@@ -1,0 +1,80 @@
+{
+  "files": [
+    {
+      "file": "README.md",
+      "bytes": 7255,
+      "sha256": "d924c585bcd859dc670ff07028b6a4e496f44ee49c4048a58dc8b59f20c483bb"
+    },
+    {
+      "file": "actions.json",
+      "bytes": 5130,
+      "sha256": "5447055e61bcb84db567420cdd9634e656f4b35c351e58d7b757ded171ffbdf9"
+    },
+    {
+      "file": "create-desktop-content-focus.png",
+      "bytes": 80654,
+      "sha256": "267f8c0b902faf1997d4a898576febb17f8c83236509b745cfbdd3419b9bfcd9"
+    },
+    {
+      "file": "create-exit.json",
+      "bytes": 1319,
+      "sha256": "d119b17691166962291f19c89e4c0f10a6d99bca6836cbb976c7f8902b3c8e21"
+    },
+    {
+      "file": "create-mobile-content-focus.png",
+      "bytes": 65327,
+      "sha256": "33b0ebd6ab4b1ce8f56c26d4b9c4730e9719fb6364cb969ed01ae30db4e80b78"
+    },
+    {
+      "file": "create-mobile-retained.png",
+      "bytes": 61139,
+      "sha256": "b3a9ac92e68c6788efe352780b24966e92c4e2177b921cabaa13c012800d324d"
+    },
+    {
+      "file": "create-tablet-content-focus.png",
+      "bytes": 63801,
+      "sha256": "62c1812c74e9b3b05d42fb4ea50552cf4afa3eddc33e215f326109f26f1d518c"
+    },
+    {
+      "file": "deployment-context.json",
+      "bytes": 831,
+      "sha256": "57432ed05aa5ad0fe62217394d2f4fb59138cac441e00dd5c5903f593994d67f"
+    },
+    {
+      "file": "entry.json",
+      "bytes": 366,
+      "sha256": "88b4ff83f78fd507df96b7881c150a03d00190c24b7a78cfc129c631ae6f026e"
+    },
+    {
+      "file": "initial.json",
+      "bytes": 410,
+      "sha256": "2f2f4e15deb1759e9653a6bffcec437fcfd6785b991994db6ca35656a3211215"
+    },
+    {
+      "file": "navigation.json",
+      "bytes": 505,
+      "sha256": "f674773c564619afe45ff3b0a0e1143878a9bda9ad875876dc8f0c7ada83fa7c"
+    },
+    {
+      "file": "proof.json",
+      "bytes": 67180,
+      "sha256": "13e2cd86ba48957bb052bef97c4801e160e8bb1b47302324c87f872d0d4cf493"
+    },
+    {
+      "file": "provenance.json",
+      "bytes": 6100,
+      "sha256": "0bc3b2258a86f15a41112131a71bbcfd620a58d26b0f92c771b59f2a29548ed3"
+    },
+    {
+      "file": "summary.json",
+      "bytes": 4567,
+      "sha256": "3eae72ce96bcd41b4ad175ee1f519800785dfc83386ea038098810b66379e9cb"
+    },
+    {
+      "file": "verification.json",
+      "bytes": 12469,
+      "sha256": "819d37158b3db8358575d1c7468980f225f03d426a98e8703966f752756c806c"
+    }
+  ],
+  "note": "SHA256 values describe these public files. This manifest excludes its own hash; source snapshot hashes are separately retained in provenance.json."
+}

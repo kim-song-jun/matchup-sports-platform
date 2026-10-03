@@ -1,0 +1,10 @@
+{
+  "navigationStartUTC": "2026-10-03T18:34:06.740Z",
+  "requestedURL": "https://alpha.teameet.co.kr/admin/tournaments/new",
+  "deploymentContext": {
+    "reference": "deployment-context.json",
+    "runtimeServingSHA": "unknown",
+    "limit": "Workflow timing is separate from browser document identity."
+  },
+  "navigationCompleteUTC": "2026-10-03T18:34:07.299Z"
+}

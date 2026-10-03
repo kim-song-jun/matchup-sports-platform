@@ -1,0 +1,49 @@
+{
+  "cancelImmediateExcluded": {
+    "prizeFields": 0,
+    "titleInputPresent": true,
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/new",
+    "utc": "2026-10-03T18:39:09.652Z"
+  },
+  "cancelSettled": {
+    "newLink": [
+      {
+        "href": "/admin/tournaments/new",
+        "text": "대회 만들기"
+      }
+    ],
+    "prizeFields": 0,
+    "titleInputPresent": false,
+    "url": "https://alpha.teameet.co.kr/admin/tournaments",
+    "utc": "2026-10-03T18:39:23.039Z"
+  },
+  "blankReentry": {
+    "prizeFieldPresent": false,
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/new",
+    "utc": "2026-10-03T18:40:07.002Z",
+    "values": [
+      {
+        "id": "sport-id",
+        "value": ""
+      },
+      {
+        "id": "title",
+        "value": ""
+      }
+    ],
+    "viewport": {
+      "dpr": 1,
+      "height": 757,
+      "width": 1183
+    }
+  },
+  "final": {
+    "titleInputPresent": false,
+    "url": "https://alpha.teameet.co.kr/admin/tournaments",
+    "utc": "2026-10-03T18:41:13.778Z"
+  },
+  "limits": [
+    "Second blank-form Cancel call returned but a 3-second URL wait timed out; top list link later left successfully. Hidden navigation dialog is not a confirmation modal.",
+    "Blank reentry only establishes mounted title/sport blank; prize fields were not mounted at step1."
+  ]
+}

@@ -1,0 +1,2631 @@
+[
+  {
+    "active": {
+      "focusVisible": true,
+      "label": "상금 항목 1 이름",
+      "rect": {
+        "bottom": 324.8625183105469,
+        "height": 44,
+        "right": 313.6000175476074,
+        "top": 280.8625183105469,
+        "width": 276.8000183105469,
+        "x": 36.79999923706055,
+        "y": 280.8625183105469
+      },
+      "tag": "INPUT",
+      "text": null
+    },
+    "documentWidth": 402,
+    "fields": [
+      {
+        "active": false,
+        "clientWidth": 327,
+        "describedby": null,
+        "focusVisible": false,
+        "name": "총상금",
+        "placeholder": "예: 1,000,000",
+        "rect": {
+          "bottom": 194.8625030517578,
+          "height": 44,
+          "right": 365.6000175476074,
+          "top": 150.8625030517578,
+          "width": 328.8000183105469,
+          "x": 36.79999923706055,
+          "y": 150.8625030517578
+        },
+        "scrollWidth": 327,
+        "tag": "INPUT",
+        "type": "text",
+        "value": ""
+      },
+      {
+        "active": true,
+        "clientWidth": 275,
+        "describedby": null,
+        "focusVisible": true,
+        "name": "상금 항목 1 이름",
+        "placeholder": "예: 1위",
+        "rect": {
+          "bottom": 324.8625183105469,
+          "height": 44,
+          "right": 313.6000175476074,
+          "top": 280.8625183105469,
+          "width": 276.8000183105469,
+          "x": 36.79999923706055,
+          "y": 280.8625183105469
+        },
+        "scrollWidth": 275,
+        "tag": "INPUT",
+        "type": "text",
+        "value": "1위"
+      },
+      {
+        "active": false,
+        "clientWidth": 327,
+        "describedby": null,
+        "focusVisible": false,
+        "name": "상금 항목 1 내용",
+        "placeholder": "예: 600,000원 또는 우승 트로피",
+        "rect": {
+          "bottom": 376.8625183105469,
+          "height": 44,
+          "right": 365.6000175476074,
+          "top": 332.8625183105469,
+          "width": 328.8000183105469,
+          "x": 36.79999923706055,
+          "y": 332.8625183105469
+        },
+        "scrollWidth": 327,
+        "tag": "INPUT",
+        "type": "text",
+        "value": ""
+      },
+      {
+        "active": false,
+        "clientWidth": 275,
+        "describedby": null,
+        "focusVisible": false,
+        "name": "상금 항목 2 이름",
+        "placeholder": "예: 1위",
+        "rect": {
+          "bottom": 428.8625183105469,
+          "height": 44,
+          "right": 313.6000175476074,
+          "top": 384.8625183105469,
+          "width": 276.8000183105469,
+          "x": 36.79999923706055,
+          "y": 384.8625183105469
+        },
+        "scrollWidth": 275,
+        "tag": "INPUT",
+        "type": "text",
+        "value": "2위"
+      },
+      {
+        "active": false,
+        "clientWidth": 327,
+        "describedby": null,
+        "focusVisible": false,
+        "name": "상금 항목 2 내용",
+        "placeholder": "예: 600,000원 또는 우승 트로피",
+        "rect": {
+          "bottom": 480.8625183105469,
+          "height": 44,
+          "right": 365.6000175476074,
+          "top": 436.8625183105469,
+          "width": 328.8000183105469,
+          "x": 36.79999923706055,
+          "y": 436.8625183105469
+        },
+        "scrollWidth": 327,
+        "tag": "INPUT",
+        "type": "text",
+        "value": ""
+      },
+      {
+        "active": false,
+        "clientWidth": 275,
+        "describedby": null,
+        "focusVisible": false,
+        "name": "상금 항목 3 이름",
+        "placeholder": "예: 1위",
+        "rect": {
+          "bottom": 532.8625183105469,
+          "height": 44,
+          "right": 313.6000175476074,
+          "top": 488.8625183105469,
+          "width": 276.8000183105469,
+          "x": 36.79999923706055,
+          "y": 488.8625183105469
+        },
+        "scrollWidth": 275,
+        "tag": "INPUT",
+        "type": "text",
+        "value": "3위"
+      },
+      {
+        "active": false,
+        "clientWidth": 327,
+        "describedby": null,
+        "focusVisible": false,
+        "name": "상금 항목 3 내용",
+        "placeholder": "예: 600,000원 또는 우승 트로피",
+        "rect": {
+          "bottom": 584.8624877929688,
+          "height": 44,
+          "right": 365.6000175476074,
+          "top": 540.8624877929688,
+          "width": 328.8000183105469,
+          "x": 36.79999923706055,
+          "y": 540.8624877929688
+        },
+        "scrollWidth": 327,
+        "tag": "INPUT",
+        "type": "text",
+        "value": ""
+      }
+    ],
+    "footerButtons": [
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 593.6000366210938,
+          "height": 44,
+          "right": 109.26250457763672,
+          "top": 549.6000366210938,
+          "width": 93.26250457763672,
+          "x": 16,
+          "y": 549.6000366210938
+        },
+        "text": "이전",
+        "type": "button"
+      },
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 593.6000366210938,
+          "height": 44,
+          "right": 386.40000915527344,
+          "top": 549.6000366210938,
+          "width": 145.16250610351562,
+          "x": 241.2375030517578,
+          "y": 549.6000366210938
+        },
+        "text": "대회 만들기",
+        "type": "submit"
+      }
+    ],
+    "helper": [
+      {
+        "rect": {
+          "bottom": 272.8625030517578,
+          "height": 40,
+          "right": 365.6000175476074,
+          "top": 232.8625030517578,
+          "width": 328.8000183105469,
+          "x": 36.79999923706055,
+          "y": 232.8625030517578
+        },
+        "text": "숫자는 원 단위로 자동 정리되고 트로피·상품권 같은 물품도 입력할 수 있어요."
+      }
+    ],
+    "lockedStep5": [
+      {
+        "disabled": true,
+        "label": "5단계 공개 확인 — 잠김"
+      }
+    ],
+    "scrollY": 945.5999755859376,
+    "switches": [
+      {
+        "checked": "false",
+        "label": "홈 오늘의 추천 노출"
+      },
+      {
+        "checked": "false",
+        "label": "대회 목록 상단 노출"
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/new",
+    "utc": "2026-10-03T18:36:27.295Z",
+    "viewport": {
+      "dpr": 1.25,
+      "height": 606,
+      "width": 402
+    },
+    "index": 0,
+    "surface": "create",
+    "widthLabel": "mobile",
+    "state": "empty-name-focused"
+  },
+  {
+    "active": {
+      "focusVisible": true,
+      "label": "상금 항목 1 내용",
+      "rect": {
+        "bottom": 376.8625183105469,
+        "height": 44,
+        "right": 365.6000175476074,
+        "top": 332.8625183105469,
+        "width": 328.8000183105469,
+        "x": 36.79999923706055,
+        "y": 332.8625183105469
+      },
+      "tag": "INPUT",
+      "text": null
+    },
+    "documentWidth": 402,
+    "fields": [
+      {
+        "active": false,
+        "clientWidth": 327,
+        "describedby": null,
+        "focusVisible": false,
+        "name": "총상금",
+        "placeholder": "예: 1,000,000",
+        "rect": {
+          "bottom": 194.8625030517578,
+          "height": 44,
+          "right": 365.6000175476074,
+          "top": 150.8625030517578,
+          "width": 328.8000183105469,
+          "x": 36.79999923706055,
+          "y": 150.8625030517578
+        },
+        "scrollWidth": 327,
+        "tag": "INPUT",
+        "type": "text",
+        "value": ""
+      },
+      {
+        "active": false,
+        "clientWidth": 275,
+        "describedby": null,
+        "focusVisible": false,
+        "name": "상금 항목 1 이름",
+        "placeholder": "예: 1위",
+        "rect": {
+          "bottom": 324.8625183105469,
+          "height": 44,
+          "right": 313.6000175476074,
+          "top": 280.8625183105469,
+          "width": 276.8000183105469,
+          "x": 36.79999923706055,
+          "y": 280.8625183105469
+        },
+        "scrollWidth": 275,
+        "tag": "INPUT",
+        "type": "text",
+        "value": "1위"
+      },
+      {
+        "active": true,
+        "clientWidth": 327,
+        "describedby": null,
+        "focusVisible": true,
+        "name": "상금 항목 1 내용",
+        "placeholder": "예: 600,000원 또는 우승 트로피",
+        "rect": {
+          "bottom": 376.8625183105469,
+          "height": 44,
+          "right": 365.6000175476074,
+          "top": 332.8625183105469,
+          "width": 328.8000183105469,
+          "x": 36.79999923706055,
+          "y": 332.8625183105469
+        },
+        "scrollWidth": 327,
+        "tag": "INPUT",
+        "type": "text",
+        "value": ""
+      },
+      {
+        "active": false,
+        "clientWidth": 275,
+        "describedby": null,
+        "focusVisible": false,
+        "name": "상금 항목 2 이름",
+        "placeholder": "예: 1위",
+        "rect": {
+          "bottom": 428.8625183105469,
+          "height": 44,
+          "right": 313.6000175476074,
+          "top": 384.8625183105469,
+          "width": 276.8000183105469,
+          "x": 36.79999923706055,
+          "y": 384.8625183105469
+        },
+        "scrollWidth": 275,
+        "tag": "INPUT",
+        "type": "text",
+        "value": "2위"
+      },
+      {
+        "active": false,
+        "clientWidth": 327,
+        "describedby": null,
+        "focusVisible": false,
+        "name": "상금 항목 2 내용",
+        "placeholder": "예: 600,000원 또는 우승 트로피",
+        "rect": {
+          "bottom": 480.8625183105469,
+          "height": 44,
+          "right": 365.6000175476074,
+          "top": 436.8625183105469,
+          "width": 328.8000183105469,
+          "x": 36.79999923706055,
+          "y": 436.8625183105469
+        },
+        "scrollWidth": 327,
+        "tag": "INPUT",
+        "type": "text",
+        "value": ""
+      },
+      {
+        "active": false,
+        "clientWidth": 275,
+        "describedby": null,
+        "focusVisible": false,
+        "name": "상금 항목 3 이름",
+        "placeholder": "예: 1위",
+        "rect": {
+          "bottom": 532.8625183105469,
+          "height": 44,
+          "right": 313.6000175476074,
+          "top": 488.8625183105469,
+          "width": 276.8000183105469,
+          "x": 36.79999923706055,
+          "y": 488.8625183105469
+        },
+        "scrollWidth": 275,
+        "tag": "INPUT",
+        "type": "text",
+        "value": "3위"
+      },
+      {
+        "active": false,
+        "clientWidth": 327,
+        "describedby": null,
+        "focusVisible": false,
+        "name": "상금 항목 3 내용",
+        "placeholder": "예: 600,000원 또는 우승 트로피",
+        "rect": {
+          "bottom": 584.8624877929688,
+          "height": 44,
+          "right": 365.6000175476074,
+          "top": 540.8624877929688,
+          "width": 328.8000183105469,
+          "x": 36.79999923706055,
+          "y": 540.8624877929688
+        },
+        "scrollWidth": 327,
+        "tag": "INPUT",
+        "type": "text",
+        "value": ""
+      }
+    ],
+    "footerButtons": [
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 593.6000366210938,
+          "height": 44,
+          "right": 109.26250457763672,
+          "top": 549.6000366210938,
+          "width": 93.26250457763672,
+          "x": 16,
+          "y": 549.6000366210938
+        },
+        "text": "이전",
+        "type": "button"
+      },
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 593.6000366210938,
+          "height": 44,
+          "right": 386.40000915527344,
+          "top": 549.6000366210938,
+          "width": 145.16250610351562,
+          "x": 241.2375030517578,
+          "y": 549.6000366210938
+        },
+        "text": "대회 만들기",
+        "type": "submit"
+      }
+    ],
+    "helper": [
+      {
+        "rect": {
+          "bottom": 272.8625030517578,
+          "height": 40,
+          "right": 365.6000175476074,
+          "top": 232.8625030517578,
+          "width": 328.8000183105469,
+          "x": 36.79999923706055,
+          "y": 232.8625030517578
+        },
+        "text": "숫자는 원 단위로 자동 정리되고 트로피·상품권 같은 물품도 입력할 수 있어요."
+      }
+    ],
+    "lockedStep5": [
+      {
+        "disabled": true,
+        "label": "5단계 공개 확인 — 잠김"
+      }
+    ],
+    "scrollY": 945.5999755859376,
+    "switches": [
+      {
+        "checked": "false",
+        "label": "홈 오늘의 추천 노출"
+      },
+      {
+        "checked": "false",
+        "label": "대회 목록 상단 노출"
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/new",
+    "utc": "2026-10-03T18:36:27.448Z",
+    "viewport": {
+      "dpr": 1.25,
+      "height": 606,
+      "width": 402
+    },
+    "index": 1,
+    "surface": "create",
+    "widthLabel": "mobile",
+    "state": "tab-content"
+  },
+  {
+    "active": {
+      "focusVisible": true,
+      "label": "상금 항목 1 삭제",
+      "rect": {
+        "bottom": 324.8625183105469,
+        "height": 44,
+        "right": 365.6000061035156,
+        "top": 280.8625183105469,
+        "width": 44,
+        "x": 321.6000061035156,
+        "y": 280.8625183105469
+      },
+      "tag": "BUTTON",
+      "text": ""
+    },
+    "documentWidth": 402,
+    "fields": [
+      {
+        "active": false,
+        "clientWidth": 327,
+        "describedby": null,
+        "focusVisible": false,
+        "name": "총상금",
+        "placeholder": "예: 1,000,000",
+        "rect": {
+          "bottom": 194.8625030517578,
+          "height": 44,
+          "right": 365.6000175476074,
+          "top": 150.8625030517578,
+          "width": 328.8000183105469,
+          "x": 36.79999923706055,
+          "y": 150.8625030517578
+        },
+        "scrollWidth": 327,
+        "tag": "INPUT",
+        "type": "text",
+        "value": ""
+      },
+      {
+        "active": false,
+        "clientWidth": 275,
+        "describedby": null,
+        "focusVisible": false,
+        "name": "상금 항목 1 이름",
+        "placeholder": "예: 1위",
+        "rect": {
+          "bottom": 324.8625183105469,
+          "height": 44,
+          "right": 313.6000175476074,
+          "top": 280.8625183105469,
+          "width": 276.8000183105469,
+          "x": 36.79999923706055,
+          "y": 280.8625183105469
+        },
+        "scrollWidth": 275,
+        "tag": "INPUT",
+        "type": "text",
+        "value": "1위"
+      },
+      {
+        "active": false,
+        "clientWidth": 327,
+        "describedby": null,
+        "focusVisible": false,
+        "name": "상금 항목 1 내용",
+        "placeholder": "예: 600,000원 또는 우승 트로피",
+        "rect": {
+          "bottom": 376.8625183105469,
+          "height": 44,
+          "right": 365.6000175476074,
+          "top": 332.8625183105469,
+          "width": 328.8000183105469,
+          "x": 36.79999923706055,
+          "y": 332.8625183105469
+        },
+        "scrollWidth": 327,
+        "tag": "INPUT",
+        "type": "text",
+        "value": ""
+      },
+      {
+        "active": false,
+        "clientWidth": 275,
+        "describedby": null,
+        "focusVisible": false,
+        "name": "상금 항목 2 이름",
+        "placeholder": "예: 1위",
+        "rect": {
+          "bottom": 428.8625183105469,
+          "height": 44,
+          "right": 313.6000175476074,
+          "top": 384.8625183105469,
+          "width": 276.8000183105469,
+          "x": 36.79999923706055,
+          "y": 384.8625183105469
+        },
+        "scrollWidth": 275,
+        "tag": "INPUT",
+        "type": "text",
+        "value": "2위"
+      },
+      {
+        "active": false,
+        "clientWidth": 327,
+        "describedby": null,
+        "focusVisible": false,
+        "name": "상금 항목 2 내용",
+        "placeholder": "예: 600,000원 또는 우승 트로피",
+        "rect": {
+          "bottom": 480.8625183105469,
+          "height": 44,
+          "right": 365.6000175476074,
+          "top": 436.8625183105469,
+          "width": 328.8000183105469,
+          "x": 36.79999923706055,
+          "y": 436.8625183105469
+        },
+        "scrollWidth": 327,
+        "tag": "INPUT",
+        "type": "text",
+        "value": ""
+      },
+      {
+        "active": false,
+        "clientWidth": 275,
+        "describedby": null,
+        "focusVisible": false,
+        "name": "상금 항목 3 이름",
+        "placeholder": "예: 1위",
+        "rect": {
+          "bottom": 532.8625183105469,
+          "height": 44,
+          "right": 313.6000175476074,
+          "top": 488.8625183105469,
+          "width": 276.8000183105469,
+          "x": 36.79999923706055,
+          "y": 488.8625183105469
+        },
+        "scrollWidth": 275,
+        "tag": "INPUT",
+        "type": "text",
+        "value": "3위"
+      },
+      {
+        "active": false,
+        "clientWidth": 327,
+        "describedby": null,
+        "focusVisible": false,
+        "name": "상금 항목 3 내용",
+        "placeholder": "예: 600,000원 또는 우승 트로피",
+        "rect": {
+          "bottom": 584.8624877929688,
+          "height": 44,
+          "right": 365.6000175476074,
+          "top": 540.8624877929688,
+          "width": 328.8000183105469,
+          "x": 36.79999923706055,
+          "y": 540.8624877929688
+        },
+        "scrollWidth": 327,
+        "tag": "INPUT",
+        "type": "text",
+        "value": ""
+      }
+    ],
+    "footerButtons": [
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 593.6000366210938,
+          "height": 44,
+          "right": 109.26250457763672,
+          "top": 549.6000366210938,
+          "width": 93.26250457763672,
+          "x": 16,
+          "y": 549.6000366210938
+        },
+        "text": "이전",
+        "type": "button"
+      },
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 593.6000366210938,
+          "height": 44,
+          "right": 386.40000915527344,
+          "top": 549.6000366210938,
+          "width": 145.16250610351562,
+          "x": 241.2375030517578,
+          "y": 549.6000366210938
+        },
+        "text": "대회 만들기",
+        "type": "submit"
+      }
+    ],
+    "helper": [
+      {
+        "rect": {
+          "bottom": 272.8625030517578,
+          "height": 40,
+          "right": 365.6000175476074,
+          "top": 232.8625030517578,
+          "width": 328.8000183105469,
+          "x": 36.79999923706055,
+          "y": 232.8625030517578
+        },
+        "text": "숫자는 원 단위로 자동 정리되고 트로피·상품권 같은 물품도 입력할 수 있어요."
+      }
+    ],
+    "lockedStep5": [
+      {
+        "disabled": true,
+        "label": "5단계 공개 확인 — 잠김"
+      }
+    ],
+    "scrollY": 945.5999755859376,
+    "switches": [
+      {
+        "checked": "false",
+        "label": "홈 오늘의 추천 노출"
+      },
+      {
+        "checked": "false",
+        "label": "대회 목록 상단 노출"
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/new",
+    "utc": "2026-10-03T18:37:00.537Z",
+    "viewport": {
+      "dpr": 1.25,
+      "height": 606,
+      "width": 402
+    },
+    "index": 2,
+    "surface": "create",
+    "widthLabel": "mobile",
+    "state": "tab-delete"
+  },
+  {
+    "active": {
+      "focusVisible": true,
+      "label": "상금 항목 1 내용",
+      "rect": {
+        "bottom": 323.26251220703125,
+        "height": 44,
+        "right": 365.6000175476074,
+        "top": 279.26251220703125,
+        "width": 328.8000183105469,
+        "x": 36.79999923706055,
+        "y": 279.26251220703125
+      },
+      "tag": "INPUT",
+      "text": null
+    },
+    "documentWidth": 402,
+    "fields": [
+      {
+        "active": false,
+        "clientWidth": 327,
+        "describedby": null,
+        "focusVisible": false,
+        "name": "총상금",
+        "placeholder": "예: 1,000,000",
+        "rect": {
+          "bottom": 141.26250457763672,
+          "height": 44,
+          "right": 365.6000175476074,
+          "top": 97.26250457763672,
+          "width": 328.8000183105469,
+          "x": 36.79999923706055,
+          "y": 97.26250457763672
+        },
+        "scrollWidth": 327,
+        "tag": "INPUT",
+        "type": "text",
+        "value": ""
+      },
+      {
+        "active": false,
+        "clientWidth": 275,
+        "describedby": null,
+        "focusVisible": false,
+        "name": "상금 항목 1 이름",
+        "placeholder": "예: 1위",
+        "rect": {
+          "bottom": 271.2624969482422,
+          "height": 44,
+          "right": 313.6000175476074,
+          "top": 227.2624969482422,
+          "width": 276.8000183105469,
+          "x": 36.79999923706055,
+          "y": 227.2624969482422
+        },
+        "scrollWidth": 275,
+        "tag": "INPUT",
+        "type": "text",
+        "value": "1위"
+      },
+      {
+        "active": true,
+        "clientWidth": 327,
+        "describedby": null,
+        "focusVisible": true,
+        "name": "상금 항목 1 내용",
+        "placeholder": "예: 600,000원 또는 우승 트로피",
+        "rect": {
+          "bottom": 323.26251220703125,
+          "height": 44,
+          "right": 365.6000175476074,
+          "top": 279.26251220703125,
+          "width": 328.8000183105469,
+          "x": 36.79999923706055,
+          "y": 279.26251220703125
+        },
+        "scrollWidth": 327,
+        "tag": "INPUT",
+        "type": "text",
+        "value": "우승 트로피 QA1593"
+      },
+      {
+        "active": false,
+        "clientWidth": 275,
+        "describedby": null,
+        "focusVisible": false,
+        "name": "상금 항목 2 이름",
+        "placeholder": "예: 1위",
+        "rect": {
+          "bottom": 375.2625122070313,
+          "height": 44,
+          "right": 313.6000175476074,
+          "top": 331.26251220703125,
+          "width": 276.8000183105469,
+          "x": 36.79999923706055,
+          "y": 331.26251220703125
+        },
+        "scrollWidth": 275,
+        "tag": "INPUT",
+        "type": "text",
+        "value": "2위"
+      },
+      {
+        "active": false,
+        "clientWidth": 327,
+        "describedby": null,
+        "focusVisible": false,
+        "name": "상금 항목 2 내용",
+        "placeholder": "예: 600,000원 또는 우승 트로피",
+        "rect": {
+          "bottom": 427.2625122070313,
+          "height": 44,
+          "right": 365.6000175476074,
+          "top": 383.2625122070313,
+          "width": 328.8000183105469,
+          "x": 36.79999923706055,
+          "y": 383.2625122070313
+        },
+        "scrollWidth": 327,
+        "tag": "INPUT",
+        "type": "text",
+        "value": ""
+      },
+      {
+        "active": false,
+        "clientWidth": 275,
+        "describedby": null,
+        "focusVisible": false,
+        "name": "상금 항목 3 이름",
+        "placeholder": "예: 1위",
+        "rect": {
+          "bottom": 479.2625122070313,
+          "height": 44,
+          "right": 313.6000175476074,
+          "top": 435.2625122070313,
+          "width": 276.8000183105469,
+          "x": 36.79999923706055,
+          "y": 435.2625122070313
+        },
+        "scrollWidth": 275,
+        "tag": "INPUT",
+        "type": "text",
+        "value": "3위"
+      },
+      {
+        "active": false,
+        "clientWidth": 327,
+        "describedby": null,
+        "focusVisible": false,
+        "name": "상금 항목 3 내용",
+        "placeholder": "예: 600,000원 또는 우승 트로피",
+        "rect": {
+          "bottom": 531.2625122070312,
+          "height": 44,
+          "right": 365.6000175476074,
+          "top": 487.2625122070313,
+          "width": 328.8000183105469,
+          "x": 36.79999923706055,
+          "y": 487.2625122070313
+        },
+        "scrollWidth": 327,
+        "tag": "INPUT",
+        "type": "text",
+        "value": ""
+      }
+    ],
+    "footerButtons": [
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 593.6000366210938,
+          "height": 44,
+          "right": 109.26250457763672,
+          "top": 549.6000366210938,
+          "width": 93.26250457763672,
+          "x": 16,
+          "y": 549.6000366210938
+        },
+        "text": "이전",
+        "type": "button"
+      },
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 593.6000366210938,
+          "height": 44,
+          "right": 386.40000915527344,
+          "top": 549.6000366210938,
+          "width": 145.16250610351562,
+          "x": 241.2375030517578,
+          "y": 549.6000366210938
+        },
+        "text": "대회 만들기",
+        "type": "submit"
+      }
+    ],
+    "helper": [
+      {
+        "rect": {
+          "bottom": 219.2624969482422,
+          "height": 40,
+          "right": 365.6000175476074,
+          "top": 179.2624969482422,
+          "width": 328.8000183105469,
+          "x": 36.79999923706055,
+          "y": 179.2624969482422
+        },
+        "text": "숫자는 원 단위로 자동 정리되고 트로피·상품권 같은 물품도 입력할 수 있어요."
+      }
+    ],
+    "lockedStep5": [
+      {
+        "disabled": true,
+        "label": "5단계 공개 확인 — 잠김"
+      }
+    ],
+    "scrollY": 999.2000122070312,
+    "switches": [
+      {
+        "checked": "false",
+        "label": "홈 오늘의 추천 노출"
+      },
+      {
+        "checked": "false",
+        "label": "대회 목록 상단 노출"
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/new",
+    "utc": "2026-10-03T18:37:19.871Z",
+    "viewport": {
+      "dpr": 1.25,
+      "height": 606,
+      "width": 402
+    },
+    "index": 3,
+    "surface": "create",
+    "widthLabel": "mobile",
+    "state": "local-content-retained-after-stepper"
+  },
+  {
+    "active": {
+      "focusVisible": true,
+      "label": "상금 항목 1 이름",
+      "rect": {
+        "bottom": 274.1666717529297,
+        "height": 44,
+        "right": 302.0000114440918,
+        "top": 230.1666717529297,
+        "width": 249.33334350585935,
+        "x": 52.66666793823242,
+        "y": 230.1666717529297
+      },
+      "tag": "INPUT",
+      "text": null
+    },
+    "documentWidth": 789,
+    "fields": [
+      {
+        "active": false,
+        "clientWidth": 682,
+        "describedby": null,
+        "focusVisible": false,
+        "name": "총상금",
+        "placeholder": "예: 1,000,000",
+        "rect": {
+          "bottom": 164.1666717529297,
+          "height": 44,
+          "right": 736.0000419616699,
+          "top": 120.16667175292967,
+          "width": 683.3333740234375,
+          "x": 52.66666793823242,
+          "y": 120.16667175292967
+        },
+        "scrollWidth": 682,
+        "tag": "INPUT",
+        "type": "text",
+        "value": ""
+      },
+      {
+        "active": true,
+        "clientWidth": 248,
+        "describedby": null,
+        "focusVisible": true,
+        "name": "상금 항목 1 이름",
+        "placeholder": "예: 1위",
+        "rect": {
+          "bottom": 274.1666717529297,
+          "height": 44,
+          "right": 302.0000114440918,
+          "top": 230.1666717529297,
+          "width": 249.33334350585935,
+          "x": 52.66666793823242,
+          "y": 230.1666717529297
+        },
+        "scrollWidth": 248,
+        "tag": "INPUT",
+        "type": "text",
+        "value": "1위"
+      },
+      {
+        "active": false,
+        "clientWidth": 373,
+        "describedby": null,
+        "focusVisible": false,
+        "name": "상금 항목 1 내용",
+        "placeholder": "예: 600,000원 또는 우승 트로피",
+        "rect": {
+          "bottom": 274.1666717529297,
+          "height": 44,
+          "right": 684,
+          "top": 230.1666717529297,
+          "width": 374,
+          "x": 310,
+          "y": 230.1666717529297
+        },
+        "scrollWidth": 373,
+        "tag": "INPUT",
+        "type": "text",
+        "value": "우승 트로피 QA1593"
+      },
+      {
+        "active": false,
+        "clientWidth": 248,
+        "describedby": null,
+        "focusVisible": false,
+        "name": "상금 항목 2 이름",
+        "placeholder": "예: 1위",
+        "rect": {
+          "bottom": 326.16668701171875,
+          "height": 44,
+          "right": 302.0000114440918,
+          "top": 282.16668701171875,
+          "width": 249.33334350585935,
+          "x": 52.66666793823242,
+          "y": 282.16668701171875
+        },
+        "scrollWidth": 248,
+        "tag": "INPUT",
+        "type": "text",
+        "value": "2위"
+      },
+      {
+        "active": false,
+        "clientWidth": 373,
+        "describedby": null,
+        "focusVisible": false,
+        "name": "상금 항목 2 내용",
+        "placeholder": "예: 600,000원 또는 우승 트로피",
+        "rect": {
+          "bottom": 326.16668701171875,
+          "height": 44,
+          "right": 684,
+          "top": 282.16668701171875,
+          "width": 374,
+          "x": 310,
+          "y": 282.16668701171875
+        },
+        "scrollWidth": 373,
+        "tag": "INPUT",
+        "type": "text",
+        "value": ""
+      },
+      {
+        "active": false,
+        "clientWidth": 248,
+        "describedby": null,
+        "focusVisible": false,
+        "name": "상금 항목 3 이름",
+        "placeholder": "예: 1위",
+        "rect": {
+          "bottom": 378.1666870117187,
+          "height": 44,
+          "right": 302.0000114440918,
+          "top": 334.16668701171875,
+          "width": 249.33334350585935,
+          "x": 52.66666793823242,
+          "y": 334.16668701171875
+        },
+        "scrollWidth": 248,
+        "tag": "INPUT",
+        "type": "text",
+        "value": "3위"
+      },
+      {
+        "active": false,
+        "clientWidth": 373,
+        "describedby": null,
+        "focusVisible": false,
+        "name": "상금 항목 3 내용",
+        "placeholder": "예: 600,000원 또는 우승 트로피",
+        "rect": {
+          "bottom": 378.1666870117187,
+          "height": 44,
+          "right": 684,
+          "top": 334.16668701171875,
+          "width": 374,
+          "x": 310,
+          "y": 334.16668701171875
+        },
+        "scrollWidth": 373,
+        "tag": "INPUT",
+        "type": "text",
+        "value": ""
+      }
+    ],
+    "footerButtons": [
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 492.6666870117187,
+          "height": 44,
+          "right": 108.98958587646484,
+          "top": 448.6666870117187,
+          "width": 92.98958587646484,
+          "x": 16,
+          "y": 448.6666870117187
+        },
+        "text": "이전",
+        "type": "button"
+      },
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 492.6666870117187,
+          "height": 44,
+          "right": 772.6666870117188,
+          "top": 448.6666870117187,
+          "width": 145.15625,
+          "x": 627.5104370117188,
+          "y": 448.6666870117187
+        },
+        "text": "대회 만들기",
+        "type": "submit"
+      }
+    ],
+    "helper": [
+      {
+        "rect": {
+          "bottom": 222.1666717529297,
+          "height": 20,
+          "right": 736.0000419616699,
+          "top": 202.1666717529297,
+          "width": 683.3333740234375,
+          "x": 52.66666793823242,
+          "y": 202.1666717529297
+        },
+        "text": "숫자는 원 단위로 자동 정리되고 트로피·상품권 같은 물품도 입력할 수 있어요."
+      }
+    ],
+    "lockedStep5": [
+      {
+        "disabled": true,
+        "label": "5단계 공개 확인 — 잠김"
+      }
+    ],
+    "scrollY": 800,
+    "switches": [
+      {
+        "checked": "false",
+        "label": "홈 오늘의 추천 노출"
+      },
+      {
+        "checked": "false",
+        "label": "대회 목록 상단 노출"
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/new",
+    "utc": "2026-10-03T18:38:09.658Z",
+    "viewport": {
+      "dpr": 1.5,
+      "height": 505,
+      "width": 789
+    },
+    "index": 4,
+    "surface": "create",
+    "widthLabel": "tablet",
+    "state": "name-focused-value-retained"
+  },
+  {
+    "active": {
+      "focusVisible": true,
+      "label": "상금 항목 1 내용",
+      "rect": {
+        "bottom": 274.1666717529297,
+        "height": 44,
+        "right": 684,
+        "top": 230.1666717529297,
+        "width": 374,
+        "x": 310,
+        "y": 230.1666717529297
+      },
+      "tag": "INPUT",
+      "text": null
+    },
+    "documentWidth": 789,
+    "fields": [
+      {
+        "active": false,
+        "clientWidth": 682,
+        "describedby": null,
+        "focusVisible": false,
+        "name": "총상금",
+        "placeholder": "예: 1,000,000",
+        "rect": {
+          "bottom": 164.1666717529297,
+          "height": 44,
+          "right": 736.0000419616699,
+          "top": 120.16667175292967,
+          "width": 683.3333740234375,
+          "x": 52.66666793823242,
+          "y": 120.16667175292967
+        },
+        "scrollWidth": 682,
+        "tag": "INPUT",
+        "type": "text",
+        "value": ""
+      },
+      {
+        "active": false,
+        "clientWidth": 248,
+        "describedby": null,
+        "focusVisible": false,
+        "name": "상금 항목 1 이름",
+        "placeholder": "예: 1위",
+        "rect": {
+          "bottom": 274.1666717529297,
+          "height": 44,
+          "right": 302.0000114440918,
+          "top": 230.1666717529297,
+          "width": 249.33334350585935,
+          "x": 52.66666793823242,
+          "y": 230.1666717529297
+        },
+        "scrollWidth": 248,
+        "tag": "INPUT",
+        "type": "text",
+        "value": "1위"
+      },
+      {
+        "active": true,
+        "clientWidth": 373,
+        "describedby": null,
+        "focusVisible": true,
+        "name": "상금 항목 1 내용",
+        "placeholder": "예: 600,000원 또는 우승 트로피",
+        "rect": {
+          "bottom": 274.1666717529297,
+          "height": 44,
+          "right": 684,
+          "top": 230.1666717529297,
+          "width": 374,
+          "x": 310,
+          "y": 230.1666717529297
+        },
+        "scrollWidth": 373,
+        "tag": "INPUT",
+        "type": "text",
+        "value": "우승 트로피 QA1593"
+      },
+      {
+        "active": false,
+        "clientWidth": 248,
+        "describedby": null,
+        "focusVisible": false,
+        "name": "상금 항목 2 이름",
+        "placeholder": "예: 1위",
+        "rect": {
+          "bottom": 326.16668701171875,
+          "height": 44,
+          "right": 302.0000114440918,
+          "top": 282.16668701171875,
+          "width": 249.33334350585935,
+          "x": 52.66666793823242,
+          "y": 282.16668701171875
+        },
+        "scrollWidth": 248,
+        "tag": "INPUT",
+        "type": "text",
+        "value": "2위"
+      },
+      {
+        "active": false,
+        "clientWidth": 373,
+        "describedby": null,
+        "focusVisible": false,
+        "name": "상금 항목 2 내용",
+        "placeholder": "예: 600,000원 또는 우승 트로피",
+        "rect": {
+          "bottom": 326.16668701171875,
+          "height": 44,
+          "right": 684,
+          "top": 282.16668701171875,
+          "width": 374,
+          "x": 310,
+          "y": 282.16668701171875
+        },
+        "scrollWidth": 373,
+        "tag": "INPUT",
+        "type": "text",
+        "value": ""
+      },
+      {
+        "active": false,
+        "clientWidth": 248,
+        "describedby": null,
+        "focusVisible": false,
+        "name": "상금 항목 3 이름",
+        "placeholder": "예: 1위",
+        "rect": {
+          "bottom": 378.1666870117187,
+          "height": 44,
+          "right": 302.0000114440918,
+          "top": 334.16668701171875,
+          "width": 249.33334350585935,
+          "x": 52.66666793823242,
+          "y": 334.16668701171875
+        },
+        "scrollWidth": 248,
+        "tag": "INPUT",
+        "type": "text",
+        "value": "3위"
+      },
+      {
+        "active": false,
+        "clientWidth": 373,
+        "describedby": null,
+        "focusVisible": false,
+        "name": "상금 항목 3 내용",
+        "placeholder": "예: 600,000원 또는 우승 트로피",
+        "rect": {
+          "bottom": 378.1666870117187,
+          "height": 44,
+          "right": 684,
+          "top": 334.16668701171875,
+          "width": 374,
+          "x": 310,
+          "y": 334.16668701171875
+        },
+        "scrollWidth": 373,
+        "tag": "INPUT",
+        "type": "text",
+        "value": ""
+      }
+    ],
+    "footerButtons": [
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 492.6666870117187,
+          "height": 44,
+          "right": 108.98958587646484,
+          "top": 448.6666870117187,
+          "width": 92.98958587646484,
+          "x": 16,
+          "y": 448.6666870117187
+        },
+        "text": "이전",
+        "type": "button"
+      },
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 492.6666870117187,
+          "height": 44,
+          "right": 772.6666870117188,
+          "top": 448.6666870117187,
+          "width": 145.15625,
+          "x": 627.5104370117188,
+          "y": 448.6666870117187
+        },
+        "text": "대회 만들기",
+        "type": "submit"
+      }
+    ],
+    "helper": [
+      {
+        "rect": {
+          "bottom": 222.1666717529297,
+          "height": 20,
+          "right": 736.0000419616699,
+          "top": 202.1666717529297,
+          "width": 683.3333740234375,
+          "x": 52.66666793823242,
+          "y": 202.1666717529297
+        },
+        "text": "숫자는 원 단위로 자동 정리되고 트로피·상품권 같은 물품도 입력할 수 있어요."
+      }
+    ],
+    "lockedStep5": [
+      {
+        "disabled": true,
+        "label": "5단계 공개 확인 — 잠김"
+      }
+    ],
+    "scrollY": 800,
+    "switches": [
+      {
+        "checked": "false",
+        "label": "홈 오늘의 추천 노출"
+      },
+      {
+        "checked": "false",
+        "label": "대회 목록 상단 노출"
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/new",
+    "utc": "2026-10-03T18:38:09.829Z",
+    "viewport": {
+      "dpr": 1.5,
+      "height": 505,
+      "width": 789
+    },
+    "index": 5,
+    "surface": "create",
+    "widthLabel": "tablet",
+    "state": "tab-content"
+  },
+  {
+    "active": {
+      "focusVisible": true,
+      "label": "상금 항목 1 삭제",
+      "rect": {
+        "bottom": 274.1666717529297,
+        "height": 44,
+        "right": 736,
+        "top": 230.1666717529297,
+        "width": 44,
+        "x": 692,
+        "y": 230.1666717529297
+      },
+      "tag": "BUTTON",
+      "text": ""
+    },
+    "documentWidth": 789,
+    "fields": [
+      {
+        "active": false,
+        "clientWidth": 682,
+        "describedby": null,
+        "focusVisible": false,
+        "name": "총상금",
+        "placeholder": "예: 1,000,000",
+        "rect": {
+          "bottom": 164.1666717529297,
+          "height": 44,
+          "right": 736.0000419616699,
+          "top": 120.16667175292967,
+          "width": 683.3333740234375,
+          "x": 52.66666793823242,
+          "y": 120.16667175292967
+        },
+        "scrollWidth": 682,
+        "tag": "INPUT",
+        "type": "text",
+        "value": ""
+      },
+      {
+        "active": false,
+        "clientWidth": 248,
+        "describedby": null,
+        "focusVisible": false,
+        "name": "상금 항목 1 이름",
+        "placeholder": "예: 1위",
+        "rect": {
+          "bottom": 274.1666717529297,
+          "height": 44,
+          "right": 302.0000114440918,
+          "top": 230.1666717529297,
+          "width": 249.33334350585935,
+          "x": 52.66666793823242,
+          "y": 230.1666717529297
+        },
+        "scrollWidth": 248,
+        "tag": "INPUT",
+        "type": "text",
+        "value": "1위"
+      },
+      {
+        "active": false,
+        "clientWidth": 373,
+        "describedby": null,
+        "focusVisible": false,
+        "name": "상금 항목 1 내용",
+        "placeholder": "예: 600,000원 또는 우승 트로피",
+        "rect": {
+          "bottom": 274.1666717529297,
+          "height": 44,
+          "right": 684,
+          "top": 230.1666717529297,
+          "width": 374,
+          "x": 310,
+          "y": 230.1666717529297
+        },
+        "scrollWidth": 373,
+        "tag": "INPUT",
+        "type": "text",
+        "value": "우승 트로피 QA1593"
+      },
+      {
+        "active": false,
+        "clientWidth": 248,
+        "describedby": null,
+        "focusVisible": false,
+        "name": "상금 항목 2 이름",
+        "placeholder": "예: 1위",
+        "rect": {
+          "bottom": 326.16668701171875,
+          "height": 44,
+          "right": 302.0000114440918,
+          "top": 282.16668701171875,
+          "width": 249.33334350585935,
+          "x": 52.66666793823242,
+          "y": 282.16668701171875
+        },
+        "scrollWidth": 248,
+        "tag": "INPUT",
+        "type": "text",
+        "value": "2위"
+      },
+      {
+        "active": false,
+        "clientWidth": 373,
+        "describedby": null,
+        "focusVisible": false,
+        "name": "상금 항목 2 내용",
+        "placeholder": "예: 600,000원 또는 우승 트로피",
+        "rect": {
+          "bottom": 326.16668701171875,
+          "height": 44,
+          "right": 684,
+          "top": 282.16668701171875,
+          "width": 374,
+          "x": 310,
+          "y": 282.16668701171875
+        },
+        "scrollWidth": 373,
+        "tag": "INPUT",
+        "type": "text",
+        "value": ""
+      },
+      {
+        "active": false,
+        "clientWidth": 248,
+        "describedby": null,
+        "focusVisible": false,
+        "name": "상금 항목 3 이름",
+        "placeholder": "예: 1위",
+        "rect": {
+          "bottom": 378.1666870117187,
+          "height": 44,
+          "right": 302.0000114440918,
+          "top": 334.16668701171875,
+          "width": 249.33334350585935,
+          "x": 52.66666793823242,
+          "y": 334.16668701171875
+        },
+        "scrollWidth": 248,
+        "tag": "INPUT",
+        "type": "text",
+        "value": "3위"
+      },
+      {
+        "active": false,
+        "clientWidth": 373,
+        "describedby": null,
+        "focusVisible": false,
+        "name": "상금 항목 3 내용",
+        "placeholder": "예: 600,000원 또는 우승 트로피",
+        "rect": {
+          "bottom": 378.1666870117187,
+          "height": 44,
+          "right": 684,
+          "top": 334.16668701171875,
+          "width": 374,
+          "x": 310,
+          "y": 334.16668701171875
+        },
+        "scrollWidth": 373,
+        "tag": "INPUT",
+        "type": "text",
+        "value": ""
+      }
+    ],
+    "footerButtons": [
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 492.6666870117187,
+          "height": 44,
+          "right": 108.98958587646484,
+          "top": 448.6666870117187,
+          "width": 92.98958587646484,
+          "x": 16,
+          "y": 448.6666870117187
+        },
+        "text": "이전",
+        "type": "button"
+      },
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 492.6666870117187,
+          "height": 44,
+          "right": 772.6666870117188,
+          "top": 448.6666870117187,
+          "width": 145.15625,
+          "x": 627.5104370117188,
+          "y": 448.6666870117187
+        },
+        "text": "대회 만들기",
+        "type": "submit"
+      }
+    ],
+    "helper": [
+      {
+        "rect": {
+          "bottom": 222.1666717529297,
+          "height": 20,
+          "right": 736.0000419616699,
+          "top": 202.1666717529297,
+          "width": 683.3333740234375,
+          "x": 52.66666793823242,
+          "y": 202.1666717529297
+        },
+        "text": "숫자는 원 단위로 자동 정리되고 트로피·상품권 같은 물품도 입력할 수 있어요."
+      }
+    ],
+    "lockedStep5": [
+      {
+        "disabled": true,
+        "label": "5단계 공개 확인 — 잠김"
+      }
+    ],
+    "scrollY": 800,
+    "switches": [
+      {
+        "checked": "false",
+        "label": "홈 오늘의 추천 노출"
+      },
+      {
+        "checked": "false",
+        "label": "대회 목록 상단 노출"
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/new",
+    "utc": "2026-10-03T18:38:36.419Z",
+    "viewport": {
+      "dpr": 1.5,
+      "height": 505,
+      "width": 789
+    },
+    "index": 6,
+    "surface": "create",
+    "widthLabel": "tablet",
+    "state": "tab-delete"
+  },
+  {
+    "active": {
+      "focusVisible": true,
+      "label": "상금 항목 1 이름",
+      "rect": {
+        "bottom": 400.5,
+        "height": 44,
+        "right": 605.390625,
+        "top": 356.5,
+        "width": 304.390625,
+        "x": 301,
+        "y": 356.5
+      },
+      "tag": "INPUT",
+      "text": null
+    },
+    "documentWidth": 1183,
+    "fields": [
+      {
+        "active": false,
+        "clientWidth": 819,
+        "describedby": null,
+        "focusVisible": false,
+        "name": "총상금",
+        "placeholder": "예: 1,000,000",
+        "rect": {
+          "bottom": 290.5,
+          "height": 44,
+          "right": 1122,
+          "top": 246.5,
+          "width": 821,
+          "x": 301,
+          "y": 246.5
+        },
+        "scrollWidth": 819,
+        "tag": "INPUT",
+        "type": "text",
+        "value": ""
+      },
+      {
+        "active": true,
+        "clientWidth": 302,
+        "describedby": null,
+        "focusVisible": true,
+        "name": "상금 항목 1 이름",
+        "placeholder": "예: 1위",
+        "rect": {
+          "bottom": 400.5,
+          "height": 44,
+          "right": 605.390625,
+          "top": 356.5,
+          "width": 304.390625,
+          "x": 301,
+          "y": 356.5
+        },
+        "scrollWidth": 302,
+        "tag": "INPUT",
+        "type": "text",
+        "value": "1위"
+      },
+      {
+        "active": false,
+        "clientWidth": 455,
+        "describedby": null,
+        "focusVisible": false,
+        "name": "상금 항목 1 내용",
+        "placeholder": "예: 600,000원 또는 우승 트로피",
+        "rect": {
+          "bottom": 400.5,
+          "height": 44,
+          "right": 1070,
+          "top": 356.5,
+          "width": 456.609375,
+          "x": 613.390625,
+          "y": 356.5
+        },
+        "scrollWidth": 455,
+        "tag": "INPUT",
+        "type": "text",
+        "value": "우승 트로피 QA1593"
+      },
+      {
+        "active": false,
+        "clientWidth": 302,
+        "describedby": null,
+        "focusVisible": false,
+        "name": "상금 항목 2 이름",
+        "placeholder": "예: 1위",
+        "rect": {
+          "bottom": 452.5,
+          "height": 44,
+          "right": 605.390625,
+          "top": 408.5,
+          "width": 304.390625,
+          "x": 301,
+          "y": 408.5
+        },
+        "scrollWidth": 302,
+        "tag": "INPUT",
+        "type": "text",
+        "value": "2위"
+      },
+      {
+        "active": false,
+        "clientWidth": 455,
+        "describedby": null,
+        "focusVisible": false,
+        "name": "상금 항목 2 내용",
+        "placeholder": "예: 600,000원 또는 우승 트로피",
+        "rect": {
+          "bottom": 452.5,
+          "height": 44,
+          "right": 1070,
+          "top": 408.5,
+          "width": 456.609375,
+          "x": 613.390625,
+          "y": 408.5
+        },
+        "scrollWidth": 455,
+        "tag": "INPUT",
+        "type": "text",
+        "value": ""
+      },
+      {
+        "active": false,
+        "clientWidth": 302,
+        "describedby": null,
+        "focusVisible": false,
+        "name": "상금 항목 3 이름",
+        "placeholder": "예: 1위",
+        "rect": {
+          "bottom": 504.5,
+          "height": 44,
+          "right": 605.390625,
+          "top": 460.5,
+          "width": 304.390625,
+          "x": 301,
+          "y": 460.5
+        },
+        "scrollWidth": 302,
+        "tag": "INPUT",
+        "type": "text",
+        "value": "3위"
+      },
+      {
+        "active": false,
+        "clientWidth": 455,
+        "describedby": null,
+        "focusVisible": false,
+        "name": "상금 항목 3 내용",
+        "placeholder": "예: 600,000원 또는 우승 트로피",
+        "rect": {
+          "bottom": 504.5,
+          "height": 44,
+          "right": 1070,
+          "top": 460.5,
+          "width": 456.609375,
+          "x": 613.390625,
+          "y": 460.5
+        },
+        "scrollWidth": 455,
+        "tag": "INPUT",
+        "type": "text",
+        "value": ""
+      }
+    ],
+    "footerButtons": [
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 745,
+          "height": 44,
+          "right": 229.15625,
+          "top": 701,
+          "width": 93.65625,
+          "x": 135.5,
+          "y": 701
+        },
+        "text": "이전",
+        "type": "button"
+      },
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 745,
+          "height": 44,
+          "right": 1031.5,
+          "top": 701,
+          "width": 145.15625,
+          "x": 886.34375,
+          "y": 701
+        },
+        "text": "대회 만들기",
+        "type": "submit"
+      }
+    ],
+    "helper": [
+      {
+        "rect": {
+          "bottom": 348.5,
+          "height": 20,
+          "right": 1122,
+          "top": 328.5,
+          "width": 821,
+          "x": 301,
+          "y": 328.5
+        },
+        "text": "숫자는 원 단위로 자동 정리되고 트로피·상품권 같은 물품도 입력할 수 있어요."
+      }
+    ],
+    "lockedStep5": [
+      {
+        "disabled": true,
+        "label": "5단계 공개 확인 — 잠김"
+      }
+    ],
+    "scrollY": 610,
+    "switches": [
+      {
+        "checked": "false",
+        "label": "홈 오늘의 추천 노출"
+      },
+      {
+        "checked": "false",
+        "label": "대회 목록 상단 노출"
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/new",
+    "utc": "2026-10-03T18:38:37.236Z",
+    "viewport": {
+      "dpr": 1,
+      "height": 757,
+      "width": 1183
+    },
+    "index": 7,
+    "surface": "create",
+    "widthLabel": "desktop",
+    "state": "name-focused-value-retained"
+  },
+  {
+    "active": {
+      "focusVisible": true,
+      "label": "상금 항목 1 내용",
+      "rect": {
+        "bottom": 400.5,
+        "height": 44,
+        "right": 1070,
+        "top": 356.5,
+        "width": 456.609375,
+        "x": 613.390625,
+        "y": 356.5
+      },
+      "tag": "INPUT",
+      "text": null
+    },
+    "documentWidth": 1183,
+    "fields": [
+      {
+        "active": false,
+        "clientWidth": 819,
+        "describedby": null,
+        "focusVisible": false,
+        "name": "총상금",
+        "placeholder": "예: 1,000,000",
+        "rect": {
+          "bottom": 290.5,
+          "height": 44,
+          "right": 1122,
+          "top": 246.5,
+          "width": 821,
+          "x": 301,
+          "y": 246.5
+        },
+        "scrollWidth": 819,
+        "tag": "INPUT",
+        "type": "text",
+        "value": ""
+      },
+      {
+        "active": false,
+        "clientWidth": 302,
+        "describedby": null,
+        "focusVisible": false,
+        "name": "상금 항목 1 이름",
+        "placeholder": "예: 1위",
+        "rect": {
+          "bottom": 400.5,
+          "height": 44,
+          "right": 605.390625,
+          "top": 356.5,
+          "width": 304.390625,
+          "x": 301,
+          "y": 356.5
+        },
+        "scrollWidth": 302,
+        "tag": "INPUT",
+        "type": "text",
+        "value": "1위"
+      },
+      {
+        "active": true,
+        "clientWidth": 455,
+        "describedby": null,
+        "focusVisible": true,
+        "name": "상금 항목 1 내용",
+        "placeholder": "예: 600,000원 또는 우승 트로피",
+        "rect": {
+          "bottom": 400.5,
+          "height": 44,
+          "right": 1070,
+          "top": 356.5,
+          "width": 456.609375,
+          "x": 613.390625,
+          "y": 356.5
+        },
+        "scrollWidth": 455,
+        "tag": "INPUT",
+        "type": "text",
+        "value": "우승 트로피 QA1593"
+      },
+      {
+        "active": false,
+        "clientWidth": 302,
+        "describedby": null,
+        "focusVisible": false,
+        "name": "상금 항목 2 이름",
+        "placeholder": "예: 1위",
+        "rect": {
+          "bottom": 452.5,
+          "height": 44,
+          "right": 605.390625,
+          "top": 408.5,
+          "width": 304.390625,
+          "x": 301,
+          "y": 408.5
+        },
+        "scrollWidth": 302,
+        "tag": "INPUT",
+        "type": "text",
+        "value": "2위"
+      },
+      {
+        "active": false,
+        "clientWidth": 455,
+        "describedby": null,
+        "focusVisible": false,
+        "name": "상금 항목 2 내용",
+        "placeholder": "예: 600,000원 또는 우승 트로피",
+        "rect": {
+          "bottom": 452.5,
+          "height": 44,
+          "right": 1070,
+          "top": 408.5,
+          "width": 456.609375,
+          "x": 613.390625,
+          "y": 408.5
+        },
+        "scrollWidth": 455,
+        "tag": "INPUT",
+        "type": "text",
+        "value": ""
+      },
+      {
+        "active": false,
+        "clientWidth": 302,
+        "describedby": null,
+        "focusVisible": false,
+        "name": "상금 항목 3 이름",
+        "placeholder": "예: 1위",
+        "rect": {
+          "bottom": 504.5,
+          "height": 44,
+          "right": 605.390625,
+          "top": 460.5,
+          "width": 304.390625,
+          "x": 301,
+          "y": 460.5
+        },
+        "scrollWidth": 302,
+        "tag": "INPUT",
+        "type": "text",
+        "value": "3위"
+      },
+      {
+        "active": false,
+        "clientWidth": 455,
+        "describedby": null,
+        "focusVisible": false,
+        "name": "상금 항목 3 내용",
+        "placeholder": "예: 600,000원 또는 우승 트로피",
+        "rect": {
+          "bottom": 504.5,
+          "height": 44,
+          "right": 1070,
+          "top": 460.5,
+          "width": 456.609375,
+          "x": 613.390625,
+          "y": 460.5
+        },
+        "scrollWidth": 455,
+        "tag": "INPUT",
+        "type": "text",
+        "value": ""
+      }
+    ],
+    "footerButtons": [
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 745,
+          "height": 44,
+          "right": 229.15625,
+          "top": 701,
+          "width": 93.65625,
+          "x": 135.5,
+          "y": 701
+        },
+        "text": "이전",
+        "type": "button"
+      },
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 745,
+          "height": 44,
+          "right": 1031.5,
+          "top": 701,
+          "width": 145.15625,
+          "x": 886.34375,
+          "y": 701
+        },
+        "text": "대회 만들기",
+        "type": "submit"
+      }
+    ],
+    "helper": [
+      {
+        "rect": {
+          "bottom": 348.5,
+          "height": 20,
+          "right": 1122,
+          "top": 328.5,
+          "width": 821,
+          "x": 301,
+          "y": 328.5
+        },
+        "text": "숫자는 원 단위로 자동 정리되고 트로피·상품권 같은 물품도 입력할 수 있어요."
+      }
+    ],
+    "lockedStep5": [
+      {
+        "disabled": true,
+        "label": "5단계 공개 확인 — 잠김"
+      }
+    ],
+    "scrollY": 610,
+    "switches": [
+      {
+        "checked": "false",
+        "label": "홈 오늘의 추천 노출"
+      },
+      {
+        "checked": "false",
+        "label": "대회 목록 상단 노출"
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/new",
+    "utc": "2026-10-03T18:38:37.399Z",
+    "viewport": {
+      "dpr": 1,
+      "height": 757,
+      "width": 1183
+    },
+    "index": 8,
+    "surface": "create",
+    "widthLabel": "desktop",
+    "state": "tab-content"
+  },
+  {
+    "active": {
+      "focusVisible": true,
+      "label": "상금 항목 1 삭제",
+      "rect": {
+        "bottom": 400.5,
+        "height": 44,
+        "right": 1122,
+        "top": 356.5,
+        "width": 44,
+        "x": 1078,
+        "y": 356.5
+      },
+      "tag": "BUTTON",
+      "text": ""
+    },
+    "documentWidth": 1183,
+    "fields": [
+      {
+        "active": false,
+        "clientWidth": 819,
+        "describedby": null,
+        "focusVisible": false,
+        "name": "총상금",
+        "placeholder": "예: 1,000,000",
+        "rect": {
+          "bottom": 290.5,
+          "height": 44,
+          "right": 1122,
+          "top": 246.5,
+          "width": 821,
+          "x": 301,
+          "y": 246.5
+        },
+        "scrollWidth": 819,
+        "tag": "INPUT",
+        "type": "text",
+        "value": ""
+      },
+      {
+        "active": false,
+        "clientWidth": 302,
+        "describedby": null,
+        "focusVisible": false,
+        "name": "상금 항목 1 이름",
+        "placeholder": "예: 1위",
+        "rect": {
+          "bottom": 400.5,
+          "height": 44,
+          "right": 605.390625,
+          "top": 356.5,
+          "width": 304.390625,
+          "x": 301,
+          "y": 356.5
+        },
+        "scrollWidth": 302,
+        "tag": "INPUT",
+        "type": "text",
+        "value": "1위"
+      },
+      {
+        "active": false,
+        "clientWidth": 455,
+        "describedby": null,
+        "focusVisible": false,
+        "name": "상금 항목 1 내용",
+        "placeholder": "예: 600,000원 또는 우승 트로피",
+        "rect": {
+          "bottom": 400.5,
+          "height": 44,
+          "right": 1070,
+          "top": 356.5,
+          "width": 456.609375,
+          "x": 613.390625,
+          "y": 356.5
+        },
+        "scrollWidth": 455,
+        "tag": "INPUT",
+        "type": "text",
+        "value": "우승 트로피 QA1593"
+      },
+      {
+        "active": false,
+        "clientWidth": 302,
+        "describedby": null,
+        "focusVisible": false,
+        "name": "상금 항목 2 이름",
+        "placeholder": "예: 1위",
+        "rect": {
+          "bottom": 452.5,
+          "height": 44,
+          "right": 605.390625,
+          "top": 408.5,
+          "width": 304.390625,
+          "x": 301,
+          "y": 408.5
+        },
+        "scrollWidth": 302,
+        "tag": "INPUT",
+        "type": "text",
+        "value": "2위"
+      },
+      {
+        "active": false,
+        "clientWidth": 455,
+        "describedby": null,
+        "focusVisible": false,
+        "name": "상금 항목 2 내용",
+        "placeholder": "예: 600,000원 또는 우승 트로피",
+        "rect": {
+          "bottom": 452.5,
+          "height": 44,
+          "right": 1070,
+          "top": 408.5,
+          "width": 456.609375,
+          "x": 613.390625,
+          "y": 408.5
+        },
+        "scrollWidth": 455,
+        "tag": "INPUT",
+        "type": "text",
+        "value": ""
+      },
+      {
+        "active": false,
+        "clientWidth": 302,
+        "describedby": null,
+        "focusVisible": false,
+        "name": "상금 항목 3 이름",
+        "placeholder": "예: 1위",
+        "rect": {
+          "bottom": 504.5,
+          "height": 44,
+          "right": 605.390625,
+          "top": 460.5,
+          "width": 304.390625,
+          "x": 301,
+          "y": 460.5
+        },
+        "scrollWidth": 302,
+        "tag": "INPUT",
+        "type": "text",
+        "value": "3위"
+      },
+      {
+        "active": false,
+        "clientWidth": 455,
+        "describedby": null,
+        "focusVisible": false,
+        "name": "상금 항목 3 내용",
+        "placeholder": "예: 600,000원 또는 우승 트로피",
+        "rect": {
+          "bottom": 504.5,
+          "height": 44,
+          "right": 1070,
+          "top": 460.5,
+          "width": 456.609375,
+          "x": 613.390625,
+          "y": 460.5
+        },
+        "scrollWidth": 455,
+        "tag": "INPUT",
+        "type": "text",
+        "value": ""
+      }
+    ],
+    "footerButtons": [
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 745,
+          "height": 44,
+          "right": 229.15625,
+          "top": 701,
+          "width": 93.65625,
+          "x": 135.5,
+          "y": 701
+        },
+        "text": "이전",
+        "type": "button"
+      },
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 745,
+          "height": 44,
+          "right": 1031.5,
+          "top": 701,
+          "width": 145.15625,
+          "x": 886.34375,
+          "y": 701
+        },
+        "text": "대회 만들기",
+        "type": "submit"
+      }
+    ],
+    "helper": [
+      {
+        "rect": {
+          "bottom": 348.5,
+          "height": 20,
+          "right": 1122,
+          "top": 328.5,
+          "width": 821,
+          "x": 301,
+          "y": 328.5
+        },
+        "text": "숫자는 원 단위로 자동 정리되고 트로피·상품권 같은 물품도 입력할 수 있어요."
+      }
+    ],
+    "lockedStep5": [
+      {
+        "disabled": true,
+        "label": "5단계 공개 확인 — 잠김"
+      }
+    ],
+    "scrollY": 610,
+    "switches": [
+      {
+        "checked": "false",
+        "label": "홈 오늘의 추천 노출"
+      },
+      {
+        "checked": "false",
+        "label": "대회 목록 상단 노출"
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/new",
+    "utc": "2026-10-03T18:38:37.567Z",
+    "viewport": {
+      "dpr": 1,
+      "height": 757,
+      "width": 1183
+    },
+    "index": 9,
+    "surface": "create",
+    "widthLabel": "desktop",
+    "state": "tab-delete"
+  },
+  {
+    "active": {
+      "focusVisible": true,
+      "label": "상금 항목 1 내용",
+      "rect": {
+        "bottom": 400.5,
+        "height": 44,
+        "right": 1070,
+        "top": 356.5,
+        "width": 456.609375,
+        "x": 613.390625,
+        "y": 356.5
+      },
+      "tag": "INPUT",
+      "text": null
+    },
+    "documentWidth": 1183,
+    "fields": [
+      {
+        "active": false,
+        "clientWidth": 819,
+        "describedby": null,
+        "focusVisible": false,
+        "name": "총상금",
+        "placeholder": "예: 1,000,000",
+        "rect": {
+          "bottom": 290.5,
+          "height": 44,
+          "right": 1122,
+          "top": 246.5,
+          "width": 821,
+          "x": 301,
+          "y": 246.5
+        },
+        "scrollWidth": 819,
+        "tag": "INPUT",
+        "type": "text",
+        "value": ""
+      },
+      {
+        "active": false,
+        "clientWidth": 302,
+        "describedby": null,
+        "focusVisible": false,
+        "name": "상금 항목 1 이름",
+        "placeholder": "예: 1위",
+        "rect": {
+          "bottom": 400.5,
+          "height": 44,
+          "right": 605.390625,
+          "top": 356.5,
+          "width": 304.390625,
+          "x": 301,
+          "y": 356.5
+        },
+        "scrollWidth": 302,
+        "tag": "INPUT",
+        "type": "text",
+        "value": "1위"
+      },
+      {
+        "active": true,
+        "clientWidth": 455,
+        "describedby": null,
+        "focusVisible": true,
+        "name": "상금 항목 1 내용",
+        "placeholder": "예: 600,000원 또는 우승 트로피",
+        "rect": {
+          "bottom": 400.5,
+          "height": 44,
+          "right": 1070,
+          "top": 356.5,
+          "width": 456.609375,
+          "x": 613.390625,
+          "y": 356.5
+        },
+        "scrollWidth": 455,
+        "tag": "INPUT",
+        "type": "text",
+        "value": ""
+      },
+      {
+        "active": false,
+        "clientWidth": 302,
+        "describedby": null,
+        "focusVisible": false,
+        "name": "상금 항목 2 이름",
+        "placeholder": "예: 1위",
+        "rect": {
+          "bottom": 452.5,
+          "height": 44,
+          "right": 605.390625,
+          "top": 408.5,
+          "width": 304.390625,
+          "x": 301,
+          "y": 408.5
+        },
+        "scrollWidth": 302,
+        "tag": "INPUT",
+        "type": "text",
+        "value": "2위"
+      },
+      {
+        "active": false,
+        "clientWidth": 455,
+        "describedby": null,
+        "focusVisible": false,
+        "name": "상금 항목 2 내용",
+        "placeholder": "예: 600,000원 또는 우승 트로피",
+        "rect": {
+          "bottom": 452.5,
+          "height": 44,
+          "right": 1070,
+          "top": 408.5,
+          "width": 456.609375,
+          "x": 613.390625,
+          "y": 408.5
+        },
+        "scrollWidth": 455,
+        "tag": "INPUT",
+        "type": "text",
+        "value": ""
+      },
+      {
+        "active": false,
+        "clientWidth": 302,
+        "describedby": null,
+        "focusVisible": false,
+        "name": "상금 항목 3 이름",
+        "placeholder": "예: 1위",
+        "rect": {
+          "bottom": 504.5,
+          "height": 44,
+          "right": 605.390625,
+          "top": 460.5,
+          "width": 304.390625,
+          "x": 301,
+          "y": 460.5
+        },
+        "scrollWidth": 302,
+        "tag": "INPUT",
+        "type": "text",
+        "value": "3위"
+      },
+      {
+        "active": false,
+        "clientWidth": 455,
+        "describedby": null,
+        "focusVisible": false,
+        "name": "상금 항목 3 내용",
+        "placeholder": "예: 600,000원 또는 우승 트로피",
+        "rect": {
+          "bottom": 504.5,
+          "height": 44,
+          "right": 1070,
+          "top": 460.5,
+          "width": 456.609375,
+          "x": 613.390625,
+          "y": 460.5
+        },
+        "scrollWidth": 455,
+        "tag": "INPUT",
+        "type": "text",
+        "value": ""
+      }
+    ],
+    "footerButtons": [
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 745,
+          "height": 44,
+          "right": 229.15625,
+          "top": 701,
+          "width": 93.65625,
+          "x": 135.5,
+          "y": 701
+        },
+        "text": "이전",
+        "type": "button"
+      },
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 745,
+          "height": 44,
+          "right": 1031.5,
+          "top": 701,
+          "width": 145.15625,
+          "x": 886.34375,
+          "y": 701
+        },
+        "text": "대회 만들기",
+        "type": "submit"
+      }
+    ],
+    "helper": [
+      {
+        "rect": {
+          "bottom": 348.5,
+          "height": 20,
+          "right": 1122,
+          "top": 328.5,
+          "width": 821,
+          "x": 301,
+          "y": 328.5
+        },
+        "text": "숫자는 원 단위로 자동 정리되고 트로피·상품권 같은 물품도 입력할 수 있어요."
+      }
+    ],
+    "lockedStep5": [
+      {
+        "disabled": true,
+        "label": "5단계 공개 확인 — 잠김"
+      }
+    ],
+    "scrollY": 610,
+    "switches": [
+      {
+        "checked": "false",
+        "label": "홈 오늘의 추천 노출"
+      },
+      {
+        "checked": "false",
+        "label": "대회 목록 상단 노출"
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/new",
+    "utc": "2026-10-03T18:39:08.991Z",
+    "viewport": {
+      "dpr": 1,
+      "height": 757,
+      "width": 1183
+    },
+    "index": 10,
+    "surface": "create",
+    "widthLabel": "desktop",
+    "state": "QA-content-restored-blank"
+  }
+]

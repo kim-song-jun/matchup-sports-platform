@@ -1,0 +1,168 @@
+{
+  "captureMetadataSHA256": "5c6373c6ba7062ea6b059a4a2dcb9fade612973914b6b713e76ab6068a1e5f5c",
+  "crops": [
+    {
+      "name": "create-mobile-content-focus",
+      "proofIndex": 1,
+      "startUTC": "2026-10-03T18:37:00.380Z",
+      "endUTC": "2026-10-03T18:37:00.403Z",
+      "sourceSHA256": "3233cb5953483bda4ba9c964248108ea1a25bf1421a8faf2cd7bc5637ab785b2",
+      "sourceFile": "create-mobile-content-focus.png",
+      "outputFile": "create-mobile-content-focus.png",
+      "bounds": [
+        20,
+        65,
+        380,
+        535
+      ],
+      "sourceSize": [
+        402,
+        605
+      ],
+      "outputSize": [
+        360,
+        470
+      ],
+      "outputSHA256": "33b0ebd6ab4b1ce8f56c26d4b9c4730e9719fb6364cb969ed01ae30db4e80b78",
+      "sourceHashVerified": true,
+      "collectorPixelEquality": true,
+      "proofUTC": "2026-10-03T18:36:27.448Z"
+    },
+    {
+      "name": "create-mobile-retained",
+      "proofIndex": 3,
+      "startUTC": "2026-10-03T18:37:19.877Z",
+      "endUTC": "2026-10-03T18:37:19.895Z",
+      "sourceSHA256": "b33eae743aec44f5c93adfabe68402deb28425ce29024ddd099824a710e2cefd",
+      "sourceFile": "create-mobile-retained.png",
+      "outputFile": "create-mobile-retained.png",
+      "bounds": [
+        20,
+        65,
+        380,
+        535
+      ],
+      "sourceSize": [
+        402,
+        605
+      ],
+      "outputSize": [
+        360,
+        470
+      ],
+      "outputSHA256": "b3a9ac92e68c6788efe352780b24966e92c4e2177b921cabaa13c012800d324d",
+      "sourceHashVerified": true,
+      "collectorPixelEquality": true,
+      "proofUTC": "2026-10-03T18:37:19.871Z"
+    },
+    {
+      "name": "create-tablet-content-focus",
+      "proofIndex": 5,
+      "startUTC": "2026-10-03T18:38:09.834Z",
+      "endUTC": "2026-10-03T18:38:09.857Z",
+      "sourceSHA256": "a003f82f7b4c66a351655376c4e290dfde2cadfdc6e1a81d3664da17257506d2",
+      "sourceFile": "create-tablet-content-focus.png",
+      "outputFile": "create-tablet-content-focus.png",
+      "bounds": [
+        38,
+        85,
+        751,
+        383
+      ],
+      "sourceSize": [
+        789,
+        505
+      ],
+      "outputSize": [
+        713,
+        298
+      ],
+      "outputSHA256": "62c1812c74e9b3b05d42fb4ea50552cf4afa3eddc33e215f326109f26f1d518c",
+      "sourceHashVerified": true,
+      "collectorPixelEquality": true,
+      "proofUTC": "2026-10-03T18:38:09.829Z"
+    },
+    {
+      "name": "create-desktop-content-focus",
+      "proofIndex": 8,
+      "startUTC": "2026-10-03T18:38:37.404Z",
+      "endUTC": "2026-10-03T18:38:37.435Z",
+      "sourceSHA256": "daad1d51454919cd585f0416053a194bd8c38d0dd8192d1e327c4fa6e9eb8a1e",
+      "sourceFile": "create-desktop-content-focus.png",
+      "outputFile": "create-desktop-content-focus.png",
+      "bounds": [
+        285,
+        157,
+        1135,
+        558
+      ],
+      "sourceSize": [
+        1183,
+        757
+      ],
+      "outputSize": [
+        850,
+        401
+      ],
+      "outputSHA256": "267f8c0b902faf1997d4a898576febb17f8c83236509b745cfbdd3419b9bfcd9",
+      "sourceHashVerified": true,
+      "collectorPixelEquality": true,
+      "proofUTC": "2026-10-03T18:38:37.399Z"
+    }
+  ],
+  "safeJSONHashes": {
+    "actions.json": "5447055e61bcb84db567420cdd9634e656f4b35c351e58d7b757ded171ffbdf9",
+    "create-exit.json": "d119b17691166962291f19c89e4c0f10a6d99bca6836cbb976c7f8902b3c8e21",
+    "entry.json": "2eed132f1d387a1344f3fcc9fabbec17f61b8798e40d56b2ab470a935bd1b9f6",
+    "initial.json": "2f2f4e15deb1759e9653a6bffcec437fcfd6785b991994db6ca35656a3211215",
+    "navigation.json": "f674773c564619afe45ff3b0a0e1143878a9bda9ad875876dc8f0c7ada83fa7c",
+    "proof.json": "13e2cd86ba48957bb052bef97c4801e160e8bb1b47302324c87f872d0d4cf493",
+    "summary.json": "945458566ecfdd89328f9ca0b54ed1b70e0483fa100ba6c4ef378322a1fa030b"
+  },
+  "privacy": "Safe crops include generic form labels, default ranks and synthetic QA prize content only. No member names, roster, account identity or real fixture title. Private source screenshots are not for publication.",
+  "sourceInputFiles": [
+    {
+      "file": "actions.json",
+      "bytes": 5130,
+      "sha256": "5447055e61bcb84db567420cdd9634e656f4b35c351e58d7b757ded171ffbdf9"
+    },
+    {
+      "file": "create-exit.json",
+      "bytes": 1319,
+      "sha256": "d119b17691166962291f19c89e4c0f10a6d99bca6836cbb976c7f8902b3c8e21"
+    },
+    {
+      "file": "entry.json",
+      "bytes": 345,
+      "sha256": "2eed132f1d387a1344f3fcc9fabbec17f61b8798e40d56b2ab470a935bd1b9f6"
+    },
+    {
+      "file": "initial.json",
+      "bytes": 410,
+      "sha256": "2f2f4e15deb1759e9653a6bffcec437fcfd6785b991994db6ca35656a3211215"
+    },
+    {
+      "file": "navigation.json",
+      "bytes": 505,
+      "sha256": "f674773c564619afe45ff3b0a0e1143878a9bda9ad875876dc8f0c7ada83fa7c"
+    },
+    {
+      "file": "proof.json",
+      "bytes": 67180,
+      "sha256": "13e2cd86ba48957bb052bef97c4801e160e8bb1b47302324c87f872d0d4cf493"
+    },
+    {
+      "file": "summary.json",
+      "bytes": 3842,
+      "sha256": "945458566ecfdd89328f9ca0b54ed1b70e0483fa100ba6c4ef378322a1fa030b"
+    },
+    {
+      "file": "provenance.json",
+      "bytes": 4039,
+      "sha256": "3b91301958fff77c67d8d946a3d862ecd8a01c84bbf262552cc44836e4705e77"
+    }
+  ],
+  "publicationProjection": "Original safe source inputs remain unchanged. Entry and summary replace internal deployment attribution with independently retrieved workflow timing; scope limits added. The proof, actions, initial, navigation and exit JSON and all 4 PNG bytes are unchanged. safeJSONHashes describe source snapshots, not all projected public files; manifest.json describes public bytes.",
+  "publisherReview": "All 4 safe crops viewed; source metadata, hashes, dimensions, crop bounds, chronology and DOM arithmetic independently checked. Original full screenshots were not opened or published; source-to-crop equality remains collector-attested.",
+  "captureMetadataScopeNote": "The capture-metadata source itself is not published or independently read here; its recorded hash is provenance, not proof of separate capture-time accuracy."
+}

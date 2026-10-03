@@ -1,0 +1,188 @@
+[
+  {
+    "index": 0,
+    "label": "create select 풋살",
+    "startUTC": "2026-10-03T18:35:07.197Z",
+    "endUTC": "2026-10-03T18:35:07.244Z"
+  },
+  {
+    "index": 1,
+    "label": "create synthetic local title",
+    "startUTC": "2026-10-03T18:35:07.281Z",
+    "endUTC": "2026-10-03T18:35:07.307Z"
+  },
+  {
+    "index": 2,
+    "label": "stepper open step2",
+    "startUTC": "2026-10-03T18:35:07.345Z",
+    "endUTC": "2026-10-03T18:35:07.628Z"
+  },
+  {
+    "index": 3,
+    "label": "focus native tournament start calendar",
+    "startUTC": "2026-10-03T18:35:20.371Z",
+    "endUTC": "2026-10-03T18:35:20.642Z"
+  },
+  {
+    "index": 4,
+    "label": "open native date popup via visible calendar icon",
+    "startUTC": "2026-10-03T18:35:28.094Z",
+    "endUTC": "2026-10-03T18:35:28.192Z"
+  },
+  {
+    "index": 5,
+    "label": "select October17 using native calendar then click schedule heading",
+    "startUTC": "2026-10-03T18:35:40.062Z",
+    "endUTC": "2026-10-03T18:35:40.527Z"
+  },
+  {
+    "index": 6,
+    "label": "stepper open step4 local promotion editor",
+    "startUTC": "2026-10-03T18:35:40.597Z",
+    "endUTC": "2026-10-03T18:35:40.873Z"
+  },
+  {
+    "index": 7,
+    "label": "mobile focus first prize name",
+    "startUTC": "2026-10-03T18:35:49.093Z",
+    "endUTC": "2026-10-03T18:35:49.370Z"
+  },
+  {
+    "index": 8,
+    "label": "mobile actual Tab name to content",
+    "startUTC": "2026-10-03T18:36:27.325Z",
+    "endUTC": "2026-10-03T18:36:27.393Z"
+  },
+  {
+    "index": 9,
+    "label": "mobile actual Tab content to delete without activating",
+    "startUTC": "2026-10-03T18:37:00.404Z",
+    "endUTC": "2026-10-03T18:37:00.475Z"
+  },
+  {
+    "index": 10,
+    "label": "mobile actual ShiftTab delete to content",
+    "startUTC": "2026-10-03T18:37:00.544Z",
+    "endUTC": "2026-10-03T18:37:00.709Z"
+  },
+  {
+    "index": 11,
+    "label": "enter synthetic local prize content",
+    "startUTC": "2026-10-03T18:37:00.757Z",
+    "endUTC": "2026-10-03T18:37:00.779Z"
+  },
+  {
+    "index": 12,
+    "label": "stepper leave prize for step3 locally",
+    "startUTC": "2026-10-03T18:37:00.828Z",
+    "endUTC": "2026-10-03T18:37:01.104Z"
+  },
+  {
+    "index": 13,
+    "label": "stepper return to observed step4 label",
+    "startUTC": "2026-10-03T18:37:19.170Z",
+    "endUTC": "2026-10-03T18:37:19.451Z"
+  },
+  {
+    "index": 14,
+    "label": "focus retained content without Enter",
+    "startUTC": "2026-10-03T18:37:19.508Z",
+    "endUTC": "2026-10-03T18:37:19.819Z"
+  },
+  {
+    "index": 15,
+    "label": "resize native window to full width and zoom150 for tablet",
+    "startUTC": "2026-10-03T18:38:03.228Z",
+    "endUTC": "2026-10-03T18:38:09.277Z"
+  },
+  {
+    "index": 16,
+    "label": "tablet focus prize name",
+    "startUTC": "2026-10-03T18:38:09.331Z",
+    "endUTC": "2026-10-03T18:38:09.605Z"
+  },
+  {
+    "index": 17,
+    "label": "tablet actual Tab name to content",
+    "startUTC": "2026-10-03T18:38:09.701Z",
+    "endUTC": "2026-10-03T18:38:09.770Z"
+  },
+  {
+    "index": 18,
+    "label": "tablet actual Tab content to delete",
+    "startUTC": "2026-10-03T18:38:36.290Z",
+    "endUTC": "2026-10-03T18:38:36.360Z"
+  },
+  {
+    "index": 19,
+    "label": "tablet actual ShiftTab delete to content",
+    "startUTC": "2026-10-03T18:38:36.425Z",
+    "endUTC": "2026-10-03T18:38:36.601Z"
+  },
+  {
+    "index": 20,
+    "label": "desktop reset browser zoom100",
+    "startUTC": "2026-10-03T18:38:36.642Z",
+    "endUTC": "2026-10-03T18:38:36.837Z"
+  },
+  {
+    "index": 21,
+    "label": "desktop focus prize name",
+    "startUTC": "2026-10-03T18:38:36.890Z",
+    "endUTC": "2026-10-03T18:38:37.170Z"
+  },
+  {
+    "index": 22,
+    "label": "desktop actual Tab name to content",
+    "startUTC": "2026-10-03T18:38:37.268Z",
+    "endUTC": "2026-10-03T18:38:37.337Z"
+  },
+  {
+    "index": 23,
+    "label": "desktop actual Tab content to delete",
+    "startUTC": "2026-10-03T18:38:37.436Z",
+    "endUTC": "2026-10-03T18:38:37.505Z"
+  },
+  {
+    "index": 24,
+    "label": "desktop actual ShiftTab delete to content",
+    "startUTC": "2026-10-03T18:38:37.571Z",
+    "endUTC": "2026-10-03T18:38:37.739Z"
+  },
+  {
+    "index": 25,
+    "label": "restore QA-only prize content to original blank",
+    "startUTC": "2026-10-03T18:39:03.638Z",
+    "endUTC": "2026-10-03T18:39:08.931Z"
+  },
+  {
+    "index": 26,
+    "label": "stepper return first step before cancel",
+    "startUTC": "2026-10-03T18:39:08.997Z",
+    "endUTC": "2026-10-03T18:39:09.275Z"
+  },
+  {
+    "index": 27,
+    "label": "cancel local wizard using visible Cancel link",
+    "startUTC": "2026-10-03T18:39:09.320Z",
+    "endUTC": "2026-10-03T18:39:09.592Z"
+  },
+  {
+    "index": 28,
+    "label": "reenter blank creation form via observed accessible label",
+    "startUTC": "2026-10-03T18:40:06.743Z",
+    "endUTC": "2026-10-03T18:40:06.820Z"
+  },
+  {
+    "index": 29,
+    "label": "cancel untouched reentry",
+    "startUTC": "2026-10-03T18:40:07.005Z",
+    "endUTC": "2026-10-03T18:40:07.289Z"
+  },
+  {
+    "index": 30,
+    "label": "leave blank reentry via visible top list link",
+    "startUTC": "2026-10-03T18:41:02.763Z",
+    "endUTC": "2026-10-03T18:41:02.855Z"
+  }
+]

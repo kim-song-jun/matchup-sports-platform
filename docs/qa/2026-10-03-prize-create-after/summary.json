@@ -1,0 +1,98 @@
+{
+  "issue": 1439,
+  "relatedPR": 1593,
+  "surface": "creation step4 shared prize editor",
+  "firstNavigationUTC": "2026-10-03T18:34:06.740Z",
+  "observedStartUTC": "2026-10-03T18:36:27.295Z",
+  "observedEndUTC": "2026-10-03T18:41:13.778Z",
+  "runtimeServingSHA": "unknown",
+  "deploymentContext": {
+    "reference": "deployment-context.json",
+    "runtimeServingSHA": "unknown",
+    "limit": "Fresh navigation follows the verified workflow success boundary; browser serving identity was not observed."
+  },
+  "beforeReference": "https://github.com/kim-song-jun/matchup-sports-platform/blob/c6aa94b4f25d8f94842efb95a70ea61f8155fe1b/docs/qa/2026-10-03-tournament-step4-new/README.md",
+  "observations": [
+    {
+      "widthLabel": "mobile",
+      "proofIndex": 1,
+      "viewport": {
+        "dpr": 1.25,
+        "height": 606,
+        "width": 402
+      },
+      "contentWidth": 328.8000183105469,
+      "totalWidth": 328.8000183105469,
+      "contentHeight": 44,
+      "contentBelowName": true,
+      "contentClientWidth": 327,
+      "contentScrollWidth": 327,
+      "documentWidth": 402,
+      "fullExampleVisibleInEmptyRows": true
+    },
+    {
+      "widthLabel": "tablet",
+      "proofIndex": 5,
+      "viewport": {
+        "dpr": 1.5,
+        "height": 505,
+        "width": 789
+      },
+      "contentWidth": 374,
+      "totalWidth": 683.3333740234375,
+      "contentHeight": 44,
+      "contentBelowName": false,
+      "contentClientWidth": 373,
+      "contentScrollWidth": 373,
+      "documentWidth": 789,
+      "fullExampleVisibleInEmptyRows": true
+    },
+    {
+      "widthLabel": "desktop",
+      "proofIndex": 8,
+      "viewport": {
+        "dpr": 1,
+        "height": 757,
+        "width": 1183
+      },
+      "contentWidth": 456.609375,
+      "totalWidth": 821,
+      "contentHeight": 44,
+      "contentBelowName": false,
+      "contentClientWidth": 455,
+      "contentScrollWidth": 455,
+      "documentWidth": 1183,
+      "fullExampleVisibleInEmptyRows": true
+    }
+  ],
+  "keyboard": "At each width, actual native Tab name→content→delete, then Shift+Tab back. The saved DOM covers name/content/delete endpoints; reverse endpoint is action-recorded but not separately captured. Mobile visual ordering places delete above content while DOM order stays name/content/delete. No delete activation.",
+  "valueRetention": "One synthetic content value entered on mobile; preserved after actual step4→step3→step4 and tablet/desktop resize. Explicitly restored empty before cancellation. Other rank names remained default.",
+  "cancel": "First actual Cancel from step1 reached the list; visible create link reopened title/sport blank. Second Cancel did not navigate within wait, followed by successful top list-link exit. See create-exit.json. This does not prove hidden prize reset or storage/database state.",
+  "counts": {
+    "DOMRows": 11,
+    "selectedActionRecords": 31,
+    "safePNGs": 4
+  },
+  "notPerformed": [
+    "Enter",
+    "final create POST",
+    "step5",
+    "save",
+    "upload",
+    "promotion toggles in this run",
+    "publication",
+    "database/network audit"
+  ],
+  "limitations": [
+    "Tablet789px and desktop1183px differ by2px from prior787/1181; not pixel-identical viewport replay.",
+    "Only selected first-row keyboard route and visible example are tested; no virtual keyboard or screen-reader speech.",
+    "Input clientWidth==scrollWidth does not prove placeholder fits; full example readability is direct pixel observation.",
+    "Single-line input does not promise all long values visible simultaneously.",
+    "Two attempted selectors had no matches and no action: step4 incorrectly expected completed label; create link visible text differed from accessible name. They are excluded from successful action counts.",
+    "Runtime SHA unknown. Existing promotion OFF/ON before result is not repeated or claimed anew.",
+    "All 11 DOM rows are step4 endpoints, including retention and explicit clearing; 9 are the three name/content/delete endpoint sequences. Initial/navigation/exit snapshots are separate.",
+    "The first mobile image begins 32.932 seconds after its linked DOM read. The times remain separate; no continuous unchanged-state assertion is made.",
+    "The selected first-row targets fit the viewport. This is not proof that every prize field or focus outline is visible or that the whole editor has no footer occlusion.",
+    "The second blank-form Cancel timeout is collector-reported in exit limits; it is not a successful cancellation. Observation gaps are not measured navigation latency."
+  ]
+}

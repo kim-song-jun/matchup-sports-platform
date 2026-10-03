@@ -100,6 +100,54 @@ function extractStepShell(path) {
 }
 
 /**
+ * Gates 의 세 스텝이 workflow_dispatch(dev) 에서도 도는지 `if:` 를 직접 본다.
+ *
+ * 이 조건이 빠져도 base 해석 셸은 멀쩡해서 위 픽스처들이 모두 통과한다. 그러면 Promote 가
+ * 거는 dispatch CI 가 게이트를 건너뛰고도 green 으로 끝나고, 매처는 그 run 을 받아들여
+ * 검사 안 된 버전 커밋이 alpha 로 나간다.
+ */
+const DISPATCH_GATED_STEPS = [
+  'Verify release changeset',
+  'Verify changeset gate base resolution',
+  'Validate planned SemVer',
+];
+const DISPATCH_DEV_CLAUSE = /github\.event_name == 'workflow_dispatch' && github\.ref == 'refs\/heads\/dev'/;
+
+function extractStepCondition(path, stepName) {
+  const lines = readFileSync(path, 'utf8').split('\n');
+  const nameIdx = lines.findIndex((l) => l.includes(`- name: ${stepName}`));
+  if (nameIdx < 0) fail(`워크플로에서 "${stepName}" 스텝을 못 찾았다: ${path}`);
+  const stepIndent = lines[nameIdx].match(/^\s*/)[0];
+  const fieldIndent = `${stepIndent}  `;
+  let endIdx = lines.length;
+  for (let i = nameIdx + 1; i < lines.length; i += 1) {
+    if (lines[i].startsWith(`${stepIndent}- `)) { endIdx = i; break; }
+  }
+  const ifIdx = lines.findIndex((l, i) => i > nameIdx && i < endIdx && l.startsWith(`${fieldIndent}if:`));
+  if (ifIdx < 0) return '';
+  const parts = [lines[ifIdx].slice(lines[ifIdx].indexOf('if:') + 3)];
+  for (let i = ifIdx + 1; i < endIdx; i += 1) {
+    // 같은 들여쓰기의 다음 필드(env:, run: …)가 시작하면 if 가 끝난 것이다
+    if (lines[i].startsWith(fieldIndent) && !lines[i].startsWith(`${fieldIndent} `)) break;
+    parts.push(lines[i]);
+  }
+  return parts.join(' ').replace(/\s+/g, ' ').trim();
+}
+
+function checkDispatchConditions(path) {
+  for (const stepName of DISPATCH_GATED_STEPS) {
+    const condition = extractStepCondition(path, stepName);
+    if (!DISPATCH_DEV_CLAUSE.test(condition)) {
+      fail(
+        `"${stepName}" 스텝의 if: 에 workflow_dispatch(dev) 절이 없다 — Promote 가 거는 CI 가 이 게이트를 건너뛴다.\n`
+        + `  받은 조건: ${condition || '(if: 없음)'}`,
+      );
+    }
+  }
+  console.log('[changeset-gate-base] if: 통과 — 게이트 3스텝이 workflow_dispatch(dev) 에서도 실행');
+}
+
+/**
  * 픽스처: **#951 의 실제 모양**을 재현한다 — 옛 base 에서 분기했고, 자기 changeset 은
  * 없고, 그사이 base 쪽에 남의 changeset 이 들어왔다.
  */
@@ -275,6 +323,7 @@ function makeDispatchFixture() {
 const fixture = makeFixture();
 try {
   if (args.includes('--self-test')) selfTest(fixture);
+  checkDispatchConditions(workflowPath);
   const shell = extractStepShell(workflowPath);
   const list = runStep(shell, fixture);
   const foreign = list.filter((f) => f.startsWith('.changeset/'));

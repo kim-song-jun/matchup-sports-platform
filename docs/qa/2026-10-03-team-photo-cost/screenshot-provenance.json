@@ -1,0 +1,196 @@
+[
+  {
+    "file": "team-photo-mobile.png",
+    "scrollY": 0,
+    "url": "https://alpha.teameet.co.kr/team-matches",
+    "utc": "2026-10-03T07:18:52.318Z",
+    "viewport": {
+      "dpr": 1.25,
+      "height": 606,
+      "scrollWidth": 405,
+      "width": 405
+    },
+    "captureStartUTC": "2026-10-03T07:18:52.324Z",
+    "captureEndUTC": "2026-10-03T07:18:52.374Z",
+    "accepted": true,
+    "sourceFile": "09-team-match-list-mobile-more-cards.png",
+    "sourceRaster": [
+      405,
+      606
+    ],
+    "cropPixels": [
+      20,
+      65,
+      385,
+      208
+    ],
+    "raster": [
+      365,
+      143
+    ],
+    "sha256": "77a03256881398fb9d928fb4d51966bb93e83df9cc41a3dd6959ddc6a78dc315",
+    "privacy": "Pixel-preserving crop; excludes member profiles, roster, chat and account identities. Photo cards use clearly synthetic QA team; cost crop excludes unverified team identities."
+  },
+  {
+    "file": "team-photo-tablet.png",
+    "scrollY": 0,
+    "url": "https://alpha.teameet.co.kr/team-matches",
+    "utc": "2026-10-03T07:21:00.611Z",
+    "viewport": {
+      "dpr": 1.5,
+      "height": 505,
+      "scrollWidth": 789,
+      "width": 789
+    },
+    "captureStartUTC": "2026-10-03T07:21:00.613Z",
+    "captureEndUTC": "2026-10-03T07:21:00.641Z",
+    "accepted": true,
+    "sourceFile": "12-team-match-list-tablet-photo.png",
+    "sourceRaster": [
+      788,
+      505
+    ],
+    "cropPixels": [
+      114,
+      240,
+      675,
+      387
+    ],
+    "raster": [
+      561,
+      147
+    ],
+    "sha256": "0a29980c8809856546b4845754634d069b28f58190133f94f2d5ef7f55e92287",
+    "privacy": "Pixel-preserving crop; excludes member profiles, roster, chat and account identities. Photo cards use clearly synthetic QA team; cost crop excludes unverified team identities.",
+    "relatedDOMObservationUTC": "2026-10-03T07:21:58.615Z",
+    "stateAlignmentLimit": "Tablet photo screenshot at07:21:00UTC and CSS observation at07:21:58.615UTC are separate states. Screenshot card is higher in viewport; later DOM thumbnail y440. Only fixture/viewport/thumbnail dimensions and style are related. Do not claim matching positions, occlusion or same scroll state."
+  },
+  {
+    "file": "team-photo-desktop.png",
+    "scrollY": 0,
+    "url": "https://alpha.teameet.co.kr/team-matches",
+    "utc": "2026-10-03T07:21:59.178Z",
+    "viewport": {
+      "dpr": 1,
+      "height": 758,
+      "scrollWidth": 1183,
+      "width": 1183
+    },
+    "captureStartUTC": "2026-10-03T07:21:59.180Z",
+    "captureEndUTC": "2026-10-03T07:21:59.223Z",
+    "accepted": true,
+    "sourceFile": "13-team-match-list-desktop-top.png",
+    "sourceRaster": [
+      1183,
+      758
+    ],
+    "cropPixels": [
+      600,
+      388,
+      1128,
+      534
+    ],
+    "raster": [
+      528,
+      146
+    ],
+    "sha256": "38ea9dff810a03997b7dd92e3986177b0ada3fb1731d7b8591049cab7119459f",
+    "privacy": "Pixel-preserving crop; excludes member profiles, roster, chat and account identities. Photo cards use clearly synthetic QA team; cost crop excludes unverified team identities."
+  },
+  {
+    "file": "cost-label-mobile.png",
+    "scrollY": 0,
+    "url": "https://alpha.teameet.co.kr/team-matches/d3b5e862-53dd-4516-b73a-f771e0ef6476",
+    "utc": "2026-10-03T07:23:47.834Z",
+    "viewport": {
+      "dpr": 1.25,
+      "height": 606,
+      "scrollWidth": 405,
+      "width": 405
+    },
+    "captureStartUTC": "2026-10-03T07:23:47.836Z",
+    "captureEndUTC": "2026-10-03T07:23:47.857Z",
+    "accepted": true,
+    "sourceFile": "15-team-match-detail-mobile-cost.png",
+    "sourceRaster": [
+      405,
+      606
+    ],
+    "cropPixels": [
+      20,
+      263,
+      385,
+      433
+    ],
+    "raster": [
+      365,
+      170
+    ],
+    "sha256": "afd1eed0673872e97b421b578ec4b4da0d5b5c5dc5c6ec9bacc49d65b991f86c",
+    "privacy": "Pixel-preserving crop; excludes member profiles, roster, chat and account identities. Photo cards use clearly synthetic QA team; cost crop excludes unverified team identities."
+  },
+  {
+    "file": "cost-label-tablet.png",
+    "scrollY": 0,
+    "url": "https://alpha.teameet.co.kr/team-matches/d3b5e862-53dd-4516-b73a-f771e0ef6476",
+    "utc": "2026-10-03T07:25:05.160Z",
+    "viewport": {
+      "dpr": 1.5,
+      "height": 505,
+      "scrollWidth": 789,
+      "width": 789
+    },
+    "captureStartUTC": "2026-10-03T07:25:05.161Z",
+    "captureEndUTC": "2026-10-03T07:25:05.209Z",
+    "accepted": true,
+    "sourceFile": "16-team-match-detail-tablet-cost.png",
+    "sourceRaster": [
+      788,
+      505
+    ],
+    "cropPixels": [
+      114,
+      262,
+      675,
+      418
+    ],
+    "raster": [
+      561,
+      156
+    ],
+    "sha256": "6b67c63e9e45e8d06e753dfe6bea936a70b138cb8ff8f862b82cd292f5f264b1",
+    "privacy": "Pixel-preserving crop; excludes member profiles, roster, chat and account identities. Photo cards use clearly synthetic QA team; cost crop excludes unverified team identities."
+  },
+  {
+    "file": "cost-label-desktop.png",
+    "scrollY": 612,
+    "url": "https://alpha.teameet.co.kr/team-matches/d3b5e862-53dd-4516-b73a-f771e0ef6476",
+    "utc": "2026-10-03T07:26:29.690Z",
+    "viewport": {
+      "dpr": 1,
+      "height": 758,
+      "scrollWidth": 1183,
+      "width": 1183
+    },
+    "captureStartUTC": "2026-10-03T07:26:29.693Z",
+    "captureEndUTC": "2026-10-03T07:26:29.745Z",
+    "accepted": true,
+    "sourceFile": "18-team-match-detail-desktop-cost.png",
+    "sourceRaster": [
+      1183,
+      758
+    ],
+    "cropPixels": [
+      55,
+      323,
+      680,
+      489
+    ],
+    "raster": [
+      625,
+      166
+    ],
+    "sha256": "85305b193d78ed7bb520fd056fdee0e35daf4d45b9a7d43a908ed9bd962a7b28",
+    "privacy": "Pixel-preserving crop; excludes member profiles, roster, chat and account identities. Photo cards use clearly synthetic QA team; cost crop excludes unverified team identities."
+  }
+]

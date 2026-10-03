@@ -1,0 +1,70 @@
+{
+  "scope": "All public files except this manifest itself.",
+  "files": [
+    {
+      "file": "README.md",
+      "bytes": 4976,
+      "sha256": "b1233526c8d12669189c1f539a95ab14dd5c772e697bb67d4818dbaa426badb1"
+    },
+    {
+      "file": "cost-label-desktop.png",
+      "bytes": 14277,
+      "sha256": "85305b193d78ed7bb520fd056fdee0e35daf4d45b9a7d43a908ed9bd962a7b28"
+    },
+    {
+      "file": "cost-label-mobile.png",
+      "bytes": 16493,
+      "sha256": "afd1eed0673872e97b421b578ec4b4da0d5b5c5dc5c6ec9bacc49d65b991f86c"
+    },
+    {
+      "file": "cost-label-tablet.png",
+      "bytes": 14551,
+      "sha256": "6b67c63e9e45e8d06e753dfe6bea936a70b138cb8ff8f862b82cd292f5f264b1"
+    },
+    {
+      "file": "coverage-matrix.json",
+      "bytes": 17967,
+      "sha256": "b11b51a43febb5598deb80e478a92372e75ed0d9a34326647c9370b3d320d69e"
+    },
+    {
+      "file": "league-list-contrast-proof.json",
+      "bytes": 6108,
+      "sha256": "c957275bf89a18cc46064b7e0b5da55fb3007bd76cc85ae7cffe95b2a7de9bf0"
+    },
+    {
+      "file": "screenshot-provenance.json",
+      "bytes": 5819,
+      "sha256": "a564897e87e335bfe92a55c7c7d48e37013bf3303419e2e5f7450ce9b3d75a00"
+    },
+    {
+      "file": "summary.json",
+      "bytes": 4121,
+      "sha256": "39173ada9f8f8e803f63dfa0107460ac71e03e644356f8d75340d9528a54eaa5"
+    },
+    {
+      "file": "team-image-cost-proof.json",
+      "bytes": 10591,
+      "sha256": "a169f88f79a47d97357a45d11053f7b198fdcb6b9e1aca2930873934684ad21a"
+    },
+    {
+      "file": "team-photo-desktop.png",
+      "bytes": 40280,
+      "sha256": "38ea9dff810a03997b7dd92e3986177b0ada3fb1731d7b8591049cab7119459f"
+    },
+    {
+      "file": "team-photo-mobile.png",
+      "bytes": 37992,
+      "sha256": "77a03256881398fb9d928fb4d51966bb93e83df9cc41a3dd6959ddc6a78dc315"
+    },
+    {
+      "file": "team-photo-tablet.png",
+      "bytes": 45035,
+      "sha256": "0a29980c8809856546b4845754634d069b28f58190133f94f2d5ef7f55e92287"
+    },
+    {
+      "file": "verification.json",
+      "bytes": 8692,
+      "sha256": "3158a161ab8930be7d28d8b99091d205fb0e7128b691c135a330f2287daf7570"
+    }
+  ]
+}

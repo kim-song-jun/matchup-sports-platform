@@ -1,0 +1,424 @@
+{
+  "scope": "27 planned surface×width rows; 9 observer-reported narrow screenshot observations and 18 unobserved. Six public product crops directly support the team-match photo/cost observations only. This is not 27 passed tests.",
+  "columns": {
+    "status": "unobserved | observer-reported-limited | safe-evidence-supported-limited",
+    "observationClaims": "Retained observer claims. Not every listed property is independently verifiable from the six public crops."
+  },
+  "rows": [
+    {
+      "surface": "league-list",
+      "cssWidth": 405,
+      "nesting": "Visiblecards single-shell plusdivider; no redundant innercard",
+      "backgroundContrast": "Four flat-color CSS samples at405 only, recomputed: date metadata4.62:1; sport4.82:1; in-progress4.87:1; ended6.45:1. Background-chain assumptions in league-list-contrast-proof.json. Other widths/states and pixel contrast unmeasured.",
+      "hierarchyCTA": "Promotion precedes league results; priority opportunity, not functionalfailure",
+      "copyBackTitle": "Umbrella대회label while리그selected; intent unconfirmed",
+      "inputClippingAlignment": "Visible sampledcard text fits; longtitles wrap",
+      "iconsImages": "Recommendation gradient32–72%; not linked to darkteamthumbnail report",
+      "emptyState": "not observed",
+      "keyboard": "not exercised in this visualrun",
+      "sourceScreenshotNumbers": [
+        "01",
+        "02"
+      ],
+      "status": "observer-reported-limited"
+    },
+    {
+      "surface": "league-list",
+      "cssWidth": 789,
+      "nesting": "Visiblecards single-shell plusdivider; no redundant innercard",
+      "backgroundContrast": "Unmeasured; screenshots only",
+      "hierarchyCTA": "Promotion precedes league results; priority opportunity, not functionalfailure",
+      "copyBackTitle": "Umbrella대회label while리그selected; intent unconfirmed",
+      "inputClippingAlignment": "Longtitle4lines in272pxcards at789; no textloss",
+      "iconsImages": "Recommendation gradient32–72%; not linked to darkteamthumbnail report",
+      "emptyState": "not observed",
+      "keyboard": "not exercised in this visualrun",
+      "sourceScreenshotNumbers": [
+        "03",
+        "04"
+      ],
+      "status": "observer-reported-limited"
+    },
+    {
+      "surface": "league-list",
+      "cssWidth": 1183,
+      "nesting": "Visiblecards single-shell plusdivider; no redundant innercard",
+      "backgroundContrast": "Unmeasured; screenshots only",
+      "hierarchyCTA": "Promotion precedes league results; priority opportunity, not functionalfailure",
+      "copyBackTitle": "Umbrella대회label while리그selected; intent unconfirmed",
+      "inputClippingAlignment": "Visible sampledcard text fits; longtitles wrap",
+      "iconsImages": "Recommendation gradient32–72%; not linked to darkteamthumbnail report",
+      "emptyState": "not observed",
+      "keyboard": "not exercised in this visualrun",
+      "sourceScreenshotNumbers": [
+        "06",
+        "07"
+      ],
+      "status": "observer-reported-limited"
+    },
+    {
+      "surface": "league-detail",
+      "cssWidth": 405,
+      "nesting": "not observed",
+      "backgroundContrast": "not measured",
+      "hierarchyCTA": "not observed",
+      "copyBackTitle": "not observed",
+      "inputClippingAlignment": "not observed",
+      "iconsImages": "not observed",
+      "emptyState": "not observed",
+      "keyboard": "not exercised in this visualrun",
+      "sourceScreenshotNumbers": [],
+      "status": "unobserved"
+    },
+    {
+      "surface": "league-detail",
+      "cssWidth": 789,
+      "nesting": "not observed",
+      "backgroundContrast": "not measured",
+      "hierarchyCTA": "not observed",
+      "copyBackTitle": "not observed",
+      "inputClippingAlignment": "not observed",
+      "iconsImages": "not observed",
+      "emptyState": "not observed",
+      "keyboard": "not exercised in this visualrun",
+      "sourceScreenshotNumbers": [],
+      "status": "unobserved"
+    },
+    {
+      "surface": "league-detail",
+      "cssWidth": 1183,
+      "nesting": "not observed",
+      "backgroundContrast": "not measured",
+      "hierarchyCTA": "not observed",
+      "copyBackTitle": "not observed",
+      "inputClippingAlignment": "not observed",
+      "iconsImages": "not observed",
+      "emptyState": "not observed",
+      "keyboard": "not exercised in this visualrun",
+      "sourceScreenshotNumbers": [],
+      "status": "unobserved"
+    },
+    {
+      "surface": "tournament-list",
+      "cssWidth": 405,
+      "nesting": "not observed",
+      "backgroundContrast": "not measured",
+      "hierarchyCTA": "not observed",
+      "copyBackTitle": "not observed",
+      "inputClippingAlignment": "not observed",
+      "iconsImages": "not observed",
+      "emptyState": "not observed",
+      "keyboard": "not exercised in this visualrun",
+      "sourceScreenshotNumbers": [],
+      "status": "unobserved"
+    },
+    {
+      "surface": "tournament-list",
+      "cssWidth": 789,
+      "nesting": "not observed",
+      "backgroundContrast": "not measured",
+      "hierarchyCTA": "not observed",
+      "copyBackTitle": "not observed",
+      "inputClippingAlignment": "not observed",
+      "iconsImages": "not observed",
+      "emptyState": "not observed",
+      "keyboard": "not exercised in this visualrun",
+      "sourceScreenshotNumbers": [],
+      "status": "unobserved"
+    },
+    {
+      "surface": "tournament-list",
+      "cssWidth": 1183,
+      "nesting": "not observed",
+      "backgroundContrast": "not measured",
+      "hierarchyCTA": "not observed",
+      "copyBackTitle": "not observed",
+      "inputClippingAlignment": "not observed",
+      "iconsImages": "not observed",
+      "emptyState": "not observed",
+      "keyboard": "not exercised in this visualrun",
+      "sourceScreenshotNumbers": [],
+      "status": "unobserved"
+    },
+    {
+      "surface": "tournament-detail",
+      "cssWidth": 405,
+      "nesting": "not observed",
+      "backgroundContrast": "not measured",
+      "hierarchyCTA": "not observed",
+      "copyBackTitle": "not observed",
+      "inputClippingAlignment": "not observed",
+      "iconsImages": "not observed",
+      "emptyState": "not observed",
+      "keyboard": "not exercised in this visualrun",
+      "sourceScreenshotNumbers": [],
+      "status": "unobserved"
+    },
+    {
+      "surface": "tournament-detail",
+      "cssWidth": 789,
+      "nesting": "not observed",
+      "backgroundContrast": "not measured",
+      "hierarchyCTA": "not observed",
+      "copyBackTitle": "not observed",
+      "inputClippingAlignment": "not observed",
+      "iconsImages": "not observed",
+      "emptyState": "not observed",
+      "keyboard": "not exercised in this visualrun",
+      "sourceScreenshotNumbers": [],
+      "status": "unobserved"
+    },
+    {
+      "surface": "tournament-detail",
+      "cssWidth": 1183,
+      "nesting": "not observed",
+      "backgroundContrast": "not measured",
+      "hierarchyCTA": "not observed",
+      "copyBackTitle": "not observed",
+      "inputClippingAlignment": "not observed",
+      "iconsImages": "not observed",
+      "emptyState": "not observed",
+      "keyboard": "not exercised in this visualrun",
+      "sourceScreenshotNumbers": [],
+      "status": "unobserved"
+    },
+    {
+      "surface": "team-match-list",
+      "cssWidth": 405,
+      "nesting": "Visiblecards single-shell; no card-insidecard issue",
+      "backgroundContrast": "not measured",
+      "hierarchyCTA": "Search/type/filter visible; floatingcreateoverlap is reviewonly atmobile/tablet, not confirmedblockedaction",
+      "copyBackTitle": "Observer reported displayed list counter20 and neither burden phrase in main text. Separate card-count DOM was not recorded; this does not prove all20 card contents were inspected. Full list text is omitted from this public package.",
+      "inputClippingAlignment": "Searchfits; mobilelongleaguelabels ellipsized, lossimpactnotestablished",
+      "iconsImages": "Three safe crops visibly show a dark text-free animal thumbnail. Separate DOM observations at all three widths report a 96×96 CSS thumbnail and a 58–72% alpha gradient.",
+      "emptyState": "not observed",
+      "keyboard": "not exercised in this visualrun",
+      "sourceScreenshotNumbers": [
+        "08",
+        "09",
+        "10"
+      ],
+      "status": "safe-evidence-supported-limited"
+    },
+    {
+      "surface": "team-match-list",
+      "cssWidth": 789,
+      "nesting": "Visiblecards single-shell; no card-insidecard issue",
+      "backgroundContrast": "not measured",
+      "hierarchyCTA": "Search/type/filter visible; floatingcreateoverlap is reviewonly atmobile/tablet, not confirmedblockedaction",
+      "copyBackTitle": "Observer reported displayed list counter20 and neither burden phrase in main text. Separate card-count DOM was not recorded; this does not prove all20 card contents were inspected. Full list text is omitted from this public package.",
+      "inputClippingAlignment": "Searchfits; mobilelongleaguelabels ellipsized, lossimpactnotestablished",
+      "iconsImages": "Three safe crops visibly show a dark text-free animal thumbnail. Separate DOM observations at all three widths report a 96×96 CSS thumbnail and a 58–72% alpha gradient.",
+      "emptyState": "not observed",
+      "keyboard": "not exercised in this visualrun",
+      "sourceScreenshotNumbers": [
+        "11",
+        "12"
+      ],
+      "status": "safe-evidence-supported-limited"
+    },
+    {
+      "surface": "team-match-list",
+      "cssWidth": 1183,
+      "nesting": "Visiblecards single-shell; no card-insidecard issue",
+      "backgroundContrast": "not measured",
+      "hierarchyCTA": "Search/type/filter visible; floatingcreateoverlap is reviewonly atmobile/tablet, not confirmedblockedaction",
+      "copyBackTitle": "Observer reported displayed list counter20 and neither burden phrase in main text. Separate card-count DOM was not recorded; this does not prove all20 card contents were inspected. Full list text is omitted from this public package.",
+      "inputClippingAlignment": "Searchfits; mobilelongleaguelabels ellipsized, lossimpactnotestablished",
+      "iconsImages": "Three safe crops visibly show a dark text-free animal thumbnail. Separate DOM observations at all three widths report a 96×96 CSS thumbnail and a 58–72% alpha gradient.",
+      "emptyState": "not observed",
+      "keyboard": "not exercised in this visualrun",
+      "sourceScreenshotNumbers": [
+        "13"
+      ],
+      "status": "safe-evidence-supported-limited"
+    },
+    {
+      "surface": "team-match-detail",
+      "cssWidth": 405,
+      "nesting": "Costsection single-shell; schedulealsoobservedmobile/desktop",
+      "backgroundContrast": "not measured",
+      "hierarchyCTA": "DisabledapplicationCTAvisible; no actionactivated",
+      "copyBackTitle": "Safe crop and separate DOM show 상대팀 부담금 25,000원 and 총비용 50,000원. Allocation mode is unverified. Header observations are observer-reported for mobile/desktop only.",
+      "inputClippingAlignment": "Observedcosttext fits; no inputs exercised",
+      "iconsImages": "Imagehero capturedmobile/desktop; tablet top unobserved",
+      "emptyState": "not observed",
+      "keyboard": "not exercised in this visualrun",
+      "sourceScreenshotNumbers": [
+        "14",
+        "15"
+      ],
+      "status": "safe-evidence-supported-limited"
+    },
+    {
+      "surface": "team-match-detail",
+      "cssWidth": 789,
+      "nesting": "Costsection single-shell; schedulealsoobservedmobile/desktop",
+      "backgroundContrast": "not measured",
+      "hierarchyCTA": "DisabledapplicationCTAvisible; no actionactivated",
+      "copyBackTitle": "Safe crop and separate DOM show 상대팀 부담금 25,000원 and 총비용 50,000원. Allocation mode is unverified. Header observations are observer-reported for mobile/desktop only.",
+      "inputClippingAlignment": "Observedcosttext fits; no inputs exercised",
+      "iconsImages": "Imagehero capturedmobile/desktop; tablet top unobserved",
+      "emptyState": "not observed",
+      "keyboard": "not exercised in this visualrun",
+      "sourceScreenshotNumbers": [
+        "16"
+      ],
+      "status": "safe-evidence-supported-limited"
+    },
+    {
+      "surface": "team-match-detail",
+      "cssWidth": 1183,
+      "nesting": "Costsection single-shell; schedulealsoobservedmobile/desktop",
+      "backgroundContrast": "not measured",
+      "hierarchyCTA": "DisabledapplicationCTAvisible; no actionactivated",
+      "copyBackTitle": "Safe crop and separate DOM show 상대팀 부담금 25,000원 and 총비용 50,000원. Allocation mode is unverified. Header observations are observer-reported for mobile/desktop only.",
+      "inputClippingAlignment": "Observedcosttext fits; no inputs exercised",
+      "iconsImages": "Imagehero capturedmobile/desktop; tablet top unobserved",
+      "emptyState": "not observed",
+      "keyboard": "not exercised in this visualrun",
+      "sourceScreenshotNumbers": [
+        "17",
+        "18"
+      ],
+      "status": "safe-evidence-supported-limited"
+    },
+    {
+      "surface": "individual-match-list",
+      "cssWidth": 405,
+      "nesting": "not observed",
+      "backgroundContrast": "not measured",
+      "hierarchyCTA": "not observed",
+      "copyBackTitle": "not observed",
+      "inputClippingAlignment": "not observed",
+      "iconsImages": "not observed",
+      "emptyState": "not observed",
+      "keyboard": "not exercised in this visualrun",
+      "sourceScreenshotNumbers": [],
+      "status": "unobserved"
+    },
+    {
+      "surface": "individual-match-list",
+      "cssWidth": 789,
+      "nesting": "not observed",
+      "backgroundContrast": "not measured",
+      "hierarchyCTA": "not observed",
+      "copyBackTitle": "not observed",
+      "inputClippingAlignment": "not observed",
+      "iconsImages": "not observed",
+      "emptyState": "not observed",
+      "keyboard": "not exercised in this visualrun",
+      "sourceScreenshotNumbers": [],
+      "status": "unobserved"
+    },
+    {
+      "surface": "individual-match-list",
+      "cssWidth": 1183,
+      "nesting": "not observed",
+      "backgroundContrast": "not measured",
+      "hierarchyCTA": "not observed",
+      "copyBackTitle": "not observed",
+      "inputClippingAlignment": "not observed",
+      "iconsImages": "not observed",
+      "emptyState": "not observed",
+      "keyboard": "not exercised in this visualrun",
+      "sourceScreenshotNumbers": [],
+      "status": "unobserved"
+    },
+    {
+      "surface": "individual-match-detail",
+      "cssWidth": 405,
+      "nesting": "not observed",
+      "backgroundContrast": "not measured",
+      "hierarchyCTA": "not observed",
+      "copyBackTitle": "not observed",
+      "inputClippingAlignment": "not observed",
+      "iconsImages": "not observed",
+      "emptyState": "not observed",
+      "keyboard": "not exercised in this visualrun",
+      "sourceScreenshotNumbers": [],
+      "status": "unobserved"
+    },
+    {
+      "surface": "individual-match-detail",
+      "cssWidth": 789,
+      "nesting": "not observed",
+      "backgroundContrast": "not measured",
+      "hierarchyCTA": "not observed",
+      "copyBackTitle": "not observed",
+      "inputClippingAlignment": "not observed",
+      "iconsImages": "not observed",
+      "emptyState": "not observed",
+      "keyboard": "not exercised in this visualrun",
+      "sourceScreenshotNumbers": [],
+      "status": "unobserved"
+    },
+    {
+      "surface": "individual-match-detail",
+      "cssWidth": 1183,
+      "nesting": "not observed",
+      "backgroundContrast": "not measured",
+      "hierarchyCTA": "not observed",
+      "copyBackTitle": "not observed",
+      "inputClippingAlignment": "not observed",
+      "iconsImages": "not observed",
+      "emptyState": "not observed",
+      "keyboard": "not exercised in this visualrun",
+      "sourceScreenshotNumbers": [],
+      "status": "unobserved"
+    },
+    {
+      "surface": "held-match-actions",
+      "cssWidth": 405,
+      "nesting": "not observed",
+      "backgroundContrast": "not measured",
+      "hierarchyCTA": "not observed",
+      "copyBackTitle": "not observed",
+      "inputClippingAlignment": "not observed",
+      "iconsImages": "not observed",
+      "emptyState": "not observed",
+      "keyboard": "not exercised in this visualrun",
+      "sourceScreenshotNumbers": [],
+      "status": "unobserved"
+    },
+    {
+      "surface": "held-match-actions",
+      "cssWidth": 789,
+      "nesting": "not observed",
+      "backgroundContrast": "not measured",
+      "hierarchyCTA": "not observed",
+      "copyBackTitle": "not observed",
+      "inputClippingAlignment": "not observed",
+      "iconsImages": "not observed",
+      "emptyState": "not observed",
+      "keyboard": "not exercised in this visualrun",
+      "sourceScreenshotNumbers": [],
+      "status": "unobserved"
+    },
+    {
+      "surface": "held-match-actions",
+      "cssWidth": 1183,
+      "nesting": "not observed",
+      "backgroundContrast": "not measured",
+      "hierarchyCTA": "not observed",
+      "copyBackTitle": "not observed",
+      "inputClippingAlignment": "not observed",
+      "iconsImages": "not observed",
+      "emptyState": "not observed",
+      "keyboard": "not exercised in this visualrun",
+      "sourceScreenshotNumbers": [],
+      "status": "unobserved"
+    }
+  ],
+  "excludedObservations": [
+    {
+      "file": "05-league-list-desktop-top.png",
+      "reason": "Resize transition: visible cards were partially faded; replaced by06 after ancestor opacity1."
+    }
+  ],
+  "limits": [
+    "Excluded resize-transition screenshot 05 remains excluded; replacement screenshot06 is reported, not included in this package.",
+    "Keyboard and empty states were not exercised in this visual run.",
+    "League-list screenshots are not included. Four recorded 405px flat-color samples are supplied in league-list-contrast-proof.json and independently recalculated; other league-list claims remain observer-reported."
+  ]
+}

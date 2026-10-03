@@ -1,0 +1,233 @@
+{
+  "sourceObservationUTC": "2026-10-03T07:13:47.106Z",
+  "url": "https://alpha.teameet.co.kr/tournaments?kind=league",
+  "relatedScreenshot": "02-league-list-mobile-cards.png",
+  "cssViewport": {
+    "width": 405,
+    "height": 606
+  },
+  "state": "League-list visiblefirsttwo cards afterscroll. Computedtextstyles; screenshot and DOM are sequential observations, not pixelcolor sampling.",
+  "method": "sRGB channel normalization; c<=0.04045 -> c/12.92 else ((c+0.055)/1.055)^2.4; luminance0.2126R+0.7152G+0.0722B; ratio(Llighter+0.05)/(Ldarker+0.05).",
+  "assumptions": "Measured chains have opacity1 and no background-image. Transparent children use nearest observed opaque background. Does not cover antialiasing, image/gradient backgrounds, hover/focus/disabled states, otherwidths or allsite.",
+  "samples": [
+    {
+      "text": "10/2 (금)~10/3 (토)",
+      "foregroundRGB": [
+        107.0,
+        118.0,
+        132.0
+      ],
+      "backgroundRGB": [
+        255.0,
+        255.0,
+        255.0
+      ],
+      "fontSize": "12px",
+      "fontWeight": "400",
+      "contrastRatio": 4.615666711779963,
+      "backgroundChain": [
+        {
+          "background": "rgba(0, 0, 0, 0)",
+          "backgroundImage": "none",
+          "color": "rgb(107, 118, 132)",
+          "opacity": "1",
+          "tag": "SPAN"
+        },
+        {
+          "background": "rgba(0, 0, 0, 0)",
+          "backgroundImage": "none",
+          "color": "rgb(25, 31, 40)",
+          "opacity": "1",
+          "tag": "DIV"
+        },
+        {
+          "background": "rgba(0, 0, 0, 0)",
+          "backgroundImage": "none",
+          "color": "rgb(25, 31, 40)",
+          "opacity": "1",
+          "tag": "DIV"
+        },
+        {
+          "background": "rgba(0, 0, 0, 0)",
+          "backgroundImage": "none",
+          "color": "rgb(25, 31, 40)",
+          "opacity": "1",
+          "tag": "DIV"
+        },
+        {
+          "background": "rgb(255, 255, 255)",
+          "backgroundImage": "none",
+          "color": "rgb(25, 31, 40)",
+          "opacity": "1",
+          "tag": "A"
+        }
+      ]
+    },
+    {
+      "text": "풋살",
+      "foregroundRGB": [
+        27.0,
+        100.0,
+        218.0
+      ],
+      "backgroundRGB": [
+        232.0,
+        243.0,
+        255.0
+      ],
+      "fontSize": "12px",
+      "fontWeight": "700",
+      "contrastRatio": 4.816090235351612,
+      "backgroundChain": [
+        {
+          "background": "rgba(0, 0, 0, 0)",
+          "backgroundImage": "none",
+          "color": "rgb(27, 100, 218)",
+          "opacity": "1",
+          "tag": "SPAN"
+        },
+        {
+          "background": "rgb(232, 243, 255)",
+          "backgroundImage": "none",
+          "color": "rgb(25, 31, 40)",
+          "opacity": "1",
+          "tag": "SPAN"
+        },
+        {
+          "background": "rgba(0, 0, 0, 0)",
+          "backgroundImage": "none",
+          "color": "rgb(25, 31, 40)",
+          "opacity": "1",
+          "tag": "DIV"
+        },
+        {
+          "background": "rgba(0, 0, 0, 0)",
+          "backgroundImage": "none",
+          "color": "rgb(25, 31, 40)",
+          "opacity": "1",
+          "tag": "DIV"
+        },
+        {
+          "background": "rgba(0, 0, 0, 0)",
+          "backgroundImage": "none",
+          "color": "rgb(25, 31, 40)",
+          "opacity": "1",
+          "tag": "DIV"
+        },
+        {
+          "background": "rgb(255, 255, 255)",
+          "backgroundImage": "none",
+          "color": "rgb(25, 31, 40)",
+          "opacity": "1",
+          "tag": "A"
+        }
+      ]
+    },
+    {
+      "text": "진행 중",
+      "foregroundRGB": [
+        3.0,
+        122.0,
+        74.0
+      ],
+      "backgroundRGB": [
+        227.0,
+        248.0,
+        239.0
+      ],
+      "fontSize": "12px",
+      "fontWeight": "700",
+      "contrastRatio": 4.873075615151585,
+      "backgroundChain": [
+        {
+          "background": "rgb(227, 248, 239)",
+          "backgroundImage": "none",
+          "color": "rgb(3, 122, 74)",
+          "opacity": "1",
+          "tag": "SPAN"
+        },
+        {
+          "background": "rgba(0, 0, 0, 0)",
+          "backgroundImage": "none",
+          "color": "rgb(25, 31, 40)",
+          "opacity": "1",
+          "tag": "DIV"
+        },
+        {
+          "background": "rgba(0, 0, 0, 0)",
+          "backgroundImage": "none",
+          "color": "rgb(25, 31, 40)",
+          "opacity": "1",
+          "tag": "DIV"
+        },
+        {
+          "background": "rgba(0, 0, 0, 0)",
+          "backgroundImage": "none",
+          "color": "rgb(25, 31, 40)",
+          "opacity": "1",
+          "tag": "DIV"
+        },
+        {
+          "background": "rgb(255, 255, 255)",
+          "backgroundImage": "none",
+          "color": "rgb(25, 31, 40)",
+          "opacity": "1",
+          "tag": "A"
+        }
+      ]
+    },
+    {
+      "text": "종료",
+      "foregroundRGB": [
+        78.0,
+        89.0,
+        104.0
+      ],
+      "backgroundRGB": [
+        242.0,
+        244.0,
+        246.0
+      ],
+      "fontSize": "12px",
+      "fontWeight": "700",
+      "contrastRatio": 6.450342460121478,
+      "backgroundChain": [
+        {
+          "background": "rgb(242, 244, 246)",
+          "backgroundImage": "none",
+          "color": "rgb(78, 89, 104)",
+          "opacity": "1",
+          "tag": "SPAN"
+        },
+        {
+          "background": "rgba(0, 0, 0, 0)",
+          "backgroundImage": "none",
+          "color": "rgb(25, 31, 40)",
+          "opacity": "1",
+          "tag": "DIV"
+        },
+        {
+          "background": "rgba(0, 0, 0, 0)",
+          "backgroundImage": "none",
+          "color": "rgb(25, 31, 40)",
+          "opacity": "1",
+          "tag": "DIV"
+        },
+        {
+          "background": "rgba(0, 0, 0, 0)",
+          "backgroundImage": "none",
+          "color": "rgb(25, 31, 40)",
+          "opacity": "1",
+          "tag": "DIV"
+        },
+        {
+          "background": "rgb(255, 255, 255)",
+          "backgroundImage": "none",
+          "color": "rgb(25, 31, 40)",
+          "opacity": "1",
+          "tag": "A"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,391 @@
+[
+  {
+    "step": "08-team-match-list-mobile-top",
+    "utc": "2026-10-03T07:18:51.945Z",
+    "url": "https://alpha.teameet.co.kr/team-matches",
+    "imageStyles": [
+      {
+        "id": "4b17f075-ed86-4ce9-99e5-c92dd469be0f",
+        "media": [
+          {
+            "background": "rgba(0, 0, 0, 0)",
+            "backgroundImage": "none",
+            "filter": "none",
+            "hasImage": true,
+            "naturalHeight": 76,
+            "naturalWidth": 76,
+            "objectFit": "contain",
+            "opacity": "1",
+            "pseudo": [],
+            "rect": {
+              "height": 76,
+              "width": 76,
+              "x": 46.79999923706055,
+              "y": 295.20001220703125
+            },
+            "tag": "IMG"
+          }
+        ],
+        "rect": {
+          "bottom": 416,
+          "height": 143.60000610351562,
+          "left": 20,
+          "right": 384.8000183105469,
+          "top": 272.3999938964844,
+          "width": 364.8000183105469,
+          "x": 20,
+          "y": 272.3999938964844
+        }
+      },
+      {
+        "id": "87328d95-dae5-4548-918f-7954a24b7fcd",
+        "media": [
+          {
+            "background": "rgba(0, 0, 0, 0)",
+            "backgroundImage": "linear-gradient(rgba(17, 24, 39, 0.58), rgba(17, 24, 39, 0.72)), [image URL omitted], [image URL omitted]",
+            "filter": "none",
+            "hasImage": false,
+            "naturalHeight": 0,
+            "naturalWidth": 0,
+            "objectFit": "fill",
+            "opacity": "1",
+            "pseudo": [],
+            "rect": {
+              "height": 96,
+              "width": 96,
+              "x": 36.79999923706055,
+              "y": 440.8000183105469
+            },
+            "tag": "DIV"
+          }
+        ],
+        "rect": {
+          "bottom": 571.6000061035156,
+          "height": 143.60000610351562,
+          "left": 20,
+          "right": 384.8000183105469,
+          "top": 428,
+          "width": 364.8000183105469,
+          "x": 20,
+          "y": 428
+        }
+      }
+    ],
+    "stateAlignmentLimit": "Mobile DOM step08 and photo screenshot source step09 are separate observations. The recorded thumbnail y440.8 is not the crop frame position. Mobile thumbnail text content was not recorded in DOM; absence of photo-overlaid text is a pixel observation only."
+  },
+  {
+    "step": "12-team-match-list-tablet-photo",
+    "thumb": {
+      "backgroundImage": "linear-gradient(rgba(17, 24, 39, 0.58), rgba(17, 24, 39, 0.72)), [image URL omitted], [image URL omitted]",
+      "filter": "none",
+      "opacity": "1",
+      "rect": {
+        "bottom": 536,
+        "height": 96,
+        "left": 131,
+        "right": 227,
+        "top": 440,
+        "width": 96,
+        "x": 131,
+        "y": 440
+      },
+      "text": ""
+    },
+    "url": "https://alpha.teameet.co.kr/team-matches",
+    "utc": "2026-10-03T07:21:58.615Z",
+    "viewport": {
+      "height": 505,
+      "width": 789
+    },
+    "stateAlignmentLimit": "Tablet photo screenshot at07:21:00UTC and CSS observation at07:21:58.615UTC are separate states. Screenshot card is higher in viewport; later DOM thumbnail y440. Only fixture/viewport/thumbnail dimensions and style are related. Do not claim matching positions, occlusion or same scroll state."
+  },
+  {
+    "step": "13-team-match-list-desktop-photo",
+    "thumb": {
+      "backgroundImage": "linear-gradient(rgba(17, 24, 39, 0.58), rgba(17, 24, 39, 0.72)), [image URL omitted], [image URL omitted]",
+      "filter": "none",
+      "opacity": "1",
+      "rect": {
+        "bottom": 497,
+        "height": 96,
+        "left": 616.5,
+        "right": 712.5,
+        "top": 401,
+        "width": 96,
+        "x": 616.5,
+        "y": 401
+      },
+      "text": ""
+    },
+    "url": "https://alpha.teameet.co.kr/team-matches",
+    "utc": "2026-10-03T07:22:36.092Z",
+    "viewport": {
+      "height": 758,
+      "width": 1183
+    }
+  },
+  {
+    "step": "15-team-match-detail-mobile-cost",
+    "labels": [
+      {
+        "color": "rgb(107, 118, 132)",
+        "fontSize": "13px",
+        "rect": {
+          "bottom": 300.1000061035156,
+          "height": 35.5,
+          "left": 20.80000114440918,
+          "right": 384.0000133514404,
+          "top": 264.6000061035156,
+          "width": 363.2000122070313,
+          "x": 20.80000114440918,
+          "y": 264.6000061035156
+        },
+        "text": "비용"
+      },
+      {
+        "color": "rgb(107, 118, 132)",
+        "fontSize": "12px",
+        "rect": {
+          "bottom": 328.1000061035156,
+          "height": 16,
+          "left": 36.79999923706055,
+          "right": 368.0000114440918,
+          "top": 312.1000061035156,
+          "width": 331.20001220703125,
+          "x": 36.79999923706055,
+          "y": 312.1000061035156
+        },
+        "text": "상대팀 부담금"
+      },
+      {
+        "color": "rgb(25, 31, 40)",
+        "fontSize": "20px",
+        "rect": {
+          "bottom": 362.1000061035156,
+          "height": 30,
+          "left": 36.79999923706055,
+          "right": 107.92499923706056,
+          "top": 332.1000061035156,
+          "width": 71.125,
+          "x": 36.79999923706055,
+          "y": 332.1000061035156
+        },
+        "text": "25,000"
+      },
+      {
+        "color": "rgb(107, 118, 132)",
+        "fontSize": "12px",
+        "rect": {
+          "bottom": 410.8999938964844,
+          "height": 16,
+          "left": 36.79999923706055,
+          "right": 67.92499923706055,
+          "top": 394.8999938964844,
+          "width": 31.125,
+          "x": 36.79999923706055,
+          "y": 394.8999938964844
+        },
+        "text": "총비용"
+      },
+      {
+        "color": "rgb(78, 89, 104)",
+        "fontSize": "13px",
+        "rect": {
+          "bottom": 414.1000061035156,
+          "height": 20,
+          "left": 311.3999938964844,
+          "right": 356.62499618530273,
+          "top": 394.1000061035156,
+          "width": 45.22500228881836,
+          "x": 311.3999938964844,
+          "y": 394.1000061035156
+        },
+        "text": "50,000"
+      }
+    ],
+    "publishedBuildMeta": [],
+    "url": "https://alpha.teameet.co.kr/team-matches/d3b5e862-53dd-4516-b73a-f771e0ef6476",
+    "utc": "2026-10-03T07:25:03.437Z",
+    "viewport": {
+      "height": 606,
+      "scrollWidth": 405,
+      "width": 405
+    }
+  },
+  {
+    "step": "16-team-match-detail-tablet-cost",
+    "labels": [
+      {
+        "color": "rgb(107, 118, 132)",
+        "fontSize": "13px",
+        "rect": {
+          "bottom": 299.16668701171875,
+          "height": 35.5,
+          "left": 115,
+          "right": 673.6666870117188,
+          "top": 263.66668701171875,
+          "width": 558.6666870117188,
+          "x": 115,
+          "y": 263.66668701171875
+        },
+        "text": "비용"
+      },
+      {
+        "color": "rgb(107, 118, 132)",
+        "fontSize": "12px",
+        "rect": {
+          "bottom": 327.16668701171875,
+          "height": 16,
+          "left": 131,
+          "right": 657.6666870117188,
+          "top": 311.16668701171875,
+          "width": 526.6666870117188,
+          "x": 131,
+          "y": 311.16668701171875
+        },
+        "text": "상대팀 부담금"
+      },
+      {
+        "color": "rgb(25, 31, 40)",
+        "fontSize": "20px",
+        "rect": {
+          "bottom": 361.1666870117187,
+          "height": 30,
+          "left": 131,
+          "right": 202.125,
+          "top": 331.16668701171875,
+          "width": 71.125,
+          "x": 131,
+          "y": 331.16668701171875
+        },
+        "text": "25,000"
+      },
+      {
+        "color": "rgb(107, 118, 132)",
+        "fontSize": "12px",
+        "rect": {
+          "bottom": 409.8333435058594,
+          "height": 16,
+          "left": 131,
+          "right": 162.1145839691162,
+          "top": 393.8333435058594,
+          "width": 31.11458396911621,
+          "x": 131,
+          "y": 393.8333435058594
+        },
+        "text": "총비용"
+      },
+      {
+        "color": "rgb(78, 89, 104)",
+        "fontSize": "13px",
+        "rect": {
+          "bottom": 412.5,
+          "height": 20,
+          "left": 601.0729370117188,
+          "right": 646.2916870117188,
+          "top": 392.5,
+          "width": 45.21875,
+          "x": 601.0729370117188,
+          "y": 392.5
+        },
+        "text": "50,000"
+      }
+    ],
+    "publishedBuildMeta": [],
+    "url": "https://alpha.teameet.co.kr/team-matches/d3b5e862-53dd-4516-b73a-f771e0ef6476",
+    "utc": "2026-10-03T07:25:44.930Z",
+    "viewport": {
+      "height": 505,
+      "scrollWidth": 789,
+      "width": 789
+    }
+  },
+  {
+    "step": "18-team-match-detail-desktop-cost",
+    "labels": [
+      {
+        "color": "rgb(107, 118, 132)",
+        "fontSize": "13px",
+        "rect": {
+          "bottom": 359.5,
+          "height": 35.5,
+          "left": 56.5,
+          "right": 678.5,
+          "top": 324,
+          "width": 622,
+          "x": 56.5,
+          "y": 324
+        },
+        "text": "비용"
+      },
+      {
+        "color": "rgb(107, 118, 132)",
+        "fontSize": "12px",
+        "rect": {
+          "bottom": 387.5,
+          "height": 16,
+          "left": 72.5,
+          "right": 662.5,
+          "top": 371.5,
+          "width": 590,
+          "x": 72.5,
+          "y": 371.5
+        },
+        "text": "상대팀 부담금"
+      },
+      {
+        "color": "rgb(25, 31, 40)",
+        "fontSize": "20px",
+        "rect": {
+          "bottom": 421.5,
+          "height": 30,
+          "left": 72.5,
+          "right": 143.625,
+          "top": 391.5,
+          "width": 71.125,
+          "x": 72.5,
+          "y": 391.5
+        },
+        "text": "25,000"
+      },
+      {
+        "color": "rgb(107, 118, 132)",
+        "fontSize": "12px",
+        "rect": {
+          "bottom": 468.5,
+          "height": 16,
+          "left": 72.5,
+          "right": 192.5,
+          "top": 452.5,
+          "width": 120,
+          "x": 72.5,
+          "y": 452.5
+        },
+        "text": "총비용"
+      },
+      {
+        "color": "rgb(78, 89, 104)",
+        "fontSize": "13px",
+        "rect": {
+          "bottom": 471.5,
+          "height": 20,
+          "left": 605.90625,
+          "right": 651.125,
+          "top": 451.5,
+          "width": 45.21875,
+          "x": 605.90625,
+          "y": 451.5
+        },
+        "text": "50,000"
+      }
+    ],
+    "publishedBuildMeta": [],
+    "url": "https://alpha.teameet.co.kr/team-matches/d3b5e862-53dd-4516-b73a-f771e0ef6476",
+    "utc": "2026-10-03T07:27:14.015Z",
+    "viewport": {
+      "height": 758,
+      "scrollWidth": 1183,
+      "width": 1183
+    }
+  }
+]

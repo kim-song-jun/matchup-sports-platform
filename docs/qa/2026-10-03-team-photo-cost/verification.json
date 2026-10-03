@@ -1,0 +1,291 @@
+{
+  "scope": "Independent review of the six approved safe PNGs and sanitized JSON only; excluded full viewport originals were not accessed.",
+  "pixelReview": "All six viewed at their actual dimensions: three dark cattle-photo crops and three cost sections. No participant names, human profile photos, contact details, rosters, conversations, account identities, secrets or payment instruments observed. The visible QA team label is a synthetic test fixture.",
+  "imageIntegrity": [
+    {
+      "file": "team-photo-mobile.png",
+      "sha256": "77a03256881398fb9d928fb4d51966bb93e83df9cc41a3dd6959ddc6a78dc315",
+      "raster": [
+        365,
+        143
+      ],
+      "sourceRasterReported": [
+        405,
+        606
+      ],
+      "cssViewport": {
+        "dpr": 1.25,
+        "height": 606,
+        "scrollWidth": 405,
+        "width": 405
+      },
+      "cropBoundsValid": true,
+      "decodedAndVisuallyInspected": true
+    },
+    {
+      "file": "team-photo-tablet.png",
+      "sha256": "0a29980c8809856546b4845754634d069b28f58190133f94f2d5ef7f55e92287",
+      "raster": [
+        561,
+        147
+      ],
+      "sourceRasterReported": [
+        788,
+        505
+      ],
+      "cssViewport": {
+        "dpr": 1.5,
+        "height": 505,
+        "scrollWidth": 789,
+        "width": 789
+      },
+      "cropBoundsValid": true,
+      "decodedAndVisuallyInspected": true
+    },
+    {
+      "file": "team-photo-desktop.png",
+      "sha256": "38ea9dff810a03997b7dd92e3986177b0ada3fb1731d7b8591049cab7119459f",
+      "raster": [
+        528,
+        146
+      ],
+      "sourceRasterReported": [
+        1183,
+        758
+      ],
+      "cssViewport": {
+        "dpr": 1,
+        "height": 758,
+        "scrollWidth": 1183,
+        "width": 1183
+      },
+      "cropBoundsValid": true,
+      "decodedAndVisuallyInspected": true
+    },
+    {
+      "file": "cost-label-mobile.png",
+      "sha256": "afd1eed0673872e97b421b578ec4b4da0d5b5c5dc5c6ec9bacc49d65b991f86c",
+      "raster": [
+        365,
+        170
+      ],
+      "sourceRasterReported": [
+        405,
+        606
+      ],
+      "cssViewport": {
+        "dpr": 1.25,
+        "height": 606,
+        "scrollWidth": 405,
+        "width": 405
+      },
+      "cropBoundsValid": true,
+      "decodedAndVisuallyInspected": true
+    },
+    {
+      "file": "cost-label-tablet.png",
+      "sha256": "6b67c63e9e45e8d06e753dfe6bea936a70b138cb8ff8f862b82cd292f5f264b1",
+      "raster": [
+        561,
+        156
+      ],
+      "sourceRasterReported": [
+        788,
+        505
+      ],
+      "cssViewport": {
+        "dpr": 1.5,
+        "height": 505,
+        "scrollWidth": 789,
+        "width": 789
+      },
+      "cropBoundsValid": true,
+      "decodedAndVisuallyInspected": true
+    },
+    {
+      "file": "cost-label-desktop.png",
+      "sha256": "85305b193d78ed7bb520fd056fdee0e35daf4d45b9a7d43a908ed9bd962a7b28",
+      "raster": [
+        625,
+        166
+      ],
+      "sourceRasterReported": [
+        1183,
+        758
+      ],
+      "cssViewport": {
+        "dpr": 1,
+        "height": 758,
+        "scrollWidth": 1183,
+        "width": 1183
+      },
+      "cropBoundsValid": true,
+      "decodedAndVisuallyInspected": true
+    }
+  ],
+  "timing": [
+    {
+      "file": "team-photo-mobile.png",
+      "screenshotObservationUTC": "2026-10-03T07:18:52.318Z",
+      "captureStartUTC": "2026-10-03T07:18:52.324Z",
+      "captureEndUTC": "2026-10-03T07:18:52.374Z",
+      "separateDOMStep": "08-team-match-list-mobile-top",
+      "separateDOMUTC": "2026-10-03T07:18:51.945Z",
+      "DOMMinusCaptureEndSeconds": -0.429,
+      "simultaneous": false
+    },
+    {
+      "file": "team-photo-tablet.png",
+      "screenshotObservationUTC": "2026-10-03T07:21:00.611Z",
+      "captureStartUTC": "2026-10-03T07:21:00.613Z",
+      "captureEndUTC": "2026-10-03T07:21:00.641Z",
+      "separateDOMStep": "12-team-match-list-tablet-photo",
+      "separateDOMUTC": "2026-10-03T07:21:58.615Z",
+      "DOMMinusCaptureEndSeconds": 57.974,
+      "simultaneous": false
+    },
+    {
+      "file": "team-photo-desktop.png",
+      "screenshotObservationUTC": "2026-10-03T07:21:59.178Z",
+      "captureStartUTC": "2026-10-03T07:21:59.180Z",
+      "captureEndUTC": "2026-10-03T07:21:59.223Z",
+      "separateDOMStep": "13-team-match-list-desktop-photo",
+      "separateDOMUTC": "2026-10-03T07:22:36.092Z",
+      "DOMMinusCaptureEndSeconds": 36.869,
+      "simultaneous": false
+    },
+    {
+      "file": "cost-label-mobile.png",
+      "screenshotObservationUTC": "2026-10-03T07:23:47.834Z",
+      "captureStartUTC": "2026-10-03T07:23:47.836Z",
+      "captureEndUTC": "2026-10-03T07:23:47.857Z",
+      "separateDOMStep": "15-team-match-detail-mobile-cost",
+      "separateDOMUTC": "2026-10-03T07:25:03.437Z",
+      "DOMMinusCaptureEndSeconds": 75.58,
+      "simultaneous": false
+    },
+    {
+      "file": "cost-label-tablet.png",
+      "screenshotObservationUTC": "2026-10-03T07:25:05.160Z",
+      "captureStartUTC": "2026-10-03T07:25:05.161Z",
+      "captureEndUTC": "2026-10-03T07:25:05.209Z",
+      "separateDOMStep": "16-team-match-detail-tablet-cost",
+      "separateDOMUTC": "2026-10-03T07:25:44.930Z",
+      "DOMMinusCaptureEndSeconds": 39.721,
+      "simultaneous": false
+    },
+    {
+      "file": "cost-label-desktop.png",
+      "screenshotObservationUTC": "2026-10-03T07:26:29.690Z",
+      "captureStartUTC": "2026-10-03T07:26:29.693Z",
+      "captureEndUTC": "2026-10-03T07:26:29.745Z",
+      "separateDOMStep": "18-team-match-detail-desktop-cost",
+      "separateDOMUTC": "2026-10-03T07:27:14.015Z",
+      "DOMMinusCaptureEndSeconds": 44.27,
+      "simultaneous": false
+    }
+  ],
+  "calculations": {
+    "gradientAlphaPercent": [
+      57.99999999999999,
+      72.0
+    ],
+    "alphaMeaning": "Spatial CSS gradient endpoint opacity, not a time change or measured brightness reduction.",
+    "photoDOMDimensionsCSS": [
+      96,
+      96
+    ],
+    "photoDOMRecords": 3,
+    "costDOMRecords": 3,
+    "costLabelRectanglesValidated": 15,
+    "costAmountsDisplayOnly": [
+      25000,
+      50000
+    ],
+    "plannedCoverageRows": 27,
+    "uniqueSurfaceWidthPairs": 27,
+    "observerScreenshotReferencedRows": 9,
+    "unobservedRows": 18,
+    "rowsDirectlySupportedBySafeProductImages": 6,
+    "contrastSamplesRecomputed": 4
+  },
+  "provenanceLimits": [
+    "File hashes, decoding, output sizes, and stated crop bounds were independently checked. Pixel equality to private originals was not rechecked because originals were intentionally excluded.",
+    "DOM geometry and screenshot pixels represent different observations. In particular mobile step08 DOM versus step09 photo and tablet photo positions are not same-frame evidence.",
+    "CSS789 differs from source PNG788; DPR metadata does not imply scaled CSS coordinates.",
+    "No serving application commit SHA was measured.",
+    "No full-app pass, numerical WCAG failure, payment correctness, or allocation semantics is established."
+  ],
+  "contrastRecalculation": {
+    "sourceObservationUTC": "2026-10-03T07:13:47.106Z",
+    "url": "https://alpha.teameet.co.kr/tournaments?kind=league",
+    "cssWidth": 405,
+    "samples": [
+      {
+        "text": "10/2 (금)~10/3 (토)",
+        "foregroundRGB": [
+          107.0,
+          118.0,
+          132.0
+        ],
+        "backgroundRGB": [
+          255.0,
+          255.0,
+          255.0
+        ],
+        "recomputedContrastRatio": 4.615666711779963,
+        "roundedRatio": 4.62,
+        "matchesRecorded": true
+      },
+      {
+        "text": "풋살",
+        "foregroundRGB": [
+          27.0,
+          100.0,
+          218.0
+        ],
+        "backgroundRGB": [
+          232.0,
+          243.0,
+          255.0
+        ],
+        "recomputedContrastRatio": 4.816090235351612,
+        "roundedRatio": 4.82,
+        "matchesRecorded": true
+      },
+      {
+        "text": "진행 중",
+        "foregroundRGB": [
+          3.0,
+          122.0,
+          74.0
+        ],
+        "backgroundRGB": [
+          227.0,
+          248.0,
+          239.0
+        ],
+        "recomputedContrastRatio": 4.873075615151585,
+        "roundedRatio": 4.87,
+        "matchesRecorded": true
+      },
+      {
+        "text": "종료",
+        "foregroundRGB": [
+          78.0,
+          89.0,
+          104.0
+        ],
+        "backgroundRGB": [
+          242.0,
+          244.0,
+          246.0
+        ],
+        "recomputedContrastRatio": 6.450342460121478,
+        "roundedRatio": 6.45,
+        "matchesRecorded": true
+      }
+    ],
+    "limits": "Only the four recorded flat-color samples and background-chain assumptions were independently recalculated. No screenshot pixel sampling or blanket WCAG conformance/failure statement."
+  }
+}

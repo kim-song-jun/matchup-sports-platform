@@ -1,0 +1,231 @@
+{
+  "verifiedUTC": "2026-10-04T06:23:20.192558+00:00",
+  "method": "Independent safe-file and actual PNG review; no new browser execution",
+  "criterion": {
+    "issueURL": "https://github.com/kim-song-jun/matchup-sports-platform/issues/129",
+    "item": 13,
+    "retrievedDateUTC": "2026-10-04",
+    "scope": "Mismatch warning and one-click total correction; current issue body independently read"
+  },
+  "counts": {
+    "proofDOMRows": 10,
+    "selectedActionRecords": 25,
+    "fieldRecords": 80,
+    "buttonRecords": 53,
+    "correctionClicks": 3,
+    "explicitRestoreActions": 6,
+    "safePNGs": 6
+  },
+  "cycles": [
+    {
+      "viewport": {
+        "dpr": 1.25,
+        "height": 606,
+        "width": 402
+      },
+      "mismatchIndex": 0,
+      "correctedIndex": 1,
+      "restoredIndex": 2,
+      "mismatchUTC": "2026-10-04T06:01:19.018Z",
+      "correctedUTC": "2026-10-04T06:01:19.732Z",
+      "restoredUTC": "2026-10-04T06:01:19.969Z",
+      "computedAllocationSum": 1000,
+      "beforeTotal": 0,
+      "afterTotal": 1000,
+      "onlyChangedField": "총상금",
+      "correctionButtonType": "button",
+      "correctionActionIndex": 4,
+      "neutralSumTextRemains": true,
+      "all8RestoredEqualBaseline": true
+    },
+    {
+      "viewport": {
+        "dpr": 1.5,
+        "height": 505,
+        "width": 788
+      },
+      "mismatchIndex": 3,
+      "correctedIndex": 4,
+      "restoredIndex": 5,
+      "mismatchUTC": "2026-10-04T06:02:20.859Z",
+      "correctedUTC": "2026-10-04T06:02:21.610Z",
+      "restoredUTC": "2026-10-04T06:02:21.843Z",
+      "computedAllocationSum": 1000,
+      "beforeTotal": 0,
+      "afterTotal": 1000,
+      "onlyChangedField": "총상금",
+      "correctionButtonType": "button",
+      "correctionActionIndex": 11,
+      "neutralSumTextRemains": true,
+      "all8RestoredEqualBaseline": true
+    },
+    {
+      "viewport": {
+        "dpr": 1,
+        "height": 757,
+        "width": 1182
+      },
+      "mismatchIndex": 6,
+      "correctedIndex": 7,
+      "restoredIndex": 8,
+      "mismatchUTC": "2026-10-04T06:02:22.525Z",
+      "correctedUTC": "2026-10-04T06:02:23.265Z",
+      "restoredUTC": "2026-10-04T06:02:23.514Z",
+      "computedAllocationSum": 1000,
+      "beforeTotal": 0,
+      "afterTotal": 1000,
+      "onlyChangedField": "총상금",
+      "correctionButtonType": "button",
+      "correctionActionIndex": 18,
+      "neutralSumTextRemains": true,
+      "all8RestoredEqualBaseline": true
+    }
+  ],
+  "baselineValues": {
+    "총상금": "0",
+    "상금 항목 1 이름": "1위",
+    "상금 항목 1 내용": "",
+    "상금 항목 2 이름": "2위",
+    "상금 항목 2 내용": "",
+    "상금 항목 3 이름": "3위",
+    "상금 항목 3 내용": "",
+    "상품 및 상금": "QA 테스트용 대회입니다. 실제 경기·상금·상품은 없습니다."
+  },
+  "reentryUTC": "2026-10-04T06:02:52.306Z",
+  "all8ValuesEqualOnReentry": true,
+  "finalUTC": "2026-10-04T06:02:52.629Z",
+  "finalPrizeInputs": 0,
+  "finalVisibleDialogs": 0,
+  "fixtureIdentifierSHA256": "9bb8586d8d3512789a6b624a536a22dbfa1d02f082dab9a37ac8abf9bab7df08",
+  "distinctRawFixtureURLs": 2,
+  "images": [
+    {
+      "file": "mobile-sum-mismatch.png",
+      "proofIndex": 0,
+      "DOMUTC": "2026-10-04T06:01:19.018Z",
+      "captureStartUTC": "2026-10-04T06:01:19.023Z",
+      "captureEndUTC": "2026-10-04T06:01:19.040Z",
+      "CSSViewport": {
+        "dpr": 1.25,
+        "height": 606,
+        "width": 402
+      },
+      "sourceRasterPixels": [
+        402,
+        605
+      ],
+      "safeRasterPixels": [
+        352,
+        196
+      ],
+      "sha256": "be1f42cc870f457a83e0d5d158d247b35e718c78f03a7a5efe4d2ec26ab35677"
+    },
+    {
+      "file": "mobile-total-corrected.png",
+      "proofIndex": 1,
+      "DOMUTC": "2026-10-04T06:01:19.732Z",
+      "captureStartUTC": "2026-10-04T06:01:19.736Z",
+      "captureEndUTC": "2026-10-04T06:01:19.752Z",
+      "CSSViewport": {
+        "dpr": 1.25,
+        "height": 606,
+        "width": 402
+      },
+      "sourceRasterPixels": [
+        402,
+        605
+      ],
+      "safeRasterPixels": [
+        352,
+        317
+      ],
+      "sha256": "ce4021e4703a51f19ed0fbfbf967e8caf6e91e71e0c319f7e139ef481d380a93"
+    },
+    {
+      "file": "tablet-sum-mismatch.png",
+      "proofIndex": 3,
+      "DOMUTC": "2026-10-04T06:02:20.859Z",
+      "captureStartUTC": "2026-10-04T06:02:20.865Z",
+      "captureEndUTC": "2026-10-04T06:02:20.890Z",
+      "CSSViewport": {
+        "dpr": 1.5,
+        "height": 505,
+        "width": 788
+      },
+      "sourceRasterPixels": [
+        788,
+        505
+      ],
+      "safeRasterPixels": [
+        718,
+        306
+      ],
+      "sha256": "a45af570cccd00d3e42fc796c483dde6177a703adc5235a19fb3badfac0a0552"
+    },
+    {
+      "file": "tablet-total-corrected.png",
+      "proofIndex": 4,
+      "DOMUTC": "2026-10-04T06:02:21.610Z",
+      "captureStartUTC": "2026-10-04T06:02:21.616Z",
+      "captureEndUTC": "2026-10-04T06:02:21.636Z",
+      "CSSViewport": {
+        "dpr": 1.5,
+        "height": 505,
+        "width": 788
+      },
+      "sourceRasterPixels": [
+        788,
+        505
+      ],
+      "safeRasterPixels": [
+        722,
+        351
+      ],
+      "sha256": "172c1fc7223e427dcbe55e81a1bf22590ad4efb1151aa986f320d80052cc5298"
+    },
+    {
+      "file": "desktop-sum-mismatch.png",
+      "proofIndex": 6,
+      "DOMUTC": "2026-10-04T06:02:22.525Z",
+      "captureStartUTC": "2026-10-04T06:02:22.532Z",
+      "captureEndUTC": "2026-10-04T06:02:22.553Z",
+      "CSSViewport": {
+        "dpr": 1,
+        "height": 757,
+        "width": 1182
+      },
+      "sourceRasterPixels": [
+        1182,
+        757
+      ],
+      "safeRasterPixels": [
+        653,
+        490
+      ],
+      "sha256": "c7cbd619053c577478ef1bef71c83c86cb726353700367eb007f213f3fcf5f44"
+    },
+    {
+      "file": "desktop-total-corrected.png",
+      "proofIndex": 7,
+      "DOMUTC": "2026-10-04T06:02:23.265Z",
+      "captureStartUTC": "2026-10-04T06:02:23.270Z",
+      "captureEndUTC": "2026-10-04T06:02:23.292Z",
+      "CSSViewport": {
+        "dpr": 1,
+        "height": 757,
+        "width": 1182
+      },
+      "sourceRasterPixels": [
+        1182,
+        757
+      ],
+      "safeRasterPixels": [
+        653,
+        483
+      ],
+      "sha256": "cd1b54ce96a31bf4ddcc91a579e124ac83da4171e5472f2a4debfae1ccd799f9"
+    }
+  ],
+  "runtimeServingSHA": "unknown",
+  "sourceContractIndependentlyVerified": false
+}

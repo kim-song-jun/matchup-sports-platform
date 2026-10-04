@@ -1,0 +1,152 @@
+[
+  {
+    "index": 0,
+    "label": "focus current total without changing",
+    "startUTC": "2026-10-04T05:59:54.599Z",
+    "endUTC": "2026-10-04T05:59:54.888Z"
+  },
+  {
+    "index": 1,
+    "label": "mobile native resize125 zoom",
+    "startUTC": "2026-10-04T06:00:18.300Z",
+    "endUTC": "2026-10-04T06:00:22.136Z"
+  },
+  {
+    "index": 2,
+    "label": "mobile enter local numeric allocation1000",
+    "startUTC": "2026-10-04T06:00:22.198Z",
+    "endUTC": "2026-10-04T06:00:22.230Z"
+  },
+  {
+    "index": 3,
+    "label": "mobile reveal mismatch text without correction",
+    "startUTC": "2026-10-04T06:01:18.644Z",
+    "endUTC": "2026-10-04T06:01:18.920Z"
+  },
+  {
+    "index": 4,
+    "label": "mobile local one-click total correction",
+    "startUTC": "2026-10-04T06:01:19.041Z",
+    "endUTC": "2026-10-04T06:01:19.318Z"
+  },
+  {
+    "index": 5,
+    "label": "mobile focus corrected total for visibility only",
+    "startUTC": "2026-10-04T06:01:19.386Z",
+    "endUTC": "2026-10-04T06:01:19.651Z"
+  },
+  {
+    "index": 6,
+    "label": "mobile restore originally blank allocation",
+    "startUTC": "2026-10-04T06:01:19.753Z",
+    "endUTC": "2026-10-04T06:01:19.775Z"
+  },
+  {
+    "index": 7,
+    "label": "mobile restore original total0",
+    "startUTC": "2026-10-04T06:01:19.850Z",
+    "endUTC": "2026-10-04T06:01:19.871Z"
+  },
+  {
+    "index": 8,
+    "label": "tablet native resize150 zoom",
+    "startUTC": "2026-10-04T06:02:12.988Z",
+    "endUTC": "2026-10-04T06:02:20.293Z"
+  },
+  {
+    "index": 9,
+    "label": "tablet enter local allocation1000",
+    "startUTC": "2026-10-04T06:02:20.371Z",
+    "endUTC": "2026-10-04T06:02:20.402Z"
+  },
+  {
+    "index": 10,
+    "label": "tablet reveal warning text",
+    "startUTC": "2026-10-04T06:02:20.489Z",
+    "endUTC": "2026-10-04T06:02:20.775Z"
+  },
+  {
+    "index": 11,
+    "label": "tablet local total correction",
+    "startUTC": "2026-10-04T06:02:20.892Z",
+    "endUTC": "2026-10-04T06:02:21.172Z"
+  },
+  {
+    "index": 12,
+    "label": "tablet focus corrected total",
+    "startUTC": "2026-10-04T06:02:21.246Z",
+    "endUTC": "2026-10-04T06:02:21.523Z"
+  },
+  {
+    "index": 13,
+    "label": "tablet restore allocation blank",
+    "startUTC": "2026-10-04T06:02:21.637Z",
+    "endUTC": "2026-10-04T06:02:21.655Z"
+  },
+  {
+    "index": 14,
+    "label": "tablet restore total0",
+    "startUTC": "2026-10-04T06:02:21.726Z",
+    "endUTC": "2026-10-04T06:02:21.747Z"
+  },
+  {
+    "index": 15,
+    "label": "desktop zoom100",
+    "startUTC": "2026-10-04T06:02:21.848Z",
+    "endUTC": "2026-10-04T06:02:21.987Z"
+  },
+  {
+    "index": 16,
+    "label": "desktop enter local allocation1000",
+    "startUTC": "2026-10-04T06:02:22.065Z",
+    "endUTC": "2026-10-04T06:02:22.084Z"
+  },
+  {
+    "index": 17,
+    "label": "desktop reveal warning text",
+    "startUTC": "2026-10-04T06:02:22.161Z",
+    "endUTC": "2026-10-04T06:02:22.437Z"
+  },
+  {
+    "index": 18,
+    "label": "desktop local total correction",
+    "startUTC": "2026-10-04T06:02:22.555Z",
+    "endUTC": "2026-10-04T06:02:22.821Z"
+  },
+  {
+    "index": 19,
+    "label": "desktop focus corrected total",
+    "startUTC": "2026-10-04T06:02:22.895Z",
+    "endUTC": "2026-10-04T06:02:23.171Z"
+  },
+  {
+    "index": 20,
+    "label": "desktop restore allocation blank",
+    "startUTC": "2026-10-04T06:02:23.295Z",
+    "endUTC": "2026-10-04T06:02:23.311Z"
+  },
+  {
+    "index": 21,
+    "label": "desktop restore total0",
+    "startUTC": "2026-10-04T06:02:23.406Z",
+    "endUTC": "2026-10-04T06:02:23.422Z"
+  },
+  {
+    "index": 22,
+    "label": "leave restored values through Overview link",
+    "startUTC": "2026-10-04T06:02:51.489Z",
+    "endUTC": "2026-10-04T06:02:51.597Z"
+  },
+  {
+    "index": 23,
+    "label": "reenter Info without saving",
+    "startUTC": "2026-10-04T06:02:51.831Z",
+    "endUTC": "2026-10-04T06:02:52.111Z"
+  },
+  {
+    "index": 24,
+    "label": "final safe Overview exit",
+    "startUTC": "2026-10-04T06:02:52.313Z",
+    "endUTC": "2026-10-04T06:02:52.405Z"
+  }
+]

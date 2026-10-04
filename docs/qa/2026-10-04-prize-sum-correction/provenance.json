@@ -1,0 +1,189 @@
+{
+  "captureMetadataSHA256": "e395ac6a82c137e8ba011e4a5de5f8b175772b78ec5809cc22848c57990cba28",
+  "crops": [
+    {
+      "name": "mobile-sum-mismatch",
+      "proofIndex": 0,
+      "startUTC": "2026-10-04T06:01:19.023Z",
+      "endUTC": "2026-10-04T06:01:19.040Z",
+      "sourceFile": "mobile-sum-mismatch.png",
+      "sourceSHA256": "afdde94c4ee455b57a0ba19cf59e7ce6260fad163e1d54b9fdf904bd2050b962",
+      "outputFile": "mobile-sum-mismatch.png",
+      "outputSHA256": "be1f42cc870f457a83e0d5d158d247b35e718c78f03a7a5efe4d2ec26ab35677",
+      "bounds": [
+        25,
+        280,
+        377,
+        476
+      ],
+      "sourceSize": [
+        402,
+        605
+      ],
+      "outputSize": [
+        352,
+        196
+      ],
+      "sourceHashVerified": true,
+      "collectorPixelEquality": true,
+      "proofUTC": "2026-10-04T06:01:19.018Z"
+    },
+    {
+      "name": "mobile-total-corrected",
+      "proofIndex": 1,
+      "startUTC": "2026-10-04T06:01:19.736Z",
+      "endUTC": "2026-10-04T06:01:19.752Z",
+      "sourceFile": "mobile-total-corrected.png",
+      "sourceSHA256": "d3c375341340c9582d1879be8154c0d85cedf540c32e509d5710e7a914f62d2e",
+      "outputFile": "mobile-total-corrected.png",
+      "outputSHA256": "ce4021e4703a51f19ed0fbfbf967e8caf6e91e71e0c319f7e139ef481d380a93",
+      "bounds": [
+        25,
+        193,
+        377,
+        510
+      ],
+      "sourceSize": [
+        402,
+        605
+      ],
+      "outputSize": [
+        352,
+        317
+      ],
+      "sourceHashVerified": true,
+      "collectorPixelEquality": true,
+      "proofUTC": "2026-10-04T06:01:19.732Z"
+    },
+    {
+      "name": "tablet-sum-mismatch",
+      "proofIndex": 3,
+      "startUTC": "2026-10-04T06:02:20.865Z",
+      "endUTC": "2026-10-04T06:02:20.890Z",
+      "sourceFile": "tablet-sum-mismatch.png",
+      "sourceSHA256": "1c263f0538421552abba1ffd0cfdf0c8b00337c99eb9d5577eef149cd330f342",
+      "outputFile": "tablet-sum-mismatch.png",
+      "outputSHA256": "a45af570cccd00d3e42fc796c483dde6177a703adc5235a19fb3badfac0a0552",
+      "bounds": [
+        35,
+        68,
+        753,
+        374
+      ],
+      "sourceSize": [
+        788,
+        505
+      ],
+      "outputSize": [
+        718,
+        306
+      ],
+      "sourceHashVerified": true,
+      "collectorPixelEquality": true,
+      "proofUTC": "2026-10-04T06:02:20.859Z"
+    },
+    {
+      "name": "tablet-total-corrected",
+      "proofIndex": 4,
+      "startUTC": "2026-10-04T06:02:21.616Z",
+      "endUTC": "2026-10-04T06:02:21.636Z",
+      "sourceFile": "tablet-total-corrected.png",
+      "sourceSHA256": "8b584c6db3b0f3adf3548952fecca769a630493b8b45978c1219584ac1f7af98",
+      "outputFile": "tablet-total-corrected.png",
+      "outputSHA256": "172c1fc7223e427dcbe55e81a1bf22590ad4efb1151aa986f320d80052cc5298",
+      "bounds": [
+        33,
+        143,
+        755,
+        494
+      ],
+      "sourceSize": [
+        788,
+        505
+      ],
+      "outputSize": [
+        722,
+        351
+      ],
+      "sourceHashVerified": true,
+      "collectorPixelEquality": true,
+      "proofUTC": "2026-10-04T06:02:21.610Z"
+    },
+    {
+      "name": "desktop-sum-mismatch",
+      "proofIndex": 6,
+      "startUTC": "2026-10-04T06:02:22.532Z",
+      "endUTC": "2026-10-04T06:02:22.553Z",
+      "sourceFile": "desktop-sum-mismatch.png",
+      "sourceSHA256": "184b59d8b8620cd69b2d158b4cbc84e35ba3b42cb98735cc5bb6eff1df60b09c",
+      "outputFile": "desktop-sum-mismatch.png",
+      "outputSHA256": "c7cbd619053c577478ef1bef71c83c86cb726353700367eb007f213f3fcf5f44",
+      "bounds": [
+        488,
+        10,
+        1141,
+        500
+      ],
+      "sourceSize": [
+        1182,
+        757
+      ],
+      "outputSize": [
+        653,
+        490
+      ],
+      "sourceHashVerified": true,
+      "collectorPixelEquality": true,
+      "proofUTC": "2026-10-04T06:02:22.525Z"
+    },
+    {
+      "name": "desktop-total-corrected",
+      "proofIndex": 7,
+      "startUTC": "2026-10-04T06:02:23.270Z",
+      "endUTC": "2026-10-04T06:02:23.292Z",
+      "sourceFile": "desktop-total-corrected.png",
+      "sourceSHA256": "22ad892c2b8efdff1c01513b4472e0d6a4c55118d26698d79d6dc6ce88fcb41b",
+      "outputFile": "desktop-total-corrected.png",
+      "outputSHA256": "cd1b54ce96a31bf4ddcc91a579e124ac83da4171e5472f2a4debfae1ccd799f9",
+      "bounds": [
+        488,
+        269,
+        1141,
+        752
+      ],
+      "sourceSize": [
+        1182,
+        757
+      ],
+      "outputSize": [
+        653,
+        483
+      ],
+      "sourceHashVerified": true,
+      "collectorPixelEquality": true,
+      "proofUTC": "2026-10-04T06:02:23.265Z"
+    }
+  ],
+  "safeJSONHashes": {
+    "actions.json": "522d700eb856ebef1a8cc993174c804bb87d2d46e096c514813d1ba48ec75c6e",
+    "entry.json": "22866cdf00b2c3323b24ac25d365c203cf8aba64661b4b6f1406f7ab8cf42f8a",
+    "exit.json": "a5f57cc1de230aecc2f1f4ca668758386a829e0f44b5879acaf237182bd12fcc",
+    "initial.json": "f542f43997fdaa7d8f90b49bf0e644c90bf8dbf98483cc9f5f01075cbc0a0cb3",
+    "proof.json": "75fd8262158febefe63d2af7dd365da3573dc382f334c3736acfef6dbf193cc0",
+    "summary.json": "266b02fb5077b55be60e470faaf813629b97ec2d784382b3edf32d8b29ae91ee"
+  },
+  "privacy": "Crops contain generic prize labels and synthetic numerical local values only; exclude fixture title, account/member names, rosters and cover image.",
+  "sourceInputHashes": {
+    "exit.json": "a5f57cc1de230aecc2f1f4ca668758386a829e0f44b5879acaf237182bd12fcc",
+    "actions.json": "522d700eb856ebef1a8cc993174c804bb87d2d46e096c514813d1ba48ec75c6e",
+    "summary.json": "266b02fb5077b55be60e470faaf813629b97ec2d784382b3edf32d8b29ae91ee",
+    "provenance.json": "24aab3a5526e1a1fbaf1757625798d4d7687c54452bdfa6928a7343d1163d752",
+    "initial.json": "f542f43997fdaa7d8f90b49bf0e644c90bf8dbf98483cc9f5f01075cbc0a0cb3",
+    "entry.json": "22866cdf00b2c3323b24ac25d365c203cf8aba64661b4b6f1406f7ab8cf42f8a",
+    "proof.json": "75fd8262158febefe63d2af7dd365da3573dc382f334c3736acfef6dbf193cc0"
+  },
+  "publicationProjection": "Source safe files remain unchanged. Entry/proof/exit replace the synthetic fixture UUID with a route template and retain exact URL SHA256; summary omits unverified source-contract assertions. PNG/actions/initial bytes preserved. safeJSONHashes describe source inputs; manifest.json describes public bytes.",
+  "fixtureIdentifierSHA256": "9bb8586d8d3512789a6b624a536a22dbfa1d02f082dab9a37ac8abf9bab7df08",
+  "publisherReview": "All six safe PNGs viewed; output hashes, dimensions, bounds, capture/proof UTC and all10 DOM value/action sequences independently checked. Private originals not accessed; source pixel equality remains collector-attested.",
+  "captureMetadataScopeNote": "Digest remains collector provenance; the private capture metadata file was not independently read."
+}

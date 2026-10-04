@@ -1,0 +1,80 @@
+{
+  "files": [
+    {
+      "file": "README.md",
+      "bytes": 7310,
+      "sha256": "691ceccb682e2011105212511be06e6996ab6abc3f28e2a90bf5938b1265baed"
+    },
+    {
+      "file": "actions.json",
+      "bytes": 3981,
+      "sha256": "522d700eb856ebef1a8cc993174c804bb87d2d46e096c514813d1ba48ec75c6e"
+    },
+    {
+      "file": "desktop-sum-mismatch.png",
+      "bytes": 89759,
+      "sha256": "c7cbd619053c577478ef1bef71c83c86cb726353700367eb007f213f3fcf5f44"
+    },
+    {
+      "file": "desktop-total-corrected.png",
+      "bytes": 87255,
+      "sha256": "cd1b54ce96a31bf4ddcc91a579e124ac83da4171e5472f2a4debfae1ccd799f9"
+    },
+    {
+      "file": "entry.json",
+      "bytes": 383,
+      "sha256": "c225a50a22748336e6a9126e0e04c7d425406ae5f59ab7c887730953008a1bf2"
+    },
+    {
+      "file": "exit.json",
+      "bytes": 1660,
+      "sha256": "8d16ebd25051e676aaf4390f209291fd25d82061aff51d85c7ff1d909bc20894"
+    },
+    {
+      "file": "initial.json",
+      "bytes": 1192,
+      "sha256": "f542f43997fdaa7d8f90b49bf0e644c90bf8dbf98483cc9f5f01075cbc0a0cb3"
+    },
+    {
+      "file": "mobile-sum-mismatch.png",
+      "bytes": 34513,
+      "sha256": "be1f42cc870f457a83e0d5d158d247b35e718c78f03a7a5efe4d2ec26ab35677"
+    },
+    {
+      "file": "mobile-total-corrected.png",
+      "bytes": 44947,
+      "sha256": "ce4021e4703a51f19ed0fbfbf967e8caf6e91e71e0c319f7e139ef481d380a93"
+    },
+    {
+      "file": "proof.json",
+      "bytes": 44937,
+      "sha256": "a24ab4aa212c2f5d4169a43b440079894659c8db13519e3c37aa8b4b034c3953"
+    },
+    {
+      "file": "provenance.json",
+      "bytes": 6772,
+      "sha256": "5b6523bf56d51403c6f9a94fdeb7619e713271ce692ee3ed237ebb9a2b4c00ed"
+    },
+    {
+      "file": "summary.json",
+      "bytes": 3956,
+      "sha256": "52a38bd4df59315d49fc7d11a121eee12ba3ce91f08faea7a1824d8411697b2e"
+    },
+    {
+      "file": "tablet-sum-mismatch.png",
+      "bytes": 61329,
+      "sha256": "a45af570cccd00d3e42fc796c483dde6177a703adc5235a19fb3badfac0a0552"
+    },
+    {
+      "file": "tablet-total-corrected.png",
+      "bytes": 64574,
+      "sha256": "172c1fc7223e427dcbe55e81a1bf22590ad4efb1151aa986f320d80052cc5298"
+    },
+    {
+      "file": "verification.json",
+      "bytes": 6426,
+      "sha256": "008785ac0bf5578e0300e5ca025cae201cdb8a47a6b9b7cd39b731908ce79ba4"
+    }
+  ],
+  "note": "Public file hashes exclude this manifest. Original source hashes are separately recorded in provenance.json."
+}

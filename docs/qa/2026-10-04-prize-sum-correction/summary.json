@@ -1,0 +1,116 @@
+{
+  "issue": 129,
+  "item": 13,
+  "originalCriterion": "Mismatch warning plus one-click correction of total to allocation sum",
+  "originalIssue": "https://github.com/kim-song-jun/matchup-sports-platform/issues/129",
+  "scope": "Existing approved synthetic tournament inline prize editor, local-only numeric mismatch and correction",
+  "firstNavigationUTC": "2026-10-04T05:59:46.115Z",
+  "observedStartUTC": "2026-10-04T05:59:54.592Z",
+  "observedEndUTC": "2026-10-04T06:02:52.629Z",
+  "runtimeServingSHA": "unknown",
+  "deploymentContext": "last reported alpha27a021fc7650672d5af25217108b101dc856c8d5; not a measured browser runtime SHA",
+  "cycles": [
+    {
+      "widthLabel": "mobile",
+      "viewport": {
+        "dpr": 1.25,
+        "height": 606,
+        "width": 402
+      },
+      "beforeProofIndex": 0,
+      "correctedProofIndex": 1,
+      "restoredProofIndex": 2,
+      "beforeTotal": "0",
+      "allocation": "1000",
+      "mismatchText": [
+        "배분 합계 1,000원 · 총상금과 달라요"
+      ],
+      "correctionType": "button",
+      "afterTotal": "1,000",
+      "afterSumText": [
+        "배분 합계 1,000원"
+      ],
+      "mismatchClauseRemoved": true,
+      "correctionButtonRemoved": true,
+      "all8RestoredEqualBaseline": true
+    },
+    {
+      "widthLabel": "tablet",
+      "viewport": {
+        "dpr": 1.5,
+        "height": 505,
+        "width": 788
+      },
+      "beforeProofIndex": 3,
+      "correctedProofIndex": 4,
+      "restoredProofIndex": 5,
+      "beforeTotal": "0",
+      "allocation": "1000",
+      "mismatchText": [
+        "배분 합계 1,000원 · 총상금과 달라요"
+      ],
+      "correctionType": "button",
+      "afterTotal": "1,000",
+      "afterSumText": [
+        "배분 합계 1,000원"
+      ],
+      "mismatchClauseRemoved": true,
+      "correctionButtonRemoved": true,
+      "all8RestoredEqualBaseline": true
+    },
+    {
+      "widthLabel": "desktop",
+      "viewport": {
+        "dpr": 1,
+        "height": 757,
+        "width": 1182
+      },
+      "beforeProofIndex": 6,
+      "correctedProofIndex": 7,
+      "restoredProofIndex": 8,
+      "beforeTotal": "0",
+      "allocation": "1000",
+      "mismatchText": [
+        "배분 합계 1,000원 · 총상금과 달라요"
+      ],
+      "correctionType": "button",
+      "afterTotal": "1,000",
+      "afterSumText": [
+        "배분 합계 1,000원"
+      ],
+      "mismatchClauseRemoved": true,
+      "correctionButtonRemoved": true,
+      "all8RestoredEqualBaseline": true
+    }
+  ],
+  "restoration": {
+    "baselineTotal": "0",
+    "baselineFirstContent": "",
+    "all8FieldsMatchOnReentry": true,
+    "finalURLRoute": "/admin/tournaments/{synthetic-fixture}/overview",
+    "finalInputsAndVisibleDialogs": 0
+  },
+  "counts": {
+    "DOMRows": 10,
+    "selectedActionRecords": 25,
+    "safePNGs": 6
+  },
+  "notPerformed": [
+    "상금 정보 저장",
+    "Enter",
+    "upload",
+    "creation",
+    "official-result mutation",
+    "notification",
+    "network/database audit"
+  ],
+  "limitations": [
+    "Only one positive integer allocation versus total0 was tested, not all monetary boundaries or save validation.",
+    "Correction leaves neutral 배분 합계1,000원 text; only mismatch clause and correction button disappear. warningLines is the collector key for all sum-related lines, not only warnings.",
+    "Pointer obscures part of warning text in screenshots; exact string is available in DOM records.",
+    "Before warning and after-total screenshots use different scroll positions and separate capture times.",
+    "UI values and route reentry restoration are observed; do not assert a direct API/DB write audit.",
+    "CSS zoom viewport on cloud browser, not real-device keyboard or screen-reader testing."
+  ],
+  "publicationScopeNote": "Source-contract assertions omitted from this public projection; this package verifies current UI evidence and does not attribute runtime code or audit network/storage."
+}

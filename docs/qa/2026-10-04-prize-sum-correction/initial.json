@@ -1,0 +1,59 @@
+{
+  "fields": [
+    {
+      "disabled": false,
+      "insideForm": false,
+      "name": "총상금",
+      "value": "0"
+    },
+    {
+      "disabled": false,
+      "insideForm": false,
+      "name": "상금 항목 1 이름",
+      "value": "1위"
+    },
+    {
+      "disabled": false,
+      "insideForm": false,
+      "name": "상금 항목 1 내용",
+      "value": ""
+    },
+    {
+      "disabled": false,
+      "insideForm": false,
+      "name": "상금 항목 2 이름",
+      "value": "2위"
+    },
+    {
+      "disabled": false,
+      "insideForm": false,
+      "name": "상금 항목 2 내용",
+      "value": ""
+    },
+    {
+      "disabled": false,
+      "insideForm": false,
+      "name": "상금 항목 3 이름",
+      "value": "3위"
+    },
+    {
+      "disabled": false,
+      "insideForm": false,
+      "name": "상금 항목 3 내용",
+      "value": ""
+    },
+    {
+      "disabled": false,
+      "insideForm": false,
+      "name": "상품 및 상금",
+      "value": "QA 테스트용 대회입니다. 실제 경기·상금·상품은 없습니다."
+    }
+  ],
+  "save": [
+    {
+      "disabled": false,
+      "type": "button"
+    }
+  ],
+  "utc": "2026-10-04T05:59:54.592Z"
+}

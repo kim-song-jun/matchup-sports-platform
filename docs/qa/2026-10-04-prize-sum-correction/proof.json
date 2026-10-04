@@ -1,0 +1,1747 @@
+[
+  {
+    "buttons": [
+      {
+        "disabled": false,
+        "name": "상금 항목 1 삭제",
+        "rect": {
+          "height": 44,
+          "width": 44,
+          "x": 321.6000061035156,
+          "y": -31.200000762939453
+        },
+        "type": "button"
+      },
+      {
+        "disabled": false,
+        "name": "상금 항목 2 삭제",
+        "rect": {
+          "height": 44,
+          "width": 44,
+          "x": 321.6000061035156,
+          "y": 72.80000305175781
+        },
+        "type": "button"
+      },
+      {
+        "disabled": false,
+        "name": "상금 항목 3 삭제",
+        "rect": {
+          "height": 44,
+          "width": 44,
+          "x": 321.6000061035156,
+          "y": 176.8000030517578
+        },
+        "type": "button"
+      },
+      {
+        "disabled": false,
+        "name": "항목 추가",
+        "rect": {
+          "height": 44,
+          "width": 115.3375015258789,
+          "x": 36.79999923706055,
+          "y": 280.8000183105469
+        },
+        "type": "button"
+      },
+      {
+        "disabled": false,
+        "name": "합계를 총상금으로",
+        "rect": {
+          "height": 44,
+          "width": 146.65000915527344,
+          "x": 36.79999923706055,
+          "y": 332.8000183105469
+        },
+        "type": "button"
+      },
+      {
+        "disabled": false,
+        "name": "상금 정보 저장",
+        "rect": {
+          "height": 44,
+          "width": 123,
+          "x": 242.6000061035156,
+          "y": 585.9874877929688
+        },
+        "type": "button"
+      }
+    ],
+    "fields": [
+      {
+        "disabled": false,
+        "insideForm": false,
+        "name": "총상금",
+        "rect": {
+          "height": 44,
+          "width": 328.8000183105469,
+          "x": 36.79999923706055,
+          "y": -161.1999969482422
+        },
+        "value": "0"
+      },
+      {
+        "disabled": false,
+        "insideForm": false,
+        "name": "상금 항목 1 이름",
+        "rect": {
+          "height": 44,
+          "width": 276.8000183105469,
+          "x": 36.79999923706055,
+          "y": -31.200000762939453
+        },
+        "value": "1위"
+      },
+      {
+        "disabled": false,
+        "insideForm": false,
+        "name": "상금 항목 1 내용",
+        "rect": {
+          "height": 44,
+          "width": 328.8000183105469,
+          "x": 36.79999923706055,
+          "y": 20.80000114440918
+        },
+        "value": "1000"
+      },
+      {
+        "disabled": false,
+        "insideForm": false,
+        "name": "상금 항목 2 이름",
+        "rect": {
+          "height": 44,
+          "width": 276.8000183105469,
+          "x": 36.79999923706055,
+          "y": 72.80000305175781
+        },
+        "value": "2위"
+      },
+      {
+        "disabled": false,
+        "insideForm": false,
+        "name": "상금 항목 2 내용",
+        "rect": {
+          "height": 44,
+          "width": 328.8000183105469,
+          "x": 36.79999923706055,
+          "y": 124.8000030517578
+        },
+        "value": ""
+      },
+      {
+        "disabled": false,
+        "insideForm": false,
+        "name": "상금 항목 3 이름",
+        "rect": {
+          "height": 44,
+          "width": 276.8000183105469,
+          "x": 36.79999923706055,
+          "y": 176.8000030517578
+        },
+        "value": "3위"
+      },
+      {
+        "disabled": false,
+        "insideForm": false,
+        "name": "상금 항목 3 내용",
+        "rect": {
+          "height": 44,
+          "width": 328.8000183105469,
+          "x": 36.79999923706055,
+          "y": 228.8000030517578
+        },
+        "value": ""
+      },
+      {
+        "disabled": false,
+        "insideForm": false,
+        "name": "상품 및 상금",
+        "rect": {
+          "height": 65.5999984741211,
+          "width": 328.8000183105469,
+          "x": 36.79999923706055,
+          "y": 508.3875122070313
+        },
+        "value": "QA 테스트용 대회입니다. 실제 경기·상금·상품은 없습니다."
+      }
+    ],
+    "regionText": "상금·시상 정보\n\n공개 페이지 \"시상·리뷰\"의 상금 카드에 그대로 표시돼요.\n\n총상금\n\n상금 배분\n\n숫자는 원 단위로 자동 정리되고 트로피·상품권 같은 물품도 입력할 수 있어요.\n\n항목 추가\n배분 합계 1,000원 · 총상금과 달라요\n합계를 총상금으로\n\n공개 페이지 미리보기\n\n1위\n1,000원\n상품 및 상금\n상금 정보 저장",
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/{synthetic-fixture}/info",
+    "urlSHA256": "a31af0d6862d208a75fd70d974458867c5aff50a8aca9f8d8bc8fdc27d2c3980",
+    "utc": "2026-10-04T06:01:19.018Z",
+    "viewport": {
+      "dpr": 1.25,
+      "height": 606,
+      "width": 402
+    },
+    "warningLines": [
+      "배분 합계 1,000원 · 총상금과 달라요"
+    ],
+    "index": 0,
+    "widthLabel": "mobile",
+    "state": "mismatch"
+  },
+  {
+    "buttons": [
+      {
+        "disabled": false,
+        "name": "상금 항목 1 삭제",
+        "rect": {
+          "height": 44,
+          "width": 44,
+          "x": 321.6000061035156,
+          "y": 410.3999938964844
+        },
+        "type": "button"
+      },
+      {
+        "disabled": false,
+        "name": "상금 항목 2 삭제",
+        "rect": {
+          "height": 44,
+          "width": 44,
+          "x": 321.6000061035156,
+          "y": 514.4000244140625
+        },
+        "type": "button"
+      },
+      {
+        "disabled": false,
+        "name": "상금 항목 3 삭제",
+        "rect": {
+          "height": 44,
+          "width": 44,
+          "x": 321.6000061035156,
+          "y": 618.4000244140625
+        },
+        "type": "button"
+      },
+      {
+        "disabled": false,
+        "name": "항목 추가",
+        "rect": {
+          "height": 44,
+          "width": 115.3375015258789,
+          "x": 36.79999923706055,
+          "y": 722.4000244140625
+        },
+        "type": "button"
+      },
+      {
+        "disabled": false,
+        "name": "상금 정보 저장",
+        "rect": {
+          "height": 44,
+          "width": 123,
+          "x": 242.6000061035156,
+          "y": 975.5875244140624
+        },
+        "type": "button"
+      }
+    ],
+    "fields": [
+      {
+        "disabled": false,
+        "insideForm": false,
+        "name": "총상금",
+        "rect": {
+          "height": 44,
+          "width": 328.8000183105469,
+          "x": 36.79999923706055,
+          "y": 280.3999938964844
+        },
+        "value": "1,000"
+      },
+      {
+        "disabled": false,
+        "insideForm": false,
+        "name": "상금 항목 1 이름",
+        "rect": {
+          "height": 44,
+          "width": 276.8000183105469,
+          "x": 36.79999923706055,
+          "y": 410.3999938964844
+        },
+        "value": "1위"
+      },
+      {
+        "disabled": false,
+        "insideForm": false,
+        "name": "상금 항목 1 내용",
+        "rect": {
+          "height": 44,
+          "width": 328.8000183105469,
+          "x": 36.79999923706055,
+          "y": 462.3999938964844
+        },
+        "value": "1000"
+      },
+      {
+        "disabled": false,
+        "insideForm": false,
+        "name": "상금 항목 2 이름",
+        "rect": {
+          "height": 44,
+          "width": 276.8000183105469,
+          "x": 36.79999923706055,
+          "y": 514.4000244140625
+        },
+        "value": "2위"
+      },
+      {
+        "disabled": false,
+        "insideForm": false,
+        "name": "상금 항목 2 내용",
+        "rect": {
+          "height": 44,
+          "width": 328.8000183105469,
+          "x": 36.79999923706055,
+          "y": 566.4000244140625
+        },
+        "value": ""
+      },
+      {
+        "disabled": false,
+        "insideForm": false,
+        "name": "상금 항목 3 이름",
+        "rect": {
+          "height": 44,
+          "width": 276.8000183105469,
+          "x": 36.79999923706055,
+          "y": 618.4000244140625
+        },
+        "value": "3위"
+      },
+      {
+        "disabled": false,
+        "insideForm": false,
+        "name": "상금 항목 3 내용",
+        "rect": {
+          "height": 44,
+          "width": 328.8000183105469,
+          "x": 36.79999923706055,
+          "y": 670.4000244140625
+        },
+        "value": ""
+      },
+      {
+        "disabled": false,
+        "insideForm": false,
+        "name": "상품 및 상금",
+        "rect": {
+          "height": 65.5999984741211,
+          "width": 328.8000183105469,
+          "x": 36.79999923706055,
+          "y": 897.9874877929688
+        },
+        "value": "QA 테스트용 대회입니다. 실제 경기·상금·상품은 없습니다."
+      }
+    ],
+    "regionText": "상금·시상 정보\n\n공개 페이지 \"시상·리뷰\"의 상금 카드에 그대로 표시돼요.\n\n총상금\n\n상금 배분\n\n숫자는 원 단위로 자동 정리되고 트로피·상품권 같은 물품도 입력할 수 있어요.\n\n항목 추가\n배분 합계 1,000원\n\n공개 페이지 미리보기\n\n1위\n1,000원\n상품 및 상금\n상금 정보 저장",
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/{synthetic-fixture}/info",
+    "urlSHA256": "a31af0d6862d208a75fd70d974458867c5aff50a8aca9f8d8bc8fdc27d2c3980",
+    "utc": "2026-10-04T06:01:19.732Z",
+    "viewport": {
+      "dpr": 1.25,
+      "height": 606,
+      "width": 402
+    },
+    "warningLines": [
+      "배분 합계 1,000원"
+    ],
+    "index": 1,
+    "widthLabel": "mobile",
+    "state": "corrected"
+  },
+  {
+    "buttons": [
+      {
+        "disabled": false,
+        "name": "상금 항목 1 삭제",
+        "rect": {
+          "height": 44,
+          "width": 44,
+          "x": 321.6000061035156,
+          "y": 410.3999938964844
+        },
+        "type": "button"
+      },
+      {
+        "disabled": false,
+        "name": "상금 항목 2 삭제",
+        "rect": {
+          "height": 44,
+          "width": 44,
+          "x": 321.6000061035156,
+          "y": 514.4000244140625
+        },
+        "type": "button"
+      },
+      {
+        "disabled": false,
+        "name": "상금 항목 3 삭제",
+        "rect": {
+          "height": 44,
+          "width": 44,
+          "x": 321.6000061035156,
+          "y": 618.4000244140625
+        },
+        "type": "button"
+      },
+      {
+        "disabled": false,
+        "name": "항목 추가",
+        "rect": {
+          "height": 44,
+          "width": 115.3375015258789,
+          "x": 36.79999923706055,
+          "y": 722.4000244140625
+        },
+        "type": "button"
+      },
+      {
+        "disabled": false,
+        "name": "상금 정보 저장",
+        "rect": {
+          "height": 44,
+          "width": 123,
+          "x": 242.6000061035156,
+          "y": 975.5875244140624
+        },
+        "type": "button"
+      }
+    ],
+    "fields": [
+      {
+        "disabled": false,
+        "insideForm": false,
+        "name": "총상금",
+        "rect": {
+          "height": 44,
+          "width": 328.8000183105469,
+          "x": 36.79999923706055,
+          "y": 280.3999938964844
+        },
+        "value": "0"
+      },
+      {
+        "disabled": false,
+        "insideForm": false,
+        "name": "상금 항목 1 이름",
+        "rect": {
+          "height": 44,
+          "width": 276.8000183105469,
+          "x": 36.79999923706055,
+          "y": 410.3999938964844
+        },
+        "value": "1위"
+      },
+      {
+        "disabled": false,
+        "insideForm": false,
+        "name": "상금 항목 1 내용",
+        "rect": {
+          "height": 44,
+          "width": 328.8000183105469,
+          "x": 36.79999923706055,
+          "y": 462.3999938964844
+        },
+        "value": ""
+      },
+      {
+        "disabled": false,
+        "insideForm": false,
+        "name": "상금 항목 2 이름",
+        "rect": {
+          "height": 44,
+          "width": 276.8000183105469,
+          "x": 36.79999923706055,
+          "y": 514.4000244140625
+        },
+        "value": "2위"
+      },
+      {
+        "disabled": false,
+        "insideForm": false,
+        "name": "상금 항목 2 내용",
+        "rect": {
+          "height": 44,
+          "width": 328.8000183105469,
+          "x": 36.79999923706055,
+          "y": 566.4000244140625
+        },
+        "value": ""
+      },
+      {
+        "disabled": false,
+        "insideForm": false,
+        "name": "상금 항목 3 이름",
+        "rect": {
+          "height": 44,
+          "width": 276.8000183105469,
+          "x": 36.79999923706055,
+          "y": 618.4000244140625
+        },
+        "value": "3위"
+      },
+      {
+        "disabled": false,
+        "insideForm": false,
+        "name": "상금 항목 3 내용",
+        "rect": {
+          "height": 44,
+          "width": 328.8000183105469,
+          "x": 36.79999923706055,
+          "y": 670.4000244140625
+        },
+        "value": ""
+      },
+      {
+        "disabled": false,
+        "insideForm": false,
+        "name": "상품 및 상금",
+        "rect": {
+          "height": 65.5999984741211,
+          "width": 328.8000183105469,
+          "x": 36.79999923706055,
+          "y": 897.9874877929688
+        },
+        "value": "QA 테스트용 대회입니다. 실제 경기·상금·상품은 없습니다."
+      }
+    ],
+    "regionText": "상금·시상 정보\n\n공개 페이지 \"시상·리뷰\"의 상금 카드에 그대로 표시돼요.\n\n총상금\n\n상금 배분\n\n숫자는 원 단위로 자동 정리되고 트로피·상품권 같은 물품도 입력할 수 있어요.\n\n항목 추가\n\n공개 페이지 미리보기\n\n상금 항목을 추가하면 여기에 바로 보여요.\n\n상품 및 상금\n상금 정보 저장",
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/{synthetic-fixture}/info",
+    "urlSHA256": "a31af0d6862d208a75fd70d974458867c5aff50a8aca9f8d8bc8fdc27d2c3980",
+    "utc": "2026-10-04T06:01:19.969Z",
+    "viewport": {
+      "dpr": 1.25,
+      "height": 606,
+      "width": 402
+    },
+    "warningLines": [],
+    "index": 2,
+    "widthLabel": "mobile",
+    "state": "restored"
+  },
+  {
+    "buttons": [
+      {
+        "disabled": false,
+        "name": "상금 항목 1 삭제",
+        "rect": {
+          "height": 44,
+          "width": 44,
+          "x": 699.3333740234375,
+          "y": 74.33333587646484
+        },
+        "type": "button"
+      },
+      {
+        "disabled": false,
+        "name": "상금 항목 2 삭제",
+        "rect": {
+          "height": 44,
+          "width": 44,
+          "x": 699.3333740234375,
+          "y": 126.33333587646484
+        },
+        "type": "button"
+      },
+      {
+        "disabled": false,
+        "name": "상금 항목 3 삭제",
+        "rect": {
+          "height": 44,
+          "width": 44,
+          "x": 699.3333740234375,
+          "y": 178.33334350585938
+        },
+        "type": "button"
+      },
+      {
+        "disabled": false,
+        "name": "항목 추가",
+        "rect": {
+          "height": 44,
+          "width": 115.33333587646484,
+          "x": 44.66666793823242,
+          "y": 230.33334350585935
+        },
+        "type": "button"
+      },
+      {
+        "disabled": false,
+        "name": "합계를 총상금으로",
+        "rect": {
+          "height": 44,
+          "width": 146.64584350585938,
+          "x": 349.04168701171875,
+          "y": 230.33334350585935
+        },
+        "type": "button"
+      },
+      {
+        "disabled": false,
+        "name": "상금 정보 저장",
+        "rect": {
+          "height": 44,
+          "width": 123,
+          "x": 620.3333740234375,
+          "y": 483
+        },
+        "type": "button"
+      }
+    ],
+    "fields": [
+      {
+        "disabled": false,
+        "insideForm": false,
+        "name": "총상금",
+        "rect": {
+          "height": 44,
+          "width": 698.6666870117188,
+          "x": 44.66666793823242,
+          "y": -35.66666793823242
+        },
+        "value": "0"
+      },
+      {
+        "disabled": false,
+        "insideForm": false,
+        "name": "상금 항목 1 이름",
+        "rect": {
+          "height": 44,
+          "width": 255.45834350585935,
+          "x": 44.66666793823242,
+          "y": 74.33333587646484
+        },
+        "value": "1위"
+      },
+      {
+        "disabled": false,
+        "insideForm": false,
+        "name": "상금 항목 1 내용",
+        "rect": {
+          "height": 44,
+          "width": 383.2083435058594,
+          "x": 308.125,
+          "y": 74.33333587646484
+        },
+        "value": "1000"
+      },
+      {
+        "disabled": false,
+        "insideForm": false,
+        "name": "상금 항목 2 이름",
+        "rect": {
+          "height": 44,
+          "width": 255.45834350585935,
+          "x": 44.66666793823242,
+          "y": 126.33333587646484
+        },
+        "value": "2위"
+      },
+      {
+        "disabled": false,
+        "insideForm": false,
+        "name": "상금 항목 2 내용",
+        "rect": {
+          "height": 44,
+          "width": 383.2083435058594,
+          "x": 308.125,
+          "y": 126.33333587646484
+        },
+        "value": ""
+      },
+      {
+        "disabled": false,
+        "insideForm": false,
+        "name": "상금 항목 3 이름",
+        "rect": {
+          "height": 44,
+          "width": 255.45834350585935,
+          "x": 44.66666793823242,
+          "y": 178.33334350585938
+        },
+        "value": "3위"
+      },
+      {
+        "disabled": false,
+        "insideForm": false,
+        "name": "상금 항목 3 내용",
+        "rect": {
+          "height": 44,
+          "width": 383.2083435058594,
+          "x": 308.125,
+          "y": 178.33334350585938
+        },
+        "value": ""
+      },
+      {
+        "disabled": false,
+        "insideForm": false,
+        "name": "상품 및 상금",
+        "rect": {
+          "height": 65.33333587646484,
+          "width": 698.6666870117188,
+          "x": 44.66666793823242,
+          "y": 405.6666870117187
+        },
+        "value": "QA 테스트용 대회입니다. 실제 경기·상금·상품은 없습니다."
+      }
+    ],
+    "regionText": "상금·시상 정보\n\n공개 페이지 \"시상·리뷰\"의 상금 카드에 그대로 표시돼요.\n\n총상금\n\n상금 배분\n\n숫자는 원 단위로 자동 정리되고 트로피·상품권 같은 물품도 입력할 수 있어요.\n\n항목 추가\n배분 합계 1,000원 · 총상금과 달라요\n합계를 총상금으로\n\n공개 페이지 미리보기\n\n1위\n1,000원\n상품 및 상금\n상금 정보 저장",
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/{synthetic-fixture}/info",
+    "urlSHA256": "a31af0d6862d208a75fd70d974458867c5aff50a8aca9f8d8bc8fdc27d2c3980",
+    "utc": "2026-10-04T06:02:20.859Z",
+    "viewport": {
+      "dpr": 1.5,
+      "height": 505,
+      "width": 788
+    },
+    "warningLines": [
+      "배분 합계 1,000원 · 총상금과 달라요"
+    ],
+    "index": 3,
+    "widthLabel": "tablet",
+    "state": "mismatch"
+  },
+  {
+    "buttons": [
+      {
+        "disabled": false,
+        "name": "상금 항목 1 삭제",
+        "rect": {
+          "height": 44,
+          "width": 44,
+          "x": 699.3333740234375,
+          "y": 340.3333435058594
+        },
+        "type": "button"
+      },
+      {
+        "disabled": false,
+        "name": "상금 항목 2 삭제",
+        "rect": {
+          "height": 44,
+          "width": 44,
+          "x": 699.3333740234375,
+          "y": 392.3333435058594
+        },
+        "type": "button"
+      },
+      {
+        "disabled": false,
+        "name": "상금 항목 3 삭제",
+        "rect": {
+          "height": 44,
+          "width": 44,
+          "x": 699.3333740234375,
+          "y": 444.3333435058594
+        },
+        "type": "button"
+      },
+      {
+        "disabled": false,
+        "name": "항목 추가",
+        "rect": {
+          "height": 44,
+          "width": 115.33333587646484,
+          "x": 44.66666793823242,
+          "y": 496.3333435058594
+        },
+        "type": "button"
+      },
+      {
+        "disabled": false,
+        "name": "상금 정보 저장",
+        "rect": {
+          "height": 44,
+          "width": 123,
+          "x": 620.3333740234375,
+          "y": 749
+        },
+        "type": "button"
+      }
+    ],
+    "fields": [
+      {
+        "disabled": false,
+        "insideForm": false,
+        "name": "총상금",
+        "rect": {
+          "height": 44,
+          "width": 698.6666870117188,
+          "x": 44.66666793823242,
+          "y": 230.33334350585935
+        },
+        "value": "1,000"
+      },
+      {
+        "disabled": false,
+        "insideForm": false,
+        "name": "상금 항목 1 이름",
+        "rect": {
+          "height": 44,
+          "width": 255.45834350585935,
+          "x": 44.66666793823242,
+          "y": 340.3333435058594
+        },
+        "value": "1위"
+      },
+      {
+        "disabled": false,
+        "insideForm": false,
+        "name": "상금 항목 1 내용",
+        "rect": {
+          "height": 44,
+          "width": 383.2083435058594,
+          "x": 308.125,
+          "y": 340.3333435058594
+        },
+        "value": "1000"
+      },
+      {
+        "disabled": false,
+        "insideForm": false,
+        "name": "상금 항목 2 이름",
+        "rect": {
+          "height": 44,
+          "width": 255.45834350585935,
+          "x": 44.66666793823242,
+          "y": 392.3333435058594
+        },
+        "value": "2위"
+      },
+      {
+        "disabled": false,
+        "insideForm": false,
+        "name": "상금 항목 2 내용",
+        "rect": {
+          "height": 44,
+          "width": 383.2083435058594,
+          "x": 308.125,
+          "y": 392.3333435058594
+        },
+        "value": ""
+      },
+      {
+        "disabled": false,
+        "insideForm": false,
+        "name": "상금 항목 3 이름",
+        "rect": {
+          "height": 44,
+          "width": 255.45834350585935,
+          "x": 44.66666793823242,
+          "y": 444.3333435058594
+        },
+        "value": "3위"
+      },
+      {
+        "disabled": false,
+        "insideForm": false,
+        "name": "상금 항목 3 내용",
+        "rect": {
+          "height": 44,
+          "width": 383.2083435058594,
+          "x": 308.125,
+          "y": 444.3333435058594
+        },
+        "value": ""
+      },
+      {
+        "disabled": false,
+        "insideForm": false,
+        "name": "상품 및 상금",
+        "rect": {
+          "height": 65.33333587646484,
+          "width": 698.6666870117188,
+          "x": 44.66666793823242,
+          "y": 671.6666870117188
+        },
+        "value": "QA 테스트용 대회입니다. 실제 경기·상금·상품은 없습니다."
+      }
+    ],
+    "regionText": "상금·시상 정보\n\n공개 페이지 \"시상·리뷰\"의 상금 카드에 그대로 표시돼요.\n\n총상금\n\n상금 배분\n\n숫자는 원 단위로 자동 정리되고 트로피·상품권 같은 물품도 입력할 수 있어요.\n\n항목 추가\n배분 합계 1,000원\n\n공개 페이지 미리보기\n\n1위\n1,000원\n상품 및 상금\n상금 정보 저장",
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/{synthetic-fixture}/info",
+    "urlSHA256": "a31af0d6862d208a75fd70d974458867c5aff50a8aca9f8d8bc8fdc27d2c3980",
+    "utc": "2026-10-04T06:02:21.610Z",
+    "viewport": {
+      "dpr": 1.5,
+      "height": 505,
+      "width": 788
+    },
+    "warningLines": [
+      "배분 합계 1,000원"
+    ],
+    "index": 4,
+    "widthLabel": "tablet",
+    "state": "corrected"
+  },
+  {
+    "buttons": [
+      {
+        "disabled": false,
+        "name": "상금 항목 1 삭제",
+        "rect": {
+          "height": 44,
+          "width": 44,
+          "x": 699.3333740234375,
+          "y": 340.3333435058594
+        },
+        "type": "button"
+      },
+      {
+        "disabled": false,
+        "name": "상금 항목 2 삭제",
+        "rect": {
+          "height": 44,
+          "width": 44,
+          "x": 699.3333740234375,
+          "y": 392.3333435058594
+        },
+        "type": "button"
+      },
+      {
+        "disabled": false,
+        "name": "상금 항목 3 삭제",
+        "rect": {
+          "height": 44,
+          "width": 44,
+          "x": 699.3333740234375,
+          "y": 444.3333435058594
+        },
+        "type": "button"
+      },
+      {
+        "disabled": false,
+        "name": "항목 추가",
+        "rect": {
+          "height": 44,
+          "width": 115.33333587646484,
+          "x": 44.66666793823242,
+          "y": 496.3333435058594
+        },
+        "type": "button"
+      },
+      {
+        "disabled": false,
+        "name": "상금 정보 저장",
+        "rect": {
+          "height": 44,
+          "width": 123,
+          "x": 620.3333740234375,
+          "y": 749
+        },
+        "type": "button"
+      }
+    ],
+    "fields": [
+      {
+        "disabled": false,
+        "insideForm": false,
+        "name": "총상금",
+        "rect": {
+          "height": 44,
+          "width": 698.6666870117188,
+          "x": 44.66666793823242,
+          "y": 230.33334350585935
+        },
+        "value": "0"
+      },
+      {
+        "disabled": false,
+        "insideForm": false,
+        "name": "상금 항목 1 이름",
+        "rect": {
+          "height": 44,
+          "width": 255.45834350585935,
+          "x": 44.66666793823242,
+          "y": 340.3333435058594
+        },
+        "value": "1위"
+      },
+      {
+        "disabled": false,
+        "insideForm": false,
+        "name": "상금 항목 1 내용",
+        "rect": {
+          "height": 44,
+          "width": 383.2083435058594,
+          "x": 308.125,
+          "y": 340.3333435058594
+        },
+        "value": ""
+      },
+      {
+        "disabled": false,
+        "insideForm": false,
+        "name": "상금 항목 2 이름",
+        "rect": {
+          "height": 44,
+          "width": 255.45834350585935,
+          "x": 44.66666793823242,
+          "y": 392.3333435058594
+        },
+        "value": "2위"
+      },
+      {
+        "disabled": false,
+        "insideForm": false,
+        "name": "상금 항목 2 내용",
+        "rect": {
+          "height": 44,
+          "width": 383.2083435058594,
+          "x": 308.125,
+          "y": 392.3333435058594
+        },
+        "value": ""
+      },
+      {
+        "disabled": false,
+        "insideForm": false,
+        "name": "상금 항목 3 이름",
+        "rect": {
+          "height": 44,
+          "width": 255.45834350585935,
+          "x": 44.66666793823242,
+          "y": 444.3333435058594
+        },
+        "value": "3위"
+      },
+      {
+        "disabled": false,
+        "insideForm": false,
+        "name": "상금 항목 3 내용",
+        "rect": {
+          "height": 44,
+          "width": 383.2083435058594,
+          "x": 308.125,
+          "y": 444.3333435058594
+        },
+        "value": ""
+      },
+      {
+        "disabled": false,
+        "insideForm": false,
+        "name": "상품 및 상금",
+        "rect": {
+          "height": 65.33333587646484,
+          "width": 698.6666870117188,
+          "x": 44.66666793823242,
+          "y": 671.6666870117188
+        },
+        "value": "QA 테스트용 대회입니다. 실제 경기·상금·상품은 없습니다."
+      }
+    ],
+    "regionText": "상금·시상 정보\n\n공개 페이지 \"시상·리뷰\"의 상금 카드에 그대로 표시돼요.\n\n총상금\n\n상금 배분\n\n숫자는 원 단위로 자동 정리되고 트로피·상품권 같은 물품도 입력할 수 있어요.\n\n항목 추가\n\n공개 페이지 미리보기\n\n상금 항목을 추가하면 여기에 바로 보여요.\n\n상품 및 상금\n상금 정보 저장",
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/{synthetic-fixture}/info",
+    "urlSHA256": "a31af0d6862d208a75fd70d974458867c5aff50a8aca9f8d8bc8fdc27d2c3980",
+    "utc": "2026-10-04T06:02:21.843Z",
+    "viewport": {
+      "dpr": 1.5,
+      "height": 505,
+      "width": 788
+    },
+    "warningLines": [],
+    "index": 5,
+    "widthLabel": "tablet",
+    "state": "restored"
+  },
+  {
+    "buttons": [
+      {
+        "disabled": false,
+        "name": "상금 항목 1 삭제",
+        "rect": {
+          "height": 44,
+          "width": 44,
+          "x": 1085,
+          "y": 200
+        },
+        "type": "button"
+      },
+      {
+        "disabled": false,
+        "name": "상금 항목 2 삭제",
+        "rect": {
+          "height": 44,
+          "width": 44,
+          "x": 1085,
+          "y": 252
+        },
+        "type": "button"
+      },
+      {
+        "disabled": false,
+        "name": "상금 항목 3 삭제",
+        "rect": {
+          "height": 44,
+          "width": 44,
+          "x": 1085,
+          "y": 304
+        },
+        "type": "button"
+      },
+      {
+        "disabled": false,
+        "name": "항목 추가",
+        "rect": {
+          "height": 44,
+          "width": 115.328125,
+          "x": 501,
+          "y": 356
+        },
+        "type": "button"
+      },
+      {
+        "disabled": false,
+        "name": "합계를 총상금으로",
+        "rect": {
+          "height": 44,
+          "width": 146.640625,
+          "x": 805.375,
+          "y": 356
+        },
+        "type": "button"
+      },
+      {
+        "disabled": false,
+        "name": "상금 정보 저장",
+        "rect": {
+          "height": 44,
+          "width": 123,
+          "x": 1006,
+          "y": 610
+        },
+        "type": "button"
+      }
+    ],
+    "fields": [
+      {
+        "disabled": false,
+        "insideForm": false,
+        "name": "총상금",
+        "rect": {
+          "height": 44,
+          "width": 628,
+          "x": 501,
+          "y": 90
+        },
+        "value": "0"
+      },
+      {
+        "disabled": false,
+        "insideForm": false,
+        "name": "상금 항목 1 이름",
+        "rect": {
+          "height": 44,
+          "width": 227.1875,
+          "x": 501,
+          "y": 200
+        },
+        "value": "1위"
+      },
+      {
+        "disabled": false,
+        "insideForm": false,
+        "name": "상금 항목 1 내용",
+        "rect": {
+          "height": 44,
+          "width": 340.8125,
+          "x": 736.1875,
+          "y": 200
+        },
+        "value": "1000"
+      },
+      {
+        "disabled": false,
+        "insideForm": false,
+        "name": "상금 항목 2 이름",
+        "rect": {
+          "height": 44,
+          "width": 227.1875,
+          "x": 501,
+          "y": 252
+        },
+        "value": "2위"
+      },
+      {
+        "disabled": false,
+        "insideForm": false,
+        "name": "상금 항목 2 내용",
+        "rect": {
+          "height": 44,
+          "width": 340.8125,
+          "x": 736.1875,
+          "y": 252
+        },
+        "value": ""
+      },
+      {
+        "disabled": false,
+        "insideForm": false,
+        "name": "상금 항목 3 이름",
+        "rect": {
+          "height": 44,
+          "width": 227.1875,
+          "x": 501,
+          "y": 304
+        },
+        "value": "3위"
+      },
+      {
+        "disabled": false,
+        "insideForm": false,
+        "name": "상금 항목 3 내용",
+        "rect": {
+          "height": 44,
+          "width": 340.8125,
+          "x": 736.1875,
+          "y": 304
+        },
+        "value": ""
+      },
+      {
+        "disabled": false,
+        "insideForm": false,
+        "name": "상품 및 상금",
+        "rect": {
+          "height": 66,
+          "width": 628,
+          "x": 501,
+          "y": 532
+        },
+        "value": "QA 테스트용 대회입니다. 실제 경기·상금·상품은 없습니다."
+      }
+    ],
+    "regionText": "상금·시상 정보\n\n공개 페이지 \"시상·리뷰\"의 상금 카드에 그대로 표시돼요.\n\n총상금\n\n상금 배분\n\n숫자는 원 단위로 자동 정리되고 트로피·상품권 같은 물품도 입력할 수 있어요.\n\n항목 추가\n배분 합계 1,000원 · 총상금과 달라요\n합계를 총상금으로\n\n공개 페이지 미리보기\n\n1위\n1,000원\n상품 및 상금\n상금 정보 저장",
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/{synthetic-fixture}/info",
+    "urlSHA256": "a31af0d6862d208a75fd70d974458867c5aff50a8aca9f8d8bc8fdc27d2c3980",
+    "utc": "2026-10-04T06:02:22.525Z",
+    "viewport": {
+      "dpr": 1,
+      "height": 757,
+      "width": 1182
+    },
+    "warningLines": [
+      "배분 합계 1,000원 · 총상금과 달라요"
+    ],
+    "index": 6,
+    "widthLabel": "desktop",
+    "state": "mismatch"
+  },
+  {
+    "buttons": [
+      {
+        "disabled": false,
+        "name": "상금 항목 1 삭제",
+        "rect": {
+          "height": 44,
+          "width": 44,
+          "x": 1085,
+          "y": 466
+        },
+        "type": "button"
+      },
+      {
+        "disabled": false,
+        "name": "상금 항목 2 삭제",
+        "rect": {
+          "height": 44,
+          "width": 44,
+          "x": 1085,
+          "y": 518
+        },
+        "type": "button"
+      },
+      {
+        "disabled": false,
+        "name": "상금 항목 3 삭제",
+        "rect": {
+          "height": 44,
+          "width": 44,
+          "x": 1085,
+          "y": 570
+        },
+        "type": "button"
+      },
+      {
+        "disabled": false,
+        "name": "항목 추가",
+        "rect": {
+          "height": 44,
+          "width": 115.328125,
+          "x": 501,
+          "y": 622
+        },
+        "type": "button"
+      },
+      {
+        "disabled": false,
+        "name": "상금 정보 저장",
+        "rect": {
+          "height": 44,
+          "width": 123,
+          "x": 1006,
+          "y": 876
+        },
+        "type": "button"
+      }
+    ],
+    "fields": [
+      {
+        "disabled": false,
+        "insideForm": false,
+        "name": "총상금",
+        "rect": {
+          "height": 44,
+          "width": 628,
+          "x": 501,
+          "y": 356
+        },
+        "value": "1,000"
+      },
+      {
+        "disabled": false,
+        "insideForm": false,
+        "name": "상금 항목 1 이름",
+        "rect": {
+          "height": 44,
+          "width": 227.1875,
+          "x": 501,
+          "y": 466
+        },
+        "value": "1위"
+      },
+      {
+        "disabled": false,
+        "insideForm": false,
+        "name": "상금 항목 1 내용",
+        "rect": {
+          "height": 44,
+          "width": 340.8125,
+          "x": 736.1875,
+          "y": 466
+        },
+        "value": "1000"
+      },
+      {
+        "disabled": false,
+        "insideForm": false,
+        "name": "상금 항목 2 이름",
+        "rect": {
+          "height": 44,
+          "width": 227.1875,
+          "x": 501,
+          "y": 518
+        },
+        "value": "2위"
+      },
+      {
+        "disabled": false,
+        "insideForm": false,
+        "name": "상금 항목 2 내용",
+        "rect": {
+          "height": 44,
+          "width": 340.8125,
+          "x": 736.1875,
+          "y": 518
+        },
+        "value": ""
+      },
+      {
+        "disabled": false,
+        "insideForm": false,
+        "name": "상금 항목 3 이름",
+        "rect": {
+          "height": 44,
+          "width": 227.1875,
+          "x": 501,
+          "y": 570
+        },
+        "value": "3위"
+      },
+      {
+        "disabled": false,
+        "insideForm": false,
+        "name": "상금 항목 3 내용",
+        "rect": {
+          "height": 44,
+          "width": 340.8125,
+          "x": 736.1875,
+          "y": 570
+        },
+        "value": ""
+      },
+      {
+        "disabled": false,
+        "insideForm": false,
+        "name": "상품 및 상금",
+        "rect": {
+          "height": 66,
+          "width": 628,
+          "x": 501,
+          "y": 798
+        },
+        "value": "QA 테스트용 대회입니다. 실제 경기·상금·상품은 없습니다."
+      }
+    ],
+    "regionText": "상금·시상 정보\n\n공개 페이지 \"시상·리뷰\"의 상금 카드에 그대로 표시돼요.\n\n총상금\n\n상금 배분\n\n숫자는 원 단위로 자동 정리되고 트로피·상품권 같은 물품도 입력할 수 있어요.\n\n항목 추가\n배분 합계 1,000원\n\n공개 페이지 미리보기\n\n1위\n1,000원\n상품 및 상금\n상금 정보 저장",
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/{synthetic-fixture}/info",
+    "urlSHA256": "a31af0d6862d208a75fd70d974458867c5aff50a8aca9f8d8bc8fdc27d2c3980",
+    "utc": "2026-10-04T06:02:23.265Z",
+    "viewport": {
+      "dpr": 1,
+      "height": 757,
+      "width": 1182
+    },
+    "warningLines": [
+      "배분 합계 1,000원"
+    ],
+    "index": 7,
+    "widthLabel": "desktop",
+    "state": "corrected"
+  },
+  {
+    "buttons": [
+      {
+        "disabled": false,
+        "name": "상금 항목 1 삭제",
+        "rect": {
+          "height": 44,
+          "width": 44,
+          "x": 1085,
+          "y": 466
+        },
+        "type": "button"
+      },
+      {
+        "disabled": false,
+        "name": "상금 항목 2 삭제",
+        "rect": {
+          "height": 44,
+          "width": 44,
+          "x": 1085,
+          "y": 518
+        },
+        "type": "button"
+      },
+      {
+        "disabled": false,
+        "name": "상금 항목 3 삭제",
+        "rect": {
+          "height": 44,
+          "width": 44,
+          "x": 1085,
+          "y": 570
+        },
+        "type": "button"
+      },
+      {
+        "disabled": false,
+        "name": "항목 추가",
+        "rect": {
+          "height": 44,
+          "width": 115.328125,
+          "x": 501,
+          "y": 622
+        },
+        "type": "button"
+      },
+      {
+        "disabled": false,
+        "name": "상금 정보 저장",
+        "rect": {
+          "height": 44,
+          "width": 123,
+          "x": 1006,
+          "y": 876
+        },
+        "type": "button"
+      }
+    ],
+    "fields": [
+      {
+        "disabled": false,
+        "insideForm": false,
+        "name": "총상금",
+        "rect": {
+          "height": 44,
+          "width": 628,
+          "x": 501,
+          "y": 356
+        },
+        "value": "0"
+      },
+      {
+        "disabled": false,
+        "insideForm": false,
+        "name": "상금 항목 1 이름",
+        "rect": {
+          "height": 44,
+          "width": 227.1875,
+          "x": 501,
+          "y": 466
+        },
+        "value": "1위"
+      },
+      {
+        "disabled": false,
+        "insideForm": false,
+        "name": "상금 항목 1 내용",
+        "rect": {
+          "height": 44,
+          "width": 340.8125,
+          "x": 736.1875,
+          "y": 466
+        },
+        "value": ""
+      },
+      {
+        "disabled": false,
+        "insideForm": false,
+        "name": "상금 항목 2 이름",
+        "rect": {
+          "height": 44,
+          "width": 227.1875,
+          "x": 501,
+          "y": 518
+        },
+        "value": "2위"
+      },
+      {
+        "disabled": false,
+        "insideForm": false,
+        "name": "상금 항목 2 내용",
+        "rect": {
+          "height": 44,
+          "width": 340.8125,
+          "x": 736.1875,
+          "y": 518
+        },
+        "value": ""
+      },
+      {
+        "disabled": false,
+        "insideForm": false,
+        "name": "상금 항목 3 이름",
+        "rect": {
+          "height": 44,
+          "width": 227.1875,
+          "x": 501,
+          "y": 570
+        },
+        "value": "3위"
+      },
+      {
+        "disabled": false,
+        "insideForm": false,
+        "name": "상금 항목 3 내용",
+        "rect": {
+          "height": 44,
+          "width": 340.8125,
+          "x": 736.1875,
+          "y": 570
+        },
+        "value": ""
+      },
+      {
+        "disabled": false,
+        "insideForm": false,
+        "name": "상품 및 상금",
+        "rect": {
+          "height": 66,
+          "width": 628,
+          "x": 501,
+          "y": 798
+        },
+        "value": "QA 테스트용 대회입니다. 실제 경기·상금·상품은 없습니다."
+      }
+    ],
+    "regionText": "상금·시상 정보\n\n공개 페이지 \"시상·리뷰\"의 상금 카드에 그대로 표시돼요.\n\n총상금\n\n상금 배분\n\n숫자는 원 단위로 자동 정리되고 트로피·상품권 같은 물품도 입력할 수 있어요.\n\n항목 추가\n\n공개 페이지 미리보기\n\n상금 항목을 추가하면 여기에 바로 보여요.\n\n상품 및 상금\n상금 정보 저장",
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/{synthetic-fixture}/info",
+    "urlSHA256": "a31af0d6862d208a75fd70d974458867c5aff50a8aca9f8d8bc8fdc27d2c3980",
+    "utc": "2026-10-04T06:02:23.514Z",
+    "viewport": {
+      "dpr": 1,
+      "height": 757,
+      "width": 1182
+    },
+    "warningLines": [],
+    "index": 8,
+    "widthLabel": "desktop",
+    "state": "restored"
+  },
+  {
+    "buttons": [
+      {
+        "disabled": false,
+        "name": "상금 항목 1 삭제",
+        "rect": {
+          "height": 44,
+          "width": 44,
+          "x": 1085,
+          "y": 1284
+        },
+        "type": "button"
+      },
+      {
+        "disabled": false,
+        "name": "상금 항목 2 삭제",
+        "rect": {
+          "height": 44,
+          "width": 44,
+          "x": 1085,
+          "y": 1336
+        },
+        "type": "button"
+      },
+      {
+        "disabled": false,
+        "name": "상금 항목 3 삭제",
+        "rect": {
+          "height": 44,
+          "width": 44,
+          "x": 1085,
+          "y": 1388
+        },
+        "type": "button"
+      },
+      {
+        "disabled": false,
+        "name": "항목 추가",
+        "rect": {
+          "height": 44,
+          "width": 115.328125,
+          "x": 501,
+          "y": 1440
+        },
+        "type": "button"
+      },
+      {
+        "disabled": false,
+        "name": "상금 정보 저장",
+        "rect": {
+          "height": 44,
+          "width": 123,
+          "x": 1006,
+          "y": 1694
+        },
+        "type": "button"
+      }
+    ],
+    "fields": [
+      {
+        "disabled": false,
+        "insideForm": false,
+        "name": "총상금",
+        "rect": {
+          "height": 44,
+          "width": 628,
+          "x": 501,
+          "y": 1174
+        },
+        "value": "0"
+      },
+      {
+        "disabled": false,
+        "insideForm": false,
+        "name": "상금 항목 1 이름",
+        "rect": {
+          "height": 44,
+          "width": 227.1875,
+          "x": 501,
+          "y": 1284
+        },
+        "value": "1위"
+      },
+      {
+        "disabled": false,
+        "insideForm": false,
+        "name": "상금 항목 1 내용",
+        "rect": {
+          "height": 44,
+          "width": 340.8125,
+          "x": 736.1875,
+          "y": 1284
+        },
+        "value": ""
+      },
+      {
+        "disabled": false,
+        "insideForm": false,
+        "name": "상금 항목 2 이름",
+        "rect": {
+          "height": 44,
+          "width": 227.1875,
+          "x": 501,
+          "y": 1336
+        },
+        "value": "2위"
+      },
+      {
+        "disabled": false,
+        "insideForm": false,
+        "name": "상금 항목 2 내용",
+        "rect": {
+          "height": 44,
+          "width": 340.8125,
+          "x": 736.1875,
+          "y": 1336
+        },
+        "value": ""
+      },
+      {
+        "disabled": false,
+        "insideForm": false,
+        "name": "상금 항목 3 이름",
+        "rect": {
+          "height": 44,
+          "width": 227.1875,
+          "x": 501,
+          "y": 1388
+        },
+        "value": "3위"
+      },
+      {
+        "disabled": false,
+        "insideForm": false,
+        "name": "상금 항목 3 내용",
+        "rect": {
+          "height": 44,
+          "width": 340.8125,
+          "x": 736.1875,
+          "y": 1388
+        },
+        "value": ""
+      },
+      {
+        "disabled": false,
+        "insideForm": false,
+        "name": "상품 및 상금",
+        "rect": {
+          "height": 66,
+          "width": 628,
+          "x": 501,
+          "y": 1616
+        },
+        "value": "QA 테스트용 대회입니다. 실제 경기·상금·상품은 없습니다."
+      }
+    ],
+    "regionText": "상금·시상 정보\n\n공개 페이지 \"시상·리뷰\"의 상금 카드에 그대로 표시돼요.\n\n총상금\n\n상금 배분\n\n숫자는 원 단위로 자동 정리되고 트로피·상품권 같은 물품도 입력할 수 있어요.\n\n항목 추가\n\n공개 페이지 미리보기\n\n상금 항목을 추가하면 여기에 바로 보여요.\n\n상품 및 상금\n상금 정보 저장",
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/{synthetic-fixture}/info",
+    "urlSHA256": "a31af0d6862d208a75fd70d974458867c5aff50a8aca9f8d8bc8fdc27d2c3980",
+    "utc": "2026-10-04T06:02:52.306Z",
+    "viewport": {
+      "dpr": 1,
+      "height": 757,
+      "width": 1182
+    },
+    "warningLines": [],
+    "index": 9,
+    "widthLabel": "desktop",
+    "state": "reentry-baseline"
+  }
+]

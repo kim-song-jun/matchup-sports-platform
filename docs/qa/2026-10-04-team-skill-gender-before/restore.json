@@ -1,0 +1,19 @@
+{
+  "initial": {
+    "utc": "2026-10-04T07:46:27.332Z",
+    "title": "",
+    "description": ""
+  },
+  "beforeRestore": {
+    "description": "",
+    "title": "QA 실력 성별 1004",
+    "url": "https://alpha.teameet.co.kr/team-matches/new/info",
+    "utc": "2026-10-04T07:51:44.703Z"
+  },
+  "restored": {
+    "description": "",
+    "title": "",
+    "url": "https://alpha.teameet.co.kr/team-matches/new/info",
+    "utc": "2026-10-04T07:51:44.771Z"
+  }
+}

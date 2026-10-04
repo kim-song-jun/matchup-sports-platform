@@ -1,0 +1,100 @@
+[
+  {
+    "label": "resize team create to mobile",
+    "startUTC": "2026-10-04T07:47:02.046Z",
+    "endUTC": "2026-10-04T07:47:06.730Z"
+  },
+  {
+    "label": "mobile zoom110",
+    "startUTC": "2026-10-04T07:47:06.731Z",
+    "endUTC": "2026-10-04T07:47:07.046Z"
+  },
+  {
+    "label": "mobile zoom125",
+    "startUTC": "2026-10-04T07:47:07.046Z",
+    "endUTC": "2026-10-04T07:47:07.347Z"
+  },
+  {
+    "label": "temporary synthetic title only; initial title was blank",
+    "startUTC": "2026-10-04T07:47:07.379Z",
+    "endUTC": "2026-10-04T07:47:07.414Z"
+  },
+  {
+    "label": "local Next info to condition",
+    "startUTC": "2026-10-04T07:47:07.415Z",
+    "endUTC": "2026-10-04T07:47:07.706Z"
+  },
+  {
+    "label": "mobile scroll to gender options without selecting",
+    "startUTC": "2026-10-04T07:49:30.544Z",
+    "endUTC": "2026-10-04T07:49:30.893Z"
+  },
+  {
+    "label": "mobile native wheel back to form top",
+    "startUTC": "2026-10-04T07:50:43.935Z",
+    "endUTC": "2026-10-04T07:50:44.559Z"
+  },
+  {
+    "label": "resize condition form tablet",
+    "startUTC": "2026-10-04T07:50:44.623Z",
+    "endUTC": "2026-10-04T07:50:51.444Z"
+  },
+  {
+    "label": "tablet native zoom150",
+    "startUTC": "2026-10-04T07:50:51.445Z",
+    "endUTC": "2026-10-04T07:50:51.748Z"
+  },
+  {
+    "label": "tablet native scroll to gender",
+    "startUTC": "2026-10-04T07:50:51.895Z",
+    "endUTC": "2026-10-04T07:50:52.280Z"
+  },
+  {
+    "label": "tablet wheel back to condition top",
+    "startUTC": "2026-10-04T07:51:03.535Z",
+    "endUTC": "2026-10-04T07:51:04.131Z"
+  },
+  {
+    "label": "desktop zoom reset",
+    "startUTC": "2026-10-04T07:51:04.175Z",
+    "endUTC": "2026-10-04T07:51:04.366Z"
+  },
+  {
+    "label": "desktop scroll to gender options",
+    "startUTC": "2026-10-04T07:51:04.508Z",
+    "endUTC": "2026-10-04T07:51:04.862Z"
+  },
+  {
+    "label": "Previous condition to info for title restoration",
+    "startUTC": "2026-10-04T07:51:14.757Z",
+    "endUTC": "2026-10-04T07:51:15.033Z"
+  },
+  {
+    "label": "restore only temporary QA title to original empty value",
+    "startUTC": "2026-10-04T07:51:44.706Z",
+    "endUTC": "2026-10-04T07:51:44.726Z"
+  },
+  {
+    "label": "Attempt Back; firstExit still records the info route and title field. Collector reports a leave-confirmation dialog, not completed list navigation.",
+    "startUTC": "2026-10-04T07:51:44.773Z",
+    "endUTC": "2026-10-04T07:51:44.831Z",
+    "originalLabel": "leave create flow through visible Back link"
+  },
+  {
+    "label": "Fresh document navigation to the same info route verifies blank title/description. This is not return from a previously reached list.",
+    "startUTC": "2026-10-04T07:52:20.828Z",
+    "endUTC": "2026-10-04T07:52:21.359Z",
+    "originalLabel": "fresh info reentry after reported45b9 deployment to verify restored title"
+  },
+  {
+    "label": "Attempt Back; later exit-attempt.json records one visible keep-draft confirmation dialog, not completed list navigation.",
+    "startUTC": "2026-10-04T07:52:22.152Z",
+    "endUTC": "2026-10-04T07:52:22.223Z",
+    "originalLabel": "leave verified restored create form"
+  },
+  {
+    "label": "confirm local leave dialog with draft retained",
+    "startUTC": "2026-10-04T07:54:13.231Z",
+    "endUTC": "2026-10-04T07:54:13.296Z"
+  }
+]

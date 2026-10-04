@@ -1,0 +1,110 @@
+{
+  "files": [
+    {
+      "file": "README.md",
+      "bytes": 8480,
+      "sha256": "f4749dae2e1795d2d2fd6f47f1a7b5f75c5fcd60a7509f7f8ed8a37aafcdf8bb"
+    },
+    {
+      "file": "actions.json",
+      "bytes": 3274,
+      "sha256": "fa8d3cae855104229c80e127895191835402aea3dd67e67776d7f85780095bd9"
+    },
+    {
+      "file": "deployment-context.json",
+      "bytes": 1516,
+      "sha256": "94f654c0f1e793b5d8329030e12e0d9598f44798528dd6021d82462136e530f6"
+    },
+    {
+      "file": "desktop-gender-before.png",
+      "bytes": 12907,
+      "sha256": "4a3c2e680d3a71e28091745728a4a6bf9418d5950d364d6ea62a2207f0ef2f75"
+    },
+    {
+      "file": "desktop-skill-before.png",
+      "bytes": 9876,
+      "sha256": "d776d253b206dd9e1443c1420cea6ba7db89d8584204c028e3e53b50d206caa0"
+    },
+    {
+      "file": "entry.json",
+      "bytes": 169,
+      "sha256": "7ca4b00c437fa06c41acac11ac2984edc313cda350fd133f84300c717df159c9"
+    },
+    {
+      "file": "exit-attempt.json",
+      "bytes": 408,
+      "sha256": "65e1e4389a133fe249d8b75cfa1c907e5131ad3469010d5efbae6932728636b7"
+    },
+    {
+      "file": "exit.json",
+      "bytes": 212,
+      "sha256": "14ef0be9e0d39056f553c433c1aaf01a0242d4b9e813aa2ebcaae79a0a6a3f10"
+    },
+    {
+      "file": "mobile-gender-before.png",
+      "bytes": 12400,
+      "sha256": "5191ad85dc0fb5e1658ee0cc410209c75efe1cf9e0ec546a04be8073aa7b0625"
+    },
+    {
+      "file": "mobile-skill-before.png",
+      "bytes": 9490,
+      "sha256": "35ac667810812a70d232ab52638088a94ee6060f31d2cbc12571735b21cbc209"
+    },
+    {
+      "file": "proof.json",
+      "bytes": 21818,
+      "sha256": "98c65a958cf1455337c737489ef6da4b1c19d64bb20010a66ef7ed17715de473"
+    },
+    {
+      "file": "provenance.json",
+      "bytes": 7524,
+      "sha256": "2a922e2dbf8190be498b83d5f661dfc04abb2d800eddb42b7f3849908db1a0b2"
+    },
+    {
+      "file": "reentry.json",
+      "bytes": 392,
+      "sha256": "09a71ae5e3476e109b797b995486f229b07c9bc3300af0c0b48df8866cd98888"
+    },
+    {
+      "file": "restore.json",
+      "bytes": 452,
+      "sha256": "999eaa89c98acfb110a62d2f21f4462dd008236bb1528115c43c9bf7bc5041a9"
+    },
+    {
+      "file": "source-comparison.json",
+      "bytes": 3688,
+      "sha256": "5ead9a5ac7426207a4d0afc5e99bf6398700446a029a1797c641f5a4d60b98a4"
+    },
+    {
+      "file": "source-manifest.json",
+      "bytes": 2614,
+      "sha256": "6a7d24f373a978422042b18e93c3c27e7abaa7ee2dadf77df999b9c715b91a6b"
+    },
+    {
+      "file": "source-safety-context.json",
+      "bytes": 1597,
+      "sha256": "5bd0ad3654944df95217eccedad90902cdeab5e608ea922904664185e0e7de02"
+    },
+    {
+      "file": "summary.json",
+      "bytes": 4395,
+      "sha256": "2688deaeb3d561084140a663e79489355693e3d77a15b407dcfa9b126b4f8a8c"
+    },
+    {
+      "file": "tablet-gender-before.png",
+      "bytes": 12247,
+      "sha256": "967036b9dc481c686f31a04c7c3062394e099dcd5dbba6abdbfc17d527810180"
+    },
+    {
+      "file": "tablet-skill-before.png",
+      "bytes": 9720,
+      "sha256": "fc432ff3a03e6ad686c4ecb009e7ec882fe15cf5fa98cfa91c8fe895b3d13508"
+    },
+    {
+      "file": "verification.json",
+      "bytes": 13559,
+      "sha256": "1294f6a40d592c796e4d2d602ed2a68435ae6e0015f5a1115cfc9c15451f82bb"
+    }
+  ],
+  "note": "Delivered public file hashes, excluding this manifest. source-manifest.json preserves original safe-input hashes."
+}

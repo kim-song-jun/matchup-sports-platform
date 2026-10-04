@@ -1,0 +1,17 @@
+{
+  "sourceSHAs": [
+    "5372ea9c3640621eb270d15c54c70a822b97d536",
+    "45b9f0756b70d3b80801d5f5f2b43c692e007d1a"
+  ],
+  "comparedIdenticalFiles": [
+    "apps/v1_web/src/components/team-matches/team-matches-create-client.tsx",
+    "apps/v1_web/src/components/team-matches/team-matches-page.tsx",
+    "apps/v1_web/src/components/v1-ui/create-form-fields.tsx",
+    "apps/v1_web/src/lib/expiring-draft.ts"
+  ],
+  "method": "Separate read-only source comparison reports identical complete contents and Git blobs for these files; not a runtime/API/DB observation",
+  "singleChoiceSource": "https://github.com/kim-song-jun/matchup-sports-platform/blob/45b9f0756b70d3b80801d5f5f2b43c692e007d1a/apps/v1_web/src/components/v1-ui/create-form-fields.tsx#L246",
+  "genderSource": "https://github.com/kim-song-jun/matchup-sports-platform/blob/45b9f0756b70d3b80801d5f5f2b43c692e007d1a/apps/v1_web/src/components/v1-ui/create-form-fields.tsx#L225",
+  "persistenceSource": "https://github.com/kim-song-jun/matchup-sports-platform/blob/45b9f0756b70d3b80801d5f5f2b43c692e007d1a/apps/v1_web/src/components/team-matches/team-matches-create-client.tsx#L580",
+  "contract": "Creation changes immediately persist local draft with24hour TTL. Skill has no clear control; blank initial grade cannot be restored by choosing a chip again, so no grade/gender choices were activated. Title can be explicitly returned to original empty value. Previous/Next and leave retain draft, do not delete it; restoration refreshes storage timestamp. Only final create or image upload invokes creation/upload mutations; never reached."
+}

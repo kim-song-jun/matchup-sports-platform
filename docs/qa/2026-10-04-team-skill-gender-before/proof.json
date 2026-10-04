@@ -1,0 +1,926 @@
+[
+  {
+    "choices": [
+      {
+        "checked": null,
+        "pressed": "false",
+        "rect": {
+          "bottom": 320,
+          "height": 44,
+          "left": 20,
+          "right": 68.07500076293945,
+          "top": 276,
+          "width": 48.07500076293945,
+          "x": 20,
+          "y": 276
+        },
+        "role": null,
+        "text": "입문",
+        "type": "button"
+      },
+      {
+        "checked": null,
+        "pressed": "false",
+        "rect": {
+          "bottom": 320,
+          "height": 44,
+          "left": 76.07500457763672,
+          "right": 124.15000534057616,
+          "top": 276,
+          "width": 48.07500076293945,
+          "x": 76.07500457763672,
+          "y": 276
+        },
+        "role": null,
+        "text": "초보",
+        "type": "button"
+      },
+      {
+        "checked": null,
+        "pressed": "false",
+        "rect": {
+          "bottom": 320,
+          "height": 44,
+          "left": 132.15000915527344,
+          "right": 180.2250099182129,
+          "top": 276,
+          "width": 48.07500076293945,
+          "x": 132.15000915527344,
+          "y": 276
+        },
+        "role": null,
+        "text": "중수",
+        "type": "button"
+      },
+      {
+        "checked": null,
+        "pressed": "false",
+        "rect": {
+          "bottom": 320,
+          "height": 44,
+          "left": 188.2250061035156,
+          "right": 236.30000686645508,
+          "top": 276,
+          "width": 48.07500076293945,
+          "x": 188.2250061035156,
+          "y": 276
+        },
+        "role": null,
+        "text": "고수",
+        "type": "button"
+      },
+      {
+        "checked": null,
+        "pressed": "true",
+        "rect": {
+          "bottom": 864,
+          "height": 44,
+          "left": 20,
+          "right": 93.5500030517578,
+          "top": 820,
+          "width": 73.55000305175781,
+          "x": 20,
+          "y": 820
+        },
+        "role": null,
+        "text": "성별 무관",
+        "type": "button"
+      },
+      {
+        "checked": null,
+        "pressed": "false",
+        "rect": {
+          "bottom": 864,
+          "height": 44,
+          "left": 101.5500030517578,
+          "right": 138.38750457763672,
+          "top": 820,
+          "width": 36.837501525878906,
+          "x": 101.5500030517578,
+          "y": 820
+        },
+        "role": null,
+        "text": "남",
+        "type": "button"
+      },
+      {
+        "checked": null,
+        "pressed": "false",
+        "rect": {
+          "bottom": 864,
+          "height": 44,
+          "left": 146.3874969482422,
+          "right": 183.2249984741211,
+          "top": 820,
+          "width": 36.837501525878906,
+          "x": 146.3874969482422,
+          "y": 820
+        },
+        "role": null,
+        "text": "여",
+        "type": "button"
+      }
+    ],
+    "heading": [
+      "팀매치 만들기",
+      "어떤 조건으로 경기하나요?"
+    ],
+    "mixedTextPresent": false,
+    "rangeInputs": [],
+    "scroll": {
+      "main": 0,
+      "y": 0
+    },
+    "selectCount": 0,
+    "url": "https://alpha.teameet.co.kr/team-matches/new/condition",
+    "utc": "2026-10-04T07:49:30.485Z",
+    "viewport": {
+      "dpr": 1.25,
+      "h": 606,
+      "w": 402
+    },
+    "index": 0,
+    "label": "mobile skill and gender options before changes",
+    "AXUTC": "2026-10-04T07:49:30.521Z",
+    "AXChoices": [
+      "\t\t\t\t21 checkbox 입문, Value: 0",
+      "\t\t\t\t22 checkbox 초보, Value: 0",
+      "\t\t\t\t23 checkbox 중수, Value: 0",
+      "\t\t\t\t24 checkbox 고수, Value: 0",
+      "\t\t\t\t37 checkbox 초보 환영, Value: 0",
+      "\t\t\t52 checkbox 성별 무관, Value: 1",
+      "\t\t\t53 checkbox 남, Value: 0",
+      "\t\t\t54 checkbox 여, Value: 0"
+    ]
+  },
+  {
+    "choices": [
+      {
+        "checked": null,
+        "pressed": "false",
+        "rect": {
+          "bottom": -256,
+          "height": 44,
+          "left": 20,
+          "right": 68.07500076293945,
+          "top": -300,
+          "width": 48.07500076293945,
+          "x": 20,
+          "y": -300
+        },
+        "role": null,
+        "text": "입문",
+        "type": "button"
+      },
+      {
+        "checked": null,
+        "pressed": "false",
+        "rect": {
+          "bottom": -256,
+          "height": 44,
+          "left": 76.07500457763672,
+          "right": 124.15000534057616,
+          "top": -300,
+          "width": 48.07500076293945,
+          "x": 76.07500457763672,
+          "y": -300
+        },
+        "role": null,
+        "text": "초보",
+        "type": "button"
+      },
+      {
+        "checked": null,
+        "pressed": "false",
+        "rect": {
+          "bottom": -256,
+          "height": 44,
+          "left": 132.15000915527344,
+          "right": 180.2250099182129,
+          "top": -300,
+          "width": 48.07500076293945,
+          "x": 132.15000915527344,
+          "y": -300
+        },
+        "role": null,
+        "text": "중수",
+        "type": "button"
+      },
+      {
+        "checked": null,
+        "pressed": "false",
+        "rect": {
+          "bottom": -256,
+          "height": 44,
+          "left": 188.2250061035156,
+          "right": 236.30000686645508,
+          "top": -300,
+          "width": 48.07500076293945,
+          "x": 188.2250061035156,
+          "y": -300
+        },
+        "role": null,
+        "text": "고수",
+        "type": "button"
+      },
+      {
+        "checked": null,
+        "pressed": "true",
+        "rect": {
+          "bottom": 288,
+          "height": 44,
+          "left": 20,
+          "right": 93.5500030517578,
+          "top": 244,
+          "width": 73.55000305175781,
+          "x": 20,
+          "y": 244
+        },
+        "role": null,
+        "text": "성별 무관",
+        "type": "button"
+      },
+      {
+        "checked": null,
+        "pressed": "false",
+        "rect": {
+          "bottom": 288,
+          "height": 44,
+          "left": 101.5500030517578,
+          "right": 138.38750457763672,
+          "top": 244,
+          "width": 36.837501525878906,
+          "x": 101.5500030517578,
+          "y": 244
+        },
+        "role": null,
+        "text": "남",
+        "type": "button"
+      },
+      {
+        "checked": null,
+        "pressed": "false",
+        "rect": {
+          "bottom": 288,
+          "height": 44,
+          "left": 146.3874969482422,
+          "right": 183.2249984741211,
+          "top": 244,
+          "width": 36.837501525878906,
+          "x": 146.3874969482422,
+          "y": 244
+        },
+        "role": null,
+        "text": "여",
+        "type": "button"
+      }
+    ],
+    "heading": [
+      "팀매치 만들기",
+      "어떤 조건으로 경기하나요?"
+    ],
+    "mixedTextPresent": false,
+    "rangeInputs": [],
+    "scroll": {
+      "main": 576,
+      "y": 0
+    },
+    "selectCount": 0,
+    "url": "https://alpha.teameet.co.kr/team-matches/new/condition",
+    "utc": "2026-10-04T07:50:04.154Z",
+    "viewport": {
+      "dpr": 1.25,
+      "h": 606,
+      "w": 402
+    },
+    "index": 1,
+    "label": "mobile gender options visible before changes",
+    "AXUTC": "2026-10-04T07:50:04.205Z",
+    "AXChoices": [
+      "\t\t\t\t21 checkbox 입문, Value: 0",
+      "\t\t\t\t22 checkbox 초보, Value: 0",
+      "\t\t\t\t23 checkbox 중수, Value: 0",
+      "\t\t\t\t24 checkbox 고수, Value: 0",
+      "\t\t\t\t37 checkbox 초보 환영, Value: 0",
+      "\t\t\t52 checkbox 성별 무관, Value: 1",
+      "\t\t\t53 checkbox 남, Value: 0",
+      "\t\t\t54 checkbox 여, Value: 0"
+    ]
+  },
+  {
+    "choices": [
+      {
+        "checked": null,
+        "pressed": "false",
+        "rect": {
+          "bottom": 296,
+          "height": 44,
+          "left": 114,
+          "right": 161.8125,
+          "top": 252,
+          "width": 47.8125,
+          "x": 114,
+          "y": 252
+        },
+        "role": null,
+        "text": "입문",
+        "type": "button"
+      },
+      {
+        "checked": null,
+        "pressed": "false",
+        "rect": {
+          "bottom": 296,
+          "height": 44,
+          "left": 169.8125,
+          "right": 217.625,
+          "top": 252,
+          "width": 47.8125,
+          "x": 169.8125,
+          "y": 252
+        },
+        "role": null,
+        "text": "초보",
+        "type": "button"
+      },
+      {
+        "checked": null,
+        "pressed": "false",
+        "rect": {
+          "bottom": 296,
+          "height": 44,
+          "left": 225.625,
+          "right": 273.4375,
+          "top": 252,
+          "width": 47.8125,
+          "x": 225.625,
+          "y": 252
+        },
+        "role": null,
+        "text": "중수",
+        "type": "button"
+      },
+      {
+        "checked": null,
+        "pressed": "false",
+        "rect": {
+          "bottom": 296,
+          "height": 44,
+          "left": 281.4375,
+          "right": 329.25,
+          "top": 252,
+          "width": 47.8125,
+          "x": 281.4375,
+          "y": 252
+        },
+        "role": null,
+        "text": "고수",
+        "type": "button"
+      },
+      {
+        "checked": null,
+        "pressed": "true",
+        "rect": {
+          "bottom": 736,
+          "height": 44,
+          "left": 114,
+          "right": 187.28125,
+          "top": 692,
+          "width": 73.28125,
+          "x": 114,
+          "y": 692
+        },
+        "role": null,
+        "text": "성별 무관",
+        "type": "button"
+      },
+      {
+        "checked": null,
+        "pressed": "false",
+        "rect": {
+          "bottom": 736,
+          "height": 44,
+          "left": 195.28125,
+          "right": 231.8541679382324,
+          "top": 692,
+          "width": 36.57291793823242,
+          "x": 195.28125,
+          "y": 692
+        },
+        "role": null,
+        "text": "남",
+        "type": "button"
+      },
+      {
+        "checked": null,
+        "pressed": "false",
+        "rect": {
+          "bottom": 736,
+          "height": 44,
+          "left": 239.8541717529297,
+          "right": 276.4270896911621,
+          "top": 692,
+          "width": 36.57291793823242,
+          "x": 239.8541717529297,
+          "y": 692
+        },
+        "role": null,
+        "text": "여",
+        "type": "button"
+      }
+    ],
+    "heading": [
+      "팀매치 만들기",
+      "어떤 조건으로 경기하나요?"
+    ],
+    "mixedTextPresent": false,
+    "rangeInputs": [],
+    "scroll": {
+      "main": 0,
+      "y": 0
+    },
+    "selectCount": 0,
+    "url": "https://alpha.teameet.co.kr/team-matches/new/condition",
+    "utc": "2026-10-04T07:50:51.813Z",
+    "viewport": {
+      "dpr": 1.5,
+      "h": 505,
+      "w": 788
+    },
+    "index": 2,
+    "label": "tablet skill options before",
+    "AXUTC": "2026-10-04T07:50:51.859Z",
+    "AXChoices": [
+      "\t\t\t\t21 checkbox 입문, Value: 0",
+      "\t\t\t\t22 checkbox 초보, Value: 0",
+      "\t\t\t\t23 checkbox 중수, Value: 0",
+      "\t\t\t\t24 checkbox 고수, Value: 0",
+      "\t\t\t\t37 checkbox 초보 환영, Value: 0",
+      "\t\t\t52 checkbox 성별 무관, Value: 1",
+      "\t\t\t53 checkbox 남, Value: 0",
+      "\t\t\t54 checkbox 여, Value: 0"
+    ]
+  },
+  {
+    "choices": [
+      {
+        "checked": null,
+        "pressed": "false",
+        "rect": {
+          "bottom": -104,
+          "height": 44,
+          "left": 114,
+          "right": 161.8125,
+          "top": -148,
+          "width": 47.8125,
+          "x": 114,
+          "y": -148
+        },
+        "role": null,
+        "text": "입문",
+        "type": "button"
+      },
+      {
+        "checked": null,
+        "pressed": "false",
+        "rect": {
+          "bottom": -104,
+          "height": 44,
+          "left": 169.8125,
+          "right": 217.625,
+          "top": -148,
+          "width": 47.8125,
+          "x": 169.8125,
+          "y": -148
+        },
+        "role": null,
+        "text": "초보",
+        "type": "button"
+      },
+      {
+        "checked": null,
+        "pressed": "false",
+        "rect": {
+          "bottom": -104,
+          "height": 44,
+          "left": 225.625,
+          "right": 273.4375,
+          "top": -148,
+          "width": 47.8125,
+          "x": 225.625,
+          "y": -148
+        },
+        "role": null,
+        "text": "중수",
+        "type": "button"
+      },
+      {
+        "checked": null,
+        "pressed": "false",
+        "rect": {
+          "bottom": -104,
+          "height": 44,
+          "left": 281.4375,
+          "right": 329.25,
+          "top": -148,
+          "width": 47.8125,
+          "x": 281.4375,
+          "y": -148
+        },
+        "role": null,
+        "text": "고수",
+        "type": "button"
+      },
+      {
+        "checked": null,
+        "pressed": "true",
+        "rect": {
+          "bottom": 336,
+          "height": 44,
+          "left": 114,
+          "right": 187.28125,
+          "top": 292,
+          "width": 73.28125,
+          "x": 114,
+          "y": 292
+        },
+        "role": null,
+        "text": "성별 무관",
+        "type": "button"
+      },
+      {
+        "checked": null,
+        "pressed": "false",
+        "rect": {
+          "bottom": 336,
+          "height": 44,
+          "left": 195.28125,
+          "right": 231.8541679382324,
+          "top": 292,
+          "width": 36.57291793823242,
+          "x": 195.28125,
+          "y": 292
+        },
+        "role": null,
+        "text": "남",
+        "type": "button"
+      },
+      {
+        "checked": null,
+        "pressed": "false",
+        "rect": {
+          "bottom": 336,
+          "height": 44,
+          "left": 239.8541717529297,
+          "right": 276.4270896911621,
+          "top": 292,
+          "width": 36.57291793823242,
+          "x": 239.8541717529297,
+          "y": 292
+        },
+        "role": null,
+        "text": "여",
+        "type": "button"
+      }
+    ],
+    "heading": [
+      "팀매치 만들기",
+      "어떤 조건으로 경기하나요?"
+    ],
+    "mixedTextPresent": false,
+    "rangeInputs": [],
+    "scroll": {
+      "main": 400,
+      "y": 0
+    },
+    "selectCount": 0,
+    "url": "https://alpha.teameet.co.kr/team-matches/new/condition",
+    "utc": "2026-10-04T07:51:03.467Z",
+    "viewport": {
+      "dpr": 1.5,
+      "h": 505,
+      "w": 788
+    },
+    "index": 3,
+    "label": "tablet gender options visible before",
+    "AXUTC": "2026-10-04T07:51:03.511Z",
+    "AXChoices": [
+      "\t\t\t\t21 checkbox 입문, Value: 0",
+      "\t\t\t\t22 checkbox 초보, Value: 0",
+      "\t\t\t\t23 checkbox 중수, Value: 0",
+      "\t\t\t\t24 checkbox 고수, Value: 0",
+      "\t\t\t\t37 checkbox 초보 환영, Value: 0",
+      "\t\t\t52 checkbox 성별 무관, Value: 1",
+      "\t\t\t53 checkbox 남, Value: 0",
+      "\t\t\t54 checkbox 여, Value: 0"
+    ]
+  },
+  {
+    "choices": [
+      {
+        "checked": null,
+        "pressed": "false",
+        "rect": {
+          "bottom": 392,
+          "height": 44,
+          "left": 331,
+          "right": 379.484375,
+          "top": 348,
+          "width": 48.484375,
+          "x": 331,
+          "y": 348
+        },
+        "role": null,
+        "text": "입문",
+        "type": "button"
+      },
+      {
+        "checked": null,
+        "pressed": "false",
+        "rect": {
+          "bottom": 392,
+          "height": 44,
+          "left": 387.484375,
+          "right": 435.96875,
+          "top": 348,
+          "width": 48.484375,
+          "x": 387.484375,
+          "y": 348
+        },
+        "role": null,
+        "text": "초보",
+        "type": "button"
+      },
+      {
+        "checked": null,
+        "pressed": "false",
+        "rect": {
+          "bottom": 392,
+          "height": 44,
+          "left": 443.96875,
+          "right": 492.453125,
+          "top": 348,
+          "width": 48.484375,
+          "x": 443.96875,
+          "y": 348
+        },
+        "role": null,
+        "text": "중수",
+        "type": "button"
+      },
+      {
+        "checked": null,
+        "pressed": "false",
+        "rect": {
+          "bottom": 392,
+          "height": 44,
+          "left": 500.453125,
+          "right": 548.9375,
+          "top": 348,
+          "width": 48.484375,
+          "x": 500.453125,
+          "y": 348
+        },
+        "role": null,
+        "text": "고수",
+        "type": "button"
+      },
+      {
+        "checked": null,
+        "pressed": "true",
+        "rect": {
+          "bottom": 884,
+          "height": 44,
+          "left": 331,
+          "right": 404.953125,
+          "top": 840,
+          "width": 73.953125,
+          "x": 331,
+          "y": 840
+        },
+        "role": null,
+        "text": "성별 무관",
+        "type": "button"
+      },
+      {
+        "checked": null,
+        "pressed": "false",
+        "rect": {
+          "bottom": 884,
+          "height": 44,
+          "left": 412.953125,
+          "right": 450.203125,
+          "top": 840,
+          "width": 37.25,
+          "x": 412.953125,
+          "y": 840
+        },
+        "role": null,
+        "text": "남",
+        "type": "button"
+      },
+      {
+        "checked": null,
+        "pressed": "false",
+        "rect": {
+          "bottom": 884,
+          "height": 44,
+          "left": 458.203125,
+          "right": 495.453125,
+          "top": 840,
+          "width": 37.25,
+          "x": 458.203125,
+          "y": 840
+        },
+        "role": null,
+        "text": "여",
+        "type": "button"
+      }
+    ],
+    "heading": [
+      "팀매치 만들기",
+      "어떤 조건으로 경기하나요?"
+    ],
+    "mixedTextPresent": false,
+    "rangeInputs": [],
+    "scroll": {
+      "main": 0,
+      "y": 0
+    },
+    "selectCount": 0,
+    "url": "https://alpha.teameet.co.kr/team-matches/new/condition",
+    "utc": "2026-10-04T07:51:04.426Z",
+    "viewport": {
+      "dpr": 1,
+      "h": 757,
+      "w": 1182
+    },
+    "index": 4,
+    "label": "desktop skill options before",
+    "AXUTC": "2026-10-04T07:51:04.466Z",
+    "AXChoices": [
+      "\t\t\t29 checkbox 입문, Value: 0",
+      "\t\t\t30 checkbox 초보, Value: 0",
+      "\t\t\t31 checkbox 중수, Value: 0",
+      "\t\t\t32 checkbox 고수, Value: 0",
+      "\t\t\t45 checkbox 초보 환영, Value: 0",
+      "\t\t60 checkbox 성별 무관, Value: 1",
+      "\t\t61 checkbox 남, Value: 0",
+      "\t\t62 checkbox 여, Value: 0"
+    ]
+  },
+  {
+    "choices": [
+      {
+        "checked": null,
+        "pressed": "false",
+        "rect": {
+          "bottom": -208,
+          "height": 44,
+          "left": 331,
+          "right": 379.484375,
+          "top": -252,
+          "width": 48.484375,
+          "x": 331,
+          "y": -252
+        },
+        "role": null,
+        "text": "입문",
+        "type": "button"
+      },
+      {
+        "checked": null,
+        "pressed": "false",
+        "rect": {
+          "bottom": -208,
+          "height": 44,
+          "left": 387.484375,
+          "right": 435.96875,
+          "top": -252,
+          "width": 48.484375,
+          "x": 387.484375,
+          "y": -252
+        },
+        "role": null,
+        "text": "초보",
+        "type": "button"
+      },
+      {
+        "checked": null,
+        "pressed": "false",
+        "rect": {
+          "bottom": -208,
+          "height": 44,
+          "left": 443.96875,
+          "right": 492.453125,
+          "top": -252,
+          "width": 48.484375,
+          "x": 443.96875,
+          "y": -252
+        },
+        "role": null,
+        "text": "중수",
+        "type": "button"
+      },
+      {
+        "checked": null,
+        "pressed": "false",
+        "rect": {
+          "bottom": -208,
+          "height": 44,
+          "left": 500.453125,
+          "right": 548.9375,
+          "top": -252,
+          "width": 48.484375,
+          "x": 500.453125,
+          "y": -252
+        },
+        "role": null,
+        "text": "고수",
+        "type": "button"
+      },
+      {
+        "checked": null,
+        "pressed": "true",
+        "rect": {
+          "bottom": 284,
+          "height": 44,
+          "left": 331,
+          "right": 404.953125,
+          "top": 240,
+          "width": 73.953125,
+          "x": 331,
+          "y": 240
+        },
+        "role": null,
+        "text": "성별 무관",
+        "type": "button"
+      },
+      {
+        "checked": null,
+        "pressed": "false",
+        "rect": {
+          "bottom": 284,
+          "height": 44,
+          "left": 412.953125,
+          "right": 450.203125,
+          "top": 240,
+          "width": 37.25,
+          "x": 412.953125,
+          "y": 240
+        },
+        "role": null,
+        "text": "남",
+        "type": "button"
+      },
+      {
+        "checked": null,
+        "pressed": "false",
+        "rect": {
+          "bottom": 284,
+          "height": 44,
+          "left": 458.203125,
+          "right": 495.453125,
+          "top": 240,
+          "width": 37.25,
+          "x": 458.203125,
+          "y": 240
+        },
+        "role": null,
+        "text": "여",
+        "type": "button"
+      }
+    ],
+    "heading": [
+      "팀매치 만들기",
+      "어떤 조건으로 경기하나요?"
+    ],
+    "mixedTextPresent": false,
+    "rangeInputs": [],
+    "scroll": {
+      "main": 0,
+      "y": 600
+    },
+    "selectCount": 0,
+    "url": "https://alpha.teameet.co.kr/team-matches/new/condition",
+    "utc": "2026-10-04T07:51:14.691Z",
+    "viewport": {
+      "dpr": 1,
+      "h": 757,
+      "w": 1182
+    },
+    "index": 5,
+    "label": "desktop gender options visible before",
+    "AXUTC": "2026-10-04T07:51:14.732Z",
+    "AXChoices": [
+      "\t\t\t29 checkbox 입문, Value: 0",
+      "\t\t\t30 checkbox 초보, Value: 0",
+      "\t\t\t31 checkbox 중수, Value: 0",
+      "\t\t\t32 checkbox 고수, Value: 0",
+      "\t\t\t45 checkbox 초보 환영, Value: 0",
+      "\t\t60 checkbox 성별 무관, Value: 1",
+      "\t\t61 checkbox 남, Value: 0",
+      "\t\t62 checkbox 여, Value: 0"
+    ]
+  }
+]

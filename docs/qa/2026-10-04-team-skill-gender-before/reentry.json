@@ -1,0 +1,18 @@
+{
+  "firstExit": {
+    "titleFieldPresent": true,
+    "url": "https://alpha.teameet.co.kr/team-matches/new/info",
+    "utc": "2026-10-04T07:52:20.826Z"
+  },
+  "reentry": {
+    "description": "",
+    "title": "",
+    "url": "https://alpha.teameet.co.kr/team-matches/new/info",
+    "utc": "2026-10-04T07:52:22.149Z",
+    "viewport": {
+      "dpr": 1,
+      "h": 757,
+      "w": 1182
+    }
+  }
+}

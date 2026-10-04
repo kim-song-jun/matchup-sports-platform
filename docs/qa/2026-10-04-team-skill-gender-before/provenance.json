@@ -1,0 +1,214 @@
+{
+  "schema": 1,
+  "screenshots": [
+    {
+      "label": "mobile-skill-before",
+      "proofIndex": 0,
+      "captureStartUTC": "2026-10-04T07:49:30.522Z",
+      "captureEndUTC": "2026-10-04T07:49:30.543Z",
+      "file": "mobile-skill-before.png",
+      "sha256": "1d4f41c58cb875b02671fabfc08a6d4a6ae36f2ba1cf1df7043aea72c8f12ebc",
+      "sourceSHA256": "1d4f41c58cb875b02671fabfc08a6d4a6ae36f2ba1cf1df7043aea72c8f12ebc",
+      "sourcePixels": [
+        402,
+        606
+      ],
+      "cropLTRB": [
+        14,
+        240,
+        273,
+        328
+      ],
+      "outputPixels": [
+        259,
+        88
+      ],
+      "outputSHA256": "35ac667810812a70d232ab52638088a94ee6060f31d2cbc12571735b21cbc209",
+      "pixelEquality": true,
+      "DOMUTC": "2026-10-04T07:49:30.485Z",
+      "CSSViewport": {
+        "dpr": 1.25,
+        "h": 606,
+        "w": 402
+      },
+      "scope": "Exact UI control crop; no account, team membership, roster or personal information"
+    },
+    {
+      "label": "mobile-gender-before",
+      "proofIndex": 1,
+      "captureStartUTC": "2026-10-04T07:50:04.207Z",
+      "captureEndUTC": "2026-10-04T07:50:04.228Z",
+      "file": "mobile-gender-before.png",
+      "sha256": "72a153f1a3433500273d33e8e5f2b3de0870e1a549d3c858912755b66ef05c34",
+      "sourceSHA256": "72a153f1a3433500273d33e8e5f2b3de0870e1a549d3c858912755b66ef05c34",
+      "sourcePixels": [
+        402,
+        606
+      ],
+      "cropLTRB": [
+        14,
+        208,
+        220,
+        296
+      ],
+      "outputPixels": [
+        206,
+        88
+      ],
+      "outputSHA256": "5191ad85dc0fb5e1658ee0cc410209c75efe1cf9e0ec546a04be8073aa7b0625",
+      "pixelEquality": true,
+      "DOMUTC": "2026-10-04T07:50:04.154Z",
+      "CSSViewport": {
+        "dpr": 1.25,
+        "h": 606,
+        "w": 402
+      },
+      "scope": "Exact UI control crop; no account, team membership, roster or personal information"
+    },
+    {
+      "label": "tablet-skill-before",
+      "proofIndex": 2,
+      "captureStartUTC": "2026-10-04T07:50:51.860Z",
+      "captureEndUTC": "2026-10-04T07:50:51.893Z",
+      "file": "tablet-skill-before.png",
+      "sha256": "4e363781a7fed31bb4d56737ad1fb578e4e5a32a8c882d9836baa713b19eb56e",
+      "sourceSHA256": "4e363781a7fed31bb4d56737ad1fb578e4e5a32a8c882d9836baa713b19eb56e",
+      "sourcePixels": [
+        788,
+        505
+      ],
+      "cropLTRB": [
+        108,
+        216,
+        366,
+        304
+      ],
+      "outputPixels": [
+        258,
+        88
+      ],
+      "outputSHA256": "fc432ff3a03e6ad686c4ecb009e7ec882fe15cf5fa98cfa91c8fe895b3d13508",
+      "pixelEquality": true,
+      "DOMUTC": "2026-10-04T07:50:51.813Z",
+      "CSSViewport": {
+        "dpr": 1.5,
+        "h": 505,
+        "w": 788
+      },
+      "scope": "Exact UI control crop; no account, team membership, roster or personal information"
+    },
+    {
+      "label": "tablet-gender-before",
+      "proofIndex": 3,
+      "captureStartUTC": "2026-10-04T07:51:03.512Z",
+      "captureEndUTC": "2026-10-04T07:51:03.535Z",
+      "file": "tablet-gender-before.png",
+      "sha256": "4eda35efaf819995e4867923ca1cb1f6058826adc45c0fa5401c7d0312d77897",
+      "sourceSHA256": "4eda35efaf819995e4867923ca1cb1f6058826adc45c0fa5401c7d0312d77897",
+      "sourcePixels": [
+        788,
+        505
+      ],
+      "cropLTRB": [
+        108,
+        256,
+        313,
+        344
+      ],
+      "outputPixels": [
+        205,
+        88
+      ],
+      "outputSHA256": "967036b9dc481c686f31a04c7c3062394e099dcd5dbba6abdbfc17d527810180",
+      "pixelEquality": true,
+      "DOMUTC": "2026-10-04T07:51:03.467Z",
+      "CSSViewport": {
+        "dpr": 1.5,
+        "h": 505,
+        "w": 788
+      },
+      "scope": "Exact UI control crop; no account, team membership, roster or personal information"
+    },
+    {
+      "label": "desktop-skill-before",
+      "proofIndex": 4,
+      "captureStartUTC": "2026-10-04T07:51:04.467Z",
+      "captureEndUTC": "2026-10-04T07:51:04.508Z",
+      "file": "desktop-skill-before.png",
+      "sha256": "058b49b8774d5a0cf08430218de6fa0765221f51b7d7c52ff576e359e2308d32",
+      "sourceSHA256": "058b49b8774d5a0cf08430218de6fa0765221f51b7d7c52ff576e359e2308d32",
+      "sourcePixels": [
+        1182,
+        757
+      ],
+      "cropLTRB": [
+        325,
+        312,
+        585,
+        400
+      ],
+      "outputPixels": [
+        260,
+        88
+      ],
+      "outputSHA256": "d776d253b206dd9e1443c1420cea6ba7db89d8584204c028e3e53b50d206caa0",
+      "pixelEquality": true,
+      "DOMUTC": "2026-10-04T07:51:04.426Z",
+      "CSSViewport": {
+        "dpr": 1,
+        "h": 757,
+        "w": 1182
+      },
+      "scope": "Exact UI control crop; no account, team membership, roster or personal information"
+    },
+    {
+      "label": "desktop-gender-before",
+      "proofIndex": 5,
+      "captureStartUTC": "2026-10-04T07:51:14.733Z",
+      "captureEndUTC": "2026-10-04T07:51:14.756Z",
+      "file": "desktop-gender-before.png",
+      "sha256": "544526cd9c69fb6a65bfe4ac818afd9f395cfc306927344c2a21a8f7fc0a4d6e",
+      "sourceSHA256": "544526cd9c69fb6a65bfe4ac818afd9f395cfc306927344c2a21a8f7fc0a4d6e",
+      "sourcePixels": [
+        1182,
+        757
+      ],
+      "cropLTRB": [
+        325,
+        204,
+        532,
+        292
+      ],
+      "outputPixels": [
+        207,
+        88
+      ],
+      "outputSHA256": "4a3c2e680d3a71e28091745728a4a6bf9418d5950d364d6ea62a2207f0ef2f75",
+      "pixelEquality": true,
+      "DOMUTC": "2026-10-04T07:51:14.691Z",
+      "CSSViewport": {
+        "dpr": 1,
+        "h": 757,
+        "w": 1182
+      },
+      "scope": "Exact UI control crop; no account, team membership, roster or personal information"
+    }
+  ],
+  "sourceCaptureMetadataSHA256": "0b7b8f9670cc27a667e82ce5c3cd0cf646a3c26fe875b8f4032ec6192c3d7b51",
+  "safeProofHashes": {
+    "actions.json": "4291c5a4952976a67657964dbe12835ab58a0cb9ce94634608c732df3782465a",
+    "deployment-context.json": "15ebd8cf9b731cca65fe02bcaef0afa9c5eb12d290bf531101594f30dcf04ed0",
+    "entry.json": "7ca4b00c437fa06c41acac11ac2984edc313cda350fd133f84300c717df159c9",
+    "exit-attempt.json": "65e1e4389a133fe249d8b75cfa1c907e5131ad3469010d5efbae6932728636b7",
+    "exit.json": "14ef0be9e0d39056f553c433c1aaf01a0242d4b9e813aa2ebcaae79a0a6a3f10",
+    "proof.json": "98c65a958cf1455337c737489ef6da4b1c19d64bb20010a66ef7ed17715de473",
+    "reentry.json": "09a71ae5e3476e109b797b995486f229b07c9bc3300af0c0b48df8866cd98888",
+    "restore.json": "999eaa89c98acfb110a62d2f21f4462dd008236bb1528115c43c9bf7bc5041a9",
+    "source-safety-context.json": "5bd0ad3654944df95217eccedad90902cdeab5e608ea922904664185e0e7de02",
+    "summary.json": "e9ee4620c752c84ac6c6273aca7a14a0e11487ff9976a86824d0f227ae726cf5"
+  },
+  "captureClock": "UTC brackets around actual screenshot; linked DOM UTC separately kept",
+  "privacy": "Only named safe subset. Private initial values/raw images excluded; initial title/description length0 substantiated and only synthetic temporary title included. Rectangular original-pixel crops.",
+  "publicProjection": "Original safe inputs stay unchanged. Public action intent labels are clarified with originalLabel retained, and summary AX/scope wording is narrowed. source-manifest.json covers original hashes; manifest.json covers delivered files.",
+  "publisherPixelReview": "All6 safe crops directly viewed; byte/hash, dimensions, crop bounds, DOM/AX/capture chronology and42 repeated control geometries independently checked. Private source-image hashes/pixelEquality remain collector attestations."
+}

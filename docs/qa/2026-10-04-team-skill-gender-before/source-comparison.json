@@ -1,0 +1,54 @@
+{
+  "commits": [
+    "5372ea9c3640621eb270d15c54c70a822b97d536",
+    "45b9f0756b70d3b80801d5f5f2b43c692e007d1a"
+  ],
+  "files": [
+    {
+      "path": "apps/v1_web/src/components/team-matches/team-matches-create-client.tsx",
+      "sameGitBlobSHA": "ee6b8009134e78044d42adb9a85ba5f8628f7c9c",
+      "sameFullContent": true,
+      "contentSHA256": "ac1c3a32523a6225c6959c8aab85c54955e97e0fdc05ef0706297afa3b7789f0",
+      "beforeURL": "https://github.com/kim-song-jun/matchup-sports-platform/blob/5372ea9c3640621eb270d15c54c70a822b97d536/apps/v1_web/src/components/team-matches/team-matches-create-client.tsx",
+      "laterURL": "https://github.com/kim-song-jun/matchup-sports-platform/blob/45b9f0756b70d3b80801d5f5f2b43c692e007d1a/apps/v1_web/src/components/team-matches/team-matches-create-client.tsx"
+    },
+    {
+      "path": "apps/v1_web/src/components/team-matches/team-matches-page.tsx",
+      "sameGitBlobSHA": "a13733a3d757c9640ee3e0f76126deed30b5e208",
+      "sameFullContent": true,
+      "contentSHA256": "f17d44cc33c5e7ceca66e8bfb3ba6f2c06ef9a5965365ce84309449837bea01b",
+      "beforeURL": "https://github.com/kim-song-jun/matchup-sports-platform/blob/5372ea9c3640621eb270d15c54c70a822b97d536/apps/v1_web/src/components/team-matches/team-matches-page.tsx",
+      "laterURL": "https://github.com/kim-song-jun/matchup-sports-platform/blob/45b9f0756b70d3b80801d5f5f2b43c692e007d1a/apps/v1_web/src/components/team-matches/team-matches-page.tsx"
+    },
+    {
+      "path": "apps/v1_web/src/components/v1-ui/create-form-fields.tsx",
+      "sameGitBlobSHA": "40fcced16560fe218753a03a2a2f1637c4467b39",
+      "sameFullContent": true,
+      "contentSHA256": "6418a8ddaca4335cfd0b803020a0f71a37a15e15176640a33b9fa5a0210d7fcf",
+      "beforeURL": "https://github.com/kim-song-jun/matchup-sports-platform/blob/5372ea9c3640621eb270d15c54c70a822b97d536/apps/v1_web/src/components/v1-ui/create-form-fields.tsx",
+      "laterURL": "https://github.com/kim-song-jun/matchup-sports-platform/blob/45b9f0756b70d3b80801d5f5f2b43c692e007d1a/apps/v1_web/src/components/v1-ui/create-form-fields.tsx"
+    },
+    {
+      "path": "apps/v1_web/src/lib/expiring-draft.ts",
+      "sameGitBlobSHA": "2e602cb3235e55dbbda285aa55ecd40cbd983d94",
+      "sameFullContent": true,
+      "contentSHA256": "552457196e5859038c688757a1c48d4ab292887a060f8af6dfa09ad0aa3e0263",
+      "beforeURL": "https://github.com/kim-song-jun/matchup-sports-platform/blob/5372ea9c3640621eb270d15c54c70a822b97d536/apps/v1_web/src/lib/expiring-draft.ts",
+      "laterURL": "https://github.com/kim-song-jun/matchup-sports-platform/blob/45b9f0756b70d3b80801d5f5f2b43c692e007d1a/apps/v1_web/src/lib/expiring-draft.ts"
+    }
+  ],
+  "boundedFindings": [
+    "team-matches-page.tsx1281 passes scalar draft.grade to PresetChipSelector with no allowFreeText and passes draft.gender to GenderRuleSelector.",
+    "create-form-fields.tsx225–237 renders exactly 성별 무관/남/여 and246–285 accepts one string and replaces it on chip click. No actual choice activation is claimed.",
+    "team-matches-create-client.tsx236 updates a draft field;580–603 persists through writeExpiringDraft.",
+    "expiring-draft.ts20 sets24hour TTL;81–87 writes a fresh savedAt envelope and catches storage failures. Actual storage bytes were not read.",
+    "team-matches-create-client.tsx79–82 configures a retained-draft leave guard. Actual observed dialog and final URL are recorded separately."
+  ],
+  "notProved": [
+    "Runtime served either exact commit",
+    "Edit UI was visited",
+    "Server-side mutation absence",
+    "Local storage write success or exact timestamp",
+    "Range-save normalization or choice behavior was exercised"
+  ]
+}

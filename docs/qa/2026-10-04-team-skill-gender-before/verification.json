@@ -1,0 +1,553 @@
+{
+  "verifiedUTC": "2026-10-04T08:05:04.640680+00:00",
+  "method": "Safe-file review and immutable public source reads, no new UI executions",
+  "counts": {
+    "sourceFiles": 18,
+    "JSON": 12,
+    "PNG": 6,
+    "conditionDOM": 6,
+    "repeatedChoiceRecords": 42,
+    "AXFilteredLines": 48,
+    "selectedCompletedActions": 19
+  },
+  "rows": [
+    {
+      "proofIndex": 0,
+      "DOMUTC": "2026-10-04T07:49:30.485Z",
+      "AXUTC": "2026-10-04T07:49:30.521Z",
+      "viewport": {
+        "dpr": 1.25,
+        "h": 606,
+        "w": 402
+      },
+      "cropTargets": [
+        "입문",
+        "초보",
+        "중수",
+        "고수"
+      ],
+      "targetRects": [
+        {
+          "bottom": 320,
+          "height": 44,
+          "left": 20,
+          "right": 68.07500076293945,
+          "top": 276,
+          "width": 48.07500076293945,
+          "x": 20,
+          "y": 276
+        },
+        {
+          "bottom": 320,
+          "height": 44,
+          "left": 76.07500457763672,
+          "right": 124.15000534057616,
+          "top": 276,
+          "width": 48.07500076293945,
+          "x": 76.07500457763672,
+          "y": 276
+        },
+        {
+          "bottom": 320,
+          "height": 44,
+          "left": 132.15000915527344,
+          "right": 180.2250099182129,
+          "top": 276,
+          "width": 48.07500076293945,
+          "x": 132.15000915527344,
+          "y": 276
+        },
+        {
+          "bottom": 320,
+          "height": 44,
+          "left": 188.2250061035156,
+          "right": 236.30000686645508,
+          "top": 276,
+          "width": 48.07500076293945,
+          "x": 188.2250061035156,
+          "y": 276
+        }
+      ],
+      "allTargetRectsInViewport": true,
+      "scroll": {
+        "main": 0,
+        "y": 0
+      },
+      "selectedGender": "성별 무관",
+      "skillPressed": [
+        "false",
+        "false",
+        "false",
+        "false"
+      ],
+      "matchingRangeInputs": 0,
+      "nativeSelectCount": 0,
+      "literalMixedTextPresent": false
+    },
+    {
+      "proofIndex": 1,
+      "DOMUTC": "2026-10-04T07:50:04.154Z",
+      "AXUTC": "2026-10-04T07:50:04.205Z",
+      "viewport": {
+        "dpr": 1.25,
+        "h": 606,
+        "w": 402
+      },
+      "cropTargets": [
+        "성별 무관",
+        "남",
+        "여"
+      ],
+      "targetRects": [
+        {
+          "bottom": 288,
+          "height": 44,
+          "left": 20,
+          "right": 93.5500030517578,
+          "top": 244,
+          "width": 73.55000305175781,
+          "x": 20,
+          "y": 244
+        },
+        {
+          "bottom": 288,
+          "height": 44,
+          "left": 101.5500030517578,
+          "right": 138.38750457763672,
+          "top": 244,
+          "width": 36.837501525878906,
+          "x": 101.5500030517578,
+          "y": 244
+        },
+        {
+          "bottom": 288,
+          "height": 44,
+          "left": 146.3874969482422,
+          "right": 183.2249984741211,
+          "top": 244,
+          "width": 36.837501525878906,
+          "x": 146.3874969482422,
+          "y": 244
+        }
+      ],
+      "allTargetRectsInViewport": true,
+      "scroll": {
+        "main": 576,
+        "y": 0
+      },
+      "selectedGender": "성별 무관",
+      "skillPressed": [
+        "false",
+        "false",
+        "false",
+        "false"
+      ],
+      "matchingRangeInputs": 0,
+      "nativeSelectCount": 0,
+      "literalMixedTextPresent": false
+    },
+    {
+      "proofIndex": 2,
+      "DOMUTC": "2026-10-04T07:50:51.813Z",
+      "AXUTC": "2026-10-04T07:50:51.859Z",
+      "viewport": {
+        "dpr": 1.5,
+        "h": 505,
+        "w": 788
+      },
+      "cropTargets": [
+        "입문",
+        "초보",
+        "중수",
+        "고수"
+      ],
+      "targetRects": [
+        {
+          "bottom": 296,
+          "height": 44,
+          "left": 114,
+          "right": 161.8125,
+          "top": 252,
+          "width": 47.8125,
+          "x": 114,
+          "y": 252
+        },
+        {
+          "bottom": 296,
+          "height": 44,
+          "left": 169.8125,
+          "right": 217.625,
+          "top": 252,
+          "width": 47.8125,
+          "x": 169.8125,
+          "y": 252
+        },
+        {
+          "bottom": 296,
+          "height": 44,
+          "left": 225.625,
+          "right": 273.4375,
+          "top": 252,
+          "width": 47.8125,
+          "x": 225.625,
+          "y": 252
+        },
+        {
+          "bottom": 296,
+          "height": 44,
+          "left": 281.4375,
+          "right": 329.25,
+          "top": 252,
+          "width": 47.8125,
+          "x": 281.4375,
+          "y": 252
+        }
+      ],
+      "allTargetRectsInViewport": true,
+      "scroll": {
+        "main": 0,
+        "y": 0
+      },
+      "selectedGender": "성별 무관",
+      "skillPressed": [
+        "false",
+        "false",
+        "false",
+        "false"
+      ],
+      "matchingRangeInputs": 0,
+      "nativeSelectCount": 0,
+      "literalMixedTextPresent": false
+    },
+    {
+      "proofIndex": 3,
+      "DOMUTC": "2026-10-04T07:51:03.467Z",
+      "AXUTC": "2026-10-04T07:51:03.511Z",
+      "viewport": {
+        "dpr": 1.5,
+        "h": 505,
+        "w": 788
+      },
+      "cropTargets": [
+        "성별 무관",
+        "남",
+        "여"
+      ],
+      "targetRects": [
+        {
+          "bottom": 336,
+          "height": 44,
+          "left": 114,
+          "right": 187.28125,
+          "top": 292,
+          "width": 73.28125,
+          "x": 114,
+          "y": 292
+        },
+        {
+          "bottom": 336,
+          "height": 44,
+          "left": 195.28125,
+          "right": 231.8541679382324,
+          "top": 292,
+          "width": 36.57291793823242,
+          "x": 195.28125,
+          "y": 292
+        },
+        {
+          "bottom": 336,
+          "height": 44,
+          "left": 239.8541717529297,
+          "right": 276.4270896911621,
+          "top": 292,
+          "width": 36.57291793823242,
+          "x": 239.8541717529297,
+          "y": 292
+        }
+      ],
+      "allTargetRectsInViewport": true,
+      "scroll": {
+        "main": 400,
+        "y": 0
+      },
+      "selectedGender": "성별 무관",
+      "skillPressed": [
+        "false",
+        "false",
+        "false",
+        "false"
+      ],
+      "matchingRangeInputs": 0,
+      "nativeSelectCount": 0,
+      "literalMixedTextPresent": false
+    },
+    {
+      "proofIndex": 4,
+      "DOMUTC": "2026-10-04T07:51:04.426Z",
+      "AXUTC": "2026-10-04T07:51:04.466Z",
+      "viewport": {
+        "dpr": 1,
+        "h": 757,
+        "w": 1182
+      },
+      "cropTargets": [
+        "입문",
+        "초보",
+        "중수",
+        "고수"
+      ],
+      "targetRects": [
+        {
+          "bottom": 392,
+          "height": 44,
+          "left": 331,
+          "right": 379.484375,
+          "top": 348,
+          "width": 48.484375,
+          "x": 331,
+          "y": 348
+        },
+        {
+          "bottom": 392,
+          "height": 44,
+          "left": 387.484375,
+          "right": 435.96875,
+          "top": 348,
+          "width": 48.484375,
+          "x": 387.484375,
+          "y": 348
+        },
+        {
+          "bottom": 392,
+          "height": 44,
+          "left": 443.96875,
+          "right": 492.453125,
+          "top": 348,
+          "width": 48.484375,
+          "x": 443.96875,
+          "y": 348
+        },
+        {
+          "bottom": 392,
+          "height": 44,
+          "left": 500.453125,
+          "right": 548.9375,
+          "top": 348,
+          "width": 48.484375,
+          "x": 500.453125,
+          "y": 348
+        }
+      ],
+      "allTargetRectsInViewport": true,
+      "scroll": {
+        "main": 0,
+        "y": 0
+      },
+      "selectedGender": "성별 무관",
+      "skillPressed": [
+        "false",
+        "false",
+        "false",
+        "false"
+      ],
+      "matchingRangeInputs": 0,
+      "nativeSelectCount": 0,
+      "literalMixedTextPresent": false
+    },
+    {
+      "proofIndex": 5,
+      "DOMUTC": "2026-10-04T07:51:14.691Z",
+      "AXUTC": "2026-10-04T07:51:14.732Z",
+      "viewport": {
+        "dpr": 1,
+        "h": 757,
+        "w": 1182
+      },
+      "cropTargets": [
+        "성별 무관",
+        "남",
+        "여"
+      ],
+      "targetRects": [
+        {
+          "bottom": 284,
+          "height": 44,
+          "left": 331,
+          "right": 404.953125,
+          "top": 240,
+          "width": 73.953125,
+          "x": 331,
+          "y": 240
+        },
+        {
+          "bottom": 284,
+          "height": 44,
+          "left": 412.953125,
+          "right": 450.203125,
+          "top": 240,
+          "width": 37.25,
+          "x": 412.953125,
+          "y": 240
+        },
+        {
+          "bottom": 284,
+          "height": 44,
+          "left": 458.203125,
+          "right": 495.453125,
+          "top": 240,
+          "width": 37.25,
+          "x": 458.203125,
+          "y": 240
+        }
+      ],
+      "allTargetRectsInViewport": true,
+      "scroll": {
+        "main": 0,
+        "y": 600
+      },
+      "selectedGender": "성별 무관",
+      "skillPressed": [
+        "false",
+        "false",
+        "false",
+        "false"
+      ],
+      "matchingRangeInputs": 0,
+      "nativeSelectCount": 0,
+      "literalMixedTextPresent": false
+    }
+  ],
+  "images": [
+    {
+      "file": "mobile-skill-before.png",
+      "proofIndex": 0,
+      "DOMUTC": "2026-10-04T07:49:30.485Z",
+      "AXUTC": "2026-10-04T07:49:30.521Z",
+      "captureStartUTC": "2026-10-04T07:49:30.522Z",
+      "captureEndUTC": "2026-10-04T07:49:30.543Z",
+      "captureDelayFromDOMSeconds": 0.037,
+      "pixels": [
+        259,
+        88
+      ],
+      "sourcePixels": [
+        402,
+        606
+      ],
+      "sha256": "35ac667810812a70d232ab52638088a94ee6060f31d2cbc12571735b21cbc209"
+    },
+    {
+      "file": "mobile-gender-before.png",
+      "proofIndex": 1,
+      "DOMUTC": "2026-10-04T07:50:04.154Z",
+      "AXUTC": "2026-10-04T07:50:04.205Z",
+      "captureStartUTC": "2026-10-04T07:50:04.207Z",
+      "captureEndUTC": "2026-10-04T07:50:04.228Z",
+      "captureDelayFromDOMSeconds": 0.053,
+      "pixels": [
+        206,
+        88
+      ],
+      "sourcePixels": [
+        402,
+        606
+      ],
+      "sha256": "5191ad85dc0fb5e1658ee0cc410209c75efe1cf9e0ec546a04be8073aa7b0625"
+    },
+    {
+      "file": "tablet-skill-before.png",
+      "proofIndex": 2,
+      "DOMUTC": "2026-10-04T07:50:51.813Z",
+      "AXUTC": "2026-10-04T07:50:51.859Z",
+      "captureStartUTC": "2026-10-04T07:50:51.860Z",
+      "captureEndUTC": "2026-10-04T07:50:51.893Z",
+      "captureDelayFromDOMSeconds": 0.047,
+      "pixels": [
+        258,
+        88
+      ],
+      "sourcePixels": [
+        788,
+        505
+      ],
+      "sha256": "fc432ff3a03e6ad686c4ecb009e7ec882fe15cf5fa98cfa91c8fe895b3d13508"
+    },
+    {
+      "file": "tablet-gender-before.png",
+      "proofIndex": 3,
+      "DOMUTC": "2026-10-04T07:51:03.467Z",
+      "AXUTC": "2026-10-04T07:51:03.511Z",
+      "captureStartUTC": "2026-10-04T07:51:03.512Z",
+      "captureEndUTC": "2026-10-04T07:51:03.535Z",
+      "captureDelayFromDOMSeconds": 0.045,
+      "pixels": [
+        205,
+        88
+      ],
+      "sourcePixels": [
+        788,
+        505
+      ],
+      "sha256": "967036b9dc481c686f31a04c7c3062394e099dcd5dbba6abdbfc17d527810180"
+    },
+    {
+      "file": "desktop-skill-before.png",
+      "proofIndex": 4,
+      "DOMUTC": "2026-10-04T07:51:04.426Z",
+      "AXUTC": "2026-10-04T07:51:04.466Z",
+      "captureStartUTC": "2026-10-04T07:51:04.467Z",
+      "captureEndUTC": "2026-10-04T07:51:04.508Z",
+      "captureDelayFromDOMSeconds": 0.041,
+      "pixels": [
+        260,
+        88
+      ],
+      "sourcePixels": [
+        1182,
+        757
+      ],
+      "sha256": "d776d253b206dd9e1443c1420cea6ba7db89d8584204c028e3e53b50d206caa0"
+    },
+    {
+      "file": "desktop-gender-before.png",
+      "proofIndex": 5,
+      "DOMUTC": "2026-10-04T07:51:14.691Z",
+      "AXUTC": "2026-10-04T07:51:14.732Z",
+      "captureStartUTC": "2026-10-04T07:51:14.733Z",
+      "captureEndUTC": "2026-10-04T07:51:14.756Z",
+      "captureDelayFromDOMSeconds": 0.042,
+      "pixels": [
+        207,
+        88
+      ],
+      "sourcePixels": [
+        1182,
+        757
+      ],
+      "sha256": "4a3c2e680d3a71e28091745728a4a6bf9418d5950d364d6ea62a2207f0ef2f75"
+    }
+  ],
+  "temporaryTitleLength": 13,
+  "fieldValueChain": [
+    "",
+    "QA 실력 성별 1004",
+    "",
+    ""
+  ],
+  "descriptionBlankAtAllRecordedInfoSamples": true,
+  "gradeGenderClicksCollectorReported": 0,
+  "firstBackReachedList": false,
+  "freshInfoLoadNotListReturn": true,
+  "actualFinalListUTC": "2026-10-04T07:54:28.375Z",
+  "runtimeServingSHA": "unknown",
+  "storageBytesOrExpiryRollbackVerified": false,
+  "sourceFilesUnchanged": true,
+  "collectorReportedSelectors": {
+    "rangeInputs": "querySelectorAll('input,select,button'), then /최소 실력|최대 실력|실력 범위|범위로|범위 선택/ against joined aria-label, placeholder and textContent",
+    "mixedTextPresent": "document.body.innerText.includes('혼성')",
+    "selectCount": "document.querySelectorAll('select').length",
+    "choices": "All buttons filtered by exact text: 입문/초보/중수/고수/성별 무관/남/여/혼성",
+    "AX": "getAXState with emit:false, disableDiffing:true, then choice-line regex /checkbox (입문|초보|중수|고수|성별 무관|남,|여,|혼성)/",
+    "attribution": "Collector supplied extraction definitions after collection; no new UI execution or broad range-name absence claim"
+  }
+}

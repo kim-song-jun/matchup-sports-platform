@@ -1,0 +1,111 @@
+{
+  "scope": "Actual before observation of requested team-match skill-range and mixed-gender UI change. Creation condition screen only; no edit fixture or edit UI used.",
+  "startUTC": "2026-10-04T07:44:32.434Z",
+  "endUTC": "2026-10-04T07:54:28.375Z",
+  "runtimeServingSHA": "unknown",
+  "counts": {
+    "DOM": 6,
+    "recordedActions": 19,
+    "PNG": 6
+  },
+  "results": [
+    {
+      "viewport": {
+        "dpr": 1.25,
+        "h": 606,
+        "w": 402
+      },
+      "skillProof": 0,
+      "genderProof": 1,
+      "skillChoices": [
+        "입문",
+        "초보",
+        "중수",
+        "고수"
+      ],
+      "genderChoices": [
+        "성별 무관",
+        "남",
+        "여"
+      ],
+      "allSkillPressedFalse": true,
+      "mixedTextPresent": false,
+      "matchingRangeControlCount": 0,
+      "selectCount": 0
+    },
+    {
+      "viewport": {
+        "dpr": 1.5,
+        "h": 505,
+        "w": 788
+      },
+      "skillProof": 2,
+      "genderProof": 3,
+      "skillChoices": [
+        "입문",
+        "초보",
+        "중수",
+        "고수"
+      ],
+      "genderChoices": [
+        "성별 무관",
+        "남",
+        "여"
+      ],
+      "allSkillPressedFalse": true,
+      "mixedTextPresent": false,
+      "matchingRangeControlCount": 0,
+      "selectCount": 0
+    },
+    {
+      "viewport": {
+        "dpr": 1,
+        "h": 757,
+        "w": 1182
+      },
+      "skillProof": 4,
+      "genderProof": 5,
+      "skillChoices": [
+        "입문",
+        "초보",
+        "중수",
+        "고수"
+      ],
+      "genderChoices": [
+        "성별 무관",
+        "남",
+        "여"
+      ],
+      "allSkillPressedFalse": true,
+      "mixedTextPresent": false,
+      "matchingRangeControlCount": 0,
+      "selectCount": 0
+    }
+  ],
+  "observed": "At402/788/1182 CSS widths, four skill chips and three gender chips are present. No literal 혼성, matching range input or native select was found by the recorded collector checks. Separate crops show grade and gender controls; this is a creation-condition baseline, not an edit-form observation. AXChoices are filtered excerpts from full-state reads, not complete AX trees.",
+  "sourceVersusUI": "Actual chip exclusive-selection behavior was not exercised. Source confirms one grade string and replacement selection. DOM role/aria and AX wording do not prove selection exclusivity by themselves.",
+  "restoration": {
+    "initialTitleLength": 0,
+    "initialDescriptionLength": 0,
+    "temporaryTitle": "QA 실력 성별 1004",
+    "restoredTitle": "",
+    "restoredDescription": "",
+    "freshNavigationTitle": "",
+    "freshNavigationDescription": "",
+    "gradeGenderClicks": 0,
+    "otherFormEdits": 0,
+    "draftDeleted": false,
+    "storageTimestampMayRefresh": true
+  },
+  "exitClarification": "The first Back did not exit: it opened a local keep-draft confirmation. reentry.json.firstExit records /new/info/titlePresenttrue; the later goto was a fresh navigation to the same info URL, not proof of list reentry. It verified title blank on fresh document load. Second Back also opened the confirmation, captured in exit-attempt.json. Actual 나가기 then reached /team-matches with titleFieldfalse and dialog0 at exit.json UTC. Action labels reflect intended actions; actual URLs govern completion.",
+  "limits": [
+    "No approved synthetic edit URL was identified; parent limited this before to creation. Same component in source is not edit UI evidence",
+    "No grade chosen because blank cannot be restored through observed UI. Gender also left untouched. No range-save normalization test",
+    "No field Enter, final create, image selection/upload, application, result/roster/permission or notification actions",
+    "No global server-write-zero, API/DB audit or storage byte-for-byte rollback claim",
+    "Local title values restored, but TTL/persistence metadata can change. Leave means retained local draft, not deletion",
+    "Physical device, keyboard range interaction or screen-reader speech not tested",
+    "New45b9 team-selection-sheet image fix is a different surface and not verified in this before package"
+  ],
+  "publisherQualification": "Selection exclusivity is a static source property, not an exercised UI test. All19 action records are selected completed calls; initial navigation is recorded separately. Actual endpoint fields override old intended-action labels."
+}

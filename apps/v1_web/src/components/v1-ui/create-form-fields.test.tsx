@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { useState } from 'react';
 import { describe, expect, it, vi } from 'vitest';
-import { CreateField, MultiPresetChipSelector, RecentVenueChips } from './create-form-fields';
+import { CreateField, GenderRuleSelector, MultiPresetChipSelector, RecentVenueChips } from './create-form-fields';
 
 describe('RecentVenueChips', () => {
   // 위저드(개인/팀매치 생성)와 관리자 리그 대진 일괄생성 폼이 이 컴포넌트를 공유한다 —
@@ -166,5 +166,19 @@ describe('MultiPresetChipSelector 다중선택 상한', () => {
     fireEvent.click(screen.getByRole('button', { name: '실력 중심' })); // 이제는 3번째로 성공
     expect(screen.getByRole('button', { name: '실력 중심' })).toHaveAttribute('aria-pressed', 'true');
     expect(screen.queryByRole('alert')).toBeNull();
+  });
+});
+
+describe('GenderRuleSelector', () => {
+  it("'성별 무관'은 '혼성'으로 보이되 고르면 저장값 '성별 무관'을 넘긴다", () => {
+    const onChange = vi.fn();
+    render(<GenderRuleSelector value="성별 무관" onChange={onChange} />);
+
+    expect(screen.getAllByRole('button').map((button) => button.textContent)).toEqual(['혼성', '남', '여']);
+    const mixed = screen.getByRole('button', { name: '혼성' });
+    expect(mixed).toHaveAttribute('aria-pressed', 'true');
+
+    fireEvent.click(mixed);
+    expect(onChange).toHaveBeenCalledWith('성별 무관');
   });
 });

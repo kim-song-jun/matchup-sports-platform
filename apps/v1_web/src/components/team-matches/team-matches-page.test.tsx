@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ReactElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { queryImageBySrc } from '@/test/next-image';
 import { TeamMatchCreatePageView, TeamMatchDetailPageView, TeamMatchListPageView } from './team-matches-page';
 import { getTeamMatchCreateViewModel, getTeamMatchDetailViewModel, getTeamMatchListViewModel } from './team-matches.view-model';
 import type { TeamMatchModel } from './team-matches.types';
@@ -1878,6 +1879,15 @@ describe('TeamMatchDetailPageView — 지금 할 일 카드 (H6)', () => {
     }
   });
 
+  it('신청 접수 카드에도 신청한 팀의 엠블럼을 그린다', () => {
+    const model = getTeamMatchDetailViewModel('pending');
+    model.myApplicationTeam = { teamId: 'team-hapjeong', name: '합정 유나이티드', logoUrl: '/images/team-logos/team-logo-03.jpg' };
+    renderPage(<TeamMatchDetailPageView model={model} />);
+
+    const card = screen.getByRole('region', { name: '신청을 접수했어요' });
+    expect(queryImageBySrc(card, '/images/team-logos/team-logo-03.jpg')).not.toBeNull();
+  });
+
   it('W4-V3: 신청 팀은 매칭 뒤에도 히어로 오른쪽 자기 팀을 우리 팀으로 보고, 호스트는 상대팀으로 본다(대조군)', () => {
     function matchedModel(viewerOnApplicantSide: boolean) {
       const model = getTeamMatchDetailViewModel('approved');
@@ -2014,6 +2024,31 @@ describe('TeamMatchDetailPageView — 여러 팀 팀장의 신청 팀 선택 시
 
     await waitFor(() => expect(submit).toHaveBeenCalledWith('a', '저녁 경기 좋아요.'));
     await waitFor(() => expect(screen.queryByRole('dialog', { name: '어느 팀으로 신청할까요?' })).not.toBeInTheDocument());
+  });
+
+  // 시트가 TeamAvatar 에 엠블럼을 안 넘기던 때는 팀이 등록한 엠블럼·기본 제공 엠블럼이 있어도
+  // 전부 팀 id 로 만든 임시 무늬(identicon)로만 보였다(2026-10-04 사용자 제보).
+  it('팀 행에 팀의 엠블럼을 그린다 — 엠블럼이 없는 팀만 임시 무늬로 남는다', async () => {
+    const model = getTeamMatchDetailViewModel('default');
+    model.applyLabel = '신청하기';
+    model.applyTeamPicker = {
+      teams: [
+        { teamId: 'a', name: '업로드 엠블럼 팀', logoUrl: '/uploads/emblem.png', roleLabel: '팀장', eligible: true, reason: null },
+        { teamId: 'b', name: '기본 엠블럼 팀', logoUrl: '/images/team-logos/team-logo-03.jpg', roleLabel: '팀장', eligible: true, reason: null },
+        { teamId: 'c', name: '엠블럼 없는 팀', logoUrl: null, roleLabel: '팀장', eligible: true, reason: null },
+      ],
+      defaultTeamId: 'a',
+      submit: vi.fn(),
+    };
+    renderPage(<TeamMatchDetailPageView model={model} />);
+
+    fireEvent.click(screen.getAllByRole('button', { name: '신청하기' })[0]);
+    const sheet = await screen.findByRole('dialog', { name: '어느 팀으로 신청할까요?' });
+    const rowOf = (name: RegExp) => within(sheet).getByRole('radio', { name }).closest('label')!;
+
+    expect(queryImageBySrc(rowOf(/업로드 엠블럼 팀/), '/uploads/emblem.png')).not.toBeNull();
+    expect(queryImageBySrc(rowOf(/기본 엠블럼 팀/), '/images/team-logos/team-logo-03.jpg')).not.toBeNull();
+    expect(rowOf(/엠블럼 없는 팀/).querySelector('img')).toBeNull();
   });
 
   it('신청이 실패하면 시트를 닫지 않고 이유를 보여 준다', async () => {

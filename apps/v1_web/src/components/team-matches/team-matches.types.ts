@@ -226,12 +226,12 @@ export type TeamMatchDetailViewModel = {
     } | null;
   };
   /** 승인 대기 중인 신청 팀(히어로 "우리 팀" 자리). */
-  myApplicationTeam?: { teamId: string; name: string } | null;
+  myApplicationTeam?: { teamId: string; name: string; logoUrl?: string | null } | null;
   /** 보는 사람이 확정된 상대팀(신청 팀) 쪽 — 히어로 오른쪽 자리를 매칭 뒤에도 "우리 팀"으로 부른다. */
   viewerOnApplicantSide?: boolean;
   /** 신청 가능한 팀이 2개 이상인 팀장의 팀 선택 시트(N-1). */
   applyTeamPicker?: {
-    teams: Array<{ teamId: string; name: string; roleLabel: string; eligible: boolean; reason: string | null }>;
+    teams: Array<{ teamId: string; name: string; logoUrl?: string | null; roleLabel: string; eligible: boolean; reason: string | null }>;
     defaultTeamId: string;
     submit: (teamId: string, message: string | null) => Promise<unknown>;
   };

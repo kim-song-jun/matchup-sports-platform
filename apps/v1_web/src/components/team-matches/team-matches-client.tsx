@@ -429,6 +429,7 @@ export function TeamMatchDetailPageClient({ teamMatchId, seed }: { teamMatchId: 
         teams: eligibility.data.teams.map((team) => ({
           teamId: team.teamId,
           name: team.name,
+          logoUrl: team.logoUrl ?? null,
           roleLabel: teamRoleLabel(team.role),
           eligible: team.eligible,
           reason: team.eligible ? null : reasonLabel(team.reasonCode),
@@ -538,7 +539,7 @@ export function TeamMatchDetailPageClient({ teamMatchId, seed }: { teamMatchId: 
       ? { retry: () => { void applications.refetch(); } }
       : undefined,
     myApplicationTeam: viewerState === 'requested' && selectedEligibility?.applicationId
-      ? { teamId: selectedEligibility.teamId, name: selectedEligibility.name }
+      ? { teamId: selectedEligibility.teamId, name: selectedEligibility.name, logoUrl: selectedEligibility.logoUrl ?? null }
       : null,
     // 진행 체크리스트와 같은 편 판정 — 호스트 팀도 관리하면 호스트 편이다.
     viewerOnApplicantSide: !canManageHostTeam && (canManageOpponentTeam || viewerState === 'approved'),

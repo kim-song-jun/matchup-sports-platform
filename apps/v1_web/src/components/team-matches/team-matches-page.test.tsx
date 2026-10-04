@@ -31,6 +31,19 @@ function renderPage(ui: ReactElement) {
 }
 
 describe('team match images', () => {
+  it('uses the square image on the list and the wide image on detail', () => {
+    const images = { imageUrl: '/uploads/wide.webp', listImageUrl: '/uploads/square.webp' };
+    const list = getTeamMatchListViewModel();
+    list.matches = [{ ...list.matches[0], ...images }];
+    const first = renderPage(<TeamMatchListPageView model={list} />);
+    expect(first.container.querySelector<HTMLElement>('.tm-match-row-thumb')?.style.backgroundImage).toContain(images.listImageUrl);
+    first.unmount();
+    const detail = getTeamMatchDetailViewModel();
+    detail.match = { ...detail.match, ...images };
+    const second = renderPage(<TeamMatchDetailPageView model={detail} />);
+    expect(second.container.querySelector<HTMLElement>('.tm-team-vs-hero')?.style.backgroundImage).toContain(images.imageUrl);
+  });
+
   it('places the lifecycle notice after the match hero and its mobile back action', () => {
     const model = getTeamMatchDetailViewModel('mine');
     const { container } = renderPage(<TeamMatchDetailPageView model={model} lifecyclePanel={<div data-testid="lifecycle-notice">보류 안내</div>} />);
@@ -50,13 +63,13 @@ describe('team match images', () => {
     const media = container.querySelector<HTMLElement>('.tm-match-row-thumb');
 
     expect(media?.style.backgroundImage).toContain('https://cdn.example.com/team-match.webp');
-    expect(media?.style.backgroundImage).toContain('/mock/generated/team-huddle.webp');
+    expect(media?.style.backgroundImage).toContain('/illustrations/sport-soccer-640.webp');
     expect(media?.style.backgroundImage).not.toContain('linear-gradient');
     expect(media?.textContent).toBe('');
     expect(screen.getByText(model.matches[0].title).closest('a')?.getAttribute('href')).toContain(`/team-matches/${model.matches[0].id}`);
   });
 
-  it.each(['/uploads/team-match-cover.webp', '/mock/generated/team-huddle.webp'])(
+  it.each(['/uploads/team-match-cover.webp', '/illustrations/sport-soccer-640.webp'])(
     'keeps text-free photos undimmed for %s while preserving closed-card state',
     (imageUrl) => {
       const model = getTeamMatchListViewModel();
@@ -65,7 +78,7 @@ describe('team match images', () => {
       const media = container.querySelector<HTMLElement>('.tm-match-row-thumb');
 
       expect(media?.style.backgroundImage).toContain(imageUrl);
-      expect(media?.style.backgroundImage).toContain('/mock/generated/team-huddle.webp');
+      expect(media?.style.backgroundImage).toContain('/illustrations/sport-soccer-640.webp');
       expect(media?.style.backgroundImage).not.toContain('linear-gradient');
       expect(media?.closest('a')).toHaveClass('tm-card-closed');
       expect(media?.textContent).toBe('');
@@ -82,6 +95,7 @@ describe('team match images', () => {
     expect(media?.style.backgroundImage).toBe('');
     expect(media?.querySelector('img')?.getAttribute('src')).toContain('sport-futsal');
     expect(screen.getByText(model.matches[0].title)).toBeInTheDocument();
+
   });
 
   it('renders the API image with a local fallback on the detail hero', () => {
@@ -92,8 +106,11 @@ describe('team match images', () => {
     const hero = container.querySelector<HTMLElement>('.tm-team-vs-hero');
 
     expect(hero?.style.backgroundImage).toContain('/uploads/team-match-cover.webp');
-    expect(hero?.style.backgroundImage).toContain('/mock/generated/team-huddle.webp');
-    expect(hero?.style.backgroundImage).toContain('linear-gradient');
+    expect(hero?.style.backgroundImage).toContain('/illustrations/sport-soccer-640.webp');
+    expect(hero?.style.backgroundImage).not.toContain('linear-gradient');
+    expect(hero).toHaveClass('tm-team-vs-hero-photo');
+    expect(hero?.querySelector('.tm-team-vs-summary')).not.toBeNull();
+
     expect(hero?.style.backgroundPosition).toBe('center');
     expect(hero?.style.backgroundRepeat).toBe('no-repeat');
     expect(hero?.style.backgroundSize).toBe('cover');
@@ -198,6 +215,22 @@ describe('team match detail — recordEntry 렌더 순서', () => {
 });
 
 describe('platform-managed team match provenance', () => {
+  it.each([false, true])('주관에 맞는 모집 문구와 부담금 라벨을 보여준다 (플랫폼=%s)', (platformManaged) => {
+    const list = getTeamMatchListViewModel();
+    list.matches = [{ ...list.matches[0], platformManaged,
+      status: 'open', closed: false, live: false, completionPending: false }];
+    const renderedList = renderPage(<TeamMatchListPageView model={list} />);
+    expect(screen.getByText(platformManaged ? '팀 모집 중' : '상대 모집 중')).toBeInTheDocument();
+    expect(screen.queryByText(platformManaged ? '상대 모집 중' : '팀 모집 중')).not.toBeInTheDocument();
+    renderedList.unmount();
+
+    const detail = getTeamMatchDetailViewModel();
+    detail.match = { ...detail.match, platformManaged, cost: 120000, opponentCost: 60000 };
+    renderPage(<TeamMatchDetailPageView model={detail} />);
+    expect(screen.getByText(platformManaged ? '각 팀 부담금' : '상대팀 부담금')).toBeInTheDocument();
+    expect(screen.queryByText(platformManaged ? '상대팀 부담금' : '각 팀 부담금')).not.toBeInTheDocument();
+  });
+
   it.each([false, true])('미배정 플랫폼 대진은 두 팀 자리를 보여준다 (마감=%s)', (closed) => {
     const model = getTeamMatchDetailViewModel();
     model.match = { ...model.match, platformManaged: true, hostTeamId: undefined,
@@ -363,6 +396,13 @@ describe('TeamMatchListPageView — 신청 마감 카드 구분', () => {
 
     expect(screen.getAllByText('신청 마감').length).toBeGreaterThan(0);
     expect(container.querySelector('.tm-match-row.tm-card-closed')).not.toBeNull();
+  });
+
+  it.each(['completed', 'cancelled', 'expired'] as const)('끝난 리그 매치도 카드 전체 흐림 대상으로 표시한다 (%s)', (apiStatus) => {
+    const model = modelWithSingleCard('closed');
+    model.matches[0] = { ...model.matches[0], apiStatus, league: { leagueId: 'league-1', title: '가을 리그' } };
+    const { container } = renderPage(<TeamMatchListPageView model={model} />);
+    expect(container.querySelector('.tm-match-row')).toHaveClass('tm-card-closed');
   });
 
   it('지정 종료 시각이 지난 matched 카드는 "종료 확인 중"으로 표시하고 마감 카드처럼 흐리지 않는다', () => {
@@ -555,7 +595,8 @@ describe('team match full edit', () => {
 
     expect(screen.getByText('다이나믹 FS')).toBeInTheDocument();
     expect(screen.getAllByText('풋살').length).toBeGreaterThan(0);
-    expect(screen.getByLabelText(/배경 이미지 선택/)).toBeInTheDocument();
+    expect(screen.getByLabelText('목록 이미지')).toBeInTheDocument();
+    expect(screen.getByLabelText('상세 이미지')).toBeInTheDocument();
     for (const label of [
       '매치 제목', '설명', '실력등급', '경기방식',
       '경기 스타일', '유니폼 색상', '장소',
@@ -588,6 +629,7 @@ describe('team match full edit', () => {
       onNext: () => undefined,
       onSubmit: () => undefined,
       lockedReason,
+      uploadImage: async () => '/uploads/team-match.webp',
     };
 
     renderPage(<TeamMatchCreatePageView model={model} />);
@@ -596,8 +638,10 @@ describe('team match full edit', () => {
       if (locked) expect(screen.getByLabelText(label)).toBeDisabled();
       else expect(screen.getByLabelText(label)).not.toBeDisabled();
     }
-    if (locked) expect(screen.getByLabelText(/배경 이미지 선택/)).toBeDisabled();
-    else expect(screen.getByLabelText(/배경 이미지 선택/)).not.toBeDisabled();
+    for (const label of ['목록 이미지', '상세 이미지']) {
+      if (locked) expect(screen.getByLabelText(label)).toBeDisabled();
+      else expect(screen.getByLabelText(label)).not.toBeDisabled();
+    }
   });
 });
 

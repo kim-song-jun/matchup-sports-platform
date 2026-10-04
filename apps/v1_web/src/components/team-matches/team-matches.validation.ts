@@ -170,6 +170,7 @@ export function buildTeamMatchPayloadResult(draft: TeamMatchDraft, hostTeamId: s
       endsAt,
       deadlineAt,
       imageUrl: draft.imageUrl.trim() || null,
+      listImageUrl: draft.listImageUrl?.trim() || null,
       manualPlaceName: draft.venue.trim(),
       addressText: draft.address.trim() || null,
       costNote: draft.cost || draft.opponentCost ? `총 ${draft.cost.toLocaleString('ko-KR')}원 · 상대팀 ${draft.opponentCost.toLocaleString('ko-KR')}원` : null,

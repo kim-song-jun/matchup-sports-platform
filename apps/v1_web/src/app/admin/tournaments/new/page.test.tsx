@@ -388,6 +388,97 @@ describe('AdminTournamentsNewPage four-step wizard', () => {
     ]);
   });
 
+  describe('상금 행 모바일 전체 폭 — 실제 생성 caller (#1439)', () => {
+    it('실제 공유 편집기에 mobile 전체 span과 sm 3열을 연결하고 이름→내용→삭제 Tab 순서를 유지한다', async () => {
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+      renderPage();
+      goToPresentationStep();
+
+      // jsdom은 Tailwind breakpoint의 실제 pixel 배치를 계산하지 않는다.
+      // 실제 caller가 렌더한 class/DOM 연결과 Tab만 검증하며 3폭 after는 alpha에서 확인한다.
+      for (const index of [1, 2, 3]) {
+        const name = screen.getByRole('combobox', { name: `상금 항목 ${index} 이름` });
+        const value = screen.getByRole('textbox', { name: `상금 항목 ${index} 내용` });
+        const remove = screen.getByRole('button', { name: `상금 항목 ${index} 삭제` });
+        const row = name.parentElement;
+        expect(row).toHaveClass(
+          'grid-cols-[minmax(0,1fr)_44px]',
+          'sm:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)_44px]',
+        );
+        expect(value).toHaveClass(
+          'col-span-2', 'col-start-1', 'row-start-2',
+          'sm:col-span-1', 'sm:col-start-2', 'sm:row-start-1',
+          'h-[44px]', 'w-full',
+        );
+        expect(remove).toHaveClass('col-start-2', 'row-start-1', 'sm:col-start-3', 'h-[44px]', 'w-[44px]');
+        expect(Array.from(row!.querySelectorAll('input, button'))).toEqual([name, value, remove]);
+      }
+
+      screen.getByRole('combobox', { name: '상금 항목 1 이름' }).focus();
+      await user.tab();
+      expect(screen.getByRole('textbox', { name: '상금 항목 1 내용' })).toHaveFocus();
+      await user.tab();
+      expect(screen.getByRole('button', { name: '상금 항목 1 삭제' })).toHaveFocus();
+      expect(createMutate).not.toHaveBeenCalled();
+      expect(updateMutate).not.toHaveBeenCalled();
+    });
+
+    it('연속 입력과 이전·다음 왕복 뒤 현금·물품 미리보기와 실제 submit 직렬화를 보존한다', () => {
+      // API 응답 callback은 합성 fixture다. 아래는 실제 wizard/editor state와 outgoing
+      // payload 계약을 검증하며 서버 저장·새로고침 roundtrip을 증명하지 않는다.
+      createMutate.mockImplementationOnce(
+        (_payload: unknown, opts: { onSuccess: (value: V1Tournament) => void }) =>
+          opts.onSuccess(fakeDraftTournament()),
+      );
+      renderPage();
+      goToPresentationStep();
+      fireEvent.click(screen.getByRole('button', { name: '상금 항목 3 삭제' }));
+      fireEvent.change(screen.getByRole('textbox', { name: '총상금' }), { target: { value: '600000' } });
+      fireEvent.change(screen.getByRole('combobox', { name: '상금 항목 1 이름' }), { target: { value: '우승' } });
+      const cash = screen.getByRole('textbox', { name: '상금 항목 1 내용' });
+      cash.focus();
+      for (const value of ['6', '600', '600000']) {
+        fireEvent.change(cash, { target: { value } });
+        expect(screen.getByRole('textbox', { name: '상금 항목 1 내용' })).toBe(cash);
+        expect(cash).toHaveValue(value);
+        expect(cash).toHaveFocus();
+      }
+      fireEvent.change(screen.getByRole('combobox', { name: '상금 항목 2 이름' }), { target: { value: '상품' } });
+      fireEvent.change(screen.getByRole('textbox', { name: '상금 항목 2 내용' }), {
+        target: { value: '우승 트로피·상품권' },
+      });
+      fireEvent.change(screen.getByLabelText('상품 및 상금 요약'), { target: { value: '현금과 물품 시상' } });
+
+      fireEvent.click(screen.getByRole('button', { name: /이전/ }));
+      expect(screen.queryByRole('textbox', { name: '상금 항목 1 내용' })).not.toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: /다음/ }));
+
+      expect(screen.getByRole('textbox', { name: '총상금' })).toHaveValue('600,000');
+      expect(screen.getByRole('combobox', { name: '상금 항목 1 이름' })).toHaveValue('우승');
+      expect(screen.getByRole('textbox', { name: '상금 항목 1 내용' })).toHaveValue('600000');
+      expect(screen.getByRole('combobox', { name: '상금 항목 2 이름' })).toHaveValue('상품');
+      expect(screen.getByRole('textbox', { name: '상금 항목 2 내용' })).toHaveValue('우승 트로피·상품권');
+      expect(screen.queryByRole('combobox', { name: '상금 항목 3 이름' })).not.toBeInTheDocument();
+      expect(screen.getByLabelText('상품 및 상금 요약')).toHaveValue('현금과 물품 시상');
+      expect(screen.getByText('600,000원')).toBeInTheDocument();
+      expect(screen.getByText('우승 트로피·상품권')).toBeInTheDocument();
+      expect(screen.getByText('배분 합계 600,000원')).toBeInTheDocument();
+      expect(createMutate).not.toHaveBeenCalled();
+
+      fireEvent.click(screen.getByRole('button', { name: '대회 만들기' }));
+
+      expect(createMutate).toHaveBeenCalledTimes(1);
+      expect(createMutate).toHaveBeenCalledWith(expect.objectContaining({
+        prizePool: 600000,
+        prizeSummary: '현금과 물품 시상',
+        prizeBreakdown: '우승 600,000원 / 상품 우승 트로피·상품권',
+      }), expect.anything());
+      expect(updateMutate).not.toHaveBeenCalled();
+      expect(screen.getByText('STEP 5 / 5')).toBeInTheDocument();
+      expect(routerReplace).toHaveBeenCalledWith('/admin/tournaments/new?draftId=draft-1');
+    });
+  });
+
   it('patches only the uploaded promo image without restoring stale text', () => {
     const edited = tournamentCreateReducer(INITIAL_TOURNAMENT_CREATE_STATE, {
       type: 'set-promo',

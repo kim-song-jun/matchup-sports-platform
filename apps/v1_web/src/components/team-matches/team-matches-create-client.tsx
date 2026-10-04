@@ -659,6 +659,7 @@ export function draftFromTeamMatchEdit(edit: V1TeamMatchEdit): TeamMatchDraft {
     uniform: edit.form.uniformColor ?? legacy?.uniform ?? '',
     gender: normalizeGenderRule(edit.form.genderRule),
     imageUrl: edit.form.imageUrl ?? '',
+    listImageUrl: edit.form.listImageUrl ?? '',
     cost: costs.cost,
     opponentCost: costs.opponentCost,
     venue: edit.form.manualPlaceName,

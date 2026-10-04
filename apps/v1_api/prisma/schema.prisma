@@ -1800,6 +1800,7 @@ model V1TeamMatch {
   title                      String
   description                String?
   imageUrl                   String?           @map("image_url")
+  listImageUrl               String?           @map("list_image_url")
   placeName                  String?           @map("place_name")
   placeAddress               String?           @map("place_address")
   startAt                    DateTime?         @map("start_at")

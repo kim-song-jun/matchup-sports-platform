@@ -1,0 +1,232 @@
+{
+  "verifiedUTC": "2026-10-04T09:07:44.256424+00:00",
+  "method": "Public safe projection and prior immutable public proof review; no UI replay or private-image access",
+  "inputFiles": 15,
+  "inputSHA256SUMS": "6e1647c9c530353e65867b746e899103095f2c60595acbe88a19bdcb0f9f2930",
+  "allInputFilesPreserved": true,
+  "counts": {
+    "DOM": 4,
+    "AXExcerpts": 4,
+    "genderControlRecords": 12,
+    "gradeStateRecords": 16,
+    "selectedCompletedActions": 18,
+    "visibleEndpoints": 3,
+    "PNG": 3
+  },
+  "rows": [
+    {
+      "proofIndex": 0,
+      "DOMUTC": "2026-10-04T08:39:33.963Z",
+      "AXUTC": "2026-10-04T08:39:34.008Z",
+      "viewport": {
+        "dpr": 1.25,
+        "h": 606,
+        "w": 402
+      },
+      "bound": {
+        "left": 20,
+        "top": 244,
+        "right": 157.75,
+        "bottom": 288
+      },
+      "withinViewport": true
+    },
+    {
+      "proofIndex": 1,
+      "DOMUTC": "2026-10-04T08:40:13.550Z",
+      "AXUTC": "2026-10-04T08:40:13.588Z",
+      "viewport": {
+        "dpr": 1.5,
+        "h": 505,
+        "w": 788
+      },
+      "bound": {
+        "left": 114,
+        "top": 216.6666717529297,
+        "right": 250.9583396911621,
+        "bottom": 260.6666717529297
+      },
+      "withinViewport": true
+    },
+    {
+      "proofIndex": 2,
+      "DOMUTC": "2026-10-04T08:40:13.806Z",
+      "AXUTC": "2026-10-04T08:40:13.853Z",
+      "viewport": {
+        "dpr": 1,
+        "h": 757,
+        "w": 1182
+      },
+      "bound": {
+        "left": 331,
+        "top": 840,
+        "right": 469.984375,
+        "bottom": 884
+      },
+      "withinViewport": false
+    },
+    {
+      "proofIndex": 3,
+      "DOMUTC": "2026-10-04T08:40:51.207Z",
+      "AXUTC": "2026-10-04T08:40:51.245Z",
+      "viewport": {
+        "dpr": 1,
+        "h": 757,
+        "w": 1182
+      },
+      "bound": {
+        "left": 331,
+        "top": 240,
+        "right": 469.984375,
+        "bottom": 284
+      },
+      "withinViewport": true
+    }
+  ],
+  "images": [
+    {
+      "file": "mobile-gender.png",
+      "proofIndex": 0,
+      "DOMUTC": "2026-10-04T08:39:33.963Z",
+      "AXUTC": "2026-10-04T08:39:34.008Z",
+      "captureStartUTC": "2026-10-04T08:39:34.010Z",
+      "captureEndUTC": "2026-10-04T08:39:34.037Z",
+      "outputSHA256": "7e57df287a63e01e0f56e3899ad5124b5e8d532d53e2a1b6ffb33c72be85e59a",
+      "decodedRasterSHA256": "a155b9bfbfb6b4ec011124a85aa6fecb278fd5068d511d579064ea9b71e17ccc"
+    },
+    {
+      "file": "tablet-gender.png",
+      "proofIndex": 1,
+      "DOMUTC": "2026-10-04T08:40:13.550Z",
+      "AXUTC": "2026-10-04T08:40:13.588Z",
+      "captureStartUTC": "2026-10-04T08:40:13.588Z",
+      "captureEndUTC": "2026-10-04T08:40:13.620Z",
+      "outputSHA256": "00d512e23915eb362ff13a225c84c4a37c83b852b78b9b7e7fcffd82318a429c",
+      "decodedRasterSHA256": "8a4ade1fbfe3642c1140d253c27294b6d964665d0e846f3ff6f10f16bd3b52a8"
+    },
+    {
+      "file": "desktop-gender.png",
+      "proofIndex": 3,
+      "DOMUTC": "2026-10-04T08:40:51.207Z",
+      "AXUTC": "2026-10-04T08:40:51.245Z",
+      "captureStartUTC": "2026-10-04T08:40:51.245Z",
+      "captureEndUTC": "2026-10-04T08:40:51.269Z",
+      "outputSHA256": "1a840bdee22c2835060f2862278d602f683c7614b7a06e2f422d0cc5e7b9f0d9",
+      "decodedRasterSHA256": "3b09ceca5100d604e5ee4ad379e2a95c314d30e6ca80d4a10d2d08ba14decddc"
+    }
+  ],
+  "beforeAfterComparisons": [
+    {
+      "sameCSSViewportDPR": true,
+      "viewport": {
+        "dpr": 1.25,
+        "h": 606,
+        "w": 402
+      },
+      "beforeProofIndex": 1,
+      "beforeUTC": "2026-10-04T07:50:04.154Z",
+      "afterProofIndex": 0,
+      "afterUTC": "2026-10-04T08:39:33.963Z",
+      "beforeDisplayedLabels": [
+        "성별 무관",
+        "남",
+        "여"
+      ],
+      "afterDisplayedLabels": [
+        "혼성",
+        "남",
+        "여"
+      ],
+      "pressedStates": [
+        "true",
+        "false",
+        "false"
+      ],
+      "meaning": "Observed displayed labels/selection positions only, not a canonical storage read or exercised selection."
+    },
+    {
+      "sameCSSViewportDPR": true,
+      "viewport": {
+        "dpr": 1.5,
+        "h": 505,
+        "w": 788
+      },
+      "beforeProofIndex": 3,
+      "beforeUTC": "2026-10-04T07:51:03.467Z",
+      "afterProofIndex": 1,
+      "afterUTC": "2026-10-04T08:40:13.550Z",
+      "beforeDisplayedLabels": [
+        "성별 무관",
+        "남",
+        "여"
+      ],
+      "afterDisplayedLabels": [
+        "혼성",
+        "남",
+        "여"
+      ],
+      "pressedStates": [
+        "true",
+        "false",
+        "false"
+      ],
+      "meaning": "Observed displayed labels/selection positions only, not a canonical storage read or exercised selection."
+    },
+    {
+      "sameCSSViewportDPR": true,
+      "viewport": {
+        "dpr": 1,
+        "h": 757,
+        "w": 1182
+      },
+      "beforeProofIndex": 5,
+      "beforeUTC": "2026-10-04T07:51:14.691Z",
+      "afterProofIndex": 3,
+      "afterUTC": "2026-10-04T08:40:51.207Z",
+      "beforeDisplayedLabels": [
+        "성별 무관",
+        "남",
+        "여"
+      ],
+      "afterDisplayedLabels": [
+        "혼성",
+        "남",
+        "여"
+      ],
+      "pressedStates": [
+        "true",
+        "false",
+        "false"
+      ],
+      "meaning": "Observed displayed labels/selection positions only, not a canonical storage read or exercised selection."
+    }
+  ],
+  "titleValueChain": [
+    "",
+    "QA 혼성 표시 1004",
+    "",
+    ""
+  ],
+  "descriptionBlankAtRecordedCheckpoints": true,
+  "actualFirstExitUTC": "2026-10-04T08:42:18.175Z",
+  "finalExitUTC": "2026-10-04T08:43:19.020Z",
+  "draftDeletionVerified": false,
+  "storagePayloadVerified": false,
+  "runtimeServingSHA": "unknown",
+  "deploymentWorkflow": {
+    "SHA": "4c81d071ede5bba14575f2aeb1097326797cbd08",
+    "status": "completed",
+    "conclusion": "success",
+    "updatedUTC": "2026-10-04T08:22:48Z",
+    "URL": "https://github.com/kim-song-jun/matchup-sports-platform/actions/runs/37188018237"
+  },
+  "sourceMapping": {
+    "selectorSourceURL": "https://github.com/kim-song-jun/matchup-sports-platform/blob/4c81d071ede5bba14575f2aeb1097326797cbd08/apps/v1_web/src/components/v1-ui/create-form-fields.tsx",
+    "selectorBlobSHA": "5247dd7a6e77b1528fe8b588695f2a4843ad3aca",
+    "labelSourceURL": "https://github.com/kim-song-jun/matchup-sports-platform/blob/4c81d071ede5bba14575f2aeb1097326797cbd08/apps/v1_web/src/lib/v1-status-labels.ts",
+    "labelBlobSHA": "d138ae2619e142235b4b01acc78d2f4eca784aaa",
+    "line386": "GENDER_RULE_OPTIONS includes the exact spaced string 성별 무관",
+    "line394": "matchGenderRuleLabel maps 성별 무관 or 무관 to 혼성",
+    "limit": "Static source only; no browser runtime, actual selected canonical value, API or DB storage proof"
+  }
+}

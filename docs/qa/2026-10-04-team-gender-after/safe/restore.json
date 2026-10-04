@@ -1,0 +1,14 @@
+{
+  "beforeRestore": {
+    "description": "",
+    "title": "QA 혼성 표시 1004",
+    "url": "https://alpha.teameet.co.kr/team-matches/new/info",
+    "utc": "2026-10-04T08:41:24.043Z"
+  },
+  "restored": {
+    "description": "",
+    "title": "",
+    "url": "https://alpha.teameet.co.kr/team-matches/new/info",
+    "utc": "2026-10-04T08:41:24.111Z"
+  }
+}

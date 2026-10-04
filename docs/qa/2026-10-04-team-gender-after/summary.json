@@ -1,0 +1,141 @@
+{
+  "scope": "Team-match creation condition screen only",
+  "page": "https://alpha.teameet.co.kr/team-matches/new/condition",
+  "freshNavigationUTC": {
+    "start": "2026-10-04T08:36:52.894Z",
+    "end": "2026-10-04T08:36:58.089Z"
+  },
+  "deploymentContext": {
+    "status": "Reported deployment context supplied for this packet; not runtime-identified by the captured browser evidence",
+    "reportedCommit": "4c81d071ede5bba14575f2aeb1097326797cbd08",
+    "reportedVersion": "1.1.5-alpha.20261004.g4c81d071ede5",
+    "reportedRunId": 37188018237,
+    "reportedHealthyUTC": "2026-10-04T08:22:31.618Z",
+    "reportedSuccessfulUTC": "2026-10-04T08:22:48Z",
+    "runtimeSHA": null
+  },
+  "counts": {
+    "recordedActions": 18,
+    "DOMSnapshots": 4,
+    "AXSnapshots": 4,
+    "visibleGenderEndpoints": 3,
+    "publishedCrops": 3,
+    "immutableSafeSourceFiles": 7
+  },
+  "visibleEndpoints": [
+    {
+      "proofIndex": 0,
+      "name": "mobile",
+      "viewportCSS": {
+        "dpr": 1.25,
+        "h": 606,
+        "w": 402
+      }
+    },
+    {
+      "proofIndex": 1,
+      "name": "tablet",
+      "viewportCSS": {
+        "dpr": 1.5,
+        "h": 505,
+        "w": 788
+      }
+    },
+    {
+      "proofIndex": 3,
+      "name": "desktop",
+      "viewportCSS": {
+        "dpr": 1,
+        "h": 757,
+        "w": 1182
+      }
+    }
+  ],
+  "offscreenEndpoint": {
+    "proofIndex": 2,
+    "reason": "Gender option rectangles y=840..884 are below viewport height 757; DOM and AX retained, screenshot excluded"
+  },
+  "observedGenderState": {
+    "labels": [
+      "혼성",
+      "남",
+      "여"
+    ],
+    "ariaPressed": [
+      "true",
+      "false",
+      "false"
+    ],
+    "AXValues": [
+      1,
+      0,
+      0
+    ],
+    "valueAttribute": [
+      null,
+      null,
+      null
+    ]
+  },
+  "observedGradeState": {
+    "labels": [
+      "입문",
+      "초보",
+      "중수",
+      "고수"
+    ],
+    "ariaPressed": [
+      "false",
+      "false",
+      "false",
+      "false"
+    ]
+  },
+  "recordedInteractionScope": {
+    "genderSelectionChanged": false,
+    "gradeSelectionChanged": false,
+    "saveAction": false,
+    "createAction": false,
+    "uploadAction": false,
+    "networkAuditPerformed": false,
+    "globalServerWrites": "Not established"
+  },
+  "localTitleSequence": [
+    "",
+    "QA 혼성 표시 1004",
+    "",
+    ""
+  ],
+  "localDescriptionSequence": [
+    "",
+    "",
+    "",
+    ""
+  ],
+  "draftSemantics": "Exit retains the local draft. Draft changes can refresh the 24-hour TTL; exit must not be described as cancel/discard. Blank title was explicitly restored and verified on fresh reentry.",
+  "finalExit": {
+    "titleFieldPresent": false,
+    "url": "https://alpha.teameet.co.kr/team-matches",
+    "utc": "2026-10-04T08:43:19.020Z",
+    "viewport": {
+      "dpr": 1,
+      "h": 757,
+      "w": 1182
+    },
+    "visibleDialogs": 0
+  },
+  "staticMappingContext": "Reported source-code mapping uses canonical 성별 무관 with display label 혼성. Live stored/API/database payload was not observed; valueAttribute is null and does not verify the canonical value.",
+  "notVerified": [
+    "List behavior",
+    "Filter behavior",
+    "Detail behavior",
+    "Admin behavior",
+    "Edit behavior",
+    "Whole pull request",
+    "Live stored payload",
+    "API payload",
+    "Database payload",
+    "Runtime commit SHA"
+  ],
+  "beforeEvidence": "https://github.com/kim-song-jun/matchup-sports-platform/blob/a678ea98bc4b6d162921534892841214ca6fe07a/docs/qa/2026-10-04-team-skill-gender-before/README.md"
+}

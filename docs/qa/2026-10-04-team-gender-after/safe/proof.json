@@ -1,0 +1,370 @@
+[
+  {
+    "genderOptions": [
+      {
+        "checked": null,
+        "pressed": "true",
+        "rect": {
+          "bottom": 288,
+          "height": 44,
+          "left": 20,
+          "right": 68.07500076293945,
+          "top": 244,
+          "width": 48.07500076293945,
+          "x": 20,
+          "y": 244
+        },
+        "role": null,
+        "text": "혼성",
+        "valueAttribute": null
+      },
+      {
+        "checked": null,
+        "pressed": "false",
+        "rect": {
+          "bottom": 288,
+          "height": 44,
+          "left": 76.07500457763672,
+          "right": 112.91250610351562,
+          "top": 244,
+          "width": 36.837501525878906,
+          "x": 76.07500457763672,
+          "y": 244
+        },
+        "role": null,
+        "text": "남",
+        "valueAttribute": null
+      },
+      {
+        "checked": null,
+        "pressed": "false",
+        "rect": {
+          "bottom": 288,
+          "height": 44,
+          "left": 120.9124984741211,
+          "right": 157.75,
+          "top": 244,
+          "width": 36.837501525878906,
+          "x": 120.9124984741211,
+          "y": 244
+        },
+        "role": null,
+        "text": "여",
+        "valueAttribute": null
+      }
+    ],
+    "gradeOptions": [
+      {
+        "pressed": "false",
+        "text": "입문"
+      },
+      {
+        "pressed": "false",
+        "text": "초보"
+      },
+      {
+        "pressed": "false",
+        "text": "중수"
+      },
+      {
+        "pressed": "false",
+        "text": "고수"
+      }
+    ],
+    "scroll": {
+      "main": 576,
+      "y": 0
+    },
+    "url": "https://alpha.teameet.co.kr/team-matches/new/condition",
+    "utc": "2026-10-04T08:39:33.963Z",
+    "viewport": {
+      "dpr": 1.25,
+      "h": 606,
+      "w": 402
+    },
+    "AXUTC": "2026-10-04T08:39:34.008Z",
+    "AXGender": [
+      "\t\t\t52 checkbox 혼성, Value: 1",
+      "\t\t\t53 checkbox 남, Value: 0",
+      "\t\t\t54 checkbox 여, Value: 0"
+    ],
+    "label": "mobile mixed alias selected without changing value",
+    "index": 0
+  },
+  {
+    "genderOptions": [
+      {
+        "checked": null,
+        "pressed": "true",
+        "rect": {
+          "bottom": 260.6666717529297,
+          "height": 44,
+          "left": 114,
+          "right": 161.8125,
+          "top": 216.6666717529297,
+          "width": 47.8125,
+          "x": 114,
+          "y": 216.6666717529297
+        },
+        "role": null,
+        "text": "혼성",
+        "valueAttribute": null
+      },
+      {
+        "checked": null,
+        "pressed": "false",
+        "rect": {
+          "bottom": 260.6666717529297,
+          "height": 44,
+          "left": 169.8125,
+          "right": 206.3854179382324,
+          "top": 216.6666717529297,
+          "width": 36.57291793823242,
+          "x": 169.8125,
+          "y": 216.6666717529297
+        },
+        "role": null,
+        "text": "남",
+        "valueAttribute": null
+      },
+      {
+        "checked": null,
+        "pressed": "false",
+        "rect": {
+          "bottom": 260.6666717529297,
+          "height": 44,
+          "left": 214.3854217529297,
+          "right": 250.9583396911621,
+          "top": 216.6666717529297,
+          "width": 36.57291793823242,
+          "x": 214.3854217529297,
+          "y": 216.6666717529297
+        },
+        "role": null,
+        "text": "여",
+        "valueAttribute": null
+      }
+    ],
+    "gradeOptions": [
+      {
+        "pressed": "false",
+        "text": "입문"
+      },
+      {
+        "pressed": "false",
+        "text": "초보"
+      },
+      {
+        "pressed": "false",
+        "text": "중수"
+      },
+      {
+        "pressed": "false",
+        "text": "고수"
+      }
+    ],
+    "scroll": {
+      "main": 475.3333435058594,
+      "y": 0
+    },
+    "url": "https://alpha.teameet.co.kr/team-matches/new/condition",
+    "utc": "2026-10-04T08:40:13.550Z",
+    "viewport": {
+      "dpr": 1.5,
+      "h": 505,
+      "w": 788
+    },
+    "AXUTC": "2026-10-04T08:40:13.588Z",
+    "AXGender": [
+      "\t\t\t52 checkbox 혼성, Value: 1",
+      "\t\t\t53 checkbox 남, Value: 0",
+      "\t\t\t54 checkbox 여, Value: 0"
+    ],
+    "label": "tablet mixed alias selected without selector click",
+    "index": 1
+  },
+  {
+    "genderOptions": [
+      {
+        "checked": null,
+        "pressed": "true",
+        "rect": {
+          "bottom": 884,
+          "height": 44,
+          "left": 331,
+          "right": 379.484375,
+          "top": 840,
+          "width": 48.484375,
+          "x": 331,
+          "y": 840
+        },
+        "role": null,
+        "text": "혼성",
+        "valueAttribute": null
+      },
+      {
+        "checked": null,
+        "pressed": "false",
+        "rect": {
+          "bottom": 884,
+          "height": 44,
+          "left": 387.484375,
+          "right": 424.734375,
+          "top": 840,
+          "width": 37.25,
+          "x": 387.484375,
+          "y": 840
+        },
+        "role": null,
+        "text": "남",
+        "valueAttribute": null
+      },
+      {
+        "checked": null,
+        "pressed": "false",
+        "rect": {
+          "bottom": 884,
+          "height": 44,
+          "left": 432.734375,
+          "right": 469.984375,
+          "top": 840,
+          "width": 37.25,
+          "x": 432.734375,
+          "y": 840
+        },
+        "role": null,
+        "text": "여",
+        "valueAttribute": null
+      }
+    ],
+    "gradeOptions": [
+      {
+        "pressed": "false",
+        "text": "입문"
+      },
+      {
+        "pressed": "false",
+        "text": "초보"
+      },
+      {
+        "pressed": "false",
+        "text": "중수"
+      },
+      {
+        "pressed": "false",
+        "text": "고수"
+      }
+    ],
+    "scroll": {
+      "main": 0,
+      "y": 0
+    },
+    "url": "https://alpha.teameet.co.kr/team-matches/new/condition",
+    "utc": "2026-10-04T08:40:13.806Z",
+    "viewport": {
+      "dpr": 1,
+      "h": 757,
+      "w": 1182
+    },
+    "AXUTC": "2026-10-04T08:40:13.853Z",
+    "AXGender": [
+      "\t\t60 checkbox 혼성, Value: 1",
+      "\t\t61 checkbox 남, Value: 0",
+      "\t\t62 checkbox 여, Value: 0"
+    ],
+    "label": "desktop mixed alias selected without selector click",
+    "index": 2
+  },
+  {
+    "genderOptions": [
+      {
+        "checked": null,
+        "pressed": "true",
+        "rect": {
+          "bottom": 284,
+          "height": 44,
+          "left": 331,
+          "right": 379.484375,
+          "top": 240,
+          "width": 48.484375,
+          "x": 331,
+          "y": 240
+        },
+        "role": null,
+        "text": "혼성",
+        "valueAttribute": null
+      },
+      {
+        "checked": null,
+        "pressed": "false",
+        "rect": {
+          "bottom": 284,
+          "height": 44,
+          "left": 387.484375,
+          "right": 424.734375,
+          "top": 240,
+          "width": 37.25,
+          "x": 387.484375,
+          "y": 240
+        },
+        "role": null,
+        "text": "남",
+        "valueAttribute": null
+      },
+      {
+        "checked": null,
+        "pressed": "false",
+        "rect": {
+          "bottom": 284,
+          "height": 44,
+          "left": 432.734375,
+          "right": 469.984375,
+          "top": 240,
+          "width": 37.25,
+          "x": 432.734375,
+          "y": 240
+        },
+        "role": null,
+        "text": "여",
+        "valueAttribute": null
+      }
+    ],
+    "gradeOptions": [
+      {
+        "pressed": "false",
+        "text": "입문"
+      },
+      {
+        "pressed": "false",
+        "text": "초보"
+      },
+      {
+        "pressed": "false",
+        "text": "중수"
+      },
+      {
+        "pressed": "false",
+        "text": "고수"
+      }
+    ],
+    "scroll": {
+      "main": 0,
+      "y": 600
+    },
+    "url": "https://alpha.teameet.co.kr/team-matches/new/condition",
+    "utc": "2026-10-04T08:40:51.207Z",
+    "viewport": {
+      "dpr": 1,
+      "h": 757,
+      "w": 1182
+    },
+    "AXUTC": "2026-10-04T08:40:51.245Z",
+    "AXGender": [
+      "\t\t60 checkbox 혼성, Value: 1",
+      "\t\t61 checkbox 남, Value: 0",
+      "\t\t62 checkbox 여, Value: 0"
+    ],
+    "label": "desktop mixed alias actually visible after scroll",
+    "index": 3
+  }
+]

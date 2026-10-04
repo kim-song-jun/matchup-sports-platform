@@ -1,0 +1,107 @@
+{
+  "schemaVersion": 1,
+  "package": "2026-10-04 team-create gender label after evidence",
+  "preparedUTC": "2026-10-04T08:53:17.544Z",
+  "sourceSafeJsonCount": 7,
+  "publishedPngCount": 3,
+  "recordedActionCount": 18,
+  "DOMSnapshotCount": 4,
+  "visibleEndpointCount": 3,
+  "scope": "Sanitized local review packet; no raw screenshot content except the three exact gender-group crops",
+  "hashCoverage": "Entries cover payload files; SHA256SUMS additionally covers manifest.json; neither file includes its own hash",
+  "files": [
+    {
+      "path": "README.md",
+      "bytes": 6064,
+      "sha256": "67aaeb97f14db23be5010d9cf7eaf53a0b6160f1af267588e826f056151978ca",
+      "mediaType": "text/markdown",
+      "immutableSourceCopy": false
+    },
+    {
+      "path": "crop-provenance.json",
+      "bytes": 6963,
+      "sha256": "72b545d7e47ed075acfcfabaa2954821a93f3b1bbdadb588471bb9f574e5420b",
+      "mediaType": "application/json",
+      "immutableSourceCopy": false
+    },
+    {
+      "path": "desktop-gender.png",
+      "bytes": 11003,
+      "sha256": "1a840bdee22c2835060f2862278d602f683c7614b7a06e2f422d0cc5e7b9f0d9",
+      "mediaType": "image/png",
+      "immutableSourceCopy": false
+    },
+    {
+      "path": "mobile-gender.png",
+      "bytes": 10646,
+      "sha256": "7e57df287a63e01e0f56e3899ad5124b5e8d532d53e2a1b6ffb33c72be85e59a",
+      "mediaType": "image/png",
+      "immutableSourceCopy": false
+    },
+    {
+      "path": "safe/actions.json",
+      "bytes": 2715,
+      "sha256": "ae274820fa776b1004642c17109d4f18f34907c3ea41e0cbe65d36e37e138f07",
+      "mediaType": "application/json",
+      "immutableSourceCopy": true
+    },
+    {
+      "path": "safe/exit.json",
+      "bytes": 208,
+      "sha256": "0b6567853322221d052896aaaae3bccb7962f01cc7080b37510b4a98282fd055",
+      "mediaType": "application/json",
+      "immutableSourceCopy": true
+    },
+    {
+      "path": "safe/initial.json",
+      "bytes": 200,
+      "sha256": "bd50455528722a08b8b3c08f3edcec76209a2079f665cc3eddd8e3260074881b",
+      "mediaType": "application/json",
+      "immutableSourceCopy": true
+    },
+    {
+      "path": "safe/leave-dialog.json",
+      "bytes": 319,
+      "sha256": "87dbd35e209d18d3fff265cebff17f3c51afb664a19fdc62b6cf7e9216c1d0df",
+      "mediaType": "application/json",
+      "immutableSourceCopy": true
+    },
+    {
+      "path": "safe/proof.json",
+      "bytes": 8182,
+      "sha256": "9cfc62423f6911e616843e7fed85321fd87b1811a87e8416eae1c9429c298902",
+      "mediaType": "application/json",
+      "immutableSourceCopy": true
+    },
+    {
+      "path": "safe/reentry.json",
+      "bytes": 336,
+      "sha256": "15751279731ed8511db64bd32882d98519740e6a30ab04ae191f2d5027f4cfcb",
+      "mediaType": "application/json",
+      "immutableSourceCopy": true
+    },
+    {
+      "path": "safe/restore.json",
+      "bytes": 354,
+      "sha256": "76db24b554389a884620beb40cd42eaba4a8d4d7cf85ef54e9138caf3d1ff7ca",
+      "mediaType": "application/json",
+      "immutableSourceCopy": true
+    },
+    {
+      "path": "summary.json",
+      "bytes": 3533,
+      "sha256": "4edf9916822a1030ec4109da0c91dc06b2f252e36458ae635ea62614283afd54",
+      "mediaType": "application/json",
+      "immutableSourceCopy": false
+    },
+    {
+      "path": "tablet-gender.png",
+      "bytes": 10658,
+      "sha256": "00d512e23915eb362ff13a225c84c4a37c83b852b78b9b7e7fcffd82318a429c",
+      "mediaType": "image/png",
+      "immutableSourceCopy": false
+    }
+  ],
+  "updatedUTC": "2026-10-04T09:05:14.888149+00:00",
+  "updateReason": "Correct reported canonical source string spacing in README and summary only: 성별 무관. Source safe JSON and all PNG bytes unchanged."
+}

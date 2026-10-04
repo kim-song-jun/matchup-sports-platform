@@ -1,0 +1,92 @@
+[
+  {
+    "label": "fresh document navigation after reported4c81 deployment",
+    "startUTC": "2026-10-04T08:36:52.894Z",
+    "endUTC": "2026-10-04T08:36:58.089Z"
+  },
+  {
+    "label": "resize mixed-label after to mobile",
+    "startUTC": "2026-10-04T08:37:18.456Z",
+    "endUTC": "2026-10-04T08:37:25.625Z"
+  },
+  {
+    "label": "mobile native zoom110",
+    "startUTC": "2026-10-04T08:37:25.626Z",
+    "endUTC": "2026-10-04T08:37:25.938Z"
+  },
+  {
+    "label": "mobile native zoom125",
+    "startUTC": "2026-10-04T08:37:25.939Z",
+    "endUTC": "2026-10-04T08:37:26.241Z"
+  },
+  {
+    "label": "temporary synthetic title with original blank baseline",
+    "startUTC": "2026-10-04T08:37:41.352Z",
+    "endUTC": "2026-10-04T08:37:41.373Z"
+  },
+  {
+    "label": "local Next info to condition for display-only after",
+    "startUTC": "2026-10-04T08:37:41.374Z",
+    "endUTC": "2026-10-04T08:37:41.671Z"
+  },
+  {
+    "label": "mobile scroll to gender display without selecting",
+    "startUTC": "2026-10-04T08:38:36.432Z",
+    "endUTC": "2026-10-04T08:38:36.819Z"
+  },
+  {
+    "label": "resize mixed-label condition tablet",
+    "startUTC": "2026-10-04T08:40:09.009Z",
+    "endUTC": "2026-10-04T08:40:13.188Z"
+  },
+  {
+    "label": "tablet native zoom150",
+    "startUTC": "2026-10-04T08:40:13.188Z",
+    "endUTC": "2026-10-04T08:40:13.488Z"
+  },
+  {
+    "label": "desktop native zoom reset",
+    "startUTC": "2026-10-04T08:40:13.620Z",
+    "endUTC": "2026-10-04T08:40:13.758Z"
+  },
+  {
+    "label": "desktop native scroll to make gender controls visible",
+    "startUTC": "2026-10-04T08:40:41.335Z",
+    "endUTC": "2026-10-04T08:40:41.642Z"
+  },
+  {
+    "label": "Previous to info for explicit QA title restore",
+    "startUTC": "2026-10-04T08:40:51.270Z",
+    "endUTC": "2026-10-04T08:40:51.545Z"
+  },
+  {
+    "label": "restore temporary QA title to original blank",
+    "startUTC": "2026-10-04T08:41:24.046Z",
+    "endUTC": "2026-10-04T08:41:24.065Z"
+  },
+  {
+    "label": "open leave dialog using Back link",
+    "startUTC": "2026-10-04T08:41:24.116Z",
+    "endUTC": "2026-10-04T08:41:24.174Z"
+  },
+  {
+    "label": "confirm leave while retaining restored local draft",
+    "startUTC": "2026-10-04T08:41:40.606Z",
+    "endUTC": "2026-10-04T08:41:40.671Z"
+  },
+  {
+    "label": "fresh info reentry to verify restored blank title",
+    "startUTC": "2026-10-04T08:42:18.177Z",
+    "endUTC": "2026-10-04T08:42:18.769Z"
+  },
+  {
+    "label": "Back from verified blank reentry",
+    "startUTC": "2026-10-04T08:42:19.469Z",
+    "endUTC": "2026-10-04T08:42:19.545Z"
+  },
+  {
+    "label": "confirm final leave from unchanged reentry",
+    "startUTC": "2026-10-04T08:42:31.496Z",
+    "endUTC": "2026-10-04T08:42:31.559Z"
+  }
+]

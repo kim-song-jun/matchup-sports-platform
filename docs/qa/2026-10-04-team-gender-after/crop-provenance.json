@@ -1,0 +1,174 @@
+{
+  "schemaVersion": 1,
+  "method": {
+    "library": "Pillow 12.3.0",
+    "sourceDecode": "JPEG decoded locally to RGB by Pillow; original screenshot bytes remain private",
+    "coordinateMapping": "Stored screenshot pixel width/height equal the corresponding CSS viewport width/height. Use 1:1 screenshot-pixel/CSS coordinates; do not multiply by devicePixelRatio.",
+    "cropConvention": "Integer [left, top, right, bottom), with right and bottom exclusive. Tight bounding area contains the group label and all three gender controls.",
+    "transformations": "Crop only, followed by lossless PNG encoding of the exact decoded RGB pixel subset. No resize, resampling, overlay, annotation, redaction, recompression to JPEG, or color conversion.",
+    "metadata": "Output PNGs contain no source metadata. Provenance identifies source images by original basename only.",
+    "timeSemantics": "DOM, accessibility-tree and screenshot timestamps are separate observations; capture start/end bracket screenshot acquisition and are not replaced with DOM timestamps.",
+    "verification": "Source SHA-256 matched the private capture ledger. Every final PNG was decoded and its RGB bytes matched the direct source crop exactly; dimensions, mode, format and absence of source metadata checked."
+  },
+  "captures": [
+    {
+      "proofIndex": 0,
+      "originalBasename": "mobile-mixed-after.png",
+      "sourceEncoding": "JPEG",
+      "sourceSha256": "78e067d14549c4106a567d48a7666621a67dccca0673d638721ac1bd7b2e23ac",
+      "sourceDimensionsPixels": {
+        "width": 402,
+        "height": 606
+      },
+      "sourceDecodedMode": "RGB",
+      "DOMUTC": "2026-10-04T08:39:33.963Z",
+      "AXUTC": "2026-10-04T08:39:34.008Z",
+      "screenshotCaptureStartUTC": "2026-10-04T08:39:34.010Z",
+      "screenshotCaptureEndUTC": "2026-10-04T08:39:34.037Z",
+      "CSSViewport": {
+        "dpr": 1.25,
+        "h": 606,
+        "w": 402
+      },
+      "DOMGenderControlsBoundingBoxCSS": {
+        "left": 20,
+        "top": 244,
+        "right": 157.75,
+        "bottom": 288
+      },
+      "disposition": "published minimal gender-group crop",
+      "publishedFile": "mobile-gender.png",
+      "cropBoxPixelsLeftTopRightBottomExclusive": [
+        16,
+        216,
+        162,
+        292
+      ],
+      "cropDimensionsPixels": {
+        "width": 146,
+        "height": 76
+      },
+      "outputEncoding": "PNG",
+      "outputSha256": "7e57df287a63e01e0f56e3899ad5124b5e8d532d53e2a1b6ffb33c72be85e59a",
+      "decodedCropRasterSha256": "a155b9bfbfb6b4ec011124a85aa6fecb278fd5068d511d579064ea9b71e17ccc",
+      "decodedPixelEqualityVerified": true,
+      "visualInspection": "Shows only 성별 조건 and the three gender options; 혼성 selected, 남 and 여 unselected; no neighboring fields or identifying content"
+    },
+    {
+      "proofIndex": 1,
+      "originalBasename": "tablet-mixed-after.png",
+      "sourceEncoding": "JPEG",
+      "sourceSha256": "6a972099a8c58d300c0b8891d2389dfcd924df43211e3d270e5fcf919fce8f5f",
+      "sourceDimensionsPixels": {
+        "width": 788,
+        "height": 505
+      },
+      "sourceDecodedMode": "RGB",
+      "DOMUTC": "2026-10-04T08:40:13.550Z",
+      "AXUTC": "2026-10-04T08:40:13.588Z",
+      "screenshotCaptureStartUTC": "2026-10-04T08:40:13.588Z",
+      "screenshotCaptureEndUTC": "2026-10-04T08:40:13.620Z",
+      "CSSViewport": {
+        "dpr": 1.5,
+        "h": 505,
+        "w": 788
+      },
+      "DOMGenderControlsBoundingBoxCSS": {
+        "left": 114,
+        "top": 216.6666717529297,
+        "right": 250.9583396911621,
+        "bottom": 260.6666717529297
+      },
+      "disposition": "published minimal gender-group crop",
+      "publishedFile": "tablet-gender.png",
+      "cropBoxPixelsLeftTopRightBottomExclusive": [
+        110,
+        189,
+        255,
+        265
+      ],
+      "cropDimensionsPixels": {
+        "width": 145,
+        "height": 76
+      },
+      "outputEncoding": "PNG",
+      "outputSha256": "00d512e23915eb362ff13a225c84c4a37c83b852b78b9b7e7fcffd82318a429c",
+      "decodedCropRasterSha256": "8a4ade1fbfe3642c1140d253c27294b6d964665d0e846f3ff6f10f16bd3b52a8",
+      "decodedPixelEqualityVerified": true,
+      "visualInspection": "Shows only 성별 조건 and the three gender options; 혼성 selected, 남 and 여 unselected; no neighboring fields or identifying content"
+    },
+    {
+      "proofIndex": 2,
+      "originalBasename": "desktop-mixed-after.png",
+      "sourceEncoding": "JPEG",
+      "sourceSha256": "058b49b8774d5a0cf08430218de6fa0765221f51b7d7c52ff576e359e2308d32",
+      "sourceDimensionsPixels": {
+        "width": 1182,
+        "height": 757
+      },
+      "sourceDecodedMode": "RGB",
+      "DOMUTC": "2026-10-04T08:40:13.806Z",
+      "AXUTC": "2026-10-04T08:40:13.853Z",
+      "screenshotCaptureStartUTC": "2026-10-04T08:40:13.854Z",
+      "screenshotCaptureEndUTC": "2026-10-04T08:40:13.885Z",
+      "CSSViewport": {
+        "dpr": 1,
+        "h": 757,
+        "w": 1182
+      },
+      "DOMGenderControlsBoundingBoxCSS": {
+        "left": 331,
+        "top": 840,
+        "right": 469.984375,
+        "bottom": 884
+      },
+      "disposition": "excluded screenshot; retained offscreen DOM and AX evidence only",
+      "reason": "Gender controls y=840..884 are entirely below the 757-pixel viewport at this snapshot. The raw screenshot is not included and no crop is published."
+    },
+    {
+      "proofIndex": 3,
+      "originalBasename": "desktop-mixed-visible-after.png",
+      "sourceEncoding": "JPEG",
+      "sourceSha256": "be491e8b5f6be6eb986d541446d65b7410e014aadb6c1231327315f0509c470a",
+      "sourceDimensionsPixels": {
+        "width": 1182,
+        "height": 757
+      },
+      "sourceDecodedMode": "RGB",
+      "DOMUTC": "2026-10-04T08:40:51.207Z",
+      "AXUTC": "2026-10-04T08:40:51.245Z",
+      "screenshotCaptureStartUTC": "2026-10-04T08:40:51.245Z",
+      "screenshotCaptureEndUTC": "2026-10-04T08:40:51.269Z",
+      "CSSViewport": {
+        "dpr": 1,
+        "h": 757,
+        "w": 1182
+      },
+      "DOMGenderControlsBoundingBoxCSS": {
+        "left": 331,
+        "top": 240,
+        "right": 469.984375,
+        "bottom": 284
+      },
+      "disposition": "published minimal gender-group crop",
+      "publishedFile": "desktop-gender.png",
+      "cropBoxPixelsLeftTopRightBottomExclusive": [
+        327,
+        212,
+        474,
+        288
+      ],
+      "cropDimensionsPixels": {
+        "width": 147,
+        "height": 76
+      },
+      "outputEncoding": "PNG",
+      "outputSha256": "1a840bdee22c2835060f2862278d602f683c7614b7a06e2f422d0cc5e7b9f0d9",
+      "decodedCropRasterSha256": "3b09ceca5100d604e5ee4ad379e2a95c314d30e6ca80d4a10d2d08ba14decddc",
+      "decodedPixelEqualityVerified": true,
+      "visualInspection": "Shows only 성별 조건 and the three gender options; 혼성 selected, 남 and 여 unselected; no neighboring fields or identifying content"
+    }
+  ],
+  "publishedCropCount": 3,
+  "excludedScreenshotCount": 1
+}

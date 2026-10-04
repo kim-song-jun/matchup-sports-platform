@@ -1,0 +1,16 @@
+{
+  "preparedUTC": "2026-10-04T10:59:14.666135+00:00",
+  "originalSafeSHA256": {
+    "actions.json": "74cc7f842a841299e2b74e86e5a30c2b2e9a6423c3c7f0e24cb7750a48cdb3ab",
+    "ax.json": "6ab3d89e454352c90c7dca06aafc09d9cd70bbc6f62a6f22f33e59a50ed67100",
+    "entry-link.json": "85f6cff7aece8718bc5941386fc7ac8853155b2a43c1ccef43595236ba272672",
+    "exit.json": "9cb79da7938fea0656bc7cab091424e9ec91e1d19dc403c57751d266486c2415",
+    "first-exit.json": "0b3baeb6fd925e0dc3d234cf30aad59f2ef8ba66e317b45d1636d9cef4953db2",
+    "proof.json": "0926c24aef7a20960bdf22ef81c826da3d24c2cf3ad10bd4bc7d64cb9a5c05d8"
+  },
+  "sourceScreenMetadataSHA256": "57cef45309a8ffb56eb7226bfb436eca32bfedc5475ff26af15c3302ea252736",
+  "publicOriginalJSONUnchanged": true,
+  "sourceCollectorPixelEquality": "All nine output crops pixel-equal to bounds of decoded source screenshot; performed by collector. Publisher validates public files independently.",
+  "sourcePaths": "Private originals retained locally and not included in publication. Basenames only in crop provenance.",
+  "captureClock": "Screenshot started/completed UTC intervals from tool-call wrapper; DOM timestamps separate."
+}

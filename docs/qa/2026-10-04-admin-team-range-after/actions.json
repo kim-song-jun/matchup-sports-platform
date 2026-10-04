@@ -1,0 +1,278 @@
+[
+  {
+    "label": "fresh navigation to observed administrator team-match list",
+    "startedUTC": "2026-10-04T10:54:33.016Z",
+    "completedUTC": "2026-10-04T10:54:33.575Z",
+    "url": "https://alpha.teameet.co.kr/admin/team-matches"
+  },
+  {
+    "label": "click observed 모집 만들기 link",
+    "startedUTC": "2026-10-04T10:54:46.249Z",
+    "completedUTC": "2026-10-04T10:54:46.362Z",
+    "url": "https://alpha.teameet.co.kr/admin/team-matches/new"
+  },
+  {
+    "label": "mobile minimum select native Tab to maximum, no value change",
+    "startedUTC": "2026-10-04T10:55:12.851Z",
+    "completedUTC": "2026-10-04T10:55:12.881Z",
+    "url": "https://alpha.teameet.co.kr/admin/team-matches/new"
+  },
+  {
+    "label": "mobile maximum select ShiftTab to minimum baseline",
+    "startedUTC": "2026-10-04T10:55:32.649Z",
+    "completedUTC": "2026-10-04T10:55:32.675Z",
+    "url": "https://alpha.teameet.co.kr/admin/team-matches/new"
+  },
+  {
+    "label": "mobile minimum ArrowDown selects entry, shared local range changes both ends",
+    "startedUTC": "2026-10-04T10:55:56.649Z",
+    "completedUTC": "2026-10-04T10:55:56.677Z",
+    "url": "https://alpha.teameet.co.kr/admin/team-matches/new"
+  },
+  {
+    "label": "mobile minimum Tab to maximum then maximum ArrowDown",
+    "startedUTC": "2026-10-04T10:55:56.836Z",
+    "completedUTC": "2026-10-04T10:55:56.867Z",
+    "url": "https://alpha.teameet.co.kr/admin/team-matches/new"
+  },
+  {
+    "label": "mobile minimum select high above maximum",
+    "startedUTC": "2026-10-04T10:56:07.133Z",
+    "completedUTC": "2026-10-04T10:56:07.146Z",
+    "url": "https://alpha.teameet.co.kr/admin/team-matches/new"
+  },
+  {
+    "label": "mobile maximum select entry below minimum",
+    "startedUTC": "2026-10-04T10:56:07.266Z",
+    "completedUTC": "2026-10-04T10:56:07.279Z",
+    "url": "https://alpha.teameet.co.kr/admin/team-matches/new"
+  },
+  {
+    "label": "mobile maximum 미설정 clears both local endpoints",
+    "startedUTC": "2026-10-04T10:56:07.415Z",
+    "completedUTC": "2026-10-04T10:56:07.431Z",
+    "url": "https://alpha.teameet.co.kr/admin/team-matches/new"
+  },
+  {
+    "label": "mobile native Tab maximum to format then uniform then gender",
+    "startedUTC": "2026-10-04T10:56:07.567Z",
+    "completedUTC": "2026-10-04T10:56:07.833Z",
+    "url": "https://alpha.teameet.co.kr/admin/team-matches/new"
+  },
+  {
+    "label": "mobile gender Space opens native choice menu",
+    "startedUTC": "2026-10-04T10:56:07.955Z",
+    "completedUTC": "2026-10-04T10:56:08.024Z",
+    "url": "https://alpha.teameet.co.kr/admin/team-matches/new"
+  },
+  {
+    "label": "mobile gender Escape closes native popup",
+    "startedUTC": "2026-10-04T10:56:22.808Z",
+    "completedUTC": "2026-10-04T10:56:22.878Z",
+    "url": "https://alpha.teameet.co.kr/admin/team-matches/new"
+  },
+  {
+    "label": "mobile gender native ArrowDown temporary male selection",
+    "startedUTC": "2026-10-04T10:56:22.990Z",
+    "completedUTC": "2026-10-04T10:56:23.009Z",
+    "url": "https://alpha.teameet.co.kr/admin/team-matches/new"
+  },
+  {
+    "label": "mobile gender native ArrowUp restores mixed",
+    "startedUTC": "2026-10-04T10:56:23.132Z",
+    "completedUTC": "2026-10-04T10:56:23.149Z",
+    "url": "https://alpha.teameet.co.kr/admin/team-matches/new"
+  },
+  {
+    "label": "mobile gender ShiftTab returns uniform input",
+    "startedUTC": "2026-10-04T10:56:23.271Z",
+    "completedUTC": "2026-10-04T10:56:23.285Z",
+    "url": "https://alpha.teameet.co.kr/admin/team-matches/new"
+  },
+  {
+    "label": "resize mobile window to tablet with native edge drag and one zoom increment",
+    "startedUTC": "2026-10-04T10:56:30.647Z",
+    "completedUTC": "2026-10-04T10:56:37.252Z",
+    "url": "https://alpha.teameet.co.kr/admin/team-matches/new"
+  },
+  {
+    "label": "tablet minimum Tab to maximum baseline",
+    "startedUTC": "2026-10-04T10:56:49.942Z",
+    "completedUTC": "2026-10-04T10:56:49.966Z",
+    "url": "https://alpha.teameet.co.kr/admin/team-matches/new"
+  },
+  {
+    "label": "tablet maximum ShiftTab to minimum",
+    "startedUTC": "2026-10-04T10:56:50.146Z",
+    "completedUTC": "2026-10-04T10:56:50.163Z",
+    "url": "https://alpha.teameet.co.kr/admin/team-matches/new"
+  },
+  {
+    "label": "tablet native minimum ArrowDown",
+    "startedUTC": "2026-10-04T10:56:50.280Z",
+    "completedUTC": "2026-10-04T10:56:50.348Z",
+    "url": "https://alpha.teameet.co.kr/admin/team-matches/new"
+  },
+  {
+    "label": "tablet native Tab then ArrowDown maximum",
+    "startedUTC": "2026-10-04T10:56:50.471Z",
+    "completedUTC": "2026-10-04T10:56:50.713Z",
+    "url": "https://alpha.teameet.co.kr/admin/team-matches/new"
+  },
+  {
+    "label": "tablet minimum select high above maximum",
+    "startedUTC": "2026-10-04T10:57:05.429Z",
+    "completedUTC": "2026-10-04T10:57:05.442Z",
+    "url": "https://alpha.teameet.co.kr/admin/team-matches/new"
+  },
+  {
+    "label": "tablet maximum entry below minimum",
+    "startedUTC": "2026-10-04T10:57:05.566Z",
+    "completedUTC": "2026-10-04T10:57:05.583Z",
+    "url": "https://alpha.teameet.co.kr/admin/team-matches/new"
+  },
+  {
+    "label": "tablet minimum 미설정 clears both endpoints",
+    "startedUTC": "2026-10-04T10:57:05.711Z",
+    "completedUTC": "2026-10-04T10:57:05.720Z",
+    "url": "https://alpha.teameet.co.kr/admin/team-matches/new"
+  },
+  {
+    "label": "tablet maximum native threeTabs through format uniform to gender",
+    "startedUTC": "2026-10-04T10:57:05.834Z",
+    "completedUTC": "2026-10-04T10:57:06.095Z",
+    "url": "https://alpha.teameet.co.kr/admin/team-matches/new"
+  },
+  {
+    "label": "tablet gender Space native popup",
+    "startedUTC": "2026-10-04T10:57:06.204Z",
+    "completedUTC": "2026-10-04T10:57:06.281Z",
+    "url": "https://alpha.teameet.co.kr/admin/team-matches/new"
+  },
+  {
+    "label": "tablet gender Escape closes native popup",
+    "startedUTC": "2026-10-04T10:57:14.765Z",
+    "completedUTC": "2026-10-04T10:57:14.834Z",
+    "url": "https://alpha.teameet.co.kr/admin/team-matches/new"
+  },
+  {
+    "label": "tablet native gender ArrowDown selects male temporarily",
+    "startedUTC": "2026-10-04T10:57:14.953Z",
+    "completedUTC": "2026-10-04T10:57:15.026Z",
+    "url": "https://alpha.teameet.co.kr/admin/team-matches/new"
+  },
+  {
+    "label": "tablet native gender ArrowUp restores mixed",
+    "startedUTC": "2026-10-04T10:57:15.145Z",
+    "completedUTC": "2026-10-04T10:57:15.214Z",
+    "url": "https://alpha.teameet.co.kr/admin/team-matches/new"
+  },
+  {
+    "label": "tablet native ShiftTab to uniform",
+    "startedUTC": "2026-10-04T10:57:15.331Z",
+    "completedUTC": "2026-10-04T10:57:15.467Z",
+    "url": "https://alpha.teameet.co.kr/admin/team-matches/new"
+  },
+  {
+    "label": "native zoom reset to desktop width",
+    "startedUTC": "2026-10-04T10:57:15.710Z",
+    "completedUTC": "2026-10-04T10:57:15.846Z",
+    "url": "https://alpha.teameet.co.kr/admin/team-matches/new"
+  },
+  {
+    "label": "desktop minimum Tab to maximum baseline",
+    "startedUTC": "2026-10-04T10:57:23.847Z",
+    "completedUTC": "2026-10-04T10:57:23.871Z",
+    "url": "https://alpha.teameet.co.kr/admin/team-matches/new"
+  },
+  {
+    "label": "desktop native ShiftTab to minimum",
+    "startedUTC": "2026-10-04T10:57:24.033Z",
+    "completedUTC": "2026-10-04T10:57:24.169Z",
+    "url": "https://alpha.teameet.co.kr/admin/team-matches/new"
+  },
+  {
+    "label": "desktop native minimum ArrowDown",
+    "startedUTC": "2026-10-04T10:57:24.307Z",
+    "completedUTC": "2026-10-04T10:57:24.379Z",
+    "url": "https://alpha.teameet.co.kr/admin/team-matches/new"
+  },
+  {
+    "label": "desktop native Tab then ArrowDown maximum",
+    "startedUTC": "2026-10-04T10:57:24.502Z",
+    "completedUTC": "2026-10-04T10:57:24.742Z",
+    "url": "https://alpha.teameet.co.kr/admin/team-matches/new"
+  },
+  {
+    "label": "desktop minimum high above maximum",
+    "startedUTC": "2026-10-04T10:57:24.910Z",
+    "completedUTC": "2026-10-04T10:57:24.921Z",
+    "url": "https://alpha.teameet.co.kr/admin/team-matches/new"
+  },
+  {
+    "label": "desktop maximum entry below minimum",
+    "startedUTC": "2026-10-04T10:57:25.068Z",
+    "completedUTC": "2026-10-04T10:57:25.083Z",
+    "url": "https://alpha.teameet.co.kr/admin/team-matches/new"
+  },
+  {
+    "label": "desktop maximum 미설정 clears both",
+    "startedUTC": "2026-10-04T10:57:25.229Z",
+    "completedUTC": "2026-10-04T10:57:25.248Z",
+    "url": "https://alpha.teameet.co.kr/admin/team-matches/new"
+  },
+  {
+    "label": "desktop maximum three native Tabs to gender",
+    "startedUTC": "2026-10-04T10:57:37.743Z",
+    "completedUTC": "2026-10-04T10:57:38.150Z",
+    "url": "https://alpha.teameet.co.kr/admin/team-matches/new"
+  },
+  {
+    "label": "desktop gender Space native popup",
+    "startedUTC": "2026-10-04T10:57:38.292Z",
+    "completedUTC": "2026-10-04T10:57:38.362Z",
+    "url": "https://alpha.teameet.co.kr/admin/team-matches/new"
+  },
+  {
+    "label": "desktop gender Escape native popup",
+    "startedUTC": "2026-10-04T10:57:38.543Z",
+    "completedUTC": "2026-10-04T10:57:38.612Z",
+    "url": "https://alpha.teameet.co.kr/admin/team-matches/new"
+  },
+  {
+    "label": "desktop native gender ArrowDown temporary male",
+    "startedUTC": "2026-10-04T10:57:38.759Z",
+    "completedUTC": "2026-10-04T10:57:38.836Z",
+    "url": "https://alpha.teameet.co.kr/admin/team-matches/new"
+  },
+  {
+    "label": "desktop native gender ArrowUp restores mixed",
+    "startedUTC": "2026-10-04T10:57:38.973Z",
+    "completedUTC": "2026-10-04T10:57:39.042Z",
+    "url": "https://alpha.teameet.co.kr/admin/team-matches/new"
+  },
+  {
+    "label": "desktop native gender ShiftTab to uniform",
+    "startedUTC": "2026-10-04T10:57:39.177Z",
+    "completedUTC": "2026-10-04T10:57:39.317Z",
+    "url": "https://alpha.teameet.co.kr/admin/team-matches/new"
+  },
+  {
+    "label": "after explicit local restoration browser Back to admin list",
+    "startedUTC": "2026-10-04T10:57:57.201Z",
+    "completedUTC": "2026-10-04T10:57:57.223Z",
+    "url": "https://alpha.teameet.co.kr/admin/team-matches"
+  },
+  {
+    "label": "fresh reentry through observed 모집 만들기 link",
+    "startedUTC": "2026-10-04T10:57:57.566Z",
+    "completedUTC": "2026-10-04T10:57:57.651Z",
+    "url": "https://alpha.teameet.co.kr/admin/team-matches/new"
+  },
+  {
+    "label": "final browser Back from untouched reentered form",
+    "startedUTC": "2026-10-04T10:57:57.953Z",
+    "completedUTC": "2026-10-04T10:57:57.971Z",
+    "url": "https://alpha.teameet.co.kr/admin/team-matches"
+  }
+]

@@ -1,0 +1,41 @@
+{
+  "ref": "951a67e3423dec502697f8bab2d78696d9374cc5",
+  "attribution": "Independent read-only source worker, immutable reference. Static contract is separate from actual runtime identity and HTTP/DB verification.",
+  "files": [
+    {
+      "path": "apps/v1_web/src/app/admin/team-matches/new/page.tsx",
+      "blob": "aead0aaae5f660afba59d5321ab657803b1bcd37",
+      "lines": {
+        "initialState": "44–90",
+        "submitPayload": "98–122",
+        "rangeGenderBinding": "186–201",
+        "finalTypeButton": "264–270"
+      }
+    },
+    {
+      "path": "apps/v1_web/src/components/team-matches/team-match-level-range-field.tsx",
+      "blob": "f8588ccb5bbfcf6d72bd68cf7c626c27234c68e9",
+      "lines": "14–40"
+    },
+    {
+      "path": "apps/v1_web/src/lib/v1-status-labels.ts",
+      "blob": "d138ae2619e142235b4b01acc78d2f4eca784aaa",
+      "lines": "385–395"
+    }
+  ],
+  "initial": {
+    "grade": "",
+    "genderRule": "성별 무관",
+    "genderDisplay": "혼성"
+  },
+  "localChange": "setGrade/setGenderRule only; page has no localStorage draft/autosave/form. No input Enter tested. Focused final type=button could activate on Enter.",
+  "restore": "Either grade 미설정 clears both ends; native ArrowUp restores gender from 남 to 혼성. Explicit UI restoration performed before leaving.",
+  "writeBoundary": "Final 팀 신청 모집 시작하기 POST /api/v1/admin/team-matches; separate image upload mutation. Neither activated.",
+  "sourceLinks": [
+    "https://github.com/kim-song-jun/matchup-sports-platform/blob/951a67e3423dec502697f8bab2d78696d9374cc5/apps/v1_web/src/app/admin/team-matches/page.tsx#L136-L141",
+    "https://github.com/kim-song-jun/matchup-sports-platform/blob/951a67e3423dec502697f8bab2d78696d9374cc5/apps/v1_web/src/app/admin/team-matches/new/page.tsx#L44-L90",
+    "https://github.com/kim-song-jun/matchup-sports-platform/blob/951a67e3423dec502697f8bab2d78696d9374cc5/apps/v1_web/src/components/team-matches/team-match-level-range-field.tsx#L14-L40",
+    "https://github.com/kim-song-jun/matchup-sports-platform/blob/951a67e3423dec502697f8bab2d78696d9374cc5/apps/v1_web/src/app/admin/team-matches/new/page.tsx#L264-L270",
+    "https://github.com/kim-song-jun/matchup-sports-platform/blob/951a67e3423dec502697f8bab2d78696d9374cc5/apps/v1_web/src/hooks/use-v1-api.ts#L3385-L3395"
+  ]
+}

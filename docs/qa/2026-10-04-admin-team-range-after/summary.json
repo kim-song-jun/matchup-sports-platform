@@ -1,0 +1,106 @@
+{
+  "scope": "Issue1599 administrator team-match create local skill range and mixed gender; consumer creation not repeated",
+  "startUTC": "2026-10-04T10:54:33.016Z",
+  "lastDOMUTC": "2026-10-04T10:57:58.248Z",
+  "proofCount": 40,
+  "successfulActionRecords": 46,
+  "axRecords": 4,
+  "validAXRecords": 3,
+  "publishedPNG": 9,
+  "viewports": [
+    {
+      "dpr": 1.25,
+      "h": 606,
+      "w": 402
+    },
+    {
+      "dpr": 1.5,
+      "h": 505,
+      "w": 788
+    },
+    {
+      "dpr": 1,
+      "h": 757,
+      "w": 1182
+    }
+  ],
+  "route": "https://alpha.teameet.co.kr/admin/team-matches/new",
+  "runtimeServingIdentity": "unknown",
+  "outcome": "No defect observed in selected admin local-select conditions",
+  "coverage": [
+    {
+      "width": "mobile",
+      "rangeBaseline": 1,
+      "rangeReverse": 2,
+      "equalRange": 3,
+      "partialRange": 4,
+      "crossMin": 5,
+      "crossMax": 6,
+      "clearBoth": 7,
+      "genderTab": 8,
+      "genderEscape": 9,
+      "genderMale": 10,
+      "genderRestored": 11,
+      "genderReverse": 12
+    },
+    {
+      "width": "tablet",
+      "rangeBaseline": 14,
+      "rangeReverse": 15,
+      "equalRange": 16,
+      "partialRange": 17,
+      "crossMin": 18,
+      "crossMax": 19,
+      "clearBoth": 20,
+      "genderTab": 21,
+      "genderEscape": 22,
+      "genderMale": 23,
+      "genderRestored": 24,
+      "genderReverse": 25
+    },
+    {
+      "width": "desktop",
+      "rangeBaseline": 27,
+      "rangeReverse": 28,
+      "equalRange": 29,
+      "partialRange": 30,
+      "crossMin": 31,
+      "crossMax": 32,
+      "clearBoth": 33,
+      "genderTab": 34,
+      "genderEscape": 35,
+      "genderMale": 36,
+      "genderRestored": 37,
+      "genderReverse": 38
+    }
+  ],
+  "freshReentryProof": 39,
+  "finalExit": {
+    "createFormHeadingPresent": false,
+    "createLink": "/admin/team-matches/new",
+    "heading": "팀매치 관리",
+    "url": "https://alpha.teameet.co.kr/admin/team-matches",
+    "utc": "2026-10-04T10:57:58.248Z",
+    "viewport": {
+      "dpr": 1,
+      "h": 757,
+      "w": 1182
+    }
+  },
+  "limitations": [
+    "Actual creation/save, API request/payload or database state not tested. No unconditional zero server-mutation assertion; network not audited.",
+    "Range and gender alone changed. Sport/region/title/timing/images/style/cost untouched; final create control remained disabled in observed states.",
+    "Observed native ArrowDown changes values, native Tab/ShiftTab moves focus. Cross-boundary extremes and blank reset used supported native selectOption.",
+    "Native Space menu is shown by desktop screenshots. Page screenshots do not contain native popup surface; mobile-gender-open source excluded from publication.",
+    "First AX record is empty because a diff was requested; excluded. Three later full AX excerpts are retained.",
+    "A readiness wait for guessed heading 팀 매치 timed out before actual 팀매치 관리 was read; not an app failure or interaction result.",
+    "Resize baseline13 has active control outside viewport; subsequent focus14 settles it. No viewport-resize scroll restoration claim. Mobile locator.press ArrowDown refocused gender and changed scrollY; no spontaneous-jump or scroll restoration claim.",
+    "Native popup photos occur after the matching keyboard endpoint DOM. Their exact capture intervals are separately recorded; no claim of simultaneous observations.",
+    "Fresh reentry followed explicit restoration. It does not test discarding dirty local edits, history-state persistence, or storage byte restoration.",
+    "No existing admin edit fixture or role transition tested. No full screenreader speech or physical mobile-device validation."
+  ],
+  "excludedImages": [
+    "mobile-initial-top",
+    "mobile-gender-open"
+  ]
+}

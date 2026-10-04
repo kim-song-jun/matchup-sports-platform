@@ -1,0 +1,26 @@
+[
+  {
+    "label": "mobile initial range and gender AX",
+    "utc": "2026-10-04T10:55:51.265Z",
+    "url": "https://alpha.teameet.co.kr/admin/team-matches/new",
+    "excerpt": ""
+  },
+  {
+    "label": "mobile full AX range and gender",
+    "utc": "2026-10-04T10:56:30.644Z",
+    "url": "https://alpha.teameet.co.kr/admin/team-matches/new",
+    "excerpt": "\t\t285 text 실력등급\n\t\t286 container\n\t\t\t287 text 최소 등급\n\t\t\t288 pop up button (collapsed, settable) 최소 등급, Value: 미설정, Secondary Actions: Expand\n\t\t\t\t289 menu\n\t\t\t\t\t290 (selected) 미설정\n\t\t\t\t\t291 입문\n\t\t\t\t\t292 초보\n\t\t\t\t\t293 중수\n\t\t\t\t\t294 고수\n\t\t295 container\n\t\t\t296 text 최대 등급\n\t\t\t297 pop up button (collapsed, settable) 최대 등급, Value: 미설정, Secondary Actions: Expand\n\t\t\t\t298 menu\n\t\t\t\t\t299 (selected) 미설정\n\t\t\t\t\t300 입문\n\t\t\t\t\t301 초보\n\t\t\t\t\t302 중수\n\t\t\t\t\t303 고수\n\t\t304 container\n\t\t\t305 text 경기방식\n\t\t\t306 combo box (settable) 경기방식\n\t\t307 container\n\t\t\t308 text 유니폼 색상\n\t\t\t309 combo box (settable) 유니폼 색상\n\t\t310 container\n\t\t\t311 text 성별 조건\n\t\t\t312 pop up button (collapsed, settable) Description: 성별 조건, Value: 혼성, Secondary Actions: Expand\n\t\t\t\t313 menu\n\t\t\t\t\t314 (selected) 혼성\n\t\t\t\t\t315 남\n\t\t\t\t\t316 여"
+  },
+  {
+    "label": "tablet full AX range and gender",
+    "utc": "2026-10-04T10:57:15.707Z",
+    "url": "https://alpha.teameet.co.kr/admin/team-matches/new",
+    "excerpt": "\t\t285 text 실력등급\n\t\t286 container\n\t\t\t287 text 최소 등급\n\t\t\t288 pop up button (collapsed, settable) 최소 등급, Value: 미설정, Secondary Actions: Expand\n\t\t\t\t289 menu\n\t\t\t\t\t290 (selected) 미설정\n\t\t\t\t\t291 입문\n\t\t\t\t\t292 초보\n\t\t\t\t\t293 중수\n\t\t\t\t\t294 고수\n\t\t295 container\n\t\t\t296 text 최대 등급\n\t\t\t297 pop up button (collapsed, settable) 최대 등급, Value: 미설정, Secondary Actions: Expand\n\t\t\t\t298 menu\n\t\t\t\t\t299 (selected) 미설정\n\t\t\t\t\t300 입문\n\t\t\t\t\t301 초보\n\t\t\t\t\t302 중수\n\t\t\t\t\t303 고수\n\t\t304 container\n\t\t\t305 text 경기방식\n\t\t\t306 combo box (settable) 경기방식\n\t\t307 container\n\t\t\t308 text 유니폼 색상\n\t\t\t309 combo box (settable) 유니폼 색상\n\t\t310 container\n\t\t\t311 text 성별 조건\n\t\t\t312 pop up button (collapsed, settable) Description: 성별 조건, Value: 혼성, Secondary Actions: Expand\n\t\t\t\t313 menu\n\t\t\t\t\t314 (selected) 혼성\n\t\t\t\t\t315 남\n\t\t\t\t\t316 여"
+  },
+  {
+    "label": "desktop full AX range and gender",
+    "utc": "2026-10-04T10:57:39.589Z",
+    "url": "https://alpha.teameet.co.kr/admin/team-matches/new",
+    "excerpt": "\t\t285 text 실력등급\n\t\t286 container\n\t\t\t287 text 최소 등급\n\t\t\t288 pop up button (collapsed, settable) 최소 등급, Value: 미설정, Secondary Actions: Expand\n\t\t\t\t289 menu\n\t\t\t\t\t290 (selected) 미설정\n\t\t\t\t\t291 입문\n\t\t\t\t\t292 초보\n\t\t\t\t\t293 중수\n\t\t\t\t\t294 고수\n\t\t295 container\n\t\t\t296 text 최대 등급\n\t\t\t297 pop up button (collapsed, settable) 최대 등급, Value: 미설정, Secondary Actions: Expand\n\t\t\t\t298 menu\n\t\t\t\t\t299 (selected) 미설정\n\t\t\t\t\t300 입문\n\t\t\t\t\t301 초보\n\t\t\t\t\t302 중수\n\t\t\t\t\t303 고수\n\t\t304 container\n\t\t\t305 text 경기방식\n\t\t\t306 combo box (settable) 경기방식\n\t\t307 container\n\t\t\t308 text 유니폼 색상\n\t\t\t309 combo box (settable) 유니폼 색상\n\t\t310 container\n\t\t\t311 text 성별 조건\n\t\t\t312 pop up button (collapsed, settable) Description: 성별 조건, Value: 혼성, Secondary Actions: Expand\n\t\t\t\t313 menu\n\t\t\t\t\t314 (selected) 혼성\n\t\t\t\t\t315 남\n\t\t\t\t\t316 여"
+  }
+]

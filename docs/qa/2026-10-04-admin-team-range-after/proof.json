@@ -1,0 +1,4153 @@
+[
+  {
+    "label": "mobile initial form, before local changes",
+    "active": {
+      "aria": null,
+      "focusVisible": false,
+      "id": "",
+      "rect": {
+        "bottom": 3257.400146484375,
+        "h": 3257.400146484375,
+        "right": 401.6000061035156,
+        "w": 401.6000061035156,
+        "x": 0,
+        "y": 0
+      },
+      "tag": "BODY",
+      "type": null
+    },
+    "blankFields": [
+      {
+        "aria": "매치 제목",
+        "id": "",
+        "type": "text",
+        "valueLength": 0
+      },
+      {
+        "aria": "모집 안내 (선택)",
+        "id": "",
+        "type": "textarea",
+        "valueLength": 0
+      },
+      {
+        "aria": "경기방식",
+        "id": "",
+        "type": "text",
+        "valueLength": 0
+      },
+      {
+        "aria": "유니폼 색상",
+        "id": "",
+        "type": "text",
+        "valueLength": 0
+      },
+      {
+        "aria": "경기 스타일 직접입력",
+        "id": "",
+        "type": "text",
+        "valueLength": 0
+      },
+      {
+        "aria": "총비용",
+        "id": "",
+        "type": "number",
+        "valueLength": 1
+      },
+      {
+        "aria": "상대팀 부담금",
+        "id": "",
+        "type": "number",
+        "valueLength": 1
+      },
+      {
+        "aria": "경기 장소",
+        "id": "",
+        "type": "text",
+        "valueLength": 0
+      },
+      {
+        "aria": "상세 주소 (선택)",
+        "id": "",
+        "type": "text",
+        "valueLength": 0
+      },
+      {
+        "aria": "경기 시작",
+        "id": "",
+        "type": "datetime-local",
+        "valueLength": 0
+      },
+      {
+        "aria": "경기 종료 (선택)",
+        "id": "",
+        "type": "datetime-local",
+        "valueLength": 0
+      },
+      {
+        "aria": "신청 마감",
+        "id": "",
+        "type": "datetime-local",
+        "valueLength": 0
+      }
+    ],
+    "bodyScrollWidth": 402,
+    "createButtons": [
+      {
+        "disabled": true,
+        "rect": {
+          "bottom": 3237.400146484375,
+          "h": 48,
+          "right": 385.6000061035156,
+          "w": 369.6000061035156,
+          "x": 16,
+          "y": 3189.400146484375
+        },
+        "text": "팀 신청 모집 시작하기",
+        "type": "button"
+      }
+    ],
+    "forms": 0,
+    "headings": [
+      {
+        "rect": {
+          "bottom": 124,
+          "h": 30,
+          "right": 385.6000061035156,
+          "w": 369.6000061035156,
+          "x": 16,
+          "y": 94
+        },
+        "text": "팀매치 모집 만들기"
+      },
+      {
+        "rect": {
+          "bottom": 233.3000030517578,
+          "h": 25.5,
+          "right": 368.79999923706055,
+          "w": 336,
+          "x": 32.79999923706055,
+          "y": 207.8000030517578
+        },
+        "text": "모집 조건"
+      },
+      {
+        "rect": {
+          "bottom": 532.3999938964844,
+          "h": 25.5,
+          "right": 368.79999923706055,
+          "w": 336,
+          "x": 32.79999923706055,
+          "y": 506.8999938964844
+        },
+        "text": "경기 정보"
+      },
+      {
+        "rect": {
+          "bottom": 1622.5,
+          "h": 25.5,
+          "right": 368.79999923706055,
+          "w": 336,
+          "x": 32.79999923706055,
+          "y": 1597
+        },
+        "text": "경기 조건"
+      },
+      {
+        "rect": {
+          "bottom": 2582.60009765625,
+          "h": 25.5,
+          "right": 368.79999923706055,
+          "w": 336,
+          "x": 32.79999923706055,
+          "y": 2557.10009765625
+        },
+        "text": "장소와 시간"
+      }
+    ],
+    "scroll": {
+      "x": 0,
+      "y": 0
+    },
+    "selects": [
+      {
+        "active": false,
+        "clientWidth": 160,
+        "focusVisible": false,
+        "id": "_r_3_-min",
+        "labels": [
+          "최소 등급미설정입문초보중수고수"
+        ],
+        "name": null,
+        "options": [
+          {
+            "disabled": false,
+            "selected": true,
+            "text": "미설정",
+            "value": ""
+          },
+          {
+            "disabled": false,
+            "selected": false,
+            "text": "입문",
+            "value": "beginner"
+          },
+          {
+            "disabled": false,
+            "selected": false,
+            "text": "초보",
+            "value": "novice"
+          },
+          {
+            "disabled": false,
+            "selected": false,
+            "text": "중수",
+            "value": "intermediate"
+          },
+          {
+            "disabled": false,
+            "selected": false,
+            "text": "고수",
+            "value": "advanced"
+          }
+        ],
+        "rect": {
+          "bottom": 1836.5,
+          "h": 48,
+          "right": 194.79999923706055,
+          "w": 162,
+          "x": 32.79999923706055,
+          "y": 1788.5
+        },
+        "scrollWidth": 160,
+        "value": ""
+      },
+      {
+        "active": false,
+        "clientWidth": 160,
+        "focusVisible": false,
+        "id": "_r_3_-max",
+        "labels": [
+          "최대 등급미설정입문초보중수고수"
+        ],
+        "name": null,
+        "options": [
+          {
+            "disabled": false,
+            "selected": true,
+            "text": "미설정",
+            "value": ""
+          },
+          {
+            "disabled": false,
+            "selected": false,
+            "text": "입문",
+            "value": "beginner"
+          },
+          {
+            "disabled": false,
+            "selected": false,
+            "text": "초보",
+            "value": "novice"
+          },
+          {
+            "disabled": false,
+            "selected": false,
+            "text": "중수",
+            "value": "intermediate"
+          },
+          {
+            "disabled": false,
+            "selected": false,
+            "text": "고수",
+            "value": "advanced"
+          }
+        ],
+        "rect": {
+          "bottom": 1836.5,
+          "h": 48,
+          "right": 368.8000030517578,
+          "w": 162,
+          "x": 206.8000030517578,
+          "y": 1788.5
+        },
+        "scrollWidth": 160,
+        "value": ""
+      },
+      {
+        "active": false,
+        "clientWidth": 334,
+        "focusVisible": false,
+        "id": "",
+        "labels": [
+          "성별 조건혼성남여"
+        ],
+        "name": "성별 조건",
+        "options": [
+          {
+            "disabled": false,
+            "selected": true,
+            "text": "혼성",
+            "value": "성별 무관"
+          },
+          {
+            "disabled": false,
+            "selected": false,
+            "text": "남",
+            "value": "남"
+          },
+          {
+            "disabled": false,
+            "selected": false,
+            "text": "여",
+            "value": "여"
+          }
+        ],
+        "rect": {
+          "bottom": 2091.5,
+          "h": 44,
+          "right": 368.79999923706055,
+          "w": 336,
+          "x": 32.79999923706055,
+          "y": 2047.5
+        },
+        "scrollWidth": 334,
+        "value": "성별 무관"
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/admin/team-matches/new",
+    "utc": "2026-10-04T10:54:59.095Z",
+    "viewport": {
+      "dpr": 1.25,
+      "h": 606,
+      "w": 402
+    }
+  },
+  {
+    "label": "mobile Tab endpoint maximum, baseline values unchanged",
+    "active": {
+      "aria": null,
+      "focusVisible": true,
+      "id": "_r_3_-max",
+      "rect": {
+        "bottom": 326.8999938964844,
+        "h": 48,
+        "right": 368.8000030517578,
+        "w": 162,
+        "x": 206.8000030517578,
+        "y": 278.8999938964844
+      },
+      "tag": "SELECT",
+      "type": null
+    },
+    "blankFields": [
+      {
+        "aria": "매치 제목",
+        "id": "",
+        "type": "text",
+        "valueLength": 0
+      },
+      {
+        "aria": "모집 안내 (선택)",
+        "id": "",
+        "type": "textarea",
+        "valueLength": 0
+      },
+      {
+        "aria": "경기방식",
+        "id": "",
+        "type": "text",
+        "valueLength": 0
+      },
+      {
+        "aria": "유니폼 색상",
+        "id": "",
+        "type": "text",
+        "valueLength": 0
+      },
+      {
+        "aria": "경기 스타일 직접입력",
+        "id": "",
+        "type": "text",
+        "valueLength": 0
+      },
+      {
+        "aria": "총비용",
+        "id": "",
+        "type": "number",
+        "valueLength": 1
+      },
+      {
+        "aria": "상대팀 부담금",
+        "id": "",
+        "type": "number",
+        "valueLength": 1
+      },
+      {
+        "aria": "경기 장소",
+        "id": "",
+        "type": "text",
+        "valueLength": 0
+      },
+      {
+        "aria": "상세 주소 (선택)",
+        "id": "",
+        "type": "text",
+        "valueLength": 0
+      },
+      {
+        "aria": "경기 시작",
+        "id": "",
+        "type": "datetime-local",
+        "valueLength": 0
+      },
+      {
+        "aria": "경기 종료 (선택)",
+        "id": "",
+        "type": "datetime-local",
+        "valueLength": 0
+      },
+      {
+        "aria": "신청 마감",
+        "id": "",
+        "type": "datetime-local",
+        "valueLength": 0
+      }
+    ],
+    "bodyScrollWidth": 402,
+    "createButtons": [
+      {
+        "disabled": true,
+        "rect": {
+          "bottom": 1727.800048828125,
+          "h": 48,
+          "right": 385.6000061035156,
+          "w": 369.6000061035156,
+          "x": 16,
+          "y": 1679.800048828125
+        },
+        "text": "팀 신청 모집 시작하기",
+        "type": "button"
+      }
+    ],
+    "forms": 0,
+    "headings": [
+      {
+        "rect": {
+          "bottom": -1385.5999755859375,
+          "h": 30,
+          "right": 385.6000061035156,
+          "w": 369.6000061035156,
+          "x": 16,
+          "y": -1415.5999755859375
+        },
+        "text": "팀매치 모집 만들기"
+      },
+      {
+        "rect": {
+          "bottom": -1276.300048828125,
+          "h": 25.5,
+          "right": 368.79999923706055,
+          "w": 336,
+          "x": 32.79999923706055,
+          "y": -1301.800048828125
+        },
+        "text": "모집 조건"
+      },
+      {
+        "rect": {
+          "bottom": -977.2000122070312,
+          "h": 25.5,
+          "right": 368.79999923706055,
+          "w": 336,
+          "x": 32.79999923706055,
+          "y": -1002.7000122070312
+        },
+        "text": "경기 정보"
+      },
+      {
+        "rect": {
+          "bottom": 112.9000015258789,
+          "h": 25.5,
+          "right": 368.79999923706055,
+          "w": 336,
+          "x": 32.79999923706055,
+          "y": 87.4000015258789
+        },
+        "text": "경기 조건"
+      },
+      {
+        "rect": {
+          "bottom": 1073,
+          "h": 25.5,
+          "right": 368.79999923706055,
+          "w": 336,
+          "x": 32.79999923706055,
+          "y": 1047.5
+        },
+        "text": "장소와 시간"
+      }
+    ],
+    "scroll": {
+      "x": 0,
+      "y": 1509.5999755859375
+    },
+    "selects": [
+      {
+        "active": false,
+        "clientWidth": 160,
+        "focusVisible": false,
+        "id": "_r_3_-min",
+        "labels": [
+          "최소 등급미설정입문초보중수고수"
+        ],
+        "name": null,
+        "options": [
+          {
+            "disabled": false,
+            "selected": true,
+            "text": "미설정",
+            "value": ""
+          },
+          {
+            "disabled": false,
+            "selected": false,
+            "text": "입문",
+            "value": "beginner"
+          },
+          {
+            "disabled": false,
+            "selected": false,
+            "text": "초보",
+            "value": "novice"
+          },
+          {
+            "disabled": false,
+            "selected": false,
+            "text": "중수",
+            "value": "intermediate"
+          },
+          {
+            "disabled": false,
+            "selected": false,
+            "text": "고수",
+            "value": "advanced"
+          }
+        ],
+        "rect": {
+          "bottom": 326.8999938964844,
+          "h": 48,
+          "right": 194.79999923706055,
+          "w": 162,
+          "x": 32.79999923706055,
+          "y": 278.8999938964844
+        },
+        "scrollWidth": 160,
+        "value": ""
+      },
+      {
+        "active": true,
+        "clientWidth": 160,
+        "focusVisible": true,
+        "id": "_r_3_-max",
+        "labels": [
+          "최대 등급미설정입문초보중수고수"
+        ],
+        "name": null,
+        "options": [
+          {
+            "disabled": false,
+            "selected": true,
+            "text": "미설정",
+            "value": ""
+          },
+          {
+            "disabled": false,
+            "selected": false,
+            "text": "입문",
+            "value": "beginner"
+          },
+          {
+            "disabled": false,
+            "selected": false,
+            "text": "초보",
+            "value": "novice"
+          },
+          {
+            "disabled": false,
+            "selected": false,
+            "text": "중수",
+            "value": "intermediate"
+          },
+          {
+            "disabled": false,
+            "selected": false,
+            "text": "고수",
+            "value": "advanced"
+          }
+        ],
+        "rect": {
+          "bottom": 326.8999938964844,
+          "h": 48,
+          "right": 368.8000030517578,
+          "w": 162,
+          "x": 206.8000030517578,
+          "y": 278.8999938964844
+        },
+        "scrollWidth": 160,
+        "value": ""
+      },
+      {
+        "active": false,
+        "clientWidth": 334,
+        "focusVisible": false,
+        "id": "",
+        "labels": [
+          "성별 조건혼성남여"
+        ],
+        "name": "성별 조건",
+        "options": [
+          {
+            "disabled": false,
+            "selected": true,
+            "text": "혼성",
+            "value": "성별 무관"
+          },
+          {
+            "disabled": false,
+            "selected": false,
+            "text": "남",
+            "value": "남"
+          },
+          {
+            "disabled": false,
+            "selected": false,
+            "text": "여",
+            "value": "여"
+          }
+        ],
+        "rect": {
+          "bottom": 581.9000244140625,
+          "h": 44,
+          "right": 368.79999923706055,
+          "w": 336,
+          "x": 32.79999923706055,
+          "y": 537.9000244140625
+        },
+        "scrollWidth": 334,
+        "value": "성별 무관"
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/admin/team-matches/new",
+    "utc": "2026-10-04T10:55:13.011Z",
+    "viewport": {
+      "dpr": 1.25,
+      "h": 606,
+      "w": 402
+    }
+  },
+  {
+    "label": "mobile reverse endpoint minimum baseline",
+    "active": {
+      "aria": null,
+      "focusVisible": true,
+      "id": "_r_3_-min",
+      "rect": {
+        "bottom": 326.8999938964844,
+        "h": 48,
+        "right": 194.79999923706055,
+        "w": 162,
+        "x": 32.79999923706055,
+        "y": 278.8999938964844
+      },
+      "tag": "SELECT"
+    },
+    "bodyScrollWidth": 402,
+    "createDisabled": true,
+    "scroll": {
+      "x": 0,
+      "y": 1509.5999755859375
+    },
+    "selects": [
+      {
+        "active": true,
+        "aria": null,
+        "clientWidth": 160,
+        "focusVisible": true,
+        "id": "_r_3_-min",
+        "rect": {
+          "bottom": 326.8999938964844,
+          "h": 48,
+          "right": 194.79999923706055,
+          "w": 162,
+          "x": 32.79999923706055,
+          "y": 278.8999938964844
+        },
+        "scrollWidth": 160,
+        "text": "미설정",
+        "value": ""
+      },
+      {
+        "active": false,
+        "aria": null,
+        "clientWidth": 160,
+        "focusVisible": false,
+        "id": "_r_3_-max",
+        "rect": {
+          "bottom": 326.8999938964844,
+          "h": 48,
+          "right": 368.8000030517578,
+          "w": 162,
+          "x": 206.8000030517578,
+          "y": 278.8999938964844
+        },
+        "scrollWidth": 160,
+        "text": "미설정",
+        "value": ""
+      },
+      {
+        "active": false,
+        "aria": "성별 조건",
+        "clientWidth": 334,
+        "focusVisible": false,
+        "id": "",
+        "rect": {
+          "bottom": 581.9000244140625,
+          "h": 44,
+          "right": 368.79999923706055,
+          "w": 336,
+          "x": 32.79999923706055,
+          "y": 537.9000244140625
+        },
+        "scrollWidth": 334,
+        "text": "혼성",
+        "value": "성별 무관"
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/admin/team-matches/new",
+    "utc": "2026-10-04T10:55:32.808Z",
+    "viewport": {
+      "dpr": 1.25,
+      "h": 606,
+      "w": 402
+    }
+  },
+  {
+    "label": "mobile equal range after minimum ArrowDown",
+    "active": {
+      "aria": null,
+      "focusVisible": true,
+      "id": "_r_3_-min",
+      "rect": {
+        "bottom": 326.8999938964844,
+        "h": 48,
+        "right": 194.79999923706055,
+        "w": 162,
+        "x": 32.79999923706055,
+        "y": 278.8999938964844
+      },
+      "tag": "SELECT"
+    },
+    "bodyScrollWidth": 402,
+    "createDisabled": true,
+    "scroll": {
+      "x": 0,
+      "y": 1509.5999755859375
+    },
+    "selects": [
+      {
+        "active": true,
+        "aria": null,
+        "clientWidth": 160,
+        "focusVisible": true,
+        "id": "_r_3_-min",
+        "rect": {
+          "bottom": 326.8999938964844,
+          "h": 48,
+          "right": 194.79999923706055,
+          "w": 162,
+          "x": 32.79999923706055,
+          "y": 278.8999938964844
+        },
+        "scrollWidth": 160,
+        "text": "입문",
+        "value": "beginner"
+      },
+      {
+        "active": false,
+        "aria": null,
+        "clientWidth": 160,
+        "focusVisible": false,
+        "id": "_r_3_-max",
+        "rect": {
+          "bottom": 326.8999938964844,
+          "h": 48,
+          "right": 368.8000030517578,
+          "w": 162,
+          "x": 206.8000030517578,
+          "y": 278.8999938964844
+        },
+        "scrollWidth": 160,
+        "text": "입문",
+        "value": "beginner"
+      },
+      {
+        "active": false,
+        "aria": "성별 조건",
+        "clientWidth": 334,
+        "focusVisible": false,
+        "id": "",
+        "rect": {
+          "bottom": 581.9000244140625,
+          "h": 44,
+          "right": 368.79999923706055,
+          "w": 336,
+          "x": 32.79999923706055,
+          "y": 537.9000244140625
+        },
+        "scrollWidth": 334,
+        "text": "혼성",
+        "value": "성별 무관"
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/admin/team-matches/new",
+    "utc": "2026-10-04T10:55:56.833Z",
+    "viewport": {
+      "dpr": 1.25,
+      "h": 606,
+      "w": 402
+    }
+  },
+  {
+    "label": "mobile partial range after maximum ArrowDown",
+    "active": {
+      "aria": null,
+      "focusVisible": true,
+      "id": "_r_3_-max",
+      "rect": {
+        "bottom": 326.8999938964844,
+        "h": 48,
+        "right": 368.8000030517578,
+        "w": 162,
+        "x": 206.8000030517578,
+        "y": 278.8999938964844
+      },
+      "tag": "SELECT"
+    },
+    "bodyScrollWidth": 402,
+    "createDisabled": true,
+    "scroll": {
+      "x": 0,
+      "y": 1509.5999755859375
+    },
+    "selects": [
+      {
+        "active": false,
+        "aria": null,
+        "clientWidth": 160,
+        "focusVisible": false,
+        "id": "_r_3_-min",
+        "rect": {
+          "bottom": 326.8999938964844,
+          "h": 48,
+          "right": 194.79999923706055,
+          "w": 162,
+          "x": 32.79999923706055,
+          "y": 278.8999938964844
+        },
+        "scrollWidth": 160,
+        "text": "입문",
+        "value": "beginner"
+      },
+      {
+        "active": true,
+        "aria": null,
+        "clientWidth": 160,
+        "focusVisible": true,
+        "id": "_r_3_-max",
+        "rect": {
+          "bottom": 326.8999938964844,
+          "h": 48,
+          "right": 368.8000030517578,
+          "w": 162,
+          "x": 206.8000030517578,
+          "y": 278.8999938964844
+        },
+        "scrollWidth": 160,
+        "text": "초보",
+        "value": "novice"
+      },
+      {
+        "active": false,
+        "aria": "성별 조건",
+        "clientWidth": 334,
+        "focusVisible": false,
+        "id": "",
+        "rect": {
+          "bottom": 581.9000244140625,
+          "h": 44,
+          "right": 368.79999923706055,
+          "w": 336,
+          "x": 32.79999923706055,
+          "y": 537.9000244140625
+        },
+        "scrollWidth": 334,
+        "text": "혼성",
+        "value": "성별 무관"
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/admin/team-matches/new",
+    "utc": "2026-10-04T10:55:56.993Z",
+    "viewport": {
+      "dpr": 1.25,
+      "h": 606,
+      "w": 402
+    }
+  },
+  {
+    "label": "mobile crossed minimum clamps maximum",
+    "active": {
+      "aria": null,
+      "focusVisible": true,
+      "id": "_r_3_-max",
+      "rect": {
+        "bottom": 326.8999938964844,
+        "h": 48,
+        "right": 368.8000030517578,
+        "w": 162,
+        "x": 206.8000030517578,
+        "y": 278.8999938964844
+      },
+      "tag": "SELECT"
+    },
+    "bodyScrollWidth": 402,
+    "createDisabled": true,
+    "scroll": {
+      "x": 0,
+      "y": 1509.5999755859375
+    },
+    "selects": [
+      {
+        "active": false,
+        "aria": null,
+        "clientWidth": 160,
+        "focusVisible": false,
+        "id": "_r_3_-min",
+        "rect": {
+          "bottom": 326.8999938964844,
+          "h": 48,
+          "right": 194.79999923706055,
+          "w": 162,
+          "x": 32.79999923706055,
+          "y": 278.8999938964844
+        },
+        "scrollWidth": 160,
+        "text": "고수",
+        "value": "advanced"
+      },
+      {
+        "active": true,
+        "aria": null,
+        "clientWidth": 160,
+        "focusVisible": true,
+        "id": "_r_3_-max",
+        "rect": {
+          "bottom": 326.8999938964844,
+          "h": 48,
+          "right": 368.8000030517578,
+          "w": 162,
+          "x": 206.8000030517578,
+          "y": 278.8999938964844
+        },
+        "scrollWidth": 160,
+        "text": "고수",
+        "value": "advanced"
+      },
+      {
+        "active": false,
+        "aria": "성별 조건",
+        "clientWidth": 334,
+        "focusVisible": false,
+        "id": "",
+        "rect": {
+          "bottom": 581.9000244140625,
+          "h": 44,
+          "right": 368.79999923706055,
+          "w": 336,
+          "x": 32.79999923706055,
+          "y": 537.9000244140625
+        },
+        "scrollWidth": 334,
+        "text": "혼성",
+        "value": "성별 무관"
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/admin/team-matches/new",
+    "utc": "2026-10-04T10:56:07.264Z",
+    "viewport": {
+      "dpr": 1.25,
+      "h": 606,
+      "w": 402
+    }
+  },
+  {
+    "label": "mobile crossed maximum clamps minimum",
+    "active": {
+      "aria": null,
+      "focusVisible": true,
+      "id": "_r_3_-max",
+      "rect": {
+        "bottom": 326.8999938964844,
+        "h": 48,
+        "right": 368.8000030517578,
+        "w": 162,
+        "x": 206.8000030517578,
+        "y": 278.8999938964844
+      },
+      "tag": "SELECT"
+    },
+    "bodyScrollWidth": 402,
+    "createDisabled": true,
+    "scroll": {
+      "x": 0,
+      "y": 1509.5999755859375
+    },
+    "selects": [
+      {
+        "active": false,
+        "aria": null,
+        "clientWidth": 160,
+        "focusVisible": false,
+        "id": "_r_3_-min",
+        "rect": {
+          "bottom": 326.8999938964844,
+          "h": 48,
+          "right": 194.79999923706055,
+          "w": 162,
+          "x": 32.79999923706055,
+          "y": 278.8999938964844
+        },
+        "scrollWidth": 160,
+        "text": "입문",
+        "value": "beginner"
+      },
+      {
+        "active": true,
+        "aria": null,
+        "clientWidth": 160,
+        "focusVisible": true,
+        "id": "_r_3_-max",
+        "rect": {
+          "bottom": 326.8999938964844,
+          "h": 48,
+          "right": 368.8000030517578,
+          "w": 162,
+          "x": 206.8000030517578,
+          "y": 278.8999938964844
+        },
+        "scrollWidth": 160,
+        "text": "입문",
+        "value": "beginner"
+      },
+      {
+        "active": false,
+        "aria": "성별 조건",
+        "clientWidth": 334,
+        "focusVisible": false,
+        "id": "",
+        "rect": {
+          "bottom": 581.9000244140625,
+          "h": 44,
+          "right": 368.79999923706055,
+          "w": 336,
+          "x": 32.79999923706055,
+          "y": 537.9000244140625
+        },
+        "scrollWidth": 334,
+        "text": "혼성",
+        "value": "성별 무관"
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/admin/team-matches/new",
+    "utc": "2026-10-04T10:56:07.412Z",
+    "viewport": {
+      "dpr": 1.25,
+      "h": 606,
+      "w": 402
+    }
+  },
+  {
+    "label": "mobile range restored blank",
+    "active": {
+      "aria": null,
+      "focusVisible": true,
+      "id": "_r_3_-max",
+      "rect": {
+        "bottom": 326.8999938964844,
+        "h": 48,
+        "right": 368.8000030517578,
+        "w": 162,
+        "x": 206.8000030517578,
+        "y": 278.8999938964844
+      },
+      "tag": "SELECT"
+    },
+    "bodyScrollWidth": 402,
+    "createDisabled": true,
+    "scroll": {
+      "x": 0,
+      "y": 1509.5999755859375
+    },
+    "selects": [
+      {
+        "active": false,
+        "aria": null,
+        "clientWidth": 160,
+        "focusVisible": false,
+        "id": "_r_3_-min",
+        "rect": {
+          "bottom": 326.8999938964844,
+          "h": 48,
+          "right": 194.79999923706055,
+          "w": 162,
+          "x": 32.79999923706055,
+          "y": 278.8999938964844
+        },
+        "scrollWidth": 160,
+        "text": "미설정",
+        "value": ""
+      },
+      {
+        "active": true,
+        "aria": null,
+        "clientWidth": 160,
+        "focusVisible": true,
+        "id": "_r_3_-max",
+        "rect": {
+          "bottom": 326.8999938964844,
+          "h": 48,
+          "right": 368.8000030517578,
+          "w": 162,
+          "x": 206.8000030517578,
+          "y": 278.8999938964844
+        },
+        "scrollWidth": 160,
+        "text": "미설정",
+        "value": ""
+      },
+      {
+        "active": false,
+        "aria": "성별 조건",
+        "clientWidth": 334,
+        "focusVisible": false,
+        "id": "",
+        "rect": {
+          "bottom": 581.9000244140625,
+          "h": 44,
+          "right": 368.79999923706055,
+          "w": 336,
+          "x": 32.79999923706055,
+          "y": 537.9000244140625
+        },
+        "scrollWidth": 334,
+        "text": "혼성",
+        "value": "성별 무관"
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/admin/team-matches/new",
+    "utc": "2026-10-04T10:56:07.564Z",
+    "viewport": {
+      "dpr": 1.25,
+      "h": 606,
+      "w": 402
+    }
+  },
+  {
+    "label": "mobile gender reached by three Tabs",
+    "active": {
+      "aria": "성별 조건",
+      "focusVisible": true,
+      "id": "",
+      "rect": {
+        "bottom": 581.9000244140625,
+        "h": 44,
+        "right": 368.79999923706055,
+        "w": 336,
+        "x": 32.79999923706055,
+        "y": 537.9000244140625
+      },
+      "tag": "SELECT"
+    },
+    "bodyScrollWidth": 402,
+    "createDisabled": true,
+    "scroll": {
+      "x": 0,
+      "y": 1509.5999755859375
+    },
+    "selects": [
+      {
+        "active": false,
+        "aria": null,
+        "clientWidth": 160,
+        "focusVisible": false,
+        "id": "_r_3_-min",
+        "rect": {
+          "bottom": 326.8999938964844,
+          "h": 48,
+          "right": 194.79999923706055,
+          "w": 162,
+          "x": 32.79999923706055,
+          "y": 278.8999938964844
+        },
+        "scrollWidth": 160,
+        "text": "미설정",
+        "value": ""
+      },
+      {
+        "active": false,
+        "aria": null,
+        "clientWidth": 160,
+        "focusVisible": false,
+        "id": "_r_3_-max",
+        "rect": {
+          "bottom": 326.8999938964844,
+          "h": 48,
+          "right": 368.8000030517578,
+          "w": 162,
+          "x": 206.8000030517578,
+          "y": 278.8999938964844
+        },
+        "scrollWidth": 160,
+        "text": "미설정",
+        "value": ""
+      },
+      {
+        "active": true,
+        "aria": "성별 조건",
+        "clientWidth": 334,
+        "focusVisible": true,
+        "id": "",
+        "rect": {
+          "bottom": 581.9000244140625,
+          "h": 44,
+          "right": 368.79999923706055,
+          "w": 336,
+          "x": 32.79999923706055,
+          "y": 537.9000244140625
+        },
+        "scrollWidth": 334,
+        "text": "혼성",
+        "value": "성별 무관"
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/admin/team-matches/new",
+    "utc": "2026-10-04T10:56:07.952Z",
+    "viewport": {
+      "dpr": 1.25,
+      "h": 606,
+      "w": 402
+    }
+  },
+  {
+    "label": "mobile gender Escape retains mixed selection",
+    "active": {
+      "aria": "성별 조건",
+      "focusVisible": true,
+      "id": "",
+      "rect": {
+        "bottom": 581.9000244140625,
+        "h": 44,
+        "right": 368.79999923706055,
+        "w": 336,
+        "x": 32.79999923706055,
+        "y": 537.9000244140625
+      },
+      "tag": "SELECT"
+    },
+    "bodyScrollWidth": 402,
+    "createDisabled": true,
+    "scroll": {
+      "x": 0,
+      "y": 1509.5999755859375
+    },
+    "selects": [
+      {
+        "active": false,
+        "aria": null,
+        "clientWidth": 160,
+        "focusVisible": false,
+        "id": "_r_3_-min",
+        "rect": {
+          "bottom": 326.8999938964844,
+          "h": 48,
+          "right": 194.79999923706055,
+          "w": 162,
+          "x": 32.79999923706055,
+          "y": 278.8999938964844
+        },
+        "scrollWidth": 160,
+        "text": "미설정",
+        "value": ""
+      },
+      {
+        "active": false,
+        "aria": null,
+        "clientWidth": 160,
+        "focusVisible": false,
+        "id": "_r_3_-max",
+        "rect": {
+          "bottom": 326.8999938964844,
+          "h": 48,
+          "right": 368.8000030517578,
+          "w": 162,
+          "x": 206.8000030517578,
+          "y": 278.8999938964844
+        },
+        "scrollWidth": 160,
+        "text": "미설정",
+        "value": ""
+      },
+      {
+        "active": true,
+        "aria": "성별 조건",
+        "clientWidth": 334,
+        "focusVisible": true,
+        "id": "",
+        "rect": {
+          "bottom": 581.9000244140625,
+          "h": 44,
+          "right": 368.79999923706055,
+          "w": 336,
+          "x": 32.79999923706055,
+          "y": 537.9000244140625
+        },
+        "scrollWidth": 334,
+        "text": "혼성",
+        "value": "성별 무관"
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/admin/team-matches/new",
+    "utc": "2026-10-04T10:56:22.988Z",
+    "viewport": {
+      "dpr": 1.25,
+      "h": 606,
+      "w": 402
+    }
+  },
+  {
+    "label": "mobile gender temporary male local value",
+    "active": {
+      "aria": "성별 조건",
+      "focusVisible": true,
+      "id": "",
+      "rect": {
+        "bottom": 325.1000061035156,
+        "h": 44,
+        "right": 368.79999923706055,
+        "w": 336,
+        "x": 32.79999923706055,
+        "y": 281.1000061035156
+      },
+      "tag": "SELECT"
+    },
+    "bodyScrollWidth": 402,
+    "createDisabled": true,
+    "scroll": {
+      "x": 0,
+      "y": 1766.4000244140625
+    },
+    "selects": [
+      {
+        "active": false,
+        "aria": null,
+        "clientWidth": 160,
+        "focusVisible": false,
+        "id": "_r_3_-min",
+        "rect": {
+          "bottom": 70.10000038146973,
+          "h": 48,
+          "right": 194.79999923706055,
+          "w": 162,
+          "x": 32.79999923706055,
+          "y": 22.100000381469727
+        },
+        "scrollWidth": 160,
+        "text": "미설정",
+        "value": ""
+      },
+      {
+        "active": false,
+        "aria": null,
+        "clientWidth": 160,
+        "focusVisible": false,
+        "id": "_r_3_-max",
+        "rect": {
+          "bottom": 70.10000038146973,
+          "h": 48,
+          "right": 368.8000030517578,
+          "w": 162,
+          "x": 206.8000030517578,
+          "y": 22.100000381469727
+        },
+        "scrollWidth": 160,
+        "text": "미설정",
+        "value": ""
+      },
+      {
+        "active": true,
+        "aria": "성별 조건",
+        "clientWidth": 334,
+        "focusVisible": true,
+        "id": "",
+        "rect": {
+          "bottom": 325.1000061035156,
+          "h": 44,
+          "right": 368.79999923706055,
+          "w": 336,
+          "x": 32.79999923706055,
+          "y": 281.1000061035156
+        },
+        "scrollWidth": 334,
+        "text": "남",
+        "value": "남"
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/admin/team-matches/new",
+    "utc": "2026-10-04T10:56:23.125Z",
+    "viewport": {
+      "dpr": 1.25,
+      "h": 606,
+      "w": 402
+    }
+  },
+  {
+    "label": "mobile restored grade blank and mixed",
+    "active": {
+      "aria": "성별 조건",
+      "focusVisible": true,
+      "id": "",
+      "rect": {
+        "bottom": 325.1000061035156,
+        "h": 44,
+        "right": 368.79999923706055,
+        "w": 336,
+        "x": 32.79999923706055,
+        "y": 281.1000061035156
+      },
+      "tag": "SELECT"
+    },
+    "bodyScrollWidth": 402,
+    "createDisabled": true,
+    "scroll": {
+      "x": 0,
+      "y": 1766.4000244140625
+    },
+    "selects": [
+      {
+        "active": false,
+        "aria": null,
+        "clientWidth": 160,
+        "focusVisible": false,
+        "id": "_r_3_-min",
+        "rect": {
+          "bottom": 70.10000038146973,
+          "h": 48,
+          "right": 194.79999923706055,
+          "w": 162,
+          "x": 32.79999923706055,
+          "y": 22.100000381469727
+        },
+        "scrollWidth": 160,
+        "text": "미설정",
+        "value": ""
+      },
+      {
+        "active": false,
+        "aria": null,
+        "clientWidth": 160,
+        "focusVisible": false,
+        "id": "_r_3_-max",
+        "rect": {
+          "bottom": 70.10000038146973,
+          "h": 48,
+          "right": 368.8000030517578,
+          "w": 162,
+          "x": 206.8000030517578,
+          "y": 22.100000381469727
+        },
+        "scrollWidth": 160,
+        "text": "미설정",
+        "value": ""
+      },
+      {
+        "active": true,
+        "aria": "성별 조건",
+        "clientWidth": 334,
+        "focusVisible": true,
+        "id": "",
+        "rect": {
+          "bottom": 325.1000061035156,
+          "h": 44,
+          "right": 368.79999923706055,
+          "w": 336,
+          "x": 32.79999923706055,
+          "y": 281.1000061035156
+        },
+        "scrollWidth": 334,
+        "text": "혼성",
+        "value": "성별 무관"
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/admin/team-matches/new",
+    "utc": "2026-10-04T10:56:23.269Z",
+    "viewport": {
+      "dpr": 1.25,
+      "h": 606,
+      "w": 402
+    }
+  },
+  {
+    "label": "mobile reverse gender to uniform input",
+    "active": {
+      "aria": "유니폼 색상",
+      "focusVisible": true,
+      "id": "",
+      "rect": {
+        "bottom": 240.1000061035156,
+        "h": 44,
+        "right": 368.79999923706055,
+        "w": 336,
+        "x": 32.79999923706055,
+        "y": 196.1000061035156
+      },
+      "tag": "INPUT"
+    },
+    "bodyScrollWidth": 402,
+    "createDisabled": true,
+    "scroll": {
+      "x": 0,
+      "y": 1766.4000244140625
+    },
+    "selects": [
+      {
+        "active": false,
+        "aria": null,
+        "clientWidth": 160,
+        "focusVisible": false,
+        "id": "_r_3_-min",
+        "rect": {
+          "bottom": 70.10000038146973,
+          "h": 48,
+          "right": 194.79999923706055,
+          "w": 162,
+          "x": 32.79999923706055,
+          "y": 22.100000381469727
+        },
+        "scrollWidth": 160,
+        "text": "미설정",
+        "value": ""
+      },
+      {
+        "active": false,
+        "aria": null,
+        "clientWidth": 160,
+        "focusVisible": false,
+        "id": "_r_3_-max",
+        "rect": {
+          "bottom": 70.10000038146973,
+          "h": 48,
+          "right": 368.8000030517578,
+          "w": 162,
+          "x": 206.8000030517578,
+          "y": 22.100000381469727
+        },
+        "scrollWidth": 160,
+        "text": "미설정",
+        "value": ""
+      },
+      {
+        "active": false,
+        "aria": "성별 조건",
+        "clientWidth": 334,
+        "focusVisible": false,
+        "id": "",
+        "rect": {
+          "bottom": 325.1000061035156,
+          "h": 44,
+          "right": 368.79999923706055,
+          "w": 336,
+          "x": 32.79999923706055,
+          "y": 281.1000061035156
+        },
+        "scrollWidth": 334,
+        "text": "혼성",
+        "value": "성별 무관"
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/admin/team-matches/new",
+    "utc": "2026-10-04T10:56:23.422Z",
+    "viewport": {
+      "dpr": 1.25,
+      "h": 606,
+      "w": 402
+    }
+  },
+  {
+    "label": "tablet restored baseline after resize",
+    "active": {
+      "aria": "유니폼 색상",
+      "focusVisible": true,
+      "id": "",
+      "rect": {
+        "bottom": -252.83334350585935,
+        "h": 44,
+        "right": 709.3333435058594,
+        "w": 307.3333435058594,
+        "x": 402,
+        "y": -296.8333435058594
+      },
+      "tag": "INPUT"
+    },
+    "bodyScrollWidth": 788,
+    "createDisabled": true,
+    "scroll": {
+      "x": 0,
+      "y": 1688.6666259765625
+    },
+    "selects": [
+      {
+        "active": false,
+        "aria": null,
+        "clientWidth": 308,
+        "focusVisible": false,
+        "id": "_r_3_-min",
+        "rect": {
+          "bottom": -337.8333435058594,
+          "h": 48,
+          "right": 388.00001525878906,
+          "w": 309.3333435058594,
+          "x": 78.66667175292969,
+          "y": -385.8333435058594
+        },
+        "scrollWidth": 308,
+        "text": "미설정",
+        "value": ""
+      },
+      {
+        "active": false,
+        "aria": null,
+        "clientWidth": 308,
+        "focusVisible": false,
+        "id": "_r_3_-max",
+        "rect": {
+          "bottom": -337.8333435058594,
+          "h": 48,
+          "right": 709.3333435058594,
+          "w": 309.3333435058594,
+          "x": 400,
+          "y": -385.8333435058594
+        },
+        "scrollWidth": 308,
+        "text": "미설정",
+        "value": ""
+      },
+      {
+        "active": false,
+        "aria": "성별 조건",
+        "clientWidth": 306,
+        "focusVisible": false,
+        "id": "",
+        "rect": {
+          "bottom": -167.83334350585938,
+          "h": 44,
+          "right": 386.00001525878906,
+          "w": 307.3333435058594,
+          "x": 78.66667175292969,
+          "y": -211.83334350585935
+        },
+        "scrollWidth": 306,
+        "text": "혼성",
+        "value": "성별 무관"
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/admin/team-matches/new",
+    "utc": "2026-10-04T10:56:37.378Z",
+    "viewport": {
+      "dpr": 1.5,
+      "h": 505,
+      "w": 788
+    }
+  },
+  {
+    "label": "tablet baseline maximum keyboard focus",
+    "active": {
+      "aria": null,
+      "focusVisible": true,
+      "id": "_r_3_-max",
+      "rect": {
+        "bottom": 276.1666717529297,
+        "h": 48,
+        "right": 709.3333435058594,
+        "w": 309.3333435058594,
+        "x": 400,
+        "y": 228.1666717529297
+      },
+      "tag": "SELECT"
+    },
+    "bodyScrollWidth": 788,
+    "createDisabled": true,
+    "scroll": {
+      "x": 0,
+      "y": 1074.6666259765625
+    },
+    "selects": [
+      {
+        "active": false,
+        "aria": null,
+        "clientWidth": 308,
+        "focusVisible": false,
+        "id": "_r_3_-min",
+        "rect": {
+          "bottom": 276.1666717529297,
+          "h": 48,
+          "right": 388.00001525878906,
+          "w": 309.3333435058594,
+          "x": 78.66667175292969,
+          "y": 228.1666717529297
+        },
+        "scrollWidth": 308,
+        "text": "미설정",
+        "value": ""
+      },
+      {
+        "active": true,
+        "aria": null,
+        "clientWidth": 308,
+        "focusVisible": true,
+        "id": "_r_3_-max",
+        "rect": {
+          "bottom": 276.1666717529297,
+          "h": 48,
+          "right": 709.3333435058594,
+          "w": 309.3333435058594,
+          "x": 400,
+          "y": 228.1666717529297
+        },
+        "scrollWidth": 308,
+        "text": "미설정",
+        "value": ""
+      },
+      {
+        "active": false,
+        "aria": "성별 조건",
+        "clientWidth": 306,
+        "focusVisible": false,
+        "id": "",
+        "rect": {
+          "bottom": 446.1666870117187,
+          "h": 44,
+          "right": 386.00001525878906,
+          "w": 307.3333435058594,
+          "x": 78.66667175292969,
+          "y": 402.1666870117187
+        },
+        "scrollWidth": 306,
+        "text": "혼성",
+        "value": "성별 무관"
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/admin/team-matches/new",
+    "utc": "2026-10-04T10:56:50.106Z",
+    "viewport": {
+      "dpr": 1.5,
+      "h": 505,
+      "w": 788
+    }
+  },
+  {
+    "label": "tablet reverse minimum focus",
+    "active": {
+      "aria": null,
+      "focusVisible": true,
+      "id": "_r_3_-min",
+      "rect": {
+        "bottom": 276.1666717529297,
+        "h": 48,
+        "right": 388.00001525878906,
+        "w": 309.3333435058594,
+        "x": 78.66667175292969,
+        "y": 228.1666717529297
+      },
+      "tag": "SELECT"
+    },
+    "bodyScrollWidth": 788,
+    "createDisabled": true,
+    "scroll": {
+      "x": 0,
+      "y": 1074.6666259765625
+    },
+    "selects": [
+      {
+        "active": true,
+        "aria": null,
+        "clientWidth": 308,
+        "focusVisible": true,
+        "id": "_r_3_-min",
+        "rect": {
+          "bottom": 276.1666717529297,
+          "h": 48,
+          "right": 388.00001525878906,
+          "w": 309.3333435058594,
+          "x": 78.66667175292969,
+          "y": 228.1666717529297
+        },
+        "scrollWidth": 308,
+        "text": "미설정",
+        "value": ""
+      },
+      {
+        "active": false,
+        "aria": null,
+        "clientWidth": 308,
+        "focusVisible": false,
+        "id": "_r_3_-max",
+        "rect": {
+          "bottom": 276.1666717529297,
+          "h": 48,
+          "right": 709.3333435058594,
+          "w": 309.3333435058594,
+          "x": 400,
+          "y": 228.1666717529297
+        },
+        "scrollWidth": 308,
+        "text": "미설정",
+        "value": ""
+      },
+      {
+        "active": false,
+        "aria": "성별 조건",
+        "clientWidth": 306,
+        "focusVisible": false,
+        "id": "",
+        "rect": {
+          "bottom": 446.1666870117187,
+          "h": 44,
+          "right": 386.00001525878906,
+          "w": 307.3333435058594,
+          "x": 78.66667175292969,
+          "y": 402.1666870117187
+        },
+        "scrollWidth": 306,
+        "text": "혼성",
+        "value": "성별 무관"
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/admin/team-matches/new",
+    "utc": "2026-10-04T10:56:50.275Z",
+    "viewport": {
+      "dpr": 1.5,
+      "h": 505,
+      "w": 788
+    }
+  },
+  {
+    "label": "tablet equal range entry after native ArrowDown",
+    "active": {
+      "aria": null,
+      "focusVisible": true,
+      "id": "_r_3_-min",
+      "rect": {
+        "bottom": 276.1666717529297,
+        "h": 48,
+        "right": 388.00001525878906,
+        "w": 309.3333435058594,
+        "x": 78.66667175292969,
+        "y": 228.1666717529297
+      },
+      "tag": "SELECT"
+    },
+    "bodyScrollWidth": 788,
+    "createDisabled": true,
+    "scroll": {
+      "x": 0,
+      "y": 1074.6666259765625
+    },
+    "selects": [
+      {
+        "active": true,
+        "aria": null,
+        "clientWidth": 308,
+        "focusVisible": true,
+        "id": "_r_3_-min",
+        "rect": {
+          "bottom": 276.1666717529297,
+          "h": 48,
+          "right": 388.00001525878906,
+          "w": 309.3333435058594,
+          "x": 78.66667175292969,
+          "y": 228.1666717529297
+        },
+        "scrollWidth": 308,
+        "text": "입문",
+        "value": "beginner"
+      },
+      {
+        "active": false,
+        "aria": null,
+        "clientWidth": 308,
+        "focusVisible": false,
+        "id": "_r_3_-max",
+        "rect": {
+          "bottom": 276.1666717529297,
+          "h": 48,
+          "right": 709.3333435058594,
+          "w": 309.3333435058594,
+          "x": 400,
+          "y": 228.1666717529297
+        },
+        "scrollWidth": 308,
+        "text": "입문",
+        "value": "beginner"
+      },
+      {
+        "active": false,
+        "aria": "성별 조건",
+        "clientWidth": 306,
+        "focusVisible": false,
+        "id": "",
+        "rect": {
+          "bottom": 446.1666870117187,
+          "h": 44,
+          "right": 386.00001525878906,
+          "w": 307.3333435058594,
+          "x": 78.66667175292969,
+          "y": 402.1666870117187
+        },
+        "scrollWidth": 306,
+        "text": "혼성",
+        "value": "성별 무관"
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/admin/team-matches/new",
+    "utc": "2026-10-04T10:56:50.467Z",
+    "viewport": {
+      "dpr": 1.5,
+      "h": 505,
+      "w": 788
+    }
+  },
+  {
+    "label": "tablet partial entry novice range",
+    "active": {
+      "aria": null,
+      "focusVisible": true,
+      "id": "_r_3_-max",
+      "rect": {
+        "bottom": 276.1666717529297,
+        "h": 48,
+        "right": 709.3333435058594,
+        "w": 309.3333435058594,
+        "x": 400,
+        "y": 228.1666717529297
+      },
+      "tag": "SELECT"
+    },
+    "bodyScrollWidth": 788,
+    "createDisabled": true,
+    "scroll": {
+      "x": 0,
+      "y": 1074.6666259765625
+    },
+    "selects": [
+      {
+        "active": false,
+        "aria": null,
+        "clientWidth": 308,
+        "focusVisible": false,
+        "id": "_r_3_-min",
+        "rect": {
+          "bottom": 276.1666717529297,
+          "h": 48,
+          "right": 388.00001525878906,
+          "w": 309.3333435058594,
+          "x": 78.66667175292969,
+          "y": 228.1666717529297
+        },
+        "scrollWidth": 308,
+        "text": "입문",
+        "value": "beginner"
+      },
+      {
+        "active": true,
+        "aria": null,
+        "clientWidth": 308,
+        "focusVisible": true,
+        "id": "_r_3_-max",
+        "rect": {
+          "bottom": 276.1666717529297,
+          "h": 48,
+          "right": 709.3333435058594,
+          "w": 309.3333435058594,
+          "x": 400,
+          "y": 228.1666717529297
+        },
+        "scrollWidth": 308,
+        "text": "초보",
+        "value": "novice"
+      },
+      {
+        "active": false,
+        "aria": "성별 조건",
+        "clientWidth": 306,
+        "focusVisible": false,
+        "id": "",
+        "rect": {
+          "bottom": 446.1666870117187,
+          "h": 44,
+          "right": 386.00001525878906,
+          "w": 307.3333435058594,
+          "x": 78.66667175292969,
+          "y": 402.1666870117187
+        },
+        "scrollWidth": 306,
+        "text": "혼성",
+        "value": "성별 무관"
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/admin/team-matches/new",
+    "utc": "2026-10-04T10:56:50.835Z",
+    "viewport": {
+      "dpr": 1.5,
+      "h": 505,
+      "w": 788
+    }
+  },
+  {
+    "label": "tablet minimum cross clamps maximum",
+    "active": {
+      "aria": null,
+      "focusVisible": true,
+      "id": "_r_3_-max",
+      "rect": {
+        "bottom": 276.1666717529297,
+        "h": 48,
+        "right": 709.3333435058594,
+        "w": 309.3333435058594,
+        "x": 400,
+        "y": 228.1666717529297
+      },
+      "tag": "SELECT"
+    },
+    "bodyScrollWidth": 788,
+    "createDisabled": true,
+    "scroll": {
+      "x": 0,
+      "y": 1074.6666259765625
+    },
+    "selects": [
+      {
+        "active": false,
+        "aria": null,
+        "clientWidth": 308,
+        "focusVisible": false,
+        "id": "_r_3_-min",
+        "rect": {
+          "bottom": 276.1666717529297,
+          "h": 48,
+          "right": 388.00001525878906,
+          "w": 309.3333435058594,
+          "x": 78.66667175292969,
+          "y": 228.1666717529297
+        },
+        "scrollWidth": 308,
+        "text": "고수",
+        "value": "advanced"
+      },
+      {
+        "active": true,
+        "aria": null,
+        "clientWidth": 308,
+        "focusVisible": true,
+        "id": "_r_3_-max",
+        "rect": {
+          "bottom": 276.1666717529297,
+          "h": 48,
+          "right": 709.3333435058594,
+          "w": 309.3333435058594,
+          "x": 400,
+          "y": 228.1666717529297
+        },
+        "scrollWidth": 308,
+        "text": "고수",
+        "value": "advanced"
+      },
+      {
+        "active": false,
+        "aria": "성별 조건",
+        "clientWidth": 306,
+        "focusVisible": false,
+        "id": "",
+        "rect": {
+          "bottom": 446.1666870117187,
+          "h": 44,
+          "right": 386.00001525878906,
+          "w": 307.3333435058594,
+          "x": 78.66667175292969,
+          "y": 402.1666870117187
+        },
+        "scrollWidth": 306,
+        "text": "혼성",
+        "value": "성별 무관"
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/admin/team-matches/new",
+    "utc": "2026-10-04T10:57:05.562Z",
+    "viewport": {
+      "dpr": 1.5,
+      "h": 505,
+      "w": 788
+    }
+  },
+  {
+    "label": "tablet maximum cross clamps minimum",
+    "active": {
+      "aria": null,
+      "focusVisible": true,
+      "id": "_r_3_-max",
+      "rect": {
+        "bottom": 276.1666717529297,
+        "h": 48,
+        "right": 709.3333435058594,
+        "w": 309.3333435058594,
+        "x": 400,
+        "y": 228.1666717529297
+      },
+      "tag": "SELECT"
+    },
+    "bodyScrollWidth": 788,
+    "createDisabled": true,
+    "scroll": {
+      "x": 0,
+      "y": 1074.6666259765625
+    },
+    "selects": [
+      {
+        "active": false,
+        "aria": null,
+        "clientWidth": 308,
+        "focusVisible": false,
+        "id": "_r_3_-min",
+        "rect": {
+          "bottom": 276.1666717529297,
+          "h": 48,
+          "right": 388.00001525878906,
+          "w": 309.3333435058594,
+          "x": 78.66667175292969,
+          "y": 228.1666717529297
+        },
+        "scrollWidth": 308,
+        "text": "입문",
+        "value": "beginner"
+      },
+      {
+        "active": true,
+        "aria": null,
+        "clientWidth": 308,
+        "focusVisible": true,
+        "id": "_r_3_-max",
+        "rect": {
+          "bottom": 276.1666717529297,
+          "h": 48,
+          "right": 709.3333435058594,
+          "w": 309.3333435058594,
+          "x": 400,
+          "y": 228.1666717529297
+        },
+        "scrollWidth": 308,
+        "text": "입문",
+        "value": "beginner"
+      },
+      {
+        "active": false,
+        "aria": "성별 조건",
+        "clientWidth": 306,
+        "focusVisible": false,
+        "id": "",
+        "rect": {
+          "bottom": 446.1666870117187,
+          "h": 44,
+          "right": 386.00001525878906,
+          "w": 307.3333435058594,
+          "x": 78.66667175292969,
+          "y": 402.1666870117187
+        },
+        "scrollWidth": 306,
+        "text": "혼성",
+        "value": "성별 무관"
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/admin/team-matches/new",
+    "utc": "2026-10-04T10:57:05.708Z",
+    "viewport": {
+      "dpr": 1.5,
+      "h": 505,
+      "w": 788
+    }
+  },
+  {
+    "label": "tablet both endpoints restored blank",
+    "active": {
+      "aria": null,
+      "focusVisible": true,
+      "id": "_r_3_-max",
+      "rect": {
+        "bottom": 276.1666717529297,
+        "h": 48,
+        "right": 709.3333435058594,
+        "w": 309.3333435058594,
+        "x": 400,
+        "y": 228.1666717529297
+      },
+      "tag": "SELECT"
+    },
+    "bodyScrollWidth": 788,
+    "createDisabled": true,
+    "scroll": {
+      "x": 0,
+      "y": 1074.6666259765625
+    },
+    "selects": [
+      {
+        "active": false,
+        "aria": null,
+        "clientWidth": 308,
+        "focusVisible": false,
+        "id": "_r_3_-min",
+        "rect": {
+          "bottom": 276.1666717529297,
+          "h": 48,
+          "right": 388.00001525878906,
+          "w": 309.3333435058594,
+          "x": 78.66667175292969,
+          "y": 228.1666717529297
+        },
+        "scrollWidth": 308,
+        "text": "미설정",
+        "value": ""
+      },
+      {
+        "active": true,
+        "aria": null,
+        "clientWidth": 308,
+        "focusVisible": true,
+        "id": "_r_3_-max",
+        "rect": {
+          "bottom": 276.1666717529297,
+          "h": 48,
+          "right": 709.3333435058594,
+          "w": 309.3333435058594,
+          "x": 400,
+          "y": 228.1666717529297
+        },
+        "scrollWidth": 308,
+        "text": "미설정",
+        "value": ""
+      },
+      {
+        "active": false,
+        "aria": "성별 조건",
+        "clientWidth": 306,
+        "focusVisible": false,
+        "id": "",
+        "rect": {
+          "bottom": 446.1666870117187,
+          "h": 44,
+          "right": 386.00001525878906,
+          "w": 307.3333435058594,
+          "x": 78.66667175292969,
+          "y": 402.1666870117187
+        },
+        "scrollWidth": 306,
+        "text": "혼성",
+        "value": "성별 무관"
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/admin/team-matches/new",
+    "utc": "2026-10-04T10:57:05.832Z",
+    "viewport": {
+      "dpr": 1.5,
+      "h": 505,
+      "w": 788
+    }
+  },
+  {
+    "label": "tablet gender keyboard endpoint",
+    "active": {
+      "aria": "성별 조건",
+      "focusVisible": true,
+      "id": "",
+      "rect": {
+        "bottom": 446.1666870117187,
+        "h": 44,
+        "right": 386.00001525878906,
+        "w": 307.3333435058594,
+        "x": 78.66667175292969,
+        "y": 402.1666870117187
+      },
+      "tag": "SELECT"
+    },
+    "bodyScrollWidth": 788,
+    "createDisabled": true,
+    "scroll": {
+      "x": 0,
+      "y": 1074.6666259765625
+    },
+    "selects": [
+      {
+        "active": false,
+        "aria": null,
+        "clientWidth": 308,
+        "focusVisible": false,
+        "id": "_r_3_-min",
+        "rect": {
+          "bottom": 276.1666717529297,
+          "h": 48,
+          "right": 388.00001525878906,
+          "w": 309.3333435058594,
+          "x": 78.66667175292969,
+          "y": 228.1666717529297
+        },
+        "scrollWidth": 308,
+        "text": "미설정",
+        "value": ""
+      },
+      {
+        "active": false,
+        "aria": null,
+        "clientWidth": 308,
+        "focusVisible": false,
+        "id": "_r_3_-max",
+        "rect": {
+          "bottom": 276.1666717529297,
+          "h": 48,
+          "right": 709.3333435058594,
+          "w": 309.3333435058594,
+          "x": 400,
+          "y": 228.1666717529297
+        },
+        "scrollWidth": 308,
+        "text": "미설정",
+        "value": ""
+      },
+      {
+        "active": true,
+        "aria": "성별 조건",
+        "clientWidth": 306,
+        "focusVisible": true,
+        "id": "",
+        "rect": {
+          "bottom": 446.1666870117187,
+          "h": 44,
+          "right": 386.00001525878906,
+          "w": 307.3333435058594,
+          "x": 78.66667175292969,
+          "y": 402.1666870117187
+        },
+        "scrollWidth": 306,
+        "text": "혼성",
+        "value": "성별 무관"
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/admin/team-matches/new",
+    "utc": "2026-10-04T10:57:06.201Z",
+    "viewport": {
+      "dpr": 1.5,
+      "h": 505,
+      "w": 788
+    }
+  },
+  {
+    "label": "tablet Escape retains mixed",
+    "active": {
+      "aria": "성별 조건",
+      "focusVisible": true,
+      "id": "",
+      "rect": {
+        "bottom": 446.1666870117187,
+        "h": 44,
+        "right": 386.00001525878906,
+        "w": 307.3333435058594,
+        "x": 78.66667175292969,
+        "y": 402.1666870117187
+      },
+      "tag": "SELECT"
+    },
+    "bodyScrollWidth": 788,
+    "createDisabled": true,
+    "scroll": {
+      "x": 0,
+      "y": 1074.6666259765625
+    },
+    "selects": [
+      {
+        "active": false,
+        "aria": null,
+        "clientWidth": 308,
+        "focusVisible": false,
+        "id": "_r_3_-min",
+        "rect": {
+          "bottom": 276.1666717529297,
+          "h": 48,
+          "right": 388.00001525878906,
+          "w": 309.3333435058594,
+          "x": 78.66667175292969,
+          "y": 228.1666717529297
+        },
+        "scrollWidth": 308,
+        "text": "미설정",
+        "value": ""
+      },
+      {
+        "active": false,
+        "aria": null,
+        "clientWidth": 308,
+        "focusVisible": false,
+        "id": "_r_3_-max",
+        "rect": {
+          "bottom": 276.1666717529297,
+          "h": 48,
+          "right": 709.3333435058594,
+          "w": 309.3333435058594,
+          "x": 400,
+          "y": 228.1666717529297
+        },
+        "scrollWidth": 308,
+        "text": "미설정",
+        "value": ""
+      },
+      {
+        "active": true,
+        "aria": "성별 조건",
+        "clientWidth": 306,
+        "focusVisible": true,
+        "id": "",
+        "rect": {
+          "bottom": 446.1666870117187,
+          "h": 44,
+          "right": 386.00001525878906,
+          "w": 307.3333435058594,
+          "x": 78.66667175292969,
+          "y": 402.1666870117187
+        },
+        "scrollWidth": 306,
+        "text": "혼성",
+        "value": "성별 무관"
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/admin/team-matches/new",
+    "utc": "2026-10-04T10:57:14.951Z",
+    "viewport": {
+      "dpr": 1.5,
+      "h": 505,
+      "w": 788
+    }
+  },
+  {
+    "label": "tablet temporary male local value",
+    "active": {
+      "aria": "성별 조건",
+      "focusVisible": true,
+      "id": "",
+      "rect": {
+        "bottom": 446.1666870117187,
+        "h": 44,
+        "right": 386.00001525878906,
+        "w": 307.3333435058594,
+        "x": 78.66667175292969,
+        "y": 402.1666870117187
+      },
+      "tag": "SELECT"
+    },
+    "bodyScrollWidth": 788,
+    "createDisabled": true,
+    "scroll": {
+      "x": 0,
+      "y": 1074.6666259765625
+    },
+    "selects": [
+      {
+        "active": false,
+        "aria": null,
+        "clientWidth": 308,
+        "focusVisible": false,
+        "id": "_r_3_-min",
+        "rect": {
+          "bottom": 276.1666717529297,
+          "h": 48,
+          "right": 388.00001525878906,
+          "w": 309.3333435058594,
+          "x": 78.66667175292969,
+          "y": 228.1666717529297
+        },
+        "scrollWidth": 308,
+        "text": "미설정",
+        "value": ""
+      },
+      {
+        "active": false,
+        "aria": null,
+        "clientWidth": 308,
+        "focusVisible": false,
+        "id": "_r_3_-max",
+        "rect": {
+          "bottom": 276.1666717529297,
+          "h": 48,
+          "right": 709.3333435058594,
+          "w": 309.3333435058594,
+          "x": 400,
+          "y": 228.1666717529297
+        },
+        "scrollWidth": 308,
+        "text": "미설정",
+        "value": ""
+      },
+      {
+        "active": true,
+        "aria": "성별 조건",
+        "clientWidth": 306,
+        "focusVisible": true,
+        "id": "",
+        "rect": {
+          "bottom": 446.1666870117187,
+          "h": 44,
+          "right": 386.00001525878906,
+          "w": 307.3333435058594,
+          "x": 78.66667175292969,
+          "y": 402.1666870117187
+        },
+        "scrollWidth": 306,
+        "text": "남",
+        "value": "남"
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/admin/team-matches/new",
+    "utc": "2026-10-04T10:57:15.139Z",
+    "viewport": {
+      "dpr": 1.5,
+      "h": 505,
+      "w": 788
+    }
+  },
+  {
+    "label": "tablet restored blank range and mixed",
+    "active": {
+      "aria": "성별 조건",
+      "focusVisible": true,
+      "id": "",
+      "rect": {
+        "bottom": 446.1666870117187,
+        "h": 44,
+        "right": 386.00001525878906,
+        "w": 307.3333435058594,
+        "x": 78.66667175292969,
+        "y": 402.1666870117187
+      },
+      "tag": "SELECT"
+    },
+    "bodyScrollWidth": 788,
+    "createDisabled": true,
+    "scroll": {
+      "x": 0,
+      "y": 1074.6666259765625
+    },
+    "selects": [
+      {
+        "active": false,
+        "aria": null,
+        "clientWidth": 308,
+        "focusVisible": false,
+        "id": "_r_3_-min",
+        "rect": {
+          "bottom": 276.1666717529297,
+          "h": 48,
+          "right": 388.00001525878906,
+          "w": 309.3333435058594,
+          "x": 78.66667175292969,
+          "y": 228.1666717529297
+        },
+        "scrollWidth": 308,
+        "text": "미설정",
+        "value": ""
+      },
+      {
+        "active": false,
+        "aria": null,
+        "clientWidth": 308,
+        "focusVisible": false,
+        "id": "_r_3_-max",
+        "rect": {
+          "bottom": 276.1666717529297,
+          "h": 48,
+          "right": 709.3333435058594,
+          "w": 309.3333435058594,
+          "x": 400,
+          "y": 228.1666717529297
+        },
+        "scrollWidth": 308,
+        "text": "미설정",
+        "value": ""
+      },
+      {
+        "active": true,
+        "aria": "성별 조건",
+        "clientWidth": 306,
+        "focusVisible": true,
+        "id": "",
+        "rect": {
+          "bottom": 446.1666870117187,
+          "h": 44,
+          "right": 386.00001525878906,
+          "w": 307.3333435058594,
+          "x": 78.66667175292969,
+          "y": 402.1666870117187
+        },
+        "scrollWidth": 306,
+        "text": "혼성",
+        "value": "성별 무관"
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/admin/team-matches/new",
+    "utc": "2026-10-04T10:57:15.328Z",
+    "viewport": {
+      "dpr": 1.5,
+      "h": 505,
+      "w": 788
+    }
+  },
+  {
+    "label": "tablet reverse gender to uniform",
+    "active": {
+      "aria": "유니폼 색상",
+      "focusVisible": true,
+      "id": "",
+      "rect": {
+        "bottom": 361.1666870117187,
+        "h": 44,
+        "right": 709.3333435058594,
+        "w": 307.3333435058594,
+        "x": 402,
+        "y": 317.16668701171875
+      },
+      "tag": "INPUT"
+    },
+    "bodyScrollWidth": 788,
+    "createDisabled": true,
+    "scroll": {
+      "x": 0,
+      "y": 1074.6666259765625
+    },
+    "selects": [
+      {
+        "active": false,
+        "aria": null,
+        "clientWidth": 308,
+        "focusVisible": false,
+        "id": "_r_3_-min",
+        "rect": {
+          "bottom": 276.1666717529297,
+          "h": 48,
+          "right": 388.00001525878906,
+          "w": 309.3333435058594,
+          "x": 78.66667175292969,
+          "y": 228.1666717529297
+        },
+        "scrollWidth": 308,
+        "text": "미설정",
+        "value": ""
+      },
+      {
+        "active": false,
+        "aria": null,
+        "clientWidth": 308,
+        "focusVisible": false,
+        "id": "_r_3_-max",
+        "rect": {
+          "bottom": 276.1666717529297,
+          "h": 48,
+          "right": 709.3333435058594,
+          "w": 309.3333435058594,
+          "x": 400,
+          "y": 228.1666717529297
+        },
+        "scrollWidth": 308,
+        "text": "미설정",
+        "value": ""
+      },
+      {
+        "active": false,
+        "aria": "성별 조건",
+        "clientWidth": 306,
+        "focusVisible": false,
+        "id": "",
+        "rect": {
+          "bottom": 446.1666870117187,
+          "h": 44,
+          "right": 386.00001525878906,
+          "w": 307.3333435058594,
+          "x": 78.66667175292969,
+          "y": 402.1666870117187
+        },
+        "scrollWidth": 306,
+        "text": "혼성",
+        "value": "성별 무관"
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/admin/team-matches/new",
+    "utc": "2026-10-04T10:57:15.594Z",
+    "viewport": {
+      "dpr": 1.5,
+      "h": 505,
+      "w": 788
+    }
+  },
+  {
+    "label": "desktop restored baseline after native zoom reset",
+    "active": {
+      "aria": "유니폼 색상",
+      "focusVisible": true,
+      "id": "",
+      "rect": {
+        "bottom": 319.5,
+        "h": 44,
+        "right": 1026,
+        "w": 307,
+        "x": 719,
+        "y": 275.5
+      },
+      "tag": "INPUT"
+    },
+    "bodyScrollWidth": 1182,
+    "createDisabled": true,
+    "scroll": {
+      "x": 0,
+      "y": 1075
+    },
+    "selects": [
+      {
+        "active": false,
+        "aria": null,
+        "clientWidth": 307,
+        "focusVisible": false,
+        "id": "_r_3_-min",
+        "rect": {
+          "bottom": 234.5,
+          "h": 48,
+          "right": 705,
+          "w": 309,
+          "x": 396,
+          "y": 186.5
+        },
+        "scrollWidth": 307,
+        "text": "미설정",
+        "value": ""
+      },
+      {
+        "active": false,
+        "aria": null,
+        "clientWidth": 307,
+        "focusVisible": false,
+        "id": "_r_3_-max",
+        "rect": {
+          "bottom": 234.5,
+          "h": 48,
+          "right": 1026,
+          "w": 309,
+          "x": 717,
+          "y": 186.5
+        },
+        "scrollWidth": 307,
+        "text": "미설정",
+        "value": ""
+      },
+      {
+        "active": false,
+        "aria": "성별 조건",
+        "clientWidth": 305,
+        "focusVisible": false,
+        "id": "",
+        "rect": {
+          "bottom": 404.5,
+          "h": 44,
+          "right": 703,
+          "w": 307,
+          "x": 396,
+          "y": 360.5
+        },
+        "scrollWidth": 305,
+        "text": "혼성",
+        "value": "성별 무관"
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/admin/team-matches/new",
+    "utc": "2026-10-04T10:57:15.980Z",
+    "viewport": {
+      "dpr": 1,
+      "h": 757,
+      "w": 1182
+    }
+  },
+  {
+    "label": "desktop baseline maximum keyboard focus",
+    "active": {
+      "aria": null,
+      "focusVisible": true,
+      "id": "_r_3_-max",
+      "rect": {
+        "bottom": 402.5,
+        "h": 48,
+        "right": 1026,
+        "w": 309,
+        "x": 717,
+        "y": 354.5
+      },
+      "tag": "SELECT"
+    },
+    "bodyScrollWidth": 1182,
+    "createDisabled": true,
+    "scroll": {
+      "x": 0,
+      "y": 907
+    },
+    "selects": [
+      {
+        "active": false,
+        "aria": null,
+        "clientWidth": 307,
+        "focusVisible": false,
+        "id": "_r_3_-min",
+        "rect": {
+          "bottom": 402.5,
+          "h": 48,
+          "right": 705,
+          "w": 309,
+          "x": 396,
+          "y": 354.5
+        },
+        "scrollWidth": 307,
+        "text": "미설정",
+        "value": ""
+      },
+      {
+        "active": true,
+        "aria": null,
+        "clientWidth": 307,
+        "focusVisible": true,
+        "id": "_r_3_-max",
+        "rect": {
+          "bottom": 402.5,
+          "h": 48,
+          "right": 1026,
+          "w": 309,
+          "x": 717,
+          "y": 354.5
+        },
+        "scrollWidth": 307,
+        "text": "미설정",
+        "value": ""
+      },
+      {
+        "active": false,
+        "aria": "성별 조건",
+        "clientWidth": 305,
+        "focusVisible": false,
+        "id": "",
+        "rect": {
+          "bottom": 572.5,
+          "h": 44,
+          "right": 703,
+          "w": 307,
+          "x": 396,
+          "y": 528.5
+        },
+        "scrollWidth": 305,
+        "text": "혼성",
+        "value": "성별 무관"
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/admin/team-matches/new",
+    "utc": "2026-10-04T10:57:24.001Z",
+    "viewport": {
+      "dpr": 1,
+      "h": 757,
+      "w": 1182
+    }
+  },
+  {
+    "label": "desktop reverse minimum focus",
+    "active": {
+      "aria": null,
+      "focusVisible": true,
+      "id": "_r_3_-min",
+      "rect": {
+        "bottom": 402.5,
+        "h": 48,
+        "right": 705,
+        "w": 309,
+        "x": 396,
+        "y": 354.5
+      },
+      "tag": "SELECT"
+    },
+    "bodyScrollWidth": 1182,
+    "createDisabled": true,
+    "scroll": {
+      "x": 0,
+      "y": 907
+    },
+    "selects": [
+      {
+        "active": true,
+        "aria": null,
+        "clientWidth": 307,
+        "focusVisible": true,
+        "id": "_r_3_-min",
+        "rect": {
+          "bottom": 402.5,
+          "h": 48,
+          "right": 705,
+          "w": 309,
+          "x": 396,
+          "y": 354.5
+        },
+        "scrollWidth": 307,
+        "text": "미설정",
+        "value": ""
+      },
+      {
+        "active": false,
+        "aria": null,
+        "clientWidth": 307,
+        "focusVisible": false,
+        "id": "_r_3_-max",
+        "rect": {
+          "bottom": 402.5,
+          "h": 48,
+          "right": 1026,
+          "w": 309,
+          "x": 717,
+          "y": 354.5
+        },
+        "scrollWidth": 307,
+        "text": "미설정",
+        "value": ""
+      },
+      {
+        "active": false,
+        "aria": "성별 조건",
+        "clientWidth": 305,
+        "focusVisible": false,
+        "id": "",
+        "rect": {
+          "bottom": 572.5,
+          "h": 44,
+          "right": 703,
+          "w": 307,
+          "x": 396,
+          "y": 528.5
+        },
+        "scrollWidth": 305,
+        "text": "혼성",
+        "value": "성별 무관"
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/admin/team-matches/new",
+    "utc": "2026-10-04T10:57:24.303Z",
+    "viewport": {
+      "dpr": 1,
+      "h": 757,
+      "w": 1182
+    }
+  },
+  {
+    "label": "desktop equal entry range after ArrowDown",
+    "active": {
+      "aria": null,
+      "focusVisible": true,
+      "id": "_r_3_-min",
+      "rect": {
+        "bottom": 402.5,
+        "h": 48,
+        "right": 705,
+        "w": 309,
+        "x": 396,
+        "y": 354.5
+      },
+      "tag": "SELECT"
+    },
+    "bodyScrollWidth": 1182,
+    "createDisabled": true,
+    "scroll": {
+      "x": 0,
+      "y": 907
+    },
+    "selects": [
+      {
+        "active": true,
+        "aria": null,
+        "clientWidth": 307,
+        "focusVisible": true,
+        "id": "_r_3_-min",
+        "rect": {
+          "bottom": 402.5,
+          "h": 48,
+          "right": 705,
+          "w": 309,
+          "x": 396,
+          "y": 354.5
+        },
+        "scrollWidth": 307,
+        "text": "입문",
+        "value": "beginner"
+      },
+      {
+        "active": false,
+        "aria": null,
+        "clientWidth": 307,
+        "focusVisible": false,
+        "id": "_r_3_-max",
+        "rect": {
+          "bottom": 402.5,
+          "h": 48,
+          "right": 1026,
+          "w": 309,
+          "x": 717,
+          "y": 354.5
+        },
+        "scrollWidth": 307,
+        "text": "입문",
+        "value": "beginner"
+      },
+      {
+        "active": false,
+        "aria": "성별 조건",
+        "clientWidth": 305,
+        "focusVisible": false,
+        "id": "",
+        "rect": {
+          "bottom": 572.5,
+          "h": 44,
+          "right": 703,
+          "w": 307,
+          "x": 396,
+          "y": 528.5
+        },
+        "scrollWidth": 305,
+        "text": "혼성",
+        "value": "성별 무관"
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/admin/team-matches/new",
+    "utc": "2026-10-04T10:57:24.499Z",
+    "viewport": {
+      "dpr": 1,
+      "h": 757,
+      "w": 1182
+    }
+  },
+  {
+    "label": "desktop partial entry novice range",
+    "active": {
+      "aria": null,
+      "focusVisible": true,
+      "id": "_r_3_-max",
+      "rect": {
+        "bottom": 402.5,
+        "h": 48,
+        "right": 1026,
+        "w": 309,
+        "x": 717,
+        "y": 354.5
+      },
+      "tag": "SELECT"
+    },
+    "bodyScrollWidth": 1182,
+    "createDisabled": true,
+    "scroll": {
+      "x": 0,
+      "y": 907
+    },
+    "selects": [
+      {
+        "active": false,
+        "aria": null,
+        "clientWidth": 307,
+        "focusVisible": false,
+        "id": "_r_3_-min",
+        "rect": {
+          "bottom": 402.5,
+          "h": 48,
+          "right": 705,
+          "w": 309,
+          "x": 396,
+          "y": 354.5
+        },
+        "scrollWidth": 307,
+        "text": "입문",
+        "value": "beginner"
+      },
+      {
+        "active": true,
+        "aria": null,
+        "clientWidth": 307,
+        "focusVisible": true,
+        "id": "_r_3_-max",
+        "rect": {
+          "bottom": 402.5,
+          "h": 48,
+          "right": 1026,
+          "w": 309,
+          "x": 717,
+          "y": 354.5
+        },
+        "scrollWidth": 307,
+        "text": "초보",
+        "value": "novice"
+      },
+      {
+        "active": false,
+        "aria": "성별 조건",
+        "clientWidth": 305,
+        "focusVisible": false,
+        "id": "",
+        "rect": {
+          "bottom": 572.5,
+          "h": 44,
+          "right": 703,
+          "w": 307,
+          "x": 396,
+          "y": 528.5
+        },
+        "scrollWidth": 305,
+        "text": "혼성",
+        "value": "성별 무관"
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/admin/team-matches/new",
+    "utc": "2026-10-04T10:57:24.874Z",
+    "viewport": {
+      "dpr": 1,
+      "h": 757,
+      "w": 1182
+    }
+  },
+  {
+    "label": "desktop minimum cross clamps maximum",
+    "active": {
+      "aria": null,
+      "focusVisible": true,
+      "id": "_r_3_-max",
+      "rect": {
+        "bottom": 402.5,
+        "h": 48,
+        "right": 1026,
+        "w": 309,
+        "x": 717,
+        "y": 354.5
+      },
+      "tag": "SELECT"
+    },
+    "bodyScrollWidth": 1182,
+    "createDisabled": true,
+    "scroll": {
+      "x": 0,
+      "y": 907
+    },
+    "selects": [
+      {
+        "active": false,
+        "aria": null,
+        "clientWidth": 307,
+        "focusVisible": false,
+        "id": "_r_3_-min",
+        "rect": {
+          "bottom": 402.5,
+          "h": 48,
+          "right": 705,
+          "w": 309,
+          "x": 396,
+          "y": 354.5
+        },
+        "scrollWidth": 307,
+        "text": "고수",
+        "value": "advanced"
+      },
+      {
+        "active": true,
+        "aria": null,
+        "clientWidth": 307,
+        "focusVisible": true,
+        "id": "_r_3_-max",
+        "rect": {
+          "bottom": 402.5,
+          "h": 48,
+          "right": 1026,
+          "w": 309,
+          "x": 717,
+          "y": 354.5
+        },
+        "scrollWidth": 307,
+        "text": "고수",
+        "value": "advanced"
+      },
+      {
+        "active": false,
+        "aria": "성별 조건",
+        "clientWidth": 305,
+        "focusVisible": false,
+        "id": "",
+        "rect": {
+          "bottom": 572.5,
+          "h": 44,
+          "right": 703,
+          "w": 307,
+          "x": 396,
+          "y": 528.5
+        },
+        "scrollWidth": 305,
+        "text": "혼성",
+        "value": "성별 무관"
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/admin/team-matches/new",
+    "utc": "2026-10-04T10:57:25.065Z",
+    "viewport": {
+      "dpr": 1,
+      "h": 757,
+      "w": 1182
+    }
+  },
+  {
+    "label": "desktop maximum cross clamps minimum",
+    "active": {
+      "aria": null,
+      "focusVisible": true,
+      "id": "_r_3_-max",
+      "rect": {
+        "bottom": 402.5,
+        "h": 48,
+        "right": 1026,
+        "w": 309,
+        "x": 717,
+        "y": 354.5
+      },
+      "tag": "SELECT"
+    },
+    "bodyScrollWidth": 1182,
+    "createDisabled": true,
+    "scroll": {
+      "x": 0,
+      "y": 907
+    },
+    "selects": [
+      {
+        "active": false,
+        "aria": null,
+        "clientWidth": 307,
+        "focusVisible": false,
+        "id": "_r_3_-min",
+        "rect": {
+          "bottom": 402.5,
+          "h": 48,
+          "right": 705,
+          "w": 309,
+          "x": 396,
+          "y": 354.5
+        },
+        "scrollWidth": 307,
+        "text": "입문",
+        "value": "beginner"
+      },
+      {
+        "active": true,
+        "aria": null,
+        "clientWidth": 307,
+        "focusVisible": true,
+        "id": "_r_3_-max",
+        "rect": {
+          "bottom": 402.5,
+          "h": 48,
+          "right": 1026,
+          "w": 309,
+          "x": 717,
+          "y": 354.5
+        },
+        "scrollWidth": 307,
+        "text": "입문",
+        "value": "beginner"
+      },
+      {
+        "active": false,
+        "aria": "성별 조건",
+        "clientWidth": 305,
+        "focusVisible": false,
+        "id": "",
+        "rect": {
+          "bottom": 572.5,
+          "h": 44,
+          "right": 703,
+          "w": 307,
+          "x": 396,
+          "y": 528.5
+        },
+        "scrollWidth": 305,
+        "text": "혼성",
+        "value": "성별 무관"
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/admin/team-matches/new",
+    "utc": "2026-10-04T10:57:25.224Z",
+    "viewport": {
+      "dpr": 1,
+      "h": 757,
+      "w": 1182
+    }
+  },
+  {
+    "label": "desktop range restored blank",
+    "active": {
+      "aria": null,
+      "focusVisible": true,
+      "id": "_r_3_-max",
+      "rect": {
+        "bottom": 402.5,
+        "h": 48,
+        "right": 1026,
+        "w": 309,
+        "x": 717,
+        "y": 354.5
+      },
+      "tag": "SELECT"
+    },
+    "bodyScrollWidth": 1182,
+    "createDisabled": true,
+    "scroll": {
+      "x": 0,
+      "y": 907
+    },
+    "selects": [
+      {
+        "active": false,
+        "aria": null,
+        "clientWidth": 307,
+        "focusVisible": false,
+        "id": "_r_3_-min",
+        "rect": {
+          "bottom": 402.5,
+          "h": 48,
+          "right": 705,
+          "w": 309,
+          "x": 396,
+          "y": 354.5
+        },
+        "scrollWidth": 307,
+        "text": "미설정",
+        "value": ""
+      },
+      {
+        "active": true,
+        "aria": null,
+        "clientWidth": 307,
+        "focusVisible": true,
+        "id": "_r_3_-max",
+        "rect": {
+          "bottom": 402.5,
+          "h": 48,
+          "right": 1026,
+          "w": 309,
+          "x": 717,
+          "y": 354.5
+        },
+        "scrollWidth": 307,
+        "text": "미설정",
+        "value": ""
+      },
+      {
+        "active": false,
+        "aria": "성별 조건",
+        "clientWidth": 305,
+        "focusVisible": false,
+        "id": "",
+        "rect": {
+          "bottom": 572.5,
+          "h": 44,
+          "right": 703,
+          "w": 307,
+          "x": 396,
+          "y": 528.5
+        },
+        "scrollWidth": 305,
+        "text": "혼성",
+        "value": "성별 무관"
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/admin/team-matches/new",
+    "utc": "2026-10-04T10:57:25.408Z",
+    "viewport": {
+      "dpr": 1,
+      "h": 757,
+      "w": 1182
+    }
+  },
+  {
+    "label": "desktop gender keyboard endpoint",
+    "active": {
+      "aria": "성별 조건",
+      "focusVisible": true,
+      "id": "",
+      "rect": {
+        "bottom": 572.5,
+        "h": 44,
+        "right": 703,
+        "w": 307,
+        "x": 396,
+        "y": 528.5
+      },
+      "tag": "SELECT"
+    },
+    "bodyScrollWidth": 1182,
+    "createDisabled": true,
+    "scroll": {
+      "x": 0,
+      "y": 907
+    },
+    "selects": [
+      {
+        "active": false,
+        "aria": null,
+        "clientWidth": 307,
+        "focusVisible": false,
+        "id": "_r_3_-min",
+        "rect": {
+          "bottom": 402.5,
+          "h": 48,
+          "right": 705,
+          "w": 309,
+          "x": 396,
+          "y": 354.5
+        },
+        "scrollWidth": 307,
+        "text": "미설정",
+        "value": ""
+      },
+      {
+        "active": false,
+        "aria": null,
+        "clientWidth": 307,
+        "focusVisible": false,
+        "id": "_r_3_-max",
+        "rect": {
+          "bottom": 402.5,
+          "h": 48,
+          "right": 1026,
+          "w": 309,
+          "x": 717,
+          "y": 354.5
+        },
+        "scrollWidth": 307,
+        "text": "미설정",
+        "value": ""
+      },
+      {
+        "active": true,
+        "aria": "성별 조건",
+        "clientWidth": 305,
+        "focusVisible": true,
+        "id": "",
+        "rect": {
+          "bottom": 572.5,
+          "h": 44,
+          "right": 703,
+          "w": 307,
+          "x": 396,
+          "y": 528.5
+        },
+        "scrollWidth": 305,
+        "text": "혼성",
+        "value": "성별 무관"
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/admin/team-matches/new",
+    "utc": "2026-10-04T10:57:38.288Z",
+    "viewport": {
+      "dpr": 1,
+      "h": 757,
+      "w": 1182
+    }
+  },
+  {
+    "label": "desktop Escape retains mixed",
+    "active": {
+      "aria": "성별 조건",
+      "focusVisible": true,
+      "id": "",
+      "rect": {
+        "bottom": 572.5,
+        "h": 44,
+        "right": 703,
+        "w": 307,
+        "x": 396,
+        "y": 528.5
+      },
+      "tag": "SELECT"
+    },
+    "bodyScrollWidth": 1182,
+    "createDisabled": true,
+    "scroll": {
+      "x": 0,
+      "y": 907
+    },
+    "selects": [
+      {
+        "active": false,
+        "aria": null,
+        "clientWidth": 307,
+        "focusVisible": false,
+        "id": "_r_3_-min",
+        "rect": {
+          "bottom": 402.5,
+          "h": 48,
+          "right": 705,
+          "w": 309,
+          "x": 396,
+          "y": 354.5
+        },
+        "scrollWidth": 307,
+        "text": "미설정",
+        "value": ""
+      },
+      {
+        "active": false,
+        "aria": null,
+        "clientWidth": 307,
+        "focusVisible": false,
+        "id": "_r_3_-max",
+        "rect": {
+          "bottom": 402.5,
+          "h": 48,
+          "right": 1026,
+          "w": 309,
+          "x": 717,
+          "y": 354.5
+        },
+        "scrollWidth": 307,
+        "text": "미설정",
+        "value": ""
+      },
+      {
+        "active": true,
+        "aria": "성별 조건",
+        "clientWidth": 305,
+        "focusVisible": true,
+        "id": "",
+        "rect": {
+          "bottom": 572.5,
+          "h": 44,
+          "right": 703,
+          "w": 307,
+          "x": 396,
+          "y": 528.5
+        },
+        "scrollWidth": 305,
+        "text": "혼성",
+        "value": "성별 무관"
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/admin/team-matches/new",
+    "utc": "2026-10-04T10:57:38.754Z",
+    "viewport": {
+      "dpr": 1,
+      "h": 757,
+      "w": 1182
+    }
+  },
+  {
+    "label": "desktop temporary male local value",
+    "active": {
+      "aria": "성별 조건",
+      "focusVisible": true,
+      "id": "",
+      "rect": {
+        "bottom": 572.5,
+        "h": 44,
+        "right": 703,
+        "w": 307,
+        "x": 396,
+        "y": 528.5
+      },
+      "tag": "SELECT"
+    },
+    "bodyScrollWidth": 1182,
+    "createDisabled": true,
+    "scroll": {
+      "x": 0,
+      "y": 907
+    },
+    "selects": [
+      {
+        "active": false,
+        "aria": null,
+        "clientWidth": 307,
+        "focusVisible": false,
+        "id": "_r_3_-min",
+        "rect": {
+          "bottom": 402.5,
+          "h": 48,
+          "right": 705,
+          "w": 309,
+          "x": 396,
+          "y": 354.5
+        },
+        "scrollWidth": 307,
+        "text": "미설정",
+        "value": ""
+      },
+      {
+        "active": false,
+        "aria": null,
+        "clientWidth": 307,
+        "focusVisible": false,
+        "id": "_r_3_-max",
+        "rect": {
+          "bottom": 402.5,
+          "h": 48,
+          "right": 1026,
+          "w": 309,
+          "x": 717,
+          "y": 354.5
+        },
+        "scrollWidth": 307,
+        "text": "미설정",
+        "value": ""
+      },
+      {
+        "active": true,
+        "aria": "성별 조건",
+        "clientWidth": 305,
+        "focusVisible": true,
+        "id": "",
+        "rect": {
+          "bottom": 572.5,
+          "h": 44,
+          "right": 703,
+          "w": 307,
+          "x": 396,
+          "y": 528.5
+        },
+        "scrollWidth": 305,
+        "text": "남",
+        "value": "남"
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/admin/team-matches/new",
+    "utc": "2026-10-04T10:57:38.970Z",
+    "viewport": {
+      "dpr": 1,
+      "h": 757,
+      "w": 1182
+    }
+  },
+  {
+    "label": "desktop range blank and gender mixed restored",
+    "active": {
+      "aria": "성별 조건",
+      "focusVisible": true,
+      "id": "",
+      "rect": {
+        "bottom": 572.5,
+        "h": 44,
+        "right": 703,
+        "w": 307,
+        "x": 396,
+        "y": 528.5
+      },
+      "tag": "SELECT"
+    },
+    "bodyScrollWidth": 1182,
+    "createDisabled": true,
+    "scroll": {
+      "x": 0,
+      "y": 907
+    },
+    "selects": [
+      {
+        "active": false,
+        "aria": null,
+        "clientWidth": 307,
+        "focusVisible": false,
+        "id": "_r_3_-min",
+        "rect": {
+          "bottom": 402.5,
+          "h": 48,
+          "right": 705,
+          "w": 309,
+          "x": 396,
+          "y": 354.5
+        },
+        "scrollWidth": 307,
+        "text": "미설정",
+        "value": ""
+      },
+      {
+        "active": false,
+        "aria": null,
+        "clientWidth": 307,
+        "focusVisible": false,
+        "id": "_r_3_-max",
+        "rect": {
+          "bottom": 402.5,
+          "h": 48,
+          "right": 1026,
+          "w": 309,
+          "x": 717,
+          "y": 354.5
+        },
+        "scrollWidth": 307,
+        "text": "미설정",
+        "value": ""
+      },
+      {
+        "active": true,
+        "aria": "성별 조건",
+        "clientWidth": 305,
+        "focusVisible": true,
+        "id": "",
+        "rect": {
+          "bottom": 572.5,
+          "h": 44,
+          "right": 703,
+          "w": 307,
+          "x": 396,
+          "y": 528.5
+        },
+        "scrollWidth": 305,
+        "text": "혼성",
+        "value": "성별 무관"
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/admin/team-matches/new",
+    "utc": "2026-10-04T10:57:39.173Z",
+    "viewport": {
+      "dpr": 1,
+      "h": 757,
+      "w": 1182
+    }
+  },
+  {
+    "label": "desktop reverse gender to uniform",
+    "active": {
+      "aria": "유니폼 색상",
+      "focusVisible": true,
+      "id": "",
+      "rect": {
+        "bottom": 487.5,
+        "h": 44,
+        "right": 1026,
+        "w": 307,
+        "x": 719,
+        "y": 443.5
+      },
+      "tag": "INPUT"
+    },
+    "bodyScrollWidth": 1182,
+    "createDisabled": true,
+    "scroll": {
+      "x": 0,
+      "y": 907
+    },
+    "selects": [
+      {
+        "active": false,
+        "aria": null,
+        "clientWidth": 307,
+        "focusVisible": false,
+        "id": "_r_3_-min",
+        "rect": {
+          "bottom": 402.5,
+          "h": 48,
+          "right": 705,
+          "w": 309,
+          "x": 396,
+          "y": 354.5
+        },
+        "scrollWidth": 307,
+        "text": "미설정",
+        "value": ""
+      },
+      {
+        "active": false,
+        "aria": null,
+        "clientWidth": 307,
+        "focusVisible": false,
+        "id": "_r_3_-max",
+        "rect": {
+          "bottom": 402.5,
+          "h": 48,
+          "right": 1026,
+          "w": 309,
+          "x": 717,
+          "y": 354.5
+        },
+        "scrollWidth": 307,
+        "text": "미설정",
+        "value": ""
+      },
+      {
+        "active": false,
+        "aria": "성별 조건",
+        "clientWidth": 305,
+        "focusVisible": false,
+        "id": "",
+        "rect": {
+          "bottom": 572.5,
+          "h": 44,
+          "right": 703,
+          "w": 307,
+          "x": 396,
+          "y": 528.5
+        },
+        "scrollWidth": 305,
+        "text": "혼성",
+        "value": "성별 무관"
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/admin/team-matches/new",
+    "utc": "2026-10-04T10:57:39.461Z",
+    "viewport": {
+      "dpr": 1,
+      "h": 757,
+      "w": 1182
+    }
+  },
+  {
+    "label": "desktop fresh reentry baseline after explicit restoration and list exit",
+    "active": {
+      "aria": null,
+      "focusVisible": false,
+      "id": "",
+      "rect": {
+        "bottom": 2427,
+        "h": 2427,
+        "right": 1182,
+        "w": 1182,
+        "x": 0,
+        "y": 0
+      },
+      "tag": "BODY",
+      "type": null
+    },
+    "blankFields": [
+      {
+        "aria": "매치 제목",
+        "id": "",
+        "type": "text",
+        "valueLength": 0
+      },
+      {
+        "aria": "모집 안내 (선택)",
+        "id": "",
+        "type": "textarea",
+        "valueLength": 0
+      },
+      {
+        "aria": "경기방식",
+        "id": "",
+        "type": "text",
+        "valueLength": 0
+      },
+      {
+        "aria": "유니폼 색상",
+        "id": "",
+        "type": "text",
+        "valueLength": 0
+      },
+      {
+        "aria": "경기 스타일 직접입력",
+        "id": "",
+        "type": "text",
+        "valueLength": 0
+      },
+      {
+        "aria": "총비용",
+        "id": "",
+        "type": "number",
+        "valueLength": 1
+      },
+      {
+        "aria": "상대팀 부담금",
+        "id": "",
+        "type": "number",
+        "valueLength": 1
+      },
+      {
+        "aria": "경기 장소",
+        "id": "",
+        "type": "text",
+        "valueLength": 0
+      },
+      {
+        "aria": "상세 주소 (선택)",
+        "id": "",
+        "type": "text",
+        "valueLength": 0
+      },
+      {
+        "aria": "경기 시작",
+        "id": "",
+        "type": "datetime-local",
+        "valueLength": 0
+      },
+      {
+        "aria": "경기 종료 (선택)",
+        "id": "",
+        "type": "datetime-local",
+        "valueLength": 0
+      },
+      {
+        "aria": "신청 마감",
+        "id": "",
+        "type": "datetime-local",
+        "valueLength": 0
+      }
+    ],
+    "bodyScrollWidth": 1182,
+    "createButtons": [
+      {
+        "disabled": true,
+        "rect": {
+          "bottom": 2395,
+          "h": 48,
+          "right": 1047,
+          "w": 672,
+          "x": 375,
+          "y": 2347
+        },
+        "text": "팀 신청 모집 시작하기",
+        "type": "button"
+      }
+    ],
+    "forms": 0,
+    "headings": [
+      {
+        "rect": {
+          "bottom": 90,
+          "h": 36,
+          "right": 1047,
+          "w": 672,
+          "x": 375,
+          "y": 54
+        },
+        "text": "팀매치 모집 만들기"
+      },
+      {
+        "rect": {
+          "bottom": 189.5,
+          "h": 25.5,
+          "right": 1026,
+          "w": 630,
+          "x": 396,
+          "y": 164
+        },
+        "text": "모집 조건"
+      },
+      {
+        "rect": {
+          "bottom": 391,
+          "h": 25.5,
+          "right": 1026,
+          "w": 630,
+          "x": 396,
+          "y": 365.5
+        },
+        "text": "경기 정보"
+      },
+      {
+        "rect": {
+          "bottom": 1116.5,
+          "h": 25.5,
+          "right": 1026,
+          "w": 630,
+          "x": 396,
+          "y": 1091
+        },
+        "text": "경기 조건"
+      },
+      {
+        "rect": {
+          "bottom": 1842,
+          "h": 25.5,
+          "right": 1026,
+          "w": 630,
+          "x": 396,
+          "y": 1816.5
+        },
+        "text": "장소와 시간"
+      }
+    ],
+    "scroll": {
+      "x": 0,
+      "y": 0
+    },
+    "selects": [
+      {
+        "active": false,
+        "clientWidth": 307,
+        "focusVisible": false,
+        "id": "_r_5_-min",
+        "labels": [
+          "최소 등급미설정입문초보중수고수"
+        ],
+        "name": null,
+        "options": [
+          {
+            "disabled": false,
+            "selected": true,
+            "text": "미설정",
+            "value": ""
+          },
+          {
+            "disabled": false,
+            "selected": false,
+            "text": "입문",
+            "value": "beginner"
+          },
+          {
+            "disabled": false,
+            "selected": false,
+            "text": "초보",
+            "value": "novice"
+          },
+          {
+            "disabled": false,
+            "selected": false,
+            "text": "중수",
+            "value": "intermediate"
+          },
+          {
+            "disabled": false,
+            "selected": false,
+            "text": "고수",
+            "value": "advanced"
+          }
+        ],
+        "rect": {
+          "bottom": 1309.5,
+          "h": 48,
+          "right": 705,
+          "w": 309,
+          "x": 396,
+          "y": 1261.5
+        },
+        "scrollWidth": 307,
+        "value": ""
+      },
+      {
+        "active": false,
+        "clientWidth": 307,
+        "focusVisible": false,
+        "id": "_r_5_-max",
+        "labels": [
+          "최대 등급미설정입문초보중수고수"
+        ],
+        "name": null,
+        "options": [
+          {
+            "disabled": false,
+            "selected": true,
+            "text": "미설정",
+            "value": ""
+          },
+          {
+            "disabled": false,
+            "selected": false,
+            "text": "입문",
+            "value": "beginner"
+          },
+          {
+            "disabled": false,
+            "selected": false,
+            "text": "초보",
+            "value": "novice"
+          },
+          {
+            "disabled": false,
+            "selected": false,
+            "text": "중수",
+            "value": "intermediate"
+          },
+          {
+            "disabled": false,
+            "selected": false,
+            "text": "고수",
+            "value": "advanced"
+          }
+        ],
+        "rect": {
+          "bottom": 1309.5,
+          "h": 48,
+          "right": 1026,
+          "w": 309,
+          "x": 717,
+          "y": 1261.5
+        },
+        "scrollWidth": 307,
+        "value": ""
+      },
+      {
+        "active": false,
+        "clientWidth": 305,
+        "focusVisible": false,
+        "id": "",
+        "labels": [
+          "성별 조건혼성남여"
+        ],
+        "name": "성별 조건",
+        "options": [
+          {
+            "disabled": false,
+            "selected": true,
+            "text": "혼성",
+            "value": "성별 무관"
+          },
+          {
+            "disabled": false,
+            "selected": false,
+            "text": "남",
+            "value": "남"
+          },
+          {
+            "disabled": false,
+            "selected": false,
+            "text": "여",
+            "value": "여"
+          }
+        ],
+        "rect": {
+          "bottom": 1479.5,
+          "h": 44,
+          "right": 703,
+          "w": 307,
+          "x": 396,
+          "y": 1435.5
+        },
+        "scrollWidth": 305,
+        "value": "성별 무관"
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/admin/team-matches/new",
+    "utc": "2026-10-04T10:57:57.947Z",
+    "viewport": {
+      "dpr": 1,
+      "h": 757,
+      "w": 1182
+    }
+  }
+]

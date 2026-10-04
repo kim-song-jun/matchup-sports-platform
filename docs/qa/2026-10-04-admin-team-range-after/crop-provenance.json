@@ -1,0 +1,275 @@
+[
+  {
+    "name": "mobile-range-keyboard",
+    "proofIndex": 1,
+    "startedUTC": "2026-10-04T10:55:13.017Z",
+    "completedUTC": "2026-10-04T10:55:13.036Z",
+    "sha256": "1390ff2398a7ae15cdb0f709333afdb74baa2f96fd5459fd855328c21f17c308",
+    "sourceBasename": "mobile-range-keyboard.raw",
+    "sourceEncoding": "JPEG",
+    "sourceSize": [
+      402,
+      606
+    ],
+    "cropBounds": [
+      24,
+      84,
+      378,
+      592
+    ],
+    "output": "mobile-range-unset.png",
+    "outputSize": [
+      354,
+      508
+    ],
+    "outputSHA256": "2099daee360ade5fca06e2958cc221635c46127e0d576a7eb92ee31cd394499d",
+    "sourceSHA256": "1390ff2398a7ae15cdb0f709333afdb74baa2f96fd5459fd855328c21f17c308",
+    "proofUTC": "2026-10-04T10:55:13.011Z",
+    "sourceCropPixelEquality": true,
+    "sourceCaptureIsNative": false,
+    "collectorReviewedPixels": true
+  },
+  {
+    "name": "mobile-range-partial",
+    "proofIndex": 4,
+    "startedUTC": "2026-10-04T10:55:56.995Z",
+    "completedUTC": "2026-10-04T10:55:57.013Z",
+    "sha256": "87c9ac7643cd6ff36474fc374794e214b74842337eb0d28163c5d8598433c9e5",
+    "sourceBasename": "mobile-range-partial.raw",
+    "sourceEncoding": "JPEG",
+    "sourceSize": [
+      402,
+      606
+    ],
+    "cropBounds": [
+      24,
+      84,
+      378,
+      592
+    ],
+    "output": "mobile-range-partial.png",
+    "outputSize": [
+      354,
+      508
+    ],
+    "outputSHA256": "02ca33b7431c8dfebf9ea3aec25d673f64625ebe180442004919d5e660e4d0cf",
+    "sourceSHA256": "87c9ac7643cd6ff36474fc374794e214b74842337eb0d28163c5d8598433c9e5",
+    "proofUTC": "2026-10-04T10:55:56.993Z",
+    "sourceCropPixelEquality": true,
+    "sourceCaptureIsNative": false,
+    "collectorReviewedPixels": true
+  },
+  {
+    "name": "tablet-range-baseline",
+    "proofIndex": 14,
+    "startedUTC": "2026-10-04T10:56:50.110Z",
+    "completedUTC": "2026-10-04T10:56:50.143Z",
+    "sha256": "ca8dafac45ccd396b856c421b4cb9dd00b044936c9bdfdef2a440071e40ca53d",
+    "sourceBasename": "tablet-range-baseline.raw",
+    "sourceEncoding": "JPEG",
+    "sourceSize": [
+      788,
+      505
+    ],
+    "cropBounds": [
+      70,
+      59,
+      722,
+      458
+    ],
+    "output": "tablet-range-unset.png",
+    "outputSize": [
+      652,
+      399
+    ],
+    "outputSHA256": "e212b7418a54058021b1e4f1389aeb12066fb3cdf43c7b8b3bbdb099af73e730",
+    "sourceSHA256": "ca8dafac45ccd396b856c421b4cb9dd00b044936c9bdfdef2a440071e40ca53d",
+    "proofUTC": "2026-10-04T10:56:50.106Z",
+    "sourceCropPixelEquality": true,
+    "sourceCaptureIsNative": false,
+    "collectorReviewedPixels": true
+  },
+  {
+    "name": "tablet-range-partial",
+    "proofIndex": 17,
+    "startedUTC": "2026-10-04T10:56:50.838Z",
+    "completedUTC": "2026-10-04T10:56:50.865Z",
+    "sha256": "5e108dc337f60e93c942259509449055ccf9f1408529e95a24b04a0ea99e0a22",
+    "sourceBasename": "tablet-range-partial.raw",
+    "sourceEncoding": "JPEG",
+    "sourceSize": [
+      788,
+      505
+    ],
+    "cropBounds": [
+      70,
+      59,
+      722,
+      458
+    ],
+    "output": "tablet-range-partial.png",
+    "outputSize": [
+      652,
+      399
+    ],
+    "outputSHA256": "91bd0c3a1aa8588c5da78ffb6d192d7b55bf8bd9dc629270c9ba173ac3b55b40",
+    "sourceSHA256": "5e108dc337f60e93c942259509449055ccf9f1408529e95a24b04a0ea99e0a22",
+    "proofUTC": "2026-10-04T10:56:50.835Z",
+    "sourceCropPixelEquality": true,
+    "sourceCaptureIsNative": false,
+    "collectorReviewedPixels": true
+  },
+  {
+    "name": "desktop-range-baseline",
+    "proofIndex": 27,
+    "startedUTC": "2026-10-04T10:57:24.003Z",
+    "completedUTC": "2026-10-04T10:57:24.031Z",
+    "sha256": "57050e428c74f55e37d94a2560b3ab0bf97513604fabe0134be256798190b1d2",
+    "sourceBasename": "desktop-range-baseline.raw",
+    "sourceEncoding": "JPEG",
+    "sourceSize": [
+      1182,
+      757
+    ],
+    "cropBounds": [
+      384,
+      178,
+      1038,
+      583
+    ],
+    "output": "desktop-range-unset.png",
+    "outputSize": [
+      654,
+      405
+    ],
+    "outputSHA256": "4611c24ee01f4517fde1a881db3f5277e2bc43ec7fc9df91ce2f579a2db131f6",
+    "sourceSHA256": "57050e428c74f55e37d94a2560b3ab0bf97513604fabe0134be256798190b1d2",
+    "proofUTC": "2026-10-04T10:57:24.001Z",
+    "sourceCropPixelEquality": true,
+    "sourceCaptureIsNative": false,
+    "collectorReviewedPixels": true
+  },
+  {
+    "name": "desktop-range-partial",
+    "proofIndex": 30,
+    "startedUTC": "2026-10-04T10:57:24.877Z",
+    "completedUTC": "2026-10-04T10:57:24.908Z",
+    "sha256": "ae0b2d2c03d45dfa8974cfe54405e5eaf434e955f75bdb7e37888a0c6d9d708c",
+    "sourceBasename": "desktop-range-partial.raw",
+    "sourceEncoding": "JPEG",
+    "sourceSize": [
+      1182,
+      757
+    ],
+    "cropBounds": [
+      384,
+      178,
+      1038,
+      583
+    ],
+    "output": "desktop-range-partial.png",
+    "outputSize": [
+      654,
+      405
+    ],
+    "outputSHA256": "878d773d602dea08592c121d9d017b4a11f389dcf7c139c4dbb6d891d82d938c",
+    "sourceSHA256": "ae0b2d2c03d45dfa8974cfe54405e5eaf434e955f75bdb7e37888a0c6d9d708c",
+    "proofUTC": "2026-10-04T10:57:24.874Z",
+    "sourceCropPixelEquality": true,
+    "sourceCaptureIsNative": false,
+    "collectorReviewedPixels": true
+  },
+  {
+    "name": "mobile-gender-native",
+    "proofIndex": 8,
+    "kind": "native-desktop",
+    "startedUTC": "2026-10-04T10:56:22.764Z",
+    "completedUTC": "2026-10-04T10:56:22.804Z",
+    "sha256": "39a57a4534531ff23592cf542a202c7674f333b8da8e6ad0e827217abf39e3ff",
+    "sourceBasename": "mobile-gender-native.raw",
+    "sourceEncoding": "JPEG",
+    "sourceSize": [
+      1364,
+      1024
+    ],
+    "cropBounds": [
+      124,
+      750,
+      560,
+      910
+    ],
+    "output": "mobile-gender-native.png",
+    "outputSize": [
+      436,
+      160
+    ],
+    "outputSHA256": "f82bd35ab345e9df6bb09f491e0650d4170686b4a49a4b212092d9299b0db30c",
+    "sourceSHA256": "39a57a4534531ff23592cf542a202c7674f333b8da8e6ad0e827217abf39e3ff",
+    "proofUTC": "2026-10-04T10:56:07.952Z",
+    "sourceCropPixelEquality": true,
+    "sourceCaptureIsNative": true,
+    "collectorReviewedPixels": true
+  },
+  {
+    "name": "tablet-gender-native",
+    "proofIndex": 21,
+    "kind": "native-desktop",
+    "startedUTC": "2026-10-04T10:57:06.381Z",
+    "completedUTC": "2026-10-04T10:57:06.422Z",
+    "sha256": "4bc0ae4b847f99cb6a55c3b57276f50f7178767152be68bb804fc7c410800b9a",
+    "sourceBasename": "tablet-gender-native.raw",
+    "sourceEncoding": "JPEG",
+    "sourceSize": [
+      1364,
+      1024
+    ],
+    "cropBounds": [
+      200,
+      666,
+      680,
+      855
+    ],
+    "output": "tablet-gender-native.png",
+    "outputSize": [
+      480,
+      189
+    ],
+    "outputSHA256": "fe0274b46271fd4de20f9e3e12426ed1ab2efaa67b5689c93f9599287959bf54",
+    "sourceSHA256": "4bc0ae4b847f99cb6a55c3b57276f50f7178767152be68bb804fc7c410800b9a",
+    "proofUTC": "2026-10-04T10:57:06.201Z",
+    "sourceCropPixelEquality": true,
+    "sourceCaptureIsNative": true,
+    "collectorReviewedPixels": true
+  },
+  {
+    "name": "desktop-gender-native",
+    "proofIndex": 34,
+    "kind": "native-desktop",
+    "startedUTC": "2026-10-04T10:57:38.493Z",
+    "completedUTC": "2026-10-04T10:57:38.540Z",
+    "sha256": "7f12bd58deb18551547c9ead390f94142ad4ee5adcb752b858cec3b4e9e852ce",
+    "sourceBasename": "desktop-gender-native.raw",
+    "sourceEncoding": "JPEG",
+    "sourceSize": [
+      1364,
+      1024
+    ],
+    "cropBounds": [
+      480,
+      680,
+      803,
+      830
+    ],
+    "output": "desktop-gender-native.png",
+    "outputSize": [
+      323,
+      150
+    ],
+    "outputSHA256": "ebe253e237a5d9cd66b7aca1a3fff980feea3e2c703092b30729ca07d20c9167",
+    "sourceSHA256": "7f12bd58deb18551547c9ead390f94142ad4ee5adcb752b858cec3b4e9e852ce",
+    "proofUTC": "2026-10-04T10:57:38.288Z",
+    "sourceCropPixelEquality": true,
+    "sourceCaptureIsNative": true,
+    "collectorReviewedPixels": true
+  }
+]

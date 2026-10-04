@@ -1,0 +1,333 @@
+{
+  "verifiedUTC": "2026-10-04T11:04:37.982655+00:00",
+  "inputFiles": 23,
+  "inputUnchanged": true,
+  "inputChecksumsSHA256": "0860f5bf4693023647d6ff93a0e9ec342796ce87c0d9f109719b19056d09abf0",
+  "counts": {
+    "formDOM": 40,
+    "timestampedCollectorSuccessfulActionRecords": 46,
+    "fullAXExcerpts": 3,
+    "excludedEmptyAXDiff": 1,
+    "PNG": 9,
+    "pageCaptures": 6,
+    "nativeDesktopCaptures": 3,
+    "rectanglesChecked": 178,
+    "selectSnapshots": 120,
+    "selectedFocusedEndpoints": 36
+  },
+  "coverage": [
+    {
+      "width": {
+        "w": 402,
+        "h": 606,
+        "dpr": 1.25
+      },
+      "proofIndices": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12
+      ],
+      "gradeWidth": 162,
+      "gradeHeight": 48,
+      "genderHeight": 44,
+      "all12FocusedEndpointsInsideViewport": true,
+      "gradeResetUTC": "2026-10-04T10:56:07.564Z",
+      "genderRestoredUTC": "2026-10-04T10:56:23.269Z"
+    },
+    {
+      "width": {
+        "w": 788,
+        "h": 505,
+        "dpr": 1.5
+      },
+      "proofIndices": [
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20,
+        21,
+        22,
+        23,
+        24,
+        25
+      ],
+      "gradeWidth": 309.3333435058594,
+      "gradeHeight": 48,
+      "genderHeight": 44,
+      "all12FocusedEndpointsInsideViewport": true,
+      "gradeResetUTC": "2026-10-04T10:57:05.832Z",
+      "genderRestoredUTC": "2026-10-04T10:57:15.328Z"
+    },
+    {
+      "width": {
+        "w": 1182,
+        "h": 757,
+        "dpr": 1
+      },
+      "proofIndices": [
+        27,
+        28,
+        29,
+        30,
+        31,
+        32,
+        33,
+        34,
+        35,
+        36,
+        37,
+        38
+      ],
+      "gradeWidth": 309,
+      "gradeHeight": 48,
+      "genderHeight": 44,
+      "all12FocusedEndpointsInsideViewport": true,
+      "gradeResetUTC": "2026-10-04T10:57:25.408Z",
+      "genderRestoredUTC": "2026-10-04T10:57:39.173Z"
+    }
+  ],
+  "images": [
+    {
+      "file": "mobile-range-unset.png",
+      "sha256": "2099daee360ade5fca06e2958cc221635c46127e0d576a7eb92ee31cd394499d",
+      "size": [
+        354,
+        508
+      ],
+      "sourceRaster": [
+        402,
+        606
+      ],
+      "native": false,
+      "proofIndex": 1,
+      "DOMUTC": "2026-10-04T10:55:13.011Z",
+      "captureStartUTC": "2026-10-04T10:55:13.017Z",
+      "captureEndUTC": "2026-10-04T10:55:13.036Z",
+      "DOMToCaptureStartMs": 6.0
+    },
+    {
+      "file": "mobile-range-partial.png",
+      "sha256": "02ca33b7431c8dfebf9ea3aec25d673f64625ebe180442004919d5e660e4d0cf",
+      "size": [
+        354,
+        508
+      ],
+      "sourceRaster": [
+        402,
+        606
+      ],
+      "native": false,
+      "proofIndex": 4,
+      "DOMUTC": "2026-10-04T10:55:56.993Z",
+      "captureStartUTC": "2026-10-04T10:55:56.995Z",
+      "captureEndUTC": "2026-10-04T10:55:57.013Z",
+      "DOMToCaptureStartMs": 2.0
+    },
+    {
+      "file": "tablet-range-unset.png",
+      "sha256": "e212b7418a54058021b1e4f1389aeb12066fb3cdf43c7b8b3bbdb099af73e730",
+      "size": [
+        652,
+        399
+      ],
+      "sourceRaster": [
+        788,
+        505
+      ],
+      "native": false,
+      "proofIndex": 14,
+      "DOMUTC": "2026-10-04T10:56:50.106Z",
+      "captureStartUTC": "2026-10-04T10:56:50.110Z",
+      "captureEndUTC": "2026-10-04T10:56:50.143Z",
+      "DOMToCaptureStartMs": 4.0
+    },
+    {
+      "file": "tablet-range-partial.png",
+      "sha256": "91bd0c3a1aa8588c5da78ffb6d192d7b55bf8bd9dc629270c9ba173ac3b55b40",
+      "size": [
+        652,
+        399
+      ],
+      "sourceRaster": [
+        788,
+        505
+      ],
+      "native": false,
+      "proofIndex": 17,
+      "DOMUTC": "2026-10-04T10:56:50.835Z",
+      "captureStartUTC": "2026-10-04T10:56:50.838Z",
+      "captureEndUTC": "2026-10-04T10:56:50.865Z",
+      "DOMToCaptureStartMs": 3.0
+    },
+    {
+      "file": "desktop-range-unset.png",
+      "sha256": "4611c24ee01f4517fde1a881db3f5277e2bc43ec7fc9df91ce2f579a2db131f6",
+      "size": [
+        654,
+        405
+      ],
+      "sourceRaster": [
+        1182,
+        757
+      ],
+      "native": false,
+      "proofIndex": 27,
+      "DOMUTC": "2026-10-04T10:57:24.001Z",
+      "captureStartUTC": "2026-10-04T10:57:24.003Z",
+      "captureEndUTC": "2026-10-04T10:57:24.031Z",
+      "DOMToCaptureStartMs": 2.0
+    },
+    {
+      "file": "desktop-range-partial.png",
+      "sha256": "878d773d602dea08592c121d9d017b4a11f389dcf7c139c4dbb6d891d82d938c",
+      "size": [
+        654,
+        405
+      ],
+      "sourceRaster": [
+        1182,
+        757
+      ],
+      "native": false,
+      "proofIndex": 30,
+      "DOMUTC": "2026-10-04T10:57:24.874Z",
+      "captureStartUTC": "2026-10-04T10:57:24.877Z",
+      "captureEndUTC": "2026-10-04T10:57:24.908Z",
+      "DOMToCaptureStartMs": 3.0
+    },
+    {
+      "file": "mobile-gender-native.png",
+      "sha256": "f82bd35ab345e9df6bb09f491e0650d4170686b4a49a4b212092d9299b0db30c",
+      "size": [
+        436,
+        160
+      ],
+      "sourceRaster": [
+        1364,
+        1024
+      ],
+      "native": true,
+      "proofIndex": 8,
+      "DOMUTC": "2026-10-04T10:56:07.952Z",
+      "captureStartUTC": "2026-10-04T10:56:22.764Z",
+      "captureEndUTC": "2026-10-04T10:56:22.804Z",
+      "DOMToCaptureStartMs": 14812.0
+    },
+    {
+      "file": "tablet-gender-native.png",
+      "sha256": "fe0274b46271fd4de20f9e3e12426ed1ab2efaa67b5689c93f9599287959bf54",
+      "size": [
+        480,
+        189
+      ],
+      "sourceRaster": [
+        1364,
+        1024
+      ],
+      "native": true,
+      "proofIndex": 21,
+      "DOMUTC": "2026-10-04T10:57:06.201Z",
+      "captureStartUTC": "2026-10-04T10:57:06.381Z",
+      "captureEndUTC": "2026-10-04T10:57:06.422Z",
+      "DOMToCaptureStartMs": 180.0
+    },
+    {
+      "file": "desktop-gender-native.png",
+      "sha256": "ebe253e237a5d9cd66b7aca1a3fff980feea3e2c703092b30729ca07d20c9167",
+      "size": [
+        323,
+        150
+      ],
+      "sourceRaster": [
+        1364,
+        1024
+      ],
+      "native": true,
+      "proofIndex": 34,
+      "DOMUTC": "2026-10-04T10:57:38.288Z",
+      "captureStartUTC": "2026-10-04T10:57:38.493Z",
+      "captureEndUTC": "2026-10-04T10:57:38.540Z",
+      "DOMToCaptureStartMs": 205.0
+    }
+  ],
+  "firstNavigation": {
+    "label": "fresh navigation to observed administrator team-match list",
+    "startedUTC": "2026-10-04T10:54:33.016Z",
+    "completedUTC": "2026-10-04T10:54:33.575Z",
+    "url": "https://alpha.teameet.co.kr/admin/team-matches"
+  },
+  "firstExit": {
+    "createFormHeadingPresent": false,
+    "createLink": "/admin/team-matches/new",
+    "heading": "팀매치 관리",
+    "url": "https://alpha.teameet.co.kr/admin/team-matches",
+    "utc": "2026-10-04T10:57:57.562Z",
+    "viewport": {
+      "dpr": 1,
+      "h": 757,
+      "w": 1182
+    }
+  },
+  "reentryDOMUTC": "2026-10-04T10:57:57.947Z",
+  "finalExit": {
+    "createFormHeadingPresent": false,
+    "createLink": "/admin/team-matches/new",
+    "heading": "팀매치 관리",
+    "url": "https://alpha.teameet.co.kr/admin/team-matches",
+    "utc": "2026-10-04T10:57:58.248Z",
+    "viewport": {
+      "dpr": 1,
+      "h": 757,
+      "w": 1182
+    }
+  },
+  "fullBlankFieldSnapshots": [
+    0,
+    1,
+    39
+  ],
+  "numericFields": "Two number inputs have valueLength1, not blank. Other recorded text/textarea/datetime fields have valueLength0; omitted fields in compact proof rows are not inferred.",
+  "sourceGitBlobsMatched": [
+    {
+      "path": "apps/v1_web/src/app/admin/team-matches/new/page.tsx",
+      "sha": "aead0aaae5f660afba59d5321ab657803b1bcd37"
+    },
+    {
+      "path": "apps/v1_web/src/components/team-matches/team-match-level-range-field.tsx",
+      "sha": "f8588ccb5bbfcf6d72bd68cf7c626c27234c68e9"
+    },
+    {
+      "path": "apps/v1_web/src/lib/v1-status-labels.ts",
+      "sha": "d138ae2619e142235b4b01acc78d2f4eca784aaa"
+    }
+  ],
+  "workflow": {
+    "sha": "951a67e3423dec502697f8bab2d78696d9374cc5",
+    "status": "completed",
+    "conclusion": "success",
+    "updatedUTC": "2026-10-04T09:49:29Z",
+    "url": "https://github.com/kim-song-jun/matchup-sports-platform/actions/runs/37192728828"
+  },
+  "runtimeServingSHA": "unknown",
+  "privateOriginalsRead": false,
+  "sourceCropEquality": "Collector attestation only; publisher inspected every supplied safe PNG.",
+  "limitations": [
+    "46 records are completed-success collector ledger entries; raw method arguments/results are not embedded. Some entries contain multiple key presses; they are not46 key events.",
+    "Native menu photos follow pre-Space DOM snapshots and precede Escape; collapsed full AX excerpts are later and do not prove expanded popup semantics.",
+    "40 DOM snapshots include initial/reentry and resize states; only36 selected focus endpoints establish within-viewport rectangles.",
+    "Admin useState and isolated final mutation/upload paths are static source findings, not network audits or consumer localStorage behavior.",
+    "Explicit restoration preceded Back and link reentry; dirty-draft discard, browser reload persistence, existing edit, actual creation and full screen-reader speech remain untested."
+  ]
+}

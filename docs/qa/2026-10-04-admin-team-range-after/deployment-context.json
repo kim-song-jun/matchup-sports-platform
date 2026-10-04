@@ -1,0 +1,23 @@
+{
+  "reportedDeployment": {
+    "sha": "951a67e3423dec502697f8bab2d78696d9374cc5",
+    "version": "1.1.5-alpha.20261004.g951a67e3423d",
+    "run": "37192728828",
+    "healthyUTC": "2026-10-04T09:49:13.916Z",
+    "successUTC": "2026-10-04T09:49:29Z"
+  },
+  "runtimeServingIdentity": "unknown; no runtime identity exposed in collected DOM",
+  "firstFreshNavigation": {
+    "label": "fresh navigation to observed administrator team-match list",
+    "startedUTC": "2026-10-04T10:54:33.016Z",
+    "completedUTC": "2026-10-04T10:54:33.575Z",
+    "url": "https://alpha.teameet.co.kr/admin/team-matches"
+  },
+  "createEntry": {
+    "label": "click observed 모집 만들기 link",
+    "startedUTC": "2026-10-04T10:54:46.249Z",
+    "completedUTC": "2026-10-04T10:54:46.362Z",
+    "url": "https://alpha.teameet.co.kr/admin/team-matches/new"
+  },
+  "attribution": "Deployment context supplied by deployment coordination; this packet records browser observations after that reported release without claiming a proven serving SHA."
+}

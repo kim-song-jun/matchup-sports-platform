@@ -1,0 +1,12 @@
+{
+  "createFormHeadingPresent": false,
+  "createLink": "/admin/team-matches/new",
+  "heading": "팀매치 관리",
+  "url": "https://alpha.teameet.co.kr/admin/team-matches",
+  "utc": "2026-10-04T10:57:57.562Z",
+  "viewport": {
+    "dpr": 1,
+    "h": 757,
+    "w": 1182
+  }
+}

@@ -1,0 +1,1784 @@
+[
+  {
+    "label": "tablet loaded free detail before scrolling, not visible-cost proof",
+    "action": [
+      {
+        "disabled": true,
+        "rect": {
+          "bottom": 0,
+          "h": 0,
+          "right": 0,
+          "w": 0,
+          "x": 0,
+          "y": 0
+        },
+        "text": "신청 불가"
+      },
+      {
+        "disabled": true,
+        "rect": {
+          "bottom": 482.6666870117187,
+          "h": 50,
+          "right": 674,
+          "w": 560,
+          "x": 114,
+          "y": 432.6666870117187
+        },
+        "text": "신청 불가"
+      }
+    ],
+    "back": [
+      {
+        "href": "/matches",
+        "rect": {
+          "bottom": 0,
+          "h": 0,
+          "right": 0,
+          "w": 0,
+          "x": 0,
+          "y": 0
+        }
+      },
+      {
+        "href": "/matches",
+        "rect": {
+          "bottom": 56,
+          "h": 44,
+          "right": 150,
+          "w": 44,
+          "x": 106,
+          "y": 12
+        }
+      }
+    ],
+    "documentScrollWidth": 788,
+    "feeRows": [
+      {
+        "children": [
+          {
+            "clientHeight": 0,
+            "clientWidth": 0,
+            "rect": {
+              "bottom": 0,
+              "h": 0,
+              "right": 0,
+              "w": 0,
+              "x": 0,
+              "y": 0
+            },
+            "scrollHeight": 0,
+            "scrollWidth": 0,
+            "style": {
+              "fontSize": "12px",
+              "lineHeight": "16px",
+              "overflow": "visible",
+              "whiteSpace": "normal",
+              "wordBreak": "normal"
+            },
+            "tag": "DIV",
+            "text": "참가비",
+            "withinViewport": false
+          },
+          {
+            "clientHeight": 0,
+            "clientWidth": 0,
+            "rect": {
+              "bottom": 0,
+              "h": 0,
+              "right": 0,
+              "w": 0,
+              "x": 0,
+              "y": 0
+            },
+            "scrollHeight": 0,
+            "scrollWidth": 0,
+            "style": {
+              "fontSize": "16px",
+              "lineHeight": "24px",
+              "overflow": "visible",
+              "whiteSpace": "normal",
+              "wordBreak": "normal"
+            },
+            "tag": "DIV",
+            "text": "무료",
+            "withinViewport": false
+          }
+        ],
+        "next": {
+          "rect": {
+            "bottom": 0,
+            "h": 0,
+            "right": 0,
+            "w": 0,
+            "x": 0,
+            "y": 0
+          },
+          "tag": "DIV"
+        },
+        "previous": {
+          "clientHeight": 0,
+          "clientWidth": 0,
+          "rect": {
+            "bottom": 0,
+            "h": 0,
+            "right": 0,
+            "w": 0,
+            "x": 0,
+            "y": 0
+          },
+          "scrollHeight": 0,
+          "scrollWidth": 0,
+          "style": {
+            "fontSize": "16px",
+            "lineHeight": "24px",
+            "overflow": "visible",
+            "whiteSpace": "normal",
+            "wordBreak": "normal"
+          },
+          "tag": "DIV",
+          "text": "성별 조건혼성",
+          "withinViewport": false
+        },
+        "row": {
+          "clientHeight": 0,
+          "clientWidth": 0,
+          "rect": {
+            "bottom": 0,
+            "h": 0,
+            "right": 0,
+            "w": 0,
+            "x": 0,
+            "y": 0
+          },
+          "scrollHeight": 0,
+          "scrollWidth": 0,
+          "style": {
+            "fontSize": "16px",
+            "lineHeight": "24px",
+            "overflow": "visible",
+            "whiteSpace": "normal",
+            "wordBreak": "normal"
+          },
+          "tag": "DIV",
+          "text": "참가비무료",
+          "withinViewport": false
+        }
+      },
+      {
+        "children": [
+          {
+            "clientHeight": 16,
+            "clientWidth": 31,
+            "rect": {
+              "bottom": 755.6666870117188,
+              "h": 16,
+              "right": 145.1145839691162,
+              "w": 31.11458396911621,
+              "x": 114,
+              "y": 739.6666870117188
+            },
+            "scrollHeight": 16,
+            "scrollWidth": 31,
+            "style": {
+              "fontSize": "12px",
+              "lineHeight": "16px",
+              "overflow": "visible",
+              "whiteSpace": "normal",
+              "wordBreak": "normal"
+            },
+            "tag": "DIV",
+            "text": "참가비",
+            "withinViewport": false
+          },
+          {
+            "clientHeight": 24,
+            "clientWidth": 26,
+            "rect": {
+              "bottom": 759.6666870117188,
+              "h": 24,
+              "right": 674,
+              "w": 25.9375,
+              "x": 648.0625,
+              "y": 735.6666870117188
+            },
+            "scrollHeight": 24,
+            "scrollWidth": 26,
+            "style": {
+              "fontSize": "16px",
+              "lineHeight": "24px",
+              "overflow": "visible",
+              "whiteSpace": "normal",
+              "wordBreak": "normal"
+            },
+            "tag": "DIV",
+            "text": "무료",
+            "withinViewport": false
+          }
+        ],
+        "next": {
+          "rect": {
+            "bottom": 865.3333358764648,
+            "h": 73.33333587646484,
+            "right": 674,
+            "w": 560,
+            "x": 114,
+            "y": 792
+          },
+          "tag": "DIV"
+        },
+        "previous": {
+          "clientHeight": 55,
+          "clientWidth": 560,
+          "rect": {
+            "bottom": 720,
+            "h": 56,
+            "right": 674,
+            "w": 560,
+            "x": 114,
+            "y": 664
+          },
+          "scrollHeight": 55,
+          "scrollWidth": 560,
+          "style": {
+            "fontSize": "16px",
+            "lineHeight": "24px",
+            "overflow": "visible",
+            "whiteSpace": "normal",
+            "wordBreak": "normal"
+          },
+          "tag": "DIV",
+          "text": "성별 조건혼성",
+          "withinViewport": false
+        },
+        "row": {
+          "clientHeight": 55,
+          "clientWidth": 560,
+          "rect": {
+            "bottom": 776,
+            "h": 56,
+            "right": 674,
+            "w": 560,
+            "x": 114,
+            "y": 720
+          },
+          "scrollHeight": 55,
+          "scrollWidth": 560,
+          "style": {
+            "fontSize": "16px",
+            "lineHeight": "24px",
+            "overflow": "visible",
+            "whiteSpace": "normal",
+            "wordBreak": "normal"
+          },
+          "tag": "DIV",
+          "text": "참가비무료",
+          "withinViewport": false
+        }
+      }
+    ],
+    "mainRect": {
+      "bottom": 505,
+      "h": 505,
+      "right": 694,
+      "w": 600,
+      "x": 94,
+      "y": 0
+    },
+    "scroll": {
+      "main": 0,
+      "windowY": 0
+    },
+    "url": "https://alpha.teameet.co.kr/matches/{fixture-73d6000a66c3}",
+    "utc": "2026-10-04T13:22:21.913Z",
+    "viewport": {
+      "dpr": 1.5,
+      "h": 505,
+      "w": 788
+    }
+  },
+  {
+    "label": "tablet free cost row after native scroll",
+    "action": [
+      {
+        "disabled": true,
+        "rect": {
+          "bottom": 0,
+          "h": 0,
+          "right": 0,
+          "w": 0,
+          "x": 0,
+          "y": 0
+        },
+        "text": "신청 불가"
+      },
+      {
+        "disabled": true,
+        "rect": {
+          "bottom": 482.6666870117187,
+          "h": 50,
+          "right": 674,
+          "w": 560,
+          "x": 114,
+          "y": 432.6666870117187
+        },
+        "text": "신청 불가"
+      }
+    ],
+    "back": [
+      {
+        "href": "/matches",
+        "rect": {
+          "bottom": 0,
+          "h": 0,
+          "right": 0,
+          "w": 0,
+          "x": 0,
+          "y": 0
+        }
+      },
+      {
+        "href": "/matches",
+        "rect": {
+          "bottom": -406.6666870117187,
+          "h": 44,
+          "right": 150,
+          "w": 44,
+          "x": 106,
+          "y": -450.6666870117187
+        }
+      }
+    ],
+    "documentScrollWidth": 788,
+    "feeRows": [
+      {
+        "children": [
+          {
+            "clientHeight": 0,
+            "clientWidth": 0,
+            "rect": {
+              "bottom": 0,
+              "h": 0,
+              "right": 0,
+              "w": 0,
+              "x": 0,
+              "y": 0
+            },
+            "scrollHeight": 0,
+            "scrollWidth": 0,
+            "style": {
+              "fontSize": "12px",
+              "lineHeight": "16px",
+              "overflow": "visible",
+              "whiteSpace": "normal",
+              "wordBreak": "normal"
+            },
+            "tag": "DIV",
+            "text": "참가비",
+            "withinViewport": false
+          },
+          {
+            "clientHeight": 0,
+            "clientWidth": 0,
+            "rect": {
+              "bottom": 0,
+              "h": 0,
+              "right": 0,
+              "w": 0,
+              "x": 0,
+              "y": 0
+            },
+            "scrollHeight": 0,
+            "scrollWidth": 0,
+            "style": {
+              "fontSize": "16px",
+              "lineHeight": "24px",
+              "overflow": "visible",
+              "whiteSpace": "normal",
+              "wordBreak": "normal"
+            },
+            "tag": "DIV",
+            "text": "무료",
+            "withinViewport": false
+          }
+        ],
+        "next": {
+          "rect": {
+            "bottom": 0,
+            "h": 0,
+            "right": 0,
+            "w": 0,
+            "x": 0,
+            "y": 0
+          },
+          "tag": "DIV"
+        },
+        "previous": {
+          "clientHeight": 0,
+          "clientWidth": 0,
+          "rect": {
+            "bottom": 0,
+            "h": 0,
+            "right": 0,
+            "w": 0,
+            "x": 0,
+            "y": 0
+          },
+          "scrollHeight": 0,
+          "scrollWidth": 0,
+          "style": {
+            "fontSize": "16px",
+            "lineHeight": "24px",
+            "overflow": "visible",
+            "whiteSpace": "normal",
+            "wordBreak": "normal"
+          },
+          "tag": "DIV",
+          "text": "성별 조건혼성",
+          "withinViewport": false
+        },
+        "row": {
+          "clientHeight": 0,
+          "clientWidth": 0,
+          "rect": {
+            "bottom": 0,
+            "h": 0,
+            "right": 0,
+            "w": 0,
+            "x": 0,
+            "y": 0
+          },
+          "scrollHeight": 0,
+          "scrollWidth": 0,
+          "style": {
+            "fontSize": "16px",
+            "lineHeight": "24px",
+            "overflow": "visible",
+            "whiteSpace": "normal",
+            "wordBreak": "normal"
+          },
+          "tag": "DIV",
+          "text": "참가비무료",
+          "withinViewport": false
+        }
+      },
+      {
+        "children": [
+          {
+            "clientHeight": 16,
+            "clientWidth": 31,
+            "rect": {
+              "bottom": 293,
+              "h": 16,
+              "right": 145.1145839691162,
+              "w": 31.11458396911621,
+              "x": 114,
+              "y": 277
+            },
+            "scrollHeight": 16,
+            "scrollWidth": 31,
+            "style": {
+              "fontSize": "12px",
+              "lineHeight": "16px",
+              "overflow": "visible",
+              "whiteSpace": "normal",
+              "wordBreak": "normal"
+            },
+            "tag": "DIV",
+            "text": "참가비",
+            "withinViewport": true
+          },
+          {
+            "clientHeight": 24,
+            "clientWidth": 26,
+            "rect": {
+              "bottom": 297,
+              "h": 24,
+              "right": 674,
+              "w": 25.9375,
+              "x": 648.0625,
+              "y": 273
+            },
+            "scrollHeight": 24,
+            "scrollWidth": 26,
+            "style": {
+              "fontSize": "16px",
+              "lineHeight": "24px",
+              "overflow": "visible",
+              "whiteSpace": "normal",
+              "wordBreak": "normal"
+            },
+            "tag": "DIV",
+            "text": "무료",
+            "withinViewport": true
+          }
+        ],
+        "next": {
+          "rect": {
+            "bottom": 402.6666793823242,
+            "h": 73.33333587646484,
+            "right": 674,
+            "w": 560,
+            "x": 114,
+            "y": 329.3333435058594
+          },
+          "tag": "DIV"
+        },
+        "previous": {
+          "clientHeight": 55,
+          "clientWidth": 560,
+          "rect": {
+            "bottom": 257.3333435058594,
+            "h": 56,
+            "right": 674,
+            "w": 560,
+            "x": 114,
+            "y": 201.33334350585935
+          },
+          "scrollHeight": 55,
+          "scrollWidth": 560,
+          "style": {
+            "fontSize": "16px",
+            "lineHeight": "24px",
+            "overflow": "visible",
+            "whiteSpace": "normal",
+            "wordBreak": "normal"
+          },
+          "tag": "DIV",
+          "text": "성별 조건혼성",
+          "withinViewport": true
+        },
+        "row": {
+          "clientHeight": 55,
+          "clientWidth": 560,
+          "rect": {
+            "bottom": 313.3333435058594,
+            "h": 56,
+            "right": 674,
+            "w": 560,
+            "x": 114,
+            "y": 257.3333435058594
+          },
+          "scrollHeight": 55,
+          "scrollWidth": 560,
+          "style": {
+            "fontSize": "16px",
+            "lineHeight": "24px",
+            "overflow": "visible",
+            "whiteSpace": "normal",
+            "wordBreak": "normal"
+          },
+          "tag": "DIV",
+          "text": "참가비무료",
+          "withinViewport": true
+        }
+      }
+    ],
+    "mainRect": {
+      "bottom": 505,
+      "h": 505,
+      "right": 694,
+      "w": 600,
+      "x": 94,
+      "y": 0
+    },
+    "scroll": {
+      "main": 462.6666564941406,
+      "windowY": 0
+    },
+    "url": "https://alpha.teameet.co.kr/matches/{fixture-73d6000a66c3}",
+    "utc": "2026-10-04T13:22:40.646Z",
+    "viewport": {
+      "dpr": 1.5,
+      "h": 505,
+      "w": 788
+    }
+  },
+  {
+    "label": "tablet settled visible free-cost row",
+    "action": [
+      {
+        "disabled": true,
+        "rect": {
+          "bottom": 0,
+          "h": 0,
+          "right": 0,
+          "w": 0,
+          "x": 0,
+          "y": 0
+        },
+        "text": "신청 불가"
+      },
+      {
+        "disabled": true,
+        "rect": {
+          "bottom": 482.6666870117187,
+          "h": 50,
+          "right": 674,
+          "w": 560,
+          "x": 114,
+          "y": 432.6666870117187
+        },
+        "text": "신청 불가"
+      }
+    ],
+    "back": [
+      {
+        "href": "/matches",
+        "rect": {
+          "bottom": 0,
+          "h": 0,
+          "right": 0,
+          "w": 0,
+          "x": 0,
+          "y": 0
+        }
+      },
+      {
+        "href": "/matches",
+        "rect": {
+          "bottom": -424,
+          "h": 44,
+          "right": 150,
+          "w": 44,
+          "x": 106,
+          "y": -468
+        }
+      }
+    ],
+    "documentScrollWidth": 788,
+    "feeRows": [
+      {
+        "children": [
+          {
+            "clientHeight": 0,
+            "clientWidth": 0,
+            "rect": {
+              "bottom": 0,
+              "h": 0,
+              "right": 0,
+              "w": 0,
+              "x": 0,
+              "y": 0
+            },
+            "scrollHeight": 0,
+            "scrollWidth": 0,
+            "style": {
+              "fontSize": "12px",
+              "lineHeight": "16px",
+              "overflow": "visible",
+              "whiteSpace": "normal",
+              "wordBreak": "normal"
+            },
+            "tag": "DIV",
+            "text": "참가비",
+            "withinViewport": false
+          },
+          {
+            "clientHeight": 0,
+            "clientWidth": 0,
+            "rect": {
+              "bottom": 0,
+              "h": 0,
+              "right": 0,
+              "w": 0,
+              "x": 0,
+              "y": 0
+            },
+            "scrollHeight": 0,
+            "scrollWidth": 0,
+            "style": {
+              "fontSize": "16px",
+              "lineHeight": "24px",
+              "overflow": "visible",
+              "whiteSpace": "normal",
+              "wordBreak": "normal"
+            },
+            "tag": "DIV",
+            "text": "무료",
+            "withinViewport": false
+          }
+        ],
+        "next": {
+          "rect": {
+            "bottom": 0,
+            "h": 0,
+            "right": 0,
+            "w": 0,
+            "x": 0,
+            "y": 0
+          },
+          "tag": "DIV"
+        },
+        "previous": {
+          "clientHeight": 0,
+          "clientWidth": 0,
+          "rect": {
+            "bottom": 0,
+            "h": 0,
+            "right": 0,
+            "w": 0,
+            "x": 0,
+            "y": 0
+          },
+          "scrollHeight": 0,
+          "scrollWidth": 0,
+          "style": {
+            "fontSize": "16px",
+            "lineHeight": "24px",
+            "overflow": "visible",
+            "whiteSpace": "normal",
+            "wordBreak": "normal"
+          },
+          "tag": "DIV",
+          "text": "성별 조건혼성",
+          "withinViewport": false
+        },
+        "row": {
+          "clientHeight": 0,
+          "clientWidth": 0,
+          "rect": {
+            "bottom": 0,
+            "h": 0,
+            "right": 0,
+            "w": 0,
+            "x": 0,
+            "y": 0
+          },
+          "scrollHeight": 0,
+          "scrollWidth": 0,
+          "style": {
+            "fontSize": "16px",
+            "lineHeight": "24px",
+            "overflow": "visible",
+            "whiteSpace": "normal",
+            "wordBreak": "normal"
+          },
+          "tag": "DIV",
+          "text": "참가비무료",
+          "withinViewport": false
+        }
+      },
+      {
+        "children": [
+          {
+            "clientHeight": 16,
+            "clientWidth": 31,
+            "rect": {
+              "bottom": 275.66668701171875,
+              "h": 16,
+              "right": 145.1145839691162,
+              "w": 31.11458396911621,
+              "x": 114,
+              "y": 259.66668701171875
+            },
+            "scrollHeight": 16,
+            "scrollWidth": 31,
+            "style": {
+              "fontSize": "12px",
+              "lineHeight": "16px",
+              "overflow": "visible",
+              "whiteSpace": "normal",
+              "wordBreak": "normal"
+            },
+            "tag": "DIV",
+            "text": "참가비",
+            "withinViewport": true
+          },
+          {
+            "clientHeight": 24,
+            "clientWidth": 26,
+            "rect": {
+              "bottom": 279.6666717529297,
+              "h": 24,
+              "right": 674,
+              "w": 25.9375,
+              "x": 648.0625,
+              "y": 255.6666717529297
+            },
+            "scrollHeight": 24,
+            "scrollWidth": 26,
+            "style": {
+              "fontSize": "16px",
+              "lineHeight": "24px",
+              "overflow": "visible",
+              "whiteSpace": "normal",
+              "wordBreak": "normal"
+            },
+            "tag": "DIV",
+            "text": "무료",
+            "withinViewport": true
+          }
+        ],
+        "next": {
+          "rect": {
+            "bottom": 385.3333358764648,
+            "h": 73.33333587646484,
+            "right": 674,
+            "w": 560,
+            "x": 114,
+            "y": 312
+          },
+          "tag": "DIV"
+        },
+        "previous": {
+          "clientHeight": 55,
+          "clientWidth": 560,
+          "rect": {
+            "bottom": 240,
+            "h": 56,
+            "right": 674,
+            "w": 560,
+            "x": 114,
+            "y": 184
+          },
+          "scrollHeight": 55,
+          "scrollWidth": 560,
+          "style": {
+            "fontSize": "16px",
+            "lineHeight": "24px",
+            "overflow": "visible",
+            "whiteSpace": "normal",
+            "wordBreak": "normal"
+          },
+          "tag": "DIV",
+          "text": "성별 조건혼성",
+          "withinViewport": true
+        },
+        "row": {
+          "clientHeight": 55,
+          "clientWidth": 560,
+          "rect": {
+            "bottom": 296,
+            "h": 56,
+            "right": 674,
+            "w": 560,
+            "x": 114,
+            "y": 240
+          },
+          "scrollHeight": 55,
+          "scrollWidth": 560,
+          "style": {
+            "fontSize": "16px",
+            "lineHeight": "24px",
+            "overflow": "visible",
+            "whiteSpace": "normal",
+            "wordBreak": "normal"
+          },
+          "tag": "DIV",
+          "text": "참가비무료",
+          "withinViewport": true
+        }
+      }
+    ],
+    "mainRect": {
+      "bottom": 505,
+      "h": 505,
+      "right": 694,
+      "w": 600,
+      "x": 94,
+      "y": 0
+    },
+    "scroll": {
+      "main": 480,
+      "windowY": 0
+    },
+    "url": "https://alpha.teameet.co.kr/matches/{fixture-73d6000a66c3}",
+    "utc": "2026-10-04T13:22:53.151Z",
+    "viewport": {
+      "dpr": 1.5,
+      "h": 505,
+      "w": 788
+    }
+  },
+  {
+    "label": "desktop same free fixture after native zoom reset",
+    "action": [
+      {
+        "disabled": true,
+        "rect": {
+          "bottom": 616,
+          "h": 50,
+          "right": 1106,
+          "w": 318,
+          "x": 788,
+          "y": 566
+        },
+        "text": "신청 불가"
+      },
+      {
+        "disabled": true,
+        "rect": {
+          "bottom": 0,
+          "h": 0,
+          "right": 0,
+          "w": 0,
+          "x": 0,
+          "y": 0
+        },
+        "text": "신청 불가"
+      }
+    ],
+    "back": [
+      {
+        "href": "/matches",
+        "rect": {
+          "bottom": 132,
+          "h": 40,
+          "right": 95,
+          "w": 40,
+          "x": 55,
+          "y": 92
+        }
+      },
+      {
+        "href": "/matches",
+        "rect": {
+          "bottom": 0,
+          "h": 0,
+          "right": 0,
+          "w": 0,
+          "x": 0,
+          "y": 0
+        }
+      }
+    ],
+    "documentScrollWidth": 1182,
+    "feeRows": [
+      {
+        "children": [
+          {
+            "clientHeight": 16,
+            "clientWidth": 120,
+            "rect": {
+              "bottom": 893.5,
+              "h": 16,
+              "right": 175,
+              "w": 120,
+              "x": 55,
+              "y": 877.5
+            },
+            "scrollHeight": 16,
+            "scrollWidth": 120,
+            "style": {
+              "fontSize": "12px",
+              "lineHeight": "16px",
+              "overflow": "visible",
+              "whiteSpace": "normal",
+              "wordBreak": "normal"
+            },
+            "tag": "DIV",
+            "text": "참가비",
+            "withinViewport": false
+          },
+          {
+            "clientHeight": 24,
+            "clientWidth": 26,
+            "rect": {
+              "bottom": 897.5,
+              "h": 24,
+              "right": 735,
+              "w": 25.9375,
+              "x": 709.0625,
+              "y": 873.5
+            },
+            "scrollHeight": 24,
+            "scrollWidth": 26,
+            "style": {
+              "fontSize": "16px",
+              "lineHeight": "24px",
+              "overflow": "visible",
+              "whiteSpace": "normal",
+              "wordBreak": "normal"
+            },
+            "tag": "DIV",
+            "text": "무료",
+            "withinViewport": false
+          }
+        ],
+        "next": {
+          "rect": {
+            "bottom": 1002,
+            "h": 74,
+            "right": 735,
+            "w": 680,
+            "x": 55,
+            "y": 928
+          },
+          "tag": "DIV"
+        },
+        "previous": {
+          "clientHeight": 51,
+          "clientWidth": 680,
+          "rect": {
+            "bottom": 860,
+            "h": 52,
+            "right": 735,
+            "w": 680,
+            "x": 55,
+            "y": 808
+          },
+          "scrollHeight": 51,
+          "scrollWidth": 680,
+          "style": {
+            "fontSize": "16px",
+            "lineHeight": "24px",
+            "overflow": "visible",
+            "whiteSpace": "normal",
+            "wordBreak": "normal"
+          },
+          "tag": "DIV",
+          "text": "성별 조건혼성",
+          "withinViewport": false
+        },
+        "row": {
+          "clientHeight": 51,
+          "clientWidth": 680,
+          "rect": {
+            "bottom": 912,
+            "h": 52,
+            "right": 735,
+            "w": 680,
+            "x": 55,
+            "y": 860
+          },
+          "scrollHeight": 51,
+          "scrollWidth": 680,
+          "style": {
+            "fontSize": "16px",
+            "lineHeight": "24px",
+            "overflow": "visible",
+            "whiteSpace": "normal",
+            "wordBreak": "normal"
+          },
+          "tag": "DIV",
+          "text": "참가비무료",
+          "withinViewport": false
+        }
+      },
+      {
+        "children": [
+          {
+            "clientHeight": 0,
+            "clientWidth": 0,
+            "rect": {
+              "bottom": 0,
+              "h": 0,
+              "right": 0,
+              "w": 0,
+              "x": 0,
+              "y": 0
+            },
+            "scrollHeight": 0,
+            "scrollWidth": 0,
+            "style": {
+              "fontSize": "12px",
+              "lineHeight": "16px",
+              "overflow": "visible",
+              "whiteSpace": "normal",
+              "wordBreak": "normal"
+            },
+            "tag": "DIV",
+            "text": "참가비",
+            "withinViewport": false
+          },
+          {
+            "clientHeight": 0,
+            "clientWidth": 0,
+            "rect": {
+              "bottom": 0,
+              "h": 0,
+              "right": 0,
+              "w": 0,
+              "x": 0,
+              "y": 0
+            },
+            "scrollHeight": 0,
+            "scrollWidth": 0,
+            "style": {
+              "fontSize": "16px",
+              "lineHeight": "24px",
+              "overflow": "visible",
+              "whiteSpace": "normal",
+              "wordBreak": "normal"
+            },
+            "tag": "DIV",
+            "text": "무료",
+            "withinViewport": false
+          }
+        ],
+        "next": {
+          "rect": {
+            "bottom": 0,
+            "h": 0,
+            "right": 0,
+            "w": 0,
+            "x": 0,
+            "y": 0
+          },
+          "tag": "DIV"
+        },
+        "previous": {
+          "clientHeight": 0,
+          "clientWidth": 0,
+          "rect": {
+            "bottom": 0,
+            "h": 0,
+            "right": 0,
+            "w": 0,
+            "x": 0,
+            "y": 0
+          },
+          "scrollHeight": 0,
+          "scrollWidth": 0,
+          "style": {
+            "fontSize": "16px",
+            "lineHeight": "24px",
+            "overflow": "visible",
+            "whiteSpace": "normal",
+            "wordBreak": "normal"
+          },
+          "tag": "DIV",
+          "text": "성별 조건혼성",
+          "withinViewport": false
+        },
+        "row": {
+          "clientHeight": 0,
+          "clientWidth": 0,
+          "rect": {
+            "bottom": 0,
+            "h": 0,
+            "right": 0,
+            "w": 0,
+            "x": 0,
+            "y": 0
+          },
+          "scrollHeight": 0,
+          "scrollWidth": 0,
+          "style": {
+            "fontSize": "16px",
+            "lineHeight": "24px",
+            "overflow": "visible",
+            "whiteSpace": "normal",
+            "wordBreak": "normal"
+          },
+          "tag": "DIV",
+          "text": "참가비무료",
+          "withinViewport": false
+        }
+      }
+    ],
+    "mainRect": {
+      "bottom": 1310.25,
+      "h": 1246.25,
+      "right": 1151,
+      "w": 1120,
+      "x": 31,
+      "y": 64
+    },
+    "scroll": {
+      "main": 0,
+      "windowY": 0
+    },
+    "url": "https://alpha.teameet.co.kr/matches/{fixture-73d6000a66c3}",
+    "utc": "2026-10-04T13:22:53.458Z",
+    "viewport": {
+      "dpr": 1,
+      "h": 757,
+      "w": 1182
+    }
+  },
+  {
+    "label": "desktop first scroll endpoint, settle check follows",
+    "action": [
+      {
+        "disabled": true,
+        "rect": {
+          "bottom": 200,
+          "h": 50,
+          "right": 1106,
+          "w": 318,
+          "x": 788,
+          "y": 150
+        },
+        "text": "신청 불가"
+      },
+      {
+        "disabled": true,
+        "rect": {
+          "bottom": 0,
+          "h": 0,
+          "right": 0,
+          "w": 0,
+          "x": 0,
+          "y": 0
+        },
+        "text": "신청 불가"
+      }
+    ],
+    "back": [
+      {
+        "href": "/matches",
+        "rect": {
+          "bottom": -467,
+          "h": 40,
+          "right": 95,
+          "w": 40,
+          "x": 55,
+          "y": -507
+        }
+      },
+      {
+        "href": "/matches",
+        "rect": {
+          "bottom": 0,
+          "h": 0,
+          "right": 0,
+          "w": 0,
+          "x": 0,
+          "y": 0
+        }
+      }
+    ],
+    "documentScrollWidth": 1182,
+    "feeRows": [
+      {
+        "children": [
+          {
+            "clientHeight": 16,
+            "clientWidth": 120,
+            "rect": {
+              "bottom": 294.5,
+              "h": 16,
+              "right": 175,
+              "w": 120,
+              "x": 55,
+              "y": 278.5
+            },
+            "scrollHeight": 16,
+            "scrollWidth": 120,
+            "style": {
+              "fontSize": "12px",
+              "lineHeight": "16px",
+              "overflow": "visible",
+              "whiteSpace": "normal",
+              "wordBreak": "normal"
+            },
+            "tag": "DIV",
+            "text": "참가비",
+            "withinViewport": true
+          },
+          {
+            "clientHeight": 24,
+            "clientWidth": 26,
+            "rect": {
+              "bottom": 298.5,
+              "h": 24,
+              "right": 735,
+              "w": 25.9375,
+              "x": 709.0625,
+              "y": 274.5
+            },
+            "scrollHeight": 24,
+            "scrollWidth": 26,
+            "style": {
+              "fontSize": "16px",
+              "lineHeight": "24px",
+              "overflow": "visible",
+              "whiteSpace": "normal",
+              "wordBreak": "normal"
+            },
+            "tag": "DIV",
+            "text": "무료",
+            "withinViewport": true
+          }
+        ],
+        "next": {
+          "rect": {
+            "bottom": 403,
+            "h": 74,
+            "right": 735,
+            "w": 680,
+            "x": 55,
+            "y": 329
+          },
+          "tag": "DIV"
+        },
+        "previous": {
+          "clientHeight": 51,
+          "clientWidth": 680,
+          "rect": {
+            "bottom": 261,
+            "h": 52,
+            "right": 735,
+            "w": 680,
+            "x": 55,
+            "y": 209
+          },
+          "scrollHeight": 51,
+          "scrollWidth": 680,
+          "style": {
+            "fontSize": "16px",
+            "lineHeight": "24px",
+            "overflow": "visible",
+            "whiteSpace": "normal",
+            "wordBreak": "normal"
+          },
+          "tag": "DIV",
+          "text": "성별 조건혼성",
+          "withinViewport": true
+        },
+        "row": {
+          "clientHeight": 51,
+          "clientWidth": 680,
+          "rect": {
+            "bottom": 313,
+            "h": 52,
+            "right": 735,
+            "w": 680,
+            "x": 55,
+            "y": 261
+          },
+          "scrollHeight": 51,
+          "scrollWidth": 680,
+          "style": {
+            "fontSize": "16px",
+            "lineHeight": "24px",
+            "overflow": "visible",
+            "whiteSpace": "normal",
+            "wordBreak": "normal"
+          },
+          "tag": "DIV",
+          "text": "참가비무료",
+          "withinViewport": true
+        }
+      },
+      {
+        "children": [
+          {
+            "clientHeight": 0,
+            "clientWidth": 0,
+            "rect": {
+              "bottom": 0,
+              "h": 0,
+              "right": 0,
+              "w": 0,
+              "x": 0,
+              "y": 0
+            },
+            "scrollHeight": 0,
+            "scrollWidth": 0,
+            "style": {
+              "fontSize": "12px",
+              "lineHeight": "16px",
+              "overflow": "visible",
+              "whiteSpace": "normal",
+              "wordBreak": "normal"
+            },
+            "tag": "DIV",
+            "text": "참가비",
+            "withinViewport": false
+          },
+          {
+            "clientHeight": 0,
+            "clientWidth": 0,
+            "rect": {
+              "bottom": 0,
+              "h": 0,
+              "right": 0,
+              "w": 0,
+              "x": 0,
+              "y": 0
+            },
+            "scrollHeight": 0,
+            "scrollWidth": 0,
+            "style": {
+              "fontSize": "16px",
+              "lineHeight": "24px",
+              "overflow": "visible",
+              "whiteSpace": "normal",
+              "wordBreak": "normal"
+            },
+            "tag": "DIV",
+            "text": "무료",
+            "withinViewport": false
+          }
+        ],
+        "next": {
+          "rect": {
+            "bottom": 0,
+            "h": 0,
+            "right": 0,
+            "w": 0,
+            "x": 0,
+            "y": 0
+          },
+          "tag": "DIV"
+        },
+        "previous": {
+          "clientHeight": 0,
+          "clientWidth": 0,
+          "rect": {
+            "bottom": 0,
+            "h": 0,
+            "right": 0,
+            "w": 0,
+            "x": 0,
+            "y": 0
+          },
+          "scrollHeight": 0,
+          "scrollWidth": 0,
+          "style": {
+            "fontSize": "16px",
+            "lineHeight": "24px",
+            "overflow": "visible",
+            "whiteSpace": "normal",
+            "wordBreak": "normal"
+          },
+          "tag": "DIV",
+          "text": "성별 조건혼성",
+          "withinViewport": false
+        },
+        "row": {
+          "clientHeight": 0,
+          "clientWidth": 0,
+          "rect": {
+            "bottom": 0,
+            "h": 0,
+            "right": 0,
+            "w": 0,
+            "x": 0,
+            "y": 0
+          },
+          "scrollHeight": 0,
+          "scrollWidth": 0,
+          "style": {
+            "fontSize": "16px",
+            "lineHeight": "24px",
+            "overflow": "visible",
+            "whiteSpace": "normal",
+            "wordBreak": "normal"
+          },
+          "tag": "DIV",
+          "text": "참가비무료",
+          "withinViewport": false
+        }
+      }
+    ],
+    "mainRect": {
+      "bottom": 711.25,
+      "h": 1246.25,
+      "right": 1151,
+      "w": 1120,
+      "x": 31,
+      "y": -535
+    },
+    "scroll": {
+      "main": 0,
+      "windowY": 599
+    },
+    "url": "https://alpha.teameet.co.kr/matches/{fixture-73d6000a66c3}",
+    "utc": "2026-10-04T13:23:17.491Z",
+    "viewport": {
+      "dpr": 1,
+      "h": 757,
+      "w": 1182
+    }
+  },
+  {
+    "label": "desktop settled visible free-cost row",
+    "action": [
+      {
+        "disabled": true,
+        "rect": {
+          "bottom": 200,
+          "h": 50,
+          "right": 1106,
+          "w": 318,
+          "x": 788,
+          "y": 150
+        },
+        "text": "신청 불가"
+      },
+      {
+        "disabled": true,
+        "rect": {
+          "bottom": 0,
+          "h": 0,
+          "right": 0,
+          "w": 0,
+          "x": 0,
+          "y": 0
+        },
+        "text": "신청 불가"
+      }
+    ],
+    "back": [
+      {
+        "href": "/matches",
+        "rect": {
+          "bottom": -468,
+          "h": 40,
+          "right": 95,
+          "w": 40,
+          "x": 55,
+          "y": -508
+        }
+      },
+      {
+        "href": "/matches",
+        "rect": {
+          "bottom": 0,
+          "h": 0,
+          "right": 0,
+          "w": 0,
+          "x": 0,
+          "y": 0
+        }
+      }
+    ],
+    "documentScrollWidth": 1182,
+    "feeRows": [
+      {
+        "children": [
+          {
+            "clientHeight": 16,
+            "clientWidth": 120,
+            "rect": {
+              "bottom": 293.5,
+              "h": 16,
+              "right": 175,
+              "w": 120,
+              "x": 55,
+              "y": 277.5
+            },
+            "scrollHeight": 16,
+            "scrollWidth": 120,
+            "style": {
+              "fontSize": "12px",
+              "lineHeight": "16px",
+              "overflow": "visible",
+              "whiteSpace": "normal",
+              "wordBreak": "normal"
+            },
+            "tag": "DIV",
+            "text": "참가비",
+            "withinViewport": true
+          },
+          {
+            "clientHeight": 24,
+            "clientWidth": 26,
+            "rect": {
+              "bottom": 297.5,
+              "h": 24,
+              "right": 735,
+              "w": 25.9375,
+              "x": 709.0625,
+              "y": 273.5
+            },
+            "scrollHeight": 24,
+            "scrollWidth": 26,
+            "style": {
+              "fontSize": "16px",
+              "lineHeight": "24px",
+              "overflow": "visible",
+              "whiteSpace": "normal",
+              "wordBreak": "normal"
+            },
+            "tag": "DIV",
+            "text": "무료",
+            "withinViewport": true
+          }
+        ],
+        "next": {
+          "rect": {
+            "bottom": 402,
+            "h": 74,
+            "right": 735,
+            "w": 680,
+            "x": 55,
+            "y": 328
+          },
+          "tag": "DIV"
+        },
+        "previous": {
+          "clientHeight": 51,
+          "clientWidth": 680,
+          "rect": {
+            "bottom": 260,
+            "h": 52,
+            "right": 735,
+            "w": 680,
+            "x": 55,
+            "y": 208
+          },
+          "scrollHeight": 51,
+          "scrollWidth": 680,
+          "style": {
+            "fontSize": "16px",
+            "lineHeight": "24px",
+            "overflow": "visible",
+            "whiteSpace": "normal",
+            "wordBreak": "normal"
+          },
+          "tag": "DIV",
+          "text": "성별 조건혼성",
+          "withinViewport": true
+        },
+        "row": {
+          "clientHeight": 51,
+          "clientWidth": 680,
+          "rect": {
+            "bottom": 312,
+            "h": 52,
+            "right": 735,
+            "w": 680,
+            "x": 55,
+            "y": 260
+          },
+          "scrollHeight": 51,
+          "scrollWidth": 680,
+          "style": {
+            "fontSize": "16px",
+            "lineHeight": "24px",
+            "overflow": "visible",
+            "whiteSpace": "normal",
+            "wordBreak": "normal"
+          },
+          "tag": "DIV",
+          "text": "참가비무료",
+          "withinViewport": true
+        }
+      },
+      {
+        "children": [
+          {
+            "clientHeight": 0,
+            "clientWidth": 0,
+            "rect": {
+              "bottom": 0,
+              "h": 0,
+              "right": 0,
+              "w": 0,
+              "x": 0,
+              "y": 0
+            },
+            "scrollHeight": 0,
+            "scrollWidth": 0,
+            "style": {
+              "fontSize": "12px",
+              "lineHeight": "16px",
+              "overflow": "visible",
+              "whiteSpace": "normal",
+              "wordBreak": "normal"
+            },
+            "tag": "DIV",
+            "text": "참가비",
+            "withinViewport": false
+          },
+          {
+            "clientHeight": 0,
+            "clientWidth": 0,
+            "rect": {
+              "bottom": 0,
+              "h": 0,
+              "right": 0,
+              "w": 0,
+              "x": 0,
+              "y": 0
+            },
+            "scrollHeight": 0,
+            "scrollWidth": 0,
+            "style": {
+              "fontSize": "16px",
+              "lineHeight": "24px",
+              "overflow": "visible",
+              "whiteSpace": "normal",
+              "wordBreak": "normal"
+            },
+            "tag": "DIV",
+            "text": "무료",
+            "withinViewport": false
+          }
+        ],
+        "next": {
+          "rect": {
+            "bottom": 0,
+            "h": 0,
+            "right": 0,
+            "w": 0,
+            "x": 0,
+            "y": 0
+          },
+          "tag": "DIV"
+        },
+        "previous": {
+          "clientHeight": 0,
+          "clientWidth": 0,
+          "rect": {
+            "bottom": 0,
+            "h": 0,
+            "right": 0,
+            "w": 0,
+            "x": 0,
+            "y": 0
+          },
+          "scrollHeight": 0,
+          "scrollWidth": 0,
+          "style": {
+            "fontSize": "16px",
+            "lineHeight": "24px",
+            "overflow": "visible",
+            "whiteSpace": "normal",
+            "wordBreak": "normal"
+          },
+          "tag": "DIV",
+          "text": "성별 조건혼성",
+          "withinViewport": false
+        },
+        "row": {
+          "clientHeight": 0,
+          "clientWidth": 0,
+          "rect": {
+            "bottom": 0,
+            "h": 0,
+            "right": 0,
+            "w": 0,
+            "x": 0,
+            "y": 0
+          },
+          "scrollHeight": 0,
+          "scrollWidth": 0,
+          "style": {
+            "fontSize": "16px",
+            "lineHeight": "24px",
+            "overflow": "visible",
+            "whiteSpace": "normal",
+            "wordBreak": "normal"
+          },
+          "tag": "DIV",
+          "text": "참가비무료",
+          "withinViewport": false
+        }
+      }
+    ],
+    "mainRect": {
+      "bottom": 710.25,
+      "h": 1246.25,
+      "right": 1151,
+      "w": 1120,
+      "x": 31,
+      "y": -536
+    },
+    "scroll": {
+      "main": 0,
+      "windowY": 600
+    },
+    "url": "https://alpha.teameet.co.kr/matches/{fixture-73d6000a66c3}",
+    "utc": "2026-10-04T13:23:24.153Z",
+    "viewport": {
+      "dpr": 1,
+      "h": 757,
+      "w": 1182
+    }
+  }
+]

@@ -1,0 +1,17 @@
+{
+  "reportedAlphaShortSHA": "56581dc7",
+  "reportedPR1606": "merged",
+  "runtimeServingIdentity": "unknown",
+  "firstFreshNavigation": {
+    "label": "fresh public individual list navigation",
+    "startedUTC": "2026-10-04T13:21:34.573Z",
+    "completedUTC": "2026-10-04T13:21:35.319Z",
+    "url": "https://alpha.teameet.co.kr/matches"
+  },
+  "source": "Parent supplied latest dev/alpha context; exact runtime identity and full new deployment SHA not observed in browser.",
+  "notClaimedDeployed": [
+    "uncommitted1418caller",
+    "uncommitted1578costcopy",
+    "uncommitted1436assistcandidate"
+  ]
+}

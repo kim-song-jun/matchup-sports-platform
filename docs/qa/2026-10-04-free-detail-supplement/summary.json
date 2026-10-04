@@ -1,0 +1,282 @@
+{
+  "scope": "Issue1586 missing tablet/desktop free-detail display only",
+  "freshStartUTC": "2026-10-04T13:21:34.573Z",
+  "lastDOMUTC": "2026-10-04T13:24:00.449Z",
+  "DOMCount": 6,
+  "actionCount": 7,
+  "listInventoryCount": 1,
+  "exitObservations": 2,
+  "PNG": 2,
+  "outcome": "Selected free-detail text and adjacent layout pass, no new defect observed",
+  "metrics": [
+    {
+      "proofIndex": 2,
+      "utc": "2026-10-04T13:22:53.151Z",
+      "viewport": {
+        "dpr": 1.5,
+        "h": 505,
+        "w": 788
+      },
+      "feeRow": {
+        "clientHeight": 55,
+        "clientWidth": 560,
+        "rect": {
+          "bottom": 296,
+          "h": 56,
+          "right": 674,
+          "w": 560,
+          "x": 114,
+          "y": 240
+        },
+        "scrollHeight": 55,
+        "scrollWidth": 560,
+        "style": {
+          "fontSize": "16px",
+          "lineHeight": "24px",
+          "overflow": "visible",
+          "whiteSpace": "normal",
+          "wordBreak": "normal"
+        },
+        "tag": "DIV",
+        "text": "참가비무료",
+        "withinViewport": true
+      },
+      "feeChildren": [
+        {
+          "clientHeight": 16,
+          "clientWidth": 31,
+          "rect": {
+            "bottom": 275.66668701171875,
+            "h": 16,
+            "right": 145.1145839691162,
+            "w": 31.11458396911621,
+            "x": 114,
+            "y": 259.66668701171875
+          },
+          "scrollHeight": 16,
+          "scrollWidth": 31,
+          "style": {
+            "fontSize": "12px",
+            "lineHeight": "16px",
+            "overflow": "visible",
+            "whiteSpace": "normal",
+            "wordBreak": "normal"
+          },
+          "tag": "DIV",
+          "text": "참가비",
+          "withinViewport": true
+        },
+        {
+          "clientHeight": 24,
+          "clientWidth": 26,
+          "rect": {
+            "bottom": 279.6666717529297,
+            "h": 24,
+            "right": 674,
+            "w": 25.9375,
+            "x": 648.0625,
+            "y": 255.6666717529297
+          },
+          "scrollHeight": 24,
+          "scrollWidth": 26,
+          "style": {
+            "fontSize": "16px",
+            "lineHeight": "24px",
+            "overflow": "visible",
+            "whiteSpace": "normal",
+            "wordBreak": "normal"
+          },
+          "tag": "DIV",
+          "text": "무료",
+          "withinViewport": true
+        }
+      ],
+      "previousRow": {
+        "clientHeight": 55,
+        "clientWidth": 560,
+        "rect": {
+          "bottom": 240,
+          "h": 56,
+          "right": 674,
+          "w": 560,
+          "x": 114,
+          "y": 184
+        },
+        "scrollHeight": 55,
+        "scrollWidth": 560,
+        "style": {
+          "fontSize": "16px",
+          "lineHeight": "24px",
+          "overflow": "visible",
+          "whiteSpace": "normal",
+          "wordBreak": "normal"
+        },
+        "tag": "DIV",
+        "text": "성별 조건혼성",
+        "withinViewport": true
+      },
+      "nextRowTop": 312,
+      "previousBottomToFeeTop": 0,
+      "feeBottomToNextTop": 16,
+      "applicationButton": {
+        "disabled": true,
+        "rect": {
+          "bottom": 482.6666870117187,
+          "h": 50,
+          "right": 674,
+          "w": 560,
+          "x": 114,
+          "y": 432.6666870117187
+        },
+        "text": "신청 불가"
+      },
+      "feeButtonOverlapArea": 0
+    },
+    {
+      "proofIndex": 5,
+      "utc": "2026-10-04T13:23:24.153Z",
+      "viewport": {
+        "dpr": 1,
+        "h": 757,
+        "w": 1182
+      },
+      "feeRow": {
+        "clientHeight": 51,
+        "clientWidth": 680,
+        "rect": {
+          "bottom": 312,
+          "h": 52,
+          "right": 735,
+          "w": 680,
+          "x": 55,
+          "y": 260
+        },
+        "scrollHeight": 51,
+        "scrollWidth": 680,
+        "style": {
+          "fontSize": "16px",
+          "lineHeight": "24px",
+          "overflow": "visible",
+          "whiteSpace": "normal",
+          "wordBreak": "normal"
+        },
+        "tag": "DIV",
+        "text": "참가비무료",
+        "withinViewport": true
+      },
+      "feeChildren": [
+        {
+          "clientHeight": 16,
+          "clientWidth": 120,
+          "rect": {
+            "bottom": 293.5,
+            "h": 16,
+            "right": 175,
+            "w": 120,
+            "x": 55,
+            "y": 277.5
+          },
+          "scrollHeight": 16,
+          "scrollWidth": 120,
+          "style": {
+            "fontSize": "12px",
+            "lineHeight": "16px",
+            "overflow": "visible",
+            "whiteSpace": "normal",
+            "wordBreak": "normal"
+          },
+          "tag": "DIV",
+          "text": "참가비",
+          "withinViewport": true
+        },
+        {
+          "clientHeight": 24,
+          "clientWidth": 26,
+          "rect": {
+            "bottom": 297.5,
+            "h": 24,
+            "right": 735,
+            "w": 25.9375,
+            "x": 709.0625,
+            "y": 273.5
+          },
+          "scrollHeight": 24,
+          "scrollWidth": 26,
+          "style": {
+            "fontSize": "16px",
+            "lineHeight": "24px",
+            "overflow": "visible",
+            "whiteSpace": "normal",
+            "wordBreak": "normal"
+          },
+          "tag": "DIV",
+          "text": "무료",
+          "withinViewport": true
+        }
+      ],
+      "previousRow": {
+        "clientHeight": 51,
+        "clientWidth": 680,
+        "rect": {
+          "bottom": 260,
+          "h": 52,
+          "right": 735,
+          "w": 680,
+          "x": 55,
+          "y": 208
+        },
+        "scrollHeight": 51,
+        "scrollWidth": 680,
+        "style": {
+          "fontSize": "16px",
+          "lineHeight": "24px",
+          "overflow": "visible",
+          "whiteSpace": "normal",
+          "wordBreak": "normal"
+        },
+        "tag": "DIV",
+        "text": "성별 조건혼성",
+        "withinViewport": true
+      },
+      "nextRowTop": 328,
+      "previousBottomToFeeTop": 0,
+      "feeBottomToNextTop": 16,
+      "applicationButton": {
+        "disabled": true,
+        "rect": {
+          "bottom": 200,
+          "h": 50,
+          "right": 1106,
+          "w": 318,
+          "x": 788,
+          "y": 150
+        },
+        "text": "신청 불가"
+      },
+      "feeButtonOverlapArea": 0
+    }
+  ],
+  "listInventory": {
+    "initialMainRows": 8,
+    "finalMainRows": 7,
+    "costValuesObserved": [
+      "10000",
+      "10000",
+      "무료"
+    ],
+    "sameFreeCardStillPresent": true,
+    "reasonForCountChange": "unknown, no attribution to data mutation or client defect"
+  },
+  "priorReuse": "Mobile free detail and three-width free list remain prior observations; no new mobile execution claimed",
+  "runtimeServingIdentity": "unknown",
+  "limitations": [
+    "Existing synthetic free fixture only. No actual payment/fee policy, API fields, DB state or server mutation audit.",
+    "Long arbitrary note, pre-existing currency/per-person unit strings and nearby recommendation renderer remain unobserved; current list did not supply these samples. No invented fixture or data edit used.",
+    "Metadata-free DOM observations can include hidden responsive duplicate. Only positive-rect within-viewport rows2 and5 are visibility results; hidden zero-rect copies are not duplicate visible content.",
+    "DOM0 and3 are pre-scroll rows offscreen;1 and4 are first wheel endpoints before later settled2 and5. Native wheel continued17.333px/tablet and1px/desktop between samples. No timestamp substitution.",
+    "Screenshot capture intervals are separate from DOM times. Exact viewport inclusion and pixel crops both support visibility; this is not a full accessibility audit.",
+    "Current Back endpoint main-row count7 differs from initial8. No complete-list preservation claim, cause unobserved.",
+    "Only navigation/zoom/scroll/Back were executed. Search submission, application, sharing, creation, save and upload were not activated; no unconditional zero-write claim.",
+    "No repeat of1558 normal-render scenarios or claims about intermittent503 resolution."
+  ]
+}

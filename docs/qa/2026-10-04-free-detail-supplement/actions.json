@@ -1,0 +1,44 @@
+[
+  {
+    "label": "fresh public individual list navigation",
+    "startedUTC": "2026-10-04T13:21:34.573Z",
+    "completedUTC": "2026-10-04T13:21:35.319Z",
+    "url": "https://alpha.teameet.co.kr/matches"
+  },
+  {
+    "label": "native browser zoom to tablet, existing mobile free detail reused rather than repeated",
+    "startedUTC": "2026-10-04T13:21:49.734Z",
+    "completedUTC": "2026-10-04T13:21:50.550Z",
+    "url": "https://alpha.teameet.co.kr/matches"
+  },
+  {
+    "label": "click actual known synthetic free-match card href",
+    "startedUTC": "2026-10-04T13:21:50.642Z",
+    "completedUTC": "2026-10-04T13:21:50.753Z",
+    "url": "https://alpha.teameet.co.kr/matches/{fixture-73d6000a66c3}"
+  },
+  {
+    "label": "native wheel down inside tablet detail at blank content margin",
+    "startedUTC": "2026-10-04T13:22:40.148Z",
+    "completedUTC": "2026-10-04T13:22:40.579Z",
+    "url": "https://alpha.teameet.co.kr/matches/{fixture-73d6000a66c3}"
+  },
+  {
+    "label": "native zoom reset to desktop while same synthetic detail open",
+    "startedUTC": "2026-10-04T13:22:53.186Z",
+    "completedUTC": "2026-10-04T13:22:53.327Z",
+    "url": "https://alpha.teameet.co.kr/matches/{fixture-73d6000a66c3}"
+  },
+  {
+    "label": "native desktop wheel down at blank main content",
+    "startedUTC": "2026-10-04T13:23:17.048Z",
+    "completedUTC": "2026-10-04T13:23:17.391Z",
+    "url": "https://alpha.teameet.co.kr/matches/{fixture-73d6000a66c3}"
+  },
+  {
+    "label": "final browser Back to unchanged public list",
+    "startedUTC": "2026-10-04T13:23:40.401Z",
+    "completedUTC": "2026-10-04T13:23:40.424Z",
+    "url": "https://alpha.teameet.co.kr/matches"
+  }
+]

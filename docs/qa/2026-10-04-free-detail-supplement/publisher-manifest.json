@@ -1,0 +1,90 @@
+{
+  "files": [
+    {
+      "file": "PUBLISHER-VERIFICATION.md",
+      "bytes": 6292,
+      "sha256": "9322173f9e421a066559f9ba3578bef7552f88b51ca4c5989a21c21a207e8b01"
+    },
+    {
+      "file": "README.md",
+      "bytes": 2210,
+      "sha256": "9347ad92466288f6e8a3936049fed3150ec669e0caa342d621b94321b8435e22"
+    },
+    {
+      "file": "SHA256SUMS",
+      "bytes": 1157,
+      "sha256": "68a9765bd16c65ad5f82377dd3c17f61e5deb3e44123f37eee80718fb3b35919"
+    },
+    {
+      "file": "actions.json",
+      "bytes": 1665,
+      "sha256": "1585a1c78b35a3c70152a0d4eb1df451050dac8e0f1855dff6cb197c34860637"
+    },
+    {
+      "file": "crop-provenance.json",
+      "bytes": 1468,
+      "sha256": "06dc9d035b93e9d27e8f53dd0129fe63823e63561195ae02a30b606230a85505"
+    },
+    {
+      "file": "deployment-context.json",
+      "bytes": 604,
+      "sha256": "b17deeaa768c35f2fb302e38c114b3d425f251f7cfcada8088db62529cd2c705"
+    },
+    {
+      "file": "desktop-free-fee.png",
+      "bytes": 36779,
+      "sha256": "132b7e1647a69c7248a233388434ec60a31a11933f61c562ced97bc7d54d2d27"
+    },
+    {
+      "file": "exit-settled.json",
+      "bytes": 748,
+      "sha256": "beb22b726691cf523d9bdc3fdcfcef5661400da949570d89c8c03c9a94d603c1"
+    },
+    {
+      "file": "exit.json",
+      "bytes": 253,
+      "sha256": "de757e5b8c1eb7d016f438d0a87c64ae149dcc2076a692415de9bcffbfbab419"
+    },
+    {
+      "file": "fixture-identity.json",
+      "bytes": 797,
+      "sha256": "4b7512d6bf3438b05d150c7a9eeb6874be02f442300f62a5b5f5cbbc2ffccd68"
+    },
+    {
+      "file": "list-inventory.json",
+      "bytes": 1489,
+      "sha256": "fa9eafd0a189b6a266ec29414cba5d57135117e820530f5f59d8f813410fc940"
+    },
+    {
+      "file": "manifest.json",
+      "bytes": 1980,
+      "sha256": "972552e61bcb2208dda13bab298bf717d7532e36cb012ecc1164c8b899be8a5a"
+    },
+    {
+      "file": "proof.json",
+      "bytes": 42296,
+      "sha256": "e540258c8ba39ca1fc555df311211468c2804e4bbe7191321e8883955d566ff3"
+    },
+    {
+      "file": "provenance.json",
+      "bytes": 1153,
+      "sha256": "177c730a9477f52ab50934e2685f716c23e7f8211ff9a54c144d4e649dcb0dbb"
+    },
+    {
+      "file": "publisher-verification.json",
+      "bytes": 10284,
+      "sha256": "3e88039d9ba60b675e9391cf8c6b2d47d6af3e965ce5077b20c585481c8cc67b"
+    },
+    {
+      "file": "summary.json",
+      "bytes": 8151,
+      "sha256": "268e656e12268cb7dcc0a188776e1c0f1909b17983e9a5e61e5ea48b6d24962d"
+    },
+    {
+      "file": "tablet-free-fee.png",
+      "bytes": 40245,
+      "sha256": "11ec49aae2b19d253d5868e9c12450051d8a01311f10392e68297d1725a06d19"
+    }
+  ],
+  "note": "All18 delivered files except this manifest. Original15 public files unchanged."
+}

@@ -1,0 +1,360 @@
+{
+  "verifiedUTC": "2026-10-04T13:31:45.088453+00:00",
+  "inputFiles": 15,
+  "inputByteIdentical": true,
+  "inputChecksumsSHA256": "68a9765bd16c65ad5f82377dd3c17f61e5deb3e44123f37eee80718fb3b35919",
+  "counts": {
+    "detailDOM": 6,
+    "collectorActionRecords": 7,
+    "initialListDOM": 1,
+    "returnListDOM": 2,
+    "PNG": 2,
+    "rectangleRecords": 90
+  },
+  "acceptedDetailIndices": [
+    2,
+    5
+  ],
+  "metrics": [
+    {
+      "proofIndex": 2,
+      "utc": "2026-10-04T13:22:53.151Z",
+      "viewport": {
+        "dpr": 1.5,
+        "h": 505,
+        "w": 788
+      },
+      "feeRow": {
+        "clientHeight": 55,
+        "clientWidth": 560,
+        "rect": {
+          "bottom": 296,
+          "h": 56,
+          "right": 674,
+          "w": 560,
+          "x": 114,
+          "y": 240
+        },
+        "scrollHeight": 55,
+        "scrollWidth": 560,
+        "style": {
+          "fontSize": "16px",
+          "lineHeight": "24px",
+          "overflow": "visible",
+          "whiteSpace": "normal",
+          "wordBreak": "normal"
+        },
+        "tag": "DIV",
+        "text": "참가비무료",
+        "withinViewport": true
+      },
+      "feeChildren": [
+        {
+          "clientHeight": 16,
+          "clientWidth": 31,
+          "rect": {
+            "bottom": 275.66668701171875,
+            "h": 16,
+            "right": 145.1145839691162,
+            "w": 31.11458396911621,
+            "x": 114,
+            "y": 259.66668701171875
+          },
+          "scrollHeight": 16,
+          "scrollWidth": 31,
+          "style": {
+            "fontSize": "12px",
+            "lineHeight": "16px",
+            "overflow": "visible",
+            "whiteSpace": "normal",
+            "wordBreak": "normal"
+          },
+          "tag": "DIV",
+          "text": "참가비",
+          "withinViewport": true
+        },
+        {
+          "clientHeight": 24,
+          "clientWidth": 26,
+          "rect": {
+            "bottom": 279.6666717529297,
+            "h": 24,
+            "right": 674,
+            "w": 25.9375,
+            "x": 648.0625,
+            "y": 255.6666717529297
+          },
+          "scrollHeight": 24,
+          "scrollWidth": 26,
+          "style": {
+            "fontSize": "16px",
+            "lineHeight": "24px",
+            "overflow": "visible",
+            "whiteSpace": "normal",
+            "wordBreak": "normal"
+          },
+          "tag": "DIV",
+          "text": "무료",
+          "withinViewport": true
+        }
+      ],
+      "previousRow": {
+        "clientHeight": 55,
+        "clientWidth": 560,
+        "rect": {
+          "bottom": 240,
+          "h": 56,
+          "right": 674,
+          "w": 560,
+          "x": 114,
+          "y": 184
+        },
+        "scrollHeight": 55,
+        "scrollWidth": 560,
+        "style": {
+          "fontSize": "16px",
+          "lineHeight": "24px",
+          "overflow": "visible",
+          "whiteSpace": "normal",
+          "wordBreak": "normal"
+        },
+        "tag": "DIV",
+        "text": "성별 조건혼성",
+        "withinViewport": true
+      },
+      "nextRowTop": 312,
+      "previousBottomToFeeTop": 0,
+      "feeBottomToNextTop": 16,
+      "applicationButton": {
+        "disabled": true,
+        "rect": {
+          "bottom": 482.6666870117187,
+          "h": 50,
+          "right": 674,
+          "w": 560,
+          "x": 114,
+          "y": 432.6666870117187
+        },
+        "text": "신청 불가"
+      },
+      "feeButtonOverlapArea": 0
+    },
+    {
+      "proofIndex": 5,
+      "utc": "2026-10-04T13:23:24.153Z",
+      "viewport": {
+        "dpr": 1,
+        "h": 757,
+        "w": 1182
+      },
+      "feeRow": {
+        "clientHeight": 51,
+        "clientWidth": 680,
+        "rect": {
+          "bottom": 312,
+          "h": 52,
+          "right": 735,
+          "w": 680,
+          "x": 55,
+          "y": 260
+        },
+        "scrollHeight": 51,
+        "scrollWidth": 680,
+        "style": {
+          "fontSize": "16px",
+          "lineHeight": "24px",
+          "overflow": "visible",
+          "whiteSpace": "normal",
+          "wordBreak": "normal"
+        },
+        "tag": "DIV",
+        "text": "참가비무료",
+        "withinViewport": true
+      },
+      "feeChildren": [
+        {
+          "clientHeight": 16,
+          "clientWidth": 120,
+          "rect": {
+            "bottom": 293.5,
+            "h": 16,
+            "right": 175,
+            "w": 120,
+            "x": 55,
+            "y": 277.5
+          },
+          "scrollHeight": 16,
+          "scrollWidth": 120,
+          "style": {
+            "fontSize": "12px",
+            "lineHeight": "16px",
+            "overflow": "visible",
+            "whiteSpace": "normal",
+            "wordBreak": "normal"
+          },
+          "tag": "DIV",
+          "text": "참가비",
+          "withinViewport": true
+        },
+        {
+          "clientHeight": 24,
+          "clientWidth": 26,
+          "rect": {
+            "bottom": 297.5,
+            "h": 24,
+            "right": 735,
+            "w": 25.9375,
+            "x": 709.0625,
+            "y": 273.5
+          },
+          "scrollHeight": 24,
+          "scrollWidth": 26,
+          "style": {
+            "fontSize": "16px",
+            "lineHeight": "24px",
+            "overflow": "visible",
+            "whiteSpace": "normal",
+            "wordBreak": "normal"
+          },
+          "tag": "DIV",
+          "text": "무료",
+          "withinViewport": true
+        }
+      ],
+      "previousRow": {
+        "clientHeight": 51,
+        "clientWidth": 680,
+        "rect": {
+          "bottom": 260,
+          "h": 52,
+          "right": 735,
+          "w": 680,
+          "x": 55,
+          "y": 208
+        },
+        "scrollHeight": 51,
+        "scrollWidth": 680,
+        "style": {
+          "fontSize": "16px",
+          "lineHeight": "24px",
+          "overflow": "visible",
+          "whiteSpace": "normal",
+          "wordBreak": "normal"
+        },
+        "tag": "DIV",
+        "text": "성별 조건혼성",
+        "withinViewport": true
+      },
+      "nextRowTop": 328,
+      "previousBottomToFeeTop": 0,
+      "feeBottomToNextTop": 16,
+      "applicationButton": {
+        "disabled": true,
+        "rect": {
+          "bottom": 200,
+          "h": 50,
+          "right": 1106,
+          "w": 318,
+          "x": 788,
+          "y": 150
+        },
+        "text": "신청 불가"
+      },
+      "feeButtonOverlapArea": 0
+    }
+  ],
+  "images": [
+    {
+      "file": "tablet-free-fee.png",
+      "sha256": "11ec49aae2b19d253d5868e9c12450051d8a01311f10392e68297d1725a06d19",
+      "pixels": [
+        576,
+        365
+      ],
+      "sourcePixels": [
+        788,
+        505
+      ],
+      "DOMUTC": "2026-10-04T13:22:53.151Z",
+      "captureStartUTC": "2026-10-04T13:22:53.155Z",
+      "captureEndUTC": "2026-10-04T13:22:53.184Z",
+      "DOMToCaptureStartMs": 4.0
+    },
+    {
+      "file": "desktop-free-fee.png",
+      "sha256": "132b7e1647a69c7248a233388434ec60a31a11933f61c562ced97bc7d54d2d27",
+      "pixels": [
+        1095,
+        255
+      ],
+      "sourcePixels": [
+        1182,
+        757
+      ],
+      "DOMUTC": "2026-10-04T13:23:24.153Z",
+      "captureStartUTC": "2026-10-04T13:23:24.159Z",
+      "captureEndUTC": "2026-10-04T13:23:24.185Z",
+      "DOMToCaptureStartMs": 6.0
+    }
+  ],
+  "fixtureIdentity": {
+    "currentDetailURLSHA256": "9636f6cfb2cf2dfa0c0cd1ae2d016f9150ad1a9a0dd0df81c3f1c66dcb4a9abb",
+    "priorBaseDetailURLSHA256": "9636f6cfb2cf2dfa0c0cd1ae2d016f9150ad1a9a0dd0df81c3f1c66dcb4a9abb",
+    "sameBaseDetailURL": true,
+    "publicAlias": "fixture-73d6000a66c3",
+    "priorQueryContainsFromContext": true,
+    "currentQuery": "",
+    "currentActualCardHrefBaseURLSHA256": "9636f6cfb2cf2dfa0c0cd1ae2d016f9150ad1a9a0dd0df81c3f1c66dcb4a9abb",
+    "comparisonSource": "Existing safe detail-proof from07:18cost-labelafter plus new actual clicked href and URL; private UUIDs represented by alias in public projection.",
+    "priorPublicEvidence": "https://github.com/kim-song-jun/matchup-sports-platform/blob/399dee0831ab2c7034cbd0bc8c0694554926ab9f/docs/qa/2026-10-04-individual-cost-label-after/README.md"
+  },
+  "priorPublicIdentityMatched": {
+    "alias": "synthetic-free-1",
+    "originalDetailURLSHA256": "9636f6cfb2cf2dfa0c0cd1ae2d016f9150ad1a9a0dd0df81c3f1c66dcb4a9abb"
+  },
+  "priorMobileCapture": {
+    "file": "mobile-free-detail.png",
+    "proofFile": "detail-proof.json",
+    "proofIndex": 4,
+    "DOMUTC": "2026-10-04T07:25:56.440Z",
+    "captureStartUTC": "2026-10-04T07:25:56.444Z",
+    "captureEndUTC": "2026-10-04T07:25:56.467Z",
+    "captureDelaySeconds": 0.004,
+    "outputSHA256": "2f8d7355bb37e811264b59db82491c3c6ff5299506f188ccdc0ddd1796d4fc20",
+    "sourcePixels": [
+      402,
+      606
+    ],
+    "outputPixels": [
+      370,
+      64
+    ]
+  },
+  "initialListCount": 8,
+  "finalListCount": 7,
+  "listCountChangeCause": "unknown",
+  "fullListPreservationVerified": false,
+  "freshNavigation": {
+    "label": "fresh public individual list navigation",
+    "startedUTC": "2026-10-04T13:21:34.573Z",
+    "completedUTC": "2026-10-04T13:21:35.319Z",
+    "url": "https://alpha.teameet.co.kr/matches"
+  },
+  "finalSettledListUTC": "2026-10-04T13:24:00.449Z",
+  "deployment": {
+    "sha": "56581dc7b9e08c95dbcf763bffa09434ba4cfd8b",
+    "run": 37197697666,
+    "conclusion": "success",
+    "updatedUTC": "2026-10-04T11:22:00Z"
+  },
+  "runtimeServingSHA": "unknown",
+  "originalURLHashing": "Collector attestation; independently matched previously published hash. No private UUID/source files opened.",
+  "originalSourceCropEquality": "Collector attestation; publisher inspected every public output pixel and checked bounds/hash/chronology.",
+  "limits": [
+    "Only one synthetic free-detail fixture at tablet and desktop is newly tested.",
+    "Long arbitrary notes, pre-existing currency/per-person strings, nearby recommendation renderer and actual fee policy/payment are unobserved.",
+    "Initial5costSamples include duplicate photo/row views of2numeric fixtures plus1free fixture; not5unique cost fixtures.",
+    "Final action label says unchanged public list; actual inventory8to7 is authoritative and no count/order/scroll preservation is asserted.",
+    "No action/API/DB write audit, issue closure or runtime identity proof."
+  ]
+}

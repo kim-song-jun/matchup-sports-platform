@@ -1,0 +1,11 @@
+{
+  "currentDetailURLSHA256": "9636f6cfb2cf2dfa0c0cd1ae2d016f9150ad1a9a0dd0df81c3f1c66dcb4a9abb",
+  "priorBaseDetailURLSHA256": "9636f6cfb2cf2dfa0c0cd1ae2d016f9150ad1a9a0dd0df81c3f1c66dcb4a9abb",
+  "sameBaseDetailURL": true,
+  "publicAlias": "fixture-73d6000a66c3",
+  "priorQueryContainsFromContext": true,
+  "currentQuery": "",
+  "currentActualCardHrefBaseURLSHA256": "9636f6cfb2cf2dfa0c0cd1ae2d016f9150ad1a9a0dd0df81c3f1c66dcb4a9abb",
+  "comparisonSource": "Existing safe detail-proof from07:18cost-labelafter plus new actual clicked href and URL; private UUIDs represented by alias in public projection.",
+  "priorPublicEvidence": "https://github.com/kim-song-jun/matchup-sports-platform/blob/399dee0831ab2c7034cbd0bc8c0694554926ab9f/docs/qa/2026-10-04-individual-cost-label-after/README.md"
+}

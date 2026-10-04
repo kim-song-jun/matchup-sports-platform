@@ -1,0 +1,58 @@
+[
+  {
+    "name": "tablet-settled-fee",
+    "index": 2,
+    "startedUTC": "2026-10-04T13:22:53.155Z",
+    "completedUTC": "2026-10-04T13:22:53.184Z",
+    "sha256": "75d567ff54ed57bb7c30efd8d641754e5deca24f22d63dc0768acca27a34573e",
+    "sourceBasename": "tablet-settled-fee.raw",
+    "sourceEncoding": "JPEG",
+    "sourceDimensions": [
+      788,
+      505
+    ],
+    "cropBounds": [
+      106,
+      125,
+      682,
+      490
+    ],
+    "output": "tablet-free-fee.png",
+    "outputDimensions": [
+      576,
+      365
+    ],
+    "outputSHA256": "11ec49aae2b19d253d5868e9c12450051d8a01311f10392e68297d1725a06d19",
+    "proofUTC": "2026-10-04T13:22:53.151Z",
+    "sourceCropPixelEquality": true,
+    "collectorPixelReview": true
+  },
+  {
+    "name": "desktop-settled-fee",
+    "index": 5,
+    "startedUTC": "2026-10-04T13:23:24.159Z",
+    "completedUTC": "2026-10-04T13:23:24.185Z",
+    "sha256": "2258b1bc4b93990998a737e186734e9da4079d3cfd171ce05a74b5cb6146f9db",
+    "sourceBasename": "desktop-settled-fee.raw",
+    "sourceEncoding": "JPEG",
+    "sourceDimensions": [
+      1182,
+      757
+    ],
+    "cropBounds": [
+      45,
+      150,
+      1140,
+      405
+    ],
+    "output": "desktop-free-fee.png",
+    "outputDimensions": [
+      1095,
+      255
+    ],
+    "outputSHA256": "132b7e1647a69c7248a233388434ec60a31a11933f61c562ced97bc7d54d2d27",
+    "proofUTC": "2026-10-04T13:23:24.153Z",
+    "sourceCropPixelEquality": true,
+    "collectorPixelReview": true
+  }
+]

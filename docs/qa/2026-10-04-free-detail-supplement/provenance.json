@@ -1,0 +1,19 @@
+{
+  "preparedUTC": "2026-10-04T13:25:44.696739+00:00",
+  "originalSafeSHA256": {
+    "actions.json": "48e347d3290722dfef9c2f26568a283a42e444b046cab779a3628d77b1991941",
+    "exit-settled.json": "1e2ecd61b49bd3d83965486840ff4a6411512e1cdcdd4acd6afd6e379e2ef705",
+    "exit.json": "a3edaaa4d07a61ce8e79d84542865c5c1981641b129724025ad570d1aa4bee97",
+    "list-inventory.json": "23c97540c30cbfbbc1dd2042d24c49555d9c95dd45a16e8483f8fd8186f45501",
+    "proof.json": "7ebdae978685b2eaed44f99065e11e753faa6270a468ca3359ce250fd9b1f54c"
+  },
+  "sourceCaptureMetadataSHA256": "cc4dd7f47c8c32d2e5c0a21f16053878c93b12e3423ab98b87676dfa74fb1731",
+  "publicProjection": "UUID strings replaced with deterministic fixture aliases, all times/counts/cost strings/geometry retained. Original files unchanged.",
+  "originalPixelComparison": "Collector verified exact decoded-source crop equality; publisher sees only safe outputs.",
+  "excludedPrivateSources": [
+    "tablet-initial-private.raw",
+    "tablet-visible-fee.raw",
+    "desktop-initial-private.raw"
+  ],
+  "captureSemantics": "Tool call start and completion interval, not a single inferred shutter timestamp."
+}

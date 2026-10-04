@@ -1,0 +1,34 @@
+{
+  "costSamples": [
+    {
+      "cost": [
+        "축구 · 입문-고수 · 혼성 · 참가비 설명: 무료"
+      ],
+      "href": "/matches/{fixture-73d6000a66c3}"
+    },
+    {
+      "cost": [
+        "풋살 · 입문-고수 · 혼성 · 참가비 설명: 10000"
+      ],
+      "href": "/matches/{fixture-c6a85e3fe145}"
+    },
+    {
+      "cost": [
+        "풋살 · 입문-고수 · 혼성 · 참가비 설명: 10000"
+      ],
+      "href": "/matches/{fixture-9645589d4a78}"
+    }
+  ],
+  "freeCardHrefs": [
+    "/matches/{fixture-73d6000a66c3}"
+  ],
+  "rowCount": 7,
+  "searchValue": "",
+  "url": "https://alpha.teameet.co.kr/matches",
+  "utc": "2026-10-04T13:24:00.449Z",
+  "viewport": {
+    "dpr": 1,
+    "h": 757,
+    "w": 1182
+  }
+}

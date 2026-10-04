@@ -1,4 +1,5 @@
 import { Prisma } from '@prisma/client';
+import { findTournamentOnSurface, TOURNAMENT_KINDS } from '../src/tournaments/tournament-surface-lookup';
 
 export const ALPHA_ROUND12_MANUAL_ID = 'ad120000-0000-4000-8000-000000000001';
 export const ALPHA_ROUND12_MANUAL_TITLE = '(테스트) 12팀·팀당 5명 대진 직접 입력';
@@ -11,7 +12,7 @@ export async function seedAlphaRound12Manual(
   if (process.env.V1_ALPHA_QA_SEED !== 'true' || process.env.V1_ALPHA_QA_ORIGIN !== 'https://alpha.teameet.co.kr') {
     throw new Error('Manual round12 fixture requires the guarded alpha QA seed entrypoint.');
   }
-  const existing = await tx.v1Tournament.findUnique({ where: { id: ALPHA_ROUND12_MANUAL_ID }, select: { id: true } });
+  const existing = await findTournamentOnSurface(tx, TOURNAMENT_KINDS, { where: { id: ALPHA_ROUND12_MANUAL_ID }, select: { id: true } });
   if (existing) return { tournamentId: existing.id, created: false, preserved: true };
   // These are the synthetic accounts created by seedAlphaQaSquads immediately
   // before this function. Reuse QA accounts, never real members or their identity.

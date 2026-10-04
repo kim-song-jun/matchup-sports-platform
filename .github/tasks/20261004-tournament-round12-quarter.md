@@ -71,3 +71,7 @@
 - [ ] PR CI·Copilot clean·dev merge
 - [ ] alpha release SHA·신규 enum 및 seed 생성 결과 검증
 - [ ] 지정 상세 및 신규 대회 admin/public/모바일 검증, 링크 전달
+- PR: https://github.com/kim-song-jun/matchup-sports-platform/pull/1608 (base dev). 이전 push 승인 blocker는 사용자 명시 승인 및 실제 push 성공으로 해소됨.
+- CI 첫 실패: 신규 seed의 raw single lookup을 canonical `findTournamentOnSurface`로 변경. Surface/runtime 검사 및 실제 DB seed integration PASS.
+- CI 두 번째: Gates/Web PASS, API integration 835 PASS/1 FAIL — 새 enum/컬럼 schema 해시를 game-schema fixture에도 동기화할 필요. 전체 migration replay/drift CI 단계 통과를 확인하고 바인딩 갱신; 해당 drift/mutation 검사 1/1 PASS.
+- GitHub AI findings 검사 외부 오류: monthly quota exceeded (402). Copilot clean review는 현재 0건이며, CLAUDE.md 규칙 예외는 사용자의 답변을 기다림. 일반 CI 통과 전 머지하지 않음. Alpha 배포/실제 대회 생성 완료라고 주장하지 않음.

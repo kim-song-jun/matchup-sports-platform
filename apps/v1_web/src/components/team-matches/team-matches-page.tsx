@@ -308,12 +308,32 @@ export function TeamMatchDetailPageView({ model, recordEntry, lifecyclePanel }: 
   const showChat = mode === 'approved' || mode === 'mine' || mode === 'pending' || Boolean(model.onChat);
   const timeRange = match.endTime ? `${match.time}-${match.endTime}` : match.time;
   const [heroMessage, setHeroMessage] = useState('');
+  const heroMessageTimerRef = useRef<number | null>(null);
+  const heroMountedRef = useRef(false);
   const [chatNoticeVisible, setChatNoticeVisible] = useState(false);
   const chatNoticeTimerRef = useRef<number | null>(null);
 
-  useEffect(() => () => {
-    if (chatNoticeTimerRef.current) window.clearTimeout(chatNoticeTimerRef.current);
+  useEffect(() => {
+    heroMountedRef.current = true;
+    return () => {
+      heroMountedRef.current = false;
+      if (heroMessageTimerRef.current !== null) window.clearTimeout(heroMessageTimerRef.current);
+      heroMessageTimerRef.current = null;
+      if (chatNoticeTimerRef.current !== null) window.clearTimeout(chatNoticeTimerRef.current);
+      chatNoticeTimerRef.current = null;
+    };
   }, []);
+
+  const showHeroMessage = (message: string) => {
+    // 이동 뒤 완료된 액션은 떠난 화면의 안내를 예약하지 않는다.
+    if (!heroMountedRef.current) return;
+    if (heroMessageTimerRef.current !== null) window.clearTimeout(heroMessageTimerRef.current);
+    setHeroMessage(message);
+    heroMessageTimerRef.current = window.setTimeout(() => {
+      heroMessageTimerRef.current = null;
+      if (heroMountedRef.current) setHeroMessage('');
+    }, 2000);
+  };
 
   const heroActionBusyRef = useRef(false);
   const runHeroAction = (
@@ -333,12 +353,10 @@ export function TeamMatchDetailPageView({ model, recordEntry, lifecyclePanel }: 
       .then((result) => {
         const message = typeof successMessage === 'function' ? successMessage(result) : successMessage;
         if (!message) return;
-        setHeroMessage(message);
-        window.setTimeout(() => setHeroMessage(''), 2000);
+        showHeroMessage(message);
       })
       .catch(() => {
-        setHeroMessage('처리하지 못했어요. 잠시 후 다시 시도해 주세요.');
-        window.setTimeout(() => setHeroMessage(''), 2000);
+        showHeroMessage('처리하지 못했어요. 잠시 후 다시 시도해 주세요.');
       })
       .finally(() => {
         heroActionBusyRef.current = false;
@@ -794,11 +812,11 @@ export function TeamMatchDetailPageView({ model, recordEntry, lifecyclePanel }: 
           picker={model.applyTeamPicker}
           onClose={() => setApplyTeamOpen(false)}
           onApplied={(result) => {
+            if (!heroMountedRef.current) return;
             setApplyTeamOpen(false);
             const message = applyResultMessage(result);
             if (!message) return;
-            setHeroMessage(message);
-            window.setTimeout(() => setHeroMessage(''), 2000);
+            showHeroMessage(message);
           }}
         />
       ) : null}

@@ -1,0 +1,80 @@
+[
+  {
+    "file": "first-create-step.png",
+    "sourceBasename": "mobile-first-create-step.png",
+    "sourceSHA256": "ff7f53a1592cba86bbec007f5ad9ca31e7d028d3b691624d9f5794e1ea27db80",
+    "sourceEncoding": "JPEG",
+    "sourceSize": [
+      402,
+      606
+    ],
+    "boundsLTRB": [
+      14,
+      73,
+      389,
+      385
+    ],
+    "outputSize": [
+      375,
+      312
+    ],
+    "outputSHA256": "b0f63bac820d726f069fd27c389ef798182b8789a58a69131128b5dd9232ad6b",
+    "pixelEquality": true,
+    "proofIndex": 1,
+    "DOMUTC": "2026-10-04T10:16:46.909Z",
+    "captureStartUTC": "2026-10-04T10:16:46.913Z",
+    "captureEndUTC": "2026-10-04T10:16:46.931Z"
+  },
+  {
+    "file": "first-step-cancel-control.png",
+    "sourceBasename": "mobile-first-create-step.png",
+    "sourceSHA256": "ff7f53a1592cba86bbec007f5ad9ca31e7d028d3b691624d9f5794e1ea27db80",
+    "sourceEncoding": "JPEG",
+    "sourceSize": [
+      402,
+      606
+    ],
+    "boundsLTRB": [
+      14,
+      525,
+      145,
+      590
+    ],
+    "outputSize": [
+      131,
+      65
+    ],
+    "outputSHA256": "942a4cd7da8013fb6c7a11e88b99f1d2e6b4768cfd04e962cdcadd35c2aeb0c4",
+    "pixelEquality": true,
+    "proofIndex": 1,
+    "DOMUTC": "2026-10-04T10:16:46.909Z",
+    "captureStartUTC": "2026-10-04T10:16:46.913Z",
+    "captureEndUTC": "2026-10-04T10:16:46.931Z"
+  },
+  {
+    "file": "returned-list-plus.png",
+    "sourceBasename": "mobile-entry-return.png",
+    "sourceSHA256": "9cc5e4b11720f1e31912d64bbd0a64b662ed0efe0b7c4fe0b7b22987b76a7165",
+    "sourceEncoding": "JPEG",
+    "sourceSize": [
+      402,
+      606
+    ],
+    "boundsLTRB": [
+      323,
+      454,
+      385,
+      516
+    ],
+    "outputSize": [
+      62,
+      62
+    ],
+    "outputSHA256": "085ad4c3fdb00ebf7ca54c73bc42ea14102d6a6c2b7378ce76056e79c47aaadb",
+    "pixelEquality": true,
+    "proofIndex": 2,
+    "DOMUTC": "2026-10-04T10:17:56.690Z",
+    "captureStartUTC": "2026-10-04T10:17:56.695Z",
+    "captureEndUTC": "2026-10-04T10:17:56.714Z"
+  }
+]

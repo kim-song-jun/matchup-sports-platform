@@ -1,0 +1,32 @@
+[
+  {
+    "label": "fresh public list for create-entry navigation supplement",
+    "startUTC": "2026-10-04T10:15:38.035Z",
+    "endUTC": "2026-10-04T10:15:43.382Z"
+  },
+  {
+    "label": "resize create-entry case mobile",
+    "startUTC": "2026-10-04T10:16:06.671Z",
+    "endUTC": "2026-10-04T10:16:12.772Z"
+  },
+  {
+    "label": "mobile zoom110",
+    "startUTC": "2026-10-04T10:16:12.773Z",
+    "endUTC": "2026-10-04T10:16:13.084Z"
+  },
+  {
+    "label": "mobile zoom125",
+    "startUTC": "2026-10-04T10:16:13.085Z",
+    "endUTC": "2026-10-04T10:16:13.396Z"
+  },
+  {
+    "label": "activate route-only mobile plus to first personal-create step",
+    "startUTC": "2026-10-04T10:16:13.420Z",
+    "endUTC": "2026-10-04T10:16:13.511Z"
+  },
+  {
+    "label": "cancel first step without changing values",
+    "startUTC": "2026-10-04T10:16:46.932Z",
+    "endUTC": "2026-10-04T10:16:47.002Z"
+  }
+]

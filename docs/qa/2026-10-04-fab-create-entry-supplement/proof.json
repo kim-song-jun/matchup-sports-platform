@@ -1,0 +1,122 @@
+[
+  {
+    "index": 0,
+    "label": "visible mobile FAB before actual navigation",
+    "search": "",
+    "url": "https://alpha.teameet.co.kr/matches",
+    "utc": "2026-10-04T10:16:13.417Z",
+    "viewport": {
+      "dpr": 1.25,
+      "h": 606,
+      "w": 402
+    },
+    "visibleCreateLinks": [
+      {
+        "aria": "매치 만들기",
+        "href": "/matches/new/sport",
+        "rect": {
+          "bottom": 514,
+          "height": 56,
+          "left": 325.6000061035156,
+          "right": 381.6000061035156,
+          "top": 458,
+          "width": 56,
+          "x": 325.6000061035156,
+          "y": 458
+        }
+      }
+    ]
+  },
+  {
+    "index": 1,
+    "label": "settled first creation page without input or selection changes",
+    "backLinks": [
+      {
+        "href": "/matches"
+      },
+      {
+        "href": "/matches"
+      }
+    ],
+    "buttons": [
+      {
+        "disabled": false,
+        "text": "취소"
+      },
+      {
+        "disabled": false,
+        "text": "다음"
+      }
+    ],
+    "editableFieldCount": 0,
+    "headings": [
+      "매치 만들기",
+      "어떤 종목인가요?"
+    ],
+    "progress": [
+      {
+        "aria": "매치 만들기 1단계/4단계",
+        "value": "1"
+      }
+    ],
+    "sportChoices": [
+      {
+        "checked": null,
+        "pressed": "true",
+        "text": "축구선택됨"
+      },
+      {
+        "checked": null,
+        "pressed": "false",
+        "text": "풋살"
+      },
+      {
+        "checked": null,
+        "pressed": "false",
+        "text": "러닝"
+      },
+      {
+        "checked": null,
+        "pressed": "false",
+        "text": "수영"
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/matches/new/sport",
+    "utc": "2026-10-04T10:16:46.909Z",
+    "viewport": {
+      "dpr": 1.25,
+      "h": 606,
+      "w": 402
+    }
+  },
+  {
+    "index": 2,
+    "label": "actual return via first-step Cancel without input",
+    "firstStepPresent": false,
+    "search": "",
+    "url": "https://alpha.teameet.co.kr/matches",
+    "utc": "2026-10-04T10:17:56.690Z",
+    "viewport": {
+      "dpr": 1.25,
+      "h": 606,
+      "w": 402
+    },
+    "visibleCreateLinks": [
+      {
+        "aria": "매치 만들기",
+        "href": "/matches/new/sport",
+        "rect": {
+          "bottom": 513.2000122070312,
+          "height": 56,
+          "left": 325.6000061035156,
+          "right": 381.6000061035156,
+          "top": 457.2000122070313,
+          "width": 56,
+          "x": 325.6000061035156,
+          "y": 457.2000122070313
+        }
+      }
+    ],
+    "visibleDialogCount": 0
+  }
+]

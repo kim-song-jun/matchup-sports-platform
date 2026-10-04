@@ -1,0 +1,85 @@
+{
+  "files": [
+    {
+      "file": "PUBLISHER-VERIFICATION.md",
+      "bytes": 4819,
+      "sha256": "fb5f05e38fa9a7d6fbcf7a13877918d89931d6936cd9aab70690713d12de7d7d"
+    },
+    {
+      "file": "README.md",
+      "bytes": 1296,
+      "sha256": "42f61518aa87a0a72d5ff060e6ada59025b2d43e4228081023cfbcd947f345fc"
+    },
+    {
+      "file": "SHA256SUMS",
+      "bytes": 1086,
+      "sha256": "0f3b73121ee24e8653a693904cf34ba1ce403a61bd38a8214dc5475f7e51da3d"
+    },
+    {
+      "file": "actions.json",
+      "bytes": 885,
+      "sha256": "63e370fd4d18b83684a811639396b76d91080071e7d4c1308be09143e7afe157"
+    },
+    {
+      "file": "crop-provenance.json",
+      "bytes": 1984,
+      "sha256": "8b160a3c410abb2de699e6bc81d248cc5fb4264ed226a10f318e99aece1abba8"
+    },
+    {
+      "file": "deployment-context.json",
+      "bytes": 443,
+      "sha256": "80357fddaf88dfd8c02565cc3e4ba0b776c4a8cab0dd44c4bcdd28ae43481541"
+    },
+    {
+      "file": "exit.json",
+      "bytes": 609,
+      "sha256": "96efd81d2d06c80a04580e9b3664eedac0766edff19fe64e8c5e31fb7d27d0db"
+    },
+    {
+      "file": "first-create-step.png",
+      "bytes": 41875,
+      "sha256": "b0f63bac820d726f069fd27c389ef798182b8789a58a69131128b5dd9232ad6b"
+    },
+    {
+      "file": "first-step-cancel-control.png",
+      "bytes": 2655,
+      "sha256": "942a4cd7da8013fb6c7a11e88b99f1d2e6b4768cfd04e962cdcadd35c2aeb0c4"
+    },
+    {
+      "file": "manifest.json",
+      "bytes": 1838,
+      "sha256": "f3b19f3a2a7d4e0cefe560f09df3ad1f4b5cd09796bbd8601db911d69790f564"
+    },
+    {
+      "file": "proof.json",
+      "bytes": 2585,
+      "sha256": "56d13c4871a100292dc9853c7d5438f302d2ed32ea4ea67f06b07863c9898497"
+    },
+    {
+      "file": "provenance.json",
+      "bytes": 678,
+      "sha256": "ea9bd2163b352fd1472dcdb037dc18f08a2a82de04e4d3b01e2c254a619e68cd"
+    },
+    {
+      "file": "publisher-verification.json",
+      "bytes": 5348,
+      "sha256": "1ea33bd19b670923174a99b9c05671e4f567ad92a85ccb4eb75062c723b6f44e"
+    },
+    {
+      "file": "returned-list-plus.png",
+      "bytes": 6859,
+      "sha256": "085ad4c3fdb00ebf7ca54c73bc42ea14102d6a6c2b7378ce76056e79c47aaadb"
+    },
+    {
+      "file": "source-contract.json",
+      "bytes": 943,
+      "sha256": "987a2e81b8a8edccd6b94382779e57ec7dd60a7338329a12ac75190ea9504d45"
+    },
+    {
+      "file": "summary.json",
+      "bytes": 2431,
+      "sha256": "f45d29ae35573d5c54761ff2d76c02ed6c572370567112b9ec552923065e21e0"
+    }
+  ],
+  "note": "All delivered files except this manifest; original14-file packet preserved."
+}

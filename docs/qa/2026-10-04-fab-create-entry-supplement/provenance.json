@@ -1,0 +1,11 @@
+{
+  "preparedUTC": "2026-10-04T10:18:58.149951+00:00",
+  "sourceJSONSHA256": {
+    "exit.json": "96efd81d2d06c80a04580e9b3664eedac0766edff19fe64e8c5e31fb7d27d0db",
+    "actions.json": "63e370fd4d18b83684a811639396b76d91080071e7d4c1308be09143e7afe157",
+    "proof.json": "56d13c4871a100292dc9853c7d5438f302d2ed32ea4ea67f06b07863c9898497"
+  },
+  "sourceCaptureMetadataSHA256": "c93df83cf52f3eb31f25fe72954bc780d9d8a5052abccd1d648a9364a835c100",
+  "originalsUnchanged": true,
+  "imageMethod": "Three exact decoded pixel subsets from two real captures. No resampling, masks or color changes. Generic first-step controls and returned plus only; private account/host data omitted."
+}

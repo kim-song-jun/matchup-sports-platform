@@ -1,0 +1,18 @@
+{
+  "commit": "951a67e3423dec502697f8bab2d78696d9374cc5",
+  "sourceOnly": true,
+  "files": [
+    {
+      "path": "apps/v1_web/src/app/matches/new/sport/page.tsx",
+      "blob": "5e72f6a82abdf4a77e61c3a2362a6659c36a3c84",
+      "finding": "Renders MatchCreatePageClient step=sport."
+    },
+    {
+      "path": "apps/v1_web/src/components/matches/matches-create-client.tsx",
+      "blob": "1e953d15e4cba5592dc8bbb8e56559de4c2c97f0",
+      "lines": "50–110,155–203,593–616",
+      "finding": "Entry reads master sports/regions/recent venues and hydrates local draft. Selection hydration persists locally. First-step Back confirms leaving if needed and routes back. Upload is separate callback177; final createMatch.mutate195 is onSubmit only. No mount-time fixture POST was found in this inspected client."
+    }
+  ],
+  "limits": "Normal entry may update local selection draft expiry; not a storage byte-restoration or network/DB audit."
+}

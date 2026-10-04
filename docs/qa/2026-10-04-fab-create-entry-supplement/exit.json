@@ -1,0 +1,28 @@
+{
+  "firstStepPresent": false,
+  "search": "",
+  "url": "https://alpha.teameet.co.kr/matches",
+  "utc": "2026-10-04T10:17:56.690Z",
+  "viewport": {
+    "dpr": 1.25,
+    "h": 606,
+    "w": 402
+  },
+  "visibleCreateLinks": [
+    {
+      "aria": "매치 만들기",
+      "href": "/matches/new/sport",
+      "rect": {
+        "bottom": 513.2000122070312,
+        "height": 56,
+        "left": 325.6000061035156,
+        "right": 381.6000061035156,
+        "top": 457.2000122070313,
+        "width": 56,
+        "x": 325.6000061035156,
+        "y": 457.2000122070313
+      }
+    }
+  ],
+  "visibleDialogCount": 0
+}

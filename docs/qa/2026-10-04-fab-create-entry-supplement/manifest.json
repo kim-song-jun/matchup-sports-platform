@@ -1,0 +1,64 @@
+{
+  "files": [
+    {
+      "file": "README.md",
+      "sha256": "42f61518aa87a0a72d5ff060e6ada59025b2d43e4228081023cfbcd947f345fc",
+      "bytes": 1296
+    },
+    {
+      "file": "actions.json",
+      "sha256": "63e370fd4d18b83684a811639396b76d91080071e7d4c1308be09143e7afe157",
+      "bytes": 885
+    },
+    {
+      "file": "crop-provenance.json",
+      "sha256": "8b160a3c410abb2de699e6bc81d248cc5fb4264ed226a10f318e99aece1abba8",
+      "bytes": 1984
+    },
+    {
+      "file": "deployment-context.json",
+      "sha256": "80357fddaf88dfd8c02565cc3e4ba0b776c4a8cab0dd44c4bcdd28ae43481541",
+      "bytes": 443
+    },
+    {
+      "file": "exit.json",
+      "sha256": "96efd81d2d06c80a04580e9b3664eedac0766edff19fe64e8c5e31fb7d27d0db",
+      "bytes": 609
+    },
+    {
+      "file": "first-create-step.png",
+      "sha256": "b0f63bac820d726f069fd27c389ef798182b8789a58a69131128b5dd9232ad6b",
+      "bytes": 41875
+    },
+    {
+      "file": "first-step-cancel-control.png",
+      "sha256": "942a4cd7da8013fb6c7a11e88b99f1d2e6b4768cfd04e962cdcadd35c2aeb0c4",
+      "bytes": 2655
+    },
+    {
+      "file": "proof.json",
+      "sha256": "56d13c4871a100292dc9853c7d5438f302d2ed32ea4ea67f06b07863c9898497",
+      "bytes": 2585
+    },
+    {
+      "file": "provenance.json",
+      "sha256": "ea9bd2163b352fd1472dcdb037dc18f08a2a82de04e4d3b01e2c254a619e68cd",
+      "bytes": 678
+    },
+    {
+      "file": "returned-list-plus.png",
+      "sha256": "085ad4c3fdb00ebf7ca54c73bc42ea14102d6a6c2b7378ce76056e79c47aaadb",
+      "bytes": 6859
+    },
+    {
+      "file": "source-contract.json",
+      "sha256": "987a2e81b8a8edccd6b94382779e57ec7dd60a7338329a12ac75190ea9504d45",
+      "bytes": 943
+    },
+    {
+      "file": "summary.json",
+      "sha256": "f45d29ae35573d5c54761ff2d76c02ed6c572370567112b9ec552923065e21e0",
+      "bytes": 2431
+    }
+  ]
+}

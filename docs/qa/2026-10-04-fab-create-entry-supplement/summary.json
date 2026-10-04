@@ -1,0 +1,56 @@
+{
+  "scope": "Issue1601 create-entry activation supplement, one mobile402×606 run. No final creation.",
+  "startedUTC": "2026-10-04T10:15:38.035Z",
+  "endedUTC": "2026-10-04T10:17:56.690Z",
+  "counts": {
+    "DOM": 3,
+    "completedActions": 6,
+    "actualCaptureEvents": 2,
+    "safePNGCrops": 3
+  },
+  "result": "The actual visible plus link /matches/new/sport was clicked. The settled1/4 sport page rendered. No choice/input/Next was activated. Its Cancel control returned to the queryless list with the create link still present.",
+  "observations": {
+    "sourcePlus": 0,
+    "firstStep": 1,
+    "return": 2
+  },
+  "limitations": [
+    "Football was already selected when the first page rendered. Whether it was a default or restored selection was not established; no selection action was sent.",
+    "Native input/textarea/select element count0 on the sport step excludes button-based sport choices. It is not a claim that all stored or hidden draft fields are empty.",
+    "No final create, upload, application, search submission or server save was activated. The creation workflow beyond its entry was not tested.",
+    "Local selection hydration may persist and update expiry even without manual choice; no localStorage byte identity claim.",
+    "This supplements earlier three-width visibility and keyboard evidence; it does not repeat creation entry at all widths.",
+    "Actual HTTP/DB behavior and runtime SHA are unobserved. Source and reported deployment are distinct evidence."
+  ],
+  "priorAfter": "https://github.com/kim-song-jun/matchup-sports-platform/blob/fb9580f68213dd5fa93187a60039a613723cbab2/docs/qa/2026-10-04-individual-fab-after/README.md",
+  "final": {
+    "index": 2,
+    "label": "actual return via first-step Cancel without input",
+    "firstStepPresent": false,
+    "search": "",
+    "url": "https://alpha.teameet.co.kr/matches",
+    "utc": "2026-10-04T10:17:56.690Z",
+    "viewport": {
+      "dpr": 1.25,
+      "h": 606,
+      "w": 402
+    },
+    "visibleCreateLinks": [
+      {
+        "aria": "매치 만들기",
+        "href": "/matches/new/sport",
+        "rect": {
+          "bottom": 513.2000122070312,
+          "height": 56,
+          "left": 325.6000061035156,
+          "right": 381.6000061035156,
+          "top": 457.2000122070313,
+          "width": 56,
+          "x": 325.6000061035156,
+          "y": 457.2000122070313
+        }
+      }
+    ],
+    "visibleDialogCount": 0
+  }
+}

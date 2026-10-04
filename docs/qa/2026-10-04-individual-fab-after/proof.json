@@ -1,0 +1,4396 @@
+[
+  {
+    "active": {
+      "aria": null,
+      "focusVisible": false,
+      "href": null,
+      "rect": {
+        "bottom": 605.6000366210938,
+        "height": 605.6000366210938,
+        "left": 0,
+        "right": 401.6000061035156,
+        "top": 0,
+        "width": 401.6000061035156,
+        "x": 0,
+        "y": 0
+      },
+      "tag": "BODY"
+    },
+    "bodyScrollWidth": 402,
+    "creates": [
+      {
+        "aria": "새 매치 만들기",
+        "position": "static",
+        "rect": {
+          "bottom": 0,
+          "height": 0,
+          "left": 0,
+          "right": 0,
+          "top": 0,
+          "width": 0,
+          "x": 0,
+          "y": 0
+        },
+        "text": "매치 만들기",
+        "zIndex": "auto"
+      },
+      {
+        "aria": "매치 만들기",
+        "position": "absolute",
+        "rect": {
+          "bottom": 514,
+          "height": 56,
+          "left": 325.6000061035156,
+          "right": 381.6000061035156,
+          "top": 458,
+          "width": 56,
+          "x": 325.6000061035156,
+          "y": 458
+        },
+        "text": "",
+        "zIndex": "30"
+      }
+    ],
+    "dialogs": 0,
+    "mainScroll": 0,
+    "rail": {
+      "anchors": [
+        {
+          "href": "/matches/id-edb832a4ea13650c",
+          "index": 0,
+          "rect": {
+            "bottom": 598,
+            "height": 285.6000061035156,
+            "left": 16,
+            "right": 292,
+            "top": 312.3999938964844,
+            "width": 276,
+            "x": 16,
+            "y": 312.3999938964844
+          },
+          "tabIndex": 0
+        },
+        {
+          "href": "/matches/id-c6a85e3fe145bb95",
+          "index": 1,
+          "rect": {
+            "bottom": 598,
+            "height": 285.6000061035156,
+            "left": 304,
+            "right": 580,
+            "top": 312.3999938964844,
+            "width": 276,
+            "x": 304,
+            "y": 312.3999938964844
+          },
+          "tabIndex": 0
+        },
+        {
+          "href": "/matches/id-9645589d4a78fb40",
+          "index": 2,
+          "rect": {
+            "bottom": 598,
+            "height": 285.6000061035156,
+            "left": 592,
+            "right": 868,
+            "top": 312.3999938964844,
+            "width": 276,
+            "x": 592,
+            "y": 312.3999938964844
+          },
+          "tabIndex": 0
+        }
+      ],
+      "clientWidth": 370,
+      "paddingLeft": "4px",
+      "paddingRight": "86px",
+      "rect": {
+        "bottom": 602,
+        "height": 293.6000061035156,
+        "left": 16,
+        "right": 385.6000061035156,
+        "top": 308.3999938964844,
+        "width": 369.6000061035156,
+        "x": 16,
+        "y": 308.3999938964844
+      },
+      "scrollLeft": 4,
+      "scrollPaddingLeft": "auto",
+      "scrollPaddingRight": "auto",
+      "scrollWidth": 942
+    },
+    "search": "",
+    "target": {
+      "href": "/matches/id-9645589d4a78fb40",
+      "metaRect": {
+        "bottom": 493.2000122070313,
+        "height": 16,
+        "left": 608.7999877929688,
+        "right": 851.1999969482422,
+        "top": 477.2000122070313,
+        "width": 242.40000915527344,
+        "x": 608.7999877929688,
+        "y": 477.2000122070313
+      },
+      "metaText": "입문-고수 · 혼성 · 참가비 설명: 10000",
+      "numericTextRect": {
+        "bottom": 492.3999938964844,
+        "height": 14.399993896484377,
+        "left": 755.2750244140625,
+        "right": 789.1500244140625,
+        "top": 478,
+        "width": 33.875,
+        "x": 755.2750244140625,
+        "y": 478
+      },
+      "rect": {
+        "bottom": 598,
+        "height": 285.6000061035156,
+        "left": 592,
+        "right": 868,
+        "top": 312.3999938964844,
+        "width": 276,
+        "x": 592,
+        "y": 312.3999938964844
+      }
+    },
+    "url": "https://alpha.teameet.co.kr/matches",
+    "utc": "2026-10-04T09:22:04.000Z",
+    "viewport": {
+      "dpr": 1.25,
+      "h": 606,
+      "w": 402
+    },
+    "windowScroll": {
+      "x": 0,
+      "y": 0
+    },
+    "index": 0,
+    "label": "mobile initial first rail position"
+  },
+  {
+    "active": {
+      "aria": null,
+      "focusVisible": false,
+      "href": null,
+      "rect": {
+        "bottom": 605.6000366210938,
+        "height": 605.6000366210938,
+        "left": 0,
+        "right": 401.6000061035156,
+        "top": 0,
+        "width": 401.6000061035156,
+        "x": 0,
+        "y": 0
+      },
+      "tag": "BODY"
+    },
+    "bodyScrollWidth": 402,
+    "creates": [
+      {
+        "aria": "새 매치 만들기",
+        "position": "static",
+        "rect": {
+          "bottom": 0,
+          "height": 0,
+          "left": 0,
+          "right": 0,
+          "top": 0,
+          "width": 0,
+          "x": 0,
+          "y": 0
+        },
+        "text": "매치 만들기",
+        "zIndex": "auto"
+      },
+      {
+        "aria": "매치 만들기",
+        "position": "absolute",
+        "rect": {
+          "bottom": 514,
+          "height": 56,
+          "left": 325.6000061035156,
+          "right": 381.6000061035156,
+          "top": 458,
+          "width": 56,
+          "x": 325.6000061035156,
+          "y": 458
+        },
+        "text": "",
+        "zIndex": "30"
+      }
+    ],
+    "dialogs": 0,
+    "mainScroll": 0,
+    "rail": {
+      "anchors": [
+        {
+          "href": "/matches/id-edb832a4ea13650c",
+          "index": 0,
+          "rect": {
+            "bottom": 598,
+            "height": 285.6000061035156,
+            "left": -552.7999877929688,
+            "right": -276.79998779296875,
+            "top": 312.3999938964844,
+            "width": 276,
+            "x": -552.7999877929688,
+            "y": 312.3999938964844
+          },
+          "tabIndex": 0
+        },
+        {
+          "href": "/matches/id-c6a85e3fe145bb95",
+          "index": 1,
+          "rect": {
+            "bottom": 598,
+            "height": 285.6000061035156,
+            "left": -264.8000183105469,
+            "right": 11.199981689453123,
+            "top": 312.3999938964844,
+            "width": 276,
+            "x": -264.8000183105469,
+            "y": 312.3999938964844
+          },
+          "tabIndex": 0
+        },
+        {
+          "href": "/matches/id-9645589d4a78fb40",
+          "index": 2,
+          "rect": {
+            "bottom": 598,
+            "height": 285.6000061035156,
+            "left": 23.200000762939453,
+            "right": 299.20000076293945,
+            "top": 312.3999938964844,
+            "width": 276,
+            "x": 23.200000762939453,
+            "y": 312.3999938964844
+          },
+          "tabIndex": 0
+        }
+      ],
+      "clientWidth": 370,
+      "paddingLeft": "4px",
+      "paddingRight": "86px",
+      "rect": {
+        "bottom": 602,
+        "height": 293.6000061035156,
+        "left": 16,
+        "right": 385.6000061035156,
+        "top": 308.3999938964844,
+        "width": 369.6000061035156,
+        "x": 16,
+        "y": 308.3999938964844
+      },
+      "scrollLeft": 572.7999877929688,
+      "scrollPaddingLeft": "auto",
+      "scrollPaddingRight": "auto",
+      "scrollWidth": 942
+    },
+    "search": "",
+    "target": {
+      "href": "/matches/id-9645589d4a78fb40",
+      "metaRect": {
+        "bottom": 493.2000122070313,
+        "height": 16,
+        "left": 40,
+        "right": 282.40000915527344,
+        "top": 477.2000122070313,
+        "width": 242.40000915527344,
+        "x": 40,
+        "y": 477.2000122070313
+      },
+      "metaText": "입문-고수 · 혼성 · 참가비 설명: 10000",
+      "numericTextRect": {
+        "bottom": 492.3999938964844,
+        "height": 14.399993896484377,
+        "left": 186.4750061035156,
+        "right": 220.3500061035156,
+        "top": 478,
+        "width": 33.875,
+        "x": 186.4750061035156,
+        "y": 478
+      },
+      "rect": {
+        "bottom": 598,
+        "height": 285.6000061035156,
+        "left": 23.200000762939453,
+        "right": 299.20000076293945,
+        "top": 312.3999938964844,
+        "width": 276,
+        "x": 23.200000762939453,
+        "y": 312.3999938964844
+      }
+    },
+    "url": "https://alpha.teameet.co.kr/matches",
+    "utc": "2026-10-04T09:22:18.652Z",
+    "viewport": {
+      "dpr": 1.25,
+      "h": 606,
+      "w": 402
+    },
+    "windowScroll": {
+      "x": 0,
+      "y": 0
+    },
+    "index": 1,
+    "label": "mobile settled horizontal end attempt"
+  },
+  {
+    "active": {
+      "aria": null,
+      "focusVisible": true,
+      "href": "/matches?sportId=id-5910324feca2029d",
+      "rect": {
+        "bottom": 200.40000915527344,
+        "height": 44,
+        "left": 88.5875015258789,
+        "right": 149.1750030517578,
+        "top": 156.40000915527344,
+        "width": 60.587501525878906,
+        "x": 88.5875015258789,
+        "y": 156.40000915527344
+      },
+      "tag": "A"
+    },
+    "bodyScrollWidth": 402,
+    "creates": [
+      {
+        "aria": "새 매치 만들기",
+        "position": "static",
+        "rect": {
+          "bottom": 0,
+          "height": 0,
+          "left": 0,
+          "right": 0,
+          "top": 0,
+          "width": 0,
+          "x": 0,
+          "y": 0
+        },
+        "text": "매치 만들기",
+        "zIndex": "auto"
+      },
+      {
+        "aria": "매치 만들기",
+        "position": "absolute",
+        "rect": {
+          "bottom": 514,
+          "height": 56,
+          "left": 325.6000061035156,
+          "right": 381.6000061035156,
+          "top": 458,
+          "width": 56,
+          "x": 325.6000061035156,
+          "y": 458
+        },
+        "text": "",
+        "zIndex": "30"
+      }
+    ],
+    "dialogs": 0,
+    "mainScroll": 0,
+    "rail": {
+      "anchors": [
+        {
+          "href": "/matches/id-edb832a4ea13650c",
+          "index": 0,
+          "rect": {
+            "bottom": 598,
+            "height": 285.6000061035156,
+            "left": 16,
+            "right": 292,
+            "top": 312.3999938964844,
+            "width": 276,
+            "x": 16,
+            "y": 312.3999938964844
+          },
+          "tabIndex": 0
+        },
+        {
+          "href": "/matches/id-c6a85e3fe145bb95",
+          "index": 1,
+          "rect": {
+            "bottom": 598,
+            "height": 285.6000061035156,
+            "left": 304,
+            "right": 580,
+            "top": 312.3999938964844,
+            "width": 276,
+            "x": 304,
+            "y": 312.3999938964844
+          },
+          "tabIndex": 0
+        },
+        {
+          "href": "/matches/id-9645589d4a78fb40",
+          "index": 2,
+          "rect": {
+            "bottom": 598,
+            "height": 285.6000061035156,
+            "left": 592,
+            "right": 868,
+            "top": 312.3999938964844,
+            "width": 276,
+            "x": 592,
+            "y": 312.3999938964844
+          },
+          "tabIndex": 0
+        }
+      ],
+      "clientWidth": 370,
+      "paddingLeft": "4px",
+      "paddingRight": "86px",
+      "rect": {
+        "bottom": 602,
+        "height": 293.6000061035156,
+        "left": 16,
+        "right": 385.6000061035156,
+        "top": 308.3999938964844,
+        "width": 369.6000061035156,
+        "x": 16,
+        "y": 308.3999938964844
+      },
+      "scrollLeft": 4,
+      "scrollPaddingLeft": "auto",
+      "scrollPaddingRight": "auto",
+      "scrollWidth": 942
+    },
+    "search": "",
+    "target": {
+      "href": "/matches/id-9645589d4a78fb40",
+      "metaRect": {
+        "bottom": 493.2000122070313,
+        "height": 16,
+        "left": 608.7999877929688,
+        "right": 851.1999969482422,
+        "top": 477.2000122070313,
+        "width": 242.40000915527344,
+        "x": 608.7999877929688,
+        "y": 477.2000122070313
+      },
+      "metaText": "입문-고수 · 혼성 · 참가비 설명: 10000",
+      "numericTextRect": {
+        "bottom": 492.3999938964844,
+        "height": 14.399993896484377,
+        "left": 755.2750244140625,
+        "right": 789.1500244140625,
+        "top": 478,
+        "width": 33.875,
+        "x": 755.2750244140625,
+        "y": 478
+      },
+      "rect": {
+        "bottom": 598,
+        "height": 285.6000061035156,
+        "left": 592,
+        "right": 868,
+        "top": 312.3999938964844,
+        "width": 276,
+        "x": 592,
+        "y": 312.3999938964844
+      }
+    },
+    "url": "https://alpha.teameet.co.kr/matches",
+    "utc": "2026-10-04T09:23:18.511Z",
+    "viewport": {
+      "dpr": 1.25,
+      "h": 606,
+      "w": 402
+    },
+    "windowScroll": {
+      "x": 0,
+      "y": 0
+    },
+    "index": 2,
+    "label": "mobile first rail link by actual Tab"
+  },
+  {
+    "active": {
+      "aria": null,
+      "focusVisible": true,
+      "href": "/matches/id-edb832a4ea13650c",
+      "rect": {
+        "bottom": 532.4000091552734,
+        "height": 285.6000061035156,
+        "left": 20,
+        "right": 296,
+        "top": 246.8000030517578,
+        "width": 276,
+        "x": 20,
+        "y": 246.8000030517578
+      },
+      "tag": "A"
+    },
+    "bodyScrollWidth": 402,
+    "creates": [
+      {
+        "aria": "새 매치 만들기",
+        "position": "static",
+        "rect": {
+          "bottom": 0,
+          "height": 0,
+          "left": 0,
+          "right": 0,
+          "top": 0,
+          "width": 0,
+          "x": 0,
+          "y": 0
+        },
+        "text": "매치 만들기",
+        "zIndex": "auto"
+      },
+      {
+        "aria": "매치 만들기",
+        "position": "absolute",
+        "rect": {
+          "bottom": 514,
+          "height": 56,
+          "left": 325.6000061035156,
+          "right": 381.6000061035156,
+          "top": 458,
+          "width": 56,
+          "x": 325.6000061035156,
+          "y": 458
+        },
+        "text": "",
+        "zIndex": "30"
+      }
+    ],
+    "dialogs": 0,
+    "mainScroll": 65.5999984741211,
+    "rail": {
+      "anchors": [
+        {
+          "href": "/matches/id-edb832a4ea13650c",
+          "index": 0,
+          "rect": {
+            "bottom": 532.4000091552734,
+            "height": 285.6000061035156,
+            "left": 20,
+            "right": 296,
+            "top": 246.8000030517578,
+            "width": 276,
+            "x": 20,
+            "y": 246.8000030517578
+          },
+          "tabIndex": 0
+        },
+        {
+          "href": "/matches/id-c6a85e3fe145bb95",
+          "index": 1,
+          "rect": {
+            "bottom": 532.4000091552734,
+            "height": 285.6000061035156,
+            "left": 308,
+            "right": 584,
+            "top": 246.8000030517578,
+            "width": 276,
+            "x": 308,
+            "y": 246.8000030517578
+          },
+          "tabIndex": 0
+        },
+        {
+          "href": "/matches/id-9645589d4a78fb40",
+          "index": 2,
+          "rect": {
+            "bottom": 532.4000091552734,
+            "height": 285.6000061035156,
+            "left": 596,
+            "right": 872,
+            "top": 246.8000030517578,
+            "width": 276,
+            "x": 596,
+            "y": 246.8000030517578
+          },
+          "tabIndex": 0
+        }
+      ],
+      "clientWidth": 370,
+      "paddingLeft": "4px",
+      "paddingRight": "86px",
+      "rect": {
+        "bottom": 536.4000091552734,
+        "height": 293.6000061035156,
+        "left": 16,
+        "right": 385.6000061035156,
+        "top": 242.8000030517578,
+        "width": 369.6000061035156,
+        "x": 16,
+        "y": 242.8000030517578
+      },
+      "scrollLeft": 0,
+      "scrollPaddingLeft": "auto",
+      "scrollPaddingRight": "auto",
+      "scrollWidth": 942
+    },
+    "search": "",
+    "target": {
+      "href": "/matches/id-9645589d4a78fb40",
+      "metaRect": {
+        "bottom": 427.6000061035156,
+        "height": 16,
+        "left": 612.7999877929688,
+        "right": 855.1999969482422,
+        "top": 411.6000061035156,
+        "width": 242.40000915527344,
+        "x": 612.7999877929688,
+        "y": 411.6000061035156
+      },
+      "metaText": "입문-고수 · 혼성 · 참가비 설명: 10000",
+      "numericTextRect": {
+        "bottom": 426.8000183105469,
+        "height": 14.4000244140625,
+        "left": 759.2750244140625,
+        "right": 793.1500244140625,
+        "top": 412.3999938964844,
+        "width": 33.875,
+        "x": 759.2750244140625,
+        "y": 412.3999938964844
+      },
+      "rect": {
+        "bottom": 532.4000091552734,
+        "height": 285.6000061035156,
+        "left": 596,
+        "right": 872,
+        "top": 246.8000030517578,
+        "width": 276,
+        "x": 596,
+        "y": 246.8000030517578
+      }
+    },
+    "url": "https://alpha.teameet.co.kr/matches",
+    "utc": "2026-10-04T09:23:42.972Z",
+    "viewport": {
+      "dpr": 1.25,
+      "h": 606,
+      "w": 402
+    },
+    "windowScroll": {
+      "x": 0,
+      "y": 0
+    },
+    "index": 3,
+    "label": "mobile actual first rail focus after14Tabs"
+  },
+  {
+    "active": {
+      "aria": null,
+      "focusVisible": true,
+      "href": "/matches/id-c6a85e3fe145bb95",
+      "rect": {
+        "bottom": 532.4000091552734,
+        "height": 285.6000061035156,
+        "left": 45.60000228881836,
+        "right": 321.60000228881836,
+        "top": 246.8000030517578,
+        "width": 276,
+        "x": 45.60000228881836,
+        "y": 246.8000030517578
+      },
+      "tag": "A"
+    },
+    "bodyScrollWidth": 402,
+    "creates": [
+      {
+        "aria": "새 매치 만들기",
+        "position": "static",
+        "rect": {
+          "bottom": 0,
+          "height": 0,
+          "left": 0,
+          "right": 0,
+          "top": 0,
+          "width": 0,
+          "x": 0,
+          "y": 0
+        },
+        "text": "매치 만들기",
+        "zIndex": "auto"
+      },
+      {
+        "aria": "매치 만들기",
+        "position": "absolute",
+        "rect": {
+          "bottom": 514,
+          "height": 56,
+          "left": 325.6000061035156,
+          "right": 381.6000061035156,
+          "top": 458,
+          "width": 56,
+          "x": 325.6000061035156,
+          "y": 458
+        },
+        "text": "",
+        "zIndex": "30"
+      }
+    ],
+    "dialogs": 0,
+    "mainScroll": 65.5999984741211,
+    "rail": {
+      "anchors": [
+        {
+          "href": "/matches/id-edb832a4ea13650c",
+          "index": 0,
+          "rect": {
+            "bottom": 532.4000091552734,
+            "height": 285.6000061035156,
+            "left": -242.40000915527344,
+            "right": 33.59999084472656,
+            "top": 246.8000030517578,
+            "width": 276,
+            "x": -242.40000915527344,
+            "y": 246.8000030517578
+          },
+          "tabIndex": 0
+        },
+        {
+          "href": "/matches/id-c6a85e3fe145bb95",
+          "index": 1,
+          "rect": {
+            "bottom": 532.4000091552734,
+            "height": 285.6000061035156,
+            "left": 45.60000228881836,
+            "right": 321.60000228881836,
+            "top": 246.8000030517578,
+            "width": 276,
+            "x": 45.60000228881836,
+            "y": 246.8000030517578
+          },
+          "tabIndex": 0
+        },
+        {
+          "href": "/matches/id-9645589d4a78fb40",
+          "index": 2,
+          "rect": {
+            "bottom": 532.4000091552734,
+            "height": 285.6000061035156,
+            "left": 333.6000061035156,
+            "right": 609.6000061035156,
+            "top": 246.8000030517578,
+            "width": 276,
+            "x": 333.6000061035156,
+            "y": 246.8000030517578
+          },
+          "tabIndex": 0
+        }
+      ],
+      "clientWidth": 370,
+      "paddingLeft": "4px",
+      "paddingRight": "86px",
+      "rect": {
+        "bottom": 536.4000091552734,
+        "height": 293.6000061035156,
+        "left": 16,
+        "right": 385.6000061035156,
+        "top": 242.8000030517578,
+        "width": 369.6000061035156,
+        "x": 16,
+        "y": 242.8000030517578
+      },
+      "scrollLeft": 262.3999938964844,
+      "scrollPaddingLeft": "auto",
+      "scrollPaddingRight": "auto",
+      "scrollWidth": 942
+    },
+    "search": "",
+    "target": {
+      "href": "/matches/id-9645589d4a78fb40",
+      "metaRect": {
+        "bottom": 427.6000061035156,
+        "height": 16,
+        "left": 350.3999938964844,
+        "right": 592.8000030517578,
+        "top": 411.6000061035156,
+        "width": 242.40000915527344,
+        "x": 350.3999938964844,
+        "y": 411.6000061035156
+      },
+      "metaText": "입문-고수 · 혼성 · 참가비 설명: 10000",
+      "numericTextRect": {
+        "bottom": 426.8000183105469,
+        "height": 14.4000244140625,
+        "left": 496.875,
+        "right": 530.75,
+        "top": 412.3999938964844,
+        "width": 33.875,
+        "x": 496.875,
+        "y": 412.3999938964844
+      },
+      "rect": {
+        "bottom": 532.4000091552734,
+        "height": 285.6000061035156,
+        "left": 333.6000061035156,
+        "right": 609.6000061035156,
+        "top": 246.8000030517578,
+        "width": 276,
+        "x": 333.6000061035156,
+        "y": 246.8000030517578
+      }
+    },
+    "url": "https://alpha.teameet.co.kr/matches",
+    "utc": "2026-10-04T09:23:53.386Z",
+    "viewport": {
+      "dpr": 1.25,
+      "h": 606,
+      "w": 402
+    },
+    "windowScroll": {
+      "x": 0,
+      "y": 0
+    },
+    "index": 4,
+    "label": "mobile middle rail focus settled"
+  },
+  {
+    "active": {
+      "aria": null,
+      "focusVisible": true,
+      "href": "/matches/id-9645589d4a78fb40",
+      "rect": {
+        "bottom": 532.4000091552734,
+        "height": 285.6000061035156,
+        "left": 45.60000228881836,
+        "right": 321.60000228881836,
+        "top": 246.8000030517578,
+        "width": 276,
+        "x": 45.60000228881836,
+        "y": 246.8000030517578
+      },
+      "tag": "A"
+    },
+    "bodyScrollWidth": 402,
+    "creates": [
+      {
+        "aria": "새 매치 만들기",
+        "position": "static",
+        "rect": {
+          "bottom": 0,
+          "height": 0,
+          "left": 0,
+          "right": 0,
+          "top": 0,
+          "width": 0,
+          "x": 0,
+          "y": 0
+        },
+        "text": "매치 만들기",
+        "zIndex": "auto"
+      },
+      {
+        "aria": "매치 만들기",
+        "position": "absolute",
+        "rect": {
+          "bottom": 514,
+          "height": 56,
+          "left": 325.6000061035156,
+          "right": 381.6000061035156,
+          "top": 458,
+          "width": 56,
+          "x": 325.6000061035156,
+          "y": 458
+        },
+        "text": "",
+        "zIndex": "30"
+      }
+    ],
+    "dialogs": 0,
+    "mainScroll": 65.5999984741211,
+    "rail": {
+      "anchors": [
+        {
+          "href": "/matches/id-edb832a4ea13650c",
+          "index": 0,
+          "rect": {
+            "bottom": 532.4000091552734,
+            "height": 285.6000061035156,
+            "left": -530.4000244140625,
+            "right": -254.4000244140625,
+            "top": 246.8000030517578,
+            "width": 276,
+            "x": -530.4000244140625,
+            "y": 246.8000030517578
+          },
+          "tabIndex": 0
+        },
+        {
+          "href": "/matches/id-c6a85e3fe145bb95",
+          "index": 1,
+          "rect": {
+            "bottom": 532.4000091552734,
+            "height": 285.6000061035156,
+            "left": -242.40000915527344,
+            "right": 33.59999084472656,
+            "top": 246.8000030517578,
+            "width": 276,
+            "x": -242.40000915527344,
+            "y": 246.8000030517578
+          },
+          "tabIndex": 0
+        },
+        {
+          "href": "/matches/id-9645589d4a78fb40",
+          "index": 2,
+          "rect": {
+            "bottom": 532.4000091552734,
+            "height": 285.6000061035156,
+            "left": 45.60000228881836,
+            "right": 321.60000228881836,
+            "top": 246.8000030517578,
+            "width": 276,
+            "x": 45.60000228881836,
+            "y": 246.8000030517578
+          },
+          "tabIndex": 0
+        }
+      ],
+      "clientWidth": 370,
+      "paddingLeft": "4px",
+      "paddingRight": "86px",
+      "rect": {
+        "bottom": 536.4000091552734,
+        "height": 293.6000061035156,
+        "left": 16,
+        "right": 385.6000061035156,
+        "top": 242.8000030517578,
+        "width": 369.6000061035156,
+        "x": 16,
+        "y": 242.8000030517578
+      },
+      "scrollLeft": 550.4000244140625,
+      "scrollPaddingLeft": "auto",
+      "scrollPaddingRight": "auto",
+      "scrollWidth": 942
+    },
+    "search": "",
+    "target": {
+      "href": "/matches/id-9645589d4a78fb40",
+      "metaRect": {
+        "bottom": 427.6000061035156,
+        "height": 16,
+        "left": 62.400001525878906,
+        "right": 304.80001068115234,
+        "top": 411.6000061035156,
+        "width": 242.40000915527344,
+        "x": 62.400001525878906,
+        "y": 411.6000061035156
+      },
+      "metaText": "입문-고수 · 혼성 · 참가비 설명: 10000",
+      "numericTextRect": {
+        "bottom": 426.8000183105469,
+        "height": 14.4000244140625,
+        "left": 208.875,
+        "right": 242.75,
+        "top": 412.3999938964844,
+        "width": 33.875,
+        "x": 208.875,
+        "y": 412.3999938964844
+      },
+      "rect": {
+        "bottom": 532.4000091552734,
+        "height": 285.6000061035156,
+        "left": 45.60000228881836,
+        "right": 321.60000228881836,
+        "top": 246.8000030517578,
+        "width": 276,
+        "x": 45.60000228881836,
+        "y": 246.8000030517578
+      }
+    },
+    "url": "https://alpha.teameet.co.kr/matches",
+    "utc": "2026-10-04T09:24:09.173Z",
+    "viewport": {
+      "dpr": 1.25,
+      "h": 606,
+      "w": 402
+    },
+    "windowScroll": {
+      "x": 0,
+      "y": 0
+    },
+    "index": 5,
+    "label": "mobile final rail focus settled"
+  },
+  {
+    "active": {
+      "aria": null,
+      "focusVisible": true,
+      "href": "/matches/id-c6a85e3fe145bb95",
+      "rect": {
+        "bottom": 532.4000091552734,
+        "height": 285.6000061035156,
+        "left": 20,
+        "right": 296,
+        "top": 246.8000030517578,
+        "width": 276,
+        "x": 20,
+        "y": 246.8000030517578
+      },
+      "tag": "A"
+    },
+    "bodyScrollWidth": 402,
+    "creates": [
+      {
+        "aria": "새 매치 만들기",
+        "position": "static",
+        "rect": {
+          "bottom": 0,
+          "height": 0,
+          "left": 0,
+          "right": 0,
+          "top": 0,
+          "width": 0,
+          "x": 0,
+          "y": 0
+        },
+        "text": "매치 만들기",
+        "zIndex": "auto"
+      },
+      {
+        "aria": "매치 만들기",
+        "position": "absolute",
+        "rect": {
+          "bottom": 514,
+          "height": 56,
+          "left": 325.6000061035156,
+          "right": 381.6000061035156,
+          "top": 458,
+          "width": 56,
+          "x": 325.6000061035156,
+          "y": 458
+        },
+        "text": "",
+        "zIndex": "30"
+      }
+    ],
+    "dialogs": 0,
+    "mainScroll": 65.5999984741211,
+    "rail": {
+      "anchors": [
+        {
+          "href": "/matches/id-edb832a4ea13650c",
+          "index": 0,
+          "rect": {
+            "bottom": 532.4000091552734,
+            "height": 285.6000061035156,
+            "left": -268,
+            "right": 8,
+            "top": 246.8000030517578,
+            "width": 276,
+            "x": -268,
+            "y": 246.8000030517578
+          },
+          "tabIndex": 0
+        },
+        {
+          "href": "/matches/id-c6a85e3fe145bb95",
+          "index": 1,
+          "rect": {
+            "bottom": 532.4000091552734,
+            "height": 285.6000061035156,
+            "left": 20,
+            "right": 296,
+            "top": 246.8000030517578,
+            "width": 276,
+            "x": 20,
+            "y": 246.8000030517578
+          },
+          "tabIndex": 0
+        },
+        {
+          "href": "/matches/id-9645589d4a78fb40",
+          "index": 2,
+          "rect": {
+            "bottom": 532.4000091552734,
+            "height": 285.6000061035156,
+            "left": 308,
+            "right": 584,
+            "top": 246.8000030517578,
+            "width": 276,
+            "x": 308,
+            "y": 246.8000030517578
+          },
+          "tabIndex": 0
+        }
+      ],
+      "clientWidth": 370,
+      "paddingLeft": "4px",
+      "paddingRight": "86px",
+      "rect": {
+        "bottom": 536.4000091552734,
+        "height": 293.6000061035156,
+        "left": 16,
+        "right": 385.6000061035156,
+        "top": 242.8000030517578,
+        "width": 369.6000061035156,
+        "x": 16,
+        "y": 242.8000030517578
+      },
+      "scrollLeft": 288,
+      "scrollPaddingLeft": "auto",
+      "scrollPaddingRight": "auto",
+      "scrollWidth": 942
+    },
+    "search": "",
+    "target": {
+      "href": "/matches/id-9645589d4a78fb40",
+      "metaRect": {
+        "bottom": 427.6000061035156,
+        "height": 16,
+        "left": 324.8000183105469,
+        "right": 567.2000274658203,
+        "top": 411.6000061035156,
+        "width": 242.40000915527344,
+        "x": 324.8000183105469,
+        "y": 411.6000061035156
+      },
+      "metaText": "입문-고수 · 혼성 · 참가비 설명: 10000",
+      "numericTextRect": {
+        "bottom": 426.8000183105469,
+        "height": 14.4000244140625,
+        "left": 471.2749938964844,
+        "right": 505.1499938964844,
+        "top": 412.3999938964844,
+        "width": 33.875,
+        "x": 471.2749938964844,
+        "y": 412.3999938964844
+      },
+      "rect": {
+        "bottom": 532.4000091552734,
+        "height": 285.6000061035156,
+        "left": 308,
+        "right": 584,
+        "top": 246.8000030517578,
+        "width": 276,
+        "x": 308,
+        "y": 246.8000030517578
+      }
+    },
+    "url": "https://alpha.teameet.co.kr/matches",
+    "utc": "2026-10-04T09:24:20.226Z",
+    "viewport": {
+      "dpr": 1.25,
+      "h": 606,
+      "w": 402
+    },
+    "windowScroll": {
+      "x": 0,
+      "y": 0
+    },
+    "index": 6,
+    "label": "mobile reverse to middle settled"
+  },
+  {
+    "active": {
+      "aria": null,
+      "focusVisible": true,
+      "href": "/matches/id-edb832a4ea13650c",
+      "rect": {
+        "bottom": 532.4000091552734,
+        "height": 285.6000061035156,
+        "left": 20,
+        "right": 296,
+        "top": 246.8000030517578,
+        "width": 276,
+        "x": 20,
+        "y": 246.8000030517578
+      },
+      "tag": "A"
+    },
+    "bodyScrollWidth": 402,
+    "creates": [
+      {
+        "aria": "새 매치 만들기",
+        "position": "static",
+        "rect": {
+          "bottom": 0,
+          "height": 0,
+          "left": 0,
+          "right": 0,
+          "top": 0,
+          "width": 0,
+          "x": 0,
+          "y": 0
+        },
+        "text": "매치 만들기",
+        "zIndex": "auto"
+      },
+      {
+        "aria": "매치 만들기",
+        "position": "absolute",
+        "rect": {
+          "bottom": 514,
+          "height": 56,
+          "left": 325.6000061035156,
+          "right": 381.6000061035156,
+          "top": 458,
+          "width": 56,
+          "x": 325.6000061035156,
+          "y": 458
+        },
+        "text": "",
+        "zIndex": "30"
+      }
+    ],
+    "dialogs": 0,
+    "mainScroll": 65.5999984741211,
+    "rail": {
+      "anchors": [
+        {
+          "href": "/matches/id-edb832a4ea13650c",
+          "index": 0,
+          "rect": {
+            "bottom": 532.4000091552734,
+            "height": 285.6000061035156,
+            "left": 20,
+            "right": 296,
+            "top": 246.8000030517578,
+            "width": 276,
+            "x": 20,
+            "y": 246.8000030517578
+          },
+          "tabIndex": 0
+        },
+        {
+          "href": "/matches/id-c6a85e3fe145bb95",
+          "index": 1,
+          "rect": {
+            "bottom": 532.4000091552734,
+            "height": 285.6000061035156,
+            "left": 308,
+            "right": 584,
+            "top": 246.8000030517578,
+            "width": 276,
+            "x": 308,
+            "y": 246.8000030517578
+          },
+          "tabIndex": 0
+        },
+        {
+          "href": "/matches/id-9645589d4a78fb40",
+          "index": 2,
+          "rect": {
+            "bottom": 532.4000091552734,
+            "height": 285.6000061035156,
+            "left": 596,
+            "right": 872,
+            "top": 246.8000030517578,
+            "width": 276,
+            "x": 596,
+            "y": 246.8000030517578
+          },
+          "tabIndex": 0
+        }
+      ],
+      "clientWidth": 370,
+      "paddingLeft": "4px",
+      "paddingRight": "86px",
+      "rect": {
+        "bottom": 536.4000091552734,
+        "height": 293.6000061035156,
+        "left": 16,
+        "right": 385.6000061035156,
+        "top": 242.8000030517578,
+        "width": 369.6000061035156,
+        "x": 16,
+        "y": 242.8000030517578
+      },
+      "scrollLeft": 0,
+      "scrollWidth": 942
+    },
+    "search": "",
+    "target": {
+      "href": "/matches/id-9645589d4a78fb40",
+      "metaRect": {
+        "bottom": 427.6000061035156,
+        "height": 16,
+        "left": 612.7999877929688,
+        "right": 855.1999969482422,
+        "top": 411.6000061035156,
+        "width": 242.40000915527344,
+        "x": 612.7999877929688,
+        "y": 411.6000061035156
+      },
+      "metaText": "입문-고수 · 혼성 · 참가비 설명: 10000",
+      "numericTextRect": {
+        "bottom": 426.8000183105469,
+        "height": 14.4000244140625,
+        "left": 759.2750244140625,
+        "right": 793.1500244140625,
+        "top": 412.3999938964844,
+        "width": 33.875,
+        "x": 759.2750244140625,
+        "y": 412.3999938964844
+      },
+      "rect": {
+        "bottom": 532.4000091552734,
+        "height": 285.6000061035156,
+        "left": 596,
+        "right": 872,
+        "top": 246.8000030517578,
+        "width": 276,
+        "x": 596,
+        "y": 246.8000030517578
+      }
+    },
+    "url": "https://alpha.teameet.co.kr/matches",
+    "utc": "2026-10-04T09:25:02.166Z",
+    "viewport": {
+      "dpr": 1.25,
+      "h": 606,
+      "w": 402
+    },
+    "windowScroll": {
+      "x": 0,
+      "y": 0
+    },
+    "index": 7,
+    "label": "mobile reverse first settled"
+  },
+  {
+    "active": {
+      "aria": null,
+      "focusVisible": true,
+      "href": "/matches/id-9645589d4a78fb40",
+      "rect": {
+        "bottom": 598,
+        "height": 285.6000061035156,
+        "left": 45.60000228881836,
+        "right": 321.60000228881836,
+        "top": 312.3999938964844,
+        "width": 276,
+        "x": 45.60000228881836,
+        "y": 312.3999938964844
+      },
+      "tag": "A"
+    },
+    "bodyScrollWidth": 402,
+    "creates": [
+      {
+        "aria": "새 매치 만들기",
+        "position": "static",
+        "rect": {
+          "bottom": 0,
+          "height": 0,
+          "left": 0,
+          "right": 0,
+          "top": 0,
+          "width": 0,
+          "x": 0,
+          "y": 0
+        },
+        "text": "매치 만들기",
+        "zIndex": "auto"
+      },
+      {
+        "aria": "매치 만들기",
+        "position": "absolute",
+        "rect": {
+          "bottom": 514,
+          "height": 56,
+          "left": 325.6000061035156,
+          "right": 381.6000061035156,
+          "top": 458,
+          "width": 56,
+          "x": 325.6000061035156,
+          "y": 458
+        },
+        "text": "",
+        "zIndex": "30"
+      }
+    ],
+    "dialogs": 0,
+    "mainScroll": 0,
+    "rail": {
+      "anchors": [
+        {
+          "href": "/matches/id-edb832a4ea13650c",
+          "index": 0,
+          "rect": {
+            "bottom": 598,
+            "height": 285.6000061035156,
+            "left": -530.4000244140625,
+            "right": -254.4000244140625,
+            "top": 312.3999938964844,
+            "width": 276,
+            "x": -530.4000244140625,
+            "y": 312.3999938964844
+          },
+          "tabIndex": 0
+        },
+        {
+          "href": "/matches/id-c6a85e3fe145bb95",
+          "index": 1,
+          "rect": {
+            "bottom": 598,
+            "height": 285.6000061035156,
+            "left": -242.40000915527344,
+            "right": 33.59999084472656,
+            "top": 312.3999938964844,
+            "width": 276,
+            "x": -242.40000915527344,
+            "y": 312.3999938964844
+          },
+          "tabIndex": 0
+        },
+        {
+          "href": "/matches/id-9645589d4a78fb40",
+          "index": 2,
+          "rect": {
+            "bottom": 598,
+            "height": 285.6000061035156,
+            "left": 45.60000228881836,
+            "right": 321.60000228881836,
+            "top": 312.3999938964844,
+            "width": 276,
+            "x": 45.60000228881836,
+            "y": 312.3999938964844
+          },
+          "tabIndex": 0
+        }
+      ],
+      "clientWidth": 370,
+      "paddingLeft": "4px",
+      "paddingRight": "86px",
+      "rect": {
+        "bottom": 602,
+        "height": 293.6000061035156,
+        "left": 16,
+        "right": 385.6000061035156,
+        "top": 308.3999938964844,
+        "width": 369.6000061035156,
+        "x": 16,
+        "y": 308.3999938964844
+      },
+      "scrollLeft": 550.4000244140625,
+      "scrollWidth": 942
+    },
+    "search": "",
+    "target": {
+      "href": "/matches/id-9645589d4a78fb40",
+      "metaRect": {
+        "bottom": 493.2000122070313,
+        "height": 16,
+        "left": 62.400001525878906,
+        "right": 304.80001068115234,
+        "top": 477.2000122070313,
+        "width": 242.40000915527344,
+        "x": 62.400001525878906,
+        "y": 477.2000122070313
+      },
+      "metaText": "입문-고수 · 혼성 · 참가비 설명: 10000",
+      "numericTextRect": {
+        "bottom": 492.3999938964844,
+        "height": 14.399993896484377,
+        "left": 208.875,
+        "right": 242.75,
+        "top": 478,
+        "width": 33.875,
+        "x": 208.875,
+        "y": 478
+      },
+      "rect": {
+        "bottom": 598,
+        "height": 285.6000061035156,
+        "left": 45.60000228881836,
+        "right": 321.60000228881836,
+        "top": 312.3999938964844,
+        "width": 276,
+        "x": 45.60000228881836,
+        "y": 312.3999938964844
+      }
+    },
+    "url": "https://alpha.teameet.co.kr/matches",
+    "utc": "2026-10-04T09:25:42.589Z",
+    "viewport": {
+      "dpr": 1.25,
+      "h": 606,
+      "w": 402
+    },
+    "windowScroll": {
+      "x": 0,
+      "y": 0
+    },
+    "index": 8,
+    "label": "mobile final focused after upward scroll to top"
+  },
+  {
+    "active": {
+      "aria": null,
+      "focusVisible": false,
+      "href": null,
+      "rect": {
+        "bottom": 605.6000366210938,
+        "height": 605.6000366210938,
+        "left": 0,
+        "right": 401.6000061035156,
+        "top": 0,
+        "width": 401.6000061035156,
+        "x": 0,
+        "y": 0
+      },
+      "tag": "BODY"
+    },
+    "bodyScrollWidth": 402,
+    "creates": [
+      {
+        "aria": "새 매치 만들기",
+        "position": "static",
+        "rect": {
+          "bottom": 0,
+          "height": 0,
+          "left": 0,
+          "right": 0,
+          "top": 0,
+          "width": 0,
+          "x": 0,
+          "y": 0
+        },
+        "text": "매치 만들기",
+        "zIndex": "auto"
+      },
+      {
+        "aria": "매치 만들기",
+        "position": "absolute",
+        "rect": {
+          "bottom": 514,
+          "height": 56,
+          "left": 325.6000061035156,
+          "right": 381.6000061035156,
+          "top": 458,
+          "width": 56,
+          "x": 325.6000061035156,
+          "y": 458
+        },
+        "text": "",
+        "zIndex": "30"
+      }
+    ],
+    "dialogs": 0,
+    "mainScroll": 0,
+    "rail": {
+      "anchors": [
+        {
+          "href": "/matches/id-edb832a4ea13650c",
+          "index": 0,
+          "rect": {
+            "bottom": 598,
+            "height": 285.6000061035156,
+            "left": 16,
+            "right": 292,
+            "top": 312.3999938964844,
+            "width": 276,
+            "x": 16,
+            "y": 312.3999938964844
+          },
+          "tabIndex": 0
+        },
+        {
+          "href": "/matches/id-c6a85e3fe145bb95",
+          "index": 1,
+          "rect": {
+            "bottom": 598,
+            "height": 285.6000061035156,
+            "left": 304,
+            "right": 580,
+            "top": 312.3999938964844,
+            "width": 276,
+            "x": 304,
+            "y": 312.3999938964844
+          },
+          "tabIndex": 0
+        },
+        {
+          "href": "/matches/id-9645589d4a78fb40",
+          "index": 2,
+          "rect": {
+            "bottom": 598,
+            "height": 285.6000061035156,
+            "left": 592,
+            "right": 868,
+            "top": 312.3999938964844,
+            "width": 276,
+            "x": 592,
+            "y": 312.3999938964844
+          },
+          "tabIndex": 0
+        }
+      ],
+      "clientWidth": 370,
+      "paddingLeft": "4px",
+      "paddingRight": "86px",
+      "rect": {
+        "bottom": 602,
+        "height": 293.6000061035156,
+        "left": 16,
+        "right": 385.6000061035156,
+        "top": 308.3999938964844,
+        "width": 369.6000061035156,
+        "x": 16,
+        "y": 308.3999938964844
+      },
+      "scrollLeft": 4,
+      "scrollWidth": 942
+    },
+    "search": "",
+    "target": {
+      "href": "/matches/id-9645589d4a78fb40",
+      "metaRect": {
+        "bottom": 493.2000122070313,
+        "height": 16,
+        "left": 608.7999877929688,
+        "right": 851.1999969482422,
+        "top": 477.2000122070313,
+        "width": 242.40000915527344,
+        "x": 608.7999877929688,
+        "y": 477.2000122070313
+      },
+      "metaText": "입문-고수 · 혼성 · 참가비 설명: 10000",
+      "numericTextRect": {
+        "bottom": 492.3999938964844,
+        "height": 14.399993896484377,
+        "left": 755.2750244140625,
+        "right": 789.1500244140625,
+        "top": 478,
+        "width": 33.875,
+        "x": 755.2750244140625,
+        "y": 478
+      },
+      "rect": {
+        "bottom": 598,
+        "height": 285.6000061035156,
+        "left": 592,
+        "right": 868,
+        "top": 312.3999938964844,
+        "width": 276,
+        "x": 592,
+        "y": 312.3999938964844
+      }
+    },
+    "url": "https://alpha.teameet.co.kr/matches",
+    "utc": "2026-10-04T09:26:11.331Z",
+    "viewport": {
+      "dpr": 1.25,
+      "h": 606,
+      "w": 402
+    },
+    "windowScroll": {
+      "x": 0,
+      "y": 0
+    },
+    "index": 9,
+    "label": "mobile settled browser Back from target detail"
+  },
+  {
+    "active": {
+      "aria": null,
+      "focusVisible": false,
+      "href": null,
+      "rect": {
+        "bottom": 504.6666870117187,
+        "height": 504.6666870117187,
+        "left": 0,
+        "right": 788,
+        "top": 0,
+        "width": 788,
+        "x": 0,
+        "y": 0
+      },
+      "tag": "BODY"
+    },
+    "bodyScrollWidth": 788,
+    "creates": [
+      {
+        "aria": "새 매치 만들기",
+        "position": "static",
+        "rect": {
+          "bottom": 0,
+          "height": 0,
+          "left": 0,
+          "right": 0,
+          "top": 0,
+          "width": 0,
+          "x": 0,
+          "y": 0
+        },
+        "text": "매치 만들기",
+        "zIndex": "auto"
+      },
+      {
+        "aria": "매치 만들기",
+        "position": "absolute",
+        "rect": {
+          "bottom": 413,
+          "height": 56,
+          "left": 618,
+          "right": 674,
+          "top": 357,
+          "width": 56,
+          "x": 618,
+          "y": 357
+        },
+        "text": "",
+        "zIndex": "30"
+      }
+    ],
+    "dialogs": 0,
+    "mainScroll": 0,
+    "rail": {
+      "anchors": [
+        {
+          "href": "/matches/id-edb832a4ea13650c",
+          "index": 0,
+          "rect": {
+            "bottom": 597.3333435058594,
+            "height": 285.3333435058594,
+            "left": 110,
+            "right": 386,
+            "top": 312,
+            "width": 276,
+            "x": 110,
+            "y": 312
+          },
+          "tabIndex": 0
+        },
+        {
+          "href": "/matches/id-c6a85e3fe145bb95",
+          "index": 1,
+          "rect": {
+            "bottom": 597.3333435058594,
+            "height": 285.3333435058594,
+            "left": 398,
+            "right": 674,
+            "top": 312,
+            "width": 276,
+            "x": 398,
+            "y": 312
+          },
+          "tabIndex": 0
+        },
+        {
+          "href": "/matches/id-9645589d4a78fb40",
+          "index": 2,
+          "rect": {
+            "bottom": 597.3333435058594,
+            "height": 285.3333435058594,
+            "left": 686,
+            "right": 962,
+            "top": 312,
+            "width": 276,
+            "x": 686,
+            "y": 312
+          },
+          "tabIndex": 0
+        }
+      ],
+      "clientWidth": 568,
+      "paddingLeft": "4px",
+      "paddingRight": "86px",
+      "rect": {
+        "bottom": 601.3333435058594,
+        "height": 293.3333435058594,
+        "left": 110,
+        "right": 678,
+        "top": 308,
+        "width": 568,
+        "x": 110,
+        "y": 308
+      },
+      "scrollLeft": 4,
+      "scrollWidth": 942
+    },
+    "search": "",
+    "target": {
+      "href": "/matches/id-9645589d4a78fb40",
+      "metaRect": {
+        "bottom": 492.6666870117187,
+        "height": 16,
+        "left": 702.6666870117188,
+        "right": 945.3333587646484,
+        "top": 476.6666870117187,
+        "width": 242.6666717529297,
+        "x": 702.6666870117188,
+        "y": 476.6666870117187
+      },
+      "metaText": "입문-고수 · 혼성 · 참가비 설명: 10000",
+      "numericTextRect": {
+        "bottom": 491.3333435058594,
+        "height": 14,
+        "left": 849.1458740234375,
+        "right": 883.0104370117188,
+        "top": 477.3333435058594,
+        "width": 33.86456298828125,
+        "x": 849.1458740234375,
+        "y": 477.3333435058594
+      },
+      "rect": {
+        "bottom": 597.3333435058594,
+        "height": 285.3333435058594,
+        "left": 686,
+        "right": 962,
+        "top": 312,
+        "width": 276,
+        "x": 686,
+        "y": 312
+      }
+    },
+    "url": "https://alpha.teameet.co.kr/matches",
+    "utc": "2026-10-04T09:26:47.718Z",
+    "viewport": {
+      "dpr": 1.5,
+      "h": 505,
+      "w": 788
+    },
+    "windowScroll": {
+      "x": 0,
+      "y": 0
+    },
+    "index": 10,
+    "label": "tablet initial layout after resize"
+  },
+  {
+    "active": {
+      "aria": null,
+      "focusVisible": false,
+      "href": null,
+      "rect": {
+        "bottom": 504.6666870117187,
+        "height": 504.6666870117187,
+        "left": 0,
+        "right": 788,
+        "top": 0,
+        "width": 788,
+        "x": 0,
+        "y": 0
+      },
+      "tag": "BODY"
+    },
+    "bodyScrollWidth": 788,
+    "creates": [
+      {
+        "aria": "새 매치 만들기",
+        "position": "static",
+        "rect": {
+          "bottom": 0,
+          "height": 0,
+          "left": 0,
+          "right": 0,
+          "top": 0,
+          "width": 0,
+          "x": 0,
+          "y": 0
+        },
+        "text": "매치 만들기",
+        "zIndex": "auto"
+      },
+      {
+        "aria": "매치 만들기",
+        "position": "absolute",
+        "rect": {
+          "bottom": 413,
+          "height": 56,
+          "left": 618,
+          "right": 674,
+          "top": 357,
+          "width": 56,
+          "x": 618,
+          "y": 357
+        },
+        "text": "",
+        "zIndex": "30"
+      }
+    ],
+    "dialogs": 0,
+    "mainScroll": 0,
+    "rail": {
+      "anchors": [
+        {
+          "href": "/matches/id-edb832a4ea13650c",
+          "index": 0,
+          "rect": {
+            "bottom": 597.3333435058594,
+            "height": 285.3333435058594,
+            "left": -260,
+            "right": 16,
+            "top": 312,
+            "width": 276,
+            "x": -260,
+            "y": 312
+          },
+          "tabIndex": 0
+        },
+        {
+          "href": "/matches/id-c6a85e3fe145bb95",
+          "index": 1,
+          "rect": {
+            "bottom": 597.3333435058594,
+            "height": 285.3333435058594,
+            "left": 28,
+            "right": 304,
+            "top": 312,
+            "width": 276,
+            "x": 28,
+            "y": 312
+          },
+          "tabIndex": 0
+        },
+        {
+          "href": "/matches/id-9645589d4a78fb40",
+          "index": 2,
+          "rect": {
+            "bottom": 597.3333435058594,
+            "height": 285.3333435058594,
+            "left": 316,
+            "right": 592,
+            "top": 312,
+            "width": 276,
+            "x": 316,
+            "y": 312
+          },
+          "tabIndex": 0
+        }
+      ],
+      "clientWidth": 568,
+      "paddingLeft": "4px",
+      "paddingRight": "86px",
+      "rect": {
+        "bottom": 601.3333435058594,
+        "height": 293.3333435058594,
+        "left": 110,
+        "right": 678,
+        "top": 308,
+        "width": 568,
+        "x": 110,
+        "y": 308
+      },
+      "scrollLeft": 374,
+      "scrollWidth": 942
+    },
+    "search": "",
+    "target": {
+      "href": "/matches/id-9645589d4a78fb40",
+      "metaRect": {
+        "bottom": 492.6666870117187,
+        "height": 16,
+        "left": 332.66668701171875,
+        "right": 575.3333587646484,
+        "top": 476.6666870117187,
+        "width": 242.6666717529297,
+        "x": 332.66668701171875,
+        "y": 476.6666870117187
+      },
+      "metaText": "입문-고수 · 혼성 · 참가비 설명: 10000",
+      "numericTextRect": {
+        "bottom": 491.3333435058594,
+        "height": 14,
+        "left": 479.1458435058594,
+        "right": 513.0104370117188,
+        "top": 477.3333435058594,
+        "width": 33.864593505859375,
+        "x": 479.1458435058594,
+        "y": 477.3333435058594
+      },
+      "rect": {
+        "bottom": 597.3333435058594,
+        "height": 285.3333435058594,
+        "left": 316,
+        "right": 592,
+        "top": 312,
+        "width": 276,
+        "x": 316,
+        "y": 312
+      }
+    },
+    "url": "https://alpha.teameet.co.kr/matches",
+    "utc": "2026-10-04T09:27:14.905Z",
+    "viewport": {
+      "dpr": 1.5,
+      "h": 505,
+      "w": 788
+    },
+    "windowScroll": {
+      "x": 0,
+      "y": 0
+    },
+    "index": 11,
+    "label": "tablet horizontal end at top vertical position"
+  },
+  {
+    "active": {
+      "aria": null,
+      "focusVisible": true,
+      "href": "/matches/id-edb832a4ea13650c",
+      "rect": {
+        "bottom": 431.3333435058594,
+        "height": 285.3333435058594,
+        "left": 114,
+        "right": 390,
+        "top": 146,
+        "width": 276,
+        "x": 114,
+        "y": 146
+      },
+      "tag": "A"
+    },
+    "bodyScrollWidth": 788,
+    "creates": [
+      {
+        "aria": "새 매치 만들기",
+        "position": "static",
+        "rect": {
+          "bottom": 0,
+          "height": 0,
+          "left": 0,
+          "right": 0,
+          "top": 0,
+          "width": 0,
+          "x": 0,
+          "y": 0
+        },
+        "text": "매치 만들기",
+        "zIndex": "auto"
+      },
+      {
+        "aria": "매치 만들기",
+        "position": "absolute",
+        "rect": {
+          "bottom": 413,
+          "height": 56,
+          "left": 618,
+          "right": 674,
+          "top": 357,
+          "width": 56,
+          "x": 618,
+          "y": 357
+        },
+        "text": "",
+        "zIndex": "30"
+      }
+    ],
+    "dialogs": 0,
+    "mainScroll": 166,
+    "rail": {
+      "anchors": [
+        {
+          "href": "/matches/id-edb832a4ea13650c",
+          "index": 0,
+          "rect": {
+            "bottom": 431.3333435058594,
+            "height": 285.3333435058594,
+            "left": 114,
+            "right": 390,
+            "top": 146,
+            "width": 276,
+            "x": 114,
+            "y": 146
+          },
+          "tabIndex": 0
+        },
+        {
+          "href": "/matches/id-c6a85e3fe145bb95",
+          "index": 1,
+          "rect": {
+            "bottom": 431.3333435058594,
+            "height": 285.3333435058594,
+            "left": 402,
+            "right": 678,
+            "top": 146,
+            "width": 276,
+            "x": 402,
+            "y": 146
+          },
+          "tabIndex": 0
+        },
+        {
+          "href": "/matches/id-9645589d4a78fb40",
+          "index": 2,
+          "rect": {
+            "bottom": 431.3333435058594,
+            "height": 285.3333435058594,
+            "left": 690,
+            "right": 966,
+            "top": 146,
+            "width": 276,
+            "x": 690,
+            "y": 146
+          },
+          "tabIndex": 0
+        }
+      ],
+      "clientWidth": 568,
+      "paddingLeft": "4px",
+      "paddingRight": "86px",
+      "rect": {
+        "bottom": 435.3333435058594,
+        "height": 293.3333435058594,
+        "left": 110,
+        "right": 678,
+        "top": 142,
+        "width": 568,
+        "x": 110,
+        "y": 142
+      },
+      "scrollLeft": 0,
+      "scrollWidth": 942
+    },
+    "search": "",
+    "target": {
+      "href": "/matches/id-9645589d4a78fb40",
+      "metaRect": {
+        "bottom": 326.66668701171875,
+        "height": 16,
+        "left": 706.6666870117188,
+        "right": 949.3333587646484,
+        "top": 310.66668701171875,
+        "width": 242.6666717529297,
+        "x": 706.6666870117188,
+        "y": 310.66668701171875
+      },
+      "metaText": "입문-고수 · 혼성 · 참가비 설명: 10000",
+      "numericTextRect": {
+        "bottom": 325.3333435058594,
+        "height": 14,
+        "left": 853.1458740234375,
+        "right": 887.0104370117188,
+        "top": 311.3333435058594,
+        "width": 33.86456298828125,
+        "x": 853.1458740234375,
+        "y": 311.3333435058594
+      },
+      "rect": {
+        "bottom": 431.3333435058594,
+        "height": 285.3333435058594,
+        "left": 690,
+        "right": 966,
+        "top": 146,
+        "width": 276,
+        "x": 690,
+        "y": 146
+      }
+    },
+    "url": "https://alpha.teameet.co.kr/matches",
+    "utc": "2026-10-04T09:27:25.968Z",
+    "viewport": {
+      "dpr": 1.5,
+      "h": 505,
+      "w": 788
+    },
+    "windowScroll": {
+      "x": 0,
+      "y": 0
+    },
+    "index": 12,
+    "label": "tablet first rail focused after locator Tab"
+  },
+  {
+    "active": {
+      "aria": null,
+      "focusVisible": true,
+      "href": "/matches/id-c6a85e3fe145bb95",
+      "rect": {
+        "bottom": 431.3333435058594,
+        "height": 285.3333435058594,
+        "left": 338,
+        "right": 614,
+        "top": 146,
+        "width": 276,
+        "x": 338,
+        "y": 146
+      },
+      "tag": "A"
+    },
+    "bodyScrollWidth": 788,
+    "creates": [
+      {
+        "aria": "새 매치 만들기",
+        "position": "static",
+        "rect": {
+          "bottom": 0,
+          "height": 0,
+          "left": 0,
+          "right": 0,
+          "top": 0,
+          "width": 0,
+          "x": 0,
+          "y": 0
+        },
+        "text": "매치 만들기",
+        "zIndex": "auto"
+      },
+      {
+        "aria": "매치 만들기",
+        "position": "absolute",
+        "rect": {
+          "bottom": 413,
+          "height": 56,
+          "left": 618,
+          "right": 674,
+          "top": 357,
+          "width": 56,
+          "x": 618,
+          "y": 357
+        },
+        "text": "",
+        "zIndex": "30"
+      }
+    ],
+    "dialogs": 0,
+    "mainScroll": 166,
+    "rail": {
+      "anchors": [
+        {
+          "href": "/matches/id-edb832a4ea13650c",
+          "index": 0,
+          "rect": {
+            "bottom": 431.3333435058594,
+            "height": 285.3333435058594,
+            "left": 50,
+            "right": 326,
+            "top": 146,
+            "width": 276,
+            "x": 50,
+            "y": 146
+          },
+          "tabIndex": 0
+        },
+        {
+          "href": "/matches/id-c6a85e3fe145bb95",
+          "index": 1,
+          "rect": {
+            "bottom": 431.3333435058594,
+            "height": 285.3333435058594,
+            "left": 338,
+            "right": 614,
+            "top": 146,
+            "width": 276,
+            "x": 338,
+            "y": 146
+          },
+          "tabIndex": 0
+        },
+        {
+          "href": "/matches/id-9645589d4a78fb40",
+          "index": 2,
+          "rect": {
+            "bottom": 431.3333435058594,
+            "height": 285.3333435058594,
+            "left": 626,
+            "right": 902,
+            "top": 146,
+            "width": 276,
+            "x": 626,
+            "y": 146
+          },
+          "tabIndex": 0
+        }
+      ],
+      "clientWidth": 568,
+      "paddingLeft": "4px",
+      "paddingRight": "86px",
+      "rect": {
+        "bottom": 435.3333435058594,
+        "height": 293.3333435058594,
+        "left": 110,
+        "right": 678,
+        "top": 142,
+        "width": 568,
+        "x": 110,
+        "y": 142
+      },
+      "scrollLeft": 64,
+      "scrollWidth": 942
+    },
+    "search": "",
+    "target": {
+      "href": "/matches/id-9645589d4a78fb40",
+      "metaRect": {
+        "bottom": 326.66668701171875,
+        "height": 16,
+        "left": 642.6666870117188,
+        "right": 885.3333587646484,
+        "top": 310.66668701171875,
+        "width": 242.6666717529297,
+        "x": 642.6666870117188,
+        "y": 310.66668701171875
+      },
+      "metaText": "입문-고수 · 혼성 · 참가비 설명: 10000",
+      "numericTextRect": {
+        "bottom": 325.3333435058594,
+        "height": 14,
+        "left": 789.1458740234375,
+        "right": 823.0104370117188,
+        "top": 311.3333435058594,
+        "width": 33.86456298828125,
+        "x": 789.1458740234375,
+        "y": 311.3333435058594
+      },
+      "rect": {
+        "bottom": 431.3333435058594,
+        "height": 285.3333435058594,
+        "left": 626,
+        "right": 902,
+        "top": 146,
+        "width": 276,
+        "x": 626,
+        "y": 146
+      }
+    },
+    "url": "https://alpha.teameet.co.kr/matches",
+    "utc": "2026-10-04T09:27:36.088Z",
+    "viewport": {
+      "dpr": 1.5,
+      "h": 505,
+      "w": 788
+    },
+    "windowScroll": {
+      "x": 0,
+      "y": 0
+    },
+    "index": 13,
+    "label": "tablet middle rail focused settled"
+  },
+  {
+    "active": {
+      "aria": null,
+      "focusVisible": true,
+      "href": "/matches/id-9645589d4a78fb40",
+      "rect": {
+        "bottom": 431.3333435058594,
+        "height": 285.3333435058594,
+        "left": 338,
+        "right": 614,
+        "top": 146,
+        "width": 276,
+        "x": 338,
+        "y": 146
+      },
+      "tag": "A"
+    },
+    "bodyScrollWidth": 788,
+    "creates": [
+      {
+        "aria": "새 매치 만들기",
+        "position": "static",
+        "rect": {
+          "bottom": 0,
+          "height": 0,
+          "left": 0,
+          "right": 0,
+          "top": 0,
+          "width": 0,
+          "x": 0,
+          "y": 0
+        },
+        "text": "매치 만들기",
+        "zIndex": "auto"
+      },
+      {
+        "aria": "매치 만들기",
+        "position": "absolute",
+        "rect": {
+          "bottom": 413,
+          "height": 56,
+          "left": 618,
+          "right": 674,
+          "top": 357,
+          "width": 56,
+          "x": 618,
+          "y": 357
+        },
+        "text": "",
+        "zIndex": "30"
+      }
+    ],
+    "dialogs": 0,
+    "mainScroll": 166,
+    "rail": {
+      "anchors": [
+        {
+          "href": "/matches/id-edb832a4ea13650c",
+          "index": 0,
+          "rect": {
+            "bottom": 431.3333435058594,
+            "height": 285.3333435058594,
+            "left": -238,
+            "right": 38,
+            "top": 146,
+            "width": 276,
+            "x": -238,
+            "y": 146
+          },
+          "tabIndex": 0
+        },
+        {
+          "href": "/matches/id-c6a85e3fe145bb95",
+          "index": 1,
+          "rect": {
+            "bottom": 431.3333435058594,
+            "height": 285.3333435058594,
+            "left": 50,
+            "right": 326,
+            "top": 146,
+            "width": 276,
+            "x": 50,
+            "y": 146
+          },
+          "tabIndex": 0
+        },
+        {
+          "href": "/matches/id-9645589d4a78fb40",
+          "index": 2,
+          "rect": {
+            "bottom": 431.3333435058594,
+            "height": 285.3333435058594,
+            "left": 338,
+            "right": 614,
+            "top": 146,
+            "width": 276,
+            "x": 338,
+            "y": 146
+          },
+          "tabIndex": 0
+        }
+      ],
+      "clientWidth": 568,
+      "paddingLeft": "4px",
+      "paddingRight": "86px",
+      "rect": {
+        "bottom": 435.3333435058594,
+        "height": 293.3333435058594,
+        "left": 110,
+        "right": 678,
+        "top": 142,
+        "width": 568,
+        "x": 110,
+        "y": 142
+      },
+      "scrollLeft": 352,
+      "scrollWidth": 942
+    },
+    "search": "",
+    "target": {
+      "href": "/matches/id-9645589d4a78fb40",
+      "metaRect": {
+        "bottom": 326.66668701171875,
+        "height": 16,
+        "left": 354.66668701171875,
+        "right": 597.3333587646484,
+        "top": 310.66668701171875,
+        "width": 242.6666717529297,
+        "x": 354.66668701171875,
+        "y": 310.66668701171875
+      },
+      "metaText": "입문-고수 · 혼성 · 참가비 설명: 10000",
+      "numericTextRect": {
+        "bottom": 325.3333435058594,
+        "height": 14,
+        "left": 501.1458435058594,
+        "right": 535.0104370117188,
+        "top": 311.3333435058594,
+        "width": 33.864593505859375,
+        "x": 501.1458435058594,
+        "y": 311.3333435058594
+      },
+      "rect": {
+        "bottom": 431.3333435058594,
+        "height": 285.3333435058594,
+        "left": 338,
+        "right": 614,
+        "top": 146,
+        "width": 276,
+        "x": 338,
+        "y": 146
+      }
+    },
+    "url": "https://alpha.teameet.co.kr/matches",
+    "utc": "2026-10-04T09:28:07.771Z",
+    "viewport": {
+      "dpr": 1.5,
+      "h": 505,
+      "w": 788
+    },
+    "windowScroll": {
+      "x": 0,
+      "y": 0
+    },
+    "index": 14,
+    "label": "tablet final rail focused settled"
+  },
+  {
+    "active": {
+      "aria": null,
+      "focusVisible": true,
+      "href": "/matches/id-c6a85e3fe145bb95",
+      "rect": {
+        "bottom": 431.3333435058594,
+        "height": 285.3333435058594,
+        "left": 114,
+        "right": 390,
+        "top": 146,
+        "width": 276,
+        "x": 114,
+        "y": 146
+      },
+      "tag": "A"
+    },
+    "bodyScrollWidth": 788,
+    "creates": [
+      {
+        "aria": "새 매치 만들기",
+        "position": "static",
+        "rect": {
+          "bottom": 0,
+          "height": 0,
+          "left": 0,
+          "right": 0,
+          "top": 0,
+          "width": 0,
+          "x": 0,
+          "y": 0
+        },
+        "text": "매치 만들기",
+        "zIndex": "auto"
+      },
+      {
+        "aria": "매치 만들기",
+        "position": "absolute",
+        "rect": {
+          "bottom": 413,
+          "height": 56,
+          "left": 618,
+          "right": 674,
+          "top": 357,
+          "width": 56,
+          "x": 618,
+          "y": 357
+        },
+        "text": "",
+        "zIndex": "30"
+      }
+    ],
+    "dialogs": 0,
+    "mainScroll": 166,
+    "rail": {
+      "anchors": [
+        {
+          "href": "/matches/id-edb832a4ea13650c",
+          "index": 0,
+          "rect": {
+            "bottom": 431.3333435058594,
+            "height": 285.3333435058594,
+            "left": -174,
+            "right": 102,
+            "top": 146,
+            "width": 276,
+            "x": -174,
+            "y": 146
+          },
+          "tabIndex": 0
+        },
+        {
+          "href": "/matches/id-c6a85e3fe145bb95",
+          "index": 1,
+          "rect": {
+            "bottom": 431.3333435058594,
+            "height": 285.3333435058594,
+            "left": 114,
+            "right": 390,
+            "top": 146,
+            "width": 276,
+            "x": 114,
+            "y": 146
+          },
+          "tabIndex": 0
+        },
+        {
+          "href": "/matches/id-9645589d4a78fb40",
+          "index": 2,
+          "rect": {
+            "bottom": 431.3333435058594,
+            "height": 285.3333435058594,
+            "left": 402,
+            "right": 678,
+            "top": 146,
+            "width": 276,
+            "x": 402,
+            "y": 146
+          },
+          "tabIndex": 0
+        }
+      ],
+      "clientWidth": 568,
+      "paddingLeft": "4px",
+      "paddingRight": "86px",
+      "rect": {
+        "bottom": 435.3333435058594,
+        "height": 293.3333435058594,
+        "left": 110,
+        "right": 678,
+        "top": 142,
+        "width": 568,
+        "x": 110,
+        "y": 142
+      },
+      "scrollLeft": 288,
+      "scrollWidth": 942
+    },
+    "search": "",
+    "target": {
+      "href": "/matches/id-9645589d4a78fb40",
+      "metaRect": {
+        "bottom": 326.66668701171875,
+        "height": 16,
+        "left": 418.6666870117187,
+        "right": 661.3333587646484,
+        "top": 310.66668701171875,
+        "width": 242.6666717529297,
+        "x": 418.6666870117187,
+        "y": 310.66668701171875
+      },
+      "metaText": "입문-고수 · 혼성 · 참가비 설명: 10000",
+      "numericTextRect": {
+        "bottom": 325.3333435058594,
+        "height": 14,
+        "left": 565.1458740234375,
+        "right": 599.0104370117188,
+        "top": 311.3333435058594,
+        "width": 33.86456298828125,
+        "x": 565.1458740234375,
+        "y": 311.3333435058594
+      },
+      "rect": {
+        "bottom": 431.3333435058594,
+        "height": 285.3333435058594,
+        "left": 402,
+        "right": 678,
+        "top": 146,
+        "width": 276,
+        "x": 402,
+        "y": 146
+      }
+    },
+    "url": "https://alpha.teameet.co.kr/matches",
+    "utc": "2026-10-04T09:28:08.218Z",
+    "viewport": {
+      "dpr": 1.5,
+      "h": 505,
+      "w": 788
+    },
+    "windowScroll": {
+      "x": 0,
+      "y": 0
+    },
+    "index": 15,
+    "label": "tablet reverse middle focus"
+  },
+  {
+    "active": {
+      "aria": null,
+      "focusVisible": true,
+      "href": "/matches/id-edb832a4ea13650c",
+      "rect": {
+        "bottom": 431.3333435058594,
+        "height": 285.3333435058594,
+        "left": 114,
+        "right": 390,
+        "top": 146,
+        "width": 276,
+        "x": 114,
+        "y": 146
+      },
+      "tag": "A"
+    },
+    "bodyScrollWidth": 788,
+    "creates": [
+      {
+        "aria": "새 매치 만들기",
+        "position": "static",
+        "rect": {
+          "bottom": 0,
+          "height": 0,
+          "left": 0,
+          "right": 0,
+          "top": 0,
+          "width": 0,
+          "x": 0,
+          "y": 0
+        },
+        "text": "매치 만들기",
+        "zIndex": "auto"
+      },
+      {
+        "aria": "매치 만들기",
+        "position": "absolute",
+        "rect": {
+          "bottom": 413,
+          "height": 56,
+          "left": 618,
+          "right": 674,
+          "top": 357,
+          "width": 56,
+          "x": 618,
+          "y": 357
+        },
+        "text": "",
+        "zIndex": "30"
+      }
+    ],
+    "dialogs": 0,
+    "mainScroll": 166,
+    "rail": {
+      "anchors": [
+        {
+          "href": "/matches/id-edb832a4ea13650c",
+          "index": 0,
+          "rect": {
+            "bottom": 431.3333435058594,
+            "height": 285.3333435058594,
+            "left": 114,
+            "right": 390,
+            "top": 146,
+            "width": 276,
+            "x": 114,
+            "y": 146
+          },
+          "tabIndex": 0
+        },
+        {
+          "href": "/matches/id-c6a85e3fe145bb95",
+          "index": 1,
+          "rect": {
+            "bottom": 431.3333435058594,
+            "height": 285.3333435058594,
+            "left": 402,
+            "right": 678,
+            "top": 146,
+            "width": 276,
+            "x": 402,
+            "y": 146
+          },
+          "tabIndex": 0
+        },
+        {
+          "href": "/matches/id-9645589d4a78fb40",
+          "index": 2,
+          "rect": {
+            "bottom": 431.3333435058594,
+            "height": 285.3333435058594,
+            "left": 690,
+            "right": 966,
+            "top": 146,
+            "width": 276,
+            "x": 690,
+            "y": 146
+          },
+          "tabIndex": 0
+        }
+      ],
+      "clientWidth": 568,
+      "paddingLeft": "4px",
+      "paddingRight": "86px",
+      "rect": {
+        "bottom": 435.3333435058594,
+        "height": 293.3333435058594,
+        "left": 110,
+        "right": 678,
+        "top": 142,
+        "width": 568,
+        "x": 110,
+        "y": 142
+      },
+      "scrollLeft": 0,
+      "scrollWidth": 942
+    },
+    "search": "",
+    "target": {
+      "href": "/matches/id-9645589d4a78fb40",
+      "metaRect": {
+        "bottom": 326.66668701171875,
+        "height": 16,
+        "left": 706.6666870117188,
+        "right": 949.3333587646484,
+        "top": 310.66668701171875,
+        "width": 242.6666717529297,
+        "x": 706.6666870117188,
+        "y": 310.66668701171875
+      },
+      "metaText": "입문-고수 · 혼성 · 참가비 설명: 10000",
+      "numericTextRect": {
+        "bottom": 325.3333435058594,
+        "height": 14,
+        "left": 853.1458740234375,
+        "right": 887.0104370117188,
+        "top": 311.3333435058594,
+        "width": 33.86456298828125,
+        "x": 853.1458740234375,
+        "y": 311.3333435058594
+      },
+      "rect": {
+        "bottom": 431.3333435058594,
+        "height": 285.3333435058594,
+        "left": 690,
+        "right": 966,
+        "top": 146,
+        "width": 276,
+        "x": 690,
+        "y": 146
+      }
+    },
+    "url": "https://alpha.teameet.co.kr/matches",
+    "utc": "2026-10-04T09:28:08.443Z",
+    "viewport": {
+      "dpr": 1.5,
+      "h": 505,
+      "w": 788
+    },
+    "windowScroll": {
+      "x": 0,
+      "y": 0
+    },
+    "index": 16,
+    "label": "tablet reverse first focus"
+  },
+  {
+    "active": {
+      "aria": null,
+      "focusVisible": true,
+      "href": "/matches/id-edb832a4ea13650c",
+      "rect": {
+        "bottom": 736,
+        "height": 312,
+        "left": 55,
+        "right": 375,
+        "top": 424,
+        "width": 320,
+        "x": 55,
+        "y": 424
+      },
+      "tag": "A"
+    },
+    "bodyScrollWidth": 1182,
+    "creates": [
+      {
+        "aria": "새 매치 만들기",
+        "position": "static",
+        "rect": {
+          "bottom": 136,
+          "height": 44,
+          "left": 992.703125,
+          "right": 1127,
+          "top": 92,
+          "width": 134.296875,
+          "x": 992.703125,
+          "y": 92
+        },
+        "text": "매치 만들기",
+        "zIndex": "auto"
+      },
+      {
+        "aria": "매치 만들기",
+        "position": "fixed",
+        "rect": {
+          "bottom": 0,
+          "height": 0,
+          "left": 0,
+          "right": 0,
+          "top": 0,
+          "width": 0,
+          "x": 0,
+          "y": 0
+        },
+        "text": "",
+        "zIndex": "30"
+      }
+    ],
+    "dialogs": 0,
+    "mainScroll": 0,
+    "rail": {
+      "anchors": [
+        {
+          "href": "/matches/id-edb832a4ea13650c",
+          "index": 0,
+          "rect": {
+            "bottom": 736,
+            "height": 312,
+            "left": 55,
+            "right": 375,
+            "top": 424,
+            "width": 320,
+            "x": 55,
+            "y": 424
+          },
+          "tabIndex": 0
+        },
+        {
+          "href": "/matches/id-c6a85e3fe145bb95",
+          "index": 1,
+          "rect": {
+            "bottom": 736,
+            "height": 312,
+            "left": 387,
+            "right": 707,
+            "top": 424,
+            "width": 320,
+            "x": 387,
+            "y": 424
+          },
+          "tabIndex": 0
+        },
+        {
+          "href": "/matches/id-9645589d4a78fb40",
+          "index": 2,
+          "rect": {
+            "bottom": 736,
+            "height": 312,
+            "left": 719,
+            "right": 1039,
+            "top": 424,
+            "width": 320,
+            "x": 719,
+            "y": 424
+          },
+          "tabIndex": 0
+        }
+      ],
+      "clientWidth": 1080,
+      "paddingLeft": "4px",
+      "paddingRight": "4px",
+      "rect": {
+        "bottom": 740,
+        "height": 320,
+        "left": 51,
+        "right": 1131,
+        "top": 420,
+        "width": 1080,
+        "x": 51,
+        "y": 420
+      },
+      "scrollLeft": 0,
+      "scrollWidth": 1080
+    },
+    "search": "",
+    "target": {
+      "href": "/matches/id-9645589d4a78fb40",
+      "metaRect": {
+        "bottom": 631,
+        "height": 16,
+        "left": 736,
+        "right": 1022,
+        "top": 615,
+        "width": 286,
+        "x": 736,
+        "y": 615
+      },
+      "metaText": "입문-고수 · 혼성 · 참가비 설명: 10000",
+      "numericTextRect": {
+        "bottom": 630,
+        "height": 14,
+        "left": 882.484375,
+        "right": 916.34375,
+        "top": 616,
+        "width": 33.859375,
+        "x": 882.484375,
+        "y": 616
+      },
+      "rect": {
+        "bottom": 736,
+        "height": 312,
+        "left": 719,
+        "right": 1039,
+        "top": 424,
+        "width": 320,
+        "x": 719,
+        "y": 424
+      }
+    },
+    "url": "https://alpha.teameet.co.kr/matches",
+    "utc": "2026-10-04T09:28:45.310Z",
+    "viewport": {
+      "dpr": 1,
+      "h": 757,
+      "w": 1182
+    },
+    "windowScroll": {
+      "x": 0,
+      "y": 0
+    },
+    "index": 17,
+    "label": "desktop resized first rail focused"
+  },
+  {
+    "active": {
+      "aria": null,
+      "focusVisible": true,
+      "href": "/matches/id-c6a85e3fe145bb95",
+      "rect": {
+        "bottom": 736,
+        "height": 312,
+        "left": 387,
+        "right": 707,
+        "top": 424,
+        "width": 320,
+        "x": 387,
+        "y": 424
+      },
+      "tag": "A"
+    },
+    "bodyScrollWidth": 1182,
+    "creates": [
+      {
+        "aria": "새 매치 만들기",
+        "position": "static",
+        "rect": {
+          "bottom": 136,
+          "height": 44,
+          "left": 992.703125,
+          "right": 1127,
+          "top": 92,
+          "width": 134.296875,
+          "x": 992.703125,
+          "y": 92
+        },
+        "text": "매치 만들기",
+        "zIndex": "auto"
+      },
+      {
+        "aria": "매치 만들기",
+        "position": "fixed",
+        "rect": {
+          "bottom": 0,
+          "height": 0,
+          "left": 0,
+          "right": 0,
+          "top": 0,
+          "width": 0,
+          "x": 0,
+          "y": 0
+        },
+        "text": "",
+        "zIndex": "30"
+      }
+    ],
+    "dialogs": 0,
+    "mainScroll": 0,
+    "rail": {
+      "anchors": [
+        {
+          "href": "/matches/id-edb832a4ea13650c",
+          "index": 0,
+          "rect": {
+            "bottom": 736,
+            "height": 312,
+            "left": 55,
+            "right": 375,
+            "top": 424,
+            "width": 320,
+            "x": 55,
+            "y": 424
+          },
+          "tabIndex": 0
+        },
+        {
+          "href": "/matches/id-c6a85e3fe145bb95",
+          "index": 1,
+          "rect": {
+            "bottom": 736,
+            "height": 312,
+            "left": 387,
+            "right": 707,
+            "top": 424,
+            "width": 320,
+            "x": 387,
+            "y": 424
+          },
+          "tabIndex": 0
+        },
+        {
+          "href": "/matches/id-9645589d4a78fb40",
+          "index": 2,
+          "rect": {
+            "bottom": 736,
+            "height": 312,
+            "left": 719,
+            "right": 1039,
+            "top": 424,
+            "width": 320,
+            "x": 719,
+            "y": 424
+          },
+          "tabIndex": 0
+        }
+      ],
+      "clientWidth": 1080,
+      "paddingLeft": "4px",
+      "paddingRight": "4px",
+      "rect": {
+        "bottom": 740,
+        "height": 320,
+        "left": 51,
+        "right": 1131,
+        "top": 420,
+        "width": 1080,
+        "x": 51,
+        "y": 420
+      },
+      "scrollLeft": 0,
+      "scrollWidth": 1080
+    },
+    "search": "",
+    "target": {
+      "href": "/matches/id-9645589d4a78fb40",
+      "metaRect": {
+        "bottom": 631,
+        "height": 16,
+        "left": 736,
+        "right": 1022,
+        "top": 615,
+        "width": 286,
+        "x": 736,
+        "y": 615
+      },
+      "metaText": "입문-고수 · 혼성 · 참가비 설명: 10000",
+      "numericTextRect": {
+        "bottom": 630,
+        "height": 14,
+        "left": 882.484375,
+        "right": 916.34375,
+        "top": 616,
+        "width": 33.859375,
+        "x": 882.484375,
+        "y": 616
+      },
+      "rect": {
+        "bottom": 736,
+        "height": 312,
+        "left": 719,
+        "right": 1039,
+        "top": 424,
+        "width": 320,
+        "x": 719,
+        "y": 424
+      }
+    },
+    "url": "https://alpha.teameet.co.kr/matches",
+    "utc": "2026-10-04T09:28:45.681Z",
+    "viewport": {
+      "dpr": 1,
+      "h": 757,
+      "w": 1182
+    },
+    "windowScroll": {
+      "x": 0,
+      "y": 0
+    },
+    "index": 18,
+    "label": "desktop middle rail focus"
+  },
+  {
+    "active": {
+      "aria": null,
+      "focusVisible": true,
+      "href": "/matches/id-9645589d4a78fb40",
+      "rect": {
+        "bottom": 736,
+        "height": 312,
+        "left": 719,
+        "right": 1039,
+        "top": 424,
+        "width": 320,
+        "x": 719,
+        "y": 424
+      },
+      "tag": "A"
+    },
+    "bodyScrollWidth": 1182,
+    "creates": [
+      {
+        "aria": "새 매치 만들기",
+        "position": "static",
+        "rect": {
+          "bottom": 136,
+          "height": 44,
+          "left": 992.703125,
+          "right": 1127,
+          "top": 92,
+          "width": 134.296875,
+          "x": 992.703125,
+          "y": 92
+        },
+        "text": "매치 만들기",
+        "zIndex": "auto"
+      },
+      {
+        "aria": "매치 만들기",
+        "position": "fixed",
+        "rect": {
+          "bottom": 0,
+          "height": 0,
+          "left": 0,
+          "right": 0,
+          "top": 0,
+          "width": 0,
+          "x": 0,
+          "y": 0
+        },
+        "text": "",
+        "zIndex": "30"
+      }
+    ],
+    "dialogs": 0,
+    "mainScroll": 0,
+    "rail": {
+      "anchors": [
+        {
+          "href": "/matches/id-edb832a4ea13650c",
+          "index": 0,
+          "rect": {
+            "bottom": 736,
+            "height": 312,
+            "left": 55,
+            "right": 375,
+            "top": 424,
+            "width": 320,
+            "x": 55,
+            "y": 424
+          },
+          "tabIndex": 0
+        },
+        {
+          "href": "/matches/id-c6a85e3fe145bb95",
+          "index": 1,
+          "rect": {
+            "bottom": 736,
+            "height": 312,
+            "left": 387,
+            "right": 707,
+            "top": 424,
+            "width": 320,
+            "x": 387,
+            "y": 424
+          },
+          "tabIndex": 0
+        },
+        {
+          "href": "/matches/id-9645589d4a78fb40",
+          "index": 2,
+          "rect": {
+            "bottom": 736,
+            "height": 312,
+            "left": 719,
+            "right": 1039,
+            "top": 424,
+            "width": 320,
+            "x": 719,
+            "y": 424
+          },
+          "tabIndex": 0
+        }
+      ],
+      "clientWidth": 1080,
+      "paddingLeft": "4px",
+      "paddingRight": "4px",
+      "rect": {
+        "bottom": 740,
+        "height": 320,
+        "left": 51,
+        "right": 1131,
+        "top": 420,
+        "width": 1080,
+        "x": 51,
+        "y": 420
+      },
+      "scrollLeft": 0,
+      "scrollWidth": 1080
+    },
+    "search": "",
+    "target": {
+      "href": "/matches/id-9645589d4a78fb40",
+      "metaRect": {
+        "bottom": 631,
+        "height": 16,
+        "left": 736,
+        "right": 1022,
+        "top": 615,
+        "width": 286,
+        "x": 736,
+        "y": 615
+      },
+      "metaText": "입문-고수 · 혼성 · 참가비 설명: 10000",
+      "numericTextRect": {
+        "bottom": 630,
+        "height": 14,
+        "left": 882.484375,
+        "right": 916.34375,
+        "top": 616,
+        "width": 33.859375,
+        "x": 882.484375,
+        "y": 616
+      },
+      "rect": {
+        "bottom": 736,
+        "height": 312,
+        "left": 719,
+        "right": 1039,
+        "top": 424,
+        "width": 320,
+        "x": 719,
+        "y": 424
+      }
+    },
+    "url": "https://alpha.teameet.co.kr/matches",
+    "utc": "2026-10-04T09:28:45.848Z",
+    "viewport": {
+      "dpr": 1,
+      "h": 757,
+      "w": 1182
+    },
+    "windowScroll": {
+      "x": 0,
+      "y": 0
+    },
+    "index": 19,
+    "label": "desktop final rail focus"
+  },
+  {
+    "active": {
+      "aria": null,
+      "focusVisible": true,
+      "href": "/matches/id-c6a85e3fe145bb95",
+      "rect": {
+        "bottom": 736,
+        "height": 312,
+        "left": 387,
+        "right": 707,
+        "top": 424,
+        "width": 320,
+        "x": 387,
+        "y": 424
+      },
+      "tag": "A"
+    },
+    "bodyScrollWidth": 1182,
+    "creates": [
+      {
+        "aria": "새 매치 만들기",
+        "position": "static",
+        "rect": {
+          "bottom": 136,
+          "height": 44,
+          "left": 992.703125,
+          "right": 1127,
+          "top": 92,
+          "width": 134.296875,
+          "x": 992.703125,
+          "y": 92
+        },
+        "text": "매치 만들기",
+        "zIndex": "auto"
+      },
+      {
+        "aria": "매치 만들기",
+        "position": "fixed",
+        "rect": {
+          "bottom": 0,
+          "height": 0,
+          "left": 0,
+          "right": 0,
+          "top": 0,
+          "width": 0,
+          "x": 0,
+          "y": 0
+        },
+        "text": "",
+        "zIndex": "30"
+      }
+    ],
+    "dialogs": 0,
+    "mainScroll": 0,
+    "rail": {
+      "anchors": [
+        {
+          "href": "/matches/id-edb832a4ea13650c",
+          "index": 0,
+          "rect": {
+            "bottom": 736,
+            "height": 312,
+            "left": 55,
+            "right": 375,
+            "top": 424,
+            "width": 320,
+            "x": 55,
+            "y": 424
+          },
+          "tabIndex": 0
+        },
+        {
+          "href": "/matches/id-c6a85e3fe145bb95",
+          "index": 1,
+          "rect": {
+            "bottom": 736,
+            "height": 312,
+            "left": 387,
+            "right": 707,
+            "top": 424,
+            "width": 320,
+            "x": 387,
+            "y": 424
+          },
+          "tabIndex": 0
+        },
+        {
+          "href": "/matches/id-9645589d4a78fb40",
+          "index": 2,
+          "rect": {
+            "bottom": 736,
+            "height": 312,
+            "left": 719,
+            "right": 1039,
+            "top": 424,
+            "width": 320,
+            "x": 719,
+            "y": 424
+          },
+          "tabIndex": 0
+        }
+      ],
+      "clientWidth": 1080,
+      "paddingLeft": "4px",
+      "paddingRight": "4px",
+      "rect": {
+        "bottom": 740,
+        "height": 320,
+        "left": 51,
+        "right": 1131,
+        "top": 420,
+        "width": 1080,
+        "x": 51,
+        "y": 420
+      },
+      "scrollLeft": 0,
+      "scrollWidth": 1080
+    },
+    "search": "",
+    "target": {
+      "href": "/matches/id-9645589d4a78fb40",
+      "metaRect": {
+        "bottom": 631,
+        "height": 16,
+        "left": 736,
+        "right": 1022,
+        "top": 615,
+        "width": 286,
+        "x": 736,
+        "y": 615
+      },
+      "metaText": "입문-고수 · 혼성 · 참가비 설명: 10000",
+      "numericTextRect": {
+        "bottom": 630,
+        "height": 14,
+        "left": 882.484375,
+        "right": 916.34375,
+        "top": 616,
+        "width": 33.859375,
+        "x": 882.484375,
+        "y": 616
+      },
+      "rect": {
+        "bottom": 736,
+        "height": 312,
+        "left": 719,
+        "right": 1039,
+        "top": 424,
+        "width": 320,
+        "x": 719,
+        "y": 424
+      }
+    },
+    "url": "https://alpha.teameet.co.kr/matches",
+    "utc": "2026-10-04T09:29:12.580Z",
+    "viewport": {
+      "dpr": 1,
+      "h": 757,
+      "w": 1182
+    },
+    "windowScroll": {
+      "x": 0,
+      "y": 0
+    },
+    "index": 20,
+    "label": "desktop reverse middle focus"
+  },
+  {
+    "active": {
+      "aria": null,
+      "focusVisible": true,
+      "href": "/matches/id-edb832a4ea13650c",
+      "rect": {
+        "bottom": 736,
+        "height": 312,
+        "left": 55,
+        "right": 375,
+        "top": 424,
+        "width": 320,
+        "x": 55,
+        "y": 424
+      },
+      "tag": "A"
+    },
+    "bodyScrollWidth": 1182,
+    "creates": [
+      {
+        "aria": "새 매치 만들기",
+        "position": "static",
+        "rect": {
+          "bottom": 136,
+          "height": 44,
+          "left": 992.703125,
+          "right": 1127,
+          "top": 92,
+          "width": 134.296875,
+          "x": 992.703125,
+          "y": 92
+        },
+        "text": "매치 만들기",
+        "zIndex": "auto"
+      },
+      {
+        "aria": "매치 만들기",
+        "position": "fixed",
+        "rect": {
+          "bottom": 0,
+          "height": 0,
+          "left": 0,
+          "right": 0,
+          "top": 0,
+          "width": 0,
+          "x": 0,
+          "y": 0
+        },
+        "text": "",
+        "zIndex": "30"
+      }
+    ],
+    "dialogs": 0,
+    "mainScroll": 0,
+    "rail": {
+      "anchors": [
+        {
+          "href": "/matches/id-edb832a4ea13650c",
+          "index": 0,
+          "rect": {
+            "bottom": 736,
+            "height": 312,
+            "left": 55,
+            "right": 375,
+            "top": 424,
+            "width": 320,
+            "x": 55,
+            "y": 424
+          },
+          "tabIndex": 0
+        },
+        {
+          "href": "/matches/id-c6a85e3fe145bb95",
+          "index": 1,
+          "rect": {
+            "bottom": 736,
+            "height": 312,
+            "left": 387,
+            "right": 707,
+            "top": 424,
+            "width": 320,
+            "x": 387,
+            "y": 424
+          },
+          "tabIndex": 0
+        },
+        {
+          "href": "/matches/id-9645589d4a78fb40",
+          "index": 2,
+          "rect": {
+            "bottom": 736,
+            "height": 312,
+            "left": 719,
+            "right": 1039,
+            "top": 424,
+            "width": 320,
+            "x": 719,
+            "y": 424
+          },
+          "tabIndex": 0
+        }
+      ],
+      "clientWidth": 1080,
+      "paddingLeft": "4px",
+      "paddingRight": "4px",
+      "rect": {
+        "bottom": 740,
+        "height": 320,
+        "left": 51,
+        "right": 1131,
+        "top": 420,
+        "width": 1080,
+        "x": 51,
+        "y": 420
+      },
+      "scrollLeft": 0,
+      "scrollWidth": 1080
+    },
+    "search": "",
+    "target": {
+      "href": "/matches/id-9645589d4a78fb40",
+      "metaRect": {
+        "bottom": 631,
+        "height": 16,
+        "left": 736,
+        "right": 1022,
+        "top": 615,
+        "width": 286,
+        "x": 736,
+        "y": 615
+      },
+      "metaText": "입문-고수 · 혼성 · 참가비 설명: 10000",
+      "numericTextRect": {
+        "bottom": 630,
+        "height": 14,
+        "left": 882.484375,
+        "right": 916.34375,
+        "top": 616,
+        "width": 33.859375,
+        "x": 882.484375,
+        "y": 616
+      },
+      "rect": {
+        "bottom": 736,
+        "height": 312,
+        "left": 719,
+        "right": 1039,
+        "top": 424,
+        "width": 320,
+        "x": 719,
+        "y": 424
+      }
+    },
+    "url": "https://alpha.teameet.co.kr/matches",
+    "utc": "2026-10-04T09:29:12.809Z",
+    "viewport": {
+      "dpr": 1,
+      "h": 757,
+      "w": 1182
+    },
+    "windowScroll": {
+      "x": 0,
+      "y": 0
+    },
+    "index": 21,
+    "label": "desktop reverse first focus"
+  },
+  {
+    "active": {
+      "aria": null,
+      "focusVisible": true,
+      "href": "/matches/id-edb832a4ea13650c",
+      "rect": {
+        "bottom": 736,
+        "height": 312,
+        "left": 55,
+        "right": 375,
+        "top": 424,
+        "width": 320,
+        "x": 55,
+        "y": 424
+      },
+      "tag": "A"
+    },
+    "bodyScrollWidth": 1182,
+    "creates": [
+      {
+        "aria": "새 매치 만들기",
+        "position": "static",
+        "rect": {
+          "bottom": 136,
+          "height": 44,
+          "left": 992.703125,
+          "right": 1127,
+          "top": 92,
+          "width": 134.296875,
+          "x": 992.703125,
+          "y": 92
+        },
+        "text": "매치 만들기",
+        "zIndex": "auto"
+      },
+      {
+        "aria": "매치 만들기",
+        "position": "fixed",
+        "rect": {
+          "bottom": 0,
+          "height": 0,
+          "left": 0,
+          "right": 0,
+          "top": 0,
+          "width": 0,
+          "x": 0,
+          "y": 0
+        },
+        "text": "",
+        "zIndex": "30"
+      }
+    ],
+    "dialogs": 0,
+    "mainScroll": 0,
+    "rail": {
+      "anchors": [
+        {
+          "href": "/matches/id-edb832a4ea13650c",
+          "index": 0,
+          "rect": {
+            "bottom": 736,
+            "height": 312,
+            "left": 55,
+            "right": 375,
+            "top": 424,
+            "width": 320,
+            "x": 55,
+            "y": 424
+          },
+          "tabIndex": 0
+        },
+        {
+          "href": "/matches/id-c6a85e3fe145bb95",
+          "index": 1,
+          "rect": {
+            "bottom": 736,
+            "height": 312,
+            "left": 387,
+            "right": 707,
+            "top": 424,
+            "width": 320,
+            "x": 387,
+            "y": 424
+          },
+          "tabIndex": 0
+        },
+        {
+          "href": "/matches/id-9645589d4a78fb40",
+          "index": 2,
+          "rect": {
+            "bottom": 736,
+            "height": 312,
+            "left": 719,
+            "right": 1039,
+            "top": 424,
+            "width": 320,
+            "x": 719,
+            "y": 424
+          },
+          "tabIndex": 0
+        }
+      ],
+      "clientWidth": 1080,
+      "paddingLeft": "4px",
+      "paddingRight": "4px",
+      "rect": {
+        "bottom": 740,
+        "height": 320,
+        "left": 51,
+        "right": 1131,
+        "top": 420,
+        "width": 1080,
+        "x": 51,
+        "y": 420
+      },
+      "scrollLeft": 0,
+      "scrollWidth": 1080
+    },
+    "search": "",
+    "target": {
+      "href": "/matches/id-9645589d4a78fb40",
+      "metaRect": {
+        "bottom": 631,
+        "height": 16,
+        "left": 736,
+        "right": 1022,
+        "top": 615,
+        "width": 286,
+        "x": 736,
+        "y": 615
+      },
+      "metaText": "입문-고수 · 혼성 · 참가비 설명: 10000",
+      "numericTextRect": {
+        "bottom": 630,
+        "height": 14,
+        "left": 882.484375,
+        "right": 916.34375,
+        "top": 616,
+        "width": 33.859375,
+        "x": 882.484375,
+        "y": 616
+      },
+      "rect": {
+        "bottom": 736,
+        "height": 312,
+        "left": 719,
+        "right": 1039,
+        "top": 424,
+        "width": 320,
+        "x": 719,
+        "y": 424
+      }
+    },
+    "url": "https://alpha.teameet.co.kr/matches",
+    "utc": "2026-10-04T09:29:53.697Z",
+    "viewport": {
+      "dpr": 1,
+      "h": 757,
+      "w": 1182
+    },
+    "windowScroll": {
+      "x": 0,
+      "y": 0
+    },
+    "index": 22,
+    "label": "desktop horizontal request settled no scroll overflow"
+  },
+  {
+    "active": {
+      "aria": null,
+      "focusVisible": false,
+      "href": null,
+      "rect": {
+        "bottom": 757.25,
+        "height": 1387.25,
+        "left": 0,
+        "right": 1182,
+        "top": -630,
+        "width": 1182,
+        "x": 0,
+        "y": -630
+      },
+      "tag": "BODY"
+    },
+    "bodyScrollWidth": 1182,
+    "creates": [],
+    "dialogs": 0,
+    "mainScroll": 0,
+    "rail": null,
+    "search": null,
+    "target": null,
+    "url": "https://alpha.teameet.co.kr/matches/id-9645589d4a78fb40",
+    "utc": "2026-10-04T09:30:11.602Z",
+    "viewport": {
+      "dpr": 1,
+      "h": 757,
+      "w": 1182
+    },
+    "windowScroll": {
+      "x": 0,
+      "y": 630
+    },
+    "index": 23,
+    "label": "desktop settled after requested downward scroll"
+  },
+  {
+    "active": {
+      "aria": null,
+      "focusVisible": false,
+      "href": null,
+      "rect": {
+        "bottom": 1545,
+        "height": 1545,
+        "left": 0,
+        "right": 1182,
+        "top": 0,
+        "width": 1182,
+        "x": 0,
+        "y": 0
+      },
+      "tag": "BODY"
+    },
+    "bodyScrollWidth": 1182,
+    "creates": [
+      {
+        "aria": "새 매치 만들기",
+        "position": "static",
+        "rect": {
+          "bottom": 136,
+          "height": 44,
+          "left": 992.703125,
+          "right": 1127,
+          "top": 92,
+          "width": 134.296875,
+          "x": 992.703125,
+          "y": 92
+        },
+        "text": "매치 만들기",
+        "zIndex": "auto"
+      },
+      {
+        "aria": "매치 만들기",
+        "position": "fixed",
+        "rect": {
+          "bottom": 0,
+          "height": 0,
+          "left": 0,
+          "right": 0,
+          "top": 0,
+          "width": 0,
+          "x": 0,
+          "y": 0
+        },
+        "text": "",
+        "zIndex": "30"
+      }
+    ],
+    "dialogs": 0,
+    "mainScroll": 0,
+    "rail": {
+      "anchors": [
+        {
+          "href": "/matches/id-edb832a4ea13650c",
+          "index": 0,
+          "rect": {
+            "bottom": 736,
+            "height": 312,
+            "left": 55,
+            "right": 375,
+            "top": 424,
+            "width": 320,
+            "x": 55,
+            "y": 424
+          },
+          "tabIndex": 0
+        },
+        {
+          "href": "/matches/id-c6a85e3fe145bb95",
+          "index": 1,
+          "rect": {
+            "bottom": 736,
+            "height": 312,
+            "left": 387,
+            "right": 707,
+            "top": 424,
+            "width": 320,
+            "x": 387,
+            "y": 424
+          },
+          "tabIndex": 0
+        },
+        {
+          "href": "/matches/id-9645589d4a78fb40",
+          "index": 2,
+          "rect": {
+            "bottom": 736,
+            "height": 312,
+            "left": 719,
+            "right": 1039,
+            "top": 424,
+            "width": 320,
+            "x": 719,
+            "y": 424
+          },
+          "tabIndex": 0
+        }
+      ],
+      "clientWidth": 1080,
+      "paddingLeft": "4px",
+      "paddingRight": "4px",
+      "rect": {
+        "bottom": 740,
+        "height": 320,
+        "left": 51,
+        "right": 1131,
+        "top": 420,
+        "width": 1080,
+        "x": 51,
+        "y": 420
+      },
+      "scrollLeft": 0,
+      "scrollWidth": 1080
+    },
+    "search": "",
+    "target": {
+      "href": "/matches/id-9645589d4a78fb40",
+      "metaRect": {
+        "bottom": 631,
+        "height": 16,
+        "left": 736,
+        "right": 1022,
+        "top": 615,
+        "width": 286,
+        "x": 736,
+        "y": 615
+      },
+      "metaText": "입문-고수 · 혼성 · 참가비 설명: 10000",
+      "numericTextRect": {
+        "bottom": 630,
+        "height": 14,
+        "left": 882.484375,
+        "right": 916.34375,
+        "top": 616,
+        "width": 33.859375,
+        "x": 882.484375,
+        "y": 616
+      },
+      "rect": {
+        "bottom": 736,
+        "height": 312,
+        "left": 719,
+        "right": 1039,
+        "top": 424,
+        "width": 320,
+        "x": 719,
+        "y": 424
+      }
+    },
+    "url": "https://alpha.teameet.co.kr/matches",
+    "utc": "2026-10-04T09:32:00.684Z",
+    "viewport": {
+      "dpr": 1,
+      "h": 757,
+      "w": 1182
+    },
+    "windowScroll": {
+      "x": 0,
+      "y": 0
+    },
+    "index": 24,
+    "label": "final safe list return after excluded scroll sequence"
+  },
+  {
+    "active": {
+      "aria": null,
+      "focusVisible": false,
+      "href": null,
+      "rect": {
+        "bottom": 1185,
+        "height": 1545,
+        "left": 0,
+        "right": 1182,
+        "top": -360,
+        "width": 1182,
+        "x": 0,
+        "y": -360
+      },
+      "tag": "BODY"
+    },
+    "bodyScrollWidth": 1182,
+    "creates": [
+      {
+        "aria": "새 매치 만들기",
+        "position": "static",
+        "rect": {
+          "bottom": -224,
+          "height": 44,
+          "left": 992.703125,
+          "right": 1127,
+          "top": -268,
+          "width": 134.296875,
+          "x": 992.703125,
+          "y": -268
+        },
+        "text": "매치 만들기",
+        "zIndex": "auto"
+      },
+      {
+        "aria": "매치 만들기",
+        "position": "fixed",
+        "rect": {
+          "bottom": 0,
+          "height": 0,
+          "left": 0,
+          "right": 0,
+          "top": 0,
+          "width": 0,
+          "x": 0,
+          "y": 0
+        },
+        "text": "",
+        "zIndex": "30"
+      }
+    ],
+    "dialogs": 0,
+    "mainScroll": 0,
+    "rail": {
+      "anchors": [
+        {
+          "href": "/matches/id-edb832a4ea13650c",
+          "index": 0,
+          "rect": {
+            "bottom": 376,
+            "height": 312,
+            "left": 55,
+            "right": 375,
+            "top": 64,
+            "width": 320,
+            "x": 55,
+            "y": 64
+          },
+          "tabIndex": 0
+        },
+        {
+          "href": "/matches/id-c6a85e3fe145bb95",
+          "index": 1,
+          "rect": {
+            "bottom": 376,
+            "height": 312,
+            "left": 387,
+            "right": 707,
+            "top": 64,
+            "width": 320,
+            "x": 387,
+            "y": 64
+          },
+          "tabIndex": 0
+        },
+        {
+          "href": "/matches/id-9645589d4a78fb40",
+          "index": 2,
+          "rect": {
+            "bottom": 376,
+            "height": 312,
+            "left": 719,
+            "right": 1039,
+            "top": 64,
+            "width": 320,
+            "x": 719,
+            "y": 64
+          },
+          "tabIndex": 0
+        }
+      ],
+      "clientWidth": 1080,
+      "paddingLeft": "4px",
+      "paddingRight": "4px",
+      "rect": {
+        "bottom": 380,
+        "height": 320,
+        "left": 51,
+        "right": 1131,
+        "top": 60,
+        "width": 1080,
+        "x": 51,
+        "y": 60
+      },
+      "scrollLeft": 0,
+      "scrollWidth": 1080
+    },
+    "search": "",
+    "target": {
+      "href": "/matches/id-9645589d4a78fb40",
+      "metaRect": {
+        "bottom": 271,
+        "height": 16,
+        "left": 736,
+        "right": 1022,
+        "top": 255,
+        "width": 286,
+        "x": 736,
+        "y": 255
+      },
+      "metaText": "입문-고수 · 혼성 · 참가비 설명: 10000",
+      "numericTextRect": {
+        "bottom": 270,
+        "height": 14,
+        "left": 882.484375,
+        "right": 916.34375,
+        "top": 256,
+        "width": 33.859375,
+        "x": 882.484375,
+        "y": 256
+      },
+      "rect": {
+        "bottom": 376,
+        "height": 312,
+        "left": 719,
+        "right": 1039,
+        "top": 64,
+        "width": 320,
+        "x": 719,
+        "y": 64
+      }
+    },
+    "url": "https://alpha.teameet.co.kr/matches",
+    "utc": "2026-10-04T09:33:46.639Z",
+    "viewport": {
+      "dpr": 1,
+      "h": 757,
+      "w": 1182
+    },
+    "windowScroll": {
+      "x": 0,
+      "y": 360
+    },
+    "index": 25,
+    "label": "separate native wheel settled on same list"
+  },
+  {
+    "active": {
+      "aria": null,
+      "focusVisible": false,
+      "href": null,
+      "rect": {
+        "bottom": 1545,
+        "height": 1545,
+        "left": 0,
+        "right": 1182,
+        "top": 0,
+        "width": 1182,
+        "x": 0,
+        "y": 0
+      },
+      "tag": "BODY"
+    },
+    "bodyScrollWidth": 1182,
+    "creates": [
+      {
+        "aria": "새 매치 만들기",
+        "position": "static",
+        "rect": {
+          "bottom": 136,
+          "height": 44,
+          "left": 992.703125,
+          "right": 1127,
+          "top": 92,
+          "width": 134.296875,
+          "x": 992.703125,
+          "y": 92
+        },
+        "text": "매치 만들기",
+        "zIndex": "auto"
+      },
+      {
+        "aria": "매치 만들기",
+        "position": "fixed",
+        "rect": {
+          "bottom": 0,
+          "height": 0,
+          "left": 0,
+          "right": 0,
+          "top": 0,
+          "width": 0,
+          "x": 0,
+          "y": 0
+        },
+        "text": "",
+        "zIndex": "30"
+      }
+    ],
+    "dialogs": 0,
+    "mainScroll": 0,
+    "rail": {
+      "anchors": [
+        {
+          "href": "/matches/id-edb832a4ea13650c",
+          "index": 0,
+          "rect": {
+            "bottom": 736,
+            "height": 312,
+            "left": 55,
+            "right": 375,
+            "top": 424,
+            "width": 320,
+            "x": 55,
+            "y": 424
+          },
+          "tabIndex": 0
+        },
+        {
+          "href": "/matches/id-c6a85e3fe145bb95",
+          "index": 1,
+          "rect": {
+            "bottom": 736,
+            "height": 312,
+            "left": 387,
+            "right": 707,
+            "top": 424,
+            "width": 320,
+            "x": 387,
+            "y": 424
+          },
+          "tabIndex": 0
+        },
+        {
+          "href": "/matches/id-9645589d4a78fb40",
+          "index": 2,
+          "rect": {
+            "bottom": 736,
+            "height": 312,
+            "left": 719,
+            "right": 1039,
+            "top": 424,
+            "width": 320,
+            "x": 719,
+            "y": 424
+          },
+          "tabIndex": 0
+        }
+      ],
+      "clientWidth": 1080,
+      "paddingLeft": "4px",
+      "paddingRight": "4px",
+      "rect": {
+        "bottom": 740,
+        "height": 320,
+        "left": 51,
+        "right": 1131,
+        "top": 420,
+        "width": 1080,
+        "x": 51,
+        "y": 420
+      },
+      "scrollLeft": 0,
+      "scrollWidth": 1080
+    },
+    "search": "",
+    "target": {
+      "href": "/matches/id-9645589d4a78fb40",
+      "metaRect": {
+        "bottom": 631,
+        "height": 16,
+        "left": 736,
+        "right": 1022,
+        "top": 615,
+        "width": 286,
+        "x": 736,
+        "y": 615
+      },
+      "metaText": "입문-고수 · 혼성 · 참가비 설명: 10000",
+      "numericTextRect": {
+        "bottom": 630,
+        "height": 14,
+        "left": 882.484375,
+        "right": 916.34375,
+        "top": 616,
+        "width": 33.859375,
+        "x": 882.484375,
+        "y": 616
+      },
+      "rect": {
+        "bottom": 736,
+        "height": 312,
+        "left": 719,
+        "right": 1039,
+        "top": 424,
+        "width": 320,
+        "x": 719,
+        "y": 424
+      }
+    },
+    "url": "https://alpha.teameet.co.kr/matches",
+    "utc": "2026-10-04T09:34:10.171Z",
+    "viewport": {
+      "dpr": 1,
+      "h": 757,
+      "w": 1182
+    },
+    "windowScroll": {
+      "x": 0,
+      "y": 0
+    },
+    "index": 26,
+    "label": "native wheel restored same list top"
+  }
+]

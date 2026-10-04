@@ -1,0 +1,237 @@
+[
+  {
+    "proofIndex": 1,
+    "DOMUTC": "2026-10-04T09:22:18.652Z",
+    "viewport": {
+      "dpr": 1.25,
+      "h": 606,
+      "w": 402
+    },
+    "mainScroll": 0,
+    "railLeft": 572.7999877929688,
+    "metaText": "입문-고수 · 혼성 · 참가비 설명: 10000",
+    "numericTextRect": {
+      "bottom": 492.3999938964844,
+      "height": 14.399993896484377,
+      "left": 186.4750061035156,
+      "right": 220.3500061035156,
+      "top": 478,
+      "width": 33.875,
+      "x": 186.4750061035156,
+      "y": 478
+    },
+    "cardRect": {
+      "bottom": 598,
+      "height": 285.6000061035156,
+      "left": 23.200000762939453,
+      "right": 299.20000076293945,
+      "top": 312.3999938964844,
+      "width": 276,
+      "x": 23.200000762939453,
+      "y": 312.3999938964844
+    },
+    "createRect": {
+      "bottom": 514,
+      "height": 56,
+      "left": 325.6000061035156,
+      "right": 381.6000061035156,
+      "top": 458,
+      "width": 56,
+      "x": 325.6000061035156,
+      "y": 458
+    },
+    "createPosition": "absolute",
+    "cardToCreateHorizontalGap": 26.400005340576172,
+    "numericBoundingRectIntersectionArea": 0.0,
+    "metadataBoundingRectIntersectionArea": 0.0,
+    "geometryScope": "Bounding rectangles, not an alpha/glyph intersection area or measured focus-outline distance."
+  },
+  {
+    "proofIndex": 5,
+    "DOMUTC": "2026-10-04T09:24:09.173Z",
+    "viewport": {
+      "dpr": 1.25,
+      "h": 606,
+      "w": 402
+    },
+    "mainScroll": 65.5999984741211,
+    "railLeft": 550.4000244140625,
+    "metaText": "입문-고수 · 혼성 · 참가비 설명: 10000",
+    "numericTextRect": {
+      "bottom": 426.8000183105469,
+      "height": 14.4000244140625,
+      "left": 208.875,
+      "right": 242.75,
+      "top": 412.3999938964844,
+      "width": 33.875,
+      "x": 208.875,
+      "y": 412.3999938964844
+    },
+    "cardRect": {
+      "bottom": 532.4000091552734,
+      "height": 285.6000061035156,
+      "left": 45.60000228881836,
+      "right": 321.60000228881836,
+      "top": 246.8000030517578,
+      "width": 276,
+      "x": 45.60000228881836,
+      "y": 246.8000030517578
+    },
+    "createRect": {
+      "bottom": 514,
+      "height": 56,
+      "left": 325.6000061035156,
+      "right": 381.6000061035156,
+      "top": 458,
+      "width": 56,
+      "x": 325.6000061035156,
+      "y": 458
+    },
+    "createPosition": "absolute",
+    "cardToCreateHorizontalGap": 4.000003814697266,
+    "numericBoundingRectIntersectionArea": 0,
+    "metadataBoundingRectIntersectionArea": 0,
+    "geometryScope": "Bounding rectangles, not an alpha/glyph intersection area or measured focus-outline distance."
+  },
+  {
+    "proofIndex": 8,
+    "DOMUTC": "2026-10-04T09:25:42.589Z",
+    "viewport": {
+      "dpr": 1.25,
+      "h": 606,
+      "w": 402
+    },
+    "mainScroll": 0,
+    "railLeft": 550.4000244140625,
+    "metaText": "입문-고수 · 혼성 · 참가비 설명: 10000",
+    "numericTextRect": {
+      "bottom": 492.3999938964844,
+      "height": 14.399993896484377,
+      "left": 208.875,
+      "right": 242.75,
+      "top": 478,
+      "width": 33.875,
+      "x": 208.875,
+      "y": 478
+    },
+    "cardRect": {
+      "bottom": 598,
+      "height": 285.6000061035156,
+      "left": 45.60000228881836,
+      "right": 321.60000228881836,
+      "top": 312.3999938964844,
+      "width": 276,
+      "x": 45.60000228881836,
+      "y": 312.3999938964844
+    },
+    "createRect": {
+      "bottom": 514,
+      "height": 56,
+      "left": 325.6000061035156,
+      "right": 381.6000061035156,
+      "top": 458,
+      "width": 56,
+      "x": 325.6000061035156,
+      "y": 458
+    },
+    "createPosition": "absolute",
+    "cardToCreateHorizontalGap": 4.000003814697266,
+    "numericBoundingRectIntersectionArea": 0.0,
+    "metadataBoundingRectIntersectionArea": 0.0,
+    "geometryScope": "Bounding rectangles, not an alpha/glyph intersection area or measured focus-outline distance."
+  },
+  {
+    "proofIndex": 14,
+    "DOMUTC": "2026-10-04T09:28:07.771Z",
+    "viewport": {
+      "dpr": 1.5,
+      "h": 505,
+      "w": 788
+    },
+    "mainScroll": 166,
+    "railLeft": 352,
+    "metaText": "입문-고수 · 혼성 · 참가비 설명: 10000",
+    "numericTextRect": {
+      "bottom": 325.3333435058594,
+      "height": 14,
+      "left": 501.1458435058594,
+      "right": 535.0104370117188,
+      "top": 311.3333435058594,
+      "width": 33.864593505859375,
+      "x": 501.1458435058594,
+      "y": 311.3333435058594
+    },
+    "cardRect": {
+      "bottom": 431.3333435058594,
+      "height": 285.3333435058594,
+      "left": 338,
+      "right": 614,
+      "top": 146,
+      "width": 276,
+      "x": 338,
+      "y": 146
+    },
+    "createRect": {
+      "bottom": 413,
+      "height": 56,
+      "left": 618,
+      "right": 674,
+      "top": 357,
+      "width": 56,
+      "x": 618,
+      "y": 357
+    },
+    "createPosition": "absolute",
+    "cardToCreateHorizontalGap": 4,
+    "numericBoundingRectIntersectionArea": 0,
+    "metadataBoundingRectIntersectionArea": 0,
+    "geometryScope": "Bounding rectangles, not an alpha/glyph intersection area or measured focus-outline distance."
+  },
+  {
+    "proofIndex": 19,
+    "DOMUTC": "2026-10-04T09:28:45.848Z",
+    "viewport": {
+      "dpr": 1,
+      "h": 757,
+      "w": 1182
+    },
+    "mainScroll": 0,
+    "railLeft": 0,
+    "metaText": "입문-고수 · 혼성 · 참가비 설명: 10000",
+    "numericTextRect": {
+      "bottom": 630,
+      "height": 14,
+      "left": 882.484375,
+      "right": 916.34375,
+      "top": 616,
+      "width": 33.859375,
+      "x": 882.484375,
+      "y": 616
+    },
+    "cardRect": {
+      "bottom": 736,
+      "height": 312,
+      "left": 719,
+      "right": 1039,
+      "top": 424,
+      "width": 320,
+      "x": 719,
+      "y": 424
+    },
+    "createRect": {
+      "bottom": 136,
+      "height": 44,
+      "left": 992.703125,
+      "right": 1127,
+      "top": 92,
+      "width": 134.296875,
+      "x": 992.703125,
+      "y": 92
+    },
+    "createPosition": "static",
+    "cardToCreateHorizontalGap": -46.296875,
+    "numericBoundingRectIntersectionArea": 0,
+    "metadataBoundingRectIntersectionArea": 0.0,
+    "geometryScope": "Bounding rectangles, not an alpha/glyph intersection area or measured focus-outline distance."
+  }
+]

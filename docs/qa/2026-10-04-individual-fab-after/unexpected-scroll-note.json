@@ -1,0 +1,16 @@
+{
+  "recordedUTC": "2026-10-04T09:30:58.359Z",
+  "observed": {
+    "dialogs": 0,
+    "mainScroll": 0,
+    "scrollY": 0,
+    "url": "https://alpha.teameet.co.kr/matches/id-9645589d4a78fb40",
+    "utc": "2026-10-04T09:31:02.409Z",
+    "viewport": {
+      "dpr": 1,
+      "h": 757,
+      "w": 1182
+    }
+  },
+  "note": "After supported tab.scroll([1000,550],down,1), following settled proof23 unexpectedly observed the approved target detail URL. The next upward-scroll action had been planned for list but occurred on detail; neither is counted as a successful list-scroll regression. Input/application causality is unobserved. No create/application action was sent."
+}

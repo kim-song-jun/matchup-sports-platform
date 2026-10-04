@@ -1,0 +1,463 @@
+{
+  "verifiedUTC": "2026-10-04T09:44:24.519594+00:00",
+  "inputFiles": 22,
+  "inputByteIdentical": true,
+  "inputChecksumsSHA256": "8a99680b71fdfd230f80f5d272d66e2afbc1512ffc4b245aeb44fec050bfa797",
+  "counts": {
+    "mainDOM": 27,
+    "completedSelectedActionCalls": 49,
+    "keyboardPreludeEndpoints": 14,
+    "PNG": 6,
+    "selectedFocusSequenceEndpoints": 15,
+    "rectangleRecordsRecomputed": 261
+  },
+  "focusSequences": [
+    {
+      "proofIndex": 3,
+      "DOMUTC": "2026-10-04T09:23:42.972Z",
+      "anchorIndex": 0,
+      "href": "/matches/id-edb832a4ea13650c",
+      "viewport": {
+        "w": 402,
+        "h": 606,
+        "dpr": 1.25
+      },
+      "railLeft": 0,
+      "mainScroll": 65.5999984741211,
+      "focusVisible": true,
+      "horizontalCardFitsRail": true,
+      "cardCreateBoundingIntersection": 0
+    },
+    {
+      "proofIndex": 4,
+      "DOMUTC": "2026-10-04T09:23:53.386Z",
+      "anchorIndex": 1,
+      "href": "/matches/id-c6a85e3fe145bb95",
+      "viewport": {
+        "w": 402,
+        "h": 606,
+        "dpr": 1.25
+      },
+      "railLeft": 262.3999938964844,
+      "mainScroll": 65.5999984741211,
+      "focusVisible": true,
+      "horizontalCardFitsRail": true,
+      "cardCreateBoundingIntersection": 0
+    },
+    {
+      "proofIndex": 5,
+      "DOMUTC": "2026-10-04T09:24:09.173Z",
+      "anchorIndex": 2,
+      "href": "/matches/id-9645589d4a78fb40",
+      "viewport": {
+        "w": 402,
+        "h": 606,
+        "dpr": 1.25
+      },
+      "railLeft": 550.4000244140625,
+      "mainScroll": 65.5999984741211,
+      "focusVisible": true,
+      "horizontalCardFitsRail": true,
+      "cardCreateBoundingIntersection": 0
+    },
+    {
+      "proofIndex": 6,
+      "DOMUTC": "2026-10-04T09:24:20.226Z",
+      "anchorIndex": 1,
+      "href": "/matches/id-c6a85e3fe145bb95",
+      "viewport": {
+        "w": 402,
+        "h": 606,
+        "dpr": 1.25
+      },
+      "railLeft": 288,
+      "mainScroll": 65.5999984741211,
+      "focusVisible": true,
+      "horizontalCardFitsRail": true,
+      "cardCreateBoundingIntersection": 0
+    },
+    {
+      "proofIndex": 7,
+      "DOMUTC": "2026-10-04T09:25:02.166Z",
+      "anchorIndex": 0,
+      "href": "/matches/id-edb832a4ea13650c",
+      "viewport": {
+        "w": 402,
+        "h": 606,
+        "dpr": 1.25
+      },
+      "railLeft": 0,
+      "mainScroll": 65.5999984741211,
+      "focusVisible": true,
+      "horizontalCardFitsRail": true,
+      "cardCreateBoundingIntersection": 0
+    },
+    {
+      "proofIndex": 12,
+      "DOMUTC": "2026-10-04T09:27:25.968Z",
+      "anchorIndex": 0,
+      "href": "/matches/id-edb832a4ea13650c",
+      "viewport": {
+        "w": 788,
+        "h": 505,
+        "dpr": 1.5
+      },
+      "railLeft": 0,
+      "mainScroll": 166,
+      "focusVisible": true,
+      "horizontalCardFitsRail": true,
+      "cardCreateBoundingIntersection": 0
+    },
+    {
+      "proofIndex": 13,
+      "DOMUTC": "2026-10-04T09:27:36.088Z",
+      "anchorIndex": 1,
+      "href": "/matches/id-c6a85e3fe145bb95",
+      "viewport": {
+        "w": 788,
+        "h": 505,
+        "dpr": 1.5
+      },
+      "railLeft": 64,
+      "mainScroll": 166,
+      "focusVisible": true,
+      "horizontalCardFitsRail": true,
+      "cardCreateBoundingIntersection": 0
+    },
+    {
+      "proofIndex": 14,
+      "DOMUTC": "2026-10-04T09:28:07.771Z",
+      "anchorIndex": 2,
+      "href": "/matches/id-9645589d4a78fb40",
+      "viewport": {
+        "w": 788,
+        "h": 505,
+        "dpr": 1.5
+      },
+      "railLeft": 352,
+      "mainScroll": 166,
+      "focusVisible": true,
+      "horizontalCardFitsRail": true,
+      "cardCreateBoundingIntersection": 0
+    },
+    {
+      "proofIndex": 15,
+      "DOMUTC": "2026-10-04T09:28:08.218Z",
+      "anchorIndex": 1,
+      "href": "/matches/id-c6a85e3fe145bb95",
+      "viewport": {
+        "w": 788,
+        "h": 505,
+        "dpr": 1.5
+      },
+      "railLeft": 288,
+      "mainScroll": 166,
+      "focusVisible": true,
+      "horizontalCardFitsRail": true,
+      "cardCreateBoundingIntersection": 0
+    },
+    {
+      "proofIndex": 16,
+      "DOMUTC": "2026-10-04T09:28:08.443Z",
+      "anchorIndex": 0,
+      "href": "/matches/id-edb832a4ea13650c",
+      "viewport": {
+        "w": 788,
+        "h": 505,
+        "dpr": 1.5
+      },
+      "railLeft": 0,
+      "mainScroll": 166,
+      "focusVisible": true,
+      "horizontalCardFitsRail": true,
+      "cardCreateBoundingIntersection": 0
+    },
+    {
+      "proofIndex": 17,
+      "DOMUTC": "2026-10-04T09:28:45.310Z",
+      "anchorIndex": 0,
+      "href": "/matches/id-edb832a4ea13650c",
+      "viewport": {
+        "w": 1182,
+        "h": 757,
+        "dpr": 1
+      },
+      "railLeft": 0,
+      "mainScroll": 0,
+      "focusVisible": true,
+      "horizontalCardFitsRail": true,
+      "cardCreateBoundingIntersection": 0
+    },
+    {
+      "proofIndex": 18,
+      "DOMUTC": "2026-10-04T09:28:45.681Z",
+      "anchorIndex": 1,
+      "href": "/matches/id-c6a85e3fe145bb95",
+      "viewport": {
+        "w": 1182,
+        "h": 757,
+        "dpr": 1
+      },
+      "railLeft": 0,
+      "mainScroll": 0,
+      "focusVisible": true,
+      "horizontalCardFitsRail": true,
+      "cardCreateBoundingIntersection": 0
+    },
+    {
+      "proofIndex": 19,
+      "DOMUTC": "2026-10-04T09:28:45.848Z",
+      "anchorIndex": 2,
+      "href": "/matches/id-9645589d4a78fb40",
+      "viewport": {
+        "w": 1182,
+        "h": 757,
+        "dpr": 1
+      },
+      "railLeft": 0,
+      "mainScroll": 0,
+      "focusVisible": true,
+      "horizontalCardFitsRail": true,
+      "cardCreateBoundingIntersection": 0
+    },
+    {
+      "proofIndex": 20,
+      "DOMUTC": "2026-10-04T09:29:12.580Z",
+      "anchorIndex": 1,
+      "href": "/matches/id-c6a85e3fe145bb95",
+      "viewport": {
+        "w": 1182,
+        "h": 757,
+        "dpr": 1
+      },
+      "railLeft": 0,
+      "mainScroll": 0,
+      "focusVisible": true,
+      "horizontalCardFitsRail": true,
+      "cardCreateBoundingIntersection": 0
+    },
+    {
+      "proofIndex": 21,
+      "DOMUTC": "2026-10-04T09:29:12.809Z",
+      "anchorIndex": 0,
+      "href": "/matches/id-edb832a4ea13650c",
+      "viewport": {
+        "w": 1182,
+        "h": 757,
+        "dpr": 1
+      },
+      "railLeft": 0,
+      "mainScroll": 0,
+      "focusVisible": true,
+      "horizontalCardFitsRail": true,
+      "cardCreateBoundingIntersection": 0
+    }
+  ],
+  "geometry": [
+    {
+      "proofIndex": 1,
+      "DOMUTC": "2026-10-04T09:22:18.652Z",
+      "horizontalBorderBoxGap": 26.400005340576172,
+      "numericIntersection": 0.0,
+      "metadataIntersection": 0.0,
+      "numericWithinViewport": true,
+      "createPosition": "absolute"
+    },
+    {
+      "proofIndex": 5,
+      "DOMUTC": "2026-10-04T09:24:09.173Z",
+      "horizontalBorderBoxGap": 4.000003814697266,
+      "numericIntersection": 0,
+      "metadataIntersection": 0,
+      "numericWithinViewport": true,
+      "createPosition": "absolute"
+    },
+    {
+      "proofIndex": 8,
+      "DOMUTC": "2026-10-04T09:25:42.589Z",
+      "horizontalBorderBoxGap": 4.000003814697266,
+      "numericIntersection": 0.0,
+      "metadataIntersection": 0.0,
+      "numericWithinViewport": true,
+      "createPosition": "absolute"
+    },
+    {
+      "proofIndex": 14,
+      "DOMUTC": "2026-10-04T09:28:07.771Z",
+      "horizontalBorderBoxGap": 4,
+      "numericIntersection": 0,
+      "metadataIntersection": 0,
+      "numericWithinViewport": true,
+      "createPosition": "absolute"
+    },
+    {
+      "proofIndex": 19,
+      "DOMUTC": "2026-10-04T09:28:45.848Z",
+      "horizontalBorderBoxGap": -46.296875,
+      "numericIntersection": 0,
+      "metadataIntersection": 0.0,
+      "numericWithinViewport": true,
+      "createPosition": "static"
+    }
+  ],
+  "images": [
+    {
+      "file": "mobile-end-cost-fab.png",
+      "proofIndex": 1,
+      "DOMUTC": "2026-10-04T09:22:18.652Z",
+      "captureStartUTC": "2026-10-04T09:22:18.655Z",
+      "captureEndUTC": "2026-10-04T09:22:18.923Z",
+      "sha256": "4b43622038aec3fb9c9323a56bd688123b5637fb10d388605fe3f112b182be29",
+      "pixels": [
+        369,
+        77
+      ],
+      "sourcePixels": [
+        402,
+        606
+      ],
+      "sourceCropEquality": "collector attestation; private original not opened"
+    },
+    {
+      "file": "mobile-focus-cost-fab.png",
+      "proofIndex": 8,
+      "DOMUTC": "2026-10-04T09:25:42.589Z",
+      "captureStartUTC": "2026-10-04T09:25:42.593Z",
+      "captureEndUTC": "2026-10-04T09:25:42.867Z",
+      "sha256": "0fc096f6ef909c35bcb7962a2b2279fc042e775727e33c041e2546a240813595",
+      "pixels": [
+        347,
+        77
+      ],
+      "sourcePixels": [
+        402,
+        606
+      ],
+      "sourceCropEquality": "collector attestation; private original not opened"
+    },
+    {
+      "file": "tablet-focused-cost.png",
+      "proofIndex": 14,
+      "DOMUTC": "2026-10-04T09:28:07.771Z",
+      "captureStartUTC": "2026-10-04T09:28:07.774Z",
+      "captureEndUTC": "2026-10-04T09:28:08.057Z",
+      "sha256": "224043ab3bbdc96ccbbaecff3d00e33f29e0e3a20e79684717a561a90ddb6b83",
+      "pixels": [
+        283,
+        53
+      ],
+      "sourcePixels": [
+        788,
+        505
+      ],
+      "sourceCropEquality": "collector attestation; private original not opened"
+    },
+    {
+      "file": "tablet-focus-fab-gap.png",
+      "proofIndex": 14,
+      "DOMUTC": "2026-10-04T09:28:07.771Z",
+      "captureStartUTC": "2026-10-04T09:28:07.774Z",
+      "captureEndUTC": "2026-10-04T09:28:08.057Z",
+      "sha256": "d9f3b0e55c7599c0b00ed7bc80be336b85131f1f23fb2af9da9b64cb87c2d703",
+      "pixels": [
+        71,
+        80
+      ],
+      "sourcePixels": [
+        788,
+        505
+      ],
+      "sourceCropEquality": "collector attestation; private original not opened"
+    },
+    {
+      "file": "desktop-focused-cost.png",
+      "proofIndex": 19,
+      "DOMUTC": "2026-10-04T09:28:45.848Z",
+      "captureStartUTC": "2026-10-04T09:28:45.852Z",
+      "captureEndUTC": "2026-10-04T09:28:46.126Z",
+      "sha256": "17b2db9be3d7f53a78db70969815098b8b5d08e839ae34415b99a66fdc462b71",
+      "pixels": [
+        331,
+        46
+      ],
+      "sourcePixels": [
+        1182,
+        757
+      ],
+      "sourceCropEquality": "collector attestation; private original not opened"
+    },
+    {
+      "file": "desktop-create-entry.png",
+      "proofIndex": 19,
+      "DOMUTC": "2026-10-04T09:28:45.848Z",
+      "captureStartUTC": "2026-10-04T09:28:45.852Z",
+      "captureEndUTC": "2026-10-04T09:28:46.126Z",
+      "sha256": "06ac33da5b732d9baf1f3158eedcc3cd8d434b698ecebde1b1903bf432dca036",
+      "pixels": [
+        150,
+        55
+      ],
+      "sourcePixels": [
+        1182,
+        757
+      ],
+      "sourceCropEquality": "collector attestation; private original not opened"
+    }
+  ],
+  "beforeAfterIdentity": {
+    "matchingSuppliedFullURLHashes": true,
+    "previousPublishedHash": {
+      "publicSource": "https://github.com/kim-song-jun/matchup-sports-platform/blob/399dee0831ab2c7034cbd0bc8c0694554926ab9f/docs/qa/2026-10-04-individual-cost-label-after/verification.json",
+      "alias": "synthetic-overlap-1",
+      "originalDetailURLSHA256": "54495c2189cf0ebc47e2f897a129a0bcc00908a2693976847583fc02e871d1b0"
+    },
+    "currentCollectorHashLink": {
+      "previousPublicAlias": "synthetic-overlap-1",
+      "currentPublicId": "id-9645589d4a78fb40",
+      "originalDetailURLSHA256": "54495c2189cf0ebc47e2f897a129a0bcc00908a2693976847583fc02e871d1b0",
+      "matchesPreviousPublicVerificationHash": true,
+      "sourceField": "safe/detail-navigation.json detail.url",
+      "sourceDOMUTC": "2026-10-04T09:26:04.568Z",
+      "sourceFileSHA256": "8cc0aac81e4cd66745585f5cc9f0dd114843d7d266d9428e9e3078d9b4802ec5",
+      "computation": "SHA256 of exact stored resolved detail URL UTF-8 bytes; no new browser observation."
+    },
+    "rawURLHashRecomputedByPublisher": false
+  },
+  "deploymentWorkflow": {
+    "sha": "117fa596b6246b25565de5c675119e7eb59b09f2",
+    "conclusion": "success",
+    "status": "completed",
+    "updatedUTC": "2026-10-04T09:17:42Z",
+    "url": "https://github.com/kim-song-jun/matchup-sports-platform/actions/runs/37190921568"
+  },
+  "runtimeServingSHA": "unknown",
+  "createDestinationIndependentSavedField": false,
+  "createActivationTested": false,
+  "mobileBackRailScrollRestored": false,
+  "scrollCallsExcludedActionIndices": [
+    44,
+    45
+  ],
+  "separateNativeWheelProofIndices": [
+    24,
+    25,
+    26
+  ],
+  "finalState": {
+    "mainScroll": 0,
+    "search": "",
+    "url": "https://alpha.teameet.co.kr/matches",
+    "utc": "2026-10-04T09:34:10.184Z",
+    "viewport": {
+      "dpr": 1,
+      "h": 757,
+      "w": 1182
+    },
+    "visibleDialogs": 0,
+    "windowScroll": {
+      "x": 0,
+      "y": 0
+    }
+  },
+  "privacy": "Actual six safe PNGs and all public JSON inspected; no host/account names, contact details, secrets or original image URLs found. No private source opened."
+}

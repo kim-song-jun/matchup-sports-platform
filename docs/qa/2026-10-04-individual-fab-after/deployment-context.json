@@ -1,0 +1,13 @@
+{
+  "reportedSHA": "117fa596b6246b25565de5c675119e7eb59b09f2",
+  "version": "1.1.5-alpha.20261004.g117fa596b624",
+  "run": "37190921568",
+  "healthyUTC": "2026-10-04T09:17:26.026Z",
+  "successUTC": "2026-10-04T09:17:42Z",
+  "runtimeServingIdentity": "unknown",
+  "freshNavigation": {
+    "label": "fresh queryless personal-match list after reported117fa deploy",
+    "startUTC": "2026-10-04T09:20:28.164Z",
+    "endUTC": "2026-10-04T09:20:31.979Z"
+  }
+}

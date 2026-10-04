@@ -1,0 +1,26 @@
+{
+  "detail": {
+    "backLinks": [
+      {
+        "aria": "뒤로가기",
+        "href": "/matches"
+      },
+      {
+        "aria": "뒤로가기",
+        "href": "/matches"
+      }
+    ],
+    "dialogs": 0,
+    "titleExact": [
+      "t",
+      "t"
+    ],
+    "url": "https://alpha.teameet.co.kr/matches/id-9645589d4a78fb40",
+    "utc": "2026-10-04T09:26:04.568Z",
+    "viewport": {
+      "dpr": 1.25,
+      "h": 606,
+      "w": 402
+    }
+  }
+}

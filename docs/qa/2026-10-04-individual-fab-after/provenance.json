@@ -1,0 +1,32 @@
+{
+  "preparedUTC": "2026-10-04T09:36:37.021646+00:00",
+  "sourceJSONSHA256": {
+    "actions.json": "8c532e629fd66684dd63083439f8b090eca5fd7ed634915ff772e63631d8dcc8",
+    "detail-navigation.json": "8cc0aac81e4cd66745585f5cc9f0dd114843d7d266d9428e9e3078d9b4802ec5",
+    "exit.json": "331af3f84cc3526fcf6624c1a6cfbcc4421d91765c9167bd4aed66359574acf3",
+    "final-exit.json": "9bf4a25e6e9e9f4f5b61a6b74aafc5aad1ff9308f3dfe4d8b8926bb7d3c8f8f3",
+    "keyboard-path.json": "ebd595befd8be79eecdddbb701d936758005eacb7d2830e7ffdd91303ddf160b",
+    "proof.json": "56dc488ca45df53435352b5f9d69eb09b7e662534c999607d6cea8b2ef301571",
+    "scope-corrections.json": "68484f4290eedddc141137cdf3d4fc548b906ee6599f81d8e803c73f1e595dd3",
+    "unexpected-scroll-note.json": "4e945a6c3076d4ac204f38aab46356244f300d4b8b7cc91930c73525deaeab6f"
+  },
+  "sourceCaptureMetadataSHA256": "0766583372a5a250ec0c16a6905327fc478ef86ecbddccf41c575441711b7a3c",
+  "sourcePreservation": "Original safe8JSON and private captures are unchanged; public JSON hashes opaque UUIDs consistently. URLs containing id-hash are aliases, not live links.",
+  "excludedCapture": "mobile-first-focus.png corresponds tofootball filter rather than first rail. Other uncropped source screenshots remain private.",
+  "imageMethod": "Six exact decoded pixel subsets; no resizing, masks or color changes. Crops exclude host/account names.",
+  "evidenceScope": "Actual UIobservations separated from deployment reports, before reference and geometry calculations.",
+  "documentationCorrection": {
+    "utc": "2026-10-04T09:40:29.304055+00:00",
+    "reason": "Narrow create-entry href evidence to collector observation; saved creates objects omit href. Original source JSON, proof and PNG bytes unchanged."
+  },
+  "beforeAfterFixtureHashLink": {
+    "previousPublicAlias": "synthetic-overlap-1",
+    "currentPublicId": "id-9645589d4a78fb40",
+    "originalDetailURLSHA256": "54495c2189cf0ebc47e2f897a129a0bcc00908a2693976847583fc02e871d1b0",
+    "matchesPreviousPublicVerificationHash": true,
+    "sourceField": "safe/detail-navigation.json detail.url",
+    "sourceDOMUTC": "2026-10-04T09:26:04.568Z",
+    "sourceFileSHA256": "8cc0aac81e4cd66745585f5cc9f0dd114843d7d266d9428e9e3078d9b4802ec5",
+    "computation": "SHA256 of exact stored resolved detail URL UTF-8 bytes; no new browser observation."
+  }
+}

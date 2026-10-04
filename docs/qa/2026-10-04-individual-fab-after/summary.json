@@ -1,0 +1,109 @@
+{
+  "scope": "Issue1601 after reported PR1603 deployment; cost/FAB visibility and selected rail navigation only",
+  "startedUTC": "2026-10-04T09:20:28.164Z",
+  "endedUTC": "2026-10-04T09:34:10.184Z",
+  "counts": {
+    "DOM": 27,
+    "completedActions": 49,
+    "keyboardPreludeEndpoints": 14,
+    "safePNGs": 6
+  },
+  "runtimeServingIdentity": "unknown",
+  "before": {
+    "reference": "https://github.com/kim-song-jun/matchup-sports-platform/blob/399dee0831ab2c7034cbd0bc8c0694554926ab9f/docs/qa/2026-10-04-individual-cost-label-after/MOBILE-FAB-OBSERVATION.md",
+    "url": "https://alpha.teameet.co.kr/matches",
+    "fixtureIdHash": "id-9645589d4a78fb40",
+    "cost": "10000",
+    "DOMUTC": "2026-10-04T07:27:08.874Z",
+    "viewport": {
+      "w": 402,
+      "h": 606,
+      "dpr": 1.25
+    },
+    "mainScroll": 0,
+    "railLeft": 490.3999938964844,
+    "railScrollWidth": 860,
+    "railClientWidth": 370,
+    "metaRect": {
+      "left": 122.4000015258789,
+      "right": 364.80001068115234,
+      "top": 477.2000122070313,
+      "bottom": 493.2000122070313
+    },
+    "FABRect": {
+      "left": 325.6000061035156,
+      "right": 381.6000061035156,
+      "top": 458,
+      "bottom": 514
+    }
+  },
+  "result": "Core before occlusion is no longer observed at the same fixture, cost, URL and402×606 viewport. Mobile terminal-scroll and focused-top screenshots show all10000 digits. Specified three-width rail forward/reverse sequences and mobile detail Enter navigate correctly.",
+  "acceptedObservations": {
+    "mobileHorizontalEnd": 1,
+    "mobileFirstMiddleFinal": [
+      3,
+      4,
+      5
+    ],
+    "mobileReverseMiddleFirst": [
+      6,
+      7
+    ],
+    "mobileFocusedAtOriginalVerticalTop": 8,
+    "mobileDetail": "detail-navigation.json",
+    "mobileBack": 9,
+    "tabletHorizontalEndDOMOnly": 11,
+    "tabletFirstMiddleFinal": [
+      12,
+      13,
+      14
+    ],
+    "tabletReverseMiddleFirst": [
+      15,
+      16
+    ],
+    "desktopFirstMiddleFinal": [
+      17,
+      18,
+      19
+    ],
+    "desktopReverseMiddleFirst": [
+      20,
+      21
+    ],
+    "desktopAllCardsFit": 22,
+    "separateNativeVerticalWheel": [
+      25,
+      26
+    ]
+  },
+  "limits": [
+    "Before label 성별 무관 is now 혼성, so isolate neither glyph-width changes nor the complete visual delta solely toPR1603. Same fixture/cost and card-position geometry are established.",
+    "Original proof2 planned label is incorrect: it is football-filter focus; first rail actually follows14Tabs atproof3. Its screenshot is excluded.",
+    "Tablet horizontal-end proof11 has cost below the bottom navigation atmainScroll0; it is not a visible-cost pass. Tablet focused proof14 is the visible comparison.",
+    "Mobile browserBack resets rail tofirst scrollLeft4; route/emptyquery return is verified, rail-scroll restoration is not.",
+    "Desktop all three cards fit; scrollWidth=clientWidth1080 with scrollLeft0. This is not a scrollable desktop fixture.",
+    "Unexpected tab.scroll coordinate call was followed by the same target detail route atproof23. Its planned upward scroll also occurred ondetail. Both are excluded from successful list-scroll results; input/application cause unobserved.",
+    "Separate direct native wheel over blank margin later stayed on/matches and changed window scroll0→360→0 atproof25/26; this does not explain or erase the prior event.",
+    "Create-entry labels/geometry are recorded, but saved creates objects omit href. The collector observed /matches/new/sport via its exact selector and earlier AX tool output; this is collector-attributed route evidence, not a separately saved href field. Activation/create flow remains unverified. No application,upload,save,share or fixture mutation control was activated.",
+    "No search or recent-search submission. No network/DB audit or unconditional zero-server-write claim.",
+    "Focused card/FAB horizontal gap is4 CSS pixels atmobile/tablet; this is border-box geometry, not focus-outline or glyph distance. Only captured conditions are covered.",
+    "Runtime serving identity unknown; deployment context separate. No earlier observations are reassigned to117fa."
+  ],
+  "finalState": {
+    "mainScroll": 0,
+    "search": "",
+    "url": "https://alpha.teameet.co.kr/matches",
+    "utc": "2026-10-04T09:34:10.184Z",
+    "viewport": {
+      "dpr": 1,
+      "h": 757,
+      "w": 1182
+    },
+    "visibleDialogs": 0,
+    "windowScroll": {
+      "x": 0,
+      "y": 0
+    }
+  }
+}

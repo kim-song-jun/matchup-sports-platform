@@ -1,0 +1,10 @@
+{
+  "recordedUTC": "2026-10-04T09:34:10.186Z",
+  "proof2": "Original planned label says first rail, but actual active href is football filter. Not used as first-rail proof; real first rail is proof3 after14Tabs. Screenshot mobile-first-focus excluded.",
+  "proof23": "Actual detail route after tab.scroll; excluded from successful list-scrolling results.",
+  "nativeWheelSupplement": "Separate direct native wheel on blank margin produced proof25 list scrollY360 and proof26 list scrollY0. It does not explain or erase prior unexpected navigation.",
+  "createEntry": "Visible/DOM href and geometry only. Activation not performed.",
+  "copyDifference": "Before has 성별 무관, after 혼성; samefixture cost10000 is verified but text widths differ.",
+  "notes": "No search/recent-search submission. No create/application/fixture-mutation control activated. No network audit.",
+  "createEntrySavedEvidenceClarification": "Original createEntry wording is retained above. Saved creates objects contain label/position/geometry but no href. Route observation is collector-attributed through selector a[href=\"/matches/new/sport\"] and earlier tool AX, not an independently retained field."
+}

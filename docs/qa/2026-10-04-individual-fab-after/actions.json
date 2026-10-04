@@ -1,0 +1,247 @@
+[
+  {
+    "label": "fresh queryless personal-match list after reported117fa deploy",
+    "startUTC": "2026-10-04T09:20:28.164Z",
+    "endUTC": "2026-10-04T09:20:31.979Z"
+  },
+  {
+    "label": "resize fresh list to same mobile width",
+    "startUTC": "2026-10-04T09:20:47.742Z",
+    "endUTC": "2026-10-04T09:20:51.889Z"
+  },
+  {
+    "label": "mobile zoom110",
+    "startUTC": "2026-10-04T09:20:51.890Z",
+    "endUTC": "2026-10-04T09:20:52.204Z"
+  },
+  {
+    "label": "mobile zoom125",
+    "startUTC": "2026-10-04T09:20:52.205Z",
+    "endUTC": "2026-10-04T09:20:52.507Z"
+  },
+  {
+    "label": "mobile rail horizontal end scroll",
+    "startUTC": "2026-10-04T09:22:04.004Z",
+    "endUTC": "2026-10-04T09:22:04.068Z"
+  },
+  {
+    "label": "mobile rail scroll back to first",
+    "startUTC": "2026-10-04T09:23:16.546Z",
+    "endUTC": "2026-10-04T09:23:16.588Z"
+  },
+  {
+    "label": "focus empty search without submit",
+    "startUTC": "2026-10-04T09:23:16.599Z",
+    "endUTC": "2026-10-04T09:23:16.904Z"
+  },
+  {
+    "label": "mobile native Tab to first rail 1",
+    "startUTC": "2026-10-04T09:23:16.905Z",
+    "endUTC": "2026-10-04T09:23:16.974Z"
+  },
+  {
+    "label": "mobile native Tab to first rail 2",
+    "startUTC": "2026-10-04T09:23:16.992Z",
+    "endUTC": "2026-10-04T09:23:17.143Z"
+  },
+  {
+    "label": "mobile native Tab to first rail 3",
+    "startUTC": "2026-10-04T09:23:17.153Z",
+    "endUTC": "2026-10-04T09:23:17.314Z"
+  },
+  {
+    "label": "mobile native Tab to first rail 4",
+    "startUTC": "2026-10-04T09:23:17.326Z",
+    "endUTC": "2026-10-04T09:23:17.483Z"
+  },
+  {
+    "label": "mobile native Tab to first rail 5",
+    "startUTC": "2026-10-04T09:23:17.492Z",
+    "endUTC": "2026-10-04T09:23:17.652Z"
+  },
+  {
+    "label": "mobile native Tab to first rail 6",
+    "startUTC": "2026-10-04T09:23:17.662Z",
+    "endUTC": "2026-10-04T09:23:17.820Z"
+  },
+  {
+    "label": "mobile native Tab to first rail 7",
+    "startUTC": "2026-10-04T09:23:17.830Z",
+    "endUTC": "2026-10-04T09:23:17.989Z"
+  },
+  {
+    "label": "mobile native Tab to first rail 8",
+    "startUTC": "2026-10-04T09:23:17.999Z",
+    "endUTC": "2026-10-04T09:23:18.157Z"
+  },
+  {
+    "label": "mobile native Tab to first rail 9",
+    "startUTC": "2026-10-04T09:23:18.167Z",
+    "endUTC": "2026-10-04T09:23:18.324Z"
+  },
+  {
+    "label": "mobile native Tab to first rail 10",
+    "startUTC": "2026-10-04T09:23:18.334Z",
+    "endUTC": "2026-10-04T09:23:18.492Z"
+  },
+  {
+    "label": "mobile native Tab sequence 11",
+    "startUTC": "2026-10-04T09:23:42.372Z",
+    "endUTC": "2026-10-04T09:23:42.441Z"
+  },
+  {
+    "label": "mobile native Tab sequence 12",
+    "startUTC": "2026-10-04T09:23:42.455Z",
+    "endUTC": "2026-10-04T09:23:42.609Z"
+  },
+  {
+    "label": "mobile native Tab sequence 13",
+    "startUTC": "2026-10-04T09:23:42.620Z",
+    "endUTC": "2026-10-04T09:23:42.781Z"
+  },
+  {
+    "label": "mobile native Tab sequence 14",
+    "startUTC": "2026-10-04T09:23:42.792Z",
+    "endUTC": "2026-10-04T09:23:42.950Z"
+  },
+  {
+    "label": "mobile Tab first to middle rail",
+    "startUTC": "2026-10-04T09:23:43.247Z",
+    "endUTC": "2026-10-04T09:23:43.318Z"
+  },
+  {
+    "label": "mobile Tab middle to final rail",
+    "startUTC": "2026-10-04T09:23:53.660Z",
+    "endUTC": "2026-10-04T09:23:53.729Z"
+  },
+  {
+    "label": "mobile ShiftTab final to middle",
+    "startUTC": "2026-10-04T09:24:09.454Z",
+    "endUTC": "2026-10-04T09:24:09.590Z"
+  },
+  {
+    "label": "mobile ShiftTab middle to first",
+    "startUTC": "2026-10-04T09:24:20.234Z",
+    "endUTC": "2026-10-04T09:24:20.370Z"
+  },
+  {
+    "label": "mobile Tab first to middle again",
+    "startUTC": "2026-10-04T09:25:02.170Z",
+    "endUTC": "2026-10-04T09:25:02.239Z"
+  },
+  {
+    "label": "mobile Tab middle to final again",
+    "startUTC": "2026-10-04T09:25:02.240Z",
+    "endUTC": "2026-10-04T09:25:02.407Z"
+  },
+  {
+    "label": "mobile scroll upward while final rail stays focused",
+    "startUTC": "2026-10-04T09:25:24.251Z",
+    "endUTC": "2026-10-04T09:25:24.290Z"
+  },
+  {
+    "label": "mobile Enter final photo card to its read-only detail",
+    "startUTC": "2026-10-04T09:25:42.868Z",
+    "endUTC": "2026-10-04T09:25:42.938Z"
+  },
+  {
+    "label": "mobile browser Back from same read-only detail",
+    "startUTC": "2026-10-04T09:26:04.571Z",
+    "endUTC": "2026-10-04T09:26:04.591Z"
+  },
+  {
+    "label": "resize list to tablet",
+    "startUTC": "2026-10-04T09:26:42.308Z",
+    "endUTC": "2026-10-04T09:26:47.403Z"
+  },
+  {
+    "label": "tablet zoom150",
+    "startUTC": "2026-10-04T09:26:47.403Z",
+    "endUTC": "2026-10-04T09:26:47.707Z"
+  },
+  {
+    "label": "tablet rail horizontal end",
+    "startUTC": "2026-10-04T09:26:48.000Z",
+    "endUTC": "2026-10-04T09:26:48.039Z"
+  },
+  {
+    "label": "tablet Tab from existing swimming filter to first rail",
+    "startUTC": "2026-10-04T09:27:14.908Z",
+    "endUTC": "2026-10-04T09:27:14.942Z"
+  },
+  {
+    "label": "tablet Tab first to middle rail",
+    "startUTC": "2026-10-04T09:27:25.971Z",
+    "endUTC": "2026-10-04T09:27:26.040Z"
+  },
+  {
+    "label": "tablet Tab middle to last",
+    "startUTC": "2026-10-04T09:27:36.094Z",
+    "endUTC": "2026-10-04T09:27:36.163Z"
+  },
+  {
+    "label": "tablet ShiftTab final to middle",
+    "startUTC": "2026-10-04T09:28:08.058Z",
+    "endUTC": "2026-10-04T09:28:08.198Z"
+  },
+  {
+    "label": "tablet ShiftTab middle to first",
+    "startUTC": "2026-10-04T09:28:08.222Z",
+    "endUTC": "2026-10-04T09:28:08.433Z"
+  },
+  {
+    "label": "desktop native zoom reset",
+    "startUTC": "2026-10-04T09:28:45.161Z",
+    "endUTC": "2026-10-04T09:28:45.298Z"
+  },
+  {
+    "label": "desktop Tab first to middle",
+    "startUTC": "2026-10-04T09:28:45.600Z",
+    "endUTC": "2026-10-04T09:28:45.670Z"
+  },
+  {
+    "label": "desktop Tab middle to final",
+    "startUTC": "2026-10-04T09:28:45.687Z",
+    "endUTC": "2026-10-04T09:28:45.838Z"
+  },
+  {
+    "label": "desktop ShiftTab final to middle",
+    "startUTC": "2026-10-04T09:29:12.430Z",
+    "endUTC": "2026-10-04T09:29:12.566Z"
+  },
+  {
+    "label": "desktop ShiftTab middle to first",
+    "startUTC": "2026-10-04T09:29:12.584Z",
+    "endUTC": "2026-10-04T09:29:12.800Z"
+  },
+  {
+    "label": "desktop horizontal end request with all cards fitting",
+    "startUTC": "2026-10-04T09:29:12.814Z",
+    "endUTC": "2026-10-04T09:29:12.857Z"
+  },
+  {
+    "label": "desktop ordinary vertical scroll down",
+    "startUTC": "2026-10-04T09:29:53.702Z",
+    "endUTC": "2026-10-04T09:29:53.785Z"
+  },
+  {
+    "label": "desktop restore vertical top",
+    "startUTC": "2026-10-04T09:30:11.606Z",
+    "endUTC": "2026-10-04T09:30:11.647Z"
+  },
+  {
+    "label": "safe browser Back after unexpected same-target detail navigation",
+    "startUTC": "2026-10-04T09:31:02.411Z",
+    "endUTC": "2026-10-04T09:31:02.434Z"
+  },
+  {
+    "label": "separate native wheel downward over blank desktop margin",
+    "startUTC": "2026-10-04T09:33:38.698Z",
+    "endUTC": "2026-10-04T09:33:38.868Z"
+  },
+  {
+    "label": "native wheel restore list top",
+    "startUTC": "2026-10-04T09:33:46.644Z",
+    "endUTC": "2026-10-04T09:33:46.989Z"
+  }
+]

@@ -1,0 +1,158 @@
+[
+  {
+    "file": "mobile-end-cost-fab.png",
+    "sourceBasename": "mobile-end-after.png",
+    "sourceSHA256": "cf3ccf399bd9a60a8eeb77075ce82c8562e7852831e9cf168869d42a54e686cc",
+    "sourceEncoding": "JPEG",
+    "sourceSize": [
+      402,
+      606
+    ],
+    "boundsLTRB": [
+      16,
+      455,
+      385,
+      532
+    ],
+    "outputSize": [
+      369,
+      77
+    ],
+    "outputSHA256": "4b43622038aec3fb9c9323a56bd688123b5637fb10d388605fe3f112b182be29",
+    "decodedPixelEquality": true,
+    "proofIndex": 1,
+    "DOMUTC": "2026-10-04T09:22:18.652Z",
+    "captureStartUTC": "2026-10-04T09:22:18.655Z",
+    "captureEndUTC": "2026-10-04T09:22:18.923Z"
+  },
+  {
+    "file": "mobile-focus-cost-fab.png",
+    "sourceBasename": "mobile-final-focus-top.png",
+    "sourceSHA256": "b267eedb412fb8d084f9f673a91a65b97eda50c5cf657ca07ed59779431919f2",
+    "sourceEncoding": "JPEG",
+    "sourceSize": [
+      402,
+      606
+    ],
+    "boundsLTRB": [
+      38,
+      455,
+      385,
+      532
+    ],
+    "outputSize": [
+      347,
+      77
+    ],
+    "outputSHA256": "0fc096f6ef909c35bcb7962a2b2279fc042e775727e33c041e2546a240813595",
+    "decodedPixelEquality": true,
+    "proofIndex": 8,
+    "DOMUTC": "2026-10-04T09:25:42.589Z",
+    "captureStartUTC": "2026-10-04T09:25:42.593Z",
+    "captureEndUTC": "2026-10-04T09:25:42.867Z"
+  },
+  {
+    "file": "tablet-focused-cost.png",
+    "sourceBasename": "tablet-final-focus.png",
+    "sourceSHA256": "1df90654dbc27af683165784f59c9da50ee2c065c202ce3c371e5d9089e309b7",
+    "sourceEncoding": "JPEG",
+    "sourceSize": [
+      788,
+      505
+    ],
+    "boundsLTRB": [
+      332,
+      301,
+      615,
+      354
+    ],
+    "outputSize": [
+      283,
+      53
+    ],
+    "outputSHA256": "224043ab3bbdc96ccbbaecff3d00e33f29e0e3a20e79684717a561a90ddb6b83",
+    "decodedPixelEquality": true,
+    "proofIndex": 14,
+    "DOMUTC": "2026-10-04T09:28:07.771Z",
+    "captureStartUTC": "2026-10-04T09:28:07.774Z",
+    "captureEndUTC": "2026-10-04T09:28:08.057Z"
+  },
+  {
+    "file": "tablet-focus-fab-gap.png",
+    "sourceBasename": "tablet-final-focus.png",
+    "sourceSHA256": "1df90654dbc27af683165784f59c9da50ee2c065c202ce3c371e5d9089e309b7",
+    "sourceEncoding": "JPEG",
+    "sourceSize": [
+      788,
+      505
+    ],
+    "boundsLTRB": [
+      609,
+      340,
+      680,
+      420
+    ],
+    "outputSize": [
+      71,
+      80
+    ],
+    "outputSHA256": "d9f3b0e55c7599c0b00ed7bc80be336b85131f1f23fb2af9da9b64cb87c2d703",
+    "decodedPixelEquality": true,
+    "proofIndex": 14,
+    "DOMUTC": "2026-10-04T09:28:07.771Z",
+    "captureStartUTC": "2026-10-04T09:28:07.774Z",
+    "captureEndUTC": "2026-10-04T09:28:08.057Z"
+  },
+  {
+    "file": "desktop-focused-cost.png",
+    "sourceBasename": "desktop-final-focus.png",
+    "sourceSHA256": "3b78e3b0c9a20de592a9198e956961c693ade7919ba8109809ed94e0ac895111",
+    "sourceEncoding": "JPEG",
+    "sourceSize": [
+      1182,
+      757
+    ],
+    "boundsLTRB": [
+      715,
+      598,
+      1046,
+      644
+    ],
+    "outputSize": [
+      331,
+      46
+    ],
+    "outputSHA256": "17b2db9be3d7f53a78db70969815098b8b5d08e839ae34415b99a66fdc462b71",
+    "decodedPixelEquality": true,
+    "proofIndex": 19,
+    "DOMUTC": "2026-10-04T09:28:45.848Z",
+    "captureStartUTC": "2026-10-04T09:28:45.852Z",
+    "captureEndUTC": "2026-10-04T09:28:46.126Z"
+  },
+  {
+    "file": "desktop-create-entry.png",
+    "sourceBasename": "desktop-final-focus.png",
+    "sourceSHA256": "3b78e3b0c9a20de592a9198e956961c693ade7919ba8109809ed94e0ac895111",
+    "sourceEncoding": "JPEG",
+    "sourceSize": [
+      1182,
+      757
+    ],
+    "boundsLTRB": [
+      984,
+      86,
+      1134,
+      141
+    ],
+    "outputSize": [
+      150,
+      55
+    ],
+    "outputSHA256": "06ac33da5b732d9baf1f3158eedcc3cd8d434b698ecebde1b1903bf432dca036",
+    "decodedPixelEquality": true,
+    "proofIndex": 19,
+    "DOMUTC": "2026-10-04T09:28:45.848Z",
+    "captureStartUTC": "2026-10-04T09:28:45.852Z",
+    "captureEndUTC": "2026-10-04T09:28:46.126Z"
+  }
+]

@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 1,
+  "preparedUTC": "2026-10-04T18:00:24.571247+09:00",
+  "inputPreservation": {
+    "allSourceBytesUnchanged": true,
+    "verifiedSourceFiles": 12
+  },
+  "derivation": {
+    "actions.json": "Byte-identical copy of safe/actions.json",
+    "exit.json": "Byte-identical copy of safe/exit.json",
+    "proof.json": "All 19 observations preserved; three identical opaque detail URLs replaced with route template and SHA-256 of the original canonical URL",
+    "source-boundary-1520.json": "Only #1520 source findings plus the shared error-telemetry caveat; no unrelated scenario included",
+    "summary.json": "Derived from recorded DOM/actions and reported deployment context",
+    "screenshots": "Six verified exact crops only; original full screenshots excluded"
+  },
+  "identitySanitization": {
+    "detailURLIndices": [
+      1,
+      7,
+      13
+    ],
+    "canonicalURLHashAlgorithm": "SHA-256 of exact UTF-8 source URL",
+    "sameCanonicalURLHash": "93615425e596a175cf159e1758b60fc3d45c4b8451083b0b0e8b2c02f5ebadc5"
+  },
+  "timestampPolicy": "Preserve original UTC strings. DOM measurement and screenshot capture intervals remain separate.",
+  "privacyReview": {
+    "sixCropsVisuallyInspected": true,
+    "allCropsExactDecodedPixelMatches": true,
+    "hostNamesIncluded": false,
+    "accountOrSidebarIncluded": false,
+    "originalFullScreenshotsIncluded": false
+  },
+  "scopeLimit": "Offline evidence preparation only; no browser action, new source lookup, live network inspection or external write."
+}

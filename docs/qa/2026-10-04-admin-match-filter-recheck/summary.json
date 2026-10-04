@@ -1,0 +1,225 @@
+{
+  "schemaVersion": 1,
+  "issue": 1520,
+  "outcome": "PASS for the recorded search/status-filter, synthetic-detail browser-Back, rapid-input final state, ordinary empty result and restoration scenarios at three widths. No new defect found in this scope.",
+  "firstNavigationAction": {
+    "label": "fresh admin matches navigation",
+    "startUTC": "2026-10-04T08:50:40.070Z",
+    "endUTC": "2026-10-04T08:50:45.423Z"
+  },
+  "deploymentContext": {
+    "evidenceClass": "Reported deployment context; not independently fetched for this packet",
+    "commit": "4c81d071ede5bba14575f2aeb1097326797cbd08",
+    "runID": 37188018237,
+    "runConclusion": "success",
+    "runCompletedUTC": "2026-10-04T08:22:48Z",
+    "healthyObservedUTC": "2026-10-04T08:22:31.618Z",
+    "version": "1.1.5-alpha.20261004.g4c81d071ede5",
+    "actualBrowserRuntimeCommit": null,
+    "interpretation": "Navigation began after the reported deployment completed. These timestamps do not identify the served browser runtime."
+  },
+  "counts": {
+    "recordedActions": 35,
+    "domObservations": 19,
+    "publishedExactPNGCrops": 6
+  },
+  "viewports": [
+    {
+      "name": "mobile",
+      "viewportCSS": {
+        "dpr": 1.25,
+        "h": 606,
+        "w": 402
+      },
+      "proofIndices": {
+        "filtered": 0,
+        "detail": 1,
+        "browserBack": 2,
+        "rapidFinal": 3,
+        "empty": 4,
+        "restored": 5
+      },
+      "filteredAndBack": {
+        "query": "1.0.3",
+        "statusFilter": "completed",
+        "visibleRows": 1,
+        "syntheticLifecycleRows": 1,
+        "sameSyntheticDetailAcrossWidths": true,
+        "queryStatusAndResultRestored": true,
+        "backScrollY": 26.399999618530273,
+        "exactScrollRestorationEstablished": false
+      },
+      "rapidInput": {
+        "sequence": [
+          "query=1.0",
+          "status FILTER=cancelled",
+          "query=1.0.3"
+        ],
+        "startUTC": "2026-10-04T08:52:40.906Z",
+        "endUTC": "2026-10-04T08:52:41.038Z",
+        "recordedActionDurationMs": 132,
+        "sourceDebounceMs": 300,
+        "settledQuery": "1.0.3",
+        "settledStatusFilter": "cancelled",
+        "visibleRows": 1,
+        "syntheticEditedRows": 1,
+        "syntheticLifecycleRows": 0,
+        "interpretation": "Final merged query/filter settled correctly. This is action timing and endpoint evidence, not a request-count or exact debounce-timing measurement."
+      },
+      "emptyResult": {
+        "query": "QA1520-no-result-1004",
+        "statusFilter": "cancelled",
+        "visibleRows": 0,
+        "message": "조건에 맞는 매치가 없어요",
+        "allVisibleRowsMatchQueryInterpretation": "true is the vacuous every() result for zero rows; not evidence of a nonempty match"
+      },
+      "restoredTestCondition": {
+        "query": "1.0.3",
+        "statusFilter": "completed",
+        "visibleRows": 1
+      }
+    },
+    {
+      "name": "tablet",
+      "viewportCSS": {
+        "dpr": 1.5,
+        "h": 505,
+        "w": 788
+      },
+      "proofIndices": {
+        "filtered": 6,
+        "detail": 7,
+        "browserBack": 8,
+        "rapidFinal": 9,
+        "empty": 10,
+        "restored": 11
+      },
+      "filteredAndBack": {
+        "query": "1.0.3",
+        "statusFilter": "completed",
+        "visibleRows": 1,
+        "syntheticLifecycleRows": 1,
+        "sameSyntheticDetailAcrossWidths": true,
+        "queryStatusAndResultRestored": true,
+        "backScrollY": 94,
+        "exactScrollRestorationEstablished": false
+      },
+      "rapidInput": {
+        "sequence": [
+          "query=1.0",
+          "status FILTER=cancelled",
+          "query=1.0.3"
+        ],
+        "startUTC": "2026-10-04T08:53:43.984Z",
+        "endUTC": "2026-10-04T08:53:44.128Z",
+        "recordedActionDurationMs": 144,
+        "sourceDebounceMs": 300,
+        "settledQuery": "1.0.3",
+        "settledStatusFilter": "cancelled",
+        "visibleRows": 1,
+        "syntheticEditedRows": 1,
+        "syntheticLifecycleRows": 0,
+        "interpretation": "Final merged query/filter settled correctly. This is action timing and endpoint evidence, not a request-count or exact debounce-timing measurement."
+      },
+      "emptyResult": {
+        "query": "QA1520-no-result-1004",
+        "statusFilter": "cancelled",
+        "visibleRows": 0,
+        "message": "조건에 맞는 매치가 없어요",
+        "allVisibleRowsMatchQueryInterpretation": "true is the vacuous every() result for zero rows; not evidence of a nonempty match"
+      },
+      "restoredTestCondition": {
+        "query": "1.0.3",
+        "statusFilter": "completed",
+        "visibleRows": 1
+      }
+    },
+    {
+      "name": "desktop",
+      "viewportCSS": {
+        "dpr": 1,
+        "h": 757,
+        "w": 1182
+      },
+      "proofIndices": {
+        "filtered": 12,
+        "detail": 13,
+        "browserBack": 14,
+        "rapidFinal": 15,
+        "empty": 16,
+        "restored": 17
+      },
+      "filteredAndBack": {
+        "query": "1.0.3",
+        "statusFilter": "completed",
+        "visibleRows": 1,
+        "syntheticLifecycleRows": 1,
+        "sameSyntheticDetailAcrossWidths": true,
+        "queryStatusAndResultRestored": true,
+        "backScrollY": 0,
+        "exactScrollRestorationEstablished": false
+      },
+      "rapidInput": {
+        "sequence": [
+          "query=1.0",
+          "status FILTER=cancelled",
+          "query=1.0.3"
+        ],
+        "startUTC": "2026-10-04T08:55:07.716Z",
+        "endUTC": "2026-10-04T08:55:07.840Z",
+        "recordedActionDurationMs": 124,
+        "sourceDebounceMs": 300,
+        "settledQuery": "1.0.3",
+        "settledStatusFilter": "cancelled",
+        "visibleRows": 1,
+        "syntheticEditedRows": 1,
+        "syntheticLifecycleRows": 0,
+        "interpretation": "Final merged query/filter settled correctly. This is action timing and endpoint evidence, not a request-count or exact debounce-timing measurement."
+      },
+      "emptyResult": {
+        "query": "QA1520-no-result-1004",
+        "statusFilter": "cancelled",
+        "visibleRows": 0,
+        "message": "조건에 맞는 매치가 없어요",
+        "allVisibleRowsMatchQueryInterpretation": "true is the vacuous every() result for zero rows; not evidence of a nonempty match"
+      },
+      "restoredTestCondition": {
+        "query": "1.0.3",
+        "statusFilter": "completed",
+        "visibleRows": 1
+      }
+    }
+  ],
+  "finalBaseline": {
+    "proofIndex": 18,
+    "domUTC": "2026-10-04T08:55:52.473Z",
+    "exitUTC": "2026-10-04T08:55:52.491Z",
+    "url": "https://alpha.teameet.co.kr/admin/matches",
+    "query": "",
+    "selectedFilter": "all",
+    "allCount": 29,
+    "visibleRows": 20,
+    "visibleDialogs": 0,
+    "paginationText": [
+      "전체 29건 중 1–20이전12다음"
+    ]
+  },
+  "recordedInteractionScope": {
+    "moderationStatusChangeAction": false,
+    "moderationModalOpened": false,
+    "saveAction": false,
+    "businessMutationAction": false,
+    "networkAuditPerformed": false,
+    "forcedAPIErrorTested": false,
+    "globalServerWrites": "Not established"
+  },
+  "measurementLimits": [
+    "visibleRowCount uses positive bounding-rectangle width and height; hidden duplicate responsive layouts were excluded. It is not a viewport-intersection count.",
+    "pagination=[] at one-row and empty states means no page bar was observed; it is not a pagination defect. Pagination navigation was not tested.",
+    "Mobile Back scrollY=26.399999618530273 and tablet Back scrollY=94 reflect the captured return state after clicking a card; exact scroll-restoration PASS is not established.",
+    "allVisibleRowsMatchQuery=true at empty endpoints is vacuous and must not be used as nonempty evidence.",
+    "Screenshots show filters and empty panels only; row/detail outcomes rely on sanitized DOM evidence.",
+    "No claim of zero POSTs or global absence of server writes. Shared API-error telemetry can POST /api/v1/logs/client-error.",
+    "This does not establish whole-issue regression coverage, API-error behavior, exact network debounce semantics or the browser runtime commit."
+  ]
+}

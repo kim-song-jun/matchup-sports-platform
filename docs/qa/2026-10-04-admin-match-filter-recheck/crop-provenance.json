@@ -1,0 +1,193 @@
+{
+  "schemaVersion": 1,
+  "method": "Exact rectangular crop from decoded source, lossless PNG encoding. No resizing, blurring, retouching, compositing, recoloring, annotations or source copying. Source files retain original bytes.",
+  "timestampSemantics": "domUTC is the preceding DOM read. Capture times are the separate screenshot-call interval, not the same instant.",
+  "crops": [
+    {
+      "file": "mobile-filter-top.png",
+      "proofIndex": 0,
+      "domUTC": "2026-10-04T08:52:22.956Z",
+      "captureStartUTC": "2026-10-04T08:52:22.964Z",
+      "captureEndUTC": "2026-10-04T08:52:23.234Z",
+      "sourceScreenshot": "mobile-filtered.png",
+      "sourceSHA256": "495f0c0d36efc879b8eb065956e3803b7f1e2c1c2cda8792ae927d277efc5f8f",
+      "sourceActualFormat": "JPEG",
+      "sourcePixelSize": [
+        402,
+        606
+      ],
+      "cropBoxLTRB": [
+        8,
+        160,
+        395,
+        330
+      ],
+      "cropCoordinateConvention": "Decoded source image pixels; left/top inclusive, right/bottom exclusive",
+      "outputPixelSize": [
+        387,
+        170
+      ],
+      "outputFormat": "PNG",
+      "outputSHA256": "d6a0cf0601d0093a3b2dd003c9562eb5fb16e63bdfb684dd82e1ba710bbc993e",
+      "exactDecodedPixelEquality": true,
+      "changedPixelCount": 0,
+      "resized": false,
+      "visualPrivacyReview": "Inspected: filter-only or filter/empty panel; no result host names, account or sidebar content"
+    },
+    {
+      "file": "mobile-empty-panel.png",
+      "proofIndex": 4,
+      "domUTC": "2026-10-04T08:52:59.102Z",
+      "captureStartUTC": "2026-10-04T08:52:59.105Z",
+      "captureEndUTC": "2026-10-04T08:52:59.373Z",
+      "sourceScreenshot": "mobile-empty.png",
+      "sourceSHA256": "d6f31f4dd1e02ca24253d9c5f97a32dc9a06dd28aa03cdbfbfa62e036a070d19",
+      "sourceActualFormat": "JPEG",
+      "sourcePixelSize": [
+        402,
+        606
+      ],
+      "cropBoxLTRB": [
+        8,
+        160,
+        395,
+        565
+      ],
+      "cropCoordinateConvention": "Decoded source image pixels; left/top inclusive, right/bottom exclusive",
+      "outputPixelSize": [
+        387,
+        405
+      ],
+      "outputFormat": "PNG",
+      "outputSHA256": "514f38ff1cb79f9a4eb2f47f960671c87bff32dd40ec54daab1ca6aaa3dfc287",
+      "exactDecodedPixelEquality": true,
+      "changedPixelCount": 0,
+      "resized": false,
+      "visualPrivacyReview": "Inspected: filter-only or filter/empty panel; no result host names, account or sidebar content"
+    },
+    {
+      "file": "tablet-filter-top.png",
+      "proofIndex": 6,
+      "domUTC": "2026-10-04T08:53:27.003Z",
+      "captureStartUTC": "2026-10-04T08:53:27.007Z",
+      "captureEndUTC": "2026-10-04T08:53:27.286Z",
+      "sourceScreenshot": "tablet-filtered.png",
+      "sourceSHA256": "f717b5f08b2d1be459d0dc2e2c180ae95eaeeba4f1808f73cb6ab32d4976339b",
+      "sourceActualFormat": "JPEG",
+      "sourcePixelSize": [
+        788,
+        505
+      ],
+      "cropBoxLTRB": [
+        16,
+        177,
+        774,
+        294
+      ],
+      "cropCoordinateConvention": "Decoded source image pixels; left/top inclusive, right/bottom exclusive",
+      "outputPixelSize": [
+        758,
+        117
+      ],
+      "outputFormat": "PNG",
+      "outputSHA256": "0deccfbfe6a37ff04262fb0b3591b03ae9aa7f54bfc0bc38095d733a8f86eaa2",
+      "exactDecodedPixelEquality": true,
+      "changedPixelCount": 0,
+      "resized": false,
+      "visualPrivacyReview": "Inspected: filter-only or filter/empty panel; no result host names, account or sidebar content"
+    },
+    {
+      "file": "tablet-empty-panel.png",
+      "proofIndex": 10,
+      "domUTC": "2026-10-04T08:54:40.458Z",
+      "captureStartUTC": "2026-10-04T08:54:40.461Z",
+      "captureEndUTC": "2026-10-04T08:54:40.736Z",
+      "sourceScreenshot": "tablet-empty.png",
+      "sourceSHA256": "9c6747c2e72b8054b9233f3b09efdbbb5ee215148b942d9327fa66366d6cb090",
+      "sourceActualFormat": "JPEG",
+      "sourcePixelSize": [
+        788,
+        505
+      ],
+      "cropBoxLTRB": [
+        16,
+        177,
+        774,
+        492
+      ],
+      "cropCoordinateConvention": "Decoded source image pixels; left/top inclusive, right/bottom exclusive",
+      "outputPixelSize": [
+        758,
+        315
+      ],
+      "outputFormat": "PNG",
+      "outputSHA256": "13b7efb1986250f3710a05d0d495bf9bf16581b91d145e44606bf81a1fd51554",
+      "exactDecodedPixelEquality": true,
+      "changedPixelCount": 0,
+      "resized": false,
+      "visualPrivacyReview": "Inspected: filter-only or filter/empty panel; no result host names, account or sidebar content"
+    },
+    {
+      "file": "desktop-filter-top.png",
+      "proofIndex": 12,
+      "domUTC": "2026-10-04T08:54:48.788Z",
+      "captureStartUTC": "2026-10-04T08:54:48.791Z",
+      "captureEndUTC": "2026-10-04T08:54:49.066Z",
+      "sourceScreenshot": "desktop-filtered.png",
+      "sourceSHA256": "8fb72108bfb746acb109d6cd1b8e3211f20458f10293ee485f7662c48ec35bd9",
+      "sourceActualFormat": "JPEG",
+      "sourcePixelSize": [
+        1182,
+        757
+      ],
+      "cropBoxLTRB": [
+        263,
+        133,
+        1160,
+        250
+      ],
+      "cropCoordinateConvention": "Decoded source image pixels; left/top inclusive, right/bottom exclusive",
+      "outputPixelSize": [
+        897,
+        117
+      ],
+      "outputFormat": "PNG",
+      "outputSHA256": "88ab203293921e72ca9a3baedccc2432cf1988a8b512f9e819782ccf7e293599",
+      "exactDecodedPixelEquality": true,
+      "changedPixelCount": 0,
+      "resized": false,
+      "visualPrivacyReview": "Inspected: filter-only or filter/empty panel; no result host names, account or sidebar content"
+    },
+    {
+      "file": "desktop-empty-panel.png",
+      "proofIndex": 16,
+      "domUTC": "2026-10-04T08:55:29.664Z",
+      "captureStartUTC": "2026-10-04T08:55:29.668Z",
+      "captureEndUTC": "2026-10-04T08:55:29.944Z",
+      "sourceScreenshot": "desktop-empty.png",
+      "sourceSHA256": "83944f3321559aa8ea6b14537bf5240d39eed49d1d2b63f784d819289c3ed97b",
+      "sourceActualFormat": "JPEG",
+      "sourcePixelSize": [
+        1182,
+        757
+      ],
+      "cropBoxLTRB": [
+        263,
+        133,
+        1160,
+        480
+      ],
+      "cropCoordinateConvention": "Decoded source image pixels; left/top inclusive, right/bottom exclusive",
+      "outputPixelSize": [
+        897,
+        347
+      ],
+      "outputFormat": "PNG",
+      "outputSHA256": "ad917d16973d2d8ed860d7ed1dab85dd39e60fd283d872818a33de6faec340bb",
+      "exactDecodedPixelEquality": true,
+      "changedPixelCount": 0,
+      "resized": false,
+      "visualPrivacyReview": "Inspected: filter-only or filter/empty panel; no result host names, account or sidebar content"
+    }
+  ]
+}

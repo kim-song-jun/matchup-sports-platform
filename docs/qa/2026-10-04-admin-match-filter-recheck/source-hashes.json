@@ -1,0 +1,67 @@
+{
+  "algorithm": "SHA-256",
+  "sourceJSONFiles": [
+    {
+      "source": "safe/actions.json",
+      "bytes": 4929,
+      "sha256": "600c0971b57a8e978a5a7ea638df8b4ba9612fa08de1ec29175b3a3546db9e83"
+    },
+    {
+      "source": "safe/proof.json",
+      "bytes": 47360,
+      "sha256": "425b6fd802bc9235b5b8902e77476aa42f09b36d2af68f09a8071d63f78a362f"
+    },
+    {
+      "source": "safe/exit.json",
+      "bytes": 238,
+      "sha256": "706c0d5bff989fbefb70a709c34275e1c6bf66cc442b0f8cc99615c188e3763d"
+    },
+    {
+      "source": "source capture metadata (not included)",
+      "bytes": 1390,
+      "sha256": "5604e700b4954785f57c56115706b57295b984905177dbfcaeeba142a713df86"
+    },
+    {
+      "source": "static read-boundary evidence (only #1520 excerpt included)",
+      "bytes": 13811,
+      "sha256": "4397b724ac95041a7bac8ce054d8b95088923077a2a93055a288deecdb3c72e9"
+    },
+    {
+      "source": "reported deployment context (only relevant deployment excerpt included)",
+      "bytes": 1466,
+      "sha256": "71e976ca75daeb2e0d192f27fda7be5c5a6858bc8a053b180079f1b1a3f7c3d0"
+    }
+  ],
+  "sourceImages": [
+    {
+      "source": "mobile-filtered.png",
+      "sha256": "495f0c0d36efc879b8eb065956e3803b7f1e2c1c2cda8792ae927d277efc5f8f",
+      "includedAsOriginal": false
+    },
+    {
+      "source": "mobile-empty.png",
+      "sha256": "d6f31f4dd1e02ca24253d9c5f97a32dc9a06dd28aa03cdbfbfa62e036a070d19",
+      "includedAsOriginal": false
+    },
+    {
+      "source": "tablet-filtered.png",
+      "sha256": "f717b5f08b2d1be459d0dc2e2c180ae95eaeeba4f1808f73cb6ab32d4976339b",
+      "includedAsOriginal": false
+    },
+    {
+      "source": "tablet-empty.png",
+      "sha256": "9c6747c2e72b8054b9233f3b09efdbbb5ee215148b942d9327fa66366d6cb090",
+      "includedAsOriginal": false
+    },
+    {
+      "source": "desktop-filtered.png",
+      "sha256": "8fb72108bfb746acb109d6cd1b8e3211f20458f10293ee485f7662c48ec35bd9",
+      "includedAsOriginal": false
+    },
+    {
+      "source": "desktop-empty.png",
+      "sha256": "83944f3321559aa8ea6b14537bf5240d39eed49d1d2b63f784d819289c3ed97b",
+      "includedAsOriginal": false
+    }
+  ]
+}

@@ -1,0 +1,83 @@
+{
+  "schemaVersion": 1,
+  "issue": 1520,
+  "fileCountIncludingManifestAndChecksums": 17,
+  "payloadFiles": [
+    {
+      "file": "README.md",
+      "bytes": 5404,
+      "sha256": "bf7fc168a0d722017220b9ff27597f73eb44a824622980c24fe28ba78c6d56c5"
+    },
+    {
+      "file": "actions.json",
+      "bytes": 4929,
+      "sha256": "600c0971b57a8e978a5a7ea638df8b4ba9612fa08de1ec29175b3a3546db9e83"
+    },
+    {
+      "file": "crop-provenance.json",
+      "bytes": 6702,
+      "sha256": "e078f5d0bf17e89314c195c544c0e7cfa0260d73668e0a451d095c4af835474b"
+    },
+    {
+      "file": "desktop-empty-panel.png",
+      "bytes": 60964,
+      "sha256": "ad917d16973d2d8ed860d7ed1dab85dd39e60fd283d872818a33de6faec340bb"
+    },
+    {
+      "file": "desktop-filter-top.png",
+      "bytes": 32609,
+      "sha256": "88ab203293921e72ca9a3baedccc2432cf1988a8b512f9e819782ccf7e293599"
+    },
+    {
+      "file": "exit.json",
+      "bytes": 238,
+      "sha256": "706c0d5bff989fbefb70a709c34275e1c6bf66cc442b0f8cc99615c188e3763d"
+    },
+    {
+      "file": "mobile-empty-panel.png",
+      "bytes": 55834,
+      "sha256": "514f38ff1cb79f9a4eb2f47f960671c87bff32dd40ec54daab1ca6aaa3dfc287"
+    },
+    {
+      "file": "mobile-filter-top.png",
+      "bytes": 28392,
+      "sha256": "d6a0cf0601d0093a3b2dd003c9562eb5fb16e63bdfb684dd82e1ba710bbc993e"
+    },
+    {
+      "file": "proof.json",
+      "bytes": 47607,
+      "sha256": "f4d61aa4312b4c28b506aa103783c644a5b2c77f0c407811a73f6ac8e505e825"
+    },
+    {
+      "file": "provenance.json",
+      "bytes": 1529,
+      "sha256": "660f3c8486741de4f3c236a7cb67282f6707373e43a3a410652d0248728bcff2"
+    },
+    {
+      "file": "source-boundary-1520.json",
+      "bytes": 7416,
+      "sha256": "5b7af594db2d495783a8f348f5607af926168fd2298d862e0d39bbc3b6689331"
+    },
+    {
+      "file": "source-hashes.json",
+      "bytes": 2130,
+      "sha256": "8ab0cf81bc69232b077706616760b52e68481fe6f49c274af38f87d17802ae97"
+    },
+    {
+      "file": "summary.json",
+      "bytes": 8108,
+      "sha256": "ff46ea8366b05cc5787ec81d9ecd6c24cf69d700b56f66de2efe7f82c0454971"
+    },
+    {
+      "file": "tablet-empty-panel.png",
+      "bytes": 54896,
+      "sha256": "13b7efb1986250f3710a05d0d495bf9bf16581b91d145e44606bf81a1fd51554"
+    },
+    {
+      "file": "tablet-filter-top.png",
+      "bytes": 26659,
+      "sha256": "0deccfbfe6a37ff04262fb0b3591b03ae9aa7f54bfc0bc38095d733a8f86eaa2"
+    }
+  ],
+  "integrityPolicy": "manifest.json lists all payload files excluding itself and SHA256SUMS. SHA256SUMS covers all packet files except SHA256SUMS itself."
+}

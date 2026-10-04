@@ -1,0 +1,227 @@
+{
+  "verifiedUTC": "2026-10-04T09:12:25.245142+00:00",
+  "inputFiles": 17,
+  "inputFilesByteIdentical": true,
+  "inputChecksumsSHA256": "86c06589c49a5ca3c4845dcf36f5311d1fc1259dc1990b7aba87ee3c0a3bdfac",
+  "counts": {
+    "DOM": 19,
+    "selectedCompletedActions": 35,
+    "PNG": 6,
+    "filterAndSearchRectangles": 112
+  },
+  "threeWidthChecks": [
+    {
+      "viewport": {
+        "dpr": 1.25,
+        "h": 606,
+        "w": 402
+      },
+      "indices": {
+        "filtered": 0,
+        "detail": 1,
+        "browserBack": 2,
+        "rapidFinal": 3,
+        "empty": 4,
+        "restored": 5
+      },
+      "queryStatusResultRestored": true,
+      "rapidSpanMilliseconds": 132,
+      "rapidSpanLessThanStatic300ms": true,
+      "rapidFinalRows": 1,
+      "emptyRows": 0,
+      "emptyEveryResultVacuous": true,
+      "beforeScroll": {
+        "x": 0,
+        "y": 0
+      },
+      "backScroll": {
+        "x": 0,
+        "y": 26.399999618530273
+      },
+      "restoredScroll": {
+        "x": 0,
+        "y": 0
+      },
+      "exactScrollRestorationVerified": false
+    },
+    {
+      "viewport": {
+        "dpr": 1.5,
+        "h": 505,
+        "w": 788
+      },
+      "indices": {
+        "filtered": 6,
+        "detail": 7,
+        "browserBack": 8,
+        "rapidFinal": 9,
+        "empty": 10,
+        "restored": 11
+      },
+      "queryStatusResultRestored": true,
+      "rapidSpanMilliseconds": 144,
+      "rapidSpanLessThanStatic300ms": true,
+      "rapidFinalRows": 1,
+      "emptyRows": 0,
+      "emptyEveryResultVacuous": true,
+      "beforeScroll": {
+        "x": 0,
+        "y": 0
+      },
+      "backScroll": {
+        "x": 0,
+        "y": 94
+      },
+      "restoredScroll": {
+        "x": 0,
+        "y": 12.666666984558104
+      },
+      "exactScrollRestorationVerified": false
+    },
+    {
+      "viewport": {
+        "dpr": 1,
+        "h": 757,
+        "w": 1182
+      },
+      "indices": {
+        "filtered": 12,
+        "detail": 13,
+        "browserBack": 14,
+        "rapidFinal": 15,
+        "empty": 16,
+        "restored": 17
+      },
+      "queryStatusResultRestored": true,
+      "rapidSpanMilliseconds": 124,
+      "rapidSpanLessThanStatic300ms": true,
+      "rapidFinalRows": 1,
+      "emptyRows": 0,
+      "emptyEveryResultVacuous": true,
+      "beforeScroll": {
+        "x": 0,
+        "y": 0
+      },
+      "backScroll": {
+        "x": 0,
+        "y": 0
+      },
+      "restoredScroll": {
+        "x": 0,
+        "y": 0
+      },
+      "exactScrollRestorationVerified": false
+    }
+  ],
+  "images": [
+    {
+      "file": "mobile-filter-top.png",
+      "proofIndex": 0,
+      "DOMUTC": "2026-10-04T08:52:22.956Z",
+      "captureStartUTC": "2026-10-04T08:52:22.964Z",
+      "captureEndUTC": "2026-10-04T08:52:23.234Z",
+      "outputSHA256": "d6a0cf0601d0093a3b2dd003c9562eb5fb16e63bdfb684dd82e1ba710bbc993e",
+      "pixels": [
+        387,
+        170
+      ]
+    },
+    {
+      "file": "mobile-empty-panel.png",
+      "proofIndex": 4,
+      "DOMUTC": "2026-10-04T08:52:59.102Z",
+      "captureStartUTC": "2026-10-04T08:52:59.105Z",
+      "captureEndUTC": "2026-10-04T08:52:59.373Z",
+      "outputSHA256": "514f38ff1cb79f9a4eb2f47f960671c87bff32dd40ec54daab1ca6aaa3dfc287",
+      "pixels": [
+        387,
+        405
+      ]
+    },
+    {
+      "file": "tablet-filter-top.png",
+      "proofIndex": 6,
+      "DOMUTC": "2026-10-04T08:53:27.003Z",
+      "captureStartUTC": "2026-10-04T08:53:27.007Z",
+      "captureEndUTC": "2026-10-04T08:53:27.286Z",
+      "outputSHA256": "0deccfbfe6a37ff04262fb0b3591b03ae9aa7f54bfc0bc38095d733a8f86eaa2",
+      "pixels": [
+        758,
+        117
+      ]
+    },
+    {
+      "file": "tablet-empty-panel.png",
+      "proofIndex": 10,
+      "DOMUTC": "2026-10-04T08:54:40.458Z",
+      "captureStartUTC": "2026-10-04T08:54:40.461Z",
+      "captureEndUTC": "2026-10-04T08:54:40.736Z",
+      "outputSHA256": "13b7efb1986250f3710a05d0d495bf9bf16581b91d145e44606bf81a1fd51554",
+      "pixels": [
+        758,
+        315
+      ]
+    },
+    {
+      "file": "desktop-filter-top.png",
+      "proofIndex": 12,
+      "DOMUTC": "2026-10-04T08:54:48.788Z",
+      "captureStartUTC": "2026-10-04T08:54:48.791Z",
+      "captureEndUTC": "2026-10-04T08:54:49.066Z",
+      "outputSHA256": "88ab203293921e72ca9a3baedccc2432cf1988a8b512f9e819782ccf7e293599",
+      "pixels": [
+        897,
+        117
+      ]
+    },
+    {
+      "file": "desktop-empty-panel.png",
+      "proofIndex": 16,
+      "DOMUTC": "2026-10-04T08:55:29.664Z",
+      "captureStartUTC": "2026-10-04T08:55:29.668Z",
+      "captureEndUTC": "2026-10-04T08:55:29.944Z",
+      "outputSHA256": "ad917d16973d2d8ed860d7ed1dab85dd39e60fd283d872818a33de6faec340bb",
+      "pixels": [
+        897,
+        347
+      ]
+    }
+  ],
+  "finalBaseline": {
+    "DOMUTC": "2026-10-04T08:55:52.473Z",
+    "exitUTC": "2026-10-04T08:55:52.491Z",
+    "query": "",
+    "filter": "all",
+    "count": 29,
+    "rowsWithPositiveRects": 20,
+    "dialogs": 0
+  },
+  "preparationTimestampClarification": {
+    "originalFieldName": "preparedUTC",
+    "originalValue": "2026-10-04T18:00:24.571247+09:00",
+    "sameInstantUTC": "2026-10-04T09:00:24.571247Z",
+    "note": "Original offset timestamp retained; preparation time is not capture/DOM time."
+  },
+  "sourceQueryHook": {
+    "sourceURL": "https://github.com/kim-song-jun/matchup-sports-platform/blob/4c81d071ede5bba14575f2aeb1097326797cbd08/apps/v1_web/src/app/admin/matches/use-admin-match-list-query.ts",
+    "gitBlobSHA": "5474aea9b1643cb86220a0e06deb747ad2068bda",
+    "contentSHA256": "0a859a157bbcbb36186b0b49189f7c96f3706471a5a9827a037898a2c034848a",
+    "finding": "Static hook merges latestDraft and debounces API search300ms; no exact runtime/network timing inferred."
+  },
+  "deploymentWorkflow": {
+    "SHA": "4c81d071ede5bba14575f2aeb1097326797cbd08",
+    "status": "completed",
+    "conclusion": "success",
+    "updatedUTC": "2026-10-04T08:22:48Z",
+    "URL": "https://github.com/kim-song-jun/matchup-sports-platform/actions/runs/37188018237"
+  },
+  "runtimeServingSHA": "unknown",
+  "privateOriginalsRead": false,
+  "rawRowTitlePredicateIndependentlyReexecuted": false,
+  "limits": [
+    "Result assertions are sanitized DOM counters; row/detail pixels omitted.",
+    "Visible rows means nonzero rectangles, not viewport visibility.",
+    "Empty every true is vacuous; no pagination navigation, forcedAPIerror, globalwritezero or wholescopePASS.",
+    "Private source/crop equality and sourcepreservation of excluded originals remain preparerattested."
+  ]
+}

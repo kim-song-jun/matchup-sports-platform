@@ -1,0 +1,126 @@
+{
+  "schemaVersion": 1,
+  "repository": "kim-song-jun/matchup-sports-platform",
+  "inspectedCommit": "4c81d071ede5bba14575f2aeb1097326797cbd08",
+  "sourcePreparedUTC": "2026-10-04T08:50:23Z",
+  "evidenceClass": "Existing static source inspection; not a live network audit or runtime build identification",
+  "scenario": "Admin matches search/status FILTER and detail browser-Back restoration",
+  "sourceOnlyFindings": [
+    {
+      "finding": "Search input calls onSearchChange(value). Filter chips are type=button and call onStatusChange(option.value). These controls do not submit a moderation form.",
+      "sources": [
+        {
+          "url": "https://github.com/kim-song-jun/matchup-sports-platform/blob/4c81d071ede5bba14575f2aeb1097326797cbd08/apps/v1_web/src/components/admin/admin-filter-bar.tsx#L68",
+          "lines": "68-79"
+        },
+        {
+          "url": "https://github.com/kim-song-jun/matchup-sports-platform/blob/4c81d071ede5bba14575f2aeb1097326797cbd08/apps/v1_web/src/components/admin/admin-filter-bar.tsx#L83",
+          "lines": "83-123"
+        },
+        {
+          "url": "https://github.com/kim-song-jun/matchup-sports-platform/blob/4c81d071ede5bba14575f2aeb1097326797cbd08/apps/v1_web/src/app/admin/matches/page.tsx#L129",
+          "lines": "129-145"
+        }
+      ]
+    },
+    {
+      "finding": "setSearch and setActiveStatus merge against latestDraft, reset page to 1, and immediately use history.replaceState for q/status/page while preserving other query/hash fields. Only API search is trimmed and debounced by 300 ms. Back/Forward or an external URL change restores draft and debounced search immediately; stale URL snapshots are ignored and timers cleaned up.",
+      "sources": [
+        {
+          "url": "https://github.com/kim-song-jun/matchup-sports-platform/blob/4c81d071ede5bba14575f2aeb1097326797cbd08/apps/v1_web/src/app/admin/matches/use-admin-match-list-query.ts#L23",
+          "lines": "23-73"
+        }
+      ]
+    },
+    {
+      "finding": "List useQuery calls v1Get('/admin/matches', filters), and detail useQuery calls v1Get('/admin/matches/:matchId'). v1Get explicitly uses method GET. There is no recordSearch call in the inspected filter/query/list/detail chain. The separate useV1RecordSearch hook posts /search/recent but is not called by this chain.",
+      "sources": [
+        {
+          "url": "https://github.com/kim-song-jun/matchup-sports-platform/blob/4c81d071ede5bba14575f2aeb1097326797cbd08/apps/v1_web/src/hooks/use-v1-api.ts#L3123",
+          "lines": "3123-3147"
+        },
+        {
+          "url": "https://github.com/kim-song-jun/matchup-sports-platform/blob/4c81d071ede5bba14575f2aeb1097326797cbd08/apps/v1_web/src/lib/api-client.ts#L185",
+          "lines": "185-186"
+        },
+        {
+          "url": "https://github.com/kim-song-jun/matchup-sports-platform/blob/4c81d071ede5bba14575f2aeb1097326797cbd08/apps/v1_web/src/hooks/use-v1-api.ts#L591",
+          "lines": "591-596"
+        }
+      ]
+    },
+    {
+      "finding": "Backend @Get('matches') and @Get('matches/:matchId') delegate to AdminService listMatches/getMatch. These perform active-admin lookup and read queries (findMany/groupBy or findUnique), then return data. No business mutation or search-history write appears in these methods or getActiveAdmin.",
+      "sources": [
+        {
+          "url": "https://github.com/kim-song-jun/matchup-sports-platform/blob/4c81d071ede5bba14575f2aeb1097326797cbd08/apps/v1_api/src/admin/admin.controller.ts#L180",
+          "lines": "180-187"
+        },
+        {
+          "url": "https://github.com/kim-song-jun/matchup-sports-platform/blob/4c81d071ede5bba14575f2aeb1097326797cbd08/apps/v1_api/src/admin/admin.service.ts#L974",
+          "lines": "974-1095"
+        },
+        {
+          "url": "https://github.com/kim-song-jun/matchup-sports-platform/blob/4c81d071ede5bba14575f2aeb1097326797cbd08/apps/v1_api/src/admin/admin.service.ts#L2817",
+          "lines": "2817-2832"
+        }
+      ]
+    },
+    {
+      "finding": "Row selection router.pushes the detail route. The detail page's visible 목록 link points to bare /admin/matches, so browser Back is the appropriate mechanism to verify restoration of q/status. The detail page itself mounts a GET hook and provides read rendering/refetch/navigation.",
+      "sources": [
+        {
+          "url": "https://github.com/kim-song-jun/matchup-sports-platform/blob/4c81d071ede5bba14575f2aeb1097326797cbd08/apps/v1_web/src/app/admin/matches/page.tsx#L145",
+          "lines": "145"
+        },
+        {
+          "url": "https://github.com/kim-song-jun/matchup-sports-platform/blob/4c81d071ede5bba14575f2aeb1097326797cbd08/apps/v1_web/src/app/admin/matches/%5Bid%5D/page.tsx#L26",
+          "lines": "26-57"
+        }
+      ]
+    }
+  ],
+  "separateBusinessMutation": {
+    "finding": "The row action 상태 변경 opens the moderation modal. handleModalSubmit invokes changeStatusMutation.mutate; useV1ChangeMatchStatus POSTs /admin/matches/:id/status with status/reason. Search/status FILTER controls are distinct from this business write.",
+    "sources": [
+      {
+        "url": "https://github.com/kim-song-jun/matchup-sports-platform/blob/4c81d071ede5bba14575f2aeb1097326797cbd08/apps/v1_web/src/app/admin/matches/page.tsx#L97",
+        "lines": "97-113"
+      },
+      {
+        "url": "https://github.com/kim-song-jun/matchup-sports-platform/blob/4c81d071ede5bba14575f2aeb1097326797cbd08/apps/v1_web/src/app/admin/matches/page.tsx#L208",
+        "lines": "208-247"
+      },
+      {
+        "url": "https://github.com/kim-song-jun/matchup-sports-platform/blob/4c81d071ede5bba14575f2aeb1097326797cbd08/apps/v1_web/src/hooks/use-v1-api.ts#L3489",
+        "lines": "3489-3499"
+      }
+    ]
+  },
+  "testSourceEvidence": {
+    "status": "Inspected existing test source only; tests were not executed.",
+    "coverage": "URL hydration; 1.0.3+completed→detail→real history Back/Forward; rapid search/status merge; 300ms debounce; unchanged history length; preserved unrelated query/hash; stale timer cancellation; page reset; invalid parameters; ordinary empty result versus API error.",
+    "source": {
+      "url": "https://github.com/kim-song-jun/matchup-sports-platform/blob/4c81d071ede5bba14575f2aeb1097326797cbd08/apps/v1_web/src/app/admin/matches/page.test.tsx#L64",
+      "lines": "64-181"
+    }
+  },
+  "errorTelemetryException": {
+    "finding": "Shared v1Api reports unexpected non-OK/API-error responses via reportClientError. That reporter can POST /api/v1/logs/client-error with keepalive. Therefore successful normal search/filter/detail/empty-result paths are read-only business behavior, but 'zero POST under every condition' is not established.",
+    "sources": [
+      {
+        "url": "https://github.com/kim-song-jun/matchup-sports-platform/blob/4c81d071ede5bba14575f2aeb1097326797cbd08/apps/v1_web/src/lib/api-client.ts#L147",
+        "lines": "147-177"
+      },
+      {
+        "url": "https://github.com/kim-song-jun/matchup-sports-platform/blob/4c81d071ede5bba14575f2aeb1097326797cbd08/apps/v1_web/src/lib/client-error-reporter.ts#L27",
+        "lines": "27-57"
+      }
+    ]
+  },
+  "limits": [
+    "No forced API error was tested.",
+    "Existing tests were inspected, not executed for this packet.",
+    "The list/detail business read path is not proof that all surrounding traffic is GET or that no server writes occurred."
+  ]
+}

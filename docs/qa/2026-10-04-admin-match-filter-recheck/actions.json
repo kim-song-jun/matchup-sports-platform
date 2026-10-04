@@ -1,0 +1,177 @@
+[
+  {
+    "label": "fresh admin matches navigation",
+    "startUTC": "2026-10-04T08:50:40.070Z",
+    "endUTC": "2026-10-04T08:50:45.423Z"
+  },
+  {
+    "label": "resize admin list to mobile",
+    "startUTC": "2026-10-04T08:51:25.266Z",
+    "endUTC": "2026-10-04T08:51:31.259Z"
+  },
+  {
+    "label": "mobile zoom110",
+    "startUTC": "2026-10-04T08:51:31.260Z",
+    "endUTC": "2026-10-04T08:51:31.573Z"
+  },
+  {
+    "label": "mobile zoom125",
+    "startUTC": "2026-10-04T08:51:31.573Z",
+    "endUTC": "2026-10-04T08:51:31.873Z"
+  },
+  {
+    "label": "mobile admin search1.0.3 local query",
+    "startUTC": "2026-10-04T08:51:41.883Z",
+    "endUTC": "2026-10-04T08:51:41.934Z"
+  },
+  {
+    "label": "mobile completed status FILTER",
+    "startUTC": "2026-10-04T08:51:41.935Z",
+    "endUTC": "2026-10-04T08:51:42.006Z"
+  },
+  {
+    "label": "mobile open visible synthetic lifecycle detail",
+    "startUTC": "2026-10-04T08:52:23.235Z",
+    "endUTC": "2026-10-04T08:52:23.471Z"
+  },
+  {
+    "label": "mobile browser Back to filtered admin list",
+    "startUTC": "2026-10-04T08:52:31.434Z",
+    "endUTC": "2026-10-04T08:52:31.456Z"
+  },
+  {
+    "label": "mobile rapid query1.0",
+    "startUTC": "2026-10-04T08:52:40.906Z",
+    "endUTC": "2026-10-04T08:52:40.933Z"
+  },
+  {
+    "label": "mobile rapid cancelled status FILTER",
+    "startUTC": "2026-10-04T08:52:40.934Z",
+    "endUTC": "2026-10-04T08:52:41.006Z"
+  },
+  {
+    "label": "mobile rapid final query1.0.3",
+    "startUTC": "2026-10-04T08:52:41.006Z",
+    "endUTC": "2026-10-04T08:52:41.038Z"
+  },
+  {
+    "label": "mobile synthetic no-result admin query",
+    "startUTC": "2026-10-04T08:52:49.038Z",
+    "endUTC": "2026-10-04T08:52:49.063Z"
+  },
+  {
+    "label": "mobile restore search1.0.3",
+    "startUTC": "2026-10-04T08:52:59.386Z",
+    "endUTC": "2026-10-04T08:52:59.408Z"
+  },
+  {
+    "label": "mobile restore completed status FILTER",
+    "startUTC": "2026-10-04T08:52:59.409Z",
+    "endUTC": "2026-10-04T08:52:59.465Z"
+  },
+  {
+    "label": "resize admin list tablet",
+    "startUTC": "2026-10-04T08:53:22.140Z",
+    "endUTC": "2026-10-04T08:53:26.690Z"
+  },
+  {
+    "label": "tablet zoom150",
+    "startUTC": "2026-10-04T08:53:26.691Z",
+    "endUTC": "2026-10-04T08:53:26.992Z"
+  },
+  {
+    "label": "tablet open synthetic lifecycle detail",
+    "startUTC": "2026-10-04T08:53:27.287Z",
+    "endUTC": "2026-10-04T08:53:27.564Z"
+  },
+  {
+    "label": "tablet browser Back",
+    "startUTC": "2026-10-04T08:53:34.610Z",
+    "endUTC": "2026-10-04T08:53:34.632Z"
+  },
+  {
+    "label": "tablet rapid query1.0",
+    "startUTC": "2026-10-04T08:53:43.984Z",
+    "endUTC": "2026-10-04T08:53:44.009Z"
+  },
+  {
+    "label": "tablet rapid cancelled status FILTER",
+    "startUTC": "2026-10-04T08:53:44.010Z",
+    "endUTC": "2026-10-04T08:53:44.095Z"
+  },
+  {
+    "label": "tablet rapid final query1.0.3",
+    "startUTC": "2026-10-04T08:53:44.095Z",
+    "endUTC": "2026-10-04T08:53:44.128Z"
+  },
+  {
+    "label": "tablet synthetic empty admin query",
+    "startUTC": "2026-10-04T08:54:18.389Z",
+    "endUTC": "2026-10-04T08:54:18.411Z"
+  },
+  {
+    "label": "tablet restore search1.0.3",
+    "startUTC": "2026-10-04T08:54:40.737Z",
+    "endUTC": "2026-10-04T08:54:40.763Z"
+  },
+  {
+    "label": "tablet restore completed status FILTER",
+    "startUTC": "2026-10-04T08:54:40.763Z",
+    "endUTC": "2026-10-04T08:54:40.834Z"
+  },
+  {
+    "label": "desktop zoom reset",
+    "startUTC": "2026-10-04T08:54:48.637Z",
+    "endUTC": "2026-10-04T08:54:48.778Z"
+  },
+  {
+    "label": "desktop open synthetic lifecycle detail",
+    "startUTC": "2026-10-04T08:54:49.068Z",
+    "endUTC": "2026-10-04T08:54:49.345Z"
+  },
+  {
+    "label": "desktop browser Back",
+    "startUTC": "2026-10-04T08:54:59.023Z",
+    "endUTC": "2026-10-04T08:54:59.048Z"
+  },
+  {
+    "label": "desktop rapid query1.0",
+    "startUTC": "2026-10-04T08:55:07.716Z",
+    "endUTC": "2026-10-04T08:55:07.739Z"
+  },
+  {
+    "label": "desktop rapid cancelled status FILTER",
+    "startUTC": "2026-10-04T08:55:07.740Z",
+    "endUTC": "2026-10-04T08:55:07.804Z"
+  },
+  {
+    "label": "desktop rapid final query1.0.3",
+    "startUTC": "2026-10-04T08:55:07.804Z",
+    "endUTC": "2026-10-04T08:55:07.840Z"
+  },
+  {
+    "label": "desktop synthetic empty admin query",
+    "startUTC": "2026-10-04T08:55:21.277Z",
+    "endUTC": "2026-10-04T08:55:21.298Z"
+  },
+  {
+    "label": "desktop restore search1.0.3",
+    "startUTC": "2026-10-04T08:55:29.945Z",
+    "endUTC": "2026-10-04T08:55:29.966Z"
+  },
+  {
+    "label": "desktop restore completed status FILTER",
+    "startUTC": "2026-10-04T08:55:29.967Z",
+    "endUTC": "2026-10-04T08:55:30.035Z"
+  },
+  {
+    "label": "restore baseline admin search empty",
+    "startUTC": "2026-10-04T08:55:38.132Z",
+    "endUTC": "2026-10-04T08:55:38.158Z"
+  },
+  {
+    "label": "restore baseline all-status FILTER",
+    "startUTC": "2026-10-04T08:55:38.158Z",
+    "endUTC": "2026-10-04T08:55:38.231Z"
+  }
+]

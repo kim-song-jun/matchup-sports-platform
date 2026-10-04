@@ -18,6 +18,7 @@ import {
   CreateGroupTeamDto,
   RecordResultDto,
   UpdateFixtureDto,
+  UpdateBracketSourcesDto,
   UpdateGroupDto,
 } from './dto/admin-bracket.dto';
 import { TournamentBracketService } from './tournament-bracket.service';
@@ -158,6 +159,11 @@ export class TournamentBracketController {
     @Body() dto: UpdateFixtureDto,
   ) {
     return this.bracketService.updateFixture(user, fixtureId, dto);
+  }
+
+  @Patch('admin/fixtures/:fixtureId/bracket-sources')
+  updateBracketSources(@CurrentUser() user: V1AuthUser, @Param('fixtureId') fixtureId: string, @Body() dto: UpdateBracketSourcesDto) {
+    return this.bracketService.updateBracketSources(user, fixtureId, dto);
   }
 
   /** DELETE /admin/fixtures/:fixtureId — 경기 삭제 (결과 있으면 409) */

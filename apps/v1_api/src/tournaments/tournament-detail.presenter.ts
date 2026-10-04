@@ -133,6 +133,7 @@ type CanonicalTournamentMatchDetail = TournamentDetailRow['tournamentMatchDetail
 type PresentedFixture = Pick<CanonicalTournamentMatchDetail, 'tournamentId' | 'groupId' | 'round' | 'fixtureNumber' | 'legNumber' | 'homeRegistrationId' | 'awayRegistrationId' | 'homeRegistration' | 'awayRegistration'> & {
   id: string;
   parentFixtureId: string | null;
+  bracketSources: Array<{ fixtureId: string; outcome: 'WINNER' | 'LOSER'; side: 'HOME' | 'AWAY' }>;
   scheduledAt: Date | null;
   fieldId: string | null;
   venue: string | null;
@@ -192,6 +193,7 @@ function presentCanonicalFixture(
     fixtureNumber: details.fixtureNumber,
     legNumber: details.legNumber,
     parentFixtureId: details.parentTeamMatchId,
+    bracketSources: (details.advancementTargets ?? []).map((edge) => ({ fixtureId: edge.sourceTeamMatchId, outcome: edge.sourceOutcome, side: edge.targetSide })),
     homeRegistrationId: details.homeRegistrationId,
     awayRegistrationId: details.awayRegistrationId,
     scheduledAt: match.startAt,
@@ -435,6 +437,7 @@ export function presentTournamentDetail(
         // 같은 아바타가 나오도록 로고도 함께 내려 준다.
         teamLogoUrl: hideIdentity ? null : (groupTeam.registration.team.profile?.logoUrl ?? null),
         sortOrder: groupTeam.sortOrder,
+        isBye: groupTeam.isBye,
       })),
       standings: group.standings.map((standing) => ({
         registrationId: standing.registrationId,
@@ -459,6 +462,7 @@ export function presentTournamentDetail(
       round: fixture.round,
       fixtureNumber: fixture.fixtureNumber,
       legNumber: fixture.legNumber,
+      bracketSources: fixture.bracketSources,
       scheduledAt: fixture.scheduledAt?.toISOString() ?? null,
       venue: fixture.venue,
       status: fixture.status,

@@ -117,6 +117,8 @@ export function BracketGroupQuickAdd({ existingGroups, createGroup, showToast, o
               className={inputCls + ' sm:w-[120px]'}
             >
               <option value="group">조별</option>
+              <option value="round12">12강</option>
+              <option value="quarter">8강</option>
               <option value="semi">준결승</option>
               <option value="final">결승</option>
               <option value="third_place">3위 결정전</option>

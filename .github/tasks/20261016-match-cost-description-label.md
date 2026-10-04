@@ -104,3 +104,5 @@ API/DTO/schema/mapper/filter/eligibility/작성/편집/저장 계약, #1587/#158
 PR #1592 remains Ready/base dev. Its original exact-head CI and static review passed, but current dev 27a021fc7650672d5af25217108b101dc856c8d5 adds the completed-match notice regression at the same test insertion anchor. Relocate only this issue's unchanged describe group (and #1592's two imports) to avoid that textual conflict, then integrate current dev without dropping either test contract. No runtime correction or new UI choice is introduced. The other unmerged PR's feature is excluded.
 
 The original tests/CI above belong to their recorded SHA. Focused tests, lint and exact new-head CI after integration remain pending; actual alpha after remains with the parent's browser QA.
+
+Latest-dev merge candidate 1daf729891f729f4adbcdb74913c72f4bd3bacbd: actual focused4files135PASS, but lint catches duplicate toMatchCard/V1Match imports after automatic integration. Keep dev's existing shared imports and remove only the two relocated duplicates; revalidate the corrected committed head before push. Original cost tests and runtime metadata expressions are unchanged.

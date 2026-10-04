@@ -1,5 +1,3 @@
-import { toMatchCard } from './matches.card-model';
-import type { V1Match } from '@/types/api';
 import type { ReactElement } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render as rtlRender, screen, within } from '@testing-library/react';

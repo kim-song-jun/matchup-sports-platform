@@ -1,0 +1,64 @@
+{
+  "files": [
+    {
+      "file": "README.md",
+      "sha256": "11604e660382f3d74e9d9ee8dfa1f5417042356021d6933c11c180851c162c0e",
+      "bytes": 1502
+    },
+    {
+      "file": "actions.json",
+      "sha256": "81ca9e61915afc6598367e490c840d84c28bd3f4c43a27a3028b55a449b18af3",
+      "bytes": 2951
+    },
+    {
+      "file": "collector-note.json",
+      "sha256": "891e93031f277148bd7e6175f5776be8ea5cc06cb0e43a1bd3ce77afd7cac49f",
+      "bytes": 723
+    },
+    {
+      "file": "crop-provenance.json",
+      "sha256": "34bf871fa64b05840a4e92ca988324423a13c8189dfbf8604f28c80bed924ce8",
+      "bytes": 2248
+    },
+    {
+      "file": "desktop-my-generic-crop.png",
+      "sha256": "b77ab3c13c38cb509c5352298912e906a64b1700e1013c9a2c5eb1079d034891",
+      "bytes": 39332
+    },
+    {
+      "file": "exit.json",
+      "sha256": "64d02d8602a3f741a4fcd4794980d5cddc9abf72d98a2c0b110a9039c62f07ac",
+      "bytes": 225
+    },
+    {
+      "file": "mobile-my-generic-crop.png",
+      "sha256": "15abc4b4cfe13dc0f89d48729b3c831db128ed80d0a800f80699ae334876da5c",
+      "bytes": 4100
+    },
+    {
+      "file": "proof.json",
+      "sha256": "cf09a7bb881c2667787603998970220f55e819bc68865ad9516979344bb5e330",
+      "bytes": 14032
+    },
+    {
+      "file": "provenance.json",
+      "sha256": "8ee8336f26a3d56cdc54854aef482f1325b3e6063773845c05ace263c57b3890",
+      "bytes": 863
+    },
+    {
+      "file": "source-context.json",
+      "sha256": "29f89ac6fbed0f35e49fbd1df457ba0a0f64aae7177f34bbb468821f1e62e696",
+      "bytes": 6289
+    },
+    {
+      "file": "summary.json",
+      "sha256": "85e03a9205701131e186b700f1127a672487a0d14dee8ab1e36f0d4261d15c20",
+      "bytes": 2742
+    },
+    {
+      "file": "tablet-my-generic-crop.png",
+      "sha256": "79fea4c94b0e1968fb8857d1d696f03720d32c313a5d1d139cb30e5fe731f062",
+      "bytes": 4178
+    }
+  ]
+}

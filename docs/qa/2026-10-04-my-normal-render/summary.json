@@ -1,0 +1,60 @@
+{
+  "scope": "Issue1558 ordinary existing-session normal-render comparison; not intermittent503 resolution.",
+  "startedUTC": "2026-10-04T08:56:49.127Z",
+  "endedUTC": "2026-10-04T09:00:37.685Z",
+  "runtimeServingIdentity": "unknown",
+  "deploymentContext": {
+    "reportedSHA": "4c81d071ede5bba14575f2aeb1097326797cbd08",
+    "healthyUTC": "2026-10-04T08:22:31.618Z",
+    "successUTC": "2026-10-04T08:22:48Z",
+    "run": "37188018237",
+    "version": "1.1.5-alpha.20261004.g4c81d071ede5",
+    "notRuntimeProof": true
+  },
+  "counts": {
+    "DOM": 13,
+    "completedActionRecords": 21,
+    "safePNGs": 3,
+    "newTabCreationWithMissingActionRecord": 1
+  },
+  "observations": [
+    {
+      "width": 402,
+      "height": 606,
+      "home": 0,
+      "entry": 1,
+      "reload": 2,
+      "newTab": 3,
+      "actualClickedLink": "visible mobile My link"
+    },
+    {
+      "width": 788,
+      "height": 505,
+      "home": 4,
+      "entry": 5,
+      "reload": 6,
+      "newTab": 7,
+      "actualClickedLink": "visible tablet My link"
+    },
+    {
+      "width": 1182,
+      "height": 757,
+      "home": 8,
+      "entry": 9,
+      "reload": 10,
+      "newTab": 11,
+      "actualClickedLink": "visible desktop profile icon labelled 내 정보"
+    }
+  ],
+  "outcome": "At all nine My endpoints the URL was /my, main content existed, generic 내 활동/내 팀 headings rendered, visible dialogs were zero, and the limited error-text predicate was false. Each home entry used its actual visible link.",
+  "safety": "No profile, settings, notification, authentication, logout, upload, share, invitation or business-mutation control was activated. Original tab2 preserved; only QA-created tabs6/7/8 closed. No network audit or global zero-server-write assertion.",
+  "limitations": [
+    "Normal rendering does not establish the cause or resolution of issue1558 intermittent503. No forced fault, HTTP response observation, uptime/performance test or private API-state assertion.",
+    "signInLinkCount=1 is the normal /my/settings link containing login copy; it does not mean a login prompt.",
+    "The first new-tab call succeeded but assignment to an undeclared identifier failed after creation; existing observed tab6 was rebound. Its exact creation start/end is missing, while later settled DOM is timestamped.",
+    "Snapshots use visibility by nonzero rectangle and CSS visibility, not universal viewport intersection. Mobile/tablet full account content is outside public image crops; safe DOM is the primary rendering record.",
+    "Images are distinct subsequent capture instants; do not label them reload/new-tab screenshots.",
+    "No reauthentication performed; earlier role/viewer histories are not inferred."
+  ],
+  "finalProofIndex": 12
+}

@@ -1,0 +1,13 @@
+{
+  "preparedUTC": "2026-10-04T09:02:11.400228+00:00",
+  "sourceSafeHashes": {
+    "actions.json": "81ca9e61915afc6598367e490c840d84c28bd3f4c43a27a3028b55a449b18af3",
+    "proof.json": "cf09a7bb881c2667787603998970220f55e819bc68865ad9516979344bb5e330",
+    "exit.json": "64d02d8602a3f741a4fcd4794980d5cddc9abf72d98a2c0b110a9039c62f07ac",
+    "new-tab-creation-note.json": "db0cf428bba4cc423da3b52c3cc132633ab39e79f62a416a7d9b9d56caf50fba"
+  },
+  "sourceCaptureMetadataSHA256": "355424dae7372088538b6f44524694236a8f25945d9de10bccdce21ab0f9ae5a",
+  "originalsModified": false,
+  "publicProjection": "new-tab note drops account-verification wording; source context selects only1558 and telemetry. All images are exact minimal crops.",
+  "evidenceAttribution": "Crops and numerical equality locally verified; publisher may independently inspect public files only."
+}

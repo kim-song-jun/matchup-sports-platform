@@ -1,0 +1,11 @@
+{
+  "utc": "2026-10-04T09:00:37.685Z",
+  "tabId": "2",
+  "url": "https://alpha.teameet.co.kr/home",
+  "qaTabsClosed": [
+    "6",
+    "7",
+    "8"
+  ],
+  "note": "Only QA-created My tabs were closed; original tab2 retained."
+}

@@ -1,0 +1,338 @@
+{
+  "verifiedUTC": "2026-10-04T09:17:03.865277+00:00",
+  "inputFiles": 14,
+  "inputFilesByteIdentical": true,
+  "inputChecksumsSHA256": "8d7c1bdf5f6625e7acc0a174ed396a6d2f4817b9b3a0c6687037572b6e6d8c4b",
+  "counts": {
+    "DOM": 13,
+    "homeDOM": 4,
+    "MyDOM": 9,
+    "completedSelectedActionRecords": 21,
+    "newTabCreationMissingTimestamps": 1,
+    "PNG": 3
+  },
+  "endpoints": [
+    {
+      "index": 0,
+      "UTC": "2026-10-04T08:57:35.906Z",
+      "tabID": "2",
+      "URL": "https://alpha.teameet.co.kr/home",
+      "viewport": {
+        "dpr": 1.25,
+        "h": 606,
+        "w": 402
+      },
+      "mainPresent": true,
+      "errorPredicateFalse": true,
+      "genericMyHeadings": [],
+      "loadingIndicatorCount": 0,
+      "dialogCount": 0,
+      "allRecordedMyLinksWithinViewport": true,
+      "signInSubstringCount": 0
+    },
+    {
+      "index": 1,
+      "UTC": "2026-10-04T08:57:52.902Z",
+      "tabID": "2",
+      "URL": "https://alpha.teameet.co.kr/my",
+      "viewport": {
+        "dpr": 1.25,
+        "h": 606,
+        "w": 402
+      },
+      "mainPresent": true,
+      "errorPredicateFalse": true,
+      "genericMyHeadings": [
+        "내 활동",
+        "내 팀"
+      ],
+      "loadingIndicatorCount": 0,
+      "dialogCount": 0,
+      "allRecordedMyLinksWithinViewport": true,
+      "signInSubstringCount": 1
+    },
+    {
+      "index": 2,
+      "UTC": "2026-10-04T08:58:02.820Z",
+      "tabID": "2",
+      "URL": "https://alpha.teameet.co.kr/my",
+      "viewport": {
+        "dpr": 1.25,
+        "h": 606,
+        "w": 402
+      },
+      "mainPresent": true,
+      "errorPredicateFalse": true,
+      "genericMyHeadings": [
+        "내 활동",
+        "내 팀"
+      ],
+      "loadingIndicatorCount": 0,
+      "dialogCount": 0,
+      "allRecordedMyLinksWithinViewport": true,
+      "signInSubstringCount": 1
+    },
+    {
+      "index": 3,
+      "UTC": "2026-10-04T08:58:18.402Z",
+      "tabID": "6",
+      "URL": "https://alpha.teameet.co.kr/my",
+      "viewport": {
+        "dpr": 1.25,
+        "h": 606,
+        "w": 402
+      },
+      "mainPresent": true,
+      "errorPredicateFalse": true,
+      "genericMyHeadings": [
+        "내 활동",
+        "내 팀"
+      ],
+      "loadingIndicatorCount": 0,
+      "dialogCount": 0,
+      "allRecordedMyLinksWithinViewport": true,
+      "signInSubstringCount": 1
+    },
+    {
+      "index": 4,
+      "UTC": "2026-10-04T08:58:53.517Z",
+      "tabID": "2",
+      "URL": "https://alpha.teameet.co.kr/home",
+      "viewport": {
+        "dpr": 1.5,
+        "h": 505,
+        "w": 788
+      },
+      "mainPresent": true,
+      "errorPredicateFalse": true,
+      "genericMyHeadings": [],
+      "loadingIndicatorCount": 0,
+      "dialogCount": 0,
+      "allRecordedMyLinksWithinViewport": true,
+      "signInSubstringCount": 0
+    },
+    {
+      "index": 5,
+      "UTC": "2026-10-04T08:59:09.566Z",
+      "tabID": "2",
+      "URL": "https://alpha.teameet.co.kr/my",
+      "viewport": {
+        "dpr": 1.5,
+        "h": 505,
+        "w": 788
+      },
+      "mainPresent": true,
+      "errorPredicateFalse": true,
+      "genericMyHeadings": [
+        "내 활동",
+        "내 팀"
+      ],
+      "loadingIndicatorCount": 0,
+      "dialogCount": 0,
+      "allRecordedMyLinksWithinViewport": true,
+      "signInSubstringCount": 1
+    },
+    {
+      "index": 6,
+      "UTC": "2026-10-04T08:59:17.835Z",
+      "tabID": "2",
+      "URL": "https://alpha.teameet.co.kr/my",
+      "viewport": {
+        "dpr": 1.5,
+        "h": 505,
+        "w": 788
+      },
+      "mainPresent": true,
+      "errorPredicateFalse": true,
+      "genericMyHeadings": [
+        "내 활동",
+        "내 팀"
+      ],
+      "loadingIndicatorCount": 0,
+      "dialogCount": 0,
+      "allRecordedMyLinksWithinViewport": true,
+      "signInSubstringCount": 1
+    },
+    {
+      "index": 7,
+      "UTC": "2026-10-04T08:59:34.198Z",
+      "tabID": "7",
+      "URL": "https://alpha.teameet.co.kr/my",
+      "viewport": {
+        "dpr": 1.5,
+        "h": 505,
+        "w": 788
+      },
+      "mainPresent": true,
+      "errorPredicateFalse": true,
+      "genericMyHeadings": [
+        "내 활동",
+        "내 팀"
+      ],
+      "loadingIndicatorCount": 0,
+      "dialogCount": 0,
+      "allRecordedMyLinksWithinViewport": true,
+      "signInSubstringCount": 1
+    },
+    {
+      "index": 8,
+      "UTC": "2026-10-04T08:59:48.551Z",
+      "tabID": "2",
+      "URL": "https://alpha.teameet.co.kr/home",
+      "viewport": {
+        "dpr": 1,
+        "h": 757,
+        "w": 1182
+      },
+      "mainPresent": true,
+      "errorPredicateFalse": true,
+      "genericMyHeadings": [],
+      "loadingIndicatorCount": 0,
+      "dialogCount": 0,
+      "allRecordedMyLinksWithinViewport": true,
+      "signInSubstringCount": 0
+    },
+    {
+      "index": 9,
+      "UTC": "2026-10-04T08:59:59.073Z",
+      "tabID": "2",
+      "URL": "https://alpha.teameet.co.kr/my",
+      "viewport": {
+        "dpr": 1,
+        "h": 757,
+        "w": 1182
+      },
+      "mainPresent": true,
+      "errorPredicateFalse": true,
+      "genericMyHeadings": [
+        "내 활동",
+        "내 팀"
+      ],
+      "loadingIndicatorCount": 0,
+      "dialogCount": 0,
+      "allRecordedMyLinksWithinViewport": true,
+      "signInSubstringCount": 1
+    },
+    {
+      "index": 10,
+      "UTC": "2026-10-04T09:00:07.687Z",
+      "tabID": "2",
+      "URL": "https://alpha.teameet.co.kr/my",
+      "viewport": {
+        "dpr": 1,
+        "h": 757,
+        "w": 1182
+      },
+      "mainPresent": true,
+      "errorPredicateFalse": true,
+      "genericMyHeadings": [
+        "내 활동",
+        "내 팀"
+      ],
+      "loadingIndicatorCount": 0,
+      "dialogCount": 0,
+      "allRecordedMyLinksWithinViewport": true,
+      "signInSubstringCount": 1
+    },
+    {
+      "index": 11,
+      "UTC": "2026-10-04T09:00:27.856Z",
+      "tabID": "8",
+      "URL": "https://alpha.teameet.co.kr/my",
+      "viewport": {
+        "dpr": 1,
+        "h": 757,
+        "w": 1182
+      },
+      "mainPresent": true,
+      "errorPredicateFalse": true,
+      "genericMyHeadings": [
+        "내 활동",
+        "내 팀"
+      ],
+      "loadingIndicatorCount": 0,
+      "dialogCount": 0,
+      "allRecordedMyLinksWithinViewport": true,
+      "signInSubstringCount": 1
+    },
+    {
+      "index": 12,
+      "UTC": "2026-10-04T09:00:37.680Z",
+      "tabID": "2",
+      "URL": "https://alpha.teameet.co.kr/home",
+      "viewport": {
+        "dpr": 1,
+        "h": 757,
+        "w": 1182
+      },
+      "mainPresent": true,
+      "errorPredicateFalse": true,
+      "genericMyHeadings": [],
+      "loadingIndicatorCount": 0,
+      "dialogCount": 0,
+      "allRecordedMyLinksWithinViewport": true,
+      "signInSubstringCount": 0
+    }
+  ],
+  "images": [
+    {
+      "file": "mobile-my-generic-crop.png",
+      "proofIndex": 1,
+      "DOMUTC": "2026-10-04T08:57:52.902Z",
+      "captureStartUTC": "2026-10-04T08:57:52.905Z",
+      "captureEndUTC": "2026-10-04T08:57:52.978Z",
+      "outputSHA256": "15abc4b4cfe13dc0f89d48729b3c831db128ed80d0a800f80699ae334876da5c",
+      "dimensions": [
+        150,
+        42
+      ],
+      "scope": "Initial My entry screenshot only, not reload/newtab screenshot"
+    },
+    {
+      "file": "tablet-my-generic-crop.png",
+      "proofIndex": 5,
+      "DOMUTC": "2026-10-04T08:59:09.566Z",
+      "captureStartUTC": "2026-10-04T08:59:09.569Z",
+      "captureEndUTC": "2026-10-04T08:59:09.651Z",
+      "outputSHA256": "79fea4c94b0e1968fb8857d1d696f03720d32c313a5d1d139cb30e5fe731f062",
+      "dimensions": [
+        150,
+        42
+      ],
+      "scope": "Initial My entry screenshot only, not reload/newtab screenshot"
+    },
+    {
+      "file": "desktop-my-generic-crop.png",
+      "proofIndex": 9,
+      "DOMUTC": "2026-10-04T08:59:59.073Z",
+      "captureStartUTC": "2026-10-04T08:59:59.078Z",
+      "captureEndUTC": "2026-10-04T08:59:59.158Z",
+      "outputSHA256": "b77ab3c13c38cb509c5352298912e906a64b1700e1013c9a2c5eb1079d034891",
+      "dimensions": [
+        345,
+        256
+      ],
+      "scope": "Initial My entry screenshot only, not reload/newtab screenshot"
+    }
+  ],
+  "QAnewTabIDs": [
+    "6",
+    "7",
+    "8"
+  ],
+  "originalTabID": "2",
+  "exitUTC": "2026-10-04T09:00:37.685Z",
+  "missingTab6CreationTimeRecovered": false,
+  "authenticationGateTested": false,
+  "intermittent503CauseOrFixVerified": false,
+  "HTTPStatusObserved": false,
+  "runtimeServingSHA": "unknown",
+  "deploymentWorkflow": {
+    "SHA": "4c81d071ede5bba14575f2aeb1097326797cbd08",
+    "status": "completed",
+    "conclusion": "success",
+    "updatedUTC": "2026-10-04T08:22:48Z",
+    "URL": "https://github.com/kim-song-jun/matchup-sports-platform/actions/runs/37188018237"
+  },
+  "scope": "Independent safe-file consistency and pixel inspection; no private source, browser replay, newtab creation or source/network audit."
+}

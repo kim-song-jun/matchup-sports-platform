@@ -1,0 +1,83 @@
+[
+  {
+    "file": "mobile-my-generic-crop.png",
+    "sourceBasename": "mobile-my.png",
+    "sourceFormat": "JPEG",
+    "sourceSHA256": "52d8259222ef0747c86083b7f65098478b60e6b6909b1f54b7b63e353cfc7720",
+    "captureLedgerSHA256": "52d8259222ef0747c86083b7f65098478b60e6b6909b1f54b7b63e353cfc7720",
+    "sourceSize": [
+      402,
+      606
+    ],
+    "bounds": [
+      130,
+      8,
+      280,
+      50
+    ],
+    "outputSize": [
+      150,
+      42
+    ],
+    "outputSHA256": "15abc4b4cfe13dc0f89d48729b3c831db128ed80d0a800f80699ae334876da5c",
+    "exactDecodedPixelSubset": true,
+    "captureStartUTC": "2026-10-04T08:57:52.905Z",
+    "captureEndUTC": "2026-10-04T08:57:52.978Z",
+    "proofIndex": 1,
+    "DOMUTC": "2026-10-04T08:57:52.902Z"
+  },
+  {
+    "file": "tablet-my-generic-crop.png",
+    "sourceBasename": "tablet-my.png",
+    "sourceFormat": "JPEG",
+    "sourceSHA256": "86a6f73824571c6d9c2bbc343bddf77aff676bbafcc51d2c2e3a70ce7a54247a",
+    "captureLedgerSHA256": "86a6f73824571c6d9c2bbc343bddf77aff676bbafcc51d2c2e3a70ce7a54247a",
+    "sourceSize": [
+      788,
+      505
+    ],
+    "bounds": [
+      320,
+      8,
+      470,
+      50
+    ],
+    "outputSize": [
+      150,
+      42
+    ],
+    "outputSHA256": "79fea4c94b0e1968fb8857d1d696f03720d32c313a5d1d139cb30e5fe731f062",
+    "exactDecodedPixelSubset": true,
+    "captureStartUTC": "2026-10-04T08:59:09.569Z",
+    "captureEndUTC": "2026-10-04T08:59:09.651Z",
+    "proofIndex": 5,
+    "DOMUTC": "2026-10-04T08:59:09.566Z"
+  },
+  {
+    "file": "desktop-my-generic-crop.png",
+    "sourceBasename": "desktop-my.png",
+    "sourceFormat": "JPEG",
+    "sourceSHA256": "1e651b2b6d6446d0e465a6de7fd4c0940082a965295c59880922e42a347fe6b5",
+    "captureLedgerSHA256": "1e651b2b6d6446d0e465a6de7fd4c0940082a965295c59880922e42a347fe6b5",
+    "sourceSize": [
+      1182,
+      757
+    ],
+    "bounds": [
+      790,
+      85,
+      1135,
+      341
+    ],
+    "outputSize": [
+      345,
+      256
+    ],
+    "outputSHA256": "b77ab3c13c38cb509c5352298912e906a64b1700e1013c9a2c5eb1079d034891",
+    "exactDecodedPixelSubset": true,
+    "captureStartUTC": "2026-10-04T08:59:59.078Z",
+    "captureEndUTC": "2026-10-04T08:59:59.158Z",
+    "proofIndex": 9,
+    "DOMUTC": "2026-10-04T08:59:59.073Z"
+  }
+]

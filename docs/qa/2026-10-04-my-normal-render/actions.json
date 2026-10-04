@@ -1,0 +1,107 @@
+[
+  {
+    "label": "fresh home navigation in existing session",
+    "startUTC": "2026-10-04T08:56:49.127Z",
+    "endUTC": "2026-10-04T08:56:49.482Z"
+  },
+  {
+    "label": "resize home to mobile",
+    "startUTC": "2026-10-04T08:57:05.465Z",
+    "endUTC": "2026-10-04T08:57:07.266Z"
+  },
+  {
+    "label": "mobile zoom110",
+    "startUTC": "2026-10-04T08:57:07.266Z",
+    "endUTC": "2026-10-04T08:57:07.568Z"
+  },
+  {
+    "label": "mobile zoom125",
+    "startUTC": "2026-10-04T08:57:07.569Z",
+    "endUTC": "2026-10-04T08:57:07.868Z"
+  },
+  {
+    "label": "mobile visible My link from home",
+    "startUTC": "2026-10-04T08:57:35.911Z",
+    "endUTC": "2026-10-04T08:57:36.012Z"
+  },
+  {
+    "label": "mobile My reload normal request",
+    "startUTC": "2026-10-04T08:57:52.979Z",
+    "endUTC": "2026-10-04T08:57:53.518Z"
+  },
+  {
+    "label": "close only QA new My tab6",
+    "startUTC": "2026-10-04T08:58:18.407Z",
+    "endUTC": "2026-10-04T08:58:18.410Z"
+  },
+  {
+    "label": "return home through visible navigation",
+    "startUTC": "2026-10-04T08:58:40.407Z",
+    "endUTC": "2026-10-04T08:58:40.702Z"
+  },
+  {
+    "label": "resize home tablet",
+    "startUTC": "2026-10-04T08:58:51.000Z",
+    "endUTC": "2026-10-04T08:58:53.207Z"
+  },
+  {
+    "label": "tablet zoom150",
+    "startUTC": "2026-10-04T08:58:53.207Z",
+    "endUTC": "2026-10-04T08:58:53.508Z"
+  },
+  {
+    "label": "tablet visible My link from home",
+    "startUTC": "2026-10-04T08:58:58.415Z",
+    "endUTC": "2026-10-04T08:58:58.689Z"
+  },
+  {
+    "label": "tablet My reload normal request",
+    "startUTC": "2026-10-04T08:59:09.653Z",
+    "endUTC": "2026-10-04T08:59:10.129Z"
+  },
+  {
+    "label": "tablet open QA new tab at verified My URL",
+    "startUTC": "2026-10-04T08:59:17.838Z",
+    "endUTC": "2026-10-04T08:59:18.517Z"
+  },
+  {
+    "label": "close only QA new My tab7",
+    "startUTC": "2026-10-04T08:59:34.203Z",
+    "endUTC": "2026-10-04T08:59:34.206Z"
+  },
+  {
+    "label": "return home using visible link before desktop",
+    "startUTC": "2026-10-04T08:59:34.206Z",
+    "endUTC": "2026-10-04T08:59:34.511Z"
+  },
+  {
+    "label": "desktop zoom reset",
+    "startUTC": "2026-10-04T08:59:48.403Z",
+    "endUTC": "2026-10-04T08:59:48.540Z"
+  },
+  {
+    "label": "desktop visible profile icon link from home",
+    "startUTC": "2026-10-04T08:59:48.555Z",
+    "endUTC": "2026-10-04T08:59:48.829Z"
+  },
+  {
+    "label": "desktop My reload normal request",
+    "startUTC": "2026-10-04T08:59:59.159Z",
+    "endUTC": "2026-10-04T08:59:59.393Z"
+  },
+  {
+    "label": "desktop open QA new tab at verified My URL",
+    "startUTC": "2026-10-04T09:00:07.691Z",
+    "endUTC": "2026-10-04T09:00:08.175Z"
+  },
+  {
+    "label": "close only QA new My tab8",
+    "startUTC": "2026-10-04T09:00:27.862Z",
+    "endUTC": "2026-10-04T09:00:27.865Z"
+  },
+  {
+    "label": "final exit through visible Home link",
+    "startUTC": "2026-10-04T09:00:27.866Z",
+    "endUTC": "2026-10-04T09:00:27.974Z"
+  }
+]

@@ -1,0 +1,632 @@
+[
+  {
+    "bodyHasContent": true,
+    "bodyScrollWidth": 402,
+    "documentTitle": "홈 | Teameet",
+    "errorTextPresent": false,
+    "headingCount": 3,
+    "loadingIndicators": [],
+    "mainPresent": true,
+    "myLinks": [
+      {
+        "aria": null,
+        "href": "/my",
+        "rect": {
+          "bottom": 589.9999885559082,
+          "height": 49.20000076293945,
+          "left": 321.2749938964844,
+          "right": 401.5999984741211,
+          "top": 540.7999877929688,
+          "width": 80.32500457763672,
+          "x": 321.2749938964844,
+          "y": 540.7999877929688
+        },
+        "text": "마이"
+      }
+    ],
+    "safeHeadings": [],
+    "safeNavigationLabels": [
+      "나의 팀"
+    ],
+    "signInLinkCount": 0,
+    "url": "https://alpha.teameet.co.kr/home",
+    "utc": "2026-10-04T08:57:35.906Z",
+    "viewport": {
+      "dpr": 1.25,
+      "h": 606,
+      "w": 402
+    },
+    "visibleDialogs": 0,
+    "label": "mobile settled home profile link",
+    "index": 0,
+    "tabId": "2"
+  },
+  {
+    "bodyHasContent": true,
+    "bodyScrollWidth": 402,
+    "documentTitle": "Teameet",
+    "errorTextPresent": false,
+    "headingCount": 6,
+    "loadingIndicators": [],
+    "mainPresent": true,
+    "myLinks": [
+      {
+        "aria": null,
+        "href": "/my",
+        "rect": {
+          "bottom": 589.2000007629395,
+          "height": 49.20000076293945,
+          "left": 321.2749938964844,
+          "right": 401.5999984741211,
+          "top": 540,
+          "width": 80.32500457763672,
+          "x": 321.2749938964844,
+          "y": 540
+        },
+        "text": "마이"
+      }
+    ],
+    "safeHeadings": [
+      "내 활동",
+      "내 팀"
+    ],
+    "safeNavigationLabels": [],
+    "signInLinkCount": 1,
+    "url": "https://alpha.teameet.co.kr/my",
+    "utc": "2026-10-04T08:57:52.902Z",
+    "viewport": {
+      "dpr": 1.25,
+      "h": 606,
+      "w": 402
+    },
+    "visibleDialogs": 0,
+    "label": "mobile settled My page",
+    "index": 1,
+    "tabId": "2"
+  },
+  {
+    "bodyHasContent": true,
+    "bodyScrollWidth": 402,
+    "documentTitle": "Teameet",
+    "errorTextPresent": false,
+    "headingCount": 6,
+    "loadingIndicators": [],
+    "mainPresent": true,
+    "myLinks": [
+      {
+        "aria": null,
+        "href": "/my",
+        "rect": {
+          "bottom": 589.9999885559082,
+          "height": 49.20000076293945,
+          "left": 321.2749938964844,
+          "right": 401.5999984741211,
+          "top": 540.7999877929688,
+          "width": 80.32500457763672,
+          "x": 321.2749938964844,
+          "y": 540.7999877929688
+        },
+        "text": "마이"
+      }
+    ],
+    "safeHeadings": [
+      "내 활동",
+      "내 팀"
+    ],
+    "safeNavigationLabels": [],
+    "signInLinkCount": 1,
+    "url": "https://alpha.teameet.co.kr/my",
+    "utc": "2026-10-04T08:58:02.820Z",
+    "viewport": {
+      "dpr": 1.25,
+      "h": 606,
+      "w": 402
+    },
+    "visibleDialogs": 0,
+    "label": "mobile settled My reload",
+    "index": 2,
+    "tabId": "2"
+  },
+  {
+    "bodyHasContent": true,
+    "bodyScrollWidth": 402,
+    "documentTitle": "Teameet",
+    "errorTextPresent": false,
+    "headingCount": 6,
+    "loadingIndicators": [],
+    "mainPresent": true,
+    "myLinks": [
+      {
+        "aria": null,
+        "href": "/my",
+        "rect": {
+          "bottom": 589.9999885559082,
+          "height": 49.20000076293945,
+          "left": 321.2749938964844,
+          "right": 401.5999984741211,
+          "top": 540.7999877929688,
+          "width": 80.32500457763672,
+          "x": 321.2749938964844,
+          "y": 540.7999877929688
+        },
+        "text": "마이"
+      }
+    ],
+    "safeHeadings": [
+      "내 활동",
+      "내 팀"
+    ],
+    "safeNavigationLabels": [],
+    "signInLinkCount": 1,
+    "url": "https://alpha.teameet.co.kr/my",
+    "utc": "2026-10-04T08:58:18.402Z",
+    "viewport": {
+      "dpr": 1.25,
+      "h": 606,
+      "w": 402
+    },
+    "visibleDialogs": 0,
+    "label": "mobile settled same-browser new tab",
+    "index": 3,
+    "tabId": "6"
+  },
+  {
+    "bodyHasContent": true,
+    "bodyScrollWidth": 788,
+    "documentTitle": "홈 | Teameet",
+    "errorTextPresent": false,
+    "headingCount": 3,
+    "loadingIndicators": [],
+    "mainPresent": true,
+    "myLinks": [
+      {
+        "aria": null,
+        "href": "/my",
+        "rect": {
+          "bottom": 488.3333358764648,
+          "height": 49.33333587646485,
+          "left": 574,
+          "right": 694,
+          "top": 439,
+          "width": 120,
+          "x": 574,
+          "y": 439
+        },
+        "text": "마이"
+      }
+    ],
+    "safeHeadings": [],
+    "safeNavigationLabels": [
+      "나의 팀"
+    ],
+    "signInLinkCount": 0,
+    "url": "https://alpha.teameet.co.kr/home",
+    "utc": "2026-10-04T08:58:53.517Z",
+    "viewport": {
+      "dpr": 1.5,
+      "h": 505,
+      "w": 788
+    },
+    "visibleDialogs": 0,
+    "label": "tablet settled home profile link",
+    "index": 4,
+    "tabId": "2"
+  },
+  {
+    "bodyHasContent": true,
+    "bodyScrollWidth": 788,
+    "documentTitle": "Teameet",
+    "errorTextPresent": false,
+    "headingCount": 6,
+    "loadingIndicators": [],
+    "mainPresent": true,
+    "myLinks": [
+      {
+        "aria": null,
+        "href": "/my",
+        "rect": {
+          "bottom": 488.3333358764648,
+          "height": 49.33333587646485,
+          "left": 574,
+          "right": 694,
+          "top": 439,
+          "width": 120,
+          "x": 574,
+          "y": 439
+        },
+        "text": "마이"
+      }
+    ],
+    "safeHeadings": [
+      "내 활동",
+      "내 팀"
+    ],
+    "safeNavigationLabels": [],
+    "signInLinkCount": 1,
+    "url": "https://alpha.teameet.co.kr/my",
+    "utc": "2026-10-04T08:59:09.566Z",
+    "viewport": {
+      "dpr": 1.5,
+      "h": 505,
+      "w": 788
+    },
+    "visibleDialogs": 0,
+    "label": "tablet settled My page",
+    "index": 5,
+    "tabId": "2"
+  },
+  {
+    "bodyHasContent": true,
+    "bodyScrollWidth": 788,
+    "documentTitle": "Teameet",
+    "errorTextPresent": false,
+    "headingCount": 6,
+    "loadingIndicators": [],
+    "mainPresent": true,
+    "myLinks": [
+      {
+        "aria": null,
+        "href": "/my",
+        "rect": {
+          "bottom": 489.0000228881836,
+          "height": 49.33333587646485,
+          "left": 574,
+          "right": 694,
+          "top": 439.6666870117187,
+          "width": 120,
+          "x": 574,
+          "y": 439.6666870117187
+        },
+        "text": "마이"
+      }
+    ],
+    "safeHeadings": [
+      "내 활동",
+      "내 팀"
+    ],
+    "safeNavigationLabels": [],
+    "signInLinkCount": 1,
+    "url": "https://alpha.teameet.co.kr/my",
+    "utc": "2026-10-04T08:59:17.835Z",
+    "viewport": {
+      "dpr": 1.5,
+      "h": 505,
+      "w": 788
+    },
+    "visibleDialogs": 0,
+    "label": "tablet settled My reload",
+    "index": 6,
+    "tabId": "2"
+  },
+  {
+    "bodyHasContent": true,
+    "bodyScrollWidth": 788,
+    "documentTitle": "Teameet",
+    "errorTextPresent": false,
+    "headingCount": 6,
+    "loadingIndicators": [],
+    "mainPresent": true,
+    "myLinks": [
+      {
+        "aria": null,
+        "href": "/my",
+        "rect": {
+          "bottom": 489.0000228881836,
+          "height": 49.33333587646485,
+          "left": 574,
+          "right": 694,
+          "top": 439.6666870117187,
+          "width": 120,
+          "x": 574,
+          "y": 439.6666870117187
+        },
+        "text": "마이"
+      }
+    ],
+    "safeHeadings": [
+      "내 활동",
+      "내 팀"
+    ],
+    "safeNavigationLabels": [],
+    "signInLinkCount": 1,
+    "url": "https://alpha.teameet.co.kr/my",
+    "utc": "2026-10-04T08:59:34.198Z",
+    "viewport": {
+      "dpr": 1.5,
+      "h": 505,
+      "w": 788
+    },
+    "visibleDialogs": 0,
+    "label": "tablet settled same-browser new tab",
+    "index": 7,
+    "tabId": "7"
+  },
+  {
+    "bodyHasContent": true,
+    "bodyScrollWidth": 1182,
+    "documentTitle": "홈 | Teameet",
+    "errorTextPresent": false,
+    "headingCount": 3,
+    "loadingIndicators": [],
+    "mainPresent": true,
+    "myLinks": [
+      {
+        "aria": null,
+        "href": "/my",
+        "rect": {
+          "bottom": 63,
+          "height": 63,
+          "left": 408.578125,
+          "right": 466.515625,
+          "top": 0,
+          "width": 57.9375,
+          "x": 408.578125,
+          "y": 0
+        },
+        "text": "마이"
+      },
+      {
+        "aria": "내 정보",
+        "href": "/my",
+        "rect": {
+          "bottom": 49.5,
+          "height": 36,
+          "left": 1091,
+          "right": 1127,
+          "top": 13.5,
+          "width": 36,
+          "x": 1091,
+          "y": 13.5
+        },
+        "text": null
+      }
+    ],
+    "safeHeadings": [],
+    "safeNavigationLabels": [
+      "나의 팀"
+    ],
+    "signInLinkCount": 0,
+    "url": "https://alpha.teameet.co.kr/home",
+    "utc": "2026-10-04T08:59:48.551Z",
+    "viewport": {
+      "dpr": 1,
+      "h": 757,
+      "w": 1182
+    },
+    "visibleDialogs": 0,
+    "label": "desktop settled home profile link",
+    "index": 8,
+    "tabId": "2"
+  },
+  {
+    "bodyHasContent": true,
+    "bodyScrollWidth": 1182,
+    "documentTitle": "Teameet",
+    "errorTextPresent": false,
+    "headingCount": 6,
+    "loadingIndicators": [],
+    "mainPresent": true,
+    "myLinks": [
+      {
+        "aria": null,
+        "href": "/my",
+        "rect": {
+          "bottom": 63,
+          "height": 63,
+          "left": 408.578125,
+          "right": 466.515625,
+          "top": 0,
+          "width": 57.9375,
+          "x": 408.578125,
+          "y": 0
+        },
+        "text": "마이"
+      },
+      {
+        "aria": "내 정보",
+        "href": "/my",
+        "rect": {
+          "bottom": 49.5,
+          "height": 36,
+          "left": 1091,
+          "right": 1127,
+          "top": 13.5,
+          "width": 36,
+          "x": 1091,
+          "y": 13.5
+        },
+        "text": null
+      }
+    ],
+    "safeHeadings": [
+      "내 활동",
+      "내 팀"
+    ],
+    "safeNavigationLabels": [],
+    "signInLinkCount": 1,
+    "url": "https://alpha.teameet.co.kr/my",
+    "utc": "2026-10-04T08:59:59.073Z",
+    "viewport": {
+      "dpr": 1,
+      "h": 757,
+      "w": 1182
+    },
+    "visibleDialogs": 0,
+    "label": "desktop settled My page",
+    "index": 9,
+    "tabId": "2"
+  },
+  {
+    "bodyHasContent": true,
+    "bodyScrollWidth": 1182,
+    "documentTitle": "Teameet",
+    "errorTextPresent": false,
+    "headingCount": 6,
+    "loadingIndicators": [],
+    "mainPresent": true,
+    "myLinks": [
+      {
+        "aria": null,
+        "href": "/my",
+        "rect": {
+          "bottom": 63,
+          "height": 63,
+          "left": 408.578125,
+          "right": 466.515625,
+          "top": 0,
+          "width": 57.9375,
+          "x": 408.578125,
+          "y": 0
+        },
+        "text": "마이"
+      },
+      {
+        "aria": "내 정보",
+        "href": "/my",
+        "rect": {
+          "bottom": 49.5,
+          "height": 36,
+          "left": 1091,
+          "right": 1127,
+          "top": 13.5,
+          "width": 36,
+          "x": 1091,
+          "y": 13.5
+        },
+        "text": null
+      }
+    ],
+    "safeHeadings": [
+      "내 활동",
+      "내 팀"
+    ],
+    "safeNavigationLabels": [],
+    "signInLinkCount": 1,
+    "url": "https://alpha.teameet.co.kr/my",
+    "utc": "2026-10-04T09:00:07.687Z",
+    "viewport": {
+      "dpr": 1,
+      "h": 757,
+      "w": 1182
+    },
+    "visibleDialogs": 0,
+    "label": "desktop settled My reload",
+    "index": 10,
+    "tabId": "2"
+  },
+  {
+    "bodyHasContent": true,
+    "bodyScrollWidth": 1182,
+    "documentTitle": "Teameet",
+    "errorTextPresent": false,
+    "headingCount": 6,
+    "loadingIndicators": [],
+    "mainPresent": true,
+    "myLinks": [
+      {
+        "aria": null,
+        "href": "/my",
+        "rect": {
+          "bottom": 63,
+          "height": 63,
+          "left": 408.578125,
+          "right": 466.515625,
+          "top": 0,
+          "width": 57.9375,
+          "x": 408.578125,
+          "y": 0
+        },
+        "text": "마이"
+      },
+      {
+        "aria": "내 정보",
+        "href": "/my",
+        "rect": {
+          "bottom": 49.5,
+          "height": 36,
+          "left": 1091,
+          "right": 1127,
+          "top": 13.5,
+          "width": 36,
+          "x": 1091,
+          "y": 13.5
+        },
+        "text": null
+      }
+    ],
+    "safeHeadings": [
+      "내 활동",
+      "내 팀"
+    ],
+    "safeNavigationLabels": [],
+    "signInLinkCount": 1,
+    "url": "https://alpha.teameet.co.kr/my",
+    "utc": "2026-10-04T09:00:27.856Z",
+    "viewport": {
+      "dpr": 1,
+      "h": 757,
+      "w": 1182
+    },
+    "visibleDialogs": 0,
+    "label": "desktop settled same-browser new tab",
+    "index": 11,
+    "tabId": "8"
+  },
+  {
+    "bodyHasContent": true,
+    "bodyScrollWidth": 1182,
+    "documentTitle": "홈 | Teameet",
+    "errorTextPresent": false,
+    "headingCount": 3,
+    "loadingIndicators": [],
+    "mainPresent": true,
+    "myLinks": [
+      {
+        "aria": null,
+        "href": "/my",
+        "rect": {
+          "bottom": 63,
+          "height": 63,
+          "left": 408.578125,
+          "right": 466.515625,
+          "top": 0,
+          "width": 57.9375,
+          "x": 408.578125,
+          "y": 0
+        },
+        "text": "마이"
+      },
+      {
+        "aria": "내 정보",
+        "href": "/my",
+        "rect": {
+          "bottom": 49.5,
+          "height": 36,
+          "left": 1091,
+          "right": 1127,
+          "top": 13.5,
+          "width": 36,
+          "x": 1091,
+          "y": 13.5
+        },
+        "text": null
+      }
+    ],
+    "safeHeadings": [],
+    "safeNavigationLabels": [
+      "나의 팀"
+    ],
+    "signInLinkCount": 0,
+    "url": "https://alpha.teameet.co.kr/home",
+    "utc": "2026-10-04T09:00:37.680Z",
+    "viewport": {
+      "dpr": 1,
+      "h": 757,
+      "w": 1182
+    },
+    "visibleDialogs": 0,
+    "label": "final home after closing only QA tabs",
+    "index": 12,
+    "tabId": "2"
+  }
+]

@@ -1,0 +1,85 @@
+{
+  "files": [
+    {
+      "file": "PUBLISHER-VERIFICATION.md",
+      "bytes": 4249,
+      "sha256": "ab14a046d79943d7d875d728655d851505745b4c14b7e292997837ed68ea2a58"
+    },
+    {
+      "file": "README.md",
+      "bytes": 1502,
+      "sha256": "11604e660382f3d74e9d9ee8dfa1f5417042356021d6933c11c180851c162c0e"
+    },
+    {
+      "file": "SHA256SUMS",
+      "bytes": 1088,
+      "sha256": "8d7c1bdf5f6625e7acc0a174ed396a6d2f4817b9b3a0c6687037572b6e6d8c4b"
+    },
+    {
+      "file": "actions.json",
+      "bytes": 2951,
+      "sha256": "81ca9e61915afc6598367e490c840d84c28bd3f4c43a27a3028b55a449b18af3"
+    },
+    {
+      "file": "collector-note.json",
+      "bytes": 723,
+      "sha256": "891e93031f277148bd7e6175f5776be8ea5cc06cb0e43a1bd3ce77afd7cac49f"
+    },
+    {
+      "file": "crop-provenance.json",
+      "bytes": 2248,
+      "sha256": "34bf871fa64b05840a4e92ca988324423a13c8189dfbf8604f28c80bed924ce8"
+    },
+    {
+      "file": "desktop-my-generic-crop.png",
+      "bytes": 39332,
+      "sha256": "b77ab3c13c38cb509c5352298912e906a64b1700e1013c9a2c5eb1079d034891"
+    },
+    {
+      "file": "exit.json",
+      "bytes": 225,
+      "sha256": "64d02d8602a3f741a4fcd4794980d5cddc9abf72d98a2c0b110a9039c62f07ac"
+    },
+    {
+      "file": "manifest.json",
+      "bytes": 1843,
+      "sha256": "51a72b47580c17455ff39a701a6862a78a12de88a53a3a465f1dcee7fc4e8c69"
+    },
+    {
+      "file": "mobile-my-generic-crop.png",
+      "bytes": 4100,
+      "sha256": "15abc4b4cfe13dc0f89d48729b3c831db128ed80d0a800f80699ae334876da5c"
+    },
+    {
+      "file": "proof.json",
+      "bytes": 14032,
+      "sha256": "cf09a7bb881c2667787603998970220f55e819bc68865ad9516979344bb5e330"
+    },
+    {
+      "file": "provenance.json",
+      "bytes": 863,
+      "sha256": "8ee8336f26a3d56cdc54854aef482f1325b3e6063773845c05ace263c57b3890"
+    },
+    {
+      "file": "publisher-verification.json",
+      "bytes": 8837,
+      "sha256": "21d88a9011b162181289ed1370d1a29b527c0e1c6d964e0b097eedba0236d31a"
+    },
+    {
+      "file": "source-context.json",
+      "bytes": 6289,
+      "sha256": "29f89ac6fbed0f35e49fbd1df457ba0a0f64aae7177f34bbb468821f1e62e696"
+    },
+    {
+      "file": "summary.json",
+      "bytes": 2742,
+      "sha256": "85e03a9205701131e186b700f1127a672487a0d14dee8ab1e36f0d4261d15c20"
+    },
+    {
+      "file": "tablet-my-generic-crop.png",
+      "bytes": 4178,
+      "sha256": "79fea4c94b0e1968fb8857d1d696f03720d32c313a5d1d139cb30e5fe731f062"
+    }
+  ],
+  "note": "All delivered files except this manifest; original14-file packet inventories are unchanged."
+}

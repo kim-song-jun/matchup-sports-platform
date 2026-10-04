@@ -1,0 +1,7 @@
+{
+  "recordedUTC": "2026-10-04T08:58:18.407Z",
+  "tabId": "6",
+  "limitation": "The supported new-tab call created tab6 successfully, then assigning its handle to an undeclared identifier failed; act1558 did not append its completed action. Existing tab6 was rebound by observed ID, not recreated. New-tab capture verifies the outcome; exact creation start/end were not retained.",
+  "loginRelatedLinkCollector": "signInLinkCount counts visible anchors containing 로그인, including normal account-settings copy; it is not a login-block indicator.",
+  "loginRelatedLinkMeaning": "A visible /my/settings link contains ordinary account-login copy. signInLinkCount is a broad substring count, not an authentication gate."
+}

@@ -1,0 +1,108 @@
+{
+  "commit": "4c81d071ede5bba14575f2aeb1097326797cbd08",
+  "sourceOnly": true,
+  "scenario": {
+    "name": "Ordinary home profile link→/my entry and reload",
+    "source_only_findings": [
+      {
+        "finding": "Desktop 내 정보 is a plain Next Link href=/my without an onClick mutation handler.",
+        "sources": [
+          {
+            "url": "https://github.com/kim-song-jun/matchup-sports-platform/blob/4c81d071ede5bba14575f2aeb1097326797cbd08/apps/v1_web/src/components/v1-ui/shell.tsx#L384",
+            "lines": "384-391"
+          }
+        ]
+      },
+      {
+        "finding": "MyHomePageClient mounts read query hooks for profile, activity summary, teams, unread notification count, pending reviews, auth/me, staff assignments, and eligible team contact summary. The page function has no mutation or notification mark-read call. auth/me here is an existing query, not an authentication action.",
+        "sources": [
+          {
+            "url": "https://github.com/kim-song-jun/matchup-sports-platform/blob/4c81d071ede5bba14575f2aeb1097326797cbd08/apps/v1_web/src/components/my/my-api-clients.tsx#L110",
+            "lines": "110-173"
+          }
+        ]
+      },
+      {
+        "finding": "Inspected hooks use GET for /me/profile, /me/activity-summary, /me/teams, /notifications, /reviews, /auth/me, /me/tournament-staff, and /me/team-contacts/summary.",
+        "sources": [
+          {
+            "url": "https://github.com/kim-song-jun/matchup-sports-platform/blob/4c81d071ede5bba14575f2aeb1097326797cbd08/apps/v1_web/src/hooks/use-v1-api.ts#L297",
+            "lines": "297-309"
+          },
+          {
+            "url": "https://github.com/kim-song-jun/matchup-sports-platform/blob/4c81d071ede5bba14575f2aeb1097326797cbd08/apps/v1_web/src/hooks/use-v1-api.ts#L1111",
+            "lines": "1111-1117"
+          },
+          {
+            "url": "https://github.com/kim-song-jun/matchup-sports-platform/blob/4c81d071ede5bba14575f2aeb1097326797cbd08/apps/v1_web/src/hooks/use-v1-api.ts#L1358",
+            "lines": "1358-1364"
+          },
+          {
+            "url": "https://github.com/kim-song-jun/matchup-sports-platform/blob/4c81d071ede5bba14575f2aeb1097326797cbd08/apps/v1_web/src/hooks/use-v1-api.ts#L2564",
+            "lines": "2564-2570"
+          },
+          {
+            "url": "https://github.com/kim-song-jun/matchup-sports-platform/blob/4c81d071ede5bba14575f2aeb1097326797cbd08/apps/v1_web/src/hooks/use-v1-api.ts#L2725",
+            "lines": "2725-2730"
+          },
+          {
+            "url": "https://github.com/kim-song-jun/matchup-sports-platform/blob/4c81d071ede5bba14575f2aeb1097326797cbd08/apps/v1_web/src/hooks/use-v1-api.ts#L2901",
+            "lines": "2901-2922"
+          },
+          {
+            "url": "https://github.com/kim-song-jun/matchup-sports-platform/blob/4c81d071ede5bba14575f2aeb1097326797cbd08/apps/v1_web/src/hooks/use-v1-api.ts#L5508",
+            "lines": "5508-5514"
+          }
+        ]
+      },
+      {
+        "finding": "The rendered player-card wrapper reads the public profile; its card UI effect only computes hover/reduced-motion eligibility, and card flip is local state. Pending-review card reads pending-review queries. These inspected child paths do not mark notifications read or change profile/settings on entry/reload.",
+        "sources": [
+          {
+            "url": "https://github.com/kim-song-jun/matchup-sports-platform/blob/4c81d071ede5bba14575f2aeb1097326797cbd08/apps/v1_web/src/components/my/my-page.tsx#L77",
+            "lines": "77-181"
+          },
+          {
+            "url": "https://github.com/kim-song-jun/matchup-sports-platform/blob/4c81d071ede5bba14575f2aeb1097326797cbd08/apps/v1_web/src/components/my/my-player-card-section.tsx#L35",
+            "lines": "35-81"
+          },
+          {
+            "url": "https://github.com/kim-song-jun/matchup-sports-platform/blob/4c81d071ede5bba14575f2aeb1097326797cbd08/apps/v1_web/src/components/users/player-card.tsx#L347",
+            "lines": "347-352"
+          },
+          {
+            "url": "https://github.com/kim-song-jun/matchup-sports-platform/blob/4c81d071ede5bba14575f2aeb1097326797cbd08/apps/v1_web/src/components/users/player-card.tsx#L618",
+            "lines": "618-635"
+          },
+          {
+            "url": "https://github.com/kim-song-jun/matchup-sports-platform/blob/4c81d071ede5bba14575f2aeb1097326797cbd08/apps/v1_web/src/components/tournaments/pending-review-card.tsx#L35",
+            "lines": "35-53"
+          },
+          {
+            "url": "https://github.com/kim-song-jun/matchup-sports-platform/blob/4c81d071ede5bba14575f2aeb1097326797cbd08/apps/v1_web/src/hooks/use-v1-api.ts#L2908",
+            "lines": "2908-2913"
+          },
+          {
+            "url": "https://github.com/kim-song-jun/matchup-sports-platform/blob/4c81d071ede5bba14575f2aeb1097326797cbd08/apps/v1_web/src/hooks/use-v1-api.ts#L4040",
+            "lines": "4040-4045"
+          }
+        ]
+      }
+    ],
+    "action_boundary": "Read /my and reload only. This does not cover clicking authentication, notification, mark-read, consent, settings, logout, share, or profile-edit controls.",
+    "limitations": "Front-end entry/reload boundary was inspected. No live /my verification or full transitive backend audit was performed; this is not an unconditional claim that all surrounding shell/telemetry traffic is GET."
+  },
+  "sharedErrorTelemetryException": {
+    "finding": "Shared v1Api reports unexpected non-OK/API-error responses via reportClientError. That reporter can POST /api/v1/logs/client-error with keepalive. Therefore successful normal search/filter/detail/empty-result paths are read-only business behavior, but 'zero POST under every condition' is not established. No deliberate failure/error induction is authorized by this evidence.",
+    "sources": [
+      {
+        "url": "https://github.com/kim-song-jun/matchup-sports-platform/blob/4c81d071ede5bba14575f2aeb1097326797cbd08/apps/v1_web/src/lib/api-client.ts#L147",
+        "lines": "147-177"
+      },
+      {
+        "url": "https://github.com/kim-song-jun/matchup-sports-platform/blob/4c81d071ede5bba14575f2aeb1097326797cbd08/apps/v1_web/src/lib/client-error-reporter.ts#L27",
+        "lines": "27-57"
+      }
+    ]
+  }
+}

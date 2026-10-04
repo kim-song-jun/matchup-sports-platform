@@ -760,7 +760,7 @@ describe('TeamMatchDetailPageClient — 취소된 팀매치는 취소를 표시�
 //    보지 않고 팀 멤버십만 봐야 completed 이후에도 버튼이 계속 동작한다.
 describe('TeamMatchDetailPageClient — 채팅 게이트는 팀 멤버십 기준이고 경기 종료 후에도 유지된다', () => {
   function mockTeamMatchForChat(
-    viewer: { state: V1TeamMatchViewerState; manageableHostTeam?: boolean; manageableOpponentTeam?: boolean },
+    viewer: { state: V1TeamMatchViewerState; manageableHostTeam?: boolean; manageableOpponentTeam?: boolean; canChat?: boolean },
     status: string,
     opponentAssigned = true,
   ) {
@@ -780,6 +780,7 @@ describe('TeamMatchDetailPageClient — 채팅 게이트는 팀 멤버십 기준
           state: viewer.state,
           manageableHostTeam: viewer.manageableHostTeam ?? false,
           manageableOpponentTeam: viewer.manageableOpponentTeam ?? false,
+          canChat: viewer.canChat,
         },
         hostTeam: { teamId: 'team-host', name: '호스트 팀' },
         approvedOpponentTeam: opponentAssigned ? { teamId: 'team-away', name: '상대 팀' } : null,
@@ -800,6 +801,23 @@ describe('TeamMatchDetailPageClient — 채팅 게이트는 팀 멤버십 기준
 
     expect(screen.getByRole('button', { name: '채팅 열기' })).toBeInTheDocument();
     expect(screen.getByTestId('team-match-chat-label')).toHaveTextContent('채팅');
+  });
+
+  it('플랫폼 운영자는 참가팀이 없어도 서버가 허용한 모집 채팅을 연다', () => {
+    mockTeamMatchForChat({ state: 'none', canChat: true }, 'recruiting', false);
+    render(<TeamMatchDetailPageClient teamMatchId="team-match-1" />);
+    expect(screen.getByRole('button', { name: '채팅 열기' })).toBeInTheDocument();
+    expect(resolveChatRoomMutateMock).toHaveBeenCalledWith(
+      { targetType: 'team_match', targetId: 'team-match-1' },
+      expect.objectContaining({ onError: expect.any(Function) }),
+    );
+  });
+
+  it('서버가 채팅 권한을 차단하면 팀 관리 플래그가 남아도 진입하지 않는다', () => {
+    mockTeamMatchForChat({ state: 'none', manageableHostTeam: true, canChat: false }, 'matched');
+    render(<TeamMatchDetailPageClient teamMatchId="team-match-1" />);
+    expect(screen.queryByRole('button', { name: '채팅 열기' })).not.toBeInTheDocument();
+    expect(resolveChatRoomMutateMock).not.toHaveBeenCalled();
   });
 
   it('리그 대진 상대팀 owner/manager는 신청서를 직접 내지 않았어도(state=none) 채팅을 연다', () => {

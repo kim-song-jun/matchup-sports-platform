@@ -1,5 +1,37 @@
 # 149. Admin Team Match Recruitment
 
+## 2026-10-02 platform chat continuation
+
+Scope: backend chat/recruitment, frontend detail entitlement, data-only migration, API/scenario docs.
+Worktree: `output/worktrees/platform-team-match-chat`; branch `fix/platform-team-match-chat`, latest
+`origin/dev` base `be228ba1b`. Shared-root WIP is untouched. No main promotion or production DB write.
+
+- [x] Platform recruitment creates its room and mandatory creating-operator participant in the same transaction.
+- [x] HOME/AWAY approval adds that team's active owner/manager participants in the approval transaction.
+- [x] List/read/send/recipient entitlement covers the active creating owner/ops operator; revocation blocks access.
+- [x] Detail `viewer.canChat` gates the existing chat CTA independently of application authorship/team membership.
+- [x] Data-only idempotent migration backfills nondeleted platform recruitment/matched/completed rooms and missing participants; preserves existing history/preferences/voluntary team exits.
+- [x] PostgreSQL HTTP integration scenarios added for preassignment access, each side's admission,
+  unauthorized members, operator exit/revocation, cancellation and migration replay/data preservation.
+- [x] Narrow regressions: API 126/126 (79 unchanged team-match cases + final chat/recruitment 47/47), Web 89/89.
+- [x] API including the new integration spec and Web typechecks: 0 diagnostics. Diff/debt checks PASS.
+- [ ] PostgreSQL integration/migration execution (Docker daemon unavailable; no approved test DB configured).
+- [ ] Headed live manual QA at 390/768/1440 (requires actual API/test DB; no screenshot success claimed).
+- [ ] User promotion to main and production `migrate deploy`; existing production rows are not yet modified.
+
+Decisions: “platform operator” means the creating operator as agreed in this conversation, not every admin.
+The latest source has `platformManaged` and staged recruitment approval; old local direct-assignment
+code is not used. A platform room exists immediately, with each side admitted as approval happens.
+Revoked/inactive creators never gain permissions from a backfill. Existing archived rooms stay archived.
+No model/schema changes; tables are `v1_team_matches`, `v1_chat_rooms`, `v1_chat_room_participants`,
+`v1_team_memberships`, `v1_admin_users`, and `v1_users`.
+
+Progress: implementation, scoped regressions, API/Web typechecks and diff/debt review complete.
+Real-DB suite attempted: fails before test setup with `DATABASE_URL is required for isolated integration suites`.
+Docker daemon is absent, WSL unavailable in sandbox, and no PostgreSQL CLI/server is installed on this host.
+No live visual QA or migration replay success claimed; no task-created server/browser processes remain.
+Code is a local branch checkpoint, not deployment/PR-ready evidence. Production data remains unchanged.
+
 ## 2026-09-30 — Additive platform match collaboration
 
 Scope: API, Web, Prisma, docs; branch `feat/platform-team-match-collaboration`, base `46833467c`; DEV/alpha only.
@@ -184,3 +216,94 @@ Runtime: a fresh PostgreSQL cluster in /tmp on 55439, API 18149, web 3149; no ex
 - RED: two open/closed hero regressions failed before the fix. GREEN: detail/page suite 62/62.
 - Headed Chromium + real isolated API/DB: before/after at 390×844, 768×1024, 1440×900. Zero console/API errors and horizontal overflow.
 - Evidence: `docs/screenshots/task149-two-team-hero/{before,after}/`; reproduction: `scripts/qa/capture-task149-two-team-hero.mjs` with the local fixture match ID supplied through `QA_MATCH_ID`.
+
+## 2026-10-03 platform recruitment wording
+
+- [x] Platform-managed public list uses `팀 모집 중`; ordinary team recruitment keeps `상대 모집 중`.
+- [x] Platform-managed public detail uses `각 팀 부담금`; ordinary team detail keeps `상대팀 부담금`. Amounts and cost persistence are unchanged.
+- [x] Focused rendering verification: both platform/ordinary cases passed (2/2).
+- Initial image intake proposal was subsequently approved by the user; implementation is tracked below.
+- Alpha/manual route QA remains unverified: this local change has not been deployed and the available session has no alpha browser/login capability. No layout or image rendering styles changed.
+
+## 2026-10-03 two optional image slots (user-approved follow-up)
+
+Scope: ordinary/admin create, edit, public list/detail, admin detail, API, nullable Prisma migration, contract/mocks.
+The user explicitly selected the previously proposed two optional slots with single-image reuse and sport defaults, then asked to implement them. Reuse the existing form/Card/control patterns for that selected flow.
+
+- [x] Persist `listImageUrl` separately; retain `imageUrl` as the detail image and backward-compatible shared image.
+- [x] Create/edit show square 1:1 and wide 16:9 previews, optional inputs, independent removal, shared fallback and sport defaults. The create confirmation and admin detail show both previews.
+- [x] Reject upload failures/empty successful responses visibly, retain saved images, disable competing uploads/removal and submitting during uploads.
+- [x] Nullable-only migration `20261003001000_v1_team_match_list_image` adds `v1_team_matches.list_image_url`; no rewrite/backfill is required. Old clients omitting the new field on update retain it.
+- [x] Sync public/admin response, mutation and edit types, MSW fixture and API domain documentation.
+- [x] API focused suites 99/99. Web affected suites 200/200 across final focused runs. Both package typechecks pass; Prisma client generated.
+- [ ] Alpha and real DB HTTP create/edit/readback validation: not deployed; no configured local PostgreSQL or alpha authenticated browser is available in this session.
+- [x] Headed component/CSS visual evidence at 390/768/1440: before 9/9 and after 12/12. Public list/detail, ordinary create, and shared admin/ordinary image field; console/network errors and horizontal overflow 0. This is presentation verification only, not a live API or upload success substitute. QA runner closes its own browser/server; PID metadata is in each report.
+- Canonical create screenshots: `docs/screenshots/team-match-image-slots/{before,after}/{mobile,tablet,desktop}-create.png`; raw capture set/reports: `output/playwright/visual-audit/team-match-image-slots/`. Before refs use `16cf66b63`. Reproduce with `QA_MODE=slots QA_PHASE=before|after QA_BASE_REF=16cf66b63 node scripts/qa/capture-team-match-image-brightness.mjs` (set env through PowerShell on Windows).
+
+### Release binding blocker / reviewable proposed change
+
+Automatic approval review rejected updating the deployment schema pins and accepted manifest hash allowlist: it requires explicit approval for a separate deployment-control task. No deploy/release gate files were changed. Image implementation and local verification are prepared, but the API image will fail the old schema pin until this follow-up is approved and applied.
+
+Canonical LF schema SHA-256 changes from `eef298c3f325d99eb5940e5a466cf6e37404c3291167afcefaa1c572a5ee7930` to `614e05114ddd39e059fc778b078c70a4d71d160c0af4b1a31c18df76d1cdc733` for the single nullable `listImageUrl` column.
+
+| File | Proposed update after explicit approval |
+| --- | --- |
+| `deploy/Dockerfile.v1-api` | Replace builder schema check and generated-client attestation hash with the new schema hash. |
+| `scripts/release/prepare-task168-final-steady-inputs.sh` | Replace the current live-schema pin; preserve the immutable M11 migration hash. |
+| `scripts/release/create-alpha-release-manifest.sh` | Replace the current schema pin in validation and its self-test fixture. |
+| `deploy/alpha-manifest-common.sh` | Append the new schema hash to the accepted final manifests; retain every predecessor hash for rollback. |
+
+Approval scope is these four local release-binding updates and their focused verification; it does not deploy alpha/production or promote main. Frozen Task 168 cutover schemas/migrations and M11 binding remain unchanged. Linux release-binder execution and actual Docker image build remain unverified in this Windows session.
+
+## 2026-10-03 ended card surface / requested DEV deployment
+
+- User requested DEV-only deployment, then corrected closure visuals: the image and its containing card must darken together.
+- [x] Team-match closed cards apply a single `brightness(0.88) grayscale(0.35)` filter to the entire card; remove the extra thumbnail opacity/grayscale so the image is not dimmed twice. Text/badges and click/focus behavior remain in the same card.
+- [x] Completed/cancelled/expired league fixtures also use this terminal-state appearance. Upcoming league fixtures and live/completion-pending friendlies remain undimmed.
+- [x] Focused lifecycle/render tests 7/7, Web typecheck PASS. Headed actual component/CSS captures before 3/3 + after 3/3 at 390/768/1440; console/network/overflow 0; browser/server cleaned up.
+- Evidence: `docs/screenshots/team-match-closed-cards/{before,after}/{mobile,tablet,desktop}-list.png`; reproduce with `QA_MODE=closed`, `QA_PHASE=before|after`, `QA_BASE_REF=16cf66b63` and the same capture runner.
+- [ ] DEV-only release: attempted the four proposed schema-binding edits after the DEV-only request. Automatic review rejected them again, stating that deployment authorization did not constitute explicit separate approval for these production/alpha integrity controls. The rejected action made no partial deploy/release edits; no branch push, PR merge, DB migration or deployment occurred.
+- Needed next authorization: explicitly approve the four-file schema-binding proposal above for this DEV/alpha release. No main promotion or production deployment is requested or permitted.
+
+### 2026-10-03 DEV upload continuation
+
+- Feature commits `16cf66b63` and `55171ad3c` were pushed to `origin/fix/team-match-image-brightness`. No DEV merge/deployment has occurred.
+- Latest `origin/dev` advanced to `a105f40a1490ccf228568084a43610822d7a18da`. Integrated it into the isolated review branch; resolved admin detail and scenario-index conflicts while preserving the new tournament link and both image previews. Admin detail 18/18 and both package typechecks pass after integration.
+- The GitHub CLI official device-login request expired without completing authentication. CLI is installed under ignored `output/tools/github-cli/`; no Git credential was extracted, stored or reused for API calls (automatic review rejected that proposed credential reuse).
+- The deployment integrity files remain unchanged. Explicit four-file approval was requested again using a selectable approval question; the user can approve the concrete proposal above. GitHub CLI login and this approval remain prerequisites for the DEV PR/release flow.
+
+### 2026-10-03 explicit release-binding approval
+
+- User explicitly approved the four deployment configuration edits and DEV deployment; this supersedes the prior authorization blocker. No main/production promotion is authorized.
+- Updated current schema pin to `614e05114ddd39e059fc778b078c70a4d71d160c0af4b1a31c18df76d1cdc733` in the Docker builder/attestation, steady-input binder and manifest writer. Appended the pin to stored-manifest validation, retaining predecessor hashes for rollback. Frozen cutover assets and M11 digest are unchanged.
+- PASS: digest from committed LF schema; real Git Bash steady-input binder execution using committed LF schema/M11 copies; tampered-schema rejection; all three changed shell scripts syntax; predecessor allowlist and immutable M11 digest checks; git diff --check. Python/jq and Docker are unavailable locally, so full stored-manifest checks and image build remain CI-owned.
+- GitHub CLI device authentication is pending. Feature source and approved release bindings are committed and pushed to `origin/fix/team-match-image-brightness`. Committed-tree expand-contract migration gate and full PR diff whitespace check PASS (57 files). No DEV PR/merge, live DB migration or alpha deployment has occurred; normal CLI authentication is the remaining prerequisite for the PR/CI/review/release flow.
+
+### 2026-10-04 DEV release resumed
+
+- User requested DEV upload again after checking remote branches. Integrated latest DEV `8ec820cbb` and platform chat/backfill commit `9bdf16848` into the isolated image branch. Preserved DEV cost guidance and no-overlay list-photo assertions while retaining separate images, platform copy and full closed-card dimming.
+- PASS: Web 225 focused tests; API 134 focused tests; API/Web tsc --noEmit. Committed LF schema digest remains the approved pin. Real PostgreSQL integration cannot run locally (no configured DB/Docker); the chat HTTP/backfill integration suite is committed for real-DB validation.
+- Expand-contract initially rejected the three data-backfill statements. Reviewed exact SQL pairs for missing-room/participant insert-only conflict no-ops and mandatory active creator rejoin; recorded existing-policy exceptions with rollback entitlement and message/preferences/team-exit preservation rationale. Gate self-test negative controls PASS; no generic SQL allowance added.
+- Normal GitHub CLI device login remains pending. DEV PR/CI/Copilot review, merge, migration deployment and actual alpha visual QA are not complete. No main/production mutation.
+
+### 2026-10-04 DEV push and CI correction
+
+- User explicitly instructed proceeding with already-validated work. Fast-forward pushed `2cd74043a` to DEV using configured Git authentication; main unchanged. CI run 37138835620 and Deploy Alpha run 37138835598 started.
+- Web CI lint found the photo text backing padding 6px/10px violates the four-pixel spacing grid. Reproduced with the unchanged pattern checker under Git Bash; corrected only this padding to 8px/12px. Earlier unit/types validation remains valid; rerun only the failing checker. Alpha still served predecessor 8ec820cbb while deployment waited on CI.
+
+### 2026-10-04 CI failures resolved with isolated PostgreSQL evidence
+
+- Complete 191-migration replay PASS in fresh PostgreSQL WASM with committed LF SQL bytes. Windows CRLF raw SQL caused canonical content-hash guards to fail; normalizing to Git/CI LF fixes those baseline artifacts without modifying migrations.
+- Reproduced new chat integration fixture failure against actual DB check v1_team_matches_friendly_required_ck (missing placeName/startAt; legacy fixture also missing regionId). Added required real persistence fields, leaving runtime constraints intact. RED 4/4 failed -> GREEN 4/4 passed for actual Nest HTTP/Prisma suite, including creator mandatory participation, team-manager access, two-run backfill/history/preferences/team-exit preservation and revoked/cancelled access denial.
+- Used a fresh process-owned PGlite instance and localhost-only socket (55439), complete real SQL schema and Prisma/HTTP requests; single-suite node environment avoids unsupported database-template cloning in WASM. It is supplemental evidence, not a substitute for Linux CI native PostgreSQL. Owned DB/socket closed after each run. No live DB touched, no env file read.
+- Added API/Web patch changesets for CI follow-up. Real alpha before captures: 9/9 public list/photographic detail/platform detail views at 390/768/1440; console/network errors 0 and overflow 0. Evidence under output/playwright/visual-audit/team-match-dev-deploy/before.
+
+### 2026-10-04 remaining native CI diagnostic
+
+- Latest DEV fe9578400 CI: Gates PASS, Web unit PASS/build in progress, API integration stage still fails. Local fresh PostgreSQL WASM chat 4/4 PASS does not establish native full-suite success. Alpha deployment remains blocked.
+- Public job-log download requires authentication (403); normal CLI login is absent. Existing integration command now writes JSON results and on failure annotates only suite/assertion names for diagnosis. Nonzero test still exits 1; no raw DB rows, secrets or request data published.
+
+### 2026-10-04 exact native failure identified
+
+- Public GitHub job HTML exposes the failure annotations despite REST anonymous rate limiting. Exact remaining failure: games/game-schema.integration-spec.ts / refuses source snapshot mutation before migration verification.
+- Root cause: game-schema.fixture.ts binds the entire schema source and still pins predecessor eef298..., whereas the user-approved nullable listImageUrl schema is 614e051.... Updated only current-schema fixture pin and explanation; historical game migration remains 6bd7fa.... Guard and mutation rejection stay intact.

@@ -49,6 +49,7 @@ function teamMatchRow(overrides: Record<string, unknown> = {}) {
     title: '풋살 상대팀 모집',
     description: null,
     imageUrl: null,
+    listImageUrl: null,
     placeName: '잠실 풋살장',
     placeAddress: null,
     startAt: FUTURE,
@@ -393,6 +394,8 @@ describe('TeamMatchesService', () => {
       sportId: 'sport-1',
       regionId: 'region-1',
       title: '경기조건 trim 검증 팀매치',
+      imageUrl: '/uploads/detail.webp',
+      listImageUrl: '  /uploads/list.webp  ',
       startsAt: FUTURE.toISOString(),
       manualPlaceName: '잠실',
       matchFormat: '  6:6  ',
@@ -403,6 +406,8 @@ describe('TeamMatchesService', () => {
     expect(prisma.v1TeamMatch.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
         matchFormat: '6:6',
+        imageUrl: '/uploads/detail.webp',
+        listImageUrl: '/uploads/list.webp',
         matchStyle: ['친선', '매너 중시'],
         uniformColor: null,
       }),

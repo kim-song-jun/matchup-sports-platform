@@ -46,6 +46,7 @@ export function toTeamMatch(match: V1TeamMatch, fallback: TeamMatchModel): TeamM
     // 다른 매치의 옥상 풋살 사진이 그대로 붙었다(matches.card-model.ts의 image와 같은 결함).
     // 없으면 null 로 두고 화면이 종목 그래픽(sportIllustration)을 그린다.
     imageUrl: match.imageUrl ?? null,
+    listImageUrl: match.listImageUrl ?? null,
     // 목업(team-matches.view-model.ts)을 사실 값의 폴백으로 쓰지 않는다 — 폴백이 걸리면
     // 실제 매치에 **존재하지 않는 팀 이름**('FC 발빠른놈들')과 남의 경기장·지역이 붙었다.
     sport: match.sport?.name ?? match.sportName ?? '',

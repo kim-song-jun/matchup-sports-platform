@@ -3059,6 +3059,15 @@ label.tm-btn:focus-within {
   filter: grayscale(0.4);
 }
 
+/* Team-match closure dims the complete card surface, image and controls together. */
+.tm-match-row.tm-card-closed {
+  filter: brightness(0.88) grayscale(0.35);
+}
+.tm-match-row.tm-card-closed .tm-match-row-thumb {
+  opacity: 1;
+  filter: none;
+}
+
 /* 반면 **미디어 위에 글자가 얹힌 자리**에는 opacity 를 걸면 안 된다. opacity 는 자식까지
    한 덩어리로 지면과 합성하므로 그 위의 상태 배지·팀 이름까지 함께 옅어진다 — alpha
    화면에서 잰 값으로 '신청 마감' 배지가 6.45:1 → **1.99:1**, 히어로의 팀 이름이
@@ -4190,6 +4199,34 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
   grid-template-columns: minmax(0, 1fr) 44px minmax(0, 1fr);
   align-items: center;
   gap: 12px;
+}
+
+.tm-team-match-images-grid { display: grid; gap: 12px; margin-top: 12px; }
+.tm-team-match-images-grid > * { min-width: 0; }
+.tm-team-match-image-stage { display: flex; align-items: center; justify-content: center; height: 200px; margin: 12px 0; }
+.tm-team-match-image-preview { display: flex; align-items: center; justify-content: center; width: 100%; overflow: hidden; border-radius: var(--radius-control); background-color: var(--surface-soft); background-size: cover; background-position: center; }
+.tm-team-match-image-square { max-width: 200px; aspect-ratio: 1; }
+.tm-team-match-image-wide { aspect-ratio: 16 / 9; max-height: 200px; }
+.tm-team-match-image-preview .tm-match-sport-illustration { width: 100%; height: 100%; object-fit: contain; }
+@media (min-width: 768px) { .tm-team-match-images-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+/* Keep uploaded photos at their original brightness. Contrast belongs behind text and controls. */
+.tm-team-vs-hero-photo .tm-team-vs-summary {
+  margin-top: 16px;
+  padding: 12px;
+  border-radius: var(--radius-control);
+  background: rgba(17, 24, 39, 0.8);
+}
+
+.tm-team-vs-hero-photo .tm-hero-button {
+  background: rgba(17, 24, 39, 0.8);
+}
+
+.tm-team-vs-hero-photo > .tm-complete-check {
+  align-self: flex-start;
+  padding: 8px 12px;
+  border-radius: var(--radius-control);
+  background: rgba(17, 24, 39, 0.8);
 }
 
 /*

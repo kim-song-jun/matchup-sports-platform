@@ -1222,6 +1222,7 @@ export type V1MySchedulePage = {
 };
 
 export type V1TeamMatch = V1Match & {
+  listImageUrl?: string | null;
   /** Server-clock derived friendly-match progress; raw matched status remains the permission contract. */
   isLive?: boolean;
   teamMatchId?: string;
@@ -1297,6 +1298,8 @@ export type V1TeamMatch = V1Match & {
     manageableHostTeam?: boolean;
     /** 승인된 신청팀(상대팀)의 owner/manager 인가 — 결과 승인 진입 게이트. */
     manageableOpponentTeam?: boolean;
+    /** Server chat entitlement, including the creator of platform recruitment. */
+    canChat?: boolean;
     /**
      * 역할을 가리지 않는 "참가팀(host·승인 신청팀) active 멤버" 여부 — 후기 진입점 판정용.
      * `state` 로 대신할 수 없다: 'host_team' 은 host 팀 owner/manager, 'approved' 는 신청서를
@@ -1342,6 +1345,7 @@ export type V1TeamMatchMutationPayload = {
   title: string;
   description?: string | null;
   imageUrl?: string | null;
+  listImageUrl?: string | null;
   startsAt: string;
   endsAt?: string | null;
   deadlineAt?: string | null;
@@ -1382,6 +1386,7 @@ export type V1TeamMatchEdit = {
     title: string;
     description?: string | null;
     imageUrl?: string | null;
+    listImageUrl?: string | null;
     startsAt: string;
     endsAt?: string | null;
     deadlineAt?: string | null;
@@ -3032,6 +3037,7 @@ export type V1AdminTeamMatchDetail = Omit<V1AdminTeamMatchRow, 'pendingApplicati
   description: string | null;
   imageUrl: string | null;
   levelLabel: string | null;
+  listImageUrl?: string | null;
   sportCode: string;
   regionName: string | null;
   placeName: string;
@@ -3061,6 +3067,7 @@ export type V1AdminTeamMatchRecruitmentPayload = {
   title: string;
   description?: string | null;
   imageUrl?: string | null;
+  listImageUrl?: string | null;
   startsAt: string;
   endsAt?: string | null;
   deadlineAt?: string | null;

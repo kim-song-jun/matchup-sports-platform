@@ -275,10 +275,11 @@ export function MatchDetailPageView({ model, lifecyclePanel }: { model: MatchDet
   const cta = model.applyLabel ?? (mode === 'mine' ? '매치 관리' : mode === 'approved' ? '승인 완료' : mode === 'pending' ? '신청 취소' : mode === 'closed' || match.status === 'full' ? '신청 마감' : '참가 신청');
   const ctaTone = mode === 'pending' ? 'tm-btn-warning' : mode === 'approved' ? 'tm-btn-success' : locked ? 'tm-btn-neutral' : 'tm-btn-primary';
   // [P2] 마감 시각이 지나 닫힌 매치(lifecycleStatus==='closed')만 정확히 구분한다 — 정원이
-  // 찬 경우(full)·취소·완료·만료는 이 시안에서 검토하지 않은 별개 사유라 기존 문구를 유지한다.
+  // 찬 경우(full)·취소·만료는 별개 사유라 기존 문구를 유지한다. 완료는 종료 안내로 구분한다.
   // 이 하나의 신호로 히어로 배지·상태 카드·하단 바 캡션 3곳의 "같은 상태 반복"을 한 자리
   // (본문 상태 카드)로 모은다(P2 A안).
   const isDeadlinePassedClosed = mode === 'closed' && match.lifecycleStatus === 'closed';
+  const closedNoticeTitle = match.lifecycleStatus === 'completed' ? '종료된 매치예요' : '모집 완료';
   const showChat = Boolean(model.onChat);
   const timeRange = match.endTime ? `${match.time}-${match.endTime}` : match.time;
   // 경기가 끝난 뒤 후기로 가는 유일한 상세 화면 진입점. 완료 알림도 후기 화면으로 보내지만,
@@ -435,11 +436,11 @@ export function MatchDetailPageView({ model, lifecyclePanel }: { model: MatchDet
             ) : null}
             {mode === 'approved' && !isPostStartLifecycle && match.lifecycleStatus !== 'on_hold' ? approvedStateCard : null}
             {/* [P2] 마감 사유를 아는 만큼만 정확히 말한다 — 시각이 지났으면 그 이유를,
-                아니면(정원 마감·취소·완료·만료) 기존 중립 문구를 유지한다. */}
+                완료면 종료를, 나머지(정원 마감·취소·만료)는 기존 중립 문구를 유지한다. */}
             {mode === 'closed' && !isPostStartLifecycle && match.lifecycleStatus !== 'on_hold' ? (
               isDeadlinePassedClosed
                 ? <StateCard tone="grey" title="신청이 마감됐어요" body="마감 시각이 지나 더 이상 신청할 수 없어요. 다른 매치를 둘러봐 주세요." />
-                : <StateCard tone="grey" title="모집 완료" body="이 매치는 신청이 마감됐어요. 다른 매치를 둘러봐 주세요." />
+                : <StateCard tone="grey" title={closedNoticeTitle} body="이 매치는 신청이 마감됐어요. 다른 매치를 둘러봐 주세요." />
             ) : null}
             {match.rules.length ? <Card pad={16} style={{ marginTop: 12 }}><div className="tm-text-body-lg">규칙</div><div style={{ display: 'grid', gap: 8, marginTop: 12 }}>{match.rules.map((rule) => <div key={rule} className="tm-text-body" style={{ color: 'var(--text-muted)', whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{rule}</div>)}</div></Card> : null}
             <Card pad={16} style={{ marginTop: 12 }}>
@@ -527,7 +528,7 @@ export function MatchDetailPageView({ model, lifecyclePanel }: { model: MatchDet
           {mode === 'closed' && !isPostStartLifecycle && match.lifecycleStatus !== 'on_hold' ? (
             isDeadlinePassedClosed
               ? <StateCard tone="grey" title="신청이 마감됐어요" body="마감 시각이 지나 더 이상 신청할 수 없어요. 다른 매치를 둘러봐 주세요." />
-              : <StateCard tone="grey" title="모집 완료" body="이 매치는 신청이 마감됐어요. 다른 매치를 둘러봐 주세요." />
+              : <StateCard tone="grey" title={closedNoticeTitle} body="이 매치는 신청이 마감됐어요. 다른 매치를 둘러봐 주세요." />
           ) : null}
           {match.rules.length ? <Card pad={16} style={{ marginTop: 12 }}><div className="tm-text-body-lg">규칙</div><div style={{ display: 'grid', gap: 8, marginTop: 12 }}>{match.rules.map((rule) => <div key={rule} className="tm-text-body" style={{ color: 'var(--text-muted)', whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{rule}</div>)}</div></Card> : null}
           <Card pad={16} style={{ marginTop: 12 }}>

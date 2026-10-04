@@ -101,7 +101,8 @@ describe('AdminTeamMatchNewPage', () => {
     useCreate.mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as never);
     render(<AdminTeamMatchNewPage />);
 
-    expect(screen.getByLabelText('대표 이미지')).toBeInTheDocument();
+    expect(screen.getByLabelText('목록 이미지')).toBeInTheDocument();
+    expect(screen.getByLabelText('상세 이미지')).toBeInTheDocument();
     expect(screen.getByLabelText('실력등급')).toBeInTheDocument();
     expect(screen.getByLabelText('경기방식')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /^친선$/ })).toBeInTheDocument();

@@ -1,0 +1,155 @@
+{
+  "files": [
+    {
+      "file": "PUBLISHER-VERIFICATION.md",
+      "bytes": 8293,
+      "sha256": "84f978d8733ff1c1e1fc36c24edb938c22074343373ec51a994461a4546180f8"
+    },
+    {
+      "file": "README.md",
+      "bytes": 3426,
+      "sha256": "43963bbc7a2174227980f09cd2c3c41b6ff7b3bf209bf66aaa5341ec05186004"
+    },
+    {
+      "file": "SHA256SUMS",
+      "bytes": 2400,
+      "sha256": "47ba12df64c75042cf9667d7c41794ef85c7109797de6ce5a219ff9a92f459e1"
+    },
+    {
+      "file": "actions.json",
+      "bytes": 7554,
+      "sha256": "79e82b63469df4e9c3263366ae071e60bab812a8f4879b3ce51207b15e6328d7"
+    },
+    {
+      "file": "before-and-source-context.json",
+      "bytes": 1488,
+      "sha256": "9202b955860f897d9db7dda663d58bef5f0d5940406ee0e5d641a0fb76e90396"
+    },
+    {
+      "file": "crop-provenance.json",
+      "bytes": 10430,
+      "sha256": "e2bd503b52568758b3a2301f07ec7a0accfb813c17038236a8c23f3955cc512a"
+    },
+    {
+      "file": "deployment-context.json",
+      "bytes": 948,
+      "sha256": "a63fa5454d3694079e3817b7fc6620e1e2fc72036e202cac6c7032ef4f94595c"
+    },
+    {
+      "file": "desktop-fixture-source.png",
+      "bytes": 45931,
+      "sha256": "5115232543aabd9b12b16921bf52ce4247859d880da853038067741f82d1ff01"
+    },
+    {
+      "file": "desktop-profile-back-control.png",
+      "bytes": 4414,
+      "sha256": "499e6a5f51c5858e8750ffcca79db412b03ef326bfe886b0c268d9aad1e45128"
+    },
+    {
+      "file": "desktop-return-fixture.png",
+      "bytes": 45931,
+      "sha256": "5115232543aabd9b12b16921bf52ce4247859d880da853038067741f82d1ff01"
+    },
+    {
+      "file": "desktop-schedule-tab-after.png",
+      "bytes": 22167,
+      "sha256": "65261345d6faf97a8bd6f3cf8f8944199a3d7c414244ea698886aaed6b96d996"
+    },
+    {
+      "file": "desktop-schedule-tab-before.png",
+      "bytes": 23623,
+      "sha256": "d189b194978f70e62caf378f48363b1551fa28a2a560e4e4e915aa7e39d8ef56"
+    },
+    {
+      "file": "entry-settled.json",
+      "bytes": 379,
+      "sha256": "76a449fe87f729df8dcdcb347c7d48e529364bd61006d369839dd5af5c0c4853"
+    },
+    {
+      "file": "entry.json",
+      "bytes": 367,
+      "sha256": "e22aeaac143c857727b2880decb7c2ea1880a773d004c90020c5efc6e78e7958"
+    },
+    {
+      "file": "exit.json",
+      "bytes": 247,
+      "sha256": "9b440a65296f987e217e51de83e3cbac59c1fb27fb8b9f1c9a71773518ca8eb6"
+    },
+    {
+      "file": "manifest.json",
+      "bytes": 4114,
+      "sha256": "8c59c2aca992cc860564eb713e605db8bd967a888ff65b0cd4df6a53b370ed4a"
+    },
+    {
+      "file": "mobile-fixture-entry.png",
+      "bytes": 44731,
+      "sha256": "79182ecdfae5abcc926e3147c75bdacfb1fa44c87c01792103738a622927fa85"
+    },
+    {
+      "file": "mobile-profile-back-control.png",
+      "bytes": 5935,
+      "sha256": "c9c75025a542fbfa348afd179d5b0ed0d8438b61d259ea55e08521fe7ab4c712"
+    },
+    {
+      "file": "mobile-return-fixture.png",
+      "bytes": 24299,
+      "sha256": "22fa4b2ca76872dbb30c73d37308829fee0560b70072ed04f49439e378f821b5"
+    },
+    {
+      "file": "mobile-schedule-entry.json",
+      "bytes": 672,
+      "sha256": "3aa55d23c0c34330a0d4e2cf91cd908ca603d86f5874cd53d50459bf0d948fc9"
+    },
+    {
+      "file": "proof.json",
+      "bytes": 66049,
+      "sha256": "0473e04488e79a38b5401b2689358ad2d77a1f59492bb6688211e97ce198098f"
+    },
+    {
+      "file": "provenance.json",
+      "bytes": 1236,
+      "sha256": "bbb5851d3831c7af05a22c73b0921d0f19d1584d1285683b24592cc8db28d73d"
+    },
+    {
+      "file": "publisher-verification.json",
+      "bytes": 12436,
+      "sha256": "11f30f591091c1d0b4865ba3553e126bb16fd284d736a732fd35ac9d4fc8599d"
+    },
+    {
+      "file": "return-comparison.json",
+      "bytes": 5830,
+      "sha256": "7fdcd83ff4f9b4c21b8154c6053646315cee3f53a76a78f40ccfde1fc4fb23d2"
+    },
+    {
+      "file": "schedule-tab-residual.json",
+      "bytes": 2059,
+      "sha256": "919daa8c0366c68a249ca45a19c7821f7cc3bb7caf0b3767841743e71a43c99d"
+    },
+    {
+      "file": "summary.json",
+      "bytes": 2653,
+      "sha256": "5471229df05af5aa82ba456a13a70f38acc4fb861071ddd12715272f651c6daf"
+    },
+    {
+      "file": "tablet-fixture-source.png",
+      "bytes": 22756,
+      "sha256": "4e582460cafa412373b9b518cf4691ddbead3224699d5f6c17dbc9b8c2320a0c"
+    },
+    {
+      "file": "tablet-profile-back-control.png",
+      "bytes": 6116,
+      "sha256": "b57475874747a26b896dad0359c1c4b3fd60dc733f9a8700af338448135b440a"
+    },
+    {
+      "file": "tablet-return-fixture.png",
+      "bytes": 22966,
+      "sha256": "e65d516f202c69ac7548fafc8f81dad9af5bad5966add07e85cc8f8dccc34ffc"
+    },
+    {
+      "file": "tablet-schedule-return-tab.png",
+      "bytes": 20631,
+      "sha256": "9088bff3adfe95b8d420a4b6c3e9366895f1527551bb3673c904696d077bf9ec"
+    }
+  ],
+  "note": "All31 delivered files except this manifest;28 input files unchanged."
+}

@@ -1,0 +1,338 @@
+[
+  {
+    "name": "mobile-fixture-top",
+    "index": 0,
+    "startedUTC": "2026-10-04T15:05:35.719Z",
+    "completedUTC": "2026-10-04T15:05:35.740Z",
+    "sha256": "b8c0bf97ebde14563c09242a5cf0fe0e60f0df478af5e381fa6887b1fc1160f8",
+    "sourceBasename": "mobile-fixture-top.raw",
+    "sourceEncoding": "JPEG",
+    "sourceSize": [
+      402,
+      606
+    ],
+    "bounds": [
+      12,
+      67,
+      390,
+      300
+    ],
+    "output": "mobile-fixture-entry.png",
+    "outputSize": [
+      378,
+      233
+    ],
+    "outputSHA256": "79182ecdfae5abcc926e3147c75bdacfb1fa44c87c01792103738a622927fa85",
+    "DOMUTC": "2026-10-04T15:05:35.714Z",
+    "sourceCropPixelEquality": true,
+    "privacy": "Crop excludes player/member names, profile identity card, roster list and biography. Generic product controls and synthetic team/competition score context only."
+  },
+  {
+    "name": "mobile-profile-header",
+    "index": 2,
+    "startedUTC": "2026-10-04T15:05:57.298Z",
+    "completedUTC": "2026-10-04T15:05:57.349Z",
+    "sha256": "31f51bfc5909e2650cd1576bc86746a19247f8b586996aebb8458e7dfb58996b",
+    "sourceBasename": "mobile-profile-header.raw",
+    "sourceEncoding": "JPEG",
+    "sourceSize": [
+      402,
+      606
+    ],
+    "bounds": [
+      0,
+      4,
+      401,
+      57
+    ],
+    "output": "mobile-profile-back-control.png",
+    "outputSize": [
+      401,
+      53
+    ],
+    "outputSHA256": "c9c75025a542fbfa348afd179d5b0ed0d8438b61d259ea55e08521fe7ab4c712",
+    "DOMUTC": "2026-10-04T15:05:57.294Z",
+    "sourceCropPixelEquality": true,
+    "privacy": "Crop excludes player/member names, profile identity card, roster list and biography. Generic product controls and synthetic team/competition score context only."
+  },
+  {
+    "name": "mobile-page-back",
+    "index": 3,
+    "startedUTC": "2026-10-04T15:05:57.693Z",
+    "completedUTC": "2026-10-04T15:05:57.722Z",
+    "sha256": "8e8e5e3ee9fe4c9d3f4675e390e8b7cfe1dce11688f8e1e42439c50bdcfb6715",
+    "sourceBasename": "mobile-page-back.raw",
+    "sourceEncoding": "JPEG",
+    "sourceSize": [
+      402,
+      606
+    ],
+    "bounds": [
+      12,
+      72,
+      390,
+      198
+    ],
+    "output": "mobile-return-fixture.png",
+    "outputSize": [
+      378,
+      126
+    ],
+    "outputSHA256": "22fa4b2ca76872dbb30c73d37308829fee0560b70072ed04f49439e378f821b5",
+    "DOMUTC": "2026-10-04T15:05:57.688Z",
+    "sourceCropPixelEquality": true,
+    "privacy": "Crop excludes player/member names, profile identity card, roster list and biography. Generic product controls and synthetic team/competition score context only."
+  },
+  {
+    "name": "tablet-fixture-before",
+    "index": 7,
+    "startedUTC": "2026-10-04T15:06:53.747Z",
+    "completedUTC": "2026-10-04T15:06:53.783Z",
+    "sha256": "fb4eaf75e163ed8739df3e235dd5ab2aa992f10d49adace6757d9522963778de",
+    "sourceBasename": "tablet-fixture-before.raw",
+    "sourceEncoding": "JPEG",
+    "sourceSize": [
+      788,
+      505
+    ],
+    "bounds": [
+      104,
+      60,
+      684,
+      183
+    ],
+    "output": "tablet-fixture-source.png",
+    "outputSize": [
+      580,
+      123
+    ],
+    "outputSHA256": "4e582460cafa412373b9b518cf4691ddbead3224699d5f6c17dbc9b8c2320a0c",
+    "DOMUTC": "2026-10-04T15:06:53.744Z",
+    "sourceCropPixelEquality": true,
+    "privacy": "Crop excludes player/member names, profile identity card, roster list and biography. Generic product controls and synthetic team/competition score context only."
+  },
+  {
+    "name": "tablet-profile-header",
+    "index": 8,
+    "startedUTC": "2026-10-04T15:07:20.327Z",
+    "completedUTC": "2026-10-04T15:07:20.393Z",
+    "sha256": "7d5fdf88ee23150c54df8566f11d7929a0e29e91d92a4bf2cf602f1f034235af",
+    "sourceBasename": "tablet-profile-header.raw",
+    "sourceEncoding": "JPEG",
+    "sourceSize": [
+      788,
+      505
+    ],
+    "bounds": [
+      94,
+      3,
+      694,
+      56
+    ],
+    "output": "tablet-profile-back-control.png",
+    "outputSize": [
+      600,
+      53
+    ],
+    "outputSHA256": "b57475874747a26b896dad0359c1c4b3fd60dc733f9a8700af338448135b440a",
+    "DOMUTC": "2026-10-04T15:07:20.323Z",
+    "sourceCropPixelEquality": true,
+    "privacy": "Crop excludes player/member names, profile identity card, roster list and biography. Generic product controls and synthetic team/competition score context only."
+  },
+  {
+    "name": "tablet-page-back",
+    "index": 9,
+    "startedUTC": "2026-10-04T15:07:20.712Z",
+    "completedUTC": "2026-10-04T15:07:20.746Z",
+    "sha256": "a8e7ced59eee7ec69b9fe6d53655d0f44beebe619d026fd0e87e6531c088df32",
+    "sourceBasename": "tablet-page-back.raw",
+    "sourceEncoding": "JPEG",
+    "sourceSize": [
+      788,
+      505
+    ],
+    "bounds": [
+      104,
+      60,
+      684,
+      183
+    ],
+    "output": "tablet-return-fixture.png",
+    "outputSize": [
+      580,
+      123
+    ],
+    "outputSHA256": "e65d516f202c69ac7548fafc8f81dad9af5bad5966add07e85cc8f8dccc34ffc",
+    "DOMUTC": "2026-10-04T15:07:20.706Z",
+    "sourceCropPixelEquality": true,
+    "privacy": "Crop excludes player/member names, profile identity card, roster list and biography. Generic product controls and synthetic team/competition score context only."
+  },
+  {
+    "name": "desktop-fixture-before",
+    "index": 13,
+    "startedUTC": "2026-10-04T15:08:04.268Z",
+    "completedUTC": "2026-10-04T15:08:04.310Z",
+    "sha256": "59922d04b25f3a65fe0243d04a77e5dbe6421e758b88ad5ef04f93ef180252c1",
+    "sourceBasename": "desktop-fixture-before.raw",
+    "sourceEncoding": "JPEG",
+    "sourceSize": [
+      1182,
+      757
+    ],
+    "bounds": [
+      264,
+      72,
+      918,
+      313
+    ],
+    "output": "desktop-fixture-source.png",
+    "outputSize": [
+      654,
+      241
+    ],
+    "outputSHA256": "5115232543aabd9b12b16921bf52ce4247859d880da853038067741f82d1ff01",
+    "DOMUTC": "2026-10-04T15:08:04.263Z",
+    "sourceCropPixelEquality": true,
+    "privacy": "Crop excludes player/member names, profile identity card, roster list and biography. Generic product controls and synthetic team/competition score context only."
+  },
+  {
+    "name": "desktop-profile-header",
+    "index": 14,
+    "startedUTC": "2026-10-04T15:08:23.536Z",
+    "completedUTC": "2026-10-04T15:08:23.596Z",
+    "sha256": "45c0a0adfccbc6794398c8d065479a7097f04baa7a04712dda3ef44a0a1d3535",
+    "sourceBasename": "desktop-profile-header.raw",
+    "sourceEncoding": "JPEG",
+    "sourceSize": [
+      1182,
+      757
+    ],
+    "bounds": [
+      49,
+      90,
+      210,
+      139
+    ],
+    "output": "desktop-profile-back-control.png",
+    "outputSize": [
+      161,
+      49
+    ],
+    "outputSHA256": "499e6a5f51c5858e8750ffcca79db412b03ef326bfe886b0c268d9aad1e45128",
+    "DOMUTC": "2026-10-04T15:08:23.532Z",
+    "sourceCropPixelEquality": true,
+    "privacy": "Crop excludes player/member names, profile identity card, roster list and biography. Generic product controls and synthetic team/competition score context only."
+  },
+  {
+    "name": "desktop-page-back",
+    "index": 15,
+    "startedUTC": "2026-10-04T15:08:23.853Z",
+    "completedUTC": "2026-10-04T15:08:23.877Z",
+    "sha256": "1b4049483d159b7216cf54caf33ffcfe1eb7c1d326d0148a88e30f587732fd96",
+    "sourceBasename": "desktop-page-back.raw",
+    "sourceEncoding": "JPEG",
+    "sourceSize": [
+      1182,
+      757
+    ],
+    "bounds": [
+      264,
+      72,
+      918,
+      313
+    ],
+    "output": "desktop-return-fixture.png",
+    "outputSize": [
+      654,
+      241
+    ],
+    "outputSHA256": "5115232543aabd9b12b16921bf52ce4247859d880da853038067741f82d1ff01",
+    "DOMUTC": "2026-10-04T15:08:23.850Z",
+    "sourceCropPixelEquality": true,
+    "privacy": "Crop excludes player/member names, profile identity card, roster list and biography. Generic product controls and synthetic team/competition score context only."
+  },
+  {
+    "name": "tablet-bracket-return",
+    "index": 11,
+    "startedUTC": "2026-10-04T15:07:31.396Z",
+    "completedUTC": "2026-10-04T15:07:31.425Z",
+    "sha256": "d62146d7563eaf63082adc9ab9db9e6d558b1490a1b0cec29452fc38af64a88f",
+    "sourceBasename": "tablet-bracket-return.raw",
+    "sourceEncoding": "JPEG",
+    "sourceSize": [
+      788,
+      505
+    ],
+    "bounds": [
+      108,
+      116,
+      680,
+      272
+    ],
+    "output": "tablet-schedule-return-tab.png",
+    "outputSize": [
+      572,
+      156
+    ],
+    "outputSHA256": "9088bff3adfe95b8d420a4b6c3e9366895f1527551bb3673c904696d077bf9ec",
+    "DOMUTC": "2026-10-04T15:07:31.391Z",
+    "sourceCropPixelEquality": true,
+    "privacy": "Crop excludes player/member names, profile identity card, roster list and biography. Generic product controls and synthetic team/competition score context only."
+  },
+  {
+    "name": "desktop-bracket-before",
+    "index": 12,
+    "startedUTC": "2026-10-04T15:08:03.721Z",
+    "completedUTC": "2026-10-04T15:08:03.753Z",
+    "sha256": "c72a9957140e72d896b8916cb1a9362f0001f5ed577bd21e71dac229918c0622",
+    "sourceBasename": "desktop-bracket-before.raw",
+    "sourceEncoding": "JPEG",
+    "sourceSize": [
+      1182,
+      757
+    ],
+    "bounds": [
+      74,
+      251,
+      1112,
+      409
+    ],
+    "output": "desktop-schedule-tab-before.png",
+    "outputSize": [
+      1038,
+      158
+    ],
+    "outputSHA256": "d189b194978f70e62caf378f48363b1551fa28a2a560e4e4e915aa7e39d8ef56",
+    "DOMUTC": "2026-10-04T15:08:03.715Z",
+    "sourceCropPixelEquality": true,
+    "privacy": "Crop excludes player/member names, profile identity card, roster list and biography. Generic product controls and synthetic team/competition score context only."
+  },
+  {
+    "name": "desktop-bracket-after",
+    "index": 17,
+    "startedUTC": "2026-10-04T15:08:37.442Z",
+    "completedUTC": "2026-10-04T15:08:37.479Z",
+    "sha256": "b8c40c7c35369f2be974a5b60be834b28ce26a4e5b8172d98f98f41eb9d6e969",
+    "sourceBasename": "desktop-bracket-after.raw",
+    "sourceEncoding": "JPEG",
+    "sourceSize": [
+      1182,
+      757
+    ],
+    "bounds": [
+      74,
+      141,
+      1112,
+      299
+    ],
+    "output": "desktop-schedule-tab-after.png",
+    "outputSize": [
+      1038,
+      158
+    ],
+    "outputSHA256": "65261345d6faf97a8bd6f3cf8f8944199a3d7c414244ea698886aaed6b96d996",
+    "DOMUTC": "2026-10-04T15:08:37.437Z",
+    "sourceCropPixelEquality": true,
+    "privacy": "Crop excludes player/member names, profile identity card, roster list and biography. Generic product controls and synthetic team/competition score context only."
+  }
+]

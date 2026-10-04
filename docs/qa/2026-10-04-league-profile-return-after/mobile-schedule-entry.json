@@ -1,0 +1,32 @@
+{
+  "fixtureHref": "/league-matches/{league-63e7cd6e36c0}/fixtures/{fixture-8f057ede6703}?from=%2Ftournaments%2F{league-63e7cd6e36c0}%2Fbracket",
+  "scroll": {
+    "main": 0,
+    "windowY": 0
+  },
+  "tabs": [
+    {
+      "selected": "true",
+      "text": "경기 일정"
+    },
+    {
+      "selected": "false",
+      "text": "리그 순위"
+    },
+    {
+      "selected": "true",
+      "text": "전체"
+    },
+    {
+      "selected": "false",
+      "text": "정규 라운드"
+    }
+  ],
+  "url": "https://alpha.teameet.co.kr/tournaments/{league-63e7cd6e36c0}/bracket",
+  "utc": "2026-10-04T15:04:45.087Z",
+  "viewport": {
+    "dpr": 1.25,
+    "h": 606,
+    "w": 402
+  }
+}

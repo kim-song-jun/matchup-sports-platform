@@ -1,0 +1,433 @@
+{
+  "verifiedUTC": "2026-10-04T15:18:21.537108+00:00",
+  "inputFiles": 28,
+  "inputByteIdentical": true,
+  "inputChecksumsSHA256": "47ba12df64c75042cf9667d7c41794ef85c7109797de6ce5a219ff9a92f459e1",
+  "counts": {
+    "mainProofDOM": 19,
+    "collectorActionRecords": 26,
+    "PNG": 12,
+    "captureCalls": 12,
+    "rectanglesRecomputed": 188,
+    "additionalEntryExitDOM": 4
+  },
+  "profileReturn": [
+    {
+      "width": "mobile",
+      "viewport": {
+        "dpr": 1.25,
+        "h": 606,
+        "w": 402
+      },
+      "indices": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "sourceUTC": "2026-10-04T15:05:35.957Z",
+      "profileUTC": "2026-10-04T15:05:57.294Z",
+      "returnUTC": "2026-10-04T15:05:57.688Z",
+      "settledReturnUTC": "2026-10-04T15:06:31.981Z",
+      "exactURLAndNestedFrom": true,
+      "sourceAndReturnScroll": {
+        "main": 108.8000030517578,
+        "windowX": 0,
+        "windowY": 0
+      },
+      "sourceAndReturnPlayerRectEqual": true,
+      "visibleProfileBackRect": {
+        "bottom": 52,
+        "h": 44,
+        "right": 48,
+        "w": 44,
+        "x": 4,
+        "y": 8
+      }
+    },
+    {
+      "width": "tablet",
+      "viewport": {
+        "dpr": 1.5,
+        "h": 505,
+        "w": 788
+      },
+      "indices": [
+        7,
+        8,
+        9,
+        10
+      ],
+      "sourceUTC": "2026-10-04T15:06:53.744Z",
+      "profileUTC": "2026-10-04T15:07:20.323Z",
+      "returnUTC": "2026-10-04T15:07:20.706Z",
+      "settledReturnUTC": "2026-10-04T15:07:31.174Z",
+      "exactURLAndNestedFrom": true,
+      "sourceAndReturnScroll": {
+        "main": 133.3333282470703,
+        "windowX": 0,
+        "windowY": 0
+      },
+      "sourceAndReturnPlayerRectEqual": true,
+      "visibleProfileBackRect": {
+        "bottom": 51.33333349227905,
+        "h": 44,
+        "right": 142,
+        "w": 44,
+        "x": 98,
+        "y": 7.333333492279053
+      }
+    },
+    {
+      "width": "desktop",
+      "viewport": {
+        "dpr": 1,
+        "h": 757,
+        "w": 1182
+      },
+      "indices": [
+        13,
+        14,
+        15,
+        16
+      ],
+      "sourceUTC": "2026-10-04T15:08:04.263Z",
+      "profileUTC": "2026-10-04T15:08:23.532Z",
+      "returnUTC": "2026-10-04T15:08:23.850Z",
+      "settledReturnUTC": "2026-10-04T15:08:37.200Z",
+      "exactURLAndNestedFrom": true,
+      "sourceAndReturnScroll": {
+        "main": 0,
+        "windowX": 0,
+        "windowY": 96
+      },
+      "sourceAndReturnPlayerRectEqual": true,
+      "visibleProfileBackRect": {
+        "bottom": 132,
+        "h": 40,
+        "right": 95,
+        "w": 40,
+        "x": 55,
+        "y": 92
+      }
+    }
+  ],
+  "historicalIdentity": {
+    "source": "Public issue1418 comment5944873604 UUIDs compared through deterministic aliases; no names or original identifiers republished.",
+    "checks": [
+      {
+        "width": "mobile",
+        "sourceHashRecomputedFromHistoricalPublicIDs": true,
+        "relativePlayerHash": true,
+        "absoluteProfileHash": true
+      },
+      {
+        "width": "tablet",
+        "sourceHashRecomputedFromHistoricalPublicIDs": true,
+        "relativePlayerHash": true,
+        "absoluteProfileHash": true
+      },
+      {
+        "width": "desktop",
+        "sourceHashRecomputedFromHistoricalPublicIDs": true,
+        "relativePlayerHash": true,
+        "absoluteProfileHash": true
+      }
+    ]
+  },
+  "residual": {
+    "scope": "Separate schedule child-tab reset after an additional fixture page Back; not failure of profile-to-fixture return",
+    "observations": [
+      {
+        "width": "tablet",
+        "beforeIndex": 6,
+        "afterIndex": 11,
+        "beforeUTC": "2026-10-04T15:06:53.250Z",
+        "afterUTC": "2026-10-04T15:07:31.391Z",
+        "beforeSelected": [
+          "경기 일정",
+          "정규 라운드"
+        ],
+        "afterSelected": [
+          "경기 일정",
+          "전체"
+        ],
+        "sameURL": true,
+        "beforeScroll": {
+          "main": 133.3333282470703,
+          "windowX": 0,
+          "windowY": 0
+        },
+        "afterScroll": {
+          "main": 133.3333282470703,
+          "windowX": 0,
+          "windowY": 0
+        },
+        "beforePicture": null,
+        "afterPicture": "tablet-schedule-return-tab.png"
+      },
+      {
+        "width": "desktop",
+        "beforeIndex": 12,
+        "afterIndex": 17,
+        "settledAfterIndex": 18,
+        "beforeUTC": "2026-10-04T15:08:03.715Z",
+        "afterUTC": "2026-10-04T15:08:37.437Z",
+        "beforeSelected": [
+          "경기 일정",
+          "정규 라운드"
+        ],
+        "afterSelected": [
+          "경기 일정",
+          "전체"
+        ],
+        "sameURL": true,
+        "beforeScroll": {
+          "main": 0,
+          "windowX": 0,
+          "windowY": 103
+        },
+        "afterScroll": {
+          "main": 0,
+          "windowX": 0,
+          "windowY": 213
+        },
+        "beforePicture": "desktop-schedule-tab-before.png",
+        "afterPicture": "desktop-schedule-tab-after.png"
+      }
+    ],
+    "limits": [
+      "No new issue uniqueness or PR1607 regression attribution; parent performing duplicate mapping.",
+      "Mobile used default 전체 only; no mobile non-default tab-reset reproduction claimed.",
+      "Desktop bracket103→213 scroll may include automatic locator-click scrolling before departure; no scroll-loss defect claimed. Tablet bracket133.333 remained equal.",
+      "Both schedule modes show the same one fixture in this dataset; tab selection resets visibly but loss of additional rows cannot be shown."
+    ]
+  },
+  "residualFixtureCountAttribution": "Collector observed one fixture in both modes; no fixtureCount stored in public proof. Not independently verified.",
+  "images": [
+    {
+      "file": "mobile-fixture-entry.png",
+      "sha256": "79182ecdfae5abcc926e3147c75bdacfb1fa44c87c01792103738a622927fa85",
+      "proofIndex": 0,
+      "DOMUTC": "2026-10-04T15:05:35.714Z",
+      "captureStartUTC": "2026-10-04T15:05:35.719Z",
+      "captureEndUTC": "2026-10-04T15:05:35.740Z",
+      "sourcePixels": [
+        402,
+        606
+      ],
+      "outputPixels": [
+        378,
+        233
+      ]
+    },
+    {
+      "file": "mobile-profile-back-control.png",
+      "sha256": "c9c75025a542fbfa348afd179d5b0ed0d8438b61d259ea55e08521fe7ab4c712",
+      "proofIndex": 2,
+      "DOMUTC": "2026-10-04T15:05:57.294Z",
+      "captureStartUTC": "2026-10-04T15:05:57.298Z",
+      "captureEndUTC": "2026-10-04T15:05:57.349Z",
+      "sourcePixels": [
+        402,
+        606
+      ],
+      "outputPixels": [
+        401,
+        53
+      ]
+    },
+    {
+      "file": "mobile-return-fixture.png",
+      "sha256": "22fa4b2ca76872dbb30c73d37308829fee0560b70072ed04f49439e378f821b5",
+      "proofIndex": 3,
+      "DOMUTC": "2026-10-04T15:05:57.688Z",
+      "captureStartUTC": "2026-10-04T15:05:57.693Z",
+      "captureEndUTC": "2026-10-04T15:05:57.722Z",
+      "sourcePixels": [
+        402,
+        606
+      ],
+      "outputPixels": [
+        378,
+        126
+      ]
+    },
+    {
+      "file": "tablet-fixture-source.png",
+      "sha256": "4e582460cafa412373b9b518cf4691ddbead3224699d5f6c17dbc9b8c2320a0c",
+      "proofIndex": 7,
+      "DOMUTC": "2026-10-04T15:06:53.744Z",
+      "captureStartUTC": "2026-10-04T15:06:53.747Z",
+      "captureEndUTC": "2026-10-04T15:06:53.783Z",
+      "sourcePixels": [
+        788,
+        505
+      ],
+      "outputPixels": [
+        580,
+        123
+      ]
+    },
+    {
+      "file": "tablet-profile-back-control.png",
+      "sha256": "b57475874747a26b896dad0359c1c4b3fd60dc733f9a8700af338448135b440a",
+      "proofIndex": 8,
+      "DOMUTC": "2026-10-04T15:07:20.323Z",
+      "captureStartUTC": "2026-10-04T15:07:20.327Z",
+      "captureEndUTC": "2026-10-04T15:07:20.393Z",
+      "sourcePixels": [
+        788,
+        505
+      ],
+      "outputPixels": [
+        600,
+        53
+      ]
+    },
+    {
+      "file": "tablet-return-fixture.png",
+      "sha256": "e65d516f202c69ac7548fafc8f81dad9af5bad5966add07e85cc8f8dccc34ffc",
+      "proofIndex": 9,
+      "DOMUTC": "2026-10-04T15:07:20.706Z",
+      "captureStartUTC": "2026-10-04T15:07:20.712Z",
+      "captureEndUTC": "2026-10-04T15:07:20.746Z",
+      "sourcePixels": [
+        788,
+        505
+      ],
+      "outputPixels": [
+        580,
+        123
+      ]
+    },
+    {
+      "file": "desktop-fixture-source.png",
+      "sha256": "5115232543aabd9b12b16921bf52ce4247859d880da853038067741f82d1ff01",
+      "proofIndex": 13,
+      "DOMUTC": "2026-10-04T15:08:04.263Z",
+      "captureStartUTC": "2026-10-04T15:08:04.268Z",
+      "captureEndUTC": "2026-10-04T15:08:04.310Z",
+      "sourcePixels": [
+        1182,
+        757
+      ],
+      "outputPixels": [
+        654,
+        241
+      ]
+    },
+    {
+      "file": "desktop-profile-back-control.png",
+      "sha256": "499e6a5f51c5858e8750ffcca79db412b03ef326bfe886b0c268d9aad1e45128",
+      "proofIndex": 14,
+      "DOMUTC": "2026-10-04T15:08:23.532Z",
+      "captureStartUTC": "2026-10-04T15:08:23.536Z",
+      "captureEndUTC": "2026-10-04T15:08:23.596Z",
+      "sourcePixels": [
+        1182,
+        757
+      ],
+      "outputPixels": [
+        161,
+        49
+      ]
+    },
+    {
+      "file": "desktop-return-fixture.png",
+      "sha256": "5115232543aabd9b12b16921bf52ce4247859d880da853038067741f82d1ff01",
+      "proofIndex": 15,
+      "DOMUTC": "2026-10-04T15:08:23.850Z",
+      "captureStartUTC": "2026-10-04T15:08:23.853Z",
+      "captureEndUTC": "2026-10-04T15:08:23.877Z",
+      "sourcePixels": [
+        1182,
+        757
+      ],
+      "outputPixels": [
+        654,
+        241
+      ]
+    },
+    {
+      "file": "tablet-schedule-return-tab.png",
+      "sha256": "9088bff3adfe95b8d420a4b6c3e9366895f1527551bb3673c904696d077bf9ec",
+      "proofIndex": 11,
+      "DOMUTC": "2026-10-04T15:07:31.391Z",
+      "captureStartUTC": "2026-10-04T15:07:31.396Z",
+      "captureEndUTC": "2026-10-04T15:07:31.425Z",
+      "sourcePixels": [
+        788,
+        505
+      ],
+      "outputPixels": [
+        572,
+        156
+      ]
+    },
+    {
+      "file": "desktop-schedule-tab-before.png",
+      "sha256": "d189b194978f70e62caf378f48363b1551fa28a2a560e4e4e915aa7e39d8ef56",
+      "proofIndex": 12,
+      "DOMUTC": "2026-10-04T15:08:03.715Z",
+      "captureStartUTC": "2026-10-04T15:08:03.721Z",
+      "captureEndUTC": "2026-10-04T15:08:03.753Z",
+      "sourcePixels": [
+        1182,
+        757
+      ],
+      "outputPixels": [
+        1038,
+        158
+      ]
+    },
+    {
+      "file": "desktop-schedule-tab-after.png",
+      "sha256": "65261345d6faf97a8bd6f3cf8f8944199a3d7c414244ea698886aaed6b96d996",
+      "proofIndex": 17,
+      "DOMUTC": "2026-10-04T15:08:37.437Z",
+      "captureStartUTC": "2026-10-04T15:08:37.442Z",
+      "captureEndUTC": "2026-10-04T15:08:37.479Z",
+      "sourcePixels": [
+        1182,
+        757
+      ],
+      "outputPixels": [
+        1038,
+        158
+      ]
+    }
+  ],
+  "workflow": {
+    "sha": "f614096872ccb5953722a33dc326e3fb8af246c1",
+    "status": "completed",
+    "conclusion": "success",
+    "updatedUTC": "2026-10-04T14:58:57Z",
+    "url": "https://github.com/kim-song-jun/matchup-sports-platform/actions/runs/37210421129",
+    "id": 37210421129
+  },
+  "runtimeServingSHA": "unknown",
+  "currentViewerRole": "unknown",
+  "sourceBlobs": [
+    {
+      "path": "apps/v1_web/src/app/league-matches/[leagueId]/fixtures/[fixtureId]/league-fixture-detail-client.tsx",
+      "sha": "f0a08e5b8156b38a0ec0882e515cb41b764876d8"
+    },
+    {
+      "path": "apps/v1_web/src/components/public-game-records/match-detail-content.tsx",
+      "sha": "b5e77d867efb700844357dc3ba8249075e8a72ae"
+    },
+    {
+      "path": "apps/v1_web/src/components/v1-ui/app-back-link.tsx",
+      "sha": "76e34b803afae77e175b2ca991bdeaee512d3f5f"
+    }
+  ],
+  "issueRemainsOpen": true,
+  "limits": [
+    "Natural URL contains only nested parent from and no hash. Arbitrary query ordering/hash retention is not live tested.",
+    "Source fixture tabs absent; profile activity tabs not changed. Additional fixture-to-bracket child-tab reset is separate.",
+    "Before guest390/768/1440 versus current viewerunknown402/788/1182: no identical persona/pixel baseline.",
+    "No tournament/team-roster/cold-profile fallback, whole-issue closure or network/API/DB audit.",
+    "Private source crop equality and pre-projection source JSON hashes remain collector attestations; only safe public outputs read."
+  ]
+}

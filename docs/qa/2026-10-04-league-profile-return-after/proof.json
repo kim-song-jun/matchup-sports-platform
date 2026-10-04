@@ -1,0 +1,2842 @@
+[
+  {
+    "label": "mobile loaded fixture, natural from query",
+    "active": {
+      "aria": null,
+      "focusVisible": false,
+      "href": null,
+      "rect": {
+        "bottom": 605.6000366210938,
+        "h": 605.6000366210938,
+        "right": 401.6000061035156,
+        "w": 401.6000061035156,
+        "x": 0,
+        "y": 0
+      },
+      "tag": "BODY"
+    },
+    "back": [
+      {
+        "href": "/tournaments/{league-63e7cd6e36c0}/bracket",
+        "rect": {
+          "bottom": 51.200000286102295,
+          "h": 44,
+          "right": 48,
+          "w": 44,
+          "x": 4,
+          "y": 7.200000286102295
+        }
+      },
+      {
+        "href": "/tournaments/{league-63e7cd6e36c0}/bracket",
+        "rect": {
+          "bottom": 0,
+          "h": 0,
+          "right": 0,
+          "w": 0,
+          "x": 0,
+          "y": 0
+        }
+      }
+    ],
+    "eventAnchorIds": [
+      {
+        "id": "match-events-period-1",
+        "rect": {
+          "bottom": 659.2000122070312,
+          "h": 18,
+          "right": 364.79999923706055,
+          "w": 328,
+          "x": 36.79999923706055,
+          "y": 641.2000122070312
+        }
+      }
+    ],
+    "hash": "",
+    "hashLinks": [],
+    "headings": [
+      {
+        "id": "",
+        "rect": {
+          "bottom": 0,
+          "h": 0,
+          "right": 0,
+          "w": 0,
+          "x": 0,
+          "y": 0
+        },
+        "tag": "H1",
+        "text": "리그 경기"
+      },
+      {
+        "id": "",
+        "rect": {
+          "bottom": 338.3000183105469,
+          "h": 25.5,
+          "right": 381.6000061035156,
+          "w": 361.6000061035156,
+          "x": 20,
+          "y": 312.8000183105469
+        },
+        "tag": "H3",
+        "text": "라인업"
+      },
+      {
+        "id": "",
+        "rect": {
+          "bottom": 612.4000244140625,
+          "h": 25.5,
+          "right": 381.6000061035156,
+          "w": 361.6000061035156,
+          "x": 20,
+          "y": 586.9000244140625
+        },
+        "tag": "H3",
+        "text": "득점·카드"
+      },
+      {
+        "id": "",
+        "rect": {
+          "bottom": 769,
+          "h": 25.5,
+          "right": 381.6000061035156,
+          "w": 361.6000061035156,
+          "x": 20,
+          "y": 743.5
+        },
+        "tag": "H3",
+        "text": "결과 변경 이력"
+      },
+      {
+        "id": "",
+        "rect": {
+          "bottom": 918.9000244140624,
+          "h": 20,
+          "right": 368.79999923706055,
+          "w": 336,
+          "x": 32.79999923706055,
+          "y": 898.9000244140625
+        },
+        "tag": "H2",
+        "text": "리그 순위·전적"
+      },
+      {
+        "id": "",
+        "rect": {
+          "bottom": 1088.5,
+          "h": 20,
+          "right": 368.79999923706055,
+          "w": 336,
+          "x": 32.79999923706055,
+          "y": 1068.5
+        },
+        "tag": "H2",
+        "text": "우리 팀 경기"
+      }
+    ],
+    "pathname": "/league-matches/{league-63e7cd6e36c0}/fixtures/{fixture-8f057ede6703}",
+    "playerLink": {
+      "focusVisible": false,
+      "href": "/users/{player-cdc985813531}?from=%2Fleague-matches%2F{league-63e7cd6e36c0}%2Ffixtures%2F{fixture-8f057ede6703}%3Ffrom%3D%252Ftournaments%252F{league-63e7cd6e36c0}%252Fbracket",
+      "rect": {
+        "bottom": 409.9000120162964,
+        "h": 15.199999809265137,
+        "right": 283.75000381469727,
+        "w": 44.95000076293945,
+        "x": 238.8000030517578,
+        "y": 394.7000122070313
+      }
+    },
+    "profileLinkCount": 5,
+    "query": "?from=%2Ftournaments%2F{league-63e7cd6e36c0}%2Fbracket",
+    "scroll": {
+      "main": 0,
+      "windowX": 0,
+      "windowY": 0
+    },
+    "tabs": [],
+    "url": "https://alpha.teameet.co.kr/league-matches/{league-63e7cd6e36c0}/fixtures/{fixture-8f057ede6703}?from=%2Ftournaments%2F{league-63e7cd6e36c0}%2Fbracket",
+    "utc": "2026-10-04T15:05:35.714Z",
+    "viewport": {
+      "dpr": 1.25,
+      "h": 606,
+      "w": 402
+    }
+  },
+  {
+    "label": "mobile visible player source before actual profile click",
+    "active": {
+      "aria": null,
+      "focusVisible": true,
+      "href": "/users/{player-cdc985813531}?from=%2Fleague-matches%2F{league-63e7cd6e36c0}%2Ffixtures%2F{fixture-8f057ede6703}%3Ffrom%3D%252Ftournaments%252F{league-63e7cd6e36c0}%252Fbracket",
+      "rect": {
+        "bottom": 301.9000120162964,
+        "h": 15.199999809265137,
+        "right": 283.75000381469727,
+        "w": 44.95000076293945,
+        "x": 238.8000030517578,
+        "y": 286.70001220703125
+      },
+      "tag": "A"
+    },
+    "back": [
+      {
+        "href": "/tournaments/{league-63e7cd6e36c0}/bracket",
+        "rect": {
+          "bottom": 52,
+          "h": 44,
+          "right": 48,
+          "w": 44,
+          "x": 4,
+          "y": 8
+        }
+      },
+      {
+        "href": "/tournaments/{league-63e7cd6e36c0}/bracket",
+        "rect": {
+          "bottom": 0,
+          "h": 0,
+          "right": 0,
+          "w": 0,
+          "x": 0,
+          "y": 0
+        }
+      }
+    ],
+    "eventAnchorIds": [
+      {
+        "id": "match-events-period-1",
+        "rect": {
+          "bottom": 551.2000122070312,
+          "h": 18,
+          "right": 364.79999923706055,
+          "w": 328,
+          "x": 36.79999923706055,
+          "y": 533.2000122070312
+        }
+      }
+    ],
+    "hash": "",
+    "hashLinks": [],
+    "headings": [
+      {
+        "id": "",
+        "rect": {
+          "bottom": 0,
+          "h": 0,
+          "right": 0,
+          "w": 0,
+          "x": 0,
+          "y": 0
+        },
+        "tag": "H1",
+        "text": "리그 경기"
+      },
+      {
+        "id": "",
+        "rect": {
+          "bottom": 230.3000030517578,
+          "h": 25.5,
+          "right": 381.6000061035156,
+          "w": 361.6000061035156,
+          "x": 20,
+          "y": 204.8000030517578
+        },
+        "tag": "H3",
+        "text": "라인업"
+      },
+      {
+        "id": "",
+        "rect": {
+          "bottom": 504.3999938964844,
+          "h": 25.5,
+          "right": 381.6000061035156,
+          "w": 361.6000061035156,
+          "x": 20,
+          "y": 478.8999938964844
+        },
+        "tag": "H3",
+        "text": "득점·카드"
+      },
+      {
+        "id": "",
+        "rect": {
+          "bottom": 661,
+          "h": 25.5,
+          "right": 381.6000061035156,
+          "w": 361.6000061035156,
+          "x": 20,
+          "y": 635.5
+        },
+        "tag": "H3",
+        "text": "결과 변경 이력"
+      },
+      {
+        "id": "",
+        "rect": {
+          "bottom": 810.9000244140625,
+          "h": 20,
+          "right": 368.79999923706055,
+          "w": 336,
+          "x": 32.79999923706055,
+          "y": 790.9000244140625
+        },
+        "tag": "H2",
+        "text": "리그 순위·전적"
+      },
+      {
+        "id": "",
+        "rect": {
+          "bottom": 980.5,
+          "h": 20,
+          "right": 368.79999923706055,
+          "w": 336,
+          "x": 32.79999923706055,
+          "y": 960.5
+        },
+        "tag": "H2",
+        "text": "우리 팀 경기"
+      }
+    ],
+    "pathname": "/league-matches/{league-63e7cd6e36c0}/fixtures/{fixture-8f057ede6703}",
+    "playerLink": {
+      "focusVisible": true,
+      "href": "/users/{player-cdc985813531}?from=%2Fleague-matches%2F{league-63e7cd6e36c0}%2Ffixtures%2F{fixture-8f057ede6703}%3Ffrom%3D%252Ftournaments%252F{league-63e7cd6e36c0}%252Fbracket",
+      "rect": {
+        "bottom": 301.9000120162964,
+        "h": 15.199999809265137,
+        "right": 283.75000381469727,
+        "w": 44.95000076293945,
+        "x": 238.8000030517578,
+        "y": 286.70001220703125
+      }
+    },
+    "profileLinkCount": 5,
+    "query": "?from=%2Ftournaments%2F{league-63e7cd6e36c0}%2Fbracket",
+    "scroll": {
+      "main": 108.8000030517578,
+      "windowX": 0,
+      "windowY": 0
+    },
+    "tabs": [],
+    "url": "https://alpha.teameet.co.kr/league-matches/{league-63e7cd6e36c0}/fixtures/{fixture-8f057ede6703}?from=%2Ftournaments%2F{league-63e7cd6e36c0}%2Fbracket",
+    "utc": "2026-10-04T15:05:35.957Z",
+    "viewport": {
+      "dpr": 1.25,
+      "h": 606,
+      "w": 402
+    }
+  },
+  {
+    "label": "mobile loaded public profile with actual Back source",
+    "active": {
+      "aria": null,
+      "focusVisible": false,
+      "href": null,
+      "rect": {
+        "bottom": 605.6000366210938,
+        "h": 605.6000366210938,
+        "right": 401.6000061035156,
+        "w": 401.6000061035156,
+        "x": 0,
+        "y": 0
+      },
+      "tag": "BODY"
+    },
+    "back": [
+      {
+        "href": "/league-matches/{league-63e7cd6e36c0}/fixtures/{fixture-8f057ede6703}?from=%2Ftournaments%2F{league-63e7cd6e36c0}%2Fbracket",
+        "rect": {
+          "bottom": 52,
+          "h": 44,
+          "right": 48,
+          "w": 44,
+          "x": 4,
+          "y": 8
+        }
+      },
+      {
+        "href": "/league-matches/{league-63e7cd6e36c0}/fixtures/{fixture-8f057ede6703}?from=%2Ftournaments%2F{league-63e7cd6e36c0}%2Fbracket",
+        "rect": {
+          "bottom": 0,
+          "h": 0,
+          "right": 0,
+          "w": 0,
+          "x": 0,
+          "y": 0
+        }
+      }
+    ],
+    "eventAnchorIds": [],
+    "hash": "",
+    "hashLinks": [],
+    "headings": [],
+    "pathname": "/users/{player-cdc985813531}",
+    "playerLink": {
+      "focusVisible": false,
+      "href": "/users/{player-cdc985813531}/card?from=%2Fusers%2F{player-cdc985813531}%3Ffrom%3D%252Fleague-matches%252F{league-63e7cd6e36c0}%252Ffixtures%252F{fixture-8f057ede6703}%253Ffrom%253D%25252Ftournaments%25252F{league-63e7cd6e36c0}%25252Fbracket",
+      "rect": {
+        "bottom": 622.7999877929688,
+        "h": 44,
+        "right": 381.6000061035156,
+        "w": 44,
+        "x": 337.6000061035156,
+        "y": 578.7999877929688
+      }
+    },
+    "profileLinkCount": 2,
+    "query": "?from=%2Fleague-matches%2F{league-63e7cd6e36c0}%2Ffixtures%2F{fixture-8f057ede6703}%3Ffrom%3D%252Ftournaments%252F{league-63e7cd6e36c0}%252Fbracket",
+    "scroll": {
+      "main": 0,
+      "windowX": 0,
+      "windowY": 0
+    },
+    "tabs": [
+      {
+        "rect": {
+          "bottom": 1234.5,
+          "h": 44,
+          "right": 276.8000030517578,
+          "w": 76,
+          "x": 200.8000030517578,
+          "y": 1190.5
+        },
+        "selected": "true",
+        "text": "전체"
+      },
+      {
+        "rect": {
+          "bottom": 1234.5,
+          "h": 44,
+          "right": 360.8000183105469,
+          "w": 76,
+          "x": 284.8000183105469,
+          "y": 1190.5
+        },
+        "selected": "false",
+        "text": "이번 달"
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/users/{player-cdc985813531}?from=%2Fleague-matches%2F{league-63e7cd6e36c0}%2Ffixtures%2F{fixture-8f057ede6703}%3Ffrom%3D%252Ftournaments%252F{league-63e7cd6e36c0}%252Fbracket",
+    "utc": "2026-10-04T15:05:57.294Z",
+    "viewport": {
+      "dpr": 1.25,
+      "h": 606,
+      "w": 402
+    }
+  },
+  {
+    "label": "mobile page Back reached fixture initial observation",
+    "active": {
+      "aria": "뒤로가기",
+      "focusVisible": false,
+      "href": "/tournaments/{league-63e7cd6e36c0}/bracket",
+      "rect": {
+        "bottom": 52,
+        "h": 44,
+        "right": 48,
+        "w": 44,
+        "x": 4,
+        "y": 8
+      },
+      "tag": "A"
+    },
+    "back": [
+      {
+        "href": "/tournaments/{league-63e7cd6e36c0}/bracket",
+        "rect": {
+          "bottom": 52,
+          "h": 44,
+          "right": 48,
+          "w": 44,
+          "x": 4,
+          "y": 8
+        }
+      },
+      {
+        "href": "/tournaments/{league-63e7cd6e36c0}/bracket",
+        "rect": {
+          "bottom": 0,
+          "h": 0,
+          "right": 0,
+          "w": 0,
+          "x": 0,
+          "y": 0
+        }
+      }
+    ],
+    "eventAnchorIds": [
+      {
+        "id": "match-events-period-1",
+        "rect": {
+          "bottom": 551.2000122070312,
+          "h": 18,
+          "right": 364.79999923706055,
+          "w": 328,
+          "x": 36.79999923706055,
+          "y": 533.2000122070312
+        }
+      }
+    ],
+    "hash": "",
+    "hashLinks": [],
+    "headings": [
+      {
+        "id": "",
+        "rect": {
+          "bottom": 0,
+          "h": 0,
+          "right": 0,
+          "w": 0,
+          "x": 0,
+          "y": 0
+        },
+        "tag": "H1",
+        "text": "리그 경기"
+      },
+      {
+        "id": "",
+        "rect": {
+          "bottom": 230.3000030517578,
+          "h": 25.5,
+          "right": 381.6000061035156,
+          "w": 361.6000061035156,
+          "x": 20,
+          "y": 204.8000030517578
+        },
+        "tag": "H3",
+        "text": "라인업"
+      },
+      {
+        "id": "",
+        "rect": {
+          "bottom": 504.3999938964844,
+          "h": 25.5,
+          "right": 381.6000061035156,
+          "w": 361.6000061035156,
+          "x": 20,
+          "y": 478.8999938964844
+        },
+        "tag": "H3",
+        "text": "득점·카드"
+      },
+      {
+        "id": "",
+        "rect": {
+          "bottom": 661,
+          "h": 25.5,
+          "right": 381.6000061035156,
+          "w": 361.6000061035156,
+          "x": 20,
+          "y": 635.5
+        },
+        "tag": "H3",
+        "text": "결과 변경 이력"
+      },
+      {
+        "id": "",
+        "rect": {
+          "bottom": 810.9000244140625,
+          "h": 20,
+          "right": 368.79999923706055,
+          "w": 336,
+          "x": 32.79999923706055,
+          "y": 790.9000244140625
+        },
+        "tag": "H2",
+        "text": "리그 순위·전적"
+      },
+      {
+        "id": "",
+        "rect": {
+          "bottom": 980.5,
+          "h": 20,
+          "right": 368.79999923706055,
+          "w": 336,
+          "x": 32.79999923706055,
+          "y": 960.5
+        },
+        "tag": "H2",
+        "text": "우리 팀 경기"
+      }
+    ],
+    "pathname": "/league-matches/{league-63e7cd6e36c0}/fixtures/{fixture-8f057ede6703}",
+    "playerLink": {
+      "focusVisible": false,
+      "href": "/users/{player-cdc985813531}?from=%2Fleague-matches%2F{league-63e7cd6e36c0}%2Ffixtures%2F{fixture-8f057ede6703}%3Ffrom%3D%252Ftournaments%252F{league-63e7cd6e36c0}%252Fbracket",
+      "rect": {
+        "bottom": 301.9000120162964,
+        "h": 15.199999809265137,
+        "right": 283.75000381469727,
+        "w": 44.95000076293945,
+        "x": 238.8000030517578,
+        "y": 286.70001220703125
+      }
+    },
+    "profileLinkCount": 5,
+    "query": "?from=%2Ftournaments%2F{league-63e7cd6e36c0}%2Fbracket",
+    "scroll": {
+      "main": 108.8000030517578,
+      "windowX": 0,
+      "windowY": 0
+    },
+    "tabs": [],
+    "url": "https://alpha.teameet.co.kr/league-matches/{league-63e7cd6e36c0}/fixtures/{fixture-8f057ede6703}?from=%2Ftournaments%2F{league-63e7cd6e36c0}%2Fbracket",
+    "utc": "2026-10-04T15:05:57.688Z",
+    "viewport": {
+      "dpr": 1.25,
+      "h": 606,
+      "w": 402
+    }
+  },
+  {
+    "label": "mobile settled fixture after page Back",
+    "active": {
+      "aria": "뒤로가기",
+      "focusVisible": false,
+      "href": "/tournaments/{league-63e7cd6e36c0}/bracket",
+      "rect": {
+        "bottom": 52,
+        "h": 44,
+        "right": 48,
+        "w": 44,
+        "x": 4,
+        "y": 8
+      },
+      "tag": "A"
+    },
+    "back": [
+      {
+        "href": "/tournaments/{league-63e7cd6e36c0}/bracket",
+        "rect": {
+          "bottom": 52,
+          "h": 44,
+          "right": 48,
+          "w": 44,
+          "x": 4,
+          "y": 8
+        }
+      },
+      {
+        "href": "/tournaments/{league-63e7cd6e36c0}/bracket",
+        "rect": {
+          "bottom": 0,
+          "h": 0,
+          "right": 0,
+          "w": 0,
+          "x": 0,
+          "y": 0
+        }
+      }
+    ],
+    "eventAnchorIds": [
+      {
+        "id": "match-events-period-1",
+        "rect": {
+          "bottom": 551.2000122070312,
+          "h": 18,
+          "right": 364.79999923706055,
+          "w": 328,
+          "x": 36.79999923706055,
+          "y": 533.2000122070312
+        }
+      }
+    ],
+    "hash": "",
+    "hashLinks": [],
+    "headings": [
+      {
+        "id": "",
+        "rect": {
+          "bottom": 0,
+          "h": 0,
+          "right": 0,
+          "w": 0,
+          "x": 0,
+          "y": 0
+        },
+        "tag": "H1",
+        "text": "리그 경기"
+      },
+      {
+        "id": "",
+        "rect": {
+          "bottom": 230.3000030517578,
+          "h": 25.5,
+          "right": 381.6000061035156,
+          "w": 361.6000061035156,
+          "x": 20,
+          "y": 204.8000030517578
+        },
+        "tag": "H3",
+        "text": "라인업"
+      },
+      {
+        "id": "",
+        "rect": {
+          "bottom": 504.3999938964844,
+          "h": 25.5,
+          "right": 381.6000061035156,
+          "w": 361.6000061035156,
+          "x": 20,
+          "y": 478.8999938964844
+        },
+        "tag": "H3",
+        "text": "득점·카드"
+      },
+      {
+        "id": "",
+        "rect": {
+          "bottom": 661,
+          "h": 25.5,
+          "right": 381.6000061035156,
+          "w": 361.6000061035156,
+          "x": 20,
+          "y": 635.5
+        },
+        "tag": "H3",
+        "text": "결과 변경 이력"
+      },
+      {
+        "id": "",
+        "rect": {
+          "bottom": 810.9000244140625,
+          "h": 20,
+          "right": 368.79999923706055,
+          "w": 336,
+          "x": 32.79999923706055,
+          "y": 790.9000244140625
+        },
+        "tag": "H2",
+        "text": "리그 순위·전적"
+      },
+      {
+        "id": "",
+        "rect": {
+          "bottom": 980.5,
+          "h": 20,
+          "right": 368.79999923706055,
+          "w": 336,
+          "x": 32.79999923706055,
+          "y": 960.5
+        },
+        "tag": "H2",
+        "text": "우리 팀 경기"
+      }
+    ],
+    "pathname": "/league-matches/{league-63e7cd6e36c0}/fixtures/{fixture-8f057ede6703}",
+    "playerLink": {
+      "focusVisible": false,
+      "href": "/users/{player-cdc985813531}?from=%2Fleague-matches%2F{league-63e7cd6e36c0}%2Ffixtures%2F{fixture-8f057ede6703}%3Ffrom%3D%252Ftournaments%252F{league-63e7cd6e36c0}%252Fbracket",
+      "rect": {
+        "bottom": 301.9000120162964,
+        "h": 15.199999809265137,
+        "right": 283.75000381469727,
+        "w": 44.95000076293945,
+        "x": 238.8000030517578,
+        "y": 286.70001220703125
+      }
+    },
+    "profileLinkCount": 5,
+    "query": "?from=%2Ftournaments%2F{league-63e7cd6e36c0}%2Fbracket",
+    "scroll": {
+      "main": 108.8000030517578,
+      "windowX": 0,
+      "windowY": 0
+    },
+    "tabs": [],
+    "url": "https://alpha.teameet.co.kr/league-matches/{league-63e7cd6e36c0}/fixtures/{fixture-8f057ede6703}?from=%2Ftournaments%2F{league-63e7cd6e36c0}%2Fbracket",
+    "utc": "2026-10-04T15:06:31.981Z",
+    "viewport": {
+      "dpr": 1.25,
+      "h": 606,
+      "w": 402
+    }
+  },
+  {
+    "label": "mobile returned public bracket tabs",
+    "active": {
+      "aria": "뒤로가기",
+      "focusVisible": false,
+      "href": "/tournaments/{league-63e7cd6e36c0}",
+      "rect": {
+        "bottom": 52,
+        "h": 44,
+        "right": 48,
+        "w": 44,
+        "x": 4,
+        "y": 8
+      },
+      "tag": "A"
+    },
+    "back": [
+      {
+        "href": "/tournaments/{league-63e7cd6e36c0}",
+        "rect": {
+          "bottom": 52,
+          "h": 44,
+          "right": 48,
+          "w": 44,
+          "x": 4,
+          "y": 8
+        }
+      },
+      {
+        "href": "/tournaments/{league-63e7cd6e36c0}",
+        "rect": {
+          "bottom": 0,
+          "h": 0,
+          "right": 0,
+          "w": 0,
+          "x": 0,
+          "y": 0
+        }
+      }
+    ],
+    "eventAnchorIds": [],
+    "hash": "",
+    "hashLinks": [],
+    "headings": [
+      {
+        "id": "",
+        "rect": {
+          "bottom": 72,
+          "h": 1,
+          "right": 20,
+          "w": 1,
+          "x": 19,
+          "y": 71
+        },
+        "tag": "H1",
+        "text": "ALPHA QA E2E 리그 20261001-1354 순위·대진표"
+      },
+      {
+        "id": "",
+        "rect": {
+          "bottom": 124,
+          "h": 52,
+          "right": 301.3374938964844,
+          "w": 281.3374938964844,
+          "x": 20,
+          "y": 72
+        },
+        "tag": "H2",
+        "text": "ALPHA QA E2E 리그 20261001-1354"
+      },
+      {
+        "id": "",
+        "rect": {
+          "bottom": 334.70001220703125,
+          "h": 25.5,
+          "right": 381.6000061035156,
+          "w": 361.6000061035156,
+          "x": 20,
+          "y": 309.20001220703125
+        },
+        "tag": "H3",
+        "text": "경기 일정"
+      }
+    ],
+    "pathname": "/tournaments/{league-63e7cd6e36c0}/bracket",
+    "playerLink": null,
+    "profileLinkCount": 0,
+    "query": "",
+    "scroll": {
+      "main": 0,
+      "windowX": 0,
+      "windowY": 0
+    },
+    "tabs": [
+      {
+        "rect": {
+          "bottom": 289.1999969482422,
+          "h": 44,
+          "right": 196.8000030517578,
+          "w": 172.8000030517578,
+          "x": 24,
+          "y": 245.1999969482422
+        },
+        "selected": "true",
+        "text": "경기 일정"
+      },
+      {
+        "rect": {
+          "bottom": 289.1999969482422,
+          "h": 44,
+          "right": 377.6000061035156,
+          "w": 172.8000030517578,
+          "x": 204.8000030517578,
+          "y": 245.1999969482422
+        },
+        "selected": "false",
+        "text": "리그 순위"
+      },
+      {
+        "rect": {
+          "bottom": 390.7000122070313,
+          "h": 44,
+          "right": 68.07500076293945,
+          "w": 48.07500076293945,
+          "x": 20,
+          "y": 346.70001220703125
+        },
+        "selected": "true",
+        "text": "전체"
+      },
+      {
+        "rect": {
+          "bottom": 390.7000122070313,
+          "h": 44,
+          "right": 160.8625030517578,
+          "w": 84.7874984741211,
+          "x": 76.07500457763672,
+          "y": 346.70001220703125
+        },
+        "selected": "false",
+        "text": "정규 라운드"
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/tournaments/{league-63e7cd6e36c0}/bracket",
+    "utc": "2026-10-04T15:06:32.226Z",
+    "viewport": {
+      "dpr": 1.25,
+      "h": 606,
+      "w": 402
+    }
+  },
+  {
+    "label": "tablet bracket regular-round selected before fixture entry",
+    "active": {
+      "aria": null,
+      "focusVisible": false,
+      "href": null,
+      "rect": {
+        "bottom": 265.6875,
+        "h": 44,
+        "right": 254.33333587646484,
+        "w": 84.52083587646484,
+        "x": 169.8125,
+        "y": 221.6875
+      },
+      "tag": "BUTTON"
+    },
+    "back": [
+      {
+        "href": "/tournaments/{league-63e7cd6e36c0}",
+        "rect": {
+          "bottom": 52,
+          "h": 44,
+          "right": 142,
+          "w": 44,
+          "x": 98,
+          "y": 8
+        }
+      },
+      {
+        "href": "/tournaments/{league-63e7cd6e36c0}",
+        "rect": {
+          "bottom": 0,
+          "h": 0,
+          "right": 0,
+          "w": 0,
+          "x": 0,
+          "y": 0
+        }
+      }
+    ],
+    "eventAnchorIds": [],
+    "hash": "",
+    "hashLinks": [],
+    "headings": [
+      {
+        "id": "",
+        "rect": {
+          "bottom": -57.33333587646485,
+          "h": 1,
+          "right": 114,
+          "w": 1,
+          "x": 113,
+          "y": -58.33333587646485
+        },
+        "tag": "H1",
+        "text": "ALPHA QA E2E 리그 20261001-1354 순위·대진표"
+      },
+      {
+        "id": "",
+        "rect": {
+          "bottom": -31.333335876464844,
+          "h": 26,
+          "right": 438.78125,
+          "w": 324.78125,
+          "x": 114,
+          "y": -57.33333587646485
+        },
+        "tag": "H2",
+        "text": "ALPHA QA E2E 리그 20261001-1354"
+      },
+      {
+        "id": "",
+        "rect": {
+          "bottom": 209.6875,
+          "h": 25.5,
+          "right": 674,
+          "w": 560,
+          "x": 114,
+          "y": 184.1875
+        },
+        "tag": "H3",
+        "text": "경기 일정"
+      }
+    ],
+    "pathname": "/tournaments/{league-63e7cd6e36c0}/bracket",
+    "playerLink": null,
+    "profileLinkCount": 0,
+    "query": "",
+    "scroll": {
+      "main": 133.3333282470703,
+      "windowX": 0,
+      "windowY": 0
+    },
+    "tabs": [
+      {
+        "rect": {
+          "bottom": 164.1875,
+          "h": 44,
+          "right": 390,
+          "w": 272,
+          "x": 118,
+          "y": 120.1875
+        },
+        "selected": "true",
+        "text": "경기 일정"
+      },
+      {
+        "rect": {
+          "bottom": 164.1875,
+          "h": 44,
+          "right": 670,
+          "w": 272,
+          "x": 398,
+          "y": 120.1875
+        },
+        "selected": "false",
+        "text": "리그 순위"
+      },
+      {
+        "rect": {
+          "bottom": 265.6875,
+          "h": 44,
+          "right": 161.8125,
+          "w": 47.8125,
+          "x": 114,
+          "y": 221.6875
+        },
+        "selected": "false",
+        "text": "전체"
+      },
+      {
+        "rect": {
+          "bottom": 265.6875,
+          "h": 44,
+          "right": 254.33333587646484,
+          "w": 84.52083587646484,
+          "x": 169.8125,
+          "y": 221.6875
+        },
+        "selected": "true",
+        "text": "정규 라운드"
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/tournaments/{league-63e7cd6e36c0}/bracket",
+    "utc": "2026-10-04T15:06:53.250Z",
+    "viewport": {
+      "dpr": 1.5,
+      "h": 505,
+      "w": 788
+    }
+  },
+  {
+    "label": "tablet source before player click",
+    "active": {
+      "aria": null,
+      "focusVisible": true,
+      "href": "/users/{player-cdc985813531}?from=%2Fleague-matches%2F{league-63e7cd6e36c0}%2Ffixtures%2F{fixture-8f057ede6703}%3Ffrom%3D%252Ftournaments%252F{league-63e7cd6e36c0}%252Fbracket",
+      "rect": {
+        "bottom": 251.5,
+        "h": 16,
+        "right": 476.9479179382324,
+        "w": 44.94791793823242,
+        "x": 432,
+        "y": 235.5
+      },
+      "tag": "A"
+    },
+    "back": [
+      {
+        "href": "/tournaments/{league-63e7cd6e36c0}/bracket",
+        "rect": {
+          "bottom": 52,
+          "h": 44,
+          "right": 142,
+          "w": 44,
+          "x": 98,
+          "y": 8
+        }
+      },
+      {
+        "href": "/tournaments/{league-63e7cd6e36c0}/bracket",
+        "rect": {
+          "bottom": 0,
+          "h": 0,
+          "right": 0,
+          "w": 0,
+          "x": 0,
+          "y": 0
+        }
+      }
+    ],
+    "eventAnchorIds": [
+      {
+        "id": "match-events-period-1",
+        "rect": {
+          "bottom": 500,
+          "h": 18,
+          "right": 657.3333587646484,
+          "w": 526.6666870117188,
+          "x": 130.6666717529297,
+          "y": 482
+        }
+      }
+    ],
+    "hash": "",
+    "hashLinks": [],
+    "headings": [
+      {
+        "id": "",
+        "rect": {
+          "bottom": 0,
+          "h": 0,
+          "right": 0,
+          "w": 0,
+          "x": 0,
+          "y": 0
+        },
+        "tag": "H1",
+        "text": "리그 경기"
+      },
+      {
+        "id": "",
+        "rect": {
+          "bottom": 179.5,
+          "h": 25.5,
+          "right": 674,
+          "w": 560,
+          "x": 114,
+          "y": 154
+        },
+        "tag": "H3",
+        "text": "라인업"
+      },
+      {
+        "id": "",
+        "rect": {
+          "bottom": 453.3333435058594,
+          "h": 25.5,
+          "right": 674,
+          "w": 560,
+          "x": 114,
+          "y": 427.8333435058594
+        },
+        "tag": "H3",
+        "text": "득점·카드"
+      },
+      {
+        "id": "",
+        "rect": {
+          "bottom": 609.6666870117188,
+          "h": 25.5,
+          "right": 674,
+          "w": 560,
+          "x": 114,
+          "y": 584.1666870117188
+        },
+        "tag": "H3",
+        "text": "결과 변경 이력"
+      },
+      {
+        "id": "",
+        "rect": {
+          "bottom": 759.1666870117188,
+          "h": 20,
+          "right": 661.3333587646484,
+          "w": 534.6666870117188,
+          "x": 126.66667175292967,
+          "y": 739.1666870117188
+        },
+        "tag": "H2",
+        "text": "리그 순위·전적"
+      },
+      {
+        "id": "",
+        "rect": {
+          "bottom": 928.5,
+          "h": 20,
+          "right": 661.3333587646484,
+          "w": 534.6666870117188,
+          "x": 126.66667175292967,
+          "y": 908.5
+        },
+        "tag": "H2",
+        "text": "우리 팀 경기"
+      }
+    ],
+    "pathname": "/league-matches/{league-63e7cd6e36c0}/fixtures/{fixture-8f057ede6703}",
+    "playerLink": {
+      "focusVisible": true,
+      "href": "/users/{player-cdc985813531}?from=%2Fleague-matches%2F{league-63e7cd6e36c0}%2Ffixtures%2F{fixture-8f057ede6703}%3Ffrom%3D%252Ftournaments%252F{league-63e7cd6e36c0}%252Fbracket",
+      "rect": {
+        "bottom": 251.5,
+        "h": 16,
+        "right": 476.9479179382324,
+        "w": 44.94791793823242,
+        "x": 432,
+        "y": 235.5
+      }
+    },
+    "profileLinkCount": 5,
+    "query": "?from=%2Ftournaments%2F{league-63e7cd6e36c0}%2Fbracket",
+    "scroll": {
+      "main": 133.3333282470703,
+      "windowX": 0,
+      "windowY": 0
+    },
+    "tabs": [],
+    "url": "https://alpha.teameet.co.kr/league-matches/{league-63e7cd6e36c0}/fixtures/{fixture-8f057ede6703}?from=%2Ftournaments%2F{league-63e7cd6e36c0}%2Fbracket",
+    "utc": "2026-10-04T15:06:53.744Z",
+    "viewport": {
+      "dpr": 1.5,
+      "h": 505,
+      "w": 788
+    }
+  },
+  {
+    "label": "tablet loaded profile and Back href",
+    "active": {
+      "aria": null,
+      "focusVisible": false,
+      "href": null,
+      "rect": {
+        "bottom": 504.6666870117187,
+        "h": 504.6666870117187,
+        "right": 788,
+        "w": 788,
+        "x": 0,
+        "y": 0
+      },
+      "tag": "BODY"
+    },
+    "back": [
+      {
+        "href": "/league-matches/{league-63e7cd6e36c0}/fixtures/{fixture-8f057ede6703}?from=%2Ftournaments%2F{league-63e7cd6e36c0}%2Fbracket",
+        "rect": {
+          "bottom": 51.33333349227905,
+          "h": 44,
+          "right": 142,
+          "w": 44,
+          "x": 98,
+          "y": 7.333333492279053
+        }
+      },
+      {
+        "href": "/league-matches/{league-63e7cd6e36c0}/fixtures/{fixture-8f057ede6703}?from=%2Ftournaments%2F{league-63e7cd6e36c0}%2Fbracket",
+        "rect": {
+          "bottom": 0,
+          "h": 0,
+          "right": 0,
+          "w": 0,
+          "x": 0,
+          "y": 0
+        }
+      }
+    ],
+    "eventAnchorIds": [],
+    "hash": "",
+    "hashLinks": [],
+    "headings": [],
+    "pathname": "/users/{player-cdc985813531}",
+    "playerLink": {
+      "focusVisible": false,
+      "href": "/users/{player-cdc985813531}/card?from=%2Fusers%2F{player-cdc985813531}%3Ffrom%3D%252Fleague-matches%252F{league-63e7cd6e36c0}%252Ffixtures%252F{fixture-8f057ede6703}%253Ffrom%253D%25252Ftournaments%25252F{league-63e7cd6e36c0}%25252Fbracket",
+      "rect": {
+        "bottom": 622,
+        "h": 44,
+        "right": 674,
+        "w": 44,
+        "x": 630,
+        "y": 578
+      }
+    },
+    "profileLinkCount": 2,
+    "query": "?from=%2Fleague-matches%2F{league-63e7cd6e36c0}%2Ffixtures%2F{fixture-8f057ede6703}%3Ffrom%3D%252Ftournaments%252F{league-63e7cd6e36c0}%252Fbracket",
+    "scroll": {
+      "main": 0,
+      "windowX": 0,
+      "windowY": 0
+    },
+    "tabs": [
+      {
+        "rect": {
+          "bottom": 1162.5,
+          "h": 44,
+          "right": 569.3333435058594,
+          "w": 76,
+          "x": 493.3333435058594,
+          "y": 1118.5
+        },
+        "selected": "true",
+        "text": "전체"
+      },
+      {
+        "rect": {
+          "bottom": 1162.5,
+          "h": 44,
+          "right": 653.3333740234375,
+          "w": 76,
+          "x": 577.3333740234375,
+          "y": 1118.5
+        },
+        "selected": "false",
+        "text": "이번 달"
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/users/{player-cdc985813531}?from=%2Fleague-matches%2F{league-63e7cd6e36c0}%2Ffixtures%2F{fixture-8f057ede6703}%3Ffrom%3D%252Ftournaments%252F{league-63e7cd6e36c0}%252Fbracket",
+    "utc": "2026-10-04T15:07:20.323Z",
+    "viewport": {
+      "dpr": 1.5,
+      "h": 505,
+      "w": 788
+    }
+  },
+  {
+    "label": "tablet actual page Back fixture",
+    "active": {
+      "aria": "뒤로가기",
+      "focusVisible": false,
+      "href": "/tournaments/{league-63e7cd6e36c0}/bracket",
+      "rect": {
+        "bottom": 52,
+        "h": 44,
+        "right": 142,
+        "w": 44,
+        "x": 98,
+        "y": 8
+      },
+      "tag": "A"
+    },
+    "back": [
+      {
+        "href": "/tournaments/{league-63e7cd6e36c0}/bracket",
+        "rect": {
+          "bottom": 52,
+          "h": 44,
+          "right": 142,
+          "w": 44,
+          "x": 98,
+          "y": 8
+        }
+      },
+      {
+        "href": "/tournaments/{league-63e7cd6e36c0}/bracket",
+        "rect": {
+          "bottom": 0,
+          "h": 0,
+          "right": 0,
+          "w": 0,
+          "x": 0,
+          "y": 0
+        }
+      }
+    ],
+    "eventAnchorIds": [
+      {
+        "id": "match-events-period-1",
+        "rect": {
+          "bottom": 500,
+          "h": 18,
+          "right": 657.3333587646484,
+          "w": 526.6666870117188,
+          "x": 130.6666717529297,
+          "y": 482
+        }
+      }
+    ],
+    "hash": "",
+    "hashLinks": [],
+    "headings": [
+      {
+        "id": "",
+        "rect": {
+          "bottom": 0,
+          "h": 0,
+          "right": 0,
+          "w": 0,
+          "x": 0,
+          "y": 0
+        },
+        "tag": "H1",
+        "text": "리그 경기"
+      },
+      {
+        "id": "",
+        "rect": {
+          "bottom": 179.5,
+          "h": 25.5,
+          "right": 674,
+          "w": 560,
+          "x": 114,
+          "y": 154
+        },
+        "tag": "H3",
+        "text": "라인업"
+      },
+      {
+        "id": "",
+        "rect": {
+          "bottom": 453.3333435058594,
+          "h": 25.5,
+          "right": 674,
+          "w": 560,
+          "x": 114,
+          "y": 427.8333435058594
+        },
+        "tag": "H3",
+        "text": "득점·카드"
+      },
+      {
+        "id": "",
+        "rect": {
+          "bottom": 609.6666870117188,
+          "h": 25.5,
+          "right": 674,
+          "w": 560,
+          "x": 114,
+          "y": 584.1666870117188
+        },
+        "tag": "H3",
+        "text": "결과 변경 이력"
+      },
+      {
+        "id": "",
+        "rect": {
+          "bottom": 759.1666870117188,
+          "h": 20,
+          "right": 661.3333587646484,
+          "w": 534.6666870117188,
+          "x": 126.66667175292967,
+          "y": 739.1666870117188
+        },
+        "tag": "H2",
+        "text": "리그 순위·전적"
+      },
+      {
+        "id": "",
+        "rect": {
+          "bottom": 928.5,
+          "h": 20,
+          "right": 661.3333587646484,
+          "w": 534.6666870117188,
+          "x": 126.66667175292967,
+          "y": 908.5
+        },
+        "tag": "H2",
+        "text": "우리 팀 경기"
+      }
+    ],
+    "pathname": "/league-matches/{league-63e7cd6e36c0}/fixtures/{fixture-8f057ede6703}",
+    "playerLink": {
+      "focusVisible": false,
+      "href": "/users/{player-cdc985813531}?from=%2Fleague-matches%2F{league-63e7cd6e36c0}%2Ffixtures%2F{fixture-8f057ede6703}%3Ffrom%3D%252Ftournaments%252F{league-63e7cd6e36c0}%252Fbracket",
+      "rect": {
+        "bottom": 251.5,
+        "h": 16,
+        "right": 476.9479179382324,
+        "w": 44.94791793823242,
+        "x": 432,
+        "y": 235.5
+      }
+    },
+    "profileLinkCount": 5,
+    "query": "?from=%2Ftournaments%2F{league-63e7cd6e36c0}%2Fbracket",
+    "scroll": {
+      "main": 133.3333282470703,
+      "windowX": 0,
+      "windowY": 0
+    },
+    "tabs": [],
+    "url": "https://alpha.teameet.co.kr/league-matches/{league-63e7cd6e36c0}/fixtures/{fixture-8f057ede6703}?from=%2Ftournaments%2F{league-63e7cd6e36c0}%2Fbracket",
+    "utc": "2026-10-04T15:07:20.706Z",
+    "viewport": {
+      "dpr": 1.5,
+      "h": 505,
+      "w": 788
+    }
+  },
+  {
+    "label": "tablet settled fixture after player page Back",
+    "active": {
+      "aria": "뒤로가기",
+      "focusVisible": false,
+      "href": "/tournaments/{league-63e7cd6e36c0}/bracket",
+      "rect": {
+        "bottom": 52,
+        "h": 44,
+        "right": 142,
+        "w": 44,
+        "x": 98,
+        "y": 8
+      },
+      "tag": "A"
+    },
+    "back": [
+      {
+        "href": "/tournaments/{league-63e7cd6e36c0}/bracket",
+        "rect": {
+          "bottom": 52,
+          "h": 44,
+          "right": 142,
+          "w": 44,
+          "x": 98,
+          "y": 8
+        }
+      },
+      {
+        "href": "/tournaments/{league-63e7cd6e36c0}/bracket",
+        "rect": {
+          "bottom": 0,
+          "h": 0,
+          "right": 0,
+          "w": 0,
+          "x": 0,
+          "y": 0
+        }
+      }
+    ],
+    "eventAnchorIds": [
+      {
+        "id": "match-events-period-1",
+        "rect": {
+          "bottom": 500,
+          "h": 18,
+          "right": 657.3333587646484,
+          "w": 526.6666870117188,
+          "x": 130.6666717529297,
+          "y": 482
+        }
+      }
+    ],
+    "hash": "",
+    "hashLinks": [],
+    "headings": [
+      {
+        "id": "",
+        "rect": {
+          "bottom": 0,
+          "h": 0,
+          "right": 0,
+          "w": 0,
+          "x": 0,
+          "y": 0
+        },
+        "tag": "H1",
+        "text": "리그 경기"
+      },
+      {
+        "id": "",
+        "rect": {
+          "bottom": 179.5,
+          "h": 25.5,
+          "right": 674,
+          "w": 560,
+          "x": 114,
+          "y": 154
+        },
+        "tag": "H3",
+        "text": "라인업"
+      },
+      {
+        "id": "",
+        "rect": {
+          "bottom": 453.3333435058594,
+          "h": 25.5,
+          "right": 674,
+          "w": 560,
+          "x": 114,
+          "y": 427.8333435058594
+        },
+        "tag": "H3",
+        "text": "득점·카드"
+      },
+      {
+        "id": "",
+        "rect": {
+          "bottom": 609.6666870117188,
+          "h": 25.5,
+          "right": 674,
+          "w": 560,
+          "x": 114,
+          "y": 584.1666870117188
+        },
+        "tag": "H3",
+        "text": "결과 변경 이력"
+      },
+      {
+        "id": "",
+        "rect": {
+          "bottom": 759.1666870117188,
+          "h": 20,
+          "right": 661.3333587646484,
+          "w": 534.6666870117188,
+          "x": 126.66667175292967,
+          "y": 739.1666870117188
+        },
+        "tag": "H2",
+        "text": "리그 순위·전적"
+      },
+      {
+        "id": "",
+        "rect": {
+          "bottom": 928.5,
+          "h": 20,
+          "right": 661.3333587646484,
+          "w": 534.6666870117188,
+          "x": 126.66667175292967,
+          "y": 908.5
+        },
+        "tag": "H2",
+        "text": "우리 팀 경기"
+      }
+    ],
+    "pathname": "/league-matches/{league-63e7cd6e36c0}/fixtures/{fixture-8f057ede6703}",
+    "playerLink": {
+      "focusVisible": false,
+      "href": "/users/{player-cdc985813531}?from=%2Fleague-matches%2F{league-63e7cd6e36c0}%2Ffixtures%2F{fixture-8f057ede6703}%3Ffrom%3D%252Ftournaments%252F{league-63e7cd6e36c0}%252Fbracket",
+      "rect": {
+        "bottom": 251.5,
+        "h": 16,
+        "right": 476.9479179382324,
+        "w": 44.94791793823242,
+        "x": 432,
+        "y": 235.5
+      }
+    },
+    "profileLinkCount": 5,
+    "query": "?from=%2Ftournaments%2F{league-63e7cd6e36c0}%2Fbracket",
+    "scroll": {
+      "main": 133.3333282470703,
+      "windowX": 0,
+      "windowY": 0
+    },
+    "tabs": [],
+    "url": "https://alpha.teameet.co.kr/league-matches/{league-63e7cd6e36c0}/fixtures/{fixture-8f057ede6703}?from=%2Ftournaments%2F{league-63e7cd6e36c0}%2Fbracket",
+    "utc": "2026-10-04T15:07:31.174Z",
+    "viewport": {
+      "dpr": 1.5,
+      "h": 505,
+      "w": 788
+    }
+  },
+  {
+    "label": "tablet bracket after return through fixture",
+    "active": {
+      "aria": "뒤로가기",
+      "focusVisible": false,
+      "href": "/tournaments/{league-63e7cd6e36c0}",
+      "rect": {
+        "bottom": 52,
+        "h": 44,
+        "right": 142,
+        "w": 44,
+        "x": 98,
+        "y": 8
+      },
+      "tag": "A"
+    },
+    "back": [
+      {
+        "href": "/tournaments/{league-63e7cd6e36c0}",
+        "rect": {
+          "bottom": 52,
+          "h": 44,
+          "right": 142,
+          "w": 44,
+          "x": 98,
+          "y": 8
+        }
+      },
+      {
+        "href": "/tournaments/{league-63e7cd6e36c0}",
+        "rect": {
+          "bottom": 0,
+          "h": 0,
+          "right": 0,
+          "w": 0,
+          "x": 0,
+          "y": 0
+        }
+      }
+    ],
+    "eventAnchorIds": [],
+    "hash": "",
+    "hashLinks": [],
+    "headings": [
+      {
+        "id": "",
+        "rect": {
+          "bottom": -57.33333587646485,
+          "h": 1,
+          "right": 114,
+          "w": 1,
+          "x": 113,
+          "y": -58.33333587646485
+        },
+        "tag": "H1",
+        "text": "ALPHA QA E2E 리그 20261001-1354 순위·대진표"
+      },
+      {
+        "id": "",
+        "rect": {
+          "bottom": -31.333335876464844,
+          "h": 26,
+          "right": 438.78125,
+          "w": 324.78125,
+          "x": 114,
+          "y": -57.33333587646485
+        },
+        "tag": "H2",
+        "text": "ALPHA QA E2E 리그 20261001-1354"
+      },
+      {
+        "id": "",
+        "rect": {
+          "bottom": 209.6875,
+          "h": 25.5,
+          "right": 674,
+          "w": 560,
+          "x": 114,
+          "y": 184.1875
+        },
+        "tag": "H3",
+        "text": "경기 일정"
+      }
+    ],
+    "pathname": "/tournaments/{league-63e7cd6e36c0}/bracket",
+    "playerLink": null,
+    "profileLinkCount": 0,
+    "query": "",
+    "scroll": {
+      "main": 133.3333282470703,
+      "windowX": 0,
+      "windowY": 0
+    },
+    "tabs": [
+      {
+        "rect": {
+          "bottom": 164.1875,
+          "h": 44,
+          "right": 390,
+          "w": 272,
+          "x": 118,
+          "y": 120.1875
+        },
+        "selected": "true",
+        "text": "경기 일정"
+      },
+      {
+        "rect": {
+          "bottom": 164.1875,
+          "h": 44,
+          "right": 670,
+          "w": 272,
+          "x": 398,
+          "y": 120.1875
+        },
+        "selected": "false",
+        "text": "리그 순위"
+      },
+      {
+        "rect": {
+          "bottom": 265.6875,
+          "h": 44,
+          "right": 161.8125,
+          "w": 47.8125,
+          "x": 114,
+          "y": 221.6875
+        },
+        "selected": "true",
+        "text": "전체"
+      },
+      {
+        "rect": {
+          "bottom": 265.6875,
+          "h": 44,
+          "right": 254.33333587646484,
+          "w": 84.52083587646484,
+          "x": 169.8125,
+          "y": 221.6875
+        },
+        "selected": "false",
+        "text": "정규 라운드"
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/tournaments/{league-63e7cd6e36c0}/bracket",
+    "utc": "2026-10-04T15:07:31.391Z",
+    "viewport": {
+      "dpr": 1.5,
+      "h": 505,
+      "w": 788
+    }
+  },
+  {
+    "label": "desktop bracket regular-round selected before fixture",
+    "active": {
+      "aria": null,
+      "focusVisible": false,
+      "href": null,
+      "rect": {
+        "bottom": 400.6875,
+        "h": 44,
+        "right": 232.671875,
+        "w": 85.1875,
+        "x": 147.484375,
+        "y": 356.6875
+      },
+      "tag": "BUTTON"
+    },
+    "back": [
+      {
+        "href": "/tournaments/{league-63e7cd6e36c0}",
+        "rect": {
+          "bottom": 0,
+          "h": 0,
+          "right": 0,
+          "w": 0,
+          "x": 0,
+          "y": 0
+        }
+      },
+      {
+        "href": "/tournaments/{league-63e7cd6e36c0}",
+        "rect": {
+          "bottom": 29,
+          "h": 40,
+          "right": 95,
+          "w": 40,
+          "x": 55,
+          "y": -11
+        }
+      }
+    ],
+    "eventAnchorIds": [],
+    "hash": "",
+    "hashLinks": [],
+    "headings": [
+      {
+        "id": "",
+        "rect": {
+          "bottom": 77,
+          "h": 1,
+          "right": 55,
+          "w": 1,
+          "x": 54,
+          "y": 76
+        },
+        "tag": "H1",
+        "text": "ALPHA QA E2E 리그 20261001-1354 순위·대진표"
+      },
+      {
+        "id": "",
+        "rect": {
+          "bottom": 103,
+          "h": 26,
+          "right": 379.78125,
+          "w": 324.78125,
+          "x": 55,
+          "y": 77
+        },
+        "tag": "H2",
+        "text": "ALPHA QA E2E 리그 20261001-1354"
+      },
+      {
+        "id": "",
+        "rect": {
+          "bottom": 344.6875,
+          "h": 25.5,
+          "right": 1091,
+          "w": 1000,
+          "x": 91,
+          "y": 319.1875
+        },
+        "tag": "H3",
+        "text": "경기 일정"
+      }
+    ],
+    "pathname": "/tournaments/{league-63e7cd6e36c0}/bracket",
+    "playerLink": null,
+    "profileLinkCount": 0,
+    "query": "",
+    "scroll": {
+      "main": 0,
+      "windowX": 0,
+      "windowY": 103
+    },
+    "tabs": [
+      {
+        "rect": {
+          "bottom": 299.1875,
+          "h": 44,
+          "right": 587,
+          "w": 508,
+          "x": 79,
+          "y": 255.1875
+        },
+        "selected": "true",
+        "text": "경기 일정"
+      },
+      {
+        "rect": {
+          "bottom": 299.1875,
+          "h": 44,
+          "right": 1103,
+          "w": 508,
+          "x": 595,
+          "y": 255.1875
+        },
+        "selected": "false",
+        "text": "리그 순위"
+      },
+      {
+        "rect": {
+          "bottom": 400.6875,
+          "h": 44,
+          "right": 139.484375,
+          "w": 48.484375,
+          "x": 91,
+          "y": 356.6875
+        },
+        "selected": "false",
+        "text": "전체"
+      },
+      {
+        "rect": {
+          "bottom": 400.6875,
+          "h": 44,
+          "right": 232.671875,
+          "w": 85.1875,
+          "x": 147.484375,
+          "y": 356.6875
+        },
+        "selected": "true",
+        "text": "정규 라운드"
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/tournaments/{league-63e7cd6e36c0}/bracket",
+    "utc": "2026-10-04T15:08:03.715Z",
+    "viewport": {
+      "dpr": 1,
+      "h": 757,
+      "w": 1182
+    }
+  },
+  {
+    "label": "desktop source before exact player click",
+    "active": {
+      "aria": null,
+      "focusVisible": true,
+      "href": "/users/{player-cdc985813531}?from=%2Fleague-matches%2F{league-63e7cd6e36c0}%2Ffixtures%2F{fixture-8f057ede6703}%3Ffrom%3D%252Ftournaments%252F{league-63e7cd6e36c0}%252Fbracket",
+      "rect": {
+        "bottom": 385.5,
+        "h": 15,
+        "right": 673.953125,
+        "w": 44.953125,
+        "x": 629,
+        "y": 370.5
+      },
+      "tag": "A"
+    },
+    "back": [
+      {
+        "href": "/tournaments/{league-63e7cd6e36c0}/bracket",
+        "rect": {
+          "bottom": 0,
+          "h": 0,
+          "right": 0,
+          "w": 0,
+          "x": 0,
+          "y": 0
+        }
+      },
+      {
+        "href": "/tournaments/{league-63e7cd6e36c0}/bracket",
+        "rect": {
+          "bottom": 36,
+          "h": 40,
+          "right": 95,
+          "w": 40,
+          "x": 55,
+          "y": -4
+        }
+      }
+    ],
+    "eventAnchorIds": [
+      {
+        "id": "match-events-period-1",
+        "rect": {
+          "bottom": 635,
+          "h": 18,
+          "right": 890,
+          "w": 598,
+          "x": 292,
+          "y": 617
+        }
+      }
+    ],
+    "hash": "",
+    "hashLinks": [],
+    "headings": [
+      {
+        "id": "",
+        "rect": {
+          "bottom": 32,
+          "h": 32,
+          "right": 195.515625,
+          "w": 88.515625,
+          "x": 107,
+          "y": 0
+        },
+        "tag": "H1",
+        "text": "리그 경기"
+      },
+      {
+        "id": "",
+        "rect": {
+          "bottom": 313.5,
+          "h": 25.5,
+          "right": 907,
+          "w": 632,
+          "x": 275,
+          "y": 288
+        },
+        "tag": "H3",
+        "text": "라인업"
+      },
+      {
+        "id": "",
+        "rect": {
+          "bottom": 588,
+          "h": 25.5,
+          "right": 907,
+          "w": 632,
+          "x": 275,
+          "y": 562.5
+        },
+        "tag": "H3",
+        "text": "득점·카드"
+      },
+      {
+        "id": "",
+        "rect": {
+          "bottom": 745,
+          "h": 25.5,
+          "right": 907,
+          "w": 632,
+          "x": 275,
+          "y": 719.5
+        },
+        "tag": "H3",
+        "text": "결과 변경 이력"
+      },
+      {
+        "id": "",
+        "rect": {
+          "bottom": 895.5,
+          "h": 20,
+          "right": 894,
+          "w": 606,
+          "x": 288,
+          "y": 875.5
+        },
+        "tag": "H2",
+        "text": "리그 순위·전적"
+      },
+      {
+        "id": "",
+        "rect": {
+          "bottom": 1065.5,
+          "h": 20,
+          "right": 894,
+          "w": 606,
+          "x": 288,
+          "y": 1045.5
+        },
+        "tag": "H2",
+        "text": "우리 팀 경기"
+      }
+    ],
+    "pathname": "/league-matches/{league-63e7cd6e36c0}/fixtures/{fixture-8f057ede6703}",
+    "playerLink": {
+      "focusVisible": true,
+      "href": "/users/{player-cdc985813531}?from=%2Fleague-matches%2F{league-63e7cd6e36c0}%2Ffixtures%2F{fixture-8f057ede6703}%3Ffrom%3D%252Ftournaments%252F{league-63e7cd6e36c0}%252Fbracket",
+      "rect": {
+        "bottom": 385.5,
+        "h": 15,
+        "right": 673.953125,
+        "w": 44.953125,
+        "x": 629,
+        "y": 370.5
+      }
+    },
+    "profileLinkCount": 5,
+    "query": "?from=%2Ftournaments%2F{league-63e7cd6e36c0}%2Fbracket",
+    "scroll": {
+      "main": 0,
+      "windowX": 0,
+      "windowY": 96
+    },
+    "tabs": [],
+    "url": "https://alpha.teameet.co.kr/league-matches/{league-63e7cd6e36c0}/fixtures/{fixture-8f057ede6703}?from=%2Ftournaments%2F{league-63e7cd6e36c0}%2Fbracket",
+    "utc": "2026-10-04T15:08:04.263Z",
+    "viewport": {
+      "dpr": 1,
+      "h": 757,
+      "w": 1182
+    }
+  },
+  {
+    "label": "desktop loaded public profile Back href",
+    "active": {
+      "aria": null,
+      "focusVisible": false,
+      "href": null,
+      "rect": {
+        "bottom": 1053,
+        "h": 1053,
+        "right": 1182,
+        "w": 1182,
+        "x": 0,
+        "y": 0
+      },
+      "tag": "BODY"
+    },
+    "back": [
+      {
+        "href": "/league-matches/{league-63e7cd6e36c0}/fixtures/{fixture-8f057ede6703}?from=%2Ftournaments%2F{league-63e7cd6e36c0}%2Fbracket",
+        "rect": {
+          "bottom": 0,
+          "h": 0,
+          "right": 0,
+          "w": 0,
+          "x": 0,
+          "y": 0
+        }
+      },
+      {
+        "href": "/league-matches/{league-63e7cd6e36c0}/fixtures/{fixture-8f057ede6703}?from=%2Ftournaments%2F{league-63e7cd6e36c0}%2Fbracket",
+        "rect": {
+          "bottom": 132,
+          "h": 40,
+          "right": 95,
+          "w": 40,
+          "x": 55,
+          "y": 92
+        }
+      }
+    ],
+    "eventAnchorIds": [],
+    "hash": "",
+    "hashLinks": [],
+    "headings": [],
+    "pathname": "/users/{player-cdc985813531}",
+    "playerLink": {
+      "focusVisible": false,
+      "href": "/users/{player-cdc985813531}/card?from=%2Fusers%2F{player-cdc985813531}%3Ffrom%3D%252Fleague-matches%252F{league-63e7cd6e36c0}%252Ffixtures%252F{fixture-8f057ede6703}%253Ffrom%253D%25252Ftournaments%25252F{league-63e7cd6e36c0}%25252Fbracket",
+      "rect": {
+        "bottom": 699,
+        "h": 44,
+        "right": 405,
+        "w": 44,
+        "x": 361,
+        "y": 655
+      }
+    },
+    "profileLinkCount": 2,
+    "query": "?from=%2Fleague-matches%2F{league-63e7cd6e36c0}%2Ffixtures%2F{fixture-8f057ede6703}%3Ffrom%3D%252Ftournaments%252F{league-63e7cd6e36c0}%252Fbracket",
+    "scroll": {
+      "main": 0,
+      "windowX": 0,
+      "windowY": 0
+    },
+    "tabs": [
+      {
+        "rect": {
+          "bottom": 660,
+          "h": 44,
+          "right": 1022,
+          "w": 76,
+          "x": 946,
+          "y": 616
+        },
+        "selected": "true",
+        "text": "전체"
+      },
+      {
+        "rect": {
+          "bottom": 660,
+          "h": 44,
+          "right": 1106,
+          "w": 76,
+          "x": 1030,
+          "y": 616
+        },
+        "selected": "false",
+        "text": "이번 달"
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/users/{player-cdc985813531}?from=%2Fleague-matches%2F{league-63e7cd6e36c0}%2Ffixtures%2F{fixture-8f057ede6703}%3Ffrom%3D%252Ftournaments%252F{league-63e7cd6e36c0}%252Fbracket",
+    "utc": "2026-10-04T15:08:23.532Z",
+    "viewport": {
+      "dpr": 1,
+      "h": 757,
+      "w": 1182
+    }
+  },
+  {
+    "label": "desktop returned fixture initial",
+    "active": {
+      "aria": "뒤로가기",
+      "focusVisible": false,
+      "href": "/tournaments/{league-63e7cd6e36c0}/bracket",
+      "rect": {
+        "bottom": 36,
+        "h": 40,
+        "right": 95,
+        "w": 40,
+        "x": 55,
+        "y": -4
+      },
+      "tag": "A"
+    },
+    "back": [
+      {
+        "href": "/tournaments/{league-63e7cd6e36c0}/bracket",
+        "rect": {
+          "bottom": 0,
+          "h": 0,
+          "right": 0,
+          "w": 0,
+          "x": 0,
+          "y": 0
+        }
+      },
+      {
+        "href": "/tournaments/{league-63e7cd6e36c0}/bracket",
+        "rect": {
+          "bottom": 36,
+          "h": 40,
+          "right": 95,
+          "w": 40,
+          "x": 55,
+          "y": -4
+        }
+      }
+    ],
+    "eventAnchorIds": [
+      {
+        "id": "match-events-period-1",
+        "rect": {
+          "bottom": 635,
+          "h": 18,
+          "right": 890,
+          "w": 598,
+          "x": 292,
+          "y": 617
+        }
+      }
+    ],
+    "hash": "",
+    "hashLinks": [],
+    "headings": [
+      {
+        "id": "",
+        "rect": {
+          "bottom": 32,
+          "h": 32,
+          "right": 195.515625,
+          "w": 88.515625,
+          "x": 107,
+          "y": 0
+        },
+        "tag": "H1",
+        "text": "리그 경기"
+      },
+      {
+        "id": "",
+        "rect": {
+          "bottom": 313.5,
+          "h": 25.5,
+          "right": 907,
+          "w": 632,
+          "x": 275,
+          "y": 288
+        },
+        "tag": "H3",
+        "text": "라인업"
+      },
+      {
+        "id": "",
+        "rect": {
+          "bottom": 588,
+          "h": 25.5,
+          "right": 907,
+          "w": 632,
+          "x": 275,
+          "y": 562.5
+        },
+        "tag": "H3",
+        "text": "득점·카드"
+      },
+      {
+        "id": "",
+        "rect": {
+          "bottom": 745,
+          "h": 25.5,
+          "right": 907,
+          "w": 632,
+          "x": 275,
+          "y": 719.5
+        },
+        "tag": "H3",
+        "text": "결과 변경 이력"
+      },
+      {
+        "id": "",
+        "rect": {
+          "bottom": 895.5,
+          "h": 20,
+          "right": 894,
+          "w": 606,
+          "x": 288,
+          "y": 875.5
+        },
+        "tag": "H2",
+        "text": "리그 순위·전적"
+      },
+      {
+        "id": "",
+        "rect": {
+          "bottom": 1065.5,
+          "h": 20,
+          "right": 894,
+          "w": 606,
+          "x": 288,
+          "y": 1045.5
+        },
+        "tag": "H2",
+        "text": "우리 팀 경기"
+      }
+    ],
+    "pathname": "/league-matches/{league-63e7cd6e36c0}/fixtures/{fixture-8f057ede6703}",
+    "playerLink": {
+      "focusVisible": false,
+      "href": "/users/{player-cdc985813531}?from=%2Fleague-matches%2F{league-63e7cd6e36c0}%2Ffixtures%2F{fixture-8f057ede6703}%3Ffrom%3D%252Ftournaments%252F{league-63e7cd6e36c0}%252Fbracket",
+      "rect": {
+        "bottom": 385.5,
+        "h": 15,
+        "right": 673.953125,
+        "w": 44.953125,
+        "x": 629,
+        "y": 370.5
+      }
+    },
+    "profileLinkCount": 5,
+    "query": "?from=%2Ftournaments%2F{league-63e7cd6e36c0}%2Fbracket",
+    "scroll": {
+      "main": 0,
+      "windowX": 0,
+      "windowY": 96
+    },
+    "tabs": [],
+    "url": "https://alpha.teameet.co.kr/league-matches/{league-63e7cd6e36c0}/fixtures/{fixture-8f057ede6703}?from=%2Ftournaments%2F{league-63e7cd6e36c0}%2Fbracket",
+    "utc": "2026-10-04T15:08:23.850Z",
+    "viewport": {
+      "dpr": 1,
+      "h": 757,
+      "w": 1182
+    }
+  },
+  {
+    "label": "desktop settled fixture after player page Back",
+    "active": {
+      "aria": "뒤로가기",
+      "focusVisible": false,
+      "href": "/tournaments/{league-63e7cd6e36c0}/bracket",
+      "rect": {
+        "bottom": 36,
+        "h": 40,
+        "right": 95,
+        "w": 40,
+        "x": 55,
+        "y": -4
+      },
+      "tag": "A"
+    },
+    "back": [
+      {
+        "href": "/tournaments/{league-63e7cd6e36c0}/bracket",
+        "rect": {
+          "bottom": 0,
+          "h": 0,
+          "right": 0,
+          "w": 0,
+          "x": 0,
+          "y": 0
+        }
+      },
+      {
+        "href": "/tournaments/{league-63e7cd6e36c0}/bracket",
+        "rect": {
+          "bottom": 36,
+          "h": 40,
+          "right": 95,
+          "w": 40,
+          "x": 55,
+          "y": -4
+        }
+      }
+    ],
+    "eventAnchorIds": [
+      {
+        "id": "match-events-period-1",
+        "rect": {
+          "bottom": 635,
+          "h": 18,
+          "right": 890,
+          "w": 598,
+          "x": 292,
+          "y": 617
+        }
+      }
+    ],
+    "hash": "",
+    "hashLinks": [],
+    "headings": [
+      {
+        "id": "",
+        "rect": {
+          "bottom": 32,
+          "h": 32,
+          "right": 195.515625,
+          "w": 88.515625,
+          "x": 107,
+          "y": 0
+        },
+        "tag": "H1",
+        "text": "리그 경기"
+      },
+      {
+        "id": "",
+        "rect": {
+          "bottom": 313.5,
+          "h": 25.5,
+          "right": 907,
+          "w": 632,
+          "x": 275,
+          "y": 288
+        },
+        "tag": "H3",
+        "text": "라인업"
+      },
+      {
+        "id": "",
+        "rect": {
+          "bottom": 588,
+          "h": 25.5,
+          "right": 907,
+          "w": 632,
+          "x": 275,
+          "y": 562.5
+        },
+        "tag": "H3",
+        "text": "득점·카드"
+      },
+      {
+        "id": "",
+        "rect": {
+          "bottom": 745,
+          "h": 25.5,
+          "right": 907,
+          "w": 632,
+          "x": 275,
+          "y": 719.5
+        },
+        "tag": "H3",
+        "text": "결과 변경 이력"
+      },
+      {
+        "id": "",
+        "rect": {
+          "bottom": 895.5,
+          "h": 20,
+          "right": 894,
+          "w": 606,
+          "x": 288,
+          "y": 875.5
+        },
+        "tag": "H2",
+        "text": "리그 순위·전적"
+      },
+      {
+        "id": "",
+        "rect": {
+          "bottom": 1065.5,
+          "h": 20,
+          "right": 894,
+          "w": 606,
+          "x": 288,
+          "y": 1045.5
+        },
+        "tag": "H2",
+        "text": "우리 팀 경기"
+      }
+    ],
+    "pathname": "/league-matches/{league-63e7cd6e36c0}/fixtures/{fixture-8f057ede6703}",
+    "playerLink": {
+      "focusVisible": false,
+      "href": "/users/{player-cdc985813531}?from=%2Fleague-matches%2F{league-63e7cd6e36c0}%2Ffixtures%2F{fixture-8f057ede6703}%3Ffrom%3D%252Ftournaments%252F{league-63e7cd6e36c0}%252Fbracket",
+      "rect": {
+        "bottom": 385.5,
+        "h": 15,
+        "right": 673.953125,
+        "w": 44.953125,
+        "x": 629,
+        "y": 370.5
+      }
+    },
+    "profileLinkCount": 5,
+    "query": "?from=%2Ftournaments%2F{league-63e7cd6e36c0}%2Fbracket",
+    "scroll": {
+      "main": 0,
+      "windowX": 0,
+      "windowY": 96
+    },
+    "tabs": [],
+    "url": "https://alpha.teameet.co.kr/league-matches/{league-63e7cd6e36c0}/fixtures/{fixture-8f057ede6703}?from=%2Ftournaments%2F{league-63e7cd6e36c0}%2Fbracket",
+    "utc": "2026-10-04T15:08:37.200Z",
+    "viewport": {
+      "dpr": 1,
+      "h": 757,
+      "w": 1182
+    }
+  },
+  {
+    "label": "desktop bracket after return through fixture",
+    "active": {
+      "aria": "뒤로가기",
+      "focusVisible": false,
+      "href": "/tournaments/{league-63e7cd6e36c0}",
+      "rect": {
+        "bottom": -81,
+        "h": 40,
+        "right": 95,
+        "w": 40,
+        "x": 55,
+        "y": -121
+      },
+      "tag": "A"
+    },
+    "back": [
+      {
+        "href": "/tournaments/{league-63e7cd6e36c0}",
+        "rect": {
+          "bottom": 0,
+          "h": 0,
+          "right": 0,
+          "w": 0,
+          "x": 0,
+          "y": 0
+        }
+      },
+      {
+        "href": "/tournaments/{league-63e7cd6e36c0}",
+        "rect": {
+          "bottom": -81,
+          "h": 40,
+          "right": 95,
+          "w": 40,
+          "x": 55,
+          "y": -121
+        }
+      }
+    ],
+    "eventAnchorIds": [],
+    "hash": "",
+    "hashLinks": [],
+    "headings": [
+      {
+        "id": "",
+        "rect": {
+          "bottom": -33,
+          "h": 1,
+          "right": 55,
+          "w": 1,
+          "x": 54,
+          "y": -34
+        },
+        "tag": "H1",
+        "text": "ALPHA QA E2E 리그 20261001-1354 순위·대진표"
+      },
+      {
+        "id": "",
+        "rect": {
+          "bottom": -7,
+          "h": 26,
+          "right": 379.78125,
+          "w": 324.78125,
+          "x": 55,
+          "y": -33
+        },
+        "tag": "H2",
+        "text": "ALPHA QA E2E 리그 20261001-1354"
+      },
+      {
+        "id": "",
+        "rect": {
+          "bottom": 234.6875,
+          "h": 25.5,
+          "right": 1091,
+          "w": 1000,
+          "x": 91,
+          "y": 209.1875
+        },
+        "tag": "H3",
+        "text": "경기 일정"
+      }
+    ],
+    "pathname": "/tournaments/{league-63e7cd6e36c0}/bracket",
+    "playerLink": null,
+    "profileLinkCount": 0,
+    "query": "",
+    "scroll": {
+      "main": 0,
+      "windowX": 0,
+      "windowY": 213
+    },
+    "tabs": [
+      {
+        "rect": {
+          "bottom": 189.1875,
+          "h": 44,
+          "right": 587,
+          "w": 508,
+          "x": 79,
+          "y": 145.1875
+        },
+        "selected": "true",
+        "text": "경기 일정"
+      },
+      {
+        "rect": {
+          "bottom": 189.1875,
+          "h": 44,
+          "right": 1103,
+          "w": 508,
+          "x": 595,
+          "y": 145.1875
+        },
+        "selected": "false",
+        "text": "리그 순위"
+      },
+      {
+        "rect": {
+          "bottom": 290.6875,
+          "h": 44,
+          "right": 139.484375,
+          "w": 48.484375,
+          "x": 91,
+          "y": 246.6875
+        },
+        "selected": "true",
+        "text": "전체"
+      },
+      {
+        "rect": {
+          "bottom": 290.6875,
+          "h": 44,
+          "right": 232.671875,
+          "w": 85.1875,
+          "x": 147.484375,
+          "y": 246.6875
+        },
+        "selected": "false",
+        "text": "정규 라운드"
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/tournaments/{league-63e7cd6e36c0}/bracket",
+    "utc": "2026-10-04T15:08:37.437Z",
+    "viewport": {
+      "dpr": 1,
+      "h": 757,
+      "w": 1182
+    }
+  },
+  {
+    "label": "desktop settled bracket after fixture return, regular-round reset remains",
+    "active": {
+      "aria": "뒤로가기",
+      "focusVisible": false,
+      "href": "/tournaments/{league-63e7cd6e36c0}",
+      "rect": {
+        "bottom": -81,
+        "h": 40,
+        "right": 95,
+        "w": 40,
+        "x": 55,
+        "y": -121
+      },
+      "tag": "A"
+    },
+    "back": [
+      {
+        "href": "/tournaments/{league-63e7cd6e36c0}",
+        "rect": {
+          "bottom": 0,
+          "h": 0,
+          "right": 0,
+          "w": 0,
+          "x": 0,
+          "y": 0
+        }
+      },
+      {
+        "href": "/tournaments/{league-63e7cd6e36c0}",
+        "rect": {
+          "bottom": -81,
+          "h": 40,
+          "right": 95,
+          "w": 40,
+          "x": 55,
+          "y": -121
+        }
+      }
+    ],
+    "eventAnchorIds": [],
+    "hash": "",
+    "hashLinks": [],
+    "headings": [
+      {
+        "id": "",
+        "rect": {
+          "bottom": -33,
+          "h": 1,
+          "right": 55,
+          "w": 1,
+          "x": 54,
+          "y": -34
+        },
+        "tag": "H1",
+        "text": "ALPHA QA E2E 리그 20261001-1354 순위·대진표"
+      },
+      {
+        "id": "",
+        "rect": {
+          "bottom": -7,
+          "h": 26,
+          "right": 379.78125,
+          "w": 324.78125,
+          "x": 55,
+          "y": -33
+        },
+        "tag": "H2",
+        "text": "ALPHA QA E2E 리그 20261001-1354"
+      },
+      {
+        "id": "",
+        "rect": {
+          "bottom": 234.6875,
+          "h": 25.5,
+          "right": 1091,
+          "w": 1000,
+          "x": 91,
+          "y": 209.1875
+        },
+        "tag": "H3",
+        "text": "경기 일정"
+      }
+    ],
+    "pathname": "/tournaments/{league-63e7cd6e36c0}/bracket",
+    "playerLink": null,
+    "profileLinkCount": 0,
+    "query": "",
+    "scroll": {
+      "main": 0,
+      "windowX": 0,
+      "windowY": 213
+    },
+    "tabs": [
+      {
+        "rect": {
+          "bottom": 189.1875,
+          "h": 44,
+          "right": 587,
+          "w": 508,
+          "x": 79,
+          "y": 145.1875
+        },
+        "selected": "true",
+        "text": "경기 일정"
+      },
+      {
+        "rect": {
+          "bottom": 189.1875,
+          "h": 44,
+          "right": 1103,
+          "w": 508,
+          "x": 595,
+          "y": 145.1875
+        },
+        "selected": "false",
+        "text": "리그 순위"
+      },
+      {
+        "rect": {
+          "bottom": 290.6875,
+          "h": 44,
+          "right": 139.484375,
+          "w": 48.484375,
+          "x": 91,
+          "y": 246.6875
+        },
+        "selected": "true",
+        "text": "전체"
+      },
+      {
+        "rect": {
+          "bottom": 290.6875,
+          "h": 44,
+          "right": 232.671875,
+          "w": 85.1875,
+          "x": 147.484375,
+          "y": 246.6875
+        },
+        "selected": "false",
+        "text": "정규 라운드"
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/tournaments/{league-63e7cd6e36c0}/bracket",
+    "utc": "2026-10-04T15:09:41.386Z",
+    "viewport": {
+      "dpr": 1,
+      "h": 757,
+      "w": 1182
+    }
+  }
+]

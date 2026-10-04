@@ -1,0 +1,13 @@
+{
+  "fixtureRoute": false,
+  "forms": 0,
+  "h1": "스포츠 대회",
+  "profileRoute": false,
+  "url": "https://alpha.teameet.co.kr/tournaments",
+  "utc": "2026-10-04T15:09:42.156Z",
+  "viewport": {
+    "dpr": 1,
+    "h": 757,
+    "w": 1182
+  }
+}

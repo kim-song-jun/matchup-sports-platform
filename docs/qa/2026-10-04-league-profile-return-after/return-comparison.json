@@ -1,0 +1,197 @@
+[
+  {
+    "width": "mobile",
+    "viewport": {
+      "dpr": 1.25,
+      "h": 606,
+      "w": 402
+    },
+    "sourceIndex": 1,
+    "profileIndex": 2,
+    "returnIndex": 3,
+    "settledReturnIndex": 4,
+    "sourceUTC": "2026-10-04T15:05:35.957Z",
+    "profileUTC": "2026-10-04T15:05:57.294Z",
+    "returnUTC": "2026-10-04T15:05:57.688Z",
+    "settledReturnUTC": "2026-10-04T15:06:31.981Z",
+    "sourceURLSHA256": "8740694ad8a8e4fc4ea4749ac1ac54e23206762554222bb0680e3cdae246f428",
+    "returnedURLSHA256": "8740694ad8a8e4fc4ea4749ac1ac54e23206762554222bb0680e3cdae246f428",
+    "sourcePlayerHrefSHA256": "642d76544552f2c73c89c15cbd33fcb7cc8d6ba0f66c5edc317e9c1f8bc5ce73",
+    "profileURLSHA256": "076ce702a15f17b08e0b0239d79933c6667b10eb7cfd658990de24a2f45fff8d",
+    "clickedLinkMatchesProfileURL": true,
+    "outgoingFromEqualsSourceRelative": true,
+    "profileFromEqualsSourceRelative": true,
+    "visiblePageBackHrefEqualsSourceRelative": true,
+    "returnedURLExactlyEqualsSource": true,
+    "settledReturnedURLExactlyEqualsSource": true,
+    "sourceScroll": {
+      "main": 108.8000030517578,
+      "windowX": 0,
+      "windowY": 0
+    },
+    "returnScroll": {
+      "main": 108.8000030517578,
+      "windowX": 0,
+      "windowY": 0
+    },
+    "settledReturnScroll": {
+      "main": 108.8000030517578,
+      "windowX": 0,
+      "windowY": 0
+    },
+    "scrollExactEquality": true,
+    "sourcePlayerRect": {
+      "bottom": 301.9000120162964,
+      "h": 15.199999809265137,
+      "right": 283.75000381469727,
+      "w": 44.95000076293945,
+      "x": 238.8000030517578,
+      "y": 286.70001220703125
+    },
+    "returnPlayerRect": {
+      "bottom": 301.9000120162964,
+      "h": 15.199999809265137,
+      "right": 283.75000381469727,
+      "w": 44.95000076293945,
+      "x": 238.8000030517578,
+      "y": 286.70001220703125
+    },
+    "sourceQuery": "from=%2Ftournaments%2F{league-63e7cd6e36c0}%2Fbracket",
+    "sourceHash": "",
+    "sourceTabs": [],
+    "hashLinkCount": 0,
+    "eventAnchorIds": [
+      "match-events-period-1"
+    ]
+  },
+  {
+    "width": "tablet",
+    "viewport": {
+      "dpr": 1.5,
+      "h": 505,
+      "w": 788
+    },
+    "sourceIndex": 7,
+    "profileIndex": 8,
+    "returnIndex": 9,
+    "settledReturnIndex": 10,
+    "sourceUTC": "2026-10-04T15:06:53.744Z",
+    "profileUTC": "2026-10-04T15:07:20.323Z",
+    "returnUTC": "2026-10-04T15:07:20.706Z",
+    "settledReturnUTC": "2026-10-04T15:07:31.174Z",
+    "sourceURLSHA256": "8740694ad8a8e4fc4ea4749ac1ac54e23206762554222bb0680e3cdae246f428",
+    "returnedURLSHA256": "8740694ad8a8e4fc4ea4749ac1ac54e23206762554222bb0680e3cdae246f428",
+    "sourcePlayerHrefSHA256": "642d76544552f2c73c89c15cbd33fcb7cc8d6ba0f66c5edc317e9c1f8bc5ce73",
+    "profileURLSHA256": "076ce702a15f17b08e0b0239d79933c6667b10eb7cfd658990de24a2f45fff8d",
+    "clickedLinkMatchesProfileURL": true,
+    "outgoingFromEqualsSourceRelative": true,
+    "profileFromEqualsSourceRelative": true,
+    "visiblePageBackHrefEqualsSourceRelative": true,
+    "returnedURLExactlyEqualsSource": true,
+    "settledReturnedURLExactlyEqualsSource": true,
+    "sourceScroll": {
+      "main": 133.3333282470703,
+      "windowX": 0,
+      "windowY": 0
+    },
+    "returnScroll": {
+      "main": 133.3333282470703,
+      "windowX": 0,
+      "windowY": 0
+    },
+    "settledReturnScroll": {
+      "main": 133.3333282470703,
+      "windowX": 0,
+      "windowY": 0
+    },
+    "scrollExactEquality": true,
+    "sourcePlayerRect": {
+      "bottom": 251.5,
+      "h": 16,
+      "right": 476.9479179382324,
+      "w": 44.94791793823242,
+      "x": 432,
+      "y": 235.5
+    },
+    "returnPlayerRect": {
+      "bottom": 251.5,
+      "h": 16,
+      "right": 476.9479179382324,
+      "w": 44.94791793823242,
+      "x": 432,
+      "y": 235.5
+    },
+    "sourceQuery": "from=%2Ftournaments%2F{league-63e7cd6e36c0}%2Fbracket",
+    "sourceHash": "",
+    "sourceTabs": [],
+    "hashLinkCount": 0,
+    "eventAnchorIds": [
+      "match-events-period-1"
+    ]
+  },
+  {
+    "width": "desktop",
+    "viewport": {
+      "dpr": 1,
+      "h": 757,
+      "w": 1182
+    },
+    "sourceIndex": 13,
+    "profileIndex": 14,
+    "returnIndex": 15,
+    "settledReturnIndex": 16,
+    "sourceUTC": "2026-10-04T15:08:04.263Z",
+    "profileUTC": "2026-10-04T15:08:23.532Z",
+    "returnUTC": "2026-10-04T15:08:23.850Z",
+    "settledReturnUTC": "2026-10-04T15:08:37.200Z",
+    "sourceURLSHA256": "8740694ad8a8e4fc4ea4749ac1ac54e23206762554222bb0680e3cdae246f428",
+    "returnedURLSHA256": "8740694ad8a8e4fc4ea4749ac1ac54e23206762554222bb0680e3cdae246f428",
+    "sourcePlayerHrefSHA256": "642d76544552f2c73c89c15cbd33fcb7cc8d6ba0f66c5edc317e9c1f8bc5ce73",
+    "profileURLSHA256": "076ce702a15f17b08e0b0239d79933c6667b10eb7cfd658990de24a2f45fff8d",
+    "clickedLinkMatchesProfileURL": true,
+    "outgoingFromEqualsSourceRelative": true,
+    "profileFromEqualsSourceRelative": true,
+    "visiblePageBackHrefEqualsSourceRelative": true,
+    "returnedURLExactlyEqualsSource": true,
+    "settledReturnedURLExactlyEqualsSource": true,
+    "sourceScroll": {
+      "main": 0,
+      "windowX": 0,
+      "windowY": 96
+    },
+    "returnScroll": {
+      "main": 0,
+      "windowX": 0,
+      "windowY": 96
+    },
+    "settledReturnScroll": {
+      "main": 0,
+      "windowX": 0,
+      "windowY": 96
+    },
+    "scrollExactEquality": true,
+    "sourcePlayerRect": {
+      "bottom": 385.5,
+      "h": 15,
+      "right": 673.953125,
+      "w": 44.953125,
+      "x": 629,
+      "y": 370.5
+    },
+    "returnPlayerRect": {
+      "bottom": 385.5,
+      "h": 15,
+      "right": 673.953125,
+      "w": 44.953125,
+      "x": 629,
+      "y": 370.5
+    },
+    "sourceQuery": "from=%2Ftournaments%2F{league-63e7cd6e36c0}%2Fbracket",
+    "sourceHash": "",
+    "sourceTabs": [],
+    "hashLinkCount": 0,
+    "eventAnchorIds": [
+      "match-events-period-1"
+    ]
+  }
+]

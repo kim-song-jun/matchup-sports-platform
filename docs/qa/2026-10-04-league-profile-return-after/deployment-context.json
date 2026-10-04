@@ -1,0 +1,16 @@
+{
+  "reportedSHA": "f614096872ccb5953722a33dc326e3fb8af246c1",
+  "release": "1.1.5-alpha.20261004.gf614096872cc",
+  "deployRun": "37210421129",
+  "reportedSuccessUTC": "2026-10-04T14:58:57Z",
+  "reportedPublicIdentityAndDBHealth": "PASS reported by parent",
+  "runtimeServingIdentity": "unknown",
+  "freshNavigation": {
+    "label": "fresh navigation to observed public team-match list URL after reported release",
+    "startedUTC": "2026-10-04T15:02:55.227Z",
+    "completedUTC": "2026-10-04T15:02:55.946Z",
+    "url": "https://alpha.teameet.co.kr/team-matches"
+  },
+  "consumerDiscovery": "Existing public global 대회 link, actual 정규 리그 filter, observed synthetic league card, 최종 순위 보기 bracket link, actual schedule fixture card. No historical fixture URL directly entered.",
+  "viewer": "Existing browser session; before was recorded guest. Current viewer identity/role not reauthenticated or independently established."
+}

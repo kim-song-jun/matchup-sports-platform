@@ -1,0 +1,15 @@
+{
+  "issue": "https://github.com/kim-song-jun/matchup-sports-platform/issues/1418",
+  "beforeComment": "https://github.com/kim-song-jun/matchup-sports-platform/issues/1418#issuecomment-5944873604",
+  "beforeManifest": "https://github.com/kim-song-jun/matchup-sports-platform/blob/219ac7df75a6ace6d29ffc25ee5192ba4cc13b9f/docs/qa/evidence/2026-10-02-alpha-public-flows/manifest.json",
+  "before": "2026-10-02 guest consumer league fixture → same public player → page Back wrongly /teams. 390x844/768x1024/1440x900; exact current CSS widths differ.",
+  "beforeURLsMatchCurrentFixtureAndPlayer": true,
+  "newQueryHashBefore": "No live before for synthetic view=record/mode=public/hash examples; not manufactured in this run.",
+  "sourceReview": "Independent source worker at deployed SHA; source alone is not UI execution.",
+  "links": [
+    "https://github.com/kim-song-jun/matchup-sports-platform/pull/1607",
+    "https://github.com/kim-song-jun/matchup-sports-platform/blob/f614096872ccb5953722a33dc326e3fb8af246c1/apps/v1_web/src/app/league-matches/%5BleagueId%5D/fixtures/%5BfixtureId%5D/league-fixture-detail-client.tsx#L106",
+    "https://github.com/kim-song-jun/matchup-sports-platform/blob/f614096872ccb5953722a33dc326e3fb8af246c1/apps/v1_web/src/components/public-game-records/match-detail-content.tsx#L36",
+    "https://github.com/kim-song-jun/matchup-sports-platform/blob/f614096872ccb5953722a33dc326e3fb8af246c1/apps/v1_web/src/components/v1-ui/app-back-link.tsx#L46"
+  ]
+}

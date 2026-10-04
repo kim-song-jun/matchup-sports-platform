@@ -1,0 +1,42 @@
+{
+  "scope": "Issue1418 PR1607 actual public league-player profile pageBack after",
+  "startUTC": "2026-10-04T15:02:55.227Z",
+  "lastDOMUTC": "2026-10-04T15:09:42.156Z",
+  "DOMRecords": 19,
+  "loggedActionRecords": 26,
+  "PNG": 12,
+  "coreResult": "3width profile→fixture actual pageBack preserves exact natural source URL, nested from and recorded source scroll",
+  "widths": [
+    {
+      "dpr": 1.25,
+      "h": 606,
+      "w": 402
+    },
+    {
+      "dpr": 1.5,
+      "h": 505,
+      "w": 788
+    },
+    {
+      "dpr": 1,
+      "h": 757,
+      "w": 1182
+    }
+  ],
+  "profileReturnAllComparisonsPass": true,
+  "residual": "Schedule regular-round child-tab resets to all after one additional Back, observed tablet and desktop; separate from profile return",
+  "limitations": [
+    "Whole issue1418 not closed: tournament route, team-roster caller and direct/cold profile fallback not executed in this batch.",
+    "Natural source query contains only parent from; hash is empty and no normal hash navigation links are exposed. Event heading id exists, but query order/arbitrary query/hash retention not live tested.",
+    "Current viewports402x606/788x505/1182x757 differ from historical390x844/768x1024/1440x900. No pixel-identical baseline comparison claimed.",
+    "Source fixture has no tab controls. Profile activity tabs were observed without changing them; schedule tabs recorded separately.",
+    "Current viewer role unknown; cannot assert identical guest/authentication state to before.",
+    "Collector playerLink uses a prefix selector: on profile snapshots it matches the card link, not the source lineup link. Return identity comparisons use only source1/7/13.",
+    "Mobile entry image is proof0 at scroll0, whereas exact mobile departure is proof1 at main108.8 with no separate picture. Matching source/return scroll is DOM evidence; later return picture is not relabeled before.",
+    "Initial consumer league fixture load briefly displayed routing/loading text and then rendered. Not an observed redirect or access denial.",
+    "The first header-specific navigation locator had no matches and timed out; using the actual visible link after DOM inspection succeeded. This was selector mismatch, not app defect.",
+    "Entry.json was a transitional observation after filter click; entry-settled.json supplies actual kind=league URL.",
+    "Actual HTTP requests/DB writes were not audited. No save/create/search-submit/application/upload/share/result/role actions performed.",
+    "No denied admin-console, QA179 or private-roster route used; public synthetic lineup was read only to follow the original explicit player link."
+  ]
+}

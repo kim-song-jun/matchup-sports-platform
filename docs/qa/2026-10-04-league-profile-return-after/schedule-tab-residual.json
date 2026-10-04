@@ -1,0 +1,68 @@
+{
+  "scope": "Separate schedule child-tab reset after an additional fixture page Back; not failure of profile-to-fixture return",
+  "observations": [
+    {
+      "width": "tablet",
+      "beforeIndex": 6,
+      "afterIndex": 11,
+      "beforeUTC": "2026-10-04T15:06:53.250Z",
+      "afterUTC": "2026-10-04T15:07:31.391Z",
+      "beforeSelected": [
+        "경기 일정",
+        "정규 라운드"
+      ],
+      "afterSelected": [
+        "경기 일정",
+        "전체"
+      ],
+      "sameURL": true,
+      "beforeScroll": {
+        "main": 133.3333282470703,
+        "windowX": 0,
+        "windowY": 0
+      },
+      "afterScroll": {
+        "main": 133.3333282470703,
+        "windowX": 0,
+        "windowY": 0
+      },
+      "beforePicture": null,
+      "afterPicture": "tablet-schedule-return-tab.png"
+    },
+    {
+      "width": "desktop",
+      "beforeIndex": 12,
+      "afterIndex": 17,
+      "settledAfterIndex": 18,
+      "beforeUTC": "2026-10-04T15:08:03.715Z",
+      "afterUTC": "2026-10-04T15:08:37.437Z",
+      "beforeSelected": [
+        "경기 일정",
+        "정규 라운드"
+      ],
+      "afterSelected": [
+        "경기 일정",
+        "전체"
+      ],
+      "sameURL": true,
+      "beforeScroll": {
+        "main": 0,
+        "windowX": 0,
+        "windowY": 103
+      },
+      "afterScroll": {
+        "main": 0,
+        "windowX": 0,
+        "windowY": 213
+      },
+      "beforePicture": "desktop-schedule-tab-before.png",
+      "afterPicture": "desktop-schedule-tab-after.png"
+    }
+  ],
+  "limits": [
+    "No new issue uniqueness or PR1607 regression attribution; parent performing duplicate mapping.",
+    "Mobile used default 전체 only; no mobile non-default tab-reset reproduction claimed.",
+    "Desktop bracket103→213 scroll may include automatic locator-click scrolling before departure; no scroll-loss defect claimed. Tablet bracket133.333 remained equal.",
+    "Both schedule modes show the same one fixture in this dataset; tab selection resets visibly but loss of additional rows cannot be shown."
+  ]
+}

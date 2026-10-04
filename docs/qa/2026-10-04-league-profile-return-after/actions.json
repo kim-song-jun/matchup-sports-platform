@@ -1,0 +1,158 @@
+[
+  {
+    "label": "fresh navigation to observed public team-match list URL after reported release",
+    "startedUTC": "2026-10-04T15:02:55.227Z",
+    "completedUTC": "2026-10-04T15:02:55.946Z",
+    "url": "https://alpha.teameet.co.kr/team-matches"
+  },
+  {
+    "label": "click actual visible public 대회 link",
+    "startedUTC": "2026-10-04T15:03:23.651Z",
+    "completedUTC": "2026-10-04T15:03:23.813Z",
+    "url": "https://alpha.teameet.co.kr/tournaments"
+  },
+  {
+    "label": "public visible regular league type filter link",
+    "startedUTC": "2026-10-04T15:03:52.322Z",
+    "completedUTC": "2026-10-04T15:03:52.606Z",
+    "url": "https://alpha.teameet.co.kr/tournaments"
+  },
+  {
+    "label": "resize native window and zoom for mobile",
+    "startedUTC": "2026-10-04T15:04:09.423Z",
+    "completedUTC": "2026-10-04T15:04:12.335Z",
+    "url": "https://alpha.teameet.co.kr/tournaments?kind=league"
+  },
+  {
+    "label": "mobile actual synthetic league card from public league list",
+    "startedUTC": "2026-10-04T15:04:12.426Z",
+    "completedUTC": "2026-10-04T15:04:12.522Z",
+    "url": "https://alpha.teameet.co.kr/tournaments/{league-63e7cd6e36c0}"
+  },
+  {
+    "label": "mobile league actual 최종 순위 보기 bracket link",
+    "startedUTC": "2026-10-04T15:04:26.049Z",
+    "completedUTC": "2026-10-04T15:04:26.132Z",
+    "url": "https://alpha.teameet.co.kr/tournaments/{league-63e7cd6e36c0}/bracket"
+  },
+  {
+    "label": "mobile actual public schedule 경기 기록 link to historical fixture",
+    "startedUTC": "2026-10-04T15:04:45.092Z",
+    "completedUTC": "2026-10-04T15:04:45.186Z",
+    "url": "https://alpha.teameet.co.kr/league-matches/{league-63e7cd6e36c0}/fixtures/{fixture-8f057ede6703}?from=%2Ftournaments%2F{league-63e7cd6e36c0}%2Fbracket"
+  },
+  {
+    "label": "mobile target player Tab then ShiftTab to expose and focus exact synthetic player link without navigation",
+    "startedUTC": "2026-10-04T15:05:35.742Z",
+    "completedUTC": "2026-10-04T15:05:35.907Z",
+    "url": "https://alpha.teameet.co.kr/league-matches/{league-63e7cd6e36c0}/fixtures/{fixture-8f057ede6703}?from=%2Ftournaments%2F{league-63e7cd6e36c0}%2Fbracket"
+  },
+  {
+    "label": "mobile actual synthetic player link click",
+    "startedUTC": "2026-10-04T15:05:46.560Z",
+    "completedUTC": "2026-10-04T15:05:46.636Z",
+    "url": "https://alpha.teameet.co.kr/users/{player-cdc985813531}?from=%2Fleague-matches%2F{league-63e7cd6e36c0}%2Ffixtures%2F{fixture-8f057ede6703}%3Ffrom%3D%252Ftournaments%252F{league-63e7cd6e36c0}%252Fbracket"
+  },
+  {
+    "label": "mobile actual page Back from player profile",
+    "startedUTC": "2026-10-04T15:05:57.350Z",
+    "completedUTC": "2026-10-04T15:05:57.451Z",
+    "url": "https://alpha.teameet.co.kr/league-matches/{league-63e7cd6e36c0}/fixtures/{fixture-8f057ede6703}?from=%2Ftournaments%2F{league-63e7cd6e36c0}%2Fbracket"
+  },
+  {
+    "label": "mobile fixture page Back to public bracket for next-width entry",
+    "startedUTC": "2026-10-04T15:06:31.985Z",
+    "completedUTC": "2026-10-04T15:06:32.034Z",
+    "url": "https://alpha.teameet.co.kr/tournaments/{league-63e7cd6e36c0}/bracket"
+  },
+  {
+    "label": "resize native mobile window to tablet and zoom increment",
+    "startedUTC": "2026-10-04T15:06:50.420Z",
+    "completedUTC": "2026-10-04T15:06:52.876Z",
+    "url": "https://alpha.teameet.co.kr/tournaments/{league-63e7cd6e36c0}/bracket"
+  },
+  {
+    "label": "tablet normal schedule 정규 라운드 tab",
+    "startedUTC": "2026-10-04T15:06:52.912Z",
+    "completedUTC": "2026-10-04T15:06:53.201Z",
+    "url": "https://alpha.teameet.co.kr/tournaments/{league-63e7cd6e36c0}/bracket"
+  },
+  {
+    "label": "tablet same public schedule fixture link",
+    "startedUTC": "2026-10-04T15:06:53.254Z",
+    "completedUTC": "2026-10-04T15:06:53.346Z",
+    "url": "https://alpha.teameet.co.kr/league-matches/{league-63e7cd6e36c0}/fixtures/{fixture-8f057ede6703}?from=%2Ftournaments%2F{league-63e7cd6e36c0}%2Fbracket"
+  },
+  {
+    "label": "tablet exact player link Tab then ShiftTab without navigation",
+    "startedUTC": "2026-10-04T15:06:53.524Z",
+    "completedUTC": "2026-10-04T15:06:53.690Z",
+    "url": "https://alpha.teameet.co.kr/league-matches/{league-63e7cd6e36c0}/fixtures/{fixture-8f057ede6703}?from=%2Ftournaments%2F{league-63e7cd6e36c0}%2Fbracket"
+  },
+  {
+    "label": "tablet actual synthetic player profile click",
+    "startedUTC": "2026-10-04T15:07:15.943Z",
+    "completedUTC": "2026-10-04T15:07:19.720Z",
+    "url": "https://alpha.teameet.co.kr/users/{player-cdc985813531}?from=%2Fleague-matches%2F{league-63e7cd6e36c0}%2Ffixtures%2F{fixture-8f057ede6703}%3Ffrom%3D%252Ftournaments%252F{league-63e7cd6e36c0}%252Fbracket"
+  },
+  {
+    "label": "tablet actual profile page Back",
+    "startedUTC": "2026-10-04T15:07:20.394Z",
+    "completedUTC": "2026-10-04T15:07:20.529Z",
+    "url": "https://alpha.teameet.co.kr/league-matches/{league-63e7cd6e36c0}/fixtures/{fixture-8f057ede6703}?from=%2Ftournaments%2F{league-63e7cd6e36c0}%2Fbracket"
+  },
+  {
+    "label": "tablet fixture page Back to originating bracket",
+    "startedUTC": "2026-10-04T15:07:31.178Z",
+    "completedUTC": "2026-10-04T15:07:31.233Z",
+    "url": "https://alpha.teameet.co.kr/tournaments/{league-63e7cd6e36c0}/bracket"
+  },
+  {
+    "label": "native zoom reset to desktop",
+    "startedUTC": "2026-10-04T15:08:03.209Z",
+    "completedUTC": "2026-10-04T15:08:03.345Z",
+    "url": "https://alpha.teameet.co.kr/tournaments/{league-63e7cd6e36c0}/bracket"
+  },
+  {
+    "label": "desktop select public schedule regular-round tab",
+    "startedUTC": "2026-10-04T15:08:03.389Z",
+    "completedUTC": "2026-10-04T15:08:03.668Z",
+    "url": "https://alpha.teameet.co.kr/tournaments/{league-63e7cd6e36c0}/bracket"
+  },
+  {
+    "label": "desktop actual public schedule fixture link",
+    "startedUTC": "2026-10-04T15:08:03.754Z",
+    "completedUTC": "2026-10-04T15:08:03.839Z",
+    "url": "https://alpha.teameet.co.kr/league-matches/{league-63e7cd6e36c0}/fixtures/{fixture-8f057ede6703}?from=%2Ftournaments%2F{league-63e7cd6e36c0}%2Fbracket"
+  },
+  {
+    "label": "desktop exact player Tab then ShiftTab without navigation",
+    "startedUTC": "2026-10-04T15:08:04.020Z",
+    "completedUTC": "2026-10-04T15:08:04.194Z",
+    "url": "https://alpha.teameet.co.kr/league-matches/{league-63e7cd6e36c0}/fixtures/{fixture-8f057ede6703}?from=%2Ftournaments%2F{league-63e7cd6e36c0}%2Fbracket"
+  },
+  {
+    "label": "desktop actual player profile click",
+    "startedUTC": "2026-10-04T15:08:22.860Z",
+    "completedUTC": "2026-10-04T15:08:22.934Z",
+    "url": "https://alpha.teameet.co.kr/users/{player-cdc985813531}?from=%2Fleague-matches%2F{league-63e7cd6e36c0}%2Ffixtures%2F{fixture-8f057ede6703}%3Ffrom%3D%252Ftournaments%252F{league-63e7cd6e36c0}%252Fbracket"
+  },
+  {
+    "label": "desktop actual profile page Back",
+    "startedUTC": "2026-10-04T15:08:23.599Z",
+    "completedUTC": "2026-10-04T15:08:23.668Z",
+    "url": "https://alpha.teameet.co.kr/league-matches/{league-63e7cd6e36c0}/fixtures/{fixture-8f057ede6703}?from=%2Ftournaments%2F{league-63e7cd6e36c0}%2Fbracket"
+  },
+  {
+    "label": "desktop fixture page Back to bracket",
+    "startedUTC": "2026-10-04T15:08:37.204Z",
+    "completedUTC": "2026-10-04T15:08:37.255Z",
+    "url": "https://alpha.teameet.co.kr/tournaments/{league-63e7cd6e36c0}/bracket"
+  },
+  {
+    "label": "final visible public 대회 navigation from bracket",
+    "startedUTC": "2026-10-04T15:09:41.390Z",
+    "completedUTC": "2026-10-04T15:09:41.479Z",
+    "url": "https://alpha.teameet.co.kr/tournaments"
+  }
+]

@@ -1,0 +1,15 @@
+{
+  "preparedUTC": "2026-10-04T15:12:05.961212+00:00",
+  "originalSafeSHA256": {
+    "actions.json": "e90d6bf19e591f21c500f53ad4775a2afb3c28b3dbcab72fe0999baccddfbbea",
+    "entry-settled.json": "0e1a3abaa246ad77404de374f218706ed2795f033fdf1d4469f64c5333b127a2",
+    "entry.json": "d061ed07a91badc53342cbeeb3918f4c326135d3a2de9d49a8949e3ffa26ae27",
+    "exit.json": "19495469f75ce71e27ee80b950f06ef04da6b559107e9cf929eeb8b0ce737521",
+    "mobile-schedule-entry.json": "c021564ad7b377103136a9a8662c4b329ab0276541525b98e0ee23ef798794f8",
+    "proof.json": "e752e1a2701b1443b0de3b4aaecfe227ab188163ace468a5dead87fcdc96005a"
+  },
+  "sourceScreenMetadataSHA256": "13d4475dca98cd4453964a17e88747d8502b9239073dc155287c3f56726ef039",
+  "publicProjection": "League/fixture/player UUID strings replaced by stable hash aliases. Original timing, route structure, geometry, counts and tab state retained. Exact original URL hashes are in return-comparison.json. No player names retained in DOM outputs.",
+  "pixelVerification": "Collector tested each publicPNG against exact crop of decoded original JPEG. Publisher independently validates public files only.",
+  "captureClock": "Tool call start/completion UTC interval is distinct from DOM UTC."
+}

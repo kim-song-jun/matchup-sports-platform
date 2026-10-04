@@ -395,8 +395,8 @@ export function MatchDetailPageView({ model, lifecyclePanel }: { model: MatchDet
                   <span className={`tm-badge ${matchStatusBadgeClass(mode, match.status, match.lifecycleStatus)}`}>{matchStatusBadgeLabel(mode, match.status, model.completed, match.lifecycleStatus)}</span>
                 )}
               </div>
-              <h2 className="tm-match-detail-title">{match.title}</h2>
-              <div className="tm-text-caption tm-match-detail-meta" style={{ marginTop: 8 }}>{match.host} 호스트</div>
+              <h2 className="tm-match-detail-title tm-hide-desktop">{match.title}</h2>
+              <div className="tm-text-caption tm-match-detail-meta">{match.host} 호스트</div>
               {heroMessage ? <div className="tm-text-caption tm-match-detail-heromsg" role="status" style={{ marginTop: 8 }}>{heroMessage}</div> : null}
             </div>
           </div>

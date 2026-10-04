@@ -1,0 +1,115 @@
+{
+  "files": [
+    {
+      "file": "README.md",
+      "bytes": 10986,
+      "sha256": "472320ac4c9988a7f3fc51aa050189b0c6b76d5793db1d758226d62ef3f82e99"
+    },
+    {
+      "file": "actions.json",
+      "bytes": 7140,
+      "sha256": "6e8da01a89134acea96fb4658b4bd063fc10c8af4e9ed7e09f327e962b461c0c"
+    },
+    {
+      "file": "ax-excerpts.json",
+      "bytes": 4269,
+      "sha256": "12d28e7470e9e62fac86e40709935acccc20ebcb975a2a6591657d40f4414a36"
+    },
+    {
+      "file": "before-context.json",
+      "bytes": 1662,
+      "sha256": "ddee75e8752224a1f4497c6d486d793b62381c7b7ebe056276ea11dc8f5bc46e"
+    },
+    {
+      "file": "console-summary.json",
+      "bytes": 5609,
+      "sha256": "e68aff6a763141ff46239da19a283b65793805e78e321451c41f80fb14a776e9"
+    },
+    {
+      "file": "deployment-context.json",
+      "bytes": 1211,
+      "sha256": "c085bd9ec9feb87aabf890afc709979b9033510ab00d7ee83e83a0834fb6f53e"
+    },
+    {
+      "file": "desktop-back-focus.png",
+      "bytes": 18597,
+      "sha256": "5520c9211ac4b092b45a9076eab531d2e2589c2a5a13773a4c1d30790a3feb63"
+    },
+    {
+      "file": "desktop-share-focus.png",
+      "bytes": 4252,
+      "sha256": "a740a706b9c571ba8eb726a29d48ef4f5ff5b838de2d68bf4e169652574fc83a"
+    },
+    {
+      "file": "desktop-title-after.png",
+      "bytes": 66486,
+      "sha256": "502008ebb8f9ed3792a8686ec769951dac900b401c11be335ec4434a6aa6a353"
+    },
+    {
+      "file": "exit.json",
+      "bytes": 221,
+      "sha256": "0ec65ede3c1cad70dfe4cecaef41e95fec4238ec44bf0e4b0df58ea37bc7db11"
+    },
+    {
+      "file": "full-ax-supplement.json",
+      "bytes": 5803,
+      "sha256": "ec2e05ff3b031275ae2c2692eb982e2e369f85847f0a71f40e5f36d1ff74ad43"
+    },
+    {
+      "file": "list-ax-excerpts.json",
+      "bytes": 477,
+      "sha256": "81c428f0e770b62113777c091aa026586008f3c743859f25eba8897e3583d446"
+    },
+    {
+      "file": "list-return-proof.json",
+      "bytes": 7962,
+      "sha256": "1a8aad427dd71f25cc994642674d4bef72e6f541b472ca35879c1e1f809d3d81"
+    },
+    {
+      "file": "mobile-share-focus.png",
+      "bytes": 4255,
+      "sha256": "75eb12232952f7f4bf62dfb3ae208156a7118402d6f9ccc94ea58eafc816160c"
+    },
+    {
+      "file": "mobile-title-after.png",
+      "bytes": 24462,
+      "sha256": "4882698dbea0fc6b3d277c355eb98d3c128f26499581b5b21e4cfa0687307e0c"
+    },
+    {
+      "file": "proof.json",
+      "bytes": 113857,
+      "sha256": "fd89eb205bcf6d70b358875b8af5b73c1d8b32e3515d48cb0582978e278bf6cc"
+    },
+    {
+      "file": "provenance.json",
+      "bytes": 13411,
+      "sha256": "5a4482cd6a68d95fd08ee74dba6f914201667a005baf6fdbebef86a82c6b44d8"
+    },
+    {
+      "file": "source-manifest.json",
+      "bytes": 2946,
+      "sha256": "46764864b564dd9e2a622b9e84ae1c04a6c40ba6746ff027c6bfd1c198c85faa"
+    },
+    {
+      "file": "summary.json",
+      "bytes": 8260,
+      "sha256": "a470cfcf0d0ed62e4669d7118fc0edf6884210f8a50ea510f88c87592d517a38"
+    },
+    {
+      "file": "tablet-share-focus.png",
+      "bytes": 4563,
+      "sha256": "12da590b52089086a9307d55934ffe41afc7afb28c4d484b28d89df5058a2d55"
+    },
+    {
+      "file": "tablet-title-after.png",
+      "bytes": 24378,
+      "sha256": "cac1d1175fe90e131dd2fd4b2c6fe3f0783eb196e064c68b21a1e53992040fe2"
+    },
+    {
+      "file": "verification.json",
+      "bytes": 10100,
+      "sha256": "ba5319ba10a8059e024bc578cd67d74d3061a2ac3002fe9c811e9b5518a5dcdf"
+    }
+  ],
+  "note": "Public projected files, excludes this manifest. source-manifest.json describes original safe inputs."
+}

@@ -1,0 +1,5458 @@
+[
+  {
+    "active": {
+      "focusVisible": false,
+      "href": null,
+      "label": null,
+      "rect": {
+        "bottom": 605.6000366210938,
+        "height": 605.6000366210938,
+        "left": 0,
+        "right": 401.6000061035156,
+        "top": 0,
+        "width": 401.6000061035156,
+        "x": 0,
+        "y": 0
+      },
+      "tag": "BODY"
+    },
+    "back": [
+      {
+        "disabled": false,
+        "focusVisible": false,
+        "href": "/matches",
+        "label": "뒤로가기",
+        "rect": {
+          "bottom": 0,
+          "height": 0,
+          "left": 0,
+          "right": 0,
+          "top": 0,
+          "width": 0,
+          "x": 0,
+          "y": 0
+        },
+        "tag": "A",
+        "visible": false
+      },
+      {
+        "disabled": false,
+        "focusVisible": false,
+        "href": "/matches",
+        "label": "뒤로가기",
+        "rect": {
+          "bottom": 56,
+          "height": 44,
+          "left": 12,
+          "right": 56,
+          "top": 12,
+          "width": 44,
+          "x": 12,
+          "y": 12
+        },
+        "tag": "A",
+        "visible": true
+      }
+    ],
+    "badge": {
+      "marginBottom": "8px",
+      "rect": {
+        "bottom": 240,
+        "height": 24,
+        "left": 16,
+        "right": 385.6000061035156,
+        "top": 216,
+        "width": 369.6000061035156,
+        "x": 16,
+        "y": 216
+      },
+      "texts": [
+        "풋살",
+        "입문-고수",
+        "성별 무관",
+        "종료"
+      ]
+    },
+    "cta": [
+      {
+        "disabled": true,
+        "focusVisible": false,
+        "href": null,
+        "label": "신청 불가",
+        "rect": {
+          "bottom": 0,
+          "height": 0,
+          "left": 0,
+          "right": 0,
+          "top": 0,
+          "width": 0,
+          "x": 0,
+          "y": 0
+        },
+        "tag": "BUTTON",
+        "visible": false
+      },
+      {
+        "disabled": true,
+        "focusVisible": false,
+        "href": null,
+        "label": "신청 불가",
+        "rect": {
+          "bottom": 583.6000366210938,
+          "height": 50,
+          "left": 20,
+          "right": 381.6000061035156,
+          "top": 533.6000366210938,
+          "width": 361.6000061035156,
+          "x": 20,
+          "y": 533.6000366210938
+        },
+        "tag": "BUTTON",
+        "visible": true
+      }
+    ],
+    "documentScrollWidth": 402,
+    "graphic": {
+      "bottom": 200,
+      "height": 200,
+      "left": 0,
+      "right": 401.6000061035156,
+      "top": 0,
+      "width": 401.6000061035156,
+      "x": 0,
+      "y": 0
+    },
+    "headings": [
+      {
+        "computedDisplay": "block",
+        "disabled": false,
+        "focusVisible": false,
+        "href": null,
+        "label": "(테스트) 1.0.3 QA 수명주기",
+        "rect": {
+          "bottom": 0,
+          "height": 0,
+          "left": 0,
+          "right": 0,
+          "top": 0,
+          "width": 0,
+          "x": 0,
+          "y": 0
+        },
+        "tag": "H1",
+        "visible": false
+      },
+      {
+        "computedDisplay": "block",
+        "disabled": false,
+        "focusVisible": false,
+        "href": null,
+        "label": "(테스트) 1.0.3 QA 수명주기",
+        "rect": {
+          "bottom": 280,
+          "height": 32,
+          "left": 16,
+          "right": 385.6000061035156,
+          "top": 248,
+          "width": 369.6000061035156,
+          "x": 16,
+          "y": 248
+        },
+        "tag": "H2",
+        "visible": true
+      }
+    ],
+    "hero": {
+      "bottom": 320,
+      "height": 320,
+      "left": 0,
+      "right": 401.6000061035156,
+      "top": 0,
+      "width": 401.6000061035156,
+      "x": 0,
+      "y": 0
+    },
+    "host": {
+      "marginTop": "8px",
+      "present": true,
+      "rect": {
+        "bottom": 304,
+        "height": 16,
+        "left": 16,
+        "right": 385.6000061035156,
+        "top": 288,
+        "width": 369.6000061035156,
+        "x": 16,
+        "y": 288
+      },
+      "textOmitted": true,
+      "visible": true
+    },
+    "scroll": {
+      "main": 0,
+      "x": 0,
+      "y": 0
+    },
+    "share": [
+      {
+        "disabled": false,
+        "focusVisible": false,
+        "href": null,
+        "label": "공유",
+        "rect": {
+          "bottom": 56,
+          "height": 44,
+          "left": 345.6000061035156,
+          "right": 389.6000061035156,
+          "top": 12,
+          "width": 44,
+          "x": 345.6000061035156,
+          "y": 12
+        },
+        "tag": "BUTTON",
+        "visible": true
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/matches/synthetic-match-1",
+    "utc": "2026-10-04T06:36:45.513Z",
+    "viewport": {
+      "dpr": 1.25,
+      "h": 606,
+      "w": 402
+    },
+    "label": "mobile initial settled title",
+    "index": 0
+  },
+  {
+    "active": {
+      "focusVisible": true,
+      "href": "/matches",
+      "label": "뒤로가기",
+      "rect": {
+        "bottom": 56,
+        "height": 44,
+        "left": 12,
+        "right": 56,
+        "top": 12,
+        "width": 44,
+        "x": 12,
+        "y": 12
+      },
+      "tag": "A"
+    },
+    "back": [
+      {
+        "disabled": false,
+        "focusVisible": false,
+        "href": "/matches",
+        "label": "뒤로가기",
+        "rect": {
+          "bottom": 0,
+          "height": 0,
+          "left": 0,
+          "right": 0,
+          "top": 0,
+          "width": 0,
+          "x": 0,
+          "y": 0
+        },
+        "tag": "A",
+        "visible": false
+      },
+      {
+        "disabled": false,
+        "focusVisible": true,
+        "href": "/matches",
+        "label": "뒤로가기",
+        "rect": {
+          "bottom": 56,
+          "height": 44,
+          "left": 12,
+          "right": 56,
+          "top": 12,
+          "width": 44,
+          "x": 12,
+          "y": 12
+        },
+        "tag": "A",
+        "visible": true
+      }
+    ],
+    "badge": {
+      "marginBottom": "8px",
+      "rect": {
+        "bottom": 240,
+        "height": 24,
+        "left": 16,
+        "right": 385.6000061035156,
+        "top": 216,
+        "width": 369.6000061035156,
+        "x": 16,
+        "y": 216
+      },
+      "texts": [
+        "풋살",
+        "입문-고수",
+        "성별 무관",
+        "종료"
+      ]
+    },
+    "cta": [
+      {
+        "disabled": true,
+        "focusVisible": false,
+        "href": null,
+        "label": "신청 불가",
+        "rect": {
+          "bottom": 0,
+          "height": 0,
+          "left": 0,
+          "right": 0,
+          "top": 0,
+          "width": 0,
+          "x": 0,
+          "y": 0
+        },
+        "tag": "BUTTON",
+        "visible": false
+      },
+      {
+        "disabled": true,
+        "focusVisible": false,
+        "href": null,
+        "label": "신청 불가",
+        "rect": {
+          "bottom": 583.6000366210938,
+          "height": 50,
+          "left": 20,
+          "right": 381.6000061035156,
+          "top": 533.6000366210938,
+          "width": 361.6000061035156,
+          "x": 20,
+          "y": 533.6000366210938
+        },
+        "tag": "BUTTON",
+        "visible": true
+      }
+    ],
+    "documentScrollWidth": 402,
+    "graphic": {
+      "bottom": 200,
+      "height": 200,
+      "left": 0,
+      "right": 401.6000061035156,
+      "top": 0,
+      "width": 401.6000061035156,
+      "x": 0,
+      "y": 0
+    },
+    "headings": [
+      {
+        "computedDisplay": "block",
+        "disabled": false,
+        "focusVisible": false,
+        "href": null,
+        "label": "(테스트) 1.0.3 QA 수명주기",
+        "rect": {
+          "bottom": 0,
+          "height": 0,
+          "left": 0,
+          "right": 0,
+          "top": 0,
+          "width": 0,
+          "x": 0,
+          "y": 0
+        },
+        "tag": "H1",
+        "visible": false
+      },
+      {
+        "computedDisplay": "block",
+        "disabled": false,
+        "focusVisible": false,
+        "href": null,
+        "label": "(테스트) 1.0.3 QA 수명주기",
+        "rect": {
+          "bottom": 280,
+          "height": 32,
+          "left": 16,
+          "right": 385.6000061035156,
+          "top": 248,
+          "width": 369.6000061035156,
+          "x": 16,
+          "y": 248
+        },
+        "tag": "H2",
+        "visible": true
+      }
+    ],
+    "hero": {
+      "bottom": 320,
+      "height": 320,
+      "left": 0,
+      "right": 401.6000061035156,
+      "top": 0,
+      "width": 401.6000061035156,
+      "x": 0,
+      "y": 0
+    },
+    "host": {
+      "marginTop": "8px",
+      "present": true,
+      "rect": {
+        "bottom": 304,
+        "height": 16,
+        "left": 16,
+        "right": 385.6000061035156,
+        "top": 288,
+        "width": 369.6000061035156,
+        "x": 16,
+        "y": 288
+      },
+      "textOmitted": true,
+      "visible": true
+    },
+    "scroll": {
+      "main": 0,
+      "x": 0,
+      "y": 0
+    },
+    "share": [
+      {
+        "disabled": false,
+        "focusVisible": false,
+        "href": null,
+        "label": "공유",
+        "rect": {
+          "bottom": 56,
+          "height": 44,
+          "left": 345.6000061035156,
+          "right": 389.6000061035156,
+          "top": 12,
+          "width": 44,
+          "x": 345.6000061035156,
+          "y": 12
+        },
+        "tag": "BUTTON",
+        "visible": true
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/matches/synthetic-match-1",
+    "utc": "2026-10-04T06:36:45.662Z",
+    "viewport": {
+      "dpr": 1.25,
+      "h": 606,
+      "w": 402
+    },
+    "label": "mobile Tab1 Back",
+    "index": 1
+  },
+  {
+    "active": {
+      "focusVisible": true,
+      "href": null,
+      "label": "공유",
+      "rect": {
+        "bottom": 56,
+        "height": 44,
+        "left": 345.6000061035156,
+        "right": 389.6000061035156,
+        "top": 12,
+        "width": 44,
+        "x": 345.6000061035156,
+        "y": 12
+      },
+      "tag": "BUTTON"
+    },
+    "back": [
+      {
+        "disabled": false,
+        "focusVisible": false,
+        "href": "/matches",
+        "label": "뒤로가기",
+        "rect": {
+          "bottom": 0,
+          "height": 0,
+          "left": 0,
+          "right": 0,
+          "top": 0,
+          "width": 0,
+          "x": 0,
+          "y": 0
+        },
+        "tag": "A",
+        "visible": false
+      },
+      {
+        "disabled": false,
+        "focusVisible": false,
+        "href": "/matches",
+        "label": "뒤로가기",
+        "rect": {
+          "bottom": 56,
+          "height": 44,
+          "left": 12,
+          "right": 56,
+          "top": 12,
+          "width": 44,
+          "x": 12,
+          "y": 12
+        },
+        "tag": "A",
+        "visible": true
+      }
+    ],
+    "badge": {
+      "marginBottom": "8px",
+      "rect": {
+        "bottom": 240,
+        "height": 24,
+        "left": 16,
+        "right": 385.6000061035156,
+        "top": 216,
+        "width": 369.6000061035156,
+        "x": 16,
+        "y": 216
+      },
+      "texts": [
+        "풋살",
+        "입문-고수",
+        "성별 무관",
+        "종료"
+      ]
+    },
+    "cta": [
+      {
+        "disabled": true,
+        "focusVisible": false,
+        "href": null,
+        "label": "신청 불가",
+        "rect": {
+          "bottom": 0,
+          "height": 0,
+          "left": 0,
+          "right": 0,
+          "top": 0,
+          "width": 0,
+          "x": 0,
+          "y": 0
+        },
+        "tag": "BUTTON",
+        "visible": false
+      },
+      {
+        "disabled": true,
+        "focusVisible": false,
+        "href": null,
+        "label": "신청 불가",
+        "rect": {
+          "bottom": 583.6000366210938,
+          "height": 50,
+          "left": 20,
+          "right": 381.6000061035156,
+          "top": 533.6000366210938,
+          "width": 361.6000061035156,
+          "x": 20,
+          "y": 533.6000366210938
+        },
+        "tag": "BUTTON",
+        "visible": true
+      }
+    ],
+    "documentScrollWidth": 402,
+    "graphic": {
+      "bottom": 200,
+      "height": 200,
+      "left": 0,
+      "right": 401.6000061035156,
+      "top": 0,
+      "width": 401.6000061035156,
+      "x": 0,
+      "y": 0
+    },
+    "headings": [
+      {
+        "computedDisplay": "block",
+        "disabled": false,
+        "focusVisible": false,
+        "href": null,
+        "label": "(테스트) 1.0.3 QA 수명주기",
+        "rect": {
+          "bottom": 0,
+          "height": 0,
+          "left": 0,
+          "right": 0,
+          "top": 0,
+          "width": 0,
+          "x": 0,
+          "y": 0
+        },
+        "tag": "H1",
+        "visible": false
+      },
+      {
+        "computedDisplay": "block",
+        "disabled": false,
+        "focusVisible": false,
+        "href": null,
+        "label": "(테스트) 1.0.3 QA 수명주기",
+        "rect": {
+          "bottom": 280,
+          "height": 32,
+          "left": 16,
+          "right": 385.6000061035156,
+          "top": 248,
+          "width": 369.6000061035156,
+          "x": 16,
+          "y": 248
+        },
+        "tag": "H2",
+        "visible": true
+      }
+    ],
+    "hero": {
+      "bottom": 320,
+      "height": 320,
+      "left": 0,
+      "right": 401.6000061035156,
+      "top": 0,
+      "width": 401.6000061035156,
+      "x": 0,
+      "y": 0
+    },
+    "host": {
+      "marginTop": "8px",
+      "present": true,
+      "rect": {
+        "bottom": 304,
+        "height": 16,
+        "left": 16,
+        "right": 385.6000061035156,
+        "top": 288,
+        "width": 369.6000061035156,
+        "x": 16,
+        "y": 288
+      },
+      "textOmitted": true,
+      "visible": true
+    },
+    "scroll": {
+      "main": 0,
+      "x": 0,
+      "y": 0
+    },
+    "share": [
+      {
+        "disabled": false,
+        "focusVisible": true,
+        "href": null,
+        "label": "공유",
+        "rect": {
+          "bottom": 56,
+          "height": 44,
+          "left": 345.6000061035156,
+          "right": 389.6000061035156,
+          "top": 12,
+          "width": 44,
+          "x": 345.6000061035156,
+          "y": 12
+        },
+        "tag": "BUTTON",
+        "visible": true
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/matches/synthetic-match-1",
+    "utc": "2026-10-04T06:36:45.829Z",
+    "viewport": {
+      "dpr": 1.25,
+      "h": 606,
+      "w": 402
+    },
+    "label": "mobile Tab2 Share",
+    "index": 2
+  },
+  {
+    "active": {
+      "focusVisible": true,
+      "href": "/matches",
+      "label": "뒤로가기",
+      "rect": {
+        "bottom": 56,
+        "height": 44,
+        "left": 12,
+        "right": 56,
+        "top": 12,
+        "width": 44,
+        "x": 12,
+        "y": 12
+      },
+      "tag": "A"
+    },
+    "back": [
+      {
+        "disabled": false,
+        "focusVisible": false,
+        "href": "/matches",
+        "label": "뒤로가기",
+        "rect": {
+          "bottom": 0,
+          "height": 0,
+          "left": 0,
+          "right": 0,
+          "top": 0,
+          "width": 0,
+          "x": 0,
+          "y": 0
+        },
+        "tag": "A",
+        "visible": false
+      },
+      {
+        "disabled": false,
+        "focusVisible": true,
+        "href": "/matches",
+        "label": "뒤로가기",
+        "rect": {
+          "bottom": 56,
+          "height": 44,
+          "left": 12,
+          "right": 56,
+          "top": 12,
+          "width": 44,
+          "x": 12,
+          "y": 12
+        },
+        "tag": "A",
+        "visible": true
+      }
+    ],
+    "badge": {
+      "marginBottom": "8px",
+      "rect": {
+        "bottom": 240,
+        "height": 24,
+        "left": 16,
+        "right": 385.6000061035156,
+        "top": 216,
+        "width": 369.6000061035156,
+        "x": 16,
+        "y": 216
+      },
+      "texts": [
+        "풋살",
+        "입문-고수",
+        "성별 무관",
+        "종료"
+      ]
+    },
+    "cta": [
+      {
+        "disabled": true,
+        "focusVisible": false,
+        "href": null,
+        "label": "신청 불가",
+        "rect": {
+          "bottom": 0,
+          "height": 0,
+          "left": 0,
+          "right": 0,
+          "top": 0,
+          "width": 0,
+          "x": 0,
+          "y": 0
+        },
+        "tag": "BUTTON",
+        "visible": false
+      },
+      {
+        "disabled": true,
+        "focusVisible": false,
+        "href": null,
+        "label": "신청 불가",
+        "rect": {
+          "bottom": 583.6000366210938,
+          "height": 50,
+          "left": 20,
+          "right": 381.6000061035156,
+          "top": 533.6000366210938,
+          "width": 361.6000061035156,
+          "x": 20,
+          "y": 533.6000366210938
+        },
+        "tag": "BUTTON",
+        "visible": true
+      }
+    ],
+    "documentScrollWidth": 402,
+    "graphic": {
+      "bottom": 200,
+      "height": 200,
+      "left": 0,
+      "right": 401.6000061035156,
+      "top": 0,
+      "width": 401.6000061035156,
+      "x": 0,
+      "y": 0
+    },
+    "headings": [
+      {
+        "computedDisplay": "block",
+        "disabled": false,
+        "focusVisible": false,
+        "href": null,
+        "label": "(테스트) 1.0.3 QA 수명주기",
+        "rect": {
+          "bottom": 0,
+          "height": 0,
+          "left": 0,
+          "right": 0,
+          "top": 0,
+          "width": 0,
+          "x": 0,
+          "y": 0
+        },
+        "tag": "H1",
+        "visible": false
+      },
+      {
+        "computedDisplay": "block",
+        "disabled": false,
+        "focusVisible": false,
+        "href": null,
+        "label": "(테스트) 1.0.3 QA 수명주기",
+        "rect": {
+          "bottom": 280,
+          "height": 32,
+          "left": 16,
+          "right": 385.6000061035156,
+          "top": 248,
+          "width": 369.6000061035156,
+          "x": 16,
+          "y": 248
+        },
+        "tag": "H2",
+        "visible": true
+      }
+    ],
+    "hero": {
+      "bottom": 320,
+      "height": 320,
+      "left": 0,
+      "right": 401.6000061035156,
+      "top": 0,
+      "width": 401.6000061035156,
+      "x": 0,
+      "y": 0
+    },
+    "host": {
+      "marginTop": "8px",
+      "present": true,
+      "rect": {
+        "bottom": 304,
+        "height": 16,
+        "left": 16,
+        "right": 385.6000061035156,
+        "top": 288,
+        "width": 369.6000061035156,
+        "x": 16,
+        "y": 288
+      },
+      "textOmitted": true,
+      "visible": true
+    },
+    "scroll": {
+      "main": 0,
+      "x": 0,
+      "y": 0
+    },
+    "share": [
+      {
+        "disabled": false,
+        "focusVisible": false,
+        "href": null,
+        "label": "공유",
+        "rect": {
+          "bottom": 56,
+          "height": 44,
+          "left": 345.6000061035156,
+          "right": 389.6000061035156,
+          "top": 12,
+          "width": 44,
+          "x": 345.6000061035156,
+          "y": 12
+        },
+        "tag": "BUTTON",
+        "visible": true
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/matches/synthetic-match-1",
+    "utc": "2026-10-04T06:36:46.069Z",
+    "viewport": {
+      "dpr": 1.25,
+      "h": 606,
+      "w": 402
+    },
+    "label": "mobile reverse Back",
+    "index": 3
+  },
+  {
+    "active": {
+      "focusVisible": false,
+      "href": null,
+      "label": null,
+      "rect": {
+        "bottom": 605.6000366210938,
+        "height": 605.6000366210938,
+        "left": 0,
+        "right": 401.6000061035156,
+        "top": 0,
+        "width": 401.6000061035156,
+        "x": 0,
+        "y": 0
+      },
+      "tag": "BODY"
+    },
+    "back": [],
+    "badge": {
+      "marginBottom": null,
+      "rect": null,
+      "texts": []
+    },
+    "cta": [],
+    "documentScrollWidth": 402,
+    "graphic": null,
+    "headings": [],
+    "hero": null,
+    "host": {
+      "marginTop": null,
+      "present": false,
+      "rect": null,
+      "textOmitted": true,
+      "visible": false
+    },
+    "listHeadings": [],
+    "scroll": {
+      "main": 0,
+      "x": 0,
+      "y": 0
+    },
+    "share": [],
+    "url": "https://alpha.teameet.co.kr/matches",
+    "utc": "2026-10-04T06:38:14.214Z",
+    "viewport": {
+      "dpr": 1.25,
+      "h": 606,
+      "w": 402
+    },
+    "label": "mobile app Back destination",
+    "index": 4
+  },
+  {
+    "active": {
+      "focusVisible": false,
+      "href": null,
+      "label": null,
+      "rect": {
+        "bottom": 605.6000366210938,
+        "height": 605.6000366210938,
+        "left": 0,
+        "right": 401.6000061035156,
+        "top": 0,
+        "width": 401.6000061035156,
+        "x": 0,
+        "y": 0
+      },
+      "tag": "BODY"
+    },
+    "back": [
+      {
+        "disabled": false,
+        "focusVisible": false,
+        "href": "/matches",
+        "label": "뒤로가기",
+        "rect": {
+          "bottom": 0,
+          "height": 0,
+          "left": 0,
+          "right": 0,
+          "top": 0,
+          "width": 0,
+          "x": 0,
+          "y": 0
+        },
+        "tag": "A",
+        "visible": false
+      },
+      {
+        "disabled": false,
+        "focusVisible": false,
+        "href": "/matches",
+        "label": "뒤로가기",
+        "rect": {
+          "bottom": 56,
+          "height": 44,
+          "left": 12,
+          "right": 56,
+          "top": 12,
+          "width": 44,
+          "x": 12,
+          "y": 12
+        },
+        "tag": "A",
+        "visible": true
+      }
+    ],
+    "badge": {
+      "marginBottom": "8px",
+      "rect": {
+        "bottom": 240,
+        "height": 24,
+        "left": 16,
+        "right": 385.6000061035156,
+        "top": 216,
+        "width": 369.6000061035156,
+        "x": 16,
+        "y": 216
+      },
+      "texts": [
+        "풋살",
+        "입문-고수",
+        "성별 무관",
+        "종료"
+      ]
+    },
+    "cta": [
+      {
+        "disabled": true,
+        "focusVisible": false,
+        "href": null,
+        "label": "신청 불가",
+        "rect": {
+          "bottom": 0,
+          "height": 0,
+          "left": 0,
+          "right": 0,
+          "top": 0,
+          "width": 0,
+          "x": 0,
+          "y": 0
+        },
+        "tag": "BUTTON",
+        "visible": false
+      },
+      {
+        "disabled": true,
+        "focusVisible": false,
+        "href": null,
+        "label": "신청 불가",
+        "rect": {
+          "bottom": 583.6000366210938,
+          "height": 50,
+          "left": 20,
+          "right": 381.6000061035156,
+          "top": 533.6000366210938,
+          "width": 361.6000061035156,
+          "x": 20,
+          "y": 533.6000366210938
+        },
+        "tag": "BUTTON",
+        "visible": true
+      }
+    ],
+    "documentScrollWidth": 402,
+    "graphic": {
+      "bottom": 200,
+      "height": 200,
+      "left": 0,
+      "right": 401.6000061035156,
+      "top": 0,
+      "width": 401.6000061035156,
+      "x": 0,
+      "y": 0
+    },
+    "headings": [
+      {
+        "computedDisplay": "block",
+        "disabled": false,
+        "focusVisible": false,
+        "href": null,
+        "label": "(테스트) 1.0.3 QA 수명주기",
+        "rect": {
+          "bottom": 0,
+          "height": 0,
+          "left": 0,
+          "right": 0,
+          "top": 0,
+          "width": 0,
+          "x": 0,
+          "y": 0
+        },
+        "tag": "H1",
+        "visible": false
+      },
+      {
+        "computedDisplay": "block",
+        "disabled": false,
+        "focusVisible": false,
+        "href": null,
+        "label": "(테스트) 1.0.3 QA 수명주기",
+        "rect": {
+          "bottom": 280,
+          "height": 32,
+          "left": 16,
+          "right": 385.6000061035156,
+          "top": 248,
+          "width": 369.6000061035156,
+          "x": 16,
+          "y": 248
+        },
+        "tag": "H2",
+        "visible": true
+      }
+    ],
+    "hero": {
+      "bottom": 320,
+      "height": 320,
+      "left": 0,
+      "right": 401.6000061035156,
+      "top": 0,
+      "width": 401.6000061035156,
+      "x": 0,
+      "y": 0
+    },
+    "host": {
+      "marginTop": "8px",
+      "present": true,
+      "rect": {
+        "bottom": 304,
+        "height": 16,
+        "left": 16,
+        "right": 385.6000061035156,
+        "top": 288,
+        "width": 369.6000061035156,
+        "x": 16,
+        "y": 288
+      },
+      "textOmitted": true,
+      "visible": true
+    },
+    "listHeadings": [],
+    "scroll": {
+      "main": 0,
+      "x": 0,
+      "y": 0
+    },
+    "share": [
+      {
+        "disabled": false,
+        "focusVisible": false,
+        "href": null,
+        "label": "공유",
+        "rect": {
+          "bottom": 56,
+          "height": 44,
+          "left": 345.6000061035156,
+          "right": 389.6000061035156,
+          "top": 12,
+          "width": 44,
+          "x": 345.6000061035156,
+          "y": 12
+        },
+        "tag": "BUTTON",
+        "visible": true
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/matches/synthetic-match-1",
+    "utc": "2026-10-04T06:38:14.460Z",
+    "viewport": {
+      "dpr": 1.25,
+      "h": 606,
+      "w": 402
+    },
+    "label": "mobile browser Back detail",
+    "index": 5
+  },
+  {
+    "active": {
+      "focusVisible": false,
+      "href": null,
+      "label": null,
+      "rect": {
+        "bottom": 605.6000366210938,
+        "height": 605.6000366210938,
+        "left": 0,
+        "right": 401.6000061035156,
+        "top": 0,
+        "width": 401.6000061035156,
+        "x": 0,
+        "y": 0
+      },
+      "tag": "BODY"
+    },
+    "back": [],
+    "badge": {
+      "marginBottom": null,
+      "rect": null,
+      "texts": []
+    },
+    "cta": [],
+    "documentScrollWidth": 402,
+    "graphic": null,
+    "headings": [],
+    "hero": null,
+    "host": {
+      "marginTop": null,
+      "present": false,
+      "rect": null,
+      "textOmitted": true,
+      "visible": false
+    },
+    "listHeadings": [
+      {
+        "disabled": false,
+        "focusVisible": false,
+        "href": null,
+        "label": "매치",
+        "rect": {
+          "bottom": 0,
+          "height": 0,
+          "left": 0,
+          "right": 0,
+          "top": 0,
+          "width": 0,
+          "x": 0,
+          "y": 0
+        },
+        "tag": "H1",
+        "visible": false
+      }
+    ],
+    "scroll": {
+      "main": 0,
+      "x": 0,
+      "y": 0
+    },
+    "share": [],
+    "url": "https://alpha.teameet.co.kr/matches",
+    "utc": "2026-10-04T06:38:14.673Z",
+    "viewport": {
+      "dpr": 1.25,
+      "h": 606,
+      "w": 402
+    },
+    "label": "mobile browser Forward list",
+    "index": 6
+  },
+  {
+    "active": {
+      "focusVisible": false,
+      "href": null,
+      "label": null,
+      "rect": {
+        "bottom": 605.6000366210938,
+        "height": 605.6000366210938,
+        "left": 0,
+        "right": 401.6000061035156,
+        "top": 0,
+        "width": 401.6000061035156,
+        "x": 0,
+        "y": 0
+      },
+      "tag": "BODY"
+    },
+    "back": [
+      {
+        "disabled": false,
+        "focusVisible": false,
+        "href": "/matches",
+        "label": "뒤로가기",
+        "rect": {
+          "bottom": 0,
+          "height": 0,
+          "left": 0,
+          "right": 0,
+          "top": 0,
+          "width": 0,
+          "x": 0,
+          "y": 0
+        },
+        "tag": "A",
+        "visible": false
+      },
+      {
+        "disabled": false,
+        "focusVisible": false,
+        "href": "/matches",
+        "label": "뒤로가기",
+        "rect": {
+          "bottom": 56,
+          "height": 44,
+          "left": 12,
+          "right": 56,
+          "top": 12,
+          "width": 44,
+          "x": 12,
+          "y": 12
+        },
+        "tag": "A",
+        "visible": true
+      }
+    ],
+    "badge": {
+      "marginBottom": "8px",
+      "rect": {
+        "bottom": 240,
+        "height": 24,
+        "left": 16,
+        "right": 385.6000061035156,
+        "top": 216,
+        "width": 369.6000061035156,
+        "x": 16,
+        "y": 216
+      },
+      "texts": [
+        "풋살",
+        "입문-고수",
+        "성별 무관",
+        "종료"
+      ]
+    },
+    "cta": [
+      {
+        "disabled": true,
+        "focusVisible": false,
+        "href": null,
+        "label": "신청 불가",
+        "rect": {
+          "bottom": 0,
+          "height": 0,
+          "left": 0,
+          "right": 0,
+          "top": 0,
+          "width": 0,
+          "x": 0,
+          "y": 0
+        },
+        "tag": "BUTTON",
+        "visible": false
+      },
+      {
+        "disabled": true,
+        "focusVisible": false,
+        "href": null,
+        "label": "신청 불가",
+        "rect": {
+          "bottom": 583.6000366210938,
+          "height": 50,
+          "left": 20,
+          "right": 381.6000061035156,
+          "top": 533.6000366210938,
+          "width": 361.6000061035156,
+          "x": 20,
+          "y": 533.6000366210938
+        },
+        "tag": "BUTTON",
+        "visible": true
+      }
+    ],
+    "documentScrollWidth": 402,
+    "graphic": {
+      "bottom": 200,
+      "height": 200,
+      "left": 0,
+      "right": 401.6000061035156,
+      "top": 0,
+      "width": 401.6000061035156,
+      "x": 0,
+      "y": 0
+    },
+    "headings": [
+      {
+        "computedDisplay": "block",
+        "disabled": false,
+        "focusVisible": false,
+        "href": null,
+        "label": "(테스트) 1.0.3 QA 수명주기",
+        "rect": {
+          "bottom": 0,
+          "height": 0,
+          "left": 0,
+          "right": 0,
+          "top": 0,
+          "width": 0,
+          "x": 0,
+          "y": 0
+        },
+        "tag": "H1",
+        "visible": false
+      },
+      {
+        "computedDisplay": "block",
+        "disabled": false,
+        "focusVisible": false,
+        "href": null,
+        "label": "(테스트) 1.0.3 QA 수명주기",
+        "rect": {
+          "bottom": 280,
+          "height": 32,
+          "left": 16,
+          "right": 385.6000061035156,
+          "top": 248,
+          "width": 369.6000061035156,
+          "x": 16,
+          "y": 248
+        },
+        "tag": "H2",
+        "visible": true
+      }
+    ],
+    "hero": {
+      "bottom": 320,
+      "height": 320,
+      "left": 0,
+      "right": 401.6000061035156,
+      "top": 0,
+      "width": 401.6000061035156,
+      "x": 0,
+      "y": 0
+    },
+    "host": {
+      "marginTop": "8px",
+      "present": true,
+      "rect": {
+        "bottom": 304,
+        "height": 16,
+        "left": 16,
+        "right": 385.6000061035156,
+        "top": 288,
+        "width": 369.6000061035156,
+        "x": 16,
+        "y": 288
+      },
+      "textOmitted": true,
+      "visible": true
+    },
+    "listHeadings": [],
+    "scroll": {
+      "main": 0,
+      "x": 0,
+      "y": 0
+    },
+    "share": [
+      {
+        "disabled": false,
+        "focusVisible": false,
+        "href": null,
+        "label": "공유",
+        "rect": {
+          "bottom": 56,
+          "height": 44,
+          "left": 345.6000061035156,
+          "right": 389.6000061035156,
+          "top": 12,
+          "width": 44,
+          "x": 345.6000061035156,
+          "y": 12
+        },
+        "tag": "BUTTON",
+        "visible": true
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/matches/synthetic-match-1",
+    "utc": "2026-10-04T06:38:14.893Z",
+    "viewport": {
+      "dpr": 1.25,
+      "h": 606,
+      "w": 402
+    },
+    "label": "mobile browser Back final detail",
+    "index": 7
+  },
+  {
+    "active": {
+      "focusVisible": false,
+      "href": null,
+      "label": null,
+      "rect": {
+        "bottom": 605.6000366210938,
+        "height": 605.6000366210938,
+        "left": 0,
+        "right": 401.6000061035156,
+        "top": 0,
+        "width": 401.6000061035156,
+        "x": 0,
+        "y": 0
+      },
+      "tag": "BODY"
+    },
+    "back": [
+      {
+        "disabled": false,
+        "focusVisible": false,
+        "href": "/matches",
+        "label": "뒤로가기",
+        "rect": {
+          "bottom": 0,
+          "height": 0,
+          "left": 0,
+          "right": 0,
+          "top": 0,
+          "width": 0,
+          "x": 0,
+          "y": 0
+        },
+        "tag": "A",
+        "visible": false
+      },
+      {
+        "disabled": false,
+        "focusVisible": false,
+        "href": "/matches",
+        "label": "뒤로가기",
+        "rect": {
+          "bottom": -272.8000183105469,
+          "height": 44,
+          "left": 12,
+          "right": 56,
+          "top": -316.8000183105469,
+          "width": 44,
+          "x": 12,
+          "y": -316.8000183105469
+        },
+        "tag": "A",
+        "visible": true
+      }
+    ],
+    "badge": {
+      "marginBottom": "8px",
+      "rect": {
+        "bottom": -88.80000305175781,
+        "height": 24,
+        "left": 16,
+        "right": 385.6000061035156,
+        "top": -112.8000030517578,
+        "width": 369.6000061035156,
+        "x": 16,
+        "y": -112.8000030517578
+      },
+      "texts": [
+        "풋살",
+        "입문-고수",
+        "성별 무관",
+        "종료"
+      ]
+    },
+    "cta": [
+      {
+        "disabled": true,
+        "focusVisible": false,
+        "href": null,
+        "label": "신청 불가",
+        "rect": {
+          "bottom": 0,
+          "height": 0,
+          "left": 0,
+          "right": 0,
+          "top": 0,
+          "width": 0,
+          "x": 0,
+          "y": 0
+        },
+        "tag": "BUTTON",
+        "visible": false
+      },
+      {
+        "disabled": true,
+        "focusVisible": false,
+        "href": null,
+        "label": "신청 불가",
+        "rect": {
+          "bottom": 583.6000366210938,
+          "height": 50,
+          "left": 20,
+          "right": 381.6000061035156,
+          "top": 533.6000366210938,
+          "width": 361.6000061035156,
+          "x": 20,
+          "y": 533.6000366210938
+        },
+        "tag": "BUTTON",
+        "visible": true
+      }
+    ],
+    "documentScrollWidth": 402,
+    "graphic": {
+      "bottom": -128.80001831054688,
+      "height": 200,
+      "left": 0,
+      "right": 401.6000061035156,
+      "top": -328.8000183105469,
+      "width": 401.6000061035156,
+      "x": 0,
+      "y": -328.8000183105469
+    },
+    "headings": [
+      {
+        "computedDisplay": "block",
+        "disabled": false,
+        "focusVisible": false,
+        "href": null,
+        "label": "(테스트) 1.0.3 QA 수명주기",
+        "rect": {
+          "bottom": 0,
+          "height": 0,
+          "left": 0,
+          "right": 0,
+          "top": 0,
+          "width": 0,
+          "x": 0,
+          "y": 0
+        },
+        "tag": "H1",
+        "visible": false
+      },
+      {
+        "computedDisplay": "block",
+        "disabled": false,
+        "focusVisible": false,
+        "href": null,
+        "label": "(테스트) 1.0.3 QA 수명주기",
+        "rect": {
+          "bottom": -48.80000305175781,
+          "height": 32,
+          "left": 16,
+          "right": 385.6000061035156,
+          "top": -80.80000305175781,
+          "width": 369.6000061035156,
+          "x": 16,
+          "y": -80.80000305175781
+        },
+        "tag": "H2",
+        "visible": true
+      }
+    ],
+    "hero": {
+      "bottom": -8.800018310546875,
+      "height": 320,
+      "left": 0,
+      "right": 401.6000061035156,
+      "top": -328.8000183105469,
+      "width": 401.6000061035156,
+      "x": 0,
+      "y": -328.8000183105469
+    },
+    "host": {
+      "marginTop": "8px",
+      "present": true,
+      "rect": {
+        "bottom": -24.799999237060547,
+        "height": 16,
+        "left": 16,
+        "right": 385.6000061035156,
+        "top": -40.79999923706055,
+        "width": 369.6000061035156,
+        "x": 16,
+        "y": -40.79999923706055
+      },
+      "textOmitted": true,
+      "visible": true
+    },
+    "listHeadings": [],
+    "scroll": {
+      "main": 328.79998779296875,
+      "x": 0,
+      "y": 0
+    },
+    "share": [
+      {
+        "disabled": false,
+        "focusVisible": false,
+        "href": null,
+        "label": "공유",
+        "rect": {
+          "bottom": -272.8000183105469,
+          "height": 44,
+          "left": 345.6000061035156,
+          "right": 389.6000061035156,
+          "top": -316.8000183105469,
+          "width": 44,
+          "x": 345.6000061035156,
+          "y": -316.8000183105469
+        },
+        "tag": "BUTTON",
+        "visible": true
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/matches/synthetic-match-1",
+    "utc": "2026-10-04T06:38:29.600Z",
+    "viewport": {
+      "dpr": 1.25,
+      "h": 606,
+      "w": 402
+    },
+    "label": "mobile native scroll endpoint",
+    "index": 8
+  },
+  {
+    "active": {
+      "focusVisible": false,
+      "href": null,
+      "label": null,
+      "rect": {
+        "bottom": 605.6000366210938,
+        "height": 605.6000366210938,
+        "left": 0,
+        "right": 401.6000061035156,
+        "top": 0,
+        "width": 401.6000061035156,
+        "x": 0,
+        "y": 0
+      },
+      "tag": "BODY"
+    },
+    "back": [
+      {
+        "disabled": false,
+        "focusVisible": false,
+        "href": "/matches",
+        "label": "뒤로가기",
+        "rect": {
+          "bottom": 0,
+          "height": 0,
+          "left": 0,
+          "right": 0,
+          "top": 0,
+          "width": 0,
+          "x": 0,
+          "y": 0
+        },
+        "tag": "A",
+        "visible": false
+      },
+      {
+        "disabled": false,
+        "focusVisible": false,
+        "href": "/matches",
+        "label": "뒤로가기",
+        "rect": {
+          "bottom": -328,
+          "height": 44,
+          "left": 12,
+          "right": 56,
+          "top": -372,
+          "width": 44,
+          "x": 12,
+          "y": -372
+        },
+        "tag": "A",
+        "visible": true
+      }
+    ],
+    "badge": {
+      "marginBottom": "8px",
+      "rect": {
+        "bottom": -144,
+        "height": 24,
+        "left": 16,
+        "right": 385.6000061035156,
+        "top": -168,
+        "width": 369.6000061035156,
+        "x": 16,
+        "y": -168
+      },
+      "texts": [
+        "풋살",
+        "입문-고수",
+        "성별 무관",
+        "종료"
+      ]
+    },
+    "cta": [
+      {
+        "disabled": true,
+        "focusVisible": false,
+        "href": null,
+        "label": "신청 불가",
+        "rect": {
+          "bottom": 0,
+          "height": 0,
+          "left": 0,
+          "right": 0,
+          "top": 0,
+          "width": 0,
+          "x": 0,
+          "y": 0
+        },
+        "tag": "BUTTON",
+        "visible": false
+      },
+      {
+        "disabled": true,
+        "focusVisible": false,
+        "href": null,
+        "label": "신청 불가",
+        "rect": {
+          "bottom": 583.6000366210938,
+          "height": 50,
+          "left": 20,
+          "right": 381.6000061035156,
+          "top": 533.6000366210938,
+          "width": 361.6000061035156,
+          "x": 20,
+          "y": 533.6000366210938
+        },
+        "tag": "BUTTON",
+        "visible": true
+      }
+    ],
+    "documentScrollWidth": 402,
+    "graphic": {
+      "bottom": -184,
+      "height": 200,
+      "left": 0,
+      "right": 401.6000061035156,
+      "top": -384,
+      "width": 401.6000061035156,
+      "x": 0,
+      "y": -384
+    },
+    "headings": [
+      {
+        "computedDisplay": "block",
+        "disabled": false,
+        "focusVisible": false,
+        "href": null,
+        "label": "(테스트) 1.0.3 QA 수명주기",
+        "rect": {
+          "bottom": 0,
+          "height": 0,
+          "left": 0,
+          "right": 0,
+          "top": 0,
+          "width": 0,
+          "x": 0,
+          "y": 0
+        },
+        "tag": "H1",
+        "visible": false
+      },
+      {
+        "computedDisplay": "block",
+        "disabled": false,
+        "focusVisible": false,
+        "href": null,
+        "label": "(테스트) 1.0.3 QA 수명주기",
+        "rect": {
+          "bottom": -104,
+          "height": 32,
+          "left": 16,
+          "right": 385.6000061035156,
+          "top": -136,
+          "width": 369.6000061035156,
+          "x": 16,
+          "y": -136
+        },
+        "tag": "H2",
+        "visible": true
+      }
+    ],
+    "hero": {
+      "bottom": -64,
+      "height": 320,
+      "left": 0,
+      "right": 401.6000061035156,
+      "top": -384,
+      "width": 401.6000061035156,
+      "x": 0,
+      "y": -384
+    },
+    "host": {
+      "marginTop": "8px",
+      "present": true,
+      "rect": {
+        "bottom": -80,
+        "height": 16,
+        "left": 16,
+        "right": 385.6000061035156,
+        "top": -96,
+        "width": 369.6000061035156,
+        "x": 16,
+        "y": -96
+      },
+      "textOmitted": true,
+      "visible": true
+    },
+    "listHeadings": [],
+    "scroll": {
+      "main": 384,
+      "x": 0,
+      "y": 0
+    },
+    "share": [
+      {
+        "disabled": false,
+        "focusVisible": false,
+        "href": null,
+        "label": "공유",
+        "rect": {
+          "bottom": -328,
+          "height": 44,
+          "left": 345.6000061035156,
+          "right": 389.6000061035156,
+          "top": -372,
+          "width": 44,
+          "x": 345.6000061035156,
+          "y": -372
+        },
+        "tag": "BUTTON",
+        "visible": true
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/matches/synthetic-match-1",
+    "utc": "2026-10-04T06:38:29.824Z",
+    "viewport": {
+      "dpr": 1.25,
+      "h": 606,
+      "w": 402
+    },
+    "label": "mobile ControlHome immediate endpoint; main not returned to top",
+    "index": 9
+  },
+  {
+    "active": {
+      "focusVisible": false,
+      "href": null,
+      "label": null,
+      "rect": {
+        "bottom": 504.6666870117187,
+        "height": 504.6666870117187,
+        "left": 0,
+        "right": 788,
+        "top": 0,
+        "width": 788,
+        "x": 0,
+        "y": 0
+      },
+      "tag": "BODY"
+    },
+    "back": [
+      {
+        "disabled": false,
+        "focusVisible": false,
+        "href": "/matches",
+        "label": "뒤로가기",
+        "rect": {
+          "bottom": 0,
+          "height": 0,
+          "left": 0,
+          "right": 0,
+          "top": 0,
+          "width": 0,
+          "x": 0,
+          "y": 0
+        },
+        "tag": "A",
+        "visible": false
+      },
+      {
+        "disabled": false,
+        "focusVisible": false,
+        "href": "/matches",
+        "label": "뒤로가기",
+        "rect": {
+          "bottom": 56,
+          "height": 44,
+          "left": 106,
+          "right": 150,
+          "top": 12,
+          "width": 44,
+          "x": 106,
+          "y": 12
+        },
+        "tag": "A",
+        "visible": true
+      }
+    ],
+    "badge": {
+      "marginBottom": "8px",
+      "rect": {
+        "bottom": 240,
+        "height": 24,
+        "left": 110,
+        "right": 678,
+        "top": 216,
+        "width": 568,
+        "x": 110,
+        "y": 216
+      },
+      "texts": [
+        "풋살",
+        "입문-고수",
+        "성별 무관",
+        "종료"
+      ]
+    },
+    "cta": [
+      {
+        "disabled": true,
+        "focusVisible": false,
+        "href": null,
+        "label": "신청 불가",
+        "rect": {
+          "bottom": 0,
+          "height": 0,
+          "left": 0,
+          "right": 0,
+          "top": 0,
+          "width": 0,
+          "x": 0,
+          "y": 0
+        },
+        "tag": "BUTTON",
+        "visible": false
+      },
+      {
+        "disabled": true,
+        "focusVisible": false,
+        "href": null,
+        "label": "신청 불가",
+        "rect": {
+          "bottom": 482.6666870117187,
+          "height": 50,
+          "left": 114,
+          "right": 674,
+          "top": 432.6666870117187,
+          "width": 560,
+          "x": 114,
+          "y": 432.6666870117187
+        },
+        "tag": "BUTTON",
+        "visible": true
+      }
+    ],
+    "documentScrollWidth": 788,
+    "graphic": {
+      "bottom": 200,
+      "height": 200,
+      "left": 94,
+      "right": 694,
+      "top": 0,
+      "width": 600,
+      "x": 94,
+      "y": 0
+    },
+    "headings": [
+      {
+        "computedDisplay": "block",
+        "disabled": false,
+        "focusVisible": false,
+        "href": null,
+        "label": "(테스트) 1.0.3 QA 수명주기",
+        "rect": {
+          "bottom": 0,
+          "height": 0,
+          "left": 0,
+          "right": 0,
+          "top": 0,
+          "width": 0,
+          "x": 0,
+          "y": 0
+        },
+        "tag": "H1",
+        "visible": false
+      },
+      {
+        "computedDisplay": "block",
+        "disabled": false,
+        "focusVisible": false,
+        "href": null,
+        "label": "(테스트) 1.0.3 QA 수명주기",
+        "rect": {
+          "bottom": 280,
+          "height": 32,
+          "left": 110,
+          "right": 678,
+          "top": 248,
+          "width": 568,
+          "x": 110,
+          "y": 248
+        },
+        "tag": "H2",
+        "visible": true
+      }
+    ],
+    "hero": {
+      "bottom": 320,
+      "height": 320,
+      "left": 94,
+      "right": 694,
+      "top": 0,
+      "width": 600,
+      "x": 94,
+      "y": 0
+    },
+    "host": {
+      "marginTop": "8px",
+      "present": true,
+      "rect": {
+        "bottom": 304,
+        "height": 16,
+        "left": 110,
+        "right": 678,
+        "top": 288,
+        "width": 568,
+        "x": 110,
+        "y": 288
+      },
+      "textOmitted": true,
+      "visible": true
+    },
+    "listHeadings": [],
+    "scroll": {
+      "main": 0,
+      "x": 0,
+      "y": 0
+    },
+    "share": [
+      {
+        "disabled": false,
+        "focusVisible": false,
+        "href": null,
+        "label": "공유",
+        "rect": {
+          "bottom": 56,
+          "height": 44,
+          "left": 638,
+          "right": 682,
+          "top": 12,
+          "width": 44,
+          "x": 638,
+          "y": 12
+        },
+        "tag": "BUTTON",
+        "visible": true
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/matches/synthetic-match-1",
+    "utc": "2026-10-04T06:38:57.323Z",
+    "viewport": {
+      "dpr": 1.5,
+      "h": 505,
+      "w": 788
+    },
+    "label": "tablet initial settled title",
+    "index": 10
+  },
+  {
+    "active": {
+      "focusVisible": true,
+      "href": "/matches",
+      "label": "뒤로가기",
+      "rect": {
+        "bottom": 56,
+        "height": 44,
+        "left": 106,
+        "right": 150,
+        "top": 12,
+        "width": 44,
+        "x": 106,
+        "y": 12
+      },
+      "tag": "A"
+    },
+    "back": [
+      {
+        "disabled": false,
+        "focusVisible": false,
+        "href": "/matches",
+        "label": "뒤로가기",
+        "rect": {
+          "bottom": 0,
+          "height": 0,
+          "left": 0,
+          "right": 0,
+          "top": 0,
+          "width": 0,
+          "x": 0,
+          "y": 0
+        },
+        "tag": "A",
+        "visible": false
+      },
+      {
+        "disabled": false,
+        "focusVisible": true,
+        "href": "/matches",
+        "label": "뒤로가기",
+        "rect": {
+          "bottom": 56,
+          "height": 44,
+          "left": 106,
+          "right": 150,
+          "top": 12,
+          "width": 44,
+          "x": 106,
+          "y": 12
+        },
+        "tag": "A",
+        "visible": true
+      }
+    ],
+    "badge": {
+      "marginBottom": "8px",
+      "rect": {
+        "bottom": 240,
+        "height": 24,
+        "left": 110,
+        "right": 678,
+        "top": 216,
+        "width": 568,
+        "x": 110,
+        "y": 216
+      },
+      "texts": [
+        "풋살",
+        "입문-고수",
+        "성별 무관",
+        "종료"
+      ]
+    },
+    "cta": [
+      {
+        "disabled": true,
+        "focusVisible": false,
+        "href": null,
+        "label": "신청 불가",
+        "rect": {
+          "bottom": 0,
+          "height": 0,
+          "left": 0,
+          "right": 0,
+          "top": 0,
+          "width": 0,
+          "x": 0,
+          "y": 0
+        },
+        "tag": "BUTTON",
+        "visible": false
+      },
+      {
+        "disabled": true,
+        "focusVisible": false,
+        "href": null,
+        "label": "신청 불가",
+        "rect": {
+          "bottom": 482.6666870117187,
+          "height": 50,
+          "left": 114,
+          "right": 674,
+          "top": 432.6666870117187,
+          "width": 560,
+          "x": 114,
+          "y": 432.6666870117187
+        },
+        "tag": "BUTTON",
+        "visible": true
+      }
+    ],
+    "documentScrollWidth": 788,
+    "graphic": {
+      "bottom": 200,
+      "height": 200,
+      "left": 94,
+      "right": 694,
+      "top": 0,
+      "width": 600,
+      "x": 94,
+      "y": 0
+    },
+    "headings": [
+      {
+        "computedDisplay": "block",
+        "disabled": false,
+        "focusVisible": false,
+        "href": null,
+        "label": "(테스트) 1.0.3 QA 수명주기",
+        "rect": {
+          "bottom": 0,
+          "height": 0,
+          "left": 0,
+          "right": 0,
+          "top": 0,
+          "width": 0,
+          "x": 0,
+          "y": 0
+        },
+        "tag": "H1",
+        "visible": false
+      },
+      {
+        "computedDisplay": "block",
+        "disabled": false,
+        "focusVisible": false,
+        "href": null,
+        "label": "(테스트) 1.0.3 QA 수명주기",
+        "rect": {
+          "bottom": 280,
+          "height": 32,
+          "left": 110,
+          "right": 678,
+          "top": 248,
+          "width": 568,
+          "x": 110,
+          "y": 248
+        },
+        "tag": "H2",
+        "visible": true
+      }
+    ],
+    "hero": {
+      "bottom": 320,
+      "height": 320,
+      "left": 94,
+      "right": 694,
+      "top": 0,
+      "width": 600,
+      "x": 94,
+      "y": 0
+    },
+    "host": {
+      "marginTop": "8px",
+      "present": true,
+      "rect": {
+        "bottom": 304,
+        "height": 16,
+        "left": 110,
+        "right": 678,
+        "top": 288,
+        "width": 568,
+        "x": 110,
+        "y": 288
+      },
+      "textOmitted": true,
+      "visible": true
+    },
+    "listHeadings": [],
+    "scroll": {
+      "main": 0,
+      "x": 0,
+      "y": 0
+    },
+    "share": [
+      {
+        "disabled": false,
+        "focusVisible": false,
+        "href": null,
+        "label": "공유",
+        "rect": {
+          "bottom": 56,
+          "height": 44,
+          "left": 638,
+          "right": 682,
+          "top": 12,
+          "width": 44,
+          "x": 638,
+          "y": 12
+        },
+        "tag": "BUTTON",
+        "visible": true
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/matches/synthetic-match-1",
+    "utc": "2026-10-04T06:38:57.518Z",
+    "viewport": {
+      "dpr": 1.5,
+      "h": 505,
+      "w": 788
+    },
+    "label": "tablet Tab1 endpoint",
+    "index": 11
+  },
+  {
+    "active": {
+      "focusVisible": true,
+      "href": null,
+      "label": "공유",
+      "rect": {
+        "bottom": 56,
+        "height": 44,
+        "left": 638,
+        "right": 682,
+        "top": 12,
+        "width": 44,
+        "x": 638,
+        "y": 12
+      },
+      "tag": "BUTTON"
+    },
+    "back": [
+      {
+        "disabled": false,
+        "focusVisible": false,
+        "href": "/matches",
+        "label": "뒤로가기",
+        "rect": {
+          "bottom": 0,
+          "height": 0,
+          "left": 0,
+          "right": 0,
+          "top": 0,
+          "width": 0,
+          "x": 0,
+          "y": 0
+        },
+        "tag": "A",
+        "visible": false
+      },
+      {
+        "disabled": false,
+        "focusVisible": false,
+        "href": "/matches",
+        "label": "뒤로가기",
+        "rect": {
+          "bottom": 56,
+          "height": 44,
+          "left": 106,
+          "right": 150,
+          "top": 12,
+          "width": 44,
+          "x": 106,
+          "y": 12
+        },
+        "tag": "A",
+        "visible": true
+      }
+    ],
+    "badge": {
+      "marginBottom": "8px",
+      "rect": {
+        "bottom": 240,
+        "height": 24,
+        "left": 110,
+        "right": 678,
+        "top": 216,
+        "width": 568,
+        "x": 110,
+        "y": 216
+      },
+      "texts": [
+        "풋살",
+        "입문-고수",
+        "성별 무관",
+        "종료"
+      ]
+    },
+    "cta": [
+      {
+        "disabled": true,
+        "focusVisible": false,
+        "href": null,
+        "label": "신청 불가",
+        "rect": {
+          "bottom": 0,
+          "height": 0,
+          "left": 0,
+          "right": 0,
+          "top": 0,
+          "width": 0,
+          "x": 0,
+          "y": 0
+        },
+        "tag": "BUTTON",
+        "visible": false
+      },
+      {
+        "disabled": true,
+        "focusVisible": false,
+        "href": null,
+        "label": "신청 불가",
+        "rect": {
+          "bottom": 482.6666870117187,
+          "height": 50,
+          "left": 114,
+          "right": 674,
+          "top": 432.6666870117187,
+          "width": 560,
+          "x": 114,
+          "y": 432.6666870117187
+        },
+        "tag": "BUTTON",
+        "visible": true
+      }
+    ],
+    "documentScrollWidth": 788,
+    "graphic": {
+      "bottom": 200,
+      "height": 200,
+      "left": 94,
+      "right": 694,
+      "top": 0,
+      "width": 600,
+      "x": 94,
+      "y": 0
+    },
+    "headings": [
+      {
+        "computedDisplay": "block",
+        "disabled": false,
+        "focusVisible": false,
+        "href": null,
+        "label": "(테스트) 1.0.3 QA 수명주기",
+        "rect": {
+          "bottom": 0,
+          "height": 0,
+          "left": 0,
+          "right": 0,
+          "top": 0,
+          "width": 0,
+          "x": 0,
+          "y": 0
+        },
+        "tag": "H1",
+        "visible": false
+      },
+      {
+        "computedDisplay": "block",
+        "disabled": false,
+        "focusVisible": false,
+        "href": null,
+        "label": "(테스트) 1.0.3 QA 수명주기",
+        "rect": {
+          "bottom": 280,
+          "height": 32,
+          "left": 110,
+          "right": 678,
+          "top": 248,
+          "width": 568,
+          "x": 110,
+          "y": 248
+        },
+        "tag": "H2",
+        "visible": true
+      }
+    ],
+    "hero": {
+      "bottom": 320,
+      "height": 320,
+      "left": 94,
+      "right": 694,
+      "top": 0,
+      "width": 600,
+      "x": 94,
+      "y": 0
+    },
+    "host": {
+      "marginTop": "8px",
+      "present": true,
+      "rect": {
+        "bottom": 304,
+        "height": 16,
+        "left": 110,
+        "right": 678,
+        "top": 288,
+        "width": 568,
+        "x": 110,
+        "y": 288
+      },
+      "textOmitted": true,
+      "visible": true
+    },
+    "listHeadings": [],
+    "scroll": {
+      "main": 0,
+      "x": 0,
+      "y": 0
+    },
+    "share": [
+      {
+        "disabled": false,
+        "focusVisible": true,
+        "href": null,
+        "label": "공유",
+        "rect": {
+          "bottom": 56,
+          "height": 44,
+          "left": 638,
+          "right": 682,
+          "top": 12,
+          "width": 44,
+          "x": 638,
+          "y": 12
+        },
+        "tag": "BUTTON",
+        "visible": true
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/matches/synthetic-match-1",
+    "utc": "2026-10-04T06:38:57.683Z",
+    "viewport": {
+      "dpr": 1.5,
+      "h": 505,
+      "w": 788
+    },
+    "label": "tablet Tab2 endpoint",
+    "index": 12
+  },
+  {
+    "active": {
+      "focusVisible": true,
+      "href": "/matches",
+      "label": "뒤로가기",
+      "rect": {
+        "bottom": 56,
+        "height": 44,
+        "left": 106,
+        "right": 150,
+        "top": 12,
+        "width": 44,
+        "x": 106,
+        "y": 12
+      },
+      "tag": "A"
+    },
+    "back": [
+      {
+        "disabled": false,
+        "focusVisible": false,
+        "href": "/matches",
+        "label": "뒤로가기",
+        "rect": {
+          "bottom": 0,
+          "height": 0,
+          "left": 0,
+          "right": 0,
+          "top": 0,
+          "width": 0,
+          "x": 0,
+          "y": 0
+        },
+        "tag": "A",
+        "visible": false
+      },
+      {
+        "disabled": false,
+        "focusVisible": true,
+        "href": "/matches",
+        "label": "뒤로가기",
+        "rect": {
+          "bottom": 56,
+          "height": 44,
+          "left": 106,
+          "right": 150,
+          "top": 12,
+          "width": 44,
+          "x": 106,
+          "y": 12
+        },
+        "tag": "A",
+        "visible": true
+      }
+    ],
+    "badge": {
+      "marginBottom": "8px",
+      "rect": {
+        "bottom": 240,
+        "height": 24,
+        "left": 110,
+        "right": 678,
+        "top": 216,
+        "width": 568,
+        "x": 110,
+        "y": 216
+      },
+      "texts": [
+        "풋살",
+        "입문-고수",
+        "성별 무관",
+        "종료"
+      ]
+    },
+    "cta": [
+      {
+        "disabled": true,
+        "focusVisible": false,
+        "href": null,
+        "label": "신청 불가",
+        "rect": {
+          "bottom": 0,
+          "height": 0,
+          "left": 0,
+          "right": 0,
+          "top": 0,
+          "width": 0,
+          "x": 0,
+          "y": 0
+        },
+        "tag": "BUTTON",
+        "visible": false
+      },
+      {
+        "disabled": true,
+        "focusVisible": false,
+        "href": null,
+        "label": "신청 불가",
+        "rect": {
+          "bottom": 482.6666870117187,
+          "height": 50,
+          "left": 114,
+          "right": 674,
+          "top": 432.6666870117187,
+          "width": 560,
+          "x": 114,
+          "y": 432.6666870117187
+        },
+        "tag": "BUTTON",
+        "visible": true
+      }
+    ],
+    "documentScrollWidth": 788,
+    "graphic": {
+      "bottom": 200,
+      "height": 200,
+      "left": 94,
+      "right": 694,
+      "top": 0,
+      "width": 600,
+      "x": 94,
+      "y": 0
+    },
+    "headings": [
+      {
+        "computedDisplay": "block",
+        "disabled": false,
+        "focusVisible": false,
+        "href": null,
+        "label": "(테스트) 1.0.3 QA 수명주기",
+        "rect": {
+          "bottom": 0,
+          "height": 0,
+          "left": 0,
+          "right": 0,
+          "top": 0,
+          "width": 0,
+          "x": 0,
+          "y": 0
+        },
+        "tag": "H1",
+        "visible": false
+      },
+      {
+        "computedDisplay": "block",
+        "disabled": false,
+        "focusVisible": false,
+        "href": null,
+        "label": "(테스트) 1.0.3 QA 수명주기",
+        "rect": {
+          "bottom": 280,
+          "height": 32,
+          "left": 110,
+          "right": 678,
+          "top": 248,
+          "width": 568,
+          "x": 110,
+          "y": 248
+        },
+        "tag": "H2",
+        "visible": true
+      }
+    ],
+    "hero": {
+      "bottom": 320,
+      "height": 320,
+      "left": 94,
+      "right": 694,
+      "top": 0,
+      "width": 600,
+      "x": 94,
+      "y": 0
+    },
+    "host": {
+      "marginTop": "8px",
+      "present": true,
+      "rect": {
+        "bottom": 304,
+        "height": 16,
+        "left": 110,
+        "right": 678,
+        "top": 288,
+        "width": 568,
+        "x": 110,
+        "y": 288
+      },
+      "textOmitted": true,
+      "visible": true
+    },
+    "listHeadings": [],
+    "scroll": {
+      "main": 0,
+      "x": 0,
+      "y": 0
+    },
+    "share": [
+      {
+        "disabled": false,
+        "focusVisible": false,
+        "href": null,
+        "label": "공유",
+        "rect": {
+          "bottom": 56,
+          "height": 44,
+          "left": 638,
+          "right": 682,
+          "top": 12,
+          "width": 44,
+          "x": 638,
+          "y": 12
+        },
+        "tag": "BUTTON",
+        "visible": true
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/matches/synthetic-match-1",
+    "utc": "2026-10-04T06:38:57.923Z",
+    "viewport": {
+      "dpr": 1.5,
+      "h": 505,
+      "w": 788
+    },
+    "label": "tablet reverse endpoint",
+    "index": 13
+  },
+  {
+    "active": {
+      "focusVisible": false,
+      "href": null,
+      "label": null,
+      "rect": {
+        "bottom": 504.6666870117187,
+        "height": 504.6666870117187,
+        "left": 0,
+        "right": 788,
+        "top": 0,
+        "width": 788,
+        "x": 0,
+        "y": 0
+      },
+      "tag": "BODY"
+    },
+    "back": [],
+    "badge": {
+      "marginBottom": null,
+      "rect": null,
+      "texts": []
+    },
+    "cta": [],
+    "documentScrollWidth": 788,
+    "graphic": null,
+    "headings": [],
+    "hero": null,
+    "host": {
+      "marginTop": null,
+      "present": false,
+      "rect": null,
+      "textOmitted": true,
+      "visible": false
+    },
+    "listHeadings": [],
+    "scroll": {
+      "main": 0,
+      "x": 0,
+      "y": 0
+    },
+    "share": [],
+    "url": "https://alpha.teameet.co.kr/matches",
+    "utc": "2026-10-04T06:39:11.896Z",
+    "viewport": {
+      "dpr": 1.5,
+      "h": 505,
+      "w": 788
+    },
+    "label": "tablet app Back destination",
+    "index": 14
+  },
+  {
+    "active": {
+      "focusVisible": false,
+      "href": null,
+      "label": null,
+      "rect": {
+        "bottom": 504.6666870117187,
+        "height": 504.6666870117187,
+        "left": 0,
+        "right": 788,
+        "top": 0,
+        "width": 788,
+        "x": 0,
+        "y": 0
+      },
+      "tag": "BODY"
+    },
+    "back": [
+      {
+        "disabled": false,
+        "focusVisible": false,
+        "href": "/matches",
+        "label": "뒤로가기",
+        "rect": {
+          "bottom": 0,
+          "height": 0,
+          "left": 0,
+          "right": 0,
+          "top": 0,
+          "width": 0,
+          "x": 0,
+          "y": 0
+        },
+        "tag": "A",
+        "visible": false
+      },
+      {
+        "disabled": false,
+        "focusVisible": false,
+        "href": "/matches",
+        "label": "뒤로가기",
+        "rect": {
+          "bottom": 56,
+          "height": 44,
+          "left": 106,
+          "right": 150,
+          "top": 12,
+          "width": 44,
+          "x": 106,
+          "y": 12
+        },
+        "tag": "A",
+        "visible": true
+      }
+    ],
+    "badge": {
+      "marginBottom": "8px",
+      "rect": {
+        "bottom": 240,
+        "height": 24,
+        "left": 110,
+        "right": 678,
+        "top": 216,
+        "width": 568,
+        "x": 110,
+        "y": 216
+      },
+      "texts": [
+        "풋살",
+        "입문-고수",
+        "성별 무관",
+        "종료"
+      ]
+    },
+    "cta": [
+      {
+        "disabled": true,
+        "focusVisible": false,
+        "href": null,
+        "label": "신청 불가",
+        "rect": {
+          "bottom": 0,
+          "height": 0,
+          "left": 0,
+          "right": 0,
+          "top": 0,
+          "width": 0,
+          "x": 0,
+          "y": 0
+        },
+        "tag": "BUTTON",
+        "visible": false
+      },
+      {
+        "disabled": true,
+        "focusVisible": false,
+        "href": null,
+        "label": "신청 불가",
+        "rect": {
+          "bottom": 482.6666870117187,
+          "height": 50,
+          "left": 114,
+          "right": 674,
+          "top": 432.6666870117187,
+          "width": 560,
+          "x": 114,
+          "y": 432.6666870117187
+        },
+        "tag": "BUTTON",
+        "visible": true
+      }
+    ],
+    "documentScrollWidth": 788,
+    "graphic": {
+      "bottom": 200,
+      "height": 200,
+      "left": 94,
+      "right": 694,
+      "top": 0,
+      "width": 600,
+      "x": 94,
+      "y": 0
+    },
+    "headings": [
+      {
+        "computedDisplay": "block",
+        "disabled": false,
+        "focusVisible": false,
+        "href": null,
+        "label": "(테스트) 1.0.3 QA 수명주기",
+        "rect": {
+          "bottom": 0,
+          "height": 0,
+          "left": 0,
+          "right": 0,
+          "top": 0,
+          "width": 0,
+          "x": 0,
+          "y": 0
+        },
+        "tag": "H1",
+        "visible": false
+      },
+      {
+        "computedDisplay": "block",
+        "disabled": false,
+        "focusVisible": false,
+        "href": null,
+        "label": "(테스트) 1.0.3 QA 수명주기",
+        "rect": {
+          "bottom": 280,
+          "height": 32,
+          "left": 110,
+          "right": 678,
+          "top": 248,
+          "width": 568,
+          "x": 110,
+          "y": 248
+        },
+        "tag": "H2",
+        "visible": true
+      }
+    ],
+    "hero": {
+      "bottom": 320,
+      "height": 320,
+      "left": 94,
+      "right": 694,
+      "top": 0,
+      "width": 600,
+      "x": 94,
+      "y": 0
+    },
+    "host": {
+      "marginTop": "8px",
+      "present": true,
+      "rect": {
+        "bottom": 304,
+        "height": 16,
+        "left": 110,
+        "right": 678,
+        "top": 288,
+        "width": 568,
+        "x": 110,
+        "y": 288
+      },
+      "textOmitted": true,
+      "visible": true
+    },
+    "listHeadings": [],
+    "scroll": {
+      "main": 0,
+      "x": 0,
+      "y": 0
+    },
+    "share": [
+      {
+        "disabled": false,
+        "focusVisible": false,
+        "href": null,
+        "label": "공유",
+        "rect": {
+          "bottom": 56,
+          "height": 44,
+          "left": 638,
+          "right": 682,
+          "top": 12,
+          "width": 44,
+          "x": 638,
+          "y": 12
+        },
+        "tag": "BUTTON",
+        "visible": true
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/matches/synthetic-match-1",
+    "utc": "2026-10-04T06:39:12.131Z",
+    "viewport": {
+      "dpr": 1.5,
+      "h": 505,
+      "w": 788
+    },
+    "label": "tablet browser Back detail",
+    "index": 15
+  },
+  {
+    "active": {
+      "focusVisible": false,
+      "href": null,
+      "label": null,
+      "rect": {
+        "bottom": 504.6666870117187,
+        "height": 504.6666870117187,
+        "left": 0,
+        "right": 788,
+        "top": 0,
+        "width": 788,
+        "x": 0,
+        "y": 0
+      },
+      "tag": "BODY"
+    },
+    "back": [],
+    "badge": {
+      "marginBottom": null,
+      "rect": null,
+      "texts": []
+    },
+    "cta": [],
+    "documentScrollWidth": 788,
+    "graphic": null,
+    "headings": [],
+    "hero": null,
+    "host": {
+      "marginTop": null,
+      "present": false,
+      "rect": null,
+      "textOmitted": true,
+      "visible": false
+    },
+    "listHeadings": [
+      {
+        "disabled": false,
+        "focusVisible": false,
+        "href": null,
+        "label": "매치",
+        "rect": {
+          "bottom": 0,
+          "height": 0,
+          "left": 0,
+          "right": 0,
+          "top": 0,
+          "width": 0,
+          "x": 0,
+          "y": 0
+        },
+        "tag": "H1",
+        "visible": false
+      }
+    ],
+    "scroll": {
+      "main": 0,
+      "x": 0,
+      "y": 0
+    },
+    "share": [],
+    "url": "https://alpha.teameet.co.kr/matches",
+    "utc": "2026-10-04T06:39:12.335Z",
+    "viewport": {
+      "dpr": 1.5,
+      "h": 505,
+      "w": 788
+    },
+    "label": "tablet browser Forward list",
+    "index": 16
+  },
+  {
+    "active": {
+      "focusVisible": false,
+      "href": null,
+      "label": null,
+      "rect": {
+        "bottom": 504.6666870117187,
+        "height": 504.6666870117187,
+        "left": 0,
+        "right": 788,
+        "top": 0,
+        "width": 788,
+        "x": 0,
+        "y": 0
+      },
+      "tag": "BODY"
+    },
+    "back": [
+      {
+        "disabled": false,
+        "focusVisible": false,
+        "href": "/matches",
+        "label": "뒤로가기",
+        "rect": {
+          "bottom": 0,
+          "height": 0,
+          "left": 0,
+          "right": 0,
+          "top": 0,
+          "width": 0,
+          "x": 0,
+          "y": 0
+        },
+        "tag": "A",
+        "visible": false
+      },
+      {
+        "disabled": false,
+        "focusVisible": false,
+        "href": "/matches",
+        "label": "뒤로가기",
+        "rect": {
+          "bottom": 56,
+          "height": 44,
+          "left": 106,
+          "right": 150,
+          "top": 12,
+          "width": 44,
+          "x": 106,
+          "y": 12
+        },
+        "tag": "A",
+        "visible": true
+      }
+    ],
+    "badge": {
+      "marginBottom": "8px",
+      "rect": {
+        "bottom": 240,
+        "height": 24,
+        "left": 110,
+        "right": 678,
+        "top": 216,
+        "width": 568,
+        "x": 110,
+        "y": 216
+      },
+      "texts": [
+        "풋살",
+        "입문-고수",
+        "성별 무관",
+        "종료"
+      ]
+    },
+    "cta": [
+      {
+        "disabled": true,
+        "focusVisible": false,
+        "href": null,
+        "label": "신청 불가",
+        "rect": {
+          "bottom": 0,
+          "height": 0,
+          "left": 0,
+          "right": 0,
+          "top": 0,
+          "width": 0,
+          "x": 0,
+          "y": 0
+        },
+        "tag": "BUTTON",
+        "visible": false
+      },
+      {
+        "disabled": true,
+        "focusVisible": false,
+        "href": null,
+        "label": "신청 불가",
+        "rect": {
+          "bottom": 482.6666870117187,
+          "height": 50,
+          "left": 114,
+          "right": 674,
+          "top": 432.6666870117187,
+          "width": 560,
+          "x": 114,
+          "y": 432.6666870117187
+        },
+        "tag": "BUTTON",
+        "visible": true
+      }
+    ],
+    "documentScrollWidth": 788,
+    "graphic": {
+      "bottom": 200,
+      "height": 200,
+      "left": 94,
+      "right": 694,
+      "top": 0,
+      "width": 600,
+      "x": 94,
+      "y": 0
+    },
+    "headings": [
+      {
+        "computedDisplay": "block",
+        "disabled": false,
+        "focusVisible": false,
+        "href": null,
+        "label": "(테스트) 1.0.3 QA 수명주기",
+        "rect": {
+          "bottom": 0,
+          "height": 0,
+          "left": 0,
+          "right": 0,
+          "top": 0,
+          "width": 0,
+          "x": 0,
+          "y": 0
+        },
+        "tag": "H1",
+        "visible": false
+      },
+      {
+        "computedDisplay": "block",
+        "disabled": false,
+        "focusVisible": false,
+        "href": null,
+        "label": "(테스트) 1.0.3 QA 수명주기",
+        "rect": {
+          "bottom": 280,
+          "height": 32,
+          "left": 110,
+          "right": 678,
+          "top": 248,
+          "width": 568,
+          "x": 110,
+          "y": 248
+        },
+        "tag": "H2",
+        "visible": true
+      }
+    ],
+    "hero": {
+      "bottom": 320,
+      "height": 320,
+      "left": 94,
+      "right": 694,
+      "top": 0,
+      "width": 600,
+      "x": 94,
+      "y": 0
+    },
+    "host": {
+      "marginTop": "8px",
+      "present": true,
+      "rect": {
+        "bottom": 304,
+        "height": 16,
+        "left": 110,
+        "right": 678,
+        "top": 288,
+        "width": 568,
+        "x": 110,
+        "y": 288
+      },
+      "textOmitted": true,
+      "visible": true
+    },
+    "listHeadings": [],
+    "scroll": {
+      "main": 0,
+      "x": 0,
+      "y": 0
+    },
+    "share": [
+      {
+        "disabled": false,
+        "focusVisible": false,
+        "href": null,
+        "label": "공유",
+        "rect": {
+          "bottom": 56,
+          "height": 44,
+          "left": 638,
+          "right": 682,
+          "top": 12,
+          "width": 44,
+          "x": 638,
+          "y": 12
+        },
+        "tag": "BUTTON",
+        "visible": true
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/matches/synthetic-match-1",
+    "utc": "2026-10-04T06:39:12.593Z",
+    "viewport": {
+      "dpr": 1.5,
+      "h": 505,
+      "w": 788
+    },
+    "label": "tablet browser Back final detail",
+    "index": 17
+  },
+  {
+    "active": {
+      "focusVisible": false,
+      "href": null,
+      "label": null,
+      "rect": {
+        "bottom": 504.6666870117187,
+        "height": 504.6666870117187,
+        "left": 0,
+        "right": 788,
+        "top": 0,
+        "width": 788,
+        "x": 0,
+        "y": 0
+      },
+      "tag": "BODY"
+    },
+    "back": [
+      {
+        "disabled": false,
+        "focusVisible": false,
+        "href": "/matches",
+        "label": "뒤로가기",
+        "rect": {
+          "bottom": 0,
+          "height": 0,
+          "left": 0,
+          "right": 0,
+          "top": 0,
+          "width": 0,
+          "x": 0,
+          "y": 0
+        },
+        "tag": "A",
+        "visible": false
+      },
+      {
+        "disabled": false,
+        "focusVisible": false,
+        "href": "/matches",
+        "label": "뒤로가기",
+        "rect": {
+          "bottom": -264,
+          "height": 44,
+          "left": 106,
+          "right": 150,
+          "top": -308,
+          "width": 44,
+          "x": 106,
+          "y": -308
+        },
+        "tag": "A",
+        "visible": true
+      }
+    ],
+    "badge": {
+      "marginBottom": "8px",
+      "rect": {
+        "bottom": -80,
+        "height": 24,
+        "left": 110,
+        "right": 678,
+        "top": -104,
+        "width": 568,
+        "x": 110,
+        "y": -104
+      },
+      "texts": [
+        "풋살",
+        "입문-고수",
+        "성별 무관",
+        "종료"
+      ]
+    },
+    "cta": [
+      {
+        "disabled": true,
+        "focusVisible": false,
+        "href": null,
+        "label": "신청 불가",
+        "rect": {
+          "bottom": 0,
+          "height": 0,
+          "left": 0,
+          "right": 0,
+          "top": 0,
+          "width": 0,
+          "x": 0,
+          "y": 0
+        },
+        "tag": "BUTTON",
+        "visible": false
+      },
+      {
+        "disabled": true,
+        "focusVisible": false,
+        "href": null,
+        "label": "신청 불가",
+        "rect": {
+          "bottom": 482.6666870117187,
+          "height": 50,
+          "left": 114,
+          "right": 674,
+          "top": 432.6666870117187,
+          "width": 560,
+          "x": 114,
+          "y": 432.6666870117187
+        },
+        "tag": "BUTTON",
+        "visible": true
+      }
+    ],
+    "documentScrollWidth": 788,
+    "graphic": {
+      "bottom": -120,
+      "height": 200,
+      "left": 94,
+      "right": 694,
+      "top": -320,
+      "width": 600,
+      "x": 94,
+      "y": -320
+    },
+    "headings": [
+      {
+        "computedDisplay": "block",
+        "disabled": false,
+        "focusVisible": false,
+        "href": null,
+        "label": "(테스트) 1.0.3 QA 수명주기",
+        "rect": {
+          "bottom": 0,
+          "height": 0,
+          "left": 0,
+          "right": 0,
+          "top": 0,
+          "width": 0,
+          "x": 0,
+          "y": 0
+        },
+        "tag": "H1",
+        "visible": false
+      },
+      {
+        "computedDisplay": "block",
+        "disabled": false,
+        "focusVisible": false,
+        "href": null,
+        "label": "(테스트) 1.0.3 QA 수명주기",
+        "rect": {
+          "bottom": -40,
+          "height": 32,
+          "left": 110,
+          "right": 678,
+          "top": -72,
+          "width": 568,
+          "x": 110,
+          "y": -72
+        },
+        "tag": "H2",
+        "visible": true
+      }
+    ],
+    "hero": {
+      "bottom": 0,
+      "height": 320,
+      "left": 94,
+      "right": 694,
+      "top": -320,
+      "width": 600,
+      "x": 94,
+      "y": -320
+    },
+    "host": {
+      "marginTop": "8px",
+      "present": true,
+      "rect": {
+        "bottom": -16,
+        "height": 16,
+        "left": 110,
+        "right": 678,
+        "top": -32,
+        "width": 568,
+        "x": 110,
+        "y": -32
+      },
+      "textOmitted": true,
+      "visible": true
+    },
+    "listHeadings": [],
+    "scroll": {
+      "main": 320,
+      "x": 0,
+      "y": 0
+    },
+    "share": [
+      {
+        "disabled": false,
+        "focusVisible": false,
+        "href": null,
+        "label": "공유",
+        "rect": {
+          "bottom": -264,
+          "height": 44,
+          "left": 638,
+          "right": 682,
+          "top": -308,
+          "width": 44,
+          "x": 638,
+          "y": -308
+        },
+        "tag": "BUTTON",
+        "visible": true
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/matches/synthetic-match-1",
+    "utc": "2026-10-04T06:39:21.936Z",
+    "viewport": {
+      "dpr": 1.5,
+      "h": 505,
+      "w": 788
+    },
+    "label": "tablet settled scroll endpoint",
+    "index": 18
+  },
+  {
+    "active": {
+      "focusVisible": false,
+      "href": null,
+      "label": null,
+      "rect": {
+        "bottom": 1265.25,
+        "height": 1265.25,
+        "left": 0,
+        "right": 1182,
+        "top": 0,
+        "width": 1182,
+        "x": 0,
+        "y": 0
+      },
+      "tag": "BODY"
+    },
+    "back": [
+      {
+        "disabled": false,
+        "focusVisible": false,
+        "href": "/matches",
+        "label": "뒤로가기",
+        "rect": {
+          "bottom": 132,
+          "height": 40,
+          "left": 55,
+          "right": 95,
+          "top": 92,
+          "width": 40,
+          "x": 55,
+          "y": 92
+        },
+        "tag": "A",
+        "visible": true
+      },
+      {
+        "disabled": false,
+        "focusVisible": false,
+        "href": "/matches",
+        "label": "뒤로가기",
+        "rect": {
+          "bottom": 0,
+          "height": 0,
+          "left": 0,
+          "right": 0,
+          "top": 0,
+          "width": 0,
+          "x": 0,
+          "y": 0
+        },
+        "tag": "A",
+        "visible": false
+      }
+    ],
+    "badge": {
+      "marginBottom": "8px",
+      "rect": {
+        "bottom": 432,
+        "height": 24,
+        "left": 71,
+        "right": 1111,
+        "top": 408,
+        "width": 1040,
+        "x": 71,
+        "y": 408
+      },
+      "texts": [
+        "풋살",
+        "입문-고수",
+        "성별 무관",
+        "종료"
+      ]
+    },
+    "cta": [
+      {
+        "disabled": true,
+        "focusVisible": false,
+        "href": null,
+        "label": "신청 불가",
+        "rect": {
+          "bottom": 616,
+          "height": 50,
+          "left": 788,
+          "right": 1106,
+          "top": 566,
+          "width": 318,
+          "x": 788,
+          "y": 566
+        },
+        "tag": "BUTTON",
+        "visible": true
+      },
+      {
+        "disabled": true,
+        "focusVisible": false,
+        "href": null,
+        "label": "신청 불가",
+        "rect": {
+          "bottom": 0,
+          "height": 0,
+          "left": 0,
+          "right": 0,
+          "top": 0,
+          "width": 0,
+          "x": 0,
+          "y": 0
+        },
+        "tag": "BUTTON",
+        "visible": false
+      }
+    ],
+    "documentScrollWidth": 1182,
+    "graphic": {
+      "bottom": 392,
+      "height": 240,
+      "left": 55,
+      "right": 1127,
+      "top": 152,
+      "width": 1072,
+      "x": 55,
+      "y": 152
+    },
+    "headings": [
+      {
+        "computedDisplay": "block",
+        "disabled": false,
+        "focusVisible": false,
+        "href": null,
+        "label": "(테스트) 1.0.3 QA 수명주기",
+        "rect": {
+          "bottom": 128,
+          "height": 32,
+          "left": 107,
+          "right": 375.078125,
+          "top": 96,
+          "width": 268.078125,
+          "x": 107,
+          "y": 96
+        },
+        "tag": "H1",
+        "visible": true
+      },
+      {
+        "computedDisplay": "none",
+        "disabled": false,
+        "focusVisible": false,
+        "href": null,
+        "label": "(테스트) 1.0.3 QA 수명주기",
+        "rect": {
+          "bottom": 0,
+          "height": 0,
+          "left": 0,
+          "right": 0,
+          "top": 0,
+          "width": 0,
+          "x": 0,
+          "y": 0
+        },
+        "tag": "H2",
+        "visible": false
+      }
+    ],
+    "hero": {
+      "bottom": 472,
+      "height": 320,
+      "left": 55,
+      "right": 1127,
+      "top": 152,
+      "width": 1072,
+      "x": 55,
+      "y": 152
+    },
+    "host": {
+      "marginTop": "0px",
+      "present": true,
+      "rect": {
+        "bottom": 456,
+        "height": 16,
+        "left": 71,
+        "right": 1111,
+        "top": 440,
+        "width": 1040,
+        "x": 71,
+        "y": 440
+      },
+      "textOmitted": true,
+      "visible": true
+    },
+    "listHeadings": [],
+    "scroll": {
+      "main": 0,
+      "x": 0,
+      "y": 0
+    },
+    "share": [
+      {
+        "disabled": false,
+        "focusVisible": false,
+        "href": null,
+        "label": "공유",
+        "rect": {
+          "bottom": 208,
+          "height": 44,
+          "left": 1071,
+          "right": 1115,
+          "top": 164,
+          "width": 44,
+          "x": 1071,
+          "y": 164
+        },
+        "tag": "BUTTON",
+        "visible": true
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/matches/synthetic-match-1",
+    "utc": "2026-10-04T06:39:22.778Z",
+    "viewport": {
+      "dpr": 1,
+      "h": 757,
+      "w": 1182
+    },
+    "label": "desktop initial settled title",
+    "index": 19
+  },
+  {
+    "active": {
+      "focusVisible": true,
+      "href": null,
+      "label": "공유",
+      "rect": {
+        "bottom": 208,
+        "height": 44,
+        "left": 1071,
+        "right": 1115,
+        "top": 164,
+        "width": 44,
+        "x": 1071,
+        "y": 164
+      },
+      "tag": "BUTTON"
+    },
+    "back": [
+      {
+        "disabled": false,
+        "focusVisible": false,
+        "href": "/matches",
+        "label": "뒤로가기",
+        "rect": {
+          "bottom": 132,
+          "height": 40,
+          "left": 55,
+          "right": 95,
+          "top": 92,
+          "width": 40,
+          "x": 55,
+          "y": 92
+        },
+        "tag": "A",
+        "visible": true
+      },
+      {
+        "disabled": false,
+        "focusVisible": false,
+        "href": "/matches",
+        "label": "뒤로가기",
+        "rect": {
+          "bottom": 0,
+          "height": 0,
+          "left": 0,
+          "right": 0,
+          "top": 0,
+          "width": 0,
+          "x": 0,
+          "y": 0
+        },
+        "tag": "A",
+        "visible": false
+      }
+    ],
+    "badge": {
+      "marginBottom": "8px",
+      "rect": {
+        "bottom": 432,
+        "height": 24,
+        "left": 71,
+        "right": 1111,
+        "top": 408,
+        "width": 1040,
+        "x": 71,
+        "y": 408
+      },
+      "texts": [
+        "풋살",
+        "입문-고수",
+        "성별 무관",
+        "종료"
+      ]
+    },
+    "cta": [
+      {
+        "disabled": true,
+        "focusVisible": false,
+        "href": null,
+        "label": "신청 불가",
+        "rect": {
+          "bottom": 616,
+          "height": 50,
+          "left": 788,
+          "right": 1106,
+          "top": 566,
+          "width": 318,
+          "x": 788,
+          "y": 566
+        },
+        "tag": "BUTTON",
+        "visible": true
+      },
+      {
+        "disabled": true,
+        "focusVisible": false,
+        "href": null,
+        "label": "신청 불가",
+        "rect": {
+          "bottom": 0,
+          "height": 0,
+          "left": 0,
+          "right": 0,
+          "top": 0,
+          "width": 0,
+          "x": 0,
+          "y": 0
+        },
+        "tag": "BUTTON",
+        "visible": false
+      }
+    ],
+    "documentScrollWidth": 1182,
+    "graphic": {
+      "bottom": 392,
+      "height": 240,
+      "left": 55,
+      "right": 1127,
+      "top": 152,
+      "width": 1072,
+      "x": 55,
+      "y": 152
+    },
+    "headings": [
+      {
+        "computedDisplay": "block",
+        "disabled": false,
+        "focusVisible": false,
+        "href": null,
+        "label": "(테스트) 1.0.3 QA 수명주기",
+        "rect": {
+          "bottom": 128,
+          "height": 32,
+          "left": 107,
+          "right": 375.078125,
+          "top": 96,
+          "width": 268.078125,
+          "x": 107,
+          "y": 96
+        },
+        "tag": "H1",
+        "visible": true
+      },
+      {
+        "computedDisplay": "none",
+        "disabled": false,
+        "focusVisible": false,
+        "href": null,
+        "label": "(테스트) 1.0.3 QA 수명주기",
+        "rect": {
+          "bottom": 0,
+          "height": 0,
+          "left": 0,
+          "right": 0,
+          "top": 0,
+          "width": 0,
+          "x": 0,
+          "y": 0
+        },
+        "tag": "H2",
+        "visible": false
+      }
+    ],
+    "hero": {
+      "bottom": 472,
+      "height": 320,
+      "left": 55,
+      "right": 1127,
+      "top": 152,
+      "width": 1072,
+      "x": 55,
+      "y": 152
+    },
+    "host": {
+      "marginTop": "0px",
+      "present": true,
+      "rect": {
+        "bottom": 456,
+        "height": 16,
+        "left": 71,
+        "right": 1111,
+        "top": 440,
+        "width": 1040,
+        "x": 71,
+        "y": 440
+      },
+      "textOmitted": true,
+      "visible": true
+    },
+    "listHeadings": [],
+    "scroll": {
+      "main": 0,
+      "x": 0,
+      "y": 0
+    },
+    "share": [
+      {
+        "disabled": false,
+        "focusVisible": true,
+        "href": null,
+        "label": "공유",
+        "rect": {
+          "bottom": 208,
+          "height": 44,
+          "left": 1071,
+          "right": 1115,
+          "top": 164,
+          "width": 44,
+          "x": 1071,
+          "y": 164
+        },
+        "tag": "BUTTON",
+        "visible": true
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/matches/synthetic-match-1",
+    "utc": "2026-10-04T06:39:54.260Z",
+    "viewport": {
+      "dpr": 1,
+      "h": 757,
+      "w": 1182
+    },
+    "label": "desktop Back to Share Tab",
+    "index": 20
+  },
+  {
+    "active": {
+      "focusVisible": true,
+      "href": "/matches",
+      "label": "뒤로가기",
+      "rect": {
+        "bottom": 132,
+        "height": 40,
+        "left": 55,
+        "right": 95,
+        "top": 92,
+        "width": 40,
+        "x": 55,
+        "y": 92
+      },
+      "tag": "A"
+    },
+    "back": [
+      {
+        "disabled": false,
+        "focusVisible": true,
+        "href": "/matches",
+        "label": "뒤로가기",
+        "rect": {
+          "bottom": 132,
+          "height": 40,
+          "left": 55,
+          "right": 95,
+          "top": 92,
+          "width": 40,
+          "x": 55,
+          "y": 92
+        },
+        "tag": "A",
+        "visible": true
+      },
+      {
+        "disabled": false,
+        "focusVisible": false,
+        "href": "/matches",
+        "label": "뒤로가기",
+        "rect": {
+          "bottom": 0,
+          "height": 0,
+          "left": 0,
+          "right": 0,
+          "top": 0,
+          "width": 0,
+          "x": 0,
+          "y": 0
+        },
+        "tag": "A",
+        "visible": false
+      }
+    ],
+    "badge": {
+      "marginBottom": "8px",
+      "rect": {
+        "bottom": 432,
+        "height": 24,
+        "left": 71,
+        "right": 1111,
+        "top": 408,
+        "width": 1040,
+        "x": 71,
+        "y": 408
+      },
+      "texts": [
+        "풋살",
+        "입문-고수",
+        "성별 무관",
+        "종료"
+      ]
+    },
+    "cta": [
+      {
+        "disabled": true,
+        "focusVisible": false,
+        "href": null,
+        "label": "신청 불가",
+        "rect": {
+          "bottom": 616,
+          "height": 50,
+          "left": 788,
+          "right": 1106,
+          "top": 566,
+          "width": 318,
+          "x": 788,
+          "y": 566
+        },
+        "tag": "BUTTON",
+        "visible": true
+      },
+      {
+        "disabled": true,
+        "focusVisible": false,
+        "href": null,
+        "label": "신청 불가",
+        "rect": {
+          "bottom": 0,
+          "height": 0,
+          "left": 0,
+          "right": 0,
+          "top": 0,
+          "width": 0,
+          "x": 0,
+          "y": 0
+        },
+        "tag": "BUTTON",
+        "visible": false
+      }
+    ],
+    "documentScrollWidth": 1182,
+    "graphic": {
+      "bottom": 392,
+      "height": 240,
+      "left": 55,
+      "right": 1127,
+      "top": 152,
+      "width": 1072,
+      "x": 55,
+      "y": 152
+    },
+    "headings": [
+      {
+        "computedDisplay": "block",
+        "disabled": false,
+        "focusVisible": false,
+        "href": null,
+        "label": "(테스트) 1.0.3 QA 수명주기",
+        "rect": {
+          "bottom": 128,
+          "height": 32,
+          "left": 107,
+          "right": 375.078125,
+          "top": 96,
+          "width": 268.078125,
+          "x": 107,
+          "y": 96
+        },
+        "tag": "H1",
+        "visible": true
+      },
+      {
+        "computedDisplay": "none",
+        "disabled": false,
+        "focusVisible": false,
+        "href": null,
+        "label": "(테스트) 1.0.3 QA 수명주기",
+        "rect": {
+          "bottom": 0,
+          "height": 0,
+          "left": 0,
+          "right": 0,
+          "top": 0,
+          "width": 0,
+          "x": 0,
+          "y": 0
+        },
+        "tag": "H2",
+        "visible": false
+      }
+    ],
+    "hero": {
+      "bottom": 472,
+      "height": 320,
+      "left": 55,
+      "right": 1127,
+      "top": 152,
+      "width": 1072,
+      "x": 55,
+      "y": 152
+    },
+    "host": {
+      "marginTop": "0px",
+      "present": true,
+      "rect": {
+        "bottom": 456,
+        "height": 16,
+        "left": 71,
+        "right": 1111,
+        "top": 440,
+        "width": 1040,
+        "x": 71,
+        "y": 440
+      },
+      "textOmitted": true,
+      "visible": true
+    },
+    "listHeadings": [],
+    "scroll": {
+      "main": 0,
+      "x": 0,
+      "y": 0
+    },
+    "share": [
+      {
+        "disabled": false,
+        "focusVisible": false,
+        "href": null,
+        "label": "공유",
+        "rect": {
+          "bottom": 208,
+          "height": 44,
+          "left": 1071,
+          "right": 1115,
+          "top": 164,
+          "width": 44,
+          "x": 1071,
+          "y": 164
+        },
+        "tag": "BUTTON",
+        "visible": true
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/matches/synthetic-match-1",
+    "utc": "2026-10-04T06:39:54.472Z",
+    "viewport": {
+      "dpr": 1,
+      "h": 757,
+      "w": 1182
+    },
+    "label": "desktop reverse Back",
+    "index": 21
+  },
+  {
+    "active": {
+      "focusVisible": false,
+      "href": null,
+      "label": null,
+      "rect": {
+        "bottom": 1545,
+        "height": 1545,
+        "left": 0,
+        "right": 1182,
+        "top": 0,
+        "width": 1182,
+        "x": 0,
+        "y": 0
+      },
+      "tag": "BODY"
+    },
+    "back": [],
+    "badge": {
+      "marginBottom": null,
+      "rect": null,
+      "texts": []
+    },
+    "cta": [],
+    "documentScrollWidth": 1182,
+    "graphic": null,
+    "headings": [],
+    "hero": null,
+    "host": {
+      "marginTop": null,
+      "present": false,
+      "rect": null,
+      "textOmitted": true,
+      "visible": false
+    },
+    "listHeadings": [
+      {
+        "disabled": false,
+        "focusVisible": false,
+        "href": null,
+        "label": "매치",
+        "rect": {
+          "bottom": 130,
+          "height": 32,
+          "left": 55,
+          "right": 96.484375,
+          "top": 98,
+          "width": 41.484375,
+          "x": 55,
+          "y": 98
+        },
+        "tag": "H1",
+        "visible": true
+      }
+    ],
+    "scroll": {
+      "main": 0,
+      "x": 0,
+      "y": 0
+    },
+    "share": [],
+    "url": "https://alpha.teameet.co.kr/matches",
+    "utc": "2026-10-04T06:39:54.864Z",
+    "viewport": {
+      "dpr": 1,
+      "h": 757,
+      "w": 1182
+    },
+    "label": "desktop app Back destination",
+    "index": 22
+  },
+  {
+    "active": {
+      "focusVisible": false,
+      "href": null,
+      "label": null,
+      "rect": {
+        "bottom": 797,
+        "height": 757,
+        "left": 0,
+        "right": 1182,
+        "top": 40,
+        "width": 1182,
+        "x": 0,
+        "y": 40
+      },
+      "tag": "BODY"
+    },
+    "back": [],
+    "badge": {
+      "marginBottom": null,
+      "rect": null,
+      "texts": []
+    },
+    "cta": [],
+    "documentScrollWidth": 1182,
+    "graphic": null,
+    "headings": [],
+    "hero": null,
+    "host": {
+      "marginTop": null,
+      "present": false,
+      "rect": null,
+      "textOmitted": true,
+      "visible": false
+    },
+    "listHeadings": [],
+    "scroll": {
+      "x": 0,
+      "y": 0
+    },
+    "share": [],
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/synthetic-tournament-1/overview",
+    "utc": "2026-10-04T06:39:55.649Z",
+    "viewport": {
+      "dpr": 1,
+      "h": 757,
+      "w": 1182
+    },
+    "label": "desktop browser Back actual destination: prior admin overview",
+    "index": 23
+  },
+  {
+    "active": {
+      "focusVisible": false,
+      "href": null,
+      "label": null,
+      "rect": {
+        "bottom": 1545,
+        "height": 1545,
+        "left": 0,
+        "right": 1182,
+        "top": 0,
+        "width": 1182,
+        "x": 0,
+        "y": 0
+      },
+      "tag": "BODY"
+    },
+    "back": [],
+    "badge": {
+      "marginBottom": null,
+      "rect": null,
+      "texts": []
+    },
+    "cta": [],
+    "documentScrollWidth": 1182,
+    "graphic": null,
+    "headings": [],
+    "hero": null,
+    "host": {
+      "marginTop": null,
+      "present": false,
+      "rect": null,
+      "textOmitted": true,
+      "visible": false
+    },
+    "listHeadings": [
+      {
+        "disabled": false,
+        "focusVisible": false,
+        "href": null,
+        "label": "매치",
+        "rect": {
+          "bottom": 130,
+          "height": 32,
+          "left": 55,
+          "right": 96.484375,
+          "top": 98,
+          "width": 41.484375,
+          "x": 55,
+          "y": 98
+        },
+        "tag": "H1",
+        "visible": true
+      }
+    ],
+    "scroll": {
+      "main": 0,
+      "x": 0,
+      "y": 0
+    },
+    "share": [],
+    "url": "https://alpha.teameet.co.kr/matches",
+    "utc": "2026-10-04T06:39:56.286Z",
+    "viewport": {
+      "dpr": 1,
+      "h": 757,
+      "w": 1182
+    },
+    "label": "desktop browser Forward list",
+    "index": 24
+  },
+  {
+    "active": {
+      "focusVisible": false,
+      "href": null,
+      "label": null,
+      "rect": {
+        "bottom": 1265.25,
+        "height": 1265.25,
+        "left": 0,
+        "right": 1182,
+        "top": 0,
+        "width": 1182,
+        "x": 0,
+        "y": 0
+      },
+      "tag": "BODY"
+    },
+    "back": [
+      {
+        "disabled": false,
+        "focusVisible": false,
+        "href": "/matches?regionId=region-seoul&q=QA+%EC%88%98%EB%AA%85%EC%A3%BC%EA%B8%B0",
+        "label": "뒤로가기",
+        "rect": {
+          "bottom": 132,
+          "height": 40,
+          "left": 55,
+          "right": 95,
+          "top": 92,
+          "width": 40,
+          "x": 55,
+          "y": 92
+        },
+        "tag": "A",
+        "visible": true
+      },
+      {
+        "disabled": false,
+        "focusVisible": false,
+        "href": "/matches?regionId=region-seoul&q=QA+%EC%88%98%EB%AA%85%EC%A3%BC%EA%B8%B0",
+        "label": "뒤로가기",
+        "rect": {
+          "bottom": 0,
+          "height": 0,
+          "left": 0,
+          "right": 0,
+          "top": 0,
+          "width": 0,
+          "x": 0,
+          "y": 0
+        },
+        "tag": "A",
+        "visible": false
+      }
+    ],
+    "badge": {
+      "marginBottom": "8px",
+      "rect": {
+        "bottom": 432,
+        "height": 24,
+        "left": 71,
+        "right": 1111,
+        "top": 408,
+        "width": 1040,
+        "x": 71,
+        "y": 408
+      },
+      "texts": [
+        "풋살",
+        "입문-고수",
+        "성별 무관",
+        "종료"
+      ]
+    },
+    "cta": [
+      {
+        "disabled": true,
+        "focusVisible": false,
+        "href": null,
+        "label": "신청 불가",
+        "rect": {
+          "bottom": 616,
+          "height": 50,
+          "left": 788,
+          "right": 1106,
+          "top": 566,
+          "width": 318,
+          "x": 788,
+          "y": 566
+        },
+        "tag": "BUTTON",
+        "visible": true
+      },
+      {
+        "disabled": true,
+        "focusVisible": false,
+        "href": null,
+        "label": "신청 불가",
+        "rect": {
+          "bottom": 0,
+          "height": 0,
+          "left": 0,
+          "right": 0,
+          "top": 0,
+          "width": 0,
+          "x": 0,
+          "y": 0
+        },
+        "tag": "BUTTON",
+        "visible": false
+      }
+    ],
+    "documentScrollWidth": 1182,
+    "graphic": {
+      "bottom": 392,
+      "height": 240,
+      "left": 55,
+      "right": 1127,
+      "top": 152,
+      "width": 1072,
+      "x": 55,
+      "y": 152
+    },
+    "headings": [
+      {
+        "computedDisplay": "block",
+        "disabled": false,
+        "focusVisible": false,
+        "href": null,
+        "label": "(테스트) 1.0.3 QA 수명주기",
+        "rect": {
+          "bottom": 128,
+          "height": 32,
+          "left": 107,
+          "right": 375.078125,
+          "top": 96,
+          "width": 268.078125,
+          "x": 107,
+          "y": 96
+        },
+        "tag": "H1",
+        "visible": true
+      },
+      {
+        "computedDisplay": "none",
+        "disabled": false,
+        "focusVisible": false,
+        "href": null,
+        "label": "(테스트) 1.0.3 QA 수명주기",
+        "rect": {
+          "bottom": 0,
+          "height": 0,
+          "left": 0,
+          "right": 0,
+          "top": 0,
+          "width": 0,
+          "x": 0,
+          "y": 0
+        },
+        "tag": "H2",
+        "visible": false
+      }
+    ],
+    "hero": {
+      "bottom": 472,
+      "height": 320,
+      "left": 55,
+      "right": 1127,
+      "top": 152,
+      "width": 1072,
+      "x": 55,
+      "y": 152
+    },
+    "host": {
+      "marginTop": "0px",
+      "present": true,
+      "rect": {
+        "bottom": 456,
+        "height": 16,
+        "left": 71,
+        "right": 1111,
+        "top": 440,
+        "width": 1040,
+        "x": 71,
+        "y": 440
+      },
+      "textOmitted": true,
+      "visible": true
+    },
+    "listHeadings": [],
+    "scroll": {
+      "main": 0,
+      "x": 0,
+      "y": 0
+    },
+    "share": [
+      {
+        "disabled": false,
+        "focusVisible": false,
+        "href": null,
+        "label": "공유",
+        "rect": {
+          "bottom": 208,
+          "height": 44,
+          "left": 1071,
+          "right": 1115,
+          "top": 164,
+          "width": 44,
+          "x": 1071,
+          "y": 164
+        },
+        "tag": "BUTTON",
+        "visible": true
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/matches/synthetic-match-1?from=%2Fmatches%3FregionId%3Dregion-seoul%26q%3DQA%2B%25EC%2588%2598%25EB%25AA%2585%25EC%25A3%25BC%25EA%25B8%25B0",
+    "utc": "2026-10-04T06:41:37.505Z",
+    "viewport": {
+      "dpr": 1,
+      "h": 757,
+      "w": 1182
+    },
+    "label": "desktop from-query detail settled",
+    "index": 25
+  },
+  {
+    "active": {
+      "focusVisible": false,
+      "href": null,
+      "label": null,
+      "rect": {
+        "bottom": 1545,
+        "height": 1545,
+        "left": 0,
+        "right": 1182,
+        "top": 0,
+        "width": 1182,
+        "x": 0,
+        "y": 0
+      },
+      "tag": "BODY"
+    },
+    "back": [],
+    "badge": {
+      "marginBottom": null,
+      "rect": null,
+      "texts": []
+    },
+    "cta": [],
+    "documentScrollWidth": 1182,
+    "graphic": null,
+    "headings": [],
+    "hero": null,
+    "host": {
+      "marginTop": null,
+      "present": false,
+      "rect": null,
+      "textOmitted": true,
+      "visible": false
+    },
+    "listHeadings": [
+      {
+        "disabled": false,
+        "focusVisible": false,
+        "href": null,
+        "label": "매치",
+        "rect": {
+          "bottom": 130,
+          "height": 32,
+          "left": 55,
+          "right": 96.484375,
+          "top": 98,
+          "width": 41.484375,
+          "x": 55,
+          "y": 98
+        },
+        "tag": "H1",
+        "visible": true
+      }
+    ],
+    "scroll": {
+      "main": 0,
+      "x": 0,
+      "y": 0
+    },
+    "share": [],
+    "url": "https://alpha.teameet.co.kr/matches",
+    "utc": "2026-10-04T06:41:49.085Z",
+    "viewport": {
+      "dpr": 1,
+      "h": 757,
+      "w": 1182
+    },
+    "label": "desktop browser Back after app Back: actual prior unfiltered list",
+    "index": 26
+  },
+  {
+    "active": {
+      "focusVisible": false,
+      "href": null,
+      "label": null,
+      "rect": {
+        "bottom": 1265.25,
+        "height": 1265.25,
+        "left": 0,
+        "right": 1182,
+        "top": 0,
+        "width": 1182,
+        "x": 0,
+        "y": 0
+      },
+      "tag": "BODY"
+    },
+    "back": [
+      {
+        "disabled": false,
+        "focusVisible": false,
+        "href": "/matches?regionId=region-seoul&q=QA+%EC%88%98%EB%AA%85%EC%A3%BC%EA%B8%B0",
+        "label": "뒤로가기",
+        "rect": {
+          "bottom": 132,
+          "height": 40,
+          "left": 55,
+          "right": 95,
+          "top": 92,
+          "width": 40,
+          "x": 55,
+          "y": 92
+        },
+        "tag": "A",
+        "visible": true
+      },
+      {
+        "disabled": false,
+        "focusVisible": false,
+        "href": "/matches?regionId=region-seoul&q=QA+%EC%88%98%EB%AA%85%EC%A3%BC%EA%B8%B0",
+        "label": "뒤로가기",
+        "rect": {
+          "bottom": 0,
+          "height": 0,
+          "left": 0,
+          "right": 0,
+          "top": 0,
+          "width": 0,
+          "x": 0,
+          "y": 0
+        },
+        "tag": "A",
+        "visible": false
+      }
+    ],
+    "badge": {
+      "marginBottom": "8px",
+      "rect": {
+        "bottom": 432,
+        "height": 24,
+        "left": 71,
+        "right": 1111,
+        "top": 408,
+        "width": 1040,
+        "x": 71,
+        "y": 408
+      },
+      "texts": [
+        "풋살",
+        "입문-고수",
+        "성별 무관",
+        "종료"
+      ]
+    },
+    "cta": [
+      {
+        "disabled": true,
+        "focusVisible": false,
+        "href": null,
+        "label": "신청 불가",
+        "rect": {
+          "bottom": 616,
+          "height": 50,
+          "left": 788,
+          "right": 1106,
+          "top": 566,
+          "width": 318,
+          "x": 788,
+          "y": 566
+        },
+        "tag": "BUTTON",
+        "visible": true
+      },
+      {
+        "disabled": true,
+        "focusVisible": false,
+        "href": null,
+        "label": "신청 불가",
+        "rect": {
+          "bottom": 0,
+          "height": 0,
+          "left": 0,
+          "right": 0,
+          "top": 0,
+          "width": 0,
+          "x": 0,
+          "y": 0
+        },
+        "tag": "BUTTON",
+        "visible": false
+      }
+    ],
+    "documentScrollWidth": 1182,
+    "graphic": {
+      "bottom": 392,
+      "height": 240,
+      "left": 55,
+      "right": 1127,
+      "top": 152,
+      "width": 1072,
+      "x": 55,
+      "y": 152
+    },
+    "headings": [
+      {
+        "computedDisplay": "block",
+        "disabled": false,
+        "focusVisible": false,
+        "href": null,
+        "label": "(테스트) 1.0.3 QA 수명주기",
+        "rect": {
+          "bottom": 128,
+          "height": 32,
+          "left": 107,
+          "right": 375.078125,
+          "top": 96,
+          "width": 268.078125,
+          "x": 107,
+          "y": 96
+        },
+        "tag": "H1",
+        "visible": true
+      },
+      {
+        "computedDisplay": "none",
+        "disabled": false,
+        "focusVisible": false,
+        "href": null,
+        "label": "(테스트) 1.0.3 QA 수명주기",
+        "rect": {
+          "bottom": 0,
+          "height": 0,
+          "left": 0,
+          "right": 0,
+          "top": 0,
+          "width": 0,
+          "x": 0,
+          "y": 0
+        },
+        "tag": "H2",
+        "visible": false
+      }
+    ],
+    "hero": {
+      "bottom": 472,
+      "height": 320,
+      "left": 55,
+      "right": 1127,
+      "top": 152,
+      "width": 1072,
+      "x": 55,
+      "y": 152
+    },
+    "host": {
+      "marginTop": "0px",
+      "present": true,
+      "rect": {
+        "bottom": 456,
+        "height": 16,
+        "left": 71,
+        "right": 1111,
+        "top": 440,
+        "width": 1040,
+        "x": 71,
+        "y": 440
+      },
+      "textOmitted": true,
+      "visible": true
+    },
+    "listHeadings": [],
+    "scroll": {
+      "main": 0,
+      "x": 0,
+      "y": 0
+    },
+    "share": [
+      {
+        "disabled": false,
+        "focusVisible": false,
+        "href": null,
+        "label": "공유",
+        "rect": {
+          "bottom": 208,
+          "height": 44,
+          "left": 1071,
+          "right": 1115,
+          "top": 164,
+          "width": 44,
+          "x": 1071,
+          "y": 164
+        },
+        "tag": "BUTTON",
+        "visible": true
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/matches/synthetic-match-1?from=%2Fmatches%3FregionId%3Dregion-seoul%26q%3DQA%2B%25EC%2588%2598%25EB%25AA%2585%25EC%25A3%25BC%25EA%25B8%25B0",
+    "utc": "2026-10-04T06:42:09.858Z",
+    "viewport": {
+      "dpr": 1,
+      "h": 757,
+      "w": 1182
+    },
+    "label": "desktop filtered exact detail before browser Back",
+    "index": 27
+  },
+  {
+    "active": {
+      "focusVisible": false,
+      "href": null,
+      "label": null,
+      "rect": {
+        "bottom": 1265.25,
+        "height": 1265.25,
+        "left": 0,
+        "right": 1182,
+        "top": 0,
+        "width": 1182,
+        "x": 0,
+        "y": 0
+      },
+      "tag": "BODY"
+    },
+    "back": [
+      {
+        "disabled": false,
+        "focusVisible": false,
+        "href": "/matches?regionId=region-seoul&q=QA+%EC%88%98%EB%AA%85%EC%A3%BC%EA%B8%B0",
+        "label": "뒤로가기",
+        "rect": {
+          "bottom": 132,
+          "height": 40,
+          "left": 55,
+          "right": 95,
+          "top": 92,
+          "width": 40,
+          "x": 55,
+          "y": 92
+        },
+        "tag": "A",
+        "visible": true
+      },
+      {
+        "disabled": false,
+        "focusVisible": false,
+        "href": "/matches?regionId=region-seoul&q=QA+%EC%88%98%EB%AA%85%EC%A3%BC%EA%B8%B0",
+        "label": "뒤로가기",
+        "rect": {
+          "bottom": 0,
+          "height": 0,
+          "left": 0,
+          "right": 0,
+          "top": 0,
+          "width": 0,
+          "x": 0,
+          "y": 0
+        },
+        "tag": "A",
+        "visible": false
+      }
+    ],
+    "badge": {
+      "marginBottom": "8px",
+      "rect": {
+        "bottom": 432,
+        "height": 24,
+        "left": 71,
+        "right": 1111,
+        "top": 408,
+        "width": 1040,
+        "x": 71,
+        "y": 408
+      },
+      "texts": [
+        "풋살",
+        "입문-고수",
+        "성별 무관",
+        "종료"
+      ]
+    },
+    "cta": [
+      {
+        "disabled": true,
+        "focusVisible": false,
+        "href": null,
+        "label": "신청 불가",
+        "rect": {
+          "bottom": 616,
+          "height": 50,
+          "left": 788,
+          "right": 1106,
+          "top": 566,
+          "width": 318,
+          "x": 788,
+          "y": 566
+        },
+        "tag": "BUTTON",
+        "visible": true
+      },
+      {
+        "disabled": true,
+        "focusVisible": false,
+        "href": null,
+        "label": "신청 불가",
+        "rect": {
+          "bottom": 0,
+          "height": 0,
+          "left": 0,
+          "right": 0,
+          "top": 0,
+          "width": 0,
+          "x": 0,
+          "y": 0
+        },
+        "tag": "BUTTON",
+        "visible": false
+      }
+    ],
+    "documentScrollWidth": 1182,
+    "graphic": {
+      "bottom": 392,
+      "height": 240,
+      "left": 55,
+      "right": 1127,
+      "top": 152,
+      "width": 1072,
+      "x": 55,
+      "y": 152
+    },
+    "headings": [
+      {
+        "computedDisplay": "block",
+        "disabled": false,
+        "focusVisible": false,
+        "href": null,
+        "label": "(테스트) 1.0.3 QA 수명주기",
+        "rect": {
+          "bottom": 128,
+          "height": 32,
+          "left": 107,
+          "right": 375.078125,
+          "top": 96,
+          "width": 268.078125,
+          "x": 107,
+          "y": 96
+        },
+        "tag": "H1",
+        "visible": true
+      },
+      {
+        "computedDisplay": "none",
+        "disabled": false,
+        "focusVisible": false,
+        "href": null,
+        "label": "(테스트) 1.0.3 QA 수명주기",
+        "rect": {
+          "bottom": 0,
+          "height": 0,
+          "left": 0,
+          "right": 0,
+          "top": 0,
+          "width": 0,
+          "x": 0,
+          "y": 0
+        },
+        "tag": "H2",
+        "visible": false
+      }
+    ],
+    "hero": {
+      "bottom": 472,
+      "height": 320,
+      "left": 55,
+      "right": 1127,
+      "top": 152,
+      "width": 1072,
+      "x": 55,
+      "y": 152
+    },
+    "host": {
+      "marginTop": "0px",
+      "present": true,
+      "rect": {
+        "bottom": 456,
+        "height": 16,
+        "left": 71,
+        "right": 1111,
+        "top": 440,
+        "width": 1040,
+        "x": 71,
+        "y": 440
+      },
+      "textOmitted": true,
+      "visible": true
+    },
+    "listHeadings": [],
+    "scroll": {
+      "main": 0,
+      "x": 0,
+      "y": 0
+    },
+    "share": [
+      {
+        "disabled": false,
+        "focusVisible": false,
+        "href": null,
+        "label": "공유",
+        "rect": {
+          "bottom": 208,
+          "height": 44,
+          "left": 1071,
+          "right": 1115,
+          "top": 164,
+          "width": 44,
+          "x": 1071,
+          "y": 164
+        },
+        "tag": "BUTTON",
+        "visible": true
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/matches/synthetic-match-1?from=%2Fmatches%3FregionId%3Dregion-seoul%26q%3DQA%2B%25EC%2588%2598%25EB%25AA%2585%25EC%25A3%25BC%25EA%25B8%25B0",
+    "utc": "2026-10-04T06:42:23.474Z",
+    "viewport": {
+      "dpr": 1,
+      "h": 757,
+      "w": 1182
+    },
+    "label": "desktop direct browser Forward restores detail title",
+    "index": 28
+  },
+  {
+    "active": {
+      "focusVisible": false,
+      "href": null,
+      "label": null,
+      "rect": {
+        "bottom": 905.25,
+        "height": 1265.25,
+        "left": 0,
+        "right": 1182,
+        "top": -360,
+        "width": 1182,
+        "x": 0,
+        "y": -360
+      },
+      "tag": "BODY"
+    },
+    "back": [
+      {
+        "disabled": false,
+        "focusVisible": false,
+        "href": "/matches?regionId=region-seoul&q=QA+%EC%88%98%EB%AA%85%EC%A3%BC%EA%B8%B0",
+        "label": "뒤로가기",
+        "rect": {
+          "bottom": -228,
+          "height": 40,
+          "left": 55,
+          "right": 95,
+          "top": -268,
+          "width": 40,
+          "x": 55,
+          "y": -268
+        },
+        "tag": "A",
+        "visible": true
+      },
+      {
+        "disabled": false,
+        "focusVisible": false,
+        "href": "/matches?regionId=region-seoul&q=QA+%EC%88%98%EB%AA%85%EC%A3%BC%EA%B8%B0",
+        "label": "뒤로가기",
+        "rect": {
+          "bottom": 0,
+          "height": 0,
+          "left": 0,
+          "right": 0,
+          "top": 0,
+          "width": 0,
+          "x": 0,
+          "y": 0
+        },
+        "tag": "A",
+        "visible": false
+      }
+    ],
+    "badge": {
+      "marginBottom": "8px",
+      "rect": {
+        "bottom": 72,
+        "height": 24,
+        "left": 71,
+        "right": 1111,
+        "top": 48,
+        "width": 1040,
+        "x": 71,
+        "y": 48
+      },
+      "texts": [
+        "풋살",
+        "입문-고수",
+        "성별 무관",
+        "종료"
+      ]
+    },
+    "cta": [
+      {
+        "disabled": true,
+        "focusVisible": false,
+        "href": null,
+        "label": "신청 불가",
+        "rect": {
+          "bottom": 256,
+          "height": 50,
+          "left": 788,
+          "right": 1106,
+          "top": 206,
+          "width": 318,
+          "x": 788,
+          "y": 206
+        },
+        "tag": "BUTTON",
+        "visible": true
+      },
+      {
+        "disabled": true,
+        "focusVisible": false,
+        "href": null,
+        "label": "신청 불가",
+        "rect": {
+          "bottom": 0,
+          "height": 0,
+          "left": 0,
+          "right": 0,
+          "top": 0,
+          "width": 0,
+          "x": 0,
+          "y": 0
+        },
+        "tag": "BUTTON",
+        "visible": false
+      }
+    ],
+    "documentScrollWidth": 1182,
+    "graphic": {
+      "bottom": 32,
+      "height": 240,
+      "left": 55,
+      "right": 1127,
+      "top": -208,
+      "width": 1072,
+      "x": 55,
+      "y": -208
+    },
+    "headings": [
+      {
+        "computedDisplay": "block",
+        "disabled": false,
+        "focusVisible": false,
+        "href": null,
+        "label": "(테스트) 1.0.3 QA 수명주기",
+        "rect": {
+          "bottom": -232,
+          "height": 32,
+          "left": 107,
+          "right": 375.078125,
+          "top": -264,
+          "width": 268.078125,
+          "x": 107,
+          "y": -264
+        },
+        "tag": "H1",
+        "visible": true
+      },
+      {
+        "computedDisplay": "none",
+        "disabled": false,
+        "focusVisible": false,
+        "href": null,
+        "label": "(테스트) 1.0.3 QA 수명주기",
+        "rect": {
+          "bottom": 0,
+          "height": 0,
+          "left": 0,
+          "right": 0,
+          "top": 0,
+          "width": 0,
+          "x": 0,
+          "y": 0
+        },
+        "tag": "H2",
+        "visible": false
+      }
+    ],
+    "hero": {
+      "bottom": 112,
+      "height": 320,
+      "left": 55,
+      "right": 1127,
+      "top": -208,
+      "width": 1072,
+      "x": 55,
+      "y": -208
+    },
+    "host": {
+      "marginTop": "0px",
+      "present": true,
+      "rect": {
+        "bottom": 96,
+        "height": 16,
+        "left": 71,
+        "right": 1111,
+        "top": 80,
+        "width": 1040,
+        "x": 71,
+        "y": 80
+      },
+      "textOmitted": true,
+      "visible": true
+    },
+    "listHeadings": [],
+    "scroll": {
+      "main": 0,
+      "x": 0,
+      "y": 360
+    },
+    "share": [
+      {
+        "disabled": false,
+        "focusVisible": false,
+        "href": null,
+        "label": "공유",
+        "rect": {
+          "bottom": -152,
+          "height": 44,
+          "left": 1071,
+          "right": 1115,
+          "top": -196,
+          "width": 44,
+          "x": 1071,
+          "y": -196
+        },
+        "tag": "BUTTON",
+        "visible": true
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/matches/synthetic-match-1?from=%2Fmatches%3FregionId%3Dregion-seoul%26q%3DQA%2B%25EC%2588%2598%25EB%25AA%2585%25EC%25A3%25BC%25EA%25B8%25B0",
+    "utc": "2026-10-04T06:42:51.668Z",
+    "viewport": {
+      "dpr": 1,
+      "h": 757,
+      "w": 1182
+    },
+    "label": "desktop settled scroll endpoint",
+    "index": 29
+  }
+]

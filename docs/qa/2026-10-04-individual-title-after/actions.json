@@ -1,0 +1,240 @@
+[
+  {
+    "label": "resize cloud Chrome window to mobile width",
+    "startUTC": "2026-10-04T06:35:23.405Z",
+    "endUTC": "2026-10-04T06:35:27.356Z"
+  },
+  {
+    "label": "fresh navigation after reported6069777 deployment",
+    "startUTC": "2026-10-04T06:35:28.002Z",
+    "endUTC": "2026-10-04T06:35:28.397Z"
+  },
+  {
+    "label": "mobile native Tab from page to Back",
+    "startUTC": "2026-10-04T06:36:45.575Z",
+    "endUTC": "2026-10-04T06:36:45.652Z"
+  },
+  {
+    "label": "mobile native Tab Back to Share",
+    "startUTC": "2026-10-04T06:36:45.707Z",
+    "endUTC": "2026-10-04T06:36:45.821Z"
+  },
+  {
+    "label": "mobile native ShiftTab Share to Back",
+    "startUTC": "2026-10-04T06:36:45.894Z",
+    "endUTC": "2026-10-04T06:36:46.058Z"
+  },
+  {
+    "label": "mobile Back link keyboard Enter",
+    "startUTC": "2026-10-04T06:38:13.982Z",
+    "endUTC": "2026-10-04T06:38:14.051Z"
+  },
+  {
+    "label": "mobile browser Back returns detail",
+    "startUTC": "2026-10-04T06:38:14.242Z",
+    "endUTC": "2026-10-04T06:38:14.278Z"
+  },
+  {
+    "label": "mobile browser Forward returns list",
+    "startUTC": "2026-10-04T06:38:14.506Z",
+    "endUTC": "2026-10-04T06:38:14.526Z"
+  },
+  {
+    "label": "mobile browser Back again detail",
+    "startUTC": "2026-10-04T06:38:14.744Z",
+    "endUTC": "2026-10-04T06:38:14.764Z"
+  },
+  {
+    "label": "mobile native wheel down",
+    "startUTC": "2026-10-04T06:38:29.242Z",
+    "endUTC": "2026-10-04T06:38:29.547Z"
+  },
+  {
+    "label": "mobile native ControlHome",
+    "startUTC": "2026-10-04T06:38:29.640Z",
+    "endUTC": "2026-10-04T06:38:29.783Z"
+  },
+  {
+    "label": "mobile native wheel up to top",
+    "startUTC": "2026-10-04T06:38:49.607Z",
+    "endUTC": "2026-10-04T06:38:50.160Z"
+  },
+  {
+    "label": "resize cloud Chrome window to tablet width",
+    "startUTC": "2026-10-04T06:38:50.197Z",
+    "endUTC": "2026-10-04T06:38:56.965Z"
+  },
+  {
+    "label": "set tablet zoom via native CtrlPlus",
+    "startUTC": "2026-10-04T06:38:56.965Z",
+    "endUTC": "2026-10-04T06:38:57.276Z"
+  },
+  {
+    "label": "tablet native Tab to Back",
+    "startUTC": "2026-10-04T06:38:57.423Z",
+    "endUTC": "2026-10-04T06:38:57.505Z"
+  },
+  {
+    "label": "tablet native Tab to Share",
+    "startUTC": "2026-10-04T06:38:57.563Z",
+    "endUTC": "2026-10-04T06:38:57.673Z"
+  },
+  {
+    "label": "tablet native ShiftTab to Back",
+    "startUTC": "2026-10-04T06:38:57.757Z",
+    "endUTC": "2026-10-04T06:38:57.907Z"
+  },
+  {
+    "label": "tablet Back link keyboard Enter",
+    "startUTC": "2026-10-04T06:39:11.682Z",
+    "endUTC": "2026-10-04T06:39:11.754Z"
+  },
+  {
+    "label": "tablet browser Back returns detail",
+    "startUTC": "2026-10-04T06:39:11.927Z",
+    "endUTC": "2026-10-04T06:39:11.960Z"
+  },
+  {
+    "label": "tablet browser Forward returns list",
+    "startUTC": "2026-10-04T06:39:12.167Z",
+    "endUTC": "2026-10-04T06:39:12.185Z"
+  },
+  {
+    "label": "tablet browser Back again detail",
+    "startUTC": "2026-10-04T06:39:12.405Z",
+    "endUTC": "2026-10-04T06:39:12.427Z"
+  },
+  {
+    "label": "tablet native wheel down",
+    "startUTC": "2026-10-04T06:39:12.633Z",
+    "endUTC": "2026-10-04T06:39:12.960Z"
+  },
+  {
+    "label": "tablet native wheel up to top",
+    "startUTC": "2026-10-04T06:39:21.970Z",
+    "endUTC": "2026-10-04T06:39:22.497Z"
+  },
+  {
+    "label": "desktop zoom reset via native Ctrl0",
+    "startUTC": "2026-10-04T06:39:22.531Z",
+    "endUTC": "2026-10-04T06:39:22.732Z"
+  },
+  {
+    "label": "desktop focus visible Back then real Tab using supported locator press",
+    "startUTC": "2026-10-04T06:39:54.203Z",
+    "endUTC": "2026-10-04T06:39:54.251Z"
+  },
+  {
+    "label": "desktop native ShiftTab Share to Back",
+    "startUTC": "2026-10-04T06:39:54.325Z",
+    "endUTC": "2026-10-04T06:39:54.461Z"
+  },
+  {
+    "label": "desktop Back link keyboard Enter",
+    "startUTC": "2026-10-04T06:39:54.542Z",
+    "endUTC": "2026-10-04T06:39:54.630Z"
+  },
+  {
+    "label": "desktop browser Back: actual prior admin overview",
+    "startUTC": "2026-10-04T06:39:54.941Z",
+    "endUTC": "2026-10-04T06:39:55.464Z",
+    "originalLabel": "desktop browser Back returns detail",
+    "actualDestinationProofIndex": 23,
+    "note": "Original action label described intent; actual endpoint is authoritative."
+  },
+  {
+    "label": "desktop browser Forward returns list",
+    "startUTC": "2026-10-04T06:39:55.669Z",
+    "endUTC": "2026-10-04T06:39:56.062Z"
+  },
+  {
+    "label": "desktop open actual Filter link",
+    "startUTC": "2026-10-04T06:40:33.665Z",
+    "endUTC": "2026-10-04T06:40:33.968Z"
+  },
+  {
+    "label": "desktop select Seoul region via filter UI",
+    "startUTC": "2026-10-04T06:40:51.153Z",
+    "endUTC": "2026-10-04T06:40:51.429Z"
+  },
+  {
+    "label": "desktop apply Seoul region filter",
+    "startUTC": "2026-10-04T06:40:57.747Z",
+    "endUTC": "2026-10-04T06:40:57.996Z"
+  },
+  {
+    "label": "desktop search synthetic title through visible search field",
+    "startUTC": "2026-10-04T06:41:05.179Z",
+    "endUTC": "2026-10-04T06:41:05.227Z"
+  },
+  {
+    "label": "desktop click Search",
+    "startUTC": "2026-10-04T06:41:05.227Z",
+    "endUTC": "2026-10-04T06:41:05.511Z"
+  },
+  {
+    "label": "desktop click exact synthetic match card from filtered list",
+    "startUTC": "2026-10-04T06:41:30.975Z",
+    "endUTC": "2026-10-04T06:41:31.075Z"
+  },
+  {
+    "label": "desktop filtered detail Back via visible app link",
+    "startUTC": "2026-10-04T06:41:37.542Z",
+    "endUTC": "2026-10-04T06:41:37.603Z"
+  },
+  {
+    "label": "desktop browser Back from filtered list",
+    "startUTC": "2026-10-04T06:41:43.686Z",
+    "endUTC": "2026-10-04T06:41:43.706Z"
+  },
+  {
+    "label": "desktop browser Forward to filtered list",
+    "startUTC": "2026-10-04T06:41:49.161Z",
+    "endUTC": "2026-10-04T06:41:49.180Z"
+  },
+  {
+    "label": "desktop open filtered exact card for browser roundtrip",
+    "startUTC": "2026-10-04T06:42:03.934Z",
+    "endUTC": "2026-10-04T06:42:03.999Z"
+  },
+  {
+    "label": "desktop browser Back from detail to filtered list",
+    "startUTC": "2026-10-04T06:42:09.904Z",
+    "endUTC": "2026-10-04T06:42:09.920Z"
+  },
+  {
+    "label": "desktop direct browser Forward returns same detail",
+    "startUTC": "2026-10-04T06:42:16.281Z",
+    "endUTC": "2026-10-04T06:42:16.304Z"
+  },
+  {
+    "label": "desktop native scroll down on detail",
+    "startUTC": "2026-10-04T06:42:23.515Z",
+    "endUTC": "2026-10-04T06:42:23.743Z"
+  },
+  {
+    "label": "desktop app Back after scroll",
+    "startUTC": "2026-10-04T06:42:51.702Z",
+    "endUTC": "2026-10-04T06:42:51.757Z"
+  },
+  {
+    "label": "list acceptance resize mobile",
+    "startUTC": "2026-10-04T06:43:21.305Z",
+    "endUTC": "2026-10-04T06:43:23.600Z"
+  },
+  {
+    "label": "list acceptance resize tablet",
+    "startUTC": "2026-10-04T06:43:51.213Z",
+    "endUTC": "2026-10-04T06:43:56.269Z"
+  },
+  {
+    "label": "list acceptance reset desktop zoom",
+    "startUTC": "2026-10-04T06:43:56.660Z",
+    "endUTC": "2026-10-04T06:43:56.834Z"
+  },
+  {
+    "label": "safe exit to initial admin tournament overview",
+    "startUTC": "2026-10-04T06:45:00.142Z",
+    "endUTC": "2026-10-04T06:45:00.709Z"
+  }
+]

@@ -1,0 +1,376 @@
+{
+  "schema": 1,
+  "captureClock": "UTC measured immediately before and after tab.getScreenshot; DOM timestamp separately recorded",
+  "screenshots": [
+    {
+      "label": "mobile-title-initial",
+      "proofIndex": 0,
+      "captureStartUTC": "2026-10-04T06:36:45.548Z",
+      "captureEndUTC": "2026-10-04T06:36:45.566Z",
+      "file": "mobile-title-after.png",
+      "sha256": "8f512ca3a642dd75fbbf2e824bda75e4f5966020a3198a64c5d8b2111e66b655",
+      "sourceFile": "mobile-title-initial.png",
+      "sourceSHA256": "8f512ca3a642dd75fbbf2e824bda75e4f5966020a3198a64c5d8b2111e66b655",
+      "sourcePixels": [
+        402,
+        606
+      ],
+      "cropLTRB": [
+        12,
+        208,
+        390,
+        282
+      ],
+      "outputPixels": [
+        378,
+        74
+      ],
+      "outputSHA256": "4882698dbea0fc6b3d277c355eb98d3c128f26499581b5b21e4cfa0687307e0c",
+      "pixelEquality": true,
+      "DOMUTC": "2026-10-04T06:36:45.513Z",
+      "CSSViewport": {
+        "dpr": 1.25,
+        "h": 606,
+        "w": 402
+      },
+      "scope": "Exact rectangular crop; no text masking or edits; host/account/roster text excluded"
+    },
+    {
+      "label": "mobile-share-focus",
+      "proofIndex": 2,
+      "captureStartUTC": "2026-10-04T06:36:45.860Z",
+      "captureEndUTC": "2026-10-04T06:36:45.893Z",
+      "file": "mobile-share-focus.png",
+      "sha256": "f290fa1e04d2a89357d69d8ea5d44498162107f8af17b7e0b349e4636188a649",
+      "sourceFile": "mobile-share-focus.png",
+      "sourceSHA256": "f290fa1e04d2a89357d69d8ea5d44498162107f8af17b7e0b349e4636188a649",
+      "sourcePixels": [
+        402,
+        606
+      ],
+      "cropLTRB": [
+        336,
+        4,
+        398,
+        64
+      ],
+      "outputPixels": [
+        62,
+        60
+      ],
+      "outputSHA256": "75eb12232952f7f4bf62dfb3ae208156a7118402d6f9ccc94ea58eafc816160c",
+      "pixelEquality": true,
+      "DOMUTC": "2026-10-04T06:36:45.829Z",
+      "CSSViewport": {
+        "dpr": 1.25,
+        "h": 606,
+        "w": 402
+      },
+      "scope": "Exact rectangular crop; no text masking or edits; host/account/roster text excluded"
+    },
+    {
+      "label": "tablet-title-initial",
+      "proofIndex": 10,
+      "captureStartUTC": "2026-10-04T06:38:57.370Z",
+      "captureEndUTC": "2026-10-04T06:38:57.422Z",
+      "file": "tablet-title-after.png",
+      "sha256": "09d3b332ca6c393dc3e8dcb49f22af8467e96266ecdd48701b44c69bd4154d77",
+      "sourceFile": "tablet-title-initial.png",
+      "sourceSHA256": "09d3b332ca6c393dc3e8dcb49f22af8467e96266ecdd48701b44c69bd4154d77",
+      "sourcePixels": [
+        788,
+        505
+      ],
+      "cropLTRB": [
+        106,
+        208,
+        686,
+        282
+      ],
+      "outputPixels": [
+        580,
+        74
+      ],
+      "outputSHA256": "cac1d1175fe90e131dd2fd4b2c6fe3f0783eb196e064c68b21a1e53992040fe2",
+      "pixelEquality": true,
+      "DOMUTC": "2026-10-04T06:38:57.323Z",
+      "CSSViewport": {
+        "dpr": 1.5,
+        "h": 505,
+        "w": 788
+      },
+      "scope": "Exact rectangular crop; no text masking or edits; host/account/roster text excluded"
+    },
+    {
+      "label": "tablet-share-focus",
+      "proofIndex": 12,
+      "captureStartUTC": "2026-10-04T06:38:57.718Z",
+      "captureEndUTC": "2026-10-04T06:38:57.757Z",
+      "file": "tablet-share-focus.png",
+      "sha256": "f561906ead712d072225d44e046ff326c5981b4585f80487f238d2b2f7b5588e",
+      "sourceFile": "tablet-share-focus.png",
+      "sourceSHA256": "f561906ead712d072225d44e046ff326c5981b4585f80487f238d2b2f7b5588e",
+      "sourcePixels": [
+        788,
+        505
+      ],
+      "cropLTRB": [
+        630,
+        4,
+        692,
+        64
+      ],
+      "outputPixels": [
+        62,
+        60
+      ],
+      "outputSHA256": "12da590b52089086a9307d55934ffe41afc7afb28c4d484b28d89df5058a2d55",
+      "pixelEquality": true,
+      "DOMUTC": "2026-10-04T06:38:57.683Z",
+      "CSSViewport": {
+        "dpr": 1.5,
+        "h": 505,
+        "w": 788
+      },
+      "scope": "Exact rectangular crop; no text masking or edits; host/account/roster text excluded"
+    },
+    {
+      "label": "desktop-title-initial",
+      "proofIndex": 19,
+      "captureStartUTC": "2026-10-04T06:39:22.813Z",
+      "captureEndUTC": "2026-10-04T06:39:22.855Z",
+      "file": "desktop-title-after.png",
+      "sha256": "0917569e7c8430ec42df8bdf93b88c4fb89c4886151c1b93fbe2b103c7dd3c12",
+      "sourceFile": "desktop-title-initial.png",
+      "sourceSHA256": "0917569e7c8430ec42df8bdf93b88c4fb89c4886151c1b93fbe2b103c7dd3c12",
+      "sourcePixels": [
+        1182,
+        757
+      ],
+      "cropLTRB": [
+        55,
+        80,
+        1128,
+        438
+      ],
+      "outputPixels": [
+        1073,
+        358
+      ],
+      "outputSHA256": "502008ebb8f9ed3792a8686ec769951dac900b401c11be335ec4434a6aa6a353",
+      "pixelEquality": true,
+      "DOMUTC": "2026-10-04T06:39:22.778Z",
+      "CSSViewport": {
+        "dpr": 1,
+        "h": 757,
+        "w": 1182
+      },
+      "scope": "Exact rectangular crop; no text masking or edits; host/account/roster text excluded"
+    },
+    {
+      "label": "desktop-share-focus",
+      "proofIndex": 20,
+      "captureStartUTC": "2026-10-04T06:39:54.300Z",
+      "captureEndUTC": "2026-10-04T06:39:54.324Z",
+      "file": "desktop-share-focus.png",
+      "sha256": "f5b09cea19737f76baa1f50edc4a9200033333d5e31bd731918765beb3d5f28c",
+      "sourceFile": "desktop-share-focus.png",
+      "sourceSHA256": "f5b09cea19737f76baa1f50edc4a9200033333d5e31bd731918765beb3d5f28c",
+      "sourcePixels": [
+        1182,
+        757
+      ],
+      "cropLTRB": [
+        1063,
+        156,
+        1123,
+        216
+      ],
+      "outputPixels": [
+        60,
+        60
+      ],
+      "outputSHA256": "a740a706b9c571ba8eb726a29d48ef4f5ff5b838de2d68bf4e169652574fc83a",
+      "pixelEquality": true,
+      "DOMUTC": "2026-10-04T06:39:54.260Z",
+      "CSSViewport": {
+        "dpr": 1,
+        "h": 757,
+        "w": 1182
+      },
+      "scope": "Exact rectangular crop; no text masking or edits; host/account/roster text excluded"
+    },
+    {
+      "label": "desktop-back-focus",
+      "proofIndex": 21,
+      "captureStartUTC": "2026-10-04T06:39:54.509Z",
+      "captureEndUTC": "2026-10-04T06:39:54.542Z",
+      "file": "desktop-back-focus.png",
+      "sha256": "8880456398414dd86727644d4e4b23e450e688006c83707b0f7927b509f63452",
+      "sourceFile": "desktop-back-focus.png",
+      "sourceSHA256": "8880456398414dd86727644d4e4b23e450e688006c83707b0f7927b509f63452",
+      "sourcePixels": [
+        1182,
+        757
+      ],
+      "cropLTRB": [
+        47,
+        84,
+        432,
+        140
+      ],
+      "outputPixels": [
+        385,
+        56
+      ],
+      "outputSHA256": "5520c9211ac4b092b45a9076eab531d2e2589c2a5a13773a4c1d30790a3feb63",
+      "pixelEquality": true,
+      "DOMUTC": "2026-10-04T06:39:54.472Z",
+      "CSSViewport": {
+        "dpr": 1,
+        "h": 757,
+        "w": 1182
+      },
+      "scope": "Exact rectangular crop; no text masking or edits; host/account/roster text excluded"
+    }
+  ],
+  "safeProofHashes": {
+    "actions.json": "1feda4adf98b749d3f5dc17aedccac0986e78c2da06e30415fffadf6c8d31295",
+    "ax-excerpts.json": "a4b2c9ad7ac3b78a4152d1f5a63ebcdeb4f7b0de4e4dfba4d23906bb98668acc",
+    "before-context.json": "d6cacfb2b38d3c819170bcce130d590df9189c1204f0e32a3626e4b46b8728af",
+    "console-summary.json": "3d665be12c8b6e3574413945d0e0512e9f731964b31af50f4b16db8b8b690443",
+    "deployment-context.json": "0b961b7e05d043a002f880a9ec4a735e4831231e28f1ff171c1af2c2be25bfd6",
+    "exit.json": "9789ad76f952a5cf13097c7655bcd9a6a1c0947c9601b73255a3151fa4f5ad28",
+    "full-ax-supplement.json": "af9fbe88e508ec9b2018707776a05d4872dfad01673b997f90ede6a11432f349",
+    "list-ax-excerpts.json": "8e763c50cf710896970a485d6a0ea593fa31c1bccd2ac00e83c254b1f2f9dfc2",
+    "list-return-proof.json": "faf1b5bd8ba8c92b73633dbebfd625d185c5043d35857bf62372df2f5e386da0",
+    "proof.json": "9891b2beeb073fdd1ea6d8fe9494cf15790494ed37af43d68a218027ecc9ca9b",
+    "summary.json": "1a09a3dedbe8259d15cc44a0d449f980e6aec24e41f4cadde8e1e2e4277cd0aa"
+  },
+  "sourceCaptureMetadataSHA256": "dbb8b1b5bda01d441210fd4ce7e5bee1b3fa05fc9690d7dd5079961b6a3e5385",
+  "privacy": "Publish only listed safe files. Raw images and raw console buffer excluded. Host/roster/account identities are not in crops; safe DOM stores host geometry with textOmitted=true. Synthetic match/region UUIDs may be pseudonymized by publisher without changing raw observations.",
+  "snapshotHistory": [
+    {
+      "reason": "Before separate fresh full-AX supplement; original PNG/proof/actions remain unchanged",
+      "hashes": {
+        "summary.json": "376e5886d2c5fd43908db66f97d3c0657a5a4a4a3371866698788cbac9053050",
+        "provenance.json": "bf75d1d79fc83a067372950f5a6251e9baa1b9135c80ceef5f0646fedcab24ba",
+        "manifest.json": "34797496f90f2f19e4f82374fd5904e2505b906ab8d87908375651fabc332e94"
+      }
+    },
+    {
+      "reason": "Clarify selected zoom action coverage and intended-action labels versus actual URLs; no underlying observation changes",
+      "hashes": {
+        "summary.json": "50719a5d573797cbbcdbce0f895173d0b5acc7ec079b4ca8f582951c8a443f64",
+        "provenance.json": "31443d7caea86db452bcb96119781faf16e1cd100d6c9b19def13952108ca441",
+        "manifest.json": "4e8adca068c99c57343361856a4c3c511af1fdb563a58b9a316d2d49494b1ac8"
+      }
+    }
+  ],
+  "supplementScope": "full-ax-supplement.json is new UTC observations and later exit; no replacement of prior empty AX diff excerpts or original capture times",
+  "sourceInputFiles": [
+    {
+      "file": "actions.json",
+      "bytes": 6937,
+      "sha256": "1feda4adf98b749d3f5dc17aedccac0986e78c2da06e30415fffadf6c8d31295"
+    },
+    {
+      "file": "ax-excerpts.json",
+      "bytes": 4316,
+      "sha256": "a4b2c9ad7ac3b78a4152d1f5a63ebcdeb4f7b0de4e4dfba4d23906bb98668acc"
+    },
+    {
+      "file": "before-context.json",
+      "bytes": 1681,
+      "sha256": "d6cacfb2b38d3c819170bcce130d590df9189c1204f0e32a3626e4b46b8728af"
+    },
+    {
+      "file": "console-summary.json",
+      "bytes": 5608,
+      "sha256": "3d665be12c8b6e3574413945d0e0512e9f731964b31af50f4b16db8b8b690443"
+    },
+    {
+      "file": "deployment-context.json",
+      "bytes": 743,
+      "sha256": "0b961b7e05d043a002f880a9ec4a735e4831231e28f1ff171c1af2c2be25bfd6"
+    },
+    {
+      "file": "desktop-back-focus.png",
+      "bytes": 18597,
+      "sha256": "5520c9211ac4b092b45a9076eab531d2e2589c2a5a13773a4c1d30790a3feb63"
+    },
+    {
+      "file": "desktop-share-focus.png",
+      "bytes": 4252,
+      "sha256": "a740a706b9c571ba8eb726a29d48ef4f5ff5b838de2d68bf4e169652574fc83a"
+    },
+    {
+      "file": "desktop-title-after.png",
+      "bytes": 66486,
+      "sha256": "502008ebb8f9ed3792a8686ec769951dac900b401c11be335ec4434a6aa6a353"
+    },
+    {
+      "file": "exit.json",
+      "bytes": 234,
+      "sha256": "9789ad76f952a5cf13097c7655bcd9a6a1c0947c9601b73255a3151fa4f5ad28"
+    },
+    {
+      "file": "full-ax-supplement.json",
+      "bytes": 5873,
+      "sha256": "af9fbe88e508ec9b2018707776a05d4872dfad01673b997f90ede6a11432f349"
+    },
+    {
+      "file": "list-ax-excerpts.json",
+      "bytes": 476,
+      "sha256": "8e763c50cf710896970a485d6a0ea593fa31c1bccd2ac00e83c254b1f2f9dfc2"
+    },
+    {
+      "file": "list-return-proof.json",
+      "bytes": 8430,
+      "sha256": "faf1b5bd8ba8c92b73633dbebfd625d185c5043d35857bf62372df2f5e386da0"
+    },
+    {
+      "file": "manifest.json",
+      "bytes": 2946,
+      "sha256": "46764864b564dd9e2a622b9e84ae1c04a6c40ba6746ff027c6bfd1c198c85faa"
+    },
+    {
+      "file": "mobile-share-focus.png",
+      "bytes": 4255,
+      "sha256": "75eb12232952f7f4bf62dfb3ae208156a7118402d6f9ccc94ea58eafc816160c"
+    },
+    {
+      "file": "mobile-title-after.png",
+      "bytes": 24462,
+      "sha256": "4882698dbea0fc6b3d277c355eb98d3c128f26499581b5b21e4cfa0687307e0c"
+    },
+    {
+      "file": "proof.json",
+      "bytes": 114576,
+      "sha256": "9891b2beeb073fdd1ea6d8fe9494cf15790494ed37af43d68a218027ecc9ca9b"
+    },
+    {
+      "file": "provenance.json",
+      "bytes": 9564,
+      "sha256": "48951e446ad2ca3325c8db1fdae59cfaf295b7dd26b5db267ed31af41e642760"
+    },
+    {
+      "file": "summary.json",
+      "bytes": 8000,
+      "sha256": "1a09a3dedbe8259d15cc44a0d449f980e6aec24e41f4cadde8e1e2e4277cd0aa"
+    },
+    {
+      "file": "tablet-share-focus.png",
+      "bytes": 4563,
+      "sha256": "12da590b52089086a9307d55934ffe41afc7afb28c4d484b28d89df5058a2d55"
+    },
+    {
+      "file": "tablet-title-after.png",
+      "bytes": 24378,
+      "sha256": "cac1d1175fe90e131dd2fd4b2c6fe3f0783eb196e064c68b21a1e53992040fe2"
+    }
+  ],
+  "publicationProjection": "Original safe inputs unchanged. Fixture/region UUIDs consistently pseudonymized in public JSON. Action27 original intent retained with actual destination. Summary and deployment attribution narrowed. source-manifest.json retains original source-file hashes; manifest.json covers public files.",
+  "hashFieldMeaning": "Each screenshots[].sha256/sourceSHA256 hashes the private source screenshot; outputSHA256 hashes the safe PNG delivered here. Only output hashes were independently verified.",
+  "publisherReview": "All7 safe PNGs and2 already-public historical title crops viewed; output hashes/dimensions/mappings checked. Private originals/capture metadata not read, pixelEquality remains collector attestation."
+}

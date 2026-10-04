@@ -1,0 +1,180 @@
+[
+  {
+    "proofIndex": 0,
+    "observedUTC": "2026-10-04T06:36:45.546Z",
+    "excerpt": []
+  },
+  {
+    "proofIndex": 1,
+    "observedUTC": "2026-10-04T06:36:45.706Z",
+    "excerpt": [
+      "The focused UI element is 5 link Description: 뒤로가기, URL: alpha.teameet.co.kr/matches"
+    ]
+  },
+  {
+    "proofIndex": 2,
+    "observedUTC": "2026-10-04T06:36:45.859Z",
+    "excerpt": [
+      "The focused UI element is 6 button 공유"
+    ]
+  },
+  {
+    "proofIndex": 3,
+    "observedUTC": "2026-10-04T06:36:46.105Z",
+    "excerpt": [
+      "The focused UI element is 5 link Description: 뒤로가기, URL: alpha.teameet.co.kr/matches"
+    ]
+  },
+  {
+    "proofIndex": 4,
+    "observedUTC": "2026-10-04T06:38:14.241Z",
+    "excerpt": []
+  },
+  {
+    "proofIndex": 5,
+    "observedUTC": "2026-10-04T06:38:14.505Z",
+    "excerpt": []
+  },
+  {
+    "proofIndex": 6,
+    "observedUTC": "2026-10-04T06:38:14.742Z",
+    "excerpt": []
+  },
+  {
+    "proofIndex": 7,
+    "observedUTC": "2026-10-04T06:38:14.928Z",
+    "excerpt": []
+  },
+  {
+    "proofIndex": 8,
+    "observedUTC": "2026-10-04T06:38:29.639Z",
+    "excerpt": []
+  },
+  {
+    "proofIndex": 9,
+    "observedUTC": "2026-10-04T06:38:29.857Z",
+    "excerpt": []
+  },
+  {
+    "proofIndex": 10,
+    "observedUTC": "2026-10-04T06:38:57.369Z",
+    "excerpt": []
+  },
+  {
+    "proofIndex": 11,
+    "observedUTC": "2026-10-04T06:38:57.561Z",
+    "excerpt": [
+      "The focused UI element is 12 link Description: 뒤로가기, URL: alpha.teameet.co.kr/matches"
+    ]
+  },
+  {
+    "proofIndex": 12,
+    "observedUTC": "2026-10-04T06:38:57.716Z",
+    "excerpt": [
+      "The focused UI element is 13 button 공유"
+    ]
+  },
+  {
+    "proofIndex": 13,
+    "observedUTC": "2026-10-04T06:38:57.955Z",
+    "excerpt": [
+      "The focused UI element is 12 link Description: 뒤로가기, URL: alpha.teameet.co.kr/matches"
+    ]
+  },
+  {
+    "proofIndex": 14,
+    "observedUTC": "2026-10-04T06:39:11.926Z",
+    "excerpt": []
+  },
+  {
+    "proofIndex": 15,
+    "observedUTC": "2026-10-04T06:39:12.166Z",
+    "excerpt": []
+  },
+  {
+    "proofIndex": 16,
+    "observedUTC": "2026-10-04T06:39:12.404Z",
+    "excerpt": []
+  },
+  {
+    "proofIndex": 17,
+    "observedUTC": "2026-10-04T06:39:12.632Z",
+    "excerpt": []
+  },
+  {
+    "proofIndex": 18,
+    "observedUTC": "2026-10-04T06:39:21.968Z",
+    "excerpt": []
+  },
+  {
+    "proofIndex": 19,
+    "observedUTC": "2026-10-04T06:39:22.812Z",
+    "excerpt": []
+  },
+  {
+    "proofIndex": 20,
+    "observedUTC": "2026-10-04T06:39:54.298Z",
+    "excerpt": [
+      "The focused UI element is 18 button 공유"
+    ]
+  },
+  {
+    "proofIndex": 21,
+    "observedUTC": "2026-10-04T06:39:54.508Z",
+    "excerpt": [
+      "The focused UI element is 14 link Description: 뒤로가기, URL: alpha.teameet.co.kr/matches"
+    ]
+  },
+  {
+    "proofIndex": 22,
+    "observedUTC": "2026-10-04T06:39:54.939Z",
+    "excerpt": []
+  },
+  {
+    "proofIndex": 23,
+    "observedUTC": "2026-10-04T06:39:55.667Z",
+    "excerpt": []
+  },
+  {
+    "proofIndex": 24,
+    "observedUTC": "2026-10-04T06:39:56.354Z",
+    "excerpt": [
+      "~\t\t\t30 heading 눈에 띄는 매치, Value: 2, ID: match-rail-heading"
+    ]
+  },
+  {
+    "proofIndex": 25,
+    "observedUTC": "2026-10-04T06:41:37.541Z",
+    "excerpt": [
+      "+\t\t60 link Description: 뒤로가기, Value: alpha.teameet.co.kr/matches?regionId=region-seoul&q=QA+%EC%88%98%EB%AA%85%EC%A3%BC%EA%B8%B0",
+      "+\t\t61 heading (테스트) 1.0.3 QA 수명주기, Value: 1",
+      "+\t\t\t64 button 공유",
+      "+\t\t\t89 button (disabled) 신청 불가"
+    ]
+  },
+  {
+    "proofIndex": 26,
+    "observedUTC": "2026-10-04T06:41:49.159Z",
+    "excerpt": []
+  },
+  {
+    "proofIndex": 27,
+    "observedUTC": "2026-10-04T06:42:09.902Z",
+    "excerpt": [
+      "+\t\t60 link Description: 뒤로가기, Value: alpha.teameet.co.kr/matches?regionId=region-seoul&q=QA+%EC%88%98%EB%AA%85%EC%A3%BC%EA%B8%B0",
+      "+\t\t61 heading (테스트) 1.0.3 QA 수명주기, Value: 1",
+      "+\t\t\t64 button 공유",
+      "+\t\t\t89 button (disabled) 신청 불가"
+    ]
+  },
+  {
+    "proofIndex": 28,
+    "observedUTC": "2026-10-04T06:42:23.513Z",
+    "excerpt": []
+  },
+  {
+    "proofIndex": 29,
+    "observedUTC": "2026-10-04T06:42:51.701Z",
+    "excerpt": []
+  }
+]

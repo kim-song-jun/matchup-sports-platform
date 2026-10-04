@@ -1,0 +1,60 @@
+{
+  "issue": "https://github.com/kim-song-jun/matchup-sports-platform/issues/1588",
+  "PR": "https://github.com/kim-song-jun/matchup-sports-platform/pull/1591",
+  "sourceCommit": "877d4a4c0b4a495df88003ea78112981bcce1869",
+  "sourceDirectory": "docs/qa/2026-10-03-individual-copy-candidates",
+  "sameFixture": "synthetic-match-1",
+  "desktop": {
+    "CSSViewport": {
+      "w": 1183,
+      "h": 758,
+      "dpr": 1
+    },
+    "captureUTC": [
+      "2026-10-03T08:47:50.974Z",
+      "2026-10-03T08:47:50.993Z"
+    ],
+    "file": "individual-title-desktop-duplicate.png",
+    "cropLTRB": [
+      55,
+      80,
+      1128,
+      475
+    ],
+    "separateDOMUTC": "2026-10-03T08:48:18.949Z",
+    "observed": "Same synthetic match title H1 and H2 both rendered"
+  },
+  "mobile": {
+    "CSSViewport": {
+      "w": 405,
+      "h": 606,
+      "dpr": 1.25
+    },
+    "captureUTC": [
+      "2026-10-03T08:46:31.597Z",
+      "2026-10-03T08:46:31.611Z"
+    ],
+    "file": "individual-title-mobile.png",
+    "cropLTRB": [
+      16,
+      212,
+      389,
+      283
+    ],
+    "observed": "One title in limited crop; not proof of whole-page uniqueness"
+  },
+  "tablet": {
+    "titleBeforeAvailable": false,
+    "historicalDetailCSSViewport": {
+      "w": 789,
+      "h": 505,
+      "dpr": 1.5
+    }
+  },
+  "limitations": [
+    "Historical runtime SHA unknown",
+    "No recorded historical host/card geometry; current geometry is not a before/after numerical delta",
+    "Current after uses402/788/1182CSS widths, not exact405/789/1183 before dimensions",
+    "Historical metadata/DOM re-read via GitHub connector; original capture and source references remain historical"
+  ]
+}

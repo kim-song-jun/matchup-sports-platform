@@ -1,0 +1,224 @@
+{
+  "issue": 1588,
+  "fixPR": 1591,
+  "scope": "Read-only actual cloud Chromium alpha after on the same synthetic individual match; responsive heading visibility, host/badge spacing, keyboard Back/share, scroll and list return",
+  "startUTC": "2026-10-04T06:35:28.002Z",
+  "endUTC": "2026-10-04T06:50:42.980Z",
+  "runtimeServingSHA": "unknown",
+  "deploymentContextFile": "deployment-context.json",
+  "counts": {
+    "detailAndRouteDOM": 30,
+    "listDOM": 7,
+    "AXDetailExcerpts": 30,
+    "AXListExcerpts": 3,
+    "selectedRecordedActions": 47,
+    "publishedPNG": 7,
+    "fullAXSupplementDOM": 3,
+    "fullAXSupplementActions": 5
+  },
+  "results": [
+    {
+      "width": "mobile",
+      "proofIndex": 0,
+      "UTC": "2026-10-04T06:36:45.513Z",
+      "CSSViewport": {
+        "dpr": 1.25,
+        "h": 606,
+        "w": 402
+      },
+      "renderedTitleTags": [
+        "H2"
+      ],
+      "title": "(테스트) 1.0.3 QA 수명주기",
+      "heroHeight": 320,
+      "hostMarginTop": "8px",
+      "badgeToHostGap": 48,
+      "titleToHostGap": 8,
+      "renderedBackCount": 1,
+      "shareCount": 1,
+      "renderedDisabledCTA": [
+        {
+          "label": "신청 불가",
+          "disabled": true,
+          "rect": {
+            "bottom": 583.6000366210938,
+            "height": 50,
+            "left": 20,
+            "right": 381.6000061035156,
+            "top": 533.6000366210938,
+            "width": 361.6000061035156,
+            "x": 20,
+            "y": 533.6000366210938
+          }
+        }
+      ],
+      "documentScrollWidth": 402
+    },
+    {
+      "width": "tablet",
+      "proofIndex": 10,
+      "UTC": "2026-10-04T06:38:57.323Z",
+      "CSSViewport": {
+        "dpr": 1.5,
+        "h": 505,
+        "w": 788
+      },
+      "renderedTitleTags": [
+        "H2"
+      ],
+      "title": "(테스트) 1.0.3 QA 수명주기",
+      "heroHeight": 320,
+      "hostMarginTop": "8px",
+      "badgeToHostGap": 48,
+      "titleToHostGap": 8,
+      "renderedBackCount": 1,
+      "shareCount": 1,
+      "renderedDisabledCTA": [
+        {
+          "label": "신청 불가",
+          "disabled": true,
+          "rect": {
+            "bottom": 482.6666870117187,
+            "height": 50,
+            "left": 114,
+            "right": 674,
+            "top": 432.6666870117187,
+            "width": 560,
+            "x": 114,
+            "y": 432.6666870117187
+          }
+        }
+      ],
+      "documentScrollWidth": 788
+    },
+    {
+      "width": "desktop",
+      "proofIndex": 19,
+      "UTC": "2026-10-04T06:39:22.778Z",
+      "CSSViewport": {
+        "dpr": 1,
+        "h": 757,
+        "w": 1182
+      },
+      "renderedTitleTags": [
+        "H1"
+      ],
+      "title": "(테스트) 1.0.3 QA 수명주기",
+      "heroHeight": 320,
+      "hostMarginTop": "0px",
+      "badgeToHostGap": 8,
+      "titleToHostGap": null,
+      "renderedBackCount": 1,
+      "shareCount": 1,
+      "renderedDisabledCTA": [
+        {
+          "label": "신청 불가",
+          "disabled": true,
+          "rect": {
+            "bottom": 616,
+            "height": 50,
+            "left": 788,
+            "right": 1106,
+            "top": 566,
+            "width": 318,
+            "x": 788,
+            "y": 566
+          }
+        }
+      ],
+      "documentScrollWidth": 1182
+    }
+  ],
+  "keyboard": {
+    "mobile": [
+      1,
+      2,
+      3
+    ],
+    "tablet": [
+      11,
+      12,
+      13
+    ],
+    "desktop": [
+      20,
+      21
+    ],
+    "method": "Mobile/tablet native Tab from BODY -> visible Back -> Share, then native Shift+Tab -> Back. Desktop supported locator press focuses visible Back and sends Tab -> Share, then native Shift+Tab -> Back. Endpoints record :focus-visible and rectangles. No share activation or CTA activation."
+  },
+  "navigation": {
+    "directDetailAppBack": [
+      4,
+      14,
+      22
+    ],
+    "mobileHistoryEndpoints": [
+      5,
+      6,
+      7
+    ],
+    "tabletHistoryEndpoints": [
+      15,
+      16,
+      17
+    ],
+    "historyCaveat": "These rapid default-route rows establish actual route/endpoints only. Desktop browser Back after app Back reached the prior admin overview (row23), then Forward list(row24); not relabelled as a detail return. Later filtered roundtrip was collected at separate settled endpoints.",
+    "filteredDesktop": {
+      "listProofBefore": 0,
+      "detailProof": 25,
+      "listProofAppBack": 1,
+      "additionalHistoryActual": [
+        26
+      ],
+      "listProofForward": 2,
+      "detailBeforeBrowserBack": 27,
+      "listProofBrowserBack": 3,
+      "detailBrowserForward": 28,
+      "observed": "UI-selected Seoul region plus synthetic search q preserved; one exact fixture anchor before/after; actual from href and Back href stored"
+    },
+    "listHeadingThreeWidths": {
+      "mobile": 4,
+      "tablet": 5,
+      "desktop": 6,
+      "file": "list-return-proof.json"
+    },
+    "actionLabelSemantics": "Action labels record collector intent, not verified outcome. Desktop action label returns detail at06:39:54.941UTC actually leads to admin overview in proof23; after filtered app Back, proof26 records prior unfiltered list. Actual URLs in DOM govern findings. Separate direct browser Back/Forward sequence proof27→list3→proof28 establishes filtered roundtrip."
+  },
+  "scroll": {
+    "mobileRows": [
+      8,
+      9
+    ],
+    "tabletRow": 18,
+    "desktopRow": 29,
+    "method": "Native wheel only; mobile row8 is an immediate in-flight sample. ControlHome row9 did not reset the nested main scroller; actual wheel-up followed and top0 was observed at tablet row10. No ControlHome success claim. Tablet main320 and desktop windowY360 are later settled samples.",
+    "focusScope": "Only observed Back/share endpoints, not all global navigation or real screen-reader speech"
+  },
+  "limitations": [
+    "No tablet title-before screenshot; three widths of after do not constitute three matched historical title pairs",
+    "visible in DOM collector means rendered nonzero box, not necessarily inside viewport; initial heading rows0/10/19 and their PNGs are at top0",
+    "Public crops intentionally omit host text; host/badge spacing is supported by DOM geometry, not a publicly visible host name",
+    "Completed fixture has a disabled CTA; registration, sharing, saved results, role behavior and noncompleted fixture CTA are untested",
+    "Photo variant not exercised; same supplied fixture uses illustration",
+    "Browser console captured44 same extension-metadata error entries in the run window, not attributed to application; no network/API response or normalized viewer/status assertion",
+    "No actual screen-reader/audio or physical-device test",
+    "PR1592 copy and PR1596 prize focus were not tested or credited",
+    "Unlogged native zoom operations in initial batch: mobile initial CtrlPlus twice, mobile list resize CtrlPlus twice, tablet list resize CtrlPlus once. Initial tablet CtrlPlus is recorded in actions at06:38:56.965UTC; desktop Ctrl0 calls are recorded. Supplement lists its own unlogged zoom keys. Viewport DOM is authoritative.",
+    "A local helper code-generation attempt was rejected before browser actions; no UI actions from that rejected call were counted"
+  ],
+  "safety": {
+    "shareSend": 0,
+    "CTAActivation": 0,
+    "fixtureEdits": 0,
+    "uploads": 0,
+    "accountOrRoleChanges": 0,
+    "networkOrDBAuditPerformed": false,
+    "searchInputOnly": "Synthetic QA search q entered through ordinary UI; final navigation leaves no visible edit inputs/dialogs",
+    "collectorReportedServerMutationActions": 0,
+    "publicationLimit": "Selected UI actions only; no network/database write audit."
+  },
+  "exitFile": "exit.json",
+  "initialBatchEndUTC": "2026-10-04T06:45:22.220Z",
+  "AXEvidenceClarification": "Original ax-excerpts.json stores diff output and some rows contain no heading. New full-ax-supplement.json separately records full AX on2026-10-04 at06:50:08.647–06:50:28.553UTC, H2/H2/H1 at402/788/1182CSS. Do not backdate these to original PNG/DOM times. No screen-reader speech test. Safe supplement contains selected excerpts derived from full AX snapshots, not complete raw trees; exhaustive extraction cannot be independently reconstructed.",
+  "finalExit": "full-ax-supplement.json.exit"
+}

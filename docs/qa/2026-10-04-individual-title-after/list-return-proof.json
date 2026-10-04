@@ -1,0 +1,317 @@
+[
+  {
+    "fixtureAnchors": [
+      {
+        "href": "/matches/synthetic-match-1?from=%2Fmatches%3FregionId%3Dregion-seoul%26q%3DQA%2B%25EC%2588%2598%25EB%25AA%2585%25EC%25A3%25BC%25EA%25B8%25B0",
+        "visible": true
+      }
+    ],
+    "headings": [
+      {
+        "rect": {
+          "bottom": 130,
+          "height": 32,
+          "left": 55,
+          "right": 96.484375,
+          "top": 98,
+          "width": 41.484375,
+          "x": 55,
+          "y": 98
+        },
+        "tag": "H1",
+        "text": "매치"
+      },
+      {
+        "rect": {
+          "bottom": 358,
+          "height": 24,
+          "left": 71,
+          "right": 133.703125,
+          "top": 334,
+          "width": 62.703125,
+          "x": 71,
+          "y": 334
+        },
+        "tag": "H2",
+        "text": "개인 매치"
+      }
+    ],
+    "mainMatchAnchorCount": 1,
+    "searchValue": "QA 수명주기",
+    "url": "https://alpha.teameet.co.kr/matches?regionId=region-seoul&q=QA+%EC%88%98%EB%AA%85%EC%A3%BC%EA%B8%B0",
+    "utc": "2026-10-04T06:41:22.333Z",
+    "viewport": {
+      "dpr": 1,
+      "h": 757,
+      "w": 1182
+    },
+    "label": "desktop settled Seoul and synthetic title list",
+    "index": 0
+  },
+  {
+    "fixtureAnchors": [
+      {
+        "href": "/matches/synthetic-match-1?from=%2Fmatches%3FregionId%3Dregion-seoul%26q%3DQA%2B%25EC%2588%2598%25EB%25AA%2585%25EC%25A3%25BC%25EA%25B8%25B0",
+        "visible": true
+      }
+    ],
+    "headings": [
+      {
+        "rect": {
+          "bottom": 130,
+          "height": 32,
+          "left": 55,
+          "right": 96.484375,
+          "top": 98,
+          "width": 41.484375,
+          "x": 55,
+          "y": 98
+        },
+        "tag": "H1",
+        "text": "매치"
+      },
+      {
+        "rect": {
+          "bottom": 358,
+          "height": 24,
+          "left": 71,
+          "right": 133.703125,
+          "top": 334,
+          "width": 62.703125,
+          "x": 71,
+          "y": 334
+        },
+        "tag": "H2",
+        "text": "개인 매치"
+      }
+    ],
+    "mainMatchAnchorCount": 1,
+    "searchValue": "QA 수명주기",
+    "url": "https://alpha.teameet.co.kr/matches?regionId=region-seoul&q=QA+%EC%88%98%EB%AA%85%EC%A3%BC%EA%B8%B0",
+    "utc": "2026-10-04T06:41:43.683Z",
+    "viewport": {
+      "dpr": 1,
+      "h": 757,
+      "w": 1182
+    },
+    "label": "desktop filtered app Back preserves region and q",
+    "index": 1
+  },
+  {
+    "fixtureAnchors": [
+      {
+        "href": "/matches/synthetic-match-1?from=%2Fmatches%3FregionId%3Dregion-seoul%26q%3DQA%2B%25EC%2588%2598%25EB%25AA%2585%25EC%25A3%25BC%25EA%25B8%25B0",
+        "visible": true
+      }
+    ],
+    "headings": [
+      {
+        "rect": {
+          "bottom": 130,
+          "height": 32,
+          "left": 55,
+          "right": 96.484375,
+          "top": 98,
+          "width": 41.484375,
+          "x": 55,
+          "y": 98
+        },
+        "tag": "H1",
+        "text": "매치"
+      },
+      {
+        "rect": {
+          "bottom": 358,
+          "height": 24,
+          "left": 71,
+          "right": 133.703125,
+          "top": 334,
+          "width": 62.703125,
+          "x": 71,
+          "y": 334
+        },
+        "tag": "H2",
+        "text": "개인 매치"
+      }
+    ],
+    "mainMatchAnchorCount": 1,
+    "searchValue": "QA 수명주기",
+    "url": "https://alpha.teameet.co.kr/matches?regionId=region-seoul&q=QA+%EC%88%98%EB%AA%85%EC%A3%BC%EA%B8%B0",
+    "utc": "2026-10-04T06:42:03.930Z",
+    "viewport": {
+      "dpr": 1,
+      "h": 757,
+      "w": 1182
+    },
+    "label": "desktop browser Forward actual filtered list",
+    "index": 2
+  },
+  {
+    "fixtureAnchors": [
+      {
+        "href": "/matches/synthetic-match-1?from=%2Fmatches%3FregionId%3Dregion-seoul%26q%3DQA%2B%25EC%2588%2598%25EB%25AA%2585%25EC%25A3%25BC%25EA%25B8%25B0",
+        "visible": true
+      }
+    ],
+    "headings": [
+      {
+        "rect": {
+          "bottom": 130,
+          "height": 32,
+          "left": 55,
+          "right": 96.484375,
+          "top": 98,
+          "width": 41.484375,
+          "x": 55,
+          "y": 98
+        },
+        "tag": "H1",
+        "text": "매치"
+      },
+      {
+        "rect": {
+          "bottom": 358,
+          "height": 24,
+          "left": 71,
+          "right": 133.703125,
+          "top": 334,
+          "width": 62.703125,
+          "x": 71,
+          "y": 334
+        },
+        "tag": "H2",
+        "text": "개인 매치"
+      }
+    ],
+    "mainMatchAnchorCount": 1,
+    "searchValue": "QA 수명주기",
+    "url": "https://alpha.teameet.co.kr/matches?regionId=region-seoul&q=QA+%EC%88%98%EB%AA%85%EC%A3%BC%EA%B8%B0",
+    "utc": "2026-10-04T06:42:16.278Z",
+    "viewport": {
+      "dpr": 1,
+      "h": 757,
+      "w": 1182
+    },
+    "label": "desktop direct browser Back preserves filtered list",
+    "index": 3
+  },
+  {
+    "fixtureAnchors": [
+      {
+        "href": "/matches/synthetic-match-1?from=%2Fmatches%3FregionId%3Dregion-seoul%26q%3DQA%2B%25EC%2588%2598%25EB%25AA%2585%25EC%25A3%25BC%25EA%25B8%25B0",
+        "visible": true
+      }
+    ],
+    "headings": [
+      {
+        "rect": {
+          "bottom": 246.40000915527344,
+          "height": 24,
+          "left": 32,
+          "right": 94.70000076293944,
+          "top": 222.40000915527344,
+          "width": 62.70000076293945,
+          "x": 32,
+          "y": 222.40000915527344
+        },
+        "tag": "H2",
+        "text": "개인 매치"
+      }
+    ],
+    "mainMatchAnchorCount": 1,
+    "searchValue": "QA 수명주기",
+    "url": "https://alpha.teameet.co.kr/matches?regionId=region-seoul&q=QA+%EC%88%98%EB%AA%85%EC%A3%BC%EA%B8%B0",
+    "utc": "2026-10-04T06:43:24.242Z",
+    "viewport": {
+      "dpr": 1.25,
+      "h": 606,
+      "w": 402
+    },
+    "label": "mobile list H2 and filtered state retained",
+    "index": 4
+  },
+  {
+    "fixtureAnchors": [
+      {
+        "href": "/matches/synthetic-match-1?from=%2Fmatches%3FregionId%3Dregion-seoul%26q%3DQA%2B%25EC%2588%2598%25EB%25AA%2585%25EC%25A3%25BC%25EA%25B8%25B0",
+        "visible": true
+      }
+    ],
+    "headings": [
+      {
+        "rect": {
+          "bottom": 246,
+          "height": 24,
+          "left": 126,
+          "right": 188.6979179382324,
+          "top": 222,
+          "width": 62.69791793823242,
+          "x": 126,
+          "y": 222
+        },
+        "tag": "H2",
+        "text": "개인 매치"
+      }
+    ],
+    "mainMatchAnchorCount": 1,
+    "searchValue": "QA 수명주기",
+    "url": "https://alpha.teameet.co.kr/matches?regionId=region-seoul&q=QA+%EC%88%98%EB%AA%85%EC%A3%BC%EA%B8%B0",
+    "utc": "2026-10-04T06:43:56.615Z",
+    "viewport": {
+      "dpr": 1.5,
+      "h": 505,
+      "w": 788
+    },
+    "label": "tablet list H2 and filtered state retained",
+    "index": 5
+  },
+  {
+    "fixtureAnchors": [
+      {
+        "href": "/matches/synthetic-match-1?from=%2Fmatches%3FregionId%3Dregion-seoul%26q%3DQA%2B%25EC%2588%2598%25EB%25AA%2585%25EC%25A3%25BC%25EA%25B8%25B0",
+        "visible": true
+      }
+    ],
+    "headings": [
+      {
+        "rect": {
+          "bottom": 130,
+          "height": 32,
+          "left": 55,
+          "right": 96.484375,
+          "top": 98,
+          "width": 41.484375,
+          "x": 55,
+          "y": 98
+        },
+        "tag": "H1",
+        "text": "매치"
+      },
+      {
+        "rect": {
+          "bottom": 358,
+          "height": 24,
+          "left": 71,
+          "right": 133.703125,
+          "top": 334,
+          "width": 62.703125,
+          "x": 71,
+          "y": 334
+        },
+        "tag": "H2",
+        "text": "개인 매치"
+      }
+    ],
+    "mainMatchAnchorCount": 1,
+    "searchValue": "QA 수명주기",
+    "url": "https://alpha.teameet.co.kr/matches?regionId=region-seoul&q=QA+%EC%88%98%EB%AA%85%EC%A3%BC%EA%B8%B0",
+    "utc": "2026-10-04T06:43:56.884Z",
+    "viewport": {
+      "dpr": 1,
+      "h": 757,
+      "w": 1182
+    },
+    "label": "desktop final filtered list",
+    "index": 6
+  }
+]

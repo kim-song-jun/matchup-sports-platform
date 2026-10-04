@@ -1,0 +1,351 @@
+{
+  "verifiedUTC": "2026-10-04T06:56:42.299647+00:00",
+  "method": "Safe evidence review and public GitHub readback; no new browser execution",
+  "initialBatchCounts": {
+    "detailAndRouteDOM": 30,
+    "detailDOM": 22,
+    "routeOnlyDOM": 8,
+    "listDOM": 7,
+    "AXDetailExcerpts": 30,
+    "AXListExcerpts": 3,
+    "selectedActions": 47,
+    "safePNGs": 7
+  },
+  "separateLaterSupplementCounts": {
+    "DOM": 3,
+    "AXExcerpts": 3,
+    "selectedActions": 5,
+    "newPNGs": 0
+  },
+  "initialHeadingGeometry": [
+    {
+      "proofIndex": 0,
+      "UTC": "2026-10-04T06:36:45.513Z",
+      "viewport": {
+        "dpr": 1.25,
+        "h": 606,
+        "w": 402
+      },
+      "renderedTitleTag": "H2",
+      "renderedTitleCount": 1,
+      "hostMarginTop": "8px",
+      "badgeToHostGapCSS": 48,
+      "titleToHostGapCSS": 8,
+      "heroHeightCSS": 320,
+      "renderedBack": 1,
+      "renderedDisabledCTA": 1,
+      "totalResponsiveCTAs": 2
+    },
+    {
+      "proofIndex": 10,
+      "UTC": "2026-10-04T06:38:57.323Z",
+      "viewport": {
+        "dpr": 1.5,
+        "h": 505,
+        "w": 788
+      },
+      "renderedTitleTag": "H2",
+      "renderedTitleCount": 1,
+      "hostMarginTop": "8px",
+      "badgeToHostGapCSS": 48,
+      "titleToHostGapCSS": 8,
+      "heroHeightCSS": 320,
+      "renderedBack": 1,
+      "renderedDisabledCTA": 1,
+      "totalResponsiveCTAs": 2
+    },
+    {
+      "proofIndex": 19,
+      "UTC": "2026-10-04T06:39:22.778Z",
+      "viewport": {
+        "dpr": 1,
+        "h": 757,
+        "w": 1182
+      },
+      "renderedTitleTag": "H1",
+      "renderedTitleCount": 1,
+      "hostMarginTop": "0px",
+      "badgeToHostGapCSS": 8,
+      "titleToHostGapCSS": null,
+      "heroHeightCSS": 320,
+      "renderedBack": 1,
+      "renderedDisabledCTA": 1,
+      "totalResponsiveCTAs": 2
+    }
+  ],
+  "focusEndpoints": [
+    {
+      "proofIndex": 1,
+      "UTC": "2026-10-04T06:36:45.662Z",
+      "label": "뒤로가기",
+      "tag": "A",
+      "focusVisible": true,
+      "widthCSS": 44,
+      "heightCSS": 44,
+      "insideViewport": true
+    },
+    {
+      "proofIndex": 2,
+      "UTC": "2026-10-04T06:36:45.829Z",
+      "label": "공유",
+      "tag": "BUTTON",
+      "focusVisible": true,
+      "widthCSS": 44,
+      "heightCSS": 44,
+      "insideViewport": true
+    },
+    {
+      "proofIndex": 3,
+      "UTC": "2026-10-04T06:36:46.069Z",
+      "label": "뒤로가기",
+      "tag": "A",
+      "focusVisible": true,
+      "widthCSS": 44,
+      "heightCSS": 44,
+      "insideViewport": true
+    },
+    {
+      "proofIndex": 11,
+      "UTC": "2026-10-04T06:38:57.518Z",
+      "label": "뒤로가기",
+      "tag": "A",
+      "focusVisible": true,
+      "widthCSS": 44,
+      "heightCSS": 44,
+      "insideViewport": true
+    },
+    {
+      "proofIndex": 12,
+      "UTC": "2026-10-04T06:38:57.683Z",
+      "label": "공유",
+      "tag": "BUTTON",
+      "focusVisible": true,
+      "widthCSS": 44,
+      "heightCSS": 44,
+      "insideViewport": true
+    },
+    {
+      "proofIndex": 13,
+      "UTC": "2026-10-04T06:38:57.923Z",
+      "label": "뒤로가기",
+      "tag": "A",
+      "focusVisible": true,
+      "widthCSS": 44,
+      "heightCSS": 44,
+      "insideViewport": true
+    },
+    {
+      "proofIndex": 20,
+      "UTC": "2026-10-04T06:39:54.260Z",
+      "label": "공유",
+      "tag": "BUTTON",
+      "focusVisible": true,
+      "widthCSS": 44,
+      "heightCSS": 44,
+      "insideViewport": true
+    },
+    {
+      "proofIndex": 21,
+      "UTC": "2026-10-04T06:39:54.472Z",
+      "label": "뒤로가기",
+      "tag": "A",
+      "focusVisible": true,
+      "widthCSS": 40,
+      "heightCSS": 40,
+      "insideViewport": true
+    }
+  ],
+  "filteredReturn": {
+    "listIndices": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6
+    ],
+    "sameExactURL": true,
+    "sameExactFixtureAnchor": true,
+    "mainMatchAnchors": 1,
+    "searchValue": "QA 수명주기",
+    "decodedFromEqualsListPathAndQuery": true,
+    "scope": "One result; no multi-item ordering or pagination assertion"
+  },
+  "fullAXSupplement": [
+    {
+      "viewport": {
+        "dpr": 1.25,
+        "h": 606,
+        "w": 402
+      },
+      "AXStartUTC": "2026-10-04T06:50:08.647Z",
+      "AXEndUTC": "2026-10-04T06:50:08.675Z",
+      "DOMUTC": "2026-10-04T06:50:08.688Z",
+      "AXHeadingLevel": 2,
+      "DOMHeadingTag": "H2"
+    },
+    {
+      "viewport": {
+        "dpr": 1.5,
+        "h": 505,
+        "w": 788
+      },
+      "AXStartUTC": "2026-10-04T06:50:28.260Z",
+      "AXEndUTC": "2026-10-04T06:50:28.290Z",
+      "DOMUTC": "2026-10-04T06:50:28.303Z",
+      "AXHeadingLevel": 2,
+      "DOMHeadingTag": "H2"
+    },
+    {
+      "viewport": {
+        "dpr": 1,
+        "h": 757,
+        "w": 1182
+      },
+      "AXStartUTC": "2026-10-04T06:50:28.488Z",
+      "AXEndUTC": "2026-10-04T06:50:28.535Z",
+      "DOMUTC": "2026-10-04T06:50:28.553Z",
+      "AXHeadingLevel": 1,
+      "DOMHeadingTag": "H1"
+    }
+  ],
+  "images": [
+    {
+      "file": "mobile-title-after.png",
+      "proofIndex": 0,
+      "DOMUTC": "2026-10-04T06:36:45.513Z",
+      "captureStartUTC": "2026-10-04T06:36:45.548Z",
+      "captureEndUTC": "2026-10-04T06:36:45.566Z",
+      "sourcePixels": [
+        402,
+        606
+      ],
+      "outputPixels": [
+        378,
+        74
+      ],
+      "sha256": "4882698dbea0fc6b3d277c355eb98d3c128f26499581b5b21e4cfa0687307e0c"
+    },
+    {
+      "file": "mobile-share-focus.png",
+      "proofIndex": 2,
+      "DOMUTC": "2026-10-04T06:36:45.829Z",
+      "captureStartUTC": "2026-10-04T06:36:45.860Z",
+      "captureEndUTC": "2026-10-04T06:36:45.893Z",
+      "sourcePixels": [
+        402,
+        606
+      ],
+      "outputPixels": [
+        62,
+        60
+      ],
+      "sha256": "75eb12232952f7f4bf62dfb3ae208156a7118402d6f9ccc94ea58eafc816160c"
+    },
+    {
+      "file": "tablet-title-after.png",
+      "proofIndex": 10,
+      "DOMUTC": "2026-10-04T06:38:57.323Z",
+      "captureStartUTC": "2026-10-04T06:38:57.370Z",
+      "captureEndUTC": "2026-10-04T06:38:57.422Z",
+      "sourcePixels": [
+        788,
+        505
+      ],
+      "outputPixels": [
+        580,
+        74
+      ],
+      "sha256": "cac1d1175fe90e131dd2fd4b2c6fe3f0783eb196e064c68b21a1e53992040fe2"
+    },
+    {
+      "file": "tablet-share-focus.png",
+      "proofIndex": 12,
+      "DOMUTC": "2026-10-04T06:38:57.683Z",
+      "captureStartUTC": "2026-10-04T06:38:57.718Z",
+      "captureEndUTC": "2026-10-04T06:38:57.757Z",
+      "sourcePixels": [
+        788,
+        505
+      ],
+      "outputPixels": [
+        62,
+        60
+      ],
+      "sha256": "12da590b52089086a9307d55934ffe41afc7afb28c4d484b28d89df5058a2d55"
+    },
+    {
+      "file": "desktop-title-after.png",
+      "proofIndex": 19,
+      "DOMUTC": "2026-10-04T06:39:22.778Z",
+      "captureStartUTC": "2026-10-04T06:39:22.813Z",
+      "captureEndUTC": "2026-10-04T06:39:22.855Z",
+      "sourcePixels": [
+        1182,
+        757
+      ],
+      "outputPixels": [
+        1073,
+        358
+      ],
+      "sha256": "502008ebb8f9ed3792a8686ec769951dac900b401c11be335ec4434a6aa6a353"
+    },
+    {
+      "file": "desktop-share-focus.png",
+      "proofIndex": 20,
+      "DOMUTC": "2026-10-04T06:39:54.260Z",
+      "captureStartUTC": "2026-10-04T06:39:54.300Z",
+      "captureEndUTC": "2026-10-04T06:39:54.324Z",
+      "sourcePixels": [
+        1182,
+        757
+      ],
+      "outputPixels": [
+        60,
+        60
+      ],
+      "sha256": "a740a706b9c571ba8eb726a29d48ef4f5ff5b838de2d68bf4e169652574fc83a"
+    },
+    {
+      "file": "desktop-back-focus.png",
+      "proofIndex": 21,
+      "DOMUTC": "2026-10-04T06:39:54.472Z",
+      "captureStartUTC": "2026-10-04T06:39:54.509Z",
+      "captureEndUTC": "2026-10-04T06:39:54.542Z",
+      "sourcePixels": [
+        1182,
+        757
+      ],
+      "outputPixels": [
+        385,
+        56
+      ],
+      "sha256": "5520c9211ac4b092b45a9076eab531d2e2589c2a5a13773a4c1d30790a3feb63"
+    }
+  ],
+  "historicalBefore": {
+    "desktopPNGHash": "5c279e7ec6e6132152f75c5f1529ed0ff8f7a1a4c9ad881079ae42605b401160",
+    "mobilePNGHash": "d574f60f340c824f75464aed836acd68d5b864e16b662937629d5bd051dd191d",
+    "bothViewed": true,
+    "sameFixtureURL": true,
+    "tabletTitleBeforeAvailable": false
+  },
+  "pseudonymIdentifierHashes": {
+    "synthetic-match-1": "dd3ee8ee44f9a38e5f36f60f1a58851a3f30dce0adf53c943a44a7e21d704a74",
+    "synthetic-tournament-1": "9bb8586d8d3512789a6b624a536a22dbfa1d02f082dab9a37ac8abf9bab7df08",
+    "region-seoul": "1e724e0f7031cc05b36947c2cf755fdedc7c059dbe203a8546d890abc1b5b8a1"
+  },
+  "projectedStringOriginalSHA256": {
+    "/admin/tournaments/synthetic-tournament-1/overview": "f47d362924f95c10f67a0f135f524afec5786c85a1de252c642517af7b0b2c9f",
+    "/matches/synthetic-match-1?from=%2Fmatches%3FregionId%3Dregion-seoul%26q%3DQA%2B%25EC%2588%2598%25EB%25AA%2585%25EC%25A3%25BC%25EA%25B8%25B0": "dbe59533c84790f8c7ec64f215e0efd4513a62386a08254f415f766196b76ee0",
+    "https://alpha.teameet.co.kr/matches?regionId=region-seoul&q=QA+%EC%88%98%EB%AA%85%EC%A3%BC%EA%B8%B0": "5ea2d507de475cb5043110aaab0e572837f3235dcf8f053bc1176e955af31fec",
+    "synthetic-match-1": "dd3ee8ee44f9a38e5f36f60f1a58851a3f30dce0adf53c943a44a7e21d704a74",
+    "https://alpha.teameet.co.kr/matches/synthetic-match-1": "f1e57d56506c764aae0c00318e4091dbed950c0678793414b668c987839b2720",
+    "+\t\t60 link Description: 뒤로가기, Value: alpha.teameet.co.kr/matches?regionId=region-seoul&q=QA+%EC%88%98%EB%AA%85%EC%A3%BC%EA%B8%B0": "3e9b4f5f3b9ae2b60ef342391c4fe1660ba6d31ba0de0a439801bf353d47bf6d",
+    "https://alpha.teameet.co.kr/admin/tournaments/synthetic-tournament-1/overview": "6cb2164659123ab1d24f75d735a7fda9c9ff91a99bb2bffb72065421821ba7aa",
+    "/matches?regionId=region-seoul&q=QA+%EC%88%98%EB%AA%85%EC%A3%BC%EA%B8%B0": "568c822144718311992b37d5a84c8643d1ac7d95813b383c8af6688f19d77460",
+    "https://alpha.teameet.co.kr/matches/synthetic-match-1?from=%2Fmatches%3FregionId%3Dregion-seoul%26q%3DQA%2B%25EC%2588%2598%25EB%25AA%2585%25EC%25A3%25BC%25EA%25B8%25B0": "78d5dd822da24cbd1cc68ccfb5e3db4b869154760b097f6dce1bcba0193f3be9"
+  },
+  "runtimeServingSHA": "unknown"
+}

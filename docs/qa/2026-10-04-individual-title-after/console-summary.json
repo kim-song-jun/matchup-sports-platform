@@ -1,0 +1,242 @@
+{
+  "observedUTC": "2026-10-04T06:43:56.932Z",
+  "filter": {
+    "levels": [
+      "warn",
+      "error"
+    ],
+    "limit": 100
+  },
+  "sinceUTC": "2026-10-04T06:35:28.002Z",
+  "returnedCount": 45,
+  "inWindow": [
+    {
+      "level": "error",
+      "timestamp": "2026-10-04T06:35:28.377Z",
+      "messageOmitted": true
+    },
+    {
+      "level": "error",
+      "timestamp": "2026-10-04T06:36:45.596Z",
+      "messageOmitted": true
+    },
+    {
+      "level": "error",
+      "timestamp": "2026-10-04T06:36:45.760Z",
+      "messageOmitted": true
+    },
+    {
+      "level": "error",
+      "timestamp": "2026-10-04T06:36:45.761Z",
+      "messageOmitted": true
+    },
+    {
+      "level": "error",
+      "timestamp": "2026-10-04T06:36:45.966Z",
+      "messageOmitted": true
+    },
+    {
+      "level": "error",
+      "timestamp": "2026-10-04T06:36:45.966Z",
+      "messageOmitted": true
+    },
+    {
+      "level": "error",
+      "timestamp": "2026-10-04T06:38:14.025Z",
+      "messageOmitted": true
+    },
+    {
+      "level": "error",
+      "timestamp": "2026-10-04T06:38:57.448Z",
+      "messageOmitted": true
+    },
+    {
+      "level": "error",
+      "timestamp": "2026-10-04T06:38:57.611Z",
+      "messageOmitted": true
+    },
+    {
+      "level": "error",
+      "timestamp": "2026-10-04T06:38:57.612Z",
+      "messageOmitted": true
+    },
+    {
+      "level": "error",
+      "timestamp": "2026-10-04T06:38:57.814Z",
+      "messageOmitted": true
+    },
+    {
+      "level": "error",
+      "timestamp": "2026-10-04T06:38:57.815Z",
+      "messageOmitted": true
+    },
+    {
+      "level": "error",
+      "timestamp": "2026-10-04T06:39:11.723Z",
+      "messageOmitted": true
+    },
+    {
+      "level": "error",
+      "timestamp": "2026-10-04T06:39:54.243Z",
+      "messageOmitted": true
+    },
+    {
+      "level": "error",
+      "timestamp": "2026-10-04T06:39:54.247Z",
+      "messageOmitted": true
+    },
+    {
+      "level": "error",
+      "timestamp": "2026-10-04T06:39:54.247Z",
+      "messageOmitted": true
+    },
+    {
+      "level": "error",
+      "timestamp": "2026-10-04T06:39:54.367Z",
+      "messageOmitted": true
+    },
+    {
+      "level": "error",
+      "timestamp": "2026-10-04T06:39:54.367Z",
+      "messageOmitted": true
+    },
+    {
+      "level": "error",
+      "timestamp": "2026-10-04T06:39:54.616Z",
+      "messageOmitted": true
+    },
+    {
+      "level": "error",
+      "timestamp": "2026-10-04T06:39:55.483Z",
+      "messageOmitted": true
+    },
+    {
+      "level": "error",
+      "timestamp": "2026-10-04T06:39:56.077Z",
+      "messageOmitted": true
+    },
+    {
+      "level": "error",
+      "timestamp": "2026-10-04T06:40:33.743Z",
+      "messageOmitted": true
+    },
+    {
+      "level": "error",
+      "timestamp": "2026-10-04T06:40:34.256Z",
+      "messageOmitted": true
+    },
+    {
+      "level": "error",
+      "timestamp": "2026-10-04T06:40:34.256Z",
+      "messageOmitted": true
+    },
+    {
+      "level": "error",
+      "timestamp": "2026-10-04T06:40:51.205Z",
+      "messageOmitted": true
+    },
+    {
+      "level": "error",
+      "timestamp": "2026-10-04T06:40:51.205Z",
+      "messageOmitted": true
+    },
+    {
+      "level": "error",
+      "timestamp": "2026-10-04T06:40:57.809Z",
+      "messageOmitted": true
+    },
+    {
+      "level": "error",
+      "timestamp": "2026-10-04T06:40:57.809Z",
+      "messageOmitted": true
+    },
+    {
+      "level": "error",
+      "timestamp": "2026-10-04T06:40:58.014Z",
+      "messageOmitted": true
+    },
+    {
+      "level": "error",
+      "timestamp": "2026-10-04T06:40:58.014Z",
+      "messageOmitted": true
+    },
+    {
+      "level": "error",
+      "timestamp": "2026-10-04T06:41:05.206Z",
+      "messageOmitted": true
+    },
+    {
+      "level": "error",
+      "timestamp": "2026-10-04T06:41:05.206Z",
+      "messageOmitted": true
+    },
+    {
+      "level": "error",
+      "timestamp": "2026-10-04T06:41:05.227Z",
+      "messageOmitted": true
+    },
+    {
+      "level": "error",
+      "timestamp": "2026-10-04T06:41:05.312Z",
+      "messageOmitted": true
+    },
+    {
+      "level": "error",
+      "timestamp": "2026-10-04T06:41:05.312Z",
+      "messageOmitted": true
+    },
+    {
+      "level": "error",
+      "timestamp": "2026-10-04T06:41:31.036Z",
+      "messageOmitted": true
+    },
+    {
+      "level": "error",
+      "timestamp": "2026-10-04T06:41:31.038Z",
+      "messageOmitted": true
+    },
+    {
+      "level": "error",
+      "timestamp": "2026-10-04T06:41:31.079Z",
+      "messageOmitted": true
+    },
+    {
+      "level": "error",
+      "timestamp": "2026-10-04T06:41:37.594Z",
+      "messageOmitted": true
+    },
+    {
+      "level": "error",
+      "timestamp": "2026-10-04T06:41:37.623Z",
+      "messageOmitted": true
+    },
+    {
+      "level": "error",
+      "timestamp": "2026-10-04T06:42:03.985Z",
+      "messageOmitted": true
+    },
+    {
+      "level": "error",
+      "timestamp": "2026-10-04T06:42:04.003Z",
+      "messageOmitted": true
+    },
+    {
+      "level": "error",
+      "timestamp": "2026-10-04T06:42:51.746Z",
+      "messageOmitted": true
+    },
+    {
+      "level": "error",
+      "timestamp": "2026-10-04T06:42:51.784Z",
+      "messageOmitted": true
+    }
+  ],
+  "limitation": "Captured tab console entries only; no network or API response capture, no broader console-clear assertion.",
+  "classification": {
+    "inWindowCount": 44,
+    "uniqueMessages": [
+      "Error sending browser metadata to extension: Object"
+    ],
+    "attribution": "Message text refers to browser metadata delivery to extension; no product-source attribution or network diagnosis established."
+  }
+}

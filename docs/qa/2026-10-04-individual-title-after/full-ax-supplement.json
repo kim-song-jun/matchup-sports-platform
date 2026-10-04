@@ -1,0 +1,201 @@
+{
+  "reason": "New full AX snapshots because initial safe excerpts used diff output and omitted unchanged headings. Historical DOM and PNG observations unchanged.",
+  "actions": [
+    {
+      "label": "resize mobile with supported native border drag",
+      "startUTC": "2026-10-04T06:49:48.320Z",
+      "endUTC": "2026-10-04T06:49:52.661Z"
+    },
+    {
+      "label": "fresh navigation for separate full AX observation",
+      "startUTC": "2026-10-04T06:49:53.279Z",
+      "endUTC": "2026-10-04T06:49:53.676Z"
+    },
+    {
+      "label": "resize tablet via native border drag",
+      "startUTC": "2026-10-04T06:50:20.694Z",
+      "endUTC": "2026-10-04T06:50:24.239Z"
+    },
+    {
+      "label": "desktop zoom native Ctrl0",
+      "startUTC": "2026-10-04T06:50:28.307Z",
+      "endUTC": "2026-10-04T06:50:28.447Z"
+    },
+    {
+      "label": "safe exit after full AX supplement",
+      "startUTC": "2026-10-04T06:50:28.557Z",
+      "endUTC": "2026-10-04T06:50:29.118Z"
+    }
+  ],
+  "observations": [
+    {
+      "label": "mobile full AX",
+      "AXStartUTC": "2026-10-04T06:50:08.647Z",
+      "AXEndUTC": "2026-10-04T06:50:08.675Z",
+      "excerpt": [
+        "\t\t\t\t5 link Description: 뒤로가기, Value: alpha.teameet.co.kr/matches",
+        "\t\t\t\t6 button 공유",
+        "\t\t\t\t8 heading (테스트) 1.0.3 QA 수명주기, Value: 2",
+        "\t\t\t33 button (disabled) 신청 불가"
+      ],
+      "DOM": {
+        "headings": [
+          {
+            "display": "block",
+            "rect": {
+              "bottom": 0,
+              "height": 0,
+              "left": 0,
+              "right": 0,
+              "top": 0,
+              "width": 0,
+              "x": 0,
+              "y": 0
+            },
+            "tag": "H1",
+            "text": "(테스트) 1.0.3 QA 수명주기"
+          },
+          {
+            "display": "block",
+            "rect": {
+              "bottom": 280,
+              "height": 32,
+              "left": 16,
+              "right": 385.6000061035156,
+              "top": 248,
+              "width": 369.6000061035156,
+              "x": 16,
+              "y": 248
+            },
+            "tag": "H2",
+            "text": "(테스트) 1.0.3 QA 수명주기"
+          }
+        ],
+        "url": "https://alpha.teameet.co.kr/matches/synthetic-match-1",
+        "utc": "2026-10-04T06:50:08.688Z",
+        "viewport": {
+          "dpr": 1.25,
+          "h": 606,
+          "w": 402
+        }
+      }
+    },
+    {
+      "label": "tablet full AX",
+      "AXStartUTC": "2026-10-04T06:50:28.260Z",
+      "AXEndUTC": "2026-10-04T06:50:28.290Z",
+      "excerpt": [
+        "\t\t\t\t5 link Description: 뒤로가기, Value: alpha.teameet.co.kr/matches",
+        "\t\t\t\t6 button 공유",
+        "\t\t\t\t8 heading (테스트) 1.0.3 QA 수명주기, Value: 2",
+        "\t\t\t33 button (disabled) 신청 불가"
+      ],
+      "DOM": {
+        "headings": [
+          {
+            "display": "block",
+            "rect": {
+              "bottom": 0,
+              "height": 0,
+              "left": 0,
+              "right": 0,
+              "top": 0,
+              "width": 0,
+              "x": 0,
+              "y": 0
+            },
+            "tag": "H1",
+            "text": "(테스트) 1.0.3 QA 수명주기"
+          },
+          {
+            "display": "block",
+            "rect": {
+              "bottom": 280,
+              "height": 32,
+              "left": 110,
+              "right": 678,
+              "top": 248,
+              "width": 568,
+              "x": 110,
+              "y": 248
+            },
+            "tag": "H2",
+            "text": "(테스트) 1.0.3 QA 수명주기"
+          }
+        ],
+        "url": "https://alpha.teameet.co.kr/matches/synthetic-match-1",
+        "utc": "2026-10-04T06:50:28.303Z",
+        "viewport": {
+          "dpr": 1.5,
+          "h": 505,
+          "w": 788
+        }
+      }
+    },
+    {
+      "label": "desktop full AX",
+      "AXStartUTC": "2026-10-04T06:50:28.488Z",
+      "AXEndUTC": "2026-10-04T06:50:28.535Z",
+      "excerpt": [
+        "\t\t14 link Description: 뒤로가기, Value: alpha.teameet.co.kr/matches",
+        "\t\t15 heading (테스트) 1.0.3 QA 수명주기, Value: 1",
+        "\t\t\t18 button 공유",
+        "\t\t\t43 button (disabled) 신청 불가"
+      ],
+      "DOM": {
+        "headings": [
+          {
+            "display": "block",
+            "rect": {
+              "bottom": 128,
+              "height": 32,
+              "left": 107,
+              "right": 375.078125,
+              "top": 96,
+              "width": 268.078125,
+              "x": 107,
+              "y": 96
+            },
+            "tag": "H1",
+            "text": "(테스트) 1.0.3 QA 수명주기"
+          },
+          {
+            "display": "none",
+            "rect": {
+              "bottom": 0,
+              "height": 0,
+              "left": 0,
+              "right": 0,
+              "top": 0,
+              "width": 0,
+              "x": 0,
+              "y": 0
+            },
+            "tag": "H2",
+            "text": "(테스트) 1.0.3 QA 수명주기"
+          }
+        ],
+        "url": "https://alpha.teameet.co.kr/matches/synthetic-match-1",
+        "utc": "2026-10-04T06:50:28.553Z",
+        "viewport": {
+          "dpr": 1,
+          "h": 757,
+          "w": 1182
+        }
+      }
+    }
+  ],
+  "runtimeServingSHA": "unknown",
+  "exit": {
+    "route": "/admin/tournaments/synthetic-tournament-1/overview",
+    "utc": "2026-10-04T06:50:42.980Z",
+    "viewport": {
+      "dpr": 1,
+      "h": 757,
+      "w": 1182
+    },
+    "visibleDialogCount": 0,
+    "visibleInputCount": 0
+  },
+  "unloggedNativeZoomKeys": "Mobile CtrlPlus twice; tablet CtrlPlus once, performed with supported native keyboard. Resize/zoom DOM dimensions are authoritative."
+}

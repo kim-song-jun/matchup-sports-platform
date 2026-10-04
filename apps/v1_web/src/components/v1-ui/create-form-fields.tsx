@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { AlertTriangleIcon, ChevronRightIcon } from '@/components/v1-ui/icons';
 import { Card } from '@/components/v1-ui/primitives';
 import { DATE_INPUT_MAX } from '@/lib/kst-calendar';
+import { GENDER_RULE_OPTIONS, matchGenderRuleLabel } from '@/lib/v1-status-labels';
 
 /**
  * matches-page.tsx / team-matches-page.tsx 생성 위저드에서 공유하는 필드 컴포넌트.
@@ -227,9 +228,9 @@ export function GenderRuleSelector({ value, onChange }: { value: string; onChang
     <div className="tm-create-field">
       <div className="tm-text-label">성별 조건</div>
       <div className="tm-team-form-chip-row">
-        {['성별 무관', '남', '여'].map((option) => (
+        {GENDER_RULE_OPTIONS.map((option) => (
           <button key={option} className={`tm-chip ${value === option ? 'tm-chip-active' : ''}`} type="button" aria-pressed={value === option} onClick={() => onChange?.(option)}>
-            {option}
+            {matchGenderRuleLabel(option)}
           </button>
         ))}
       </div>

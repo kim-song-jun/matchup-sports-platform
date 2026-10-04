@@ -23,6 +23,7 @@ import { formatAdminDateTime } from '@/lib/date-utils';
 import { extractErrorMessage } from '@/lib/error-message';
 import { randomUuid } from '@/lib/uuid';
 import type { V1AdminTeamMatchDetail } from '@/types/api';
+import { matchGenderRuleLabel } from '@/lib/v1-status-labels';
 
 /**
  * 팀매치 상세.
@@ -333,7 +334,7 @@ export default function AdminTeamMatchDetailPage() {
               <AdminDetailRow label="경기 형식" value={teamMatch.matchFormat} />
               <AdminDetailRow label="형식 메모" value={teamMatch.formatNote} />
               <AdminDetailRow label="경기 성격" value={teamMatch.matchStyle.length > 0 ? teamMatch.matchStyle.join(', ') : null} />
-              <AdminDetailRow label="성별 조건" value={teamMatch.genderRule} />
+              <AdminDetailRow label="성별 조건" value={matchGenderRuleLabel(teamMatch.genderRule)} />
               <AdminDetailRow label="유니폼 색" value={teamMatch.uniformColor} />
               <AdminDetailRow label="비용 안내" value={teamMatch.costNote} />
             </dl>

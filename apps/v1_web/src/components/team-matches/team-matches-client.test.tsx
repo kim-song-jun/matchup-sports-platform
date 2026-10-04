@@ -921,8 +921,8 @@ describe('toTeamMatch — legacy/unmigrated condition fields never show mock dat
   it('성별 조건이 없으면 빈 값으로 둔다 — 문자열로 채우면 화면 가드가 무력해진다', () => {
     expect(toTeamMatch(realMatch({ genderRule: null }), mockFallback).gender).toBe('');
     expect(toTeamMatch(realMatch({}), mockFallback).gender).toBe('');
-    // 값이 있으면 그대로 흐른다.
-    expect(toTeamMatch(realMatch({ genderRule: '성별 무관' }), mockFallback).gender).toBe('성별 무관');
+    // 값이 있으면 매치 라벨로 흐른다(저장값 '성별 무관' → '혼성').
+    expect(toTeamMatch(realMatch({ genderRule: '성별 무관' }), mockFallback).gender).toBe('혼성');
   });
 
   /**

@@ -382,8 +382,17 @@ export function leagueSeasonStageLabel(stage: LeagueSeasonStage): string {
 export const ARRIVAL_PENDING_LABEL = '도착 전';
 export const ARRIVAL_CONFIRMED_LABEL = '도착 확인';
 
-/** 성별 조건 정본 값(서버 GENDER_RULES 와 같다). 값이 곧 화면 라벨이다. */
+/** 성별 조건 정본 값(서버 GENDER_RULES 와 같다). 매치 화면에서는 `matchGenderRuleLabel` 로 읽는다. */
 export const GENDER_RULE_OPTIONS = ['성별 무관', '남', '여'] as const;
+
+/**
+ * 매치(개인·팀) 화면의 성별 조건 라벨 — 남녀가 함께 뛰는 경기라 '성별 무관'을 '혼성'으로 보여 준다.
+ * 저장·필터 값은 그대로 '성별 무관'이다: 서버 검증·기존 매치·공유된 필터 링크가 모두 이 값을 쓴다.
+ * 팀 프로필의 가입 조건은 이 라벨을 쓰지 않는다(`teamGenderRuleLabel`).
+ */
+export function matchGenderRuleLabel(value: string | null | undefined): string {
+  return value === '성별 무관' || value === '무관' ? '혼성' : value ?? '';
+}
 
 /** 정본이 아닌 값(옛 저장값·내부 코드)은 원문 대신 빈 문자열 — 호출부가 "미정"·배지 생략으로 처리한다. */
 export function genderRuleLabel(value: string | null | undefined): string {

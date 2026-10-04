@@ -138,3 +138,11 @@ describe('formatDeadline / formatDeadlineDetail — 실제 시각(사실) 계약
     expect(card.deadline).toBe('지났어요');
   });
 });
+
+describe('toMatchCard — 성별 조건 라벨', () => {
+  // 저장값은 '성별 무관' 그대로고, 매치 화면에서만 '혼성'으로 읽는다(옛 별칭 '무관'도 같다).
+  it.each([['성별 무관', '혼성'], ['무관', '혼성'], ['남', '남'], ['여', '여'], [null, '']])('%s → %s', (genderRule, label) => {
+    const card = toMatchCard({ id: 'm-g', matchId: 'm-g', status: 'recruiting', genderRule } as unknown as V1Match, base.matches[0]);
+    expect(card.gender).toBe(label);
+  });
+});

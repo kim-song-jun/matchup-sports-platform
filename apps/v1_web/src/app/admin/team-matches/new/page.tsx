@@ -15,7 +15,7 @@ import { randomUuid } from '@/lib/uuid';
 import { MultiPresetChipSelector } from '@/components/v1-ui/create-form-fields';
 import { teamMatchDateErrors } from '@/lib/team-match-dates';
 import { V1_LEVELS } from '@/lib/v1-levels';
-import { GENDER_RULE_OPTIONS } from '@/lib/v1-status-labels';
+import { GENDER_RULE_OPTIONS, matchGenderRuleLabel } from '@/lib/v1-status-labels';
 import { toDistrictRegionOptions } from '@/lib/v1-regions';
 import { kstDatetimeLocalToIso } from '@/lib/kst-calendar';
 import { TeamMatchImagesField } from '@/components/team-matches/team-match-images';
@@ -202,7 +202,7 @@ export default function AdminTeamMatchNewPage() {
               <label className="text-[length:var(--font-size-body-sm)] font-medium text-[var(--text-strong)]">
                 성별 조건
                 <select aria-label="성별 조건" value={genderRule} onChange={(event) => setGenderRule(event.target.value)} className={"mt-1 " + inputClass}>
-                  {GENDER_RULE_OPTIONS.map((gender) => <option key={gender} value={gender}>{gender}</option>)}
+                  {GENDER_RULE_OPTIONS.map((gender) => <option key={gender} value={gender}>{matchGenderRuleLabel(gender)}</option>)}
                 </select>
               </label>
             </div>

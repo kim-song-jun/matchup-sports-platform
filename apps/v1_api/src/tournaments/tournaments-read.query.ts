@@ -89,6 +89,7 @@ export const TOURNAMENT_DETAIL_INCLUDE = {
     where: { teamMatch: { deletedAt: null, game: { sourceType: V1GameSourceType.TEAM_MATCH } } },
     orderBy: [{ round: 'asc' }, { fixtureNumber: 'asc' }],
     include: {
+      advancementTargets: { where: { source: { teamMatch: { deletedAt: null } } }, select: { sourceTeamMatchId: true, sourceOutcome: true, targetSide: true } },
       homeRegistration: {
         include: { team: { select: { id: true, name: true, profile: { select: { logoUrl: true } } } } },
       },

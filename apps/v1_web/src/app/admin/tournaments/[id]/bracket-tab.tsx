@@ -13,7 +13,7 @@ import type {
   V1GenerateLeagueFixturesResponse,
 } from '@/types/api';
 import { extractErrorMessage } from '@/lib/error-message';
-import { V1ApiError, v1Post } from '@/lib/api-client';
+import { V1ApiError, v1Post, v1Patch } from '@/lib/api-client';
 // 조별리그 라운드로빈은 서버(POST /admin/tournaments/:id/league/fixtures/generate)로 이관했다.
 // 여기 남는 knockoutSeedPairs 는 녹아웃 시드 페어링 전용이다.
 import { knockoutSeedPairs, round12Pairs } from '@/lib/tournament-bracket-gen';
@@ -141,6 +141,10 @@ export function BracketTab({
   const [publishScheduleInput, setPublishScheduleInput] = useState('');
 
   // ── 경기 수정 모달 상태 ─────────────────────────────────────────────
+  const [sourceFixture, setSourceFixture] = useState<V1AdminBracketFixture | null>(null);
+  const [homeSource, setHomeSource] = useState('');
+  const [awaySource, setAwaySource] = useState('');
+  const [savingSources, setSavingSources] = useState(false);
   const [editFixture, setEditFixture] = useState<V1AdminBracketFixture | null>(null);
   const [editFxScheduledAt, setEditFxScheduledAt] = useState('');
   const [editFxVenue, setEditFxVenue] = useState('');
@@ -760,6 +764,13 @@ export function BracketTab({
                   >
                     <Pencil size={12} aria-hidden="true" /> 수정
                   </button>
+                  {['quarter', 'semi', 'final', 'third_place'].includes(groups.find((group) => group.id === f.groupId)?.phase ?? '') && (
+                    <button type="button" className="tm-chip" onClick={() => {
+                      setSourceFixture(f);
+                      setHomeSource(f.bracketSources?.find((source) => source.side === 'HOME')?.fixtureId ?? '');
+                      setAwaySource(f.bracketSources?.find((source) => source.side === 'AWAY')?.fixtureId ?? '');
+                    }}>진출 연결</button>
+                  )}
                   {canOperate && (
                     <Link
                       href={operateHref}
@@ -806,6 +817,35 @@ export function BracketTab({
       )}
 
       {/* ── Fixture edit modal ────────────────────────────────────────── */}
+      <SimpleModal open={!!sourceFixture} title="진출 경기 연결" onClose={() => { if (!savingSources) setSourceFixture(null); }}>
+        <form className="space-y-4" onSubmit={async (event) => {
+          event.preventDefault();
+          if (!sourceFixture || savingSources) return;
+          setSavingSources(true);
+          try {
+            await v1Patch(`/admin/fixtures/${sourceFixture.id}/bracket-sources`, { homeSourceFixtureId: homeSource || null, awaySourceFixtureId: awaySource || null });
+            await refetch();
+            setSourceFixture(null);
+            showToast('진출 연결을 저장했어요.', 'success');
+          } catch (err) { showToast(extractErrorMessage(err, '진출 연결 저장에 실패했어요.'), 'error'); }
+          finally { setSavingSources(false); }
+        }}>
+          <p className="tm-text-caption">미정인 자리에 이전 경기의 승자를 연결해요. 3·4위전에는 4강 패자가 연결돼요. 결과 확정 시 기존 진출 처리로 팀이 배정돼요.</p>
+          {(['HOME', 'AWAY'] as const).map((side) => {
+            const targetPhase = groups.find((group) => group.id === sourceFixture?.groupId)?.phase ?? '';
+            const previous: Record<string, string> = { quarter: 'round12', semi: 'quarter', final: 'semi', third_place: 'semi' };
+            const candidates = (bracket?.fixtures ?? []).filter((fixture) => groups.find((group) => group.id === fixture.groupId)?.phase === previous[targetPhase] && fixture.legNumber === 1 && !fixture.parentFixtureId && fixture.status === 'scheduled' && !fixture.result);
+            return <label key={side} className="block tm-text-label">{side === 'HOME' ? '홈 자리' : '어웨이 자리'}
+              <select className={inputCls} disabled={savingSources} value={side === 'HOME' ? homeSource : awaySource} onChange={(event) => side === 'HOME' ? setHomeSource(event.target.value) : setAwaySource(event.target.value)}>
+                <option value="">연결 없음 · 직접 배정</option>
+                {candidates.map((fixture) => <option key={fixture.id} value={fixture.id}>{bracketFixtureLabel(fixture, groups)} {targetPhase === 'third_place' ? '패자' : '승자'}</option>)}
+              </select>
+            </label>;
+          })}
+          <button type="submit" className={submitBtnCls} disabled={savingSources}>{savingSources ? '저장 중…' : '연결 저장'}</button>
+        </form>
+      </SimpleModal>
+
       <SimpleModal
         open={editFixture !== null}
         title="경기 수정"

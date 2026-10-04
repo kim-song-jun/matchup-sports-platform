@@ -278,6 +278,7 @@ describe('TournamentBracketService', () => {
     v1TournamentGroupTeam: { findUnique: jest.Mock; findFirst: jest.Mock; findMany: jest.Mock; create: jest.Mock };
     v1TournamentMatchDetails: { findUnique: jest.Mock; findUniqueOrThrow: jest.Mock; findFirst: jest.Mock; findMany: jest.Mock; create: jest.Mock; update: jest.Mock };
     v1TeamMatch: { findUnique: jest.Mock; findUniqueOrThrow: jest.Mock; findMany: jest.Mock; create: jest.Mock; update: jest.Mock };
+    v1TournamentMatchAdvancementEdge: { findMany: jest.Mock };
     v1TeamSchedule: { findUnique: jest.Mock; update: jest.Mock; create: jest.Mock; updateMany: jest.Mock };
     v1TournamentRegistration: { findFirst: jest.Mock; findMany: jest.Mock; findUnique: jest.Mock };
     v1GameResultRevision: { findUnique: jest.Mock };
@@ -330,6 +331,7 @@ describe('TournamentBracketService', () => {
         create: jest.fn().mockResolvedValue({ id: 'fixture-1' }),
         update: jest.fn(),
       },
+      v1TournamentMatchAdvancementEdge: { findMany: jest.fn().mockResolvedValue([]) },
       v1TeamSchedule: { findUnique: jest.fn().mockResolvedValue(null), update: jest.fn(), create: jest.fn(), updateMany: jest.fn().mockResolvedValue({ count: 0 }) },
       v1TournamentRegistration: {
         findFirst: jest.fn(),
@@ -405,6 +407,12 @@ describe('TournamentBracketService', () => {
     await expect(
       service.recordResult(nonAdminUser, 'fixture-1', { homeScore: 1, awayScore: 0 }),
     ).rejects.toThrow(ForbiddenException);
+  });
+
+  it('updateBracketSources: support admin cannot mutate → 403', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(supportAdmin);
+    await expect(service.updateBracketSources(supportUser, 'fixture-1', { homeSourceFixtureId: null }))
+      .rejects.toMatchObject({ response: { code: 'PERMISSION_DENIED' } });
   });
 
   // ─── createGroup ──────────────────────────────────────────────────────────

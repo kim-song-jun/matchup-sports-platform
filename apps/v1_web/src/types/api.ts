@@ -3716,7 +3716,10 @@ export type V1TournamentFixtureVideo = {
  * 실명. `null`과 'TBD'를 반드시 구분해서 표시할 것 — 둘 다 "미정"으로 뭉치면 "이미
  * 배정됐지만 비공개"와 "아직 배정 안 됨"을 사용자가 구분할 수 없다.
  */
+export type V1BracketSource = { fixtureId: string; outcome: 'WINNER' | 'LOSER'; side: 'HOME' | 'AWAY' };
+
 export type V1TournamentFixture = {
+  bracketSources?: V1BracketSource[];
   id: string;
   groupId: string | null;
   round: string;
@@ -4120,6 +4123,7 @@ export type V1AdminBracketGroupTeam = {
 };
 
 export type V1AdminBracketFixture = {
+  bracketSources?: V1BracketSource[];
   id: string;
   tournamentId: string;
   groupId: string | null;

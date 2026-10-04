@@ -152,6 +152,17 @@ export class UpdateFixtureDto {
   awayRegistrationId?: string;
 }
 
+export class UpdateBracketSourcesDto {
+  /** null clears the source; omitted sides remain unchanged. */
+  @IsOptional()
+  @IsUUID()
+  homeSourceFixtureId?: string | null;
+
+  @IsOptional()
+  @IsUUID()
+  awaySourceFixtureId?: string | null;
+}
+
 // ─── Result DTOs ──────────────────────────────────────────────────────────────
 
 export class RecordResultDto {

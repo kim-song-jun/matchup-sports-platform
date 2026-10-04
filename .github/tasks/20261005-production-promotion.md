@@ -77,3 +77,8 @@ Owned: this task/status record, GitHub canonical promotion workflow dispatch and
 - Validation: unit70/70; bracket render9/9; existing round12 DB contracts2/2; new real PostgreSQL interleaving2/2 PASS on fix.
 - RED evidence on exact old cca source with the same new tests: actual PostgreSQL40P01 deadlock in reverse UUID case; stale-null request succeeds incorrectly; third-place LOSER labels absent. All3 regressions detected. Raw logs outside repo `/tmp/production-bracket-red-api.log`, `/tmp/production-bracket-red-web.log`.
 - User explicitly chose waiting for Copilot. No review exception granted for PR1609 or follow-up fixes, no main merge, production still1.1.5.
+
+## Committed-tree CI follow-up
+
+- Fix PR #1610, initial head3044fe180. CI #37222439717 Gates/Web PASS, API DB replay/integration PASS, API unit had7 failures in league-fixture-generator.service.spec.ts only: its fake transaction omitted the advancement-edge delegate newly read by the shared assignment guard. Added explicit empty-edge fixture data to that existing league mock, without a runtime fallback or weakened assertions. Reran affected generator/shared-helper specs.
+- Both package typechecks PASS. Owned test PostgreSQL stopped after verification; no local Next/browser process created for this follow-up. Copilot still not submitted on either PR.

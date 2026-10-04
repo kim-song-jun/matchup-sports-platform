@@ -3143,6 +3143,8 @@ label.tm-btn:focus-within {
   -webkit-overflow-scrolling: touch;
   margin-inline: -4px;
   padding: 4px;
+  /* 마지막 카드의 start snap/수동 끝 스크롤이 만들기 FAB의 읽기 영역을 피할 공간. */
+  padding-inline-end: var(--v1-shell-fab-clear-pad);
 }
 
 /* 키보드 보정 뒤 mandatory snap이 다른 카드로 되돌리지 않게 한다. */
@@ -3156,6 +3158,10 @@ label.tm-btn:focus-within {
 }
 
 @media (min-width: 1024px) {
+  .tm-match-rail-h {
+    padding-inline-end: 4px;
+  }
+
   .tm-match-rail-h > * {
     flex: 0 0 320px;
   }

@@ -62,3 +62,12 @@
 - [4강 예시](../../docs/screenshots/tournament-connected-bracket/4-desktop.png) · [8강 예시](../../docs/screenshots/tournament-connected-bracket/8-desktop.png) · [12강 예시](../../docs/screenshots/tournament-connected-bracket/12-desktop.png) · [모바일](../../docs/screenshots/tournament-connected-bracket/12-mobile.png). 각 screenshot의 sample 문구는 실제 배포/실대진과 구분하기 위해 유지.
 - cleanup: 모든 소유 headed browser context 종료, 테스트 PostgreSQL 종료.
 - **미완:** 원격 push/PR/CI/Copilot/dev merge/alpha 배포 및 배포 후 실제 admin/public QA. 이전 자동 승인 검토의 remote push 차단에 대한 명시 승인 대기. 브라우저 로컬 예시는 alpha 배포 완료를 뜻하지 않음.
+
+## 10/05 alpha 배포 및 사용자 연습 대회
+
+- 사용자가 GitHub push/dev merge/alpha 배포를 명시 승인. feature 원격 push 성공, 최신 dev f61409687 흡수. main은 대상 아님.
+- 사용자 추가 요청: 대회 1개, 12팀 × 선수 5명 신청 상태, 직접 대진 입력. alpha 전용 기존 seed 경로에서 `(테스트) 12팀·팀당 5명 대진 직접 입력` / `ad120000-0000-4000-8000-000000000001`을 최초 1회 생성. 풋살 group_knockout, closed, 확정 12팀, active roster60, min/max5, 참가비0, 조/경기0, 미공개. 기존 합성 QA 계정60명만 재사용하며 신규 가상팀12개 회원수5.
+- 재배포 시 이 대회의 팀·명단·조·대진·결과를 변경하지 않는다. 같은 id가 존재하면 create를 건너뛴다. 실제 DB integration1/1(12×5와 수동 group 보존) 및 타입/runtime seed 검사 PASS.
+- [ ] PR CI·Copilot clean·dev merge
+- [ ] alpha release SHA·신규 enum 및 seed 생성 결과 검증
+- [ ] 지정 상세 및 신규 대회 admin/public/모바일 검증, 링크 전달

@@ -41,6 +41,20 @@ const PHASE_LABEL: Record<string, string> = {
   third_place: '3·4위전',
 };
 
+/** Resolve persisted winner/loser sources for every bracket surface. */
+function withBracketSourceNames(fixture: V1TournamentFixture, rounds: Pick<RoundGroup, 'label' | 'fixtures'>[]): V1TournamentFixture {
+  const sourceLabel = (side: 'HOME' | 'AWAY') => {
+    const edge = fixture.bracketSources?.find((source) => source.side === side);
+    const stage = rounds.find((round) => round.fixtures.some((source) => source.id === edge?.fixtureId));
+    const source = stage?.fixtures.find((source) => source.id === edge?.fixtureId);
+    return source ? `${stage!.label} ${source.fixtureNumber}경기 ${edge?.outcome === 'LOSER' ? '패자' : '승자'}` : 'TBD';
+  };
+  return { ...fixture,
+    homeTeamName: fixture.homeTeamName === 'TBD' ? sourceLabel('HOME') : fixture.homeTeamName,
+    awayTeamName: fixture.awayTeamName === 'TBD' ? sourceLabel('AWAY') : fixture.awayTeamName,
+  };
+}
+
 function getFixturePhase(round: string): keyof typeof PHASE_ORDER | null {
   const normalized = round.trim().toLowerCase();
 
@@ -707,16 +721,10 @@ function ConnectedBracket({ rounds, groups, champion }: { rounds: BracketGraphRo
         <div style={{ height: HEAD_H, display: 'flex', justifyContent: 'center', alignItems: 'center' }}><span className="tm-bk2-pill">{round.label}</span></div>
         {graph.nodes.filter((node) => node.round === round.key).map((node) => {
           const fixture = node.fixture;
-          const sourceLabel = (side: 'HOME' | 'AWAY') => {
-            const edge = fixture?.bracketSources?.find((source) => source.side === side);
-            const source = rounds.flatMap((stage) => stage.fixtures).find((item) => item.id === edge?.fixtureId);
-            const stage = rounds.find((stage) => stage.fixtures.some((item) => item.id === edge?.fixtureId));
-            return source ? `${stage?.label ?? ''} ${source.fixtureNumber}경기 ${edge?.outcome === 'LOSER' ? '패자' : '승자'}` : 'TBD';
-          };
           return <div key={node.id} data-bracket-node={node.id} style={{ position: 'absolute', width: COL_W, top: HEAD_H + node.y, transform: 'translateY(-50%)' }}>
             {fixture ? <>
               <p className="tm-text-micro" style={{ marginBottom: 4, color: 'var(--text-caption)' }}>{fixture.fixtureNumber}번 경기</p>
-              <MatchCard fixture={{ ...fixture, homeTeamName: fixture.homeTeamName === 'TBD' ? sourceLabel('HOME') : fixture.homeTeamName, awayTeamName: fixture.awayTeamName === 'TBD' ? sourceLabel('AWAY') : fixture.awayTeamName }} />
+              <MatchCard fixture={withBracketSourceNames(fixture, rounds)} />
             </> : node.bye ? <div className="tm-bk2-card" role="region" aria-label="12강 부전승" style={{ padding: 12 }}>
               <div className="tm-text-caption-strong" style={{ color: 'var(--blue700)', marginBottom: 8 }}>부전승 · 8강 직행</div>
               <div className="flex items-center gap-2"><TeamAvatar seed={node.bye.teamId ?? node.bye.registrationId} name={teamDisplayName(node.bye.teamName).label} logoUrl={node.bye.teamLogoUrl} size="sm" /><span className="tm-text-caption-strong">{teamDisplayName(node.bye.teamName).label}</span></div>
@@ -908,7 +916,7 @@ export function TournamentBracket({ fixtures, groups }: TournamentBracketProps) 
           </div>
           {thirdPlace.fixtures.map((f) => (
             <div key={f.id} className="tm-bk2-third-match">
-              <MatchCard fixture={f} />
+              <MatchCard fixture={withBracketSourceNames(f, rounds)} />
             </div>
           ))}
         </div>

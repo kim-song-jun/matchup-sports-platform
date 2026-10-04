@@ -29,109 +29,6 @@ function render(ui: ReactElement) {
   return rtlRender(<QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>);
 }
 
-describe('MatchDetailPageView — desktop 제목 중복 정리 (#1588 A)', () => {
-  const title = '(합성) 개인 매치 제목';
-  const readCss = (path: string) => readFileSync(resolve(process.cwd(), path), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
-
-  function detail(image: string | null = null) {
-    const base = getMatchDetailViewModel();
-    return { ...base, match: { ...base.match, id: 'title-fixture', title, host: '합성 호스트', image } };
-  }
-
-  afterEach(() => {
-    navState.pathname = '/matches/match-4';
-    navState.search = '';
-  });
-
-  it.each([null, '/uploads/title-fixture.webp'])('사진 %s: entity H1을 유지하고 hero H2만 desktop utility에 연결한다', (image) => {
-    const { container } = render(<MatchDetailPageView model={detail(image)} />);
-    const h1 = screen.getByRole('heading', { level: 1, name: title });
-    const h2 = screen.getByRole('heading', { level: 2, name: title });
-    const hero = container.querySelector('.tm-match-detail-hero');
-
-    expect(h1.parentElement).toHaveClass('tm-desktop-page-head', 'tm-show-desktop');
-    expect(h2).toHaveClass('tm-match-detail-title', 'tm-hide-desktop');
-    expect(h2).not.toHaveAttribute('hidden');
-    expect(h2).not.toHaveAttribute('aria-hidden');
-    expect(hero).toContainElement(h2);
-    expect(hero).not.toHaveClass('tm-hide-desktop');
-    expect(h2.parentElement).not.toHaveClass('tm-hide-desktop');
-    expect(hero?.querySelector('.tm-match-detail-meta')).not.toHaveClass('tm-hide-desktop');
-    expect(hero?.querySelector('.tm-match-detail-sport-badge')).not.toHaveClass('tm-hide-desktop');
-  });
-
-  it('실제 CSS import chain의 1024px hide/show 계약을 사용한다 (jsdom viewport 실측 아님)', () => {
-    const layout = readFileSync(resolve(process.cwd(), 'src/app/layout.tsx'), 'utf8');
-    const desktopIndex = readFileSync(resolve(process.cwd(), 'src/app/desktop/index.css'), 'utf8');
-    const shell = readCss('src/app/desktop/_shell.css');
-    const globals = readCss('src/app/globals.css');
-
-    expect(layout).toContain("import './desktop/index.css'");
-    expect(desktopIndex).toMatch(/@import\s+"\.\/_shell\.css"/);
-    expect(shell).toMatch(/@media\s*\(min-width:\s*1024px\)\s*\{\s*\.tm-hide-desktop\s*\{\s*display:\s*none\s*!important;\s*\}\s*\}/);
-    expect(shell).toMatch(/\.tm-show-desktop\s*\{\s*display:\s*none;\s*\}/);
-    expect(shell).toMatch(/@media\s*\(min-width:\s*1024px\)\s*\{\s*\.tm-show-desktop\s*\{\s*display:\s*block;\s*\}\s*\}/);
-    const titleRule = globals.match(/\.tm-match-detail-title\s*\{([^}]*)\}/)?.[1];
-    expect(titleRule).toBeDefined();
-    expect(titleRule).not.toMatch(/display:\s*none|visibility:\s*hidden/);
-  });
-
-  it('host 간격은 기본 8px을 유지하고 desktop에서만 숨긴 제목 뒤 여백을 정리한다', () => {
-    const { container } = render(<MatchDetailPageView model={detail()} />);
-    const hero = container.querySelector('.tm-match-detail-hero');
-    const host = hero?.querySelector<HTMLElement>('.tm-match-detail-meta');
-    const badges = hero?.querySelector('.tm-match-detail-sport-badge')?.parentElement;
-    const globals = readCss('src/app/globals.css');
-    const hostRule = globals.match(/\.tm-match-detail-overlay\s+\.tm-match-detail-meta\s*\{([^}]*)\}/)?.[1];
-
-    expect(host).toHaveTextContent('합성 호스트 호스트');
-    expect(host?.style.marginTop).toBe('');
-    expect(badges?.style.marginBottom).toBe('8px');
-    expect(hostRule).toMatch(/margin-top:\s*8px;/);
-    expect(globals).toMatch(/@media\s*\(min-width:\s*1024px\)\s*\{\s*\.tm-match-detail-overlay\s+\.tm-match-detail-meta\s*\{[^}]*margin-top:\s*0(?:px)?;/);
-  });
-
-  it('Back/from·공유·배지·CTA를 실제 상세 view에 보존한다', async () => {
-    const from = '/matches?q=QA&sport=futsal';
-    navState.pathname = '/matches/title-fixture';
-    navState.search = `from=${encodeURIComponent(from)}`;
-    const onShare = vi.fn().mockResolvedValue(null);
-    const { container } = render(<MatchDetailPageView model={{ ...detail(), backHref: from, onShare }} />);
-    const desktopBack = container.querySelector('.tm-desktop-page-head .tm-desktop-back');
-    const hero = container.querySelector<HTMLElement>('.tm-match-detail-hero');
-    expect(hero).not.toBeNull();
-    const mobileBack = within(hero!).getByRole('link', { name: '뒤로가기' });
-
-    expect(desktopBack).toHaveAttribute('href', from);
-    expect(mobileBack).toHaveAttribute('href', from);
-    expect(mobileBack).toHaveClass('tm-hide-desktop');
-    expect(container.querySelector('.tm-match-detail-sport-badge')).toHaveTextContent('풋살');
-    expect(container.querySelector('.tm-match-detail-hero')).toHaveTextContent('모집 중');
-    for (const cta of screen.getAllByRole('button', { name: '참가 신청' })) expect(cta).toBeDisabled();
-    expect(screen.getAllByRole('button', { name: '참가 신청' })).toHaveLength(2);
-
-    fireEvent.click(screen.getByRole('button', { name: '공유' }));
-    await waitFor(() => expect(onShare).toHaveBeenCalledOnce());
-    expect(screen.getByRole('heading', { level: 1, name: title })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { level: 2, name: title })).toBeInTheDocument();
-  });
-
-  it('목록의 scope H2·카드 제목·from 링크에는 상세 제목 숨김을 적용하지 않는다', () => {
-    navState.pathname = '/matches';
-    navState.search = 'q=QA&sport=futsal';
-    const base = getMatchListViewModel();
-    const model = { ...base, matches: [{ ...base.matches[0], id: 'title-fixture', title }], nearbyMatches: [] };
-    const { container } = render(<MatchListPageView model={model} />);
-    const scopeHeading = screen.getByRole('heading', { level: 2, name: model.summary.label });
-    const rowTitle = container.querySelector('.tm-match-row-title');
-
-    expect(scopeHeading).not.toHaveClass('tm-hide-desktop');
-    expect(rowTitle).toHaveTextContent(title);
-    expect(rowTitle).not.toHaveClass('tm-hide-desktop');
-    expect(rowTitle?.closest('a')).toHaveAttribute('href', `/matches/title-fixture?from=${encodeURIComponent('/matches?q=QA&sport=futsal')}`);
-  });
-});
-
 describe('MatchDetailPageView — closed mode (참가한 적 없는 뷰어가 마감류 매치를 볼 때)', () => {
   it('참가 확정 배너/문구를 보여주지 않는다', () => {
     const model = getMatchDetailViewModel('closed');
@@ -940,5 +837,108 @@ describe('MatchListPageView — 상세로 가는 카드는 지금 목록(검색�
     const { container } = render(<MatchListPageView model={listWithNearby()} />);
 
     expect(matchHrefs(container)).toEqual(['/matches/m-a', '/matches/m-b', '/matches/m-b', '/matches/m-n']);
+  });
+});
+
+describe('MatchDetailPageView — desktop 제목 중복 정리 (#1588 A)', () => {
+  const title = '(합성) 개인 매치 제목';
+  const readCss = (path: string) => readFileSync(resolve(process.cwd(), path), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+
+  function detail(image: string | null = null) {
+    const base = getMatchDetailViewModel();
+    return { ...base, match: { ...base.match, id: 'title-fixture', title, host: '합성 호스트', image } };
+  }
+
+  afterEach(() => {
+    navState.pathname = '/matches/match-4';
+    navState.search = '';
+  });
+
+  it.each([null, '/uploads/title-fixture.webp'])('사진 %s: entity H1을 유지하고 hero H2만 desktop utility에 연결한다', (image) => {
+    const { container } = render(<MatchDetailPageView model={detail(image)} />);
+    const h1 = screen.getByRole('heading', { level: 1, name: title });
+    const h2 = screen.getByRole('heading', { level: 2, name: title });
+    const hero = container.querySelector('.tm-match-detail-hero');
+
+    expect(h1.parentElement).toHaveClass('tm-desktop-page-head', 'tm-show-desktop');
+    expect(h2).toHaveClass('tm-match-detail-title', 'tm-hide-desktop');
+    expect(h2).not.toHaveAttribute('hidden');
+    expect(h2).not.toHaveAttribute('aria-hidden');
+    expect(hero).toContainElement(h2);
+    expect(hero).not.toHaveClass('tm-hide-desktop');
+    expect(h2.parentElement).not.toHaveClass('tm-hide-desktop');
+    expect(hero?.querySelector('.tm-match-detail-meta')).not.toHaveClass('tm-hide-desktop');
+    expect(hero?.querySelector('.tm-match-detail-sport-badge')).not.toHaveClass('tm-hide-desktop');
+  });
+
+  it('실제 CSS import chain의 1024px hide/show 계약을 사용한다 (jsdom viewport 실측 아님)', () => {
+    const layout = readFileSync(resolve(process.cwd(), 'src/app/layout.tsx'), 'utf8');
+    const desktopIndex = readFileSync(resolve(process.cwd(), 'src/app/desktop/index.css'), 'utf8');
+    const shell = readCss('src/app/desktop/_shell.css');
+    const globals = readCss('src/app/globals.css');
+
+    expect(layout).toContain("import './desktop/index.css'");
+    expect(desktopIndex).toMatch(/@import\s+"\.\/_shell\.css"/);
+    expect(shell).toMatch(/@media\s*\(min-width:\s*1024px\)\s*\{\s*\.tm-hide-desktop\s*\{\s*display:\s*none\s*!important;\s*\}\s*\}/);
+    expect(shell).toMatch(/\.tm-show-desktop\s*\{\s*display:\s*none;\s*\}/);
+    expect(shell).toMatch(/@media\s*\(min-width:\s*1024px\)\s*\{\s*\.tm-show-desktop\s*\{\s*display:\s*block;\s*\}\s*\}/);
+    const titleRule = globals.match(/\.tm-match-detail-title\s*\{([^}]*)\}/)?.[1];
+    expect(titleRule).toBeDefined();
+    expect(titleRule).not.toMatch(/display:\s*none|visibility:\s*hidden/);
+  });
+
+  it('host 간격은 기본 8px을 유지하고 desktop에서만 숨긴 제목 뒤 여백을 정리한다', () => {
+    const { container } = render(<MatchDetailPageView model={detail()} />);
+    const hero = container.querySelector('.tm-match-detail-hero');
+    const host = hero?.querySelector<HTMLElement>('.tm-match-detail-meta');
+    const badges = hero?.querySelector('.tm-match-detail-sport-badge')?.parentElement;
+    const globals = readCss('src/app/globals.css');
+    const hostRule = globals.match(/\.tm-match-detail-overlay\s+\.tm-match-detail-meta\s*\{([^}]*)\}/)?.[1];
+
+    expect(host).toHaveTextContent('합성 호스트 호스트');
+    expect(host?.style.marginTop).toBe('');
+    expect(badges?.style.marginBottom).toBe('8px');
+    expect(hostRule).toMatch(/margin-top:\s*8px;/);
+    expect(globals).toMatch(/@media\s*\(min-width:\s*1024px\)\s*\{\s*\.tm-match-detail-overlay\s+\.tm-match-detail-meta\s*\{[^}]*margin-top:\s*0(?:px)?;/);
+  });
+
+  it('Back/from·공유·배지·CTA를 실제 상세 view에 보존한다', async () => {
+    const from = '/matches?q=QA&sport=futsal';
+    navState.pathname = '/matches/title-fixture';
+    navState.search = `from=${encodeURIComponent(from)}`;
+    const onShare = vi.fn().mockResolvedValue(null);
+    const { container } = render(<MatchDetailPageView model={{ ...detail(), backHref: from, onShare }} />);
+    const desktopBack = container.querySelector('.tm-desktop-page-head .tm-desktop-back');
+    const hero = container.querySelector<HTMLElement>('.tm-match-detail-hero');
+    expect(hero).not.toBeNull();
+    const mobileBack = within(hero!).getByRole('link', { name: '뒤로가기' });
+
+    expect(desktopBack).toHaveAttribute('href', from);
+    expect(mobileBack).toHaveAttribute('href', from);
+    expect(mobileBack).toHaveClass('tm-hide-desktop');
+    expect(container.querySelector('.tm-match-detail-sport-badge')).toHaveTextContent('풋살');
+    expect(container.querySelector('.tm-match-detail-hero')).toHaveTextContent('모집 중');
+    for (const cta of screen.getAllByRole('button', { name: '참가 신청' })) expect(cta).toBeDisabled();
+    expect(screen.getAllByRole('button', { name: '참가 신청' })).toHaveLength(2);
+
+    fireEvent.click(screen.getByRole('button', { name: '공유' }));
+    await waitFor(() => expect(onShare).toHaveBeenCalledOnce());
+    expect(screen.getByRole('heading', { level: 1, name: title })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 2, name: title })).toBeInTheDocument();
+  });
+
+  it('목록의 scope H2·카드 제목·from 링크에는 상세 제목 숨김을 적용하지 않는다', () => {
+    navState.pathname = '/matches';
+    navState.search = 'q=QA&sport=futsal';
+    const base = getMatchListViewModel();
+    const model = { ...base, matches: [{ ...base.matches[0], id: 'title-fixture', title }], nearbyMatches: [] };
+    const { container } = render(<MatchListPageView model={model} />);
+    const scopeHeading = screen.getByRole('heading', { level: 2, name: model.summary.label });
+    const rowTitle = container.querySelector('.tm-match-row-title');
+
+    expect(scopeHeading).not.toHaveClass('tm-hide-desktop');
+    expect(rowTitle).toHaveTextContent(title);
+    expect(rowTitle).not.toHaveClass('tm-hide-desktop');
+    expect(rowTitle?.closest('a')).toHaveAttribute('href', `/matches/title-fixture?from=${encodeURIComponent('/matches?q=QA&sport=futsal')}`);
   });
 });

@@ -134,3 +134,9 @@ Forbidden: 다른 파일·worktree, API/DTO/mapper/mode, 비용, #1587 notice, �
 - 현재 단계: 5path candidate를 root에 인계한다. Root lint/typecheck·필수 gates·독립 review·명시 commit/PR/CI는 pending. 실제 alpha after·3폭 간격/스크롤/focus·console/network/native share는 별도 승인 배포 이후 pending이다.
 
 - Root 독립 검토: 제품/공유 CSS·테스트 diff와 H1/hero/host·실제 desktop utility import 관계를 대조해 새 결함0. 담당자 GREEN을 자체 테스트 재실행으로 세지 않았다. Root `pnpm --filter v1_web lint`(tsc+v1-pattern) 1회 PASS, 필수 aggregate gates 6/6와 changeset policy PASS. 정확한 원격 head CI와 실제 alpha after는 후속 대기다.
+
+## 2026-10-04 latest-dev reconciliation
+
+PR #1591 remains Ready/base dev. Its original exact-head CI and static review passed, but current dev 27a021fc7650672d5af25217108b101dc856c8d5 adds the completed-match notice regression at the same test insertion anchor. Relocate only this issue's unchanged describe group (and #1592's two imports) to avoid that textual conflict, then integrate current dev without dropping either test contract. No runtime correction or new UI choice is introduced. The other unmerged PR's feature is excluded.
+
+The original tests/CI above belong to their recorded SHA. Focused tests, lint and exact new-head CI after integration remain pending; actual alpha after remains with the parent's browser QA.

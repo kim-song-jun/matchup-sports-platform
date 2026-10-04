@@ -1,11 +1,11 @@
+import { toMatchCard } from './matches.card-model';
+import type { V1Match } from '@/types/api';
 import type { ReactElement } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render as rtlRender, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { MatchCreatePageView, MatchDetailPageView, MatchListPageView } from './matches-page';
 import { getMatchCreateViewModel, getMatchDetailViewModel, getMatchListViewModel } from './matches.view-model';
-import { toMatchCard } from './matches.card-model';
-import type { V1Match } from '@/types/api';
 
 const navState = vi.hoisted(() => ({ pathname: '/matches/match-4', search: '' }));
 
@@ -28,66 +28,6 @@ function render(ui: ReactElement) {
 
   return rtlRender(<QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>);
 }
-
-describe('MatchListPageView — 참가비 자유 입력의 의미와 원문 (#1586)', () => {
-  afterEach(() => { navState.pathname = '/matches/match-4'; navState.search = ''; });
-
-  function list(costNote: string | null) {
-    navState.pathname = '/matches';
-    navState.search = 'q=qa&sportId=futsal';
-    const base = getMatchListViewModel();
-    const data: V1Match = {
-      id: 'qa-cost-main', title: '비용 설명 합성 매치', sportName: '풋살', placeName: '합성 구장',
-      startsAt: '2080-10-03T09:00:00.000Z', capacityText: '1/2명', capacity: 2,
-      participantCount: 1, status: 'recruiting', levelLabel: '입문·초급', genderRule: '남',
-      imageUrl: '/mock/generated/futsal-rooftop.webp', costNote,
-    };
-    const card = toMatchCard(data, base.matches[0]);
-    return { ...base, matches: [card], nearbyMatches: [{ ...card, id: 'qa-cost-nearby', image: null }] };
-  }
-
-  function expectMetadata(container: HTMLElement, model: ReturnType<typeof list>, raw: string | null) {
-    const card = model.matches[0];
-    const note = raw ? `참가비 설명: ${raw}` : null;
-    const row = container.querySelector<HTMLElement>('.tm-match-row');
-    expect(row).not.toBeNull();
-    expect(within(row!).getByText([card.sport, card.level, card.gender, note].filter(Boolean).join(' · '))).toBeInTheDocument();
-    const rails = container.querySelectorAll<HTMLElement>('.tm-match-list-card');
-    expect(rails).toHaveLength(2);
-    for (const rail of rails) expect(within(rail).getByText([card.level, card.gender, note].filter(Boolean).join(' · '))).toBeInTheDocument();
-    expect(container.textContent?.match(/참가비 설명:/g)?.length ?? 0).toBe(raw ? 3 : 0);
-    const from = '/matches?q=qa&sportId=futsal';
-    for (const link of container.querySelectorAll<HTMLAnchorElement>('.tm-match-row, .tm-match-list-card')) {
-      expect(link.getAttribute('href')).toContain(`from=${encodeURIComponent(from)}`);
-    }
-  }
-
-  it.each(['10000', '10,000원/1인', '무료', '구장비 현장 정산', 'USD 10'])('행·사진·인접 레일에 라벨과 %s 원문을 보존한다', (raw) => {
-    const model = list(raw);
-    const { container } = render(<MatchListPageView model={model} />);
-    expectMetadata(container, model, raw);
-    expect(model.matches[0].costNote).toBe(raw);
-    if (raw === '10000') expect(container.textContent).not.toContain('10,000원');
-  });
-
-  it.each([null, ''])('값 %s는 라벨·단위·무료로 대체하지 않는다', (raw) => {
-    const model = list(raw);
-    const { container } = render(<MatchListPageView model={model} />);
-    expectMetadata(container, model, raw);
-    expect(container.textContent).not.toContain('무료');
-  });
-
-  it('연속 데이터 갱신에서도 최신 원문과 필터 출처 링크를 유지한다', () => {
-    const first = list('10000');
-    const { container, rerender } = render(<MatchListPageView model={first} />);
-    for (const raw of ['10,000원/1인', '구장비 현장 정산', null]) {
-      const model = list(raw);
-      rerender(<QueryClientProvider client={new QueryClient()}><MatchListPageView model={model} /></QueryClientProvider>);
-      expectMetadata(container, model, raw);
-      expect(screen.getAllByText('비용 설명 합성 매치')).toHaveLength(3);
-    }
-  });
-});
 
 describe('MatchDetailPageView — closed mode (참가한 적 없는 뷰어가 마감류 매치를 볼 때)', () => {
   it('참가 확정 배너/문구를 보여주지 않는다', () => {
@@ -897,5 +837,65 @@ describe('MatchListPageView — 상세로 가는 카드는 지금 목록(검색�
     const { container } = render(<MatchListPageView model={listWithNearby()} />);
 
     expect(matchHrefs(container)).toEqual(['/matches/m-a', '/matches/m-b', '/matches/m-b', '/matches/m-n']);
+  });
+});
+
+describe('MatchListPageView — 참가비 자유 입력의 의미와 원문 (#1586)', () => {
+  afterEach(() => { navState.pathname = '/matches/match-4'; navState.search = ''; });
+
+  function list(costNote: string | null) {
+    navState.pathname = '/matches';
+    navState.search = 'q=qa&sportId=futsal';
+    const base = getMatchListViewModel();
+    const data: V1Match = {
+      id: 'qa-cost-main', title: '비용 설명 합성 매치', sportName: '풋살', placeName: '합성 구장',
+      startsAt: '2080-10-03T09:00:00.000Z', capacityText: '1/2명', capacity: 2,
+      participantCount: 1, status: 'recruiting', levelLabel: '입문·초급', genderRule: '남',
+      imageUrl: '/mock/generated/futsal-rooftop.webp', costNote,
+    };
+    const card = toMatchCard(data, base.matches[0]);
+    return { ...base, matches: [card], nearbyMatches: [{ ...card, id: 'qa-cost-nearby', image: null }] };
+  }
+
+  function expectMetadata(container: HTMLElement, model: ReturnType<typeof list>, raw: string | null) {
+    const card = model.matches[0];
+    const note = raw ? `참가비 설명: ${raw}` : null;
+    const row = container.querySelector<HTMLElement>('.tm-match-row');
+    expect(row).not.toBeNull();
+    expect(within(row!).getByText([card.sport, card.level, card.gender, note].filter(Boolean).join(' · '))).toBeInTheDocument();
+    const rails = container.querySelectorAll<HTMLElement>('.tm-match-list-card');
+    expect(rails).toHaveLength(2);
+    for (const rail of rails) expect(within(rail).getByText([card.level, card.gender, note].filter(Boolean).join(' · '))).toBeInTheDocument();
+    expect(container.textContent?.match(/참가비 설명:/g)?.length ?? 0).toBe(raw ? 3 : 0);
+    const from = '/matches?q=qa&sportId=futsal';
+    for (const link of container.querySelectorAll<HTMLAnchorElement>('.tm-match-row, .tm-match-list-card')) {
+      expect(link.getAttribute('href')).toContain(`from=${encodeURIComponent(from)}`);
+    }
+  }
+
+  it.each(['10000', '10,000원/1인', '무료', '구장비 현장 정산', 'USD 10'])('행·사진·인접 레일에 라벨과 %s 원문을 보존한다', (raw) => {
+    const model = list(raw);
+    const { container } = render(<MatchListPageView model={model} />);
+    expectMetadata(container, model, raw);
+    expect(model.matches[0].costNote).toBe(raw);
+    if (raw === '10000') expect(container.textContent).not.toContain('10,000원');
+  });
+
+  it.each([null, ''])('값 %s는 라벨·단위·무료로 대체하지 않는다', (raw) => {
+    const model = list(raw);
+    const { container } = render(<MatchListPageView model={model} />);
+    expectMetadata(container, model, raw);
+    expect(container.textContent).not.toContain('무료');
+  });
+
+  it('연속 데이터 갱신에서도 최신 원문과 필터 출처 링크를 유지한다', () => {
+    const first = list('10000');
+    const { container, rerender } = render(<MatchListPageView model={first} />);
+    for (const raw of ['10,000원/1인', '구장비 현장 정산', null]) {
+      const model = list(raw);
+      rerender(<QueryClientProvider client={new QueryClient()}><MatchListPageView model={model} /></QueryClientProvider>);
+      expectMetadata(container, model, raw);
+      expect(screen.getAllByText('비용 설명 합성 매치')).toHaveLength(3);
+    }
   });
 });

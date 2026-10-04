@@ -98,3 +98,9 @@ API/DTO/schema/mapper/filter/eligibility/작성/편집/저장 계약, #1587/#158
 - Root `pnpm --filter v1_web lint`(tsc+v1-pattern) 1회 PASS. 필수 aggregate gates 6/6, changeset policy PASS. 정확한 4path candidate·diff check·새 marker 0 확인. 의존성 링크 2개를 제거하고 명시 commit/Ready dev PR·정확한 head CI·독립 리뷰로 이어간다.
 - Host: 직렬 검증 전 12 cores, load 6.40/5.11/4.82, memory free 67%, swap 5010.94/6144 MB, Node77/browser40; 기존 Docker8서비스 Up/6healthy. 사용자 승인 범위의 좁은 검증만 worker1로 실행했고 다른 프로세스·서비스를 건드리지 않았다.
 - 실제 CSS3폭의 긴 원문 줄바꿈/겹침·실제 Back/Forward/연속 필터 입력·console/network·정확한 alpha after는 미검증이다. 실제 비용 fixture의 matchId도 공개 증거에 없어 임의 엔티티/단위를 만들지 않았다. 별도 승인 배포 대기, issue Refs/Open 유지.
+
+## 2026-10-04 latest-dev reconciliation
+
+PR #1592 remains Ready/base dev. Its original exact-head CI and static review passed, but current dev 27a021fc7650672d5af25217108b101dc856c8d5 adds the completed-match notice regression at the same test insertion anchor. Relocate only this issue's unchanged describe group (and #1592's two imports) to avoid that textual conflict, then integrate current dev without dropping either test contract. No runtime correction or new UI choice is introduced. The other unmerged PR's feature is excluded.
+
+The original tests/CI above belong to their recorded SHA. Focused tests, lint and exact new-head CI after integration remain pending; actual alpha after remains with the parent's browser QA.

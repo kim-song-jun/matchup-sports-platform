@@ -1,5 +1,29 @@
 # v1_api
 
+## 1.2.0
+
+### Minor Changes
+
+- d782108: 대회 수동 대진관리에 12강·8강 단계를 추가하고 명시적 부전승과 사용자 결선 대진표를 지원해요. 경기별 진출 관계를 저장하고 4강·8강·12강의 카드와 부전승을 연결선으로 표시해요.
+
+  Alpha에 12팀·팀당 선수 5명 신청 확정 및 빈 대진관리 연습 대회를 최초 한 번 생성하고 이후 직접 입력한 편성을 보존해요.
+
+### Patch Changes
+
+- 1c885f4: Keep integration failure diagnostics visible while preserving deployment failure gates.
+- 238cf0b: Verify platform chat backfill with complete team match persistence fixtures.
+- c5cadcb: 플랫폼 주관 모집 생성 시 운영자 채팅방을 자동 생성하고 승인된 팀의 팀장·매니저를 추가합니다. 기존 플랫폼 매치의 누락된 채팅방과 참여자도 마이그레이션으로 보완합니다.
+- 34669e2: 팀매치 신청 화면의 팀 선택 시트와 "신청을 접수했어요" 카드에 팀 엠블럼이 제대로 보여요.
+
+  팀이 등록한 엠블럼이나 기본 제공 엠블럼이 있어도 모든 팀이 자동으로 만든 픽셀 무늬로만 보이던
+  문제를 고쳤어요. 신청 가능 여부 응답(`application-eligibility`)에 팀별 엠블럼(`logoUrl`)을 함께
+  내려주고, 화면이 그 엠블럼을 그대로 그려요. 엠블럼이 없는 팀은 지금처럼 임시 무늬가 남아요.
+
+- 24f66e5: Sync the game schema source snapshot with the additive team match list image column.
+- 55171ad: 일반·관리자 팀매치 생성과 수정에서 목록용 정사각형 이미지와 상세용 가로형 이미지를 각각 선택할 수 있습니다. 한 장만 있으면 함께 사용하고, 이미지가 없으면 종목별 기본 이미지를 표시합니다. 기존 매치 사진은 그대로 유지합니다.
+
+  마감·종료된 팀매치는 이미지와 카드 전체를 함께 어둡게 표시하며, 종료된 리그 매치에도 동일하게 적용합니다.
+
 ## 1.1.4
 
 ### Patch Changes

@@ -1,7 +1,7 @@
 {
   "issue": 1588,
   "fixPR": 1591,
-  "scope": "Read-only actual cloud Chromium alpha after on the same synthetic individual match; responsive heading visibility, host/badge spacing, keyboard Back/share, scroll and list return",
+  "scope": "Actual cloud Chromium alpha after on the same synthetic individual match; responsive heading visibility, host/badge spacing, keyboard Back/share, scroll and list return",
   "startUTC": "2026-10-04T06:35:28.002Z",
   "endUTC": "2026-10-04T06:50:42.980Z",
   "runtimeServingSHA": "unknown",
@@ -213,12 +213,24 @@
     "uploads": 0,
     "accountOrRoleChanges": 0,
     "networkOrDBAuditPerformed": false,
-    "searchInputOnly": "Synthetic QA search q entered through ordinary UI; final navigation leaves no visible edit inputs/dialogs",
-    "collectorReportedServerMutationActions": 0,
-    "publicationLimit": "Selected UI actions only; no network/database write audit."
+    "publicationLimit": "No match application/result/fixture/account-role edit action was reported. General server-write zero is withdrawn: nonempty search submission has a search-history write path in inspected source; actual HTTP/DB success and browser serving SHA remain unobserved.",
+    "searchSubmission": {
+      "query": "QA 수명주기",
+      "recordedSubmitActions": 1,
+      "startUTC": "2026-10-04T06:41:05.227Z",
+      "endUTC": "2026-10-04T06:41:05.511Z",
+      "potentialSideEffect": "Search-history POST /search/recent under the inspected source contract",
+      "actualHTTPOrDatabaseOutcome": "not observed"
+    }
   },
   "exitFile": "exit.json",
   "initialBatchEndUTC": "2026-10-04T06:45:22.220Z",
   "AXEvidenceClarification": "Original ax-excerpts.json stores diff output and some rows contain no heading. New full-ax-supplement.json separately records full AX on2026-10-04 at06:50:08.647–06:50:28.553UTC, H2/H2/H1 at402/788/1182CSS. Do not backdate these to original PNG/DOM times. No screen-reader speech test. Safe supplement contains selected excerpts derived from full AX snapshots, not complete raw trees; exhaustive extraction cannot be independently reconstructed.",
-  "finalExit": "full-ax-supplement.json.exit"
+  "finalExit": "full-ax-supplement.json.exit",
+  "safetyCorrection": {
+    "file": "SEARCH-SIDE-EFFECT-CORRECTION.md",
+    "sourceVerification": "search-write-source-verification.json",
+    "originalEvidenceCommit": "8f819519a6c68c5aa8ba15ca4d7261244ab17ea3",
+    "newUIExecution": false
+  }
 }

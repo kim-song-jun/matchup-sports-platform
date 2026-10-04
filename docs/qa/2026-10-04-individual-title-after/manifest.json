@@ -2,8 +2,13 @@
   "files": [
     {
       "file": "README.md",
-      "bytes": 10986,
-      "sha256": "472320ac4c9988a7f3fc51aa050189b0c6b76d5793db1d758226d62ef3f82e99"
+      "bytes": 11526,
+      "sha256": "58f88a00fc5ab6bc28658528c41597e42a43b247b9678d5ae953030cbcf648c1"
+    },
+    {
+      "file": "SEARCH-SIDE-EFFECT-CORRECTION.md",
+      "bytes": 4601,
+      "sha256": "75eb618302e9e32cc02ed9d9d88b06be57cb14776349d27fb629c9f33fc2f8af"
     },
     {
       "file": "actions.json",
@@ -82,8 +87,13 @@
     },
     {
       "file": "provenance.json",
-      "bytes": 13411,
-      "sha256": "5a4482cd6a68d95fd08ee74dba6f914201667a005baf6fdbebef86a82c6b44d8"
+      "bytes": 13981,
+      "sha256": "02ae51039beb8fe15848d1f44a673010e8bf3e7d352a8b1d4b9390de71401232"
+    },
+    {
+      "file": "search-write-source-verification.json",
+      "bytes": 7595,
+      "sha256": "3d00007c1ce4a4b642fcab9b20c3c673c77fcd760497f0b1bb64834b28f4849f"
     },
     {
       "file": "source-manifest.json",
@@ -92,8 +102,8 @@
     },
     {
       "file": "summary.json",
-      "bytes": 8260,
-      "sha256": "a470cfcf0d0ed62e4669d7118fc0edf6884210f8a50ea510f88c87592d517a38"
+      "bytes": 8863,
+      "sha256": "cfb2ec7f796e55cdf0cdc2f81dbde18372612820c8dee9c1550827a92f0592ad"
     },
     {
       "file": "tablet-share-focus.png",
@@ -111,5 +121,5 @@
       "sha256": "ba5319ba10a8059e024bc578cd67d74d3061a2ac3002fe9c811e9b5518a5dcdf"
     }
   ],
-  "note": "Public projected files, excludes this manifest. source-manifest.json describes original safe inputs."
+  "note": "Current corrected public file hashes; original source snapshots remain in source-manifest.json. Excludes this manifest."
 }

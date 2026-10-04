@@ -372,5 +372,16 @@
   ],
   "publicationProjection": "Original safe inputs unchanged. Fixture/region UUIDs consistently pseudonymized in public JSON. Action27 original intent retained with actual destination. Summary and deployment attribution narrowed. source-manifest.json retains original source-file hashes; manifest.json covers public files.",
   "hashFieldMeaning": "Each screenshots[].sha256/sourceSHA256 hashes the private source screenshot; outputSHA256 hashes the safe PNG delivered here. Only output hashes were independently verified.",
-  "publisherReview": "All7 safe PNGs and2 already-public historical title crops viewed; output hashes/dimensions/mappings checked. Private originals/capture metadata not read, pixelEquality remains collector attestation."
+  "publisherReview": "All7 safe PNGs and2 already-public historical title crops viewed; output hashes/dimensions/mappings checked. Private originals/capture metadata not read, pixelEquality remains collector attestation.",
+  "publicationCorrections": [
+    {
+      "supersededCommit": "8f819519a6c68c5aa8ba15ca4d7261244ab17ea3",
+      "scope": "Search side-effect attribution only",
+      "changes": [
+        "README and summary retract general server-write-zero/read-only characterization",
+        "New correction/source verification documents"
+      ],
+      "preserved": "All original safe source inputs and public PNG, DOM, AX, action, capture-time bytes remain unchanged. Existing sourceInputFiles/source-manifest refer to original snapshots, not corrected public metadata."
+    }
+  ]
 }

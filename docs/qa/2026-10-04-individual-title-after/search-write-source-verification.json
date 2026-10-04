@@ -1,0 +1,173 @@
+{
+  "scope": "Correction of search side-effect attribution only; no new browser execution",
+  "supersedesEvidenceCommit": "8f819519a6c68c5aa8ba15ca4d7261244ab17ea3",
+  "verifiedUTC": "2026-10-04T07:15:11.433084+00:00",
+  "withdrawnClaim": {
+    "field": "summary.safety.collectorReportedServerMutationActions",
+    "previousValue": 0,
+    "reason": "The run includes an actual nonempty search submission; both relevant source versions wire it to search-history POST. A zero count across all server mutations is unsupported."
+  },
+  "observedUI": {
+    "actionIndex": 33,
+    "startUTC": "2026-10-04T06:41:05.227Z",
+    "endUTC": "2026-10-04T06:41:05.511Z",
+    "query": "QA 수명주기",
+    "evidence": "Existing immutable actions and list DOM; unchanged"
+  },
+  "staticContract": {
+    "originalDeploymentContextCommit": "606977780cd758b20b23cd78614a9693098153fa",
+    "laterInspectedCommit": "5372ea9c3640621eb270d15c54c70a822b97d536",
+    "clientAndHookFullContentsIdenticalAcrossBoth": true,
+    "chain": [
+      "Search submit button/form -> search.onSubmit",
+      "submitSearch trims q; nonempty q calls recordSearch.mutate",
+      "useV1RecordSearch mutationFn -> v1Post /search/recent",
+      "v1Post -> method POST",
+      "SearchController POST recent -> SearchService.record",
+      "After identity/query validation, service may update or create a search-history row; create branch can prune overflow beyond20"
+    ]
+  },
+  "runtimeLimits": {
+    "browserServingSHA": "unknown",
+    "actualHTTPRequestObserved": false,
+    "HTTPResponseOrSuccessObserved": false,
+    "databaseOutcomeObserved": false,
+    "searchHistoryWritePossible": true,
+    "searchHistoryPersistenceConfirmed": false,
+    "replayOrCleanupPerformed": false
+  },
+  "preservedBoundedClaim": "No match application, result, fixture or account/role edit action was performed in the selected UI sequence according to collector; this does not establish global server-write zero.",
+  "sourceRecords": [
+    {
+      "commit": "606977780cd758b20b23cd78614a9693098153fa",
+      "path": "apps/v1_web/src/components/matches/matches-client.tsx",
+      "gitBlobSHA": "beaad5aae239ef379456604227988ccd1108366b",
+      "fullContentSHA256": "418cadd8870d3475e3dbe3880a2681568b993e4760b0c54f2f9b32513305f136",
+      "fullContentBytes": 34189,
+      "links": [
+        {
+          "startLine": 223,
+          "endLine": 232,
+          "url": "https://github.com/kim-song-jun/matchup-sports-platform/blob/606977780cd758b20b23cd78614a9693098153fa/apps/v1_web/src/components/matches/matches-client.tsx#L223"
+        },
+        {
+          "startLine": 170,
+          "endLine": 177,
+          "url": "https://github.com/kim-song-jun/matchup-sports-platform/blob/606977780cd758b20b23cd78614a9693098153fa/apps/v1_web/src/components/matches/matches-client.tsx#L170"
+        }
+      ]
+    },
+    {
+      "commit": "606977780cd758b20b23cd78614a9693098153fa",
+      "path": "apps/v1_web/src/hooks/use-v1-api.ts",
+      "gitBlobSHA": "e31bba3e9d671f59c39e95493e79bbbe731c0e2c",
+      "fullContentSHA256": "a3bcd67495a1b5023d7db8bc83cce633e5c293bf5654f46406c8b18e4f27b45a",
+      "fullContentBytes": 247568,
+      "links": [
+        {
+          "startLine": 591,
+          "endLine": 597,
+          "url": "https://github.com/kim-song-jun/matchup-sports-platform/blob/606977780cd758b20b23cd78614a9693098153fa/apps/v1_web/src/hooks/use-v1-api.ts#L591"
+        }
+      ]
+    },
+    {
+      "commit": "5372ea9c3640621eb270d15c54c70a822b97d536",
+      "path": "apps/v1_web/src/components/matches/matches-client.tsx",
+      "gitBlobSHA": "beaad5aae239ef379456604227988ccd1108366b",
+      "fullContentSHA256": "418cadd8870d3475e3dbe3880a2681568b993e4760b0c54f2f9b32513305f136",
+      "fullContentBytes": 34189,
+      "links": [
+        {
+          "startLine": 223,
+          "endLine": 232,
+          "url": "https://github.com/kim-song-jun/matchup-sports-platform/blob/5372ea9c3640621eb270d15c54c70a822b97d536/apps/v1_web/src/components/matches/matches-client.tsx#L223"
+        },
+        {
+          "startLine": 170,
+          "endLine": 177,
+          "url": "https://github.com/kim-song-jun/matchup-sports-platform/blob/5372ea9c3640621eb270d15c54c70a822b97d536/apps/v1_web/src/components/matches/matches-client.tsx#L170"
+        }
+      ]
+    },
+    {
+      "commit": "5372ea9c3640621eb270d15c54c70a822b97d536",
+      "path": "apps/v1_web/src/hooks/use-v1-api.ts",
+      "gitBlobSHA": "e31bba3e9d671f59c39e95493e79bbbe731c0e2c",
+      "fullContentSHA256": "a3bcd67495a1b5023d7db8bc83cce633e5c293bf5654f46406c8b18e4f27b45a",
+      "fullContentBytes": 247568,
+      "links": [
+        {
+          "startLine": 591,
+          "endLine": 597,
+          "url": "https://github.com/kim-song-jun/matchup-sports-platform/blob/5372ea9c3640621eb270d15c54c70a822b97d536/apps/v1_web/src/hooks/use-v1-api.ts#L591"
+        }
+      ]
+    },
+    {
+      "commit": "606977780cd758b20b23cd78614a9693098153fa",
+      "path": "apps/v1_api/src/search/search.controller.ts",
+      "gitBlobSHA": "416d6e977c69efae8ff8095669f38a57788d5d70",
+      "fullContentSHA256": "13698691a10643f176b24606ae17f821363790319c58221c649b22d0cf2c64bf",
+      "fullContentBytes": 1184,
+      "links": [
+        {
+          "startLine": 22,
+          "endLine": 29,
+          "url": "https://github.com/kim-song-jun/matchup-sports-platform/blob/606977780cd758b20b23cd78614a9693098153fa/apps/v1_api/src/search/search.controller.ts#L22"
+        }
+      ]
+    },
+    {
+      "commit": "606977780cd758b20b23cd78614a9693098153fa",
+      "path": "apps/v1_api/src/search/search.service.ts",
+      "gitBlobSHA": "5cf413f715e164f70439769dc83a387b7ad53f18",
+      "fullContentSHA256": "1fbd3fe6e26408b2b566e94a36277f64daee459d58eea4992c0c916dcbd93913",
+      "fullContentBytes": 3624,
+      "links": [
+        {
+          "startLine": 39,
+          "endLine": 60,
+          "url": "https://github.com/kim-song-jun/matchup-sports-platform/blob/606977780cd758b20b23cd78614a9693098153fa/apps/v1_api/src/search/search.service.ts#L39"
+        },
+        {
+          "startLine": 62,
+          "endLine": 104,
+          "url": "https://github.com/kim-song-jun/matchup-sports-platform/blob/606977780cd758b20b23cd78614a9693098153fa/apps/v1_api/src/search/search.service.ts#L62"
+        }
+      ]
+    },
+    {
+      "commit": "606977780cd758b20b23cd78614a9693098153fa",
+      "path": "apps/v1_web/src/lib/api-client.ts",
+      "gitBlobSHA": "dcb9733d0458d58deaecf8f3d1a8ef5a59a3492f",
+      "fullContentSHA256": "9f5545c3bb5e70431ca24c7e12f49c0e942451ef398f74a4434de98446c51221",
+      "fullContentBytes": 12670,
+      "links": [
+        {
+          "startLine": 189,
+          "endLine": 191,
+          "url": "https://github.com/kim-song-jun/matchup-sports-platform/blob/606977780cd758b20b23cd78614a9693098153fa/apps/v1_web/src/lib/api-client.ts#L189"
+        }
+      ]
+    },
+    {
+      "commit": "606977780cd758b20b23cd78614a9693098153fa",
+      "path": "apps/v1_web/src/components/matches/matches-page.tsx",
+      "gitBlobSHA": "6455bee807cb3b853e9f81b6ce405af931aec0d7",
+      "fullContentSHA256": "43457545e5a20fcd13ae54023c29b0cef7ba066bc35e2d54f1aca12c09fbe6ae",
+      "fullContentBytes": 80445,
+      "links": [
+        {
+          "startLine": 690,
+          "endLine": 711,
+          "url": "https://github.com/kim-song-jun/matchup-sports-platform/blob/606977780cd758b20b23cd78614a9693098153fa/apps/v1_web/src/components/matches/matches-page.tsx#L690"
+        }
+      ]
+    }
+  ],
+  "artifactIntegrity": {
+    "all7PNGAndDOMActionFilesUnchanged": true,
+    "newBrowserObservations": 0
+  }
+}

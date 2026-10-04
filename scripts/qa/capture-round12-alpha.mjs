@@ -27,6 +27,9 @@ try {
     await page.goto(`${base}/tournaments/${tournament.id}/bracket`, { waitUntil: 'domcontentloaded' });
     await page.waitForFunction(() => document.body.innerText.includes('대진'), { timeout: 20000 });
     await page.waitForTimeout(1500);
+    await page.getByRole('tab', { name: '순위 · 대진표', exact: true }).click();
+    await page.waitForFunction(() => Array.from(document.querySelectorAll('[role=tab]')).some((tab) => tab.textContent === '순위 · 대진표' && tab.getAttribute('aria-selected') === 'true'));
+    await page.waitForTimeout(1500);
     await page.screenshot({ path: `${output}/${name}.png`, fullPage: true });
     evidence.push({ name, width, height, url: page.url(), errors, failedRequests, overflow: await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth) });
     await page.close();

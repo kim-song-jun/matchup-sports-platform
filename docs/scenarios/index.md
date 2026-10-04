@@ -1,6 +1,6 @@
 ## 2026-10-04 — 12강·8강 수동 대진 관리
 
-[작업 문서](../../.github/tasks/20261004-tournament-round12-quarter.md): 관리자 정식 단계·부전승 저장·사용자 결선 표시 확장. 회귀 및 alpha 배포/3폭 QA 진행 중. 실제 대회 데이터 변경 없음.
+[작업 문서](../../.github/tasks/20261004-tournament-round12-quarter.md): 관리자 정식 단계·부전승 저장·사용자 결선 표시 확장. API 128/128·Web 64/64, 실제 PostgreSQL 통합 1/1, 192 migration 재생·드리프트 0. 원격 push가 자동 승인 검토에서 차단되어 PR/alpha 배포 및 변경 후 3폭 QA는 미실행. 실제 대회 데이터 변경 없음.
 
 # Teameet QA Scenario Index
 

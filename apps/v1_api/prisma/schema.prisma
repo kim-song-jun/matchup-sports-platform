@@ -2542,9 +2542,9 @@ enum V1TournamentPlayerEligibility {
 }
 
 enum V1TournamentGroupPhase {
+  group
   round12
   quarter
-  group
   semi
   final
   third_place

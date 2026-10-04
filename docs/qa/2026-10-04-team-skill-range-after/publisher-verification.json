@@ -1,0 +1,328 @@
+{
+  "verifiedUTC": "2026-10-04T10:09:34.327109+00:00",
+  "inputFiles": 25,
+  "inputByteIdentical": true,
+  "inputChecksumsSHA256": "876c2b0a28a76db157aa1b3c651f7fb4ec18651960199ff31585430cbbbf854a",
+  "counts": {
+    "mainDOM": 41,
+    "conditionSnapshots": 34,
+    "repeatedSelectRecords": 68,
+    "completedSelectedActionCalls": 58,
+    "PNG": 8,
+    "rectangleRecordsRecomputed": 170,
+    "optionListsRecorded": 28
+  },
+  "matrix": [
+    {
+      "width": 402,
+      "height": 606,
+      "unset": 1,
+      "same": 2,
+      "partial": 3,
+      "minCrossing": 4,
+      "maxCrossing": 5,
+      "keyboardValues": [
+        6,
+        7
+      ],
+      "keyboardForwardReverse": [
+        10,
+        11
+      ],
+      "roundTripPreservation": 9,
+      "restoreSettled": 13,
+      "sameValues": [
+        "novice",
+        "novice"
+      ],
+      "partialValues": [
+        "novice",
+        "intermediate"
+      ],
+      "minimumCrossingValues": [
+        "advanced",
+        "advanced"
+      ],
+      "maximumCrossingValues": [
+        "beginner",
+        "beginner"
+      ],
+      "roundTripValues": [
+        "novice",
+        "intermediate"
+      ],
+      "restoredValues": [
+        "",
+        ""
+      ]
+    },
+    {
+      "width": 788,
+      "height": 505,
+      "unset": 14,
+      "same": 15,
+      "partial": 16,
+      "minCrossing": 17,
+      "maxCrossing": 18,
+      "keyboardForwardReverse": [
+        19,
+        20
+      ],
+      "roundTripPreservation": 22,
+      "restore": 23,
+      "sameValues": [
+        "novice",
+        "novice"
+      ],
+      "partialValues": [
+        "novice",
+        "intermediate"
+      ],
+      "minimumCrossingValues": [
+        "advanced",
+        "advanced"
+      ],
+      "maximumCrossingValues": [
+        "beginner",
+        "beginner"
+      ],
+      "roundTripValues": [
+        "novice",
+        "intermediate"
+      ],
+      "restoredValues": [
+        "",
+        ""
+      ]
+    },
+    {
+      "width": 1182,
+      "height": 757,
+      "unset": 24,
+      "same": 25,
+      "partial": 26,
+      "minCrossing": 27,
+      "maxCrossing": 28,
+      "keyboardForwardReverse": [
+        29,
+        30
+      ],
+      "fullRange": 31,
+      "roundTripPreservation": 33,
+      "freshReloadPreservation": 34,
+      "restore": 35,
+      "freshUnsetReload": 36,
+      "sameValues": [
+        "novice",
+        "novice"
+      ],
+      "partialValues": [
+        "novice",
+        "intermediate"
+      ],
+      "minimumCrossingValues": [
+        "advanced",
+        "advanced"
+      ],
+      "maximumCrossingValues": [
+        "beginner",
+        "beginner"
+      ],
+      "roundTripValues": [
+        "beginner",
+        "advanced"
+      ],
+      "restoredValues": [
+        "",
+        ""
+      ]
+    }
+  ],
+  "images": [
+    {
+      "file": "mobile-unset.png",
+      "proofIndex": 1,
+      "DOMUTC": "2026-10-04T09:50:01.041Z",
+      "captureStartUTC": "2026-10-04T09:50:01.046Z",
+      "captureEndUTC": "2026-10-04T09:50:01.067Z",
+      "pixels": [
+        374,
+        144
+      ],
+      "sourcePixels": [
+        402,
+        606
+      ],
+      "sha256": "1a3126ecdf6e79fc643f6c199a285936b98d039e876041c020a6fd0f018f3b8d",
+      "sourceCropEquality": "collector attestation; private original not opened"
+    },
+    {
+      "file": "mobile-partial.png",
+      "proofIndex": 3,
+      "DOMUTC": "2026-10-04T09:50:37.216Z",
+      "captureStartUTC": "2026-10-04T09:50:37.220Z",
+      "captureEndUTC": "2026-10-04T09:50:37.243Z",
+      "pixels": [
+        374,
+        144
+      ],
+      "sourcePixels": [
+        402,
+        606
+      ],
+      "sha256": "97d0f0e9c42924a4b8ee2d221c058538f0bea3f00d45ccc1d21dc8815c3ba816",
+      "sourceCropEquality": "collector attestation; private original not opened"
+    },
+    {
+      "file": "mobile-restored.png",
+      "proofIndex": 13,
+      "DOMUTC": "2026-10-04T09:54:59.731Z",
+      "captureStartUTC": "2026-10-04T09:54:59.735Z",
+      "captureEndUTC": "2026-10-04T09:54:59.804Z",
+      "pixels": [
+        374,
+        145
+      ],
+      "sourcePixels": [
+        402,
+        606
+      ],
+      "sha256": "84a7f1ff27a2191080d6d0da55b8cb1341bf2eecd07bf46fdcb44e3a9d2377e6",
+      "sourceCropEquality": "collector attestation; private original not opened"
+    },
+    {
+      "file": "tablet-unset.png",
+      "proofIndex": 14,
+      "DOMUTC": "2026-10-04T09:55:05.341Z",
+      "captureStartUTC": "2026-10-04T09:55:05.349Z",
+      "captureEndUTC": "2026-10-04T09:55:05.431Z",
+      "pixels": [
+        572,
+        145
+      ],
+      "sourcePixels": [
+        788,
+        505
+      ],
+      "sha256": "d7a7b546d793f9bb4bb40830c1a2eb6ae2a1c34da4dccdae529ca0366b279932",
+      "sourceCropEquality": "collector attestation; private original not opened"
+    },
+    {
+      "file": "tablet-partial-keyboard.png",
+      "proofIndex": 20,
+      "DOMUTC": "2026-10-04T09:55:46.150Z",
+      "captureStartUTC": "2026-10-04T09:55:46.153Z",
+      "captureEndUTC": "2026-10-04T09:55:46.228Z",
+      "pixels": [
+        572,
+        144
+      ],
+      "sourcePixels": [
+        788,
+        505
+      ],
+      "sha256": "bce1706aa05ede1cd57f3d0158b03b7fb3f5bd8a3143d63400ba674d571d4c9f",
+      "sourceCropEquality": "collector attestation; private original not opened"
+    },
+    {
+      "file": "desktop-unset.png",
+      "proofIndex": 24,
+      "DOMUTC": "2026-10-04T09:56:12.079Z",
+      "captureStartUTC": "2026-10-04T09:56:12.084Z",
+      "captureEndUTC": "2026-10-04T09:56:12.168Z",
+      "pixels": [
+        532,
+        144
+      ],
+      "sourcePixels": [
+        1182,
+        757
+      ],
+      "sha256": "36e1f27f959917ae40911c0e29346c2502a2e000152767564e8d078ec741687b",
+      "sourceCropEquality": "collector attestation; private original not opened"
+    },
+    {
+      "file": "desktop-partial-keyboard.png",
+      "proofIndex": 30,
+      "DOMUTC": "2026-10-04T09:56:50.162Z",
+      "captureStartUTC": "2026-10-04T09:56:50.166Z",
+      "captureEndUTC": "2026-10-04T09:56:50.240Z",
+      "pixels": [
+        532,
+        144
+      ],
+      "sourcePixels": [
+        1182,
+        757
+      ],
+      "sha256": "f3615c184cd50a936b5536962301da87d3483b006ff374eedc65607f5233b579",
+      "sourceCropEquality": "collector attestation; private original not opened"
+    },
+    {
+      "file": "desktop-full-range-reload.png",
+      "proofIndex": 34,
+      "DOMUTC": "2026-10-04T09:57:35.296Z",
+      "captureStartUTC": "2026-10-04T09:57:35.302Z",
+      "captureEndUTC": "2026-10-04T09:57:35.386Z",
+      "pixels": [
+        532,
+        144
+      ],
+      "sourcePixels": [
+        1182,
+        757
+      ],
+      "sha256": "6174fe5fd4f77b2e0ea512a9287480b9768e72374c59e3ea96bbb54761d8392b",
+      "sourceCropEquality": "collector attestation; private original not opened"
+    }
+  ],
+  "sourceFilesGitBlobsMatched": [
+    {
+      "path": "apps/v1_web/src/components/team-matches/team-match-level-range-field.tsx",
+      "sha": "f8588ccb5bbfcf6d72bd68cf7c626c27234c68e9"
+    },
+    {
+      "path": "apps/v1_web/src/components/team-matches/team-matches-create-client.tsx",
+      "sha": "2b594b0310da0a1ff2094d0ca1a138cfb0d582cb"
+    },
+    {
+      "path": "apps/v1_web/src/components/team-matches/team-matches-page.tsx",
+      "sha": "b1f46a0792e19b7127262b0d8ad53c562c422185"
+    }
+  ],
+  "deploymentWorkflows": {
+    "initial": {
+      "sha": "19e192d577544b26986799a47f76e8b259a1a8e2",
+      "status": "completed",
+      "conclusion": "success",
+      "updatedUTC": "2026-10-04T09:40:35Z",
+      "url": "https://github.com/kim-song-jun/matchup-sports-platform/actions/runs/37192161237"
+    },
+    "later": {
+      "sha": "951a67e3423dec502697f8bab2d78696d9374cc5",
+      "status": "completed",
+      "conclusion": "success",
+      "updatedUTC": "2026-10-04T09:49:29Z",
+      "url": "https://github.com/kim-song-jun/matchup-sports-platform/actions/runs/37192728828"
+    }
+  },
+  "runtimeServingSHA": "unknown",
+  "fullBeginnerAdvancedRangeOnlyDesktop": true,
+  "finalCreateOrSaveTested": false,
+  "editOrAdminCreateTested": false,
+  "malformedInjectionTested": false,
+  "storageBytesRestored": false,
+  "mobileIntermediateRouteSavedInProof": false,
+  "finalState": {
+    "titleFieldPresent": false,
+    "url": "https://alpha.teameet.co.kr/team-matches",
+    "utc": "2026-10-04T09:58:48.774Z",
+    "viewport": {
+      "dpr": 1,
+      "h": 757,
+      "w": 1182
+    },
+    "visibleDialogs": 0
+  },
+  "scope": "Safe prepared files only; original source captures and original safe JSON not opened. Values and layout scoped to recorded endpoints; source and collector reports separately attributed."
+}

@@ -1,0 +1,119 @@
+{
+  "files": [
+    {
+      "file": "README.md",
+      "bytes": 2353,
+      "sha256": "a9b3f13ad698a2dab15084c3bf92558f9f4979164784fcd35aa4e9ab58246dc6"
+    },
+    {
+      "file": "actions.json",
+      "bytes": 8706,
+      "sha256": "64914ddf280d2c2417d6fa35ecd27c8e353ce784d552082e1dc5b788554b5115"
+    },
+    {
+      "file": "collector-scope-notes.json",
+      "bytes": 3167,
+      "sha256": "8a60b7c1712e460e57b8303492028c527a73f4d822ebf218d5d9f92d7a13bb7b"
+    },
+    {
+      "file": "coverage.json",
+      "bytes": 896,
+      "sha256": "7a01958d270dddc50f657f6433fe43583d668c6a281cd73cb95c9f261360fffa"
+    },
+    {
+      "file": "crop-provenance.json",
+      "bytes": 5328,
+      "sha256": "2a82b43bd4a9d490cdf69f46d5f1d660b38670e00238416f298d896a7f4b6752"
+    },
+    {
+      "file": "deployment-context.json",
+      "bytes": 1729,
+      "sha256": "a28d3028b6522d3ae6b92785b4fbf4132185f563fb3fe44686bf555ad792f73f"
+    },
+    {
+      "file": "desktop-full-range-reload.png",
+      "bytes": 13633,
+      "sha256": "6174fe5fd4f77b2e0ea512a9287480b9768e72374c59e3ea96bbb54761d8392b"
+    },
+    {
+      "file": "desktop-partial-keyboard.png",
+      "bytes": 18247,
+      "sha256": "f3615c184cd50a936b5536962301da87d3483b006ff374eedc65607f5233b579"
+    },
+    {
+      "file": "desktop-unset.png",
+      "bytes": 14826,
+      "sha256": "36e1f27f959917ae40911c0e29346c2502a2e000152767564e8d078ec741687b"
+    },
+    {
+      "file": "exit.json",
+      "bytes": 209,
+      "sha256": "bbc83d7c9969ab30ed61fdf3f796a74296346e67c0c6e0873a7581a80000f56d"
+    },
+    {
+      "file": "geometry-and-values.json",
+      "bytes": 4583,
+      "sha256": "a823e6ecf3f7bf9a94ac15deb4a0ee81c619ff06ebec42313065305cd04a775d"
+    },
+    {
+      "file": "info-next-note.json",
+      "bytes": 698,
+      "sha256": "2fee197ac9cc82a43124324a0177be856cb55dad74566983bd32f56a63e351ea"
+    },
+    {
+      "file": "initial-info.json",
+      "bytes": 964,
+      "sha256": "d460ff71796ac23eaa1470f8d2902e0f1ef8008be9bb9c8764b3f6f648eebc09"
+    },
+    {
+      "file": "leave-dialog.json",
+      "bytes": 372,
+      "sha256": "5b7e14bd5dd0c4045209700f28356b221c1e1ddd493e90984880d985835b693a"
+    },
+    {
+      "file": "mobile-partial.png",
+      "bytes": 13631,
+      "sha256": "97d0f0e9c42924a4b8ee2d221c058538f0bea3f00d45ccc1d21dc8815c3ba816"
+    },
+    {
+      "file": "mobile-restored.png",
+      "bytes": 20129,
+      "sha256": "84a7f1ff27a2191080d6d0da55b8cb1341bf2eecd07bf46fdcb44e3a9d2377e6"
+    },
+    {
+      "file": "mobile-unset.png",
+      "bytes": 14689,
+      "sha256": "1a3126ecdf6e79fc643f6c199a285936b98d039e876041c020a6fd0f018f3b8d"
+    },
+    {
+      "file": "proof.json",
+      "bytes": 109718,
+      "sha256": "dbc3084abc7f8a4941f9f5da04f6f1980babd0494981b05445272677e5c11a4e"
+    },
+    {
+      "file": "provenance.json",
+      "bytes": 1486,
+      "sha256": "f671414417c20fc1812faf590b22a1ffa484dd3704d503e33228f74ce8fba910"
+    },
+    {
+      "file": "source-contract.json",
+      "bytes": 1761,
+      "sha256": "2a8c46893012ed803fb804a175d63e0f4a398dca01f5a7b264c347f0bba250b6"
+    },
+    {
+      "file": "summary.json",
+      "bytes": 3570,
+      "sha256": "fa18b7d6b0d6f7784a06276ea832cea7c80df02b14251871a3d15e392ecaae58"
+    },
+    {
+      "file": "tablet-partial-keyboard.png",
+      "bytes": 17556,
+      "sha256": "bce1706aa05ede1cd57f3d0158b03b7fb3f5bd8a3143d63400ba674d571d4c9f"
+    },
+    {
+      "file": "tablet-unset.png",
+      "bytes": 19690,
+      "sha256": "d7a7b546d793f9bb4bb40830c1a2eb6ae2a1c34da4dccdae529ca0366b279932"
+    }
+  ]
+}

@@ -1,0 +1,99 @@
+{
+  "scope": "PR1602 / issue1599 creation-only local range after; not full create/edit/save acceptance",
+  "firstNavigation": {
+    "label": "fresh team creation info navigation after reported19e192 deployment",
+    "startUTC": "2026-10-04T09:42:14.048Z",
+    "endUTC": "2026-10-04T09:42:19.353Z"
+  },
+  "endUTC": "2026-10-04T09:58:48.774Z",
+  "counts": {
+    "DOM": 41,
+    "completedActionRecords": 58,
+    "safePNGs": 8
+  },
+  "observed": "Three widths expose paired native minimum/maximum controls and the visible unset option. Same-level, partial range, both crossing directions, ArrowDown and select-to-select Tab/ShiftTab, local Next/Previous preservation and reset are observed. Desktop full range survives a fresh document reload.",
+  "widths": [
+    {
+      "width": 402,
+      "height": 606,
+      "unset": 1,
+      "same": 2,
+      "partial": 3,
+      "minCrossing": 4,
+      "maxCrossing": 5,
+      "keyboardValues": [
+        6,
+        7
+      ],
+      "keyboardForwardReverse": [
+        10,
+        11
+      ],
+      "roundTripPreservation": 9,
+      "restoreSettled": 13
+    },
+    {
+      "width": 788,
+      "height": 505,
+      "unset": 14,
+      "same": 15,
+      "partial": 16,
+      "minCrossing": 17,
+      "maxCrossing": 18,
+      "keyboardForwardReverse": [
+        19,
+        20
+      ],
+      "roundTripPreservation": 22,
+      "restore": 23
+    },
+    {
+      "width": 1182,
+      "height": 757,
+      "unset": 24,
+      "same": 25,
+      "partial": 26,
+      "minCrossing": 27,
+      "maxCrossing": 28,
+      "keyboardForwardReverse": [
+        29,
+        30
+      ],
+      "fullRange": 31,
+      "roundTripPreservation": 33,
+      "freshReloadPreservation": 34,
+      "restore": 35,
+      "freshUnsetReload": 36
+    }
+  ],
+  "mixedLabel": "At observed condition snapshots, exact Korean label 혼성 remains pressed=true and 남/여 false. These gender controls were not changed.",
+  "restoration": {
+    "gradeUnsetFreshReloadIndex": 36,
+    "titleBeforeRestoreIndex": 37,
+    "titleBlankIndex": 38,
+    "titleBlankFreshReloadIndex": 39,
+    "EscapeReturnedBlankInfoIndex": 40,
+    "descriptionRestoredBlank": true,
+    "exit": {
+      "titleFieldPresent": false,
+      "url": "https://alpha.teameet.co.kr/team-matches",
+      "utc": "2026-10-04T09:58:48.774Z",
+      "viewport": {
+        "dpr": 1,
+        "h": 757,
+        "w": 1182
+      },
+      "visibleDialogs": 0
+    }
+  },
+  "limitations": [
+    "No existing-edit fixture, administrator creation, final creation/save/API payload or database preservation tested.",
+    "Malformed/legacy storage injection and error-path submission are excluded.",
+    "No whole localStorage byte restoration; UI values are restored while draft TTL may refresh.",
+    "Source contract is exact19e192 static code. Runtime serving identity is unknown; initial19e192 deployment and intervening951a67 plus later reloads remain separate.",
+    "Snapshot0 is unrelated local place-time; index8 is not successful reverse-select focus. Collector-scope-notes preserves these distinctions.",
+    "Body width and select geometry describe observed views; no general guarantee for arbitrary text, viewport, physical devices or every assistive technology.",
+    "Mobile outgoing place-time endpoint is collector-reported tool output, while its returned range is retained atproof9. Tablet21/desktop32 retain outgoing endpoint rows.",
+    "Select IDs change betweenproof7/8 without a recorded explicit reload/goto. Cause and document continuity are unknown; no uninterrupted SPA or serving-SHA assertion."
+  ]
+}

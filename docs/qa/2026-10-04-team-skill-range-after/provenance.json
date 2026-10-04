@@ -1,0 +1,21 @@
+{
+  "preparedUTC": "2026-10-04T10:01:54.959682+00:00",
+  "sourceSafeSHA256": {
+    "actions.json": "1957c7fd1c6a2c04bfefe30c49a72e08d969ddfe6038f008fec6cee754b38120",
+    "exit.json": "8cbb9dd217f72cfc3da4eb5564190b1c68d7d90b589f298116fbbd79d556ebf9",
+    "info-next-note.json": "248b42c3981f1ceb62e22e49fa577ad99b432cd6464e0d685fb4953d2ea05829",
+    "initial-info.json": "189eda12cc8a7868672ed561ccd32be56d249eae88336ce25c1cfbec5d26d500",
+    "leave-dialog.json": "2f2c0df008363b84828f7f0a3a387dd8d5f497089862eab1446ec4aae1afad4d",
+    "proof.json": "31cc4706b669ee40cad4ef8b21da1b29072c107e918c07a283be8f77ace7f80a",
+    "source-contract.json": "2a8c46893012ed803fb804a175d63e0f4a398dca01f5a7b264c347f0bba250b6"
+  },
+  "sourceCaptureMetadataSHA256": "f637c774e5f73f4626481a6e87c9629137b596ab93c6f1eb77b4a11c5a53b9eb",
+  "originalSourceBytesUnchanged": true,
+  "publicProjection": "Location select values/options from unrelated place-time snapshots omitted. Synthetic title and blank values are retained. No private member/roster or source images included.",
+  "cropMethod": "Eight exact pixel subsets; no scaling, masks, or color alteration. Original screenshots may be JPEG despite .png names.",
+  "documentationCorrection": {
+    "utc": "2026-10-04T10:05:10.415397+00:00",
+    "reason": "Correct first-Next narrative to saved route/UTC. Historical source note/action labels retained; source proof/photos unchanged."
+  },
+  "scopeSupplementUTC": "2026-10-04T10:06:35.829724+00:00"
+}

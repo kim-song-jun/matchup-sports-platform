@@ -1,0 +1,54 @@
+[
+  {
+    "width": 402,
+    "height": 606,
+    "unset": 1,
+    "same": 2,
+    "partial": 3,
+    "minCrossing": 4,
+    "maxCrossing": 5,
+    "keyboardValues": [
+      6,
+      7
+    ],
+    "keyboardForwardReverse": [
+      10,
+      11
+    ],
+    "roundTripPreservation": 9,
+    "restoreSettled": 13
+  },
+  {
+    "width": 788,
+    "height": 505,
+    "unset": 14,
+    "same": 15,
+    "partial": 16,
+    "minCrossing": 17,
+    "maxCrossing": 18,
+    "keyboardForwardReverse": [
+      19,
+      20
+    ],
+    "roundTripPreservation": 22,
+    "restore": 23
+  },
+  {
+    "width": 1182,
+    "height": 757,
+    "unset": 24,
+    "same": 25,
+    "partial": 26,
+    "minCrossing": 27,
+    "maxCrossing": 28,
+    "keyboardForwardReverse": [
+      29,
+      30
+    ],
+    "fullRange": 31,
+    "roundTripPreservation": 33,
+    "freshReloadPreservation": 34,
+    "restore": 35,
+    "freshUnsetReload": 36
+  }
+]

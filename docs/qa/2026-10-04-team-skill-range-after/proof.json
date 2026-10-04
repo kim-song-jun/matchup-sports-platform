@@ -1,0 +1,4883 @@
+[
+  {
+    "active": {
+      "aria": null,
+      "focusVisible": false,
+      "id": "",
+      "tag": "BODY"
+    },
+    "bodyScrollWidth": 402,
+    "description": null,
+    "dialogs": 0,
+    "gender": [],
+    "mainScroll": 0,
+    "selects": [],
+    "stepText": [
+      "5/6단계"
+    ],
+    "title": null,
+    "url": "https://alpha.teameet.co.kr/team-matches/new/place-time",
+    "utc": "2026-10-04T09:49:19.810Z",
+    "viewport": {
+      "dpr": 1.25,
+      "h": 606,
+      "w": 402
+    },
+    "windowScroll": {
+      "x": 0,
+      "y": 0
+    },
+    "index": 0,
+    "label": "mobile initial range unset",
+    "unrelatedSelectCount": 2,
+    "scopeNote": "Local place-time route observation only; unrelated location fields excluded."
+  },
+  {
+    "active": {
+      "aria": null,
+      "focusVisible": false,
+      "id": "",
+      "tag": "BODY"
+    },
+    "bodyScrollWidth": 402,
+    "description": null,
+    "dialogs": 0,
+    "gender": [
+      {
+        "pressed": "true",
+        "rect": {
+          "bottom": 920,
+          "height": 44,
+          "left": 20,
+          "right": 68.07500076293945,
+          "top": 876,
+          "width": 48.07500076293945,
+          "x": 20,
+          "y": 876
+        },
+        "text": "혼성"
+      },
+      {
+        "pressed": "false",
+        "rect": {
+          "bottom": 920,
+          "height": 44,
+          "left": 76.07500457763672,
+          "right": 112.91250610351562,
+          "top": 876,
+          "width": 36.837501525878906,
+          "x": 76.07500457763672,
+          "y": 876
+        },
+        "text": "남"
+      },
+      {
+        "pressed": "false",
+        "rect": {
+          "bottom": 920,
+          "height": 44,
+          "left": 120.9124984741211,
+          "right": 157.75,
+          "top": 876,
+          "width": 36.837501525878906,
+          "x": 120.9124984741211,
+          "y": 876
+        },
+        "text": "여"
+      }
+    ],
+    "mainScroll": 0,
+    "selects": [
+      {
+        "ariaDescribedBy": null,
+        "ariaInvalid": "false",
+        "clientWidth": 173,
+        "id": "_r_h_-min",
+        "labels": [
+          "최소 등급"
+        ],
+        "options": [
+          {
+            "disabled": false,
+            "text": "미설정",
+            "value": ""
+          },
+          {
+            "disabled": false,
+            "text": "입문",
+            "value": "beginner"
+          },
+          {
+            "disabled": false,
+            "text": "초보",
+            "value": "novice"
+          },
+          {
+            "disabled": false,
+            "text": "중수",
+            "value": "intermediate"
+          },
+          {
+            "disabled": false,
+            "text": "고수",
+            "value": "advanced"
+          }
+        ],
+        "rect": {
+          "bottom": 376,
+          "height": 48,
+          "left": 20,
+          "right": 194.8000030517578,
+          "top": 328,
+          "width": 174.8000030517578,
+          "x": 20,
+          "y": 328
+        },
+        "scrollWidth": 173,
+        "selectedText": "미설정",
+        "value": ""
+      },
+      {
+        "ariaDescribedBy": null,
+        "ariaInvalid": "false",
+        "clientWidth": 173,
+        "id": "_r_h_-max",
+        "labels": [
+          "최대 등급"
+        ],
+        "options": [
+          {
+            "disabled": false,
+            "text": "미설정",
+            "value": ""
+          },
+          {
+            "disabled": false,
+            "text": "입문",
+            "value": "beginner"
+          },
+          {
+            "disabled": false,
+            "text": "초보",
+            "value": "novice"
+          },
+          {
+            "disabled": false,
+            "text": "중수",
+            "value": "intermediate"
+          },
+          {
+            "disabled": false,
+            "text": "고수",
+            "value": "advanced"
+          }
+        ],
+        "rect": {
+          "bottom": 376,
+          "height": 48,
+          "left": 206.8000030517578,
+          "right": 381.6000061035156,
+          "top": 328,
+          "width": 174.8000030517578,
+          "x": 206.8000030517578,
+          "y": 328
+        },
+        "scrollWidth": 173,
+        "selectedText": "미설정",
+        "value": ""
+      }
+    ],
+    "stepText": [
+      "4/6단계"
+    ],
+    "title": null,
+    "url": "https://alpha.teameet.co.kr/team-matches/new/condition",
+    "utc": "2026-10-04T09:50:01.041Z",
+    "viewport": {
+      "dpr": 1.25,
+      "h": 606,
+      "w": 402
+    },
+    "windowScroll": {
+      "x": 0,
+      "y": 0
+    },
+    "index": 1,
+    "label": "mobile actual initial min-max unset"
+  },
+  {
+    "active": {
+      "aria": null,
+      "focusVisible": false,
+      "id": "",
+      "tag": "BODY"
+    },
+    "bodyScrollWidth": 402,
+    "description": null,
+    "dialogs": 0,
+    "gender": [
+      {
+        "pressed": "true",
+        "rect": {
+          "bottom": 920,
+          "height": 44,
+          "left": 20,
+          "right": 68.07500076293945,
+          "top": 876,
+          "width": 48.07500076293945,
+          "x": 20,
+          "y": 876
+        },
+        "text": "혼성"
+      },
+      {
+        "pressed": "false",
+        "rect": {
+          "bottom": 920,
+          "height": 44,
+          "left": 76.07500457763672,
+          "right": 112.91250610351562,
+          "top": 876,
+          "width": 36.837501525878906,
+          "x": 76.07500457763672,
+          "y": 876
+        },
+        "text": "남"
+      },
+      {
+        "pressed": "false",
+        "rect": {
+          "bottom": 920,
+          "height": 44,
+          "left": 120.9124984741211,
+          "right": 157.75,
+          "top": 876,
+          "width": 36.837501525878906,
+          "x": 120.9124984741211,
+          "y": 876
+        },
+        "text": "여"
+      }
+    ],
+    "mainScroll": 0,
+    "selects": [
+      {
+        "ariaDescribedBy": null,
+        "ariaInvalid": "false",
+        "clientWidth": 173,
+        "id": "_r_h_-min",
+        "labels": [
+          "최소 등급"
+        ],
+        "options": [
+          {
+            "disabled": false,
+            "text": "미설정",
+            "value": ""
+          },
+          {
+            "disabled": false,
+            "text": "입문",
+            "value": "beginner"
+          },
+          {
+            "disabled": false,
+            "text": "초보",
+            "value": "novice"
+          },
+          {
+            "disabled": false,
+            "text": "중수",
+            "value": "intermediate"
+          },
+          {
+            "disabled": false,
+            "text": "고수",
+            "value": "advanced"
+          }
+        ],
+        "rect": {
+          "bottom": 376,
+          "height": 48,
+          "left": 20,
+          "right": 194.8000030517578,
+          "top": 328,
+          "width": 174.8000030517578,
+          "x": 20,
+          "y": 328
+        },
+        "scrollWidth": 173,
+        "selectedText": "초보",
+        "value": "novice"
+      },
+      {
+        "ariaDescribedBy": null,
+        "ariaInvalid": "false",
+        "clientWidth": 173,
+        "id": "_r_h_-max",
+        "labels": [
+          "최대 등급"
+        ],
+        "options": [
+          {
+            "disabled": false,
+            "text": "미설정",
+            "value": ""
+          },
+          {
+            "disabled": false,
+            "text": "입문",
+            "value": "beginner"
+          },
+          {
+            "disabled": false,
+            "text": "초보",
+            "value": "novice"
+          },
+          {
+            "disabled": false,
+            "text": "중수",
+            "value": "intermediate"
+          },
+          {
+            "disabled": false,
+            "text": "고수",
+            "value": "advanced"
+          }
+        ],
+        "rect": {
+          "bottom": 376,
+          "height": 48,
+          "left": 206.8000030517578,
+          "right": 381.6000061035156,
+          "top": 328,
+          "width": 174.8000030517578,
+          "x": 206.8000030517578,
+          "y": 328
+        },
+        "scrollWidth": 173,
+        "selectedText": "초보",
+        "value": "novice"
+      }
+    ],
+    "stepText": [
+      "4/6단계"
+    ],
+    "title": null,
+    "url": "https://alpha.teameet.co.kr/team-matches/new/condition",
+    "utc": "2026-10-04T09:50:37.187Z",
+    "viewport": {
+      "dpr": 1.25,
+      "h": 606,
+      "w": 402
+    },
+    "windowScroll": {
+      "x": 0,
+      "y": 0
+    },
+    "index": 2,
+    "label": "mobile same-value pair after minimum selection"
+  },
+  {
+    "active": {
+      "aria": null,
+      "focusVisible": false,
+      "id": "",
+      "tag": "BODY"
+    },
+    "bodyScrollWidth": 402,
+    "description": null,
+    "dialogs": 0,
+    "gender": [
+      {
+        "pressed": "true",
+        "rect": {
+          "bottom": 920,
+          "height": 44,
+          "left": 20,
+          "right": 68.07500076293945,
+          "top": 876,
+          "width": 48.07500076293945,
+          "x": 20,
+          "y": 876
+        },
+        "text": "혼성"
+      },
+      {
+        "pressed": "false",
+        "rect": {
+          "bottom": 920,
+          "height": 44,
+          "left": 76.07500457763672,
+          "right": 112.91250610351562,
+          "top": 876,
+          "width": 36.837501525878906,
+          "x": 76.07500457763672,
+          "y": 876
+        },
+        "text": "남"
+      },
+      {
+        "pressed": "false",
+        "rect": {
+          "bottom": 920,
+          "height": 44,
+          "left": 120.9124984741211,
+          "right": 157.75,
+          "top": 876,
+          "width": 36.837501525878906,
+          "x": 120.9124984741211,
+          "y": 876
+        },
+        "text": "여"
+      }
+    ],
+    "mainScroll": 0,
+    "selects": [
+      {
+        "ariaDescribedBy": null,
+        "ariaInvalid": "false",
+        "clientWidth": 173,
+        "id": "_r_h_-min",
+        "labels": [
+          "최소 등급"
+        ],
+        "options": [
+          {
+            "disabled": false,
+            "text": "미설정",
+            "value": ""
+          },
+          {
+            "disabled": false,
+            "text": "입문",
+            "value": "beginner"
+          },
+          {
+            "disabled": false,
+            "text": "초보",
+            "value": "novice"
+          },
+          {
+            "disabled": false,
+            "text": "중수",
+            "value": "intermediate"
+          },
+          {
+            "disabled": false,
+            "text": "고수",
+            "value": "advanced"
+          }
+        ],
+        "rect": {
+          "bottom": 376,
+          "height": 48,
+          "left": 20,
+          "right": 194.8000030517578,
+          "top": 328,
+          "width": 174.8000030517578,
+          "x": 20,
+          "y": 328
+        },
+        "scrollWidth": 173,
+        "selectedText": "초보",
+        "value": "novice"
+      },
+      {
+        "ariaDescribedBy": null,
+        "ariaInvalid": "false",
+        "clientWidth": 173,
+        "id": "_r_h_-max",
+        "labels": [
+          "최대 등급"
+        ],
+        "options": [
+          {
+            "disabled": false,
+            "text": "미설정",
+            "value": ""
+          },
+          {
+            "disabled": false,
+            "text": "입문",
+            "value": "beginner"
+          },
+          {
+            "disabled": false,
+            "text": "초보",
+            "value": "novice"
+          },
+          {
+            "disabled": false,
+            "text": "중수",
+            "value": "intermediate"
+          },
+          {
+            "disabled": false,
+            "text": "고수",
+            "value": "advanced"
+          }
+        ],
+        "rect": {
+          "bottom": 376,
+          "height": 48,
+          "left": 206.8000030517578,
+          "right": 381.6000061035156,
+          "top": 328,
+          "width": 174.8000030517578,
+          "x": 206.8000030517578,
+          "y": 328
+        },
+        "scrollWidth": 173,
+        "selectedText": "중수",
+        "value": "intermediate"
+      }
+    ],
+    "stepText": [
+      "4/6단계"
+    ],
+    "title": null,
+    "url": "https://alpha.teameet.co.kr/team-matches/new/condition",
+    "utc": "2026-10-04T09:50:37.216Z",
+    "viewport": {
+      "dpr": 1.25,
+      "h": 606,
+      "w": 402
+    },
+    "windowScroll": {
+      "x": 0,
+      "y": 0
+    },
+    "index": 3,
+    "label": "mobile novice-intermediate range"
+  },
+  {
+    "active": {
+      "aria": null,
+      "focusVisible": false,
+      "id": "",
+      "tag": "BODY"
+    },
+    "bodyScrollWidth": 402,
+    "description": null,
+    "dialogs": 0,
+    "gender": [
+      {
+        "pressed": "true",
+        "rect": {
+          "bottom": 920,
+          "height": 44,
+          "left": 20,
+          "right": 68.07500076293945,
+          "top": 876,
+          "width": 48.07500076293945,
+          "x": 20,
+          "y": 876
+        },
+        "text": "혼성"
+      },
+      {
+        "pressed": "false",
+        "rect": {
+          "bottom": 920,
+          "height": 44,
+          "left": 76.07500457763672,
+          "right": 112.91250610351562,
+          "top": 876,
+          "width": 36.837501525878906,
+          "x": 76.07500457763672,
+          "y": 876
+        },
+        "text": "남"
+      },
+      {
+        "pressed": "false",
+        "rect": {
+          "bottom": 920,
+          "height": 44,
+          "left": 120.9124984741211,
+          "right": 157.75,
+          "top": 876,
+          "width": 36.837501525878906,
+          "x": 120.9124984741211,
+          "y": 876
+        },
+        "text": "여"
+      }
+    ],
+    "mainScroll": 0,
+    "selects": [
+      {
+        "ariaDescribedBy": null,
+        "ariaInvalid": "false",
+        "clientWidth": 173,
+        "id": "_r_h_-min",
+        "labels": [
+          "최소 등급"
+        ],
+        "options": [
+          {
+            "disabled": false,
+            "text": "미설정",
+            "value": ""
+          },
+          {
+            "disabled": false,
+            "text": "입문",
+            "value": "beginner"
+          },
+          {
+            "disabled": false,
+            "text": "초보",
+            "value": "novice"
+          },
+          {
+            "disabled": false,
+            "text": "중수",
+            "value": "intermediate"
+          },
+          {
+            "disabled": false,
+            "text": "고수",
+            "value": "advanced"
+          }
+        ],
+        "rect": {
+          "bottom": 376,
+          "height": 48,
+          "left": 20,
+          "right": 194.8000030517578,
+          "top": 328,
+          "width": 174.8000030517578,
+          "x": 20,
+          "y": 328
+        },
+        "scrollWidth": 173,
+        "selectedText": "고수",
+        "value": "advanced"
+      },
+      {
+        "ariaDescribedBy": null,
+        "ariaInvalid": "false",
+        "clientWidth": 173,
+        "id": "_r_h_-max",
+        "labels": [
+          "최대 등급"
+        ],
+        "options": [
+          {
+            "disabled": false,
+            "text": "미설정",
+            "value": ""
+          },
+          {
+            "disabled": false,
+            "text": "입문",
+            "value": "beginner"
+          },
+          {
+            "disabled": false,
+            "text": "초보",
+            "value": "novice"
+          },
+          {
+            "disabled": false,
+            "text": "중수",
+            "value": "intermediate"
+          },
+          {
+            "disabled": false,
+            "text": "고수",
+            "value": "advanced"
+          }
+        ],
+        "rect": {
+          "bottom": 376,
+          "height": 48,
+          "left": 206.8000030517578,
+          "right": 381.6000061035156,
+          "top": 328,
+          "width": 174.8000030517578,
+          "x": 206.8000030517578,
+          "y": 328
+        },
+        "scrollWidth": 173,
+        "selectedText": "고수",
+        "value": "advanced"
+      }
+    ],
+    "stepText": [
+      "4/6단계"
+    ],
+    "title": null,
+    "url": "https://alpha.teameet.co.kr/team-matches/new/condition",
+    "utc": "2026-10-04T09:50:55.204Z",
+    "viewport": {
+      "dpr": 1.25,
+      "h": 606,
+      "w": 402
+    },
+    "windowScroll": {
+      "x": 0,
+      "y": 0
+    },
+    "index": 4,
+    "label": "mobile min crossing raises maximum to advanced"
+  },
+  {
+    "active": {
+      "aria": null,
+      "focusVisible": false,
+      "id": "",
+      "tag": "BODY"
+    },
+    "bodyScrollWidth": 402,
+    "description": null,
+    "dialogs": 0,
+    "gender": [
+      {
+        "pressed": "true",
+        "rect": {
+          "bottom": 920,
+          "height": 44,
+          "left": 20,
+          "right": 68.07500076293945,
+          "top": 876,
+          "width": 48.07500076293945,
+          "x": 20,
+          "y": 876
+        },
+        "text": "혼성"
+      },
+      {
+        "pressed": "false",
+        "rect": {
+          "bottom": 920,
+          "height": 44,
+          "left": 76.07500457763672,
+          "right": 112.91250610351562,
+          "top": 876,
+          "width": 36.837501525878906,
+          "x": 76.07500457763672,
+          "y": 876
+        },
+        "text": "남"
+      },
+      {
+        "pressed": "false",
+        "rect": {
+          "bottom": 920,
+          "height": 44,
+          "left": 120.9124984741211,
+          "right": 157.75,
+          "top": 876,
+          "width": 36.837501525878906,
+          "x": 120.9124984741211,
+          "y": 876
+        },
+        "text": "여"
+      }
+    ],
+    "mainScroll": 0,
+    "selects": [
+      {
+        "ariaDescribedBy": null,
+        "ariaInvalid": "false",
+        "clientWidth": 173,
+        "id": "_r_h_-min",
+        "labels": [
+          "최소 등급"
+        ],
+        "options": [
+          {
+            "disabled": false,
+            "text": "미설정",
+            "value": ""
+          },
+          {
+            "disabled": false,
+            "text": "입문",
+            "value": "beginner"
+          },
+          {
+            "disabled": false,
+            "text": "초보",
+            "value": "novice"
+          },
+          {
+            "disabled": false,
+            "text": "중수",
+            "value": "intermediate"
+          },
+          {
+            "disabled": false,
+            "text": "고수",
+            "value": "advanced"
+          }
+        ],
+        "rect": {
+          "bottom": 376,
+          "height": 48,
+          "left": 20,
+          "right": 194.8000030517578,
+          "top": 328,
+          "width": 174.8000030517578,
+          "x": 20,
+          "y": 328
+        },
+        "scrollWidth": 173,
+        "selectedText": "입문",
+        "value": "beginner"
+      },
+      {
+        "ariaDescribedBy": null,
+        "ariaInvalid": "false",
+        "clientWidth": 173,
+        "id": "_r_h_-max",
+        "labels": [
+          "최대 등급"
+        ],
+        "options": [
+          {
+            "disabled": false,
+            "text": "미설정",
+            "value": ""
+          },
+          {
+            "disabled": false,
+            "text": "입문",
+            "value": "beginner"
+          },
+          {
+            "disabled": false,
+            "text": "초보",
+            "value": "novice"
+          },
+          {
+            "disabled": false,
+            "text": "중수",
+            "value": "intermediate"
+          },
+          {
+            "disabled": false,
+            "text": "고수",
+            "value": "advanced"
+          }
+        ],
+        "rect": {
+          "bottom": 376,
+          "height": 48,
+          "left": 206.8000030517578,
+          "right": 381.6000061035156,
+          "top": 328,
+          "width": 174.8000030517578,
+          "x": 206.8000030517578,
+          "y": 328
+        },
+        "scrollWidth": 173,
+        "selectedText": "입문",
+        "value": "beginner"
+      }
+    ],
+    "stepText": [
+      "4/6단계"
+    ],
+    "title": null,
+    "url": "https://alpha.teameet.co.kr/team-matches/new/condition",
+    "utc": "2026-10-04T09:50:55.230Z",
+    "viewport": {
+      "dpr": 1.25,
+      "h": 606,
+      "w": 402
+    },
+    "windowScroll": {
+      "x": 0,
+      "y": 0
+    },
+    "index": 5,
+    "label": "mobile max crossing lowers minimum to beginner"
+  },
+  {
+    "active": {
+      "aria": null,
+      "focusVisible": true,
+      "id": "_r_h_-min",
+      "tag": "SELECT"
+    },
+    "bodyScrollWidth": 402,
+    "description": null,
+    "dialogs": 0,
+    "gender": [
+      {
+        "pressed": "true",
+        "rect": {
+          "bottom": 898.4000244140625,
+          "height": 44,
+          "left": 20,
+          "right": 68.07500076293945,
+          "top": 854.4000244140625,
+          "width": 48.07500076293945,
+          "x": 20,
+          "y": 854.4000244140625
+        },
+        "text": "혼성"
+      },
+      {
+        "pressed": "false",
+        "rect": {
+          "bottom": 898.4000244140625,
+          "height": 44,
+          "left": 76.07500457763672,
+          "right": 112.91250610351562,
+          "top": 854.4000244140625,
+          "width": 36.837501525878906,
+          "x": 76.07500457763672,
+          "y": 854.4000244140625
+        },
+        "text": "남"
+      },
+      {
+        "pressed": "false",
+        "rect": {
+          "bottom": 898.4000244140625,
+          "height": 44,
+          "left": 120.9124984741211,
+          "right": 157.75,
+          "top": 854.4000244140625,
+          "width": 36.837501525878906,
+          "x": 120.9124984741211,
+          "y": 854.4000244140625
+        },
+        "text": "여"
+      }
+    ],
+    "mainScroll": 20.799999237060547,
+    "selects": [
+      {
+        "ariaDescribedBy": null,
+        "ariaInvalid": "false",
+        "clientWidth": 173,
+        "id": "_r_h_-min",
+        "labels": [
+          "최소 등급"
+        ],
+        "options": [
+          {
+            "disabled": false,
+            "text": "미설정",
+            "value": ""
+          },
+          {
+            "disabled": false,
+            "text": "입문",
+            "value": "beginner"
+          },
+          {
+            "disabled": false,
+            "text": "초보",
+            "value": "novice"
+          },
+          {
+            "disabled": false,
+            "text": "중수",
+            "value": "intermediate"
+          },
+          {
+            "disabled": false,
+            "text": "고수",
+            "value": "advanced"
+          }
+        ],
+        "rect": {
+          "bottom": 354.3999938964844,
+          "height": 48,
+          "left": 20,
+          "right": 194.8000030517578,
+          "top": 306.3999938964844,
+          "width": 174.8000030517578,
+          "x": 20,
+          "y": 306.3999938964844
+        },
+        "scrollWidth": 173,
+        "selectedText": "초보",
+        "value": "novice"
+      },
+      {
+        "ariaDescribedBy": null,
+        "ariaInvalid": "false",
+        "clientWidth": 173,
+        "id": "_r_h_-max",
+        "labels": [
+          "최대 등급"
+        ],
+        "options": [
+          {
+            "disabled": false,
+            "text": "미설정",
+            "value": ""
+          },
+          {
+            "disabled": false,
+            "text": "입문",
+            "value": "beginner"
+          },
+          {
+            "disabled": false,
+            "text": "초보",
+            "value": "novice"
+          },
+          {
+            "disabled": false,
+            "text": "중수",
+            "value": "intermediate"
+          },
+          {
+            "disabled": false,
+            "text": "고수",
+            "value": "advanced"
+          }
+        ],
+        "rect": {
+          "bottom": 354.3999938964844,
+          "height": 48,
+          "left": 206.8000030517578,
+          "right": 381.6000061035156,
+          "top": 306.3999938964844,
+          "width": 174.8000030517578,
+          "x": 206.8000030517578,
+          "y": 306.3999938964844
+        },
+        "scrollWidth": 173,
+        "selectedText": "초보",
+        "value": "novice"
+      }
+    ],
+    "stepText": [
+      "4/6단계"
+    ],
+    "title": null,
+    "url": "https://alpha.teameet.co.kr/team-matches/new/condition",
+    "utc": "2026-10-04T09:50:55.265Z",
+    "viewport": {
+      "dpr": 1.25,
+      "h": 606,
+      "w": 402
+    },
+    "windowScroll": {
+      "x": 0,
+      "y": 0
+    },
+    "index": 6,
+    "label": "mobile keyboard minimum change"
+  },
+  {
+    "active": {
+      "aria": null,
+      "focusVisible": true,
+      "id": "_r_h_-max",
+      "tag": "SELECT"
+    },
+    "bodyScrollWidth": 402,
+    "description": null,
+    "dialogs": 0,
+    "gender": [
+      {
+        "pressed": "true",
+        "rect": {
+          "bottom": 898.4000244140625,
+          "height": 44,
+          "left": 20,
+          "right": 68.07500076293945,
+          "top": 854.4000244140625,
+          "width": 48.07500076293945,
+          "x": 20,
+          "y": 854.4000244140625
+        },
+        "text": "혼성"
+      },
+      {
+        "pressed": "false",
+        "rect": {
+          "bottom": 898.4000244140625,
+          "height": 44,
+          "left": 76.07500457763672,
+          "right": 112.91250610351562,
+          "top": 854.4000244140625,
+          "width": 36.837501525878906,
+          "x": 76.07500457763672,
+          "y": 854.4000244140625
+        },
+        "text": "남"
+      },
+      {
+        "pressed": "false",
+        "rect": {
+          "bottom": 898.4000244140625,
+          "height": 44,
+          "left": 120.9124984741211,
+          "right": 157.75,
+          "top": 854.4000244140625,
+          "width": 36.837501525878906,
+          "x": 120.9124984741211,
+          "y": 854.4000244140625
+        },
+        "text": "여"
+      }
+    ],
+    "mainScroll": 20.799999237060547,
+    "selects": [
+      {
+        "ariaDescribedBy": null,
+        "ariaInvalid": "false",
+        "clientWidth": 173,
+        "id": "_r_h_-min",
+        "labels": [
+          "최소 등급"
+        ],
+        "options": [
+          {
+            "disabled": false,
+            "text": "미설정",
+            "value": ""
+          },
+          {
+            "disabled": false,
+            "text": "입문",
+            "value": "beginner"
+          },
+          {
+            "disabled": false,
+            "text": "초보",
+            "value": "novice"
+          },
+          {
+            "disabled": false,
+            "text": "중수",
+            "value": "intermediate"
+          },
+          {
+            "disabled": false,
+            "text": "고수",
+            "value": "advanced"
+          }
+        ],
+        "rect": {
+          "bottom": 354.3999938964844,
+          "height": 48,
+          "left": 20,
+          "right": 194.8000030517578,
+          "top": 306.3999938964844,
+          "width": 174.8000030517578,
+          "x": 20,
+          "y": 306.3999938964844
+        },
+        "scrollWidth": 173,
+        "selectedText": "초보",
+        "value": "novice"
+      },
+      {
+        "ariaDescribedBy": null,
+        "ariaInvalid": "false",
+        "clientWidth": 173,
+        "id": "_r_h_-max",
+        "labels": [
+          "최대 등급"
+        ],
+        "options": [
+          {
+            "disabled": false,
+            "text": "미설정",
+            "value": ""
+          },
+          {
+            "disabled": false,
+            "text": "입문",
+            "value": "beginner"
+          },
+          {
+            "disabled": false,
+            "text": "초보",
+            "value": "novice"
+          },
+          {
+            "disabled": false,
+            "text": "중수",
+            "value": "intermediate"
+          },
+          {
+            "disabled": false,
+            "text": "고수",
+            "value": "advanced"
+          }
+        ],
+        "rect": {
+          "bottom": 354.3999938964844,
+          "height": 48,
+          "left": 206.8000030517578,
+          "right": 381.6000061035156,
+          "top": 306.3999938964844,
+          "width": 174.8000030517578,
+          "x": 206.8000030517578,
+          "y": 306.3999938964844
+        },
+        "scrollWidth": 173,
+        "selectedText": "중수",
+        "value": "intermediate"
+      }
+    ],
+    "stepText": [
+      "4/6단계"
+    ],
+    "title": null,
+    "url": "https://alpha.teameet.co.kr/team-matches/new/condition",
+    "utc": "2026-10-04T09:50:55.518Z",
+    "viewport": {
+      "dpr": 1.25,
+      "h": 606,
+      "w": 402
+    },
+    "windowScroll": {
+      "x": 0,
+      "y": 0
+    },
+    "index": 7,
+    "label": "mobile keyboard maximum range change"
+  },
+  {
+    "active": {
+      "aria": null,
+      "focusVisible": true,
+      "id": "",
+      "tag": "BUTTON"
+    },
+    "bodyScrollWidth": 402,
+    "description": null,
+    "dialogs": 0,
+    "gender": [
+      {
+        "pressed": "true",
+        "rect": {
+          "bottom": 920,
+          "height": 44,
+          "left": 20,
+          "right": 68.07500076293945,
+          "top": 876,
+          "width": 48.07500076293945,
+          "x": 20,
+          "y": 876
+        },
+        "text": "혼성"
+      },
+      {
+        "pressed": "false",
+        "rect": {
+          "bottom": 920,
+          "height": 44,
+          "left": 76.07500457763672,
+          "right": 112.91250610351562,
+          "top": 876,
+          "width": 36.837501525878906,
+          "x": 76.07500457763672,
+          "y": 876
+        },
+        "text": "남"
+      },
+      {
+        "pressed": "false",
+        "rect": {
+          "bottom": 920,
+          "height": 44,
+          "left": 120.9124984741211,
+          "right": 157.75,
+          "top": 876,
+          "width": 36.837501525878906,
+          "x": 120.9124984741211,
+          "y": 876
+        },
+        "text": "여"
+      }
+    ],
+    "mainScroll": 0,
+    "selects": [
+      {
+        "ariaDescribedBy": null,
+        "ariaInvalid": "false",
+        "clientWidth": 173,
+        "id": "_r_2_-min",
+        "labels": [
+          "최소 등급"
+        ],
+        "options": [
+          {
+            "disabled": false,
+            "text": "미설정",
+            "value": ""
+          },
+          {
+            "disabled": false,
+            "text": "입문",
+            "value": "beginner"
+          },
+          {
+            "disabled": false,
+            "text": "초보",
+            "value": "novice"
+          },
+          {
+            "disabled": false,
+            "text": "중수",
+            "value": "intermediate"
+          },
+          {
+            "disabled": false,
+            "text": "고수",
+            "value": "advanced"
+          }
+        ],
+        "rect": {
+          "bottom": 376,
+          "height": 48,
+          "left": 20,
+          "right": 194.8000030517578,
+          "top": 328,
+          "width": 174.8000030517578,
+          "x": 20,
+          "y": 328
+        },
+        "scrollWidth": 173,
+        "selectedText": "초보",
+        "value": "novice"
+      },
+      {
+        "ariaDescribedBy": null,
+        "ariaInvalid": "false",
+        "clientWidth": 173,
+        "id": "_r_2_-max",
+        "labels": [
+          "최대 등급"
+        ],
+        "options": [
+          {
+            "disabled": false,
+            "text": "미설정",
+            "value": ""
+          },
+          {
+            "disabled": false,
+            "text": "입문",
+            "value": "beginner"
+          },
+          {
+            "disabled": false,
+            "text": "초보",
+            "value": "novice"
+          },
+          {
+            "disabled": false,
+            "text": "중수",
+            "value": "intermediate"
+          },
+          {
+            "disabled": false,
+            "text": "고수",
+            "value": "advanced"
+          }
+        ],
+        "rect": {
+          "bottom": 376,
+          "height": 48,
+          "left": 206.8000030517578,
+          "right": 381.6000061035156,
+          "top": 328,
+          "width": 174.8000030517578,
+          "x": 206.8000030517578,
+          "y": 328
+        },
+        "scrollWidth": 173,
+        "selectedText": "중수",
+        "value": "intermediate"
+      }
+    ],
+    "stepText": [
+      "4/6단계"
+    ],
+    "title": null,
+    "url": "https://alpha.teameet.co.kr/team-matches/new/condition",
+    "utc": "2026-10-04T09:52:31.575Z",
+    "viewport": {
+      "dpr": 1.25,
+      "h": 606,
+      "w": 402
+    },
+    "windowScroll": {
+      "x": 0,
+      "y": 0
+    },
+    "index": 8,
+    "label": "mobile reverse keyboard focus preserves range"
+  },
+  {
+    "active": {
+      "aria": null,
+      "focusVisible": false,
+      "id": "",
+      "tag": "BODY"
+    },
+    "bodyScrollWidth": 402,
+    "description": null,
+    "dialogs": 0,
+    "gender": [
+      {
+        "pressed": "true",
+        "rect": {
+          "bottom": 920,
+          "height": 44,
+          "left": 20,
+          "right": 68.07500076293945,
+          "top": 876,
+          "width": 48.07500076293945,
+          "x": 20,
+          "y": 876
+        },
+        "text": "혼성"
+      },
+      {
+        "pressed": "false",
+        "rect": {
+          "bottom": 920,
+          "height": 44,
+          "left": 76.07500457763672,
+          "right": 112.91250610351562,
+          "top": 876,
+          "width": 36.837501525878906,
+          "x": 76.07500457763672,
+          "y": 876
+        },
+        "text": "남"
+      },
+      {
+        "pressed": "false",
+        "rect": {
+          "bottom": 920,
+          "height": 44,
+          "left": 120.9124984741211,
+          "right": 157.75,
+          "top": 876,
+          "width": 36.837501525878906,
+          "x": 120.9124984741211,
+          "y": 876
+        },
+        "text": "여"
+      }
+    ],
+    "mainScroll": 0,
+    "selects": [
+      {
+        "ariaDescribedBy": null,
+        "ariaInvalid": "false",
+        "clientWidth": 173,
+        "id": "_r_h_-min",
+        "labels": [
+          "최소 등급"
+        ],
+        "options": [
+          {
+            "disabled": false,
+            "text": "미설정",
+            "value": ""
+          },
+          {
+            "disabled": false,
+            "text": "입문",
+            "value": "beginner"
+          },
+          {
+            "disabled": false,
+            "text": "초보",
+            "value": "novice"
+          },
+          {
+            "disabled": false,
+            "text": "중수",
+            "value": "intermediate"
+          },
+          {
+            "disabled": false,
+            "text": "고수",
+            "value": "advanced"
+          }
+        ],
+        "rect": {
+          "bottom": 376,
+          "height": 48,
+          "left": 20,
+          "right": 194.8000030517578,
+          "top": 328,
+          "width": 174.8000030517578,
+          "x": 20,
+          "y": 328
+        },
+        "scrollWidth": 173,
+        "selectedText": "초보",
+        "value": "novice"
+      },
+      {
+        "ariaDescribedBy": null,
+        "ariaInvalid": "false",
+        "clientWidth": 173,
+        "id": "_r_h_-max",
+        "labels": [
+          "최대 등급"
+        ],
+        "options": [
+          {
+            "disabled": false,
+            "text": "미설정",
+            "value": ""
+          },
+          {
+            "disabled": false,
+            "text": "입문",
+            "value": "beginner"
+          },
+          {
+            "disabled": false,
+            "text": "초보",
+            "value": "novice"
+          },
+          {
+            "disabled": false,
+            "text": "중수",
+            "value": "intermediate"
+          },
+          {
+            "disabled": false,
+            "text": "고수",
+            "value": "advanced"
+          }
+        ],
+        "rect": {
+          "bottom": 376,
+          "height": 48,
+          "left": 206.8000030517578,
+          "right": 381.6000061035156,
+          "top": 328,
+          "width": 174.8000030517578,
+          "x": 206.8000030517578,
+          "y": 328
+        },
+        "scrollWidth": 173,
+        "selectedText": "중수",
+        "value": "intermediate"
+      }
+    ],
+    "stepText": [
+      "4/6단계"
+    ],
+    "title": null,
+    "url": "https://alpha.teameet.co.kr/team-matches/new/condition",
+    "utc": "2026-10-04T09:52:33.159Z",
+    "viewport": {
+      "dpr": 1.25,
+      "h": 606,
+      "w": 402
+    },
+    "windowScroll": {
+      "x": 0,
+      "y": 0
+    },
+    "index": 9,
+    "label": "mobile range preserved after Next and Previous"
+  },
+  {
+    "active": {
+      "aria": null,
+      "focusVisible": true,
+      "id": "_r_h_-max",
+      "tag": "SELECT"
+    },
+    "bodyScrollWidth": 402,
+    "description": null,
+    "dialogs": 0,
+    "gender": [
+      {
+        "pressed": "true",
+        "rect": {
+          "bottom": 898.4000244140625,
+          "height": 44,
+          "left": 20,
+          "right": 68.07500076293945,
+          "top": 854.4000244140625,
+          "width": 48.07500076293945,
+          "x": 20,
+          "y": 854.4000244140625
+        },
+        "text": "혼성"
+      },
+      {
+        "pressed": "false",
+        "rect": {
+          "bottom": 898.4000244140625,
+          "height": 44,
+          "left": 76.07500457763672,
+          "right": 112.91250610351562,
+          "top": 854.4000244140625,
+          "width": 36.837501525878906,
+          "x": 76.07500457763672,
+          "y": 854.4000244140625
+        },
+        "text": "남"
+      },
+      {
+        "pressed": "false",
+        "rect": {
+          "bottom": 898.4000244140625,
+          "height": 44,
+          "left": 120.9124984741211,
+          "right": 157.75,
+          "top": 854.4000244140625,
+          "width": 36.837501525878906,
+          "x": 120.9124984741211,
+          "y": 854.4000244140625
+        },
+        "text": "여"
+      }
+    ],
+    "mainScroll": 20.799999237060547,
+    "selects": [
+      {
+        "ariaDescribedBy": null,
+        "ariaInvalid": "false",
+        "clientWidth": 173,
+        "id": "_r_h_-min",
+        "labels": [
+          "최소 등급"
+        ],
+        "options": [
+          {
+            "disabled": false,
+            "text": "미설정",
+            "value": ""
+          },
+          {
+            "disabled": false,
+            "text": "입문",
+            "value": "beginner"
+          },
+          {
+            "disabled": false,
+            "text": "초보",
+            "value": "novice"
+          },
+          {
+            "disabled": false,
+            "text": "중수",
+            "value": "intermediate"
+          },
+          {
+            "disabled": false,
+            "text": "고수",
+            "value": "advanced"
+          }
+        ],
+        "rect": {
+          "bottom": 354.3999938964844,
+          "height": 48,
+          "left": 20,
+          "right": 194.8000030517578,
+          "top": 306.3999938964844,
+          "width": 174.8000030517578,
+          "x": 20,
+          "y": 306.3999938964844
+        },
+        "scrollWidth": 173,
+        "selectedText": "초보",
+        "value": "novice"
+      },
+      {
+        "ariaDescribedBy": null,
+        "ariaInvalid": "false",
+        "clientWidth": 173,
+        "id": "_r_h_-max",
+        "labels": [
+          "최대 등급"
+        ],
+        "options": [
+          {
+            "disabled": false,
+            "text": "미설정",
+            "value": ""
+          },
+          {
+            "disabled": false,
+            "text": "입문",
+            "value": "beginner"
+          },
+          {
+            "disabled": false,
+            "text": "초보",
+            "value": "novice"
+          },
+          {
+            "disabled": false,
+            "text": "중수",
+            "value": "intermediate"
+          },
+          {
+            "disabled": false,
+            "text": "고수",
+            "value": "advanced"
+          }
+        ],
+        "rect": {
+          "bottom": 354.3999938964844,
+          "height": 48,
+          "left": 206.8000030517578,
+          "right": 381.6000061035156,
+          "top": 306.3999938964844,
+          "width": 174.8000030517578,
+          "x": 206.8000030517578,
+          "y": 306.3999938964844
+        },
+        "scrollWidth": 173,
+        "selectedText": "중수",
+        "value": "intermediate"
+      }
+    ],
+    "stepText": [
+      "4/6단계"
+    ],
+    "title": null,
+    "url": "https://alpha.teameet.co.kr/team-matches/new/condition",
+    "utc": "2026-10-04T09:54:43.148Z",
+    "viewport": {
+      "dpr": 1.25,
+      "h": 606,
+      "w": 402
+    },
+    "windowScroll": {
+      "x": 0,
+      "y": 0
+    },
+    "index": 10,
+    "label": "mobile actual forward select focus"
+  },
+  {
+    "active": {
+      "aria": null,
+      "focusVisible": true,
+      "id": "_r_h_-min",
+      "tag": "SELECT"
+    },
+    "bodyScrollWidth": 402,
+    "description": null,
+    "dialogs": 0,
+    "gender": [
+      {
+        "pressed": "true",
+        "rect": {
+          "bottom": 898.4000244140625,
+          "height": 44,
+          "left": 20,
+          "right": 68.07500076293945,
+          "top": 854.4000244140625,
+          "width": 48.07500076293945,
+          "x": 20,
+          "y": 854.4000244140625
+        },
+        "text": "혼성"
+      },
+      {
+        "pressed": "false",
+        "rect": {
+          "bottom": 898.4000244140625,
+          "height": 44,
+          "left": 76.07500457763672,
+          "right": 112.91250610351562,
+          "top": 854.4000244140625,
+          "width": 36.837501525878906,
+          "x": 76.07500457763672,
+          "y": 854.4000244140625
+        },
+        "text": "남"
+      },
+      {
+        "pressed": "false",
+        "rect": {
+          "bottom": 898.4000244140625,
+          "height": 44,
+          "left": 120.9124984741211,
+          "right": 157.75,
+          "top": 854.4000244140625,
+          "width": 36.837501525878906,
+          "x": 120.9124984741211,
+          "y": 854.4000244140625
+        },
+        "text": "여"
+      }
+    ],
+    "mainScroll": 20.799999237060547,
+    "selects": [
+      {
+        "ariaDescribedBy": null,
+        "ariaInvalid": "false",
+        "clientWidth": 173,
+        "id": "_r_h_-min",
+        "labels": [
+          "최소 등급"
+        ],
+        "options": [
+          {
+            "disabled": false,
+            "text": "미설정",
+            "value": ""
+          },
+          {
+            "disabled": false,
+            "text": "입문",
+            "value": "beginner"
+          },
+          {
+            "disabled": false,
+            "text": "초보",
+            "value": "novice"
+          },
+          {
+            "disabled": false,
+            "text": "중수",
+            "value": "intermediate"
+          },
+          {
+            "disabled": false,
+            "text": "고수",
+            "value": "advanced"
+          }
+        ],
+        "rect": {
+          "bottom": 354.3999938964844,
+          "height": 48,
+          "left": 20,
+          "right": 194.8000030517578,
+          "top": 306.3999938964844,
+          "width": 174.8000030517578,
+          "x": 20,
+          "y": 306.3999938964844
+        },
+        "scrollWidth": 173,
+        "selectedText": "초보",
+        "value": "novice"
+      },
+      {
+        "ariaDescribedBy": null,
+        "ariaInvalid": "false",
+        "clientWidth": 173,
+        "id": "_r_h_-max",
+        "labels": [
+          "최대 등급"
+        ],
+        "options": [
+          {
+            "disabled": false,
+            "text": "미설정",
+            "value": ""
+          },
+          {
+            "disabled": false,
+            "text": "입문",
+            "value": "beginner"
+          },
+          {
+            "disabled": false,
+            "text": "초보",
+            "value": "novice"
+          },
+          {
+            "disabled": false,
+            "text": "중수",
+            "value": "intermediate"
+          },
+          {
+            "disabled": false,
+            "text": "고수",
+            "value": "advanced"
+          }
+        ],
+        "rect": {
+          "bottom": 354.3999938964844,
+          "height": 48,
+          "left": 206.8000030517578,
+          "right": 381.6000061035156,
+          "top": 306.3999938964844,
+          "width": 174.8000030517578,
+          "x": 206.8000030517578,
+          "y": 306.3999938964844
+        },
+        "scrollWidth": 173,
+        "selectedText": "중수",
+        "value": "intermediate"
+      }
+    ],
+    "stepText": [
+      "4/6단계"
+    ],
+    "title": null,
+    "url": "https://alpha.teameet.co.kr/team-matches/new/condition",
+    "utc": "2026-10-04T09:54:43.186Z",
+    "viewport": {
+      "dpr": 1.25,
+      "h": 606,
+      "w": 402
+    },
+    "windowScroll": {
+      "x": 0,
+      "y": 0
+    },
+    "index": 11,
+    "label": "mobile actual reverse select focus"
+  },
+  {
+    "active": {
+      "aria": null,
+      "focusVisible": true,
+      "id": "_r_h_-min",
+      "tag": "SELECT"
+    },
+    "bodyScrollWidth": 402,
+    "description": null,
+    "dialogs": 0,
+    "gender": [
+      {
+        "pressed": "true",
+        "rect": {
+          "bottom": 898.4000244140625,
+          "height": 44,
+          "left": 20,
+          "right": 68.07500076293945,
+          "top": 854.4000244140625,
+          "width": 48.07500076293945,
+          "x": 20,
+          "y": 854.4000244140625
+        },
+        "text": "혼성"
+      },
+      {
+        "pressed": "false",
+        "rect": {
+          "bottom": 898.4000244140625,
+          "height": 44,
+          "left": 76.07500457763672,
+          "right": 112.91250610351562,
+          "top": 854.4000244140625,
+          "width": 36.837501525878906,
+          "x": 76.07500457763672,
+          "y": 854.4000244140625
+        },
+        "text": "남"
+      },
+      {
+        "pressed": "false",
+        "rect": {
+          "bottom": 898.4000244140625,
+          "height": 44,
+          "left": 120.9124984741211,
+          "right": 157.75,
+          "top": 854.4000244140625,
+          "width": 36.837501525878906,
+          "x": 120.9124984741211,
+          "y": 854.4000244140625
+        },
+        "text": "여"
+      }
+    ],
+    "mainScroll": 20.799999237060547,
+    "selects": [
+      {
+        "ariaDescribedBy": null,
+        "ariaInvalid": "false",
+        "clientWidth": 173,
+        "id": "_r_h_-min",
+        "labels": [
+          "최소 등급"
+        ],
+        "options": [
+          {
+            "disabled": false,
+            "text": "미설정",
+            "value": ""
+          },
+          {
+            "disabled": false,
+            "text": "입문",
+            "value": "beginner"
+          },
+          {
+            "disabled": false,
+            "text": "초보",
+            "value": "novice"
+          },
+          {
+            "disabled": false,
+            "text": "중수",
+            "value": "intermediate"
+          },
+          {
+            "disabled": false,
+            "text": "고수",
+            "value": "advanced"
+          }
+        ],
+        "rect": {
+          "bottom": 354.3999938964844,
+          "height": 48,
+          "left": 20,
+          "right": 194.8000030517578,
+          "top": 306.3999938964844,
+          "width": 174.8000030517578,
+          "x": 20,
+          "y": 306.3999938964844
+        },
+        "scrollWidth": 173,
+        "selectedText": "미설정",
+        "value": ""
+      },
+      {
+        "ariaDescribedBy": null,
+        "ariaInvalid": "false",
+        "clientWidth": 173,
+        "id": "_r_h_-max",
+        "labels": [
+          "최대 등급"
+        ],
+        "options": [
+          {
+            "disabled": false,
+            "text": "미설정",
+            "value": ""
+          },
+          {
+            "disabled": false,
+            "text": "입문",
+            "value": "beginner"
+          },
+          {
+            "disabled": false,
+            "text": "초보",
+            "value": "novice"
+          },
+          {
+            "disabled": false,
+            "text": "중수",
+            "value": "intermediate"
+          },
+          {
+            "disabled": false,
+            "text": "고수",
+            "value": "advanced"
+          }
+        ],
+        "rect": {
+          "bottom": 354.3999938964844,
+          "height": 48,
+          "left": 206.8000030517578,
+          "right": 381.6000061035156,
+          "top": 306.3999938964844,
+          "width": 174.8000030517578,
+          "x": 206.8000030517578,
+          "y": 306.3999938964844
+        },
+        "scrollWidth": 173,
+        "selectedText": "미설정",
+        "value": ""
+      }
+    ],
+    "stepText": [
+      "4/6단계"
+    ],
+    "title": null,
+    "url": "https://alpha.teameet.co.kr/team-matches/new/condition",
+    "utc": "2026-10-04T09:54:43.215Z",
+    "viewport": {
+      "dpr": 1.25,
+      "h": 606,
+      "w": 402
+    },
+    "windowScroll": {
+      "x": 0,
+      "y": 0
+    },
+    "index": 12,
+    "label": "mobile both endpoints restored unset"
+  },
+  {
+    "active": {
+      "aria": null,
+      "focusVisible": true,
+      "id": "_r_h_-min",
+      "tag": "SELECT"
+    },
+    "bodyScrollWidth": 402,
+    "description": null,
+    "dialogs": 0,
+    "gender": [
+      {
+        "pressed": "true",
+        "rect": {
+          "bottom": 898.4000244140625,
+          "height": 44,
+          "left": 20,
+          "right": 68.07500076293945,
+          "top": 854.4000244140625,
+          "width": 48.07500076293945,
+          "x": 20,
+          "y": 854.4000244140625
+        },
+        "text": "혼성"
+      },
+      {
+        "pressed": "false",
+        "rect": {
+          "bottom": 898.4000244140625,
+          "height": 44,
+          "left": 76.07500457763672,
+          "right": 112.91250610351562,
+          "top": 854.4000244140625,
+          "width": 36.837501525878906,
+          "x": 76.07500457763672,
+          "y": 854.4000244140625
+        },
+        "text": "남"
+      },
+      {
+        "pressed": "false",
+        "rect": {
+          "bottom": 898.4000244140625,
+          "height": 44,
+          "left": 120.9124984741211,
+          "right": 157.75,
+          "top": 854.4000244140625,
+          "width": 36.837501525878906,
+          "x": 120.9124984741211,
+          "y": 854.4000244140625
+        },
+        "text": "여"
+      }
+    ],
+    "mainScroll": 20.799999237060547,
+    "selects": [
+      {
+        "ariaDescribedBy": null,
+        "ariaInvalid": "false",
+        "clientWidth": 173,
+        "id": "_r_h_-min",
+        "labels": [
+          "최소 등급"
+        ],
+        "options": [
+          {
+            "disabled": false,
+            "text": "미설정",
+            "value": ""
+          },
+          {
+            "disabled": false,
+            "text": "입문",
+            "value": "beginner"
+          },
+          {
+            "disabled": false,
+            "text": "초보",
+            "value": "novice"
+          },
+          {
+            "disabled": false,
+            "text": "중수",
+            "value": "intermediate"
+          },
+          {
+            "disabled": false,
+            "text": "고수",
+            "value": "advanced"
+          }
+        ],
+        "rect": {
+          "bottom": 354.3999938964844,
+          "height": 48,
+          "left": 20,
+          "right": 194.8000030517578,
+          "top": 306.3999938964844,
+          "width": 174.8000030517578,
+          "x": 20,
+          "y": 306.3999938964844
+        },
+        "scrollWidth": 173,
+        "selectedText": "미설정",
+        "value": ""
+      },
+      {
+        "ariaDescribedBy": null,
+        "ariaInvalid": "false",
+        "clientWidth": 173,
+        "id": "_r_h_-max",
+        "labels": [
+          "최대 등급"
+        ],
+        "options": [
+          {
+            "disabled": false,
+            "text": "미설정",
+            "value": ""
+          },
+          {
+            "disabled": false,
+            "text": "입문",
+            "value": "beginner"
+          },
+          {
+            "disabled": false,
+            "text": "초보",
+            "value": "novice"
+          },
+          {
+            "disabled": false,
+            "text": "중수",
+            "value": "intermediate"
+          },
+          {
+            "disabled": false,
+            "text": "고수",
+            "value": "advanced"
+          }
+        ],
+        "rect": {
+          "bottom": 354.3999938964844,
+          "height": 48,
+          "left": 206.8000030517578,
+          "right": 381.6000061035156,
+          "top": 306.3999938964844,
+          "width": 174.8000030517578,
+          "x": 206.8000030517578,
+          "y": 306.3999938964844
+        },
+        "scrollWidth": 173,
+        "selectedText": "미설정",
+        "value": ""
+      }
+    ],
+    "stepText": [
+      "4/6단계"
+    ],
+    "title": null,
+    "url": "https://alpha.teameet.co.kr/team-matches/new/condition",
+    "utc": "2026-10-04T09:54:59.731Z",
+    "viewport": {
+      "dpr": 1.25,
+      "h": 606,
+      "w": 402
+    },
+    "windowScroll": {
+      "x": 0,
+      "y": 0
+    },
+    "index": 13,
+    "label": "mobile settled unset restoration"
+  },
+  {
+    "active": {
+      "aria": null,
+      "focusVisible": true,
+      "id": "_r_h_-min",
+      "tag": "SELECT"
+    },
+    "bodyScrollWidth": 788,
+    "description": null,
+    "dialogs": 0,
+    "gender": [
+      {
+        "pressed": "true",
+        "rect": {
+          "bottom": 770.6666870117188,
+          "height": 44,
+          "left": 114,
+          "right": 161.8125,
+          "top": 726.6666870117188,
+          "width": 47.8125,
+          "x": 114,
+          "y": 726.6666870117188
+        },
+        "text": "혼성"
+      },
+      {
+        "pressed": "false",
+        "rect": {
+          "bottom": 770.6666870117188,
+          "height": 44,
+          "left": 169.8125,
+          "right": 206.3854179382324,
+          "top": 726.6666870117188,
+          "width": 36.57291793823242,
+          "x": 169.8125,
+          "y": 726.6666870117188
+        },
+        "text": "남"
+      },
+      {
+        "pressed": "false",
+        "rect": {
+          "bottom": 770.6666870117188,
+          "height": 44,
+          "left": 214.3854217529297,
+          "right": 250.9583396911621,
+          "top": 726.6666870117188,
+          "width": 36.57291793823242,
+          "x": 214.3854217529297,
+          "y": 726.6666870117188
+        },
+        "text": "여"
+      }
+    ],
+    "mainScroll": 20.66666603088379,
+    "selects": [
+      {
+        "ariaDescribedBy": null,
+        "ariaInvalid": "false",
+        "clientWidth": 273,
+        "id": "_r_h_-min",
+        "labels": [
+          "최소 등급"
+        ],
+        "options": [
+          {
+            "disabled": false,
+            "text": "미설정",
+            "value": ""
+          },
+          {
+            "disabled": false,
+            "text": "입문",
+            "value": "beginner"
+          },
+          {
+            "disabled": false,
+            "text": "초보",
+            "value": "novice"
+          },
+          {
+            "disabled": false,
+            "text": "중수",
+            "value": "intermediate"
+          },
+          {
+            "disabled": false,
+            "text": "고수",
+            "value": "advanced"
+          }
+        ],
+        "rect": {
+          "bottom": 330.66668701171875,
+          "height": 48,
+          "left": 114,
+          "right": 388,
+          "top": 282.66668701171875,
+          "width": 274,
+          "x": 114,
+          "y": 282.66668701171875
+        },
+        "scrollWidth": 273,
+        "selectedText": "미설정",
+        "value": ""
+      },
+      {
+        "ariaDescribedBy": null,
+        "ariaInvalid": "false",
+        "clientWidth": 273,
+        "id": "_r_h_-max",
+        "labels": [
+          "최대 등급"
+        ],
+        "options": [
+          {
+            "disabled": false,
+            "text": "미설정",
+            "value": ""
+          },
+          {
+            "disabled": false,
+            "text": "입문",
+            "value": "beginner"
+          },
+          {
+            "disabled": false,
+            "text": "초보",
+            "value": "novice"
+          },
+          {
+            "disabled": false,
+            "text": "중수",
+            "value": "intermediate"
+          },
+          {
+            "disabled": false,
+            "text": "고수",
+            "value": "advanced"
+          }
+        ],
+        "rect": {
+          "bottom": 330.66668701171875,
+          "height": 48,
+          "left": 400,
+          "right": 674,
+          "top": 282.66668701171875,
+          "width": 274,
+          "x": 400,
+          "y": 282.66668701171875
+        },
+        "scrollWidth": 273,
+        "selectedText": "미설정",
+        "value": ""
+      }
+    ],
+    "stepText": [
+      "4/6단계"
+    ],
+    "title": null,
+    "url": "https://alpha.teameet.co.kr/team-matches/new/condition",
+    "utc": "2026-10-04T09:55:05.341Z",
+    "viewport": {
+      "dpr": 1.5,
+      "h": 505,
+      "w": 788
+    },
+    "windowScroll": {
+      "x": 0,
+      "y": 0
+    },
+    "index": 14,
+    "label": "tablet initial unset range"
+  },
+  {
+    "active": {
+      "focusVisible": true,
+      "id": "_r_h_-min",
+      "tag": "SELECT"
+    },
+    "bodyScrollWidth": 788,
+    "description": null,
+    "dialogs": 0,
+    "gender": [
+      {
+        "pressed": "true",
+        "rect": {
+          "bottom": 770.6666870117188,
+          "height": 44,
+          "left": 114,
+          "right": 161.8125,
+          "top": 726.6666870117188,
+          "width": 47.8125,
+          "x": 114,
+          "y": 726.6666870117188
+        },
+        "text": "혼성"
+      },
+      {
+        "pressed": "false",
+        "rect": {
+          "bottom": 770.6666870117188,
+          "height": 44,
+          "left": 169.8125,
+          "right": 206.3854179382324,
+          "top": 726.6666870117188,
+          "width": 36.57291793823242,
+          "x": 169.8125,
+          "y": 726.6666870117188
+        },
+        "text": "남"
+      },
+      {
+        "pressed": "false",
+        "rect": {
+          "bottom": 770.6666870117188,
+          "height": 44,
+          "left": 214.3854217529297,
+          "right": 250.9583396911621,
+          "top": 726.6666870117188,
+          "width": 36.57291793823242,
+          "x": 214.3854217529297,
+          "y": 726.6666870117188
+        },
+        "text": "여"
+      }
+    ],
+    "mainScroll": 20.66666603088379,
+    "selects": [
+      {
+        "ariaInvalid": "false",
+        "clientWidth": 273,
+        "id": "_r_h_-min",
+        "labels": [
+          "최소 등급"
+        ],
+        "rect": {
+          "bottom": 330.66668701171875,
+          "height": 48,
+          "left": 114,
+          "right": 388,
+          "top": 282.66668701171875,
+          "width": 274,
+          "x": 114,
+          "y": 282.66668701171875
+        },
+        "scrollWidth": 273,
+        "selectedText": "초보",
+        "value": "novice"
+      },
+      {
+        "ariaInvalid": "false",
+        "clientWidth": 273,
+        "id": "_r_h_-max",
+        "labels": [
+          "최대 등급"
+        ],
+        "rect": {
+          "bottom": 330.66668701171875,
+          "height": 48,
+          "left": 400,
+          "right": 674,
+          "top": 282.66668701171875,
+          "width": 274,
+          "x": 400,
+          "y": 282.66668701171875
+        },
+        "scrollWidth": 273,
+        "selectedText": "초보",
+        "value": "novice"
+      }
+    ],
+    "title": null,
+    "url": "https://alpha.teameet.co.kr/team-matches/new/condition",
+    "utc": "2026-10-04T09:55:45.938Z",
+    "viewport": {
+      "dpr": 1.5,
+      "h": 505,
+      "w": 788
+    },
+    "windowScroll": {
+      "x": 0,
+      "y": 0
+    },
+    "index": 15,
+    "label": "tablet same-level novice pair"
+  },
+  {
+    "active": {
+      "focusVisible": true,
+      "id": "_r_h_-min",
+      "tag": "SELECT"
+    },
+    "bodyScrollWidth": 788,
+    "description": null,
+    "dialogs": 0,
+    "gender": [
+      {
+        "pressed": "true",
+        "rect": {
+          "bottom": 770.6666870117188,
+          "height": 44,
+          "left": 114,
+          "right": 161.8125,
+          "top": 726.6666870117188,
+          "width": 47.8125,
+          "x": 114,
+          "y": 726.6666870117188
+        },
+        "text": "혼성"
+      },
+      {
+        "pressed": "false",
+        "rect": {
+          "bottom": 770.6666870117188,
+          "height": 44,
+          "left": 169.8125,
+          "right": 206.3854179382324,
+          "top": 726.6666870117188,
+          "width": 36.57291793823242,
+          "x": 169.8125,
+          "y": 726.6666870117188
+        },
+        "text": "남"
+      },
+      {
+        "pressed": "false",
+        "rect": {
+          "bottom": 770.6666870117188,
+          "height": 44,
+          "left": 214.3854217529297,
+          "right": 250.9583396911621,
+          "top": 726.6666870117188,
+          "width": 36.57291793823242,
+          "x": 214.3854217529297,
+          "y": 726.6666870117188
+        },
+        "text": "여"
+      }
+    ],
+    "mainScroll": 20.66666603088379,
+    "selects": [
+      {
+        "ariaInvalid": "false",
+        "clientWidth": 273,
+        "id": "_r_h_-min",
+        "labels": [
+          "최소 등급"
+        ],
+        "rect": {
+          "bottom": 330.66668701171875,
+          "height": 48,
+          "left": 114,
+          "right": 388,
+          "top": 282.66668701171875,
+          "width": 274,
+          "x": 114,
+          "y": 282.66668701171875
+        },
+        "scrollWidth": 273,
+        "selectedText": "초보",
+        "value": "novice"
+      },
+      {
+        "ariaInvalid": "false",
+        "clientWidth": 273,
+        "id": "_r_h_-max",
+        "labels": [
+          "최대 등급"
+        ],
+        "rect": {
+          "bottom": 330.66668701171875,
+          "height": 48,
+          "left": 400,
+          "right": 674,
+          "top": 282.66668701171875,
+          "width": 274,
+          "x": 400,
+          "y": 282.66668701171875
+        },
+        "scrollWidth": 273,
+        "selectedText": "중수",
+        "value": "intermediate"
+      }
+    ],
+    "title": null,
+    "url": "https://alpha.teameet.co.kr/team-matches/new/condition",
+    "utc": "2026-10-04T09:55:45.962Z",
+    "viewport": {
+      "dpr": 1.5,
+      "h": 505,
+      "w": 788
+    },
+    "windowScroll": {
+      "x": 0,
+      "y": 0
+    },
+    "index": 16,
+    "label": "tablet partial range novice-intermediate"
+  },
+  {
+    "active": {
+      "focusVisible": true,
+      "id": "_r_h_-min",
+      "tag": "SELECT"
+    },
+    "bodyScrollWidth": 788,
+    "description": null,
+    "dialogs": 0,
+    "gender": [
+      {
+        "pressed": "true",
+        "rect": {
+          "bottom": 770.6666870117188,
+          "height": 44,
+          "left": 114,
+          "right": 161.8125,
+          "top": 726.6666870117188,
+          "width": 47.8125,
+          "x": 114,
+          "y": 726.6666870117188
+        },
+        "text": "혼성"
+      },
+      {
+        "pressed": "false",
+        "rect": {
+          "bottom": 770.6666870117188,
+          "height": 44,
+          "left": 169.8125,
+          "right": 206.3854179382324,
+          "top": 726.6666870117188,
+          "width": 36.57291793823242,
+          "x": 169.8125,
+          "y": 726.6666870117188
+        },
+        "text": "남"
+      },
+      {
+        "pressed": "false",
+        "rect": {
+          "bottom": 770.6666870117188,
+          "height": 44,
+          "left": 214.3854217529297,
+          "right": 250.9583396911621,
+          "top": 726.6666870117188,
+          "width": 36.57291793823242,
+          "x": 214.3854217529297,
+          "y": 726.6666870117188
+        },
+        "text": "여"
+      }
+    ],
+    "mainScroll": 20.66666603088379,
+    "selects": [
+      {
+        "ariaInvalid": "false",
+        "clientWidth": 273,
+        "id": "_r_h_-min",
+        "labels": [
+          "최소 등급"
+        ],
+        "rect": {
+          "bottom": 330.66668701171875,
+          "height": 48,
+          "left": 114,
+          "right": 388,
+          "top": 282.66668701171875,
+          "width": 274,
+          "x": 114,
+          "y": 282.66668701171875
+        },
+        "scrollWidth": 273,
+        "selectedText": "고수",
+        "value": "advanced"
+      },
+      {
+        "ariaInvalid": "false",
+        "clientWidth": 273,
+        "id": "_r_h_-max",
+        "labels": [
+          "최대 등급"
+        ],
+        "rect": {
+          "bottom": 330.66668701171875,
+          "height": 48,
+          "left": 400,
+          "right": 674,
+          "top": 282.66668701171875,
+          "width": 274,
+          "x": 400,
+          "y": 282.66668701171875
+        },
+        "scrollWidth": 273,
+        "selectedText": "고수",
+        "value": "advanced"
+      }
+    ],
+    "title": null,
+    "url": "https://alpha.teameet.co.kr/team-matches/new/condition",
+    "utc": "2026-10-04T09:55:45.998Z",
+    "viewport": {
+      "dpr": 1.5,
+      "h": 505,
+      "w": 788
+    },
+    "windowScroll": {
+      "x": 0,
+      "y": 0
+    },
+    "index": 17,
+    "label": "tablet min crossing raises both advanced"
+  },
+  {
+    "active": {
+      "focusVisible": true,
+      "id": "_r_h_-min",
+      "tag": "SELECT"
+    },
+    "bodyScrollWidth": 788,
+    "description": null,
+    "dialogs": 0,
+    "gender": [
+      {
+        "pressed": "true",
+        "rect": {
+          "bottom": 770.6666870117188,
+          "height": 44,
+          "left": 114,
+          "right": 161.8125,
+          "top": 726.6666870117188,
+          "width": 47.8125,
+          "x": 114,
+          "y": 726.6666870117188
+        },
+        "text": "혼성"
+      },
+      {
+        "pressed": "false",
+        "rect": {
+          "bottom": 770.6666870117188,
+          "height": 44,
+          "left": 169.8125,
+          "right": 206.3854179382324,
+          "top": 726.6666870117188,
+          "width": 36.57291793823242,
+          "x": 169.8125,
+          "y": 726.6666870117188
+        },
+        "text": "남"
+      },
+      {
+        "pressed": "false",
+        "rect": {
+          "bottom": 770.6666870117188,
+          "height": 44,
+          "left": 214.3854217529297,
+          "right": 250.9583396911621,
+          "top": 726.6666870117188,
+          "width": 36.57291793823242,
+          "x": 214.3854217529297,
+          "y": 726.6666870117188
+        },
+        "text": "여"
+      }
+    ],
+    "mainScroll": 20.66666603088379,
+    "selects": [
+      {
+        "ariaInvalid": "false",
+        "clientWidth": 273,
+        "id": "_r_h_-min",
+        "labels": [
+          "최소 등급"
+        ],
+        "rect": {
+          "bottom": 330.66668701171875,
+          "height": 48,
+          "left": 114,
+          "right": 388,
+          "top": 282.66668701171875,
+          "width": 274,
+          "x": 114,
+          "y": 282.66668701171875
+        },
+        "scrollWidth": 273,
+        "selectedText": "입문",
+        "value": "beginner"
+      },
+      {
+        "ariaInvalid": "false",
+        "clientWidth": 273,
+        "id": "_r_h_-max",
+        "labels": [
+          "최대 등급"
+        ],
+        "rect": {
+          "bottom": 330.66668701171875,
+          "height": 48,
+          "left": 400,
+          "right": 674,
+          "top": 282.66668701171875,
+          "width": 274,
+          "x": 400,
+          "y": 282.66668701171875
+        },
+        "scrollWidth": 273,
+        "selectedText": "입문",
+        "value": "beginner"
+      }
+    ],
+    "title": null,
+    "url": "https://alpha.teameet.co.kr/team-matches/new/condition",
+    "utc": "2026-10-04T09:55:46.024Z",
+    "viewport": {
+      "dpr": 1.5,
+      "h": 505,
+      "w": 788
+    },
+    "windowScroll": {
+      "x": 0,
+      "y": 0
+    },
+    "index": 18,
+    "label": "tablet max crossing lowers both beginner"
+  },
+  {
+    "active": {
+      "focusVisible": true,
+      "id": "_r_h_-max",
+      "tag": "SELECT"
+    },
+    "bodyScrollWidth": 788,
+    "description": null,
+    "dialogs": 0,
+    "gender": [
+      {
+        "pressed": "true",
+        "rect": {
+          "bottom": 744,
+          "height": 44,
+          "left": 114,
+          "right": 161.8125,
+          "top": 700,
+          "width": 47.8125,
+          "x": 114,
+          "y": 700
+        },
+        "text": "혼성"
+      },
+      {
+        "pressed": "false",
+        "rect": {
+          "bottom": 744,
+          "height": 44,
+          "left": 169.8125,
+          "right": 206.3854179382324,
+          "top": 700,
+          "width": 36.57291793823242,
+          "x": 169.8125,
+          "y": 700
+        },
+        "text": "남"
+      },
+      {
+        "pressed": "false",
+        "rect": {
+          "bottom": 744,
+          "height": 44,
+          "left": 214.3854217529297,
+          "right": 250.9583396911621,
+          "top": 700,
+          "width": 36.57291793823242,
+          "x": 214.3854217529297,
+          "y": 700
+        },
+        "text": "여"
+      }
+    ],
+    "mainScroll": 47.33333206176758,
+    "selects": [
+      {
+        "ariaInvalid": "false",
+        "clientWidth": 273,
+        "id": "_r_h_-min",
+        "labels": [
+          "최소 등급"
+        ],
+        "rect": {
+          "bottom": 304,
+          "height": 48,
+          "left": 114,
+          "right": 388,
+          "top": 256,
+          "width": 274,
+          "x": 114,
+          "y": 256
+        },
+        "scrollWidth": 273,
+        "selectedText": "초보",
+        "value": "novice"
+      },
+      {
+        "ariaInvalid": "false",
+        "clientWidth": 273,
+        "id": "_r_h_-max",
+        "labels": [
+          "최대 등급"
+        ],
+        "rect": {
+          "bottom": 304,
+          "height": 48,
+          "left": 400,
+          "right": 674,
+          "top": 256,
+          "width": 274,
+          "x": 400,
+          "y": 256
+        },
+        "scrollWidth": 273,
+        "selectedText": "중수",
+        "value": "intermediate"
+      }
+    ],
+    "title": null,
+    "url": "https://alpha.teameet.co.kr/team-matches/new/condition",
+    "utc": "2026-10-04T09:55:46.115Z",
+    "viewport": {
+      "dpr": 1.5,
+      "h": 505,
+      "w": 788
+    },
+    "windowScroll": {
+      "x": 0,
+      "y": 0
+    },
+    "index": 19,
+    "label": "tablet keyboard novice-intermediate maximum focus"
+  },
+  {
+    "active": {
+      "focusVisible": true,
+      "id": "_r_h_-min",
+      "tag": "SELECT"
+    },
+    "bodyScrollWidth": 788,
+    "description": null,
+    "dialogs": 0,
+    "gender": [
+      {
+        "pressed": "true",
+        "rect": {
+          "bottom": 744,
+          "height": 44,
+          "left": 114,
+          "right": 161.8125,
+          "top": 700,
+          "width": 47.8125,
+          "x": 114,
+          "y": 700
+        },
+        "text": "혼성"
+      },
+      {
+        "pressed": "false",
+        "rect": {
+          "bottom": 744,
+          "height": 44,
+          "left": 169.8125,
+          "right": 206.3854179382324,
+          "top": 700,
+          "width": 36.57291793823242,
+          "x": 169.8125,
+          "y": 700
+        },
+        "text": "남"
+      },
+      {
+        "pressed": "false",
+        "rect": {
+          "bottom": 744,
+          "height": 44,
+          "left": 214.3854217529297,
+          "right": 250.9583396911621,
+          "top": 700,
+          "width": 36.57291793823242,
+          "x": 214.3854217529297,
+          "y": 700
+        },
+        "text": "여"
+      }
+    ],
+    "mainScroll": 47.33333206176758,
+    "selects": [
+      {
+        "ariaInvalid": "false",
+        "clientWidth": 273,
+        "id": "_r_h_-min",
+        "labels": [
+          "최소 등급"
+        ],
+        "rect": {
+          "bottom": 304,
+          "height": 48,
+          "left": 114,
+          "right": 388,
+          "top": 256,
+          "width": 274,
+          "x": 114,
+          "y": 256
+        },
+        "scrollWidth": 273,
+        "selectedText": "초보",
+        "value": "novice"
+      },
+      {
+        "ariaInvalid": "false",
+        "clientWidth": 273,
+        "id": "_r_h_-max",
+        "labels": [
+          "최대 등급"
+        ],
+        "rect": {
+          "bottom": 304,
+          "height": 48,
+          "left": 400,
+          "right": 674,
+          "top": 256,
+          "width": 274,
+          "x": 400,
+          "y": 256
+        },
+        "scrollWidth": 273,
+        "selectedText": "중수",
+        "value": "intermediate"
+      }
+    ],
+    "title": null,
+    "url": "https://alpha.teameet.co.kr/team-matches/new/condition",
+    "utc": "2026-10-04T09:55:46.150Z",
+    "viewport": {
+      "dpr": 1.5,
+      "h": 505,
+      "w": 788
+    },
+    "windowScroll": {
+      "x": 0,
+      "y": 0
+    },
+    "index": 20,
+    "label": "tablet reverse minimum focus range retained"
+  },
+  {
+    "active": {
+      "focusVisible": false,
+      "id": "",
+      "tag": "BODY"
+    },
+    "bodyScrollWidth": 788,
+    "description": null,
+    "dialogs": 0,
+    "gender": [],
+    "mainScroll": 0,
+    "selects": [],
+    "title": null,
+    "url": "https://alpha.teameet.co.kr/team-matches/new/place-time",
+    "utc": "2026-10-04T09:56:11.375Z",
+    "viewport": {
+      "dpr": 1.5,
+      "h": 505,
+      "w": 788
+    },
+    "windowScroll": {
+      "x": 0,
+      "y": 0
+    },
+    "index": 21,
+    "label": "tablet local place-time reached without changing its fields",
+    "unrelatedSelectCount": 2,
+    "scopeNote": "Local place-time route observation only; unrelated location fields excluded."
+  },
+  {
+    "active": {
+      "focusVisible": false,
+      "id": "",
+      "tag": "BODY"
+    },
+    "bodyScrollWidth": 788,
+    "description": null,
+    "dialogs": 0,
+    "gender": [
+      {
+        "pressed": "true",
+        "rect": {
+          "bottom": 791.3333740234375,
+          "height": 44,
+          "left": 114,
+          "right": 161.8125,
+          "top": 747.3333740234375,
+          "width": 47.8125,
+          "x": 114,
+          "y": 747.3333740234375
+        },
+        "text": "혼성"
+      },
+      {
+        "pressed": "false",
+        "rect": {
+          "bottom": 791.3333740234375,
+          "height": 44,
+          "left": 169.8125,
+          "right": 206.3854179382324,
+          "top": 747.3333740234375,
+          "width": 36.57291793823242,
+          "x": 169.8125,
+          "y": 747.3333740234375
+        },
+        "text": "남"
+      },
+      {
+        "pressed": "false",
+        "rect": {
+          "bottom": 791.3333740234375,
+          "height": 44,
+          "left": 214.3854217529297,
+          "right": 250.9583396911621,
+          "top": 747.3333740234375,
+          "width": 36.57291793823242,
+          "x": 214.3854217529297,
+          "y": 747.3333740234375
+        },
+        "text": "여"
+      }
+    ],
+    "mainScroll": 0,
+    "selects": [
+      {
+        "ariaInvalid": "false",
+        "clientWidth": 273,
+        "id": "_r_10_-min",
+        "labels": [
+          "최소 등급"
+        ],
+        "rect": {
+          "bottom": 351.3333435058594,
+          "height": 48,
+          "left": 114,
+          "right": 388,
+          "top": 303.3333435058594,
+          "width": 274,
+          "x": 114,
+          "y": 303.3333435058594
+        },
+        "scrollWidth": 273,
+        "selectedText": "초보",
+        "value": "novice"
+      },
+      {
+        "ariaInvalid": "false",
+        "clientWidth": 273,
+        "id": "_r_10_-max",
+        "labels": [
+          "최대 등급"
+        ],
+        "rect": {
+          "bottom": 351.3333435058594,
+          "height": 48,
+          "left": 400,
+          "right": 674,
+          "top": 303.3333435058594,
+          "width": 274,
+          "x": 400,
+          "y": 303.3333435058594
+        },
+        "scrollWidth": 273,
+        "selectedText": "중수",
+        "value": "intermediate"
+      }
+    ],
+    "title": null,
+    "url": "https://alpha.teameet.co.kr/team-matches/new/condition",
+    "utc": "2026-10-04T09:56:11.901Z",
+    "viewport": {
+      "dpr": 1.5,
+      "h": 505,
+      "w": 788
+    },
+    "windowScroll": {
+      "x": 0,
+      "y": 0
+    },
+    "index": 22,
+    "label": "tablet partial range preserved after round trip"
+  },
+  {
+    "active": {
+      "focusVisible": false,
+      "id": "",
+      "tag": "BODY"
+    },
+    "bodyScrollWidth": 788,
+    "description": null,
+    "dialogs": 0,
+    "gender": [
+      {
+        "pressed": "true",
+        "rect": {
+          "bottom": 791.3333740234375,
+          "height": 44,
+          "left": 114,
+          "right": 161.8125,
+          "top": 747.3333740234375,
+          "width": 47.8125,
+          "x": 114,
+          "y": 747.3333740234375
+        },
+        "text": "혼성"
+      },
+      {
+        "pressed": "false",
+        "rect": {
+          "bottom": 791.3333740234375,
+          "height": 44,
+          "left": 169.8125,
+          "right": 206.3854179382324,
+          "top": 747.3333740234375,
+          "width": 36.57291793823242,
+          "x": 169.8125,
+          "y": 747.3333740234375
+        },
+        "text": "남"
+      },
+      {
+        "pressed": "false",
+        "rect": {
+          "bottom": 791.3333740234375,
+          "height": 44,
+          "left": 214.3854217529297,
+          "right": 250.9583396911621,
+          "top": 747.3333740234375,
+          "width": 36.57291793823242,
+          "x": 214.3854217529297,
+          "y": 747.3333740234375
+        },
+        "text": "여"
+      }
+    ],
+    "mainScroll": 0,
+    "selects": [
+      {
+        "ariaInvalid": "false",
+        "clientWidth": 273,
+        "id": "_r_10_-min",
+        "labels": [
+          "최소 등급"
+        ],
+        "rect": {
+          "bottom": 351.3333435058594,
+          "height": 48,
+          "left": 114,
+          "right": 388,
+          "top": 303.3333435058594,
+          "width": 274,
+          "x": 114,
+          "y": 303.3333435058594
+        },
+        "scrollWidth": 273,
+        "selectedText": "미설정",
+        "value": ""
+      },
+      {
+        "ariaInvalid": "false",
+        "clientWidth": 273,
+        "id": "_r_10_-max",
+        "labels": [
+          "최대 등급"
+        ],
+        "rect": {
+          "bottom": 351.3333435058594,
+          "height": 48,
+          "left": 400,
+          "right": 674,
+          "top": 303.3333435058594,
+          "width": 274,
+          "x": 400,
+          "y": 303.3333435058594
+        },
+        "scrollWidth": 273,
+        "selectedText": "미설정",
+        "value": ""
+      }
+    ],
+    "title": null,
+    "url": "https://alpha.teameet.co.kr/team-matches/new/condition",
+    "utc": "2026-10-04T09:56:11.927Z",
+    "viewport": {
+      "dpr": 1.5,
+      "h": 505,
+      "w": 788
+    },
+    "windowScroll": {
+      "x": 0,
+      "y": 0
+    },
+    "index": 23,
+    "label": "tablet both endpoints restored unset"
+  },
+  {
+    "active": {
+      "focusVisible": false,
+      "id": "",
+      "tag": "BODY"
+    },
+    "bodyScrollWidth": 1182,
+    "description": null,
+    "dialogs": 0,
+    "gender": [
+      {
+        "pressed": "true",
+        "rect": {
+          "bottom": 940,
+          "height": 44,
+          "left": 331,
+          "right": 379.484375,
+          "top": 896,
+          "width": 48.484375,
+          "x": 331,
+          "y": 896
+        },
+        "text": "혼성"
+      },
+      {
+        "pressed": "false",
+        "rect": {
+          "bottom": 940,
+          "height": 44,
+          "left": 387.484375,
+          "right": 424.734375,
+          "top": 896,
+          "width": 37.25,
+          "x": 387.484375,
+          "y": 896
+        },
+        "text": "남"
+      },
+      {
+        "pressed": "false",
+        "rect": {
+          "bottom": 940,
+          "height": 44,
+          "left": 432.734375,
+          "right": 469.984375,
+          "top": 896,
+          "width": 37.25,
+          "x": 432.734375,
+          "y": 896
+        },
+        "text": "여"
+      }
+    ],
+    "mainScroll": 0,
+    "selects": [
+      {
+        "ariaInvalid": "false",
+        "clientWidth": 252,
+        "id": "_r_10_-min",
+        "labels": [
+          "최소 등급"
+        ],
+        "rect": {
+          "bottom": 448,
+          "height": 48,
+          "left": 331,
+          "right": 585,
+          "top": 400,
+          "width": 254,
+          "x": 331,
+          "y": 400
+        },
+        "scrollWidth": 252,
+        "selectedText": "미설정",
+        "value": ""
+      },
+      {
+        "ariaInvalid": "false",
+        "clientWidth": 252,
+        "id": "_r_10_-max",
+        "labels": [
+          "최대 등급"
+        ],
+        "rect": {
+          "bottom": 448,
+          "height": 48,
+          "left": 597,
+          "right": 851,
+          "top": 400,
+          "width": 254,
+          "x": 597,
+          "y": 400
+        },
+        "scrollWidth": 252,
+        "selectedText": "미설정",
+        "value": ""
+      }
+    ],
+    "title": null,
+    "url": "https://alpha.teameet.co.kr/team-matches/new/condition",
+    "utc": "2026-10-04T09:56:12.079Z",
+    "viewport": {
+      "dpr": 1,
+      "h": 757,
+      "w": 1182
+    },
+    "windowScroll": {
+      "x": 0,
+      "y": 0
+    },
+    "index": 24,
+    "label": "desktop initial unset range"
+  },
+  {
+    "active": {
+      "focusVisible": false,
+      "id": "",
+      "tag": "BODY"
+    },
+    "bodyScrollWidth": 1182,
+    "description": null,
+    "dialogs": 0,
+    "gender": [
+      {
+        "pressed": "true",
+        "rect": {
+          "bottom": 940,
+          "height": 44,
+          "left": 331,
+          "right": 379.484375,
+          "top": 896,
+          "width": 48.484375,
+          "x": 331,
+          "y": 896
+        },
+        "text": "혼성"
+      },
+      {
+        "pressed": "false",
+        "rect": {
+          "bottom": 940,
+          "height": 44,
+          "left": 387.484375,
+          "right": 424.734375,
+          "top": 896,
+          "width": 37.25,
+          "x": 387.484375,
+          "y": 896
+        },
+        "text": "남"
+      },
+      {
+        "pressed": "false",
+        "rect": {
+          "bottom": 940,
+          "height": 44,
+          "left": 432.734375,
+          "right": 469.984375,
+          "top": 896,
+          "width": 37.25,
+          "x": 432.734375,
+          "y": 896
+        },
+        "text": "여"
+      }
+    ],
+    "mainScroll": 0,
+    "selects": [
+      {
+        "ariaInvalid": "false",
+        "clientWidth": 252,
+        "id": "_r_10_-min",
+        "labels": [
+          "최소 등급"
+        ],
+        "rect": {
+          "bottom": 448,
+          "height": 48,
+          "left": 331,
+          "right": 585,
+          "top": 400,
+          "width": 254,
+          "x": 331,
+          "y": 400
+        },
+        "scrollWidth": 252,
+        "selectedText": "초보",
+        "value": "novice"
+      },
+      {
+        "ariaInvalid": "false",
+        "clientWidth": 252,
+        "id": "_r_10_-max",
+        "labels": [
+          "최대 등급"
+        ],
+        "rect": {
+          "bottom": 448,
+          "height": 48,
+          "left": 597,
+          "right": 851,
+          "top": 400,
+          "width": 254,
+          "x": 597,
+          "y": 400
+        },
+        "scrollWidth": 252,
+        "selectedText": "초보",
+        "value": "novice"
+      }
+    ],
+    "title": null,
+    "url": "https://alpha.teameet.co.kr/team-matches/new/condition",
+    "utc": "2026-10-04T09:56:49.999Z",
+    "viewport": {
+      "dpr": 1,
+      "h": 757,
+      "w": 1182
+    },
+    "windowScroll": {
+      "x": 0,
+      "y": 0
+    },
+    "index": 25,
+    "label": "desktop same-level novice pair"
+  },
+  {
+    "active": {
+      "focusVisible": false,
+      "id": "",
+      "tag": "BODY"
+    },
+    "bodyScrollWidth": 1182,
+    "description": null,
+    "dialogs": 0,
+    "gender": [
+      {
+        "pressed": "true",
+        "rect": {
+          "bottom": 940,
+          "height": 44,
+          "left": 331,
+          "right": 379.484375,
+          "top": 896,
+          "width": 48.484375,
+          "x": 331,
+          "y": 896
+        },
+        "text": "혼성"
+      },
+      {
+        "pressed": "false",
+        "rect": {
+          "bottom": 940,
+          "height": 44,
+          "left": 387.484375,
+          "right": 424.734375,
+          "top": 896,
+          "width": 37.25,
+          "x": 387.484375,
+          "y": 896
+        },
+        "text": "남"
+      },
+      {
+        "pressed": "false",
+        "rect": {
+          "bottom": 940,
+          "height": 44,
+          "left": 432.734375,
+          "right": 469.984375,
+          "top": 896,
+          "width": 37.25,
+          "x": 432.734375,
+          "y": 896
+        },
+        "text": "여"
+      }
+    ],
+    "mainScroll": 0,
+    "selects": [
+      {
+        "ariaInvalid": "false",
+        "clientWidth": 252,
+        "id": "_r_10_-min",
+        "labels": [
+          "최소 등급"
+        ],
+        "rect": {
+          "bottom": 448,
+          "height": 48,
+          "left": 331,
+          "right": 585,
+          "top": 400,
+          "width": 254,
+          "x": 331,
+          "y": 400
+        },
+        "scrollWidth": 252,
+        "selectedText": "초보",
+        "value": "novice"
+      },
+      {
+        "ariaInvalid": "false",
+        "clientWidth": 252,
+        "id": "_r_10_-max",
+        "labels": [
+          "최대 등급"
+        ],
+        "rect": {
+          "bottom": 448,
+          "height": 48,
+          "left": 597,
+          "right": 851,
+          "top": 400,
+          "width": 254,
+          "x": 597,
+          "y": 400
+        },
+        "scrollWidth": 252,
+        "selectedText": "중수",
+        "value": "intermediate"
+      }
+    ],
+    "title": null,
+    "url": "https://alpha.teameet.co.kr/team-matches/new/condition",
+    "utc": "2026-10-04T09:56:50.020Z",
+    "viewport": {
+      "dpr": 1,
+      "h": 757,
+      "w": 1182
+    },
+    "windowScroll": {
+      "x": 0,
+      "y": 0
+    },
+    "index": 26,
+    "label": "desktop partial novice-intermediate range"
+  },
+  {
+    "active": {
+      "focusVisible": false,
+      "id": "",
+      "tag": "BODY"
+    },
+    "bodyScrollWidth": 1182,
+    "description": null,
+    "dialogs": 0,
+    "gender": [
+      {
+        "pressed": "true",
+        "rect": {
+          "bottom": 940,
+          "height": 44,
+          "left": 331,
+          "right": 379.484375,
+          "top": 896,
+          "width": 48.484375,
+          "x": 331,
+          "y": 896
+        },
+        "text": "혼성"
+      },
+      {
+        "pressed": "false",
+        "rect": {
+          "bottom": 940,
+          "height": 44,
+          "left": 387.484375,
+          "right": 424.734375,
+          "top": 896,
+          "width": 37.25,
+          "x": 387.484375,
+          "y": 896
+        },
+        "text": "남"
+      },
+      {
+        "pressed": "false",
+        "rect": {
+          "bottom": 940,
+          "height": 44,
+          "left": 432.734375,
+          "right": 469.984375,
+          "top": 896,
+          "width": 37.25,
+          "x": 432.734375,
+          "y": 896
+        },
+        "text": "여"
+      }
+    ],
+    "mainScroll": 0,
+    "selects": [
+      {
+        "ariaInvalid": "false",
+        "clientWidth": 252,
+        "id": "_r_10_-min",
+        "labels": [
+          "최소 등급"
+        ],
+        "rect": {
+          "bottom": 448,
+          "height": 48,
+          "left": 331,
+          "right": 585,
+          "top": 400,
+          "width": 254,
+          "x": 331,
+          "y": 400
+        },
+        "scrollWidth": 252,
+        "selectedText": "고수",
+        "value": "advanced"
+      },
+      {
+        "ariaInvalid": "false",
+        "clientWidth": 252,
+        "id": "_r_10_-max",
+        "labels": [
+          "최대 등급"
+        ],
+        "rect": {
+          "bottom": 448,
+          "height": 48,
+          "left": 597,
+          "right": 851,
+          "top": 400,
+          "width": 254,
+          "x": 597,
+          "y": 400
+        },
+        "scrollWidth": 252,
+        "selectedText": "고수",
+        "value": "advanced"
+      }
+    ],
+    "title": null,
+    "url": "https://alpha.teameet.co.kr/team-matches/new/condition",
+    "utc": "2026-10-04T09:56:50.045Z",
+    "viewport": {
+      "dpr": 1,
+      "h": 757,
+      "w": 1182
+    },
+    "windowScroll": {
+      "x": 0,
+      "y": 0
+    },
+    "index": 27,
+    "label": "desktop min crossing raises both advanced"
+  },
+  {
+    "active": {
+      "focusVisible": false,
+      "id": "",
+      "tag": "BODY"
+    },
+    "bodyScrollWidth": 1182,
+    "description": null,
+    "dialogs": 0,
+    "gender": [
+      {
+        "pressed": "true",
+        "rect": {
+          "bottom": 940,
+          "height": 44,
+          "left": 331,
+          "right": 379.484375,
+          "top": 896,
+          "width": 48.484375,
+          "x": 331,
+          "y": 896
+        },
+        "text": "혼성"
+      },
+      {
+        "pressed": "false",
+        "rect": {
+          "bottom": 940,
+          "height": 44,
+          "left": 387.484375,
+          "right": 424.734375,
+          "top": 896,
+          "width": 37.25,
+          "x": 387.484375,
+          "y": 896
+        },
+        "text": "남"
+      },
+      {
+        "pressed": "false",
+        "rect": {
+          "bottom": 940,
+          "height": 44,
+          "left": 432.734375,
+          "right": 469.984375,
+          "top": 896,
+          "width": 37.25,
+          "x": 432.734375,
+          "y": 896
+        },
+        "text": "여"
+      }
+    ],
+    "mainScroll": 0,
+    "selects": [
+      {
+        "ariaInvalid": "false",
+        "clientWidth": 252,
+        "id": "_r_10_-min",
+        "labels": [
+          "최소 등급"
+        ],
+        "rect": {
+          "bottom": 448,
+          "height": 48,
+          "left": 331,
+          "right": 585,
+          "top": 400,
+          "width": 254,
+          "x": 331,
+          "y": 400
+        },
+        "scrollWidth": 252,
+        "selectedText": "입문",
+        "value": "beginner"
+      },
+      {
+        "ariaInvalid": "false",
+        "clientWidth": 252,
+        "id": "_r_10_-max",
+        "labels": [
+          "최대 등급"
+        ],
+        "rect": {
+          "bottom": 448,
+          "height": 48,
+          "left": 597,
+          "right": 851,
+          "top": 400,
+          "width": 254,
+          "x": 597,
+          "y": 400
+        },
+        "scrollWidth": 252,
+        "selectedText": "입문",
+        "value": "beginner"
+      }
+    ],
+    "title": null,
+    "url": "https://alpha.teameet.co.kr/team-matches/new/condition",
+    "utc": "2026-10-04T09:56:50.067Z",
+    "viewport": {
+      "dpr": 1,
+      "h": 757,
+      "w": 1182
+    },
+    "windowScroll": {
+      "x": 0,
+      "y": 0
+    },
+    "index": 28,
+    "label": "desktop max crossing lowers both beginner"
+  },
+  {
+    "active": {
+      "focusVisible": true,
+      "id": "_r_10_-max",
+      "tag": "SELECT"
+    },
+    "bodyScrollWidth": 1182,
+    "description": null,
+    "dialogs": 0,
+    "gender": [
+      {
+        "pressed": "true",
+        "rect": {
+          "bottom": 894,
+          "height": 44,
+          "left": 331,
+          "right": 379.484375,
+          "top": 850,
+          "width": 48.484375,
+          "x": 331,
+          "y": 850
+        },
+        "text": "혼성"
+      },
+      {
+        "pressed": "false",
+        "rect": {
+          "bottom": 894,
+          "height": 44,
+          "left": 387.484375,
+          "right": 424.734375,
+          "top": 850,
+          "width": 37.25,
+          "x": 387.484375,
+          "y": 850
+        },
+        "text": "남"
+      },
+      {
+        "pressed": "false",
+        "rect": {
+          "bottom": 894,
+          "height": 44,
+          "left": 432.734375,
+          "right": 469.984375,
+          "top": 850,
+          "width": 37.25,
+          "x": 432.734375,
+          "y": 850
+        },
+        "text": "여"
+      }
+    ],
+    "mainScroll": 0,
+    "selects": [
+      {
+        "ariaInvalid": "false",
+        "clientWidth": 252,
+        "id": "_r_10_-min",
+        "labels": [
+          "최소 등급"
+        ],
+        "rect": {
+          "bottom": 402,
+          "height": 48,
+          "left": 331,
+          "right": 585,
+          "top": 354,
+          "width": 254,
+          "x": 331,
+          "y": 354
+        },
+        "scrollWidth": 252,
+        "selectedText": "초보",
+        "value": "novice"
+      },
+      {
+        "ariaInvalid": "false",
+        "clientWidth": 252,
+        "id": "_r_10_-max",
+        "labels": [
+          "최대 등급"
+        ],
+        "rect": {
+          "bottom": 402,
+          "height": 48,
+          "left": 597,
+          "right": 851,
+          "top": 354,
+          "width": 254,
+          "x": 597,
+          "y": 354
+        },
+        "scrollWidth": 252,
+        "selectedText": "중수",
+        "value": "intermediate"
+      }
+    ],
+    "title": null,
+    "url": "https://alpha.teameet.co.kr/team-matches/new/condition",
+    "utc": "2026-10-04T09:56:50.131Z",
+    "viewport": {
+      "dpr": 1,
+      "h": 757,
+      "w": 1182
+    },
+    "windowScroll": {
+      "x": 0,
+      "y": 46
+    },
+    "index": 29,
+    "label": "desktop keyboard partial range max focus"
+  },
+  {
+    "active": {
+      "focusVisible": true,
+      "id": "_r_10_-min",
+      "tag": "SELECT"
+    },
+    "bodyScrollWidth": 1182,
+    "description": null,
+    "dialogs": 0,
+    "gender": [
+      {
+        "pressed": "true",
+        "rect": {
+          "bottom": 894,
+          "height": 44,
+          "left": 331,
+          "right": 379.484375,
+          "top": 850,
+          "width": 48.484375,
+          "x": 331,
+          "y": 850
+        },
+        "text": "혼성"
+      },
+      {
+        "pressed": "false",
+        "rect": {
+          "bottom": 894,
+          "height": 44,
+          "left": 387.484375,
+          "right": 424.734375,
+          "top": 850,
+          "width": 37.25,
+          "x": 387.484375,
+          "y": 850
+        },
+        "text": "남"
+      },
+      {
+        "pressed": "false",
+        "rect": {
+          "bottom": 894,
+          "height": 44,
+          "left": 432.734375,
+          "right": 469.984375,
+          "top": 850,
+          "width": 37.25,
+          "x": 432.734375,
+          "y": 850
+        },
+        "text": "여"
+      }
+    ],
+    "mainScroll": 0,
+    "selects": [
+      {
+        "ariaInvalid": "false",
+        "clientWidth": 252,
+        "id": "_r_10_-min",
+        "labels": [
+          "최소 등급"
+        ],
+        "rect": {
+          "bottom": 402,
+          "height": 48,
+          "left": 331,
+          "right": 585,
+          "top": 354,
+          "width": 254,
+          "x": 331,
+          "y": 354
+        },
+        "scrollWidth": 252,
+        "selectedText": "초보",
+        "value": "novice"
+      },
+      {
+        "ariaInvalid": "false",
+        "clientWidth": 252,
+        "id": "_r_10_-max",
+        "labels": [
+          "최대 등급"
+        ],
+        "rect": {
+          "bottom": 402,
+          "height": 48,
+          "left": 597,
+          "right": 851,
+          "top": 354,
+          "width": 254,
+          "x": 597,
+          "y": 354
+        },
+        "scrollWidth": 252,
+        "selectedText": "중수",
+        "value": "intermediate"
+      }
+    ],
+    "title": null,
+    "url": "https://alpha.teameet.co.kr/team-matches/new/condition",
+    "utc": "2026-10-04T09:56:50.162Z",
+    "viewport": {
+      "dpr": 1,
+      "h": 757,
+      "w": 1182
+    },
+    "windowScroll": {
+      "x": 0,
+      "y": 46
+    },
+    "index": 30,
+    "label": "desktop reverse keyboard min focus"
+  },
+  {
+    "active": {
+      "focusVisible": true,
+      "id": "_r_10_-min",
+      "tag": "SELECT"
+    },
+    "bodyScrollWidth": 1182,
+    "description": null,
+    "dialogs": 0,
+    "gender": [
+      {
+        "pressed": "true",
+        "rect": {
+          "bottom": 894,
+          "height": 44,
+          "left": 331,
+          "right": 379.484375,
+          "top": 850,
+          "width": 48.484375,
+          "x": 331,
+          "y": 850
+        },
+        "text": "혼성"
+      },
+      {
+        "pressed": "false",
+        "rect": {
+          "bottom": 894,
+          "height": 44,
+          "left": 387.484375,
+          "right": 424.734375,
+          "top": 850,
+          "width": 37.25,
+          "x": 387.484375,
+          "y": 850
+        },
+        "text": "남"
+      },
+      {
+        "pressed": "false",
+        "rect": {
+          "bottom": 894,
+          "height": 44,
+          "left": 432.734375,
+          "right": 469.984375,
+          "top": 850,
+          "width": 37.25,
+          "x": 432.734375,
+          "y": 850
+        },
+        "text": "여"
+      }
+    ],
+    "mainScroll": 0,
+    "selects": [
+      {
+        "ariaInvalid": "false",
+        "clientWidth": 252,
+        "id": "_r_10_-min",
+        "labels": [
+          "최소 등급"
+        ],
+        "rect": {
+          "bottom": 402,
+          "height": 48,
+          "left": 331,
+          "right": 585,
+          "top": 354,
+          "width": 254,
+          "x": 331,
+          "y": 354
+        },
+        "scrollWidth": 252,
+        "selectedText": "입문",
+        "value": "beginner"
+      },
+      {
+        "ariaInvalid": "false",
+        "clientWidth": 252,
+        "id": "_r_10_-max",
+        "labels": [
+          "최대 등급"
+        ],
+        "rect": {
+          "bottom": 402,
+          "height": 48,
+          "left": 597,
+          "right": 851,
+          "top": 354,
+          "width": 254,
+          "x": 597,
+          "y": 354
+        },
+        "scrollWidth": 252,
+        "selectedText": "고수",
+        "value": "advanced"
+      }
+    ],
+    "title": null,
+    "url": "https://alpha.teameet.co.kr/team-matches/new/condition",
+    "utc": "2026-10-04T09:56:50.271Z",
+    "viewport": {
+      "dpr": 1,
+      "h": 757,
+      "w": 1182
+    },
+    "windowScroll": {
+      "x": 0,
+      "y": 46
+    },
+    "index": 31,
+    "label": "desktop full beginner-advanced range"
+  },
+  {
+    "active": {
+      "focusVisible": false,
+      "id": "",
+      "tag": "BODY"
+    },
+    "bodyScrollWidth": 1182,
+    "description": null,
+    "dialogs": 0,
+    "gender": [],
+    "mainScroll": 0,
+    "selects": [],
+    "title": null,
+    "url": "https://alpha.teameet.co.kr/team-matches/new/place-time",
+    "utc": "2026-10-04T09:57:33.684Z",
+    "viewport": {
+      "dpr": 1,
+      "h": 757,
+      "w": 1182
+    },
+    "windowScroll": {
+      "x": 0,
+      "y": 0
+    },
+    "index": 32,
+    "label": "desktop local place-time reached",
+    "unrelatedSelectCount": 2,
+    "scopeNote": "Local place-time route observation only; unrelated location fields excluded."
+  },
+  {
+    "active": {
+      "focusVisible": false,
+      "id": "",
+      "tag": "BODY"
+    },
+    "bodyScrollWidth": 1182,
+    "description": null,
+    "dialogs": 0,
+    "gender": [
+      {
+        "pressed": "true",
+        "rect": {
+          "bottom": 940,
+          "height": 44,
+          "left": 331,
+          "right": 379.484375,
+          "top": 896,
+          "width": 48.484375,
+          "x": 331,
+          "y": 896
+        },
+        "text": "혼성"
+      },
+      {
+        "pressed": "false",
+        "rect": {
+          "bottom": 940,
+          "height": 44,
+          "left": 387.484375,
+          "right": 424.734375,
+          "top": 896,
+          "width": 37.25,
+          "x": 387.484375,
+          "y": 896
+        },
+        "text": "남"
+      },
+      {
+        "pressed": "false",
+        "rect": {
+          "bottom": 940,
+          "height": 44,
+          "left": 432.734375,
+          "right": 469.984375,
+          "top": 896,
+          "width": 37.25,
+          "x": 432.734375,
+          "y": 896
+        },
+        "text": "여"
+      }
+    ],
+    "mainScroll": 0,
+    "selects": [
+      {
+        "ariaInvalid": "false",
+        "clientWidth": 252,
+        "id": "_r_1f_-min",
+        "labels": [
+          "최소 등급"
+        ],
+        "rect": {
+          "bottom": 448,
+          "height": 48,
+          "left": 331,
+          "right": 585,
+          "top": 400,
+          "width": 254,
+          "x": 331,
+          "y": 400
+        },
+        "scrollWidth": 252,
+        "selectedText": "입문",
+        "value": "beginner"
+      },
+      {
+        "ariaInvalid": "false",
+        "clientWidth": 252,
+        "id": "_r_1f_-max",
+        "labels": [
+          "최대 등급"
+        ],
+        "rect": {
+          "bottom": 448,
+          "height": 48,
+          "left": 597,
+          "right": 851,
+          "top": 400,
+          "width": 254,
+          "x": 597,
+          "y": 400
+        },
+        "scrollWidth": 252,
+        "selectedText": "고수",
+        "value": "advanced"
+      }
+    ],
+    "title": null,
+    "url": "https://alpha.teameet.co.kr/team-matches/new/condition",
+    "utc": "2026-10-04T09:57:34.265Z",
+    "viewport": {
+      "dpr": 1,
+      "h": 757,
+      "w": 1182
+    },
+    "windowScroll": {
+      "x": 0,
+      "y": 0
+    },
+    "index": 33,
+    "label": "desktop full range preserved through stage round trip"
+  },
+  {
+    "active": {
+      "focusVisible": false,
+      "id": "",
+      "tag": "BODY"
+    },
+    "bodyScrollWidth": 1182,
+    "description": null,
+    "dialogs": 0,
+    "gender": [
+      {
+        "pressed": "true",
+        "rect": {
+          "bottom": 860,
+          "height": 44,
+          "left": 331,
+          "right": 379.484375,
+          "top": 816,
+          "width": 48.484375,
+          "x": 331,
+          "y": 816
+        },
+        "text": "혼성"
+      },
+      {
+        "pressed": "false",
+        "rect": {
+          "bottom": 860,
+          "height": 44,
+          "left": 387.484375,
+          "right": 424.734375,
+          "top": 816,
+          "width": 37.25,
+          "x": 387.484375,
+          "y": 816
+        },
+        "text": "남"
+      },
+      {
+        "pressed": "false",
+        "rect": {
+          "bottom": 860,
+          "height": 44,
+          "left": 432.734375,
+          "right": 469.984375,
+          "top": 816,
+          "width": 37.25,
+          "x": 432.734375,
+          "y": 816
+        },
+        "text": "여"
+      }
+    ],
+    "mainScroll": 0,
+    "selects": [
+      {
+        "ariaInvalid": "false",
+        "clientWidth": 252,
+        "id": "_r_2_-min",
+        "labels": [
+          "최소 등급"
+        ],
+        "rect": {
+          "bottom": 368,
+          "height": 48,
+          "left": 331,
+          "right": 585,
+          "top": 320,
+          "width": 254,
+          "x": 331,
+          "y": 320
+        },
+        "scrollWidth": 252,
+        "selectedText": "입문",
+        "value": "beginner"
+      },
+      {
+        "ariaInvalid": "false",
+        "clientWidth": 252,
+        "id": "_r_2_-max",
+        "labels": [
+          "최대 등급"
+        ],
+        "rect": {
+          "bottom": 368,
+          "height": 48,
+          "left": 597,
+          "right": 851,
+          "top": 320,
+          "width": 254,
+          "x": 597,
+          "y": 320
+        },
+        "scrollWidth": 252,
+        "selectedText": "고수",
+        "value": "advanced"
+      }
+    ],
+    "title": null,
+    "url": "https://alpha.teameet.co.kr/team-matches/new/condition",
+    "utc": "2026-10-04T09:57:35.296Z",
+    "viewport": {
+      "dpr": 1,
+      "h": 757,
+      "w": 1182
+    },
+    "windowScroll": {
+      "x": 0,
+      "y": 80
+    },
+    "index": 34,
+    "label": "desktop full range survives fresh reload"
+  },
+  {
+    "active": {
+      "focusVisible": false,
+      "id": "",
+      "tag": "BODY"
+    },
+    "bodyScrollWidth": 1182,
+    "description": null,
+    "dialogs": 0,
+    "gender": [
+      {
+        "pressed": "true",
+        "rect": {
+          "bottom": 860,
+          "height": 44,
+          "left": 331,
+          "right": 379.484375,
+          "top": 816,
+          "width": 48.484375,
+          "x": 331,
+          "y": 816
+        },
+        "text": "혼성"
+      },
+      {
+        "pressed": "false",
+        "rect": {
+          "bottom": 860,
+          "height": 44,
+          "left": 387.484375,
+          "right": 424.734375,
+          "top": 816,
+          "width": 37.25,
+          "x": 387.484375,
+          "y": 816
+        },
+        "text": "남"
+      },
+      {
+        "pressed": "false",
+        "rect": {
+          "bottom": 860,
+          "height": 44,
+          "left": 432.734375,
+          "right": 469.984375,
+          "top": 816,
+          "width": 37.25,
+          "x": 432.734375,
+          "y": 816
+        },
+        "text": "여"
+      }
+    ],
+    "mainScroll": 0,
+    "selects": [
+      {
+        "ariaInvalid": "false",
+        "clientWidth": 252,
+        "id": "_r_2_-min",
+        "labels": [
+          "최소 등급"
+        ],
+        "rect": {
+          "bottom": 368,
+          "height": 48,
+          "left": 331,
+          "right": 585,
+          "top": 320,
+          "width": 254,
+          "x": 331,
+          "y": 320
+        },
+        "scrollWidth": 252,
+        "selectedText": "미설정",
+        "value": ""
+      },
+      {
+        "ariaInvalid": "false",
+        "clientWidth": 252,
+        "id": "_r_2_-max",
+        "labels": [
+          "최대 등급"
+        ],
+        "rect": {
+          "bottom": 368,
+          "height": 48,
+          "left": 597,
+          "right": 851,
+          "top": 320,
+          "width": 254,
+          "x": 597,
+          "y": 320
+        },
+        "scrollWidth": 252,
+        "selectedText": "미설정",
+        "value": ""
+      }
+    ],
+    "title": null,
+    "url": "https://alpha.teameet.co.kr/team-matches/new/condition",
+    "utc": "2026-10-04T09:58:00.402Z",
+    "viewport": {
+      "dpr": 1,
+      "h": 757,
+      "w": 1182
+    },
+    "windowScroll": {
+      "x": 0,
+      "y": 80
+    },
+    "index": 35,
+    "label": "desktop both endpoints restored unset"
+  },
+  {
+    "active": {
+      "focusVisible": false,
+      "id": "",
+      "tag": "BODY"
+    },
+    "bodyScrollWidth": 1182,
+    "description": null,
+    "dialogs": 0,
+    "gender": [
+      {
+        "pressed": "true",
+        "rect": {
+          "bottom": 860,
+          "height": 44,
+          "left": 331,
+          "right": 379.484375,
+          "top": 816,
+          "width": 48.484375,
+          "x": 331,
+          "y": 816
+        },
+        "text": "혼성"
+      },
+      {
+        "pressed": "false",
+        "rect": {
+          "bottom": 860,
+          "height": 44,
+          "left": 387.484375,
+          "right": 424.734375,
+          "top": 816,
+          "width": 37.25,
+          "x": 387.484375,
+          "y": 816
+        },
+        "text": "남"
+      },
+      {
+        "pressed": "false",
+        "rect": {
+          "bottom": 860,
+          "height": 44,
+          "left": 432.734375,
+          "right": 469.984375,
+          "top": 816,
+          "width": 37.25,
+          "x": 432.734375,
+          "y": 816
+        },
+        "text": "여"
+      }
+    ],
+    "mainScroll": 0,
+    "selects": [
+      {
+        "ariaInvalid": "false",
+        "clientWidth": 252,
+        "id": "_r_2_-min",
+        "labels": [
+          "최소 등급"
+        ],
+        "rect": {
+          "bottom": 368,
+          "height": 48,
+          "left": 331,
+          "right": 585,
+          "top": 320,
+          "width": 254,
+          "x": 331,
+          "y": 320
+        },
+        "scrollWidth": 252,
+        "selectedText": "미설정",
+        "value": ""
+      },
+      {
+        "ariaInvalid": "false",
+        "clientWidth": 252,
+        "id": "_r_2_-max",
+        "labels": [
+          "최대 등급"
+        ],
+        "rect": {
+          "bottom": 368,
+          "height": 48,
+          "left": 597,
+          "right": 851,
+          "top": 320,
+          "width": 254,
+          "x": 597,
+          "y": 320
+        },
+        "scrollWidth": 252,
+        "selectedText": "미설정",
+        "value": ""
+      }
+    ],
+    "title": null,
+    "url": "https://alpha.teameet.co.kr/team-matches/new/condition",
+    "utc": "2026-10-04T09:58:01.577Z",
+    "viewport": {
+      "dpr": 1,
+      "h": 757,
+      "w": 1182
+    },
+    "windowScroll": {
+      "x": 0,
+      "y": 80
+    },
+    "index": 36,
+    "label": "desktop unset values on fresh reentry"
+  },
+  {
+    "active": {
+      "focusVisible": false,
+      "id": "",
+      "tag": "BODY"
+    },
+    "bodyScrollWidth": 1182,
+    "description": "",
+    "dialogs": 0,
+    "gender": [],
+    "mainScroll": 0,
+    "selects": [],
+    "title": "QA 실력 범위 1004",
+    "url": "https://alpha.teameet.co.kr/team-matches/new/info",
+    "utc": "2026-10-04T09:58:01.967Z",
+    "viewport": {
+      "dpr": 1,
+      "h": 757,
+      "w": 1182
+    },
+    "windowScroll": {
+      "x": 0,
+      "y": 0
+    },
+    "index": 37,
+    "label": "temporary title before explicit restoration"
+  },
+  {
+    "active": {
+      "focusVisible": true,
+      "id": "field-title",
+      "tag": "INPUT"
+    },
+    "bodyScrollWidth": 1182,
+    "description": "",
+    "dialogs": 0,
+    "gender": [],
+    "mainScroll": 0,
+    "selects": [],
+    "title": "",
+    "url": "https://alpha.teameet.co.kr/team-matches/new/info",
+    "utc": "2026-10-04T09:58:02.003Z",
+    "viewport": {
+      "dpr": 1,
+      "h": 757,
+      "w": 1182
+    },
+    "windowScroll": {
+      "x": 0,
+      "y": 0
+    },
+    "index": 38,
+    "label": "title and description restored blank"
+  },
+  {
+    "active": {
+      "focusVisible": false,
+      "id": "",
+      "tag": "BODY"
+    },
+    "bodyScrollWidth": 1182,
+    "description": "",
+    "dialogs": 0,
+    "gender": [],
+    "mainScroll": 0,
+    "selects": [],
+    "title": "",
+    "url": "https://alpha.teameet.co.kr/team-matches/new/info",
+    "utc": "2026-10-04T09:58:22.137Z",
+    "viewport": {
+      "dpr": 1,
+      "h": 757,
+      "w": 1182
+    },
+    "windowScroll": {
+      "x": 0,
+      "y": 80
+    },
+    "index": 39,
+    "label": "blank title after fresh info reload"
+  },
+  {
+    "active": {
+      "focusVisible": true,
+      "id": "",
+      "tag": "A"
+    },
+    "bodyScrollWidth": 1182,
+    "description": "",
+    "dialogs": 0,
+    "gender": [],
+    "mainScroll": 0,
+    "selects": [],
+    "title": "",
+    "url": "https://alpha.teameet.co.kr/team-matches/new/info",
+    "utc": "2026-10-04T09:58:48.517Z",
+    "viewport": {
+      "dpr": 1,
+      "h": 757,
+      "w": 1182
+    },
+    "windowScroll": {
+      "x": 0,
+      "y": 0
+    },
+    "index": 40,
+    "label": "Escape returns to restored blank info"
+  }
+]

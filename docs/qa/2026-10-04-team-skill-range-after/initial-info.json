@@ -1,0 +1,49 @@
+{
+  "buttons": [
+    {
+      "disabled": false,
+      "text": "이전"
+    },
+    {
+      "disabled": false,
+      "text": "다음"
+    }
+  ],
+  "fields": [
+    {
+      "aria": null,
+      "placeholder": "예: 토요일 저녁 풋살 상대팀 구합니다",
+      "tag": "INPUT",
+      "type": "text",
+      "value": ""
+    },
+    {
+      "aria": null,
+      "placeholder": "예: 친선 위주로 즐겁게 경기할 팀을 찾고 있어요.",
+      "tag": "TEXTAREA",
+      "type": "textarea",
+      "value": ""
+    },
+    {
+      "aria": "목록 이미지",
+      "placeholder": null,
+      "tag": "INPUT",
+      "type": "file",
+      "value": null
+    },
+    {
+      "aria": "상세 이미지",
+      "placeholder": null,
+      "tag": "INPUT",
+      "type": "file",
+      "value": null
+    }
+  ],
+  "url": "https://alpha.teameet.co.kr/team-matches/new/info",
+  "utc": "2026-10-04T09:42:32.642Z",
+  "viewport": {
+    "dpr": 1,
+    "h": 757,
+    "w": 1182
+  }
+}

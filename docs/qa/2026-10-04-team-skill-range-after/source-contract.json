@@ -1,0 +1,27 @@
+{
+  "commit": "19e192d577544b26986799a47f76e8b259a1a8e2",
+  "sourceReadUTC": "2026-10-04T09:46:38Z",
+  "runtimeServingIdentity": "unknown",
+  "sources": [
+    {
+      "path": "apps/v1_web/src/components/team-matches/team-match-level-range-field.tsx",
+      "blob": "f8588ccb5bbfcf6d72bd68cf7c626c27234c68e9",
+      "lines": "18–26,35–40",
+      "finding": "Both native selects include 미설정 with empty value. Selecting it calls onChange(''), yielding both endpoints unset. A nonempty endpoint fills the missing counterpart; crossing endpoints adjusts the other endpoint in one callback."
+    },
+    {
+      "path": "apps/v1_web/src/components/team-matches/team-matches-create-client.tsx",
+      "blob": "2b594b0310da0a1ff2094d0ca1a138cfb0d582cb",
+      "lines": "220–300,576–616",
+      "finding": "onFieldChange calls setDraft. setPersistedDraft immediately updates local draft reference and expiring local storage then React state. Previous/Next only route; Next validates locally. Final onSubmit invokes createTeamMatch.mutate. Cancel/leave does not mean draft removal."
+    },
+    {
+      "path": "apps/v1_web/src/components/team-matches/team-matches-page.tsx",
+      "blob": "b1f46a0792e19b7127262b0d8ad53c562c422185",
+      "lines": "1273–1284",
+      "finding": "ConditionFields renders the range component and forwards its onChange to grade field callback. Other form values are separate; existing mixed-label selector remains."
+    }
+  ],
+  "scope": "Select/title UI-only changes may persist locally and refresh TTL. Restore original UI values explicitly. Do not save/create/upload or inspect/inject malformed draft storage.",
+  "limitations": "Static exact-commit source, not a live network/API/DB audit. No runtime SHA confirmation."
+}

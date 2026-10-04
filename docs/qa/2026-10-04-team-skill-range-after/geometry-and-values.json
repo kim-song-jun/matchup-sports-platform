@@ -1,0 +1,332 @@
+[
+  {
+    "width": 402,
+    "case": "unset",
+    "index": 1,
+    "UTC": "2026-10-04T09:50:01.041Z",
+    "values": [
+      "",
+      ""
+    ],
+    "height": [
+      48,
+      48
+    ],
+    "widths": [
+      174.8000030517578,
+      174.8000030517578
+    ],
+    "overflow": [
+      false,
+      false
+    ]
+  },
+  {
+    "width": 402,
+    "case": "same",
+    "index": 2,
+    "UTC": "2026-10-04T09:50:37.187Z",
+    "values": [
+      "novice",
+      "novice"
+    ],
+    "height": [
+      48,
+      48
+    ],
+    "widths": [
+      174.8000030517578,
+      174.8000030517578
+    ],
+    "overflow": [
+      false,
+      false
+    ]
+  },
+  {
+    "width": 402,
+    "case": "partial",
+    "index": 3,
+    "UTC": "2026-10-04T09:50:37.216Z",
+    "values": [
+      "novice",
+      "intermediate"
+    ],
+    "height": [
+      48,
+      48
+    ],
+    "widths": [
+      174.8000030517578,
+      174.8000030517578
+    ],
+    "overflow": [
+      false,
+      false
+    ]
+  },
+  {
+    "width": 402,
+    "case": "minCrossing",
+    "index": 4,
+    "UTC": "2026-10-04T09:50:55.204Z",
+    "values": [
+      "advanced",
+      "advanced"
+    ],
+    "height": [
+      48,
+      48
+    ],
+    "widths": [
+      174.8000030517578,
+      174.8000030517578
+    ],
+    "overflow": [
+      false,
+      false
+    ]
+  },
+  {
+    "width": 402,
+    "case": "maxCrossing",
+    "index": 5,
+    "UTC": "2026-10-04T09:50:55.230Z",
+    "values": [
+      "beginner",
+      "beginner"
+    ],
+    "height": [
+      48,
+      48
+    ],
+    "widths": [
+      174.8000030517578,
+      174.8000030517578
+    ],
+    "overflow": [
+      false,
+      false
+    ]
+  },
+  {
+    "width": 788,
+    "case": "unset",
+    "index": 14,
+    "UTC": "2026-10-04T09:55:05.341Z",
+    "values": [
+      "",
+      ""
+    ],
+    "height": [
+      48,
+      48
+    ],
+    "widths": [
+      274,
+      274
+    ],
+    "overflow": [
+      false,
+      false
+    ]
+  },
+  {
+    "width": 788,
+    "case": "same",
+    "index": 15,
+    "UTC": "2026-10-04T09:55:45.938Z",
+    "values": [
+      "novice",
+      "novice"
+    ],
+    "height": [
+      48,
+      48
+    ],
+    "widths": [
+      274,
+      274
+    ],
+    "overflow": [
+      false,
+      false
+    ]
+  },
+  {
+    "width": 788,
+    "case": "partial",
+    "index": 16,
+    "UTC": "2026-10-04T09:55:45.962Z",
+    "values": [
+      "novice",
+      "intermediate"
+    ],
+    "height": [
+      48,
+      48
+    ],
+    "widths": [
+      274,
+      274
+    ],
+    "overflow": [
+      false,
+      false
+    ]
+  },
+  {
+    "width": 788,
+    "case": "minCrossing",
+    "index": 17,
+    "UTC": "2026-10-04T09:55:45.998Z",
+    "values": [
+      "advanced",
+      "advanced"
+    ],
+    "height": [
+      48,
+      48
+    ],
+    "widths": [
+      274,
+      274
+    ],
+    "overflow": [
+      false,
+      false
+    ]
+  },
+  {
+    "width": 788,
+    "case": "maxCrossing",
+    "index": 18,
+    "UTC": "2026-10-04T09:55:46.024Z",
+    "values": [
+      "beginner",
+      "beginner"
+    ],
+    "height": [
+      48,
+      48
+    ],
+    "widths": [
+      274,
+      274
+    ],
+    "overflow": [
+      false,
+      false
+    ]
+  },
+  {
+    "width": 1182,
+    "case": "unset",
+    "index": 24,
+    "UTC": "2026-10-04T09:56:12.079Z",
+    "values": [
+      "",
+      ""
+    ],
+    "height": [
+      48,
+      48
+    ],
+    "widths": [
+      254,
+      254
+    ],
+    "overflow": [
+      false,
+      false
+    ]
+  },
+  {
+    "width": 1182,
+    "case": "same",
+    "index": 25,
+    "UTC": "2026-10-04T09:56:49.999Z",
+    "values": [
+      "novice",
+      "novice"
+    ],
+    "height": [
+      48,
+      48
+    ],
+    "widths": [
+      254,
+      254
+    ],
+    "overflow": [
+      false,
+      false
+    ]
+  },
+  {
+    "width": 1182,
+    "case": "partial",
+    "index": 26,
+    "UTC": "2026-10-04T09:56:50.020Z",
+    "values": [
+      "novice",
+      "intermediate"
+    ],
+    "height": [
+      48,
+      48
+    ],
+    "widths": [
+      254,
+      254
+    ],
+    "overflow": [
+      false,
+      false
+    ]
+  },
+  {
+    "width": 1182,
+    "case": "minCrossing",
+    "index": 27,
+    "UTC": "2026-10-04T09:56:50.045Z",
+    "values": [
+      "advanced",
+      "advanced"
+    ],
+    "height": [
+      48,
+      48
+    ],
+    "widths": [
+      254,
+      254
+    ],
+    "overflow": [
+      false,
+      false
+    ]
+  },
+  {
+    "width": 1182,
+    "case": "maxCrossing",
+    "index": 28,
+    "UTC": "2026-10-04T09:56:50.067Z",
+    "values": [
+      "beginner",
+      "beginner"
+    ],
+    "height": [
+      48,
+      48
+    ],
+    "widths": [
+      254,
+      254
+    ],
+    "overflow": [
+      false,
+      false
+    ]
+  }
+]

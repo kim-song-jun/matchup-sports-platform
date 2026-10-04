@@ -1,0 +1,210 @@
+[
+  {
+    "file": "mobile-unset.png",
+    "sourceBasename": "mobile-range-unset.png",
+    "sourceSHA256": "16b02b92d56b9bedce257faa3e32935ecce11061d8e9d803cbb9960640eb9798",
+    "sourceEncoding": "JPEG",
+    "sourceSize": [
+      402,
+      606
+    ],
+    "boundsLTRB": [
+      14,
+      240,
+      388,
+      384
+    ],
+    "outputSize": [
+      374,
+      144
+    ],
+    "outputSHA256": "1a3126ecdf6e79fc643f6c199a285936b98d039e876041c020a6fd0f018f3b8d",
+    "decodedPixelEquality": true,
+    "proofIndex": 1,
+    "DOMUTC": "2026-10-04T09:50:01.041Z",
+    "captureStartUTC": "2026-10-04T09:50:01.046Z",
+    "captureEndUTC": "2026-10-04T09:50:01.067Z"
+  },
+  {
+    "file": "mobile-partial.png",
+    "sourceBasename": "mobile-range-selected.png",
+    "sourceSHA256": "d7269b5cf05ecef75c6b3bc3225772b29d7d8ba29b3d6a04fb264104b91fa3e4",
+    "sourceEncoding": "JPEG",
+    "sourceSize": [
+      402,
+      606
+    ],
+    "boundsLTRB": [
+      14,
+      240,
+      388,
+      384
+    ],
+    "outputSize": [
+      374,
+      144
+    ],
+    "outputSHA256": "97d0f0e9c42924a4b8ee2d221c058538f0bea3f00d45ccc1d21dc8815c3ba816",
+    "decodedPixelEquality": true,
+    "proofIndex": 3,
+    "DOMUTC": "2026-10-04T09:50:37.216Z",
+    "captureStartUTC": "2026-10-04T09:50:37.220Z",
+    "captureEndUTC": "2026-10-04T09:50:37.243Z"
+  },
+  {
+    "file": "mobile-restored.png",
+    "sourceBasename": "mobile-range-restored.png",
+    "sourceSHA256": "60e2bb100da09fb33b4541210bee46aab2fca64d38034982b510e931e45794b2",
+    "sourceEncoding": "JPEG",
+    "sourceSize": [
+      402,
+      606
+    ],
+    "boundsLTRB": [
+      14,
+      218,
+      388,
+      363
+    ],
+    "outputSize": [
+      374,
+      145
+    ],
+    "outputSHA256": "84a7f1ff27a2191080d6d0da55b8cb1341bf2eecd07bf46fdcb44e3a9d2377e6",
+    "decodedPixelEquality": true,
+    "proofIndex": 13,
+    "DOMUTC": "2026-10-04T09:54:59.731Z",
+    "captureStartUTC": "2026-10-04T09:54:59.735Z",
+    "captureEndUTC": "2026-10-04T09:54:59.804Z"
+  },
+  {
+    "file": "tablet-unset.png",
+    "sourceBasename": "tablet-range-unset.png",
+    "sourceSHA256": "49fd547f416c0389c41753363d23f37be5963ab68ee88f18ee4c502504a8b428",
+    "sourceEncoding": "JPEG",
+    "sourceSize": [
+      788,
+      505
+    ],
+    "boundsLTRB": [
+      108,
+      194,
+      680,
+      339
+    ],
+    "outputSize": [
+      572,
+      145
+    ],
+    "outputSHA256": "d7a7b546d793f9bb4bb40830c1a2eb6ae2a1c34da4dccdae529ca0366b279932",
+    "decodedPixelEquality": true,
+    "proofIndex": 14,
+    "DOMUTC": "2026-10-04T09:55:05.341Z",
+    "captureStartUTC": "2026-10-04T09:55:05.349Z",
+    "captureEndUTC": "2026-10-04T09:55:05.431Z"
+  },
+  {
+    "file": "tablet-partial-keyboard.png",
+    "sourceBasename": "tablet-range-keyboard.png",
+    "sourceSHA256": "50e9cb1b73a9add058f04d1fab18838cf112eec844ae501ef8a7bc275fac751e",
+    "sourceEncoding": "JPEG",
+    "sourceSize": [
+      788,
+      505
+    ],
+    "boundsLTRB": [
+      108,
+      168,
+      680,
+      312
+    ],
+    "outputSize": [
+      572,
+      144
+    ],
+    "outputSHA256": "bce1706aa05ede1cd57f3d0158b03b7fb3f5bd8a3143d63400ba674d571d4c9f",
+    "decodedPixelEquality": true,
+    "proofIndex": 20,
+    "DOMUTC": "2026-10-04T09:55:46.150Z",
+    "captureStartUTC": "2026-10-04T09:55:46.153Z",
+    "captureEndUTC": "2026-10-04T09:55:46.228Z"
+  },
+  {
+    "file": "desktop-unset.png",
+    "sourceBasename": "desktop-range-unset.png",
+    "sourceSHA256": "8dc4c183fcb2a01dfd2649f53c6e0810c29a0ffffb17ae6dd21da70f239f2796",
+    "sourceEncoding": "JPEG",
+    "sourceSize": [
+      1182,
+      757
+    ],
+    "boundsLTRB": [
+      325,
+      312,
+      857,
+      456
+    ],
+    "outputSize": [
+      532,
+      144
+    ],
+    "outputSHA256": "36e1f27f959917ae40911c0e29346c2502a2e000152767564e8d078ec741687b",
+    "decodedPixelEquality": true,
+    "proofIndex": 24,
+    "DOMUTC": "2026-10-04T09:56:12.079Z",
+    "captureStartUTC": "2026-10-04T09:56:12.084Z",
+    "captureEndUTC": "2026-10-04T09:56:12.168Z"
+  },
+  {
+    "file": "desktop-partial-keyboard.png",
+    "sourceBasename": "desktop-range-keyboard.png",
+    "sourceSHA256": "fc6f77db9a62aeb20da710ea616ce978308ecb9c99663e82ace501eb310812dd",
+    "sourceEncoding": "JPEG",
+    "sourceSize": [
+      1182,
+      757
+    ],
+    "boundsLTRB": [
+      325,
+      266,
+      857,
+      410
+    ],
+    "outputSize": [
+      532,
+      144
+    ],
+    "outputSHA256": "f3615c184cd50a936b5536962301da87d3483b006ff374eedc65607f5233b579",
+    "decodedPixelEquality": true,
+    "proofIndex": 30,
+    "DOMUTC": "2026-10-04T09:56:50.162Z",
+    "captureStartUTC": "2026-10-04T09:56:50.166Z",
+    "captureEndUTC": "2026-10-04T09:56:50.240Z"
+  },
+  {
+    "file": "desktop-full-range-reload.png",
+    "sourceBasename": "desktop-full-range-reload.png",
+    "sourceSHA256": "c93c0332340670ebf30a5b9479e5cfd4d951c62c819239a3e485c0eef5928ec9",
+    "sourceEncoding": "JPEG",
+    "sourceSize": [
+      1182,
+      757
+    ],
+    "boundsLTRB": [
+      325,
+      232,
+      857,
+      376
+    ],
+    "outputSize": [
+      532,
+      144
+    ],
+    "outputSHA256": "6174fe5fd4f77b2e0ea512a9287480b9768e72374c59e3ea96bbb54761d8392b",
+    "decodedPixelEquality": true,
+    "proofIndex": 34,
+    "DOMUTC": "2026-10-04T09:57:35.296Z",
+    "captureStartUTC": "2026-10-04T09:57:35.302Z",
+    "captureEndUTC": "2026-10-04T09:57:35.386Z"
+  }
+]

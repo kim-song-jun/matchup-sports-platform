@@ -1,0 +1,292 @@
+[
+  {
+    "label": "fresh team creation info navigation after reported19e192 deployment",
+    "startUTC": "2026-10-04T09:42:14.048Z",
+    "endUTC": "2026-10-04T09:42:19.353Z"
+  },
+  {
+    "label": "read-only attempt through visible step4 navigation without editing blank title",
+    "startUTC": "2026-10-04T09:42:56.942Z",
+    "endUTC": "2026-10-04T09:42:57.243Z"
+  },
+  {
+    "label": "resize skill form mobile",
+    "startUTC": "2026-10-04T09:48:09.906Z",
+    "endUTC": "2026-10-04T09:48:16.099Z"
+  },
+  {
+    "label": "mobile zoom110",
+    "startUTC": "2026-10-04T09:48:16.099Z",
+    "endUTC": "2026-10-04T09:48:16.402Z"
+  },
+  {
+    "label": "mobile zoom125",
+    "startUTC": "2026-10-04T09:48:16.402Z",
+    "endUTC": "2026-10-04T09:48:16.717Z"
+  },
+  {
+    "label": "temporary synthetic title from blank baseline",
+    "startUTC": "2026-10-04T09:48:16.718Z",
+    "endUTC": "2026-10-04T09:48:22.395Z"
+  },
+  {
+    "label": "local Next from info to condition",
+    "startUTC": "2026-10-04T09:48:22.397Z",
+    "endUTC": "2026-10-04T09:48:22.676Z"
+  },
+  {
+    "label": "Next after settled valid synthetic title",
+    "startUTC": "2026-10-04T09:48:50.983Z",
+    "endUTC": "2026-10-04T09:48:51.280Z"
+  },
+  {
+    "label": "Previous from observed local place-time to condition",
+    "startUTC": "2026-10-04T09:49:42.821Z",
+    "endUTC": "2026-10-04T09:49:43.107Z"
+  },
+  {
+    "label": "mobile select minimum novice using observed native selector",
+    "startUTC": "2026-10-04T09:50:37.162Z",
+    "endUTC": "2026-10-04T09:50:37.178Z"
+  },
+  {
+    "label": "mobile choose intermediate maximum",
+    "startUTC": "2026-10-04T09:50:37.194Z",
+    "endUTC": "2026-10-04T09:50:37.207Z"
+  },
+  {
+    "label": "mobile crossing minimum up to advanced",
+    "startUTC": "2026-10-04T09:50:55.183Z",
+    "endUTC": "2026-10-04T09:50:55.195Z"
+  },
+  {
+    "label": "mobile crossing maximum down to beginner",
+    "startUTC": "2026-10-04T09:50:55.209Z",
+    "endUTC": "2026-10-04T09:50:55.220Z"
+  },
+  {
+    "label": "mobile native ArrowDown on minimum",
+    "startUTC": "2026-10-04T09:50:55.234Z",
+    "endUTC": "2026-10-04T09:50:55.257Z"
+  },
+  {
+    "label": "mobile native Tab minimum to maximum",
+    "startUTC": "2026-10-04T09:50:55.268Z",
+    "endUTC": "2026-10-04T09:50:55.340Z"
+  },
+  {
+    "label": "mobile native ArrowDown on maximum",
+    "startUTC": "2026-10-04T09:50:55.341Z",
+    "endUTC": "2026-10-04T09:50:55.510Z"
+  },
+  {
+    "label": "mobile ShiftTab maximum back to minimum",
+    "startUTC": "2026-10-04T09:52:31.426Z",
+    "endUTC": "2026-10-04T09:52:31.562Z"
+  },
+  {
+    "label": "mobile Next condition to local place-time",
+    "startUTC": "2026-10-04T09:52:31.580Z",
+    "endUTC": "2026-10-04T09:52:31.866Z"
+  },
+  {
+    "label": "mobile Previous place-time back to condition",
+    "startUTC": "2026-10-04T09:52:32.623Z",
+    "endUTC": "2026-10-04T09:52:32.899Z"
+  },
+  {
+    "label": "mobile locator-focused minimum Tab to maximum",
+    "startUTC": "2026-10-04T09:54:43.108Z",
+    "endUTC": "2026-10-04T09:54:43.135Z"
+  },
+  {
+    "label": "mobile locator-focused maximum ShiftTab to minimum",
+    "startUTC": "2026-10-04T09:54:43.153Z",
+    "endUTC": "2026-10-04T09:54:43.178Z"
+  },
+  {
+    "label": "mobile restore both endpoints through visible minimum unset",
+    "startUTC": "2026-10-04T09:54:43.191Z",
+    "endUTC": "2026-10-04T09:54:43.205Z"
+  },
+  {
+    "label": "resize range form tablet",
+    "startUTC": "2026-10-04T09:54:59.806Z",
+    "endUTC": "2026-10-04T09:55:05.019Z"
+  },
+  {
+    "label": "tablet zoom150",
+    "startUTC": "2026-10-04T09:55:05.020Z",
+    "endUTC": "2026-10-04T09:55:05.331Z"
+  },
+  {
+    "label": "tablet same level minimum novice",
+    "startUTC": "2026-10-04T09:55:45.910Z",
+    "endUTC": "2026-10-04T09:55:45.925Z"
+  },
+  {
+    "label": "tablet partial range maximum intermediate",
+    "startUTC": "2026-10-04T09:55:45.943Z",
+    "endUTC": "2026-10-04T09:55:45.953Z"
+  },
+  {
+    "label": "tablet crossing minimum advanced",
+    "startUTC": "2026-10-04T09:55:45.965Z",
+    "endUTC": "2026-10-04T09:55:45.988Z"
+  },
+  {
+    "label": "tablet crossing maximum beginner",
+    "startUTC": "2026-10-04T09:55:46.002Z",
+    "endUTC": "2026-10-04T09:55:46.012Z"
+  },
+  {
+    "label": "tablet keyboard minimum ArrowDown",
+    "startUTC": "2026-10-04T09:55:46.034Z",
+    "endUTC": "2026-10-04T09:55:46.074Z"
+  },
+  {
+    "label": "tablet keyboard minimum Tab to maximum",
+    "startUTC": "2026-10-04T09:55:46.075Z",
+    "endUTC": "2026-10-04T09:55:46.088Z"
+  },
+  {
+    "label": "tablet keyboard maximum ArrowDown",
+    "startUTC": "2026-10-04T09:55:46.089Z",
+    "endUTC": "2026-10-04T09:55:46.104Z"
+  },
+  {
+    "label": "tablet keyboard maximum ShiftTab",
+    "startUTC": "2026-10-04T09:55:46.119Z",
+    "endUTC": "2026-10-04T09:55:46.138Z"
+  },
+  {
+    "label": "tablet Next condition to local place-time",
+    "startUTC": "2026-10-04T09:56:10.858Z",
+    "endUTC": "2026-10-04T09:56:11.133Z"
+  },
+  {
+    "label": "tablet Previous back to condition",
+    "startUTC": "2026-10-04T09:56:11.379Z",
+    "endUTC": "2026-10-04T09:56:11.668Z"
+  },
+  {
+    "label": "tablet restore both endpoints via maximum unset",
+    "startUTC": "2026-10-04T09:56:11.906Z",
+    "endUTC": "2026-10-04T09:56:11.918Z"
+  },
+  {
+    "label": "desktop native zoom reset for range form",
+    "startUTC": "2026-10-04T09:56:11.931Z",
+    "endUTC": "2026-10-04T09:56:12.068Z"
+  },
+  {
+    "label": "desktop select novice minimum same-level",
+    "startUTC": "2026-10-04T09:56:49.975Z",
+    "endUTC": "2026-10-04T09:56:49.988Z"
+  },
+  {
+    "label": "desktop select intermediate maximum partial range",
+    "startUTC": "2026-10-04T09:56:50.003Z",
+    "endUTC": "2026-10-04T09:56:50.013Z"
+  },
+  {
+    "label": "desktop raise minimum above max",
+    "startUTC": "2026-10-04T09:56:50.024Z",
+    "endUTC": "2026-10-04T09:56:50.035Z"
+  },
+  {
+    "label": "desktop lower maximum below min",
+    "startUTC": "2026-10-04T09:56:50.049Z",
+    "endUTC": "2026-10-04T09:56:50.059Z"
+  },
+  {
+    "label": "desktop keyboard minimum ArrowDown",
+    "startUTC": "2026-10-04T09:56:50.070Z",
+    "endUTC": "2026-10-04T09:56:50.088Z"
+  },
+  {
+    "label": "desktop keyboard minimum Tab",
+    "startUTC": "2026-10-04T09:56:50.089Z",
+    "endUTC": "2026-10-04T09:56:50.103Z"
+  },
+  {
+    "label": "desktop keyboard maximum ArrowDown",
+    "startUTC": "2026-10-04T09:56:50.104Z",
+    "endUTC": "2026-10-04T09:56:50.121Z"
+  },
+  {
+    "label": "desktop keyboard maximum ShiftTab",
+    "startUTC": "2026-10-04T09:56:50.135Z",
+    "endUTC": "2026-10-04T09:56:50.153Z"
+  },
+  {
+    "label": "desktop full range minimum beginner",
+    "startUTC": "2026-10-04T09:56:50.241Z",
+    "endUTC": "2026-10-04T09:56:50.251Z"
+  },
+  {
+    "label": "desktop full range maximum advanced",
+    "startUTC": "2026-10-04T09:56:50.253Z",
+    "endUTC": "2026-10-04T09:56:50.263Z"
+  },
+  {
+    "label": "desktop Next full range to local place-time",
+    "startUTC": "2026-10-04T09:57:33.119Z",
+    "endUTC": "2026-10-04T09:57:33.400Z"
+  },
+  {
+    "label": "desktop Previous to condition full range",
+    "startUTC": "2026-10-04T09:57:33.691Z",
+    "endUTC": "2026-10-04T09:57:33.985Z"
+  },
+  {
+    "label": "desktop fresh document reload to verify retained local draft",
+    "startUTC": "2026-10-04T09:57:34.269Z",
+    "endUTC": "2026-10-04T09:57:34.582Z"
+  },
+  {
+    "label": "desktop restore both skill endpoints via visible unset",
+    "startUTC": "2026-10-04T09:58:00.375Z",
+    "endUTC": "2026-10-04T09:58:00.390Z"
+  },
+  {
+    "label": "reload restored unset range",
+    "startUTC": "2026-10-04T09:58:00.406Z",
+    "endUTC": "2026-10-04T09:58:00.881Z"
+  },
+  {
+    "label": "Previous condition to info for title restoration",
+    "startUTC": "2026-10-04T09:58:01.583Z",
+    "endUTC": "2026-10-04T09:58:01.876Z"
+  },
+  {
+    "label": "restore synthetic title to original blank",
+    "startUTC": "2026-10-04T09:58:01.971Z",
+    "endUTC": "2026-10-04T09:58:01.993Z"
+  },
+  {
+    "label": "fresh info reload after title restoration",
+    "startUTC": "2026-10-04T09:58:20.966Z",
+    "endUTC": "2026-10-04T09:58:21.471Z"
+  },
+  {
+    "label": "open leave dialog after direct value restoration",
+    "startUTC": "2026-10-04T09:58:22.141Z",
+    "endUTC": "2026-10-04T09:58:22.210Z"
+  },
+  {
+    "label": "Escape normal leave dialog with restored fields",
+    "startUTC": "2026-10-04T09:58:48.470Z",
+    "endUTC": "2026-10-04T09:58:48.503Z"
+  },
+  {
+    "label": "reopen normal leave dialog",
+    "startUTC": "2026-10-04T09:58:48.520Z",
+    "endUTC": "2026-10-04T09:58:48.581Z"
+  },
+  {
+    "label": "confirm leave with restored local draft retained",
+    "startUTC": "2026-10-04T09:58:48.600Z",
+    "endUTC": "2026-10-04T09:58:48.675Z"
+  }
+]

@@ -1,0 +1,10 @@
+{
+  "firstNextOutcome": {
+    "requiredTextPresent": false,
+    "title": null,
+    "url": "https://alpha.teameet.co.kr/team-matches/new/condition",
+    "utc": "2026-10-04T09:48:50.981Z"
+  },
+  "note": "First Next immediately after title fill remained info; retry is after observing settled valid title. No reason inferred.",
+  "actualObservationCorrection": "The stored firstNextOutcome is /new/condition at2026-10-04T09:48:50.981Z with title=null because the title field is not mounted there. The historical note incorrectly says info/settled title. The subsequent planned retry was an additional Next from condition, followed by actual place-time. Do not infer a stuck or failed initial Next."
+}

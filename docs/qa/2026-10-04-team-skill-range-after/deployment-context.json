@@ -1,0 +1,41 @@
+{
+  "runtimeServingIdentity": "unknown",
+  "initialReportedDeployment": {
+    "sha": "19e192d577544b26986799a47f76e8b259a1a8e2",
+    "version": "1.1.5-alpha.20261004.g19e192d57754",
+    "run": "37192161237",
+    "successUTC": "2026-10-04T09:40:35Z",
+    "healthyUTC": "2026-10-04T09:40:10.688Z"
+  },
+  "laterReportedDeploymentDuringRun": {
+    "sha": "951a67e3423dec502697f8bab2d78696d9374cc5",
+    "version": "1.1.5-alpha.20261004.g951a67e3423d",
+    "run": "37192728828",
+    "successUTC": "2026-10-04T09:49:29Z",
+    "healthyUTC": "2026-10-04T09:49:13.916Z"
+  },
+  "freshEntry": {
+    "label": "fresh team creation info navigation after reported19e192 deployment",
+    "startUTC": "2026-10-04T09:42:14.048Z",
+    "endUTC": "2026-10-04T09:42:19.353Z"
+  },
+  "laterDocumentReloadActions": [
+    {
+      "label": "desktop fresh document reload to verify retained local draft",
+      "startUTC": "2026-10-04T09:57:34.269Z",
+      "endUTC": "2026-10-04T09:57:34.582Z"
+    },
+    {
+      "label": "reload restored unset range",
+      "startUTC": "2026-10-04T09:58:00.406Z",
+      "endUTC": "2026-10-04T09:58:00.881Z"
+    },
+    {
+      "label": "fresh info reload after title restoration",
+      "startUTC": "2026-10-04T09:58:20.966Z",
+      "endUTC": "2026-10-04T09:58:21.471Z"
+    }
+  ],
+  "scope": "Initial document entry followed reported19e192; observation spans reported951a67 deployment. Subsequent fresh reloads are separately recorded. Runtime SHA is not inferred or retroactively assigned.",
+  "additionalDocumentContinuityLimit": "Proof7→8 native-select IDs changed without a recorded explicit reload/goto. A remount/reload cannot be confirmed or ruled out; runtime identity remains unknown across all observations."
+}

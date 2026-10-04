@@ -1,0 +1,37 @@
+{
+  "excludedInitialSnapshot": {
+    "index": 0,
+    "actualRoute": "/team-matches/new/place-time",
+    "originalLabel": "mobile initial range unset",
+    "correction": "Not a range-control observation. The first retained Next outcome was condition; the subsequent extra Next was followed by place-time. Previous returned to actual condition baseline atindex1. No save/final create was performed."
+  },
+  "firstNext": "The actual retained firstNextOutcome at09:48:50.981Z is /new/condition and title=null (title field not mounted). Its original explanatory note and the subsequent retry action label are mistaken historical wording, preserved. The additional Next advanced the local condition flow to place-time. The prelude is not evidence that initial Next was stuck or needed retry.",
+  "locatorMismatch": "Exact getByLabel lookup initially matched no option selector; actual label DOM includes option text. Observed selector IDs then addressed native selects. Later operations use select order after confirming condition route. This is collector targeting, not a product accessibility failure.",
+  "reverseFocusExcluded": {
+    "index": 8,
+    "actualActiveTag": "BUTTON",
+    "reason": "Starting focus was not established as maximum selector. Reverse success instead uses explicit max locator then ShiftTab atindex11."
+  },
+  "keyboardMethod": "Supported locator.press focuses a native select then sends the key; forward/reverse outcomes and focusVisible are stored. Mobile earlier Tab/Down also used native computer keys. No claim of whole-page uninterrupted keyboard traversal.",
+  "captures": "mobile-unset.png raw source is place-time and excluded; published mobile-unset.png is cropped from mobile-range-unset.png actual condition. Photo and DOM times are separate.",
+  "storage": "UI title/range restored, but local storage expiry/updated timestamp and selection hydration may change. No byte-for-byte storage restoration claim. Leave retains draft.",
+  "mutations": "No final create, server save, upload, application, permission or result control invoked; no API/DB/network audit.",
+  "mobileRoundTripEvidence": "Mobile outgoing place-time endpoint is collector-reported from tool output09:52:32.622Z, not a separate retained proof row. Completed actions17/18 plus returned proof9 establish the executed sequence and restored range; tablet21 anddesktop32 have retained outgoing endpoints.",
+  "unexplainedComponentIdentityChange": {
+    "fromIndex": 7,
+    "toIndex": 8,
+    "fromUTC": "2026-10-04T09:50:55.518Z",
+    "toUTC": "2026-10-04T09:52:31.575Z",
+    "fromIds": [
+      "_r_h_-min",
+      "_r_h_-max"
+    ],
+    "toIds": [
+      "_r_2_-min",
+      "_r_2_-max"
+    ],
+    "recordedReloadOrGotoInBetween": false,
+    "limitation": "Collector did not issue an explicit reload/goto in the retained sequence. Cause of ID change and possible remount/reload are unknown. Do not assert uninterrupted document identity or serving commit across this interval."
+  },
+  "actionCount": "58 rows are successful completed calls logged after awaiting the action. Failed tool attempts are not counted; partial UI effects of unsuccessful calls are not inferred."
+}

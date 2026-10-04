@@ -1418,10 +1418,10 @@ export function TournamentDetailView({
             On desktop these fill the area below the short rail and balance the 2-col;
             on mobile the rail is hidden (.tm-show-desktop) and 공지/환불 flow naturally. */}
         {(railCTA || hasAnnouncements || tournament.refundPolicyText) ? (
-          <div className="tm-tournament-detail-aside">
+          <div className="tm-tournament-detail-aside-boundary"><div className="tm-tournament-detail-aside">
             {railCTA}
             {asideExtra}
-          </div>
+          </div></div>
         ) : null}
 
         {/* Bracket 진입 카드와 참가 전 확인 사항 — completed는 leftContent(액션 리스트·아코디언)로 이전.
@@ -1658,7 +1658,7 @@ function getFlowSteps(competition: V1TournamentDetail): Array<{ title: string; b
     return [
       { title: '조별 리그', body: '같은 조 팀끼리 돌아가며 맞붙어 조 안에서 순위를 가려요.' },
       { title: '결선 진출', body: '각 조 상위 팀이 결선 토너먼트에 올라가요.' },
-      { title: '결선 토너먼트', body: '4강·결승 단판 승부로 우승팀을 가려요. 4강에서 진 두 팀은 3·4위전을 치러요.' },
+      { title: '결선 토너먼트', body: '편성된 12강·8강·4강을 거쳐 결승에서 우승팀을 가려요. 부전승 팀은 경기 없이 다음 단계로 올라가요.' },
     ];
   }
   if (format === 'knockout') {
@@ -1947,7 +1947,7 @@ function BracketSection({ tournament }: { tournament: V1TournamentDetail }) {
   if (format === 'knockout') {
     if (!hasAnyFixtures) return null;
     return (
-      <div className="tm-tournament-detail-bracket">
+      <div className="tm-tournament-detail-bracket" data-connected-bracket-wide={knockoutFixtures.length > 1 ? 'true' : undefined}>
         <div className="tm-match-detail-body">
           <section aria-labelledby="bracket-heading" style={{ marginTop: 24 }}>
             <div id="bracket-heading" className="tm-text-body-lg" style={{ marginBottom: 8 }}>
@@ -1968,7 +1968,7 @@ function BracketSection({ tournament }: { tournament: V1TournamentDetail }) {
   if (!hasKnockoutFixtures) return null;
 
   return (
-    <div className="tm-tournament-detail-bracket">
+    <div className="tm-tournament-detail-bracket" data-connected-bracket-wide={knockoutFixtures.length > 1 ? 'true' : undefined}>
       <div className="tm-match-detail-body">
         <section aria-labelledby="bracket-heading" style={{ marginTop: 24 }}>
           <div id="bracket-heading" className="tm-text-body-lg" style={{ marginBottom: 8 }}>
@@ -2017,7 +2017,7 @@ export function partitionTournamentSections(
   groups: V1TournamentGroup[],
 ) {
   const groupPhaseGroups = groups.filter((g) => g.phase === 'group');
-  const knockoutPhases = new Set(['semi', 'final', 'third_place']);
+  const knockoutPhases = new Set(['round12', 'quarter', 'semi', 'final', 'third_place']);
   const knockoutGroupIds = new Set(
     groups.filter((g) => knockoutPhases.has(g.phase)).map((g) => g.id),
   );
@@ -2029,7 +2029,7 @@ export function partitionTournamentSections(
   // TB-3: group_knockout에서 groupId=null이지만 round가 녹아웃 단계인 픽스처가 결선 대진표에서
   // 누락되는 문제 수정 — knockoutFixtures에 fallback으로 포함. round 는 표시 라벨이라 한글('4강'·
   // '결승'·'3·4위전')이 정상값이므로 영문 키와 한글 라벨을 모두 매칭(어드민 자동생성은 한글 라벨 사용).
-  const knockoutRoundLabels = ['semi', 'final', 'third_place', '4강', '결승', '3·4위전'];
+  const knockoutRoundLabels = ['round12', 'quarter', 'semi', 'final', 'third_place', '12강', '8강', '4강', '결승', '3·4위전'];
   const knockoutFixtures =
     format === 'knockout'
       ? fixtures

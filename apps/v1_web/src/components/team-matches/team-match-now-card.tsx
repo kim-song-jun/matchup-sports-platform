@@ -190,7 +190,7 @@ export function HostApplicationsErrorCard({ onRetry }: { onRetry: () => void }) 
 /** A-2 — 신청한 팀(승인 대기). 무엇을 기다리는지와 승인되면 무엇이 열리는지를 말한다. */
 export function PendingApplicationCard({ hostTeamName, team }: {
   hostTeamName: string;
-  team?: { teamId: string; name: string } | null;
+  team?: { teamId: string; name: string; logoUrl?: string | null } | null;
 }) {
   return (
     <NowCard
@@ -202,7 +202,7 @@ export function PendingApplicationCard({ hostTeamName, team }: {
       <div style={{ ...INNER_BOX, padding: '4px 12px' }}>
         {team ? (
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, minHeight: 56 }}>
-            <TeamAvatar seed={team.teamId} name={team.name} size="md" />
+            <TeamAvatar seed={team.teamId} name={team.name} logoUrl={team.logoUrl} size="md" />
             <div style={{ flex: 1, minWidth: 0 }}>
               <div className="tm-text-label" style={{ color: 'var(--text-strong)' }}>{team.name}</div>
               <div className="tm-text-micro" style={{ marginTop: 2, color: 'var(--text-caption)' }}>우리 팀으로 신청했어요</div>

@@ -109,12 +109,12 @@ vi.mock('./team-matches-page', () => ({
       <span data-testid="team-match-status-caption">{model.statusCaption}</span>
       <span data-testid="team-match-manage-menu">{JSON.stringify(model.manageMenu ?? null)}</span>
       <span data-testid="team-match-progress">{JSON.stringify(model.progress ?? null)}</span>
-      <span data-testid="team-match-my-application-team">{model.myApplicationTeam?.name}</span>
+      <span data-testid="team-match-my-application-team" data-logo={model.myApplicationTeam?.logoUrl ?? ''}>{model.myApplicationTeam?.name}</span>
       <span data-testid="team-match-viewer-applicant-side">{String(model.viewerOnApplicantSide === true)}</span>
       {model.applicationsError ? <button onClick={model.applicationsError.retry}>신청 목록 다시 불러오기</button> : null}
       <span data-testid="team-match-applicants">{JSON.stringify(model.match.applicantTeams.map(({ name, applicationStatus, appliedByName, message }) => ({ name, applicationStatus, appliedByName, message })))}</span>
       {model.applyTeamPicker ? (
-        <div data-testid="team-match-apply-picker" data-default-team={model.applyTeamPicker.defaultTeamId}>
+        <div data-testid="team-match-apply-picker" data-default-team={model.applyTeamPicker.defaultTeamId} data-logos={model.applyTeamPicker.teams.map((team) => team.logoUrl ?? '').join('|')}>
           {model.applyTeamPicker.teams.map((team) => `${team.name}:${team.roleLabel}:${team.eligible ? '' : team.reason}`).join('|')}
           <button onClick={() => { void model.applyTeamPicker?.submit('team-b', '한마디'); }}>시트로 신청</button>
         </div>
@@ -760,7 +760,7 @@ describe('TeamMatchDetailPageClient — 취소된 팀매치는 취소를 표시�
 //    보지 않고 팀 멤버십만 봐야 completed 이후에도 버튼이 계속 동작한다.
 describe('TeamMatchDetailPageClient — 채팅 게이트는 팀 멤버십 기준이고 경기 종료 후에도 유지된다', () => {
   function mockTeamMatchForChat(
-    viewer: { state: V1TeamMatchViewerState; manageableHostTeam?: boolean; manageableOpponentTeam?: boolean },
+    viewer: { state: V1TeamMatchViewerState; manageableHostTeam?: boolean; manageableOpponentTeam?: boolean; canChat?: boolean },
     status: string,
     opponentAssigned = true,
   ) {
@@ -780,6 +780,7 @@ describe('TeamMatchDetailPageClient — 채팅 게이트는 팀 멤버십 기준
           state: viewer.state,
           manageableHostTeam: viewer.manageableHostTeam ?? false,
           manageableOpponentTeam: viewer.manageableOpponentTeam ?? false,
+          canChat: viewer.canChat,
         },
         hostTeam: { teamId: 'team-host', name: '호스트 팀' },
         approvedOpponentTeam: opponentAssigned ? { teamId: 'team-away', name: '상대 팀' } : null,
@@ -800,6 +801,23 @@ describe('TeamMatchDetailPageClient — 채팅 게이트는 팀 멤버십 기준
 
     expect(screen.getByRole('button', { name: '채팅 열기' })).toBeInTheDocument();
     expect(screen.getByTestId('team-match-chat-label')).toHaveTextContent('채팅');
+  });
+
+  it('플랫폼 운영자는 참가팀이 없어도 서버가 허용한 모집 채팅을 연다', () => {
+    mockTeamMatchForChat({ state: 'none', canChat: true }, 'recruiting', false);
+    render(<TeamMatchDetailPageClient teamMatchId="team-match-1" />);
+    expect(screen.getByRole('button', { name: '채팅 열기' })).toBeInTheDocument();
+    expect(resolveChatRoomMutateMock).toHaveBeenCalledWith(
+      { targetType: 'team_match', targetId: 'team-match-1' },
+      expect.objectContaining({ onError: expect.any(Function) }),
+    );
+  });
+
+  it('서버가 채팅 권한을 차단하면 팀 관리 플래그가 남아도 진입하지 않는다', () => {
+    mockTeamMatchForChat({ state: 'none', manageableHostTeam: true, canChat: false }, 'matched');
+    render(<TeamMatchDetailPageClient teamMatchId="team-match-1" />);
+    expect(screen.queryByRole('button', { name: '채팅 열기' })).not.toBeInTheDocument();
+    expect(resolveChatRoomMutateMock).not.toHaveBeenCalled();
   });
 
   it('리그 대진 상대팀 owner/manager는 신청서를 직접 내지 않았어도(state=none) 채팅을 연다', () => {
@@ -903,8 +921,8 @@ describe('toTeamMatch — legacy/unmigrated condition fields never show mock dat
   it('성별 조건이 없으면 빈 값으로 둔다 — 문자열로 채우면 화면 가드가 무력해진다', () => {
     expect(toTeamMatch(realMatch({ genderRule: null }), mockFallback).gender).toBe('');
     expect(toTeamMatch(realMatch({}), mockFallback).gender).toBe('');
-    // 값이 있으면 그대로 흐른다.
-    expect(toTeamMatch(realMatch({ genderRule: '성별 무관' }), mockFallback).gender).toBe('성별 무관');
+    // 값이 있으면 매치 라벨로 흐른다(저장값 '성별 무관' → '혼성').
+    expect(toTeamMatch(realMatch({ genderRule: '성별 무관' }), mockFallback).gender).toBe('혼성');
   });
 
   /**
@@ -1736,7 +1754,7 @@ describe('TeamMatchDetailPageClient — 호스트의 신청 승인·관리 메�
 });
 
 describe('TeamMatchDetailPageClient — 여러 팀 팀장의 신청 팀 선택 (H6 N-1)', () => {
-  function mockViewer(teams: Array<{ teamId: string; name: string; role: string; eligible: boolean; reasonCode: string }>, viewerState = 'none') {
+  function mockViewer(teams: Array<{ teamId: string; name: string; logoUrl?: string | null; role: string; eligible: boolean; reasonCode: string }>, viewerState = 'none') {
     useV1TeamMatchMock.mockReturnValue({
       data: {
         id: 'tm-n1',
@@ -1801,6 +1819,27 @@ describe('TeamMatchDetailPageClient — 여러 팀 팀장의 신청 팀 선택 (
 
     await waitFor(() => expect(applyTeamMatchMutateAsync).toHaveBeenCalledWith({ applicantTeamId: 'team-b', message: '한마디' }));
     await waitFor(() => expect(window.localStorage.getItem('teameet.v1.lastTeamMatchApplyTeamId')).toBe('team-b'));
+  });
+
+  // 서버가 내려준 팀 엠블럼이 시트까지 이어져야 한다 — 중간에 빠지면 화면은 팀 id 로 만든 임시
+  // 무늬만 그린다(2026-10-04 사용자 제보). 엠블럼이 없는 팀은 빈 값으로 남는다.
+  it('서버가 준 팀 엠블럼을 신청 시트의 팀 행에 그대로 싣는다', () => {
+    mockViewer([
+      { teamId: 'team-a', name: 'A팀', logoUrl: '/images/team-logos/team-logo-03.jpg', role: 'owner', eligible: true, reasonCode: 'OK' },
+      { teamId: 'team-b', name: 'B팀', logoUrl: null, role: 'manager', eligible: true, reasonCode: 'OK' },
+    ]);
+    render(<TeamMatchDetailPageClient teamMatchId="tm-n1" />);
+
+    expect(screen.getByTestId('team-match-apply-picker')).toHaveAttribute('data-logos', '/images/team-logos/team-logo-03.jpg|');
+  });
+
+  it('승인 대기 중인 신청 팀의 엠블럼을 "우리 팀" 자리에 싣는다', () => {
+    mockViewer([
+      { teamId: 'team-a', name: 'A팀', logoUrl: '/uploads/a-emblem.png', role: 'owner', eligible: false, reasonCode: 'ALREADY_REQUESTED' },
+    ], 'requested');
+    render(<TeamMatchDetailPageClient teamMatchId="tm-n1" />);
+
+    expect(screen.getByTestId('team-match-my-application-team')).toHaveAttribute('data-logo', '/uploads/a-emblem.png');
   });
 
   it('승인 대기 중인 신청 팀은 히어로 "우리 팀" 자리에 그 팀을 싣고, 시트는 없다', () => {

@@ -26,17 +26,17 @@ import { competitionMatchLabel } from '@/lib/tournament-round-label';
 
 /**
  * 선수 이름을 프로필로 잇는다. **열어도 되는지는 서버가 이미 판단해서** `profileHref` 로
- * 내려주므로(없으면 `null`) 여기서 동의·계정 유무를 다시 따지지 않는다 — 화면 세 곳이
+ * 내려주므로(없으면 `null`) 여기서 동의·계정 유무를 다시 따지지 않는다 — 각 선수 링크가
  * 각자 판단하면 언젠가 갈린다.
  *
  * 링크가 없을 때 굳이 span 으로 감싸지 않고 이름을 그대로 돌려주는 이유: 대부분의
  * 참가자가 그 경우이고, 의미 없는 래퍼가 한 겹 늘면 기존 레이아웃(폭·정렬)이 미묘하게
  * 달라진다.
  */
-function ProfileLink({ href, children }: { href: string | null; children: React.ReactNode }) {
+function ProfileLink({ href, from, children }: { href: string | null; from?: string; children: React.ReactNode }) {
   if (href === null) return <>{children}</>;
   return (
-    <Link href={href} style={{ color: 'inherit', textDecoration: 'underline', textUnderlineOffset: 2 }}>
+    <Link href={withFromPath(href, from)} style={{ color: 'inherit', textDecoration: 'underline', textUnderlineOffset: 2 }}>
       {children}
     </Link>
   );
@@ -125,7 +125,7 @@ function MatchOutcomeNotice({ outcome }: { outcome: PublicMatchDetail['outcome']
   );
 }
 
-function LineupColumn({ title, slots }: { title: string; slots: readonly PublicLineupSlot[] }) {
+function LineupColumn({ title, slots, from }: { title: string; slots: readonly PublicLineupSlot[]; from?: string }) {
   return (
     <div style={{ flex: 1 }}>
       <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-caption)', marginBottom: 8 }}>{title}</div>
@@ -139,7 +139,7 @@ function LineupColumn({ title, slots }: { title: string; slots: readonly PublicL
                 <span className="tab-num" style={{ color: 'var(--text-caption)', width: 20 }}>{slot.jerseyNumber}</span>
               ) : null}
               <span style={{ color: 'var(--text-strong)', fontWeight: 600 }}>
-                <ProfileLink href={slot.profileHref}>{presentParticipantName(slot.displayName)}</ProfileLink>
+                <ProfileLink href={slot.profileHref} from={from}>{presentParticipantName(slot.displayName)}</ProfileLink>
               </span>
               {/* [P1-d] 포지션 표시를 걷어냈다 — 공개 응답에서 `position` 이 빠졌다(D4:
                   관중에게는 등번호와 이름만). 포지션은 팀이 짜 넣은 전술 정보라 전술보드
@@ -162,7 +162,7 @@ function LineupColumn({ title, slots }: { title: string; slots: readonly PublicL
  * 홈/원정은 스코어 헤더의 좌(홈)/우(원정) 배치를 그대로 이어받아, 시간·아이콘을
  * 가운데 열에 두고 좌우 열에 각 팀의 이벤트만 채우는 2열 타임라인으로 보여준다.
  */
-function EventRow({ event }: { event: PublicMatchEvent }) {
+function EventRow({ event, from }: { event: PublicMatchEvent; from?: string }) {
   const presentation = eventPresentation(event);
   // 두 열의 바깥쪽 가장자리에 붙는다 -- 홈은 오른쪽(가운데 시각 쪽), 원정은 왼쪽 정렬.
   const alignItems = event.side === 'home' ? 'flex-end' : 'flex-start';
@@ -174,7 +174,7 @@ function EventRow({ event }: { event: PublicMatchEvent }) {
           <span className="tab-num" style={{ color: 'var(--text-caption)', fontSize: 12 }}>{event.jerseyNumber}</span>
         ) : null}
         <span style={{ fontWeight: 600, fontSize: 13, color: 'var(--text-strong)' }}>
-          <ProfileLink href={event.profileHref}>
+          <ProfileLink href={event.profileHref} from={from}>
             {presentGameEventParticipantName(event.type, event.participantName)}
           </ProfileLink>
         </span>
@@ -183,7 +183,7 @@ function EventRow({ event }: { event: PublicMatchEvent }) {
         <span style={{ fontSize: 'var(--font-size-caption)', color: 'var(--text-caption)' }}>
           도움 ·{' '}
           {assist.jerseyNumber !== null ? <span className="tab-num">{assist.jerseyNumber} </span> : null}
-          <ProfileLink href={assist.profileHref}>{presentParticipantName(assist.participantName)}</ProfileLink>
+          <ProfileLink href={assist.profileHref} from={from}>{presentParticipantName(assist.participantName)}</ProfileLink>
         </span>
       ) : null}
     </span>
@@ -231,9 +231,11 @@ function EventRow({ event }: { event: PublicMatchEvent }) {
 function EventsSection({
   events,
   isStatusOnly,
+  from,
 }: {
   events: readonly PublicMatchEvent[];
   isStatusOnly: boolean;
+  from?: string;
 }) {
   if (events.length === 0) {
     // status_only는 "이벤트가 없었다"가 아니라 "이 대회는 진행 상태만 공개해서
@@ -279,7 +281,7 @@ function EventsSection({
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               {byPeriod.get(period)!.map((event, index) => (
-                <EventRow key={`${event.type}-${event.sideId}-${period}-${index}`} event={event} />
+                <EventRow key={`${event.type}-${event.sideId}-${period}-${index}`} event={event} from={from} />
               ))}
             </div>
           </div>
@@ -295,7 +297,7 @@ function EventsSection({
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             {unknownPeriodEvents.map((event, index) => (
-              <EventRow key={`${event.type}-${event.sideId}-unknown-${index}`} event={event} />
+              <EventRow key={`${event.type}-${event.sideId}-unknown-${index}`} event={event} from={from} />
             ))}
           </div>
         </div>
@@ -449,7 +451,7 @@ export function MatchDetailContent({
         <Card pad={16}>
           <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-caption)', marginBottom: 4 }}>MVP</div>
           <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-strong)' }}>
-            <ProfileLink href={data.mvp.profileHref}>{presentParticipantName(data.mvp.displayName)}</ProfileLink>
+            <ProfileLink href={data.mvp.profileHref} from={from}>{presentParticipantName(data.mvp.displayName)}</ProfileLink>
           </div>
         </Card>
       ) : null}
@@ -464,8 +466,8 @@ export function MatchDetailContent({
           <h3 className="tm-hub-section-title" style={{ marginBottom: 12 }}>라인업</h3>
           <Card pad={16}>
             <div style={{ display: 'flex', gap: 20 }}>
-              <LineupColumn title={sideLabel(data.home)} slots={data.lineup.home} />
-              <LineupColumn title={sideLabel(data.away)} slots={data.lineup.away} />
+              <LineupColumn title={sideLabel(data.home)} slots={data.lineup.home} from={from} />
+              <LineupColumn title={sideLabel(data.away)} slots={data.lineup.away} from={from} />
             </div>
           </Card>
         </section>
@@ -476,7 +478,7 @@ export function MatchDetailContent({
       <section>
         <h3 className="tm-hub-section-title" style={{ marginBottom: 12 }}>득점·카드</h3>
         <Card pad={16}>
-          <EventsSection events={data.events} isStatusOnly={isStatusOnly} />
+          <EventsSection events={data.events} isStatusOnly={isStatusOnly} from={from} />
         </Card>
       </section>
 

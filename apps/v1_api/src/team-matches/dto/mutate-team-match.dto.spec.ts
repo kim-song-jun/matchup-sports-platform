@@ -3,6 +3,7 @@ import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
 import { MATCH_STYLE_MAX_ITEMS } from '../team-match-conditions.constants';
 import { MutateTeamMatchDto } from './mutate-team-match.dto';
+import { CreateAdminTeamMatchRecruitmentDto } from './admin-team-match-recruitment.dto';
 
 /**
  * 경기 스타일(matchStyle) 다중선택 상한 검증. 사용자 확정 결정(3개, 상충 조합/배지 정리
@@ -21,6 +22,17 @@ const basePayload = {
 };
 
 describe('MutateTeamMatchDto matchStyle cap', () => {
+  it.each([MutateTeamMatchDto, CreateAdminTeamMatchRecruitmentDto])('accepts both image fields through the real DTO whitelist (%p)', async (Dto) => {
+    const { hostTeamId, ...shared } = basePayload;
+    const required = Dto === MutateTeamMatchDto ? { hostTeamId } : { clientCommandId: hostTeamId };
+    const dto = plainToInstance(Dto as typeof MutateTeamMatchDto, {
+      ...shared, ...required, imageUrl: '/uploads/wide.webp', listImageUrl: '/uploads/square.webp',
+    });
+    expect(await validate(dto, { whitelist: true, forbidNonWhitelisted: true })).toEqual([]);
+    const invalid = plainToInstance(Dto as typeof MutateTeamMatchDto, { ...shared, ...required, listImageUrl: 123 });
+    expect((await validate(invalid)).find((error) => error.property === 'listImageUrl')?.constraints).toHaveProperty('isString');
+  });
+
   it('confirms the configured cap is 3, not the old 6', () => {
     expect(MATCH_STYLE_MAX_ITEMS).toBe(3);
   });

@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ReactElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { queryImageBySrc } from '@/test/next-image';
 import { TeamMatchCreatePageView, TeamMatchDetailPageView, TeamMatchListPageView } from './team-matches-page';
 import { getTeamMatchCreateViewModel, getTeamMatchDetailViewModel, getTeamMatchListViewModel } from './team-matches.view-model';
 import type { TeamMatchModel } from './team-matches.types';
@@ -31,6 +32,19 @@ function renderPage(ui: ReactElement) {
 }
 
 describe('team match images', () => {
+  it('uses the square image on the list and the wide image on detail', () => {
+    const images = { imageUrl: '/uploads/wide.webp', listImageUrl: '/uploads/square.webp' };
+    const list = getTeamMatchListViewModel();
+    list.matches = [{ ...list.matches[0], ...images }];
+    const first = renderPage(<TeamMatchListPageView model={list} />);
+    expect(first.container.querySelector<HTMLElement>('.tm-match-row-thumb')?.style.backgroundImage).toContain(images.listImageUrl);
+    first.unmount();
+    const detail = getTeamMatchDetailViewModel();
+    detail.match = { ...detail.match, ...images };
+    const second = renderPage(<TeamMatchDetailPageView model={detail} />);
+    expect(second.container.querySelector<HTMLElement>('.tm-team-vs-hero')?.style.backgroundImage).toContain(images.imageUrl);
+  });
+
   it('places the lifecycle notice after the match hero and its mobile back action', () => {
     const model = getTeamMatchDetailViewModel('mine');
     const { container } = renderPage(<TeamMatchDetailPageView model={model} lifecyclePanel={<div data-testid="lifecycle-notice">보류 안내</div>} />);
@@ -50,13 +64,13 @@ describe('team match images', () => {
     const media = container.querySelector<HTMLElement>('.tm-match-row-thumb');
 
     expect(media?.style.backgroundImage).toContain('https://cdn.example.com/team-match.webp');
-    expect(media?.style.backgroundImage).toContain('/mock/generated/team-huddle.webp');
+    expect(media?.style.backgroundImage).toContain('/illustrations/sport-soccer-640.webp');
     expect(media?.style.backgroundImage).not.toContain('linear-gradient');
     expect(media?.textContent).toBe('');
     expect(screen.getByText(model.matches[0].title).closest('a')?.getAttribute('href')).toContain(`/team-matches/${model.matches[0].id}`);
   });
 
-  it.each(['/uploads/team-match-cover.webp', '/mock/generated/team-huddle.webp'])(
+  it.each(['/uploads/team-match-cover.webp', '/illustrations/sport-soccer-640.webp'])(
     'keeps text-free photos undimmed for %s while preserving closed-card state',
     (imageUrl) => {
       const model = getTeamMatchListViewModel();
@@ -65,7 +79,7 @@ describe('team match images', () => {
       const media = container.querySelector<HTMLElement>('.tm-match-row-thumb');
 
       expect(media?.style.backgroundImage).toContain(imageUrl);
-      expect(media?.style.backgroundImage).toContain('/mock/generated/team-huddle.webp');
+      expect(media?.style.backgroundImage).toContain('/illustrations/sport-soccer-640.webp');
       expect(media?.style.backgroundImage).not.toContain('linear-gradient');
       expect(media?.closest('a')).toHaveClass('tm-card-closed');
       expect(media?.textContent).toBe('');
@@ -82,6 +96,7 @@ describe('team match images', () => {
     expect(media?.style.backgroundImage).toBe('');
     expect(media?.querySelector('img')?.getAttribute('src')).toContain('sport-futsal');
     expect(screen.getByText(model.matches[0].title)).toBeInTheDocument();
+
   });
 
   it('renders the API image with a local fallback on the detail hero', () => {
@@ -92,8 +107,11 @@ describe('team match images', () => {
     const hero = container.querySelector<HTMLElement>('.tm-team-vs-hero');
 
     expect(hero?.style.backgroundImage).toContain('/uploads/team-match-cover.webp');
-    expect(hero?.style.backgroundImage).toContain('/mock/generated/team-huddle.webp');
-    expect(hero?.style.backgroundImage).toContain('linear-gradient');
+    expect(hero?.style.backgroundImage).toContain('/illustrations/sport-soccer-640.webp');
+    expect(hero?.style.backgroundImage).not.toContain('linear-gradient');
+    expect(hero).toHaveClass('tm-team-vs-hero-photo');
+    expect(hero?.querySelector('.tm-team-vs-summary')).not.toBeNull();
+
     expect(hero?.style.backgroundPosition).toBe('center');
     expect(hero?.style.backgroundRepeat).toBe('no-repeat');
     expect(hero?.style.backgroundSize).toBe('cover');
@@ -198,6 +216,22 @@ describe('team match detail — recordEntry 렌더 순서', () => {
 });
 
 describe('platform-managed team match provenance', () => {
+  it.each([false, true])('주관에 맞는 모집 문구와 부담금 라벨을 보여준다 (플랫폼=%s)', (platformManaged) => {
+    const list = getTeamMatchListViewModel();
+    list.matches = [{ ...list.matches[0], platformManaged,
+      status: 'open', closed: false, live: false, completionPending: false }];
+    const renderedList = renderPage(<TeamMatchListPageView model={list} />);
+    expect(screen.getByText(platformManaged ? '팀 모집 중' : '상대 모집 중')).toBeInTheDocument();
+    expect(screen.queryByText(platformManaged ? '상대 모집 중' : '팀 모집 중')).not.toBeInTheDocument();
+    renderedList.unmount();
+
+    const detail = getTeamMatchDetailViewModel();
+    detail.match = { ...detail.match, platformManaged, cost: 120000, opponentCost: 60000 };
+    renderPage(<TeamMatchDetailPageView model={detail} />);
+    expect(screen.getByText(platformManaged ? '각 팀 부담금' : '상대팀 부담금')).toBeInTheDocument();
+    expect(screen.queryByText(platformManaged ? '상대팀 부담금' : '각 팀 부담금')).not.toBeInTheDocument();
+  });
+
   it.each([false, true])('미배정 플랫폼 대진은 두 팀 자리를 보여준다 (마감=%s)', (closed) => {
     const model = getTeamMatchDetailViewModel();
     model.match = { ...model.match, platformManaged: true, hostTeamId: undefined,
@@ -363,6 +397,13 @@ describe('TeamMatchListPageView — 신청 마감 카드 구분', () => {
 
     expect(screen.getAllByText('신청 마감').length).toBeGreaterThan(0);
     expect(container.querySelector('.tm-match-row.tm-card-closed')).not.toBeNull();
+  });
+
+  it.each(['completed', 'cancelled', 'expired'] as const)('끝난 리그 매치도 카드 전체 흐림 대상으로 표시한다 (%s)', (apiStatus) => {
+    const model = modelWithSingleCard('closed');
+    model.matches[0] = { ...model.matches[0], apiStatus, league: { leagueId: 'league-1', title: '가을 리그' } };
+    const { container } = renderPage(<TeamMatchListPageView model={model} />);
+    expect(container.querySelector('.tm-match-row')).toHaveClass('tm-card-closed');
   });
 
   it('지정 종료 시각이 지난 matched 카드는 "종료 확인 중"으로 표시하고 마감 카드처럼 흐리지 않는다', () => {
@@ -555,9 +596,10 @@ describe('team match full edit', () => {
 
     expect(screen.getByText('다이나믹 FS')).toBeInTheDocument();
     expect(screen.getAllByText('풋살').length).toBeGreaterThan(0);
-    expect(screen.getByLabelText(/배경 이미지 선택/)).toBeInTheDocument();
+    expect(screen.getByLabelText('목록 이미지')).toBeInTheDocument();
+    expect(screen.getByLabelText('상세 이미지')).toBeInTheDocument();
     for (const label of [
-      '매치 제목', '설명', '실력등급', '경기방식',
+      '매치 제목', '설명', '최소 등급', '최대 등급', '경기방식',
       '경기 스타일', '유니폼 색상', '장소',
       '상세 주소', '날짜', '시작 시간', '종료 시간', '신청 마감일', '신청 마감시간',
     ]) {
@@ -588,6 +630,7 @@ describe('team match full edit', () => {
       onNext: () => undefined,
       onSubmit: () => undefined,
       lockedReason,
+      uploadImage: async () => '/uploads/team-match.webp',
     };
 
     renderPage(<TeamMatchCreatePageView model={model} />);
@@ -596,8 +639,10 @@ describe('team match full edit', () => {
       if (locked) expect(screen.getByLabelText(label)).toBeDisabled();
       else expect(screen.getByLabelText(label)).not.toBeDisabled();
     }
-    if (locked) expect(screen.getByLabelText(/배경 이미지 선택/)).toBeDisabled();
-    else expect(screen.getByLabelText(/배경 이미지 선택/)).not.toBeDisabled();
+    for (const label of ['목록 이미지', '상세 이미지']) {
+      if (locked) expect(screen.getByLabelText(label)).toBeDisabled();
+      else expect(screen.getByLabelText(label)).not.toBeDisabled();
+    }
   });
 });
 
@@ -1834,6 +1879,15 @@ describe('TeamMatchDetailPageView — 지금 할 일 카드 (H6)', () => {
     }
   });
 
+  it('신청 접수 카드에도 신청한 팀의 엠블럼을 그린다', () => {
+    const model = getTeamMatchDetailViewModel('pending');
+    model.myApplicationTeam = { teamId: 'team-hapjeong', name: '합정 유나이티드', logoUrl: '/images/team-logos/team-logo-03.jpg' };
+    renderPage(<TeamMatchDetailPageView model={model} />);
+
+    const card = screen.getByRole('region', { name: '신청을 접수했어요' });
+    expect(queryImageBySrc(card, '/images/team-logos/team-logo-03.jpg')).not.toBeNull();
+  });
+
   it('W4-V3: 신청 팀은 매칭 뒤에도 히어로 오른쪽 자기 팀을 우리 팀으로 보고, 호스트는 상대팀으로 본다(대조군)', () => {
     function matchedModel(viewerOnApplicantSide: boolean) {
       const model = getTeamMatchDetailViewModel('approved');
@@ -1970,6 +2024,31 @@ describe('TeamMatchDetailPageView — 여러 팀 팀장의 신청 팀 선택 시
 
     await waitFor(() => expect(submit).toHaveBeenCalledWith('a', '저녁 경기 좋아요.'));
     await waitFor(() => expect(screen.queryByRole('dialog', { name: '어느 팀으로 신청할까요?' })).not.toBeInTheDocument());
+  });
+
+  // 시트가 TeamAvatar 에 엠블럼을 안 넘기던 때는 팀이 등록한 엠블럼·기본 제공 엠블럼이 있어도
+  // 전부 팀 id 로 만든 임시 무늬(identicon)로만 보였다(2026-10-04 사용자 제보).
+  it('팀 행에 팀의 엠블럼을 그린다 — 엠블럼이 없는 팀만 임시 무늬로 남는다', async () => {
+    const model = getTeamMatchDetailViewModel('default');
+    model.applyLabel = '신청하기';
+    model.applyTeamPicker = {
+      teams: [
+        { teamId: 'a', name: '업로드 엠블럼 팀', logoUrl: '/uploads/emblem.png', roleLabel: '팀장', eligible: true, reason: null },
+        { teamId: 'b', name: '기본 엠블럼 팀', logoUrl: '/images/team-logos/team-logo-03.jpg', roleLabel: '팀장', eligible: true, reason: null },
+        { teamId: 'c', name: '엠블럼 없는 팀', logoUrl: null, roleLabel: '팀장', eligible: true, reason: null },
+      ],
+      defaultTeamId: 'a',
+      submit: vi.fn(),
+    };
+    renderPage(<TeamMatchDetailPageView model={model} />);
+
+    fireEvent.click(screen.getAllByRole('button', { name: '신청하기' })[0]);
+    const sheet = await screen.findByRole('dialog', { name: '어느 팀으로 신청할까요?' });
+    const rowOf = (name: RegExp) => within(sheet).getByRole('radio', { name }).closest('label')!;
+
+    expect(queryImageBySrc(rowOf(/업로드 엠블럼 팀/), '/uploads/emblem.png')).not.toBeNull();
+    expect(queryImageBySrc(rowOf(/기본 엠블럼 팀/), '/images/team-logos/team-logo-03.jpg')).not.toBeNull();
+    expect(rowOf(/엠블럼 없는 팀/).querySelector('img')).toBeNull();
   });
 
   it('신청이 실패하면 시트를 닫지 않고 이유를 보여 준다', async () => {

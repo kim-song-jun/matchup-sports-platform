@@ -65,7 +65,7 @@ export const DEMO_TABS: ReadonlyArray<{ key: DemoTab; label: string }> = [
 export const SPORT_FILTERS: readonly SportFilter[] = ['전체', '축구', '풋살', '러닝', '수영'];
 
 export const DEMO_MATCHES: readonly DemoMatch[] = [
-  { id: 'seongsu', sport: '풋살', title: '성수 저녁 풋살', meta: '풋살 · 입문-초보 · 성별 무관', when: '토요일 19:00 · 성동구', image: '/illustrations/sport-futsal-320.webp', capacity: 10, filled: 6 },
+  { id: 'seongsu', sport: '풋살', title: '성수 저녁 풋살', meta: '풋살 · 입문-초보 · 혼성', when: '토요일 19:00 · 성동구', image: '/illustrations/sport-futsal-320.webp', capacity: 10, filled: 6 },
   { id: 'sunday', sport: '축구', title: '일요 아침 축구', meta: '축구 · 중급 · 11:11', when: '일요일 08:00 · 광진구', image: '/illustrations/sport-soccer-320.webp', capacity: 22, filled: 18 },
   { id: 'run', sport: '러닝', title: '한강 퇴근런', meta: '러닝 · 누구나 · 5km', when: '화요일 20:00 · 성동구', image: '/illustrations/sport-running-320.webp', capacity: 10, filled: 9 },
 ];

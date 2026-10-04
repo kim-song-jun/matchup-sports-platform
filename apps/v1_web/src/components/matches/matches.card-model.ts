@@ -9,6 +9,7 @@
 import { formatCardDate as formatDate, formatCardTime as formatTime } from '@/lib/date-utils';
 import type { MatchCardModel, MatchListViewModel } from './matches.types';
 import type { V1Match, V1MatchApiStatus, V1Sport, V1ViewerState } from '@/types/api';
+import { matchGenderRuleLabel } from '@/lib/v1-status-labels';
 
 
 const FIXED_MATCH_SPORT_NAMES = ['축구', '풋살', '러닝', '수영'] as const;
@@ -43,7 +44,7 @@ export function toMatchCard(match: V1Match, fallback: MatchCardModel): MatchCard
     // 팀매치 카드 모델과 같은 이유로 빈 문자열을 쓴다 — 문자열로 채우면 소비처의
     // "값이 있을 때만 그린다" 가드가 무력해진다. 라벨 있는 자리(`InfoRow`)는 빈 값을
     // '미정' 으로 그린다.
-    gender: match.genderRule ?? '',
+    gender: matchGenderRuleLabel(match.genderRule),
     host: match.host?.displayName ?? '호스트',
     image: match.imageUrl ?? null,
     costNote: match.costNote ?? null,

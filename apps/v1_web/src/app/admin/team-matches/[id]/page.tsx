@@ -1,4 +1,5 @@
 'use client';
+import { TeamMatchImagesPreview } from '@/components/team-matches/team-match-images';
 
 import Link from 'next/link';
 import { useState } from 'react';
@@ -22,6 +23,7 @@ import { formatAdminDateTime } from '@/lib/date-utils';
 import { extractErrorMessage } from '@/lib/error-message';
 import { randomUuid } from '@/lib/uuid';
 import type { V1AdminTeamMatchDetail } from '@/types/api';
+import { matchGenderRuleLabel } from '@/lib/v1-status-labels';
 
 /**
  * 팀매치 상세.
@@ -307,14 +309,7 @@ export default function AdminTeamMatchDetailPage() {
               </Link>
             )}
 
-            {teamMatch.imageUrl && (
-              <div
-                role="img"
-                aria-label={`${teamMatch.title} 대표 이미지`}
-                className="mt-5 aspect-[16/7] w-full rounded-2xl bg-[var(--surface-soft)] bg-cover bg-center"
-                style={{ backgroundImage: `url("${teamMatch.imageUrl.replaceAll('"', '%22')}")` }}
-              />
-            )}
+            <TeamMatchImagesPreview images={teamMatch} sport={teamMatch.sportName} />
 
             <dl className="mt-5 grid gap-3 sm:grid-cols-2">
               <AdminDetailRow label="팀매치 ID" value={teamMatch.teamMatchId} />
@@ -339,7 +334,7 @@ export default function AdminTeamMatchDetailPage() {
               <AdminDetailRow label="경기 형식" value={teamMatch.matchFormat} />
               <AdminDetailRow label="형식 메모" value={teamMatch.formatNote} />
               <AdminDetailRow label="경기 성격" value={teamMatch.matchStyle.length > 0 ? teamMatch.matchStyle.join(', ') : null} />
-              <AdminDetailRow label="성별 조건" value={teamMatch.genderRule} />
+              <AdminDetailRow label="성별 조건" value={matchGenderRuleLabel(teamMatch.genderRule)} />
               <AdminDetailRow label="유니폼 색" value={teamMatch.uniformColor} />
               <AdminDetailRow label="비용 안내" value={teamMatch.costNote} />
             </dl>

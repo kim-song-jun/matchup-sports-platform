@@ -15,10 +15,11 @@ import { extractErrorMessage } from '@/lib/error-message';
 import { randomUuid } from '@/lib/uuid';
 import { teamMatchDateErrors } from '@/lib/team-match-dates';
 import { V1_LEVELS } from '@/lib/v1-levels';
-import { GENDER_RULE_OPTIONS, genderRuleLabel } from '@/lib/v1-status-labels';
+import { GENDER_RULE_OPTIONS, genderRuleLabel, matchGenderRuleLabel } from '@/lib/v1-status-labels';
 import { toDistrictRegionOptions } from '@/lib/v1-regions';
 import type { V1AdminTeamMatchDetail } from '@/types/api';
 import { isoToKstDatetimeLocal, kstDatetimeLocalToIso } from '@/lib/kst-calendar';
+import { TeamMatchImagesField } from '@/components/team-matches/team-match-images';
 
 const inputClass = 'mt-1 min-h-[44px] w-full rounded-xl border border-[var(--border-strong)] bg-[var(--card-surface)] px-3 text-[length:var(--font-size-body-sm)] text-[var(--text-strong)] focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:opacity-60';
 
@@ -33,6 +34,7 @@ function EditForm({ teamMatch }: { teamMatch: V1AdminTeamMatchDetail }) {
   const [title, setTitle] = useState(teamMatch.title);
   const [description, setDescription] = useState(teamMatch.description ?? '');
   const [imageUrl, setImageUrl] = useState(teamMatch.imageUrl ?? '');
+  const [listImageUrl, setListImageUrl] = useState(teamMatch.listImageUrl ?? '');
   const [regionId, setRegionId] = useState(teamMatch.regionId);
   const [placeName, setPlaceName] = useState(teamMatch.placeName);
   const [addressText, setAddressText] = useState(teamMatch.placeAddress ?? '');
@@ -57,17 +59,10 @@ function EditForm({ teamMatch }: { teamMatch: V1AdminTeamMatchDetail }) {
   });
   const canSubmit = canWrite && title.trim() !== '' && regionId !== '' && placeName.trim() !== '' && startsAt !== '' && Object.keys(dateErrors).length === 0 && !uploading;
 
-  const uploadImage = async (file?: File) => {
-    if (!file) return;
-    setUploading(true);
-    try {
-      const result = await uploadImages.mutateAsync([file]);
-      setImageUrl(result.urls[0] ?? imageUrl);
-    } catch (error) {
-      showToast(extractErrorMessage(error, '이미지를 업로드하지 못했어요.'), 'error');
-    } finally {
-      setUploading(false);
-    }
+  const uploadImage = async (file: File) => {
+    const result = await uploadImages.mutateAsync([file]);
+    if (!result.urls[0]) throw new Error('이미지를 업로드하지 못했어요.');
+    return result.urls[0];
   };
 
   const submit = async () => {
@@ -82,6 +77,7 @@ function EditForm({ teamMatch }: { teamMatch: V1AdminTeamMatchDetail }) {
         title: title.trim(),
         description: description.trim() || null,
         imageUrl: imageUrl || null,
+        listImageUrl: listImageUrl || null,
         startsAt: startsAtIso,
         endsAt: kstDatetimeLocalToIso(endsAt),
         deadlineAt: kstDatetimeLocalToIso(deadlineAt),
@@ -120,11 +116,9 @@ function EditForm({ teamMatch }: { teamMatch: V1AdminTeamMatchDetail }) {
             <label className="block text-[length:var(--font-size-body-sm)] font-medium">제목<input aria-label="제목" value={title} onChange={(event) => setTitle(event.target.value)} maxLength={100} className={inputClass} /></label>
             <label className="block text-[length:var(--font-size-body-sm)] font-medium">모집 안내<textarea aria-label="모집 안내" value={description} onChange={(event) => setDescription(event.target.value)} maxLength={2000} rows={4} className={`${inputClass} py-3`} /></label>
             <label className="block text-[length:var(--font-size-body-sm)] font-medium">지역<select aria-label="지역" value={regionId} onChange={(event) => setRegionId(event.target.value)} className={inputClass}><option value="">지역 선택</option>{toDistrictRegionOptions(regions ?? []).map((region) => <option key={region.id} value={region.id}>{region.name}</option>)}</select></label>
-            <div>
-              <label htmlFor="admin-team-match-edit-image" className="block text-[length:var(--font-size-body-sm)] font-medium">대표 이미지</label>
-              <input id="admin-team-match-edit-image" aria-label="대표 이미지" type="file" accept="image/png,image/jpeg,image/webp" disabled={uploading} onChange={(event) => void uploadImage(event.target.files?.[0])} className="mt-1 min-h-[44px] w-full text-[length:var(--font-size-body-sm)] file:mr-3 file:min-h-[44px] file:rounded-xl file:border-0 file:px-4" />
-              {imageUrl && <button type="button" onClick={() => setImageUrl('')} className="mt-2 min-h-[44px] rounded-lg px-3 text-[length:var(--font-size-body-sm)] font-semibold text-red-600">현재 이미지 제거</button>}
-            </div>
+            <TeamMatchImagesField images={{ imageUrl, listImageUrl }} sport={teamMatch.sportName}
+              onChange={(field, value) => field === 'listImageUrl' ? setListImageUrl(value) : setImageUrl(value)}
+              onUpload={uploadImage} onUploadingChange={setUploading} disabled={mutation.isPending} />
           </section>
 
           <section className="space-y-4 rounded-2xl border border-[var(--border)] bg-[var(--card-surface)] p-5">
@@ -146,7 +140,7 @@ function EditForm({ teamMatch }: { teamMatch: V1AdminTeamMatchDetail }) {
               <label className="text-[length:var(--font-size-body-sm)] font-medium">최대 등급<select aria-label="최대 등급" value={maxLevelCode} onChange={(event) => setMaxLevelCode(event.target.value)} className={inputClass}><option value="">미지정</option>{V1_LEVELS.map((level) => <option key={level.code} value={level.code}>{level.label}</option>)}</select></label>
               <label className="text-[length:var(--font-size-body-sm)] font-medium">경기 형식<input aria-label="경기 형식" value={matchFormat} onChange={(event) => setMatchFormat(event.target.value)} maxLength={20} className={inputClass} /></label>
               <label className="text-[length:var(--font-size-body-sm)] font-medium">유니폼 색<input aria-label="유니폼 색" value={uniformColor} onChange={(event) => setUniformColor(event.target.value)} maxLength={20} className={inputClass} /></label>
-              <label className="text-[length:var(--font-size-body-sm)] font-medium">성별 조건<select aria-label="성별 조건" value={genderRule} onChange={(event) => setGenderRule(event.target.value)} className={inputClass}><option value="">미지정</option>{GENDER_RULE_OPTIONS.map((gender) => <option key={gender} value={gender}>{gender}</option>)}</select></label>
+              <label className="text-[length:var(--font-size-body-sm)] font-medium">성별 조건<select aria-label="성별 조건" value={genderRule} onChange={(event) => setGenderRule(event.target.value)} className={inputClass}><option value="">미지정</option>{GENDER_RULE_OPTIONS.map((gender) => <option key={gender} value={gender}>{matchGenderRuleLabel(gender)}</option>)}</select></label>
               <label className="text-[length:var(--font-size-body-sm)] font-medium">경기 성격<input aria-label="경기 성격" value={matchStyle} onChange={(event) => setMatchStyle(event.target.value)} placeholder="쉼표로 최대 3개" className={inputClass} /></label>
             </div>
             <label className="block text-[length:var(--font-size-body-sm)] font-medium">비용 안내<input aria-label="비용 안내" value={costNote} onChange={(event) => setCostNote(event.target.value)} maxLength={500} className={inputClass} /></label>

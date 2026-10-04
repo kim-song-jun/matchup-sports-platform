@@ -1,4 +1,5 @@
 import { Prisma } from '@prisma/client';
+import { activeChatOperator } from './platform-team-match-chat';
 
 type ChatEntitlementRoom = {
   matchId: string | null;
@@ -7,6 +8,8 @@ type ChatEntitlementRoom = {
   teamMatch: {
     hostTeamId: string | null;
     approvedApplicantTeamId: string | null;
+    platformManaged?: boolean;
+    createdByUserId?: string | null;
   } | null;
   teamContactId: string | null;
   teamContact: {
@@ -16,6 +19,31 @@ type ChatEntitlementRoom = {
 };
 
 const managerRoles = ['owner', 'manager'] as const;
+
+export function teamMatchChatEntitlementWhere(userId: string): Prisma.V1TeamMatchWhereInput {
+  const managers = { some: { userId, status: 'active' as const, role: { in: [...managerRoles] } } };
+  return {
+    deletedAt: null,
+    OR: [
+      {
+        platformManaged: true, status: { in: ['recruiting', 'closed', 'matched', 'completed'] },
+        OR: [
+          { createdByUserId: userId, createdByUser: { is: { adminUser: { is: activeChatOperator } } } },
+          { hostTeam: { is: { memberships: managers } } },
+          { approvedApplicantTeam: { is: { memberships: managers } } },
+        ],
+      },
+      {
+        platformManaged: false, status: { in: ['matched', 'completed'] },
+        hostTeamId: { not: null }, approvedApplicantTeamId: { not: null },
+        OR: [
+          { hostTeam: { is: { memberships: managers } } },
+          { approvedApplicantTeam: { is: { memberships: managers } } },
+        ],
+      },
+    ],
+  };
+}
 
 export function currentChatEntitlementWhere(userId: string): Prisma.V1ChatRoomWhereInput {
   return {
@@ -43,39 +71,7 @@ export function currentChatEntitlementWhere(userId: string): Prisma.V1ChatRoomWh
           },
         },
       },
-      {
-        teamMatch: {
-          is: {
-            // 'matched' 로 exact-match 하면 결과 제출로 completed 전이되는 순간 채팅방이
-            // 목록에서 통째로 사라진다 — approvedApplicantTeamId가 채워진 시점(=매칭
-            // 확정)부터 completed 까지는 계속 대화가 필요하므로 두 상태 모두 허용한다.
-            // cancelled/expired/recruiting/closed 는 여전히 제외돼 "매칭 전"·"매칭이
-            // 취소된 뒤"는 이전과 동일하게 막힌다.
-            status: { in: ['matched', 'completed'] },
-            deletedAt: null,
-            hostTeamId: { not: null },
-            approvedApplicantTeamId: { not: null },
-            OR: [
-              {
-                hostTeam: {
-                  memberships: {
-                    some: { userId, status: 'active', role: { in: [...managerRoles] } },
-                  },
-                },
-              },
-              {
-                approvedApplicantTeam: {
-                  is: {
-                    memberships: {
-                      some: { userId, status: 'active', role: { in: [...managerRoles] } },
-                    },
-                  },
-                },
-              },
-            ],
-          },
-        },
-      },
+      { teamMatch: { is: teamMatchChatEntitlementWhere(userId) } },
       {
         // status 로 좁히지 않는다 — 컨택 방은 요청 시점부터 양 팀 운영진에게 보여야 한다
         // ("팀 컨택의 채팅 흡수" §3.6). 전송 가능 여부는 ChatService.sendMessage 의
@@ -135,18 +131,16 @@ export function currentChatRecipientEntitlementWhere(
     const teamIds = [room.teamMatch?.hostTeamId, room.teamMatch?.approvedApplicantTeamId].filter(
       (teamId): teamId is string => Boolean(teamId),
     );
-    return {
-      user: {
-        teamMemberships: {
-          some: {
-            teamId: { in: teamIds },
-            status: 'active',
-            role: { in: [...managerRoles] },
-          },
-        },
-      },
+    const teamManagers: Prisma.V1ChatRoomParticipantWhereInput = {
+      user: { teamMemberships: { some: { teamId: { in: teamIds }, status: 'active', role: { in: [...managerRoles] } } } },
     };
+    if (!room.teamMatch?.platformManaged || !room.teamMatch.createdByUserId) return teamManagers;
+    return { OR: [teamManagers, {
+      userId: room.teamMatch.createdByUserId,
+      user: { adminUser: { is: activeChatOperator } },
+    }] };
   }
+
   if (room.teamContactId) {
     const teamIds = [room.teamContact?.fromTeamId, room.teamContact?.toTeamId].filter(
       (teamId): teamId is string => Boolean(teamId),

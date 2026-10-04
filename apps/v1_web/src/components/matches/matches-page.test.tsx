@@ -1,9 +1,14 @@
 import type { ReactElement } from 'react';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { fireEvent, render as rtlRender, screen, within } from '@testing-library/react';
+import { fireEvent, render as rtlRender, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { MatchCreatePageView, MatchDetailPageView, MatchListPageView } from './matches-page';
-import { getMatchCreateViewModel, getMatchDetailViewModel, getMatchListViewModel } from './matches.view-model';
+import { applyLabel, getMatchCreateViewModel, getMatchDetailViewModel, getMatchListViewModel } from './matches.view-model';
+import { getStatus, getViewerState, toMatchCard } from './matches.card-model';
+import { toDetailMode } from './matches.mode';
+import type { V1Match } from '@/types/api';
 
 const navState = vi.hoisted(() => ({ pathname: '/matches/match-4', search: '' }));
 
@@ -26,6 +31,132 @@ function render(ui: ReactElement) {
 
   return rtlRender(<QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>);
 }
+
+describe('MatchDetailPageView — 종료와 모집 마감 안내 분리 (#1587)', () => {
+  function detail(overrides: Partial<V1Match> = {}) {
+    const data: V1Match = {
+      id: 'qa-completed-notice', title: '종료 안내 합성 매치', sportName: '풋살',
+      placeName: '합성 구장', startsAt: '2026-10-02T09:00:00.000Z',
+      endsAt: '2026-10-02T11:00:00.000Z', deadlineAt: '2026-10-02T08:00:00.000Z',
+      capacityText: '1/2명', capacity: 2, participantCount: 1,
+      status: 'completed', displayState: 'completed', viewerState: 'guest',
+      hostParticipates: false, imageUrl: null, rulesText: null, ...overrides,
+    };
+    const status = getStatus(data);
+    const viewer = getViewerState(data);
+    const mode = toDetailMode(viewer, status);
+    const fallback = getMatchDetailViewModel(mode);
+    return {
+      ...fallback, mode, completed: status === 'completed',
+      noShow: status === 'completed' && data.viewer?.participantStatus === 'no_show',
+      statusLabel: data.viewer?.participantStatus === 'no_show' ? '불참 기록' : undefined,
+      applyLabel: applyLabel(viewer, status, false),
+      match: {
+        ...toMatchCard(data, fallback.match), description: '', address: '', rules: [],
+        participants: [], applicationsHref: `/matches/${data.id}/applications`,
+      },
+    };
+  }
+
+  function bodies(container: HTMLElement) {
+    const desktop = container.querySelector<HTMLElement>('.tm-match-detail-desktop-layout .tm-match-detail-body');
+    const mobile = container.querySelector<HTMLElement>('.tm-match-detail-body.tm-hide-desktop');
+    expect(desktop).not.toBeNull();
+    expect(mobile).not.toBeNull();
+    return [within(desktop!), within(mobile!)];
+  }
+
+  it.each([1, 2])('completed 비참가자 %i/2명은 양쪽 본문에 종료 안내와 신청 불가를 표시한다', (count) => {
+    const model = detail({ participantCount: count, capacityText: `${count}/2명` });
+    const { container } = render(<MatchDetailPageView model={model} />);
+    for (const body of bodies(container)) {
+      expect(body.getByText('종료된 매치예요')).toBeInTheDocument();
+      expect(body.getByText('이 매치는 신청이 마감됐어요. 다른 매치를 둘러봐 주세요.')).toBeInTheDocument();
+      expect(body.queryByText('모집 완료')).not.toBeInTheDocument();
+      expect(body.queryByText(/자리 남았어요/)).not.toBeInTheDocument();
+    }
+    expect(screen.getAllByText('종료').length).toBeGreaterThan(0);
+    for (const button of screen.getAllByRole('button', { name: '신청 불가' })) expect(button).toBeDisabled();
+  });
+
+  it('raw completed보다 displayState completion_pending을 우선해 종료 확인 카드를 유지한다', () => {
+    const { container } = render(<MatchDetailPageView model={detail({ displayState: 'completion_pending' })} />);
+    for (const body of bodies(container)) {
+      expect(body.getByText('경기 종료를 확인하고 있어요')).toBeInTheDocument();
+      expect(body.queryByText('종료된 매치예요')).not.toBeInTheDocument();
+      expect(body.queryByText('모집 완료')).not.toBeInTheDocument();
+    }
+  });
+
+  it('실제 full 상태의 모집 완료 안내와 신청 불가를 유지한다', () => {
+    const { container } = render(<MatchDetailPageView model={detail({ status: 'recruiting', displayState: 'full', participantCount: 2, capacityText: '2/2명' })} />);
+    for (const body of bodies(container)) {
+      expect(body.getByText('모집 완료')).toBeInTheDocument();
+      expect(body.queryByText('종료된 매치예요')).not.toBeInTheDocument();
+    }
+    for (const button of screen.getAllByRole('button', { name: '신청 불가' })) expect(button).toBeDisabled();
+  });
+
+  it('시간 closed의 기존 마감 안내와 CTA를 유지한다', () => {
+    const { container } = render(<MatchDetailPageView model={detail({ status: 'closed', displayState: 'closed' })} />);
+    for (const body of bodies(container)) {
+      expect(body.getByText('신청이 마감됐어요')).toBeInTheDocument();
+      expect(body.getByText('마감 시각이 지나 더 이상 신청할 수 없어요. 다른 매치를 둘러봐 주세요.')).toBeInTheDocument();
+      expect(body.queryByText('종료된 매치예요')).not.toBeInTheDocument();
+    }
+    for (const button of screen.getAllByRole('button', { name: '신청 마감' })) expect(button).toBeDisabled();
+  });
+
+  it.each([
+    ['in_progress', '경기가 진행 중이에요'],
+    ['completion_pending', '경기 종료를 확인하고 있어요'],
+  ] as const)('%s의 기존 lifecycle 안내를 유지한다', (status, title) => {
+    const { container } = render(<MatchDetailPageView model={detail({ status, displayState: status })} />);
+    for (const body of bodies(container)) {
+      expect(body.getByText(title)).toBeInTheDocument();
+      expect(body.queryByText('종료된 매치예요')).not.toBeInTheDocument();
+      expect(body.queryByText('모집 완료')).not.toBeInTheDocument();
+    }
+  });
+
+  it('on_hold에는 일반 닫힘 카드를 추가하지 않는다', () => {
+    const { container } = render(<MatchDetailPageView model={detail({ status: 'on_hold', displayState: 'on_hold' })} />);
+    expect(screen.getAllByText('보류').length).toBeGreaterThan(0);
+    for (const body of bodies(container)) {
+      expect(body.queryByText('종료된 매치예요')).not.toBeInTheDocument();
+      expect(body.queryByText('모집 완료')).not.toBeInTheDocument();
+    }
+  });
+
+  it('운영만 하는 completed host는 신청자 관리 경로를 유지한다', () => {
+    const model = detail({ viewerState: 'host' });
+    render(<MatchDetailPageView model={model} />);
+    expect(model.mode).toBe('mine');
+    expect(screen.queryByText('종료된 매치예요')).not.toBeInTheDocument();
+    for (const link of screen.getAllByRole('link', { name: '신청자 관리' })) expect(link).toHaveAttribute('href', '/matches/qa-completed-notice/applications');
+  });
+
+  it('completed participant는 기존 참여 완료 안내를 유지한다', () => {
+    render(<MatchDetailPageView model={detail({ viewerState: 'participant' })} />);
+    expect(screen.getAllByText('참여 완료').length).toBeGreaterThan(0);
+    expect(screen.queryByText('종료된 매치예요')).not.toBeInTheDocument();
+  });
+
+  it('completed no_show participant는 기존 불참 안내를 유지한다', () => {
+    render(<MatchDetailPageView model={detail({ viewer: { state: 'participant', participantId: 'qa-no-show', applicationId: null, participantStatus: 'no_show', canApply: false } })} />);
+    expect(screen.getAllByText('불참으로 기록됐어요').length).toBeGreaterThan(0);
+    expect(screen.queryByText('종료된 매치예요')).not.toBeInTheDocument();
+    expect(screen.queryByText('참여 완료')).not.toBeInTheDocument();
+  });
+
+  it('requested viewer의 pending 우선순위와 신청 취소를 유지한다', () => {
+    const model = { ...detail({ status: 'closed', displayState: 'closed', viewerState: 'requested' }), onApply: vi.fn() };
+    render(<MatchDetailPageView model={model} />);
+    expect(model.mode).toBe('pending');
+    expect(screen.queryByText('종료된 매치예요')).not.toBeInTheDocument();
+    for (const button of screen.getAllByRole('button', { name: '신청 취소' })) expect(button).toBeEnabled();
+  });
+});
 
 describe('MatchDetailPageView — closed mode (참가한 적 없는 뷰어가 마감류 매치를 볼 때)', () => {
   it('참가 확정 배너/문구를 보여주지 않는다', () => {
@@ -109,6 +240,66 @@ describe('MatchDetailPageView — approved mode (실제 참가 확정자)', () =
     render(<MatchDetailPageView model={model} />);
 
     expect(screen.getAllByText('참가를 확정했어요. 경기 당일 늦지 않게 도착해 주세요.').length).toBeGreaterThan(0);
+  });
+});
+
+describe('MatchListPageView — 참가비 자유 입력의 의미와 원문 (#1586)', () => {
+  afterEach(() => { navState.pathname = '/matches/match-4'; navState.search = ''; });
+
+  function list(costNote: string | null) {
+    navState.pathname = '/matches';
+    navState.search = 'q=qa&sportId=futsal';
+    const base = getMatchListViewModel();
+    const data: V1Match = {
+      id: 'qa-cost-main', title: '비용 설명 합성 매치', sportName: '풋살', placeName: '합성 구장',
+      startsAt: '2080-10-03T09:00:00.000Z', capacityText: '1/2명', capacity: 2,
+      participantCount: 1, status: 'recruiting', levelLabel: '입문·초급', genderRule: '남',
+      imageUrl: '/mock/generated/futsal-rooftop.webp', costNote,
+    };
+    const card = toMatchCard(data, base.matches[0]);
+    return { ...base, matches: [card], nearbyMatches: [{ ...card, id: 'qa-cost-nearby', image: null }] };
+  }
+
+  function expectMetadata(container: HTMLElement, model: ReturnType<typeof list>, raw: string | null) {
+    const card = model.matches[0];
+    const note = raw ? `참가비 설명: ${raw}` : null;
+    const row = container.querySelector<HTMLElement>('.tm-match-row');
+    expect(row).not.toBeNull();
+    expect(within(row!).getByText([card.sport, card.level, card.gender, note].filter(Boolean).join(' · '))).toBeInTheDocument();
+    const rails = container.querySelectorAll<HTMLElement>('.tm-match-list-card');
+    expect(rails).toHaveLength(2);
+    for (const rail of rails) expect(within(rail).getByText([card.level, card.gender, note].filter(Boolean).join(' · '))).toBeInTheDocument();
+    expect(container.textContent?.match(/참가비 설명:/g)?.length ?? 0).toBe(raw ? 3 : 0);
+    const from = '/matches?q=qa&sportId=futsal';
+    for (const link of container.querySelectorAll<HTMLAnchorElement>('.tm-match-row, .tm-match-list-card')) {
+      expect(link.getAttribute('href')).toContain(`from=${encodeURIComponent(from)}`);
+    }
+  }
+
+  it.each(['10000', '10,000원/1인', '무료', '구장비 현장 정산', 'USD 10'])('행·사진·인접 레일에 라벨과 %s 원문을 보존한다', (raw) => {
+    const model = list(raw);
+    const { container } = render(<MatchListPageView model={model} />);
+    expectMetadata(container, model, raw);
+    expect(model.matches[0].costNote).toBe(raw);
+    if (raw === '10000') expect(container.textContent).not.toContain('10,000원');
+  });
+
+  it.each([null, ''])('값 %s는 라벨·단위·무료로 대체하지 않는다', (raw) => {
+    const model = list(raw);
+    const { container } = render(<MatchListPageView model={model} />);
+    expectMetadata(container, model, raw);
+    expect(container.textContent).not.toContain('무료');
+  });
+
+  it('연속 데이터 갱신에서도 최신 원문과 필터 출처 링크를 유지한다', () => {
+    const first = list('10000');
+    const { container, rerender } = render(<MatchListPageView model={first} />);
+    for (const raw of ['10,000원/1인', '구장비 현장 정산', null]) {
+      const model = list(raw);
+      rerender(<QueryClientProvider client={new QueryClient()}><MatchListPageView model={model} /></QueryClientProvider>);
+      expectMetadata(container, model, raw);
+      expect(screen.getAllByText('비용 설명 합성 매치')).toHaveLength(3);
+    }
   });
 });
 
@@ -835,5 +1026,108 @@ describe('MatchListPageView — 상세로 가는 카드는 지금 목록(검색�
     const { container } = render(<MatchListPageView model={listWithNearby()} />);
 
     expect(matchHrefs(container)).toEqual(['/matches/m-a', '/matches/m-b', '/matches/m-b', '/matches/m-n']);
+  });
+});
+
+describe('MatchDetailPageView — desktop 제목 중복 정리 (#1588 A)', () => {
+  const title = '(합성) 개인 매치 제목';
+  const readCss = (path: string) => readFileSync(resolve(process.cwd(), path), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+
+  function detail(image: string | null = null) {
+    const base = getMatchDetailViewModel();
+    return { ...base, match: { ...base.match, id: 'title-fixture', title, host: '합성 호스트', image } };
+  }
+
+  afterEach(() => {
+    navState.pathname = '/matches/match-4';
+    navState.search = '';
+  });
+
+  it.each([null, '/uploads/title-fixture.webp'])('사진 %s: entity H1을 유지하고 hero H2만 desktop utility에 연결한다', (image) => {
+    const { container } = render(<MatchDetailPageView model={detail(image)} />);
+    const h1 = screen.getByRole('heading', { level: 1, name: title });
+    const h2 = screen.getByRole('heading', { level: 2, name: title });
+    const hero = container.querySelector('.tm-match-detail-hero');
+
+    expect(h1.parentElement).toHaveClass('tm-desktop-page-head', 'tm-show-desktop');
+    expect(h2).toHaveClass('tm-match-detail-title', 'tm-hide-desktop');
+    expect(h2).not.toHaveAttribute('hidden');
+    expect(h2).not.toHaveAttribute('aria-hidden');
+    expect(hero).toContainElement(h2);
+    expect(hero).not.toHaveClass('tm-hide-desktop');
+    expect(h2.parentElement).not.toHaveClass('tm-hide-desktop');
+    expect(hero?.querySelector('.tm-match-detail-meta')).not.toHaveClass('tm-hide-desktop');
+    expect(hero?.querySelector('.tm-match-detail-sport-badge')).not.toHaveClass('tm-hide-desktop');
+  });
+
+  it('실제 CSS import chain의 1024px hide/show 계약을 사용한다 (jsdom viewport 실측 아님)', () => {
+    const layout = readFileSync(resolve(process.cwd(), 'src/app/layout.tsx'), 'utf8');
+    const desktopIndex = readFileSync(resolve(process.cwd(), 'src/app/desktop/index.css'), 'utf8');
+    const shell = readCss('src/app/desktop/_shell.css');
+    const globals = readCss('src/app/globals.css');
+
+    expect(layout).toContain("import './desktop/index.css'");
+    expect(desktopIndex).toMatch(/@import\s+"\.\/_shell\.css"/);
+    expect(shell).toMatch(/@media\s*\(min-width:\s*1024px\)\s*\{\s*\.tm-hide-desktop\s*\{\s*display:\s*none\s*!important;\s*\}\s*\}/);
+    expect(shell).toMatch(/\.tm-show-desktop\s*\{\s*display:\s*none;\s*\}/);
+    expect(shell).toMatch(/@media\s*\(min-width:\s*1024px\)\s*\{\s*\.tm-show-desktop\s*\{\s*display:\s*block;\s*\}\s*\}/);
+    const titleRule = globals.match(/\.tm-match-detail-title\s*\{([^}]*)\}/)?.[1];
+    expect(titleRule).toBeDefined();
+    expect(titleRule).not.toMatch(/display:\s*none|visibility:\s*hidden/);
+  });
+
+  it('host 간격은 기본 8px을 유지하고 desktop에서만 숨긴 제목 뒤 여백을 정리한다', () => {
+    const { container } = render(<MatchDetailPageView model={detail()} />);
+    const hero = container.querySelector('.tm-match-detail-hero');
+    const host = hero?.querySelector<HTMLElement>('.tm-match-detail-meta');
+    const badges = hero?.querySelector('.tm-match-detail-sport-badge')?.parentElement;
+    const globals = readCss('src/app/globals.css');
+    const hostRule = globals.match(/\.tm-match-detail-overlay\s+\.tm-match-detail-meta\s*\{([^}]*)\}/)?.[1];
+
+    expect(host).toHaveTextContent('합성 호스트 호스트');
+    expect(host?.style.marginTop).toBe('');
+    expect(badges?.style.marginBottom).toBe('8px');
+    expect(hostRule).toMatch(/margin-top:\s*8px;/);
+    expect(globals).toMatch(/@media\s*\(min-width:\s*1024px\)\s*\{\s*\.tm-match-detail-overlay\s+\.tm-match-detail-meta\s*\{[^}]*margin-top:\s*0(?:px)?;/);
+  });
+
+  it('Back/from·공유·배지·CTA를 실제 상세 view에 보존한다', async () => {
+    const from = '/matches?q=QA&sport=futsal';
+    navState.pathname = '/matches/title-fixture';
+    navState.search = `from=${encodeURIComponent(from)}`;
+    const onShare = vi.fn().mockResolvedValue(null);
+    const { container } = render(<MatchDetailPageView model={{ ...detail(), backHref: from, onShare }} />);
+    const desktopBack = container.querySelector('.tm-desktop-page-head .tm-desktop-back');
+    const hero = container.querySelector<HTMLElement>('.tm-match-detail-hero');
+    expect(hero).not.toBeNull();
+    const mobileBack = within(hero!).getByRole('link', { name: '뒤로가기' });
+
+    expect(desktopBack).toHaveAttribute('href', from);
+    expect(mobileBack).toHaveAttribute('href', from);
+    expect(mobileBack).toHaveClass('tm-hide-desktop');
+    expect(container.querySelector('.tm-match-detail-sport-badge')).toHaveTextContent('풋살');
+    expect(container.querySelector('.tm-match-detail-hero')).toHaveTextContent('모집 중');
+    for (const cta of screen.getAllByRole('button', { name: '참가 신청' })) expect(cta).toBeDisabled();
+    expect(screen.getAllByRole('button', { name: '참가 신청' })).toHaveLength(2);
+
+    fireEvent.click(screen.getByRole('button', { name: '공유' }));
+    await waitFor(() => expect(onShare).toHaveBeenCalledOnce());
+    expect(screen.getByRole('heading', { level: 1, name: title })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 2, name: title })).toBeInTheDocument();
+  });
+
+  it('목록의 scope H2·카드 제목·from 링크에는 상세 제목 숨김을 적용하지 않는다', () => {
+    navState.pathname = '/matches';
+    navState.search = 'q=QA&sport=futsal';
+    const base = getMatchListViewModel();
+    const model = { ...base, matches: [{ ...base.matches[0], id: 'title-fixture', title }], nearbyMatches: [] };
+    const { container } = render(<MatchListPageView model={model} />);
+    const scopeHeading = screen.getByRole('heading', { level: 2, name: model.summary.label });
+    const rowTitle = container.querySelector('.tm-match-row-title');
+
+    expect(scopeHeading).not.toHaveClass('tm-hide-desktop');
+    expect(rowTitle).toHaveTextContent(title);
+    expect(rowTitle).not.toHaveClass('tm-hide-desktop');
+    expect(rowTitle?.closest('a')).toHaveAttribute('href', `/matches/title-fixture?from=${encodeURIComponent('/matches?q=QA&sport=futsal')}`);
   });
 });

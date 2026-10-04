@@ -7,9 +7,10 @@ export type TeamMatchModel = {
   /**
    * API 가 사진을 안 주면 null — matches.card-model.ts 의 `image` 와 같은 이유(웨이브4,
    * 2026-09-04). 목업 사진(`/mock/generated/team-huddle.webp`)으로 메우면 실제 팀매치에
-   * 다른 매치의 사진이 그대로 붙는다. 화면은 null 이면 종목 그래픽(sportIllustration)을 그린다.
+   * 다른 매치의 사진이 그대로 붙는다. 두 슬롯 모두 비어 있으면 종목 그래픽을 그린다.
    */
   imageUrl: string | null;
+  listImageUrl?: string | null;
   sport: string;
   hostTeam: string;
   /** 플랫폼이 개설해 두 팀의 신청을 받는 모집이면 true. */
@@ -225,12 +226,12 @@ export type TeamMatchDetailViewModel = {
     } | null;
   };
   /** 승인 대기 중인 신청 팀(히어로 "우리 팀" 자리). */
-  myApplicationTeam?: { teamId: string; name: string } | null;
+  myApplicationTeam?: { teamId: string; name: string; logoUrl?: string | null } | null;
   /** 보는 사람이 확정된 상대팀(신청 팀) 쪽 — 히어로 오른쪽 자리를 매칭 뒤에도 "우리 팀"으로 부른다. */
   viewerOnApplicantSide?: boolean;
   /** 신청 가능한 팀이 2개 이상인 팀장의 팀 선택 시트(N-1). */
   applyTeamPicker?: {
-    teams: Array<{ teamId: string; name: string; roleLabel: string; eligible: boolean; reason: string | null }>;
+    teams: Array<{ teamId: string; name: string; logoUrl?: string | null; roleLabel: string; eligible: boolean; reason: string | null }>;
     defaultTeamId: string;
     submit: (teamId: string, message: string | null) => Promise<unknown>;
   };
@@ -286,6 +287,7 @@ export type TeamMatchCreateViewModel = {
     uniform: string;
     gender: string;
     imageUrl: string;
+    listImageUrl?: string;
     cost: number;
     opponentCost: number;
     venue: string;

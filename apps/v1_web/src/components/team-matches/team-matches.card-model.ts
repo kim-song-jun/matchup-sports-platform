@@ -6,7 +6,7 @@
  * 그려야 한다.
  */
 import { formatCardDate as formatDate, formatCardTime as formatTime } from '@/lib/date-utils';
-import { genderRuleLabel } from '@/lib/v1-status-labels';
+import { genderRuleLabel, matchGenderRuleLabel } from '@/lib/v1-status-labels';
 import { toKstDateString } from '@/lib/kst-calendar';
 import type { TeamMatchListViewModel, TeamMatchModel } from './team-matches.types';
 import type { V1Sport, V1TeamMatch, V1TeamMatchApiStatus, V1TeamMatchViewerState } from '@/types/api';
@@ -46,6 +46,7 @@ export function toTeamMatch(match: V1TeamMatch, fallback: TeamMatchModel): TeamM
     // 다른 매치의 옥상 풋살 사진이 그대로 붙었다(matches.card-model.ts의 image와 같은 결함).
     // 없으면 null 로 두고 화면이 종목 그래픽(sportIllustration)을 그린다.
     imageUrl: match.imageUrl ?? null,
+    listImageUrl: match.listImageUrl ?? null,
     // 목업(team-matches.view-model.ts)을 사실 값의 폴백으로 쓰지 않는다 — 폴백이 걸리면
     // 실제 매치에 **존재하지 않는 팀 이름**('FC 발빠른놈들')과 남의 경기장·지역이 붙었다.
     sport: match.sport?.name ?? match.sportName ?? '',
@@ -69,7 +70,7 @@ export function toTeamMatch(match: V1TeamMatch, fallback: TeamMatchModel): TeamM
     // 기본이다)에도 회색 배지가 항상 뜬다. 같은 파일이 매너·승·비용에서는 이미 "모르면
     // null" 을 지키는데 성별만 어긋나 있었다.
     // 상세는 `InfoRow` 가 빈 값을 '미정' 으로 그리므로 라벨 있는 자리에서는 뜻이 살아난다.
-    gender: genderRuleLabel(match.genderRule),
+    gender: matchGenderRuleLabel(genderRuleLabel(match.genderRule)),
     // 매너 평점·승수는 이제 API 가 실제로 내려준다(hostTeam.mannerScore / hostTeam.wins —
     // team-matches.service.ts 의 computeRevealedTeamTrustBatch · loadOfficialWinCounts).
     // `...fallback` 스프레드에 맡겨두면 매치마다 다른 실제 팀인데도 항상 같은 목업

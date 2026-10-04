@@ -796,15 +796,29 @@ describe('ChatService', () => {
     // 함께 고정한다 — 이 단언 없이는 하드코딩된 'matched'로 되돌아가도 이 테스트는 여전히
     // 통과한다(위 mockResolvedValue가 무조건 값을 돌려주므로).
     const where = prisma.v1TeamMatch.findFirst.mock.calls[0][0].where;
-    expect(where.status).toEqual({ in: ['matched', 'completed'] });
+    expect(where.OR).toContainEqual(expect.objectContaining({
+      platformManaged: false, status: { in: ['matched', 'completed'] },
+    }));
   });
 
-  it('resolve(team_match): 매칭 전(승인된 상대팀 없음) 이면 409 STATE_CONFLICT', async () => {
+  it('resolve(team_match): 채팅 자격이 없는 경우 403 PERMISSION_DENIED', async () => {
     prisma.v1TeamMatch.findFirst.mockResolvedValue(null);
 
     await expect(service.resolve(userA, { targetType: 'team_match', targetId: 'tm-1' })).rejects.toMatchObject({
-      response: { code: 'STATE_CONFLICT' },
+      response: { code: 'PERMISSION_DENIED' },
     });
+  });
+
+  it('leave: 플랫폼 모집을 만든 운영자는 필수 참여자이므로 퇴장할 수 없다', async () => {
+    prisma.v1ChatRoom.findFirst.mockResolvedValue(makeRoom({
+      matchId: null, match: null, teamMatchId: 'platform-1',
+      teamMatch: { id: 'platform-1', title: 'Platform', platformManaged: true,
+        createdByUserId: userA.id, hostTeamId: null, approvedApplicantTeamId: null },
+    }));
+    await expect(service.leave(userA, 'room-1', {})).rejects.toMatchObject({
+      response: { code: 'PLATFORM_OPERATOR_REQUIRED' },
+    });
+    expect(prisma.v1ChatRoomParticipant.update).not.toHaveBeenCalled();
   });
 
   // ─── 8. resolve(match): 비-참가자 → 403 PERMISSION_DENIED ──────────────────

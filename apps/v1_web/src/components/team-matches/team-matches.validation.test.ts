@@ -132,6 +132,23 @@ describe('firstIncompleteTeamMatchStep — 진행 표시줄 클릭 이동 가드
 });
 
 describe('buildTeamMatchPayloadResult — payload | missingFields 분기', () => {
+  it.each([
+    ['', null, null], ['중수', 'intermediate', 'intermediate'],
+    ['초보-중수', 'novice', 'intermediate'], ['입문-고수', 'beginner', 'advanced'],
+    ['B', 'intermediate', 'intermediate'],
+  ])('preserves %s as the existing API range contract', (grade, minLevelCode, maxLevelCode) => {
+    const ctx = baseCtx(); ctx.draft.grade = grade;
+    const result = buildTeamMatchPayloadResult(ctx.draft, ctx.hostTeamId, ctx.sportId, ctx.regionId);
+    expect(result.payload).toMatchObject({ minLevelCode, maxLevelCode });
+  });
+
+  it.each(['고수-입문', 'unknown', '초보-', '입문-중수-고수'])('blocks invalid restored %s instead of saving an invented grade', (grade) => {
+    const ctx = baseCtx(); ctx.draft.grade = grade;
+    const result = buildTeamMatchPayloadResult(ctx.draft, ctx.hostTeamId, ctx.sportId, ctx.regionId);
+    expect(result.payload).toBeUndefined();
+    expect(result.missingFields).toEqual(expect.arrayContaining([expect.objectContaining({ field: 'grade' })]));
+  });
+
   it('결측 필드가 있으면 payload 대신 missingFields를 반환한다', () => {
     const ctx = baseCtx({ draft: { ...baseCtx().draft, venue: '' } });
     const result = buildTeamMatchPayloadResult(ctx.draft, ctx.hostTeamId, ctx.sportId, ctx.regionId);

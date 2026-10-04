@@ -1,4 +1,5 @@
 import { genderRuleColumnFilter, normalizeGenderRule } from '../common/gender-rule';
+import { teamMatchChatEntitlementWhere } from '../chat/chat-entitlement';
 import { canConfirmTeamMatch, validateTeamMatchDates } from './team-match-dates';
 import {
   BadRequestException,
@@ -274,6 +275,7 @@ export class TeamMatchesService {
       title: teamMatch.title,
       description: teamMatch.description,
       imageUrl: teamMatch.imageUrl,
+      listImageUrl: teamMatch.listImageUrl,
       sport: { sportId: teamMatch.sport.id, name: teamMatch.sport.name },
       region: { regionId: teamMatch.region.id, name: teamMatch.region.name },
       place: { name: teamMatch.placeName, addressText: teamMatch.placeAddress },
@@ -423,6 +425,9 @@ export class TeamMatchesService {
         return {
           teamId: team.id,
           name: team.name,
+          // 신청 팀 고르기 화면이 팀이 등록한 엠블럼을 그대로 그리도록 함께 내려준다 — 이게 없으면
+          // 화면은 팀 id 로 만든 임시 무늬(identicon)만 그릴 수 있다. 엠블럼이 없는 팀은 null.
+          logoUrl: team.profile?.logoUrl ?? null,
           role: team.memberships[0]?.role ?? 'member',
           eligible: reasonCode === 'OK',
           reasonCode,
@@ -655,6 +660,7 @@ export class TeamMatchesService {
           title: dto.title,
           description: dto.description ?? null,
           imageUrl: dto.imageUrl ?? null,
+          listImageUrl: dto.listImageUrl?.trim() || null,
           placeName: dto.manualPlaceName,
           placeAddress: dto.addressText ?? null,
           startAt: dates.startsAt,
@@ -722,6 +728,7 @@ export class TeamMatchesService {
         title: teamMatch.title,
         description: teamMatch.description,
         imageUrl: teamMatch.imageUrl,
+        listImageUrl: teamMatch.listImageUrl,
         startsAt: teamMatch.startAt,
         endsAt: teamMatch.endAt,
         deadlineAt: teamMatch.deadlineAt,
@@ -783,6 +790,7 @@ export class TeamMatchesService {
           title: dto.title,
           description: dto.description ?? null,
           imageUrl: dto.imageUrl ?? null,
+          listImageUrl: dto.listImageUrl === undefined ? undefined : dto.listImageUrl?.trim() || null,
           placeName: dto.manualPlaceName,
           placeAddress: dto.addressText ?? null,
           startAt: dates.startsAt,
@@ -1641,6 +1649,7 @@ export class TeamMatchesService {
       title: teamMatch.title,
       descriptionPreview: teamMatch.description ? teamMatch.description.slice(0, 120) : null,
       imageUrl: teamMatch.imageUrl,
+      listImageUrl: teamMatch.listImageUrl,
       sport: { sportId: teamMatch.sport.id, name: teamMatch.sport.name },
       region: teamMatch.region ? { regionId: teamMatch.region.id, name: teamMatch.region.name } : null,
       place: { name: teamMatch.placeName, addressText: teamMatch.placeAddress },
@@ -1765,6 +1774,7 @@ export class TeamMatchesService {
         manageableHostTeam: false,
         manageableOpponentTeam: false,
         participantMember: false,
+        canChat: false,
         eligibleTeams: [],
         manageRoute: null,
       };
@@ -1795,11 +1805,15 @@ export class TeamMatchesService {
     // 판정해야 한다. 한쪽만 원장을 보게 두면 같은 팀이 두 응답에서 다른 자격으로 내려가고,
     // 그 갈림이 다시 "누를 수 있는데 반드시 실패하는 버튼"이 된다.
     const ledger = await readTeamMatchApplicationLedger(this.prisma, teamMatch.id);
+    const canChat = Boolean(await this.prisma.v1TeamMatch.findFirst({
+      where: { id: teamMatch.id, ...teamMatchChatEntitlementWhere(user.id) }, select: { id: true },
+    }));
     return {
       state: this.getViewerState(teamMatch, user),
       manageableHostTeam,
       manageableOpponentTeam,
       participantMember,
+      canChat,
       eligibleTeams: eligibleTeams.map((team) => {
         const { reasonCode } = judgeApplicationAttempt(teamMatch, ledger, user.id, team.id, team.sportId);
         return { teamId: team.id, name: team.name, role: team.memberships[0]?.role ?? 'member', eligible: reasonCode === 'OK', reasonCode };
@@ -1888,7 +1902,10 @@ export class TeamMatchesService {
         ...(teamId ? { id: teamId } : {}),
         memberships: { some: { userId, status: 'active', role: { in: ['owner', 'manager'] } } },
       },
-      include: { memberships: { where: { userId, status: 'active' }, select: { role: true } } },
+      include: {
+        memberships: { where: { userId, status: 'active' }, select: { role: true } },
+        profile: { select: { logoUrl: true } },
+      },
       orderBy: { createdAt: 'desc' },
     });
   }

@@ -1,7 +1,44 @@
 > 친선 팀매치의 현재 전체 화면 흐름, 화면별 입출력, 공식 기록 반영 규칙과 모바일/데스크톱
 > 스크린샷 32개는 [`friendly-team-match-screen-flow.md`](./friendly-team-match-screen-flow.md)를 참고한다.
 
+## 2026-10-03 목록/상세 이미지 분리
+
+- 일반·관리자 생성/수정: 목록 정사각형과 상세 가로형 이미지를 각각 선택 업로드한다. 양쪽 모두 선택 사항이다.
+- 한 장만 업로드하면 양쪽에서 공유하며, 둘 다 없거나 두 이미지를 제거하면 종목별 기본 이미지를 표시한다.
+- 각각 다른 이미지 저장 후 목록/상세/수정 재진입에서도 선택한 사진이 유지돼야 한다. 업로드 실패는 오류로 표시하고 기존 사진을 유지하며, 업로드 중 제출·다른 업로드·삭제를 막는다.
+- 기존 `imageUrl`만 가진 매치는 양쪽 화면에서 계속 표시한다. 새 nullable `list_image_url` 마이그레이션은 기존 사진을 변경하지 않는다.
+- 로컬 검증: API 99/99, Web 200/200, 양 패키지 타입 검사 PASS. 실제 DB 및 배포된 alpha의 업로드→저장→재조회 검증은 미실행이다.
+- Headed 컴포넌트/CSS 전후 확인: 390/768/1440에서 before 9/9, after 12/12. 콘솔·네트워크 오류와 가로 넘침 0. [모바일 이전](../screenshots/team-match-image-slots/before/mobile-create.png) / [이후](../screenshots/team-match-image-slots/after/mobile-create.png), [데스크톱 이후](../screenshots/team-match-image-slots/after/desktop-create.png). 관리자 폼의 공유 입력은 별도 fixture로 검증했으며 alpha/API 동작을 대체하지 않는다.
+
 # Team Match Flow Scenarios
+
+## 2026-10-02 — Team-match photo brightness
+
+- PASS (presentation fixtures): uploaded photo on list/detail has no full-image gradient and retains local image fallback.
+- PASS: photo detail team summary and buttons retain scoped contrast backgrounds; no-photo sport graphics unchanged.
+- PASS: headed Chrome before/after, 390/768/1440, 12/12 captures; console/network errors 0, horizontal overflow 0.
+- PASS: actual component regression 124/124 (RED 2 -> GREEN).
+- PENDING: live creation/upload/API verification and Alpha deployment. No live result is claimed from component fixtures.
+
+Mobile detail [before](../screenshots/team-match-image-brightness/mobile-detail-before.png) ·
+[after](../screenshots/team-match-image-brightness/mobile-detail-after.png).
+Mobile list [before](../screenshots/team-match-image-brightness/mobile-list-before.png) ·
+[after](../screenshots/team-match-image-brightness/mobile-list-after.png).
+
+## 2026-10-02 platform chat regression
+
+- [ ] New platform recruitment: the creating operator sees its chat before any team is assigned.
+- [ ] First HOME approval: all HOME owners/managers see the room; members/unapproved teams get 403.
+- [ ] AWAY approval: all AWAY owners/managers join the same room; both teams receive operator messages.
+- [ ] The operator cannot leave; revocation/inactive/support role removes list/read/send/resolve access.
+- [ ] Completed matches retain conversation; cancelled/expired/deleted matches deny entry.
+- [ ] Apply backfill twice: missing rooms/participants added once; messages, read markers, preferences,
+  archived rooms and voluntary team exits retained.
+- [ ] 390/768/1440 headed screenshots and console/network checks for operator/HOME/AWAY.
+
+Evidence: `apps/v1_api/test/chat/platform-team-match-chat.integration-spec.ts` (real PostgreSQL HTTP).
+Local execution is pending approved PostgreSQL; no production backfill has run.
+
 
 > **Stack scope note (Todo 26 reconciliation, 2026-08-04):** everything from `## Scenario Checklist` through `## Notes` below describes the **legacy** `apps/api` (port 8111) / `apps/web` (port 3003) stack. Its routes (`POST /team-matches/:id/result`, `POST /team-matches/:id/check-in`, `POST /team-matches/:id/evaluate`, `GET /team-matches/:id/referee-schedule`) still exist verbatim in `apps/api/src/team-matches/team-matches.controller.ts` — none of this is false, it just documents a different, older team-match implementation than the one Tasks 12-24 shipped. The **v1 team-match implementation is a full rewrite** with a different controller, different route shapes, a versioned `Game`/`GameResultRevision` result model, and no `check-in`/`evaluate`/`referee-schedule` routes at all. See `## v1 stack (Tasks 12-24)` immediately below for the current, verified v1 surface and the two Todo-26 E2E scenario IDs this domain owns.
 

@@ -1,8 +1,44 @@
+## 2026-10-05 — 4강·8강·12강 경기별 연결선
+
+[작업 문서](../../.github/tasks/20261004-tournament-round12-quarter.md): 기존 canonical 진출 edge 관리·공개 응답 + SVG 경기별 연결선 + desktop 전체 행/모바일 단계 이동. API150·Web116·실제 DB2 통과, 양쪽 타입 및 패턴/surface PASS. 사용자 지정 상세 shell에서 명시적인 browser-local 예시 9/9 확인(4/8/12×390/768/1440, 카드/aside 겹침0, overflow0, JS error0). 비로그인 auth/me401은 기록. [12강 모습](../screenshots/tournament-connected-bracket/12-desktop.png). **실제 alpha 변경 후 QA 0/3, push 승인 대기로 배포 전.**
+
+## 2026-10-04 — 12강·8강 수동 대진 관리
+
+[작업 문서](../../.github/tasks/20261004-tournament-round12-quarter.md): 관리자 정식 단계·부전승 저장·사용자 결선 표시 확장. API 128/128·Web 64/64, 실제 PostgreSQL 통합 1/1, 192 migration 재생·드리프트 0. 원격 push가 자동 승인 검토에서 차단되어 PR/alpha 배포 및 변경 후 3폭 QA는 미실행. 실제 대회 데이터 변경 없음.
+
 # Teameet QA Scenario Index
 
+## 2026-10-03 — 종료 팀매치 카드 전체 dim / DEV 요청
+
+이미지와 카드 전체에 동일한 dim 적용; 완료·취소·만료된 리그 포함. 진행 중/종료 확인 중/예정 리그는 유지.
+회귀 7/7, Web 타입 검사 PASS, headed fixture 6/6(390/768/1440), console/network/overflow 0.
+DEV 배포 요청은 접수했으나 schema binding 4파일 수정이 자동 승인 검토에서 다시 거절됨. 구체적인 승인 대상과 증거는 [Task 149](../../.github/tasks/149-admin-assigned-team-match.md)에 기록. 배포 미실행.
+
+## 2026-10-03 — 팀매치 목록/상세 이미지 입력
+
+[Task 149 후속](../../.github/tasks/149-admin-assigned-team-match.md): 일반·관리자 생성/수정의 선택 이미지 두 슬롯, 한 장 공유, 종목 기본 이미지, 기존 사진 호환. [시나리오](./05-team-match-flows.md).
+API 99/99, Web 200/200, 두 패키지 타입 검사 PASS. Headed 컴포넌트 fixture 전후 21/21(390/768/1440), console/network/overflow 0.
+실제 DB 적용·HTTP 저장/재조회 및 alpha QA 미실행. 배포 스키마 pin 갱신은 자동 승인 검토가 별도 승인 대상으로 거절하여 보류했고, 구체적인 4개 파일 변경안을 Task 149에 남겼다.
+
+## 2026-10-02 — 팀매치 이미지 밝기
+
+[Task 132 후속](../../.github/tasks/archive/132-v1-team-match-full-edit-and-image-contract.md):
+목록·상세의 전체 사진 암막 제거, 상세 텍스트/버튼에만 대비 배경 적용.
+실제 컴포넌트 회귀 124/124, headed fixture 전후 캡처 12/12 (390/768/1440), 오류·overflow 0.
+[시나리오/이미지 비교](./05-team-match-flows.md). 실제 업로드·API 생성 흐름 및 Alpha 배포는 미실행.
 ## 2026-10-03 — 대회·리그 팀매치 관리 경계 수정
 
 [감사 및 후속 작업](../../.github/tasks/20261003-competition-team-match-surface-audit.md): 기존 감사 20/20에서 발견한 관리자 분류·상태 변경, 사용자 공동 기록 이동, 조건부 컨택 판정·해체 리그 링크를 최신 dev에서 수정한다. [관리자 시나리오](./10-profile-settings-admin.md), [팀매치 시나리오](./05-team-match-flows.md). 회귀·타입 검사, dev PR 리뷰·CI, Alpha 배포·3폭 실제 화면 확인 진행 중.
+
+## 2026-10-02 — 플랫폼 주관 채팅 자동 참여
+
+[Task 149](../../.github/tasks/149-admin-assigned-team-match.md)의 채팅 후속 작업:
+모집 생성 시 운영자 참여, 각 팀 승인 시 운영진 참여, 기존 매치 data-only backfill 구현.
+[시나리오](./05-team-match-flows.md)는 실제 PostgreSQL 및 headed QA 미실행 상태로 유지한다.
+운영 DB 적용과 main 승격은 아직 하지 않았다.
+범위 회귀: API 126/126, Web 89/89, 양쪽 타입 검사 0. 실제 DB 테스트는
+`DATABASE_URL is required for isolated integration suites`로 실행 전 차단됐다.
+
 
 ## 2026-10-02 — 승격 보류 후 Alpha QA
 

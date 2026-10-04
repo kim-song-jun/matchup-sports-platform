@@ -1,3 +1,4 @@
+import { ensurePlatformTeamMatchChat } from '../chat/platform-team-match-chat';
 import { canConfirmTeamMatch, validateTeamMatchDates } from './team-match-dates';
 import {
   BadRequestException,
@@ -82,6 +83,7 @@ export class AdminTeamMatchRecruitmentsService {
           throw new ConflictException({ code: 'IDEMPOTENCY_CONFLICT', message: '같은 요청 키로 다른 모집 정보를 제출할 수 없어요.' });
         }
         const teamMatch = await tx.v1TeamMatch.findUniqueOrThrow({ where: { id: existing.resourceId } });
+        await ensurePlatformTeamMatchChat(tx, teamMatch.id);
         return this.createResponse(teamMatch.id, teamMatch.status, true);
       }
 
@@ -105,6 +107,7 @@ export class AdminTeamMatchRecruitmentsService {
           title: dto.title.trim(),
           description: dto.description?.trim() || null,
           imageUrl: dto.imageUrl?.trim() || null,
+          listImageUrl: dto.listImageUrl?.trim() || null,
           placeName: dto.manualPlaceName.trim(),
           placeAddress: dto.addressText?.trim() || null,
           startAt: dates.startsAt,
@@ -122,6 +125,7 @@ export class AdminTeamMatchRecruitmentsService {
           competitionConfigVersionId: competitionConfig.id,
         },
       });
+      await ensurePlatformTeamMatchChat(tx, teamMatch.id);
       const response = this.createResponse(teamMatch.id, teamMatch.status, false);
       await tx.v1IdempotencyRecord.create({
         data: {
@@ -260,6 +264,7 @@ export class AdminTeamMatchRecruitmentsService {
             data: { hostTeamId: targetApplication.applicantTeam.id },
           });
         }
+        await ensurePlatformTeamMatchChat(tx, teamMatch.id);
         const game = await this.ensurePlatformRecruitmentGame(
           tx,
           teamMatch,
@@ -313,6 +318,7 @@ export class AdminTeamMatchRecruitmentsService {
           where: { id: teamMatch.id },
           data: { hostTeamId: targetTeam.id },
         });
+        await ensurePlatformTeamMatchChat(tx, teamMatch.id);
         const game = await this.ensurePlatformRecruitmentGame(
           tx,
           teamMatch,
@@ -373,6 +379,7 @@ export class AdminTeamMatchRecruitmentsService {
         where: { id: teamMatch.id },
         data: { hostTeamId: home.id, approvedApplicantTeamId: away.id, status: 'matched' },
       });
+      await ensurePlatformTeamMatchChat(tx, teamMatch.id);
       const approved = await tx.v1TeamMatchApplication.updateMany({
         where: { id: applicationId, teamMatchId, status: 'requested' },
         data: { status: 'approved', reviewedByUserId: admin.userId, reviewedAt: new Date() },
@@ -615,6 +622,7 @@ export class AdminTeamMatchRecruitmentsService {
           title: dto.title.trim(),
           description: dto.description?.trim() || null,
           imageUrl: dto.imageUrl?.trim() || null,
+          listImageUrl: dto.listImageUrl === undefined ? undefined : dto.listImageUrl?.trim() || null,
           placeName: dto.manualPlaceName.trim(),
           placeAddress: dto.addressText?.trim() || null,
           startAt: dates.startsAt,

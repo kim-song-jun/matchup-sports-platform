@@ -556,7 +556,11 @@ export const gameSchemaSourceManifest = {
   // 2026-10-01 merge: dev's Task 181 ②③ + this branch's Task 180 G12, re-pinned on the merged file.
   // 2026-10-01 Task 180 W4-V8: V1TeamInvitation @@unique([teamId, invitedUserId]) -> @@index (one row per invite);
   // the pending-only partial unique lives in 20261001220000_v1_team_invitation_history SQL. No game model changed.
-  schema: 'eef298c3f325d99eb5940e5a466cf6e37404c3291167afcefaa1c572a5ee7930',
+  // 2026-10-04 Task 149: nullable V1TeamMatch.listImageUrl; game models and bound migration unchanged.
+  // 2026-10-05: additive round12/quarter enum values + group-team isBye, backed by
+  // the round12 migration. Full migration replay and zero schema drift passed;
+  // no V1Game model or bound historical game-operations migration changed.
+  schema: '1eea17ce17f1150aa031cb3ef9cb492e4242375c98a4ad85ff2657a1c6e5d31d',
   migration: '6bd7fae42e9ee7debff71d26f7252d220ad2c12ae6f14745d103fc7fa61e8f64',
 } as const;
 

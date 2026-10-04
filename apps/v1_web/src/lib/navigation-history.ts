@@ -11,6 +11,8 @@
  *   소비 컴포넌트가 전부 Router 의 자손이라 effect 순서(자식 먼저)가 이를 보장한다.
  */
 
+import { sanitizeRedirectPath } from './session-storage';
+
 const IDX_KEY = '__tmIdx';
 const PARENT_KEY = '__tmParent';
 /** 오버레이가 URL 을 바꾸지 않고 쌓는 항목의 state 표식(값 = 오버레이 id). */
@@ -23,6 +25,8 @@ const APP_BACK_PENDING_MS = 1000;
 // 모듈이 다시 평가돼도(HMR) 이전 설치를 걷어 낼 수 있게 window 에 남기는 설치 기록.
 const INSTALL_MARKER = '__teameetNavHistoryInstall';
 const URL_BASE = 'https://nav-history.invalid';
+// withFromPath가 지원하는 출처 체인의 깊이까지만 비교용 query를 정규화한다.
+const FROM_COMPARISON_MAX_DEPTH = 4;
 
 // buffer: a same-URL entry the unsaved-changes guard pushes so a cold-entry back stays in this document.
 // stale: the form entry under a buffer that was reloaded — a dead same-URL copy that traversal skips.
@@ -75,16 +79,27 @@ function clearPendingAppBack() {
 
 const currentUrl = () => `${window.location.pathname}${window.location.search}${window.location.hash}`;
 
-/** 비교용 정규화 — 쿼리 인코딩 차이(`from=/a` vs `from=%2Fa`)와 hash 는 같은 화면으로 본다. */
-export function normalizeInAppUrl(url: string): string | null {
+function normalizeComparisonUrl(url: string, fromDepth: number): string | null {
   try {
     const parsed = new URL(url, URL_BASE);
     if (parsed.origin !== URL_BASE) return null;
-    const query = parsed.searchParams.toString();
-    return `${parsed.pathname}${query ? `?${query}` : ''}`;
+    const params = new URLSearchParams();
+    for (const [key, value] of parsed.searchParams) {
+      const from = key === 'from' && fromDepth < FROM_COMPARISON_MAX_DEPTH ? sanitizeRedirectPath(value) : null;
+      params.append(key, from ? normalizeComparisonUrl(from, fromDepth + 1) ?? value : value);
+    }
+    params.sort(); // stable sort: 반복 키의 값 순서는 바꾸지 않는다.
+    const query = params.toString();
+    // 현재 화면의 hash 비교는 기존처럼 생략하지만 부모의 복귀 앵커는 구분한다.
+    return `${parsed.pathname}${query ? `?${query}` : ''}${fromDepth > 0 ? parsed.hash : ''}`;
   } catch {
     return null; // URL 로 읽히지 않는 값은 어떤 항목과도 같지 않다.
   }
+}
+
+/** query 키 순서·인코딩은 안전한 중첩 출처까지 비교한다. URL 자체나 비정상 출처는 변경하지 않는다. */
+export function normalizeInAppUrl(url: string): string | null {
+  return normalizeComparisonUrl(url, 0);
 }
 
 const sameUrl = (a: string, b: string) => {

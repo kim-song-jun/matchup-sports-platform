@@ -1,6 +1,7 @@
 /** 조별리그 대진 생성기(`league_r{n}`)와 조 단계 코드가 남긴 라운드 값을 화면 이름으로. 이미 한국어인 값은 그대로. */
 export const TOURNAMENT_PHASE_LABEL: Readonly<Record<string, string>> = {
   group: '조별리그',
+  round12: '12강',
   quarter: '8강',
   semi: '4강',
   semifinal: '4강',

@@ -302,7 +302,8 @@ export function TeamMatchDetailPageClient({ teamMatchId, seed }: { teamMatchId: 
   // 서버는 취소된 매치의 채팅방을 열지도, 기존 방에 들어오지도 못하게 막는다(chat.service.ts
   // assertCanUseTeamMatchChat) — 버튼을 남기면 눌러서 409 를 봐야만 알게 된다.
   const isCancelled = query.data ? getStatus(query.data) === 'cancelled' : false;
-  const chatAvailable = !isCancelled && canOpenTeamMatchChat(canManageHostTeam, canManageOpponentTeam, opponentAssigned);
+  const chatAvailable = !isCancelled && (query.data?.viewer?.canChat
+    ?? canOpenTeamMatchChat(canManageHostTeam, canManageOpponentTeam, opponentAssigned));
   // platformManaged의 hostTeam은 경기 HOME 사이드일 뿐 모집 운영자가 아니다. 서버가
   // host_team을 내리지 않는 것이 정본이지만, API/Web 롤링 배포 중 구 응답이 남아도
   // "내가 만든 팀매치"/"매치 관리"가 다시 노출되지 않도록 화면에서도 방어한다.
@@ -428,6 +429,7 @@ export function TeamMatchDetailPageClient({ teamMatchId, seed }: { teamMatchId: 
         teams: eligibility.data.teams.map((team) => ({
           teamId: team.teamId,
           name: team.name,
+          logoUrl: team.logoUrl ?? null,
           roleLabel: teamRoleLabel(team.role),
           eligible: team.eligible,
           reason: team.eligible ? null : reasonLabel(team.reasonCode),
@@ -537,7 +539,7 @@ export function TeamMatchDetailPageClient({ teamMatchId, seed }: { teamMatchId: 
       ? { retry: () => { void applications.refetch(); } }
       : undefined,
     myApplicationTeam: viewerState === 'requested' && selectedEligibility?.applicationId
-      ? { teamId: selectedEligibility.teamId, name: selectedEligibility.name }
+      ? { teamId: selectedEligibility.teamId, name: selectedEligibility.name, logoUrl: selectedEligibility.logoUrl ?? null }
       : null,
     // 진행 체크리스트와 같은 편 판정 — 호스트 팀도 관리하면 호스트 편이다.
     viewerOnApplicantSide: !canManageHostTeam && (canManageOpponentTeam || viewerState === 'approved'),
@@ -607,7 +609,7 @@ function buildTeamMatchFilterSheet(
     { label: '최신순', value: 'latest', href: buildTeamMatchHref(params, { sort: sort === 'latest' ? null : 'latest', filter: '1' }), active: sort === 'latest' },
   ];
   const genderOptions: NonNullable<TeamMatchListViewModel['filterSheet']>['genderOptions'] = [
-    { label: '성별 무관', value: '성별 무관', href: buildTeamMatchHref(params, { genderRule: genderRule === '성별 무관' ? null : '성별 무관', filter: '1' }), active: genderRule === '성별 무관' },
+    { label: '혼성', value: '성별 무관', href: buildTeamMatchHref(params, { genderRule: genderRule === '성별 무관' ? null : '성별 무관', filter: '1' }), active: genderRule === '성별 무관' },
     { label: '남', value: '남', href: buildTeamMatchHref(params, { genderRule: genderRule === '남' ? null : '남', filter: '1' }), active: genderRule === '남' },
     { label: '여', value: '여', href: buildTeamMatchHref(params, { genderRule: genderRule === '여' ? null : '여', filter: '1' }), active: genderRule === '여' },
   ];

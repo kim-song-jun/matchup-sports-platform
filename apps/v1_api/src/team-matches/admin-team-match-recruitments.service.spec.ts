@@ -20,6 +20,7 @@ const createDto = {
   deadlineAt: DEADLINE.toISOString(),
   manualPlaceName: '잠실 풋살장',
   imageUrl: '/uploads/admin-team-match.webp',
+  listImageUrl: '/uploads/admin-team-match-list.webp',
   costNote: '총 90,000원 · 상대팀 30,000원',
   minLevelCode: 'intermediate',
   maxLevelCode: 'intermediate',
@@ -77,7 +78,10 @@ describe('AdminTeamMatchRecruitmentsService', () => {
       v1IdempotencyRecord: { findFirst: jest.fn().mockResolvedValue(null), create: jest.fn().mockResolvedValue({}) },
       v1TeamMatch: {
         create: jest.fn().mockResolvedValue({ id: 'team-match-1', status: 'recruiting' }),
-        findUniqueOrThrow: jest.fn().mockResolvedValue({ updatedAt: new Date('2026-08-02T00:00:00.000Z') }),
+        findUniqueOrThrow: jest.fn().mockResolvedValue({
+          updatedAt: new Date('2026-08-02T00:00:00.000Z'), platformManaged: true,
+          createdByUserId: adminUser.id, hostTeamId: null, approvedApplicantTeamId: null, deletedAt: null,
+        }),
         findFirst: jest.fn().mockResolvedValue({
           id: 'team-match-1',
           title: createDto.title,
@@ -142,6 +146,12 @@ describe('AdminTeamMatchRecruitmentsService', () => {
       v1TeamSchedule: { create: jest.fn().mockResolvedValue({}) },
       v1StatusChangeLog: { createMany: jest.fn().mockResolvedValue({ count: 2 }) },
       v1TeamMembership: { findMany: jest.fn().mockResolvedValue([]) },
+      v1AdminUser: { findFirst: jest.fn().mockResolvedValue({ userId: adminUser.id }) },
+      v1ChatRoom: { upsert: jest.fn().mockResolvedValue({ id: 'platform-room', createdAt: new Date('2026-08-01') }) },
+      v1ChatRoomParticipant: {
+        createMany: jest.fn().mockResolvedValue({ count: 1 }),
+        updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+      },
       $executeRaw: jest.fn().mockResolvedValue(undefined),
       $queryRaw: jest.fn().mockResolvedValue([{ id: 'team-match-1' }]),
       $transaction: jest.fn(async (callback: (tx: any) => unknown) => callback(prisma)),
@@ -162,6 +172,14 @@ describe('AdminTeamMatchRecruitmentsService', () => {
       detailRoute: '/admin/team-matches/team-match-1',
       replayed: false,
     });
+    expect(prisma.v1ChatRoom.upsert).toHaveBeenCalledWith({
+      where: { teamMatchId: 'team-match-1' },
+      create: { teamMatchId: 'team-match-1', status: 'active' }, update: {},
+    });
+    expect(prisma.v1ChatRoomParticipant.createMany).toHaveBeenCalledWith({
+      data: [{ chatRoomId: 'platform-room', userId: adminUser.id, status: 'active', visibleFromAt: new Date('2026-08-01') }],
+      skipDuplicates: true,
+    });
     expect(prisma.v1TeamMatch.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
         hostTeamId: null,
@@ -169,6 +187,7 @@ describe('AdminTeamMatchRecruitmentsService', () => {
         approvedApplicantTeamId: null,
         status: 'recruiting',
         imageUrl: '/uploads/admin-team-match.webp',
+        listImageUrl: '/uploads/admin-team-match-list.webp',
         costNote: '총 90,000원 · 상대팀 30,000원',
         minSportLevelId: 'level-intermediate',
         maxSportLevelId: 'level-intermediate',

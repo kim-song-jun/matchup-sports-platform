@@ -1800,6 +1800,7 @@ model V1TeamMatch {
   title                      String
   description                String?
   imageUrl                   String?           @map("image_url")
+  listImageUrl               String?           @map("list_image_url")
   placeName                  String?           @map("place_name")
   placeAddress               String?           @map("place_address")
   startAt                    DateTime?         @map("start_at")
@@ -2542,6 +2543,8 @@ enum V1TournamentPlayerEligibility {
 
 enum V1TournamentGroupPhase {
   group
+  round12
+  quarter
   semi
   final
   third_place
@@ -2922,6 +2925,7 @@ model V1TournamentGroup {
 }
 
 model V1TournamentGroupTeam {
+  isBye          Boolean  @default(false) @map("is_bye")
   id             String   @id @default(uuid())
   groupId        String   @map("group_id")
   registrationId String   @map("registration_id")

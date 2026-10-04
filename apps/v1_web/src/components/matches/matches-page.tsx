@@ -27,6 +27,7 @@ import { useCurrentHref } from '@/components/v1-ui/use-current-href';
 import { withFromPath } from '@/lib/session-storage';
 import type { V1MatchApiStatus } from '@/types/api';
 import { extractErrorMessage } from '@/lib/error-message';
+import { matchGenderRuleLabel } from '@/lib/v1-status-labels';
 
 /**
  * 종목 한국어 레이블 → 인디케이터 dot CSS 색상.
@@ -275,10 +276,11 @@ export function MatchDetailPageView({ model, lifecyclePanel }: { model: MatchDet
   const cta = model.applyLabel ?? (mode === 'mine' ? '매치 관리' : mode === 'approved' ? '승인 완료' : mode === 'pending' ? '신청 취소' : mode === 'closed' || match.status === 'full' ? '신청 마감' : '참가 신청');
   const ctaTone = mode === 'pending' ? 'tm-btn-warning' : mode === 'approved' ? 'tm-btn-success' : locked ? 'tm-btn-neutral' : 'tm-btn-primary';
   // [P2] 마감 시각이 지나 닫힌 매치(lifecycleStatus==='closed')만 정확히 구분한다 — 정원이
-  // 찬 경우(full)·취소·완료·만료는 이 시안에서 검토하지 않은 별개 사유라 기존 문구를 유지한다.
+  // 찬 경우(full)·취소·만료는 별개 사유라 기존 문구를 유지한다. 완료는 종료 안내로 구분한다.
   // 이 하나의 신호로 히어로 배지·상태 카드·하단 바 캡션 3곳의 "같은 상태 반복"을 한 자리
   // (본문 상태 카드)로 모은다(P2 A안).
   const isDeadlinePassedClosed = mode === 'closed' && match.lifecycleStatus === 'closed';
+  const closedNoticeTitle = match.lifecycleStatus === 'completed' ? '종료된 매치예요' : '모집 완료';
   const showChat = Boolean(model.onChat);
   const timeRange = match.endTime ? `${match.time}-${match.endTime}` : match.time;
   // 경기가 끝난 뒤 후기로 가는 유일한 상세 화면 진입점. 완료 알림도 후기 화면으로 보내지만,
@@ -394,8 +396,8 @@ export function MatchDetailPageView({ model, lifecyclePanel }: { model: MatchDet
                   <span className={`tm-badge ${matchStatusBadgeClass(mode, match.status, match.lifecycleStatus)}`}>{matchStatusBadgeLabel(mode, match.status, model.completed, match.lifecycleStatus)}</span>
                 )}
               </div>
-              <h2 className="tm-match-detail-title">{match.title}</h2>
-              <div className="tm-text-caption tm-match-detail-meta" style={{ marginTop: 8 }}>{match.host} 호스트</div>
+              <h2 className="tm-match-detail-title tm-hide-desktop">{match.title}</h2>
+              <div className="tm-text-caption tm-match-detail-meta">{match.host} 호스트</div>
               {heroMessage ? <div className="tm-text-caption tm-match-detail-heromsg" role="status" style={{ marginTop: 8 }}>{heroMessage}</div> : null}
             </div>
           </div>
@@ -435,11 +437,11 @@ export function MatchDetailPageView({ model, lifecyclePanel }: { model: MatchDet
             ) : null}
             {mode === 'approved' && !isPostStartLifecycle && match.lifecycleStatus !== 'on_hold' ? approvedStateCard : null}
             {/* [P2] 마감 사유를 아는 만큼만 정확히 말한다 — 시각이 지났으면 그 이유를,
-                아니면(정원 마감·취소·완료·만료) 기존 중립 문구를 유지한다. */}
+                완료면 종료를, 나머지(정원 마감·취소·만료)는 기존 중립 문구를 유지한다. */}
             {mode === 'closed' && !isPostStartLifecycle && match.lifecycleStatus !== 'on_hold' ? (
               isDeadlinePassedClosed
                 ? <StateCard tone="grey" title="신청이 마감됐어요" body="마감 시각이 지나 더 이상 신청할 수 없어요. 다른 매치를 둘러봐 주세요." />
-                : <StateCard tone="grey" title="모집 완료" body="이 매치는 신청이 마감됐어요. 다른 매치를 둘러봐 주세요." />
+                : <StateCard tone="grey" title={closedNoticeTitle} body="이 매치는 신청이 마감됐어요. 다른 매치를 둘러봐 주세요." />
             ) : null}
             {match.rules.length ? <Card pad={16} style={{ marginTop: 12 }}><div className="tm-text-body-lg">규칙</div><div style={{ display: 'grid', gap: 8, marginTop: 12 }}>{match.rules.map((rule) => <div key={rule} className="tm-text-body" style={{ color: 'var(--text-muted)', whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{rule}</div>)}</div></Card> : null}
             <Card pad={16} style={{ marginTop: 12 }}>
@@ -527,7 +529,7 @@ export function MatchDetailPageView({ model, lifecyclePanel }: { model: MatchDet
           {mode === 'closed' && !isPostStartLifecycle && match.lifecycleStatus !== 'on_hold' ? (
             isDeadlinePassedClosed
               ? <StateCard tone="grey" title="신청이 마감됐어요" body="마감 시각이 지나 더 이상 신청할 수 없어요. 다른 매치를 둘러봐 주세요." />
-              : <StateCard tone="grey" title="모집 완료" body="이 매치는 신청이 마감됐어요. 다른 매치를 둘러봐 주세요." />
+              : <StateCard tone="grey" title={closedNoticeTitle} body="이 매치는 신청이 마감됐어요. 다른 매치를 둘러봐 주세요." />
           ) : null}
           {match.rules.length ? <Card pad={16} style={{ marginTop: 12 }}><div className="tm-text-body-lg">규칙</div><div style={{ display: 'grid', gap: 8, marginTop: 12 }}>{match.rules.map((rule) => <div key={rule} className="tm-text-body" style={{ color: 'var(--text-muted)', whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{rule}</div>)}</div></Card> : null}
           <Card pad={16} style={{ marginTop: 12 }}>
@@ -845,7 +847,7 @@ function MatchRowItem({ match, fromHref }: { match: MatchCardModel; fromHref?: s
       </div>
       <div className="tm-match-row-main">
         {/* 빈 값을 그대로 이으면 "풋살 · 3-5 · " 처럼 구분점만 남는다 — 있는 것만 잇는다. */}
-        <div className="tm-text-caption tm-match-row-meta">{[match.sport, match.level, match.gender, match.costNote].filter(Boolean).join(' · ')}</div>
+        <div className="tm-text-caption tm-match-row-meta">{[match.sport, match.level, match.gender, match.costNote ? `참가비 설명: ${match.costNote}` : null].filter(Boolean).join(' · ')}</div>
         <div className="tm-match-row-headline">
           {stateBadge ? <span className={`tm-badge ${stateBadge.className} tm-card-closed-badge`}>{stateBadge.label}</span> : null}
           <div className="tm-text-body-lg tm-match-row-title">{match.title}</div>
@@ -897,7 +899,26 @@ function revealFocusedRailCard(event: FocusEvent<HTMLDivElement>) {
   const target = card.getBoundingClientRect();
   if (target.width + gutter * 2 > bounds.width) return;
   const left = bounds.left + gutter;
-  const right = bounds.right - gutter;
+  let right = bounds.right - gutter;
+  const fab = rail.closest('.tm-app-frame')?.querySelector<HTMLElement>('.tm-floating-fab');
+  const fabBounds = fab?.getBoundingClientRect();
+  if (fabBounds && fabBounds.width > 0 && fabBounds.height > 0
+    && target.top - gutter < fabBounds.bottom && target.bottom + gutter > fabBounds.top
+    && fabBounds.left < bounds.right && fabBounds.right > bounds.left) {
+    const clearRight = Math.min(right, fabBounds.left - gutter);
+    if (target.width <= clearRight - left) {
+      right = clearRight;
+    } else {
+      // 좁은 폭은 카드+링을 FAB 왼쪽에 넣을 수 없다. 같은 본문만 위로 드러내며,
+      // scroll range가 부족하면 상한에서 멈춘다 — 불가능한 전체 표시를 강제하지 않는다.
+      const main = rail.closest<HTMLElement>('.tm-scroll-area');
+      if (main) {
+        const maxTop = Math.max(0, main.scrollHeight - main.clientHeight);
+        const top = Math.min(maxTop, Math.max(0, main.scrollTop + target.bottom + gutter - fabBounds.top));
+        if (top !== main.scrollTop) main.scrollTo({ top, behavior: 'instant' });
+      }
+    }
+  }
   const delta = target.left < left ? target.left - left : target.right > right ? target.right - right : 0;
   if (delta !== 0) rail.scrollTo({ left: Math.max(0, rail.scrollLeft + delta), behavior: 'instant' });
 }
@@ -961,7 +982,7 @@ function MatchCardItem({ match, fromHref }: { match: MatchCardModel; fromHref: s
         {/* [격상1] 종목 배지 제거 — 미디어 상단 badge에 이미 표시됨(중복).
             [격상2] 마감 orange 배지 제거 — footer actionLabel로 통합.
             레벨·성별은 pill 배지 → caption 인라인 텍스트로 강등(메타 배지 동등경쟁 해소). */}
-        <div className="tm-text-caption" style={{ color: 'var(--text-caption)', marginTop: 2 }}>{[match.level, match.gender, match.costNote].filter(Boolean).join(' · ')}</div>
+        <div className="tm-text-caption" style={{ color: 'var(--text-caption)', marginTop: 2 }}>{[match.level, match.gender, match.costNote ? `참가비 설명: ${match.costNote}` : null].filter(Boolean).join(' · ')}</div>
         <div className="tm-match-row-headline" style={{ marginTop: 8 }}>
           {stateBadge ? <span className={`tm-badge ${stateBadge.className} tm-card-closed-badge`}>{stateBadge.label}</span> : null}
           <div className="tm-text-body-lg">{match.title}</div>
@@ -1328,7 +1349,7 @@ function ConfirmStep({ model }: { model: MatchCreateViewModel }) {
   const regionName = model.form?.regions.find((region) => region.id === model.form?.regionId)?.name ?? '지역 선택 필요';
   const deadlineText = draft.deadlineDate && draft.deadlineTime ? `${draft.deadlineDate} ${draft.deadlineTime}` : '경기 시작 전까지';
   const timeRangeText = draft.endTime ? `${draft.date} ${draft.startTime}-${draft.endTime}` : `${draft.date} ${draft.startTime}`;
-  return <div><h1 className="tm-text-heading">입력한 내용을 확인해 주세요</h1><Card pad={0} style={{ marginTop: 16, overflow: 'hidden' }}><div className="tm-create-image-preview" style={{ backgroundImage: cssUrl(draft.image) }} /><div style={{ padding: 16 }}><div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}><span className="tm-badge tm-badge-blue">{model.selectedSport}</span><span className="tm-badge tm-badge-grey">{draft.minLevel}-{draft.maxLevel}</span><span className="tm-badge tm-badge-grey">{draft.gender}</span></div><div className="tm-text-subhead" style={{ marginTop: 12 }}>{draft.title}</div><div className="tm-text-caption" style={{ marginTop: 8 }}>{draft.description}</div></div></Card><Card pad={16} style={{ marginTop: 12 }}><InfoRow label="지역" value={regionName} sub="검색·추천에 사용돼요" /><InfoRow label="일시" value={timeRangeText} /><InfoRow label="신청 마감" value={deadlineText} /><InfoRow label="장소" value={draft.venue} sub={draft.address} /><InfoRow label="인원" value={`최대 ${draft.capacity}명`} /><InfoRow label="주최자 참가" value={draft.hostParticipates ? '참가해요' : '참가하지 않아요'} sub={draft.hostParticipates ? '주최자도 모집 인원에 포함돼요' : '용병만 모집하고 주최자는 운영만 해요'} />{draft.costNote ? <InfoRow label="참가비" value={draft.costNote} /> : null}<InfoRow label="이미지" value="대표 이미지" sub="목록과 상세 화면에 표시돼요" /></Card></div>;
+  return <div><h1 className="tm-text-heading">입력한 내용을 확인해 주세요</h1><Card pad={0} style={{ marginTop: 16, overflow: 'hidden' }}><div className="tm-create-image-preview" style={{ backgroundImage: cssUrl(draft.image) }} /><div style={{ padding: 16 }}><div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}><span className="tm-badge tm-badge-blue">{model.selectedSport}</span><span className="tm-badge tm-badge-grey">{draft.minLevel}-{draft.maxLevel}</span><span className="tm-badge tm-badge-grey">{matchGenderRuleLabel(draft.gender)}</span></div><div className="tm-text-subhead" style={{ marginTop: 12 }}>{draft.title}</div><div className="tm-text-caption" style={{ marginTop: 8 }}>{draft.description}</div></div></Card><Card pad={16} style={{ marginTop: 12 }}><InfoRow label="지역" value={regionName} sub="검색·추천에 사용돼요" /><InfoRow label="일시" value={timeRangeText} /><InfoRow label="신청 마감" value={deadlineText} /><InfoRow label="장소" value={draft.venue} sub={draft.address} /><InfoRow label="인원" value={`최대 ${draft.capacity}명`} /><InfoRow label="주최자 참가" value={draft.hostParticipates ? '참가해요' : '참가하지 않아요'} sub={draft.hostParticipates ? '주최자도 모집 인원에 포함돼요' : '용병만 모집하고 주최자는 운영만 해요'} />{draft.costNote ? <InfoRow label="참가비" value={draft.costNote} /> : null}<InfoRow label="이미지" value="대표 이미지" sub="목록과 상세 화면에 표시돼요" /></Card></div>;
 }
 
 function stepToNumber(step: MatchCreateViewModel['step']) {

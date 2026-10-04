@@ -5,6 +5,7 @@
  */
 const PHASE_LABEL: Readonly<Record<string, string>> = {
   group: '조별리그',
+  round12: '12강',
   quarter: '8강',
   semi: '4강',
   semifinal: '4강',

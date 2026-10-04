@@ -49,6 +49,7 @@ function teamMatchRow(overrides: Record<string, unknown> = {}) {
     title: '풋살 상대팀 모집',
     description: null,
     imageUrl: null,
+    listImageUrl: null,
     placeName: '잠실 풋살장',
     placeAddress: null,
     startAt: FUTURE,
@@ -393,6 +394,8 @@ describe('TeamMatchesService', () => {
       sportId: 'sport-1',
       regionId: 'region-1',
       title: '경기조건 trim 검증 팀매치',
+      imageUrl: '/uploads/detail.webp',
+      listImageUrl: '  /uploads/list.webp  ',
       startsAt: FUTURE.toISOString(),
       manualPlaceName: '잠실',
       matchFormat: '  6:6  ',
@@ -403,6 +406,8 @@ describe('TeamMatchesService', () => {
     expect(prisma.v1TeamMatch.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
         matchFormat: '6:6',
+        imageUrl: '/uploads/detail.webp',
+        listImageUrl: '/uploads/list.webp',
         matchStyle: ['친선', '매너 중시'],
         uniformColor: null,
       }),
@@ -1986,6 +1991,28 @@ describe('TeamMatchesService', () => {
         { teamId: 'team-badminton', eligible: false, reasonCode: 'SPORT_MISMATCH' },
         { teamId: 'team-futsal', eligible: true, reasonCode: 'OK' },
       ]);
+    });
+
+    // 신청 팀 고르기 화면은 이 응답으로 팀 행을 그린다. 엠블럼이 응답에 없으면 화면은 팀 id 로 만든
+    // 임시 무늬(identicon)밖에 그릴 수 없어, 팀이 등록한 엠블럼·기본 제공 엠블럼이 있어도 안 보였다.
+    it('applicationEligibility: 각 팀이 등록한 엠블럼(logoUrl)을 함께 내려준다 — 엠블럼이 없는 팀은 null', async () => {
+      prisma.v1Team.findMany.mockResolvedValue([
+        { id: 'team-uploaded', name: '업로드팀', sportId: 'sport-1', memberships: [{ role: 'owner' }], profile: { logoUrl: '/uploads/logo.png' } },
+        { id: 'team-preset', name: '기본 엠블럼팀', sportId: 'sport-1', memberships: [{ role: 'manager' }], profile: { logoUrl: '/images/team-logos/team-logo-03.jpg' } },
+        { id: 'team-none', name: '엠블럼 없는 팀', sportId: 'sport-1', memberships: [{ role: 'manager' }], profile: null },
+      ]);
+
+      const eligibility = await service.applicationEligibility(manager, 'tm-1', {});
+
+      expect(eligibility.teams.map((team) => [team.teamId, team.logoUrl])).toEqual([
+        ['team-uploaded', '/uploads/logo.png'],
+        ['team-preset', '/images/team-logos/team-logo-03.jpg'],
+        ['team-none', null],
+      ]);
+      // 목이 profile 을 줘도 쿼리가 profile 을 고르지 않으면 실제 DB 에서는 logoUrl 이 항상 null 이다.
+      expect(prisma.v1Team.findMany).toHaveBeenCalledWith(expect.objectContaining({
+        include: expect.objectContaining({ profile: { select: { logoUrl: true } } }),
+      }));
     });
   });
 

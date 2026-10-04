@@ -182,6 +182,7 @@ export function BracketGroupCard({
   // 다시 계산하면 "방금 4팀 배정 + 대진 생성까지 끝낸" 카드가 사용자 눈앞에서 접혀버린다.
   const [expanded, setExpanded] = useState(() => !isGroupReady(group, groupFixtures));
   const [isBatchAssigning, setIsBatchAssigning] = useState(false);
+  const [assignAsBye, setAssignAsBye] = useState(false);
   const [manualFixtureOpen, setManualFixtureOpen] = useState(false);
   const [fixtureRound, setFixtureRound] = useState('');
   const [fixtureNumber, setFixtureNumber] = useState('1');
@@ -216,7 +217,7 @@ export function BracketGroupCard({
         for (const registrationId of registrationIds) {
           await new Promise<void>((resolve, reject) => {
             assignGroupTeam.mutate(
-              { groupId: group.id, registrationId },
+              { groupId: group.id, registrationId, ...(assignAsBye ? { isBye: true } : {}) },
               { onSuccess: () => resolve(), onError: reject },
             );
           });
@@ -230,9 +231,9 @@ export function BracketGroupCard({
     })();
   }
 
-  const isKnockout = group.phase === 'semi' || group.phase === 'final' || group.phase === 'third_place';
+  const isKnockout = group.phase !== 'group';
   const roundOptions: string[] = isKnockout
-    ? ['16강', '8강', '4강', '결승', '3·4위전']
+    ? ['12강', '8강', '4강', '결승', '3·4위전']
     : ['조별 1라운드', '조별 2라운드', '조별 3라운드', '조별 4라운드', '조별 5라운드'];
 
   const bookedInRound = new Set<string>();
@@ -357,6 +358,7 @@ export function BracketGroupCard({
                     className="inline-flex items-center gap-1 pl-3 pr-1 py-0.5 rounded-full bg-[var(--surface-soft)] text-xs text-[var(--text-body)]"
                   >
                     {gt.teamName ?? gt.registrationId}
+                    {gt.isBye && <span> · 부전승 · 8강 직행</span>}
                     <button
                       type="button"
                       onClick={() => onRemoveGroupTeam(gt.id, gt.teamName ?? '이 팀')}
@@ -391,6 +393,13 @@ export function BracketGroupCard({
           </div>
 
           {/* ── 팀 배정 ── */}
+          {group.phase === 'round12' && (
+            <label className="flex items-center gap-2 min-h-[44px] tm-text-body text-[var(--text-body)]">
+              <input type="checkbox" checked={assignAsBye} disabled={isBatchAssigning}
+                onChange={(event) => setAssignAsBye(event.target.checked)} />
+              선택한 팀을 부전승으로 배정 (최대 4팀 · 8강 대진은 직접 배정해 주세요)
+            </label>
+          )}
           <TeamStagingPicker
             pickerId={`bracket-group-${group.id}-team-search`}
             suggestedTeams={suggestedTeams}

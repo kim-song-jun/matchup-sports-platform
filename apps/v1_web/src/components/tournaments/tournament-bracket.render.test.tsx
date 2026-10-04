@@ -130,3 +130,28 @@ describe('MatchCard — 진행 중·종료 경기도 시각을 유지한다 (D-1
     expect(within(card).queryByText('● LIVE')).not.toBeInTheDocument();
   });
 });
+
+it('12강 부전승은 상대 미배정과 구분해 경기 점수 없이 표시한다', () => {
+  render(<TournamentBracket fixtures={[makeFixture({ id: 'r12-match', fixtureNumber: 1, round: '12강' }), makeFixture({ id: 'quarter-match', fixtureNumber: 2, round: '8강' })]}
+    groups={[{ id: 'round12', name: '12강', phase: 'round12', sortOrder: 0, advanceCount: null, standings: [],
+      groupTeams: [{ id: 'bye', registrationId: 'bye-registration', teamId: 'bye-team', teamName: '직행FC', teamLogoUrl: null, sortOrder: 0, isBye: true }] }]} />);
+  expect(screen.getByRole('region', { name: '12강 부전승' })).toHaveTextContent('부전승 · 8강 직행');
+  expect(screen.getByText('직행FC')).toBeVisible();
+  expect(screen.getByRole('navigation', { name: '대진 단계 이동' })).toHaveTextContent('12강');
+});
+
+it('진출팀이 미정인 자리에 실제 저장된 이전 경기의 승자 출처를 표시한다', () => {
+  render(<TournamentBracket groups={[]} fixtures={[
+    makeFixture({ id: 'q-source', round: 'quarter', fixtureNumber: 3 }),
+    makeFixture({ id: 's-target', round: 'semi', fixtureNumber: 1, homeTeamName: 'TBD', bracketSources: [{ fixtureId: 'q-source', side: 'HOME', outcome: 'WINNER' }] }),
+  ]} />);
+  expect(screen.getByText('8강 3경기 승자')).toBeVisible();
+  expect(screen.getByRole('img', { name: '경기별 진출 연결선' })).toBeInTheDocument();
+});
+
+it('12강 경기가 아직 없어도 명시적 부전승을 8강 배정과 함께 표시한다', () => {
+  render(<TournamentBracket fixtures={[makeFixture({ id: 'q-bye', round: 'quarter', fixtureNumber: 1, homeRegistrationId: 'direct' })]}
+    groups={[{ id: 'r12-bye', name: '12강', phase: 'round12', sortOrder: 0, advanceCount: null, standings: [], groupTeams: [{ id: 'bye-only', registrationId: 'direct', teamId: 'direct-team', teamName: '직행팀', teamLogoUrl: null, sortOrder: 0, isBye: true }] }]} />);
+  expect(screen.getByText('직행팀')).toBeVisible();
+  expect(screen.getByRole('navigation', { name: '대진 단계 이동' })).toHaveTextContent('12강');
+});

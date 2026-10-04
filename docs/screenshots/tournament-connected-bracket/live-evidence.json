@@ -1,0 +1,130 @@
+{
+  "sha": "9ac4bdf0070e7b6b1d0005936a21464ec3ebc998",
+  "title": "(테스트) 12팀·팀당 5명 대진 직접 입력",
+  "teams": 12,
+  "players": 60,
+  "groups": 0,
+  "fixtures": 0,
+  "viewports": [
+    {
+      "name": "requested",
+      "viewport": "mobile",
+      "width": 390,
+      "height": 844,
+      "url": "https://alpha.teameet.co.kr/tournaments/d209a886-1a38-44ab-90a7-d08009aeee16",
+      "rosters": 0,
+      "errors": [],
+      "consoleErrors": [
+        "Failed to load resource: the server responded with a status of 401 ()"
+      ],
+      "failures": [
+        {
+          "url": "https://alpha.teameet.co.kr/api/v1/auth/me",
+          "status": 401
+        }
+      ],
+      "overflow": 0,
+      "paths": 1
+    },
+    {
+      "name": "practice",
+      "viewport": "mobile",
+      "width": 390,
+      "height": 844,
+      "url": "https://alpha.teameet.co.kr/tournaments/ad120000-0000-4000-8000-000000000001",
+      "rosters": 12,
+      "errors": [],
+      "consoleErrors": [
+        "Failed to load resource: the server responded with a status of 401 ()"
+      ],
+      "failures": [
+        {
+          "url": "https://alpha.teameet.co.kr/api/v1/auth/me",
+          "status": 401
+        }
+      ],
+      "overflow": 0,
+      "paths": 0
+    },
+    {
+      "name": "requested",
+      "viewport": "tablet",
+      "width": 768,
+      "height": 1024,
+      "url": "https://alpha.teameet.co.kr/tournaments/d209a886-1a38-44ab-90a7-d08009aeee16",
+      "rosters": 0,
+      "errors": [],
+      "consoleErrors": [
+        "Failed to load resource: the server responded with a status of 401 ()"
+      ],
+      "failures": [
+        {
+          "url": "https://alpha.teameet.co.kr/api/v1/auth/me",
+          "status": 401
+        }
+      ],
+      "overflow": 0,
+      "paths": 1
+    },
+    {
+      "name": "practice",
+      "viewport": "tablet",
+      "width": 768,
+      "height": 1024,
+      "url": "https://alpha.teameet.co.kr/tournaments/ad120000-0000-4000-8000-000000000001",
+      "rosters": 12,
+      "errors": [],
+      "consoleErrors": [
+        "Failed to load resource: the server responded with a status of 401 ()"
+      ],
+      "failures": [
+        {
+          "url": "https://alpha.teameet.co.kr/api/v1/auth/me",
+          "status": 401
+        }
+      ],
+      "overflow": 0,
+      "paths": 0
+    },
+    {
+      "name": "requested",
+      "viewport": "desktop",
+      "width": 1440,
+      "height": 1000,
+      "url": "https://alpha.teameet.co.kr/tournaments/d209a886-1a38-44ab-90a7-d08009aeee16",
+      "rosters": 0,
+      "errors": [],
+      "consoleErrors": [
+        "Failed to load resource: the server responded with a status of 401 ()"
+      ],
+      "failures": [
+        {
+          "url": "https://alpha.teameet.co.kr/api/v1/auth/me",
+          "status": 401
+        }
+      ],
+      "overflow": 0,
+      "paths": 1
+    },
+    {
+      "name": "practice",
+      "viewport": "desktop",
+      "width": 1440,
+      "height": 1000,
+      "url": "https://alpha.teameet.co.kr/tournaments/ad120000-0000-4000-8000-000000000001",
+      "rosters": 12,
+      "errors": [],
+      "consoleErrors": [
+        "Failed to load resource: the server responded with a status of 401 ()"
+      ],
+      "failures": [
+        {
+          "url": "https://alpha.teameet.co.kr/api/v1/auth/me",
+          "status": 401
+        }
+      ],
+      "overflow": 0,
+      "paths": 0
+    }
+  ]
+}

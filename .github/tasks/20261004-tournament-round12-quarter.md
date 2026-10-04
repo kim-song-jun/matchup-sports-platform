@@ -68,10 +68,31 @@
 - 사용자가 GitHub push/dev merge/alpha 배포를 명시 승인. feature 원격 push 성공, 최신 dev f61409687 흡수. main은 대상 아님.
 - 사용자 추가 요청: 대회 1개, 12팀 × 선수 5명 신청 상태, 직접 대진 입력. alpha 전용 기존 seed 경로에서 `(테스트) 12팀·팀당 5명 대진 직접 입력` / `ad120000-0000-4000-8000-000000000001`을 최초 1회 생성. 풋살 group_knockout, closed, 확정 12팀, active roster60, min/max5, 참가비0, 조/경기0, 미공개. 기존 합성 QA 계정60명만 재사용하며 신규 가상팀12개 회원수5.
 - 재배포 시 이 대회의 팀·명단·조·대진·결과를 변경하지 않는다. 같은 id가 존재하면 create를 건너뛴다. 실제 DB integration1/1(12×5와 수동 group 보존) 및 타입/runtime seed 검사 PASS.
-- [ ] PR CI·Copilot clean·dev merge
-- [ ] alpha release SHA·신규 enum 및 seed 생성 결과 검증
-- [ ] 지정 상세 및 신규 대회 admin/public/모바일 검증, 링크 전달
+- [x] PR CI·사용자 승인 Copilot 리뷰 예외·dev merge
+- [x] alpha release SHA·migration 적용 및 seed 생성 결과 검증
+- [x] 지정 상세 및 신규 대회 public/모바일 검증, 대진관리 로그인 보호 확인
+- [ ] 인증된 관리자 대진 입력 클릭 QA — 현재 세션에 관리자 인증 없음; 사용자가 직접 입력할 대회는 실제 생성 완료
 - PR: https://github.com/kim-song-jun/matchup-sports-platform/pull/1608 (base dev). 이전 push 승인 blocker는 사용자 명시 승인 및 실제 push 성공으로 해소됨.
 - CI 첫 실패: 신규 seed의 raw single lookup을 canonical `findTournamentOnSurface`로 변경. Surface/runtime 검사 및 실제 DB seed integration PASS.
 - CI 두 번째: Gates/Web PASS, API integration 835 PASS/1 FAIL — 새 enum/컬럼 schema 해시를 game-schema fixture에도 동기화할 필요. 전체 migration replay/drift CI 단계 통과를 확인하고 바인딩 갱신; 해당 drift/mutation 검사 1/1 PASS.
 - GitHub AI findings 검사 외부 오류: monthly quota exceeded (402). Copilot clean review는 현재 0건이며, CLAUDE.md 규칙 예외는 사용자의 답변을 기다림. 일반 CI 통과 전 머지하지 않음. Alpha 배포/실제 대회 생성 완료라고 주장하지 않음.
+
+## 리뷰 예외 승인 이후 배포
+
+- 사용자 `진행해줘`로 이번 PR 한정 리뷰 예외 승인. PR 본문에 예외와 CI 증거 기록. Copilot clean 자체가 통과한 것으로 표기하지 않음.
+- PR #1608: dev에 merge 완료, merge SHA `9ac4bdf0070e7b6b1d0005936a21464ec3ebc998`. 저장소가 squash를 허용하지 않아 허용된 merge 방식 사용. main 변경 없음.
+- Feature head CI #37214820149 및 merge head CI #37215711099 모두 PASS. API integration122 suites/836 tests + unit338 suites/4557 tests, Web590 suites/6346 tests, empty DB replay/zero drift.
+- Alpha workflow #37215711057 진행. 현재 실제 runtime 생성/화면 PASS는 미확인.
+- 읽기 전용 실제 runtime QA: `node scripts/qa/capture-round12-live.mjs <merge SHA>`; 배포 identity 확인, 실대회·연습 대회 각390/768/1440, 각12명단 토글/5명 검증. 브라우저 샘플 주입이나 대진 mutation 없음.
+
+## Alpha 실제 배포 결과
+
+- Deploy Alpha #37215711057 SUCCESS. 공개 `x-teameet-commit` = `9ac4bdf0070e7b6b1d0005936a21464ec3ebc998`, release `1.2.0-alpha.20261005.g9ac4bdf0070e`, health DB=true.
+- 배포 seed 출력: manualRound12.created=true, teams12, playersPerTeam5, players60, groups0, matches0. 실제 공개 API도 confirmedCount12/participantTeams12, 전원 confirmed/players5, groups0/fixtures0 일치.
+- Headed 실제 alpha 공개 QA **6/6 PASS**: 지정 상세 및 연습 상세 × 390/768/1440. 연습 명단 **36/36** 토글(폭별12팀), 각5명 DOM과 닉네임 확인. page overflow0, JS pageerror0. console/network는 기존 비로그인 auth/me401 1건씩이며 성공으로 숨기지 않음.
+- 지정 상세는 실제 데이터가 결승1경기이므로 실제 연결선1(결승→우승)을 세 폭에서 확인. 4/8/12의 전체 실대진을 만들어서 테스트했다고 주장하지 않음. 새 연습 대회는 사용자가 직접 입력하도록 조/경기0 유지.
+- 비로그인 admin bracket 진입은 3/3 로그인으로 정상 이동하며 redirect에 현재 tournament bracket 경로를 유지. 인증된 관리자 편집 클릭은 0/3(인증 unavailable)로 별도 표기. 권한 우회·추가 fixture mutation 없음.
+- [실제 연습 PC](../../docs/screenshots/tournament-connected-bracket/live-practice-desktop.png) · [태블릿](../../docs/screenshots/tournament-connected-bracket/live-practice-tablet.png) · [모바일](../../docs/screenshots/tournament-connected-bracket/live-practice-mobile.png) · [실제 연결선](../../docs/screenshots/tournament-connected-bracket/live-graph-desktop.png) · [실측 JSON](../../docs/screenshots/tournament-connected-bracket/live-evidence.json).
+- 대진관리: https://alpha.teameet.co.kr/admin/tournaments/ad120000-0000-4000-8000-000000000001/bracket
+- 공개 대회: https://alpha.teameet.co.kr/tournaments/ad120000-0000-4000-8000-000000000001
+- Cleanup: 소유 headed browser parent20402/chrome20419 및 parent20806/chrome20818은 finally 종료. 테스트 PostgreSQL은 이전 검증 후 종료. 기존 공유 tree는 변경하지 않음.

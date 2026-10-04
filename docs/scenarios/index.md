@@ -1,4 +1,10 @@
-## 2026-10-05 — 4강·8강·12강 경기별 연결선
+## 2026-10-05 — Alpha 실제 배포 및 12팀×5명 연습 대회
+
+[PR #1608](https://github.com/kim-song-jun/matchup-sports-platform/pull/1608) dev merge + Deploy Alpha #37215711057 SUCCESS, SHA9ac4bdf0070e. 일반 CI 전부 PASS; Copilot 월간 quota 오류로 리뷰는 사용자 승인한 이번 PR 한정 예외. 실제 연습 대회 `ad120000-0000-4000-8000-000000000001` 생성: confirmed12팀/players60/팀당5, 조·경기0. 사용자 수동 입력은 재배포에 보존.
+
+공개 headed QA **6/6**(기존 지정 상세·신규 연습 상세 × 390/768/1440), 실제 명단 토글36/36·각5명, overflow0/pageerror0. 기존 auth/me401은 별도 기록. 기존 지정 상세의 실제 결승→우승 연결선 세 폭 확인. 새 대회 대진은 비워둠. Admin 로그인벽3/3 정상; 인증된 admin 편집 클릭0/3(현재 관리자 인증 unavailable). [연습 PC](../screenshots/tournament-connected-bracket/live-practice-desktop.png) · [태블릿](../screenshots/tournament-connected-bracket/live-practice-tablet.png) · [모바일](../screenshots/tournament-connected-bracket/live-practice-mobile.png) · [실측](../screenshots/tournament-connected-bracket/live-evidence.json). [작업 문서](../../.github/tasks/20261004-tournament-round12-quarter.md).
+
+## 2026-10-05 — 4강·8강·12강 경기별 연결선 (배포 전 기록)
 
 [작업 문서](../../.github/tasks/20261004-tournament-round12-quarter.md): 기존 canonical 진출 edge 관리·공개 응답 + SVG 경기별 연결선 + desktop 전체 행/모바일 단계 이동. API150·Web116·실제 DB2 통과, 양쪽 타입 및 패턴/surface PASS. 사용자 지정 상세 shell에서 명시적인 browser-local 예시 9/9 확인(4/8/12×390/768/1440, 카드/aside 겹침0, overflow0, JS error0). 비로그인 auth/me401은 기록. [12강 모습](../screenshots/tournament-connected-bracket/12-desktop.png). **실제 alpha 변경 후 QA 0/3, push 승인 대기로 배포 전.**
 

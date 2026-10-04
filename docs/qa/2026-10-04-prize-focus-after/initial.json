@@ -1,0 +1,29 @@
+{
+  "fields": [
+    {
+      "id": "sport-id",
+      "value": ""
+    },
+    {
+      "id": "title",
+      "value": ""
+    }
+  ],
+  "step5": [],
+  "url": "https://alpha.teameet.co.kr/admin/tournaments/new",
+  "utc": "2026-10-04T07:06:09.077Z",
+  "viewport": {
+    "dpr": 1.25,
+    "h": 606,
+    "w": 402
+  },
+  "step5Inspection": {
+    "buttons": [
+      {
+        "disabled": true,
+        "label": "5단계 공개 확인 — 잠김"
+      }
+    ],
+    "utc": "2026-10-04T07:06:42.401Z"
+  }
+}

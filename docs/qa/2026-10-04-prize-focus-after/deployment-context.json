@@ -1,0 +1,22 @@
+{
+  "reportedSHA": "5372ea9c3640621eb270d15c54c70a822b97d536",
+  "reportedVersion": "1.1.5-alpha.20261004.g5372ea9c3640",
+  "run": "37183695434",
+  "reportedSuccessUTC": "2026-10-04T07:02:48Z",
+  "reportedHealthyUTC": "2026-10-04T07:02:25.697Z",
+  "source": "Parent deployment/public identity report, not browser serving identity",
+  "runtimeServingSHA": "unknown",
+  "freshNavigation": {
+    "label": "fresh navigation after reported5372ea9 deployment",
+    "startUTC": "2026-10-04T07:05:46.347Z",
+    "endUTC": "2026-10-04T07:05:46.872Z"
+  },
+  "independentlyReadWorkflowMetadata": {
+    "run": 37183695434,
+    "headSHA": "5372ea9c3640621eb270d15c54c70a822b97d536",
+    "conclusion": "success",
+    "updatedUTC": "2026-10-04T07:02:48Z",
+    "url": "https://github.com/kim-song-jun/matchup-sports-platform/actions/runs/37183695434"
+  },
+  "identityLimit": "Workflow success independently re-read. Version and healthy time remain parent-reported; browser runtime serving SHA unknown."
+}

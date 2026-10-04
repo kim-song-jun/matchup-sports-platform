@@ -1,0 +1,197 @@
+{
+  "issue": 1596,
+  "fixPR": 1597,
+  "startUTC": "2026-10-04T07:05:46.347Z",
+  "endUTC": "2026-10-04T07:14:28.230Z",
+  "scope": "Same synthetic unsaved creation wizard, first prize name click then actual native Tab7, third-delete then ShiftTab reverse; local value and scroll/resize observations; no final submit",
+  "runtimeServingSHA": "unknown",
+  "counts": {
+    "DOM": 40,
+    "PNG": 5,
+    "controlRecords": 360,
+    "selectedCompletedActionRecords": 61
+  },
+  "originalBefore": "https://github.com/kim-song-jun/matchup-sports-platform/blob/044a2798fb4a9c1fdbfc968ade11fe8375c32b56/docs/qa/2026-10-04-prize-footer-focus/README.md",
+  "results": [
+    {
+      "width": "mobile",
+      "proofIndex": 7,
+      "reverseProofIndex": 10,
+      "utc": "2026-10-04T07:10:13.958Z",
+      "CSSViewport": {
+        "dpr": 1.25,
+        "h": 606,
+        "w": 402
+      },
+      "active": {
+        "focusVisible": true,
+        "label": "상금 항목 3 내용",
+        "rect": {
+          "bottom": 532.8625183105469,
+          "height": 44,
+          "left": 36.79999923706055,
+          "right": 364.79999923706055,
+          "top": 488.8625183105469,
+          "width": 328,
+          "x": 36.79999923706055,
+          "y": 488.8625183105469
+        },
+        "tag": "INPUT",
+        "value": ""
+      },
+      "footerTop": 536.7999877929688,
+      "overlap": 0,
+      "clearance": 3.937469482421875
+    },
+    {
+      "width": "tablet",
+      "proofIndex": 25,
+      "reverseProofIndex": 27,
+      "utc": "2026-10-04T07:12:26.293Z",
+      "CSSViewport": {
+        "dpr": 1.5,
+        "h": 505,
+        "w": 788
+      },
+      "active": {
+        "focusVisible": true,
+        "label": "상금 항목 3 내용",
+        "rect": {
+          "bottom": 378.1666870117187,
+          "height": 44,
+          "left": 309.72918701171875,
+          "right": 683.3333740234375,
+          "top": 334.16668701171875,
+          "width": 373.6041870117187,
+          "x": 309.72918701171875,
+          "y": 334.16668701171875
+        },
+        "tag": "INPUT",
+        "value": ""
+      },
+      "footerTop": 436,
+      "overlap": 0,
+      "clearance": 57.83331298828125
+    },
+    {
+      "width": "desktop",
+      "proofIndex": 36,
+      "reverseProofIndex": 38,
+      "utc": "2026-10-04T07:13:05.817Z",
+      "CSSViewport": {
+        "dpr": 1,
+        "h": 757,
+        "w": 1182
+      },
+      "active": {
+        "focusVisible": true,
+        "label": "상금 항목 3 내용",
+        "rect": {
+          "bottom": 504.5,
+          "height": 44,
+          "left": 613,
+          "right": 1069,
+          "top": 460.5,
+          "width": 456,
+          "x": 613,
+          "y": 460.5
+        },
+        "tag": "INPUT",
+        "value": ""
+      },
+      "footerTop": 688,
+      "overlap": 0,
+      "clearance": 183.5
+    }
+  ],
+  "mobile": {
+    "nativeSequenceProofRange": [
+      0,
+      7
+    ],
+    "stableLaterProof": 8,
+    "firstSixTabsScrollY": [
+      944.7999877929688,
+      944.7999877929688,
+      944.7999877929688,
+      944.7999877929688,
+      944.7999877929688,
+      944.7999877929688,
+      944.7999877929688
+    ],
+    "Tab7ActualScrollDelta": 52.0,
+    "beforeComparison": "Historical402x606 third content y539.262512–583.262512 fully overlaps footer top536.799988. New original Tab7 path has zero overlap without manual wheel; current width328 rather than historical328.800018CSSpx, actual viewport geometry retained.",
+    "ring": "3.937469CSSpx content clearance; actual PNG shows focus ring above footer. Do not round up and call exact4px.",
+    "localInput": {
+      "fillProof": 11,
+      "nativeXProof": 12,
+      "reverseValueProof": 14,
+      "restoredBlankProof": 15,
+      "observed": "Supported locator.fill entered QA 포커스1004(with a space before1004); actual native x appended, Tab/ShiftTab preserved it, direct fill restored blank. Exact strings are in DOM.",
+      "scrollAttribution": "Locator.fill was accompanied by scrollY996.799988→1204.800049 and centered the field. This is not a native typing observation and cannot establish a product-induced jump. Subsequent native x and Tab/reverse did not change scrollY."
+    }
+  },
+  "tabletDesktopNoExtraTabScroll": {
+    "tabletRange": [
+      18,
+      27
+    ],
+    "tabletScrollY": 800,
+    "desktopRange": [
+      29,
+      38
+    ],
+    "desktopScrollY": 610
+  },
+  "resizeAndManualScroll": {
+    "mobileManualWheelProof": 16,
+    "tabletResizeProof": 17,
+    "desktopResizeProof": 28,
+    "observed": "After original focus proof and local restoration, native wheel moved mobile96CSSpx. Combined window-width+zoom change then left active third content above viewport at tablet y-323.166687, no footer overlap. Fresh first-name click and Tab sequence recovered. Later tablet→desktop zoom resize kept active input in view at y270.5.",
+    "limit": "Original footer Tab condition passes; do not claim resize always keeps focused input visible. Tablet offscreen sample has DOM only and combines width/zoom/manual prior scroll, with no matched before or causal attribution."
+  },
+  "valuePreservation": {
+    "baseline": {
+      "상금 항목 1 이름": "1위",
+      "상금 항목 1 내용": "",
+      "상금 항목 1 삭제": "",
+      "상금 항목 2 이름": "2위",
+      "상금 항목 2 내용": "",
+      "상금 항목 2 삭제": "",
+      "상금 항목 3 이름": "3위",
+      "상금 항목 3 내용": "",
+      "상금 항목 3 삭제": ""
+    },
+    "allRestoredAtProof15": true,
+    "step4ReentryProof39Matches": true,
+    "stageAwayFile": "step-away.json",
+    "restoredBasicFields": "restore.json"
+  },
+  "navigation": {
+    "firstDateAttempt": "native calendar selection followed by Escape left empty date/deadline, and Next showed required errors. navigation.json records that unsuccessful attempt; not claimed as successful date entry.",
+    "acceptedDate": "navigation-accepted.json records separate native calendar October17 selection closed by clicking neutral heading. No Enter. Before historical time22:46 and new time00:08 differ; dates only navigate local wizard and are not compared as business-time behavior.",
+    "step5": "Initial textContent-only collector returned[]; later initial.step5Inspection explicitly reads disabled aria-label. Every prize proof row records disabled step5.",
+    "exit": "Third prize content explicitly restored blank; title/sport explicitly reset; Cancel followed by list route, prizeInputs0/dialog0. Hidden date values were not independently re-entered or inspected after exit; no storage-discard assertion."
+  },
+  "limitations": [
+    "Cloud Chromium window/zoom, not physical devices, soft keyboard, IME or screen-reader speech",
+    "No Save/create/upload/delete execution/step5/notification actions reported; no HTTP/DB audit or global server-write-zero claim",
+    "First exact-label selectOption attempt had no matching label and failed before changing a field; subsequent observed sport-id selector succeeded. Failed call is not in successful-action ledger.",
+    "Original mobile Tab screenshot is at later stable proof8, not exact first Tab7 timestamp; tablet and desktop captures occur later than associated DOM and before next UI action, with exact intervals in provenance",
+    "Control rectangle overlap is geometric; CSS focusVisible alone is not a visibility claim. Safe PNGs separately show ring",
+    "Initial appbar/header and captured fields examined; not full-form accessibility certification",
+    "Observed resize offscreen state is retained as a limitation, not relabelled a footer regression or proven new defect"
+  ],
+  "safety": {
+    "finalSubmitActions": 0,
+    "step5Visits": 0,
+    "uploadActions": 0,
+    "deleteExecutionActions": 0,
+    "notifications": 0,
+    "resultChanges": 0,
+    "permissionChanges": 0,
+    "searchSubmissions": 0,
+    "localSyntheticInputOnly": true
+  },
+  "publicationLimit": "Static local-state/source-contract claims omitted; observed UI values, geometry and route exit only. No direct network/database/global server-write-zero claim."
+}

@@ -1,0 +1,21 @@
+{
+  "dates": [
+    {
+      "id": "scheduled-at",
+      "value": "2026-10-17T00:08"
+    },
+    {
+      "id": "scheduled-end-at",
+      "value": ""
+    },
+    {
+      "id": "registration-deadline-at",
+      "value": "2026-10-14T23:59"
+    },
+    {
+      "id": "roster-deadline-at",
+      "value": ""
+    }
+  ],
+  "utc": "2026-10-04T07:08:28.022Z"
+}

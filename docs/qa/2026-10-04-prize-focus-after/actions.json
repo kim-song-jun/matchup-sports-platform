@@ -1,0 +1,309 @@
+[
+  {
+    "label": "fresh navigation after reported5372ea9 deployment",
+    "startUTC": "2026-10-04T07:05:46.347Z",
+    "endUTC": "2026-10-04T07:05:46.872Z"
+  },
+  {
+    "label": "resize native window to mobile",
+    "startUTC": "2026-10-04T07:06:02.314Z",
+    "endUTC": "2026-10-04T07:06:08.406Z"
+  },
+  {
+    "label": "mobile native zoom110",
+    "startUTC": "2026-10-04T07:06:08.408Z",
+    "endUTC": "2026-10-04T07:06:08.720Z"
+  },
+  {
+    "label": "mobile native zoom125",
+    "startUTC": "2026-10-04T07:06:08.721Z",
+    "endUTC": "2026-10-04T07:06:09.023Z"
+  },
+  {
+    "label": "local select futsal via observed sport-id",
+    "startUTC": "2026-10-04T07:06:59.904Z",
+    "endUTC": "2026-10-04T07:06:59.929Z"
+  },
+  {
+    "label": "local synthetic title via observed title id",
+    "startUTC": "2026-10-04T07:06:59.929Z",
+    "endUTC": "2026-10-04T07:06:59.961Z"
+  },
+  {
+    "label": "local Next step1 to step2",
+    "startUTC": "2026-10-04T07:06:59.961Z",
+    "endUTC": "2026-10-04T07:07:00.251Z"
+  },
+  {
+    "label": "open native start-date calendar via visible icon",
+    "startUTC": "2026-10-04T07:07:19.519Z",
+    "endUTC": "2026-10-04T07:07:19.623Z"
+  },
+  {
+    "label": "select October17 using visible native calendar day",
+    "startUTC": "2026-10-04T07:07:37.053Z",
+    "endUTC": "2026-10-04T07:07:37.219Z"
+  },
+  {
+    "label": "close native picker with Escape",
+    "startUTC": "2026-10-04T07:07:37.219Z",
+    "endUTC": "2026-10-04T07:07:37.388Z"
+  },
+  {
+    "label": "attempt Next from step2 while date selection remained blank",
+    "startUTC": "2026-10-04T07:07:37.509Z",
+    "endUTC": "2026-10-04T07:07:37.811Z",
+    "originalLabel": "local Next step2 to step3",
+    "outcomeLimit": "Completed tool call, not successful stage advancement; navigation.json shows blank dates and collector reported required errors."
+  },
+  {
+    "label": "reopen native start-date calendar after uncommitted selection",
+    "startUTC": "2026-10-04T07:08:00.363Z",
+    "endUTC": "2026-10-04T07:08:00.524Z"
+  },
+  {
+    "label": "native calendar select visible October17 day",
+    "startUTC": "2026-10-04T07:08:10.953Z",
+    "endUTC": "2026-10-04T07:08:11.107Z"
+  },
+  {
+    "label": "dismiss native picker by clicking neutral heading",
+    "startUTC": "2026-10-04T07:08:27.693Z",
+    "endUTC": "2026-10-04T07:08:27.968Z"
+  },
+  {
+    "label": "local validated Next step2 to step3",
+    "startUTC": "2026-10-04T07:08:28.024Z",
+    "endUTC": "2026-10-04T07:08:28.299Z"
+  },
+  {
+    "label": "local Next step3 to step4",
+    "startUTC": "2026-10-04T07:08:28.350Z",
+    "endUTC": "2026-10-04T07:08:28.632Z"
+  },
+  {
+    "label": "mobile click first prize name",
+    "startUTC": "2026-10-04T07:10:12.476Z",
+    "endUTC": "2026-10-04T07:10:12.759Z"
+  },
+  {
+    "label": "mobile native Tab 1",
+    "startUTC": "2026-10-04T07:10:12.821Z",
+    "endUTC": "2026-10-04T07:10:12.890Z"
+  },
+  {
+    "label": "mobile native Tab 2",
+    "startUTC": "2026-10-04T07:10:12.949Z",
+    "endUTC": "2026-10-04T07:10:13.058Z"
+  },
+  {
+    "label": "mobile native Tab 3",
+    "startUTC": "2026-10-04T07:10:13.128Z",
+    "endUTC": "2026-10-04T07:10:13.229Z"
+  },
+  {
+    "label": "mobile native Tab 4",
+    "startUTC": "2026-10-04T07:10:13.297Z",
+    "endUTC": "2026-10-04T07:10:13.397Z"
+  },
+  {
+    "label": "mobile native Tab 5",
+    "startUTC": "2026-10-04T07:10:13.455Z",
+    "endUTC": "2026-10-04T07:10:13.565Z"
+  },
+  {
+    "label": "mobile native Tab 6",
+    "startUTC": "2026-10-04T07:10:13.631Z",
+    "endUTC": "2026-10-04T07:10:13.733Z"
+  },
+  {
+    "label": "mobile native Tab 7",
+    "startUTC": "2026-10-04T07:10:13.789Z",
+    "endUTC": "2026-10-04T07:10:13.901Z"
+  },
+  {
+    "label": "mobile Tab8 to third delete",
+    "startUTC": "2026-10-04T07:11:16.919Z",
+    "endUTC": "2026-10-04T07:11:16.988Z"
+  },
+  {
+    "label": "mobile ShiftTab from third delete to third content",
+    "startUTC": "2026-10-04T07:11:17.058Z",
+    "endUTC": "2026-10-04T07:11:17.223Z"
+  },
+  {
+    "label": "mobile local synthetic third content value",
+    "startUTC": "2026-10-04T07:11:17.305Z",
+    "endUTC": "2026-10-04T07:11:17.324Z"
+  },
+  {
+    "label": "mobile native key x into already focused local third content",
+    "startUTC": "2026-10-04T07:11:53.383Z",
+    "endUTC": "2026-10-04T07:11:53.452Z"
+  },
+  {
+    "label": "mobile Tab from edited content to third delete",
+    "startUTC": "2026-10-04T07:11:53.524Z",
+    "endUTC": "2026-10-04T07:11:53.624Z"
+  },
+  {
+    "label": "mobile reverse to edited third content",
+    "startUTC": "2026-10-04T07:11:53.705Z",
+    "endUTC": "2026-10-04T07:11:53.863Z"
+  },
+  {
+    "label": "mobile restore third content blank",
+    "startUTC": "2026-10-04T07:11:53.940Z",
+    "endUTC": "2026-10-04T07:11:53.960Z"
+  },
+  {
+    "label": "mobile manual wheel down120 after focus proof",
+    "startUTC": "2026-10-04T07:11:54.027Z",
+    "endUTC": "2026-10-04T07:11:54.187Z"
+  },
+  {
+    "label": "resize mobile to tablet window while third input remains active",
+    "startUTC": "2026-10-04T07:12:17.876Z",
+    "endUTC": "2026-10-04T07:12:24.415Z"
+  },
+  {
+    "label": "tablet native zoom150",
+    "startUTC": "2026-10-04T07:12:24.415Z",
+    "endUTC": "2026-10-04T07:12:24.719Z"
+  },
+  {
+    "label": "tablet click first prize name",
+    "startUTC": "2026-10-04T07:12:24.788Z",
+    "endUTC": "2026-10-04T07:12:25.065Z"
+  },
+  {
+    "label": "tablet native Tab 1",
+    "startUTC": "2026-10-04T07:12:25.122Z",
+    "endUTC": "2026-10-04T07:12:25.202Z"
+  },
+  {
+    "label": "tablet native Tab 2",
+    "startUTC": "2026-10-04T07:12:25.261Z",
+    "endUTC": "2026-10-04T07:12:25.371Z"
+  },
+  {
+    "label": "tablet native Tab 3",
+    "startUTC": "2026-10-04T07:12:25.443Z",
+    "endUTC": "2026-10-04T07:12:25.540Z"
+  },
+  {
+    "label": "tablet native Tab 4",
+    "startUTC": "2026-10-04T07:12:25.599Z",
+    "endUTC": "2026-10-04T07:12:25.710Z"
+  },
+  {
+    "label": "tablet native Tab 5",
+    "startUTC": "2026-10-04T07:12:25.767Z",
+    "endUTC": "2026-10-04T07:12:25.883Z"
+  },
+  {
+    "label": "tablet native Tab 6",
+    "startUTC": "2026-10-04T07:12:25.944Z",
+    "endUTC": "2026-10-04T07:12:26.050Z"
+  },
+  {
+    "label": "tablet native Tab 7",
+    "startUTC": "2026-10-04T07:12:26.117Z",
+    "endUTC": "2026-10-04T07:12:26.219Z"
+  },
+  {
+    "label": "tablet Tab8 to third delete",
+    "startUTC": "2026-10-04T07:13:03.644Z",
+    "endUTC": "2026-10-04T07:13:03.716Z"
+  },
+  {
+    "label": "tablet reverse to third content",
+    "startUTC": "2026-10-04T07:13:03.794Z",
+    "endUTC": "2026-10-04T07:13:03.951Z"
+  },
+  {
+    "label": "resize tablet to desktop by native zoom reset",
+    "startUTC": "2026-10-04T07:13:04.015Z",
+    "endUTC": "2026-10-04T07:13:04.185Z"
+  },
+  {
+    "label": "desktop click first prize name",
+    "startUTC": "2026-10-04T07:13:04.309Z",
+    "endUTC": "2026-10-04T07:13:04.590Z"
+  },
+  {
+    "label": "desktop native Tab 1",
+    "startUTC": "2026-10-04T07:13:04.669Z",
+    "endUTC": "2026-10-04T07:13:04.740Z"
+  },
+  {
+    "label": "desktop native Tab 2",
+    "startUTC": "2026-10-04T07:13:04.819Z",
+    "endUTC": "2026-10-04T07:13:04.907Z"
+  },
+  {
+    "label": "desktop native Tab 3",
+    "startUTC": "2026-10-04T07:13:04.984Z",
+    "endUTC": "2026-10-04T07:13:05.076Z"
+  },
+  {
+    "label": "desktop native Tab 4",
+    "startUTC": "2026-10-04T07:13:05.141Z",
+    "endUTC": "2026-10-04T07:13:05.245Z"
+  },
+  {
+    "label": "desktop native Tab 5",
+    "startUTC": "2026-10-04T07:13:05.326Z",
+    "endUTC": "2026-10-04T07:13:05.413Z"
+  },
+  {
+    "label": "desktop native Tab 6",
+    "startUTC": "2026-10-04T07:13:05.484Z",
+    "endUTC": "2026-10-04T07:13:05.581Z"
+  },
+  {
+    "label": "desktop native Tab 7",
+    "startUTC": "2026-10-04T07:13:05.655Z",
+    "endUTC": "2026-10-04T07:13:05.751Z"
+  },
+  {
+    "label": "desktop Tab8 to third delete",
+    "startUTC": "2026-10-04T07:13:45.367Z",
+    "endUTC": "2026-10-04T07:13:45.437Z"
+  },
+  {
+    "label": "desktop reverse to third content",
+    "startUTC": "2026-10-04T07:13:45.511Z",
+    "endUTC": "2026-10-04T07:13:45.672Z"
+  },
+  {
+    "label": "local Previous step4 to step3",
+    "startUTC": "2026-10-04T07:13:45.751Z",
+    "endUTC": "2026-10-04T07:13:46.031Z"
+  },
+  {
+    "label": "local Next step3 returns step4",
+    "startUTC": "2026-10-04T07:13:46.110Z",
+    "endUTC": "2026-10-04T07:13:46.397Z"
+  },
+  {
+    "label": "return local step1 for explicit basic-field restore",
+    "startUTC": "2026-10-04T07:14:18.214Z",
+    "endUTC": "2026-10-04T07:14:18.513Z"
+  },
+  {
+    "label": "clear QA title locally",
+    "startUTC": "2026-10-04T07:14:18.559Z",
+    "endUTC": "2026-10-04T07:14:18.577Z"
+  },
+  {
+    "label": "restore sport placeholder locally",
+    "startUTC": "2026-10-04T07:14:18.579Z",
+    "endUTC": "2026-10-04T07:14:18.590Z"
+  },
+  {
+    "label": "Cancel local unsaved wizard",
+    "startUTC": "2026-10-04T07:14:18.650Z",
+    "endUTC": "2026-10-04T07:14:18.730Z"
+  }
+]

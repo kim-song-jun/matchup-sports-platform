@@ -1,0 +1,276 @@
+{
+  "schema": 1,
+  "captureClock": "UTC brackets around actual tab.getScreenshot, DOM UTC separate",
+  "screenshots": [
+    {
+      "label": "mobile-third-content-tab-after",
+      "proofIndex": 8,
+      "captureStartUTC": "2026-10-04T07:11:16.875Z",
+      "captureEndUTC": "2026-10-04T07:11:16.898Z",
+      "file": "mobile-third-content-tab-after.png",
+      "sha256": "96a1eecff3ef1c8e107d3ab83f1c0de59f5bbaa92ef59dee95e8d2e67eea184c",
+      "sourceSHA256": "96a1eecff3ef1c8e107d3ab83f1c0de59f5bbaa92ef59dee95e8d2e67eea184c",
+      "sourcePixels": [
+        402,
+        606
+      ],
+      "cropLTRB": [
+        0,
+        0,
+        402,
+        605
+      ],
+      "outputSHA256": "ebf07e5af1c2b35c6e365841f6b147066d40690093d720187bcc6b90245c4d00",
+      "outputPixels": [
+        402,
+        605
+      ],
+      "pixelEquality": true,
+      "DOMUTC": "2026-10-04T07:11:16.872Z",
+      "CSSViewport": {
+        "dpr": 1.25,
+        "h": 606,
+        "w": 402
+      },
+      "scope": "Exact rectangle, no edits; only synthetic unsaved wizard and generic controls"
+    },
+    {
+      "label": "mobile-third-content-reverse-after",
+      "proofIndex": 10,
+      "captureStartUTC": "2026-10-04T07:11:17.285Z",
+      "captureEndUTC": "2026-10-04T07:11:17.304Z",
+      "file": "mobile-third-content-reverse-after.png",
+      "sha256": "6f0f5832aa93ccd3ea335ebfbf72ac139ca938e8ce8b9777534c43cb1e3062d5",
+      "sourceSHA256": "6f0f5832aa93ccd3ea335ebfbf72ac139ca938e8ce8b9777534c43cb1e3062d5",
+      "sourcePixels": [
+        402,
+        606
+      ],
+      "cropLTRB": [
+        0,
+        0,
+        402,
+        605
+      ],
+      "outputSHA256": "cd80c9bdb3536ab4264e8c0faf54b418d104420d08545fbe454c91f8d18df093",
+      "outputPixels": [
+        402,
+        605
+      ],
+      "pixelEquality": true,
+      "DOMUTC": "2026-10-04T07:11:17.281Z",
+      "CSSViewport": {
+        "dpr": 1.25,
+        "h": 606,
+        "w": 402
+      },
+      "scope": "Exact rectangle, no edits; only synthetic unsaved wizard and generic controls"
+    },
+    {
+      "label": "tablet-third-content-tab-after",
+      "proofIndex": 25,
+      "captureStartUTC": "2026-10-04T07:13:03.616Z",
+      "captureEndUTC": "2026-10-04T07:13:03.643Z",
+      "file": "tablet-third-content-tab-after.png",
+      "sha256": "9c976c76d81153ed2c7b6d6995eed1092d6f9d390ebce19db95cd9c2b11fcc84",
+      "sourceSHA256": "9c976c76d81153ed2c7b6d6995eed1092d6f9d390ebce19db95cd9c2b11fcc84",
+      "sourcePixels": [
+        788,
+        505
+      ],
+      "cropLTRB": [
+        0,
+        176,
+        788,
+        504
+      ],
+      "outputSHA256": "6df3edf606a5a6475881efd4ebcecd91e05abadb43e99be3884103304be010fd",
+      "outputPixels": [
+        788,
+        328
+      ],
+      "pixelEquality": true,
+      "DOMUTC": "2026-10-04T07:12:26.293Z",
+      "CSSViewport": {
+        "dpr": 1.5,
+        "h": 505,
+        "w": 788
+      },
+      "scope": "Exact rectangle, no edits; only synthetic unsaved wizard and generic controls"
+    },
+    {
+      "label": "desktop-resize-focused-input",
+      "proofIndex": 28,
+      "captureStartUTC": "2026-10-04T07:13:04.271Z",
+      "captureEndUTC": "2026-10-04T07:13:04.308Z",
+      "file": "desktop-resize-focused-input.png",
+      "sha256": "15db4fd3811442cec3ab66f4d39c56eab4eebfd4a39d9f784a29b8d2e1c8d028",
+      "sourceSHA256": "15db4fd3811442cec3ab66f4d39c56eab4eebfd4a39d9f784a29b8d2e1c8d028",
+      "sourcePixels": [
+        1182,
+        757
+      ],
+      "cropLTRB": [
+        282,
+        130,
+        1182,
+        757
+      ],
+      "outputSHA256": "1d0567ddb55bfd2b8547405fd88538c6b75b0dc40163f0b2b8fec5ce21842a97",
+      "outputPixels": [
+        900,
+        627
+      ],
+      "pixelEquality": true,
+      "DOMUTC": "2026-10-04T07:13:04.266Z",
+      "CSSViewport": {
+        "dpr": 1,
+        "h": 757,
+        "w": 1182
+      },
+      "scope": "Exact rectangle, no edits; only synthetic unsaved wizard and generic controls"
+    },
+    {
+      "label": "desktop-third-content-tab-after",
+      "proofIndex": 36,
+      "captureStartUTC": "2026-10-04T07:13:45.329Z",
+      "captureEndUTC": "2026-10-04T07:13:45.367Z",
+      "file": "desktop-third-content-tab-after.png",
+      "sha256": "69adbfd274eb6130e469c4081e6c2be99a59603fc4cc3ff80a14d09ceccf1766",
+      "sourceSHA256": "69adbfd274eb6130e469c4081e6c2be99a59603fc4cc3ff80a14d09ceccf1766",
+      "sourcePixels": [
+        1182,
+        757
+      ],
+      "cropLTRB": [
+        282,
+        300,
+        1182,
+        757
+      ],
+      "outputSHA256": "d0a50ae6307c1e1eff8a074b888e38e8982932096282f13515ad37fff41ab794",
+      "outputPixels": [
+        900,
+        457
+      ],
+      "pixelEquality": true,
+      "DOMUTC": "2026-10-04T07:13:05.817Z",
+      "CSSViewport": {
+        "dpr": 1,
+        "h": 757,
+        "w": 1182
+      },
+      "scope": "Exact rectangle, no edits; only synthetic unsaved wizard and generic controls"
+    }
+  ],
+  "sourceCaptureMetadataSHA256": "de19684f9bc43fd9d45b4130c86c9463ff4642ef4020d768b2d3c639f96da608",
+  "safeProofHashes": {
+    "actions.json": "7db02c0b877573b77b8af4f3bf93396887b0ddcfa8a2d4f0d8b3cef01d360941",
+    "deployment-context.json": "6bacef622d9c9971aaf21d5c46b70623ebd82f17534715410e1b7752d957cf83",
+    "entry.json": "dd31bd1dfb2b705a7845573f7e4da2d7943c2de95358bd753f33c0511dfadf95",
+    "exit.json": "2c3d51106a7d90ba4630a417a0d5a78c4eee48f7632fb84eccc5137a957535f0",
+    "initial.json": "7e708b5c57b97dfb2630ca639453c05d835e2d281aee3a6012391a81ea3fa501",
+    "navigation-accepted.json": "b1546d6309bc3d80625cc35982d30a6d509b744588fb1e4775e658cce3f8e1ad",
+    "navigation.json": "fd7093ce295e67dd0457d09d6d24bedd555df1128f51937cae2f4638c4a87a19",
+    "proof.json": "a47ebf3a86ad809880559e5423712ff9b76f6663650898b2a18f62162fabc88a",
+    "restore.json": "efd208665a63f33b0f4fcccc72ed2374f6943969e63e6102a4388bbfade7a8e7",
+    "step-away.json": "be221bd81447810dda63207daa628ab617a82e59a1dbd89ed6aa1e8df2127a49",
+    "summary.json": "21d98d8d7d0b332c98a2882de9862336eba71d700a15f11ba9255b4769c4f1ad"
+  },
+  "privacy": "Only explicit safe subset. Raw screenshots excluded; no account/member/roster data in crops. Exact rectangular crops were compared bytewise at decoded pixel level by collector.",
+  "sourceInputFiles": [
+    {
+      "file": "actions.json",
+      "bytes": 8646,
+      "sha256": "7db02c0b877573b77b8af4f3bf93396887b0ddcfa8a2d4f0d8b3cef01d360941"
+    },
+    {
+      "file": "deployment-context.json",
+      "bytes": 546,
+      "sha256": "6bacef622d9c9971aaf21d5c46b70623ebd82f17534715410e1b7752d957cf83"
+    },
+    {
+      "file": "desktop-resize-focused-input.png",
+      "bytes": 120711,
+      "sha256": "1d0567ddb55bfd2b8547405fd88538c6b75b0dc40163f0b2b8fec5ce21842a97"
+    },
+    {
+      "file": "desktop-third-content-tab-after.png",
+      "bytes": 90602,
+      "sha256": "d0a50ae6307c1e1eff8a074b888e38e8982932096282f13515ad37fff41ab794"
+    },
+    {
+      "file": "entry.json",
+      "bytes": 392,
+      "sha256": "dd31bd1dfb2b705a7845573f7e4da2d7943c2de95358bd753f33c0511dfadf95"
+    },
+    {
+      "file": "exit.json",
+      "bytes": 207,
+      "sha256": "2c3d51106a7d90ba4630a417a0d5a78c4eee48f7632fb84eccc5137a957535f0"
+    },
+    {
+      "file": "initial.json",
+      "bytes": 490,
+      "sha256": "7e708b5c57b97dfb2630ca639453c05d835e2d281aee3a6012391a81ea3fa501"
+    },
+    {
+      "file": "manifest.json",
+      "bytes": 2656,
+      "sha256": "bc1c3d32ae2951078c1f4102679dae4ceec7c83bdde88254c2015aeb325f9199"
+    },
+    {
+      "file": "mobile-third-content-reverse-after.png",
+      "bytes": 75341,
+      "sha256": "cd80c9bdb3536ab4264e8c0faf54b418d104420d08545fbe454c91f8d18df093"
+    },
+    {
+      "file": "mobile-third-content-tab-after.png",
+      "bytes": 75169,
+      "sha256": "ebf07e5af1c2b35c6e365841f6b147066d40690093d720187bcc6b90245c4d00"
+    },
+    {
+      "file": "navigation-accepted.json",
+      "bytes": 346,
+      "sha256": "b1546d6309bc3d80625cc35982d30a6d509b744588fb1e4775e658cce3f8e1ad"
+    },
+    {
+      "file": "navigation.json",
+      "bytes": 314,
+      "sha256": "fd7093ce295e67dd0457d09d6d24bedd555df1128f51937cae2f4638c4a87a19"
+    },
+    {
+      "file": "proof.json",
+      "bytes": 205069,
+      "sha256": "a47ebf3a86ad809880559e5423712ff9b76f6663650898b2a18f62162fabc88a"
+    },
+    {
+      "file": "provenance.json",
+      "bytes": 6219,
+      "sha256": "b42904e55619a0f5a38ed7a2f02bdb75656357ff981c9364ca7180b3ed157f52"
+    },
+    {
+      "file": "restore.json",
+      "bytes": 330,
+      "sha256": "efd208665a63f33b0f4fcccc72ed2374f6943969e63e6102a4388bbfade7a8e7"
+    },
+    {
+      "file": "step-away.json",
+      "bytes": 169,
+      "sha256": "be221bd81447810dda63207daa628ab617a82e59a1dbd89ed6aa1e8df2127a49"
+    },
+    {
+      "file": "summary.json",
+      "bytes": 8544,
+      "sha256": "21d98d8d7d0b332c98a2882de9862336eba71d700a15f11ba9255b4769c4f1ad"
+    },
+    {
+      "file": "tablet-third-content-tab-after.png",
+      "bytes": 73515,
+      "sha256": "6df3edf606a5a6475881efd4ebcecd91e05abadb43e99be3884103304be010fd"
+    }
+  ],
+  "publicationProjection": "Original safe inputs unchanged. PNG/proof/initial/date/restore/step-away/exit bytes preserved. Entry prior UUID pseudonymized with URL hash; attempted Next label clarified with original retained; summary source/storage attribution narrowed. source-manifest.json covers original files, manifest.json covers public files.",
+  "hashMeaning": "screenshots.sha256/sourceSHA256 refer to private source; outputSHA256 refers to delivered crop. Only output bytes independently checked.",
+  "publisherReview": "All5 safe PNGs viewed. Hashes/dimensions/crop math, all40 DOM row geometry and selected action/capture chronology checked. Private originals and capture metadata not opened; source pixel equality remains collector attestation."
+}

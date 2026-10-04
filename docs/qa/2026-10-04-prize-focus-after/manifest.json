@@ -1,0 +1,105 @@
+{
+  "files": [
+    {
+      "file": "README.md",
+      "bytes": 10529,
+      "sha256": "fe689c9780b74ed5b1e8ef3553b8a15b4044c20d057eef4107c4875ecccbfd35"
+    },
+    {
+      "file": "actions.json",
+      "bytes": 8883,
+      "sha256": "1a6b8616e78cd87496e29f4cfe21178271359df93bfb58815c7616c90f7dd036"
+    },
+    {
+      "file": "deployment-context.json",
+      "bytes": 988,
+      "sha256": "df394256f961aa79e31095bc34592cd71631c67d3ccc06594a34bef3a9578631"
+    },
+    {
+      "file": "desktop-resize-focused-input.png",
+      "bytes": 120711,
+      "sha256": "1d0567ddb55bfd2b8547405fd88538c6b75b0dc40163f0b2b8fec5ce21842a97"
+    },
+    {
+      "file": "desktop-third-content-tab-after.png",
+      "bytes": 90602,
+      "sha256": "d0a50ae6307c1e1eff8a074b888e38e8982932096282f13515ad37fff41ab794"
+    },
+    {
+      "file": "entry.json",
+      "bytes": 472,
+      "sha256": "b7f64a92694b44b5bde433461eba81442af77da95ce5b68c86040f2f8a0e7080"
+    },
+    {
+      "file": "exit.json",
+      "bytes": 207,
+      "sha256": "2c3d51106a7d90ba4630a417a0d5a78c4eee48f7632fb84eccc5137a957535f0"
+    },
+    {
+      "file": "initial.json",
+      "bytes": 490,
+      "sha256": "7e708b5c57b97dfb2630ca639453c05d835e2d281aee3a6012391a81ea3fa501"
+    },
+    {
+      "file": "mobile-third-content-reverse-after.png",
+      "bytes": 75341,
+      "sha256": "cd80c9bdb3536ab4264e8c0faf54b418d104420d08545fbe454c91f8d18df093"
+    },
+    {
+      "file": "mobile-third-content-tab-after.png",
+      "bytes": 75169,
+      "sha256": "ebf07e5af1c2b35c6e365841f6b147066d40690093d720187bcc6b90245c4d00"
+    },
+    {
+      "file": "navigation-accepted.json",
+      "bytes": 346,
+      "sha256": "b1546d6309bc3d80625cc35982d30a6d509b744588fb1e4775e658cce3f8e1ad"
+    },
+    {
+      "file": "navigation.json",
+      "bytes": 314,
+      "sha256": "fd7093ce295e67dd0457d09d6d24bedd555df1128f51937cae2f4638c4a87a19"
+    },
+    {
+      "file": "proof.json",
+      "bytes": 205069,
+      "sha256": "a47ebf3a86ad809880559e5423712ff9b76f6663650898b2a18f62162fabc88a"
+    },
+    {
+      "file": "provenance.json",
+      "bytes": 9789,
+      "sha256": "92407cc9f7bf0a7c32a29a99522b89319d7395e3dc094e955d5726dcaffa6315"
+    },
+    {
+      "file": "restore.json",
+      "bytes": 330,
+      "sha256": "efd208665a63f33b0f4fcccc72ed2374f6943969e63e6102a4388bbfade7a8e7"
+    },
+    {
+      "file": "source-manifest.json",
+      "bytes": 2656,
+      "sha256": "bc1c3d32ae2951078c1f4102679dae4ceec7c83bdde88254c2015aeb325f9199"
+    },
+    {
+      "file": "step-away.json",
+      "bytes": 169,
+      "sha256": "be221bd81447810dda63207daa628ab617a82e59a1dbd89ed6aa1e8df2127a49"
+    },
+    {
+      "file": "summary.json",
+      "bytes": 8056,
+      "sha256": "495e4335bdacd0fbd3a08861f3a1b877ec2629d01e715c97399b8bf0bf9167e3"
+    },
+    {
+      "file": "tablet-third-content-tab-after.png",
+      "bytes": 73515,
+      "sha256": "6df3edf606a5a6475881efd4ebcecd91e05abadb43e99be3884103304be010fd"
+    },
+    {
+      "file": "verification.json",
+      "bytes": 44256,
+      "sha256": "f4a95a1cc557150333fdb5a96ababd3ebe7413f03abc9192f9529a83160c2c60"
+    }
+  ],
+  "note": "Public projected file hashes; source-manifest.json preserves original safe-file hashes. Excludes this manifest."
+}

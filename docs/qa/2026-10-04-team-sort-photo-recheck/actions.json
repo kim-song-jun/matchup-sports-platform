@@ -1,0 +1,222 @@
+[
+  {
+    "label": "fresh document reload of current team list after reported45b9 deployment",
+    "startUTC": "2026-10-04T07:59:16.441Z",
+    "endUTC": "2026-10-04T07:59:17.174Z"
+  },
+  {
+    "label": "resize team list mobile",
+    "startUTC": "2026-10-04T08:00:20.375Z",
+    "endUTC": "2026-10-04T08:00:25.335Z"
+  },
+  {
+    "label": "mobile native zoom110",
+    "startUTC": "2026-10-04T08:00:25.336Z",
+    "endUTC": "2026-10-04T08:00:25.649Z"
+  },
+  {
+    "label": "mobile native zoom125",
+    "startUTC": "2026-10-04T08:00:25.650Z",
+    "endUTC": "2026-10-04T08:00:25.950Z"
+  },
+  {
+    "label": "mobile load more team list GET pagination",
+    "startUTC": "2026-10-04T08:01:50.831Z",
+    "endUTC": "2026-10-04T08:01:51.128Z"
+  },
+  {
+    "label": "mobile load second more page",
+    "startUTC": "2026-10-04T08:04:04.503Z",
+    "endUTC": "2026-10-04T08:04:04.782Z"
+  },
+  {
+    "label": "mobile load third more page",
+    "startUTC": "2026-10-04T08:05:04.153Z",
+    "endUTC": "2026-10-04T08:05:04.438Z"
+  },
+  {
+    "label": "mobile native scroll to top for known photo fixture",
+    "startUTC": "2026-10-04T08:05:13.405Z",
+    "endUTC": "2026-10-04T08:05:25.757Z"
+  },
+  {
+    "label": "mobile native small scroll to show full cow thumbnail above navigation",
+    "startUTC": "2026-10-04T08:06:14.129Z",
+    "endUTC": "2026-10-04T08:06:14.329Z"
+  },
+  {
+    "label": "mobile open approved cow-photo synthetic detail",
+    "startUTC": "2026-10-04T08:10:20.094Z",
+    "endUTC": "2026-10-04T08:10:25.715Z"
+  },
+  {
+    "label": "mobile approved photo detail app Back to previously loaded list",
+    "startUTC": "2026-10-04T08:13:33.318Z",
+    "endUTC": "2026-10-04T08:13:33.393Z"
+  },
+  {
+    "label": "mobile open team filters through actual link",
+    "startUTC": "2026-10-04T08:14:06.931Z",
+    "endUTC": "2026-10-04T08:14:07.213Z"
+  },
+  {
+    "label": "mobile select ordinary team-match kind using filter link",
+    "startUTC": "2026-10-04T08:15:26.611Z",
+    "endUTC": "2026-10-04T08:15:30.747Z"
+  },
+  {
+    "label": "mobile apply ordinary-kind filter",
+    "startUTC": "2026-10-04T08:15:42.076Z",
+    "endUTC": "2026-10-04T08:15:42.363Z"
+  },
+  {
+    "label": "mobile add observed futsal filter link",
+    "startUTC": "2026-10-04T08:16:05.362Z",
+    "endUTC": "2026-10-04T08:16:05.642Z"
+  },
+  {
+    "label": "mobile filtered load more",
+    "startUTC": "2026-10-04T08:16:16.071Z",
+    "endUTC": "2026-10-04T08:16:16.340Z"
+  },
+  {
+    "label": "mobile open cow detail from friendly plus futsal28",
+    "startUTC": "2026-10-04T08:17:03.768Z",
+    "endUTC": "2026-10-04T08:17:03.856Z"
+  },
+  {
+    "label": "mobile browser Back preserves filtered28",
+    "startUTC": "2026-10-04T08:17:13.660Z",
+    "endUTC": "2026-10-04T08:17:13.679Z"
+  },
+  {
+    "label": "mobile browser Forward returns filtered photo detail",
+    "startUTC": "2026-10-04T08:17:24.207Z",
+    "endUTC": "2026-10-04T08:17:24.225Z"
+  },
+  {
+    "label": "mobile app Back after browser Forward",
+    "startUTC": "2026-10-04T08:17:33.679Z",
+    "endUTC": "2026-10-04T08:17:33.760Z"
+  },
+  {
+    "label": "resize filtered team list tablet",
+    "startUTC": "2026-10-04T08:19:01.118Z",
+    "endUTC": "2026-10-04T08:19:05.563Z"
+  },
+  {
+    "label": "tablet native zoom150",
+    "startUTC": "2026-10-04T08:19:05.564Z",
+    "endUTC": "2026-10-04T08:19:05.870Z"
+  },
+  {
+    "label": "tablet native scroll to full cow thumbnail",
+    "startUTC": "2026-10-04T08:19:57.390Z",
+    "endUTC": "2026-10-04T08:19:57.589Z"
+  },
+  {
+    "label": "tablet open cow photo detail from preserved filter",
+    "startUTC": "2026-10-04T08:20:07.742Z",
+    "endUTC": "2026-10-04T08:20:07.832Z"
+  },
+  {
+    "label": "tablet photo detail app Back",
+    "startUTC": "2026-10-04T08:20:35.151Z",
+    "endUTC": "2026-10-04T08:20:35.414Z"
+  },
+  {
+    "label": "tablet open filter for default-order control",
+    "startUTC": "2026-10-04T08:20:52.236Z",
+    "endUTC": "2026-10-04T08:20:52.509Z"
+  },
+  {
+    "label": "tablet filter reset via observed link",
+    "startUTC": "2026-10-04T08:21:02.705Z",
+    "endUTC": "2026-10-04T08:21:02.990Z"
+  },
+  {
+    "label": "tablet apply reset filter",
+    "startUTC": "2026-10-04T08:21:23.075Z",
+    "endUTC": "2026-10-04T08:21:23.359Z"
+  },
+  {
+    "label": "tablet clear sport using observed All tab",
+    "startUTC": "2026-10-04T08:21:32.472Z",
+    "endUTC": "2026-10-04T08:21:32.752Z"
+  },
+  {
+    "label": "tablet load more default page1",
+    "startUTC": "2026-10-04T08:24:40.104Z",
+    "endUTC": "2026-10-04T08:24:40.415Z"
+  },
+  {
+    "label": "tablet load more default page2",
+    "startUTC": "2026-10-04T08:25:22.470Z",
+    "endUTC": "2026-10-04T08:25:22.755Z"
+  },
+  {
+    "label": "tablet load more default page3",
+    "startUTC": "2026-10-04T08:25:31.965Z",
+    "endUTC": "2026-10-04T08:25:32.251Z"
+  },
+  {
+    "label": "tablet wheel to top before desktop comparison",
+    "startUTC": "2026-10-04T08:25:53.160Z",
+    "endUTC": "2026-10-04T08:26:05.469Z"
+  },
+  {
+    "label": "desktop native zoom reset for same68 rows",
+    "startUTC": "2026-10-04T08:26:05.699Z",
+    "endUTC": "2026-10-04T08:26:05.835Z"
+  },
+  {
+    "label": "desktop open approved cow photo detail",
+    "startUTC": "2026-10-04T08:26:16.584Z",
+    "endUTC": "2026-10-04T08:26:16.710Z"
+  },
+  {
+    "label": "desktop photo detail app Back to default68",
+    "startUTC": "2026-10-04T08:27:45.141Z",
+    "endUTC": "2026-10-04T08:27:45.204Z"
+  },
+  {
+    "label": "desktop open filter for same compound condition",
+    "startUTC": "2026-10-04T08:28:33.459Z",
+    "endUTC": "2026-10-04T08:28:33.759Z"
+  },
+  {
+    "label": "desktop friendly kind filter link",
+    "startUTC": "2026-10-04T08:28:44.241Z",
+    "endUTC": "2026-10-04T08:28:44.538Z"
+  },
+  {
+    "label": "desktop apply friendly kind",
+    "startUTC": "2026-10-04T08:28:57.543Z",
+    "endUTC": "2026-10-04T08:28:57.821Z"
+  },
+  {
+    "label": "desktop add observed futsal tab condition",
+    "startUTC": "2026-10-04T08:29:08.246Z",
+    "endUTC": "2026-10-04T08:29:08.518Z"
+  },
+  {
+    "label": "desktop filtered more to complete sample",
+    "startUTC": "2026-10-04T08:29:29.299Z",
+    "endUTC": "2026-10-04T08:29:29.564Z"
+  },
+  {
+    "label": "desktop filtered cow detail open",
+    "startUTC": "2026-10-04T08:29:38.534Z",
+    "endUTC": "2026-10-04T08:29:38.631Z"
+  },
+  {
+    "label": "desktop app Back filtered28",
+    "startUTC": "2026-10-04T08:29:52.790Z",
+    "endUTC": "2026-10-04T08:29:52.846Z"
+  },
+  {
+    "label": "restore queryless team list using visible Team tab link",
+    "startUTC": "2026-10-04T08:30:17.061Z",
+    "endUTC": "2026-10-04T08:30:17.354Z"
+  }
+]

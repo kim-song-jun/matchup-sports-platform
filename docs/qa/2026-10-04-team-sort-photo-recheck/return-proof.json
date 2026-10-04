@@ -1,0 +1,83 @@
+[
+  {
+    "backLinks": [
+      {
+        "entitySHA": "d8567c48424794390f65ab27f13c4b2c60f91b38ffa685349d488e7967d744a3",
+        "hrefSHA256": "1119fc9cba1ca01d31a478f4fe6bcab55973d7c60c251b905210d59662a35656",
+        "visible": false
+      },
+      {
+        "entitySHA": "d8567c48424794390f65ab27f13c4b2c60f91b38ffa685349d488e7967d744a3",
+        "hrefSHA256": "1119fc9cba1ca01d31a478f4fe6bcab55973d7c60c251b905210d59662a35656",
+        "visible": true
+      }
+    ],
+    "photoHeroPresent": true,
+    "rowCount": 0,
+    "entitySHA": "d63179cc560496b5fe1c0909587981f57a5e41f28e50f798fd3c6a09fb5f284d",
+    "urlSHA256": "7e00fd9e41edf6a1d02d7bea69df9b7585ed68c20f9fe882b69f37bbc7f42c4b",
+    "routeTemplate": "/team-matches/:entity",
+    "utc": "2026-10-04T08:17:13.657Z",
+    "viewport": {
+      "dpr": 1.25,
+      "h": 606,
+      "w": 402
+    },
+    "label": "mobile filtered detail before browser Back",
+    "index": 0
+  },
+  {
+    "backLinks": [
+      {
+        "entitySHA": "d8567c48424794390f65ab27f13c4b2c60f91b38ffa685349d488e7967d744a3",
+        "hrefSHA256": "1119fc9cba1ca01d31a478f4fe6bcab55973d7c60c251b905210d59662a35656",
+        "visible": false
+      },
+      {
+        "entitySHA": "d8567c48424794390f65ab27f13c4b2c60f91b38ffa685349d488e7967d744a3",
+        "hrefSHA256": "1119fc9cba1ca01d31a478f4fe6bcab55973d7c60c251b905210d59662a35656",
+        "visible": true
+      }
+    ],
+    "photoHeroPresent": true,
+    "rowCount": 0,
+    "entitySHA": "d63179cc560496b5fe1c0909587981f57a5e41f28e50f798fd3c6a09fb5f284d",
+    "urlSHA256": "7e00fd9e41edf6a1d02d7bea69df9b7585ed68c20f9fe882b69f37bbc7f42c4b",
+    "routeTemplate": "/team-matches/:entity",
+    "utc": "2026-10-04T08:17:33.676Z",
+    "viewport": {
+      "dpr": 1.25,
+      "h": 606,
+      "w": 402
+    },
+    "label": "mobile browser Forward same filtered photo detail",
+    "index": 1
+  },
+  {
+    "backLinks": [
+      {
+        "entitySHA": "d8567c48424794390f65ab27f13c4b2c60f91b38ffa685349d488e7967d744a3",
+        "hrefSHA256": "1119fc9cba1ca01d31a478f4fe6bcab55973d7c60c251b905210d59662a35656",
+        "visible": true
+      },
+      {
+        "entitySHA": "d8567c48424794390f65ab27f13c4b2c60f91b38ffa685349d488e7967d744a3",
+        "hrefSHA256": "1119fc9cba1ca01d31a478f4fe6bcab55973d7c60c251b905210d59662a35656",
+        "visible": false
+      }
+    ],
+    "photoHeroPresent": true,
+    "rowCount": 0,
+    "entitySHA": "d63179cc560496b5fe1c0909587981f57a5e41f28e50f798fd3c6a09fb5f284d",
+    "urlSHA256": "7e00fd9e41edf6a1d02d7bea69df9b7585ed68c20f9fe882b69f37bbc7f42c4b",
+    "routeTemplate": "/team-matches/:entity",
+    "utc": "2026-10-04T08:29:52.787Z",
+    "viewport": {
+      "dpr": 1,
+      "h": 757,
+      "w": 1182
+    },
+    "label": "desktop filtered detail",
+    "index": 2
+  }
+]

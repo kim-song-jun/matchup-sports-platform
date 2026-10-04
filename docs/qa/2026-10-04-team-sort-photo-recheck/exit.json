@@ -1,0 +1,19 @@
+{
+  "errorTextPresent": false,
+  "more": [
+    {
+      "disabled": false,
+      "text": "더 보기"
+    }
+  ],
+  "rows": 20,
+  "searchValue": "",
+  "url": "https://alpha.teameet.co.kr/team-matches",
+  "utc": "2026-10-04T08:30:38.514Z",
+  "viewport": {
+    "dpr": 1,
+    "h": 757,
+    "w": 1182
+  },
+  "visibleDialogCount": 0
+}

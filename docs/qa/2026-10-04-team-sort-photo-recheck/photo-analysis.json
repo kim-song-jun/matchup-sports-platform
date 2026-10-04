@@ -1,0 +1,255 @@
+{
+  "createdUTC": "2026-10-04T08:42:45.792450+00:00",
+  "styleEvidenceClass": "recomputed from supplied photo DOM observations",
+  "numericalEvidenceClass": "preserved prior analyst assertions; original source was not opened or independently reanalyzed by projection preparer",
+  "observationCount": 7,
+  "listPhotoIndices": [
+    0,
+    3,
+    5
+  ],
+  "detailPhotoIndices": [
+    1,
+    4,
+    6
+  ],
+  "controlIndex": 2,
+  "observations": [
+    {
+      "index": 0,
+      "label": "mobile-list-photo",
+      "utc": "2026-10-04T08:07:16.473Z",
+      "viewport": {
+        "dpr": 1.25,
+        "h": 606,
+        "w": 402
+      },
+      "evidenceType": "approved uploaded-photo fixture style observation",
+      "allRecordedChainOpacityOne": true,
+      "recordedChainFilters": [
+        "none"
+      ],
+      "allRecordedChainMixBlendNormal": true,
+      "backgroundFunctionKinds": [
+        "url",
+        "url"
+      ],
+      "primaryBackgroundURLSHA256": "2808f485687aecfb981f33726d2b2ce603fc72e07eaafa4b86b5170c237107bd",
+      "pseudoBeforeContent": "none",
+      "pseudoAfterContent": "none",
+      "summaryPanelPercentHeroRectangle": null
+    },
+    {
+      "index": 1,
+      "label": "mobile-detail-photo",
+      "utc": "2026-10-04T08:11:42.031Z",
+      "viewport": {
+        "dpr": 1.25,
+        "h": 606,
+        "w": 402
+      },
+      "evidenceType": "approved uploaded-photo fixture style observation",
+      "allRecordedChainOpacityOne": true,
+      "recordedChainFilters": [
+        "none"
+      ],
+      "allRecordedChainMixBlendNormal": true,
+      "backgroundFunctionKinds": [
+        "url",
+        "url"
+      ],
+      "primaryBackgroundURLSHA256": "2808f485687aecfb981f33726d2b2ce603fc72e07eaafa4b86b5170c237107bd",
+      "pseudoBeforeContent": "none",
+      "pseudoAfterContent": "none",
+      "summaryPanelPercentHeroRectangle": 55.536
+    },
+    {
+      "index": 2,
+      "label": "mobile-known-completed-control-offscreen-style",
+      "utc": "2026-10-04T08:14:06.925Z",
+      "viewport": {
+        "dpr": 1.25,
+        "h": 606,
+        "w": 402
+      },
+      "evidenceType": "offscreen style-only default-icon control",
+      "allRecordedChainOpacityOne": true,
+      "recordedChainFilters": [
+        "brightness(0.88) grayscale(0.35)",
+        "none"
+      ],
+      "allRecordedChainMixBlendNormal": true,
+      "backgroundFunctionKinds": [],
+      "primaryBackgroundURLSHA256": null,
+      "pseudoBeforeContent": "none",
+      "pseudoAfterContent": "none",
+      "summaryPanelPercentHeroRectangle": null
+    },
+    {
+      "index": 3,
+      "label": "tablet-list-photo",
+      "utc": "2026-10-04T08:20:07.708Z",
+      "viewport": {
+        "dpr": 1.5,
+        "h": 505,
+        "w": 788
+      },
+      "evidenceType": "approved uploaded-photo fixture style observation",
+      "allRecordedChainOpacityOne": true,
+      "recordedChainFilters": [
+        "none"
+      ],
+      "allRecordedChainMixBlendNormal": true,
+      "backgroundFunctionKinds": [
+        "url",
+        "url"
+      ],
+      "primaryBackgroundURLSHA256": "2808f485687aecfb981f33726d2b2ce603fc72e07eaafa4b86b5170c237107bd",
+      "pseudoBeforeContent": "none",
+      "pseudoAfterContent": "none",
+      "summaryPanelPercentHeroRectangle": null
+    },
+    {
+      "index": 4,
+      "label": "tablet-detail-photo",
+      "utc": "2026-10-04T08:20:30.439Z",
+      "viewport": {
+        "dpr": 1.5,
+        "h": 505,
+        "w": 788
+      },
+      "evidenceType": "approved uploaded-photo fixture style observation",
+      "allRecordedChainOpacityOne": true,
+      "recordedChainFilters": [
+        "none"
+      ],
+      "allRecordedChainMixBlendNormal": true,
+      "backgroundFunctionKinds": [
+        "url",
+        "url"
+      ],
+      "primaryBackgroundURLSHA256": "2808f485687aecfb981f33726d2b2ce603fc72e07eaafa4b86b5170c237107bd",
+      "pseudoBeforeContent": "none",
+      "pseudoAfterContent": "none",
+      "summaryPanelPercentHeroRectangle": 35.5
+    },
+    {
+      "index": 5,
+      "label": "desktop-list-photo",
+      "utc": "2026-10-04T08:26:16.550Z",
+      "viewport": {
+        "dpr": 1,
+        "h": 757,
+        "w": 1182
+      },
+      "evidenceType": "approved uploaded-photo fixture style observation",
+      "allRecordedChainOpacityOne": true,
+      "recordedChainFilters": [
+        "none"
+      ],
+      "allRecordedChainMixBlendNormal": true,
+      "backgroundFunctionKinds": [
+        "url",
+        "url"
+      ],
+      "primaryBackgroundURLSHA256": "2808f485687aecfb981f33726d2b2ce603fc72e07eaafa4b86b5170c237107bd",
+      "pseudoBeforeContent": "none",
+      "pseudoAfterContent": "none",
+      "summaryPanelPercentHeroRectangle": null
+    },
+    {
+      "index": 6,
+      "label": "desktop-detail-photo",
+      "utc": "2026-10-04T08:27:45.077Z",
+      "viewport": {
+        "dpr": 1,
+        "h": 757,
+        "w": 1182
+      },
+      "evidenceType": "approved uploaded-photo fixture style observation",
+      "allRecordedChainOpacityOne": true,
+      "recordedChainFilters": [
+        "none"
+      ],
+      "allRecordedChainMixBlendNormal": true,
+      "backgroundFunctionKinds": [
+        "url",
+        "url"
+      ],
+      "primaryBackgroundURLSHA256": "2808f485687aecfb981f33726d2b2ce603fc72e07eaafa4b86b5170c237107bd",
+      "pseudoBeforeContent": "none",
+      "pseudoAfterContent": "none",
+      "summaryPanelPercentHeroRectangle": 39.308
+    }
+  ],
+  "numericalModels": [
+    {
+      "label": "mobile-list-photo",
+      "observedUTC": "2026-10-04T08:07:16.473Z",
+      "principalModel": {
+        "interior_inset_css_px": 12,
+        "resamplers": [
+          "bilinear",
+          "bilinear"
+        ],
+        "source_expected_mean_luma": 123.44698,
+        "screenshot_mean_luma": 121.01474,
+        "mean_ratio": 0.980297,
+        "gain_through_origin": 0.986771,
+        "affine_slope": 1.00336,
+        "affine_offset": -2.84706,
+        "luma_MAE": 3.63402,
+        "luma_RMSE": 4.81122,
+        "luma_correlation": 0.99857
+      }
+    },
+    {
+      "label": "tablet-list-photo",
+      "observedUTC": "2026-10-04T08:20:07.708Z",
+      "principalModel": {
+        "interior_inset_css_px": 12,
+        "resamplers": [
+          "bilinear",
+          "bilinear"
+        ],
+        "source_expected_mean_luma": 123.61453,
+        "screenshot_mean_luma": 121.14416,
+        "mean_ratio": 0.980016,
+        "gain_through_origin": 0.987196,
+        "affine_slope": 1.005585,
+        "affine_offset": -3.16078,
+        "luma_MAE": 3.84924,
+        "luma_RMSE": 5.04732,
+        "luma_correlation": 0.998414
+      }
+    },
+    {
+      "label": "desktop-list-photo",
+      "observedUTC": "2026-10-04T08:26:16.550Z",
+      "principalModel": {
+        "interior_inset_css_px": 12,
+        "resampler": "bilinear",
+        "source_expected_mean_luma": 122.94213,
+        "screenshot_mean_luma": 121.49286,
+        "mean_ratio": 0.988212,
+        "gain_through_origin": 0.991998,
+        "affine_slope": 1.001558,
+        "affine_offset": -1.64078,
+        "luma_MAE": 3.56541,
+        "luma_RMSE": 4.85186,
+        "luma_correlation": 0.998221
+      }
+    }
+  ],
+  "conclusion": "For this open cow fixture, list/detail chains record opacity 1, filter none, normal blending, two URL background layers and no gradient or active pseudo-element overlay. Three-width list pixel analysis reports no evidence of a material uniform dim layer. Detail summary/navigation/share surfaces use localized rgba(17,24,39,0.8) panels.",
+  "detailCaveat": "Numeric source-to-screenshot pixel models apply to list thumbnails only. The detail conclusion is based on recorded styles and exact illustrative crops, not equivalent hero pixel measurements. Area percentages are rectangle area ratios; rounded corners/overlapping controls are not subtracted.",
+  "controlCaveat": "The completed friendly control was offscreen and used a default icon. Its ancestor brightness(0.88) grayscale(0.35) is style-only evidence, not proof about an uploaded photo.",
+  "numericalCaveats": [
+    "Encoded RGB/luma proxy, not linear-light luminance",
+    "5% uniform attenuation is an engineering threshold, not a universal perceptual threshold",
+    "JPEG screenshots, unknown capture color handling, DPR normalization, fractional positioning, and resampling limit exact equivalence",
+    "A tiny effect cannot be ruled out; no generalization to other uploaded photos or a completed uploaded-photo state"
+  ],
+  "sourceDownloadSHA256": "7b973af30c89b8c9ff5eb53eade4a4c13e44ca963d2447cad4db0749a63c4acb",
+  "sourceDownloadEvidence": "Collector reports supported browser imageDownload; only hash/metadata are in this public projection"
+}

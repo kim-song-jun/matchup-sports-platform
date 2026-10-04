@@ -1,0 +1,1007 @@
+{
+  "verifiedUTC": "2026-10-04T08:56:20.780085+00:00",
+  "scope": "Independent public-projection review; no live UI replay, private original/source-image read or source-pixel reanalysis",
+  "sourceFiles": 30,
+  "allInputBytesPreserved": true,
+  "sourceHashes": [
+    {
+      "file": "README.md",
+      "bytes": 4842,
+      "sha256": "4948ec51ef64672e0e6840102216c2a6bb9c9b8f3172f7bb30d715d281acab96"
+    },
+    {
+      "file": "SHA256SUMS",
+      "bytes": 2584,
+      "sha256": "4a0a17d2af5b07817f3e1a19f9ebe1047e7d5343597a50d2158780502d3a58a7"
+    },
+    {
+      "file": "actions.json",
+      "bytes": 6603,
+      "sha256": "b2256e881381669545c768547f7a28d3e9d9c6bdc1e0e016a2d3eedd5f43440a"
+    },
+    {
+      "file": "crop-provenance.json",
+      "bytes": 9044,
+      "sha256": "0179eafe45219136f074dfeb46c73571be5d5eb32f098461a235d7b5098cac03"
+    },
+    {
+      "file": "crops/desktop-detail-panel.png",
+      "bytes": 16063,
+      "sha256": "38df4c223dadf8fc10d8eea8ce517d78f73ffe778569979bf5b1823aa019e244"
+    },
+    {
+      "file": "crops/desktop-detail-uncovered.png",
+      "bytes": 46036,
+      "sha256": "dd90a7bff2fed1cb3f4136f97f1f3a363cca35985aafa76a9ae420a26e807383"
+    },
+    {
+      "file": "crops/desktop-list-photo.png",
+      "bytes": 15593,
+      "sha256": "ae10f052c5ada185f34e36ffccc587454114a658b0b95c478c1761cffddf1554"
+    },
+    {
+      "file": "crops/mobile-detail-panel.png",
+      "bytes": 7098,
+      "sha256": "7f82327232cf852c1822d5c6242dabafd867057ff4e2877dac55289668b29782"
+    },
+    {
+      "file": "crops/mobile-detail-uncovered.png",
+      "bytes": 9925,
+      "sha256": "9be02a75ca5ab10ca31c6ba075ba68def747c4bb822df68ebc5c7ad3ec64e147"
+    },
+    {
+      "file": "crops/mobile-list-photo.png",
+      "bytes": 14710,
+      "sha256": "22748f9d518238c655d7dba672f865f0fccac2764953435ce86aa7cb34680df7"
+    },
+    {
+      "file": "crops/tablet-detail-panel.png",
+      "bytes": 16171,
+      "sha256": "ab1a08d7eec52d564727a80f56e659282a9ab45c287b656b3cc83f30c690a55c"
+    },
+    {
+      "file": "crops/tablet-detail-uncovered.png",
+      "bytes": 49910,
+      "sha256": "7a379cc7113c0f8a9c46814939b171ec0ef797e3f2539cf516c01e0bfba15ca3"
+    },
+    {
+      "file": "crops/tablet-list-photo.png",
+      "bytes": 15177,
+      "sha256": "b95eb40ed0bde1fe63d2d43e35af61aad62aea57e81c476ffbc80679100e4a5b"
+    },
+    {
+      "file": "deployment-context.json",
+      "bytes": 1466,
+      "sha256": "71e976ca75daeb2e0d192f27fda7be5c5a6858bc8a053b180079f1b1a3f7c3d0"
+    },
+    {
+      "file": "entry.json",
+      "bytes": 343,
+      "sha256": "1206668a506f3e55e09365b1dfca2b93e35903c01cbadec85f0c59117b268d5e"
+    },
+    {
+      "file": "exit.json",
+      "bytes": 327,
+      "sha256": "926b09d79f9af255cb9f819e5854d9a163e028d9cf35fd3cdcc60d409eae73b3"
+    },
+    {
+      "file": "manifest.json",
+      "bytes": 5930,
+      "sha256": "b4197e502e8dc06596f73e46e18c653b8d86c524c2b95e9de6bb84f0340f5550"
+    },
+    {
+      "file": "mobile-photo-pixel-analysis.json",
+      "bytes": 8568,
+      "sha256": "cdca9b1709cf51d16172e9c71ccf83dc44d9da79e8a4f751566c6b2a714436fe"
+    },
+    {
+      "file": "original-source-proof.json",
+      "bytes": 1090,
+      "sha256": "0a8c994829fe845c13c3b14ca986600430c1fcb73a404cfaf04165542ebd6e99"
+    },
+    {
+      "file": "photo-analysis.json",
+      "bytes": 8629,
+      "sha256": "edb41be3e96467477443343fb38098f6b9cb3f134f29943b5d128af29ce324ff"
+    },
+    {
+      "file": "photo-proof.json",
+      "bytes": 69371,
+      "sha256": "eb1fc4887b91f3a0bd3569568726fc1561dcafa4986bd3c4cd5d110c426d6933"
+    },
+    {
+      "file": "provenance.json",
+      "bytes": 6512,
+      "sha256": "2a03542572702a0d63f063e7adee495b5c83c0e5c5fb1ed7d11a2e404c6508ca"
+    },
+    {
+      "file": "return-proof.json",
+      "bytes": 2773,
+      "sha256": "313509e6615d1b3915d0553651cff5081333e4a7f3148fccf90ba124193f9432"
+    },
+    {
+      "file": "sort-analysis.json",
+      "bytes": 264561,
+      "sha256": "dde634cda2a06031a7a28d5a78a287e51cb7821b42962a3035488774a778df58"
+    },
+    {
+      "file": "sort-proof.json",
+      "bytes": 631173,
+      "sha256": "eca077a58d05d4f0de333d1aa48bef3b7162ceea8e5d3d7d70de6d39eb0b6556"
+    },
+    {
+      "file": "source-context.json",
+      "bytes": 4942,
+      "sha256": "3dd6148da8bc1b2c0302ac2725d5d0d2184ea500467120c70f110692eba20cf3"
+    },
+    {
+      "file": "source-preservation-check.json",
+      "bytes": 990,
+      "sha256": "805f3b66348a1b671730784b1adae2fb55aecc5f009a7fec05d1f5e04595aa6e"
+    },
+    {
+      "file": "summary.json",
+      "bytes": 3280,
+      "sha256": "ad72afec621819485e61ba1ab1adf64cae71e3cb047b39abac5db6baf98f95da"
+    },
+    {
+      "file": "three-width-photo-pixel-analysis.json",
+      "bytes": 16738,
+      "sha256": "0ac2c56ac66f669ca9d9397a782e2a645da5a96eff47ddd3eddb6da260a8ba55"
+    },
+    {
+      "file": "transient-note.json",
+      "bytes": 2458,
+      "sha256": "404d788c2865193aadbf56cbbaf2193b480fade016a210a994224e174674c102"
+    }
+  ],
+  "counts": {
+    "sortSnapshots": 23,
+    "repeatedRowsChecked": 856,
+    "nonemptyArithmeticConforming": 22,
+    "settledAcceptanceSnapshots": 12,
+    "selectedActionRecords": 44,
+    "photoDOM": 7,
+    "approvedUploadedPhotoDOM": 6,
+    "sourceScreenshotGroups": 6,
+    "PNG": 9
+  },
+  "sortSnapshots": [
+    {
+      "index": 0,
+      "utc": "2026-10-04T08:01:35.645Z",
+      "viewport": {
+        "dpr": 1.25,
+        "h": 606,
+        "w": 402
+      },
+      "rowCount": 20,
+      "bucketCounts": {
+        "open": 2,
+        "future": 18,
+        "past": 0,
+        "unparsed": 0
+      },
+      "conformingAtDisplayedMinute": true,
+      "settledAcceptance": false,
+      "URL": "https://alpha.teameet.co.kr/team-matches"
+    },
+    {
+      "index": 1,
+      "utc": "2026-10-04T08:01:58.575Z",
+      "viewport": {
+        "dpr": 1.25,
+        "h": 606,
+        "w": 402
+      },
+      "rowCount": 40,
+      "bucketCounts": {
+        "open": 2,
+        "future": 27,
+        "past": 11,
+        "unparsed": 0
+      },
+      "conformingAtDisplayedMinute": true,
+      "settledAcceptance": false,
+      "URL": "https://alpha.teameet.co.kr/team-matches"
+    },
+    {
+      "index": 2,
+      "utc": "2026-10-04T08:04:41.438Z",
+      "viewport": {
+        "dpr": 1.25,
+        "h": 606,
+        "w": 402
+      },
+      "rowCount": 60,
+      "bucketCounts": {
+        "open": 2,
+        "future": 27,
+        "past": 31,
+        "unparsed": 0
+      },
+      "conformingAtDisplayedMinute": true,
+      "settledAcceptance": false,
+      "URL": "https://alpha.teameet.co.kr/team-matches"
+    },
+    {
+      "index": 3,
+      "utc": "2026-10-04T08:05:13.394Z",
+      "viewport": {
+        "dpr": 1.25,
+        "h": 606,
+        "w": 402
+      },
+      "rowCount": 68,
+      "bucketCounts": {
+        "open": 2,
+        "future": 27,
+        "past": 39,
+        "unparsed": 0
+      },
+      "conformingAtDisplayedMinute": true,
+      "settledAcceptance": true,
+      "URL": "https://alpha.teameet.co.kr/team-matches"
+    },
+    {
+      "index": 4,
+      "utc": "2026-10-04T08:13:48.498Z",
+      "viewport": {
+        "dpr": 1.25,
+        "h": 606,
+        "w": 402
+      },
+      "rowCount": 68,
+      "bucketCounts": {
+        "open": 2,
+        "future": 27,
+        "past": 39,
+        "unparsed": 0
+      },
+      "conformingAtDisplayedMinute": true,
+      "settledAcceptance": true,
+      "URL": "https://alpha.teameet.co.kr/team-matches"
+    },
+    {
+      "index": 5,
+      "utc": "2026-10-04T08:15:51.013Z",
+      "viewport": {
+        "dpr": 1.25,
+        "h": 606,
+        "w": 402
+      },
+      "rowCount": 20,
+      "bucketCounts": {
+        "open": 2,
+        "future": 3,
+        "past": 15,
+        "unparsed": 0
+      },
+      "conformingAtDisplayedMinute": true,
+      "settledAcceptance": false,
+      "URL": "https://alpha.teameet.co.kr/team-matches?kind=friendly"
+    },
+    {
+      "index": 6,
+      "utc": "2026-10-04T08:16:16.065Z",
+      "viewport": {
+        "dpr": 1.25,
+        "h": 606,
+        "w": 402
+      },
+      "rowCount": 20,
+      "bucketCounts": {
+        "open": 2,
+        "future": 3,
+        "past": 15,
+        "unparsed": 0
+      },
+      "conformingAtDisplayedMinute": true,
+      "settledAcceptance": false,
+      "URL": "https://alpha.teameet.co.kr/team-matches?kind=friendly&sportId=b60abf1d-0caf-477e-ba61-d51984e63151"
+    },
+    {
+      "index": 7,
+      "utc": "2026-10-04T08:16:26.146Z",
+      "viewport": {
+        "dpr": 1.25,
+        "h": 606,
+        "w": 402
+      },
+      "rowCount": 28,
+      "bucketCounts": {
+        "open": 2,
+        "future": 3,
+        "past": 23,
+        "unparsed": 0
+      },
+      "conformingAtDisplayedMinute": true,
+      "settledAcceptance": true,
+      "URL": "https://alpha.teameet.co.kr/team-matches?kind=friendly&sportId=b60abf1d-0caf-477e-ba61-d51984e63151"
+    },
+    {
+      "index": 8,
+      "utc": "2026-10-04T08:17:24.200Z",
+      "viewport": {
+        "dpr": 1.25,
+        "h": 606,
+        "w": 402
+      },
+      "rowCount": 28,
+      "bucketCounts": {
+        "open": 2,
+        "future": 3,
+        "past": 23,
+        "unparsed": 0
+      },
+      "conformingAtDisplayedMinute": true,
+      "settledAcceptance": true,
+      "URL": "https://alpha.teameet.co.kr/team-matches?kind=friendly&sportId=b60abf1d-0caf-477e-ba61-d51984e63151"
+    },
+    {
+      "index": 9,
+      "utc": "2026-10-04T08:19:01.068Z",
+      "viewport": {
+        "dpr": 1.25,
+        "h": 606,
+        "w": 402
+      },
+      "rowCount": 28,
+      "bucketCounts": {
+        "open": 2,
+        "future": 3,
+        "past": 23,
+        "unparsed": 0
+      },
+      "conformingAtDisplayedMinute": true,
+      "settledAcceptance": true,
+      "URL": "https://alpha.teameet.co.kr/team-matches?kind=friendly&sportId=b60abf1d-0caf-477e-ba61-d51984e63151"
+    },
+    {
+      "index": 10,
+      "utc": "2026-10-04T08:19:06.024Z",
+      "viewport": {
+        "dpr": 1.5,
+        "h": 505,
+        "w": 788
+      },
+      "rowCount": 28,
+      "bucketCounts": {
+        "open": 2,
+        "future": 3,
+        "past": 23,
+        "unparsed": 0
+      },
+      "conformingAtDisplayedMinute": true,
+      "settledAcceptance": true,
+      "URL": "https://alpha.teameet.co.kr/team-matches?kind=friendly&sportId=b60abf1d-0caf-477e-ba61-d51984e63151"
+    },
+    {
+      "index": 11,
+      "utc": "2026-10-04T08:20:52.227Z",
+      "viewport": {
+        "dpr": 1.5,
+        "h": 505,
+        "w": 788
+      },
+      "rowCount": 28,
+      "bucketCounts": {
+        "open": 2,
+        "future": 3,
+        "past": 23,
+        "unparsed": 0
+      },
+      "conformingAtDisplayedMinute": true,
+      "settledAcceptance": true,
+      "URL": "https://alpha.teameet.co.kr/team-matches?kind=friendly&sportId=b60abf1d-0caf-477e-ba61-d51984e63151"
+    },
+    {
+      "index": 12,
+      "utc": "2026-10-04T08:21:39.549Z",
+      "viewport": {
+        "dpr": 1.5,
+        "h": 505,
+        "w": 788
+      },
+      "rowCount": 20,
+      "bucketCounts": {
+        "open": 2,
+        "future": 18,
+        "past": 0,
+        "unparsed": 0
+      },
+      "conformingAtDisplayedMinute": true,
+      "settledAcceptance": false,
+      "URL": "https://alpha.teameet.co.kr/team-matches"
+    },
+    {
+      "index": 13,
+      "utc": "2026-10-04T08:22:13.970Z",
+      "viewport": {
+        "dpr": 1.5,
+        "h": 505,
+        "w": 788
+      },
+      "rowCount": 0,
+      "bucketCounts": {
+        "open": 0,
+        "future": 0,
+        "past": 0,
+        "unparsed": 0
+      },
+      "conformingAtDisplayedMinute": false,
+      "settledAcceptance": false,
+      "URL": "https://alpha.teameet.co.kr/team-matches"
+    },
+    {
+      "index": 14,
+      "utc": "2026-10-04T08:23:47.586Z",
+      "viewport": {
+        "dpr": 1.5,
+        "h": 505,
+        "w": 788
+      },
+      "rowCount": 20,
+      "bucketCounts": {
+        "open": 2,
+        "future": 18,
+        "past": 0,
+        "unparsed": 0
+      },
+      "conformingAtDisplayedMinute": true,
+      "settledAcceptance": false,
+      "URL": "https://alpha.teameet.co.kr/team-matches"
+    },
+    {
+      "index": 15,
+      "utc": "2026-10-04T08:25:22.460Z",
+      "viewport": {
+        "dpr": 1.5,
+        "h": 505,
+        "w": 788
+      },
+      "rowCount": 40,
+      "bucketCounts": {
+        "open": 2,
+        "future": 27,
+        "past": 11,
+        "unparsed": 0
+      },
+      "conformingAtDisplayedMinute": true,
+      "settledAcceptance": false,
+      "URL": "https://alpha.teameet.co.kr/team-matches"
+    },
+    {
+      "index": 16,
+      "utc": "2026-10-04T08:25:31.955Z",
+      "viewport": {
+        "dpr": 1.5,
+        "h": 505,
+        "w": 788
+      },
+      "rowCount": 60,
+      "bucketCounts": {
+        "open": 2,
+        "future": 27,
+        "past": 31,
+        "unparsed": 0
+      },
+      "conformingAtDisplayedMinute": true,
+      "settledAcceptance": false,
+      "URL": "https://alpha.teameet.co.kr/team-matches"
+    },
+    {
+      "index": 17,
+      "utc": "2026-10-04T08:25:53.150Z",
+      "viewport": {
+        "dpr": 1.5,
+        "h": 505,
+        "w": 788
+      },
+      "rowCount": 68,
+      "bucketCounts": {
+        "open": 2,
+        "future": 27,
+        "past": 39,
+        "unparsed": 0
+      },
+      "conformingAtDisplayedMinute": true,
+      "settledAcceptance": true,
+      "URL": "https://alpha.teameet.co.kr/team-matches"
+    },
+    {
+      "index": 18,
+      "utc": "2026-10-04T08:26:06.078Z",
+      "viewport": {
+        "dpr": 1,
+        "h": 757,
+        "w": 1182
+      },
+      "rowCount": 68,
+      "bucketCounts": {
+        "open": 2,
+        "future": 27,
+        "past": 39,
+        "unparsed": 0
+      },
+      "conformingAtDisplayedMinute": true,
+      "settledAcceptance": true,
+      "URL": "https://alpha.teameet.co.kr/team-matches"
+    },
+    {
+      "index": 19,
+      "utc": "2026-10-04T08:28:33.449Z",
+      "viewport": {
+        "dpr": 1,
+        "h": 757,
+        "w": 1182
+      },
+      "rowCount": 68,
+      "bucketCounts": {
+        "open": 2,
+        "future": 27,
+        "past": 39,
+        "unparsed": 0
+      },
+      "conformingAtDisplayedMinute": true,
+      "settledAcceptance": true,
+      "URL": "https://alpha.teameet.co.kr/team-matches"
+    },
+    {
+      "index": 20,
+      "utc": "2026-10-04T08:29:29.289Z",
+      "viewport": {
+        "dpr": 1,
+        "h": 757,
+        "w": 1182
+      },
+      "rowCount": 20,
+      "bucketCounts": {
+        "open": 2,
+        "future": 3,
+        "past": 15,
+        "unparsed": 0
+      },
+      "conformingAtDisplayedMinute": true,
+      "settledAcceptance": false,
+      "URL": "https://alpha.teameet.co.kr/team-matches?kind=friendly&sportId=b60abf1d-0caf-477e-ba61-d51984e63151"
+    },
+    {
+      "index": 21,
+      "utc": "2026-10-04T08:29:38.523Z",
+      "viewport": {
+        "dpr": 1,
+        "h": 757,
+        "w": 1182
+      },
+      "rowCount": 28,
+      "bucketCounts": {
+        "open": 2,
+        "future": 3,
+        "past": 23,
+        "unparsed": 0
+      },
+      "conformingAtDisplayedMinute": true,
+      "settledAcceptance": true,
+      "URL": "https://alpha.teameet.co.kr/team-matches?kind=friendly&sportId=b60abf1d-0caf-477e-ba61-d51984e63151"
+    },
+    {
+      "index": 22,
+      "utc": "2026-10-04T08:30:04.208Z",
+      "viewport": {
+        "dpr": 1,
+        "h": 757,
+        "w": 1182
+      },
+      "rowCount": 28,
+      "bucketCounts": {
+        "open": 2,
+        "future": 3,
+        "past": 23,
+        "unparsed": 0
+      },
+      "conformingAtDisplayedMinute": true,
+      "settledAcceptance": true,
+      "URL": "https://alpha.teameet.co.kr/team-matches?kind=friendly&sportId=b60abf1d-0caf-477e-ba61-d51984e63151"
+    }
+  ],
+  "comparisons": [
+    {
+      "fromIndex": 3,
+      "toIndex": 4,
+      "sameEntitySet": true,
+      "sameEntityOrder": true,
+      "sameEntityOrderAndDisplayedDates": true
+    },
+    {
+      "fromIndex": 3,
+      "toIndex": 17,
+      "sameEntitySet": true,
+      "sameEntityOrder": false,
+      "sameEntityOrderAndDisplayedDates": false
+    },
+    {
+      "fromIndex": 17,
+      "toIndex": 18,
+      "sameEntitySet": true,
+      "sameEntityOrder": true,
+      "sameEntityOrderAndDisplayedDates": true
+    },
+    {
+      "fromIndex": 18,
+      "toIndex": 19,
+      "sameEntitySet": true,
+      "sameEntityOrder": true,
+      "sameEntityOrderAndDisplayedDates": true
+    },
+    {
+      "fromIndex": 7,
+      "toIndex": 8,
+      "sameEntitySet": true,
+      "sameEntityOrder": true,
+      "sameEntityOrderAndDisplayedDates": true
+    },
+    {
+      "fromIndex": 7,
+      "toIndex": 9,
+      "sameEntitySet": true,
+      "sameEntityOrder": true,
+      "sameEntityOrderAndDisplayedDates": true
+    },
+    {
+      "fromIndex": 7,
+      "toIndex": 10,
+      "sameEntitySet": true,
+      "sameEntityOrder": true,
+      "sameEntityOrderAndDisplayedDates": true
+    },
+    {
+      "fromIndex": 7,
+      "toIndex": 11,
+      "sameEntitySet": true,
+      "sameEntityOrder": true,
+      "sameEntityOrderAndDisplayedDates": true
+    },
+    {
+      "fromIndex": 7,
+      "toIndex": 21,
+      "sameEntitySet": true,
+      "sameEntityOrder": true,
+      "sameEntityOrderAndDisplayedDates": true
+    },
+    {
+      "fromIndex": 7,
+      "toIndex": 22,
+      "sameEntitySet": true,
+      "sameEntityOrder": true,
+      "sameEntityOrderAndDisplayedDates": true
+    }
+  ],
+  "crossTimeDateAndRankChanges": [
+    {
+      "entitySHA": "33b0491c44a72e0a8bac795ad33d353759e469afece130d301a6e02b839ac212",
+      "earlyObservationIndex": 3,
+      "laterObservationIndex": 17,
+      "earlyRankOneBased": 10,
+      "laterRankOneBased": 10,
+      "earlyDateText": "10월 11일 (일) 16:43",
+      "laterDateText": "10월 11일 (일) 17:21",
+      "dateChanged": true
+    },
+    {
+      "entitySHA": "fd560d6b5d545b1055a32df574ea00ec551f8179486e3add2c5d4c0523945f27",
+      "earlyObservationIndex": 3,
+      "laterObservationIndex": 17,
+      "earlyRankOneBased": 11,
+      "laterRankOneBased": 11,
+      "earlyDateText": "10월 11일 (일) 16:43",
+      "laterDateText": "10월 11일 (일) 17:21",
+      "dateChanged": true
+    },
+    {
+      "entitySHA": "c32f7d54475ff39d10a62e29255fac4331e41a6fdba56598378d337fd449f9b3",
+      "earlyObservationIndex": 3,
+      "laterObservationIndex": 17,
+      "earlyRankOneBased": 42,
+      "laterRankOneBased": 43,
+      "earlyDateText": "10월 1일 (목) 17:00",
+      "laterDateText": "10월 1일 (목) 17:00",
+      "dateChanged": false
+    },
+    {
+      "entitySHA": "f9354468475d9a1213c8f24f51221b69c56cc37761cc359f82cb07cc17015908",
+      "earlyObservationIndex": 3,
+      "laterObservationIndex": 17,
+      "earlyRankOneBased": 43,
+      "laterRankOneBased": 42,
+      "earlyDateText": "10월 1일 (목) 16:43",
+      "laterDateText": "10월 1일 (목) 17:21",
+      "dateChanged": true
+    },
+    {
+      "entitySHA": "ef437ec5cf3befdcb15877ffe30c47ecfebf732ef12171ce0fc55b6f39536cbb",
+      "earlyObservationIndex": 3,
+      "laterObservationIndex": 17,
+      "earlyRankOneBased": 55,
+      "laterRankOneBased": 55,
+      "earlyDateText": "9월 27일 (일) 16:43",
+      "laterDateText": "9월 27일 (일) 17:21",
+      "dateChanged": true
+    }
+  ],
+  "photoStyleGeometry": [
+    {
+      "index": 0,
+      "UTC": "2026-10-04T08:07:16.473Z",
+      "chainLength": 9,
+      "recordedFilters": [
+        "none"
+      ],
+      "recordedOpacityOne": true,
+      "panelPercentGeometry": null,
+      "sourceImageHashesMatchAcrossUploadedFixture": true
+    },
+    {
+      "index": 1,
+      "UTC": "2026-10-04T08:11:42.031Z",
+      "chainLength": 9,
+      "recordedFilters": [
+        "none"
+      ],
+      "recordedOpacityOne": true,
+      "panelPercentGeometry": 55.536474863570525,
+      "sourceImageHashesMatchAcrossUploadedFixture": true
+    },
+    {
+      "index": 2,
+      "UTC": "2026-10-04T08:14:06.925Z",
+      "chainLength": 9,
+      "recordedFilters": [
+        "brightness(0.88) grayscale(0.35)",
+        "none"
+      ],
+      "recordedOpacityOne": true,
+      "panelPercentGeometry": null,
+      "sourceImageHashesMatchAcrossUploadedFixture": false
+    },
+    {
+      "index": 3,
+      "UTC": "2026-10-04T08:20:07.708Z",
+      "chainLength": 9,
+      "recordedFilters": [
+        "none"
+      ],
+      "recordedOpacityOne": true,
+      "panelPercentGeometry": null,
+      "sourceImageHashesMatchAcrossUploadedFixture": true
+    },
+    {
+      "index": 4,
+      "UTC": "2026-10-04T08:20:30.439Z",
+      "chainLength": 9,
+      "recordedFilters": [
+        "none"
+      ],
+      "recordedOpacityOne": true,
+      "panelPercentGeometry": 35.5,
+      "sourceImageHashesMatchAcrossUploadedFixture": true
+    },
+    {
+      "index": 5,
+      "UTC": "2026-10-04T08:26:16.550Z",
+      "chainLength": 9,
+      "recordedFilters": [
+        "none"
+      ],
+      "recordedOpacityOne": true,
+      "panelPercentGeometry": null,
+      "sourceImageHashesMatchAcrossUploadedFixture": true
+    },
+    {
+      "index": 6,
+      "UTC": "2026-10-04T08:27:45.077Z",
+      "chainLength": 9,
+      "recordedFilters": [
+        "none"
+      ],
+      "recordedOpacityOne": true,
+      "panelPercentGeometry": 39.30769230769231,
+      "sourceImageHashesMatchAcrossUploadedFixture": true
+    }
+  ],
+  "captureLinks": [
+    {
+      "file": "crops/mobile-list-photo.png",
+      "photoIndex": 0,
+      "DOMUTC": "2026-10-04T08:07:16.473Z",
+      "panelUTC": null,
+      "captureStartUTC": "2026-10-04T08:07:16.483Z",
+      "captureEndUTC": "2026-10-04T08:07:16.509Z",
+      "delayFromPhotoDOMSeconds": 0.01,
+      "outputSHA256": "22748f9d518238c655d7dba672f865f0fccac2764953435ce86aa7cb34680df7",
+      "outputPixels": [
+        96,
+        96
+      ]
+    },
+    {
+      "file": "crops/tablet-list-photo.png",
+      "photoIndex": 3,
+      "DOMUTC": "2026-10-04T08:20:07.708Z",
+      "panelUTC": null,
+      "captureStartUTC": "2026-10-04T08:20:07.715Z",
+      "captureEndUTC": "2026-10-04T08:20:07.741Z",
+      "delayFromPhotoDOMSeconds": 0.007,
+      "outputSHA256": "b95eb40ed0bde1fe63d2d43e35af61aad62aea57e81c476ffbc80679100e4a5b",
+      "outputPixels": [
+        96,
+        96
+      ]
+    },
+    {
+      "file": "crops/desktop-list-photo.png",
+      "photoIndex": 5,
+      "DOMUTC": "2026-10-04T08:26:16.550Z",
+      "panelUTC": null,
+      "captureStartUTC": "2026-10-04T08:26:16.555Z",
+      "captureEndUTC": "2026-10-04T08:26:16.583Z",
+      "delayFromPhotoDOMSeconds": 0.005,
+      "outputSHA256": "ae10f052c5ada185f34e36ffccc587454114a658b0b95c478c1761cffddf1554",
+      "outputPixels": [
+        96,
+        96
+      ]
+    },
+    {
+      "file": "crops/mobile-detail-uncovered.png",
+      "photoIndex": 1,
+      "DOMUTC": "2026-10-04T08:11:42.031Z",
+      "panelUTC": "2026-10-04T08:11:42.047Z",
+      "captureStartUTC": "2026-10-04T08:11:42.052Z",
+      "captureEndUTC": "2026-10-04T08:11:42.323Z",
+      "delayFromPhotoDOMSeconds": 0.021,
+      "outputSHA256": "9be02a75ca5ab10ca31c6ba075ba68def747c4bb822df68ebc5c7ad3ec64e147",
+      "outputPixels": [
+        272,
+        70
+      ]
+    },
+    {
+      "file": "crops/mobile-detail-panel.png",
+      "photoIndex": 1,
+      "DOMUTC": "2026-10-04T08:11:42.031Z",
+      "panelUTC": "2026-10-04T08:11:42.047Z",
+      "captureStartUTC": "2026-10-04T08:11:42.052Z",
+      "captureEndUTC": "2026-10-04T08:11:42.323Z",
+      "delayFromPhotoDOMSeconds": 0.021,
+      "outputSHA256": "7f82327232cf852c1822d5c6242dabafd867057ff4e2877dac55289668b29782",
+      "outputPixels": [
+        370,
+        28
+      ]
+    },
+    {
+      "file": "crops/tablet-detail-uncovered.png",
+      "photoIndex": 4,
+      "DOMUTC": "2026-10-04T08:20:30.439Z",
+      "panelUTC": "2026-10-04T08:20:35.121Z",
+      "captureStartUTC": "2026-10-04T08:20:35.127Z",
+      "captureEndUTC": "2026-10-04T08:20:35.151Z",
+      "delayFromPhotoDOMSeconds": 4.688,
+      "outputSHA256": "7a379cc7113c0f8a9c46814939b171ec0ef797e3f2539cf516c01e0bfba15ca3",
+      "outputPixels": [
+        474,
+        118
+      ]
+    },
+    {
+      "file": "crops/tablet-detail-panel.png",
+      "photoIndex": 4,
+      "DOMUTC": "2026-10-04T08:20:30.439Z",
+      "panelUTC": "2026-10-04T08:20:35.121Z",
+      "captureStartUTC": "2026-10-04T08:20:35.127Z",
+      "captureEndUTC": "2026-10-04T08:20:35.151Z",
+      "delayFromPhotoDOMSeconds": 4.688,
+      "outputSHA256": "ab1a08d7eec52d564727a80f56e659282a9ab45c287b656b3cc83f30c690a55c",
+      "outputPixels": [
+        568,
+        28
+      ]
+    },
+    {
+      "file": "crops/desktop-detail-uncovered.png",
+      "photoIndex": 6,
+      "DOMUTC": "2026-10-04T08:27:45.077Z",
+      "panelUTC": "2026-10-04T08:27:45.095Z",
+      "captureStartUTC": "2026-10-04T08:27:45.101Z",
+      "captureEndUTC": "2026-10-04T08:27:45.139Z",
+      "delayFromPhotoDOMSeconds": 0.024,
+      "outputSHA256": "dd90a7bff2fed1cb3f4136f97f1f3a363cca35985aafa76a9ae420a26e807383",
+      "outputPixels": [
+        536,
+        94
+      ]
+    },
+    {
+      "file": "crops/desktop-detail-panel.png",
+      "photoIndex": 6,
+      "DOMUTC": "2026-10-04T08:27:45.077Z",
+      "panelUTC": "2026-10-04T08:27:45.095Z",
+      "captureStartUTC": "2026-10-04T08:27:45.101Z",
+      "captureEndUTC": "2026-10-04T08:27:45.139Z",
+      "delayFromPhotoDOMSeconds": 0.024,
+      "outputSHA256": "38df4c223dadf8fc10d8eea8ce517d78f73ffe778569979bf5b1823aa019e244",
+      "outputPixels": [
+        584,
+        28
+      ]
+    }
+  ],
+  "numericalReportArithmeticOnly": [
+    {
+      "label": "mobile-list-photo",
+      "reportedRatio": 0.980297,
+      "ratioFromReportedMeans": 0.9802972903832885,
+      "reportedBinCount": 5184,
+      "meaning": "Internal arithmetic consistency only. Original pixels/fit statistics not independently recalculated."
+    },
+    {
+      "label": "tablet-list-photo",
+      "reportedRatio": 0.980016,
+      "ratioFromReportedMeans": 0.980015537008473,
+      "reportedBinCount": 5184,
+      "meaning": "Internal arithmetic consistency only. Original pixels/fit statistics not independently recalculated."
+    },
+    {
+      "label": "desktop-list-photo",
+      "reportedRatio": 0.988212,
+      "ratioFromReportedMeans": 0.9882117708551168,
+      "reportedBinCount": 5184,
+      "meaning": "Internal arithmetic consistency only. Original pixels/fit statistics not independently recalculated."
+    }
+  ],
+  "workflowReadback": {
+    "initial": {
+      "SHA": "45b9f0756b70d3b80801d5f5f2b43c692e007d1a",
+      "status": "completed",
+      "conclusion": "success",
+      "updatedUTC": "2026-10-04T07:45:40Z",
+      "URL": "https://github.com/kim-song-jun/matchup-sports-platform/actions/runs/37185889857"
+    },
+    "later": {
+      "SHA": "4c81d071ede5bba14575f2aeb1097326797cbd08",
+      "status": "completed",
+      "conclusion": "success",
+      "updatedUTC": "2026-10-04T08:22:48Z",
+      "URL": "https://github.com/kim-song-jun/matchup-sports-platform/actions/runs/37188018237"
+    }
+  },
+  "sourceExcerptsRead": [
+    {
+      "kind": "api",
+      "sourceURL": "https://github.com/kim-song-jun/matchup-sports-platform/blob/45b9f0756b70d3b80801d5f5f2b43c692e007d1a/apps/v1_api/src/team-matches/team-matches.service.ts",
+      "gitBlobSHA": "eebea984267bffbb004dca00269adb3336b1bc1d",
+      "excerptSHA256": "3ebfca9e61644c90b49c1c2c48fff464b504ab28e8a2eeddf86ba831da93bcf6"
+    },
+    {
+      "kind": "partition",
+      "sourceURL": "https://github.com/kim-song-jun/matchup-sports-platform/blob/45b9f0756b70d3b80801d5f5f2b43c692e007d1a/apps/v1_web/src/components/team-matches/team-matches.card-model.ts",
+      "gitBlobSHA": "c497dee6298be6120adb6337d00ea605d0159f8c",
+      "excerptSHA256": "c6f4aade9f6865914fffd2ddcd1d728bd8b2c71bf07381b86b2bb057683965ff"
+    },
+    {
+      "kind": "date",
+      "sourceURL": "https://github.com/kim-song-jun/matchup-sports-platform/blob/45b9f0756b70d3b80801d5f5f2b43c692e007d1a/apps/v1_web/src/lib/date-utils.ts",
+      "gitBlobSHA": "20e170eb5b5ec1a03f0483a10696221405cf37da",
+      "excerptSHA256": "bddb31eaec50cfbf59b7f9f2da5ba3802e413c3fe997b438a9ebdfcb76bb5fe3"
+    }
+  ],
+  "explicitLimits": [
+    "Dates use assumed2026/KST displayed minute, not API timestamps/seconds/tie IDs/createdAt. No unscheduled rows.",
+    "44 selected completed tool calls include intention labels; GET pagination in an action label is not HTTP capture evidence.",
+    "Only mobile browser Back/Forward; tablet/desktop appBack. Final exit20 is a fresh default-list state, not loss during an asserted68rowreturn.",
+    "Four displayed date changes and one neighbor swap across snapshots are not breakpoint or seed/deployment causality.",
+    "Private screenshot crop equality, sourceJPEG numerical regression, source preservation of the earlier9JSON and transient unsaved tool excerpts remain prior attestations.",
+    "No error screenshot, HTTP status/rootcause/wholeappPASS/runtimeSHA proof."
+  ]
+}

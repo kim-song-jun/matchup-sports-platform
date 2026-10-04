@@ -1,0 +1,165 @@
+{
+  "files": [
+    {
+      "file": "PUBLISHER-VERIFICATION.md",
+      "bytes": 6724,
+      "sha256": "b22cd343f9f48b44b9637f1867e54b6f39ed59a98a1e63f440886c846de5e2e7"
+    },
+    {
+      "file": "README.md",
+      "bytes": 4842,
+      "sha256": "4948ec51ef64672e0e6840102216c2a6bb9c9b8f3172f7bb30d715d281acab96"
+    },
+    {
+      "file": "SHA256SUMS",
+      "bytes": 2584,
+      "sha256": "4a0a17d2af5b07817f3e1a19f9ebe1047e7d5343597a50d2158780502d3a58a7"
+    },
+    {
+      "file": "actions.json",
+      "bytes": 6603,
+      "sha256": "b2256e881381669545c768547f7a28d3e9d9c6bdc1e0e016a2d3eedd5f43440a"
+    },
+    {
+      "file": "crop-provenance.json",
+      "bytes": 9044,
+      "sha256": "0179eafe45219136f074dfeb46c73571be5d5eb32f098461a235d7b5098cac03"
+    },
+    {
+      "file": "crops/desktop-detail-panel.png",
+      "bytes": 16063,
+      "sha256": "38df4c223dadf8fc10d8eea8ce517d78f73ffe778569979bf5b1823aa019e244"
+    },
+    {
+      "file": "crops/desktop-detail-uncovered.png",
+      "bytes": 46036,
+      "sha256": "dd90a7bff2fed1cb3f4136f97f1f3a363cca35985aafa76a9ae420a26e807383"
+    },
+    {
+      "file": "crops/desktop-list-photo.png",
+      "bytes": 15593,
+      "sha256": "ae10f052c5ada185f34e36ffccc587454114a658b0b95c478c1761cffddf1554"
+    },
+    {
+      "file": "crops/mobile-detail-panel.png",
+      "bytes": 7098,
+      "sha256": "7f82327232cf852c1822d5c6242dabafd867057ff4e2877dac55289668b29782"
+    },
+    {
+      "file": "crops/mobile-detail-uncovered.png",
+      "bytes": 9925,
+      "sha256": "9be02a75ca5ab10ca31c6ba075ba68def747c4bb822df68ebc5c7ad3ec64e147"
+    },
+    {
+      "file": "crops/mobile-list-photo.png",
+      "bytes": 14710,
+      "sha256": "22748f9d518238c655d7dba672f865f0fccac2764953435ce86aa7cb34680df7"
+    },
+    {
+      "file": "crops/tablet-detail-panel.png",
+      "bytes": 16171,
+      "sha256": "ab1a08d7eec52d564727a80f56e659282a9ab45c287b656b3cc83f30c690a55c"
+    },
+    {
+      "file": "crops/tablet-detail-uncovered.png",
+      "bytes": 49910,
+      "sha256": "7a379cc7113c0f8a9c46814939b171ec0ef797e3f2539cf516c01e0bfba15ca3"
+    },
+    {
+      "file": "crops/tablet-list-photo.png",
+      "bytes": 15177,
+      "sha256": "b95eb40ed0bde1fe63d2d43e35af61aad62aea57e81c476ffbc80679100e4a5b"
+    },
+    {
+      "file": "deployment-context.json",
+      "bytes": 1466,
+      "sha256": "71e976ca75daeb2e0d192f27fda7be5c5a6858bc8a053b180079f1b1a3f7c3d0"
+    },
+    {
+      "file": "entry.json",
+      "bytes": 343,
+      "sha256": "1206668a506f3e55e09365b1dfca2b93e35903c01cbadec85f0c59117b268d5e"
+    },
+    {
+      "file": "exit.json",
+      "bytes": 327,
+      "sha256": "926b09d79f9af255cb9f819e5854d9a163e028d9cf35fd3cdcc60d409eae73b3"
+    },
+    {
+      "file": "manifest.json",
+      "bytes": 5930,
+      "sha256": "b4197e502e8dc06596f73e46e18c653b8d86c524c2b95e9de6bb84f0340f5550"
+    },
+    {
+      "file": "mobile-photo-pixel-analysis.json",
+      "bytes": 8568,
+      "sha256": "cdca9b1709cf51d16172e9c71ccf83dc44d9da79e8a4f751566c6b2a714436fe"
+    },
+    {
+      "file": "original-source-proof.json",
+      "bytes": 1090,
+      "sha256": "0a8c994829fe845c13c3b14ca986600430c1fcb73a404cfaf04165542ebd6e99"
+    },
+    {
+      "file": "photo-analysis.json",
+      "bytes": 8629,
+      "sha256": "edb41be3e96467477443343fb38098f6b9cb3f134f29943b5d128af29ce324ff"
+    },
+    {
+      "file": "photo-proof.json",
+      "bytes": 69371,
+      "sha256": "eb1fc4887b91f3a0bd3569568726fc1561dcafa4986bd3c4cd5d110c426d6933"
+    },
+    {
+      "file": "provenance.json",
+      "bytes": 6512,
+      "sha256": "2a03542572702a0d63f063e7adee495b5c83c0e5c5fb1ed7d11a2e404c6508ca"
+    },
+    {
+      "file": "publisher-verification.json",
+      "bytes": 28706,
+      "sha256": "7659ff55eb91d6d3d36f0db715158d70f6b2bef95adb7d8b16d23871c43c5eb1"
+    },
+    {
+      "file": "return-proof.json",
+      "bytes": 2773,
+      "sha256": "313509e6615d1b3915d0553651cff5081333e4a7f3148fccf90ba124193f9432"
+    },
+    {
+      "file": "sort-analysis.json",
+      "bytes": 264561,
+      "sha256": "dde634cda2a06031a7a28d5a78a287e51cb7821b42962a3035488774a778df58"
+    },
+    {
+      "file": "sort-proof.json",
+      "bytes": 631173,
+      "sha256": "eca077a58d05d4f0de333d1aa48bef3b7162ceea8e5d3d7d70de6d39eb0b6556"
+    },
+    {
+      "file": "source-context.json",
+      "bytes": 4942,
+      "sha256": "3dd6148da8bc1b2c0302ac2725d5d0d2184ea500467120c70f110692eba20cf3"
+    },
+    {
+      "file": "source-preservation-check.json",
+      "bytes": 990,
+      "sha256": "805f3b66348a1b671730784b1adae2fb55aecc5f009a7fec05d1f5e04595aa6e"
+    },
+    {
+      "file": "summary.json",
+      "bytes": 3280,
+      "sha256": "ad72afec621819485e61ba1ab1adf64cae71e3cb047b39abac5db6baf98f95da"
+    },
+    {
+      "file": "three-width-photo-pixel-analysis.json",
+      "bytes": 16738,
+      "sha256": "0ac2c56ac66f669ca9d9397a782e2a645da5a96eff47ddd3eddb6da260a8ba55"
+    },
+    {
+      "file": "transient-note.json",
+      "bytes": 2458,
+      "sha256": "404d788c2865193aadbf56cbbaf2193b480fade016a210a994224e174674c102"
+    }
+  ],
+  "note": "All delivered files except this publisher manifest. Original manifest and SHA256SUMS are unchanged historical30-file input inventories."
+}

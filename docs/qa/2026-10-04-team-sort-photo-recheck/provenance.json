@@ -1,0 +1,113 @@
+{
+  "createdUTC": "2026-10-04T08:42:45.792450+00:00",
+  "packetType": "separate sanitized publication projection; original collector files preserved",
+  "sourceArtifacts": [
+    {
+      "sourceFile": "safe/actions.json",
+      "sourceSHA256": "b2256e881381669545c768547f7a28d3e9d9c6bdc1e0e016a2d3eedd5f43440a",
+      "sourceBytes": 6603,
+      "projectionFile": "actions.json",
+      "projectionSHA256": "b2256e881381669545c768547f7a28d3e9d9c6bdc1e0e016a2d3eedd5f43440a",
+      "mode": "byte-identical safe collector artifact"
+    },
+    {
+      "sourceFile": "safe/entry.json",
+      "sourceSHA256": "1206668a506f3e55e09365b1dfca2b93e35903c01cbadec85f0c59117b268d5e",
+      "sourceBytes": 343,
+      "projectionFile": "entry.json",
+      "projectionSHA256": "1206668a506f3e55e09365b1dfca2b93e35903c01cbadec85f0c59117b268d5e",
+      "mode": "byte-identical safe collector artifact"
+    },
+    {
+      "sourceFile": "safe/exit.json",
+      "sourceSHA256": "926b09d79f9af255cb9f819e5854d9a163e028d9cf35fd3cdcc60d409eae73b3",
+      "sourceBytes": 327,
+      "projectionFile": "exit.json",
+      "projectionSHA256": "926b09d79f9af255cb9f819e5854d9a163e028d9cf35fd3cdcc60d409eae73b3",
+      "mode": "byte-identical safe collector artifact"
+    },
+    {
+      "sourceFile": "safe/sort-proof.json",
+      "sourceSHA256": "e97c2c2507df75eba61805d1dcf978306ecffecfb7d8e7ce4539f5603ace9bd2",
+      "sourceBytes": 546821,
+      "projectionFile": "sort-proof.json",
+      "projectionSHA256": "eca077a58d05d4f0de333d1aa48bef3b7162ceea8e5d3d7d70de6d39eb0b6556",
+      "mode": "sanitized projection; identifier-bearing hrefs/detail URLs/selectors replaced with SHA-256 fields"
+    },
+    {
+      "sourceFile": "safe/photo-proof.json",
+      "sourceSHA256": "6a3af6d0ab430c152d2b6379be17be617f48dc565e2ef57577e0958b78b11381",
+      "sourceBytes": 68601,
+      "projectionFile": "photo-proof.json",
+      "projectionSHA256": "eb1fc4887b91f3a0bd3569568726fc1561dcafa4986bd3c4cd5d110c426d6933",
+      "mode": "sanitized projection; identifier-bearing hrefs/detail URLs/selectors replaced with SHA-256 fields"
+    },
+    {
+      "sourceFile": "safe/return-proof.json",
+      "sourceSHA256": "60c7fc4d319d80edbd07036cdf04ed51e9594c6cf84a64ef2b9166b8072dd066",
+      "sourceBytes": 2142,
+      "projectionFile": "return-proof.json",
+      "projectionSHA256": "313509e6615d1b3915d0553651cff5081333e4a7f3148fccf90ba124193f9432",
+      "mode": "sanitized projection; identifier-bearing hrefs/detail URLs/selectors replaced with SHA-256 fields"
+    },
+    {
+      "sourceFile": "safe/original-source-proof.json",
+      "sourceSHA256": "0a8c994829fe845c13c3b14ca986600430c1fcb73a404cfaf04165542ebd6e99",
+      "sourceBytes": 1090,
+      "projectionFile": "original-source-proof.json",
+      "projectionSHA256": "0a8c994829fe845c13c3b14ca986600430c1fcb73a404cfaf04165542ebd6e99",
+      "mode": "byte-identical safe collector artifact"
+    },
+    {
+      "sourceFile": "safe/mobile-photo-pixel-analysis.json",
+      "sourceSHA256": "cdca9b1709cf51d16172e9c71ccf83dc44d9da79e8a4f751566c6b2a714436fe",
+      "sourceBytes": 8568,
+      "projectionFile": "mobile-photo-pixel-analysis.json",
+      "projectionSHA256": "cdca9b1709cf51d16172e9c71ccf83dc44d9da79e8a4f751566c6b2a714436fe",
+      "mode": "byte-identical safe collector artifact"
+    },
+    {
+      "sourceFile": "safe/three-width-photo-pixel-analysis.json",
+      "sourceSHA256": "0ac2c56ac66f669ca9d9397a782e2a645da5a96eff47ddd3eddb6da260a8ba55",
+      "sourceBytes": 16738,
+      "projectionFile": "three-width-photo-pixel-analysis.json",
+      "projectionSHA256": "0ac2c56ac66f669ca9d9397a782e2a645da5a96eff47ddd3eddb6da260a8ba55",
+      "mode": "byte-identical safe collector artifact"
+    }
+  ],
+  "identifierProjection": {
+    "algorithm": "SHA-256 of exact UTF-8 string; lowercase hex",
+    "entitySHA": "Hash of urlsplit(href-or-url).path only; excludes origin, query and fragment",
+    "hrefSHA256": "Hash of complete original href string, including any query",
+    "urlSHA256": "Hash of complete original detail URL string",
+    "selectorSHA256": "Hash of exact original entity-bearing selector",
+    "topLevelListURLs": "Exact list URLs retained; only /team-matches with ordinary kind/sportId filter parameters. No personal q query was used.",
+    "rowFieldsPreserved": [
+      "index",
+      "dateText",
+      "badges",
+      "className",
+      "rect",
+      "whenWithoutVenue"
+    ],
+    "note": "Hashes are pseudonymous linkage fields, not evidence of anonymity against a party that already knows the source identifiers."
+  },
+  "evidenceClasses": {
+    "collectorObservations": "Supplied safe JSON preserves what the collector recorded; geometry/style/date values are not independently recollected live.",
+    "recomputed": "Sort parsing/buckets/comparisons, style-chain checks and panel rectangle ratios recomputed from supplied JSON.",
+    "exactCrops": "Nine exact decoded RGB pixel crops from the six authorized screenshots, checked against capture SHA-256 and saved as PNG. Source screenshots decode as JPEG despite .png names. Bounds and capture-to-DOM links are in crop-provenance.json.",
+    "priorPixelAnalysis": "Mobile and three-width numerical files are byte-identical analyst reports. The original JPEG was not opened, copied or independently verified during packet preparation.",
+    "attestations": "Deployment reports, supported source download, retained transient tool/console excerpt, and recovered screenshot interpretation are collector/parent attestations, clearly labeled.",
+    "staticSource": "Supplied immutable source references explain intended behavior but do not prove served identity."
+  },
+  "independentPublicVerification": "A publisher can verify file hashes, sanitized row calculations, style/geometry derivations and visible crop contents. With only this public packet, they cannot independently verify original raw source-image bytes, private screenshot-to-crop pixel equality, live DOM collection, retained unsaved tool results, or deployment state.",
+  "excluded": [
+    "original downloaded image and image URLs",
+    "full screenshots",
+    "team/host names and roster data",
+    "raw row/detail URLs and entity UUIDs",
+    "the later recovered screenshot with a misleading error filename",
+    "other private files"
+  ],
+  "observedLocalPreparationActions": "Read only the nine allowed safe JSON files, capture metadata and six authorized screenshot files; produced the publish projection. No browser/network/GitHub actions."
+}

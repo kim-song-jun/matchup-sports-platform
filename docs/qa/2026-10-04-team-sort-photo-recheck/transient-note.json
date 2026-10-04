@@ -1,0 +1,70 @@
+{
+  "title": "Temporary tablet list retrieval state; cause undetermined",
+  "originalObservationFile": "sort-proof.json",
+  "timeline": [
+    {
+      "utc": "2026-10-04T08:21:39.549Z",
+      "index": 12,
+      "evidenceClass": "original collector observation projected without substantive changes",
+      "rows": 20,
+      "moreButtonCount": 0,
+      "interpretation": "Intermediate state before error; not a completed acceptance pass"
+    },
+    {
+      "utc": "2026-10-04T08:22:13.970Z",
+      "index": 13,
+      "evidenceClass": "original collector observation projected without substantive changes",
+      "rows": 0,
+      "moreButtonCount": 0,
+      "interpretation": "No row-order verdict possible"
+    },
+    {
+      "utc": "2026-10-04T08:22:13.989Z",
+      "evidenceClass": "collector attestation transcribed later from retained tool return; not an original capture-time raw file",
+      "loadingIndicators": [],
+      "errorTextPresent": true,
+      "buttons": [
+        {
+          "text": "다시 불러오기",
+          "label": null,
+          "disabled": false
+        },
+        {
+          "text": "",
+          "label": "맨 위로 이동",
+          "disabled": false
+        }
+      ]
+    },
+    {
+      "utcApproximate": "2026-10-04T08:22:42Z",
+      "evidenceClass": "collector attestation from recovered full accessibility/screenshot state; screenshot excluded from public evidence",
+      "rows": 20,
+      "morePresent": true,
+      "manualRetry": false,
+      "interpretation": "Recovered automatically; this later screenshot is not an error screenshot"
+    },
+    {
+      "utc": "2026-10-04T08:23:47.586Z",
+      "index": 14,
+      "evidenceClass": "original collector observation projected without substantive changes",
+      "rows": 20,
+      "moreButtonCount": 1,
+      "interpretation": "Persisted confirmation of recovered rows and More button"
+    }
+  ],
+  "retainedConsoleExcerpt": {
+    "evidenceClass": "collector attestation of captured console within the inspected window, not a complete console/network audit",
+    "onlyRecordedMessage": "Error sending browser metadata to extension: Object"
+  },
+  "notEstablished": [
+    "error screenshot",
+    "HTTP status",
+    "network request/response audit",
+    "root cause",
+    "pagination bug",
+    "HTTP 503",
+    "deployment or seed causality"
+  ],
+  "classification": "Transient observed UI availability issue that recovered; no permanent sorting failure established."
+}

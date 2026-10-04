@@ -1,0 +1,84 @@
+{
+  "referenceCommit": "45b9f0756b70d3b80801d5f5f2b43c692e007d1a",
+  "evidenceClass": "static source references supplied by read-only source review; not reread or fetched by projection preparer",
+  "servedIdentityVerified": false,
+  "references": [
+    {
+      "path": "apps/v1_api/src/team-matches/team-matches.service.ts",
+      "line": 198,
+      "url": "https://github.com/kim-song-jun/matchup-sports-platform/blob/45b9f0756b70d3b80801d5f5f2b43c692e007d1a/apps/v1_api/src/team-matches/team-matches.service.ts#L198",
+      "relevance": "Default scheduled ordering: upcoming ASC, past DESC, then unscheduled; latest uses createdAt DESC and ID tie handling."
+    },
+    {
+      "path": "apps/v1_api/src/team-matches/team-matches.service.ts",
+      "line": 2191,
+      "url": "https://github.com/kim-song-jun/matchup-sports-platform/blob/45b9f0756b70d3b80801d5f5f2b43c692e007d1a/apps/v1_api/src/team-matches/team-matches.service.ts#L2191",
+      "relevance": "Public invariant rejects null startAt; no live unscheduled example was available for this QA."
+    },
+    {
+      "path": "apps/v1_web/src/components/team-matches/team-matches.card-model.ts",
+      "line": 185,
+      "url": "https://github.com/kim-song-jun/matchup-sports-platform/blob/45b9f0756b70d3b80801d5f5f2b43c692e007d1a/apps/v1_web/src/components/team-matches/team-matches.card-model.ts#L185",
+      "relevance": "Frontend availability grouping is a stable partition; explains open-badge rows preceding otherwise chronological rows."
+    },
+    {
+      "path": "apps/v1_web/src/lib/date-utils.ts",
+      "line": 345,
+      "url": "https://github.com/kim-song-jun/matchup-sports-platform/blob/45b9f0756b70d3b80801d5f5f2b43c692e007d1a/apps/v1_web/src/lib/date-utils.ts#L345",
+      "relevance": "Displayed date formatting uses KST."
+    },
+    {
+      "path": "apps/v1_web/src/components/team-matches/team-match-images.tsx",
+      "line": 13,
+      "url": "https://github.com/kim-song-jun/matchup-sports-platform/blob/45b9f0756b70d3b80801d5f5f2b43c692e007d1a/apps/v1_web/src/components/team-matches/team-match-images.tsx#L13",
+      "relevance": "List/detail source priority uses two URL layers without a gradient."
+    },
+    {
+      "path": "apps/v1_web/src/app/globals.css",
+      "line": 4213,
+      "url": "https://github.com/kim-song-jun/matchup-sports-platform/blob/45b9f0756b70d3b80801d5f5f2b43c692e007d1a/apps/v1_web/src/app/globals.css#L4213",
+      "relevance": "Localized detail panel treatment."
+    },
+    {
+      "path": "apps/v1_web/src/app/globals.css",
+      "line": 3062,
+      "url": "https://github.com/kim-song-jun/matchup-sports-platform/blob/45b9f0756b70d3b80801d5f5f2b43c692e007d1a/apps/v1_web/src/app/globals.css#L3062",
+      "relevance": "Closed card filter treatment."
+    },
+    {
+      "path": "apps/v1_web/src/components/team-matches/team-matches-client.tsx",
+      "line": 257,
+      "url": "https://github.com/kim-song-jun/matchup-sports-platform/blob/45b9f0756b70d3b80801d5f5f2b43c692e007d1a/apps/v1_web/src/components/team-matches/team-matches-client.tsx#L257",
+      "relevance": "Team search client path (lines 257–265); search was avoided in this QA."
+    },
+    {
+      "path": "apps/v1_web/src/hooks/use-v1-api.ts",
+      "line": 591,
+      "url": "https://github.com/kim-song-jun/matchup-sports-platform/blob/45b9f0756b70d3b80801d5f5f2b43c692e007d1a/apps/v1_web/src/hooks/use-v1-api.ts#L591",
+      "relevance": "Search hook includes a POST /search/recent path; not invoked intentionally by this QA."
+    },
+    {
+      "path": "apps/v1_web/src/components/team-matches/team-matches-client.tsx",
+      "line": 597,
+      "url": "https://github.com/kim-song-jun/matchup-sports-platform/blob/45b9f0756b70d3b80801d5f5f2b43c692e007d1a/apps/v1_web/src/components/team-matches/team-matches-client.tsx#L597",
+      "relevance": "Filter href construction (lines 597–643); ordinary filter/link actions were used."
+    },
+    {
+      "path": "apps/v1_api/prisma/seed-alpha-league-qa.ts",
+      "line": 729,
+      "url": "https://github.com/kim-song-jun/matchup-sports-platform/blob/45b9f0756b70d3b80801d5f5f2b43c692e007d1a/apps/v1_api/prisma/seed-alpha-league-qa.ts#L729",
+      "relevance": "QA seed can update now-offset dates; source-level possibility only."
+    },
+    {
+      "path": "deploy/deploy-alpha.sh",
+      "line": 318,
+      "url": "https://github.com/kim-song-jun/matchup-sports-platform/blob/45b9f0756b70d3b80801d5f5f2b43c692e007d1a/deploy/deploy-alpha.sh#L318",
+      "relevance": "Deployment script invokes seed; actual run/DB causality for displayed date changes was not observed."
+    }
+  ],
+  "limitations": [
+    "Static source is not proof of which frontend/backend bytes served this browser session.",
+    "No raw API timestamp, seconds, createdAt, tie-ID or live unscheduled ordering proof is present.",
+    "The seed references do not prove that any particular seed invocation changed the observed database."
+  ]
+}

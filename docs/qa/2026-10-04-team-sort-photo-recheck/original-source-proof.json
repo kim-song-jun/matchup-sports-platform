@@ -1,0 +1,40 @@
+{
+  "entry": {
+    "startUTC": "2026-10-04T08:08:16.253Z",
+    "sourceURLSHA256": "2808f485687aecfb981f33726d2b2ce603fc72e07eaafa4b86b5170c237107bd",
+    "source": "First URL actually displayed by current known fixture thumbnail CSS; same-origin HTTPS, no query",
+    "endUTC": "2026-10-04T08:08:16.495Z"
+  },
+  "DOM": {
+    "images": [
+      {
+        "complete": true,
+        "filter": "none",
+        "naturalHeight": 2160,
+        "naturalWidth": 3840,
+        "opacity": "1",
+        "rect": {
+          "bottom": 437.8000030517578,
+          "height": 282,
+          "left": 0,
+          "right": 502,
+          "top": 155.8000030517578,
+          "width": 502,
+          "x": 0,
+          "y": 155.8000030517578
+        }
+      }
+    ],
+    "utc": "2026-10-04T08:08:48.654Z",
+    "viewport": {
+      "dpr": 1.25,
+      "h": 606,
+      "w": 402
+    }
+  },
+  "downloadObservedUTC": "2026-10-04T08:09:24.981Z",
+  "downloadSHA256": "7b973af30c89b8c9ff5eb53eade4a4c13e44ca963d2447cad4db0749a63c4acb",
+  "downloadBytes": 1860293,
+  "rawAssetPublished": false,
+  "rawURLPublished": false
+}

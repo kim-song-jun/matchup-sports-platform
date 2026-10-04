@@ -1,0 +1,97 @@
+{
+  "title": "Teammeet alpha sorting and dark-photo QA evidence",
+  "createdUTC": "2026-10-04T08:42:45.792450+00:00",
+  "scope": "Local public projection of the completed 2026-10-04 browser QA; no new browser/network/source-host actions performed to build this packet",
+  "qaWindowUTC": {
+    "entry": "2026-10-04T07:59:16.441Z",
+    "exit": "2026-10-04T08:30:38.514Z"
+  },
+  "result": "Specified settled sorting/return samples conform at displayed-minute precision. The approved open cow fixture shows no material uniform thumbnail dimming in the retained three-width analysis; detail darkening is localized to panels. A separate transient tablet retrieval state recovered automatically.",
+  "sorting": {
+    "observations": 23,
+    "nonemptyArithmeticChecksConforming": 22,
+    "settledAcceptanceIndices": [
+      3,
+      4,
+      7,
+      8,
+      9,
+      10,
+      11,
+      17,
+      18,
+      19,
+      21,
+      22
+    ],
+    "defaultCompleteRows": 68,
+    "defaultOpenBadgeRows": 2,
+    "defaultOtherFutureRows": 27,
+    "defaultOtherPastRows": 39,
+    "friendlyFutsalCompleteRows": 28,
+    "noUnscheduledSamples": true,
+    "emptyOrIntermediateStatesCountedAsSettledPass": false
+  },
+  "navigation": {
+    "mobile": [
+      "actual browser Back",
+      "actual browser Forward",
+      "app Back"
+    ],
+    "tablet": [
+      "app Back"
+    ],
+    "desktop": [
+      "app Back"
+    ],
+    "threeWidthBrowserHistoryClaim": false,
+    "filters": "UI filter/link actions only; no personal search query"
+  },
+  "photos": {
+    "DOMObservations": 7,
+    "approvedUploadedFixtureObservations": 6,
+    "offscreenDefaultIconControlObservations": 1,
+    "exactSafePNGCrops": 9,
+    "listPixelAnalysisScope": "same approved open cow fixture at three independently timestamped widths",
+    "summaryPanelRectanglePercent": {
+      "mobile": 55.536,
+      "tablet": 35.5,
+      "desktop": 39.308
+    }
+  },
+  "exit": {
+    "errorTextPresent": false,
+    "more": [
+      {
+        "disabled": false,
+        "text": "더 보기"
+      }
+    ],
+    "rows": 20,
+    "searchValue": "",
+    "url": "https://alpha.teameet.co.kr/team-matches",
+    "utc": "2026-10-04T08:30:38.514Z",
+    "viewport": {
+      "dpr": 1,
+      "h": 757,
+      "w": 1182
+    },
+    "visibleDialogCount": 0
+  },
+  "behaviorBoundary": "Collector reports no forms/drafts or create/save/application/share/notification/permission/result actions. Filter Apply is a navigation action. The actual QA179 route was not opened. The default public list included generic rows; no roster/target interactions were performed. This is not a claim of zero server writes or a complete HTTP audit.",
+  "limitations": [
+    "Actual served browser runtime commit is unknown across two reported deployments.",
+    "Displayed date checks assume year 2026 and KST; raw timestamps, seconds, createdAt and ID ties were not verified.",
+    "Numerical source-image comparison is preserved analyst evidence, not independently reproduced from a public original asset.",
+    "No error screenshot, HTTP status or root cause was captured."
+  ],
+  "filesToStartWith": [
+    "README.md",
+    "sort-analysis.json",
+    "photo-analysis.json",
+    "transient-note.json",
+    "deployment-context.json",
+    "provenance.json",
+    "manifest.json"
+  ]
+}

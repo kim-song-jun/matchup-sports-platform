@@ -1,0 +1,27 @@
+{
+  "evidenceClass": "deployment observations supplied by collector/parent; not independently fetched during projection preparation",
+  "initialReportedDeployment": {
+    "commit": "45b9f0756b70d3b80801d5f5f2b43c692e007d1a",
+    "runID": 37185889857,
+    "runConclusion": "success",
+    "runCompletedUTC": "2026-10-04T07:45:40Z",
+    "healthyObservedUTC": "2026-10-04T07:44:46.703Z",
+    "version": "1.1.5-alpha.20261004.g45b9f0756b70"
+  },
+  "entryDocumentReload": {
+    "label": "fresh document reload of current team list after reported45b9 deployment",
+    "startUTC": "2026-10-04T07:59:16.441Z",
+    "endUTC": "2026-10-04T07:59:17.174Z"
+  },
+  "laterReportedDeploymentDuringSameSPA": {
+    "commit": "4c81d071ede5bba14575f2aeb1097326797cbd08",
+    "runID": 37188018237,
+    "runConclusion": "success",
+    "runCompletedUTC": "2026-10-04T08:22:48Z",
+    "healthyObservedUTC": "2026-10-04T08:22:31.618Z",
+    "version": "1.1.5-alpha.20261004.g4c81d071ede5"
+  },
+  "actualBrowserRuntimeCommit": null,
+  "interpretation": "Entry records a fresh document reload after the initial reported deployment. The run later spans a second reported deployment within the same SPA. Later wall-clock observations do not establish a fresh reload of, or served runtime identity for, the newer commit.",
+  "transientTiming": "The temporary list retrieval error overlaps the deployment window. Timing alone does not establish deployment, HTTP 503, pagination, or seed causality."
+}

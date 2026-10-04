@@ -1,0 +1,254 @@
+{
+  "created_utc": "2026-10-04T08:17:28.163615+00:00",
+  "scope": "Approved synthetic cow fixture mobile list thumbnail only. Local analysis; no browser/network writes; no image artifacts created.",
+  "conclusion": "The mobile thumbnail is consistent with the centered cover crop of the downloaded source, with a small capture-level luminance difference. No evidence of a material uniform dim layer. The original photo itself has dark foreground areas. Exact equivalence and a very small effect cannot be established from this JPEG capture.",
+  "materiality_for_this_check": "A uniform attenuation of at least 5% in encoded RGB/luma would be material for this comparison. This is an engineering comparison threshold, not a perceptual universal or statistical confidence interval.",
+  "inputs": {
+    "source_sha256": "7b973af30c89b8c9ff5eb53eade4a4c13e44ca963d2447cad4db0749a63c4acb",
+    "source_sha_matches_proof": true,
+    "source_url_hash_matches_css_primary": true,
+    "source_dimensions": [
+      3840,
+      2160
+    ],
+    "source_format": "JPEG RGB",
+    "source_ICC_profile_present": false,
+    "source_exif_orientation": 1,
+    "screenshot_sha256": "eb919be7f3cfa80686f3001e30930f7ab16067b7e78d36c2c870f648ed5f65e3",
+    "screenshot_dimensions": [
+      402,
+      606
+    ],
+    "screenshot_format": "JPEG RGB despite .png extension",
+    "screenshot_ICC_profile_present": false,
+    "raw_image_or_url_in_artifact": false
+  },
+  "geometry": {
+    "css_rect": {
+      "x": 36.79999923706055,
+      "y": 248,
+      "width": 96,
+      "height": 96
+    },
+    "css_background_size": "cover, cover",
+    "css_background_position": "50% 50%, 50% 50%",
+    "border_radius_css_px": 12,
+    "dpr": 1.25,
+    "source_center_cover_box": [
+      840,
+      0,
+      3000,
+      2160
+    ],
+    "source_pixels_per_css_pixel": 22.5,
+    "principal_screenshot_ROI_half_open": [
+      49,
+      260,
+      121,
+      332
+    ],
+    "principal_pixel_count": 5184,
+    "rounded_corner_handling": "Principal 72x72 ROI is inset at least 12 CSS px. Sensitivity ROIs use 6px and 18px insets; even 6px excludes the 12px-radius curved boundary.",
+    "capture_mapping": "Direct CSS-coordinate model plus a plausible 502x757 physical raster -> 402x606 capture model, with thumbnail at (46,310) physical pixels and 120x120 physical size. Physical capture dimensions are inferred from measured CSS extents and DPR; pipeline resampling is not independently established."
+  },
+  "methodology": {
+    "luma": "0.2126*R + 0.7152*G + 0.0722*B on decoded 8-bit channels (0..255); encoded luma proxy, not linear-light luminance.",
+    "source_handling": "Decode supplied original JPEG without edits; center-cover crop and controlled resize in memory only. No source image or screenshot written/copied/published.",
+    "comparisons": "Pixel correspondence, mean ratio, zero-intercept gain, affine gain/offset, correlation, MAE/RMSE; inset and resampler sensitivity.",
+    "color": "Neither input includes an ICC profile; use decoded RGB with ordinary sRGB-like interpretation. Any browser/display/capture color transform is unknown.",
+    "visual_check": "Original source and authorized mobile capture inspected. Cow/landscape foreground is already dark in source; sky remains bright in thumbnail.",
+    "computed_style_evidence": "Recorded thumbnail/ancestor opacity=1, filter=none, blend mode=normal; background consists of URL layers with no gradient. Style evidence alone does not prove pixels."
+  },
+  "principal_two_stage_bilinear_model": {
+    "interior_inset_css_px": 12,
+    "resamplers": [
+      "bilinear",
+      "bilinear"
+    ],
+    "source_expected_mean_luma": 123.44698,
+    "screenshot_mean_luma": 121.01474,
+    "mean_ratio": 0.980297,
+    "gain_through_origin": 0.986771,
+    "affine_slope": 1.00336,
+    "affine_offset": -2.84706,
+    "luma_MAE": 3.63402,
+    "luma_RMSE": 4.81122,
+    "luma_correlation": 0.99857
+  },
+  "direct_coordinate_models_without_shift": [
+    {
+      "resampler": "box",
+      "origin_shift_css_px": [
+        0,
+        0
+      ],
+      "source_expected_mean_luma": 122.96994,
+      "screenshot_mean_luma": 121.01474,
+      "mean_ratio": 0.9841,
+      "gain_through_origin": 0.986204,
+      "affine_slope": 0.991462,
+      "affine_offset": -0.90525,
+      "luma_MAE": 5.1128,
+      "luma_RMSE": 7.76376,
+      "luma_correlation": 0.995324
+    },
+    {
+      "resampler": "bilinear",
+      "origin_shift_css_px": [
+        0,
+        0
+      ],
+      "source_expected_mean_luma": 123.01733,
+      "screenshot_mean_luma": 121.01474,
+      "mean_ratio": 0.983721,
+      "gain_through_origin": 0.987928,
+      "affine_slope": 0.998565,
+      "affine_offset": -1.82602,
+      "luma_MAE": 4.30724,
+      "luma_RMSE": 6.3304,
+      "luma_correlation": 0.996993
+    },
+    {
+      "resampler": "bicubic",
+      "origin_shift_css_px": [
+        0,
+        0
+      ],
+      "source_expected_mean_luma": 123.01022,
+      "screenshot_mean_luma": 121.01474,
+      "mean_ratio": 0.983778,
+      "gain_through_origin": 0.985455,
+      "affine_slope": 0.989629,
+      "affine_offset": -0.71979,
+      "luma_MAE": 4.99955,
+      "luma_RMSE": 7.46156,
+      "luma_correlation": 0.99574
+    },
+    {
+      "resampler": "lanczos",
+      "origin_shift_css_px": [
+        0,
+        0
+      ],
+      "source_expected_mean_luma": 123.01159,
+      "screenshot_mean_luma": 121.01474,
+      "mean_ratio": 0.983767,
+      "gain_through_origin": 0.984432,
+      "affine_slope": 0.98608,
+      "affine_offset": -0.28454,
+      "luma_MAE": 5.45487,
+      "luma_RMSE": 8.21445,
+      "luma_correlation": 0.994798
+    }
+  ],
+  "sensitivity": {
+    "direct_coordinate_36_models": {
+      "mean_ratio": [
+        0.974586,
+        0.993094
+      ],
+      "gain_through_origin": [
+        0.975428,
+        0.992293
+      ],
+      "luma_correlation": [
+        0.980947,
+        0.997302
+      ]
+    },
+    "direct_coordinate_origin_shift_range_css_px": [
+      -0.4,
+      0.4
+    ],
+    "two_stage_48_models_three_insets_four_by_four_resamplers": {
+      "mean_ratio": [
+        0.978885,
+        0.981526
+      ],
+      "gain_through_origin": [
+        0.980112,
+        0.987584
+      ],
+      "luma_correlation": [
+        0.994927,
+        0.998807
+      ]
+    },
+    "note": "These ranges express chosen geometric/resampling sensitivity; not statistical uncertainty bounds."
+  },
+  "uniform_attenuation_hypotheses_principal_model": [
+    {
+      "gain": 1,
+      "luma_RMSE": 4.81122
+    },
+    {
+      "gain": 0.98,
+      "luma_RMSE": 4.51789
+    },
+    {
+      "gain": 0.95,
+      "luma_RMSE": 6.93436
+    },
+    {
+      "gain": 0.9,
+      "luma_RMSE": 13.37731
+    },
+    {
+      "gain": 0.8,
+      "luma_RMSE": 27.54042
+    }
+  ],
+  "principal_luma_bins": [
+    {
+      "expected_luma_bin": [
+        0,
+        60
+      ],
+      "pixel_count": 1316,
+      "expected_mean": 39.61253,
+      "actual_mean": 37.1129,
+      "mean_difference": -2.49963
+    },
+    {
+      "expected_luma_bin": [
+        60,
+        120
+      ],
+      "pixel_count": 1729,
+      "expected_mean": 80.34867,
+      "actual_mean": 77.60436,
+      "mean_difference": -2.74431
+    },
+    {
+      "expected_luma_bin": [
+        120,
+        180
+      ],
+      "pixel_count": 326,
+      "expected_mean": 147.51194,
+      "actual_mean": 144.57022,
+      "mean_difference": -2.94172
+    },
+    {
+      "expected_luma_bin": [
+        180,
+        256
+      ],
+      "pixel_count": 1813,
+      "expected_mean": 221.07409,
+      "actual_mean": 219.07997,
+      "mean_difference": -1.99412
+    }
+  ],
+  "interpretation": {
+    "mean_difference": "Principal model: screenshot mean 121.01474 vs source-model 123.44698, about 2.0% lower.",
+    "gain_fit": "Best multiplicative gain 0.98677 (about 1.3% lower). Affine slope 1.00336 and offset -2.84706 indicate a small approximately constant decoded-channel difference rather than strong uniform attenuation.",
+    "fit_quality": "Luma correlation 0.99857. A 5% attenuation model has greater error than no attenuation; 10% and 20% attenuation are clearly inconsistent.",
+    "caveats": [
+      "Compressed screenshot and unknown browser/capture filtering prevent exact reproduction.",
+      "Fractional CSS placement, DPR normalization, JPEG decoding/compression, and color handling can cause small differences.",
+      "A tiny dimming effect cannot be distinguished conclusively from capture artifacts.",
+      "The result applies to this approved mobile list fixture, not other photos, desktop/tablet, or hero image until separately measured."
+    ]
+  }
+}

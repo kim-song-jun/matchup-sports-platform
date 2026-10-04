@@ -1,0 +1,2511 @@
+[
+  {
+    "after": {
+      "backdropFilter": "none",
+      "backgroundColor": "rgba(0, 0, 0, 0)",
+      "backgroundFunctionKinds": [],
+      "backgroundImage": "none",
+      "backgroundPosition": "0% 0%",
+      "backgroundSize": "auto",
+      "borderRadius": "0px",
+      "content": "none",
+      "display": "inline",
+      "filter": "none",
+      "mixBlendMode": "normal",
+      "opacity": "1",
+      "visibility": "visible"
+    },
+    "before": {
+      "backdropFilter": "none",
+      "backgroundColor": "rgba(0, 0, 0, 0)",
+      "backgroundFunctionKinds": [],
+      "backgroundImage": "none",
+      "backgroundPosition": "0% 0%",
+      "backgroundSize": "auto",
+      "borderRadius": "0px",
+      "content": "none",
+      "display": "inline",
+      "filter": "none",
+      "mixBlendMode": "normal",
+      "opacity": "1",
+      "visibility": "visible"
+    },
+    "cardBadges": [
+      "상대 모집 중"
+    ],
+    "chain": [
+      {
+        "className": "tm-match-row-thumb",
+        "rect": {
+          "bottom": 344,
+          "height": 96,
+          "left": 36.79999923706055,
+          "right": 132.79999923706055,
+          "top": 248,
+          "width": 96,
+          "x": 36.79999923706055,
+          "y": 248
+        },
+        "style": {
+          "backdropFilter": "none",
+          "backgroundColor": "rgba(0, 0, 0, 0)",
+          "backgroundFunctionKinds": [
+            "url",
+            "url"
+          ],
+          "backgroundImage": "url([omitted]), url([omitted])",
+          "backgroundPosition": "50% 50%, 50% 50%",
+          "backgroundSize": "cover, cover",
+          "borderRadius": "12px",
+          "content": null,
+          "display": "block",
+          "filter": "none",
+          "mixBlendMode": "normal",
+          "opacity": "1",
+          "visibility": "visible"
+        },
+        "tag": "DIV"
+      },
+      {
+        "className": "tm-match-row tm-card-interactive tm-pressable",
+        "rect": {
+          "bottom": 378.8000030517578,
+          "height": 143.60000610351562,
+          "left": 20,
+          "right": 381.6000061035156,
+          "top": 235.1999969482422,
+          "width": 361.6000061035156,
+          "x": 20,
+          "y": 235.1999969482422
+        },
+        "style": {
+          "backdropFilter": "none",
+          "backgroundColor": "rgb(255, 255, 255)",
+          "backgroundFunctionKinds": [],
+          "backgroundImage": "none",
+          "backgroundPosition": "0% 0%",
+          "backgroundSize": "auto",
+          "borderRadius": "16px",
+          "content": null,
+          "display": "flex",
+          "filter": "none",
+          "mixBlendMode": "normal",
+          "opacity": "1",
+          "visibility": "visible"
+        },
+        "tag": "A"
+      },
+      {
+        "className": "tm-match-card-stack",
+        "rect": {
+          "bottom": 11167.50038909912,
+          "height": 11087.900390625,
+          "left": 20,
+          "right": 381.6000061035156,
+          "top": 79.5999984741211,
+          "width": 361.6000061035156,
+          "x": 20,
+          "y": 79.5999984741211
+        },
+        "style": {
+          "backdropFilter": "none",
+          "backgroundColor": "rgba(0, 0, 0, 0)",
+          "backgroundFunctionKinds": [],
+          "backgroundImage": "none",
+          "backgroundPosition": "0% 0%",
+          "backgroundSize": "auto",
+          "borderRadius": "0px",
+          "content": null,
+          "display": "flex",
+          "filter": "none",
+          "mixBlendMode": "normal",
+          "opacity": "1",
+          "visibility": "visible"
+        },
+        "tag": "DIV"
+      },
+      {
+        "className": "tm-match-list",
+        "rect": {
+          "bottom": 11275.50038909912,
+          "height": 11329.900390625,
+          "left": 0,
+          "right": 401.6000061035156,
+          "top": -54.400001525878906,
+          "width": 401.6000061035156,
+          "x": 0,
+          "y": -54.400001525878906
+        },
+        "style": {
+          "backdropFilter": "none",
+          "backgroundColor": "rgba(0, 0, 0, 0)",
+          "backgroundFunctionKinds": [],
+          "backgroundImage": "none",
+          "backgroundPosition": "0% 0%",
+          "backgroundSize": "auto",
+          "borderRadius": "0px",
+          "content": null,
+          "display": "block",
+          "filter": "none",
+          "mixBlendMode": "normal",
+          "opacity": "1",
+          "visibility": "visible"
+        },
+        "tag": "DIV"
+      },
+      {
+        "className": "tm-page-transition-enter",
+        "rect": {
+          "bottom": 11275.499801635742,
+          "height": 11468.2998046875,
+          "left": 0,
+          "right": 401.6000061035156,
+          "top": -192.8000030517578,
+          "width": 401.6000061035156,
+          "x": 0,
+          "y": -192.8000030517578
+        },
+        "style": {
+          "backdropFilter": "none",
+          "backgroundColor": "rgba(0, 0, 0, 0)",
+          "backgroundFunctionKinds": [],
+          "backgroundImage": "none",
+          "backgroundPosition": "0% 0%",
+          "backgroundSize": "auto",
+          "borderRadius": "0px",
+          "content": null,
+          "display": "block",
+          "filter": "none",
+          "mixBlendMode": "normal",
+          "opacity": "1",
+          "visibility": "visible"
+        },
+        "tag": "DIV"
+      },
+      {
+        "className": "tm-scroll-area",
+        "rect": {
+          "bottom": 531.1999999880791,
+          "height": 532,
+          "left": 0,
+          "right": 401.6000061035156,
+          "top": -0.800000011920929,
+          "width": 401.6000061035156,
+          "x": 0,
+          "y": -0.800000011920929
+        },
+        "style": {
+          "backdropFilter": "none",
+          "backgroundColor": "rgba(0, 0, 0, 0)",
+          "backgroundFunctionKinds": [],
+          "backgroundImage": "none",
+          "backgroundPosition": "0% 0%",
+          "backgroundSize": "auto",
+          "borderRadius": "0px",
+          "content": null,
+          "display": "block",
+          "filter": "none",
+          "mixBlendMode": "normal",
+          "opacity": "1",
+          "visibility": "visible"
+        },
+        "tag": "MAIN"
+      },
+      {
+        "className": "tm-app-frame tm-app-frame-no-topbar",
+        "rect": {
+          "bottom": 605.1999999880791,
+          "height": 606,
+          "left": 0,
+          "right": 401.6000061035156,
+          "top": -0.800000011920929,
+          "width": 401.6000061035156,
+          "x": 0,
+          "y": -0.800000011920929
+        },
+        "style": {
+          "backdropFilter": "none",
+          "backgroundColor": "rgb(255, 255, 255)",
+          "backgroundFunctionKinds": [],
+          "backgroundImage": "none",
+          "backgroundPosition": "0% 0%",
+          "backgroundSize": "auto",
+          "borderRadius": "0px",
+          "content": null,
+          "display": "block",
+          "filter": "none",
+          "mixBlendMode": "normal",
+          "opacity": "1",
+          "visibility": "visible"
+        },
+        "tag": "DIV"
+      },
+      {
+        "className": "",
+        "rect": {
+          "bottom": 605.6000366210938,
+          "height": 605.6000366210938,
+          "left": 0,
+          "right": 401.6000061035156,
+          "top": 0,
+          "width": 401.6000061035156,
+          "x": 0,
+          "y": 0
+        },
+        "style": {
+          "backdropFilter": "none",
+          "backgroundColor": "rgb(255, 255, 255)",
+          "backgroundFunctionKinds": [],
+          "backgroundImage": "none",
+          "backgroundPosition": "0% 0%",
+          "backgroundSize": "auto",
+          "borderRadius": "0px",
+          "content": null,
+          "display": "block",
+          "filter": "none",
+          "mixBlendMode": "normal",
+          "opacity": "1",
+          "visibility": "visible"
+        },
+        "tag": "BODY"
+      },
+      {
+        "className": "",
+        "rect": {
+          "bottom": 605.6000366210938,
+          "height": 605.6000366210938,
+          "left": 0,
+          "right": 401.6000061035156,
+          "top": 0,
+          "width": 401.6000061035156,
+          "x": 0,
+          "y": 0
+        },
+        "style": {
+          "backdropFilter": "none",
+          "backgroundColor": "rgb(255, 255, 255)",
+          "backgroundFunctionKinds": [],
+          "backgroundImage": "none",
+          "backgroundPosition": "0% 0%",
+          "backgroundSize": "auto",
+          "borderRadius": "0px",
+          "content": null,
+          "display": "block",
+          "filter": "none",
+          "mixBlendMode": "normal",
+          "opacity": "1",
+          "visibility": "visible"
+        },
+        "tag": "HTML"
+      }
+    ],
+    "rect": {
+      "bottom": 344,
+      "height": 96,
+      "left": 36.79999923706055,
+      "right": 132.79999923706055,
+      "top": 248,
+      "width": 96,
+      "x": 36.79999923706055,
+      "y": 248
+    },
+    "scroll": {
+      "main": 192,
+      "y": 0
+    },
+    "selectorSHA256": "3585b7ec5323721e0cd34e6eed4a8f0d66c205b15dba5d2b2a02976c072b1f77",
+    "selectorTarget": ".tm-match-row-thumb",
+    "entitySHA": "d63179cc560496b5fe1c0909587981f57a5e41f28e50f798fd3c6a09fb5f284d",
+    "textLength": 0,
+    "url": "https://alpha.teameet.co.kr/team-matches",
+    "utc": "2026-10-04T08:07:16.473Z",
+    "viewport": {
+      "dpr": 1.25,
+      "h": 606,
+      "w": 402
+    },
+    "backgroundSourceHashes": [
+      "2808f485687aecfb981f33726d2b2ce603fc72e07eaafa4b86b5170c237107bd",
+      "b9ba885ec5e8628379a3837c741619100048e57556dc910f95d943c9788a2e9f"
+    ],
+    "rawURLStored": false,
+    "label": "mobile-list-photo",
+    "index": 0
+  },
+  {
+    "after": {
+      "backdropFilter": "none",
+      "backgroundColor": "rgba(0, 0, 0, 0)",
+      "backgroundFunctionKinds": [],
+      "backgroundImage": "none",
+      "backgroundPosition": "0% 0%",
+      "backgroundSize": "auto",
+      "borderRadius": "0px",
+      "content": "none",
+      "display": "block",
+      "filter": "none",
+      "mixBlendMode": "normal",
+      "opacity": "1",
+      "visibility": "visible"
+    },
+    "before": {
+      "backdropFilter": "none",
+      "backgroundColor": "rgba(0, 0, 0, 0)",
+      "backgroundFunctionKinds": [],
+      "backgroundImage": "none",
+      "backgroundPosition": "0% 0%",
+      "backgroundSize": "auto",
+      "borderRadius": "0px",
+      "content": "none",
+      "display": "block",
+      "filter": "none",
+      "mixBlendMode": "normal",
+      "opacity": "1",
+      "visibility": "visible"
+    },
+    "cardBadges": [],
+    "chain": [
+      {
+        "className": "tm-team-vs-hero tm-team-vs-hero-photo",
+        "rect": {
+          "bottom": 232,
+          "height": 232,
+          "left": 0,
+          "right": 401.6000061035156,
+          "top": 0,
+          "width": 401.6000061035156,
+          "x": 0,
+          "y": 0
+        },
+        "style": {
+          "backdropFilter": "none",
+          "backgroundColor": "rgb(25, 31, 40)",
+          "backgroundFunctionKinds": [
+            "url",
+            "url"
+          ],
+          "backgroundImage": "url([omitted]), url([omitted])",
+          "backgroundPosition": "50% 50%, 50% 50%",
+          "backgroundSize": "cover, cover",
+          "borderRadius": "0px",
+          "content": null,
+          "display": "flex",
+          "filter": "none",
+          "mixBlendMode": "normal",
+          "opacity": "1",
+          "visibility": "visible"
+        },
+        "tag": "DIV"
+      },
+      {
+        "className": "tm-match-detail",
+        "rect": {
+          "bottom": 1294.6500244140625,
+          "height": 1294.6500244140625,
+          "left": 0,
+          "right": 401.6000061035156,
+          "top": 0,
+          "width": 401.6000061035156,
+          "x": 0,
+          "y": 0
+        },
+        "style": {
+          "backdropFilter": "none",
+          "backgroundColor": "rgba(0, 0, 0, 0)",
+          "backgroundFunctionKinds": [],
+          "backgroundImage": "none",
+          "backgroundPosition": "0% 0%",
+          "backgroundSize": "auto",
+          "borderRadius": "0px",
+          "content": null,
+          "display": "block",
+          "filter": "none",
+          "mixBlendMode": "normal",
+          "opacity": "1",
+          "visibility": "visible"
+        },
+        "tag": "ARTICLE"
+      },
+      {
+        "className": "tm-team-match-detail-left",
+        "rect": {
+          "bottom": 1294.6500244140625,
+          "height": 1294.6500244140625,
+          "left": 0,
+          "right": 401.6000061035156,
+          "top": 0,
+          "width": 401.6000061035156,
+          "x": 0,
+          "y": 0
+        },
+        "style": {
+          "backdropFilter": "none",
+          "backgroundColor": "rgba(0, 0, 0, 0)",
+          "backgroundFunctionKinds": [],
+          "backgroundImage": "none",
+          "backgroundPosition": "0% 0%",
+          "backgroundSize": "auto",
+          "borderRadius": "0px",
+          "content": null,
+          "display": "block",
+          "filter": "none",
+          "mixBlendMode": "normal",
+          "opacity": "1",
+          "visibility": "visible"
+        },
+        "tag": "DIV"
+      },
+      {
+        "className": "tm-team-match-detail-desktop tm-content-enter",
+        "rect": {
+          "bottom": 1294.6500244140625,
+          "height": 1294.6500244140625,
+          "left": 0,
+          "right": 401.6000061035156,
+          "top": 0,
+          "width": 401.6000061035156,
+          "x": 0,
+          "y": 0
+        },
+        "style": {
+          "backdropFilter": "none",
+          "backgroundColor": "rgba(0, 0, 0, 0)",
+          "backgroundFunctionKinds": [],
+          "backgroundImage": "none",
+          "backgroundPosition": "0% 0%",
+          "backgroundSize": "auto",
+          "borderRadius": "0px",
+          "content": null,
+          "display": "block",
+          "filter": "none",
+          "mixBlendMode": "normal",
+          "opacity": "1",
+          "visibility": "visible"
+        },
+        "tag": "DIV"
+      },
+      {
+        "className": "tm-page-transition-enter",
+        "rect": {
+          "bottom": 1294.6500244140625,
+          "height": 1294.6500244140625,
+          "left": 0,
+          "right": 401.6000061035156,
+          "top": 0,
+          "width": 401.6000061035156,
+          "x": 0,
+          "y": 0
+        },
+        "style": {
+          "backdropFilter": "none",
+          "backgroundColor": "rgba(0, 0, 0, 0)",
+          "backgroundFunctionKinds": [],
+          "backgroundImage": "none",
+          "backgroundPosition": "0% 0%",
+          "backgroundSize": "auto",
+          "borderRadius": "0px",
+          "content": null,
+          "display": "block",
+          "filter": "none",
+          "mixBlendMode": "normal",
+          "opacity": "1",
+          "visibility": "visible"
+        },
+        "tag": "DIV"
+      },
+      {
+        "className": "tm-scroll-area",
+        "rect": {
+          "bottom": 606,
+          "height": 606,
+          "left": 0,
+          "right": 401.6000061035156,
+          "top": 0,
+          "width": 401.6000061035156,
+          "x": 0,
+          "y": 0
+        },
+        "style": {
+          "backdropFilter": "none",
+          "backgroundColor": "rgba(0, 0, 0, 0)",
+          "backgroundFunctionKinds": [],
+          "backgroundImage": "none",
+          "backgroundPosition": "0% 0%",
+          "backgroundSize": "auto",
+          "borderRadius": "0px",
+          "content": null,
+          "display": "block",
+          "filter": "none",
+          "mixBlendMode": "normal",
+          "opacity": "1",
+          "visibility": "visible"
+        },
+        "tag": "MAIN"
+      },
+      {
+        "className": "tm-app-frame tm-app-frame-no-topbar tm-app-frame-no-bottom",
+        "rect": {
+          "bottom": 606,
+          "height": 606,
+          "left": 0,
+          "right": 401.6000061035156,
+          "top": 0,
+          "width": 401.6000061035156,
+          "x": 0,
+          "y": 0
+        },
+        "style": {
+          "backdropFilter": "none",
+          "backgroundColor": "rgb(255, 255, 255)",
+          "backgroundFunctionKinds": [],
+          "backgroundImage": "none",
+          "backgroundPosition": "0% 0%",
+          "backgroundSize": "auto",
+          "borderRadius": "0px",
+          "content": null,
+          "display": "block",
+          "filter": "none",
+          "mixBlendMode": "normal",
+          "opacity": "1",
+          "visibility": "visible"
+        },
+        "tag": "DIV"
+      },
+      {
+        "className": "",
+        "rect": {
+          "bottom": 605.6000366210938,
+          "height": 605.6000366210938,
+          "left": 0,
+          "right": 401.6000061035156,
+          "top": 0,
+          "width": 401.6000061035156,
+          "x": 0,
+          "y": 0
+        },
+        "style": {
+          "backdropFilter": "none",
+          "backgroundColor": "rgb(255, 255, 255)",
+          "backgroundFunctionKinds": [],
+          "backgroundImage": "none",
+          "backgroundPosition": "0% 0%",
+          "backgroundSize": "auto",
+          "borderRadius": "0px",
+          "content": null,
+          "display": "block",
+          "filter": "none",
+          "mixBlendMode": "normal",
+          "opacity": "1",
+          "visibility": "visible"
+        },
+        "tag": "BODY"
+      },
+      {
+        "className": "",
+        "rect": {
+          "bottom": 605.6000366210938,
+          "height": 605.6000366210938,
+          "left": 0,
+          "right": 401.6000061035156,
+          "top": 0,
+          "width": 401.6000061035156,
+          "x": 0,
+          "y": 0
+        },
+        "style": {
+          "backdropFilter": "none",
+          "backgroundColor": "rgb(255, 255, 255)",
+          "backgroundFunctionKinds": [],
+          "backgroundImage": "none",
+          "backgroundPosition": "0% 0%",
+          "backgroundSize": "auto",
+          "borderRadius": "0px",
+          "content": null,
+          "display": "block",
+          "filter": "none",
+          "mixBlendMode": "normal",
+          "opacity": "1",
+          "visibility": "visible"
+        },
+        "tag": "HTML"
+      }
+    ],
+    "rect": {
+      "bottom": 232,
+      "height": 232,
+      "left": 0,
+      "right": 401.6000061035156,
+      "top": 0,
+      "width": 401.6000061035156,
+      "x": 0,
+      "y": 0
+    },
+    "scroll": {
+      "main": 0,
+      "y": 0
+    },
+    "selector": ".tm-team-vs-hero-photo",
+    "textLength": 51,
+    "entitySHA": "d63179cc560496b5fe1c0909587981f57a5e41f28e50f798fd3c6a09fb5f284d",
+    "urlSHA256": "b726b1d646531a750a30d66f54149ffc521e53ae45e4bb6295278a6c794e5f32",
+    "routeTemplate": "/team-matches/:entity",
+    "utc": "2026-10-04T08:11:42.031Z",
+    "viewport": {
+      "dpr": 1.25,
+      "h": 606,
+      "w": 402
+    },
+    "backgroundSourceHashes": [
+      "2808f485687aecfb981f33726d2b2ce603fc72e07eaafa4b86b5170c237107bd",
+      "b9ba885ec5e8628379a3837c741619100048e57556dc910f95d943c9788a2e9f"
+    ],
+    "rawURLStored": false,
+    "label": "mobile-detail-photo",
+    "index": 1,
+    "localizedPanels": {
+      "panels": [
+        {
+          "backgroundColor": "rgba(17, 24, 39, 0.8)",
+          "backgroundImage": "none",
+          "className": "tm-btn tm-btn-icon tm-btn-ghost tm-hero-button",
+          "color": "rgb(255, 255, 255)",
+          "filter": "none",
+          "opacity": "1",
+          "rect": {
+            "bottom": 56,
+            "height": 44,
+            "left": 16,
+            "right": 60,
+            "top": 12,
+            "width": 44,
+            "x": 16,
+            "y": 12
+          },
+          "tag": "A",
+          "textLength": 0
+        },
+        {
+          "backgroundColor": "rgba(17, 24, 39, 0.8)",
+          "backgroundImage": "none",
+          "className": "tm-btn tm-btn-icon tm-btn-ghost tm-hero-button",
+          "color": "rgb(255, 255, 255)",
+          "filter": "none",
+          "opacity": "1",
+          "rect": {
+            "bottom": 56,
+            "height": 44,
+            "left": 341.6000061035156,
+            "right": 385.6000061035156,
+            "top": 12,
+            "width": 44,
+            "x": 341.6000061035156,
+            "y": 12
+          },
+          "tag": "BUTTON",
+          "textLength": 0
+        },
+        {
+          "backgroundColor": "rgba(17, 24, 39, 0.8)",
+          "backgroundImage": "none",
+          "className": "tm-team-vs-summary",
+          "color": "rgb(255, 255, 255)",
+          "filter": "none",
+          "opacity": "1",
+          "rect": {
+            "bottom": 212,
+            "height": 140,
+            "left": 16,
+            "right": 385.6000061035156,
+            "top": 72,
+            "width": 369.6000061035156,
+            "x": 16,
+            "y": 72
+          },
+          "tag": "DIV",
+          "textLength": 51
+        }
+      ],
+      "utc": "2026-10-04T08:11:42.047Z",
+      "viewport": {
+        "dpr": 1.25,
+        "h": 606,
+        "w": 402
+      }
+    }
+  },
+  {
+    "after": {
+      "backdropFilter": "none",
+      "backgroundColor": "rgba(0, 0, 0, 0)",
+      "backgroundFunctionKinds": [],
+      "backgroundImage": "none",
+      "backgroundPosition": "0% 0%",
+      "backgroundSize": "auto",
+      "borderRadius": "0px",
+      "content": "none",
+      "display": "block",
+      "filter": "none",
+      "mixBlendMode": "normal",
+      "opacity": "1",
+      "visibility": "visible"
+    },
+    "before": {
+      "backdropFilter": "none",
+      "backgroundColor": "rgba(0, 0, 0, 0)",
+      "backgroundFunctionKinds": [],
+      "backgroundImage": "none",
+      "backgroundPosition": "0% 0%",
+      "backgroundSize": "auto",
+      "borderRadius": "0px",
+      "content": "none",
+      "display": "block",
+      "filter": "none",
+      "mixBlendMode": "normal",
+      "opacity": "1",
+      "visibility": "visible"
+    },
+    "cardBadges": [
+      "경기 종료"
+    ],
+    "chain": [
+      {
+        "className": "tm-match-row-thumb tm-match-media-sport",
+        "rect": {
+          "bottom": 6376.80029296875,
+          "height": 96,
+          "left": 36.79999923706055,
+          "right": 132.79999923706055,
+          "top": 6280.80029296875,
+          "width": 96,
+          "x": 36.79999923706055,
+          "y": 6280.80029296875
+        },
+        "style": {
+          "backdropFilter": "none",
+          "backgroundColor": "rgb(249, 250, 251)",
+          "backgroundFunctionKinds": [],
+          "backgroundImage": "none",
+          "backgroundPosition": "0% 0%",
+          "backgroundSize": "auto",
+          "borderRadius": "12px",
+          "content": null,
+          "display": "flex",
+          "filter": "none",
+          "mixBlendMode": "normal",
+          "opacity": "1",
+          "visibility": "visible"
+        },
+        "tag": "DIV"
+      },
+      {
+        "className": "tm-match-row tm-card-interactive tm-pressable tm-card-closed",
+        "rect": {
+          "bottom": 6427.600006103516,
+          "height": 159.60000610351562,
+          "left": 20,
+          "right": 381.6000061035156,
+          "top": 6268,
+          "width": 361.6000061035156,
+          "x": 20,
+          "y": 6268
+        },
+        "style": {
+          "backdropFilter": "none",
+          "backgroundColor": "rgb(249, 250, 251)",
+          "backgroundFunctionKinds": [],
+          "backgroundImage": "none",
+          "backgroundPosition": "0% 0%",
+          "backgroundSize": "auto",
+          "borderRadius": "16px",
+          "content": null,
+          "display": "flex",
+          "filter": "brightness(0.88) grayscale(0.35)",
+          "mixBlendMode": "normal",
+          "opacity": "1",
+          "visibility": "visible"
+        },
+        "tag": "A"
+      },
+      {
+        "className": "tm-match-card-stack",
+        "rect": {
+          "bottom": 11360.300384521484,
+          "height": 11087.900390625,
+          "left": 20,
+          "right": 381.6000061035156,
+          "top": 272.3999938964844,
+          "width": 361.6000061035156,
+          "x": 20,
+          "y": 272.3999938964844
+        },
+        "style": {
+          "backdropFilter": "none",
+          "backgroundColor": "rgba(0, 0, 0, 0)",
+          "backgroundFunctionKinds": [],
+          "backgroundImage": "none",
+          "backgroundPosition": "0% 0%",
+          "backgroundSize": "auto",
+          "borderRadius": "0px",
+          "content": null,
+          "display": "flex",
+          "filter": "none",
+          "mixBlendMode": "normal",
+          "opacity": "1",
+          "visibility": "visible"
+        },
+        "tag": "DIV"
+      },
+      {
+        "className": "tm-match-list",
+        "rect": {
+          "bottom": 11468.300399780272,
+          "height": 11329.900390625,
+          "left": 0,
+          "right": 401.6000061035156,
+          "top": 138.40000915527344,
+          "width": 401.6000061035156,
+          "x": 0,
+          "y": 138.40000915527344
+        },
+        "style": {
+          "backdropFilter": "none",
+          "backgroundColor": "rgba(0, 0, 0, 0)",
+          "backgroundFunctionKinds": [],
+          "backgroundImage": "none",
+          "backgroundPosition": "0% 0%",
+          "backgroundSize": "auto",
+          "borderRadius": "0px",
+          "content": null,
+          "display": "block",
+          "filter": "none",
+          "mixBlendMode": "normal",
+          "opacity": "1",
+          "visibility": "visible"
+        },
+        "tag": "DIV"
+      },
+      {
+        "className": "tm-page-transition-enter",
+        "rect": {
+          "bottom": 11468.2998046875,
+          "height": 11468.2998046875,
+          "left": 0,
+          "right": 401.6000061035156,
+          "top": 0,
+          "width": 401.6000061035156,
+          "x": 0,
+          "y": 0
+        },
+        "style": {
+          "backdropFilter": "none",
+          "backgroundColor": "rgba(0, 0, 0, 0)",
+          "backgroundFunctionKinds": [],
+          "backgroundImage": "none",
+          "backgroundPosition": "0% 0%",
+          "backgroundSize": "auto",
+          "borderRadius": "0px",
+          "content": null,
+          "display": "block",
+          "filter": "none",
+          "mixBlendMode": "normal",
+          "opacity": "1",
+          "visibility": "visible"
+        },
+        "tag": "DIV"
+      },
+      {
+        "className": "tm-scroll-area",
+        "rect": {
+          "bottom": 532,
+          "height": 532,
+          "left": 0,
+          "right": 401.6000061035156,
+          "top": 0,
+          "width": 401.6000061035156,
+          "x": 0,
+          "y": 0
+        },
+        "style": {
+          "backdropFilter": "none",
+          "backgroundColor": "rgba(0, 0, 0, 0)",
+          "backgroundFunctionKinds": [],
+          "backgroundImage": "none",
+          "backgroundPosition": "0% 0%",
+          "backgroundSize": "auto",
+          "borderRadius": "0px",
+          "content": null,
+          "display": "block",
+          "filter": "none",
+          "mixBlendMode": "normal",
+          "opacity": "1",
+          "visibility": "visible"
+        },
+        "tag": "MAIN"
+      },
+      {
+        "className": "tm-app-frame tm-app-frame-no-topbar",
+        "rect": {
+          "bottom": 606,
+          "height": 606,
+          "left": 0,
+          "right": 401.6000061035156,
+          "top": 0,
+          "width": 401.6000061035156,
+          "x": 0,
+          "y": 0
+        },
+        "style": {
+          "backdropFilter": "none",
+          "backgroundColor": "rgb(255, 255, 255)",
+          "backgroundFunctionKinds": [],
+          "backgroundImage": "none",
+          "backgroundPosition": "0% 0%",
+          "backgroundSize": "auto",
+          "borderRadius": "0px",
+          "content": null,
+          "display": "block",
+          "filter": "none",
+          "mixBlendMode": "normal",
+          "opacity": "1",
+          "visibility": "visible"
+        },
+        "tag": "DIV"
+      },
+      {
+        "className": "",
+        "rect": {
+          "bottom": 605.6000366210938,
+          "height": 605.6000366210938,
+          "left": 0,
+          "right": 401.6000061035156,
+          "top": 0,
+          "width": 401.6000061035156,
+          "x": 0,
+          "y": 0
+        },
+        "style": {
+          "backdropFilter": "none",
+          "backgroundColor": "rgb(255, 255, 255)",
+          "backgroundFunctionKinds": [],
+          "backgroundImage": "none",
+          "backgroundPosition": "0% 0%",
+          "backgroundSize": "auto",
+          "borderRadius": "0px",
+          "content": null,
+          "display": "block",
+          "filter": "none",
+          "mixBlendMode": "normal",
+          "opacity": "1",
+          "visibility": "visible"
+        },
+        "tag": "BODY"
+      },
+      {
+        "className": "",
+        "rect": {
+          "bottom": 605.6000366210938,
+          "height": 605.6000366210938,
+          "left": 0,
+          "right": 401.6000061035156,
+          "top": 0,
+          "width": 401.6000061035156,
+          "x": 0,
+          "y": 0
+        },
+        "style": {
+          "backdropFilter": "none",
+          "backgroundColor": "rgb(255, 255, 255)",
+          "backgroundFunctionKinds": [],
+          "backgroundImage": "none",
+          "backgroundPosition": "0% 0%",
+          "backgroundSize": "auto",
+          "borderRadius": "0px",
+          "content": null,
+          "display": "block",
+          "filter": "none",
+          "mixBlendMode": "normal",
+          "opacity": "1",
+          "visibility": "visible"
+        },
+        "tag": "HTML"
+      }
+    ],
+    "rect": {
+      "bottom": 6376.80029296875,
+      "height": 96,
+      "left": 36.79999923706055,
+      "right": 132.79999923706055,
+      "top": 6280.80029296875,
+      "width": 96,
+      "x": 36.79999923706055,
+      "y": 6280.80029296875
+    },
+    "scroll": {
+      "main": 0,
+      "y": 0
+    },
+    "selectorSHA256": "c8f1b1e9544b13b798af6bf9133724eec89841c1f934ef993e41f66987979178",
+    "selectorTarget": ".tm-match-row-thumb",
+    "entitySHA": "34a7f7ff8573c364c56d98b18ea7137f934b625fc4f3f049a0d772b8a114b03a",
+    "textLength": 0,
+    "url": "https://alpha.teameet.co.kr/team-matches",
+    "utc": "2026-10-04T08:14:06.925Z",
+    "viewport": {
+      "dpr": 1.25,
+      "h": 606,
+      "w": 402
+    },
+    "backgroundSourceHashes": [],
+    "rawURLStored": false,
+    "label": "mobile-known-completed-control-offscreen-style",
+    "index": 2
+  },
+  {
+    "after": {
+      "backdropFilter": "none",
+      "backgroundColor": "rgba(0, 0, 0, 0)",
+      "backgroundFunctionKinds": [],
+      "backgroundImage": "none",
+      "backgroundPosition": "0% 0%",
+      "backgroundSize": "auto",
+      "borderRadius": "0px",
+      "content": "none",
+      "display": "inline",
+      "filter": "none",
+      "mixBlendMode": "normal",
+      "opacity": "1",
+      "visibility": "visible"
+    },
+    "before": {
+      "backdropFilter": "none",
+      "backgroundColor": "rgba(0, 0, 0, 0)",
+      "backgroundFunctionKinds": [],
+      "backgroundImage": "none",
+      "backgroundPosition": "0% 0%",
+      "backgroundSize": "auto",
+      "borderRadius": "0px",
+      "content": "none",
+      "display": "inline",
+      "filter": "none",
+      "mixBlendMode": "normal",
+      "opacity": "1",
+      "visibility": "visible"
+    },
+    "cardBadges": [
+      "상대 모집 중"
+    ],
+    "chain": [
+      {
+        "className": "tm-match-row-thumb",
+        "rect": {
+          "bottom": 376,
+          "height": 96,
+          "left": 130.6666717529297,
+          "right": 226.6666717529297,
+          "top": 280,
+          "width": 96,
+          "x": 130.6666717529297,
+          "y": 280
+        },
+        "style": {
+          "backdropFilter": "none",
+          "backgroundColor": "rgba(0, 0, 0, 0)",
+          "backgroundFunctionKinds": [
+            "url",
+            "url"
+          ],
+          "backgroundImage": "url([omitted]), url([omitted])",
+          "backgroundPosition": "50% 50%, 50% 50%",
+          "backgroundSize": "cover, cover",
+          "borderRadius": "12px",
+          "content": null,
+          "display": "block",
+          "filter": "none",
+          "mixBlendMode": "normal",
+          "opacity": "1",
+          "visibility": "visible"
+        },
+        "tag": "DIV"
+      },
+      {
+        "className": "tm-match-row tm-card-interactive tm-pressable",
+        "rect": {
+          "bottom": 410.6666870117187,
+          "height": 143.33334350585938,
+          "left": 114,
+          "right": 674,
+          "top": 267.3333435058594,
+          "width": 560,
+          "x": 114,
+          "y": 267.3333435058594
+        },
+        "style": {
+          "backdropFilter": "none",
+          "backgroundColor": "rgb(255, 255, 255)",
+          "backgroundFunctionKinds": [],
+          "backgroundImage": "none",
+          "backgroundPosition": "0% 0%",
+          "backgroundSize": "auto",
+          "borderRadius": "16px",
+          "content": null,
+          "display": "flex",
+          "filter": "none",
+          "mixBlendMode": "normal",
+          "opacity": "1",
+          "visibility": "visible"
+        },
+        "tag": "A"
+      },
+      {
+        "className": "tm-match-card-stack",
+        "rect": {
+          "bottom": 4500.83349609375,
+          "height": 4388.83349609375,
+          "left": 114,
+          "right": 674,
+          "top": 112,
+          "width": 560,
+          "x": 114,
+          "y": 112
+        },
+        "style": {
+          "backdropFilter": "none",
+          "backgroundColor": "rgba(0, 0, 0, 0)",
+          "backgroundFunctionKinds": [],
+          "backgroundImage": "none",
+          "backgroundPosition": "0% 0%",
+          "backgroundSize": "auto",
+          "borderRadius": "0px",
+          "content": null,
+          "display": "grid",
+          "filter": "none",
+          "mixBlendMode": "normal",
+          "opacity": "1",
+          "visibility": "visible"
+        },
+        "tag": "DIV"
+      },
+      {
+        "className": "tm-match-list",
+        "rect": {
+          "bottom": 4608.83349609375,
+          "height": 4630.83349609375,
+          "left": 94,
+          "right": 694,
+          "top": -22,
+          "width": 600,
+          "x": 94,
+          "y": -22
+        },
+        "style": {
+          "backdropFilter": "none",
+          "backgroundColor": "rgba(0, 0, 0, 0)",
+          "backgroundFunctionKinds": [],
+          "backgroundImage": "none",
+          "backgroundPosition": "0% 0%",
+          "backgroundSize": "auto",
+          "borderRadius": "0px",
+          "content": null,
+          "display": "block",
+          "filter": "none",
+          "mixBlendMode": "normal",
+          "opacity": "1",
+          "visibility": "visible"
+        },
+        "tag": "DIV"
+      },
+      {
+        "className": "tm-page-transition-enter",
+        "rect": {
+          "bottom": 4608.83349609375,
+          "height": 4768.83349609375,
+          "left": 94,
+          "right": 694,
+          "top": -160,
+          "width": 600,
+          "x": 94,
+          "y": -160
+        },
+        "style": {
+          "backdropFilter": "none",
+          "backgroundColor": "rgba(0, 0, 0, 0)",
+          "backgroundFunctionKinds": [],
+          "backgroundImage": "none",
+          "backgroundPosition": "0% 0%",
+          "backgroundSize": "auto",
+          "borderRadius": "0px",
+          "content": null,
+          "display": "block",
+          "filter": "none",
+          "mixBlendMode": "normal",
+          "opacity": "1",
+          "visibility": "visible"
+        },
+        "tag": "DIV"
+      },
+      {
+        "className": "tm-scroll-area",
+        "rect": {
+          "bottom": 431,
+          "height": 431,
+          "left": 94,
+          "right": 694,
+          "top": 0,
+          "width": 600,
+          "x": 94,
+          "y": 0
+        },
+        "style": {
+          "backdropFilter": "none",
+          "backgroundColor": "rgba(0, 0, 0, 0)",
+          "backgroundFunctionKinds": [],
+          "backgroundImage": "none",
+          "backgroundPosition": "0% 0%",
+          "backgroundSize": "auto",
+          "borderRadius": "0px",
+          "content": null,
+          "display": "block",
+          "filter": "none",
+          "mixBlendMode": "normal",
+          "opacity": "1",
+          "visibility": "visible"
+        },
+        "tag": "MAIN"
+      },
+      {
+        "className": "tm-app-frame tm-app-frame-no-topbar",
+        "rect": {
+          "bottom": 505,
+          "height": 505,
+          "left": 94,
+          "right": 694,
+          "top": 0,
+          "width": 600,
+          "x": 94,
+          "y": 0
+        },
+        "style": {
+          "backdropFilter": "none",
+          "backgroundColor": "rgb(255, 255, 255)",
+          "backgroundFunctionKinds": [],
+          "backgroundImage": "none",
+          "backgroundPosition": "0% 0%",
+          "backgroundSize": "auto",
+          "borderRadius": "0px",
+          "content": null,
+          "display": "block",
+          "filter": "none",
+          "mixBlendMode": "normal",
+          "opacity": "1",
+          "visibility": "visible"
+        },
+        "tag": "DIV"
+      },
+      {
+        "className": "",
+        "rect": {
+          "bottom": 504.6666870117187,
+          "height": 504.6666870117187,
+          "left": 0,
+          "right": 788,
+          "top": 0,
+          "width": 788,
+          "x": 0,
+          "y": 0
+        },
+        "style": {
+          "backdropFilter": "none",
+          "backgroundColor": "rgb(255, 255, 255)",
+          "backgroundFunctionKinds": [],
+          "backgroundImage": "none",
+          "backgroundPosition": "0% 0%",
+          "backgroundSize": "auto",
+          "borderRadius": "0px",
+          "content": null,
+          "display": "block",
+          "filter": "none",
+          "mixBlendMode": "normal",
+          "opacity": "1",
+          "visibility": "visible"
+        },
+        "tag": "BODY"
+      },
+      {
+        "className": "",
+        "rect": {
+          "bottom": 504.6666870117187,
+          "height": 504.6666870117187,
+          "left": 0,
+          "right": 788,
+          "top": 0,
+          "width": 788,
+          "x": 0,
+          "y": 0
+        },
+        "style": {
+          "backdropFilter": "none",
+          "backgroundColor": "rgb(255, 255, 255)",
+          "backgroundFunctionKinds": [],
+          "backgroundImage": "none",
+          "backgroundPosition": "0% 0%",
+          "backgroundSize": "auto",
+          "borderRadius": "0px",
+          "content": null,
+          "display": "block",
+          "filter": "none",
+          "mixBlendMode": "normal",
+          "opacity": "1",
+          "visibility": "visible"
+        },
+        "tag": "HTML"
+      }
+    ],
+    "rect": {
+      "bottom": 376,
+      "height": 96,
+      "left": 130.6666717529297,
+      "right": 226.6666717529297,
+      "top": 280,
+      "width": 96,
+      "x": 130.6666717529297,
+      "y": 280
+    },
+    "scroll": {
+      "main": 160,
+      "y": 0
+    },
+    "selectorSHA256": "592a1f65ac6a01f5c28bc0a38e90ee882fe2d7202145e296bfbd155017a7900a",
+    "selectorTarget": ".tm-match-row-thumb",
+    "entitySHA": "d63179cc560496b5fe1c0909587981f57a5e41f28e50f798fd3c6a09fb5f284d",
+    "textLength": 0,
+    "url": "https://alpha.teameet.co.kr/team-matches?kind=friendly&sportId=b60abf1d-0caf-477e-ba61-d51984e63151",
+    "utc": "2026-10-04T08:20:07.708Z",
+    "viewport": {
+      "dpr": 1.5,
+      "h": 505,
+      "w": 788
+    },
+    "backgroundSourceHashes": [
+      "2808f485687aecfb981f33726d2b2ce603fc72e07eaafa4b86b5170c237107bd",
+      "b9ba885ec5e8628379a3837c741619100048e57556dc910f95d943c9788a2e9f"
+    ],
+    "rawURLStored": false,
+    "label": "tablet-list-photo",
+    "index": 3
+  },
+  {
+    "after": {
+      "backdropFilter": "none",
+      "backgroundColor": "rgba(0, 0, 0, 0)",
+      "backgroundFunctionKinds": [],
+      "backgroundImage": "none",
+      "backgroundPosition": "0% 0%",
+      "backgroundSize": "auto",
+      "borderRadius": "0px",
+      "content": "none",
+      "display": "block",
+      "filter": "none",
+      "mixBlendMode": "normal",
+      "opacity": "1",
+      "visibility": "visible"
+    },
+    "before": {
+      "backdropFilter": "none",
+      "backgroundColor": "rgba(0, 0, 0, 0)",
+      "backgroundFunctionKinds": [],
+      "backgroundImage": "none",
+      "backgroundPosition": "0% 0%",
+      "backgroundSize": "auto",
+      "borderRadius": "0px",
+      "content": "none",
+      "display": "block",
+      "filter": "none",
+      "mixBlendMode": "normal",
+      "opacity": "1",
+      "visibility": "visible"
+    },
+    "cardBadges": [],
+    "chain": [
+      {
+        "className": "tm-team-vs-hero tm-team-vs-hero-photo",
+        "rect": {
+          "bottom": 224,
+          "height": 224,
+          "left": 94,
+          "right": 694,
+          "top": 0,
+          "width": 600,
+          "x": 94,
+          "y": 0
+        },
+        "style": {
+          "backdropFilter": "none",
+          "backgroundColor": "rgb(25, 31, 40)",
+          "backgroundFunctionKinds": [
+            "url",
+            "url"
+          ],
+          "backgroundImage": "url([omitted]), url([omitted])",
+          "backgroundPosition": "50% 50%, 50% 50%",
+          "backgroundSize": "cover, cover",
+          "borderRadius": "0px",
+          "content": null,
+          "display": "flex",
+          "filter": "none",
+          "mixBlendMode": "normal",
+          "opacity": "1",
+          "visibility": "visible"
+        },
+        "tag": "DIV"
+      },
+      {
+        "className": "tm-match-detail",
+        "rect": {
+          "bottom": 1257.5833740234375,
+          "height": 1257.5833740234375,
+          "left": 94,
+          "right": 694,
+          "top": 0,
+          "width": 600,
+          "x": 94,
+          "y": 0
+        },
+        "style": {
+          "backdropFilter": "none",
+          "backgroundColor": "rgba(0, 0, 0, 0)",
+          "backgroundFunctionKinds": [],
+          "backgroundImage": "none",
+          "backgroundPosition": "0% 0%",
+          "backgroundSize": "auto",
+          "borderRadius": "0px",
+          "content": null,
+          "display": "block",
+          "filter": "none",
+          "mixBlendMode": "normal",
+          "opacity": "1",
+          "visibility": "visible"
+        },
+        "tag": "ARTICLE"
+      },
+      {
+        "className": "tm-team-match-detail-left",
+        "rect": {
+          "bottom": 1257.5833740234375,
+          "height": 1257.5833740234375,
+          "left": 94,
+          "right": 694,
+          "top": 0,
+          "width": 600,
+          "x": 94,
+          "y": 0
+        },
+        "style": {
+          "backdropFilter": "none",
+          "backgroundColor": "rgba(0, 0, 0, 0)",
+          "backgroundFunctionKinds": [],
+          "backgroundImage": "none",
+          "backgroundPosition": "0% 0%",
+          "backgroundSize": "auto",
+          "borderRadius": "0px",
+          "content": null,
+          "display": "block",
+          "filter": "none",
+          "mixBlendMode": "normal",
+          "opacity": "1",
+          "visibility": "visible"
+        },
+        "tag": "DIV"
+      },
+      {
+        "className": "tm-team-match-detail-desktop tm-content-enter",
+        "rect": {
+          "bottom": 1257.5833740234375,
+          "height": 1257.5833740234375,
+          "left": 94,
+          "right": 694,
+          "top": 0,
+          "width": 600,
+          "x": 94,
+          "y": 0
+        },
+        "style": {
+          "backdropFilter": "none",
+          "backgroundColor": "rgba(0, 0, 0, 0)",
+          "backgroundFunctionKinds": [],
+          "backgroundImage": "none",
+          "backgroundPosition": "0% 0%",
+          "backgroundSize": "auto",
+          "borderRadius": "0px",
+          "content": null,
+          "display": "block",
+          "filter": "none",
+          "mixBlendMode": "normal",
+          "opacity": "1",
+          "visibility": "visible"
+        },
+        "tag": "DIV"
+      },
+      {
+        "className": "tm-page-transition-enter",
+        "rect": {
+          "bottom": 1257.5833740234375,
+          "height": 1257.5833740234375,
+          "left": 94,
+          "right": 694,
+          "top": 0,
+          "width": 600,
+          "x": 94,
+          "y": 0
+        },
+        "style": {
+          "backdropFilter": "none",
+          "backgroundColor": "rgba(0, 0, 0, 0)",
+          "backgroundFunctionKinds": [],
+          "backgroundImage": "none",
+          "backgroundPosition": "0% 0%",
+          "backgroundSize": "auto",
+          "borderRadius": "0px",
+          "content": null,
+          "display": "block",
+          "filter": "none",
+          "mixBlendMode": "normal",
+          "opacity": "1",
+          "visibility": "visible"
+        },
+        "tag": "DIV"
+      },
+      {
+        "className": "tm-scroll-area",
+        "rect": {
+          "bottom": 505,
+          "height": 505,
+          "left": 94,
+          "right": 694,
+          "top": 0,
+          "width": 600,
+          "x": 94,
+          "y": 0
+        },
+        "style": {
+          "backdropFilter": "none",
+          "backgroundColor": "rgba(0, 0, 0, 0)",
+          "backgroundFunctionKinds": [],
+          "backgroundImage": "none",
+          "backgroundPosition": "0% 0%",
+          "backgroundSize": "auto",
+          "borderRadius": "0px",
+          "content": null,
+          "display": "block",
+          "filter": "none",
+          "mixBlendMode": "normal",
+          "opacity": "1",
+          "visibility": "visible"
+        },
+        "tag": "MAIN"
+      },
+      {
+        "className": "tm-app-frame tm-app-frame-no-topbar tm-app-frame-no-bottom",
+        "rect": {
+          "bottom": 505,
+          "height": 505,
+          "left": 94,
+          "right": 694,
+          "top": 0,
+          "width": 600,
+          "x": 94,
+          "y": 0
+        },
+        "style": {
+          "backdropFilter": "none",
+          "backgroundColor": "rgb(255, 255, 255)",
+          "backgroundFunctionKinds": [],
+          "backgroundImage": "none",
+          "backgroundPosition": "0% 0%",
+          "backgroundSize": "auto",
+          "borderRadius": "0px",
+          "content": null,
+          "display": "block",
+          "filter": "none",
+          "mixBlendMode": "normal",
+          "opacity": "1",
+          "visibility": "visible"
+        },
+        "tag": "DIV"
+      },
+      {
+        "className": "",
+        "rect": {
+          "bottom": 504.6666870117187,
+          "height": 504.6666870117187,
+          "left": 0,
+          "right": 788,
+          "top": 0,
+          "width": 788,
+          "x": 0,
+          "y": 0
+        },
+        "style": {
+          "backdropFilter": "none",
+          "backgroundColor": "rgb(255, 255, 255)",
+          "backgroundFunctionKinds": [],
+          "backgroundImage": "none",
+          "backgroundPosition": "0% 0%",
+          "backgroundSize": "auto",
+          "borderRadius": "0px",
+          "content": null,
+          "display": "block",
+          "filter": "none",
+          "mixBlendMode": "normal",
+          "opacity": "1",
+          "visibility": "visible"
+        },
+        "tag": "BODY"
+      },
+      {
+        "className": "",
+        "rect": {
+          "bottom": 504.6666870117187,
+          "height": 504.6666870117187,
+          "left": 0,
+          "right": 788,
+          "top": 0,
+          "width": 788,
+          "x": 0,
+          "y": 0
+        },
+        "style": {
+          "backdropFilter": "none",
+          "backgroundColor": "rgb(255, 255, 255)",
+          "backgroundFunctionKinds": [],
+          "backgroundImage": "none",
+          "backgroundPosition": "0% 0%",
+          "backgroundSize": "auto",
+          "borderRadius": "0px",
+          "content": null,
+          "display": "block",
+          "filter": "none",
+          "mixBlendMode": "normal",
+          "opacity": "1",
+          "visibility": "visible"
+        },
+        "tag": "HTML"
+      }
+    ],
+    "rect": {
+      "bottom": 224,
+      "height": 224,
+      "left": 94,
+      "right": 694,
+      "top": 0,
+      "width": 600,
+      "x": 94,
+      "y": 0
+    },
+    "scroll": {
+      "main": 0,
+      "y": 0
+    },
+    "selector": ".tm-team-vs-hero-photo",
+    "textLength": 51,
+    "entitySHA": "d63179cc560496b5fe1c0909587981f57a5e41f28e50f798fd3c6a09fb5f284d",
+    "urlSHA256": "7e00fd9e41edf6a1d02d7bea69df9b7585ed68c20f9fe882b69f37bbc7f42c4b",
+    "routeTemplate": "/team-matches/:entity",
+    "utc": "2026-10-04T08:20:30.439Z",
+    "viewport": {
+      "dpr": 1.5,
+      "h": 505,
+      "w": 788
+    },
+    "backgroundSourceHashes": [
+      "2808f485687aecfb981f33726d2b2ce603fc72e07eaafa4b86b5170c237107bd",
+      "b9ba885ec5e8628379a3837c741619100048e57556dc910f95d943c9788a2e9f"
+    ],
+    "rawURLStored": false,
+    "label": "tablet-detail-photo",
+    "index": 4,
+    "localizedPanels": {
+      "panels": [
+        {
+          "backgroundColor": "rgba(17, 24, 39, 0.8)",
+          "backgroundImage": "none",
+          "className": "tm-btn tm-btn-icon tm-btn-ghost tm-hero-button",
+          "color": "rgb(255, 255, 255)",
+          "filter": "none",
+          "opacity": "1",
+          "rect": {
+            "bottom": 56,
+            "height": 44,
+            "left": 110,
+            "right": 154,
+            "top": 12,
+            "width": 44,
+            "x": 110,
+            "y": 12
+          },
+          "tag": "A",
+          "textLength": 0
+        },
+        {
+          "backgroundColor": "rgba(17, 24, 39, 0.8)",
+          "backgroundImage": "none",
+          "className": "tm-btn tm-btn-icon tm-btn-ghost tm-hero-button",
+          "color": "rgb(255, 255, 255)",
+          "filter": "none",
+          "opacity": "1",
+          "rect": {
+            "bottom": 56,
+            "height": 44,
+            "left": 634,
+            "right": 678,
+            "top": 12,
+            "width": 44,
+            "x": 634,
+            "y": 12
+          },
+          "tag": "BUTTON",
+          "textLength": 0
+        },
+        {
+          "backgroundColor": "rgba(17, 24, 39, 0.8)",
+          "backgroundImage": "none",
+          "className": "tm-team-vs-summary",
+          "color": "rgb(255, 255, 255)",
+          "filter": "none",
+          "opacity": "1",
+          "rect": {
+            "bottom": 204,
+            "height": 84,
+            "left": 110,
+            "right": 678,
+            "top": 120,
+            "width": 568,
+            "x": 110,
+            "y": 120
+          },
+          "tag": "DIV",
+          "textLength": 51
+        }
+      ],
+      "utc": "2026-10-04T08:20:35.121Z",
+      "viewport": {
+        "dpr": 1.5,
+        "h": 505,
+        "w": 788
+      }
+    }
+  },
+  {
+    "after": {
+      "backdropFilter": "none",
+      "backgroundColor": "rgba(0, 0, 0, 0)",
+      "backgroundFunctionKinds": [],
+      "backgroundImage": "none",
+      "backgroundPosition": "0% 0%",
+      "backgroundSize": "auto",
+      "borderRadius": "0px",
+      "content": "none",
+      "display": "inline",
+      "filter": "none",
+      "mixBlendMode": "normal",
+      "opacity": "1",
+      "visibility": "visible"
+    },
+    "before": {
+      "backdropFilter": "none",
+      "backgroundColor": "rgba(0, 0, 0, 0)",
+      "backgroundFunctionKinds": [],
+      "backgroundImage": "none",
+      "backgroundPosition": "0% 0%",
+      "backgroundSize": "auto",
+      "borderRadius": "0px",
+      "content": "none",
+      "display": "inline",
+      "filter": "none",
+      "mixBlendMode": "normal",
+      "opacity": "1",
+      "visibility": "visible"
+    },
+    "cardBadges": [
+      "상대 모집 중"
+    ],
+    "chain": [
+      {
+        "className": "tm-match-row-thumb",
+        "rect": {
+          "bottom": 497,
+          "height": 96,
+          "left": 616,
+          "right": 712,
+          "top": 401,
+          "width": 96,
+          "x": 616,
+          "y": 401
+        },
+        "style": {
+          "backdropFilter": "none",
+          "backgroundColor": "rgba(0, 0, 0, 0)",
+          "backgroundFunctionKinds": [
+            "url",
+            "url"
+          ],
+          "backgroundImage": "url([omitted]), url([omitted])",
+          "backgroundPosition": "50% 50%, 50% 50%",
+          "backgroundSize": "cover, cover",
+          "borderRadius": "12px",
+          "content": null,
+          "display": "block",
+          "filter": "none",
+          "mixBlendMode": "normal",
+          "opacity": "1",
+          "visibility": "visible"
+        },
+        "tag": "DIV"
+      },
+      {
+        "className": "tm-match-row tm-card-interactive tm-pressable",
+        "rect": {
+          "bottom": 532,
+          "height": 144,
+          "left": 599,
+          "right": 1127,
+          "top": 388,
+          "width": 528,
+          "x": 599,
+          "y": 388
+        },
+        "style": {
+          "backdropFilter": "none",
+          "backgroundColor": "rgb(255, 255, 255)",
+          "backgroundFunctionKinds": [],
+          "backgroundImage": "none",
+          "backgroundPosition": "0% 0%",
+          "backgroundSize": "auto",
+          "borderRadius": "16px",
+          "content": null,
+          "display": "flex",
+          "filter": "none",
+          "mixBlendMode": "normal",
+          "opacity": "1",
+          "visibility": "visible"
+        },
+        "tag": "A"
+      },
+      {
+        "className": "tm-match-card-stack",
+        "rect": {
+          "bottom": 5959.5,
+          "height": 5571.5,
+          "left": 55,
+          "right": 1127,
+          "top": 388,
+          "width": 1072,
+          "x": 55,
+          "y": 388
+        },
+        "style": {
+          "backdropFilter": "none",
+          "backgroundColor": "rgba(0, 0, 0, 0)",
+          "backgroundFunctionKinds": [],
+          "backgroundImage": "none",
+          "backgroundPosition": "0% 0%",
+          "backgroundSize": "auto",
+          "borderRadius": "0px",
+          "content": null,
+          "display": "grid",
+          "filter": "none",
+          "mixBlendMode": "normal",
+          "opacity": "1",
+          "visibility": "visible"
+        },
+        "tag": "DIV"
+      },
+      {
+        "className": "tm-match-list",
+        "rect": {
+          "bottom": 6007.5,
+          "height": 5743.5,
+          "left": 55,
+          "right": 1127,
+          "top": 264,
+          "width": 1072,
+          "x": 55,
+          "y": 264
+        },
+        "style": {
+          "backdropFilter": "none",
+          "backgroundColor": "rgba(0, 0, 0, 0)",
+          "backgroundFunctionKinds": [],
+          "backgroundImage": "none",
+          "backgroundPosition": "0% 0%",
+          "backgroundSize": "auto",
+          "borderRadius": "0px",
+          "content": null,
+          "display": "block",
+          "filter": "none",
+          "mixBlendMode": "normal",
+          "opacity": "1",
+          "visibility": "visible"
+        },
+        "tag": "DIV"
+      },
+      {
+        "className": "tm-page-transition-enter",
+        "rect": {
+          "bottom": 6007.5,
+          "height": 5943.5,
+          "left": 55,
+          "right": 1127,
+          "top": 64,
+          "width": 1072,
+          "x": 55,
+          "y": 64
+        },
+        "style": {
+          "backdropFilter": "none",
+          "backgroundColor": "rgba(0, 0, 0, 0)",
+          "backgroundFunctionKinds": [],
+          "backgroundImage": "none",
+          "backgroundPosition": "0% 0%",
+          "backgroundSize": "auto",
+          "borderRadius": "0px",
+          "content": null,
+          "display": "block",
+          "filter": "none",
+          "mixBlendMode": "normal",
+          "opacity": "1",
+          "visibility": "visible"
+        },
+        "tag": "DIV"
+      },
+      {
+        "className": "tm-scroll-area",
+        "rect": {
+          "bottom": 6055.5,
+          "height": 5991.5,
+          "left": 31,
+          "right": 1151,
+          "top": 64,
+          "width": 1120,
+          "x": 31,
+          "y": 64
+        },
+        "style": {
+          "backdropFilter": "none",
+          "backgroundColor": "rgba(0, 0, 0, 0)",
+          "backgroundFunctionKinds": [],
+          "backgroundImage": "none",
+          "backgroundPosition": "0% 0%",
+          "backgroundSize": "auto",
+          "borderRadius": "0px",
+          "content": null,
+          "display": "block",
+          "filter": "none",
+          "mixBlendMode": "normal",
+          "opacity": "1",
+          "visibility": "visible"
+        },
+        "tag": "MAIN"
+      },
+      {
+        "className": "tm-app-frame tm-app-frame-no-topbar",
+        "rect": {
+          "bottom": 6172.5,
+          "height": 6172.5,
+          "left": 0,
+          "right": 1182,
+          "top": 0,
+          "width": 1182,
+          "x": 0,
+          "y": 0
+        },
+        "style": {
+          "backdropFilter": "none",
+          "backgroundColor": "rgb(255, 255, 255)",
+          "backgroundFunctionKinds": [],
+          "backgroundImage": "none",
+          "backgroundPosition": "0% 0%",
+          "backgroundSize": "auto",
+          "borderRadius": "0px",
+          "content": null,
+          "display": "flex",
+          "filter": "none",
+          "mixBlendMode": "normal",
+          "opacity": "1",
+          "visibility": "visible"
+        },
+        "tag": "DIV"
+      },
+      {
+        "className": "",
+        "rect": {
+          "bottom": 6172.5,
+          "height": 6172.5,
+          "left": 0,
+          "right": 1182,
+          "top": 0,
+          "width": 1182,
+          "x": 0,
+          "y": 0
+        },
+        "style": {
+          "backdropFilter": "none",
+          "backgroundColor": "rgb(255, 255, 255)",
+          "backgroundFunctionKinds": [],
+          "backgroundImage": "none",
+          "backgroundPosition": "0% 0%",
+          "backgroundSize": "auto",
+          "borderRadius": "0px",
+          "content": null,
+          "display": "block",
+          "filter": "none",
+          "mixBlendMode": "normal",
+          "opacity": "1",
+          "visibility": "visible"
+        },
+        "tag": "BODY"
+      },
+      {
+        "className": "",
+        "rect": {
+          "bottom": 6172.5,
+          "height": 6172.5,
+          "left": 0,
+          "right": 1182,
+          "top": 0,
+          "width": 1182,
+          "x": 0,
+          "y": 0
+        },
+        "style": {
+          "backdropFilter": "none",
+          "backgroundColor": "rgb(255, 255, 255)",
+          "backgroundFunctionKinds": [],
+          "backgroundImage": "none",
+          "backgroundPosition": "0% 0%",
+          "backgroundSize": "auto",
+          "borderRadius": "0px",
+          "content": null,
+          "display": "block",
+          "filter": "none",
+          "mixBlendMode": "normal",
+          "opacity": "1",
+          "visibility": "visible"
+        },
+        "tag": "HTML"
+      }
+    ],
+    "rect": {
+      "bottom": 497,
+      "height": 96,
+      "left": 616,
+      "right": 712,
+      "top": 401,
+      "width": 96,
+      "x": 616,
+      "y": 401
+    },
+    "scroll": {
+      "main": 0,
+      "y": 0
+    },
+    "selectorSHA256": "3585b7ec5323721e0cd34e6eed4a8f0d66c205b15dba5d2b2a02976c072b1f77",
+    "selectorTarget": ".tm-match-row-thumb",
+    "entitySHA": "d63179cc560496b5fe1c0909587981f57a5e41f28e50f798fd3c6a09fb5f284d",
+    "textLength": 0,
+    "url": "https://alpha.teameet.co.kr/team-matches",
+    "utc": "2026-10-04T08:26:16.550Z",
+    "viewport": {
+      "dpr": 1,
+      "h": 757,
+      "w": 1182
+    },
+    "backgroundSourceHashes": [
+      "2808f485687aecfb981f33726d2b2ce603fc72e07eaafa4b86b5170c237107bd",
+      "b9ba885ec5e8628379a3837c741619100048e57556dc910f95d943c9788a2e9f"
+    ],
+    "rawURLStored": false,
+    "label": "desktop-list-photo",
+    "index": 5
+  },
+  {
+    "after": {
+      "backdropFilter": "none",
+      "backgroundColor": "rgba(0, 0, 0, 0)",
+      "backgroundFunctionKinds": [],
+      "backgroundImage": "none",
+      "backgroundPosition": "0% 0%",
+      "backgroundSize": "auto",
+      "borderRadius": "0px",
+      "content": "none",
+      "display": "block",
+      "filter": "none",
+      "mixBlendMode": "normal",
+      "opacity": "1",
+      "visibility": "visible"
+    },
+    "before": {
+      "backdropFilter": "none",
+      "backgroundColor": "rgba(0, 0, 0, 0)",
+      "backgroundFunctionKinds": [],
+      "backgroundImage": "none",
+      "backgroundPosition": "0% 0%",
+      "backgroundSize": "auto",
+      "borderRadius": "0px",
+      "content": "none",
+      "display": "block",
+      "filter": "none",
+      "mixBlendMode": "normal",
+      "opacity": "1",
+      "visibility": "visible"
+    },
+    "cardBadges": [],
+    "chain": [
+      {
+        "className": "tm-team-vs-hero tm-team-vs-hero-photo",
+        "rect": {
+          "bottom": 352,
+          "height": 200,
+          "left": 55,
+          "right": 679,
+          "top": 152,
+          "width": 624,
+          "x": 55,
+          "y": 152
+        },
+        "style": {
+          "backdropFilter": "none",
+          "backgroundColor": "rgb(25, 31, 40)",
+          "backgroundFunctionKinds": [
+            "url",
+            "url"
+          ],
+          "backgroundImage": "url([omitted]), url([omitted])",
+          "backgroundPosition": "50% 50%, 50% 50%",
+          "backgroundSize": "cover, cover",
+          "borderRadius": "16px",
+          "content": null,
+          "display": "flex",
+          "filter": "none",
+          "mixBlendMode": "normal",
+          "opacity": "1",
+          "visibility": "visible"
+        },
+        "tag": "DIV"
+      },
+      {
+        "className": "tm-match-detail",
+        "rect": {
+          "bottom": 1024.25,
+          "height": 872.25,
+          "left": 55,
+          "right": 679,
+          "top": 152,
+          "width": 624,
+          "x": 55,
+          "y": 152
+        },
+        "style": {
+          "backdropFilter": "none",
+          "backgroundColor": "rgba(0, 0, 0, 0)",
+          "backgroundFunctionKinds": [],
+          "backgroundImage": "none",
+          "backgroundPosition": "0% 0%",
+          "backgroundSize": "auto",
+          "borderRadius": "0px",
+          "content": null,
+          "display": "block",
+          "filter": "none",
+          "mixBlendMode": "normal",
+          "opacity": "1",
+          "visibility": "visible"
+        },
+        "tag": "ARTICLE"
+      },
+      {
+        "className": "tm-team-match-detail-left",
+        "rect": {
+          "bottom": 1024.25,
+          "height": 872.25,
+          "left": 55,
+          "right": 679,
+          "top": 152,
+          "width": 624,
+          "x": 55,
+          "y": 152
+        },
+        "style": {
+          "backdropFilter": "none",
+          "backgroundColor": "rgba(0, 0, 0, 0)",
+          "backgroundFunctionKinds": [],
+          "backgroundImage": "none",
+          "backgroundPosition": "0% 0%",
+          "backgroundSize": "auto",
+          "borderRadius": "0px",
+          "content": null,
+          "display": "block",
+          "filter": "none",
+          "mixBlendMode": "normal",
+          "opacity": "1",
+          "visibility": "visible"
+        },
+        "tag": "DIV"
+      },
+      {
+        "className": "tm-team-match-detail-desktop tm-content-enter",
+        "rect": {
+          "bottom": 1024.25,
+          "height": 872.25,
+          "left": 55,
+          "right": 1127,
+          "top": 152,
+          "width": 1072,
+          "x": 55,
+          "y": 152
+        },
+        "style": {
+          "backdropFilter": "none",
+          "backgroundColor": "rgba(0, 0, 0, 0)",
+          "backgroundFunctionKinds": [],
+          "backgroundImage": "none",
+          "backgroundPosition": "0% 0%",
+          "backgroundSize": "auto",
+          "borderRadius": "0px",
+          "content": null,
+          "display": "grid",
+          "filter": "none",
+          "mixBlendMode": "normal",
+          "opacity": "1",
+          "visibility": "visible"
+        },
+        "tag": "DIV"
+      },
+      {
+        "className": "tm-page-transition-enter",
+        "rect": {
+          "bottom": 1024.25,
+          "height": 960.25,
+          "left": 55,
+          "right": 1127,
+          "top": 64,
+          "width": 1072,
+          "x": 55,
+          "y": 64
+        },
+        "style": {
+          "backdropFilter": "none",
+          "backgroundColor": "rgba(0, 0, 0, 0)",
+          "backgroundFunctionKinds": [],
+          "backgroundImage": "none",
+          "backgroundPosition": "0% 0%",
+          "backgroundSize": "auto",
+          "borderRadius": "0px",
+          "content": null,
+          "display": "block",
+          "filter": "none",
+          "mixBlendMode": "normal",
+          "opacity": "1",
+          "visibility": "visible"
+        },
+        "tag": "DIV"
+      },
+      {
+        "className": "tm-scroll-area",
+        "rect": {
+          "bottom": 1072.25,
+          "height": 1008.25,
+          "left": 31,
+          "right": 1151,
+          "top": 64,
+          "width": 1120,
+          "x": 31,
+          "y": 64
+        },
+        "style": {
+          "backdropFilter": "none",
+          "backgroundColor": "rgba(0, 0, 0, 0)",
+          "backgroundFunctionKinds": [],
+          "backgroundImage": "none",
+          "backgroundPosition": "0% 0%",
+          "backgroundSize": "auto",
+          "borderRadius": "0px",
+          "content": null,
+          "display": "block",
+          "filter": "none",
+          "mixBlendMode": "normal",
+          "opacity": "1",
+          "visibility": "visible"
+        },
+        "tag": "MAIN"
+      },
+      {
+        "className": "tm-app-frame tm-app-frame-no-topbar tm-app-frame-no-bottom",
+        "rect": {
+          "bottom": 1189.25,
+          "height": 1189.25,
+          "left": 0,
+          "right": 1182,
+          "top": 0,
+          "width": 1182,
+          "x": 0,
+          "y": 0
+        },
+        "style": {
+          "backdropFilter": "none",
+          "backgroundColor": "rgb(255, 255, 255)",
+          "backgroundFunctionKinds": [],
+          "backgroundImage": "none",
+          "backgroundPosition": "0% 0%",
+          "backgroundSize": "auto",
+          "borderRadius": "0px",
+          "content": null,
+          "display": "flex",
+          "filter": "none",
+          "mixBlendMode": "normal",
+          "opacity": "1",
+          "visibility": "visible"
+        },
+        "tag": "DIV"
+      },
+      {
+        "className": "",
+        "rect": {
+          "bottom": 1189.25,
+          "height": 1189.25,
+          "left": 0,
+          "right": 1182,
+          "top": 0,
+          "width": 1182,
+          "x": 0,
+          "y": 0
+        },
+        "style": {
+          "backdropFilter": "none",
+          "backgroundColor": "rgb(255, 255, 255)",
+          "backgroundFunctionKinds": [],
+          "backgroundImage": "none",
+          "backgroundPosition": "0% 0%",
+          "backgroundSize": "auto",
+          "borderRadius": "0px",
+          "content": null,
+          "display": "block",
+          "filter": "none",
+          "mixBlendMode": "normal",
+          "opacity": "1",
+          "visibility": "visible"
+        },
+        "tag": "BODY"
+      },
+      {
+        "className": "",
+        "rect": {
+          "bottom": 1189.25,
+          "height": 1189.25,
+          "left": 0,
+          "right": 1182,
+          "top": 0,
+          "width": 1182,
+          "x": 0,
+          "y": 0
+        },
+        "style": {
+          "backdropFilter": "none",
+          "backgroundColor": "rgb(255, 255, 255)",
+          "backgroundFunctionKinds": [],
+          "backgroundImage": "none",
+          "backgroundPosition": "0% 0%",
+          "backgroundSize": "auto",
+          "borderRadius": "0px",
+          "content": null,
+          "display": "block",
+          "filter": "none",
+          "mixBlendMode": "normal",
+          "opacity": "1",
+          "visibility": "visible"
+        },
+        "tag": "HTML"
+      }
+    ],
+    "rect": {
+      "bottom": 352,
+      "height": 200,
+      "left": 55,
+      "right": 679,
+      "top": 152,
+      "width": 624,
+      "x": 55,
+      "y": 152
+    },
+    "scroll": {
+      "main": 0,
+      "y": 0
+    },
+    "selector": ".tm-team-vs-hero-photo",
+    "textLength": 51,
+    "entitySHA": "d63179cc560496b5fe1c0909587981f57a5e41f28e50f798fd3c6a09fb5f284d",
+    "urlSHA256": "b726b1d646531a750a30d66f54149ffc521e53ae45e4bb6295278a6c794e5f32",
+    "routeTemplate": "/team-matches/:entity",
+    "utc": "2026-10-04T08:27:45.077Z",
+    "viewport": {
+      "dpr": 1,
+      "h": 757,
+      "w": 1182
+    },
+    "backgroundSourceHashes": [
+      "2808f485687aecfb981f33726d2b2ce603fc72e07eaafa4b86b5170c237107bd",
+      "b9ba885ec5e8628379a3837c741619100048e57556dc910f95d943c9788a2e9f"
+    ],
+    "rawURLStored": false,
+    "label": "desktop-detail-photo",
+    "index": 6,
+    "localizedPanels": {
+      "panels": [
+        {
+          "backgroundColor": "rgba(17, 24, 39, 0.8)",
+          "backgroundImage": "none",
+          "className": "tm-btn tm-btn-icon tm-btn-ghost tm-hero-button",
+          "color": "rgb(255, 255, 255)",
+          "filter": "none",
+          "opacity": "1",
+          "rect": {
+            "bottom": 212,
+            "height": 44,
+            "left": 615,
+            "right": 659,
+            "top": 168,
+            "width": 44,
+            "x": 615,
+            "y": 168
+          },
+          "tag": "BUTTON",
+          "textLength": 0
+        },
+        {
+          "backgroundColor": "rgba(17, 24, 39, 0.8)",
+          "backgroundImage": "none",
+          "className": "tm-team-vs-summary",
+          "color": "rgb(255, 255, 255)",
+          "filter": "none",
+          "opacity": "1",
+          "rect": {
+            "bottom": 332,
+            "height": 84,
+            "left": 75,
+            "right": 659,
+            "top": 248,
+            "width": 584,
+            "x": 75,
+            "y": 248
+          },
+          "tag": "DIV",
+          "textLength": 51
+        }
+      ],
+      "utc": "2026-10-04T08:27:45.095Z",
+      "viewport": {
+        "dpr": 1,
+        "h": 757,
+        "w": 1182
+      }
+    }
+  }
+]

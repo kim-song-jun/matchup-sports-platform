@@ -1,0 +1,528 @@
+{
+  "created_utc": "2026-10-04T08:28:50.505880+00:00",
+  "scope": "Approved synthetic cow fixture list thumbnail across mobile, tablet, desktop. Each observation is timestamped independently; this is not a simultaneous capture. Local numerical analysis only.",
+  "overall_conclusion": "All three list thumbnails closely match a centered cover crop of the same original source. No evidence of a material uniform dim layer at any measured width. The source has dark cow/landscape foreground areas. Small residual differences are compatible with browser/capture resampling, JPEG compression and color handling; a tiny effect cannot be ruled out.",
+  "shared_source": {
+    "sha256": "7b973af30c89b8c9ff5eb53eade4a4c13e44ca963d2447cad4db0749a63c4acb",
+    "sha_matches_download_proof": true,
+    "dimensions": [
+      3840,
+      2160
+    ],
+    "format": "JPEG RGB",
+    "ICC_profile_present": false,
+    "exif_orientation": 1,
+    "center_cover_crop_half_open": [
+      840,
+      0,
+      3000,
+      2160
+    ],
+    "source_pixels_per_css_pixel": 22.5
+  },
+  "methodology": {
+    "luma": "0.2126R+0.7152G+0.0722B in decoded 8-bit channels, range0..255; encoded luma proxy, not linear-light luminance.",
+    "materiality": "At least 5% uniform attenuation in encoded RGB/luma is the engineering threshold used here; not a universal perceptual threshold.",
+    "geometry": "Measured 96x96 CSS thumbnail, center cover; principal72x72 interior excludes12px rounded corners. Check6px/18px insets and four standard resize kernels. Subpixel shifts\u00b10.4 CSS px test coordinate sensitivity.",
+    "comparison": "Mean ratio, zero-intercept gain, affine gain/offset, correlation, MAE/RMSE and explicit uniform attenuation hypotheses. Geometry/resampling fit is not pixel identity.",
+    "visual_inspection": "Original source plus authorized mobile, tablet and desktop captures inspected; source foreground is dark and corresponding sky stays bright across sizes.",
+    "restrictions_observed": "Only approved image/proof files read. No browser/network/GitHub actions; no raw image/URL publication; no image copies or manipulated proof images created. Analytical source crop/resize performed only in memory.",
+    "limitations": [
+      "All screenshot files decode as JPEG despite .png filenames; lossy capture prevents exact pixel matching.",
+      "No embedded ICC profiles; browser/display/capture color transforms are unknown.",
+      "DPR normalization and fractional CSS placement can shift image features by subpixels.",
+      "These conclusions apply only to the approved cow fixture list thumbnail at the recorded times, not other images or hero areas."
+    ]
+  },
+  "mobile_artifact_preserved": true,
+  "observations": [
+    {
+      "label": "mobile-list-photo",
+      "observed_utc": "2026-10-04T08:07:16.473Z",
+      "status": "Frozen prior observation; summarized without recomputation or modification.",
+      "analysis_file": "mobile-photo-pixel-analysis.json",
+      "analysis_sha256": "cdca9b1709cf51d16172e9c71ccf83dc44d9da79e8a4f751566c6b2a714436fe",
+      "screenshot_sha256": "eb919be7f3cfa80686f3001e30930f7ab16067b7e78d36c2c870f648ed5f65e3",
+      "viewport": {
+        "dpr": 1.25,
+        "h": 606,
+        "w": 402
+      },
+      "principal_model": {
+        "interior_inset_css_px": 12,
+        "resamplers": [
+          "bilinear",
+          "bilinear"
+        ],
+        "source_expected_mean_luma": 123.44698,
+        "screenshot_mean_luma": 121.01474,
+        "mean_ratio": 0.980297,
+        "gain_through_origin": 0.986771,
+        "affine_slope": 1.00336,
+        "affine_offset": -2.84706,
+        "luma_MAE": 3.63402,
+        "luma_RMSE": 4.81122,
+        "luma_correlation": 0.99857
+      },
+      "conclusion": "No evidence of material uniform added dimming; small JPEG/capture-level difference remains."
+    },
+    {
+      "label": "tablet-list-photo",
+      "observed_utc": "2026-10-04T08:20:07.708Z",
+      "source_url_hash_matches_original": true,
+      "screenshot_sha256": "39d823f86363d0d70e6102d9ded106befa1883fed2cac6ea98a84b6e8d1878b5",
+      "screenshot": {
+        "dimensions": [
+          788,
+          505
+        ],
+        "actual_format": "JPEG",
+        "filename_extension": ".png",
+        "mode": "RGB",
+        "ICC_profile_present": false
+      },
+      "viewport": {
+        "dpr": 1.5,
+        "h": 505,
+        "w": 788
+      },
+      "css_rect": {
+        "bottom": 376,
+        "height": 96,
+        "left": 130.6666717529297,
+        "right": 226.6666717529297,
+        "top": 280,
+        "width": 96,
+        "x": 130.6666717529297,
+        "y": 280
+      },
+      "principal_ROI_half_open": [
+        143,
+        292,
+        215,
+        364
+      ],
+      "principal_pixel_count": 5184,
+      "capture_mapping": "Plausible physical 1182x757 raster -> 788x505 capture; thumbnail (196,420), 144x144 pixels from CSS rect and DPR1.5. Physical height inferred from CSS viewport extent 504.666687px. Capture resamplers are not independently known.",
+      "style_evidence": {
+        "background_size": "cover, cover",
+        "background_position": "50% 50%, 50% 50%",
+        "border_radius": "12px",
+        "background_function_kinds": [
+          "url",
+          "url"
+        ],
+        "all_recorded_ancestor_opacity_1": true,
+        "all_recorded_ancestor_filter_none": true,
+        "all_recorded_ancestor_mix_blend_normal": true
+      },
+      "principal_model": {
+        "interior_inset_css_px": 12,
+        "resamplers": [
+          "bilinear",
+          "bilinear"
+        ],
+        "source_expected_mean_luma": 123.61453,
+        "screenshot_mean_luma": 121.14416,
+        "mean_ratio": 0.980016,
+        "gain_through_origin": 0.987196,
+        "affine_slope": 1.005585,
+        "affine_offset": -3.16078,
+        "luma_MAE": 3.84924,
+        "luma_RMSE": 5.04732,
+        "luma_correlation": 0.998414
+      },
+      "direct_coordinate_unshifted_models": [
+        {
+          "resampler": "box",
+          "origin_shift_css_px": [
+            0,
+            0
+          ],
+          "source_expected_mean_luma": 123.01163,
+          "screenshot_mean_luma": 121.14416,
+          "mean_ratio": 0.984819,
+          "gain_through_origin": 0.988131,
+          "affine_slope": 0.996413,
+          "affine_offset": -1.4262,
+          "luma_MAE": 4.80613,
+          "luma_RMSE": 6.98921,
+          "luma_correlation": 0.996252
+        },
+        {
+          "resampler": "bilinear",
+          "origin_shift_css_px": [
+            0,
+            0
+          ],
+          "source_expected_mean_luma": 123.08333,
+          "screenshot_mean_luma": 121.14416,
+          "mean_ratio": 0.984245,
+          "gain_through_origin": 0.989536,
+          "affine_slope": 1.00293,
+          "affine_offset": -2.29977,
+          "luma_MAE": 4.34873,
+          "luma_RMSE": 6.13989,
+          "luma_correlation": 0.997197
+        },
+        {
+          "resampler": "bicubic",
+          "origin_shift_css_px": [
+            0,
+            0
+          ],
+          "source_expected_mean_luma": 123.06915,
+          "screenshot_mean_luma": 121.14416,
+          "mean_ratio": 0.984359,
+          "gain_through_origin": 0.987279,
+          "affine_slope": 0.994556,
+          "affine_offset": -1.25503,
+          "luma_MAE": 4.73048,
+          "luma_RMSE": 6.76215,
+          "luma_correlation": 0.996538
+        },
+        {
+          "resampler": "lanczos",
+          "origin_shift_css_px": [
+            0,
+            0
+          ],
+          "source_expected_mean_luma": 123.07255,
+          "screenshot_mean_luma": 121.14416,
+          "mean_ratio": 0.984331,
+          "gain_through_origin": 0.986306,
+          "affine_slope": 0.991202,
+          "affine_offset": -0.84561,
+          "luma_MAE": 5.10809,
+          "luma_RMSE": 7.38179,
+          "luma_correlation": 0.995836
+        }
+      ],
+      "sensitivity": {
+        "direct_36_models_origin_shift_plus_minus_0_4_css_px": {
+          "mean_ratio": [
+            0.975102,
+            0.993881
+          ],
+          "gain_through_origin": [
+            0.97746,
+            0.993636
+          ],
+          "luma_correlation": [
+            0.980586,
+            0.997543
+          ]
+        },
+        "insets_6_12_18_px_across_resamplers": {
+          "mean_ratio": [
+            0.976937,
+            0.981836
+          ],
+          "gain_through_origin": [
+            0.980651,
+            0.988256
+          ],
+          "luma_correlation": [
+            0.995551,
+            0.998734
+          ]
+        },
+        "inset_resampler_model_count": 48,
+        "note": "Model sensitivity ranges, not statistical confidence intervals."
+      },
+      "uniform_attenuation_hypotheses_principal_model": [
+        {
+          "gain": 1,
+          "luma_RMSE": 5.04732
+        },
+        {
+          "gain": 0.98,
+          "luma_RMSE": 4.80546
+        },
+        {
+          "gain": 0.95,
+          "luma_RMSE": 7.16862
+        },
+        {
+          "gain": 0.9,
+          "luma_RMSE": 13.54768
+        },
+        {
+          "gain": 0.8,
+          "luma_RMSE": 27.68666
+        }
+      ],
+      "principal_luma_bins": [
+        {
+          "expected_luma_bin": [
+            0,
+            60
+          ],
+          "pixel_count": 1323,
+          "expected_mean": 39.66577,
+          "actual_mean": 36.5587,
+          "mean_difference": -3.10707
+        },
+        {
+          "expected_luma_bin": [
+            60,
+            120
+          ],
+          "pixel_count": 1727,
+          "expected_mean": 80.66419,
+          "actual_mean": 77.95221,
+          "mean_difference": -2.71197
+        },
+        {
+          "expected_luma_bin": [
+            120,
+            180
+          ],
+          "pixel_count": 317,
+          "expected_mean": 148.1318,
+          "actual_mean": 146.71718,
+          "mean_difference": -1.41462
+        },
+        {
+          "expected_luma_bin": [
+            180,
+            256
+          ],
+          "pixel_count": 1817,
+          "expected_mean": 221.28512,
+          "actual_mean": 219.32381,
+          "mean_difference": -1.96131
+        }
+      ],
+      "conclusion": "No evidence of material uniform added dimming. Appearance closely tracks the same centered source crop, with a small encoded-luma difference. Exact equivalence and tiny effects cannot be established from this JPEG capture."
+    },
+    {
+      "label": "desktop-list-photo",
+      "observed_utc": "2026-10-04T08:26:16.550Z",
+      "source_url_hash_matches_original": true,
+      "screenshot_sha256": "78d4bf35efa714ff2b31db0c7dbc53c6147fe7e315bb9d378c022fb94bfef0f7",
+      "screenshot": {
+        "dimensions": [
+          1182,
+          757
+        ],
+        "actual_format": "JPEG",
+        "filename_extension": ".png",
+        "mode": "RGB",
+        "ICC_profile_present": false
+      },
+      "viewport": {
+        "dpr": 1,
+        "h": 757,
+        "w": 1182
+      },
+      "css_rect": {
+        "bottom": 497,
+        "height": 96,
+        "left": 616,
+        "right": 712,
+        "top": 401,
+        "width": 96,
+        "x": 616,
+        "y": 401
+      },
+      "principal_ROI_half_open": [
+        628,
+        413,
+        700,
+        485
+      ],
+      "principal_pixel_count": 5184,
+      "capture_mapping": "DPR1.0, integer CSS placement and 1182x757 capture dimensions: direct source crop/resample. No extra DPR downsample assumed.",
+      "style_evidence": {
+        "background_size": "cover, cover",
+        "background_position": "50% 50%, 50% 50%",
+        "border_radius": "12px",
+        "background_function_kinds": [
+          "url",
+          "url"
+        ],
+        "all_recorded_ancestor_opacity_1": true,
+        "all_recorded_ancestor_filter_none": true,
+        "all_recorded_ancestor_mix_blend_normal": true
+      },
+      "principal_model": {
+        "interior_inset_css_px": 12,
+        "resampler": "bilinear",
+        "source_expected_mean_luma": 122.94213,
+        "screenshot_mean_luma": 121.49286,
+        "mean_ratio": 0.988212,
+        "gain_through_origin": 0.991998,
+        "affine_slope": 1.001558,
+        "affine_offset": -1.64078,
+        "luma_MAE": 3.56541,
+        "luma_RMSE": 4.85186,
+        "luma_correlation": 0.998221
+      },
+      "direct_coordinate_unshifted_models": [
+        {
+          "resampler": "box",
+          "origin_shift_css_px": [
+            0,
+            0
+          ],
+          "source_expected_mean_luma": 122.8868,
+          "screenshot_mean_luma": 121.49286,
+          "mean_ratio": 0.988657,
+          "gain_through_origin": 0.990655,
+          "affine_slope": 0.995644,
+          "affine_offset": -0.85861,
+          "luma_MAE": 3.9739,
+          "luma_RMSE": 5.48393,
+          "luma_correlation": 0.997673
+        },
+        {
+          "resampler": "bilinear",
+          "origin_shift_css_px": [
+            0,
+            0
+          ],
+          "source_expected_mean_luma": 122.94213,
+          "screenshot_mean_luma": 121.49286,
+          "mean_ratio": 0.988212,
+          "gain_through_origin": 0.991998,
+          "affine_slope": 1.001558,
+          "affine_offset": -1.64078,
+          "luma_MAE": 3.56541,
+          "luma_RMSE": 4.85186,
+          "luma_correlation": 0.998221
+        },
+        {
+          "resampler": "bicubic",
+          "origin_shift_css_px": [
+            0,
+            0
+          ],
+          "source_expected_mean_luma": 122.92959,
+          "screenshot_mean_luma": 121.49286,
+          "mean_ratio": 0.988313,
+          "gain_through_origin": 0.989773,
+          "affine_slope": 0.993403,
+          "affine_offset": -0.62572,
+          "luma_MAE": 3.8903,
+          "luma_RMSE": 5.34108,
+          "luma_correlation": 0.997824
+        },
+        {
+          "resampler": "lanczos",
+          "origin_shift_css_px": [
+            0,
+            0
+          ],
+          "source_expected_mean_luma": 122.93364,
+          "screenshot_mean_luma": 121.49286,
+          "mean_ratio": 0.98828,
+          "gain_through_origin": 0.988829,
+          "affine_slope": 0.990185,
+          "affine_offset": -0.23422,
+          "luma_MAE": 4.28162,
+          "luma_RMSE": 5.97922,
+          "luma_correlation": 0.997251
+        }
+      ],
+      "sensitivity": {
+        "direct_36_models_origin_shift_plus_minus_0_4_css_px": {
+          "mean_ratio": [
+            0.979187,
+            0.997655
+          ],
+          "gain_through_origin": [
+            0.978572,
+            0.997178
+          ],
+          "luma_correlation": [
+            0.985825,
+            0.998221
+          ]
+        },
+        "insets_6_12_18_px_across_resamplers": {
+          "mean_ratio": [
+            0.987802,
+            0.989202
+          ],
+          "gain_through_origin": [
+            0.987518,
+            0.992536
+          ],
+          "luma_correlation": [
+            0.996578,
+            0.998485
+          ]
+        },
+        "inset_resampler_model_count": 12,
+        "note": "Model sensitivity ranges, not statistical confidence intervals."
+      },
+      "uniform_attenuation_hypotheses_principal_model": [
+        {
+          "gain": 1,
+          "luma_RMSE": 4.85186
+        },
+        {
+          "gain": 0.98,
+          "luma_RMSE": 5.02261
+        },
+        {
+          "gain": 0.95,
+          "luma_RMSE": 7.70755
+        },
+        {
+          "gain": 0.9,
+          "luma_RMSE": 14.16947
+        },
+        {
+          "gain": 0.8,
+          "luma_RMSE": 28.28454
+        }
+      ],
+      "principal_luma_bins": [
+        {
+          "expected_luma_bin": [
+            0,
+            60
+          ],
+          "pixel_count": 1349,
+          "expected_mean": 39.33565,
+          "actual_mean": 37.80115,
+          "mean_difference": -1.5345
+        },
+        {
+          "expected_luma_bin": [
+            60,
+            120
+          ],
+          "pixel_count": 1720,
+          "expected_mean": 80.7756,
+          "actual_mean": 79.18607,
+          "mean_difference": -1.58953
+        },
+        {
+          "expected_luma_bin": [
+            120,
+            180
+          ],
+          "pixel_count": 303,
+          "expected_mean": 147.63505,
+          "actual_mean": 146.61978,
+          "mean_difference": -1.01526
+        },
+        {
+          "expected_luma_bin": [
+            180,
+            256
+          ],
+          "pixel_count": 1812,
+          "expected_mean": 221.08209,
+          "actual_mean": 219.75685,
+          "mean_difference": -1.32524
+        }
+      ],
+      "conclusion": "No evidence of material uniform added dimming. Appearance closely tracks the same centered source crop, with a small encoded-luma difference. Exact equivalence and tiny effects cannot be established from this JPEG capture."
+    }
+  ],
+  "contains_raw_images_or_urls": false
+}

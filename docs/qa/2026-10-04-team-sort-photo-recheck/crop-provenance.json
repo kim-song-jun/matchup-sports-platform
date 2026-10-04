@@ -1,0 +1,254 @@
+[
+  {
+    "file": "crops/mobile-list-photo.png",
+    "sourceCaptureLabel": "mobile-list-photo",
+    "sourceCaptureSHA256": "eb919be7f3cfa80686f3001e30930f7ab16067b7e78d36c2c870f648ed5f65e3",
+    "sourceFormat": "JPEG",
+    "sourceDimensions": [
+      402,
+      606
+    ],
+    "boundsLTRBHalfOpen": [
+      37,
+      248,
+      133,
+      344
+    ],
+    "outputDimensions": [
+      96,
+      96
+    ],
+    "proofFile": "photo-proof.json",
+    "proofIndex": 0,
+    "captureStartUTC": "2026-10-04T08:07:16.483Z",
+    "captureEndUTC": "2026-10-04T08:07:16.509Z",
+    "sha256": "22748f9d518238c655d7dba672f865f0fccac2764953435ce86aa7cb34680df7",
+    "transformation": "Exact decoded RGB pixel crop; lossless PNG serialization only. No scaling, masking, recoloring, or overlays.",
+    "visualInspection": "Exact crop inspected. No team/host names, row metadata, roster, or personal content visible. Generic home/opponent labels may remain on panel crops.",
+    "boundsShortenedAfterInspection": false
+  },
+  {
+    "file": "crops/tablet-list-photo.png",
+    "sourceCaptureLabel": "tablet-list-photo",
+    "sourceCaptureSHA256": "39d823f86363d0d70e6102d9ded106befa1883fed2cac6ea98a84b6e8d1878b5",
+    "sourceFormat": "JPEG",
+    "sourceDimensions": [
+      788,
+      505
+    ],
+    "boundsLTRBHalfOpen": [
+      131,
+      280,
+      227,
+      376
+    ],
+    "outputDimensions": [
+      96,
+      96
+    ],
+    "proofFile": "photo-proof.json",
+    "proofIndex": 3,
+    "captureStartUTC": "2026-10-04T08:20:07.715Z",
+    "captureEndUTC": "2026-10-04T08:20:07.741Z",
+    "sha256": "b95eb40ed0bde1fe63d2d43e35af61aad62aea57e81c476ffbc80679100e4a5b",
+    "transformation": "Exact decoded RGB pixel crop; lossless PNG serialization only. No scaling, masking, recoloring, or overlays.",
+    "visualInspection": "Exact crop inspected. No team/host names, row metadata, roster, or personal content visible. Generic home/opponent labels may remain on panel crops.",
+    "boundsShortenedAfterInspection": false
+  },
+  {
+    "file": "crops/desktop-list-photo.png",
+    "sourceCaptureLabel": "desktop-list-photo",
+    "sourceCaptureSHA256": "78d4bf35efa714ff2b31db0c7dbc53c6147fe7e315bb9d378c022fb94bfef0f7",
+    "sourceFormat": "JPEG",
+    "sourceDimensions": [
+      1182,
+      757
+    ],
+    "boundsLTRBHalfOpen": [
+      616,
+      401,
+      712,
+      497
+    ],
+    "outputDimensions": [
+      96,
+      96
+    ],
+    "proofFile": "photo-proof.json",
+    "proofIndex": 5,
+    "captureStartUTC": "2026-10-04T08:26:16.555Z",
+    "captureEndUTC": "2026-10-04T08:26:16.583Z",
+    "sha256": "ae10f052c5ada185f34e36ffccc587454114a658b0b95c478c1761cffddf1554",
+    "transformation": "Exact decoded RGB pixel crop; lossless PNG serialization only. No scaling, masking, recoloring, or overlays.",
+    "visualInspection": "Exact crop inspected. No team/host names, row metadata, roster, or personal content visible. Generic home/opponent labels may remain on panel crops.",
+    "boundsShortenedAfterInspection": false
+  },
+  {
+    "file": "crops/mobile-detail-uncovered.png",
+    "sourceCaptureLabel": "mobile-detail-photo",
+    "sourceCaptureSHA256": "e730dd73897e22f721094f83b147bf945931f024d4f2569df1782867377a4cac",
+    "sourceFormat": "JPEG",
+    "sourceDimensions": [
+      402,
+      606
+    ],
+    "boundsLTRBHalfOpen": [
+      64,
+      0,
+      336,
+      70
+    ],
+    "outputDimensions": [
+      272,
+      70
+    ],
+    "proofFile": "photo-proof.json",
+    "proofIndex": 1,
+    "captureStartUTC": "2026-10-04T08:11:42.052Z",
+    "captureEndUTC": "2026-10-04T08:11:42.323Z",
+    "sha256": "9be02a75ca5ab10ca31c6ba075ba68def747c4bb822df68ebc5c7ad3ec64e147",
+    "transformation": "Exact decoded RGB pixel crop; lossless PNG serialization only. No scaling, masking, recoloring, or overlays.",
+    "visualInspection": "Exact crop inspected. No team/host names, row metadata, roster, or personal content visible. Generic home/opponent labels may remain on panel crops.",
+    "boundsShortenedAfterInspection": false
+  },
+  {
+    "file": "crops/mobile-detail-panel.png",
+    "sourceCaptureLabel": "mobile-detail-photo",
+    "sourceCaptureSHA256": "e730dd73897e22f721094f83b147bf945931f024d4f2569df1782867377a4cac",
+    "sourceFormat": "JPEG",
+    "sourceDimensions": [
+      402,
+      606
+    ],
+    "boundsLTRBHalfOpen": [
+      16,
+      72,
+      386,
+      100
+    ],
+    "outputDimensions": [
+      370,
+      28
+    ],
+    "proofFile": "photo-proof.json",
+    "proofIndex": 1,
+    "captureStartUTC": "2026-10-04T08:11:42.052Z",
+    "captureEndUTC": "2026-10-04T08:11:42.323Z",
+    "sha256": "7f82327232cf852c1822d5c6242dabafd867057ff4e2877dac55289668b29782",
+    "transformation": "Exact decoded RGB pixel crop; lossless PNG serialization only. No scaling, masking, recoloring, or overlays.",
+    "visualInspection": "Exact crop inspected. No team/host names, row metadata, roster, or personal content visible. Generic home/opponent labels may remain on panel crops.",
+    "boundsShortenedAfterInspection": false
+  },
+  {
+    "file": "crops/tablet-detail-uncovered.png",
+    "sourceCaptureLabel": "tablet-detail-photo",
+    "sourceCaptureSHA256": "6024157abd0dd1539da8856fe3d33a5eb2a3cf816ce4b8360e2d5134a5a03960",
+    "sourceFormat": "JPEG",
+    "sourceDimensions": [
+      788,
+      505
+    ],
+    "boundsLTRBHalfOpen": [
+      156,
+      0,
+      630,
+      118
+    ],
+    "outputDimensions": [
+      474,
+      118
+    ],
+    "proofFile": "photo-proof.json",
+    "proofIndex": 4,
+    "captureStartUTC": "2026-10-04T08:20:35.127Z",
+    "captureEndUTC": "2026-10-04T08:20:35.151Z",
+    "sha256": "7a379cc7113c0f8a9c46814939b171ec0ef797e3f2539cf516c01e0bfba15ca3",
+    "transformation": "Exact decoded RGB pixel crop; lossless PNG serialization only. No scaling, masking, recoloring, or overlays.",
+    "visualInspection": "Exact crop inspected. No team/host names, row metadata, roster, or personal content visible. Generic home/opponent labels may remain on panel crops.",
+    "boundsShortenedAfterInspection": false
+  },
+  {
+    "file": "crops/tablet-detail-panel.png",
+    "sourceCaptureLabel": "tablet-detail-photo",
+    "sourceCaptureSHA256": "6024157abd0dd1539da8856fe3d33a5eb2a3cf816ce4b8360e2d5134a5a03960",
+    "sourceFormat": "JPEG",
+    "sourceDimensions": [
+      788,
+      505
+    ],
+    "boundsLTRBHalfOpen": [
+      110,
+      120,
+      678,
+      148
+    ],
+    "outputDimensions": [
+      568,
+      28
+    ],
+    "proofFile": "photo-proof.json",
+    "proofIndex": 4,
+    "captureStartUTC": "2026-10-04T08:20:35.127Z",
+    "captureEndUTC": "2026-10-04T08:20:35.151Z",
+    "sha256": "ab1a08d7eec52d564727a80f56e659282a9ab45c287b656b3cc83f30c690a55c",
+    "transformation": "Exact decoded RGB pixel crop; lossless PNG serialization only. No scaling, masking, recoloring, or overlays.",
+    "visualInspection": "Exact crop inspected. No team/host names, row metadata, roster, or personal content visible. Generic home/opponent labels may remain on panel crops.",
+    "boundsShortenedAfterInspection": false
+  },
+  {
+    "file": "crops/desktop-detail-uncovered.png",
+    "sourceCaptureLabel": "desktop-detail-photo",
+    "sourceCaptureSHA256": "49d7bdb2a8bda4ddb46fc15f353cd254810fdfb8554f7da77ff090334dc3a439",
+    "sourceFormat": "JPEG",
+    "sourceDimensions": [
+      1182,
+      757
+    ],
+    "boundsLTRBHalfOpen": [
+      75,
+      152,
+      611,
+      246
+    ],
+    "outputDimensions": [
+      536,
+      94
+    ],
+    "proofFile": "photo-proof.json",
+    "proofIndex": 6,
+    "captureStartUTC": "2026-10-04T08:27:45.101Z",
+    "captureEndUTC": "2026-10-04T08:27:45.139Z",
+    "sha256": "dd90a7bff2fed1cb3f4136f97f1f3a363cca35985aafa76a9ae420a26e807383",
+    "transformation": "Exact decoded RGB pixel crop; lossless PNG serialization only. No scaling, masking, recoloring, or overlays.",
+    "visualInspection": "Exact crop inspected. No team/host names, row metadata, roster, or personal content visible. Generic home/opponent labels may remain on panel crops.",
+    "boundsShortenedAfterInspection": false
+  },
+  {
+    "file": "crops/desktop-detail-panel.png",
+    "sourceCaptureLabel": "desktop-detail-photo",
+    "sourceCaptureSHA256": "49d7bdb2a8bda4ddb46fc15f353cd254810fdfb8554f7da77ff090334dc3a439",
+    "sourceFormat": "JPEG",
+    "sourceDimensions": [
+      1182,
+      757
+    ],
+    "boundsLTRBHalfOpen": [
+      75,
+      248,
+      659,
+      276
+    ],
+    "outputDimensions": [
+      584,
+      28
+    ],
+    "proofFile": "photo-proof.json",
+    "proofIndex": 6,
+    "captureStartUTC": "2026-10-04T08:27:45.101Z",
+    "captureEndUTC": "2026-10-04T08:27:45.139Z",
+    "sha256": "38df4c223dadf8fc10d8eea8ce517d78f73ffe778569979bf5b1823aa019e244",
+    "transformation": "Exact decoded RGB pixel crop; lossless PNG serialization only. No scaling, masking, recoloring, or overlays.",
+    "visualInspection": "Exact crop inspected. No team/host names, row metadata, roster, or personal content visible. Generic home/opponent labels may remain on panel crops.",
+    "boundsShortenedAfterInspection": false
+  }
+]

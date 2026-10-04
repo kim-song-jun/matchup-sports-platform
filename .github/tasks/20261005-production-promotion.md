@@ -57,3 +57,22 @@ Owned: this task/status record, GitHub canonical promotion workflow dispatch and
 - Alerts50/51 source traced: prefix matching only collects HTTP response errors in read-only capture diagnostics; it does not grant trust, authorize a navigation/request, or send credentials.
 - Automatic approval review rejected PATCH dismissing these three alerts: deployment authorization did not include suppressing high security alerts. No dismissal performed and no main merge performed. Explicit user approval requested with evidence and suppression impact.
 - Copilot requested but no actual Copilot submitted review yet; do not claim clean.
+
+## Security approval resolved
+
+- User explicitly approved recording evidence and dismissing CodeQL alerts49–51. All three now dismissed as false positive; diagnostic threads replied and resolved. CodeQL aggregate now PASS; PR MERGEABLE/CLEAN, all CI PASS, unresolved0.
+- Copilot requested >12min ago but no Copilot review submitted. Latest user question requests a PR1609-specific clean-review exception before merge; still pending, not implicitly approved.
+
+## User chose waiting for review
+
+- User explicitly chose waiting for Copilot rather than a PR1609 review exception. Main merge/deployment remains unperformed. Re-requested Copilot after initial >12min absence; GitHub accepted the request, but reviewRequests is still empty and no Copilot review exists. Only actual submitted review can satisfy the gate.
+
+## User merge and production monitoring completed
+
+- User directly merged main promotion PR #1609 on2026-10-04T18:17:12Z. Main commit `9305fee17e8b86ce59b7f332db3958caf1e7ab26`; source headcca. Follow-up dev fix PR #1610 remained OPEN and is not included in this production release. Its latest headed9aaa543 passed CI; an additional reviewer P2 about roster-worker lock coordination remains for the separate follow-up. Do not mark that PR or its visual QA complete.
+- User requested monitoring through deployment. Production run #37223844835 completed SUCCESS: API/Gates/Web/Build images/Deploy all PASS.
+- Actual production environment approval reached waiting state with current_user_can_approve=true. Approved through the normal required-reviewer API as a configured reviewer under the existing main deployment authorization; no protection bypass, no forced main push, no Stage A/B dispatch.
+- Actual live production release1.2.1, exact commit9305fee17e8b86ce59b7f332db3958caf1e7ab26. Landing and tournaments pages HTTP200 with matching identity headers. API health HTTP200/status success/DB=true. Public tournament list and an actual listed tournament detail API both200/success.
+- Alpha-only manual12-team practice tournament API returned404 on production: no accidental practice seed promotion. No production data reset or manual seed invocation performed.
+- Final runtime evidence timestamp2026-10-04T18:38:45Z (2026-10-05 KST). Evidence file outside runtime `/tmp/teameet-main-monitor-final.json`. No local app/DB/browser started for monitoring.
+- Production promotion/monitoring objective complete for the user-merged release. PR1610 follow-up and Copilot/actual alpha validation remain separate outstanding work, not part of this released tree.

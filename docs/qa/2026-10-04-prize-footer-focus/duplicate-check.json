@@ -1,0 +1,272 @@
+{
+  "checkedUTC": "2026-10-04T05:56:06.882Z",
+  "repository": "kim-song-jun/matchup-sports-platform",
+  "queries": [
+    {
+      "query": "repo:kim-song-jun/matchup-sports-platform is:issue 상금",
+      "stateFilter": null,
+      "maximumResults": 100,
+      "results": [
+        {
+          "number": 1439,
+          "title": "[UI/UX 개선] 대회 생성에서 꺼진 홍보 설정도 18개 입력과 중첩 미리보기로 노출",
+          "url": "https://github.com/kim-song-jun/matchup-sports-platform/issues/1439"
+        },
+        {
+          "number": 129,
+          "title": "QA: P17 — 대회 admin(대회 운영자)",
+          "url": "https://github.com/kim-song-jun/matchup-sports-platform/issues/129"
+        },
+        {
+          "number": 1579,
+          "title": "[Alpha 접근성][P2] 대회 상세 ‘상품 및 상금’ 캡션 대비 4.2087:1로 AA 미달",
+          "url": "https://github.com/kim-song-jun/matchup-sports-platform/issues/1579"
+        },
+        {
+          "number": 1437,
+          "title": "[Alpha E2E] 대회 생성 다음 단계에서 이전 스크롤·버튼 포커스가 남아 필수 입력이 가려짐",
+          "url": "https://github.com/kim-song-jun/matchup-sports-platform/issues/1437"
+        },
+        {
+          "number": 122,
+          "title": "QA: P10 — 대회 참가자",
+          "url": "https://github.com/kim-song-jun/matchup-sports-platform/issues/122"
+        }
+      ]
+    },
+    {
+      "query": "repo:kim-song-jun/matchup-sports-platform is:issue footer",
+      "stateFilter": null,
+      "maximumResults": 100,
+      "results": [
+        {
+          "number": 1439,
+          "title": "[UI/UX 개선] 대회 생성에서 꺼진 홍보 설정도 18개 입력과 중첩 미리보기로 노출",
+          "url": "https://github.com/kim-song-jun/matchup-sports-platform/issues/1439"
+        },
+        {
+          "number": 1430,
+          "title": "[UI/UX 개선] 참가 명단의 하단 ‘추가’ 버튼이 긴 입력폼을 덮고 상단 버튼과 역할 혼동",
+          "url": "https://github.com/kim-song-jun/matchup-sports-platform/issues/1430"
+        },
+        {
+          "number": 1434,
+          "title": "[UI/UX 개선] 모바일 리그 대진 입력칸 정렬 불일치와 좁은 장소 필드",
+          "url": "https://github.com/kim-song-jun/matchup-sports-platform/issues/1434"
+        },
+        {
+          "number": 1437,
+          "title": "[Alpha E2E] 대회 생성 다음 단계에서 이전 스크롤·버튼 포커스가 남아 필수 입력이 가려짐",
+          "url": "https://github.com/kim-song-jun/matchup-sports-platform/issues/1437"
+        },
+        {
+          "number": 1534,
+          "title": "[UI/UX P3] 팀 만들기 태블릿에서 Tab으로 이동한 레벨 선택칸 하단이 고정 버튼에 가림",
+          "url": "https://github.com/kim-song-jun/matchup-sports-platform/issues/1534"
+        },
+        {
+          "number": 1464,
+          "title": "[접근성] 관리자 약관 작성의 노출 위치·동의 유형 선택에 접근 가능한 이름 누락",
+          "url": "https://github.com/kim-song-jun/matchup-sports-platform/issues/1464"
+        },
+        {
+          "number": 1564,
+          "title": "[Alpha QA P2] 관리자 명단 검토를 열면 초기 포커스가 배경에 남아 키보드 탐색이 모달 밖으로 이동",
+          "url": "https://github.com/kim-song-jun/matchup-sports-platform/issues/1564"
+        }
+      ]
+    },
+    {
+      "query": "repo:kim-song-jun/matchup-sports-platform is:issue 포커스",
+      "stateFilter": null,
+      "maximumResults": 100,
+      "results": [
+        {
+          "number": 1412,
+          "title": "[Alpha QA/A11y] 친선 등번호 모달을 Escape로 닫으면 트리거 대신 BODY로 포커스 이동",
+          "url": "https://github.com/kim-song-jun/matchup-sports-platform/issues/1412"
+        },
+        {
+          "number": 1455,
+          "title": "[UX] 모바일 친선 공동 기록 ‘득점 추가’ 폼이 화면 밖에서 열리고 포커스가 이동하지 않음",
+          "url": "https://github.com/kim-song-jun/matchup-sports-platform/issues/1455"
+        },
+        {
+          "number": 1450,
+          "title": "[UX] 경기 운영 화면의 배경·카드·활성 보조 버튼 구분이 일관되지 않음",
+          "url": "https://github.com/kim-song-jun/matchup-sports-platform/issues/1450"
+        },
+        {
+          "number": 1434,
+          "title": "[UI/UX 개선] 모바일 리그 대진 입력칸 정렬 불일치와 좁은 장소 필드",
+          "url": "https://github.com/kim-song-jun/matchup-sports-platform/issues/1434"
+        },
+        {
+          "number": 1518,
+          "title": "[UI/UX] 완료·결과 확정 친선에도 공동 기록 참여 안내가 남음",
+          "url": "https://github.com/kim-song-jun/matchup-sports-platform/issues/1518"
+        },
+        {
+          "number": 1534,
+          "title": "[UI/UX P3] 팀 만들기 태블릿에서 Tab으로 이동한 레벨 선택칸 하단이 고정 버튼에 가림",
+          "url": "https://github.com/kim-song-jun/matchup-sports-platform/issues/1534"
+        },
+        {
+          "number": 1569,
+          "title": "[Alpha QA P2] 개인매치 추천 레일의 중간 카드가 키보드 포커스 상태에서도 모바일 화면 밖에 대부분 가려짐",
+          "url": "https://github.com/kim-song-jun/matchup-sports-platform/issues/1569"
+        },
+        {
+          "number": 1571,
+          "title": "[Alpha QA P2] 관리자 개인 어워드에 빈 항목을 추가하면 모바일 가로 넘침으로 삭제 버튼이 일부 잘림",
+          "url": "https://github.com/kim-song-jun/matchup-sports-platform/issues/1571"
+        },
+        {
+          "number": 1439,
+          "title": "[UI/UX 개선] 대회 생성에서 꺼진 홍보 설정도 18개 입력과 중첩 미리보기로 노출",
+          "url": "https://github.com/kim-song-jun/matchup-sports-platform/issues/1439"
+        },
+        {
+          "number": 1464,
+          "title": "[접근성] 관리자 약관 작성의 노출 위치·동의 유형 선택에 접근 가능한 이름 누락",
+          "url": "https://github.com/kim-song-jun/matchup-sports-platform/issues/1464"
+        },
+        {
+          "number": 1564,
+          "title": "[Alpha QA P2] 관리자 명단 검토를 열면 초기 포커스가 배경에 남아 키보드 탐색이 모달 밖으로 이동",
+          "url": "https://github.com/kim-song-jun/matchup-sports-platform/issues/1564"
+        },
+        {
+          "number": 1404,
+          "title": "[Alpha QA/A11y] 대회 결과 영상 링크의 role=listitem이 링크 의미를 덮어씀",
+          "url": "https://github.com/kim-song-jun/matchup-sports-platform/issues/1404"
+        },
+        {
+          "number": 1411,
+          "title": "[Alpha QA] 친선 참석명단에서 뒤로가기를 누르면 미저장 변경을 경고 없이 잃음",
+          "url": "https://github.com/kim-song-jun/matchup-sports-platform/issues/1411"
+        }
+      ]
+    },
+    {
+      "query": "repo:kim-song-jun/matchup-sports-platform is:issue 시상",
+      "stateFilter": null,
+      "maximumResults": 100,
+      "results": [
+        {
+          "number": 1418,
+          "title": "[Alpha QA] 대회 득점자 프로필의 뒤로가기가 대진표 대신 팀 찾기로 이동",
+          "url": "https://github.com/kim-song-jun/matchup-sports-platform/issues/1418"
+        },
+        {
+          "number": 123,
+          "title": "QA: P11 — 대회 팀 주장(로스터 담당)",
+          "url": "https://github.com/kim-song-jun/matchup-sports-platform/issues/123"
+        },
+        {
+          "number": 129,
+          "title": "QA: P17 — 대회 admin(대회 운영자)",
+          "url": "https://github.com/kim-song-jun/matchup-sports-platform/issues/129"
+        }
+      ]
+    },
+    {
+      "query": "repo:kim-song-jun/matchup-sports-platform is:issue \"상금\" \"가림\"",
+      "stateFilter": null,
+      "maximumResults": 100,
+      "results": [
+        {
+          "number": 1439,
+          "title": "[UI/UX 개선] 대회 생성에서 꺼진 홍보 설정도 18개 입력과 중첩 미리보기로 노출",
+          "url": "https://github.com/kim-song-jun/matchup-sports-platform/issues/1439"
+        },
+        {
+          "number": 1437,
+          "title": "[Alpha E2E] 대회 생성 다음 단계에서 이전 스크롤·버튼 포커스가 남아 필수 입력이 가려짐",
+          "url": "https://github.com/kim-song-jun/matchup-sports-platform/issues/1437"
+        }
+      ]
+    },
+    {
+      "query": "repo:kim-song-jun/matchup-sports-platform is:issue \"prize\" \"focus\"",
+      "stateFilter": null,
+      "maximumResults": 100,
+      "results": [
+        {
+          "number": 1579,
+          "title": "[Alpha 접근성][P2] 대회 상세 ‘상품 및 상금’ 캡션 대비 4.2087:1로 AA 미달",
+          "url": "https://github.com/kim-song-jun/matchup-sports-platform/issues/1579"
+        }
+      ]
+    },
+    {
+      "query": "repo:kim-song-jun/matchup-sports-platform is:issue \"세 번째\"",
+      "stateFilter": null,
+      "maximumResults": 100,
+      "results": [
+        {
+          "number": 1569,
+          "title": "[Alpha QA P2] 개인매치 추천 레일의 중간 카드가 키보드 포커스 상태에서도 모바일 화면 밖에 대부분 가려짐",
+          "url": "https://github.com/kim-song-jun/matchup-sports-platform/issues/1569"
+        },
+        {
+          "number": 392,
+          "title": "[v1/경기기록] deriveTournamentRevision의 missingScorer가 되돌린 골을 세어 '득점자 미기재' 오탐",
+          "url": "https://github.com/kim-song-jun/matchup-sports-platform/issues/392"
+        }
+      ]
+    }
+  ],
+  "related": [
+    {
+      "number": 1439,
+      "state": "open",
+      "updatedUTC": "2026-10-03T19:46:22Z",
+      "url": "https://github.com/kim-song-jun/matchup-sports-platform/issues/1439",
+      "relationship": "Same creation surface and mobile prize-width work. Prior October3 comment explicitly left third-row Tab untested; this is a new same-step focused-input occlusion observation.",
+      "commentsRead": [
+        {
+          "url": "https://github.com/kim-song-jun/matchup-sports-platform/issues/1439#issuecomment-5970863770",
+          "createdUTC": "2026-10-03T16:03:14Z",
+          "updatedUTC": "2026-10-03T16:03:14Z"
+        },
+        {
+          "url": "https://github.com/kim-song-jun/matchup-sports-platform/issues/1439#issuecomment-5972591015",
+          "createdUTC": "2026-10-03T19:12:46Z",
+          "updatedUTC": "2026-10-03T19:12:46Z"
+        },
+        {
+          "url": "https://github.com/kim-song-jun/matchup-sports-platform/issues/1439#issuecomment-5972848607",
+          "createdUTC": "2026-10-03T19:46:21Z",
+          "updatedUTC": "2026-10-03T19:46:21Z"
+        }
+      ]
+    },
+    {
+      "number": 1437,
+      "state": "closed",
+      "updatedUTC": "2026-10-03T13:50:32Z",
+      "url": "https://github.com/kim-song-jun/matchup-sports-platform/issues/1437",
+      "relationship": "Stage-change scroll/heading focus; differs from Tab within the same step4."
+    },
+    {
+      "number": 1534,
+      "state": "closed",
+      "updatedUTC": "2026-10-03T15:11:07Z",
+      "url": "https://github.com/kim-song-jun/matchup-sports-platform/issues/1534",
+      "relationship": "Team-creation level SELECT footer occlusion; different route and control."
+    },
+    {
+      "number": 1430,
+      "state": "open",
+      "updatedUTC": "2026-10-01T05:39:44Z",
+      "url": "https://github.com/kim-song-jun/matchup-sports-platform/issues/1430",
+      "relationship": "Participant-roster inline input and sticky add action; different route and interaction."
+    }
+  ],
+  "conclusion": "No exact existing third-prize-content native-Tab reproduction found in these query results and reviewed related issue bodies/comments. Related #1439 remains the existing context; issue routing/creation is not performed by this evidence publication.",
+  "limits": [
+    "Repository issue search coverage is bounded to these queries, up to100 results per query, with no open/closed filter.",
+    "This is a timestamped duplicate check, not a guarantee against every wording or later issue."
+  ]
+}

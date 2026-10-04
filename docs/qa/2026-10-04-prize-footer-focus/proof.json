@@ -1,0 +1,6404 @@
+[
+  {
+    "active": {
+      "focusVisible": true,
+      "label": "상금 항목 1 이름",
+      "rect": {
+        "bottom": 323.26251220703125,
+        "height": 44,
+        "right": 313.6000175476074,
+        "top": 279.26251220703125,
+        "width": 276.8000183105469,
+        "x": 36.79999923706055,
+        "y": 279.26251220703125
+      },
+      "tag": "INPUT",
+      "value": "1위"
+    },
+    "controls": [
+      {
+        "active": true,
+        "label": "상금 항목 1 이름",
+        "rect": {
+          "bottom": 323.26251220703125,
+          "height": 44,
+          "right": 313.6000175476074,
+          "top": 279.26251220703125,
+          "width": 276.8000183105469,
+          "x": 36.79999923706055,
+          "y": 279.26251220703125
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": "1위"
+      },
+      {
+        "active": false,
+        "label": "상금 항목 1 내용",
+        "rect": {
+          "bottom": 375.2625122070313,
+          "height": 44,
+          "right": 365.6000175476074,
+          "top": 331.26251220703125,
+          "width": 328.8000183105469,
+          "x": 36.79999923706055,
+          "y": 331.26251220703125
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": ""
+      },
+      {
+        "active": false,
+        "label": "상금 항목 1 삭제",
+        "rect": {
+          "bottom": 323.26251220703125,
+          "height": 44,
+          "right": 365.6000061035156,
+          "top": 279.26251220703125,
+          "width": 44,
+          "x": 321.6000061035156,
+          "y": 279.26251220703125
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "BUTTON",
+        "value": ""
+      },
+      {
+        "active": false,
+        "label": "상금 항목 2 이름",
+        "rect": {
+          "bottom": 427.2625122070313,
+          "height": 44,
+          "right": 313.6000175476074,
+          "top": 383.2625122070313,
+          "width": 276.8000183105469,
+          "x": 36.79999923706055,
+          "y": 383.2625122070313
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": "2위"
+      },
+      {
+        "active": false,
+        "label": "상금 항목 2 내용",
+        "rect": {
+          "bottom": 479.2625122070313,
+          "height": 44,
+          "right": 365.6000175476074,
+          "top": 435.2625122070313,
+          "width": 328.8000183105469,
+          "x": 36.79999923706055,
+          "y": 435.2625122070313
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": ""
+      },
+      {
+        "active": false,
+        "label": "상금 항목 2 삭제",
+        "rect": {
+          "bottom": 427.2625122070313,
+          "height": 44,
+          "right": 365.6000061035156,
+          "top": 383.2625122070313,
+          "width": 44,
+          "x": 321.6000061035156,
+          "y": 383.2625122070313
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "BUTTON",
+        "value": ""
+      },
+      {
+        "active": false,
+        "label": "상금 항목 3 이름",
+        "rect": {
+          "bottom": 531.2625122070312,
+          "height": 44,
+          "right": 313.6000175476074,
+          "top": 487.2625122070313,
+          "width": 276.8000183105469,
+          "x": 36.79999923706055,
+          "y": 487.2625122070313
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": "3위"
+      },
+      {
+        "active": false,
+        "label": "상금 항목 3 내용",
+        "rect": {
+          "bottom": 583.2625122070312,
+          "height": 44,
+          "right": 365.6000175476074,
+          "top": 539.2625122070312,
+          "width": 328.8000183105469,
+          "x": 36.79999923706055,
+          "y": 539.2625122070312
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": ""
+      },
+      {
+        "active": false,
+        "label": "상금 항목 3 삭제",
+        "rect": {
+          "bottom": 531.2625122070312,
+          "height": 44,
+          "right": 365.6000061035156,
+          "top": 487.2625122070313,
+          "width": 44,
+          "x": 321.6000061035156,
+          "y": 487.2625122070313
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "BUTTON",
+        "value": ""
+      }
+    ],
+    "documentWidth": 402,
+    "footer": {
+      "position": "fixed",
+      "rect": {
+        "bottom": 605.5999908447266,
+        "height": 68.80000305175781,
+        "right": 402.3999938964844,
+        "top": 536.7999877929688,
+        "width": 402.3999938964844,
+        "x": 0,
+        "y": 536.7999877929688
+      }
+    },
+    "lockedStep5": [
+      {
+        "disabled": true,
+        "label": "5단계 공개 확인 — 잠김"
+      }
+    ],
+    "scrollY": 947.2000122070312,
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/new",
+    "utc": "2026-10-04T05:47:29.210Z",
+    "viewport": {
+      "dpr": 1.25,
+      "height": 606,
+      "width": 402
+    },
+    "index": 0,
+    "kind": "prize-tab",
+    "widthLabel": "mobile",
+    "state": "first-name-start"
+  },
+  {
+    "active": {
+      "focusVisible": true,
+      "label": "상금 항목 1 내용",
+      "rect": {
+        "bottom": 375.2625122070313,
+        "height": 44,
+        "right": 365.6000175476074,
+        "top": 331.26251220703125,
+        "width": 328.8000183105469,
+        "x": 36.79999923706055,
+        "y": 331.26251220703125
+      },
+      "tag": "INPUT",
+      "value": ""
+    },
+    "controls": [
+      {
+        "active": false,
+        "label": "상금 항목 1 이름",
+        "rect": {
+          "bottom": 323.26251220703125,
+          "height": 44,
+          "right": 313.6000175476074,
+          "top": 279.26251220703125,
+          "width": 276.8000183105469,
+          "x": 36.79999923706055,
+          "y": 279.26251220703125
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": "1위"
+      },
+      {
+        "active": true,
+        "label": "상금 항목 1 내용",
+        "rect": {
+          "bottom": 375.2625122070313,
+          "height": 44,
+          "right": 365.6000175476074,
+          "top": 331.26251220703125,
+          "width": 328.8000183105469,
+          "x": 36.79999923706055,
+          "y": 331.26251220703125
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": ""
+      },
+      {
+        "active": false,
+        "label": "상금 항목 1 삭제",
+        "rect": {
+          "bottom": 323.26251220703125,
+          "height": 44,
+          "right": 365.6000061035156,
+          "top": 279.26251220703125,
+          "width": 44,
+          "x": 321.6000061035156,
+          "y": 279.26251220703125
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "BUTTON",
+        "value": ""
+      },
+      {
+        "active": false,
+        "label": "상금 항목 2 이름",
+        "rect": {
+          "bottom": 427.2625122070313,
+          "height": 44,
+          "right": 313.6000175476074,
+          "top": 383.2625122070313,
+          "width": 276.8000183105469,
+          "x": 36.79999923706055,
+          "y": 383.2625122070313
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": "2위"
+      },
+      {
+        "active": false,
+        "label": "상금 항목 2 내용",
+        "rect": {
+          "bottom": 479.2625122070313,
+          "height": 44,
+          "right": 365.6000175476074,
+          "top": 435.2625122070313,
+          "width": 328.8000183105469,
+          "x": 36.79999923706055,
+          "y": 435.2625122070313
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": ""
+      },
+      {
+        "active": false,
+        "label": "상금 항목 2 삭제",
+        "rect": {
+          "bottom": 427.2625122070313,
+          "height": 44,
+          "right": 365.6000061035156,
+          "top": 383.2625122070313,
+          "width": 44,
+          "x": 321.6000061035156,
+          "y": 383.2625122070313
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "BUTTON",
+        "value": ""
+      },
+      {
+        "active": false,
+        "label": "상금 항목 3 이름",
+        "rect": {
+          "bottom": 531.2625122070312,
+          "height": 44,
+          "right": 313.6000175476074,
+          "top": 487.2625122070313,
+          "width": 276.8000183105469,
+          "x": 36.79999923706055,
+          "y": 487.2625122070313
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": "3위"
+      },
+      {
+        "active": false,
+        "label": "상금 항목 3 내용",
+        "rect": {
+          "bottom": 583.2625122070312,
+          "height": 44,
+          "right": 365.6000175476074,
+          "top": 539.2625122070312,
+          "width": 328.8000183105469,
+          "x": 36.79999923706055,
+          "y": 539.2625122070312
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": ""
+      },
+      {
+        "active": false,
+        "label": "상금 항목 3 삭제",
+        "rect": {
+          "bottom": 531.2625122070312,
+          "height": 44,
+          "right": 365.6000061035156,
+          "top": 487.2625122070313,
+          "width": 44,
+          "x": 321.6000061035156,
+          "y": 487.2625122070313
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "BUTTON",
+        "value": ""
+      }
+    ],
+    "documentWidth": 402,
+    "footer": {
+      "position": "fixed",
+      "rect": {
+        "bottom": 605.5999908447266,
+        "height": 68.80000305175781,
+        "right": 402.3999938964844,
+        "top": 536.7999877929688,
+        "width": 402.3999938964844,
+        "x": 0,
+        "y": 536.7999877929688
+      }
+    },
+    "lockedStep5": [
+      {
+        "disabled": true,
+        "label": "5단계 공개 확인 — 잠김"
+      }
+    ],
+    "scrollY": 947.2000122070312,
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/new",
+    "utc": "2026-10-04T05:47:29.331Z",
+    "viewport": {
+      "dpr": 1.25,
+      "height": 606,
+      "width": 402
+    },
+    "index": 1,
+    "kind": "prize-tab",
+    "widthLabel": "mobile",
+    "state": "Tab-1"
+  },
+  {
+    "active": {
+      "focusVisible": true,
+      "label": "상금 항목 1 삭제",
+      "rect": {
+        "bottom": 323.26251220703125,
+        "height": 44,
+        "right": 365.6000061035156,
+        "top": 279.26251220703125,
+        "width": 44,
+        "x": 321.6000061035156,
+        "y": 279.26251220703125
+      },
+      "tag": "BUTTON",
+      "value": ""
+    },
+    "controls": [
+      {
+        "active": false,
+        "label": "상금 항목 1 이름",
+        "rect": {
+          "bottom": 323.26251220703125,
+          "height": 44,
+          "right": 313.6000175476074,
+          "top": 279.26251220703125,
+          "width": 276.8000183105469,
+          "x": 36.79999923706055,
+          "y": 279.26251220703125
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": "1위"
+      },
+      {
+        "active": false,
+        "label": "상금 항목 1 내용",
+        "rect": {
+          "bottom": 375.2625122070313,
+          "height": 44,
+          "right": 365.6000175476074,
+          "top": 331.26251220703125,
+          "width": 328.8000183105469,
+          "x": 36.79999923706055,
+          "y": 331.26251220703125
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": ""
+      },
+      {
+        "active": true,
+        "label": "상금 항목 1 삭제",
+        "rect": {
+          "bottom": 323.26251220703125,
+          "height": 44,
+          "right": 365.6000061035156,
+          "top": 279.26251220703125,
+          "width": 44,
+          "x": 321.6000061035156,
+          "y": 279.26251220703125
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "BUTTON",
+        "value": ""
+      },
+      {
+        "active": false,
+        "label": "상금 항목 2 이름",
+        "rect": {
+          "bottom": 427.2625122070313,
+          "height": 44,
+          "right": 313.6000175476074,
+          "top": 383.2625122070313,
+          "width": 276.8000183105469,
+          "x": 36.79999923706055,
+          "y": 383.2625122070313
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": "2위"
+      },
+      {
+        "active": false,
+        "label": "상금 항목 2 내용",
+        "rect": {
+          "bottom": 479.2625122070313,
+          "height": 44,
+          "right": 365.6000175476074,
+          "top": 435.2625122070313,
+          "width": 328.8000183105469,
+          "x": 36.79999923706055,
+          "y": 435.2625122070313
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": ""
+      },
+      {
+        "active": false,
+        "label": "상금 항목 2 삭제",
+        "rect": {
+          "bottom": 427.2625122070313,
+          "height": 44,
+          "right": 365.6000061035156,
+          "top": 383.2625122070313,
+          "width": 44,
+          "x": 321.6000061035156,
+          "y": 383.2625122070313
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "BUTTON",
+        "value": ""
+      },
+      {
+        "active": false,
+        "label": "상금 항목 3 이름",
+        "rect": {
+          "bottom": 531.2625122070312,
+          "height": 44,
+          "right": 313.6000175476074,
+          "top": 487.2625122070313,
+          "width": 276.8000183105469,
+          "x": 36.79999923706055,
+          "y": 487.2625122070313
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": "3위"
+      },
+      {
+        "active": false,
+        "label": "상금 항목 3 내용",
+        "rect": {
+          "bottom": 583.2625122070312,
+          "height": 44,
+          "right": 365.6000175476074,
+          "top": 539.2625122070312,
+          "width": 328.8000183105469,
+          "x": 36.79999923706055,
+          "y": 539.2625122070312
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": ""
+      },
+      {
+        "active": false,
+        "label": "상금 항목 3 삭제",
+        "rect": {
+          "bottom": 531.2625122070312,
+          "height": 44,
+          "right": 365.6000061035156,
+          "top": 487.2625122070313,
+          "width": 44,
+          "x": 321.6000061035156,
+          "y": 487.2625122070313
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "BUTTON",
+        "value": ""
+      }
+    ],
+    "documentWidth": 402,
+    "footer": {
+      "position": "fixed",
+      "rect": {
+        "bottom": 605.5999908447266,
+        "height": 68.80000305175781,
+        "right": 402.3999938964844,
+        "top": 536.7999877929688,
+        "width": 402.3999938964844,
+        "x": 0,
+        "y": 536.7999877929688
+      }
+    },
+    "lockedStep5": [
+      {
+        "disabled": true,
+        "label": "5단계 공개 확인 — 잠김"
+      }
+    ],
+    "scrollY": 947.2000122070312,
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/new",
+    "utc": "2026-10-04T05:47:29.512Z",
+    "viewport": {
+      "dpr": 1.25,
+      "height": 606,
+      "width": 402
+    },
+    "index": 2,
+    "kind": "prize-tab",
+    "widthLabel": "mobile",
+    "state": "Tab-2"
+  },
+  {
+    "active": {
+      "focusVisible": true,
+      "label": "상금 항목 2 이름",
+      "rect": {
+        "bottom": 427.2625122070313,
+        "height": 44,
+        "right": 313.6000175476074,
+        "top": 383.2625122070313,
+        "width": 276.8000183105469,
+        "x": 36.79999923706055,
+        "y": 383.2625122070313
+      },
+      "tag": "INPUT",
+      "value": "2위"
+    },
+    "controls": [
+      {
+        "active": false,
+        "label": "상금 항목 1 이름",
+        "rect": {
+          "bottom": 323.26251220703125,
+          "height": 44,
+          "right": 313.6000175476074,
+          "top": 279.26251220703125,
+          "width": 276.8000183105469,
+          "x": 36.79999923706055,
+          "y": 279.26251220703125
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": "1위"
+      },
+      {
+        "active": false,
+        "label": "상금 항목 1 내용",
+        "rect": {
+          "bottom": 375.2625122070313,
+          "height": 44,
+          "right": 365.6000175476074,
+          "top": 331.26251220703125,
+          "width": 328.8000183105469,
+          "x": 36.79999923706055,
+          "y": 331.26251220703125
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": ""
+      },
+      {
+        "active": false,
+        "label": "상금 항목 1 삭제",
+        "rect": {
+          "bottom": 323.26251220703125,
+          "height": 44,
+          "right": 365.6000061035156,
+          "top": 279.26251220703125,
+          "width": 44,
+          "x": 321.6000061035156,
+          "y": 279.26251220703125
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "BUTTON",
+        "value": ""
+      },
+      {
+        "active": true,
+        "label": "상금 항목 2 이름",
+        "rect": {
+          "bottom": 427.2625122070313,
+          "height": 44,
+          "right": 313.6000175476074,
+          "top": 383.2625122070313,
+          "width": 276.8000183105469,
+          "x": 36.79999923706055,
+          "y": 383.2625122070313
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": "2위"
+      },
+      {
+        "active": false,
+        "label": "상금 항목 2 내용",
+        "rect": {
+          "bottom": 479.2625122070313,
+          "height": 44,
+          "right": 365.6000175476074,
+          "top": 435.2625122070313,
+          "width": 328.8000183105469,
+          "x": 36.79999923706055,
+          "y": 435.2625122070313
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": ""
+      },
+      {
+        "active": false,
+        "label": "상금 항목 2 삭제",
+        "rect": {
+          "bottom": 427.2625122070313,
+          "height": 44,
+          "right": 365.6000061035156,
+          "top": 383.2625122070313,
+          "width": 44,
+          "x": 321.6000061035156,
+          "y": 383.2625122070313
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "BUTTON",
+        "value": ""
+      },
+      {
+        "active": false,
+        "label": "상금 항목 3 이름",
+        "rect": {
+          "bottom": 531.2625122070312,
+          "height": 44,
+          "right": 313.6000175476074,
+          "top": 487.2625122070313,
+          "width": 276.8000183105469,
+          "x": 36.79999923706055,
+          "y": 487.2625122070313
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": "3위"
+      },
+      {
+        "active": false,
+        "label": "상금 항목 3 내용",
+        "rect": {
+          "bottom": 583.2625122070312,
+          "height": 44,
+          "right": 365.6000175476074,
+          "top": 539.2625122070312,
+          "width": 328.8000183105469,
+          "x": 36.79999923706055,
+          "y": 539.2625122070312
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": ""
+      },
+      {
+        "active": false,
+        "label": "상금 항목 3 삭제",
+        "rect": {
+          "bottom": 531.2625122070312,
+          "height": 44,
+          "right": 365.6000061035156,
+          "top": 487.2625122070313,
+          "width": 44,
+          "x": 321.6000061035156,
+          "y": 487.2625122070313
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "BUTTON",
+        "value": ""
+      }
+    ],
+    "documentWidth": 402,
+    "footer": {
+      "position": "fixed",
+      "rect": {
+        "bottom": 605.5999908447266,
+        "height": 68.80000305175781,
+        "right": 402.3999938964844,
+        "top": 536.7999877929688,
+        "width": 402.3999938964844,
+        "x": 0,
+        "y": 536.7999877929688
+      }
+    },
+    "lockedStep5": [
+      {
+        "disabled": true,
+        "label": "5단계 공개 확인 — 잠김"
+      }
+    ],
+    "scrollY": 947.2000122070312,
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/new",
+    "utc": "2026-10-04T05:47:29.676Z",
+    "viewport": {
+      "dpr": 1.25,
+      "height": 606,
+      "width": 402
+    },
+    "index": 3,
+    "kind": "prize-tab",
+    "widthLabel": "mobile",
+    "state": "Tab-3"
+  },
+  {
+    "active": {
+      "focusVisible": true,
+      "label": "상금 항목 2 내용",
+      "rect": {
+        "bottom": 479.2625122070313,
+        "height": 44,
+        "right": 365.6000175476074,
+        "top": 435.2625122070313,
+        "width": 328.8000183105469,
+        "x": 36.79999923706055,
+        "y": 435.2625122070313
+      },
+      "tag": "INPUT",
+      "value": ""
+    },
+    "controls": [
+      {
+        "active": false,
+        "label": "상금 항목 1 이름",
+        "rect": {
+          "bottom": 323.26251220703125,
+          "height": 44,
+          "right": 313.6000175476074,
+          "top": 279.26251220703125,
+          "width": 276.8000183105469,
+          "x": 36.79999923706055,
+          "y": 279.26251220703125
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": "1위"
+      },
+      {
+        "active": false,
+        "label": "상금 항목 1 내용",
+        "rect": {
+          "bottom": 375.2625122070313,
+          "height": 44,
+          "right": 365.6000175476074,
+          "top": 331.26251220703125,
+          "width": 328.8000183105469,
+          "x": 36.79999923706055,
+          "y": 331.26251220703125
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": ""
+      },
+      {
+        "active": false,
+        "label": "상금 항목 1 삭제",
+        "rect": {
+          "bottom": 323.26251220703125,
+          "height": 44,
+          "right": 365.6000061035156,
+          "top": 279.26251220703125,
+          "width": 44,
+          "x": 321.6000061035156,
+          "y": 279.26251220703125
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "BUTTON",
+        "value": ""
+      },
+      {
+        "active": false,
+        "label": "상금 항목 2 이름",
+        "rect": {
+          "bottom": 427.2625122070313,
+          "height": 44,
+          "right": 313.6000175476074,
+          "top": 383.2625122070313,
+          "width": 276.8000183105469,
+          "x": 36.79999923706055,
+          "y": 383.2625122070313
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": "2위"
+      },
+      {
+        "active": true,
+        "label": "상금 항목 2 내용",
+        "rect": {
+          "bottom": 479.2625122070313,
+          "height": 44,
+          "right": 365.6000175476074,
+          "top": 435.2625122070313,
+          "width": 328.8000183105469,
+          "x": 36.79999923706055,
+          "y": 435.2625122070313
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": ""
+      },
+      {
+        "active": false,
+        "label": "상금 항목 2 삭제",
+        "rect": {
+          "bottom": 427.2625122070313,
+          "height": 44,
+          "right": 365.6000061035156,
+          "top": 383.2625122070313,
+          "width": 44,
+          "x": 321.6000061035156,
+          "y": 383.2625122070313
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "BUTTON",
+        "value": ""
+      },
+      {
+        "active": false,
+        "label": "상금 항목 3 이름",
+        "rect": {
+          "bottom": 531.2625122070312,
+          "height": 44,
+          "right": 313.6000175476074,
+          "top": 487.2625122070313,
+          "width": 276.8000183105469,
+          "x": 36.79999923706055,
+          "y": 487.2625122070313
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": "3위"
+      },
+      {
+        "active": false,
+        "label": "상금 항목 3 내용",
+        "rect": {
+          "bottom": 583.2625122070312,
+          "height": 44,
+          "right": 365.6000175476074,
+          "top": 539.2625122070312,
+          "width": 328.8000183105469,
+          "x": 36.79999923706055,
+          "y": 539.2625122070312
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": ""
+      },
+      {
+        "active": false,
+        "label": "상금 항목 3 삭제",
+        "rect": {
+          "bottom": 531.2625122070312,
+          "height": 44,
+          "right": 365.6000061035156,
+          "top": 487.2625122070313,
+          "width": 44,
+          "x": 321.6000061035156,
+          "y": 487.2625122070313
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "BUTTON",
+        "value": ""
+      }
+    ],
+    "documentWidth": 402,
+    "footer": {
+      "position": "fixed",
+      "rect": {
+        "bottom": 605.5999908447266,
+        "height": 68.80000305175781,
+        "right": 402.3999938964844,
+        "top": 536.7999877929688,
+        "width": 402.3999938964844,
+        "x": 0,
+        "y": 536.7999877929688
+      }
+    },
+    "lockedStep5": [
+      {
+        "disabled": true,
+        "label": "5단계 공개 확인 — 잠김"
+      }
+    ],
+    "scrollY": 947.2000122070312,
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/new",
+    "utc": "2026-10-04T05:47:29.840Z",
+    "viewport": {
+      "dpr": 1.25,
+      "height": 606,
+      "width": 402
+    },
+    "index": 4,
+    "kind": "prize-tab",
+    "widthLabel": "mobile",
+    "state": "Tab-4"
+  },
+  {
+    "active": {
+      "focusVisible": true,
+      "label": "상금 항목 2 삭제",
+      "rect": {
+        "bottom": 427.2625122070313,
+        "height": 44,
+        "right": 365.6000061035156,
+        "top": 383.2625122070313,
+        "width": 44,
+        "x": 321.6000061035156,
+        "y": 383.2625122070313
+      },
+      "tag": "BUTTON",
+      "value": ""
+    },
+    "controls": [
+      {
+        "active": false,
+        "label": "상금 항목 1 이름",
+        "rect": {
+          "bottom": 323.26251220703125,
+          "height": 44,
+          "right": 313.6000175476074,
+          "top": 279.26251220703125,
+          "width": 276.8000183105469,
+          "x": 36.79999923706055,
+          "y": 279.26251220703125
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": "1위"
+      },
+      {
+        "active": false,
+        "label": "상금 항목 1 내용",
+        "rect": {
+          "bottom": 375.2625122070313,
+          "height": 44,
+          "right": 365.6000175476074,
+          "top": 331.26251220703125,
+          "width": 328.8000183105469,
+          "x": 36.79999923706055,
+          "y": 331.26251220703125
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": ""
+      },
+      {
+        "active": false,
+        "label": "상금 항목 1 삭제",
+        "rect": {
+          "bottom": 323.26251220703125,
+          "height": 44,
+          "right": 365.6000061035156,
+          "top": 279.26251220703125,
+          "width": 44,
+          "x": 321.6000061035156,
+          "y": 279.26251220703125
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "BUTTON",
+        "value": ""
+      },
+      {
+        "active": false,
+        "label": "상금 항목 2 이름",
+        "rect": {
+          "bottom": 427.2625122070313,
+          "height": 44,
+          "right": 313.6000175476074,
+          "top": 383.2625122070313,
+          "width": 276.8000183105469,
+          "x": 36.79999923706055,
+          "y": 383.2625122070313
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": "2위"
+      },
+      {
+        "active": false,
+        "label": "상금 항목 2 내용",
+        "rect": {
+          "bottom": 479.2625122070313,
+          "height": 44,
+          "right": 365.6000175476074,
+          "top": 435.2625122070313,
+          "width": 328.8000183105469,
+          "x": 36.79999923706055,
+          "y": 435.2625122070313
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": ""
+      },
+      {
+        "active": true,
+        "label": "상금 항목 2 삭제",
+        "rect": {
+          "bottom": 427.2625122070313,
+          "height": 44,
+          "right": 365.6000061035156,
+          "top": 383.2625122070313,
+          "width": 44,
+          "x": 321.6000061035156,
+          "y": 383.2625122070313
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "BUTTON",
+        "value": ""
+      },
+      {
+        "active": false,
+        "label": "상금 항목 3 이름",
+        "rect": {
+          "bottom": 531.2625122070312,
+          "height": 44,
+          "right": 313.6000175476074,
+          "top": 487.2625122070313,
+          "width": 276.8000183105469,
+          "x": 36.79999923706055,
+          "y": 487.2625122070313
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": "3위"
+      },
+      {
+        "active": false,
+        "label": "상금 항목 3 내용",
+        "rect": {
+          "bottom": 583.2625122070312,
+          "height": 44,
+          "right": 365.6000175476074,
+          "top": 539.2625122070312,
+          "width": 328.8000183105469,
+          "x": 36.79999923706055,
+          "y": 539.2625122070312
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": ""
+      },
+      {
+        "active": false,
+        "label": "상금 항목 3 삭제",
+        "rect": {
+          "bottom": 531.2625122070312,
+          "height": 44,
+          "right": 365.6000061035156,
+          "top": 487.2625122070313,
+          "width": 44,
+          "x": 321.6000061035156,
+          "y": 487.2625122070313
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "BUTTON",
+        "value": ""
+      }
+    ],
+    "documentWidth": 402,
+    "footer": {
+      "position": "fixed",
+      "rect": {
+        "bottom": 605.5999908447266,
+        "height": 68.80000305175781,
+        "right": 402.3999938964844,
+        "top": 536.7999877929688,
+        "width": 402.3999938964844,
+        "x": 0,
+        "y": 536.7999877929688
+      }
+    },
+    "lockedStep5": [
+      {
+        "disabled": true,
+        "label": "5단계 공개 확인 — 잠김"
+      }
+    ],
+    "scrollY": 947.2000122070312,
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/new",
+    "utc": "2026-10-04T05:47:30.018Z",
+    "viewport": {
+      "dpr": 1.25,
+      "height": 606,
+      "width": 402
+    },
+    "index": 5,
+    "kind": "prize-tab",
+    "widthLabel": "mobile",
+    "state": "Tab-5"
+  },
+  {
+    "active": {
+      "focusVisible": true,
+      "label": "상금 항목 3 이름",
+      "rect": {
+        "bottom": 531.2625122070312,
+        "height": 44,
+        "right": 313.6000175476074,
+        "top": 487.2625122070313,
+        "width": 276.8000183105469,
+        "x": 36.79999923706055,
+        "y": 487.2625122070313
+      },
+      "tag": "INPUT",
+      "value": "3위"
+    },
+    "controls": [
+      {
+        "active": false,
+        "label": "상금 항목 1 이름",
+        "rect": {
+          "bottom": 323.26251220703125,
+          "height": 44,
+          "right": 313.6000175476074,
+          "top": 279.26251220703125,
+          "width": 276.8000183105469,
+          "x": 36.79999923706055,
+          "y": 279.26251220703125
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": "1위"
+      },
+      {
+        "active": false,
+        "label": "상금 항목 1 내용",
+        "rect": {
+          "bottom": 375.2625122070313,
+          "height": 44,
+          "right": 365.6000175476074,
+          "top": 331.26251220703125,
+          "width": 328.8000183105469,
+          "x": 36.79999923706055,
+          "y": 331.26251220703125
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": ""
+      },
+      {
+        "active": false,
+        "label": "상금 항목 1 삭제",
+        "rect": {
+          "bottom": 323.26251220703125,
+          "height": 44,
+          "right": 365.6000061035156,
+          "top": 279.26251220703125,
+          "width": 44,
+          "x": 321.6000061035156,
+          "y": 279.26251220703125
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "BUTTON",
+        "value": ""
+      },
+      {
+        "active": false,
+        "label": "상금 항목 2 이름",
+        "rect": {
+          "bottom": 427.2625122070313,
+          "height": 44,
+          "right": 313.6000175476074,
+          "top": 383.2625122070313,
+          "width": 276.8000183105469,
+          "x": 36.79999923706055,
+          "y": 383.2625122070313
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": "2위"
+      },
+      {
+        "active": false,
+        "label": "상금 항목 2 내용",
+        "rect": {
+          "bottom": 479.2625122070313,
+          "height": 44,
+          "right": 365.6000175476074,
+          "top": 435.2625122070313,
+          "width": 328.8000183105469,
+          "x": 36.79999923706055,
+          "y": 435.2625122070313
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": ""
+      },
+      {
+        "active": false,
+        "label": "상금 항목 2 삭제",
+        "rect": {
+          "bottom": 427.2625122070313,
+          "height": 44,
+          "right": 365.6000061035156,
+          "top": 383.2625122070313,
+          "width": 44,
+          "x": 321.6000061035156,
+          "y": 383.2625122070313
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "BUTTON",
+        "value": ""
+      },
+      {
+        "active": true,
+        "label": "상금 항목 3 이름",
+        "rect": {
+          "bottom": 531.2625122070312,
+          "height": 44,
+          "right": 313.6000175476074,
+          "top": 487.2625122070313,
+          "width": 276.8000183105469,
+          "x": 36.79999923706055,
+          "y": 487.2625122070313
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": "3위"
+      },
+      {
+        "active": false,
+        "label": "상금 항목 3 내용",
+        "rect": {
+          "bottom": 583.2625122070312,
+          "height": 44,
+          "right": 365.6000175476074,
+          "top": 539.2625122070312,
+          "width": 328.8000183105469,
+          "x": 36.79999923706055,
+          "y": 539.2625122070312
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": ""
+      },
+      {
+        "active": false,
+        "label": "상금 항목 3 삭제",
+        "rect": {
+          "bottom": 531.2625122070312,
+          "height": 44,
+          "right": 365.6000061035156,
+          "top": 487.2625122070313,
+          "width": 44,
+          "x": 321.6000061035156,
+          "y": 487.2625122070313
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "BUTTON",
+        "value": ""
+      }
+    ],
+    "documentWidth": 402,
+    "footer": {
+      "position": "fixed",
+      "rect": {
+        "bottom": 605.5999908447266,
+        "height": 68.80000305175781,
+        "right": 402.3999938964844,
+        "top": 536.7999877929688,
+        "width": 402.3999938964844,
+        "x": 0,
+        "y": 536.7999877929688
+      }
+    },
+    "lockedStep5": [
+      {
+        "disabled": true,
+        "label": "5단계 공개 확인 — 잠김"
+      }
+    ],
+    "scrollY": 947.2000122070312,
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/new",
+    "utc": "2026-10-04T05:47:30.183Z",
+    "viewport": {
+      "dpr": 1.25,
+      "height": 606,
+      "width": 402
+    },
+    "index": 6,
+    "kind": "prize-tab",
+    "widthLabel": "mobile",
+    "state": "Tab-6"
+  },
+  {
+    "active": {
+      "focusVisible": true,
+      "label": "상금 항목 3 내용",
+      "rect": {
+        "bottom": 583.2625122070312,
+        "height": 44,
+        "right": 365.6000175476074,
+        "top": 539.2625122070312,
+        "width": 328.8000183105469,
+        "x": 36.79999923706055,
+        "y": 539.2625122070312
+      },
+      "tag": "INPUT",
+      "value": ""
+    },
+    "controls": [
+      {
+        "active": false,
+        "label": "상금 항목 1 이름",
+        "rect": {
+          "bottom": 323.26251220703125,
+          "height": 44,
+          "right": 313.6000175476074,
+          "top": 279.26251220703125,
+          "width": 276.8000183105469,
+          "x": 36.79999923706055,
+          "y": 279.26251220703125
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": "1위"
+      },
+      {
+        "active": false,
+        "label": "상금 항목 1 내용",
+        "rect": {
+          "bottom": 375.2625122070313,
+          "height": 44,
+          "right": 365.6000175476074,
+          "top": 331.26251220703125,
+          "width": 328.8000183105469,
+          "x": 36.79999923706055,
+          "y": 331.26251220703125
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": ""
+      },
+      {
+        "active": false,
+        "label": "상금 항목 1 삭제",
+        "rect": {
+          "bottom": 323.26251220703125,
+          "height": 44,
+          "right": 365.6000061035156,
+          "top": 279.26251220703125,
+          "width": 44,
+          "x": 321.6000061035156,
+          "y": 279.26251220703125
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "BUTTON",
+        "value": ""
+      },
+      {
+        "active": false,
+        "label": "상금 항목 2 이름",
+        "rect": {
+          "bottom": 427.2625122070313,
+          "height": 44,
+          "right": 313.6000175476074,
+          "top": 383.2625122070313,
+          "width": 276.8000183105469,
+          "x": 36.79999923706055,
+          "y": 383.2625122070313
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": "2위"
+      },
+      {
+        "active": false,
+        "label": "상금 항목 2 내용",
+        "rect": {
+          "bottom": 479.2625122070313,
+          "height": 44,
+          "right": 365.6000175476074,
+          "top": 435.2625122070313,
+          "width": 328.8000183105469,
+          "x": 36.79999923706055,
+          "y": 435.2625122070313
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": ""
+      },
+      {
+        "active": false,
+        "label": "상금 항목 2 삭제",
+        "rect": {
+          "bottom": 427.2625122070313,
+          "height": 44,
+          "right": 365.6000061035156,
+          "top": 383.2625122070313,
+          "width": 44,
+          "x": 321.6000061035156,
+          "y": 383.2625122070313
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "BUTTON",
+        "value": ""
+      },
+      {
+        "active": false,
+        "label": "상금 항목 3 이름",
+        "rect": {
+          "bottom": 531.2625122070312,
+          "height": 44,
+          "right": 313.6000175476074,
+          "top": 487.2625122070313,
+          "width": 276.8000183105469,
+          "x": 36.79999923706055,
+          "y": 487.2625122070313
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": "3위"
+      },
+      {
+        "active": true,
+        "label": "상금 항목 3 내용",
+        "rect": {
+          "bottom": 583.2625122070312,
+          "height": 44,
+          "right": 365.6000175476074,
+          "top": 539.2625122070312,
+          "width": 328.8000183105469,
+          "x": 36.79999923706055,
+          "y": 539.2625122070312
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": ""
+      },
+      {
+        "active": false,
+        "label": "상금 항목 3 삭제",
+        "rect": {
+          "bottom": 531.2625122070312,
+          "height": 44,
+          "right": 365.6000061035156,
+          "top": 487.2625122070313,
+          "width": 44,
+          "x": 321.6000061035156,
+          "y": 487.2625122070313
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "BUTTON",
+        "value": ""
+      }
+    ],
+    "documentWidth": 402,
+    "footer": {
+      "position": "fixed",
+      "rect": {
+        "bottom": 605.5999908447266,
+        "height": 68.80000305175781,
+        "right": 402.3999938964844,
+        "top": 536.7999877929688,
+        "width": 402.3999938964844,
+        "x": 0,
+        "y": 536.7999877929688
+      }
+    },
+    "lockedStep5": [
+      {
+        "disabled": true,
+        "label": "5단계 공개 확인 — 잠김"
+      }
+    ],
+    "scrollY": 947.2000122070312,
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/new",
+    "utc": "2026-10-04T05:47:30.351Z",
+    "viewport": {
+      "dpr": 1.25,
+      "height": 606,
+      "width": 402
+    },
+    "index": 7,
+    "kind": "prize-tab",
+    "widthLabel": "mobile",
+    "state": "Tab-7"
+  },
+  {
+    "active": {
+      "focusVisible": true,
+      "label": "상금 항목 3 내용",
+      "rect": {
+        "bottom": 583.2625122070312,
+        "height": 44,
+        "right": 365.6000175476074,
+        "top": 539.2625122070312,
+        "width": 328.8000183105469,
+        "x": 36.79999923706055,
+        "y": 539.2625122070312
+      },
+      "tag": "INPUT",
+      "value": ""
+    },
+    "controls": [
+      {
+        "active": false,
+        "label": "상금 항목 1 이름",
+        "rect": {
+          "bottom": 323.26251220703125,
+          "height": 44,
+          "right": 313.6000175476074,
+          "top": 279.26251220703125,
+          "width": 276.8000183105469,
+          "x": 36.79999923706055,
+          "y": 279.26251220703125
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": "1위"
+      },
+      {
+        "active": false,
+        "label": "상금 항목 1 내용",
+        "rect": {
+          "bottom": 375.2625122070313,
+          "height": 44,
+          "right": 365.6000175476074,
+          "top": 331.26251220703125,
+          "width": 328.8000183105469,
+          "x": 36.79999923706055,
+          "y": 331.26251220703125
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": ""
+      },
+      {
+        "active": false,
+        "label": "상금 항목 1 삭제",
+        "rect": {
+          "bottom": 323.26251220703125,
+          "height": 44,
+          "right": 365.6000061035156,
+          "top": 279.26251220703125,
+          "width": 44,
+          "x": 321.6000061035156,
+          "y": 279.26251220703125
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "BUTTON",
+        "value": ""
+      },
+      {
+        "active": false,
+        "label": "상금 항목 2 이름",
+        "rect": {
+          "bottom": 427.2625122070313,
+          "height": 44,
+          "right": 313.6000175476074,
+          "top": 383.2625122070313,
+          "width": 276.8000183105469,
+          "x": 36.79999923706055,
+          "y": 383.2625122070313
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": "2위"
+      },
+      {
+        "active": false,
+        "label": "상금 항목 2 내용",
+        "rect": {
+          "bottom": 479.2625122070313,
+          "height": 44,
+          "right": 365.6000175476074,
+          "top": 435.2625122070313,
+          "width": 328.8000183105469,
+          "x": 36.79999923706055,
+          "y": 435.2625122070313
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": ""
+      },
+      {
+        "active": false,
+        "label": "상금 항목 2 삭제",
+        "rect": {
+          "bottom": 427.2625122070313,
+          "height": 44,
+          "right": 365.6000061035156,
+          "top": 383.2625122070313,
+          "width": 44,
+          "x": 321.6000061035156,
+          "y": 383.2625122070313
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "BUTTON",
+        "value": ""
+      },
+      {
+        "active": false,
+        "label": "상금 항목 3 이름",
+        "rect": {
+          "bottom": 531.2625122070312,
+          "height": 44,
+          "right": 313.6000175476074,
+          "top": 487.2625122070313,
+          "width": 276.8000183105469,
+          "x": 36.79999923706055,
+          "y": 487.2625122070313
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": "3위"
+      },
+      {
+        "active": true,
+        "label": "상금 항목 3 내용",
+        "rect": {
+          "bottom": 583.2625122070312,
+          "height": 44,
+          "right": 365.6000175476074,
+          "top": 539.2625122070312,
+          "width": 328.8000183105469,
+          "x": 36.79999923706055,
+          "y": 539.2625122070312
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": ""
+      },
+      {
+        "active": false,
+        "label": "상금 항목 3 삭제",
+        "rect": {
+          "bottom": 531.2625122070312,
+          "height": 44,
+          "right": 365.6000061035156,
+          "top": 487.2625122070313,
+          "width": 44,
+          "x": 321.6000061035156,
+          "y": 487.2625122070313
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "BUTTON",
+        "value": ""
+      }
+    ],
+    "documentWidth": 402,
+    "footer": {
+      "position": "fixed",
+      "rect": {
+        "bottom": 605.5999908447266,
+        "height": 68.80000305175781,
+        "right": 402.3999938964844,
+        "top": 536.7999877929688,
+        "width": 402.3999938964844,
+        "x": 0,
+        "y": 536.7999877929688
+      }
+    },
+    "lockedStep5": [
+      {
+        "disabled": true,
+        "label": "5단계 공개 확인 — 잠김"
+      }
+    ],
+    "scrollY": 947.2000122070312,
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/new",
+    "utc": "2026-10-04T05:48:55.452Z",
+    "viewport": {
+      "dpr": 1.25,
+      "height": 606,
+      "width": 402
+    },
+    "index": 8,
+    "kind": "prize-tab",
+    "widthLabel": "mobile",
+    "state": "third-content-stable-later-observation"
+  },
+  {
+    "active": {
+      "focusVisible": true,
+      "label": "상금 항목 3 삭제",
+      "rect": {
+        "bottom": 531.2625122070312,
+        "height": 44,
+        "right": 365.6000061035156,
+        "top": 487.2625122070313,
+        "width": 44,
+        "x": 321.6000061035156,
+        "y": 487.2625122070313
+      },
+      "tag": "BUTTON",
+      "value": ""
+    },
+    "controls": [
+      {
+        "active": false,
+        "label": "상금 항목 1 이름",
+        "rect": {
+          "bottom": 323.26251220703125,
+          "height": 44,
+          "right": 313.6000175476074,
+          "top": 279.26251220703125,
+          "width": 276.8000183105469,
+          "x": 36.79999923706055,
+          "y": 279.26251220703125
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": "1위"
+      },
+      {
+        "active": false,
+        "label": "상금 항목 1 내용",
+        "rect": {
+          "bottom": 375.2625122070313,
+          "height": 44,
+          "right": 365.6000175476074,
+          "top": 331.26251220703125,
+          "width": 328.8000183105469,
+          "x": 36.79999923706055,
+          "y": 331.26251220703125
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": ""
+      },
+      {
+        "active": false,
+        "label": "상금 항목 1 삭제",
+        "rect": {
+          "bottom": 323.26251220703125,
+          "height": 44,
+          "right": 365.6000061035156,
+          "top": 279.26251220703125,
+          "width": 44,
+          "x": 321.6000061035156,
+          "y": 279.26251220703125
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "BUTTON",
+        "value": ""
+      },
+      {
+        "active": false,
+        "label": "상금 항목 2 이름",
+        "rect": {
+          "bottom": 427.2625122070313,
+          "height": 44,
+          "right": 313.6000175476074,
+          "top": 383.2625122070313,
+          "width": 276.8000183105469,
+          "x": 36.79999923706055,
+          "y": 383.2625122070313
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": "2위"
+      },
+      {
+        "active": false,
+        "label": "상금 항목 2 내용",
+        "rect": {
+          "bottom": 479.2625122070313,
+          "height": 44,
+          "right": 365.6000175476074,
+          "top": 435.2625122070313,
+          "width": 328.8000183105469,
+          "x": 36.79999923706055,
+          "y": 435.2625122070313
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": ""
+      },
+      {
+        "active": false,
+        "label": "상금 항목 2 삭제",
+        "rect": {
+          "bottom": 427.2625122070313,
+          "height": 44,
+          "right": 365.6000061035156,
+          "top": 383.2625122070313,
+          "width": 44,
+          "x": 321.6000061035156,
+          "y": 383.2625122070313
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "BUTTON",
+        "value": ""
+      },
+      {
+        "active": false,
+        "label": "상금 항목 3 이름",
+        "rect": {
+          "bottom": 531.2625122070312,
+          "height": 44,
+          "right": 313.6000175476074,
+          "top": 487.2625122070313,
+          "width": 276.8000183105469,
+          "x": 36.79999923706055,
+          "y": 487.2625122070313
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": "3위"
+      },
+      {
+        "active": false,
+        "label": "상금 항목 3 내용",
+        "rect": {
+          "bottom": 583.2625122070312,
+          "height": 44,
+          "right": 365.6000175476074,
+          "top": 539.2625122070312,
+          "width": 328.8000183105469,
+          "x": 36.79999923706055,
+          "y": 539.2625122070312
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": ""
+      },
+      {
+        "active": true,
+        "label": "상금 항목 3 삭제",
+        "rect": {
+          "bottom": 531.2625122070312,
+          "height": 44,
+          "right": 365.6000061035156,
+          "top": 487.2625122070313,
+          "width": 44,
+          "x": 321.6000061035156,
+          "y": 487.2625122070313
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "BUTTON",
+        "value": ""
+      }
+    ],
+    "documentWidth": 402,
+    "footer": {
+      "position": "fixed",
+      "rect": {
+        "bottom": 605.5999908447266,
+        "height": 68.80000305175781,
+        "right": 402.3999938964844,
+        "top": 536.7999877929688,
+        "width": 402.3999938964844,
+        "x": 0,
+        "y": 536.7999877929688
+      }
+    },
+    "lockedStep5": [
+      {
+        "disabled": true,
+        "label": "5단계 공개 확인 — 잠김"
+      }
+    ],
+    "scrollY": 947.2000122070312,
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/new",
+    "utc": "2026-10-04T05:48:55.583Z",
+    "viewport": {
+      "dpr": 1.25,
+      "height": 606,
+      "width": 402
+    },
+    "index": 9,
+    "kind": "prize-tab",
+    "widthLabel": "mobile",
+    "state": "third-delete"
+  },
+  {
+    "active": {
+      "focusVisible": true,
+      "label": "상금 항목 3 내용",
+      "rect": {
+        "bottom": 583.2625122070312,
+        "height": 44,
+        "right": 365.6000175476074,
+        "top": 539.2625122070312,
+        "width": 328.8000183105469,
+        "x": 36.79999923706055,
+        "y": 539.2625122070312
+      },
+      "tag": "INPUT",
+      "value": ""
+    },
+    "controls": [
+      {
+        "active": false,
+        "label": "상금 항목 1 이름",
+        "rect": {
+          "bottom": 323.26251220703125,
+          "height": 44,
+          "right": 313.6000175476074,
+          "top": 279.26251220703125,
+          "width": 276.8000183105469,
+          "x": 36.79999923706055,
+          "y": 279.26251220703125
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": "1위"
+      },
+      {
+        "active": false,
+        "label": "상금 항목 1 내용",
+        "rect": {
+          "bottom": 375.2625122070313,
+          "height": 44,
+          "right": 365.6000175476074,
+          "top": 331.26251220703125,
+          "width": 328.8000183105469,
+          "x": 36.79999923706055,
+          "y": 331.26251220703125
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": ""
+      },
+      {
+        "active": false,
+        "label": "상금 항목 1 삭제",
+        "rect": {
+          "bottom": 323.26251220703125,
+          "height": 44,
+          "right": 365.6000061035156,
+          "top": 279.26251220703125,
+          "width": 44,
+          "x": 321.6000061035156,
+          "y": 279.26251220703125
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "BUTTON",
+        "value": ""
+      },
+      {
+        "active": false,
+        "label": "상금 항목 2 이름",
+        "rect": {
+          "bottom": 427.2625122070313,
+          "height": 44,
+          "right": 313.6000175476074,
+          "top": 383.2625122070313,
+          "width": 276.8000183105469,
+          "x": 36.79999923706055,
+          "y": 383.2625122070313
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": "2위"
+      },
+      {
+        "active": false,
+        "label": "상금 항목 2 내용",
+        "rect": {
+          "bottom": 479.2625122070313,
+          "height": 44,
+          "right": 365.6000175476074,
+          "top": 435.2625122070313,
+          "width": 328.8000183105469,
+          "x": 36.79999923706055,
+          "y": 435.2625122070313
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": ""
+      },
+      {
+        "active": false,
+        "label": "상금 항목 2 삭제",
+        "rect": {
+          "bottom": 427.2625122070313,
+          "height": 44,
+          "right": 365.6000061035156,
+          "top": 383.2625122070313,
+          "width": 44,
+          "x": 321.6000061035156,
+          "y": 383.2625122070313
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "BUTTON",
+        "value": ""
+      },
+      {
+        "active": false,
+        "label": "상금 항목 3 이름",
+        "rect": {
+          "bottom": 531.2625122070312,
+          "height": 44,
+          "right": 313.6000175476074,
+          "top": 487.2625122070313,
+          "width": 276.8000183105469,
+          "x": 36.79999923706055,
+          "y": 487.2625122070313
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": "3위"
+      },
+      {
+        "active": true,
+        "label": "상금 항목 3 내용",
+        "rect": {
+          "bottom": 583.2625122070312,
+          "height": 44,
+          "right": 365.6000175476074,
+          "top": 539.2625122070312,
+          "width": 328.8000183105469,
+          "x": 36.79999923706055,
+          "y": 539.2625122070312
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": ""
+      },
+      {
+        "active": false,
+        "label": "상금 항목 3 삭제",
+        "rect": {
+          "bottom": 531.2625122070312,
+          "height": 44,
+          "right": 365.6000061035156,
+          "top": 487.2625122070313,
+          "width": 44,
+          "x": 321.6000061035156,
+          "y": 487.2625122070313
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "BUTTON",
+        "value": ""
+      }
+    ],
+    "documentWidth": 402,
+    "footer": {
+      "position": "fixed",
+      "rect": {
+        "bottom": 605.5999908447266,
+        "height": 68.80000305175781,
+        "right": 402.3999938964844,
+        "top": 536.7999877929688,
+        "width": 402.3999938964844,
+        "x": 0,
+        "y": 536.7999877929688
+      }
+    },
+    "lockedStep5": [
+      {
+        "disabled": true,
+        "label": "5단계 공개 확인 — 잠김"
+      }
+    ],
+    "scrollY": 947.2000122070312,
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/new",
+    "utc": "2026-10-04T05:48:55.813Z",
+    "viewport": {
+      "dpr": 1.25,
+      "height": 606,
+      "width": 402
+    },
+    "index": 10,
+    "kind": "prize-tab",
+    "widthLabel": "mobile",
+    "state": "third-content-reverse"
+  },
+  {
+    "active": {
+      "focusVisible": true,
+      "label": "상금 항목 3 내용",
+      "rect": {
+        "bottom": 437.6625061035156,
+        "height": 44,
+        "right": 365.6000175476074,
+        "top": 393.6625061035156,
+        "width": 328.8000183105469,
+        "x": 36.79999923706055,
+        "y": 393.6625061035156
+      },
+      "tag": "INPUT",
+      "value": ""
+    },
+    "controls": [
+      {
+        "active": false,
+        "label": "상금 항목 1 이름",
+        "rect": {
+          "bottom": 177.66250610351562,
+          "height": 44,
+          "right": 313.6000175476074,
+          "top": 133.66250610351562,
+          "width": 276.8000183105469,
+          "x": 36.79999923706055,
+          "y": 133.66250610351562
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": "1위"
+      },
+      {
+        "active": false,
+        "label": "상금 항목 1 내용",
+        "rect": {
+          "bottom": 229.6625061035156,
+          "height": 44,
+          "right": 365.6000175476074,
+          "top": 185.6625061035156,
+          "width": 328.8000183105469,
+          "x": 36.79999923706055,
+          "y": 185.6625061035156
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": ""
+      },
+      {
+        "active": false,
+        "label": "상금 항목 1 삭제",
+        "rect": {
+          "bottom": 177.66250610351562,
+          "height": 44,
+          "right": 365.6000061035156,
+          "top": 133.66250610351562,
+          "width": 44,
+          "x": 321.6000061035156,
+          "y": 133.66250610351562
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "BUTTON",
+        "value": ""
+      },
+      {
+        "active": false,
+        "label": "상금 항목 2 이름",
+        "rect": {
+          "bottom": 281.6625061035156,
+          "height": 44,
+          "right": 313.6000175476074,
+          "top": 237.6625061035156,
+          "width": 276.8000183105469,
+          "x": 36.79999923706055,
+          "y": 237.6625061035156
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": "2위"
+      },
+      {
+        "active": false,
+        "label": "상금 항목 2 내용",
+        "rect": {
+          "bottom": 333.6625061035156,
+          "height": 44,
+          "right": 365.6000175476074,
+          "top": 289.6625061035156,
+          "width": 328.8000183105469,
+          "x": 36.79999923706055,
+          "y": 289.6625061035156
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": ""
+      },
+      {
+        "active": false,
+        "label": "상금 항목 2 삭제",
+        "rect": {
+          "bottom": 281.6625061035156,
+          "height": 44,
+          "right": 365.6000061035156,
+          "top": 237.6625061035156,
+          "width": 44,
+          "x": 321.6000061035156,
+          "y": 237.6625061035156
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "BUTTON",
+        "value": ""
+      },
+      {
+        "active": false,
+        "label": "상금 항목 3 이름",
+        "rect": {
+          "bottom": 385.6625061035156,
+          "height": 44,
+          "right": 313.6000175476074,
+          "top": 341.6625061035156,
+          "width": 276.8000183105469,
+          "x": 36.79999923706055,
+          "y": 341.6625061035156
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": "3위"
+      },
+      {
+        "active": true,
+        "label": "상금 항목 3 내용",
+        "rect": {
+          "bottom": 437.6625061035156,
+          "height": 44,
+          "right": 365.6000175476074,
+          "top": 393.6625061035156,
+          "width": 328.8000183105469,
+          "x": 36.79999923706055,
+          "y": 393.6625061035156
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": ""
+      },
+      {
+        "active": false,
+        "label": "상금 항목 3 삭제",
+        "rect": {
+          "bottom": 385.6625061035156,
+          "height": 44,
+          "right": 365.6000061035156,
+          "top": 341.6625061035156,
+          "width": 44,
+          "x": 321.6000061035156,
+          "y": 341.6625061035156
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "BUTTON",
+        "value": ""
+      }
+    ],
+    "documentWidth": 402,
+    "footer": {
+      "position": "fixed",
+      "rect": {
+        "bottom": 605.5999908447266,
+        "height": 68.80000305175781,
+        "right": 402.3999938964844,
+        "top": 536.7999877929688,
+        "width": 402.3999938964844,
+        "x": 0,
+        "y": 536.7999877929688
+      }
+    },
+    "lockedStep5": [
+      {
+        "disabled": true,
+        "label": "5단계 공개 확인 — 잠김"
+      }
+    ],
+    "scrollY": 1092.800048828125,
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/new",
+    "utc": "2026-10-04T05:48:56.162Z",
+    "viewport": {
+      "dpr": 1.25,
+      "height": 606,
+      "width": 402
+    },
+    "index": 11,
+    "kind": "prize-tab",
+    "widthLabel": "mobile",
+    "state": "third-content-after-manual-scroll"
+  },
+  {
+    "active": {
+      "focusVisible": true,
+      "label": "상금 항목 3 내용",
+      "rect": {
+        "bottom": 391.2625122070313,
+        "height": 44,
+        "right": 365.6000175476074,
+        "top": 347.26251220703125,
+        "width": 328.8000183105469,
+        "x": 36.79999923706055,
+        "y": 347.26251220703125
+      },
+      "tag": "INPUT",
+      "value": ""
+    },
+    "controls": [
+      {
+        "active": false,
+        "label": "상금 항목 1 이름",
+        "rect": {
+          "bottom": 131.26250457763672,
+          "height": 44,
+          "right": 313.6000175476074,
+          "top": 87.26250457763672,
+          "width": 276.8000183105469,
+          "x": 36.79999923706055,
+          "y": 87.26250457763672
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": "1위"
+      },
+      {
+        "active": false,
+        "label": "상금 항목 1 내용",
+        "rect": {
+          "bottom": 183.2624969482422,
+          "height": 44,
+          "right": 365.6000175476074,
+          "top": 139.2624969482422,
+          "width": 328.8000183105469,
+          "x": 36.79999923706055,
+          "y": 139.2624969482422
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": ""
+      },
+      {
+        "active": false,
+        "label": "상금 항목 1 삭제",
+        "rect": {
+          "bottom": 131.26250457763672,
+          "height": 44,
+          "right": 365.6000061035156,
+          "top": 87.26250457763672,
+          "width": 44,
+          "x": 321.6000061035156,
+          "y": 87.26250457763672
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "BUTTON",
+        "value": ""
+      },
+      {
+        "active": false,
+        "label": "상금 항목 2 이름",
+        "rect": {
+          "bottom": 235.2624969482422,
+          "height": 44,
+          "right": 313.6000175476074,
+          "top": 191.2624969482422,
+          "width": 276.8000183105469,
+          "x": 36.79999923706055,
+          "y": 191.2624969482422
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": "2위"
+      },
+      {
+        "active": false,
+        "label": "상금 항목 2 내용",
+        "rect": {
+          "bottom": 287.2624969482422,
+          "height": 44,
+          "right": 365.6000175476074,
+          "top": 243.2624969482422,
+          "width": 328.8000183105469,
+          "x": 36.79999923706055,
+          "y": 243.2624969482422
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": ""
+      },
+      {
+        "active": false,
+        "label": "상금 항목 2 삭제",
+        "rect": {
+          "bottom": 235.2624969482422,
+          "height": 44,
+          "right": 365.6000061035156,
+          "top": 191.2624969482422,
+          "width": 44,
+          "x": 321.6000061035156,
+          "y": 191.2624969482422
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "BUTTON",
+        "value": ""
+      },
+      {
+        "active": false,
+        "label": "상금 항목 3 이름",
+        "rect": {
+          "bottom": 339.26251220703125,
+          "height": 44,
+          "right": 313.6000175476074,
+          "top": 295.26251220703125,
+          "width": 276.8000183105469,
+          "x": 36.79999923706055,
+          "y": 295.26251220703125
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": "3위"
+      },
+      {
+        "active": true,
+        "label": "상금 항목 3 내용",
+        "rect": {
+          "bottom": 391.2625122070313,
+          "height": 44,
+          "right": 365.6000175476074,
+          "top": 347.26251220703125,
+          "width": 328.8000183105469,
+          "x": 36.79999923706055,
+          "y": 347.26251220703125
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": ""
+      },
+      {
+        "active": false,
+        "label": "상금 항목 3 삭제",
+        "rect": {
+          "bottom": 339.26251220703125,
+          "height": 44,
+          "right": 365.6000061035156,
+          "top": 295.26251220703125,
+          "width": 44,
+          "x": 321.6000061035156,
+          "y": 295.26251220703125
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "BUTTON",
+        "value": ""
+      }
+    ],
+    "documentWidth": 402,
+    "footer": {
+      "position": "fixed",
+      "rect": {
+        "bottom": 605.5999908447266,
+        "height": 68.80000305175781,
+        "right": 402.3999938964844,
+        "top": 536.7999877929688,
+        "width": 402.3999938964844,
+        "x": 0,
+        "y": 536.7999877929688
+      }
+    },
+    "lockedStep5": [
+      {
+        "disabled": true,
+        "label": "5단계 공개 확인 — 잠김"
+      }
+    ],
+    "scrollY": 1139.199951171875,
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/new",
+    "utc": "2026-10-04T05:49:16.729Z",
+    "viewport": {
+      "dpr": 1.25,
+      "height": 606,
+      "width": 402
+    },
+    "index": 12,
+    "kind": "prize-tab",
+    "widthLabel": "mobile",
+    "state": "third-content-after-manual-scroll-settled"
+  },
+  {
+    "active": {
+      "focusVisible": true,
+      "label": "상금 항목 1 이름",
+      "rect": {
+        "bottom": 274.1666717529297,
+        "height": 44,
+        "right": 301.7291679382324,
+        "top": 230.1666717529297,
+        "width": 249.0625,
+        "x": 52.66666793823242,
+        "y": 230.1666717529297
+      },
+      "tag": "INPUT",
+      "value": "1위"
+    },
+    "controls": [
+      {
+        "active": true,
+        "label": "상금 항목 1 이름",
+        "rect": {
+          "bottom": 274.1666717529297,
+          "height": 44,
+          "right": 301.7291679382324,
+          "top": 230.1666717529297,
+          "width": 249.0625,
+          "x": 52.66666793823242,
+          "y": 230.1666717529297
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": "1위"
+      },
+      {
+        "active": false,
+        "label": "상금 항목 1 내용",
+        "rect": {
+          "bottom": 274.1666717529297,
+          "height": 44,
+          "right": 683.3333740234375,
+          "top": 230.1666717529297,
+          "width": 373.6041870117187,
+          "x": 309.72918701171875,
+          "y": 230.1666717529297
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": ""
+      },
+      {
+        "active": false,
+        "label": "상금 항목 1 삭제",
+        "rect": {
+          "bottom": 274.1666717529297,
+          "height": 44,
+          "right": 735.3333740234375,
+          "top": 230.1666717529297,
+          "width": 44,
+          "x": 691.3333740234375,
+          "y": 230.1666717529297
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "BUTTON",
+        "value": ""
+      },
+      {
+        "active": false,
+        "label": "상금 항목 2 이름",
+        "rect": {
+          "bottom": 326.16668701171875,
+          "height": 44,
+          "right": 301.7291679382324,
+          "top": 282.16668701171875,
+          "width": 249.0625,
+          "x": 52.66666793823242,
+          "y": 282.16668701171875
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": "2위"
+      },
+      {
+        "active": false,
+        "label": "상금 항목 2 내용",
+        "rect": {
+          "bottom": 326.16668701171875,
+          "height": 44,
+          "right": 683.3333740234375,
+          "top": 282.16668701171875,
+          "width": 373.6041870117187,
+          "x": 309.72918701171875,
+          "y": 282.16668701171875
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": ""
+      },
+      {
+        "active": false,
+        "label": "상금 항목 2 삭제",
+        "rect": {
+          "bottom": 326.16668701171875,
+          "height": 44,
+          "right": 735.3333740234375,
+          "top": 282.16668701171875,
+          "width": 44,
+          "x": 691.3333740234375,
+          "y": 282.16668701171875
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "BUTTON",
+        "value": ""
+      },
+      {
+        "active": false,
+        "label": "상금 항목 3 이름",
+        "rect": {
+          "bottom": 378.1666870117187,
+          "height": 44,
+          "right": 301.7291679382324,
+          "top": 334.16668701171875,
+          "width": 249.0625,
+          "x": 52.66666793823242,
+          "y": 334.16668701171875
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": "3위"
+      },
+      {
+        "active": false,
+        "label": "상금 항목 3 내용",
+        "rect": {
+          "bottom": 378.1666870117187,
+          "height": 44,
+          "right": 683.3333740234375,
+          "top": 334.16668701171875,
+          "width": 373.6041870117187,
+          "x": 309.72918701171875,
+          "y": 334.16668701171875
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": ""
+      },
+      {
+        "active": false,
+        "label": "상금 항목 3 삭제",
+        "rect": {
+          "bottom": 378.1666870117187,
+          "height": 44,
+          "right": 735.3333740234375,
+          "top": 334.16668701171875,
+          "width": 44,
+          "x": 691.3333740234375,
+          "y": 334.16668701171875
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "BUTTON",
+        "value": ""
+      }
+    ],
+    "documentWidth": 788,
+    "footer": {
+      "position": "fixed",
+      "rect": {
+        "bottom": 504.6666717529297,
+        "height": 68.66667175292969,
+        "right": 788,
+        "top": 436,
+        "width": 788,
+        "x": 0,
+        "y": 436
+      }
+    },
+    "lockedStep5": [
+      {
+        "disabled": true,
+        "label": "5단계 공개 확인 — 잠김"
+      }
+    ],
+    "scrollY": 800,
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/new",
+    "utc": "2026-10-04T05:49:53.021Z",
+    "viewport": {
+      "dpr": 1.5,
+      "height": 505,
+      "width": 788
+    },
+    "index": 13,
+    "kind": "prize-tab",
+    "widthLabel": "tablet",
+    "state": "first-name-start"
+  },
+  {
+    "active": {
+      "focusVisible": true,
+      "label": "상금 항목 1 내용",
+      "rect": {
+        "bottom": 274.1666717529297,
+        "height": 44,
+        "right": 683.3333740234375,
+        "top": 230.1666717529297,
+        "width": 373.6041870117187,
+        "x": 309.72918701171875,
+        "y": 230.1666717529297
+      },
+      "tag": "INPUT",
+      "value": ""
+    },
+    "controls": [
+      {
+        "active": false,
+        "label": "상금 항목 1 이름",
+        "rect": {
+          "bottom": 274.1666717529297,
+          "height": 44,
+          "right": 301.7291679382324,
+          "top": 230.1666717529297,
+          "width": 249.0625,
+          "x": 52.66666793823242,
+          "y": 230.1666717529297
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": "1위"
+      },
+      {
+        "active": true,
+        "label": "상금 항목 1 내용",
+        "rect": {
+          "bottom": 274.1666717529297,
+          "height": 44,
+          "right": 683.3333740234375,
+          "top": 230.1666717529297,
+          "width": 373.6041870117187,
+          "x": 309.72918701171875,
+          "y": 230.1666717529297
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": ""
+      },
+      {
+        "active": false,
+        "label": "상금 항목 1 삭제",
+        "rect": {
+          "bottom": 274.1666717529297,
+          "height": 44,
+          "right": 735.3333740234375,
+          "top": 230.1666717529297,
+          "width": 44,
+          "x": 691.3333740234375,
+          "y": 230.1666717529297
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "BUTTON",
+        "value": ""
+      },
+      {
+        "active": false,
+        "label": "상금 항목 2 이름",
+        "rect": {
+          "bottom": 326.16668701171875,
+          "height": 44,
+          "right": 301.7291679382324,
+          "top": 282.16668701171875,
+          "width": 249.0625,
+          "x": 52.66666793823242,
+          "y": 282.16668701171875
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": "2위"
+      },
+      {
+        "active": false,
+        "label": "상금 항목 2 내용",
+        "rect": {
+          "bottom": 326.16668701171875,
+          "height": 44,
+          "right": 683.3333740234375,
+          "top": 282.16668701171875,
+          "width": 373.6041870117187,
+          "x": 309.72918701171875,
+          "y": 282.16668701171875
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": ""
+      },
+      {
+        "active": false,
+        "label": "상금 항목 2 삭제",
+        "rect": {
+          "bottom": 326.16668701171875,
+          "height": 44,
+          "right": 735.3333740234375,
+          "top": 282.16668701171875,
+          "width": 44,
+          "x": 691.3333740234375,
+          "y": 282.16668701171875
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "BUTTON",
+        "value": ""
+      },
+      {
+        "active": false,
+        "label": "상금 항목 3 이름",
+        "rect": {
+          "bottom": 378.1666870117187,
+          "height": 44,
+          "right": 301.7291679382324,
+          "top": 334.16668701171875,
+          "width": 249.0625,
+          "x": 52.66666793823242,
+          "y": 334.16668701171875
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": "3위"
+      },
+      {
+        "active": false,
+        "label": "상금 항목 3 내용",
+        "rect": {
+          "bottom": 378.1666870117187,
+          "height": 44,
+          "right": 683.3333740234375,
+          "top": 334.16668701171875,
+          "width": 373.6041870117187,
+          "x": 309.72918701171875,
+          "y": 334.16668701171875
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": ""
+      },
+      {
+        "active": false,
+        "label": "상금 항목 3 삭제",
+        "rect": {
+          "bottom": 378.1666870117187,
+          "height": 44,
+          "right": 735.3333740234375,
+          "top": 334.16668701171875,
+          "width": 44,
+          "x": 691.3333740234375,
+          "y": 334.16668701171875
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "BUTTON",
+        "value": ""
+      }
+    ],
+    "documentWidth": 788,
+    "footer": {
+      "position": "fixed",
+      "rect": {
+        "bottom": 504.6666717529297,
+        "height": 68.66667175292969,
+        "right": 788,
+        "top": 436,
+        "width": 788,
+        "x": 0,
+        "y": 436
+      }
+    },
+    "lockedStep5": [
+      {
+        "disabled": true,
+        "label": "5단계 공개 확인 — 잠김"
+      }
+    ],
+    "scrollY": 800,
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/new",
+    "utc": "2026-10-04T05:49:53.159Z",
+    "viewport": {
+      "dpr": 1.5,
+      "height": 505,
+      "width": 788
+    },
+    "index": 14,
+    "kind": "prize-tab",
+    "widthLabel": "tablet",
+    "state": "Tab-1"
+  },
+  {
+    "active": {
+      "focusVisible": true,
+      "label": "상금 항목 1 삭제",
+      "rect": {
+        "bottom": 274.1666717529297,
+        "height": 44,
+        "right": 735.3333740234375,
+        "top": 230.1666717529297,
+        "width": 44,
+        "x": 691.3333740234375,
+        "y": 230.1666717529297
+      },
+      "tag": "BUTTON",
+      "value": ""
+    },
+    "controls": [
+      {
+        "active": false,
+        "label": "상금 항목 1 이름",
+        "rect": {
+          "bottom": 274.1666717529297,
+          "height": 44,
+          "right": 301.7291679382324,
+          "top": 230.1666717529297,
+          "width": 249.0625,
+          "x": 52.66666793823242,
+          "y": 230.1666717529297
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": "1위"
+      },
+      {
+        "active": false,
+        "label": "상금 항목 1 내용",
+        "rect": {
+          "bottom": 274.1666717529297,
+          "height": 44,
+          "right": 683.3333740234375,
+          "top": 230.1666717529297,
+          "width": 373.6041870117187,
+          "x": 309.72918701171875,
+          "y": 230.1666717529297
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": ""
+      },
+      {
+        "active": true,
+        "label": "상금 항목 1 삭제",
+        "rect": {
+          "bottom": 274.1666717529297,
+          "height": 44,
+          "right": 735.3333740234375,
+          "top": 230.1666717529297,
+          "width": 44,
+          "x": 691.3333740234375,
+          "y": 230.1666717529297
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "BUTTON",
+        "value": ""
+      },
+      {
+        "active": false,
+        "label": "상금 항목 2 이름",
+        "rect": {
+          "bottom": 326.16668701171875,
+          "height": 44,
+          "right": 301.7291679382324,
+          "top": 282.16668701171875,
+          "width": 249.0625,
+          "x": 52.66666793823242,
+          "y": 282.16668701171875
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": "2위"
+      },
+      {
+        "active": false,
+        "label": "상금 항목 2 내용",
+        "rect": {
+          "bottom": 326.16668701171875,
+          "height": 44,
+          "right": 683.3333740234375,
+          "top": 282.16668701171875,
+          "width": 373.6041870117187,
+          "x": 309.72918701171875,
+          "y": 282.16668701171875
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": ""
+      },
+      {
+        "active": false,
+        "label": "상금 항목 2 삭제",
+        "rect": {
+          "bottom": 326.16668701171875,
+          "height": 44,
+          "right": 735.3333740234375,
+          "top": 282.16668701171875,
+          "width": 44,
+          "x": 691.3333740234375,
+          "y": 282.16668701171875
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "BUTTON",
+        "value": ""
+      },
+      {
+        "active": false,
+        "label": "상금 항목 3 이름",
+        "rect": {
+          "bottom": 378.1666870117187,
+          "height": 44,
+          "right": 301.7291679382324,
+          "top": 334.16668701171875,
+          "width": 249.0625,
+          "x": 52.66666793823242,
+          "y": 334.16668701171875
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": "3위"
+      },
+      {
+        "active": false,
+        "label": "상금 항목 3 내용",
+        "rect": {
+          "bottom": 378.1666870117187,
+          "height": 44,
+          "right": 683.3333740234375,
+          "top": 334.16668701171875,
+          "width": 373.6041870117187,
+          "x": 309.72918701171875,
+          "y": 334.16668701171875
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": ""
+      },
+      {
+        "active": false,
+        "label": "상금 항목 3 삭제",
+        "rect": {
+          "bottom": 378.1666870117187,
+          "height": 44,
+          "right": 735.3333740234375,
+          "top": 334.16668701171875,
+          "width": 44,
+          "x": 691.3333740234375,
+          "y": 334.16668701171875
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "BUTTON",
+        "value": ""
+      }
+    ],
+    "documentWidth": 788,
+    "footer": {
+      "position": "fixed",
+      "rect": {
+        "bottom": 504.6666717529297,
+        "height": 68.66667175292969,
+        "right": 788,
+        "top": 436,
+        "width": 788,
+        "x": 0,
+        "y": 436
+      }
+    },
+    "lockedStep5": [
+      {
+        "disabled": true,
+        "label": "5단계 공개 확인 — 잠김"
+      }
+    ],
+    "scrollY": 800,
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/new",
+    "utc": "2026-10-04T05:49:53.332Z",
+    "viewport": {
+      "dpr": 1.5,
+      "height": 505,
+      "width": 788
+    },
+    "index": 15,
+    "kind": "prize-tab",
+    "widthLabel": "tablet",
+    "state": "Tab-2"
+  },
+  {
+    "active": {
+      "focusVisible": true,
+      "label": "상금 항목 2 이름",
+      "rect": {
+        "bottom": 326.16668701171875,
+        "height": 44,
+        "right": 301.7291679382324,
+        "top": 282.16668701171875,
+        "width": 249.0625,
+        "x": 52.66666793823242,
+        "y": 282.16668701171875
+      },
+      "tag": "INPUT",
+      "value": "2위"
+    },
+    "controls": [
+      {
+        "active": false,
+        "label": "상금 항목 1 이름",
+        "rect": {
+          "bottom": 274.1666717529297,
+          "height": 44,
+          "right": 301.7291679382324,
+          "top": 230.1666717529297,
+          "width": 249.0625,
+          "x": 52.66666793823242,
+          "y": 230.1666717529297
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": "1위"
+      },
+      {
+        "active": false,
+        "label": "상금 항목 1 내용",
+        "rect": {
+          "bottom": 274.1666717529297,
+          "height": 44,
+          "right": 683.3333740234375,
+          "top": 230.1666717529297,
+          "width": 373.6041870117187,
+          "x": 309.72918701171875,
+          "y": 230.1666717529297
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": ""
+      },
+      {
+        "active": false,
+        "label": "상금 항목 1 삭제",
+        "rect": {
+          "bottom": 274.1666717529297,
+          "height": 44,
+          "right": 735.3333740234375,
+          "top": 230.1666717529297,
+          "width": 44,
+          "x": 691.3333740234375,
+          "y": 230.1666717529297
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "BUTTON",
+        "value": ""
+      },
+      {
+        "active": true,
+        "label": "상금 항목 2 이름",
+        "rect": {
+          "bottom": 326.16668701171875,
+          "height": 44,
+          "right": 301.7291679382324,
+          "top": 282.16668701171875,
+          "width": 249.0625,
+          "x": 52.66666793823242,
+          "y": 282.16668701171875
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": "2위"
+      },
+      {
+        "active": false,
+        "label": "상금 항목 2 내용",
+        "rect": {
+          "bottom": 326.16668701171875,
+          "height": 44,
+          "right": 683.3333740234375,
+          "top": 282.16668701171875,
+          "width": 373.6041870117187,
+          "x": 309.72918701171875,
+          "y": 282.16668701171875
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": ""
+      },
+      {
+        "active": false,
+        "label": "상금 항목 2 삭제",
+        "rect": {
+          "bottom": 326.16668701171875,
+          "height": 44,
+          "right": 735.3333740234375,
+          "top": 282.16668701171875,
+          "width": 44,
+          "x": 691.3333740234375,
+          "y": 282.16668701171875
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "BUTTON",
+        "value": ""
+      },
+      {
+        "active": false,
+        "label": "상금 항목 3 이름",
+        "rect": {
+          "bottom": 378.1666870117187,
+          "height": 44,
+          "right": 301.7291679382324,
+          "top": 334.16668701171875,
+          "width": 249.0625,
+          "x": 52.66666793823242,
+          "y": 334.16668701171875
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": "3위"
+      },
+      {
+        "active": false,
+        "label": "상금 항목 3 내용",
+        "rect": {
+          "bottom": 378.1666870117187,
+          "height": 44,
+          "right": 683.3333740234375,
+          "top": 334.16668701171875,
+          "width": 373.6041870117187,
+          "x": 309.72918701171875,
+          "y": 334.16668701171875
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": ""
+      },
+      {
+        "active": false,
+        "label": "상금 항목 3 삭제",
+        "rect": {
+          "bottom": 378.1666870117187,
+          "height": 44,
+          "right": 735.3333740234375,
+          "top": 334.16668701171875,
+          "width": 44,
+          "x": 691.3333740234375,
+          "y": 334.16668701171875
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "BUTTON",
+        "value": ""
+      }
+    ],
+    "documentWidth": 788,
+    "footer": {
+      "position": "fixed",
+      "rect": {
+        "bottom": 504.6666717529297,
+        "height": 68.66667175292969,
+        "right": 788,
+        "top": 436,
+        "width": 788,
+        "x": 0,
+        "y": 436
+      }
+    },
+    "lockedStep5": [
+      {
+        "disabled": true,
+        "label": "5단계 공개 확인 — 잠김"
+      }
+    ],
+    "scrollY": 800,
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/new",
+    "utc": "2026-10-04T05:49:53.490Z",
+    "viewport": {
+      "dpr": 1.5,
+      "height": 505,
+      "width": 788
+    },
+    "index": 16,
+    "kind": "prize-tab",
+    "widthLabel": "tablet",
+    "state": "Tab-3"
+  },
+  {
+    "active": {
+      "focusVisible": true,
+      "label": "상금 항목 2 내용",
+      "rect": {
+        "bottom": 326.16668701171875,
+        "height": 44,
+        "right": 683.3333740234375,
+        "top": 282.16668701171875,
+        "width": 373.6041870117187,
+        "x": 309.72918701171875,
+        "y": 282.16668701171875
+      },
+      "tag": "INPUT",
+      "value": ""
+    },
+    "controls": [
+      {
+        "active": false,
+        "label": "상금 항목 1 이름",
+        "rect": {
+          "bottom": 274.1666717529297,
+          "height": 44,
+          "right": 301.7291679382324,
+          "top": 230.1666717529297,
+          "width": 249.0625,
+          "x": 52.66666793823242,
+          "y": 230.1666717529297
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": "1위"
+      },
+      {
+        "active": false,
+        "label": "상금 항목 1 내용",
+        "rect": {
+          "bottom": 274.1666717529297,
+          "height": 44,
+          "right": 683.3333740234375,
+          "top": 230.1666717529297,
+          "width": 373.6041870117187,
+          "x": 309.72918701171875,
+          "y": 230.1666717529297
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": ""
+      },
+      {
+        "active": false,
+        "label": "상금 항목 1 삭제",
+        "rect": {
+          "bottom": 274.1666717529297,
+          "height": 44,
+          "right": 735.3333740234375,
+          "top": 230.1666717529297,
+          "width": 44,
+          "x": 691.3333740234375,
+          "y": 230.1666717529297
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "BUTTON",
+        "value": ""
+      },
+      {
+        "active": false,
+        "label": "상금 항목 2 이름",
+        "rect": {
+          "bottom": 326.16668701171875,
+          "height": 44,
+          "right": 301.7291679382324,
+          "top": 282.16668701171875,
+          "width": 249.0625,
+          "x": 52.66666793823242,
+          "y": 282.16668701171875
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": "2위"
+      },
+      {
+        "active": true,
+        "label": "상금 항목 2 내용",
+        "rect": {
+          "bottom": 326.16668701171875,
+          "height": 44,
+          "right": 683.3333740234375,
+          "top": 282.16668701171875,
+          "width": 373.6041870117187,
+          "x": 309.72918701171875,
+          "y": 282.16668701171875
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": ""
+      },
+      {
+        "active": false,
+        "label": "상금 항목 2 삭제",
+        "rect": {
+          "bottom": 326.16668701171875,
+          "height": 44,
+          "right": 735.3333740234375,
+          "top": 282.16668701171875,
+          "width": 44,
+          "x": 691.3333740234375,
+          "y": 282.16668701171875
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "BUTTON",
+        "value": ""
+      },
+      {
+        "active": false,
+        "label": "상금 항목 3 이름",
+        "rect": {
+          "bottom": 378.1666870117187,
+          "height": 44,
+          "right": 301.7291679382324,
+          "top": 334.16668701171875,
+          "width": 249.0625,
+          "x": 52.66666793823242,
+          "y": 334.16668701171875
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": "3위"
+      },
+      {
+        "active": false,
+        "label": "상금 항목 3 내용",
+        "rect": {
+          "bottom": 378.1666870117187,
+          "height": 44,
+          "right": 683.3333740234375,
+          "top": 334.16668701171875,
+          "width": 373.6041870117187,
+          "x": 309.72918701171875,
+          "y": 334.16668701171875
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": ""
+      },
+      {
+        "active": false,
+        "label": "상금 항목 3 삭제",
+        "rect": {
+          "bottom": 378.1666870117187,
+          "height": 44,
+          "right": 735.3333740234375,
+          "top": 334.16668701171875,
+          "width": 44,
+          "x": 691.3333740234375,
+          "y": 334.16668701171875
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "BUTTON",
+        "value": ""
+      }
+    ],
+    "documentWidth": 788,
+    "footer": {
+      "position": "fixed",
+      "rect": {
+        "bottom": 504.6666717529297,
+        "height": 68.66667175292969,
+        "right": 788,
+        "top": 436,
+        "width": 788,
+        "x": 0,
+        "y": 436
+      }
+    },
+    "lockedStep5": [
+      {
+        "disabled": true,
+        "label": "5단계 공개 확인 — 잠김"
+      }
+    ],
+    "scrollY": 800,
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/new",
+    "utc": "2026-10-04T05:49:53.660Z",
+    "viewport": {
+      "dpr": 1.5,
+      "height": 505,
+      "width": 788
+    },
+    "index": 17,
+    "kind": "prize-tab",
+    "widthLabel": "tablet",
+    "state": "Tab-4"
+  },
+  {
+    "active": {
+      "focusVisible": true,
+      "label": "상금 항목 2 삭제",
+      "rect": {
+        "bottom": 326.16668701171875,
+        "height": 44,
+        "right": 735.3333740234375,
+        "top": 282.16668701171875,
+        "width": 44,
+        "x": 691.3333740234375,
+        "y": 282.16668701171875
+      },
+      "tag": "BUTTON",
+      "value": ""
+    },
+    "controls": [
+      {
+        "active": false,
+        "label": "상금 항목 1 이름",
+        "rect": {
+          "bottom": 274.1666717529297,
+          "height": 44,
+          "right": 301.7291679382324,
+          "top": 230.1666717529297,
+          "width": 249.0625,
+          "x": 52.66666793823242,
+          "y": 230.1666717529297
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": "1위"
+      },
+      {
+        "active": false,
+        "label": "상금 항목 1 내용",
+        "rect": {
+          "bottom": 274.1666717529297,
+          "height": 44,
+          "right": 683.3333740234375,
+          "top": 230.1666717529297,
+          "width": 373.6041870117187,
+          "x": 309.72918701171875,
+          "y": 230.1666717529297
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": ""
+      },
+      {
+        "active": false,
+        "label": "상금 항목 1 삭제",
+        "rect": {
+          "bottom": 274.1666717529297,
+          "height": 44,
+          "right": 735.3333740234375,
+          "top": 230.1666717529297,
+          "width": 44,
+          "x": 691.3333740234375,
+          "y": 230.1666717529297
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "BUTTON",
+        "value": ""
+      },
+      {
+        "active": false,
+        "label": "상금 항목 2 이름",
+        "rect": {
+          "bottom": 326.16668701171875,
+          "height": 44,
+          "right": 301.7291679382324,
+          "top": 282.16668701171875,
+          "width": 249.0625,
+          "x": 52.66666793823242,
+          "y": 282.16668701171875
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": "2위"
+      },
+      {
+        "active": false,
+        "label": "상금 항목 2 내용",
+        "rect": {
+          "bottom": 326.16668701171875,
+          "height": 44,
+          "right": 683.3333740234375,
+          "top": 282.16668701171875,
+          "width": 373.6041870117187,
+          "x": 309.72918701171875,
+          "y": 282.16668701171875
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": ""
+      },
+      {
+        "active": true,
+        "label": "상금 항목 2 삭제",
+        "rect": {
+          "bottom": 326.16668701171875,
+          "height": 44,
+          "right": 735.3333740234375,
+          "top": 282.16668701171875,
+          "width": 44,
+          "x": 691.3333740234375,
+          "y": 282.16668701171875
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "BUTTON",
+        "value": ""
+      },
+      {
+        "active": false,
+        "label": "상금 항목 3 이름",
+        "rect": {
+          "bottom": 378.1666870117187,
+          "height": 44,
+          "right": 301.7291679382324,
+          "top": 334.16668701171875,
+          "width": 249.0625,
+          "x": 52.66666793823242,
+          "y": 334.16668701171875
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": "3위"
+      },
+      {
+        "active": false,
+        "label": "상금 항목 3 내용",
+        "rect": {
+          "bottom": 378.1666870117187,
+          "height": 44,
+          "right": 683.3333740234375,
+          "top": 334.16668701171875,
+          "width": 373.6041870117187,
+          "x": 309.72918701171875,
+          "y": 334.16668701171875
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": ""
+      },
+      {
+        "active": false,
+        "label": "상금 항목 3 삭제",
+        "rect": {
+          "bottom": 378.1666870117187,
+          "height": 44,
+          "right": 735.3333740234375,
+          "top": 334.16668701171875,
+          "width": 44,
+          "x": 691.3333740234375,
+          "y": 334.16668701171875
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "BUTTON",
+        "value": ""
+      }
+    ],
+    "documentWidth": 788,
+    "footer": {
+      "position": "fixed",
+      "rect": {
+        "bottom": 504.6666717529297,
+        "height": 68.66667175292969,
+        "right": 788,
+        "top": 436,
+        "width": 788,
+        "x": 0,
+        "y": 436
+      }
+    },
+    "lockedStep5": [
+      {
+        "disabled": true,
+        "label": "5단계 공개 확인 — 잠김"
+      }
+    ],
+    "scrollY": 800,
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/new",
+    "utc": "2026-10-04T05:49:53.837Z",
+    "viewport": {
+      "dpr": 1.5,
+      "height": 505,
+      "width": 788
+    },
+    "index": 18,
+    "kind": "prize-tab",
+    "widthLabel": "tablet",
+    "state": "Tab-5"
+  },
+  {
+    "active": {
+      "focusVisible": true,
+      "label": "상금 항목 3 이름",
+      "rect": {
+        "bottom": 378.1666870117187,
+        "height": 44,
+        "right": 301.7291679382324,
+        "top": 334.16668701171875,
+        "width": 249.0625,
+        "x": 52.66666793823242,
+        "y": 334.16668701171875
+      },
+      "tag": "INPUT",
+      "value": "3위"
+    },
+    "controls": [
+      {
+        "active": false,
+        "label": "상금 항목 1 이름",
+        "rect": {
+          "bottom": 274.1666717529297,
+          "height": 44,
+          "right": 301.7291679382324,
+          "top": 230.1666717529297,
+          "width": 249.0625,
+          "x": 52.66666793823242,
+          "y": 230.1666717529297
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": "1위"
+      },
+      {
+        "active": false,
+        "label": "상금 항목 1 내용",
+        "rect": {
+          "bottom": 274.1666717529297,
+          "height": 44,
+          "right": 683.3333740234375,
+          "top": 230.1666717529297,
+          "width": 373.6041870117187,
+          "x": 309.72918701171875,
+          "y": 230.1666717529297
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": ""
+      },
+      {
+        "active": false,
+        "label": "상금 항목 1 삭제",
+        "rect": {
+          "bottom": 274.1666717529297,
+          "height": 44,
+          "right": 735.3333740234375,
+          "top": 230.1666717529297,
+          "width": 44,
+          "x": 691.3333740234375,
+          "y": 230.1666717529297
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "BUTTON",
+        "value": ""
+      },
+      {
+        "active": false,
+        "label": "상금 항목 2 이름",
+        "rect": {
+          "bottom": 326.16668701171875,
+          "height": 44,
+          "right": 301.7291679382324,
+          "top": 282.16668701171875,
+          "width": 249.0625,
+          "x": 52.66666793823242,
+          "y": 282.16668701171875
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": "2위"
+      },
+      {
+        "active": false,
+        "label": "상금 항목 2 내용",
+        "rect": {
+          "bottom": 326.16668701171875,
+          "height": 44,
+          "right": 683.3333740234375,
+          "top": 282.16668701171875,
+          "width": 373.6041870117187,
+          "x": 309.72918701171875,
+          "y": 282.16668701171875
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": ""
+      },
+      {
+        "active": false,
+        "label": "상금 항목 2 삭제",
+        "rect": {
+          "bottom": 326.16668701171875,
+          "height": 44,
+          "right": 735.3333740234375,
+          "top": 282.16668701171875,
+          "width": 44,
+          "x": 691.3333740234375,
+          "y": 282.16668701171875
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "BUTTON",
+        "value": ""
+      },
+      {
+        "active": true,
+        "label": "상금 항목 3 이름",
+        "rect": {
+          "bottom": 378.1666870117187,
+          "height": 44,
+          "right": 301.7291679382324,
+          "top": 334.16668701171875,
+          "width": 249.0625,
+          "x": 52.66666793823242,
+          "y": 334.16668701171875
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": "3위"
+      },
+      {
+        "active": false,
+        "label": "상금 항목 3 내용",
+        "rect": {
+          "bottom": 378.1666870117187,
+          "height": 44,
+          "right": 683.3333740234375,
+          "top": 334.16668701171875,
+          "width": 373.6041870117187,
+          "x": 309.72918701171875,
+          "y": 334.16668701171875
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": ""
+      },
+      {
+        "active": false,
+        "label": "상금 항목 3 삭제",
+        "rect": {
+          "bottom": 378.1666870117187,
+          "height": 44,
+          "right": 735.3333740234375,
+          "top": 334.16668701171875,
+          "width": 44,
+          "x": 691.3333740234375,
+          "y": 334.16668701171875
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "BUTTON",
+        "value": ""
+      }
+    ],
+    "documentWidth": 788,
+    "footer": {
+      "position": "fixed",
+      "rect": {
+        "bottom": 504.6666717529297,
+        "height": 68.66667175292969,
+        "right": 788,
+        "top": 436,
+        "width": 788,
+        "x": 0,
+        "y": 436
+      }
+    },
+    "lockedStep5": [
+      {
+        "disabled": true,
+        "label": "5단계 공개 확인 — 잠김"
+      }
+    ],
+    "scrollY": 800,
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/new",
+    "utc": "2026-10-04T05:49:54.007Z",
+    "viewport": {
+      "dpr": 1.5,
+      "height": 505,
+      "width": 788
+    },
+    "index": 19,
+    "kind": "prize-tab",
+    "widthLabel": "tablet",
+    "state": "Tab-6"
+  },
+  {
+    "active": {
+      "focusVisible": true,
+      "label": "상금 항목 3 내용",
+      "rect": {
+        "bottom": 378.1666870117187,
+        "height": 44,
+        "right": 683.3333740234375,
+        "top": 334.16668701171875,
+        "width": 373.6041870117187,
+        "x": 309.72918701171875,
+        "y": 334.16668701171875
+      },
+      "tag": "INPUT",
+      "value": ""
+    },
+    "controls": [
+      {
+        "active": false,
+        "label": "상금 항목 1 이름",
+        "rect": {
+          "bottom": 274.1666717529297,
+          "height": 44,
+          "right": 301.7291679382324,
+          "top": 230.1666717529297,
+          "width": 249.0625,
+          "x": 52.66666793823242,
+          "y": 230.1666717529297
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": "1위"
+      },
+      {
+        "active": false,
+        "label": "상금 항목 1 내용",
+        "rect": {
+          "bottom": 274.1666717529297,
+          "height": 44,
+          "right": 683.3333740234375,
+          "top": 230.1666717529297,
+          "width": 373.6041870117187,
+          "x": 309.72918701171875,
+          "y": 230.1666717529297
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": ""
+      },
+      {
+        "active": false,
+        "label": "상금 항목 1 삭제",
+        "rect": {
+          "bottom": 274.1666717529297,
+          "height": 44,
+          "right": 735.3333740234375,
+          "top": 230.1666717529297,
+          "width": 44,
+          "x": 691.3333740234375,
+          "y": 230.1666717529297
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "BUTTON",
+        "value": ""
+      },
+      {
+        "active": false,
+        "label": "상금 항목 2 이름",
+        "rect": {
+          "bottom": 326.16668701171875,
+          "height": 44,
+          "right": 301.7291679382324,
+          "top": 282.16668701171875,
+          "width": 249.0625,
+          "x": 52.66666793823242,
+          "y": 282.16668701171875
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": "2위"
+      },
+      {
+        "active": false,
+        "label": "상금 항목 2 내용",
+        "rect": {
+          "bottom": 326.16668701171875,
+          "height": 44,
+          "right": 683.3333740234375,
+          "top": 282.16668701171875,
+          "width": 373.6041870117187,
+          "x": 309.72918701171875,
+          "y": 282.16668701171875
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": ""
+      },
+      {
+        "active": false,
+        "label": "상금 항목 2 삭제",
+        "rect": {
+          "bottom": 326.16668701171875,
+          "height": 44,
+          "right": 735.3333740234375,
+          "top": 282.16668701171875,
+          "width": 44,
+          "x": 691.3333740234375,
+          "y": 282.16668701171875
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "BUTTON",
+        "value": ""
+      },
+      {
+        "active": false,
+        "label": "상금 항목 3 이름",
+        "rect": {
+          "bottom": 378.1666870117187,
+          "height": 44,
+          "right": 301.7291679382324,
+          "top": 334.16668701171875,
+          "width": 249.0625,
+          "x": 52.66666793823242,
+          "y": 334.16668701171875
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": "3위"
+      },
+      {
+        "active": true,
+        "label": "상금 항목 3 내용",
+        "rect": {
+          "bottom": 378.1666870117187,
+          "height": 44,
+          "right": 683.3333740234375,
+          "top": 334.16668701171875,
+          "width": 373.6041870117187,
+          "x": 309.72918701171875,
+          "y": 334.16668701171875
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": ""
+      },
+      {
+        "active": false,
+        "label": "상금 항목 3 삭제",
+        "rect": {
+          "bottom": 378.1666870117187,
+          "height": 44,
+          "right": 735.3333740234375,
+          "top": 334.16668701171875,
+          "width": 44,
+          "x": 691.3333740234375,
+          "y": 334.16668701171875
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "BUTTON",
+        "value": ""
+      }
+    ],
+    "documentWidth": 788,
+    "footer": {
+      "position": "fixed",
+      "rect": {
+        "bottom": 504.6666717529297,
+        "height": 68.66667175292969,
+        "right": 788,
+        "top": 436,
+        "width": 788,
+        "x": 0,
+        "y": 436
+      }
+    },
+    "lockedStep5": [
+      {
+        "disabled": true,
+        "label": "5단계 공개 확인 — 잠김"
+      }
+    ],
+    "scrollY": 800,
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/new",
+    "utc": "2026-10-04T05:49:54.182Z",
+    "viewport": {
+      "dpr": 1.5,
+      "height": 505,
+      "width": 788
+    },
+    "index": 20,
+    "kind": "prize-tab",
+    "widthLabel": "tablet",
+    "state": "Tab-7"
+  },
+  {
+    "active": {
+      "focusVisible": true,
+      "label": "상금 항목 3 삭제",
+      "rect": {
+        "bottom": 378.1666870117187,
+        "height": 44,
+        "right": 735.3333740234375,
+        "top": 334.16668701171875,
+        "width": 44,
+        "x": 691.3333740234375,
+        "y": 334.16668701171875
+      },
+      "tag": "BUTTON",
+      "value": ""
+    },
+    "controls": [
+      {
+        "active": false,
+        "label": "상금 항목 1 이름",
+        "rect": {
+          "bottom": 274.1666717529297,
+          "height": 44,
+          "right": 301.7291679382324,
+          "top": 230.1666717529297,
+          "width": 249.0625,
+          "x": 52.66666793823242,
+          "y": 230.1666717529297
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": "1위"
+      },
+      {
+        "active": false,
+        "label": "상금 항목 1 내용",
+        "rect": {
+          "bottom": 274.1666717529297,
+          "height": 44,
+          "right": 683.3333740234375,
+          "top": 230.1666717529297,
+          "width": 373.6041870117187,
+          "x": 309.72918701171875,
+          "y": 230.1666717529297
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": ""
+      },
+      {
+        "active": false,
+        "label": "상금 항목 1 삭제",
+        "rect": {
+          "bottom": 274.1666717529297,
+          "height": 44,
+          "right": 735.3333740234375,
+          "top": 230.1666717529297,
+          "width": 44,
+          "x": 691.3333740234375,
+          "y": 230.1666717529297
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "BUTTON",
+        "value": ""
+      },
+      {
+        "active": false,
+        "label": "상금 항목 2 이름",
+        "rect": {
+          "bottom": 326.16668701171875,
+          "height": 44,
+          "right": 301.7291679382324,
+          "top": 282.16668701171875,
+          "width": 249.0625,
+          "x": 52.66666793823242,
+          "y": 282.16668701171875
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": "2위"
+      },
+      {
+        "active": false,
+        "label": "상금 항목 2 내용",
+        "rect": {
+          "bottom": 326.16668701171875,
+          "height": 44,
+          "right": 683.3333740234375,
+          "top": 282.16668701171875,
+          "width": 373.6041870117187,
+          "x": 309.72918701171875,
+          "y": 282.16668701171875
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": ""
+      },
+      {
+        "active": false,
+        "label": "상금 항목 2 삭제",
+        "rect": {
+          "bottom": 326.16668701171875,
+          "height": 44,
+          "right": 735.3333740234375,
+          "top": 282.16668701171875,
+          "width": 44,
+          "x": 691.3333740234375,
+          "y": 282.16668701171875
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "BUTTON",
+        "value": ""
+      },
+      {
+        "active": false,
+        "label": "상금 항목 3 이름",
+        "rect": {
+          "bottom": 378.1666870117187,
+          "height": 44,
+          "right": 301.7291679382324,
+          "top": 334.16668701171875,
+          "width": 249.0625,
+          "x": 52.66666793823242,
+          "y": 334.16668701171875
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": "3위"
+      },
+      {
+        "active": false,
+        "label": "상금 항목 3 내용",
+        "rect": {
+          "bottom": 378.1666870117187,
+          "height": 44,
+          "right": 683.3333740234375,
+          "top": 334.16668701171875,
+          "width": 373.6041870117187,
+          "x": 309.72918701171875,
+          "y": 334.16668701171875
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": ""
+      },
+      {
+        "active": true,
+        "label": "상금 항목 3 삭제",
+        "rect": {
+          "bottom": 378.1666870117187,
+          "height": 44,
+          "right": 735.3333740234375,
+          "top": 334.16668701171875,
+          "width": 44,
+          "x": 691.3333740234375,
+          "y": 334.16668701171875
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "BUTTON",
+        "value": ""
+      }
+    ],
+    "documentWidth": 788,
+    "footer": {
+      "position": "fixed",
+      "rect": {
+        "bottom": 504.6666717529297,
+        "height": 68.66667175292969,
+        "right": 788,
+        "top": 436,
+        "width": 788,
+        "x": 0,
+        "y": 436
+      }
+    },
+    "lockedStep5": [
+      {
+        "disabled": true,
+        "label": "5단계 공개 확인 — 잠김"
+      }
+    ],
+    "scrollY": 800,
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/new",
+    "utc": "2026-10-04T05:49:54.369Z",
+    "viewport": {
+      "dpr": 1.5,
+      "height": 505,
+      "width": 788
+    },
+    "index": 21,
+    "kind": "prize-tab",
+    "widthLabel": "tablet",
+    "state": "third-delete"
+  },
+  {
+    "active": {
+      "focusVisible": true,
+      "label": "상금 항목 3 내용",
+      "rect": {
+        "bottom": 378.1666870117187,
+        "height": 44,
+        "right": 683.3333740234375,
+        "top": 334.16668701171875,
+        "width": 373.6041870117187,
+        "x": 309.72918701171875,
+        "y": 334.16668701171875
+      },
+      "tag": "INPUT",
+      "value": ""
+    },
+    "controls": [
+      {
+        "active": false,
+        "label": "상금 항목 1 이름",
+        "rect": {
+          "bottom": 274.1666717529297,
+          "height": 44,
+          "right": 301.7291679382324,
+          "top": 230.1666717529297,
+          "width": 249.0625,
+          "x": 52.66666793823242,
+          "y": 230.1666717529297
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": "1위"
+      },
+      {
+        "active": false,
+        "label": "상금 항목 1 내용",
+        "rect": {
+          "bottom": 274.1666717529297,
+          "height": 44,
+          "right": 683.3333740234375,
+          "top": 230.1666717529297,
+          "width": 373.6041870117187,
+          "x": 309.72918701171875,
+          "y": 230.1666717529297
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": ""
+      },
+      {
+        "active": false,
+        "label": "상금 항목 1 삭제",
+        "rect": {
+          "bottom": 274.1666717529297,
+          "height": 44,
+          "right": 735.3333740234375,
+          "top": 230.1666717529297,
+          "width": 44,
+          "x": 691.3333740234375,
+          "y": 230.1666717529297
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "BUTTON",
+        "value": ""
+      },
+      {
+        "active": false,
+        "label": "상금 항목 2 이름",
+        "rect": {
+          "bottom": 326.16668701171875,
+          "height": 44,
+          "right": 301.7291679382324,
+          "top": 282.16668701171875,
+          "width": 249.0625,
+          "x": 52.66666793823242,
+          "y": 282.16668701171875
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": "2위"
+      },
+      {
+        "active": false,
+        "label": "상금 항목 2 내용",
+        "rect": {
+          "bottom": 326.16668701171875,
+          "height": 44,
+          "right": 683.3333740234375,
+          "top": 282.16668701171875,
+          "width": 373.6041870117187,
+          "x": 309.72918701171875,
+          "y": 282.16668701171875
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": ""
+      },
+      {
+        "active": false,
+        "label": "상금 항목 2 삭제",
+        "rect": {
+          "bottom": 326.16668701171875,
+          "height": 44,
+          "right": 735.3333740234375,
+          "top": 282.16668701171875,
+          "width": 44,
+          "x": 691.3333740234375,
+          "y": 282.16668701171875
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "BUTTON",
+        "value": ""
+      },
+      {
+        "active": false,
+        "label": "상금 항목 3 이름",
+        "rect": {
+          "bottom": 378.1666870117187,
+          "height": 44,
+          "right": 301.7291679382324,
+          "top": 334.16668701171875,
+          "width": 249.0625,
+          "x": 52.66666793823242,
+          "y": 334.16668701171875
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": "3위"
+      },
+      {
+        "active": true,
+        "label": "상금 항목 3 내용",
+        "rect": {
+          "bottom": 378.1666870117187,
+          "height": 44,
+          "right": 683.3333740234375,
+          "top": 334.16668701171875,
+          "width": 373.6041870117187,
+          "x": 309.72918701171875,
+          "y": 334.16668701171875
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": ""
+      },
+      {
+        "active": false,
+        "label": "상금 항목 3 삭제",
+        "rect": {
+          "bottom": 378.1666870117187,
+          "height": 44,
+          "right": 735.3333740234375,
+          "top": 334.16668701171875,
+          "width": 44,
+          "x": 691.3333740234375,
+          "y": 334.16668701171875
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "BUTTON",
+        "value": ""
+      }
+    ],
+    "documentWidth": 788,
+    "footer": {
+      "position": "fixed",
+      "rect": {
+        "bottom": 504.6666717529297,
+        "height": 68.66667175292969,
+        "right": 788,
+        "top": 436,
+        "width": 788,
+        "x": 0,
+        "y": 436
+      }
+    },
+    "lockedStep5": [
+      {
+        "disabled": true,
+        "label": "5단계 공개 확인 — 잠김"
+      }
+    ],
+    "scrollY": 800,
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/new",
+    "utc": "2026-10-04T05:49:54.603Z",
+    "viewport": {
+      "dpr": 1.5,
+      "height": 505,
+      "width": 788
+    },
+    "index": 22,
+    "kind": "prize-tab",
+    "widthLabel": "tablet",
+    "state": "third-content-reverse"
+  },
+  {
+    "active": {
+      "focusVisible": true,
+      "label": "상금 항목 1 이름",
+      "rect": {
+        "bottom": 400.5,
+        "height": 44,
+        "right": 605,
+        "top": 356.5,
+        "width": 304,
+        "x": 301,
+        "y": 356.5
+      },
+      "tag": "INPUT",
+      "value": "1위"
+    },
+    "controls": [
+      {
+        "active": true,
+        "label": "상금 항목 1 이름",
+        "rect": {
+          "bottom": 400.5,
+          "height": 44,
+          "right": 605,
+          "top": 356.5,
+          "width": 304,
+          "x": 301,
+          "y": 356.5
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": "1위"
+      },
+      {
+        "active": false,
+        "label": "상금 항목 1 내용",
+        "rect": {
+          "bottom": 400.5,
+          "height": 44,
+          "right": 1069,
+          "top": 356.5,
+          "width": 456,
+          "x": 613,
+          "y": 356.5
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": ""
+      },
+      {
+        "active": false,
+        "label": "상금 항목 1 삭제",
+        "rect": {
+          "bottom": 400.5,
+          "height": 44,
+          "right": 1121,
+          "top": 356.5,
+          "width": 44,
+          "x": 1077,
+          "y": 356.5
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "BUTTON",
+        "value": ""
+      },
+      {
+        "active": false,
+        "label": "상금 항목 2 이름",
+        "rect": {
+          "bottom": 452.5,
+          "height": 44,
+          "right": 605,
+          "top": 408.5,
+          "width": 304,
+          "x": 301,
+          "y": 408.5
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": "2위"
+      },
+      {
+        "active": false,
+        "label": "상금 항목 2 내용",
+        "rect": {
+          "bottom": 452.5,
+          "height": 44,
+          "right": 1069,
+          "top": 408.5,
+          "width": 456,
+          "x": 613,
+          "y": 408.5
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": ""
+      },
+      {
+        "active": false,
+        "label": "상금 항목 2 삭제",
+        "rect": {
+          "bottom": 452.5,
+          "height": 44,
+          "right": 1121,
+          "top": 408.5,
+          "width": 44,
+          "x": 1077,
+          "y": 408.5
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "BUTTON",
+        "value": ""
+      },
+      {
+        "active": false,
+        "label": "상금 항목 3 이름",
+        "rect": {
+          "bottom": 504.5,
+          "height": 44,
+          "right": 605,
+          "top": 460.5,
+          "width": 304,
+          "x": 301,
+          "y": 460.5
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": "3위"
+      },
+      {
+        "active": false,
+        "label": "상금 항목 3 내용",
+        "rect": {
+          "bottom": 504.5,
+          "height": 44,
+          "right": 1069,
+          "top": 460.5,
+          "width": 456,
+          "x": 613,
+          "y": 460.5
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": ""
+      },
+      {
+        "active": false,
+        "label": "상금 항목 3 삭제",
+        "rect": {
+          "bottom": 504.5,
+          "height": 44,
+          "right": 1121,
+          "top": 460.5,
+          "width": 44,
+          "x": 1077,
+          "y": 460.5
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "BUTTON",
+        "value": ""
+      }
+    ],
+    "documentWidth": 1182,
+    "footer": {
+      "position": "fixed",
+      "rect": {
+        "bottom": 757,
+        "height": 69,
+        "right": 1182,
+        "top": 688,
+        "width": 1182,
+        "x": 0,
+        "y": 688
+      }
+    },
+    "lockedStep5": [
+      {
+        "disabled": true,
+        "label": "5단계 공개 확인 — 잠김"
+      }
+    ],
+    "scrollY": 610,
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/new",
+    "utc": "2026-10-04T05:50:12.748Z",
+    "viewport": {
+      "dpr": 1,
+      "height": 757,
+      "width": 1182
+    },
+    "index": 23,
+    "kind": "prize-tab",
+    "widthLabel": "desktop",
+    "state": "first-name-start"
+  },
+  {
+    "active": {
+      "focusVisible": true,
+      "label": "상금 항목 1 내용",
+      "rect": {
+        "bottom": 400.5,
+        "height": 44,
+        "right": 1069,
+        "top": 356.5,
+        "width": 456,
+        "x": 613,
+        "y": 356.5
+      },
+      "tag": "INPUT",
+      "value": ""
+    },
+    "controls": [
+      {
+        "active": false,
+        "label": "상금 항목 1 이름",
+        "rect": {
+          "bottom": 400.5,
+          "height": 44,
+          "right": 605,
+          "top": 356.5,
+          "width": 304,
+          "x": 301,
+          "y": 356.5
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": "1위"
+      },
+      {
+        "active": true,
+        "label": "상금 항목 1 내용",
+        "rect": {
+          "bottom": 400.5,
+          "height": 44,
+          "right": 1069,
+          "top": 356.5,
+          "width": 456,
+          "x": 613,
+          "y": 356.5
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": ""
+      },
+      {
+        "active": false,
+        "label": "상금 항목 1 삭제",
+        "rect": {
+          "bottom": 400.5,
+          "height": 44,
+          "right": 1121,
+          "top": 356.5,
+          "width": 44,
+          "x": 1077,
+          "y": 356.5
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "BUTTON",
+        "value": ""
+      },
+      {
+        "active": false,
+        "label": "상금 항목 2 이름",
+        "rect": {
+          "bottom": 452.5,
+          "height": 44,
+          "right": 605,
+          "top": 408.5,
+          "width": 304,
+          "x": 301,
+          "y": 408.5
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": "2위"
+      },
+      {
+        "active": false,
+        "label": "상금 항목 2 내용",
+        "rect": {
+          "bottom": 452.5,
+          "height": 44,
+          "right": 1069,
+          "top": 408.5,
+          "width": 456,
+          "x": 613,
+          "y": 408.5
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": ""
+      },
+      {
+        "active": false,
+        "label": "상금 항목 2 삭제",
+        "rect": {
+          "bottom": 452.5,
+          "height": 44,
+          "right": 1121,
+          "top": 408.5,
+          "width": 44,
+          "x": 1077,
+          "y": 408.5
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "BUTTON",
+        "value": ""
+      },
+      {
+        "active": false,
+        "label": "상금 항목 3 이름",
+        "rect": {
+          "bottom": 504.5,
+          "height": 44,
+          "right": 605,
+          "top": 460.5,
+          "width": 304,
+          "x": 301,
+          "y": 460.5
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": "3위"
+      },
+      {
+        "active": false,
+        "label": "상금 항목 3 내용",
+        "rect": {
+          "bottom": 504.5,
+          "height": 44,
+          "right": 1069,
+          "top": 460.5,
+          "width": 456,
+          "x": 613,
+          "y": 460.5
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": ""
+      },
+      {
+        "active": false,
+        "label": "상금 항목 3 삭제",
+        "rect": {
+          "bottom": 504.5,
+          "height": 44,
+          "right": 1121,
+          "top": 460.5,
+          "width": 44,
+          "x": 1077,
+          "y": 460.5
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "BUTTON",
+        "value": ""
+      }
+    ],
+    "documentWidth": 1182,
+    "footer": {
+      "position": "fixed",
+      "rect": {
+        "bottom": 757,
+        "height": 69,
+        "right": 1182,
+        "top": 688,
+        "width": 1182,
+        "x": 0,
+        "y": 688
+      }
+    },
+    "lockedStep5": [
+      {
+        "disabled": true,
+        "label": "5단계 공개 확인 — 잠김"
+      }
+    ],
+    "scrollY": 610,
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/new",
+    "utc": "2026-10-04T05:50:12.880Z",
+    "viewport": {
+      "dpr": 1,
+      "height": 757,
+      "width": 1182
+    },
+    "index": 24,
+    "kind": "prize-tab",
+    "widthLabel": "desktop",
+    "state": "Tab-1"
+  },
+  {
+    "active": {
+      "focusVisible": true,
+      "label": "상금 항목 1 삭제",
+      "rect": {
+        "bottom": 400.5,
+        "height": 44,
+        "right": 1121,
+        "top": 356.5,
+        "width": 44,
+        "x": 1077,
+        "y": 356.5
+      },
+      "tag": "BUTTON",
+      "value": ""
+    },
+    "controls": [
+      {
+        "active": false,
+        "label": "상금 항목 1 이름",
+        "rect": {
+          "bottom": 400.5,
+          "height": 44,
+          "right": 605,
+          "top": 356.5,
+          "width": 304,
+          "x": 301,
+          "y": 356.5
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": "1위"
+      },
+      {
+        "active": false,
+        "label": "상금 항목 1 내용",
+        "rect": {
+          "bottom": 400.5,
+          "height": 44,
+          "right": 1069,
+          "top": 356.5,
+          "width": 456,
+          "x": 613,
+          "y": 356.5
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": ""
+      },
+      {
+        "active": true,
+        "label": "상금 항목 1 삭제",
+        "rect": {
+          "bottom": 400.5,
+          "height": 44,
+          "right": 1121,
+          "top": 356.5,
+          "width": 44,
+          "x": 1077,
+          "y": 356.5
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "BUTTON",
+        "value": ""
+      },
+      {
+        "active": false,
+        "label": "상금 항목 2 이름",
+        "rect": {
+          "bottom": 452.5,
+          "height": 44,
+          "right": 605,
+          "top": 408.5,
+          "width": 304,
+          "x": 301,
+          "y": 408.5
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": "2위"
+      },
+      {
+        "active": false,
+        "label": "상금 항목 2 내용",
+        "rect": {
+          "bottom": 452.5,
+          "height": 44,
+          "right": 1069,
+          "top": 408.5,
+          "width": 456,
+          "x": 613,
+          "y": 408.5
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": ""
+      },
+      {
+        "active": false,
+        "label": "상금 항목 2 삭제",
+        "rect": {
+          "bottom": 452.5,
+          "height": 44,
+          "right": 1121,
+          "top": 408.5,
+          "width": 44,
+          "x": 1077,
+          "y": 408.5
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "BUTTON",
+        "value": ""
+      },
+      {
+        "active": false,
+        "label": "상금 항목 3 이름",
+        "rect": {
+          "bottom": 504.5,
+          "height": 44,
+          "right": 605,
+          "top": 460.5,
+          "width": 304,
+          "x": 301,
+          "y": 460.5
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": "3위"
+      },
+      {
+        "active": false,
+        "label": "상금 항목 3 내용",
+        "rect": {
+          "bottom": 504.5,
+          "height": 44,
+          "right": 1069,
+          "top": 460.5,
+          "width": 456,
+          "x": 613,
+          "y": 460.5
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": ""
+      },
+      {
+        "active": false,
+        "label": "상금 항목 3 삭제",
+        "rect": {
+          "bottom": 504.5,
+          "height": 44,
+          "right": 1121,
+          "top": 460.5,
+          "width": 44,
+          "x": 1077,
+          "y": 460.5
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "BUTTON",
+        "value": ""
+      }
+    ],
+    "documentWidth": 1182,
+    "footer": {
+      "position": "fixed",
+      "rect": {
+        "bottom": 757,
+        "height": 69,
+        "right": 1182,
+        "top": 688,
+        "width": 1182,
+        "x": 0,
+        "y": 688
+      }
+    },
+    "lockedStep5": [
+      {
+        "disabled": true,
+        "label": "5단계 공개 확인 — 잠김"
+      }
+    ],
+    "scrollY": 610,
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/new",
+    "utc": "2026-10-04T05:50:13.048Z",
+    "viewport": {
+      "dpr": 1,
+      "height": 757,
+      "width": 1182
+    },
+    "index": 25,
+    "kind": "prize-tab",
+    "widthLabel": "desktop",
+    "state": "Tab-2"
+  },
+  {
+    "active": {
+      "focusVisible": true,
+      "label": "상금 항목 2 이름",
+      "rect": {
+        "bottom": 452.5,
+        "height": 44,
+        "right": 605,
+        "top": 408.5,
+        "width": 304,
+        "x": 301,
+        "y": 408.5
+      },
+      "tag": "INPUT",
+      "value": "2위"
+    },
+    "controls": [
+      {
+        "active": false,
+        "label": "상금 항목 1 이름",
+        "rect": {
+          "bottom": 400.5,
+          "height": 44,
+          "right": 605,
+          "top": 356.5,
+          "width": 304,
+          "x": 301,
+          "y": 356.5
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": "1위"
+      },
+      {
+        "active": false,
+        "label": "상금 항목 1 내용",
+        "rect": {
+          "bottom": 400.5,
+          "height": 44,
+          "right": 1069,
+          "top": 356.5,
+          "width": 456,
+          "x": 613,
+          "y": 356.5
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": ""
+      },
+      {
+        "active": false,
+        "label": "상금 항목 1 삭제",
+        "rect": {
+          "bottom": 400.5,
+          "height": 44,
+          "right": 1121,
+          "top": 356.5,
+          "width": 44,
+          "x": 1077,
+          "y": 356.5
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "BUTTON",
+        "value": ""
+      },
+      {
+        "active": true,
+        "label": "상금 항목 2 이름",
+        "rect": {
+          "bottom": 452.5,
+          "height": 44,
+          "right": 605,
+          "top": 408.5,
+          "width": 304,
+          "x": 301,
+          "y": 408.5
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": "2위"
+      },
+      {
+        "active": false,
+        "label": "상금 항목 2 내용",
+        "rect": {
+          "bottom": 452.5,
+          "height": 44,
+          "right": 1069,
+          "top": 408.5,
+          "width": 456,
+          "x": 613,
+          "y": 408.5
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": ""
+      },
+      {
+        "active": false,
+        "label": "상금 항목 2 삭제",
+        "rect": {
+          "bottom": 452.5,
+          "height": 44,
+          "right": 1121,
+          "top": 408.5,
+          "width": 44,
+          "x": 1077,
+          "y": 408.5
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "BUTTON",
+        "value": ""
+      },
+      {
+        "active": false,
+        "label": "상금 항목 3 이름",
+        "rect": {
+          "bottom": 504.5,
+          "height": 44,
+          "right": 605,
+          "top": 460.5,
+          "width": 304,
+          "x": 301,
+          "y": 460.5
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": "3위"
+      },
+      {
+        "active": false,
+        "label": "상금 항목 3 내용",
+        "rect": {
+          "bottom": 504.5,
+          "height": 44,
+          "right": 1069,
+          "top": 460.5,
+          "width": 456,
+          "x": 613,
+          "y": 460.5
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": ""
+      },
+      {
+        "active": false,
+        "label": "상금 항목 3 삭제",
+        "rect": {
+          "bottom": 504.5,
+          "height": 44,
+          "right": 1121,
+          "top": 460.5,
+          "width": 44,
+          "x": 1077,
+          "y": 460.5
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "BUTTON",
+        "value": ""
+      }
+    ],
+    "documentWidth": 1182,
+    "footer": {
+      "position": "fixed",
+      "rect": {
+        "bottom": 757,
+        "height": 69,
+        "right": 1182,
+        "top": 688,
+        "width": 1182,
+        "x": 0,
+        "y": 688
+      }
+    },
+    "lockedStep5": [
+      {
+        "disabled": true,
+        "label": "5단계 공개 확인 — 잠김"
+      }
+    ],
+    "scrollY": 610,
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/new",
+    "utc": "2026-10-04T05:50:13.216Z",
+    "viewport": {
+      "dpr": 1,
+      "height": 757,
+      "width": 1182
+    },
+    "index": 26,
+    "kind": "prize-tab",
+    "widthLabel": "desktop",
+    "state": "Tab-3"
+  },
+  {
+    "active": {
+      "focusVisible": true,
+      "label": "상금 항목 2 내용",
+      "rect": {
+        "bottom": 452.5,
+        "height": 44,
+        "right": 1069,
+        "top": 408.5,
+        "width": 456,
+        "x": 613,
+        "y": 408.5
+      },
+      "tag": "INPUT",
+      "value": ""
+    },
+    "controls": [
+      {
+        "active": false,
+        "label": "상금 항목 1 이름",
+        "rect": {
+          "bottom": 400.5,
+          "height": 44,
+          "right": 605,
+          "top": 356.5,
+          "width": 304,
+          "x": 301,
+          "y": 356.5
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": "1위"
+      },
+      {
+        "active": false,
+        "label": "상금 항목 1 내용",
+        "rect": {
+          "bottom": 400.5,
+          "height": 44,
+          "right": 1069,
+          "top": 356.5,
+          "width": 456,
+          "x": 613,
+          "y": 356.5
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": ""
+      },
+      {
+        "active": false,
+        "label": "상금 항목 1 삭제",
+        "rect": {
+          "bottom": 400.5,
+          "height": 44,
+          "right": 1121,
+          "top": 356.5,
+          "width": 44,
+          "x": 1077,
+          "y": 356.5
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "BUTTON",
+        "value": ""
+      },
+      {
+        "active": false,
+        "label": "상금 항목 2 이름",
+        "rect": {
+          "bottom": 452.5,
+          "height": 44,
+          "right": 605,
+          "top": 408.5,
+          "width": 304,
+          "x": 301,
+          "y": 408.5
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": "2위"
+      },
+      {
+        "active": true,
+        "label": "상금 항목 2 내용",
+        "rect": {
+          "bottom": 452.5,
+          "height": 44,
+          "right": 1069,
+          "top": 408.5,
+          "width": 456,
+          "x": 613,
+          "y": 408.5
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": ""
+      },
+      {
+        "active": false,
+        "label": "상금 항목 2 삭제",
+        "rect": {
+          "bottom": 452.5,
+          "height": 44,
+          "right": 1121,
+          "top": 408.5,
+          "width": 44,
+          "x": 1077,
+          "y": 408.5
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "BUTTON",
+        "value": ""
+      },
+      {
+        "active": false,
+        "label": "상금 항목 3 이름",
+        "rect": {
+          "bottom": 504.5,
+          "height": 44,
+          "right": 605,
+          "top": 460.5,
+          "width": 304,
+          "x": 301,
+          "y": 460.5
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": "3위"
+      },
+      {
+        "active": false,
+        "label": "상금 항목 3 내용",
+        "rect": {
+          "bottom": 504.5,
+          "height": 44,
+          "right": 1069,
+          "top": 460.5,
+          "width": 456,
+          "x": 613,
+          "y": 460.5
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": ""
+      },
+      {
+        "active": false,
+        "label": "상금 항목 3 삭제",
+        "rect": {
+          "bottom": 504.5,
+          "height": 44,
+          "right": 1121,
+          "top": 460.5,
+          "width": 44,
+          "x": 1077,
+          "y": 460.5
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "BUTTON",
+        "value": ""
+      }
+    ],
+    "documentWidth": 1182,
+    "footer": {
+      "position": "fixed",
+      "rect": {
+        "bottom": 757,
+        "height": 69,
+        "right": 1182,
+        "top": 688,
+        "width": 1182,
+        "x": 0,
+        "y": 688
+      }
+    },
+    "lockedStep5": [
+      {
+        "disabled": true,
+        "label": "5단계 공개 확인 — 잠김"
+      }
+    ],
+    "scrollY": 610,
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/new",
+    "utc": "2026-10-04T05:50:13.381Z",
+    "viewport": {
+      "dpr": 1,
+      "height": 757,
+      "width": 1182
+    },
+    "index": 27,
+    "kind": "prize-tab",
+    "widthLabel": "desktop",
+    "state": "Tab-4"
+  },
+  {
+    "active": {
+      "focusVisible": true,
+      "label": "상금 항목 2 삭제",
+      "rect": {
+        "bottom": 452.5,
+        "height": 44,
+        "right": 1121,
+        "top": 408.5,
+        "width": 44,
+        "x": 1077,
+        "y": 408.5
+      },
+      "tag": "BUTTON",
+      "value": ""
+    },
+    "controls": [
+      {
+        "active": false,
+        "label": "상금 항목 1 이름",
+        "rect": {
+          "bottom": 400.5,
+          "height": 44,
+          "right": 605,
+          "top": 356.5,
+          "width": 304,
+          "x": 301,
+          "y": 356.5
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": "1위"
+      },
+      {
+        "active": false,
+        "label": "상금 항목 1 내용",
+        "rect": {
+          "bottom": 400.5,
+          "height": 44,
+          "right": 1069,
+          "top": 356.5,
+          "width": 456,
+          "x": 613,
+          "y": 356.5
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": ""
+      },
+      {
+        "active": false,
+        "label": "상금 항목 1 삭제",
+        "rect": {
+          "bottom": 400.5,
+          "height": 44,
+          "right": 1121,
+          "top": 356.5,
+          "width": 44,
+          "x": 1077,
+          "y": 356.5
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "BUTTON",
+        "value": ""
+      },
+      {
+        "active": false,
+        "label": "상금 항목 2 이름",
+        "rect": {
+          "bottom": 452.5,
+          "height": 44,
+          "right": 605,
+          "top": 408.5,
+          "width": 304,
+          "x": 301,
+          "y": 408.5
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": "2위"
+      },
+      {
+        "active": false,
+        "label": "상금 항목 2 내용",
+        "rect": {
+          "bottom": 452.5,
+          "height": 44,
+          "right": 1069,
+          "top": 408.5,
+          "width": 456,
+          "x": 613,
+          "y": 408.5
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": ""
+      },
+      {
+        "active": true,
+        "label": "상금 항목 2 삭제",
+        "rect": {
+          "bottom": 452.5,
+          "height": 44,
+          "right": 1121,
+          "top": 408.5,
+          "width": 44,
+          "x": 1077,
+          "y": 408.5
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "BUTTON",
+        "value": ""
+      },
+      {
+        "active": false,
+        "label": "상금 항목 3 이름",
+        "rect": {
+          "bottom": 504.5,
+          "height": 44,
+          "right": 605,
+          "top": 460.5,
+          "width": 304,
+          "x": 301,
+          "y": 460.5
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": "3위"
+      },
+      {
+        "active": false,
+        "label": "상금 항목 3 내용",
+        "rect": {
+          "bottom": 504.5,
+          "height": 44,
+          "right": 1069,
+          "top": 460.5,
+          "width": 456,
+          "x": 613,
+          "y": 460.5
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": ""
+      },
+      {
+        "active": false,
+        "label": "상금 항목 3 삭제",
+        "rect": {
+          "bottom": 504.5,
+          "height": 44,
+          "right": 1121,
+          "top": 460.5,
+          "width": 44,
+          "x": 1077,
+          "y": 460.5
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "BUTTON",
+        "value": ""
+      }
+    ],
+    "documentWidth": 1182,
+    "footer": {
+      "position": "fixed",
+      "rect": {
+        "bottom": 757,
+        "height": 69,
+        "right": 1182,
+        "top": 688,
+        "width": 1182,
+        "x": 0,
+        "y": 688
+      }
+    },
+    "lockedStep5": [
+      {
+        "disabled": true,
+        "label": "5단계 공개 확인 — 잠김"
+      }
+    ],
+    "scrollY": 610,
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/new",
+    "utc": "2026-10-04T05:50:13.552Z",
+    "viewport": {
+      "dpr": 1,
+      "height": 757,
+      "width": 1182
+    },
+    "index": 28,
+    "kind": "prize-tab",
+    "widthLabel": "desktop",
+    "state": "Tab-5"
+  },
+  {
+    "active": {
+      "focusVisible": true,
+      "label": "상금 항목 3 이름",
+      "rect": {
+        "bottom": 504.5,
+        "height": 44,
+        "right": 605,
+        "top": 460.5,
+        "width": 304,
+        "x": 301,
+        "y": 460.5
+      },
+      "tag": "INPUT",
+      "value": "3위"
+    },
+    "controls": [
+      {
+        "active": false,
+        "label": "상금 항목 1 이름",
+        "rect": {
+          "bottom": 400.5,
+          "height": 44,
+          "right": 605,
+          "top": 356.5,
+          "width": 304,
+          "x": 301,
+          "y": 356.5
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": "1위"
+      },
+      {
+        "active": false,
+        "label": "상금 항목 1 내용",
+        "rect": {
+          "bottom": 400.5,
+          "height": 44,
+          "right": 1069,
+          "top": 356.5,
+          "width": 456,
+          "x": 613,
+          "y": 356.5
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": ""
+      },
+      {
+        "active": false,
+        "label": "상금 항목 1 삭제",
+        "rect": {
+          "bottom": 400.5,
+          "height": 44,
+          "right": 1121,
+          "top": 356.5,
+          "width": 44,
+          "x": 1077,
+          "y": 356.5
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "BUTTON",
+        "value": ""
+      },
+      {
+        "active": false,
+        "label": "상금 항목 2 이름",
+        "rect": {
+          "bottom": 452.5,
+          "height": 44,
+          "right": 605,
+          "top": 408.5,
+          "width": 304,
+          "x": 301,
+          "y": 408.5
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": "2위"
+      },
+      {
+        "active": false,
+        "label": "상금 항목 2 내용",
+        "rect": {
+          "bottom": 452.5,
+          "height": 44,
+          "right": 1069,
+          "top": 408.5,
+          "width": 456,
+          "x": 613,
+          "y": 408.5
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": ""
+      },
+      {
+        "active": false,
+        "label": "상금 항목 2 삭제",
+        "rect": {
+          "bottom": 452.5,
+          "height": 44,
+          "right": 1121,
+          "top": 408.5,
+          "width": 44,
+          "x": 1077,
+          "y": 408.5
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "BUTTON",
+        "value": ""
+      },
+      {
+        "active": true,
+        "label": "상금 항목 3 이름",
+        "rect": {
+          "bottom": 504.5,
+          "height": 44,
+          "right": 605,
+          "top": 460.5,
+          "width": 304,
+          "x": 301,
+          "y": 460.5
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": "3위"
+      },
+      {
+        "active": false,
+        "label": "상금 항목 3 내용",
+        "rect": {
+          "bottom": 504.5,
+          "height": 44,
+          "right": 1069,
+          "top": 460.5,
+          "width": 456,
+          "x": 613,
+          "y": 460.5
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": ""
+      },
+      {
+        "active": false,
+        "label": "상금 항목 3 삭제",
+        "rect": {
+          "bottom": 504.5,
+          "height": 44,
+          "right": 1121,
+          "top": 460.5,
+          "width": 44,
+          "x": 1077,
+          "y": 460.5
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "BUTTON",
+        "value": ""
+      }
+    ],
+    "documentWidth": 1182,
+    "footer": {
+      "position": "fixed",
+      "rect": {
+        "bottom": 757,
+        "height": 69,
+        "right": 1182,
+        "top": 688,
+        "width": 1182,
+        "x": 0,
+        "y": 688
+      }
+    },
+    "lockedStep5": [
+      {
+        "disabled": true,
+        "label": "5단계 공개 확인 — 잠김"
+      }
+    ],
+    "scrollY": 610,
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/new",
+    "utc": "2026-10-04T05:50:13.722Z",
+    "viewport": {
+      "dpr": 1,
+      "height": 757,
+      "width": 1182
+    },
+    "index": 29,
+    "kind": "prize-tab",
+    "widthLabel": "desktop",
+    "state": "Tab-6"
+  },
+  {
+    "active": {
+      "focusVisible": true,
+      "label": "상금 항목 3 내용",
+      "rect": {
+        "bottom": 504.5,
+        "height": 44,
+        "right": 1069,
+        "top": 460.5,
+        "width": 456,
+        "x": 613,
+        "y": 460.5
+      },
+      "tag": "INPUT",
+      "value": ""
+    },
+    "controls": [
+      {
+        "active": false,
+        "label": "상금 항목 1 이름",
+        "rect": {
+          "bottom": 400.5,
+          "height": 44,
+          "right": 605,
+          "top": 356.5,
+          "width": 304,
+          "x": 301,
+          "y": 356.5
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": "1위"
+      },
+      {
+        "active": false,
+        "label": "상금 항목 1 내용",
+        "rect": {
+          "bottom": 400.5,
+          "height": 44,
+          "right": 1069,
+          "top": 356.5,
+          "width": 456,
+          "x": 613,
+          "y": 356.5
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": ""
+      },
+      {
+        "active": false,
+        "label": "상금 항목 1 삭제",
+        "rect": {
+          "bottom": 400.5,
+          "height": 44,
+          "right": 1121,
+          "top": 356.5,
+          "width": 44,
+          "x": 1077,
+          "y": 356.5
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "BUTTON",
+        "value": ""
+      },
+      {
+        "active": false,
+        "label": "상금 항목 2 이름",
+        "rect": {
+          "bottom": 452.5,
+          "height": 44,
+          "right": 605,
+          "top": 408.5,
+          "width": 304,
+          "x": 301,
+          "y": 408.5
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": "2위"
+      },
+      {
+        "active": false,
+        "label": "상금 항목 2 내용",
+        "rect": {
+          "bottom": 452.5,
+          "height": 44,
+          "right": 1069,
+          "top": 408.5,
+          "width": 456,
+          "x": 613,
+          "y": 408.5
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": ""
+      },
+      {
+        "active": false,
+        "label": "상금 항목 2 삭제",
+        "rect": {
+          "bottom": 452.5,
+          "height": 44,
+          "right": 1121,
+          "top": 408.5,
+          "width": 44,
+          "x": 1077,
+          "y": 408.5
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "BUTTON",
+        "value": ""
+      },
+      {
+        "active": false,
+        "label": "상금 항목 3 이름",
+        "rect": {
+          "bottom": 504.5,
+          "height": 44,
+          "right": 605,
+          "top": 460.5,
+          "width": 304,
+          "x": 301,
+          "y": 460.5
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": "3위"
+      },
+      {
+        "active": true,
+        "label": "상금 항목 3 내용",
+        "rect": {
+          "bottom": 504.5,
+          "height": 44,
+          "right": 1069,
+          "top": 460.5,
+          "width": 456,
+          "x": 613,
+          "y": 460.5
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": ""
+      },
+      {
+        "active": false,
+        "label": "상금 항목 3 삭제",
+        "rect": {
+          "bottom": 504.5,
+          "height": 44,
+          "right": 1121,
+          "top": 460.5,
+          "width": 44,
+          "x": 1077,
+          "y": 460.5
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "BUTTON",
+        "value": ""
+      }
+    ],
+    "documentWidth": 1182,
+    "footer": {
+      "position": "fixed",
+      "rect": {
+        "bottom": 757,
+        "height": 69,
+        "right": 1182,
+        "top": 688,
+        "width": 1182,
+        "x": 0,
+        "y": 688
+      }
+    },
+    "lockedStep5": [
+      {
+        "disabled": true,
+        "label": "5단계 공개 확인 — 잠김"
+      }
+    ],
+    "scrollY": 610,
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/new",
+    "utc": "2026-10-04T05:50:13.900Z",
+    "viewport": {
+      "dpr": 1,
+      "height": 757,
+      "width": 1182
+    },
+    "index": 30,
+    "kind": "prize-tab",
+    "widthLabel": "desktop",
+    "state": "Tab-7"
+  },
+  {
+    "active": {
+      "focusVisible": true,
+      "label": "상금 항목 3 삭제",
+      "rect": {
+        "bottom": 504.5,
+        "height": 44,
+        "right": 1121,
+        "top": 460.5,
+        "width": 44,
+        "x": 1077,
+        "y": 460.5
+      },
+      "tag": "BUTTON",
+      "value": ""
+    },
+    "controls": [
+      {
+        "active": false,
+        "label": "상금 항목 1 이름",
+        "rect": {
+          "bottom": 400.5,
+          "height": 44,
+          "right": 605,
+          "top": 356.5,
+          "width": 304,
+          "x": 301,
+          "y": 356.5
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": "1위"
+      },
+      {
+        "active": false,
+        "label": "상금 항목 1 내용",
+        "rect": {
+          "bottom": 400.5,
+          "height": 44,
+          "right": 1069,
+          "top": 356.5,
+          "width": 456,
+          "x": 613,
+          "y": 356.5
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": ""
+      },
+      {
+        "active": false,
+        "label": "상금 항목 1 삭제",
+        "rect": {
+          "bottom": 400.5,
+          "height": 44,
+          "right": 1121,
+          "top": 356.5,
+          "width": 44,
+          "x": 1077,
+          "y": 356.5
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "BUTTON",
+        "value": ""
+      },
+      {
+        "active": false,
+        "label": "상금 항목 2 이름",
+        "rect": {
+          "bottom": 452.5,
+          "height": 44,
+          "right": 605,
+          "top": 408.5,
+          "width": 304,
+          "x": 301,
+          "y": 408.5
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": "2위"
+      },
+      {
+        "active": false,
+        "label": "상금 항목 2 내용",
+        "rect": {
+          "bottom": 452.5,
+          "height": 44,
+          "right": 1069,
+          "top": 408.5,
+          "width": 456,
+          "x": 613,
+          "y": 408.5
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": ""
+      },
+      {
+        "active": false,
+        "label": "상금 항목 2 삭제",
+        "rect": {
+          "bottom": 452.5,
+          "height": 44,
+          "right": 1121,
+          "top": 408.5,
+          "width": 44,
+          "x": 1077,
+          "y": 408.5
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "BUTTON",
+        "value": ""
+      },
+      {
+        "active": false,
+        "label": "상금 항목 3 이름",
+        "rect": {
+          "bottom": 504.5,
+          "height": 44,
+          "right": 605,
+          "top": 460.5,
+          "width": 304,
+          "x": 301,
+          "y": 460.5
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": "3위"
+      },
+      {
+        "active": false,
+        "label": "상금 항목 3 내용",
+        "rect": {
+          "bottom": 504.5,
+          "height": 44,
+          "right": 1069,
+          "top": 460.5,
+          "width": 456,
+          "x": 613,
+          "y": 460.5
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": ""
+      },
+      {
+        "active": true,
+        "label": "상금 항목 3 삭제",
+        "rect": {
+          "bottom": 504.5,
+          "height": 44,
+          "right": 1121,
+          "top": 460.5,
+          "width": 44,
+          "x": 1077,
+          "y": 460.5
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "BUTTON",
+        "value": ""
+      }
+    ],
+    "documentWidth": 1182,
+    "footer": {
+      "position": "fixed",
+      "rect": {
+        "bottom": 757,
+        "height": 69,
+        "right": 1182,
+        "top": 688,
+        "width": 1182,
+        "x": 0,
+        "y": 688
+      }
+    },
+    "lockedStep5": [
+      {
+        "disabled": true,
+        "label": "5단계 공개 확인 — 잠김"
+      }
+    ],
+    "scrollY": 610,
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/new",
+    "utc": "2026-10-04T05:50:14.088Z",
+    "viewport": {
+      "dpr": 1,
+      "height": 757,
+      "width": 1182
+    },
+    "index": 31,
+    "kind": "prize-tab",
+    "widthLabel": "desktop",
+    "state": "third-delete"
+  },
+  {
+    "active": {
+      "focusVisible": true,
+      "label": "상금 항목 3 내용",
+      "rect": {
+        "bottom": 504.5,
+        "height": 44,
+        "right": 1069,
+        "top": 460.5,
+        "width": 456,
+        "x": 613,
+        "y": 460.5
+      },
+      "tag": "INPUT",
+      "value": ""
+    },
+    "controls": [
+      {
+        "active": false,
+        "label": "상금 항목 1 이름",
+        "rect": {
+          "bottom": 400.5,
+          "height": 44,
+          "right": 605,
+          "top": 356.5,
+          "width": 304,
+          "x": 301,
+          "y": 356.5
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": "1위"
+      },
+      {
+        "active": false,
+        "label": "상금 항목 1 내용",
+        "rect": {
+          "bottom": 400.5,
+          "height": 44,
+          "right": 1069,
+          "top": 356.5,
+          "width": 456,
+          "x": 613,
+          "y": 356.5
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": ""
+      },
+      {
+        "active": false,
+        "label": "상금 항목 1 삭제",
+        "rect": {
+          "bottom": 400.5,
+          "height": 44,
+          "right": 1121,
+          "top": 356.5,
+          "width": 44,
+          "x": 1077,
+          "y": 356.5
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "BUTTON",
+        "value": ""
+      },
+      {
+        "active": false,
+        "label": "상금 항목 2 이름",
+        "rect": {
+          "bottom": 452.5,
+          "height": 44,
+          "right": 605,
+          "top": 408.5,
+          "width": 304,
+          "x": 301,
+          "y": 408.5
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": "2위"
+      },
+      {
+        "active": false,
+        "label": "상금 항목 2 내용",
+        "rect": {
+          "bottom": 452.5,
+          "height": 44,
+          "right": 1069,
+          "top": 408.5,
+          "width": 456,
+          "x": 613,
+          "y": 408.5
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": ""
+      },
+      {
+        "active": false,
+        "label": "상금 항목 2 삭제",
+        "rect": {
+          "bottom": 452.5,
+          "height": 44,
+          "right": 1121,
+          "top": 408.5,
+          "width": 44,
+          "x": 1077,
+          "y": 408.5
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "BUTTON",
+        "value": ""
+      },
+      {
+        "active": false,
+        "label": "상금 항목 3 이름",
+        "rect": {
+          "bottom": 504.5,
+          "height": 44,
+          "right": 605,
+          "top": 460.5,
+          "width": 304,
+          "x": 301,
+          "y": 460.5
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": "3위"
+      },
+      {
+        "active": true,
+        "label": "상금 항목 3 내용",
+        "rect": {
+          "bottom": 504.5,
+          "height": 44,
+          "right": 1069,
+          "top": 460.5,
+          "width": 456,
+          "x": 613,
+          "y": 460.5
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "INPUT",
+        "value": ""
+      },
+      {
+        "active": false,
+        "label": "상금 항목 3 삭제",
+        "rect": {
+          "bottom": 504.5,
+          "height": 44,
+          "right": 1121,
+          "top": 460.5,
+          "width": 44,
+          "x": 1077,
+          "y": 460.5
+        },
+        "scrollMarginBottom": "0px",
+        "tag": "BUTTON",
+        "value": ""
+      }
+    ],
+    "documentWidth": 1182,
+    "footer": {
+      "position": "fixed",
+      "rect": {
+        "bottom": 757,
+        "height": 69,
+        "right": 1182,
+        "top": 688,
+        "width": 1182,
+        "x": 0,
+        "y": 688
+      }
+    },
+    "lockedStep5": [
+      {
+        "disabled": true,
+        "label": "5단계 공개 확인 — 잠김"
+      }
+    ],
+    "scrollY": 610,
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/new",
+    "utc": "2026-10-04T05:50:14.317Z",
+    "viewport": {
+      "dpr": 1,
+      "height": 757,
+      "width": 1182
+    },
+    "index": 32,
+    "kind": "prize-tab",
+    "widthLabel": "desktop",
+    "state": "third-content-reverse"
+  }
+]

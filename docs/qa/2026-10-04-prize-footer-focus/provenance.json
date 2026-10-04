@@ -1,0 +1,163 @@
+{
+  "captureMetadataSHA256": "185b5b1b370141ea38f34509b86df1c2ed88521c88d2bf53bf3c8b5bad0bd39c",
+  "crops": [
+    {
+      "name": "mobile-third-content-tab",
+      "proofIndex": 7,
+      "startUTC": "2026-10-04T05:47:30.354Z",
+      "endUTC": "2026-10-04T05:47:30.372Z",
+      "sourceFile": "mobile-third-content-tab.png",
+      "sourceSHA256": "7a1ff99cd82ed1b4e1cf21ff039545316cbd415b2a771ca1d50bee1b07601393",
+      "outputFile": "mobile-third-content-tab.png",
+      "outputSHA256": "9750a00b4a8d4999af21340795f00d292be7d45fea6078e9c5a35623af8d88a5",
+      "bounds": [
+        0,
+        0,
+        402,
+        605
+      ],
+      "sourceSize": [
+        402,
+        605
+      ],
+      "outputSize": [
+        402,
+        605
+      ],
+      "sourceHashVerified": true,
+      "collectorPixelEquality": true,
+      "proofUTC": "2026-10-04T05:47:30.351Z"
+    },
+    {
+      "name": "mobile-third-content-manual-scroll-settled",
+      "proofIndex": 12,
+      "startUTC": "2026-10-04T05:49:16.734Z",
+      "endUTC": "2026-10-04T05:49:16.752Z",
+      "sourceFile": "mobile-third-content-manual-scroll-settled.png",
+      "sourceSHA256": "9178571da96dfed2fbb2ef4b61eb819b0a7885d6fd05ceab08f6ab89743d446b",
+      "outputFile": "mobile-third-content-manual-scroll-settled.png",
+      "outputSHA256": "c55eaa09e121820c9b987c55fff6e1e45bd45cf54490a5bc9c0b025dc8b55551",
+      "bounds": [
+        0,
+        0,
+        402,
+        605
+      ],
+      "sourceSize": [
+        402,
+        605
+      ],
+      "outputSize": [
+        402,
+        605
+      ],
+      "sourceHashVerified": true,
+      "collectorPixelEquality": true,
+      "proofUTC": "2026-10-04T05:49:16.729Z"
+    },
+    {
+      "name": "tablet-third-content-tab",
+      "proofIndex": 20,
+      "startUTC": "2026-10-04T05:49:54.186Z",
+      "endUTC": "2026-10-04T05:49:54.228Z",
+      "sourceFile": "tablet-third-content-tab.png",
+      "sourceSHA256": "9c976c76d81153ed2c7b6d6995eed1092d6f9d390ebce19db95cd9c2b11fcc84",
+      "outputFile": "tablet-third-content-tab.png",
+      "outputSHA256": "e760d57ea8e976403d41f37bec0321889ce94581e778fd2456ba09da99ab06db",
+      "bounds": [
+        0,
+        175,
+        788,
+        504
+      ],
+      "sourceSize": [
+        788,
+        505
+      ],
+      "outputSize": [
+        788,
+        329
+      ],
+      "sourceHashVerified": true,
+      "collectorPixelEquality": true,
+      "proofUTC": "2026-10-04T05:49:54.182Z"
+    },
+    {
+      "name": "desktop-third-content-tab",
+      "proofIndex": 30,
+      "startUTC": "2026-10-04T05:50:13.906Z",
+      "endUTC": "2026-10-04T05:50:13.945Z",
+      "sourceFile": "desktop-third-content-tab.png",
+      "sourceSHA256": "69adbfd274eb6130e469c4081e6c2be99a59603fc4cc3ff80a14d09ceccf1766",
+      "outputFile": "desktop-third-content-tab.png",
+      "outputSHA256": "e5378ccc544b5641a2ff1c16c25039d6ccd968c5a964c51c14c2344a047923a9",
+      "bounds": [
+        260,
+        300,
+        1160,
+        757
+      ],
+      "sourceSize": [
+        1182,
+        757
+      ],
+      "outputSize": [
+        900,
+        457
+      ],
+      "sourceHashVerified": true,
+      "collectorPixelEquality": true,
+      "proofUTC": "2026-10-04T05:50:13.900Z"
+    }
+  ],
+  "safeJSONHashes": {
+    "actions.json": "1b845a666e12a9244aee3a93c67f68b1a265192ce2f93d476804a8df6c97e354",
+    "entry.json": "f02d6e71fb339100699157c53b7cc646e3ac869c6590df99be4025172b904823",
+    "initial.json": "d3c72e039d43e23d55de78964722324c5718382b0d5dc8b58db900b107745dcf",
+    "navigation.json": "15fc5b0a932eb817eff5289d66cf8bfe3483a00d3ebde1d34e84395157dec9bd",
+    "proof.json": "199c548f5fa303a88b147a3384ff4a94424ae92f531177cb6c17deacf5371e1d",
+    "summary.json": "3d422c8879b875c3ab554c35b9c5cf139aefbca65f00cb6ca30a2963455762e8"
+  },
+  "privacy": "Crops show default prize values and generic form controls only; no roster/account identity. Source images not published.",
+  "excludedCapture": "mobile-third-content-manual-scroll.png is an in-progress scroll frame; use separately timed settled image instead.",
+  "sourceInputFiles": [
+    {
+      "file": "actions.json",
+      "bytes": 6442,
+      "sha256": "1b845a666e12a9244aee3a93c67f68b1a265192ce2f93d476804a8df6c97e354"
+    },
+    {
+      "file": "entry.json",
+      "bytes": 358,
+      "sha256": "f02d6e71fb339100699157c53b7cc646e3ac869c6590df99be4025172b904823"
+    },
+    {
+      "file": "initial.json",
+      "bytes": 404,
+      "sha256": "d3c72e039d43e23d55de78964722324c5718382b0d5dc8b58db900b107745dcf"
+    },
+    {
+      "file": "navigation.json",
+      "bytes": 443,
+      "sha256": "15fc5b0a932eb817eff5289d66cf8bfe3483a00d3ebde1d34e84395157dec9bd"
+    },
+    {
+      "file": "proof.json",
+      "bytes": 158874,
+      "sha256": "199c548f5fa303a88b147a3384ff4a94424ae92f531177cb6c17deacf5371e1d"
+    },
+    {
+      "file": "summary.json",
+      "bytes": 8198,
+      "sha256": "3d422c8879b875c3ab554c35b9c5cf139aefbca65f00cb6ca30a2963455762e8"
+    },
+    {
+      "file": "provenance.json",
+      "bytes": 4031,
+      "sha256": "bb1f914dbb55113c95eb2423b730ef11752769f46e319d5cef14859d226660aa"
+    }
+  ],
+  "publicationProjection": "Original safe source inputs unchanged. Entry/summary use independently retrieved historical workflow context and scope clarifications. Proof/actions/initial/navigation and four PNG bytes preserved. safeJSONHashes are source snapshots; manifest.json covers projected public bytes.",
+  "publisherReview": "All four safe PNGs viewed. Output hashes, dimensions, bounds, capture/proof chronology, all33DOM focus/value records and rectangle intersections independently checked. Private source screenshots not opened or published; source-to-crop equality remains collector-attested.",
+  "captureMetadataScopeNote": "The original capture-metadata file was not read here; its digest remains collector provenance rather than independent capture-time verification."
+}

@@ -1,0 +1,293 @@
+{
+  "relatedIssue": 1439,
+  "finding": "Mobile third-prize content receives real keyboard focus but remains fully covered by fixed creation footer",
+  "runtimeServingSHA": "unknown",
+  "deploymentContext": {
+    "reference": "deployment-context.json",
+    "runtimeServingSHA": "unknown",
+    "scope": "Historical workflow context, not latest deployment or serving identity"
+  },
+  "freshNavigationUTC": "2026-10-04T05:45:45.156Z",
+  "observedStartUTC": "2026-10-04T05:47:29.210Z",
+  "observedEndUTC": "2026-10-04T05:50:14.317Z",
+  "reproduction": [
+    "Open /admin/tournaments/new and enter minimal synthetic title/sport/date locally, then step4.",
+    "At402×606 CSS viewport, click first prize name. Native Tab7 times reaches third prize content.",
+    "The focused input remains y539.26–583.26 behind fixed footer y536.80–605.60; scrollY stays947.20.",
+    "Tab to third delete and Shift+Tab back retains hidden content focus. Manual scrolling reveals the field."
+  ],
+  "keyRecords": [
+    {
+      "proofIndex": 7,
+      "utc": "2026-10-04T05:47:30.351Z",
+      "viewport": {
+        "dpr": 1.25,
+        "height": 606,
+        "width": 402
+      },
+      "label": "상금 항목 3 내용",
+      "focusVisible": true,
+      "scrollY": 947.2000122070312,
+      "activeRect": {
+        "bottom": 583.2625122070312,
+        "height": 44,
+        "right": 365.6000175476074,
+        "top": 539.2625122070312,
+        "width": 328.8000183105469,
+        "x": 36.79999923706055,
+        "y": 539.2625122070312
+      },
+      "footerRect": {
+        "bottom": 605.5999908447266,
+        "height": 68.80000305175781,
+        "right": 402.3999938964844,
+        "top": 536.7999877929688,
+        "width": 402.3999938964844,
+        "x": 0,
+        "y": 536.7999877929688
+      },
+      "overlapHeight": 44.0,
+      "clearanceAboveFooter": -46.4625244140625
+    },
+    {
+      "proofIndex": 8,
+      "utc": "2026-10-04T05:48:55.452Z",
+      "viewport": {
+        "dpr": 1.25,
+        "height": 606,
+        "width": 402
+      },
+      "label": "상금 항목 3 내용",
+      "focusVisible": true,
+      "scrollY": 947.2000122070312,
+      "activeRect": {
+        "bottom": 583.2625122070312,
+        "height": 44,
+        "right": 365.6000175476074,
+        "top": 539.2625122070312,
+        "width": 328.8000183105469,
+        "x": 36.79999923706055,
+        "y": 539.2625122070312
+      },
+      "footerRect": {
+        "bottom": 605.5999908447266,
+        "height": 68.80000305175781,
+        "right": 402.3999938964844,
+        "top": 536.7999877929688,
+        "width": 402.3999938964844,
+        "x": 0,
+        "y": 536.7999877929688
+      },
+      "overlapHeight": 44.0,
+      "clearanceAboveFooter": -46.4625244140625
+    },
+    {
+      "proofIndex": 10,
+      "utc": "2026-10-04T05:48:55.813Z",
+      "viewport": {
+        "dpr": 1.25,
+        "height": 606,
+        "width": 402
+      },
+      "label": "상금 항목 3 내용",
+      "focusVisible": true,
+      "scrollY": 947.2000122070312,
+      "activeRect": {
+        "bottom": 583.2625122070312,
+        "height": 44,
+        "right": 365.6000175476074,
+        "top": 539.2625122070312,
+        "width": 328.8000183105469,
+        "x": 36.79999923706055,
+        "y": 539.2625122070312
+      },
+      "footerRect": {
+        "bottom": 605.5999908447266,
+        "height": 68.80000305175781,
+        "right": 402.3999938964844,
+        "top": 536.7999877929688,
+        "width": 402.3999938964844,
+        "x": 0,
+        "y": 536.7999877929688
+      },
+      "overlapHeight": 44.0,
+      "clearanceAboveFooter": -46.4625244140625
+    },
+    {
+      "proofIndex": 12,
+      "utc": "2026-10-04T05:49:16.729Z",
+      "viewport": {
+        "dpr": 1.25,
+        "height": 606,
+        "width": 402
+      },
+      "label": "상금 항목 3 내용",
+      "focusVisible": true,
+      "scrollY": 1139.199951171875,
+      "activeRect": {
+        "bottom": 391.2625122070313,
+        "height": 44,
+        "right": 365.6000175476074,
+        "top": 347.26251220703125,
+        "width": 328.8000183105469,
+        "x": 36.79999923706055,
+        "y": 347.26251220703125
+      },
+      "footerRect": {
+        "bottom": 605.5999908447266,
+        "height": 68.80000305175781,
+        "right": 402.3999938964844,
+        "top": 536.7999877929688,
+        "width": 402.3999938964844,
+        "x": 0,
+        "y": 536.7999877929688
+      },
+      "overlapHeight": 0,
+      "clearanceAboveFooter": 145.53747558593744
+    },
+    {
+      "proofIndex": 20,
+      "utc": "2026-10-04T05:49:54.182Z",
+      "viewport": {
+        "dpr": 1.5,
+        "height": 505,
+        "width": 788
+      },
+      "label": "상금 항목 3 내용",
+      "focusVisible": true,
+      "scrollY": 800,
+      "activeRect": {
+        "bottom": 378.1666870117187,
+        "height": 44,
+        "right": 683.3333740234375,
+        "top": 334.16668701171875,
+        "width": 373.6041870117187,
+        "x": 309.72918701171875,
+        "y": 334.16668701171875
+      },
+      "footerRect": {
+        "bottom": 504.6666717529297,
+        "height": 68.66667175292969,
+        "right": 788,
+        "top": 436,
+        "width": 788,
+        "x": 0,
+        "y": 436
+      },
+      "overlapHeight": 0,
+      "clearanceAboveFooter": 57.83331298828131
+    },
+    {
+      "proofIndex": 30,
+      "utc": "2026-10-04T05:50:13.900Z",
+      "viewport": {
+        "dpr": 1,
+        "height": 757,
+        "width": 1182
+      },
+      "label": "상금 항목 3 내용",
+      "focusVisible": true,
+      "scrollY": 610,
+      "activeRect": {
+        "bottom": 504.5,
+        "height": 44,
+        "right": 1069,
+        "top": 460.5,
+        "width": 456,
+        "x": 613,
+        "y": 460.5
+      },
+      "footerRect": {
+        "bottom": 757,
+        "height": 69,
+        "right": 1182,
+        "top": 688,
+        "width": 1182,
+        "x": 0,
+        "y": 688
+      },
+      "overlapHeight": 0,
+      "clearanceAboveFooter": 183.5
+    }
+  ],
+  "normalControls": {
+    "settledManualScrollRow": 12,
+    "tabletRows": [
+      13,
+      20,
+      21,
+      22
+    ],
+    "desktopRows": [
+      23,
+      30,
+      31,
+      32
+    ]
+  },
+  "counts": {
+    "DOMRows": 33,
+    "selectedActionRecords": 40,
+    "safePNGs": 4
+  },
+  "limits": [
+    "The earlier Oct3 below-fold inactive-field observation was not a focus defect; this is a new actual keyboard traversal.",
+    "The later observation85.101seconds after row7 has the same focus/geometry/scrollY; no continuous trace covers the entire interval; manual-scroll first endpoint row11 was captured while scrolling and is excluded from settled geometry/image comparison. Row12 and its separate screenshot are the settled control.",
+    "Native type_text attempt returned AT-SPI provider unavailable. The subsequent read and all retained fields stayed blank. No blind-typing result claimed; native Tab/ShiftTab/scroll remained available.",
+    "The generic state label on row8 was corrected from an estimated duration to later-observation; timestamp and geometry were unchanged.",
+    "First nine prize controls traversed only. No all-form accessibility certification, real-device keyboard, screen-reader speech, save or final-step result.",
+    "Runtime SHA remains unknown; deployment context is the last reported deployment, not browser serving identity.",
+    "Wizard remains in local step4 for subsequent authorized Home retention QA; exit evidence follows in its own completion package.",
+    "The failed type_text/provider-error attempt is collector-reported in this summary, not a separately timestamped entry in the 40 selected action records. All retained prize-content DOM values are blank.",
+    "focusVisible:true is DOM focus-state evidence, not evidence that the outline is visually unobscured. The hidden mobile input is geometrically inside the viewport but behind the footer.",
+    "Manual scrolling is a same-session visibility control, not a fix or deployed after. Observation gaps do not measure scroll duration.",
+    "This is a new same-step traversal. It does not retroactively turn the earlier inactive third-row below-fold observation into a focus failure or establish a PR as its cause."
+  ],
+  "notPerformed": [
+    "Save",
+    "create",
+    "step5",
+    "upload",
+    "delete activation",
+    "official-result change",
+    "notification"
+  ],
+  "prizeValuesAtEnd": [
+    {
+      "label": "상금 항목 1 이름",
+      "value": "1위"
+    },
+    {
+      "label": "상금 항목 1 내용",
+      "value": ""
+    },
+    {
+      "label": "상금 항목 1 삭제",
+      "value": ""
+    },
+    {
+      "label": "상금 항목 2 이름",
+      "value": "2위"
+    },
+    {
+      "label": "상금 항목 2 내용",
+      "value": ""
+    },
+    {
+      "label": "상금 항목 2 삭제",
+      "value": ""
+    },
+    {
+      "label": "상금 항목 3 이름",
+      "value": "3위"
+    },
+    {
+      "label": "상금 항목 3 내용",
+      "value": ""
+    },
+    {
+      "label": "상금 항목 3 삭제",
+      "value": ""
+    }
+  ]
+}

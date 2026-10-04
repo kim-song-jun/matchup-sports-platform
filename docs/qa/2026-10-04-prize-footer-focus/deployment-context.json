@@ -1,0 +1,14 @@
+{
+  "source": "https://github.com/kim-song-jun/matchup-sports-platform/actions/runs/37143395492",
+  "metadataSource": "https://api.github.com/repos/kim-song-jun/matchup-sports-platform/actions/runs/37143395492",
+  "commit": "27a021fc7650672d5af25217108b101dc856c8d5",
+  "status": "completed",
+  "conclusion": "success",
+  "runUpdatedUTC": "2026-10-03T18:31:28Z",
+  "contextType": "Previously reported deployment, independently re-read as historical workflow metadata",
+  "runtimeServingSHA": "unknown",
+  "limits": [
+    "Not a statement that this is the latest deployment.",
+    "Fresh browser navigation follows this recorded workflow time, but browser serving commit/bundle identity was not measured."
+  ]
+}

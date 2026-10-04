@@ -22,7 +22,7 @@ import { trackEvent } from '@/lib/analytics';
 import { clearExpiringDraft, draftStorageAvailable, readExpiringDraft, writeExpiringDraft } from '@/lib/expiring-draft';
 import { extractErrorMessage } from '@/lib/error-message';
 import { getCreatorProfilePrompt, profileEditHref } from '@/lib/creator-profile';
-import { labelToLevelCode, levelCodeToLabel, V1_LEVELS, type V1LevelCode } from '@/lib/v1-levels';
+import { formatTeamMatchLevelRange } from '@/lib/team-match-level-range';
 import { toDistrictRegionOptions } from '@/lib/v1-regions';
 import { lockedReasonLabel, teamRoleLabel } from '@/lib/v1-status-labels';
 import type { V1MyTeam, V1TeamMatchEdit } from '@/types/api';
@@ -154,7 +154,9 @@ export function TeamMatchCreatePageClient({ step }: { step: Exclude<TeamMatchCre
 
   useEffect(() => {
     if (!pendingFocusField) return;
-    const el = document.getElementById(`field-${pendingFocusField}`);
+    const el = pendingFocusField === 'grade'
+      ? document.querySelector<HTMLElement>('[data-team-match-field="grade"]')
+      : document.getElementById(`field-${pendingFocusField}`);
     el?.focus();
     setPendingFocusField(null);
   }, [pendingFocusField]);
@@ -586,7 +588,13 @@ function usePersistedDraft() {
     // 며칠 전 작성하다 만 내용이 새 팀매치 작성 화면에 그대로 되살아났다.
     const stored = readExpiringDraft<Partial<TeamMatchDraft>>(storageKey);
     if (stored === null) return;
-    const hydrated = normalizeDraftDate({ ...buildDefaultDraft(), ...stored });
+    // 저장소의 JSON은 타입 선언과 무관하다. 누락된 예전 필드는 기본값으로 두되,
+    // 잘못된 등급은 확인 화면에서도 안전하게 표시하고 재선택 전 저장을 막는다.
+    const defaults = buildDefaultDraft();
+    const grade = stored.grade === undefined
+      ? defaults.grade
+      : typeof stored.grade === 'string' ? stored.grade : '등급을 다시 선택해 주세요';
+    const hydrated = normalizeDraftDate({ ...defaults, ...stored, grade });
     draftRef.current = hydrated;
     setDraft(hydrated);
   }, []);
@@ -653,7 +661,7 @@ export function draftFromTeamMatchEdit(edit: V1TeamMatchEdit): TeamMatchDraft {
     ...buildDefaultDraft(),
     title: edit.form.title,
     description: edit.form.description ?? '',
-    grade: levelCodeToDraftGrade(edit.form.minLevelCode) ?? legacy?.grade ?? '',
+    grade: formatTeamMatchLevelRange(edit.form.minLevelCode, edit.form.maxLevelCode) || legacy?.grade || '',
     format: edit.form.matchFormat ?? legacy?.format ?? '',
     style: edit.form.matchStyle?.length ? edit.form.matchStyle : legacy?.style ?? [],
     uniform: edit.form.uniformColor ?? legacy?.uniform ?? '',
@@ -671,12 +679,6 @@ export function draftFromTeamMatchEdit(edit: V1TeamMatchEdit): TeamMatchDraft {
     deadlineDate: deadline.slice(0, 10),
     deadlineTime: deadline.slice(11, 16),
   };
-}
-
-function levelCodeToDraftGrade(code?: string | null) {
-  if (!code) return null;
-  const isKnownCode = V1_LEVELS.some((level) => level.code === code);
-  return isKnownCode ? levelCodeToLabel(code as V1LevelCode) : null;
 }
 
 // buildTeamMatchMutationPayload는 team-matches.validation.ts의 buildTeamMatchPayloadResult로

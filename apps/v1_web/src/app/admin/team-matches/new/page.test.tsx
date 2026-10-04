@@ -64,7 +64,8 @@ describe('AdminTeamMatchNewPage', () => {
     fireEvent.change(screen.getByLabelText('지역'), { target: { value: 'region-gangnam' } });
     fireEvent.change(screen.getByLabelText('매치 제목'), { target: { value: '  관리자 모집전  ' } });
     fireEvent.change(screen.getByLabelText('경기 장소'), { target: { value: '  잠실 풋살장  ' } });
-    fireEvent.change(screen.getByLabelText('실력등급'), { target: { value: 'intermediate' } });
+    fireEvent.change(screen.getByLabelText('최소 등급'), { target: { value: 'intermediate' } });
+    fireEvent.change(screen.getByLabelText('최대 등급'), { target: { value: 'advanced' } });
     fireEvent.change(screen.getByLabelText('경기방식'), { target: { value: '5:5' } });
     fireEvent.click(screen.getByRole('button', { name: /^친선$/ }));
     fireEvent.click(screen.getByRole('button', { name: /^매너 중시$/ }));
@@ -86,7 +87,7 @@ describe('AdminTeamMatchNewPage', () => {
       startsAt: '2026-10-20T10:00:00.000Z',
       costNote: '총 90,000원 · 상대팀 30,000원',
       minLevelCode: 'intermediate',
-      maxLevelCode: 'intermediate',
+      maxLevelCode: 'advanced',
       genderRule: '성별 무관',
       matchFormat: '5:5',
       matchStyle: ['친선', '매너 중시', '패스 연습'],
@@ -103,7 +104,8 @@ describe('AdminTeamMatchNewPage', () => {
 
     expect(screen.getByLabelText('목록 이미지')).toBeInTheDocument();
     expect(screen.getByLabelText('상세 이미지')).toBeInTheDocument();
-    expect(screen.getByLabelText('실력등급')).toBeInTheDocument();
+    expect(screen.getByLabelText('최소 등급')).toBeInTheDocument();
+    expect(screen.getByLabelText('최대 등급')).toBeInTheDocument();
     expect(screen.getByLabelText('경기방식')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /^친선$/ })).toBeInTheDocument();
     expect(screen.getByLabelText('유니폼 색상')).toBeInTheDocument();

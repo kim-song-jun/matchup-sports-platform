@@ -1,0 +1,182 @@
+[
+  {
+    "label": "fresh public list navigation after reported5372ea9",
+    "startUTC": "2026-10-04T07:18:35.520Z",
+    "endUTC": "2026-10-04T07:18:42.155Z"
+  },
+  {
+    "label": "resize list window mobile",
+    "startUTC": "2026-10-04T07:19:04.085Z",
+    "endUTC": "2026-10-04T07:19:09.600Z"
+  },
+  {
+    "label": "mobile native zoom110",
+    "startUTC": "2026-10-04T07:19:09.601Z",
+    "endUTC": "2026-10-04T07:19:09.940Z"
+  },
+  {
+    "label": "mobile native zoom125",
+    "startUTC": "2026-10-04T07:19:09.940Z",
+    "endUTC": "2026-10-04T07:19:10.255Z"
+  },
+  {
+    "label": "mobile horizontal wheel to show test photo rail card",
+    "startUTC": "2026-10-04T07:20:51.171Z",
+    "endUTC": "2026-10-04T07:20:51.442Z"
+  },
+  {
+    "label": "mobile horizontal wheel left to center test card",
+    "startUTC": "2026-10-04T07:21:30.813Z",
+    "endUTC": "2026-10-04T07:21:30.872Z"
+  },
+  {
+    "label": "mobile scroll down to numeric body row",
+    "startUTC": "2026-10-04T07:21:47.636Z",
+    "endUTC": "2026-10-04T07:21:48.239Z"
+  },
+  {
+    "label": "mobile open current test numeric-cost body row",
+    "startUTC": "2026-10-04T07:22:17.154Z",
+    "endUTC": "2026-10-04T07:22:17.288Z"
+  },
+  {
+    "label": "mobile detail native scroll to fee row",
+    "startUTC": "2026-10-04T07:23:02.556Z",
+    "endUTC": "2026-10-04T07:23:02.706Z"
+  },
+  {
+    "label": "mobile numeric detail app Back",
+    "startUTC": "2026-10-04T07:23:22.384Z",
+    "endUTC": "2026-10-04T07:23:22.454Z"
+  },
+  {
+    "label": "mobile read-only football filter link",
+    "startUTC": "2026-10-04T07:23:46.455Z",
+    "endUTC": "2026-10-04T07:23:46.730Z"
+  },
+  {
+    "label": "mobile open free synthetic fixture from football-filtered row",
+    "startUTC": "2026-10-04T07:25:12.384Z",
+    "endUTC": "2026-10-04T07:25:12.471Z"
+  },
+  {
+    "label": "mobile browser Back from filtered free detail",
+    "startUTC": "2026-10-04T07:25:20.566Z",
+    "endUTC": "2026-10-04T07:25:20.586Z"
+  },
+  {
+    "label": "mobile browser Forward to same free detail",
+    "startUTC": "2026-10-04T07:25:30.616Z",
+    "endUTC": "2026-10-04T07:25:30.634Z"
+  },
+  {
+    "label": "mobile free detail scroll to fee row",
+    "startUTC": "2026-10-04T07:25:41.249Z",
+    "endUTC": "2026-10-04T07:25:41.503Z"
+  },
+  {
+    "label": "mobile free detail app Back keeps sport filter",
+    "startUTC": "2026-10-04T07:25:56.469Z",
+    "endUTC": "2026-10-04T07:25:56.558Z"
+  },
+  {
+    "label": "mobile restore All8 filter link",
+    "startUTC": "2026-10-04T07:26:44.848Z",
+    "endUTC": "2026-10-04T07:26:45.123Z"
+  },
+  {
+    "label": "mobile horizontal wheel to last numeric rail card for clipping inspection",
+    "startUTC": "2026-10-04T07:26:53.049Z",
+    "endUTC": "2026-10-04T07:26:53.198Z"
+  },
+  {
+    "label": "resize cost list to tablet",
+    "startUTC": "2026-10-04T07:28:05.909Z",
+    "endUTC": "2026-10-04T07:28:12.510Z"
+  },
+  {
+    "label": "tablet native zoom150",
+    "startUTC": "2026-10-04T07:28:12.510Z",
+    "endUTC": "2026-10-04T07:28:12.836Z"
+  },
+  {
+    "label": "tablet native vertical scroll to photo caption above bottom navigation",
+    "startUTC": "2026-10-04T07:29:20.368Z",
+    "endUTC": "2026-10-04T07:29:20.593Z"
+  },
+  {
+    "label": "tablet native scroll to numeric body rows",
+    "startUTC": "2026-10-04T07:29:29.204Z",
+    "endUTC": "2026-10-04T07:29:29.779Z"
+  },
+  {
+    "label": "tablet open current test numeric body row",
+    "startUTC": "2026-10-04T07:29:49.470Z",
+    "endUTC": "2026-10-04T07:29:49.552Z"
+  },
+  {
+    "label": "tablet numeric detail scroll to fee",
+    "startUTC": "2026-10-04T07:30:01.417Z",
+    "endUTC": "2026-10-04T07:30:01.591Z"
+  },
+  {
+    "label": "tablet numeric detail app Back",
+    "startUTC": "2026-10-04T07:30:11.875Z",
+    "endUTC": "2026-10-04T07:30:11.945Z"
+  },
+  {
+    "label": "tablet football filter link",
+    "startUTC": "2026-10-04T07:30:23.567Z",
+    "endUTC": "2026-10-04T07:30:23.841Z"
+  },
+  {
+    "label": "tablet restore All8",
+    "startUTC": "2026-10-04T07:30:33.892Z",
+    "endUTC": "2026-10-04T07:30:34.156Z"
+  },
+  {
+    "label": "desktop native zoom reset",
+    "startUTC": "2026-10-04T07:30:34.286Z",
+    "endUTC": "2026-10-04T07:30:34.425Z"
+  },
+  {
+    "label": "desktop native scroll to numeric body rows",
+    "startUTC": "2026-10-04T07:30:44.684Z",
+    "endUTC": "2026-10-04T07:30:45.006Z"
+  },
+  {
+    "label": "desktop open numeric current fixture row",
+    "startUTC": "2026-10-04T07:30:54.291Z",
+    "endUTC": "2026-10-04T07:30:54.375Z"
+  },
+  {
+    "label": "desktop numeric detail app Back",
+    "startUTC": "2026-10-04T07:31:12.334Z",
+    "endUTC": "2026-10-04T07:31:12.380Z"
+  },
+  {
+    "label": "desktop reopen numeric fixture to put fee inside screenshot viewport",
+    "startUTC": "2026-10-04T07:31:29.287Z",
+    "endUTC": "2026-10-04T07:31:29.371Z"
+  },
+  {
+    "label": "desktop native scroll400 to fee row",
+    "startUTC": "2026-10-04T07:31:42.910Z",
+    "endUTC": "2026-10-04T07:31:43.121Z"
+  },
+  {
+    "label": "desktop fee inspected app Back",
+    "startUTC": "2026-10-04T07:31:56.583Z",
+    "endUTC": "2026-10-04T07:31:56.640Z"
+  },
+  {
+    "label": "desktop football filter link",
+    "startUTC": "2026-10-04T07:32:08.731Z",
+    "endUTC": "2026-10-04T07:32:09.006Z"
+  },
+  {
+    "label": "desktop restore All8 after fee QA",
+    "startUTC": "2026-10-04T07:32:20.131Z",
+    "endUTC": "2026-10-04T07:32:20.201Z"
+  }
+]

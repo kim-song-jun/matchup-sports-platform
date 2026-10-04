@@ -1,0 +1,37 @@
+{
+  "commit": "5372ea9c3640621eb270d15c54c70a822b97d536",
+  "sources": [
+    {
+      "name": "page",
+      "sourceURL": "https://github.com/kim-song-jun/matchup-sports-platform/blob/5372ea9c3640621eb270d15c54c70a822b97d536/apps/v1_web/src/components/matches/matches-page.tsx",
+      "gitBlobSHA": "ffe6f210d13af0fc1f5b13d35eb1a665906af4d4",
+      "contentSHA256": "f5cb0571ec41d64377fc9c9ce84f4cc101e129b4b138ac05b4718ca3d2507912"
+    },
+    {
+      "name": "client",
+      "sourceURL": "https://github.com/kim-song-jun/matchup-sports-platform/blob/5372ea9c3640621eb270d15c54c70a822b97d536/apps/v1_web/src/components/matches/matches-client.tsx",
+      "gitBlobSHA": "beaad5aae239ef379456604227988ccd1108366b",
+      "contentSHA256": "418cadd8870d3475e3dbe3880a2681568b993e4760b0c54f2f9b32513305f136"
+    },
+    {
+      "name": "hook",
+      "sourceURL": "https://github.com/kim-song-jun/matchup-sports-platform/blob/5372ea9c3640621eb270d15c54c70a822b97d536/apps/v1_web/src/hooks/use-v1-api.ts",
+      "gitBlobSHA": "e31bba3e9d671f59c39e95493e79bbbe731c0e2c",
+      "contentSHA256": "a3bcd67495a1b5023d7db8bc83cce633e5c293bf5654f46406c8b18e4f27b45a"
+    },
+    {
+      "name": "sheet",
+      "sourceURL": "https://github.com/kim-song-jun/matchup-sports-platform/blob/5372ea9c3640621eb270d15c54c70a822b97d536/apps/v1_web/src/components/v1-ui/bottom-sheet.tsx",
+      "gitBlobSHA": "e77ae3ce150acddc22f0c36dc426c1fd2e15e9f7",
+      "contentSHA256": "87cfdb8f7e734f8e6a2870b8f9740a18aa31b42b341570f92ffd5e33ae7e6e16"
+    }
+  ],
+  "findings": [
+    "matches-page.tsx lines849 and965 prefix truthy costNote verbatim with 참가비 설명. This is a label, not currency conversion.",
+    "SportSelector lines791–808 renders href links; matches-client.tsx buildSportSummary supplies URL choices. Actual tested sport filter links are distinct from filter-sheet UI.",
+    "Search form lines690–693 and submitSearch223–230 connect nonempty searches to recordSearch.mutate; use-v1-api.ts591–597 uses POST /search/recent. No such search interaction is reported in this batch.",
+    "useV1Matches663–675 uses GET /matches. This narrow static review does not exclude telemetry/auth/global writes."
+  ],
+  "runtimeServingSHA": "unknown",
+  "HTTPOrDBAudit": false
+}

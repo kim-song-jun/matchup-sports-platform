@@ -1,0 +1,21 @@
+{
+  "reportedSHA": "5372ea9c3640621eb270d15c54c70a822b97d536",
+  "reportedVersion": "1.1.5-alpha.20261004.g5372ea9c3640",
+  "run": "37183695434",
+  "reportedSuccessUTC": "2026-10-04T07:02:48Z",
+  "reportedHealthyUTC": "2026-10-04T07:02:25.697Z",
+  "source": "Parent verified deployment/public identity, not a browser runtime SHA observation",
+  "runtimeServingSHA": "unknown",
+  "freshNavigation": {
+    "label": "fresh public list navigation after reported5372ea9",
+    "startUTC": "2026-10-04T07:18:35.520Z",
+    "endUTC": "2026-10-04T07:18:42.155Z"
+  },
+  "publisherWorkflowReadback": {
+    "headSHA": "5372ea9c3640621eb270d15c54c70a822b97d536",
+    "conclusion": "success",
+    "status": "completed",
+    "updatedUTC": "2026-10-04T07:02:48Z",
+    "URL": "https://github.com/kim-song-jun/matchup-sports-platform/actions/runs/37183695434"
+  }
+}

@@ -1,0 +1,1018 @@
+[
+  {
+    "back": [
+      {
+        "href": "/matches",
+        "visible": false
+      },
+      {
+        "href": "/matches",
+        "visible": true
+      }
+    ],
+    "feeRows": [
+      {
+        "children": [
+          {
+            "rect": {
+              "bottom": 0,
+              "height": 0,
+              "left": 0,
+              "right": 0,
+              "top": 0,
+              "width": 0,
+              "x": 0,
+              "y": 0
+            },
+            "text": "참가비"
+          },
+          {
+            "rect": {
+              "bottom": 0,
+              "height": 0,
+              "left": 0,
+              "right": 0,
+              "top": 0,
+              "width": 0,
+              "x": 0,
+              "y": 0
+            },
+            "text": "10000"
+          }
+        ],
+        "rect": {
+          "bottom": 0,
+          "height": 0,
+          "left": 0,
+          "right": 0,
+          "top": 0,
+          "width": 0,
+          "x": 0,
+          "y": 0
+        },
+        "text": "참가비10000",
+        "visible": false
+      },
+      {
+        "children": [
+          {
+            "rect": {
+              "bottom": 465.2000122070313,
+              "height": 16,
+              "left": 20,
+              "right": 51.125,
+              "top": 449.2000122070313,
+              "width": 31.125,
+              "x": 20,
+              "y": 449.2000122070313
+            },
+            "text": "참가비"
+          },
+          {
+            "rect": {
+              "bottom": 469.2000122070313,
+              "height": 24,
+              "left": 336.38751220703125,
+              "right": 381.60001373291016,
+              "top": 445.2000122070313,
+              "width": 45.212501525878906,
+              "x": 336.38751220703125,
+              "y": 445.2000122070313
+            },
+            "text": "10000"
+          }
+        ],
+        "rect": {
+          "bottom": 485.6000061035156,
+          "height": 56,
+          "left": 20,
+          "right": 381.6000061035156,
+          "top": 429.6000061035156,
+          "width": 361.6000061035156,
+          "x": 20,
+          "y": 429.6000061035156
+        },
+        "text": "참가비10000",
+        "visible": true
+      }
+    ],
+    "headings": [
+      {
+        "rect": {
+          "bottom": -14.400001525878906,
+          "height": 32,
+          "left": 16,
+          "right": 385.6000061035156,
+          "top": -46.400001525878906,
+          "width": 369.6000061035156,
+          "x": 16,
+          "y": -46.400001525878906
+        },
+        "tag": "H2",
+        "text": "test"
+      }
+    ],
+    "scroll": {
+      "main": 190.3999938964844,
+      "windowY": 0
+    },
+    "url": "https://alpha.teameet.co.kr/matches/synthetic-numeric-1",
+    "utc": "2026-10-04T07:23:02.753Z",
+    "viewport": {
+      "dpr": 1.25,
+      "h": 606,
+      "w": 402
+    },
+    "label": "mobile current numeric fixture detail fee",
+    "index": 0
+  },
+  {
+    "back": [
+      {
+        "href": "/matches",
+        "visible": false
+      },
+      {
+        "href": "/matches",
+        "visible": true
+      }
+    ],
+    "feeRows": [
+      {
+        "children": [
+          {
+            "rect": {
+              "bottom": 0,
+              "height": 0,
+              "left": 0,
+              "right": 0,
+              "top": 0,
+              "width": 0,
+              "x": 0,
+              "y": 0
+            },
+            "text": "참가비"
+          },
+          {
+            "rect": {
+              "bottom": 0,
+              "height": 0,
+              "left": 0,
+              "right": 0,
+              "top": 0,
+              "width": 0,
+              "x": 0,
+              "y": 0
+            },
+            "text": "10000"
+          }
+        ],
+        "rect": {
+          "bottom": 0,
+          "height": 0,
+          "left": 0,
+          "right": 0,
+          "top": 0,
+          "width": 0,
+          "x": 0,
+          "y": 0
+        },
+        "text": "참가비10000",
+        "visible": false
+      },
+      {
+        "children": [
+          {
+            "rect": {
+              "bottom": 367.6000061035156,
+              "height": 16,
+              "left": 20,
+              "right": 51.125,
+              "top": 351.6000061035156,
+              "width": 31.125,
+              "x": 20,
+              "y": 351.6000061035156
+            },
+            "text": "참가비"
+          },
+          {
+            "rect": {
+              "bottom": 371.6000061035156,
+              "height": 24,
+              "left": 336.38751220703125,
+              "right": 381.60001373291016,
+              "top": 347.6000061035156,
+              "width": 45.212501525878906,
+              "x": 336.38751220703125,
+              "y": 347.6000061035156
+            },
+            "text": "10000"
+          }
+        ],
+        "rect": {
+          "bottom": 388,
+          "height": 56,
+          "left": 20,
+          "right": 381.6000061035156,
+          "top": 332,
+          "width": 361.6000061035156,
+          "x": 20,
+          "y": 332
+        },
+        "text": "참가비10000",
+        "visible": true
+      }
+    ],
+    "headings": [
+      {
+        "rect": {
+          "bottom": -112,
+          "height": 32,
+          "left": 16,
+          "right": 385.6000061035156,
+          "top": -144,
+          "width": 369.6000061035156,
+          "x": 16,
+          "y": -144
+        },
+        "tag": "H2",
+        "text": "test"
+      }
+    ],
+    "scroll": {
+      "main": 288,
+      "windowY": 0
+    },
+    "url": "https://alpha.teameet.co.kr/matches/synthetic-numeric-1",
+    "utc": "2026-10-04T07:23:22.364Z",
+    "viewport": {
+      "dpr": 1.25,
+      "h": 606,
+      "w": 402
+    },
+    "label": "mobile numeric detail fee settled",
+    "index": 1
+  },
+  {
+    "back": [
+      {
+        "href": "/matches?sportId=sport-football",
+        "visible": false
+      },
+      {
+        "href": "/matches?sportId=sport-football",
+        "visible": true
+      }
+    ],
+    "feeRows": [
+      {
+        "children": [
+          {
+            "rect": {
+              "bottom": 0,
+              "height": 0,
+              "left": 0,
+              "right": 0,
+              "top": 0,
+              "width": 0,
+              "x": 0,
+              "y": 0
+            },
+            "text": "참가비"
+          },
+          {
+            "rect": {
+              "bottom": 0,
+              "height": 0,
+              "left": 0,
+              "right": 0,
+              "top": 0,
+              "width": 0,
+              "x": 0,
+              "y": 0
+            },
+            "text": "무료"
+          }
+        ],
+        "rect": {
+          "bottom": 0,
+          "height": 0,
+          "left": 0,
+          "right": 0,
+          "top": 0,
+          "width": 0,
+          "x": 0,
+          "y": 0
+        },
+        "text": "참가비무료",
+        "visible": false
+      },
+      {
+        "children": [
+          {
+            "rect": {
+              "bottom": 755.6000366210938,
+              "height": 16,
+              "left": 20,
+              "right": 51.125,
+              "top": 739.6000366210938,
+              "width": 31.125,
+              "x": 20,
+              "y": 739.6000366210938
+            },
+            "text": "참가비"
+          },
+          {
+            "rect": {
+              "bottom": 759.6000366210938,
+              "height": 24,
+              "left": 355.6625061035156,
+              "right": 381.6000061035156,
+              "top": 735.6000366210938,
+              "width": 25.9375,
+              "x": 355.6625061035156,
+              "y": 735.6000366210938
+            },
+            "text": "무료"
+          }
+        ],
+        "rect": {
+          "bottom": 776,
+          "height": 56,
+          "left": 20,
+          "right": 381.6000061035156,
+          "top": 720,
+          "width": 361.6000061035156,
+          "x": 20,
+          "y": 720
+        },
+        "text": "참가비무료",
+        "visible": true
+      }
+    ],
+    "headings": [
+      {
+        "rect": {
+          "bottom": 280,
+          "height": 32,
+          "left": 16,
+          "right": 385.6000061035156,
+          "top": 248,
+          "width": 369.6000061035156,
+          "x": 16,
+          "y": 248
+        },
+        "tag": "H2",
+        "text": "QA-PR1438 개인매치"
+      }
+    ],
+    "scroll": {
+      "main": 0,
+      "windowY": 0
+    },
+    "url": "https://alpha.teameet.co.kr/matches/synthetic-free-1?from=%2Fmatches%3FsportId%3Dsport-football",
+    "utc": "2026-10-04T07:25:20.562Z",
+    "viewport": {
+      "dpr": 1.25,
+      "h": 606,
+      "w": 402
+    },
+    "label": "mobile free fixture detail from football filter",
+    "index": 2
+  },
+  {
+    "back": [
+      {
+        "href": "/matches?sportId=sport-football",
+        "visible": false
+      },
+      {
+        "href": "/matches?sportId=sport-football",
+        "visible": true
+      }
+    ],
+    "feeRows": [
+      {
+        "children": [
+          {
+            "rect": {
+              "bottom": 0,
+              "height": 0,
+              "left": 0,
+              "right": 0,
+              "top": 0,
+              "width": 0,
+              "x": 0,
+              "y": 0
+            },
+            "text": "참가비"
+          },
+          {
+            "rect": {
+              "bottom": 0,
+              "height": 0,
+              "left": 0,
+              "right": 0,
+              "top": 0,
+              "width": 0,
+              "x": 0,
+              "y": 0
+            },
+            "text": "무료"
+          }
+        ],
+        "rect": {
+          "bottom": 0,
+          "height": 0,
+          "left": 0,
+          "right": 0,
+          "top": 0,
+          "width": 0,
+          "x": 0,
+          "y": 0
+        },
+        "text": "참가비무료",
+        "visible": false
+      },
+      {
+        "children": [
+          {
+            "rect": {
+              "bottom": 755.6000366210938,
+              "height": 16,
+              "left": 20,
+              "right": 51.125,
+              "top": 739.6000366210938,
+              "width": 31.125,
+              "x": 20,
+              "y": 739.6000366210938
+            },
+            "text": "참가비"
+          },
+          {
+            "rect": {
+              "bottom": 759.6000366210938,
+              "height": 24,
+              "left": 355.6625061035156,
+              "right": 381.6000061035156,
+              "top": 735.6000366210938,
+              "width": 25.9375,
+              "x": 355.6625061035156,
+              "y": 735.6000366210938
+            },
+            "text": "무료"
+          }
+        ],
+        "rect": {
+          "bottom": 776,
+          "height": 56,
+          "left": 20,
+          "right": 381.6000061035156,
+          "top": 720,
+          "width": 361.6000061035156,
+          "x": 20,
+          "y": 720
+        },
+        "text": "참가비무료",
+        "visible": true
+      }
+    ],
+    "headings": [
+      {
+        "rect": {
+          "bottom": 280,
+          "height": 32,
+          "left": 16,
+          "right": 385.6000061035156,
+          "top": 248,
+          "width": 369.6000061035156,
+          "x": 16,
+          "y": 248
+        },
+        "tag": "H2",
+        "text": "QA-PR1438 개인매치"
+      }
+    ],
+    "scroll": {
+      "main": 0,
+      "windowY": 0
+    },
+    "url": "https://alpha.teameet.co.kr/matches/synthetic-free-1?from=%2Fmatches%3FsportId%3Dsport-football",
+    "utc": "2026-10-04T07:25:41.245Z",
+    "viewport": {
+      "dpr": 1.25,
+      "h": 606,
+      "w": 402
+    },
+    "label": "mobile browser Forward same free fixture",
+    "index": 3
+  },
+  {
+    "back": [
+      {
+        "href": "/matches?sportId=sport-football",
+        "visible": false
+      },
+      {
+        "href": "/matches?sportId=sport-football",
+        "visible": true
+      }
+    ],
+    "feeRows": [
+      {
+        "children": [
+          {
+            "rect": {
+              "bottom": 0,
+              "height": 0,
+              "left": 0,
+              "right": 0,
+              "top": 0,
+              "width": 0,
+              "x": 0,
+              "y": 0
+            },
+            "text": "참가비"
+          },
+          {
+            "rect": {
+              "bottom": 0,
+              "height": 0,
+              "left": 0,
+              "right": 0,
+              "top": 0,
+              "width": 0,
+              "x": 0,
+              "y": 0
+            },
+            "text": "무료"
+          }
+        ],
+        "rect": {
+          "bottom": 0,
+          "height": 0,
+          "left": 0,
+          "right": 0,
+          "top": 0,
+          "width": 0,
+          "x": 0,
+          "y": 0
+        },
+        "text": "참가비무료",
+        "visible": false
+      },
+      {
+        "children": [
+          {
+            "rect": {
+              "bottom": 371.6000061035156,
+              "height": 16,
+              "left": 20,
+              "right": 51.125,
+              "top": 355.6000061035156,
+              "width": 31.125,
+              "x": 20,
+              "y": 355.6000061035156
+            },
+            "text": "참가비"
+          },
+          {
+            "rect": {
+              "bottom": 375.6000061035156,
+              "height": 24,
+              "left": 355.6625061035156,
+              "right": 381.6000061035156,
+              "top": 351.6000061035156,
+              "width": 25.9375,
+              "x": 355.6625061035156,
+              "y": 351.6000061035156
+            },
+            "text": "무료"
+          }
+        ],
+        "rect": {
+          "bottom": 392,
+          "height": 56,
+          "left": 20,
+          "right": 381.6000061035156,
+          "top": 336,
+          "width": 361.6000061035156,
+          "x": 20,
+          "y": 336
+        },
+        "text": "참가비무료",
+        "visible": true
+      }
+    ],
+    "headings": [
+      {
+        "rect": {
+          "bottom": -104,
+          "height": 32,
+          "left": 16,
+          "right": 385.6000061035156,
+          "top": -136,
+          "width": 369.6000061035156,
+          "x": 16,
+          "y": -136
+        },
+        "tag": "H2",
+        "text": "QA-PR1438 개인매치"
+      }
+    ],
+    "scroll": {
+      "main": 384,
+      "windowY": 0
+    },
+    "url": "https://alpha.teameet.co.kr/matches/synthetic-free-1?from=%2Fmatches%3FsportId%3Dsport-football",
+    "utc": "2026-10-04T07:25:56.440Z",
+    "viewport": {
+      "dpr": 1.25,
+      "h": 606,
+      "w": 402
+    },
+    "label": "mobile free fee row settled in viewport",
+    "index": 4
+  },
+  {
+    "back": [
+      {
+        "href": "/matches",
+        "visible": false
+      },
+      {
+        "href": "/matches",
+        "visible": true
+      }
+    ],
+    "feeRows": [
+      {
+        "children": [
+          {
+            "rect": {
+              "bottom": 0,
+              "height": 0,
+              "left": 0,
+              "right": 0,
+              "top": 0,
+              "width": 0,
+              "x": 0,
+              "y": 0
+            },
+            "text": "참가비"
+          },
+          {
+            "rect": {
+              "bottom": 0,
+              "height": 0,
+              "left": 0,
+              "right": 0,
+              "top": 0,
+              "width": 0,
+              "x": 0,
+              "y": 0
+            },
+            "text": "10000"
+          }
+        ],
+        "rect": {
+          "bottom": 0,
+          "height": 0,
+          "left": 0,
+          "right": 0,
+          "top": 0,
+          "width": 0,
+          "x": 0,
+          "y": 0
+        },
+        "text": "참가비10000",
+        "visible": false
+      },
+      {
+        "children": [
+          {
+            "rect": {
+              "bottom": 335.66668701171875,
+              "height": 16,
+              "left": 114,
+              "right": 145.1145839691162,
+              "top": 319.66668701171875,
+              "width": 31.11458396911621,
+              "x": 114,
+              "y": 319.66668701171875
+            },
+            "text": "참가비"
+          },
+          {
+            "rect": {
+              "bottom": 339.66668701171875,
+              "height": 24,
+              "left": 628.7916870117188,
+              "right": 674.0000228881836,
+              "top": 315.66668701171875,
+              "width": 45.20833587646485,
+              "x": 628.7916870117188,
+              "y": 315.66668701171875
+            },
+            "text": "10000"
+          }
+        ],
+        "rect": {
+          "bottom": 356,
+          "height": 56,
+          "left": 114,
+          "right": 674,
+          "top": 300,
+          "width": 560,
+          "x": 114,
+          "y": 300
+        },
+        "text": "참가비10000",
+        "visible": true
+      }
+    ],
+    "headings": [
+      {
+        "rect": {
+          "bottom": -144,
+          "height": 32,
+          "left": 110,
+          "right": 678,
+          "top": -176,
+          "width": 568,
+          "x": 110,
+          "y": -176
+        },
+        "tag": "H2",
+        "text": "test"
+      }
+    ],
+    "scroll": {
+      "main": 320,
+      "windowY": 0
+    },
+    "url": "https://alpha.teameet.co.kr/matches/synthetic-numeric-1",
+    "utc": "2026-10-04T07:30:11.849Z",
+    "viewport": {
+      "dpr": 1.5,
+      "h": 505,
+      "w": 788
+    },
+    "label": "tablet numeric detail fee settled",
+    "index": 5
+  },
+  {
+    "back": [
+      {
+        "href": "/matches",
+        "visible": true
+      },
+      {
+        "href": "/matches",
+        "visible": false
+      }
+    ],
+    "feeRows": [
+      {
+        "children": [
+          {
+            "rect": {
+              "bottom": 853.5,
+              "height": 16,
+              "left": 55,
+              "right": 175,
+              "top": 837.5,
+              "width": 120,
+              "x": 55,
+              "y": 837.5
+            },
+            "text": "참가비"
+          },
+          {
+            "rect": {
+              "bottom": 857.5,
+              "height": 24,
+              "left": 689.78125,
+              "right": 735,
+              "top": 833.5,
+              "width": 45.21875,
+              "x": 689.78125,
+              "y": 833.5
+            },
+            "text": "10000"
+          }
+        ],
+        "rect": {
+          "bottom": 872,
+          "height": 52,
+          "left": 55,
+          "right": 735,
+          "top": 820,
+          "width": 680,
+          "x": 55,
+          "y": 820
+        },
+        "text": "참가비10000",
+        "visible": true
+      },
+      {
+        "children": [
+          {
+            "rect": {
+              "bottom": 0,
+              "height": 0,
+              "left": 0,
+              "right": 0,
+              "top": 0,
+              "width": 0,
+              "x": 0,
+              "y": 0
+            },
+            "text": "참가비"
+          },
+          {
+            "rect": {
+              "bottom": 0,
+              "height": 0,
+              "left": 0,
+              "right": 0,
+              "top": 0,
+              "width": 0,
+              "x": 0,
+              "y": 0
+            },
+            "text": "10000"
+          }
+        ],
+        "rect": {
+          "bottom": 0,
+          "height": 0,
+          "left": 0,
+          "right": 0,
+          "top": 0,
+          "width": 0,
+          "x": 0,
+          "y": 0
+        },
+        "text": "참가비10000",
+        "visible": false
+      }
+    ],
+    "headings": [
+      {
+        "rect": {
+          "bottom": 128,
+          "height": 32,
+          "left": 107,
+          "right": 151.359375,
+          "top": 96,
+          "width": 44.359375,
+          "x": 107,
+          "y": 96
+        },
+        "tag": "H1",
+        "text": "test"
+      }
+    ],
+    "scroll": {
+      "main": 0,
+      "windowY": 0
+    },
+    "url": "https://alpha.teameet.co.kr/matches/synthetic-numeric-1",
+    "utc": "2026-10-04T07:31:12.300Z",
+    "viewport": {
+      "dpr": 1,
+      "h": 757,
+      "w": 1182
+    },
+    "label": "desktop numeric fixture detail fee",
+    "index": 6
+  },
+  {
+    "back": [
+      {
+        "href": "/matches",
+        "visible": true
+      },
+      {
+        "href": "/matches",
+        "visible": false
+      }
+    ],
+    "feeRows": [
+      {
+        "children": [
+          {
+            "rect": {
+              "bottom": 373.5,
+              "height": 16,
+              "left": 55,
+              "right": 175,
+              "top": 357.5,
+              "width": 120,
+              "x": 55,
+              "y": 357.5
+            },
+            "text": "참가비"
+          },
+          {
+            "rect": {
+              "bottom": 377.5,
+              "height": 24,
+              "left": 689.78125,
+              "right": 735,
+              "top": 353.5,
+              "width": 45.21875,
+              "x": 689.78125,
+              "y": 353.5
+            },
+            "text": "10000"
+          }
+        ],
+        "rect": {
+          "bottom": 392,
+          "height": 52,
+          "left": 55,
+          "right": 735,
+          "top": 340,
+          "width": 680,
+          "x": 55,
+          "y": 340
+        },
+        "text": "참가비10000",
+        "visible": true
+      },
+      {
+        "children": [
+          {
+            "rect": {
+              "bottom": 0,
+              "height": 0,
+              "left": 0,
+              "right": 0,
+              "top": 0,
+              "width": 0,
+              "x": 0,
+              "y": 0
+            },
+            "text": "참가비"
+          },
+          {
+            "rect": {
+              "bottom": 0,
+              "height": 0,
+              "left": 0,
+              "right": 0,
+              "top": 0,
+              "width": 0,
+              "x": 0,
+              "y": 0
+            },
+            "text": "10000"
+          }
+        ],
+        "rect": {
+          "bottom": 0,
+          "height": 0,
+          "left": 0,
+          "right": 0,
+          "top": 0,
+          "width": 0,
+          "x": 0,
+          "y": 0
+        },
+        "text": "참가비10000",
+        "visible": false
+      }
+    ],
+    "headings": [
+      {
+        "rect": {
+          "bottom": -352,
+          "height": 32,
+          "left": 107,
+          "right": 151.359375,
+          "top": -384,
+          "width": 44.359375,
+          "x": 107,
+          "y": -384
+        },
+        "tag": "H1",
+        "text": "test"
+      }
+    ],
+    "scroll": {
+      "main": 0,
+      "windowY": 480
+    },
+    "url": "https://alpha.teameet.co.kr/matches/synthetic-numeric-1",
+    "utc": "2026-10-04T07:31:56.551Z",
+    "viewport": {
+      "dpr": 1,
+      "h": 757,
+      "w": 1182
+    },
+    "label": "desktop numeric fee actually in viewport after scroll",
+    "index": 7
+  }
+]

@@ -1,0 +1,491 @@
+{
+  "schema": 1,
+  "screenshots": [
+    {
+      "label": "mobile-photo-cost",
+      "proofIndex": 1,
+      "captureStartUTC": "2026-10-04T07:21:47.605Z",
+      "captureEndUTC": "2026-10-04T07:21:47.629Z",
+      "file": "mobile-photo-cost.png",
+      "sha256": "4196a0e0829042c7bbb5588781b9540b0b3419e4458a0f9217b62a543660367a",
+      "proofFile": "proof.json",
+      "sourceSHA256": "4196a0e0829042c7bbb5588781b9540b0b3419e4458a0f9217b62a543660367a",
+      "sourcePixels": [
+        402,
+        606
+      ],
+      "cropLTRB": [
+        25,
+        470,
+        285,
+        532
+      ],
+      "outputPixels": [
+        260,
+        62
+      ],
+      "outputSHA256": "520195eeaa6bbd4a7da272b084eaea82f90465cfe26ccb68aa60eae3e721d952",
+      "pixelEquality": true,
+      "DOMUTC": "2026-10-04T07:21:47.601Z",
+      "CSSViewport": {
+        "dpr": 1.25,
+        "h": 606,
+        "w": 402
+      },
+      "scope": "Exact crop; no masks/repaint. Cost copy/product labels only; host/account/roster omitted."
+    },
+    {
+      "label": "mobile-row-cost",
+      "proofIndex": 2,
+      "captureStartUTC": "2026-10-04T07:22:17.130Z",
+      "captureEndUTC": "2026-10-04T07:22:17.150Z",
+      "file": "mobile-row-cost.png",
+      "sha256": "6af4ed4b5b3751221dcdb2867e65f375c960c02e06f92810d788a2ef7ed03c4b",
+      "proofFile": "proof.json",
+      "sourceSHA256": "6af4ed4b5b3751221dcdb2867e65f375c960c02e06f92810d788a2ef7ed03c4b",
+      "sourcePixels": [
+        402,
+        606
+      ],
+      "cropLTRB": [
+        139,
+        249,
+        373,
+        310
+      ],
+      "outputPixels": [
+        234,
+        61
+      ],
+      "outputSHA256": "18f79edc718e7342ee162995cf9bb12b40876609295ff1103c2968c94ec86e3e",
+      "pixelEquality": true,
+      "DOMUTC": "2026-10-04T07:21:54.832Z",
+      "CSSViewport": {
+        "dpr": 1.25,
+        "h": 606,
+        "w": 402
+      },
+      "scope": "Exact crop; no masks/repaint. Cost copy/product labels only; host/account/roster omitted."
+    },
+    {
+      "label": "mobile-detail-cost",
+      "proofIndex": 1,
+      "captureStartUTC": "2026-10-04T07:23:22.367Z",
+      "captureEndUTC": "2026-10-04T07:23:22.382Z",
+      "file": "mobile-detail-cost.png",
+      "sha256": "7fbc72d451cc2d69215d16b0be35a796f3412770210ad50468266a08cd49ae9a",
+      "proofFile": "detail-proof.json",
+      "sourceSHA256": "7fbc72d451cc2d69215d16b0be35a796f3412770210ad50468266a08cd49ae9a",
+      "sourcePixels": [
+        402,
+        606
+      ],
+      "cropLTRB": [
+        16,
+        328,
+        386,
+        392
+      ],
+      "outputPixels": [
+        370,
+        64
+      ],
+      "outputSHA256": "d7db4f3c06abf87e5431755f0a31d4c38c645c7a8b2b4bfc3be5831342667c12",
+      "pixelEquality": true,
+      "DOMUTC": "2026-10-04T07:23:22.364Z",
+      "CSSViewport": {
+        "dpr": 1.25,
+        "h": 606,
+        "w": 402
+      },
+      "scope": "Exact crop; no masks/repaint. Cost copy/product labels only; host/account/roster omitted."
+    },
+    {
+      "label": "mobile-free-cost",
+      "proofIndex": 4,
+      "captureStartUTC": "2026-10-04T07:24:50.389Z",
+      "captureEndUTC": "2026-10-04T07:24:50.661Z",
+      "file": "mobile-free-cost.png",
+      "sha256": "23dc6d8c4dd398a03d320efcb04f73fac8ec9df5e159afb629b45679feab1401",
+      "proofFile": "proof.json",
+      "sourceSHA256": "23dc6d8c4dd398a03d320efcb04f73fac8ec9df5e159afb629b45679feab1401",
+      "sourcePixels": [
+        402,
+        606
+      ],
+      "cropLTRB": [
+        139,
+        280,
+        374,
+        321
+      ],
+      "outputPixels": [
+        235,
+        41
+      ],
+      "outputSHA256": "ac8623ce4db4c3d49e757c423f6cfc8f4e716938c01b1f3cab1fe617de657489",
+      "pixelEquality": true,
+      "DOMUTC": "2026-10-04T07:24:50.383Z",
+      "CSSViewport": {
+        "dpr": 1.25,
+        "h": 606,
+        "w": 402
+      },
+      "scope": "Exact crop; no masks/repaint. Cost copy/product labels only; host/account/roster omitted."
+    },
+    {
+      "label": "mobile-free-detail",
+      "proofIndex": 4,
+      "captureStartUTC": "2026-10-04T07:25:56.444Z",
+      "captureEndUTC": "2026-10-04T07:25:56.467Z",
+      "file": "mobile-free-detail.png",
+      "sha256": "2c55f14db16e392c4e7ef27347dffe903eac950b9a8c22010eb52b1ae96e2de2",
+      "proofFile": "detail-proof.json",
+      "sourceSHA256": "2c55f14db16e392c4e7ef27347dffe903eac950b9a8c22010eb52b1ae96e2de2",
+      "sourcePixels": [
+        402,
+        606
+      ],
+      "cropLTRB": [
+        16,
+        332,
+        386,
+        396
+      ],
+      "outputPixels": [
+        370,
+        64
+      ],
+      "outputSHA256": "2f8d7355bb37e811264b59db82491c3c6ff5299506f188ccdc0ddd1796d4fc20",
+      "pixelEquality": true,
+      "DOMUTC": "2026-10-04T07:25:56.440Z",
+      "CSSViewport": {
+        "dpr": 1.25,
+        "h": 606,
+        "w": 402
+      },
+      "scope": "Exact crop; no masks/repaint. Cost copy/product labels only; host/account/roster omitted."
+    },
+    {
+      "label": "mobile-last-photo-cta-overlap",
+      "proofIndex": 7,
+      "captureStartUTC": "2026-10-04T07:27:08.894Z",
+      "captureEndUTC": "2026-10-04T07:27:08.914Z",
+      "file": "mobile-last-photo-cta-overlap.png",
+      "sha256": "9b22d1f1cd721e0ed662e73b5197b2d876008d1dc4d9f8f54b0e0e4b448c30c7",
+      "proofFile": "proof.json",
+      "sourceSHA256": "9b22d1f1cd721e0ed662e73b5197b2d876008d1dc4d9f8f54b0e0e4b448c30c7",
+      "sourcePixels": [
+        402,
+        606
+      ],
+      "cropLTRB": [
+        112,
+        465,
+        386,
+        533
+      ],
+      "outputPixels": [
+        274,
+        68
+      ],
+      "outputSHA256": "e1207aa75c5ef83bf48595f132355d261e6aa39950b3a8a70c6853d577a79aea",
+      "pixelEquality": true,
+      "DOMUTC": "2026-10-04T07:27:08.874Z",
+      "CSSViewport": {
+        "dpr": 1.25,
+        "h": 606,
+        "w": 402
+      },
+      "scope": "Exact crop; no masks/repaint. Cost copy/product labels only; host/account/roster omitted."
+    },
+    {
+      "label": "tablet-photo-cost",
+      "proofIndex": 9,
+      "captureStartUTC": "2026-10-04T07:29:29.174Z",
+      "captureEndUTC": "2026-10-04T07:29:29.203Z",
+      "file": "tablet-photo-cost.png",
+      "sha256": "0d9bb6f8ae0de45234da4f521d572962a107191e7c4cce893cd2ee5b27df5d5a",
+      "proofFile": "proof.json",
+      "sourceSHA256": "0d9bb6f8ae0de45234da4f521d572962a107191e7c4cce893cd2ee5b27df5d5a",
+      "sourcePixels": [
+        788,
+        505
+      ],
+      "cropLTRB": [
+        120,
+        310,
+        378,
+        368
+      ],
+      "outputPixels": [
+        258,
+        58
+      ],
+      "outputSHA256": "7bdafdca6065f2de965e7d526cd49b2a87a3de0d67668ab9a066393653bef535",
+      "pixelEquality": true,
+      "DOMUTC": "2026-10-04T07:29:29.170Z",
+      "CSSViewport": {
+        "dpr": 1.5,
+        "h": 505,
+        "w": 788
+      },
+      "scope": "Exact crop; no masks/repaint. Cost copy/product labels only; host/account/roster omitted."
+    },
+    {
+      "label": "tablet-row-cost",
+      "proofIndex": 10,
+      "captureStartUTC": "2026-10-04T07:29:49.441Z",
+      "captureEndUTC": "2026-10-04T07:29:49.469Z",
+      "file": "tablet-row-cost.png",
+      "sha256": "99162a3cdf7f65e6de29a62c0ed46857ad78237d3c64bac9246f25676fa5aee8",
+      "proofFile": "proof.json",
+      "sourceSHA256": "99162a3cdf7f65e6de29a62c0ed46857ad78237d3c64bac9246f25676fa5aee8",
+      "sourcePixels": [
+        788,
+        505
+      ],
+      "cropLTRB": [
+        233,
+        279,
+        665,
+        334
+      ],
+      "outputPixels": [
+        432,
+        55
+      ],
+      "outputSHA256": "9ec7e71c7bbcda1185e14f9e5b2c1efba3ce029a76e2670379ed8458217c72db",
+      "pixelEquality": true,
+      "DOMUTC": "2026-10-04T07:29:49.436Z",
+      "CSSViewport": {
+        "dpr": 1.5,
+        "h": 505,
+        "w": 788
+      },
+      "scope": "Exact crop; no masks/repaint. Cost copy/product labels only; host/account/roster omitted."
+    },
+    {
+      "label": "tablet-detail-cost",
+      "proofIndex": 5,
+      "captureStartUTC": "2026-10-04T07:30:11.852Z",
+      "captureEndUTC": "2026-10-04T07:30:11.873Z",
+      "file": "tablet-detail-cost.png",
+      "sha256": "a4c5a458b358a0c9260023894cfc5d285071244c67271db9f2d2809011b1e9f6",
+      "proofFile": "detail-proof.json",
+      "sourceSHA256": "a4c5a458b358a0c9260023894cfc5d285071244c67271db9f2d2809011b1e9f6",
+      "sourcePixels": [
+        788,
+        505
+      ],
+      "cropLTRB": [
+        110,
+        296,
+        679,
+        360
+      ],
+      "outputPixels": [
+        569,
+        64
+      ],
+      "outputSHA256": "e014df51258d27587b728d4115dae10e5023f7372ca07a6e4a639da62b2aabca",
+      "pixelEquality": true,
+      "DOMUTC": "2026-10-04T07:30:11.849Z",
+      "CSSViewport": {
+        "dpr": 1.5,
+        "h": 505,
+        "w": 788
+      },
+      "scope": "Exact crop; no masks/repaint. Cost copy/product labels only; host/account/roster omitted."
+    },
+    {
+      "label": "tablet-free-cost",
+      "proofIndex": 12,
+      "captureStartUTC": "2026-10-04T07:30:33.614Z",
+      "captureEndUTC": "2026-10-04T07:30:33.891Z",
+      "file": "tablet-free-cost.png",
+      "sha256": "3d89614386a12384f3e25a7ec297f366cf2c295dbe51a26cb67725a8774be788",
+      "proofFile": "proof.json",
+      "sourceSHA256": "3d89614386a12384f3e25a7ec297f366cf2c295dbe51a26cb67725a8774be788",
+      "sourcePixels": [
+        788,
+        505
+      ],
+      "cropLTRB": [
+        232,
+        280,
+        665,
+        306
+      ],
+      "outputPixels": [
+        433,
+        26
+      ],
+      "outputSHA256": "5d58c0260889b1f8ec32b90937758134859bc5fec6f4d36ee03b5a81f8daa462",
+      "pixelEquality": true,
+      "DOMUTC": "2026-10-04T07:30:33.609Z",
+      "CSSViewport": {
+        "dpr": 1.5,
+        "h": 505,
+        "w": 788
+      },
+      "scope": "Exact crop; no masks/repaint. Cost copy/product labels only; host/account/roster omitted."
+    },
+    {
+      "label": "desktop-photo-cost",
+      "proofIndex": 13,
+      "captureStartUTC": "2026-10-04T07:30:44.655Z",
+      "captureEndUTC": "2026-10-04T07:30:44.683Z",
+      "file": "desktop-photo-cost.png",
+      "sha256": "cf4a831e6f0ad50b3896830c85b21adf6f2499ae37ea9b51bbb8e0b0abd240eb",
+      "proofFile": "proof.json",
+      "sourceSHA256": "cf4a831e6f0ad50b3896830c85b21adf6f2499ae37ea9b51bbb8e0b0abd240eb",
+      "sourcePixels": [
+        1182,
+        757
+      ],
+      "cropLTRB": [
+        397,
+        609,
+        699,
+        664
+      ],
+      "outputPixels": [
+        302,
+        55
+      ],
+      "outputSHA256": "48f63336359f1f95574747afa50d7be8817bc67c992d401940bb970ccb32869f",
+      "pixelEquality": true,
+      "DOMUTC": "2026-10-04T07:30:44.651Z",
+      "CSSViewport": {
+        "dpr": 1,
+        "h": 757,
+        "w": 1182
+      },
+      "scope": "Exact crop; no masks/repaint. Cost copy/product labels only; host/account/roster omitted."
+    },
+    {
+      "label": "desktop-row-cost",
+      "proofIndex": 14,
+      "captureStartUTC": "2026-10-04T07:30:54.248Z",
+      "captureEndUTC": "2026-10-04T07:30:54.290Z",
+      "file": "desktop-row-cost.png",
+      "sha256": "393a3ad99b0adba0df70e9a562a94844d849538cc37ca09538d09d29047e6542",
+      "proofFile": "proof.json",
+      "sourceSHA256": "393a3ad99b0adba0df70e9a562a94844d849538cc37ca09538d09d29047e6542",
+      "sourcePixels": [
+        1182,
+        757
+      ],
+      "cropLTRB": [
+        175,
+        421,
+        574,
+        479
+      ],
+      "outputPixels": [
+        399,
+        58
+      ],
+      "outputSHA256": "587a917b7da0cac318e9027bd22bcd8b29db3acfeb19a1eb0b5f1cf8abf5e9d8",
+      "pixelEquality": true,
+      "DOMUTC": "2026-10-04T07:30:54.235Z",
+      "CSSViewport": {
+        "dpr": 1,
+        "h": 757,
+        "w": 1182
+      },
+      "scope": "Exact crop; no masks/repaint. Cost copy/product labels only; host/account/roster omitted."
+    },
+    {
+      "label": "desktop-detail-cost-visible",
+      "proofIndex": 7,
+      "captureStartUTC": "2026-10-04T07:31:56.554Z",
+      "captureEndUTC": "2026-10-04T07:31:56.581Z",
+      "file": "desktop-detail-cost-visible.png",
+      "sha256": "6f20069a35445f29259bfc7c77199ec3a43b59c3fd4408ee325b8ebc58feb8db",
+      "proofFile": "detail-proof.json",
+      "sourceSHA256": "6f20069a35445f29259bfc7c77199ec3a43b59c3fd4408ee325b8ebc58feb8db",
+      "sourcePixels": [
+        1182,
+        757
+      ],
+      "cropLTRB": [
+        51,
+        336,
+        740,
+        396
+      ],
+      "outputPixels": [
+        689,
+        60
+      ],
+      "outputSHA256": "c30dc9dfc3ccadc52cb224b202f765e5b7188b94e3eeae9fdd1ecead8fe4d984",
+      "pixelEquality": true,
+      "DOMUTC": "2026-10-04T07:31:56.551Z",
+      "CSSViewport": {
+        "dpr": 1,
+        "h": 757,
+        "w": 1182
+      },
+      "scope": "Exact crop; no masks/repaint. Cost copy/product labels only; host/account/roster omitted."
+    },
+    {
+      "label": "desktop-free-cost",
+      "proofIndex": 16,
+      "captureStartUTC": "2026-10-04T07:32:19.856Z",
+      "captureEndUTC": "2026-10-04T07:32:20.131Z",
+      "file": "desktop-free-cost.png",
+      "sha256": "d3e30fe570717ffe9559a7b3253dd98536a7752feb6d2768ef105c618bffb41e",
+      "proofFile": "proof.json",
+      "sourceSHA256": "d3e30fe570717ffe9559a7b3253dd98536a7752feb6d2768ef105c618bffb41e",
+      "sourcePixels": [
+        1182,
+        757
+      ],
+      "cropLTRB": [
+        175,
+        396,
+        574,
+        425
+      ],
+      "outputPixels": [
+        399,
+        29
+      ],
+      "outputSHA256": "e1aace72b2112dc9aad3865ede13eb9c23e86a81b406064daf8807e94e734544",
+      "pixelEquality": true,
+      "DOMUTC": "2026-10-04T07:32:19.852Z",
+      "CSSViewport": {
+        "dpr": 1,
+        "h": 757,
+        "w": 1182
+      },
+      "scope": "Exact crop; no masks/repaint. Cost copy/product labels only; host/account/roster omitted."
+    }
+  ],
+  "sourceCaptureMetadataSHA256": "1a96dfdb67697297dbf2a6c520f74d8ed7a7374d0d76cd407272bc2941e254e4",
+  "safeProofHashes": {
+    "actions.json": "c4394f245645dac347b909b6cd5ee92944eaf5bc18da728f3304fc03287e0901",
+    "deployment-context.json": "f64d436dc65be8866d8cb68e484af6cce14aeb61f8de1b76b72fda42cdebacaf",
+    "detail-proof.json": "9129e6c342268b52484a35751d336d41408bc1f4243c560351d0613e2f770de6",
+    "exit.json": "a7e025d100da6cdef2f8ec8629dad00a25246fa55cec3995c6f727746ed73edd",
+    "mobile-floating-cta-observation.json": "d2eb72c6fa5ad0de829e0a2cba67da43859eb16f5bcb59b459c561c6e2a084c3",
+    "proof.json": "bf350f749881fc9d213d1bffb3d5ddcc83a8e99998b769cf454345f2ae4fced8",
+    "source-safety-context.json": "d74aaaed5dc9e863ae791af209e6b2ca16e7598ddb2752ea19044f9cdacf5723",
+    "summary.json": "9aab037063c3f9b405a83b26faf48cd400bbb9d6dfc523c6b7a11758455cde17"
+  },
+  "sourceProofBeforeMinimizationSHA256": "5bda13f797a48a5d3b47835c7f815ffe13b8b85435af14d5e1e12be8c214024a",
+  "minimization": "Removed redundant non-cost date/venue caption strings from selectedCards.metadata infirst4records. Cost strings/rectangles/URLs/timestamps unchanged. Raw original retained privately. No personal names retained in JSON/PNG.",
+  "excludedCaptures": [
+    {
+      "file": "desktop-detail-cost.png",
+      "reason": "Fee row outsideviewport, not evidence of visible cost; replaced by distinct later actualscroll observation without changing oldDOM"
+    }
+  ],
+  "captureClock": "UTC brackets around actual screenshot call, separate from linked DOMUTC",
+  "privacy": "Only named safe files. Private raw images and4x inspection-only enlargement excluded. Publisher may pseudonymize fixture UUIDs without treating as old entity proof.",
+  "collectorPixelReview": "All14 final crops viewed directly; exact output/source decoded pixels verified. Mobile free word wraps between its two characters; overlap candidate shows partial rightmost digit occlusion, not total value disappearance.",
+  "publicProjection": "Opaque fixture/sport UUIDs are consistently replaced with descriptive aliases in public JSON. Original URL SHA256 values are in verification.json. Original source manifest/hashes retained; public manifest covers delivered bytes.",
+  "publisherReview": "All14 safe PNGs viewed directly; JSON values/geometry, crop bounds, output bytes and separate observation/capture UTCs independently checked. No private originals opened: pixelEquality and source hashes remain collector attestations."
+}

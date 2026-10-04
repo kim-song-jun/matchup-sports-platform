@@ -1,0 +1,1582 @@
+{
+  "verifiedUTC": "2026-10-04T07:46:49.500277+00:00",
+  "method": "Safe-file review and public immutable source review; no new UI actions",
+  "counts": {
+    "sourceFiles": 24,
+    "sourceJSON": 10,
+    "PNG": 14,
+    "listDOM": 18,
+    "detailDOM": 8,
+    "completedSelectedActions": 36,
+    "repeatedCostMetadata": 70,
+    "repeatedSelectedCards": 57,
+    "rectangleRecordsRecomputed": 225
+  },
+  "matrix": [
+    {
+      "viewport": {
+        "dpr": 1.25,
+        "h": 606,
+        "w": 402
+      },
+      "photoProofIndex": 1,
+      "rowProofIndex": 2,
+      "detailProofIndex": 1,
+      "freeProofIndex": 4,
+      "sameCurrentNumericHref": true,
+      "photoHeight": 16,
+      "rowHeight": 32,
+      "freeHeight": 32,
+      "feeRect": {
+        "bottom": 388,
+        "height": 56,
+        "left": 20,
+        "right": 381.6000061035156,
+        "top": 332,
+        "width": 361.6000061035156,
+        "x": 20,
+        "y": 332
+      },
+      "numericPhotoRowDetail": "10000",
+      "freeValue": "무료"
+    },
+    {
+      "viewport": {
+        "dpr": 1.5,
+        "h": 505,
+        "w": 788
+      },
+      "photoProofIndex": 9,
+      "rowProofIndex": 10,
+      "detailProofIndex": 5,
+      "freeProofIndex": 12,
+      "sameCurrentNumericHref": true,
+      "photoHeight": 16,
+      "rowHeight": 16,
+      "freeHeight": 16,
+      "feeRect": {
+        "bottom": 356,
+        "height": 56,
+        "left": 114,
+        "right": 674,
+        "top": 300,
+        "width": 560,
+        "x": 114,
+        "y": 300
+      },
+      "numericPhotoRowDetail": "10000",
+      "freeValue": "무료"
+    },
+    {
+      "viewport": {
+        "dpr": 1,
+        "h": 757,
+        "w": 1182
+      },
+      "photoProofIndex": 13,
+      "rowProofIndex": 14,
+      "detailProofIndex": 7,
+      "freeProofIndex": 16,
+      "sameCurrentNumericHref": true,
+      "photoHeight": 16,
+      "rowHeight": 16,
+      "freeHeight": 16,
+      "feeRect": {
+        "bottom": 392,
+        "height": 52,
+        "left": 55,
+        "right": 735,
+        "top": 340,
+        "width": 680,
+        "x": 55,
+        "y": 340
+      },
+      "numericPhotoRowDetail": "10000",
+      "freeValue": "무료"
+    }
+  ],
+  "metadataViewportChecks": [
+    {
+      "proofIndex": 0,
+      "href": "/matches/synthetic-numeric-1",
+      "photo": true,
+      "rect": {
+        "bottom": 493.2000122070313,
+        "height": 16,
+        "left": -165.60000610351562,
+        "right": 76.80000305175781,
+        "top": 477.2000122070313,
+        "width": 242.40000915527344,
+        "x": -165.60000610351562,
+        "y": 477.2000122070313
+      },
+      "withinViewportRectangleOnly": false
+    },
+    {
+      "proofIndex": 0,
+      "href": "/matches/synthetic-overlap-1",
+      "photo": true,
+      "rect": {
+        "bottom": 493.2000122070313,
+        "height": 16,
+        "left": 122.4000015258789,
+        "right": 364.80001068115234,
+        "top": 477.2000122070313,
+        "width": 242.40000915527344,
+        "x": 122.4000015258789,
+        "y": 477.2000122070313
+      },
+      "withinViewportRectangleOnly": true
+    },
+    {
+      "proofIndex": 0,
+      "href": "/matches/synthetic-free-1",
+      "photo": false,
+      "rect": {
+        "bottom": 1233.2000732421875,
+        "height": 32,
+        "left": 144.8000030517578,
+        "right": 364.8000030517578,
+        "top": 1201.2000732421875,
+        "width": 220,
+        "x": 144.8000030517578,
+        "y": 1201.2000732421875
+      },
+      "withinViewportRectangleOnly": false
+    },
+    {
+      "proofIndex": 0,
+      "href": "/matches/synthetic-numeric-1",
+      "photo": false,
+      "rect": {
+        "bottom": 1534.4000244140625,
+        "height": 32,
+        "left": 144.8000030517578,
+        "right": 364.8000030517578,
+        "top": 1502.4000244140625,
+        "width": 220,
+        "x": 144.8000030517578,
+        "y": 1502.4000244140625
+      },
+      "withinViewportRectangleOnly": false
+    },
+    {
+      "proofIndex": 0,
+      "href": "/matches/synthetic-overlap-1",
+      "photo": false,
+      "rect": {
+        "bottom": 1693,
+        "height": 32,
+        "left": 144.8000030517578,
+        "right": 364.8000030517578,
+        "top": 1661,
+        "width": 220,
+        "x": 144.8000030517578,
+        "y": 1661
+      },
+      "withinViewportRectangleOnly": false
+    },
+    {
+      "proofIndex": 1,
+      "href": "/matches/synthetic-numeric-1",
+      "photo": true,
+      "rect": {
+        "bottom": 493.2000122070313,
+        "height": 16,
+        "left": 32.79999923706055,
+        "right": 275.200008392334,
+        "top": 477.2000122070313,
+        "width": 242.40000915527344,
+        "x": 32.79999923706055,
+        "y": 477.2000122070313
+      },
+      "withinViewportRectangleOnly": true
+    },
+    {
+      "proofIndex": 1,
+      "href": "/matches/synthetic-overlap-1",
+      "photo": true,
+      "rect": {
+        "bottom": 493.2000122070313,
+        "height": 16,
+        "left": 320.8000183105469,
+        "right": 563.2000274658203,
+        "top": 477.2000122070313,
+        "width": 242.40000915527344,
+        "x": 320.8000183105469,
+        "y": 477.2000122070313
+      },
+      "withinViewportRectangleOnly": false
+    },
+    {
+      "proofIndex": 1,
+      "href": "/matches/synthetic-free-1",
+      "photo": false,
+      "rect": {
+        "bottom": 1233.2000732421875,
+        "height": 32,
+        "left": 144.8000030517578,
+        "right": 364.8000030517578,
+        "top": 1201.2000732421875,
+        "width": 220,
+        "x": 144.8000030517578,
+        "y": 1201.2000732421875
+      },
+      "withinViewportRectangleOnly": false
+    },
+    {
+      "proofIndex": 1,
+      "href": "/matches/synthetic-numeric-1",
+      "photo": false,
+      "rect": {
+        "bottom": 1534.4000244140625,
+        "height": 32,
+        "left": 144.8000030517578,
+        "right": 364.8000030517578,
+        "top": 1502.4000244140625,
+        "width": 220,
+        "x": 144.8000030517578,
+        "y": 1502.4000244140625
+      },
+      "withinViewportRectangleOnly": false
+    },
+    {
+      "proofIndex": 1,
+      "href": "/matches/synthetic-overlap-1",
+      "photo": false,
+      "rect": {
+        "bottom": 1693,
+        "height": 32,
+        "left": 144.8000030517578,
+        "right": 364.8000030517578,
+        "top": 1661,
+        "width": 220,
+        "x": 144.8000030517578,
+        "y": 1661
+      },
+      "withinViewportRectangleOnly": false
+    },
+    {
+      "proofIndex": 2,
+      "href": "/matches/synthetic-numeric-1",
+      "photo": true,
+      "rect": {
+        "bottom": -754.7999877929688,
+        "height": 16,
+        "left": 32.79999923706055,
+        "right": 275.200008392334,
+        "top": -770.7999877929688,
+        "width": 242.40000915527344,
+        "x": 32.79999923706055,
+        "y": -770.7999877929688
+      },
+      "withinViewportRectangleOnly": false
+    },
+    {
+      "proofIndex": 2,
+      "href": "/matches/synthetic-overlap-1",
+      "photo": true,
+      "rect": {
+        "bottom": -754.7999877929688,
+        "height": 16,
+        "left": 320.8000183105469,
+        "right": 563.2000274658203,
+        "top": -770.7999877929688,
+        "width": 242.40000915527344,
+        "x": 320.8000183105469,
+        "y": -770.7999877929688
+      },
+      "withinViewportRectangleOnly": false
+    },
+    {
+      "proofIndex": 2,
+      "href": "/matches/synthetic-free-1",
+      "photo": false,
+      "rect": {
+        "bottom": -14.799999237060549,
+        "height": 32,
+        "left": 144.8000030517578,
+        "right": 364.8000030517578,
+        "top": -46.79999923706055,
+        "width": 220,
+        "x": 144.8000030517578,
+        "y": -46.79999923706055
+      },
+      "withinViewportRectangleOnly": false
+    },
+    {
+      "proofIndex": 2,
+      "href": "/matches/synthetic-numeric-1",
+      "photo": false,
+      "rect": {
+        "bottom": 286.40000915527344,
+        "height": 32,
+        "left": 144.8000030517578,
+        "right": 364.8000030517578,
+        "top": 254.40000915527344,
+        "width": 220,
+        "x": 144.8000030517578,
+        "y": 254.40000915527344
+      },
+      "withinViewportRectangleOnly": true
+    },
+    {
+      "proofIndex": 2,
+      "href": "/matches/synthetic-overlap-1",
+      "photo": false,
+      "rect": {
+        "bottom": 445,
+        "height": 32,
+        "left": 144.8000030517578,
+        "right": 364.8000030517578,
+        "top": 413,
+        "width": 220,
+        "x": 144.8000030517578,
+        "y": 413
+      },
+      "withinViewportRectangleOnly": true
+    },
+    {
+      "proofIndex": 3,
+      "href": "/matches/synthetic-numeric-1",
+      "photo": true,
+      "rect": {
+        "bottom": 493.2000122070313,
+        "height": 16,
+        "left": 320.8000183105469,
+        "right": 563.2000274658203,
+        "top": 477.2000122070313,
+        "width": 242.40000915527344,
+        "x": 320.8000183105469,
+        "y": 477.2000122070313
+      },
+      "withinViewportRectangleOnly": false
+    },
+    {
+      "proofIndex": 3,
+      "href": "/matches/synthetic-overlap-1",
+      "photo": true,
+      "rect": {
+        "bottom": 493.2000122070313,
+        "height": 16,
+        "left": 608.7999877929688,
+        "right": 851.1999969482422,
+        "top": 477.2000122070313,
+        "width": 242.40000915527344,
+        "x": 608.7999877929688,
+        "y": 477.2000122070313
+      },
+      "withinViewportRectangleOnly": false
+    },
+    {
+      "proofIndex": 3,
+      "href": "/matches/synthetic-free-1",
+      "photo": false,
+      "rect": {
+        "bottom": 1233.2000732421875,
+        "height": 32,
+        "left": 144.8000030517578,
+        "right": 364.8000030517578,
+        "top": 1201.2000732421875,
+        "width": 220,
+        "x": 144.8000030517578,
+        "y": 1201.2000732421875
+      },
+      "withinViewportRectangleOnly": false
+    },
+    {
+      "proofIndex": 3,
+      "href": "/matches/synthetic-numeric-1",
+      "photo": false,
+      "rect": {
+        "bottom": 1534.4000244140625,
+        "height": 32,
+        "left": 144.8000030517578,
+        "right": 364.8000030517578,
+        "top": 1502.4000244140625,
+        "width": 220,
+        "x": 144.8000030517578,
+        "y": 1502.4000244140625
+      },
+      "withinViewportRectangleOnly": false
+    },
+    {
+      "proofIndex": 3,
+      "href": "/matches/synthetic-overlap-1",
+      "photo": false,
+      "rect": {
+        "bottom": 1693,
+        "height": 32,
+        "left": 144.8000030517578,
+        "right": 364.8000030517578,
+        "top": 1661,
+        "width": 220,
+        "x": 144.8000030517578,
+        "y": 1661
+      },
+      "withinViewportRectangleOnly": false
+    },
+    {
+      "proofIndex": 4,
+      "href": "/matches/synthetic-free-1?from=%2Fmatches%3FsportId%3Dsport-football",
+      "photo": false,
+      "rect": {
+        "bottom": 317.20001220703125,
+        "height": 32,
+        "left": 144.8000030517578,
+        "right": 364.8000030517578,
+        "top": 285.20001220703125,
+        "width": 220,
+        "x": 144.8000030517578,
+        "y": 285.20001220703125
+      },
+      "withinViewportRectangleOnly": true
+    },
+    {
+      "proofIndex": 5,
+      "href": "/matches/synthetic-free-1?from=%2Fmatches%3FsportId%3Dsport-football",
+      "photo": false,
+      "rect": {
+        "bottom": 317.20001220703125,
+        "height": 32,
+        "left": 144.8000030517578,
+        "right": 364.8000030517578,
+        "top": 285.20001220703125,
+        "width": 220,
+        "x": 144.8000030517578,
+        "y": 285.20001220703125
+      },
+      "withinViewportRectangleOnly": true
+    },
+    {
+      "proofIndex": 6,
+      "href": "/matches/synthetic-free-1?from=%2Fmatches%3FsportId%3Dsport-football",
+      "photo": false,
+      "rect": {
+        "bottom": 317.20001220703125,
+        "height": 32,
+        "left": 144.8000030517578,
+        "right": 364.8000030517578,
+        "top": 285.20001220703125,
+        "width": 220,
+        "x": 144.8000030517578,
+        "y": 285.20001220703125
+      },
+      "withinViewportRectangleOnly": true
+    },
+    {
+      "proofIndex": 7,
+      "href": "/matches/synthetic-numeric-1",
+      "photo": true,
+      "rect": {
+        "bottom": 493.2000122070313,
+        "height": 16,
+        "left": -165.60000610351562,
+        "right": 76.80000305175781,
+        "top": 477.2000122070313,
+        "width": 242.40000915527344,
+        "x": -165.60000610351562,
+        "y": 477.2000122070313
+      },
+      "withinViewportRectangleOnly": false
+    },
+    {
+      "proofIndex": 7,
+      "href": "/matches/synthetic-overlap-1",
+      "photo": true,
+      "rect": {
+        "bottom": 493.2000122070313,
+        "height": 16,
+        "left": 122.4000015258789,
+        "right": 364.80001068115234,
+        "top": 477.2000122070313,
+        "width": 242.40000915527344,
+        "x": 122.4000015258789,
+        "y": 477.2000122070313
+      },
+      "withinViewportRectangleOnly": true
+    },
+    {
+      "proofIndex": 7,
+      "href": "/matches/synthetic-free-1",
+      "photo": false,
+      "rect": {
+        "bottom": 1233.2000732421875,
+        "height": 32,
+        "left": 144.8000030517578,
+        "right": 364.8000030517578,
+        "top": 1201.2000732421875,
+        "width": 220,
+        "x": 144.8000030517578,
+        "y": 1201.2000732421875
+      },
+      "withinViewportRectangleOnly": false
+    },
+    {
+      "proofIndex": 7,
+      "href": "/matches/synthetic-numeric-1",
+      "photo": false,
+      "rect": {
+        "bottom": 1534.4000244140625,
+        "height": 32,
+        "left": 144.8000030517578,
+        "right": 364.8000030517578,
+        "top": 1502.4000244140625,
+        "width": 220,
+        "x": 144.8000030517578,
+        "y": 1502.4000244140625
+      },
+      "withinViewportRectangleOnly": false
+    },
+    {
+      "proofIndex": 7,
+      "href": "/matches/synthetic-overlap-1",
+      "photo": false,
+      "rect": {
+        "bottom": 1693,
+        "height": 32,
+        "left": 144.8000030517578,
+        "right": 364.8000030517578,
+        "top": 1661,
+        "width": 220,
+        "x": 144.8000030517578,
+        "y": 1661
+      },
+      "withinViewportRectangleOnly": false
+    },
+    {
+      "proofIndex": 8,
+      "href": "/matches/synthetic-numeric-1",
+      "photo": true,
+      "rect": {
+        "bottom": 492.6666870117187,
+        "height": 16,
+        "left": 126.66667175292967,
+        "right": 369.3333435058594,
+        "top": 476.6666870117187,
+        "width": 242.6666717529297,
+        "x": 126.66667175292967,
+        "y": 476.6666870117187
+      },
+      "withinViewportRectangleOnly": true
+    },
+    {
+      "proofIndex": 8,
+      "href": "/matches/synthetic-overlap-1",
+      "photo": true,
+      "rect": {
+        "bottom": 492.6666870117187,
+        "height": 16,
+        "left": 414.6666870117187,
+        "right": 657.3333587646484,
+        "top": 476.6666870117187,
+        "width": 242.6666717529297,
+        "x": 414.6666870117187,
+        "y": 476.6666870117187
+      },
+      "withinViewportRectangleOnly": true
+    },
+    {
+      "proofIndex": 8,
+      "href": "/matches/synthetic-free-1",
+      "photo": false,
+      "rect": {
+        "bottom": 1215.3333740234375,
+        "height": 16,
+        "left": 238.6666717529297,
+        "right": 657.3333587646484,
+        "top": 1199.3333740234375,
+        "width": 418.6666870117187,
+        "x": 238.6666717529297,
+        "y": 1199.3333740234375
+      },
+      "withinViewportRectangleOnly": false
+    },
+    {
+      "proofIndex": 8,
+      "href": "/matches/synthetic-numeric-1",
+      "photo": false,
+      "rect": {
+        "bottom": 1500,
+        "height": 16,
+        "left": 238.6666717529297,
+        "right": 657.3333587646484,
+        "top": 1484,
+        "width": 418.6666870117187,
+        "x": 238.6666717529297,
+        "y": 1484
+      },
+      "withinViewportRectangleOnly": false
+    },
+    {
+      "proofIndex": 8,
+      "href": "/matches/synthetic-overlap-1",
+      "photo": false,
+      "rect": {
+        "bottom": 1642.3333740234375,
+        "height": 16,
+        "left": 238.6666717529297,
+        "right": 657.3333587646484,
+        "top": 1626.3333740234375,
+        "width": 418.6666870117187,
+        "x": 238.6666717529297,
+        "y": 1626.3333740234375
+      },
+      "withinViewportRectangleOnly": false
+    },
+    {
+      "proofIndex": 9,
+      "href": "/matches/synthetic-numeric-1",
+      "photo": true,
+      "rect": {
+        "bottom": 332.66668701171875,
+        "height": 16,
+        "left": 126.66667175292967,
+        "right": 369.3333435058594,
+        "top": 316.66668701171875,
+        "width": 242.6666717529297,
+        "x": 126.66667175292967,
+        "y": 316.66668701171875
+      },
+      "withinViewportRectangleOnly": true
+    },
+    {
+      "proofIndex": 9,
+      "href": "/matches/synthetic-overlap-1",
+      "photo": true,
+      "rect": {
+        "bottom": 332.66668701171875,
+        "height": 16,
+        "left": 414.6666870117187,
+        "right": 657.3333587646484,
+        "top": 316.66668701171875,
+        "width": 242.6666717529297,
+        "x": 414.6666870117187,
+        "y": 316.66668701171875
+      },
+      "withinViewportRectangleOnly": true
+    },
+    {
+      "proofIndex": 9,
+      "href": "/matches/synthetic-free-1",
+      "photo": false,
+      "rect": {
+        "bottom": 1055.3333740234375,
+        "height": 16,
+        "left": 238.6666717529297,
+        "right": 657.3333587646484,
+        "top": 1039.3333740234375,
+        "width": 418.6666870117187,
+        "x": 238.6666717529297,
+        "y": 1039.3333740234375
+      },
+      "withinViewportRectangleOnly": false
+    },
+    {
+      "proofIndex": 9,
+      "href": "/matches/synthetic-numeric-1",
+      "photo": false,
+      "rect": {
+        "bottom": 1340,
+        "height": 16,
+        "left": 238.6666717529297,
+        "right": 657.3333587646484,
+        "top": 1324,
+        "width": 418.6666870117187,
+        "x": 238.6666717529297,
+        "y": 1324
+      },
+      "withinViewportRectangleOnly": false
+    },
+    {
+      "proofIndex": 9,
+      "href": "/matches/synthetic-overlap-1",
+      "photo": false,
+      "rect": {
+        "bottom": 1482.3333740234375,
+        "height": 16,
+        "left": 238.6666717529297,
+        "right": 657.3333587646484,
+        "top": 1466.3333740234375,
+        "width": 418.6666870117187,
+        "x": 238.6666717529297,
+        "y": 1466.3333740234375
+      },
+      "withinViewportRectangleOnly": false
+    },
+    {
+      "proofIndex": 10,
+      "href": "/matches/synthetic-numeric-1",
+      "photo": true,
+      "rect": {
+        "bottom": -707.3333740234375,
+        "height": 16,
+        "left": 126.66667175292967,
+        "right": 369.3333435058594,
+        "top": -723.3333740234375,
+        "width": 242.6666717529297,
+        "x": 126.66667175292967,
+        "y": -723.3333740234375
+      },
+      "withinViewportRectangleOnly": false
+    },
+    {
+      "proofIndex": 10,
+      "href": "/matches/synthetic-overlap-1",
+      "photo": true,
+      "rect": {
+        "bottom": -707.3333740234375,
+        "height": 16,
+        "left": 414.6666870117187,
+        "right": 657.3333587646484,
+        "top": -723.3333740234375,
+        "width": 242.6666717529297,
+        "x": 414.6666870117187,
+        "y": -723.3333740234375
+      },
+      "withinViewportRectangleOnly": false
+    },
+    {
+      "proofIndex": 10,
+      "href": "/matches/synthetic-free-1",
+      "photo": false,
+      "rect": {
+        "bottom": 15.333333313465118,
+        "height": 16,
+        "left": 238.6666717529297,
+        "right": 657.3333587646484,
+        "top": -0.6666666865348816,
+        "width": 418.6666870117187,
+        "x": 238.6666717529297,
+        "y": -0.6666666865348816
+      },
+      "withinViewportRectangleOnly": false
+    },
+    {
+      "proofIndex": 10,
+      "href": "/matches/synthetic-numeric-1",
+      "photo": false,
+      "rect": {
+        "bottom": 300,
+        "height": 16,
+        "left": 238.6666717529297,
+        "right": 657.3333587646484,
+        "top": 284,
+        "width": 418.6666870117187,
+        "x": 238.6666717529297,
+        "y": 284
+      },
+      "withinViewportRectangleOnly": true
+    },
+    {
+      "proofIndex": 10,
+      "href": "/matches/synthetic-overlap-1",
+      "photo": false,
+      "rect": {
+        "bottom": 442.3333435058594,
+        "height": 16,
+        "left": 238.6666717529297,
+        "right": 657.3333587646484,
+        "top": 426.3333435058594,
+        "width": 418.6666870117187,
+        "x": 238.6666717529297,
+        "y": 426.3333435058594
+      },
+      "withinViewportRectangleOnly": true
+    },
+    {
+      "proofIndex": 11,
+      "href": "/matches/synthetic-numeric-1",
+      "photo": true,
+      "rect": {
+        "bottom": 492.6666870117187,
+        "height": 16,
+        "left": 414.6666870117187,
+        "right": 657.3333587646484,
+        "top": 476.6666870117187,
+        "width": 242.6666717529297,
+        "x": 414.6666870117187,
+        "y": 476.6666870117187
+      },
+      "withinViewportRectangleOnly": true
+    },
+    {
+      "proofIndex": 11,
+      "href": "/matches/synthetic-overlap-1",
+      "photo": true,
+      "rect": {
+        "bottom": 492.6666870117187,
+        "height": 16,
+        "left": 702.6666870117188,
+        "right": 945.3333587646484,
+        "top": 476.6666870117187,
+        "width": 242.6666717529297,
+        "x": 702.6666870117188,
+        "y": 476.6666870117187
+      },
+      "withinViewportRectangleOnly": false
+    },
+    {
+      "proofIndex": 11,
+      "href": "/matches/synthetic-free-1",
+      "photo": false,
+      "rect": {
+        "bottom": 1215.3333740234375,
+        "height": 16,
+        "left": 238.6666717529297,
+        "right": 657.3333587646484,
+        "top": 1199.3333740234375,
+        "width": 418.6666870117187,
+        "x": 238.6666717529297,
+        "y": 1199.3333740234375
+      },
+      "withinViewportRectangleOnly": false
+    },
+    {
+      "proofIndex": 11,
+      "href": "/matches/synthetic-numeric-1",
+      "photo": false,
+      "rect": {
+        "bottom": 1500,
+        "height": 16,
+        "left": 238.6666717529297,
+        "right": 657.3333587646484,
+        "top": 1484,
+        "width": 418.6666870117187,
+        "x": 238.6666717529297,
+        "y": 1484
+      },
+      "withinViewportRectangleOnly": false
+    },
+    {
+      "proofIndex": 11,
+      "href": "/matches/synthetic-overlap-1",
+      "photo": false,
+      "rect": {
+        "bottom": 1642.3333740234375,
+        "height": 16,
+        "left": 238.6666717529297,
+        "right": 657.3333587646484,
+        "top": 1626.3333740234375,
+        "width": 418.6666870117187,
+        "x": 238.6666717529297,
+        "y": 1626.3333740234375
+      },
+      "withinViewportRectangleOnly": false
+    },
+    {
+      "proofIndex": 12,
+      "href": "/matches/synthetic-free-1?from=%2Fmatches%3FsportId%3Dsport-football",
+      "photo": false,
+      "rect": {
+        "bottom": 300.66668701171875,
+        "height": 16,
+        "left": 238.6666717529297,
+        "right": 657.3333587646484,
+        "top": 284.66668701171875,
+        "width": 418.6666870117187,
+        "x": 238.6666717529297,
+        "y": 284.66668701171875
+      },
+      "withinViewportRectangleOnly": true
+    },
+    {
+      "proofIndex": 13,
+      "href": "/matches/synthetic-numeric-1",
+      "photo": true,
+      "rect": {
+        "bottom": 631,
+        "height": 16,
+        "left": 404,
+        "right": 690,
+        "top": 615,
+        "width": 286,
+        "x": 404,
+        "y": 615
+      },
+      "withinViewportRectangleOnly": true
+    },
+    {
+      "proofIndex": 13,
+      "href": "/matches/synthetic-overlap-1",
+      "photo": true,
+      "rect": {
+        "bottom": 631,
+        "height": 16,
+        "left": 736,
+        "right": 1022,
+        "top": 615,
+        "width": 286,
+        "x": 736,
+        "y": 615
+      },
+      "withinViewportRectangleOnly": true
+    },
+    {
+      "proofIndex": 13,
+      "href": "/matches/synthetic-free-1",
+      "photo": false,
+      "rect": {
+        "bottom": 1083,
+        "height": 16,
+        "left": 180,
+        "right": 566,
+        "top": 1067,
+        "width": 386,
+        "x": 180,
+        "y": 1067
+      },
+      "withinViewportRectangleOnly": false
+    },
+    {
+      "proofIndex": 13,
+      "href": "/matches/synthetic-numeric-1",
+      "photo": false,
+      "rect": {
+        "bottom": 1230,
+        "height": 16,
+        "left": 180,
+        "right": 566,
+        "top": 1214,
+        "width": 386,
+        "x": 180,
+        "y": 1214
+      },
+      "withinViewportRectangleOnly": false
+    },
+    {
+      "proofIndex": 13,
+      "href": "/matches/synthetic-overlap-1",
+      "photo": false,
+      "rect": {
+        "bottom": 1230,
+        "height": 16,
+        "left": 724,
+        "right": 1110,
+        "top": 1214,
+        "width": 386,
+        "x": 724,
+        "y": 1214
+      },
+      "withinViewportRectangleOnly": false
+    },
+    {
+      "proofIndex": 14,
+      "href": "/matches/synthetic-numeric-1",
+      "photo": true,
+      "rect": {
+        "bottom": -157,
+        "height": 16,
+        "left": 404,
+        "right": 690,
+        "top": -173,
+        "width": 286,
+        "x": 404,
+        "y": -173
+      },
+      "withinViewportRectangleOnly": false
+    },
+    {
+      "proofIndex": 14,
+      "href": "/matches/synthetic-overlap-1",
+      "photo": true,
+      "rect": {
+        "bottom": -157,
+        "height": 16,
+        "left": 736,
+        "right": 1022,
+        "top": -173,
+        "width": 286,
+        "x": 736,
+        "y": -173
+      },
+      "withinViewportRectangleOnly": false
+    },
+    {
+      "proofIndex": 14,
+      "href": "/matches/synthetic-free-1",
+      "photo": false,
+      "rect": {
+        "bottom": 295,
+        "height": 16,
+        "left": 180,
+        "right": 566,
+        "top": 279,
+        "width": 386,
+        "x": 180,
+        "y": 279
+      },
+      "withinViewportRectangleOnly": true
+    },
+    {
+      "proofIndex": 14,
+      "href": "/matches/synthetic-numeric-1",
+      "photo": false,
+      "rect": {
+        "bottom": 442,
+        "height": 16,
+        "left": 180,
+        "right": 566,
+        "top": 426,
+        "width": 386,
+        "x": 180,
+        "y": 426
+      },
+      "withinViewportRectangleOnly": true
+    },
+    {
+      "proofIndex": 14,
+      "href": "/matches/synthetic-overlap-1",
+      "photo": false,
+      "rect": {
+        "bottom": 442,
+        "height": 16,
+        "left": 724,
+        "right": 1110,
+        "top": 426,
+        "width": 386,
+        "x": 724,
+        "y": 426
+      },
+      "withinViewportRectangleOnly": true
+    },
+    {
+      "proofIndex": 15,
+      "href": "/matches/synthetic-numeric-1",
+      "photo": true,
+      "rect": {
+        "bottom": -157,
+        "height": 16,
+        "left": 404,
+        "right": 690,
+        "top": -173,
+        "width": 286,
+        "x": 404,
+        "y": -173
+      },
+      "withinViewportRectangleOnly": false
+    },
+    {
+      "proofIndex": 15,
+      "href": "/matches/synthetic-overlap-1",
+      "photo": true,
+      "rect": {
+        "bottom": -157,
+        "height": 16,
+        "left": 736,
+        "right": 1022,
+        "top": -173,
+        "width": 286,
+        "x": 736,
+        "y": -173
+      },
+      "withinViewportRectangleOnly": false
+    },
+    {
+      "proofIndex": 15,
+      "href": "/matches/synthetic-free-1",
+      "photo": false,
+      "rect": {
+        "bottom": 295,
+        "height": 16,
+        "left": 180,
+        "right": 566,
+        "top": 279,
+        "width": 386,
+        "x": 180,
+        "y": 279
+      },
+      "withinViewportRectangleOnly": true
+    },
+    {
+      "proofIndex": 15,
+      "href": "/matches/synthetic-numeric-1",
+      "photo": false,
+      "rect": {
+        "bottom": 442,
+        "height": 16,
+        "left": 180,
+        "right": 566,
+        "top": 426,
+        "width": 386,
+        "x": 180,
+        "y": 426
+      },
+      "withinViewportRectangleOnly": true
+    },
+    {
+      "proofIndex": 15,
+      "href": "/matches/synthetic-overlap-1",
+      "photo": false,
+      "rect": {
+        "bottom": 442,
+        "height": 16,
+        "left": 724,
+        "right": 1110,
+        "top": 426,
+        "width": 386,
+        "x": 724,
+        "y": 426
+      },
+      "withinViewportRectangleOnly": true
+    },
+    {
+      "proofIndex": 16,
+      "href": "/matches/synthetic-free-1?from=%2Fmatches%3FsportId%3Dsport-football",
+      "photo": false,
+      "rect": {
+        "bottom": 417,
+        "height": 16,
+        "left": 180,
+        "right": 566,
+        "top": 401,
+        "width": 386,
+        "x": 180,
+        "y": 401
+      },
+      "withinViewportRectangleOnly": true
+    },
+    {
+      "proofIndex": 17,
+      "href": "/matches/synthetic-numeric-1",
+      "photo": true,
+      "rect": {
+        "bottom": 631,
+        "height": 16,
+        "left": 404,
+        "right": 690,
+        "top": 615,
+        "width": 286,
+        "x": 404,
+        "y": 615
+      },
+      "withinViewportRectangleOnly": true
+    },
+    {
+      "proofIndex": 17,
+      "href": "/matches/synthetic-overlap-1",
+      "photo": true,
+      "rect": {
+        "bottom": 631,
+        "height": 16,
+        "left": 736,
+        "right": 1022,
+        "top": 615,
+        "width": 286,
+        "x": 736,
+        "y": 615
+      },
+      "withinViewportRectangleOnly": true
+    },
+    {
+      "proofIndex": 17,
+      "href": "/matches/synthetic-free-1",
+      "photo": false,
+      "rect": {
+        "bottom": 1083,
+        "height": 16,
+        "left": 180,
+        "right": 566,
+        "top": 1067,
+        "width": 386,
+        "x": 180,
+        "y": 1067
+      },
+      "withinViewportRectangleOnly": false
+    },
+    {
+      "proofIndex": 17,
+      "href": "/matches/synthetic-numeric-1",
+      "photo": false,
+      "rect": {
+        "bottom": 1230,
+        "height": 16,
+        "left": 180,
+        "right": 566,
+        "top": 1214,
+        "width": 386,
+        "x": 180,
+        "y": 1214
+      },
+      "withinViewportRectangleOnly": false
+    },
+    {
+      "proofIndex": 17,
+      "href": "/matches/synthetic-overlap-1",
+      "photo": false,
+      "rect": {
+        "bottom": 1230,
+        "height": 16,
+        "left": 724,
+        "right": 1110,
+        "top": 1214,
+        "width": 386,
+        "x": 724,
+        "y": 1214
+      },
+      "withinViewportRectangleOnly": false
+    }
+  ],
+  "numericReturnPairs": [
+    {
+      "before": 2,
+      "after": 3,
+      "countBefore": 8,
+      "countAfter": 8,
+      "selectedCardsEqual": true,
+      "scrollBefore": {
+        "main": 1248,
+        "x": 0,
+        "y": 0
+      },
+      "scrollAfter": {
+        "main": 0,
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "before": 10,
+      "after": 11,
+      "countBefore": 8,
+      "countAfter": 8,
+      "selectedCardsEqual": true,
+      "scrollBefore": {
+        "main": 1200,
+        "x": 0,
+        "y": 0
+      },
+      "scrollAfter": {
+        "main": 0,
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "before": 14,
+      "after": 15,
+      "countBefore": 8,
+      "countAfter": 8,
+      "selectedCardsEqual": true,
+      "scrollBefore": {
+        "main": 0,
+        "x": 0,
+        "y": 788
+      },
+      "scrollAfter": {
+        "main": 0,
+        "x": 0,
+        "y": 788
+      }
+    }
+  ],
+  "freeFilteredIndices": [
+    4,
+    5,
+    6,
+    12,
+    16
+  ],
+  "fullListIdentityOrderVerified": false,
+  "URLHashes": [
+    {
+      "alias": "synthetic-numeric-1",
+      "originalDetailURLSHA256": "4ab24cdba8ec87c268b6a9737b5191bb4db1b656c79040f741db2fd958773356"
+    },
+    {
+      "alias": "synthetic-free-1",
+      "originalDetailURLSHA256": "9636f6cfb2cf2dfa0c0cd1ae2d016f9150ad1a9a0dd0df81c3f1c66dcb4a9abb"
+    },
+    {
+      "alias": "synthetic-overlap-1",
+      "originalDetailURLSHA256": "54495c2189cf0ebc47e2f897a129a0bcc00908a2693976847583fc02e871d1b0"
+    },
+    {
+      "alias": "synthetic-no-cost-control-1",
+      "originalDetailURLSHA256": "f1e57d56506c764aae0c00318e4091dbed950c0678793414b668c987839b2720"
+    }
+  ],
+  "candidate": {
+    "proofIndex": 7,
+    "listUTC": "2026-10-04T07:27:08.874Z",
+    "overlayUTC": "2026-10-04T07:27:08.890Z",
+    "metadataRect": {
+      "bottom": 493.2000122070313,
+      "height": 16,
+      "left": 122.4000015258789,
+      "right": 364.80001068115234,
+      "top": 477.2000122070313,
+      "width": 242.40000915527344,
+      "x": 122.4000015258789,
+      "y": 477.2000122070313
+    },
+    "CTARect": {
+      "bottom": 514,
+      "height": 56,
+      "left": 325.6000061035156,
+      "right": 381.6000061035156,
+      "top": 458,
+      "width": 56,
+      "x": 325.6000061035156,
+      "y": 458
+    },
+    "bboxOverlapWidthCSS": 39.20000457763672,
+    "bboxOverlapHeightCSS": 16.0,
+    "note": "Bounding-box intersection is not a measured glyph occlusion width. Actual crop shows partial final digit only; no per-glyph rectangle, opaque-circle contour or shadow subtraction."
+  },
+  "images": [
+    {
+      "file": "mobile-photo-cost.png",
+      "proofFile": "proof.json",
+      "proofIndex": 1,
+      "DOMUTC": "2026-10-04T07:21:47.601Z",
+      "captureStartUTC": "2026-10-04T07:21:47.605Z",
+      "captureEndUTC": "2026-10-04T07:21:47.629Z",
+      "captureDelaySeconds": 0.004,
+      "outputSHA256": "520195eeaa6bbd4a7da272b084eaea82f90465cfe26ccb68aa60eae3e721d952",
+      "sourcePixels": [
+        402,
+        606
+      ],
+      "outputPixels": [
+        260,
+        62
+      ]
+    },
+    {
+      "file": "mobile-row-cost.png",
+      "proofFile": "proof.json",
+      "proofIndex": 2,
+      "DOMUTC": "2026-10-04T07:21:54.832Z",
+      "captureStartUTC": "2026-10-04T07:22:17.130Z",
+      "captureEndUTC": "2026-10-04T07:22:17.150Z",
+      "captureDelaySeconds": 22.298,
+      "outputSHA256": "18f79edc718e7342ee162995cf9bb12b40876609295ff1103c2968c94ec86e3e",
+      "sourcePixels": [
+        402,
+        606
+      ],
+      "outputPixels": [
+        234,
+        61
+      ]
+    },
+    {
+      "file": "mobile-detail-cost.png",
+      "proofFile": "detail-proof.json",
+      "proofIndex": 1,
+      "DOMUTC": "2026-10-04T07:23:22.364Z",
+      "captureStartUTC": "2026-10-04T07:23:22.367Z",
+      "captureEndUTC": "2026-10-04T07:23:22.382Z",
+      "captureDelaySeconds": 0.003,
+      "outputSHA256": "d7db4f3c06abf87e5431755f0a31d4c38c645c7a8b2b4bfc3be5831342667c12",
+      "sourcePixels": [
+        402,
+        606
+      ],
+      "outputPixels": [
+        370,
+        64
+      ]
+    },
+    {
+      "file": "mobile-free-cost.png",
+      "proofFile": "proof.json",
+      "proofIndex": 4,
+      "DOMUTC": "2026-10-04T07:24:50.383Z",
+      "captureStartUTC": "2026-10-04T07:24:50.389Z",
+      "captureEndUTC": "2026-10-04T07:24:50.661Z",
+      "captureDelaySeconds": 0.006,
+      "outputSHA256": "ac8623ce4db4c3d49e757c423f6cfc8f4e716938c01b1f3cab1fe617de657489",
+      "sourcePixels": [
+        402,
+        606
+      ],
+      "outputPixels": [
+        235,
+        41
+      ]
+    },
+    {
+      "file": "mobile-free-detail.png",
+      "proofFile": "detail-proof.json",
+      "proofIndex": 4,
+      "DOMUTC": "2026-10-04T07:25:56.440Z",
+      "captureStartUTC": "2026-10-04T07:25:56.444Z",
+      "captureEndUTC": "2026-10-04T07:25:56.467Z",
+      "captureDelaySeconds": 0.004,
+      "outputSHA256": "2f8d7355bb37e811264b59db82491c3c6ff5299506f188ccdc0ddd1796d4fc20",
+      "sourcePixels": [
+        402,
+        606
+      ],
+      "outputPixels": [
+        370,
+        64
+      ]
+    },
+    {
+      "file": "mobile-last-photo-cta-overlap.png",
+      "proofFile": "proof.json",
+      "proofIndex": 7,
+      "DOMUTC": "2026-10-04T07:27:08.874Z",
+      "captureStartUTC": "2026-10-04T07:27:08.894Z",
+      "captureEndUTC": "2026-10-04T07:27:08.914Z",
+      "captureDelaySeconds": 0.02,
+      "outputSHA256": "e1207aa75c5ef83bf48595f132355d261e6aa39950b3a8a70c6853d577a79aea",
+      "sourcePixels": [
+        402,
+        606
+      ],
+      "outputPixels": [
+        274,
+        68
+      ]
+    },
+    {
+      "file": "tablet-photo-cost.png",
+      "proofFile": "proof.json",
+      "proofIndex": 9,
+      "DOMUTC": "2026-10-04T07:29:29.170Z",
+      "captureStartUTC": "2026-10-04T07:29:29.174Z",
+      "captureEndUTC": "2026-10-04T07:29:29.203Z",
+      "captureDelaySeconds": 0.004,
+      "outputSHA256": "7bdafdca6065f2de965e7d526cd49b2a87a3de0d67668ab9a066393653bef535",
+      "sourcePixels": [
+        788,
+        505
+      ],
+      "outputPixels": [
+        258,
+        58
+      ]
+    },
+    {
+      "file": "tablet-row-cost.png",
+      "proofFile": "proof.json",
+      "proofIndex": 10,
+      "DOMUTC": "2026-10-04T07:29:49.436Z",
+      "captureStartUTC": "2026-10-04T07:29:49.441Z",
+      "captureEndUTC": "2026-10-04T07:29:49.469Z",
+      "captureDelaySeconds": 0.005,
+      "outputSHA256": "9ec7e71c7bbcda1185e14f9e5b2c1efba3ce029a76e2670379ed8458217c72db",
+      "sourcePixels": [
+        788,
+        505
+      ],
+      "outputPixels": [
+        432,
+        55
+      ]
+    },
+    {
+      "file": "tablet-detail-cost.png",
+      "proofFile": "detail-proof.json",
+      "proofIndex": 5,
+      "DOMUTC": "2026-10-04T07:30:11.849Z",
+      "captureStartUTC": "2026-10-04T07:30:11.852Z",
+      "captureEndUTC": "2026-10-04T07:30:11.873Z",
+      "captureDelaySeconds": 0.003,
+      "outputSHA256": "e014df51258d27587b728d4115dae10e5023f7372ca07a6e4a639da62b2aabca",
+      "sourcePixels": [
+        788,
+        505
+      ],
+      "outputPixels": [
+        569,
+        64
+      ]
+    },
+    {
+      "file": "tablet-free-cost.png",
+      "proofFile": "proof.json",
+      "proofIndex": 12,
+      "DOMUTC": "2026-10-04T07:30:33.609Z",
+      "captureStartUTC": "2026-10-04T07:30:33.614Z",
+      "captureEndUTC": "2026-10-04T07:30:33.891Z",
+      "captureDelaySeconds": 0.005,
+      "outputSHA256": "5d58c0260889b1f8ec32b90937758134859bc5fec6f4d36ee03b5a81f8daa462",
+      "sourcePixels": [
+        788,
+        505
+      ],
+      "outputPixels": [
+        433,
+        26
+      ]
+    },
+    {
+      "file": "desktop-photo-cost.png",
+      "proofFile": "proof.json",
+      "proofIndex": 13,
+      "DOMUTC": "2026-10-04T07:30:44.651Z",
+      "captureStartUTC": "2026-10-04T07:30:44.655Z",
+      "captureEndUTC": "2026-10-04T07:30:44.683Z",
+      "captureDelaySeconds": 0.004,
+      "outputSHA256": "48f63336359f1f95574747afa50d7be8817bc67c992d401940bb970ccb32869f",
+      "sourcePixels": [
+        1182,
+        757
+      ],
+      "outputPixels": [
+        302,
+        55
+      ]
+    },
+    {
+      "file": "desktop-row-cost.png",
+      "proofFile": "proof.json",
+      "proofIndex": 14,
+      "DOMUTC": "2026-10-04T07:30:54.235Z",
+      "captureStartUTC": "2026-10-04T07:30:54.248Z",
+      "captureEndUTC": "2026-10-04T07:30:54.290Z",
+      "captureDelaySeconds": 0.013,
+      "outputSHA256": "587a917b7da0cac318e9027bd22bcd8b29db3acfeb19a1eb0b5f1cf8abf5e9d8",
+      "sourcePixels": [
+        1182,
+        757
+      ],
+      "outputPixels": [
+        399,
+        58
+      ]
+    },
+    {
+      "file": "desktop-detail-cost-visible.png",
+      "proofFile": "detail-proof.json",
+      "proofIndex": 7,
+      "DOMUTC": "2026-10-04T07:31:56.551Z",
+      "captureStartUTC": "2026-10-04T07:31:56.554Z",
+      "captureEndUTC": "2026-10-04T07:31:56.581Z",
+      "captureDelaySeconds": 0.003,
+      "outputSHA256": "c30dc9dfc3ccadc52cb224b202f765e5b7188b94e3eeae9fdd1ecead8fe4d984",
+      "sourcePixels": [
+        1182,
+        757
+      ],
+      "outputPixels": [
+        689,
+        60
+      ]
+    },
+    {
+      "file": "desktop-free-cost.png",
+      "proofFile": "proof.json",
+      "proofIndex": 16,
+      "DOMUTC": "2026-10-04T07:32:19.852Z",
+      "captureStartUTC": "2026-10-04T07:32:19.856Z",
+      "captureEndUTC": "2026-10-04T07:32:20.131Z",
+      "captureDelaySeconds": 0.004,
+      "outputSHA256": "e1aace72b2112dc9aad3865ede13eb9c23e86a81b406064daf8807e94e734544",
+      "sourcePixels": [
+        1182,
+        757
+      ],
+      "outputPixels": [
+        399,
+        29
+      ]
+    }
+  ],
+  "sourceFilesUnchanged": true
+}

@@ -1,0 +1,56 @@
+{
+  "createLinks": [
+    {
+      "label": "새 매치 만들기",
+      "position": "static",
+      "rect": {
+        "bottom": 0,
+        "height": 0,
+        "left": 0,
+        "right": 0,
+        "top": 0,
+        "width": 0,
+        "x": 0,
+        "y": 0
+      },
+      "zIndex": "auto"
+    },
+    {
+      "label": "매치 만들기",
+      "position": "absolute",
+      "rect": {
+        "bottom": 514,
+        "height": 56,
+        "left": 325.6000061035156,
+        "right": 381.6000061035156,
+        "top": 458,
+        "width": 56,
+        "x": 325.6000061035156,
+        "y": 458
+      },
+      "zIndex": "30"
+    }
+  ],
+  "numericMeta": [
+    {
+      "rect": {
+        "bottom": 493.2000122070313,
+        "height": 16,
+        "left": 122.4000015258789,
+        "right": 364.80001068115234,
+        "top": 477.2000122070313,
+        "width": 242.40000915527344,
+        "x": 122.4000015258789,
+        "y": 477.2000122070313
+      },
+      "text": "입문-고수 · 성별 무관 · 참가비 설명: 10000"
+    }
+  ],
+  "url": "https://alpha.teameet.co.kr/matches",
+  "utc": "2026-10-04T07:27:08.890Z",
+  "viewport": {
+    "dpr": 1.25,
+    "h": 606,
+    "w": 402
+  }
+}

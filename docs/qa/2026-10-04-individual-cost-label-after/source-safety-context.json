@@ -1,0 +1,17 @@
+{
+  "sha": "5372ea9c3640621eb270d15c54c70a822b97d536",
+  "scope": "Static call-path review only, not HTTP/DB or global telemetry audit",
+  "searchedSubmitted": false,
+  "excludedSearchReason": "Nonempty submitSearch invokes recordSearch.mutate and POST /search/recent. This run never filled/submitted search, pressed search Enter, or selected recent-search items.",
+  "searchSource": "https://github.com/kim-song-jun/matchup-sports-platform/blob/5372ea9c3640621eb270d15c54c70a822b97d536/apps/v1_web/src/components/matches/matches-client.tsx#L223",
+  "searchHook": "https://github.com/kim-song-jun/matchup-sports-platform/blob/5372ea9c3640621eb270d15c54c70a822b97d536/apps/v1_web/src/hooks/use-v1-api.ts#L591",
+  "filterPaths": [
+    "apps/v1_web/src/components/matches/matches-page.tsx#L727",
+    "apps/v1_web/src/components/matches/matches-page.tsx#L748",
+    "apps/v1_web/src/components/matches/matches-client.tsx#L465",
+    "apps/v1_web/src/components/v1-ui/bottom-sheet.tsx#L89",
+    "apps/v1_web/src/hooks/use-v1-api.ts#L663"
+  ],
+  "filterFinding": "Ordinary href Links outside search form; URL/local state updates and GET matches. No application mutation identified on inspected filter event path.",
+  "labelSource": "apps/v1_web/src/components/matches/matches-page.tsx#L849 and #L965; actual old raw value string is prefixed with 참가비 설명, not interpreted as currency."
+}

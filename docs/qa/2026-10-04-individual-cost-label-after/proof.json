@@ -1,0 +1,4093 @@
+[
+  {
+    "costMetadata": [
+      {
+        "cardClass": "tm-match-list-card tm-card-interactive tm-pressable tm-card-closed",
+        "cardRect": {
+          "bottom": 598,
+          "height": 285.6000061035156,
+          "left": -182.40000915527344,
+          "right": 93.59999084472656,
+          "top": 312.3999938964844,
+          "width": 276,
+          "x": -182.40000915527344,
+          "y": 312.3999938964844
+        },
+        "clientHeight": 16,
+        "clientWidth": 242,
+        "href": "/matches/synthetic-numeric-1",
+        "railHeading": "눈에 띄는 매치",
+        "rect": {
+          "bottom": 493.2000122070313,
+          "height": 16,
+          "left": -165.60000610351562,
+          "right": 76.80000305175781,
+          "top": 477.2000122070313,
+          "width": 242.40000915527344,
+          "x": -165.60000610351562,
+          "y": 477.2000122070313
+        },
+        "scrollHeight": 16,
+        "scrollWidth": 242,
+        "style": {
+          "fontSize": "12px",
+          "lineHeight": "16px",
+          "overflow": "visible",
+          "overflowWrap": "normal",
+          "textOverflow": "clip",
+          "whiteSpace": "normal",
+          "wordBreak": "normal"
+        },
+        "text": "입문-고수 · 성별 무관 · 참가비 설명: 10000",
+        "withinViewport": false
+      },
+      {
+        "cardClass": "tm-match-list-card tm-card-interactive tm-pressable tm-card-closed",
+        "cardRect": {
+          "bottom": 598,
+          "height": 285.6000061035156,
+          "left": 105.5999984741211,
+          "right": 381.5999984741211,
+          "top": 312.3999938964844,
+          "width": 276,
+          "x": 105.5999984741211,
+          "y": 312.3999938964844
+        },
+        "clientHeight": 16,
+        "clientWidth": 242,
+        "href": "/matches/synthetic-overlap-1",
+        "railHeading": "눈에 띄는 매치",
+        "rect": {
+          "bottom": 493.2000122070313,
+          "height": 16,
+          "left": 122.4000015258789,
+          "right": 364.80001068115234,
+          "top": 477.2000122070313,
+          "width": 242.40000915527344,
+          "x": 122.4000015258789,
+          "y": 477.2000122070313
+        },
+        "scrollHeight": 16,
+        "scrollWidth": 242,
+        "style": {
+          "fontSize": "12px",
+          "lineHeight": "16px",
+          "overflow": "visible",
+          "overflowWrap": "normal",
+          "textOverflow": "clip",
+          "whiteSpace": "normal",
+          "wordBreak": "normal"
+        },
+        "text": "입문-고수 · 성별 무관 · 참가비 설명: 10000",
+        "withinViewport": true
+      },
+      {
+        "cardClass": "tm-match-row tm-card-interactive tm-pressable tm-card-closed",
+        "cardRect": {
+          "bottom": 1335.000030517578,
+          "height": 146.60000610351562,
+          "left": 20,
+          "right": 381.6000061035156,
+          "top": 1188.4000244140625,
+          "width": 361.6000061035156,
+          "x": 20,
+          "y": 1188.4000244140625
+        },
+        "clientHeight": 32,
+        "clientWidth": 220,
+        "href": "/matches/synthetic-free-1",
+        "railHeading": null,
+        "rect": {
+          "bottom": 1233.2000732421875,
+          "height": 32,
+          "left": 144.8000030517578,
+          "right": 364.8000030517578,
+          "top": 1201.2000732421875,
+          "width": 220,
+          "x": 144.8000030517578,
+          "y": 1201.2000732421875
+        },
+        "scrollHeight": 32,
+        "scrollWidth": 220,
+        "style": {
+          "fontSize": "12px",
+          "lineHeight": "16px",
+          "overflow": "visible",
+          "overflowWrap": "normal",
+          "textOverflow": "clip",
+          "whiteSpace": "normal",
+          "wordBreak": "normal"
+        },
+        "text": "축구 · 입문-고수 · 성별 무관 · 참가비 설명: 무료",
+        "withinViewport": false
+      },
+      {
+        "cardClass": "tm-match-row tm-card-interactive tm-pressable tm-card-closed",
+        "cardRect": {
+          "bottom": 1636.1999816894531,
+          "height": 146.60000610351562,
+          "left": 20,
+          "right": 381.6000061035156,
+          "top": 1489.5999755859375,
+          "width": 361.6000061035156,
+          "x": 20,
+          "y": 1489.5999755859375
+        },
+        "clientHeight": 32,
+        "clientWidth": 220,
+        "href": "/matches/synthetic-numeric-1",
+        "railHeading": null,
+        "rect": {
+          "bottom": 1534.4000244140625,
+          "height": 32,
+          "left": 144.8000030517578,
+          "right": 364.8000030517578,
+          "top": 1502.4000244140625,
+          "width": 220,
+          "x": 144.8000030517578,
+          "y": 1502.4000244140625
+        },
+        "scrollHeight": 32,
+        "scrollWidth": 220,
+        "style": {
+          "fontSize": "12px",
+          "lineHeight": "16px",
+          "overflow": "visible",
+          "overflowWrap": "normal",
+          "textOverflow": "clip",
+          "whiteSpace": "normal",
+          "wordBreak": "normal"
+        },
+        "text": "풋살 · 입문-고수 · 성별 무관 · 참가비 설명: 10000",
+        "withinViewport": false
+      },
+      {
+        "cardClass": "tm-match-row tm-card-interactive tm-pressable tm-card-closed",
+        "cardRect": {
+          "bottom": 1794.8000793457031,
+          "height": 146.60000610351562,
+          "left": 20,
+          "right": 381.6000061035156,
+          "top": 1648.2000732421875,
+          "width": 361.6000061035156,
+          "x": 20,
+          "y": 1648.2000732421875
+        },
+        "clientHeight": 32,
+        "clientWidth": 220,
+        "href": "/matches/synthetic-overlap-1",
+        "railHeading": null,
+        "rect": {
+          "bottom": 1693,
+          "height": 32,
+          "left": 144.8000030517578,
+          "right": 364.8000030517578,
+          "top": 1661,
+          "width": 220,
+          "x": 144.8000030517578,
+          "y": 1661
+        },
+        "scrollHeight": 32,
+        "scrollWidth": 220,
+        "style": {
+          "fontSize": "12px",
+          "lineHeight": "16px",
+          "overflow": "visible",
+          "overflowWrap": "normal",
+          "textOverflow": "clip",
+          "whiteSpace": "normal",
+          "wordBreak": "normal"
+        },
+        "text": "풋살 · 입문-고수 · 성별 무관 · 참가비 설명: 10000",
+        "withinViewport": false
+      }
+    ],
+    "documentScrollWidth": 402,
+    "mainRows": 8,
+    "rails": [
+      {
+        "heading": "눈에 띄는 매치",
+        "rect": {
+          "bottom": 602,
+          "height": 329.6000061035156,
+          "left": 20,
+          "right": 381.6000061035156,
+          "top": 272.3999938964844,
+          "width": 361.6000061035156,
+          "x": 20,
+          "y": 272.3999938964844
+        },
+        "scrollers": [
+          {
+            "clientWidth": 370,
+            "rect": {
+              "bottom": 602,
+              "height": 293.6000061035156,
+              "left": 16,
+              "right": 385.6000061035156,
+              "top": 308.3999938964844,
+              "width": 369.6000061035156,
+              "x": 16,
+              "y": 308.3999938964844
+            },
+            "scrollLeft": 490.3999938964844,
+            "scrollWidth": 860
+          }
+        ]
+      }
+    ],
+    "scroll": {
+      "main": 0,
+      "x": 0,
+      "y": 0
+    },
+    "searchValue": "",
+    "selectedCards": [
+      {
+        "cls": "tm-match-list-card tm-card-interactive tm-pressable tm-card-closed",
+        "href": "/matches/synthetic-numeric-1",
+        "metadata": [
+          "입문-고수 · 성별 무관 · 참가비 설명: 10000"
+        ],
+        "title": null
+      },
+      {
+        "cls": "tm-match-row tm-card-interactive tm-pressable tm-card-closed",
+        "href": "/matches/synthetic-free-1",
+        "metadata": [
+          "축구 · 입문-고수 · 성별 무관 · 참가비 설명: 무료"
+        ],
+        "title": "QA-PR1438 개인매치"
+      },
+      {
+        "cls": "tm-match-row tm-card-interactive tm-pressable tm-card-closed",
+        "href": "/matches/synthetic-no-cost-control-1",
+        "metadata": [
+          "풋살 · 입문-고수 · 성별 무관"
+        ],
+        "title": "(테스트) 1.0.3 QA 수명주기"
+      },
+      {
+        "cls": "tm-match-row tm-card-interactive tm-pressable tm-card-closed",
+        "href": "/matches/synthetic-numeric-1",
+        "metadata": [
+          "풋살 · 입문-고수 · 성별 무관 · 참가비 설명: 10000"
+        ],
+        "title": "test"
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/matches",
+    "utc": "2026-10-04T07:21:17.262Z",
+    "viewport": {
+      "dpr": 1.25,
+      "h": 606,
+      "w": 402
+    },
+    "label": "mobile photo rail after horizontal wheel",
+    "index": 0
+  },
+  {
+    "costMetadata": [
+      {
+        "cardClass": "tm-match-list-card tm-card-interactive tm-pressable tm-card-closed",
+        "cardRect": {
+          "bottom": 598,
+          "height": 285.6000061035156,
+          "left": 16,
+          "right": 292,
+          "top": 312.3999938964844,
+          "width": 276,
+          "x": 16,
+          "y": 312.3999938964844
+        },
+        "clientHeight": 16,
+        "clientWidth": 242,
+        "href": "/matches/synthetic-numeric-1",
+        "railHeading": "눈에 띄는 매치",
+        "rect": {
+          "bottom": 493.2000122070313,
+          "height": 16,
+          "left": 32.79999923706055,
+          "right": 275.200008392334,
+          "top": 477.2000122070313,
+          "width": 242.40000915527344,
+          "x": 32.79999923706055,
+          "y": 477.2000122070313
+        },
+        "scrollHeight": 16,
+        "scrollWidth": 242,
+        "style": {
+          "fontSize": "12px",
+          "lineHeight": "16px",
+          "overflow": "visible",
+          "overflowWrap": "normal",
+          "textOverflow": "clip",
+          "whiteSpace": "normal",
+          "wordBreak": "normal"
+        },
+        "text": "입문-고수 · 성별 무관 · 참가비 설명: 10000",
+        "withinViewport": true
+      },
+      {
+        "cardClass": "tm-match-list-card tm-card-interactive tm-pressable tm-card-closed",
+        "cardRect": {
+          "bottom": 598,
+          "height": 285.6000061035156,
+          "left": 304,
+          "right": 580,
+          "top": 312.3999938964844,
+          "width": 276,
+          "x": 304,
+          "y": 312.3999938964844
+        },
+        "clientHeight": 16,
+        "clientWidth": 242,
+        "href": "/matches/synthetic-overlap-1",
+        "railHeading": "눈에 띄는 매치",
+        "rect": {
+          "bottom": 493.2000122070313,
+          "height": 16,
+          "left": 320.8000183105469,
+          "right": 563.2000274658203,
+          "top": 477.2000122070313,
+          "width": 242.40000915527344,
+          "x": 320.8000183105469,
+          "y": 477.2000122070313
+        },
+        "scrollHeight": 16,
+        "scrollWidth": 242,
+        "style": {
+          "fontSize": "12px",
+          "lineHeight": "16px",
+          "overflow": "visible",
+          "overflowWrap": "normal",
+          "textOverflow": "clip",
+          "whiteSpace": "normal",
+          "wordBreak": "normal"
+        },
+        "text": "입문-고수 · 성별 무관 · 참가비 설명: 10000",
+        "withinViewport": false
+      },
+      {
+        "cardClass": "tm-match-row tm-card-interactive tm-pressable tm-card-closed",
+        "cardRect": {
+          "bottom": 1335.000030517578,
+          "height": 146.60000610351562,
+          "left": 20,
+          "right": 381.6000061035156,
+          "top": 1188.4000244140625,
+          "width": 361.6000061035156,
+          "x": 20,
+          "y": 1188.4000244140625
+        },
+        "clientHeight": 32,
+        "clientWidth": 220,
+        "href": "/matches/synthetic-free-1",
+        "railHeading": null,
+        "rect": {
+          "bottom": 1233.2000732421875,
+          "height": 32,
+          "left": 144.8000030517578,
+          "right": 364.8000030517578,
+          "top": 1201.2000732421875,
+          "width": 220,
+          "x": 144.8000030517578,
+          "y": 1201.2000732421875
+        },
+        "scrollHeight": 32,
+        "scrollWidth": 220,
+        "style": {
+          "fontSize": "12px",
+          "lineHeight": "16px",
+          "overflow": "visible",
+          "overflowWrap": "normal",
+          "textOverflow": "clip",
+          "whiteSpace": "normal",
+          "wordBreak": "normal"
+        },
+        "text": "축구 · 입문-고수 · 성별 무관 · 참가비 설명: 무료",
+        "withinViewport": false
+      },
+      {
+        "cardClass": "tm-match-row tm-card-interactive tm-pressable tm-card-closed",
+        "cardRect": {
+          "bottom": 1636.1999816894531,
+          "height": 146.60000610351562,
+          "left": 20,
+          "right": 381.6000061035156,
+          "top": 1489.5999755859375,
+          "width": 361.6000061035156,
+          "x": 20,
+          "y": 1489.5999755859375
+        },
+        "clientHeight": 32,
+        "clientWidth": 220,
+        "href": "/matches/synthetic-numeric-1",
+        "railHeading": null,
+        "rect": {
+          "bottom": 1534.4000244140625,
+          "height": 32,
+          "left": 144.8000030517578,
+          "right": 364.8000030517578,
+          "top": 1502.4000244140625,
+          "width": 220,
+          "x": 144.8000030517578,
+          "y": 1502.4000244140625
+        },
+        "scrollHeight": 32,
+        "scrollWidth": 220,
+        "style": {
+          "fontSize": "12px",
+          "lineHeight": "16px",
+          "overflow": "visible",
+          "overflowWrap": "normal",
+          "textOverflow": "clip",
+          "whiteSpace": "normal",
+          "wordBreak": "normal"
+        },
+        "text": "풋살 · 입문-고수 · 성별 무관 · 참가비 설명: 10000",
+        "withinViewport": false
+      },
+      {
+        "cardClass": "tm-match-row tm-card-interactive tm-pressable tm-card-closed",
+        "cardRect": {
+          "bottom": 1794.8000793457031,
+          "height": 146.60000610351562,
+          "left": 20,
+          "right": 381.6000061035156,
+          "top": 1648.2000732421875,
+          "width": 361.6000061035156,
+          "x": 20,
+          "y": 1648.2000732421875
+        },
+        "clientHeight": 32,
+        "clientWidth": 220,
+        "href": "/matches/synthetic-overlap-1",
+        "railHeading": null,
+        "rect": {
+          "bottom": 1693,
+          "height": 32,
+          "left": 144.8000030517578,
+          "right": 364.8000030517578,
+          "top": 1661,
+          "width": 220,
+          "x": 144.8000030517578,
+          "y": 1661
+        },
+        "scrollHeight": 32,
+        "scrollWidth": 220,
+        "style": {
+          "fontSize": "12px",
+          "lineHeight": "16px",
+          "overflow": "visible",
+          "overflowWrap": "normal",
+          "textOverflow": "clip",
+          "whiteSpace": "normal",
+          "wordBreak": "normal"
+        },
+        "text": "풋살 · 입문-고수 · 성별 무관 · 참가비 설명: 10000",
+        "withinViewport": false
+      }
+    ],
+    "documentScrollWidth": 402,
+    "mainRows": 8,
+    "rails": [
+      {
+        "heading": "눈에 띄는 매치",
+        "rect": {
+          "bottom": 602,
+          "height": 329.6000061035156,
+          "left": 20,
+          "right": 381.6000061035156,
+          "top": 272.3999938964844,
+          "width": 361.6000061035156,
+          "x": 20,
+          "y": 272.3999938964844
+        },
+        "scrollers": [
+          {
+            "clientWidth": 370,
+            "rect": {
+              "bottom": 602,
+              "height": 293.6000061035156,
+              "left": 16,
+              "right": 385.6000061035156,
+              "top": 308.3999938964844,
+              "width": 369.6000061035156,
+              "x": 16,
+              "y": 308.3999938964844
+            },
+            "scrollLeft": 292,
+            "scrollWidth": 860
+          }
+        ]
+      }
+    ],
+    "scroll": {
+      "main": 0,
+      "x": 0,
+      "y": 0
+    },
+    "searchValue": "",
+    "selectedCards": [
+      {
+        "cls": "tm-match-list-card tm-card-interactive tm-pressable tm-card-closed",
+        "href": "/matches/synthetic-numeric-1",
+        "metadata": [
+          "입문-고수 · 성별 무관 · 참가비 설명: 10000"
+        ],
+        "title": null
+      },
+      {
+        "cls": "tm-match-row tm-card-interactive tm-pressable tm-card-closed",
+        "href": "/matches/synthetic-free-1",
+        "metadata": [
+          "축구 · 입문-고수 · 성별 무관 · 참가비 설명: 무료"
+        ],
+        "title": "QA-PR1438 개인매치"
+      },
+      {
+        "cls": "tm-match-row tm-card-interactive tm-pressable tm-card-closed",
+        "href": "/matches/synthetic-no-cost-control-1",
+        "metadata": [
+          "풋살 · 입문-고수 · 성별 무관"
+        ],
+        "title": "(테스트) 1.0.3 QA 수명주기"
+      },
+      {
+        "cls": "tm-match-row tm-card-interactive tm-pressable tm-card-closed",
+        "href": "/matches/synthetic-numeric-1",
+        "metadata": [
+          "풋살 · 입문-고수 · 성별 무관 · 참가비 설명: 10000"
+        ],
+        "title": "test"
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/matches",
+    "utc": "2026-10-04T07:21:47.601Z",
+    "viewport": {
+      "dpr": 1.25,
+      "h": 606,
+      "w": 402
+    },
+    "label": "mobile centered test photo rail",
+    "index": 1
+  },
+  {
+    "costMetadata": [
+      {
+        "cardClass": "tm-match-list-card tm-card-interactive tm-pressable tm-card-closed",
+        "cardRect": {
+          "bottom": -650.0000305175781,
+          "height": 285.6000061035156,
+          "left": 16,
+          "right": 292,
+          "top": -935.6000366210938,
+          "width": 276,
+          "x": 16,
+          "y": -935.6000366210938
+        },
+        "clientHeight": 16,
+        "clientWidth": 242,
+        "href": "/matches/synthetic-numeric-1",
+        "railHeading": "눈에 띄는 매치",
+        "rect": {
+          "bottom": -754.7999877929688,
+          "height": 16,
+          "left": 32.79999923706055,
+          "right": 275.200008392334,
+          "top": -770.7999877929688,
+          "width": 242.40000915527344,
+          "x": 32.79999923706055,
+          "y": -770.7999877929688
+        },
+        "scrollHeight": 16,
+        "scrollWidth": 242,
+        "style": {
+          "fontSize": "12px",
+          "lineHeight": "16px",
+          "overflow": "visible",
+          "overflowWrap": "normal",
+          "textOverflow": "clip",
+          "whiteSpace": "normal",
+          "wordBreak": "normal"
+        },
+        "text": "입문-고수 · 성별 무관 · 참가비 설명: 10000",
+        "withinViewport": false
+      },
+      {
+        "cardClass": "tm-match-list-card tm-card-interactive tm-pressable tm-card-closed",
+        "cardRect": {
+          "bottom": -650.0000305175781,
+          "height": 285.6000061035156,
+          "left": 304,
+          "right": 580,
+          "top": -935.6000366210938,
+          "width": 276,
+          "x": 304,
+          "y": -935.6000366210938
+        },
+        "clientHeight": 16,
+        "clientWidth": 242,
+        "href": "/matches/synthetic-overlap-1",
+        "railHeading": "눈에 띄는 매치",
+        "rect": {
+          "bottom": -754.7999877929688,
+          "height": 16,
+          "left": 320.8000183105469,
+          "right": 563.2000274658203,
+          "top": -770.7999877929688,
+          "width": 242.40000915527344,
+          "x": 320.8000183105469,
+          "y": -770.7999877929688
+        },
+        "scrollHeight": 16,
+        "scrollWidth": 242,
+        "style": {
+          "fontSize": "12px",
+          "lineHeight": "16px",
+          "overflow": "visible",
+          "overflowWrap": "normal",
+          "textOverflow": "clip",
+          "whiteSpace": "normal",
+          "wordBreak": "normal"
+        },
+        "text": "입문-고수 · 성별 무관 · 참가비 설명: 10000",
+        "withinViewport": false
+      },
+      {
+        "cardClass": "tm-match-row tm-card-interactive tm-pressable tm-card-closed",
+        "cardRect": {
+          "bottom": 87.00000381469727,
+          "height": 146.60000610351562,
+          "left": 20,
+          "right": 381.6000061035156,
+          "top": -59.60000228881836,
+          "width": 361.6000061035156,
+          "x": 20,
+          "y": -59.60000228881836
+        },
+        "clientHeight": 32,
+        "clientWidth": 220,
+        "href": "/matches/synthetic-free-1",
+        "railHeading": null,
+        "rect": {
+          "bottom": -14.799999237060549,
+          "height": 32,
+          "left": 144.8000030517578,
+          "right": 364.8000030517578,
+          "top": -46.79999923706055,
+          "width": 220,
+          "x": 144.8000030517578,
+          "y": -46.79999923706055
+        },
+        "scrollHeight": 32,
+        "scrollWidth": 220,
+        "style": {
+          "fontSize": "12px",
+          "lineHeight": "16px",
+          "overflow": "visible",
+          "overflowWrap": "normal",
+          "textOverflow": "clip",
+          "whiteSpace": "normal",
+          "wordBreak": "normal"
+        },
+        "text": "축구 · 입문-고수 · 성별 무관 · 참가비 설명: 무료",
+        "withinViewport": false
+      },
+      {
+        "cardClass": "tm-match-row tm-card-interactive tm-pressable tm-card-closed",
+        "cardRect": {
+          "bottom": 388.2000122070313,
+          "height": 146.60000610351562,
+          "left": 20,
+          "right": 381.6000061035156,
+          "top": 241.6000061035156,
+          "width": 361.6000061035156,
+          "x": 20,
+          "y": 241.6000061035156
+        },
+        "clientHeight": 32,
+        "clientWidth": 220,
+        "href": "/matches/synthetic-numeric-1",
+        "railHeading": null,
+        "rect": {
+          "bottom": 286.40000915527344,
+          "height": 32,
+          "left": 144.8000030517578,
+          "right": 364.8000030517578,
+          "top": 254.40000915527344,
+          "width": 220,
+          "x": 144.8000030517578,
+          "y": 254.40000915527344
+        },
+        "scrollHeight": 32,
+        "scrollWidth": 220,
+        "style": {
+          "fontSize": "12px",
+          "lineHeight": "16px",
+          "overflow": "visible",
+          "overflowWrap": "normal",
+          "textOverflow": "clip",
+          "whiteSpace": "normal",
+          "wordBreak": "normal"
+        },
+        "text": "풋살 · 입문-고수 · 성별 무관 · 참가비 설명: 10000",
+        "withinViewport": true
+      },
+      {
+        "cardClass": "tm-match-row tm-card-interactive tm-pressable tm-card-closed",
+        "cardRect": {
+          "bottom": 546.8000183105469,
+          "height": 146.60000610351562,
+          "left": 20,
+          "right": 381.6000061035156,
+          "top": 400.2000122070313,
+          "width": 361.6000061035156,
+          "x": 20,
+          "y": 400.2000122070313
+        },
+        "clientHeight": 32,
+        "clientWidth": 220,
+        "href": "/matches/synthetic-overlap-1",
+        "railHeading": null,
+        "rect": {
+          "bottom": 445,
+          "height": 32,
+          "left": 144.8000030517578,
+          "right": 364.8000030517578,
+          "top": 413,
+          "width": 220,
+          "x": 144.8000030517578,
+          "y": 413
+        },
+        "scrollHeight": 32,
+        "scrollWidth": 220,
+        "style": {
+          "fontSize": "12px",
+          "lineHeight": "16px",
+          "overflow": "visible",
+          "overflowWrap": "normal",
+          "textOverflow": "clip",
+          "whiteSpace": "normal",
+          "wordBreak": "normal"
+        },
+        "text": "풋살 · 입문-고수 · 성별 무관 · 참가비 설명: 10000",
+        "withinViewport": true
+      }
+    ],
+    "documentScrollWidth": 402,
+    "mainRows": 8,
+    "rails": [
+      {
+        "heading": "눈에 띄는 매치",
+        "rect": {
+          "bottom": -646.0000305175781,
+          "height": 329.6000061035156,
+          "left": 20,
+          "right": 381.6000061035156,
+          "top": -975.6000366210938,
+          "width": 361.6000061035156,
+          "x": 20,
+          "y": -975.6000366210938
+        },
+        "scrollers": [
+          {
+            "clientWidth": 370,
+            "rect": {
+              "bottom": -646.0000305175781,
+              "height": 293.6000061035156,
+              "left": 16,
+              "right": 385.6000061035156,
+              "top": -939.6000366210938,
+              "width": 369.6000061035156,
+              "x": 16,
+              "y": -939.6000366210938
+            },
+            "scrollLeft": 292,
+            "scrollWidth": 860
+          }
+        ]
+      }
+    ],
+    "scroll": {
+      "main": 1248,
+      "x": 0,
+      "y": 0
+    },
+    "searchValue": "",
+    "selectedCards": [
+      {
+        "cls": "tm-match-list-card tm-card-interactive tm-pressable tm-card-closed",
+        "href": "/matches/synthetic-numeric-1",
+        "metadata": [
+          "입문-고수 · 성별 무관 · 참가비 설명: 10000"
+        ],
+        "title": null
+      },
+      {
+        "cls": "tm-match-row tm-card-interactive tm-pressable tm-card-closed",
+        "href": "/matches/synthetic-free-1",
+        "metadata": [
+          "축구 · 입문-고수 · 성별 무관 · 참가비 설명: 무료"
+        ],
+        "title": "QA-PR1438 개인매치"
+      },
+      {
+        "cls": "tm-match-row tm-card-interactive tm-pressable tm-card-closed",
+        "href": "/matches/synthetic-no-cost-control-1",
+        "metadata": [
+          "풋살 · 입문-고수 · 성별 무관"
+        ],
+        "title": "(테스트) 1.0.3 QA 수명주기"
+      },
+      {
+        "cls": "tm-match-row tm-card-interactive tm-pressable tm-card-closed",
+        "href": "/matches/synthetic-numeric-1",
+        "metadata": [
+          "풋살 · 입문-고수 · 성별 무관 · 참가비 설명: 10000"
+        ],
+        "title": "test"
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/matches",
+    "utc": "2026-10-04T07:21:54.832Z",
+    "viewport": {
+      "dpr": 1.25,
+      "h": 606,
+      "w": 402
+    },
+    "label": "mobile body rows settled",
+    "index": 2
+  },
+  {
+    "costMetadata": [
+      {
+        "cardClass": "tm-match-list-card tm-card-interactive tm-pressable tm-card-closed",
+        "cardRect": {
+          "bottom": 598,
+          "height": 285.6000061035156,
+          "left": 304,
+          "right": 580,
+          "top": 312.3999938964844,
+          "width": 276,
+          "x": 304,
+          "y": 312.3999938964844
+        },
+        "clientHeight": 16,
+        "clientWidth": 242,
+        "href": "/matches/synthetic-numeric-1",
+        "railHeading": "눈에 띄는 매치",
+        "rect": {
+          "bottom": 493.2000122070313,
+          "height": 16,
+          "left": 320.8000183105469,
+          "right": 563.2000274658203,
+          "top": 477.2000122070313,
+          "width": 242.40000915527344,
+          "x": 320.8000183105469,
+          "y": 477.2000122070313
+        },
+        "scrollHeight": 16,
+        "scrollWidth": 242,
+        "style": {
+          "fontSize": "12px",
+          "lineHeight": "16px",
+          "overflow": "visible",
+          "overflowWrap": "normal",
+          "textOverflow": "clip",
+          "whiteSpace": "normal",
+          "wordBreak": "normal"
+        },
+        "text": "입문-고수 · 성별 무관 · 참가비 설명: 10000",
+        "withinViewport": false
+      },
+      {
+        "cardClass": "tm-match-list-card tm-card-interactive tm-pressable tm-card-closed",
+        "cardRect": {
+          "bottom": 598,
+          "height": 285.6000061035156,
+          "left": 592,
+          "right": 868,
+          "top": 312.3999938964844,
+          "width": 276,
+          "x": 592,
+          "y": 312.3999938964844
+        },
+        "clientHeight": 16,
+        "clientWidth": 242,
+        "href": "/matches/synthetic-overlap-1",
+        "railHeading": "눈에 띄는 매치",
+        "rect": {
+          "bottom": 493.2000122070313,
+          "height": 16,
+          "left": 608.7999877929688,
+          "right": 851.1999969482422,
+          "top": 477.2000122070313,
+          "width": 242.40000915527344,
+          "x": 608.7999877929688,
+          "y": 477.2000122070313
+        },
+        "scrollHeight": 16,
+        "scrollWidth": 242,
+        "style": {
+          "fontSize": "12px",
+          "lineHeight": "16px",
+          "overflow": "visible",
+          "overflowWrap": "normal",
+          "textOverflow": "clip",
+          "whiteSpace": "normal",
+          "wordBreak": "normal"
+        },
+        "text": "입문-고수 · 성별 무관 · 참가비 설명: 10000",
+        "withinViewport": false
+      },
+      {
+        "cardClass": "tm-match-row tm-card-interactive tm-pressable tm-card-closed",
+        "cardRect": {
+          "bottom": 1335.000030517578,
+          "height": 146.60000610351562,
+          "left": 20,
+          "right": 381.6000061035156,
+          "top": 1188.4000244140625,
+          "width": 361.6000061035156,
+          "x": 20,
+          "y": 1188.4000244140625
+        },
+        "clientHeight": 32,
+        "clientWidth": 220,
+        "href": "/matches/synthetic-free-1",
+        "railHeading": null,
+        "rect": {
+          "bottom": 1233.2000732421875,
+          "height": 32,
+          "left": 144.8000030517578,
+          "right": 364.8000030517578,
+          "top": 1201.2000732421875,
+          "width": 220,
+          "x": 144.8000030517578,
+          "y": 1201.2000732421875
+        },
+        "scrollHeight": 32,
+        "scrollWidth": 220,
+        "style": {
+          "fontSize": "12px",
+          "lineHeight": "16px",
+          "overflow": "visible",
+          "overflowWrap": "normal",
+          "textOverflow": "clip",
+          "whiteSpace": "normal",
+          "wordBreak": "normal"
+        },
+        "text": "축구 · 입문-고수 · 성별 무관 · 참가비 설명: 무료",
+        "withinViewport": false
+      },
+      {
+        "cardClass": "tm-match-row tm-card-interactive tm-pressable tm-card-closed",
+        "cardRect": {
+          "bottom": 1636.1999816894531,
+          "height": 146.60000610351562,
+          "left": 20,
+          "right": 381.6000061035156,
+          "top": 1489.5999755859375,
+          "width": 361.6000061035156,
+          "x": 20,
+          "y": 1489.5999755859375
+        },
+        "clientHeight": 32,
+        "clientWidth": 220,
+        "href": "/matches/synthetic-numeric-1",
+        "railHeading": null,
+        "rect": {
+          "bottom": 1534.4000244140625,
+          "height": 32,
+          "left": 144.8000030517578,
+          "right": 364.8000030517578,
+          "top": 1502.4000244140625,
+          "width": 220,
+          "x": 144.8000030517578,
+          "y": 1502.4000244140625
+        },
+        "scrollHeight": 32,
+        "scrollWidth": 220,
+        "style": {
+          "fontSize": "12px",
+          "lineHeight": "16px",
+          "overflow": "visible",
+          "overflowWrap": "normal",
+          "textOverflow": "clip",
+          "whiteSpace": "normal",
+          "wordBreak": "normal"
+        },
+        "text": "풋살 · 입문-고수 · 성별 무관 · 참가비 설명: 10000",
+        "withinViewport": false
+      },
+      {
+        "cardClass": "tm-match-row tm-card-interactive tm-pressable tm-card-closed",
+        "cardRect": {
+          "bottom": 1794.8000793457031,
+          "height": 146.60000610351562,
+          "left": 20,
+          "right": 381.6000061035156,
+          "top": 1648.2000732421875,
+          "width": 361.6000061035156,
+          "x": 20,
+          "y": 1648.2000732421875
+        },
+        "clientHeight": 32,
+        "clientWidth": 220,
+        "href": "/matches/synthetic-overlap-1",
+        "railHeading": null,
+        "rect": {
+          "bottom": 1693,
+          "height": 32,
+          "left": 144.8000030517578,
+          "right": 364.8000030517578,
+          "top": 1661,
+          "width": 220,
+          "x": 144.8000030517578,
+          "y": 1661
+        },
+        "scrollHeight": 32,
+        "scrollWidth": 220,
+        "style": {
+          "fontSize": "12px",
+          "lineHeight": "16px",
+          "overflow": "visible",
+          "overflowWrap": "normal",
+          "textOverflow": "clip",
+          "whiteSpace": "normal",
+          "wordBreak": "normal"
+        },
+        "text": "풋살 · 입문-고수 · 성별 무관 · 참가비 설명: 10000",
+        "withinViewport": false
+      }
+    ],
+    "documentScrollWidth": 402,
+    "mainRows": 8,
+    "rails": [
+      {
+        "heading": "눈에 띄는 매치",
+        "rect": {
+          "bottom": 602,
+          "height": 329.6000061035156,
+          "left": 20,
+          "right": 381.6000061035156,
+          "top": 272.3999938964844,
+          "width": 361.6000061035156,
+          "x": 20,
+          "y": 272.3999938964844
+        },
+        "scrollers": [
+          {
+            "clientWidth": 370,
+            "rect": {
+              "bottom": 602,
+              "height": 293.6000061035156,
+              "left": 16,
+              "right": 385.6000061035156,
+              "top": 308.3999938964844,
+              "width": 369.6000061035156,
+              "x": 16,
+              "y": 308.3999938964844
+            },
+            "scrollLeft": 4,
+            "scrollWidth": 860
+          }
+        ]
+      }
+    ],
+    "scroll": {
+      "main": 0,
+      "x": 0,
+      "y": 0
+    },
+    "searchValue": "",
+    "selectedCards": [
+      {
+        "cls": "tm-match-list-card tm-card-interactive tm-pressable tm-card-closed",
+        "href": "/matches/synthetic-numeric-1",
+        "metadata": [
+          "입문-고수 · 성별 무관 · 참가비 설명: 10000"
+        ],
+        "title": null
+      },
+      {
+        "cls": "tm-match-row tm-card-interactive tm-pressable tm-card-closed",
+        "href": "/matches/synthetic-free-1",
+        "metadata": [
+          "축구 · 입문-고수 · 성별 무관 · 참가비 설명: 무료"
+        ],
+        "title": "QA-PR1438 개인매치"
+      },
+      {
+        "cls": "tm-match-row tm-card-interactive tm-pressable tm-card-closed",
+        "href": "/matches/synthetic-no-cost-control-1",
+        "metadata": [
+          "풋살 · 입문-고수 · 성별 무관"
+        ],
+        "title": "(테스트) 1.0.3 QA 수명주기"
+      },
+      {
+        "cls": "tm-match-row tm-card-interactive tm-pressable tm-card-closed",
+        "href": "/matches/synthetic-numeric-1",
+        "metadata": [
+          "풋살 · 입문-고수 · 성별 무관 · 참가비 설명: 10000"
+        ],
+        "title": "test"
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/matches",
+    "utc": "2026-10-04T07:23:46.451Z",
+    "viewport": {
+      "dpr": 1.25,
+      "h": 606,
+      "w": 402
+    },
+    "label": "mobile numeric detail app Back settled list",
+    "index": 3
+  },
+  {
+    "costMetadata": [
+      {
+        "cardClass": "tm-match-row tm-card-interactive tm-pressable tm-card-closed",
+        "cardRect": {
+          "bottom": 419,
+          "height": 146.60000610351562,
+          "left": 20,
+          "right": 381.6000061035156,
+          "top": 272.3999938964844,
+          "width": 361.6000061035156,
+          "x": 20,
+          "y": 272.3999938964844
+        },
+        "clientHeight": 32,
+        "clientWidth": 220,
+        "href": "/matches/synthetic-free-1?from=%2Fmatches%3FsportId%3Dsport-football",
+        "railHeading": null,
+        "rect": {
+          "bottom": 317.20001220703125,
+          "height": 32,
+          "left": 144.8000030517578,
+          "right": 364.8000030517578,
+          "top": 285.20001220703125,
+          "width": 220,
+          "x": 144.8000030517578,
+          "y": 285.20001220703125
+        },
+        "scrollHeight": 32,
+        "scrollWidth": 220,
+        "style": {
+          "fontSize": "12px",
+          "lineHeight": "16px",
+          "overflow": "visible",
+          "overflowWrap": "normal",
+          "textOverflow": "clip",
+          "whiteSpace": "normal",
+          "wordBreak": "normal"
+        },
+        "text": "축구 · 입문-고수 · 성별 무관 · 참가비 설명: 무료",
+        "withinViewport": true
+      }
+    ],
+    "documentScrollWidth": 402,
+    "mainRows": 1,
+    "rails": [],
+    "scroll": {
+      "main": 0,
+      "x": 0,
+      "y": 0
+    },
+    "searchValue": "",
+    "selectedCards": [
+      {
+        "cls": "tm-match-row tm-card-interactive tm-pressable tm-card-closed",
+        "href": "/matches/synthetic-free-1?from=%2Fmatches%3FsportId%3Dsport-football",
+        "metadata": [
+          "축구 · 입문-고수 · 성별 무관 · 참가비 설명: 무료"
+        ],
+        "title": "QA-PR1438 개인매치"
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/matches?sportId=sport-football",
+    "utc": "2026-10-04T07:24:50.383Z",
+    "viewport": {
+      "dpr": 1.25,
+      "h": 606,
+      "w": 402
+    },
+    "label": "mobile football filter free fixture and nearby rail availability",
+    "index": 4
+  },
+  {
+    "costMetadata": [
+      {
+        "cardClass": "tm-match-row tm-card-interactive tm-pressable tm-card-closed",
+        "cardRect": {
+          "bottom": 419,
+          "height": 146.60000610351562,
+          "left": 20,
+          "right": 381.6000061035156,
+          "top": 272.3999938964844,
+          "width": 361.6000061035156,
+          "x": 20,
+          "y": 272.3999938964844
+        },
+        "clientHeight": 32,
+        "clientWidth": 220,
+        "href": "/matches/synthetic-free-1?from=%2Fmatches%3FsportId%3Dsport-football",
+        "railHeading": null,
+        "rect": {
+          "bottom": 317.20001220703125,
+          "height": 32,
+          "left": 144.8000030517578,
+          "right": 364.8000030517578,
+          "top": 285.20001220703125,
+          "width": 220,
+          "x": 144.8000030517578,
+          "y": 285.20001220703125
+        },
+        "scrollHeight": 32,
+        "scrollWidth": 220,
+        "style": {
+          "fontSize": "12px",
+          "lineHeight": "16px",
+          "overflow": "visible",
+          "overflowWrap": "normal",
+          "textOverflow": "clip",
+          "whiteSpace": "normal",
+          "wordBreak": "normal"
+        },
+        "text": "축구 · 입문-고수 · 성별 무관 · 참가비 설명: 무료",
+        "withinViewport": true
+      }
+    ],
+    "documentScrollWidth": 402,
+    "mainRows": 1,
+    "rails": [],
+    "scroll": {
+      "main": 0,
+      "x": 0,
+      "y": 0
+    },
+    "searchValue": "",
+    "selectedCards": [
+      {
+        "cls": "tm-match-row tm-card-interactive tm-pressable tm-card-closed",
+        "href": "/matches/synthetic-free-1?from=%2Fmatches%3FsportId%3Dsport-football",
+        "metadata": [
+          "축구 · 입문-고수 · 성별 무관 · 참가비 설명: 무료"
+        ],
+        "title": "QA-PR1438 개인매치"
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/matches?sportId=sport-football",
+    "utc": "2026-10-04T07:25:30.611Z",
+    "viewport": {
+      "dpr": 1.25,
+      "h": 606,
+      "w": 402
+    },
+    "label": "mobile browser Back football filter retained",
+    "index": 5
+  },
+  {
+    "costMetadata": [
+      {
+        "cardClass": "tm-match-row tm-card-interactive tm-pressable tm-card-closed",
+        "cardRect": {
+          "bottom": 419,
+          "height": 146.60000610351562,
+          "left": 20,
+          "right": 381.6000061035156,
+          "top": 272.3999938964844,
+          "width": 361.6000061035156,
+          "x": 20,
+          "y": 272.3999938964844
+        },
+        "clientHeight": 32,
+        "clientWidth": 220,
+        "href": "/matches/synthetic-free-1?from=%2Fmatches%3FsportId%3Dsport-football",
+        "railHeading": null,
+        "rect": {
+          "bottom": 317.20001220703125,
+          "height": 32,
+          "left": 144.8000030517578,
+          "right": 364.8000030517578,
+          "top": 285.20001220703125,
+          "width": 220,
+          "x": 144.8000030517578,
+          "y": 285.20001220703125
+        },
+        "scrollHeight": 32,
+        "scrollWidth": 220,
+        "style": {
+          "fontSize": "12px",
+          "lineHeight": "16px",
+          "overflow": "visible",
+          "overflowWrap": "normal",
+          "textOverflow": "clip",
+          "whiteSpace": "normal",
+          "wordBreak": "normal"
+        },
+        "text": "축구 · 입문-고수 · 성별 무관 · 참가비 설명: 무료",
+        "withinViewport": true
+      }
+    ],
+    "documentScrollWidth": 402,
+    "mainRows": 1,
+    "rails": [],
+    "scroll": {
+      "main": 0,
+      "x": 0,
+      "y": 0
+    },
+    "searchValue": "",
+    "selectedCards": [
+      {
+        "cls": "tm-match-row tm-card-interactive tm-pressable tm-card-closed",
+        "href": "/matches/synthetic-free-1?from=%2Fmatches%3FsportId%3Dsport-football",
+        "metadata": [
+          "축구 · 입문-고수 · 성별 무관 · 참가비 설명: 무료"
+        ],
+        "title": "QA-PR1438 개인매치"
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/matches?sportId=sport-football",
+    "utc": "2026-10-04T07:26:36.982Z",
+    "viewport": {
+      "dpr": 1.25,
+      "h": 606,
+      "w": 402
+    },
+    "label": "mobile free app Back sport filter retained",
+    "index": 6
+  },
+  {
+    "costMetadata": [
+      {
+        "cardClass": "tm-match-list-card tm-card-interactive tm-pressable tm-card-closed",
+        "cardRect": {
+          "bottom": 598,
+          "height": 285.6000061035156,
+          "left": -182.40000915527344,
+          "right": 93.59999084472656,
+          "top": 312.3999938964844,
+          "width": 276,
+          "x": -182.40000915527344,
+          "y": 312.3999938964844
+        },
+        "clientHeight": 16,
+        "clientWidth": 242,
+        "href": "/matches/synthetic-numeric-1",
+        "railHeading": "눈에 띄는 매치",
+        "rect": {
+          "bottom": 493.2000122070313,
+          "height": 16,
+          "left": -165.60000610351562,
+          "right": 76.80000305175781,
+          "top": 477.2000122070313,
+          "width": 242.40000915527344,
+          "x": -165.60000610351562,
+          "y": 477.2000122070313
+        },
+        "scrollHeight": 16,
+        "scrollWidth": 242,
+        "style": {
+          "fontSize": "12px",
+          "lineHeight": "16px",
+          "overflow": "visible",
+          "overflowWrap": "normal",
+          "textOverflow": "clip",
+          "whiteSpace": "normal",
+          "wordBreak": "normal"
+        },
+        "text": "입문-고수 · 성별 무관 · 참가비 설명: 10000",
+        "withinViewport": false
+      },
+      {
+        "cardClass": "tm-match-list-card tm-card-interactive tm-pressable tm-card-closed",
+        "cardRect": {
+          "bottom": 598,
+          "height": 285.6000061035156,
+          "left": 105.5999984741211,
+          "right": 381.5999984741211,
+          "top": 312.3999938964844,
+          "width": 276,
+          "x": 105.5999984741211,
+          "y": 312.3999938964844
+        },
+        "clientHeight": 16,
+        "clientWidth": 242,
+        "href": "/matches/synthetic-overlap-1",
+        "railHeading": "눈에 띄는 매치",
+        "rect": {
+          "bottom": 493.2000122070313,
+          "height": 16,
+          "left": 122.4000015258789,
+          "right": 364.80001068115234,
+          "top": 477.2000122070313,
+          "width": 242.40000915527344,
+          "x": 122.4000015258789,
+          "y": 477.2000122070313
+        },
+        "scrollHeight": 16,
+        "scrollWidth": 242,
+        "style": {
+          "fontSize": "12px",
+          "lineHeight": "16px",
+          "overflow": "visible",
+          "overflowWrap": "normal",
+          "textOverflow": "clip",
+          "whiteSpace": "normal",
+          "wordBreak": "normal"
+        },
+        "text": "입문-고수 · 성별 무관 · 참가비 설명: 10000",
+        "withinViewport": true
+      },
+      {
+        "cardClass": "tm-match-row tm-card-interactive tm-pressable tm-card-closed",
+        "cardRect": {
+          "bottom": 1335.000030517578,
+          "height": 146.60000610351562,
+          "left": 20,
+          "right": 381.6000061035156,
+          "top": 1188.4000244140625,
+          "width": 361.6000061035156,
+          "x": 20,
+          "y": 1188.4000244140625
+        },
+        "clientHeight": 32,
+        "clientWidth": 220,
+        "href": "/matches/synthetic-free-1",
+        "railHeading": null,
+        "rect": {
+          "bottom": 1233.2000732421875,
+          "height": 32,
+          "left": 144.8000030517578,
+          "right": 364.8000030517578,
+          "top": 1201.2000732421875,
+          "width": 220,
+          "x": 144.8000030517578,
+          "y": 1201.2000732421875
+        },
+        "scrollHeight": 32,
+        "scrollWidth": 220,
+        "style": {
+          "fontSize": "12px",
+          "lineHeight": "16px",
+          "overflow": "visible",
+          "overflowWrap": "normal",
+          "textOverflow": "clip",
+          "whiteSpace": "normal",
+          "wordBreak": "normal"
+        },
+        "text": "축구 · 입문-고수 · 성별 무관 · 참가비 설명: 무료",
+        "withinViewport": false
+      },
+      {
+        "cardClass": "tm-match-row tm-card-interactive tm-pressable tm-card-closed",
+        "cardRect": {
+          "bottom": 1636.1999816894531,
+          "height": 146.60000610351562,
+          "left": 20,
+          "right": 381.6000061035156,
+          "top": 1489.5999755859375,
+          "width": 361.6000061035156,
+          "x": 20,
+          "y": 1489.5999755859375
+        },
+        "clientHeight": 32,
+        "clientWidth": 220,
+        "href": "/matches/synthetic-numeric-1",
+        "railHeading": null,
+        "rect": {
+          "bottom": 1534.4000244140625,
+          "height": 32,
+          "left": 144.8000030517578,
+          "right": 364.8000030517578,
+          "top": 1502.4000244140625,
+          "width": 220,
+          "x": 144.8000030517578,
+          "y": 1502.4000244140625
+        },
+        "scrollHeight": 32,
+        "scrollWidth": 220,
+        "style": {
+          "fontSize": "12px",
+          "lineHeight": "16px",
+          "overflow": "visible",
+          "overflowWrap": "normal",
+          "textOverflow": "clip",
+          "whiteSpace": "normal",
+          "wordBreak": "normal"
+        },
+        "text": "풋살 · 입문-고수 · 성별 무관 · 참가비 설명: 10000",
+        "withinViewport": false
+      },
+      {
+        "cardClass": "tm-match-row tm-card-interactive tm-pressable tm-card-closed",
+        "cardRect": {
+          "bottom": 1794.8000793457031,
+          "height": 146.60000610351562,
+          "left": 20,
+          "right": 381.6000061035156,
+          "top": 1648.2000732421875,
+          "width": 361.6000061035156,
+          "x": 20,
+          "y": 1648.2000732421875
+        },
+        "clientHeight": 32,
+        "clientWidth": 220,
+        "href": "/matches/synthetic-overlap-1",
+        "railHeading": null,
+        "rect": {
+          "bottom": 1693,
+          "height": 32,
+          "left": 144.8000030517578,
+          "right": 364.8000030517578,
+          "top": 1661,
+          "width": 220,
+          "x": 144.8000030517578,
+          "y": 1661
+        },
+        "scrollHeight": 32,
+        "scrollWidth": 220,
+        "style": {
+          "fontSize": "12px",
+          "lineHeight": "16px",
+          "overflow": "visible",
+          "overflowWrap": "normal",
+          "textOverflow": "clip",
+          "whiteSpace": "normal",
+          "wordBreak": "normal"
+        },
+        "text": "풋살 · 입문-고수 · 성별 무관 · 참가비 설명: 10000",
+        "withinViewport": false
+      }
+    ],
+    "documentScrollWidth": 402,
+    "mainRows": 8,
+    "rails": [
+      {
+        "heading": "눈에 띄는 매치",
+        "rect": {
+          "bottom": 602,
+          "height": 329.6000061035156,
+          "left": 20,
+          "right": 381.6000061035156,
+          "top": 272.3999938964844,
+          "width": 361.6000061035156,
+          "x": 20,
+          "y": 272.3999938964844
+        },
+        "scrollers": [
+          {
+            "clientWidth": 370,
+            "rect": {
+              "bottom": 602,
+              "height": 293.6000061035156,
+              "left": 16,
+              "right": 385.6000061035156,
+              "top": 308.3999938964844,
+              "width": 369.6000061035156,
+              "x": 16,
+              "y": 308.3999938964844
+            },
+            "scrollLeft": 490.3999938964844,
+            "scrollWidth": 860
+          }
+        ]
+      }
+    ],
+    "scroll": {
+      "main": 0,
+      "x": 0,
+      "y": 0
+    },
+    "searchValue": "",
+    "selectedCards": [
+      {
+        "cls": "tm-match-list-card tm-card-interactive tm-pressable tm-card-closed",
+        "href": "/matches/synthetic-numeric-1",
+        "metadata": [
+          "입문-고수 · 성별 무관 · 참가비 설명: 10000"
+        ],
+        "title": null
+      },
+      {
+        "cls": "tm-match-row tm-card-interactive tm-pressable tm-card-closed",
+        "href": "/matches/synthetic-free-1",
+        "metadata": [
+          "축구 · 입문-고수 · 성별 무관 · 참가비 설명: 무료"
+        ],
+        "title": "QA-PR1438 개인매치"
+      },
+      {
+        "cls": "tm-match-row tm-card-interactive tm-pressable tm-card-closed",
+        "href": "/matches/synthetic-no-cost-control-1",
+        "metadata": [
+          "풋살 · 입문-고수 · 성별 무관"
+        ],
+        "title": "(테스트) 1.0.3 QA 수명주기"
+      },
+      {
+        "cls": "tm-match-row tm-card-interactive tm-pressable tm-card-closed",
+        "href": "/matches/synthetic-numeric-1",
+        "metadata": [
+          "풋살 · 입문-고수 · 성별 무관 · 참가비 설명: 10000"
+        ],
+        "title": "test"
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/matches",
+    "utc": "2026-10-04T07:27:08.874Z",
+    "viewport": {
+      "dpr": 1.25,
+      "h": 606,
+      "w": 402
+    },
+    "label": "mobile last photo card clipping candidate",
+    "index": 7
+  },
+  {
+    "costMetadata": [
+      {
+        "cardClass": "tm-match-list-card tm-card-interactive tm-pressable tm-card-closed",
+        "cardRect": {
+          "bottom": 597.3333435058594,
+          "height": 285.3333435058594,
+          "left": 110,
+          "right": 386,
+          "top": 312,
+          "width": 276,
+          "x": 110,
+          "y": 312
+        },
+        "clientHeight": 16,
+        "clientWidth": 243,
+        "href": "/matches/synthetic-numeric-1",
+        "railHeading": "눈에 띄는 매치",
+        "rect": {
+          "bottom": 492.6666870117187,
+          "height": 16,
+          "left": 126.66667175292967,
+          "right": 369.3333435058594,
+          "top": 476.6666870117187,
+          "width": 242.6666717529297,
+          "x": 126.66667175292967,
+          "y": 476.6666870117187
+        },
+        "scrollHeight": 16,
+        "scrollWidth": 243,
+        "style": {
+          "fontSize": "12px",
+          "lineHeight": "16px",
+          "overflow": "visible",
+          "overflowWrap": "normal",
+          "textOverflow": "clip",
+          "whiteSpace": "normal",
+          "wordBreak": "normal"
+        },
+        "text": "입문-고수 · 성별 무관 · 참가비 설명: 10000",
+        "withinViewport": true
+      },
+      {
+        "cardClass": "tm-match-list-card tm-card-interactive tm-pressable tm-card-closed",
+        "cardRect": {
+          "bottom": 597.3333435058594,
+          "height": 285.3333435058594,
+          "left": 398,
+          "right": 674,
+          "top": 312,
+          "width": 276,
+          "x": 398,
+          "y": 312
+        },
+        "clientHeight": 16,
+        "clientWidth": 243,
+        "href": "/matches/synthetic-overlap-1",
+        "railHeading": "눈에 띄는 매치",
+        "rect": {
+          "bottom": 492.6666870117187,
+          "height": 16,
+          "left": 414.6666870117187,
+          "right": 657.3333587646484,
+          "top": 476.6666870117187,
+          "width": 242.6666717529297,
+          "x": 414.6666870117187,
+          "y": 476.6666870117187
+        },
+        "scrollHeight": 16,
+        "scrollWidth": 243,
+        "style": {
+          "fontSize": "12px",
+          "lineHeight": "16px",
+          "overflow": "visible",
+          "overflowWrap": "normal",
+          "textOverflow": "clip",
+          "whiteSpace": "normal",
+          "wordBreak": "normal"
+        },
+        "text": "입문-고수 · 성별 무관 · 참가비 설명: 10000",
+        "withinViewport": true
+      },
+      {
+        "cardClass": "tm-match-row tm-card-interactive tm-pressable tm-card-closed",
+        "cardRect": {
+          "bottom": 1317.0000915527344,
+          "height": 130.33334350585938,
+          "left": 114,
+          "right": 674,
+          "top": 1186.666748046875,
+          "width": 560,
+          "x": 114,
+          "y": 1186.666748046875
+        },
+        "clientHeight": 16,
+        "clientWidth": 419,
+        "href": "/matches/synthetic-free-1",
+        "railHeading": null,
+        "rect": {
+          "bottom": 1215.3333740234375,
+          "height": 16,
+          "left": 238.6666717529297,
+          "right": 657.3333587646484,
+          "top": 1199.3333740234375,
+          "width": 418.6666870117187,
+          "x": 238.6666717529297,
+          "y": 1199.3333740234375
+        },
+        "scrollHeight": 16,
+        "scrollWidth": 419,
+        "style": {
+          "fontSize": "12px",
+          "lineHeight": "16px",
+          "overflow": "visible",
+          "overflowWrap": "normal",
+          "textOverflow": "clip",
+          "whiteSpace": "normal",
+          "wordBreak": "normal"
+        },
+        "text": "축구 · 입문-고수 · 성별 무관 · 참가비 설명: 무료",
+        "withinViewport": false
+      },
+      {
+        "cardClass": "tm-match-row tm-card-interactive tm-pressable tm-card-closed",
+        "cardRect": {
+          "bottom": 1601.6667175292969,
+          "height": 130.33334350585938,
+          "left": 114,
+          "right": 674,
+          "top": 1471.3333740234375,
+          "width": 560,
+          "x": 114,
+          "y": 1471.3333740234375
+        },
+        "clientHeight": 16,
+        "clientWidth": 419,
+        "href": "/matches/synthetic-numeric-1",
+        "railHeading": null,
+        "rect": {
+          "bottom": 1500,
+          "height": 16,
+          "left": 238.6666717529297,
+          "right": 657.3333587646484,
+          "top": 1484,
+          "width": 418.6666870117187,
+          "x": 238.6666717529297,
+          "y": 1484
+        },
+        "scrollHeight": 16,
+        "scrollWidth": 419,
+        "style": {
+          "fontSize": "12px",
+          "lineHeight": "16px",
+          "overflow": "visible",
+          "overflowWrap": "normal",
+          "textOverflow": "clip",
+          "whiteSpace": "normal",
+          "wordBreak": "normal"
+        },
+        "text": "풋살 · 입문-고수 · 성별 무관 · 참가비 설명: 10000",
+        "withinViewport": false
+      },
+      {
+        "cardClass": "tm-match-row tm-card-interactive tm-pressable tm-card-closed",
+        "cardRect": {
+          "bottom": 1744.0000915527344,
+          "height": 130.33334350585938,
+          "left": 114,
+          "right": 674,
+          "top": 1613.666748046875,
+          "width": 560,
+          "x": 114,
+          "y": 1613.666748046875
+        },
+        "clientHeight": 16,
+        "clientWidth": 419,
+        "href": "/matches/synthetic-overlap-1",
+        "railHeading": null,
+        "rect": {
+          "bottom": 1642.3333740234375,
+          "height": 16,
+          "left": 238.6666717529297,
+          "right": 657.3333587646484,
+          "top": 1626.3333740234375,
+          "width": 418.6666870117187,
+          "x": 238.6666717529297,
+          "y": 1626.3333740234375
+        },
+        "scrollHeight": 16,
+        "scrollWidth": 419,
+        "style": {
+          "fontSize": "12px",
+          "lineHeight": "16px",
+          "overflow": "visible",
+          "overflowWrap": "normal",
+          "textOverflow": "clip",
+          "whiteSpace": "normal",
+          "wordBreak": "normal"
+        },
+        "text": "풋살 · 입문-고수 · 성별 무관 · 참가비 설명: 10000",
+        "withinViewport": false
+      }
+    ],
+    "documentScrollWidth": 788,
+    "mainRows": 8,
+    "rails": [
+      {
+        "heading": "눈에 띄는 매치",
+        "rect": {
+          "bottom": 601.3333435058594,
+          "height": 329.3333435058594,
+          "left": 114,
+          "right": 674,
+          "top": 272,
+          "width": 560,
+          "x": 114,
+          "y": 272
+        },
+        "scrollers": [
+          {
+            "clientWidth": 568,
+            "rect": {
+              "bottom": 601.3333435058594,
+              "height": 293.3333435058594,
+              "left": 110,
+              "right": 678,
+              "top": 308,
+              "width": 568,
+              "x": 110,
+              "y": 308
+            },
+            "scrollLeft": 292,
+            "scrollWidth": 860
+          }
+        ]
+      }
+    ],
+    "scroll": {
+      "main": 0,
+      "x": 0,
+      "y": 0
+    },
+    "searchValue": "",
+    "selectedCards": [
+      {
+        "cls": "tm-match-list-card tm-card-interactive tm-pressable tm-card-closed",
+        "href": "/matches/synthetic-numeric-1",
+        "metadata": [
+          "입문-고수 · 성별 무관 · 참가비 설명: 10000"
+        ],
+        "title": null
+      },
+      {
+        "cls": "tm-match-row tm-card-interactive tm-pressable tm-card-closed",
+        "href": "/matches/synthetic-free-1",
+        "metadata": [
+          "축구 · 입문-고수 · 성별 무관 · 참가비 설명: 무료"
+        ],
+        "title": "QA-PR1438 개인매치"
+      },
+      {
+        "cls": "tm-match-row tm-card-interactive tm-pressable tm-card-closed",
+        "href": "/matches/synthetic-no-cost-control-1",
+        "metadata": [
+          "풋살 · 입문-고수 · 성별 무관"
+        ],
+        "title": "(테스트) 1.0.3 QA 수명주기"
+      },
+      {
+        "cls": "tm-match-row tm-card-interactive tm-pressable tm-card-closed",
+        "href": "/matches/synthetic-numeric-1",
+        "metadata": [
+          "풋살 · 입문-고수 · 성별 무관 · 참가비 설명: 10000"
+        ],
+        "title": "test"
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/matches",
+    "utc": "2026-10-04T07:28:58.112Z",
+    "viewport": {
+      "dpr": 1.5,
+      "h": 505,
+      "w": 788
+    },
+    "label": "tablet default photo rail",
+    "index": 8
+  },
+  {
+    "costMetadata": [
+      {
+        "cardClass": "tm-match-list-card tm-card-interactive tm-pressable tm-card-closed",
+        "cardRect": {
+          "bottom": 437.3333435058594,
+          "height": 285.3333435058594,
+          "left": 110,
+          "right": 386,
+          "top": 152,
+          "width": 276,
+          "x": 110,
+          "y": 152
+        },
+        "clientHeight": 16,
+        "clientWidth": 243,
+        "href": "/matches/synthetic-numeric-1",
+        "railHeading": "눈에 띄는 매치",
+        "rect": {
+          "bottom": 332.66668701171875,
+          "height": 16,
+          "left": 126.66667175292967,
+          "right": 369.3333435058594,
+          "top": 316.66668701171875,
+          "width": 242.6666717529297,
+          "x": 126.66667175292967,
+          "y": 316.66668701171875
+        },
+        "scrollHeight": 16,
+        "scrollWidth": 243,
+        "style": {
+          "fontSize": "12px",
+          "lineHeight": "16px",
+          "overflow": "visible",
+          "overflowWrap": "normal",
+          "textOverflow": "clip",
+          "whiteSpace": "normal",
+          "wordBreak": "normal"
+        },
+        "text": "입문-고수 · 성별 무관 · 참가비 설명: 10000",
+        "withinViewport": true
+      },
+      {
+        "cardClass": "tm-match-list-card tm-card-interactive tm-pressable tm-card-closed",
+        "cardRect": {
+          "bottom": 437.3333435058594,
+          "height": 285.3333435058594,
+          "left": 398,
+          "right": 674,
+          "top": 152,
+          "width": 276,
+          "x": 398,
+          "y": 152
+        },
+        "clientHeight": 16,
+        "clientWidth": 243,
+        "href": "/matches/synthetic-overlap-1",
+        "railHeading": "눈에 띄는 매치",
+        "rect": {
+          "bottom": 332.66668701171875,
+          "height": 16,
+          "left": 414.6666870117187,
+          "right": 657.3333587646484,
+          "top": 316.66668701171875,
+          "width": 242.6666717529297,
+          "x": 414.6666870117187,
+          "y": 316.66668701171875
+        },
+        "scrollHeight": 16,
+        "scrollWidth": 243,
+        "style": {
+          "fontSize": "12px",
+          "lineHeight": "16px",
+          "overflow": "visible",
+          "overflowWrap": "normal",
+          "textOverflow": "clip",
+          "whiteSpace": "normal",
+          "wordBreak": "normal"
+        },
+        "text": "입문-고수 · 성별 무관 · 참가비 설명: 10000",
+        "withinViewport": true
+      },
+      {
+        "cardClass": "tm-match-row tm-card-interactive tm-pressable tm-card-closed",
+        "cardRect": {
+          "bottom": 1157.0000915527344,
+          "height": 130.33334350585938,
+          "left": 114,
+          "right": 674,
+          "top": 1026.666748046875,
+          "width": 560,
+          "x": 114,
+          "y": 1026.666748046875
+        },
+        "clientHeight": 16,
+        "clientWidth": 419,
+        "href": "/matches/synthetic-free-1",
+        "railHeading": null,
+        "rect": {
+          "bottom": 1055.3333740234375,
+          "height": 16,
+          "left": 238.6666717529297,
+          "right": 657.3333587646484,
+          "top": 1039.3333740234375,
+          "width": 418.6666870117187,
+          "x": 238.6666717529297,
+          "y": 1039.3333740234375
+        },
+        "scrollHeight": 16,
+        "scrollWidth": 419,
+        "style": {
+          "fontSize": "12px",
+          "lineHeight": "16px",
+          "overflow": "visible",
+          "overflowWrap": "normal",
+          "textOverflow": "clip",
+          "whiteSpace": "normal",
+          "wordBreak": "normal"
+        },
+        "text": "축구 · 입문-고수 · 성별 무관 · 참가비 설명: 무료",
+        "withinViewport": false
+      },
+      {
+        "cardClass": "tm-match-row tm-card-interactive tm-pressable tm-card-closed",
+        "cardRect": {
+          "bottom": 1441.6667175292969,
+          "height": 130.33334350585938,
+          "left": 114,
+          "right": 674,
+          "top": 1311.3333740234375,
+          "width": 560,
+          "x": 114,
+          "y": 1311.3333740234375
+        },
+        "clientHeight": 16,
+        "clientWidth": 419,
+        "href": "/matches/synthetic-numeric-1",
+        "railHeading": null,
+        "rect": {
+          "bottom": 1340,
+          "height": 16,
+          "left": 238.6666717529297,
+          "right": 657.3333587646484,
+          "top": 1324,
+          "width": 418.6666870117187,
+          "x": 238.6666717529297,
+          "y": 1324
+        },
+        "scrollHeight": 16,
+        "scrollWidth": 419,
+        "style": {
+          "fontSize": "12px",
+          "lineHeight": "16px",
+          "overflow": "visible",
+          "overflowWrap": "normal",
+          "textOverflow": "clip",
+          "whiteSpace": "normal",
+          "wordBreak": "normal"
+        },
+        "text": "풋살 · 입문-고수 · 성별 무관 · 참가비 설명: 10000",
+        "withinViewport": false
+      },
+      {
+        "cardClass": "tm-match-row tm-card-interactive tm-pressable tm-card-closed",
+        "cardRect": {
+          "bottom": 1584.0000915527344,
+          "height": 130.33334350585938,
+          "left": 114,
+          "right": 674,
+          "top": 1453.666748046875,
+          "width": 560,
+          "x": 114,
+          "y": 1453.666748046875
+        },
+        "clientHeight": 16,
+        "clientWidth": 419,
+        "href": "/matches/synthetic-overlap-1",
+        "railHeading": null,
+        "rect": {
+          "bottom": 1482.3333740234375,
+          "height": 16,
+          "left": 238.6666717529297,
+          "right": 657.3333587646484,
+          "top": 1466.3333740234375,
+          "width": 418.6666870117187,
+          "x": 238.6666717529297,
+          "y": 1466.3333740234375
+        },
+        "scrollHeight": 16,
+        "scrollWidth": 419,
+        "style": {
+          "fontSize": "12px",
+          "lineHeight": "16px",
+          "overflow": "visible",
+          "overflowWrap": "normal",
+          "textOverflow": "clip",
+          "whiteSpace": "normal",
+          "wordBreak": "normal"
+        },
+        "text": "풋살 · 입문-고수 · 성별 무관 · 참가비 설명: 10000",
+        "withinViewport": false
+      }
+    ],
+    "documentScrollWidth": 788,
+    "mainRows": 8,
+    "rails": [
+      {
+        "heading": "눈에 띄는 매치",
+        "rect": {
+          "bottom": 441.3333435058594,
+          "height": 329.3333435058594,
+          "left": 114,
+          "right": 674,
+          "top": 112,
+          "width": 560,
+          "x": 114,
+          "y": 112
+        },
+        "scrollers": [
+          {
+            "clientWidth": 568,
+            "rect": {
+              "bottom": 441.3333435058594,
+              "height": 293.3333435058594,
+              "left": 110,
+              "right": 678,
+              "top": 148,
+              "width": 568,
+              "x": 110,
+              "y": 148
+            },
+            "scrollLeft": 292,
+            "scrollWidth": 860
+          }
+        ]
+      }
+    ],
+    "scroll": {
+      "main": 160,
+      "x": 0,
+      "y": 0
+    },
+    "searchValue": "",
+    "selectedCards": [
+      {
+        "cls": "tm-match-list-card tm-card-interactive tm-pressable tm-card-closed",
+        "href": "/matches/synthetic-numeric-1",
+        "metadata": [
+          "입문-고수 · 성별 무관 · 참가비 설명: 10000"
+        ],
+        "title": null
+      },
+      {
+        "cls": "tm-match-row tm-card-interactive tm-pressable tm-card-closed",
+        "href": "/matches/synthetic-free-1",
+        "metadata": [
+          "축구 · 입문-고수 · 성별 무관 · 참가비 설명: 무료"
+        ],
+        "title": "QA-PR1438 개인매치"
+      },
+      {
+        "cls": "tm-match-row tm-card-interactive tm-pressable tm-card-closed",
+        "href": "/matches/synthetic-no-cost-control-1",
+        "metadata": [
+          "풋살 · 입문-고수 · 성별 무관"
+        ],
+        "title": "(테스트) 1.0.3 QA 수명주기"
+      },
+      {
+        "cls": "tm-match-row tm-card-interactive tm-pressable tm-card-closed",
+        "href": "/matches/synthetic-numeric-1",
+        "metadata": [
+          "풋살 · 입문-고수 · 성별 무관 · 참가비 설명: 10000"
+        ],
+        "title": "test"
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/matches",
+    "utc": "2026-10-04T07:29:29.170Z",
+    "viewport": {
+      "dpr": 1.5,
+      "h": 505,
+      "w": 788
+    },
+    "label": "tablet photo caption visible after scroll",
+    "index": 9
+  },
+  {
+    "costMetadata": [
+      {
+        "cardClass": "tm-match-list-card tm-card-interactive tm-pressable tm-card-closed",
+        "cardRect": {
+          "bottom": -602.6666564941406,
+          "height": 285.3333435058594,
+          "left": 110,
+          "right": 386,
+          "top": -888,
+          "width": 276,
+          "x": 110,
+          "y": -888
+        },
+        "clientHeight": 16,
+        "clientWidth": 243,
+        "href": "/matches/synthetic-numeric-1",
+        "railHeading": "눈에 띄는 매치",
+        "rect": {
+          "bottom": -707.3333740234375,
+          "height": 16,
+          "left": 126.66667175292967,
+          "right": 369.3333435058594,
+          "top": -723.3333740234375,
+          "width": 242.6666717529297,
+          "x": 126.66667175292967,
+          "y": -723.3333740234375
+        },
+        "scrollHeight": 16,
+        "scrollWidth": 243,
+        "style": {
+          "fontSize": "12px",
+          "lineHeight": "16px",
+          "overflow": "visible",
+          "overflowWrap": "normal",
+          "textOverflow": "clip",
+          "whiteSpace": "normal",
+          "wordBreak": "normal"
+        },
+        "text": "입문-고수 · 성별 무관 · 참가비 설명: 10000",
+        "withinViewport": false
+      },
+      {
+        "cardClass": "tm-match-list-card tm-card-interactive tm-pressable tm-card-closed",
+        "cardRect": {
+          "bottom": -602.6666564941406,
+          "height": 285.3333435058594,
+          "left": 398,
+          "right": 674,
+          "top": -888,
+          "width": 276,
+          "x": 398,
+          "y": -888
+        },
+        "clientHeight": 16,
+        "clientWidth": 243,
+        "href": "/matches/synthetic-overlap-1",
+        "railHeading": "눈에 띄는 매치",
+        "rect": {
+          "bottom": -707.3333740234375,
+          "height": 16,
+          "left": 414.6666870117187,
+          "right": 657.3333587646484,
+          "top": -723.3333740234375,
+          "width": 242.6666717529297,
+          "x": 414.6666870117187,
+          "y": -723.3333740234375
+        },
+        "scrollHeight": 16,
+        "scrollWidth": 243,
+        "style": {
+          "fontSize": "12px",
+          "lineHeight": "16px",
+          "overflow": "visible",
+          "overflowWrap": "normal",
+          "textOverflow": "clip",
+          "whiteSpace": "normal",
+          "wordBreak": "normal"
+        },
+        "text": "입문-고수 · 성별 무관 · 참가비 설명: 10000",
+        "withinViewport": false
+      },
+      {
+        "cardClass": "tm-match-row tm-card-interactive tm-pressable tm-card-closed",
+        "cardRect": {
+          "bottom": 117.00000953674316,
+          "height": 130.33334350585938,
+          "left": 114,
+          "right": 674,
+          "top": -13.333333969116213,
+          "width": 560,
+          "x": 114,
+          "y": -13.333333969116213
+        },
+        "clientHeight": 16,
+        "clientWidth": 419,
+        "href": "/matches/synthetic-free-1",
+        "railHeading": null,
+        "rect": {
+          "bottom": 15.333333313465118,
+          "height": 16,
+          "left": 238.6666717529297,
+          "right": 657.3333587646484,
+          "top": -0.6666666865348816,
+          "width": 418.6666870117187,
+          "x": 238.6666717529297,
+          "y": -0.6666666865348816
+        },
+        "scrollHeight": 16,
+        "scrollWidth": 419,
+        "style": {
+          "fontSize": "12px",
+          "lineHeight": "16px",
+          "overflow": "visible",
+          "overflowWrap": "normal",
+          "textOverflow": "clip",
+          "whiteSpace": "normal",
+          "wordBreak": "normal"
+        },
+        "text": "축구 · 입문-고수 · 성별 무관 · 참가비 설명: 무료",
+        "withinViewport": false
+      },
+      {
+        "cardClass": "tm-match-row tm-card-interactive tm-pressable tm-card-closed",
+        "cardRect": {
+          "bottom": 401.6666870117187,
+          "height": 130.33334350585938,
+          "left": 114,
+          "right": 674,
+          "top": 271.3333435058594,
+          "width": 560,
+          "x": 114,
+          "y": 271.3333435058594
+        },
+        "clientHeight": 16,
+        "clientWidth": 419,
+        "href": "/matches/synthetic-numeric-1",
+        "railHeading": null,
+        "rect": {
+          "bottom": 300,
+          "height": 16,
+          "left": 238.6666717529297,
+          "right": 657.3333587646484,
+          "top": 284,
+          "width": 418.6666870117187,
+          "x": 238.6666717529297,
+          "y": 284
+        },
+        "scrollHeight": 16,
+        "scrollWidth": 419,
+        "style": {
+          "fontSize": "12px",
+          "lineHeight": "16px",
+          "overflow": "visible",
+          "overflowWrap": "normal",
+          "textOverflow": "clip",
+          "whiteSpace": "normal",
+          "wordBreak": "normal"
+        },
+        "text": "풋살 · 입문-고수 · 성별 무관 · 참가비 설명: 10000",
+        "withinViewport": true
+      },
+      {
+        "cardClass": "tm-match-row tm-card-interactive tm-pressable tm-card-closed",
+        "cardRect": {
+          "bottom": 544.0000305175781,
+          "height": 130.33334350585938,
+          "left": 114,
+          "right": 674,
+          "top": 413.6666870117187,
+          "width": 560,
+          "x": 114,
+          "y": 413.6666870117187
+        },
+        "clientHeight": 16,
+        "clientWidth": 419,
+        "href": "/matches/synthetic-overlap-1",
+        "railHeading": null,
+        "rect": {
+          "bottom": 442.3333435058594,
+          "height": 16,
+          "left": 238.6666717529297,
+          "right": 657.3333587646484,
+          "top": 426.3333435058594,
+          "width": 418.6666870117187,
+          "x": 238.6666717529297,
+          "y": 426.3333435058594
+        },
+        "scrollHeight": 16,
+        "scrollWidth": 419,
+        "style": {
+          "fontSize": "12px",
+          "lineHeight": "16px",
+          "overflow": "visible",
+          "overflowWrap": "normal",
+          "textOverflow": "clip",
+          "whiteSpace": "normal",
+          "wordBreak": "normal"
+        },
+        "text": "풋살 · 입문-고수 · 성별 무관 · 참가비 설명: 10000",
+        "withinViewport": true
+      }
+    ],
+    "documentScrollWidth": 788,
+    "mainRows": 8,
+    "rails": [
+      {
+        "heading": "눈에 띄는 매치",
+        "rect": {
+          "bottom": -598.6666564941406,
+          "height": 329.3333435058594,
+          "left": 114,
+          "right": 674,
+          "top": -928,
+          "width": 560,
+          "x": 114,
+          "y": -928
+        },
+        "scrollers": [
+          {
+            "clientWidth": 568,
+            "rect": {
+              "bottom": -598.6666564941406,
+              "height": 293.3333435058594,
+              "left": 110,
+              "right": 678,
+              "top": -892,
+              "width": 568,
+              "x": 110,
+              "y": -892
+            },
+            "scrollLeft": 292,
+            "scrollWidth": 860
+          }
+        ]
+      }
+    ],
+    "scroll": {
+      "main": 1200,
+      "x": 0,
+      "y": 0
+    },
+    "searchValue": "",
+    "selectedCards": [
+      {
+        "cls": "tm-match-list-card tm-card-interactive tm-pressable tm-card-closed",
+        "href": "/matches/synthetic-numeric-1",
+        "metadata": [
+          "입문-고수 · 성별 무관 · 참가비 설명: 10000"
+        ],
+        "title": null
+      },
+      {
+        "cls": "tm-match-row tm-card-interactive tm-pressable tm-card-closed",
+        "href": "/matches/synthetic-free-1",
+        "metadata": [
+          "축구 · 입문-고수 · 성별 무관 · 참가비 설명: 무료"
+        ],
+        "title": "QA-PR1438 개인매치"
+      },
+      {
+        "cls": "tm-match-row tm-card-interactive tm-pressable tm-card-closed",
+        "href": "/matches/synthetic-no-cost-control-1",
+        "metadata": [
+          "풋살 · 입문-고수 · 성별 무관"
+        ],
+        "title": "(테스트) 1.0.3 QA 수명주기"
+      },
+      {
+        "cls": "tm-match-row tm-card-interactive tm-pressable tm-card-closed",
+        "href": "/matches/synthetic-numeric-1",
+        "metadata": [
+          "풋살 · 입문-고수 · 성별 무관 · 참가비 설명: 10000"
+        ],
+        "title": "test"
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/matches",
+    "utc": "2026-10-04T07:29:49.436Z",
+    "viewport": {
+      "dpr": 1.5,
+      "h": 505,
+      "w": 788
+    },
+    "label": "tablet numeric body rows settled",
+    "index": 10
+  },
+  {
+    "costMetadata": [
+      {
+        "cardClass": "tm-match-list-card tm-card-interactive tm-pressable tm-card-closed",
+        "cardRect": {
+          "bottom": 597.3333435058594,
+          "height": 285.3333435058594,
+          "left": 398,
+          "right": 674,
+          "top": 312,
+          "width": 276,
+          "x": 398,
+          "y": 312
+        },
+        "clientHeight": 16,
+        "clientWidth": 243,
+        "href": "/matches/synthetic-numeric-1",
+        "railHeading": "눈에 띄는 매치",
+        "rect": {
+          "bottom": 492.6666870117187,
+          "height": 16,
+          "left": 414.6666870117187,
+          "right": 657.3333587646484,
+          "top": 476.6666870117187,
+          "width": 242.6666717529297,
+          "x": 414.6666870117187,
+          "y": 476.6666870117187
+        },
+        "scrollHeight": 16,
+        "scrollWidth": 243,
+        "style": {
+          "fontSize": "12px",
+          "lineHeight": "16px",
+          "overflow": "visible",
+          "overflowWrap": "normal",
+          "textOverflow": "clip",
+          "whiteSpace": "normal",
+          "wordBreak": "normal"
+        },
+        "text": "입문-고수 · 성별 무관 · 참가비 설명: 10000",
+        "withinViewport": true
+      },
+      {
+        "cardClass": "tm-match-list-card tm-card-interactive tm-pressable tm-card-closed",
+        "cardRect": {
+          "bottom": 597.3333435058594,
+          "height": 285.3333435058594,
+          "left": 686,
+          "right": 962,
+          "top": 312,
+          "width": 276,
+          "x": 686,
+          "y": 312
+        },
+        "clientHeight": 16,
+        "clientWidth": 243,
+        "href": "/matches/synthetic-overlap-1",
+        "railHeading": "눈에 띄는 매치",
+        "rect": {
+          "bottom": 492.6666870117187,
+          "height": 16,
+          "left": 702.6666870117188,
+          "right": 945.3333587646484,
+          "top": 476.6666870117187,
+          "width": 242.6666717529297,
+          "x": 702.6666870117188,
+          "y": 476.6666870117187
+        },
+        "scrollHeight": 16,
+        "scrollWidth": 243,
+        "style": {
+          "fontSize": "12px",
+          "lineHeight": "16px",
+          "overflow": "visible",
+          "overflowWrap": "normal",
+          "textOverflow": "clip",
+          "whiteSpace": "normal",
+          "wordBreak": "normal"
+        },
+        "text": "입문-고수 · 성별 무관 · 참가비 설명: 10000",
+        "withinViewport": false
+      },
+      {
+        "cardClass": "tm-match-row tm-card-interactive tm-pressable tm-card-closed",
+        "cardRect": {
+          "bottom": 1317.0000915527344,
+          "height": 130.33334350585938,
+          "left": 114,
+          "right": 674,
+          "top": 1186.666748046875,
+          "width": 560,
+          "x": 114,
+          "y": 1186.666748046875
+        },
+        "clientHeight": 16,
+        "clientWidth": 419,
+        "href": "/matches/synthetic-free-1",
+        "railHeading": null,
+        "rect": {
+          "bottom": 1215.3333740234375,
+          "height": 16,
+          "left": 238.6666717529297,
+          "right": 657.3333587646484,
+          "top": 1199.3333740234375,
+          "width": 418.6666870117187,
+          "x": 238.6666717529297,
+          "y": 1199.3333740234375
+        },
+        "scrollHeight": 16,
+        "scrollWidth": 419,
+        "style": {
+          "fontSize": "12px",
+          "lineHeight": "16px",
+          "overflow": "visible",
+          "overflowWrap": "normal",
+          "textOverflow": "clip",
+          "whiteSpace": "normal",
+          "wordBreak": "normal"
+        },
+        "text": "축구 · 입문-고수 · 성별 무관 · 참가비 설명: 무료",
+        "withinViewport": false
+      },
+      {
+        "cardClass": "tm-match-row tm-card-interactive tm-pressable tm-card-closed",
+        "cardRect": {
+          "bottom": 1601.6667175292969,
+          "height": 130.33334350585938,
+          "left": 114,
+          "right": 674,
+          "top": 1471.3333740234375,
+          "width": 560,
+          "x": 114,
+          "y": 1471.3333740234375
+        },
+        "clientHeight": 16,
+        "clientWidth": 419,
+        "href": "/matches/synthetic-numeric-1",
+        "railHeading": null,
+        "rect": {
+          "bottom": 1500,
+          "height": 16,
+          "left": 238.6666717529297,
+          "right": 657.3333587646484,
+          "top": 1484,
+          "width": 418.6666870117187,
+          "x": 238.6666717529297,
+          "y": 1484
+        },
+        "scrollHeight": 16,
+        "scrollWidth": 419,
+        "style": {
+          "fontSize": "12px",
+          "lineHeight": "16px",
+          "overflow": "visible",
+          "overflowWrap": "normal",
+          "textOverflow": "clip",
+          "whiteSpace": "normal",
+          "wordBreak": "normal"
+        },
+        "text": "풋살 · 입문-고수 · 성별 무관 · 참가비 설명: 10000",
+        "withinViewport": false
+      },
+      {
+        "cardClass": "tm-match-row tm-card-interactive tm-pressable tm-card-closed",
+        "cardRect": {
+          "bottom": 1744.0000915527344,
+          "height": 130.33334350585938,
+          "left": 114,
+          "right": 674,
+          "top": 1613.666748046875,
+          "width": 560,
+          "x": 114,
+          "y": 1613.666748046875
+        },
+        "clientHeight": 16,
+        "clientWidth": 419,
+        "href": "/matches/synthetic-overlap-1",
+        "railHeading": null,
+        "rect": {
+          "bottom": 1642.3333740234375,
+          "height": 16,
+          "left": 238.6666717529297,
+          "right": 657.3333587646484,
+          "top": 1626.3333740234375,
+          "width": 418.6666870117187,
+          "x": 238.6666717529297,
+          "y": 1626.3333740234375
+        },
+        "scrollHeight": 16,
+        "scrollWidth": 419,
+        "style": {
+          "fontSize": "12px",
+          "lineHeight": "16px",
+          "overflow": "visible",
+          "overflowWrap": "normal",
+          "textOverflow": "clip",
+          "whiteSpace": "normal",
+          "wordBreak": "normal"
+        },
+        "text": "풋살 · 입문-고수 · 성별 무관 · 참가비 설명: 10000",
+        "withinViewport": false
+      }
+    ],
+    "documentScrollWidth": 788,
+    "mainRows": 8,
+    "rails": [
+      {
+        "heading": "눈에 띄는 매치",
+        "rect": {
+          "bottom": 601.3333435058594,
+          "height": 329.3333435058594,
+          "left": 114,
+          "right": 674,
+          "top": 272,
+          "width": 560,
+          "x": 114,
+          "y": 272
+        },
+        "scrollers": [
+          {
+            "clientWidth": 568,
+            "rect": {
+              "bottom": 601.3333435058594,
+              "height": 293.3333435058594,
+              "left": 110,
+              "right": 678,
+              "top": 308,
+              "width": 568,
+              "x": 110,
+              "y": 308
+            },
+            "scrollLeft": 4,
+            "scrollWidth": 860
+          }
+        ]
+      }
+    ],
+    "scroll": {
+      "main": 0,
+      "x": 0,
+      "y": 0
+    },
+    "searchValue": "",
+    "selectedCards": [
+      {
+        "cls": "tm-match-list-card tm-card-interactive tm-pressable tm-card-closed",
+        "href": "/matches/synthetic-numeric-1",
+        "metadata": [
+          "입문-고수 · 성별 무관 · 참가비 설명: 10000"
+        ],
+        "title": null
+      },
+      {
+        "cls": "tm-match-row tm-card-interactive tm-pressable tm-card-closed",
+        "href": "/matches/synthetic-free-1",
+        "metadata": [
+          "축구 · 입문-고수 · 성별 무관 · 참가비 설명: 무료"
+        ],
+        "title": "QA-PR1438 개인매치"
+      },
+      {
+        "cls": "tm-match-row tm-card-interactive tm-pressable tm-card-closed",
+        "href": "/matches/synthetic-no-cost-control-1",
+        "metadata": [
+          "풋살 · 입문-고수 · 성별 무관"
+        ],
+        "title": "(테스트) 1.0.3 QA 수명주기"
+      },
+      {
+        "cls": "tm-match-row tm-card-interactive tm-pressable tm-card-closed",
+        "href": "/matches/synthetic-numeric-1",
+        "metadata": [
+          "풋살 · 입문-고수 · 성별 무관 · 참가비 설명: 10000"
+        ],
+        "title": "test"
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/matches",
+    "utc": "2026-10-04T07:30:23.562Z",
+    "viewport": {
+      "dpr": 1.5,
+      "h": 505,
+      "w": 788
+    },
+    "label": "tablet numeric app Back settled list",
+    "index": 11
+  },
+  {
+    "costMetadata": [
+      {
+        "cardClass": "tm-match-row tm-card-interactive tm-pressable tm-card-closed",
+        "cardRect": {
+          "bottom": 402.3333435058594,
+          "height": 130.33334350585938,
+          "left": 114,
+          "right": 674,
+          "top": 272,
+          "width": 560,
+          "x": 114,
+          "y": 272
+        },
+        "clientHeight": 16,
+        "clientWidth": 419,
+        "href": "/matches/synthetic-free-1?from=%2Fmatches%3FsportId%3Dsport-football",
+        "railHeading": null,
+        "rect": {
+          "bottom": 300.66668701171875,
+          "height": 16,
+          "left": 238.6666717529297,
+          "right": 657.3333587646484,
+          "top": 284.66668701171875,
+          "width": 418.6666870117187,
+          "x": 238.6666717529297,
+          "y": 284.66668701171875
+        },
+        "scrollHeight": 16,
+        "scrollWidth": 419,
+        "style": {
+          "fontSize": "12px",
+          "lineHeight": "16px",
+          "overflow": "visible",
+          "overflowWrap": "normal",
+          "textOverflow": "clip",
+          "whiteSpace": "normal",
+          "wordBreak": "normal"
+        },
+        "text": "축구 · 입문-고수 · 성별 무관 · 참가비 설명: 무료",
+        "withinViewport": true
+      }
+    ],
+    "documentScrollWidth": 788,
+    "mainRows": 1,
+    "rails": [],
+    "scroll": {
+      "main": 0,
+      "x": 0,
+      "y": 0
+    },
+    "searchValue": "",
+    "selectedCards": [
+      {
+        "cls": "tm-match-row tm-card-interactive tm-pressable tm-card-closed",
+        "href": "/matches/synthetic-free-1?from=%2Fmatches%3FsportId%3Dsport-football",
+        "metadata": [
+          "축구 · 입문-고수 · 성별 무관 · 참가비 설명: 무료"
+        ],
+        "title": "QA-PR1438 개인매치"
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/matches?sportId=sport-football",
+    "utc": "2026-10-04T07:30:33.609Z",
+    "viewport": {
+      "dpr": 1.5,
+      "h": 505,
+      "w": 788
+    },
+    "label": "tablet football free label and nearby rail unavailable",
+    "index": 12
+  },
+  {
+    "costMetadata": [
+      {
+        "cardClass": "tm-match-list-card tm-card-interactive tm-pressable tm-card-closed",
+        "cardRect": {
+          "bottom": 736,
+          "height": 312,
+          "left": 387,
+          "right": 707,
+          "top": 424,
+          "width": 320,
+          "x": 387,
+          "y": 424
+        },
+        "clientHeight": 16,
+        "clientWidth": 286,
+        "href": "/matches/synthetic-numeric-1",
+        "railHeading": "눈에 띄는 매치",
+        "rect": {
+          "bottom": 631,
+          "height": 16,
+          "left": 404,
+          "right": 690,
+          "top": 615,
+          "width": 286,
+          "x": 404,
+          "y": 615
+        },
+        "scrollHeight": 16,
+        "scrollWidth": 286,
+        "style": {
+          "fontSize": "12px",
+          "lineHeight": "16px",
+          "overflow": "visible",
+          "overflowWrap": "normal",
+          "textOverflow": "clip",
+          "whiteSpace": "normal",
+          "wordBreak": "normal"
+        },
+        "text": "입문-고수 · 성별 무관 · 참가비 설명: 10000",
+        "withinViewport": true
+      },
+      {
+        "cardClass": "tm-match-list-card tm-card-interactive tm-pressable tm-card-closed",
+        "cardRect": {
+          "bottom": 736,
+          "height": 312,
+          "left": 719,
+          "right": 1039,
+          "top": 424,
+          "width": 320,
+          "x": 719,
+          "y": 424
+        },
+        "clientHeight": 16,
+        "clientWidth": 286,
+        "href": "/matches/synthetic-overlap-1",
+        "railHeading": "눈에 띄는 매치",
+        "rect": {
+          "bottom": 631,
+          "height": 16,
+          "left": 736,
+          "right": 1022,
+          "top": 615,
+          "width": 286,
+          "x": 736,
+          "y": 615
+        },
+        "scrollHeight": 16,
+        "scrollWidth": 286,
+        "style": {
+          "fontSize": "12px",
+          "lineHeight": "16px",
+          "overflow": "visible",
+          "overflowWrap": "normal",
+          "textOverflow": "clip",
+          "whiteSpace": "normal",
+          "wordBreak": "normal"
+        },
+        "text": "입문-고수 · 성별 무관 · 참가비 설명: 10000",
+        "withinViewport": true
+      },
+      {
+        "cardClass": "tm-match-row tm-card-interactive tm-pressable tm-card-closed",
+        "cardRect": {
+          "bottom": 1185,
+          "height": 131,
+          "left": 55,
+          "right": 583,
+          "top": 1054,
+          "width": 528,
+          "x": 55,
+          "y": 1054
+        },
+        "clientHeight": 16,
+        "clientWidth": 386,
+        "href": "/matches/synthetic-free-1",
+        "railHeading": null,
+        "rect": {
+          "bottom": 1083,
+          "height": 16,
+          "left": 180,
+          "right": 566,
+          "top": 1067,
+          "width": 386,
+          "x": 180,
+          "y": 1067
+        },
+        "scrollHeight": 16,
+        "scrollWidth": 386,
+        "style": {
+          "fontSize": "12px",
+          "lineHeight": "16px",
+          "overflow": "visible",
+          "overflowWrap": "normal",
+          "textOverflow": "clip",
+          "whiteSpace": "normal",
+          "wordBreak": "normal"
+        },
+        "text": "축구 · 입문-고수 · 성별 무관 · 참가비 설명: 무료",
+        "withinViewport": false
+      },
+      {
+        "cardClass": "tm-match-row tm-card-interactive tm-pressable tm-card-closed",
+        "cardRect": {
+          "bottom": 1332,
+          "height": 131,
+          "left": 55,
+          "right": 583,
+          "top": 1201,
+          "width": 528,
+          "x": 55,
+          "y": 1201
+        },
+        "clientHeight": 16,
+        "clientWidth": 386,
+        "href": "/matches/synthetic-numeric-1",
+        "railHeading": null,
+        "rect": {
+          "bottom": 1230,
+          "height": 16,
+          "left": 180,
+          "right": 566,
+          "top": 1214,
+          "width": 386,
+          "x": 180,
+          "y": 1214
+        },
+        "scrollHeight": 16,
+        "scrollWidth": 386,
+        "style": {
+          "fontSize": "12px",
+          "lineHeight": "16px",
+          "overflow": "visible",
+          "overflowWrap": "normal",
+          "textOverflow": "clip",
+          "whiteSpace": "normal",
+          "wordBreak": "normal"
+        },
+        "text": "풋살 · 입문-고수 · 성별 무관 · 참가비 설명: 10000",
+        "withinViewport": false
+      },
+      {
+        "cardClass": "tm-match-row tm-card-interactive tm-pressable tm-card-closed",
+        "cardRect": {
+          "bottom": 1332,
+          "height": 131,
+          "left": 599,
+          "right": 1127,
+          "top": 1201,
+          "width": 528,
+          "x": 599,
+          "y": 1201
+        },
+        "clientHeight": 16,
+        "clientWidth": 386,
+        "href": "/matches/synthetic-overlap-1",
+        "railHeading": null,
+        "rect": {
+          "bottom": 1230,
+          "height": 16,
+          "left": 724,
+          "right": 1110,
+          "top": 1214,
+          "width": 386,
+          "x": 724,
+          "y": 1214
+        },
+        "scrollHeight": 16,
+        "scrollWidth": 386,
+        "style": {
+          "fontSize": "12px",
+          "lineHeight": "16px",
+          "overflow": "visible",
+          "overflowWrap": "normal",
+          "textOverflow": "clip",
+          "whiteSpace": "normal",
+          "wordBreak": "normal"
+        },
+        "text": "풋살 · 입문-고수 · 성별 무관 · 참가비 설명: 10000",
+        "withinViewport": false
+      }
+    ],
+    "documentScrollWidth": 1182,
+    "mainRows": 8,
+    "rails": [
+      {
+        "heading": "눈에 띄는 매치",
+        "rect": {
+          "bottom": 740,
+          "height": 356,
+          "left": 55,
+          "right": 1127,
+          "top": 384,
+          "width": 1072,
+          "x": 55,
+          "y": 384
+        },
+        "scrollers": [
+          {
+            "clientWidth": 1080,
+            "rect": {
+              "bottom": 740,
+              "height": 320,
+              "left": 51,
+              "right": 1131,
+              "top": 420,
+              "width": 1080,
+              "x": 51,
+              "y": 420
+            },
+            "scrollLeft": 0,
+            "scrollWidth": 1080
+          }
+        ]
+      }
+    ],
+    "scroll": {
+      "main": 0,
+      "x": 0,
+      "y": 0
+    },
+    "searchValue": "",
+    "selectedCards": [
+      {
+        "cls": "tm-match-list-card tm-card-interactive tm-pressable tm-card-closed",
+        "href": "/matches/synthetic-numeric-1",
+        "metadata": [
+          "입문-고수 · 성별 무관 · 참가비 설명: 10000"
+        ],
+        "title": null
+      },
+      {
+        "cls": "tm-match-row tm-card-interactive tm-pressable tm-card-closed",
+        "href": "/matches/synthetic-free-1",
+        "metadata": [
+          "축구 · 입문-고수 · 성별 무관 · 참가비 설명: 무료"
+        ],
+        "title": "QA-PR1438 개인매치"
+      },
+      {
+        "cls": "tm-match-row tm-card-interactive tm-pressable tm-card-closed",
+        "href": "/matches/synthetic-no-cost-control-1",
+        "metadata": [
+          "풋살 · 입문-고수 · 성별 무관"
+        ],
+        "title": "(테스트) 1.0.3 QA 수명주기"
+      },
+      {
+        "cls": "tm-match-row tm-card-interactive tm-pressable tm-card-closed",
+        "href": "/matches/synthetic-numeric-1",
+        "metadata": [
+          "풋살 · 입문-고수 · 성별 무관 · 참가비 설명: 10000"
+        ],
+        "title": "test"
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/matches",
+    "utc": "2026-10-04T07:30:44.651Z",
+    "viewport": {
+      "dpr": 1,
+      "h": 757,
+      "w": 1182
+    },
+    "label": "desktop default photo rail after filter restoration",
+    "index": 13
+  },
+  {
+    "costMetadata": [
+      {
+        "cardClass": "tm-match-list-card tm-card-interactive tm-pressable tm-card-closed",
+        "cardRect": {
+          "bottom": -52,
+          "height": 312,
+          "left": 387,
+          "right": 707,
+          "top": -364,
+          "width": 320,
+          "x": 387,
+          "y": -364
+        },
+        "clientHeight": 16,
+        "clientWidth": 286,
+        "href": "/matches/synthetic-numeric-1",
+        "railHeading": "눈에 띄는 매치",
+        "rect": {
+          "bottom": -157,
+          "height": 16,
+          "left": 404,
+          "right": 690,
+          "top": -173,
+          "width": 286,
+          "x": 404,
+          "y": -173
+        },
+        "scrollHeight": 16,
+        "scrollWidth": 286,
+        "style": {
+          "fontSize": "12px",
+          "lineHeight": "16px",
+          "overflow": "visible",
+          "overflowWrap": "normal",
+          "textOverflow": "clip",
+          "whiteSpace": "normal",
+          "wordBreak": "normal"
+        },
+        "text": "입문-고수 · 성별 무관 · 참가비 설명: 10000",
+        "withinViewport": false
+      },
+      {
+        "cardClass": "tm-match-list-card tm-card-interactive tm-pressable tm-card-closed",
+        "cardRect": {
+          "bottom": -52,
+          "height": 312,
+          "left": 719,
+          "right": 1039,
+          "top": -364,
+          "width": 320,
+          "x": 719,
+          "y": -364
+        },
+        "clientHeight": 16,
+        "clientWidth": 286,
+        "href": "/matches/synthetic-overlap-1",
+        "railHeading": "눈에 띄는 매치",
+        "rect": {
+          "bottom": -157,
+          "height": 16,
+          "left": 736,
+          "right": 1022,
+          "top": -173,
+          "width": 286,
+          "x": 736,
+          "y": -173
+        },
+        "scrollHeight": 16,
+        "scrollWidth": 286,
+        "style": {
+          "fontSize": "12px",
+          "lineHeight": "16px",
+          "overflow": "visible",
+          "overflowWrap": "normal",
+          "textOverflow": "clip",
+          "whiteSpace": "normal",
+          "wordBreak": "normal"
+        },
+        "text": "입문-고수 · 성별 무관 · 참가비 설명: 10000",
+        "withinViewport": false
+      },
+      {
+        "cardClass": "tm-match-row tm-card-interactive tm-pressable tm-card-closed",
+        "cardRect": {
+          "bottom": 397,
+          "height": 131,
+          "left": 55,
+          "right": 583,
+          "top": 266,
+          "width": 528,
+          "x": 55,
+          "y": 266
+        },
+        "clientHeight": 16,
+        "clientWidth": 386,
+        "href": "/matches/synthetic-free-1",
+        "railHeading": null,
+        "rect": {
+          "bottom": 295,
+          "height": 16,
+          "left": 180,
+          "right": 566,
+          "top": 279,
+          "width": 386,
+          "x": 180,
+          "y": 279
+        },
+        "scrollHeight": 16,
+        "scrollWidth": 386,
+        "style": {
+          "fontSize": "12px",
+          "lineHeight": "16px",
+          "overflow": "visible",
+          "overflowWrap": "normal",
+          "textOverflow": "clip",
+          "whiteSpace": "normal",
+          "wordBreak": "normal"
+        },
+        "text": "축구 · 입문-고수 · 성별 무관 · 참가비 설명: 무료",
+        "withinViewport": true
+      },
+      {
+        "cardClass": "tm-match-row tm-card-interactive tm-pressable tm-card-closed",
+        "cardRect": {
+          "bottom": 544,
+          "height": 131,
+          "left": 55,
+          "right": 583,
+          "top": 413,
+          "width": 528,
+          "x": 55,
+          "y": 413
+        },
+        "clientHeight": 16,
+        "clientWidth": 386,
+        "href": "/matches/synthetic-numeric-1",
+        "railHeading": null,
+        "rect": {
+          "bottom": 442,
+          "height": 16,
+          "left": 180,
+          "right": 566,
+          "top": 426,
+          "width": 386,
+          "x": 180,
+          "y": 426
+        },
+        "scrollHeight": 16,
+        "scrollWidth": 386,
+        "style": {
+          "fontSize": "12px",
+          "lineHeight": "16px",
+          "overflow": "visible",
+          "overflowWrap": "normal",
+          "textOverflow": "clip",
+          "whiteSpace": "normal",
+          "wordBreak": "normal"
+        },
+        "text": "풋살 · 입문-고수 · 성별 무관 · 참가비 설명: 10000",
+        "withinViewport": true
+      },
+      {
+        "cardClass": "tm-match-row tm-card-interactive tm-pressable tm-card-closed",
+        "cardRect": {
+          "bottom": 544,
+          "height": 131,
+          "left": 599,
+          "right": 1127,
+          "top": 413,
+          "width": 528,
+          "x": 599,
+          "y": 413
+        },
+        "clientHeight": 16,
+        "clientWidth": 386,
+        "href": "/matches/synthetic-overlap-1",
+        "railHeading": null,
+        "rect": {
+          "bottom": 442,
+          "height": 16,
+          "left": 724,
+          "right": 1110,
+          "top": 426,
+          "width": 386,
+          "x": 724,
+          "y": 426
+        },
+        "scrollHeight": 16,
+        "scrollWidth": 386,
+        "style": {
+          "fontSize": "12px",
+          "lineHeight": "16px",
+          "overflow": "visible",
+          "overflowWrap": "normal",
+          "textOverflow": "clip",
+          "whiteSpace": "normal",
+          "wordBreak": "normal"
+        },
+        "text": "풋살 · 입문-고수 · 성별 무관 · 참가비 설명: 10000",
+        "withinViewport": true
+      }
+    ],
+    "documentScrollWidth": 1182,
+    "mainRows": 8,
+    "rails": [
+      {
+        "heading": "눈에 띄는 매치",
+        "rect": {
+          "bottom": -48,
+          "height": 356,
+          "left": 55,
+          "right": 1127,
+          "top": -404,
+          "width": 1072,
+          "x": 55,
+          "y": -404
+        },
+        "scrollers": [
+          {
+            "clientWidth": 1080,
+            "rect": {
+              "bottom": -48,
+              "height": 320,
+              "left": 51,
+              "right": 1131,
+              "top": -368,
+              "width": 1080,
+              "x": 51,
+              "y": -368
+            },
+            "scrollLeft": 0,
+            "scrollWidth": 1080
+          }
+        ]
+      }
+    ],
+    "scroll": {
+      "main": 0,
+      "x": 0,
+      "y": 788
+    },
+    "searchValue": "",
+    "selectedCards": [
+      {
+        "cls": "tm-match-list-card tm-card-interactive tm-pressable tm-card-closed",
+        "href": "/matches/synthetic-numeric-1",
+        "metadata": [
+          "입문-고수 · 성별 무관 · 참가비 설명: 10000"
+        ],
+        "title": null
+      },
+      {
+        "cls": "tm-match-row tm-card-interactive tm-pressable tm-card-closed",
+        "href": "/matches/synthetic-free-1",
+        "metadata": [
+          "축구 · 입문-고수 · 성별 무관 · 참가비 설명: 무료"
+        ],
+        "title": "QA-PR1438 개인매치"
+      },
+      {
+        "cls": "tm-match-row tm-card-interactive tm-pressable tm-card-closed",
+        "href": "/matches/synthetic-no-cost-control-1",
+        "metadata": [
+          "풋살 · 입문-고수 · 성별 무관"
+        ],
+        "title": "(테스트) 1.0.3 QA 수명주기"
+      },
+      {
+        "cls": "tm-match-row tm-card-interactive tm-pressable tm-card-closed",
+        "href": "/matches/synthetic-numeric-1",
+        "metadata": [
+          "풋살 · 입문-고수 · 성별 무관 · 참가비 설명: 10000"
+        ],
+        "title": "test"
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/matches",
+    "utc": "2026-10-04T07:30:54.235Z",
+    "viewport": {
+      "dpr": 1,
+      "h": 757,
+      "w": 1182
+    },
+    "label": "desktop numeric body row settled",
+    "index": 14
+  },
+  {
+    "costMetadata": [
+      {
+        "cardClass": "tm-match-list-card tm-card-interactive tm-pressable tm-card-closed",
+        "cardRect": {
+          "bottom": -52,
+          "height": 312,
+          "left": 387,
+          "right": 707,
+          "top": -364,
+          "width": 320,
+          "x": 387,
+          "y": -364
+        },
+        "clientHeight": 16,
+        "clientWidth": 286,
+        "href": "/matches/synthetic-numeric-1",
+        "railHeading": "눈에 띄는 매치",
+        "rect": {
+          "bottom": -157,
+          "height": 16,
+          "left": 404,
+          "right": 690,
+          "top": -173,
+          "width": 286,
+          "x": 404,
+          "y": -173
+        },
+        "scrollHeight": 16,
+        "scrollWidth": 286,
+        "style": {
+          "fontSize": "12px",
+          "lineHeight": "16px",
+          "overflow": "visible",
+          "overflowWrap": "normal",
+          "textOverflow": "clip",
+          "whiteSpace": "normal",
+          "wordBreak": "normal"
+        },
+        "text": "입문-고수 · 성별 무관 · 참가비 설명: 10000",
+        "withinViewport": false
+      },
+      {
+        "cardClass": "tm-match-list-card tm-card-interactive tm-pressable tm-card-closed",
+        "cardRect": {
+          "bottom": -52,
+          "height": 312,
+          "left": 719,
+          "right": 1039,
+          "top": -364,
+          "width": 320,
+          "x": 719,
+          "y": -364
+        },
+        "clientHeight": 16,
+        "clientWidth": 286,
+        "href": "/matches/synthetic-overlap-1",
+        "railHeading": "눈에 띄는 매치",
+        "rect": {
+          "bottom": -157,
+          "height": 16,
+          "left": 736,
+          "right": 1022,
+          "top": -173,
+          "width": 286,
+          "x": 736,
+          "y": -173
+        },
+        "scrollHeight": 16,
+        "scrollWidth": 286,
+        "style": {
+          "fontSize": "12px",
+          "lineHeight": "16px",
+          "overflow": "visible",
+          "overflowWrap": "normal",
+          "textOverflow": "clip",
+          "whiteSpace": "normal",
+          "wordBreak": "normal"
+        },
+        "text": "입문-고수 · 성별 무관 · 참가비 설명: 10000",
+        "withinViewport": false
+      },
+      {
+        "cardClass": "tm-match-row tm-card-interactive tm-pressable tm-card-closed",
+        "cardRect": {
+          "bottom": 397,
+          "height": 131,
+          "left": 55,
+          "right": 583,
+          "top": 266,
+          "width": 528,
+          "x": 55,
+          "y": 266
+        },
+        "clientHeight": 16,
+        "clientWidth": 386,
+        "href": "/matches/synthetic-free-1",
+        "railHeading": null,
+        "rect": {
+          "bottom": 295,
+          "height": 16,
+          "left": 180,
+          "right": 566,
+          "top": 279,
+          "width": 386,
+          "x": 180,
+          "y": 279
+        },
+        "scrollHeight": 16,
+        "scrollWidth": 386,
+        "style": {
+          "fontSize": "12px",
+          "lineHeight": "16px",
+          "overflow": "visible",
+          "overflowWrap": "normal",
+          "textOverflow": "clip",
+          "whiteSpace": "normal",
+          "wordBreak": "normal"
+        },
+        "text": "축구 · 입문-고수 · 성별 무관 · 참가비 설명: 무료",
+        "withinViewport": true
+      },
+      {
+        "cardClass": "tm-match-row tm-card-interactive tm-pressable tm-card-closed",
+        "cardRect": {
+          "bottom": 544,
+          "height": 131,
+          "left": 55,
+          "right": 583,
+          "top": 413,
+          "width": 528,
+          "x": 55,
+          "y": 413
+        },
+        "clientHeight": 16,
+        "clientWidth": 386,
+        "href": "/matches/synthetic-numeric-1",
+        "railHeading": null,
+        "rect": {
+          "bottom": 442,
+          "height": 16,
+          "left": 180,
+          "right": 566,
+          "top": 426,
+          "width": 386,
+          "x": 180,
+          "y": 426
+        },
+        "scrollHeight": 16,
+        "scrollWidth": 386,
+        "style": {
+          "fontSize": "12px",
+          "lineHeight": "16px",
+          "overflow": "visible",
+          "overflowWrap": "normal",
+          "textOverflow": "clip",
+          "whiteSpace": "normal",
+          "wordBreak": "normal"
+        },
+        "text": "풋살 · 입문-고수 · 성별 무관 · 참가비 설명: 10000",
+        "withinViewport": true
+      },
+      {
+        "cardClass": "tm-match-row tm-card-interactive tm-pressable tm-card-closed",
+        "cardRect": {
+          "bottom": 544,
+          "height": 131,
+          "left": 599,
+          "right": 1127,
+          "top": 413,
+          "width": 528,
+          "x": 599,
+          "y": 413
+        },
+        "clientHeight": 16,
+        "clientWidth": 386,
+        "href": "/matches/synthetic-overlap-1",
+        "railHeading": null,
+        "rect": {
+          "bottom": 442,
+          "height": 16,
+          "left": 724,
+          "right": 1110,
+          "top": 426,
+          "width": 386,
+          "x": 724,
+          "y": 426
+        },
+        "scrollHeight": 16,
+        "scrollWidth": 386,
+        "style": {
+          "fontSize": "12px",
+          "lineHeight": "16px",
+          "overflow": "visible",
+          "overflowWrap": "normal",
+          "textOverflow": "clip",
+          "whiteSpace": "normal",
+          "wordBreak": "normal"
+        },
+        "text": "풋살 · 입문-고수 · 성별 무관 · 참가비 설명: 10000",
+        "withinViewport": true
+      }
+    ],
+    "documentScrollWidth": 1182,
+    "mainRows": 8,
+    "rails": [
+      {
+        "heading": "눈에 띄는 매치",
+        "rect": {
+          "bottom": -48,
+          "height": 356,
+          "left": 55,
+          "right": 1127,
+          "top": -404,
+          "width": 1072,
+          "x": 55,
+          "y": -404
+        },
+        "scrollers": [
+          {
+            "clientWidth": 1080,
+            "rect": {
+              "bottom": -48,
+              "height": 320,
+              "left": 51,
+              "right": 1131,
+              "top": -368,
+              "width": 1080,
+              "x": 51,
+              "y": -368
+            },
+            "scrollLeft": 0,
+            "scrollWidth": 1080
+          }
+        ]
+      }
+    ],
+    "scroll": {
+      "main": 0,
+      "x": 0,
+      "y": 788
+    },
+    "searchValue": "",
+    "selectedCards": [
+      {
+        "cls": "tm-match-list-card tm-card-interactive tm-pressable tm-card-closed",
+        "href": "/matches/synthetic-numeric-1",
+        "metadata": [
+          "입문-고수 · 성별 무관 · 참가비 설명: 10000"
+        ],
+        "title": null
+      },
+      {
+        "cls": "tm-match-row tm-card-interactive tm-pressable tm-card-closed",
+        "href": "/matches/synthetic-free-1",
+        "metadata": [
+          "축구 · 입문-고수 · 성별 무관 · 참가비 설명: 무료"
+        ],
+        "title": "QA-PR1438 개인매치"
+      },
+      {
+        "cls": "tm-match-row tm-card-interactive tm-pressable tm-card-closed",
+        "href": "/matches/synthetic-no-cost-control-1",
+        "metadata": [
+          "풋살 · 입문-고수 · 성별 무관"
+        ],
+        "title": "(테스트) 1.0.3 QA 수명주기"
+      },
+      {
+        "cls": "tm-match-row tm-card-interactive tm-pressable tm-card-closed",
+        "href": "/matches/synthetic-numeric-1",
+        "metadata": [
+          "풋살 · 입문-고수 · 성별 무관 · 참가비 설명: 10000"
+        ],
+        "title": "test"
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/matches",
+    "utc": "2026-10-04T07:31:29.282Z",
+    "viewport": {
+      "dpr": 1,
+      "h": 757,
+      "w": 1182
+    },
+    "label": "desktop numeric app Back list restored",
+    "index": 15
+  },
+  {
+    "costMetadata": [
+      {
+        "cardClass": "tm-match-row tm-card-interactive tm-pressable tm-card-closed",
+        "cardRect": {
+          "bottom": 519,
+          "height": 131,
+          "left": 55,
+          "right": 583,
+          "top": 388,
+          "width": 528,
+          "x": 55,
+          "y": 388
+        },
+        "clientHeight": 16,
+        "clientWidth": 386,
+        "href": "/matches/synthetic-free-1?from=%2Fmatches%3FsportId%3Dsport-football",
+        "railHeading": null,
+        "rect": {
+          "bottom": 417,
+          "height": 16,
+          "left": 180,
+          "right": 566,
+          "top": 401,
+          "width": 386,
+          "x": 180,
+          "y": 401
+        },
+        "scrollHeight": 16,
+        "scrollWidth": 386,
+        "style": {
+          "fontSize": "12px",
+          "lineHeight": "16px",
+          "overflow": "visible",
+          "overflowWrap": "normal",
+          "textOverflow": "clip",
+          "whiteSpace": "normal",
+          "wordBreak": "normal"
+        },
+        "text": "축구 · 입문-고수 · 성별 무관 · 참가비 설명: 무료",
+        "withinViewport": true
+      }
+    ],
+    "documentScrollWidth": 1182,
+    "mainRows": 1,
+    "rails": [],
+    "scroll": {
+      "main": 0,
+      "x": 0,
+      "y": 0
+    },
+    "searchValue": "",
+    "selectedCards": [
+      {
+        "cls": "tm-match-row tm-card-interactive tm-pressable tm-card-closed",
+        "href": "/matches/synthetic-free-1?from=%2Fmatches%3FsportId%3Dsport-football",
+        "metadata": [
+          "축구 · 입문-고수 · 성별 무관 · 참가비 설명: 무료"
+        ],
+        "title": "QA-PR1438 개인매치"
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/matches?sportId=sport-football",
+    "utc": "2026-10-04T07:32:19.852Z",
+    "viewport": {
+      "dpr": 1,
+      "h": 757,
+      "w": 1182
+    },
+    "label": "desktop football free label and nearby rail unavailable",
+    "index": 16
+  },
+  {
+    "costMetadata": [
+      {
+        "cardClass": "tm-match-list-card tm-card-interactive tm-pressable tm-card-closed",
+        "cardRect": {
+          "bottom": 736,
+          "height": 312,
+          "left": 387,
+          "right": 707,
+          "top": 424,
+          "width": 320,
+          "x": 387,
+          "y": 424
+        },
+        "clientHeight": 16,
+        "clientWidth": 286,
+        "href": "/matches/synthetic-numeric-1",
+        "railHeading": "눈에 띄는 매치",
+        "rect": {
+          "bottom": 631,
+          "height": 16,
+          "left": 404,
+          "right": 690,
+          "top": 615,
+          "width": 286,
+          "x": 404,
+          "y": 615
+        },
+        "scrollHeight": 16,
+        "scrollWidth": 286,
+        "style": {
+          "fontSize": "12px",
+          "lineHeight": "16px",
+          "overflow": "visible",
+          "overflowWrap": "normal",
+          "textOverflow": "clip",
+          "whiteSpace": "normal",
+          "wordBreak": "normal"
+        },
+        "text": "입문-고수 · 성별 무관 · 참가비 설명: 10000",
+        "withinViewport": true
+      },
+      {
+        "cardClass": "tm-match-list-card tm-card-interactive tm-pressable tm-card-closed",
+        "cardRect": {
+          "bottom": 736,
+          "height": 312,
+          "left": 719,
+          "right": 1039,
+          "top": 424,
+          "width": 320,
+          "x": 719,
+          "y": 424
+        },
+        "clientHeight": 16,
+        "clientWidth": 286,
+        "href": "/matches/synthetic-overlap-1",
+        "railHeading": "눈에 띄는 매치",
+        "rect": {
+          "bottom": 631,
+          "height": 16,
+          "left": 736,
+          "right": 1022,
+          "top": 615,
+          "width": 286,
+          "x": 736,
+          "y": 615
+        },
+        "scrollHeight": 16,
+        "scrollWidth": 286,
+        "style": {
+          "fontSize": "12px",
+          "lineHeight": "16px",
+          "overflow": "visible",
+          "overflowWrap": "normal",
+          "textOverflow": "clip",
+          "whiteSpace": "normal",
+          "wordBreak": "normal"
+        },
+        "text": "입문-고수 · 성별 무관 · 참가비 설명: 10000",
+        "withinViewport": true
+      },
+      {
+        "cardClass": "tm-match-row tm-card-interactive tm-pressable tm-card-closed",
+        "cardRect": {
+          "bottom": 1185,
+          "height": 131,
+          "left": 55,
+          "right": 583,
+          "top": 1054,
+          "width": 528,
+          "x": 55,
+          "y": 1054
+        },
+        "clientHeight": 16,
+        "clientWidth": 386,
+        "href": "/matches/synthetic-free-1",
+        "railHeading": null,
+        "rect": {
+          "bottom": 1083,
+          "height": 16,
+          "left": 180,
+          "right": 566,
+          "top": 1067,
+          "width": 386,
+          "x": 180,
+          "y": 1067
+        },
+        "scrollHeight": 16,
+        "scrollWidth": 386,
+        "style": {
+          "fontSize": "12px",
+          "lineHeight": "16px",
+          "overflow": "visible",
+          "overflowWrap": "normal",
+          "textOverflow": "clip",
+          "whiteSpace": "normal",
+          "wordBreak": "normal"
+        },
+        "text": "축구 · 입문-고수 · 성별 무관 · 참가비 설명: 무료",
+        "withinViewport": false
+      },
+      {
+        "cardClass": "tm-match-row tm-card-interactive tm-pressable tm-card-closed",
+        "cardRect": {
+          "bottom": 1332,
+          "height": 131,
+          "left": 55,
+          "right": 583,
+          "top": 1201,
+          "width": 528,
+          "x": 55,
+          "y": 1201
+        },
+        "clientHeight": 16,
+        "clientWidth": 386,
+        "href": "/matches/synthetic-numeric-1",
+        "railHeading": null,
+        "rect": {
+          "bottom": 1230,
+          "height": 16,
+          "left": 180,
+          "right": 566,
+          "top": 1214,
+          "width": 386,
+          "x": 180,
+          "y": 1214
+        },
+        "scrollHeight": 16,
+        "scrollWidth": 386,
+        "style": {
+          "fontSize": "12px",
+          "lineHeight": "16px",
+          "overflow": "visible",
+          "overflowWrap": "normal",
+          "textOverflow": "clip",
+          "whiteSpace": "normal",
+          "wordBreak": "normal"
+        },
+        "text": "풋살 · 입문-고수 · 성별 무관 · 참가비 설명: 10000",
+        "withinViewport": false
+      },
+      {
+        "cardClass": "tm-match-row tm-card-interactive tm-pressable tm-card-closed",
+        "cardRect": {
+          "bottom": 1332,
+          "height": 131,
+          "left": 599,
+          "right": 1127,
+          "top": 1201,
+          "width": 528,
+          "x": 599,
+          "y": 1201
+        },
+        "clientHeight": 16,
+        "clientWidth": 386,
+        "href": "/matches/synthetic-overlap-1",
+        "railHeading": null,
+        "rect": {
+          "bottom": 1230,
+          "height": 16,
+          "left": 724,
+          "right": 1110,
+          "top": 1214,
+          "width": 386,
+          "x": 724,
+          "y": 1214
+        },
+        "scrollHeight": 16,
+        "scrollWidth": 386,
+        "style": {
+          "fontSize": "12px",
+          "lineHeight": "16px",
+          "overflow": "visible",
+          "overflowWrap": "normal",
+          "textOverflow": "clip",
+          "whiteSpace": "normal",
+          "wordBreak": "normal"
+        },
+        "text": "풋살 · 입문-고수 · 성별 무관 · 참가비 설명: 10000",
+        "withinViewport": false
+      }
+    ],
+    "documentScrollWidth": 1182,
+    "mainRows": 8,
+    "rails": [
+      {
+        "heading": "눈에 띄는 매치",
+        "rect": {
+          "bottom": 740,
+          "height": 356,
+          "left": 55,
+          "right": 1127,
+          "top": 384,
+          "width": 1072,
+          "x": 55,
+          "y": 384
+        },
+        "scrollers": [
+          {
+            "clientWidth": 1080,
+            "rect": {
+              "bottom": 740,
+              "height": 320,
+              "left": 51,
+              "right": 1131,
+              "top": 420,
+              "width": 1080,
+              "x": 51,
+              "y": 420
+            },
+            "scrollLeft": 0,
+            "scrollWidth": 1080
+          }
+        ]
+      }
+    ],
+    "scroll": {
+      "main": 0,
+      "x": 0,
+      "y": 0
+    },
+    "searchValue": "",
+    "selectedCards": [
+      {
+        "cls": "tm-match-list-card tm-card-interactive tm-pressable tm-card-closed",
+        "href": "/matches/synthetic-numeric-1",
+        "metadata": [
+          "입문-고수 · 성별 무관 · 참가비 설명: 10000"
+        ],
+        "title": null
+      },
+      {
+        "cls": "tm-match-row tm-card-interactive tm-pressable tm-card-closed",
+        "href": "/matches/synthetic-free-1",
+        "metadata": [
+          "축구 · 입문-고수 · 성별 무관 · 참가비 설명: 무료"
+        ],
+        "title": "QA-PR1438 개인매치"
+      },
+      {
+        "cls": "tm-match-row tm-card-interactive tm-pressable tm-card-closed",
+        "href": "/matches/synthetic-no-cost-control-1",
+        "metadata": [
+          "풋살 · 입문-고수 · 성별 무관"
+        ],
+        "title": "(테스트) 1.0.3 QA 수명주기"
+      },
+      {
+        "cls": "tm-match-row tm-card-interactive tm-pressable tm-card-closed",
+        "href": "/matches/synthetic-numeric-1",
+        "metadata": [
+          "풋살 · 입문-고수 · 성별 무관 · 참가비 설명: 10000"
+        ],
+        "title": "test"
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/matches",
+    "utc": "2026-10-04T07:32:51.519Z",
+    "viewport": {
+      "dpr": 1,
+      "h": 757,
+      "w": 1182
+    },
+    "label": "desktop final queryless list restored",
+    "index": 17
+  }
+]

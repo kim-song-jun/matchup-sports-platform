@@ -1,0 +1,145 @@
+{
+  "files": [
+    {
+      "file": "MOBILE-FAB-OBSERVATION.md",
+      "bytes": 2446,
+      "sha256": "3a1ed8418a7e263a5821845c4fbf1851856565c4156f38673d8fa0ace73b939f"
+    },
+    {
+      "file": "README.md",
+      "bytes": 9168,
+      "sha256": "3c0e00a377348bb85738be6c5aac8392256cdb0cae4e8e2419216741c8c3b7d0"
+    },
+    {
+      "file": "actions.json",
+      "bytes": 5381,
+      "sha256": "6980f7f4cb32b28b6b0f1c43400bef090d077143c847f0fd6ea4ff12c102cde4"
+    },
+    {
+      "file": "deployment-context.json",
+      "bytes": 847,
+      "sha256": "cd433576eb695d8aba3c6ae65a20705eae547e5957e56ff0a4bd684bcb89500f"
+    },
+    {
+      "file": "desktop-detail-cost-visible.png",
+      "bytes": 3845,
+      "sha256": "c30dc9dfc3ccadc52cb224b202f765e5b7188b94e3eeae9fdd1ecead8fe4d984"
+    },
+    {
+      "file": "desktop-free-cost.png",
+      "bytes": 7953,
+      "sha256": "e1aace72b2112dc9aad3865ede13eb9c23e86a81b406064daf8807e94e734544"
+    },
+    {
+      "file": "desktop-photo-cost.png",
+      "bytes": 10814,
+      "sha256": "48f63336359f1f95574747afa50d7be8817bc67c992d401940bb970ccb32869f"
+    },
+    {
+      "file": "desktop-row-cost.png",
+      "bytes": 12567,
+      "sha256": "587a917b7da0cac318e9027bd22bcd8b29db3acfeb19a1eb0b5f1cf8abf5e9d8"
+    },
+    {
+      "file": "detail-proof.json",
+      "bytes": 22542,
+      "sha256": "067926c6fb4de48c3bfae65fe1b9ee653cbef66add4d265e17a6264002f413ab"
+    },
+    {
+      "file": "exit.json",
+      "bytes": 216,
+      "sha256": "cde2863b7bcbd7dd3258144fc58208b427857c9431699c0c05490480d2a64f76"
+    },
+    {
+      "file": "mobile-detail-cost.png",
+      "bytes": 3935,
+      "sha256": "d7db4f3c06abf87e5431755f0a31d4c38c645c7a8b2b4bfc3be5831342667c12"
+    },
+    {
+      "file": "mobile-floating-cta-observation.json",
+      "bytes": 1184,
+      "sha256": "a35bf97379f524cf686f874ebbb97a9c47c84027aac1aaac60725f17f263e01b"
+    },
+    {
+      "file": "mobile-free-cost.png",
+      "bytes": 7310,
+      "sha256": "ac8623ce4db4c3d49e757c423f6cfc8f4e716938c01b1f3cab1fe617de657489"
+    },
+    {
+      "file": "mobile-free-detail.png",
+      "bytes": 3591,
+      "sha256": "2f8d7355bb37e811264b59db82491c3c6ff5299506f188ccdc0ddd1796d4fc20"
+    },
+    {
+      "file": "mobile-last-photo-cta-overlap.png",
+      "bytes": 16270,
+      "sha256": "e1207aa75c5ef83bf48595f132355d261e6aa39950b3a8a70c6853d577a79aea"
+    },
+    {
+      "file": "mobile-photo-cost.png",
+      "bytes": 10669,
+      "sha256": "520195eeaa6bbd4a7da272b084eaea82f90465cfe26ccb68aa60eae3e721d952"
+    },
+    {
+      "file": "mobile-row-cost.png",
+      "bytes": 10343,
+      "sha256": "18f79edc718e7342ee162995cf9bb12b40876609295ff1103c2968c94ec86e3e"
+    },
+    {
+      "file": "proof.json",
+      "bytes": 119433,
+      "sha256": "956fff6fca9b23a36cd2331310c8170a01e799b4df38726ec99fb3e9e964cc87"
+    },
+    {
+      "file": "provenance.json",
+      "bytes": 16251,
+      "sha256": "bf89410d9ac7e93776b01421c49b0cc5f62dd8bbfa681a75051df8a292cfc47b"
+    },
+    {
+      "file": "source-manifest.json",
+      "bytes": 3608,
+      "sha256": "e374b09826022ce1163fac42576e66e54f540888e27f115af10e7fb60ea113c7"
+    },
+    {
+      "file": "source-safety-context.json",
+      "bytes": 1388,
+      "sha256": "d74aaaed5dc9e863ae791af209e6b2ca16e7598ddb2752ea19044f9cdacf5723"
+    },
+    {
+      "file": "source-verification.json",
+      "bytes": 2259,
+      "sha256": "f91092c5451198a229c60e9479b3ebedd90318e2a634da650070024bffac744f"
+    },
+    {
+      "file": "summary.json",
+      "bytes": 11153,
+      "sha256": "b60cae9c2b41acd5c6273ade7e774d651f8dd0b542caf9d225b852acac9d8000"
+    },
+    {
+      "file": "tablet-detail-cost.png",
+      "bytes": 3837,
+      "sha256": "e014df51258d27587b728d4115dae10e5023f7372ca07a6e4a639da62b2aabca"
+    },
+    {
+      "file": "tablet-free-cost.png",
+      "bytes": 8791,
+      "sha256": "5d58c0260889b1f8ec32b90937758134859bc5fec6f4d36ee03b5a81f8daa462"
+    },
+    {
+      "file": "tablet-photo-cost.png",
+      "bytes": 11906,
+      "sha256": "7bdafdca6065f2de965e7d526cd49b2a87a3de0d67668ab9a066393653bef535"
+    },
+    {
+      "file": "tablet-row-cost.png",
+      "bytes": 12561,
+      "sha256": "9ec7e71c7bbcda1185e14f9e5b2c1efba3ce029a76e2670379ed8458217c72db"
+    },
+    {
+      "file": "verification.json",
+      "bytes": 39900,
+      "sha256": "a584734b6e35ea477f050dbcc231a902a7db59fcc8a9423e9f3ba9cdc38103b6"
+    }
+  ],
+  "note": "Delivered file hashes; this manifest excludes itself. source-manifest.json covers original safe inputs."
+}

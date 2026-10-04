@@ -1,0 +1,315 @@
+{
+  "issue": 1586,
+  "fixPR": 1592,
+  "startUTC": "2026-10-04T07:18:35.520Z",
+  "endUTC": "2026-10-04T07:32:51.535Z",
+  "runtimeServingSHA": "unknown",
+  "counts": {
+    "listDOM": 18,
+    "detailDOM": 8,
+    "PNG": 14,
+    "completedSelectedActionRecords": 36
+  },
+  "currentFixtures": {
+    "numeric": {
+      "id": "synthetic-numeric-1",
+      "title": "test",
+      "observedValue": "10000",
+      "identityEvidence": "Same exact current href in photo/body, actual card navigation to detail at3widths"
+    },
+    "free": {
+      "id": "synthetic-free-1",
+      "title": "QA-PR1438 개인매치",
+      "observedValue": "무료",
+      "identityEvidence": "Actual football-filter card href→detail, browserBack/Forward and appBack; row display3widths"
+    },
+    "mobileOverlapCandidate": {
+      "id": "synthetic-overlap-1",
+      "title": "t",
+      "observedValue": "10000"
+    },
+    "missingCostDisplayControl": {
+      "id": "synthetic-no-cost-control-1",
+      "observation": "Its selected body metadata lacks cost label; this is not proof of API null versus empty string and is not the numeric-cost fixture"
+    }
+  },
+  "matrix": [
+    {
+      "width": "mobile",
+      "CSSViewport": {
+        "dpr": 1.25,
+        "h": 606,
+        "w": 402
+      },
+      "photo": {
+        "proofIndex": 1,
+        "text": "입문-고수 · 성별 무관 · 참가비 설명: 10000",
+        "rect": {
+          "bottom": 493.2000122070313,
+          "height": 16,
+          "left": 32.79999923706055,
+          "right": 275.200008392334,
+          "top": 477.2000122070313,
+          "width": 242.40000915527344,
+          "x": 32.79999923706055,
+          "y": 477.2000122070313
+        },
+        "clientWidth": 242,
+        "scrollWidth": 242,
+        "lineHeight": "16px"
+      },
+      "row": {
+        "proofIndex": 2,
+        "text": "풋살 · 입문-고수 · 성별 무관 · 참가비 설명: 10000",
+        "rect": {
+          "bottom": 286.40000915527344,
+          "height": 32,
+          "left": 144.8000030517578,
+          "right": 364.8000030517578,
+          "top": 254.40000915527344,
+          "width": 220,
+          "x": 144.8000030517578,
+          "y": 254.40000915527344
+        },
+        "clientWidth": 220,
+        "scrollWidth": 220,
+        "lineHeight": "16px"
+      },
+      "detail": {
+        "detailProofIndex": 1,
+        "text": "참가비10000",
+        "rect": {
+          "bottom": 388,
+          "height": 56,
+          "left": 20,
+          "right": 381.6000061035156,
+          "top": 332,
+          "width": 361.6000061035156,
+          "x": 20,
+          "y": 332
+        }
+      },
+      "free": {
+        "proofIndex": 4,
+        "text": "축구 · 입문-고수 · 성별 무관 · 참가비 설명: 무료",
+        "rect": {
+          "bottom": 317.20001220703125,
+          "height": 32,
+          "left": 144.8000030517578,
+          "right": 364.8000030517578,
+          "top": 285.20001220703125,
+          "width": 220,
+          "x": 144.8000030517578,
+          "y": 285.20001220703125
+        },
+        "mainRows": 1,
+        "railCount": 0
+      }
+    },
+    {
+      "width": "tablet",
+      "CSSViewport": {
+        "dpr": 1.5,
+        "h": 505,
+        "w": 788
+      },
+      "photo": {
+        "proofIndex": 9,
+        "text": "입문-고수 · 성별 무관 · 참가비 설명: 10000",
+        "rect": {
+          "bottom": 332.66668701171875,
+          "height": 16,
+          "left": 126.66667175292967,
+          "right": 369.3333435058594,
+          "top": 316.66668701171875,
+          "width": 242.6666717529297,
+          "x": 126.66667175292967,
+          "y": 316.66668701171875
+        },
+        "clientWidth": 243,
+        "scrollWidth": 243,
+        "lineHeight": "16px"
+      },
+      "row": {
+        "proofIndex": 10,
+        "text": "풋살 · 입문-고수 · 성별 무관 · 참가비 설명: 10000",
+        "rect": {
+          "bottom": 300,
+          "height": 16,
+          "left": 238.6666717529297,
+          "right": 657.3333587646484,
+          "top": 284,
+          "width": 418.6666870117187,
+          "x": 238.6666717529297,
+          "y": 284
+        },
+        "clientWidth": 419,
+        "scrollWidth": 419,
+        "lineHeight": "16px"
+      },
+      "detail": {
+        "detailProofIndex": 5,
+        "text": "참가비10000",
+        "rect": {
+          "bottom": 356,
+          "height": 56,
+          "left": 114,
+          "right": 674,
+          "top": 300,
+          "width": 560,
+          "x": 114,
+          "y": 300
+        }
+      },
+      "free": {
+        "proofIndex": 12,
+        "text": "축구 · 입문-고수 · 성별 무관 · 참가비 설명: 무료",
+        "rect": {
+          "bottom": 300.66668701171875,
+          "height": 16,
+          "left": 238.6666717529297,
+          "right": 657.3333587646484,
+          "top": 284.66668701171875,
+          "width": 418.6666870117187,
+          "x": 238.6666717529297,
+          "y": 284.66668701171875
+        },
+        "mainRows": 1,
+        "railCount": 0
+      }
+    },
+    {
+      "width": "desktop",
+      "CSSViewport": {
+        "dpr": 1,
+        "h": 757,
+        "w": 1182
+      },
+      "photo": {
+        "proofIndex": 13,
+        "text": "입문-고수 · 성별 무관 · 참가비 설명: 10000",
+        "rect": {
+          "bottom": 631,
+          "height": 16,
+          "left": 404,
+          "right": 690,
+          "top": 615,
+          "width": 286,
+          "x": 404,
+          "y": 615
+        },
+        "clientWidth": 286,
+        "scrollWidth": 286,
+        "lineHeight": "16px"
+      },
+      "row": {
+        "proofIndex": 14,
+        "text": "풋살 · 입문-고수 · 성별 무관 · 참가비 설명: 10000",
+        "rect": {
+          "bottom": 442,
+          "height": 16,
+          "left": 180,
+          "right": 566,
+          "top": 426,
+          "width": 386,
+          "x": 180,
+          "y": 426
+        },
+        "clientWidth": 386,
+        "scrollWidth": 386,
+        "lineHeight": "16px"
+      },
+      "detail": {
+        "detailProofIndex": 7,
+        "text": "참가비10000",
+        "rect": {
+          "bottom": 392,
+          "height": 52,
+          "left": 55,
+          "right": 735,
+          "top": 340,
+          "width": 680,
+          "x": 55,
+          "y": 340
+        }
+      },
+      "free": {
+        "proofIndex": 16,
+        "text": "축구 · 입문-고수 · 성별 무관 · 참가비 설명: 무료",
+        "rect": {
+          "bottom": 417,
+          "height": 16,
+          "left": 180,
+          "right": 566,
+          "top": 401,
+          "width": 386,
+          "x": 180,
+          "y": 401
+        },
+        "mainRows": 1,
+        "railCount": 0
+      }
+    }
+  ],
+  "historicalBefore": {
+    "source": "https://github.com/kim-song-jun/matchup-sports-platform/blob/877d4a4c0b4a495df88003ea78112981bcce1869/docs/qa/2026-10-03-individual-copy-candidates/README.md",
+    "URL": "https://alpha.teameet.co.kr/matches",
+    "tabletCSS": [
+      789,
+      505
+    ],
+    "desktopCSS": [
+      1183,
+      758
+    ],
+    "sameEntityConfirmed": false,
+    "limits": "Historical test/10000 cost crops have no matchId/href; three positions are not three proven entities. Current IDs are new verified observations. Mobile cost-before and nearby-rail before absent."
+  },
+  "findings": {
+    "mainLabel": "Current selected numeric photo/body displays 참가비 설명:10000 with original raw digits; detail retains 참가비10000. No inferred KRW/one-person policy or numeric conversion.",
+    "wrap": "Mobile numeric body32px/two lines at16px line-height; tablet/desktop16px/one line. Selected photo captions16px/one line. Paired public crops show these exact samples; long arbitrary text not tested.",
+    "free": "무료 preserved, not rewritten as0원. Mobile free detail confirmed in viewport; tablet/desktop free detail not revisited.",
+    "nearbyRail": "Football filter has1 main row and0 rail sections at all3 widths. Nearby renderer remains unobserved; not PASS. No fixtures were created or edited; filter navigation changed URL/local UI state. Server-side effects were not audited.",
+    "mobileFloatingCTA": "New candidate separate from value preservation: in unfiltered402x606 atmainScroll0, horizontal rail scrolled tolast t card (scrollLeft490.4), visible +create CTA overlaps metadata right edge. Exact original crop shows the final digit partly covered. General FAB preexistence/change causality not established; no payment/data error or new regression attribution.",
+    "freeWrap": "In the mobile free row, 무료 wraps between 무 and 료 across two16px lines. Both glyphs are visible in the exact crop; no claim of unbroken-word layout. Tablet/desktop free row is one line."
+  },
+  "returnCoverage": {
+    "numericAppBackListProof": [
+      3,
+      11,
+      15
+    ],
+    "freeFilteredMobile": {
+      "beforeList": 4,
+      "detailBeforeBrowserBack": 2,
+      "listBrowserBack": 5,
+      "detailBrowserForward": 3,
+      "detailScrolledFee": 4,
+      "listAppBack": 6
+    },
+    "filterRestoration": "All8 links restore queryless list; final proof17 and exit.json show8 rows, empty search value, no visible dialog. Search submission deliberately excluded from this batch."
+  },
+  "unverified": [
+    "Existing units10,000원/1인, USD10 and long free-text memo were not present in inspected current8-row list; no fixtures invented",
+    "API null/empty distinctions, normalized price/status/viewer and backend writes not observed",
+    "Historical cost card entity identity unavailable; no exact-entity before-after claim",
+    "No actual nearby rail sample despite1-result filter at3widths",
+    "Physical devices, soft keyboard, screen-reader speech, numeric payment or save behavior not tested",
+    "Detailed fee proof0 is immediate scrolling sample; proof1 is later settled observation. DOM visible flag means nonzero rendered box, not viewport/occlusion visibility. Use exact rectangles and PNGs.",
+    "Tablet default/returned caption rows8/11 lie under bottom navigation despite withinViewport=true; paired publishable caption isrow9 afterscroll. withinViewport is plain rectangle math and ignores sticky overlays.",
+    "Desktop detail proof6 is belowviewport at820–872. Its screenshot desktop-detail-cost.png is excluded; proof7/desktop-detail-cost-visible.png are the actual visible fee.",
+    "Partial horizontal cards outside scrollport are not truncation failures; current source clips horizontal rail until user scrolls"
+  ],
+  "safety": {
+    "searchSubmitActions": 0,
+    "creationOrSaveActions": 0,
+    "registrationActions": 0,
+    "shareSendActions": 0,
+    "roleOrPermissionChanges": 0,
+    "resultChanges": 0,
+    "uploads": 0,
+    "globalServerWriteZeroClaim": false,
+    "applicationReadOnlyScope": "Only navigation, supported scroll/window/zoom, source-checked filter links. No network/DB audit."
+  },
+  "publisherQualification": "Selected action records are completed tool calls, not a blanket successful outcome audit. Counts/URLs/selected fixture values are observed; full eight-card identity/order and scroll restoration are not established."
+}

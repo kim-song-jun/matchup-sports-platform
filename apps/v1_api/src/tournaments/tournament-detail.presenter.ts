@@ -435,6 +435,7 @@ export function presentTournamentDetail(
         // 같은 아바타가 나오도록 로고도 함께 내려 준다.
         teamLogoUrl: hideIdentity ? null : (groupTeam.registration.team.profile?.logoUrl ?? null),
         sortOrder: groupTeam.sortOrder,
+        isBye: groupTeam.isBye,
       })),
       standings: group.standings.map((standing) => ({
         registrationId: standing.registrationId,

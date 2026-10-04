@@ -2542,6 +2542,8 @@ enum V1TournamentPlayerEligibility {
 }
 
 enum V1TournamentGroupPhase {
+  round12
+  quarter
   group
   semi
   final
@@ -2923,6 +2925,7 @@ model V1TournamentGroup {
 }
 
 model V1TournamentGroupTeam {
+  isBye          Boolean  @default(false) @map("is_bye")
   id             String   @id @default(uuid())
   groupId        String   @map("group_id")
   registrationId String   @map("registration_id")

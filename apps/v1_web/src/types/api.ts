@@ -3451,7 +3451,7 @@ export type V1TournamentPaymentStatus =
 
 export type V1PlayerEligibilityStatus = 'non_pro' | 'pro' | 'needs_review';
 
-export type V1TournamentGroupPhase = 'group' | 'semi' | 'final' | 'third_place';
+export type V1TournamentGroupPhase = 'group' | 'round12' | 'quarter' | 'semi' | 'final' | 'third_place';
 
 export type V1AnnouncementAudience =
   | 'public'
@@ -3640,6 +3640,8 @@ export type V1Tournament = {
  * 'TBD' 같은 별도 문자열로 구분된다.
  */
 export type V1TournamentGroupTeam = {
+  /** 명시적으로 지정된 12강 부전승. 미배정 상대와 구분한다. */
+  isBye?: boolean;
   id: string;
   registrationId: string;
   teamId: string | null;
@@ -4107,6 +4109,8 @@ export type V1AdminBracketGroup = {
 };
 
 export type V1AdminBracketGroupTeam = {
+  /** 명시적으로 지정된 12강 부전승. 미배정 상대와 구분한다. */
+  isBye?: boolean;
   id: string;
   groupId: string;
   registrationId: string;
@@ -4513,6 +4517,8 @@ export type V1CreateGroupPayload = {
 };
 
 export type V1CreateGroupTeamPayload = {
+  /** 명시적으로 지정된 12강 부전승. 미배정 상대와 구분한다. */
+  isBye?: boolean;
   groupId: string;
   registrationId: string;
   sortOrder?: number;

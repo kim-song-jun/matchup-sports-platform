@@ -277,6 +277,16 @@ export class TournamentBracketService {
         });
       }
 
+      if (dto.isBye && group.phase !== 'round12') {
+        throw new BadRequestException({ code: 'BYE_PHASE_INVALID', message: '부전승은 12강 단계에서만 지정할 수 있어요.' });
+      }
+      if (group.phase === 'round12') {
+        const assigned = await tx.v1TournamentGroupTeam.findMany({ where: { groupId: group.id } });
+        if (assigned.length >= 12 || (dto.isBye && assigned.filter((team) => team.isBye).length >= 4)) {
+          throw new ConflictException({ code: 'ROUND12_CAPACITY', message: '12강은 최대 12팀, 부전승은 최대 4팀이에요.' });
+        }
+      }
+
       // 등록이 해당 대회 소속 + confirmed 상태인지 확인
       await tx.$queryRaw`SELECT id FROM v1_tournament_registrations WHERE id = ${dto.registrationId} FOR UPDATE`;
       const registration = await tx.v1TournamentRegistration.findFirst({
@@ -306,10 +316,20 @@ export class TournamentBracketService {
         });
       }
 
+      if (dto.isBye) {
+        const booked = await tx.v1TournamentMatchDetails.findFirst({ where: {
+          groupId: group.id,
+          OR: [{ homeRegistrationId: dto.registrationId }, { awayRegistrationId: dto.registrationId }],
+          teamMatch: { deletedAt: null },
+        } });
+        if (booked) throw new ConflictException({ code: 'BYE_TEAM_HAS_MATCH', message: '12강 경기에 배정된 팀은 부전승으로 지정할 수 없어요.' });
+      }
+
       const groupTeam = await tx.v1TournamentGroupTeam.create({
         data: {
           groupId: dto.groupId,
           registrationId: dto.registrationId,
+          isBye: dto.isBye ?? false,
           sortOrder: dto.sortOrder ?? 0,
         },
       });
@@ -319,7 +339,7 @@ export class TournamentBracketService {
           action: 'tournament.bracket.group_team.create',
           targetType: 'tournament_group_team',
           targetId: groupTeam.id,
-          afterJson: { groupId: dto.groupId, registrationId: dto.registrationId },
+          afterJson: { groupId: dto.groupId, registrationId: dto.registrationId, isBye: dto.isBye ?? false },
         },
         tx,
       );
@@ -402,10 +422,17 @@ export class TournamentBracketService {
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`league-fixture-generation:${tournamentId}`}, 0))`;
       await tx.$executeRawUnsafe('SELECT pg_advisory_xact_lock(hashtextextended($1, 0))', durableCommandId);
       const group = dto.groupId
-        ? await tx.v1TournamentGroup.findFirst({ where: { id: dto.groupId, tournamentId }, select: { name: true } })
+        ? await tx.v1TournamentGroup.findFirst({ where: { id: dto.groupId, tournamentId }, select: { name: true, phase: true } })
         : null;
       if (dto.groupId && group === null) {
         throw new NotFoundException({ code: 'GROUP_NOT_FOUND', message: '해당 대회의 조를 찾을 수 없어요.' });
+      }
+      if (dto.groupId && group?.phase === 'round12') {
+        const byeTeam = await tx.v1TournamentGroupTeam.findFirst({ where: {
+          groupId: dto.groupId, isBye: true,
+          registrationId: { in: [dto.homeRegistrationId, dto.awayRegistrationId].filter((id): id is string => typeof id === 'string') },
+        } });
+        if (byeTeam) throw new ConflictException({ code: 'BYE_TEAM_HAS_MATCH', message: '부전승팀은 12강 경기에 넣을 수 없어요. 8강에 직접 배정해 주세요.' });
       }
       const pinnedTournament = await findTournamentOnSurface(tx, TOURNAMENT_KINDS, {
         where: { id: tournamentId, deletedAt: null },
@@ -658,6 +685,7 @@ export class TournamentBracketService {
       where: { teamMatchId: fixtureId },
       select: {
         tournamentId: true,
+        groupId: true,
         homeRegistrationId: true,
         awayRegistrationId: true,
         teamMatch: {
@@ -716,6 +744,16 @@ export class TournamentBracketService {
         throw new BadRequestException({ code: 'FIXTURE_SAME_TEAM', message: '같은 팀끼리 경기를 만들 수 없어요.' });
       }
       const updated = await this.prisma.$transaction(async (tx) => {
+        // Same lock as assignment/creation: a concurrent bye designation cannot
+        // race between the participant check and the canonical match update.
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`league-fixture-generation:${canonical.tournamentId}`}, 0))`;
+        if (canonical.groupId && changesTeams) {
+          const byeTeam = await tx.v1TournamentGroupTeam.findFirst({ where: {
+            groupId: canonical.groupId, isBye: true,
+            registrationId: { in: [dto.homeRegistrationId, dto.awayRegistrationId].filter((id): id is string => typeof id === 'string') },
+          } });
+          if (byeTeam) throw new ConflictException({ code: 'BYE_TEAM_HAS_MATCH', message: '부전승팀은 12강 경기에 넣을 수 없어요. 8강에 직접 배정해 주세요.' });
+        }
         const row = await updateTournamentMatchInTx(tx, {
           teamMatchId: fixtureId,
           scheduledAt: dto.scheduledAt !== undefined ? new Date(dto.scheduledAt) : undefined,
@@ -1136,6 +1174,7 @@ export class TournamentBracketService {
       id: row.id,
       groupId: row.groupId,
       registrationId: row.registrationId,
+      isBye: row.isBye,
       sortOrder: row.sortOrder,
       createdAt: row.createdAt.toISOString(),
     };

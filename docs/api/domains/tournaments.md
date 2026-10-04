@@ -277,3 +277,13 @@ The admin response derives `isTeamCaptain` from the registration team's canonica
 `PATCH /players/:playerId` is available only before `rosterLockedAt`. It lets team managers correct the player's `eligibilityStatus` only. The already stored roster snapshots (`realName`, `birthDateSnapshot`, `genderSnapshot`) are not refreshed by eligibility edits, and the current member profile/phone is not revalidated on this path.
 
 All team roster mutations lock the registration row and re-read `rosterLockedAt`, registration status, tournament roster deadline, and `rosterDeadlineOverrideAt` inside the same transaction as the player write. A concurrent admin lock or deadline-override revocation wins before a later player mutation can commit.
+
+
+## 12강·8강 수동 결선 (2026-10-04)
+
+- `CreateGroupDto.phase`: `group | round12 | quarter | semi | final | third_place`.
+- `POST /admin/tournaments/:id/group-teams`의 `isBye?: boolean`은 명시적인 12강 부전승이다. 생략하면 false. 다른 단계에서 true는 `BYE_PHASE_INVALID`(400).
+- 12강은 최대 12팀·부전승 최대 4팀이며 초과는 `ROUND12_CAPACITY`(409). 기존 12강 경기에 배정된 팀의 부전승 지정 및 부전승팀을 같은 단계 경기로 추가/수정하면 `BYE_TEAM_HAS_MATCH`(409).
+- 관리자/공개 `groups[].groupTeams[].isBye`는 저장된 명시적 부전승을 전달한다. 공개 여부와 팀 신원 공개 게이트는 기존 정책을 유지한다.
+- 관리자 자동 생성은 12팀/부전승 4팀 편성 시 나머지 8팀의 4경기를 생성한다. 부전승에는 TeamMatch/Game/점수를 만들지 않는다. 8강 슬롯은 기존처럼 관리자가 직접 배정한다.
+- 예선 종료 자동 생성·부전승팀 자동 8강 배정·신규 진출 연결 API는 이번 계약에 포함하지 않는다.

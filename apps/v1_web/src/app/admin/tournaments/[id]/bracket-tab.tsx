@@ -16,7 +16,7 @@ import { extractErrorMessage } from '@/lib/error-message';
 import { V1ApiError, v1Post } from '@/lib/api-client';
 // 조별리그 라운드로빈은 서버(POST /admin/tournaments/:id/league/fixtures/generate)로 이관했다.
 // 여기 남는 knockoutSeedPairs 는 녹아웃 시드 페어링 전용이다.
-import { knockoutSeedPairs } from '@/lib/tournament-bracket-gen';
+import { knockoutSeedPairs, round12Pairs } from '@/lib/tournament-bracket-gen';
 import { competitionMatchLabel } from '@/lib/tournament-round-label';
 import { AdminDataTable, AdminEmpty } from '@/components/admin';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
@@ -301,6 +301,10 @@ export function BracketTab({
     // KNOCKOUT phase — 아래는 전부 녹아웃 시드 페어링 경로다.
     // Check for existing fixtures in this group
     const existingInGroup = allFixtures.filter((f) => f.groupId === targetGroupId);
+    if (existingInGroup.length > 0 && (group.phase === 'round12' || group.phase === 'quarter')) {
+      showToast('이미 경기 일정이 있어요. 기존 대진을 수정하거나 빠진 경기를 직접 추가해 주세요.', 'error');
+      return;
+    }
     if (existingInGroup.length > 0) {
       const ok = await confirmModal({
         title: '경기 일정 추가',
@@ -318,9 +322,17 @@ export function BracketTab({
     try {
       {
         // KNOCKOUT phase — seed-pair: 1 vs N, 2 vs N-1, …
-        const teams = group.groupTeams;
+        const teams = group.groupTeams.filter((team) => !team.isBye);
+        if (group.phase === 'round12' && (group.groupTeams.length !== 12 || teams.length !== 8)) {
+          showToast('12팀을 배정하고 부전승 4팀을 지정해 주세요. 나머지 8팀의 4경기를 만들어요.', 'error');
+          return;
+        }
         const roundLabel =
-          group.phase === 'semi'
+          group.phase === 'round12'
+            ? '12강'
+            : group.phase === 'quarter'
+            ? '8강'
+            : group.phase === 'semi'
             ? '4강'
             : group.phase === 'final'
             ? '결승'
@@ -341,7 +353,7 @@ export function BracketTab({
         // 시드순(sortOrder) 정렬 후 1vsN 페어링 (순수 함수 knockoutSeedPairs)
         const sorted = [...teams].sort((a, b) => a.sortOrder - b.sortOrder);
         const payloads: Parameters<typeof createFixture.mutate>[0][] = [];
-        for (const { home, away } of knockoutSeedPairs(sorted)) {
+        for (const { home, away } of (group.phase === 'round12' ? round12Pairs(group.groupTeams) : knockoutSeedPairs(sorted))) {
           payloads.push({
             groupId: targetGroupId,
             round: roundLabel,

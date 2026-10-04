@@ -25,12 +25,16 @@ interface RoundGroup {
 }
 
 const PHASE_ORDER: Record<string, number> = {
-  semi: 0,
-  final: 1,
-  third_place: 2,
+  round12: 0,
+  quarter: 1,
+  semi: 2,
+  final: 3,
+  third_place: 4,
 };
 
 const PHASE_LABEL: Record<string, string> = {
+  round12: '12강',
+  quarter: '8강',
   semi: '4강',
   final: '결승',
   third_place: '3·4위전',
@@ -41,6 +45,8 @@ function getFixturePhase(round: string): keyof typeof PHASE_ORDER | null {
 
   if (normalized.includes('third_place') || normalized.includes('3·4위전') || normalized.includes('3-4위전')) return 'third_place';
   if (normalized === 'final' || normalized === '결승') return 'final';
+  if (normalized === 'round12' || normalized === '12강') return 'round12';
+  if (normalized === 'quarter' || normalized === 'quarterfinal' || normalized === '8강') return 'quarter';
   if (normalized === 'semi' || normalized === 'semifinal' || normalized === '4강') return 'semi';
   return null;
 }
@@ -585,7 +591,7 @@ function BracketRoundCol({
   const slotCount = matchups ? matchups.length : round.fixtures.length;
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', width: COL_W, flexShrink: 0 }}>
+    <div data-bracket-round={round.key} style={{ display: 'flex', flexDirection: 'column', width: COL_W, flexShrink: 0 }}>
       {/* 라운드 라벨 */}
       <div style={{ height: HEAD_H, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <span className="tm-bk2-pill">{headLabel}</span>
@@ -594,12 +600,14 @@ function BracketRoundCol({
       <div style={{
         height: h, position: 'relative',
         display: 'flex', flexDirection: 'column',
-        justifyContent: centered ? 'center' : 'flex-start',
+        justifyContent: centered ? 'space-around' : 'flex-start',
       }}>
         {centered && !matchups ? (
           /* 결승: 세로 정중앙 — single-leg only */
           round.fixtures.map((fix) => (
-            <MatchCard key={fix.id} fixture={fix} />
+            <div key={fix.id} style={{ height: SLOT_H, display: 'flex', alignItems: 'center' }}>
+              <MatchCard fixture={fix} />
+            </div>
           ))
         ) : matchups ? (
           /* multi-leg: 합산 카드 */
@@ -735,6 +743,33 @@ export function TournamentBracket({ fixtures, groups }: TournamentBracketProps) 
 
   return (
     <div>
+      {mainRounds.length > 1 && (
+        <nav aria-label="대진 단계 이동" className="flex flex-wrap gap-2 mb-3">
+          {mainRounds.map((round) => (
+            <button key={round.key} type="button" className="tm-chip" onClick={() => {
+              const container = scrollRef.current;
+              const column = Array.from(container?.querySelectorAll<HTMLElement>('[data-bracket-round]') ?? []).find((element) => element.dataset.bracketRound === round.key);
+              if (container && column) container.scrollTo({
+                left: column.getBoundingClientRect().left - container.getBoundingClientRect().left + container.scrollLeft,
+                behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth',
+              });
+            }}>{round.label}</button>
+          ))}
+        </nav>
+      )}
+      {groups.filter((group) => group.phase === 'round12').some((group) => group.groupTeams.some((team) => team.isBye)) && (
+        <section aria-label="12강 부전승" className="mb-4 rounded-xl border border-[var(--border)] p-3">
+          <p className="tm-text-caption-strong">부전승 · 8강 직행</p>
+          <div className="flex flex-wrap gap-3 mt-2">
+            {groups.filter((group) => group.phase === 'round12').flatMap((group) => group.groupTeams.filter((team) => team.isBye)).map((team) => (
+              <div key={team.id} className="flex items-center gap-2 tm-text-body text-[var(--text-body)]">
+                <TeamAvatar seed={team.teamId ?? team.registrationId} name={teamDisplayName(team.teamName).label} logoUrl={team.teamLogoUrl} size="sm" />
+                <span>{teamDisplayName(team.teamName).label}</span>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
       {/* 실제로 스크롤할 내용이 없으면(트리가 컬럼 폭 안에 다 들어옴) 힌트 자체가
           거짓 안내가 되므로 숨긴다 — 데스크톱 전용 CSS(.tm-bracket-page-grid
           .tm-bk2-scroll-hint)와 별개로 모바일 폭에서도 동일하게 적용. */}
@@ -785,7 +820,9 @@ export function TournamentBracket({ fixtures, groups }: TournamentBracketProps) 
                     centered={!isFirst}
                   />
                   {!isLast && (
-                    <ConnectorSegment topCount={slotCount} totalH={rH} nextN={nextSlotCount} />
+                    mainRounds.some((stage) => stage.key === 'round12' || stage.key === 'quarter') ? (
+                      <div aria-hidden="true" style={{ flex: '1 0 auto', minWidth: CONN_W, height: treeH + HEAD_H, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--grey400)' }}>→</div>
+                    ) : <ConnectorSegment topCount={slotCount} totalH={rH} nextN={nextSlotCount} />
                   )}
                   {isLast && (
                     <ConnectorSegment topCount={1} totalH={treeH} nextN={1} />

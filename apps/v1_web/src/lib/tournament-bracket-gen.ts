@@ -21,3 +21,13 @@ export function knockoutSeedPairs<T>(teams: T[]): Array<{ home: T; away: T | nul
   }
   return out;
 }
+
+/** 명시한 부전승만 제외한다. 상대 미배정은 부전승으로 추정하지 않는다. */
+export function round12Pairs<T extends { isBye?: boolean; sortOrder: number }>(teams: T[]): Array<{ home: T; away: T }> {
+  const playing = teams.filter((team) => !team.isBye).sort((a, b) => a.sortOrder - b.sortOrder);
+  if (teams.length !== 12 || playing.length !== 8) {
+    throw new Error('12팀을 배정하고 부전승 4팀을 지정해 주세요. 나머지 8팀의 4경기를 만들어요.');
+  }
+  // Eight participants always produce four full pairs, without a fake bye fixture.
+  return Array.from({ length: 4 }, (_, index) => ({ home: playing[index], away: playing[7 - index] }));
+}

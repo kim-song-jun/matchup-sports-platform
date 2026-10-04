@@ -18,7 +18,7 @@ import {
 
 // ─── Group phase constants ─────────────────────────────────────────────────────
 
-export const TOURNAMENT_GROUP_PHASES = ['group', 'semi', 'final', 'third_place'] as const;
+export const TOURNAMENT_GROUP_PHASES = ['group', 'round12', 'quarter', 'semi', 'final', 'third_place'] as const;
 export type TournamentGroupPhase = (typeof TOURNAMENT_GROUP_PHASES)[number];
 
 // ─── Group DTOs ───────────────────────────────────────────────────────────────
@@ -63,6 +63,11 @@ export class UpdateGroupDto {
 // ─── GroupTeam DTOs ───────────────────────────────────────────────────────────
 
 export class CreateGroupTeamDto {
+  /** 12강 부전승: 경기 없이 8강에 직접 배정할 팀. */
+  @IsOptional()
+  @IsBoolean()
+  isBye?: boolean;
+
   @IsUUID()
   groupId!: string;
 

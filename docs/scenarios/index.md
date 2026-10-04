@@ -1,3 +1,7 @@
+## 2026-10-04 — 12강·8강 수동 대진 관리
+
+[작업 문서](../../.github/tasks/20261004-tournament-round12-quarter.md): 관리자 정식 단계·부전승 저장·사용자 결선 표시 확장. 회귀 및 alpha 배포/3폭 QA 진행 중. 실제 대회 데이터 변경 없음.
+
 # Teameet QA Scenario Index
 
 ## 2026-10-03 — 종료 팀매치 카드 전체 dim / DEV 요청

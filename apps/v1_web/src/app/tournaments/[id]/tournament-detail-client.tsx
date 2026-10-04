@@ -2017,7 +2017,7 @@ export function partitionTournamentSections(
   groups: V1TournamentGroup[],
 ) {
   const groupPhaseGroups = groups.filter((g) => g.phase === 'group');
-  const knockoutPhases = new Set(['semi', 'final', 'third_place']);
+  const knockoutPhases = new Set(['round12', 'quarter', 'semi', 'final', 'third_place']);
   const knockoutGroupIds = new Set(
     groups.filter((g) => knockoutPhases.has(g.phase)).map((g) => g.id),
   );
@@ -2029,7 +2029,7 @@ export function partitionTournamentSections(
   // TB-3: group_knockout에서 groupId=null이지만 round가 녹아웃 단계인 픽스처가 결선 대진표에서
   // 누락되는 문제 수정 — knockoutFixtures에 fallback으로 포함. round 는 표시 라벨이라 한글('4강'·
   // '결승'·'3·4위전')이 정상값이므로 영문 키와 한글 라벨을 모두 매칭(어드민 자동생성은 한글 라벨 사용).
-  const knockoutRoundLabels = ['semi', 'final', 'third_place', '4강', '결승', '3·4위전'];
+  const knockoutRoundLabels = ['round12', 'quarter', 'semi', 'final', 'third_place', '12강', '8강', '4강', '결승', '3·4위전'];
   const knockoutFixtures =
     format === 'knockout'
       ? fixtures

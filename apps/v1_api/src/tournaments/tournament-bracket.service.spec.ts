@@ -275,7 +275,7 @@ describe('TournamentBracketService', () => {
     v1AdminUser: { findUnique: jest.Mock };
     v1Tournament: { findFirst: jest.Mock };
     v1TournamentGroup: { findFirst: jest.Mock; create: jest.Mock; findMany: jest.Mock };
-    v1TournamentGroupTeam: { findUnique: jest.Mock; create: jest.Mock };
+    v1TournamentGroupTeam: { findUnique: jest.Mock; findFirst: jest.Mock; findMany: jest.Mock; create: jest.Mock };
     v1TournamentMatchDetails: { findUnique: jest.Mock; findUniqueOrThrow: jest.Mock; findFirst: jest.Mock; findMany: jest.Mock; create: jest.Mock; update: jest.Mock };
     v1TeamMatch: { findUnique: jest.Mock; findUniqueOrThrow: jest.Mock; findMany: jest.Mock; create: jest.Mock; update: jest.Mock };
     v1TeamSchedule: { findUnique: jest.Mock; update: jest.Mock; create: jest.Mock; updateMany: jest.Mock };
@@ -304,7 +304,7 @@ describe('TournamentBracketService', () => {
       v1AdminUser: { findUnique: jest.fn() },
       v1Tournament: { findFirst: jest.fn() },
       v1TournamentGroup: { findFirst: jest.fn(), create: jest.fn(), findMany: jest.fn() },
-      v1TournamentGroupTeam: { findUnique: jest.fn(), create: jest.fn() },
+      v1TournamentGroupTeam: { findUnique: jest.fn(), findFirst: jest.fn().mockResolvedValue(null), findMany: jest.fn().mockResolvedValue([]), create: jest.fn() },
       v1TournamentMatchDetails: {
         findUnique: jest.fn().mockResolvedValue(null),
         findUniqueOrThrow: jest.fn().mockImplementation(async () => canonicalDetailsRow()),
@@ -672,6 +672,23 @@ describe('TournamentBracketService', () => {
     });
 
     expect(result).toMatchObject({ groupId: 'group-1', registrationId: 'reg-1' });
+  });
+
+  it('부전승을 조별리그 팀 배정에 허용하지 않는다', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdmin);
+    prisma.v1Tournament.findFirst.mockResolvedValue(tournamentRow());
+    prisma.v1TournamentGroup.findFirst.mockResolvedValue(groupRow());
+    await expect(service.createGroupTeam(ownerUser, 'tournament-1', { groupId: 'group-1', registrationId: 'reg-1', isBye: true }))
+      .rejects.toMatchObject({ response: { code: 'BYE_PHASE_INVALID' } });
+  });
+
+  it('12강의 다섯 번째 부전승은 저장하지 않는다', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdmin);
+    prisma.v1Tournament.findFirst.mockResolvedValue(tournamentRow());
+    prisma.v1TournamentGroup.findFirst.mockResolvedValue(groupRow({ phase: 'round12' }));
+    prisma.v1TournamentGroupTeam.findMany.mockResolvedValue(Array.from({ length: 4 }, () => ({ isBye: true })));
+    await expect(service.createGroupTeam(ownerUser, 'tournament-1', { groupId: 'group-1', registrationId: 'reg-1', isBye: true }))
+      .rejects.toMatchObject({ response: { code: 'ROUND12_CAPACITY' } });
   });
 
   // ─── createFixture ────────────────────────────────────────────────────────

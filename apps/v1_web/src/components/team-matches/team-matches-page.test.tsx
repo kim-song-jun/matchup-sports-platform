@@ -599,7 +599,7 @@ describe('team match full edit', () => {
     expect(screen.getByLabelText('목록 이미지')).toBeInTheDocument();
     expect(screen.getByLabelText('상세 이미지')).toBeInTheDocument();
     for (const label of [
-      '매치 제목', '설명', '실력등급', '경기방식',
+      '매치 제목', '설명', '최소 등급', '최대 등급', '경기방식',
       '경기 스타일', '유니폼 색상', '장소',
       '상세 주소', '날짜', '시작 시간', '종료 시간', '신청 마감일', '신청 마감시간',
     ]) {

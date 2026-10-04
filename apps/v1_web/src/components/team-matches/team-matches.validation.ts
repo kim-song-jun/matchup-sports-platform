@@ -1,5 +1,5 @@
 import { teamMatchDateErrors } from '@/lib/team-match-dates';
-import { labelToLevelCode } from '@/lib/v1-levels';
+import { parseTeamMatchLevelRange } from '@/lib/team-match-level-range';
 import type { V1TeamMatchMutationPayload } from '@/types/api';
 import type { TeamMatchCreateStep, TeamMatchCreateViewModel } from './team-matches.types';
 import { kstDatetimeLocalToIso } from '@/lib/kst-calendar';
@@ -60,6 +60,7 @@ const RULES: Array<{
   { field: 'hostTeamId', label: '팀을 선택해 주세요', step: 'team', isSatisfied: (ctx) => Boolean(ctx.hostTeamId) },
   { field: 'sportId', label: '종목을 선택해 주세요', step: 'sport', isSatisfied: (ctx) => Boolean(ctx.sportId) },
   { field: 'title', label: '매치 제목을 입력해 주세요', step: 'info', isSatisfied: (ctx) => Boolean(ctx.draft.title.trim()) },
+  { field: 'grade', label: '실력등급을 다시 선택해 주세요', step: 'condition', isSatisfied: (ctx) => parseTeamMatchLevelRange(ctx.draft.grade) !== null },
   { field: 'regionId', label: '지역을 선택해 주세요', step: 'place-time', isSatisfied: (ctx) => Boolean(ctx.regionId) },
   { field: 'venue', label: '장소를 입력해 주세요', step: 'place-time', isSatisfied: (ctx) => Boolean(ctx.draft.venue.trim()) },
   { field: 'date', label: '날짜를 입력해 주세요', step: 'place-time', isSatisfied: (ctx) => Boolean(ctx.draft.date) },
@@ -145,6 +146,8 @@ export function buildTeamMatchPayloadResult(draft: TeamMatchDraft, hostTeamId: s
   const ctx: TeamMatchValidationContext = { hostTeamId, sportId, regionId, draft, existingDeadlineAt };
   const missingFields = getTeamMatchMissingFields(ctx);
   if (missingFields.length > 0) return { missingFields };
+  const levelRange = parseTeamMatchLevelRange(draft.grade);
+  if (!levelRange) return { missingFields: [missingFieldFor('grade')] };
 
   const startsAt = parseStartsAt(draft);
   if (!startsAt) {
@@ -178,8 +181,7 @@ export function buildTeamMatchPayloadResult(draft: TeamMatchDraft, hostTeamId: s
       // 구조화 컬럼으로만 쓴다(team-matches-create-client.tsx의 원래 buildTeamMatchMutationPayload
       // 설계를 그대로 따른다 — 위저드 단계 게이팅 리팩터로 이 파일에 옮겨오며 함께 이관).
       rulesText: null,
-      minLevelCode: draft.grade.trim() ? labelToLevelCode(draft.grade) : null,
-      maxLevelCode: draft.grade.trim() ? labelToLevelCode(draft.grade) : null,
+      ...levelRange,
       genderRule: normalizeGenderRule(draft.gender),
       matchFormat: draft.format.trim() || null,
       matchStyle: draft.style.map((item) => item.trim()).filter(Boolean),

@@ -14,11 +14,12 @@ import { extractErrorMessage } from '@/lib/error-message';
 import { randomUuid } from '@/lib/uuid';
 import { MultiPresetChipSelector } from '@/components/v1-ui/create-form-fields';
 import { teamMatchDateErrors } from '@/lib/team-match-dates';
-import { V1_LEVELS } from '@/lib/v1-levels';
+import { parseTeamMatchLevelRange } from '@/lib/team-match-level-range';
 import { GENDER_RULE_OPTIONS, matchGenderRuleLabel } from '@/lib/v1-status-labels';
 import { toDistrictRegionOptions } from '@/lib/v1-regions';
 import { kstDatetimeLocalToIso } from '@/lib/kst-calendar';
 import { TeamMatchImagesField } from '@/components/team-matches/team-match-images';
+import { TeamMatchLevelRangeField } from '@/components/team-matches/team-match-level-range-field';
 
 const inputClass =
   'h-[44px] w-full rounded-xl border border-[var(--border-strong)] bg-[var(--card-surface)] px-3 text-[length:var(--font-size-body-sm)] text-[var(--text-strong)] placeholder:text-gray-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:opacity-50';
@@ -56,7 +57,7 @@ export default function AdminTeamMatchNewPage() {
   const [deadlineAt, setDeadlineAt] = useState('');
   const [startsAt, setStartsAt] = useState('');
   const [endsAt, setEndsAt] = useState('');
-  const [levelCode, setLevelCode] = useState('');
+  const [grade, setGrade] = useState('');
   const [matchFormat, setMatchFormat] = useState('');
   const [matchStyle, setMatchStyle] = useState<string[]>([]);
   const [uniformColor, setUniformColor] = useState('');
@@ -76,6 +77,7 @@ export default function AdminTeamMatchNewPage() {
   // 입력 원문(KST 벽시계)을 그대로 넘긴다 — 해석 실패는 검증이 필드 오류로 잡는다.
   const startIso = kstDatetimeLocalToIso(startsAt);
   const dateErrors = teamMatchDateErrors({ startsAt, endsAt, deadlineAt });
+  const levelRange = parseTeamMatchLevelRange(grade);
   const datesValid = startsAt !== '' && Object.keys(dateErrors).length === 0;
   const canSubmit =
     canWrite &&
@@ -85,7 +87,7 @@ export default function AdminTeamMatchNewPage() {
     placeName.trim() !== '' &&
     startsAt !== '' &&
     datesValid &&
-    !uploadingImage;
+    !uploadingImage && levelRange !== null;
 
   const uploadImage = async (file: File) => {
     const result = await uploadImages.mutateAsync([file]);
@@ -94,7 +96,7 @@ export default function AdminTeamMatchNewPage() {
   };
 
   const submit = async () => {
-    if (!canSubmit || !startIso) return;
+    if (!canSubmit || !startIso || !levelRange) return;
     try {
       const result = await createRecruitment.mutateAsync({
         clientCommandId: randomUuid(),
@@ -111,8 +113,7 @@ export default function AdminTeamMatchNewPage() {
         addressText: addressText.trim() || null,
         costNote: moneyNote(totalCost, opponentCost),
         rulesText: null,
-        minLevelCode: levelCode || null,
-        maxLevelCode: levelCode || null,
+        ...levelRange,
         genderRule,
         matchFormat: matchFormat.trim() || null,
         matchStyle,
@@ -182,13 +183,7 @@ export default function AdminTeamMatchNewPage() {
               <p className="mt-1 text-[length:var(--font-size-body-sm)] text-[var(--text-muted)]">일반 팀매치와 동일하게 등급, 방식, 스타일, 유니폼, 성별과 비용을 설정해요.</p>
             </div>
             <div className="grid gap-4 md:grid-cols-2">
-              <label className="text-[length:var(--font-size-body-sm)] font-medium text-[var(--text-strong)]">
-                실력등급
-                <select aria-label="실력등급" value={levelCode} onChange={(event) => setLevelCode(event.target.value)} className={"mt-1 " + inputClass}>
-                  <option value="">등급 미지정</option>
-                  {V1_LEVELS.map((level) => <option key={level.code} value={level.code}>{level.label}</option>)}
-                </select>
-              </label>
+              <div className="md:col-span-2"><TeamMatchLevelRangeField value={grade} onChange={setGrade} /></div>
               <label className="text-[length:var(--font-size-body-sm)] font-medium text-[var(--text-strong)]">
                 경기방식
                 <input aria-label="경기방식" list="admin-team-match-formats" value={matchFormat} onChange={(event) => setMatchFormat(event.target.value)} maxLength={20} placeholder="예: 5:5" className={"mt-1 " + inputClass} />

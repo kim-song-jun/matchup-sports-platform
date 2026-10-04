@@ -122,6 +122,75 @@ describe('헤더 뒤로가기 — back 인가 replace 인가', () => {
     expect(decideBackAction('/teams/1?from=/teams')).toBe('back');
   });
 
+  it('출처 helper가 query 키를 재배치해도 바로 앞 같은 화면이면 back한다', () => {
+    freshTab('/league-matches/9/fixtures/1?from=%2Fleague-matches%2F9&view=record&mode=public#events');
+    installNavigationHistory();
+    window.history.pushState({}, '', '/users/player-one');
+
+    expect(decideBackAction('/league-matches/9/fixtures/1?mode=public&view=record&from=/league-matches/9#events')).toBe('back');
+    expect(decideBackAction('/league-matches/9/fixtures/1?mode=public&view=summary&from=/league-matches/9#events')).toBe('replace');
+  });
+
+  it('반복 query 키의 값 순서는 유지하며 다른 순서를 같은 화면으로 보지 않는다', () => {
+    freshTab('/league-matches/9/fixtures/1?from=%2Fhome&view=record&tag=home&tag=away');
+    installNavigationHistory();
+    window.history.pushState({}, '', '/users/player-one');
+
+    expect(decideBackAction('/league-matches/9/fixtures/1?tag=home&view=record&tag=away&from=/home')).toBe('back');
+    expect(decideBackAction('/league-matches/9/fixtures/1?tag=away&view=record&tag=home&from=/home')).toBe('replace');
+  });
+
+  it('query가 같아도 외부 origin으로 back하지 않는다', () => {
+    freshTab('/league-matches/9/fixtures/1?view=record');
+    installNavigationHistory();
+    window.history.pushState({}, '', '/users/player-one');
+
+    expect(decideBackAction('https://outside.example/league-matches/9/fixtures/1?view=record')).toBe('replace');
+    expect(decideBackAction('//outside.example/league-matches/9/fixtures/1?view=record')).toBe('replace');
+  });
+
+  it('안전한 중첩 출처는 query 키 순서만 무시하고 부모 조회 조건·앵커는 구분한다', () => {
+    const parent = '/league-matches/9?from=%2Fhome&tab=fixtures#schedule';
+    freshTab(`/league-matches/9/fixtures/1?view=record&from=${encodeURIComponent(parent)}`);
+    installNavigationHistory();
+    window.history.pushState({}, '', '/users/player-one');
+    const target = (ancestor: string) => `/league-matches/9/fixtures/1?from=${encodeURIComponent(ancestor)}&view=record`;
+
+    expect(decideBackAction(target('/league-matches/9?tab=fixtures&from=%2Fhome#schedule'))).toBe('back');
+    expect(decideBackAction(target('/league-matches/9?tab=standings&from=%2Fhome#schedule'))).toBe('replace');
+    expect(decideBackAction(target('/league-matches/9?tab=fixtures&from=%2Fhome#standings'))).toBe('replace');
+  });
+
+  it('중첩 부모의 반복 query 값 순서도 보존한다', () => {
+    const parent = '/league-matches/9?from=%2Fhome&tag=home&tag=away';
+    freshTab(`/league-matches/9/fixtures/1?from=${encodeURIComponent(parent)}`);
+    installNavigationHistory();
+    window.history.pushState({}, '', '/users/player-one');
+    const target = (ancestor: string) => `/league-matches/9/fixtures/1?from=${encodeURIComponent(ancestor)}`;
+
+    expect(decideBackAction(target('/league-matches/9?tag=home&tag=away&from=%2Fhome'))).toBe('back');
+    expect(decideBackAction(target('/league-matches/9?tag=away&tag=home&from=%2Fhome'))).toBe('replace');
+  });
+
+  it('출처 helper가 버린 비정상 부모를 같은 항목으로 정규화하지 않는다', () => {
+    freshTab('/league-matches/9/fixtures/1?view=record&from=https%3A%2F%2Foutside.example%2Fhome');
+    installNavigationHistory();
+    window.history.pushState({}, '', '/users/player-one');
+
+    expect(decideBackAction('/league-matches/9/fixtures/1?view=record')).toBe('replace');
+  });
+
+  it('지원 깊이보다 긴 출처를 잘라서 같은 항목으로 보지 않는다', () => {
+    let parent = '/home?tab=one';
+    for (let index = 0; index < 5; index += 1) parent = `/teams/team-${index}?from=${encodeURIComponent(parent)}`;
+    freshTab(`/league-matches/9/fixtures/1?from=${encodeURIComponent(parent)}`);
+    installNavigationHistory();
+    window.history.pushState({}, '', '/users/player-one');
+
+    expect(decideBackAction(`/league-matches/9/fixtures/1?from=${encodeURIComponent(parent)}`)).toBe('back');
+    expect(decideBackAction('/league-matches/9/fixtures/1?from=%2Fteams%2Fteam-4')).toBe('replace');
+  });
+
   it('앞에 앱 항목이 없으면(첫 항목) replace — 앱 밖으로 back 하지 않는다', () => {
     installNavigationHistory();
     expect(decideBackAction('/home')).toBe('replace');

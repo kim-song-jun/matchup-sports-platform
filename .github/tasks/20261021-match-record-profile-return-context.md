@@ -1,10 +1,30 @@
 # Task 20261021: 경기 기록 선수 프로필의 복귀 문맥 (#1418)
 
-Status: Review (local contract checks passed; committed head CI and alpha QA pending)
+Status: Blocked (follow-up local verification passed; git write/PR/CI and alpha QA pending)
 **Owner**: Codex root → independent product review → parent alpha QA
 **Created**: 2026-10-04
 
 ## Context
+
+### Actual league caller follow-up — 2026-10-04
+
+PR1606 head `627a6dff6baee39e4e2d3a565c3ce83e23622e3c`의 정확 CI37196956805는 Gates/API/Web SUCCESS(11:03:36 UTC)였다. 외부 병합은 11:08:08 UTC, merge `56581dc7b9e08c95dbcf763bffa09434ba4cfd8b`이며 이 세션은 병합/배포하지 않았다.
+
+독립 적대적 리뷰는 추가 P2를 찾았다. shared에 주입된 from은 보존되지만 실제 리그 caller103–105가 pathname + 부모 from으로 selfHref를 재구성해 현재의 다른 query/hash를 버린다. 이전 신규 테스트는 완성된 출처를 직접 주입해서 실제 caller를 거치지 않았다. 이 finding은 타당하며, 현재 dev56581dc에 동일하게 남아 있다. report/caller-reproduction.json은 부모가 제공한 읽기 전용 정적 증거이며 alpha 재현 이미지가 아니다.
+
+후속은 기존 `useCurrentHref`의 SSR·mount/hashchange 계약을 실제 리그 caller에서 재사용한다. 실제 LeagueFixtureDetailClient → shared renderer → player href → AppBackLink를 통합하는 합성 경계 테스트로 RED/GREEN을 확보한다. 부모 from의 sanitize 및 공개동의 null gate는 유지한다. 완료 console/live 데이터 접근0, Refs #1418 유지, 실제 after는 별도 승인 alpha 배포 후 부모 QA다.
+
+추가 P2: 기존 withFromPath가 nested from을 마지막 query 키로 재배치하므로, 현재 URL만 보존하면 `from`이 선두/중간인 same-tab Back 2사례가 계속 replace를 선택한다. 실제 caller28사례 수정 전26 FAIL/2 PASS, hook만 수정 후2 FAIL/26 PASS로 확인했다. 비교용 normalizeInAppUrl에서 query 키를 stable sort하되 반복 키의 값 순서와 다른 조회 조건·외부 origin은 구분한다. 실제 URL/저장값/API 계약 및 redirect helper는 변경하지 않는다. 이 필요한 Back 비교 수정과 기존 history 회귀 테스트2파일을 후속 소유 범위에 추가한다.
+
+독립 검토의 2단계 부모 반례도 RED로 확인했다. 최상위 query sort만으로는 부모 from 안의 키 재배치가 남으므로 실제 caller2 + history2가 FAIL이었다(2파일4 FAIL/54 PASS). 최종 비교는 기존 sanitizeRedirectPath가 허용하는 중첩 from까지 최대4단계 query를 정규화한다. 부모 hash·반복 키 값 순서·다른 부모 조회 조건은 구분하며, unsafe/지원깊이 초과값을 삭제하거나 같은 화면으로 접지 않는다. redirect/URL 자체는 변경하지 않는다.
+
+#### Follow-up original conditions
+
+- [x] 실제 리그 caller에서 query/hash/중첩 출처 누락 RED 및 최소 수정 후 GREEN.
+- [x] hashchange·query rerender·출처 없음·cold profile replace·same-tab Back 연타·null gate·외부 nested from 제외.
+- [x] loading/error/404 정상 요약·Retry·기존 참가자/운영 경로 회귀, SSR hash hydration 계약 유지.
+- [ ] 명시 소유6pathspec·clean·검증바이트 일치·Ready/dev 후속 PR·정확 head CI.
+- [ ] actual alpha query/hash 전용 before 미확보 및 전체 원 조건/3폭 after 대기 구분.
 
 [#1418](https://github.com/kim-song-jun/matchup-sports-platform/issues/1418)은 대회 득점자 프로필의 페이지 뒤로가기가 원래 대회 대신 /teams로 가는 결함이다. [PR1467](https://github.com/kim-song-jun/matchup-sports-platform/pull/1467)은2026-10-01 14:43:18 UTC에 bracket 순위 링크만 해결했으며 shared MatchDetailContent는 수정하지 않았다. 시상·현재 bracket 정상 대조와 대회/리그 경기 기록 잔여를 구분한다.
 
@@ -48,7 +68,7 @@ Root owns product/test/task/changeset 및 git/CI. child는 v1 호출부·서버 
 
 ### Owned files
 
-`apps/v1_web/src/components/public-game-records/match-detail-content.tsx`, `match-detail-profile-return.test.tsx`, 이 task, `.changeset/match-record-profile-return-context.md`.
+현재 후속은 `apps/v1_web/src/app/league-matches/[leagueId]/fixtures/[fixtureId]/league-fixture-detail-client.tsx`, 같은 폴더의 `league-fixture-profile-return.test.tsx`, `apps/v1_web/src/lib/navigation-history.ts`, `apps/v1_web/src/lib/navigation-history.test.ts`, 이 task, `.changeset/league-fixture-current-url.md` 여섯 파일만 소유한다. PR1606의 기존 shared 제품/테스트/changeset과 이전 worktree는 변경하지 않는다.
 
 ### Forbidden files
 
@@ -57,7 +77,7 @@ shared withFromPath/sanitizeRedirectPath/AppBackLink, 팀 명단/bracket/awards 
 ## Acceptance Criteria
 
 - [x] 이 잔여의 source/실제 컴포넌트 계약·검증과 원 이슈 전체 수용 조건을 구분.
-- [ ] exact committed scope4/clean/diff check/debt markers0 및 정확 CI/독립 검토 기록.
+- [ ] exact committed scope6/clean/diff check/debt markers0 및 정확 CI/독립 검토 기록.
 - [x] 공개 actual before 원본/시간/폭을 정확 인용하고 after는 승인 alpha 배포 후 부모 QA.
 - [x] Refs #1418 유지. 전체 원래 bracket/팀명단/직접/탭/scroll·실제 이미지 QA 전에는 이슈 종료하지 않음.
 
@@ -82,6 +102,21 @@ actual renderer/jsdom history는 실제 alpha Next 런타임·물리 기기·scr
 | 2026-10-04 | Parent | 이미지 상세 개선 목업 | 기존 /tmp/teameet-team-match-photo-contrast-options-20261004.html 존재/동일hash 확인. 이번 구현 범위에 섞지 않음. |
 
 ## Progress Snapshot
+
+### Current follow-up cursor
+
+- 2026-10-04 fresh fetch origin/dev56581dc, main clean/동일SHA, 열린 dev PR0. 기존 PR1606은 MERGED이므로 재사용하지 않는다.
+- 독립 WT `/tmp/teameet-issue-1418-league-current-url-20261004`, branch `fix/issue-1418-league-fixture-current-url`. 실제 caller RED28개 중26 FAIL/2 PASS → hook만 적용2 FAIL/26 PASS → 최상위 query 정렬 중간 검증12파일229 PASS. 이후 독립 검토가 부모 내부 query 재배치를 추가로 찾아 실제 caller/history2파일4 FAIL/54 PASS로 RED를 확정했다.
+- 최종 안전한 중첩 비교 후보의 GREEN **12파일235 PASS (22.72s)**. 실제 리그 caller30·기존 caller32·history29·shared 신규26/기존32·currentHref4·AppBack13·session32·tracker13·미저장 guard24. API/Next 경계는 합성이며 실제 alpha 사용자 클릭·scroll 검증으로 세지 않는다.
+- 최초 lint는 신규 fixture의 필수 registrationDeadlineAt/standings 필드 누락을 찾아 테스트 데이터만 보정했다. 변경된 실제 caller30을 **30 PASS (1.67s)** 재확인하고 최종 lint/typecheck·v1 pattern 및 필수 aggregate **6/6 PASS**를 확인했다. 제품은 독립 검토 이후 동일하다.
+- 독립 child는 제품/테스트4/4를 읽기 전용 재검토해 nested-from P2 해결 및 추가 P1/P2 지적0을 보고했다. 테스트·수정 실행0, 외부4라운드 전체 clean/실제 hydration/alpha 결과로 확대하지 않는다.
+- 테스트는 최소1worker 직렬이며 shell PID/PPID와 종료 결과를 기록했다. 호스트 load17~82/12코어와 메모리 free49~57%를 확인했고, 프로세스 목록/sysctl/Docker socket 읽기의 sandbox 권한 상승은 자동 승인 검토가 거절했다. 허용된 부분만 확인하고 우회/다른 세션 종료0, 전체 suite/build는 CI 소유다.
+- 현재환경에서 gh CLI 원격 조회는 network 차단이지만 연결된 GitHub connector 읽기는 성공했다. PR1606 merged/dev, 원 이슈1418 OPEN, 열린 dev PR0과 원격 dev의 미수정 caller를 다시 확인했다. 쓰기/정확 head CI는 실제 성공 여부를 후속 기록에 남긴다.
+- 2026-10-04 11:39 UTC 이후 게시 차단: 기본 git add는 공유 `.git/worktrees/.../index.lock` 쓰기 Operation not permitted. 검증된6파일의 명시 pathspec add/commit 권한 상승은 자동 승인 검토가 “user-authorized and otherwise reversible”임을 인정했지만 review context의 write escalation 금지로 거절했다. stage/commit/push/새PR/정확headCI 실제0. GitHub API 커밋 등 우회0. 필요한 것은 공유 .git 쓰기/원격 push가 허용되는 실행 환경이며 기존 사용자 commit/push/PR 승인 부재가 아니다.
+- task deps symlink2개는 실제 목적지를 확인하고 제거했으며 모든 검증 shell은 exit 완료했다. 부모의 #1578/#1436 후속 후보는 별도 PR/소스 조사 대기열에 기록했고 현재 차단 때문에 기존 shared tree/다른 branch와 섞어 편집하지 않는다.
+- 후속 테스트/API 데이터는 로컬 합성만. 부모가 제공한 P2 정적 증거와 기존 actual alpha before9사진을 구분하며, query/hash 전용 실제 before/after는 미확보다.
+
+### PR1606 historical cursor (not current whole-issue PASS)
 
 - Fresh fetch origin/dev951a67e, WT `/tmp/teameet-issue-1418-profile-return-20261004`, branch `fix/issue-1418-match-profile-return-context`.
 - 원격 dev를 2026-10-04 10:43 UTC에 다시 읽어 같은 SHA와 열린 dev PR 0을 확인했다. main 및 기존 feature WT 변경0.

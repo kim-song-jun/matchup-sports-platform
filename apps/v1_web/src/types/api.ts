@@ -1412,6 +1412,8 @@ export type V1TeamMatchEligibility = {
   teams: Array<{
     teamId: string;
     name: string;
+    /** 팀이 등록한 엠블럼 또는 기본 제공 엠블럼. 엠블럼이 없는 팀은 null. */
+    logoUrl?: string | null;
     role: string;
     eligible: boolean;
     reasonCode: string;

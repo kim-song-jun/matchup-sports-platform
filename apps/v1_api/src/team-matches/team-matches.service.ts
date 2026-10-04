@@ -425,6 +425,9 @@ export class TeamMatchesService {
         return {
           teamId: team.id,
           name: team.name,
+          // 신청 팀 고르기 화면이 팀이 등록한 엠블럼을 그대로 그리도록 함께 내려준다 — 이게 없으면
+          // 화면은 팀 id 로 만든 임시 무늬(identicon)만 그릴 수 있다. 엠블럼이 없는 팀은 null.
+          logoUrl: team.profile?.logoUrl ?? null,
           role: team.memberships[0]?.role ?? 'member',
           eligible: reasonCode === 'OK',
           reasonCode,
@@ -1899,7 +1902,10 @@ export class TeamMatchesService {
         ...(teamId ? { id: teamId } : {}),
         memberships: { some: { userId, status: 'active', role: { in: ['owner', 'manager'] } } },
       },
-      include: { memberships: { where: { userId, status: 'active' }, select: { role: true } } },
+      include: {
+        memberships: { where: { userId, status: 'active' }, select: { role: true } },
+        profile: { select: { logoUrl: true } },
+      },
       orderBy: { createdAt: 'desc' },
     });
   }

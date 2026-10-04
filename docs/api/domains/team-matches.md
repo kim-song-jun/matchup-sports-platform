@@ -108,7 +108,7 @@
 | POST | `/team-matches` | Yes(host team owner/manager) | 모집글 생성 |
 | GET | `/team-matches/:teamMatchId/edit` | Yes(host team owner/manager) | 수정 폼 프리필 |
 | GET | `/team-matches/:teamMatchId` | Optional | 모집글 상세 |
-| GET | `/team-matches/:teamMatchId/application-eligibility` | Yes | `teamId?` 기준 신청 가능 여부 |
+| GET | `/team-matches/:teamMatchId/application-eligibility` | Yes | `teamId?` 기준 신청 가능 여부(팀마다 `logoUrl` — 등록·기본 제공 엠블럼, 없으면 null — 포함) |
 | PATCH | `/team-matches/:teamMatchId` | Yes(host team owner/manager) | 모집글 수정 |
 | POST | `/team-matches/:teamMatchId/close` | Yes(host team owner/manager) | 모집 마감(대기 신청 `expired`) |
 | POST | `/team-matches/:teamMatchId/reopen` | Yes(host team owner/manager) | 마감 취소(시작 전만) |

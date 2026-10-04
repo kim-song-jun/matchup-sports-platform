@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { ArrowLeft, ArrowRight, Check, ChevronLeft, Copy, Lock } from 'lucide-react';
-import { useEffect, useReducer, useRef, useState } from 'react';
+import { useEffect, useReducer, useRef, useState, type FocusEvent } from 'react';
 import {
   useV1AdminTournament,
   useV1AdminTournaments,
@@ -30,7 +30,7 @@ import {
 import { resolveTournamentImage } from '@/lib/tournament-promo';
 import { TournamentDatetimeField } from '@/components/admin/tournaments/tournament-datetime-field';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
-import { revealWizardStage } from './wizard-stage-viewport';
+import { revealWizardControl, revealWizardStage } from './wizard-stage-viewport';
 import { TournamentCard } from '@/app/tournaments/tournament-card';
 import {
   CONFIRM_STEP_INDEX,
@@ -132,6 +132,22 @@ export default function AdminTournamentsNewPage() {
   const stepFieldsRef = useRef<HTMLDivElement>(null);
   const footerRef = useRef<HTMLDivElement>(null);
   const formRef = useRef<HTMLFormElement>(null);
+  const focusRevealFrameRef = useRef<number | null>(null);
+  useEffect(() => () => {
+    if (focusRevealFrameRef.current !== null) cancelAnimationFrame(focusRevealFrameRef.current);
+  }, []);
+  const revealFocusedControl = (event: FocusEvent<HTMLDivElement>) => {
+    if (focusRevealFrameRef.current !== null) cancelAnimationFrame(focusRevealFrameRef.current);
+    focusRevealFrameRef.current = null;
+    const control = event.target;
+    // First-error scrolling owns its existing smooth animation; portals are not wizard fields.
+    if (focusFirstErrorRef.current || !(control instanceof HTMLElement) || !stepFieldsRef.current?.contains(control)) return;
+    focusRevealFrameRef.current = requestAnimationFrame(() => {
+      focusRevealFrameRef.current = null;
+      if (document.activeElement !== control || !control.isConnected || !stepFieldsRef.current?.contains(control)) return;
+      revealWizardControl(control, footerRef.current);
+    });
+  };
   const renderedStepRef = useRef(state.step);
   useEffect(() => {
     if (renderedStepRef.current === state.step) return;
@@ -146,13 +162,16 @@ export default function AdminTournamentsNewPage() {
 
   useEffect(() => {
     if (!focusFirstErrorRef.current) return;
-    focusFirstErrorRef.current = false;
-    // 오류 문구가 `data-error-focus` 로 가리키는 입력에 포커스한다. 그룹 오류는 그룹의 첫 입력을 가리킨다.
-    const alert = formRef.current?.querySelector<HTMLElement>('[role="alert"][data-error-focus]');
-    if (!alert) return;
-    const control = document.getElementById(alert.dataset.errorFocus ?? '');
-    (control ?? alert).scrollIntoView({ block: 'center', behavior: scrollBehavior() });
-    control?.focus({ preventScroll: true });
+    try {
+      // 오류 문구가 `data-error-focus` 로 가리키는 입력에 포커스한다. 그룹 오류는 그룹의 첫 입력을 가리킨다.
+      const alert = formRef.current?.querySelector<HTMLElement>('[role="alert"][data-error-focus]');
+      if (!alert) return;
+      const control = document.getElementById(alert.dataset.errorFocus ?? '');
+      (control ?? alert).scrollIntoView({ block: 'center', behavior: scrollBehavior() });
+      control?.focus({ preventScroll: true });
+    } finally {
+      focusFirstErrorRef.current = false;
+    }
   }, [errors]);
 
   const goToStep = (nextStep: number) => {
@@ -345,7 +364,7 @@ export default function AdminTournamentsNewPage() {
             </p>
           </div>
 
-          <div ref={stepFieldsRef} className="px-5 py-6 sm:px-7">
+          <div ref={stepFieldsRef} onFocusCapture={revealFocusedControl} className="px-5 py-6 sm:px-7">
             {state.step === 0 ? (
               <BasicStep
                 state={state}

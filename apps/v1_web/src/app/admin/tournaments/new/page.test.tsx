@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Providers } from '@/app/providers';
@@ -1093,6 +1093,223 @@ describe('AdminTournamentsNewPage — 4단계(공개 확인)', () => {
         'aria-checked',
         'false',
       );
+    });
+  });
+
+  describe('같은 단계 키보드 focus의 footer 가림 회복 (#1439 후속)', () => {
+    const restores: (() => void)[] = [];
+    const frames = new Map<number, FrameRequestCallback>();
+    let nextFrame = 0;
+    let container: HTMLDivElement;
+
+    function patch(target: object, key: string, value: unknown) {
+      const descriptor = Object.getOwnPropertyDescriptor(target, key);
+      Object.defineProperty(target, key, { configurable: true, writable: true, value });
+      restores.push(() => descriptor ? Object.defineProperty(target, key, descriptor) : Reflect.deleteProperty(target, key));
+    }
+
+    function flushFocusFrames() {
+      act(() => {
+        const pending = [...frames.values()];
+        frames.clear();
+        for (const callback of pending) callback(0);
+      });
+    }
+
+    async function layout(options: {
+      internal?: boolean; width?: number; height?: number; footerTop?: number;
+      fieldTop?: number; visualHeight?: number;
+    } = {}) {
+      const width = options.width ?? 402;
+      const height = options.height ?? 606;
+      const footerTop = options.footerTop ?? 536.8;
+      const initialScroll = 947.2;
+      container = document.createElement('div');
+      const header = document.createElement('header');
+      header.style.position = 'sticky';
+      const main = document.createElement('main');
+      container.append(header, main);
+      container.style.overflowY = options.internal ? 'auto' : 'visible';
+      document.body.appendChild(container);
+      const scroller = options.internal ? container : document.documentElement;
+      patch(document, 'scrollingElement', document.documentElement);
+      patch(window, 'innerWidth', width);
+      patch(window, 'innerHeight', height);
+      patch(window, 'visualViewport', options.visualHeight ? {
+        offsetTop: 0, height: options.visualHeight, width, scale: 1,
+        addEventListener: vi.fn(), removeEventListener: vi.fn(),
+      } : undefined);
+      patch(scroller, 'clientHeight', height);
+      patch(scroller, 'scrollHeight', height + 2000);
+      patch(scroller, 'scrollTop', 0);
+      const scrollTo = vi.fn(({ top }: ScrollToOptions) => { scroller.scrollTop = top ?? 0; });
+      patch(scroller, 'scrollTo', scrollTo);
+      const view = render(<Providers><AdminTournamentsNewPage /></Providers>, { container: main });
+      goToPresentationStep();
+      await act(async () => {});
+      const field = screen.getByRole('textbox', { name: '상금 항목 3 내용' });
+      const footer = main.querySelector<HTMLElement>('form > .fixed')!;
+      footer.style.position = 'fixed';
+      scroller.scrollTop = initialScroll;
+      scrollTo.mockClear();
+      const origins = new Map<Element | string, number>([[field, initialScroll + (options.fieldTop ?? 539.2625)]]);
+      vi.spyOn(Element.prototype, 'getBoundingClientRect').mockImplementation(function (this: Element) {
+        if (this === footer) return new DOMRect(0, footerTop, width, height - footerTop);
+        if (this === container) return new DOMRect(0, 0, width, height);
+        if (this === header) return new DOMRect(0, 0, width, width < 1024 ? 52 : 0);
+        if (this.matches('input, select, textarea, button, h2')) {
+          return new DOMRect(16, (origins.get(this) ?? origins.get(this.id) ?? initialScroll + 200) - scroller.scrollTop, 300, 44);
+        }
+        return new DOMRect();
+      });
+      vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
+        const id = ++nextFrame;
+        frames.set(id, callback);
+        return id;
+      });
+      vi.spyOn(window, 'cancelAnimationFrame').mockImplementation((id) => { frames.delete(id); });
+      // Parent alpha rects define the failure boundary. Other rects/scroll/RAF are browser
+      // API fixtures: this renders the real wizard/editor but does not resolve CSS or IME.
+      return { view, scroller, scrollTo, field, footer, initialScroll, origins };
+    }
+
+    beforeEach(() => {
+      frames.clear();
+      nextFrame = 0;
+    });
+    afterEach(() => {
+      frames.clear();
+      vi.restoreAllMocks();
+      while (restores.length) restores.pop()?.();
+      container?.remove();
+    });
+
+    async function tabToThirdValue() {
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+      screen.getByRole('combobox', { name: '상금 항목 1 이름' }).focus();
+      flushFocusFrames();
+      for (let index = 0; index < 7; index += 1) {
+        await user.tab();
+        flushFocusFrames();
+      }
+      return user;
+    }
+
+    it.each([false, true])('모바일 Tab7: 실제 3번 내용을 footer 위로 보인다 (internal=%s)', async (internal) => {
+      const { scroller, field, footer, initialScroll } = await layout({ internal });
+      await tabToThirdValue();
+      expect(field).toHaveFocus();
+      expect(field.getBoundingClientRect().bottom).toBeLessThanOrEqual(footer.getBoundingClientRect().top - 4 + 0.001);
+      expect(scroller.scrollTop).toBeCloseTo(initialScroll + 50.4625);
+      for (const value of ['트', '트로피']) {
+        fireEvent.change(field, { target: { value } });
+        expect(screen.getByRole('textbox', { name: '상금 항목 3 내용' })).toBe(field);
+        expect(field).toHaveValue(value);
+        expect(field).toHaveFocus();
+      }
+      expect(createMutate).not.toHaveBeenCalled();
+      expect(updateMutate).not.toHaveBeenCalled();
+      expect(uploadMutateAsync).not.toHaveBeenCalled();
+      expect(changeStatusMutate).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      { width: 788, height: 505, footerTop: 436, fieldTop: 334.17 },
+      { width: 1182, height: 757, footerTop: 688, fieldTop: 460.5 },
+    ])('이미 보이는 $width 폭 Tab7은 스크롤하지 않는다', async (spec) => {
+      const { field, scroller, scrollTo, initialScroll } = await layout(spec);
+      await tabToThirdValue();
+      expect(field).toHaveFocus();
+      expect(scroller.scrollTop).toBe(initialScroll);
+      expect(scrollTo).not.toHaveBeenCalled();
+    });
+
+    it('Shift+Tab 뒤 다시 같은 내용에 들어와도 가림만 회복한다', async () => {
+      const { field, footer, scroller, initialScroll } = await layout();
+      const user = await tabToThirdValue();
+      await user.tab();
+      flushFocusFrames();
+      expect(screen.getByRole('button', { name: '상금 항목 3 삭제' })).toHaveFocus();
+      scroller.scrollTop = initialScroll;
+      await user.tab({ shift: true });
+      flushFocusFrames();
+      expect(field).toHaveFocus();
+      expect(field.getBoundingClientRect().bottom).toBeLessThanOrEqual(footer.getBoundingClientRect().top - 4 + 0.001);
+    });
+
+    it('빠른 연속 focus는 이전 예약을 취소하고 현재 내용만 회복한다', async () => {
+      const { field, scroller, initialScroll, origins, scrollTo } = await layout();
+      const current = screen.getByRole('textbox', { name: '상금 항목 2 내용' });
+      origins.set(current, initialScroll + 550);
+      field.focus();
+      current.focus();
+      flushFocusFrames();
+      expect(current).toHaveFocus();
+      expect(current.getBoundingClientRect().bottom).toBeLessThanOrEqual(532.801);
+      expect(scroller.scrollTop).toBeCloseTo(initialScroll + 61.2);
+      expect(scrollTo).toHaveBeenCalledTimes(1);
+      expect(window.cancelAnimationFrame).toHaveBeenCalled();
+    });
+
+    it('footer focus는 본문 reveal 대상이 아니며 이전 입력 예약도 이동시키지 않는다', async () => {
+      const { field, scroller, initialScroll, scrollTo } = await layout();
+      field.focus();
+      const action = screen.getByRole('button', { name: '대회 만들기' });
+      action.focus();
+      flushFocusFrames();
+      expect(action).toHaveFocus();
+      expect(scroller.scrollTop).toBe(initialScroll);
+      expect(scrollTo).not.toHaveBeenCalled();
+      expect(createMutate).not.toHaveBeenCalled();
+    });
+
+    it('줄어든 visual viewport도 현재 control만 보정한다', async () => {
+      const { field, scroller, initialScroll } = await layout({ visualHeight: 320 });
+      field.focus();
+      flushFocusFrames();
+      expect(field).toHaveFocus();
+      expect(field.getBoundingClientRect().bottom).toBeLessThanOrEqual(316);
+      expect(scroller.scrollTop).toBeCloseTo(initialScroll + 267.2625);
+    });
+
+    it('단계 이동으로 사라진 입력의 예약은 새 제목 focus를 덮지 않는다', async () => {
+      const { field, scrollTo, scroller } = await layout();
+      field.focus();
+      fireEvent.click(screen.getByRole('button', { name: /이전/ }));
+      const heading = screen.getByRole('heading', { level: 2, name: /참가 조건/ });
+      expect(heading).toHaveFocus();
+      const stageScroll = scroller.scrollTop;
+      scrollTo.mockClear();
+      flushFocusFrames();
+      expect(heading).toHaveFocus();
+      expect(scroller.scrollTop).toBe(stageScroll);
+      expect(scrollTo).not.toHaveBeenCalled();
+    });
+
+    it('첫 오류 control의 기존 smooth center 이동에 RAF 보정을 덧붙이지 않는다', async () => {
+      const { origins, scroller, scrollTo } = await layout();
+      fireEvent.click(screen.getByRole('button', { name: /이전/ }));
+      fireEvent.click(screen.getByRole('button', { name: /이전/ }));
+      fireEvent.change(screen.getByLabelText(/대회 시작/), { target: { value: '' } });
+      fireEvent.click(screen.getByRole('button', { name: /이전/ }));
+      vi.mocked(Element.prototype.scrollIntoView).mockClear();
+      origins.set('scheduled-at', scroller.scrollTop + 600);
+      scrollTo.mockClear();
+      fireEvent.click(screen.getByRole('button', { name: /4단계 상금/ }));
+      expect(screen.getByLabelText(/대회 시작/)).toHaveFocus();
+      expect(Element.prototype.scrollIntoView).toHaveBeenLastCalledWith({ block: 'center', behavior: 'smooth' });
+      flushFocusFrames();
+      expect(scrollTo).not.toHaveBeenCalled();
+    });
+
+    it('unmount는 남은 focus 예약을 회수한다', async () => {
+      const { field, view, scrollTo } = await layout();
+      field.focus();
+      const scheduledIds = [...frames.keys()];
+      view.unmount();
+      expect(vi.mocked(window.cancelAnimationFrame).mock.calls.some(([id]) => scheduledIds.includes(id))).toBe(true);
+      flushFocusFrames();
+      expect(scrollTo).not.toHaveBeenCalled();
     });
   });
 

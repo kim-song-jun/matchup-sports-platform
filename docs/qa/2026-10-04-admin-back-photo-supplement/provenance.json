@@ -1,0 +1,14 @@
+{
+  "preparedUTC": "2026-10-04T10:14:42.212739+00:00",
+  "sourceSafeSHA256": {
+    "exit.json": "af18c25b52cff75c783f6ad67f298cb1b5f9bdd4d0c8e56e67034f42a2934641",
+    "actions.json": "bedde09fa933058ec5ec8472a4333f0b8cc9691e094cf4fd4e6925038da8ecbc",
+    "proof.json": "d361b72ccf1c5271446217f2c8da8fe0a7579230570043088b2ec84cecf79000"
+  },
+  "sourceCapturesSHA256": "da07b7ee7fcf5733f6c7024d58f9ce3a408bd1a956733560ac367e57edf95a2c",
+  "originalsUnchanged": true,
+  "detailURLSHA256": "93615425e596a175cf159e1758b60fc3d45c4b8451083b0b0e8b2c02f5ebadc5",
+  "matchesPreviousActualDetailURL": true,
+  "previousPublicEvidence": "https://github.com/kim-song-jun/matchup-sports-platform/blob/879da904c41cfaf0f97148c4da9b4ed1bf367a36/docs/qa/2026-10-04-admin-match-filter-recheck/README.md",
+  "privacy": "Opaque fixture ID hashed consistently. Four crops from three actual captures exclude account sidebar and host names; no redaction, scaling or color changes."
+}

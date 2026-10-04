@@ -1,0 +1,195 @@
+{
+  "verifiedUTC": "2026-10-04T10:19:01.098664+00:00",
+  "inputFiles": 14,
+  "inputByteIdentical": true,
+  "inputChecksumsSHA256": "741934d0685af543c1e77d31507ab90581f237ddc4e11ad067eb504818ccfdd3",
+  "counts": {
+    "DOM": 11,
+    "completedSelectedActionCalls": 17,
+    "captureEvents": 3,
+    "PNG": 4,
+    "rectangleRecordsRecomputed": 56
+  },
+  "postBack": [
+    {
+      "postBackIndex": 3,
+      "DOMUTC": "2026-10-04T10:11:11.756Z",
+      "viewport": {
+        "w": 402,
+        "h": 606,
+        "dpr": 1.25
+      },
+      "search": "1.0.3",
+      "selectedFilter": "완료1",
+      "visibleRows": 1,
+      "syntheticLifeCycleRows": 1,
+      "beforeScroll": {
+        "x": 0,
+        "y": 0
+      },
+      "afterScroll": {
+        "x": 0,
+        "y": 26.399999618530273
+      },
+      "exactScrollRestorationClaimed": false,
+      "recordedDialogCount": 1
+    },
+    {
+      "postBackIndex": 6,
+      "DOMUTC": "2026-10-04T10:12:02.011Z",
+      "viewport": {
+        "w": 788,
+        "h": 505,
+        "dpr": 1.5
+      },
+      "search": "1.0.3",
+      "selectedFilter": "완료1",
+      "visibleRows": 1,
+      "syntheticLifeCycleRows": 1,
+      "beforeScroll": {
+        "x": 0,
+        "y": 0
+      },
+      "afterScroll": {
+        "x": 0,
+        "y": 94
+      },
+      "exactScrollRestorationClaimed": false,
+      "recordedDialogCount": 1
+    },
+    {
+      "postBackIndex": 9,
+      "DOMUTC": "2026-10-04T10:12:32.221Z",
+      "viewport": {
+        "w": 1182,
+        "h": 757,
+        "dpr": 1
+      },
+      "search": "1.0.3",
+      "selectedFilter": "완료1",
+      "visibleRows": 1,
+      "syntheticLifeCycleRows": 1,
+      "beforeScroll": {
+        "x": 0,
+        "y": 0
+      },
+      "afterScroll": {
+        "x": 0,
+        "y": 0
+      },
+      "exactScrollRestorationClaimed": false,
+      "recordedDialogCount": 0
+    }
+  ],
+  "images": [
+    {
+      "file": "mobile-post-back.png",
+      "proofIndex": 3,
+      "BackCompletedUTC": "2026-10-04T10:11:11.702Z",
+      "DOMUTC": "2026-10-04T10:11:11.756Z",
+      "captureStartUTC": "2026-10-04T10:11:11.762Z",
+      "captureEndUTC": "2026-10-04T10:11:12.033Z",
+      "BackCompletionToCaptureStartMs": 60.0,
+      "DOMToCaptureStartMs": 6.0,
+      "sha256": "d2c98eed7ec3e695877b4f4c528c95979efc5514fc93a809ac80cf36744383ec",
+      "pixels": [
+        386,
+        293
+      ],
+      "sourcePixels": [
+        402,
+        606
+      ]
+    },
+    {
+      "file": "tablet-post-back.png",
+      "proofIndex": 6,
+      "BackCompletedUTC": "2026-10-04T10:12:01.970Z",
+      "DOMUTC": "2026-10-04T10:12:02.011Z",
+      "captureStartUTC": "2026-10-04T10:12:02.014Z",
+      "captureEndUTC": "2026-10-04T10:12:02.286Z",
+      "BackCompletionToCaptureStartMs": 44.0,
+      "DOMToCaptureStartMs": 3.0,
+      "sha256": "0e00e69dedc0114bd7e4bf0bef5a40640eaaa76cc7d195633556e939edc851ad",
+      "pixels": [
+        757,
+        239
+      ],
+      "sourcePixels": [
+        788,
+        505
+      ]
+    },
+    {
+      "file": "desktop-post-back-filters.png",
+      "proofIndex": 9,
+      "BackCompletedUTC": "2026-10-04T10:12:32.177Z",
+      "DOMUTC": "2026-10-04T10:12:32.221Z",
+      "captureStartUTC": "2026-10-04T10:12:32.227Z",
+      "captureEndUTC": "2026-10-04T10:12:32.502Z",
+      "BackCompletionToCaptureStartMs": 50.0,
+      "DOMToCaptureStartMs": 6.0,
+      "sha256": "dfbcca809b6a7f4e40577e50f643eb584784b8b2c0664f6afcf20f7474b9b4db",
+      "pixels": [
+        893,
+        115
+      ],
+      "sourcePixels": [
+        1182,
+        757
+      ]
+    },
+    {
+      "file": "desktop-post-back-row.png",
+      "proofIndex": 9,
+      "BackCompletedUTC": "2026-10-04T10:12:32.177Z",
+      "DOMUTC": "2026-10-04T10:12:32.221Z",
+      "captureStartUTC": "2026-10-04T10:12:32.227Z",
+      "captureEndUTC": "2026-10-04T10:12:32.502Z",
+      "BackCompletionToCaptureStartMs": 50.0,
+      "DOMToCaptureStartMs": 6.0,
+      "sha256": "72356adf2fd7629141ed8ab9ababbaad0ca4fc0fc39f263e809ea1d384ff121d",
+      "pixels": [
+        543,
+        116
+      ],
+      "sourcePixels": [
+        1182,
+        757
+      ]
+    }
+  ],
+  "priorIdentityHashMatches": true,
+  "rawURLRehashedByPublisher": false,
+  "priorPublicIdentity": {
+    "detailURLIndices": [
+      1,
+      7,
+      13
+    ],
+    "canonicalURLHashAlgorithm": "SHA-256 of exact UTF-8 source URL",
+    "sameCanonicalURLHash": "93615425e596a175cf159e1758b60fc3d45c4b8451083b0b0e8b2c02f5ebadc5"
+  },
+  "workflow": {
+    "sha": "951a67e3423dec502697f8bab2d78696d9374cc5",
+    "conclusion": "success",
+    "updatedUTC": "2026-10-04T09:49:29Z",
+    "url": "https://github.com/kim-song-jun/matchup-sports-platform/actions/runs/37192728828"
+  },
+  "sourceQueryHook": {
+    "sha": "5474aea9b1643cb86220a0e06deb747ad2068bda",
+    "url": "https://github.com/kim-song-jun/matchup-sports-platform/blob/951a67e3423dec502697f8bab2d78696d9374cc5/apps/v1_web/src/app/admin/matches/use-admin-match-list-query.ts"
+  },
+  "runtimeServingSHA": "unknown",
+  "exit": {
+    "dialogs": 0,
+    "search": "",
+    "selectedFilters": [
+      "전체29"
+    ],
+    "url": "https://alpha.teameet.co.kr/admin/matches",
+    "utc": "2026-10-04T10:13:01.992Z"
+  },
+  "privateSourcesRead": false,
+  "scope": "Back-photo supplement only; prior rapid/empty tests not repeated, no exact scroll restoration, no network audit. Source preservation and exact private-source crop equality remain collector attestations."
+}

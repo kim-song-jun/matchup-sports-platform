@@ -1,0 +1,1000 @@
+[
+  {
+    "dialogs": 1,
+    "filters": [
+      {
+        "pressed": "false",
+        "rect": {
+          "bottom": 271.5,
+          "height": 44,
+          "left": 16,
+          "right": 97.26250457763672,
+          "top": 227.5,
+          "width": 81.26250457763672,
+          "x": 16,
+          "y": 227.5
+        },
+        "text": "전체2"
+      },
+      {
+        "pressed": "false",
+        "rect": {
+          "bottom": 271.5,
+          "height": 44,
+          "left": 105.26250457763672,
+          "right": 204.3625030517578,
+          "top": 227.5,
+          "width": 99.0999984741211,
+          "x": 105.26250457763672,
+          "y": 227.5
+        },
+        "text": "모집 중0"
+      },
+      {
+        "pressed": "false",
+        "rect": {
+          "bottom": 271.5,
+          "height": 44,
+          "left": 212.3625030517578,
+          "right": 293.62500762939453,
+          "top": 227.5,
+          "width": 81.26250457763672,
+          "x": 212.3625030517578,
+          "y": 227.5
+        },
+        "text": "마감0"
+      },
+      {
+        "pressed": "false",
+        "rect": {
+          "bottom": 323.5,
+          "height": 44,
+          "left": 16,
+          "right": 111.0875015258789,
+          "top": 279.5,
+          "width": 95.0875015258789,
+          "x": 16,
+          "y": 279.5
+        },
+        "text": "취소됨1"
+      },
+      {
+        "pressed": "true",
+        "rect": {
+          "bottom": 323.5,
+          "height": 44,
+          "left": 119.0875015258789,
+          "right": 198.75,
+          "top": 279.5,
+          "width": 79.6624984741211,
+          "x": 119.0875015258789,
+          "y": 279.5
+        },
+        "text": "완료1"
+      },
+      {
+        "pressed": "false",
+        "rect": {
+          "bottom": 323.5,
+          "height": 44,
+          "left": 206.75,
+          "right": 288.0125045776367,
+          "top": 279.5,
+          "width": 81.26250457763672,
+          "x": 206.75,
+          "y": 279.5
+        },
+        "text": "보관0"
+      }
+    ],
+    "headings": [
+      {
+        "rect": {
+          "bottom": 124,
+          "height": 30,
+          "left": 16,
+          "right": 385.6000061035156,
+          "top": 94,
+          "width": 369.6000061035156,
+          "x": 16,
+          "y": 94
+        },
+        "text": "매치 관리"
+      }
+    ],
+    "lifeCycleRows": 1,
+    "scroll": {
+      "x": 0,
+      "y": 0
+    },
+    "search": "1.0.3",
+    "searchRect": {
+      "bottom": 215.5,
+      "height": 44,
+      "left": 16,
+      "right": 385.6000061035156,
+      "top": 171.5,
+      "width": 369.6000061035156,
+      "x": 16,
+      "y": 171.5
+    },
+    "url": "https://alpha.teameet.co.kr/admin/matches?q=1.0.3&status=completed",
+    "utc": "2026-10-04T10:10:35.320Z",
+    "viewport": {
+      "dpr": 1.25,
+      "h": 606,
+      "w": 402
+    },
+    "visibleRows": 2,
+    "index": 0,
+    "label": "mobile filtered list before detail"
+  },
+  {
+    "dialogs": 1,
+    "filters": [],
+    "headings": [],
+    "lifeCycleRows": 0,
+    "scroll": {
+      "x": 0,
+      "y": 0
+    },
+    "search": null,
+    "searchRect": null,
+    "url": "https://alpha.teameet.co.kr/admin/matches/id-dd3ee8ee44f9a38e",
+    "utc": "2026-10-04T10:10:35.652Z",
+    "viewport": {
+      "dpr": 1.25,
+      "h": 606,
+      "w": 402
+    },
+    "visibleRows": 0,
+    "index": 1,
+    "label": "mobile exact detail endpoint"
+  },
+  {
+    "dialogs": 1,
+    "filters": [],
+    "headings": [],
+    "lifeCycleRows": 0,
+    "scroll": {
+      "x": 0,
+      "y": 0
+    },
+    "search": null,
+    "searchRect": null,
+    "url": "https://alpha.teameet.co.kr/admin/matches/id-dd3ee8ee44f9a38e",
+    "utc": "2026-10-04T10:11:11.683Z",
+    "viewport": {
+      "dpr": 1.25,
+      "h": 606,
+      "w": 402
+    },
+    "visibleRows": 0,
+    "index": 2,
+    "label": "mobile settled detail heading"
+  },
+  {
+    "dialogs": 1,
+    "filters": [
+      {
+        "pressed": "false",
+        "rect": {
+          "bottom": 245.1000061035156,
+          "height": 44,
+          "left": 16,
+          "right": 97.26250457763672,
+          "top": 201.1000061035156,
+          "width": 81.26250457763672,
+          "x": 16,
+          "y": 201.1000061035156
+        },
+        "text": "전체2"
+      },
+      {
+        "pressed": "false",
+        "rect": {
+          "bottom": 245.1000061035156,
+          "height": 44,
+          "left": 105.26250457763672,
+          "right": 204.3625030517578,
+          "top": 201.1000061035156,
+          "width": 99.0999984741211,
+          "x": 105.26250457763672,
+          "y": 201.1000061035156
+        },
+        "text": "모집 중0"
+      },
+      {
+        "pressed": "false",
+        "rect": {
+          "bottom": 245.1000061035156,
+          "height": 44,
+          "left": 212.3625030517578,
+          "right": 293.62500762939453,
+          "top": 201.1000061035156,
+          "width": 81.26250457763672,
+          "x": 212.3625030517578,
+          "y": 201.1000061035156
+        },
+        "text": "마감0"
+      },
+      {
+        "pressed": "false",
+        "rect": {
+          "bottom": 297.1000061035156,
+          "height": 44,
+          "left": 16,
+          "right": 111.0875015258789,
+          "top": 253.1000061035156,
+          "width": 95.0875015258789,
+          "x": 16,
+          "y": 253.1000061035156
+        },
+        "text": "취소됨1"
+      },
+      {
+        "pressed": "true",
+        "rect": {
+          "bottom": 297.1000061035156,
+          "height": 44,
+          "left": 119.0875015258789,
+          "right": 198.75,
+          "top": 253.1000061035156,
+          "width": 79.6624984741211,
+          "x": 119.0875015258789,
+          "y": 253.1000061035156
+        },
+        "text": "완료1"
+      },
+      {
+        "pressed": "false",
+        "rect": {
+          "bottom": 297.1000061035156,
+          "height": 44,
+          "left": 206.75,
+          "right": 288.0125045776367,
+          "top": 253.1000061035156,
+          "width": 81.26250457763672,
+          "x": 206.75,
+          "y": 253.1000061035156
+        },
+        "text": "보관0"
+      }
+    ],
+    "headings": [
+      {
+        "rect": {
+          "bottom": 97.5999984741211,
+          "height": 30,
+          "left": 16,
+          "right": 385.6000061035156,
+          "top": 67.5999984741211,
+          "width": 369.6000061035156,
+          "x": 16,
+          "y": 67.5999984741211
+        },
+        "text": "매치 관리"
+      }
+    ],
+    "lifeCycleRows": 1,
+    "scroll": {
+      "x": 0,
+      "y": 26.399999618530273
+    },
+    "search": "1.0.3",
+    "searchRect": {
+      "bottom": 189.1000061035156,
+      "height": 44,
+      "left": 16,
+      "right": 385.6000061035156,
+      "top": 145.10000610351562,
+      "width": 369.6000061035156,
+      "x": 16,
+      "y": 145.10000610351562
+    },
+    "url": "https://alpha.teameet.co.kr/admin/matches?q=1.0.3&status=completed",
+    "utc": "2026-10-04T10:11:11.756Z",
+    "viewport": {
+      "dpr": 1.25,
+      "h": 606,
+      "w": 402
+    },
+    "visibleRows": 1,
+    "index": 3,
+    "label": "mobile direct post-Back state"
+  },
+  {
+    "dialogs": 1,
+    "filters": [
+      {
+        "pressed": "false",
+        "rect": {
+          "bottom": 287,
+          "height": 44,
+          "left": 24,
+          "right": 104.98958587646484,
+          "top": 243,
+          "width": 80.98958587646484,
+          "x": 24,
+          "y": 243
+        },
+        "text": "전체2"
+      },
+      {
+        "pressed": "false",
+        "rect": {
+          "bottom": 287,
+          "height": 44,
+          "left": 112.98958587646484,
+          "right": 211.8229217529297,
+          "top": 243,
+          "width": 98.83333587646484,
+          "x": 112.98958587646484,
+          "y": 243
+        },
+        "text": "모집 중0"
+      },
+      {
+        "pressed": "false",
+        "rect": {
+          "bottom": 287,
+          "height": 44,
+          "left": 219.8229217529297,
+          "right": 300.81250762939453,
+          "top": 243,
+          "width": 80.98958587646484,
+          "x": 219.8229217529297,
+          "y": 243
+        },
+        "text": "마감0"
+      },
+      {
+        "pressed": "false",
+        "rect": {
+          "bottom": 287,
+          "height": 44,
+          "left": 308.8125,
+          "right": 403.6354217529297,
+          "top": 243,
+          "width": 94.82292175292967,
+          "x": 308.8125,
+          "y": 243
+        },
+        "text": "취소됨1"
+      },
+      {
+        "pressed": "true",
+        "rect": {
+          "bottom": 287,
+          "height": 44,
+          "left": 411.6354370117187,
+          "right": 491.2916870117187,
+          "top": 243,
+          "width": 79.65625,
+          "x": 411.6354370117187,
+          "y": 243
+        },
+        "text": "완료1"
+      },
+      {
+        "pressed": "false",
+        "rect": {
+          "bottom": 287,
+          "height": 44,
+          "left": 499.2916870117187,
+          "right": 580.2812728881836,
+          "top": 243,
+          "width": 80.98958587646484,
+          "x": 499.2916870117187,
+          "y": 243
+        },
+        "text": "보관0"
+      }
+    ],
+    "headings": [
+      {
+        "rect": {
+          "bottom": 134,
+          "height": 36,
+          "left": 24,
+          "right": 764,
+          "top": 98,
+          "width": 740,
+          "x": 24,
+          "y": 98
+        },
+        "text": "매치 관리"
+      }
+    ],
+    "lifeCycleRows": 1,
+    "scroll": {
+      "x": 0,
+      "y": 0
+    },
+    "search": "1.0.3",
+    "searchRect": {
+      "bottom": 231,
+      "height": 44,
+      "left": 24,
+      "right": 764,
+      "top": 187,
+      "width": 740,
+      "x": 24,
+      "y": 187
+    },
+    "url": "https://alpha.teameet.co.kr/admin/matches?q=1.0.3&status=completed",
+    "utc": "2026-10-04T10:12:01.446Z",
+    "viewport": {
+      "dpr": 1.5,
+      "h": 505,
+      "w": 788
+    },
+    "visibleRows": 1,
+    "index": 4,
+    "label": "tablet settled filtered list"
+  },
+  {
+    "dialogs": 1,
+    "filters": [],
+    "headings": [],
+    "lifeCycleRows": 0,
+    "scroll": {
+      "x": 0,
+      "y": 0
+    },
+    "search": null,
+    "searchRect": null,
+    "url": "https://alpha.teameet.co.kr/admin/matches/id-dd3ee8ee44f9a38e",
+    "utc": "2026-10-04T10:12:01.952Z",
+    "viewport": {
+      "dpr": 1.5,
+      "h": 505,
+      "w": 788
+    },
+    "visibleRows": 0,
+    "index": 5,
+    "label": "tablet settled same detail"
+  },
+  {
+    "dialogs": 1,
+    "filters": [
+      {
+        "pressed": "false",
+        "rect": {
+          "bottom": 193,
+          "height": 44,
+          "left": 24,
+          "right": 104.98958587646484,
+          "top": 149,
+          "width": 80.98958587646484,
+          "x": 24,
+          "y": 149
+        },
+        "text": "전체2"
+      },
+      {
+        "pressed": "false",
+        "rect": {
+          "bottom": 193,
+          "height": 44,
+          "left": 112.98958587646484,
+          "right": 211.8229217529297,
+          "top": 149,
+          "width": 98.83333587646484,
+          "x": 112.98958587646484,
+          "y": 149
+        },
+        "text": "모집 중0"
+      },
+      {
+        "pressed": "false",
+        "rect": {
+          "bottom": 193,
+          "height": 44,
+          "left": 219.8229217529297,
+          "right": 300.81250762939453,
+          "top": 149,
+          "width": 80.98958587646484,
+          "x": 219.8229217529297,
+          "y": 149
+        },
+        "text": "마감0"
+      },
+      {
+        "pressed": "false",
+        "rect": {
+          "bottom": 193,
+          "height": 44,
+          "left": 308.8125,
+          "right": 403.6354217529297,
+          "top": 149,
+          "width": 94.82292175292967,
+          "x": 308.8125,
+          "y": 149
+        },
+        "text": "취소됨1"
+      },
+      {
+        "pressed": "true",
+        "rect": {
+          "bottom": 193,
+          "height": 44,
+          "left": 411.6354370117187,
+          "right": 491.2916870117187,
+          "top": 149,
+          "width": 79.65625,
+          "x": 411.6354370117187,
+          "y": 149
+        },
+        "text": "완료1"
+      },
+      {
+        "pressed": "false",
+        "rect": {
+          "bottom": 193,
+          "height": 44,
+          "left": 499.2916870117187,
+          "right": 580.2812728881836,
+          "top": 149,
+          "width": 80.98958587646484,
+          "x": 499.2916870117187,
+          "y": 149
+        },
+        "text": "보관0"
+      }
+    ],
+    "headings": [
+      {
+        "rect": {
+          "bottom": 40,
+          "height": 36,
+          "left": 24,
+          "right": 764,
+          "top": 4,
+          "width": 740,
+          "x": 24,
+          "y": 4
+        },
+        "text": "매치 관리"
+      }
+    ],
+    "lifeCycleRows": 1,
+    "scroll": {
+      "x": 0,
+      "y": 94
+    },
+    "search": "1.0.3",
+    "searchRect": {
+      "bottom": 137,
+      "height": 44,
+      "left": 24,
+      "right": 764,
+      "top": 93,
+      "width": 740,
+      "x": 24,
+      "y": 93
+    },
+    "url": "https://alpha.teameet.co.kr/admin/matches?q=1.0.3&status=completed",
+    "utc": "2026-10-04T10:12:02.011Z",
+    "viewport": {
+      "dpr": 1.5,
+      "h": 505,
+      "w": 788
+    },
+    "visibleRows": 1,
+    "index": 6,
+    "label": "tablet direct post-Back state"
+  },
+  {
+    "dialogs": 0,
+    "filters": [
+      {
+        "pressed": "false",
+        "rect": {
+          "bottom": 243,
+          "height": 44,
+          "left": 272,
+          "right": 353.65625,
+          "top": 199,
+          "width": 81.65625,
+          "x": 272,
+          "y": 199
+        },
+        "text": "전체2"
+      },
+      {
+        "pressed": "false",
+        "rect": {
+          "bottom": 243,
+          "height": 44,
+          "left": 361.65625,
+          "right": 461.15625,
+          "top": 199,
+          "width": 99.5,
+          "x": 361.65625,
+          "y": 199
+        },
+        "text": "모집 중0"
+      },
+      {
+        "pressed": "false",
+        "rect": {
+          "bottom": 243,
+          "height": 44,
+          "left": 469.15625,
+          "right": 550.8125,
+          "top": 199,
+          "width": 81.65625,
+          "x": 469.15625,
+          "y": 199
+        },
+        "text": "마감0"
+      },
+      {
+        "pressed": "false",
+        "rect": {
+          "bottom": 243,
+          "height": 44,
+          "left": 558.8125,
+          "right": 654.296875,
+          "top": 199,
+          "width": 95.484375,
+          "x": 558.8125,
+          "y": 199
+        },
+        "text": "취소됨1"
+      },
+      {
+        "pressed": "true",
+        "rect": {
+          "bottom": 243,
+          "height": 44,
+          "left": 662.296875,
+          "right": 741.953125,
+          "top": 199,
+          "width": 79.65625,
+          "x": 662.296875,
+          "y": 199
+        },
+        "text": "완료1"
+      },
+      {
+        "pressed": "false",
+        "rect": {
+          "bottom": 243,
+          "height": 44,
+          "left": 749.953125,
+          "right": 831.609375,
+          "top": 199,
+          "width": 81.65625,
+          "x": 749.953125,
+          "y": 199
+        },
+        "text": "보관0"
+      }
+    ],
+    "headings": [
+      {
+        "rect": {
+          "bottom": 90,
+          "height": 36,
+          "left": 272,
+          "right": 1150,
+          "top": 54,
+          "width": 878,
+          "x": 272,
+          "y": 54
+        },
+        "text": "매치 관리"
+      }
+    ],
+    "lifeCycleRows": 1,
+    "scroll": {
+      "x": 0,
+      "y": 0
+    },
+    "search": "1.0.3",
+    "searchRect": {
+      "bottom": 187,
+      "height": 44,
+      "left": 272,
+      "right": 1150,
+      "top": 143,
+      "width": 878,
+      "x": 272,
+      "y": 143
+    },
+    "url": "https://alpha.teameet.co.kr/admin/matches?q=1.0.3&status=completed",
+    "utc": "2026-10-04T10:12:31.813Z",
+    "viewport": {
+      "dpr": 1,
+      "h": 757,
+      "w": 1182
+    },
+    "visibleRows": 1,
+    "index": 7,
+    "label": "desktop settled filtered list"
+  },
+  {
+    "dialogs": 0,
+    "filters": [],
+    "headings": [],
+    "lifeCycleRows": 0,
+    "scroll": {
+      "x": 0,
+      "y": 0
+    },
+    "search": null,
+    "searchRect": null,
+    "url": "https://alpha.teameet.co.kr/admin/matches/id-dd3ee8ee44f9a38e",
+    "utc": "2026-10-04T10:12:32.151Z",
+    "viewport": {
+      "dpr": 1,
+      "h": 757,
+      "w": 1182
+    },
+    "visibleRows": 0,
+    "index": 8,
+    "label": "desktop settled same detail"
+  },
+  {
+    "dialogs": 0,
+    "filters": [
+      {
+        "pressed": "false",
+        "rect": {
+          "bottom": 243,
+          "height": 44,
+          "left": 272,
+          "right": 353.65625,
+          "top": 199,
+          "width": 81.65625,
+          "x": 272,
+          "y": 199
+        },
+        "text": "전체2"
+      },
+      {
+        "pressed": "false",
+        "rect": {
+          "bottom": 243,
+          "height": 44,
+          "left": 361.65625,
+          "right": 461.15625,
+          "top": 199,
+          "width": 99.5,
+          "x": 361.65625,
+          "y": 199
+        },
+        "text": "모집 중0"
+      },
+      {
+        "pressed": "false",
+        "rect": {
+          "bottom": 243,
+          "height": 44,
+          "left": 469.15625,
+          "right": 550.8125,
+          "top": 199,
+          "width": 81.65625,
+          "x": 469.15625,
+          "y": 199
+        },
+        "text": "마감0"
+      },
+      {
+        "pressed": "false",
+        "rect": {
+          "bottom": 243,
+          "height": 44,
+          "left": 558.8125,
+          "right": 654.296875,
+          "top": 199,
+          "width": 95.484375,
+          "x": 558.8125,
+          "y": 199
+        },
+        "text": "취소됨1"
+      },
+      {
+        "pressed": "true",
+        "rect": {
+          "bottom": 243,
+          "height": 44,
+          "left": 662.296875,
+          "right": 741.953125,
+          "top": 199,
+          "width": 79.65625,
+          "x": 662.296875,
+          "y": 199
+        },
+        "text": "완료1"
+      },
+      {
+        "pressed": "false",
+        "rect": {
+          "bottom": 243,
+          "height": 44,
+          "left": 749.953125,
+          "right": 831.609375,
+          "top": 199,
+          "width": 81.65625,
+          "x": 749.953125,
+          "y": 199
+        },
+        "text": "보관0"
+      }
+    ],
+    "headings": [
+      {
+        "rect": {
+          "bottom": 90,
+          "height": 36,
+          "left": 272,
+          "right": 1150,
+          "top": 54,
+          "width": 878,
+          "x": 272,
+          "y": 54
+        },
+        "text": "매치 관리"
+      }
+    ],
+    "lifeCycleRows": 1,
+    "scroll": {
+      "x": 0,
+      "y": 0
+    },
+    "search": "1.0.3",
+    "searchRect": {
+      "bottom": 187,
+      "height": 44,
+      "left": 272,
+      "right": 1150,
+      "top": 143,
+      "width": 878,
+      "x": 272,
+      "y": 143
+    },
+    "url": "https://alpha.teameet.co.kr/admin/matches?q=1.0.3&status=completed",
+    "utc": "2026-10-04T10:12:32.221Z",
+    "viewport": {
+      "dpr": 1,
+      "h": 757,
+      "w": 1182
+    },
+    "visibleRows": 1,
+    "index": 9,
+    "label": "desktop direct post-Back state"
+  },
+  {
+    "dialogs": 0,
+    "filters": [
+      {
+        "pressed": "true",
+        "rect": {
+          "bottom": 243,
+          "height": 44,
+          "left": 272,
+          "right": 352.171875,
+          "top": 199,
+          "width": 80.171875,
+          "x": 272,
+          "y": 199
+        },
+        "text": "전체29"
+      },
+      {
+        "pressed": "false",
+        "rect": {
+          "bottom": 243,
+          "height": 44,
+          "left": 360.171875,
+          "right": 460.1875,
+          "top": 199,
+          "width": 100.015625,
+          "x": 360.171875,
+          "y": 199
+        },
+        "text": "모집 중11"
+      },
+      {
+        "pressed": "false",
+        "rect": {
+          "bottom": 243,
+          "height": 44,
+          "left": 468.1875,
+          "right": 549.84375,
+          "top": 199,
+          "width": 81.65625,
+          "x": 468.1875,
+          "y": 199
+        },
+        "text": "마감0"
+      },
+      {
+        "pressed": "false",
+        "rect": {
+          "bottom": 243,
+          "height": 44,
+          "left": 557.84375,
+          "right": 653.84375,
+          "top": 199,
+          "width": 96,
+          "x": 557.84375,
+          "y": 199
+        },
+        "text": "취소됨12"
+      },
+      {
+        "pressed": "false",
+        "rect": {
+          "bottom": 243,
+          "height": 44,
+          "left": 661.84375,
+          "right": 743.5,
+          "top": 199,
+          "width": 81.65625,
+          "x": 661.84375,
+          "y": 199
+        },
+        "text": "완료5"
+      },
+      {
+        "pressed": "false",
+        "rect": {
+          "bottom": 243,
+          "height": 44,
+          "left": 751.5,
+          "right": 833.15625,
+          "top": 199,
+          "width": 81.65625,
+          "x": 751.5,
+          "y": 199
+        },
+        "text": "보관1"
+      }
+    ],
+    "headings": [
+      {
+        "rect": {
+          "bottom": 90,
+          "height": 36,
+          "left": 272,
+          "right": 1150,
+          "top": 54,
+          "width": 878,
+          "x": 272,
+          "y": 54
+        },
+        "text": "매치 관리"
+      }
+    ],
+    "lifeCycleRows": 1,
+    "scroll": {
+      "x": 0,
+      "y": 0
+    },
+    "search": "",
+    "searchRect": {
+      "bottom": 187,
+      "height": 44,
+      "left": 272,
+      "right": 1150,
+      "top": 143,
+      "width": 878,
+      "x": 272,
+      "y": 143
+    },
+    "url": "https://alpha.teameet.co.kr/admin/matches",
+    "utc": "2026-10-04T10:13:01.980Z",
+    "viewport": {
+      "dpr": 1,
+      "h": 757,
+      "w": 1182
+    },
+    "visibleRows": 20,
+    "index": 10,
+    "label": "restored baseline after photo supplement"
+  }
+]

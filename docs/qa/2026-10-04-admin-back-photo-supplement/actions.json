@@ -1,0 +1,87 @@
+[
+  {
+    "label": "fresh admin match-list navigation for Back-photo supplement",
+    "startUTC": "2026-10-04T10:09:23.772Z",
+    "endUTC": "2026-10-04T10:09:29.008Z"
+  },
+  {
+    "label": "resize admin Back-photo case mobile",
+    "startUTC": "2026-10-04T10:09:44.602Z",
+    "endUTC": "2026-10-04T10:09:50.501Z"
+  },
+  {
+    "label": "mobile zoom110",
+    "startUTC": "2026-10-04T10:09:50.502Z",
+    "endUTC": "2026-10-04T10:09:50.803Z"
+  },
+  {
+    "label": "mobile zoom125",
+    "startUTC": "2026-10-04T10:09:50.804Z",
+    "endUTC": "2026-10-04T10:09:51.117Z"
+  },
+  {
+    "label": "admin local query1.0.3",
+    "startUTC": "2026-10-04T10:09:51.117Z",
+    "endUTC": "2026-10-04T10:09:51.147Z"
+  },
+  {
+    "label": "mobile completed status FILTER",
+    "startUTC": "2026-10-04T10:10:35.136Z",
+    "endUTC": "2026-10-04T10:10:35.199Z"
+  },
+  {
+    "label": "mobile open existing synthetic detail row",
+    "startUTC": "2026-10-04T10:10:35.329Z",
+    "endUTC": "2026-10-04T10:10:35.610Z"
+  },
+  {
+    "label": "mobile browser Back for immediate photo",
+    "startUTC": "2026-10-04T10:11:11.685Z",
+    "endUTC": "2026-10-04T10:11:11.702Z"
+  },
+  {
+    "label": "resize admin Back-photo case tablet",
+    "startUTC": "2026-10-04T10:11:56.489Z",
+    "endUTC": "2026-10-04T10:12:01.134Z"
+  },
+  {
+    "label": "tablet zoom150",
+    "startUTC": "2026-10-04T10:12:01.135Z",
+    "endUTC": "2026-10-04T10:12:01.435Z"
+  },
+  {
+    "label": "tablet open same synthetic detail row",
+    "startUTC": "2026-10-04T10:12:01.451Z",
+    "endUTC": "2026-10-04T10:12:01.729Z"
+  },
+  {
+    "label": "tablet browser Back for immediate photo",
+    "startUTC": "2026-10-04T10:12:01.955Z",
+    "endUTC": "2026-10-04T10:12:01.970Z"
+  },
+  {
+    "label": "desktop zoom reset for Back photo",
+    "startUTC": "2026-10-04T10:12:31.666Z",
+    "endUTC": "2026-10-04T10:12:31.801Z"
+  },
+  {
+    "label": "desktop open same synthetic detail row",
+    "startUTC": "2026-10-04T10:12:31.816Z",
+    "endUTC": "2026-10-04T10:12:32.104Z"
+  },
+  {
+    "label": "desktop browser Back for immediate photo",
+    "startUTC": "2026-10-04T10:12:32.153Z",
+    "endUTC": "2026-10-04T10:12:32.177Z"
+  },
+  {
+    "label": "restore admin search empty after photos",
+    "startUTC": "2026-10-04T10:12:46.984Z",
+    "endUTC": "2026-10-04T10:12:47.015Z"
+  },
+  {
+    "label": "restore admin all-status FILTER after photos",
+    "startUTC": "2026-10-04T10:12:47.016Z",
+    "endUTC": "2026-10-04T10:12:47.087Z"
+  }
+]

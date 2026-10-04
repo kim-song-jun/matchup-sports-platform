@@ -1,0 +1,83 @@
+{
+  "scope": "Issue1520 immediate post-browserBack photo supplement only",
+  "startUTC": "2026-10-04T10:09:23.772Z",
+  "endUTC": "2026-10-04T10:13:01.992Z",
+  "counts": {
+    "DOM": 11,
+    "completedActions": 17,
+    "actualCaptureEvents": 3,
+    "safePNGCrops": 4
+  },
+  "postBackIndices": [
+    3,
+    6,
+    9
+  ],
+  "postBackResults": [
+    {
+      "index": 3,
+      "utc": "2026-10-04T10:11:11.756Z",
+      "viewport": {
+        "dpr": 1.25,
+        "h": 606,
+        "w": 402
+      },
+      "url": "https://alpha.teameet.co.kr/admin/matches?q=1.0.3&status=completed",
+      "search": "1.0.3",
+      "selectedFilters": [
+        "완료1"
+      ],
+      "visibleRows": 1,
+      "sameSyntheticRow": 1
+    },
+    {
+      "index": 6,
+      "utc": "2026-10-04T10:12:02.011Z",
+      "viewport": {
+        "dpr": 1.5,
+        "h": 505,
+        "w": 788
+      },
+      "url": "https://alpha.teameet.co.kr/admin/matches?q=1.0.3&status=completed",
+      "search": "1.0.3",
+      "selectedFilters": [
+        "완료1"
+      ],
+      "visibleRows": 1,
+      "sameSyntheticRow": 1
+    },
+    {
+      "index": 9,
+      "utc": "2026-10-04T10:12:32.221Z",
+      "viewport": {
+        "dpr": 1,
+        "h": 757,
+        "w": 1182
+      },
+      "url": "https://alpha.teameet.co.kr/admin/matches?q=1.0.3&status=completed",
+      "search": "1.0.3",
+      "selectedFilters": [
+        "완료1"
+      ],
+      "visibleRows": 1,
+      "sameSyntheticRow": 1
+    }
+  ],
+  "result": "All three actual post-Back states retain q1.0.3, completed filter and one same synthetic row. Captures immediately follow URL/field readiness and safe DOM observation in the same call; exact action-to-capture gaps are recorded.",
+  "limitations": [
+    "Mobile pre-detail snapshot0 has two transitional rows despite completed selection. It is not a settled count pass; mobile post-Back3 has exactly one row.",
+    "This supplements missing post-Back images. It does not rerun or broaden earlier rapid/empty cases.",
+    "No exact scroll restoration claim; current mobile/tablet scroll positions are retained as observed.",
+    "No moderation/status save, query-history submission or fixture mutation was invoked; no HTTP/DB/global-write audit.",
+    "Runtime SHA unknown; reported951a67 is context only."
+  ],
+  "exit": {
+    "dialogs": 0,
+    "search": "",
+    "selectedFilters": [
+      "전체29"
+    ],
+    "url": "https://alpha.teameet.co.kr/admin/matches",
+    "utc": "2026-10-04T10:13:01.992Z"
+  }
+}

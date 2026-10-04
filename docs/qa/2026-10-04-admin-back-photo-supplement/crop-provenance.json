@@ -1,0 +1,130 @@
+[
+  {
+    "file": "mobile-post-back.png",
+    "sourceBasename": "mobile-direct-back.png",
+    "sourceSHA256": "47f66c4d129bd81087491aca2ab55e890df994e84755f529b28d22ae0ccb92bd",
+    "sourceEncoding": "JPEG",
+    "sourceSize": [
+      402,
+      606
+    ],
+    "boundsLTRB": [
+      8,
+      132,
+      394,
+      425
+    ],
+    "outputSize": [
+      386,
+      293
+    ],
+    "outputSHA256": "d2c98eed7ec3e695877b4f4c528c95979efc5514fc93a809ac80cf36744383ec",
+    "exactPixelSubset": true,
+    "proofIndex": 3,
+    "DOMUTC": "2026-10-04T10:11:11.756Z",
+    "captureStartUTC": "2026-10-04T10:11:11.762Z",
+    "captureEndUTC": "2026-10-04T10:11:12.033Z",
+    "precedingBrowserBack": {
+      "label": "mobile browser Back for immediate photo",
+      "startUTC": "2026-10-04T10:11:11.685Z",
+      "endUTC": "2026-10-04T10:11:11.702Z"
+    },
+    "captureStartMinusBackCompletionMs": 60.0
+  },
+  {
+    "file": "tablet-post-back.png",
+    "sourceBasename": "tablet-direct-back.png",
+    "sourceSHA256": "ff2bd019bbac8e02ec9e95198e05facc948f7b9291dba92666d6190a30f2f783",
+    "sourceEncoding": "JPEG",
+    "sourceSize": [
+      788,
+      505
+    ],
+    "boundsLTRB": [
+      16,
+      83,
+      773,
+      322
+    ],
+    "outputSize": [
+      757,
+      239
+    ],
+    "outputSHA256": "0e00e69dedc0114bd7e4bf0bef5a40640eaaa76cc7d195633556e939edc851ad",
+    "exactPixelSubset": true,
+    "proofIndex": 6,
+    "DOMUTC": "2026-10-04T10:12:02.011Z",
+    "captureStartUTC": "2026-10-04T10:12:02.014Z",
+    "captureEndUTC": "2026-10-04T10:12:02.286Z",
+    "precedingBrowserBack": {
+      "label": "tablet browser Back for immediate photo",
+      "startUTC": "2026-10-04T10:12:01.955Z",
+      "endUTC": "2026-10-04T10:12:01.970Z"
+    },
+    "captureStartMinusBackCompletionMs": 44.0
+  },
+  {
+    "file": "desktop-post-back-filters.png",
+    "sourceBasename": "desktop-direct-back.png",
+    "sourceSHA256": "6f0f9fd5b1d9e54fadc188428a9e0c9edf74e98dc38c90921b5e169ac90aafbc",
+    "sourceEncoding": "JPEG",
+    "sourceSize": [
+      1182,
+      757
+    ],
+    "boundsLTRB": [
+      265,
+      135,
+      1158,
+      250
+    ],
+    "outputSize": [
+      893,
+      115
+    ],
+    "outputSHA256": "dfbcca809b6a7f4e40577e50f643eb584784b8b2c0664f6afcf20f7474b9b4db",
+    "exactPixelSubset": true,
+    "proofIndex": 9,
+    "DOMUTC": "2026-10-04T10:12:32.221Z",
+    "captureStartUTC": "2026-10-04T10:12:32.227Z",
+    "captureEndUTC": "2026-10-04T10:12:32.502Z",
+    "precedingBrowserBack": {
+      "label": "desktop browser Back for immediate photo",
+      "startUTC": "2026-10-04T10:12:32.153Z",
+      "endUTC": "2026-10-04T10:12:32.177Z"
+    },
+    "captureStartMinusBackCompletionMs": 50.0
+  },
+  {
+    "file": "desktop-post-back-row.png",
+    "sourceBasename": "desktop-direct-back.png",
+    "sourceSHA256": "6f0f9fd5b1d9e54fadc188428a9e0c9edf74e98dc38c90921b5e169ac90aafbc",
+    "sourceEncoding": "JPEG",
+    "sourceSize": [
+      1182,
+      757
+    ],
+    "boundsLTRB": [
+      270,
+      258,
+      813,
+      374
+    ],
+    "outputSize": [
+      543,
+      116
+    ],
+    "outputSHA256": "72356adf2fd7629141ed8ab9ababbaad0ca4fc0fc39f263e809ea1d384ff121d",
+    "exactPixelSubset": true,
+    "proofIndex": 9,
+    "DOMUTC": "2026-10-04T10:12:32.221Z",
+    "captureStartUTC": "2026-10-04T10:12:32.227Z",
+    "captureEndUTC": "2026-10-04T10:12:32.502Z",
+    "precedingBrowserBack": {
+      "label": "desktop browser Back for immediate photo",
+      "startUTC": "2026-10-04T10:12:32.153Z",
+      "endUTC": "2026-10-04T10:12:32.177Z"
+    },
+    "captureStartMinusBackCompletionMs": 50.0
+  }
+]

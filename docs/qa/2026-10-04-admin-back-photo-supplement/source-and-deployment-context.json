@@ -1,0 +1,21 @@
+{
+  "runtimeServingIdentity": "unknown",
+  "reportedDeployment": {
+    "sha": "951a67e3423dec502697f8bab2d78696d9374cc5",
+    "version": "1.1.5-alpha.20261004.g951a67e3423d",
+    "run": "37192728828",
+    "successUTC": "2026-10-04T09:49:29Z",
+    "healthyUTC": "2026-10-04T09:49:13.916Z"
+  },
+  "freshNavigation": {
+    "label": "fresh admin match-list navigation for Back-photo supplement",
+    "startUTC": "2026-10-04T10:09:23.772Z",
+    "endUTC": "2026-10-04T10:09:29.008Z"
+  },
+  "querySource": {
+    "url": "https://github.com/kim-song-jun/matchup-sports-platform/blob/951a67e3423dec502697f8bab2d78696d9374cc5/apps/v1_web/src/app/admin/matches/use-admin-match-list-query.ts",
+    "blob": "5474aea9b1643cb86220a0e06deb747ad2068bda",
+    "finding": "Search/filter merge into local draft and URL; search query debounced. No recordSearch or business mutation in this hook. Earlier source scope includes GET list/detail, distinct moderation POST excluded."
+  },
+  "limits": "Source and reported deployment are not runtime identity or network audit."
+}

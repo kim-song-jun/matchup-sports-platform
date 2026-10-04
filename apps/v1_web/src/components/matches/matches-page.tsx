@@ -899,7 +899,26 @@ function revealFocusedRailCard(event: FocusEvent<HTMLDivElement>) {
   const target = card.getBoundingClientRect();
   if (target.width + gutter * 2 > bounds.width) return;
   const left = bounds.left + gutter;
-  const right = bounds.right - gutter;
+  let right = bounds.right - gutter;
+  const fab = rail.closest('.tm-app-frame')?.querySelector<HTMLElement>('.tm-floating-fab');
+  const fabBounds = fab?.getBoundingClientRect();
+  if (fabBounds && fabBounds.width > 0 && fabBounds.height > 0
+    && target.top - gutter < fabBounds.bottom && target.bottom + gutter > fabBounds.top
+    && fabBounds.left < bounds.right && fabBounds.right > bounds.left) {
+    const clearRight = Math.min(right, fabBounds.left - gutter);
+    if (target.width <= clearRight - left) {
+      right = clearRight;
+    } else {
+      // 좁은 폭은 카드+링을 FAB 왼쪽에 넣을 수 없다. 같은 본문만 위로 드러내며,
+      // scroll range가 부족하면 상한에서 멈춘다 — 불가능한 전체 표시를 강제하지 않는다.
+      const main = rail.closest<HTMLElement>('.tm-scroll-area');
+      if (main) {
+        const maxTop = Math.max(0, main.scrollHeight - main.clientHeight);
+        const top = Math.min(maxTop, Math.max(0, main.scrollTop + target.bottom + gutter - fabBounds.top));
+        if (top !== main.scrollTop) main.scrollTo({ top, behavior: 'instant' });
+      }
+    }
+  }
   const delta = target.left < left ? target.left - left : target.right > right ? target.right - right : 0;
   if (delta !== 0) rail.scrollTo({ left: Math.max(0, rail.scrollLeft + delta), behavior: 'instant' });
 }

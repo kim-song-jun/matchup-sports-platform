@@ -1,0 +1,259 @@
+{
+  "verifiedUTC": "2026-10-04T06:16:33.779222+00:00",
+  "method": "Independent safe-file/PNG inspection, no new browser execution",
+  "counts": {
+    "proofDOMRows": 13,
+    "selectedActionRecords": 23,
+    "cycles": 3,
+    "safePNGs": 8,
+    "restoredFields": 9
+  },
+  "cycles": [
+    {
+      "viewport": {
+        "dpr": 1.25,
+        "height": 606,
+        "width": 402
+      },
+      "beforeIndex": 1,
+      "offIndex": 2,
+      "afterIndex": 3,
+      "beforeUTC": "2026-10-04T05:54:29.787Z",
+      "offUTC": "2026-10-04T05:54:30.154Z",
+      "afterUTC": "2026-10-04T05:54:30.868Z",
+      "allNineBeforeAfterValuesEqual": true,
+      "exactTitle": "QA 홈 보존 1004",
+      "offMountedFieldCount": 0
+    },
+    {
+      "viewport": {
+        "dpr": 1.5,
+        "height": 505,
+        "width": 788
+      },
+      "beforeIndex": 5,
+      "offIndex": 6,
+      "afterIndex": 7,
+      "beforeUTC": "2026-10-04T05:55:34.708Z",
+      "offUTC": "2026-10-04T05:55:35.058Z",
+      "afterUTC": "2026-10-04T05:55:35.780Z",
+      "allNineBeforeAfterValuesEqual": true,
+      "exactTitle": "QA 홈 보존 1004",
+      "offMountedFieldCount": 0
+    },
+    {
+      "viewport": {
+        "dpr": 1,
+        "height": 757,
+        "width": 1182
+      },
+      "beforeIndex": 8,
+      "offIndex": 9,
+      "afterIndex": 10,
+      "beforeUTC": "2026-10-04T05:55:36.029Z",
+      "offUTC": "2026-10-04T05:55:36.382Z",
+      "afterUTC": "2026-10-04T05:55:37.110Z",
+      "allNineBeforeAfterValuesEqual": true,
+      "exactTitle": "QA 홈 보존 1004",
+      "offMountedFieldCount": 0
+    }
+  ],
+  "stepperReturnIndex": 4,
+  "baselineValues": {
+    "카드 제목": "",
+    "배지": "",
+    "소개 문구": "",
+    "날짜 문구": "10월 17일 (토)",
+    "강조 문구": "",
+    "장소 문구": "",
+    "상금 문구": "",
+    "노출 우선순위": "0",
+    "홍보 이미지": ""
+  },
+  "restorationIndex": 11,
+  "bothOffIndex": 12,
+  "allRecordedListCardsOff": true,
+  "step5DisabledAll13Rows": true,
+  "exitSupplementMatchesHomeExit": true,
+  "images": [
+    {
+      "file": "mobile-home-title-entered.png",
+      "proofIndex": 1,
+      "DOMUTC": "2026-10-04T05:54:29.787Z",
+      "captureStartUTC": "2026-10-04T05:54:29.791Z",
+      "captureEndUTC": "2026-10-04T05:54:29.815Z",
+      "CSSViewport": {
+        "dpr": 1.25,
+        "height": 606,
+        "width": 402
+      },
+      "sourceRasterPixels": [
+        402,
+        605
+      ],
+      "safeRasterPixels": [
+        326,
+        105
+      ],
+      "sha256": "064d531c55d495d55622d2087be76d167fe5a8fa67f7b28b9d0c7de04c00f605"
+    },
+    {
+      "file": "mobile-home-off.png",
+      "proofIndex": 2,
+      "DOMUTC": "2026-10-04T05:54:30.154Z",
+      "captureStartUTC": "2026-10-04T05:54:30.157Z",
+      "captureEndUTC": "2026-10-04T05:54:30.177Z",
+      "CSSViewport": {
+        "dpr": 1.25,
+        "height": 606,
+        "width": 402
+      },
+      "sourceRasterPixels": [
+        402,
+        605
+      ],
+      "safeRasterPixels": [
+        327,
+        149
+      ],
+      "sha256": "7d32e5348e5c1cee542c14f0a57f4cffd5925341625f840fc22d55b5dcfd0626"
+    },
+    {
+      "file": "mobile-home-on-retained.png",
+      "proofIndex": 3,
+      "DOMUTC": "2026-10-04T05:54:30.868Z",
+      "captureStartUTC": "2026-10-04T05:54:30.871Z",
+      "captureEndUTC": "2026-10-04T05:54:30.895Z",
+      "CSSViewport": {
+        "dpr": 1.25,
+        "height": 606,
+        "width": 402
+      },
+      "sourceRasterPixels": [
+        402,
+        605
+      ],
+      "safeRasterPixels": [
+        326,
+        105
+      ],
+      "sha256": "763d4bf76bd8702ce6e65615e51ee8617847f7c90a80f8c65646c7421b842e1c"
+    },
+    {
+      "file": "tablet-home-off.png",
+      "proofIndex": 6,
+      "DOMUTC": "2026-10-04T05:55:35.058Z",
+      "captureStartUTC": "2026-10-04T05:55:35.062Z",
+      "captureEndUTC": "2026-10-04T05:55:35.091Z",
+      "CSSViewport": {
+        "dpr": 1.5,
+        "height": 505,
+        "width": 788
+      },
+      "sourceRasterPixels": [
+        788,
+        505
+      ],
+      "safeRasterPixels": [
+        691,
+        149
+      ],
+      "sha256": "349167e94da2028c2650f553ddbde7729823483a63dd4a9999ace7d51d50ea16"
+    },
+    {
+      "file": "tablet-home-on-retained.png",
+      "proofIndex": 7,
+      "DOMUTC": "2026-10-04T05:55:35.780Z",
+      "captureStartUTC": "2026-10-04T05:55:35.785Z",
+      "captureEndUTC": "2026-10-04T05:55:35.810Z",
+      "CSSViewport": {
+        "dpr": 1.5,
+        "height": 505,
+        "width": 788
+      },
+      "sourceRasterPixels": [
+        788,
+        505
+      ],
+      "safeRasterPixels": [
+        675,
+        100
+      ],
+      "sha256": "9cf737e1b4c5df713597e9179793edd469e93c60d1ab4d97236005d777a9e539"
+    },
+    {
+      "file": "desktop-home-off.png",
+      "proofIndex": 9,
+      "DOMUTC": "2026-10-04T05:55:36.382Z",
+      "captureStartUTC": "2026-10-04T05:55:36.385Z",
+      "captureEndUTC": "2026-10-04T05:55:36.410Z",
+      "CSSViewport": {
+        "dpr": 1,
+        "height": 757,
+        "width": 1182
+      },
+      "sourceRasterPixels": [
+        1182,
+        757
+      ],
+      "safeRasterPixels": [
+        828,
+        159
+      ],
+      "sha256": "03623f20b69f809305b36dba16c3743f93db6c074f66d60ea9a54713f13c17ee"
+    },
+    {
+      "file": "desktop-home-on-retained.png",
+      "proofIndex": 10,
+      "DOMUTC": "2026-10-04T05:55:37.110Z",
+      "captureStartUTC": "2026-10-04T05:55:37.114Z",
+      "captureEndUTC": "2026-10-04T05:55:37.144Z",
+      "CSSViewport": {
+        "dpr": 1,
+        "height": 757,
+        "width": 1182
+      },
+      "sourceRasterPixels": [
+        1182,
+        757
+      ],
+      "safeRasterPixels": [
+        803,
+        105
+      ],
+      "sha256": "38c91efa2afab4b8e0ff89c847adae9ea6ccee8473d6be35359733e4b02f021d"
+    },
+    {
+      "file": "desktop-home-restored-off.png",
+      "proofIndex": 12,
+      "DOMUTC": "2026-10-04T05:56:13.194Z",
+      "captureStartUTC": "2026-10-04T05:56:13.198Z",
+      "captureEndUTC": "2026-10-04T05:56:13.224Z",
+      "CSSViewport": {
+        "dpr": 1,
+        "height": 757,
+        "width": 1182
+      },
+      "sourceRasterPixels": [
+        1182,
+        757
+      ],
+      "safeRasterPixels": [
+        828,
+        159
+      ],
+      "sha256": "2a4fa3cdc1db09be4e7db4c1d2808fc199c7337606c29ce2a0ea8c7803450458"
+    }
+  ],
+  "originalToCropEquality": "Collector attestation; private originals not read",
+  "sourceHashes": {
+    "exit.json": "45b24d0e1a5e725f43d8a06dde90dcf9e0ebd15d54adfb0a72952378273876a9",
+    "entry-context.json": "24cdb882ef5be5548d6102ed13a557ec53b812c09e1b96834b78edc5151d815c",
+    "actions.json": "97b63f58adfbec10ac004ad7e380aab51ccd6d8de12f217b5ee65bef2dc9c358",
+    "summary.json": "90873619f8286a946bfd4bed7e93eb6075ac7fb67d8f9009e5bf95be2eeb7b15",
+    "provenance.json": "79e312e309342cb1aa382c0c472ec129abd3f71f12b33eabf643c6161ba69bfe",
+    "step-away.json": "7fc75345039969e15eb0fa66b1aa98b075fafb35f948e16efc9e6645d2ec6d09",
+    "proof.json": "d4f19d12b9c9a81998bbbdc25e1d144eb2eb0cc8842707af519315610ea0a800"
+  },
+  "wizardExitSupplementSHA256": "94ebb9ba706910ce4312fd5fde5fabe7e19ac65b3940332695b9506929a22b94"
+}

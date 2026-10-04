@@ -1,0 +1,15 @@
+{
+  "wizardEntry": {
+    "navigationStartUTC": "2026-10-04T05:45:45.156Z",
+    "requestedURL": "https://alpha.teameet.co.kr/admin/tournaments/new",
+    "runtimeServingSHA": "unknown",
+    "deploymentContext": {
+      "lastReportedCommit": "27a021fc7650672d5af25217108b101dc856c8d5",
+      "reportedSuccessUTC": "2026-10-03T18:31:28Z"
+    },
+    "navigationEndUTC": "2026-10-04T05:45:45.462Z"
+  },
+  "sameUnsavedWizardAs": "prize-boundary",
+  "homePhaseFirstDOMUTC": "2026-10-04T05:54:29.674Z",
+  "noNewNavigationBeforeHome": true
+}

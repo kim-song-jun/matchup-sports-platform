@@ -1,0 +1,230 @@
+{
+  "captureMetadataSHA256": "d85657e1545c03a6a23588a21736a40e29d8b8b5e9a7a389b105a73ce289461f",
+  "crops": [
+    {
+      "name": "mobile-home-title-entered",
+      "proofIndex": 1,
+      "startUTC": "2026-10-04T05:54:29.791Z",
+      "endUTC": "2026-10-04T05:54:29.815Z",
+      "sourceFile": "mobile-home-title-entered.png",
+      "sourceSHA256": "d54fc5dfe95a0e52f108334a55da8f30e09097244dd38142de67a1976ee15ab6",
+      "outputFile": "mobile-home-title-entered.png",
+      "outputSHA256": "064d531c55d495d55622d2087be76d167fe5a8fa67f7b28b9d0c7de04c00f605",
+      "bounds": [
+        38,
+        250,
+        364,
+        355
+      ],
+      "sourceSize": [
+        402,
+        605
+      ],
+      "outputSize": [
+        326,
+        105
+      ],
+      "sourceHashVerified": true,
+      "collectorPixelEquality": true,
+      "proofUTC": "2026-10-04T05:54:29.787Z"
+    },
+    {
+      "name": "mobile-home-off",
+      "proofIndex": 2,
+      "startUTC": "2026-10-04T05:54:30.157Z",
+      "endUTC": "2026-10-04T05:54:30.177Z",
+      "sourceFile": "mobile-home-off.png",
+      "sourceSHA256": "f13eb99bdf111f98929c4c9184bff2457dfd3975755855553bbde6250619f0d4",
+      "outputFile": "mobile-home-off.png",
+      "outputSHA256": "7d32e5348e5c1cee542c14f0a57f4cffd5925341625f840fc22d55b5dcfd0626",
+      "bounds": [
+        38,
+        303,
+        365,
+        452
+      ],
+      "sourceSize": [
+        402,
+        605
+      ],
+      "outputSize": [
+        327,
+        149
+      ],
+      "sourceHashVerified": true,
+      "collectorPixelEquality": true,
+      "proofUTC": "2026-10-04T05:54:30.154Z"
+    },
+    {
+      "name": "mobile-home-on-retained",
+      "proofIndex": 3,
+      "startUTC": "2026-10-04T05:54:30.871Z",
+      "endUTC": "2026-10-04T05:54:30.895Z",
+      "sourceFile": "mobile-home-on-retained.png",
+      "sourceSHA256": "6835fef814679542540906aacd1cb3eaca18274279f13d53d0599437cb8c6aa9",
+      "outputFile": "mobile-home-on-retained.png",
+      "outputSHA256": "763d4bf76bd8702ce6e65615e51ee8617847f7c90a80f8c65646c7421b842e1c",
+      "bounds": [
+        38,
+        250,
+        364,
+        355
+      ],
+      "sourceSize": [
+        402,
+        605
+      ],
+      "outputSize": [
+        326,
+        105
+      ],
+      "sourceHashVerified": true,
+      "collectorPixelEquality": true,
+      "proofUTC": "2026-10-04T05:54:30.868Z"
+    },
+    {
+      "name": "tablet-home-off",
+      "proofIndex": 6,
+      "startUTC": "2026-10-04T05:55:35.062Z",
+      "endUTC": "2026-10-04T05:55:35.091Z",
+      "sourceFile": "tablet-home-off.png",
+      "sourceSHA256": "6ac38c60c1bf30add06216097916c8f096a42eb1119a0749574c8084ba784229",
+      "outputFile": "tablet-home-off.png",
+      "outputSHA256": "349167e94da2028c2650f553ddbde7729823483a63dd4a9999ace7d51d50ea16",
+      "bounds": [
+        50,
+        207,
+        741,
+        356
+      ],
+      "sourceSize": [
+        788,
+        505
+      ],
+      "outputSize": [
+        691,
+        149
+      ],
+      "sourceHashVerified": true,
+      "collectorPixelEquality": true,
+      "proofUTC": "2026-10-04T05:55:35.058Z"
+    },
+    {
+      "name": "tablet-home-on-retained",
+      "proofIndex": 7,
+      "startUTC": "2026-10-04T05:55:35.785Z",
+      "endUTC": "2026-10-04T05:55:35.810Z",
+      "sourceFile": "tablet-home-on-retained.png",
+      "sourceSHA256": "a6fc2bda7e24501507f129a6f4fd47dacc918293717424b91d966a3a69320189",
+      "outputFile": "tablet-home-on-retained.png",
+      "outputSHA256": "9cf737e1b4c5df713597e9179793edd469e93c60d1ab4d97236005d777a9e539",
+      "bounds": [
+        60,
+        200,
+        735,
+        300
+      ],
+      "sourceSize": [
+        788,
+        505
+      ],
+      "outputSize": [
+        675,
+        100
+      ],
+      "sourceHashVerified": true,
+      "collectorPixelEquality": true,
+      "proofUTC": "2026-10-04T05:55:35.780Z"
+    },
+    {
+      "name": "desktop-home-off",
+      "proofIndex": 9,
+      "startUTC": "2026-10-04T05:55:36.385Z",
+      "endUTC": "2026-10-04T05:55:36.410Z",
+      "sourceFile": "desktop-home-off.png",
+      "sourceSHA256": "a40a99ad92b5cb2296a374958a5e30673dfc75acd57328d27ffee5b3eb3c0169",
+      "outputFile": "desktop-home-off.png",
+      "outputSHA256": "03623f20b69f809305b36dba16c3743f93db6c074f66d60ea9a54713f13c17ee",
+      "bounds": [
+        299,
+        439,
+        1127,
+        598
+      ],
+      "sourceSize": [
+        1182,
+        757
+      ],
+      "outputSize": [
+        828,
+        159
+      ],
+      "sourceHashVerified": true,
+      "collectorPixelEquality": true,
+      "proofUTC": "2026-10-04T05:55:36.382Z"
+    },
+    {
+      "name": "desktop-home-on-retained",
+      "proofIndex": 10,
+      "startUTC": "2026-10-04T05:55:37.114Z",
+      "endUTC": "2026-10-04T05:55:37.144Z",
+      "sourceFile": "desktop-home-on-retained.png",
+      "sourceSHA256": "2e51e95bc053d80c5dd85de9c201feba88f8540be16312257deca8701d41c056",
+      "outputFile": "desktop-home-on-retained.png",
+      "outputSHA256": "38c91efa2afab4b8e0ff89c847adae9ea6ccee8473d6be35359733e4b02f021d",
+      "bounds": [
+        309,
+        325,
+        1112,
+        430
+      ],
+      "sourceSize": [
+        1182,
+        757
+      ],
+      "outputSize": [
+        803,
+        105
+      ],
+      "sourceHashVerified": true,
+      "collectorPixelEquality": true,
+      "proofUTC": "2026-10-04T05:55:37.110Z"
+    },
+    {
+      "name": "desktop-home-restored-off",
+      "proofIndex": 12,
+      "startUTC": "2026-10-04T05:56:13.198Z",
+      "endUTC": "2026-10-04T05:56:13.224Z",
+      "sourceFile": "desktop-home-restored-off.png",
+      "sourceSHA256": "8aa4d815d12f1d40e39e1d0664da1bfce135d0c570755f818b4e8bd327e86de5",
+      "outputFile": "desktop-home-restored-off.png",
+      "outputSHA256": "2a4fa3cdc1db09be4e7db4c1d2808fc199c7337606c29ce2a0ea8c7803450458",
+      "bounds": [
+        299,
+        439,
+        1127,
+        598
+      ],
+      "sourceSize": [
+        1182,
+        757
+      ],
+      "outputSize": [
+        828,
+        159
+      ],
+      "sourceHashVerified": true,
+      "collectorPixelEquality": true,
+      "proofUTC": "2026-10-04T05:56:13.194Z"
+    }
+  ],
+  "safeJSONHashes": {
+    "actions.json": "97b63f58adfbec10ac004ad7e380aab51ccd6d8de12f217b5ee65bef2dc9c358",
+    "entry-context.json": "24cdb882ef5be5548d6102ed13a557ec53b812c09e1b96834b78edc5151d815c",
+    "exit.json": "45b24d0e1a5e725f43d8a06dde90dcf9e0ebd15d54adfb0a72952378273876a9",
+    "proof.json": "d4f19d12b9c9a81998bbbdc25e1d144eb2eb0cc8842707af519315610ea0a800",
+    "step-away.json": "7fc75345039969e15eb0fa66b1aa98b075fafb35f948e16efc9e6645d2ec6d09",
+    "summary.json": "90873619f8286a946bfd4bed7e93eb6075ac7fb67d8f9009e5bf95be2eeb7b15"
+  },
+  "privacy": "Crops show generic promotion labels and synthetic local title, with no personal/account/roster data."
+}

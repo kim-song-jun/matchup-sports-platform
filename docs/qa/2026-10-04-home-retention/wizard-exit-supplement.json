@@ -1,0 +1,27 @@
+{
+  "basicsRestored": {
+    "fields": [
+      {
+        "id": "sport-id",
+        "value": ""
+      },
+      {
+        "id": "title",
+        "value": ""
+      }
+    ],
+    "utc": "2026-10-04T05:56:13.678Z"
+  },
+  "exit": {
+    "promoSwitchCount": 0,
+    "url": "https://alpha.teameet.co.kr/admin/tournaments",
+    "utc": "2026-10-04T05:56:13.951Z",
+    "viewport": {
+      "dpr": 1,
+      "height": 757,
+      "width": 1182
+    },
+    "wizardTitlePresent": false
+  },
+  "relatesTo": "prize-boundary and subsequent Home retention in the same unsaved wizard"
+}

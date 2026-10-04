@@ -1,0 +1,140 @@
+[
+  {
+    "index": 0,
+    "label": "mobile native resize125 zoom",
+    "startUTC": "2026-10-04T05:53:36.045Z",
+    "endUTC": "2026-10-04T05:53:39.809Z"
+  },
+  {
+    "index": 1,
+    "label": "enable Home promotion locally",
+    "startUTC": "2026-10-04T05:53:48.660Z",
+    "endUTC": "2026-10-04T05:53:48.935Z"
+  },
+  {
+    "index": 2,
+    "label": "enter synthetic Home title",
+    "startUTC": "2026-10-04T05:54:29.681Z",
+    "endUTC": "2026-10-04T05:54:29.709Z"
+  },
+  {
+    "index": 3,
+    "label": "mobile Home OFF",
+    "startUTC": "2026-10-04T05:54:29.816Z",
+    "endUTC": "2026-10-04T05:54:30.093Z"
+  },
+  {
+    "index": 4,
+    "label": "mobile Home ON again",
+    "startUTC": "2026-10-04T05:54:30.178Z",
+    "endUTC": "2026-10-04T05:54:30.459Z"
+  },
+  {
+    "index": 5,
+    "label": "focus restored Home title",
+    "startUTC": "2026-10-04T05:54:30.524Z",
+    "endUTC": "2026-10-04T05:54:30.794Z"
+  },
+  {
+    "index": 6,
+    "label": "mobile stepper leave Home editor for step3",
+    "startUTC": "2026-10-04T05:54:56.587Z",
+    "endUTC": "2026-10-04T05:54:56.857Z"
+  },
+  {
+    "index": 7,
+    "label": "mobile stepper return step4",
+    "startUTC": "2026-10-04T05:54:56.921Z",
+    "endUTC": "2026-10-04T05:54:57.237Z"
+  },
+  {
+    "index": 8,
+    "label": "focus Home title after stepper return",
+    "startUTC": "2026-10-04T05:54:57.307Z",
+    "endUTC": "2026-10-04T05:54:57.603Z"
+  },
+  {
+    "index": 9,
+    "label": "tablet native resize150 zoom",
+    "startUTC": "2026-10-04T05:55:26.970Z",
+    "endUTC": "2026-10-04T05:55:34.630Z"
+  },
+  {
+    "index": 10,
+    "label": "tablet Home OFF",
+    "startUTC": "2026-10-04T05:55:34.714Z",
+    "endUTC": "2026-10-04T05:55:34.995Z"
+  },
+  {
+    "index": 11,
+    "label": "tablet Home ON again",
+    "startUTC": "2026-10-04T05:55:35.092Z",
+    "endUTC": "2026-10-04T05:55:35.371Z"
+  },
+  {
+    "index": 12,
+    "label": "tablet focus retained Home title",
+    "startUTC": "2026-10-04T05:55:35.437Z",
+    "endUTC": "2026-10-04T05:55:35.710Z"
+  },
+  {
+    "index": 13,
+    "label": "desktop zoom100",
+    "startUTC": "2026-10-04T05:55:35.811Z",
+    "endUTC": "2026-10-04T05:55:35.950Z"
+  },
+  {
+    "index": 14,
+    "label": "desktop Home OFF",
+    "startUTC": "2026-10-04T05:55:36.033Z",
+    "endUTC": "2026-10-04T05:55:36.313Z"
+  },
+  {
+    "index": 15,
+    "label": "desktop Home ON again",
+    "startUTC": "2026-10-04T05:55:36.412Z",
+    "endUTC": "2026-10-04T05:55:36.676Z"
+  },
+  {
+    "index": 16,
+    "label": "desktop focus retained Home title",
+    "startUTC": "2026-10-04T05:55:36.753Z",
+    "endUTC": "2026-10-04T05:55:37.028Z"
+  },
+  {
+    "index": 17,
+    "label": "explicitly restore Home custom title blank",
+    "startUTC": "2026-10-04T05:56:12.760Z",
+    "endUTC": "2026-10-04T05:56:12.781Z"
+  },
+  {
+    "index": 18,
+    "label": "restore Home OFF",
+    "startUTC": "2026-10-04T05:56:12.862Z",
+    "endUTC": "2026-10-04T05:56:13.136Z"
+  },
+  {
+    "index": 19,
+    "label": "stepper first step to cancel",
+    "startUTC": "2026-10-04T05:56:13.225Z",
+    "endUTC": "2026-10-04T05:56:13.503Z"
+  },
+  {
+    "index": 20,
+    "label": "restore synthetic wizard title blank",
+    "startUTC": "2026-10-04T05:56:13.547Z",
+    "endUTC": "2026-10-04T05:56:13.563Z"
+  },
+  {
+    "index": 21,
+    "label": "restore sport placeholder",
+    "startUTC": "2026-10-04T05:56:13.606Z",
+    "endUTC": "2026-10-04T05:56:13.625Z"
+  },
+  {
+    "index": 22,
+    "label": "Cancel local wizard",
+    "startUTC": "2026-10-04T05:56:13.680Z",
+    "endUTC": "2026-10-04T05:56:13.770Z"
+  }
+]

@@ -1,0 +1,1487 @@
+[
+  {
+    "cards": [
+      {
+        "checked": "true",
+        "fields": [
+          {
+            "active": false,
+            "name": "카드 제목",
+            "rect": {
+              "height": 44,
+              "width": 295.20001220703125,
+              "x": 53.60000228881836,
+              "y": 786.7750244140625
+            },
+            "value": ""
+          },
+          {
+            "active": false,
+            "name": "배지",
+            "rect": {
+              "height": 44,
+              "width": 295.20001220703125,
+              "x": 53.60000228881836,
+              "y": 890.75
+            },
+            "value": ""
+          },
+          {
+            "active": false,
+            "name": "소개 문구",
+            "rect": {
+              "height": 44,
+              "width": 295.20001220703125,
+              "x": 53.60000228881836,
+              "y": 994.7250366210938
+            },
+            "value": ""
+          },
+          {
+            "active": false,
+            "name": "날짜 문구",
+            "rect": {
+              "height": 44,
+              "width": 295.20001220703125,
+              "x": 53.60000228881836,
+              "y": 1098.7000732421875
+            },
+            "value": "10월 17일 (토)"
+          },
+          {
+            "active": false,
+            "name": "강조 문구",
+            "rect": {
+              "height": 44,
+              "width": 295.20001220703125,
+              "x": 53.60000228881836,
+              "y": 1202.675048828125
+            },
+            "value": ""
+          },
+          {
+            "active": false,
+            "name": "장소 문구",
+            "rect": {
+              "height": 44,
+              "width": 295.20001220703125,
+              "x": 53.60000228881836,
+              "y": 1306.6500244140625
+            },
+            "value": ""
+          },
+          {
+            "active": false,
+            "name": "상금 문구",
+            "rect": {
+              "height": 44,
+              "width": 295.20001220703125,
+              "x": 53.60000228881836,
+              "y": 1410.625
+            },
+            "value": ""
+          },
+          {
+            "active": false,
+            "name": "노출 우선순위",
+            "rect": {
+              "height": 44,
+              "width": 295.20001220703125,
+              "x": 53.60000228881836,
+              "y": 1514.5999755859375
+            },
+            "value": "0"
+          },
+          {
+            "active": false,
+            "name": "홍보 이미지",
+            "rect": {
+              "height": 44,
+              "width": 295.20001220703125,
+              "x": 53.60000228881836,
+              "y": 1618.5750732421875
+            },
+            "value": ""
+          }
+        ],
+        "label": "홈 오늘의 추천 노출",
+        "rect": {
+          "height": 1453.7625732421875,
+          "width": 328.8000183105469,
+          "x": 36.79999923706055,
+          "y": 309.6000061035156
+        },
+        "summary": "저장 전에 실제 카드 형태를 확인할 수 있어요."
+      },
+      {
+        "checked": "false",
+        "fields": [],
+        "label": "대회 목록 상단 노출",
+        "rect": {
+          "height": 61.60000228881836,
+          "width": 328.8000183105469,
+          "x": 36.79999923706055,
+          "y": 1779.362548828125
+        },
+        "summary": "꺼짐"
+      }
+    ],
+    "scrollY": 2255.199951171875,
+    "step5": [
+      {
+        "disabled": true,
+        "label": "5단계 공개 확인 — 잠김"
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/new",
+    "utc": "2026-10-04T05:54:29.674Z",
+    "viewport": {
+      "dpr": 1.25,
+      "height": 606,
+      "width": 402
+    },
+    "index": 0,
+    "widthLabel": "mobile",
+    "state": "initial-on-blank-title"
+  },
+  {
+    "cards": [
+      {
+        "checked": "true",
+        "fields": [
+          {
+            "active": true,
+            "name": "카드 제목",
+            "rect": {
+              "height": 44,
+              "width": 295.20001220703125,
+              "x": 53.60000228881836,
+              "y": 281.1750183105469
+            },
+            "value": "QA 홈 보존 1004"
+          },
+          {
+            "active": false,
+            "name": "배지",
+            "rect": {
+              "height": 44,
+              "width": 295.20001220703125,
+              "x": 53.60000228881836,
+              "y": 385.1499938964844
+            },
+            "value": ""
+          },
+          {
+            "active": false,
+            "name": "소개 문구",
+            "rect": {
+              "height": 44,
+              "width": 295.20001220703125,
+              "x": 53.60000228881836,
+              "y": 489.125
+            },
+            "value": ""
+          },
+          {
+            "active": false,
+            "name": "날짜 문구",
+            "rect": {
+              "height": 44,
+              "width": 295.20001220703125,
+              "x": 53.60000228881836,
+              "y": 593.1000366210938
+            },
+            "value": "10월 17일 (토)"
+          },
+          {
+            "active": false,
+            "name": "강조 문구",
+            "rect": {
+              "height": 44,
+              "width": 295.20001220703125,
+              "x": 53.60000228881836,
+              "y": 697.0750122070312
+            },
+            "value": ""
+          },
+          {
+            "active": false,
+            "name": "장소 문구",
+            "rect": {
+              "height": 44,
+              "width": 295.20001220703125,
+              "x": 53.60000228881836,
+              "y": 801.0499877929688
+            },
+            "value": ""
+          },
+          {
+            "active": false,
+            "name": "상금 문구",
+            "rect": {
+              "height": 44,
+              "width": 295.20001220703125,
+              "x": 53.60000228881836,
+              "y": 905.0250244140624
+            },
+            "value": ""
+          },
+          {
+            "active": false,
+            "name": "노출 우선순위",
+            "rect": {
+              "height": 44,
+              "width": 295.20001220703125,
+              "x": 53.60000228881836,
+              "y": 1009
+            },
+            "value": "0"
+          },
+          {
+            "active": false,
+            "name": "홍보 이미지",
+            "rect": {
+              "height": 44,
+              "width": 295.20001220703125,
+              "x": 53.60000228881836,
+              "y": 1112.9749755859375
+            },
+            "value": ""
+          }
+        ],
+        "label": "홈 오늘의 추천 노출",
+        "rect": {
+          "height": 1453.7625732421875,
+          "width": 328.8000183105469,
+          "x": 36.79999923706055,
+          "y": -196
+        },
+        "summary": "저장 전에 실제 카드 형태를 확인할 수 있어요."
+      },
+      {
+        "checked": "false",
+        "fields": [],
+        "label": "대회 목록 상단 노출",
+        "rect": {
+          "height": 61.60000228881836,
+          "width": 328.8000183105469,
+          "x": 36.79999923706055,
+          "y": 1273.7625732421875
+        },
+        "summary": "꺼짐"
+      }
+    ],
+    "scrollY": 2760.800048828125,
+    "step5": [
+      {
+        "disabled": true,
+        "label": "5단계 공개 확인 — 잠김"
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/new",
+    "utc": "2026-10-04T05:54:29.787Z",
+    "viewport": {
+      "dpr": 1.25,
+      "height": 606,
+      "width": 402
+    },
+    "index": 1,
+    "widthLabel": "mobile",
+    "state": "title-entered"
+  },
+  {
+    "cards": [
+      {
+        "checked": "false",
+        "fields": [],
+        "label": "홈 오늘의 추천 노출",
+        "rect": {
+          "height": 61.60000228881836,
+          "width": 328.8000183105469,
+          "x": 36.79999923706055,
+          "y": 309.6000061035156
+        },
+        "summary": "꺼짐 · 입력한 항목 1개 보관 중"
+      },
+      {
+        "checked": "false",
+        "fields": [],
+        "label": "대회 목록 상단 노출",
+        "rect": {
+          "height": 61.60000228881836,
+          "width": 328.8000183105469,
+          "x": 36.79999923706055,
+          "y": 387.2000122070313
+        },
+        "summary": "꺼짐"
+      }
+    ],
+    "scrollY": 2255.199951171875,
+    "step5": [
+      {
+        "disabled": true,
+        "label": "5단계 공개 확인 — 잠김"
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/new",
+    "utc": "2026-10-04T05:54:30.154Z",
+    "viewport": {
+      "dpr": 1.25,
+      "height": 606,
+      "width": 402
+    },
+    "index": 2,
+    "widthLabel": "mobile",
+    "state": "off-retained-summary"
+  },
+  {
+    "cards": [
+      {
+        "checked": "true",
+        "fields": [
+          {
+            "active": true,
+            "name": "카드 제목",
+            "rect": {
+              "height": 44,
+              "width": 295.20001220703125,
+              "x": 53.60000228881836,
+              "y": 281.1750183105469
+            },
+            "value": "QA 홈 보존 1004"
+          },
+          {
+            "active": false,
+            "name": "배지",
+            "rect": {
+              "height": 44,
+              "width": 295.20001220703125,
+              "x": 53.60000228881836,
+              "y": 385.1499938964844
+            },
+            "value": ""
+          },
+          {
+            "active": false,
+            "name": "소개 문구",
+            "rect": {
+              "height": 44,
+              "width": 295.20001220703125,
+              "x": 53.60000228881836,
+              "y": 489.125
+            },
+            "value": ""
+          },
+          {
+            "active": false,
+            "name": "날짜 문구",
+            "rect": {
+              "height": 44,
+              "width": 295.20001220703125,
+              "x": 53.60000228881836,
+              "y": 593.1000366210938
+            },
+            "value": "10월 17일 (토)"
+          },
+          {
+            "active": false,
+            "name": "강조 문구",
+            "rect": {
+              "height": 44,
+              "width": 295.20001220703125,
+              "x": 53.60000228881836,
+              "y": 697.0750122070312
+            },
+            "value": ""
+          },
+          {
+            "active": false,
+            "name": "장소 문구",
+            "rect": {
+              "height": 44,
+              "width": 295.20001220703125,
+              "x": 53.60000228881836,
+              "y": 801.0499877929688
+            },
+            "value": ""
+          },
+          {
+            "active": false,
+            "name": "상금 문구",
+            "rect": {
+              "height": 44,
+              "width": 295.20001220703125,
+              "x": 53.60000228881836,
+              "y": 905.0250244140624
+            },
+            "value": ""
+          },
+          {
+            "active": false,
+            "name": "노출 우선순위",
+            "rect": {
+              "height": 44,
+              "width": 295.20001220703125,
+              "x": 53.60000228881836,
+              "y": 1009
+            },
+            "value": "0"
+          },
+          {
+            "active": false,
+            "name": "홍보 이미지",
+            "rect": {
+              "height": 44,
+              "width": 295.20001220703125,
+              "x": 53.60000228881836,
+              "y": 1112.9749755859375
+            },
+            "value": ""
+          }
+        ],
+        "label": "홈 오늘의 추천 노출",
+        "rect": {
+          "height": 1453.7625732421875,
+          "width": 328.8000183105469,
+          "x": 36.79999923706055,
+          "y": -196
+        },
+        "summary": "저장 전에 실제 카드 형태를 확인할 수 있어요."
+      },
+      {
+        "checked": "false",
+        "fields": [],
+        "label": "대회 목록 상단 노출",
+        "rect": {
+          "height": 61.60000228881836,
+          "width": 328.8000183105469,
+          "x": 36.79999923706055,
+          "y": 1273.7625732421875
+        },
+        "summary": "꺼짐"
+      }
+    ],
+    "scrollY": 2760.800048828125,
+    "step5": [
+      {
+        "disabled": true,
+        "label": "5단계 공개 확인 — 잠김"
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/new",
+    "utc": "2026-10-04T05:54:30.868Z",
+    "viewport": {
+      "dpr": 1.25,
+      "height": 606,
+      "width": 402
+    },
+    "index": 3,
+    "widthLabel": "mobile",
+    "state": "on-exact-title-retained"
+  },
+  {
+    "cards": [
+      {
+        "checked": "true",
+        "fields": [
+          {
+            "active": true,
+            "name": "카드 제목",
+            "rect": {
+              "height": 44,
+              "width": 295.20001220703125,
+              "x": 53.60000228881836,
+              "y": 279.57501220703125
+            },
+            "value": "QA 홈 보존 1004"
+          },
+          {
+            "active": false,
+            "name": "배지",
+            "rect": {
+              "height": 44,
+              "width": 295.20001220703125,
+              "x": 53.60000228881836,
+              "y": 383.5500183105469
+            },
+            "value": ""
+          },
+          {
+            "active": false,
+            "name": "소개 문구",
+            "rect": {
+              "height": 44,
+              "width": 295.20001220703125,
+              "x": 53.60000228881836,
+              "y": 487.5249938964844
+            },
+            "value": ""
+          },
+          {
+            "active": false,
+            "name": "날짜 문구",
+            "rect": {
+              "height": 44,
+              "width": 295.20001220703125,
+              "x": 53.60000228881836,
+              "y": 591.5
+            },
+            "value": "10월 17일 (토)"
+          },
+          {
+            "active": false,
+            "name": "강조 문구",
+            "rect": {
+              "height": 44,
+              "width": 295.20001220703125,
+              "x": 53.60000228881836,
+              "y": 695.4750366210938
+            },
+            "value": ""
+          },
+          {
+            "active": false,
+            "name": "장소 문구",
+            "rect": {
+              "height": 44,
+              "width": 295.20001220703125,
+              "x": 53.60000228881836,
+              "y": 799.4500122070312
+            },
+            "value": ""
+          },
+          {
+            "active": false,
+            "name": "상금 문구",
+            "rect": {
+              "height": 44,
+              "width": 295.20001220703125,
+              "x": 53.60000228881836,
+              "y": 903.4249877929688
+            },
+            "value": ""
+          },
+          {
+            "active": false,
+            "name": "노출 우선순위",
+            "rect": {
+              "height": 44,
+              "width": 295.20001220703125,
+              "x": 53.60000228881836,
+              "y": 1007.4000244140624
+            },
+            "value": "0"
+          },
+          {
+            "active": false,
+            "name": "홍보 이미지",
+            "rect": {
+              "height": 44,
+              "width": 295.20001220703125,
+              "x": 53.60000228881836,
+              "y": 1111.375
+            },
+            "value": ""
+          }
+        ],
+        "label": "홈 오늘의 추천 노출",
+        "rect": {
+          "height": 1453.7625732421875,
+          "width": 328.8000183105469,
+          "x": 36.79999923706055,
+          "y": -197.6000061035156
+        },
+        "summary": "저장 전에 실제 카드 형태를 확인할 수 있어요."
+      },
+      {
+        "checked": "false",
+        "fields": [],
+        "label": "대회 목록 상단 노출",
+        "rect": {
+          "height": 61.60000228881836,
+          "width": 328.8000183105469,
+          "x": 36.79999923706055,
+          "y": 1272.1624755859375
+        },
+        "summary": "꺼짐"
+      }
+    ],
+    "scrollY": 2762.39990234375,
+    "step5": [
+      {
+        "disabled": true,
+        "label": "5단계 공개 확인 — 잠김"
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/new",
+    "utc": "2026-10-04T05:54:57.670Z",
+    "viewport": {
+      "dpr": 1.25,
+      "height": 606,
+      "width": 402
+    },
+    "index": 4,
+    "widthLabel": "mobile",
+    "state": "stepper-return-exact-title-retained"
+  },
+  {
+    "cards": [
+      {
+        "checked": "true",
+        "fields": [
+          {
+            "active": true,
+            "name": "카드 제목",
+            "rect": {
+              "height": 44,
+              "width": 318.66668701171875,
+              "x": 69.33333587646484,
+              "y": -268.5
+            },
+            "value": "QA 홈 보존 1004"
+          },
+          {
+            "active": false,
+            "name": "배지",
+            "rect": {
+              "height": 44,
+              "width": 318.66668701171875,
+              "x": 400,
+              "y": -268.5
+            },
+            "value": ""
+          },
+          {
+            "active": false,
+            "name": "소개 문구",
+            "rect": {
+              "height": 44,
+              "width": 649.3333740234375,
+              "x": 69.33333587646484,
+              "y": -164.5
+            },
+            "value": ""
+          },
+          {
+            "active": false,
+            "name": "날짜 문구",
+            "rect": {
+              "height": 44,
+              "width": 318.66668701171875,
+              "x": 69.33333587646484,
+              "y": -60.5
+            },
+            "value": "10월 17일 (토)"
+          },
+          {
+            "active": false,
+            "name": "강조 문구",
+            "rect": {
+              "height": 44,
+              "width": 318.66668701171875,
+              "x": 400,
+              "y": -60.5
+            },
+            "value": ""
+          },
+          {
+            "active": false,
+            "name": "장소 문구",
+            "rect": {
+              "height": 44,
+              "width": 318.66668701171875,
+              "x": 69.33333587646484,
+              "y": 43.5
+            },
+            "value": ""
+          },
+          {
+            "active": false,
+            "name": "상금 문구",
+            "rect": {
+              "height": 44,
+              "width": 318.66668701171875,
+              "x": 400,
+              "y": 43.5
+            },
+            "value": ""
+          },
+          {
+            "active": false,
+            "name": "노출 우선순위",
+            "rect": {
+              "height": 44,
+              "width": 318.66668701171875,
+              "x": 69.33333587646484,
+              "y": 147.5
+            },
+            "value": "0"
+          },
+          {
+            "active": false,
+            "name": "홍보 이미지",
+            "rect": {
+              "height": 44,
+              "width": 497.0104370117187,
+              "x": 69.33333587646484,
+              "y": 251.5
+            },
+            "value": ""
+          }
+        ],
+        "label": "홈 오늘의 추천 노출",
+        "rect": {
+          "height": 1214.666748046875,
+          "width": 682.6666870117188,
+          "x": 52.66666793823242,
+          "y": -870.5
+        },
+        "summary": "저장 전에 실제 카드 형태를 확인할 수 있어요."
+      },
+      {
+        "checked": "false",
+        "fields": [],
+        "label": "대회 목록 상단 노출",
+        "rect": {
+          "height": 61.33333587646485,
+          "width": 682.6666870117188,
+          "x": 52.66666793823242,
+          "y": 360.16668701171875
+        },
+        "summary": "꺼짐"
+      }
+    ],
+    "scrollY": 2744.666748046875,
+    "step5": [
+      {
+        "disabled": true,
+        "label": "5단계 공개 확인 — 잠김"
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/new",
+    "utc": "2026-10-04T05:55:34.708Z",
+    "viewport": {
+      "dpr": 1.5,
+      "height": 505,
+      "width": 788
+    },
+    "index": 5,
+    "widthLabel": "tablet",
+    "state": "before-toggle-title-retained"
+  },
+  {
+    "cards": [
+      {
+        "checked": "false",
+        "fields": [],
+        "label": "홈 오늘의 추천 노출",
+        "rect": {
+          "height": 61.33333587646485,
+          "width": 682.6666870117188,
+          "x": 52.66666793823242,
+          "y": 213.5
+        },
+        "summary": "꺼짐 · 입력한 항목 1개 보관 중"
+      },
+      {
+        "checked": "false",
+        "fields": [],
+        "label": "대회 목록 상단 노출",
+        "rect": {
+          "height": 61.33333587646485,
+          "width": 682.6666870117188,
+          "x": 52.66666793823242,
+          "y": 290.8333435058594
+        },
+        "summary": "꺼짐"
+      }
+    ],
+    "scrollY": 1660.6666259765625,
+    "step5": [
+      {
+        "disabled": true,
+        "label": "5단계 공개 확인 — 잠김"
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/new",
+    "utc": "2026-10-04T05:55:35.058Z",
+    "viewport": {
+      "dpr": 1.5,
+      "height": 505,
+      "width": 788
+    },
+    "index": 6,
+    "widthLabel": "tablet",
+    "state": "off-retained-summary"
+  },
+  {
+    "cards": [
+      {
+        "checked": "true",
+        "fields": [
+          {
+            "active": true,
+            "name": "카드 제목",
+            "rect": {
+              "height": 44,
+              "width": 318.66668701171875,
+              "x": 69.33333587646484,
+              "y": 230.1666717529297
+            },
+            "value": "QA 홈 보존 1004"
+          },
+          {
+            "active": false,
+            "name": "배지",
+            "rect": {
+              "height": 44,
+              "width": 318.66668701171875,
+              "x": 400,
+              "y": 230.1666717529297
+            },
+            "value": ""
+          },
+          {
+            "active": false,
+            "name": "소개 문구",
+            "rect": {
+              "height": 44,
+              "width": 649.3333740234375,
+              "x": 69.33333587646484,
+              "y": 334.16668701171875
+            },
+            "value": ""
+          },
+          {
+            "active": false,
+            "name": "날짜 문구",
+            "rect": {
+              "height": 44,
+              "width": 318.66668701171875,
+              "x": 69.33333587646484,
+              "y": 438.1666870117187
+            },
+            "value": "10월 17일 (토)"
+          },
+          {
+            "active": false,
+            "name": "강조 문구",
+            "rect": {
+              "height": 44,
+              "width": 318.66668701171875,
+              "x": 400,
+              "y": 438.1666870117187
+            },
+            "value": ""
+          },
+          {
+            "active": false,
+            "name": "장소 문구",
+            "rect": {
+              "height": 44,
+              "width": 318.66668701171875,
+              "x": 69.33333587646484,
+              "y": 542.1666870117188
+            },
+            "value": ""
+          },
+          {
+            "active": false,
+            "name": "상금 문구",
+            "rect": {
+              "height": 44,
+              "width": 318.66668701171875,
+              "x": 400,
+              "y": 542.1666870117188
+            },
+            "value": ""
+          },
+          {
+            "active": false,
+            "name": "노출 우선순위",
+            "rect": {
+              "height": 44,
+              "width": 318.66668701171875,
+              "x": 69.33333587646484,
+              "y": 646.1666870117188
+            },
+            "value": "0"
+          },
+          {
+            "active": false,
+            "name": "홍보 이미지",
+            "rect": {
+              "height": 44,
+              "width": 497.0104370117187,
+              "x": 69.33333587646484,
+              "y": 750.1666870117188
+            },
+            "value": ""
+          }
+        ],
+        "label": "홈 오늘의 추천 노출",
+        "rect": {
+          "height": 1214.666748046875,
+          "width": 682.6666870117188,
+          "x": 52.66666793823242,
+          "y": -371.8333435058594
+        },
+        "summary": "저장 전에 실제 카드 형태를 확인할 수 있어요."
+      },
+      {
+        "checked": "false",
+        "fields": [],
+        "label": "대회 목록 상단 노출",
+        "rect": {
+          "height": 61.33333587646485,
+          "width": 682.6666870117188,
+          "x": 52.66666793823242,
+          "y": 858.8333740234375
+        },
+        "summary": "꺼짐"
+      }
+    ],
+    "scrollY": 2246,
+    "step5": [
+      {
+        "disabled": true,
+        "label": "5단계 공개 확인 — 잠김"
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/new",
+    "utc": "2026-10-04T05:55:35.780Z",
+    "viewport": {
+      "dpr": 1.5,
+      "height": 505,
+      "width": 788
+    },
+    "index": 7,
+    "widthLabel": "tablet",
+    "state": "on-exact-title-retained"
+  },
+  {
+    "cards": [
+      {
+        "checked": "true",
+        "fields": [
+          {
+            "active": true,
+            "name": "카드 제목",
+            "rect": {
+              "height": 44,
+              "width": 387,
+              "x": 318,
+              "y": 237.5
+            },
+            "value": "QA 홈 보존 1004"
+          },
+          {
+            "active": false,
+            "name": "배지",
+            "rect": {
+              "height": 44,
+              "width": 387,
+              "x": 717,
+              "y": 237.5
+            },
+            "value": ""
+          },
+          {
+            "active": false,
+            "name": "소개 문구",
+            "rect": {
+              "height": 44,
+              "width": 786,
+              "x": 318,
+              "y": 341.5
+            },
+            "value": ""
+          },
+          {
+            "active": false,
+            "name": "날짜 문구",
+            "rect": {
+              "height": 44,
+              "width": 387,
+              "x": 318,
+              "y": 445.5
+            },
+            "value": "10월 17일 (토)"
+          },
+          {
+            "active": false,
+            "name": "강조 문구",
+            "rect": {
+              "height": 44,
+              "width": 387,
+              "x": 717,
+              "y": 445.5
+            },
+            "value": ""
+          },
+          {
+            "active": false,
+            "name": "장소 문구",
+            "rect": {
+              "height": 44,
+              "width": 387,
+              "x": 318,
+              "y": 549.5
+            },
+            "value": ""
+          },
+          {
+            "active": false,
+            "name": "상금 문구",
+            "rect": {
+              "height": 44,
+              "width": 387,
+              "x": 717,
+              "y": 549.5
+            },
+            "value": ""
+          },
+          {
+            "active": false,
+            "name": "노출 우선순위",
+            "rect": {
+              "height": 44,
+              "width": 387,
+              "x": 318,
+              "y": 653.5
+            },
+            "value": "0"
+          },
+          {
+            "active": false,
+            "name": "홍보 이미지",
+            "rect": {
+              "height": 44,
+              "width": 633.015625,
+              "x": 318,
+              "y": 757.5
+            },
+            "value": ""
+          }
+        ],
+        "label": "홈 오늘의 추천 노출",
+        "rect": {
+          "height": 1284,
+          "width": 820,
+          "x": 301,
+          "y": -433.5
+        },
+        "summary": "저장 전에 실제 카드 형태를 확인할 수 있어요."
+      },
+      {
+        "checked": "false",
+        "fields": [],
+        "label": "대회 목록 상단 노출",
+        "rect": {
+          "height": 62,
+          "width": 820,
+          "x": 301,
+          "y": 866.5
+        },
+        "summary": "꺼짐"
+      }
+    ],
+    "scrollY": 2246,
+    "step5": [
+      {
+        "disabled": true,
+        "label": "5단계 공개 확인 — 잠김"
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/new",
+    "utc": "2026-10-04T05:55:36.029Z",
+    "viewport": {
+      "dpr": 1,
+      "height": 757,
+      "width": 1182
+    },
+    "index": 8,
+    "widthLabel": "desktop",
+    "state": "before-toggle-title-retained"
+  },
+  {
+    "cards": [
+      {
+        "checked": "false",
+        "fields": [],
+        "label": "홈 오늘의 추천 노출",
+        "rect": {
+          "height": 62,
+          "width": 820,
+          "x": 301,
+          "y": 447.5
+        },
+        "summary": "꺼짐 · 입력한 항목 1개 보관 중"
+      },
+      {
+        "checked": "false",
+        "fields": [],
+        "label": "대회 목록 상단 노출",
+        "rect": {
+          "height": 62,
+          "width": 820,
+          "x": 301,
+          "y": 525.5
+        },
+        "summary": "꺼짐"
+      }
+    ],
+    "scrollY": 1365,
+    "step5": [
+      {
+        "disabled": true,
+        "label": "5단계 공개 확인 — 잠김"
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/new",
+    "utc": "2026-10-04T05:55:36.382Z",
+    "viewport": {
+      "dpr": 1,
+      "height": 757,
+      "width": 1182
+    },
+    "index": 9,
+    "widthLabel": "desktop",
+    "state": "off-retained-summary"
+  },
+  {
+    "cards": [
+      {
+        "checked": "true",
+        "fields": [
+          {
+            "active": true,
+            "name": "카드 제목",
+            "rect": {
+              "height": 44,
+              "width": 387,
+              "x": 318,
+              "y": 356.5
+            },
+            "value": "QA 홈 보존 1004"
+          },
+          {
+            "active": false,
+            "name": "배지",
+            "rect": {
+              "height": 44,
+              "width": 387,
+              "x": 717,
+              "y": 356.5
+            },
+            "value": ""
+          },
+          {
+            "active": false,
+            "name": "소개 문구",
+            "rect": {
+              "height": 44,
+              "width": 786,
+              "x": 318,
+              "y": 460.5
+            },
+            "value": ""
+          },
+          {
+            "active": false,
+            "name": "날짜 문구",
+            "rect": {
+              "height": 44,
+              "width": 387,
+              "x": 318,
+              "y": 564.5
+            },
+            "value": "10월 17일 (토)"
+          },
+          {
+            "active": false,
+            "name": "강조 문구",
+            "rect": {
+              "height": 44,
+              "width": 387,
+              "x": 717,
+              "y": 564.5
+            },
+            "value": ""
+          },
+          {
+            "active": false,
+            "name": "장소 문구",
+            "rect": {
+              "height": 44,
+              "width": 387,
+              "x": 318,
+              "y": 668.5
+            },
+            "value": ""
+          },
+          {
+            "active": false,
+            "name": "상금 문구",
+            "rect": {
+              "height": 44,
+              "width": 387,
+              "x": 717,
+              "y": 668.5
+            },
+            "value": ""
+          },
+          {
+            "active": false,
+            "name": "노출 우선순위",
+            "rect": {
+              "height": 44,
+              "width": 387,
+              "x": 318,
+              "y": 772.5
+            },
+            "value": "0"
+          },
+          {
+            "active": false,
+            "name": "홍보 이미지",
+            "rect": {
+              "height": 44,
+              "width": 633.015625,
+              "x": 318,
+              "y": 876.5
+            },
+            "value": ""
+          }
+        ],
+        "label": "홈 오늘의 추천 노출",
+        "rect": {
+          "height": 1284,
+          "width": 820,
+          "x": 301,
+          "y": -314.5
+        },
+        "summary": "저장 전에 실제 카드 형태를 확인할 수 있어요."
+      },
+      {
+        "checked": "false",
+        "fields": [],
+        "label": "대회 목록 상단 노출",
+        "rect": {
+          "height": 62,
+          "width": 820,
+          "x": 301,
+          "y": 985.5
+        },
+        "summary": "꺼짐"
+      }
+    ],
+    "scrollY": 2127,
+    "step5": [
+      {
+        "disabled": true,
+        "label": "5단계 공개 확인 — 잠김"
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/new",
+    "utc": "2026-10-04T05:55:37.110Z",
+    "viewport": {
+      "dpr": 1,
+      "height": 757,
+      "width": 1182
+    },
+    "index": 10,
+    "widthLabel": "desktop",
+    "state": "on-exact-title-retained"
+  },
+  {
+    "cards": [
+      {
+        "checked": "true",
+        "fields": [
+          {
+            "active": true,
+            "name": "카드 제목",
+            "rect": {
+              "height": 44,
+              "width": 387,
+              "x": 318,
+              "y": 356.5
+            },
+            "value": ""
+          },
+          {
+            "active": false,
+            "name": "배지",
+            "rect": {
+              "height": 44,
+              "width": 387,
+              "x": 717,
+              "y": 356.5
+            },
+            "value": ""
+          },
+          {
+            "active": false,
+            "name": "소개 문구",
+            "rect": {
+              "height": 44,
+              "width": 786,
+              "x": 318,
+              "y": 460.5
+            },
+            "value": ""
+          },
+          {
+            "active": false,
+            "name": "날짜 문구",
+            "rect": {
+              "height": 44,
+              "width": 387,
+              "x": 318,
+              "y": 564.5
+            },
+            "value": "10월 17일 (토)"
+          },
+          {
+            "active": false,
+            "name": "강조 문구",
+            "rect": {
+              "height": 44,
+              "width": 387,
+              "x": 717,
+              "y": 564.5
+            },
+            "value": ""
+          },
+          {
+            "active": false,
+            "name": "장소 문구",
+            "rect": {
+              "height": 44,
+              "width": 387,
+              "x": 318,
+              "y": 668.5
+            },
+            "value": ""
+          },
+          {
+            "active": false,
+            "name": "상금 문구",
+            "rect": {
+              "height": 44,
+              "width": 387,
+              "x": 717,
+              "y": 668.5
+            },
+            "value": ""
+          },
+          {
+            "active": false,
+            "name": "노출 우선순위",
+            "rect": {
+              "height": 44,
+              "width": 387,
+              "x": 318,
+              "y": 772.5
+            },
+            "value": "0"
+          },
+          {
+            "active": false,
+            "name": "홍보 이미지",
+            "rect": {
+              "height": 44,
+              "width": 633.015625,
+              "x": 318,
+              "y": 876.5
+            },
+            "value": ""
+          }
+        ],
+        "label": "홈 오늘의 추천 노출",
+        "rect": {
+          "height": 1284,
+          "width": 820,
+          "x": 301,
+          "y": -314.5
+        },
+        "summary": "저장 전에 실제 카드 형태를 확인할 수 있어요."
+      },
+      {
+        "checked": "false",
+        "fields": [],
+        "label": "대회 목록 상단 노출",
+        "rect": {
+          "height": 62,
+          "width": 820,
+          "x": 301,
+          "y": 985.5
+        },
+        "summary": "꺼짐"
+      }
+    ],
+    "scrollY": 2127,
+    "step5": [
+      {
+        "disabled": true,
+        "label": "5단계 공개 확인 — 잠김"
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/new",
+    "utc": "2026-10-04T05:56:12.857Z",
+    "viewport": {
+      "dpr": 1,
+      "height": 757,
+      "width": 1182
+    },
+    "index": 11,
+    "widthLabel": "desktop",
+    "state": "Home-title-restored-blank"
+  },
+  {
+    "cards": [
+      {
+        "checked": "false",
+        "fields": [],
+        "label": "홈 오늘의 추천 노출",
+        "rect": {
+          "height": 62,
+          "width": 820,
+          "x": 301,
+          "y": 447.5
+        },
+        "summary": "꺼짐"
+      },
+      {
+        "checked": "false",
+        "fields": [],
+        "label": "대회 목록 상단 노출",
+        "rect": {
+          "height": 62,
+          "width": 820,
+          "x": 301,
+          "y": 525.5
+        },
+        "summary": "꺼짐"
+      }
+    ],
+    "scrollY": 1365,
+    "step5": [
+      {
+        "disabled": true,
+        "label": "5단계 공개 확인 — 잠김"
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/new",
+    "utc": "2026-10-04T05:56:13.194Z",
+    "viewport": {
+      "dpr": 1,
+      "height": 757,
+      "width": 1182
+    },
+    "index": 12,
+    "widthLabel": "desktop",
+    "state": "both-promotions-restored-OFF"
+  }
+]

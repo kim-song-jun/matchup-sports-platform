@@ -1,0 +1,92 @@
+{
+  "relatedIssue": 1439,
+  "scope": "New Home custom-title exact-value retention, actual OFF→ON at three CSS widths",
+  "runtimeServingSHA": "unknown",
+  "deploymentContext": {
+    "lastReportedCommit": "27a021fc7650672d5af25217108b101dc856c8d5",
+    "reportedSuccessUTC": "2026-10-03T18:31:28Z"
+  },
+  "observedStartUTC": "2026-10-04T05:54:29.674Z",
+  "observedEndUTC": "2026-10-04T05:56:13.951Z",
+  "enteredTitle": "QA 홈 보존 1004",
+  "cycles": [
+    {
+      "widthLabel": "mobile",
+      "before": 1,
+      "off": 2,
+      "after": 3,
+      "viewport": {
+        "dpr": 1.25,
+        "height": 606,
+        "width": 402
+      },
+      "sameExactTitle": true,
+      "offSummary": "꺼짐 · 입력한 항목 1개 보관 중",
+      "offMountedFields": 0
+    },
+    {
+      "widthLabel": "tablet",
+      "before": 5,
+      "off": 6,
+      "after": 7,
+      "viewport": {
+        "dpr": 1.5,
+        "height": 505,
+        "width": 788
+      },
+      "sameExactTitle": true,
+      "offSummary": "꺼짐 · 입력한 항목 1개 보관 중",
+      "offMountedFields": 0
+    },
+    {
+      "widthLabel": "desktop",
+      "before": 8,
+      "off": 9,
+      "after": 10,
+      "viewport": {
+        "dpr": 1,
+        "height": 757,
+        "width": 1182
+      },
+      "sameExactTitle": true,
+      "offSummary": "꺼짐 · 입력한 항목 1개 보관 중",
+      "offMountedFields": 0
+    }
+  ],
+  "stepperRoundTrip": {
+    "away": "step-away.json",
+    "restoredProofIndex": 4,
+    "exactTitleRetained": true
+  },
+  "restoration": {
+    "all9ObservedHomeFieldsEqualInitial": true,
+    "listOffAllRows": true,
+    "bothOffAtEnd": true,
+    "titleAndSportRestoredBlank": true,
+    "cancelExit": "/admin/tournaments"
+  },
+  "counts": {
+    "DOMRows": 13,
+    "selectedActionRecords": 23,
+    "safePNGs": 8
+  },
+  "notPerformed": [
+    "Save",
+    "create",
+    "step5",
+    "Enter",
+    "upload",
+    "externalSend",
+    "List value retest",
+    "network/database audit"
+  ],
+  "limitations": [
+    "One custom title is tested; other8 observed values stayed at their initial defaults. Not every field type.",
+    "Prior historic Home report remains separate; these are newOct4 observations.",
+    "CSS zoom widths on cloud desktop, not a real-device virtual keyboard or screen-reader test.",
+    "OFF body unmounted; title retention proven from subsequent input.value, not hidden application state.",
+    "Same local wizard as preceding prize test, with a single initial navigation.",
+    "No global-storage-absence claim: known query-cache localStorage exists; inspected promo-input reducer has no autosave path.",
+    "UI clear and route exit are observed; no direct storage/network write audit."
+  ]
+}

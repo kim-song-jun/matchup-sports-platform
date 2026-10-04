@@ -10,7 +10,8 @@ function knownLevelCode(value: string): V1LevelCode | null {
 }
 
 /** 단일 등급 드래프트와 새 범위가 같은 저장 경로를 쓴다. 미상 값은 입문으로 바꾸지 않는다. */
-export function parseTeamMatchLevelRange(value: string): TeamMatchLevelRange | null {
+export function parseTeamMatchLevelRange(value: unknown): TeamMatchLevelRange | null {
+  if (typeof value !== 'string') return null;
   const trimmed = value.trim();
   if (!trimmed) return { minLevelCode: null, maxLevelCode: null };
   const parts = trimmed.split(/[-~–]/).map((part) => part.trim());

@@ -169,6 +169,39 @@ describe('#1599 actual team-match create/edit conditions', () => {
     expect(readExpiringDraft<{ grade: string }>(draftKey)?.grade).toBe('초보-고수');
   });
 
+  it.each([null, 7, { min: 'novice', max: 'intermediate' }, ['초보']])('malformed stored grade %j renders a recoverable condition field', async (grade) => {
+    writeExpiringDraft(draftKey, { ...storedDraft(), grade });
+    const user = userEvent.setup();
+    expect(() => renderClient(<TeamMatchCreatePageClient step="condition" />)).not.toThrow();
+    expect(screen.getByLabelText('최소 등급')).toHaveAttribute('aria-invalid', 'true');
+    await user.click(screen.getByRole('button', { name: '다음' }));
+    expect(state.push).not.toHaveBeenCalled(); expect(state.create).not.toHaveBeenCalled();
+    await user.selectOptions(screen.getByLabelText('최소 등급'), 'novice');
+    await user.selectOptions(screen.getByLabelText('최대 등급'), 'intermediate');
+    await user.click(screen.getByRole('button', { name: '다음' }));
+    expect(state.push).toHaveBeenCalledWith('/team-matches/new/place-time');
+    expect(readExpiringDraft<{ grade: string }>(draftKey)?.grade).toBe('초보-중수');
+  });
+
+  it.each([null, 7, { min: 'novice' }, ['초보']])('malformed stored grade %j cannot crash direct confirmation or submit an invented range', async (grade) => {
+    writeExpiringDraft(draftKey, { ...storedDraft(), grade });
+    state.pathname = '/team-matches/new/confirm';
+    const user = userEvent.setup();
+    expect(() => renderClient(<TeamMatchCreatePageClient step="confirm" />)).not.toThrow();
+    expect(screen.getAllByText('등급을 다시 선택해 주세요').length).toBeGreaterThan(0);
+    await user.click(screen.getByRole('button', { name: '팀매치 만들기' }));
+    expect(state.create).not.toHaveBeenCalled();
+    expect(screen.getAllByText(/실력등급을 다시 선택해 주세요/).length).toBeGreaterThan(0);
+  });
+
+  it('legacy draft without a grade keeps the default unset range', () => {
+    const { grade: _grade, ...legacy } = storedDraft();
+    writeExpiringDraft(draftKey, legacy);
+    expect(() => renderClient(<TeamMatchCreatePageClient step="condition" />)).not.toThrow();
+    expect(screen.getByLabelText('최소 등급')).toHaveValue('');
+    expect(screen.getByLabelText('최대 등급')).toHaveValue('');
+  });
+
   it('cancel and Escape retain an edited range until leaving is explicitly confirmed', async () => {
     state.edit = editFixture('beginner', 'advanced');
     state.pathname = '/team-matches/conditions-match/edit';

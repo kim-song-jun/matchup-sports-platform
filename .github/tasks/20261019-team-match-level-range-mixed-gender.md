@@ -40,6 +40,7 @@ Status: Review
 
 - [x] min>max 또는 max<min 입력은 양쪽을 한 번에 조정. 같은 draft 저장키 유지.
 - [x] 이전 단일 등급·알려진 A/B/C는 보존, unknown/역순/불완전 값은 임의 입문으로 저장하지 않음.
+- [x] 저장 초안의 null/숫자/객체/배열 등급은 실제 condition·confirm 화면에서 안전한 재선택 안내를 표시하고 저장을 막음. 등급 필드 누락은 기존 미설정 기본값 유지.
 - [x] 단계 remount/확인/저장, 연속 입력, 실제 변경 취소·Escape·계속 작성·나가기, invalid grade focus.
 - [ ] 물리 키보드/IME/native select/브라우저 Back·Forward 및 실제3폭 레이아웃은 alpha 후속 범위.
 
@@ -113,3 +114,14 @@ Status: Review
 - Root가 공개 모바일 실력 before PNG를 직접 확인했다. SHA25635ac667810812a70d232ab52638088a94ee6060f31d2cbc12571735b21cbc209. 추가 새 after는0.
 - Host preflight12cores/load33.39·37.83·46.25, swap11358.5/12288MB, Node226/browser44/Docker8up5healthy를 보고 최소 worker로 사용자 승인 검증만 직렬 실행. 타 세션 프로세스 종료0.
 - Git diff check PASS, touched debt markers0, API/DB/permission/status source diff0. 최종 commit/CI와 독립 exact SHA 판정은 PR 기록에 남긴다.
+
+### PR1602 P2 follow-up — 2026-10-04
+
+- [외부 리뷰5405092940](https://github.com/kim-song-jun/matchup-sports-platform/pull/1602#pullrequestreview-5405092940)는 head516d2ae에서 저장 초안의 grade:null/7이 trim 예외를 내는 지적이다. 타당하며 이전 내부 검토의 finding0을 대체한다.
+- 실제 create client + storage hydration + condition/confirm renderer로 null/숫자/객체/배열8사례 RED: 모두 trim TypeError로 실패. 필드가 없는 이전 초안 control1 PASS. 제품 수정 전 실행이다.
+- 파서는 unknown 입력을 string 판정 후 처리하고, 복원 경계는 비문자열을 안전한 '등급을 다시 선택해 주세요' 표시로 바꾼다. 따라서 객체가 confirm의 React child로 전달되지 않으며 재선택 전 API 저장0이다. 유효한 문자열·단일·범위·A/B/C 및 누락 기본값은 유지한다.
+- actual condition/client19/19 GREEN: invalid 화면 안내·저장 차단·두 끝점 재선택 복구·direct confirm과 기존 생성/편집/취소/실패 재시도 포함. API/DTO/schema/성별 계약 변경0.
+- 검증 직전 호스트12cores/load161.007·137.059·91.862, swap9657.44/11264MB, Node251/browser42/Docker8up5healthy. 명시 승인된 검증만1worker 직렬, 타 세션 프로세스 종료0.
+- 최종 scoped 회귀·lint/guard·pathspec commit·원격 새 head CI·외부 재리뷰는 다음 PR 기록으로 고정한다. 이전 head CI 성공을 새 head 성공으로 사용하지 않는다.
+- P2 최종 candidate scoped5files205/205 PASS(28.54초,1worker 직렬), frontend lint(typecheck+v1-pattern) PASS, 필수6guard 재확인 PASS. 내부 독립 reviewer는 제품2+actual client test1 증분을 읽고 새 P1/P2 지적0이며 test/browser 실행0이다. reviewed git-diff SHA2564d8ab174d3cc1db95fa3cb83e6b4fbfa7f63937aae7884ffad9672226cbd8f79. 외부 exact 새 head 재리뷰는 별도로 대기한다.
+- PR1603은 외부에서09:03:32 UTC에 merge117fa596으로 병합됐다. 기존 FAB 브랜치 수정0. 발견된 오래된 hero timer의 CI 안정화는 fresh origin/dev의 별도 후속 변경으로 분리한다.

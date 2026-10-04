@@ -588,7 +588,13 @@ function usePersistedDraft() {
     // 며칠 전 작성하다 만 내용이 새 팀매치 작성 화면에 그대로 되살아났다.
     const stored = readExpiringDraft<Partial<TeamMatchDraft>>(storageKey);
     if (stored === null) return;
-    const hydrated = normalizeDraftDate({ ...buildDefaultDraft(), ...stored });
+    // 저장소의 JSON은 타입 선언과 무관하다. 누락된 예전 필드는 기본값으로 두되,
+    // 잘못된 등급은 확인 화면에서도 안전하게 표시하고 재선택 전 저장을 막는다.
+    const defaults = buildDefaultDraft();
+    const grade = stored.grade === undefined
+      ? defaults.grade
+      : typeof stored.grade === 'string' ? stored.grade : '등급을 다시 선택해 주세요';
+    const hydrated = normalizeDraftDate({ ...defaults, ...stored, grade });
     draftRef.current = hydrated;
     setDraft(hydrated);
   }, []);

@@ -744,3 +744,36 @@ Reviewed 8/8 areas: signup age; chat access/blocking; report processing; final a
 - Scope: normal `final` schema pin becomes `158eb655609db3136765f043ddb82b71c6b39319bf09aacf8226fdfa29c0bee0`. M11 remains `08eac7347cbb10fcc4ef87d31d63bd9516d5bfda281dcf5730c4f0a1985d9323`; frozen StageA/StageB snapshots, migrations, ledger/catalog checks and destructive-operation gates remain unchanged.
 - Stored `final` manifests accept the two explicitly reviewed schema hashes so prior release history remains readable. The producer/Docker builder accept only the current hash, and schema/client/M11/checksum consistency is still mandatory.
 - Validation: failed live binder is RED evidence; new actual-script tests 7/7 PASS (current source binding, historical/current manifest, modified schema/M11, unknown schema, client mismatch and checksum tampering). Manifest creator self-test and Docker target negative controls 4/4 PASS; shell syntax and diff checks PASS. Existing release-state test needs passwordless sudo unavailable locally; CI owns that existing gate. No live database mutation performed during this fix.
+
+
+## Android Alpha physical QA and fixes — 2026-10-05
+
+### Scope / Progress Snapshot
+
+- Base: `origin/dev` `ccabd36e859f`; branch `fix/android-qa-fixes-20261005`, isolated worktree `/tmp/teameet-android-qa-fixes-20261005`.
+- Owned: Android MIME/filename/inset helpers and their tests, Android Alpha CI regression step, this task and Android scenario evidence. Forbidden: unrelated shared-tree WIP, API/Web behavior, production/main.
+- [x] Existing Alpha APK checksum and native-tree equivalence checked; approved Alpha-only reinstall completed. Production package untouched.
+- [x] Real Alpha QA: 25 player/admin accounts, 204/204 API checks; physical SM-A325N Android 13, 16/16 route-loading checks at 411×884; route loading does not imply all mutation journeys passed.
+- [x] Native back/resume/chat send and keyboard layout checked. Rotation recovered but produced null document-root initialization errors.
+- [x] Actual FCM foreground/background/terminated delivery and exact chat-room tap route; permission denial/settings recovery; no notification during 33s logged-out and 44s opted-out observation windows; re-login registration and off/on renewal checked.
+- [x] Native PDF selected through DocumentsUI, uploaded/sent, persisted on reload, authenticated 414B download SHA256 matched original. Own phone TXT/PDF input fixtures removed; original rotation restored; own ADB forwarding/daemon stopped.
+- [x] Fix document MIME narrowing: all 12 Web/API supported document extensions retain selectable MIME types, including TXT/CSV/ZIP/Office/HWP/HWPX.
+- [x] Fix download notification title: prefer RFC 5987 UTF-8 `filename*`, preserve literal `+`, sanitize path/control characters, retain URLUtil fallback for absent/invalid headers.
+- [x] Fix rotation inset race: one guarded generated script; absent document root is skipped safely and cached latest native values are republished by existing `onPageFinished`.
+- [x] JDK17 JUnit 11/11; Java-generated inset JavaScript executed in Node VM 2/2; Android Play-policy contract PASS. Full APK compilation and physical after-fix QA are not proven by these checks.
+- [x] Android Alpha CI `37274478114` test/build PASS (source `e07ff2fb5`).
+- [ ] Corrected APK physical verification.
+- [ ] dev PR #1611 review/merge; no main promotion. CI Changeset gate requires this workflow change to include a fixed-group patch Changeset.
+
+### Acceptance Criteria / scenarios
+
+1. Chat file picker allows a supported TXT beside PDF, and all 12 declared extensions map to their API MIME contracts. PDF upload remains functional.
+2. A Korean API `filename*` produces the original download display title instead of `/file` → `file.txt`; malformed/control/path parameters cannot create unsafe names. DownloadManager cached-file basename is a separate unverified contract; only the notification title is changed here.
+3. Inset publication before a document exists causes no exception; subsequent load and keyboard transitions publish the current CSS variables and native dataset. Actual portrait/landscape WebView recreation must be rerun with the corrected APK.
+
+### Evidence / residual risk
+
+- Before-fix physical evidence: operator-local `output/android-alpha-20261005/qa-report.json`, `native-basics.json`, `picker-disabled-txt.json`, `native-download-completed.png`, `native-pdf-upload.json`; screenshots that included unrelated phone files were deleted. Credentials, cookies and FCM token values are excluded.
+- Phone left on Alpha home with the authorized player session and push ON. QA-labelled messages and two private server files remain as evidence; no seed/reset or production writes.
+- Remaining external coverage: real Kakao callback, multi-device/account-switch/production isolation, map apps and geocoded venue fixtures, natural token refresh/OEM/foldable/multiwindow, signed upgrades and Play release gates. In-place Alpha upgrade failed signature compatibility and used an explicitly approved reinstall; this is not upgrade PASS.
+- No new project workflow/policy introduced; existing rules remain unchanged.

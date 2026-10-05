@@ -40,6 +40,17 @@ final class FileChooserPolicy {
             case ".heic" -> "image/heic";
             case ".heif" -> "image/heif";
             case ".pdf" -> "application/pdf";
+            case ".doc" -> "application/msword";
+            case ".docx" -> "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+            case ".xls" -> "application/vnd.ms-excel";
+            case ".xlsx" -> "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+            case ".ppt" -> "application/vnd.ms-powerpoint";
+            case ".pptx" -> "application/vnd.openxmlformats-officedocument.presentationml.presentation";
+            case ".hwp" -> "application/x-hwp";
+            case ".hwpx" -> "application/hwp+zip";
+            case ".txt" -> "text/plain";
+            case ".csv" -> "text/csv";
+            case ".zip" -> "application/zip";
             default -> value;
         };
     }

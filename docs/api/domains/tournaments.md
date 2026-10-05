@@ -297,3 +297,13 @@ All team roster mutations lock the registration row and re-read `rosterLockedAt`
 - 결과 확정 후 팀 배정은 기존 canonical advancement projection의 책임. 새 endpoint는 기록/점수를 만들거나 이미 끝난 경기의 결과를 추정하지 않음.
 - 공개 상세 `fixtures[].bracketSources`와 관리자 bracket fixture에 `[{ fixtureId, outcome: WINNER|LOSER, side: HOME|AWAY }]`를 반환. 대진표 비공개 게이트와 source 삭제 필터 유지. 공개되지 않은 대회에는 fixture 및 연결 전체를 노출하지 않음.
 - 부전승 선은 round12 groupTeam.isBye + quarter 슬롯의 같은 registrationId로 렌더. 별도 경기·가짜 승점 없음. 연결이 없는 수동 대진은 번호 순서로 추정하지 않음.
+
+### 라운드별 부전승 직접 등록 (2026-10-05)
+
+- `POST /admin/tournaments/:tournamentId/byes`: 인증 + mutation admin. 입력 `{ groupId: UUID, registrationId: UUID, sortOrder: integer(0..63) }`, 반환은 groupTeam. 감사 action `tournament.bracket.bye.save`.
+- 그룹 phase로 12강·8강·4강을 구분한다. 해당 대회의 confirmed 등록 하나만 필요하며 홈·어웨이 또는 경기 생성 없이 저장한다. 조에 이미 있는 팀은 부전승으로 전환하거나 위치를 갱신한다.
+- 12강 정원 12팀/부전승 4팀, 8강 정원 8팀/부전승 4팀, 4강 정원 4팀/부전승 2팀. 초과 `409 BYE_CAPACITY`; group/final/third_place는 `400 BYE_PHASE_INVALID`.
+- 다른 조의 같은 단계 부전승 중복 `409 BYE_ALREADY_IN_ROUND`; 같은 단계 경기 참가 중인 팀 `409 BYE_TEAM_HAS_MATCH`. 기존 경기 생성/수정도 해당 단계 부전승팀을 거절한다.
+- 부전승 groupTeam의 `sortOrder`는 해당 열의 일반 경기와 부전승을 합친 0부터의 삽입 위치다. UI에서는 1부터 표시한다. 예시 이미지의 12강은 위치 1·4·5·8에 부전승을 놓을 수 있다. 기존 일반 팀의 sortOrder 의미는 유지한다.
+- 저장된 경기 진출 연결과 다음 단계 실제 registrationId 자리 배정이 있으면 HOME/AWAY 가지를 우선한다. 부전승은 12강→8강, 8강→4강, 4강→결승으로 표시하며 미연결 항목도 지정 위치에서 표시한다. 결과에 따라 다음 경기 팀은 운영자가 직접 배정할 수 있고 이 API는 자동 배정하지 않는다.
+- 기존 `POST .../group-teams`의 isBye 입력은 12강 전용 호환 경로를 유지한다. 신규 직접 입력 UI는 위 byes 경로를 사용한다.

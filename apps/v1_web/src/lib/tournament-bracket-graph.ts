@@ -1,3 +1,4 @@
+import { byeRound } from './tournament-bracket-rounds';
 import type { V1TournamentFixture, V1TournamentGroup, V1TournamentGroupTeam } from '@/types/api';
 
 export type BracketGraphRound = { key: string; label: string; fixtures: V1TournamentFixture[] };
@@ -17,14 +18,17 @@ export function buildBracketGraph(rounds: BracketGraphRound[], groups: V1Tournam
       if (sourceNode && sourceIndex + 1 === targetIndex) edges.push({ source: source.fixtureId, target: node.id, side: source.side, outcome: source.outcome });
     }
   }
-  if (rounds.some((round) => round.key === 'round12')) {
-    const seen = new Set<string>();
-    for (const bye of groups.filter((group) => group.phase === 'round12').flatMap((group) => group.groupTeams.filter((team) => team.isBye))) {
-      if (seen.has(bye.registrationId)) continue;
-      seen.add(bye.registrationId);
-      const node: BracketGraphNode = { id: `bye:${bye.registrationId}`, round: 'round12', bye, y: 0 };
+  const seen = new Set<string>();
+  for (const group of groups) {
+    const meta = byeRound(group.phase);
+    if (!meta || !rounds.some((round) => round.key === group.phase)) continue;
+    for (const bye of group.groupTeams.filter((team) => team.isBye)) {
+      const key = group.phase + ':' + bye.registrationId;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const node: BracketGraphNode = { id: group.phase === 'round12' ? 'bye:' + bye.registrationId : 'bye:' + key, round: group.phase, bye, y: 0 };
       nodes.push(node); byId.set(node.id, node);
-      for (const target of nodes.filter((candidate) => candidate.round === 'quarter' && candidate.fixture)) {
+      for (const target of nodes.filter((candidate) => candidate.round === meta.next && candidate.fixture)) {
         for (const side of ['HOME', 'AWAY'] as const) {
           const registration = side === 'HOME' ? target.fixture!.homeRegistrationId : target.fixture!.awayRegistrationId;
           if (registration === bye.registrationId && !edges.some((edge) => edge.target === target.id && edge.side === side)) edges.push({ source: node.id, target: target.id, side, outcome: 'BYE' });
@@ -32,6 +36,20 @@ export function buildBracketGraph(rounds: BracketGraphRound[], groups: V1Tournam
       }
     }
   }
+  // sortOrder is the insertion position among matches and byes.
+  const rank = new Map<string, number>();
+  rounds.forEach((round, roundIndex) => {
+    const ordered = nodes.filter((node) => node.round === round.key && node.fixture);
+    const byes = nodes.filter((node) => node.round === round.key && node.bye)
+      .sort((a, b) => (a.bye!.sortOrder ?? 0) - (b.bye!.sortOrder ?? 0) || a.id.localeCompare(b.id));
+    let previousPosition = -1;
+    for (const node of byes) {
+      const position = Math.max(node.bye!.sortOrder ?? 0, previousPosition + 1);
+      ordered.splice(Math.min(position, ordered.length), 0, node);
+      previousPosition = position;
+    }
+    ordered.forEach((node, index) => rank.set(node.id, roundIndex * 1000 + index));
+  });
   // Traverse each destination backwards in HOME/AWAY order. Every pair shares
   // its own junction; there is no common spine connecting unrelated matches.
   let cursor = 0;
@@ -50,7 +68,12 @@ export function buildBracketGraph(rounds: BracketGraphRound[], groups: V1Tournam
     }
     return node.y;
   };
-  for (const round of [...rounds].reverse()) for (const node of nodes.filter((candidate) => candidate.round === round.key)) position(node);
+  const rootRank = (node: BracketGraphNode): number => {
+    const parents = edges.filter((edge) => edge.target === node.id).map((edge) => byId.get(edge.source)!);
+    return parents.length ? Math.min(...parents.map(rootRank)) : rank.get(node.id)!;
+  };
+  const roots = nodes.filter((node) => !edges.some((edge) => edge.source === node.id));
+  roots.sort((a, b) => rootRank(a) - rootRank(b)).forEach(position);
   return { nodes, edges, height: Math.max(cursor, 144) };
 }
 

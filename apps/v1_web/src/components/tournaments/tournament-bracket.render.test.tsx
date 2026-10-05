@@ -155,3 +155,10 @@ it('12강 경기가 아직 없어도 명시적 부전승을 8강 배정과 함�
   expect(screen.getByText('직행팀')).toBeVisible();
   expect(screen.getByRole('navigation', { name: '대진 단계 이동' })).toHaveTextContent('12강');
 });
+
+it.each([['quarter', '8강', '4강'], ['semi', '4강', '결승']] as const)('%s 부전승도 해당 라운드와 다음 단계를 구분한다', (phase, label, nextLabel) => {
+  render(<TournamentBracket fixtures={[]} groups={[{ id: phase, name: label, phase, sortOrder: 0, advanceCount: null, standings: [],
+    groupTeams: [{ id: 'bye', registrationId: 'direct', teamId: 'direct-team', teamName: '직행팀', teamLogoUrl: null, sortOrder: 0, isBye: true }] }]} />);
+  expect(screen.getByRole('region', { name: label + ' 부전승' })).toHaveTextContent('부전승 · ' + nextLabel + ' 직행');
+
+});

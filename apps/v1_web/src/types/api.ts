@@ -5028,3 +5028,10 @@ export type V1AdminRosterEligibleMember = {
 export type V1AdminRosterEligibleMembersResponse = {
   members: V1AdminRosterEligibleMember[];
 };
+
+export interface V1CreateBracketByePayload {
+  groupId: string;
+  registrationId: string;
+  /** Zero-based insertion position among matches and byes. */
+  sortOrder: number;
+}

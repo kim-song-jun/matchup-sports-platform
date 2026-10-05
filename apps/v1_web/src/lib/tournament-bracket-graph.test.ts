@@ -35,3 +35,43 @@ describe('경기별 진출 그래프', () => {
     expect(bracketConnectionPath({ x: 180, y: 50 }, { x: 236, y: 125 }, 'HOME')).toBe('M 180 50 H 202.4 V 125 H 236');
   });
 });
+
+it('12강 미연결 부전승 네 팀도 이미지의 경기 사이 위치에 놓는다', () => {
+  const graph = buildBracketGraph([{ key: 'round12', label: '12강', fixtures: ['r1', 'r2', 'r3', 'r4'].map((id) => fixture(id)) }],
+    [{ phase: 'round12', groupTeams: [0, 3, 4, 7].map((sortOrder, index) => ({ registrationId: 'b' + index, isBye: true, sortOrder })) } as V1TournamentGroup]);
+  expect([...graph.nodes].sort((a, b) => a.y - b.y).map((node) => node.id)).toEqual(['bye:b0', 'r1', 'r2', 'bye:b1', 'bye:b2', 'r3', 'r4', 'bye:b3']);
+  expect(graph.edges).toEqual([]);
+});
+it('8강과 4강 부전승은 각 다음 라운드의 실제 등록 팀 자리로 연결한다', () => {
+  const graph = buildBracketGraph([
+    { key: 'quarter', label: '8강', fixtures: [] },
+    { key: 'semi', label: '4강', fixtures: [{ ...fixture('s'), homeRegistrationId: 'b8' }] },
+    { key: 'final', label: '결승', fixtures: [{ ...fixture('f'), awayRegistrationId: 'b4' }] },
+  ], [
+    { phase: 'quarter', groupTeams: [{ registrationId: 'b8', isBye: true, sortOrder: 0 }] },
+    { phase: 'semi', groupTeams: [{ registrationId: 'b4', isBye: true, sortOrder: 1 }] },
+  ] as V1TournamentGroup[]);
+  expect(graph.edges).toContainEqual({ source: 'bye:quarter:b8', target: 's', side: 'HOME', outcome: 'BYE' });
+  expect(graph.edges).toContainEqual({ source: 'bye:semi:b4', target: 'f', side: 'AWAY', outcome: 'BYE' });
+});
+
+it('이미지의 12강 배치가 네 8강 가지와 각각 연결된다', () => {
+  const q = (id: string, sourceId: string, side: 'HOME' | 'AWAY', byeId: string): V1TournamentFixture => ({
+    ...fixture(id, [source(sourceId, side)]),
+    ...(side === 'HOME' ? { awayRegistrationId: byeId } : { homeRegistrationId: byeId }),
+  });
+  const graph = buildBracketGraph([
+    { key: 'round12', label: '12강', fixtures: ['r1', 'r2', 'r3', 'r4'].map((id) => fixture(id)) },
+    { key: 'quarter', label: '8강', fixtures: [q('q1', 'r1', 'AWAY', 'b0'), q('q2', 'r2', 'HOME', 'b1'), q('q3', 'r3', 'AWAY', 'b2'), q('q4', 'r4', 'HOME', 'b3')] },
+    { key: 'semi', label: '4강', fixtures: [fixture('s1', [source('q1', 'HOME'), source('q2', 'AWAY')]), fixture('s2', [source('q3', 'HOME'), source('q4', 'AWAY')])] },
+    { key: 'final', label: '결승', fixtures: [fixture('f', [source('s1', 'HOME'), source('s2', 'AWAY')])] },
+  ], [{ phase: 'round12', groupTeams: [0, 3, 4, 7].map((sortOrder, i) => ({ registrationId: 'b' + i, isBye: true, sortOrder })) } as V1TournamentGroup]);
+  const first = graph.nodes.filter((node) => node.round === 'round12').sort((a, b) => a.y - b.y);
+  expect(first.map((node) => node.id)).toEqual(['bye:b0', 'r1', 'r2', 'bye:b1', 'bye:b2', 'r3', 'r4', 'bye:b3']);
+  expect(graph.edges).toHaveLength(14);
+  expect(graph.nodes.filter((node) => node.fixture)).toHaveLength(11);
+  for (const id of ['q1', 'q2', 'q3', 'q4']) {
+    const sources = graph.edges.filter((edge) => edge.target === id).map((edge) => graph.nodes.find((node) => node.id === edge.source)!.y);
+    expect(graph.nodes.find((node) => node.id === id)!.y).toBe((sources[0] + sources[1]) / 2);
+  }
+});

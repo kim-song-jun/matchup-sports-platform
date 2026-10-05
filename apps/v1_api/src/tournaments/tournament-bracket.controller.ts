@@ -16,6 +16,7 @@ import {
   CreateFixtureDto,
   CreateGroupDto,
   CreateGroupTeamDto,
+  CreateBracketByeDto,
   RecordResultDto,
   UpdateFixtureDto,
   UpdateBracketSourcesDto,
@@ -45,6 +46,15 @@ export class TournamentBracketController {
     private readonly bracketService: TournamentBracketService,
     private readonly leagueFixtureGenerator: LeagueFixtureGeneratorService,
   ) {}
+
+  @Post('admin/tournaments/:tournamentId/byes')
+  createBye(
+    @CurrentUser() user: V1AuthUser,
+    @Param('tournamentId') tournamentId: string,
+    @Body() dto: CreateBracketByeDto,
+  ) {
+    return this.bracketService.createBye(user, tournamentId, dto);
+  }
 
   @Get('admin/competition-configs')
   listCompetitionConfigs(

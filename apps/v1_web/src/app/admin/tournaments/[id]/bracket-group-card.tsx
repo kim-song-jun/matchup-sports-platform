@@ -4,8 +4,9 @@ import { useEffect, useRef, useState } from 'react';
 import { Check, ChevronRight, Pencil, Plus, RefreshCw, Trash2, X } from 'lucide-react';
 import { EntityPicker, type EntityPickerItem } from '@/components/admin/entity-picker';
 import { AdminDataTable, AdminEmpty, type AdminTableColumn } from '@/components/admin';
+import { byeRound } from '@/lib/tournament-bracket-rounds';
 import { extractErrorMessage } from '@/lib/error-message';
-import type { useV1AssignGroupTeam, useV1CreateFixture } from '@/hooks/use-v1-api';
+import type { useV1AssignGroupTeam, useV1CreateFixture, useV1CreateBracketBye } from '@/hooks/use-v1-api';
 import type { V1AdminBracketFixture, V1AdminBracketGroup, V1AdminBracketStanding } from '@/types/api';
 import { computeQualifyingShortlist, isGroupReady } from './bracket-group-helpers';
 import { inputCls, submitBtnCls } from './bracket-shared-styles';
@@ -150,6 +151,7 @@ interface BracketGroupCardProps {
   confirmedTeamItems: EntityPickerItem[];
   assignGroupTeam: ReturnType<typeof useV1AssignGroupTeam>;
   createFixture: ReturnType<typeof useV1CreateFixture>;
+  createBye?: ReturnType<typeof useV1CreateBracketBye>;
   isAutoGenerating: boolean;
   onAutoGenerate: (groupId: string) => void;
   onEditGroup: (group: V1AdminBracketGroup) => void;
@@ -168,6 +170,7 @@ export function BracketGroupCard({
   confirmedTeamItems,
   assignGroupTeam,
   createFixture,
+  createBye,
   isAutoGenerating,
   onAutoGenerate,
   onEditGroup,
@@ -182,7 +185,8 @@ export function BracketGroupCard({
   // 다시 계산하면 "방금 4팀 배정 + 대진 생성까지 끝낸" 카드가 사용자 눈앞에서 접혀버린다.
   const [expanded, setExpanded] = useState(() => !isGroupReady(group, groupFixtures));
   const [isBatchAssigning, setIsBatchAssigning] = useState(false);
-  const [assignAsBye, setAssignAsBye] = useState(false);
+  const [entryType, setEntryType] = useState<'match' | 'bye'>('match');
+  const [byePosition, setByePosition] = useState('1');
   const [manualFixtureOpen, setManualFixtureOpen] = useState(false);
   const [fixtureRound, setFixtureRound] = useState('');
   const [fixtureNumber, setFixtureNumber] = useState('1');
@@ -217,7 +221,7 @@ export function BracketGroupCard({
         for (const registrationId of registrationIds) {
           await new Promise<void>((resolve, reject) => {
             assignGroupTeam.mutate(
-              { groupId: group.id, registrationId, ...(assignAsBye ? { isBye: true } : {}) },
+              { groupId: group.id, registrationId },
               { onSuccess: () => resolve(), onError: reject },
             );
           });
@@ -236,6 +240,16 @@ export function BracketGroupCard({
     ? ['12강', '8강', '4강', '결승', '3·4위전']
     : ['조별 1라운드', '조별 2라운드', '조별 3라운드', '조별 4라운드', '조별 5라운드'];
 
+  const byeGroup = allGroups.find((candidate) => candidate.id === group.id && byeRound(candidate.phase)?.label === fixtureRound)
+    ?? allGroups.find((candidate) => byeRound(candidate.phase)?.label === fixtureRound);
+  function suggestedByePosition(selectedGroup: V1AdminBracketGroup | undefined, savedPosition?: number) {
+    const used = new Set(selectedGroup?.groupTeams.filter((team) => team.isBye).map((team) => team.sortOrder + 1));
+    if (savedPosition !== undefined) used.add(savedPosition);
+    const preferred = selectedGroup?.phase === 'round12' ? [1, 4, 5, 8] : [1, 3, 5, 7];
+    return String(preferred.find((position) => !used.has(position)) ?? Array.from({ length: 64 }, (_, i) => i + 1).find((position) => !used.has(position)) ?? 64);
+  }
+  const validByePosition = /^\d+$/.test(byePosition) && Number(byePosition) >= 1 && Number(byePosition) <= 64;
+  const byePending = createBye?.isPending ?? false;
   const bookedInRound = new Set<string>();
   if (fixtureRound) {
     groupFixtures
@@ -252,6 +266,14 @@ export function BracketGroupCard({
 
   function handleCreateFixture(e: React.FormEvent) {
     e.preventDefault();
+    if (entryType === 'bye') {
+      if (!createBye || !byeGroup || !fixtureHomeRegId || !validByePosition) return;
+      createBye.mutate({ groupId: byeGroup.id, registrationId: fixtureHomeRegId, sortOrder: Number(byePosition) - 1 }, {
+        onSuccess: () => { setFixtureHomeRegId(''); setByePosition(suggestedByePosition(byeGroup, Number(byePosition))); showToast('부전승을 저장했어요.', 'success'); },
+        onError: (err) => showToast(extractErrorMessage(err, '부전승 저장에 실패했어요.'), 'error'),
+      });
+      return;
+    }
     if (!fixtureRound.trim() || !fixtureNumber) return;
     if (fixtureHomeRegId && fixtureHomeRegId === fixtureAwayRegId) {
       showToast('홈과 어웨이에 같은 팀을 선택할 수 없어요.', 'error');
@@ -296,7 +318,7 @@ export function BracketGroupCard({
   const bodyId = `bracket-group-${group.id}-body`;
 
   return (
-    <div ref={rootRef} className="rounded-2xl border border-[var(--border)] bg-[var(--card-surface)] overflow-hidden">
+    <div ref={rootRef} className="rounded-2xl border border-[var(--border)] bg-[var(--card-surface)] overflow-visible">
       <div className="flex items-start gap-2 px-5 py-4">
         <button
           type="button"
@@ -358,7 +380,7 @@ export function BracketGroupCard({
                     className="inline-flex items-center gap-1 pl-3 pr-1 py-0.5 rounded-full bg-[var(--surface-soft)] text-xs text-[var(--text-body)]"
                   >
                     {gt.teamName ?? gt.registrationId}
-                    {gt.isBye && <span> · 부전승 · 8강 직행</span>}
+                    {gt.isBye && <span> · {byeRound(group.phase)?.label} 부전승 · {byeRound(group.phase)?.nextLabel} 직행</span>}
                     <button
                       type="button"
                       onClick={() => onRemoveGroupTeam(gt.id, gt.teamName ?? '이 팀')}
@@ -393,13 +415,6 @@ export function BracketGroupCard({
           </div>
 
           {/* ── 팀 배정 ── */}
-          {group.phase === 'round12' && (
-            <label className="flex items-center gap-2 min-h-[44px] tm-text-body text-[var(--text-body)]">
-              <input type="checkbox" checked={assignAsBye} disabled={isBatchAssigning}
-                onChange={(event) => setAssignAsBye(event.target.checked)} />
-              선택한 팀을 부전승으로 배정 (최대 4팀 · 8강 대진은 직접 배정해 주세요)
-            </label>
-          )}
           <TeamStagingPicker
             pickerId={`bracket-group-${group.id}-team-search`}
             suggestedTeams={suggestedTeams}
@@ -438,7 +453,7 @@ export function BracketGroupCard({
                     id={`fixture-round-${group.id}`}
                     value={fixtureRound}
                     onChange={(e) => setFixtureRound(e.target.value)}
-                    disabled={createFixture.isPending}
+                    disabled={createFixture.isPending || byePending}
                     className={inputCls}
                   >
                     <option value="">라운드 선택</option>
@@ -447,6 +462,23 @@ export function BracketGroupCard({
                     ))}
                   </select>
                 </div>
+                <fieldset className="flex items-center gap-4">
+                  <legend className="text-[length:var(--font-size-label)] text-[var(--text-strong)]">등록 유형</legend>
+                  {(['match', 'bye'] as const).map((type) => <label key={type} className="inline-flex items-center gap-2 min-h-[44px]">
+                    <input type="radio" name={'entry-type-' + group.id} checked={entryType === type}
+                      disabled={createFixture.isPending || byePending || (type === 'bye' && (!createBye || !byeGroup))}
+                      onChange={() => { setEntryType(type); setFixtureAwayRegId(''); if (type === 'bye') setByePosition(suggestedByePosition(byeGroup)); }} />
+                    {type === 'match' ? '일반 경기' : '부전승'}
+                  </label>)}
+                  {!byeGroup && <span className="text-[length:var(--font-size-caption)] text-[var(--text-muted)]">부전승은 생성된 12강·8강·4강 조를 선택해 주세요.</span>}
+                </fieldset>
+                {entryType === 'bye' && <div className="flex flex-col gap-1">
+                  <label htmlFor={'bye-position-' + group.id}>대진표 위치</label>
+                  <input id={'bye-position-' + group.id} type="number" min="1" max="64" step="1" value={byePosition}
+                    onChange={(event) => setByePosition(event.target.value)} disabled={byePending} className={inputCls} />
+                  <p className="text-[length:var(--font-size-caption)] text-[var(--text-muted)]">경기와 부전승을 합친 위에서부터의 순서예요. 다음 라운드의 진출 자리가 정해지면 그 자리로 연결돼요.</p>
+                </div>}
+                {entryType === 'match' && <>
                 <div className="flex flex-col gap-1">
                   <label htmlFor={`fixture-number-${group.id}`} className="text-[length:var(--font-size-label)] text-[var(--text-strong)]">번호</label>
                   <input
@@ -456,13 +488,14 @@ export function BracketGroupCard({
                     min="1"
                     value={fixtureNumber}
                     onChange={(e) => setFixtureNumber(e.target.value)}
-                    disabled={createFixture.isPending}
+                    disabled={createFixture.isPending || byePending}
                     className={inputCls}
                   />
                 </div>
+                </>}
                 <div className="flex flex-col gap-1">
                   <label htmlFor={`fixture-home-${group.id}`} className="text-[length:var(--font-size-label)] text-[var(--text-strong)]">
-                    홈 팀 (선택)
+                    {entryType === 'bye' ? '부전승 팀' : '홈 팀 (선택)'}
                     {homeBooked && <span className="ml-1 text-xs text-[var(--orange700)]" aria-live="polite">이미 해당 라운드에 배정됨</span>}
                   </label>
                   <EntityPicker
@@ -470,11 +503,12 @@ export function BracketGroupCard({
                     value={confirmedTeamItems.find((it) => it.id === fixtureHomeRegId) ?? null}
                     onChange={(item) => setFixtureHomeRegId(item?.id ?? '')}
                     items={confirmedTeamItems.filter((it) => it.id !== fixtureAwayRegId)}
-                    disabled={createFixture.isPending}
+                    disabled={createFixture.isPending || byePending}
                     clearLabel="미정"
-                    placeholder="홈 팀 검색"
+                    placeholder={entryType === 'bye' ? '부전승 팀 검색' : '홈 팀 검색'}
                   />
                 </div>
+                {entryType === 'match' && <>
                 <div className="flex flex-col gap-1">
                   <label htmlFor={`fixture-away-${group.id}`} className="text-[length:var(--font-size-label)] text-[var(--text-strong)]">
                     어웨이 팀 (선택)
@@ -485,23 +519,24 @@ export function BracketGroupCard({
                     value={confirmedTeamItems.find((it) => it.id === fixtureAwayRegId) ?? null}
                     onChange={(item) => setFixtureAwayRegId(item?.id ?? '')}
                     items={confirmedTeamItems.filter((it) => it.id !== fixtureHomeRegId)}
-                    disabled={createFixture.isPending}
+                    disabled={createFixture.isPending || byePending}
                     clearLabel="미정"
                     placeholder="어웨이 팀 검색"
                   />
                 </div>
+                </>}
                 <div className="flex flex-col gap-1 items-start sm:col-span-2">
-                  {(sameTeam || hasBookingWarn) && (
+                  {entryType === 'match' && (sameTeam || hasBookingWarn) && (
                     <p className="text-xs text-[var(--orange700)]" role="alert">
                       {sameTeam ? '홈과 어웨이에 같은 팀을 선택할 수 없어요.' : '해당 라운드에 이미 배정된 팀이 있어요. 확인 후 추가해 주세요.'}
                     </p>
                   )}
                   <button
                     type="submit"
-                    disabled={!fixtureRound || !fixtureNumber || sameTeam || createFixture.isPending}
+                    disabled={entryType === 'bye' ? !byeGroup || !fixtureHomeRegId || !validByePosition || byePending : !fixtureRound || !fixtureNumber || sameTeam || createFixture.isPending}
                     className={submitBtnCls + ' w-full sm:w-auto'}
                   >
-                    <Plus size={14} aria-hidden="true" />경기 일정 추가
+                    <Plus size={14} aria-hidden="true" />{entryType === 'bye' ? '부전승 저장' : '경기 일정 추가'}
                   </button>
                 </div>
               </form>

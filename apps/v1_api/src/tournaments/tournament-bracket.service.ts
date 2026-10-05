@@ -21,6 +21,7 @@ import {
   CreateFixtureDto,
   CreateGroupDto,
   CreateGroupTeamDto,
+  CreateBracketByeDto,
   RecordResultDto,
   UpdateFixtureDto,
   UpdateBracketSourcesDto,
@@ -353,6 +354,52 @@ export class TournamentBracketService {
 
   // ─── fixture ──────────────────────────────────────────────────────────────
 
+  /** 부전승은 결과가 있는 경기 대신 라운드의 단독 진출 항목으로 저장한다. */
+  async createBye(user: V1AuthUser, tournamentId: string, dto: CreateBracketByeDto) {
+    const admin = await this.adminContext.getMutationAdmin(user.id);
+    await this.loadTournament(tournamentId);
+    const saved = await this.prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`league-fixture-generation:${tournamentId}`}, 0))`;
+      const group = await tx.v1TournamentGroup.findFirst({ where: { id: dto.groupId, tournamentId } });
+      if (!group) throw new NotFoundException({ code: 'GROUP_NOT_FOUND', message: '해당 대회의 조를 찾을 수 없어요.' });
+      const limits: Record<string, { teams: number; byes: number }> = {
+        round12: { teams: 12, byes: 4 }, quarter: { teams: 8, byes: 4 }, semi: { teams: 4, byes: 2 },
+      };
+      const limit = limits[group.phase];
+      if (!limit) throw new BadRequestException({ code: 'BYE_PHASE_INVALID', message: '부전승은 12강·8강·4강에서 등록할 수 있어요.' });
+      await tx.$queryRaw`SELECT id FROM v1_tournament_registrations WHERE id = ${dto.registrationId} FOR UPDATE`;
+      const registration = await tx.v1TournamentRegistration.findFirst({ where: { id: dto.registrationId, tournamentId } });
+      if (!registration) throw new NotFoundException({ code: 'REGISTRATION_NOT_FOUND', message: '해당 대회의 신청을 찾을 수 없어요.' });
+      if (registration.status !== 'confirmed') throw new ConflictException({ code: 'REGISTRATION_NOT_CONFIRMED', message: '확정된 신청만 부전승으로 등록할 수 있어요.' });
+      const assigned = await tx.v1TournamentGroupTeam.findMany({ where: { groupId: group.id } });
+      const existing = assigned.find((team) => team.registrationId === dto.registrationId);
+      if ((!existing && assigned.length >= limit.teams) || assigned.filter((team) => team.isBye && team.id !== existing?.id).length >= limit.byes) {
+        throw new ConflictException({ code: 'BYE_CAPACITY', message: '해당 라운드의 팀 또는 부전승 정원을 초과했어요.' });
+      }
+      const booked = await tx.v1TournamentMatchDetails.findFirst({ where: {
+        tournamentId, group: { phase: group.phase },
+        OR: [{ homeRegistrationId: dto.registrationId }, { awayRegistrationId: dto.registrationId }],
+        teamMatch: { deletedAt: null },
+      } });
+      if (booked) throw new ConflictException({ code: 'BYE_TEAM_HAS_MATCH', message: '해당 라운드의 경기에 배정된 팀은 부전승으로 등록할 수 없어요.' });
+      const duplicate = await tx.v1TournamentGroupTeam.findFirst({ where: {
+        registrationId: dto.registrationId, isBye: true,
+        group: { tournamentId, phase: group.phase }, NOT: { groupId: group.id },
+      } });
+      if (duplicate) throw new ConflictException({ code: 'BYE_ALREADY_IN_ROUND', message: '이 팀은 해당 라운드에 이미 부전승으로 등록되어 있어요.' });
+      const row = existing
+        ? await tx.v1TournamentGroupTeam.update({ where: { id: existing.id }, data: { isBye: true, sortOrder: dto.sortOrder } })
+        : await tx.v1TournamentGroupTeam.create({ data: { groupId: group.id, registrationId: dto.registrationId, isBye: true, sortOrder: dto.sortOrder } });
+      await this.adminContext.logAdminAction(admin, {
+        action: 'tournament.bracket.bye.save', targetType: 'tournament_group_team', targetId: row.id,
+        beforeJson: existing ? { isBye: existing.isBye, sortOrder: existing.sortOrder } : undefined,
+        afterJson: { tournamentId, groupId: group.id, phase: group.phase, registrationId: dto.registrationId, isBye: true, sortOrder: dto.sortOrder },
+      }, tx);
+      return row;
+    });
+    return this.serializeGroupTeam(saved);
+  }
+
   async createFixture(user: V1AuthUser, tournamentId: string, dto: CreateFixtureDto) {
     const admin = await this.adminContext.getMutationAdmin(user.id);
     const tournament = await this.loadTournament(tournamentId);
@@ -429,12 +476,12 @@ export class TournamentBracketService {
       if (dto.groupId && group === null) {
         throw new NotFoundException({ code: 'GROUP_NOT_FOUND', message: '해당 대회의 조를 찾을 수 없어요.' });
       }
-      if (dto.groupId && group?.phase === 'round12') {
+      if (dto.groupId && group && ['round12', 'quarter', 'semi'].includes(group.phase)) {
         const byeTeam = await tx.v1TournamentGroupTeam.findFirst({ where: {
           groupId: dto.groupId, isBye: true,
           registrationId: { in: [dto.homeRegistrationId, dto.awayRegistrationId].filter((id): id is string => typeof id === 'string') },
         } });
-        if (byeTeam) throw new ConflictException({ code: 'BYE_TEAM_HAS_MATCH', message: '부전승팀은 12강 경기에 넣을 수 없어요. 8강에 직접 배정해 주세요.' });
+        if (byeTeam) throw new ConflictException({ code: 'BYE_TEAM_HAS_MATCH', message: '부전승팀은 해당 라운드의 경기에 넣을 수 없어요. 다음 라운드에 직접 배정해 주세요.' });
       }
       const pinnedTournament = await findTournamentOnSurface(tx, TOURNAMENT_KINDS, {
         where: { id: tournamentId, deletedAt: null },
@@ -800,7 +847,7 @@ export class TournamentBracketService {
             groupId: canonical.groupId, isBye: true,
             registrationId: { in: [dto.homeRegistrationId, dto.awayRegistrationId].filter((id): id is string => typeof id === 'string') },
           } });
-          if (byeTeam) throw new ConflictException({ code: 'BYE_TEAM_HAS_MATCH', message: '부전승팀은 12강 경기에 넣을 수 없어요. 8강에 직접 배정해 주세요.' });
+          if (byeTeam) throw new ConflictException({ code: 'BYE_TEAM_HAS_MATCH', message: '부전승팀은 해당 라운드의 경기에 넣을 수 없어요. 다음 라운드에 직접 배정해 주세요.' });
         }
         const incoming = await tx.v1TournamentMatchAdvancementEdge.findMany({ where: { targetTeamMatchId: fixtureId } });
         if (incoming.some((edge) => edge.targetSide === 'HOME' ? dto.homeRegistrationId !== undefined && dto.homeRegistrationId !== canonical.homeRegistrationId : dto.awayRegistrationId !== undefined && dto.awayRegistrationId !== canonical.awayRegistrationId)) {

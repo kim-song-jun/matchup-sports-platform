@@ -47,6 +47,29 @@ describe('BracketGroupCard — 팀 일괄 배정', () => {
 
   const fixtures: V1AdminBracketFixture[] = [];
 
+
+  it('12강 부전승은 상대팀 없이 한 팀과 대진 위치만 저장한다', () => {
+    const group = { ...semiGroup, id: 'r12', name: '12강', phase: 'round12' as const };
+    const createBye = { mutate: vi.fn((_payload: unknown, options: { onSuccess: () => void }) => options.onSuccess()), isPending: false } as unknown as ReturnType<typeof import('@/hooks/use-v1-api').useV1CreateBracketBye>;
+    const createFixture = noopMutation();
+    render(<BracketGroupCard group={group} allGroups={[group]} allStandings={[]} fixtures={[]}
+      confirmedTeamItems={[{ id: 'reg-1', label: '강남FC' }]} assignGroupTeam={noopMutation() as unknown as ReturnType<typeof import('@/hooks/use-v1-api').useV1AssignGroupTeam>}
+      createFixture={createFixture} createBye={createBye} isAutoGenerating={false} onAutoGenerate={vi.fn()} onEditGroup={vi.fn()}
+      onDeleteGroup={vi.fn()} onRemoveGroupTeam={vi.fn()} autoFocus={false} showToast={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: /직접 입력/ }));
+    fireEvent.change(screen.getByLabelText('라운드'), { target: { value: '12강' } });
+    fireEvent.click(screen.getByLabelText('부전승'));
+    expect(screen.queryByLabelText('어웨이 팀 (선택)')).not.toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('대진표 위치'), { target: { value: '4' } });
+    fireEvent.change(screen.getByLabelText('부전승 팀'), { target: { value: '강남' } });
+    fireEvent.click(screen.getByRole('option', { name: /강남FC/ }));
+    fireEvent.click(screen.getByRole('button', { name: '부전승 저장' }));
+    expect(createBye.mutate).toHaveBeenCalledWith({ groupId: 'r12', registrationId: 'reg-1', sortOrder: 3 }, expect.any(Object));
+    expect(createFixture.mutate).not.toHaveBeenCalled();
+    expect(screen.getByLabelText('대진표 위치')).toHaveValue(1);
+    expect(screen.getByLabelText('부전승 팀')).toHaveValue('');
+  });
+
   it('예선 상위 진출팀 추천칩 2개를 담고 "2팀 배정"을 누르면 서로 다른 registrationId로 두 번 순차 호출된다', async () => {
     const mutateCalls: { groupId: string; registrationId: string }[] = [];
     const assignGroupTeam = {

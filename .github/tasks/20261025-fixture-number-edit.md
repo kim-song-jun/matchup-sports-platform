@@ -66,3 +66,8 @@ mutation admin와 기존 서비스 권한을 유지. DB migration 없음. 번호
 - touched paths TODO/FIXME/HACK/XXX 신규 marker0, diff check 통과. DB 통합 테스트는 로컬 Docker/DB가 없어 NOT RUN; CI/실제 alpha 범위를 별도 기록한다.
 - API 정본 문서의 생성 Game source가 TOURNAMENT_FIXTURE로 남은 drift도 실제 TEAM_MATCH 계약으로 동기화. README/global-contract에서 번호 수정 도메인 계약으로 연결함.
 - Unit 검증과 별개로 실제 Postgres에서 번호 저장·중복 시 장소 rollback·공개 재조회·일정 title·진출 UUID 유지·옛 좌표 신규 Game 생성 및 재시도를 검증하는 기존 integration suite 케이스 추가. 로컬 DB 부재로 실행 증거는 CI에 남긴다. 임시 fixture는 이 테스트 DB 안에서만 생성/삭제한다.
+- PR 최신 backend 계약 SHA3d32c72e 기준 CI37310340763 Gates/API/Web SUCCESS. 실제 Postgres integration122suite839passed(3skipped), API unit339suite4595passed. 새 tournament-round12-quarter suite PASS 로그 확인.
+- Copilot 요청은 실제 실패: GitHub Advanced Security37310346316 로그의 SessionModelError/monthly quota/402 quota. clean review가 도착한 것으로 표시하지 않는다. 직접 적대 검토의 권한/DTO/충돌/locking/결과·UUID/일정/명단/생성 세대/캐시9항목에서 blocking finding0.
+- 사용자가 직접 로그인 완료. baseline1440/768/390 actual screenshot + console/exception/network 오류0, remote mutation0. 결과 확정된12강2번 경기의 수정 창, 팀 picker 잠금 확인.
+- 첫 시각 검사 helper는768에서 숨겨진 모바일 메뉴 dialog를 잘못 골라 FAIL. 경기 수정 aria-labelledby를 기준으로 좁히고 재측정 PASS, 실패 로그 보존. 앱 상태나 오류를 숨기는 retry 없음.
+- baseline 모바일에서 긴 팀 chip이 수정 창 오른쪽으로 잘리는 기존 layout defect를 발견. 같은 수정 폼의 팀 입력을 모바일 세로/태블릿 이상 가로로 재배치하고 min-w-0로 폭을 제한. 마지막 이 수정은 CI 재검증 후 alpha에서 확인한다.

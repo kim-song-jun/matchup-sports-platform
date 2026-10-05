@@ -895,8 +895,8 @@ export function BracketTab({
               className={inputCls}
             />
           </div>
-          <div className="flex gap-3">
-            <div className="flex flex-col gap-1 flex-1">
+          <div className="flex flex-col gap-3 sm:flex-row">
+            <div className="flex min-w-0 flex-col gap-1 flex-1">
               <label htmlFor="edit-fx-home" className="text-[length:var(--font-size-label)] text-[var(--text-strong)]">홈 팀</label>
               <EntityPicker
                 id="edit-fx-home"
@@ -908,7 +908,7 @@ export function BracketTab({
                 placeholder="홈 팀 검색"
               />
             </div>
-            <div className="flex flex-col gap-1 flex-1">
+            <div className="flex min-w-0 flex-col gap-1 flex-1">
               <label htmlFor="edit-fx-away" className="text-[length:var(--font-size-label)] text-[var(--text-strong)]">어웨이 팀</label>
               <EntityPicker
                 id="edit-fx-away"

@@ -103,3 +103,35 @@ it('미정 12강 4경기·부전승 4자리와 8강4·4강2·결승1·3위전1�
   groups[0].groupTeams[0].registrationId = 'assigned-team';
   expect(buildBracketGraph(rounds, groups).nodes.find((node) => node.id === 'bye-slot:slot-0')?.bye?.registrationId).toBe('assigned-team');
 });
+
+
+it('부전승팀만 8강에 배정해도 미연결 경기들이 아래로 밀리거나 겹치지 않는다', () => {
+  const groups = [{ phase: 'round12', groupTeams: [0, 3, 4, 7].map((sortOrder, index) => ({
+    id: `slot-${index}`, registrationId: `b${index}`, isBye: true, sortOrder,
+  })) }] as V1TournamentGroup[];
+  const rounds = [
+    { key: 'round12', label: '12강', fixtures: ['r1', 'r2', 'r3', 'r4'].map((id) => fixture(id)) },
+    { key: 'quarter', label: '8강', fixtures: ['q1', 'q2', 'q3', 'q4'].map((id) => fixture(id)) },
+    { key: 'semi', label: '4강', fixtures: ['s1', 's2'].map((id) => fixture(id)) },
+    { key: 'final', label: '결승', fixtures: [fixture('f')] },
+  ];
+  const before = buildBracketGraph(rounds, groups);
+  const assigned = rounds.map((round) => round.key !== 'quarter' ? round : { ...round,
+    fixtures: round.fixtures.map((item, index) => ({ ...item, homeRegistrationId: `b${index}`, awayRegistrationId: `playing-${index}` })),
+  });
+  const after = buildBracketGraph(assigned, groups);
+  expect(before.height).toBe(896);
+  expect(after.height).toBe(before.height);
+  expect(after.edges).toHaveLength(4);
+  expect(after.edges.every((edge) => edge.outcome === 'BYE')).toBe(true);
+  expect(after.nodes.map((node) => [node.id, node.y])).toEqual(before.nodes.map((node) => [node.id, node.y]));
+  expect(after.nodes.filter((node) => node.round === 'quarter').map((node) => node.y)).toEqual([112, 336, 560, 784]);
+  for (const round of rounds) {
+    const column = after.nodes.filter((node) => node.round === round.key).sort((a, b) => a.y - b.y);
+    for (let index = 1; index < column.length; index++) {
+      const previousHalf = column[index - 1].bye ? 40 : 72;
+      const currentHalf = column[index].bye ? 40 : 72;
+      expect(column[index].y - column[index - 1].y).toBeGreaterThanOrEqual(previousHalf + currentHalf);
+    }
+  }
+});

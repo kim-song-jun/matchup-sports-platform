@@ -56,9 +56,12 @@ export function buildBracketGraph(rounds: BracketGraphRound[], groups: V1Tournam
     }
     ordered.forEach((node, index) => rank.set(node.id, roundIndex * 1000 + index));
   });
-  // An entirely TBD bracket has no advancement edges yet. Keep every round
-  // within the same vertical canvas without inventing winner relationships.
-  if (edges.length === 0) {
+  // Partial connections keep the existing shared canvas. A single assigned
+  // bye must not move unlinked rounds below the connected branches or make
+  // two next-round cards share the height of consecutive bye slots.
+  const hasUnlinkedSides = nodes.some((node) => node.fixture && node.round !== rounds[0]?.key
+    && new Set(edges.filter((edge) => edge.target === node.id).map((edge) => edge.side)).size < 2);
+  if (edges.length === 0 || hasUnlinkedSides) {
     const columns = rounds.map((round) => nodes.filter((node) => node.round === round.key).sort((a, b) => rank.get(a.id)! - rank.get(b.id)!));
     const columnHeights = columns.map((column) => column.reduce((sum, node) => sum + (node.bye ? 80 : 144), 0));
     const height = Math.max(144, ...columnHeights);

@@ -289,7 +289,7 @@ export function BracketTab({
     const group = allGroups.find((g) => g.id === targetGroupId);
     if (!group) return;
 
-    const isKnockout = group.phase === 'semi' || group.phase === 'final' || group.phase === 'third_place';
+    const isKnockout = group.phase !== 'group';
 
     if (!isKnockout) {
       // GROUP phase — 조별리그 대진은 서버가 만든다. 회전 수(1회전/2회전)를 모달에서 고른 뒤

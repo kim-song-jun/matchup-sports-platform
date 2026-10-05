@@ -132,14 +132,14 @@ describe('groupFixturesByRound', () => {
     expect(rounds[0].fixtures.map((f) => f.id)).toEqual(['fB', 'fC', 'fA']);
   });
 
-  it('uses fixture.round as key with sortIndex=100 when groupId is null', () => {
+  it('recognizes quarterfinal labels without a groupId', () => {
     const f = makeFixture({ id: 'f-free', fixtureNumber: 1, groupId: null, round: 'quarterfinal' });
 
     const rounds = groupFixturesByRound([f], []);
 
     expect(rounds).toHaveLength(1);
-    expect(rounds[0].key).toBe('quarterfinal');
-    expect(rounds[0].sortIndex).toBe(100);
+    expect(rounds[0].key).toBe('quarter');
+    expect(rounds[0].sortIndex).toBe(1);
   });
 
   it('uses fixture.round as fallback when groupId is present but group is not found', () => {
@@ -201,5 +201,18 @@ describe('groupFixturesByRound', () => {
 
     expect(rounds).toHaveLength(1);
     expect(rounds[0].fixtures.map((f) => f.id)).toEqual(['f2', 'f1']);
+  });
+});
+
+describe('12강·8강 결선 정렬', () => {
+  it('한글 라운드와 정식 단계를 같은 순서로 묶는다', () => {
+    const groups = [makeGroup({ id: 'r12', phase: 'round12' }), makeGroup({ id: 'q', phase: 'quarter' })];
+    const rounds = groupFixturesByRound([
+      makeFixture({ id: 'f', fixtureNumber: 1, round: '결승' }),
+      makeFixture({ id: 'q', fixtureNumber: 3, round: '8강', groupId: 'q' }),
+      makeFixture({ id: 's', fixtureNumber: 1, round: '4강' }),
+      makeFixture({ id: 'r', fixtureNumber: 1, round: '12강', groupId: 'r12' }),
+    ], groups);
+    expect(rounds.map((round) => round.label)).toEqual(['12강', '8강', '4강', '결승']);
   });
 });

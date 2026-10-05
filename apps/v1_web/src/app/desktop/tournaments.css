@@ -855,3 +855,19 @@
     max-height: var(--tm-pitch-max-h);
   }
 }
+
+/* Multiple knockout matches need the full row below the detail/CTA columns. */
+@media (min-width: 1024px) {
+  .tm-tournament-detail-bracket[data-connected-bracket-wide="true"] {
+    grid-column: 1 / -1;
+  }
+}
+
+.tm-tournament-detail-aside-boundary { display: contents; }
+@media (min-width: 1024px) {
+  .tm-tournament-detail-grid:has(> .tm-tournament-detail-bracket[data-connected-bracket-wide="true"]) > .tm-tournament-detail-aside-boundary {
+    display: block;
+    align-self: stretch;
+    min-width: 0;
+  }
+}

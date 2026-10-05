@@ -1,3 +1,11 @@
+## 2026-10-05 — 4강·8강·12강 경기별 연결선
+
+[작업 문서](../../.github/tasks/20261004-tournament-round12-quarter.md): 기존 canonical 진출 edge 관리·공개 응답 + SVG 경기별 연결선 + desktop 전체 행/모바일 단계 이동. API150·Web116·실제 DB2 통과, 양쪽 타입 및 패턴/surface PASS. 사용자 지정 상세 shell에서 명시적인 browser-local 예시 9/9 확인(4/8/12×390/768/1440, 카드/aside 겹침0, overflow0, JS error0). 비로그인 auth/me401은 기록. [12강 모습](../screenshots/tournament-connected-bracket/12-desktop.png). **실제 alpha 변경 후 QA 0/3, push 승인 대기로 배포 전.**
+
+## 2026-10-04 — 12강·8강 수동 대진 관리
+
+[작업 문서](../../.github/tasks/20261004-tournament-round12-quarter.md): 관리자 정식 단계·부전승 저장·사용자 결선 표시 확장. API 128/128·Web 64/64, 실제 PostgreSQL 통합 1/1, 192 migration 재생·드리프트 0. 원격 push가 자동 승인 검토에서 차단되어 PR/alpha 배포 및 변경 후 3폭 QA는 미실행. 실제 대회 데이터 변경 없음.
+
 # Teameet QA Scenario Index
 
 ## 2026-10-03 — 종료 팀매치 카드 전체 dim / DEV 요청

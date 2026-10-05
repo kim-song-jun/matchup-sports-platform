@@ -9,6 +9,7 @@ import {
 } from '@prisma/client';
 // 같은 `prisma/` 폴더 안의 모듈이라 프로덕션 이미지에도 함께 복사된다 — 아래 경고가 금지하는
 // 건 이 이미지에 없는 `../src/...` import 다.
+import { seedAlphaRound12Manual } from './seed-alpha-round12-manual';
 import { seedAlphaQaSquads } from './seed-alpha-qa-squads';
 import { refreshAlphaTeamMembershipCounts } from './seed-alpha-membership-counts';
 import { deterministicCanonicalMatchId, ensureCanonicalOfficialResult, ensureCanonicalTournamentMatch, findTournamentOnSurfaceOrThrow } from './canonical-tournament-seed';
@@ -1153,7 +1154,11 @@ async function main() {
         qaSquads: squads,
       };
     });
-    process.stdout.write(`${JSON.stringify({ status: 'ok', ...summary })}\n`);
+    if (!admin) throw new Error('An active admin is required for the manual round12 QA tournament.');
+    const manualRound12 = await prisma.$transaction((tx) => seedAlphaRound12Manual(tx, {
+      sportId: sport.id, regionId: region.id, adminId: admin.id, competitionConfigVersionId, now: new Date(),
+    }), { timeout: 15000 });
+    process.stdout.write(`${JSON.stringify({ status: 'ok', ...summary, manualRound12 })}\n`);
   } finally {
     await prisma.$disconnect();
   }

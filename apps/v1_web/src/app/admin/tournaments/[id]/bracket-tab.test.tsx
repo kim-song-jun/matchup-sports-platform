@@ -93,6 +93,7 @@ vi.mock('@/hooks/use-v1-api', () => ({
   useV1CreateGroup: noopMutation,
   useV1AssignGroupTeam: noopMutation,
   useV1CreateFixture: noopMutation,
+  useV1CreateBracketBye: noopMutation,
   useV1RecalculateStandings: noopMutation,
   useV1UpdateFixture: () => ({ mutate: updateFixtureMutate, mutateAsync: vi.fn(), isPending: false }),
   useV1DeleteFixture: () => ({ mutate: deleteFixtureMutate, mutateAsync: vi.fn(), isPending: false }),

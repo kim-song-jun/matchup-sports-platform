@@ -1,5 +1,7 @@
 'use client';
 
+import { byeRound } from '@/lib/tournament-bracket-rounds';
+
 /**
  * TournamentBracket — World Cup 스타일 결선 대진표.
  *
@@ -10,6 +12,7 @@
  */
 
 import { Fragment, useRef, useState, useCallback, useEffect } from 'react';
+import { buildBracketGraph, bracketConnectionPath, type BracketGraphRound } from '@/lib/tournament-bracket-graph';
 import { Trophy } from 'lucide-react';
 import { TeamAvatar } from '@/components/v1-ui/team-avatar';
 import { formatTournamentDateTimeShort } from '@/lib/date-utils';
@@ -25,12 +28,16 @@ interface RoundGroup {
 }
 
 const PHASE_ORDER: Record<string, number> = {
-  semi: 0,
-  final: 1,
-  third_place: 2,
+  round12: 0,
+  quarter: 1,
+  semi: 2,
+  final: 3,
+  third_place: 4,
 };
 
 const PHASE_LABEL: Record<string, string> = {
+  round12: '12강',
+  quarter: '8강',
   semi: '4강',
   final: '결승',
   third_place: '3·4위전',
@@ -41,6 +48,8 @@ function getFixturePhase(round: string): keyof typeof PHASE_ORDER | null {
 
   if (normalized.includes('third_place') || normalized.includes('3·4위전') || normalized.includes('3-4위전')) return 'third_place';
   if (normalized === 'final' || normalized === '결승') return 'final';
+  if (normalized === 'round12' || normalized === '12강') return 'round12';
+  if (normalized === 'quarter' || normalized === 'quarterfinal' || normalized === '8강') return 'quarter';
   if (normalized === 'semi' || normalized === 'semifinal' || normalized === '4강') return 'semi';
   return null;
 }
@@ -61,22 +70,9 @@ export function groupFixturesByRound(
     let sortIndex: number;
     const fixturePhase = getFixturePhase(fixture.round);
 
-    if (fixturePhase) {
-      key = fixturePhase;
-      sortIndex = PHASE_ORDER[fixturePhase];
-    } else if (fixture.groupId !== null) {
-      const group = groupById.get(fixture.groupId);
-      if (group) {
-        key = group.phase;
-        sortIndex = PHASE_ORDER[group.phase] ?? 99;
-      } else {
-        key = fixture.round;
-        sortIndex = PHASE_ORDER[fixture.round] ?? 100;
-      }
-    } else {
-      key = fixture.round;
-      sortIndex = PHASE_ORDER[fixture.round] ?? 100;
-    }
+    const group = fixture.groupId ? groupById.get(fixture.groupId) : undefined;
+    key = fixturePhase ?? group?.phase ?? fixture.round;
+    sortIndex = PHASE_ORDER[key] ?? 100;
 
     const existing = roundMap.get(key);
     if (existing) {
@@ -85,6 +81,13 @@ export function groupFixturesByRound(
       if (sortIndex < existing.sortIndex) existing.sortIndex = sortIndex;
     } else {
       roundMap.set(key, { key, label: getRoundLabel(key), sortIndex, fixtures: [fixture] });
+    }
+  }
+
+  for (const group of groups) {
+    const meta = byeRound(group.phase);
+    if (meta && !roundMap.has(group.phase) && group.groupTeams.some((team) => team.isBye)) {
+      roundMap.set(group.phase, { key: group.phase, label: meta.label, sortIndex: PHASE_ORDER[group.phase], fixtures: [] });
     }
   }
 
@@ -373,19 +376,20 @@ function slotCY(i: number) {
 
 /* ── 팀 행 ── */
 function MatchTeamRow({
-  teamId, name, logoUrl, score, isWinner, isLoser,
+  teamId, name, logoUrl, score, isWinner, isLoser, isPending = false,
 }: {
-  teamId: string | null; name: string | null; logoUrl: string | null; score: number | null; isWinner: boolean; isLoser: boolean;
+  teamId: string | null; name: string | null; logoUrl: string | null; score: number | null; isWinner: boolean; isLoser: boolean; isPending?: boolean;
 }) {
   const { label, isPlaceholder } = teamDisplayName(name);
-  const decided = !isPlaceholder;
+  const decided = !isPlaceholder && !isPending;
   return (
     <div
       className="tm-bk2-row"
       data-winner={isWinner ? 'true' : undefined}
       data-loser={isLoser ? 'true' : undefined}
+      data-bracket-team-row
     >
-      <TeamAvatar seed={teamId ?? label} name={label} logoUrl={logoUrl} size="sm" />
+      {isPending ? <span className="tm-on-tint" aria-hidden="true" style={{ width: 28, height: 28, borderRadius: 'var(--radius-control)', flexShrink: 0, display: 'grid', placeItems: 'center', background: 'var(--grey100)', color: 'var(--text-caption)' }}>—</span> : <TeamAvatar seed={teamId ?? label} name={label} logoUrl={logoUrl} size="sm" />}
       <span className="tm-bk2-name" style={!decided ? { color: 'var(--text-caption)' } : undefined}>{label}</span>
       {score !== null && <span className="tm-bk2-score tab-num">{score}</span>}
       {score === null && decided && <span className="tm-bk2-score" style={{ opacity: 0.25 }}>-</span>}
@@ -426,12 +430,14 @@ function MatchCard({ fixture }: { fixture: V1TournamentFixture }) {
       <MatchTeamRow
         teamId={fixture.homeTeamId} logoUrl={fixture.homeTeamLogoUrl}
         name={fixture.homeTeamName} score={hasResult ? fixture.result!.homeScore : null}
+        isPending={fixture.homeRegistrationId === null && fixture.bracketSources?.some((source) => source.side === 'HOME')}
         isWinner={winner === 'home'} isLoser={isDone && winner === 'away'}
       />
       <div className="tm-bk2-divider" aria-hidden="true" />
       <MatchTeamRow
         teamId={fixture.awayTeamId} logoUrl={fixture.awayTeamLogoUrl}
         name={fixture.awayTeamName} score={hasResult ? fixture.result!.awayScore : null}
+        isPending={fixture.awayRegistrationId === null && fixture.bracketSources?.some((source) => source.side === 'AWAY')}
         isWinner={winner === 'away'} isLoser={isDone && winner === 'home'}
       />
       {badges.length === 1 && <div className={badges[0].className}>{badges[0].label}</div>}
@@ -585,7 +591,7 @@ function BracketRoundCol({
   const slotCount = matchups ? matchups.length : round.fixtures.length;
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', width: COL_W, flexShrink: 0 }}>
+    <div data-bracket-round={round.key} style={{ display: 'flex', flexDirection: 'column', width: COL_W, flexShrink: 0 }}>
       {/* 라운드 라벨 */}
       <div style={{ height: HEAD_H, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <span className="tm-bk2-pill">{headLabel}</span>
@@ -594,12 +600,14 @@ function BracketRoundCol({
       <div style={{
         height: h, position: 'relative',
         display: 'flex', flexDirection: 'column',
-        justifyContent: centered ? 'center' : 'flex-start',
+        justifyContent: centered ? 'space-around' : 'flex-start',
       }}>
         {centered && !matchups ? (
           /* 결승: 세로 정중앙 — single-leg only */
           round.fixtures.map((fix) => (
-            <MatchCard key={fix.id} fixture={fix} />
+            <div key={fix.id} style={{ height: SLOT_H, display: 'flex', alignItems: 'center' }}>
+              <MatchCard fixture={fix} />
+            </div>
           ))
         ) : matchups ? (
           /* multi-leg: 합산 카드 */
@@ -655,6 +663,77 @@ function BracketEmpty() {
   );
 }
 
+/** SVG endpoints are measured from rendered cards/rows, including badges and logos. */
+function ConnectedBracket({ rounds, groups, champion }: { rounds: BracketGraphRound[]; groups: V1TournamentGroup[]; champion: string | null }) {
+  const graph = buildBracketGraph(rounds, groups);
+  const canvas = useRef<HTMLDivElement>(null);
+  const [paths, setPaths] = useState<Array<{ id: string; d: string; label: string; decided: boolean }>>([]);
+  useEffect(() => {
+    const element = canvas.current;
+    if (!element) return;
+    const measure = () => {
+      const bounds = element.getBoundingClientRect();
+      const cards = new Map(Array.from(element.querySelectorAll<HTMLElement>('[data-bracket-node]')).map((card) => [card.dataset.bracketNode!, card]));
+      const next = graph.edges.flatMap((edge) => {
+        const source = cards.get(edge.source);
+        const target = cards.get(edge.target);
+        const row = target?.querySelectorAll<HTMLElement>('[data-bracket-team-row]')[edge.side === 'HOME' ? 0 : 1];
+        if (!source || !target || !row) return [];
+        const from = (source.querySelector<HTMLElement>('.tm-bk2-card') ?? source).getBoundingClientRect();
+        const to = row.getBoundingClientRect();
+        const sourceFixture = graph.nodes.find((node) => node.id === edge.source)?.fixture;
+        return [{ id: `${edge.source}:${edge.target}:${edge.side}`, d: bracketConnectionPath({ x: from.right - bounds.left, y: from.top + from.height / 2 - bounds.top }, { x: to.left - bounds.left, y: to.top + to.height / 2 - bounds.top }, edge.side), label: `${sourceFixture ? `${sourceFixture.fixtureNumber}번 경기 ${edge.outcome === 'LOSER' ? '패자' : '승자'}` : '부전승'} → ${graph.nodes.find((node) => node.id === edge.target)?.fixture?.fixtureNumber}번 경기 ${edge.side === 'HOME' ? '홈' : '어웨이'}`, decided: edge.outcome === 'BYE' || (sourceFixture?.status === 'completed' && getWinner(sourceFixture) !== null) }];
+      });
+      const final = rounds.find((round) => round.key === 'final')?.fixtures[0];
+      const source = final && cards.get(final.id);
+      const trophy = element.querySelector<HTMLElement>('[data-bracket-champion]');
+      if (source && trophy) {
+        const from = source.getBoundingClientRect(); const to = trophy.getBoundingClientRect();
+        next.push({ id: 'champion', d: bracketConnectionPath({ x: from.right - bounds.left, y: from.top + from.height / 2 - bounds.top }, { x: to.left - bounds.left, y: to.top + to.height / 2 - bounds.top }, 'HOME'), label: '결승 승자 → 우승', decided: champion !== null });
+      }
+      setPaths(next);
+    };
+    measure();
+    if (typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(measure);
+    observer.observe(element);
+    element.querySelectorAll('[data-bracket-node]').forEach((card) => observer.observe(card));
+    return () => observer.disconnect();
+  }, [rounds, groups, champion]);
+  const minWidth = rounds.length * COL_W + rounds.length * 40 + CHAMP_W;
+  const finalY = graph.nodes.find((node) => node.round === 'final')?.y ?? graph.height / 2;
+  return <div ref={canvas} style={{ position: 'relative', display: 'flex', width: '100%', minWidth, height: graph.height + HEAD_H }}>
+    <svg aria-label="경기별 진출 연결선" role="img" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none', overflow: 'visible' }}>
+      {paths.map((path) => <path key={path.id} d={path.d} fill="none" stroke={path.decided ? 'var(--blue500)' : 'var(--grey300)'} strokeWidth={2} strokeLinejoin="round"><title>{path.label}</title></path>)}
+    </svg>
+    {rounds.map((round) => <Fragment key={round.key}>
+      <div data-bracket-round={round.key} style={{ width: COL_W, flexShrink: 0, position: 'relative' }}>
+        <div style={{ height: HEAD_H, display: 'flex', justifyContent: 'center', alignItems: 'center' }}><span className="tm-bk2-pill">{round.label}</span></div>
+        {graph.nodes.filter((node) => node.round === round.key).map((node) => {
+          const fixture = node.fixture;
+          const sourceLabel = (side: 'HOME' | 'AWAY') => {
+            const edge = fixture?.bracketSources?.find((source) => source.side === side);
+            const source = rounds.flatMap((stage) => stage.fixtures).find((item) => item.id === edge?.fixtureId);
+            const stage = rounds.find((stage) => stage.fixtures.some((item) => item.id === edge?.fixtureId));
+            return source ? `${stage?.label ?? ''} ${source.fixtureNumber}경기 ${edge?.outcome === 'LOSER' ? '패자' : '승자'}` : 'TBD';
+          };
+          return <div key={node.id} data-bracket-node={node.id} style={{ position: 'absolute', width: COL_W, top: HEAD_H + node.y, transform: 'translateY(-50%)' }}>
+            {fixture ? <>
+              <p className="tm-text-micro" style={{ marginBottom: 4, color: 'var(--text-caption)' }}>{fixture.fixtureNumber}번 경기</p>
+              <MatchCard fixture={{ ...fixture, homeTeamName: fixture.homeTeamName === 'TBD' ? sourceLabel('HOME') : fixture.homeTeamName, awayTeamName: fixture.awayTeamName === 'TBD' ? sourceLabel('AWAY') : fixture.awayTeamName }} />
+            </> : node.bye ? <div className="tm-bk2-card" role="region" aria-label={`${byeRound(node.round)?.label} 부전승`} style={{ padding: 12 }}>
+              <div className="tm-text-caption-strong" style={{ color: 'var(--blue700)', marginBottom: 8 }}>부전승 · {byeRound(node.round)?.nextLabel} 직행</div>
+              <div className="flex items-center gap-2"><TeamAvatar seed={node.bye.teamId ?? node.bye.registrationId ?? node.bye.id} name={teamDisplayName(node.bye.registrationId === null ? 'TBD' : node.bye.teamName).label} logoUrl={node.bye.teamLogoUrl} size="sm" /><span className="tm-text-caption-strong">{teamDisplayName(node.bye.registrationId === null ? 'TBD' : node.bye.teamName).label}</span></div>
+            </div> : null}
+          </div>;
+        })}
+      </div>
+      <div aria-hidden="true" style={{ flex: '1 0 40px' }} />
+    </Fragment>)}
+    <div style={{ width: CHAMP_W, flexShrink: 0, position: 'relative' }}><div data-bracket-champion style={{ position: 'absolute', top: HEAD_H + finalY, width: CHAMP_W, transform: 'translateY(-50%)' }}><ChampionSlot champion={champion} /></div></div>
+  </div>;
+}
+
 /* ── Public Component ── */
 
 export interface TournamentBracketProps {
@@ -664,7 +743,7 @@ export interface TournamentBracketProps {
 
 export function TournamentBracket({ fixtures, groups }: TournamentBracketProps) {
   const rounds = groupFixturesByRound(fixtures, groups);
-  if (fixtures.length === 0 || rounds.length === 0) return <BracketEmpty />;
+
 
   const mainRounds = rounds.filter((r) => r.key !== 'third_place');
   const thirdPlace = rounds.find((r) => r.key === 'third_place') ?? null;
@@ -733,8 +812,27 @@ export function TournamentBracket({ fixtures, groups }: TournamentBracketProps) 
     return () => observer.disconnect();
   }, [mainRounds.length]);
 
+  if (rounds.length === 0) return <BracketEmpty />;
+  const usesAggregate = mainRounds.some((round) => isMultiLeg(round.fixtures));
+  const hasUnlinked = mainRounds.slice(1).some((round) => round.fixtures.some((fixture) => !(fixture.bracketSources?.length)));
+
   return (
     <div>
+      {mainRounds.length > 1 && (
+        <nav aria-label="대진 단계 이동" className="flex flex-wrap gap-2 mb-3">
+          {mainRounds.map((round) => (
+            <button key={round.key} type="button" className="tm-chip" onClick={() => {
+              const container = scrollRef.current;
+              const column = Array.from(container?.querySelectorAll<HTMLElement>('[data-bracket-round]') ?? []).find((element) => element.dataset.bracketRound === round.key);
+              if (container && column) container.scrollTo({
+                left: column.getBoundingClientRect().left - container.getBoundingClientRect().left + container.scrollLeft,
+                behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth',
+              });
+            }}>{round.label}</button>
+          ))}
+        </nav>
+      )}
+      {hasUnlinked && <p className="tm-text-caption mb-3">진출 연결이 등록된 경기만 선으로 이어져요. 연결되지 않은 경기는 별도로 표시해요.</p>}
       {/* 실제로 스크롤할 내용이 없으면(트리가 컬럼 폭 안에 다 들어옴) 힌트 자체가
           거짓 안내가 되므로 숨긴다 — 데스크톱 전용 CSS(.tm-bracket-page-grid
           .tm-bk2-scroll-hint)와 별개로 모바일 폭에서도 동일하게 적용. */}
@@ -760,7 +858,8 @@ export function TournamentBracket({ fixtures, groups }: TournamentBracketProps) 
           {/* width:100%로 래퍼 폭을 채우려 하되, 라운드 컬럼·커넥터 최소폭(flexShrink:0
               / minWidth)의 합이 그보다 크면 자연스럽게 오버플로해 상위 overflowX:auto가
               스크롤을 켠다. 남는 폭은 각 ConnectorSegment의 연장선(flex-grow)이 흡수한다. */}
-          <div ref={contentRef} style={{ display: 'flex', width: '100%', alignItems: 'flex-start', paddingRight: 8 }}>
+          <div ref={contentRef}>
+            {usesAggregate ? (          <div  style={{ display: 'flex', width: '100%', alignItems: 'flex-start', paddingRight: 8 }}>
 
             {mainRounds.map((round, idx) => {
               const isFirst = idx === 0;
@@ -795,6 +894,7 @@ export function TournamentBracket({ fixtures, groups }: TournamentBracketProps) 
             })}
 
             <ChampionCol champion={champion} h={treeH} />
+          </div>) : <ConnectedBracket rounds={mainRounds} groups={groups} champion={champion} />}
           </div>
         </div>
 

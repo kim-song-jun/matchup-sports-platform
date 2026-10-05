@@ -22,6 +22,7 @@ import { hasStoredV1Session, sanitizeRedirectPath, withFromPath } from '@/lib/se
 import { getSportAccent } from '@/lib/v1-sport-accent';
 import { getTournamentStatusConfig } from '@/lib/v1-tournament-status';
 import { competitionMatchLabel } from '@/lib/tournament-round-label';
+import { compareTournamentGroupNames } from '@/lib/tournament-display-order';
 import { splitPrizeSegments, isPrizeAmountValue, formatPrizeRowValue } from '@/lib/prize-breakdown';
 import { TournamentBracket } from '@/components/tournaments/tournament-bracket';
 import { LeagueFixtureCard } from '@/components/tournaments/league-fixture-card';
@@ -2016,7 +2017,8 @@ export function partitionTournamentSections(
   fixtures: V1TournamentFixture[],
   groups: V1TournamentGroup[],
 ) {
-  const groupPhaseGroups = groups.filter((g) => g.phase === 'group');
+  const groupPhaseGroups = groups.filter((g) => g.phase === 'group')
+    .sort((a, b) => compareTournamentGroupNames(a.name, b.name));
   const knockoutPhases = new Set(['round12', 'quarter', 'semi', 'final', 'third_place']);
   const knockoutGroupIds = new Set(
     groups.filter((g) => knockoutPhases.has(g.phase)).map((g) => g.id),

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildScheduleFilters, groupScheduleEntries } from './schedule-grouping';
+import { buildScheduleFilters, groupScheduleEntries, groupUnscheduledEntries, partitionLiveSchedule } from './schedule-grouping';
 import type { PublicScheduleEntry } from './types';
 
 /**
@@ -41,6 +41,33 @@ const ALPHA_SHAPE: PublicScheduleEntry[] = [
 ];
 
 describe('groupScheduleEntries', () => {
+  it('생성/경기 번호와 관계없이 조별 A/B/C 다음 12강/8강/4강/결승 순으로 정렬한다', () => {
+    const entries = [
+      entry({ fixtureId: 'semi', round: 'semi', fixtureNumber: 1 }),
+      entry({ fixtureId: 'b', round: 'group', groupName: 'B조', fixtureNumber: 1 }),
+      entry({ fixtureId: 'c', round: 'league_r1', groupName: 'C조', fixtureNumber: 1 }),
+      entry({ fixtureId: 'a', round: 'group', groupName: 'A조', fixtureNumber: 99 }),
+      entry({ fixtureId: 'final', round: 'final', fixtureNumber: 1 }),
+      entry({ fixtureId: 'quarter', round: 'quarter', fixtureNumber: 1 }),
+      entry({ fixtureId: 'r12', round: 'round12', fixtureNumber: 1 }),
+    ];
+    expect(groupScheduleEntries(entries).flatMap(phase => phase.groups.map(group => group.label)))
+      .toEqual(['A조', 'B조', 'C조', '12강', '8강', '4강', '결승']);
+    expect(groupUnscheduledEntries(entries).map(group => group.label))
+      .toEqual(['A조', 'B조', 'C조', '12강', '8강', '4강', '결승']);
+  });
+
+  it('시간 미정/확정 모두 여러 live 경기를 추출하고 이미 종료/예정 경기는 올리지 않는다', () => {
+    const current = entry({ fixtureId: 'live-a', round: 'group', status: 'live', fixtureNumber: 1 });
+    const next = entry({ fixtureId: 'scheduled', round: 'final', status: 'scheduled', fixtureNumber: 1, scheduledAt: '2020-01-01T00:00:00Z' });
+    const ended = entry({ fixtureId: 'ended', round: 'semi', status: 'ended', fixtureNumber: 1 });
+    const second = entry({ fixtureId: 'live-b', round: 'quarter', status: 'live', fixtureNumber: 2 });
+    const result = partitionLiveSchedule([ended, current, next], [current, second]);
+    expect(result.live.map(item => item.fixtureId)).toEqual(['live-a', 'live-b']);
+    expect(result.items.map(item => item.fixtureId)).toEqual(['ended', 'scheduled']);
+    expect(result.unscheduled).toEqual([]);
+  });
+
   it('조별리그와 결선으로 나누고, 각 단계 안에서 진행 순서대로 묶는다', () => {
     const phases = groupScheduleEntries(ALPHA_SHAPE);
 

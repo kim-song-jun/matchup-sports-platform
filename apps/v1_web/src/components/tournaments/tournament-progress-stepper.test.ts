@@ -50,6 +50,39 @@ function shape(stages: ReturnType<typeof buildTournamentStages>) {
 }
 
 describe('buildTournamentStages — 한국어 라운드 라벨', () => {
+  it.each([
+    ['group', 'semi', 'quarter', 'round12', 'final'],
+    ['조별리그', '4강', '8강', '12강', '결승'],
+  ])('경기 번호와 응답 순서보다 결선 규모를 우선한다 (%s)', (...rounds) => {
+    const stages = buildTournamentStages(tournament({
+      format: 'group_knockout',
+      status: 'in_progress',
+      fixtures: rounds.map((round, index) => fixture({
+        round,
+        fixtureNumber: index + 1,
+        liveStatus: index === 2 ? 'live' : 'scheduled',
+      })),
+    }));
+
+    expect(shape(stages)).toEqual([
+      ['조별리그', 'done'],
+      ['12강', 'done'],
+      ['8강', 'active'],
+      ['4강', 'upcoming'],
+      ['결승', 'upcoming'],
+    ]);
+  });
+
+  it('각 라운드의 경기 번호가 1이어도 12강 → 8강 → 4강 → 결승으로 세운다', () => {
+    const stages = buildTournamentStages(tournament({
+      format: 'group_knockout',
+      status: 'in_progress',
+      fixtures: ['group', 'semi', 'quarter', 'round12', 'final'].map((round) => fixture({ round })),
+    }));
+
+    expect(stages.map((stage) => stage.label)).toEqual(['조별리그', '12강', '8강', '4강', '결승']);
+  });
+
   it('종료된 group_knockout 대회의 모든 단계가 완료로 표시된다 (alpha 이승민의 찐막 실데이터)', () => {
     const stages = buildTournamentStages(
       tournament({

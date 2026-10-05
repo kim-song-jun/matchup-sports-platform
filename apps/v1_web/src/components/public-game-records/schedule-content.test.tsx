@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { ScheduleContent } from './schedule-content';
 import type { PublicTournamentScheduleResponse } from './types';
@@ -22,6 +22,32 @@ function makeData(overrides: Partial<PublicTournamentScheduleResponse> = {}): Pu
 }
 
 describe('ScheduleContent — 순위표 팀 링크', () => {
+  it('진행 중 경기를 여러 건 최상단에 표시하고 일반 일정에는 중복하지 않는다', () => {
+    const data = makeData({
+      items: [
+        fixtureEntry({ fixtureId: 'final', round: 'final', status: 'scheduled' }),
+        fixtureEntry({ fixtureId: 'live-a', round: 'group', groupName: 'B조', status: 'live' }),
+      ],
+      unscheduled: [
+        fixtureEntry({ fixtureId: 'live-b', round: 'quarter', status: 'live', scheduledAt: null }),
+        fixtureEntry({ fixtureId: 'group-a', round: 'group', groupName: 'A조', scheduledAt: null }),
+      ],
+    });
+    const { container, rerender } = render(<ScheduleContent tournamentId="tour-1" data={data} prioritizeLiveGames />);
+    const liveSection = screen.getByRole('region', { name: '진행 중인 경기' });
+    expect(within(liveSection).getAllByRole('link')).toHaveLength(2);
+    expect(container.querySelector('section')).toBe(liveSection);
+    const paths = screen.getAllByRole('link').map(link => link.getAttribute('href'));
+    expect(paths.filter(path => path?.includes('/live-a'))).toHaveLength(1);
+    expect(paths.filter(path => path?.includes('/live-b'))).toHaveLength(1);
+    expect(paths.findIndex(path => path?.includes('/group-a'))).toBeLessThan(paths.findIndex(path => path?.includes('/final')));
+    rerender(<ScheduleContent tournamentId="tour-1" data={{ ...data,
+      items: data.items.map(entry => ({ ...entry, status: 'ended' })),
+      unscheduled: data.unscheduled.map(entry => ({ ...entry, status: 'ended' })),
+    }} prioritizeLiveGames />);
+    expect(screen.queryByRole('region', { name: '진행 중인 경기' })).not.toBeInTheDocument();
+  });
+
   it('순위표의 팀명을 누르면 /teams/:teamId/records 로 이동한다', () => {
     const data = makeData({
       standings: [

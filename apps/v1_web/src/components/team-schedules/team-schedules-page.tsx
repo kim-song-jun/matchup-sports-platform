@@ -8,7 +8,7 @@ import { Check } from 'lucide-react';
 import { ChevronLeftIcon, ChevronRightIcon, PlusIcon } from '@/components/v1-ui/icons';
 import { josa } from '@/lib/korean';
 import { friendlyRsvpLabel } from '@/lib/v1-status-labels';
-import { displayInitials } from '@/lib/display-initials';
+import { UserAvatar } from '@/components/v1-ui/user-avatar';
 import { PageSkeleton } from '@/components/v1-ui/page-skeleton';
 import { ConfirmModal } from '@/components/v1-ui/confirm-modal';
 import { scheduleTypeLabel, weekdayHeaders } from './team-schedules.view-model';
@@ -591,26 +591,7 @@ function ScheduleAttendeeSection({ model, friendlyMatch }: { model: ScheduleDeta
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxWidth: 560 }}>
           {filtered.map((item) => (
             <div key={item.userId} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 0' }}>
-              <div
-                aria-hidden="true"
-                style={{
-                  width: 32,
-                  height: 32,
-                  borderRadius: 'var(--radius-circle)',
-                  /* [다크모드 fix] grey100 다크값(#1c1e24)이 카드 배경 --card-surface
-                     다크값(#1c1e24)과 동일해 아바타 원이 안 보였다. grey150(다크 #20222a)로 분리. */
-                  background: 'var(--grey150)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontSize: 13,
-                  fontWeight: 700,
-                  color: 'var(--text-muted)',
-                  flexShrink: 0,
-                }}
-              >
-                {displayInitials(item.nickname, { fallback: '?' })}
-              </div>
+              <UserAvatar imageUrl={item.profileImageUrl} size={32} />
               {/* 이름이 버튼·배지에 밀려 "QA0929선수/10" 처럼 꺾이지 않게 최소 폭을 준다. */}
               <div className="tm-text-body" style={{ flex: '1 1 auto', minWidth: '7rem', wordBreak: 'keep-all' }}>{item.nickname}</div>
               {canProxyItem(item) ? (

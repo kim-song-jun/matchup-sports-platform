@@ -389,7 +389,7 @@ function MatchTeamRow({
       data-loser={isLoser ? 'true' : undefined}
       data-bracket-team-row
     >
-      {isPending ? <span className="tm-on-tint" aria-hidden="true" style={{ width: 28, height: 28, borderRadius: 'var(--radius-control)', flexShrink: 0, display: 'grid', placeItems: 'center', background: 'var(--grey100)', color: 'var(--text-caption)' }}>—</span> : <TeamAvatar seed={teamId ?? label} name={label} logoUrl={logoUrl} size="sm" />}
+      <TeamAvatar seed={teamId ?? label} name={label} logoUrl={isPending ? null : logoUrl} size="sm" />
       <span className="tm-bk2-name" style={!decided ? { color: 'var(--text-caption)' } : undefined}>{label}</span>
       {score !== null && <span className="tm-bk2-score tab-num">{score}</span>}
       {score === null && decided && <span className="tm-bk2-score" style={{ opacity: 0.25 }}>-</span>}

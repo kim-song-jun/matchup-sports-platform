@@ -30,7 +30,7 @@ import { useShellOverride } from '@/components/v1-ui/shell-override';
 import { Card, EmptyState, ErrorState, KPIStat, ListItem } from '@/components/v1-ui/primitives';
 import { MyPlayerCardSection, useMyPlayerCardAbsent } from './my-player-card-section';
 import { TeamAvatar } from '@/components/v1-ui/team-avatar';
-import { cssUrl } from '@/lib/assets';
+import { UserAvatar } from '@/components/v1-ui/user-avatar';
 import { withFromPath } from '@/lib/session-storage';
 import { PendingReviewsCard } from '@/components/tournaments/pending-review-card';
 import type {
@@ -75,7 +75,6 @@ const MENU_ICON_MAP: Record<string, React.ComponentType<LucideProps>> = {
 };
 
 export function MyHomePageView({ model }: { model: MyHomeViewModel }) {
-  const avatarStyle = model.user.profileImageUrl ? { backgroundImage: cssUrl(model.user.profileImageUrl) } : undefined;
 
   // 셸 승격(U36): title/activeTab/centerTitle은 route-chrome/fragments/my-home.ts의 정적
   // 테이블로 옮겼다. hasNewNotification만 model(런타임 상태) 의존이라 여기서 override로
@@ -110,9 +109,7 @@ export function MyHomePageView({ model }: { model: MyHomeViewModel }) {
                 <>
                 <h2 className="tm-text-body-lg">프로필</h2>
                 <div className="tm-my-account-block">
-                  <div className="tm-my-avatar tm-my-account-avatar" style={avatarStyle}>
-                    {model.user.profileImageUrl ? null : model.user.initials}
-                  </div>
+                  <UserAvatar imageUrl={model.user.profileImageUrl} size={52} className="tm-my-avatar tm-my-account-avatar" radius="var(--radius-container)" />
                   <div className="tm-my-account-name">{model.user.name}</div>
                   <div className="tm-my-account-meta">
                     {model.user.handle} · {model.user.region} · {model.user.genderLabel}

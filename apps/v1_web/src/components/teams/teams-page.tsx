@@ -20,7 +20,7 @@ import { extractErrorMessage } from '@/lib/error-message';
 import { isTeamLogoPreset, TEAM_LOGO_PRESETS } from '@/lib/team-logo-presets';
 import { isTeamOperatorRole } from '@/lib/team-role';
 import { withFromPath } from '@/lib/session-storage';
-import { displayInitials } from '@/lib/display-initials';
+import { UserAvatar } from '@/components/v1-ui/user-avatar';
 import { formatTournamentDateTimeShort } from '@/lib/date-utils';
 import { TeamUpcomingGamesCard } from './team-upcoming-games-card';
 import { TeamCompetitionEntriesSection } from './team-competition-entries-section';
@@ -426,7 +426,7 @@ function TeamDetailMembersCard({ team, subPageFrom }: { team: TeamDetailViewMode
         <div style={{ display: 'grid', gap: 8 }}>
             {team.membersList.length ? (
             team.membersList.map((member) => {
-              const content = <><TeamAvatar seed={member.userId} name={member.name} size="sm" /><div style={{ flex: 1, minWidth: 0 }}><div className="tm-text-body" style={{ color: 'var(--text-strong)', lineHeight: 1.35 }}>{member.name}</div><div className="tm-text-caption" style={{ marginTop: 2 }}>{member.role}</div></div>{member.profileHref ? <ChevronRightIcon size={18} stroke="var(--text-caption)" strokeWidth={2} /> : null}</>;
+              const content = <><UserAvatar size={28} /><div style={{ flex: 1, minWidth: 0 }}><div className="tm-text-body" style={{ color: 'var(--text-strong)', lineHeight: 1.35 }}>{member.name}</div><div className="tm-text-caption" style={{ marginTop: 2 }}>{member.role}</div></div>{member.profileHref ? <ChevronRightIcon size={18} stroke="var(--text-caption)" strokeWidth={2} /> : null}</>;
               return member.profileHref ? <Link key={member.membershipId} className="tm-list-row tm-pressable" href={member.profileHref}>{content}</Link> : <div key={member.membershipId} className="tm-list-row">{content}</div>;
             })
           ) : <div className="tm-text-caption" style={{ lineHeight: 1.55 }}>공개된 멤버가 아직 없어요.</div>}
@@ -1420,7 +1420,6 @@ function TeamLogoField({
       <div className="tm-text-label">팀 로고</div>
       <div className="tm-team-logo-picker">
         <div className="tm-team-logo-current">
-          {/* 팀 id가 아직 없는 create/edit draft이므로 팀명을 seed로 사용(TeamAvatar 자체 fallback과 동일 규칙). */}
           <TeamAvatar seed={teamName} name={teamName} logoUrl={logoUrl} size="xl" />
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8, minWidth: 0 }}>
             <button
@@ -1701,7 +1700,7 @@ function JoinRequestSection({ model }: { model: TeamMembersViewModel }) {
       <div className="tm-member-request-list">
         {model.requests.map((request) => (
           <div key={request.id} className="tm-card tm-member-request-row">
-            <MemberInitial name={request.name} />
+            <UserAvatar size={40} className="tm-member-initial" />
             <div style={{ flex: 1, minWidth: 0 }}>
               {request.profileHref ? (
                 <Link className="tm-text-body tm-member-name-link" href={request.profileHref}>{request.name}</Link>
@@ -1725,11 +1724,6 @@ function JoinRequestSection({ model }: { model: TeamMembersViewModel }) {
       </div>
     </section>
   );
-}
-
-/** 사람 이름 첫 글자 동그라미 — 가입 신청·초대·멤버 행이 같은 모양을 쓴다. */
-function MemberInitial({ name }: { name: string }) {
-  return <span aria-hidden="true" className="tm-member-initial">{displayInitials(name, { fallback: '?' })}</span>;
 }
 
 /** 목록 어디서 눌렀든 거절 이유가 화면 밖 위쪽에 묻히지 않게, 생길 때 끌어와 읽힌다. */
@@ -1850,7 +1844,7 @@ function InvitationSection({ invitations }: { invitations: NonNullable<TeamMembe
           {items.map((item) => (
             <div key={item.invitationId} className="tm-invitation-card">
               <div className="tm-invitation-card-head">
-                <MemberInitial name={item.displayName} />
+                <UserAvatar size={40} className="tm-member-initial" />
                 <div className="tm-invitation-meta">
                   <span className="tm-invitation-meta-name">{item.displayName}</span>
                   <span className="tm-invitation-meta-date">{formatTournamentDateTimeShort(item.createdAt) ?? '날짜 미정'} 초대</span>
@@ -1889,7 +1883,7 @@ function InvitationSection({ invitations }: { invitations: NonNullable<TeamMembe
             {pastItems.map((item) => (
               <li key={item.invitationId} className="tm-invitation-card">
                 <div className="tm-invitation-card-head">
-                  <MemberInitial name={item.displayName} />
+                  <UserAvatar size={40} className="tm-member-initial" />
                   <div className="tm-invitation-meta">
                     <span className="tm-invitation-meta-name">{item.displayName}</span>
                     <span className="tm-invitation-meta-date">{formatTournamentDateTimeShort(item.closedAt) ?? '날짜 미정'}</span>

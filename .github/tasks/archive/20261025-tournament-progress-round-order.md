@@ -1,6 +1,6 @@
 # 대회 진행 단계의 결선 순서 수정
 
-Status: In Progress (implemented; Alpha deployment/after QA pending)
+Status: Completed (dev merged; Alpha deployed and verified)
 Owner: Codex (단일 실행)
 Created: 2026-10-05
 
@@ -26,7 +26,7 @@ Alpha `/tournaments/ad120000-0000-4000-8000-000000000001/bracket` 상단에서 �
 - [x] 영문/한국어 라운드, 역순 경기 번호 및 동률 번호 CLI 회귀 검증 (4 시나리오).
 - [x] 8강 진행 중이면 조별/12강은 완료, 4강/결승은 예정.
 - [x] Alpha baseline 1440/768/390 실측.
-- [ ] 수정 배포 이후 Alpha 1440/768/390 실측.
+- [x] 수정 배포 이후 Alpha 1440/768/390 실측.
 - API/fixture 계약 변경 없음. 기존 결승·3위전 제외·리그 테스트 유지.
 
 ## Parallel Work Breakdown
@@ -37,7 +37,7 @@ Forbidden: 타 작업의 substantive dirty 파일, API/DB/관리자 대진 편�
 ## Acceptance Criteria
 - [x] 사용자 지정 순서 적용.
 - [x] 좁은 production builder CLI 회귀 검증 PASS.
-- [ ] 배포 이후 Alpha 화면 확인.
+- [x] 배포 이후 Alpha 화면 확인.
 
 ## Tech Debt Resolved
 결승 외 결선 순서를 경기 번호 또는 서버 배열 순서에 맡기던 정렬을 라운드 규모 기준으로 수정한다.
@@ -71,3 +71,15 @@ Alpha after 증거는 수정 버전 배포가 필요하다. 기존 공유 트리
 - 공유 node_modules를 바꾸지 않고 `/tmp/teameet-progress-order-validation-20261005`에 frozen-lockfile install. clean dependencies에서 프론트 tsc0 및 pattern check PASS. 추가 page 테스트는 native PostCSS binding 설치 후 재확인 예정.
 - Node22 frozen-lockfile optional native dependency 재설치 후 추가 page/partition/권한97 PASS. 변경 관련 총169 tests PASS.
 - public-live-polling 주석 및 public-records 도메인 문서를 예정/미정 진행 경기 polling·cursor 페이지별 부하 모델과 동기화.
+
+## Deployment and final QA receipt — 2026-10-06 KST
+
+- PR #1622 merged into dev: 5d3015b594fdc6f06c84d183d07a0459e382c65a. Main/production untouched.
+- Dev CI run 37330330719 PASS; Alpha deploy run 37330330696 SUCCESS. Public landing header confirms exact merge SHA, release 1.2.1-alpha.20261006.g5d3015b594fd; API health 200, DB healthy.
+- Final validation supersedes earlier dependency blockers: 169 unique frontend tests PASS, clean dependency tsc exit 0 and pattern check PASS.
+- GitHub Copilot review unavailable due monthly quota HTTP402 (run37329137772); direct Codex review of exact PR head ba69ab697a6966c48e8a7326109cfb6c37004c4a recorded in PR, blocking findings 0. No automatic review pass claimed.
+- Headed Alpha public spectator flow: opened bracket -> schedule -> standings -> schedule at widths1440,768,390. Stages all group/12/8/4/final; standings A/B/C; schedule A/B/C then12/8/4/final/third-place. Document widths equal viewport; pageerror0. Mobile stage strip preserves horizontal scrolling to final.
+- Existing logged-out my-fixtures401/console errors reproduced from baseline, no new error endpoint. Actual live fixtures0 during before and after. Multiple live games, deduplication, end transition and renderer behavior verified by regression tests; production data not modified to simulate live games.
+- All three viewport verdicts PASS for changed ordering and layout. Before/after screenshots and JSON in docs/screenshots/pr1622-alpha.
+- Owned headed browserPID12980/parent29528 closed in finally; process absence verified. No local Next server started.
+- Local dev fast-forwarded to merge SHA; own pre-sync WIP backed up at tmp/backups/progress-deploy-before-sync-20261006. Other session WIP preserved.

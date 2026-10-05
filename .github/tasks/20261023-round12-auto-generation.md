@@ -1,6 +1,6 @@
 # 12강·8강 자동 대진 생성 분기 수정
 
-Status: In Progress
+Status: Deployed (administrator mutation QA not run)
 **Owner**: Codex (단일 실행)
 **Created**: 2026-10-05
 
@@ -32,7 +32,9 @@ Forbidden: API/DB/schema, Alpha기존대회데이터, 공유 EntityPicker, 기�
 - [x] 좁은 RED→GREEN과 관련 폼/조별리그 테스트 PASS.
 - [x] 변경은 로직분기만이며 기존 UI/저장계약 유지.
 - [x] 로컬검증과 Alpha실측을 구분해 보고.
-- [ ] dev/Alpha 반영 및 로그인 관리자 실측 (이번 변경은 로컬 미커밋).
+- [x] dev 반영: PR #1618, merge ed0a4e85a.
+- [x] Alpha 배포 실측: ed0a4e85a, 실행37301483732 SUCCESS.
+- [ ] 로그인 관리자 자동 생성 클릭 실측 (인증 세션 없음).
 
 ## Tech Debt Resolved
 추가된 round12/quarter enum을 놓친 녹아웃 판별 수정.
@@ -62,3 +64,10 @@ Alpha 로그인 클릭검증에는 인증된 관리자 브라우저 필요. 로�
 - Alpha 로그인 저장/자동생성/viewport 실측 NOT RUN. 사용자 실제 화면의 정확한 입력 실패 원인은 미확인, 자동생성 오류만 RED→GREEN으로 증명. commit/PR/push/배포없음, precommit typecheck/CI 및 committed-tree 검증 미실행.
 
 - 격리작업트리 precommit frontend tsc PASS (incremental false). 실제배포대상4소스가루트검증본과개행정규화후동일. capture script node --check 및 git diff --check PASS, debt marker0.
+
+- PR #1618의 committed9-file diff 검토 및 CI Gates/API/Web SUCCESS. dev merge ed0a4e85a 완료, Alpha37301483732 진행 중.
+- 사용자 요청 범위는 코드의 Alpha 배포. 실제 기존대회 자동생성·팀배정·진출연결은 변경하지 않는다.
+
+- dev commit ed0a4e85a의 CI37301483730 완료: Web/API/Gates SUCCESS. Alpha37301483732가 CI대기를 마치고 이미지빌드 시작.
+
+- Alpha실제header ed0a4e85a 확인 및 공개대진표3폭 검증 PASS. 관리자 자동생성 실제저장 QA는 인증세션이 없고 기존사용자대회를변경하지 않으므로 NOT RUN. 미검증 항목을 mock성공/실제저장으로 대체하지 않음.

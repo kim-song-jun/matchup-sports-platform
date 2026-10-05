@@ -1,0 +1,45 @@
+{
+  "url": "https://alpha.teameet.co.kr/tournaments/ad120000-0000-4000-8000-000000000001/bracket",
+  "deployedCommit": "ed0a4e85a1e5ef068000b6b81584138efd552f81",
+  "ciRun": 37301483730,
+  "alphaRun": 37301483732,
+  "browserPid": 18956,
+  "parentPid": 6288,
+  "browserClosed": true,
+  "viewports": [
+    {
+      "width": 1440,
+      "documentWidth": 1440,
+      "lineCount": 15,
+      "minimumCardGap": 15.5,
+      "verdict": "PASS"
+    },
+    {
+      "width": 768,
+      "documentWidth": 768,
+      "lineCount": 15,
+      "minimumCardGap": 15.5,
+      "verdict": "PASS"
+    },
+    {
+      "width": 390,
+      "documentWidth": 390,
+      "lineCount": 15,
+      "minimumCardGap": 15.5,
+      "verdict": "PASS"
+    }
+  ],
+  "issues": [
+    {
+      "kind": "http",
+      "status": 401,
+      "path": "/api/v1/tournaments/ad120000-0000-4000-8000-000000000001/my-fixtures"
+    },
+    {
+      "kind": "console",
+      "message": "Failed to load resource: the server responded with a status of 401 ()"
+    }
+  ],
+  "dataNote": "Before had zero stored bracket sources; current real tournament has twelve. Agent performed no remote mutations. Partial-layout regression is proven by RED/GREEN; screenshots are not a same-data comparison.",
+  "administratorMutationQA": "NOT RUN: no authenticated admin session"
+}

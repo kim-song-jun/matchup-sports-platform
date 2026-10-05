@@ -13,27 +13,46 @@ const output = path.resolve('tmp/qa-round12-partial-connections');
   console.log(JSON.stringify({ ...ownership, started: true }));
   const browser = await chromium.connect(server.wsEndpoint());
   const issues = [];
+  let page;
   try {
-    const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
+    page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
     page.on('pageerror', error => issues.push({ kind: 'pageerror', message: error.message }));
     page.on('console', message => { if (message.type() === 'error') issues.push({ kind: 'console', message: message.text() }); });
     page.on('response', response => { if (response.status() >= 400) issues.push({ kind: 'http', status: response.status(), path: new URL(response.url()).pathname }); });
     const response = await page.goto(`${origin}/tournaments/${id}/bracket`, { waitUntil: 'domcontentloaded' });
     const headers = response.headers();
+    // The hidden server-rendered standings panel unmounts after hydration.
+    // Wait for the interactive page before selecting its tab.
+    await page.locator('[data-bracket-round="quarter"]').waitFor({ state: 'detached' });
     await page.getByRole('tab', { name: '순위 · 대진표', exact: true }).click();
     await page.locator('[data-bracket-round="quarter"]').waitFor();
     const viewports = [];
     for (const width of [1440, 768, 390]) {
       await page.setViewportSize({ width, height: 1000 });
+      await page.locator('[data-bracket-round="round12"]').scrollIntoViewIfNeeded();
+      await page.getByRole('button', { name: '12강', exact: true }).click();
       await page.waitForTimeout(500);
       await page.screenshot({ path: path.join(output, `${phase}-${width}.png`), fullPage: true });
       viewports.push(await page.evaluate(() => {
         const bounds = element => { const rect = element.getBoundingClientRect(); return { x: rect.x, y: rect.y, width: rect.width, height: rect.height }; };
         return { width: innerWidth, documentWidth: document.documentElement.scrollWidth, rounds: Array.from(document.querySelectorAll('[data-bracket-round]')).map(round => ({ phase: round.dataset.bracketRound, bounds: bounds(round), nodes: Array.from(round.querySelectorAll('[data-bracket-node]')).map(node => ({ id: node.dataset.bracketNode, bounds: bounds(node), text: node.innerText })) })), lines: Array.from(document.querySelectorAll('svg[aria-label="경기별 진출 연결선"] path')).map(line => ({ path: line.getAttribute('d'), title: line.textContent })) };
       }));
+      await page.getByRole('button', { name: '결승', exact: true }).click();
+      await page.waitForTimeout(500);
+      await page.locator('[data-bracket-round="final"] [data-bracket-node]').scrollIntoViewIfNeeded();
+      await page.screenshot({ path: path.join(output, `${phase}-${width}-final.png`), fullPage: true });
     }
     fs.writeFileSync(path.join(output, `${phase}-evidence.json`), JSON.stringify({ ...ownership, url: page.url(), commit: headers['x-teameet-commit'], viewports, issues }, null, 2));
     console.log(JSON.stringify({ captured: true, viewports: viewports.map(viewport => ({ width: viewport.width, documentWidth: viewport.documentWidth, lines: viewport.lines.length })), issues }));
+  } catch (error) {
+    if (page) {
+      await page.screenshot({ path: path.join(output, `${phase}-failure.png`), fullPage: true });
+      console.log(JSON.stringify({ failed: true, issues, diagnostics: await page.evaluate(() => ({
+        tabs: Array.from(document.querySelectorAll('[role="tab"]')).map(tab => ({ text: tab.textContent, selected: tab.getAttribute('aria-selected') })),
+        rounds: Array.from(document.querySelectorAll('[data-bracket-round]')).map(round => ({ phase: round.dataset.bracketRound, display: getComputedStyle(round).display, width: round.getBoundingClientRect().width, height: round.getBoundingClientRect().height })),
+      })) }));
+    }
+    throw error;
   } finally {
     await browser.close();
     await server.close();

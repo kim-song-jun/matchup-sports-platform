@@ -67,6 +67,13 @@ function renderCompose(m: ReviewSourcePageModel) {
 }
 
 describe('후기 작성 화면 — 팀 평가가 기본', () => {
+  it('이미지 없는 상대 팀과 선수는 각각 팀·사람 기본 아이콘을 표시한다', () => {
+    const { container } = renderCompose(model());
+    expect(container.querySelector('.tm-review-target-head .tm-review-avatar svg')).toHaveClass('lucide-users-round');
+    for (const name of ['선수1', '선수2']) {
+      expect(screen.getByRole('button', { name: new RegExp(name) }).querySelector('.tm-review-avatar svg')).toHaveClass('lucide-user-round');
+    }
+  });
   // 예전엔 팀 1 + 선수 N 을 전부 같은 카드로 깔아 "이 경기의 모든 사람을 평가해야 한다"처럼 읽혔다.
   it('팀은 펼친 카드이고, 선수는 몇 명인지 알리는 제목 아래 접힌 한 줄씩이다', () => {
     renderCompose(model());

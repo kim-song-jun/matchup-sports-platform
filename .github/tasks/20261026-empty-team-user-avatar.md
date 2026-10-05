@@ -51,11 +51,11 @@ Forbidden: API/Prisma/DB 데이터 변경, 후원사/대회 타이틀 브랜드 
 사용자는 기본 아이콘 변경을 명시 선택했다. 기존 슬롯 안의 기계적 아이콘 교체이며 새 레이아웃·모달 설계로 확대하지 않는다(CLAUDE.md UI착수 규칙의 기계적 수정 예외).
 
 ## Progress Snapshot
-origin/dev 9d7869721에서 격리 branch fix/team-user-empty-avatar-consistency 생성. 소비부 32/32 정적 점검 완료. identicon 생성 코드 제거, 팀/사람 슬롯 통일, 팀 생성 logo 미선택 null 유지. 공용 TeamAvatar RED 10건 → GREEN 10건. 관련 7 suite 중 사진 load 비동기 assertion 1건 보정 후 재검증 중.
+origin/dev 9d7869721에서 격리 branch fix/team-user-empty-avatar-consistency 생성. 소비부 33/33 정적 점검 완료. identicon 생성 코드 제거, 팀/사람 슬롯 통일, 팀 생성 logo 미선택 null 유지. 공용 TeamAvatar RED 10건 → GREEN 10건. 관련 7 suite 중 사진 load 비동기 assertion 1건 보정 후 재검증 중.
 
 ## Audit Inventory
 
-기본 이미지 consumer source 32개. 텍스트/타입/후원사/대회 타이틀은 아바타와 구분한다.
+기본 이미지 consumer source 33개. 텍스트/타입/후원사/대회 타이틀은 아바타와 구분한다.
 
 | Source | Verdict |
 |---|---|
@@ -73,6 +73,7 @@ origin/dev 9d7869721에서 격리 branch fix/team-user-empty-avatar-consistency 
 | `apps/v1_web/src/components/my/my-dissolved-teams-section.tsx` | PASS: 공용 아이콘 전파/직접 슬롯 확인 |
 | `apps/v1_web/src/components/my/my-api-clients.tsx` | PASS: 프로필 편집 사진 없음/실패 아이콘 |
 | `apps/v1_web/src/components/my/my-page.tsx` | PASS: 공용 아이콘 전파/직접 슬롯 확인 |
+| `apps/v1_web/src/components/reviews/reviews-page.tsx` | PASS: 팀/대회/팀매치 공용 후기의 팀/유저 기본 아이콘·작성자 이미지 구분 |
 | `apps/v1_web/src/components/public-game-records/team-records-content.tsx` | PASS: 공용 아이콘 전파/직접 슬롯 확인 |
 | `apps/v1_web/src/components/team-matches/team-match-detail-sheets.tsx` | PASS: 공용 아이콘 전파/직접 슬롯 확인 |
 | `apps/v1_web/src/components/team-matches/team-match-now-card.tsx` | PASS: 공용 아이콘 전파/직접 슬롯 확인 |
@@ -98,3 +99,8 @@ origin/dev 9d7869721에서 격리 branch fix/team-user-empty-avatar-consistency 
 - `tsc --noEmit` PASS. Pattern checker required elevated execution after sandbox shell EPERM; obsolete font-size baseline reduced 1→0; final pattern checker PASS.
 - Touched-path tech-debt markers: none. No API/DB/schema/permissions changes.
 - Alpha before QA: Chromium initial missing libs resolved using existing /tmp libraries; networkidle timeout on polling page; headed session closed in finally. DOMContentLoaded headed capture PASS: 3 public routes × 3 widths = 9/9 before screenshots, commit 9d7869721, no horizontal overflow; baseline teams has 190 SVG pattern rects at every width. Browser closed in finally. Authenticated admin/roster remains unverified.
+
+- Final extended audit: 공용 후기 화면을 추가해 33/33. Ops 대회 타이틀/후원사/채팅방 카테고리 썸네일/전술판 이름 라벨은 엔티티 아바타가 아니며 범위 외. Admin 팀/유저 테이블에는 기존 avatar 슬롯 없음.
+- User approved this PR only: Copilot quota 402 대신 직접 review + 검증 후 alpha 배포. PR CI appeared after delay; merge awaits CI.
+
+- 공용 후기 회귀 RED 1 → GREEN 1; 후기 팀 우선/빈 상태 8 tests PASS. 총 unique 205 tests across 11 suites PASS. 추가 후 tsc PASS / pattern PASS.

@@ -83,7 +83,7 @@ function toGroupStandingsRows(group: V1TournamentGroup): TournamentStandingsRow[
   let nextPosition = rows.reduce((max, row) => Math.max(max, row.position), 0) + 1;
 
   for (const team of group.groupTeams) {
-    if (recordedRegistrationIds.has(team.registrationId)) continue;
+    if (!team.registrationId || recordedRegistrationIds.has(team.registrationId)) continue;
     rows.push({
       key: team.registrationId,
       teamId: team.teamId,

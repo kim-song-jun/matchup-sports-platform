@@ -87,3 +87,19 @@ it('기존 부전승 모두 기본 위치 0이면 이미지의 경기 사이 자
     [{ phase: 'round12', groupTeams: Array.from({ length: 4 }, (_, i) => ({ registrationId: 'b' + i, isBye: true, sortOrder: 0 })) } as V1TournamentGroup]);
   expect([...graph.nodes].sort((a, b) => a.y - b.y).map((node) => node.id)).toEqual(['bye:b0', 'r1', 'r2', 'bye:b1', 'bye:b2', 'r3', 'r4', 'bye:b3']);
 });
+
+it('미정 12강 4경기·부전승 4자리와 8강4·4강2·결승1·3위전1을 먼저 만든다', () => {
+  const rounds = [['round12', 4], ['quarter', 4], ['semi', 2], ['final', 1], ['third_place', 1]].map(([key, count]) => ({ key: String(key), label: String(key), fixtures: Array.from({ length: Number(count) }, (_, i) => ({ ...fixture(String(key) + i), homeRegistrationId: null, awayRegistrationId: null })) }));
+  const groups = [{ phase: 'round12', groupTeams: [0, 3, 4, 7].map((sortOrder, i) => ({ id: 'slot-' + i, registrationId: null, isBye: true, sortOrder })) }] as V1TournamentGroup[];
+  const graph = buildBracketGraph(rounds, groups);
+  expect(graph.nodes.filter((node) => node.fixture)).toHaveLength(12);
+  expect(graph.nodes.filter((node) => node.bye)).toHaveLength(4);
+  expect(new Set(graph.nodes.map((node) => node.id)).size).toBe(16);
+  expect(graph.edges).toEqual([]);
+  expect(graph.nodes.filter((node) => node.round === 'round12').sort((a,b) => a.y-b.y).map((node) => node.id)).toEqual(['bye-slot:slot-0', 'round120', 'round121', 'bye-slot:slot-1', 'bye-slot:slot-2', 'round122', 'round123', 'bye-slot:slot-3']);
+  expect(graph.height).toBe(896);
+  expect(graph.nodes.filter((node) => node.round === 'quarter').map((node) => node.y)).toEqual([112, 336, 560, 784]);
+  expect(graph.nodes.find((node) => node.round === 'final')?.y).toBe(448);
+  groups[0].groupTeams[0].registrationId = 'assigned-team';
+  expect(buildBracketGraph(rounds, groups).nodes.find((node) => node.id === 'bye-slot:slot-0')?.bye?.registrationId).toBe('assigned-team');
+});

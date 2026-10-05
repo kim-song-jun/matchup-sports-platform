@@ -518,7 +518,7 @@ export class LeagueFixtureGeneratorService {
         if (currentGroup === null) {
           throw new NotFoundException({ code: 'GROUP_NOT_FOUND', message: '해당 대회를 찾을 수 없어요.' });
         }
-        const currentRegistrationIds = [...currentGroup.groupTeams]
+        const currentRegistrationIds = [...currentGroup.groupTeams].filter((team): team is typeof team & { registrationId: string } => team.registrationId !== null)
           .sort((a, b) => a.sortOrder - b.sortOrder || (a.registrationId < b.registrationId ? -1 : a.registrationId > b.registrationId ? 1 : 0))
           .map((team) => team.registrationId);
         const currentGuardBase = { ...guardBase, groupPhase: currentGroup.phase, teamCount: currentGroup.groupTeams.length };

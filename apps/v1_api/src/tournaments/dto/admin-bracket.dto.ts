@@ -83,11 +83,16 @@ export class CreateGroupTeamDto {
 
 /** 단독 부전승 대진. 라운드는 소속 group의 phase로 결정한다. */
 export class CreateBracketByeDto {
+  /** Existing bye slot to edit; absent creates a new slot. */
+  @IsOptional()
+  @IsUUID()
+  byeId?: string;
   @IsUUID()
   groupId!: string;
 
+  @IsOptional()
   @IsUUID()
-  registrationId!: string;
+  registrationId?: string | null;
 
   /** 해당 라운드 대진표에서 위부터 0-based 위치. */
   @Type(() => Number)

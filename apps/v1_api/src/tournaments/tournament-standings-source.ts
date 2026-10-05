@@ -106,6 +106,7 @@ export async function loadCanonicalStandingsSource(
   }
   const groups = groupRows.map((group) => ({
     ...group,
+    groupTeams: group.groupTeams.filter((team): team is typeof team & { registrationId: string } => team.registrationId !== null),
     fixtures: (byGroup.get(group.id) ?? []).map((row) => ({
       homeRegistrationId: row.homeRegistrationId,
       awayRegistrationId: row.awayRegistrationId,

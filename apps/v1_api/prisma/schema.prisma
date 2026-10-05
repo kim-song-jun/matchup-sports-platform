@@ -2928,12 +2928,12 @@ model V1TournamentGroupTeam {
   isBye          Boolean  @default(false) @map("is_bye")
   id             String   @id @default(uuid())
   groupId        String   @map("group_id")
-  registrationId String   @map("registration_id")
+  registrationId String?  @map("registration_id")
   sortOrder      Int      @default(0) @map("sort_order")
   createdAt      DateTime @default(now()) @map("created_at")
 
   group        V1TournamentGroup        @relation(fields: [groupId], references: [id], onDelete: Cascade)
-  registration V1TournamentRegistration @relation(fields: [registrationId], references: [id], onDelete: Cascade)
+  registration V1TournamentRegistration? @relation(fields: [registrationId], references: [id], onDelete: Cascade)
 
   @@unique([groupId, registrationId])
   @@index([registrationId])

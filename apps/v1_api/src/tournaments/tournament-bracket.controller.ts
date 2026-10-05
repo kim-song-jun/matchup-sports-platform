@@ -176,7 +176,7 @@ export class TournamentBracketController {
     return this.bracketService.updateBracketSources(user, fixtureId, dto);
   }
 
-  /** DELETE /admin/fixtures/:fixtureId — 경기 삭제 (결과 있으면 409) */
+  /** DELETE /admin/fixtures/:fixtureId — 시작 전 경기 삭제 (Game·감사 보존, 시작/결과/진출 배정 있으면 409) */
   @Delete('admin/fixtures/:fixtureId')
   deleteFixture(@CurrentUser() user: V1AuthUser, @Param('fixtureId') fixtureId: string) {
     return this.bracketService.deleteFixture(user, fixtureId);

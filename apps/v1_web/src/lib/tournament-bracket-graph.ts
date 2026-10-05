@@ -23,15 +23,15 @@ export function buildBracketGraph(rounds: BracketGraphRound[], groups: V1Tournam
     const meta = byeRound(group.phase);
     if (!meta || !rounds.some((round) => round.key === group.phase)) continue;
     for (const bye of group.groupTeams.filter((team) => team.isBye)) {
-      const key = group.phase + ':' + bye.registrationId;
+      const key = group.phase + ':' + (bye.registrationId ?? bye.id);
       if (seen.has(key)) continue;
       seen.add(key);
-      const node: BracketGraphNode = { id: group.phase === 'round12' ? 'bye:' + bye.registrationId : 'bye:' + key, round: group.phase, bye, y: 0 };
+      const node: BracketGraphNode = { id: bye.id ? 'bye-slot:' + bye.id : group.phase === 'round12' ? 'bye:' + bye.registrationId : 'bye:' + key, round: group.phase, bye, y: 0 };
       nodes.push(node); byId.set(node.id, node);
       for (const target of nodes.filter((candidate) => candidate.round === meta.next && candidate.fixture)) {
         for (const side of ['HOME', 'AWAY'] as const) {
           const registration = side === 'HOME' ? target.fixture!.homeRegistrationId : target.fixture!.awayRegistrationId;
-          if (registration === bye.registrationId && !edges.some((edge) => edge.target === target.id && edge.side === side)) edges.push({ source: node.id, target: target.id, side, outcome: 'BYE' });
+          if (bye.registrationId && registration === bye.registrationId && !edges.some((edge) => edge.target === target.id && edge.side === side)) edges.push({ source: node.id, target: target.id, side, outcome: 'BYE' });
         }
       }
     }
@@ -56,6 +56,23 @@ export function buildBracketGraph(rounds: BracketGraphRound[], groups: V1Tournam
     }
     ordered.forEach((node, index) => rank.set(node.id, roundIndex * 1000 + index));
   });
+  // An entirely TBD bracket has no advancement edges yet. Keep every round
+  // within the same vertical canvas without inventing winner relationships.
+  if (edges.length === 0) {
+    const columns = rounds.map((round) => nodes.filter((node) => node.round === round.key).sort((a, b) => rank.get(a.id)! - rank.get(b.id)!));
+    const columnHeights = columns.map((column) => column.reduce((sum, node) => sum + (node.bye ? 80 : 144), 0));
+    const height = Math.max(144, ...columnHeights);
+    columns.forEach((column, index) => {
+      const gap = column.length ? (height - columnHeights[index]) / column.length : 0;
+      let cursor = 0;
+      for (const node of column) {
+        const slotHeight = (node.bye ? 80 : 144) + gap;
+        node.y = cursor + slotHeight / 2;
+        cursor += slotHeight;
+      }
+    });
+    return { nodes, edges, height };
+  }
   // Traverse each destination backwards in HOME/AWAY order. Every pair shares
   // its own junction; there is no common spine connecting unrelated matches.
   let cursor = 0;

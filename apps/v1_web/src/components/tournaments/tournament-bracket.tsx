@@ -723,7 +723,7 @@ function ConnectedBracket({ rounds, groups, champion }: { rounds: BracketGraphRo
               <MatchCard fixture={{ ...fixture, homeTeamName: fixture.homeTeamName === 'TBD' ? sourceLabel('HOME') : fixture.homeTeamName, awayTeamName: fixture.awayTeamName === 'TBD' ? sourceLabel('AWAY') : fixture.awayTeamName }} />
             </> : node.bye ? <div className="tm-bk2-card" role="region" aria-label={`${byeRound(node.round)?.label} 부전승`} style={{ padding: 12 }}>
               <div className="tm-text-caption-strong" style={{ color: 'var(--blue700)', marginBottom: 8 }}>부전승 · {byeRound(node.round)?.nextLabel} 직행</div>
-              <div className="flex items-center gap-2"><TeamAvatar seed={node.bye.teamId ?? node.bye.registrationId} name={teamDisplayName(node.bye.teamName).label} logoUrl={node.bye.teamLogoUrl} size="sm" /><span className="tm-text-caption-strong">{teamDisplayName(node.bye.teamName).label}</span></div>
+              <div className="flex items-center gap-2"><TeamAvatar seed={node.bye.teamId ?? node.bye.registrationId ?? node.bye.id} name={teamDisplayName(node.bye.registrationId === null ? 'TBD' : node.bye.teamName).label} logoUrl={node.bye.teamLogoUrl} size="sm" /><span className="tm-text-caption-strong">{teamDisplayName(node.bye.registrationId === null ? 'TBD' : node.bye.teamName).label}</span></div>
             </div> : null}
           </div>;
         })}

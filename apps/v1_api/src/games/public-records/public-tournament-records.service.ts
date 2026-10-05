@@ -837,9 +837,9 @@ export class PublicTournamentRecordsService {
         groupId: group.id,
         groupName: group.name,
         registrationId: groupTeam.registrationId,
-        teamId: hideIdentity ? null : groupTeam.registration.team.id,
-        teamName: hideIdentity ? null : groupTeam.registration.team.name,
-        teamLogoUrl: hideIdentity ? null : (groupTeam.registration.team.profile?.logoUrl ?? null),
+        teamId: hideIdentity ? null : (groupTeam.registration?.team.id ?? null),
+        teamName: hideIdentity ? null : (groupTeam.registration?.team.name ?? null),
+        teamLogoUrl: hideIdentity ? null : (groupTeam.registration?.team.profile?.logoUrl ?? null),
         // 편성 순서일 뿐 성적 순위가 아니다. 표가 전부 0이면 프론트(TournamentStandingsTable)가
         // 메달 색·진출 강조를 스스로 끄고 "아직 경기 기록이 없어요" 안내를 붙인다.
         position: index + 1,

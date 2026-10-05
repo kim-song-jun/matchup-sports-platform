@@ -353,4 +353,46 @@ describe('Task 6 L3 tournament fixture Game adapter', () => {
       'TASK6_L3=PASS fixture=1 game=1 pin_copy=1 replay_same=1 generic_result_rejected=1 drafts=0',
     );
   });
+
+  it('persists four independent TBD bye slots and assigns a team without changing slot identity', async () => {
+    const group = await prisma.v1TournamentGroup.create({ data: { tournamentId: ids.tournament, phase: 'round12', name: 'TBD 12강' } });
+    const beforeGames = await prisma.v1Game.count({ where: { teamMatch: { tournamentId: ids.tournament } } });
+    const slots = [];
+    for (const sortOrder of [0, 3, 4, 7]) slots.push(await bracket.createBye(authUser, ids.tournament, { groupId: group.id, sortOrder }));
+    expect(new Set(slots.map((slot) => slot.id)).size).toBe(4);
+    expect(slots.every((slot) => slot.registrationId === null)).toBe(true);
+    const assigned = await bracket.createBye(authUser, ids.tournament, { groupId: group.id, byeId: slots[0].id, sortOrder: 0, registrationId: ids.homeRegistration });
+    expect(assigned).toMatchObject({ id: slots[0].id, registrationId: ids.homeRegistration, sortOrder: 0 });
+    expect(await prisma.v1Game.count({ where: { teamMatch: { tournamentId: ids.tournament } } })).toBe(beforeGames);
+    const cleared = await bracket.createBye(authUser, ids.tournament, { groupId: group.id, byeId: slots[0].id, sortOrder: 0, registrationId: null });
+    expect(cleared).toMatchObject({ id: slots[0].id, registrationId: null });
+    const invalidId = '66000000-0000-4000-8000-000000000099';
+    await expect(prisma.v1TournamentGroupTeam.create({ data: { id: invalidId, groupId: group.id, registrationId: null, isBye: false } })).rejects.toThrow();
+    expect(await prisma.v1TournamentGroupTeam.count({ where: { id: invalidId } })).toBe(0);
+    for (const slot of slots) await bracket.removeGroupTeam(authUser, slot.id);
+    expect(await prisma.v1TournamentGroupTeam.count({ where: { groupId: group.id } })).toBe(0);
+    await bracket.deleteGroup(authUser, group.id);
+  });
+
+  it('archives an unstarted fixture with real Game/audit FKs and allows its original number to be reused', async () => {
+    await prisma.v1Tournament.update({ where: { id: ids.tournament }, data: { status: 'closed' } });
+    try {
+      const created = await bracket.createFixture(authUser, ids.tournament, { groupId: ids.group, round: 'delete_before_start', fixtureNumber: 88 });
+      const original = await prisma.v1TeamMatch.findUniqueOrThrow({ where: { id: created.id }, include: { game: true, _count: { select: { operationAudits: true } } } });
+      expect(original.game).not.toBeNull();
+      await expect(bracket.deleteFixture(authUser, created.id)).resolves.toEqual({ deleted: true });
+      const archived = await prisma.v1TeamMatch.findUniqueOrThrow({ where: { id: created.id }, include: { game: true, tournamentDetails: true, _count: { select: { operationAudits: true } } } });
+      expect(archived.deletedAt).not.toBeNull();
+      expect(archived.game?.id).toBe(original.game?.id);
+      expect(archived.game?.state).toBe('CANCELLED');
+      expect(archived._count.operationAudits).toBe(original._count.operationAudits);
+      expect(archived.tournamentDetails?.groupId).toBeNull();
+      expect((await bracket.getBracket(authUser, ids.tournament)).fixtures.some((fixture) => fixture.id === created.id)).toBe(false);
+      const recreated = await bracket.createFixture(authUser, ids.tournament, { groupId: ids.group, round: 'delete_before_start', fixtureNumber: 88 });
+      expect(recreated.id).not.toBe(created.id);
+      expect(await prisma.v1AdminActionLog.count({ where: { targetId: created.id, action: 'tournament.bracket.fixture.delete' } })).toBe(1);
+    } finally {
+      await prisma.v1Tournament.update({ where: { id: ids.tournament }, data: { status: 'in_progress' } });
+    }
+  });
 });

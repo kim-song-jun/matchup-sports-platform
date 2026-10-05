@@ -257,15 +257,16 @@ export function BracketTab({
   };
 
   const handleRemoveGroupTeam = async (groupTeamId: string, teamName: string) => {
+    const isBye = bracket?.groups.some((group) => group.groupTeams.some((team) => team.id === groupTeamId && team.isBye)) ?? false;
     const ok = await confirmModal({
-      title: '팀 배정 해제',
-      message: `${teamName} 팀의 조 배정을 해제할까요? 해당 조 순위 기록도 함께 정리돼요.`,
-      confirmLabel: '해제',
+      title: isBye ? '부전승 자리 삭제' : '팀 배정 해제',
+      message: isBye ? `${teamName} 부전승 자리를 삭제할까요? 팀만 미정으로 바꾸려면 자리 수정을 이용해 주세요.` : `${teamName} 팀의 조 배정을 해제할까요? 해당 조 순위 기록도 함께 정리돼요.`,
+      confirmLabel: isBye ? '삭제' : '해제',
       tone: 'danger',
     });
     if (!ok) return;
     removeGroupTeam.mutate(groupTeamId, {
-      onSuccess: () => showToast('팀 배정을 해제했어요.', 'success'),
+      onSuccess: () => showToast(isBye ? '부전승 자리를 삭제했어요.' : '팀 배정을 해제했어요.', 'success'),
       onError: (err) => showToast(extractErrorMessage(err, '배정 해제에 실패했어요.'), 'error'),
     });
   };
@@ -327,7 +328,7 @@ export function BracketTab({
     try {
       {
         // KNOCKOUT phase — seed-pair: 1 vs N, 2 vs N-1, …
-        const teams = group.groupTeams.filter((team) => !team.isBye);
+        const teams = group.groupTeams.filter((team): team is typeof team & { registrationId: string } => !team.isBye && team.registrationId !== null);
         if (group.phase === 'round12' && (group.groupTeams.length !== 12 || teams.length !== 8)) {
           showToast('12팀을 배정하고 부전승 4팀을 지정해 주세요. 나머지 8팀의 4경기를 만들어요.', 'error');
           return;
@@ -358,7 +359,7 @@ export function BracketTab({
         // 시드순(sortOrder) 정렬 후 1vsN 페어링 (순수 함수 knockoutSeedPairs)
         const sorted = [...teams].sort((a, b) => a.sortOrder - b.sortOrder);
         const payloads: Parameters<typeof createFixture.mutate>[0][] = [];
-        for (const { home, away } of (group.phase === 'round12' ? round12Pairs(group.groupTeams) : knockoutSeedPairs(sorted))) {
+        for (const { home, away } of (group.phase === 'round12' ? round12Pairs(group.groupTeams.filter((team): team is typeof team & { registrationId: string } => team.registrationId !== null)) : knockoutSeedPairs(sorted))) {
           payloads.push({
             groupId: targetGroupId,
             round: roundLabel,

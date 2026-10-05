@@ -714,8 +714,8 @@ export function TeamMatchDetailPageView({ model, recordEntry, lifecyclePanel }: 
                 {/* P1: 숫자(subhead/20px/700) : 단위(body/15px) = 2:1 비율 + tabular-nums */}
                 {match.opponentCost !== null && (
                   <div className="tm-info-cost-hero">
-                    <div className="tm-text-caption" style={{ color: 'var(--text-caption)' }}>{match.platformManaged ? '각 팀 부담금' : '상대팀 부담금'}</div>
-                    <div className="tm-text-caption" style={{ marginTop: 4 }}>{match.platformManaged ? null : TEAM_MATCH_COST_EXPLANATION}</div>
+                    <div className="tm-text-caption" style={{ color: 'var(--text-caption)' }}>상대팀 부담금</div>
+                    <div className="tm-text-caption" style={{ marginTop: 4 }}>{TEAM_MATCH_COST_EXPLANATION}</div>
 
                     <div className="tm-info-cost-amount">
                       {match.opponentCost === 0 ? (

@@ -560,7 +560,7 @@ export const gameSchemaSourceManifest = {
   // 2026-10-05: additive round12/quarter enum values + group-team isBye, backed by
   // the round12 migration. Full migration replay and zero schema drift passed;
   // no V1Game model or bound historical game-operations migration changed.
-  schema: '1eea17ce17f1150aa031cb3ef9cb492e4242375c98a4ad85ff2657a1c6e5d31d',
+  schema: 'b25172e1bec1a80df93747750b913c0fd17f479dd9fc157a758639a3282f3749',
   migration: '6bd7fae42e9ee7debff71d26f7252d220ad2c12ae6f14745d103fc7fa61e8f64',
 } as const;
 

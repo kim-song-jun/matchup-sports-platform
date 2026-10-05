@@ -108,3 +108,6 @@ Recreation fix: archived Details round retains originalRound:deleted:id and crea
 
 - Renderer 11 PASS. Final API/web type checks and pattern/surface gates PASS. Fresh DB scenarios will run in remote CI; local Docker unavailable.
 Final bracket service 83 PASS; read 46 PASS; frontend graph10/form7/tab12/render11 PASS. Total focused contracts 169 PASS. Commit scope contains only this follow-up; no new TODO/FIXME/HACK/XXX markers.
+
+CI #37288172468 fix round: web PASS; API found archived Details in getBracket (add deletedAt filter) and nullable groupTeams in DB standings helper (filter placeholders). Gates/Game-schema fixtures require current schema digest sync; update final binder/attestation/manifest whitelist + fixture SHA, retaining historical digest and frozen M11. Expanded exact scope to these files; source schema itself unchanged.
+Release binding verification: 7 PASS plus create-alpha-release-manifest self-test PASS on LF portable copies (Windows checkout M11 has CRLF; immutable source untouched). Current digest b25172e1bec1a80df93747750b913c0fd17f479dd9fc157a758639a3282f3749; previous 1eea digest remains accepted for historical manifests. No guard bypass or destructive history cleanup.

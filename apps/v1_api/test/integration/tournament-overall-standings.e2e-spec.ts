@@ -195,6 +195,7 @@ describe('recalculateAndUpsertOverallStandings + recalculateAndUpsertGroupStandi
     });
     return groups.map((group) => ({
       ...group,
+      groupTeams: group.groupTeams.filter((team): team is typeof team & { registrationId: string } => team.registrationId !== null),
       fixtures: group.tournamentMatchDetails.map((details) => ({
         homeRegistrationId: details.homeRegistrationId,
         awayRegistrationId: details.awayRegistrationId,

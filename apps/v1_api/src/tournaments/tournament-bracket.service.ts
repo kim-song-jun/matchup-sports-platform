@@ -1170,7 +1170,7 @@ export class TournamentBracketService {
         orderBy: [{ groupId: 'asc' }, { position: 'asc' }],
       }),
       this.prisma.v1TournamentMatchDetails.findMany({
-        where: { tournamentId },
+        where: { tournamentId, teamMatch: { deletedAt: null } },
         include: tournamentTeamMatchBracketInclude,
         orderBy: [{ round: 'asc' }, { fixtureNumber: 'asc' }, { legNumber: 'asc' }],
       }),

@@ -77,8 +77,8 @@ alpha 실제 배포와 인증 세션에 의존. 병렬 구현은 가능하지만
 - [x] reviewer: 파일 10/10, shared helper caller 8/8, Critical 0 / Warning 0.
 - [x] alpha baseline: root가 `/events` → 캠페인 → 상세를 390/768/1440에서 총 9장 캡처했다. baseline serving SHA는 `4e1c14bb9`다.
 - [x] root 타입 검사 통과. Windows `find.exe`와 Unix 검사 명령 충돌을 피하기 위해 패턴 검사는 기존 Git Bash를 자식 shell로 지정해 통과했다. 제품/검사 코드는 변경하지 않았다.
-- [ ] root committed diff 검토 및 PR 게시.
-- [ ] 리뷰·PR.
+- [x] root committed diff 10파일 검토, 미추적 의존성 없음, clean 작업트리 확인.
+- [x] 리뷰·PR: [dev PR #1625](https://github.com/kim-song-jun/matchup-sports-platform/pull/1625) 게시 및 채팅 attach. Copilot 리뷰 요청 완료. 현재 CI/리뷰 진행 중.
 - [ ] dev 머지·QA 상태 변경·alpha 재검증.
 
 ## Validation Evidence

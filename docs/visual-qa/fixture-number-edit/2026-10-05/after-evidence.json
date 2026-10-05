@@ -1,0 +1,219 @@
+{
+  "phase": "after",
+  "target": "https://alpha.teameet.co.kr/admin/tournaments/ad120000-0000-4000-8000-000000000001/bracket",
+  "inspectorPid": 34764,
+  "console": [],
+  "authFlow": [
+    {
+      "path": "/api/v1/auth/me",
+      "status": 200
+    }
+  ],
+  "exceptions": [],
+  "httpErrors": [],
+  "mutations": [],
+  "views": [
+    {
+      "width": 1440,
+      "height": 900,
+      "teamColumns": [
+        {
+          "name": "홈 팀",
+          "x": 500,
+          "y": 531,
+          "width": 214,
+          "height": 67.5
+        },
+        {
+          "name": "어웨이 팀",
+          "x": 726,
+          "y": 531,
+          "width": 214,
+          "height": 67.5
+        }
+      ],
+      "documentWidth": 1440,
+      "dialog": {
+        "x": 480,
+        "y": 183.5,
+        "width": 480,
+        "height": 533
+      },
+      "number": {
+        "value": "2",
+        "min": "1",
+        "max": "2147483647",
+        "step": "1",
+        "disabled": false,
+        "label": "대진 번호"
+      },
+      "teamPickers": [
+        {
+          "disabled": true
+        },
+        {
+          "disabled": true
+        }
+      ],
+      "buttons": [
+        {
+          "label": "모달 닫기",
+          "disabled": false
+        },
+        {
+          "label": "선택 해제",
+          "disabled": true
+        },
+        {
+          "label": "선택 해제",
+          "disabled": true
+        },
+        {
+          "label": "취소",
+          "disabled": false
+        },
+        {
+          "label": "저장",
+          "disabled": false
+        }
+      ]
+    },
+    {
+      "width": 768,
+      "height": 900,
+      "teamColumns": [
+        {
+          "name": "홈 팀",
+          "x": 164,
+          "y": 531,
+          "width": 214,
+          "height": 67.5
+        },
+        {
+          "name": "어웨이 팀",
+          "x": 390,
+          "y": 531,
+          "width": 214,
+          "height": 67.5
+        }
+      ],
+      "documentWidth": 768,
+      "dialog": {
+        "x": 144,
+        "y": 183.5,
+        "width": 480,
+        "height": 533
+      },
+      "number": {
+        "value": "2",
+        "min": "1",
+        "max": "2147483647",
+        "step": "1",
+        "disabled": false,
+        "label": "대진 번호"
+      },
+      "teamPickers": [
+        {
+          "disabled": true
+        },
+        {
+          "disabled": true
+        }
+      ],
+      "buttons": [
+        {
+          "label": "모달 닫기",
+          "disabled": false
+        },
+        {
+          "label": "선택 해제",
+          "disabled": true
+        },
+        {
+          "label": "선택 해제",
+          "disabled": true
+        },
+        {
+          "label": "취소",
+          "disabled": false
+        },
+        {
+          "label": "저장",
+          "disabled": false
+        }
+      ]
+    },
+    {
+      "width": 390,
+      "height": 844,
+      "teamColumns": [
+        {
+          "name": "홈 팀",
+          "x": 36,
+          "y": 454.25,
+          "width": 318,
+          "height": 67.5
+        },
+        {
+          "name": "어웨이 팀",
+          "x": 36,
+          "y": 533.75,
+          "width": 318,
+          "height": 67.5
+        }
+      ],
+      "documentWidth": 390,
+      "dialog": {
+        "x": 16,
+        "y": 106.75,
+        "width": 358,
+        "height": 630.5
+      },
+      "number": {
+        "value": "2",
+        "min": "1",
+        "max": "2147483647",
+        "step": "1",
+        "disabled": false,
+        "label": "대진 번호"
+      },
+      "teamPickers": [
+        {
+          "disabled": true
+        },
+        {
+          "disabled": true
+        }
+      ],
+      "buttons": [
+        {
+          "label": "모달 닫기",
+          "disabled": false
+        },
+        {
+          "label": "선택 해제",
+          "disabled": true
+        },
+        {
+          "label": "선택 해제",
+          "disabled": true
+        },
+        {
+          "label": "취소",
+          "disabled": false
+        },
+        {
+          "label": "저장",
+          "disabled": false
+        }
+      ]
+    }
+  ],
+  "commit": "b734052aa51c861e6043d51edebbfa841087de87",
+  "invalidNumberBlockedInUI": true,
+  "reopenedNumber": "2",
+  "numberReceivesFocusAfterCloseButton": true,
+  "expectedAuthRenewal401": [],
+  "baselineMobileTeamOverflow": false,
+  "verdict": "PASS"
+}

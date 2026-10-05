@@ -1,6 +1,6 @@
 # 대진 번호 수정
 
-Status: In Progress
+Status: Complete
 **Owner**: Codex (단일 실행)
 **Created**: 2026-10-05
 
@@ -26,7 +26,7 @@ Status: In Progress
 - [x] 번호 변경 시 TeamMatch/팀 일정 title 동기화 및 출전정지 순서에 따른 관련 팀 후속 재계산.
 - [x] 번호 이동 후 옛 좌표 생성에 새 immutable creation generation, 기존 멱등 기록 보존.
 - [x] 프론트 실제 클릭: 번호 hydrate/유효성/저장 성공 뒤 목록 반영, 서버중복 오류에서 모달 보존.
-- [ ] Alpha 관리자 실제 로그인·3폭 before/after·console/network 확인. 인증 불가 시 미검증을 명시하고 성공으로 대체하지 않음.
+- [x] Alpha 관리자 실제 로그인·3폭 before/after·console/network 확인. 기존 대회 데이터 mutation0.
 
 ## Parallel Work Breakdown
 병렬 에이전트 없음. 순차: API/정본 저장 → 사용자가 선택한 UI → 타입·mock·문서 → 검증 → dev/Alpha.
@@ -36,8 +36,8 @@ Forbidden: schema/migration, 다른 WIP, 기존 실제대회 번호/팀/결과 �
 ## Acceptance Criteria
 - [x] A·B·C 제시 → 사용자 A 선택(기존 경기 수정 모달) 확인.
 - [x] 새 번호가 실제 저장 계약과 일치하고 연결/결과 유지.
-- [ ] 좁은 RED→GREEN, committed diff/typecheck, 실제 Alpha 검증 또는 정확한 blocker 기록.
-- [ ] dev 머지 및 alpha 배포. 관리자 인증 미검증은 분리 보고.
+- [x] 좁은 RED→GREEN, committed diff/typecheck, 실제 Alpha 검증.
+- [x] dev 머지 및 alpha 배포. 실제 관리자 로그인 화면 검증 완료.
 
 ## Tech Debt Resolved
 create에서만 받는 번호를 update 계약으로 연결. 기존 생성 멱등키가 좌표 기반이므로 번호 이동으로 빈 옛 좌표를 재사용할 때 이전 게임을 잘못 replay하지 않도록 세대 관리.
@@ -71,3 +71,14 @@ mutation admin와 기존 서비스 권한을 유지. DB migration 없음. 번호
 - 사용자가 직접 로그인 완료. baseline1440/768/390 actual screenshot + console/exception/network 오류0, remote mutation0. 결과 확정된12강2번 경기의 수정 창, 팀 picker 잠금 확인.
 - 첫 시각 검사 helper는768에서 숨겨진 모바일 메뉴 dialog를 잘못 골라 FAIL. 경기 수정 aria-labelledby를 기준으로 좁히고 재측정 PASS, 실패 로그 보존. 앱 상태나 오류를 숨기는 retry 없음.
 - baseline 모바일에서 긴 팀 chip이 수정 창 오른쪽으로 잘리는 기존 layout defect를 발견. 같은 수정 폼의 팀 입력을 모바일 세로/태블릿 이상 가로로 재배치하고 min-w-0로 폭을 제한. 마지막 이 수정은 CI 재검증 후 alpha에서 확인한다.
+
+## Completion Evidence
+- PR [#1619](https://github.com/kim-song-jun/matchup-sports-platform/pull/1619) dev merge b734052aa51c861e6043d51edebbfa841087de87. 최신 feature CI37311986987 및 dev CI37313213758 SUCCESS. Alpha deploy37313213711 SUCCESS; 실제 document x-teameet-commit 동일 SHA.
+- 운영자 persona: 사용자 직접 로그인한 headed Chromium에서 기존 결과 확정12강2번 경기 수정 창 검증. 1440×900 / 768×900 / 390×844 모두 PASS, mobile 긴 팀명 잘림 해결.
+- 현재 번호2 hydrate, 결과잠금 팀 picker 비활성 유지·번호 입력 활성, 0 저장 클릭은 실제 오류 toast·모달 보존 및 API mutation0, 임시7 입력 후 취소·재열기2 유지, Tab 번호 focus·Escape close PASS.
+- Before baseline04654d2974599c9da53656193ca001f18ab0797e, after b734052aa. [갤러리와 전체 측정](../../docs/visual-qa/fixture-number-edit/2026-10-05/README.md). 각 before/after 측정 구간 console/runtime/http 오류0, 기존 대회 write0.
+- 장시간 열린 QA 세션의 전체 로그에는 로그인 전 auth401 및 alpha 재배포 중 socket.io500/503·client-error503·pending-count503이 있었다. 배포 완료 뒤 실제 after 측정 구간에는 발생하지 않음. 세션 전체를 오류0으로 보고하지 않는다.
+- QA helper 첫 시도의 hidden mobile menu 선택 오류는 측정 selector를 실제 경기 수정 제목으로 좁혀 수정한 후 재검증. baseline 모바일 overflow는 알려진 기존 UI 결함으로 명시, after 모든 팀 입력 모달 안에 위치.
+- 새 서비스 단위 테스트의 잘못된 FINAL mock을 실제 v1 Game 상태 ENDED·TeamMatch completed·동일 OFFICIAL revision으로 보정. 해당 계약 좁은 재검증1 PASS(84 unrelated skipped); 런타임 앱 코드 변경 없음.
+- Cleanup: 전용 browser PID12180 / Node parent33892를 소유 세션 close로 종료. 각 inspector는 CDP detach·client 종료. 인증정보/쿠키/storageState export 없음.
+- Copilot 자동 리뷰는 monthly quota HTTP402로 실패. 직접 Codex 정적/적대 검토 blocking0 및 실제 CI 증거를 기록하며 Copilot clean review로 대체하지 않음.

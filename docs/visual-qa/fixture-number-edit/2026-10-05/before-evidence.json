@@ -1,0 +1,188 @@
+{
+  "phase": "before",
+  "target": "https://alpha.teameet.co.kr/admin/tournaments/ad120000-0000-4000-8000-000000000001/bracket",
+  "inspectorPid": 19860,
+  "console": [],
+  "exceptions": [],
+  "httpErrors": [],
+  "mutations": [],
+  "views": [
+    {
+      "width": 1440,
+      "height": 900,
+      "teamColumns": [
+        {
+          "name": "홈 팀",
+          "x": 500,
+          "y": 489.25,
+          "width": 214,
+          "height": 67.5
+        },
+        {
+          "name": "어웨이 팀",
+          "x": 726,
+          "y": 489.25,
+          "width": 214,
+          "height": 67.5
+        }
+      ],
+      "documentWidth": 1440,
+      "dialog": {
+        "x": 480,
+        "y": 225.25,
+        "width": 480,
+        "height": 449.5
+      },
+      "number": null,
+      "teamPickers": [
+        {
+          "disabled": true
+        },
+        {
+          "disabled": true
+        }
+      ],
+      "buttons": [
+        {
+          "label": "모달 닫기",
+          "disabled": false
+        },
+        {
+          "label": "선택 해제",
+          "disabled": true
+        },
+        {
+          "label": "선택 해제",
+          "disabled": true
+        },
+        {
+          "label": "취소",
+          "disabled": false
+        },
+        {
+          "label": "저장",
+          "disabled": false
+        }
+      ]
+    },
+    {
+      "width": 768,
+      "height": 900,
+      "teamColumns": [
+        {
+          "name": "홈 팀",
+          "x": 164,
+          "y": 489.25,
+          "width": 214,
+          "height": 67.5
+        },
+        {
+          "name": "어웨이 팀",
+          "x": 390,
+          "y": 489.25,
+          "width": 214,
+          "height": 67.5
+        }
+      ],
+      "documentWidth": 768,
+      "dialog": {
+        "x": 144,
+        "y": 225.25,
+        "width": 480,
+        "height": 449.5
+      },
+      "number": null,
+      "teamPickers": [
+        {
+          "disabled": true
+        },
+        {
+          "disabled": true
+        }
+      ],
+      "buttons": [
+        {
+          "label": "모달 닫기",
+          "disabled": false
+        },
+        {
+          "label": "선택 해제",
+          "disabled": true
+        },
+        {
+          "label": "선택 해제",
+          "disabled": true
+        },
+        {
+          "label": "취소",
+          "disabled": false
+        },
+        {
+          "label": "저장",
+          "disabled": false
+        }
+      ]
+    },
+    {
+      "width": 390,
+      "height": 844,
+      "teamColumns": [
+        {
+          "name": "홈 팀",
+          "x": 36,
+          "y": 452.25,
+          "width": 197.578125,
+          "height": 67.5
+        },
+        {
+          "name": "어웨이 팀",
+          "x": 245.578125,
+          "y": 452.25,
+          "width": 198.140625,
+          "height": 67.5
+        }
+      ],
+      "documentWidth": 390,
+      "dialog": {
+        "x": 16,
+        "y": 188.25,
+        "width": 358,
+        "height": 467.5
+      },
+      "number": null,
+      "teamPickers": [
+        {
+          "disabled": true
+        },
+        {
+          "disabled": true
+        }
+      ],
+      "buttons": [
+        {
+          "label": "모달 닫기",
+          "disabled": false
+        },
+        {
+          "label": "선택 해제",
+          "disabled": true
+        },
+        {
+          "label": "선택 해제",
+          "disabled": true
+        },
+        {
+          "label": "취소",
+          "disabled": false
+        },
+        {
+          "label": "저장",
+          "disabled": false
+        }
+      ]
+    }
+  ],
+  "commit": "04654d2974599c9da53656193ca001f18ab0797e",
+  "verdict": "BASELINE_KNOWN_TEAM_OVERFLOW",
+  "baselineMobileTeamOverflow": true
+}

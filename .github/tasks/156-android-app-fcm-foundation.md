@@ -761,8 +761,9 @@ Reviewed 8/8 areas: signup age; chat access/blocking; report processing; final a
 - [x] Fix download notification title: prefer RFC 5987 UTF-8 `filename*`, preserve literal `+`, sanitize path/control characters, retain URLUtil fallback for absent/invalid headers.
 - [x] Fix rotation inset race: one guarded generated script; absent document root is skipped safely and cached latest native values are republished by existing `onPageFinished`.
 - [x] JDK17 JUnit 11/11; Java-generated inset JavaScript executed in Node VM 2/2; Android Play-policy contract PASS. Full APK compilation and physical after-fix QA are not proven by these checks.
-- [ ] Android CI APK assembly and corrected APK physical verification.
-- [ ] dev PR review/merge; no main promotion.
+- [x] Android Alpha CI `37274478114` test/build PASS (source `e07ff2fb5`).
+- [ ] Corrected APK physical verification.
+- [ ] dev PR #1611 review/merge; no main promotion. CI Changeset gate requires this workflow change to include a fixed-group patch Changeset.
 
 ### Acceptance Criteria / scenarios
 

@@ -785,7 +785,7 @@ export function TournamentDetailView({
         <h1 className="tm-text-heading" style={{ color: 'var(--text-strong)', margin: 0, lineHeight: 1.3 }}>
           {tournament.title}
         </h1>
-        <div style={{ marginTop: 4, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+        <div style={{ marginTop: 4, display: 'flex', alignItems: 'center', gap: 'var(--spacing-1)', flexWrap: 'wrap' }}>
           <span className={`tm-badge ${status.badgeClass}`}>
             {status.label}
           </span>

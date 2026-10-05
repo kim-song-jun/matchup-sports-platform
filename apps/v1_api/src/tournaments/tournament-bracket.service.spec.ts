@@ -1700,12 +1700,25 @@ describe('TournamentBracketService', () => {
 
   it('updateFixture: OFFICIAL 경기의 번호만 수정하고 변경 전·후 번호를 감사에 남긴다', async () => {
     prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdmin);
-    const detail = canonicalDetailsRow({ group: { name: 'A조' } });
-    prisma.v1TournamentMatchDetails.findUnique.mockResolvedValue({ ...detail, teamMatch: { ...detail.teamMatch, game: { ...detail.teamMatch.game, state: 'FINAL', currentOfficialRevision: { state: 'OFFICIAL' } } } });
+    const base = canonicalDetailsRow({ group: { name: 'A조' } });
+    const detail = {
+      ...base,
+      teamMatch: {
+        ...base.teamMatch,
+        status: 'completed',
+        game: {
+          ...base.teamMatch.game,
+          state: 'ENDED',
+          currentOfficialRevisionId: 'revision-1',
+          currentOfficialRevision: { state: 'OFFICIAL' },
+        },
+      },
+    };
+    prisma.v1TournamentMatchDetails.findUnique.mockResolvedValue(detail);
     prisma.v1TournamentMatchDetails.findUniqueOrThrow.mockResolvedValue(detail);
     prisma.v1TournamentMatchDetails.findFirst.mockResolvedValue(null);
     prisma.v1TournamentRegistration.findMany.mockResolvedValue([{ id: 'reg-1', teamId: 'team-old', team: { name: '홈' } }, { id: 'reg-2', teamId: 'team-away', team: { name: '어웨이' } }]);
-    queueFixtureUpdateRaw(prisma.$queryRaw, { id: 'game-1', state: 'FINAL', sourceType: 'TEAM_MATCH', currentOfficialRevisionId: 'revision-1' }, { id: 'fixture-1', deletedAt: null });
+    queueFixtureUpdateRaw(prisma.$queryRaw, { id: 'game-1', state: 'ENDED', sourceType: 'TEAM_MATCH', currentOfficialRevisionId: 'revision-1' }, { id: 'fixture-1', deletedAt: null });
     prisma.v1GameResultRevision.findUnique.mockResolvedValue({ state: 'OFFICIAL' });
     prisma.v1TeamMatch.update.mockResolvedValue(detail.teamMatch);
     expect(await service.updateFixture(ownerUser, 'fixture-1', { fixtureNumber: 7 })).toMatchObject({ id: 'fixture-1', fixtureNumber: 7 });

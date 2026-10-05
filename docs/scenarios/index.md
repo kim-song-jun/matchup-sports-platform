@@ -1,3 +1,7 @@
+## 2026-10-05 — Android Alpha QA 후속 수정
+
+[Task 156](../../.github/tasks/156-android-app-fcm-foundation.md#android-alpha-physical-qa-and-fixes--2026-10-05) · [Android 실행 기록](./android-device-ui-audit.md#2026-10-05--latest-alpha-continuation-and-android-fixes): 최신 Alpha 실기기 16화면·실제 FCM 3상태·권한/로그아웃·PDF 업로드 확인. TXT 선택 제한, 한글 다운로드 표시명, 회전 inset 초기화 오류 수정안과 회귀 11+2 통과. 수정 APK 빌드·실기기 after QA 및 dev 반영 대기. 전체 기능/모든 라우트 통과를 의미하지 않는다.
+
 ## 2026-10-05 — 4강·8강·12강 경기별 연결선
 
 [작업 문서](../../.github/tasks/20261004-tournament-round12-quarter.md): 기존 canonical 진출 edge 관리·공개 응답 + SVG 경기별 연결선 + desktop 전체 행/모바일 단계 이동. API150·Web116·실제 DB2 통과, 양쪽 타입 및 패턴/surface PASS. 사용자 지정 상세 shell에서 명시적인 browser-local 예시 9/9 확인(4/8/12×390/768/1440, 카드/aside 겹침0, overflow0, JS error0). 비로그인 auth/me401은 기록. [12강 모습](../screenshots/tournament-connected-bracket/12-desktop.png). **실제 alpha 변경 후 QA 0/3, push 승인 대기로 배포 전.**

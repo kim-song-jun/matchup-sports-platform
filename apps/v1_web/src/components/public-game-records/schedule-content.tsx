@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Film, MapPin } from 'lucide-react';
 import { Card, EmptyState } from '@/components/v1-ui/primitives';
@@ -724,6 +724,15 @@ function ScheduleSections({
   );
 }
 
+/** 일정 단계만 읽는다. 조회/API 필터와 별개이며 잘못된 값은 전체다. */
+function scheduleFilterFromHref(href: string | null | undefined): string {
+  const pathAndQuery = href?.split('#')[0] ?? '';
+  const queryStart = pathAndQuery.indexOf('?');
+  const query = queryStart < 0 ? '' : pathAndQuery.slice(queryStart + 1);
+  const phase = new URLSearchParams(query).get('schedulePhase');
+  return phase === 'group_stage' || phase === 'knockout' || phase === 'mine' ? phase : 'all';
+}
+
 /**
  * `showStandings=false` 는 이 콘텐츠가 **순위표를 이미 보여주는 화면 안에** 들어갈 때
  * 쓴다. `/bracket` 은 "순위 · 대진표" 탭에서 조별 순위를 그리는데, "경기 일정" 탭이
@@ -768,7 +777,47 @@ export function ScheduleContent({
   // F4 fix: 필터는 "경기 일정"과 "시간 미정 경기" 두 섹션이 공유해야 한다 — 컴포넌트
   // 최상단(이른 return보다 앞)에서 훅을 선언해 두 섹션 모두 같은 값을 본다. early
   // return(!data.bracketPublished) 뒤에 두면 훅 순서가 렌더마다 달라질 수 있어 여기에 둔다.
-  const [filter, setFilter] = useState('all');
+  const [draft, setDraft] = useState(() => ({
+    tournamentId, filter: scheduleFilterFromHref(fromHref), href: fromHref,
+  }));
+  const filter = draft.tournamentId === tournamentId ? draft.filter : 'all';
+  const scheduleFromHref = draft.tournamentId === tournamentId ? draft.href : fromHref;
+
+  useEffect(() => {
+    if (!fromHref) return;
+    const source = new URL(fromHref, window.location.origin);
+    const sync = () => {
+      if (source.origin !== window.location.origin || source.pathname !== window.location.pathname) return;
+      const href = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+      const nextFilter = scheduleFilterFromHref(href);
+      setDraft((previous) => previous.tournamentId === tournamentId && previous.filter === nextFilter && previous.href === href
+        ? previous : { tournamentId, filter: nextFilter, href });
+    };
+    // 늦은 router snapshot은 마지막 선택을 덮지 않는다. 실제 pop/hash 이벤트는 최신 URL을 읽는다.
+    if (source.searchParams.toString() === new URLSearchParams(window.location.search).toString()) sync();
+    window.addEventListener('popstate', sync);
+    window.addEventListener('hashchange', sync);
+    return () => {
+      window.removeEventListener('popstate', sync);
+      window.removeEventListener('hashchange', sync);
+    };
+  }, [fromHref, tournamentId]);
+
+  function setFilter(nextFilter: string) {
+    let href = fromHref;
+    if (fromHref) {
+      const source = new URL(fromHref, window.location.origin);
+      const url = new URL(window.location.href);
+      if (source.origin === url.origin && source.pathname === url.pathname) {
+        if (nextFilter === 'all') url.searchParams.delete('schedulePhase');
+        else url.searchParams.set('schedulePhase', nextFilter);
+        href = `${url.pathname}${url.search}${url.hash}`;
+        window.history.replaceState(null, '', href);
+      }
+    }
+    // URL snapshot보다 먼저 실제 경기 링크에도 마지막 선택의 출처를 반영한다.
+    setDraft({ tournamentId, filter: nextFilter, href });
+  }
 
   if (!data.bracketPublished) {
     return (
@@ -904,7 +953,7 @@ export function ScheduleContent({
             onSelectFilter={setFilter}
             phaseLabels={phaseLabels}
             isRegularLeague={isRegularLeague}
-            fromHref={fromHref}
+            fromHref={scheduleFromHref}
           />
         )}
         {hasNextPage ? (
@@ -944,7 +993,7 @@ export function ScheduleContent({
                   showGroupHeading
                   myFixtureIds={myFixtureIds}
                   isRegularLeague={isRegularLeague}
-                  fromHref={fromHref}
+                  fromHref={scheduleFromHref}
                 />
               ))}
             </div>

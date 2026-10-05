@@ -1,10 +1,27 @@
 # Task 20261021: 경기 기록 선수 프로필의 복귀 문맥 (#1418)
 
-Status: Blocked (follow-up local verification passed; git write/PR/CI and alpha QA pending)
+Status: Blocked (MD-QA17 canonical integration; git write/PR/CI and alpha QA pending)
 **Owner**: Codex root → independent product review → parent alpha QA
 **Created**: 2026-10-04
 
 ## Context
+
+### MD-QA17 schedule phase follow-up — 2026-10-05
+
+[MD-QA17](https://teameet.jmandu.kr/issues/17/)은 공개 리그 일정의 정규 라운드 → 경기 → 선수 → 페이지 Back 경기 → 페이지 Back 일정에서 마지막 선택이 전체로 초기화되는 #1418 잔여다. [원본 alpha 증거](https://github.com/kim-song-jun/matchup-sports-platform/issues/1418#issuecomment-5981548339)의 태블릿/데스크톱에서 관측됐으며, 모바일은 전체 선택 여정이라 같은 필터 실패를 검증한 것이 아니다. 선수 → 같은 경기 복귀의 기존 3폭 PASS와 구분한다. CSS viewport 402×606 / 788×505 / 1182×757, 2026-10-04 UTC, serving SHA/persona 미확인이다. `schedule-tab-after.png`는 Back 후 결함 화면이며 수정 후 증거가 아니다.
+
+`ScheduleContent`의 `useState('all')` 선택이 재마운트될 때 사라진다. 보존된 후보는 `schedulePhase=group_stage|knockout|mine`을 현재 URL과 실제 경기 링크의 `from`에 유지하고 전체 선택은 key를 제거한다. local draft가 즉시 선택/링크에 반영되고 stale router query가 최신 선택을 덮지 않는다. `replaceState(null, ...)`은 Next의 router restore를 실행하면서 Next tree와 앱 history index를 유지한다. query·반복 값·중첩 from·hash·history 길이 및 기존 public/null gate는 유지한다. 로직 전용 변경이며 화면 구조·스타일 변경은 없다.
+
+기존 2026-10-04 복사본의 RED9 FAIL/2 PASS, Next `__NA` 경계 RED1 FAIL, 최종14 PASS/typecheck PASS는 과거 증거다. 이번 세션은 canonical 테스트/helper 경로와 패키지 기반 Next source 탐색으로 통합하며 새 실행 결과를 별도로 기록한다. 부모 QA만 사이트 댓글/상태를 쓰며 Refs #1418을 유지한다. 실제 alpha 수정 후 검증 전 완료 처리하지 않는다.
+
+#### MD-QA17 original conditions
+
+- [x] 현재 dev/local `ccabd36e859f2058d2c08bf6f2655de0bc02c775` 읽기 정합, 후보15/15 해시 보존 및 patch apply-check PASS.
+- [x] 기존 제품 후보 그대로 통합, canonical `schedule-filter-return.test.tsx` 및 패키지 기반 `next-history-boundary.ts`, v1_web patch Changeset 추가.
+- [x] canonical focused14/기존 일정45 PASS, 변경 graph typecheck·v1 pattern·정적6guard PASS (이번 실행, 단일 worker/직렬).
+- [ ] 권한이 허용된 환경에서 fresh fetch → 독립 feature worktree → exact5 pathspec commit → push → Ready/dev PR → 정확 head CI.
+- [ ] 별도 승인된 alpha 배포 후 부모 QA의 같은 선택/fixture/player·두 단계 Back·상위 탭·direct/deeplink·Back/Forward·빠른 연속 선택/중단 및 3폭 after.
+- [x] Git 쓰기/권한 상승/다른 Git 경로 우회·merge/deploy/자동승인·실회원/완료 결과/QA179 변경0.
 
 ### Actual league caller follow-up — 2026-10-04
 
@@ -34,7 +51,7 @@ Fresh origin/dev951a67e3423dec502697f8bab2d78696d9374cc5에서도 실제 shared 
 
 ## Goal
 
-서버가 공개를 허용한 선수 프로필 링크에 현재 경기 기록의 안전한 from을 전달해 실제 AppBackLink가 원래 기록으로 복귀하도록 한다.
+서버가 공개를 허용한 선수 프로필 링크에 현재 경기 기록의 안전한 from을 전달해 실제 AppBackLink가 원래 기록으로 복귀하도록 하고, 이어서 일정으로 돌아갈 때 선택한 단계를 보존한다.
 
 ## Original Conditions (must all be satisfied)
 
@@ -49,11 +66,15 @@ Fresh origin/dev951a67e3423dec502697f8bab2d78696d9374cc5에서도 실제 shared 
 
 대회 또는 리그 경기 기록에서 공개된 선수 이름을 눌러 프로필을 연다. 페이지의 뒤로가기는 현재 경기 기록의 query/hash와 앞선 내부 from 체인을 유지한다. 공개 프로필 링크가 null인 이름은 평문을 유지한다. 출처 없는 직접 프로필 진입은 기존 /teams fallback을 유지한다.
 
+공개 리그 일정에서 정규 라운드를 선택하고 경기·선수로 이동한 뒤 페이지 Back을 두 번 누른다. 같은 일정의 정규 라운드 선택으로 돌아와야 한다. 상위 순위/일정 탭 왕복과 단계가 있는 직접 진입에서도 선택을 복원하고 빠른 연속 선택은 마지막 값을 유지한다. 실제 alpha 동선은 부모 QA 대기다.
+
 ## Test Scenarios
 
 ### Happy path
 - [x] 실제 shared renderer의 여섯 link(네 군/두 lineup side/known·unknown period)와 대회·리그 nested source.
 - [x] 실제 AppBackLink 클릭 + 실제 jsdom navigation history로 바로 앞 경기 복귀; Next router/search 경계만 대체.
+- [x] MD-QA17 canonical14: 실제 bracket caller/fixture caller/선수 링크/AppBackLink의 두 단계 복귀, 상위 탭/직접 진입/SSR, 빠른 선택·stale query, mounted pop 이벤트, 엔티티 격리, query/from/hash/history 및 설치된 Next replaceState 경계. 합성 DOM/라우터 경계이며 alpha/물리 Back/Forward 검증이 아니다.
+- [x] 기존 ScheduleContent45 회귀(미정·내 팀·공개 gate·리그/대회 표시·링크 포함) 이번 최종 제품에서 PASS.
 ### Edge cases
 - [x] target profile query/hash 보존, source nested query/hash 보존.
 - [x] from 없음 control, 외부/protocol-relative/backslash/정규화 외부/script 출처 제외.
@@ -66,9 +87,13 @@ Fresh origin/dev951a67e3423dec502697f8bab2d78696d9374cc5에서도 실제 shared 
 
 Root owns product/test/task/changeset 및 git/CI. child는 v1 호출부·서버 공개 gate·기존 정상 경로와 root 제품 patch를 읽기 전용 검토한다. 테스트·린트는 root가1worker 직렬, full suite/build는 CI 소유. 별도 parent browser는 건드리지 않는다.
 
+현재 MD-QA17 작업은 root 단독으로 진행한다. 서브에이전트 위임은 이번 요청에 없으며 과거 child 검토를 이번 독립 검토로 세지 않는다.
+
 ### Owned files
 
-현재 후속은 `apps/v1_web/src/app/league-matches/[leagueId]/fixtures/[fixtureId]/league-fixture-detail-client.tsx`, 같은 폴더의 `league-fixture-profile-return.test.tsx`, `apps/v1_web/src/lib/navigation-history.ts`, `apps/v1_web/src/lib/navigation-history.test.ts`, 이 task, `.changeset/league-fixture-current-url.md` 여섯 파일만 소유한다. PR1606의 기존 shared 제품/테스트/changeset과 이전 worktree는 변경하지 않는다.
+현재 MD-QA17은 다음 다섯 파일만 소유한다: `apps/v1_web/src/components/public-game-records/schedule-content.tsx`, 같은 폴더의 `schedule-filter-return.test.tsx`, `apps/v1_web/src/test/helpers/next-history-boundary.ts`, 이 task, `.changeset/league-schedule-filter-return.md`. PR1606/1607의 기존 제품/테스트와 이전 후보 자료는 변경하지 않는다.
+
+이전 리그 caller 후속 소유6은 PR1607로 병합됐다(`f61409687`, 최신 dev git cursor 확인). 아래 과거 진행 기록의 git write 차단/6pathspec 체크는 그 시점의 기록이며 이번 MD-QA17의 완료 증거가 아니다.
 
 ### Forbidden files
 
@@ -77,7 +102,7 @@ shared withFromPath/sanitizeRedirectPath/AppBackLink, 팀 명단/bracket/awards 
 ## Acceptance Criteria
 
 - [x] 이 잔여의 source/실제 컴포넌트 계약·검증과 원 이슈 전체 수용 조건을 구분.
-- [ ] exact committed scope6/clean/diff check/debt markers0 및 정확 CI/독립 검토 기록.
+- [ ] MD-QA17 exact committed scope5/clean 및 정확 CI/독립 검토 기록. local diff-check와 touched debt markers0은 확인했으나 committed-tree 대기.
 - [x] 공개 actual before 원본/시간/폭을 정확 인용하고 after는 승인 alpha 배포 후 부모 QA.
 - [x] Refs #1418 유지. 전체 원래 bracket/팀명단/직접/탭/scroll·실제 이미지 QA 전에는 이슈 종료하지 않음.
 
@@ -103,7 +128,17 @@ actual renderer/jsdom history는 실제 alpha Next 런타임·물리 기기·scr
 
 ## Progress Snapshot
 
-### Current follow-up cursor
+### MD-QA17 current cursor
+
+- 2026-10-05 원격 GitHub 읽기에서 dev `ccabd36e859f2058d2c08bf6f2655de0bc02c775` 확인, 시작 local dev/HEAD 동일·clean. 열린 dev PR은1610만이며 일정 수정 중복은 발견하지 못했다. Git fetch는 `.git` 읽기 전용 때문에 실행하지 않았다.
+- 이번 세션도 `.git`에 read 접근만 지정됐다. 기존 자동 승인 심사의 review-context Git write escalation 거절은 유지되며 재시도/새 Git 저장소·worktree·API 커밋 우회0이다. 허용된 작업 파일만 수정한다. commit/push 승인 부재가 아니라 실행 정책 차단이다.
+- 기존15/15 자료 및 source-binding의 원본 제품/Next source 해시 일치. 제품은 검증된 후보 SHA256 `ef643ea7c2570738dc3475044081afdd62b278590f2f5e0b718b99f3beaf8987` 그대로다. 테스트는 canonical helper import/정식 suite 이름만 조정하고 helper는 `createRequire(import.meta.url).resolve('next/dist/client/components/app-router.js')`로 설치 경로를 찾는다.
+- baseline·실행 로그·PID/PPID·통합 범위/해시는 `/tmp/teameet-mdqa17-canonical-20261005/`에 별도 보존한다. 원본 후보 자료를 덮지 않는다. committed-tree/새 PR/정확 head CI/alpha after는 대기다.
+- 이번 canonical14 PASS는03:04:08→03:04:16 UTC, 기존 일정45 PASS는03:06:19→03:06:23 UTC. app cwd의 저장소 Vitest 설정, worker1·직렬, 신규 helper import를 사용했다. 변경 graph typecheck(신규 test/helper 및 제품·실제 caller import graph) PASS03:05:56→03:06:16 UTC, 전체 패키지 lint/build/전체suite는 실행하지 않았다.
+- v1 pattern 및 Android policy/v1 DB/production deploy security/compose parity/alpha seed runtime/alpha immutable deploy 정적6guard PASS. 런타임DB·배포·기기 실행 증거로 세지 않는다. touched TODO/FIXME/HACK/XXX0, local diff-check PASS, intended5files/import helper 확인, staged diff0. Git read만 사용해 변경 범위를 점검했으며 committed-tree 검증으로 확대하지 않는다.
+- preflight load11.49→17.26, vm_stat 확인. sysctl/ps는 sandbox에서 읽기 제한, Docker socket 없음, 대상3013/8121 리스너 관측0이다. 권한 상승0, 사용자 진행 지시에 따라 최소 단위검증을 수행했다. runner PID/PPID/exit 기록과 소유 프로세스 그룹 종료 확인; 브라우저/서버·다른 세션 프로세스 조작0. 전체 Node/browser 수 회복은 ps 접근 제한으로 확인하지 못했다.
+
+### PR1607 historical cursor (not current MD-QA17 verification)
 
 - 2026-10-04 fresh fetch origin/dev56581dc, main clean/동일SHA, 열린 dev PR0. 기존 PR1606은 MERGED이므로 재사용하지 않는다.
 - 독립 WT `/tmp/teameet-issue-1418-league-current-url-20261004`, branch `fix/issue-1418-league-fixture-current-url`. 실제 caller RED28개 중26 FAIL/2 PASS → hook만 적용2 FAIL/26 PASS → 최상위 query 정렬 중간 검증12파일229 PASS. 이후 독립 검토가 부모 내부 query 재배치를 추가로 찾아 실제 caller/history2파일4 FAIL/54 PASS로 RED를 확정했다.

@@ -141,3 +141,7 @@ validation/permission error.
 V1 intentionally has no payment, refund, dispute, support ticket, DM, file attachment, venue
 operator, lesson, marketplace, or tournament success API outside the games/result flow documented
 above. UI must not simulate successful transactions or support outcomes for these surfaces.
+
+## Bracket bye mutation
+
+`POST /admin/tournaments/:tournamentId/byes` follows the standard auth guard, mutation-admin permission, DTO whitelist and success/error envelopes. A bye is a saved group-team entry, without a TeamMatch or Game result. See [the tournament domain](./domains/tournaments.md#라운드별-부전승-직접-등록-2026-10-05) for phase, capacity, conflict and display-position contracts.

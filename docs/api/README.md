@@ -68,3 +68,5 @@ kept for historical reference under `docs/archive/v0-api/domains/`, not indexed 
 - Strict input validation: `whitelist + forbidNonWhitelisted + transform`
 - A controller, DTO, service, error, permission, pagination, multipart, idempotency, or frontend contract change updates the matching canonical domain file in the same change.
 - No canonical index may link to a superseded contract tree.
+
+라운드별 부전승 직접 입력과 대진표 표시 위치 계약은 [Tournaments](./domains/tournaments.md#라운드별-부전승-직접-등록-2026-10-05)에 정리한다.

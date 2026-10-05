@@ -1,5 +1,7 @@
 'use client';
 
+import { byeRound } from '@/lib/tournament-bracket-rounds';
+
 /**
  * TournamentBracket — World Cup 스타일 결선 대진표.
  *
@@ -82,9 +84,11 @@ export function groupFixturesByRound(
     }
   }
 
-  // Explicit byes are real bracket entries even before a 12강 match is scheduled.
-  if (!roundMap.has('round12') && groups.some((group) => group.phase === 'round12' && group.groupTeams.some((team) => team.isBye))) {
-    roundMap.set('round12', { key: 'round12', label: '12강', sortIndex: PHASE_ORDER.round12, fixtures: [] });
+  for (const group of groups) {
+    const meta = byeRound(group.phase);
+    if (meta && !roundMap.has(group.phase) && group.groupTeams.some((team) => team.isBye)) {
+      roundMap.set(group.phase, { key: group.phase, label: meta.label, sortIndex: PHASE_ORDER[group.phase], fixtures: [] });
+    }
   }
 
   for (const round of roundMap.values()) {
@@ -717,8 +721,8 @@ function ConnectedBracket({ rounds, groups, champion }: { rounds: BracketGraphRo
             {fixture ? <>
               <p className="tm-text-micro" style={{ marginBottom: 4, color: 'var(--text-caption)' }}>{fixture.fixtureNumber}번 경기</p>
               <MatchCard fixture={{ ...fixture, homeTeamName: fixture.homeTeamName === 'TBD' ? sourceLabel('HOME') : fixture.homeTeamName, awayTeamName: fixture.awayTeamName === 'TBD' ? sourceLabel('AWAY') : fixture.awayTeamName }} />
-            </> : node.bye ? <div className="tm-bk2-card" role="region" aria-label="12강 부전승" style={{ padding: 12 }}>
-              <div className="tm-text-caption-strong" style={{ color: 'var(--blue700)', marginBottom: 8 }}>부전승 · 8강 직행</div>
+            </> : node.bye ? <div className="tm-bk2-card" role="region" aria-label={`${byeRound(node.round)?.label} 부전승`} style={{ padding: 12 }}>
+              <div className="tm-text-caption-strong" style={{ color: 'var(--blue700)', marginBottom: 8 }}>부전승 · {byeRound(node.round)?.nextLabel} 직행</div>
               <div className="flex items-center gap-2"><TeamAvatar seed={node.bye.teamId ?? node.bye.registrationId} name={teamDisplayName(node.bye.teamName).label} logoUrl={node.bye.teamLogoUrl} size="sm" /><span className="tm-text-caption-strong">{teamDisplayName(node.bye.teamName).label}</span></div>
             </div> : null}
           </div>;
@@ -808,7 +812,7 @@ export function TournamentBracket({ fixtures, groups }: TournamentBracketProps) 
     return () => observer.disconnect();
   }, [mainRounds.length]);
 
-  if (fixtures.length === 0 || rounds.length === 0) return <BracketEmpty />;
+  if (rounds.length === 0) return <BracketEmpty />;
   const usesAggregate = mainRounds.some((round) => isMultiLeg(round.fixtures));
   const hasUnlinked = mainRounds.slice(1).some((round) => round.fixtures.some((fixture) => !(fixture.bracketSources?.length)));
 

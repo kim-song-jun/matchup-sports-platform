@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { Check, RefreshCw, Pencil, Trash2, ChevronRight } from 'lucide-react';
 import { isBracketPublished as isBracketPublishedNow } from '@/lib/bracket-visibility';
 import { onlyDigits } from '@/lib/number-format';
-import { useV1PublishTournamentBracket, useV1UnpublishTournamentBracket, useV1AdminBracket, useV1CreateGroup, useV1AssignGroupTeam, useV1CreateFixture, useV1RecalculateStandings, useV1UpdateFixture, useV1DeleteFixture, useV1UpdateGroup, useV1DeleteGroup, useV1RemoveGroupTeam } from '@/hooks/use-v1-api';
+import { useV1PublishTournamentBracket, useV1UnpublishTournamentBracket, useV1AdminBracket, useV1CreateGroup, useV1AssignGroupTeam, useV1CreateBracketBye, useV1CreateFixture, useV1RecalculateStandings, useV1UpdateFixture, useV1DeleteFixture, useV1UpdateGroup, useV1DeleteGroup, useV1RemoveGroupTeam } from '@/hooks/use-v1-api';
 import type {
   V1AdminTournamentRegistration,
   V1AdminBracketGroup,
@@ -129,6 +129,7 @@ export function BracketTab({
   const createGroup = useV1CreateGroup(tournamentId);
   const assignGroupTeam = useV1AssignGroupTeam(tournamentId);
   const createFixture = useV1CreateFixture(tournamentId);
+  const createBye = useV1CreateBracketBye(tournamentId);
   const recalculate = useV1RecalculateStandings(tournamentId);
   const updateFixture = useV1UpdateFixture(tournamentId);
   const deleteFixture = useV1DeleteFixture(tournamentId);
@@ -652,6 +653,7 @@ export function BracketTab({
               confirmedTeamItems={confirmedTeamItems}
               assignGroupTeam={assignGroupTeam}
               createFixture={createFixture}
+              createBye={createBye}
               isAutoGenerating={isAutoGenerating}
               onAutoGenerate={(groupId) => void handleAutoGenerate(groupId)}
               onEditGroup={(g) => {

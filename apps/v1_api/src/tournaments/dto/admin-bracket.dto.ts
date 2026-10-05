@@ -81,6 +81,22 @@ export class CreateGroupTeamDto {
   sortOrder?: number;
 }
 
+/** 단독 부전승 대진. 라운드는 소속 group의 phase로 결정한다. */
+export class CreateBracketByeDto {
+  @IsUUID()
+  groupId!: string;
+
+  @IsUUID()
+  registrationId!: string;
+
+  /** 해당 라운드 대진표에서 위부터 0-based 위치. */
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(7)
+  sortOrder!: number;
+}
+
 // ─── Fixture DTOs ─────────────────────────────────────────────────────────────
 
 export class CreateFixtureDto {

@@ -280,7 +280,6 @@ export class GameResultStandingsProjectionService {
     }
     return groups.map((group) => ({
       ...group,
-      groupTeams: group.groupTeams.filter((team): team is typeof team & { registrationId: string } => team.registrationId !== null),
       fixtures: fixturesByGroup.get(group.id) ?? [],
     })) as GroupForStandingsRow[];
   }

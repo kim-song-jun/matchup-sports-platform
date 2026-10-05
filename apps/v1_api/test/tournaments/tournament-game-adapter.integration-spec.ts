@@ -367,7 +367,7 @@ describe('Task 6 L3 tournament fixture Game adapter', () => {
     const cleared = await bracket.createBye(authUser, ids.tournament, { groupId: group.id, byeId: slots[0].id, sortOrder: 0, registrationId: null });
     expect(cleared).toMatchObject({ id: slots[0].id, registrationId: null });
     const invalidId = '66000000-0000-4000-8000-000000000099';
-    await expect(prisma.v1TournamentGroupTeam.create({ data: { id: invalidId, groupId: group.id, registrationId: null, isBye: false } })).rejects.toThrow();
+    await expect(prisma.v1TournamentGroupTeam.create({ data: { id: invalidId, groupId: group.id, registrationId: null as never, isBye: false } })).rejects.toThrow();
     expect(await prisma.v1TournamentGroupTeam.count({ where: { id: invalidId } })).toBe(0);
     for (const slot of slots) await bracket.removeGroupTeam(authUser, slot.id);
     expect(await prisma.v1TournamentGroupTeam.count({ where: { groupId: group.id } })).toBe(0);

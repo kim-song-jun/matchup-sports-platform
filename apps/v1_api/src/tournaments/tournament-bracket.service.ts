@@ -283,7 +283,8 @@ export class TournamentBracketService {
       }
       if (group.phase === 'round12') {
         const assigned = await tx.v1TournamentGroupTeam.findMany({ where: { groupId: group.id } });
-        if (assigned.length >= 12 || (dto.isBye && assigned.filter((team) => team.isBye).length >= 4)) {
+        const emptyByeCount = await tx.v1TournamentByeSlot.count({ where: { groupId: group.id } });
+        if (assigned.length + emptyByeCount >= 12 || (dto.isBye && assigned.filter((team) => team.isBye).length + emptyByeCount >= 4)) {
           throw new ConflictException({ code: 'ROUND12_CAPACITY', message: '12강은 최대 12팀, 부전승은 최대 4팀이에요.' });
         }
       }
@@ -369,7 +370,9 @@ export class TournamentBracketService {
         throw new BadRequestException({ code: 'BYE_POSITION_INVALID', message: '해당 라운드의 대진표 위치 범위를 확인해 주세요.' });
       }
       const registrationId = dto.registrationId ?? null;
-      const assigned = await tx.v1TournamentGroupTeam.findMany({ where: { groupId: group.id } });
+      const realAssigned = await tx.v1TournamentGroupTeam.findMany({ where: { groupId: group.id } });
+      const emptySlots = await tx.v1TournamentByeSlot.findMany({ where: { groupId: group.id } });
+      const assigned = [...realAssigned, ...emptySlots.map((slot) => ({ ...slot, registrationId: null, isBye: true }))];
       const existing = dto.byeId
         ? assigned.find((team) => team.id === dto.byeId && team.isBye)
         : registrationId ? assigned.find((team) => team.registrationId === registrationId) : undefined;
@@ -395,9 +398,26 @@ export class TournamentBracketService {
         } });
         if (duplicate) throw new ConflictException({ code: 'BYE_ALREADY_IN_ROUND', message: '이 팀은 해당 라운드에 이미 배정되어 있어요. 기존 배정을 먼저 해제해 주세요.' });
       }
-      const row = existing
-        ? await tx.v1TournamentGroupTeam.update({ where: { id: existing.id }, data: { registrationId, isBye: true, sortOrder: dto.sortOrder } })
-        : await tx.v1TournamentGroupTeam.create({ data: { groupId: group.id, registrationId, isBye: true, sortOrder: dto.sortOrder } });
+      let row: Parameters<TournamentBracketService['serializeGroupTeam']>[0];
+      if (registrationId) {
+        if (existing?.registrationId === null) {
+          row = await tx.v1TournamentGroupTeam.create({ data: { id: existing.id, groupId: group.id, registrationId, isBye: true, sortOrder: dto.sortOrder, createdAt: existing.createdAt } });
+          await tx.v1TournamentByeSlot.delete({ where: { id: existing.id } });
+        } else {
+          row = existing
+            ? await tx.v1TournamentGroupTeam.update({ where: { id: existing.id }, data: { registrationId, isBye: true, sortOrder: dto.sortOrder } })
+            : await tx.v1TournamentGroupTeam.create({ data: { groupId: group.id, registrationId, isBye: true, sortOrder: dto.sortOrder } });
+        }
+      } else {
+        const slot = existing?.registrationId === null
+          ? await tx.v1TournamentByeSlot.update({ where: { id: existing.id }, data: { sortOrder: dto.sortOrder } })
+          : await tx.v1TournamentByeSlot.create({ data: { ...(existing ? { id: existing.id, createdAt: existing.createdAt } : {}), groupId: group.id, sortOrder: dto.sortOrder } });
+        if (existing?.registrationId) {
+          await tx.v1TournamentGroupTeam.delete({ where: { id: existing.id } });
+          await tx.v1TournamentStanding.deleteMany({ where: { groupId: group.id, registrationId: existing.registrationId } });
+        }
+        row = { ...slot, registrationId: null, isBye: true };
+      }
       await this.adminContext.logAdminAction(admin, {
         action: 'tournament.bracket.bye.save', targetType: 'tournament_group_team', targetId: row.id,
         beforeJson: existing ? { registrationId: existing.registrationId, isBye: existing.isBye, sortOrder: existing.sortOrder } : undefined,
@@ -991,12 +1011,12 @@ export class TournamentBracketService {
     const admin = await this.adminContext.getMutationAdmin(user.id);
     const group = await this.prisma.v1TournamentGroup.findUnique({
       where: { id: groupId },
-      include: { _count: { select: { groupTeams: true, tournamentMatchDetails: true } } },
+      include: { _count: { select: { groupTeams: true, byeSlots: true, tournamentMatchDetails: true } } },
     });
     if (!group) {
       throw new NotFoundException({ code: 'GROUP_NOT_FOUND', message: '조를 찾을 수 없어요.' });
     }
-    if (group._count.groupTeams > 0) {
+    if (group._count.groupTeams > 0 || (group._count.byeSlots ?? 0) > 0) {
       throw new ConflictException({
         code: 'GROUP_HAS_TEAMS',
         message: '조에 배정된 팀이 있어요. 팀 배정을 먼저 해제해 주세요.',
@@ -1012,12 +1032,12 @@ export class TournamentBracketService {
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`league-fixture-generation:${group.tournamentId}`}, 0))`;
       const current = await tx.v1TournamentGroup.findUnique({
         where: { id: groupId },
-        include: { _count: { select: { groupTeams: true, tournamentMatchDetails: true } } },
+        include: { _count: { select: { groupTeams: true, byeSlots: true, tournamentMatchDetails: true } } },
       });
       if (!current) {
         throw new NotFoundException({ code: 'GROUP_NOT_FOUND', message: '조를 찾을 수 없어요.' });
       }
-      if (current._count.groupTeams > 0) {
+      if (current._count.groupTeams > 0 || (current._count.byeSlots ?? 0) > 0) {
         throw new ConflictException({ code: 'GROUP_HAS_TEAMS', message: '조에 배정된 팀이 있어요. 팀 배정을 먼저 해제해 주세요.' });
       }
       if (current._count.tournamentMatchDetails > 0) {
@@ -1041,19 +1061,26 @@ export class TournamentBracketService {
   /** 조 팀 배정 해제 — 해당 팀의 조 순위 행도 함께 정리한다. */
   async removeGroupTeam(user: V1AuthUser, groupTeamId: string) {
     const admin = await this.adminContext.getMutationAdmin(user.id);
-    const groupTeam = await this.prisma.v1TournamentGroupTeam.findUnique({
-      where: { id: groupTeamId },
-      include: { group: { select: { tournamentId: true } } },
+    const assignedTeam = await this.prisma.v1TournamentGroupTeam.findUnique({
+      where: { id: groupTeamId }, include: { group: { select: { tournamentId: true } } },
     });
+    const emptySlot = assignedTeam ? null : await this.prisma.v1TournamentByeSlot.findUnique({
+      where: { id: groupTeamId }, include: { group: { select: { tournamentId: true } } },
+    });
+    const groupTeam = assignedTeam ?? (emptySlot ? { ...emptySlot, registrationId: null } : null);
     if (!groupTeam) {
       throw new NotFoundException({ code: 'GROUP_TEAM_NOT_FOUND', message: '조 팀 배정을 찾을 수 없어요.' });
     }
     await this.prisma.$transaction(async (tx) => {
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`league-fixture-generation:${groupTeam.group.tournamentId}`}, 0))`;
-      if (!await tx.v1TournamentGroupTeam.findUnique({ where: { id: groupTeamId }, select: { id: true } })) {
+      const current = emptySlot
+        ? await tx.v1TournamentByeSlot.findUnique({ where: { id: groupTeamId }, select: { id: true } })
+        : await tx.v1TournamentGroupTeam.findUnique({ where: { id: groupTeamId }, select: { id: true } });
+      if (!current) {
         throw new NotFoundException({ code: 'GROUP_TEAM_NOT_FOUND', message: '조 팀 배정을 찾을 수 없어요.' });
       }
-      await tx.v1TournamentGroupTeam.delete({ where: { id: groupTeamId } });
+      if (emptySlot) await tx.v1TournamentByeSlot.delete({ where: { id: groupTeamId } });
+      else await tx.v1TournamentGroupTeam.delete({ where: { id: groupTeamId } });
       if (groupTeam.registrationId) await tx.v1TournamentStanding.deleteMany({
         where: { groupId: groupTeam.groupId, registrationId: groupTeam.registrationId },
       });
@@ -1150,6 +1177,7 @@ export class TournamentBracketService {
       this.prisma.v1TournamentGroup.findMany({
         where: { tournamentId },
         include: {
+          byeSlots: true,
           groupTeams: {
             include: {
               registration: {
@@ -1236,10 +1264,10 @@ export class TournamentBracketService {
     return {
       groups: groups.map((g) => ({
         ...this.serializeGroup(g),
-        groupTeams: g.groupTeams.map((gt) => ({
+        groupTeams: [...g.groupTeams.map((gt) => ({
           ...this.serializeGroupTeam(gt),
-          teamName: gt.registration?.team.name ?? null,
-        })),
+          teamName: gt.registration.team.name,
+        })), ...(g.byeSlots ?? []).map((slot) => ({ ...this.serializeGroupTeam({ ...slot, registrationId: null, isBye: true }), teamName: null }))],
       })),
       fixtures: [...fixtureRows.values()].sort((a, b) =>
         a.round.localeCompare(b.round) || a.fixtureNumber - b.fixtureNumber || a.legNumber - b.legNumber),
@@ -1265,7 +1293,7 @@ export class TournamentBracketService {
     };
   }
 
-  private serializeGroupTeam(row: V1TournamentGroupTeam) {
+  private serializeGroupTeam(row: Omit<V1TournamentGroupTeam, 'registrationId'> & { registrationId: string | null }) {
     return {
       id: row.id,
       groupId: row.groupId,

@@ -278,7 +278,8 @@ describe('TournamentBracketService', () => {
     v1AdminUser: { findUnique: jest.Mock };
     v1Tournament: { findFirst: jest.Mock };
     v1TournamentGroup: { findFirst: jest.Mock; create: jest.Mock; findMany: jest.Mock };
-    v1TournamentGroupTeam: { findUnique: jest.Mock; findFirst: jest.Mock; findMany: jest.Mock; create: jest.Mock; update: jest.Mock };
+    v1TournamentByeSlot: { findMany: jest.Mock; findUnique: jest.Mock; count: jest.Mock; create: jest.Mock; update: jest.Mock; delete: jest.Mock };
+    v1TournamentGroupTeam: { delete: jest.Mock; findUnique: jest.Mock; findFirst: jest.Mock; findMany: jest.Mock; create: jest.Mock; update: jest.Mock };
     v1TournamentMatchDetails: { findUnique: jest.Mock; findUniqueOrThrow: jest.Mock; findFirst: jest.Mock; findMany: jest.Mock; create: jest.Mock; update: jest.Mock };
     v1TeamMatch: { findUnique: jest.Mock; findUniqueOrThrow: jest.Mock; findMany: jest.Mock; create: jest.Mock; update: jest.Mock };
     v1TournamentMatchAdvancementEdge: { findMany: jest.Mock; deleteMany: jest.Mock };
@@ -293,7 +294,7 @@ describe('TournamentBracketService', () => {
     v1GameRosterAdjustment: { updateMany: jest.Mock };
     v1TeamTacticsBoard: { deleteMany: jest.Mock };
     v1TournamentPlayer: { findMany: jest.Mock };
-    v1TournamentStanding: { upsert: jest.Mock; findMany: jest.Mock };
+    v1TournamentStanding: { deleteMany: jest.Mock; upsert: jest.Mock; findMany: jest.Mock };
     v1TournamentOverallStanding: { upsert: jest.Mock; deleteMany: jest.Mock };
     v1AdminActionLog: { create: jest.Mock };
     v1StatusChangeLog: { create: jest.Mock };
@@ -309,7 +310,8 @@ describe('TournamentBracketService', () => {
       v1AdminUser: { findUnique: jest.fn() },
       v1Tournament: { findFirst: jest.fn().mockResolvedValue(tournamentRow({ status: 'closed' })) },
       v1TournamentGroup: { findFirst: jest.fn(), create: jest.fn(), findMany: jest.fn() },
-      v1TournamentGroupTeam: { findUnique: jest.fn(), findFirst: jest.fn().mockResolvedValue(null), findMany: jest.fn().mockResolvedValue([]), create: jest.fn(), update: jest.fn() },
+      v1TournamentByeSlot: { findMany: jest.fn().mockResolvedValue([]), findUnique: jest.fn().mockResolvedValue(null), count: jest.fn().mockResolvedValue(0), create: jest.fn(), update: jest.fn(), delete: jest.fn() },
+      v1TournamentGroupTeam: { delete: jest.fn(), findUnique: jest.fn(), findFirst: jest.fn().mockResolvedValue(null), findMany: jest.fn().mockResolvedValue([]), create: jest.fn(), update: jest.fn() },
       v1TournamentMatchDetails: {
         findUnique: jest.fn().mockResolvedValue(null),
         findUniqueOrThrow: jest.fn().mockImplementation(async () => canonicalDetailsRow()),
@@ -355,7 +357,7 @@ describe('TournamentBracketService', () => {
       v1GameRosterAdjustment: { updateMany: jest.fn().mockResolvedValue({ count: 0 }) },
       v1TeamTacticsBoard: { deleteMany: jest.fn().mockResolvedValue({ count: 0 }) },
       v1TournamentPlayer: { findMany: jest.fn().mockResolvedValue([]) },
-      v1TournamentStanding: { upsert: jest.fn(), findMany: jest.fn() },
+      v1TournamentStanding: { deleteMany: jest.fn(), upsert: jest.fn(), findMany: jest.fn() },
       v1TournamentOverallStanding: {
         upsert: jest.fn().mockResolvedValue({}),
         deleteMany: jest.fn().mockResolvedValue({ count: 0 }),
@@ -718,8 +720,8 @@ describe('TournamentBracketService', () => {
     });
     it('팀 없이 부전승 네 자리를 독립적으로 저장하고 다섯 번째는 거절한다', async () => {
       const rows: Array<Record<string, unknown>> = [];
-      prisma.v1TournamentGroupTeam.findMany.mockImplementation(async () => [...rows]);
-      prisma.v1TournamentGroupTeam.create.mockImplementation(async ({ data }) => { const row = { id: 'slot-' + rows.length, ...data, createdAt: new Date() }; rows.push(row); return row; });
+      prisma.v1TournamentByeSlot.findMany.mockImplementation(async () => [...rows]);
+      prisma.v1TournamentByeSlot.create.mockImplementation(async ({ data }) => { const row = { id: 'slot-' + rows.length, ...data, createdAt: new Date() }; rows.push(row); return row; });
       for (const sortOrder of [0, 3, 4, 7]) {
         expect(await service.createBye(ownerUser, 'tournament-1', { groupId: 'group-1', sortOrder })).toMatchObject({ registrationId: null, isBye: true, sortOrder });
       }
@@ -730,19 +732,23 @@ describe('TournamentBracketService', () => {
       expect(games.createFromSourceInTransaction).not.toHaveBeenCalled();
     });
     it('미정 자리에 팀을 배정해도 동일 id와 위치를 유지한다', async () => {
-      const existing = { id: 'slot-1', groupId: 'group-1', registrationId: null, isBye: true, sortOrder: 3, createdAt: new Date() };
-      prisma.v1TournamentGroupTeam.findMany.mockResolvedValue([existing]);
-      prisma.v1TournamentGroupTeam.update.mockImplementation(async ({ data }) => ({ ...existing, ...data }));
+      const existing = { id: 'slot-1', groupId: 'group-1', sortOrder: 3, createdAt: new Date() };
+      prisma.v1TournamentByeSlot.findMany.mockResolvedValue([existing]);
+      prisma.v1TournamentGroupTeam.create.mockImplementation(async ({ data }) => ({ ...existing, ...data }));
       expect(await service.createBye(ownerUser, 'tournament-1', { ...dto, byeId: 'slot-1' })).toMatchObject({ id: 'slot-1', registrationId: 'reg-1', sortOrder: 3 });
-      expect(prisma.v1TournamentGroupTeam.create).not.toHaveBeenCalled();
+      expect(prisma.v1TournamentByeSlot.delete).toHaveBeenCalledWith({ where: { id: 'slot-1' } });
+      prisma.v1TournamentByeSlot.findMany.mockResolvedValue([]);
+      prisma.v1TournamentGroupTeam.findMany.mockResolvedValue([{ ...existing, registrationId: 'reg-1', isBye: true }]);
+      prisma.v1TournamentByeSlot.create.mockImplementation(async ({ data }) => ({ ...existing, ...data }));
       expect(await service.createBye(ownerUser, 'tournament-1', { ...dto, byeId: 'slot-1', registrationId: null })).toMatchObject({ id: 'slot-1', registrationId: null, sortOrder: 3 });
+      expect(prisma.v1TournamentGroupTeam.delete).toHaveBeenCalledWith({ where: { id: 'slot-1' } });
     });
     it('다른 조의 부전승 id를 수정하지 않는다', async () => {
       await expect(service.createBye(ownerUser, 'tournament-1', { ...dto, byeId: 'foreign-slot' })).rejects.toMatchObject({ response: { code: 'BYE_NOT_FOUND' } });
       expect(prisma.v1TournamentGroupTeam.update).not.toHaveBeenCalled();
     });
     it('같은 대진 위치에 미정 부전승을 중복 생성하지 않는다', async () => {
-      prisma.v1TournamentGroupTeam.findMany.mockResolvedValue([{ id: 'slot-1', registrationId: null, isBye: true, sortOrder: 3 }]);
+      prisma.v1TournamentByeSlot.findMany.mockResolvedValue([{ id: 'slot-1', groupId: 'group-1', sortOrder: 3 }]);
       await expect(service.createBye(ownerUser, 'tournament-1', { groupId: 'group-1', sortOrder: 3 })).rejects.toMatchObject({ response: { code: 'BYE_POSITION_OCCUPIED' } });
     });
     it.each(['round12', 'quarter', 'semi'])('%s에 한 팀만으로 부전승을 저장한다', async (phase) => {

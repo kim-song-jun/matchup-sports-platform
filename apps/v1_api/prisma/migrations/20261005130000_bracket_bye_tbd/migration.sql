@@ -1,4 +1,10 @@
--- A bye is a persistent bracket slot and can exist before a team is known.
-ALTER TABLE "v1_tournament_group_teams" ALTER COLUMN "registration_id" DROP NOT NULL;
-ALTER TABLE "v1_tournament_group_teams" ADD CONSTRAINT "v1_group_team_unassigned_bye_check"
-  CHECK ("registration_id" IS NOT NULL OR "is_bye" = true);
+-- Add unassigned bye slots without relaxing existing group-team registration invariants.
+CREATE TABLE "v1_tournament_bye_slots" (
+  "id" TEXT NOT NULL,
+  "group_id" TEXT NOT NULL,
+  "sort_order" INTEGER NOT NULL,
+  "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT "v1_tournament_bye_slots_pkey" PRIMARY KEY ("id"),
+  CONSTRAINT "v1_tournament_bye_slots_group_id_fkey" FOREIGN KEY ("group_id") REFERENCES "v1_tournament_groups"("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+CREATE UNIQUE INDEX "v1_tournament_bye_slots_group_id_sort_order_key" ON "v1_tournament_bye_slots"("group_id", "sort_order");

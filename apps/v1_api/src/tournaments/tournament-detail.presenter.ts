@@ -428,7 +428,7 @@ export function presentTournamentDetail(
       phase: group.phase,
       sortOrder: group.sortOrder,
       advanceCount: group.advanceCount,
-      groupTeams: group.groupTeams.map((groupTeam) => ({
+      groupTeams: [...group.groupTeams, ...(group.byeSlots ?? []).map((slot) => ({ ...slot, registrationId: null, registration: null, isBye: true }))].map((groupTeam) => ({
         id: groupTeam.id,
         registrationId: groupTeam.registrationId,
         teamId: hideIdentity ? null : (groupTeam.registration?.team.id ?? null),

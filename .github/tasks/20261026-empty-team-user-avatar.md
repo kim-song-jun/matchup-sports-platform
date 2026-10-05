@@ -1,6 +1,6 @@
 # Task 20261026: 빈 팀·유저 아바타 전체 점검 및 기본 아이콘 통일
 
-Status: Implemented — review / alpha pending
+Status: Implemented and alpha deployed — public visual QA PASS; authenticated visual QA pending
 Owner: Codex (single agent)
 Created: 2026-10-05
 
@@ -36,7 +36,7 @@ Forbidden: API/Prisma/DB 데이터 변경, 후원사/대회 타이틀 브랜드 
 - [x] 전체 inventory 처리 M/N, 이미지 없는 실 엔티티는 팀/사람 아이콘.
 - [x] 이미지 교체·실패 회복·비어짐에 stale 그림 없음.
 - [x] 기존 크기·레이아웃·클릭/키보드·사진/로고 저장 유지, 관련 테스트 및 lint PASS.
-- [ ] alpha 검증 결과와 미검증 범위 명시.
+- [x] alpha 검증 결과와 미검증 범위 명시.
 
 ## Tech Debt Resolved
 팀원에 TeamAvatar를 쓰던 의미 혼선, URL 변경 때 loaded boolean이 남던 수명주기, 이니셜/빈 원 표시를 함께 정리한다.
@@ -106,3 +106,35 @@ origin/dev 9d7869721에서 격리 branch fix/team-user-empty-avatar-consistency 
 - 공용 후기 회귀 RED 1 → GREEN 1; 후기 팀 우선/빈 상태 8 tests PASS. 총 unique 205 tests across 11 suites PASS. 추가 후 tsc PASS / pattern PASS.
 
 - CI Web 6418/6419 PASS; remaining failure was the old TeamMembersSection initials contract, intentionally superseded by user-requested person icon. Updated to verify neutral person glyph plus unchanged full display names; 3 member tests PASS.
+
+## Final Progress Snapshot (2026-10-06)
+- PR #1623 merged to dev, merge SHA `3b56d2b8b135f25aface7d20d2474a27f5c852ed`.
+- PR CI `37332538390` PASS; merge CI `37334059810` PASS; alpha deploy `37334059834` PASS.
+- Alpha actual release `1.2.1-alpha.20261006.g4e1c14bb9cd0`, served SHA `4e1c14bb9cd089da10e1dae0088dfea6deb5b72d`; git ancestry check confirms inclusion of this fix.
+- API health success, DB true. Local dev and origin/dev both 4e1c14bb9cd0 at verification.
+- Source inventory 33/33. Narrow regression 208 tests / 12 suites PASS, tsc + pattern PASS. CI full Web tests/build + API + release gates PASS.
+- Copilot quota HTTP402: user explicitly approved one-PR replacement with direct review and validation. Not recorded as a clean Copilot review.
+- Shared dev sync: 22 CRLF-only overlapping files backed up to `/tmp/teameet-avatar-dev-ff-backup-20261006`; normalized bytes match HEAD, no substantive WIP removal. Shared tree subsequently advanced to origin/dev 4e1c14bb9cd0; ancestry and matching refs verified.
+
+## Alpha Manual QA
+Persona: anonymous public visitor, real headed Chromium; no local Next server, no auth bypass or DB writes.
+
+| Journey / state | 390 | 768 | 1440 |
+|---|---|---|---|
+| Team list, existing logos | PASS | PASS | PASS |
+| Team list → detail, member person icons | PASS | PASS | PASS |
+| Tournament list → actual tournament detail | PASS | PASS | PASS |
+| Tournament detail → bracket (unpublished gate) | PASS | PASS | PASS |
+| Team-match list → detail, empty team icons | PASS | PASS | PASS |
+| Public team owner profile without photo | PASS | PASS | PASS |
+| Team image request failure (intentional browser fault injection) | PASS | PASS | PASS |
+
+24 normal route/viewport observations + 3 intentional image-failure scenarios = 27/27 captured. Public profile 3 widths recaptured after finite entrance animations settled. No horizontal overflow, pageerror 0, unplanned non-aborted transport failure 0. Console contains expected anonymous HTTP401 from auth/me and protected my-fixtures; recorded rather than reported as console-clean. Intentional image failures are separately tagged.
+
+Team list identicon SVG rectangles: 190 before → 0 after; deliberate image failure shows 20 team icons and 0 pattern rectangles at all widths. Public no-photo profile: 0 person icon before → 1 after at all widths. Existing uploaded/preset logo images still render normally. Public member names, links, labels and privacy gate remain unchanged.
+
+Limitations: authenticated admin moderation, roster editing, my/edit, invitations/requests, ops and protected review flows have source/tests validation, but no logged-in browser session was available. The chosen tournament bracket is unpublished, so its actual pending/bye avatar rows were verified by render tests rather than exposed at runtime. Other inventory consumers were statically audited; the above public journeys are the explicit browser coverage, not all 33 consumers.
+
+Evidence: `docs/screenshots/20261006-empty-avatar/` in post-merge QA evidence commit; PR #1623 gallery links are SHA-pinned. Earlier failed capture targeted a hidden responsive bracket link; selector fixed to visible link and browser closed in finally. No application failure was hidden by that correction.
+
+Cleanup: headed runner/browser trees 79557→79574 (failed capture), 79858→79876 (full capture), 80095→80113 (settled profile) closed by browser.close() in finally. No owned browser/server remains running.

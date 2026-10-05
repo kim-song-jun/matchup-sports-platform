@@ -1,0 +1,626 @@
+{
+  "records": [
+    {
+      "route": "/teams",
+      "width": 390,
+      "status": 200,
+      "commit": "9d78697219b2b424aee13decf897c45ceb48c2e3",
+      "url": "https://alpha.teameet.co.kr/teams",
+      "teamIcons": 0,
+      "userIcons": 0,
+      "patternRects": 190,
+      "overflow": false,
+      "links": [
+        "/teams/new",
+        "/teams/ad200601-0000-4000-8000-000000000020",
+        "/teams/ad200601-0000-4000-8000-000000000019",
+        "/teams/ad200601-0000-4000-8000-000000000018",
+        "/teams/ad200601-0000-4000-8000-000000000017",
+        "/teams/ad200601-0000-4000-8000-000000000016",
+        "/teams/ad200601-0000-4000-8000-000000000015",
+        "/teams/ad200601-0000-4000-8000-000000000014",
+        "/teams/ad200601-0000-4000-8000-000000000013",
+        "/teams/ad200601-0000-4000-8000-000000000012"
+      ]
+    },
+    {
+      "route": "/teams",
+      "width": 768,
+      "status": 200,
+      "commit": "9d78697219b2b424aee13decf897c45ceb48c2e3",
+      "url": "https://alpha.teameet.co.kr/teams",
+      "teamIcons": 0,
+      "userIcons": 0,
+      "patternRects": 190,
+      "overflow": false,
+      "links": [
+        "/teams/new",
+        "/teams/ad200601-0000-4000-8000-000000000020",
+        "/teams/ad200601-0000-4000-8000-000000000019",
+        "/teams/ad200601-0000-4000-8000-000000000018",
+        "/teams/ad200601-0000-4000-8000-000000000017",
+        "/teams/ad200601-0000-4000-8000-000000000016",
+        "/teams/ad200601-0000-4000-8000-000000000015",
+        "/teams/ad200601-0000-4000-8000-000000000014",
+        "/teams/ad200601-0000-4000-8000-000000000013",
+        "/teams/ad200601-0000-4000-8000-000000000012"
+      ]
+    },
+    {
+      "route": "/teams",
+      "width": 1440,
+      "status": 200,
+      "commit": "9d78697219b2b424aee13decf897c45ceb48c2e3",
+      "url": "https://alpha.teameet.co.kr/teams",
+      "teamIcons": 0,
+      "userIcons": 0,
+      "patternRects": 190,
+      "overflow": false,
+      "links": [
+        "/teams/new",
+        "/teams/ad200601-0000-4000-8000-000000000020",
+        "/teams/ad200601-0000-4000-8000-000000000019",
+        "/teams/ad200601-0000-4000-8000-000000000018",
+        "/teams/ad200601-0000-4000-8000-000000000017",
+        "/teams/ad200601-0000-4000-8000-000000000016",
+        "/teams/ad200601-0000-4000-8000-000000000015",
+        "/teams/ad200601-0000-4000-8000-000000000014",
+        "/teams/ad200601-0000-4000-8000-000000000013",
+        "/teams/ad200601-0000-4000-8000-000000000012"
+      ]
+    },
+    {
+      "route": "/tournaments",
+      "width": 390,
+      "status": 200,
+      "commit": "9d78697219b2b424aee13decf897c45ceb48c2e3",
+      "url": "https://alpha.teameet.co.kr/tournaments",
+      "teamIcons": 0,
+      "userIcons": 0,
+      "patternRects": 2,
+      "overflow": false,
+      "links": [
+        "/tournaments/ad200600-0000-4000-8000-000000000001",
+        "/tournaments/ad120000-0000-4000-8000-000000000001",
+        "/tournaments/95a12047-c2f9-4c30-aab2-ba978d0c6653",
+        "/tournaments/f36132ca-1f1e-4331-951f-4c71208ea17c",
+        "/tournaments/fdf43b68-5d55-4593-bd2d-e45bce465651",
+        "/tournaments/7a3b65be-5a49-4234-843f-e7c71e4842a7",
+        "/tournaments/932beb19-bc91-4446-86d8-9f69f5e4eae1",
+        "/tournaments/dbd2f4f0-09e7-4ca4-9d72-ce5b5d67e87c",
+        "/tournaments/c1f2ff15-9363-4915-9c11-8179e57369cb",
+        "/tournaments/7d386de1-da41-4bc5-a14a-53d55e8af0c8"
+      ]
+    },
+    {
+      "route": "/tournaments",
+      "width": 768,
+      "status": 200,
+      "commit": "9d78697219b2b424aee13decf897c45ceb48c2e3",
+      "url": "https://alpha.teameet.co.kr/tournaments",
+      "teamIcons": 0,
+      "userIcons": 0,
+      "patternRects": 2,
+      "overflow": false,
+      "links": [
+        "/tournaments/ad200600-0000-4000-8000-000000000001",
+        "/tournaments/ad120000-0000-4000-8000-000000000001",
+        "/tournaments/95a12047-c2f9-4c30-aab2-ba978d0c6653",
+        "/tournaments/f36132ca-1f1e-4331-951f-4c71208ea17c",
+        "/tournaments/fdf43b68-5d55-4593-bd2d-e45bce465651",
+        "/tournaments/7a3b65be-5a49-4234-843f-e7c71e4842a7",
+        "/tournaments/932beb19-bc91-4446-86d8-9f69f5e4eae1",
+        "/tournaments/dbd2f4f0-09e7-4ca4-9d72-ce5b5d67e87c",
+        "/tournaments/c1f2ff15-9363-4915-9c11-8179e57369cb",
+        "/tournaments/7d386de1-da41-4bc5-a14a-53d55e8af0c8"
+      ]
+    },
+    {
+      "route": "/tournaments",
+      "width": 1440,
+      "status": 200,
+      "commit": "9d78697219b2b424aee13decf897c45ceb48c2e3",
+      "url": "https://alpha.teameet.co.kr/tournaments",
+      "teamIcons": 0,
+      "userIcons": 0,
+      "patternRects": 2,
+      "overflow": false,
+      "links": [
+        "/tournaments/ad200600-0000-4000-8000-000000000001",
+        "/tournaments/ad120000-0000-4000-8000-000000000001",
+        "/tournaments/95a12047-c2f9-4c30-aab2-ba978d0c6653",
+        "/tournaments/f36132ca-1f1e-4331-951f-4c71208ea17c",
+        "/tournaments/fdf43b68-5d55-4593-bd2d-e45bce465651",
+        "/tournaments/7a3b65be-5a49-4234-843f-e7c71e4842a7",
+        "/tournaments/932beb19-bc91-4446-86d8-9f69f5e4eae1",
+        "/tournaments/dbd2f4f0-09e7-4ca4-9d72-ce5b5d67e87c",
+        "/tournaments/c1f2ff15-9363-4915-9c11-8179e57369cb",
+        "/tournaments/7d386de1-da41-4bc5-a14a-53d55e8af0c8"
+      ]
+    },
+    {
+      "route": "/team-matches",
+      "width": 390,
+      "status": 200,
+      "commit": "9d78697219b2b424aee13decf897c45ceb48c2e3",
+      "url": "https://alpha.teameet.co.kr/team-matches",
+      "teamIcons": 0,
+      "userIcons": 0,
+      "patternRects": 0,
+      "overflow": false,
+      "links": []
+    },
+    {
+      "route": "/team-matches",
+      "width": 768,
+      "status": 200,
+      "commit": "9d78697219b2b424aee13decf897c45ceb48c2e3",
+      "url": "https://alpha.teameet.co.kr/team-matches",
+      "teamIcons": 0,
+      "userIcons": 0,
+      "patternRects": 0,
+      "overflow": false,
+      "links": []
+    },
+    {
+      "route": "/team-matches",
+      "width": 1440,
+      "status": 200,
+      "commit": "9d78697219b2b424aee13decf897c45ceb48c2e3",
+      "url": "https://alpha.teameet.co.kr/team-matches",
+      "teamIcons": 0,
+      "userIcons": 0,
+      "patternRects": 0,
+      "overflow": false,
+      "links": []
+    }
+  ],
+  "errors": [],
+  "failed": [
+    {
+      "url": "https://alpha.teameet.co.kr/api/v1/teams",
+      "error": "net::ERR_ABORTED",
+      "intentional": false
+    },
+    {
+      "url": "https://alpha.teameet.co.kr/teams/ad200601-0000-4000-8000-000000000017",
+      "error": "net::ERR_ABORTED",
+      "intentional": false
+    },
+    {
+      "url": "https://alpha.teameet.co.kr/teams/ad200601-0000-4000-8000-000000000016",
+      "error": "net::ERR_ABORTED",
+      "intentional": false
+    },
+    {
+      "url": "https://alpha.teameet.co.kr/teams/ad200601-0000-4000-8000-000000000013",
+      "error": "net::ERR_ABORTED",
+      "intentional": false
+    },
+    {
+      "url": "https://www.googletagmanager.com/gtag/js",
+      "error": "net::ERR_ABORTED",
+      "intentional": false
+    },
+    {
+      "url": "https://alpha.teameet.co.kr/teams/ad200601-0000-4000-8000-000000000018",
+      "error": "net::ERR_ABORTED",
+      "intentional": false
+    },
+    {
+      "url": "https://alpha.teameet.co.kr/api/v1/health",
+      "error": "net::ERR_ABORTED",
+      "intentional": false
+    },
+    {
+      "url": "https://www.google-analytics.com/g/collect",
+      "error": "net::ERR_ABORTED",
+      "intentional": false
+    },
+    {
+      "url": "https://alpha.teameet.co.kr/api/v1/health",
+      "error": "net::ERR_ABORTED",
+      "intentional": false
+    },
+    {
+      "url": "https://www.google-analytics.com/g/collect",
+      "error": "net::ERR_ABORTED",
+      "intentional": false
+    },
+    {
+      "url": "https://alpha.teameet.co.kr/teams/ad200601-0000-4000-8000-000000000004",
+      "error": "net::ERR_ABORTED",
+      "intentional": false
+    },
+    {
+      "url": "https://www.google-analytics.com/g/collect",
+      "error": "net::ERR_ABORTED",
+      "intentional": false
+    },
+    {
+      "url": "https://www.google-analytics.com/g/collect",
+      "error": "net::ERR_ABORTED",
+      "intentional": false
+    },
+    {
+      "url": "https://alpha.teameet.co.kr/teams/ad200601-0000-4000-8000-000000000006",
+      "error": "net::ERR_ABORTED",
+      "intentional": false
+    },
+    {
+      "url": "https://alpha.teameet.co.kr/teams/ad200601-0000-4000-8000-000000000007",
+      "error": "net::ERR_ABORTED",
+      "intentional": false
+    },
+    {
+      "url": "https://alpha.teameet.co.kr/teams/ad200601-0000-4000-8000-000000000005",
+      "error": "net::ERR_ABORTED",
+      "intentional": false
+    },
+    {
+      "url": "https://www.google-analytics.com/g/collect",
+      "error": "net::ERR_ABORTED",
+      "intentional": false
+    },
+    {
+      "url": "https://www.google-analytics.com/g/collect",
+      "error": "net::ERR_ABORTED",
+      "intentional": false
+    },
+    {
+      "url": "https://alpha.teameet.co.kr/teams/ad200601-0000-4000-8000-000000000006",
+      "error": "net::ERR_ABORTED",
+      "intentional": false
+    },
+    {
+      "url": "https://alpha.teameet.co.kr/teams/ad200601-0000-4000-8000-000000000004",
+      "error": "net::ERR_ABORTED",
+      "intentional": false
+    },
+    {
+      "url": "https://alpha.teameet.co.kr/teams/ad200601-0000-4000-8000-000000000016",
+      "error": "net::ERR_ABORTED",
+      "intentional": false
+    },
+    {
+      "url": "https://alpha.teameet.co.kr/teams/ad200601-0000-4000-8000-000000000018",
+      "error": "net::ERR_ABORTED",
+      "intentional": false
+    },
+    {
+      "url": "https://alpha.teameet.co.kr/teams/ad200601-0000-4000-8000-000000000011",
+      "error": "net::ERR_ABORTED",
+      "intentional": false
+    },
+    {
+      "url": "https://www.google-analytics.com/g/collect",
+      "error": "net::ERR_ABORTED",
+      "intentional": false
+    },
+    {
+      "url": "https://www.google-analytics.com/g/collect",
+      "error": "net::ERR_ABORTED",
+      "intentional": false
+    },
+    {
+      "url": "https://alpha.teameet.co.kr/api/v1/health",
+      "error": "net::ERR_ABORTED",
+      "intentional": false
+    },
+    {
+      "url": "https://www.google-analytics.com/g/collect",
+      "error": "net::ERR_ABORTED",
+      "intentional": false
+    },
+    {
+      "url": "https://alpha.teameet.co.kr/teams/ad200601-0000-4000-8000-000000000012",
+      "error": "net::ERR_ABORTED",
+      "intentional": false
+    },
+    {
+      "url": "https://www.google-analytics.com/g/collect",
+      "error": "net::ERR_ABORTED",
+      "intentional": false
+    },
+    {
+      "url": "https://www.google-analytics.com/g/collect",
+      "error": "net::ERR_ABORTED",
+      "intentional": false
+    },
+    {
+      "url": "https://alpha.teameet.co.kr/tournaments/ad120000-0000-4000-8000-000000000001",
+      "error": "net::ERR_ABORTED",
+      "intentional": false
+    },
+    {
+      "url": "https://alpha.teameet.co.kr/api/v1/health",
+      "error": "net::ERR_ABORTED",
+      "intentional": false
+    },
+    {
+      "url": "https://alpha.teameet.co.kr/tournaments/95a12047-c2f9-4c30-aab2-ba978d0c6653",
+      "error": "net::ERR_ABORTED",
+      "intentional": false
+    },
+    {
+      "url": "https://www.google-analytics.com/g/collect",
+      "error": "net::ERR_ABORTED",
+      "intentional": false
+    },
+    {
+      "url": "https://alpha.teameet.co.kr/tournaments/ad200600-0000-4000-8000-000000000001",
+      "error": "net::ERR_ABORTED",
+      "intentional": false
+    },
+    {
+      "url": "https://www.google-analytics.com/g/collect",
+      "error": "net::ERR_ABORTED",
+      "intentional": false
+    },
+    {
+      "url": "https://alpha.teameet.co.kr/tournaments/f36132ca-1f1e-4331-951f-4c71208ea17c",
+      "error": "net::ERR_ABORTED",
+      "intentional": false
+    },
+    {
+      "url": "https://www.google-analytics.com/g/collect",
+      "error": "net::ERR_ABORTED",
+      "intentional": false
+    },
+    {
+      "url": "https://www.google-analytics.com/g/collect",
+      "error": "net::ERR_ABORTED",
+      "intentional": false
+    },
+    {
+      "url": "https://www.google-analytics.com/g/collect",
+      "error": "net::ERR_ABORTED",
+      "intentional": false
+    },
+    {
+      "url": "https://alpha.teameet.co.kr/tournaments/ad200600-0000-4000-8000-000000000001",
+      "error": "net::ERR_ABORTED",
+      "intentional": false
+    },
+    {
+      "url": "https://alpha.teameet.co.kr/tournaments/f36132ca-1f1e-4331-951f-4c71208ea17c",
+      "error": "net::ERR_ABORTED",
+      "intentional": false
+    },
+    {
+      "url": "https://alpha.teameet.co.kr/api/v1/popups/active",
+      "error": "net::ERR_ABORTED",
+      "intentional": false
+    },
+    {
+      "url": "https://www.google-analytics.com/g/collect",
+      "error": "net::ERR_ABORTED",
+      "intentional": false
+    },
+    {
+      "url": "https://alpha.teameet.co.kr/tournaments/95a12047-c2f9-4c30-aab2-ba978d0c6653",
+      "error": "net::ERR_ABORTED",
+      "intentional": false
+    },
+    {
+      "url": "https://www.google-analytics.com/g/collect",
+      "error": "net::ERR_ABORTED",
+      "intentional": false
+    },
+    {
+      "url": "https://www.google-analytics.com/g/collect",
+      "error": "net::ERR_ABORTED",
+      "intentional": false
+    },
+    {
+      "url": "https://alpha.teameet.co.kr/api/v1/tournaments",
+      "error": "net::ERR_ABORTED",
+      "intentional": false
+    },
+    {
+      "url": "https://alpha.teameet.co.kr/tournaments/ad120000-0000-4000-8000-000000000001",
+      "error": "net::ERR_ABORTED",
+      "intentional": false
+    },
+    {
+      "url": "https://alpha.teameet.co.kr/api/v1/health",
+      "error": "net::ERR_ABORTED",
+      "intentional": false
+    },
+    {
+      "url": "https://alpha.teameet.co.kr/api/v1/tournaments",
+      "error": "net::ERR_ABORTED",
+      "intentional": false
+    },
+    {
+      "url": "https://alpha.teameet.co.kr/mock/generated/futsal-rooftop.webp",
+      "error": "net::ERR_ABORTED",
+      "intentional": false
+    },
+    {
+      "url": "https://www.google-analytics.com/g/collect",
+      "error": "net::ERR_ABORTED",
+      "intentional": false
+    },
+    {
+      "url": "https://www.google-analytics.com/g/collect",
+      "error": "net::ERR_ABORTED",
+      "intentional": false
+    },
+    {
+      "url": "https://alpha.teameet.co.kr/tournaments/fdf43b68-5d55-4593-bd2d-e45bce465651",
+      "error": "net::ERR_ABORTED",
+      "intentional": false
+    },
+    {
+      "url": "https://alpha.teameet.co.kr/tournaments/7a3b65be-5a49-4234-843f-e7c71e4842a7",
+      "error": "net::ERR_ABORTED",
+      "intentional": false
+    },
+    {
+      "url": "https://alpha.teameet.co.kr/tournaments/f36132ca-1f1e-4331-951f-4c71208ea17c",
+      "error": "net::ERR_ABORTED",
+      "intentional": false
+    },
+    {
+      "url": "https://www.google-analytics.com/g/collect",
+      "error": "net::ERR_ABORTED",
+      "intentional": false
+    },
+    {
+      "url": "https://www.google-analytics.com/g/collect",
+      "error": "net::ERR_ABORTED",
+      "intentional": false
+    },
+    {
+      "url": "https://alpha.teameet.co.kr/tournaments/ad200600-0000-4000-8000-000000000001",
+      "error": "net::ERR_ABORTED",
+      "intentional": false
+    },
+    {
+      "url": "https://alpha.teameet.co.kr/api/v1/health",
+      "error": "net::ERR_ABORTED",
+      "intentional": false
+    },
+    {
+      "url": "https://www.google-analytics.com/g/collect",
+      "error": "net::ERR_ABORTED",
+      "intentional": false
+    },
+    {
+      "url": "https://alpha.teameet.co.kr/tournaments/campaigns/alpha-qa-futsal-recruiting",
+      "error": "net::ERR_ABORTED",
+      "intentional": false
+    },
+    {
+      "url": "https://www.google-analytics.com/g/collect",
+      "error": "net::ERR_ABORTED",
+      "intentional": false
+    },
+    {
+      "url": "https://alpha.teameet.co.kr/tournaments",
+      "error": "net::ERR_ABORTED",
+      "intentional": false
+    },
+    {
+      "url": "https://alpha.teameet.co.kr/tournaments/ad120000-0000-4000-8000-000000000001",
+      "error": "net::ERR_ABORTED",
+      "intentional": false
+    },
+    {
+      "url": "https://www.google-analytics.com/g/collect",
+      "error": "net::ERR_ABORTED",
+      "intentional": false
+    },
+    {
+      "url": "https://www.google-analytics.com/g/collect",
+      "error": "net::ERR_ABORTED",
+      "intentional": false
+    },
+    {
+      "url": "https://www.google-analytics.com/g/collect",
+      "error": "net::ERR_ABORTED",
+      "intentional": false
+    },
+    {
+      "url": "https://alpha.teameet.co.kr/team-matches",
+      "error": "net::ERR_ABORTED",
+      "intentional": false
+    },
+    {
+      "url": "https://alpha.teameet.co.kr/team-matches/4b17f075-ed86-4ce9-99e5-c92dd469be0f",
+      "error": "net::ERR_ABORTED",
+      "intentional": false
+    },
+    {
+      "url": "https://alpha.teameet.co.kr/team-matches/new/team",
+      "error": "net::ERR_ABORTED",
+      "intentional": false
+    },
+    {
+      "url": "https://www.google-analytics.com/g/collect",
+      "error": "net::ERR_ABORTED",
+      "intentional": false
+    },
+    {
+      "url": "https://alpha.teameet.co.kr/team-matches/046667a6-54df-4f21-84b5-ef5b19074394",
+      "error": "net::ERR_ABORTED",
+      "intentional": false
+    },
+    {
+      "url": "https://alpha.teameet.co.kr/api/v1/health",
+      "error": "net::ERR_ABORTED",
+      "intentional": false
+    },
+    {
+      "url": "https://www.google-analytics.com/g/collect",
+      "error": "net::ERR_ABORTED",
+      "intentional": false
+    },
+    {
+      "url": "https://www.google-analytics.com/g/collect",
+      "error": "net::ERR_ABORTED",
+      "intentional": false
+    },
+    {
+      "url": "https://www.google-analytics.com/g/collect",
+      "error": "net::ERR_ABORTED",
+      "intentional": false
+    },
+    {
+      "url": "https://www.google-analytics.com/g/collect",
+      "error": "net::ERR_ABORTED",
+      "intentional": false
+    },
+    {
+      "url": "https://www.google-analytics.com/g/collect",
+      "error": "net::ERR_ABORTED",
+      "intentional": false
+    },
+    {
+      "url": "https://www.google-analytics.com/g/collect",
+      "error": "net::ERR_ABORTED",
+      "intentional": false
+    },
+    {
+      "url": "https://alpha.teameet.co.kr/team-matches/e457a18a-a87e-4e1b-9d92-75f1a0ab5206",
+      "error": "net::ERR_ABORTED",
+      "intentional": false
+    },
+    {
+      "url": "https://alpha.teameet.co.kr/team-matches/c4b296a0-1290-445c-bbe7-a603bc850b0b",
+      "error": "net::ERR_ABORTED",
+      "intentional": false
+    },
+    {
+      "url": "https://alpha.teameet.co.kr/team-matches/f70821a4-6272-4235-b86d-2d7041048e37",
+      "error": "net::ERR_ABORTED",
+      "intentional": false
+    },
+    {
+      "url": "https://www.google-analytics.com/g/collect",
+      "error": "net::ERR_ABORTED",
+      "intentional": false
+    },
+    {
+      "url": "https://alpha.teameet.co.kr/api/v1/health",
+      "error": "net::ERR_ABORTED",
+      "intentional": false
+    },
+    {
+      "url": "https://alpha.teameet.co.kr/team-matches/d4057deb-e403-4305-b6ae-c31a751f328b",
+      "error": "net::ERR_ABORTED",
+      "intentional": false
+    },
+    {
+      "url": "https://www.google-analytics.com/g/collect",
+      "error": "net::ERR_ABORTED",
+      "intentional": false
+    },
+    {
+      "url": "https://www.google-analytics.com/g/collect",
+      "error": "net::ERR_ABORTED",
+      "intentional": false
+    }
+  ]
+}

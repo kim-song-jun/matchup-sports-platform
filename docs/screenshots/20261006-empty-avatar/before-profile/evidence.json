@@ -1,0 +1,158 @@
+{
+  "records": [
+    {
+      "route": "/users/ad200602-0000-4000-8000-000000002001",
+      "width": 390,
+      "status": 200,
+      "commit": "5d3015b594fdc6f06c84d183d07a0459e382c65a",
+      "userIcons": 0,
+      "overflow": false
+    },
+    {
+      "route": "/users/ad200602-0000-4000-8000-000000002001",
+      "width": 768,
+      "status": 200,
+      "commit": "5d3015b594fdc6f06c84d183d07a0459e382c65a",
+      "userIcons": 0,
+      "overflow": false
+    },
+    {
+      "route": "/users/ad200602-0000-4000-8000-000000002001",
+      "width": 1440,
+      "status": 200,
+      "commit": "5d3015b594fdc6f06c84d183d07a0459e382c65a",
+      "userIcons": 0,
+      "overflow": false
+    }
+  ],
+  "errors": [],
+  "consoleErrors": [
+    {
+      "message": "Failed to load resource: the server responded with a status of 401 ()",
+      "url": "https://alpha.teameet.co.kr/api/v1/auth/me",
+      "intentional": false
+    },
+    {
+      "message": "Failed to load resource: the server responded with a status of 401 ()",
+      "url": "https://alpha.teameet.co.kr/api/v1/auth/me",
+      "intentional": false
+    },
+    {
+      "message": "Failed to load resource: the server responded with a status of 401 ()",
+      "url": "https://alpha.teameet.co.kr/api/v1/auth/me",
+      "intentional": false
+    }
+  ],
+  "failed": [
+    {
+      "url": "https://www.google-analytics.com/g/collect",
+      "error": "net::ERR_ABORTED",
+      "intentional": false
+    },
+    {
+      "url": "https://www.google-analytics.com/g/collect",
+      "error": "net::ERR_ABORTED",
+      "intentional": false
+    },
+    {
+      "url": "https://www.google-analytics.com/g/collect",
+      "error": "net::ERR_ABORTED",
+      "intentional": false
+    },
+    {
+      "url": "https://alpha.teameet.co.kr/api/v1/health",
+      "error": "net::ERR_ABORTED",
+      "intentional": false
+    },
+    {
+      "url": "https://www.google-analytics.com/g/collect",
+      "error": "net::ERR_ABORTED",
+      "intentional": false
+    },
+    {
+      "url": "https://www.google-analytics.com/g/collect",
+      "error": "net::ERR_ABORTED",
+      "intentional": false
+    },
+    {
+      "url": "https://www.google-analytics.com/g/collect",
+      "error": "net::ERR_ABORTED",
+      "intentional": false
+    },
+    {
+      "url": "https://www.google-analytics.com/g/collect",
+      "error": "net::ERR_ABORTED",
+      "intentional": false
+    },
+    {
+      "url": "https://alpha.teameet.co.kr/users/ad200602-0000-4000-8000-000000002001/records",
+      "error": "net::ERR_ABORTED",
+      "intentional": false
+    },
+    {
+      "url": "https://alpha.teameet.co.kr/notifications",
+      "error": "net::ERR_ABORTED",
+      "intentional": false
+    },
+    {
+      "url": "https://www.google-analytics.com/g/collect",
+      "error": "net::ERR_ABORTED",
+      "intentional": false
+    },
+    {
+      "url": "https://alpha.teameet.co.kr/teams/ad200601-0000-4000-8000-000000000020",
+      "error": "net::ERR_ABORTED",
+      "intentional": false
+    },
+    {
+      "url": "https://alpha.teameet.co.kr/my",
+      "error": "net::ERR_ABORTED",
+      "intentional": false
+    },
+    {
+      "url": "https://www.google-analytics.com/g/collect",
+      "error": "net::ERR_ABORTED",
+      "intentional": false
+    },
+    {
+      "url": "https://alpha.teameet.co.kr/notifications",
+      "error": "net::ERR_ABORTED",
+      "intentional": false
+    },
+    {
+      "url": "https://alpha.teameet.co.kr/api/v1/health",
+      "error": "net::ERR_ABORTED",
+      "intentional": false
+    },
+    {
+      "url": "https://www.google-analytics.com/g/collect",
+      "error": "net::ERR_ABORTED",
+      "intentional": false
+    },
+    {
+      "url": "https://alpha.teameet.co.kr/teams",
+      "error": "net::ERR_ABORTED",
+      "intentional": false
+    },
+    {
+      "url": "https://www.google-analytics.com/g/collect",
+      "error": "net::ERR_ABORTED",
+      "intentional": false
+    },
+    {
+      "url": "https://www.google-analytics.com/g/collect",
+      "error": "net::ERR_ABORTED",
+      "intentional": false
+    },
+    {
+      "url": "https://alpha.teameet.co.kr/notifications",
+      "error": "net::ERR_ABORTED",
+      "intentional": false
+    },
+    {
+      "url": "https://alpha.teameet.co.kr/users/ad200602-0000-4000-8000-000000002001/card",
+      "error": "net::ERR_ABORTED",
+      "intentional": false
+    }
+  ]
+}

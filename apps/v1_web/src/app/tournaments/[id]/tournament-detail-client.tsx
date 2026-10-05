@@ -594,7 +594,6 @@ export function TournamentDetailView({
 }) {
   const childHref = useChildHref();
   const participantFrom = useContext(DetailChainFromContext) ?? `/tournaments/${tournament.id}`;
-  const status = getTournamentStatusConfig(tournament.status);
   const sportAccent = getSportAccent(tournament.sport.code);
   const isOpen = tournament.kind === 'regular_league'
     ? tournament.status !== 'completed' && tournament.status !== 'cancelled'
@@ -645,6 +644,7 @@ export function TournamentDetailView({
      판정을 공유한다. status만 보던 예전 로직은 신청 마감이 지난 open 대회에서도
      '참가 신청하기'를 활성으로 그렸다. */
   const registrationBlock = resolveTournamentRegistrationBlock(tournament);
+  const status = getTournamentStatusConfig(tournament.status, registrationBlock !== null);
   const prizeText = tournament.prizeSummary?.trim() ?? '';
   const genderCategoryLabel = getGenderCategoryLabel(tournament.genderCategory);
   const genderQuotaLabel = getGenderQuotaLabel(tournament);

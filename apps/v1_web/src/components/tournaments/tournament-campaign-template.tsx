@@ -9,7 +9,7 @@ import type {
 } from '@/types/tournament-campaign';
 import { TournamentCampaignMedia } from './tournament-campaign-media';
 import { TournamentCampaignDecision } from './tournament-campaign-decision';
-import { TournamentCampaignRegistrationProvider } from './tournament-campaign-registration-state';
+import { TournamentCampaignRegistrationProvider, TournamentCampaignStatusBadge } from './tournament-campaign-registration-state';
 import { TournamentCampaignRewards } from './tournament-campaign-rewards';
 import {
   formatPrizeSummary,
@@ -42,6 +42,10 @@ export function TournamentCampaignTemplate({
   );
   const heroTitleLines = splitCampaignHeroTitle(content.hero.title);
   return (
+    <TournamentCampaignRegistrationProvider
+      availability={tournament.registrationAvailability}
+      deadlineAt={tournament.registrationDeadlineAt}
+    >
     <article className={`${styles.campaign} tm-content-enter`} data-preview={preview || undefined}>
       <section className={styles.hero} aria-labelledby="campaign-title">
         <TournamentCampaignMedia
@@ -54,7 +58,7 @@ export function TournamentCampaignTemplate({
         <div className={styles.heroScrim} aria-hidden="true" />
         <div className={styles.heroContent}>
           <div className={styles.heroEyebrow}>
-            <span className={`tm-badge ${status.badgeClass}`}>{status.label}</span>
+            <TournamentCampaignStatusBadge status={tournament.status} />
             <span className={styles.heroSport}>{tournament.sport.name}</span>
           </div>
           <h1
@@ -74,10 +78,6 @@ export function TournamentCampaignTemplate({
         </div>
       </section>
 
-      <TournamentCampaignRegistrationProvider
-        availability={tournament.registrationAvailability}
-        deadlineAt={tournament.registrationDeadlineAt}
-      >
       <div className={styles.content}>
         <section className={styles.facts} aria-label="대회 핵심 정보">
           <CampaignFact icon={<CalendarDays aria-hidden="true" />} label="일정" value={dateLabel} />
@@ -162,8 +162,8 @@ export function TournamentCampaignTemplate({
         ) : null}
 
       </div>
-      </TournamentCampaignRegistrationProvider>
     </article>
+    </TournamentCampaignRegistrationProvider>
   );
 }
 

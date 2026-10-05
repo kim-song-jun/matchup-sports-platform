@@ -396,6 +396,8 @@ function CoChampionBanner({ names }: { names: string[] }) {
 /* ── 최종 순위 테이블 ── */
 const ROUND_LABEL_MAP: Record<string, string> = {
   final: '결승', '결승': '결승',
+  round12: '12강', '12강': '12강',
+  quarter: '8강', '8강': '8강',
   semi: '4강', '4강': '4강',
   third_place: '3·4위전', '3·4위전': '3·4위전',
 };
@@ -423,6 +425,7 @@ function KnockoutResultsTable({
   const semiByMatchup = new Map<number | string, V1TournamentFixture[]>();
   const finalFixtures: V1TournamentFixture[] = [];
   const thirdFixtures: V1TournamentFixture[] = [];
+  const earlierFixtures: V1TournamentFixture[] = [];
 
   for (const f of fixtures) {
     // 4강은 1·2차전을 대진 번호로 묶는다. 번호가 비어도 4강 카드로는 남겨야 하므로
@@ -435,6 +438,10 @@ function KnockoutResultsTable({
         semiByMatchup.set(key, bucket);
         break;
       }
+      case 'round12':
+      case 'quarter':
+        earlierFixtures.push(f);
+        break;
       case 'third_place':
         thirdFixtures.push(f);
         break;
@@ -615,6 +622,17 @@ function KnockoutResultsTable({
           </div>
         );
       })}
+
+      {earlierFixtures.map((fixture) => fixture.result && (
+        <div key={fixture.id} style={cardStyle}>
+          <MatchRow label={ROUND_LABEL_MAP[kindOf(fixture) ?? ''] ?? '결선'}
+            home={fixture.homeTeamName} away={fixture.awayTeamName}
+            homeScore={fixture.result.homeScore} awayScore={fixture.result.awayScore}
+            winner={getWinnerSide(fixture.result)} hasPenalty={fixture.result.hasPenalty}
+            homePK={fixture.result.homePenaltyScore} awayPK={fixture.result.awayPenaltyScore}
+            date={fmtDate(fixture.scheduledAt)} fixtureId={fixture.id} />
+        </div>
+      ))}
 
       {/* ── 3·4위전 카드 ── */}
       {thirdFixtures.map((f) => {
@@ -799,13 +817,15 @@ function VideoGallerySection({
  * 폴백으로만 남긴다.
  */
 /** 결선 카드의 종류. 이 화면이 실제로 그릴 수 있는 세 가지뿐이다. */
-export type KnockoutKind = 'final' | 'semi' | 'third_place';
+export type KnockoutKind = 'final' | 'semi' | 'quarter' | 'round12' | 'third_place';
 
 /** 결선 섹션 정렬 순서(결승 → 4강 → 3·4위전). */
-const KNOCKOUT_KIND_ORDER: Record<KnockoutKind, number> = { final: 0, semi: 1, third_place: 2 };
+const KNOCKOUT_KIND_ORDER: Record<KnockoutKind, number> = { final: 0, semi: 1, quarter: 2, round12: 3, third_place: 4 };
 
 /** 편성에 붙지 못한(groupId 없음/편성 삭제됨) 경기용 폴백 — 알려진 라벨만 인정한다. */
 const KNOCKOUT_KIND_BY_LABEL: Record<string, KnockoutKind> = {
+  round12: 'round12', '12강': 'round12',
+  quarter: 'quarter', '8강': 'quarter',
   final: 'final', '결승': 'final',
   semi: 'semi', '4강': 'semi',
   third_place: 'third_place', '3·4위전': 'third_place',

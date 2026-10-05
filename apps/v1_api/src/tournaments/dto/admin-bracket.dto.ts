@@ -18,7 +18,7 @@ import {
 
 // ─── Group phase constants ─────────────────────────────────────────────────────
 
-export const TOURNAMENT_GROUP_PHASES = ['group', 'semi', 'final', 'third_place'] as const;
+export const TOURNAMENT_GROUP_PHASES = ['group', 'round12', 'quarter', 'semi', 'final', 'third_place'] as const;
 export type TournamentGroupPhase = (typeof TOURNAMENT_GROUP_PHASES)[number];
 
 // ─── Group DTOs ───────────────────────────────────────────────────────────────
@@ -63,6 +63,11 @@ export class UpdateGroupDto {
 // ─── GroupTeam DTOs ───────────────────────────────────────────────────────────
 
 export class CreateGroupTeamDto {
+  /** 12강 부전승: 경기 없이 8강에 직접 배정할 팀. */
+  @IsOptional()
+  @IsBoolean()
+  isBye?: boolean;
+
   @IsUUID()
   groupId!: string;
 
@@ -74,6 +79,27 @@ export class CreateGroupTeamDto {
   @IsInt()
   @Min(0)
   sortOrder?: number;
+}
+
+/** 단독 부전승 대진. 라운드는 소속 group의 phase로 결정한다. */
+export class CreateBracketByeDto {
+  /** Existing bye slot to edit; absent creates a new slot. */
+  @IsOptional()
+  @IsUUID()
+  byeId?: string;
+  @IsUUID()
+  groupId!: string;
+
+  @IsOptional()
+  @IsUUID()
+  registrationId?: string | null;
+
+  /** 해당 라운드 대진표에서 위부터 0-based 위치. */
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(7)
+  sortOrder!: number;
 }
 
 // ─── Fixture DTOs ─────────────────────────────────────────────────────────────
@@ -145,6 +171,17 @@ export class UpdateFixtureDto {
   @IsOptional()
   @IsUUID()
   awayRegistrationId?: string;
+}
+
+export class UpdateBracketSourcesDto {
+  /** null clears the source; omitted sides remain unchanged. */
+  @IsOptional()
+  @IsUUID()
+  homeSourceFixtureId?: string | null;
+
+  @IsOptional()
+  @IsUUID()
+  awaySourceFixtureId?: string | null;
 }
 
 // ─── Result DTOs ──────────────────────────────────────────────────────────────

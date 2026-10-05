@@ -3451,7 +3451,7 @@ export type V1TournamentPaymentStatus =
 
 export type V1PlayerEligibilityStatus = 'non_pro' | 'pro' | 'needs_review';
 
-export type V1TournamentGroupPhase = 'group' | 'semi' | 'final' | 'third_place';
+export type V1TournamentGroupPhase = 'group' | 'round12' | 'quarter' | 'semi' | 'final' | 'third_place';
 
 export type V1AnnouncementAudience =
   | 'public'
@@ -3640,8 +3640,10 @@ export type V1Tournament = {
  * 'TBD' 같은 별도 문자열로 구분된다.
  */
 export type V1TournamentGroupTeam = {
+  /** 명시적으로 지정된 12강 부전승. 미배정 상대와 구분한다. */
+  isBye?: boolean;
   id: string;
-  registrationId: string;
+  registrationId: string | null;
   teamId: string | null;
   teamName: string | null;
   teamLogoUrl: string | null;
@@ -3714,7 +3716,10 @@ export type V1TournamentFixtureVideo = {
  * 실명. `null`과 'TBD'를 반드시 구분해서 표시할 것 — 둘 다 "미정"으로 뭉치면 "이미
  * 배정됐지만 비공개"와 "아직 배정 안 됨"을 사용자가 구분할 수 없다.
  */
+export type V1BracketSource = { fixtureId: string; outcome: 'WINNER' | 'LOSER'; side: 'HOME' | 'AWAY' };
+
 export type V1TournamentFixture = {
+  bracketSources?: V1BracketSource[];
   id: string;
   groupId: string | null;
   round: string;
@@ -4107,15 +4112,18 @@ export type V1AdminBracketGroup = {
 };
 
 export type V1AdminBracketGroupTeam = {
+  /** 명시적으로 지정된 12강 부전승. 미배정 상대와 구분한다. */
+  isBye?: boolean;
   id: string;
   groupId: string;
-  registrationId: string;
-  teamName: string;
+  registrationId: string | null;
+  teamName: string | null;
   sortOrder: number;
   createdAt: string;
 };
 
 export type V1AdminBracketFixture = {
+  bracketSources?: V1BracketSource[];
   id: string;
   tournamentId: string;
   groupId: string | null;
@@ -4513,6 +4521,8 @@ export type V1CreateGroupPayload = {
 };
 
 export type V1CreateGroupTeamPayload = {
+  /** 명시적으로 지정된 12강 부전승. 미배정 상대와 구분한다. */
+  isBye?: boolean;
   groupId: string;
   registrationId: string;
   sortOrder?: number;
@@ -5018,3 +5028,11 @@ export type V1AdminRosterEligibleMember = {
 export type V1AdminRosterEligibleMembersResponse = {
   members: V1AdminRosterEligibleMember[];
 };
+
+export interface V1CreateBracketByePayload {
+  groupId: string;
+  byeId?: string;
+  registrationId?: string | null;
+  /** Zero-based insertion position among matches and byes. */
+  sortOrder: number;
+}

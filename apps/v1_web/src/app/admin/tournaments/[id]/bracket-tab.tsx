@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { Check, RefreshCw, Pencil, Trash2, ChevronRight } from 'lucide-react';
 import { isBracketPublished as isBracketPublishedNow } from '@/lib/bracket-visibility';
 import { onlyDigits } from '@/lib/number-format';
-import { useV1PublishTournamentBracket, useV1UnpublishTournamentBracket, useV1AdminBracket, useV1CreateGroup, useV1AssignGroupTeam, useV1CreateFixture, useV1RecalculateStandings, useV1UpdateFixture, useV1DeleteFixture, useV1UpdateGroup, useV1DeleteGroup, useV1RemoveGroupTeam } from '@/hooks/use-v1-api';
+import { useV1PublishTournamentBracket, useV1UnpublishTournamentBracket, useV1AdminBracket, useV1CreateGroup, useV1AssignGroupTeam, useV1CreateBracketBye, useV1CreateFixture, useV1RecalculateStandings, useV1UpdateFixture, useV1DeleteFixture, useV1UpdateGroup, useV1DeleteGroup, useV1RemoveGroupTeam } from '@/hooks/use-v1-api';
 import type {
   V1AdminTournamentRegistration,
   V1AdminBracketGroup,
@@ -13,10 +13,10 @@ import type {
   V1GenerateLeagueFixturesResponse,
 } from '@/types/api';
 import { extractErrorMessage } from '@/lib/error-message';
-import { V1ApiError, v1Post } from '@/lib/api-client';
+import { V1ApiError, v1Post, v1Patch } from '@/lib/api-client';
 // 조별리그 라운드로빈은 서버(POST /admin/tournaments/:id/league/fixtures/generate)로 이관했다.
 // 여기 남는 knockoutSeedPairs 는 녹아웃 시드 페어링 전용이다.
-import { knockoutSeedPairs } from '@/lib/tournament-bracket-gen';
+import { knockoutSeedPairs, round12Pairs } from '@/lib/tournament-bracket-gen';
 import { competitionMatchLabel } from '@/lib/tournament-round-label';
 import { AdminDataTable, AdminEmpty } from '@/components/admin';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
@@ -129,6 +129,7 @@ export function BracketTab({
   const createGroup = useV1CreateGroup(tournamentId);
   const assignGroupTeam = useV1AssignGroupTeam(tournamentId);
   const createFixture = useV1CreateFixture(tournamentId);
+  const createBye = useV1CreateBracketBye(tournamentId);
   const recalculate = useV1RecalculateStandings(tournamentId);
   const updateFixture = useV1UpdateFixture(tournamentId);
   const deleteFixture = useV1DeleteFixture(tournamentId);
@@ -141,6 +142,10 @@ export function BracketTab({
   const [publishScheduleInput, setPublishScheduleInput] = useState('');
 
   // ── 경기 수정 모달 상태 ─────────────────────────────────────────────
+  const [sourceFixture, setSourceFixture] = useState<V1AdminBracketFixture | null>(null);
+  const [homeSource, setHomeSource] = useState('');
+  const [awaySource, setAwaySource] = useState('');
+  const [savingSources, setSavingSources] = useState(false);
   const [editFixture, setEditFixture] = useState<V1AdminBracketFixture | null>(null);
   const [editFxScheduledAt, setEditFxScheduledAt] = useState('');
   const [editFxVenue, setEditFxVenue] = useState('');
@@ -252,15 +257,16 @@ export function BracketTab({
   };
 
   const handleRemoveGroupTeam = async (groupTeamId: string, teamName: string) => {
+    const isBye = bracket?.groups.some((group) => group.groupTeams.some((team) => team.id === groupTeamId && team.isBye)) ?? false;
     const ok = await confirmModal({
-      title: '팀 배정 해제',
-      message: `${teamName} 팀의 조 배정을 해제할까요? 해당 조 순위 기록도 함께 정리돼요.`,
-      confirmLabel: '해제',
+      title: isBye ? '부전승 자리 삭제' : '팀 배정 해제',
+      message: isBye ? `${teamName} 부전승 자리를 삭제할까요? 팀만 미정으로 바꾸려면 자리 수정을 이용해 주세요.` : `${teamName} 팀의 조 배정을 해제할까요? 해당 조 순위 기록도 함께 정리돼요.`,
+      confirmLabel: isBye ? '삭제' : '해제',
       tone: 'danger',
     });
     if (!ok) return;
     removeGroupTeam.mutate(groupTeamId, {
-      onSuccess: () => showToast('팀 배정을 해제했어요.', 'success'),
+      onSuccess: () => showToast(isBye ? '부전승 자리를 삭제했어요.' : '팀 배정을 해제했어요.', 'success'),
       onError: (err) => showToast(extractErrorMessage(err, '배정 해제에 실패했어요.'), 'error'),
     });
   };
@@ -301,6 +307,10 @@ export function BracketTab({
     // KNOCKOUT phase — 아래는 전부 녹아웃 시드 페어링 경로다.
     // Check for existing fixtures in this group
     const existingInGroup = allFixtures.filter((f) => f.groupId === targetGroupId);
+    if (existingInGroup.length > 0 && (group.phase === 'round12' || group.phase === 'quarter')) {
+      showToast('이미 경기 일정이 있어요. 기존 대진을 수정하거나 빠진 경기를 직접 추가해 주세요.', 'error');
+      return;
+    }
     if (existingInGroup.length > 0) {
       const ok = await confirmModal({
         title: '경기 일정 추가',
@@ -318,9 +328,17 @@ export function BracketTab({
     try {
       {
         // KNOCKOUT phase — seed-pair: 1 vs N, 2 vs N-1, …
-        const teams = group.groupTeams;
+        const teams = group.groupTeams.filter((team): team is typeof team & { registrationId: string } => !team.isBye && team.registrationId !== null);
+        if (group.phase === 'round12' && (group.groupTeams.length !== 12 || teams.length !== 8)) {
+          showToast('12팀을 배정하고 부전승 4팀을 지정해 주세요. 나머지 8팀의 4경기를 만들어요.', 'error');
+          return;
+        }
         const roundLabel =
-          group.phase === 'semi'
+          group.phase === 'round12'
+            ? '12강'
+            : group.phase === 'quarter'
+            ? '8강'
+            : group.phase === 'semi'
             ? '4강'
             : group.phase === 'final'
             ? '결승'
@@ -341,7 +359,7 @@ export function BracketTab({
         // 시드순(sortOrder) 정렬 후 1vsN 페어링 (순수 함수 knockoutSeedPairs)
         const sorted = [...teams].sort((a, b) => a.sortOrder - b.sortOrder);
         const payloads: Parameters<typeof createFixture.mutate>[0][] = [];
-        for (const { home, away } of knockoutSeedPairs(sorted)) {
+        for (const { home, away } of (group.phase === 'round12' ? round12Pairs(group.groupTeams.filter((team): team is typeof team & { registrationId: string } => team.registrationId !== null)) : knockoutSeedPairs(sorted))) {
           payloads.push({
             groupId: targetGroupId,
             round: roundLabel,
@@ -636,6 +654,7 @@ export function BracketTab({
               confirmedTeamItems={confirmedTeamItems}
               assignGroupTeam={assignGroupTeam}
               createFixture={createFixture}
+              createBye={createBye}
               isAutoGenerating={isAutoGenerating}
               onAutoGenerate={(groupId) => void handleAutoGenerate(groupId)}
               onEditGroup={(g) => {
@@ -748,6 +767,13 @@ export function BracketTab({
                   >
                     <Pencil size={12} aria-hidden="true" /> 수정
                   </button>
+                  {['quarter', 'semi', 'final', 'third_place'].includes(groups.find((group) => group.id === f.groupId)?.phase ?? '') && (
+                    <button type="button" className="tm-chip" onClick={() => {
+                      setSourceFixture(f);
+                      setHomeSource(f.bracketSources?.find((source) => source.side === 'HOME')?.fixtureId ?? '');
+                      setAwaySource(f.bracketSources?.find((source) => source.side === 'AWAY')?.fixtureId ?? '');
+                    }}>진출 연결</button>
+                  )}
                   {canOperate && (
                     <Link
                       href={operateHref}
@@ -794,6 +820,35 @@ export function BracketTab({
       )}
 
       {/* ── Fixture edit modal ────────────────────────────────────────── */}
+      <SimpleModal open={!!sourceFixture} title="진출 경기 연결" onClose={() => { if (!savingSources) setSourceFixture(null); }}>
+        <form className="space-y-4" onSubmit={async (event) => {
+          event.preventDefault();
+          if (!sourceFixture || savingSources) return;
+          setSavingSources(true);
+          try {
+            await v1Patch(`/admin/fixtures/${sourceFixture.id}/bracket-sources`, { homeSourceFixtureId: homeSource || null, awaySourceFixtureId: awaySource || null });
+            await refetch();
+            setSourceFixture(null);
+            showToast('진출 연결을 저장했어요.', 'success');
+          } catch (err) { showToast(extractErrorMessage(err, '진출 연결 저장에 실패했어요.'), 'error'); }
+          finally { setSavingSources(false); }
+        }}>
+          <p className="tm-text-caption">미정인 자리에 이전 경기의 승자를 연결해요. 3·4위전에는 4강 패자가 연결돼요. 결과 확정 시 기존 진출 처리로 팀이 배정돼요.</p>
+          {(['HOME', 'AWAY'] as const).map((side) => {
+            const targetPhase = groups.find((group) => group.id === sourceFixture?.groupId)?.phase ?? '';
+            const previous: Record<string, string> = { quarter: 'round12', semi: 'quarter', final: 'semi', third_place: 'semi' };
+            const candidates = (bracket?.fixtures ?? []).filter((fixture) => groups.find((group) => group.id === fixture.groupId)?.phase === previous[targetPhase] && fixture.legNumber === 1 && !fixture.parentFixtureId && fixture.status === 'scheduled' && !fixture.result);
+            return <label key={side} className="block tm-text-label">{side === 'HOME' ? '홈 자리' : '어웨이 자리'}
+              <select className={inputCls} disabled={savingSources} value={side === 'HOME' ? homeSource : awaySource} onChange={(event) => side === 'HOME' ? setHomeSource(event.target.value) : setAwaySource(event.target.value)}>
+                <option value="">연결 없음 · 직접 배정</option>
+                {candidates.map((fixture) => <option key={fixture.id} value={fixture.id}>{bracketFixtureLabel(fixture, groups)} {targetPhase === 'third_place' ? '패자' : '승자'}</option>)}
+              </select>
+            </label>;
+          })}
+          <button type="submit" className={submitBtnCls} disabled={savingSources}>{savingSources ? '저장 중…' : '연결 저장'}</button>
+        </form>
+      </SimpleModal>
+
       <SimpleModal
         open={editFixture !== null}
         title="경기 수정"

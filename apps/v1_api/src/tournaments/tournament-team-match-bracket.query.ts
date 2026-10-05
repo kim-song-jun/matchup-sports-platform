@@ -4,6 +4,7 @@ type PublicFixtureStatus = 'scheduled' | 'in_progress' | 'completed' | 'cancelle
 
 /** Official game data consumed by the existing bracket result presenter. */
 export const tournamentTeamMatchBracketInclude = {
+  advancementTargets: { where: { source: { teamMatch: { deletedAt: null } } }, select: { sourceTeamMatchId: true, sourceOutcome: true, targetSide: true } },
   homeRegistration: { include: { team: { select: { name: true } } } },
   awayRegistration: { include: { team: { select: { name: true } } } },
   teamMatch: {
@@ -58,6 +59,7 @@ export function serializeTournamentTeamMatchBracket(row: TournamentTeamMatchBrac
     fixtureNumber: row.fixtureNumber,
     legNumber: row.legNumber,
     parentFixtureId: row.parentTeamMatchId,
+    bracketSources: (row.advancementTargets ?? []).map((edge) => ({ fixtureId: edge.sourceTeamMatchId, outcome: edge.sourceOutcome, side: edge.targetSide })),
     homeRegistrationId: row.homeRegistrationId,
     awayRegistrationId: row.awayRegistrationId,
     scheduledAt: match.startAt?.toISOString() ?? null,

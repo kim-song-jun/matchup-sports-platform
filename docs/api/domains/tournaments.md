@@ -277,3 +277,42 @@ The admin response derives `isTeamCaptain` from the registration team's canonica
 `PATCH /players/:playerId` is available only before `rosterLockedAt`. It lets team managers correct the player's `eligibilityStatus` only. The already stored roster snapshots (`realName`, `birthDateSnapshot`, `genderSnapshot`) are not refreshed by eligibility edits, and the current member profile/phone is not revalidated on this path.
 
 All team roster mutations lock the registration row and re-read `rosterLockedAt`, registration status, tournament roster deadline, and `rosterDeadlineOverrideAt` inside the same transaction as the player write. A concurrent admin lock or deadline-override revocation wins before a later player mutation can commit.
+
+
+## 12강·8강 수동 결선 (2026-10-04)
+
+- `CreateGroupDto.phase`: `group | round12 | quarter | semi | final | third_place`.
+- `POST /admin/tournaments/:id/group-teams`의 `isBye?: boolean`은 명시적인 12강 부전승이다. 생략하면 false. 다른 단계에서 true는 `BYE_PHASE_INVALID`(400).
+- 12강은 최대 12팀·부전승 최대 4팀이며 초과는 `ROUND12_CAPACITY`(409). 기존 12강 경기에 배정된 팀의 부전승 지정 및 부전승팀을 같은 단계 경기로 추가/수정하면 `BYE_TEAM_HAS_MATCH`(409).
+- 관리자/공개 `groups[].groupTeams[].isBye`는 저장된 명시적 부전승을 전달한다. 공개 여부와 팀 신원 공개 게이트는 기존 정책을 유지한다.
+- 관리자 자동 생성은 12팀/부전승 4팀 편성 시 나머지 8팀의 4경기를 생성한다. 부전승에는 TeamMatch/Game/점수를 만들지 않는다. 8강 슬롯은 기존처럼 관리자가 직접 배정한다.
+- 예선 종료 자동 생성·부전승팀 자동 8강 배정·신규 진출 연결 API는 이번 계약에 포함하지 않는다.
+
+### 경기별 진출 연결 (12강·8강·4강)
+
+- `PATCH /admin/fixtures/:fixtureId/bracket-sources`: 인증 + mutation admin 필요. `{ homeSourceFixtureId?: UUID | null, awaySourceFixtureId?: UUID | null }`. 생략한 쪽은 유지, null은 해제. 결과 `{ fixtureId, bracketSources }`. 감사 action은 `tournament.bracket.sources.update`.
+- source는 같은 대회의 바로 이전 group.phase: round12→quarter→semi→final. third_place는 semi의 LOSER. 다른 단계·같은 소스를 양쪽에 쓰면 400 `BRACKET_SOURCE_PHASE_INVALID`/`BRACKET_SOURCE_INVALID`.
+- 연결 자리는 팀이 미정이어야 함(409 `BRACKET_SOURCE_SLOT_ASSIGNED`). 하나의 source+outcome은 하나의 target만 허용(409 `BRACKET_SOURCE_ALREADY_LINKED`). 현재/기존/신규 source 모두 Game SCHEDULED + TeamMatch matched + official revision 없음 + 1차전이어야 함(409 `BRACKET_SOURCE_LOCKED`).
+- 참가팀 변경은 연결된 자리에 409 `BRACKET_SOURCE_SLOT_LINKED`; 먼저 연결 해제 후 직접 배정. 경기 삭제는 시작 전만 허용하며 미정 다음 경기 연결은 해제하고 배정/시작된 다음 경기가 있으면 거절한다.
+- 결과 확정 후 팀 배정은 기존 canonical advancement projection의 책임. 새 endpoint는 기록/점수를 만들거나 이미 끝난 경기의 결과를 추정하지 않음.
+- 공개 상세 `fixtures[].bracketSources`와 관리자 bracket fixture에 `[{ fixtureId, outcome: WINNER|LOSER, side: HOME|AWAY }]`를 반환. 대진표 비공개 게이트와 source 삭제 필터 유지. 공개되지 않은 대회에는 fixture 및 연결 전체를 노출하지 않음.
+- 부전승 선은 round12 groupTeam.isBye + quarter 슬롯의 같은 registrationId로 렌더. 별도 경기·가짜 승점 없음. 연결이 없는 수동 대진은 번호 순서로 추정하지 않음.
+
+### 라운드별 부전승 직접 등록 (2026-10-05)
+
+- `POST /admin/tournaments/:tournamentId/byes`: 인증 + mutation admin. 입력 `{ groupId: UUID, registrationId?: UUID | null, byeId?: UUID, sortOrder: integer(0..7) }`, 반환은 groupTeam. 감사 action `tournament.bracket.bye.save`.
+- 그룹 phase로 12강·8강·4강을 구분한다. 팀 미정은 registrationId 생략/null로 저장하며, 팀을 선택하면 해당 대회의 confirmed 등록이어야 한다. 홈·어웨이 또는 경기 생성 없이 저장한다. byeId를 보내면 해당 조의 기존 부전승 id와 위치를 유지하며 팀 배정/미정 전환/위치 수정을 저장한다. byeId 생략 시 새 자리 생성 또는 기존 일반 배정을 변환한다.
+- 12강 정원 12팀/부전승 4팀, 8강 정원 8팀/부전승 4팀, 4강 정원 4팀/부전승 2팀. 초과 `409 BYE_CAPACITY`; group/final/third_place는 `400 BYE_PHASE_INVALID`.
+- 다른 조의 같은 단계 부전승 중복 `409 BYE_ALREADY_IN_ROUND`; 같은 단계 경기 참가 중인 팀 `409 BYE_TEAM_HAS_MATCH`. 기존 경기 생성/수정도 해당 단계 부전승팀을 거절한다.
+- 4강 위치는 0..3이며 초과는 `400 BYE_POSITION_INVALID`. 중복 위치는 `409 BYE_POSITION_OCCUPIED`, 다른 조/없는 byeId는 `404 BYE_NOT_FOUND`. 이전 명단 순번이 위치 범위를 벗어난 기존 부전승은 읽기 렌더링에서 경기 사이 위치로 호환하고 DB 값은 변경하지 않는다.
+- 부전승 groupTeam의 `sortOrder`는 해당 열의 일반 경기와 부전승을 합친 0부터의 삽입 위치다. UI에서는 1부터 표시한다. 예시 이미지의 12강은 위치 1·4·5·8에 부전승을 놓을 수 있다. 기존 일반 팀의 sortOrder 의미는 유지한다.
+- 저장된 경기 진출 연결과 다음 단계 실제 registrationId 자리 배정이 있으면 HOME/AWAY 가지를 우선한다. 부전승은 12강→8강, 8강→4강, 4강→결승으로 표시하며 미연결 항목도 지정 위치에서 표시한다. 결과에 따라 다음 경기 팀은 운영자가 직접 배정할 수 있고 이 API는 자동 배정하지 않는다.
+- 기존 `POST .../group-teams`의 isBye 입력은 12강 전용 호환 경로를 유지한다. 신규 직접 입력 UI는 위 byes 경로를 사용한다.
+
+### 시작 전 대진 삭제 (2026-10-05)
+
+- `DELETE /admin/fixtures/:fixtureId`: V1AuthGuard + mutation admin. tournament draft/open/closed, TeamMatch matched, Game SCHEDULED, 결과 리비전 없음일 때 `{ deleted: true }`.
+- Game은 CANCELLED, 공개 정책 STATUS_ONLY, TeamMatch는 archived/deletedAt으로 숨긴다. Game·감사·스태프 이력을 물리 삭제하지 않는다. 일정/용병 모집은 취소한다.
+- 원래 라운드/번호는 관리자 감사에 남기고 Details는 group/parent를 해제하고 round를 <originalRound>:deleted:<fixtureId>로 보관해 같은 대진 번호 재등록 및 빈 조 삭제를 허용한다.
+- 대회/경기 시작 `409 FIXTURE_ALREADY_STARTED`, 결과 `409 FIXTURE_HAS_RESULT`, 연결된 다음 경기 팀 배정/시작 `409 FIXTURE_DOWNSTREAM_ASSIGNED`, 하위 경기 `409 FIXTURE_HAS_CHILDREN`. 미정 다음 경기 연결은 원자적으로 해제한다.
+- TBD 부전승은 Game/TeamMatch를 만들지 않으며 `DELETE /admin/group-teams/:id`로 자리 삭제. 미정 자리는 별도 V1TournamentByeSlot에 저장하고 응답에서 registrationId=null, isBye=true로 표시한다. 기존 GroupTeam의 필수 등록 계약은 유지한다. 팀 배정/미정 전환은 같은 id를 유지하며 두 저장소 사이에서 원자적으로 이동한다. 공개 신원/대진 게이트 유지.

@@ -17,12 +17,16 @@ import type {
 /** "+ 조 추가" 원클릭 템플릿 4종 — 기존 단계 select의 옵션 라벨을 그대로 재사용(신규 문구 0). */
 export const GROUP_PHASE_TEMPLATES: { phase: V1TournamentGroupPhase; label: string }[] = [
   { phase: 'group', label: '조별' },
+  { phase: 'round12', label: '12강' },
+  { phase: 'quarter', label: '8강' },
   { phase: 'semi', label: '준결승' },
   { phase: 'final', label: '결승' },
   { phase: 'third_place', label: '3위 결정전' },
 ];
 
-const KNOCKOUT_PHASE_BASE_NAME: Record<'semi' | 'final' | 'third_place', string> = {
+const KNOCKOUT_PHASE_BASE_NAME: Record<Exclude<V1TournamentGroupPhase, 'group'>, string> = {
+  round12: '12강',
+  quarter: '8강',
   semi: '4강',
   final: '결승',
   third_place: '3위 결정전',

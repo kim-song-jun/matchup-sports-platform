@@ -10,6 +10,7 @@ import { AttestRequestsSection } from '@/components/public-game-records/attest-r
 import { LeagueClaimMyRecordSection } from '@/components/public-game-records/claim-my-record';
 import { Card, ErrorState } from '@/components/v1-ui/primitives';
 import { TeamAvatar } from '@/components/v1-ui/team-avatar';
+import { useCurrentHref } from '@/components/v1-ui/use-current-href';
 import { MatchTeamRosterCard } from '@/components/game-roster/match-team-roster-card';
 import { useMyMatchRosterTeam } from '@/components/game-roster/use-my-match-roster-team';
 import { extractErrorMessage } from '@/lib/error-message';
@@ -65,7 +66,7 @@ function recordLine(row: V1LeagueStandingRow | undefined): string | null {
 
 function TeamSide({ teamId, name, logoUrl, record, align, from }: {
   teamId: string | null;
-  from: string;
+  from?: string;
   name: string;
   logoUrl: string | null;
   record: string | null;
@@ -101,8 +102,8 @@ function getViewerState(match: V1TeamMatch | undefined): V1TeamMatchViewerState 
 export default function LeagueFixtureDetailClient({ leagueId, fixtureId }: { leagueId: string; fixtureId: string }) {
   // 활동 기록·팀 전적처럼 리그 화면이 아닌 곳에서 들어왔으면 그 화면으로 돌아간다.
   const fromPath = sanitizeRedirectPath(useSearchParams().get('from'));
-  // 팀 상세로 넘길 출처 — 이 경기 화면이 받은 출처까지 담는다.
-  const selfHref = withFromPath(`/league-matches/${leagueId}/fixtures/${fixtureId}`, fromPath);
+  // 선수·팀 상세로 넘길 출처에는 현재 query와 이벤트 앵커까지 보존한다.
+  const selfHref = useCurrentHref() ?? undefined;
   // 리그로 돌아가는 버튼은 받은 출처를 잇는다(받은 출처가 그 리그면 그대로 접힌다).
   const parentHref = withFromPath(`/league-matches/${leagueId}`, fromPath);
   const router = useRouter();

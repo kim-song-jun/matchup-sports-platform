@@ -1102,6 +1102,13 @@ describe('TournamentsReadService', () => {
       expect(result.fixtures[0].awayRegistrationId).toBe('reg-2');
     });
 
+    it('팀 미정 부전승도 공개 대진 응답에서 독립적인 자리를 유지한다', async () => {
+      const row = openRowWithNamedGroupsAndFixtures({ groups: [{ id: 'group-1', name: '12강', phase: 'round12', sortOrder: 0, advanceCount: null, standings: [], groupTeams: [], byeSlots: [{ id: 'bye-slot-1', groupId: 'group-1', sortOrder: 3, createdAt: new Date() }] }] });
+      prisma.v1Tournament.findFirst.mockResolvedValue(row);
+      const result = await service.get(TOURNAMENT_UUID);
+      expect(result.groups[0].groupTeams[0]).toMatchObject({ id: 'bye-slot-1', registrationId: null, teamId: null, teamName: null, teamLogoUrl: null, isBye: true, sortOrder: 3 });
+    });
+
     it('로그인했지만 이 대회 스태프가 아닌 사용자에게도 그대로 가려진다', async () => {
       prisma.v1Tournament.findFirst.mockResolvedValue(openRowWithNamedGroupsAndFixtures());
       // v1TournamentStaffAssignment.findMany는 beforeEach 기본값([])을 그대로 사용 —

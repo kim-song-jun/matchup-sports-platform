@@ -42,13 +42,14 @@ export function buildBracketGraph(rounds: BracketGraphRound[], groups: V1Tournam
     const ordered = nodes.filter((node) => node.round === round.key && node.fixture);
     const byes = nodes.filter((node) => node.round === round.key && node.bye)
       .sort((a, b) => (a.bye!.sortOrder ?? 0) - (b.bye!.sortOrder ?? 0) || a.id.localeCompare(b.id));
+    const legacyDefaultPositions = byes.length > 1 && byes.every((node) => (node.bye!.sortOrder ?? 0) === 0);
     let previousPosition = -1;
     for (const [index, node] of byes.entries()) {
       const requested = node.bye!.sortOrder ?? 0;
       // Earlier group-team rows stored roster order, not a bracket position.
       const meta = byeRound(round.key);
       const legacyPosition = round.key === 'round12' ? [0, 3, 4, 7][index] ?? index * 2 : index * 2;
-      const insertion = meta && requested >= meta.positions ? legacyPosition : requested;
+      const insertion = meta && (legacyDefaultPositions || requested >= meta.positions) ? legacyPosition : requested;
       const position = Math.max(insertion, previousPosition + 1);
       ordered.splice(Math.min(position, ordered.length), 0, node);
       previousPosition = position;

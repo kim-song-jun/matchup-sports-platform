@@ -69,3 +69,11 @@ V1AuthGuard + getMutationAdmin 유지. 대회소속·confirmed 상태·동시성
 - 호환 보완: 그래프·폼 14 PASS, 부전승 서비스 8 PASS. 표시 위치는 12강/8강 1..8, 4강 1..4. 원래 명단 순번이 범위를 벗어나는 기존 bye는 읽기 렌더링에서 경기 사이 배치.
 - 로그아웃 공개 접근의 /my-fixtures 401과 console resource error는 baseline에도 존재. 새 pageerror 없음. 브라우저 owned PID/parent 기록 및 종료 완료.
 - 최종 원격 검증 후 dev 머지/alpha 배포 및 새 커밋 헤더·health·after 화면 확인 진행 중.
+
+### 첫 배포 및 실제 화면 후속 보완
+
+- #1612 merged dev 47d1e166112d104f8d32ceaad5466528c74151ff. CI/Gates/API/Web 및 Deploy Alpha(37278674143) PASS. API/Web HTTP 200, 동일 커밋 헤더, health db=true, byes 비인증 POST 401.
+- after 1440/768/390 확인: 본문 가로 overflow 없음. 공개 실제 groupTeam 두 개는 둘 다 sortOrder=0임을 API로 확인했고 위쪽에 함께 표시됨. 앞선 10·11 예시는 일반 명단 호환 테스트였으며 해당 대회의 실제 값은 아니었음.
+- 실제 기본값 중복의 읽기 배치를 이미지 순서로 보완 중. 기존 DB 값 및 팀/경기 배정 유지. 관리자 로그인 저장 검증은 계속 미실행.
+
+- 중복 기본값 호환 최종 로컬 검증: 그래프 9 PASS, frontend tsc PASS, pattern-check PASS. 후속 커밋 dev 반영 후 배포 게이트와 after 화면 재확인 예정.

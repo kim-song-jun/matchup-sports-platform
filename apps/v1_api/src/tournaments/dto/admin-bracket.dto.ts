@@ -13,6 +13,7 @@ import {
   Max,
   MaxLength,
   Min,
+  ValidateIf,
   ValidateNested,
 } from 'class-validator';
 
@@ -154,6 +155,13 @@ export class CreateFixtureDto {
 }
 
 export class UpdateFixtureDto {
+  /** 번호 생략은 미변경, null은 허용하지 않는다. */
+  @ValidateIf((_object, value) => value !== undefined)
+  @IsInt()
+  @Min(1)
+  @Max(2147483647)
+  fixtureNumber?: number;
+
   @IsOptional()
   @IsDateString()
   scheduledAt?: string;

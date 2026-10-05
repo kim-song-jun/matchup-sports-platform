@@ -4979,6 +4979,7 @@ export function useV1UpdateFixture(tournamentId: string) {
       }) => v1Patch<V1AdminBracketFixture>(`/admin/fixtures/${fixtureId}`, body),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: v1Keys.adminTournamentBracket(tournamentId) });
+      queryClient.invalidateQueries({ queryKey: v1Keys.tournament(tournamentId) });
     },
   });
 }

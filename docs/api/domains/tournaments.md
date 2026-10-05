@@ -135,16 +135,17 @@ Paid tournaments (`entryFee > 0`) require `bankName`, `bankAccount`, and `bankHo
 
 `POST /api/v1/admin/tournaments/:tournamentId/fixtures` uses `CreateFixtureDto` and requires an
 authenticated mutation-capable admin. In its source transaction, it copies the tournament's
-active `competitionConfigVersionId` to the fixture and creates exactly one `TOURNAMENT_FIXTURE`
+active `competitionConfigVersionId` to the fixture and creates exactly one `TEAM_MATCH`
 Game with HOME/AWAY side snapshots and the registered participant snapshots. A missing or
 inactive pin fails with `409 COMPETITION_CONFIG_REQUIRED` and rolls back both fixture and Game.
 The deterministic fixture command is derived from tournament, round, fixture number, and leg;
-the same payload replays the original fixture, while a changed payload with that key returns
+an occupied coordinate with the same payload returns its current canonical fixture, while a changed payload at that coordinate returns
 `409 COMMAND_IDEMPOTENCY_PAYLOAD_REUSE`.
 
 | Method | Path | DTO | Result |
 |---|---|---|---|
 | `POST` | `/api/v1/admin/tournaments/:tournamentId/fixtures` | `CreateFixtureDto` | active admin fixture/Game source creation or the explicit pin/idempotency conflict above. |
+| `PATCH` | `/api/v1/admin/fixtures/:fixtureId` | `UpdateFixtureDto` | fixture metadata including optional positive integer `fixtureNumber`; duplicate round/leg number returns `409 FIXTURE_NUMBER_CONFLICT`. See [대진 번호 수정](#대진-번호-수정-2026-10-05). |
 
 The legacy generic result paths remain registered only to reject unsafe writes:
 
@@ -316,3 +317,13 @@ All team roster mutations lock the registration row and re-read `rosterLockedAt`
 - 원래 라운드/번호는 관리자 감사에 남기고 Details는 group/parent를 해제하고 round를 <originalRound>:deleted:<fixtureId>로 보관해 같은 대진 번호 재등록 및 빈 조 삭제를 허용한다.
 - 대회/경기 시작 `409 FIXTURE_ALREADY_STARTED`, 결과 `409 FIXTURE_HAS_RESULT`, 연결된 다음 경기 팀 배정/시작 `409 FIXTURE_DOWNSTREAM_ASSIGNED`, 하위 경기 `409 FIXTURE_HAS_CHILDREN`. 미정 다음 경기 연결은 원자적으로 해제한다.
 - TBD 부전승은 Game/TeamMatch를 만들지 않으며 `DELETE /admin/group-teams/:id`로 자리 삭제. 미정 자리는 별도 V1TournamentByeSlot에 저장하고 응답에서 registrationId=null, isBye=true로 표시한다. 기존 GroupTeam의 필수 등록 계약은 유지한다. 팀 배정/미정 전환은 같은 id를 유지하며 두 저장소 사이에서 원자적으로 이동한다. 공개 신원/대진 게이트 유지.
+
+### 대진 번호 수정 (2026-10-05)
+
+- `PATCH /api/v1/admin/fixtures/:fixtureId`는 기존 일정·장소·팀 필드와 함께 `fixtureNumber?: number`를 받는다. 인증 및 mutation admin 검증을 유지한다.
+- 번호는 JSON 숫자 정수 1..2147483647이다. 생략하면 유지하며 null/문자열/boolean/0/소수/범위 초과는 400이다.
+- 같은 대회·round·legNumber의 다른 경기와 번호가 겹치면 `409 FIXTURE_NUMBER_CONFLICT`다. 조가 달라도 같은 round/leg에서는 번호를 공유하지 않는다. 변경은 기존 생성 잠금 및 DB 유일성으로 보호하며 실패 시 전체 트랜잭션을 되돌린다.
+- 응답의 fixtureNumber, TeamMatch 제목, 연결된 팀 일정 제목에 새 번호가 반영된다. 번호가 출전정지 경기 순서에 영향을 주므로 관련 팀의 시작 전 명단 재계산 이벤트를 남긴다. 일정 상태는 번호 변경만으로 되살리지 않는다.
+- 경기 UUID, 팀 배정, 진출 edge, parent ID 및 Game 결과/리비전은 유지한다. 결과 확정 경기에서도 번호만 수정할 수 있으며 팀 변경의 기존 결과 잠금은 유지한다. 감사 `tournament.bracket.fixture.update`에 변경 전·후 번호를 기록한다.
+- 번호 이동 후 비워진 옛 좌표에서 새 경기 생성은 다음 creation generation을 사용한다. 이전 멱등 기록 및 경기 UUID를 덮어쓰거나 옛 경기를 replay하지 않는다. 기존 좌표의 동일 요청 재시도 계약은 유지한다.
+- 관리자 경기 수정 모달에서 현재 번호를 채우고 실제 API로 저장한다. 오류 시 입력/모달 유지, 성공 후 관리자 및 공개 상세 캐시를 갱신한다. 기존 프론트 MSW에는 이 PATCH 핸들러가 없으며 번호가 없는 기존 수정 payload는 계속 유효하다.

@@ -30,7 +30,7 @@ Status: In Progress
 
 ## Parallel Work Breakdown
 병렬 에이전트 없음. 순차: API/정본 저장 → 사용자가 선택한 UI → 타입·mock·문서 → 검증 → dev/Alpha.
-Owned: apps/v1_api/src/tournaments/dto/admin-bracket.dto.ts/.spec.ts, tournament-bracket.service.ts/.spec.ts, tournament-match-update.ts/.spec.ts, 필요한 creation generation helper/test; apps/v1_web/src/app/admin/tournaments/[id]/bracket-tab.tsx/.test.tsx, types/api.ts, 필요한 hook/mock scoped 변경; docs/api/README.md, global-contract.md, domains/tournaments.md, 이 문서, scoped changeset.
+Owned: apps/v1_api/src/tournaments/dto/admin-bracket.dto.ts/.spec.ts, tournament-bracket.service.ts/.spec.ts, tournament-match-update.ts/.spec.ts, 필요한 creation generation helper/test, test/tournaments/tournament-round12-quarter.integration-spec.ts; apps/v1_web/src/app/admin/tournaments/[id]/bracket-tab.tsx/.test.tsx, types/api.ts, 필요한 hook/mock scoped 변경; docs/api/README.md, global-contract.md, domains/tournaments.md, 이 문서, scoped changeset.
 Forbidden: schema/migration, 다른 WIP, 기존 실제대회 번호/팀/결과 변경, main 배포.
 
 ## Acceptance Criteria
@@ -65,3 +65,4 @@ mutation admin와 기존 서비스 권한을 유지. DB migration 없음. 번호
 - 적대 검증: DTO strict 숫자/null/범위, tournament/round/leg 유일성·원자적 rollback, 동일 번호 no-op, Game→Details→TeamMatch 잠금, UUID edge/결과 유지, 일정 취소 상태 보존, 명단 재계산, 생성 키 세대·오류 전파, 모바일 모달 스크롤 정적 점검. 발견된 creation query의 전역 조회 범위를 actor로 줄임.
 - touched paths TODO/FIXME/HACK/XXX 신규 marker0, diff check 통과. DB 통합 테스트는 로컬 Docker/DB가 없어 NOT RUN; CI/실제 alpha 범위를 별도 기록한다.
 - API 정본 문서의 생성 Game source가 TOURNAMENT_FIXTURE로 남은 drift도 실제 TEAM_MATCH 계약으로 동기화. README/global-contract에서 번호 수정 도메인 계약으로 연결함.
+- Unit 검증과 별개로 실제 Postgres에서 번호 저장·중복 시 장소 rollback·공개 재조회·일정 title·진출 UUID 유지·옛 좌표 신규 Game 생성 및 재시도를 검증하는 기존 integration suite 케이스 추가. 로컬 DB 부재로 실행 증거는 CI에 남긴다. 임시 fixture는 이 테스트 DB 안에서만 생성/삭제한다.

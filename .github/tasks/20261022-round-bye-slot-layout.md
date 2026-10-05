@@ -61,3 +61,11 @@ V1AuthGuard + getMutationAdmin 유지. 대회소속·confirmed 상태·동시성
 - 새 TODO/FIXME/HACK/XXX 없음. 기존 공유 작업트리 WIP 및 alpha 대회 데이터 변경 없음.
 
 - API surface-check PASS / web pattern-check PASS. git diff --check PASS. 신규 import 대상 tournament-bracket-rounds.ts는 현재 명시된 untracked 소스이며 커밋 시 포함 필요. 커밋되지 않은 작업트리 기준 검증이므로 committed-tree/PR 검증은 미실행.
+
+## Alpha deployment — 2026-10-05
+
+- 사용자 alpha 배포 명시 승인. PR #1612, base dev, 최초 구현 09179e515. 원격 API/Web/Gates 전체 PASS.
+- 배포 전 headed 공개 대진표 baseline: tmp/qa-round-bye-deploy/before-{1440,768,390}.png. 세 viewport 문서 폭 정상. 기존 부전승 명단 순번 10·11이 아래 배치되는 것을 실제 확인해 읽기 호환 추가. DB 데이터 수정 없음.
+- 호환 보완: 그래프·폼 14 PASS, 부전승 서비스 8 PASS. 표시 위치는 12강/8강 1..8, 4강 1..4. 원래 명단 순번이 범위를 벗어나는 기존 bye는 읽기 렌더링에서 경기 사이 배치.
+- 로그아웃 공개 접근의 /my-fixtures 401과 console resource error는 baseline에도 존재. 새 pageerror 없음. 브라우저 owned PID/parent 기록 및 종료 완료.
+- 최종 원격 검증 후 dev 머지/alpha 배포 및 새 커밋 헤더·health·after 화면 확인 진행 중.

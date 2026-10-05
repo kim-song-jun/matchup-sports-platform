@@ -246,9 +246,10 @@ export function BracketGroupCard({
     const used = new Set(selectedGroup?.groupTeams.filter((team) => team.isBye).map((team) => team.sortOrder + 1));
     if (savedPosition !== undefined) used.add(savedPosition);
     const preferred = selectedGroup?.phase === 'round12' ? [1, 4, 5, 8] : [1, 3, 5, 7];
-    return String(preferred.find((position) => !used.has(position)) ?? Array.from({ length: 64 }, (_, i) => i + 1).find((position) => !used.has(position)) ?? 64);
+    return String(preferred.find((position) => position <= (byeRound(selectedGroup?.phase ?? '')?.positions ?? 8) && !used.has(position)) ?? Array.from({ length: byeRound(selectedGroup?.phase ?? '')?.positions ?? 8 }, (_, i) => i + 1).find((position) => !used.has(position)) ?? 1);
   }
-  const validByePosition = /^\d+$/.test(byePosition) && Number(byePosition) >= 1 && Number(byePosition) <= 64;
+  const byeMaxPosition = byeRound(byeGroup?.phase ?? '')?.positions ?? 8;
+  const validByePosition = /^\d+$/.test(byePosition) && Number(byePosition) >= 1 && Number(byePosition) <= byeMaxPosition;
   const byePending = createBye?.isPending ?? false;
   const bookedInRound = new Set<string>();
   if (fixtureRound) {
@@ -474,7 +475,7 @@ export function BracketGroupCard({
                 </fieldset>
                 {entryType === 'bye' && <div className="flex flex-col gap-1">
                   <label htmlFor={'bye-position-' + group.id}>대진표 위치</label>
-                  <input id={'bye-position-' + group.id} type="number" min="1" max="64" step="1" value={byePosition}
+                  <input id={'bye-position-' + group.id} type="number" min="1" max={byeMaxPosition} step="1" value={byePosition}
                     onChange={(event) => setByePosition(event.target.value)} disabled={byePending} className={inputCls} />
                   <p className="text-[length:var(--font-size-caption)] text-[var(--text-muted)]">경기와 부전승을 합친 위에서부터의 순서예요. 다음 라운드의 진출 자리가 정해지면 그 자리로 연결돼요.</p>
                 </div>}

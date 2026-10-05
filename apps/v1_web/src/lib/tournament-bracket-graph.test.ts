@@ -75,3 +75,9 @@ it('이미지의 12강 배치가 네 8강 가지와 각각 연결된다', () => 
     expect(graph.nodes.find((node) => node.id === id)!.y).toBe((sources[0] + sources[1]) / 2);
   }
 });
+
+it('기존 팀 명단 순번 10·11로 저장된 12강 부전승도 아래에 모으지 않는다', () => {
+  const graph = buildBracketGraph([{ key: 'round12', label: '12강', fixtures: [fixture('r1'), fixture('r2')] }],
+    [{ phase: 'round12', groupTeams: [10, 11].map((sortOrder, i) => ({ registrationId: 'b' + i, isBye: true, sortOrder })) } as V1TournamentGroup]);
+  expect([...graph.nodes].sort((a, b) => a.y - b.y).map((node) => node.id)).toEqual(['bye:b0', 'r1', 'r2', 'bye:b1']);
+});

@@ -367,6 +367,9 @@ export class TournamentBracketService {
       };
       const limit = limits[group.phase];
       if (!limit) throw new BadRequestException({ code: 'BYE_PHASE_INVALID', message: '부전승은 12강·8강·4강에서 등록할 수 있어요.' });
+      if (dto.sortOrder >= (group.phase === 'semi' ? 4 : 8)) {
+        throw new BadRequestException({ code: 'BYE_POSITION_INVALID', message: '해당 라운드의 대진표 위치 범위를 확인해 주세요.' });
+      }
       await tx.$queryRaw`SELECT id FROM v1_tournament_registrations WHERE id = ${dto.registrationId} FOR UPDATE`;
       const registration = await tx.v1TournamentRegistration.findFirst({ where: { id: dto.registrationId, tournamentId } });
       if (!registration) throw new NotFoundException({ code: 'REGISTRATION_NOT_FOUND', message: '해당 대회의 신청을 찾을 수 없어요.' });

@@ -93,7 +93,7 @@ export class CreateBracketByeDto {
   @Type(() => Number)
   @IsInt()
   @Min(0)
-  @Max(63)
+  @Max(7)
   sortOrder!: number;
 }
 

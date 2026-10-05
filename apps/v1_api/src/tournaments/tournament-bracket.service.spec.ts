@@ -725,6 +725,10 @@ describe('TournamentBracketService', () => {
       prisma.v1TournamentMatchDetails.findFirst.mockResolvedValue({ teamMatchId: 'fixture-1' });
       await expect(service.createBye(ownerUser, 'tournament-1', dto)).rejects.toMatchObject({ response: { code: 'BYE_TEAM_HAS_MATCH' } });
     });
+    it('4강에서 다섯 번째 대진표 위치를 거절한다', async () => {
+      prisma.v1TournamentGroup.findFirst.mockResolvedValue(groupRow({ phase: 'semi' }));
+      await expect(service.createBye(ownerUser, 'tournament-1', { ...dto, sortOrder: 4 })).rejects.toMatchObject({ response: { code: 'BYE_POSITION_INVALID' } });
+    });
     it('결승 부전승을 거절한다', async () => {
       prisma.v1TournamentGroup.findFirst.mockResolvedValue(groupRow({ phase: 'final' }));
       await expect(service.createBye(ownerUser, 'tournament-1', dto)).rejects.toMatchObject({ response: { code: 'BYE_PHASE_INVALID' } });

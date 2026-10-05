@@ -81,3 +81,9 @@ it('기존 팀 명단 순번 10·11로 저장된 12강 부전승도 아래에 �
     [{ phase: 'round12', groupTeams: [10, 11].map((sortOrder, i) => ({ registrationId: 'b' + i, isBye: true, sortOrder })) } as V1TournamentGroup]);
   expect([...graph.nodes].sort((a, b) => a.y - b.y).map((node) => node.id)).toEqual(['bye:b0', 'r1', 'r2', 'bye:b1']);
 });
+
+it('기존 부전승 모두 기본 위치 0이면 이미지의 경기 사이 자리로 나눈다', () => {
+  const graph = buildBracketGraph([{ key: 'round12', label: '12강', fixtures: ['r1', 'r2', 'r3', 'r4'].map((id) => fixture(id)) }],
+    [{ phase: 'round12', groupTeams: Array.from({ length: 4 }, (_, i) => ({ registrationId: 'b' + i, isBye: true, sortOrder: 0 })) } as V1TournamentGroup]);
+  expect([...graph.nodes].sort((a, b) => a.y - b.y).map((node) => node.id)).toEqual(['bye:b0', 'r1', 'r2', 'bye:b1', 'bye:b2', 'r3', 'r4', 'bye:b3']);
+});

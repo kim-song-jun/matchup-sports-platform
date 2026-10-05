@@ -104,3 +104,5 @@ origin/dev 9d7869721에서 격리 branch fix/team-user-empty-avatar-consistency 
 - User approved this PR only: Copilot quota 402 대신 직접 review + 검증 후 alpha 배포. PR CI appeared after delay; merge awaits CI.
 
 - 공용 후기 회귀 RED 1 → GREEN 1; 후기 팀 우선/빈 상태 8 tests PASS. 총 unique 205 tests across 11 suites PASS. 추가 후 tsc PASS / pattern PASS.
+
+- CI Web 6418/6419 PASS; remaining failure was the old TeamMembersSection initials contract, intentionally superseded by user-requested person icon. Updated to verify neutral person glyph plus unchanged full display names; 3 member tests PASS.

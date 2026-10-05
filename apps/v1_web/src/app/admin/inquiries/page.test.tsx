@@ -5,14 +5,11 @@ import AdminInquiriesPage from './page';
 import type { AdminListFilters, V1AdminInquiryRow } from '@/types/api';
 
 const inquiriesMock = vi.fn<(filters?: AdminListFilters) => unknown>();
-const replaceMock = vi.fn();
 // 딥링크용 초기 쿼리. 테스트마다 바꿔 끼울 수 있게 변수로 둔다.
 let searchParamsValue = new URLSearchParams();
 
 vi.mock('next/navigation', () => ({
   useSearchParams: () => searchParamsValue,
-  useRouter: () => ({ replace: replaceMock }),
-  usePathname: () => '/admin/inquiries',
 }));
 
 vi.mock('@/hooks/use-v1-api', () => ({
@@ -67,7 +64,7 @@ function mockInquiriesData() {
 describe('AdminInquiriesPage — 신고 사유 필터', () => {
   beforeEach(() => {
     searchParamsValue = new URLSearchParams();
-    replaceMock.mockReset();
+    window.history.replaceState(null, '', '/admin/inquiries');
     inquiriesMock.mockReset();
     mockInquiriesData();
   });
@@ -186,7 +183,7 @@ describe('AdminInquiriesPage — 신고 사유 필터', () => {
 
       await user.selectOptions(screen.getByLabelText('문의 분류 필터'), 'report');
 
-      expect(replaceMock).toHaveBeenLastCalledWith('/admin/inquiries?category=report', { scroll: false });
+      expect(window.location.pathname + window.location.search).toBe('/admin/inquiries?category=report');
     });
 
     it('필터를 모두 비우면 쿼리 없는 주소로 되돌린다', async () => {
@@ -196,7 +193,7 @@ describe('AdminInquiriesPage — 신고 사유 필터', () => {
 
       await user.selectOptions(screen.getByLabelText('문의 분류 필터'), '');
 
-      expect(replaceMock).toHaveBeenLastCalledWith('/admin/inquiries', { scroll: false });
+      expect(window.location.pathname + window.location.search).toBe('/admin/inquiries');
     });
 
     // 신고 누적 팀 목록(#7) → 문의 목록 딥링크. 팀 id 는 자유 문자열이라 pickAllowed(허용
@@ -226,7 +223,7 @@ describe('AdminInquiriesPage — 신고 사유 필터', () => {
         expect(screen.queryByText(/이 팀의 신고만 보는 중이에요/)).not.toBeInTheDocument();
         const args = inquiriesMock.mock.calls.at(-1)?.[0];
         expect(args).not.toHaveProperty('reportedTeamId');
-        expect(replaceMock).toHaveBeenLastCalledWith('/admin/inquiries', { scroll: false });
+        expect(window.location.pathname + window.location.search).toBe('/admin/inquiries');
       });
 
       it('다른 필터를 바꿔도 reportedTeamId 는 주소·훅에서 사라지지 않는다', async () => {
@@ -237,9 +234,8 @@ describe('AdminInquiriesPage — 신고 사유 필터', () => {
 
         await user.selectOptions(screen.getByLabelText('문의 분류 필터'), 'report');
 
-        expect(replaceMock).toHaveBeenLastCalledWith(
+        expect(window.location.pathname + window.location.search).toBe(
           '/admin/inquiries?category=report&reportedTeamId=team-2',
-          { scroll: false },
         );
         const args = inquiriesMock.mock.calls.at(-1)?.[0];
         expect(args).toMatchObject({ category: 'report', reportedTeamId: 'team-2' });

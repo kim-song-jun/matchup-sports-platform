@@ -81,6 +81,7 @@ describe('TournamentCampaignTemplate', () => {
 
       expect(screen.getByRole('heading', { name: '함께 뛸 팀을 기다리고 있어요' })).toBeInTheDocument();
       expect(screen.getAllByRole('link', { name: '참가 신청하기' })).toHaveLength(2);
+      expect(screen.getAllByText('모집 중')).toHaveLength(2);
 
       act(() => {
         vi.setSystemTime(new Date('2026-08-08T00:00:01.000Z'));
@@ -89,8 +90,48 @@ describe('TournamentCampaignTemplate', () => {
 
       expect(screen.getByRole('heading', { name: '접수 기간이 종료됐어요' })).toBeInTheDocument();
       expect(screen.getByText('접수 종료')).toHaveClass('tm-badge-grey');
+      expect(screen.getByText('모집 마감')).toHaveClass('tm-badge-grey');
+      expect(screen.queryByText('모집 중')).not.toBeInTheDocument();
       expect(screen.queryByRole('link', { name: '참가 신청하기' })).not.toBeInTheDocument();
       expect(screen.getByRole('heading', { name: '대회 상세 안내를 확인해 주세요' })).toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('마감일이 지난 0/4팀 캠페인은 hero에서도 모집 마감을 표시해요', () => {
+    const source = campaign('open');
+    render(<TournamentCampaignTemplate campaign={{
+      ...source,
+      tournament: {
+        ...source.tournament,
+        confirmedCount: 0,
+        teamCount: 4,
+        registrationDeadlineAt: '2020-01-01T00:00:00.000Z',
+        registrationAvailability: 'deadline_passed',
+      },
+    }} />);
+
+    expect(screen.getByText('모집 마감')).toHaveClass('tm-badge-grey');
+    expect(screen.queryByText('모집 중')).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: '참가 신청하기' })).not.toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: '접수 기간이 종료됐어요' })).toBeInTheDocument();
+  });
+
+  it('캠페인은 한국 시각으로 표시된 마감 순간부터 배지와 신청 버튼을 함께 닫아요', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-10-06T06:00:00.000Z'));
+    try {
+      const source = campaign('open');
+      render(<TournamentCampaignTemplate campaign={{
+        ...source,
+        tournament: {
+          ...source.tournament,
+          registrationDeadlineAt: '2026-10-06T15:00:00.000+09:00',
+        },
+      }} />);
+      expect(screen.getByText('모집 마감')).toHaveClass('tm-badge-grey');
+      expect(screen.queryByRole('link', { name: '참가 신청하기' })).not.toBeInTheDocument();
     } finally {
       vi.useRealTimers();
     }
@@ -246,7 +287,7 @@ describe('TournamentCampaignTemplate', () => {
 
       expect(screen.queryByRole('link', { name: '참가 신청하기' })).not.toBeInTheDocument();
       expect(screen.getByRole('heading', { name: heading })).toBeInTheDocument();
-      expect(screen.getByText(badgeLabel)).toBeInTheDocument();
+      expect(screen.getAllByText(badgeLabel)).toHaveLength(registrationAvailability === 'full' ? 2 : 1);
       expect(screen.getByRole('heading', { name: '대회 상세 안내를 확인해 주세요' })).toBeInTheDocument();
     },
   );

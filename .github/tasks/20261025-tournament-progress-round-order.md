@@ -69,3 +69,5 @@ Alpha after 증거는 수정 버전 배포가 필요하다. 기존 공유 트리
 - 배포 착수: 최신 origin/dev9d7869721에서 `fix/tournament-progress-order-live` 격리 worktree 생성, 소유14파일만 복사.
 - 기존 Ubuntu 의존성으로 화면/그룹/stepper Vitest72 PASS, 일정 권한1 PASS. 추가 page/partition 스위트는 누락된 persistence 패키지로 import 단계에서 막힘.
 - 공유 node_modules를 바꾸지 않고 `/tmp/teameet-progress-order-validation-20261005`에 frozen-lockfile install. clean dependencies에서 프론트 tsc0 및 pattern check PASS. 추가 page 테스트는 native PostCSS binding 설치 후 재확인 예정.
+- Node22 frozen-lockfile optional native dependency 재설치 후 추가 page/partition/권한97 PASS. 변경 관련 총169 tests PASS.
+- public-live-polling 주석 및 public-records 도메인 문서를 예정/미정 진행 경기 polling·cursor 페이지별 부하 모델과 동기화.

@@ -106,6 +106,7 @@ alpha 실제 배포와 인증 세션에 의존. 병렬 구현은 가능하지만
 - 예상 geometry (아직 라이브 검증 아님): 현재 root 실측 배지 폭 합265.65625px + 4px×3 = 277.65625px로 390px의 가용278px에 들어간다. 768/1440에서도 같은 배지 위계와 한 줄 구성을 유지하며, 더 좁은 화면이나 긴 데이터는 기존 자연 줄바꿈을 허용한다.
 - [x] root가 기존 상세 회귀32개를 worker1/파일 직렬로 각1회 실행해32/32 PASS, TypeScript와 기존 v1 패턴 검사도 각1회 PASS. 기존 React act 경고1건은 기록했다. CSS 클래스/가짜 geometry 단위 테스트는 추가하지 않았다. 로그는 위 followup-18의 detail-tests.log/typecheck.log/patterns.log다. 호스트 preflight CPU9%,여유17.1GB,Node59/Chrome24; Docker daemon은 없으며 이번 프론트 단위 검증에는 필요하지 않았다. 의존성은 기존 lockfile의 offline cache만 재사용했고 다운로드0/manifest변경0이다.
 - [x] 독립 frontend/code reviewer가 의도된4/4경로를 검토해 Critical0/Warning0. 실제 alpha 간격 after는 pending으로 유지했다. 보고서: ignored followup-18/code-review.md.
-- [ ] dev 후속 PR 게시/최신 head Copilot 요청 및 추적.
+- [x] [dev 후속 PR #1627](https://github.com/kim-song-jun/matchup-sports-platform/pull/1627) 게시/채팅 attach. 제품 source commit `3629665f93cd2007231801ee2995882673706a64`, branch `fix/mdqa-18-mobile-status-chips`, worktree `C:/Users/kinso/.codex/worktrees/mdqa-18-19-postqa-docs/matchup-sports-platform`. 이 인계 문서 커밋으로 제품을 다시 바꾸지 않는다.
+- [ ] 최종 head Copilot 및 CI를 추적하고 기존 dev-pr-5/사용자 머지를 기다린다. 새 자동 머지 정책을 추가하지 않는다.
 - [ ] 후속 merge를 포함한 serving SHA에서390/768/1440 detail 캡처·console/network와 Pass A/B 재검수.
 - Tracker QA transition remains BLOCKED_UI_OPTION_ABSENT; Done/보류로 대체하지 않는다.

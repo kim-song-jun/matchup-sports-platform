@@ -70,3 +70,5 @@ kept for historical reference under `docs/archive/v0-api/domains/`, not indexed 
 - No canonical index may link to a superseded contract tree.
 
 라운드별 부전승 직접 입력과 대진표 표시 위치 계약은 [Tournaments](./domains/tournaments.md#라운드별-부전승-직접-등록-2026-10-05)에 정리한다.
+
+- 2026-10-05: tournament bye slots allow null registration + byeId reassignment; pre-start fixture deletion archives canonical history. See [tournament contract](domains/tournaments.md).

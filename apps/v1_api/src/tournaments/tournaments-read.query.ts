@@ -53,6 +53,7 @@ export const TOURNAMENT_DETAIL_INCLUDE = {
   groups: {
     orderBy: [{ phase: 'asc' }, { sortOrder: 'asc' }],
     include: {
+      byeSlots: true,
       groupTeams: {
         orderBy: { sortOrder: 'asc' },
         include: {

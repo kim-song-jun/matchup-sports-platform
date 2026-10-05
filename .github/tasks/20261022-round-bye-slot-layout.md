@@ -1,6 +1,6 @@
 # 라운드별 부전승 입력과 대진 위치
 
-Status: Implementation Ready — Alpha QA Pending
+Status: In Progress — TBD Bye / Pre-start Delete Follow-up
 **Owner**: Codex, 단일 실행
 **Created**: 2026-10-05
 
@@ -77,3 +77,43 @@ V1AuthGuard + getMutationAdmin 유지. 대회소속·confirmed 상태·동시성
 - 실제 기본값 중복의 읽기 배치를 이미지 순서로 보완 중. 기존 DB 값 및 팀/경기 배정 유지. 관리자 로그인 저장 검증은 계속 미실행.
 
 - 중복 기본값 호환 최종 로컬 검증: 그래프 9 PASS, frontend tsc PASS, pattern-check PASS. 후속 커밋 dev 반영 후 배포 게이트와 after 화면 재확인 예정.
+
+## Final alpha evidence — 2026-10-05 17:16 KST
+
+- PR #1612와 #1613 dev 머지. 최종 서버 커밋 2e92d8afc1c256fc8d2709c455d247b947b1bbf3, release 1.2.1-alpha.20261005.g2e92d8afc1c2.
+- 최종 dev CI 37281104345 SUCCESS, Deploy Alpha 37281104439 SUCCESS. API/Web 모두 HTTP 200 + 동일 X-Teameet-Commit. API health checks.db=true. 신규 byes 비인증 POST는 401로 보호.
+- Headed 공개 시나리오: /tournaments/ad120000-0000-4000-8000-000000000001/bracket → 순위 · 대진표. after 1440/768/390 screenshot 확인: 기존 기본값 0 두 부전승이 일반 경기 전후로 나뉨. 본문 가로 overflow 없음. 현재 대회는 두 미정 경기와 두 부전승만 편성돼 있어 완성된 12팀 연결 트리의 실제 데이터 검증은 아님.
+- 증거: tmp/qa-round-bye-deploy/before-*.png, first-after-*.png, after-*.png, before/after-evidence.json. 기존 /my-fixtures 401 + resource console error는 로그아웃 baseline과 동일. 새 pageerror 없음.
+- Owned headed browser PID/PPID 기록 및 종료 완료. 로컬 웹 서버 실행 없음. 원래 alpha 팀/유저/대회/경기 데이터는 이 배포에서 변경하지 않음.
+- 메인 작업트리 dev는 머지마다 FF 동기화 완료. 이전 같은 작업의 카드 overflow 변경은 배포 코드에 포함돼 있고 tmp/qa-round-bye-deploy/local-dev-backup/bracket-group-card.tsx에 원본 백업 보존. 기타 로컬 WIP 유지.
+- 배포 완료. 관리자 로그인 후 실제 부전승 저장 클릭 및 완성된 12강 연결 데이터 검증은 인증 상태가 없어 미확인. 이 최종 evidence 갱신은 로컬 문서이며 추가 배포를 만들지 않음.
+
+## TBD bye / pre-start deletion follow-up — 2026-10-05
+
+Status: In Progress
+- [x] Phase 1: nullable bye registration and same-slot reassignment, DB check, API/read contract.
+- [x] Phase 2: TBD bye form, edit/delete and stable graph identity.
+- [x] Phase 3: pre-start fixture soft deletion, preserve Game/audit, block started/results/downstream.
+- [ ] Phase 4: focused tests, type/pattern/surface gates, dev PR and alpha deployment.
+- User requested round12 4 matches +4 TBD byes; quarter4/semi2/final1/third_place1, teams assigned later. No auto pairing or alpha data edits.
+- Owned scope extended to schema/migration, presenters/generator/standings nullable filtering. Existing WIP preserved.
+
+- Implementation: nullable V1TournamentGroupTeam.registrationId with SQL CHECK permitting null only for byes. Persistent byeId allows assigning/clearing a team on the same slot; graph uses slot id and never connects null registrations.
+- Pre-start delete: tournament draft/open/closed + Game SCHEDULED + matched TeamMatch, no result. Archive TeamMatch, cancel Game/visibility/schedules, disconnect empty downstream sources, release group and round-number key while retaining append-only history and original fields in audit.
+- Focused backend bracket/read tests: 125 PASS; additional delete permission/downstream cases included. Frontend graph 10 + form 7 + tab 12 PASS. API/web type checks and web pattern PASS; API surface gate PASS after documented lock baseline.
+- Headed alpha baseline: tmp/qa-round-bye-deploy/tbd-before-{1440,768,390}.png; all document widths equal viewport. Existing /my-fixtures 401 remains; no pageerror. Owned browser PID13944 / parent34652 closed.
+- Admin save/delete live QA remains unverified because no authenticated admin browser is available. Docker is not running locally, so real DB migration/write integration is not claimed. No alpha tournament records changed.
+Final follow-up: delete-only 12 PASS (83 bracket total including four new cases); read 46 PASS; graph 10/form7/tab12 PASS. Real DB adapter integration added for four null slots, assignment/clear/remove, CHECK rejection, canonical archive and number reuse; remote CI execution pending. Entirely TBD graph columns share a common canvas height without invented edges.
+Recreation fix: archived Details round retains originalRound:deleted:id and creation command gains a revision count after deletion, preserving durable idempotency records while allowing original number reuse.
+
+- Renderer 11 PASS. Final API/web type checks and pattern/surface gates PASS. Fresh DB scenarios will run in remote CI; local Docker unavailable.
+Final bracket service 83 PASS; read 46 PASS; frontend graph10/form7/tab12/render11 PASS. Total focused contracts 169 PASS. Commit scope contains only this follow-up; no new TODO/FIXME/HACK/XXX markers.
+
+CI #37288172468 fix round: web PASS; API found archived Details in getBracket (add deletedAt filter) and nullable groupTeams in DB standings helper (filter placeholders). Gates/Game-schema fixtures require current schema digest sync; update final binder/attestation/manifest whitelist + fixture SHA, retaining historical digest and frozen M11. Expanded exact scope to these files; source schema itself unchanged.
+Release binding verification: 7 PASS plus create-alpha-release-manifest self-test PASS on LF portable copies (Windows checkout M11 has CRLF; immutable source untouched). Current digest b25172e1bec1a80df93747750b913c0fd17f479dd9fc157a758639a3282f3749; previous 1eea digest remains accepted for historical manifests. No guard bypass or destructive history cleanup.
+
+
+### Additive deployment correction
+- CI migration gate rejected DROP NOT NULL. Final storage uses additive V1TournamentByeSlot; existing GroupTeam registration remains required. Assignment/clear transfers the same id atomically, public/admin presentation remains nullable.
+- Supersedes nullable-column/CHECK implementation notes above. No migration-gate exception. Owned scope includes tournaments-read.query and final-schema digest binders; unrelated nullable standings changes reverted.
+- Current validation: bracket/read 129 tests PASS; API typecheck and surface gate PASS. Real DB CI and alpha deployment pending.

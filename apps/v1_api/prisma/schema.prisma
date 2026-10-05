@@ -2916,6 +2916,7 @@ model V1TournamentGroup {
   tournament V1Tournament            @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
   tournamentMatchDetails V1TournamentMatchDetails[]
   groupTeams V1TournamentGroupTeam[]
+  byeSlots   V1TournamentByeSlot[]
   standings  V1TournamentStanding[]
 
   @@unique([tournamentId, name], map: "v1_tournament_groups_tournament_id_name_key")
@@ -3985,4 +3986,15 @@ model V1TeamMemberUnavailability {
   @@index([teamId, userId], map: "v1_team_member_unavailabilities_team_id_user_id_idx")
   @@index([userId], map: "v1_team_member_unavailabilities_user_id_idx")
   @@map("v1_team_member_unavailabilities")
+}
+
+/// Team-unassigned bye positions, independent of confirmed group-team registrations.
+model V1TournamentByeSlot {
+  id        String   @id @default(uuid())
+  groupId   String   @map("group_id")
+  sortOrder Int      @map("sort_order")
+  createdAt DateTime @default(now()) @map("created_at")
+  group     V1TournamentGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  @@unique([groupId, sortOrder], map: "v1_tournament_bye_slots_group_id_sort_order_key")
+  @@map("v1_tournament_bye_slots")
 }

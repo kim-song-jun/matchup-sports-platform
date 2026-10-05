@@ -4,6 +4,18 @@ import { TournamentBracket } from './tournament-bracket';
 import type { V1TournamentFixture } from '@/types/api';
 import { queryImageBySrc } from '@/test/next-image';
 
+it('팀 없는 부전승 네 자리는 비공개 팀과 구분해 미정으로 표시한다', () => {
+  render(<TournamentBracket fixtures={[]} groups={[{ id: 'r12', name: '12강', phase: 'round12', sortOrder: 0, advanceCount: null, standings: [],
+    groupTeams: [0, 3, 4, 7].map((sortOrder, index) => ({ id: 'empty-bye-' + index, registrationId: null, teamId: null, teamName: null, teamLogoUrl: null, sortOrder, isBye: true })) }]} />);
+  const slots = screen.getAllByRole('region', { name: '12강 부전승' });
+  expect(slots).toHaveLength(4);
+  for (const slot of slots) {
+    expect(slot).toHaveTextContent('미정');
+    expect(slot).toHaveTextContent('부전승 · 8강 직행');
+    expect(slot).not.toHaveTextContent('비공개');
+  }
+});
+
 function makeFixture(
   overrides: Partial<V1TournamentFixture> & Pick<V1TournamentFixture, 'id' | 'fixtureNumber'>,
 ): V1TournamentFixture {

@@ -58,6 +58,7 @@ import { loadCanonicalStandingsSource } from './tournament-standings-source';
 import { participantDisplayName } from './participant-display-name';
 import { readJerseyNumbers } from './tournament-player-jersey';
 import { createTournamentMatchInTx } from './tournament-match-creation';
+import { nextFixtureCreationCommandId } from './tournament-fixture-generation';
 import { updateTournamentMatchInTx } from './tournament-match-update';
 import { competitionTeamTargets, enqueueRosterResync } from '../games/roster/roster-resync-events';
 import { tournamentTeamMatchBracketInclude, serializeTournamentTeamMatchBracket } from './tournament-team-match-bracket.query';
@@ -623,7 +624,7 @@ export class TournamentBracketService {
         where: { tournamentId, round: { startsWith: dto.round + ':deleted:' }, fixtureNumber: dto.fixtureNumber, legNumber, teamMatch: { deletedAt: { not: null } } },
         select: { teamMatchId: true },
       });
-      const creationCommandId = archived.length ? `${durableCommandId}:revision:${archived.length}` : durableCommandId;
+      const creationCommandId = await nextFixtureCreationCommandId(tx, durableCommandId, tournamentId, archived.length, user.id);
       const registrationIds = [dto.homeRegistrationId, dto.awayRegistrationId].filter(
         (registrationId): registrationId is string => registrationId !== null && registrationId !== undefined,
       );
@@ -886,8 +887,12 @@ export class TournamentBracketService {
         if (incoming.some((edge) => edge.targetSide === 'HOME' ? dto.homeRegistrationId !== undefined && dto.homeRegistrationId !== canonical.homeRegistrationId : dto.awayRegistrationId !== undefined && dto.awayRegistrationId !== canonical.awayRegistrationId)) {
           throw new ConflictException({ code: 'BRACKET_SOURCE_SLOT_LINKED', message: '진출 경기가 연결된 자리는 직접 팀을 변경할 수 없어요. 먼저 진출 연결을 해제해 주세요.' });
         }
+        const previousNumber = dto.fixtureNumber === undefined ? undefined : (await tx.v1TournamentMatchDetails.findUniqueOrThrow({
+          where: { teamMatchId: fixtureId }, select: { fixtureNumber: true },
+        })).fixtureNumber;
         const row = await updateTournamentMatchInTx(tx, {
           teamMatchId: fixtureId,
+          fixtureNumber: dto.fixtureNumber,
           scheduledAt: dto.scheduledAt !== undefined ? new Date(dto.scheduledAt) : undefined,
           venue: dto.venue,
           homeRegistrationId: dto.homeRegistrationId,
@@ -899,7 +904,9 @@ export class TournamentBracketService {
             action: 'tournament.bracket.fixture.update',
             targetType: 'team_match',
             targetId: fixtureId,
+            ...(previousNumber === undefined ? {} : { beforeJson: { fixtureNumber: previousNumber } }),
             afterJson: {
+              fixtureNumber: row.fixtureNumber,
               scheduledAt: row.startAt?.toISOString() ?? null,
               venue: row.placeName,
               homeRegistrationId: row.homeRegistrationId,

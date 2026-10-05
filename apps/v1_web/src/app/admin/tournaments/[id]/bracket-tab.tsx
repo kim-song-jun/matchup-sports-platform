@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import Link from 'next/link';
 import { Check, RefreshCw, Pencil, Trash2, ChevronRight } from 'lucide-react';
 import { isBracketPublished as isBracketPublishedNow } from '@/lib/bracket-visibility';
@@ -147,6 +147,8 @@ export function BracketTab({
   const [awaySource, setAwaySource] = useState('');
   const [savingSources, setSavingSources] = useState(false);
   const [editFixture, setEditFixture] = useState<V1AdminBracketFixture | null>(null);
+  const editNumberId = useId();
+  const [editFxNumber, setEditFxNumber] = useState('');
   const [editFxScheduledAt, setEditFxScheduledAt] = useState('');
   const [editFxVenue, setEditFxVenue] = useState('');
   const [editFxHomeRegId, setEditFxHomeRegId] = useState('');
@@ -185,6 +187,11 @@ export function BracketTab({
   const handleUpdateFixture = (e: React.FormEvent) => {
     e.preventDefault();
     if (!editFixture) return;
+    const fixtureNumber = Number(editFxNumber);
+    if (!editFxNumber.trim() || !Number.isInteger(fixtureNumber) || fixtureNumber < 1 || fixtureNumber > 2147483647) {
+      showToast('대진 번호는 1부터 2147483647까지의 정수로 입력해 주세요.', 'error');
+      return;
+    }
     // 팀 필드는 각각 독립적으로 판단한다 — 홈만 바꾸고 어웨이는 그대로여도 어웨이 필드를
     // 잘못 건드리지 않기 위해서다. '미정'으로 되돌린 경우(editFx*RegId === '')는 서버 계약대로
     // null을 명시적으로 보내 배정을 해제한다 — 필드를 아예 빼면(undefined) 서버가 '미변경'으로
@@ -199,6 +206,7 @@ export function BracketTab({
     updateFixture.mutate(
       {
         fixtureId: editFixture.id,
+        ...(fixtureNumber !== editFixture.fixtureNumber ? { fixtureNumber } : {}),
         ...(scheduledAtIso ? { scheduledAt: scheduledAtIso } : {}),
         venue: editFxVenue,
         ...(homeChanged ? { homeRegistrationId: editFxHomeRegId || null } : {}),
@@ -757,6 +765,7 @@ export function BracketTab({
                     type="button"
                     onClick={() => {
                       setEditFixture(f);
+                      setEditFxNumber(String(f.fixtureNumber));
                       setEditFxScheduledAt(isoToKstDatetimeLocal(f.scheduledAt));
                       setEditFxVenue(f.venue ?? '');
                       setEditFxHomeRegId(f.homeRegistrationId ?? '');
@@ -856,6 +865,12 @@ export function BracketTab({
         pending={updateFixture.isPending}
       >
         <form onSubmit={handleUpdateFixture} noValidate className="flex flex-col gap-4">
+          <div className="flex flex-col gap-1">
+            <label htmlFor={editNumberId} className="text-[length:var(--font-size-label)] text-[var(--text-strong)]">대진 번호</label>
+            <input id={editNumberId} type="number" inputMode="numeric" min={1} max={2147483647} step={1}
+              value={editFxNumber} onChange={(e) => setEditFxNumber(e.target.value)}
+              disabled={updateFixture.isPending} className={inputCls} />
+          </div>
           <div className="flex flex-col gap-1">
             <label htmlFor="edit-fx-scheduled" className="text-[length:var(--font-size-label)] text-[var(--text-strong)]">경기 일시</label>
             <input

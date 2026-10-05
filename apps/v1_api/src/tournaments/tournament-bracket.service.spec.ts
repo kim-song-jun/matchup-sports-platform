@@ -286,7 +286,7 @@ describe('TournamentBracketService', () => {
     v1TeamSchedule: { findMany: jest.Mock; findUnique: jest.Mock; update: jest.Mock; create: jest.Mock; updateMany: jest.Mock };
     v1TournamentRegistration: { findFirst: jest.Mock; findMany: jest.Mock; findUnique: jest.Mock };
     v1GameResultRevision: { findUnique: jest.Mock };
-    v1IdempotencyRecord: { findFirst: jest.Mock };
+    v1IdempotencyRecord: { findFirst: jest.Mock; findMany: jest.Mock };
     v1Game: { update: jest.Mock; findMany: jest.Mock };
     v1GameVisibilityPolicy: { update: jest.Mock };
     v1GameLineup: { findFirst: jest.Mock; updateMany: jest.Mock; create: jest.Mock };
@@ -345,7 +345,7 @@ describe('TournamentBracketService', () => {
         findUnique: jest.fn(),
       },
       v1GameResultRevision: { findUnique: jest.fn().mockResolvedValue({ state: 'VOID' }) },
-      v1IdempotencyRecord: { findFirst: jest.fn().mockResolvedValue(null) },
+      v1IdempotencyRecord: { findFirst: jest.fn().mockResolvedValue(null), findMany: jest.fn().mockResolvedValue([]) },
       v1GameVisibilityPolicy: { update: jest.fn().mockResolvedValue({}) },
       v1Game: { update: jest.fn().mockResolvedValue({}), findMany: jest.fn().mockResolvedValue([]) },
       v1GameLineup: {
@@ -826,6 +826,19 @@ describe('TournamentBracketService', () => {
       fixtureNumber: 1,
       status: 'scheduled',
     });
+  });
+
+  it('createFixture: 번호를 이동한 옛 좌표에 새 게임 ID를 생성한다', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdmin);
+    prisma.v1Tournament.findFirst.mockResolvedValue(tournamentRow());
+    prisma.v1TournamentGroup.findFirst.mockResolvedValue(groupRow());
+    const baseKey = 'tournament-fixture:tournament-1:group_a:1:1';
+    prisma.v1IdempotencyRecord.findMany.mockResolvedValue([{ idempotencyKey: baseKey, resourceId: 'old-match' }]);
+    prisma.v1TournamentMatchDetails.findMany.mockResolvedValueOnce([]).mockResolvedValueOnce([{ teamMatchId: 'old-match', tournamentId: 'tournament-1' }]);
+    prisma.v1TeamMatch.findUniqueOrThrow.mockResolvedValue({ ...canonicalDetailsRow().teamMatch, hostTeamId: null, approvedApplicantTeamId: null });
+    await service.createFixture(ownerUser, 'tournament-1', { groupId: 'group-1', round: 'group_a', fixtureNumber: 1 });
+    expect(prisma.v1IdempotencyRecord.findFirst).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ idempotencyKey: baseKey + ':revision:1' }) }));
+    expect(prisma.v1TeamMatch.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ id: expect.not.stringMatching(/^old-match$/) }) }));
   });
 
   // W9-V2 — 저장되는 팀매치 제목도 화면과 같은 경기 이름을 쓴다(조별은 조 이름 + 라운드, 결선은 라운드만).
@@ -1683,6 +1696,22 @@ describe('TournamentBracketService', () => {
     await expect(
       service.updateFixture(ownerUser, 'fixture-1', { homeRegistrationId: 'reg-3' }),
     ).rejects.toMatchObject({ response: { code: 'FIXTURE_HAS_RESULT' } });
+  });
+
+  it('updateFixture: OFFICIAL 경기의 번호만 수정하고 변경 전·후 번호를 감사에 남긴다', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdmin);
+    const detail = canonicalDetailsRow({ group: { name: 'A조' } });
+    prisma.v1TournamentMatchDetails.findUnique.mockResolvedValue({ ...detail, teamMatch: { ...detail.teamMatch, game: { ...detail.teamMatch.game, state: 'FINAL', currentOfficialRevision: { state: 'OFFICIAL' } } } });
+    prisma.v1TournamentMatchDetails.findUniqueOrThrow.mockResolvedValue(detail);
+    prisma.v1TournamentMatchDetails.findFirst.mockResolvedValue(null);
+    prisma.v1TournamentRegistration.findMany.mockResolvedValue([{ id: 'reg-1', teamId: 'team-old', team: { name: '홈' } }, { id: 'reg-2', teamId: 'team-away', team: { name: '어웨이' } }]);
+    queueFixtureUpdateRaw(prisma.$queryRaw, { id: 'game-1', state: 'FINAL', sourceType: 'TEAM_MATCH', currentOfficialRevisionId: 'revision-1' }, { id: 'fixture-1', deletedAt: null });
+    prisma.v1GameResultRevision.findUnique.mockResolvedValue({ state: 'OFFICIAL' });
+    prisma.v1TeamMatch.update.mockResolvedValue(detail.teamMatch);
+    expect(await service.updateFixture(ownerUser, 'fixture-1', { fixtureNumber: 7 })).toMatchObject({ id: 'fixture-1', fixtureNumber: 7 });
+    expect(prisma.v1AdminActionLog.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ beforeJson: { fixtureNumber: 1 }, afterJson: expect.objectContaining({ fixtureNumber: 7 }) }) }));
+    expect(prisma.v1Game.update).not.toHaveBeenCalled();
+    expect(prisma.v1TournamentMatchAdvancementEdge.deleteMany).not.toHaveBeenCalled();
   });
 
   it('updateFixture: 결과가 VOID면 팀 변경이 막히지 않는다(결과 없음과 동일 취급)', async () => {

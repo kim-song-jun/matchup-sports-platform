@@ -18,7 +18,7 @@ in the same change that discovers the drift.
 - [Matches](./domains/matches.md)
 - [Teams](./domains/teams.md)
 - [Team matches](./domains/team-matches.md)
-- [Tournaments](./domains/tournaments.md)
+- [Tournaments](./domains/tournaments.md) — 대진 생성·번호 수정·진출 연결 및 결과 계약
 - [League matches](./domains/league-matches.md)
 - [Games](./domains/games.md)
 - [Team schedules](./domains/team-schedules.md)

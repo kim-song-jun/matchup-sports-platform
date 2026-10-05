@@ -59,7 +59,7 @@ Status: Review
 ## Risks & Dependencies
 - 실제 alpha QA는 Chrome 관리자 로그인 handoff 상태이며 root가 이어서 진행한다.
 - 현재 tracker 메뉴에서 QA 상태 전환 항목을 찾지 못해 사용자 확인 대기다. dev 머지 후 QA 전환은 미완료로 남기고 Done은 사용하지 않는다.
-- dev PR 및 머지 후 alpha 검증은 root가 이어서 진행한다.
+- [dev PR #1626](https://github.com/kim-song-jun/matchup-sports-platform/pull/1626) 게시 및 채팅 attach 완료. CI/Copilot 리뷰와 머지 후 alpha 검증을 추적한다.
 
 ## Ambiguity Log
 - 화면/스타일/API 계약을 바꾸지 않는 로직 전용 수정이다. `CLAUDE.md` UI 착수 규칙의 로직 전용 예외를 적용한다.
@@ -81,8 +81,8 @@ Status: Review
 - [x] 할당·상세·기존 PR 중복 확인.
 - [x] 로컬 dev 먼저 fetch/FF 최신화; 시작 SHA `4e1c14bb9cd089da10e1dae0088dfea6deb5b72d`.
 - [x] 구현·회귀 검증(RED 5실패/2통과 → GREEN 4파일 37/37).
-- [ ] 리뷰·PR.
+- [x] 리뷰·PR: dev PR #1626 게시, Copilot 리뷰 요청 완료. 현재 CI/리뷰 진행 중.
 - [ ] dev 머지·QA 상태 변경·alpha 재검증.
 - [x] reviewer 6/6파일 Critical 0 / Warning 0, 타입·패턴 검사 통과.
-- PR 게시 및 committed diff 검토: root 진행 중.
+- [x] root committed diff 6파일 검토, 미추적 의존성 없음, clean 작업트리 확인.
 - alpha Chrome 관리자 로그인: handoff 상태. tracker QA 메뉴 위치: 사용자 확인 대기. Done 전환 금지.

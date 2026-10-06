@@ -27,13 +27,14 @@ function readHubFilters(params: Pick<URLSearchParams, 'get'>): HubFilters {
 }
 
 function buildListHref(pathname: string, query: string, filters: HubFilters): string {
-  const params = new URLSearchParams(query);
+  const location = typeof window !== 'undefined' && window.location.pathname === pathname ? window.location : null;
+  const params = new URLSearchParams(location?.search ?? query);
   if (filters.activeTab === 'series') params.set('tab', 'series');
   else params.delete('tab');
   if (filters.seriesFilter) params.set('seriesId', filters.seriesFilter);
   else params.delete('seriesId');
   const nextQuery = params.toString();
-  return nextQuery ? `${pathname}?${nextQuery}` : pathname;
+  return `${pathname}${nextQuery ? `?${nextQuery}` : ''}${location?.hash ?? ''}`;
 }
 
 const TABS: { key: TabKey; label: string }[] = [
@@ -58,7 +59,6 @@ export default function AdminLeagueHubPage() {
  */
 function LeagueHub() {
   const searchParams = useSearchParams();
-  const router = useRouter();
   const pathname = usePathname();
 
   const query = searchParams.toString();
@@ -67,10 +67,23 @@ function LeagueHub() {
   const { activeTab, seriesFilter } = filters;
   // 상세 복귀·Back/Forward는 URL에서 복원하고, 연속 선택은 최신 local draft에 병합한다.
   useEffect(() => {
+    // Next가 이전 선택을 늦게 전달해도 실제 주소의 최신 선택과 ref를 덮지 않는다.
+    if (window.location.pathname !== pathname || new URLSearchParams(window.location.search).toString() !== query) return;
     const next = readHubFilters(new URLSearchParams(query));
     latestFilters.current = next;
     setFilters(next);
-  }, [query]);
+  }, [pathname, query]);
+  useEffect(() => {
+    // Back이 직전에 무시한 snapshot과 같은 query여도 실제 주소에서 선택을 복원한다.
+    const restore = () => {
+      if (window.location.pathname !== pathname) return;
+      const next = readHubFilters(new URLSearchParams(window.location.search));
+      latestFilters.current = next;
+      setFilters(next);
+    };
+    window.addEventListener('popstate', restore);
+    return () => window.removeEventListener('popstate', restore);
+  }, [pathname]);
   // '' = 전체, 'independent' = 무소속만, 그 외 = 체계 id. 필터 선택은 탭을 오가도
   // 남아야 하므로 허브가 들고, 목록 쿼리는 정규 리그 패널만 마운트될 때 실행되도록
   // 패널 컴포넌트(LeaguesPanel) 안에 둔다 — 리그 체계 탭에서 리그 목록 API 가
@@ -80,7 +93,7 @@ function LeagueHub() {
     const next = { ...latestFilters.current, ...patch };
     latestFilters.current = next;
     setFilters(next);
-    router.replace(buildListHref(pathname, query, next), { scroll: false });
+    window.history.replaceState(null, '', buildListHref(pathname, query, next));
   }
 
   return (

@@ -10,11 +10,10 @@ vi.mock('@/hooks/use-v1-api', () => ({
   useV1AdminLeagueSeriesList: () => seriesListMock(),
 }));
 
-const replaceMock = vi.fn();
 let searchParams = new URLSearchParams();
 vi.mock('next/navigation', () => ({
   usePathname: () => '/admin/league-matches',
-  useRouter: () => ({ replace: replaceMock, push: vi.fn() }),
+  useRouter: () => ({ push: vi.fn() }),
   useSearchParams: () => searchParams,
 }));
 
@@ -55,6 +54,7 @@ describe('AdminLeagueHubPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     searchParams = new URLSearchParams();
+    window.history.replaceState(null, '', '/admin/league-matches');
     leagueListMock.mockReturnValue({ data: { items: LEAGUES }, isPending: false, isError: false, refetch: vi.fn() });
     seriesListMock.mockReturnValue({ data: { items: SERIES }, isPending: false, isError: false, refetch: vi.fn() });
   });
@@ -93,7 +93,8 @@ describe('AdminLeagueHubPage', () => {
 
     await user.click(screen.getByRole('tab', { name: '리그 체계' }));
 
-    expect(replaceMock).toHaveBeenCalledWith('/admin/league-matches?tab=series', { scroll: false });
+    expect(`${window.location.pathname}${window.location.search}`).toBe('/admin/league-matches?tab=series');
+    expect(screen.getByRole('tab', { name: '리그 체계' })).toHaveAttribute('aria-selected', 'true');
     expect(screen.getByRole('link', { name: /리그 체계 만들기/ })).toHaveAttribute(
       'href',
       '/admin/league-series/new',
@@ -104,6 +105,7 @@ describe('AdminLeagueHubPage', () => {
 
   it('lands on the series tab when ?tab=series (구 URL 리다이렉트 착지)', () => {
     searchParams = new URLSearchParams('tab=series');
+    window.history.replaceState(null, '', '/admin/league-matches?tab=series');
     render(<AdminLeagueHubPage />);
 
     expect(screen.getByRole('tab', { name: '리그 체계' })).toHaveAttribute('aria-selected', 'true');

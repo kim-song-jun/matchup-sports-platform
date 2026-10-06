@@ -39,6 +39,7 @@ import { LeagueWeeksPlanField } from './league-weeks-plan-field';
 import { resolveWeeksCount, type WeeksPlan } from '@/lib/league-round-robin-plan';
 import { formatKstDateShort, formatKstTime } from '@/lib/date-utils';
 import { RecentVenueChips } from '@/components/v1-ui/create-form-fields';
+import { LeagueVisibilityControl } from './league-visibility-control';
 import {
   computeDailyPlan,
   dayOffsetLabel,
@@ -656,6 +657,8 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
           </div>
         }
       />
+
+      <LeagueVisibilityControl leagueId={leagueId} isPublic={series.isPublic} />
 
 {series.fixtures.length === 0 ? (
 <>

@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import sitemap from '@/app/sitemap';
 import { metadata as eventsMetadata } from '@/app/events/layout';
-import { absoluteSiteUrl, buildTournamentDescription, getSiteOrigin, metadataDescription, teamDescriptionFallback } from './seo';
+import { absoluteSiteUrl, buildTournamentDescription, fetchPublicV1, getSiteOrigin, metadataDescription, teamDescriptionFallback } from './seo';
 
 afterEach(() => {
   vi.unstubAllEnvs();
@@ -74,6 +74,25 @@ describe('SEO site origin', () => {
     expect(entries).toContainEqual(
       expect.objectContaining({ url: 'https://teameet.co.kr/events' }),
     );
+  });
+});
+
+describe('fetchPublicV1 cache policy', () => {
+  it('uses no-store for publication-sensitive public league reads', async () => {
+    vi.stubEnv('INTERNAL_API_ORIGIN', 'http://api.test');
+    const fetchMock = vi.fn().mockResolvedValue(new Response(
+      JSON.stringify({ status: 'success', data: { leagueId: 'league-1' } }),
+      { status: 200, headers: { 'content-type': 'application/json' } },
+    ));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(fetchPublicV1('/league-matches/league-1', { cache: 'no-store' })).resolves.toEqual({ leagueId: 'league-1' });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://api.test/api/v1/league-matches/league-1',
+      expect.objectContaining({ cache: 'no-store' }),
+    );
+    expect(fetchMock.mock.calls[0][1]).not.toHaveProperty('next');
   });
 });
 

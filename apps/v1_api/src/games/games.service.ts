@@ -934,7 +934,7 @@ function mapIdentityEventError(error: unknown) {
       return new ConflictException({
         code: 'COMMAND_CONCURRENCY_CONFLICT',
         message: '동시에 처리된 요청이 있어요. 최신 상태를 다시 불러와 주세요.',
-      });
+    });
     }
     // P2002 는 반대로 신원 테이블의 유일성이 실제로 깨진 것(같은 요청의 중복 이벤트 등)이라
     // 도메인 코드를 유지한다.
@@ -1182,9 +1182,10 @@ export class GamesService {
         },
         events: { orderBy: { sequence: 'asc' } },
         currentOfficialRevision: true,
+        teamMatch: { select: { league: { select: { isPublic: true } } } },
       },
-    });
-    if (game === null || game.visibilityPolicy === null) {
+      });
+    if (game === null || game.visibilityPolicy === null || game.teamMatch?.league?.isPublic === false) {
       throw this.notFound();
     }
     const publicLiveEnabled = await isPublicLiveEnabled(this.prisma);

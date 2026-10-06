@@ -20,6 +20,7 @@ in the same change that discovers the drift.
 - [Team matches](./domains/team-matches.md)
 - [Tournaments](./domains/tournaments.md)
 - [League matches](./domains/league-matches.md)
+- [Regular league public visibility](./domains/league-matches.md#public-visibility) — publication control, admin access and public read gates.
 - [Games](./domains/games.md)
 - [Team schedules](./domains/team-schedules.md)
 - [Tournament operations](./domains/tournament-operations.md)

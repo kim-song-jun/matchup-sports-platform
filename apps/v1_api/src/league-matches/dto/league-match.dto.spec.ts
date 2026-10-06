@@ -1,7 +1,7 @@
 import 'reflect-metadata';
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
-import { CreateLeagueMatchDto } from './league-match.dto';
+import { CreateLeagueMatchDto, UpdateLeagueVisibilityDto } from './league-match.dto';
 
 const valid = {
   title: '부산 리그',
@@ -27,5 +27,17 @@ describe('CreateLeagueMatchDto region identifiers', () => {
     const errors = await validate(plainToInstance(CreateLeagueMatchDto, { ...valid, regionId }));
 
     expect(errors.some((error) => error.property === 'regionId')).toBe(true);
+  });
+});
+
+describe('UpdateLeagueVisibilityDto', () => {
+  it('accepts an explicit boolean false', async () => {
+    const errors = await validate(plainToInstance(UpdateLeagueVisibilityDto, { isPublic: false }));
+    expect(errors).toHaveLength(0);
+  });
+
+  it.each(['false', 0, null, undefined])('rejects a non-boolean visibility value: %p', async (isPublic) => {
+    const errors = await validate(plainToInstance(UpdateLeagueVisibilityDto, { isPublic }));
+    expect(errors.some((error) => error.property === 'isPublic')).toBe(true);
   });
 });

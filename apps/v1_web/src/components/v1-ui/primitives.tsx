@@ -325,11 +325,12 @@ type SectionTitleProps = {
   sub?: string;
   action?: string;
   actionHref?: string;
+  compact?: boolean;
   /** Optional id placed on the title element so aria-labelledby references resolve. */
   id?: string;
 };
 
-export function SectionTitle({ title, sub, action, actionHref, id }: SectionTitleProps) {
+export function SectionTitle({ title, sub, action, actionHref, compact = false, id }: SectionTitleProps) {
   const actionContent = (
     <>
       {action}
@@ -338,7 +339,7 @@ export function SectionTitle({ title, sub, action, actionHref, id }: SectionTitl
   );
 
   return (
-    <div className="tm-section-title" style={{ alignItems: sub ? 'flex-start' : 'center' }}>
+    <div className={`tm-section-title${compact ? ' tm-section-title-compact' : ''}`} style={{ alignItems: sub ? 'flex-start' : 'center' }}>
       <div>
         <div id={id} className="tm-text-body-lg">{title}</div>
         {sub ? <div className="tm-text-caption" style={{ marginTop: 4 }}>{sub}</div> : null}

@@ -6,7 +6,7 @@ import type { V1TournamentDetail } from '@/types/api';
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
   const { id } = await params;
-  const tournament = await fetchPublicV1<V1TournamentDetail>(`/tournaments/${encodeURIComponent(id)}`);
+  const tournament = await fetchPublicV1<V1TournamentDetail>(`/tournaments/${encodeURIComponent(id)}`, { cache: 'no-store' });
   if (!tournament) return buildNoIndexMetadata('대회 후기를 찾을 수 없어요');
   return buildPublicMetadata({
     title: `${tournament.title} 참가 후기`,
@@ -22,6 +22,6 @@ export default async function TournamentReviewsPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  if (!await fetchPublicV1<V1TournamentDetail>(`/tournaments/${encodeURIComponent(id)}`)) notFound();
+  if (!await fetchPublicV1<V1TournamentDetail>(`/tournaments/${encodeURIComponent(id)}`, { cache: 'no-store' })) notFound();
   return <TournamentReviewsPageClient tournamentId={id} />;
 }

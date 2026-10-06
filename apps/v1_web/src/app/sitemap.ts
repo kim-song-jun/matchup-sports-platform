@@ -15,7 +15,7 @@ import type { V1PublicLeagueListItem, V1PublicLeagueListResponse } from '@/types
 
 // 0 = 빌드 타임 프리렌더를 끈다. API에 못 닿는 CI 빌드에서 구운 사이트맵(정적 라우트만
 // 8개)이 배포 직후 서빙되던 사고 재발 방지(메모: isr-serves-build-time-empty-cache).
-// fetchPublicV1 내부 fetch는 `next: { revalidate: 300 }}`를 그대로 쓴다.
+// 일반 sitemap 조회는 fetchPublicV1의 300초 캐시를 쓰고, 공개 여부가 바뀌는 리그 조회는 no-store로 최신 상태를 확인한다.
 export const revalidate = 0;
 
 // 리그(/league-matches)는 대회(/tournaments)와 같은 "대회 유형" 축인데도 sitemap엔
@@ -129,7 +129,7 @@ async function fetchTournamentItems(): Promise<V1TournamentListItem[]> {
   do {
     const query = new URLSearchParams({ limit: '50' });
     if (cursor) query.set('cursor', cursor);
-    const page = await fetchPublicV1<V1TournamentListPage>(`/tournaments?${query.toString()}`);
+    const page = await fetchPublicV1<V1TournamentListPage>(`/tournaments?${query.toString()}`, { cache: 'no-store' });
     if (!page) break;
     items.push(...page.items);
     cursor = page.pageInfo.hasNext ? page.pageInfo.nextCursor : null;
@@ -152,7 +152,7 @@ async function fetchLeagueItems(): Promise<V1PublicLeagueListItem[]> {
   do {
     const query = new URLSearchParams({ limit: '50' });
     if (cursor) query.set('cursor', cursor);
-    const page = await fetchPublicV1<V1PublicLeagueListResponse>(`/league-matches?${query.toString()}`);
+    const page = await fetchPublicV1<V1PublicLeagueListResponse>(`/league-matches?${query.toString()}`, { cache: 'no-store' });
     if (!page) break;
     items.push(...page.items);
     cursor = page.pageInfo.hasNext ? page.pageInfo.nextCursor : null;

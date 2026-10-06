@@ -12,6 +12,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { PrismaService } from '../prisma/prisma.service';
 import { TournamentStaffAccessService } from './staff/tournament-staff-access.service';
 import { TournamentsReadService } from './tournaments-read.service';
+import { PUBLIC_TOURNAMENT_VISIBILITY_WHERE } from './tournament-surface-lookup';
 
 const authUser = {
   id: 'user-1',
@@ -299,6 +300,16 @@ describe('TournamentsReadService', () => {
       entryFee: 60000,
     });
     expect(result.pageInfo).toMatchObject({ hasNext: false, nextCursor: null });
+  });
+
+  it('unified public list excludes hidden regular leagues while retaining tournaments', async () => {
+    prisma.v1Tournament.findMany.mockResolvedValue([]);
+
+    await service.list({ kind: 'all' });
+
+    expect(prisma.v1Tournament.findMany.mock.calls[0][0].where.AND).toEqual(
+      expect.arrayContaining([PUBLIC_TOURNAMENT_VISIBILITY_WHERE]),
+    );
   });
 
   /**

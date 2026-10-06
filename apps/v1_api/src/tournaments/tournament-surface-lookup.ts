@@ -37,6 +37,15 @@ export const ALL_COMPETITION_KINDS = [
   V1CompetitionKind.regular_league,
 ] as const;
 
+/** Kind-safe visibility condition for ordinary public tournament reads. */
+export const PUBLIC_TOURNAMENT_VISIBILITY_WHERE: Prisma.V1TournamentWhereInput = {
+  OR: [
+    { kind: V1CompetitionKind.regular_tournament },
+    { kind: null },
+    { kind: V1CompetitionKind.regular_league, isPublic: true },
+  ],
+};
+
 /**
  * `PrismaService` 와 `$transaction` 콜백이 주는 클라이언트를 **둘 다** 받는다.
  *
@@ -89,6 +98,22 @@ export async function findTournamentOnSurface<Args extends Prisma.V1TournamentFi
   const result = await db.v1Tournament.findFirst({
     ...rest,
     where: { AND: [tournamentKindCondition(allowedKinds), where ?? {}] },
+  });
+  return result as Prisma.V1TournamentGetPayload<Args> | null;
+}
+
+/** Public counterpart. Keep admin and operational reads on findTournamentOnSurface. */
+export async function findPublicTournamentOnSurface<Args extends Prisma.V1TournamentFindFirstArgs>(
+  db: TournamentSurfaceClient,
+  allowedKinds: readonly V1CompetitionKind[],
+  args: Args,
+): Promise<Prisma.V1TournamentGetPayload<Args> | null> {
+  const { where, ...rest } = args;
+  const result = await db.v1Tournament.findFirst({
+    ...rest,
+    where: {
+      AND: [tournamentKindCondition(allowedKinds), PUBLIC_TOURNAMENT_VISIBILITY_WHERE, where ?? {}],
+    },
   });
   return result as Prisma.V1TournamentGetPayload<Args> | null;
 }

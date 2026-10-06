@@ -8,7 +8,8 @@ export type Loaded<T> = { ok: true; data: T | null } | { ok: false };
  */
 export async function loadPublic<T>(path: string): Promise<Loaded<T>> {
   try {
-    return { ok: true, data: await fetchPublicV1<T>(path) };
+    // 공개 여부 변경 직후에도 SSR 상세·JSON-LD·페이지 seed가 공개 데이터를 재사용하지 않게 한다.
+    return { ok: true, data: await fetchPublicV1<T>(path, { cache: 'no-store' }) };
   } catch (error) {
     console.error(`[seo] 리그 화면 서버 조회 실패 — ${path}`, error);
     return { ok: false };

@@ -4661,6 +4661,11 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
   margin-bottom: 12px;
 }
 
+.tm-section-title-compact {
+  margin: 0;
+  padding: 0;
+}
+
 .tm-team-info-row {
   display: grid;
   grid-template-columns: 92px minmax(0, 1fr);

@@ -1197,6 +1197,7 @@ describe('LeagueMatchAdminService.detail — 대진의 gameState', () => {
     jest.spyOn(service as never, 'loadLeague' as never).mockResolvedValue({
       id: 'league-1',
       title: '리그',
+      isPublic: false,
       status: 'in_progress',
       sportId: 'sport-1',
       registrations: [],
@@ -1224,9 +1225,89 @@ describe('LeagueMatchAdminService.detail — 대진의 gameState', () => {
     ]);
   });
 
+  it('관리자 상세는 비공개 리그도 계속 열고 공개 상태를 반환한다', async () => {
+    const result = await detailWith([]);
+
+    expect(result.isPublic).toBe(false);
+  });
+
   it('경기가 아직 없는 대진은 null 이다 — 진행 중으로 지어내지 않는다', async () => {
     const result = await detailWith([fixtureRow('no-game', null)]);
 
     expect(result.fixtures[0].gameState).toBeNull();
+  });
+});
+
+describe('LeagueMatchAdminService.updateVisibility', () => {
+  const leagueId = 'league-visibility-1';
+  const admin = { id: 'admin-row-1', userId: adminUser.id, adminRole: 'ops', status: 'active' };
+
+  function createService(isPublic = true) {
+    const tx = {
+      $queryRaw: jest.fn().mockResolvedValue([{ id: leagueId }]),
+      v1Tournament: {
+        findUniqueOrThrow: jest.fn().mockResolvedValue({ isPublic }),
+        update: jest.fn().mockResolvedValue({}),
+      },
+    };
+    const prisma = { $transaction: jest.fn((run: (client: unknown) => unknown) => run(tx)) };
+    const adminContext = {
+      getActiveAdmin: jest.fn().mockResolvedValue(admin),
+      logAdminAction: jest.fn().mockResolvedValue({ actionLogId: 'audit-1', statusChangeLogId: null }),
+    };
+    const service = new LeagueMatchAdminService(
+      prisma as never,
+      adminContext as never,
+      {} as never,
+      {} as never,
+    );
+    return { service, prisma, tx, adminContext };
+  }
+
+  it('changes only isPublic and audits the before/after transition in the same transaction', async () => {
+    const { service, tx, adminContext } = createService(true);
+
+    await expect(service.updateVisibility(adminUser, leagueId, { isPublic: false })).resolves.toEqual({
+      leagueId,
+      isPublic: false,
+    });
+
+    expect(tx.v1Tournament.update).toHaveBeenCalledWith({
+      where: { id: leagueId },
+      data: { isPublic: false },
+    });
+    expect(adminContext.logAdminAction).toHaveBeenCalledWith(
+      admin,
+      expect.objectContaining({
+        action: 'league_match.visibility',
+        targetType: 'league_match',
+        targetId: leagueId,
+        beforeJson: { isPublic: true },
+        afterJson: { isPublic: false },
+      }),
+      tx,
+    );
+  });
+
+  it('does not create a false transition audit when the value is unchanged', async () => {
+    const { service, tx, adminContext } = createService(false);
+
+    await expect(service.updateVisibility(adminUser, leagueId, { isPublic: false })).resolves.toEqual({
+      leagueId,
+      isPublic: false,
+    });
+
+    expect(tx.v1Tournament.update).not.toHaveBeenCalled();
+    expect(adminContext.logAdminAction).not.toHaveBeenCalled();
+  });
+
+  it('requires an active admin before opening a visibility transaction', async () => {
+    const { service, prisma, adminContext } = createService();
+    adminContext.getActiveAdmin.mockRejectedValue(new Error('admin access required'));
+
+    await expect(service.updateVisibility(adminUser, leagueId, { isPublic: false })).rejects.toThrow(
+      'admin access required',
+    );
+    expect(prisma.$transaction).not.toHaveBeenCalled();
   });
 });

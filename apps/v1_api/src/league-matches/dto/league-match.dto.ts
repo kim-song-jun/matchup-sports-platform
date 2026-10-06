@@ -1,5 +1,10 @@
 import { Type } from 'class-transformer';
-import { ArrayNotEmpty, IsArray, IsDateString, IsIn, IsInt, IsNotEmpty, IsOptional, IsString, IsUUID, Matches, Max, MaxLength, Min, ValidateNested } from 'class-validator';
+import { ArrayNotEmpty, IsArray, IsBoolean, IsDateString, IsIn, IsInt, IsNotEmpty, IsOptional, IsString, IsUUID, Matches, Max, MaxLength, Min, ValidateNested } from 'class-validator';
+
+export class UpdateLeagueVisibilityDto {
+  @IsBoolean()
+  isPublic!: boolean;
+}
 
 export class CreateLeagueMatchDto {
   @IsString()

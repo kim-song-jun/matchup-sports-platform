@@ -13,7 +13,11 @@ import {
 import { TournamentListQueryDto } from './dto/tournament-read.dto';
 import { leagueProgressOf, magicNumberOf } from './league-progress';
 import { COMPETITION_LIST_SURFACE } from './tournament-surface';
-import { findTournamentOnSurface, ALL_COMPETITION_KINDS } from './tournament-surface-lookup';
+import {
+  findPublicTournamentOnSurface,
+  ALL_COMPETITION_KINDS,
+  PUBLIC_TOURNAMENT_VISIBILITY_WHERE,
+} from './tournament-surface-lookup';
 import { hasTournamentFixtureOfficialResult } from './tournament-fixture-official-result';
 import {
   PUBLIC_COMPETITION_STATUS_WHERE,
@@ -138,6 +142,10 @@ export class TournamentsReadService {
       ...(query.genderCategory ? { genderCategory: query.genderCategory } : {}),
     };
 
+    if (query.kind !== undefined && query.kind !== 'tournament') {
+      where.AND = [...(Array.isArray(where.AND) ? where.AND : where.AND ? [where.AND] : []), PUBLIC_TOURNAMENT_VISIBILITY_WHERE];
+    }
+
     // 전체 건수는 페이지 번호를 그릴 때만 센다 — 무한 스크롤은 "다음이 있는지"만 알면
     // 되므로 매 스크롤마다 COUNT 를 한 번 더 때릴 이유가 없다.
     const wantsPageNumbers = query.page !== undefined && query.page > 0;
@@ -186,7 +194,7 @@ export class TournamentsReadService {
     // 대진표 공개 게이트를 리그에서 빼고(③), 화면이 그것을 그리게(④⑤⑥) 만든 뒤에야
     // 열어야 한다. 순서를 뒤집으면 사용자는 404 대신 **빈 껍데기**를 본다 — 사용자가 계속
     // 말하는 "덜 된 것 같다" 가 정확히 그 인상이고, 그러면 우리가 그걸 직접 만드는 것이다.
-    const row = await findTournamentOnSurface(this.prisma, ALL_COMPETITION_KINDS, {
+    const row = await findPublicTournamentOnSurface(this.prisma, ALL_COMPETITION_KINDS, {
       where: {
         // 목록만 막으면 **id 를 아는 사람은 그대로 열 수 있다** — 대회 id 는 대진·순위
         // 응답에 실려 나가므로 상세·순위에도 같은 조건을 건다(종류 조건은 헬퍼가 건다).
@@ -297,7 +305,7 @@ export class TournamentsReadService {
    * - 팀별 잔여 경기 수를 세어 `magicNumberOf`에 넘긴다
    */
   async getOverallStandings(tournamentId: string, user?: V1AuthUser) {
-    const tournament = await findTournamentOnSurface(this.prisma, ALL_COMPETITION_KINDS, {
+    const tournament = await findPublicTournamentOnSurface(this.prisma, ALL_COMPETITION_KINDS, {
       where: {
         // 목록만 막으면 **id 를 아는 사람은 그대로 열 수 있다** — 대회 id 는 대진·순위
         // 응답에 실려 나가므로 상세·순위에도 같은 조건을 건다(종류 조건은 헬퍼가 건다).
@@ -436,7 +444,7 @@ export class TournamentsReadService {
    * 진행률이 영원히 100% 에 못 닿는다. 그 분류는 `bucketLeagueFixtures` 가 한다.
    */
   private async leagueOverallStandings(leagueId: string, hideIdentity: boolean, isCompleted: boolean) {
-    const leagueRow = await findTournamentOnSurface(this.prisma, ['regular_league'], {
+    const leagueRow = await findPublicTournamentOnSurface(this.prisma, ['regular_league'], {
       where: { id: leagueId, deletedAt: null },
       select: {
         id: true,

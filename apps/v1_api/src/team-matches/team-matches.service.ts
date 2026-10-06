@@ -139,6 +139,7 @@ export class TeamMatchesService {
       deletedAt: null,
       OR: [{ tournamentId: null }, { leagueId: { not: null } }],
       AND: [
+        { OR: [{ leagueId: null }, { league: { is: { isPublic: true } } }] },
         ...constraints,
         ...(isDefaultDiscovery
           ? [query.sort === 'recommended'
@@ -480,7 +481,10 @@ export class TeamMatchesService {
     const teamMatches = await this.prisma.v1TeamMatch.findMany({
       where: {
         deletedAt: null,
-        AND: [{ OR: [{ tournamentId: null }, { leagueId: { not: null } }] }],
+        AND: [
+          { OR: [{ tournamentId: null }, { leagueId: { not: null } }] },
+          { OR: [{ leagueId: null }, { league: { is: { isPublic: true } } }] },
+        ],
         // 'expired'는 계산 상태(getApiStatus)라 DB status 로 존재하지 않는다 — list()와
         // 동일하게 startAt 과거 조건으로 매핑한다.
         ...(matchStatusFilter
@@ -1707,6 +1711,8 @@ export class TeamMatchesService {
         deletedAt: null,
         OR: [{ tournamentId: null }, { leagueId: { not: null } }],
         AND: [{
+          OR: [{ leagueId: null }, { league: { is: { isPublic: true } } }],
+        }, {
           OR: [
             { hostTeam: { status: 'active', deletedAt: null } },
             { hostTeamId: null, leagueId: null, tournamentId: null },

@@ -820,6 +820,19 @@ describe('ProfileService tournament appearance aggregation', () => {
       expect(result.activitySummary.monthly.matchCount).toBe(3);
       expect(result.activitySummary.totals.tournamentCount).toBe(1);
       expect(result.activitySummary.monthly.tournamentCount).toBe(1);
+      expect(prisma.v1GameResultParticipant.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            resultRevision: expect.objectContaining({
+              game: expect.objectContaining({
+                teamMatch: {
+                  is: { OR: [{ leagueId: null }, { league: { is: { isPublic: true } } }] },
+                },
+              }),
+            }),
+          }),
+        }),
+      );
       // 반대로 경기별 상세(최근 활동)는 같은 REVOKED 에 막혀야 한다 -- 두 노출 수준이
       // 실제로 분리돼 있음을 여기서 함께 고정한다.
       expect(result.recentActivity).toBeNull();

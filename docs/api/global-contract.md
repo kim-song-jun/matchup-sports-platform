@@ -68,6 +68,12 @@ Review and compensation effects are exact:
 
 ## Runtime And General Conventions
 
+Regular league publication is independent of lifecycle and result visibility.
+`PATCH /admin/league-matches/:leagueId/visibility` accepts `{isPublic:boolean}` under
+existing mutation-admin authorization and the standard validation/envelope/audit
+contract. Public discovery and direct league/game reads cannot bypass a private
+parent league; admin operations retain access. See [league visibility](./domains/league-matches.md#public-visibility).
+
 The section above is the frozen cross-domain contract for the games/tournament-operations command
 surface. What follows applies to every v1 endpoint, not only that surface.
 

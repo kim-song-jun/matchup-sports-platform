@@ -33,7 +33,7 @@ import {
 } from '../tournaments/league-competition-mirror';
 import { LEAGUE_TIE_BREAK_ORDER } from './league-tie-break';
 import type { LeagueState } from './league-state';
-import { findTournamentOnSurface } from '../tournaments/tournament-surface-lookup';
+import { findPublicTournamentOnSurface } from '../tournaments/tournament-surface-lookup';
 import { isLeagueRegistrationOpen } from './league-registration-open';
 
 const PLAYER_RECORDS_LIMIT = 30;
@@ -98,6 +98,7 @@ export class LeagueMatchPublicService {
     const baseWhere: Prisma.V1TournamentWhereInput = {
       kind: 'regular_league',
       deletedAt: null,
+      isPublic: true,
       ...(query.sportId ? { sportId: query.sportId } : {}),
       ...(query.regionId ? { regionId: query.regionId } : {}),
       ...(query.teamId ? { registrations: { some: { teamId: query.teamId, status: 'confirmed' } } } : {}),
@@ -223,6 +224,7 @@ export class LeagueMatchPublicService {
       where: {
         kind: 'regular_league',
         deletedAt: null,
+        isPublic: true,
         // 참가 판정이 **확정 등록** 기준이다 — 리그 축의 `V1LeagueTeam` 은 상태가 없어
         // 전부 참가였고, 백필이 그것을 `confirmed` 로 옮겼다(88개 리그 전부 1:1 실측).
         registrations: { some: { teamId: { in: teamIds }, status: 'confirmed' } },
@@ -476,6 +478,7 @@ export class LeagueMatchPublicService {
             where: {
               kind: 'regular_league',
               deletedAt: null,
+              isPublic: true,
               seriesId: league.seriesId,
               id: { not: league.id },
             },
@@ -754,7 +757,7 @@ export class LeagueMatchPublicService {
   }
 
   private async loadLeague(leagueId: string) {
-    const row = await findTournamentOnSurface(this.prisma, ['regular_league'], {
+    const row = await findPublicTournamentOnSurface(this.prisma, ['regular_league'], {
       where: { id: leagueId, deletedAt: null },
       select: {
         id: true,

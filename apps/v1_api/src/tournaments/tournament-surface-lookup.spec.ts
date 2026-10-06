@@ -3,6 +3,8 @@ import { Prisma, V1CompetitionKind } from '@prisma/client';
 import {
   findTournamentOnSurface,
   findTournamentOnSurfaceOrThrow,
+  findPublicTournamentOnSurface,
+  PUBLIC_TOURNAMENT_VISIBILITY_WHERE,
   LEAGUE_KINDS,
   TOURNAMENT_KINDS,
   tournamentKindCondition,
@@ -124,5 +126,34 @@ describe('findTournamentOnSurfaceOrThrow', () => {
     await expect(
       findTournamentOnSurfaceOrThrow(client, TOURNAMENT_KINDS, { where: { id: 'none' } }),
     ).rejects.toBeInstanceOf(NotFoundException);
+  });
+});
+
+describe('findPublicTournamentOnSurface', () => {
+  it('filters private league parents and leaves ordinary tournament visibility unchanged', async () => {
+    const { client, calls } = captureClient(null);
+
+    await expect(
+      findPublicTournamentOnSurface(client, LEAGUE_KINDS, { where: { id: 'private-league' } }),
+    ).resolves.toBeNull();
+
+    expect(calls[0].where).toEqual({
+      AND: [
+        { OR: [{ kind: V1CompetitionKind.regular_league }] },
+        PUBLIC_TOURNAMENT_VISIBILITY_WHERE,
+        { id: 'private-league' },
+      ],
+    });
+  });
+
+  it('keeps the ordinary admin/operational lookup independent of public visibility', async () => {
+    const { client, calls } = captureClient({ id: 'private-league' });
+
+    await expect(findTournamentOnSurface(client, LEAGUE_KINDS, { where: { id: 'private-league' } }))
+      .resolves.toEqual({ id: 'private-league' });
+
+    expect(calls[0].where).toEqual({
+      AND: [{ OR: [{ kind: V1CompetitionKind.regular_league }] }, { id: 'private-league' }],
+    });
   });
 });

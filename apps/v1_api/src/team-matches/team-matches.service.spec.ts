@@ -2165,6 +2165,25 @@ describe('TeamMatchesService', () => {
     expect(result.hostTeam!.wins).toBe(2);
   });
 
+  it('detail(getPublicTeamMatch): private regular-league parent resolves as the normal 404', async () => {
+    prisma.v1TeamMatch.findFirst.mockResolvedValue(null);
+
+    await expect(service.detail(null, 'tm-private-league')).rejects.toMatchObject({
+      status: 404,
+      response: { code: 'NOT_FOUND_OR_ARCHIVED' },
+    });
+
+    expect(prisma.v1TeamMatch.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          AND: expect.arrayContaining([
+            { OR: [{ leagueId: null }, { league: { is: { isPublic: true } } }] },
+          ]),
+        }),
+      }),
+    );
+  });
+
   it('list: default discovery includes completed team matches from the last seven days', async () => {
     prisma.v1TeamMatch.findMany.mockResolvedValue([]);
 

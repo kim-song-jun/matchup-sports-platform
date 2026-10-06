@@ -2,6 +2,12 @@
 
 ## Read Endpoints
 
+Regular league publication is independently controlled by `V1Tournament.isPublic`.
+Unpublished leagues are excluded from unified public tournament reads, including
+direct detail and overall standings, while admin operations remain available.
+The default is public; this gate does not change lifecycle or bracket publication.
+See [the league visibility contract](./league-matches.md#public-visibility).
+
 | Method | Path | Auth | Request | Response |
 |---|---|---|---|---|
 | `GET` | `/api/v1/tournaments` | optional user | `TournamentListQueryDto` | public tournament list page |

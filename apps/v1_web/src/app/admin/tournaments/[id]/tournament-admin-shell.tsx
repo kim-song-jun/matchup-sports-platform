@@ -26,6 +26,7 @@ import {
   allowedNextStatuses,
   formatDateRange,
 } from './tournament-admin-shared';
+import { useAdminListReturnHref } from '../../use-admin-url-list-query';
 
 /**
  * 대회 상세 섹션 구획.
@@ -149,6 +150,8 @@ export function TournamentAdminShell({ id, children }: { id: string; children: R
   const { toasts, showToast } = useAdminToast();
   const { confirm: confirmStatusChange, ConfirmModal: StatusConfirmModal } = useConfirm();
   const pathname = usePathname();
+  // '대회 목록으로'는 대회 목록을 마지막으로 본 주소(검색·필터·페이지)로 돌아간다(MD-QA #21).
+  const listHref = useAdminListReturnHref('/admin/tournaments');
   const basePath = `/admin/tournaments/${id}`;
 
   // ── Status change ────────────────────────────────────────────────────
@@ -219,7 +222,7 @@ export function TournamentAdminShell({ id, children }: { id: string; children: R
       {/* ── Back link ─────────────────────────────────────────────────── */}
       <div className="mb-4">
         <Link
-          href="/admin/tournaments"
+          href={listHref}
           className="inline-flex items-center gap-1 min-h-[44px] text-[length:var(--font-size-label)] text-[var(--text-muted)] hover:text-[var(--text-muted)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 rounded"
         >
           <ChevronLeft size={14} aria-hidden="true" />

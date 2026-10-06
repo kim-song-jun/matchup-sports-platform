@@ -14,6 +14,7 @@ import {
 import { useV1AdminMatch } from '@/hooks/use-v1-api';
 import { formatAdminDateTime } from '@/lib/date-utils';
 import { extractErrorMessage } from '@/lib/error-message';
+import { useAdminListReturnHref } from '../../use-admin-url-list-query';
 
 /**
  * 매치 상세. 백엔드(`GET /admin/matches/:matchId`)·훅·타입은 이미 있었는데 이 화면이 없어서
@@ -23,10 +24,12 @@ import { extractErrorMessage } from '@/lib/error-message';
  * 두 곳에 두면 M4 에서 정리한 '이중 편집 진입점'을 다시 만드는 셈이다.
  */
 
+// '목록'은 그 목록을 마지막으로 본 주소(검색·필터·페이지)로 돌아간다(MD-QA #21).
 function BackLink() {
+  const href = useAdminListReturnHref('/admin/matches');
   return (
     <Link
-      href="/admin/matches"
+      href={href}
       className="inline-flex h-[44px] items-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--card-surface)] px-4 text-sm font-semibold text-[var(--text-body)] hover:bg-[var(--surface-soft)] focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
     >
       <ArrowLeft size={16} aria-hidden="true" />

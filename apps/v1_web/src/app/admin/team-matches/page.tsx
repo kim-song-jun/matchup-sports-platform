@@ -11,8 +11,7 @@ import type { V1AdminTeamMatchRow } from '@/types/api';
 import { formatAdminDateTimeShort } from '@/lib/date-utils';
 import { extractErrorMessage } from '@/lib/error-message';
 import { useAdminCanWrite } from '@/hooks/use-admin-can-write';
-import { useAdminListQuery } from '@/hooks/use-admin-list-query';
-import { pickAllowedParam } from '../pick-allowed-param';
+import { useAdminUrlListQuery } from '../use-admin-url-list-query';
 import {
   AdminPageHeader,
   AdminFilterBar,
@@ -68,9 +67,6 @@ export default function AdminTeamMatchesPage() {
 function AdminTeamMatchesPageContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
-  // 허용 목록에 없는 값(오타난 북마크·옛 링크)은 조용히 '전체'로 떨어뜨린다 —
-  // 그대로 실으면 서버가 400 을 내고 목록이 통째로 에러 화면이 된다.
-  const initialStatus = pickAllowedParam(searchParams.get('status'), STATUS_OPTIONS);
   // ── Admin capabilities ─────────────────────────────────────────────
   const canWrite = useAdminCanWrite();
   const [activeKind, setActiveKind] = useState<(typeof KIND_OPTIONS)[number]['value']>(
@@ -79,6 +75,7 @@ function AdminTeamMatchesPageContent() {
 
   // ── Filter state — 검색 debounce·상태 필터·page 리셋은 공용 훅이 담당 ─────
   // (백엔드 q 지원이 이번에 추가되어 hideSearch도 함께 해제한다 — 제목·호스트 팀명 검색)
+  // 조건은 URL에 남아 상세에 다녀와도 유지되고, 허용 목록에 없는 ?status= 는 '전체'로 떨어진다.
   const {
     search,
     setSearch,
@@ -87,7 +84,7 @@ function AdminTeamMatchesPageContent() {
     filters,
     resetToFirstPage,
     buildPagination,
-  } = useAdminListQuery({ initialStatus, pageSize: PAGE_SIZE });
+  } = useAdminUrlListQuery(STATUS_OPTIONS, PAGE_SIZE);
 
   const { data, isPending, isFetching, isError, error, refetch } = useV1AdminTeamMatches({ ...filters, ...(activeKind ? { kind: activeKind } : {}) });
   const rows = data?.items ?? [];
@@ -162,6 +159,11 @@ function AdminTeamMatchesPageContent() {
                   const next = KIND_OPTIONS.find((option) => option.value === event.target.value);
                   if (!next) return;
                   setActiveKind(next.value);
+                  // 경기 유형도 URL에 남긴다 — 검색·상태와 함께 상세 왕복 뒤에 복원된다(MD-QA #21).
+                  const url = new URL(window.location.href);
+                  if (next.value) url.searchParams.set('kind', next.value);
+                  else url.searchParams.delete('kind');
+                  window.history.replaceState(null, '', `${url.pathname}${url.search}${url.hash}`);
                   resetToFirstPage();
                 }}
                 className="min-h-[44px] rounded-xl border border-[var(--border)] bg-[var(--card-surface)] px-3 text-[var(--text-strong)] focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"

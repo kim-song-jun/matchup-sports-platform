@@ -2,7 +2,7 @@
 
 import { Suspense, useState } from 'react';
 import Link from 'next/link';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { Eye } from 'lucide-react';
 import {
   useV1AdminUsers,
@@ -12,8 +12,7 @@ import { extractErrorMessage } from '@/lib/error-message';
 import { formatAuthProviders, formatGender, formatUserTitle } from '@/lib/format-user';
 import { formatAdminDate } from '@/lib/date-utils';
 import { useAdminCanWrite } from '@/hooks/use-admin-can-write';
-import { useAdminListQuery } from '@/hooks/use-admin-list-query';
-import { pickAllowedParam } from '../pick-allowed-param';
+import { useAdminUrlListQuery } from '../use-admin-url-list-query';
 import {
   AdminPageHeader,
   AdminFilterBar,
@@ -70,12 +69,9 @@ export default function AdminUsersPage() {
 
 function AdminUsersPageContent() {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  // 허용 목록에 없는 값(오타난 북마크·옛 링크)은 조용히 '전체'로 떨어뜨린다 —
-  // 그대로 실으면 서버가 400 을 내고 목록이 통째로 에러 화면이 된다.
-  const initialStatus = pickAllowedParam(searchParams.get('status'), USER_STATUS_FILTER_OPTIONS);
 
-  // 검색 debounce·상태 필터·page=1 리셋·페이지네이션 조립은 공용 훅이 담당한다.
+  // 검색 debounce·상태 필터·page=1 리셋·페이지네이션 조립은 공용 훅이 담당한다. 조건은 URL에 남아
+  // 상세에 다녀와도 유지되고, 허용 목록에 없는 ?status= 는 조용히 '전체'로 떨어진다(서버 400 방지).
   // (커서 누적 대신 페이지 단위 교체 — 회원 목록은 "몇 명 중 어디쯤"이 보여야 한다.)
   const {
     search,
@@ -85,7 +81,7 @@ function AdminUsersPageContent() {
     filters,
     resetToFirstPage,
     buildPagination,
-  } = useAdminListQuery({ initialStatus, pageSize: PAGE_SIZE });
+  } = useAdminUrlListQuery(USER_STATUS_FILTER_OPTIONS, PAGE_SIZE);
 
   // Modal state
   const [modalOpen, setModalOpen] = useState(false);

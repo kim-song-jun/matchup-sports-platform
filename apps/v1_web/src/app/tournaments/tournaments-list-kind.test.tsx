@@ -73,8 +73,15 @@ describe('#1543 대회 목록 — 상태와 모순되지 않는 영역 이름', 
         .toHaveAttribute('href', `/tournaments?${new URLSearchParams({ ...Object.fromEntries(params), filter: '1' })}`);
       if (hasItems) {
         const list = within(region).getByRole('list', { name: '대회 목록' });
-        expect(within(list).getByRole('link', { name: /수영 대조 대회/ }))
-          .toHaveAttribute('href', '/tournaments/swimming-control');
+        const detailHref = within(list).getByRole('link', { name: /수영 대조 대회/ }).getAttribute('href');
+        expect(detailHref).toBeTruthy();
+        const detailUrl = new URL(detailHref!, 'https://teameet.test');
+        expect(detailUrl.origin).toBe('https://teameet.test');
+        expect(detailUrl.pathname).toBe('/tournaments/swimming-control');
+        expect(detailUrl.hash).toBe('');
+        expect([...detailUrl.searchParams.entries()]).toEqual([
+          ['from', `/tournaments?${params.toString()}`],
+        ]);
         expect(within(region).queryByText('조건에 맞는 대회가 없어요')).not.toBeInTheDocument();
       } else {
         expect(within(region).getByText('조건에 맞는 대회가 없어요')).toBeInTheDocument();

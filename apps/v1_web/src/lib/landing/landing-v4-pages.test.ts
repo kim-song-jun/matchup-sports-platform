@@ -20,6 +20,14 @@ describe('fetchAllPages', () => {
     expect(fetchSeoSeed.mock.calls[1][0]).toBe('/teams?limit=50&cursor=c1');
   });
 
+  it('publication-sensitive landing lists pass no-store through to their API reads', async () => {
+    fetchSeoSeed.mockResolvedValue(page([], null));
+
+    await fetchAllPages('/team-matches', 'landing-v4 team-matches', { cache: 'no-store' });
+
+    expect(fetchSeoSeed).toHaveBeenCalledWith('/team-matches?limit=50', 'landing-v4 team-matches', { cache: 'no-store' });
+  });
+
   it('4페이지에서 멈추고 "더 있음"을 남긴다', async () => {
     fetchSeoSeed.mockImplementation(async () => page(['x'], 'next'));
     const merged = await fetchAllPages<{ id: string }>('/teams', 'teams');

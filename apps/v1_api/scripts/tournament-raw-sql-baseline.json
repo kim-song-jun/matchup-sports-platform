@@ -21,8 +21,8 @@
     "why": "The cleanup script uses three CTE/delete references to collect and remove explicitly demo-owned tournament IDs; execution requires both --execute and --confirm=delete-v1-demo-data, and protected official/audit-linked rows are excluded before deletion."
   },
   "src/league-matches/league-match-admin.service.ts": {
-    "allowed": 4,
-    "why": "BE-5 drop: 리그 정본 행에 거는 `SELECT id FROM \"v1_tournaments\" ... FOR UPDATE` 4곳(대진 생성·재생성·팀 추가·팀 제거). Prisma 로는 행 잠금을 걸 수 없어 raw SQL 이어야 하고, 이 자리는 잠금 대상 **한 행**을 id 로 특정하므로 종류 조건이 없어도 다른 대회를 건드리지 않는다(그 id 로 진행하는 리그 트랜잭션이 이미 kind 를 확인한 뒤다). 문자열 안의 테이블명은 타입 시스템이 못 보므로 저장 축을 옮길 때 함께 옮겨야 한다 — BE-5 drop 이 그 사고를 실제로 냈고(v1_leagues 를 겨냥한 채 남아 relation does not exist), 통합 스펙이 500 으로 잡았다."
+    "allowed": 5,
+    "why": "BE-5 drop: 기존 네 곳은 리그 정본 행을 id 로 특정해 대진 생성·재생성·팀 추가·팀 제거를 직렬화하는 FOR UPDATE 잠금이다. 다섯 번째 visibility 변경도 같은 잠금이 필요하며, 이 쿼리에서 kind='regular_league'·deleted_at IS NULL 을 확인하고 is_public을 함께 읽어 잠금 대상과 갱신 전 상태가 같은 행임을 보장한다. 반환되는 id/is_public만으로는 대회 사용자 표면이 노출되지 않는다. Prisma 로 행 잠금을 걸 수 없어 raw SQL 이어야 하고, 문자열 안의 테이블명은 타입 시스템이 못 보므로 저장 축을 옮길 때 함께 옮겨야 한다 — BE-5 drop 이 그 사고를 실제로 냈고(v1_leagues 를 겨냥한 채 남아 relation does not exist), 통합 스펙이 500 으로 잡았다."
   },
   "src/game-operations/result-escalation-access.service.ts": {
     "allowed": 1,
@@ -47,5 +47,9 @@
   "src/tournaments/tournament-bracket.service.ts": {
     "allowed": 1,
     "why": "FOR UPDATE locks only the tournament id while deleting an unstarted fixture. Immediately after this lock findTournamentOnSurface(tx, TOURNAMENT_KINDS) revalidates tournament kind and deletedAt before any mutation; league rows are rejected."
+  },
+  "src/games/public-records/public-team-records.service.ts": {
+    "allowed": 3,
+    "why": "Public team-record page, summary, and available-season queries join the regular-league parent to filter is_public in SQL before pagination or aggregation. This prevents hidden league fixtures from leaking titles/results or revealing their existence through totals and season options; each query is a read-only public parent filter."
   }
 }

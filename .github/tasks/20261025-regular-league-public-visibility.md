@@ -12,7 +12,7 @@ Status: In Progress
 
 ## Original Conditions
 - [x] 사용자 A안 선택: 메인·목록·상세까지 비공개 기능 추가.
-- [ ] 삭제·취소·진행 상태 변경 없이 공개 여부만 변경.
+- [x] 삭제·취소·진행 상태 변경 없이 공개 여부만 변경(API 변경 키·unit 검증).
 - [ ] 기존 대회/리그는 migration 후 공개 상태 유지.
 - [ ] 운영 서비스 대상은 id 22cad756-211f-4438-9066-208efabd3a2e.
 - [ ] 운영 반영은 사용자 main 승격 뒤 진행. 에이전트의 main 승격 금지.
@@ -24,8 +24,8 @@ Status: In Progress
 - [ ] 비공개 리그의 공개 목록·상세·파생 공개 경기 차단; 공개 리그 유지.
 - [ ] 일반 계정의 공개 설정 변경 거부; 관리자 저장 및 감사 기록.
 - [ ] 공개/비공개 전환 시 기존 진행 상태·참가팀·대진 보존.
-- [ ] 프론트 실제 payload/오류 처리와 mock 계약 일치.
-- [ ] 변경 범위의 좁은 테스트·typecheck, 독립 리뷰.
+- [x] 프론트 payload/오류 처리와 mock 계약 일치(unit 검증; 실제 웹 저장은 별도).
+- [x] 변경 범위의 좁은 테스트·typecheck, 독립 리뷰.
 - [ ] alpha 실제 화면 및 사용자 동선 검증. 배포 접근 제한 시 정확한 미검증 범위 기록.
 
 ## Parallel Work Breakdown
@@ -35,9 +35,9 @@ Status: In Progress
 - Forbidden: .env 조회, main 승격, 운영 schema/데이터를 배포 전 임의 변경, 취소/삭제/rollback, 다른 세션 WIP, self-commit.
 
 ## Acceptance Criteria
-- [ ] public filtering을 클라이언트에만 의존하지 않음.
+- [x] public filtering을 클라이언트에만 의존하지 않음.
 - [ ] 비공개 리그의 관리자 운영·데이터 보존.
-- [ ] DB migration·API docs·frontend 계약·fixtures sync.
+- [x] DB migration·API docs·frontend 계약·fixtures sync.
 - [ ] 실제 검증 결과와 미검증/운영 반영 상태를 구분해서 보고.
 
 ## Tech Debt Resolved
@@ -56,7 +56,17 @@ Status: In Progress
 ## Progress Snapshot
 - 조사 완료: 운영 스키마에도 별도 비공개 필드 없음. 운영 쓰기 0건.
 - Wave 0 completed: isPublic schema와 additive migration 추가, Prisma Client generate 성공(DB 쓰기 없음).
-- Wave 1 in_progress: backend/frontend GPT-6-luna 구현; 공개 경계 GPT-6-sol 읽기 전용 점검 병렬.
-- Wave 2 pending. 공유 작업트리 dev, 착수 시 clean. fetch 결과 origin/dev보다 66 commit 뒤: 구현 경로만 먼저 로컬 커밋으로 고정한 뒤 upstream을 통합하고 통합본을 검증한다.
-- 로컬 Docker daemon은 꺼져 있음(기존 상태): DB integration을 시작하지 않았고 좁은 unit/typecheck와 배포 후 alpha 경로를 우선한다. load/swap은 기록 후 사용자 진행 지침에 따라 계속 작업한다.
+- Wave 1 implemented: backend/frontend GPT-6-luna 구현; feature 52개 경로만 pathspec commit 33c5ddafd으로 고정했다.
+- Wave 2 in_progress. upstream 66 commits를 merge a6b5748c7으로 통합했다. global-contract 문서 충돌은 두 계약 모두 보존해 해결했고 feature diff는 origin/dev 기준 52개 경로다.
+- 최초 backend 검증: 9 suites, 266 passed/5 failed. 새 공개 조건으로 바뀐 조회 모양에 대한 기존 날짜/친선경기 테스트 기대값 5개를 보완 중이다. Frontend 7 files/145 tests passed; 기존 fixture provider act 경고의 원인을 별도 확인 중이다.
+- backend tsc 통과; surface gate는 새 row-lock/조회 및 공개 집계 SQL의 등록되지 않은 참조 3건을 검출했다. 회피하지 않고 불필요한 조회 제거와 필수 SQL의 근거 등록으로 수정 중이다.
+- GPT-6-sol 독립 리뷰에서 support 관리자 mutation 허용과 일부 공개 SSR/LLM/landing/sitemap의 300초 캐시 잔존을 확인했다. 실제 write gate와 no-store 경계를 보완한다.
+- 착수 시 Docker daemon은 꺼져 있었으나 검증 시 다른 프로젝트 컨테이너가 실행 중인 것으로 관찰됐다. 다른 프로젝트 DB/프로세스는 사용하거나 종료하지 않는다. DB integration은 아직 미실행이다.
+- ego-browser task space 814는 카카오 로그인 단계에서 사용자에게 제어를 넘겼다. 실제 alpha 관리자 QA는 웹 로그인과 코드 배포가 필요하며, 현재 AWS 인증만 완료됐다. 운영 쓰기 0건.
+- load/swap은 기록 후 사용자 진행 지침에 따라 직렬 최소 worker로 작업한다. 테스트 launcher PID 96268/97576, lint PID 98711은 실행 종료를 확인했다.
 - 문서 patch의 오래된 앵커가 일치하지 않아 최초 적용이 실패했으며, 정본 앵커로 다시 적용해 복구했다. 실패를 성공으로 보고하지 않는다.
+- Wave 2 code review PASS: support는 실제 getMutationAdmin에서 transaction 전에 403; lock query에서 현재 공개 상태를 읽어 불필요한 조회 제거. audit/no-op·공개 조회/SQL·캐시 경계는 GPT-6-sol이 독립 확인했다.
+- backend 9개 unit suite를 실행했고 실패한 3개 suite만 수정 뒤 재검증(152 tests passed)했다. backend tsc/surface gate 통과. SQL baseline에는 필수 regular_league row lock과 공개 전적 페이지/집계/시즌 필터의 정확한 근거를 등록했다.
+- frontend 11개 test file(169개 고유 tests) 통과. 추가 캐시 테스트의 wrapper 인자 전달을 실제 호출과 일치시켜 실패 2건을 해결했다. MSW boolean literal 추론 오류는 fixture 계약 타입으로 수정했고 tsc 통과. 새 UI는 기존 타이포그래피 토큰을 사용한다.
+- Jest config module-loader 경고와 기존 PersistQueryClientProvider act 경고는 기존 설정/provider에 기인한 baseline으로 분리했다. 새로운 공개 설정 테스트는 해당 provider를 쓰지 않고 fixture suite는 새 mutation을 inert mock한다. 이 작업에서 경고를 숨기지 않았다.
+- 아직 DB integration·실제 alpha UI·운영 비공개 전환은 미실행이다. 이 상태를 전체 완료로 보고하지 않는다.

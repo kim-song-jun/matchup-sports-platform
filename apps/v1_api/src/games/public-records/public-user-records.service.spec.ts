@@ -616,7 +616,14 @@ describe('PublicUserRecordsService', () => {
     expect(prisma.v1GameResultParticipant.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({
-          resultRevision: expect.objectContaining({ game: { sourceType: 'TEAM_MATCH' } }),
+          resultRevision: expect.objectContaining({
+            game: {
+              sourceType: 'TEAM_MATCH',
+              teamMatch: {
+                is: { OR: [{ leagueId: null }, { league: { is: { isPublic: true } } }] },
+              },
+            },
+          }),
         }),
       }),
     );

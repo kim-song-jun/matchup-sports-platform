@@ -53,7 +53,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const results = await Promise.allSettled([
     fetchCursorItems<V1Match>('/matches'),
     fetchCursorItems<V1Team>('/teams'),
-    fetchCursorItems<V1TeamMatch>('/team-matches'),
+    fetchCursorItems<V1TeamMatch>('/team-matches', { cache: 'no-store' }),
     fetchTournamentItems(),
     fetchNoticeItems(),
     fetchLeagueItems(),
@@ -104,14 +104,14 @@ function settledItems<T>(result: PromiseSettledResult<T[]>): T[] {
   return result.status === 'fulfilled' ? result.value : [];
 }
 
-async function fetchCursorItems<T>(path: string): Promise<T[]> {
+async function fetchCursorItems<T>(path: string, options: { cache?: 'no-store' } = {}): Promise<T[]> {
   const items: T[] = [];
   let cursor: string | null = null;
 
   do {
     const query = new URLSearchParams({ limit: '50' });
     if (cursor) query.set('cursor', cursor);
-    const page = await fetchPublicV1<CursorPage<T>>(`${path}?${query.toString()}`);
+    const page = await fetchPublicV1<CursorPage<T>>(`${path}?${query.toString()}`, options);
     if (!page) break;
     items.push(...page.items);
     cursor = page.pageInfo

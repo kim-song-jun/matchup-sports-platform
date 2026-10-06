@@ -1244,15 +1244,15 @@ describe('LeagueMatchAdminService.updateVisibility', () => {
 
   function createService(isPublic = true) {
     const tx = {
-      $queryRaw: jest.fn().mockResolvedValue([{ id: leagueId }]),
+      $queryRaw: jest.fn().mockResolvedValue([{ id: leagueId, isPublic }]),
       v1Tournament: {
-        findUniqueOrThrow: jest.fn().mockResolvedValue({ isPublic }),
         update: jest.fn().mockResolvedValue({}),
       },
     };
     const prisma = { $transaction: jest.fn((run: (client: unknown) => unknown) => run(tx)) };
     const adminContext = {
       getActiveAdmin: jest.fn().mockResolvedValue(admin),
+      getMutationAdmin: jest.fn().mockResolvedValue(admin),
       logAdminAction: jest.fn().mockResolvedValue({ actionLogId: 'audit-1', statusChangeLogId: null }),
     };
     const service = new LeagueMatchAdminService(
@@ -1276,6 +1276,10 @@ describe('LeagueMatchAdminService.updateVisibility', () => {
       where: { id: leagueId },
       data: { isPublic: false },
     });
+    const lockSql = tx.$queryRaw.mock.calls[0]?.[0] as TemplateStringsArray;
+    expect(lockSql.join(' ')).toContain('SELECT "id", "is_public" AS "isPublic"');
+    expect(lockSql.join(' ')).toContain('AND "kind" = \'regular_league\'');
+    expect(lockSql.join(' ')).toContain('FOR UPDATE');
     expect(adminContext.logAdminAction).toHaveBeenCalledWith(
       admin,
       expect.objectContaining({
@@ -1303,10 +1307,40 @@ describe('LeagueMatchAdminService.updateVisibility', () => {
 
   it('requires an active admin before opening a visibility transaction', async () => {
     const { service, prisma, adminContext } = createService();
-    adminContext.getActiveAdmin.mockRejectedValue(new Error('admin access required'));
+    adminContext.getMutationAdmin.mockRejectedValue(new Error('admin access required'));
 
     await expect(service.updateVisibility(adminUser, leagueId, { isPublic: false })).rejects.toThrow(
       'admin access required',
+    );
+    expect(adminContext.getMutationAdmin).toHaveBeenCalledWith(adminUser.id);
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it('forbids support admins from changing visibility before opening a transaction', async () => {
+    const v1AdminUserFindUnique = jest.fn().mockResolvedValue({
+      id: 'support-admin-row',
+      userId: adminUser.id,
+      adminRole: 'support',
+      status: 'active',
+      user: { accountStatus: 'active' },
+    });
+    const adminContext = new AdminContextService({
+      v1AdminUser: { findUnique: v1AdminUserFindUnique },
+    } as never);
+    const prisma = { $transaction: jest.fn() };
+    const service = new LeagueMatchAdminService(
+      prisma as never,
+      adminContext,
+      {} as never,
+      {} as never,
+    );
+
+    await expect(service.updateVisibility(adminUser, leagueId, { isPublic: false })).rejects.toMatchObject({
+      status: 403,
+      response: expect.objectContaining({ code: 'PERMISSION_DENIED' }),
+    });
+    expect(v1AdminUserFindUnique).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { userId: adminUser.id } }),
     );
     expect(prisma.$transaction).not.toHaveBeenCalled();
   });

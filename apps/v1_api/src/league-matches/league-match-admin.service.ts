@@ -430,24 +430,21 @@ export class LeagueMatchAdminService {
   }
 
   async updateVisibility(user: V1AuthUser, leagueId: string, dto: UpdateLeagueVisibilityDto) {
-    const admin = await this.adminContext.getActiveAdmin(user.id);
+    const admin = await this.adminContext.getMutationAdmin(user.id);
     return this.prisma.$transaction(async (tx) => {
-      const locked = await tx.$queryRaw<Array<{ id: string }>>`
-        SELECT "id"
+      const locked = await tx.$queryRaw<Array<{ id: string; isPublic: boolean }>>`
+        SELECT "id", "is_public" AS "isPublic"
         FROM "v1_tournaments"
         WHERE "id" = ${leagueId}
           AND "kind" = 'regular_league'
           AND "deleted_at" IS NULL
         FOR UPDATE
       `;
-      if (locked.length === 0) {
+      const current = locked[0];
+      if (current === undefined) {
         throw new NotFoundException({ code: 'LEAGUE_NOT_FOUND', message: '리그를 찾을 수 없어요.' });
       }
 
-      const current = await tx.v1Tournament.findUniqueOrThrow({
-        where: { id: leagueId },
-        select: { isPublic: true },
-      });
       if (current.isPublic === dto.isPublic) return { leagueId, isPublic: current.isPublic };
 
       await tx.v1Tournament.update({ where: { id: leagueId }, data: { isPublic: dto.isPublic } });

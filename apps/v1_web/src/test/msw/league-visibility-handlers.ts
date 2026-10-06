@@ -4,7 +4,13 @@ import type { V1AdminLeagueDetail, V1AdminLeagueListItem, V1PublicLeagueDetail, 
 const api = '*/api/v1';
 const leagueId = 'league-visibility-fixture';
 
-export const v1LeagueVisibilityFixture = {
+export const v1LeagueVisibilityFixture: {
+  isPublic: boolean;
+  adminDetail: V1AdminLeagueDetail;
+  adminListItem: V1AdminLeagueListItem;
+  publicDetail: V1PublicLeagueDetail;
+  publicListItem: V1PublicLeagueListItem;
+} = {
   isPublic: true,
   adminDetail: {
     leagueId,
@@ -16,7 +22,7 @@ export const v1LeagueVisibilityFixture = {
     registrationDeadlineAt: null,
     registrationOpen: false,
     fixtures: [],
-  } satisfies V1AdminLeagueDetail,
+  },
   adminListItem: {
     leagueId,
     title: '공개 설정 검증 리그',
@@ -29,7 +35,7 @@ export const v1LeagueVisibilityFixture = {
     seriesTitle: null,
     tierLabel: null,
     seasonNo: null,
-  } satisfies V1AdminLeagueListItem,
+  },
   publicDetail: {
     leagueId,
     title: '공개 설정 검증 리그',
@@ -41,7 +47,7 @@ export const v1LeagueVisibilityFixture = {
     registrationOpen: false,
     fixtures: [],
     seriesSiblings: [],
-  } satisfies V1PublicLeagueDetail,
+  },
   publicListItem: {
     leagueId,
     title: '공개 설정 검증 리그',
@@ -56,7 +62,7 @@ export const v1LeagueVisibilityFixture = {
     seasonNo: null,
     seriesTitle: null,
     teamCount: 2,
-  } satisfies V1PublicLeagueListItem,
+  },
 };
 
 function envelope<T>(data: T) {

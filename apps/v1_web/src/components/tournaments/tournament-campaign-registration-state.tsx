@@ -2,6 +2,8 @@
 
 import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
+import { getTournamentStatusConfig } from '@/lib/v1-tournament-status';
+import type { V1PublicTournamentStatus } from '@/types/api';
 import type { V1TournamentRegistrationAvailability } from '@/types/tournament-campaign';
 
 type CampaignRegistrationState = {
@@ -55,6 +57,17 @@ export function useTournamentCampaignRegistration(): CampaignRegistrationState {
   const state = useContext(CampaignRegistrationContext);
   if (state === null) throw new MissingCampaignRegistrationProviderError();
   return state;
+}
+
+export function TournamentCampaignStatusBadge({
+  status,
+}: {
+  readonly status: V1PublicTournamentStatus;
+}) {
+  // hero도 신청 버튼과 같은 시계를 구독해야 페이지를 열어 둔 뒤 마감돼도 모순이 없다.
+  const { registrationOpen } = useTournamentCampaignRegistration();
+  const config = getTournamentStatusConfig(status, !registrationOpen);
+  return <span className={`tm-badge ${config.badgeClass}`}>{config.label}</span>;
 }
 
 class MissingCampaignRegistrationProviderError extends Error {

@@ -21,11 +21,14 @@ import { formatAdminDateTime } from '@/lib/date-utils';
 import { extractErrorMessage } from '@/lib/error-message';
 import { teamRoleLabel } from '@/lib/v1-status-labels';
 import type { V1AdminTeamDetail } from '@/types/api';
+import { useAdminListReturnHref } from '../../use-admin-url-list-query';
 
+// '목록'은 그 목록을 마지막으로 본 주소(검색·필터·페이지)로 돌아간다(MD-QA #21).
 function BackLink() {
+  const href = useAdminListReturnHref('/admin/teams');
   return (
     <Link
-      href="/admin/teams"
+      href={href}
       className="inline-flex h-[44px] items-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--card-surface)] px-4 text-sm font-semibold text-[var(--text-body)] hover:bg-[var(--surface-soft)] focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
     >
       <ArrowLeft size={16} aria-hidden="true" />

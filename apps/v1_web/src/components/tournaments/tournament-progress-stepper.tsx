@@ -102,6 +102,7 @@ function StageWithConnector({
 
 import type { V1TournamentDetail, V1TournamentFixture } from '@/types/api';
 import { isLeagueCompetition } from '@/lib/competition-kind';
+import { compareTournamentRounds } from '@/lib/tournament-display-order';
 
 /**
  * 라운드 이름 한 개를 단계 분류로 접는다.
@@ -209,7 +210,8 @@ function isFinalRound(round: string): boolean {
  * `tournament.fixtures` 는 `round asc` 로 오는 조회라 문자열 알파벳 순('final' <
  * 'group' < 'semi')을 타 **결승이 4강보다 먼저 오는 배열**을 그대로 물려받았다
  * (alpha #ab100000... 실측). 결승은 항상 결선의 마지막이라는 사실(`isFinalRound`)을
- * 1차 기준으로 쓰고, fixtureNumber 는 결승이 아닌 라운드가 여럿일 때의 2차 기준으로만 쓴다.
+ * 1차 기준으로 쓰고, 나머지는 참가 팀 수가 큰 라운드부터 세운다(12강 → 8강 → 4강).
+ * fixtureNumber 는 알 수 없는 운영자 입력 라운드 또는 같은 규모의 라운드에만 쓴다.
  */
 function knockoutStageDrafts(fixtures: V1TournamentFixture[]): StageDraft[] {
   const byRound = new Map<string, V1TournamentFixture[]>();
@@ -225,6 +227,8 @@ function knockoutStageDrafts(fixtures: V1TournamentFixture[]): StageDraft[] {
     .sort((a, b) => {
       const finalRank = Number(isFinalRound(a.key)) - Number(isFinalRound(b.key));
       if (finalRank !== 0) return finalRank;
+      const sizeRank = compareTournamentRounds(a.key, b.key);
+      if (sizeRank !== 0) return sizeRank;
       return (
         Math.min(...a.fixtures.map((f) => f.fixtureNumber)) -
         Math.min(...b.fixtures.map((f) => f.fixtureNumber))

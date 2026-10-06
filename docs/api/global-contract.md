@@ -74,6 +74,8 @@ existing mutation-admin authorization and the standard validation/envelope/audit
 contract. Public discovery and direct league/game reads cannot bypass a private
 parent league; admin operations retain access. See [league visibility](./domains/league-matches.md#public-visibility).
 
+대진 번호 수정은 기존 관리자 fixture metadata PATCH를 사용한다. `fixtureNumber`의 범위·생략·중복 오류와 생성 키 세대 계약은 [Tournaments](./domains/tournaments.md#대진-번호-수정-2026-10-05)에 정의하며 Game 결과 명령/리비전 계약을 변경하지 않는다.
+
 The section above is the frozen cross-domain contract for the games/tournament-operations command
 surface. What follows applies to every v1 endpoint, not only that surface.
 

@@ -78,6 +78,56 @@ let bracketGroups = bracket.groups;
 /** `updateFixture.mutate(body, { onSuccess, onError })` — 실제로 보낸 payload를 검증하는 데 쓴다. */
 const updateFixtureMutate = vi.fn();
 
+describe('BracketTab — 대진 번호 수정', () => {
+  beforeEach(() => {
+    bracketFixtures = [fixtureRow({ fixtureNumber: 1 })];
+    bracketGroups = bracket.groups;
+    updateFixtureMutate.mockReset();
+  });
+  async function openNumberEdit() {
+    fireEvent.click(screen.getAllByRole('button', { name: 'A조 · 조별리그 1라운드 1번 경기 수정' })[0]);
+    return screen.findByRole('dialog', { name: '경기 수정' });
+  }
+  it('현재 번호를 채우고 새 번호를 실제 수정 payload로 보내며 성공 후 목록을 갱신한다', async () => {
+    const toast = renderTab();
+    const dialog = await openNumberEdit();
+    const input = within(dialog).getByLabelText('대진 번호');
+    expect(input).toHaveValue(1);
+    fireEvent.change(input, { target: { value: '7' } });
+    updateFixtureMutate.mockImplementation((payload, options) => {
+      bracketFixtures = bracketFixtures.map((fixture) => fixture.id === payload.fixtureId ? { ...fixture, fixtureNumber: payload.fixtureNumber } : fixture);
+      options.onSuccess();
+    });
+    fireEvent.click(within(dialog).getByRole('button', { name: '저장' }));
+    expect(updateFixtureMutate.mock.calls[0][0]).toMatchObject({ fixtureId: 'fx-1', fixtureNumber: 7 });
+    expect(updateFixtureMutate.mock.calls[0][0]).not.toHaveProperty('homeRegistrationId');
+    expect(updateFixtureMutate.mock.calls[0][0]).not.toHaveProperty('awayRegistrationId');
+    expect(screen.queryByRole('dialog', { name: '경기 수정' })).not.toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: 'A조 · 조별리그 1라운드 7번 경기 수정' }).length).toBeGreaterThan(0);
+    expect(toast).toHaveBeenCalledWith('경기 정보를 수정했어요.', 'success');
+  });
+  it.each(['', '0', '1.5', '2147483648'])('잘못된 입력 %s는 요청 없이 수정 창을 유지한다', async (value) => {
+    const toast = renderTab();
+    const dialog = await openNumberEdit();
+    fireEvent.change(within(dialog).getByLabelText('대진 번호'), { target: { value } });
+    fireEvent.click(within(dialog).getByRole('button', { name: '저장' }));
+    expect(updateFixtureMutate).not.toHaveBeenCalled();
+    expect(toast).toHaveBeenCalledWith(expect.stringContaining('정수'), 'error');
+    expect(dialog).toBeInTheDocument();
+  });
+  it('서버의 중복 번호 오류와 입력을 유지하고 성공으로 표시하지 않는다', async () => {
+    const message = '같은 라운드·차수에서 이미 사용 중인 대진 번호예요.';
+    updateFixtureMutate.mockImplementation((_payload, options) => options.onError(new Error(message)));
+    const toast = renderTab();
+    const dialog = await openNumberEdit();
+    fireEvent.change(within(dialog).getByLabelText('대진 번호'), { target: { value: '2' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: '저장' }));
+    expect(toast).toHaveBeenCalledWith(message, 'error');
+    expect(within(dialog).getByLabelText('대진 번호')).toHaveValue(2);
+    expect(dialog).toBeInTheDocument();
+  });
+});
+
 function noopMutation() {
   return { mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false };
 }

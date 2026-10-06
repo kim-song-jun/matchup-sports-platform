@@ -1,29 +1,46 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useV1Notice, useV1Notices } from '@/hooks/use-v1-api';
 import type { V1Notice, V1NoticeResponse, V1NoticesResponse } from '@/types/api';
 import { toNotice } from './notices.format';
 import { NoticeDetailPageView, NoticeListPageView } from './notices-page';
-import type { NoticeDetailViewModel, NoticeListViewModel, NoticeModel } from './notices.types';
+import type { NoticeDetailViewModel, NoticeListViewModel } from './notices.types';
 import { getNoticeDetailViewModel, getNoticeListViewModel } from './notices.view-model';
+
+const NOTICE_CATEGORIES = ['전체', '업데이트', '안내'] as const;
 
 /** `seed` 는 서버가 받은 전체(무필터) 목록이다 — 분류를 고르면 쓰지 않는다. */
 export function NoticeListPageClient({ seed }: { readonly seed?: V1NoticesResponse } = {}) {
-  const [selectedCategory, setSelectedCategory] = useState('전체');
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const urlCategory = NOTICE_CATEGORIES.find((category) => category === searchParams.get('category')) ?? '전체';
+  const [selectedCategory, setSelectedCategory] = useState(urlCategory);
+  useEffect(() => setSelectedCategory(urlCategory), [urlCategory]);
+  // 상세를 즉시 열어도 router.replace 반영 전의 쿼리로 복귀하지 않도록 로컬 선택값을 쓴다.
+  const listParams = new URLSearchParams(searchParams.toString());
+  if (selectedCategory === '전체') listParams.delete('category');
+  else listParams.set('category', selectedCategory);
+  const listQuery = listParams.toString();
+
   const query = useV1Notices(
     selectedCategory === '전체' ? undefined : { category: selectedCategory },
     { seed: selectedCategory === '전체' ? seed : undefined },
   );
   const fallback = getNoticeListViewModel();
-  const categories = useMemo(() => {
-    const labels = ['전체', '업데이트', '안내'];
-    return labels.map((label) => ({
-      label,
-      active: selectedCategory === label,
-      onSelect: () => setSelectedCategory(label),
-    }));
-  }, [selectedCategory]);
+  const categories = NOTICE_CATEGORIES.map((label) => ({
+    label,
+    active: selectedCategory === label,
+    onSelect: () => {
+      setSelectedCategory(label);
+      const nextParams = new URLSearchParams(listParams);
+      if (label === '전체') nextParams.delete('category');
+      else nextParams.set('category', label);
+      const nextQuery = nextParams.toString();
+      router.replace(`/notices${nextQuery ? `?${nextQuery}` : ''}`, { scroll: false });
+    },
+  }));
 
   const status: NoticeListViewModel['status'] = query.isPending
     ? 'loading'
@@ -46,6 +63,7 @@ export function NoticeListPageClient({ seed }: { readonly seed?: V1NoticesRespon
   const model: NoticeListViewModel = {
     ...fallback,
     filters: categories,
+    selfHref: listQuery ? `/notices?${listQuery}` : undefined,
     notices: visibleNotices,
     status,
     onRetry: query.isError ? () => query.refetch() : undefined,

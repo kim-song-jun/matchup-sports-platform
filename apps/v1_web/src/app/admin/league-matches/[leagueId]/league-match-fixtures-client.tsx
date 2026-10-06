@@ -81,7 +81,7 @@ const WEEKDAY_OPTIONS = [
   { value: 6, label: '토요일' },
 ];
 
-export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: string }) {
+export default function LeagueMatchFixturesClient({ leagueId, returnHref = '/admin/league-matches' }: { leagueId: string; returnHref?: string }) {
   const { data: series, isPending, isError, error, refetch } = useV1AdminLeagueMatch(leagueId);
   const revertCompletion = useV1RevertLeagueCompletion(leagueId);
   const [revertModalOpen, setRevertModalOpen] = useState(false);
@@ -620,7 +620,7 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
       {/* 대회 관리 상세의 "대회 목록으로"와 같은 자리·같은 모양 — 리그 상세에만 없었다. */}
       <div className="mb-4">
         <Link
-          href="/admin/league-matches"
+          href={returnHref}
           className="inline-flex items-center gap-1 min-h-[44px] text-[length:var(--font-size-label)] text-[var(--text-muted)] hover:text-[var(--text-strong)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 rounded"
         >
           <ChevronLeft size={14} aria-hidden="true" />

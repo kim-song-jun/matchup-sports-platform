@@ -13,6 +13,7 @@ import {
   Max,
   MaxLength,
   Min,
+  ValidateIf,
   ValidateNested,
 } from 'class-validator';
 
@@ -154,6 +155,13 @@ export class CreateFixtureDto {
 }
 
 export class UpdateFixtureDto {
+  /** 번호 생략은 미변경, null은 허용하지 않는다. */
+  @ValidateIf((_object, value) => value !== undefined)
+  @IsInt()
+  @Min(1)
+  @Max(2147483647)
+  fixtureNumber?: number;
+
   @IsOptional()
   @IsDateString()
   scheduledAt?: string;
@@ -166,11 +174,11 @@ export class UpdateFixtureDto {
   /** 결과가 이미 기록된 경기는 팀 변경 불가 (409) — 결과를 먼저 삭제해야 한다 */
   @IsOptional()
   @IsUUID()
-  homeRegistrationId?: string;
+  homeRegistrationId?: string | null;
 
   @IsOptional()
   @IsUUID()
-  awayRegistrationId?: string;
+  awayRegistrationId?: string | null;
 }
 
 export class UpdateBracketSourcesDto {

@@ -1,8 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { Suspense, useEffect, useState } from 'react';
-import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { Suspense } from 'react';
 import { X } from 'lucide-react';
 import {
   AdminDataTable,
@@ -24,8 +23,8 @@ import type {
   V1InquiryReportReason,
   V1InquiryStatus,
 } from '@/types/api';
-import { pickAllowedParam } from '../pick-allowed-param';
 import { GuestInquiryPurgePanel } from './guest-inquiry-purge-panel';
+import { useInquiryListQuery } from './use-inquiry-list-query';
 
 const STATUS_OPTIONS = [
   { value: '', label: '전체' },
@@ -87,9 +86,6 @@ function requesterContact(row: V1AdminInquiryRow) {
 
 const PAGE_SIZE = 20;
 
-// 이 화면에만 있던 방어를 공용으로 옮겼다 — 같은 규칙이 필요한 화면이 넷이다.
-const pickAllowed = pickAllowedParam;
-
 // useSearchParams 는 Suspense 경계를 요구한다(Next.js App Router).
 export default function AdminInquiriesPage() {
   return (
@@ -100,73 +96,14 @@ export default function AdminInquiriesPage() {
 }
 
 function AdminInquiriesPageContent() {
-  const searchParams = useSearchParams();
-  const router = useRouter();
-  const pathname = usePathname();
-
-  // URL → 초기 상태. 운영자가 "스팸 신고 목록" 같은 링크를 받아 그대로 그 화면에 도착한다.
-  const [search, setSearch] = useState(() => searchParams.get('q') ?? '');
-  const [debouncedSearch, setDebouncedSearch] = useState(() => searchParams.get('q') ?? '');
-  const [activeStatus, setActiveStatus] = useState(() => pickAllowed(searchParams.get('status'), STATUS_OPTIONS));
-  const [activeCategory, setActiveCategory] = useState(() => pickAllowed(searchParams.get('category'), CATEGORY_OPTIONS));
-  const [activeReportReason, setActiveReportReason] = useState(() =>
-    // 분류가 report 가 아닌데 사유만 들어온 링크는 무시한다 — 보이지 않는 필터가 목록을 좁힌다.
-    pickAllowed(searchParams.get('category'), CATEGORY_OPTIONS) === 'report'
-      ? pickAllowed(searchParams.get('reportReason'), REPORT_REASON_OPTIONS)
-      : '',
-  );
-  // 신고 누적 팀 목록(#7)에서 넘어오는 딥링크 전용 필터. teamId 는 자유 문자열이라
-  // pickAllowed(허용 목록 대조)를 쓸 수 없다 — 존재 여부만 본다.
-  const [activeReportedTeamId, setActiveReportedTeamId] = useState(
-    () => searchParams.get('reportedTeamId') ?? '',
-  );
-  // 커서 누적 대신 페이지 단위 교체다 — 목록 어디쯤인지와 총량이 보여야 한다.
-  const [page, setPage] = useState(1);
+  const {
+    search, setSearch, debouncedSearch, activeStatus, setActiveStatus,
+    activeCategory, setActiveCategory, activeReportReason, setActiveReportReason,
+    activeReportedTeamId, setActiveReportedTeamId, page, setPage,
+  } = useInquiryListQuery({
+    statuses: STATUS_OPTIONS, categories: CATEGORY_OPTIONS, reportReasons: REPORT_REASON_OPTIONS,
+  });
   const { toasts, showToast } = useAdminToast();
-
-  useEffect(() => {
-    const timer = setTimeout(() => setDebouncedSearch(search.trim()), 300);
-    return () => clearTimeout(timer);
-  }, [search]);
-
-  useEffect(() => {
-    setPage(1);
-  }, [debouncedSearch, activeStatus, activeCategory, activeReportReason, activeReportedTeamId]);
-
-  // 상태 → URL. 읽기만 지원하면 링크를 손으로 조립해야 해서 사실상 쓰이지 않는다 — 화면에서
-  // 필터를 건 뒤 주소창을 그대로 복사해 공유할 수 있어야 딥링크가 의미를 갖는다.
-  //
-  // push 가 아니라 **replace** 다. 필터를 만질 때마다 히스토리가 쌓이면 뒤로가기가 목록 안에서
-  // 맴돌아 운영자가 이전 화면으로 못 돌아간다. page 는 싣지 않는다 — 목록은 계속 변하므로
-  // "3페이지" 를 공유해봐야 받는 쪽에서 같은 내용이 아니다.
-  useEffect(() => {
-    const next = new URLSearchParams();
-    if (debouncedSearch) next.set('q', debouncedSearch);
-    if (activeStatus) next.set('status', activeStatus);
-    if (activeCategory) next.set('category', activeCategory);
-    if (activeCategory === 'report' && activeReportReason) {
-      next.set('reportReason', activeReportReason);
-    }
-    // 다른 필터를 만지는 순간 팀 필터가 주소에서 조용히 사라지지 않도록 항상 함께 싣는다.
-    if (activeReportedTeamId) next.set('reportedTeamId', activeReportedTeamId);
-    const query = next.toString();
-    router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
-  }, [
-    debouncedSearch,
-    activeStatus,
-    activeCategory,
-    activeReportReason,
-    activeReportedTeamId,
-    pathname,
-    router,
-  ]);
-
-  // 분류가 'report'를 벗어나면 사유 필터는 보이지 않는데, 선택값이 남아 있으면 안 보이는
-  // 필터가 목록을 계속 좁혀 "왜 결과가 없지?"를 만든다 — 분류를 바꿀 때 항상 함께 초기화한다.
-  function handleCategoryChange(value: string) {
-    setActiveCategory(value);
-    if (value !== 'report') setActiveReportReason('');
-  }
 
   const filters: AdminListFilters = {
     ...(debouncedSearch ? { q: debouncedSearch } : {}),
@@ -257,7 +194,7 @@ function AdminInquiriesPageContent() {
             <>
               <select
                 value={activeCategory}
-                onChange={(event) => handleCategoryChange(event.target.value)}
+                onChange={(event) => setActiveCategory(event.target.value)}
                 aria-label="문의 분류 필터"
                 className="h-[44px] rounded-xl border border-[var(--border)] bg-[var(--card-surface)] px-3 text-sm text-[var(--text-body)] focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
               >

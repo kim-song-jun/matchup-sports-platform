@@ -254,8 +254,12 @@ game is currently `LIVE`/`PAUSED`) rather than one query per fixture --
 
 The frontend (`apps/v1_web/src/components/public-game-records/**`) polls
 `GET /tournaments/:id/schedule` and `GET /tournaments/:id/matches/:fixtureId`
-on a fixed interval *only* while the currently-loaded page has at least one
-`status === 'live'` entry (`use-public-game-records.ts`). A public,
+on a fixed interval (`use-public-game-records.ts`). Schedule polling includes
+`scheduled` and `live` entries in both scheduled and time-unset lists, so kickoff
+and the end of a time-unset game appear without a reload. Match-detail polling
+remains limited to `status === 'live'`. The bracket hub loads cursor pages
+sequentially and displays all live entries first, then groups A/B/C and knockout
+rounds in competition order; live entries do not also appear in the regular list. A public,
 potentially-hundreds-of-viewers surface deliberately does not reuse the
 operations console's authenticated realtime socket/takeover channel
 (`apps/v1_api/src/realtime/realtime.gateway.ts`) -- that channel is scoped to
@@ -265,9 +269,10 @@ Load model (stated accurately -- an earlier draft of this section claimed
 polling load was independent of spectator count, which is wrong):
 `react-query`'s cache lives in each viewer's browser and does not dedupe
 requests across viewers, so server load is roughly
-(spectators on a page holding a live fixture) x (1 / poll interval) and
+(polling spectators) x (loaded schedule pages / poll interval) and
 **does** scale with viewers. What the design bounds is when that cost is
-paid: a page with no live fixture never polls, and each viewer is floored at
+paid: schedules stop once no scheduled/live games remain, match details stop
+outside live play, and each viewer is floored at
 a 10s interval (2026-08: relaxed from the original 8s, after a minute-scale
 interval was tried and rejected -- this surface is what a spectator follows a
 live game on, so score changes and period transitions must land while the game

@@ -14,7 +14,7 @@ const { hooks } = vi.hoisted(() => ({ hooks: { rows: [] as V1AdminTeamMatchRow[]
 const { routerPush } = vi.hoisted(() => ({ routerPush: vi.fn() }));
 
 vi.mock('next/navigation', () => ({
-  useSearchParams: () => new URLSearchParams(),
+  useSearchParams: () => new URLSearchParams(window.location.search),
   useRouter: () => ({ push: routerPush }),
 }));
 vi.mock('@/hooks/use-v1-api', () => ({
@@ -135,16 +135,20 @@ describe('competition moderation boundary', () => {
   });
 });
 
-it('경기 유형을 바꾸면 API 필터와 첫 페이지에 반영한다', async () => {
+it('경기 유형을 바꾸면 API 필터와 첫 페이지에 반영하고, 상세 왕복 뒤 복원되도록 URL에도 남긴다', async () => {
   hooks.rows = [];
+  window.history.replaceState(null, '', '/admin/team-matches?q=QA0930');
   const user = userEvent.setup();
   render(<AdminTeamMatchesPage />);
   await user.selectOptions(screen.getByRole('combobox', { name: '경기 유형' }), 'tournament');
   expect(hooks.filters).toMatchObject({ kind: 'tournament', page: 1 });
+  expect(window.location.search).toBe('?q=QA0930&kind=tournament');
   await user.selectOptions(screen.getByRole('combobox', { name: '경기 유형' }), 'league');
   expect(hooks.filters).toMatchObject({ kind: 'league', page: 1 });
   await user.selectOptions(screen.getByRole('combobox', { name: '경기 유형' }), '');
   expect(hooks.filters).not.toHaveProperty('kind');
+  expect(window.location.search).toBe('?q=QA0930');
+  window.history.replaceState(null, '', '/');
 });
 
 it('완료 경기의 일반 상태 모달도 실제로 선택 가능한 상태로 시작한다', async () => {

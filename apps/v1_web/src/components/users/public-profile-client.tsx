@@ -2,6 +2,8 @@
 
 import Link from 'next/link';
 import { useState } from 'react';
+import { useSearchParams } from 'next/navigation';
+import { UserAvatar } from '@/components/v1-ui/user-avatar';
 import { formatTournamentDateShort } from '@/lib/date-utils';
 import { withFromPath } from '@/lib/session-storage';
 import { displayInitials } from '@/lib/display-initials';
@@ -245,7 +247,18 @@ function ProfileActivityCard({
   readonly recent: V1PublicProfile['recentActivity'] | null;
   readonly recordsHref: string;
 }) {
-  const [period, setPeriod] = useState<ActivityPeriod>('total');
+  // 고른 기간은 주소(?period=monthly)에도 남긴다 — 화면 안 상태로만 들고 있으면 '활동 기록 전체 보기'에
+  // 다녀오는 사이 '전체'로 돌아갔다(MD-QA #20). 이 주소가 곧 기록 링크의 출처(from)라 돌아오면 복원된다.
+  const searchParams = useSearchParams();
+  const [period, setPeriod] = useState<ActivityPeriod>(() => (searchParams?.get('period') === 'monthly' ? 'monthly' : 'total'));
+  const selectPeriod = (next: ActivityPeriod) => {
+    setPeriod(next);
+    const url = new URL(window.location.href);
+    if (next === 'monthly') url.searchParams.set('period', 'monthly');
+    else url.searchParams.delete('period');
+    // 같은 history 항목을 바꾼다(Next 라우터가 useSearchParams 를 따라 갱신) — 탭 전환마다 Back 이 쌓이지 않는다.
+    window.history.replaceState(null, '', `${url.pathname}${url.search}${url.hash}`);
+  };
   const stats = summary
     ? period === 'total'
       ? [
@@ -275,7 +288,7 @@ function ProfileActivityCard({
             role="tablist"
             ariaLabel="활동 기간"
             activeId={period}
-            onSelect={(id) => setPeriod(id as ActivityPeriod)}
+            onSelect={(id) => selectPeriod(id as ActivityPeriod)}
             items={[
               { id: 'total', label: '전체' },
               { id: 'monthly', label: '이번 달' },
@@ -318,33 +331,7 @@ function ProfileActivityCard({
   );
 }
 
-/**
- * 프로필 사진은 배경 이미지로만 깔려 있어서 URL 이 깨지면 이니셜도 없이 빈 원이 남았다
- * (2026-09-04 감사). 실제 <img> 로 그려 onError 때 이니셜로 되돌린다.
- */
-export function ProfileAvatar({
-  imageUrl,
-  initials,
-  size,
-}: {
-  imageUrl?: string | null;
-  initials: string;
-  /** px 지정 시 기본 64px(.tm-my-avatar) 대신 이 크기로 그린다 — 폰트도 같은 비율로 줄인다. */
-  size?: number;
-}) {
-  // 실패는 URL 단위로 기억한다 — boolean 하나면 프로필을 갱신해 새 사진을 받아도
-  // 이전 실패가 남아 계속 이니셜만 보인다(#1027 Copilot).
-  const [failedUrl, setFailedUrl] = useState<string | null>(null);
-  const showImage = Boolean(imageUrl) && failedUrl !== imageUrl;
-  const style = size ? { width: size, height: size, fontSize: Math.round(size * 0.375) } : undefined;
-  return (
-    <div className="tm-my-avatar" style={style}>
-      {showImage ? (
-        // eslint-disable-next-line @next/next/no-img-element -- 업로드 원본 URL 이 외부 호스트일 수 있어 최적화 로더를 태우지 않는다.
-        <img src={imageUrl ?? ''} alt="" aria-hidden="true" onError={() => setFailedUrl(imageUrl ?? null)} />
-      ) : (
-        initials
-      )}
-    </div>
-  );
+/** 기존 프로필 호출 계약은 유지하며 모든 사진 fallback은 공용 사람 아이콘을 사용한다. */
+export function ProfileAvatar({ imageUrl, size = 64 }: { imageUrl?: string | null; initials: string; size?: number }) {
+  return <UserAvatar imageUrl={imageUrl} size={size} className="tm-my-avatar" radius="var(--radius-hero)" />;
 }

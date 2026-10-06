@@ -3,11 +3,13 @@ import { BadRequestException, ConflictException, NotFoundException } from '@nest
 import { createTeamMatchScheduleInTx, MATCH_SCHEDULE_DEFAULT_DURATION_MS } from '../team-schedules/team-match-schedule';
 import { competitionTeamTargets, enqueueRosterResync, type RosterResyncTarget } from '../games/roster/roster-resync-events';
 import { revokeReplacedSideTeamAdjustments } from '../games/roster/side-team-change';
+import { competitionMatchLabel } from './tournament-round-label';
 
 type Tx = Prisma.TransactionClient;
 
 export type TournamentMatchUpdateInput = {
   teamMatchId: string;
+  fixtureNumber?: number;
   scheduledAt?: Date | null;
   venue?: string;
   homeRegistrationId?: string | null;
@@ -69,6 +71,8 @@ export async function updateTournamentMatchInTx(
       round: true,
       fixtureNumber: true,
       legNumber: true,
+      tournament: { select: { title: true } },
+      group: { select: { name: true } },
       parentTeamMatchId: true,
       homeRegistrationId: true,
       awayRegistrationId: true,
@@ -96,6 +100,29 @@ export async function updateTournamentMatchInTx(
   const officialRevision = gameRows[0].currentOfficialRevisionId === null
     ? null
     : await tx.v1GameResultRevision.findUnique({ where: { id: gameRows[0].currentOfficialRevisionId }, select: { state: true } });
+
+  // Compare with the latest assignment while Game/Details are locked. A
+  // winner may have been projected after the caller's initial read.
+  if (input.homeRegistrationId !== undefined || input.awayRegistrationId !== undefined) {
+    const incoming = await tx.v1TournamentMatchAdvancementEdge.findMany({ where: { targetTeamMatchId: input.teamMatchId } });
+    if (incoming.some((edge) => edge.targetSide === 'HOME'
+      ? input.homeRegistrationId !== undefined && input.homeRegistrationId !== detail.homeRegistrationId
+      : input.awayRegistrationId !== undefined && input.awayRegistrationId !== detail.awayRegistrationId)) {
+      throw new ConflictException({ code: 'BRACKET_SOURCE_SLOT_LINKED', message: '진출 경기가 연결된 자리는 직접 팀을 변경할 수 없어요. 먼저 진출 연결을 해제해 주세요.' });
+    }
+  }
+  const nextNumber = input.fixtureNumber === undefined ? detail.fixtureNumber : input.fixtureNumber;
+  if (!Number.isInteger(nextNumber) || nextNumber < 1 || nextNumber > 2147483647) {
+    throw new BadRequestException({ code: 'FIXTURE_NUMBER_INVALID', message: '대진 번호는 1부터 2147483647까지의 정수로 입력해 주세요.' });
+  }
+  const numberChanged = nextNumber !== detail.fixtureNumber;
+  if (numberChanged && await tx.v1TournamentMatchDetails.findFirst({
+    where: { tournamentId: detail.tournamentId, round: detail.round, fixtureNumber: nextNumber, legNumber: detail.legNumber, teamMatchId: { not: input.teamMatchId } },
+    select: { teamMatchId: true },
+  })) throw fixtureNumberConflict();
+  const nextTitle = numberChanged
+    ? `${detail.tournament.title} · ${competitionMatchLabel({ groupName: detail.group?.name, round: detail.round, legNumber: detail.legNumber })} ${nextNumber}`
+    : detail.teamMatch.title;
 
   const nextHome = input.homeRegistrationId !== undefined ? input.homeRegistrationId : detail.homeRegistrationId;
   const nextAway = input.awayRegistrationId !== undefined ? input.awayRegistrationId : detail.awayRegistrationId;
@@ -135,13 +162,19 @@ export async function updateTournamentMatchInTx(
       ? new Date(nextStartAt.getTime() + (detail.teamMatch.endAt.getTime() - detail.teamMatch.startAt.getTime()))
       : detail.teamMatch.endAt;
 
-  await tx.v1TournamentMatchDetails.update({
-    where: { teamMatchId: input.teamMatchId },
-    data: { homeRegistrationId: nextHome, awayRegistrationId: nextAway },
-  });
+  try {
+    await tx.v1TournamentMatchDetails.update({
+      where: { teamMatchId: input.teamMatchId },
+      data: { homeRegistrationId: nextHome, awayRegistrationId: nextAway, ...(numberChanged ? { fixtureNumber: nextNumber } : {}) },
+    });
+  } catch (error) {
+    if (numberChanged && error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') throw fixtureNumberConflict();
+    throw error;
+  }
   const updated = await tx.v1TeamMatch.update({
     where: { id: input.teamMatchId },
     data: {
+      ...(numberChanged ? { title: nextTitle } : {}),
       hostTeamId: nextHomeTeamId,
       approvedApplicantTeamId: nextAwayTeamId,
       startAt: nextStartAt,
@@ -158,6 +191,11 @@ export async function updateTournamentMatchInTx(
       createdAt: true,
       updatedAt: true,
     },
+  });
+
+  if (numberChanged) await tx.v1TeamSchedule.updateMany({
+    where: { teamMatchId: input.teamMatchId },
+    data: { title: nextTitle, version: { increment: 1 } },
   });
 
   const sideChanges = [
@@ -195,7 +233,7 @@ export async function updateTournamentMatchInTx(
   }
   if (teamsChanged) await tx.v1Game.update({ where: { id: game.id }, data: { version: { increment: 1 } } });
   // 팀 경기 순서(출전정지)와 경기 시각(결장 기간)이 바뀌었으니 관련 팀의 시작 전 경기를 다시 계산한다.
-  if (teamsChanged || timeChanged) {
+  if (teamsChanged || timeChanged || numberChanged) {
     resync.push(
       ...competitionTeamTargets(detail.tournamentId, [
         detail.teamMatch.hostTeamId,
@@ -212,7 +250,7 @@ export async function updateTournamentMatchInTx(
     tournamentId: detail.tournamentId,
     groupId: detail.groupId,
     round: detail.round,
-    fixtureNumber: detail.fixtureNumber,
+    fixtureNumber: nextNumber,
     legNumber: detail.legNumber,
     parentTeamMatchId: detail.parentTeamMatchId,
     homeRegistrationId: nextHome,
@@ -223,6 +261,10 @@ export async function updateTournamentMatchInTx(
     createdAt: updated.createdAt,
     updatedAt: updated.updatedAt,
   };
+}
+
+function fixtureNumberConflict() {
+  return new ConflictException({ code: 'FIXTURE_NUMBER_CONFLICT', message: '같은 라운드·차수에서 이미 사용 중인 대진 번호예요.' });
 }
 
 /** 새로 만든 대체 리비전의 id를 돌려준다 — 팀이 갓 배정된 것이면 후속 이벤트가 그 위에 명단을 채운다. */

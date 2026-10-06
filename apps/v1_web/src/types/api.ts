@@ -4529,6 +4529,7 @@ export type V1CreateGroupTeamPayload = {
 };
 
 export type V1UpdateFixturePayload = {
+  fixtureNumber?: number;
   scheduledAt?: string;
   venue?: string;
   homeRegistrationId?: string;

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Suspense, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
@@ -16,7 +16,7 @@ import {
   dissolutionBlockersFromError,
 } from '@/lib/team-dissolution-blockers';
 import { useAdminCanWrite } from '@/hooks/use-admin-can-write';
-import { useAdminListQuery } from '@/hooks/use-admin-list-query';
+import { useAdminUrlListQuery } from '../use-admin-url-list-query';
 import {
   AdminPageHeader,
   AdminDataTable,
@@ -90,11 +90,21 @@ function RestoreNameTakenNotice({ message, teamId }: RestoreNameTaken) {
 // ── Page ──────────────────────────────────────────────────────────────────
 
 export default function AdminTeamsPage() {
+  // useSearchParams(조건을 URL에 두는 목록 훅)는 Suspense 경계가 필요하다 (users/matches 페이지와 동일 구조)
+  return (
+    <Suspense fallback={null}>
+      <AdminTeamsPageContent />
+    </Suspense>
+  );
+}
+
+function AdminTeamsPageContent() {
   const router = useRouter();
   // ── Admin capabilities ─────────────────────────────────────────────
   const canWrite = useAdminCanWrite();
 
   // ── Filter state — 검색 debounce·상태 필터·page 리셋은 공용 훅이 담당 ─────
+  // 조건(?q=&status=&page=)은 URL에 남아 상세에 다녀와도 유지된다(MD-QA #21).
   const {
     search,
     setSearch,
@@ -103,16 +113,7 @@ export default function AdminTeamsPage() {
     filters,
     resetToFirstPage,
     buildPagination,
-  } = useAdminListQuery({ pageSize: PAGE_SIZE });
-
-  // URL searchParam pre-selection on mount (`?status=`, `?q=`)
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const s = params.get('status') ?? '';
-    if (s) setActiveStatus(s);
-    const q = params.get('q')?.trim() ?? '';
-    if (q) setSearch(q);
-  }, [setActiveStatus, setSearch]);
+  } = useAdminUrlListQuery(STATUS_OPTIONS, PAGE_SIZE);
 
   const { data, isPending, isFetching, isError, error, refetch } = useV1AdminTeams(filters);
   const rows = data?.items ?? [];

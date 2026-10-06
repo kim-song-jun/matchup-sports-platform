@@ -32,6 +32,7 @@ import { publicAssetPath } from '@/lib/assets';
 import { TournamentAwardIcon } from '@/components/tournaments/tournament-award-icon';
 import { isLeagueCompetition } from '@/lib/competition-kind';
 import { displayInitials } from '@/lib/display-initials';
+import { AvatarFallback } from '@/components/v1-ui/avatar-fallback';
 import { useCurrentHref } from '@/components/v1-ui/use-current-href';
 
 const REVIEW_PHOTO_MAX = 3;
@@ -764,14 +765,13 @@ export function ReviewFormModal({
 
 /* ── 후기 카드 (임베드 목록 · 전체보기 페이지 공용) ── */
 export function ReviewCard({ review }: { review: V1TournamentReview }) {
-  const letter = displayInitials(review.teamName ?? review.authorNickname, { fallback: '?' });
   const date = new Date(review.createdAt).toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' });
   const photoUrls = review.photoUrls ?? [];
 
   return (
     <div className="tm-review-card">
       <div className="tm-review-card-header">
-        <div className="tm-review-card-avatar" aria-hidden="true">{letter}</div>
+        <div className="tm-review-card-avatar" aria-hidden="true"><AvatarFallback kind={review.teamName ? 'team' : 'user'} size={18} /></div>
         <div>
           <div className="tm-review-card-author">{review.teamName ?? review.authorNickname}</div>
           <div className="tm-review-card-date">{date}</div>

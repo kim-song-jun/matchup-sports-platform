@@ -168,6 +168,21 @@ it('12강 경기가 아직 없어도 명시적 부전승을 8강 배정과 함�
   expect(screen.getByRole('navigation', { name: '대진 단계 이동' })).toHaveTextContent('12강');
 });
 
+
+it('3·4위전의 미정 두 자리에 저장된 4강 패자 출처를 표시한다', () => {
+  render(<TournamentBracket groups={[]} fixtures={[
+    makeFixture({ id: 'semi-one', round: 'semi', fixtureNumber: 1 }),
+    makeFixture({ id: 'semi-two', round: 'semi', fixtureNumber: 2 }),
+    makeFixture({ id: 'third', round: 'third_place', fixtureNumber: 1,
+      homeTeamName: 'TBD', awayTeamName: 'TBD', bracketSources: [
+        { fixtureId: 'semi-one', side: 'HOME', outcome: 'LOSER' },
+        { fixtureId: 'semi-two', side: 'AWAY', outcome: 'LOSER' },
+      ] }),
+  ]} />);
+  const card = screen.getByRole('group', { name: '4강 1경기 패자 대 4강 2경기 패자' });
+  expect(within(card).getByText('4강 1경기 패자')).toBeVisible();
+  expect(within(card).getByText('4강 2경기 패자')).toBeVisible();
+});
 it.each([['quarter', '8강', '4강'], ['semi', '4강', '결승']] as const)('%s 부전승도 해당 라운드와 다음 단계를 구분한다', (phase, label, nextLabel) => {
   render(<TournamentBracket fixtures={[]} groups={[{ id: phase, name: label, phase, sortOrder: 0, advanceCount: null, standings: [],
     groupTeams: [{ id: 'bye', registrationId: 'direct', teamId: 'direct-team', teamName: '직행팀', teamLogoUrl: null, sortOrder: 0, isBye: true }] }]} />);

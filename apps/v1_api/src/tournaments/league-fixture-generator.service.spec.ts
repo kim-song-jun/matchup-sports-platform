@@ -292,6 +292,7 @@ describe('LeagueFixtureGeneratorService.generate', () => {
     v1Tournament: { findFirst: jest.fn() },
     v1TournamentGroup: { findFirst: jest.fn() },
     v1TournamentRegistration: { findMany: jest.fn() },
+    v1TournamentMatchAdvancementEdge: { findMany: jest.fn() },
     v1TournamentPlayer: { findMany: jest.fn() },
     v1IdempotencyRecord: { findFirst: jest.fn() },
     v1TournamentMatchDetails: {
@@ -481,6 +482,7 @@ describe('LeagueFixtureGeneratorService.generate', () => {
       competitionConfigVersionId: 'ccv-1',
     });
     prisma.v1TournamentMatchDetails.findMany.mockResolvedValue([]);
+    prisma.v1TournamentMatchAdvancementEdge.findMany.mockResolvedValue([]);
     prisma.v1TournamentMatchDetails.findUniqueOrThrow.mockImplementation(({ where }: { where: { teamMatchId: string } }) =>
       Promise.resolve(existingFixture(where.teamMatchId, { id: `game-${where.teamMatchId}` })),
     );

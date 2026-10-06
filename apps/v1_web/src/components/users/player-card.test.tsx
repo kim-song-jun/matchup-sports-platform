@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, within, waitFor } from '@testing-library/react';
 import { resolveNextImageSrc } from '@/test/next-image';
 import { PlayerCard } from './player-card';
 import type { V1PlayerCard, V1PlayerCardStat } from '@/types/api';
@@ -190,7 +190,7 @@ describe('선수 카드', () => {
     );
     expect(screen.getByRole('link', { name: /사진 추가하기/ })).toHaveAttribute('href', '/my/profile/edit');
 
-    // 남이 보면 슬롯 대신 이니셜 렌더가 남는다.
+    // 남이 보면 슬롯 대신 사람 아이콘이 남는다.
     rerender(
       <PlayerCard card={card()} displayName="김선준" profileImageUrl={null} teamName={null} isOwner={false} />,
     );
@@ -215,6 +215,16 @@ describe('선수 카드', () => {
     expect(resolveNextImageSrc(img)).toBe('/uploads/2026/08/me.webp');
     // 카드 렌더 폭에 맞춰 줄여 받는다 -- 이 값이 없으면 next/image 는 뷰포트 폭 기준으로 큰 이미지를 고른다.
     expect(img?.getAttribute('sizes')).toBe('138px');
+  });
+
+  it('사진 오류는 사람 아이콘으로 표시하고 새 사진으로 복구한다', async () => {
+    const { container, rerender } = render(<PlayerCard card={card()} displayName="김선준" profileImageUrl="/uploads/broken.png" teamName={null} isOwner={false} />);
+    fireEvent.error(container.querySelector('.tm-pcard-render-photo img') as HTMLImageElement);
+    expect(container.querySelector('.tm-pcard-render-photo img')).toBeNull();
+    expect(container.querySelector('.tm-pcard-render-img svg')).toHaveClass('lucide-user-round');
+    rerender(<PlayerCard card={card()} displayName="김선준" profileImageUrl="/uploads/new.png" teamName={null} isOwner={false} />);
+    fireEvent.load(container.querySelector('.tm-pcard-render-photo img') as HTMLImageElement);
+    await waitFor(() => expect(container.querySelector('.tm-pcard-render-img')).toBeNull());
   });
 
   it('settingsHref 를 주면 카드 설정 입구가, 없으면(남의 카드) 안 보인다', () => {

@@ -6,7 +6,7 @@ import { useEffect, useId, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { CalendarCheck, Camera, Clock, HeartHandshake, Lock, Settings, Share2, Sparkles, Target, UserRound, Zap } from 'lucide-react';
 import { publicAssetPath } from '@/lib/assets';
-import { displayInitials } from '@/lib/display-initials';
+import { AvatarFallback } from '@/components/v1-ui/avatar-fallback';
 import { josa } from '@/lib/korean';
 import type { V1PlayerCard, V1PlayerCardStat } from '@/types/api';
 import { useLoopPause } from './use-loop-pause';
@@ -304,7 +304,7 @@ export function PlayerCard({
    */
   readonly belowCardSlot?: ReactNode;
 }) {
-  const initial = displayInitials(displayName, { fallback: '?' });
+  const photoUrl = profileImageUrl?.trim() || null;
   const needsConsent = card.nextUnlock?.reason.type === 'consent';
   const { left, right } = splitStats(card.stats);
   const [flipped, setFlipped] = useState(false);
@@ -314,7 +314,8 @@ export function PlayerCard({
    * 새 URL 은 자연히 미도착 상태다.
    */
   const [loadedPhotoUrl, setLoadedPhotoUrl] = useState<string | null>(null);
-  const photoLoaded = profileImageUrl !== null && loadedPhotoUrl === profileImageUrl;
+  const [failedPhotoUrl, setFailedPhotoUrl] = useState<string | null>(null);
+  const photoLoaded = photoUrl !== null && loadedPhotoUrl === photoUrl && failedPhotoUrl !== photoUrl;
   /**
    * 여정 면 (A안): 아직 한 경기도 안 뛰었고 열린 능력치도 없으면, 자물쇠 여섯 개의
    * 벽 대신 "시작하는 카드"를 그린다. 후기는 경기를 뛴 사람에게만 달리므로
@@ -326,7 +327,7 @@ export function PlayerCard({
    * 사진 추가 슬롯을 띄울지. 본인 + 사진 없음일 때만이다 -- 남의 카드에서 "사진 올리세요"는
    * 소음이고, 공유 화면(isOwner=false)에서도 뜨면 받은 사람이 조작할 수 없는 버튼을 본다.
    */
-  const photoSlotHref = isOwner && !profileImageUrl ? '/my/profile/edit' : null;
+  const photoSlotHref = isOwner && !photoUrl ? '/my/profile/edit' : null;
 
   /**
    * 포인터 추종 기울기 + 글레어 (목업 확정 인터랙션).
@@ -383,24 +384,25 @@ export function PlayerCard({
           렌더 대신 위쪽 줄 안의 사진 추가 슬롯을 쓴다(아래 .tm-player-card-top). */}
       {photoSlotHref ? null : (
         <div className="tm-pcard-render" aria-hidden="true">
-          {profileImageUrl ? (
+          {!photoLoaded ? <div className="tm-pcard-render-img" style={{ position: 'absolute', inset: 0 }}><AvatarFallback kind="user" size={72} /></div> : null}
+          {photoUrl && failedPhotoUrl !== photoUrl ? (
             /* background-image div 가 아니라 next/image: 900×1200 원본 JPEG 를 138px 상자에
                그대로 받던 것을 276px WebP/AVIF 로 줄여 받고(sizes), 이 카드는 페이지 최상단
                LCP 후보라 미리 불러온다(priority). 도착 전까지는 투명이고 CSS 가 페이드시킨다 --
                사진이 한 박자 늦게 "툭" 나타나던 팝인이 사라진다. */
             <div className="tm-pcard-render-photo" data-loaded={photoLoaded ? 'true' : undefined}>
               <Image
-                src={publicAssetPath(profileImageUrl)}
+                key={photoUrl}
+                src={publicAssetPath(photoUrl)}
                 alt=""
                 fill
                 sizes="138px"
                 priority
-                onLoad={() => setLoadedPhotoUrl(profileImageUrl)}
+                onLoad={() => setLoadedPhotoUrl(photoUrl)}
+                onError={() => setFailedPhotoUrl(photoUrl)}
               />
             </div>
-          ) : (
-            <div className="tm-pcard-render-img">{initial}</div>
-          )}
+          ) : null}
         </div>
       )}
 

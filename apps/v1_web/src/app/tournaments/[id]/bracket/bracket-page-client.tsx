@@ -369,7 +369,7 @@ export function BracketScheduleTab({
   // schedule-page-client.tsx와 동일한 데이터 배선(usePublicTournamentSchedule 페이지
   // 합치기 + 로딩/에러 분기) — AppChrome 래핑만 없는 얇은 버전이라 별도 훅으로
   // 추출하지 않았다(두 곳뿐이라 공용 추상화를 새로 만드는 게 오히려 과설계).
-  const { data, isPending, isError, error, refetch, hasNextPage, isFetchingNextPage, fetchNextPage } =
+  const { data, isPending, isError, error, refetch, hasNextPage, isFetching, isFetchingNextPage, fetchNextPage } =
     usePublicTournamentSchedule(tournamentId);
   // `/schedule`의 권한 기능도 통합 허브인 `/bracket`에서 동일하게 제공한다. 공개 일정
   // 조회와 분리된 인증 전용 요청이라 비로그인·비참가자는 빈 상태로 끝나고, 참가팀
@@ -377,6 +377,11 @@ export function BracketScheduleTab({
   const myFixtures = useV1MyTournamentFixtures(tournamentId);
   // 리그는 조회조차 하지 않는다 — 위 섹션 주석 참조.
   const playerRecords = usePublicTournamentPlayerRecords(tournamentId, { enabled: !isRegularLeague });
+
+  // A live game can be on any cursor page; load them sequentially before claiming all live games are shown.
+  useEffect(() => {
+    if (hasNextPage && !isFetching && !isError) void fetchNextPage();
+  }, [hasNextPage, isFetching, isError, fetchNextPage]);
 
   // isPending — 서버 렌더에서 isLoading 은 false 라 아래 오류 분기로 떨어진다(대회 상세와 같다).
   if (isPending) {
@@ -404,6 +409,7 @@ export function BracketScheduleTab({
     <>
       <ScheduleContent
         tournamentId={tournamentId}
+        prioritizeLiveGames
         isRegularLeague={isRegularLeague}
         data={combined}
         hasNextPage={hasNextPage}
@@ -476,15 +482,27 @@ export function BracketPageContent({ tournament }: { tournament: V1TournamentDet
     ? (leagueSchedule.data?.pages.reduce((sum, page) => sum + page.items.length, 0) ?? 0)
     : 0;
   const stages = buildTournamentStages(tournament);
-  const [activeTab, setActiveTab] = useState<'standings' | 'schedule'>('schedule');
+  const searchParams = useSearchParams();
+  const [activeTab, setActiveTab] = useState<'standings' | 'schedule'>(() =>
+    searchParams.get('tab') === 'standings' ? 'standings' : 'schedule',
+  );
   // 닫힌 순위 패널은 서버 HTML·하이드레이션에만 싣고 그 뒤엔 내린다 — 라이브 폴링마다 보이지 않는
   // 대진표를 다시 그리지 않게. 서버와 첫 클라이언트 렌더가 같아야 해서 effect 로 넘긴다.
   const [hydrated, setHydrated] = useState(false);
   useEffect(() => setHydrated(true), []);
-  // 순위표에서 팀 전적으로 나갔다 돌아오면 이 화면(대진표·순위, 받은 출처 포함)으로 되돌아온다.
-  const bracketSelfHref = useCurrentHref();
+  // 화면 뒤로가기는 이 컴포넌트를 새로 만든다. 선택한 보기를 출처에 실어 순위표를 복원한다.
+  let bracketSelfHref = useCurrentHref();
+  if (bracketSelfHref) {
+    const hashIndex = bracketSelfHref.indexOf('#');
+    const hash = hashIndex < 0 ? '' : bracketSelfHref.slice(hashIndex);
+    const pathEnd = bracketSelfHref.search(/[?#]/);
+    const path = pathEnd < 0 ? bracketSelfHref : bracketSelfHref.slice(0, pathEnd);
+    const query = new URLSearchParams(searchParams.toString());
+    if (activeTab === 'standings') query.set('tab', 'standings');
+    else query.delete('tab');
+    bracketSelfHref = `${path}${query.size ? `?${query.toString()}` : ''}${hash}`;
+  }
   // 이 화면으로 들어올 때 받은 from(대회 상세의 자기 URL)을 그대로 붙여 상세로 되돌아간다.
-  const searchParams = useSearchParams();
   const detailHref = withFromPath(`/tournaments/${tournament.id}`, searchParams.get('from'));
 
   const { groupPhaseGroups, knockoutFixtures, hasGroupStandings, hasKnockoutFixtures } =
@@ -626,7 +644,19 @@ export function BracketPageContent({ tournament }: { tournament: V1TournamentDet
             { id: 'standings', label: isRegularLeague ? '리그 순위' : '순위 · 대진표' },
           ]}
           activeId={activeTab}
-          onSelect={(id) => setActiveTab(id as 'schedule' | 'standings')}
+          onSelect={(id) => {
+            const nextTab = id === 'standings' ? 'standings' : 'schedule';
+            setActiveTab(nextTab);
+            // 복귀 표식이 일정의 단계 필터와 경기 링크 출처로 다시 섞이지 않게 한다.
+            if (nextTab === 'schedule' && bracketSelfHref) {
+              const source = new URL(bracketSelfHref, window.location.origin);
+              const url = new URL(window.location.href);
+              if (source.origin === url.origin && source.pathname === url.pathname && url.searchParams.get('tab') === 'standings') {
+                url.searchParams.delete('tab');
+                window.history.replaceState(null, '', `${url.pathname}${url.search}${url.hash}`);
+              }
+            }
+          }}
           ariaLabel="보기 방식"
           role="tablist"
         />

@@ -414,19 +414,7 @@ public final class MainActivity extends AppCompatActivity {
     private void publishSystemInsets() {
         if (webView == null) return;
         webView.evaluateJavascript(
-            "document.documentElement.style.setProperty('--teameet-native-safe-bottom','"
-                + bottomSystemInsetCssPixels
-                + "px');document.documentElement.style.setProperty('--v1-shell-safe-bottom','"
-                + bottomSystemInsetCssPixels
-                + "px');document.documentElement.dataset.teameetNativeApp='android'",
-            null
-        );
-        webView.evaluateJavascript(
-            "document.documentElement.style.setProperty(\"--teameet-native-keyboard-inset\",\""
-                + keyboardInsetCssPixels
-                + "px\");document.documentElement.dataset.teameetNativeKeyboard=\""
-                + (keyboardVisible ? "open" : "closed")
-                + "\"",
+            NativeInsetsScript.create(bottomSystemInsetCssPixels, keyboardInsetCssPixels, keyboardVisible),
             null
         );
     }
@@ -443,8 +431,10 @@ public final class MainActivity extends AppCompatActivity {
             return;
         }
         try {
+            String fileName = DownloadFileName.fromContentDisposition(contentDisposition);
+            if (fileName == null) fileName = URLUtil.guessFileName(url, contentDisposition, mimeType);
             DownloadManager.Request request = new DownloadManager.Request(Uri.parse(url))
-                .setTitle(URLUtil.guessFileName(url, contentDisposition, mimeType))
+                .setTitle(fileName)
                 .setNotificationVisibility(
                     DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED
                 );

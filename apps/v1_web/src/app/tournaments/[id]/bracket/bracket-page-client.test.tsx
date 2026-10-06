@@ -1,26 +1,42 @@
-import { screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { renderBracketPage, renderBracketStandingsTab } from './bracket-test-utils';
+import { AppBackLink } from '@/components/v1-ui/app-back-link';
+import { __resetNavigationHistoryForTests } from '@/lib/navigation-history';
+import type { PublicScheduleEntry } from '@/components/public-game-records/types';
 import type { V1TournamentDetail, V1TournamentFixture, V1TournamentGroup } from '@/types/api';
 
 // 순위표 링크의 출처는 현재 URL(받은 from 포함)이다 — 기본은 출처 없음으로 고정하고,
 // from 을 검증하는 테스트만 setMockSearchParams 로 override 한다.
-const { getMockSearchParams, setMockSearchParams } = vi.hoisted(() => {
+const { getMockSearchParams, setMockSearchParams, getMockPathname, setMockPathname, replace } = vi.hoisted(() => {
   let params = new URLSearchParams();
+  let pathname = '/tournaments/tour-1/bracket';
   return {
     getMockSearchParams: () => params,
     setMockSearchParams: (next: URLSearchParams) => {
       params = next;
     },
+    getMockPathname: () => pathname,
+    setMockPathname: (next: string) => { pathname = next; },
+    replace: vi.fn(),
   };
 });
 
 vi.mock('next/navigation', async (importOriginal) => ({
   ...(await importOriginal<typeof import('next/navigation')>()),
-  usePathname: () => '/tournaments/tour-1/bracket',
+  usePathname: () => getMockPathname(),
   useSearchParams: () => getMockSearchParams(),
+  useRouter: () => ({ replace }),
 }));
+
+afterEach(() => {
+  setMockSearchParams(new URLSearchParams());
+  setMockPathname('/tournaments/tour-1/bracket');
+  replace.mockClear();
+  __resetNavigationHistoryForTests();
+  window.history.replaceState(null, '', '/');
+});
 
 /**
  * 조별/리그 순위표에서 팀명을 누르면 **그 자리에서** 그 팀의 경기 상세가 펼쳐져야
@@ -287,7 +303,7 @@ describe('BracketPageContent — 순위표 팀 링크', () => {
     // 뒤로가기가 이 대진표 화면으로 돌아오도록 ?from=이 함께 실린다.
     expect(link).toHaveAttribute(
       'href',
-      `/teams/team-42/records?from=${encodeURIComponent('/tournaments/tour-1/bracket')}`,
+      `/teams/team-42/records?from=${encodeURIComponent('/tournaments/tour-1/bracket?tab=standings')}`,
     );
   });
 
@@ -838,6 +854,107 @@ describe('BracketPageContent — 정규 리그 거울 행(format=group_knockout,
       },
     ],
     nextCursor: null,
+  });
+
+  it('리그 순위의 팀 전적에서 화면 뒤로가기를 누르면 선택한 탭과 순위표를 복원한다', async () => {
+    const tournament = { ...mirrorLeague(), id: 'tour-1', groups: [] };
+    const schedule = { ...leagueSchedule(), tournamentId: 'tour-1' };
+    const detailFrom = '/tournaments/tour-1?from=%2Fhome';
+    const query = new URLSearchParams({ from: detailFrom, schedulePhase: 'knockout' });
+    query.set('q', 'one?two words');
+    query.append('tag', 'a');
+    query.append('tag', 'b');
+    setMockSearchParams(query);
+    window.history.replaceState(null, '', `/tournaments/tour-1/bracket?${query}#standings`);
+
+    const bracket = renderBracketPage(tournament, schedule);
+    await userEvent.click(screen.getByRole('tab', { name: '리그 순위' }));
+    expect(screen.getByRole('table', { name: '리그 순위표' })).toBeVisible();
+
+    const recordsHref = screen.getByRole('link', { name: /성수 FC/ }).getAttribute('href');
+    expect(recordsHref).not.toBeNull();
+    const recordsUrl = new URL(recordsHref ?? '', window.location.origin);
+    bracket.unmount();
+    setMockPathname(recordsUrl.pathname);
+    setMockSearchParams(recordsUrl.searchParams);
+    window.history.replaceState(null, '', `${recordsUrl.pathname}${recordsUrl.search}`);
+
+    const recordsBack = render(<AppBackLink fallbackHref="/teams/team-42">뒤로가기</AppBackLink>);
+    await userEvent.click(screen.getByRole('link', { name: '뒤로가기' }));
+    const returnHref: unknown = replace.mock.calls[0]?.[0];
+    expect(typeof returnHref).toBe('string');
+    if (typeof returnHref !== 'string') throw new TypeError('화면 뒤로가기의 복귀 경로가 없어요.');
+    const returnUrl = new URL(returnHref, window.location.origin);
+    expect(returnUrl.searchParams.get('from')).toBe(detailFrom);
+    expect(returnUrl.searchParams.get('schedulePhase')).toBe('knockout');
+    expect(returnUrl.searchParams.get('q')).toBe('one?two words');
+    expect(returnUrl.searchParams.getAll('tag')).toEqual(['a', 'b']);
+    expect(returnUrl.hash).toBe('#standings');
+    recordsBack.unmount();
+
+    setMockPathname(returnUrl.pathname);
+    setMockSearchParams(returnUrl.searchParams);
+    window.history.replaceState(null, '', returnHref);
+    renderBracketPage(tournament, schedule);
+
+    expect(screen.getByRole('tab', { name: '리그 순위' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('tab', { name: '경기 일정' })).toHaveAttribute('aria-selected', 'false');
+    expect(screen.getByRole('table', { name: '리그 순위표' })).toBeVisible();
+    expect(screen.getByRole('link', { name: /성수 FC/ })).toBeVisible();
+  });
+
+  it('복원된 순위에서 일정으로 바꾼 뒤 정규 라운드 경기를 보고 돌아오면 일정과 단계 필터를 복원한다', async () => {
+    const tournament = { ...mirrorLeague(), id: 'tour-1', groups: [] };
+    const entry: PublicScheduleEntry = {
+      fixtureId: 'fixture-1', round: '1주차', fixtureNumber: 1, legNumber: 1,
+      groupId: null, groupName: null, scheduledAt: '2026-01-01T10:00:00.000Z',
+      venue: null, fieldId: null, fieldName: null,
+      home: { registrationId: 'reg-home', teamId: 'team-42', teamName: '성수 FC' },
+      away: { registrationId: 'reg-away', teamId: 'team-away', teamName: '마포 FC' },
+      visibilityMode: 'live', status: 'ended', resultState: 'official', scoreStatus: 'official',
+      score: { home: 1, away: 0, penalties: null }, clock: null, periodBreak: null,
+      scorers: [], cards: [], outcome: null, hasVideo: false,
+    };
+    const schedule = { ...leagueSchedule(), tournamentId: 'tour-1', items: [entry] };
+    setMockSearchParams(new URLSearchParams({ tab: 'standings', from: '/tournaments/tour-1' }));
+    window.history.replaceState(null, '', `/tournaments/tour-1/bracket?${getMockSearchParams()}`);
+    const bracket = renderBracketPage(tournament, schedule);
+    expect(screen.getByRole('tab', { name: '리그 순위' })).toHaveAttribute('aria-selected', 'true');
+
+    await userEvent.click(screen.getByRole('tab', { name: '경기 일정' }));
+    await userEvent.click(screen.getByRole('tab', { name: '정규 라운드' }));
+    const fixtureLink = bracket.container.querySelector<HTMLAnchorElement>('a[href^="/league-matches/tour-1/fixtures/fixture-1"]');
+    if (!fixtureLink) throw new TypeError('선택한 정규 라운드의 경기 링크가 없어요.');
+    const fixtureUrl = new URL(fixtureLink.href);
+    const fixtureFrom = new URL(fixtureUrl.searchParams.get('from') ?? '', window.location.origin);
+    expect(fixtureFrom.searchParams.has('tab')).toBe(false);
+    expect(fixtureFrom.searchParams.get('schedulePhase')).toBe('knockout');
+    bracket.unmount();
+    setMockPathname(fixtureUrl.pathname);
+    setMockSearchParams(fixtureUrl.searchParams);
+    window.history.replaceState(null, '', `${fixtureUrl.pathname}${fixtureUrl.search}`);
+
+    const fixtureBack = render(<AppBackLink fallbackHref="/tournaments/tour-1/bracket">뒤로가기</AppBackLink>);
+    await userEvent.click(screen.getByRole('link', { name: '뒤로가기' }));
+    const returnHref: unknown = replace.mock.calls[0]?.[0];
+    if (typeof returnHref !== 'string') throw new TypeError('경기 화면의 복귀 경로가 없어요.');
+    const returnUrl = new URL(returnHref, window.location.origin);
+    fixtureBack.unmount();
+    setMockPathname(returnUrl.pathname);
+    setMockSearchParams(returnUrl.searchParams);
+    window.history.replaceState(null, '', returnHref);
+    renderBracketPage(tournament, schedule);
+
+    expect(screen.getByRole('tab', { name: '경기 일정' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('tab', { name: '정규 라운드' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.queryByRole('table', { name: '리그 순위표' })).not.toBeInTheDocument();
+  });
+
+  it.each(['schedule', 'unknown', 'https://external.invalid'])('허용되지 않은 순위 탭 값 %s는 경기 일정으로 직접 진입한다', (tab) => {
+    setMockSearchParams(new URLSearchParams({ tab }));
+    renderBracketPage(mirrorLeague(), leagueSchedule());
+    expect(screen.getByRole('tab', { name: '경기 일정' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.queryByRole('table', { name: '리그 순위표' })).not.toBeInTheDocument();
   });
 
   it('순위 탭이 /schedule 의 리그 순위를 그린다 — 상세의 groups 는 리그에서 늘 비어 있다', () => {

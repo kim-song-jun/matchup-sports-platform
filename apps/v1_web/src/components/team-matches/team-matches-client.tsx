@@ -108,6 +108,15 @@ export function TeamMatchListPageClient({ seed }: { readonly seed?: CursorListSe
     setSearchValue(initialQuery);
     setSubmittedQuery(initialQuery);
   }, [initialQuery]);
+  // replace가 아직 URL에 반영되지 않아도 후속 탐색은 목록 조회에 적용한 검색어를 따른다.
+  // 입력 draft 대신 submittedQuery를 덮어써 지운 검색어가 종목·필터 링크에서 되살아나지 않게 한다.
+  const navigationParams = useMemo(() => {
+    const params = new URLSearchParams(searchParams.toString());
+    const appliedQuery = submittedQuery.trim();
+    if (appliedQuery) params.set('q', appliedQuery);
+    else params.delete('q');
+    return params;
+  }, [searchParams, submittedQuery]);
   const sportsQuery = useV1MasterSports({ seed: seed?.sports });
   const teamMatchFilters = useMemo(() => {
     const filters: { sportId?: string; query?: string; sort?: 'recommended' | 'deadline' | 'latest'; view?: 'card' | 'compact'; genderRule?: string; levelCodes?: string; kind?: 'friendly' | 'competition' } = {};
@@ -218,11 +227,11 @@ export function TeamMatchListPageClient({ seed }: { readonly seed?: CursorListSe
         query: submittedQuery,
         filterCount: activeFilterCount,
         search: searchModel,
-        filterHref: buildTeamMatchHref(searchParams, { filter: '1' }),
-        filterSheet: buildTeamMatchFilterSheet(searchParams, selectedSort, selectedView, selectedGenderRule, selectedLevels, selectedKind, filterOpen),
+        filterHref: buildTeamMatchHref(navigationParams, { filter: '1' }),
+        filterSheet: buildTeamMatchFilterSheet(navigationParams, selectedSort, selectedView, selectedGenderRule, selectedLevels, selectedKind, filterOpen),
         sports: buildSportChips({
           base,
-          params: searchParams,
+          params: navigationParams,
           sports: sportsQuery.data,
           matches: countItems,
           selectedSportId,
@@ -238,11 +247,11 @@ export function TeamMatchListPageClient({ seed }: { readonly seed?: CursorListSe
         query: submittedQuery,
         filterCount: activeFilterCount,
         search: searchModel,
-        filterHref: buildTeamMatchHref(searchParams, { filter: '1' }),
-        filterSheet: buildTeamMatchFilterSheet(searchParams, selectedSort, selectedView, selectedGenderRule, selectedLevels, selectedKind, filterOpen),
+        filterHref: buildTeamMatchHref(navigationParams, { filter: '1' }),
+        filterSheet: buildTeamMatchFilterSheet(navigationParams, selectedSort, selectedView, selectedGenderRule, selectedLevels, selectedKind, filterOpen),
         sports: buildSportChips({
           base,
-          params: searchParams,
+          params: navigationParams,
           sports: sportsQuery.data,
           matches: countItems,
           selectedSportId,

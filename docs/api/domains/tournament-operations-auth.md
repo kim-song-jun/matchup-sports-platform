@@ -70,6 +70,10 @@ The following pre-normalization v1 admin/audit contract is retained here so supe
 `GET /admin/users` rows include `ownedTeamCount`, `membershipCount`, and
 `teamRoleCounts: { owner, manager, member }` so the admin list can show team
 leader/member role distribution without opening detail.
+For both list and detail, `membershipCount` counts only `V1TeamMembership.status=active`,
+using the same memberships as `teamRoleCounts`; therefore `membershipCount = owner + manager + member`.
+Past `left`/`removed` records are excluded, and a user with only past memberships has count zero.
+The team’s own status does not change this membership-status filter.
 
 `GET /admin/users/:userId` returns the list row fields plus:
 

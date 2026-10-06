@@ -1,5 +1,11 @@
 # Task 20261033: 내 일정 예정 상태 상세 복귀 보존 (MD-QA #26)
 
+### Root Phase C validation — 2026-10-06
+- Actual Copilot inline4191575419 duplicate URL serialization repaired in this same PR/worktree. Current delta verified; source/test scope preserved.
+- Root serialized narrow GREEN: related schedule46/46 PASS. Evidence: 26-review-green.log.
+- Changed-tree TypeScript and existing v1 pattern checker PASS (26-review-type-pattern.log). Independent delta review4/4, Critical0/Warning0; root inspected actual diff.
+- Commit/push/new-head review/tracker follow-up pending below; no merged, deployed or alpha browser success claimed.
+
 Status: Review
 **Owner**: root → mdqa_26_builder
 **Created**: 2026-10-06
@@ -8,7 +14,7 @@ Status: Review
 - Report: https://teameet.jmandu.kr/issues/26/
 - Root actually read the report/reproduction and accepted it through MD-QA UI. Assignee 김성준 / 확인 중 verified.
 - Exact report and intake evidence: F:/user/documents/project/matchup-sports-platform/tmp/qa/mdqa-assigned-monitor/2026-10-06-intake/intake-audit.json (entry id=26). Read this entry before analysis.
-- Existing tasks/worktrees and latest dev PRs checked; no MD-QA #26 implementation/PR exists.
+- At intake, existing tasks/worktrees and latest dev PRs were checked and no MD-QA #26 implementation/PR existed. Current implementation is in [PR #1632](https://github.com/kim-song-jun/matchup-sports-platform/pull/1632).
 
 ## Goal
 Fix the reported current-v1 behavior with the smallest correct change and a real regression, then independent review and dev PR.
@@ -34,6 +40,7 @@ Fix the reported current-v1 behavior with the smallest correct change and a real
 ## Parallel Work Breakdown
 - Phase A: builder investigates, records exact root cause, adds narrow RED regression, implements.
 - Phase B: root serializes validation; independent reviewer checks final diff; root commits/pushes/dev PR and tracker comment.
+- Phase C: builder handles the existing PR #1632 Copilot maintainability comment only within MySchedulePageClient and this task; root reruns the existing regression/type checks, reviews and commits/pushes.
 - Owned files: apps/v1_web/src/app/my/schedule/; apps/v1_web/src/app/teams/[id]/schedules/[scheduleId]/ detail if needed; respective local tests; apps/v1_web/src/components/team-schedules/team-schedules-client.tsx (MySchedulePageClient only, root-approved scope expansion); apps/v1_web/src/components/team-schedules/team-schedules.view-model.ts (my-schedule link modeling only if needed); this task; .changeset/mdqa-26-my-schedule-return.md.
 - Forbidden: all other modules, shared hooks/types/MSW/DTO/schema/navigation helpers, other tasks/state, dev/main, browser/tracker actions, commit/push. Date utility exception belongs only to #27.
 - You are not alone. Preserve others' changes and coordinate scope expansion with root.
@@ -49,6 +56,7 @@ Fix the reported current-v1 behavior with the smallest correct change and a real
 ## Tech Debt Resolved
 - Removed the hard-coded all reset and bare /my/schedule detail origin in the touched my-schedule client.
 - Reused MyScheduleViewModel's status union and the existing sanitized withFromPath/AppBackLink flow. Root requested the smallest existing-client fix rather than unrelated file extraction.
+- Phase C: unified the duplicated status set/delete and query serialization in the component-local schedulePathForStatus helper. Both the detail origin and URL replacement use it with their existing current/new status input.
 
 ## Security Notes
 - Preserve authentication/authorization; validate local return paths and untrusted query input where applicable. No secrets read/output.
@@ -65,11 +73,11 @@ Fix the reported current-v1 behavior with the smallest correct change and a real
 | 2026-10-06 | mdqa_26_builder | Is UI A/B/C needed for this fix? | CLAUDE.md UI-start policy excludes logic-only changes. Existing screen structure and controls stay unchanged. |
 
 ## Progress Snapshot
-- Phase: A / Investigation and implementation.
+- Phase: C / PR #1632 maintainability follow-up; root validation pending.
 - Worktree: C:/Users/kinso/.codex/worktrees/mdqa-26-my-schedule-return/matchup-sports-platform
 - Branch: fix/mdqa-26-my-schedule-return
 - Tracker: 확인 중 / 김성준; actual intake saved 2026-10-06.
-- PR/head/merge: not created.
+- PR/head/merge: [PR #1632](https://github.com/kim-song-jun/matchup-sports-platform/pull/1632); Phase C started from 3f6e3694cffea85de494c97d454cc620cbf1a260. Root owns subsequent Git/PR cursors.
 - Root cause: MySchedulePageClient initializes its status to all on every mount, and detail links carry only /my/schedule as their from path. The existing detail AppBackLink already honors a sanitized full from path.
 - RED verified by root: 26-red.log, 1/1 failed because the actual detail href had from=/my/schedule without status=scheduled. Production remained unchanged for that run.
 - Implementation: allowlist URL status, maintain immediate local selection, replace the list URL without scrolling, and generate the detail from path from that current selection. No detail, attendance, write, API, permission or shared navigation code was changed.
@@ -84,3 +92,11 @@ Fix the reported current-v1 behavior with the smallest correct change and a real
 - 관련 회귀 실행에서 미처리 MSW 요청이나 act 경고가 없습니다.
 - 실제 렌더링된 제어·상세 복귀 경로와 결과를 검증했습니다. 배포된 alpha에서 원문 시나리오를 다시 확인해야 합니다.
 - Latest cursor overrides earlier pending implementation/validation notes: implementation and code validation complete; root commit/PR/latest-head review/merge/tracker cursor follows. Tracker remains 김성준 / 확인 중; no close or alpha success claim.
+
+## Phase C — Copilot Maintainability Follow-up — 2026-10-06
+- Actual comment verified through GitHub API: [discussion_r4191575419](https://github.com/kim-song-jun/matchup-sports-platform/pull/1632#discussion_r4191575419), path team-schedules-client.tsx, reviewed commit 3f6e3694cffea85de494c97d454cc620cbf1a260. The finding is optional maintainability: duplicate URL generation could drift between detail origin and status-change navigation.
+- Verified two copies of current searchParams cloning, status set/delete and serialization in MySchedulePageClient. Replaced them with one component-local, typed helper; no shared abstraction, API, permission, write flow or other component edits.
+- Preserved immediate local selection, URL status allowlist, existing search parameters, nested from handling, and scroll:false replacement. Existing rendered regressions already cover these contracts, so no test-only implementation assertions were added.
+- Changed files: apps/v1_web/src/components/team-schedules/team-schedules-client.tsx (MySchedulePageClient only), this task. Existing tests and changeset stay unchanged.
+- Root validation command: pnpm --filter v1_web test 'src/app/my/schedule/my-schedule-return.test.tsx' 'src/app/my/schedule/my-schedule.test.tsx' 'src/app/teams/[id]/schedules/team-schedules.test.tsx' --maxWorkers=1 --minWorkers=1 --no-file-parallelism. Required type/pattern checks remain root-owned.
+- Phase C validation: pending root serialized rerun; builder did not run tests, builds or browser QA and did not commit/push.

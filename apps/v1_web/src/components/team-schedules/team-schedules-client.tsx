@@ -799,12 +799,16 @@ export function MySchedulePageClient() {
   const [statusFilter, setStatusFilter] = useState<MyScheduleViewModel['statusFilter']>(urlStatus);
   useEffect(() => setStatusFilter(urlStatus), [urlStatus]);
 
+  function schedulePathForStatus(status: MyScheduleViewModel['statusFilter']) {
+    const params = new URLSearchParams(searchParams.toString());
+    if (status === 'all') params.delete('status');
+    else params.set('status', status);
+    const query = params.toString();
+    return `/my/schedule${query ? `?${query}` : ''}`;
+  }
+
   // 상세를 바로 열어도 URL 반영을 기다리지 않고 현재 선택을 출처에 담는다.
-  const returnParams = new URLSearchParams(searchParams.toString());
-  if (statusFilter === 'all') returnParams.delete('status');
-  else returnParams.set('status', statusFilter);
-  const returnQuery = returnParams.toString();
-  const returnPath = `/my/schedule${returnQuery ? `?${returnQuery}` : ''}`;
+  const returnPath = schedulePathForStatus(statusFilter);
   const filters = useMemo(
     () => (statusFilter === 'all' ? { limit: 50 } : { limit: 50, status: statusFilter }),
     [statusFilter],
@@ -815,11 +819,7 @@ export function MySchedulePageClient() {
     statusFilter,
     onStatusFilterChange: (value) => {
       setStatusFilter(value);
-      const params = new URLSearchParams(searchParams.toString());
-      if (value === 'all') params.delete('status');
-      else params.set('status', value);
-      const query = params.toString();
-      router.replace(`/my/schedule${query ? `?${query}` : ''}`, { scroll: false });
+      router.replace(schedulePathForStatus(value), { scroll: false });
     },
     statusOptions: [
       { value: 'all', label: '전체' },

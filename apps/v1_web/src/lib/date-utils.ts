@@ -292,6 +292,14 @@ export function formatAdminKstDateTime(dateStr: string | null | undefined): stri
   return `${parts.year}.${parts.month}.${parts.day} ${parts.hour}:${parts.minute}`;
 }
 
+/** 대회 목록용 KST 고정 일시: 'M.D HH:MM'. 개요와 같은 시간대를 쓰고 기존 local 관리자 계약은 유지한다. */
+export function formatAdminKstDateTimeShort(dateStr: string | null | undefined): string {
+  if (!dateStr) return '—';
+  const parts = getTournamentKstParts(dateStr);
+  if (!parts) return dateStr;
+  return `${parts.month}.${parts.day} ${parts.hour}:${parts.minute}`;
+}
+
 /**
  * 관리자 운영 화면 공용 일시 포맷터: 'YYYY.M.D HH:MM'
  * 대회 도메인 밖의 관리자 로그/운영 테이블·상세 화면에서 사용해요.

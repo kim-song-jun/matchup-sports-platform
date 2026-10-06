@@ -1,6 +1,10 @@
+import { execFileSync } from 'node:child_process';
+import { resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
   formatAdminDate,
+  formatAdminDateTimeShort,
   formatCardDate,
   formatCardTime,
   formatKstDateShort,
@@ -10,6 +14,62 @@ import {
   formatTournamentDateTimeLong,
   formatTournamentDateTimeShort,
 } from './date-utils';
+
+describe('formatAdminDateTimeShort (관리자 대회 목록 · MD-QA #27)', () => {
+  it.each(['UTC', 'America/Los_Angeles', 'Asia/Seoul'])(
+    '실제 %s 호스트에서 같은 API 일정·마감을 개요와 같은 KST로 표시한다',
+    (hostTimeZone) => {
+      // Given: UTC 날짜 경계를 넘는 같은 API 값. LA에서는 보고된 16시간 차이를 재현한다.
+      // worker의 process.env.TZ 변경만으로는 V8 로컬 시간대가 바뀌지 않을 수 있어,
+      // TZ를 지정해 새 Node 프로세스를 시작하고 실제 적용된 시간대도 함께 검증한다.
+      // jsdom의 import.meta.url은 HTTP URL이므로 패키지 실행 경로에서 파일 URL을 만든다.
+      const dateUtilsUrl = pathToFileURL(resolve('src/lib/date-utils.ts')).href;
+      const overviewUtilsUrl = pathToFileURL(resolve('src/app/admin/tournaments/[id]/tournament-admin-shared.ts')).href;
+      const script = `
+        import { formatAdminDateTimeShort } from ${JSON.stringify(dateUtilsUrl)};
+        import { formatDate, formatDateRange } from ${JSON.stringify(overviewUtilsUrl)};
+        const scheduledAt = '2026-10-11T16:24:00.000Z';
+        const scheduledEndAt = '2026-10-12T00:24:00.000Z';
+        const registrationDeadlineAt = '2026-10-04T15:24:00.000Z';
+        console.log(JSON.stringify({
+          hostTimeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+          listSchedule: [scheduledAt, scheduledEndAt].map(formatAdminDateTimeShort).join(' ~ '),
+          listDeadline: formatAdminDateTimeShort(registrationDeadlineAt),
+          overviewSchedule: formatDateRange(scheduledAt, scheduledEndAt),
+          overviewDeadline: formatDate(registrationDeadlineAt),
+        }));
+      `;
+
+      // When: 실제 목록·개요 표시 함수를 같은 원본 시각에 적용한다.
+      const output = execFileSync(process.execPath, ['--experimental-strip-types', '--input-type=module', '--eval', script], {
+        env: { ...process.env, TZ: hostTimeZone },
+        encoding: 'utf8',
+        timeout: 10_000,
+      });
+
+      // Then: 형식은 달라도 날짜와 시각은 고정된 제품 시간대에 일치한다.
+      expect(JSON.parse(output)).toEqual({
+        hostTimeZone,
+        listSchedule: '10.12 01:24 ~ 10.12 09:24',
+        listDeadline: '10.5 00:24',
+        overviewSchedule: '2026. 10. 12. 오전 01:24 ~ 2026. 10. 12. 오전 09:24',
+        overviewDeadline: '2026. 10. 5. 오전 12:24',
+      });
+    },
+  );
+
+  it.each([
+    [null, '—'],
+    [undefined, '—'],
+    ['', '—'],
+    ['not-a-date', 'not-a-date'],
+  ] as const)(
+    '빈 값·잘못된 값 %s의 기존 표시 계약을 유지한다',
+    (value, expected) => {
+      expect(formatAdminDateTimeShort(value)).toBe(expected);
+    },
+  );
+});
 
 describe('formatAdminDate', () => {
   it('유효한 날짜는 Y.M.D (formatAdminDateTime의 날짜 전용 자매 스타일)', () => {

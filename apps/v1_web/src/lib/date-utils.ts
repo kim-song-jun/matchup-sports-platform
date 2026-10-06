@@ -312,14 +312,13 @@ export function formatAdminDateTime(dateStr: string | null | undefined): string 
 /**
  * 연도 없는 목록용 일시: 'M.D HH:MM' — 목록 열은 폭이 좁아 연도를 의도적으로 뺀다
  * (로그·최근 활동처럼 대부분 올해 데이터인 열). 상세 화면은 연도 포함 본판을 쓴다.
+ * 관리자 대회 개요와 같은 KST 기준을 사용해 기기 시간대에 따라 일정·마감이 달라지지 않는다.
  */
 export function formatAdminDateTimeShort(dateStr: string | null | undefined): string {
   if (!dateStr) return '—';
-  const d = new Date(dateStr);
-  if (Number.isNaN(d.getTime())) return dateStr;
-  const hour = String(d.getHours()).padStart(2, '0');
-  const minute = String(d.getMinutes()).padStart(2, '0');
-  return `${d.getMonth() + 1}.${d.getDate()} ${hour}:${minute}`;
+  const parts = getTournamentKstParts(dateStr);
+  if (!parts) return dateStr;
+  return `${parts.month}.${parts.day} ${parts.hour}:${parts.minute}`;
 }
 
 /** formatAdminDateTime 의 날짜 전용 자매 — 어드민 목록의 가입일·생성일 열처럼 시각이 불필요한 곳 */

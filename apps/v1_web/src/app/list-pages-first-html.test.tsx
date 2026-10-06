@@ -181,13 +181,27 @@ describe('공개 목록 첫 HTML — seed 성공', () => {
 
   it('/teams 는 첫 페이지 팀과 상세 링크, 실제 종목 ID 칩을 그린다', async () => {
     const html = await serverHtml(TeamsPage);
+    const template = document.createElement('template');
+    template.innerHTML = markup(html);
+    const teamLinks = [...template.content.querySelectorAll('a.tm-team-card')];
+    const origin = 'https://alpha.teameet.co.kr';
+    const detailUrls = teamLinks.map((link) => {
+      const href = link.getAttribute('href');
+      if (href === null) throw new Error('SSR 팀 카드의 상세 링크가 없어요.');
+      return new URL(href, origin);
+    });
 
-    expect(html).toContain('강남 유나이티드');
-    expect(html).toContain('href="/teams/team-1"');
+    expect(template.content.textContent).toContain('강남 유나이티드');
+    expect(detailUrls).toHaveLength(1);
+    expect(detailUrls[0]?.origin).toBe(origin);
+    expect(detailUrls[0]?.pathname).toBe('/teams/team-1');
+    expect(detailUrls[0]?.hash).toBe('');
+    // 복귀 출처만 추가된다. 중복 from이나 다른 query로 계약이 약해지면 실패한다.
+    expect([...(detailUrls[0]?.searchParams.entries() ?? [])]).toEqual([['from', '/teams']]);
     expect(html).toContain('sportId=sport-futsal-uuid');
     expect(html).not.toContain('팀 목록 불러오는 중');
     expect(ldPaths(html)).toEqual(['/teams/team-1']);
-    expect(ldPaths(html)).toEqual(detailPaths(html, '/teams'));
+    expect(ldPaths(html)).toEqual(detailUrls.map((url) => url.pathname));
     expect(itemList(html)?.map((entry) => entry.name)).toEqual(['강남 유나이티드']);
   });
 

@@ -1,5 +1,11 @@
 # Task 20261031: 팀 목록 검색 상세 복귀 보존 (MD-QA #24)
 
+### Root Phase C validation — 2026-10-06
+- Actual Web CI old bare-link expectation repaired in this same PR/worktree. Current delta verified; source/test scope preserved.
+- Root serialized narrow GREEN: first HTML23/23 PASS. Evidence: 24-ci-green.log.
+- Changed-tree TypeScript and existing v1 pattern checker PASS (24-review-type-pattern.log). Independent delta review4/4, Critical0/Warning0; root inspected actual diff.
+- Commit/push/new-head review/tracker follow-up pending below; no merged, deployed or alpha browser success claimed.
+
 Status: Review
 **Owner**: root → mdqa_24_builder
 **Created**: 2026-10-06
@@ -34,6 +40,7 @@ Fix the reported current-v1 behavior with the smallest correct change and a real
 ## Parallel Work Breakdown
 - Phase A: builder investigates, records exact root cause, adds narrow RED regression, implements.
 - Phase B: root serializes validation; independent reviewer checks final diff; root commits/pushes/dev PR and tracker comment.
+- Phase C: Web CI follow-up for PR #1635. Builder owns only the `/teams` seed-success case in `apps/v1_web/src/app/list-pages-first-html.test.tsx` and this task; root owns serialized validation, review, commit and push. All other route cases, product code, shared helpers/API and browser work remain excluded.
 - Owned files: apps/v1_web/src/app/teams/page.tsx and list client; apps/v1_web/src/app/teams/[id]/page.tsx and team detail client; apps/v1_web/src/components/teams/teams-client.tsx (TeamListPageClient); apps/v1_web/src/components/teams/teams-page.tsx (public TeamListPageView/TeamCard only, root approved 2026-10-06); apps/v1_web/src/components/teams/teams-search-return.test.tsx; corresponding local tests (NOT records/schedules subdirectories); this task; .changeset/mdqa-24-team-return.md.
 - Forbidden: all other modules, shared hooks/types/MSW/DTO/schema/navigation helpers, other tasks/state, dev/main, browser/tracker actions, commit/push. Date utility exception belongs only to #27.
 - You are not alone. Preserve others' changes and coordinate scope expansion with root.
@@ -86,3 +93,11 @@ Fix the reported current-v1 behavior with the smallest correct change and a real
 - 관련 회귀 실행에서 미처리 MSW 요청이나 act 경고가 없습니다.
 - 실제 렌더링된 제어·상세 복귀 경로와 결과를 검증했습니다. 배포된 alpha에서 원문 시나리오를 다시 확인해야 합니다.
 - Latest cursor overrides earlier pending implementation/validation notes: implementation and code validation complete; root commit/PR/latest-head review/merge/tracker cursor follows. Tracker remains 김성준 / 확인 중; no close or alpha success claim.
+
+## Phase C — First HTML Contract Sync (2026-10-06)
+- PR: #1635. Actual CI run `37413928418`, Web job `112108254172`: 596 test files / 6474 tests passed, 1 test failed at `list-pages-first-html.test.tsx:186`, expecting the old bare `href="/teams/team-1"` after the Card began adding a list return source.
+- Evidence read: root's `tmp/qa/mdqa-assigned-monitor/2026-10-06-intake/24-ci-failure-summary.txt`. This is an assertion-contract drift, not a new production navigation change.
+- Changed only the existing `/teams` real SSR seed-success test. Parse actual script-free card markup, require one same-origin `/teams/team-1` link with empty hash, and require decoded query entries to be exactly `[['from', '/teams']]`. Duplicate/extra params and a wrong origin/path remain failures.
+- Preserve actual body seed name, sport chip, no loading state, canonical JSON-LD team path/name and card-to-JSON-LD path correspondence. Other route cases and the shared `detailPaths` helper are unchanged.
+- Exact affected command for root: `pnpm --filter v1_web test -- src/app/list-pages-first-html.test.tsx --maxWorkers=1 --no-file-parallelism`.
+- Status: ready for root's serialized affected-test/type/review gates; builder launched no tests, builds, Git mutations or browser actions.

@@ -80,3 +80,7 @@ Status: In Progress
 - alpha SSM 31b89f8c-6479-4457-bab1-489dcf486aff의 READ ONLY 확인: is_public column 존재, 기존 59개 모두 true, 운영 대상 ID는 alpha에 없음. health DB true, 공개 목록 200, 존재하지 않는 운영 ID 상세 404, 비로그인 visibility PATCH 401, sitemap no-store를 확인했다. alpha의 llms 404는 기존 nginx 정책이다.
 - 실제 공개/비공개 전환·감사·데이터 보존과 viewport별 UI 검증은 로그인/제어권 반환을 기다린다. ego space 814를 사용자 로그인용으로 유지하며 검증 후 finish({ keep: [] })로 닫는다. alpha/production 수동 쓰기 0건.
 - 승격 준비: c98c1004c에서 32개 Changeset 소비와 API/Web 1.2.0 → 1.3.0 및 changelog를 pathspec 36개 경로로 커밋했다. 11ae087f4에서 main의 승격 merge 이력 3개를 dev에 흡수했고 제품 코드 diff는 없었다. committed tree의 release-promotion gate와 diff check가 통과했다. 새 dev SHA의 CI/alpha 및 승격 PR 검증은 이어서 확인한다.
+- 승격 PR #1641(dev → main) 생성. e33ec7cfb의 dev CI 37536558288 및 alpha 37536558273은 성공했지만 PR CI 37536639933의 팝업 test 한 건과 CodeQL check 112519412131은 실패했다. CodeQL 분석 jobs 자체의 success와 보안 check failure를 구분했다.
+- 승격 게이트 수정: 대회 복귀 test에서 제목 일부만 이스케이프하던 RegExp을 literal includes matcher로 교체했다. 팝업 test는 unmount가 예약하는 실제 history.back 완료를 다음 test 전에 기다리고, 표식 항목이 있으면 링크가 replace로 이동하는 실제 계약을 검증한다. 첫 좁은 검증에서 기존 route test의 잘못된 push 기대값도 드러나 수정했고, 마지막 2 files/12 tests는 통과했다. 제품 코드 변경은 없다.
+- 2026-10-07 사용자가 A안과 운영 `[수원] 수요일 여성부 리그전` 대상을 다시 명시했다. 배포 뒤 운영 DB에서 해당 행의 공개 여부를 변경하는 작업을 진행한다. AWS SSM READ ONLY e4fa415a-1e86-4936-9567-04a2a9c107ce에서 운영에는 아직 is_public이 없고 대상 진행 상태는 in_progress, deletedAt=null, 두 홍보 flag=false임을 확인했다.
+- ego task814는 재조회 시 task space not found로 확인됐다. 사용자에 의해 유지 중이라고 더 이상 보고하지 않으며 새 task space를 만들어 복구하지 않는다. 실제 관리자 UI 검증은 미완이다. DB 전환·공개 경로 검증은 CLI로 별도 수행하며 UI 완료로 주장하지 않는다.

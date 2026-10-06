@@ -176,7 +176,7 @@ describe('MD-QA #22 — 공개 대회 상세 복귀', () => {
     const user = userEvent.setup();
     renderRoute();
     await expectFilteredList();
-    await user.click(screen.getByRole('link', { name: new RegExp(tournament.title.replace(/[()]/g, '\\$&')) }));
+    await user.click(screen.getByRole('link', { name: (name) => name.includes(tournament.title) }));
     await screen.findByRole('heading', { level: 1, name: tournament.title });
 
     // When: 상세 화면의 공통 뒤로가기 액션.

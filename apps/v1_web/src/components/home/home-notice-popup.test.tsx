@@ -1,10 +1,10 @@
-import { act, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { getHomePopupStorageKey, HomePopupDialog } from './home-notice-popup';
 import type { HomePopup } from './home.types';
 import { bindSoftNavigator } from '@/lib/navigation-history';
-import { overlayMarkerOf } from '@/lib/overlay-history';
+import { overlayMarkerOf, waitForOverlayHistory } from '@/lib/overlay-history';
 
 const popup: HomePopup = {
   id: 'popup-main',
@@ -20,6 +20,12 @@ describe('HomePopupDialog', () => {
     window.localStorage.clear();
   });
 
+  afterEach(async () => {
+    cleanup();
+    // Unmount can schedule a real history.back(). Let it settle before the next popup opens.
+    await waitForOverlayHistory();
+  });
+
   it('renders an internal CTA link when configured', async () => {
     render(<HomePopupDialog popup={{ ...popup, linkUrl: '/matches', linkLabel: '매치 보기' }} />);
 
@@ -28,24 +34,28 @@ describe('HomePopupDialog', () => {
     expect(screen.queryByRole('button', { name: '닫기' })).not.toBeInTheDocument();
   });
 
-  // 팝업 링크를 눌러 이동하면 닫기는 URL 이 바뀐 뒤에 온다 — 닫기 back 이 이동 push 와 엇갈리지 않는다.
+  // 팝업 링크는 자기 표식 항목을 목적지로 바꾸고 URL 변경 뒤 닫힌다.
   it('closes on route change without walking history back', async () => {
     const historyBack = vi.spyOn(window.history, 'back');
+    const routerReplace = vi.fn();
+    const unbind = bindSoftNavigator(routerReplace);
     const linked = { ...popup, linkUrl: '/matches', linkLabel: '매치 보기' };
     const { rerender } = render(<HomePopupDialog popup={linked} location="/home" />);
     const link = await screen.findByRole('link', { name: '매치 보기' });
+    await waitFor(() => expect(overlayMarkerOf(window.history.state)).not.toBeNull());
 
     const notPrevented = link.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, button: 0 }));
-    expect(notPrevented).toBe(true); // 링크가 그대로 이동한다
-    await act(async () => {}); // 이동(push)은 클릭 처리보다 늦게 커밋된다
+    expect(notPrevented).toBe(false);
+    expect(routerReplace).toHaveBeenCalledWith('/matches');
     expect(screen.getByRole('dialog', { name: popup.title })).toBeInTheDocument();
     expect(historyBack).not.toHaveBeenCalled();
 
-    window.history.pushState({}, '', '/matches');
+    window.history.replaceState({}, '', '/matches');
     rerender(<HomePopupDialog popup={linked} location="/matches" />);
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
     expect(historyBack).not.toHaveBeenCalled();
     historyBack.mockRestore();
+    unbind();
   });
 
   it('closes when only the query string changes', async () => {
@@ -77,7 +87,9 @@ describe('HomePopupDialog', () => {
     expect(link).toHaveAttribute('target', '_blank');
 
     link.addEventListener('click', (event) => event.preventDefault()); // jsdom 은 새 창을 열지 못한다
-    link.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, button: 0 }));
+    act(() => {
+      link.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, button: 0 }));
+    });
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
   });
 

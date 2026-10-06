@@ -790,7 +790,21 @@ export function TeamScheduleFormPageClient({ teamId, scheduleId }: { teamId: str
 // ── 내 일정 (GET /me/schedule) ────────────────────────────────────────────────
 
 export function MySchedulePageClient() {
-  const [statusFilter, setStatusFilter] = useState<'all' | 'scheduled' | 'cancelled' | 'completed'>('all');
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const requestedStatus = searchParams.get('status');
+  const urlStatus = requestedStatus === 'scheduled' || requestedStatus === 'cancelled' || requestedStatus === 'completed'
+    ? requestedStatus
+    : 'all';
+  const [statusFilter, setStatusFilter] = useState<MyScheduleViewModel['statusFilter']>(urlStatus);
+  useEffect(() => setStatusFilter(urlStatus), [urlStatus]);
+
+  // 상세를 바로 열어도 URL 반영을 기다리지 않고 현재 선택을 출처에 담는다.
+  const returnParams = new URLSearchParams(searchParams.toString());
+  if (statusFilter === 'all') returnParams.delete('status');
+  else returnParams.set('status', statusFilter);
+  const returnQuery = returnParams.toString();
+  const returnPath = `/my/schedule${returnQuery ? `?${returnQuery}` : ''}`;
   const filters = useMemo(
     () => (statusFilter === 'all' ? { limit: 50 } : { limit: 50, status: statusFilter }),
     [statusFilter],
@@ -799,7 +813,14 @@ export function MySchedulePageClient() {
 
   const model: MyScheduleViewModel = {
     statusFilter,
-    onStatusFilterChange: setStatusFilter,
+    onStatusFilterChange: (value) => {
+      setStatusFilter(value);
+      const params = new URLSearchParams(searchParams.toString());
+      if (value === 'all') params.delete('status');
+      else params.set('status', value);
+      const query = params.toString();
+      router.replace(`/my/schedule${query ? `?${query}` : ''}`, { scroll: false });
+    },
     statusOptions: [
       { value: 'all', label: '전체' },
       { value: 'scheduled', label: '예정' },
@@ -819,7 +840,7 @@ export function MySchedulePageClient() {
         isTentative: display.isTentative,
         dateTimeLabel: formatTournamentDateRangeWithTime(item.startAt, item.endAt) ?? '일정 미정',
         myAttendanceLabel: item.myAttendanceStatus ? attendanceStatusLabel(item.myAttendanceStatus) : null,
-        href: withFromPath(`/teams/${item.teamId}/schedules/${item.id}`, '/my/schedule'),
+        href: withFromPath(`/teams/${item.teamId}/schedules/${item.id}`, returnPath),
       };
     }),
     loading: query.isLoading,

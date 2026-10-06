@@ -174,11 +174,11 @@ export class UpdateFixtureDto {
   /** 결과가 이미 기록된 경기는 팀 변경 불가 (409) — 결과를 먼저 삭제해야 한다 */
   @IsOptional()
   @IsUUID()
-  homeRegistrationId?: string;
+  homeRegistrationId?: string | null;
 
   @IsOptional()
   @IsUUID()
-  awayRegistrationId?: string;
+  awayRegistrationId?: string | null;
 }
 
 export class UpdateBracketSourcesDto {

@@ -299,6 +299,13 @@ All team roster mutations lock the registration row and re-read `rosterLockedAt`
 - 공개 상세 `fixtures[].bracketSources`와 관리자 bracket fixture에 `[{ fixtureId, outcome: WINNER|LOSER, side: HOME|AWAY }]`를 반환. 대진표 비공개 게이트와 source 삭제 필터 유지. 공개되지 않은 대회에는 fixture 및 연결 전체를 노출하지 않음.
 - 부전승 선은 round12 groupTeam.isBye + quarter 슬롯의 같은 registrationId로 렌더. 별도 경기·가짜 승점 없음. 연결이 없는 수동 대진은 번호 순서로 추정하지 않음.
 
+
+### 진출 연결 동시성 보호 (2026-10-05)
+
+- 연결 PATCH는 잠금 전에 동일 대회·이전 단계 출처를 검증하고, 결과 확정과 동일하게 출처 Game → 대상 Game 순서로 잠급니다. 단계 사이에는 UUID순 잠금을 사용하지 않습니다.
+- 명단 재계산은 Game UUID순으로 잠그되 `NOWAIT`를 사용합니다. 출처→대상 순서의 결과 확정·대진 PATCH가 Game을 점유하면 명단 트랜잭션 전체를 롤백하고 `COMMAND_CONCURRENCY_CONFLICT`(409)를 반환합니다. 결과 명단 워커는 기존 outbox 재시도로 돌아가며, 양 경로가 서로의 Game을 기다리는 교착을 만들지 않습니다.
+- 팀 변경 PATCH의 `BRACKET_SOURCE_SLOT_LINKED`(409)는 대상 Game/Details 잠금 후 최신 배정 ID와 비교합니다. 최초 조회 뒤 결과 확정으로 승자가 배정된 자리를 과거 `null`로 덮어쓸 수 없습니다. 현재 배정과 같은 ID를 보내거나 장소·일정만 바꾸는 요청은 허용됩니다.
+- 공개 3·4위전의 미정 슬롯도 저장된 LOSER 출처를 `4강 N경기 패자`로 표시합니다.
 ### 라운드별 부전승 직접 등록 (2026-10-05)
 
 - `POST /admin/tournaments/:tournamentId/byes`: 인증 + mutation admin. 입력 `{ groupId: UUID, registrationId?: UUID | null, byeId?: UUID, sortOrder: integer(0..7) }`, 반환은 groupTeam. 감사 action `tournament.bracket.bye.save`.

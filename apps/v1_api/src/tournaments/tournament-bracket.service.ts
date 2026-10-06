@@ -774,8 +774,23 @@ export class TournamentBracketService {
         ? old.find((edge) => edge.targetSide === side)?.sourceTeamMatchId ?? null
         : (side === 'HOME' ? dto.homeSourceFixtureId : dto.awaySourceFixtureId) ?? null }));
       const ids = [...new Set([fixtureId, ...old.map((edge) => edge.sourceTeamMatchId), ...desired.flatMap((source) => source.id ? [source.id] : [])])].sort();
-      // Same explicit Game -> Details -> TeamMatch lock order as result projection.
-      await tx.$queryRaw`SELECT id FROM v1_games WHERE team_match_id IN (${Prisma.join(ids)}) ORDER BY id FOR UPDATE`;
+      // Result projection locks the source Game before downstream Games. Validate
+      // the phase graph before taking any locks, then use that same direction;
+      // UUID ordering across phases can deadlock with officialization.
+      const phases = await tx.v1TournamentMatchDetails.findMany({
+        where: { tournamentId: initial.tournamentId, teamMatchId: { in: ids }, teamMatch: { deletedAt: null } },
+        select: { teamMatchId: true, group: { select: { phase: true } } },
+      });
+      if (phases.length !== ids.length) throw new BadRequestException({ code: 'BRACKET_SOURCE_INVALID', message: '같은 대회의 삭제되지 않은 경기만 연결할 수 있어요.' });
+      const sourcePhase: Record<string, string> = { quarter: 'round12', semi: 'quarter', final: 'semi', third_place: 'semi' };
+      const targetPhase = phases.find((match) => match.teamMatchId === fixtureId)?.group?.phase;
+      const upstreamIds = ids.filter((id) => id !== fixtureId);
+      if (desired.some((source) => source.id === fixtureId) || upstreamIds.some((id) => {
+        const phase = phases.find((match) => match.teamMatchId === id)?.group?.phase;
+        return !targetPhase || !phase || phase !== sourcePhase[targetPhase];
+      })) throw new BadRequestException({ code: 'BRACKET_SOURCE_PHASE_INVALID', message: '바로 이전 단계의 경기만 연결할 수 있어요. 3·4위전은 4강 패자를 연결해요.' });
+      if (upstreamIds.length) await tx.$queryRaw`SELECT id FROM v1_games WHERE team_match_id IN (${Prisma.join(upstreamIds)}) ORDER BY id FOR UPDATE`;
+      await tx.$queryRaw`SELECT id FROM v1_games WHERE team_match_id = ${fixtureId} FOR UPDATE`;
       await tx.$queryRaw`SELECT team_match_id FROM v1_tournament_match_details WHERE tournament_id = ${initial.tournamentId} AND team_match_id IN (${Prisma.join(ids)}) ORDER BY team_match_id FOR UPDATE`;
       await tx.$queryRaw`SELECT id FROM v1_team_matches WHERE id IN (${Prisma.join(ids)}) ORDER BY id FOR UPDATE`;
       const matches = await tx.v1TournamentMatchDetails.findMany({
@@ -787,13 +802,12 @@ export class TournamentBracketService {
         throw new ConflictException({ code: 'BRACKET_SOURCE_LOCKED', message: '연결은 모든 대상 경기가 시작되기 전에 설정해 주세요. 홈·어웨이 2차전 연결은 지원하지 않아요.' });
       }
       const target = matches.find((match) => match.teamMatchId === fixtureId)!;
-      const fromPhase: Record<string, string> = { quarter: 'round12', semi: 'quarter', final: 'semi', third_place: 'semi' };
       const outcome = target.group?.phase === 'third_place' ? 'LOSER' as const : 'WINNER' as const;
       const picked = desired.filter((source): source is { side: 'HOME' | 'AWAY'; id: string } => source.id !== null);
       if (picked.length === 2 && picked[0].id === picked[1].id) throw new BadRequestException({ code: 'BRACKET_SOURCE_INVALID', message: '양쪽 자리에 같은 경기를 연결할 수 없어요.' });
       for (const source of picked) {
         const sourceMatch = matches.find((match) => match.teamMatchId === source.id)!;
-        if (!target.group || sourceMatch.group?.phase !== fromPhase[target.group.phase]) throw new BadRequestException({ code: 'BRACKET_SOURCE_PHASE_INVALID', message: '바로 이전 단계의 경기만 연결할 수 있어요. 3·4위전은 4강 패자를 연결해요.' });
+        if (!target.group || sourceMatch.group?.phase !== sourcePhase[target.group.phase]) throw new BadRequestException({ code: 'BRACKET_SOURCE_PHASE_INVALID', message: '바로 이전 단계의 경기만 연결할 수 있어요. 3·4위전은 4강 패자를 연결해요.' });
         const registrationId = source.side === 'HOME' ? target.homeRegistrationId : target.awayRegistrationId;
         if (registrationId !== null) throw new ConflictException({ code: 'BRACKET_SOURCE_SLOT_ASSIGNED', message: '진출 경기를 연결할 자리는 팀을 미정으로 설정해 주세요.' });
         const occupied = await tx.v1TournamentMatchAdvancementEdge.findFirst({ where: { sourceTeamMatchId: source.id, sourceOutcome: outcome, targetTeamMatchId: { not: fixtureId } } });
@@ -882,10 +896,6 @@ export class TournamentBracketService {
             registrationId: { in: [dto.homeRegistrationId, dto.awayRegistrationId].filter((id): id is string => typeof id === 'string') },
           } });
           if (byeTeam) throw new ConflictException({ code: 'BYE_TEAM_HAS_MATCH', message: '부전승팀은 해당 라운드의 경기에 넣을 수 없어요. 다음 라운드에 직접 배정해 주세요.' });
-        }
-        const incoming = await tx.v1TournamentMatchAdvancementEdge.findMany({ where: { targetTeamMatchId: fixtureId } });
-        if (incoming.some((edge) => edge.targetSide === 'HOME' ? dto.homeRegistrationId !== undefined && dto.homeRegistrationId !== canonical.homeRegistrationId : dto.awayRegistrationId !== undefined && dto.awayRegistrationId !== canonical.awayRegistrationId)) {
-          throw new ConflictException({ code: 'BRACKET_SOURCE_SLOT_LINKED', message: '진출 경기가 연결된 자리는 직접 팀을 변경할 수 없어요. 먼저 진출 연결을 해제해 주세요.' });
         }
         const previousNumber = dto.fixtureNumber === undefined ? undefined : (await tx.v1TournamentMatchDetails.findUniqueOrThrow({
           where: { teamMatchId: fixtureId }, select: { fixtureNumber: true },

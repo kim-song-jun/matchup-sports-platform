@@ -15,6 +15,9 @@ import {
   type GameRosterPreload,
 } from './game-roster-loader';
 import { completeQueuedDuplicates, parseRosterResyncTarget } from './roster-resync-events';
+import { lockGameRows } from './game-row-lock';
+
+export { lockGameRows } from './game-row-lock';
 
 type Tx = Prisma.TransactionClient;
 
@@ -111,17 +114,6 @@ export async function isUnmigratedTeamAuthoredLineup(tx: Tx, gameId: string, sid
 }
 
 /**
- * `v1_games` 행을 id 순으로 잠근다. 경기 시작 명령이 잠그는 행이라, 잠근 뒤 읽은 `SCHEDULED` 판정은
- * 명단을 쓰는 동안 바뀌지 않는다. 이미 쥔 행은 다시 잡아도 기다리지 않는다.
- * 명단을 쓰는 경로는 이것 대신 `lockRosterWriteScope` 를 트랜잭션 첫 잠금으로 부른다.
- */
-export async function lockGameRows(tx: Tx, gameIds: readonly string[]): Promise<void> {
-  for (const gameId of [...new Set(gameIds)].sort()) {
-    await tx.$queryRaw`SELECT id FROM v1_games WHERE id = ${gameId} FOR UPDATE`;
-  }
-}
-
-/**
  * 명단을 쓰는 트랜잭션의 첫 잠금. 순서는 대회·리그 행(KEY SHARE) → 리그의 빈 참가 명단 채우기
  * (신청 → 계정 → 멤버십) → 경기(id 순)다. 감사 행의 대회 FK 검사가 대회 행을 KEY SHARE 하는데 대회 설정
  * 변경·순위 재계산은 대회 → 경기 순으로 잡으므로, 경기를 먼저 쥐면 둘이 서로를 기다린다.
@@ -163,7 +155,9 @@ export async function lockRosterWriteScope(
     const teamIds = [...leagueTeams.get(leagueId)!].sort();
     if (teamIds.length > 0) await fillEmptyLeagueRosters(tx, leagueId, teamIds);
   }
-  await lockGameRows(tx, ids);
+  // Result projection and bracket PATCH lock upstream Games first, unlike UUID order.
+  // Abort on a busy Game so this transaction releases earlier locks; the worker retries.
+  await lockGameRows(tx, ids, false);
 }
 
 /**

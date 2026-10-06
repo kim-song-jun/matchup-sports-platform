@@ -101,6 +101,16 @@ export async function updateTournamentMatchInTx(
     ? null
     : await tx.v1GameResultRevision.findUnique({ where: { id: gameRows[0].currentOfficialRevisionId }, select: { state: true } });
 
+  // Compare with the latest assignment while Game/Details are locked. A
+  // winner may have been projected after the caller's initial read.
+  if (input.homeRegistrationId !== undefined || input.awayRegistrationId !== undefined) {
+    const incoming = await tx.v1TournamentMatchAdvancementEdge.findMany({ where: { targetTeamMatchId: input.teamMatchId } });
+    if (incoming.some((edge) => edge.targetSide === 'HOME'
+      ? input.homeRegistrationId !== undefined && input.homeRegistrationId !== detail.homeRegistrationId
+      : input.awayRegistrationId !== undefined && input.awayRegistrationId !== detail.awayRegistrationId)) {
+      throw new ConflictException({ code: 'BRACKET_SOURCE_SLOT_LINKED', message: '진출 경기가 연결된 자리는 직접 팀을 변경할 수 없어요. 먼저 진출 연결을 해제해 주세요.' });
+    }
+  }
   const nextNumber = input.fixtureNumber === undefined ? detail.fixtureNumber : input.fixtureNumber;
   if (!Number.isInteger(nextNumber) || nextNumber < 1 || nextNumber > 2147483647) {
     throw new BadRequestException({ code: 'FIXTURE_NUMBER_INVALID', message: '대진 번호는 1부터 2147483647까지의 정수로 입력해 주세요.' });

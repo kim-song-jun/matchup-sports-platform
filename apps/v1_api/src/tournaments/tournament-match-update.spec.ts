@@ -81,6 +81,7 @@ function fakeTx() {
         return {};
       }),
     },
+    v1TournamentMatchAdvancementEdge: { findMany: jest.fn(async () => []) },
     v1TournamentRegistration: {
       findMany: jest.fn(async ({ where }: { where: { id: { in: string[] } } }) =>
         where.id.in.map((id) => REGISTRATIONS[id]).filter((row) => row !== undefined),
@@ -212,4 +213,20 @@ describe('updateTournamentMatchInTx — 자기 경기만 잠그고 명단은 후
     expect(tx.v1TeamMatch.update).not.toHaveBeenCalled();
     expect(tx.v1TeamSchedule.updateMany).not.toHaveBeenCalled();
   });
+});
+
+
+it('연결된 슬롯을 null로 덮으려는 요청은 잠금 뒤 최신 승자 배정과 비교하여 409로 거절한다', async () => {
+  const { tx, calls } = fakeTx();
+  (tx.v1TournamentMatchAdvancementEdge.findMany as jest.Mock).mockResolvedValue([{ targetSide: 'HOME' }]);
+  await expect(updateTournamentMatchInTx(tx, { teamMatchId: 'tm-x', homeRegistrationId: null }))
+    .rejects.toMatchObject({ response: { code: 'BRACKET_SOURCE_SLOT_LINKED' } });
+  expect(calls).not.toContain('write');
+});
+
+it('연결된 슬롯의 최신 팀을 그대로 보내는 수정은 허용한다', async () => {
+  const { tx } = fakeTx();
+  (tx.v1TournamentMatchAdvancementEdge.findMany as jest.Mock).mockResolvedValue([{ targetSide: 'HOME' }]);
+  await expect(updateTournamentMatchInTx(tx, { teamMatchId: 'tm-x', homeRegistrationId: 'reg-a', venue: '새 장소' }))
+    .resolves.toMatchObject({ homeRegistrationId: 'reg-a' });
 });

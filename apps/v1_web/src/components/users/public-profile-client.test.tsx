@@ -150,6 +150,28 @@ describe('PublicProfilePageClient — 받은 후기 요약 · 활동 카드', ()
     expect(screen.queryByLabelText('팀 3개')).not.toBeInTheDocument();
   });
 
+  it('이번 달을 고르면 주소에 기간을 남기고, 그 주소로 돌아오면 이번 달이 그대로다 (MD-QA #20)', () => {
+    useV1PublicProfileMock.mockReturnValue({ isLoading: false, isError: false, data: profile({ activitySummary }) } as never);
+    window.history.replaceState(null, '', '/users/user-1?from=%2Fteams%2Fteam-9');
+    const { unmount } = render(<PublicProfilePageClient userId="user-1" />);
+
+    fireEvent.click(screen.getByRole('tab', { name: '이번 달' }));
+    expect(`${window.location.pathname}${window.location.search}`).toBe('/users/user-1?from=%2Fteams%2Fteam-9&period=monthly');
+    fireEvent.click(screen.getByRole('tab', { name: '전체' }));
+    expect(window.location.search).toBe('?from=%2Fteams%2Fteam-9');
+    unmount();
+
+    // 활동 기록의 '뒤로가기'가 출처(from)로 돌려보내는 주소 — 기간이 실려 있으면 이번 달로 연다.
+    navigation.search = 'period=monthly';
+    render(<PublicProfilePageClient userId="user-1" />);
+    expect(screen.getByRole('tab', { name: '이번 달' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByLabelText('팀 가입 1회')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /활동 기록 전체 보기/ })).toHaveAttribute(
+      'href',
+      `/users/user-1/records?from=${encodeURIComponent('/users/user-1?period=monthly')}`,
+    );
+  });
+
   it('최근 경기와 기록 전체 보기가 활동 카드 안에 있고, 기록 링크는 이 프로필을 출처로 싣는다', () => {
     navigation.search = 'from=%2Fteams%2Fteam-9';
     useV1PublicProfileMock.mockReturnValue({

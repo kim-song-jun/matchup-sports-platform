@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { UserAvatar } from '@/components/v1-ui/user-avatar';
 import { formatTournamentDateShort } from '@/lib/date-utils';
 import { withFromPath } from '@/lib/session-storage';
@@ -246,7 +247,18 @@ function ProfileActivityCard({
   readonly recent: V1PublicProfile['recentActivity'] | null;
   readonly recordsHref: string;
 }) {
-  const [period, setPeriod] = useState<ActivityPeriod>('total');
+  // 고른 기간은 주소(?period=monthly)에도 남긴다 — 화면 안 상태로만 들고 있으면 '활동 기록 전체 보기'에
+  // 다녀오는 사이 '전체'로 돌아갔다(MD-QA #20). 이 주소가 곧 기록 링크의 출처(from)라 돌아오면 복원된다.
+  const searchParams = useSearchParams();
+  const [period, setPeriod] = useState<ActivityPeriod>(() => (searchParams?.get('period') === 'monthly' ? 'monthly' : 'total'));
+  const selectPeriod = (next: ActivityPeriod) => {
+    setPeriod(next);
+    const url = new URL(window.location.href);
+    if (next === 'monthly') url.searchParams.set('period', 'monthly');
+    else url.searchParams.delete('period');
+    // 같은 history 항목을 바꾼다(Next 라우터가 useSearchParams 를 따라 갱신) — 탭 전환마다 Back 이 쌓이지 않는다.
+    window.history.replaceState(null, '', `${url.pathname}${url.search}${url.hash}`);
+  };
   const stats = summary
     ? period === 'total'
       ? [
@@ -276,7 +288,7 @@ function ProfileActivityCard({
             role="tablist"
             ariaLabel="활동 기간"
             activeId={period}
-            onSelect={(id) => setPeriod(id as ActivityPeriod)}
+            onSelect={(id) => selectPeriod(id as ActivityPeriod)}
             items={[
               { id: 'total', label: '전체' },
               { id: 'monthly', label: '이번 달' },

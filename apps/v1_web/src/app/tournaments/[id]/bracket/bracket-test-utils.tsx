@@ -25,6 +25,8 @@ export function renderBracketPage(
 ): RenderResult {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   if (schedule) {
+    // 실제 클릭을 기다리는 동안 캐시 fixture가 배경 재요청 실패로 바뀌지 않게 한다.
+    queryClient.setQueryDefaults(publicGameRecordsKeys.schedule(tournament.id, {}), { staleTime: Infinity });
     // 무한 쿼리라 페이지 배열 모양으로 넣는다 — 화면이 `data.pages` 를 읽는다.
     queryClient.setQueryData(publicGameRecordsKeys.schedule(tournament.id, {}), {
       pages: [schedule],

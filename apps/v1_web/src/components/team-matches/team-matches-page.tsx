@@ -47,7 +47,22 @@ export function TeamMatchListPageView({ model }: { model: TeamMatchListViewModel
   // 상세의 뒤로가기가 검색어·필터가 걸린 이 목록 URL 로 돌아오게 카드마다 출처로 싣는다.
   // 쿼리 없는 목록은 상세 뒤로가기의 fallback 이 이미 같은 곳이라 싣지 않는다(공개 첫 HTML 의 카드 링크를 깨끗하게 유지).
   const currentHref = useCurrentHref();
-  const listFromHref = currentHref?.includes('?') ? currentHref : null;
+  let listFromHref = currentHref?.includes('?') ? currentHref : null;
+  // 실제 검색 모델이 있으면 상세 복귀도 replace 완료 전의 URL보다 현재 적용한 검색어를 따른다.
+  // 첫 # 뒤는 앵커 전체로 보존해 앵커 안의 ?를 목록 검색 조건으로 해석하지 않는다.
+  if (currentHref && model.search) {
+    const hashIndex = currentHref.indexOf('#');
+    const hash = hashIndex >= 0 ? currentHref.slice(hashIndex) : '';
+    const pathAndQuery = hashIndex >= 0 ? currentHref.slice(0, hashIndex) : currentHref;
+    const queryIndex = pathAndQuery.indexOf('?');
+    const pathname = queryIndex >= 0 ? pathAndQuery.slice(0, queryIndex) : pathAndQuery;
+    const params = new URLSearchParams(queryIndex >= 0 ? pathAndQuery.slice(queryIndex + 1) : '');
+    const appliedQuery = model.query.trim();
+    if (appliedQuery) params.set('q', appliedQuery);
+    else params.delete('q');
+    const search = params.toString();
+    listFromHref = search ? `${pathname}?${search}${hash}` : null;
+  }
   return (
     <>
       {/* 데스크톱 전용 인라인 헤더 — FAB가 데스크톱에서 숨겨지므로 대체 CTA 제공 */}

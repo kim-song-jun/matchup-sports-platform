@@ -108,6 +108,32 @@ afterEach(() => {
 afterAll(() => server.close());
 
 describe('팀 검색 목록 상세 복귀 (MD-QA #24)', () => {
+  it.each(['/teams', '/teams?filter=1'])('보존할 조건이 없는 목록의 실제 카드는 기본 상세 경로를 유지한다 (%s)', async (initialHref) => {
+    // Given: 기본 목록 또는 필터 시트만 열린 목록에는 보존할 검색·필터 조건이 없어요.
+    const rendered = renderRoute(initialHref);
+    // When: 실제 API 목록을 받아 카드가 렌더돼요. 시트 뒤 본문도 실제 DOM에서 확인해요.
+    await waitFor(() => expect(rendered.container.querySelectorAll('a.tm-team-card')).toHaveLength(20));
+    // Then: 상세의 기본 뒤로가기 /teams와 같은 출처를 중복해서 붙이지 않아요.
+    expect(rendered.container.querySelector('a.tm-team-card')).toHaveAttribute('href', teamPath);
+  });
+
+  it('중첩 출처만 있는 목록도 상세와 앱 뒤로가기에서 원래 출처를 유지한다', async () => {
+    // Given: 검색어가 없어도 목록에는 내 팀에서 들어온 중첩 출처가 있어요.
+    const listHref = withFromPath('/teams', '/my/teams');
+    const user = userEvent.setup();
+    renderRoute(listHref);
+    const card = await screen.findByRole('link', { name: /E2E 알파 A팀/ });
+    expect(card).toHaveAttribute('href', withFromPath(teamPath, listHref));
+    // When: 실제 카드를 열고 실제 앱 뒤로가기를 눌러요.
+    await user.click(card);
+    const back = await screen.findByRole('link', { name: '뒤로가기' });
+    expect(back).toHaveAttribute('href', listHref);
+    await user.click(back);
+    // Then: 검색어 유무와 관계없이 중첩 출처가 담긴 목록으로 돌아와요.
+    await waitFor(() => expect(navigation.href).toBe(listHref));
+    expect(await screen.findByRole('textbox', { name: '팀 검색어' })).toHaveValue('');
+  });
+
   it.each(['', 'sportId=sport-futsal&regionId=region-seoul-gangdong&sort=latest&levelCodes=novice'])('확정 검색 뒤 상세에서 앱 뒤로가기를 누르면 검색어·조건과 1팀 결과를 보존한다 (%s)', async (filters) => {
     // Given: 검색 전 목록은 20팀이고, 검색 제출 후 q가 실제 URL에 반영돼요.
     const user = userEvent.setup();

@@ -196,8 +196,8 @@ describe('공개 목록 첫 HTML — seed 성공', () => {
     expect(detailUrls[0]?.origin).toBe(origin);
     expect(detailUrls[0]?.pathname).toBe('/teams/team-1');
     expect(detailUrls[0]?.hash).toBe('');
-    // 복귀 출처만 추가된다. 중복 from이나 다른 query로 계약이 약해지면 실패한다.
-    expect([...(detailUrls[0]?.searchParams.entries() ?? [])]).toEqual([['from', '/teams']]);
+    // 기본 복귀는 이미 /teams다. 첫 HTML의 상세 링크에는 불필요한 출처나 다른 query를 붙이지 않는다.
+    expect([...(detailUrls[0]?.searchParams.entries() ?? [])]).toEqual([]);
     expect(html).toContain('sportId=sport-futsal-uuid');
     expect(html).not.toContain('팀 목록 불러오는 중');
     expect(ldPaths(html)).toEqual(['/teams/team-1']);

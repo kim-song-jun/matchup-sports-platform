@@ -168,8 +168,9 @@ export function TeamListPageClient({ seed }: { readonly seed?: CursorListSeed<V1
     },
   };
 
-  // 확정된 검색·필터 URL을 상세 출처로 넘겨 앱 뒤로가기와 하위 화면 복귀가 같은 목록을 유지한다.
-  return <TeamListPageView model={model} fromHref={buildTeamHref(searchParams, { filter: null })} />;
+  // 기본 뒤로가기는 이미 /teams다. 검색·필터·중첩 출처가 있는 확정 URL만 상세에 이어 준다.
+  const listHref = sanitizeRedirectPath(buildTeamHref(searchParams, { filter: null }));
+  return <TeamListPageView model={model} fromHref={listHref?.includes('?') ? listHref : undefined} />;
 
   function submitSearch(value: string, options?: { source?: string }) {
     const nextQuery = value.trim();

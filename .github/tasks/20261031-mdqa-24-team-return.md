@@ -41,6 +41,7 @@ Fix the reported current-v1 behavior with the smallest correct change and a real
 - Phase A: builder investigates, records exact root cause, adds narrow RED regression, implements.
 - Phase B: root serializes validation; independent reviewer checks final diff; root commits/pushes/dev PR and tracker comment.
 - Phase C: Web CI follow-up for PR #1635. Builder owns only the `/teams` seed-success case in `apps/v1_web/src/app/list-pages-first-html.test.tsx` and this task; root owns serialized validation, review, commit and push. All other route cases, product code, shared helpers/API and browser work remain excluded.
+- Phase D: optional canonical-link consistency follow-up. Builder owns only TeamListPageClient in `teams-client.tsx`, `teams-search-return.test.tsx`, the exact `/teams` seed-success SSR case and this task. root validates RED before product edits and owns GREEN/types/review/integration; other routes, products, fixtures, helpers and Git/browser actions remain excluded.
 - Owned files: apps/v1_web/src/app/teams/page.tsx and list client; apps/v1_web/src/app/teams/[id]/page.tsx and team detail client; apps/v1_web/src/components/teams/teams-client.tsx (TeamListPageClient); apps/v1_web/src/components/teams/teams-page.tsx (public TeamListPageView/TeamCard only, root approved 2026-10-06); apps/v1_web/src/components/teams/teams-search-return.test.tsx; corresponding local tests (NOT records/schedules subdirectories); this task; .changeset/mdqa-24-team-return.md.
 - Forbidden: all other modules, shared hooks/types/MSW/DTO/schema/navigation helpers, other tasks/state, dev/main, browser/tracker actions, commit/push. Date utility exception belongs only to #27.
 - You are not alone. Preserve others' changes and coordinate scope expansion with root.
@@ -101,3 +102,18 @@ Fix the reported current-v1 behavior with the smallest correct change and a real
 - Preserve actual body seed name, sport chip, no loading state, canonical JSON-LD team path/name and card-to-JSON-LD path correspondence. Other route cases and the shared `detailPaths` helper are unchanged.
 - Exact affected command for root: `pnpm --filter v1_web test -- src/app/list-pages-first-html.test.tsx --maxWorkers=1 --no-file-parallelism`.
 - Status: ready for root's serialized affected-test/type/review gates; builder launched no tests, builds, Git mutations or browser actions.
+
+## Phase D — Default Card Canonical Path (2026-10-06)
+- Latest reviewed PR head: `3741ea876a517dddd64ab5e96994da5d611763a2`. Read the actual p1635 Copilot body in root's `pr-phase-c-audit.json`.
+- Classification: optional URL hygiene/canonical consistency improvement, not a broken back contract. Copilot explicitly states back behavior is correct. Actual `/teams/:id` route-chrome default and AppBackLink fallback both point to `/teams`; sibling matches/team-matches list views attach a source only when query state exists.
+- Safe scope: pass a source only when the sanitized confirmed `buildTeamHref(searchParams, { filter: null })` carries query state. A source consisting only of `/teams` is redundant; `/teams?filter=1` also reduces to that bare path. Search, real filters and nested `from` query state must continue to be carried.
+- RED preparation: added actual rendered API card expectations for `/teams` and `/teams?filter=1` requiring the bare detail href, and a real nested-source card → detail → app-back flow with no search. Changed only the existing team's SSR decoded query expectation from redundant `from=/teams` to an empty query while keeping origin/path/hash/body/seed/JSON-LD/sport-chip checks.
+- Root RED command: `pnpm --filter v1_web test -- src/components/teams/teams-search-return.test.tsx src/app/list-pages-first-html.test.tsx --maxWorkers=1 --no-file-parallelism`.
+- Root actual RED: 3 expected canonical-link failures / 28 passed / 31 total, log `24-phase-d-red.log`. The nested-from-only and confirmed search/full-filter cases passed before the conditional gate.
+- Minimal product change after root authorization: sanitize the confirmed `buildTeamHref(...filter:null)` and pass optional `fromHref` only when it contains query state. Default and filter-sheet-only cards keep the canonical bare detail path; meaningful query and nested `from` remain carried through the existing helpers.
+- GREEN command is the same two-file command above. Status: GREEN-ready; three code/test files and own task frozen for root. No self tests, Git or browser actions. Classification remains optional URL hygiene, not a navigation correctness defect or alpha success claim.
+
+## Root Phase D Validation — 2026-10-06
+- Optional default URL hygiene RED3/28PASS31, then related2files31/31PASS (24-phase-d-green.log). Existing filtered/nested navigation and all other SSR contracts preserved.
+- Final TypeScript PASS; initial pattern executable path input failed and was not treated as PASS. Corrected unchanged checker PASS (24-phase-d-pattern-corrected.log). No repeated tsc/fullsuite/build.
+- Independent4/4 PASS Critical0/Warning0 (review-24-phase-d.md), exact source/test hashes inspected. No new markers/untracked production imports, diff --check clean. Same PR1635 followup; no alpha QA/merge claim.

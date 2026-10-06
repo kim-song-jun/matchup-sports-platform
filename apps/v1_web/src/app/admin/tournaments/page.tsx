@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { Plus, Calendar, Clock, Users, Coins } from 'lucide-react';
 import { useV1AdminTournaments } from '@/hooks/use-v1-api';
 import type { V1Tournament } from '@/types/api';
-import { formatAdminDateTimeShort, formatEntryFee } from '@/lib/date-utils';
+import { formatAdminKstDateTimeShort, formatEntryFee } from '@/lib/date-utils';
 import { extractErrorMessage } from '@/lib/error-message';
 import { useAdminCanWrite } from '@/hooks/use-admin-can-write';
 import { useAdminUrlListQuery } from '../use-admin-url-list-query';
@@ -24,9 +24,9 @@ import { MockSeedPanel } from '@/components/admin/tournaments/mock-seed-panel';
 // ── Helpers ───────────────────────────────────────────────────────────────
 
 function formatDateRange(startStr: string | null, endStr: string | null): string {
-  const start = formatAdminDateTimeShort(startStr);
+  const start = formatAdminKstDateTimeShort(startStr);
   if (start === '—') return start;
-  const end = formatAdminDateTimeShort(endStr);
+  const end = formatAdminKstDateTimeShort(endStr);
   if (end === '—' || end === start) return start;
   return `${start} ~ ${end}`;
 }
@@ -170,7 +170,7 @@ function AdminTournamentsPageContent() {
                 width: 'w-[124px]',
                 render: (row) => (
                   <span className="whitespace-nowrap text-[var(--text-muted)]">
-                    {formatAdminDateTimeShort(row.registrationDeadlineAt)}
+                    {formatAdminKstDateTimeShort(row.registrationDeadlineAt)}
                   </span>
                 ),
               },

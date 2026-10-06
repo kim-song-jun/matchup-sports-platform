@@ -790,7 +790,30 @@ export function TeamScheduleFormPageClient({ teamId, scheduleId }: { teamId: str
 // ── 내 일정 (GET /me/schedule) ────────────────────────────────────────────────
 
 export function MySchedulePageClient() {
-  const [statusFilter, setStatusFilter] = useState<'all' | 'scheduled' | 'cancelled' | 'completed'>('all');
+  const searchParams = useSearchParams();
+  const queryString = searchParams.toString();
+  const requestedStatus = searchParams.get('status');
+  const urlStatus = requestedStatus === 'scheduled' || requestedStatus === 'cancelled' || requestedStatus === 'completed'
+    ? requestedStatus
+    : 'all';
+  const [statusFilter, setStatusFilter] = useState<MyScheduleViewModel['statusFilter']>(urlStatus);
+  useEffect(() => {
+    // 이전 Next query가 늦게 도착해도 실제 URL의 마지막 선택을 덮지 않는다.
+    if (window.location.pathname === '/my/schedule' && new URLSearchParams(window.location.search).toString() !== queryString) return;
+    setStatusFilter(urlStatus);
+  }, [urlStatus, queryString]);
+
+  function schedulePathForStatus(status: MyScheduleViewModel['statusFilter']) {
+    const currentLocation = typeof window !== 'undefined' && window.location.pathname === '/my/schedule' ? window.location : null;
+    const params = new URLSearchParams(currentLocation?.search ?? queryString);
+    if (status === 'all') params.delete('status');
+    else params.set('status', status);
+    const query = params.toString();
+    return `/my/schedule${query ? `?${query}` : ''}${currentLocation?.hash ?? ''}`;
+  }
+
+  // 상세를 바로 열어도 URL 반영을 기다리지 않고 현재 선택을 출처에 담는다.
+  const returnPath = schedulePathForStatus(statusFilter);
   const filters = useMemo(
     () => (statusFilter === 'all' ? { limit: 50 } : { limit: 50, status: statusFilter }),
     [statusFilter],
@@ -799,7 +822,11 @@ export function MySchedulePageClient() {
 
   const model: MyScheduleViewModel = {
     statusFilter,
-    onStatusFilterChange: setStatusFilter,
+    onStatusFilterChange: (value) => {
+      setStatusFilter(value);
+      // Next native-history 연동으로 query와 앱 history stamp를 함께 갱신한다.
+      window.history.replaceState(null, '', schedulePathForStatus(value));
+    },
     statusOptions: [
       { value: 'all', label: '전체' },
       { value: 'scheduled', label: '예정' },
@@ -819,7 +846,7 @@ export function MySchedulePageClient() {
         isTentative: display.isTentative,
         dateTimeLabel: formatTournamentDateRangeWithTime(item.startAt, item.endAt) ?? '일정 미정',
         myAttendanceLabel: item.myAttendanceStatus ? attendanceStatusLabel(item.myAttendanceStatus) : null,
-        href: withFromPath(`/teams/${item.teamId}/schedules/${item.id}`, '/my/schedule'),
+        href: withFromPath(`/teams/${item.teamId}/schedules/${item.id}`, returnPath),
       };
     }),
     loading: query.isLoading,

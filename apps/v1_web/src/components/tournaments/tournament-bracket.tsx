@@ -1,5 +1,7 @@
 'use client';
 
+import { byeRound } from '@/lib/tournament-bracket-rounds';
+
 /**
  * TournamentBracket — World Cup 스타일 결선 대진표.
  *
@@ -40,6 +42,20 @@ const PHASE_LABEL: Record<string, string> = {
   final: '결승',
   third_place: '3·4위전',
 };
+
+/** Resolve persisted winner/loser sources for every bracket surface. */
+function withBracketSourceNames(fixture: V1TournamentFixture, rounds: Pick<RoundGroup, 'label' | 'fixtures'>[]): V1TournamentFixture {
+  const sourceLabel = (side: 'HOME' | 'AWAY') => {
+    const edge = fixture.bracketSources?.find((source) => source.side === side);
+    const stage = rounds.find((round) => round.fixtures.some((source) => source.id === edge?.fixtureId));
+    const source = stage?.fixtures.find((source) => source.id === edge?.fixtureId);
+    return source ? `${stage!.label} ${source.fixtureNumber}경기 ${edge?.outcome === 'LOSER' ? '패자' : '승자'}` : 'TBD';
+  };
+  return { ...fixture,
+    homeTeamName: fixture.homeTeamName === 'TBD' ? sourceLabel('HOME') : fixture.homeTeamName,
+    awayTeamName: fixture.awayTeamName === 'TBD' ? sourceLabel('AWAY') : fixture.awayTeamName,
+  };
+}
 
 function getFixturePhase(round: string): keyof typeof PHASE_ORDER | null {
   const normalized = round.trim().toLowerCase();
@@ -82,9 +98,11 @@ export function groupFixturesByRound(
     }
   }
 
-  // Explicit byes are real bracket entries even before a 12강 match is scheduled.
-  if (!roundMap.has('round12') && groups.some((group) => group.phase === 'round12' && group.groupTeams.some((team) => team.isBye))) {
-    roundMap.set('round12', { key: 'round12', label: '12강', sortIndex: PHASE_ORDER.round12, fixtures: [] });
+  for (const group of groups) {
+    const meta = byeRound(group.phase);
+    if (meta && !roundMap.has(group.phase) && group.groupTeams.some((team) => team.isBye)) {
+      roundMap.set(group.phase, { key: group.phase, label: meta.label, sortIndex: PHASE_ORDER[group.phase], fixtures: [] });
+    }
   }
 
   for (const round of roundMap.values()) {
@@ -385,7 +403,7 @@ function MatchTeamRow({
       data-loser={isLoser ? 'true' : undefined}
       data-bracket-team-row
     >
-      {isPending ? <span className="tm-on-tint" aria-hidden="true" style={{ width: 28, height: 28, borderRadius: 'var(--radius-control)', flexShrink: 0, display: 'grid', placeItems: 'center', background: 'var(--grey100)', color: 'var(--text-caption)' }}>—</span> : <TeamAvatar seed={teamId ?? label} name={label} logoUrl={logoUrl} size="sm" />}
+      <TeamAvatar seed={teamId ?? label} name={label} logoUrl={isPending ? null : logoUrl} size="sm" />
       <span className="tm-bk2-name" style={!decided ? { color: 'var(--text-caption)' } : undefined}>{label}</span>
       {score !== null && <span className="tm-bk2-score tab-num">{score}</span>}
       {score === null && decided && <span className="tm-bk2-score" style={{ opacity: 0.25 }}>-</span>}
@@ -707,19 +725,13 @@ function ConnectedBracket({ rounds, groups, champion }: { rounds: BracketGraphRo
         <div style={{ height: HEAD_H, display: 'flex', justifyContent: 'center', alignItems: 'center' }}><span className="tm-bk2-pill">{round.label}</span></div>
         {graph.nodes.filter((node) => node.round === round.key).map((node) => {
           const fixture = node.fixture;
-          const sourceLabel = (side: 'HOME' | 'AWAY') => {
-            const edge = fixture?.bracketSources?.find((source) => source.side === side);
-            const source = rounds.flatMap((stage) => stage.fixtures).find((item) => item.id === edge?.fixtureId);
-            const stage = rounds.find((stage) => stage.fixtures.some((item) => item.id === edge?.fixtureId));
-            return source ? `${stage?.label ?? ''} ${source.fixtureNumber}경기 ${edge?.outcome === 'LOSER' ? '패자' : '승자'}` : 'TBD';
-          };
           return <div key={node.id} data-bracket-node={node.id} style={{ position: 'absolute', width: COL_W, top: HEAD_H + node.y, transform: 'translateY(-50%)' }}>
             {fixture ? <>
               <p className="tm-text-micro" style={{ marginBottom: 4, color: 'var(--text-caption)' }}>{fixture.fixtureNumber}번 경기</p>
-              <MatchCard fixture={{ ...fixture, homeTeamName: fixture.homeTeamName === 'TBD' ? sourceLabel('HOME') : fixture.homeTeamName, awayTeamName: fixture.awayTeamName === 'TBD' ? sourceLabel('AWAY') : fixture.awayTeamName }} />
-            </> : node.bye ? <div className="tm-bk2-card" role="region" aria-label="12강 부전승" style={{ padding: 12 }}>
-              <div className="tm-text-caption-strong" style={{ color: 'var(--blue700)', marginBottom: 8 }}>부전승 · 8강 직행</div>
-              <div className="flex items-center gap-2"><TeamAvatar seed={node.bye.teamId ?? node.bye.registrationId} name={teamDisplayName(node.bye.teamName).label} logoUrl={node.bye.teamLogoUrl} size="sm" /><span className="tm-text-caption-strong">{teamDisplayName(node.bye.teamName).label}</span></div>
+              <MatchCard fixture={withBracketSourceNames(fixture, rounds)} />
+            </> : node.bye ? <div className="tm-bk2-card" role="region" aria-label={`${byeRound(node.round)?.label} 부전승`} style={{ padding: 12 }}>
+              <div className="tm-text-caption-strong" style={{ color: 'var(--blue700)', marginBottom: 8 }}>부전승 · {byeRound(node.round)?.nextLabel} 직행</div>
+              <div className="flex items-center gap-2"><TeamAvatar seed={node.bye.teamId ?? node.bye.registrationId ?? node.bye.id} name={teamDisplayName(node.bye.registrationId === null ? 'TBD' : node.bye.teamName).label} logoUrl={node.bye.teamLogoUrl} size="sm" /><span className="tm-text-caption-strong">{teamDisplayName(node.bye.registrationId === null ? 'TBD' : node.bye.teamName).label}</span></div>
             </div> : null}
           </div>;
         })}
@@ -808,7 +820,7 @@ export function TournamentBracket({ fixtures, groups }: TournamentBracketProps) 
     return () => observer.disconnect();
   }, [mainRounds.length]);
 
-  if (fixtures.length === 0 || rounds.length === 0) return <BracketEmpty />;
+  if (rounds.length === 0) return <BracketEmpty />;
   const usesAggregate = mainRounds.some((round) => isMultiLeg(round.fixtures));
   const hasUnlinked = mainRounds.slice(1).some((round) => round.fixtures.some((fixture) => !(fixture.bracketSources?.length)));
 
@@ -908,7 +920,7 @@ export function TournamentBracket({ fixtures, groups }: TournamentBracketProps) 
           </div>
           {thirdPlace.fixtures.map((f) => (
             <div key={f.id} className="tm-bk2-third-match">
-              <MatchCard fixture={f} />
+              <MatchCard fixture={withBracketSourceNames(f, rounds)} />
             </div>
           ))}
         </div>

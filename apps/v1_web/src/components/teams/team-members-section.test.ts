@@ -1,5 +1,5 @@
 import { createElement } from 'react';
-import { render } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { filterTeamMembers, TeamMembersSection } from './team-members-section';
 
@@ -26,14 +26,20 @@ describe('filterTeamMembers', () => {
   });
 });
 
-describe('TeamMembersSection 이니셜 (F54)', () => {
-  it('이름 앞의 괄호를 건너뛰어 "(" 가 아니라 첫 글자를 보인다', () => {
+describe('TeamMembersSection 기본 아이콘', () => {
+  it('이름과 무관한 사람 아이콘을 표시하고 실제 이름은 그대로 보인다', () => {
     const member = (id: string, name: string) => ({ id, name, role: '멤버', meta: '', actions: [] });
     const { container } = render(
       createElement(TeamMembersSection, { members: [member('m-1', '(QA0929)선수11'), member('m-2', '김하나')] }),
     );
 
-    const initials = Array.from(container.querySelectorAll('.tm-member-initial'), (node) => node.textContent);
-    expect(initials).toEqual(['Q', '김']);
+    const avatars = container.querySelectorAll('.tm-member-initial');
+    expect(avatars).toHaveLength(2);
+    for (const avatar of avatars) {
+      expect(avatar.querySelector('svg')).toHaveClass('lucide-user-round');
+      expect(avatar.textContent).toBe('');
+    }
+    expect(screen.getByText('(QA0929)선수11')).toBeInTheDocument();
+    expect(screen.getByText('김하나')).toBeInTheDocument();
   });
 });

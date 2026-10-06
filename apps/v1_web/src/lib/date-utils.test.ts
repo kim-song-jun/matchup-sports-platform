@@ -1,6 +1,12 @@
+import { execFileSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { ModuleKind, ScriptTarget, transpileModule } from 'typescript';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
   formatAdminDate,
+  formatAdminDateTimeShort,
+  formatAdminKstDateTimeShort,
   formatCardDate,
   formatCardTime,
   formatKstDateShort,
@@ -10,6 +16,80 @@ import {
   formatTournamentDateTimeLong,
   formatTournamentDateTimeShort,
 } from './date-utils';
+
+function runtimeModuleUrl(relativePath: string): string {
+  // Node 22.0도 실행할 수 있게 실제 TS 소스를 일반 ESM으로 바꾼다. formatter는 대체하지 않는다.
+  const source = readFileSync(resolve(relativePath), 'utf8');
+  const { outputText } = transpileModule(source, {
+    compilerOptions: { module: ModuleKind.ESNext, target: ScriptTarget.ES2022, removeComments: true },
+  });
+  return `data:text/javascript;base64,${Buffer.from(outputText).toString('base64')}`;
+}
+
+describe('formatAdminKstDateTimeShort / 기존 local admin family (관리자 대회 목록 · MD-QA #27)', () => {
+  const dateUtilsUrl = runtimeModuleUrl('src/lib/date-utils.ts');
+  const overviewUtilsUrl = runtimeModuleUrl('src/app/admin/tournaments/[id]/tournament-admin-shared.ts');
+
+  it.each([
+    { hostTimeZone: 'UTC', offset: 0, localFamily: ['10.11 16:24', '2026.10.11 16:24', '2026.10.11'] },
+    { hostTimeZone: 'America/Los_Angeles', offset: 420, localFamily: ['10.11 09:24', '2026.10.11 09:24', '2026.10.11'] },
+    { hostTimeZone: 'Asia/Seoul', offset: -540, localFamily: ['10.12 01:24', '2026.10.12 01:24', '2026.10.12'] },
+  ] as const)(
+    '실제 $hostTimeZone 호스트에서 대회는 KST, 기존 관리자 목록·상세는 같은 로컬 시각을 유지한다',
+    ({ hostTimeZone, offset, localFamily }) => {
+      // Given: UTC 날짜 경계를 넘는 같은 API 값. LA에서는 보고된 16시간 차이를 재현한다.
+      // worker의 process.env.TZ 변경만으로는 V8 로컬 시간대가 바뀌지 않을 수 있어,
+      // TZ를 지정해 새 Node 프로세스를 시작하고 실제 적용된 시간대도 함께 검증한다.
+      const script = `
+        import { formatAdminKstDateTimeShort, formatAdminDateTimeShort, formatAdminDateTime, formatAdminDate } from ${JSON.stringify(dateUtilsUrl)};
+        import { formatDate, formatDateRange } from ${JSON.stringify(overviewUtilsUrl)};
+        const scheduledAt = '2026-10-11T16:24:00.000Z';
+        const scheduledEndAt = '2026-10-12T00:24:00.000Z';
+        const registrationDeadlineAt = '2026-10-04T15:24:00.000Z';
+        console.log(JSON.stringify({
+          hostTimeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+          hostOffset: new Date(scheduledAt).getTimezoneOffset(),
+          listSchedule: [scheduledAt, scheduledEndAt].map(formatAdminKstDateTimeShort).join(' ~ '),
+          listDeadline: formatAdminKstDateTimeShort(registrationDeadlineAt),
+          overviewSchedule: formatDateRange(scheduledAt, scheduledEndAt),
+          overviewDeadline: formatDate(registrationDeadlineAt),
+          localFamily: [formatAdminDateTimeShort, formatAdminDateTime, formatAdminDate].map(format => format(scheduledAt)),
+        }));
+      `;
+
+      // When: 실제 목록·개요 표시 함수를 같은 원본 시각에 적용한다.
+      const output = execFileSync(process.execPath, ['--input-type=module', '--eval', script], {
+        env: { ...process.env, TZ: hostTimeZone },
+        encoding: 'utf8',
+        timeout: 10_000,
+      });
+
+      // Then: 형식은 달라도 날짜와 시각은 고정된 제품 시간대에 일치한다.
+      expect(JSON.parse(output)).toEqual({
+        hostTimeZone,
+        hostOffset: offset,
+        listSchedule: '10.12 01:24 ~ 10.12 09:24',
+        listDeadline: '10.5 00:24',
+        overviewSchedule: '2026. 10. 12. 오전 01:24 ~ 2026. 10. 12. 오전 09:24',
+        overviewDeadline: '2026. 10. 5. 오전 12:24',
+        localFamily,
+      });
+    },
+  );
+
+  it.each([
+    [null, '—'],
+    [undefined, '—'],
+    ['', '—'],
+    ['not-a-date', 'not-a-date'],
+  ] as const)(
+    '빈 값·잘못된 값 %s의 기존 표시 계약을 유지한다',
+    (value, expected) => {
+      expect(formatAdminDateTimeShort(value)).toBe(expected);
+      expect(formatAdminKstDateTimeShort(value)).toBe(expected);
+    },
+  );
+});
 
 describe('formatAdminDate', () => {
   it('유효한 날짜는 Y.M.D (formatAdminDateTime의 날짜 전용 자매 스타일)', () => {

@@ -4,7 +4,7 @@ const fetchPublicV1 = vi.fn();
 
 vi.mock('@/lib/seo', async () => {
   const actual = await vi.importActual<typeof import('@/lib/seo')>('@/lib/seo');
-  return { ...actual, fetchPublicV1: (path: string) => fetchPublicV1(path) };
+  return { ...actual, fetchPublicV1: (path: string, options?: { cache?: 'no-store' }) => fetchPublicV1(path, options) };
 });
 
 const { collectLlmsFullSnapshot } = await import('./llms-full');
@@ -21,6 +21,15 @@ afterEach(() => {
 const page = (items: unknown[]) => ({ items, nextCursor: null, pageInfo: { hasNext: false, nextCursor: null } });
 
 describe('collectLlmsFullSnapshot', () => {
+  it('does not cache league or team-match lists in the generated publication-sensitive snapshot', async () => {
+    fetchPublicV1.mockImplementation(async () => page([]));
+
+    await collectLlmsFullSnapshot();
+
+    expect(fetchPublicV1).toHaveBeenCalledWith('/league-matches?limit=50', { cache: 'no-store' });
+    expect(fetchPublicV1).toHaveBeenCalledWith('/team-matches?limit=50', { cache: 'no-store' });
+  });
+
   it('한 목록이 실패해도 나머지는 채우고, 실패한 섹션만 null 로 표시하며 로그를 남긴다', async () => {
     fetchPublicV1.mockImplementation(async (path: string) => {
       if (path.startsWith('/teams')) throw new Error('upstream 502');

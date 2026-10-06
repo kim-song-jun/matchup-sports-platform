@@ -7,6 +7,7 @@ import { getTournamentStatusConfig } from '@/lib/v1-tournament-status';
 import { getSportAccent } from '@/lib/v1-sport-accent';
 import { formatTournamentDateRangeShort, formatEntryFee } from '@/lib/date-utils';
 import { resolveTournamentImage } from '@/lib/tournament-promo';
+import { withFromPath } from '@/lib/session-storage';
 import {
   CompetitionCardHeader,
   CompetitionCardShell,
@@ -74,8 +75,11 @@ function CapacityMiniBar({ item }: { item: WithCapacity }) {
 export function TournamentCard({
   item,
   interactive = true,
+  fromPath,
 }: {
   item: V1TournamentListItem;
+  /** 목록 필터를 상세의 공통 뒤로가기에 전달한다. 다른 카드 소비처는 기존 URL을 유지한다. */
+  fromPath?: string;
   /**
    * false면 참가자 목록으로 이동하는 <Link>가 아니라 순수 미리보기용 <div>로 렌더한다.
    * 관리자 위저드의 "공개 화면 확인" 단계처럼 실제 카드 그대로를 보여주되 클릭·포커스는
@@ -115,7 +119,7 @@ export function TournamentCard({
     <div role="listitem" style={{ height: '100%' }}>
       <CompetitionCardShell
         interactive={interactive}
-        href={`/tournaments/${item.id}`}
+        href={withFromPath(`/tournaments/${item.id}`, fromPath)}
         ariaLabel={`${item.title} — ${sportAccent.label} — ${status.label}`}
       >
         <CompetitionCardHeader

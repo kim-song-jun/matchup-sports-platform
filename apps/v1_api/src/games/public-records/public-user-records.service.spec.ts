@@ -202,6 +202,34 @@ describe('PublicUserRecordsService', () => {
 
     const result = await service.getRecords(OWNER_ID, {}, OWNER_ID);
 
+    expect(prisma.v1GameResultParticipant.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          resultRevision: expect.objectContaining({
+            game: expect.objectContaining({
+              teamMatch: {
+                is: { OR: [{ leagueId: null }, { league: { is: { isPublic: true } } }] },
+              },
+            }),
+          }),
+        }),
+      }),
+    );
+    expect(prisma.v1TournamentAward.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          tournament: {
+            is: {
+              OR: [
+                { kind: 'regular_tournament' },
+                { kind: null },
+                { kind: 'regular_league', isPublic: true },
+              ],
+            },
+          },
+        }),
+      }),
+    );
     expect(result.summary).toMatchObject({
       appearances: 1,
       goals: 1,
@@ -588,7 +616,14 @@ describe('PublicUserRecordsService', () => {
     expect(prisma.v1GameResultParticipant.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({
-          resultRevision: expect.objectContaining({ game: { sourceType: 'TEAM_MATCH' } }),
+          resultRevision: expect.objectContaining({
+            game: {
+              sourceType: 'TEAM_MATCH',
+              teamMatch: {
+                is: { OR: [{ leagueId: null }, { league: { is: { isPublic: true } } }] },
+              },
+            },
+          }),
         }),
       }),
     );

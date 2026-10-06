@@ -1,4 +1,5 @@
 import { tournamentRoundLabel } from '@/lib/tournament-round-label';
+import { compareTournamentGroupNames, compareTournamentRounds } from '@/lib/tournament-display-order';
 import type { PublicScheduleEntry } from './types';
 
 /**
@@ -58,7 +59,7 @@ export const LEAGUE_PHASE_LABELS: SchedulePhaseLabels = {
  * "3위 결정전"처럼 조가 아닌 이름은 두 조건 모두 걸리지 않는다.
  */
 function isGroupStage(entry: PublicScheduleEntry): boolean {
-  if (entry.round.startsWith('조별')) return true;
+  if (tournamentRoundLabel(entry.round).startsWith('조별')) return true;
   const name = entry.groupName?.trim() ?? '';
   return name.endsWith('조');
 }
@@ -84,10 +85,8 @@ export function phaseKeyOf(entry: PublicScheduleEntry): SchedulePhaseKey {
 }
 
 /**
- * 대회 진행 순서는 `fixtureNumber` 가 이미 갖고 있다(alpha 실측: A조 1 · B조 2 · 4강 3,4 ·
- * 결승 5 · 3·4위전 6). `scheduledAt` 으로 정렬하면 일정이 아직 안 잡혔거나 운영상 시간이
- * 뒤바뀐 대회에서 순서가 무너지므로, 그룹 순서는 **그 그룹의 가장 이른 fixtureNumber** 로
- * 정한다.
+ * 조별리그는 조 이름, 결선은 라운드 규모로 정렬한다. 경기 번호는 라운드마다 다시
+ * 시작할 수 있으므로 같은 조/라운드 안에서만 순서를 정하는 보조 기준이다.
  */
 export function groupScheduleEntries(
   entries: readonly PublicScheduleEntry[],
@@ -121,7 +120,10 @@ export function groupScheduleEntries(
           ...group,
           entries: [...group.entries].sort((a, b) => a.fixtureNumber - b.fixtureNumber),
         }))
-        .sort((a, b) => orderOf(a.entries) - orderOf(b.entries)),
+        .sort((a, b) => (phase.key === 'group_stage'
+          ? compareTournamentGroupNames(a.label, b.label)
+          : compareTournamentRounds(a.entries[0].round, b.entries[0].round))
+          || orderOf(a.entries) - orderOf(b.entries)),
     }))
     // 조별리그가 없는 순수 토너먼트, 결선이 아직 없는 리그 — 빈 단계는 제목만 남으므로 지운다.
     .filter((phase) => phase.groups.length > 0);
@@ -133,21 +135,23 @@ export function groupScheduleEntries(
  * 이 목록은 예전에 한 줄로 흘려보냈다 — 그래서 같은 조(또는 라운드)의 경기가 여러 개면
  * 카드마다 `A조`·`4강` 이 그대로 반복돼 나왔다(오너 지적: "조도 중복되고"). 일정이 잡힌
  * 목록은 이미 제목 한 번 + 카드에서 라벨 생략으로 처리하고 있으므로, 여기도 같은 모양으로
- * 맞춘다. 단계(조별/결선)까지 나누지는 않는다 — 시간 미정 목록은 보통 몇 건뿐이라
- * 두 겹으로 접으면 제목만 늘어난다.
+ * 맞춘다. 제목 계층은 늘리지 않고, 일정이 정해진 목록과 같은 조별 → 결선 순서를 따른다.
  */
 export function groupUnscheduledEntries(entries: readonly PublicScheduleEntry[]): ScheduleGroup[] {
-  const byLabel = new Map<string, ScheduleGroup>();
-  for (const entry of entries) {
-    const label = groupLabelOf(entry);
-    const existing = byLabel.get(label);
-    if (existing === undefined) byLabel.set(label, { key: label, label, entries: [entry] });
-    else existing.entries.push(entry);
-  }
-  return [...byLabel.values()].map((group) => ({
-    ...group,
-    entries: [...group.entries].sort((a, b) => a.fixtureNumber - b.fixtureNumber),
-  }));
+  return groupScheduleEntries(entries).flatMap(phase => phase.groups);
+}
+
+/** Actual public game status, rather than an elapsed scheduled kickoff, determines live play. */
+export function partitionLiveSchedule(items: readonly PublicScheduleEntry[], unscheduled: readonly PublicScheduleEntry[]) {
+  const live = [...new Map([...items, ...unscheduled]
+    .filter(entry => entry.status === 'live')
+    .map(entry => [entry.fixtureId, entry])).values()]
+    .sort((a, b) => (a.scheduledAt ?? '').localeCompare(b.scheduledAt ?? '') || a.fixtureNumber - b.fixtureNumber);
+  return {
+    live,
+    items: items.filter(entry => entry.status !== 'live'),
+    unscheduled: unscheduled.filter(entry => entry.status !== 'live'),
+  };
 }
 
 /** 필터 칩 하나. `key` 가 null 이면 "전체". */

@@ -76,7 +76,7 @@ export async function countOfficialGameAppearances(
   userId: string,
   { monthStart, nextMonthStart }: ActivityMonth,
   // 홈처럼 monthly 만 쓰는 곳은 DB 에서 이번 달로 자른다 — 이때 total 계열도 이번 달 값이 된다.
-  { monthOnly = false }: { monthOnly?: boolean } = {},
+  { monthOnly = false, publicOnly = false }: { monthOnly?: boolean; publicOnly?: boolean } = {},
 ): Promise<{ total: number; monthly: number; tournamentTotal: number; tournamentMonthly: number }> {
   const links = await prisma.v1ParticipantIdentityLinkCurrent.findMany({
     where: { userId },
@@ -96,7 +96,18 @@ export async function countOfficialGameAppearances(
         officialAt: monthOnly ? { not: null, gte: monthStart, lt: nextMonthStart } : { not: null },
         // 공개 개인 기록과 같은 공식 게임 모집단. 팀매치를 빼면 개인 기록에는 3경기가
         // 보이는데 마이페이지 활동은 0회가 되어 같은 사용자의 두 화면이 모순된다.
-        game: { sourceType: 'TEAM_MATCH' },
+        game: {
+          sourceType: 'TEAM_MATCH',
+          ...(publicOnly
+            ? {
+                teamMatch: {
+                  is: {
+                    OR: [{ leagueId: null }, { league: { is: { isPublic: true } } }],
+                  },
+                },
+              }
+            : {}),
+        },
       },
     },
     select: {

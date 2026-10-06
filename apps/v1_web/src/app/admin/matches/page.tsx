@@ -9,7 +9,7 @@ import {
 import { formatAdminDateTimeShort } from '@/lib/date-utils';
 import { extractErrorMessage } from '@/lib/error-message';
 import { useAdminCanWrite } from '@/hooks/use-admin-can-write';
-import { useAdminMatchListQuery } from './use-admin-match-list-query';
+import { useAdminUrlListQuery } from '../use-admin-url-list-query';
 import {
   AdminPageHeader,
   AdminFilterBar,
@@ -62,7 +62,7 @@ function AdminMatchesPageContent() {
     filters,
     resetToFirstPage,
     buildPagination,
-  } = useAdminMatchListQuery(MATCH_STATUS_FILTER_OPTIONS, PAGE_SIZE);
+  } = useAdminUrlListQuery(MATCH_STATUS_FILTER_OPTIONS, PAGE_SIZE);
 
   // Modal state
   const [modalOpen, setModalOpen] = useState(false);

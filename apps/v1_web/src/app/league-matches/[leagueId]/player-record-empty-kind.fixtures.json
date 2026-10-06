@@ -1,0 +1,79 @@
+{
+  "goalsHiddenGoals": {
+    "leagueId": "league-contract",
+    "goals": [
+      {
+        "userId": "user-public",
+        "nickname": "공개 합성 선수",
+        "goals": 1,
+        "assists": 0
+      }
+    ],
+    "assists": [],
+    "hiddenByEligibility": true
+  },
+  "goalsHiddenAssists": {
+    "leagueId": "league-contract",
+    "goals": [
+      {
+        "userId": "user-public",
+        "nickname": "공개 합성 선수",
+        "goals": 1,
+        "assists": 0
+      }
+    ],
+    "assists": [],
+    "hiddenByEligibility": true
+  },
+  "assistsHiddenAssists": {
+    "leagueId": "league-contract",
+    "goals": [],
+    "assists": [
+      {
+        "userId": "user-public",
+        "nickname": "공개 합성 선수",
+        "goals": 0,
+        "assists": 1
+      }
+    ],
+    "hiddenByEligibility": true
+  },
+  "assistsHiddenGoals": {
+    "leagueId": "league-contract",
+    "goals": [],
+    "assists": [
+      {
+        "userId": "user-public",
+        "nickname": "공개 합성 선수",
+        "goals": 0,
+        "assists": 1
+      }
+    ],
+    "hiddenByEligibility": true
+  },
+  "goalsNoHidden": {
+    "leagueId": "league-contract",
+    "goals": [
+      {
+        "userId": "user-public",
+        "nickname": "공개 합성 선수",
+        "goals": 1,
+        "assists": 0
+      }
+    ],
+    "assists": [],
+    "hiddenByEligibility": false
+  },
+  "bothHidden": {
+    "leagueId": "league-contract",
+    "goals": [],
+    "assists": [],
+    "hiddenByEligibility": true
+  },
+  "bothNoHidden": {
+    "leagueId": "league-contract",
+    "goals": [],
+    "assists": [],
+    "hiddenByEligibility": false
+  }
+}

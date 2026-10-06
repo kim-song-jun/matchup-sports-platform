@@ -1,7 +1,8 @@
 import 'reflect-metadata';
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
-import { CreateLeagueMatchDto } from './league-match.dto';
+import { CreateLeagueMatchDto, UpdateLeagueVisibilityDto } from './league-match.dto';
+import { createGlobalValidationPipe } from '../../common/global-validation-pipe';
 
 const valid = {
   title: '부산 리그',
@@ -27,5 +28,21 @@ describe('CreateLeagueMatchDto region identifiers', () => {
     const errors = await validate(plainToInstance(CreateLeagueMatchDto, { ...valid, regionId }));
 
     expect(errors.some((error) => error.property === 'regionId')).toBe(true);
+  });
+});
+
+describe('UpdateLeagueVisibilityDto', () => {
+  const metadata = { type: 'body' as const, metatype: UpdateLeagueVisibilityDto };
+
+  it.each([false, true])('preserves explicit boolean %p through the HTTP validation pipe', async (isPublic) => {
+    const dto = await createGlobalValidationPipe().transform({ isPublic }, metadata);
+    expect(dto.isPublic).toBe(isPublic);
+  });
+
+  it.each(['false', 'true', '', 0, 1, null, undefined, {}, []])('rejects non-boolean %p through the HTTP validation pipe', async (isPublic) => {
+    await expect(createGlobalValidationPipe().transform({ isPublic }, metadata)).rejects.toMatchObject({
+      status: 400,
+      response: { code: 'VALIDATION_ERROR' },
+    });
   });
 });

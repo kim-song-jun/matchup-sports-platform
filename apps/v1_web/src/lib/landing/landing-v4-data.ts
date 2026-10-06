@@ -72,8 +72,8 @@ const TEAM_MATCH_LIMIT = 6;
 
 export async function fetchLandingV4Data(): Promise<LandingV4Data> {
   const [teamMatches, tournaments, teams] = await Promise.all([
-    fetchAllPages<V1TeamMatch>('/team-matches', 'landing-v4 team-matches'),
-    fetchAllPages<V1TournamentListItem>('/tournaments', 'landing-v4 tournaments'),
+    fetchAllPages<V1TeamMatch>('/team-matches', 'landing-v4 team-matches', { cache: 'no-store' }),
+    fetchAllPages<V1TournamentListItem>('/tournaments', 'landing-v4 tournaments', { cache: 'no-store' }),
     fetchAllPages<V1Team>('/teams', 'landing-v4 teams'),
   ]);
   return summarizeLandingData(teamMatches, tournaments, teams, new Date());
@@ -86,7 +86,11 @@ const MAX_PAGES = 4;
 /** 여러 페이지를 이어 붙인 목록. 서버는 최상위 nextCursor 를 채우지 않아 읽을 땐 pageInfo 를 믿고, 돌려줄 땐 둘을 같게 둔다. */
 export type MergedPage<T> = { items: T[]; nextCursor: string | null; pageInfo: PageInfo };
 
-export async function fetchAllPages<T>(path: string, label: string): Promise<MergedPage<T> | null> {
+export async function fetchAllPages<T>(
+  path: string,
+  label: string,
+  options: { cache?: 'no-store' } = {},
+): Promise<MergedPage<T> | null> {
   const items: T[] = [];
   let cursor: string | null = null;
   const merged = (hasNext: boolean): MergedPage<T> => {
@@ -96,7 +100,7 @@ export async function fetchAllPages<T>(path: string, label: string): Promise<Mer
   for (let pageIndex = 0; pageIndex < MAX_PAGES; pageIndex += 1) {
     const query = new URLSearchParams({ limit: String(LIST_LIMIT) });
     if (cursor) query.set('cursor', cursor);
-    const page = await fetchSeoSeed<CursorPage<T>>(`${path}?${query.toString()}`, label);
+    const page = await fetchSeoSeed<CursorPage<T>>(`${path}?${query.toString()}`, label, options);
     if (!page) return pageIndex === 0 ? null : merged(true);
     items.push(...page.items);
     cursor = page.pageInfo?.nextCursor ?? null;

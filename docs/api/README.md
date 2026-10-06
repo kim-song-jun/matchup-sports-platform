@@ -18,8 +18,9 @@ in the same change that discovers the drift.
 - [Matches](./domains/matches.md)
 - [Teams](./domains/teams.md)
 - [Team matches](./domains/team-matches.md)
-- [Tournaments](./domains/tournaments.md)
+- [Tournaments](./domains/tournaments.md) — 대진 생성·번호 수정·진출 연결 및 결과 계약
 - [League matches](./domains/league-matches.md)
+- [Regular league public visibility](./domains/league-matches.md#public-visibility) — publication control, admin access and public read gates.
 - [Games](./domains/games.md)
 - [Team schedules](./domains/team-schedules.md)
 - [Tournament operations](./domains/tournament-operations.md)
@@ -68,3 +69,7 @@ kept for historical reference under `docs/archive/v0-api/domains/`, not indexed 
 - Strict input validation: `whitelist + forbidNonWhitelisted + transform`
 - A controller, DTO, service, error, permission, pagination, multipart, idempotency, or frontend contract change updates the matching canonical domain file in the same change.
 - No canonical index may link to a superseded contract tree.
+
+라운드별 부전승 직접 입력과 대진표 표시 위치 계약은 [Tournaments](./domains/tournaments.md#라운드별-부전승-직접-등록-2026-10-05)에 정리한다.
+
+- 2026-10-05: tournament bye slots allow null registration + byeId reassignment; pre-start fixture deletion archives canonical history. See [tournament contract](domains/tournaments.md).

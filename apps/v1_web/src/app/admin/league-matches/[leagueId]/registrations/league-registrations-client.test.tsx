@@ -4,11 +4,13 @@ import LeagueRegistrationsClient from './league-registrations-client';
 
 const openMutate = vi.fn();
 const leagueData: {
+  isPublic: boolean;
   state: 'draft' | 'active' | 'completed';
   registrationOpen: boolean;
   registrationDeadlineAt: string | null;
   title: string;
 } = {
+  isPublic: true,
   state: 'draft',
   registrationOpen: false,
   registrationDeadlineAt: null,

@@ -75,17 +75,25 @@ function page(teamName: string): PublicTeamRecordsResponse {
   return {
     teamId: 'team-1',
     teamName,
-    summary: { played: 0, won: 0, drawn: 0, lost: 0, goalsFor: 0, goalsAgainst: 0 },
+    teamLogoUrl: null,
+    summary: {
+      played: 0, won: 0, drawn: 0, lost: 0, goalsFor: 0, goalsAgainst: 0,
+      byType: {
+        league: { played: 0, won: 0, drawn: 0, lost: 0, goalsFor: 0, goalsAgainst: 0 },
+        tournament: { played: 0, won: 0, drawn: 0, lost: 0, goalsFor: 0, goalsAgainst: 0 },
+        friendly: { played: 0, won: 0, drawn: 0, lost: 0, goalsFor: 0, goalsAgainst: 0 },
+      },
+    },
     availableSeasons: ['2026', '2025'],
     items: [],
     nextCursor: null,
-  } as unknown as PublicTeamRecordsResponse;
+  };
 }
 
 function loaded(teamName: string) {
   return {
     data: { pages: [page(teamName)] },
-    isLoading: false,
+    isPending: false,
     isError: false,
     error: null,
     refetch: vi.fn(),
@@ -97,7 +105,8 @@ function loaded(teamName: string) {
 
 function lastOverrideTitle() {
   const calls = shellOverride.useShellOverride.mock.calls;
-  return calls[calls.length - 1]?.[0]?.title as string | undefined;
+  const title: unknown = calls[calls.length - 1]?.[0]?.title;
+  return typeof title === 'string' ? title : undefined;
 }
 
 describe('TeamRecordsPageClient', () => {
@@ -105,6 +114,7 @@ describe('TeamRecordsPageClient', () => {
     mocks.usePublicTeamRecords.mockReset();
     shellOverride.useShellOverride.mockReset();
     navigation.searchParams = new URLSearchParams();
+    window.history.replaceState(null, '', '/teams/team-1/records');
   });
 
   // 팀 상세(출처 포함) → 팀 전적 → 경기 상세로 가도 뒤로가기 체인이 처음 출처까지 이어져야 한다.
@@ -142,7 +152,7 @@ describe('TeamRecordsPageClient', () => {
   it('keeps the generic heading while the team name is still unknown', () => {
     mocks.usePublicTeamRecords.mockReturnValue({
       data: undefined,
-      isLoading: true,
+      isPending: true,
       isError: false,
       error: null,
       refetch: vi.fn(),

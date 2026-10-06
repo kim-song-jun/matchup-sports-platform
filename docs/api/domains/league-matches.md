@@ -3,6 +3,32 @@
 League creation is exposed under `/api/v1/admin/league-matches` and public
 league reads under `/api/v1/league-matches`.
 
+## Public visibility
+
+`V1Tournament.isPublic` (`v1_tournaments.is_public`) controls publication separately
+from league lifecycle and soft deletion. It defaults to `true`, including existing
+rows after migration. Public discovery and direct public reads require it to be
+`true`; authenticated membership alone does not bypass publication. Admin league
+reads and operations keep access to unpublished leagues.
+
+`PATCH /api/v1/admin/league-matches/:leagueId/visibility` accepts only
+`{ "isPublic": boolean }` and returns `{ leagueId, isPublic }` in the standard
+success envelope. It requires an active mutation administrator and records the
+publication change in the existing admin audit. The admin league detail includes
+`isPublic` so settings hydrate from the actual league. The HTTP validation pipe
+preserves the original JSON type for this field: strings (including `"false"`),
+numbers, arrays, objects, null and a missing value return `400 VALIDATION_ERROR`.
+
+Unpublishing removes the league from home discovery, league and tournament public
+lists, API-backed search and sitemap discovery. Direct public league, standings,
+fixture and associated public game reads return the normal not-found error.
+Publication changes preserve lifecycle, registrations, fixtures and result
+visibility policies. Re-publishing makes the preserved league data public again.
+
+Production rollout requires the additive migration and API/web deployment before
+changing a league setting. A database-only change ahead of the serving API cannot
+enforce publication. Production promotion from dev to main is performed by the user.
+
 ## Create a league
 
 Creation requires an authenticated active owner/ops administrator. The existing

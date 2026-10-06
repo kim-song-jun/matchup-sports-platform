@@ -7,6 +7,7 @@ import { compareRosterOrder } from '../../common/roster-order';
 import { isBracketPublished, shouldHideParticipantIdentity } from '../../tournaments/tournament-detail.presenter';
 import {
   ALL_COMPETITION_KINDS,
+  findPublicTournamentOnSurface,
   findTournamentOnSurface,
   TOURNAMENT_KINDS,
 } from '../../tournaments/tournament-surface-lookup';
@@ -617,7 +618,7 @@ export class PublicTournamentRecordsService {
   }
 
   async getSchedule(tournamentId: string, query: PublicTournamentScheduleQueryDto, user?: V1AuthUser) {
-    const tournament = await findTournamentOnSurface(this.prisma, ALL_COMPETITION_KINDS, {
+    const tournament = await findPublicTournamentOnSurface(this.prisma, ALL_COMPETITION_KINDS, {
       where: {
         id: tournamentId,
         deletedAt: null,
@@ -919,7 +920,7 @@ export class PublicTournamentRecordsService {
     query: PublicTournamentScheduleQueryDto,
     hideIdentity: boolean,
   ) {
-    const leagueRow = await findTournamentOnSurface(this.prisma, ['regular_league'], {
+    const leagueRow = await findPublicTournamentOnSurface(this.prisma, ['regular_league'], {
       where: { id: leagueId, deletedAt: null },
       select: {
         tier: true,
@@ -1067,7 +1068,7 @@ export class PublicTournamentRecordsService {
   }
 
   async getMatch(tournamentId: string, fixtureId: string, user: V1AuthUser | undefined) {
-    const tournament = await findTournamentOnSurface(this.prisma, ALL_COMPETITION_KINDS, {
+    const tournament = await findPublicTournamentOnSurface(this.prisma, ALL_COMPETITION_KINDS, {
       where: {
         id: tournamentId,
         deletedAt: null,
@@ -1803,7 +1804,7 @@ export class PublicTournamentRecordsService {
    * /admin/league-matches/:leagueId/videos 에서 등록)에서 내린다.
    */
   async getLeagueFixtureRecord(leagueId: string, teamMatchId: string) {
-    const league = await findTournamentOnSurface(this.prisma, ['regular_league'], {
+    const league = await findPublicTournamentOnSurface(this.prisma, ['regular_league'], {
       where: { id: leagueId, deletedAt: null },
       select: { id: true, title: true },
     });

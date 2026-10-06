@@ -8,7 +8,7 @@ export async function GET(): Promise<Response> {
   return new Response(renderLlmsFull(await collectLlmsFullSnapshot()), {
     headers: {
       'content-type': 'text/plain; charset=utf-8',
-      'cache-control': 'public, max-age=0, s-maxage=300, stale-while-revalidate=600',
+      'cache-control': 'no-store',
     },
   });
 }

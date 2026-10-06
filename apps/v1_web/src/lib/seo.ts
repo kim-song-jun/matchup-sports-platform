@@ -210,10 +210,10 @@ export function buildTournamentDescription(
   );
 }
 
-export async function fetchPublicV1<T>(path: string): Promise<T | null> {
+export async function fetchPublicV1<T>(path: string, options: { cache?: 'no-store' } = {}): Promise<T | null> {
   const response = await fetch(`${getInternalApiOrigin()}/api/v1${path}`, {
     headers: { accept: 'application/json' },
-    next: { revalidate: 300 },
+    ...(options.cache === 'no-store' ? { cache: 'no-store' as const } : { next: { revalidate: 300 } }),
   });
 
   if (response.status === 404) return null;

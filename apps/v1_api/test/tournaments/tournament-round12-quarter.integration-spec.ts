@@ -41,6 +41,49 @@ describe('12강·8강 실제 저장 계약', () => {
 describe('경기별 진출 연결 실제 저장 계약', () => {
   beforeAll(async () => { await prisma.$connect(); });
   afterAll(async () => { await prisma.$disconnect(); });
+  it('실제 DB에서 번호 변경·중복 rollback·공개 재조회·옛 번호 재사용 후에도 진출 관계를 유지한다', async () => {
+    const tournamentId = competitionConfigFixture.tournamentId;
+    const groups = await prisma.v1TournamentGroup.findMany({ where: { tournamentId } });
+    const round12 = groups.find((group) => group.phase === 'round12')!;
+    const quarter = groups.find((group) => group.phase === 'quarter')!;
+    const dto = { groupId: round12.id, round: '12강', fixtureNumber: 201,
+      homeRegistrationId: competitionConfigFixture.registrationIds[1], awayRegistrationId: competitionConfigFixture.registrationIds[2], scheduledAt: '2099-01-01T09:00:00.000Z' };
+    const source = await service.createFixture(user, tournamentId, dto);
+    const target = await service.createFixture(user, tournamentId, { groupId: quarter.id, round: '8강', fixtureNumber: 201 });
+    await service.updateBracketSources(user, target.id, { awaySourceFixtureId: source.id });
+    const peer = await service.createFixture(user, tournamentId, { groupId: round12.id, round: '12강', fixtureNumber: 202 });
+    const before = await prisma.v1TeamMatch.findUniqueOrThrow({ where: { id: source.id }, include: { game: { include: { sides: { orderBy: { id: 'asc' } } } }, tournamentDetails: true } });
+    await expect(service.updateFixture(user, source.id, { fixtureNumber: 202, venue: '저장되면 안 되는 장소' }))
+      .rejects.toMatchObject({ response: { code: 'FIXTURE_NUMBER_CONFLICT' } });
+    expect(await prisma.v1TeamMatch.findUniqueOrThrow({ where: { id: source.id }, select: { placeName: true } })).toEqual({ placeName: before.placeName });
+    expect((await service.updateFixture(user, source.id, { fixtureNumber: 203 })).fixtureNumber).toBe(203);
+    const after = await prisma.v1TeamMatch.findUniqueOrThrow({ where: { id: source.id }, include: { game: { include: { sides: { orderBy: { id: 'asc' } } } }, tournamentDetails: true } });
+    expect(after.tournamentDetails).toMatchObject({ fixtureNumber: 203, homeRegistrationId: dto.homeRegistrationId, awayRegistrationId: dto.awayRegistrationId });
+    expect(after.game).toEqual(before.game);
+    expect(after.title).toMatch(/203$/);
+    const schedules = await prisma.v1TeamSchedule.findMany({ where: { teamMatchId: source.id } });
+    expect(schedules).toHaveLength(2);
+    expect(schedules.every((schedule) => schedule.title === after.title)).toBe(true);
+    expect((await service.getBracket(user, tournamentId)).fixtures.find((fixture) => fixture.id === target.id)?.bracketSources)
+      .toEqual([{ fixtureId: source.id, side: 'AWAY', outcome: 'WINNER' }]);
+    await prisma.v1Tournament.update({ where: { id: tournamentId }, data: { bracketPublishedAt: new Date() } });
+    const row = await prisma.v1Tournament.findUniqueOrThrow({ where: { id: tournamentId }, include: TOURNAMENT_DETAIL_INCLUDE });
+    expect(presentTournamentDetail(row, true, new Date(), true).fixtures.find((fixture) => fixture.id === source.id)?.fixtureNumber).toBe(203);
+    const replacement = await service.createFixture(user, tournamentId, dto);
+    expect(replacement.id).not.toBe(source.id);
+    expect((await service.createFixture(user, tournamentId, dto)).id).toBe(replacement.id);
+    expect((await prisma.v1TournamentMatchDetails.findUniqueOrThrow({ where: { teamMatchId: source.id } })).fixtureNumber).toBe(203);
+    expect((await prisma.v1Game.findUniqueOrThrow({ where: { teamMatchId: replacement.id } })).id).not.toBe(before.game?.id);
+    await prisma.v1Tournament.update({ where: { id: tournamentId }, data: { status: 'closed' } });
+    try {
+      await service.deleteFixture(user, target.id);
+      await service.deleteFixture(user, source.id);
+      await service.deleteFixture(user, replacement.id);
+      await service.deleteFixture(user, peer.id);
+    } finally {
+      await prisma.v1Tournament.update({ where: { id: tournamentId }, data: { status: 'in_progress' } });
+    }
+  });
   it('12→8→4→결승과 3위전 패자를 저장·재조회하고 잘못된 단계/중복 연결/시작 후 변경을 거절한다', async () => {
     const tournamentId = competitionConfigFixture.tournamentId;
     const groups = await prisma.v1TournamentGroup.findMany({ where: { tournamentId } });

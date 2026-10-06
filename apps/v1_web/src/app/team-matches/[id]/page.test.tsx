@@ -67,6 +67,7 @@ describe('TeamMatchDetailPage (server)', () => {
 
     await expect(TeamMatchDetailPage({ params: Promise.resolve({ id: 'tm-1' }) })).resolves.toBeTruthy();
     expect(vi.mocked(redirect)).not.toHaveBeenCalledWith(expect.stringContaining('/league-matches/'));
+    expect(fetchPublicV1Mock).toHaveBeenCalledWith('/team-matches/tm-1', { cache: 'no-store' });
   });
 });
 

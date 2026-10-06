@@ -12,6 +12,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { PrismaService } from '../prisma/prisma.service';
 import { TournamentStaffAccessService } from './staff/tournament-staff-access.service';
 import { TournamentsReadService } from './tournaments-read.service';
+import { PUBLIC_TOURNAMENT_VISIBILITY_WHERE } from './tournament-surface-lookup';
 
 const authUser = {
   id: 'user-1',
@@ -299,6 +300,16 @@ describe('TournamentsReadService', () => {
       entryFee: 60000,
     });
     expect(result.pageInfo).toMatchObject({ hasNext: false, nextCursor: null });
+  });
+
+  it('unified public list excludes hidden regular leagues while retaining tournaments', async () => {
+    prisma.v1Tournament.findMany.mockResolvedValue([]);
+
+    await service.list({ kind: 'all' });
+
+    expect(prisma.v1Tournament.findMany.mock.calls[0][0].where.AND).toEqual(
+      expect.arrayContaining([PUBLIC_TOURNAMENT_VISIBILITY_WHERE]),
+    );
   });
 
   /**
@@ -1100,6 +1111,13 @@ describe('TournamentsReadService', () => {
       expect(result.fixtures[0].venue).toBe('1경기장');
       expect(result.fixtures[0].homeRegistrationId).toBe('reg-1');
       expect(result.fixtures[0].awayRegistrationId).toBe('reg-2');
+    });
+
+    it('팀 미정 부전승도 공개 대진 응답에서 독립적인 자리를 유지한다', async () => {
+      const row = openRowWithNamedGroupsAndFixtures({ groups: [{ id: 'group-1', name: '12강', phase: 'round12', sortOrder: 0, advanceCount: null, standings: [], groupTeams: [], byeSlots: [{ id: 'bye-slot-1', groupId: 'group-1', sortOrder: 3, createdAt: new Date() }] }] });
+      prisma.v1Tournament.findFirst.mockResolvedValue(row);
+      const result = await service.get(TOURNAMENT_UUID);
+      expect(result.groups[0].groupTeams[0]).toMatchObject({ id: 'bye-slot-1', registrationId: null, teamId: null, teamName: null, teamLogoUrl: null, isBye: true, sortOrder: 3 });
     });
 
     it('로그인했지만 이 대회 스태프가 아닌 사용자에게도 그대로 가려진다', async () => {

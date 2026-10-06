@@ -7,14 +7,14 @@
  *
  * 왜 두 갈래인가: 순위가 비는 이유가 두 가지이고 **처방이 다르다**.
  * - `hiddenByEligibility` — 기록은 쌓였는데 선수의 신원 연동·공개 동의가 없어 가려졌다.
- *   할 일이 있는 상태다.
+ *   득점·도움 전체의 플래그이므로, 빈 개별 순위에 해당 종류의 기록이 있다고 단정할 수 없다.
  * - 그 외 — 아직 확정된 결과가 없다. 기다리는 것 말고 할 일이 없다.
  * 둘을 한 문구로 뭉치면 "연동하면 되는데 그냥 기다리는" 사용자가 생긴다.
  */
 export function playerRecordEmptySub(kind: 'goals' | 'assists', hiddenByEligibility: boolean): string {
   const label = kind === 'goals' ? '득점' : '도움';
   return hiddenByEligibility
-    ? `${label} 기록은 있지만, 선수가 신원 연동과 경기 기록 공개에 동의하면 순위가 공개돼요.`
+    ? `선수의 신원 연동과 경기 기록 공개 동의에 따라 공개 가능한 ${label} 기록만 순위에 표시돼요.`
     : `확정된 경기 결과가 쌓이면 ${label} 순위가 나타나요.`;
 }
 

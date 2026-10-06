@@ -34,6 +34,8 @@ readonly TASK168_M1_M10=(
 )
 readonly TASK168_M11=20260911090000_retire_tournament_fixture_tables
 readonly TASK168_M11_PATH="deploy/task168-final-drop/migrations/${TASK168_M11}/migration.sql"
+# The post-M11 final-drop schema pin above remains historical and immutable.
+# Current final-policy releases bind the live additive schema below.
 readonly TASK168_FINAL_SCHEMA_SHA256=e44990c6d17e612b9d93e4ce41a6c5adaacb813ab3c67f75fd4f05b185736f46
 
 build_stage_b_migrations_json() {
@@ -111,7 +113,7 @@ if [[ "${1:-}" == '--self-test' ]]; then
   PREVIOUS_SHA="$RELEASE_SHA"
   PREVIOUS_STAGE=final
   MIGRATION_BASE_SHA="$RELEASE_SHA"
-  TASK168_SCHEMA_SHA256=1eea17ce17f1150aa031cb3ef9cb492e4242375c98a4ad85ff2657a1c6e5d31d
+  TASK168_SCHEMA_SHA256=21f6da3c1a609b9352d662260064a63553145127fb124560156d8279ba074409
   TASK168_M11_SHA256=08eac7347cbb10fcc4ef87d31d63bd9516d5bfda281dcf5730c4f0a1985d9323
   api_digest=sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
   web_digest=sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd
@@ -299,7 +301,7 @@ fi
 for name in RELEASE_SHA RELEASE_VERSION REGISTRY DEPLOY_BUCKET EXPECTED_BUCKET_OWNER SOURCE_VERSION_ID SOURCE_SHA256 IMAGE_TAG PREVIOUS_SHA PREVIOUS_STAGE MIGRATION_BASE_SHA TASK168_SCHEMA_SHA256 TASK168_M11_SHA256; do
   [[ -n "${!name:-}" ]] || { echo "$name is required" >&2; exit 1; }
 done
-[[ "$TASK168_SCHEMA_SHA256" == 1eea17ce17f1150aa031cb3ef9cb492e4242375c98a4ad85ff2657a1c6e5d31d && "$TASK168_M11_SHA256" == 08eac7347cbb10fcc4ef87d31d63bd9516d5bfda281dcf5730c4f0a1985d9323 ]] || { echo 'Task168 final-policy binding mismatch' >&2; exit 1; }
+[[ "$TASK168_SCHEMA_SHA256" == 21f6da3c1a609b9352d662260064a63553145127fb124560156d8279ba074409 && "$TASK168_M11_SHA256" == 08eac7347cbb10fcc4ef87d31d63bd9516d5bfda281dcf5730c4f0a1985d9323 ]] || { echo 'Task168 final-policy binding mismatch' >&2; exit 1; }
 
 if [[ "$PREVIOUS_STAGE" == final && "$PREVIOUS_SHA" != none ]]; then
   rollback_compatible_with="$PREVIOUS_SHA"

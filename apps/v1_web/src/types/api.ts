@@ -3643,7 +3643,7 @@ export type V1TournamentGroupTeam = {
   /** 명시적으로 지정된 12강 부전승. 미배정 상대와 구분한다. */
   isBye?: boolean;
   id: string;
-  registrationId: string;
+  registrationId: string | null;
   teamId: string | null;
   teamName: string | null;
   teamLogoUrl: string | null;
@@ -4116,8 +4116,8 @@ export type V1AdminBracketGroupTeam = {
   isBye?: boolean;
   id: string;
   groupId: string;
-  registrationId: string;
-  teamName: string;
+  registrationId: string | null;
+  teamName: string | null;
   sortOrder: number;
   createdAt: string;
 };
@@ -4529,6 +4529,7 @@ export type V1CreateGroupTeamPayload = {
 };
 
 export type V1UpdateFixturePayload = {
+  fixtureNumber?: number;
   scheduledAt?: string;
   venue?: string;
   homeRegistrationId?: string;
@@ -5028,3 +5029,11 @@ export type V1AdminRosterEligibleMember = {
 export type V1AdminRosterEligibleMembersResponse = {
   members: V1AdminRosterEligibleMember[];
 };
+
+export interface V1CreateBracketByePayload {
+  groupId: string;
+  byeId?: string;
+  registrationId?: string | null;
+  /** Zero-based insertion position among matches and byes. */
+  sortOrder: number;
+}

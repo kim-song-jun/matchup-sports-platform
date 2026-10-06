@@ -119,6 +119,9 @@ export function TournamentsListPageClient({ seed }: { readonly seed?: Tournament
      `/league-matches` 가 아직 살아 있어 리그를 두 곳에서 볼 수 있는데, 그건 중복일 뿐
      깨지지 않는다 — **리다이렉트 PR 이 정리할 몫**이다. */
   const searchParams = useSearchParams();
+  // 상세의 앱 뒤로가기가 필터 없는 기본 목록으로 복귀하지 않도록 현재 목록 URL을 출처로 넘긴다.
+  const listQuery = searchParams.toString();
+  const listPath = `/tournaments${listQuery ? `?${listQuery}` : ''}`;
   const activeKind: CompetitionKind = parseCompetitionKind(searchParams.get('kind'), 'all');
   /* 빈 문자열은 **없는 것과 같다.** `?status=` 를 그대로 넘기면 서버가 400 을 내 목록이
      통째로 에러가 된다(실측). 아래 `??` 폴백만으로는 안 걸린다 — `''` 는 null 이 아니다. */
@@ -303,7 +306,7 @@ export function TournamentsListPageClient({ seed }: { readonly seed?: Tournament
               aria-busy={isFetching || undefined}
             >
               {displayItems.map((item) => (
-                <TournamentCard key={item.id} item={item} />
+                <TournamentCard key={item.id} item={item} fromPath={listPath} />
               ))}
             </div>
 

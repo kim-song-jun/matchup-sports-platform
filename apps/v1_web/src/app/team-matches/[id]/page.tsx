@@ -9,7 +9,7 @@ import type { V1TeamMatch } from '@/types/api';
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
   const { id } = await params;
-  const teamMatch = await fetchPublicV1<V1TeamMatch>(`/team-matches/${encodeURIComponent(id)}`);
+  const teamMatch = await fetchPublicV1<V1TeamMatch>(`/team-matches/${encodeURIComponent(id)}`, { cache: 'no-store' });
   if (!teamMatch) return buildNoIndexMetadata('팀매치를 찾을 수 없어요');
 
   return buildPublicMetadata({
@@ -28,7 +28,7 @@ export default async function TeamMatchDetailPage({ params, searchParams }: {
   searchParams?: Promise<{ from?: string | string[] }>;
 }) {
   const { id } = await params;
-  const teamMatch = await fetchPublicV1<V1TeamMatch>(`/team-matches/${encodeURIComponent(id)}`);
+  const teamMatch = await fetchPublicV1<V1TeamMatch>(`/team-matches/${encodeURIComponent(id)}`, { cache: 'no-store' });
   if (!teamMatch) notFound();
   // 리그 대진은 리그 경기 상세로 보낸다 — 이 화면의 "상대팀 모집 → 신청 → 승인" 프레임은
   // 상대가 이미 확정된 리그 경기와 맞지 않는다(상대팀 이름 자리에 "승인 완료"가 뜨던

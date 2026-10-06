@@ -19,13 +19,14 @@ set -Eeuo pipefail
 # 2026-10-01 Task 181 ③: additive chat file message (enum values file + nullable v1_upload_assets.original_name).
 # 2026-10-01 Task 180 G12 adds v1_team_invite_links.
 # 2026-10-01 Task 180 W4-V8: v1_team_invitations unique (team, user) -> pending-only partial unique + plain index.
+# 2026-10-07: additive v1_tournaments.is_public with its own migration; M11 remains unchanged.
 schema=apps/v1_api/prisma/schema.prisma
 m11=apps/v1_api/prisma/migrations/20260911090000_retire_tournament_fixture_tables/migration.sql
 [[ -f "$schema" && -f "$m11" ]] || { echo 'Task168 final-policy source inputs missing' >&2; exit 1; }
 
 schema_sha="$(sha256sum "$schema" | awk '{print $1}')"
 m11_sha="$(sha256sum "$m11" | awk '{print $1}')"
-[[ "$schema_sha" == 1eea17ce17f1150aa031cb3ef9cb492e4242375c98a4ad85ff2657a1c6e5d31d \
+[[ "$schema_sha" == 21f6da3c1a609b9352d662260064a63553145127fb124560156d8279ba074409 \
   && "$m11_sha" == 08eac7347cbb10fcc4ef87d31d63bd9516d5bfda281dcf5730c4f0a1985d9323 ]] \
   || { echo 'Task168 final-policy schema/M11 digest mismatch' >&2; exit 1; }
 

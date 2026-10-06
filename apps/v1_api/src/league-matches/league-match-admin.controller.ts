@@ -14,6 +14,7 @@ import {
   RevertLeagueCompletionDto,
   UpdateLeagueDisciplineDto,
   UpdateLeagueFixtureDto,
+  UpdateLeagueVisibilityDto,
 } from './dto/league-match.dto';
 import { LeagueMatchAdminService } from './league-match-admin.service';
 
@@ -54,6 +55,15 @@ export class LeagueMatchAdminController {
   @Get(':leagueId')
   detail(@CurrentUser() user: V1AuthUser, @Param('leagueId', leagueIdPipe) leagueId: string) {
     return this.service.detail(user, leagueId);
+  }
+
+  @Patch(':leagueId/visibility')
+  updateVisibility(
+    @CurrentUser() user: V1AuthUser,
+    @Param('leagueId', leagueIdPipe) leagueId: string,
+    @Body() dto: UpdateLeagueVisibilityDto,
+  ) {
+    return this.service.updateVisibility(user, leagueId, dto);
   }
 
   @Post()

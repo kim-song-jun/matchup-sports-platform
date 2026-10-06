@@ -27,7 +27,7 @@ export default async function TournamentsPage({ searchParams }: { searchParams: 
   const filtered = LIST_FILTER_PARAMS.some((key) => firstSearchParam(params[key]) !== null);
   const page = filtered
     ? null
-    : await fetchSeoSeed<V1TournamentListPage>(tournamentListSeedPath(kind), 'tournaments');
+    : await fetchSeoSeed<V1TournamentListPage>(tournamentListSeedPath(kind), 'tournaments', { cache: 'no-store' });
   const seed: TournamentListSeed | undefined = page ? { kind, page } : undefined;
 
   return (

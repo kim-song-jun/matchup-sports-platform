@@ -11,6 +11,7 @@ import type { PublicMatchDetail } from '@/components/public-game-records/types';
 async function loadMatch(tournamentId: string, fixtureId: string) {
   return fetchPublicV1<PublicMatchDetail>(
     `/tournaments/${encodeURIComponent(tournamentId)}/matches/${encodeURIComponent(fixtureId)}`,
+    { cache: 'no-store' },
   );
 }
 

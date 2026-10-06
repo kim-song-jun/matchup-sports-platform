@@ -4935,6 +4935,17 @@ export function useV1AssignGroupTeam(tournamentId: string) {
   });
 }
 
+export function useV1CreateBracketBye(tournamentId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: import('@/types/api').V1CreateBracketByePayload) =>
+      v1Post<V1AdminBracketGroupTeam>(`/admin/tournaments/${tournamentId}/byes`, body),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminTournamentBracket(tournamentId) });
+    },
+  });
+}
+
 export function useV1CreateFixture(tournamentId: string) {
   const queryClient = useQueryClient();
   return useMutation({
@@ -4968,6 +4979,7 @@ export function useV1UpdateFixture(tournamentId: string) {
       }) => v1Patch<V1AdminBracketFixture>(`/admin/fixtures/${fixtureId}`, body),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: v1Keys.adminTournamentBracket(tournamentId) });
+      queryClient.invalidateQueries({ queryKey: v1Keys.tournament(tournamentId) });
     },
   });
 }
@@ -5633,6 +5645,7 @@ import type {
   V1AddLeagueTeamResult,
   V1AdminLeagueDetail,
   V1AdminLeagueListItem,
+  V1UpdateLeagueVisibilityResult,
   V1AdminLeagueTeamsResponse,
   V1CancelLeagueFixturePayload,
   V1CancelLeagueFixtureResult,
@@ -5717,6 +5730,40 @@ export function useV1AdminLeagueMatch(leagueId: string) {
     queryKey: v1Keys.adminLeagueMatch(leagueId),
     queryFn: () => v1Get<V1AdminLeagueDetail>(`/admin/league-matches/${leagueId}`),
     enabled: Boolean(leagueId),
+  });
+}
+
+/** 공개 여부 변경은 관리자 운영 데이터를 보존하고 공개 읽기 캐시만 다시 확인한다. */
+export function useV1UpdateLeagueVisibility(leagueId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { isPublic: boolean }) =>
+      v1Patch<V1UpdateLeagueVisibilityResult>(
+        `/admin/league-matches/${encodeURIComponent(leagueId)}/visibility`,
+        body,
+      ),
+    onSuccess: (result) => {
+      const fixtureIds = queryClient
+        .getQueryData<V1AdminLeagueDetail>(v1Keys.adminLeagueMatch(leagueId))
+        ?.fixtures.map((fixture) => fixture.teamMatchId) ?? [];
+      queryClient.setQueryData<V1AdminLeagueDetail>(v1Keys.adminLeagueMatch(leagueId), (current) =>
+        current ? { ...current, isPublic: result.isPublic } : current,
+      );
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminLeagueMatch(leagueId) });
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminLeagueMatchList() });
+      queryClient.invalidateQueries({ queryKey: v1Keys.leagueMatches() });
+      queryClient.invalidateQueries({ queryKey: v1Keys.leagueMatch(leagueId) });
+      queryClient.invalidateQueries({ queryKey: ['v1', 'league-claimable-fixtures', leagueId] });
+      for (const fixtureId of fixtureIds) {
+        queryClient.invalidateQueries({ queryKey: v1Keys.teamMatch(fixtureId) });
+      }
+      queryClient.invalidateQueries({ queryKey: v1Keys.tournament(leagueId) });
+      queryClient.invalidateQueries({ queryKey: ['tournament-reviews', leagueId] });
+      queryClient.invalidateQueries({ queryKey: ['tournament-reviews-me', leagueId] });
+      queryClient.invalidateQueries({ queryKey: v1Keys.myTournamentFixtures(leagueId) });
+      queryClient.invalidateQueries({ queryKey: v1Keys.home() });
+      queryClient.invalidateQueries({ queryKey: v1Keys.tournaments() });
+    },
   });
 }
 

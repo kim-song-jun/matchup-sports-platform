@@ -5,8 +5,7 @@ import { useShellOverride } from '@/components/v1-ui/shell-override';
 import { Card, EmptyState, ErrorState, KPIStat } from '@/components/v1-ui/primitives';
 import { ChevronRightIcon } from '@/components/v1-ui/icons';
 import { SegmentedTabs, type SegmentedTabsItem } from '@/components/v1-ui/segmented-tabs';
-import { cssUrl } from '@/lib/assets';
-import { displayInitials } from '@/lib/display-initials';
+import { AvatarImage } from '@/components/v1-ui/user-avatar';
 import { useKeepTappedItemInPlace } from './review-scroll-anchor';
 import { REVIEW_METRIC_FIELDS } from './reviews.types';
 import type { ReviewMetricDraft, ReviewSourcePageModel, ReviewsPageModel, ReviewsReceivedPageModel, ReviewsTab, ReviewTargetDraft, ReviewTargetViewModel } from './reviews.types';
@@ -473,7 +472,7 @@ function ReviewTeamCard({
       style={{ width: '100%', minWidth: 0 }}
     >
       <div className="tm-review-target-head">
-        <Avatar imageUrl={target.imageUrl} initials={target.initials} />
+        <Avatar imageUrl={target.imageUrl} kind={target.targetType} />
         <div style={{ flex: 1, minWidth: 0 }}>
           <div className="tm-review-card-head" style={{ flexWrap: 'wrap' }}>
             <div style={{ minWidth: 0, overflowWrap: 'anywhere' }}>
@@ -575,7 +574,7 @@ function ReviewPlayerItem({
         }}
         type="button"
       >
-        <Avatar imageUrl={target.imageUrl} initials={target.initials} size={36} />
+        <Avatar imageUrl={target.imageUrl} kind={target.targetType} size={36} />
         <div style={{ flex: 1, minWidth: 0, overflowWrap: 'anywhere' }}>
           <div className="tm-text-label" style={{ fontSize: 'var(--font-size-body)' }}>{target.name}</div>
           {detail ? (
@@ -811,7 +810,7 @@ function ReceivedReviewRow({ review }: { review: V1ReceivedReviewDetail }) {
   return (
     <div className="tm-review-received-row">
       {/* 작성자를 공개한다(2026-08-18). 팀 대상 후기는 보낸 팀 이름이 더 유용해서 팀명을 우선한다. */}
-      <Avatar imageUrl={review.reviewerUser?.imageUrl} initials={displayInitials(review.reviewerTeam?.name ?? review.reviewerUser?.name, { fallback: '리뷰', count: 2 })} size={34} />
+      <Avatar imageUrl={review.reviewerTeam ? review.reviewerTeam.imageUrl : review.reviewerUser?.imageUrl} kind={review.reviewerTeam ? 'team' : 'user'} size={34} />
       <div style={{ flex: 1, minWidth: 0 }}>
         <div className="tm-text-label">{review.reviewerTeam?.name ?? review.reviewerUser?.name ?? '작성자 미상'}</div>
         <div className="tm-text-caption" style={{ marginTop: 2 }}>{review.rating}점 · {firstTag}</div>
@@ -820,12 +819,8 @@ function ReceivedReviewRow({ review }: { review: V1ReceivedReviewDetail }) {
   );
 }
 
-function Avatar({ imageUrl, initials, size = 42 }: { imageUrl: string | null | undefined; initials: string; size?: number }) {
-  return imageUrl ? (
-    <div className="tm-review-avatar" style={{ width: size, height: size, backgroundImage: cssUrl(imageUrl) }} />
-  ) : (
-    <div className="tm-review-avatar" style={{ width: size, height: size }}>{initials}</div>
-  );
+function Avatar({ imageUrl, kind, size = 42 }: { imageUrl: string | null | undefined; kind: 'team' | 'user'; size?: number }) {
+  return <AvatarImage imageUrl={imageUrl} kind={kind} size={size} className="tm-review-avatar" />;
 }
 
 function ReviewSkeleton({ count }: { count: number }) {

@@ -54,6 +54,7 @@ import {
   RevertLeagueCompletionDto,
   UpdateLeagueDisciplineDto,
   UpdateLeagueFixtureDto,
+  UpdateLeagueVisibilityDto,
 } from './dto/league-match.dto';
 import { LEAGUE_TIE_BREAK_ORDER } from './league-tie-break';
 import { findTournamentOnSurface } from '../tournaments/tournament-surface-lookup';
@@ -267,6 +268,7 @@ export class LeagueMatchAdminService {
       select: {
         id: true,
         title: true,
+        isPublic: true,
         status: true,
         scheduledAt: true,
         scheduledEndAt: true,
@@ -306,6 +308,7 @@ export class LeagueMatchAdminService {
       items: listable.map((row) => ({
         leagueId: row.id,
         title: row.title,
+        isPublic: row.isPublic,
         state: LEAGUE_STATE_BY_STATUS[row.status],
         teamCount: row._count.registrations,
         fixtureCount: fixtureCountByLeagueId.get(row.id) ?? 0,
@@ -384,6 +387,7 @@ export class LeagueMatchAdminService {
     return {
       leagueId: league.id,
       title: league.title,
+      isPublic: league.isPublic,
       state: league.state,
       // **대진 일정 폼이 요일을 날짜로 전개하는 기준일이다.** BE-2 이후 서버는 요일을 모르고
       // `schedule.dates` 를 받으므로, 화면이 "리그 시작일 이후 매주 그 요일" 을 직접 펼쳐야
@@ -423,6 +427,40 @@ export class LeagueMatchAdminService {
         };
       }),
     };
+  }
+
+  async updateVisibility(user: V1AuthUser, leagueId: string, dto: UpdateLeagueVisibilityDto) {
+    const admin = await this.adminContext.getMutationAdmin(user.id);
+    return this.prisma.$transaction(async (tx) => {
+      const locked = await tx.$queryRaw<Array<{ id: string; isPublic: boolean }>>`
+        SELECT "id", "is_public" AS "isPublic"
+        FROM "v1_tournaments"
+        WHERE "id" = ${leagueId}
+          AND "kind" = 'regular_league'
+          AND "deleted_at" IS NULL
+        FOR UPDATE
+      `;
+      const current = locked[0];
+      if (current === undefined) {
+        throw new NotFoundException({ code: 'LEAGUE_NOT_FOUND', message: '리그를 찾을 수 없어요.' });
+      }
+
+      if (current.isPublic === dto.isPublic) return { leagueId, isPublic: current.isPublic };
+
+      await tx.v1Tournament.update({ where: { id: leagueId }, data: { isPublic: dto.isPublic } });
+      await this.adminContext.logAdminAction(
+        admin,
+        {
+          action: 'league_match.visibility',
+          targetType: 'league_match',
+          targetId: leagueId,
+          beforeJson: { isPublic: current.isPublic },
+          afterJson: { isPublic: dto.isPublic },
+        },
+        tx,
+      );
+      return { leagueId, isPublic: dto.isPublic };
+    });
   }
 
   // generateFixtures/previewFixtures/regenerateFixtures 공용: timing DTO를 기본값 채운
@@ -1591,6 +1629,7 @@ export class LeagueMatchAdminService {
       select: {
         id: true,
         title: true,
+        isPublic: true,
         status: true,
         registrationDeadlineAt: true,
         sportId: true,

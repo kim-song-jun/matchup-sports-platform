@@ -47,7 +47,22 @@ export function TeamMatchListPageView({ model }: { model: TeamMatchListViewModel
   // 상세의 뒤로가기가 검색어·필터가 걸린 이 목록 URL 로 돌아오게 카드마다 출처로 싣는다.
   // 쿼리 없는 목록은 상세 뒤로가기의 fallback 이 이미 같은 곳이라 싣지 않는다(공개 첫 HTML 의 카드 링크를 깨끗하게 유지).
   const currentHref = useCurrentHref();
-  const listFromHref = currentHref?.includes('?') ? currentHref : null;
+  let listFromHref = currentHref?.includes('?') ? currentHref : null;
+  // 실제 검색 모델이 있으면 상세 복귀도 replace 완료 전의 URL보다 현재 적용한 검색어를 따른다.
+  // 첫 # 뒤는 앵커 전체로 보존해 앵커 안의 ?를 목록 검색 조건으로 해석하지 않는다.
+  if (currentHref && model.search) {
+    const hashIndex = currentHref.indexOf('#');
+    const hash = hashIndex >= 0 ? currentHref.slice(hashIndex) : '';
+    const pathAndQuery = hashIndex >= 0 ? currentHref.slice(0, hashIndex) : currentHref;
+    const queryIndex = pathAndQuery.indexOf('?');
+    const pathname = queryIndex >= 0 ? pathAndQuery.slice(0, queryIndex) : pathAndQuery;
+    const params = new URLSearchParams(queryIndex >= 0 ? pathAndQuery.slice(queryIndex + 1) : '');
+    const appliedQuery = model.query.trim();
+    if (appliedQuery) params.set('q', appliedQuery);
+    else params.delete('q');
+    const search = params.toString();
+    listFromHref = search ? `${pathname}?${search}${hash}` : null;
+  }
   return (
     <>
       {/* 데스크톱 전용 인라인 헤더 — FAB가 데스크톱에서 숨겨지므로 대체 CTA 제공 */}
@@ -63,11 +78,13 @@ export function TeamMatchListPageView({ model }: { model: TeamMatchListViewModel
       {/* 결과가 0건일 때만 tm-list-empty — matches-page.tsx 와 같은 이유. */}
       <div className={`tm-match-list${!model.isLoading && model.matches.length === 0 ? ' tm-list-empty' : ''}`}>
         <div className="tm-sport-chip-row">{model.sports.map((sport) => sport.href ? <Link key={sport.label} className={`tm-chip ${sport.active ? 'tm-chip-active' : ''}`} href={sport.href} aria-current={sport.active ? 'page' : undefined}>{sport.label} <span className="tab-num">{sport.count}</span></Link> : <button key={sport.label} className={`tm-chip ${sport.active ? 'tm-chip-active' : ''}`} type="button" aria-pressed={sport.active}>{sport.label} <span className="tab-num">{sport.count}</span></button>)}</div>
+        <p className="tm-text-caption">전체·종목별 건수는 불러온 목록 기준이에요</p>
         {/* P1: 통계 숫자 tabular-nums + weight 차등 (2:1 원칙) */}
         <div className="tm-match-summary-row">
           {/* matches-page.tsx 와 같은 이유 — 이 화면도 모바일 헤딩이 0개였다. */}
           <h2 className="tm-list-scope-heading">{buildTeamMatchSummaryLabel()}</h2>
           <div className="tm-text-caption tab-num">
+            <div>현재 목록 기준</div>
             <span style={{ fontVariantNumeric: 'tabular-nums', fontWeight: 700 }}>{model.summary.count}</span>개 · 오늘 {model.summary.today} · 모집 중 <strong style={{ fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{model.summary.urgent}</strong>
           </div>
         </div>
@@ -714,8 +731,8 @@ export function TeamMatchDetailPageView({ model, recordEntry, lifecyclePanel }: 
                 {/* P1: 숫자(subhead/20px/700) : 단위(body/15px) = 2:1 비율 + tabular-nums */}
                 {match.opponentCost !== null && (
                   <div className="tm-info-cost-hero">
-                    <div className="tm-text-caption" style={{ color: 'var(--text-caption)' }}>{match.platformManaged ? '각 팀 부담금' : '상대팀 부담금'}</div>
-                    <div className="tm-text-caption" style={{ marginTop: 4 }}>{match.platformManaged ? null : TEAM_MATCH_COST_EXPLANATION}</div>
+                    <div className="tm-text-caption" style={{ color: 'var(--text-caption)' }}>상대팀 부담금</div>
+                    <div className="tm-text-caption" style={{ marginTop: 4 }}>{TEAM_MATCH_COST_EXPLANATION}</div>
 
                     <div className="tm-info-cost-amount">
                       {match.opponentCost === 0 ? (

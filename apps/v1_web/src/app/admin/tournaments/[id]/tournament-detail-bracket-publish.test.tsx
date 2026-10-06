@@ -31,6 +31,7 @@ vi.mock('@/hooks/use-v1-api', () => ({
   useV1CreateGroup: vi.fn(),
   useV1AssignGroupTeam: vi.fn(),
   useV1CreateFixture: vi.fn(),
+  useV1CreateBracketBye: () => ({ mutate: vi.fn(), isPending: false }),
   useV1RecalculateStandings: vi.fn(),
   useV1UpdateFixture: vi.fn(),
   useV1DeleteFixture: vi.fn(),

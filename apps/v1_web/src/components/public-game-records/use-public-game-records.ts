@@ -46,9 +46,8 @@ export interface ScheduleFilters {
  * channel for a potentially-hundreds-of-viewers, unauthenticated audience is
  * out of this lane's scope (rationale spelled out in
  * `docs/api/domains/public-records.md`'s "Lane 1 addition" section). Only
- * polls while the currently-loaded page actually contains a `status ===
- * 'live'` fixture/match, so an idle spectator on a fully-scheduled or
- * fully-completed tournament page never polls at all.
+ * Schedule polling includes scheduled games and time-unset live games so kickoff is discovered
+ * without reloading. Completed tournaments stop polling; match-detail polling remains live-only.
  *
  * 주기 값과 그 근거(왜 10초인지, 관전자 수에 비례하는 부하 모델, 왜 이 값이
  * `useV1Tournament`와 반드시 같아야 하는지)는 `@/lib/public-live-polling`에 단일
@@ -81,8 +80,9 @@ export function usePublicTournamentSchedule(
     enabled: Boolean(tournamentId) && (options.enabled ?? true),
     retry: false,
     refetchInterval: (query) => {
-      const hasLive = query.state.data?.pages.some((page) => page.items.some((item) => item.status === 'live'));
-      return hasLive === true ? LIVE_POLL_INTERVAL_MS : false;
+      const hasPendingGames = query.state.data?.pages.some((page) => [...page.items, ...page.unscheduled]
+        .some((item) => item.status === 'live' || item.status === 'scheduled'));
+      return hasPendingGames === true ? LIVE_POLL_INTERVAL_MS : false;
     },
   });
 }

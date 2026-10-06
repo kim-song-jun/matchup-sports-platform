@@ -2,7 +2,6 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { V1ApiError } from '@/lib/api-client';
 import { trackEvent } from '@/lib/analytics';
-import { TEAM_LOGO_PRESETS } from '@/lib/team-logo-presets';
 import type { TeamFormViewModel } from './teams.types';
 import { TeamCreatePageClient, TeamEditPageClient } from './teams-form-client';
 
@@ -173,20 +172,19 @@ describe('Team form client contracts', () => {
     });
   });
 
-  it('submits one bundled logo preset through the existing logoUrl contract', async () => {
+  it('keeps an unselected logo empty instead of silently assigning a random image', async () => {
     render(<TeamCreatePageClient />);
 
     await waitFor(() => {
-      expect(TEAM_LOGO_PRESETS).toContain(screen.getByTestId('team-logo-url').textContent);
+      expect(screen.getByTestId('team-logo-url').textContent).toBe('');
     });
-    const selectedLogoUrl = screen.getByTestId('team-logo-url').textContent;
 
     fireEvent.change(screen.getByLabelText('팀 이름'), { target: { value: '프리셋 저장 팀' } });
     fireEvent.click(screen.getByRole('button', { name: '팀 만들기' }));
 
     await waitFor(() => {
       expect(createTeamMutateAsync).toHaveBeenCalledWith(
-        expect.objectContaining({ logoUrl: selectedLogoUrl }),
+        expect.objectContaining({ logoUrl: null }),
       );
     });
   });

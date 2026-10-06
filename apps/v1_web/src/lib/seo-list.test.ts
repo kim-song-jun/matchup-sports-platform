@@ -9,7 +9,7 @@ const fetchPublicV1 = vi.fn();
 
 vi.mock('@/lib/seo', async () => {
   const actual = await vi.importActual<typeof import('@/lib/seo')>('@/lib/seo');
-  return { ...actual, fetchPublicV1: (path: string) => fetchPublicV1(path) };
+  return { ...actual, fetchPublicV1: (...args: Parameters<typeof actual.fetchPublicV1>) => fetchPublicV1(...args) };
 });
 
 const { fetchSeoMasterSports, fetchSeoSeed } = await import('./seo-list');
@@ -30,7 +30,15 @@ describe('fetchSeoSeed', () => {
     fetchPublicV1.mockResolvedValue({ items: [{ id: 'a' }], pageInfo: { hasNext: true, nextCursor: 'c' } });
 
     await expect(fetchSeoSeed('/matches', 'matches')).resolves.toEqual({ items: [{ id: 'a' }], pageInfo: { hasNext: true, nextCursor: 'c' } });
-    expect(fetchPublicV1).toHaveBeenCalledWith('/matches');
+    expect(fetchPublicV1).toHaveBeenCalledWith('/matches', {});
+  });
+
+  it('공개 여부가 바뀔 수 있는 목록은 no-store 요청 옵션을 전달한다', async () => {
+    fetchPublicV1.mockResolvedValue({ items: [], pageInfo: { hasNext: false, nextCursor: null } });
+
+    await fetchSeoSeed('/tournaments', 'tournaments', { cache: 'no-store' });
+
+    expect(fetchPublicV1).toHaveBeenCalledWith('/tournaments', { cache: 'no-store' });
   });
 
   it('업스트림이 죽어도 던지지 않고 null 을 준다 — 빈 목록을 사실처럼 넘기지 않는다', async () => {

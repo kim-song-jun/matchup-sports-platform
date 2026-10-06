@@ -21,7 +21,7 @@ export const revalidate = 0;
 export default async function TeamMatchesPage({ searchParams }: { searchParams: SearchParams }) {
   const filtered = hasListFilter(await searchParams, TEAM_MATCH_LIST_FILTER_PARAMS);
   const [page, sports] = await Promise.all([
-    fetchSeoSeed<CursorPage<V1TeamMatch>>(TEAM_MATCH_LIST_SEED_PATH, 'team-matches'),
+    fetchSeoSeed<CursorPage<V1TeamMatch>>(TEAM_MATCH_LIST_SEED_PATH, 'team-matches', { cache: 'no-store' }),
     fetchSeoMasterSports(),
   ]);
 

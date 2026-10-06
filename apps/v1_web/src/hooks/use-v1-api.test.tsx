@@ -6,6 +6,7 @@ import { v1Api, v1Get, v1Patch, v1Post } from '@/lib/api-client';
 import { trackEvent } from '@/lib/analytics';
 import { v1Keys } from '@/lib/query-keys';
 import type { V1Profile } from '@/types/api';
+import type { V1AdminLeagueDetail } from '@/types/league-match';
 import {
   useV1AdminTournamentReviews,
   useV1ChatRooms,
@@ -17,6 +18,7 @@ import {
   useV1SubmitReview,
   useV1UnhideReview,
   useV1UpdateProfile,
+  useV1UpdateLeagueVisibility,
 } from './use-v1-api';
 
 vi.mock('@/lib/api-client', async () => {
@@ -167,6 +169,56 @@ describe('useV1HideReview', () => {
     expect(invalidateSpy).toHaveBeenCalledWith({
       queryKey: ['admin-tournament-reviews', 'tournament-1'],
     });
+  });
+});
+
+describe('useV1UpdateLeagueVisibility', () => {
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('sends only isPublic and invalidates admin plus public league surfaces after saving', async () => {
+    v1PatchMock.mockResolvedValue({ leagueId: 'league-1', isPublic: false });
+    const { wrapper, queryClient } = createWrapperWithClient();
+    queryClient.setQueryData(v1Keys.adminLeagueMatch('league-1'), {
+      leagueId: 'league-1',
+      title: '검증 리그',
+      state: 'active',
+      isPublic: true,
+      teamIds: [],
+      startsOn: '2026-10-01T00:00:00.000Z',
+      registrationDeadlineAt: null,
+      registrationOpen: false,
+      fixtures: [{
+        teamMatchId: 'fixture-1',
+        title: '검증 리그 1주차',
+        homeTeamId: 'team-1',
+        awayTeamId: 'team-2',
+        startAt: '2026-10-01T00:00:00.000Z',
+        placeName: '미정',
+        status: 'scheduled',
+      }],
+    } as V1AdminLeagueDetail);
+    const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
+    const { result } = renderHook(() => useV1UpdateLeagueVisibility('league-1'), { wrapper });
+
+    result.current.mutate({ isPublic: false });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+    expect(v1PatchMock).toHaveBeenCalledWith('/admin/league-matches/league-1/visibility', { isPublic: false });
+    expect(queryClient.getQueryData<V1AdminLeagueDetail>(v1Keys.adminLeagueMatch('league-1'))?.isPublic).toBe(false);
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: v1Keys.adminLeagueMatch('league-1') });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: v1Keys.adminLeagueMatchList() });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: v1Keys.leagueMatches() });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: v1Keys.leagueMatch('league-1') });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['v1', 'league-claimable-fixtures', 'league-1'] });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: v1Keys.teamMatch('fixture-1') });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: v1Keys.tournament('league-1') });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['tournament-reviews', 'league-1'] });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['tournament-reviews-me', 'league-1'] });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: v1Keys.myTournamentFixtures('league-1') });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: v1Keys.home() });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: v1Keys.tournaments() });
   });
 });
 

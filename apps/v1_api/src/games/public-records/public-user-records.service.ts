@@ -171,7 +171,18 @@ export class PublicUserRecordsService {
 
   private async loadTournamentAwards(userId: string, season: string | undefined) {
     const awards = await this.prisma.v1TournamentAward.findMany({
-      where: { recipientUserId: userId },
+      where: {
+        recipientUserId: userId,
+        tournament: {
+          is: {
+            OR: [
+              { kind: 'regular_tournament' },
+              { kind: null },
+              { kind: 'regular_league', isPublic: true },
+            ],
+          },
+        },
+      },
       orderBy: [{ tournament: { scheduledEndAt: 'desc' } }, { sortOrder: 'asc' }],
       select: {
         id: true,
@@ -232,7 +243,14 @@ export class PublicUserRecordsService {
         participantId: { in: participantIds },
         resultRevision: {
           officialAt: { not: null },
-          game: { sourceType: 'TEAM_MATCH' },
+          game: {
+            sourceType: 'TEAM_MATCH',
+            teamMatch: {
+              is: {
+                OR: [{ leagueId: null }, { league: { is: { isPublic: true } } }],
+              },
+            },
+          },
         },
       },
       select: {
@@ -468,7 +486,7 @@ export class PublicUserRecordsService {
       leagueIds.length === 0
         ? []
         : this.prisma.v1Tournament.findMany({
-            where: { id: { in: leagueIds }, kind: 'regular_league' },
+            where: { id: { in: leagueIds }, kind: 'regular_league', isPublic: true },
             select: { id: true, title: true },
           }),
     ]);

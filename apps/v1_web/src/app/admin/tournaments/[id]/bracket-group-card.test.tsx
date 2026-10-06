@@ -47,6 +47,53 @@ describe('BracketGroupCard — 팀 일괄 배정', () => {
 
   const fixtures: V1AdminBracketFixture[] = [];
 
+
+  it('팀 미정 부전승을 저장하고 기존 자리 수정도 동일 byeId로 보낸다', () => {
+    const group = { ...semiGroup, id: 'r12', name: '12강', phase: 'round12' as const,
+      groupTeams: [{ id: 'slot-1', groupId: 'r12', registrationId: null, teamName: null, isBye: true, sortOrder: 3, createdAt: '2026-10-05T00:00:00Z' }] };
+    const createBye = { mutate: vi.fn(), isPending: false } as unknown as ReturnType<typeof import('@/hooks/use-v1-api').useV1CreateBracketBye>;
+    const createFixture = noopMutation();
+    render(<BracketGroupCard group={group} allGroups={[group]} allStandings={[]} fixtures={[]}
+      confirmedTeamItems={[{ id: 'reg-1', label: '강남FC' }]} assignGroupTeam={noopMutation() as unknown as ReturnType<typeof import('@/hooks/use-v1-api').useV1AssignGroupTeam>}
+      createFixture={createFixture} createBye={createBye} isAutoGenerating={false} onAutoGenerate={vi.fn()} onEditGroup={vi.fn()}
+      onDeleteGroup={vi.fn()} onRemoveGroupTeam={vi.fn()} autoFocus={false} showToast={vi.fn()} />);
+    expect(screen.getByText('팀 미정')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /직접 입력/ }));
+    fireEvent.change(screen.getByLabelText('라운드'), { target: { value: '12강' } });
+    fireEvent.click(screen.getByLabelText('부전승'));
+    expect(screen.getByRole('button', { name: '부전승 저장' })).toBeEnabled();
+    fireEvent.click(screen.getByRole('button', { name: '부전승 저장' }));
+    expect(createBye.mutate).toHaveBeenCalledWith({ groupId: 'r12', registrationId: null, sortOrder: 0 }, expect.any(Object));
+    fireEvent.click(screen.getByRole('button', { name: '부전승 4번 자리 수정' }));
+    fireEvent.change(screen.getByLabelText('부전승 팀 (선택 · 미정 가능)'), { target: { value: '강남' } });
+    fireEvent.click(screen.getByRole('option', { name: /강남FC/ }));
+    fireEvent.click(screen.getByRole('button', { name: '부전승 수정 저장' }));
+    expect(createBye.mutate).toHaveBeenLastCalledWith({ groupId: 'r12', byeId: 'slot-1', registrationId: 'reg-1', sortOrder: 3 }, expect.any(Object));
+    expect(createFixture.mutate).not.toHaveBeenCalled();
+  });
+
+  it('12강 부전승은 상대팀 없이 한 팀과 대진 위치만 저장한다', () => {
+    const group = { ...semiGroup, id: 'r12', name: '12강', phase: 'round12' as const };
+    const createBye = { mutate: vi.fn((_payload: unknown, options: { onSuccess: () => void }) => options.onSuccess()), isPending: false } as unknown as ReturnType<typeof import('@/hooks/use-v1-api').useV1CreateBracketBye>;
+    const createFixture = noopMutation();
+    render(<BracketGroupCard group={group} allGroups={[group]} allStandings={[]} fixtures={[]}
+      confirmedTeamItems={[{ id: 'reg-1', label: '강남FC' }]} assignGroupTeam={noopMutation() as unknown as ReturnType<typeof import('@/hooks/use-v1-api').useV1AssignGroupTeam>}
+      createFixture={createFixture} createBye={createBye} isAutoGenerating={false} onAutoGenerate={vi.fn()} onEditGroup={vi.fn()}
+      onDeleteGroup={vi.fn()} onRemoveGroupTeam={vi.fn()} autoFocus={false} showToast={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: /직접 입력/ }));
+    fireEvent.change(screen.getByLabelText('라운드'), { target: { value: '12강' } });
+    fireEvent.click(screen.getByLabelText('부전승'));
+    expect(screen.queryByLabelText('어웨이 팀 (선택)')).not.toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('대진표 위치'), { target: { value: '4' } });
+    fireEvent.change(screen.getByLabelText('부전승 팀 (선택 · 미정 가능)'), { target: { value: '강남' } });
+    fireEvent.click(screen.getByRole('option', { name: /강남FC/ }));
+    fireEvent.click(screen.getByRole('button', { name: '부전승 저장' }));
+    expect(createBye.mutate).toHaveBeenCalledWith({ groupId: 'r12', registrationId: 'reg-1', sortOrder: 3 }, expect.any(Object));
+    expect(createFixture.mutate).not.toHaveBeenCalled();
+    expect(screen.getByLabelText('대진표 위치')).toHaveValue(1);
+    expect(screen.getByLabelText('부전승 팀 (선택 · 미정 가능)')).toHaveValue('');
+  });
+
   it('예선 상위 진출팀 추천칩 2개를 담고 "2팀 배정"을 누르면 서로 다른 registrationId로 두 번 순차 호출된다', async () => {
     const mutateCalls: { groupId: string; registrationId: string }[] = [];
     const assignGroupTeam = {

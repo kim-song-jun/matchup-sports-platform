@@ -9,9 +9,13 @@ import type { V1MasterSportsResponse, V1Sport } from '@/types/api';
  * 실패하면 빈 목록이 아니라 `null` 이다. 빈 목록을 seed 로 넘기면 클라이언트가 실제 응답이
  * 올 때까지 "대회가 없어요" 빈 상태를 사실처럼 그린다 — seed 없음이면 기존 로딩 경로를 탄다.
  */
-export async function fetchSeoSeed<T>(path: string, label: string): Promise<T | null> {
+export async function fetchSeoSeed<T>(
+  path: string,
+  label: string,
+  options: { cache?: 'no-store' } = {},
+): Promise<T | null> {
   try {
-    const data = await fetchPublicV1<T>(path);
+    const data = await fetchPublicV1<T>(path, options);
     if (data === null) console.error(`[seo] ${label} 목록 서버 프리렌더 404 — 클라이언트 로딩으로 넘긴다`);
     return data;
   } catch (error) {

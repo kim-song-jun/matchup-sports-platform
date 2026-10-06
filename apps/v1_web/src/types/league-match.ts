@@ -158,6 +158,8 @@ export interface V1AdminLeagueDetail {
   leagueId: string;
   title: string;
   state: 'draft' | 'active' | 'completed';
+  /** 공개 리그 목록·상세에 노출되는지 여부. 관리자 상세는 항상 값을 내려준다. */
+  isPublic: boolean;
   /**
    * 그룹 B 감사 결함 1 — 참가팀 추가 화면이 "이 리그 종목과 같은 팀만" 검색을 좁히는 데
    * 쓴다. public 조회(V1PublicLeagueDetail)는 `sport: { sportId, code, name }` 중첩
@@ -192,6 +194,12 @@ export interface V1AdminLeagueDetail {
   fixtures: V1LeagueFixture[];
 }
 
+/** PATCH /admin/league-matches/:leagueId/visibility 응답 */
+export interface V1UpdateLeagueVisibilityResult {
+  leagueId: string;
+  isPublic: boolean;
+}
+
 /**
  * 이슈 1(감사 보통) — 같은 시리즈의 다른 시즌·티어 리그. 상세 화면의 탐색 링크에 쓴다.
  * tier·seasonNo 는 시리즈에 속한 리그라면(V1League 모델 불변식 — 셋은 항상 함께
@@ -205,7 +213,7 @@ export interface V1LeagueSeriesSibling {
   state: 'draft' | 'active' | 'completed';
 }
 
-export interface V1PublicLeagueDetail extends V1AdminLeagueDetail {
+export interface V1PublicLeagueDetail extends Omit<V1AdminLeagueDetail, 'isPublic'> {
   // startsOn 은 V1AdminLeagueDetail 로 올라갔다(대진 폼이 기준일로 쓴다) — 여기서 다시
   // 선언하면 두 곳이 갈릴 수 있어 상속만 받는다.
   endsOn: string;

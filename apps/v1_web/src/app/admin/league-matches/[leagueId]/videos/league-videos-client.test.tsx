@@ -7,7 +7,7 @@ import type { TournamentVideoFixture } from '@/hooks/use-v1-fixture-videos';
 import LeagueVideosClient from './league-videos-client';
 
 const api = vi.hoisted(() => ({ items: [] as TournamentVideoFixture[], create: vi.fn(), upload: vi.fn(), remove: vi.fn(), navigate: vi.fn() }));
-vi.mock('@/hooks/use-v1-api', () => ({ useV1AdminLeagueMatch: () => ({ data: { title: '합성 리그' } }) }));
+vi.mock('@/hooks/use-v1-api', () => ({ useV1AdminLeagueMatch: () => ({ data: { title: '합성 리그', isPublic: true } }) }));
 vi.mock('@/hooks/use-v1-fixture-videos', () => ({
   useLeagueFixtureVideos: () => ({ data: { items: api.items }, isPending: false, isError: false }),
   useCreateLeagueFixtureVideoLink: () => ({ mutateAsync: api.create, isPending: false }),

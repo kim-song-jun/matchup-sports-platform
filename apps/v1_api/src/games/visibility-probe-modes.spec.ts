@@ -20,6 +20,7 @@ function serviceWith(input: {
   readonly mode: V1VisibilityMode;
   readonly publicLive: 'on' | 'off';
   readonly officialScore: { home: number; away: number } | null;
+  readonly leagueIsPublic?: boolean;
 }) {
   const prisma = {
     v1Game: {
@@ -44,6 +45,7 @@ function serviceWith(input: {
         events: [LIVE_GOAL],
         currentOfficialRevision:
           input.officialScore === null ? null : { id: 'rev-1', score: input.officialScore },
+        teamMatch: { league: input.leagueIsPublic === false ? { isPublic: false } : { isPublic: true } },
       }),
     },
     v1GameOperationFlag: {
@@ -100,6 +102,20 @@ describe('GET /games/:gameId/visibility resolves every stored policy mode', () =
       mode: V1VisibilityMode.HIDDEN,
       publicLive: 'on',
       officialScore: { home: 2, away: 1 },
+    });
+
+    await expect(service.getVisibility('game-1')).rejects.toMatchObject({
+      status: 404,
+      response: expect.objectContaining({ code: 'GAME_NOT_FOUND' }),
+    });
+  });
+
+  it('answers a game from a private regular league with the same 404 as a missing game', async () => {
+    const service = serviceWith({
+      mode: V1VisibilityMode.LIVE,
+      publicLive: 'on',
+      officialScore: { home: 2, away: 1 },
+      leagueIsPublic: false,
     });
 
     await expect(service.getVisibility('game-1')).rejects.toMatchObject({

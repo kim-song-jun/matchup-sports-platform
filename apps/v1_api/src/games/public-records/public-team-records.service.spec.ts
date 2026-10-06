@@ -80,6 +80,11 @@ describe('PublicTeamRecordsService', () => {
     const pageQuery = queryRaw.mock.calls[0]?.[0] as { strings?: readonly string[] };
     expect(pageQuery.strings?.join(' ')).toContain('ORDER BY trf.played_at DESC, trf.id DESC');
     expect(pageQuery.strings?.join(' ')).toContain('trf.played_at >=');
+    for (const callIndex of [0, 1, 2]) {
+      const sql = (queryRaw.mock.calls[callIndex]?.[0] as { strings?: readonly string[] }).strings?.join(' ');
+      expect(sql).toContain('LEFT JOIN v1_tournaments league ON league.id = tm.league_id');
+      expect(sql).toContain('tm.league_id IS NULL OR league.is_public IS TRUE');
+    }
     expect(result.items[0]).toEqual(
       expect.objectContaining({
         playedAt: playedAt.toISOString(),

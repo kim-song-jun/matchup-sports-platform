@@ -464,7 +464,7 @@ export class ProfileService {
       this.getRevealedMonthlyReviewCount(userId, monthStart, nextMonthStart),
       // 레거시 개인매치(V1MatchParticipant)만 세면 대회(V1Game 계열)를 여러 번 뛴 유저도 0으로 보인다
       // (프로덕션 실측: 팀원 7명 전원 matchCount=0). 대회 출전은 별도 카운트로 더한다.
-      countOfficialGameAppearances(this.prisma, userId, month),
+      countOfficialGameAppearances(this.prisma, userId, month, { publicOnly: true }),
     ]);
 
     return {

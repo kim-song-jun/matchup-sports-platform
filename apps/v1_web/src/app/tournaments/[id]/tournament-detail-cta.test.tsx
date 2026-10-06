@@ -214,6 +214,36 @@ describe('TournamentDetailView — 통합 진입 CTA 중복 제거(P2)', () => {
 });
 
 describe('TournamentDetailView — 신청 차단 사유 표시', () => {
+  it.each([
+    { status: 'open', deadline: null, pending: 0, label: '모집 중' },
+    { status: 'open', deadline: '2026-10-06T15:00:00.000+09:00', pending: 0, label: '모집 중' },
+    { status: 'open', deadline: '2026-10-06T14:59:59.999+09:00', pending: 0, label: '모집 마감' },
+    { status: 'open', deadline: '2099-01-01T00:00:00.000Z', pending: 4, label: '모집 마감' },
+    { status: 'closed', deadline: '2020-01-01T00:00:00.000Z', pending: 0, label: '마감' },
+    { status: 'in_progress', deadline: '2020-01-01T00:00:00.000Z', pending: 0, label: '진행 중' },
+    { status: 'completed', deadline: '2020-01-01T00:00:00.000Z', pending: 0, label: '종료' },
+  ] satisfies Array<{ status: V1TournamentStatus; deadline: string | null; pending: number; label: string }>) (
+    '대표 배지는 기존 신청 경계와 대회 단계를 유지해요: $status / $deadline / $pending',
+    ({ status, deadline, pending, label }) => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date('2026-10-06T06:00:00.000Z'));
+      try {
+        const tournament = makeTournament({
+          id: 't-deadline-boundary',
+          status,
+          format: 'knockout',
+          teamCount: 4,
+          pendingPaymentCount: pending,
+          registrationDeadlineAt: deadline,
+        });
+        render(<TournamentDetailView tournament={tournament} myRegistration={null} />);
+        expect(screen.getByText(label, { selector: '.tm-badge' })).toBeInTheDocument();
+      } finally {
+        vi.useRealTimers();
+      }
+    },
+  );
+
   it('신청 마감 사유를 disabled CTA의 설명으로 이어 붙이고 화면에도 보여준다', () => {
     const tournament = makeTournament({
       id: 't-deadline',
@@ -224,6 +254,8 @@ describe('TournamentDetailView — 신청 차단 사유 표시', () => {
     render(<TournamentDetailView tournament={tournament} myRegistration={null} />);
 
     const reason = '신청이 마감돼서 새로 신청할 수 없어요.';
+    expect(screen.getByText('모집 마감')).toHaveClass('tm-badge-grey');
+    expect(screen.queryByText('모집 중')).not.toBeInTheDocument();
     // 버튼의 이름은 보이는 글자 그대로 두고(WCAG 2.5.3), 사유는 설명으로 잇는다.
     const button = screen.getByRole('button', { name: '신청 마감' });
     expect(button).toBeDisabled();

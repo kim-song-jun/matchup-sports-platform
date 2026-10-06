@@ -114,6 +114,7 @@ type AdminListSummary = {
   - 이메일 계정과 카카오 계정 모두 원본 unique key를 비우므로 같은 이메일/카카오 계정으로 재가입할 수 있다.
   - `GET /admin/users/:id`는 `withdrawalRequest.reason`으로 사용자가 탈퇴 대기 요청 때 작성한 메시지를 노출한다.
   - 팀 정보는 소유 팀(`ownerUserId` 기준, 보관 팀 포함·최근 5건 목록과 전체 개수), 팀장/매니저/멤버 역할 카운트, active 소속팀 목록을 분리해 제공한다. 소유 팀은 소속 팀의 owner(팀장) 역할과 같은 개념이다.
+  - 회원 목록·상세의 `membershipCount`는 역할 카운트·상세 소속 배열과 동일한 `V1TeamMembership.status=active` 기준이며 `owner + manager + member` 합계와 같다. 과거 탈퇴(`left`)·제명(`removed`) 이력은 제외하며 현재 소속이 없으면 0이다. 팀 자체 상태는 이 membership 상태 필터를 변경하지 않는다.
 
 아래 "사용자·운영자 접근 불변식" 절은 같은 사용자 상태 변경/삭제 계약을 DTO 레벨(`ChangeUserStatusDto`/`DeleteAdminUserDto`)에서 상세히 다룬다.
 

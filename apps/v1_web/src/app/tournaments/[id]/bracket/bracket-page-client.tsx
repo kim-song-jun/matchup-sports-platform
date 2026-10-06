@@ -83,7 +83,7 @@ function toGroupStandingsRows(group: V1TournamentGroup): TournamentStandingsRow[
   let nextPosition = rows.reduce((max, row) => Math.max(max, row.position), 0) + 1;
 
   for (const team of group.groupTeams) {
-    if (recordedRegistrationIds.has(team.registrationId)) continue;
+    if (!team.registrationId || recordedRegistrationIds.has(team.registrationId)) continue;
     rows.push({
       key: team.registrationId,
       teamId: team.teamId,
@@ -369,7 +369,7 @@ export function BracketScheduleTab({
   // schedule-page-client.tsx와 동일한 데이터 배선(usePublicTournamentSchedule 페이지
   // 합치기 + 로딩/에러 분기) — AppChrome 래핑만 없는 얇은 버전이라 별도 훅으로
   // 추출하지 않았다(두 곳뿐이라 공용 추상화를 새로 만드는 게 오히려 과설계).
-  const { data, isPending, isError, error, refetch, hasNextPage, isFetchingNextPage, fetchNextPage } =
+  const { data, isPending, isError, error, refetch, hasNextPage, isFetching, isFetchingNextPage, fetchNextPage } =
     usePublicTournamentSchedule(tournamentId);
   // `/schedule`의 권한 기능도 통합 허브인 `/bracket`에서 동일하게 제공한다. 공개 일정
   // 조회와 분리된 인증 전용 요청이라 비로그인·비참가자는 빈 상태로 끝나고, 참가팀
@@ -377,6 +377,11 @@ export function BracketScheduleTab({
   const myFixtures = useV1MyTournamentFixtures(tournamentId);
   // 리그는 조회조차 하지 않는다 — 위 섹션 주석 참조.
   const playerRecords = usePublicTournamentPlayerRecords(tournamentId, { enabled: !isRegularLeague });
+
+  // A live game can be on any cursor page; load them sequentially before claiming all live games are shown.
+  useEffect(() => {
+    if (hasNextPage && !isFetching && !isError) void fetchNextPage();
+  }, [hasNextPage, isFetching, isError, fetchNextPage]);
 
   // isPending — 서버 렌더에서 isLoading 은 false 라 아래 오류 분기로 떨어진다(대회 상세와 같다).
   if (isPending) {
@@ -404,6 +409,7 @@ export function BracketScheduleTab({
     <>
       <ScheduleContent
         tournamentId={tournamentId}
+        prioritizeLiveGames
         isRegularLeague={isRegularLeague}
         data={combined}
         hasNextPage={hasNextPage}

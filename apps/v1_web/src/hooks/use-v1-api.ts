@@ -4935,6 +4935,17 @@ export function useV1AssignGroupTeam(tournamentId: string) {
   });
 }
 
+export function useV1CreateBracketBye(tournamentId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: import('@/types/api').V1CreateBracketByePayload) =>
+      v1Post<V1AdminBracketGroupTeam>(`/admin/tournaments/${tournamentId}/byes`, body),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminTournamentBracket(tournamentId) });
+    },
+  });
+}
+
 export function useV1CreateFixture(tournamentId: string) {
   const queryClient = useQueryClient();
   return useMutation({
@@ -4968,6 +4979,7 @@ export function useV1UpdateFixture(tournamentId: string) {
       }) => v1Patch<V1AdminBracketFixture>(`/admin/fixtures/${fixtureId}`, body),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: v1Keys.adminTournamentBracket(tournamentId) });
+      queryClient.invalidateQueries({ queryKey: v1Keys.tournament(tournamentId) });
     },
   });
 }

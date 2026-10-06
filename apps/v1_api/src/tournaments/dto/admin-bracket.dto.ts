@@ -13,6 +13,7 @@ import {
   Max,
   MaxLength,
   Min,
+  ValidateIf,
   ValidateNested,
 } from 'class-validator';
 
@@ -81,6 +82,27 @@ export class CreateGroupTeamDto {
   sortOrder?: number;
 }
 
+/** 단독 부전승 대진. 라운드는 소속 group의 phase로 결정한다. */
+export class CreateBracketByeDto {
+  /** Existing bye slot to edit; absent creates a new slot. */
+  @IsOptional()
+  @IsUUID()
+  byeId?: string;
+  @IsUUID()
+  groupId!: string;
+
+  @IsOptional()
+  @IsUUID()
+  registrationId?: string | null;
+
+  /** 해당 라운드 대진표에서 위부터 0-based 위치. */
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(7)
+  sortOrder!: number;
+}
+
 // ─── Fixture DTOs ─────────────────────────────────────────────────────────────
 
 export class CreateFixtureDto {
@@ -133,6 +155,13 @@ export class CreateFixtureDto {
 }
 
 export class UpdateFixtureDto {
+  /** 번호 생략은 미변경, null은 허용하지 않는다. */
+  @ValidateIf((_object, value) => value !== undefined)
+  @IsInt()
+  @Min(1)
+  @Max(2147483647)
+  fixtureNumber?: number;
+
   @IsOptional()
   @IsDateString()
   scheduledAt?: string;

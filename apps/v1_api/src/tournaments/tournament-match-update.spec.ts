@@ -1,4 +1,4 @@
-import type { Prisma } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 import { updateTournamentMatchInTx } from './tournament-match-update';
 
 // 명단 계산 자체는 game-roster-sync 스펙·통합 스펙이 본다. 여기서는 대진 수정이 자기 경기만 잠그고
@@ -19,6 +19,8 @@ function detailRow() {
     round: 'r1',
     fixtureNumber: 1,
     legNumber: 1,
+    tournament: { title: '대회' },
+    group: null,
     parentTeamMatchId: null,
     homeRegistrationId: 'reg-a',
     awayRegistrationId: 'reg-b',
@@ -71,6 +73,7 @@ function fakeTx() {
       throw new Error(`unexpected raw query: ${query}`);
     }),
     v1TournamentMatchDetails: {
+      findFirst: jest.fn(async () => null),
       findUnique: jest.fn(async () => detailRow()),
       findUniqueOrThrow: jest.fn(async () => detailRow()),
       update: jest.fn(async () => {
@@ -169,6 +172,46 @@ describe('updateTournamentMatchInTx — 자기 경기만 잠그고 명단은 후
     await updateTournamentMatchInTx(tx, { teamMatchId: 'tm-x', venue: '새 구장' });
     expect(events).toEqual([]);
     expect(calls).not.toContain('enqueue');
+  });
+
+  it('번호만 고치면 새 번호를 저장·응답하고 제목과 일정은 동기화하며 경기·결과·사이드는 유지한다', async () => {
+    const { tx, events } = fakeTx();
+    const input = { teamMatchId: 'tm-x', fixtureNumber: 7 };
+    const result = await updateTournamentMatchInTx(tx, input);
+    expect(result).toMatchObject({ id: 'tm-x', fixtureNumber: 7, homeRegistrationId: 'reg-a', awayRegistrationId: 'reg-b' });
+    expect(tx.v1TournamentMatchDetails.update).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ fixtureNumber: 7 }) }));
+    expect(tx.v1TeamMatch.update).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ title: expect.stringMatching(/7$/) }) }));
+    expect(tx.v1TeamSchedule.updateMany).toHaveBeenCalledWith({ where: { teamMatchId: 'tm-x' }, data: { title: expect.stringMatching(/7$/), version: { increment: 1 } } });
+    expect(tx.v1Game.update).not.toHaveBeenCalled();
+    expect(tx.v1GameSide.update).not.toHaveBeenCalled();
+    expect(tx.v1GameLineup.updateMany).not.toHaveBeenCalled();
+    expect(events).toHaveLength(2);
+  });
+
+  it('같은 대회·라운드·차수의 중복 번호는 아무것도 쓰기 전에 거절한다', async () => {
+    const { tx, calls } = fakeTx();
+    (tx.v1TournamentMatchDetails.findFirst as jest.Mock).mockResolvedValue({ teamMatchId: 'tm-other' });
+    const input = { teamMatchId: 'tm-x', fixtureNumber: 7 };
+    await expect(updateTournamentMatchInTx(tx, input)).rejects.toMatchObject({ response: { code: 'FIXTURE_NUMBER_CONFLICT' } });
+    expect(tx.v1TournamentMatchDetails.findFirst).toHaveBeenCalledWith({ where: { tournamentId: 'tour-1', round: 'r1', fixtureNumber: 7, legNumber: 1, teamMatchId: { not: 'tm-x' } }, select: { teamMatchId: true } });
+    expect(calls).not.toContain('write');
+    expect(calls).not.toContain('enqueue');
+  });
+
+  it('같은 번호는 충돌 검사·제목 재작성·명단 이벤트 없이 유지한다', async () => {
+    const { tx, events } = fakeTx();
+    expect(await updateTournamentMatchInTx(tx, { teamMatchId: 'tm-x', fixtureNumber: 1 })).toMatchObject({ fixtureNumber: 1 });
+    expect(tx.v1TournamentMatchDetails.findFirst).not.toHaveBeenCalled();
+    expect(tx.v1TeamSchedule.updateMany).not.toHaveBeenCalled();
+    expect(events).toEqual([]);
+  });
+
+  it('DB 유일성 경쟁도 중복 번호 409로 변환한다', async () => {
+    const { tx } = fakeTx();
+    (tx.v1TournamentMatchDetails.update as jest.Mock).mockRejectedValue(new Prisma.PrismaClientKnownRequestError('unique conflict', { code: 'P2002', clientVersion: '6.19.2' }));
+    await expect(updateTournamentMatchInTx(tx, { teamMatchId: 'tm-x', fixtureNumber: 7 })).rejects.toMatchObject({ response: { code: 'FIXTURE_NUMBER_CONFLICT' } });
+    expect(tx.v1TeamMatch.update).not.toHaveBeenCalled();
+    expect(tx.v1TeamSchedule.updateMany).not.toHaveBeenCalled();
   });
 });
 

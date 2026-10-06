@@ -6,7 +6,7 @@ import { Search, Star } from 'lucide-react';
 import { publicAssetPath } from '@/lib/assets';
 import { useV1AdminTournamentReviews, useV1HideReview, useV1UnhideReview } from '@/hooks/use-v1-api';
 import type { V1AdminTournamentReview } from '@/types/api';
-import { displayInitials } from '@/lib/display-initials';
+import { UserAvatar } from '@/components/v1-ui/user-avatar';
 import { extractErrorMessage } from '@/lib/error-message';
 import { AdminEmpty, AdminListSkeleton } from '@/components/admin';
 import { PaginationBar } from '@/components/v1-ui/pagination-bar';
@@ -260,7 +260,6 @@ function ReviewModerationCard({
   unhidePending: boolean;
 }) {
   const isHidden = !!review.hiddenAt;
-  const letter = displayInitials(review.authorNickname, { fallback: '?' });
   const photoUrls = review.photoUrls ?? [];
 
   return (
@@ -271,24 +270,7 @@ function ReviewModerationCard({
       ].join(' ')}
     >
       <div className="flex items-start gap-3">
-        {review.authorProfileImageUrl ? (
-          <Image
-            src={publicAssetPath(review.authorProfileImageUrl)}
-            alt=""
-            aria-hidden="true"
-            loading="lazy"
-            width={36}
-            height={36}
-            className="w-9 h-9 rounded-full object-cover shrink-0"
-          />
-        ) : (
-          <div
-            aria-hidden="true"
-            className="tm-on-tint w-9 h-9 rounded-full bg-[var(--grey300)] text-[var(--text-muted)] text-[length:var(--font-size-label)] font-semibold flex items-center justify-center shrink-0"
-          >
-            {letter}
-          </div>
-        )}
+        <UserAvatar imageUrl={review.authorProfileImageUrl} size={36} />
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <p className="text-[length:var(--font-size-label)] font-semibold text-[var(--text-strong)] truncate">{review.authorNickname}</p>

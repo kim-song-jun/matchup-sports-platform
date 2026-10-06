@@ -1,11 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import Link from 'next/link';
 import { Check, RefreshCw, Pencil, Trash2, ChevronRight } from 'lucide-react';
 import { isBracketPublished as isBracketPublishedNow } from '@/lib/bracket-visibility';
 import { onlyDigits } from '@/lib/number-format';
-import { useV1PublishTournamentBracket, useV1UnpublishTournamentBracket, useV1AdminBracket, useV1CreateGroup, useV1AssignGroupTeam, useV1CreateFixture, useV1RecalculateStandings, useV1UpdateFixture, useV1DeleteFixture, useV1UpdateGroup, useV1DeleteGroup, useV1RemoveGroupTeam } from '@/hooks/use-v1-api';
+import { useV1PublishTournamentBracket, useV1UnpublishTournamentBracket, useV1AdminBracket, useV1CreateGroup, useV1AssignGroupTeam, useV1CreateBracketBye, useV1CreateFixture, useV1RecalculateStandings, useV1UpdateFixture, useV1DeleteFixture, useV1UpdateGroup, useV1DeleteGroup, useV1RemoveGroupTeam } from '@/hooks/use-v1-api';
 import type {
   V1AdminTournamentRegistration,
   V1AdminBracketGroup,
@@ -129,6 +129,7 @@ export function BracketTab({
   const createGroup = useV1CreateGroup(tournamentId);
   const assignGroupTeam = useV1AssignGroupTeam(tournamentId);
   const createFixture = useV1CreateFixture(tournamentId);
+  const createBye = useV1CreateBracketBye(tournamentId);
   const recalculate = useV1RecalculateStandings(tournamentId);
   const updateFixture = useV1UpdateFixture(tournamentId);
   const deleteFixture = useV1DeleteFixture(tournamentId);
@@ -146,6 +147,8 @@ export function BracketTab({
   const [awaySource, setAwaySource] = useState('');
   const [savingSources, setSavingSources] = useState(false);
   const [editFixture, setEditFixture] = useState<V1AdminBracketFixture | null>(null);
+  const editNumberId = useId();
+  const [editFxNumber, setEditFxNumber] = useState('');
   const [editFxScheduledAt, setEditFxScheduledAt] = useState('');
   const [editFxVenue, setEditFxVenue] = useState('');
   const [editFxHomeRegId, setEditFxHomeRegId] = useState('');
@@ -184,6 +187,11 @@ export function BracketTab({
   const handleUpdateFixture = (e: React.FormEvent) => {
     e.preventDefault();
     if (!editFixture) return;
+    const fixtureNumber = Number(editFxNumber);
+    if (!editFxNumber.trim() || !Number.isInteger(fixtureNumber) || fixtureNumber < 1 || fixtureNumber > 2147483647) {
+      showToast('대진 번호는 1부터 2147483647까지의 정수로 입력해 주세요.', 'error');
+      return;
+    }
     // 팀 필드는 각각 독립적으로 판단한다 — 홈만 바꾸고 어웨이는 그대로여도 어웨이 필드를
     // 잘못 건드리지 않기 위해서다. '미정'으로 되돌린 경우(editFx*RegId === '')는 서버 계약대로
     // null을 명시적으로 보내 배정을 해제한다 — 필드를 아예 빼면(undefined) 서버가 '미변경'으로
@@ -198,6 +206,7 @@ export function BracketTab({
     updateFixture.mutate(
       {
         fixtureId: editFixture.id,
+        ...(fixtureNumber !== editFixture.fixtureNumber ? { fixtureNumber } : {}),
         ...(scheduledAtIso ? { scheduledAt: scheduledAtIso } : {}),
         venue: editFxVenue,
         ...(homeChanged ? { homeRegistrationId: editFxHomeRegId || null } : {}),
@@ -256,15 +265,16 @@ export function BracketTab({
   };
 
   const handleRemoveGroupTeam = async (groupTeamId: string, teamName: string) => {
+    const isBye = bracket?.groups.some((group) => group.groupTeams.some((team) => team.id === groupTeamId && team.isBye)) ?? false;
     const ok = await confirmModal({
-      title: '팀 배정 해제',
-      message: `${teamName} 팀의 조 배정을 해제할까요? 해당 조 순위 기록도 함께 정리돼요.`,
-      confirmLabel: '해제',
+      title: isBye ? '부전승 자리 삭제' : '팀 배정 해제',
+      message: isBye ? `${teamName} 부전승 자리를 삭제할까요? 팀만 미정으로 바꾸려면 자리 수정을 이용해 주세요.` : `${teamName} 팀의 조 배정을 해제할까요? 해당 조 순위 기록도 함께 정리돼요.`,
+      confirmLabel: isBye ? '삭제' : '해제',
       tone: 'danger',
     });
     if (!ok) return;
     removeGroupTeam.mutate(groupTeamId, {
-      onSuccess: () => showToast('팀 배정을 해제했어요.', 'success'),
+      onSuccess: () => showToast(isBye ? '부전승 자리를 삭제했어요.' : '팀 배정을 해제했어요.', 'success'),
       onError: (err) => showToast(extractErrorMessage(err, '배정 해제에 실패했어요.'), 'error'),
     });
   };
@@ -287,7 +297,7 @@ export function BracketTab({
     const group = allGroups.find((g) => g.id === targetGroupId);
     if (!group) return;
 
-    const isKnockout = group.phase === 'semi' || group.phase === 'final' || group.phase === 'third_place';
+    const isKnockout = group.phase !== 'group';
 
     if (!isKnockout) {
       // GROUP phase — 조별리그 대진은 서버가 만든다. 회전 수(1회전/2회전)를 모달에서 고른 뒤
@@ -326,7 +336,7 @@ export function BracketTab({
     try {
       {
         // KNOCKOUT phase — seed-pair: 1 vs N, 2 vs N-1, …
-        const teams = group.groupTeams.filter((team) => !team.isBye);
+        const teams = group.groupTeams.filter((team): team is typeof team & { registrationId: string } => !team.isBye && team.registrationId !== null);
         if (group.phase === 'round12' && (group.groupTeams.length !== 12 || teams.length !== 8)) {
           showToast('12팀을 배정하고 부전승 4팀을 지정해 주세요. 나머지 8팀의 4경기를 만들어요.', 'error');
           return;
@@ -357,7 +367,7 @@ export function BracketTab({
         // 시드순(sortOrder) 정렬 후 1vsN 페어링 (순수 함수 knockoutSeedPairs)
         const sorted = [...teams].sort((a, b) => a.sortOrder - b.sortOrder);
         const payloads: Parameters<typeof createFixture.mutate>[0][] = [];
-        for (const { home, away } of (group.phase === 'round12' ? round12Pairs(group.groupTeams) : knockoutSeedPairs(sorted))) {
+        for (const { home, away } of (group.phase === 'round12' ? round12Pairs(group.groupTeams.filter((team): team is typeof team & { registrationId: string } => team.registrationId !== null)) : knockoutSeedPairs(sorted))) {
           payloads.push({
             groupId: targetGroupId,
             round: roundLabel,
@@ -652,6 +662,7 @@ export function BracketTab({
               confirmedTeamItems={confirmedTeamItems}
               assignGroupTeam={assignGroupTeam}
               createFixture={createFixture}
+              createBye={createBye}
               isAutoGenerating={isAutoGenerating}
               onAutoGenerate={(groupId) => void handleAutoGenerate(groupId)}
               onEditGroup={(g) => {
@@ -754,6 +765,7 @@ export function BracketTab({
                     type="button"
                     onClick={() => {
                       setEditFixture(f);
+                      setEditFxNumber(String(f.fixtureNumber));
                       setEditFxScheduledAt(isoToKstDatetimeLocal(f.scheduledAt));
                       setEditFxVenue(f.venue ?? '');
                       setEditFxHomeRegId(f.homeRegistrationId ?? '');
@@ -854,6 +866,12 @@ export function BracketTab({
       >
         <form onSubmit={handleUpdateFixture} noValidate className="flex flex-col gap-4">
           <div className="flex flex-col gap-1">
+            <label htmlFor={editNumberId} className="text-[length:var(--font-size-label)] text-[var(--text-strong)]">대진 번호</label>
+            <input id={editNumberId} type="number" inputMode="numeric" min={1} max={2147483647} step={1}
+              value={editFxNumber} onChange={(e) => setEditFxNumber(e.target.value)}
+              disabled={updateFixture.isPending} className={inputCls} />
+          </div>
+          <div className="flex flex-col gap-1">
             <label htmlFor="edit-fx-scheduled" className="text-[length:var(--font-size-label)] text-[var(--text-strong)]">경기 일시</label>
             <input
               id="edit-fx-scheduled"
@@ -877,8 +895,8 @@ export function BracketTab({
               className={inputCls}
             />
           </div>
-          <div className="flex gap-3">
-            <div className="flex flex-col gap-1 flex-1">
+          <div className="flex flex-col gap-3 sm:flex-row">
+            <div className="flex min-w-0 flex-col gap-1 flex-1">
               <label htmlFor="edit-fx-home" className="text-[length:var(--font-size-label)] text-[var(--text-strong)]">홈 팀</label>
               <EntityPicker
                 id="edit-fx-home"
@@ -890,7 +908,7 @@ export function BracketTab({
                 placeholder="홈 팀 검색"
               />
             </div>
-            <div className="flex flex-col gap-1 flex-1">
+            <div className="flex min-w-0 flex-col gap-1 flex-1">
               <label htmlFor="edit-fx-away" className="text-[length:var(--font-size-label)] text-[var(--text-strong)]">어웨이 팀</label>
               <EntityPicker
                 id="edit-fx-away"

@@ -259,6 +259,43 @@ describe('AdminService — list/detail endpoints', () => {
       prisma.v1AdminUser.findUnique.mockResolvedValue(activeAdminRecord);
     });
 
+    it.each([
+      ['left-only history', [], 1],
+      ['removed-only history', [], 1],
+      ['active roles with left/removed history', ['owner', 'manager', 'member'], 5],
+    ])('counts only active memberships for %s', async (_name, roles, historicalCount) => {
+      const activeRoles = roles as string[];
+      const row = makeUserRow({
+        _count: { hostedMatches: 3, ownedTeams: 1, teamMemberships: historicalCount },
+        teamMemberships: activeRoles.map((role, index) => ({
+          id: `tm-${index}`,
+          role,
+          status: 'active',
+          joinedAt: new Date('2026-05-18T00:00:00.000Z'),
+          team: { id: `t-${index}`, name: '현재 소속팀', status: 'active', memberCount: 3 },
+        })),
+        reputationSummary: null,
+        hostedMatches: [],
+        ownedTeams: [],
+        statusLogs: [],
+      });
+      prisma.v1User.findMany.mockResolvedValue([row]);
+
+      const result = await service.listUsers(adminAuthUser, {});
+      const item = result.items[0];
+
+      expect(item.membershipCount).toBe(activeRoles.length);
+      expect(item.teamRoleCounts).toEqual({
+        owner: activeRoles.filter((role) => role === 'owner').length,
+        manager: activeRoles.filter((role) => role === 'manager').length,
+        member: activeRoles.filter((role) => role === 'member').length,
+      });
+      expect(item.membershipCount).toBe(
+        Object.values(item.teamRoleCounts).reduce((total, count) => total + count, 0),
+      );
+      expect(prisma.v1User.findMany.mock.calls[0][0].select.teamMemberships.where).toEqual({ status: 'active' });
+    });
+
     it('returns items and pageInfo with correct shape for active admin', async () => {
       const row = makeUserRow();
       prisma.v1User.findMany.mockResolvedValue([row]);
@@ -353,6 +390,43 @@ describe('AdminService — list/detail endpoints', () => {
       await expect(service.getUser(adminAuthUser, 'missing-id')).rejects.toMatchObject({
         response: { code: 'NOT_FOUND' },
       });
+    });
+
+    it.each([
+      ['left-only history', [], 1],
+      ['removed-only history', [], 1],
+      ['active roles with left/removed history', ['owner', 'manager', 'member'], 5],
+    ])('counts only active memberships for %s', async (_name, roles, historicalCount) => {
+      const activeRoles = roles as string[];
+      const row = makeUserRow({
+        _count: { hostedMatches: 3, ownedTeams: 1, teamMemberships: historicalCount },
+        teamMemberships: activeRoles.map((role, index) => ({
+          id: `tm-${index}`,
+          role,
+          status: 'active',
+          joinedAt: new Date('2026-05-18T00:00:00.000Z'),
+          team: { id: `t-${index}`, name: '현재 소속팀', status: 'active', memberCount: 3 },
+        })),
+        reputationSummary: null,
+        hostedMatches: [],
+        ownedTeams: [],
+        statusLogs: [],
+      });
+      prisma.v1User.findUnique.mockResolvedValue(row);
+
+      const item = await service.getUser(adminAuthUser, 'u-1');
+
+      expect(item.membershipCount).toBe(activeRoles.length);
+      expect(item.teamRoleCounts).toEqual({
+        owner: activeRoles.filter((role) => role === 'owner').length,
+        manager: activeRoles.filter((role) => role === 'manager').length,
+        member: activeRoles.filter((role) => role === 'member').length,
+      });
+      expect(item.membershipCount).toBe(
+        Object.values(item.teamRoleCounts).reduce((total, count) => total + count, 0),
+      );
+      expect(prisma.v1User.findUnique.mock.calls[0][0].select.teamMemberships.where).toEqual({ status: 'active' });
+      expect(item.teamMemberships).toHaveLength(item.membershipCount);
     });
 
     it('returns full detail shape including optional reputationSummary', async () => {

@@ -16,7 +16,7 @@ import { formatBirthDate, isValidBirthDateDigits, normalizeSeparatedDigits } fro
 import { PhoneVerificationCard } from '@/components/auth/phone-verification/phone-verification-card';
 import { useTheme } from '@/components/providers/theme-provider';
 import { useV1PushRegistration } from '@/hooks/use-v1-push-registration';
-import { cssUrl } from '@/lib/assets';
+import { UserAvatar } from '@/components/v1-ui/user-avatar';
 import { extractErrorMessage } from '@/lib/error-message';
 import { clearStoredV1Session, sanitizeRedirectPath, withFromPath } from '@/lib/session-storage';
 import { isTeamOperatorRole } from '@/lib/team-role';
@@ -592,9 +592,7 @@ export function ProfileEditPageClient() {
           <h1 className="tm-text-heading">프로필 수정</h1>
         </div>
         <section className="tm-my-profile-head">
-          <div className="tm-auth-profile-preview" style={profileImageUrl ? { backgroundImage: cssUrl(profileImageUrl) } : undefined}>
-            {profileImageUrl ? null : <span className="tm-text-caption">{displayInitials(normalizedNickname || nickname || realName, { fallback: 'T' })}</span>}
-          </div>
+          <UserAvatar imageUrl={profileImageUrl} size={72} className="tm-auth-profile-preview" />
           <div>
             <div className="tm-text-body-lg">프로필 사진</div>
             <div className="tm-text-caption" style={{ marginTop: 4 }}>매치 목록과 신청서에 함께 보여요.</div>

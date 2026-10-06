@@ -228,8 +228,9 @@ describe('platform-managed team match provenance', () => {
     const detail = getTeamMatchDetailViewModel();
     detail.match = { ...detail.match, platformManaged, cost: 120000, opponentCost: 60000 };
     renderPage(<TeamMatchDetailPageView model={detail} />);
-    expect(screen.getByText(platformManaged ? '각 팀 부담금' : '상대팀 부담금')).toBeInTheDocument();
-    expect(screen.queryByText(platformManaged ? '상대팀 부담금' : '각 팀 부담금')).not.toBeInTheDocument();
+    expect(screen.getByText('상대팀 부담금')).toBeInTheDocument();
+    expect(screen.getByText('신청하는 팀의 비용이에요')).toBeInTheDocument();
+    expect(screen.queryByText('각 팀 부담금')).not.toBeInTheDocument();
   });
 
   it.each([false, true])('미배정 플랫폼 대진은 두 팀 자리를 보여준다 (마감=%s)', (closed) => {

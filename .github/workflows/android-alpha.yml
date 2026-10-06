@@ -6,11 +6,13 @@ on:
     branches: [dev]
     paths:
       - apps/v1_android/**
+      - scripts/qa/android-native-insets.test.mjs
       - .github/workflows/android-alpha.yml
   push:
     branches: [dev]
     paths:
       - apps/v1_android/**
+      - scripts/qa/android-native-insets.test.mjs
       - .github/workflows/android-alpha.yml
 
 permissions:
@@ -51,6 +53,9 @@ jobs:
 
       - name: Verify Play policy source contracts
         run: node scripts/qa/check-android-play-policy.mjs
+
+      - name: Verify native inset script lifecycle
+        run: node --test scripts/qa/android-native-insets.test.mjs
 
       - name: Gate Alpha Firebase configuration
         id: firebase

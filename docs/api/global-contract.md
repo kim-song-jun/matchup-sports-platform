@@ -68,6 +68,8 @@ Review and compensation effects are exact:
 
 ## Runtime And General Conventions
 
+대진 번호 수정은 기존 관리자 fixture metadata PATCH를 사용한다. `fixtureNumber`의 범위·생략·중복 오류와 생성 키 세대 계약은 [Tournaments](./domains/tournaments.md#대진-번호-수정-2026-10-05)에 정의하며 Game 결과 명령/리비전 계약을 변경하지 않는다.
+
 The section above is the frozen cross-domain contract for the games/tournament-operations command
 surface. What follows applies to every v1 endpoint, not only that surface.
 
@@ -141,3 +143,9 @@ validation/permission error.
 V1 intentionally has no payment, refund, dispute, support ticket, DM, file attachment, venue
 operator, lesson, marketplace, or tournament success API outside the games/result flow documented
 above. UI must not simulate successful transactions or support outcomes for these surfaces.
+
+## Bracket bye mutation
+
+`POST /admin/tournaments/:tournamentId/byes` follows the standard auth guard, mutation-admin permission, DTO whitelist and success/error envelopes. A bye is a saved group-team entry, without a TeamMatch or Game result. See [the tournament domain](./domains/tournaments.md#라운드별-부전승-직접-등록-2026-10-05) for phase, capacity, conflict and display-position contracts.
+
+- 2026-10-05: tournament bye slots allow null registration + byeId reassignment; pre-start fixture deletion archives canonical history. See [tournament contract](domains/tournaments.md).

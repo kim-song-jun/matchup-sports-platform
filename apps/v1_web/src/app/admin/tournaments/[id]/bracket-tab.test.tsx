@@ -13,7 +13,7 @@
  *     매핑 없는 500 으로 끝나 운영자가 "서버 오류" 만 봤다.
  */
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { V1AdminBracketFixture, V1AdminTournamentBracket, V1AdminTournamentRegistration } from '@/types/api';
 import { V1ApiError } from '@/lib/api-client';
 import { BracketTab, describeLeagueReplace } from './bracket-tab';
@@ -73,8 +73,60 @@ const bracket: V1AdminTournamentBracket = {
 
 /** `deleteFixture.mutate(id, { onSuccess, onError })` 를 테스트마다 다르게 응답시킨다. */
 const deleteFixtureMutate = vi.fn();
+const createFixtureMutate = vi.fn();
+let bracketGroups = bracket.groups;
 /** `updateFixture.mutate(body, { onSuccess, onError })` — 실제로 보낸 payload를 검증하는 데 쓴다. */
 const updateFixtureMutate = vi.fn();
+
+describe('BracketTab — 대진 번호 수정', () => {
+  beforeEach(() => {
+    bracketFixtures = [fixtureRow({ fixtureNumber: 1 })];
+    bracketGroups = bracket.groups;
+    updateFixtureMutate.mockReset();
+  });
+  async function openNumberEdit() {
+    fireEvent.click(screen.getAllByRole('button', { name: 'A조 · 조별리그 1라운드 1번 경기 수정' })[0]);
+    return screen.findByRole('dialog', { name: '경기 수정' });
+  }
+  it('현재 번호를 채우고 새 번호를 실제 수정 payload로 보내며 성공 후 목록을 갱신한다', async () => {
+    const toast = renderTab();
+    const dialog = await openNumberEdit();
+    const input = within(dialog).getByLabelText('대진 번호');
+    expect(input).toHaveValue(1);
+    fireEvent.change(input, { target: { value: '7' } });
+    updateFixtureMutate.mockImplementation((payload, options) => {
+      bracketFixtures = bracketFixtures.map((fixture) => fixture.id === payload.fixtureId ? { ...fixture, fixtureNumber: payload.fixtureNumber } : fixture);
+      options.onSuccess();
+    });
+    fireEvent.click(within(dialog).getByRole('button', { name: '저장' }));
+    expect(updateFixtureMutate.mock.calls[0][0]).toMatchObject({ fixtureId: 'fx-1', fixtureNumber: 7 });
+    expect(updateFixtureMutate.mock.calls[0][0]).not.toHaveProperty('homeRegistrationId');
+    expect(updateFixtureMutate.mock.calls[0][0]).not.toHaveProperty('awayRegistrationId');
+    expect(screen.queryByRole('dialog', { name: '경기 수정' })).not.toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: 'A조 · 조별리그 1라운드 7번 경기 수정' }).length).toBeGreaterThan(0);
+    expect(toast).toHaveBeenCalledWith('경기 정보를 수정했어요.', 'success');
+  });
+  it.each(['', '0', '1.5', '2147483648'])('잘못된 입력 %s는 요청 없이 수정 창을 유지한다', async (value) => {
+    const toast = renderTab();
+    const dialog = await openNumberEdit();
+    fireEvent.change(within(dialog).getByLabelText('대진 번호'), { target: { value } });
+    fireEvent.click(within(dialog).getByRole('button', { name: '저장' }));
+    expect(updateFixtureMutate).not.toHaveBeenCalled();
+    expect(toast).toHaveBeenCalledWith(expect.stringContaining('정수'), 'error');
+    expect(dialog).toBeInTheDocument();
+  });
+  it('서버의 중복 번호 오류와 입력을 유지하고 성공으로 표시하지 않는다', async () => {
+    const message = '같은 라운드·차수에서 이미 사용 중인 대진 번호예요.';
+    updateFixtureMutate.mockImplementation((_payload, options) => options.onError(new Error(message)));
+    const toast = renderTab();
+    const dialog = await openNumberEdit();
+    fireEvent.change(within(dialog).getByLabelText('대진 번호'), { target: { value: '2' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: '저장' }));
+    expect(toast).toHaveBeenCalledWith(message, 'error');
+    expect(within(dialog).getByLabelText('대진 번호')).toHaveValue(2);
+    expect(dialog).toBeInTheDocument();
+  });
+});
 
 function noopMutation() {
   return { mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false };
@@ -82,7 +134,7 @@ function noopMutation() {
 
 vi.mock('@/hooks/use-v1-api', () => ({
   useV1AdminBracket: () => ({
-    data: { ...bracket, fixtures: bracketFixtures },
+    data: { ...bracket, groups: bracketGroups, fixtures: bracketFixtures },
     isPending: false,
     isError: false,
     error: null,
@@ -92,7 +144,8 @@ vi.mock('@/hooks/use-v1-api', () => ({
   useV1UnpublishTournamentBracket: noopMutation,
   useV1CreateGroup: noopMutation,
   useV1AssignGroupTeam: noopMutation,
-  useV1CreateFixture: noopMutation,
+  useV1CreateFixture: () => ({ mutate: createFixtureMutate, isPending: false }),
+  useV1CreateBracketBye: noopMutation,
   useV1RecalculateStandings: noopMutation,
   useV1UpdateFixture: () => ({ mutate: updateFixtureMutate, mutateAsync: vi.fn(), isPending: false }),
   useV1DeleteFixture: () => ({ mutate: deleteFixtureMutate, mutateAsync: vi.fn(), isPending: false }),
@@ -496,5 +549,85 @@ describe('BracketTab — 경기 수정: 킥오프 시각 KST 왕복', () => {
     const [payload] = updateFixtureMutate.mock.calls[0] as [Record<string, unknown>, unknown];
     // America/New_York 로컬로 잘못 해석하면 2026-08-31T02:00:00.000Z 가 나온다.
     expect(payload.scheduledAt).toBe('2026-08-30T13:00:00.000Z');
+  });
+});
+
+
+describe('BracketTab — 12강·8강 토너먼트 자동 생성', () => {
+  beforeEach(() => {
+    bracketFixtures = [];
+    bracketGroups = bracket.groups;
+    createFixtureMutate.mockReset();
+    v1Post.mockReset();
+    vi.clearAllMocks();
+    createFixtureMutate.mockImplementation((payload: Partial<V1AdminBracketFixture>, options: { onSuccess: () => void }) => {
+      bracketFixtures.push(fixtureRow({
+        ...payload,
+        id: `created-${payload.fixtureNumber}`,
+        homeTeamName: `팀 ${payload.homeRegistrationId}`,
+        awayTeamName: `팀 ${payload.awayRegistrationId}`,
+      }));
+      options.onSuccess();
+    });
+  });
+
+  afterEach(() => {
+    bracketGroups = bracket.groups;
+    bracketFixtures = [];
+    createFixtureMutate.mockReset();
+  });
+
+  function setKnockoutGroup(phase: 'round12' | 'quarter', byes = 0) {
+    const count = phase === 'round12' ? 12 : 8;
+    bracketGroups = [{
+      ...bracket.groups[0],
+      id: 'knockout',
+      name: phase === 'round12' ? '12강' : '8강',
+      phase,
+      advanceCount: null,
+      groupTeams: Array.from({ length: count }, (_, index) => ({
+        id: `gt-${index + 1}`,
+        groupId: 'knockout',
+        registrationId: `r${index + 1}`,
+        teamName: `팀 ${index + 1}`,
+        sortOrder: index,
+        isBye: index < byes,
+        createdAt: '2026-10-05T00:00:00.000Z',
+      })),
+    }];
+  }
+
+  it.each(['round12', 'quarter'] as const)('%s 조는 리그 회전수 모달 없이 일반 경기 4개만 생성해 화면에 표시한다', async (phase) => {
+    setKnockoutGroup(phase, phase === 'round12' ? 4 : 0);
+    const showToast = renderTab();
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: '대진 자동 생성' }));
+    });
+
+    const label = phase === 'round12' ? '12강' : '8강';
+    expect(screen.queryByRole('dialog', { name: '조별리그 대진 자동 생성' })).not.toBeInTheDocument();
+    expect(showToast).toHaveBeenCalledWith(`${label} 경기 일정 4개를 자동으로 만들었어요.`, 'success');
+    expect(bracketFixtures).toHaveLength(4);
+    expect(bracketFixtures.every((fixture) => fixture.groupId === 'knockout' && fixture.round === label)).toBe(true);
+    const participants = bracketFixtures.flatMap((fixture) => [fixture.homeRegistrationId, fixture.awayRegistrationId]);
+    expect(new Set(participants).size).toBe(8);
+    expect([...participants].sort()).toEqual(bracketGroups[0].groupTeams.filter((team) => !team.isBye).map((team) => team.registrationId).sort());
+    expect(bracketGroups[0].groupTeams.filter((team) => team.isBye)).toHaveLength(phase === 'round12' ? 4 : 0);
+    expect(screen.getByText(/대진 4경기/)).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: `${label} 4번 경기 수정` }).length).toBeGreaterThan(0);
+    expect(v1Post).not.toHaveBeenCalled();
+  });
+
+  it('12팀이 있어도 부전승 4팀을 지정하지 않으면 이유를 표시하고 경기를 생성하지 않는다', async () => {
+    setKnockoutGroup('round12');
+    const showToast = renderTab();
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: '대진 자동 생성' }));
+    });
+    expect(showToast).toHaveBeenCalledWith('12팀을 배정하고 부전승 4팀을 지정해 주세요. 나머지 8팀의 4경기를 만들어요.', 'error');
+    expect(screen.queryByRole('dialog', { name: '조별리그 대진 자동 생성' })).not.toBeInTheDocument();
+    expect(bracketFixtures).toHaveLength(0);
+    expect(createFixtureMutate).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: '대진 자동 생성' })).toBeEnabled();
   });
 });

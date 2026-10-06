@@ -428,14 +428,14 @@ export function presentTournamentDetail(
       phase: group.phase,
       sortOrder: group.sortOrder,
       advanceCount: group.advanceCount,
-      groupTeams: group.groupTeams.map((groupTeam) => ({
+      groupTeams: [...group.groupTeams, ...(group.byeSlots ?? []).map((slot) => ({ ...slot, registrationId: null, registration: null, isBye: true }))].map((groupTeam) => ({
         id: groupTeam.id,
         registrationId: groupTeam.registrationId,
-        teamId: hideIdentity ? null : groupTeam.registration.team.id,
-        teamName: hideIdentity ? null : groupTeam.registration.team.name,
+        teamId: hideIdentity ? null : (groupTeam.registration?.team.id ?? null),
+        teamName: hideIdentity ? null : (groupTeam.registration?.team.name ?? null),
         // 순위 행이 아직 없을 때 이 편성 목록만으로 순위표를 그리므로(#374), 순위 행과
         // 같은 아바타가 나오도록 로고도 함께 내려 준다.
-        teamLogoUrl: hideIdentity ? null : (groupTeam.registration.team.profile?.logoUrl ?? null),
+        teamLogoUrl: hideIdentity ? null : (groupTeam.registration?.team.profile?.logoUrl ?? null),
         sortOrder: groupTeam.sortOrder,
         isBye: groupTeam.isBye,
       })),

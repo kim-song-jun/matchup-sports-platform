@@ -161,9 +161,7 @@ export function TournamentStandingsTable({
                 const expanded = expandedKey === row.key;
                 // 참가팀 공개 정책 통일(fix/v1-publish) — teamName===null이 "이 팀은
                 // 모집 중이라 비공개"의 단일 판정 기준(별도 boolean을 두지 않는다).
-                // teamId도 null이므로 seed는 항상 채워지는 row.key(registrationId)로
-                // 대신한다 — TeamAvatar의 identicon이 팀마다 달라 보여야 하는데
-                // teamId가 전부 null이면 모든 비공개 팀이 같은 무늬로 뭉친다.
+                // 비공개 팀은 로고 없이 기본 팀 아이콘으로 표시한다.
                 const isHidden = row.teamName === null;
                 const teamCell = (
                   <>

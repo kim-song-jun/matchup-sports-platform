@@ -768,7 +768,6 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
           select: {
             hostedMatches: true,
             ownedTeams: true,
-            teamMemberships: true,
           },
         },
       },
@@ -800,7 +799,7 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
         createdAt: row.createdAt,
         hostedMatchCount: row._count.hostedMatches,
         ownedTeamCount: row._count.ownedTeams,
-        membershipCount: row._count.teamMemberships,
+        membershipCount: row.teamMemberships.length,
         teamRoleCounts: {
           owner: row.teamMemberships.filter((membership) => membership.role === 'owner').length,
           manager: row.teamMemberships.filter((membership) => membership.role === 'manager').length,
@@ -858,7 +857,6 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
           select: {
             hostedMatches: true,
             ownedTeams: true,
-            teamMemberships: true,
           },
         },
         hostedMatches: {
@@ -924,7 +922,7 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
       deletedAt: row.deletedAt,
       hostedMatchCount: row._count.hostedMatches,
       ownedTeamCount: row._count.ownedTeams,
-      membershipCount: row._count.teamMemberships,
+      membershipCount: row.teamMemberships.length,
       teamRoleCounts: {
         owner: row.teamMemberships.filter((membership) => membership.role === 'owner').length,
         manager: row.teamMemberships.filter((membership) => membership.role === 'manager').length,

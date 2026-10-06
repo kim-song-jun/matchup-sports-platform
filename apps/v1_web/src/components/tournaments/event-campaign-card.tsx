@@ -15,7 +15,10 @@ export function EventCampaignCard({
   readonly activeSportCode?: string;
 }) {
   const sportAccent = getSportAccent(item.tournament.sport.code);
-  const status = getTournamentStatusConfig(item.tournament.status);
+  const status = getTournamentStatusConfig(
+    item.tournament.status,
+    item.tournament.registrationAvailability !== 'available',
+  );
   const dateLabel = formatTournamentDateRangeShort(
     item.tournament.scheduledAt,
     item.tournament.scheduledEndAt,

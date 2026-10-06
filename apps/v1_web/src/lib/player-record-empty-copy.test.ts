@@ -11,6 +11,16 @@ describe('playerRecordEmptySub', () => {
     expect(playerRecordEmptySub('assists', true)).toContain('신원 연동');
   });
 
+  it.each([['goals', '득점'], ['assists', '도움']] as const)(
+    '전체 비공개 플래그로 %s 기록의 존재를 단정하지 않는다',
+    (kind, label) => {
+      expect(playerRecordEmptySub(kind, true)).toBe(
+        `선수의 신원 연동과 경기 기록 공개 동의에 따라 공개 가능한 ${label} 기록만 순위에 표시돼요.`,
+      );
+      expect(playerRecordEmptySub(kind, true)).not.toContain(`${label} 기록은 있지만`);
+    },
+  );
+
   it('아직 결과가 없는 것뿐이면 연동 이야기를 꺼내지 않는다', () => {
     // 할 일이 없는 사용자에게 연동을 권하면 잘못된 처방이 된다.
     expect(playerRecordEmptySub('goals', false)).not.toContain('신원 연동');

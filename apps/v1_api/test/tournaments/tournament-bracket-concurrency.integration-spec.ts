@@ -7,6 +7,7 @@ import { GameTakeoverService } from '../../src/games/game-takeover.service';
 import { TournamentBracketService } from '../../src/tournaments/tournament-bracket.service';
 import { TournamentResultReviewService } from '../../src/tournament-operations/results/tournament-result-review.service';
 import { TournamentStaffAccessService } from '../../src/tournaments/staff/tournament-staff-access.service';
+import { handleCompetitionRosterResync } from '../../src/games/roster/game-roster-sync';
 import { competitionConfigFixture as ids, seedCompetitionConfigFixture } from '../fixtures/competition-config.fixture';
 
 const prisma = new PrismaService();
@@ -55,6 +56,60 @@ describe('대진 PATCH와 실제 결과 확정의 PostgreSQL 동시성', () => {
     quarter = (await bracket().createGroup(user, ids.tournamentId, { name: '8강', phase: 'quarter' })).id;
   });
   afterAll(async () => { await prisma.$disconnect(); });
+
+  it('출처와 대상 잠금 사이에 결과 명단 워커가 겹치면 교착 대신 워커를 재시도한다', async () => {
+    const fixtures = await Promise.all([301, 302].map((fixtureNumber) => bracket().createFixture(user, ids.tournamentId, {
+      groupId: round12, round: '12강', fixtureNumber,
+      homeRegistrationId: ids.registrationIds[0], awayRegistrationId: ids.registrationIds[2],
+    })));
+    const gameRows = await prisma.v1Game.findMany({ where: { teamMatchId: { in: fixtures.map((row) => row.id) } }, orderBy: { id: 'asc' } });
+    const target = gameRows[0]; const source = gameRows[1];
+    if (target?.teamMatchId == null || source?.teamMatchId == null) throw new Error('Expected two canonical fixtures');
+    await prisma.v1TournamentMatchDetails.update({ where: { teamMatchId: target.teamMatchId }, data: {
+      groupId: quarter, round: '8강', homeRegistrationId: null, awayRegistrationId: ids.registrationIds[1],
+    } });
+    await prisma.v1TeamMatch.update({ where: { id: target.teamMatchId }, data: { hostTeamId: null, approvedApplicantTeamId: ids.teamIds[1] } });
+    await prisma.v1GameSide.updateMany({ where: { gameId: target.id, sideKey: 'HOME' }, data: { teamId: null } });
+    await prisma.v1GameSide.updateMany({ where: { gameId: target.id, sideKey: 'AWAY' }, data: { teamId: ids.teamIds[1] } });
+    const previous = await bracket().createFixture(user, ids.tournamentId, { groupId: ids.groupId, round: 'group', fixtureNumber: 303,
+      homeRegistrationId: ids.registrationIds[0], awayRegistrationId: ids.registrationIds[1] });
+    const previousGame = await prisma.v1Game.update({ where: { teamMatchId: previous.id }, data: { state: 'ENDED' } });
+    await prisma.v1Tournament.update({ where: { id: ids.tournamentId }, data: { yellowAccumulationLimit: 2 } });
+    const workerLocked = gate(); const workerRelease = gate(); const patchLocked = gate(); const patchRelease = gate();
+    const event = { id: '11000000-0000-4000-8000-000000000099', payload: { scope: 'result', gameId: previousGame.id } };
+    const worker = prisma.$transaction((tx) => handleCompetitionRosterResync(new Proxy(tx, { get(client, key) {
+      if (key !== '$queryRaw') return Reflect.get(client, key);
+      return async (strings: TemplateStringsArray, ...values: unknown[]) => {
+        const result = await client.$queryRaw(strings, ...values);
+        if (strings.join('?').includes('FROM v1_games WHERE id =') && values[0] === target.id) {
+          workerLocked.resolve(); await workerRelease.promise;
+        }
+        return result;
+      };
+    } }), event), { timeout: 15000 });
+    const workerOutcome = worker.then((value) => ({ value }), (error: unknown) => ({ error }));
+    await workerLocked.promise;
+    const db = new Proxy(prisma, { get(client, key) {
+      if (key !== '$transaction') return Reflect.get(client, key);
+      return (callback: (tx: Prisma.TransactionClient) => Promise<unknown>, options: object) => client.$transaction((tx) => callback(new Proxy(tx, { get(transaction, property) {
+        if (property !== '$queryRaw') return Reflect.get(transaction, property);
+        return async (strings: TemplateStringsArray, ...values: unknown[]) => {
+          const result = await transaction.$queryRaw(strings, ...values);
+          if (strings.join('?').includes('FROM v1_games WHERE team_match_id IN')) {
+            patchLocked.resolve(); await patchRelease.promise;
+          }
+          return result;
+        };
+      } })), options);
+    } });
+    const patch = bracket(db).updateBracketSources(user, target.teamMatchId, { homeSourceFixtureId: source.teamMatchId });
+    const patchOutcome = patch.then((value) => ({ value }), (error: unknown) => ({ error }));
+    try { await patchLocked.promise; } finally { workerRelease.resolve(); patchRelease.resolve(); }
+    expect(await workerOutcome).toMatchObject({ error: { response: { code: 'COMMAND_CONCURRENCY_CONFLICT' } } });
+    expect(await patchOutcome).toMatchObject({ value: { fixtureId: target.teamMatchId } });
+    await expect(prisma.$transaction((tx) => handleCompetitionRosterResync(tx, event), { timeout: 15000 })).resolves.toBeGreaterThanOrEqual(0);
+    expect(await prisma.v1TournamentMatchAdvancementEdge.findFirst({ where: { sourceTeamMatchId: source.teamMatchId, targetTeamMatchId: target.teamMatchId } })).not.toBeNull();
+  }, 30000);
 
   it('대상 UUID가 더 작아도 출처를 먼저 잠가 결과 확정과 연결 PATCH가 교착하지 않는다', async () => {
     const sourceId = ids.teamMatchIds[2];

@@ -50,3 +50,12 @@ Canonical task: [Task 156](../../.github/tasks/156-android-app-fcm-foundation.md
 - 일시적 ALB `403 Forbidden`은 일반 앱 권한 오류와 구분했다. 낮은 요청 속도로 재검증해 관리자·운영 대상이 다시 열리는 것을 확인했다.
 - 관리자 계정도 팀장·참가팀 권한을 자동으로 얻지 않는다. 팀 일정 수정/선수 명단 등 권한 제한 내부 화면과 해당 계정에 데이터가 없는 개인 상세는 미검증으로 남긴다.
 - 현재 수정안의 실기기 CSS 비교와 배포본 확인은 별도 단계다. dev/Alpha 반영과 최종 배포 상태는 Task 156 Progress Snapshot을 따른다.
+
+
+## 2026-10-05 — latest Alpha continuation and Android fixes
+
+- Task 156, Alpha `ccabd36e859f`, Samsung SM-A325N Android 13 (411×884 portrait; keyboard 411×506; landscape keyboard 836×167).
+- Before-fix scope: 16 route loads, native back/resume/send; real foreground/background/terminated FCM receipt and exact chat-room tap destination; permission denial/recovery, logged-out and opted-out observation windows; actual PDF picker/upload/persisted 414B SHA256 round-trip. 25 account API audit passed 204 checks. These are scoped checks, not a full-app/180-route regression claim.
+- Findings: supported TXT disabled because document MIME mapping narrowed to PDF (High); Korean download notification title becomes `file.txt` (Low); document-root null inset errors during recreation (Medium, layout/state recover).
+- Fix candidates and executable regressions are recorded in [Task 156](../../.github/tasks/156-android-app-fcm-foundation.md#android-alpha-physical-qa-and-fixes--2026-10-05). JDK17 tests 11/11, generated JavaScript lifecycle tests 2/2, Play-policy contract PASS. Corrected APK build and physical after-state remain pending.
+- Original rotation restored, own phone input files removed, owned ADB forwarding/server stopped. Operator-local evidence `output/android-alpha-20261005/`; no private device screenshots or credentials added to Git.

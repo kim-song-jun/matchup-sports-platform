@@ -5,7 +5,7 @@ import { useId, useState } from 'react';
 import { MoreHorizontal } from 'lucide-react';
 import { ActionSheet, type ActionSheetAction } from '@/components/v1-ui/action-sheet';
 import { SearchIcon } from '@/components/v1-ui/icons';
-import { displayInitials } from '@/lib/display-initials';
+import { UserAvatar } from '@/components/v1-ui/user-avatar';
 import type { TeamMemberRowModel } from './teams.types';
 
 /** 이 인원부터 이름·등번호 검색을 둔다 — 그보다 적으면 한 화면에 다 보여 검색이 자리만 차지한다(H2 A-1). */
@@ -108,7 +108,7 @@ function TeamMemberRow({ member, onOpen }: { member: TeamMemberRowModel; onOpen:
   );
   return (
     <div className={member.highlighted ? 'tm-member-row tm-member-row-highlight' : 'tm-member-row'}>
-      <span aria-hidden="true" className="tm-member-initial">{displayInitials(member.name, { fallback: '?' })}</span>
+      <UserAvatar size={40} className="tm-member-initial" />
       {member.profileHref ? (
         <Link className="tm-member-row-main tm-pressable" href={member.profileHref}>{body}</Link>
       ) : (

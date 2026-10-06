@@ -22,6 +22,7 @@ import { hasStoredV1Session, sanitizeRedirectPath, withFromPath } from '@/lib/se
 import { getSportAccent } from '@/lib/v1-sport-accent';
 import { getTournamentStatusConfig } from '@/lib/v1-tournament-status';
 import { competitionMatchLabel } from '@/lib/tournament-round-label';
+import { compareTournamentGroupNames } from '@/lib/tournament-display-order';
 import { splitPrizeSegments, isPrizeAmountValue, formatPrizeRowValue } from '@/lib/prize-breakdown';
 import { TournamentBracket } from '@/components/tournaments/tournament-bracket';
 import { LeagueFixtureCard } from '@/components/tournaments/league-fixture-card';
@@ -593,7 +594,6 @@ export function TournamentDetailView({
 }) {
   const childHref = useChildHref();
   const participantFrom = useContext(DetailChainFromContext) ?? `/tournaments/${tournament.id}`;
-  const status = getTournamentStatusConfig(tournament.status);
   const sportAccent = getSportAccent(tournament.sport.code);
   const isOpen = tournament.kind === 'regular_league'
     ? tournament.status !== 'completed' && tournament.status !== 'cancelled'
@@ -644,6 +644,7 @@ export function TournamentDetailView({
      판정을 공유한다. status만 보던 예전 로직은 신청 마감이 지난 open 대회에서도
      '참가 신청하기'를 활성으로 그렸다. */
   const registrationBlock = resolveTournamentRegistrationBlock(tournament);
+  const status = getTournamentStatusConfig(tournament.status, registrationBlock !== null);
   const prizeText = tournament.prizeSummary?.trim() ?? '';
   const genderCategoryLabel = getGenderCategoryLabel(tournament.genderCategory);
   const genderQuotaLabel = getGenderQuotaLabel(tournament);
@@ -784,7 +785,7 @@ export function TournamentDetailView({
         <h1 className="tm-text-heading" style={{ color: 'var(--text-strong)', margin: 0, lineHeight: 1.3 }}>
           {tournament.title}
         </h1>
-        <div style={{ marginTop: 4, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+        <div style={{ marginTop: 4, display: 'flex', alignItems: 'center', gap: 'var(--spacing-1)', flexWrap: 'wrap' }}>
           <span className={`tm-badge ${status.badgeClass}`}>
             {status.label}
           </span>
@@ -2016,7 +2017,8 @@ export function partitionTournamentSections(
   fixtures: V1TournamentFixture[],
   groups: V1TournamentGroup[],
 ) {
-  const groupPhaseGroups = groups.filter((g) => g.phase === 'group');
+  const groupPhaseGroups = groups.filter((g) => g.phase === 'group')
+    .sort((a, b) => compareTournamentGroupNames(a.name, b.name));
   const knockoutPhases = new Set(['round12', 'quarter', 'semi', 'final', 'third_place']);
   const knockoutGroupIds = new Set(
     groups.filter((g) => knockoutPhases.has(g.phase)).map((g) => g.id),

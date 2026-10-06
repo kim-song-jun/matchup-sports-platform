@@ -12,7 +12,6 @@ import { V1ApiError } from '@/lib/api-client';
 import { getCreatorProfilePrompt, profileEditHref } from '@/lib/creator-profile';
 import { isTeamOperatorRole } from '@/lib/team-role';
 import { sanitizeRedirectPath, withFromPath } from '@/lib/session-storage';
-import { getRandomTeamLogoPreset } from '@/lib/team-logo-presets';
 import { rememberApplyTeamId } from '@/components/team-matches/team-match-next-step';
 import { TEAM_NAME_TAKEN_MESSAGE, teamErrorMessage } from '@/lib/team-error-messages';
 import { labelToLevelCode } from '@/lib/v1-levels';
@@ -72,7 +71,7 @@ export function TeamCreatePageClient() {
   };
   const [draft, setDraft] = useState<TeamDraft>(() => {
     const vm = getTeamFormViewModel('create').team;
-    return { ...vm, logoUrl: vm.logoUrl || getRandomTeamLogoPreset() };
+    return vm;
   });
   const [sportId, setSportId] = useState('');
   const [regionId, setRegionId] = useState('');

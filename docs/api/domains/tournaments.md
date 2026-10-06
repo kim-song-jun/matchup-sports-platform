@@ -135,16 +135,17 @@ Paid tournaments (`entryFee > 0`) require `bankName`, `bankAccount`, and `bankHo
 
 `POST /api/v1/admin/tournaments/:tournamentId/fixtures` uses `CreateFixtureDto` and requires an
 authenticated mutation-capable admin. In its source transaction, it copies the tournament's
-active `competitionConfigVersionId` to the fixture and creates exactly one `TOURNAMENT_FIXTURE`
+active `competitionConfigVersionId` to the fixture and creates exactly one `TEAM_MATCH`
 Game with HOME/AWAY side snapshots and the registered participant snapshots. A missing or
 inactive pin fails with `409 COMPETITION_CONFIG_REQUIRED` and rolls back both fixture and Game.
 The deterministic fixture command is derived from tournament, round, fixture number, and leg;
-the same payload replays the original fixture, while a changed payload with that key returns
+an occupied coordinate with the same payload returns its current canonical fixture, while a changed payload at that coordinate returns
 `409 COMMAND_IDEMPOTENCY_PAYLOAD_REUSE`.
 
 | Method | Path | DTO | Result |
 |---|---|---|---|
 | `POST` | `/api/v1/admin/tournaments/:tournamentId/fixtures` | `CreateFixtureDto` | active admin fixture/Game source creation or the explicit pin/idempotency conflict above. |
+| `PATCH` | `/api/v1/admin/fixtures/:fixtureId` | `UpdateFixtureDto` | fixture metadata including optional positive integer `fixtureNumber`; duplicate round/leg number returns `409 FIXTURE_NUMBER_CONFLICT`. See [대진 번호 수정](#대진-번호-수정-2026-10-05). |
 
 The legacy generic result paths remain registered only to reject unsafe writes:
 
@@ -293,7 +294,7 @@ All team roster mutations lock the registration row and re-read `rosterLockedAt`
 - `PATCH /admin/fixtures/:fixtureId/bracket-sources`: 인증 + mutation admin 필요. `{ homeSourceFixtureId?: UUID | null, awaySourceFixtureId?: UUID | null }`. 생략한 쪽은 유지, null은 해제. 결과 `{ fixtureId, bracketSources }`. 감사 action은 `tournament.bracket.sources.update`.
 - source는 같은 대회의 바로 이전 group.phase: round12→quarter→semi→final. third_place는 semi의 LOSER. 다른 단계·같은 소스를 양쪽에 쓰면 400 `BRACKET_SOURCE_PHASE_INVALID`/`BRACKET_SOURCE_INVALID`.
 - 연결 자리는 팀이 미정이어야 함(409 `BRACKET_SOURCE_SLOT_ASSIGNED`). 하나의 source+outcome은 하나의 target만 허용(409 `BRACKET_SOURCE_ALREADY_LINKED`). 현재/기존/신규 source 모두 Game SCHEDULED + TeamMatch matched + official revision 없음 + 1차전이어야 함(409 `BRACKET_SOURCE_LOCKED`).
-- 참가팀 변경은 연결된 자리에 409 `BRACKET_SOURCE_SLOT_LINKED`; 먼저 연결 해제 후 직접 배정. 경기 삭제는 기존 advancement_edge blocker를 유지.
+- 참가팀 변경은 연결된 자리에 409 `BRACKET_SOURCE_SLOT_LINKED`; 먼저 연결 해제 후 직접 배정. 경기 삭제는 시작 전만 허용하며 미정 다음 경기 연결은 해제하고 배정/시작된 다음 경기가 있으면 거절한다.
 - 결과 확정 후 팀 배정은 기존 canonical advancement projection의 책임. 새 endpoint는 기록/점수를 만들거나 이미 끝난 경기의 결과를 추정하지 않음.
 - 공개 상세 `fixtures[].bracketSources`와 관리자 bracket fixture에 `[{ fixtureId, outcome: WINNER|LOSER, side: HOME|AWAY }]`를 반환. 대진표 비공개 게이트와 source 삭제 필터 유지. 공개되지 않은 대회에는 fixture 및 연결 전체를 노출하지 않음.
 - 부전승 선은 round12 groupTeam.isBye + quarter 슬롯의 같은 registrationId로 렌더. 별도 경기·가짜 승점 없음. 연결이 없는 수동 대진은 번호 순서로 추정하지 않음.
@@ -302,5 +303,34 @@ All team roster mutations lock the registration row and re-read `rosterLockedAt`
 ### 진출 연결 동시성 보호 (2026-10-05)
 
 - 연결 PATCH는 잠금 전에 동일 대회·이전 단계 출처를 검증하고, 결과 확정과 동일하게 출처 Game → 대상 Game 순서로 잠급니다. 단계 사이에는 UUID순 잠금을 사용하지 않습니다.
+- 명단 재계산은 Game UUID순으로 잠그되 `NOWAIT`를 사용합니다. 출처→대상 순서의 결과 확정·대진 PATCH가 Game을 점유하면 명단 트랜잭션 전체를 롤백하고 `COMMAND_CONCURRENCY_CONFLICT`(409)를 반환합니다. 결과 명단 워커는 기존 outbox 재시도로 돌아가며, 양 경로가 서로의 Game을 기다리는 교착을 만들지 않습니다.
 - 팀 변경 PATCH의 `BRACKET_SOURCE_SLOT_LINKED`(409)는 대상 Game/Details 잠금 후 최신 배정 ID와 비교합니다. 최초 조회 뒤 결과 확정으로 승자가 배정된 자리를 과거 `null`로 덮어쓸 수 없습니다. 현재 배정과 같은 ID를 보내거나 장소·일정만 바꾸는 요청은 허용됩니다.
 - 공개 3·4위전의 미정 슬롯도 저장된 LOSER 출처를 `4강 N경기 패자`로 표시합니다.
+### 라운드별 부전승 직접 등록 (2026-10-05)
+
+- `POST /admin/tournaments/:tournamentId/byes`: 인증 + mutation admin. 입력 `{ groupId: UUID, registrationId?: UUID | null, byeId?: UUID, sortOrder: integer(0..7) }`, 반환은 groupTeam. 감사 action `tournament.bracket.bye.save`.
+- 그룹 phase로 12강·8강·4강을 구분한다. 팀 미정은 registrationId 생략/null로 저장하며, 팀을 선택하면 해당 대회의 confirmed 등록이어야 한다. 홈·어웨이 또는 경기 생성 없이 저장한다. byeId를 보내면 해당 조의 기존 부전승 id와 위치를 유지하며 팀 배정/미정 전환/위치 수정을 저장한다. byeId 생략 시 새 자리 생성 또는 기존 일반 배정을 변환한다.
+- 12강 정원 12팀/부전승 4팀, 8강 정원 8팀/부전승 4팀, 4강 정원 4팀/부전승 2팀. 초과 `409 BYE_CAPACITY`; group/final/third_place는 `400 BYE_PHASE_INVALID`.
+- 다른 조의 같은 단계 부전승 중복 `409 BYE_ALREADY_IN_ROUND`; 같은 단계 경기 참가 중인 팀 `409 BYE_TEAM_HAS_MATCH`. 기존 경기 생성/수정도 해당 단계 부전승팀을 거절한다.
+- 4강 위치는 0..3이며 초과는 `400 BYE_POSITION_INVALID`. 중복 위치는 `409 BYE_POSITION_OCCUPIED`, 다른 조/없는 byeId는 `404 BYE_NOT_FOUND`. 이전 명단 순번이 위치 범위를 벗어난 기존 부전승은 읽기 렌더링에서 경기 사이 위치로 호환하고 DB 값은 변경하지 않는다.
+- 부전승 groupTeam의 `sortOrder`는 해당 열의 일반 경기와 부전승을 합친 0부터의 삽입 위치다. UI에서는 1부터 표시한다. 예시 이미지의 12강은 위치 1·4·5·8에 부전승을 놓을 수 있다. 기존 일반 팀의 sortOrder 의미는 유지한다.
+- 저장된 경기 진출 연결과 다음 단계 실제 registrationId 자리 배정이 있으면 HOME/AWAY 가지를 우선한다. 부전승은 12강→8강, 8강→4강, 4강→결승으로 표시하며 미연결 항목도 지정 위치에서 표시한다. 결과에 따라 다음 경기 팀은 운영자가 직접 배정할 수 있고 이 API는 자동 배정하지 않는다.
+- 기존 `POST .../group-teams`의 isBye 입력은 12강 전용 호환 경로를 유지한다. 신규 직접 입력 UI는 위 byes 경로를 사용한다.
+
+### 시작 전 대진 삭제 (2026-10-05)
+
+- `DELETE /admin/fixtures/:fixtureId`: V1AuthGuard + mutation admin. tournament draft/open/closed, TeamMatch matched, Game SCHEDULED, 결과 리비전 없음일 때 `{ deleted: true }`.
+- Game은 CANCELLED, 공개 정책 STATUS_ONLY, TeamMatch는 archived/deletedAt으로 숨긴다. Game·감사·스태프 이력을 물리 삭제하지 않는다. 일정/용병 모집은 취소한다.
+- 원래 라운드/번호는 관리자 감사에 남기고 Details는 group/parent를 해제하고 round를 <originalRound>:deleted:<fixtureId>로 보관해 같은 대진 번호 재등록 및 빈 조 삭제를 허용한다.
+- 대회/경기 시작 `409 FIXTURE_ALREADY_STARTED`, 결과 `409 FIXTURE_HAS_RESULT`, 연결된 다음 경기 팀 배정/시작 `409 FIXTURE_DOWNSTREAM_ASSIGNED`, 하위 경기 `409 FIXTURE_HAS_CHILDREN`. 미정 다음 경기 연결은 원자적으로 해제한다.
+- TBD 부전승은 Game/TeamMatch를 만들지 않으며 `DELETE /admin/group-teams/:id`로 자리 삭제. 미정 자리는 별도 V1TournamentByeSlot에 저장하고 응답에서 registrationId=null, isBye=true로 표시한다. 기존 GroupTeam의 필수 등록 계약은 유지한다. 팀 배정/미정 전환은 같은 id를 유지하며 두 저장소 사이에서 원자적으로 이동한다. 공개 신원/대진 게이트 유지.
+
+### 대진 번호 수정 (2026-10-05)
+
+- `PATCH /api/v1/admin/fixtures/:fixtureId`는 기존 일정·장소·팀 필드와 함께 `fixtureNumber?: number`를 받는다. 인증 및 mutation admin 검증을 유지한다.
+- 번호는 JSON 숫자 정수 1..2147483647이다. 생략하면 유지하며 null/문자열/boolean/0/소수/범위 초과는 400이다.
+- 같은 대회·round·legNumber의 다른 경기와 번호가 겹치면 `409 FIXTURE_NUMBER_CONFLICT`다. 조가 달라도 같은 round/leg에서는 번호를 공유하지 않는다. 변경은 기존 생성 잠금 및 DB 유일성으로 보호하며 실패 시 전체 트랜잭션을 되돌린다.
+- 응답의 fixtureNumber, TeamMatch 제목, 연결된 팀 일정 제목에 새 번호가 반영된다. 번호가 출전정지 경기 순서에 영향을 주므로 관련 팀의 시작 전 명단 재계산 이벤트를 남긴다. 일정 상태는 번호 변경만으로 되살리지 않는다.
+- 경기 UUID, 팀 배정, 진출 edge, parent ID 및 Game 결과/리비전은 유지한다. 결과 확정 경기에서도 번호만 수정할 수 있으며 팀 변경의 기존 결과 잠금은 유지한다. 감사 `tournament.bracket.fixture.update`에 변경 전·후 번호를 기록한다.
+- 번호 이동 후 비워진 옛 좌표에서 새 경기 생성은 다음 creation generation을 사용한다. 이전 멱등 기록 및 경기 UUID를 덮어쓰거나 옛 경기를 replay하지 않는다. 기존 좌표의 동일 요청 재시도 계약은 유지한다.
+- 관리자 경기 수정 모달에서 현재 번호를 채우고 실제 API로 저장한다. 오류 시 입력/모달 유지, 성공 후 관리자 및 공개 상세 캐시를 갱신한다. 기존 프론트 MSW에는 이 PATCH 핸들러가 없으며 번호가 없는 기존 수정 payload는 계속 유효하다.

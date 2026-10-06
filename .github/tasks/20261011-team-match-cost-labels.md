@@ -1,10 +1,10 @@
 # Task 20261011: Team-match cost perspective labels
 
-Status: PR #1583 P2 remediation verified locally — follow-up commit and exact-head CI pending
+Status: Review — platform applicant-cost follow-up; Git publication and alpha validation pending
 **Owner**: delegated bug-fix session
 **Created**: 2026-10-03
 **Issue**: https://github.com/kim-song-jun/matchup-sports-platform/issues/1578
-**Branch**: fix/issue-1578-team-match-cost-labels
+**Branch**: fix/issue-1578-platform-cost-explanation (prior PR #1583: fix/issue-1578-team-match-cost-labels)
 
 ## Context
 Current UI always labels the second parsed cost amount as 상대팀 부담금. V1 stores only costNote; there is no shareMode or equal-allocation contract. A total exactly twice the second amount does not establish equal sharing.
@@ -83,3 +83,24 @@ No original private conversation/attachments, credentials, account identities or
 - Execution was serial with one worker after the parent's lint finished. No full suite, lint, browser, actual screen reader, API/data write or remote mutation was run by this delegated fix. Host preflight was recorded; the two owned dependency symlinks were removed after verification. Parent owns follow-up lint, the explicit five-path commit and current-head CI.
 - These are DOM/accessibility-name algorithm and local callback/payload regressions. Actual alpha after, real screen-reader speech, browser navigation, 0/0 null round-trip and fixture allocation mode remain unverified/out of scope.
 - Root independently read the actual submitted P2 and reviewed the five-path patch. The implementation helper ran the 28-test GREEN; root then ran corrected-tree lint/typecheck/v1 pattern, six required QA gates and Changeset policy, all PASS. The previous 176-test execution and CI on 4b67ad80 are historical checks; the new committed head requires fresh CI.
+
+## Platform-managed applicant cost follow-up — 2026-10-05 KST
+
+- PR #1583 is historical and merged. The remaining platform-managed branch still says 각 팀 부담금 and suppresses the applicant explanation even though V1 exposes only costNote and a second applicant amount; differential 90,000/30,000 and 50,000/0 are valid current inputs. User choice C applies to both provenance modes.
+- Owned for this follow-up: `team-matches-page.tsx`, `team-matches-page.test.tsx`, new `team-match-platform-cost.test.tsx` under `apps/v1_web/src/components/team-matches/`, this existing task and `.changeset/platform-team-match-applicant-cost.md`. Shared create fields, API/DTO/schema, stored costNote, amounts, filters and payment/save contracts remain forbidden.
+- The user-created independent worktree starts at `56581dc7b9e08c95dbcf763bffa09434ba4cfd8b`. Current dev is `f614096872ccb5953722a33dc326e3fb8af246c1`; its six PR #1607 paths are disjoint from this follow-up. The target source is identical. No branch synchronization or Git write has been performed by this session.
+- New canonical tests use the actual mapper, detail/list renderer and edit-hydration/payload functions. Synthetic inputs cover differential allocation, zero/free invitation, null, total-only and an equal numeric pair without inferring a shareMode.
+- [x] Canonical RED → GREEN and selected existing adjacent regression results recorded.
+- [x] Changed dependency graph typecheck, diff/debt/aggregate checks recorded.
+- [ ] Explicit pathspec commit, remote exact head and Ready/dev PR CI verified.
+- [ ] Actual unequal-allocation platform fixture before/after verified on alpha at mobile/tablet/desktop after separately approved deployment.
+- Publication is blocked by the selected execution policy: `.git` is read-only and the previous narrowly scoped commit escalation was rejected. No denied Git write is retried or bypassed. Candidate edits/tests continue in the permitted worktree filesystem.
+- Existing public alpha cost evidence is not proven to be platform-managed or unequal allocation; it must not be claimed as this follow-up's actual before. Actual after and save/payment/browser/real screen-reader validation remain pending.
+
+### Canonical follow-up validation — 2026-10-05 00:19–00:28 KST
+- RED on original actual product: new `team-match-platform-cost.test.tsx` 2FAIL/10PASS (12); the differential and zero platform detail contracts fail because of 각 팀 wording.
+- GREEN on canonical worktree config with one worker: new mapper/detail/list/edit-payload 12PASS + existing cost/accessibility descriptions 19PASS; selected existing page provenance/cost/mock 10PASS, 125 skipped. Total tested 41PASS across two serial invocations; no full page-suite claim.
+- Combined changed-source dependency graph typecheck PASS with exact canonical products/tests and unchanged current f614 dependencies. Frontend pattern checks in each WT, six static aggregate gates (DB/deploy/compose/seed/Android/immutable deploy) and both explicit changed-path Changeset policy checks PASS. Full app lint/build/integration/e2e not run; exact committed-head CI remains pending.
+- Independent read-only review: 5/5 owned candidate files reviewed, no new Critical/P1/P2 or mandatory fix. Reviewer did not rerun tests. No new TODO/FIXME/HACK/XXX in touched paths.
+- All owned existing files match current f614 before modification; six new dev paths remain disjoint. Full candidate patch is checked against clean current dev without applying it. This does not synchronize the WT branch or validate a committed PR tree.
+- Publication and actual alpha follow-up remain blocked/pending as listed above; no Git write, paid review re-request, merge or deploy.

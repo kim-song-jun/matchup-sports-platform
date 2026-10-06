@@ -1,16 +1,30 @@
-import { render, screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { act, cleanup, render, screen, within } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { V1TournamentListItem } from '@/types/api';
 import { TournamentHeroCard } from './tournament-hero-card';
 
 function promo(id: string, priority: number, enabled = true): V1TournamentListItem {
   return {
     id,
+    sportId: 'sport-futsal',
     title: id,
     status: 'open',
-    scheduledAt: '2026-08-01T09:00:00.000Z',
+    kind: 'regular_tournament',
+    format: 'knockout',
+    registrationDeadlineAt: null,
+    scheduledAt: '2026-10-07T09:00:00.000Z',
+    scheduledEndAt: null,
     sport: { code: 'futsal', name: '풋살' },
     venue: '서울',
+    coverImageUrl: null,
+    teamCount: 4,
+    confirmedCount: 0,
+    pendingPaymentCount: 0,
+    genderCategory: 'mixed',
+    entryFee: 0,
+    prizePool: null,
+    prizeSummary: null,
+    prizeBreakdown: null,
     promoHomeEnabled: enabled,
     promoHomePriority: priority,
     promoHomeTitle: `홈 ${id}`,
@@ -21,7 +35,20 @@ function promo(id: string, priority: number, enabled = true): V1TournamentListIt
     promoHomeTeamsText: null,
     promoHomeLocationText: null,
     promoHomePrizeText: null,
-  } as V1TournamentListItem;
+    promoListEnabled: false,
+    promoListPriority: 0,
+    promoListTitle: null,
+    promoListSubtitle: null,
+    promoListImageUrl: null,
+    promoListBadgeText: null,
+    promoListDateText: null,
+    promoListTeamsText: null,
+    promoListLocationText: null,
+    promoListPrizeText: null,
+    campaignSlug: null,
+    createdAt: '2026-08-01T00:00:00.000Z',
+    updatedAt: '2026-08-01T00:00:00.000Z',
+  };
 }
 
 describe('TournamentHeroCard', () => {
@@ -85,6 +112,98 @@ describe('TournamentHeroCard', () => {
       'href',
       '/tournaments/detail-tournament?from=%2Fhome',
     );
+  });
+});
+
+describe('TournamentHeroCard — 현재 신청 게이트', () => {
+  const deadline = '2026-10-06T15:00:00.000+09:00';
+  const expired = '2026-10-06T14:59:59.999+09:00';
+  const future = '2026-10-06T15:01:00.000+09:00';
+  const campaignSlug = 'futsal-cup';
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(deadline));
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.useRealTimers();
+  });
+
+  it.each<[string, Partial<V1TournamentListItem>, string]>([
+    ['마감된 0/4팀 캠페인', { campaignSlug, registrationDeadlineAt: expired }, '모집 마감'],
+    ['마감된 일반 대회', { registrationDeadlineAt: expired }, '모집 마감'],
+    ['미래 마감 캠페인', { campaignSlug, registrationDeadlineAt: future }, '참가 신청하기'],
+    ['미래 마감 일반 대회', { registrationDeadlineAt: future }, '참가 신청하기'],
+    ['마감일 없는 캠페인', { campaignSlug }, '참가 신청하기'],
+    ['마감일 없는 일반 대회', {}, '참가 신청하기'],
+    ['확정팀으로 정원이 찬 대회', { confirmedCount: 4 }, '모집 마감'],
+    ['입금대기팀까지 정원이 찬 캠페인', { campaignSlug, confirmedCount: 2, pendingPaymentCount: 2 }, '모집 마감'],
+    ['마감 순간의 캠페인', { campaignSlug, registrationDeadlineAt: deadline }, '모집 마감'],
+    ['마감 순간의 일반 대회', { registrationDeadlineAt: deadline }, '참가 신청하기'],
+    ['시작한 캠페인', { campaignSlug, scheduledAt: expired, registrationDeadlineAt: future }, '모집 마감'],
+    ['시작 순간의 캠페인', { campaignSlug, scheduledAt: deadline, registrationDeadlineAt: future }, '모집 마감'],
+    ['시작일 지난 일반 대회', { scheduledAt: expired, registrationDeadlineAt: future }, '참가 신청하기'],
+    ['잘못된 마감일의 캠페인', { campaignSlug, registrationDeadlineAt: 'invalid-date' }, '모집 마감'],
+    ['잘못된 마감일의 일반 대회', { registrationDeadlineAt: 'invalid-date' }, '참가 신청하기'],
+  ])('%s은 링크 대상의 신청 게이트와 같은 CTA를 보여줘요', (_condition, overrides, expectedCta) => {
+    // Given: API 목록의 실제 마감·정원 필드가 있는 홈 홍보 대회.
+    const item = { ...promo('registration', 0), ...overrides };
+    // When: 홈 카드를 렌더해요.
+    render(<TournamentHeroCard items={[item]} />);
+    // Then: 닫힌 신청도 카드 상세 탐색은 유지하고 신청 가능하다고 안내하지 않아요.
+    const link = screen.getByRole('link', { name: /^대회 상세 — 홈 registration/ });
+    expect(link).toHaveAccessibleName(`대회 상세 — 홈 registration — ${expectedCta}`);
+    expect(within(link).getByText(expectedCta)).toBeInTheDocument();
+    expect(link).toHaveAttribute('href', item.campaignSlug
+      ? `/tournaments/campaigns/${item.campaignSlug}`
+      : '/tournaments/registration?from=%2Fhome');
+    if (expectedCta === '모집 마감') {
+      expect(within(link).queryByText('참가 신청하기')).not.toBeInTheDocument();
+    }
+  });
+
+  it.each<[string | null, string]>([
+    [future, '참가 신청하기'],
+    [expired, '모집 마감'],
+    [null, '모집 마감'],
+  ])('정원 필드 없는 정규 리그는 마감일 %s의 리그 게이트를 따라요', (registrationDeadlineAt, expectedCta) => {
+    // Given: 서버는 정규 리그의 정원 필드를 생략해요.
+    const item = { ...promo('league', 0), kind: 'regular_league', registrationDeadlineAt } satisfies V1TournamentListItem;
+    delete item.teamCount;
+    // When: 홈 카드를 렌더해요.
+    render(<TournamentHeroCard items={[item]} />);
+    // Then: 정원이 없다는 이유로 신청을 닫거나 마감일 없는 리그의 신청을 열지 않아요.
+    expect(screen.getByText(expectedCta)).toBeInTheDocument();
+  });
+
+  it.each([null, campaignSlug])('카드를 열어 둔 채 마감이 지나면 %s 링크의 CTA도 갱신해요', (slug) => {
+    // Given: 현재부터 30초 뒤 마감되는 카드가 이미 렌더되어 있어요.
+    const item = { ...promo('time-passage', 0), campaignSlug: slug, registrationDeadlineAt: '2026-10-06T15:00:30.000+09:00' };
+    render(<TournamentHeroCard items={[item]} />);
+    expect(screen.getByText('참가 신청하기')).toBeInTheDocument();
+    // When: 새 목록 응답이나 부모 rerender 없이 시간이 마감을 지나요.
+    act(() => { vi.advanceTimersByTime(60_000); });
+    // Then: 카드와 링크는 남고 CTA만 실제 신청 마감에 맞춰요.
+    expect(screen.getByText('모집 마감')).toBeInTheDocument();
+    expect(screen.queryByText('참가 신청하기')).not.toBeInTheDocument();
+    expect(screen.getByRole('link')).toHaveAttribute('href', slug
+      ? `/tournaments/campaigns/${slug}`
+      : '/tournaments/time-passage?from=%2Fhome');
+  });
+
+  it('마감일 없는 캠페인도 화면 체류 중 대회가 시작하면 신청 CTA를 닫아요', () => {
+    // Given: 마감일은 없지만 30초 뒤 시작하는 캠페인이 보여요.
+    render(<TournamentHeroCard items={[{
+      ...promo('start-passage', 0), campaignSlug, scheduledAt: '2026-10-06T15:00:30.000+09:00',
+    }]} />);
+    expect(screen.getByText('참가 신청하기')).toBeInTheDocument();
+    // When: API 재조회 없이 대회 시작 시각을 지나요.
+    act(() => { vi.advanceTimersByTime(60_000); });
+    // Then: 시작한 캠페인을 계속 신청 가능하다고 안내하지 않아요.
+    expect(screen.getByText('모집 마감')).toBeInTheDocument();
+    expect(screen.queryByText('참가 신청하기')).not.toBeInTheDocument();
   });
 });
 

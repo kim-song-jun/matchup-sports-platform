@@ -1,12 +1,15 @@
 'use client';
 
 import Link from 'next/link';
+import { useEffect, useState } from 'react';
 import { Card } from '@/components/v1-ui/primitives';
 import { FeaturedSlotSkeleton } from './featured-slot-skeleton';
 import { TrophyIcon } from '@/components/v1-ui/icons';
 import { cssUrl } from '@/lib/assets';
 import { getSortedTournamentPromos, resolveTournamentImage } from '@/lib/tournament-promo';
 import { withFromPath } from '@/lib/session-storage';
+import { resolveTournamentRegistrationBlock } from '@/lib/tournament-registration-availability';
+import { getTournamentStatusConfig } from '@/lib/v1-tournament-status';
 import type { V1TournamentListItem } from '@/types/api';
 
 /**
@@ -15,20 +18,49 @@ import type { V1TournamentListItem } from '@/types/api';
  * 관리자가 홈 홍보를 켠 open 대회를 우선순위 순으로 모두 노출한다.
  */
 export function TournamentHeroCard({ items, loading = false }: { items: V1TournamentListItem[]; loading?: boolean }) {
+  const [, refreshClock] = useState(0);
+  // 목록이 늦게 도착하거나 바뀌어도 mount 시각이 아닌 현재 시각으로 판정한다.
+  const now = Date.now();
+  const featuredCards = getSortedTournamentPromos(items, 'home').map((featured) => {
+    const deadline = featured.registrationDeadlineAt ? new Date(featured.registrationDeadlineAt).getTime() : null;
+    const scheduledAt = featured.scheduledAt ? new Date(featured.scheduledAt).getTime() : null;
+    const registrationBlocked = featured.teamCount === undefined
+      // open 홍보 목록의 정규 리그는 정원이 없다. 숫자를 채우지 않고 리그의 마감 게이트만 적용한다.
+      ? featured.kind !== 'regular_league' || deadline === null || !Number.isFinite(deadline) || deadline < now
+      : resolveTournamentRegistrationBlock({ ...featured, teamCount: featured.teamCount }, new Date(now)) !== null;
+    // 캠페인 링크는 일반 신청 게이트보다 엄격하다: 시작·마감 순간부터 접수를 닫는다.
+    const campaignBlocked = Boolean(featured.campaignSlug) && (
+      (scheduledAt !== null && scheduledAt <= now)
+      || (deadline !== null && (!Number.isFinite(deadline) || deadline <= now))
+    );
+    return { featured, deadline, scheduledAt, registrationBlocked: registrationBlocked || campaignBlocked };
+  });
+  const hasUpcomingGate = featuredCards.some(({ featured, deadline, scheduledAt, registrationBlocked }) =>
+    !registrationBlocked && (
+      (deadline !== null && Number.isFinite(deadline) && deadline >= now)
+      || (Boolean(featured.campaignSlug) && scheduledAt !== null && Number.isFinite(scheduledAt) && scheduledAt > now)
+    ));
+
+  useEffect(() => {
+    if (loading || !hasUpcomingGate) return;
+    // 캠페인 페이지와 같은 1분 갱신 주기다. 닫힌 카드와 loading에는 타이머를 남기지 않는다.
+    const timer = window.setInterval(() => refreshClock((tick) => tick + 1), 60_000);
+    return () => window.clearInterval(timer);
+  }, [hasUpcomingGate, loading]);
+
   if (loading) {
     // 자리표시 뼈대는 추천 매치 슬롯과 공유한다 — 각자 만들면 한쪽만 실제 카드와 어긋나고
     // 그 차이가 그대로 레이아웃 이동이 된다(그 사고를 두 번 냈다).
     return <FeaturedSlotSkeleton eyebrow="상금 대회 · 모집 중" title="추천 대회를 가져오고 있어요" />;
   }
 
-  const featuredItems = getSortedTournamentPromos(items, 'home');
-
-  if (featuredItems.length === 0) return null;
+  if (featuredCards.length === 0) return null;
 
   return (
     <>
-      {featuredItems.map((featured) => {
+      {featuredCards.map(({ featured, registrationBlocked }) => {
         const cardTitle = featured.promoHomeTitle?.trim() || featured.title;
+        const ctaLabel = registrationBlocked ? getTournamentStatusConfig(featured.status, true).label : '참가 신청하기';
         const cardBody = featured.promoHomeSubtitle?.trim() || featured.venue || `${featured.sport.name} 대회`;
         const badgeText = featured.promoHomeBadgeText?.trim() || '추천 대회';
         // 홈 홍보 이미지를 따로 지정하지 않았으면 대회 커버(기본 이미지)를 그대로 쓴다.
@@ -47,7 +79,7 @@ export function TournamentHeroCard({ items, loading = false }: { items: V1Tourna
             href={featured.campaignSlug
               ? `/tournaments/campaigns/${featured.campaignSlug}`
               : withFromPath(`/tournaments/${featured.id}`, '/home')}
-            aria-label={`대회 상세 — ${cardTitle}`}
+            aria-label={`대회 상세 — ${cardTitle} — ${ctaLabel}`}
           >
             <Card pad={0} className="tm-featured-card" style={{ overflow: 'hidden' }}>
               <div
@@ -103,7 +135,7 @@ export function TournamentHeroCard({ items, loading = false }: { items: V1Tourna
                   className="tm-btn tm-btn-outline tm-btn-sm tm-featured-cta"
                   aria-hidden="true"
                 >
-                  참가 신청하기
+                  {ctaLabel}
                 </span>
               </div>
             </Card>

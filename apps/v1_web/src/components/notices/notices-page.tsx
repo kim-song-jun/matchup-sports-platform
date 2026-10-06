@@ -5,6 +5,7 @@ import { PageSkeleton } from '@/components/v1-ui/page-skeleton';
 import { RichContentRenderer } from '@/components/content/rich-content-renderer';
 import type { NoticeDetailViewModel, NoticeListViewModel, NoticeModel } from './notices.types';
 import { AppBackLink } from '@/components/v1-ui/app-back-link';
+import { withFromPath } from '@/lib/session-storage';
 
 export function NoticeListPageView({ model }: { model: NoticeListViewModel }) {
   return (
@@ -48,7 +49,7 @@ export function NoticeListPageView({ model }: { model: NoticeListViewModel }) {
             onRetry={model.onRetry}
           />
         ) : model.notices.length ? (
-          model.notices.map((notice) => <NoticeRow key={notice.id} notice={notice} />)
+          model.notices.map((notice) => <NoticeRow key={notice.id} notice={notice} fromPath={model.selfHref} />)
         ) : (
           /* [P2 UX 라이팅] 능동형 + 해요체 */
           <EmptyState
@@ -105,9 +106,9 @@ export function NoticeDetailPageView({ model }: { model: NoticeDetailViewModel }
   );
 }
 
-function NoticeRow({ notice }: { notice: NoticeModel }) {
+function NoticeRow({ notice, fromPath }: { notice: NoticeModel; fromPath?: string }) {
   return (
-    <Link className="tm-card tm-pressable tm-notice-row" href={"/notices/" + notice.id}>
+    <Link className="tm-card tm-pressable tm-notice-row" href={withFromPath(`/notices/${notice.id}`, fromPath)}>
       <span className="tm-notice-row-icon" aria-hidden="true">
         <BellIcon size={18} />
       </span>

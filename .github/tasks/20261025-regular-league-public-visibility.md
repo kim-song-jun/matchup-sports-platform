@@ -13,9 +13,9 @@ Status: In Progress
 ## Original Conditions
 - [x] 사용자 A안 선택: 메인·목록·상세까지 비공개 기능 추가.
 - [x] 삭제·취소·진행 상태 변경 없이 공개 여부만 변경(API 변경 키·unit 검증).
-- [ ] 기존 대회/리그는 migration 후 공개 상태 유지.
+- [x] alpha migration 후 기존 대회/리그 59개는 공개 상태 유지. production은 배포 후 확인.
 - [ ] 운영 서비스 대상은 id 22cad756-211f-4438-9066-208efabd3a2e.
-- [ ] 운영 반영은 사용자 main 승격 뒤 진행. 에이전트의 main 승격 금지.
+- [ ] 운영 반영은 dev → main 승격과 production 승인·배포 뒤 진행. 2026-10-07 사용자가 승격 PR 생성을 명시적으로 요청했다.
 
 ## User Scenarios
 관리자가 정규 리그 상세의 공개 설정에서 비공개를 저장한다. 일반 사용자는 목록·검색·직접 공개 상세에서 볼 수 없으며, 관리자는 같은 리그와 대진을 계속 운영한다. 다시 공개하면 기존 정보가 표시된다.
@@ -32,13 +32,13 @@ Status: In Progress
 - Wave 0: backend implementer 단독 schema+additive migration, isPublic Boolean default true; 이 계약 확정 전 다른 구현 금지.
 - Wave 1 backend: apps/v1_api 공개 조회·권한·관리자 endpoint·감사·테스트. frontend: apps/v1_web types/hooks/MSW 및 관리자 정규 리그 공개 설정 UI. root: task/API docs·회귀 경계 검토·검증 오케스트레이션.
 - Wave 2: GPT-6-sol 독립 검토; 필요한 수정; 직렬 최소 검증.
-- Forbidden: .env 조회, main 승격, 운영 schema/데이터를 배포 전 임의 변경, 취소/삭제/rollback, 다른 세션 WIP, self-commit.
+- Forbidden: .env 조회, main 직접 push, 운영 schema/데이터를 배포 전 임의 변경, 취소/삭제/rollback, 다른 세션 WIP, self-commit.
 
 ## Acceptance Criteria
 - [x] public filtering을 클라이언트에만 의존하지 않음.
 - [ ] 비공개 리그의 관리자 운영·데이터 보존.
 - [x] DB migration·API docs·frontend 계약·fixtures sync.
-- [ ] 실제 검증 결과와 미검증/운영 반영 상태를 구분해서 보고.
+- [x] 실제 검증 결과와 미검증/운영 반영 상태를 구분해서 보고.
 
 ## Tech Debt Resolved
 - 공개 여부를 진행 상태와 삭제 여부로 우회하는 경로를 만들지 않는다.
@@ -52,6 +52,7 @@ Status: In Progress
 ## Ambiguity Log
 - 2026-10-07 A안 선택 완료. 공개 범위: 메인·목록·검색·상세. 관리자 운영 보존. 새 디자인 대안/요금/정원/대진 수정은 범위 밖.
 - 공개 설정 구현 계약: V1Tournament.isPublic(Boolean, DB is_public), default true; 정규 리그 관리에서 제어. DTO whitelist에 맞춘 별도 관리자 visibility endpoint를 우선 사용.
+- 2026-10-07 사용자 추가 요청: dev → main 승격 PR 생성. 릴리스 전체 dev 변경을 승격하며 API/Web fixed version 1.3.0으로 Changeset 32개를 소비한다. 기존 웹 로그인 요청에는 아직 답이 없어 실제 관리자 UI 저장 검증은 남아 있다.
 
 ## Progress Snapshot
 - 조사 완료: 운영 스키마에도 별도 비공개 필드 없음. 운영 쓰기 0건.
@@ -75,3 +76,7 @@ Status: In Progress
 - game-projection integration의 takeoverClaim null은 feature에서 변경하지 않은 generic worker/test의 실패다. GPT-6-sol은 정확히 1초 만료를 쓰는 밀리초 경계와 shared advisory lock이라는 기존 null 경로를 확인했다. 단일 CI만으로 원인 분기는 미확정이며 이 작업에서 관련 코드를 수정하지 않았다. 다음 필수 CI에서 재확인한다.
 - alpha EC2 i-07344f6ccf3f53c53의 Name=teameet-alpha-dev를 검증하고 SSM cfba02f6-48ef-44ba-b1f0-df9db4cfc812의 READ ONLY transaction으로 조사했다. 실제 alpha DB에는 운영 대상 id가 없고 visibility column도 아직 없다. 따라서 alpha 공개 화면의 이전 관찰을 동일 DB 행의 근거로 쓰지 않으며, alpha QA는 별도 QA 리그를 사용한다. alpha/production 수동 쓰기 0건.
 - 경로 탐색에서 존재하지 않는 replay/test 경로와 changeset 문구 앵커를 사용한 호출은 실패했다. 실제 workflow 경로(test-final-schema-binding.py)와 정확한 문구로 복구했다. 제품/배포 검증 실패와 분리해 기록한다.
+- 최종 feature SHA 88c1c1d8d의 CI 37492133674, alpha 배포 37492133760은 모두 success. API unit 340 suites/4623 tests, integration 123 suites/842 passed/3 skipped, Web 607 files, Gates와 migration replay가 통과했다. 앞선 generic worker 실패도 이 필수 CI에서는 통과했다.
+- alpha SSM 31b89f8c-6479-4457-bab1-489dcf486aff의 READ ONLY 확인: is_public column 존재, 기존 59개 모두 true, 운영 대상 ID는 alpha에 없음. health DB true, 공개 목록 200, 존재하지 않는 운영 ID 상세 404, 비로그인 visibility PATCH 401, sitemap no-store를 확인했다. alpha의 llms 404는 기존 nginx 정책이다.
+- 실제 공개/비공개 전환·감사·데이터 보존과 viewport별 UI 검증은 로그인/제어권 반환을 기다린다. ego space 814를 사용자 로그인용으로 유지하며 검증 후 finish({ keep: [] })로 닫는다. alpha/production 수동 쓰기 0건.
+- 승격 준비: c98c1004c에서 32개 Changeset 소비와 API/Web 1.2.0 → 1.3.0 및 changelog를 pathspec 36개 경로로 커밋했다. 11ae087f4에서 main의 승격 merge 이력 3개를 dev에 흡수했고 제품 코드 diff는 없었다. committed tree의 release-promotion gate와 diff check가 통과했다. 새 dev SHA의 CI/alpha 및 승격 PR 검증은 이어서 확인한다.

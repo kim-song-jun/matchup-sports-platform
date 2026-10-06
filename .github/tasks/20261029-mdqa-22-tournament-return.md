@@ -1,5 +1,11 @@
 # Task 20261029: 공개 대회 목록 유형·상태 복귀 보존 (MD-QA #22)
 
+### Root Phase C validation — 2026-10-06
+- Actual Web CI old bare-link expectation repaired in this same PR/worktree. Current delta verified; source/test scope preserved.
+- Root serialized narrow GREEN: SSR seed5/5 PASS. Evidence: 22-ci-green.log.
+- Changed-tree TypeScript and existing v1 pattern checker PASS (22-review-type-pattern.log). Independent delta review4/4, Critical0/Warning0; root inspected actual diff.
+- Commit/push/new-head review/tracker follow-up pending below; no merged, deployed or alpha browser success claimed.
+
 Status: Review
 **Owner**: root → mdqa_22_builder
 **Created**: 2026-10-06
@@ -82,3 +88,10 @@ Fix the reported current-v1 behavior with the smallest correct change and a real
 - 관련 회귀 실행에서 미처리 MSW 요청이나 act 경고가 없습니다.
 - 실제 렌더링된 제어·상세 복귀 경로와 결과를 검증했습니다. 배포된 alpha에서 원문 시나리오를 다시 확인해야 합니다.
 - Latest cursor overrides earlier pending implementation/validation notes: implementation and code validation complete; root commit/PR/latest-head review/merge/tracker cursor follows. Tracker remains 김성준 / 확인 중; no close or alpha success claim.
+
+## Phase C — PR #1633 CI SSR Compatibility
+- Root supplied actual Web CI evidence: run `37413898366`, job `112108159843`, 596 files / 6475 tests passed and one failure in `tournaments-page-seed.test.tsx:82`. The stale SSR assertion expected a bare detail href, while the actual card correctly includes `from=/tournaments`.
+- Checked current `page.tsx`, list client, and route-local card: server seed eligibility, actual seeded HTML rendering, and JSON-LD canonical detail paths remain unchanged. Only rendered card links now preserve the full current list URL through the existing safe origin helper.
+- Owned follow-up scope is only `apps/v1_web/src/app/tournaments/tournaments-page-seed.test.tsx` and this task. Product/shared/API code remains unchanged. Touched-test search found one obsolete bare href expectation.
+- SSR link assertions now parse the actual first card from the HTML DOM, assert same origin, exact detail pathname, empty hash, and the entire decoded query equal to one `from` with the exact current list URL. Both unfiltered `/tournaments` and existing `kind=league` seed cases exercise that contract. Existing HTML title/order, ItemList names/order, loading/error, filter seed suppression, and canonical metadata assertions remain intact.
+- Validation: narrow SSR GREEN pending root serialization: `pnpm --filter v1_web exec vitest run src/app/tournaments/tournaments-page-seed.test.tsx --maxWorkers=1 --no-file-parallelism`. No worker test/build/browser/Git process run. Root owns commit/push and latest-head CI/review.

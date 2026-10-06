@@ -63,6 +63,17 @@ function itemListNames(html: string): string[] {
   return data?.itemListElement.map((entry) => entry.name) ?? [];
 }
 
+function expectFirstCardLink(html: string, detailPath: string, fromPath: string) {
+  const document = new DOMParser().parseFromString(markup(html), 'text/html');
+  const href = document.querySelector('[role="list"][aria-label="대회 목록"] [role="listitem"] a')?.getAttribute('href');
+  expect(href).toBeTruthy();
+  const detailUrl = new URL(href!, 'https://teameet.test');
+  expect(detailUrl.origin).toBe('https://teameet.test');
+  expect(detailUrl.pathname).toBe(detailPath);
+  expect(detailUrl.hash).toBe('');
+  expect([...detailUrl.searchParams.entries()]).toEqual([['from', fromPath]]);
+}
+
 describe('/tournaments 서버 렌더', () => {
   beforeEach(() => {
     requested.length = 0;
@@ -79,7 +90,7 @@ describe('/tournaments 서버 렌더', () => {
 
     expect(markup(html)).toContain('서울 풋살 오픈');
     expect(markup(html)).toContain('부산 농구 챌린지');
-    expect(markup(html)).toContain('href="/tournaments/t-1"');
+    expectFirstCardLink(html, '/tournaments/t-1', '/tournaments');
     expect(itemListNames(html)).toEqual(['서울 풋살 오픈', '부산 농구 챌린지']);
     expect(html).not.toContain('대회 목록 불러오는 중');
     // seed 없는 추천 캐러셀은 자리(스켈레톤)를 잡아 둔다 — null 이면 하이드레이션 뒤에 목록을 밀어낸다.
@@ -93,6 +104,7 @@ describe('/tournaments 서버 렌더', () => {
 
     expect(requested.some((url) => url.includes('/tournaments?') && url.includes('kind=league'))).toBe(true);
     expect(markup(html)).toContain('서울 나이트 리그');
+    expectFirstCardLink(html, '/tournaments/l-1', '/tournaments?kind=league');
   });
 
   it('API 가 실패하면 빈 상태 대신 로딩 스켈레톤으로 넘기고 ItemList 를 내지 않는다', async () => {

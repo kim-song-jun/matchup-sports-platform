@@ -69,4 +69,9 @@ Status: In Progress
 - backend 9개 unit suite를 실행했고 실패한 3개 suite만 수정 뒤 재검증(152 tests passed)했다. backend tsc/surface gate 통과. SQL baseline에는 필수 regular_league row lock과 공개 전적 페이지/집계/시즌 필터의 정확한 근거를 등록했다.
 - frontend 11개 test file(169개 고유 tests) 통과. 추가 캐시 테스트의 wrapper 인자 전달을 실제 호출과 일치시켜 실패 2건을 해결했다. MSW boolean literal 추론 오류는 fixture 계약 타입으로 수정했고 tsc 통과. 새 UI는 기존 타이포그래피 토큰을 사용한다.
 - Jest config module-loader 경고와 기존 PersistQueryClientProvider act 경고는 기존 설정/provider에 기인한 baseline으로 분리했다. 새로운 공개 설정 테스트는 해당 provider를 쓰지 않고 fixture suite는 새 mutation을 inert mock한다. 이 작업에서 경고를 숨기지 않았다.
-- 아직 DB integration·실제 alpha UI·운영 비공개 전환은 미실행이다. 이 상태를 전체 완료로 보고하지 않는다.
+- 로컬 DB integration·실제 alpha UI·운영 비공개 전환은 미실행이다. CI integration 결과는 아래와 같이 별도로 기록하며, 전체 완료로 보고하지 않는다.
+- dev d28eb5c3f push 완료. 첫 CI 37490469602는 실패했고 alpha 37490469549는 해당 CI를 기다리므로 배포되지 않았다. Web 606 files/6557 tests, API integration 121 suites/840 tests는 통과했다.
+- 이번 변경의 CI 누락 2건을 수정: 관리자 목록 복귀 테스트에 새 공개 설정 hook/owner/Boolean fixture 추가(16 tests passed); schema 변경에 따른 current source/manifest/runtime client pin 5곳 갱신. historical final-drop·StageB·기존 승인 hash·M11/game migration은 보존했다. 실제 current/historical binding·변조 거부 검증 7개와 game source snapshot 검증이 통과했다.
+- game-projection integration의 takeoverClaim null은 feature에서 변경하지 않은 generic worker/test의 실패다. GPT-6-sol은 정확히 1초 만료를 쓰는 밀리초 경계와 shared advisory lock이라는 기존 null 경로를 확인했다. 단일 CI만으로 원인 분기는 미확정이며 이 작업에서 관련 코드를 수정하지 않았다. 다음 필수 CI에서 재확인한다.
+- alpha EC2 i-07344f6ccf3f53c53의 Name=teameet-alpha-dev를 검증하고 SSM cfba02f6-48ef-44ba-b1f0-df9db4cfc812의 READ ONLY transaction으로 조사했다. 실제 alpha DB에는 운영 대상 id가 없고 visibility column도 아직 없다. 따라서 alpha 공개 화면의 이전 관찰을 동일 DB 행의 근거로 쓰지 않으며, alpha QA는 별도 QA 리그를 사용한다. alpha/production 수동 쓰기 0건.
+- 경로 탐색에서 존재하지 않는 replay/test 경로와 changeset 문구 앵커를 사용한 호출은 실패했다. 실제 workflow 경로(test-final-schema-binding.py)와 정확한 문구로 복구했다. 제품/배포 검증 실패와 분리해 기록한다.

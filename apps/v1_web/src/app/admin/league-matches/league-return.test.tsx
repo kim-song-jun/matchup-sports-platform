@@ -56,8 +56,17 @@ vi.mock('@/hooks/use-v1-api', () => ({
     isPending: false, isError: false, refetch: vi.fn(),
   }),
   useV1AdminLeagueMatch: (leagueId: string) => ({
-    data: { ...LEAGUES.find((league) => league.leagueId === leagueId), teamIds: ['team-1', 'team-2'], recentVenues: [], fixtures: [] },
+    data: { ...LEAGUES.find((league) => league.leagueId === leagueId), isPublic: true, teamIds: ['team-1', 'team-2'], recentVenues: [], fixtures: [] },
     isPending: false, isError: false, refetch: vi.fn(),
+  }),
+  useV1AdminMe: () => ({
+    data: {
+      userId: 'owner-user', adminUserId: 'owner-admin', adminRole: 'owner', status: 'active',
+      capabilities: ['status:write'], lastActiveAt: null,
+    },
+  }),
+  useV1UpdateLeagueVisibility: () => ({
+    mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false, isError: false, isSuccess: false, error: null,
   }),
   useV1AdminLeagueTeams: () => ({ data: undefined }),
   useV1AdminTeam: () => ({ data: undefined }),

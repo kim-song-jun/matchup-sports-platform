@@ -65,7 +65,9 @@ function mount(ui: ReactElement) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
-  return render(<QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>);
+  const wrap = (page: ReactElement) => <QueryClientProvider client={queryClient}>{page}</QueryClientProvider>;
+  const page = render(wrap(ui));
+  return { ...page, rerenderPage: (nextPage: ReactElement) => page.rerender(wrap(nextPage)) };
 }
 
 function navigate(href: string) {
@@ -75,6 +77,7 @@ function navigate(href: string) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  navigation.replace.mockReset();
   navigate('/my/schedule');
   api.useV1MySchedule.mockReturnValue({
     data: { items: [schedule], nextCursor: null }, isLoading: false, isError: false, refetch: vi.fn(),
@@ -159,6 +162,7 @@ describe('MD-QA #26 — 내 일정 상세 복귀', () => {
 
   it('URL 반영 전에 상태를 연속으로 선택해도 최신 상태와 기존 중첩 출처를 상세에 담는다', () => {
     navigate('/my/schedule?view=calendar&from=%2Fmy');
+    const historyLength = window.history.length;
     mount(MySchedulePage());
 
     // Router mock은 아직 URL을 반영하지 않아 실제 탐색이 대기 중인 순간을 재현한다.
@@ -166,9 +170,8 @@ describe('MD-QA #26 — 내 일정 상세 복귀', () => {
     fireEvent.click(screen.getByRole('button', { name: '완료' }));
     expect(screen.getByRole('button', { name: '완료' })).toHaveAttribute('aria-pressed', 'true');
     expect(api.useV1MySchedule).toHaveBeenLastCalledWith({ limit: 50, status: 'completed' });
-    expect(navigation.replace).toHaveBeenLastCalledWith(
-      '/my/schedule?view=calendar&from=%2Fmy&status=completed', { scroll: false },
-    );
+    expect(`${window.location.pathname}${window.location.search}`).toBe('/my/schedule?view=calendar&from=%2Fmy&status=completed');
+    expect(window.history.length).toBe(historyLength);
     const detailHref = screen.getByRole('link', { name: /정기 훈련/ }).getAttribute('href');
     if (!detailHref) throw new Error('팀 일정 상세 링크가 없어요');
     const returnPath = new URL(detailHref, 'https://teameet.test').searchParams.get('from');
@@ -176,9 +179,65 @@ describe('MD-QA #26 — 내 일정 상세 복귀', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '전체' }));
     expect(api.useV1MySchedule).toHaveBeenLastCalledWith({ limit: 50 });
-    expect(navigation.replace).toHaveBeenLastCalledWith('/my/schedule?view=calendar&from=%2Fmy', { scroll: false });
+    expect(`${window.location.pathname}${window.location.search}`).toBe('/my/schedule?view=calendar&from=%2Fmy');
+    expect(window.history.length).toBe(historyLength);
     expect(screen.getByRole('link', { name: /정기 훈련/ })).toHaveAttribute(
       'href', '/teams/team-1/schedules/sched-1?from=%2Fmy%2Fschedule%3Fview%3Dcalendar%26from%3D%252Fmy',
     );
+  });
+
+  it('빠른 상태 선택 뒤 늦게 도착한 중간 query snapshot은 마지막 선택과 상세 출처를 덮어쓰지 않는다', () => {
+    navigate('/my/schedule?view=calendar&from=%2Fmy');
+    // 주소는 최신 탐색을 반영했지만 Next의 검색 snapshot은 늦게 전달되는 경계를 재현한다.
+    navigation.replace.mockImplementation((href: string) => window.history.replaceState(null, '', href));
+    const page = mount(MySchedulePage());
+    fireEvent.click(screen.getByRole('button', { name: '예정' }));
+    fireEvent.click(screen.getByRole('button', { name: '완료' }));
+    expect(new URLSearchParams(window.location.search).get('status')).toBe('completed');
+
+    api.useV1MySchedule.mockClear();
+    navigation.url = '/my/schedule?view=calendar&from=%2Fmy&status=scheduled';
+    page.rerenderPage(MySchedulePage());
+
+    expect(screen.getByRole('button', { name: '완료' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: '예정' })).toHaveAttribute('aria-pressed', 'false');
+    expect(api.useV1MySchedule).not.toHaveBeenCalledWith({ limit: 50, status: 'scheduled' });
+    expect(api.useV1MySchedule).toHaveBeenLastCalledWith({ limit: 50, status: 'completed' });
+    expect(screen.getByRole('link', { name: /정기 훈련/ })).toHaveAttribute(
+      'href', '/teams/team-1/schedules/sched-1?from=%2Fmy%2Fschedule%3Fview%3Dcalendar%26status%3Dcompleted%26from%3D%252Fmy',
+    );
+
+    navigation.url = `${window.location.pathname}${window.location.search}`;
+    page.rerenderPage(MySchedulePage());
+    expect(screen.getByRole('button', { name: '완료' })).toHaveAttribute('aria-pressed', 'true');
+    expect(api.useV1MySchedule).toHaveBeenLastCalledWith({ limit: 50, status: 'completed' });
+  });
+
+  it('native Back과 Forward의 현재 query snapshot은 선택과 상세 출처를 복원한다', async () => {
+    navigate('/my/schedule?status=scheduled&from=%2Fmy#schedule');
+    const page = mount(MySchedulePage());
+    window.history.pushState(null, '', '/my/schedule?status=cancelled&from=%2Fmy#schedule');
+    navigation.url = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+    page.rerenderPage(MySchedulePage());
+    expect(screen.getByRole('button', { name: '취소됨' })).toHaveAttribute('aria-pressed', 'true');
+
+    const traverse = async (direction: 'back' | 'forward') => {
+      await new Promise<void>((resolve) => {
+        window.addEventListener('popstate', () => resolve(), { once: true });
+        window.history[direction]();
+      });
+      navigation.url = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+      page.rerenderPage(MySchedulePage());
+    };
+    await traverse('back');
+    expect(screen.getByRole('button', { name: '예정' })).toHaveAttribute('aria-pressed', 'true');
+    expect(api.useV1MySchedule).toHaveBeenLastCalledWith({ limit: 50, status: 'scheduled' });
+    expect(screen.getByRole('link', { name: /정기 훈련/ })).toHaveAttribute(
+      'href', '/teams/team-1/schedules/sched-1?from=%2Fmy%2Fschedule%3Fstatus%3Dscheduled%26from%3D%252Fmy%23schedule',
+    );
+    await traverse('forward');
+    expect(screen.getByRole('button', { name: '취소됨' })).toHaveAttribute('aria-pressed', 'true');
+    expect(api.useV1MySchedule).toHaveBeenLastCalledWith({ limit: 50, status: 'cancelled' });
+    expect(window.location.hash).toBe('#schedule');
   });
 });

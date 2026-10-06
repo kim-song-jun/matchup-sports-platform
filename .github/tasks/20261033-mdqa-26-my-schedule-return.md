@@ -41,6 +41,7 @@ Fix the reported current-v1 behavior with the smallest correct change and a real
 - Phase A: builder investigates, records exact root cause, adds narrow RED regression, implements.
 - Phase B: root serializes validation; independent reviewer checks final diff; root commits/pushes/dev PR and tracker comment.
 - Phase C: builder handles the existing PR #1632 Copilot maintainability comment only within MySchedulePageClient and this task; root reruns the existing regression/type checks, reviews and commits/pushes.
+- Phase D: builder first adds a dynamic stale Next-query regression for the latest-head Copilot finding, waits for root RED, then aligns the same client with the existing guarded native-history pattern. Owned paths are only team-schedules-client.tsx (MySchedulePageClient), my-schedule-return.test.tsx and this task; no builder test or Git execution.
 - Owned files: apps/v1_web/src/app/my/schedule/; apps/v1_web/src/app/teams/[id]/schedules/[scheduleId]/ detail if needed; respective local tests; apps/v1_web/src/components/team-schedules/team-schedules-client.tsx (MySchedulePageClient only, root-approved scope expansion); apps/v1_web/src/components/team-schedules/team-schedules.view-model.ts (my-schedule link modeling only if needed); this task; .changeset/mdqa-26-my-schedule-return.md.
 - Forbidden: all other modules, shared hooks/types/MSW/DTO/schema/navigation helpers, other tasks/state, dev/main, browser/tracker actions, commit/push. Date utility exception belongs only to #27.
 - You are not alone. Preserve others' changes and coordinate scope expansion with root.
@@ -57,6 +58,7 @@ Fix the reported current-v1 behavior with the smallest correct change and a real
 - Removed the hard-coded all reset and bare /my/schedule detail origin in the touched my-schedule client.
 - Reused MyScheduleViewModel's status union and the existing sanitized withFromPath/AppBackLink flow. Root requested the smallest existing-client fix rather than unrelated file extraction.
 - Phase C: unified the duplicated status set/delete and query serialization in the component-local schedulePathForStatus helper. Both the detail origin and URL replacement use it with their existing current/new status input.
+- Phase D: guarded the URL-to-draft resync against stale Next snapshots and removed async router replacement from my-schedule filter changes. The existing serializer now reads the current route's latest browser query/hash, with the captured query retained for server rendering.
 
 ## Security Notes
 - Preserve authentication/authorization; validate local return paths and untrusted query input where applicable. No secrets read/output.
@@ -73,11 +75,11 @@ Fix the reported current-v1 behavior with the smallest correct change and a real
 | 2026-10-06 | mdqa_26_builder | Is UI A/B/C needed for this fix? | CLAUDE.md UI-start policy excludes logic-only changes. Existing screen structure and controls stay unchanged. |
 
 ## Progress Snapshot
-- Phase: C / PR #1632 maintainability follow-up; root validation pending.
+- Phase: D / PR #1632 stale query follow-up; root RED confirmed and minimal product fix ready for root GREEN.
 - Worktree: C:/Users/kinso/.codex/worktrees/mdqa-26-my-schedule-return/matchup-sports-platform
 - Branch: fix/mdqa-26-my-schedule-return
 - Tracker: 확인 중 / 김성준; actual intake saved 2026-10-06.
-- PR/head/merge: [PR #1632](https://github.com/kim-song-jun/matchup-sports-platform/pull/1632); Phase C started from 3f6e3694cffea85de494c97d454cc620cbf1a260. Root owns subsequent Git/PR cursors.
+- PR/head/merge: [PR #1632](https://github.com/kim-song-jun/matchup-sports-platform/pull/1632); Phase D started from 21ff6a80275f9c24b1c460c16cd6932deb7284b6. Root owns subsequent Git/PR cursors.
 - Root cause: MySchedulePageClient initializes its status to all on every mount, and detail links carry only /my/schedule as their from path. The existing detail AppBackLink already honors a sanitized full from path.
 - RED verified by root: 26-red.log, 1/1 failed because the actual detail href had from=/my/schedule without status=scheduled. Production remained unchanged for that run.
 - Implementation: allowlist URL status, maintain immediate local selection, replace the list URL without scrolling, and generate the detail from path from that current selection. No detail, attendance, write, API, permission or shared navigation code was changed.
@@ -100,3 +102,18 @@ Fix the reported current-v1 behavior with the smallest correct change and a real
 - Changed files: apps/v1_web/src/components/team-schedules/team-schedules-client.tsx (MySchedulePageClient only), this task. Existing tests and changeset stay unchanged.
 - Root validation command: pnpm --filter v1_web test 'src/app/my/schedule/my-schedule-return.test.tsx' 'src/app/my/schedule/my-schedule.test.tsx' 'src/app/teams/[id]/schedules/team-schedules.test.tsx' --maxWorkers=1 --minWorkers=1 --no-file-parallelism. Required type/pattern checks remain root-owned.
 - Phase C validation: pending root serialized rerun; builder did not run tests, builds or browser QA and did not commit/push.
+
+## Phase D — Stale Next Query Follow-up — 2026-10-06
+- Actual comment verified through read-only GitHub API: [discussion_r4191667282](https://github.com/kim-song-jun/matchup-sports-platform/pull/1632#discussion_r4191667282), reviewed head 21ff6a80275f9c24b1c460c16cd6932deb7284b6. The unguarded URL-to-state effect can adopt an intermediate scheduled query after the user already selected completed; the original static router mock did not replay that effect boundary.
+- Existing v1 reference patterns checked: user-records-page-client.tsx, league-match-standings-client.tsx and public-game-records/schedule-content.tsx use immediate local draft, native replaceState and a captured-query/current-location resync guard.
+- RED regression prepared in the existing return test: render and click scheduled -> completed, reflect the latest browser address while delivering the earlier scheduled Next snapshot through a retained-component rerender, assert completed control/query/detail-from remain current, then deliver the matching snapshot. This verifies the real effect and dependent UI instead of a static mock.
+- Product remained unchanged for the root RED run. The initial pnpm test option-parsing failure is not RED evidence. Root's corrected exec-vitest run produced 1 FAILED / 10 SKIPPED, completed aria-pressed=false after the intermediate query; evidence: 26-phase-d-red-corrected.log.
+- Root authorized the minimal product fix after that RED. MySchedulePageClient now compares the captured query to the current same-route browser query before resync; the retained internal serializer reads the latest query/hash and native replaceState updates the current history entry. No shared helpers, permission, attendance or write flows changed.
+- Existing rapid-selection assertions now verify the actual URL and unchanged history length rather than router mock calls. Added matching-snapshot and actual native Back/Forward coverage, including status/query/detail-origin restoration and the return hash.
+- GREEN-ready root command: pnpm --filter v1_web exec vitest run 'src/app/my/schedule/my-schedule-return.test.tsx' 'src/app/my/schedule/my-schedule.test.tsx' 'src/app/teams/[id]/schedules/team-schedules.test.tsx' --maxWorkers=1 --minWorkers=1 --no-file-parallelism.
+- Phase D validation: pending root GREEN (48 related cases expected); no independent tests/high-load checks, Git actions or alpha QA performed by builder.
+
+## Root Phase D Validation — 2026-10-06
+- Actual stale Next snapshot RED1/10SKIP; initial pnpm options parse error is not RED (26-phase-d-red-corrected.log). Matching snapshot and actual native Back/Forward added. Related3files48/48PASS (26-phase-d-green.log), existing wrapper act warnings3 recorded.
+- Final TypeScript and unchanged v1pattern checker PASS (26-phase-d-type-pattern.log). Independent4/4 PASS Critical0/Warning0, exact source/test hashes (review-26-phase-d.md). No repeated fullsuite/build/Nextserver.
+- Source/test/task exact3paths, diff --check clean, no newmarkers/untrackedproductionimports. SamePR1632 latesthead review/CI/merge pending. GitHub Advanced Security provider-model failure remains distinct; no alpha QA claim.

@@ -1,6 +1,6 @@
 # MD-QA #18: 신청 마감일 경과 대회의 대표 모집 상태 정합성
 
-Status: Review
+Status: In Progress — home CTA follow-up
 **Owner**: Codex MD-QA monitor / mdqa_18 worker
 **Created**: 2026-10-06
 
@@ -9,7 +9,7 @@ Status: Review
 신청 마감일이 지난 0/4팀 합성 대회가 이벤트 카드·캠페인·대회 상세에서 모집 중으로 표시되는 반면 신청 버튼과 안내는 마감이다. 정원 충족 사례와 다르다. 최초 조사 당시에는 후보 검증 기록만 있었다. 이후 PR #1625가 dev에 머지됐으며 아래 Progress Snapshot에서 사후 QA와 같은 티켓의 후속 수정 상태를 추적한다.
 
 ## Goal
-신청 마감일이 지난 대회의 대표 상태와 실제 신청 가능 여부를 일치시키고 dev PR 및 머지 후 alpha QA로 연결한다.
+신청 마감일이 지난 대회의 대표 상태와 실제 신청 가능 여부를 일치시키고 dev PR·머지 추적·기존 리포트 수정 댓글로 연결한다. 2026-10-06 사용자 범위 변경 이후 이 자동화의 신규 alpha 브라우저 QA는 제외한다.
 
 ## Original Conditions (must all be satisfied)
 - [x] 최신 origin/dev에서 분기한 전용 워크트리 사용.
@@ -107,6 +107,27 @@ alpha 실제 배포와 인증 세션에 의존. 병렬 구현은 가능하지만
 - [x] root가 기존 상세 회귀32개를 worker1/파일 직렬로 각1회 실행해32/32 PASS, TypeScript와 기존 v1 패턴 검사도 각1회 PASS. 기존 React act 경고1건은 기록했다. CSS 클래스/가짜 geometry 단위 테스트는 추가하지 않았다. 로그는 위 followup-18의 detail-tests.log/typecheck.log/patterns.log다. 호스트 preflight CPU9%,여유17.1GB,Node59/Chrome24; Docker daemon은 없으며 이번 프론트 단위 검증에는 필요하지 않았다. 의존성은 기존 lockfile의 offline cache만 재사용했고 다운로드0/manifest변경0이다.
 - [x] 독립 frontend/code reviewer가 의도된4/4경로를 검토해 Critical0/Warning0. 실제 alpha 간격 after는 pending으로 유지했다. 보고서: ignored followup-18/code-review.md.
 - [x] [dev 후속 PR #1627](https://github.com/kim-song-jun/matchup-sports-platform/pull/1627) 게시/채팅 attach. 제품 source commit `3629665f93cd2007231801ee2995882673706a64`, branch `fix/mdqa-18-mobile-status-chips`, worktree `C:/Users/kinso/.codex/worktrees/mdqa-18-19-postqa-docs/matchup-sports-platform`. 이 인계 문서 커밋으로 제품을 다시 바꾸지 않는다.
-- [ ] 최종 head Copilot 및 CI를 추적하고 기존 dev-pr-5/사용자 머지를 기다린다. 새 자동 머지 정책을 추가하지 않는다.
-- [ ] 후속 merge를 포함한 serving SHA에서390/768/1440 detail 캡처·console/network와 Pass A/B 재검수.
+- [x] 후속 #1627은 최신 head Gates/API/Web 성공, Copilot FindingsNone, 독립 코드 리뷰4/4 PASS 후 dev에 머지됐다(위 a29 merge). 새 자동 머지 정책을 추가하지 않았다.
+- [x] 다른 실행의 역사 detail 재검수는 #18 comment-31에 PASS로 기록됐다. 이 자동화의 신규 alpha 캡처/QA는 사용자 범위 변경으로 제외됐으며 홈의 아래 별도 미해결 지점을 전체 완료와 구분한다.
 - Tracker QA transition remains BLOCKED_UI_OPTION_ABSENT; Done/보류로 대체하지 않는다.
+
+## Progress Snapshot — home recruitment CTA follow-up (2026-10-06)
+- Phase: investigate → failing regression → minimal fix → review → dev PR → tracker comment → merge tracking.
+- User scope: 버그 수정·코드 검증·dev PR·머지 추적·기존 리포트 댓글. 이 자동화는 alpha 재QA, responsive 캡처, 갤러리, serving SHA 실측을 수행하지 않는다. 위 기존 QA는 역사 기록이다. Done/완료는 사용자만 처리하며 QA 선택이 없으면 상태를 대신 바꾸지 않는다.
+- Original PR #1625와 모바일 후속 #1627은 dev MERGED. #1627 merge `a29f080a53689b0e53c502ff2a26dd463f7909b5`; 원/후속 머지 안내는 [comment-28](https://teameet.jmandu.kr/issues/18/#comment-28)에 이미 있어 중복 게시하지 않는다.
+- New evidence: [comment-31](https://teameet.jmandu.kr/issues/18/#comment-31), 김성준 10.06 10:58 KST. 마감 캠페인 `/tournaments/campaigns/alpha-qa-futsal-recruiting`의 `/home` 추천 카드가 계속 `참가 신청하기`를 표시한다. 기존 events/campaign/detail 수정과 별도로 남은 경로다. 콘텐츠 제목의 모집중 낱말은 결함 근거로 쓰지 않는다.
+- Authenticated IAB를 통해 김성준 담당 실명, 전체 9건, 활성 3건, 상세·설명·최근 댓글 및 추가 pagination 없음을 확인했다. 이전 Chrome 연결 blocker는 해소됐다. #19 comment-29는 역사 QA PASS이며 신규 결함이 아니다.
+- Dedup: 기존 워크트리/태스크/열린 dev PR을 확인했다. #18 홈 후속 PR은 없고 #1628(MD-QA #20), #1629(MD-QA #21) 및 #1610은 타 작업이다.
+- Worktree: `C:/Users/kinso/.codex/worktrees/mdqa-18-home-cta/matchup-sports-platform`; branch `fix/mdqa-18-home-recruitment-cta`; fetch 직후 `origin/dev` a29f080a5에서 생성했다. 이미 머지된 기존 branch에 새 fix를 push하지 않는다.
+- Owned (builder): `apps/v1_web/src/components/home/tournament-hero-card.tsx`, direct `tournament-hero-card.test.tsx`, `.changeset/mdqa-18-home-recruitment-cta.md`. Root owns this canonical task and Git/PR/state. Forbidden: shared helpers/hooks/types/MSW/API/schema/CSS/tokens, unrelated home paths, main, old worktrees. Shared scope expansion 필요 시 root와 조율한다. Subagent commit/push 금지.
+- Acceptance: 만료된 0/4 대회 홈 카드가 신청 가능하다고 안내하지 않는다. 기존 캠페인/상세 링크·카드 노출·정렬·outline 위계를 유지한다. 미래 마감/마감일 없음·정원 충족·마감 경계·시간 경과 계약을 현재 v1 신청 게이트와 대조해 실제 렌더 회귀 테스트로 고정한다. 신청/결제/API 계약은 변경하지 않는다.
+- Ambiguity: 구조·토큰 변경 없는 기존 신청 상태 로직 연결이므로 CLAUDE.md의 로직 전용 예외를 적용한다. 일반 대회 gate는 `deadline < now`; 캠페인의 기존 gate는 `deadline <= now`다. 링크 대상의 경계와 맞춘다.
+- Hypotheses: (1) home CTA가 상태와 무관하게 고정 문자열을 렌더한다; (2) home list API가 deadline/정원 계약을 누락한다; (3) deadline이 화면 체류 중 지나도 render가 갱신되지 않는다. 실제 타입/훅/helper/caller와 실패 회귀로 구분한다.
+- [x] RED: `pnpm --filter v1_web exec vitest run src/components/home/tournament-hero-card.test.tsx --maxWorkers=1 --no-file-parallelism` — 13 FAIL / 13 PASS (26). 닫힌 신청/체류 중 마감에서 실제 렌더 CTA가 `참가 신청하기`로 남아 `모집 마감`을 찾지 못했다. 로그: 원 checkout ignored `tmp/qa/mdqa-assigned-monitor/2026-10-06-home-cta/red.log`.
+- [x] API 누락 가설 배제: 현행 `tournament-card.presenter.ts`가 deadline, kind, published campaignSlug, confirmedCount/pendingPaymentCount를 직렬화하고 정규 리그만 teamCount를 생략한다. home는 `useV1AllTournaments({status:'open'})` 목록을 전달한다. 신규 API/MSW/schema 계약은 없다.
+- [x] GREEN: hero26 + 기존 home-featured-slot10 = 2파일36/36 PASS. 마감/정원/링크 대상별 경계/정규 리그 정원 생략/화면 체류 중 마감·시작을 실제 카드 렌더로 검증했다. 홈 wrapper의 기존 PersistQueryClientProvider act 경고10건을 별도 기록했다. 로그: 위 ignored `green.log`.
+- [x] `pnpm --filter v1_web exec tsc --noEmit` 및 기존 v1 패턴 검사 각1회 PASS. Windows find.exe 충돌을 피하려고 검사 자식 shell만 기존 Git Bash로 지정했다. manifest/lockfile/API/mock 변경과 다운로드는 없으며 새 의존성이 없다. CPU45%/여유6GB까지 회복된 시점에 worker1·파일 직렬 검증; 이후 타입 검사는 아래 우선순위로 직렬 실행했다. 로그 `typecheck.log` / `patterns.log`.
+- [x] 구현: 기존 shared 신청 gate를 재사용하고 정원 생략 정규 리그는 유효 마감일만 판단한다. 캠페인 링크는 기존 시작/마감 `<=`·invalid deadline gate를 추가로 따른다. 현재 시각 재판정과 기존60초 갱신을 사용하며 loading/전체 닫힘/unmount에서 timer를 정리한다. 링크/노출/정렬/outline/스타일·토큰은 유지한다.
+- [x] Independent review: 접근성 실제 finding1건을 수정했다. 열린/마감 accessible-name 회귀 RED 2 FAIL → 시각 CTA와 link 이름에 같은 ctaLabel을 연결한 최종 GREEN 36/36 PASS. 최종 TypeScript incremental 및 v1 패턴 검사 PASS. 독립 reviewer가 의도된4/4경로를 재검수하여 Critical0/Warning0, PASS. 최종 로그 final-green.log / final-typecheck.log / final-patterns.log / code-review.md. 기존 wrapper act 경고10건은 성공 판정과 분리해 기록한다.
+- [ ] Explicit committed diff / latest origin/dev drift check / dev PR / Copilot request.
+- [ ] 기존 #18에 정확한 PR 상태와 수정 댓글 저장·표시 확인; 머지는 기존 자동화/사용자를 기다린다.

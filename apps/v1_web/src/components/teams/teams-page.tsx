@@ -84,7 +84,7 @@ const ACTIVITY_TYPE_OPTIONS = [
   { value: 'competitive', label: '실력 중심' },
 ] as const;
 
-export function TeamListPageView({ model }: { model: TeamListViewModel }) {
+export function TeamListPageView({ model, fromHref }: { readonly model: TeamListViewModel; readonly fromHref?: string }) {
   // RouteChromeConfig엔 floatingSlot 필드가 없다(정적 테이블은 ReactNode를 못 담는다,
   // 설계 문서 §1.3) — FAB이 고정 JSX라도 항상 override로 옮긴다.
   useShellOverride({
@@ -119,7 +119,7 @@ export function TeamListPageView({ model }: { model: TeamListViewModel }) {
           <TeamListSkeleton />
         ) : model.teams.length ? (
           <>
-            <div className="tm-team-card-stack">{model.teams.map((team) => <TeamCard key={team.id} team={team} />)}</div>
+            <div className="tm-team-card-stack">{model.teams.map((team) => <TeamCard key={team.id} team={team} fromHref={fromHref} />)}</div>
             {model.hasNextPage ? (
               <button
                 type="button"
@@ -1996,13 +1996,13 @@ function TeamFilterSheet({ model }: { model: TeamListViewModel }) {
 }
 
 /** 고르는 화면의 카드라 한 줄씩만 쓴다(390 에서 5장). 팀장 이름은 비교 축이 아니라 팀 상세에서 본다. */
-function TeamCard({ team }: { team: TeamModel }) {
+function TeamCard({ team, fromHref }: { readonly team: TeamModel; readonly fromHref?: string }) {
   // 활동 일정과 소개 중 한 줄만 — 둘 다 없으면 줄 자체를 그리지 않는다.
   const extraLine = team.next.trim() || team.intro.trim();
   const memberCapacity = formatMemberCapacity(team);
 
   return (
-    <Link className="tm-team-card tm-team-card-compact tm-pressable" href={`/teams/${team.id}`}>
+    <Link className="tm-team-card tm-team-card-compact tm-pressable" href={withFromPath(`/teams/${team.id}`, fromHref)}>
       <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
         <TeamAvatar seed={team.id} name={team.name} logoUrl={team.logoUrl} size="lg" />
         <div style={{ flex: 1, minWidth: 0 }}>

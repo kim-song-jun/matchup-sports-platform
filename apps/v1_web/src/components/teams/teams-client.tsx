@@ -168,7 +168,9 @@ export function TeamListPageClient({ seed }: { readonly seed?: CursorListSeed<V1
     },
   };
 
-  return <TeamListPageView model={model} />;
+  // 기본 뒤로가기는 이미 /teams다. 검색·필터·중첩 출처가 있는 확정 URL만 상세에 이어 준다.
+  const listHref = sanitizeRedirectPath(buildTeamHref(searchParams, { filter: null }));
+  return <TeamListPageView model={model} fromHref={listHref?.includes('?') ? listHref : undefined} />;
 
   function submitSearch(value: string, options?: { source?: string }) {
     const nextQuery = value.trim();

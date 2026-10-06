@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { Suspense, useEffect, useState } from 'react';
+import { Suspense, useEffect, useRef, useState } from 'react';
 import { Plus } from 'lucide-react';
 import {
   AdminDataTable,
@@ -13,9 +13,28 @@ import {
 } from '@/components/admin';
 import { useV1AdminLeagueMatchList, useV1AdminLeagueSeriesList } from '@/hooks/use-v1-api';
 import type { V1AdminLeagueListItem } from '@/types/league-match';
+import { withFromPath } from '@/lib/session-storage';
 import { LeagueSeriesView } from './league-series-view';
 
 type TabKey = 'leagues' | 'series';
+type HubFilters = { readonly activeTab: TabKey; readonly seriesFilter: string };
+
+function readHubFilters(params: Pick<URLSearchParams, 'get'>): HubFilters {
+  return {
+    activeTab: params.get('tab') === 'series' ? 'series' : 'leagues',
+    seriesFilter: params.get('seriesId') ?? '',
+  };
+}
+
+function buildListHref(pathname: string, query: string, filters: HubFilters): string {
+  const params = new URLSearchParams(query);
+  if (filters.activeTab === 'series') params.set('tab', 'series');
+  else params.delete('tab');
+  if (filters.seriesFilter) params.set('seriesId', filters.seriesFilter);
+  else params.delete('seriesId');
+  const nextQuery = params.toString();
+  return nextQuery ? `${pathname}?${nextQuery}` : pathname;
+}
 
 const TABS: { key: TabKey; label: string }[] = [
   { key: 'leagues', label: '정규 리그' },
@@ -42,24 +61,26 @@ function LeagueHub() {
   const router = useRouter();
   const pathname = usePathname();
 
-  // URL → 초기 상태. 구 URL 리다이렉트·딥링크가 그대로 해당 탭에 도착한다.
-  const [activeTab, setActiveTab] = useState<TabKey>(() =>
-    searchParams.get('tab') === 'series' ? 'series' : 'leagues',
-  );
-  // 뒤로가기/앞으로가기·외부 내비게이션으로 URL 만 바뀐 경우에도 탭을 따라가게 한다 —
-  // 클릭은 setActiveTab 이 즉시 처리하므로(RSC 왕복 대기 없음) 이 effect 는 재동기화 전용이다.
+  const query = searchParams.toString();
+  const [filters, setFilters] = useState<HubFilters>(() => readHubFilters(searchParams));
+  const latestFilters = useRef(filters);
+  const { activeTab, seriesFilter } = filters;
+  // 상세 복귀·Back/Forward는 URL에서 복원하고, 연속 선택은 최신 local draft에 병합한다.
   useEffect(() => {
-    setActiveTab(searchParams.get('tab') === 'series' ? 'series' : 'leagues');
-  }, [searchParams]);
+    const next = readHubFilters(new URLSearchParams(query));
+    latestFilters.current = next;
+    setFilters(next);
+  }, [query]);
   // '' = 전체, 'independent' = 무소속만, 그 외 = 체계 id. 필터 선택은 탭을 오가도
   // 남아야 하므로 허브가 들고, 목록 쿼리는 정규 리그 패널만 마운트될 때 실행되도록
   // 패널 컴포넌트(LeaguesPanel) 안에 둔다 — 리그 체계 탭에서 리그 목록 API 가
   // 불필요하게 호출되지 않게 한다.
-  const [seriesFilter, setSeriesFilter] = useState('');
-
-  function handleTabChange(tab: TabKey) {
-    setActiveTab(tab);
-    router.replace(tab === 'series' ? `${pathname}?tab=series` : pathname, { scroll: false });
+  const listHref = buildListHref(pathname, query, filters);
+  function handleFiltersChange(patch: Partial<HubFilters>) {
+    const next = { ...latestFilters.current, ...patch };
+    latestFilters.current = next;
+    setFilters(next);
+    router.replace(buildListHref(pathname, query, next), { scroll: false });
   }
 
   return (
@@ -102,7 +123,7 @@ function LeagueHub() {
               // aria-controls 는 활성 탭에만 단다 (#771 Copilot 지적의 허브 공통 반영).
               aria-controls={isActive ? `league-panel-${tab.key}` : undefined}
               type="button"
-              onClick={() => handleTabChange(tab.key)}
+              onClick={() => handleFiltersChange({ activeTab: tab.key })}
               className={[
                 'min-h-[44px] rounded-lg px-4 text-[length:var(--font-size-label)] font-medium transition-colors',
                 'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2',
@@ -126,7 +147,7 @@ function LeagueHub() {
         {activeTab === 'series' ? (
           <LeagueSeriesView />
         ) : (
-          <LeaguesPanel seriesFilter={seriesFilter} onSeriesFilterChange={setSeriesFilter} />
+          <LeaguesPanel seriesFilter={seriesFilter} onSeriesFilterChange={(value) => handleFiltersChange({ seriesFilter: value })} listHref={listHref} />
         )}
       </div>
     </div>
@@ -137,9 +158,11 @@ function LeagueHub() {
 function LeaguesPanel({
   seriesFilter,
   onSeriesFilterChange,
+  listHref,
 }: {
   seriesFilter: string;
   onSeriesFilterChange: (value: string) => void;
+  listHref: string;
 }) {
   const { data, isPending, isError, refetch } = useV1AdminLeagueMatchList(
     seriesFilter || undefined,
@@ -174,6 +197,7 @@ function LeaguesPanel({
         isError={isError}
         onRetry={() => void refetch()}
         filtered={seriesFilter !== ''}
+        listHref={listHref}
       />
     </>
   );
@@ -185,12 +209,14 @@ function LeagueListTable({
   isError,
   onRetry,
   filtered,
+  listHref,
 }: {
   items: V1AdminLeagueListItem[];
   isPending: boolean;
   isError: boolean;
   onRetry: () => void;
   filtered: boolean;
+  listHref: string;
 }) {
   const router = useRouter();
   return (
@@ -213,7 +239,7 @@ function LeagueListTable({
       // 그룹 G(alpha 실측): 제목 텍스트를 Link로만 두면 실제 클릭 표면이 글자 높이(15px)뿐이라
       // 44px 터치 기준에 못 미친다. 행/카드 전체를 누르는 onRowClick(AdminDataTable 내장 기능,
       // 44px+ 행 높이를 그대로 가짐)으로 옮기고 제목은 일반 텍스트로 되돌린다.
-      onRowClick={(row) => router.push(`/admin/league-matches/${encodeURIComponent(row.leagueId)}`)}
+      onRowClick={(row) => router.push(withFromPath(`/admin/league-matches/${encodeURIComponent(row.leagueId)}`, listHref))}
       rowClickLabel={(row) => `${row.title} 상세 보기`}
       columns={[
         {

@@ -21,6 +21,14 @@ function readDraft(query: string, statuses: StatusOptions): Draft {
 
 const LIST_RETURN_KEY_PREFIX = 'teameet.admin.listReturn:';
 
+function rememberListUrl(pathname: string, search: string): void {
+  try {
+    window.sessionStorage.setItem(`${LIST_RETURN_KEY_PREFIX}${pathname}`, `${pathname}${search}`);
+  } catch (error) {
+    console.warn('관리자 목록 복귀 주소를 저장하지 못했어요.', error);
+  }
+}
+
 /**
  * 검색어·상태·페이지를 URL(`?q=&status=&page=`)에 두는 관리자 목록 조회 상태.
  * 매치·회원·팀·팀매치·대회 목록이 쓴다 — 화면 안 상태로만 들고 있으면 상세에 다녀오는 사이
@@ -32,11 +40,7 @@ export function useAdminUrlListQuery(statuses: StatusOptions, pageSize: number):
 
   useEffect(() => {
     // Next가 replaceState·Back을 반영할 때마다 지금 주소를 기억한다(오래된 snapshot이 아니라 실제 주소).
-    try {
-      window.sessionStorage.setItem(`${LIST_RETURN_KEY_PREFIX}${window.location.pathname}`, `${window.location.pathname}${window.location.search}`);
-    } catch {
-      // 저장소가 막힌 환경에선 '목록'이 조건 없는 목록으로 돌아갈 뿐이다.
-    }
+    rememberListUrl(window.location.pathname, window.location.search);
   }, [query]);
   const fromUrl = useMemo(() => readDraft(query, statuses), [query, statuses]);
   const [draft, setDraft] = useState(fromUrl);
@@ -75,6 +79,8 @@ export function useAdminUrlListQuery(statuses: StatusOptions, pageSize: number):
     // Next의 native History 연동이 내부 state를 복사한다. 새 history 항목·scroll 이동 없음.
     // API 검색만 debounce하며 URL은 즉시 보존해 입력 직후 상세로 이동해도 유실되지 않는다.
     window.history.replaceState(null, '', `${url.pathname}${url.search}${url.hash}`);
+    // Detail navigation can happen before Next publishes its new query snapshot.
+    rememberListUrl(url.pathname, url.search);
   }, []);
 
   const setSearch = useCallback((search: string) => updateDraft({ search, page: 1 }), [updateDraft]);

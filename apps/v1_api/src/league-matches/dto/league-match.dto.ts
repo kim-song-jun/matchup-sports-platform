@@ -1,7 +1,9 @@
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import { ArrayNotEmpty, IsArray, IsBoolean, IsDateString, IsIn, IsInt, IsNotEmpty, IsOptional, IsString, IsUUID, Matches, Max, MaxLength, Min, ValidateNested } from 'class-validator';
 
 export class UpdateLeagueVisibilityDto {
+  // Keep the JSON type: implicit Boolean conversion would turn the string "false" into true.
+  @Transform(({ obj }) => obj.isPublic, { toClassOnly: true })
   @IsBoolean()
   isPublic!: boolean;
 }

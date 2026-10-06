@@ -2,8 +2,9 @@ import { act, render, renderHook, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { useAdminListReturnHref, useAdminUrlListQuery } from './use-admin-url-list-query';
 
+const navigation = vi.hoisted(() => ({ querySnapshot: null as string | null }));
 vi.mock('next/navigation', () => ({
-  useSearchParams: () => new URLSearchParams(window.location.search),
+  useSearchParams: () => new URLSearchParams(navigation.querySnapshot ?? window.location.search),
 }));
 
 const STATUSES = [{ value: '' }, { value: 'active' }, { value: 'suspended' }] as const;
@@ -19,6 +20,7 @@ function TeamsList() {
 }
 
 afterEach(() => {
+  navigation.querySnapshot = null;
   window.sessionStorage.clear();
   window.history.replaceState(null, '', '/');
 });
@@ -26,10 +28,12 @@ afterEach(() => {
 describe('관리자 목록 조건의 상세 왕복 (MD-QA #21)', () => {
   it('목록 조건을 바꿀 때마다 그 주소를 기억하고, 상세의 목록 버튼이 그 주소로 돌아간다', () => {
     window.history.replaceState(null, '', '/admin/teams?q=E2E');
+    navigation.querySnapshot = window.location.search;
     const { unmount } = render(<TeamsList />);
     act(() => screen.getByRole('button', { name: '활성' }).click());
     act(() => screen.getByRole('button', { name: '3페이지' }).click());
     expect(window.location.search).toBe('?q=E2E&status=active&page=3');
+    expect(navigation.querySnapshot).toBe('?q=E2E');
     unmount();
 
     // 상세로 이동한 뒤 — 목록 버튼은 마지막으로 본 목록 주소다.

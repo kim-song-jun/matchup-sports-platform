@@ -3,22 +3,35 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { V1ApiError } from '@/lib/api-client';
 import type { V1AdminTeamRow } from '@/types/api';
 import AdminTeamsPage from './page';
+import AdminTeamDetailPage from './[id]/page';
 
 const hooks = vi.hoisted(() => ({
   teams: vi.fn(),
   mutate: vi.fn(),
   capabilities: [] as string[],
+  push: vi.fn(),
+  querySnapshot: null as string | null,
 }));
 
 vi.mock('next/navigation', () => ({
-  useRouter: () => ({ push: vi.fn() }),
-  useSearchParams: () => new URLSearchParams(window.location.search),
+  useRouter: () => ({ push: hooks.push }),
+  useParams: () => ({ id: 'team-1' }),
+  useSearchParams: () => new URLSearchParams(hooks.querySnapshot ?? window.location.search),
 }));
 
 vi.mock('@/hooks/use-v1-api', () => ({
   useV1AdminTeams: (filters: unknown) => hooks.teams(filters),
   useV1ChangeTeamStatus: () => ({ mutate: hooks.mutate, isPending: false }),
   useV1AdminMe: () => ({ data: { capabilities: hooks.capabilities } }),
+  useV1RenameArchivedTeam: () => ({ mutate: vi.fn(), isPending: false }),
+  useV1AdminTeam: () => ({
+    data: {
+      teamId: 'team-1', name: '마포 FC', status: 'active', sportName: '풋살', regionName: '서울 마포구',
+      ownerName: '김팀장', ownerUserId: 'owner-1', memberCount: 5, managerCount: 1,
+      createdAt: '2026-09-01T00:00:00.000Z', trustScore: null, recentHostedTeamMatches: [], members: [],
+    },
+    isPending: false, isError: false, error: null, refetch: vi.fn(),
+  }),
 }));
 
 describe('AdminTeamsPage — 주소로 들어온 검색어', () => {
@@ -61,6 +74,48 @@ describe('AdminTeamsPage — 주소로 들어온 검색어', () => {
 
     expect(screen.getByRole('searchbox', { name: '팀명 검색' })).toHaveValue('');
     expect(hooks.teams).toHaveBeenLastCalledWith(expect.not.objectContaining({ q: expect.anything() }));
+  });
+});
+
+describe('AdminTeamsPage — query snapshot 갱신 전 상세 왕복', () => {
+  afterEach(() => {
+    hooks.querySnapshot = null;
+    hooks.push.mockReset();
+    window.sessionStorage.clear();
+    window.history.replaceState(null, '', '/');
+  });
+
+  it('검색 변경 직후 실제 행과 상세 목록 링크로 왕복해도 최신 조건을 복원한다', () => {
+    const row: V1AdminTeamRow = {
+      teamId: 'team-1', name: '마포 FC', sportId: 'sport-1', sportName: '풋살', ownerUserId: 'owner-1', ownerName: '김팀장',
+      memberCount: 5, managerCount: 1, status: 'active', createdAt: '2026-09-01T00:00:00.000Z',
+    };
+    hooks.teams.mockReturnValue({
+      data: { items: [row], pageInfo: { page: 1, totalPages: 1, total: 1, limit: 20 }, summary: { total: 1, byStatus: { active: 1 } } },
+      isPending: false, isFetching: false, isError: false, error: null, refetch: vi.fn(),
+    });
+    window.history.replaceState(null, '', '/admin/teams?q=old');
+    hooks.querySnapshot = window.location.search;
+    const list = render(<AdminTeamsPage />);
+    fireEvent.change(screen.getByRole('searchbox', { name: '팀명 검색' }), { target: { value: '마포' } });
+    expect(hooks.querySnapshot).toBe('?q=old');
+    fireEvent.click(screen.getAllByRole('button', { name: '마포 FC 상세 보기' })[0]);
+    expect(hooks.push).toHaveBeenCalledWith('/admin/teams/team-1');
+    list.unmount();
+
+    window.history.replaceState(null, '', '/admin/teams/team-1');
+    const detail = render(<AdminTeamDetailPage />);
+    const back = screen.getByRole('link', { name: '목록' });
+    const href = back.getAttribute('href')!;
+    expect(new URL(href, window.location.origin).searchParams.get('q')).toBe('마포');
+    back.addEventListener('click', event => event.preventDefault());
+    fireEvent.click(back);
+    detail.unmount();
+
+    window.history.replaceState(null, '', href);
+    hooks.querySnapshot = null;
+    render(<AdminTeamsPage />);
+    expect(screen.getByRole('searchbox', { name: '팀명 검색' })).toHaveValue('마포');
   });
 });
 

@@ -2,6 +2,7 @@ import 'reflect-metadata';
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
 import { CreateLeagueMatchDto, UpdateLeagueVisibilityDto } from './league-match.dto';
+import { createGlobalValidationPipe } from '../../common/global-validation-pipe';
 
 const valid = {
   title: '부산 리그',
@@ -31,13 +32,17 @@ describe('CreateLeagueMatchDto region identifiers', () => {
 });
 
 describe('UpdateLeagueVisibilityDto', () => {
-  it('accepts an explicit boolean false', async () => {
-    const errors = await validate(plainToInstance(UpdateLeagueVisibilityDto, { isPublic: false }));
-    expect(errors).toHaveLength(0);
+  const metadata = { type: 'body' as const, metatype: UpdateLeagueVisibilityDto };
+
+  it.each([false, true])('preserves explicit boolean %p through the HTTP validation pipe', async (isPublic) => {
+    const dto = await createGlobalValidationPipe().transform({ isPublic }, metadata);
+    expect(dto.isPublic).toBe(isPublic);
   });
 
-  it.each(['false', 0, null, undefined])('rejects a non-boolean visibility value: %p', async (isPublic) => {
-    const errors = await validate(plainToInstance(UpdateLeagueVisibilityDto, { isPublic }));
-    expect(errors.some((error) => error.property === 'isPublic')).toBe(true);
+  it.each(['false', 'true', '', 0, 1, null, undefined, {}, []])('rejects non-boolean %p through the HTTP validation pipe', async (isPublic) => {
+    await expect(createGlobalValidationPipe().transform({ isPublic }, metadata)).rejects.toMatchObject({
+      status: 400,
+      response: { code: 'VALIDATION_ERROR' },
+    });
   });
 });

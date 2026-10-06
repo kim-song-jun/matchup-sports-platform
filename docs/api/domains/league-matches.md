@@ -15,7 +15,9 @@ reads and operations keep access to unpublished leagues.
 `{ "isPublic": boolean }` and returns `{ leagueId, isPublic }` in the standard
 success envelope. It requires an active mutation administrator and records the
 publication change in the existing admin audit. The admin league detail includes
-`isPublic` so settings hydrate from the actual league.
+`isPublic` so settings hydrate from the actual league. The HTTP validation pipe
+preserves the original JSON type for this field: strings (including `"false"`),
+numbers, arrays, objects, null and a missing value return `400 VALIDATION_ERROR`.
 
 Unpublishing removes the league from home discovery, league and tournament public
 lists, API-backed search and sitemap discovery. Direct public league, standings,

@@ -261,7 +261,9 @@ league fixture record and the bracket's tournament detail) polls while `live`, a
 for a `scheduled` game from 15 minutes before `scheduledAt` until 3 hours after it
 (`publicLivePollDelay` in `apps/v1_web/src/lib/public-live-polling.ts`); before that
 window it re-checks at most every 15 minutes, so a page opened before kickoff picks
-up the start without a reload. Ended, cancelled and time-unset detail pages do not poll. The bracket hub loads cursor pages
+up the start without a reload. All positive polling delays keep the 10-second
+floor, including the countdown immediately before the window opens. Ended,
+cancelled and time-unset detail pages do not poll. The bracket hub loads cursor pages
 sequentially and displays all live entries first, then groups A/B/C and knockout
 rounds in competition order; live entries do not also appear in the regular list. A public,
 potentially-hundreds-of-viewers surface deliberately does not reuse the

@@ -17,7 +17,7 @@
  * 부하 모델(정확히 서술): `react-query` 캐시는 브라우저마다 따로라 관전자 간 요청을
  * 합치지 못한다. 서버 부하는 대략 (폴링 중인 관전자 수) x (로드된 페이지 수 / 주기)로
  * **관전자 수에 비례해 늘어난다.** 일정은 예정/진행 경기가 있으면 시작·종료를 발견하도록
- * 폴링하고, 시간 미정 진행 경기도 포함한다. 경기 상세는 실제 live 상태에서만 폴링한다.
+ * 폴링하고, 시간 미정 진행 경기도 포함한다. 경기 상세는 live 또는 시작 전 폴링 창에서 갱신한다.
  * 모든 경기가 종료되면 멈추며 뷰어당 10초 하한으로 지불한다. 관전자 수가 이 하한으로 감당이 안
  * 되는 규모가 되면 다음 수는 주기를 더 줄이는 것이 아니라 공유 캐시(CDN/edge 또는
  * 서버측)나 진짜 공개 브로드캐스트 채널이다.
@@ -50,7 +50,7 @@ export function publicLivePollDelay(
   if (!Number.isFinite(start) || now > start + PRESTART_POLL_GRACE_MS) return false;
   const opensAt = start - PRESTART_POLL_WINDOW_MS;
   if (now >= opensAt) return PUBLIC_LIVE_POLL_INTERVAL_MS;
-  return Math.min(opensAt - now, PRESTART_IDLE_RECHECK_MS);
+  return Math.max(PUBLIC_LIVE_POLL_INTERVAL_MS, Math.min(opensAt - now, PRESTART_IDLE_RECHECK_MS));
 }
 
 /** 여러 경기를 한 화면이 함께 볼 때(대진표) — 가장 먼저 필요한 폴링에 맞춘다. 모두 멈춤이면 false. */

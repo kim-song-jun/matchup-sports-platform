@@ -27,6 +27,13 @@ describe('publicLivePollDelay — 경기 시작 전에 열어 둔 화면도 시�
     expect(publicLivePollDelay('scheduled', scheduledAt, at(-24 * 60 * 60_000))).toBe(15 * 60_000);
   });
 
+  it.each([1, 1_000, 9_999])('창이 열리기 %ims 전에도 공개 조회의 10초 하한을 지킨다', (remainingMs) => {
+    const now = at(-PRESTART_POLL_WINDOW_MS - remainingMs);
+    expect(publicLivePollDelay('scheduled', scheduledAt, now)).toBe(PUBLIC_LIVE_POLL_INTERVAL_MS);
+    expect(earliestPublicLivePollDelay([{ status: 'scheduled', scheduledAt }], now))
+      .toBe(PUBLIC_LIVE_POLL_INTERVAL_MS);
+  });
+
   it('끝났거나 시각이 없거나 너무 오래 시작하지 않은 경기는 멈춘다', () => {
     expect(publicLivePollDelay('ended', scheduledAt, at(0))).toBe(false);
     expect(publicLivePollDelay('cancelled', scheduledAt, at(0))).toBe(false);

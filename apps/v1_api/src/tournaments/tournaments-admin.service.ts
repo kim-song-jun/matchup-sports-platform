@@ -659,6 +659,11 @@ export class TournamentsAdminService {
     }
 
     await this.prisma.$transaction(async (tx) => {
+      // lineup만 저장하면 일반 필드 data가 비어 Prisma updateMany가 SQL 없이 count=0을
+      // 반환한다. 이 경우에도 실제 CAS 쓰기를 수행하고 기존 버전보다 새 버전을 발행한다.
+      if (Object.keys(data).length === 0) {
+        data.updatedAt = new Date(Math.max(Date.now(), casBaseline.getTime() + 1));
+      }
       // 원자적 CAS 시행부 — where절의 updatedAt이 그 사이 이미 바뀌었으면 count가 0이라
       // "쓴 줄 없음"으로 걸린다. 이게 X03(관리자 두 명 동시 편집 시 나중 저장이 CAS 충돌
       // 경고 없이 앞선 저장을 조용히 덮어쓰던 결함)의 근본 수정이다. updateMany는 갱신된

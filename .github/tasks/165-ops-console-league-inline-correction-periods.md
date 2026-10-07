@@ -213,5 +213,15 @@
 - [x] 현재 고정한 설정의 종목/이름 계열에서 버전을 재사용·생성하고, 읽기 catalog 정규화가 버전 쓰기의 부재 의미를 바꾸지 않도록 수정. 명시적으로 잘못된 catalog는 계속 거절한다. 피리어드 버전 쓰기도 같은 원칙 적용.
 - [x] 서비스·config 관련 단위6파일140건 PASS(5파일132건 + validator8건, 직렬), API TypeScript PASS. 기존 v1 키 부재의 재검증과 명시 빈 포지션 거절 단언 포함.
 - [x] HTTP/DB 회귀에 named config 등록·pin → 동일 재저장2회 → 실제 교체 변경, catalog 부재 설정의 피리어드 변경 → 동일 라인업 재저장을 추가.
-- [ ] 이 후속 수정 committed-tree 검증·일반 push·최신 CI의 실제 PostgreSQL 회귀 확인 후 새 head 정식 재리뷰.
+- [x] 계열/catalog 수정 `3c156ee68` committed-tree 단위 회귀·타입 검사·일반 push·32/32파일 정식 재리뷰 완료. 최신 PostgreSQL CI의 lineup-only409 실패는 아래 후속 항목에서 추적한다.
 - Acceptance Criteria: 현재 계열의 동일 content는 현재 pin을 재사용한다. 실제 lineup/periods 변경도 원본 계열과 catalog 키 부재를 유지하고, 기존 읽기 정규화·권한·CAS·불변 버전·감사로그 계약을 보존한다.
+
+### PR #1642 lineup-only 저장 CAS 후속 검증
+
+- Owned files: `apps/v1_api/src/tournaments/tournaments-admin.service.ts`, 기존 `tournament-draft-period-resave.e2e-spec.ts`, API 도메인 문서, 이 task 문서. 작성자 변경·다른 작업트리 보존, 병렬 에이전트 없음.
+- [x] head3c156ee68의 실제 PostgreSQL CI에서 catalog=false 기간 변경 후 lineup-only 재저장이409인 RED 확인. 정식 리뷰5437515161 게시. Prisma6.19.2의 빈 updateMany는 SQL 없이 count=0을 반환하는 엔진 동작과 대조했다.
+- [x] 일반 필드가 비어도 기존 버전보다 새 updatedAt을 쓰는 원자적 CAS를 수행한다. count=0 경합·권한·감사 로그를 그대로 유지한다.
+- [x] 기존 HTTP/DB 회귀에서 제목 동반 저장을 제거해 동일 lineup 재저장과 실제 lineup 변경을 검증하고, 반환 버전/DB 일치·이전 버전409을 단언한다.
+- [x] 관련 서비스 단위85건·API TypeScript PASS. 단위 mock 통과를 실제 DB HTTP GREEN으로 간주하지 않는다.
+- [ ] committed-tree 좁은 검증·일반 push·최신 PostgreSQL CI GREEN과 정식 재리뷰. 이 체크는 alpha QA 완료를 뜻하지 않는다.
+- Validation limitation: 로컬 Docker 접근 부재. 외부 임시 SQLite 진단도 schema engine 오류로 실행되지 않아 성공 근거로 사용하지 않았다. 실제 DB GREEN은 새 head CI로 확인한다.

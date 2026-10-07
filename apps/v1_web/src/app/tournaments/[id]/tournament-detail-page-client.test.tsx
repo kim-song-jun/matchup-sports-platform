@@ -73,6 +73,7 @@ function makeTournament(overrides: Partial<V1TournamentDetail> = {}): V1Tourname
     genderMinFemale: null,
     genderMaxFemale: null,
     entryFee: 0,
+    entryFeeConfigured: true,
     prizePool: null,
     prizeSummary: null,
     prizeBreakdown: null,
@@ -169,6 +170,7 @@ describe('TournamentDetailPageClient GA events', () => {
       data: makeTournament({
         status: 'in_progress',
         kind: 'regular_league',
+        entryFeeConfigured: false,
         registrationDeadlineAt: '2099-08-10T14:59:00.000Z',
         confirmedCount: 8,
         teamCount: 8,
@@ -189,6 +191,50 @@ describe('TournamentDetailPageClient GA events', () => {
     expect(within(rail).queryByText('정원')).not.toBeInTheDocument();
     expect(within(rail).queryByText('참가비')).not.toBeInTheDocument();
     expect(screen.queryByRole('complementary', { name: '참가 신청' })).not.toBeInTheDocument();
+  });
+
+  describe('참가비 표시 — 설정된 리그만 그린다', () => {
+    function renderTournament(overrides: Partial<V1TournamentDetail>) {
+      tournamentApiMocks.useV1Tournament.mockReturnValue({
+        data: makeTournament(overrides),
+        isLoading: false,
+        isError: false,
+        error: null,
+        refetch: vi.fn(),
+      });
+      render(<TournamentDetailPageClient tournamentId="tournament-1" />);
+    }
+
+    it.each([
+      ['신청 접수 중', 'open'],
+      ['진행 중', 'in_progress'],
+    ] as const)('미설정 리그(%s)는 화면 어디에도 참가비와 "무료"를 그리지 않는다', async (_label, status) => {
+      renderTournament({ kind: 'regular_league', status, entryFee: 0, entryFeeConfigured: false });
+
+      await screen.findByRole('heading', { level: 1, name: '테스트 대회' });
+      expect(screen.queryByText('참가비')).not.toBeInTheDocument();
+      expect(screen.queryByText('무료')).not.toBeInTheDocument();
+    });
+
+    it('설정된 리그는 0원이면 "무료", 금액이 있으면 금액을 그린다', async () => {
+      renderTournament({ kind: 'regular_league', status: 'open', entryFee: 0, entryFeeConfigured: true });
+      await screen.findByRole('heading', { level: 1, name: '테스트 대회' });
+      expect(screen.getAllByText('참가비').length).toBeGreaterThan(0);
+      expect(screen.getAllByText('무료').length).toBeGreaterThan(0);
+    });
+
+    it('설정된 유료 리그는 금액을 그린다', async () => {
+      renderTournament({ kind: 'regular_league', status: 'open', entryFee: 50000, entryFeeConfigured: true });
+      await screen.findByRole('heading', { level: 1, name: '테스트 대회' });
+      expect(screen.getAllByText('50,000원').length).toBeGreaterThan(0);
+      expect(screen.queryByText('무료')).not.toBeInTheDocument();
+    });
+
+    it('대조군: 대회는 참가비를 그대로 그린다 (무료·유료)', async () => {
+      renderTournament({ kind: 'regular_tournament', status: 'open', entryFee: 20000, entryFeeConfigured: true });
+      await screen.findByRole('heading', { level: 1, name: '테스트 대회' });
+      expect(screen.getAllByText('20,000원').length).toBeGreaterThan(0);
+    });
   });
 });
 

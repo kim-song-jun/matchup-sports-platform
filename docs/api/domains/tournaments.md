@@ -215,6 +215,10 @@ Tournament promo cards are separate from prize fields and from the normal tourna
 
 Tournament announcement `audience` values are `public`, `all_registered`, `confirmed_only`, and `waitlist`. `public` means the announcement is visible on public tournament detail to logged-out users as soon as it is published. Public tournament detail (`GET /api/v1/tournaments/:tournamentId`) returns only announcements where `audience=public` and `publishedAt` is not null; team-scoped announcement values are retained for admin operations and targeted follow-up delivery.
 
+## Entry fee configured flag
+
+The list (`GET /api/v1/tournaments`) and detail (`GET /api/v1/tournaments/:tournamentId`) responses include `entryFeeConfigured: boolean`. For regular leagues it is `entryFeeConfiguredAt != null` — `false` means the fee has not been set yet and clients must not show `entryFee: 0` as "무료". For regular tournaments it is always `true`. `entryFee` keeps its numeric type, and bank account fields are not part of either response. Registration screens read the amount from the registration's own `payment.amount` (the snapshot at submit time), not from the tournament's current `entryFee`.
+
 ## Registration Endpoints
 
 | Method | Path | Auth | Request | Response |

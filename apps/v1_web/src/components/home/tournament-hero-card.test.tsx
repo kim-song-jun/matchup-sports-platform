@@ -10,6 +10,7 @@ function promo(id: string, priority: number, enabled = true): V1TournamentListIt
     title: id,
     status: 'open',
     kind: 'regular_tournament',
+    entryFeeConfigured: true,
     format: 'knockout',
     registrationDeadlineAt: null,
     scheduledAt: '2026-10-07T09:00:00.000Z',

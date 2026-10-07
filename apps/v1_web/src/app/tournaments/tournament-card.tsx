@@ -209,12 +209,14 @@ export function TournamentCard({
         <div style={{ flex: 1 }} aria-hidden="true" />
 
         <div className={styles.footer} data-testid="tournament-card-footer">
-          <div className={styles.price}>
-            <span className={`tm-text-caption ${styles.muted}`}>참가비</span>
-            <strong className={`tm-text-body tab-num ${styles.amount}`}>
-              {formatEntryFee(item.entryFee)}
-            </strong>
-          </div>
+          {item.kind === 'regular_league' && !item.entryFeeConfigured ? null : (
+            <div className={styles.price}>
+              <span className={`tm-text-caption ${styles.muted}`}>참가비</span>
+              <strong className={`tm-text-body tab-num ${styles.amount}`}>
+                {formatEntryFee(item.entryFee)}
+              </strong>
+            </div>
+          )}
           <div className={styles.capacity}>
             <span className={`tm-text-label tab-num ${styles.summary}`}>
               {capacity

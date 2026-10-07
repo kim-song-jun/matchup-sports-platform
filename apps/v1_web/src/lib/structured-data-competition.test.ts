@@ -29,6 +29,18 @@ describe('buildLeagueEventLd', () => {
     expect(ld).toMatchObject({ startDate: league.startsOn, endDate: league.endsOn });
   });
 
+  it('대표 이미지는 절대 URL 로 싣고, 없으면 image 키 자체를 넣지 않는다', () => {
+    const withCover = buildLeagueEventLd({ ...league, coverImageUrl: '/uploads/2026/10/cover.webp' }, null);
+    expect(withCover.image).toBe('https://teameet.co.kr/uploads/2026/10/cover.webp');
+
+    // 이미 절대 URL 이면 그대로 둔다(대조).
+    expect(buildLeagueEventLd({ ...league, coverImageUrl: 'https://cdn.example.com/a.png' }, null).image).toBe(
+      'https://cdn.example.com/a.png',
+    );
+
+    expect(buildLeagueEventLd({ ...league, coverImageUrl: null }, null)).not.toHaveProperty('image');
+  });
+
   it('순위표가 없거나 비어 있으면 참가 팀을 지어내지 않는다', () => {
     expect(buildLeagueEventLd(league, null)).not.toHaveProperty('competitor');
     expect(buildLeagueEventLd(league, { standings: [] } as unknown as V1LeagueStandingsResponse)).not.toHaveProperty('competitor');
@@ -73,5 +85,36 @@ describe('리그 대진 LD (buildTeamMatchEventLd + path 옵션)', () => {
     expect(ld?.['@id']).toBe('https://teameet.co.kr/league-matches/lg1/fixtures/f9#event');
     expect(ld?.superEvent).toEqual({ '@id': buildLeagueEventLd(league, null)['@id'] });
     expect(buildTeamMatchEventLd(teamMatch, 'f9')?.['@id']).toBe('https://teameet.co.kr/team-matches/f9#event');
+  });
+});
+
+describe('buildSportsEventLd — 참가비 미설정 리그 게이트', () => {
+  const event = (over: Partial<V1TournamentDetail>) => buildSportsEventLd({
+    id: 'x1', title: '송파 풋살 리그', scheduledAt: '2026-10-03T01:00:00.000Z', status: 'open',
+    sport: { code: 'futsal', name: '풋살' }, kind: 'regular_league', entryFee: 0, entryFeeConfigured: false,
+    registrationDeadlineAt: null, coverImageUrl: null,
+    ...over,
+  } as V1TournamentDetail);
+
+  it('미설정 리그는 무료도 가격도 말하지 않는다', () => {
+    const ld = event({});
+
+    expect(ld).not.toHaveProperty('offers');
+    expect(ld).not.toHaveProperty('isAccessibleForFree');
+  });
+
+  it('참가비를 확정한 리그는 0원이면 무료, 유료면 가격을 싣는다', () => {
+    expect(event({ entryFeeConfigured: true })).toMatchObject({ isAccessibleForFree: true, offers: { price: 0 } });
+    expect(event({ entryFeeConfigured: true, entryFee: 70000 })).toMatchObject({
+      isAccessibleForFree: false,
+      offers: { price: 70000 },
+    });
+  });
+
+  it('대회는 entryFeeConfigured 와 무관하게 현행대로 가격을 싣는다', () => {
+    expect(event({ kind: 'regular_tournament', entryFee: 0 })).toMatchObject({
+      isAccessibleForFree: true,
+      offers: { price: 0 },
+    });
   });
 });

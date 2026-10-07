@@ -3500,6 +3500,8 @@ export type V1TournamentListItem = {
   seriesId?: string | null;
   genderCategory: V1TournamentGenderCategory | null;
   entryFee: number;
+  /** 리그가 아니면 항상 true. 리그는 운영자가 참가비를 확정했을 때만 true — false 면 참가비를 그리지 않는다. */
+  entryFeeConfigured: boolean;
   prizePool: number | null;
   prizeSummary: string | null;
   prizeBreakdown: string | null;
@@ -3853,6 +3855,8 @@ export type V1TournamentDetail = {
   genderMinFemale: number | null;
   genderMaxFemale: number | null;
   entryFee: number;
+  /** 리그가 아니면 항상 true. 리그는 운영자가 참가비를 확정했을 때만 true — false 면 참가비를 그리지 않는다. */
+  entryFeeConfigured: boolean;
   prizePool: number | null;
   prizeSummary: string | null;
   prizeBreakdown: string | null;

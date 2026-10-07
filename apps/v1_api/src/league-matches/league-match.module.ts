@@ -8,6 +8,9 @@ import { V1AuthGuard } from '../auth/v1-auth.guard';
 // 리그 경기 영상(대회 영상의 팀매치 판) — 다른 컨트롤러들과 같은 이유로 별도 파일 등록.
 import { LeagueFixtureVideosController } from './league-fixture-videos.controller';
 import { LeagueFixtureVideosService } from './league-fixture-videos.service';
+import { LeagueCoverImageService } from './league-cover-image.service';
+import { LeagueEntryFeeController } from './league-entry-fee.controller';
+import { LeagueEntryFeeService } from './league-entry-fee.service';
 import { LeagueMatchAdminController } from './league-match-admin.controller';
 import { LeagueMatchAdminService } from './league-match-admin.service';
 // D2: 리그 결과 이의 제기(팀) + 수락/거부(운영자). LeagueMatchForfeitController/-Service와
@@ -16,6 +19,8 @@ import { LeagueMatchForfeitController } from './league-match-forfeit.controller'
 import { LeagueMatchForfeitService } from './league-match-forfeit.service';
 import { LeagueMatchPublicController } from './league-match-public.controller';
 import { LeagueMatchPublicService } from './league-match-public.service';
+import { LeagueMatchSettingsController } from './league-match-settings.controller';
+import { LeagueRegistrationCloseService } from './league-registration-close.service';
 import { LeagueSeriesAdminController } from './league-series-admin.controller';
 import { LeagueSeriesAdminService } from './league-series-admin.service';
 
@@ -30,6 +35,9 @@ import { LeagueSeriesAdminService } from './league-series-admin.service';
   imports: [AdminContextModule, GamesModule, NotificationsModule, UploadsModule],
   controllers: [
     LeagueMatchAdminController,
+    // 신청 마감·대표 이미지·참가비 — 서비스가 league-match-admin.service 밖에 있어 컨트롤러도 따로 둔다.
+    LeagueEntryFeeController,
+    LeagueMatchSettingsController,
     // #750 후속 등록 — import 구문만 있고 이 배열에 빠져 있어 라우트가 404 였다(alpha 실측).
     LeagueFixtureVideosController,
     LeagueMatchForfeitController,
@@ -37,10 +45,13 @@ import { LeagueSeriesAdminService } from './league-series-admin.service';
     LeagueSeriesAdminController,
   ],
   providers: [
+    LeagueCoverImageService,
+    LeagueEntryFeeService,
     LeagueFixtureVideosService,
     LeagueMatchAdminService,
     LeagueMatchForfeitService,
     LeagueMatchPublicService,
+    LeagueRegistrationCloseService,
     LeagueSeriesAdminService,
     OptionalV1AuthGuard,
     V1AuthGuard,

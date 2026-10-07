@@ -787,3 +787,30 @@ describe('RegistrationsTab — 전체 명단 CSV', () => {
     expect(mutate).not.toHaveBeenCalled();
   });
 });
+
+describe('RegistrationsTab — 신청 행의 팀별 금액', () => {
+  it('각 행은 자기 신청의 payment.amount 를 그린다 — 다른 행의 금액이나 현재 참가비가 아니다', () => {
+    const pay = (amount: number) => ({ method: 'bank_transfer', status: 'ready', amount }) as unknown as V1AdminTournamentRegistration['payment'];
+    const mutate = vi.fn();
+    for (const hook of [useV1ConfirmPaymentMock, useV1ConfirmRegistrationMock, useV1CancelRegistrationAdminMock,
+      useV1RejectCancelRequestMock, useV1RosterLockMock, useV1RosterUnlockMock, useV1ExportRosterCsvMock,
+      useV1ExportTournamentRosterCsvMock, useV1RosterDeadlineOverrideGrantMock, useV1RosterDeadlineOverrideRevokeMock,
+      useV1UpdatePlayerEligibilityMock, useV1AdminAddPlayerMock, useV1AdminRemovePlayerMock] as const) {
+      (hook as unknown as { mockReturnValue: (value: unknown) => void }).mockReturnValue({ mutate, isPending: false });
+    }
+    useV1AdminTournamentPlayersMock.mockReturnValue({ data: { players: [] }, isPending: false, isError: false } as unknown as ReturnType<typeof useV1AdminTournamentPlayers>);
+    useV1AdminRosterEligibleMembersMock.mockReturnValue({ data: { members: [] }, isPending: false, isError: false } as unknown as ReturnType<typeof useV1AdminRosterEligibleMembers>);
+    const items = [
+      baseRegistration({ id: 'reg-a', teamName: '전 금액 FC', payment: pay(70000) }),
+      baseRegistration({ id: 'reg-b', teamId: 'team-b', teamName: '후 금액 FC', payment: pay(80000) }),
+    ];
+    useV1AdminTournamentRegistrationsMock.mockReturnValue({ data: { items, truncated: false }, isPending: false, isError: false, error: null, refetch: vi.fn() } as unknown as ReturnType<typeof useV1AdminTournamentRegistrations>);
+    render(<RegistrationsTab tournamentId="league-1" canWrite requireCancelReason showToast={vi.fn()} />);
+    const [rowA, rowB] = screen.getAllByRole('listitem');
+    expect(rowA).toHaveTextContent('전 금액 FC');
+    expect(rowA).toHaveTextContent('70,000');
+    expect(rowA).not.toHaveTextContent('80,000');
+    expect(rowB).toHaveTextContent('80,000');
+    expect(rowB).not.toHaveTextContent('70,000');
+  });
+});

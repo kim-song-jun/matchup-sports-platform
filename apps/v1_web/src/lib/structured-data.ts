@@ -46,7 +46,7 @@ export type JsonLdNode = Record<string, unknown>;
  * 우리가 직접 넣는 값이라 그 보정을 받지 못한다 — 상대 경로로 나가면 크롤러가 이미지를
  * 해석하지 못할 수 있다.
  */
-function absoluteImageUrl(value: string): string {
+export function absoluteImageUrl(value: string): string {
   return /^https?:\/\//i.test(value) ? value : absoluteSiteUrl(value);
 }
 
@@ -138,8 +138,10 @@ export function buildSportsEventLd(
     eventAttendanceMode: 'https://schema.org/OfflineEventAttendanceMode',
     inLanguage: 'ko-KR',
     organizer: { '@id': organizationId() },
-    isAccessibleForFree: tournament.entryFee === 0,
   };
+  // 참가비를 정하지 않은 리그는 '무료'도 가격도 말하지 않는다 — 화면이 숨기는 값을 LD 가 내보내면 안 된다.
+  const feeUnset = tournament.kind === 'regular_league' && !tournament.entryFeeConfigured;
+  if (!feeUnset) node.isAccessibleForFree = tournament.entryFee === 0;
 
   if (tournament.scheduledEndAt) node.endDate = tournament.scheduledEndAt;
 
@@ -154,17 +156,19 @@ export function buildSportsEventLd(
 
   // 참가비는 화면(참가 안내)에 그대로 노출되는 값이다. 무료 대회도 price 0으로 명시해야
   // 답변엔진이 "참가비 얼마"라는 질문에 이 페이지를 근거로 쓸 수 있다.
-  node.offers = {
-    '@type': 'Offer',
-    price: tournament.entryFee,
-    priceCurrency: 'KRW',
-    url,
-    availability:
-      tournament.status === 'open'
-        ? 'https://schema.org/InStock'
-        : 'https://schema.org/SoldOut',
-    ...(tournament.registrationDeadlineAt ? { validThrough: tournament.registrationDeadlineAt } : {}),
-  };
+  if (!feeUnset) {
+    node.offers = {
+      '@type': 'Offer',
+      price: tournament.entryFee,
+      priceCurrency: 'KRW',
+      url,
+      availability:
+        tournament.status === 'open'
+          ? 'https://schema.org/InStock'
+          : 'https://schema.org/SoldOut',
+      ...(tournament.registrationDeadlineAt ? { validThrough: tournament.registrationDeadlineAt } : {}),
+    };
+  }
 
   // 참가 팀 수는 화면에 노출되지만 LD 에는 싣지 않는다 — `maximumAttendeeCapacity` 는
   // '최대 참석 인원(개인)'을 뜻해서 팀 수를 넣으면 값의 의미가 어긋난다. 팀 수를 담을

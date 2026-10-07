@@ -23,6 +23,7 @@ import {
 } from '@/hooks/use-v1-api';
 import { extractErrorMessage } from '@/lib/error-message';
 import { formatEntryFee, formatTournamentDateRangeMedium } from '@/lib/date-utils';
+import { resolveRegistrationAmount } from '@/lib/tournament-registration-amount';
 import {
   filterTournamentTeamsBySport,
   getTournamentTeamEmptyState,
@@ -80,16 +81,15 @@ function paymentSummaryLabel(method: V1TournamentPaymentMethod, isFreeEntry: boo
 }
 
 /**
- * 목록 카드 메타에 붙일 결제 조각. **무료 대회에서는 빈 문자열** — 결제 수단도 상태도 안 붙인다.
+ * 목록 카드 메타에 붙일 결제 조각. **0원 신청에서는 빈 문자열**(행마다 그 신청의 금액으로 판정) — 결제 수단도 상태도 안 붙인다.
  *
  * "무료" 로만 바꾸면 뒤에 상태가 따라붙어 **"무료 · 결제 완료"** 가 된다. 내지도 않은 돈이
  * "완료" 됐다는 말이라 참가자에게 의미가 없다. 참가 확정 여부는 같은 카드의 상태 배지가 말한다.
  */
 function paymentMetaSuffix(
-  payment: { method: V1TournamentPaymentMethod; status: string } | null | undefined,
-  isFreeEntry: boolean,
+  payment: { method: V1TournamentPaymentMethod; status: string; amount: number } | null | undefined,
 ): string {
-  if (isFreeEntry || !payment) return '';
+  if (!payment || payment.amount === 0) return '';
   return ` · ${paymentMethodLabel(payment.method)} · ${paymentStatusLabel(payment.status)}`;
 }
 
@@ -688,10 +688,14 @@ function RegistrationDetailView({
     belowMinimum &&
     isRosterEditable;
 
+  /* 이 신청의 금액 — 참가비가 바뀌어도 신청 당시 금액(payment.amount)을 보인다. */
+  const registeredAmount = resolveRegistrationAmount(registration, tournament);
+  const isFreeRegistration = registeredAmount === 0;
+
   /* Compact payment summary for the pass facts (full breakdown lives in the 신청 내역 card). */
   const paymentSummary = registration.payment
     ? `${formatEntryFee(registration.payment.amount)} · ${paymentStatusLabel(registration.payment.status)}`
-    : formatEntryFee(tournament.entryFee);
+    : formatEntryFee(registeredAmount);
 
   /* The pass owns the roster glance+action for active states; the standalone roster
    * card only renders for states without a pass (e.g. awaiting_payment). */
@@ -709,7 +713,7 @@ function RegistrationDetailView({
     registration.status === 'cancel_requested'
       ? '취소 요청을 검토 중이에요. 처리 결과를 안내받기 전에는 추가 입금을 하지 마세요.'
       : registration.status === 'payment_checking'
-        ? tournament.entryFee === 0
+        ? isFreeRegistration
           ? '신청이 접수됐어요. 운영자가 선수 명단과 참가 조건을 확인하고 있어요.'
           : '입금이 확인됐어요. 운영자가 선수 명단과 참가 조건을 확인하고 있어요.'
         : registration.status === 'awaiting_payment'
@@ -1012,7 +1016,7 @@ function RegistrationDetailView({
                     <div style={{ display: 'flex', flexDirection: 'column' }}>
                       <InfoRow
                         label="결제 수단"
-                        value={paymentSummaryLabel(registration.payment.method, tournament.entryFee === 0)}
+                        value={paymentSummaryLabel(registration.payment.method, isFreeRegistration)}
                       />
                       <InfoRow label="결제 금액" value={formatEntryFee(registration.payment.amount)} />
                       <InfoRow
@@ -1043,7 +1047,7 @@ function RegistrationDetailView({
                     <div style={{ display: 'flex', flexDirection: 'column' }}>
                       <InfoRow
                         label="참가비"
-                        value={formatEntryFee(tournament.entryFee)}
+                        value={formatEntryFee(registeredAmount)}
                         isLast={!registration.depositorName && registration.status !== 'awaiting_payment'}
                       />
                       {registration.depositorName ? (
@@ -1155,65 +1159,6 @@ function RegistrationDetailView({
         error={cancelError}
       />
     </>
-  );
-}
-
-function MyRegistrationsList({
-  tournamentId,
-  registrations,
-  isFreeEntry,
-}: {
-  tournamentId: string;
-  registrations: V1TournamentRegistration[];
-  isFreeEntry: boolean;
-}) {
-  return (
-    <div style={{ padding: '0 20px 120px', marginTop: 16 }}>
-      <div style={{ marginLeft: -20, marginRight: -20 }}>
-        <SectionTitle title="팀별 신청 내역" />
-      </div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 8 }}>
-        {registrations.map((registration) => {
-          const status = registrationStatusConfig(registration.status);
-          const href = appRoute(`/tournaments/${tournamentId}/my?reg=${registration.id}`);
-          const teamName = registration.teamName ?? `팀 ${registration.teamId.slice(0, 8)}`;
-          const primaryAction = registration.status === 'draft' ? '이어서 작성' : '상세 보기';
-          return (
-            <Link key={registration.id} href={href} style={{ display: 'block', textDecoration: 'none' }}>
-              <Card pad={16}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <div style={{ minWidth: 0, flex: 1 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                      <span
-                        className="tm-text-label"
-                        style={{
-                          color: 'var(--text-strong)',
-                          fontWeight: 700,
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          whiteSpace: 'nowrap',
-                        }}
-                      >
-                        {teamName}
-                      </span>
-                      <span className={`tm-badge ${status.badgeClass}`}>{status.label}</span>
-                    </div>
-                    <div className="tm-text-caption" style={{ color: 'var(--text-muted)', marginTop: 8 }}>
-                      선수 {registration.playerCount}명
-                      {paymentMetaSuffix(registration.payment, isFreeEntry)}
-                    </div>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--text-muted)' }}>
-                    <span className="tm-text-caption">{primaryAction}</span>
-                    <ChevronRight size={16} />
-                  </div>
-                </div>
-              </Card>
-            </Link>
-          );
-        })}
-      </div>
-    </div>
   );
 }
 
@@ -1351,7 +1296,7 @@ function TeamRegistrationHub({
             const reapplyBlockedNote =
               registration?.status === 'cancelled' && blockMessage ? ` · ${blockMessage}` : '';
             const meta = registration
-              ? `선수 ${registration.playerCount}명${paymentMetaSuffix(registration.payment, isFreeEntry)}${reapplyBlockedNote}`
+              ? `선수 ${registration.playerCount}명${paymentMetaSuffix(registration.payment)}${reapplyBlockedNote}`
               : canStartNewRegistration
                 ? '아직 이 팀으로 신청하지 않았어요'
                 : blockMessage ?? '현재 새 신청을 받을 수 없어요';

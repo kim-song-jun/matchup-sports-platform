@@ -115,6 +115,7 @@ function makeCompletedTournament(overrides: Partial<V1TournamentDetail> = {}): V
     genderMinFemale: null,
     genderMaxFemale: null,
     entryFee: 0,
+    entryFeeConfigured: true,
     prizePool: null,
     prizeSummary: null,
     prizeBreakdown: null,

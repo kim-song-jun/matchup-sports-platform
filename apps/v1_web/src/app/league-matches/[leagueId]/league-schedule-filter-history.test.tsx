@@ -42,7 +42,7 @@ const league = {
   startsOn: '2020-01-01T00:00:00Z', endsOn: '2020-02-01T00:00:00Z',
   teamIds: ['synthetic-home', 'synthetic-away'], fixtures: [fixture],
   seriesId: null, tier: null, tierLabel: null, seasonNo: null, seriesSiblings: [],
-  registrationOpen: false, registrationDeadlineAt: null,
+  registrationOpen: false, sportCode: 'futsal', coverImageUrl: null, entryFee: 0, entryFeeConfigured: false, registrationDeadlineAt: null,
 };
 vi.mock('@/hooks/use-v1-api', () => ({
   useV1LeagueMatch: () => ({

@@ -158,6 +158,7 @@ function makeTournament(
     genderMinFemale: null,
     genderMaxFemale: null,
     entryFee: 0,
+    entryFeeConfigured: true,
     prizePool: null,
     prizeSummary: null,
     prizeBreakdown: null,
@@ -1036,6 +1037,8 @@ describe('TournamentDetailView — 정규 리그 거울 행', () => {
       // 거울 행은 format 을 쓰지 않아 스키마 기본값이 남는다 — 종류는 kind 가 말한다.
       format: 'group_knockout',
       kind: 'regular_league',
+      // 미설정 리그 — 서버는 entryFee=0 과 함께 false 를 내린다.
+      entryFeeConfigured: false,
       groups: [],
       fixtures: [],
       leagueFixtures: [
@@ -1119,6 +1122,13 @@ describe('TournamentDetailView — 정규 리그 거울 행', () => {
     render(createElement(TournamentDetailView, { tournament: makeMirror(), myRegistration: null }));
     await screen.findByText('통합 순위');
     expect(screen.queryByText('참가비')).toBeNull();
+  });
+
+  it('운영자가 참가비를 확정한 리그에는 0원도 무료로 적는다 — 대조군', async () => {
+    vi.mocked(v1Get).mockResolvedValueOnce(standingsResponse);
+    render(createElement(TournamentDetailView, { tournament: makeMirror({ entryFeeConfigured: true, entryFee: 0 }), myRegistration: null }));
+    await screen.findByText('통합 순위');
+    expect(screen.getAllByText('참가비').length).toBeGreaterThan(0);
   });
 
   it('대회 상세에는 참가비를 적는다 — 대조군', () => {

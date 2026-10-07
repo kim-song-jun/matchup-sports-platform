@@ -17,6 +17,7 @@ import {
   syncTeamMatchScheduleInTx,
 } from '../team-schedules/team-schedules.service';
 import { scheduleLeagueResultEntryReminder } from '../jobs/league-reminders/league-result-entry-reminder.service';
+import { countLeagueActiveRegistrations, countLeagueConfirmedApplications } from './league-active-registration';
 import { LeagueCompletionProjectionService } from './league-completion-projection.service';
 import {
   STATUS_BY_LEAGUE_STATE,
@@ -409,6 +410,16 @@ export class LeagueMatchAdminService {
       // 하므로 0 으로 뭉개지 않고 그대로 내린다.
       yellowAccumulationLimit: league.yellowAccumulationLimit,
       redCardSuspensionMatches: league.redCardSuspensionMatches,
+      sportCode: league.sportCode,
+      coverImageUrl: league.coverImageUrl,
+      entryFee: league.entryFee,
+      entryFeeConfiguredAt: league.entryFeeConfiguredAt,
+      bankName: league.bankName,
+      bankAccount: league.bankAccount,
+      bankHolder: league.bankHolder,
+      // 화면 힌트 — 사유 필수의 최종 판정은 참가비 저장 트랜잭션의 쓰기 후 카운트가 한다.
+      activeRegistrationCount: await countLeagueActiveRegistrations(this.prisma, leagueId),
+      confirmedRegistrationCount: await countLeagueConfirmedApplications(this.prisma, leagueId),
       teamIds,
       recentVenues,
       fixtures: fixtures.map((fixture) => {
@@ -1776,6 +1787,14 @@ export class LeagueMatchAdminService {
         // 있다. 둘 다 null 이면 이 리그에는 규정이 적용되지 않는다.
         yellowAccumulationLimit: true,
         redCardSuspensionMatches: true,
+        // 대표 이미지·참가비 카드용(어드민 응답 전용 — 계좌는 공개 서비스에서 절대 select 하지 않는다).
+        coverImageUrl: true,
+        entryFee: true,
+        entryFeeConfiguredAt: true,
+        bankName: true,
+        bankAccount: true,
+        bankHolder: true,
+        sport: { select: { code: true } },
         // 거울이 `startsOn` 을 여기 담는다(leagueMirrorCreateData).
         scheduledAt: true,
         registrations: {
@@ -1800,10 +1819,12 @@ export class LeagueMatchAdminService {
     }
     // 호출부는 `league.teams`·`league.state`·`league.startsOn` 을 그대로 쓴다 — 이름과
     // 값만 맞춰 돌려주고 응답 계약은 건드리지 않는다(BE-5 는 저장소 축만 옮긴다).
-    const { registrations, scheduledAt, status, regionId, ...rest } = league;
+    const { registrations, scheduledAt, status, regionId, sport, entryFeeConfiguredAt, ...rest } = league;
     return {
       ...rest,
       regionId,
+      sportCode: sport.code,
+      entryFeeConfiguredAt: entryFeeConfiguredAt?.toISOString() ?? null,
       state: LEAGUE_STATE_BY_STATUS[status],
       startsOn: scheduledAt,
       teams: registrations,

@@ -175,6 +175,16 @@ describe('buildTournamentDescription', () => {
     expect(buildTournamentDescription({ ...open, kind: 'regular_league' })).toContain('풋살 리그 방식');
   });
 
+  it('미설정 리그의 설명에는 참가비를 적지 않고, 설정된 리그·대회는 그대로 적는다', () => {
+    const league = { ...open, kind: 'regular_league' } as typeof open;
+    const unset = buildTournamentDescription({ ...league, entryFee: 0, entryFeeConfigured: false });
+    expect(unset).not.toContain('참가비');
+    expect(unset).toContain('풋살 리그 방식 · 20팀 중 14팀 확정');
+    expect(buildTournamentDescription({ ...league, entryFee: 0, entryFeeConfigured: true })).toContain('참가비 무료');
+    expect(buildTournamentDescription({ ...league, entryFee: 50000, entryFeeConfigured: true })).toContain('참가비 50,000원');
+    expect(buildTournamentDescription({ ...open, entryFeeConfigured: true })).toContain('참가비 300,000원');
+  });
+
   it('이모지뿐인 짧은 소개는 버리고, 충분한 소개는 사실 뒤에 잇되 155자에서 자른다', () => {
     expect(buildTournamentDescription({ ...open, promoListSubtitle: '⚽️ 5대5 ⚽️' })).not.toContain('⚽');
     const long = buildTournamentDescription({ ...open, promoListSubtitle: '비선출 남성 동호인을 위한 가을 정규 대회로 조별 예선 뒤 상위 팀이 결선 토너먼트에 오릅니다 '.repeat(3) });

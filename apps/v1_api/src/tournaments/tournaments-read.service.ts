@@ -142,9 +142,7 @@ export class TournamentsReadService {
       ...(query.genderCategory ? { genderCategory: query.genderCategory } : {}),
     };
 
-    if (query.kind !== undefined && query.kind !== 'tournament') {
-      where.AND = [...(Array.isArray(where.AND) ? where.AND : where.AND ? [where.AND] : []), PUBLIC_TOURNAMENT_VISIBILITY_WHERE];
-    }
+    where.AND = [...(Array.isArray(where.AND) ? where.AND : where.AND ? [where.AND] : []), PUBLIC_TOURNAMENT_VISIBILITY_WHERE];
 
     // 전체 건수는 페이지 번호를 그릴 때만 센다 — 무한 스크롤은 "다음이 있는지"만 알면
     // 되므로 매 스크롤마다 COUNT 를 한 번 더 때릴 이유가 없다.

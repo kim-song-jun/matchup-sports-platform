@@ -155,6 +155,7 @@ describe('TournamentCampaignReadService', () => {
       tournament: {
         deletedAt: null,
         status: { in: ['open', 'closed', 'in_progress', 'completed'] },
+        isPublic: true,
       },
     });
     expect(query.select.tournament.select.bankAccount).toBeUndefined();
@@ -268,6 +269,7 @@ describe('TournamentCampaignReadService', () => {
         tournament: {
           deletedAt: null,
           status: { in: ['open', 'closed', 'in_progress', 'completed'] },
+          isPublic: true,
         },
       },
       select: { id: true },

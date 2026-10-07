@@ -3535,6 +3535,8 @@ export type V1Tournament = {
   id: string;
   sportId: string;
   title: string;
+  /** 관리자 응답에만 온다 — false 면 일반 사용자 화면(목록·검색·상세·기록)에서 숨겨져 있다. */
+  isPublic?: boolean;
   status: V1TournamentStatus;
   format: V1TournamentFormat;
   registrationDeadlineAt: string | null;

@@ -279,7 +279,7 @@ The service reads the selected member's profile and phone from the team membersh
 - `profile.birthDate`
 - `user.phone`
 
-If any required source field is missing, the API rejects the request with `400 PLAYER_REQUIRED_PROFILE_MISSING`.
+If any required source field is missing, the API rejects the request with `400 PLAYER_REQUIRED_PROFILE_MISSING`. The message names exactly the missing fields and where they are filled (for example `이 팀원의 프로필에 생년월일·휴대폰 번호가 없어 선수로 등록할 수 없어요. 팀원이 마이 > 프로필 수정에서 입력하면 등록할 수 있어요.`), and the candidate list reason is `<fields> 미입력`. `PLAYER_PHONE_NOT_VERIFIED` likewise tells the member to finish phone verification in profile edit.
 
 The stored roster snapshot uses the server-side member profile values for `realName`, `birthDateSnapshot`, and nullable `genderSnapshot`; clients must not treat editable form values as the source of truth. Gender accepts the profile contract values `male` and `female`. A `mixed` tournament requires a profile gender when a player is added; missing gender is rejected with `400 PLAYER_REQUIRED_PROFILE_MISSING`. Legacy or non-mixed roster snapshots may still be `null` and are shown as `미등록`.
 

@@ -2,7 +2,7 @@
 
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { v1Get } from '@/lib/api-client';
-import { PUBLIC_LIVE_POLL_INTERVAL_MS } from '@/lib/public-live-polling';
+import { PUBLIC_LIVE_POLL_INTERVAL_MS, publicLivePollDelay } from '@/lib/public-live-polling';
 import type {
   PublicMatchDetail,
   PublicTeamRecordsResponse,
@@ -47,7 +47,8 @@ export interface ScheduleFilters {
  * out of this lane's scope (rationale spelled out in
  * `docs/api/domains/public-records.md`'s "Lane 1 addition" section). Only
  * Schedule polling includes scheduled games and time-unset live games so kickoff is discovered
- * without reloading. Completed tournaments stop polling; match-detail polling remains live-only.
+ * without reloading. Completed tournaments stop polling. Match detail polls while live and, before
+ * kickoff, from 15 minutes before the scheduled time (publicLivePollDelay) so an open page finds kickoff.
  *
  * 주기 값과 그 근거(왜 10초인지, 관전자 수에 비례하는 부하 모델, 왜 이 값이
  * `useV1Tournament`와 반드시 같아야 하는지)는 `@/lib/public-live-polling`에 단일
@@ -105,7 +106,8 @@ export function usePublicMatch(
     // 서버 page 가 404 판정용으로 이미 받은 공개 응답 — 첫 화면(서버 HTML 포함)에 쓴다.
     placeholderData: options?.seed ?? undefined,
     retry: false,
-    refetchInterval: (query) => (query.state.data?.status === 'live' ? LIVE_POLL_INTERVAL_MS : false),
+    // 진행 중이면 10초, 시작 전이면 킥오프가 가까워질 때부터 — 시작 전에 열어 둔 화면도 시작을 스스로 발견한다.
+    refetchInterval: (query) => publicLivePollDelay(query.state.data?.status, query.state.data?.scheduledAt),
   });
 }
 
@@ -123,7 +125,7 @@ export function usePublicLeagueFixtureRecord(leagueId: string, teamMatchId: stri
     queryFn: () => v1Get<PublicMatchDetail>(`/league-matches/${leagueId}/fixtures/${teamMatchId}/record`),
     enabled: Boolean(leagueId) && Boolean(teamMatchId),
     retry: false,
-    refetchInterval: (query) => (query.state.data?.status === 'live' ? LIVE_POLL_INTERVAL_MS : false),
+    refetchInterval: (query) => publicLivePollDelay(query.state.data?.status, query.state.data?.scheduledAt),
   });
 }
 

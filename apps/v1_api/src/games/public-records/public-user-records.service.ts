@@ -11,6 +11,7 @@ import {
   isParticipantPubliclyEligible,
   loadParticipantConsentEligibility,
 } from './public-consent';
+import { PUBLIC_COMPETITION_TEAM_MATCH_WHERE, PUBLIC_TOURNAMENT_VISIBILITY_WHERE } from '../../tournaments/tournament-surface-lookup';
 
 interface EligibleResultRow {
   readonly participantResultId: string;
@@ -173,15 +174,7 @@ export class PublicUserRecordsService {
     const awards = await this.prisma.v1TournamentAward.findMany({
       where: {
         recipientUserId: userId,
-        tournament: {
-          is: {
-            OR: [
-              { kind: 'regular_tournament' },
-              { kind: null },
-              { kind: 'regular_league', isPublic: true },
-            ],
-          },
-        },
+        tournament: { is: PUBLIC_TOURNAMENT_VISIBILITY_WHERE },
       },
       orderBy: [{ tournament: { scheduledEndAt: 'desc' } }, { sortOrder: 'asc' }],
       select: {
@@ -246,9 +239,7 @@ export class PublicUserRecordsService {
           game: {
             sourceType: 'TEAM_MATCH',
             teamMatch: {
-              is: {
-                OR: [{ leagueId: null }, { league: { is: { isPublic: true } } }],
-              },
+              is: PUBLIC_COMPETITION_TEAM_MATCH_WHERE,
             },
           },
         },
@@ -482,7 +473,7 @@ export class PublicUserRecordsService {
         : this.prisma.v1Team.findMany({ where: { id: { in: teamIds } }, select: { id: true, name: true } }),
       tournamentIds.length === 0
         ? []
-        : this.prisma.v1Tournament.findMany({ where: { id: { in: tournamentIds } }, select: { id: true, title: true } }),
+        : this.prisma.v1Tournament.findMany({ where: { id: { in: tournamentIds }, ...PUBLIC_TOURNAMENT_VISIBILITY_WHERE }, select: { id: true, title: true } }),
       leagueIds.length === 0
         ? []
         : this.prisma.v1Tournament.findMany({

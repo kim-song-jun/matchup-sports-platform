@@ -50,6 +50,6 @@
   },
   "src/games/public-records/public-team-records.service.ts": {
     "allowed": 3,
-    "why": "Public team-record page, summary, and available-season queries join the regular-league parent to filter is_public in SQL before pagination or aggregation. This prevents hidden league fixtures from leaking titles/results or revealing their existence through totals and season options; each query is a read-only public parent filter."
+    "why": "Public team-record page, summary, and available-season queries join the parent competition (regular league via league_id, otherwise the tournament via tournament_id) to filter is_public in SQL before pagination or aggregation. This prevents hidden league/tournament fixtures from leaking titles/results or revealing their existence through totals and season options; each query is a read-only public parent filter."
   }
 }

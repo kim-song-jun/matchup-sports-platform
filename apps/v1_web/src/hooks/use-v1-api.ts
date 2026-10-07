@@ -5768,6 +5768,28 @@ export function useV1UpdateLeagueVisibility(leagueId: string) {
   });
 }
 
+/** 대회 공개 여부 변경 — 리그와 같은 규칙. 관리 데이터는 그대로, 공개 읽기 캐시만 다시 확인한다. */
+export function useV1UpdateTournamentVisibility(tournamentId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { isPublic: boolean }) =>
+      v1Patch<{ tournamentId: string; isPublic: boolean }>(
+        `/admin/tournaments/${encodeURIComponent(tournamentId)}/visibility`,
+        body,
+      ),
+    onSuccess: (result) => {
+      queryClient.setQueryData<V1Tournament>(v1Keys.adminTournament(tournamentId), (current) =>
+        current ? { ...current, isPublic: result.isPublic } : current,
+      );
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminTournament(tournamentId) });
+      queryClient.invalidateQueries({ queryKey: v1Keys.tournament(tournamentId) });
+      queryClient.invalidateQueries({ queryKey: v1Keys.tournaments() });
+      queryClient.invalidateQueries({ queryKey: ['tournament-reviews', tournamentId] });
+      queryClient.invalidateQueries({ queryKey: v1Keys.home() });
+    },
+  });
+}
+
 export function useV1CreateLeagueMatch() {
   const queryClient = useQueryClient();
   return useMutation({

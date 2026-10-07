@@ -208,7 +208,7 @@ describe('PublicUserRecordsService', () => {
           resultRevision: expect.objectContaining({
             game: expect.objectContaining({
               teamMatch: {
-                is: { OR: [{ leagueId: null }, { league: { is: { isPublic: true } } }] },
+                is: { AND: [{ OR: [{ leagueId: null }, { league: { is: { isPublic: true } } }] }, { OR: [{ tournamentId: null }, { tournament: { is: { isPublic: true } } }] }] },
               },
             }),
           }),
@@ -218,15 +218,7 @@ describe('PublicUserRecordsService', () => {
     expect(prisma.v1TournamentAward.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({
-          tournament: {
-            is: {
-              OR: [
-                { kind: 'regular_tournament' },
-                { kind: null },
-                { kind: 'regular_league', isPublic: true },
-              ],
-            },
-          },
+          tournament: { is: { isPublic: true } },
         }),
       }),
     );
@@ -620,7 +612,7 @@ describe('PublicUserRecordsService', () => {
             game: {
               sourceType: 'TEAM_MATCH',
               teamMatch: {
-                is: { OR: [{ leagueId: null }, { league: { is: { isPublic: true } } }] },
+                is: { AND: [{ OR: [{ leagueId: null }, { league: { is: { isPublic: true } } }] }, { OR: [{ tournamentId: null }, { tournament: { is: { isPublic: true } } }] }] },
               },
             },
           }),

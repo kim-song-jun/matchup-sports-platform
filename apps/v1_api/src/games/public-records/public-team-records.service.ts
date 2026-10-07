@@ -278,9 +278,9 @@ export class PublicTeamRecordsService {
         ON vp.game_id = g.id
        AND vp.mode IN ('LIVE', 'STATUS_ONLY', 'OFFICIAL_ONLY')
       LEFT JOIN v1_team_matches tm ON tm.id = g.team_match_id
-      LEFT JOIN v1_tournaments league ON league.id = tm.league_id
+      LEFT JOIN v1_tournaments league ON league.id = COALESCE(tm.league_id, tm.tournament_id)
       WHERE trf.team_id = ${teamId}
-        AND (tm.league_id IS NULL OR league.is_public IS TRUE)
+        AND (league.id IS NULL OR league.is_public IS TRUE)
       ORDER BY season DESC
     `);
     return rows.map((row) => row.season);
@@ -318,9 +318,9 @@ export class PublicTeamRecordsService {
         ON game.id = trf.game_id
        AND game.current_official_revision_id = trf.revision_id
       LEFT JOIN v1_team_matches tm ON tm.id = game.team_match_id
-      LEFT JOIN v1_tournaments league ON league.id = tm.league_id
+      LEFT JOIN v1_tournaments league ON league.id = COALESCE(tm.league_id, tm.tournament_id)
       WHERE trf.team_id = ${teamId}
-      AND (tm.league_id IS NULL OR league.is_public IS TRUE)
+      AND (league.id IS NULL OR league.is_public IS TRUE)
       ${seasonSql}
       ${cursorSql}
       ${typeSql}
@@ -597,9 +597,9 @@ export class PublicTeamRecordsService {
       -- 공개이므로, 여기서 빼면 킬스위치가 팀 전적을 0 으로 만든다.
       INNER JOIN v1_game_visibility_policies vp ON vp.game_id = g.id
       LEFT JOIN v1_team_matches tm ON tm.id = g.team_match_id
-      LEFT JOIN v1_tournaments league ON league.id = tm.league_id
+      LEFT JOIN v1_tournaments league ON league.id = COALESCE(tm.league_id, tm.tournament_id)
       WHERE trf.team_id = ${teamId}
-      AND (tm.league_id IS NULL OR league.is_public IS TRUE)
+      AND (league.id IS NULL OR league.is_public IS TRUE)
       ${seasonSql}
       AND vp.mode IN ('LIVE', 'OFFICIAL_ONLY')
       GROUP BY category

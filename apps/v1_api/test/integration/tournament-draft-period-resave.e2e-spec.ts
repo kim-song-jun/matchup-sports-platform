@@ -3,6 +3,7 @@ import request = require('supertest');
 import { PrismaService } from '../../src/prisma/prisma.service';
 import { ManagedTermsRuntimeService } from '../../src/terms/managed-terms-runtime.service';
 import { seedCompetitionConfigVersions } from '../../src/tournaments/competition-config/competition-config-backfill';
+import { FUTSAL_V1_CONFIG } from '../../src/tournaments/competition-config/competition-config.presets';
 import { createV1IntegrationApp } from './integration-app';
 
 const ownerId = '14420000-0000-4000-8000-000000000001';
@@ -60,6 +61,55 @@ describe('Tournament draft custom periods survive HTTP re-save', () => {
       expect(persisted.competitionConfig?.periods).toEqual(periods.body.data.periods);
       expect(persisted.competitionConfig?.lineup).toMatchObject({ maxPlayers: lineupMaxPlayers, substitutions: 'rolling', maxSubstitutions: null });
       if (lineupMaxPlayers === 5) expect(persisted.competitionConfigVersionId).toBe(originalPin.competitionConfigVersionId);
+    }
+  });
+
+  it.each([true, false])('re-saves and changes a separately named pinned config without resetting its family (catalog=%s)', async (hasCatalog) => {
+    const { positions, formations, ...lineup } = FUTSAL_V1_CONFIG.lineup;
+    const config = {
+      ...FUTSAL_V1_CONFIG,
+      periods: [{ code: 'SINGLE_PERIOD', label: '단일', durationMinutes: hasCatalog ? 31 : 32, extraTime: false }],
+      lineup: { ...lineup, maxPlayers: 5, ...(hasCatalog ? { positions, formations } : {}) },
+    };
+    const name = `회귀 전용 풋살 ${hasCatalog ? 'catalog' : 'v1-missing-catalog'}`;
+    const registered = await request(app.getHttpServer())
+      .post('/api/v1/admin/competition-configs').set('x-v1-user-id', ownerId)
+      .send({ sportCode: 'futsal', name, config }).expect(201);
+    const created = await request(app.getHttpServer())
+      .post('/api/v1/admin/tournaments').set('x-v1-user-id', ownerId)
+      .send({ sportId, title: '이름 지정 설정 회귀 초안', teamCount: 8 }).expect(201);
+    const id: string = created.body.data.id;
+    const pinned = await request(app.getHttpServer())
+      .patch(`/api/v1/admin/tournaments/${id}/competition-config`).set('x-v1-user-id', ownerId)
+      .send({ competitionConfigVersionId: registered.body.data.id, expectedVersion: created.body.data.updatedAt }).expect(200);
+    let expectedVersion: string = pinned.body.data.expectedVersion;
+    for (const mode of ['rolling', 'rolling', 'limited'] as const) {
+      const saved = await request(app.getHttpServer())
+        .patch(`/api/v1/admin/tournaments/${id}`).set('x-v1-user-id', ownerId)
+        .send({ expectedVersion, title: `이름 지정 재저장 ${mode}`, lineupMaxPlayers: 5, substitutionMode: mode, ...(mode === 'limited' ? { maxSubstitutions: 5 } : {}) }).expect(200);
+      expectedVersion = saved.body.data.updatedAt;
+      const row = await prisma.v1Tournament.findUniqueOrThrow({ where: { id }, include: { competitionConfig: true } });
+      expect(row.competitionConfig).toMatchObject({ name, periods: config.periods, lineup: { maxPlayers: 5, substitutions: mode, maxSubstitutions: mode === 'limited' ? 5 : null } });
+      if (mode === 'rolling') expect(row.competitionConfigVersionId).toBe(registered.body.data.id);
+      if (!hasCatalog) {
+        expect(row.competitionConfig?.lineup).not.toHaveProperty('positions');
+        expect(row.competitionConfig?.lineup).not.toHaveProperty('formations');
+      }
+      const periodsRead = await request(app.getHttpServer())
+        .get(`/api/v1/admin/tournaments/${id}/periods`).set('x-v1-user-id', ownerId).expect(200);
+      expect(periodsRead.body.data.periods).toEqual(config.periods);
+    }
+    if (!hasCatalog) {
+      const periodChange = await request(app.getHttpServer())
+        .patch(`/api/v1/admin/tournaments/${id}/periods`).set('x-v1-user-id', ownerId)
+        .send({ expectedVersion, periods: [{ durationMinutes: 35 }] }).expect(200);
+      await request(app.getHttpServer())
+        .patch(`/api/v1/admin/tournaments/${id}`).set('x-v1-user-id', ownerId)
+        .send({ expectedVersion: periodChange.body.data.expectedVersion, lineupMaxPlayers: 5, substitutionMode: 'limited', maxSubstitutions: 5 }).expect(200);
+      const row = await prisma.v1Tournament.findUniqueOrThrow({ where: { id }, include: { competitionConfig: true } });
+      expect(row.competitionConfig).toMatchObject({ name, periods: periodChange.body.data.periods });
+      expect(row.competitionConfig?.lineup).not.toHaveProperty('positions');
+      expect(row.competitionConfig?.lineup).not.toHaveProperty('formations');
     }
   });
 });

@@ -108,7 +108,7 @@ export class CompetitionConfigRegistry {
   async create(user: V1AuthUser, dto: CreateCompetitionConfigDto) {
     const admin = await this.adminContext.getMutationAdmin(user.id);
     const sportCode = normalizeCompetitionSportCode(dto.sportCode);
-    const config = validateCompetitionConfig(dto.config);
+    const config = validateCompetitionConfig(dto.config, { preserveMissingCatalogKeys: true });
     const created = await this.prisma.$transaction(async (tx) => {
       const row = await tx.v1CompetitionConfigVersion.create({
         data: {
@@ -145,7 +145,7 @@ export class CompetitionConfigRegistry {
     dto: CreateCompetitionConfigVersionDto,
   ) {
     const admin = await this.adminContext.getMutationAdmin(user.id);
-    const config = validateCompetitionConfig(dto.config);
+    const config = validateCompetitionConfig(dto.config, { preserveMissingCatalogKeys: true });
     const created = await this.prisma.$transaction(async (tx) => {
       const source = await tx.v1CompetitionConfigVersion.findUnique({
         where: { id: configId },

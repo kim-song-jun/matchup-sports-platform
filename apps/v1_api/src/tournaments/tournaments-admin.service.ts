@@ -608,16 +608,24 @@ export class TournamentsAdminService {
       const pinnedVersion = existing.competitionConfigVersionId
         ? await this.prisma.v1CompetitionConfigVersion.findUnique({
             where: { id: existing.competitionConfigVersionId },
-            select: { periods: true, events: true, lineup: true, result: true, tieBreak: true, visibility: true },
+            select: { name: true, periods: true, events: true, lineup: true, result: true, tieBreak: true, visibility: true },
           })
         : null;
       const pinnedLineup = pinnedVersion ? parseLineupLimits(pinnedVersion.lineup) : null;
-      const pinnedConfig = pinnedVersion ? validateCompetitionConfig(pinnedVersion) : undefined;
+      const pinnedConfig = pinnedVersion ? validateCompetitionConfig({
+        periods: pinnedVersion.periods,
+        events: pinnedVersion.events,
+        lineup: pinnedVersion.lineup,
+        result: pinnedVersion.result,
+        tieBreak: pinnedVersion.tieBreak,
+        visibility: pinnedVersion.visibility,
+      }, { preserveMissingCatalogKeys: true }) : undefined;
       const resolved = await this.lineupSizeConfigResolver.resolveVersionForLineupConfig(
         user,
         normalizeCompetitionSportCode(sport.code),
         {
           baseConfig: pinnedConfig,
+          baseConfigName: pinnedVersion?.name,
           maxPlayers: dto.lineupMaxPlayers ?? pinnedLineup?.maxPlayers,
           substitutionMode: dto.substitutionMode ?? pinnedLineup?.substitutions,
           maxSubstitutions:

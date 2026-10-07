@@ -74,6 +74,7 @@ export class LineupSizeConfigResolver {
       substitutionMode?: CompetitionConfig['lineup']['substitutions'];
       maxSubstitutions?: number | null;
       baseConfig?: CompetitionConfig;
+      baseConfigName?: string;
     },
   ): Promise<{ id: string; version: number; contentHash: string }> {
     const canonical = canonicalCompetitionConfigForSport(normalizedSportCode);
@@ -126,7 +127,7 @@ export class LineupSizeConfigResolver {
       targetMode,
       targetMaxSubstitutions,
     );
-    return this.findOrCreateVersion(user, normalizedSportCode, targetConfig);
+    return this.findOrCreateVersion(user, normalizedSportCode, targetConfig, overrides.baseConfigName);
   }
 
   /**
@@ -138,6 +139,7 @@ export class LineupSizeConfigResolver {
     user: V1AuthUser,
     normalizedSportCode: string,
     targetConfig: CompetitionConfig,
+    baseConfigName?: string,
   ): Promise<{ id: string; version: number; contentHash: string }> {
     const contentHash = competitionConfigContentHash(targetConfig);
 
@@ -149,14 +151,15 @@ export class LineupSizeConfigResolver {
       throw new Error(`No competition-config repoint seed registered for sportCode "${normalizedSportCode}"`);
     }
 
+    const name = baseConfigName ?? seed.name;
     const existing = await this.prisma.v1CompetitionConfigVersion.findFirst({
-      where: { sportCode: normalizedSportCode, name: seed.name, contentHash },
+      where: { sportCode: normalizedSportCode, name, contentHash },
       select: { id: true, version: true, contentHash: true },
     });
     if (existing) return existing;
 
     const latest = await this.prisma.v1CompetitionConfigVersion.findFirst({
-      where: { sportCode: normalizedSportCode, name: seed.name },
+      where: { sportCode: normalizedSportCode, name },
       orderBy: { version: 'desc' },
       select: { id: true },
     });

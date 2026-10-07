@@ -15,6 +15,7 @@ describe('대회 공개 여부 전환 HTTP/DB 계약', () => {
   let db: PrismaService;
   const adminUserId = randomUUID();
   const outsiderId = randomUUID();
+  const participantId = randomUUID();
   let tournamentId: string;
   let sportId: string;
 
@@ -33,7 +34,7 @@ describe('대회 공개 여부 전환 HTTP/DB 계약', () => {
     db = app.get(PrismaService);
     const terms = app.get(ManagedTermsRuntimeService);
     const required = (await terms.currentSignupTerms()).items.filter((item) => item.requirement === 'required').map((item) => item.documentId);
-    for (const id of [adminUserId, outsiderId]) {
+    for (const id of [adminUserId, outsiderId, participantId]) {
       await db.v1User.create({ data: { id, email: `${id}@integration.test`, accountStatus: 'active', onboardingStatus: 'completed' } });
       await terms.acceptSignupTerms(id, required);
     }
@@ -71,6 +72,25 @@ describe('대회 공개 여부 전환 HTTP/DB 계약', () => {
     await toggle(true).expect(200);
     expect(await listed()).toContain(tournamentId);
     await get(null, `/tournaments/${tournamentId}`).expect(200);
+  });
+
+  it('비공개 대회 공지는 미신청자에겐 404, 활성 참가자는 그대로 읽고, 다시 공개하면 미신청자도 공개 공지를 본다', async () => {
+    const regionId = (await db.v1Region.create({ data: { code: `visibility-${participantId}`, name: '공개 전환 지역', level: 2 } })).id;
+    const team = await db.v1Team.create({ data: { ownerUserId: participantId, sportId, regionId, name: `공개 전환 팀 ${participantId.slice(0, 6)}` } });
+    await db.v1TournamentRegistration.create({ data: { tournamentId, teamId: team.id, appliedByUserId: participantId, status: 'confirmed' } });
+    await db.v1TournamentAnnouncement.create({ data: { tournamentId, title: '경기장 안내', body: '주차는 B2', audience: 'public', publishedAt: new Date() } });
+    const titles = async (user: string) =>
+      (await get(user, `/tournaments/${tournamentId}/announcements/me`).expect(200)).body.data.items.map((item: { title: string }) => item.title);
+
+    expect(await titles(outsiderId)).toEqual(['경기장 안내']);
+
+    await toggle(false).expect(200);
+    expect((await get(outsiderId, `/tournaments/${tournamentId}/announcements/me`).expect(404)).body.code).toBe('TOURNAMENT_NOT_FOUND');
+    expect(await titles(participantId)).toEqual(['경기장 안내']);
+    expect((await get(adminUserId, `/admin/tournaments/${tournamentId}/announcements`).expect(200)).body.data.items).toHaveLength(1);
+
+    await toggle(true).expect(200);
+    expect(await titles(outsiderId)).toEqual(['경기장 안내']);
   });
 
   it('문자열 "false" 처럼 JSON 불리언이 아닌 값과 일반 사용자의 전환은 거부한다', async () => {

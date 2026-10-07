@@ -189,6 +189,25 @@ describe('TournamentAnnouncementsService', () => {
     expect(notifications.emitToManyDeferred).toHaveBeenCalled();
   });
 
+  // 비공개 대회(관리자 공개 설정 off) — 미신청자에겐 공개 상세처럼 없는 대회다. 공개 공지라도 이
+  // 경로로 새면 비공개가 뚫린다(#1644 리뷰 P1). 활성 신청이 있는 참가자는 그대로 읽는다.
+  it('listForParticipant: 비공개 대회는 활성 신청이 없으면 404, 있으면 공지를 그대로 읽는다', async () => {
+    prisma.v1Tournament.findFirst.mockResolvedValue({ id: 'tournament-1', kind: 'regular_tournament', isPublic: false });
+    prisma.v1TournamentAnnouncement.findMany.mockResolvedValue([
+      announcementRow({ id: 'ann-public', audience: 'public', publishedAt: new Date() }),
+    ]);
+
+    prisma.v1TournamentRegistration.findMany.mockResolvedValue([]);
+    await expect(service.listForParticipant(plainUser, 'tournament-1')).rejects.toMatchObject({
+      response: { code: 'TOURNAMENT_NOT_FOUND' },
+    });
+    expect(prisma.v1TournamentAnnouncement.findMany).not.toHaveBeenCalled();
+
+    prisma.v1TournamentRegistration.findMany.mockResolvedValue([{ status: 'confirmed' }]);
+    const result = await service.listForParticipant(plainUser, 'tournament-1');
+    expect(result.items.map((item: { id: string }) => item.id)).toEqual(['ann-public']);
+  });
+
   it('listForParticipant: 리그 id 로는 열리지 않는다', async () => {
     prisma.v1Tournament.findFirst.mockImplementation(
       kindAwareFindFirst({ id: 'league-1', kind: 'regular_league' }),

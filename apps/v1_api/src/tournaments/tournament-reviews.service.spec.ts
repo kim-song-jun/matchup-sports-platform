@@ -654,6 +654,7 @@ describe('TournamentReviewsService — review hide moderation', () => {
   let service: TournamentReviewsService;
   let prisma: {
     v1AdminUser: { findUnique: jest.Mock };
+    v1Tournament: { findFirst: jest.Mock };
     v1TournamentReview: {
       findMany: jest.Mock;
       count: jest.Mock;
@@ -667,6 +668,7 @@ describe('TournamentReviewsService — review hide moderation', () => {
   beforeEach(async () => {
     prisma = {
       v1AdminUser: { findUnique: jest.fn() },
+      v1Tournament: { findFirst: jest.fn().mockResolvedValue({ id: 'tournament-1' }) },
       v1TournamentReview: {
         findMany: jest.fn(),
         count: jest.fn(),

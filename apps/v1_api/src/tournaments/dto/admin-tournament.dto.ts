@@ -1,4 +1,4 @@
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import {
   IsDateString,
   IsDefined,
@@ -692,6 +692,14 @@ export class UpdateTournamentDto {
   @Min(0)
   @Max(9999)
   promoListPriority?: number;
+}
+
+/** 공개 여부 전환 — 리그(UpdateLeagueVisibilityDto)와 같은 계약. */
+export class UpdateTournamentVisibilityDto {
+  // JSON 타입을 지킨다: 암묵 Boolean 변환은 문자열 "false" 를 true 로 바꾼다.
+  @Transform(({ obj }) => obj.isPublic, { toClassOnly: true })
+  @IsBoolean()
+  isPublic!: boolean;
 }
 
 export class ChangeTournamentStatusDto {

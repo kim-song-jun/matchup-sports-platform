@@ -99,6 +99,14 @@ export class TournamentAnnouncementsService {
       select: { status: true },
     });
     const myStatuses = new Set(myActiveRegistrations.map((r) => r.status));
+    // 비공개 대회는 활성 신청이 있는 참가자만 공지를 읽는다 — 미신청자에겐 공개 상세처럼 없는
+    // 대회다(공개 공지라도 이 경로로 새면 비공개가 뚫린다). 관리자 공지 조회는 별도 경로라 그대로다.
+    if (tournament.isPublic === false && myStatuses.size === 0) {
+      throw new NotFoundException({
+        code: 'TOURNAMENT_NOT_FOUND',
+        message: '대회를 찾을 수 없어요.',
+      });
+    }
 
     const rows = await this.prisma.v1TournamentAnnouncement.findMany({
       where: { tournamentId, publishedAt: { not: null } },

@@ -39,7 +39,7 @@ export function deriveRegistrationSetupSteps(input: {
       ? { label: '② 신청 열기 진행 중', tone: 'blue' }
       : { label: '② 신청 열기 대기', tone: 'grey' },
     {
-      label: `③ 신청 확인 ${activeRegistrationCount}팀`,
+      label: `③ 직접 신청 ${activeRegistrationCount}팀`,
       tone: activeRegistrationCount > 0 ? 'green' : 'grey',
     },
   ];

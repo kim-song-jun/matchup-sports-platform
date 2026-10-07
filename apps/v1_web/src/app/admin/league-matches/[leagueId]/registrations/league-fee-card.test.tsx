@@ -118,7 +118,7 @@ describe('LeagueFeeCard', () => {
       const dialog = screen.getByRole('dialog');
       expect(dialog).toHaveTextContent('참가비를 바꿀까요?');
       expect(dialog).toHaveTextContent('70,000원 → 80,000원');
-      expect(dialog).toHaveTextContent('이미 신청한 3팀은 신청할 때의 금액이 그대로 유지돼요. 새로 신청하는 팀부터 80,000원이에요.');
+      expect(dialog).toHaveTextContent('직접 신청한 3팀은 신청할 때의 금액이 그대로 유지돼요. 새로 신청하는 팀부터 80,000원이에요.');
       expect(feeMutate).not.toHaveBeenCalled();
       expect(within(dialog).getByRole('button', { name: '바꾸기' })).toBeDisabled();
 

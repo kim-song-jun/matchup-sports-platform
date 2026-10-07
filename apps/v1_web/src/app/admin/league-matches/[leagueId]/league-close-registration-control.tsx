@@ -124,7 +124,7 @@ export function LeagueCloseRegistrationControl({
               <div className="tm-text-label" style={{ color: 'var(--text-strong)' }}>{deadlineText}</div>
             </div>
             <div className="tm-info-row" style={{ padding: '0 16px' }}>
-              <div className="tm-text-caption">낸 신청</div>
+              <div className="tm-text-caption">팀이 직접 낸 신청</div>
               <div className="tm-text-label" style={{ color: 'var(--text-strong)' }}>
                 {activeRegistrationCount}팀 (확정 {confirmedCount} · 대기 {waitingCount})
               </div>

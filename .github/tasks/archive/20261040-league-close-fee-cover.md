@@ -1,6 +1,6 @@
 # Task 20261040: 리그 즉시 모집마감 · 참가비 · 대표 이미지 (MD-QA #35 · #36 · #37)
 
-Status: 진행 중
+Status: 완료 (2026-10-08 — PR #1649 dev 머지·alpha 실측, 후속 문구 PR #1650)
 **Owner**: Planning team → BE-2 → BE-1 → FE-data → FE-A·B·C·D → DOCS
 **Created**: 2026-10-07
 
@@ -47,7 +47,7 @@ Status: 진행 중
 - [x] **#37 D9 A** 이미지가 있으면 OG·JSON-LD(절대 URL) 사용, 없으면 현행.
 - [x] **#37 D10 A** draft·active·보류·종료 모두 편집 허용.
 - [x] **공개 화면 통합** #35 D3 C 와 #36 D2 C 는 같은 자리이므로 `/league-matches/:leagueId`(`LeagueRegistrationCta` 자리)에 '참가 안내' 카드 **하나**로 합친다. 열림: 금액(설정된 경우)·입금 방법(계좌이체, 계좌번호는 공개 응답에 없고 '신청 후 안내돼요')·마감 시각·신청 버튼 / 닫힘(마감 설정됨·지남·리그 안 끝남·내 팀 신청 없음): '신청이 마감됐어요' + 다른 리그 링크 / 그 외(마감 미설정이고 참가비도 미설정, 끝난 리그): 카드 없음. 이미 신청한 팀은 기존처럼 카드를 숨긴다.
-- [ ] 대회 상세 `/tournaments/:id` 의 `showsEntryFee = !isLeagueMirror` 를 '설정된(`entryFeeConfiguredAt` 있음) 리그만 표시'로 바꾼다.
+- [x] 대회 상세 `/tournaments/:id` 의 `showsEntryFee = !isLeagueMirror` 를 '설정된(`entryFeeConfiguredAt` 있음) 리그만 표시'로 바꾼다.
 
 ## User Scenarios
 ### Scenario 1: 정원이 찬 리그를 바로 마감한다
@@ -82,28 +82,28 @@ Expected result: 같은 티어의 참가비·계좌·대표 이미지가 복사�
 
 ## Test Scenarios
 ### Happy path
-- [ ] 열린 리그 마감 → 신청 제출 409 `REGISTRATION_DEADLINE_PASSED`, **다른 열린 리그는 계속 신청 가능**, 재오픈 후 다시 가능.
-- [ ] 참가비 설정 → 어드민·공개 상세 반영, 공개 JSON 에 계좌 sentinel 없음(어드민에는 있음).
-- [ ] 금액 변경 후 기존 신청 `payment.amount` 불변, 새 신청은 새 금액.
-- [ ] 대표 이미지 설정·교체·제거가 해당 리그에만 반영(다른 리그 null).
-- [ ] 승강 확정 후 같은 티어 값 복사, `entryFeeConfiguredAt` null.
+- [x] 열린 리그 마감 → 신청 제출 409 `REGISTRATION_DEADLINE_PASSED`, **다른 열린 리그는 계속 신청 가능**, 재오픈 후 다시 가능.
+- [x] 참가비 설정 → 어드민·공개 상세 반영, 공개 JSON 에 계좌 sentinel 없음(어드민에는 있음).
+- [x] 금액 변경 후 기존 신청 `payment.amount` 불변, 새 신청은 새 금액.
+- [x] 대표 이미지 설정·교체·제거가 해당 리그에만 반영(다른 리그 null).
+- [x] 승강 확정 후 같은 티어 값 복사, `entryFeeConfiguredAt` null.
 ### Edge cases
-- [ ] 이미 닫힌/마감 미설정 리그의 `close-registration` 은 `alreadyProcessed:true`, 쓰기·감사 0. 같은 값의 `entry-fee`·`cover-image` 도 멱등.
-- [ ] 0원 '무료 확정'은 계좌 없이 저장되고 `entryFeeConfiguredAt` 이 세팅된다. 같은 0원이라도 미설정이면 쓴다.
-- [ ] 활성 신청이 있어도 값이 그대로인 '확인'(이어받은 설정 확정)은 사유가 필요 없다. 활성 신청 0 이면 금액 변경도 사유 불필요.
-- [ ] 보류 중 리그도 마감·이미지 변경 가능. 종료 리그는 마감 불가·참가비 변경 불가·이미지 변경 가능.
-- [ ] KST 자정 경계에서 프리셋 23:59 계산이 로컬 타임존에 의존하지 않는다.
-- [ ] 같은 밀리초 경계: `마감 = now` 는 다음 판정부터 닫힘(응답은 `registrationOpen:false`).
+- [x] 이미 닫힌/마감 미설정 리그의 `close-registration` 은 `alreadyProcessed:true`, 쓰기·감사 0. 같은 값의 `entry-fee`·`cover-image` 도 멱등.
+- [x] 0원 '무료 확정'은 계좌 없이 저장되고 `entryFeeConfiguredAt` 이 세팅된다. 같은 0원이라도 미설정이면 쓴다.
+- [x] 활성 신청이 있어도 값이 그대로인 '확인'(이어받은 설정 확정)은 사유가 필요 없다. 활성 신청 0 이면 금액 변경도 사유 불필요.
+- [x] 보류 중 리그도 마감·이미지 변경 가능. 종료 리그는 마감 불가·참가비 변경 불가·이미지 변경 가능.
+- [x] KST 자정 경계에서 프리셋 23:59 계산이 로컬 타임존에 의존하지 않는다.
+- [ ] 같은 밀리초 경계: `마감 = now` 는 다음 판정부터 닫힘(응답은 `registrationOpen:false`). — 받아들인 위험으로 남김: 같은 밀리초 제출 1건 통과 가능, 응답 상수만 단위 테스트가 확인.
 ### Error paths
-- [ ] 대회 id 로 세 엔드포인트 호출 → 404 `LEAGUE_NOT_FOUND`. support 관리자·비어드민 → 403.
-- [ ] 유료인데 계좌 누락 → 422 `LEAGUE_PAYMENT_INSTRUCTIONS_REQUIRED`. 활성 신청 + 금액 변경 + 사유 없음 → 422 `LEAGUE_ENTRY_FEE_REASON_REQUIRED` 이고 DB 값 불변.
-- [ ] 외부 URL·`javascript:`·`..` 경로·빈 문자열·키 누락 → 400. 동시 변경 → 409 `LEAGUE_STATE_CHANGED`.
-- [ ] 무료로 열기: 0원 저장이 실패하면 열기를 호출하지 않는다. 업로드 실패 시 저장 호출 0.
+- [x] 대회 id 로 세 엔드포인트 호출 → 404 `LEAGUE_NOT_FOUND`. support 관리자·비어드민 → 403.
+- [x] 유료인데 계좌 누락 → 422 `LEAGUE_PAYMENT_INSTRUCTIONS_REQUIRED`. 활성 신청 + 금액 변경 + 사유 없음 → 422 `LEAGUE_ENTRY_FEE_REASON_REQUIRED` 이고 DB 값 불변.
+- [x] 외부 URL·`javascript:`·`..` 경로·빈 문자열·키 누락 → 400. 동시 변경 → 409 `LEAGUE_STATE_CHANGED`.
+- [x] 무료로 열기: 0원 저장이 실패하면 열기를 호출하지 않는다. 업로드 실패 시 저장 호출 0.
 ### Mock data updates needed
-- [ ] `apps/v1_web/src/test/msw/league-visibility-handlers.ts` 리그 fixture 에 새 필수 필드, `test/msw/fixtures.ts` 대회 fixture 에 `entryFeeConfigured:true`.
-- [ ] 새 필수 필드로 깨지는 웹 인라인 fixture(어드민·공개 리그 테스트 10여 개, 대회 `V1TournamentListItem`·`V1TournamentDetail` 리터럴)를 소유 단계가 같은 커밋에서 갱신.
-- [ ] `apps/v1_api/src/league-matches/league-match-admin.service.spec.ts`·`league-competition-mirror.spec.ts`·`league-series-admin.service.spec.ts` 를 새 응답·승계 필드에 맞춰 갱신.
-- [ ] 스키마 바이트 핀 5곳(`game-schema.fixture.ts`·`Dockerfile.v1-api`·`alpha-manifest-common.sh`·`create-alpha-release-manifest.sh`·`prepare-task168-final-steady-inputs.sh`) 재고정.
+- [x] `apps/v1_web/src/test/msw/league-visibility-handlers.ts` 리그 fixture 에 새 필수 필드, `test/msw/fixtures.ts` 대회 fixture 에 `entryFeeConfigured:true`.
+- [x] 새 필수 필드로 깨지는 웹 인라인 fixture(어드민·공개 리그 테스트 10여 개, 대회 `V1TournamentListItem`·`V1TournamentDetail` 리터럴)를 소유 단계가 같은 커밋에서 갱신.
+- [x] `apps/v1_api/src/league-matches/league-match-admin.service.spec.ts`·`league-competition-mirror.spec.ts`·`league-series-admin.service.spec.ts` 를 새 응답·승계 필드에 맞춰 갱신.
+- [x] 스키마 바이트 핀 5곳(`game-schema.fixture.ts`·`Dockerfile.v1-api`·`alpha-manifest-common.sh`·`create-alpha-release-manifest.sh`·`prepare-task168-final-steady-inputs.sh`) 재고정.
 
 ## Parallel Work Breakdown
 구현 계약(엔드포인트·DTO·오류 코드·응답 필드·파일 소유권·테스트표)의 정본은 구현 단계에 넘기는 계약서이고, 아래는 저장소에 남기는 요약이다. 둘이 어긋나면 `BLOCKED` 로 멈추고 기획 재진입한다.
@@ -119,8 +119,8 @@ Expected result: 같은 티어의 참가비·계좌·대표 이미지가 복사�
 DB: `V1Tournament.entryFeeConfiguredAt DateTime?` 한 줄 + `ADD COLUMN IF NOT EXISTS` 마이그레이션(`20261008100000_v1_league_entry_fee_configured`, 착수 직전 최신 타임스탬프 재확인).
 
 ### Backend (순차: BE-2 → BE-1. 서로 파일이 겹치지 않는다)
-- [ ] **BE-2 (#36 서버 · 마이그레이션 · 공유 읽기면 · 시즌 승계)** — 스키마 한 줄·마이그레이션·스키마 핀 5곳 / 활성 신청 상태 상수 / entry-fee DTO·서비스·컨트롤러 / 어드민·공개 상세 응답 확장(`league-match-admin.service.ts` 의 `detail`·`loadLeague` 만) / presenter `entryFeeConfigured` / `LeagueMirrorSource.inherited` + `commitPromotions` 에서 같은 티어 직전 시즌 값 복사(`entryFeeConfiguredAt` 은 싣지 않음) / spec·통합 spec.
-- [ ] **BE-1 (#35·#37 서버 · 배선)** — `common/safe-image-url.ts` 승격(기본 동작 불변·`localUploadsOnly`)과 캠페인 DTO 교체 / close-registration·cover-image DTO·서비스(새 파일)·컨트롤러 / `league-match.module.ts` 에 세 서비스·두 컨트롤러 등록(+ `league-match.module.spec.ts` 가 새 컨트롤러가 풀리는지 단언 — #750 방지) / `tournament-raw-sql-baseline.json` 에 cover 서비스 항목 / spec·통합 spec.
+- [x] **BE-2 (#36 서버 · 마이그레이션 · 공유 읽기면 · 시즌 승계)** — 스키마 한 줄·마이그레이션·스키마 핀 5곳 / 활성 신청 상태 상수 / entry-fee DTO·서비스·컨트롤러 / 어드민·공개 상세 응답 확장(`league-match-admin.service.ts` 의 `detail`·`loadLeague` 만) / presenter `entryFeeConfigured` / `LeagueMirrorSource.inherited` + `commitPromotions` 에서 같은 티어 직전 시즌 값 복사(`entryFeeConfiguredAt` 은 싣지 않음) / spec·통합 spec.
+- [x] **BE-1 (#35·#37 서버 · 배선)** — `common/safe-image-url.ts` 승격(기본 동작 불변·`localUploadsOnly`)과 캠페인 DTO 교체 / close-registration·cover-image DTO·서비스(새 파일)·컨트롤러 / `league-match.module.ts` 에 세 서비스·두 컨트롤러 등록(+ `league-match.module.spec.ts` 가 새 컨트롤러가 풀리는지 단언 — #750 방지) / `tournament-raw-sql-baseline.json` 에 cover 서비스 항목 / spec·통합 spec.
 ### Frontend (FE-data 선행, 이후 A·B·C·D 병렬 — 파일 겹침 없음)
 "A·B·C 3안 제시 → 사용자 선택"은 **2026-10-07 완료**(위 Original Conditions 의 D 항목들). 구현 전 목업 조각(`f35`·`f36`·`f37`)을 열어 마크업·문구를 대조한다.
 - [x] **FE-data** — `types/league-match.ts`·`types/api.ts` 필드 / 훅 3개(`useV1CloseLeagueRegistration`·`useV1UpdateLeagueEntryFee`·`useV1UpdateLeagueCoverImage`) + 재오픈 훅 포함 공통 무효화 헬퍼 / `ConfirmModal` 선택 prop `details` / MSW fixture.
@@ -132,20 +132,20 @@ DB: `V1Tournament.entryFeeConfiguredAt DateTime?` 한 줄 + `ADD COLUMN IF NOT E
 - [x] 스키마 바이트 핀 5곳 재고정(BE-2 에 포함). 새 의존성·환경변수 없음.
 ### Sequential (병렬 작업 이후에 실행)
 - [x] **DOCS** — `docs/api/domains/league-matches.md`·`tournaments.md`, 정본 6절 결정 이력 3행, `.changeset/league-close-fee-cover.md`(v1_api·v1_web patch), 이 문서 Status.
-- [ ] 통합: 전체 `tsc`(두 앱)·`lint`·소유 테스트, PR(base `dev`, 한국어, 머지 방식은 `--merge`), Copilot 리뷰 clean, CI 통합 spec green.
-- [ ] 머지 후 alpha 배포 SHA 확인 → ego-browser 로 Scenario 1~6 + 390/768/1440 갤러리를 같은 PR 에 게시 → 메인 트리 로컬 `dev` `--ff-only` 동기화.
+- [x] 통합: 전체 `tsc`(두 앱)·`lint`·소유 테스트, PR(base `dev`, 한국어, 머지 방식은 `--merge`), Copilot 리뷰 clean, CI 통합 spec green.
+- [x] 머지 후 alpha 배포 SHA 확인 → ego-browser 로 Scenario 1~6 + 390/768/1440 갤러리를 같은 PR 에 게시 → 메인 트리 로컬 `dev` `--ff-only` 동기화.
 
 ## Acceptance Criteria
-- [ ] Original conditions 전부 충족
-- [ ] User scenarios 전부 통과
-- [ ] Test scenarios 전부 green (서버 통합 spec 은 CI 에서 확인)
-- [ ] 범위 내 tech debt 해결됨 (새로운 부채 0) — `LeagueRegistrationCta` 삭제, 옛 주석 정정
-- [ ] Security 리뷰 통과 (아래 노트 참조)
-- [ ] Mock data 업데이트 완료, schema와 sync (스키마 변경이므로 migration 포함·핀 5곳 재고정)
-- [ ] 디자인 시스템 준수 (token, component, naming) — 하드코딩 색·`transition-all` 0, 44px, 포커스 링, 해요체
-- [ ] **UI 항목: 3안 제시→선택 완료(2026-10-07)** — #35 D1~D4 · #36 D1·D2·D4·D5 · #37 D1~D3 의 선택안(B·C·C·B / B·C·B·B / A·B·C)을 목업대로 구현, 구현 전에 목업 조각 대조
-- [ ] 머지 후 alpha 에서 ego-browser 로 사용자 흐름·3폭(390/768/1440) before/after·콘솔/네트워크 확인, 목록 카드 푸터 재균형 확인
-- [ ] Code review: Critical=0, Warning=0
+- [x] Original conditions 전부 충족
+- [x] User scenarios 전부 통과
+- [x] Test scenarios 전부 green (서버 통합 spec 은 CI 에서 확인)
+- [x] 범위 내 tech debt 해결됨 (새로운 부채 0) — `LeagueRegistrationCta` 삭제, 옛 주석 정정
+- [x] Security 리뷰 통과 (아래 노트 참조)
+- [x] Mock data 업데이트 완료, schema와 sync (스키마 변경이므로 migration 포함·핀 5곳 재고정)
+- [x] 디자인 시스템 준수 (token, component, naming) — 하드코딩 색·`transition-all` 0, 44px, 포커스 링, 해요체
+- [x] **UI 항목: 3안 제시→선택 완료(2026-10-07)** — #35 D1~D4 · #36 D1·D2·D4·D5 · #37 D1~D3 의 선택안(B·C·C·B / B·C·B·B / A·B·C)을 목업대로 구현, 구현 전에 목업 조각 대조
+- [x] 머지 후 alpha 에서 ego-browser 로 사용자 흐름·3폭(390/768/1440) before/after·콘솔/네트워크 확인, 목록 카드 푸터 재균형 확인
+- [x] Code review: Critical=0, Warning=0
 
 ## Tech Debt Resolved
 - 리그 참가비·대표 이미지 저장 경로가 없어 전 리그가 0원/이미지 null 이던 누락(이관 때 매핑이 필드를 안 옮긴 것 — 의도 아님)을 해소한다.
@@ -161,7 +161,7 @@ DB: `V1Tournament.entryFeeConfiguredAt DateTime?` 한 줄 + `ADD COLUMN IF NOT E
 ## Risks & Dependencies
 - 외부 블로커: 없음. 서버 통합 spec 은 `DATABASE_URL` 이 있는 CI 에서만 돈다 — 로컬 green 으로 대체하지 않는다.
 - 선행 태스크: 보류(#1645)·공개 설정(#1644)의 카드 골격과 `GateConfirmModal`/`ConfirmModal`, 정본 §6(신청 판정자는 마감 하나).
-- 위험: ① `league-match-fixtures-client.tsx` 는 다른 세션이 편집 중 → 마운트 4줄만, 머지 충돌 시 그 4줄만 재적용. ② `schema.prisma` 를 다른 세션이 동시에 고치면 핀 해시가 어긋난다 → 마지막에 재계산, 공유 `node_modules` 에 `prisma generate` 금지(격리 생성). ③ 마감=now 같은 밀리초 제출 1건이 통과할 수 있음(수용). ④ 목록 카드에서 가격 블록을 빼면 푸터가 쏠린다 → 스크린샷으로 재균형. ⑤ 공개 '참가 안내' 카드가 마감 지난 모든 진행 중 리그에 남는다(일찍 닫은 것과 기한 만료를 구분하지 않음 — 결정 D3 C 의 대가). ⑥ 서버가 미설정 리그의 신청 열기를 막지 않아 모달이 유일한 안전장치(직접 API 호출은 우회 가능 — 결정 D4 B). ⑦ 금액을 0 으로 내리면 기존 유료 신청자의 입금 계좌 안내(`serialize` 가 현재 `entryFee > 0` 로 판정)가 사라진다 — 계약서 N절 1번, 오케스트레이터 확인 대기. ⑧ 전역 ValidationPipe 가 암묵 변환을 켜 두어 `entryFee` DTO 는 `@Transform(({ obj }) => obj.entryFee)` 로 원본을 검증해야 `""`→0 '무료 확정'을 막는다. ⑨ '활성 신청' 에 운영자가 넣은 로스터 팀(`seeded`·`promoted`)이 섞이는 해석 문제 — 계약서 N절 2번.
+- 위험: ① `league-match-fixtures-client.tsx` 는 다른 세션이 편집 중 → 마운트 4줄만, 머지 충돌 시 그 4줄만 재적용. ② `schema.prisma` 를 다른 세션이 동시에 고치면 핀 해시가 어긋난다 → 마지막에 재계산, 공유 `node_modules` 에 `prisma generate` 금지(격리 생성). ③ 마감=now 같은 밀리초 제출 1건이 통과할 수 있음(수용). ④ 목록 카드에서 가격 블록을 빼면 푸터가 쏠린다 → 스크린샷으로 재균형. ⑤ 공개 '참가 안내' 카드가 마감 지난 모든 진행 중 리그에 남는다(일찍 닫은 것과 기한 만료를 구분하지 않음 — 결정 D3 C 의 대가). ⑥ 서버가 미설정 리그의 신청 열기를 막지 않아 모달이 유일한 안전장치(직접 API 호출은 우회 가능 — 결정 D4 B). ⑦ 금액을 0 으로 내리면 기존 유료 신청자의 입금 계좌 안내(`serialize` 가 현재 `entryFee > 0` 로 판정)가 사라진다 — 계약서 O절 3번으로 해소: 신청별 `payment.amount > 0` 기준으로 판정. ⑧ 전역 ValidationPipe 가 암묵 변환을 켜 두어 `entryFee` DTO 는 `@Transform(({ obj }) => obj.entryFee)` 로 원본을 검증해야 `""`→0 '무료 확정'을 막는다. ⑨ '활성 신청' 에 운영자가 넣은 로스터 팀(`seeded`·`promoted`)이 섞이는 해석 문제 — 계약서 O절 4번으로 해소: 팀이 직접 낸 신청(`applied`·`null`)만 센다. 화면 라벨은 PR #1650 에서 '팀이 직접 낸 신청'으로 밝혔다.
 - 이 태스크는 alpha 데이터를 직접 쓰지 않는다(SQL·백필 없음). QA 로 만든 새 리그·대진은 지워지지 않는다(409 `FIXTURE_NOT_DELETABLE`)는 전제로 진행한다.
 
 ## Ambiguity Log
@@ -169,9 +169,18 @@ DB: `V1Tournament.entryFeeConfiguredAt DateTime?` 한 줄 + `ADD COLUMN IF NOT E
 
 | Date | Raised by | Question | Resolution |
 |------|-----------|----------|------------|
-| 2026-10-07 | contract author | 통합 목록에 '모집 중' 필터가 없다 — "다른 모집 리그 링크"의 대상 | 기본값 `/tournaments?kind=league`, 문구 "다른 리그 둘러보기". 모집 중 필터는 목록 API 변경이라 별도 결정 대기 |
+| 2026-10-07 | contract author | 통합 목록에 '모집 중' 필터가 없다 — "다른 모집 리그 링크"의 대상 | 사용자 선택(2026-10-07): '다른 리그 둘러보기' → `/tournaments?kind=league`. 모집 중 필터는 만들지 않는다 |
 | 2026-10-07 | contract author | `CoverImageUploader` 는 빈 상태에 대회 예시 사진·240px 미리보기를 그려 스톡 금지·56px 노출과 충돌 | 컴포넌트 대신 입력 계약·`useV1UploadImages`·`CompetitionThumbnail` 재사용(계약서 Q2) |
 | 2026-10-07 | contract author | 사유 모달: 목업은 `GateConfirmModal`(사유 항상 필수)이나 D6 B 는 신청이 있을 때만 필수 | `ConfirmModal` + `reasonField`(필수 여부 동적) + `details` 슬롯(Q3) |
 | 2026-10-07 | contract author | 끝난 리그의 참가비 수정, 감사 액션명, 활성 신청 상태 집합 | 막는다 409 / `league_match.entry_fee_updated` / `draft`·`cancelled` 제외 7개(Q4·Q5·Q8) |
 | 2026-10-07 | contract author | 스폰서 DTO 검증기는 캠페인과 규칙이 달라 통합하면 동작이 바뀐다 | 캠페인만 승격, 스폰서 불변(Q6). 시즌 1 시딩은 직전 시즌이 없어 복사 대상 아님(Q7) |
 
+| 2026-10-08 | alpha QA | 같은 리그인데 신청 관리 목록은 5팀, 마감 확인창은 '낸 신청 2팀' | 세는 대상이 다르다(목록은 운영자가 넣은 팀 포함). 기준은 유지하고 라벨을 '팀이 직접 낸 신청'·'③ 직접 신청 N팀'으로 바꿨다(PR #1650) |
+
+## Verification (2026-10-08)
+
+- PR #1649 dev 머지(`5fb342c76`) → deploy-alpha 성공, 마이그레이션 `20261008100000_v1_league_entry_fee_configured` 적용 로그 확인.
+- CI: Gates·API·Web 통과. 통합 스펙 4개(즉시 마감·참가비·대표 이미지·시즌 승계)가 실제 DB 로 마감 후 제출 409, 감사 before/after, 멱등, 공개 응답 계좌 부재(비로그인·무관 사용자·다른 팀장), 승계 복사를 검증.
+- alpha 실화면(기존 QA 리그 1개, 사용자 승인 범위): 미설정 확인 모달 → 참가비 70,000원·계좌 저장(신청 2팀이라 사유 모달) → 대표 이미지 업로드 → 7일 프리셋으로 열기 → 공개 '참가 안내' 모집 중 카드·56px 썸네일 → 지금 마감(확인창 '2팀(확정 1·대기 1)') → 공개 '신청이 마감됐어요'·'다른 리그 둘러보기' → 되돌리기. 10단계 PASS, 3폭 갤러리 19장은 PR #1649 코멘트.
+- 남은 흔적(되돌릴 수 없음): 그 리그의 참가비가 '0원 확정'으로 남고(미설정으로 못 돌림), 가짜 계좌 값과 업로드 파일이 남으며, 마감 시각이 검증 시각으로 바뀌었다(원래도 지난 마감이라 공개 상태는 같다).
+- 범위 밖으로 보고한 기존 동작: 마감된 리그의 `/tournaments/:id/apply` 1단계 '다음' 버튼이 비활성화되지 않는다(서버는 409 로 거부) — 이번 변경 전부터 같다.

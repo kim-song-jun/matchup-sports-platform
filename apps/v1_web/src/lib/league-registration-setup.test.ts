@@ -30,7 +30,7 @@ describe('deriveRegistrationSetupSteps', () => {
       registrationOpen: false,
       activeRegistrationCount: 0,
     });
-    expect(steps.map((s) => s.label)).toEqual(['① 참가비 설정 필요', '② 신청 열기 대기', '③ 신청 확인 0팀']);
+    expect(steps.map((s) => s.label)).toEqual(['① 참가비 설정 필요', '② 신청 열기 대기', '③ 직접 신청 0팀']);
     expect(steps.map((s) => s.tone)).toEqual(['orange', 'grey', 'grey']);
   });
 
@@ -40,7 +40,7 @@ describe('deriveRegistrationSetupSteps', () => {
       registrationOpen: true,
       activeRegistrationCount: 3,
     });
-    expect(steps.map((s) => s.label)).toEqual(['① 참가비 설정 완료', '② 신청 열기 진행 중', '③ 신청 확인 3팀']);
+    expect(steps.map((s) => s.label)).toEqual(['① 참가비 설정 완료', '② 신청 열기 진행 중', '③ 직접 신청 3팀']);
     expect(steps.map((s) => s.tone)).toEqual(['green', 'blue', 'green']);
   });
 

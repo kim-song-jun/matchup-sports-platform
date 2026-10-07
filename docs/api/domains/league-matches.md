@@ -53,6 +53,13 @@ While on hold, fixture generation and regeneration return `409 LEAGUE_ON_HOLD`
 without creating or cancelling fixtures. Both actions recheck the status after
 locking the parent league row, including a hold committed during plan calculation.
 
+While a league is on hold, already-scheduled notifications for its fixtures are
+suppressed at fire time (the outbox rows are kept, so resuming re-enables the next
+firing): game day-before/kickoff reminders and lineup reminders/todos
+(`NOT_IN_HELD_LEAGUE_WHERE`), the admin result-entry reminder, team schedule
+RSVP-deadline and guest-recruitment-close reminders for fixture schedules, and the
+league roster-submission reminder (`src/league-matches/league-hold.ts`).
+
 ## Close registration (즉시 마감)
 
 `POST /api/v1/admin/league-matches/:leagueId/close-registration` (HTTP 200) takes an

@@ -1,0 +1,121 @@
+{
+ "pr": 1649,
+ "league": "QA 1001 리그 테스트",
+ "commit": "5fb342c7670b524edaf9d40bdd15f93e7155144c",
+ "deployAlphaRun": 37661291128,
+ "migration": "20261008100000_v1_league_entry_fee_configured",
+ "steps": [
+  {
+   "step": 1,
+   "verdict": "PASS",
+   "widths": "-",
+   "notes": "alpha 커밋 5fb342c7 헤더 확인",
+   "screenshots": []
+  },
+  {
+   "step": 2,
+   "verdict": "PASS",
+   "widths": "1440",
+   "notes": "칩은 선택만, '다시 열기' 가 실행 버튼",
+   "screenshots": [
+    "fee-card-unset-1440.png",
+    "open-confirm-modal-1440.png"
+   ]
+  },
+  {
+   "step": 3,
+   "verdict": "FAIL",
+   "widths": "1440,390",
+   "notes": "공개 JSON 문자열 검색에 계좌·bank 없음",
+   "screenshots": [
+    "fee-card-set-1440.png",
+    "fee-card-set-390.png"
+   ]
+  },
+  {
+   "step": 3,
+   "verdict": "PASS",
+   "widths": "1440,390",
+   "notes": "저장은 확인 모달(신청 2팀 있어 사유 필수, 'QA 검증' 입력)을 거침; 공개 JSON 에 계좌·bank 키 없음",
+   "screenshots": [
+    "fee-change-modal-1440.png",
+    "fee-card-set-1440.png",
+    "fee-card-set-390.png"
+   ]
+  },
+  {
+   "step": 4,
+   "verdict": "PASS",
+   "widths": "1440,768,390",
+   "notes": "파일 선택 즉시 업로드·저장",
+   "screenshots": [
+    "admin-detail-cards-1440.png",
+    "admin-detail-cards-768.png",
+    "admin-detail-cards-390.png"
+   ]
+  },
+  {
+   "step": 5,
+   "verdict": "PASS",
+   "widths": "390,768,1440",
+   "notes": "draft(준비 중) 리그인데도 카드 노출",
+   "screenshots": [
+    "public-open-390.png",
+    "public-open-768.png",
+    "public-open-1440.png"
+   ]
+  },
+  {
+   "step": 6,
+   "verdict": "PASS",
+   "widths": "390",
+   "notes": "목록은 5팀, 어드민 상세 activeRegistrationCount=2/confirmed=1 — 집계 모집단 차이 확인 필요(7단계 모달 수치 참조)",
+   "screenshots": [
+    "list-card-390.png"
+   ]
+  },
+  {
+   "step": 7,
+   "verdict": "PASS",
+   "widths": "1440",
+   "notes": "관찰: 신청 관리 목록은 5팀(확정 4·입금확인중 1)·목록 카드 '5팀 참가'인데 어드민 상세/모달 집계는 2팀(확정1·대기1) — 모집단 불일치 의심",
+   "screenshots": [
+    "close-modal-1440.png",
+    "admin-closed-card-1440.png"
+   ]
+  },
+  {
+   "step": 8,
+   "verdict": "PASS",
+   "widths": "390,768,1440",
+   "notes": "관찰: /apply 의 '다음' 버튼이 마감 안내에도 비활성화되지 않음(제출 안 함, 서버 거부 여부 미검증)",
+   "screenshots": [
+    "public-closed-390.png",
+    "public-closed-768.png",
+    "public-closed-1440.png",
+    "apply-closed-390.png"
+   ]
+  },
+  {
+   "step": 9,
+   "verdict": "PASS",
+   "widths": "1440",
+   "notes": "(a) 대표 이미지 제거(확인창 '대표 이미지를 지울까요?') 후 null. (b) 참가비 0원 저장(사유 'QA 검증 원복') — entryFeeConfiguredAt 은 설정 상태로 남음(미설정 복귀 불가), 은행·계좌·예금주 테스트값은 남음. (c) 원래 마감 2026-10-01(과거)였으므로 닫힌 상태 유지(마감 시각은 지금 시각으로 바뀜). 업로드 파일 /uploads/... 은 서버에 남음",
+   "screenshots": [
+    "cover-remove-modal-1440.png"
+   ]
+  },
+  {
+   "step": 10,
+   "verdict": "PASS",
+   "widths": "1440",
+   "notes": "의도한 422 없음",
+   "screenshots": []
+  }
+ ],
+ "observations": [
+  "신청 팀 수 집계가 화면마다 다름: 신청 관리·목록 카드 5팀(확정 4·입금확인중 1) vs 어드민 상세·마감 확인창 2팀(확정 1·대기 1)",
+  "마감된 /apply 에서 안내는 뜨지만 다음 버튼이 비활성화되지 않음(제출 미검증)"
+ ],
+ "revert": "대표 이미지 제거, 참가비 0원 저장. 남는 것: entryFeeConfiguredAt, 테스트 은행·계좌·예금주 값, 업로드 파일, 마감 시각 변경(닫힌 상태 유지)"
+}

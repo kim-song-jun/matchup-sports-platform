@@ -137,7 +137,10 @@ export class TournamentsAdminService {
       (typeof TOURNAMENT_LIST_STATUSES)[number],
       number
     >;
-    for (const group of statusGroups) byStatus[group.status] = group._count._all;
+    // 대회 목록이 다루지 않는 상태(리그 보류 on_hold)는 집계에 넣지 않는다 — 이 목록은 대회만 본다.
+    for (const group of statusGroups) {
+      if (group.status in byStatus) byStatus[group.status as keyof typeof byStatus] = group._count._all;
+    }
 
     // status 필터가 걸리면 그 상태의 건수가, 없으면 전체가 곧 이 목록의 총 건수다.
     // groupBy 는 status 를 제외한 같은 필터로 집계하므로 추가 쿼리 없이 정확하다.

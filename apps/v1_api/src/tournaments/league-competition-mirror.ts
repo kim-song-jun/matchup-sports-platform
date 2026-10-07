@@ -31,6 +31,7 @@ export const STATUS_BY_LEAGUE_STATE: Record<LeagueState, V1TournamentStatus> = {
   [LeagueStateValue.draft]: V1TournamentStatus.draft,
   [LeagueStateValue.active]: V1TournamentStatus.in_progress,
   [LeagueStateValue.completed]: V1TournamentStatus.completed,
+  [LeagueStateValue.on_hold]: V1TournamentStatus.on_hold,
 };
 
 
@@ -233,6 +234,8 @@ export const LEAGUE_STATE_BY_STATUS: Record<V1TournamentStatus, LeagueState> = {
   [V1TournamentStatus.in_progress]: LeagueStateValue.active,
   [V1TournamentStatus.completed]: LeagueStateValue.completed,
   [V1TournamentStatus.cancelled]: LeagueStateValue.completed,
+  // 보류 — 공개 화면에선 비공개라 보이지 않고, 관리 화면이 '보류'로 그린다. 보류 해제가 직전 상태로 되돌린다.
+  [V1TournamentStatus.on_hold]: LeagueStateValue.on_hold,
 };
 
 /**
@@ -273,5 +276,6 @@ export const STATUSES_BY_LEAGUE_STATE: Record<LeagueState, V1TournamentStatus[]>
       [LeagueStateValue.draft]: [] as V1TournamentStatus[],
       [LeagueStateValue.active]: [] as V1TournamentStatus[],
       [LeagueStateValue.completed]: [] as V1TournamentStatus[],
+      [LeagueStateValue.on_hold]: [] as V1TournamentStatus[],
     },
   );

@@ -169,7 +169,7 @@ export function findInactivePromotionTeamIds(
  * 다시 정의하면 두 화면이 서로 다른 규칙으로 다시 갈라진다(2026-08-22 재감사: 공개
  * 목록만 createdAt desc 단독 정렬로 남아 있던 게 바로 이 문제였다).
  */
-export const LEAGUE_STATE_PRIORITY: Record<string, number> = { active: 0, draft: 1, completed: 2 };
+export const LEAGUE_STATE_PRIORITY: Record<string, number> = { active: 0, draft: 1, completed: 2, on_hold: 3 };
 
 /**
  * 우선순위 순서로 나열한 상태 값. DB enum 정렬로는 이 순서를 못 만들므로, 상태별로

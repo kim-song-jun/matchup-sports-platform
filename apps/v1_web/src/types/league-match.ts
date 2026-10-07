@@ -1,7 +1,7 @@
 export interface V1AdminLeagueListItem {
   leagueId: string;
   title: string;
-  state: 'draft' | 'active' | 'completed';
+  state: 'draft' | 'active' | 'completed' | 'on_hold';
   teamCount: number;
   fixtureCount: number;
   startsOn: string;
@@ -24,7 +24,7 @@ export interface V1AdminLeagueListItem {
 export interface V1PublicLeagueListItem {
   leagueId: string;
   title: string;
-  state: 'draft' | 'active' | 'completed';
+  state: 'draft' | 'active' | 'completed' | 'on_hold';
   startsOn: string;
   endsOn: string;
   sport: { sportId: string; code: string; name: string };
@@ -104,7 +104,7 @@ export type V1LeagueMatchesFilters = {
   teamId?: string;
   sportId?: string;
   regionId?: string;
-  state?: 'draft' | 'active' | 'completed';
+  state?: 'draft' | 'active' | 'completed' | 'on_hold';
   cursor?: string;
   limit?: number;
 };
@@ -157,7 +157,7 @@ export interface V1LeagueFixture {
 export interface V1AdminLeagueDetail {
   leagueId: string;
   title: string;
-  state: 'draft' | 'active' | 'completed';
+  state: 'draft' | 'active' | 'completed' | 'on_hold';
   /** 공개 리그 목록·상세에 노출되는지 여부. 관리자 상세는 항상 값을 내려준다. */
   isPublic: boolean;
   /**
@@ -210,7 +210,7 @@ export interface V1LeagueSeriesSibling {
   tier: number;
   tierLabel: string;
   seasonNo: number;
-  state: 'draft' | 'active' | 'completed';
+  state: 'draft' | 'active' | 'completed' | 'on_hold';
 }
 
 export interface V1PublicLeagueDetail extends Omit<V1AdminLeagueDetail, 'isPublic'> {
@@ -247,7 +247,7 @@ export interface V1CreateLeaguePayload {
 export interface V1CreateLeagueResult {
   leagueId: string;
   title: string;
-  state: 'draft' | 'active' | 'completed';
+  state: 'draft' | 'active' | 'completed' | 'on_hold';
 }
 
 /**
@@ -385,6 +385,14 @@ export interface V1CancelLeagueFixtureResult {
 // 사유는 선택(감사 로그용). 이미 active 면 alreadyProcessed: true 로 멱등 응답한다.
 export interface V1RevertLeagueCompletionPayload {
   reason?: string;
+}
+
+/** 리그 보류·보류 해제 응답 — state 는 바뀐 뒤 상태, alreadyProcessed 는 이미 그 상태였는지. */
+export interface V1LeagueHoldResult {
+  leagueId: string;
+  state: 'draft' | 'active' | 'completed' | 'on_hold';
+  isPublic: boolean;
+  alreadyProcessed: boolean;
 }
 
 export interface V1RevertLeagueCompletionResult {

@@ -12,6 +12,7 @@ import { ConflictException, UnprocessableEntityException } from '@nestjs/common'
 import type { GameActorScope, GameCreationResult, GameParticipantCreationInput } from '../games/games.types';
 import { GamesService } from '../games/games.service';
 import { createTeamMatchScheduleInTx } from '../team-schedules/team-match-schedule';
+import { defaultFixtureEndAt } from './competition-config/fixture-end-at';
 
 export type TournamentMatchCreationTeam = {
   id: string | null;
@@ -209,6 +210,8 @@ export async function createTournamentMatchInTx(
   if (conflictingMatch !== null) {
     throw new ConflictException({ code: 'TEAM_MATCH_ID_COLLISION', message: '같은 대진 ID가 이미 다른 생성 요청에 사용됐어요.' });
   }
+  // 종료 시각을 안 받았으면 시작 + 경기 설정의 정규 시간(연장 제외 피리어드 합계)으로 채운다.
+  const endAt = input.endAt ?? await defaultFixtureEndAt(tx, input.competitionConfigVersionId, input.startAt);
   const teamMatch = await tx.v1TeamMatch.create({
     data: {
       id: teamMatchId,
@@ -222,7 +225,7 @@ export async function createTournamentMatchInTx(
       title: input.title,
       placeName: input.placeName,
       startAt: input.startAt,
-      endAt: input.endAt ?? null,
+      endAt,
       status: input.status ?? V1TeamMatchStatus.matched,
       competitionConfigVersionId: input.competitionConfigVersionId,
     },
@@ -266,11 +269,11 @@ export async function createTournamentMatchInTx(
 
   let schedulesCreated = 0;
   if (input.home.id !== null && input.startAt !== null) {
-    await createTeamMatchScheduleInTx(tx, input.home.id, teamMatch.id, input.title, input.startAt, input.endAt ?? null);
+    await createTeamMatchScheduleInTx(tx, input.home.id, teamMatch.id, input.title, input.startAt, endAt);
     schedulesCreated = 1;
   }
   if (input.away.id !== null && input.startAt !== null) {
-    await createTeamMatchScheduleInTx(tx, input.away.id, teamMatch.id, input.title, input.startAt, input.endAt ?? null);
+    await createTeamMatchScheduleInTx(tx, input.away.id, teamMatch.id, input.title, input.startAt, endAt);
     schedulesCreated += 1;
   }
 

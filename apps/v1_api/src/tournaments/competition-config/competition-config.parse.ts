@@ -147,6 +147,18 @@ export function parsePeriodDurations(
 }
 
 /**
+ * 정규 시간(분) — 연장(extraTime)을 뺀 피리어드 길이의 합. 경기 종료 시각을 따로 받지 않았을 때
+ * "시작 + 피리어드 합계"(전·후반이든 단판이든)로 채우는 기준이다. 길이를 모르는 피리어드가 하나라도 있으면(레거시 `{count}`
+ * 모양, 손상된 항목) null — 종료 시각을 지어내지 않는다.
+ */
+export function regulationMinutes(value: Prisma.JsonValue | null | undefined): number | null {
+  const periods = parsePeriodDurations(value);
+  if (periods === null || periods.length === 0 || periods.some((period) => period === null)) return null;
+  const total = periods.reduce((sum, period) => sum + (period!.extraTime ? 0 : period!.durationMinutes), 0);
+  return total > 0 ? total : null;
+}
+
+/**
  * 승부차기 종료 판정 정책을 `result` 컬럼에서 **관용적으로** 읽는다.
  *
  * 왜 프리셋이 아니라 여기서 기본값을 주는가: canonical 프리셋

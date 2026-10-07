@@ -4,6 +4,7 @@ import { createTeamMatchScheduleInTx, MATCH_SCHEDULE_DEFAULT_DURATION_MS } from 
 import { competitionTeamTargets, enqueueRosterResync, type RosterResyncTarget } from '../games/roster/roster-resync-events';
 import { revokeReplacedSideTeamAdjustments } from '../games/roster/side-team-change';
 import { competitionMatchLabel } from './tournament-round-label';
+import { defaultFixtureEndAt } from './competition-config/fixture-end-at';
 
 type Tx = Prisma.TransactionClient;
 
@@ -84,6 +85,7 @@ export async function updateTournamentMatchInTx(
           approvedApplicantTeamId: true,
           startAt: true,
           endAt: true,
+          competitionConfigVersionId: true,
           placeName: true,
           status: true,
           createdAt: true,
@@ -156,11 +158,13 @@ export async function updateTournamentMatchInTx(
     });
   }
   const nextPlaceName = input.venue !== undefined ? input.venue.trim() || null : detail.teamMatch.placeName;
+  // 길이를 아는 경기는 그 길이를 새 시작에 그대로 옮기고, 종료 시각이 없던 경기는 새 시작 +
+  // 경기 설정의 정규 시간(연장 제외 피리어드 합계)으로 채운다 — 대진 생성과 같은 기준이다.
   const nextEndAt = nextStartAt === null
     ? null
     : detail.teamMatch.startAt !== null && detail.teamMatch.endAt !== null
       ? new Date(nextStartAt.getTime() + (detail.teamMatch.endAt.getTime() - detail.teamMatch.startAt.getTime()))
-      : detail.teamMatch.endAt;
+      : detail.teamMatch.endAt ?? await defaultFixtureEndAt(tx, detail.teamMatch.competitionConfigVersionId, nextStartAt);
 
   try {
     await tx.v1TournamentMatchDetails.update({

@@ -4356,6 +4356,8 @@ export type V1LineupSizeOptions = {
   defaultSubstitutionMode: V1SubstitutionMode | null;
   /** canonical 기본 교체 횟수 — substitutionMode가 'rolling'이면 항상 null. */
   defaultMaxSubstitutions: number | null;
+  /** 대회 생성 화면 "경기 시간"의 기본 피리어드(연장 제외) — 축구 전반 45·후반 45, 풋살 20·20. 미지원 종목은 []. */
+  defaultPeriods?: Array<{ label: string; durationMinutes: number }>;
 };
 
 /** "교체 방식" — 후보→주전 교체를 제한할지(limited), 무제한 롤링으로 둘지(rolling). */

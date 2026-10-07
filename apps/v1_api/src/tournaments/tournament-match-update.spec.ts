@@ -50,6 +50,7 @@ function fakeTx() {
   const calls: string[] = [];
   const events: unknown[] = [];
   const tx = {
+    v1CompetitionConfigVersion: { findUnique: jest.fn().mockResolvedValue(null) },
     $executeRaw: jest.fn(async (strings: TemplateStringsArray, ...values: unknown[]) => {
       if (!strings.join('?').includes('INSERT INTO v1_outbox_events')) throw new Error('unexpected raw execute');
       calls.push('enqueue');

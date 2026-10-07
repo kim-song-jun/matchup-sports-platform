@@ -3,6 +3,7 @@ import {
   parseLineupLimits,
   parsePeriodDurations,
   parseResultPolicy,
+  regulationMinutes,
 } from './competition-config.parse';
 import { FOOTBALL_V1_CONFIG, FUTSAL_V1_CONFIG } from './competition-config.presets';
 
@@ -176,6 +177,29 @@ describe('parsePeriodDurations', () => {
  * 그렇듯 파싱 결과를 그대로 응답에 실을 수 있게). 이 형태는 이 테스트가 못 박는 계약이므로,
  * 구현이 다른 키를 고르면 여기와 `competition-config.types.ts` 를 함께 바꿔야 한다.
  */
+describe('regulationMinutes', () => {
+  it('연장을 뺀 피리어드 길이의 합이다 — 축구 45+45, 풋살 20+20', () => {
+    expect(regulationMinutes(FOOTBALL_V1_CONFIG.periods as never)).toBe(90);
+    expect(regulationMinutes(FUTSAL_V1_CONFIG.periods as never)).toBe(40);
+    expect(regulationMinutes([
+      { durationMinutes: 25, extraTime: false },
+      { durationMinutes: 25, extraTime: false },
+      { durationMinutes: 10, extraTime: true },
+    ])).toBe(50);
+  });
+
+  it('전·후반 없는 단판 경기는 그 한 피리어드 길이다', () => {
+    expect(regulationMinutes([{ code: 'SINGLE_PERIOD', label: '단일', durationMinutes: 30, extraTime: false }])).toBe(30);
+  });
+
+  it('길이를 모르는 피리어드가 있거나 레거시 {count} 모양이면 지어내지 않고 null', () => {
+    expect(regulationMinutes({ count: 2 })).toBeNull();
+    expect(regulationMinutes([{ durationMinutes: 20, extraTime: false }, { label: '후반' }])).toBeNull();
+    expect(regulationMinutes([])).toBeNull();
+    expect(regulationMinutes(null)).toBeNull();
+  });
+});
+
 describe('parseResultPolicy', () => {
   it('키가 없으면 FIFA 정규(earlyStop: true)를 기본값으로 쓴다', () => {
     expect(parseResultPolicy(null)).toEqual({ earlyStop: true });

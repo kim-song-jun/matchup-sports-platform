@@ -267,8 +267,8 @@ export interface V1LeagueFixtureScheduleTemplate {
 
 /** "한 구장 순차 진행" 설정 — 서버 LeagueFixtureTimingDto와 동일 계약. */
 export interface V1LeagueFixtureTimingPayload {
-  /** 경기당 소요 시간(분), 5~240. */
-  gameDurationMinutes: number;
+  /** 경기당 소요 시간(분), 5~240. 생략하면 서버가 경기 설정의 정규 시간(전·후반 합계, 단판이면 그 길이)을 쓴다. */
+  gameDurationMinutes?: number;
   /** 경기 간 휴식(분), 0~120. 생략 시 서버 기본 0. */
   breakMinutes?: number;
   /** 팀당 매치데이(하루) 경기 수, 1~10. 생략 시 서버 기본 1. */

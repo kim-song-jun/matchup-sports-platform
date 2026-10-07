@@ -213,6 +213,7 @@ export class TournamentBracketService {
         substitutionModes: [],
         defaultSubstitutionMode: null,
         defaultMaxSubstitutions: null,
+        defaultPeriods: [],
       };
     }
     const canonical = canonicalCompetitionConfigForSport(normalizedSportCode);
@@ -224,6 +225,10 @@ export class TournamentBracketService {
       substitutionModes: this.lineupSizeConfigResolver.selectableSubstitutionModes(),
       defaultSubstitutionMode: canonical.lineup.substitutions,
       defaultMaxSubstitutions: canonical.lineup.maxSubstitutions,
+      // 대회 생성 화면의 "경기 시간"(피리어드별 길이 — 전·후반 또는 단판) 기본값 — 연장은 정규 시간이 아니라 뺀다.
+      defaultPeriods: canonical.periods
+        .filter((period) => !period.extraTime)
+        .map((period) => ({ label: period.label, durationMinutes: period.durationMinutes })),
     };
   }
 

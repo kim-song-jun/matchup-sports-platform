@@ -23,6 +23,7 @@ import {
   leagueMirrorCreateData,
   toMirrorSource,
 } from '../tournaments/league-competition-mirror';
+import { defaultFixtureEndAt, regulationMinutesForConfigVersion } from '../tournaments/competition-config/fixture-end-at';
 import { buildOddTeamCountWarning, checkLeagueTeamRemovalAllowed } from './league-lifecycle-rules';
 import {
   createLeagueRosterRegistration,
@@ -466,10 +467,22 @@ export class LeagueMatchAdminService {
   // generateFixtures/previewFixtures/regenerateFixtures 공용: timing DTO를 기본값 채운
   // 계산 옵션으로 정규화하고, 총 라운드 수(주차 수 × 팀당 하루 경기 수)를 확정한다.
   // 상한 검증은 형식이 아니라 도메인 규칙이므로 DTO가 아니라 여기서 소유한다.
-  private resolveFixturePlan(dto: GenerateLeagueFixturesDto): { totalRounds: number; timing?: FixtureTimingOptions } {
+  // 경기 시간(gameDurationMinutes)을 비우면 경기 설정의 정규 시간(연장 제외 피리어드 합계)을 쓴다 — 그것도
+  // 모르면(레거시 설정) 지어내지 않고 입력을 요구한다.
+  private resolveFixturePlan(
+    dto: GenerateLeagueFixturesDto,
+    defaultGameMinutes: number | null,
+  ): { totalRounds: number; timing?: FixtureTimingOptions } {
+    const gameDurationMinutes = dto.timing ? dto.timing.gameDurationMinutes ?? defaultGameMinutes : null;
+    if (dto.timing && gameDurationMinutes === null) {
+      throw new UnprocessableEntityException({
+        code: 'LEAGUE_FIXTURE_DURATION_REQUIRED',
+        message: '이 리그의 기본 경기 시간을 알 수 없어요. 경기 시간(분)을 입력해 주세요.',
+      });
+    }
     const timing: FixtureTimingOptions | undefined = dto.timing
       ? {
-          gameDurationMinutes: dto.timing.gameDurationMinutes,
+          gameDurationMinutes: gameDurationMinutes!,
           breakMinutes: dto.timing.breakMinutes ?? 0,
           gamesPerTeamPerDay: dto.timing.gamesPerTeamPerDay ?? 1,
         }
@@ -540,7 +553,8 @@ export class LeagueMatchAdminService {
       throw new ConflictException({ code: 'COMPETITION_CONFIG_REQUIRED', message: '이 종목에 활성 경기 설정이 없어요.' });
     }
     const teamIds = league.teams.map((entry) => entry.teamId);
-    const { totalRounds, timing } = this.resolveFixturePlan(dto);
+    const regulation = await regulationMinutesForConfigVersion(this.prisma, config.id);
+    const { totalRounds, timing } = this.resolveFixturePlan(dto, regulation);
     const schedule = generateRoundRobinFixtures(teamIds, totalRounds);
     // 날짜 검증은 **트랜잭션 밖**에서 한다 — 도메인 거부가 락을 잡을 이유가 없다.
     const matchdayStartAts = this.resolveScheduleStartAts(dto, totalRounds, timing);
@@ -884,7 +898,8 @@ export class LeagueMatchAdminService {
         message: '공식 결과가 확정된 대진이 있어 대진을 다시 만들 수 없어요.',
       });
     }
-    const { totalRounds, timing } = this.resolveFixturePlan(dto);
+    const regulation = await regulationMinutesForConfigVersion(this.prisma, config.id);
+    const { totalRounds, timing } = this.resolveFixturePlan(dto, regulation);
     const schedule = generateRoundRobinFixtures(teamIds, totalRounds);
     const matchdayStartAts = this.resolveScheduleStartAts(dto, totalRounds, timing);
     const slots = timing
@@ -906,18 +921,24 @@ export class LeagueMatchAdminService {
             : new Set(schedule.map((fixture) => fixture.round)).size,
       fixtureCount: schedule.length,
       placeName,
-      fixtures: schedule.map((fixture, index) => ({
-        round: fixture.round,
-        matchday: slots !== undefined ? slots[index].matchday : fixture.round,
-        orderInDay: slots !== undefined ? slots[index].orderInDay : null,
-        homeTeamId: fixture.homeTeamId,
-        awayTeamId: fixture.awayTeamId,
-        startAt:
+      fixtures: schedule.map((fixture, index) => {
+        const startAt =
           slots !== undefined
             ? slots[index].startAt
-            : (matchdayStartAts?.[fixture.round - 1] ?? resolveFixtureStartAt(league.startsOn, fixture.round)),
-        endAt: slots !== undefined ? slots[index].endAt : null,
-      })),
+            : (matchdayStartAts?.[fixture.round - 1] ?? resolveFixtureStartAt(league.startsOn, fixture.round));
+        return {
+          round: fixture.round,
+          matchday: slots !== undefined ? slots[index].matchday : fixture.round,
+          orderInDay: slots !== undefined ? slots[index].orderInDay : null,
+          homeTeamId: fixture.homeTeamId,
+          awayTeamId: fixture.awayTeamId,
+          startAt,
+          // 실제 생성(createLeagueFixture)과 같은 기본값 — 경기 시간을 비우면 시작 + 정규 시간.
+          endAt: slots !== undefined
+            ? slots[index].endAt
+            : regulation === null ? null : new Date(startAt.getTime() + regulation * 60_000),
+        };
+      }),
       warnings: buildOddTeamCountWarning(teamIds.length),
     };
   }
@@ -1027,7 +1048,8 @@ export class LeagueMatchAdminService {
       throw new ConflictException({ code: 'COMPETITION_CONFIG_REQUIRED', message: '이 종목에 활성 경기 설정이 없어요.' });
     }
     const teamIds = league.teams.map((entry) => entry.teamId);
-    const { totalRounds, timing } = this.resolveFixturePlan(dto);
+    const regulation = await regulationMinutesForConfigVersion(this.prisma, config.id);
+    const { totalRounds, timing } = this.resolveFixturePlan(dto, regulation);
     const matchdayStartAts = this.resolveScheduleStartAts(dto, totalRounds, timing);
     const schedule = generateRoundRobinFixtures(teamIds, totalRounds);
 
@@ -1289,14 +1311,18 @@ export class LeagueMatchAdminService {
     // 감사 결함(index 9): timing으로 생성된 대진은 startAt·endAt이 한 슬롯의 시작·끝이다.
     // startAt만 바꾸고 endAt을 그대로 두면 "종료가 시작보다 이전"인 옛 값이 남는다 — 원래
     // duration(endAt-startAt, generateFixtures가 resolveFixtureTimeSlots로 채운 값)을 새
-    // startAt에 그대로 적용해 유지한다. timing 없이 만들어져 endAt이 애초에 없는(null)
-    // 대진은 계속 없음으로 둔다 — duration 자체가 정의되지 않으므로 임의로 만들어내지 않는다.
+    // startAt에 그대로 적용해 유지한다. 종료 시각이 없던(이 규칙 이전에 만든) 대진은 새 시작 +
+    // 경기 설정의 정규 시간(연장 제외 피리어드 합계)으로 채운다 — 생성 경로와 같은 기준이다.
     const durationMs = teamMatch.endAt !== null && teamMatch.startAt !== null
       ? teamMatch.endAt.getTime() - teamMatch.startAt.getTime()
       : null;
     const nextStartAt = dto.startsAt === undefined ? undefined : new Date(dto.startsAt);
-    const nextEndAt = nextStartAt !== undefined && durationMs !== null ? new Date(nextStartAt.getTime() + durationMs) : undefined;
     const updated = await this.prisma.$transaction(async (tx) => {
+      const nextEndAt = nextStartAt === undefined
+        ? undefined
+        : durationMs !== null
+          ? new Date(nextStartAt.getTime() + durationMs)
+          : (await defaultFixtureEndAt(tx, teamMatch.competitionConfigVersionId, nextStartAt)) ?? undefined;
       // generateFixtures와 동일하게: 빈/공백 문자열로 지우는 요청은 "미지정"으로 되돌린다 —
       // 그대로 저장하면 loadRecentVenues distinct 집계에서 조용히 빠지는 값이 남는다.
       const trimmedPlaceName = dto.placeName === undefined ? undefined : dto.placeName.trim();

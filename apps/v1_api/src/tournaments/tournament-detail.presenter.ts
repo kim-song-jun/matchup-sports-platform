@@ -352,6 +352,8 @@ export function presentTournamentDetail(
     genderMinFemale: row.genderMinFemale,
     genderMaxFemale: row.genderMaxFemale,
     entryFee: row.entryFee,
+    // 미설정 리그만 false — 화면이 0원을 '무료'로 말하지 않게 한다. 대회는 항상 true. 입금 계좌는 이 응답에 없다.
+    entryFeeConfigured: row.kind === 'regular_league' ? row.entryFeeConfiguredAt !== null : true,
     rulesText: row.rulesText,
     refundPolicyText: row.refundPolicyText,
     prizePool: row.prizePool,

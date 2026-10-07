@@ -26,6 +26,9 @@ export const SENSITIVE_KEYS: readonly string[] = [
   'birthDate',
   'cardNumber',
   'cvc',
+  // 리그 참가비 입금 계좌(entry-fee 요청 본문). bankName 은 공개 가능한 은행명이라 제외.
+  'bankAccount',
+  'bankHolder',
 ];
 
 const REDACTED = '[REDACTED]' as const;

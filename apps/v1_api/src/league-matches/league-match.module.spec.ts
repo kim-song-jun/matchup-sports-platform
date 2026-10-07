@@ -5,7 +5,12 @@ import { TermsModule } from '../terms/terms.module';
 import { UploadsService } from '../uploads/uploads.service';
 import { LeagueFixtureVideosController } from './league-fixture-videos.controller';
 import { LeagueFixtureVideosService } from './league-fixture-videos.service';
+import { LeagueCoverImageService } from './league-cover-image.service';
+import { LeagueEntryFeeController } from './league-entry-fee.controller';
+import { LeagueEntryFeeService } from './league-entry-fee.service';
 import { LeagueMatchModule } from './league-match.module';
+import { LeagueMatchSettingsController } from './league-match-settings.controller';
+import { LeagueRegistrationCloseService } from './league-registration-close.service';
 
 /**
  * DI 그래프가 실제로 풀리고 **컨트롤러가 모듈에 등록돼 있는지** 확인한다 —
@@ -38,5 +43,14 @@ describe('LeagueMatchModule wiring', () => {
     expect(moduleRef.get(LeagueFixtureVideosController)).toBeInstanceOf(LeagueFixtureVideosController);
     expect(moduleRef.get(LeagueFixtureVideosService)).toBeInstanceOf(LeagueFixtureVideosService);
     expect(moduleRef.get(UploadsService)).toBeInstanceOf(UploadsService);
+  });
+
+  // 서비스·컨트롤러가 import 만 되고 모듈에 안 올라가면 유닛은 green 인데 alpha 에서 라우트가 404 다.
+  it('resolves the close-registration, cover-image and entry-fee controllers and services', () => {
+    expect(moduleRef.get(LeagueMatchSettingsController)).toBeInstanceOf(LeagueMatchSettingsController);
+    expect(moduleRef.get(LeagueEntryFeeController)).toBeInstanceOf(LeagueEntryFeeController);
+    expect(moduleRef.get(LeagueRegistrationCloseService)).toBeInstanceOf(LeagueRegistrationCloseService);
+    expect(moduleRef.get(LeagueCoverImageService)).toBeInstanceOf(LeagueCoverImageService);
+    expect(moduleRef.get(LeagueEntryFeeService)).toBeInstanceOf(LeagueEntryFeeService);
   });
 });

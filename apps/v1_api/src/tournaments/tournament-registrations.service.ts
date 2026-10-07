@@ -787,7 +787,8 @@ export class TournamentRegistrationsService {
     const paymentInstructions =
       payment?.method === 'bank_transfer' &&
       payment.status === 'ready' &&
-      (tournament?.entryFee ?? 0) > 0 &&
+      // 신청 당시 금액(스냅샷)이 기준이다 — 현재 참가비가 0으로 바뀌어도 이미 낸 유료 신청의 입금 안내는 유지된다.
+      (payment.amount ?? 0) > 0 &&
       tournament?.bankName?.trim() &&
       tournament.bankAccount?.trim() &&
       tournament.bankHolder?.trim()

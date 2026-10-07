@@ -572,6 +572,7 @@ export class LeagueMatchAdminService {
       // 보호가 **조용히** 사라지고, ② 그 테이블이 사라지는 릴리스에서 relation does not exist
       // 로 깨진다. BE-5 drop 이 정확히 ②를 일으켰다 — 통합 스펙이 500 으로 잡았다.
       await tx.$queryRaw`SELECT id FROM "v1_tournaments" WHERE id = ${leagueId} FOR UPDATE`;
+      await this.assertFixtureGenerationAllowedInTx(tx, leagueId);
       const existingCount = await tx.v1TeamMatch.count({ where: { leagueId } });
       if (existingCount > 0) {
         throw new ConflictException({ code: 'LEAGUE_FIXTURES_EXIST', message: '이미 대진이 생성된 리그예요.' });
@@ -1061,6 +1062,7 @@ export class LeagueMatchAdminService {
 
     const result = await this.prisma.$transaction(async (tx) => {
       await tx.$queryRaw`SELECT id FROM "v1_tournaments" WHERE id = ${leagueId} FOR UPDATE`;
+      await this.assertFixtureGenerationAllowedInTx(tx, leagueId);
       const existingFixtures = await tx.v1TeamMatch.findMany({
         where: { leagueId },
         select: {
@@ -1600,7 +1602,7 @@ export class LeagueMatchAdminService {
       }
       // 조건부 UPDATE 가 승자 판정이다 — 그 사이 상태가 바뀌었으면 0행이라 덮어쓰지 않는다.
       const held = await tx.v1Tournament.updateMany({
-        where: { id: leagueId, kind: 'regular_league', status: league.status },
+        where: { id: leagueId, kind: 'regular_league', deletedAt: null, status: league.status, isPublic: league.isPublic },
         data: { status: 'on_hold', heldFromStatus: league.status, heldFromPublic: league.isPublic, isPublic: false },
       });
       if (held.count !== 1) {
@@ -1736,6 +1738,20 @@ export class LeagueMatchAdminService {
       tx,
     );
     return false;
+  }
+
+  private async assertFixtureGenerationAllowedInTx(tx: Prisma.TransactionClient, leagueId: string) {
+    // 계획 계산 뒤 보류가 커밋될 수 있으므로 정본 행 잠금 뒤의 최신 상태로 판정한다.
+    const league = await findTournamentOnSurface(tx, ['regular_league'], {
+      where: { id: leagueId, deletedAt: null },
+      select: { status: true },
+    });
+    if (league === null) {
+      throw new NotFoundException({ code: 'LEAGUE_NOT_FOUND', message: '리그를 찾을 수 없어요.' });
+    }
+    if (league.status === 'on_hold') {
+      throw new ConflictException({ code: 'LEAGUE_ON_HOLD', message: '보류 중에는 대진을 만들거나 다시 만들 수 없어요. 먼저 보류를 해제해 주세요.' });
+    }
   }
 
   private async loadLeague(leagueId: string) {

@@ -69,6 +69,9 @@ describe('리그 보류·보류 해제 HTTP/DB 계약', () => {
     expect((await admin('post', '/hold', { reason: '다시' }).expect(200)).body.data.alreadyProcessed).toBe(true);
     // 보류 중에는 공개로 돌릴 수 없다 — 보류 해제가 공개도 되돌린다.
     expect((await admin('patch', '/visibility', { isPublic: true }).expect(409)).body.code).toBe('LEAGUE_ON_HOLD');
+    expect((await admin('post', '/fixtures', { weeksCount: 1 }).expect(409)).body.code).toBe('LEAGUE_ON_HOLD');
+    expect((await admin('post', '/fixtures/regenerate', { weeksCount: 1, reason: '보류 상태에서 재생성' }).expect(409)).body.code).toBe('LEAGUE_ON_HOLD');
+    expect(await prisma.v1TeamMatch.findMany({ where: { leagueId }, select: { id: true, status: true } })).toEqual(fixtures);
     const detail = await request(app.getHttpServer()).get(`/api/v1/admin/league-matches/${leagueId}`).set('x-v1-user-id', ownerUserId).expect(200);
     expect(detail.body.data).toMatchObject({ state: 'on_hold', isPublic: false });
 

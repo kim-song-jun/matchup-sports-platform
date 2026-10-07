@@ -47,7 +47,11 @@ hold returns `alreadyProcessed: true`. While on hold,
 `PATCH .../visibility` with `isPublic: true` returns `409 LEAGUE_ON_HOLD`; resuming
 restores visibility. Both actions record `league_match.hold` / `league_match.resume`
 in the admin audit and return `{ leagueId, state, isPublic, alreadyProcessed }`.
-A concurrent status change returns `409 LEAGUE_STATE_CHANGED`.
+A concurrent status or visibility change returns `409 LEAGUE_STATE_CHANGED`;
+hold compares both values so a newly private league is never restored as public.
+While on hold, fixture generation and regeneration return `409 LEAGUE_ON_HOLD`
+without creating or cancelling fixtures. Both actions recheck the status after
+locking the parent league row, including a hold committed during plan calculation.
 
 ## Create a league
 

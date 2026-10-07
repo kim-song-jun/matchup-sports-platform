@@ -256,8 +256,12 @@ The frontend (`apps/v1_web/src/components/public-game-records/**`) polls
 `GET /tournaments/:id/schedule` and `GET /tournaments/:id/matches/:fixtureId`
 on a fixed interval (`use-public-game-records.ts`). Schedule polling includes
 `scheduled` and `live` entries in both scheduled and time-unset lists, so kickoff
-and the end of a time-unset game appear without a reload. Match-detail polling
-remains limited to `status === 'live'`. The bracket hub loads cursor pages
+and the end of a time-unset game appear without a reload. Match detail (and the
+league fixture record and the bracket's tournament detail) polls while `live`, and
+for a `scheduled` game from 15 minutes before `scheduledAt` until 3 hours after it
+(`publicLivePollDelay` in `apps/v1_web/src/lib/public-live-polling.ts`); before that
+window it re-checks at most every 15 minutes, so a page opened before kickoff picks
+up the start without a reload. Ended, cancelled and time-unset detail pages do not poll. The bracket hub loads cursor pages
 sequentially and displays all live entries first, then groups A/B/C and knockout
 rounds in competition order; live entries do not also appear in the regular list. A public,
 potentially-hundreds-of-viewers surface deliberately does not reuse the

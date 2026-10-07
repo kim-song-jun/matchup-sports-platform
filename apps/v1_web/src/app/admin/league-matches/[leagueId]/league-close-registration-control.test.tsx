@@ -64,10 +64,11 @@ describe('LeagueCloseRegistrationControl', () => {
     expect(screen.getByText('현재 계정은 신청을 마감할 권한이 없어요.')).toBeInTheDocument();
   });
 
-  it('모달은 낸 신청 6팀 중 확정 4 · 대기 2 를 보여 주고, 사유를 비우면 reason 키 없이 보낸다', () => {
+  it('모달은 팀이 직접 낸 신청 6팀 중 확정 4 · 대기 2 를 보여 주고, 사유를 비우면 reason 키 없이 보낸다', () => {
     renderControl();
     fireEvent.click(screen.getByRole('button', { name: '지금 마감하기' }));
     const dialog = screen.getByRole('dialog');
+    expect(within(dialog).getByText('팀이 직접 낸 신청')).toBeInTheDocument();
     expect(within(dialog).getByText('6팀 (확정 4 · 대기 2)')).toBeInTheDocument();
     expect(within(dialog).getByText(/대기 중인 2팀은 마감 뒤에도 처리할 수 있어요/)).toBeInTheDocument();
     fireEvent.click(within(dialog).getByRole('button', { name: '지금 마감' }));

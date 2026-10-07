@@ -299,7 +299,7 @@ function ChangeDetails({ change, league }: { change: PendingChange; league: Leag
       ) : null}
       <p className="mt-2 text-[length:var(--font-size-caption)] text-[var(--text-muted)]">
         {change.feeChanged
-          ? `이미 신청한 ${count}팀은 신청할 때의 금액이 그대로 유지돼요. 새로 신청하는 팀부터 ${money(change.payload.entryFee)}이에요.`
+          ? `직접 신청한 ${count}팀은 신청할 때의 금액이 그대로 유지돼요. 새로 신청하는 팀부터 ${money(change.payload.entryFee)}이에요.`
           : '입금 대기 중인 팀에게도 새 계좌가 보여요.'}
       </p>
     </>

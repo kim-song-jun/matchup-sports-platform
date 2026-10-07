@@ -29,6 +29,7 @@ export const v1LeagueVisibilityFixture: {
     bankAccount: null,
     bankHolder: null,
     activeRegistrationCount: 0,
+    confirmedRegistrationCount: 0,
     fixtures: [],
   },
   adminListItem: {

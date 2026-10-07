@@ -32,3 +32,15 @@ export function countLeagueActiveRegistrations(
 ): Promise<number> {
   return client.v1TournamentRegistration.count({ where: leagueActiveRegistrationWhere(leagueId) });
 }
+
+/** 같은 모집단 중 확정된 신청 — 활성 신청 수와 나란히 보여 주므로 seeded·promoted 를 섞지 않는다. */
+export function leagueConfirmedApplicationWhere(leagueId: string): Prisma.V1TournamentRegistrationWhereInput {
+  return { ...leagueActiveRegistrationWhere(leagueId), status: 'confirmed' };
+}
+
+export function countLeagueConfirmedApplications(
+  client: Pick<Prisma.TransactionClient, 'v1TournamentRegistration'>,
+  leagueId: string,
+): Promise<number> {
+  return client.v1TournamentRegistration.count({ where: leagueConfirmedApplicationWhere(leagueId) });
+}

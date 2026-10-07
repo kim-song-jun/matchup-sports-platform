@@ -17,7 +17,7 @@ import {
   syncTeamMatchScheduleInTx,
 } from '../team-schedules/team-schedules.service';
 import { scheduleLeagueResultEntryReminder } from '../jobs/league-reminders/league-result-entry-reminder.service';
-import { countLeagueActiveRegistrations } from './league-active-registration';
+import { countLeagueActiveRegistrations, countLeagueConfirmedApplications } from './league-active-registration';
 import { LeagueCompletionProjectionService } from './league-completion-projection.service';
 import {
   STATUS_BY_LEAGUE_STATE,
@@ -419,6 +419,7 @@ export class LeagueMatchAdminService {
       bankHolder: league.bankHolder,
       // 화면 힌트 — 사유 필수의 최종 판정은 참가비 저장 트랜잭션의 쓰기 후 카운트가 한다.
       activeRegistrationCount: await countLeagueActiveRegistrations(this.prisma, leagueId),
+      confirmedRegistrationCount: await countLeagueConfirmedApplications(this.prisma, leagueId),
       teamIds,
       recentVenues,
       fixtures: fixtures.map((fixture) => {

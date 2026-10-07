@@ -126,7 +126,7 @@ describe('리그 참가비 설정 HTTP/DB 계약', () => {
     await patchFee({ entryFee: 70000, ...BANK }).expect(200);
     const a = await submitTeam('a');
     expect(a.submitted).toMatchObject({ payment: { amount: 70000 }, paymentInstructions: expect.objectContaining({ bankAccount: BANK.bankAccount }) });
-    expect((await adminDetail()).body.data.activeRegistrationCount).toBe(1);
+    expect((await adminDetail()).body.data).toMatchObject({ activeRegistrationCount: 1, confirmedRegistrationCount: 0 });
 
     // 신청이 있으니 사유가 필요하다 — 없으면 422 이고 DB 값은 그대로.
     expect((await patchFee({ entryFee: 80000 }).expect(422)).body.code).toBe('LEAGUE_ENTRY_FEE_REASON_REQUIRED');

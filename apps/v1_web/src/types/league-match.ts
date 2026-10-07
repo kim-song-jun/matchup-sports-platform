@@ -203,6 +203,8 @@ export interface V1AdminLeagueDetail {
   bankHolder: string | null;
   /** 팀이 직접 낸 활성 신청 수. 사유 필수 판정은 서버가 하고 이 값은 화면 힌트다. */
   activeRegistrationCount: number;
+  /** 같은 모집단(팀이 직접 낸 신청) 중 확정 수 — 운영자 시드 팀은 넣지 않는다. */
+  confirmedRegistrationCount: number;
   fixtures: V1LeagueFixture[];
 }
 
@@ -232,7 +234,8 @@ type V1AdminOnlyLeagueFields =
   | 'bankAccount'
   | 'bankHolder'
   | 'entryFeeConfiguredAt'
-  | 'activeRegistrationCount';
+  | 'activeRegistrationCount'
+  | 'confirmedRegistrationCount';
 
 export interface V1PublicLeagueDetail extends Omit<V1AdminLeagueDetail, V1AdminOnlyLeagueFields> {
   /** 참가비를 운영자가 확정했는가. `false` 면 참가비를 '무료'로 말하지 않는다. */

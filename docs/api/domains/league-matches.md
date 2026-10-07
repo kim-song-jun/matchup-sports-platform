@@ -157,7 +157,9 @@ lock); it is intentionally not opened for leagues.
 
 - Admin detail (`GET /api/v1/admin/league-matches/:leagueId`) adds `sportCode`,
   `coverImageUrl`, `entryFee`, `entryFeeConfiguredAt` (ISO or `null`), `bankName`,
-  `bankAccount`, `bankHolder` and `activeRegistrationCount` (a screen hint; the final
+  `bankAccount`, `bankHolder`, `activeRegistrationCount` and `confirmedRegistrationCount`
+  (both count only team-submitted registrations, so operator-seeded teams never make
+  "confirmed" exceed "active"; screen hints — the final
   reason-required decision is the save transaction's own count). Bank fields are
   admin-only.
 - Public detail (`GET /api/v1/league-matches/:leagueId`) adds `sportCode`,

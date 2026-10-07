@@ -1,6 +1,6 @@
 # Task 20261025: 정규 리그 공개 여부 설정
 
-Status: In Progress
+Status: In Progress — 운영 비공개 적용 완료, 관리자 UI 실측 미완
 **Owner**: Codex root; implementation GPT-6-luna; independent review GPT-6-sol
 **Created**: 2026-10-07
 
@@ -13,17 +13,17 @@ Status: In Progress
 ## Original Conditions
 - [x] 사용자 A안 선택: 메인·목록·상세까지 비공개 기능 추가.
 - [x] 삭제·취소·진행 상태 변경 없이 공개 여부만 변경(API 변경 키·unit 검증).
-- [x] alpha migration 후 기존 대회/리그 59개는 공개 상태 유지. production은 배포 후 확인.
-- [ ] 운영 서비스 대상은 id 22cad756-211f-4438-9066-208efabd3a2e.
-- [ ] 운영 반영은 dev → main 승격과 production 승인·배포 뒤 진행. 2026-10-07 사용자가 승격 PR 생성을 명시적으로 요청했다.
+- [x] alpha migration 후 기존 대회/리그 59개는 공개 상태 유지. production 배포 후 대상 isPublic=true와 데이터 해시 보존을 확인한 뒤 승인된 대상만 false로 변경.
+- [x] 운영 서비스 대상 id 22cad756-211f-4438-9066-208efabd3a2e 적용 완료.
+- [x] 사용자 승인 dev → main 승격 PR #1641 머지, production 승인 게이트 및 canonical 배포 완료 후 DB 전환.
 
 ## User Scenarios
 관리자가 정규 리그 상세의 공개 설정에서 비공개를 저장한다. 일반 사용자는 목록·검색·직접 공개 상세에서 볼 수 없으며, 관리자는 같은 리그와 대진을 계속 운영한다. 다시 공개하면 기존 정보가 표시된다.
 
 ## Test Scenarios
-- [ ] 비공개 리그의 공개 목록·상세·파생 공개 경기 차단; 공개 리그 유지.
+- [x] 운영 비공개 리그의 공개 목록·상세·파생 경기 24개 차단; 공개 대회 4개 조회와 health 정상. 운영에 남은 공개 정규 리그는 0개.
 - [ ] 일반 계정의 공개 설정 변경 거부; 관리자 저장 및 감사 기록.
-- [ ] 공개/비공개 전환 시 기존 진행 상태·참가팀·대진 보존.
+- [x] 운영 true→false 전환의 진행 상태·참가 등록·출전자·대진·경기 데이터 해시 보존. 다시 공개하는 실제 운영 전환은 실행하지 않음.
 - [x] 프론트 payload/오류 처리와 mock 계약 일치(unit 검증; 실제 웹 저장은 별도).
 - [x] 변경 범위의 좁은 테스트·typecheck, 독립 리뷰.
 - [ ] alpha 실제 화면 및 사용자 동선 검증. 배포 접근 제한 시 정확한 미검증 범위 기록.
@@ -53,6 +53,7 @@ Status: In Progress
 - 2026-10-07 A안 선택 완료. 공개 범위: 메인·목록·검색·상세. 관리자 운영 보존. 새 디자인 대안/요금/정원/대진 수정은 범위 밖.
 - 공개 설정 구현 계약: V1Tournament.isPublic(Boolean, DB is_public), default true; 정규 리그 관리에서 제어. DTO whitelist에 맞춘 별도 관리자 visibility endpoint를 우선 사용.
 - 2026-10-07 사용자 추가 요청: dev → main 승격 PR 생성. 릴리스 전체 dev 변경을 승격하며 API/Web fixed version 1.3.0으로 Changeset 32개를 소비한다. 기존 웹 로그인 요청에는 아직 답이 없어 실제 관리자 UI 저장 검증은 남아 있다.
+- 2026-10-07 최종 사용자 요청은 운영 A안과 수원 대상의 DB 직접 전환이다. 사용자의 dev→main 승격 요청과 함께 production 승인까지 진행했다. 후속 수정 Changeset 1개를 추가 소비해 최종 package는 1.3.1, 기존 resolver에 따른 운영 release 표시는 1.3.2다. 관리자 UI 실측 완료로 해석하지 않는다.
 
 ## Progress Snapshot
 - 조사 완료: 운영 스키마에도 별도 비공개 필드 없음. 운영 쓰기 0건.
@@ -88,3 +89,13 @@ Status: In Progress
 - 공개 설정 API 문서를 HTTP 타입 검증과 sync하고 API/Web patch Changeset을 추가했다. 예정 릴리스는 fixed 1.3.1이다. 제품 변경의 dev CI/alpha를 먼저 검증한 뒤 Changeset을 소비하고 최종 승격 후보를 다시 확인한다.
 - 운영 READ ONLY SSM 14a0a06f-2130-4b29-90c4-30bd9dc79130에서 M11(20260903180000_v1_drop_league_tables) 적용을 확인했다. Stage A/B 재전환 없이 일반 운영 배포 경로를 사용한다. 대상은 등록 4개·대진 24개, deletedAt=null, in_progress를 유지했다. 직접 DB 실행은 AWS 실행 주체를 SYSTEM으로 기록하고 다른 리그·참가·대진·경기·가격·정원은 수정하지 않는다.
 - CodeQL 6dfefa73f check는 SUCCESS로 바뀌어 제목 matcher 경고가 해소됐다. 이전 별도 PR의 번호/다차전/이미지 hydration/QA helper 지적은 해당 리뷰가 기존 미해결 범위로 구분했으며, 이 운영 비공개 요청의 변경 범위에 추가하지 않았다.
+- 최종 package 커밋 e2fba07d9fc2701c7413b6368c16aeacf369302c: API/Web 1.3.1, Changeset 총 33개 소비. exact 5 paths 커밋 및 release shape/promotion gate/diff check 통과. dev CI 37544886122, PR CI 37544890571(API/Web/Gates), CodeQL check·3 analysis, alpha 37544886145 모두 success. alpha HTTP 200, 동일 SHA와 release 1.3.2-alpha.20261007.ge2fba07d9fc2 확인.
+- PR #1641(dev→main)은 사용자 승격 요청에 따라 2026-10-06T23:29:29Z 머지됐다. main merge SHA 9f987cf2bdc90bbd704a86762341f263c46bb0e4는 최종 dev 후보와 tree diff 0이다. origin/main을 local dev에 FF로 흡수하고 dev에 정상 push했다. branch/worktree/stash/reset/전체 staging을 사용하지 않았다.
+- canonical 운영 배포 37546848573은 Gates/API/Web/Build images/Deploy 모두 success. 기존 kim-song-jun credential은 production reviewer이며 current_user_can_approve=true를 확인해 승인했다(environment18023983320, deployment6897949980). 실제 HTTP 200, commit9f987cf2bdc90bbd704a86762341f263c46bb0e4, release1.3.2. Task168 Stage A/B 재실행 0회.
+- 운영 READ ONLY SSM a5a51323-338d-4c48-be62-245114a17035: visibility migration·bye migration·M11 원장 확인, 대상 isPublic=true, in_progress, deletedAt=null, 등록4/경기24와 이전 세 해시 일치. 같은 새 운영 커밋의 상세·순위·선수 기록·웹 상세 200을 전환 직전에 확인했다.
+- 운영 apply SSM c4291eea-c8dc-4448-97e8-1dab66036704는 Success/exit0. Serializable transaction에서 isPublic만 true→false로 저장하고 실제 AWS 실행 주체의 SYSTEM 감사 1개를 생성했다. auditId=d66225cb-74ec-4a79-b685-850fe6cf2c77, requestId=suwon-visibility-75118a27-a755-4d56-b0d0-04c5b84720fc. 다른 scalar metadata/등록+선수/대진+경기+details의 전후 SHA-256이 모두 일치하고 진행 상태·삭제 여부·등록4/경기24가 보존됐다.
+- 데이터 보존 SHA-256: metadata6d594f1fce8248f409c0d00317e96973b9406585cc61706a4de9aeb361720243; registrations a9d651b43e8513b81a9ff8faabc593117873d973ecce0a34ec19fa26cbd179df; matches b69fd9797d8f54d70a6f1a1df2e54c6d14bf0af7714521aeb177f05332236e41.
+- GPT-6-sol이 운영 실행문을 읽기 전용 검토했다. 검사 결과의 실제 apply/true→false/SYSTEM audit/hash/SHA binding과 제목 단독 누출 검증 누락 2건을 수정한 후 focused PASS. reviewer는 운영 실행·테스트·브라우저를 수행하지 않았으며 실제 결과는 root CLI로 별도 검증했다.
+- 운영 after CLI exit0: 공개 경로60개 중404=54,200=5,401=1. 상세/순위/선수 기록, 모든24개 팀 경기·fixture record, 통합 대회 상세·웹 상세·팀 경기 SSR404. 공개 리그/통합 대회 pagination, landing/리그/정규 리그 목록 SSR, sitemap/llms-full에서 대상 ID·제목 및 발견 출력의 경기24 IDs 부재. 공개 대회4개, guest visibility PATCH401, health200/DBtrue, 마지막 HEAD의 동일 운영 SHA를 확인했다.
+- 남은 미검증: 실제 관리자 UI 저장·권한별 웹 동선·반응형 before/after. GitHub Advanced Security AI review37544892963은 claude-opus-5 model not available로 실패한 외부 실행 한계이며 CodeQL success와 구분한다. 운영 DB 직접 전환 완료를 UI 기능 전체 완료로 주장하지 않는다.
+- cleanup: 새 로컬 dev server/browser/proxy/DB 0개. 임시 Python/AWS 실행은 종료 확인. version launcher21379/Node21438 종료. 기존 ego814는 not found. 독립 reviewer completed. 정확한 node comm 기준88→82, 주요 MCP signature 수는 증가하지 않았으며 타 세션 Vitest/Docker/MCP는 종료하지 않았다.

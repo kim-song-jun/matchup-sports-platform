@@ -181,6 +181,7 @@ export function buildTournamentDescription(
     | 'scheduledEndAt'
     | 'venue'
     | 'entryFee'
+    | 'entryFeeConfigured'
     | 'teamCount'
     | 'confirmedCount'
     | 'registrationDeadlineAt'
@@ -192,7 +193,10 @@ export function buildTournamentDescription(
     formatTournamentDateRangeMedium(tournament.scheduledAt, tournament.scheduledEndAt),
     tournament.venue?.trim() || null,
     `${tournament.sport.name} ${competitionFormatLabel(tournament)}`,
-    `참가비 ${formatEntryFee(tournament.entryFee)}`,
+    // 미설정 리그의 entryFee 0 은 '무료' 가 아니라 미확정이다.
+    tournament.kind === 'regular_league' && !tournament.entryFeeConfigured
+      ? null
+      : `참가비 ${formatEntryFee(tournament.entryFee)}`,
   ];
   if (tournament.status === 'open') {
     if (tournament.teamCount) facts.push(`${tournament.teamCount}팀 중 ${tournament.confirmedCount}팀 확정`);

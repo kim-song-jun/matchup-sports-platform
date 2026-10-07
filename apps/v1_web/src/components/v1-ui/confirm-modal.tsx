@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useId, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { waitForOverlayHistory } from '@/lib/overlay-history';
 import { useModalA11y } from './use-modal-a11y';
@@ -102,6 +102,8 @@ interface ConfirmModalProps {
   open: boolean;
   title: string;
   message: string;
+  /** 본문과 사유 입력칸 사이의 요약 영역(예: `.tm-info-row` 줄들). 있을 때만 `aria-describedby` 에 포함된다. */
+  details?: ReactNode;
   /**
    * 확인 버튼 문구. **취소 버튼 문구(기본 '취소')와 같아지지 않게** 실행할 행동을 적는다.
    * 취소 성격의 작업이면 '취소'가 아니라 '초대 취소' / '신청 취소'처럼 대상을 붙인다
@@ -141,6 +143,7 @@ export function ConfirmModal({
   open,
   title,
   message,
+  details,
   confirmLabel = '확인',
   cancelLabel = '취소',
   tone = 'default',
@@ -154,6 +157,7 @@ export function ConfirmModal({
   const idPrefix = useId();
   const titleId = `${idPrefix}-confirm-title`;
   const messageId = `${idPrefix}-confirm-message`;
+  const detailsId = `${idPrefix}-confirm-details`;
   const reasonId = `${idPrefix}-confirm-reason`;
   const reasonHintId = `${idPrefix}-confirm-reason-hint`;
   const [acknowledged, setAcknowledged] = useState(false);
@@ -186,7 +190,7 @@ export function ConfirmModal({
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        aria-describedby={messageId}
+        aria-describedby={details ? `${messageId} ${detailsId}` : messageId}
         className="w-full max-w-[360px] rounded-2xl overflow-hidden"
         style={{
           background: 'var(--surface)',
@@ -210,6 +214,7 @@ export function ConfirmModal({
           >
             {message}
           </p>
+          {details ? <div id={detailsId} style={{ marginTop: 12 }}>{details}</div> : null}
           {reasonField ? (
             <div className="tm-create-field" style={{ marginTop: 16 }}>
               <label className="tm-text-label" htmlFor={reasonId}>

@@ -24,6 +24,7 @@ function buildItem(overrides: Partial<V1TournamentListItem> = {}): V1TournamentL
     teamCount: 16,
     genderCategory: 'mixed',
     entryFee: 0,
+    entryFeeConfigured: true,
     prizePool: null,
     prizeSummary: null,
     prizeBreakdown: null,

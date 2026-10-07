@@ -252,3 +252,40 @@ describe('ConfirmModal layer (W3-V10)', () => {
     expect(modal).toBeGreaterThan(zOf(read('src/app/desktop/_shell.css'), /\.tm-desktop-nav\s*\{[^}]*z-index:\s*(\d+)/));
   });
 });
+
+describe('ConfirmModal details', () => {
+  it('renders details between message and reason field and lists both in aria-describedby', () => {
+    render(
+      <ConfirmModal
+        open
+        title="신청 마감"
+        message="지금 신청을 마감할까요?"
+        details={<p>낸 신청 3팀</p>}
+        reasonField={{ label: '사유', value: '', onChange: () => undefined }}
+        onConfirm={() => undefined}
+        onCancel={() => undefined}
+      />,
+    );
+
+    const dialog = screen.getByRole('dialog');
+    const ids = (dialog.getAttribute('aria-describedby') ?? '').split(' ');
+    expect(ids).toHaveLength(2);
+    const [messageEl, detailsEl] = ids.map((id) => document.getElementById(id));
+    expect(messageEl).toHaveTextContent('지금 신청을 마감할까요?');
+    expect(detailsEl).toHaveTextContent('낸 신청 3팀');
+    // 순서: 본문 → details → 사유 입력칸
+    expect(messageEl!.compareDocumentPosition(detailsEl!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(detailsEl!.compareDocumentPosition(screen.getByLabelText('사유')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('keeps aria-describedby on the message alone and adds no wrapper when details is omitted', () => {
+    render(
+      <ConfirmModal open title="확인" message="진행할까요?" onConfirm={() => undefined} onCancel={() => undefined} />,
+    );
+
+    const describedBy = screen.getByRole('dialog').getAttribute('aria-describedby') ?? '';
+    expect(describedBy.split(' ')).toHaveLength(1);
+    expect(describedBy.endsWith('-confirm-message')).toBe(true);
+    expect(document.querySelector('[id$="-confirm-details"]')).toBeNull();
+  });
+});

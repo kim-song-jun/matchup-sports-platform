@@ -5673,6 +5673,12 @@ import type {
   V1UpdateLeagueFixtureResult,
   V1OpenLeagueRegistrationPayload,
   V1OpenLeagueRegistrationResult,
+  V1CloseLeagueRegistrationPayload,
+  V1CloseLeagueRegistrationResult,
+  V1UpdateLeagueEntryFeePayload,
+  V1UpdateLeagueEntryFeeResult,
+  V1UpdateLeagueCoverImagePayload,
+  V1UpdateLeagueCoverImageResult,
 
   V1CreateManualLeagueFixturePayload,
 
@@ -5824,10 +5830,51 @@ export function useV1OpenLeagueRegistration(leagueId: string) {
   return useMutation({
     mutationFn: (body: V1OpenLeagueRegistrationPayload) =>
       v1Post<V1OpenLeagueRegistrationResult>(`/admin/league-matches/${leagueId}/open-registration`, body),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: v1Keys.adminLeagueMatch(leagueId) });
-      queryClient.invalidateQueries({ queryKey: v1Keys.adminLeagueMatchList() });
-    },
+    onSuccess: () => invalidateLeagueSurfaces(queryClient, leagueId),
+  });
+}
+
+/**
+ * 리그 설정(신청 마감·참가비·대표 이미지) 변경이 비추는 화면 전부 — 어드민 상세·목록, 공개 상세(문자열 id 키는
+ * `leagueMatches()` 의 빈 객체 부분일치에 안 잡혀 따로 필요), `/tournaments/:id`, 통합 목록 카드.
+ */
+function invalidateLeagueSurfaces(queryClient: QueryClient, leagueId: string) {
+  queryClient.invalidateQueries({ queryKey: v1Keys.adminLeagueMatch(leagueId) });
+  queryClient.invalidateQueries({ queryKey: v1Keys.adminLeagueMatchList() });
+  queryClient.invalidateQueries({ queryKey: v1Keys.leagueMatches() });
+  queryClient.invalidateQueries({ queryKey: v1Keys.leagueMatch(leagueId) });
+  queryClient.invalidateQueries({ queryKey: v1Keys.tournament(leagueId) });
+  queryClient.invalidateQueries({ queryKey: v1Keys.tournaments() });
+}
+
+/** 리그 신청을 지금 마감한다(마감 시각을 지금으로). 다시 열기는 `useV1OpenLeagueRegistration`. */
+export function useV1CloseLeagueRegistration(leagueId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: V1CloseLeagueRegistrationPayload) =>
+      v1Post<V1CloseLeagueRegistrationResult>(
+        `/admin/league-matches/${encodeURIComponent(leagueId)}/close-registration`,
+        body,
+      ),
+    onSuccess: () => invalidateLeagueSurfaces(queryClient, leagueId),
+  });
+}
+
+export function useV1UpdateLeagueEntryFee(leagueId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: V1UpdateLeagueEntryFeePayload) =>
+      v1Patch<V1UpdateLeagueEntryFeeResult>(`/admin/league-matches/${encodeURIComponent(leagueId)}/entry-fee`, body),
+    onSuccess: () => invalidateLeagueSurfaces(queryClient, leagueId),
+  });
+}
+
+export function useV1UpdateLeagueCoverImage(leagueId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: V1UpdateLeagueCoverImagePayload) =>
+      v1Patch<V1UpdateLeagueCoverImageResult>(`/admin/league-matches/${encodeURIComponent(leagueId)}/cover-image`, body),
+    onSuccess: () => invalidateLeagueSurfaces(queryClient, leagueId),
   });
 }
 

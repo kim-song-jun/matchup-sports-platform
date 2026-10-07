@@ -28,6 +28,7 @@ import { withFromPath } from '@/lib/session-storage';
 import { competitionDetailHref } from '@/lib/fixture-detail-route';
 import { competitionKindLabel } from '@/lib/v1-status-labels';
 import { formatEntryFee } from '@/lib/date-utils';
+import { resolveRegistrationAmount } from '@/lib/tournament-registration-amount';
 import {
   filterTournamentTeamsBySport,
   getTournamentTeamEmptyState,
@@ -1330,7 +1331,9 @@ function PaymentGuideStep({
   const paymentInstructions =
     registration?.paymentInstructions ?? initialPaymentInstructions;
   // 참가비 0원이면 입금 절차 자체가 없다 — 계좌 안내도, 계좌 미설정 경고도 그리지 않는다.
-  const isFreeEntry = tournament.entryFee === 0;
+  // 신청 이후 화면이라 현재 참가비가 아니라 이 신청의 금액으로 판정한다.
+  const registeredAmount = resolveRegistrationAmount(registration, tournament);
+  const isFreeEntry = registeredAmount === 0;
 
   // aria-live region ref for clipboard confirmation
   const copyLiveRef = useRef<HTMLSpanElement>(null);
@@ -1448,7 +1451,7 @@ function PaymentGuideStep({
                 </div>
               </div>
               <InfoRow label="예금주" value={paymentInstructions.bankHolder.trim() || '—'} />
-              <InfoRow label="입금액" value={formatEntryFee(tournament.entryFee)} />
+              <InfoRow label="입금액" value={formatEntryFee(registeredAmount)} />
               <InfoRow
                 label="입금자명"
                 value={registration?.depositorName ?? '—'}
@@ -1464,7 +1467,7 @@ function PaymentGuideStep({
               <div style={{ marginTop: 12 }}>
                 <InfoRow
                   label="입금액"
-                  value={formatEntryFee(tournament.entryFee)}
+                  value={formatEntryFee(registeredAmount)}
                   isLast
                 />
               </div>

@@ -635,11 +635,9 @@ export function TournamentDetailView({
    */
   const isLeagueMirror = tournament.kind === 'regular_league';
   const showsCapacity = !isLeagueMirror;
-  /* 참가비도 정규 리그에는 개념이 없다 — `V1League` 에 참가비 필드가 **없고**, 거울의
-     `entry_fee` 는 `@default(0)` 이라 그리면 **"무료"** 가 뜬다. 그건 사실이 아니라
-     미설정이다(정원 8 과 같은 자리). 정원과 따로 두는 이유는 두 개념이 언젠가 갈릴 수
-     있어서다 — 한 이름으로 묶으면 그때 이름이 거짓이 된다. */
-  const showsEntryFee = !isLeagueMirror;
+  /* 리그는 운영자가 참가비를 확정했을 때만 그린다(0원 '무료 확정' 포함). 미설정 리그의
+     `entry_fee` 는 `@default(0)` 이라 그리면 사실이 아닌 "무료" 가 뜬다. */
+  const showsEntryFee = !isLeagueMirror || tournament.entryFeeConfigured;
   /* 신규 신청 차단 사유(마감 경과·정원 마감) — CTA·안내 문구·정원 캡션이 전부 이 하나의
      판정을 공유한다. status만 보던 예전 로직은 신청 마감이 지난 open 대회에서도
      '참가 신청하기'를 활성으로 그렸다. */

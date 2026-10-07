@@ -77,6 +77,7 @@ function makeTournament(overrides: Partial<V1TournamentDetail> = {}): V1Tourname
     genderMinFemale: null,
     genderMaxFemale: null,
     entryFee: 0,
+    entryFeeConfigured: true,
     prizePool: null,
     prizeSummary: null,
     prizeBreakdown: null,
@@ -205,6 +206,70 @@ describe('MyRegistrationPageClient — 셸 backHref override', () => {
     for (const word of ['결제', '계좌이체', '카드 · 간편결제', '입금']) {
       expect(text).not.toContain(word);
     }
+  });
+
+  it.each([0, 80000])('현재 참가비가 %i원이어도 신청 행마다 자기 금액대로 결제 메타를 그린다', (currentFee) => {
+    myRegistrationApiMocks.useV1Tournament.mockReturnValue({
+      data: makeTournament({ entryFee: currentFee }),
+      isLoading: false,
+    });
+    myRegistrationApiMocks.useV1MyTeams.mockReturnValue({
+      data: { items: [makeTeam(), makeTeam({ teamId: 'team-2', membershipId: 'membership-2', name: '송파 풋살 크루' })] },
+      isLoading: false,
+    });
+    myRegistrationApiMocks.useV1MyRegistrations.mockReturnValue({
+      data: [
+        makeRegistration({
+          id: 'registration-paid',
+          playerCount: 7,
+          payment: { method: 'bank_transfer', status: 'paid', amount: 70000, paidAt: '2026-09-04T00:00:00.000Z' },
+        }),
+        makeRegistration({
+          id: 'registration-free',
+          teamId: 'team-2',
+          teamName: '송파 풋살 크루',
+          playerCount: 9,
+          payment: { method: 'bank_transfer', status: 'paid', amount: 0, paidAt: '2026-09-04T00:00:00.000Z' },
+        }),
+      ],
+      isLoading: false,
+      isError: false,
+      error: null,
+    });
+
+    const { container } = render(<MyRegistrationPageClient tournamentId="tournament-1" />);
+    const text = container.textContent ?? '';
+    expect(text).toContain('선수 7명 · 계좌이체 · 결제 완료');
+    expect(text).toContain('선수 9명');
+    expect(text).not.toContain('선수 9명 ·');
+  });
+
+  it('참가비를 바꾼 뒤에도 신청 상세는 신청 당시 금액을 보인다 (같은 금액이면 그대로)', () => {
+    searchParams = new URLSearchParams('reg=registration-1');
+    myRegistrationApiMocks.useV1Tournament.mockReturnValue({
+      data: makeTournament({ entryFee: 80000 }),
+      isLoading: false,
+    });
+    myRegistrationApiMocks.useV1MyRegistrations.mockReturnValue({
+      data: [makeRegistration({
+        payment: { method: 'bank_transfer', status: 'paid', amount: 70000, paidAt: '2026-09-04T00:00:00.000Z' },
+      })],
+      isLoading: false,
+      isError: false,
+      error: null,
+    });
+
+    const changed = render(<MyRegistrationPageClient tournamentId="tournament-1" />);
+    expect(changed.container.textContent).toContain('70,000원');
+    expect(changed.container.textContent).not.toContain('80,000원');
+    changed.unmount();
+
+    myRegistrationApiMocks.useV1Tournament.mockReturnValue({
+      data: makeTournament({ entryFee: 70000 }),
+      isLoading: false,
+    });
+    const same = render(<MyRegistrationPageClient tournamentId="tournament-1" />);
+    expect(same.container.textContent).toContain('70,000원');
   });
 
   it('정규 리그 신청 허브에는 거울 teamCount 정원 요약을 표시하지 않는다', () => {

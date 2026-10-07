@@ -38,6 +38,7 @@ function card(id: string) {
     teamCount: 8,
     confirmedCount: 0,
     entryFee: 0,
+    entryFeeConfigured: true,
   };
 }
 

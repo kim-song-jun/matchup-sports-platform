@@ -89,6 +89,7 @@ function makeTournament(overrides: Partial<V1TournamentDetail> = {}): V1Tourname
     genderMinFemale: null,
     genderMaxFemale: null,
     entryFee: 0,
+    entryFeeConfigured: true,
     prizePool: null,
     prizeSummary: null,
     prizeBreakdown: null,
@@ -361,6 +362,64 @@ describe('TournamentApplyPageClient GA events', () => {
     expect(screen.getByText('선수 명단을 이어서 등록해요')).toBeInTheDocument();
     // 그 안내 문구에도 결제가 남으면 안 된다 — "입금 확인을 기다리는 동안" 은 없는 절차다.
     expect(screen.queryByText(/입금 확인을 기다리는 동안/)).not.toBeInTheDocument();
+  });
+
+  describe('신청 완료 화면의 금액은 이 신청의 payment.amount 다', () => {
+    const bank = { bankName: '국민은행', bankAccount: '123-456-7890', bankHolder: '팀밋' };
+
+    async function completeApplication(currentFee: number, payment: { amount: number } | null) {
+      tournamentApplyApiMocks.useV1Tournament.mockReturnValue({
+        data: makeTournament({ entryFee: currentFee }),
+        isLoading: false,
+        isError: false,
+        error: null,
+      });
+      const registration = {
+        id: 'registration-1',
+        status: 'awaiting_payment',
+        depositorName: '김성준',
+        payment: payment ? { method: 'bank_transfer', status: 'ready', paidAt: null, ...payment } : null,
+        paymentInstructions: payment && payment.amount > 0 ? bank : null,
+      };
+      tournamentApplyApiMocks.useV1Registration.mockReturnValue({ data: registration });
+      tournamentApplyApiMocks.useV1CreateRegistration.mockReturnValue({
+        mutateAsync: vi.fn().mockResolvedValue({ id: 'registration-1', status: 'draft' }),
+        isPending: false,
+      });
+      tournamentApplyApiMocks.useV1SubmitRegistration.mockReturnValue({
+        mutateAsync: vi.fn().mockResolvedValue(registration),
+        isPending: false,
+      });
+
+      render(<TournamentApplyPageClient tournamentId="tournament-1" />);
+      fireEvent.click((await screen.findAllByRole('button', { name: /^다음 단계/ }))[0]);
+      fireEvent.click(await screen.findByLabelText('전체 동의'));
+      if (currentFee > 0) fireEvent.change(await screen.findByLabelText('입금자명 *'), { target: { value: '김성준' } });
+      fireEvent.click(screen.getAllByRole('button', { name: '신청 제출하기' })[0]);
+      fireEvent.click(await screen.findByRole('button', { name: '확인하고 신청하기' }));
+      expect(await screen.findByText('신청했어요')).toBeInTheDocument();
+    }
+
+    it('참가비를 80,000원으로 올린 뒤에도 70,000원으로 낸 신청은 입금액 70,000원을 보인다', async () => {
+      await completeApplication(80000, { amount: 70000 });
+
+      expect(screen.getByText('입금액').parentElement).toHaveTextContent('70,000원');
+      expect(screen.getByText('입금액').parentElement).not.toHaveTextContent('80,000원');
+    });
+
+    it('대조군: 신청 당시와 같은 금액이면 그 금액 그대로 보인다', async () => {
+      await completeApplication(70000, { amount: 70000 });
+
+      expect(screen.getByText('입금액').parentElement).toHaveTextContent('70,000원');
+    });
+
+    it('참가비가 오른 뒤에도 0원으로 낸 신청은 입금 안내를 그리지 않는다', async () => {
+      await completeApplication(80000, { amount: 0 });
+
+      expect(screen.queryByText('아래 계좌로 참가비를 입금해 주세요')).not.toBeInTheDocument();
+      expect(screen.queryByText('입금액')).not.toBeInTheDocument();
+      expect(screen.getByRole('link', { name: '선수 명단 등록' })).toBeInTheDocument();
+    });
   });
 
   it('참가비가 없는 대회는 2단계에서 결제 수단·입금자명을 요구하지 않는다', async () => {

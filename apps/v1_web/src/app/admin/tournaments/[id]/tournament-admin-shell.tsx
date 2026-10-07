@@ -275,7 +275,7 @@ export function TournamentAdminShell({ id, children }: { id: string; children: R
       )}
 
       {/* 공개 설정 — 비공개면 일반 사용자 화면에서 숨고 관리자 운영은 그대로다(리그와 같은 카드). */}
-      <TournamentVisibilityControl tournamentId={id} isPublic={tournament.isPublic ?? true} />
+      <TournamentVisibilityControl tournamentId={id} isPublic={tournament.isPublic ?? true} status={tournament.status} />
 
       {/* ── Tournament-ops quick links: 이 관리자 콘솔 섹션들과 별개인 대회 현장 운영
           콘솔(스태프 배정·운영 보드)은 여기 말고는 진입 경로가 없었다. T6-5(D-16):

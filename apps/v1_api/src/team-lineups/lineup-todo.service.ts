@@ -9,6 +9,7 @@ import { summarizeGameRoster, type GameRosterSummary } from '../games/roster/gam
 import { PrismaService } from '../prisma/prisma.service';
 import { loadTeamCompetitionGameOrder } from '../tournaments/discipline/team-game-order';
 import { competitionMatchLabel } from '../tournaments/tournament-round-label';
+import { NOT_IN_HELD_LEAGUE_WHERE } from '../league-matches/league-hold';
 
 /** 라인업이 아직 끝나지 않은 상태. 완료(SUBMITTED/LOCKED)는 아예 목록에 오르지 않는다. */
 export type LineupTodoState = 'MISSING' | 'DRAFT';
@@ -209,6 +210,8 @@ export class LineupTodoService {
         hostTeamId: { not: null },
         approvedApplicantTeamId: { not: null },
         game: { isNot: null },
+        // 보류 리그의 경기는 라인업 할 일·리마인더·다음 경기에서 뺀다 — 보류가 풀리면 다시 나온다(league-hold.ts).
+        AND: [NOT_IN_HELD_LEAGUE_WHERE],
         ...(teamIds !== null
           ? { OR: [{ hostTeamId: { in: teamIds } }, { approvedApplicantTeamId: { in: teamIds } }] }
           : {}),

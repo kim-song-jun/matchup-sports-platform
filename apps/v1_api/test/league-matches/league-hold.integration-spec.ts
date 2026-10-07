@@ -4,6 +4,8 @@ import request = require('supertest');
 import { PrismaService } from '../../src/prisma/prisma.service';
 import { ManagedTermsRuntimeService } from '../../src/terms/managed-terms-runtime.service';
 import { createV1IntegrationApp } from '../integration/integration-app';
+import { loadReminderGameSides } from '../../src/jobs/lineup-reminders/game-attendee-reminders';
+import { isTeamMatchInHeldLeague } from '../../src/league-matches/league-hold';
 
 const suiteId = randomUUID().slice(0, 8);
 const ownerUserId = `league-hold-owner-${suiteId}`;
@@ -83,6 +85,23 @@ describe('리그 보류·보류 해제 HTTP/DB 계약', () => {
     await request(app.getHttpServer()).get(`/api/v1/league-matches/${leagueId}`).expect(200);
     const actions = await prisma.v1AdminActionLog.findMany({ where: { targetId: leagueId, action: { in: ['league_match.hold', 'league_match.resume'] } }, orderBy: { createdAt: 'asc' } });
     expect(actions.map((row) => row.action)).toEqual(['league_match.hold', 'league_match.resume']);
+  });
+
+  it('보류 중에는 이미 예약된 경기 알림 대상에서 빠지고, 보류를 풀면 다시 대상이 된다', async () => {
+    const fixtureIds = (await prisma.v1TeamMatch.findMany({ where: { leagueId }, select: { id: true } })).map((row) => row.id);
+    const remindable = async () =>
+      (await loadReminderGameSides(prisma, { gte: new Date(0) })).filter((side) => fixtureIds.includes(side.teamMatchId)).length;
+    expect(fixtureIds.length).toBeGreaterThan(0);
+    expect(await remindable()).toBeGreaterThan(0);
+    expect(await isTeamMatchInHeldLeague(prisma, fixtureIds[0])).toBe(false);
+
+    await admin('post', '/hold', { reason: '알림 보류 확인' }).expect(200);
+    expect(await remindable()).toBe(0);
+    expect(await isTeamMatchInHeldLeague(prisma, fixtureIds[0])).toBe(true);
+
+    await admin('post', '/resume', {}).expect(200);
+    expect(await remindable()).toBeGreaterThan(0);
+    expect(await isTeamMatchInHeldLeague(prisma, fixtureIds[0])).toBe(false);
   });
 
   it('보류 전에 비공개였으면 해제해도 비공개로 돌아가고, 사유 없는 보류와 일반 사용자는 거부한다', async () => {

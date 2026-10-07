@@ -193,6 +193,7 @@ export type TournamentCreateAction =
   | { type: 'prefill-period-minutes'; value: string[] }
   /** 피리어드 설정 저장 성공 — 다음 PATCH 의 expectedVersion 을 새 updatedAt 으로 맞춘다. */
   | { type: 'periods-saved'; updatedAt: string }
+  | { type: 'draft-saved'; tournament: V1Tournament }
   /** 초안 생성/수정 성공 직후 — draftId를 고정하고 확인 단계로 넘어간다. */
   | { type: 'draft-created'; tournament: V1Tournament }
   /** 새로고침으로 돌아온 admin/tournaments/new?draftId=… — 서버 값으로 폼 전체를 복원한다. */
@@ -270,6 +271,9 @@ export function tournamentCreateReducer(
         bankAccount: action.bankAccount,
         bankHolder: action.bankHolder,
       };
+    case 'draft-saved':
+      // 피리어드 저장 실패 후에도 같은 초안으로 재시도하고 입력 단계는 유지한다.
+      return { ...state, draftId: action.tournament.id, draftUpdatedAt: action.tournament.updatedAt };
     case 'draft-created':
       // 지금 폼에 입력된 값은 이미 서버에 그대로 반영됐다 — id·updatedAt만 고정하고
       // 확인 단계로 이동한다. updatedAt은 다음 PATCH의 expectedVersion으로 쓰인다.

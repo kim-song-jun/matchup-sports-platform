@@ -16,7 +16,7 @@ import {
 } from '@/hooks/use-v1-api';
 import { extractErrorMessage, extractErrorCode } from '@/lib/error-message';
 import { formatWithComma, onlyDigits } from '@/lib/number-format';
-import type { V1TournamentFormat, V1TournamentGenderCategory } from '@/types/api';
+import type { V1Tournament, V1TournamentFormat, V1TournamentGenderCategory } from '@/types/api';
 import { AdminPageHeader, AdminToasts, useAdminToast } from '@/components/admin';
 import { CoverImageUploader } from '@/components/admin/tournaments/cover-image-uploader';
 import {
@@ -182,7 +182,7 @@ export default function AdminTournamentsNewPage() {
     // "공개 확인" 단계는 초안이 실제로 만들어진 뒤에만 들어갈 수 있다 — 검증만 통과했다고
     // 스텝 버튼을 직접 눌러 건너뛸 수 있으면, 대회가 없는 채로 "접수 시작하기"를 누르는
     // 상황이 생긴다(잠김 상태, 스테퍼 버튼도 이 조건으로 disabled 처리).
-    if (nextStep === CONFIRM_STEP_INDEX && !state.draftId) return;
+    if (nextStep === CONFIRM_STEP_INDEX && (!state.draftId || state.periodMinutesDirty || pending)) return;
     if (nextStep < state.step) {
       dispatch({ type: 'set-step', step: nextStep });
       setErrors({});
@@ -249,6 +249,7 @@ export default function AdminTournamentsNewPage() {
    */
   const handleCreateOrUpdateDraft = (event: React.FormEvent) => {
     event.preventDefault();
+    if (pending) return;
     const allErrors = Object.assign(
       {},
       ...[0, 1, 2, 3].map((step) => validateTournamentCreateStep(state, step)),
@@ -268,8 +269,13 @@ export default function AdminTournamentsNewPage() {
 
     // 운영자가 경기 시간을 고쳤으면 대회 저장 직후 피리어드 설정으로 저장한다 — 생성 API 는 종목
     // 기본 피리어드로 만들고, 피리어드는 감사·버전 검사를 갖춘 전용 API 가 소유한다.
-    const persistPeriods = (tournament: { id: string; updatedAt: string }) => {
-      if (!state.periodMinutesDirty) return;
+    const persistPeriods = (tournament: V1Tournament) => {
+      // 생성 ID는 즉시 유지하되 두 저장이 모두 끝나야 공개 확인을 허용한다.
+      dispatch({ type: 'draft-saved', tournament });
+      if (!state.periodMinutesDirty) {
+        dispatch({ type: 'draft-created', tournament });
+        return;
+      }
       savePeriods.mutate(
         {
           tournamentId: tournament.id,
@@ -278,10 +284,15 @@ export default function AdminTournamentsNewPage() {
         },
         {
           onSuccess: (result) => {
-            if (result.expectedVersion) dispatch({ type: 'periods-saved', updatedAt: result.expectedVersion });
+            if (!result.expectedVersion) {
+              showToast('경기 시간 저장 버전을 확인하지 못했어요. 초안을 다시 불러와 주세요.', 'error');
+              return;
+            }
+            dispatch({ type: 'periods-saved', updatedAt: result.expectedVersion });
+            dispatch({ type: 'draft-created', tournament: { ...tournament, updatedAt: result.expectedVersion } });
           },
           onError: (error) => {
-            showToast(extractErrorMessage(error, '대회는 저장했지만 경기 시간을 저장하지 못했어요. 이전 단계에서 다시 저장해 주세요.'), 'error');
+            showToast(extractErrorMessage(error, '대회는 초안으로 저장했지만 경기 시간을 저장하지 못했어요. 저장하고 계속하기로 다시 시도해 주세요.'), 'error');
           },
         },
       );
@@ -294,7 +305,6 @@ export default function AdminTournamentsNewPage() {
       }
       updateTournament.mutate({ ...payload, expectedVersion: state.draftUpdatedAt }, {
         onSuccess: (tournament) => {
-          dispatch({ type: 'draft-created', tournament });
           persistPeriods(tournament);
         },
         onError: (error) => {
@@ -310,7 +320,6 @@ export default function AdminTournamentsNewPage() {
 
     createTournament.mutate(payload, {
       onSuccess: (tournament) => {
-        dispatch({ type: 'draft-created', tournament });
         persistPeriods(tournament);
         // draftId를 URL에 남겨 새로고침해도 같은 초안을 이어가고, 다시 만들지 않게 한다.
         router.replace(`${pathname}?draftId=${tournament.id}`);
@@ -329,7 +338,7 @@ export default function AdminTournamentsNewPage() {
 
   /** "확인" 단계의 주 CTA — 되돌리기 어려운 전환(초안 → 접수 중)이라 확인 모달을 거친다. */
   const handleStartRegistration = async () => {
-    if (!state.draftId) return;
+    if (!state.draftId || state.periodMinutesDirty || pending) return;
     const ok = await confirm({
       title: '접수를 시작할까요?',
       message:
@@ -372,7 +381,7 @@ export default function AdminTournamentsNewPage() {
       />
 
       <form ref={formRef} onSubmit={handleCreateOrUpdateDraft} noValidate className="pb-28">
-        <WizardStepper currentStep={state.step} hasDraft={state.draftId !== null} onSelect={goToStep} />
+        <WizardStepper currentStep={state.step} hasDraft={state.draftId !== null && !state.periodMinutesDirty} onSelect={goToStep} />
 
         <div className="mx-auto mt-5 max-w-4xl rounded-2xl border border-[var(--border)] bg-[var(--card-surface)]">
           <div className="border-b border-[var(--border)] px-5 py-5 sm:px-7">
@@ -1041,7 +1050,7 @@ function ParticipationStep({
                     onClick={() => {
                       if (!selected) dispatch({ type: 'set-period-minutes', value: switchPeriodCount(state.periodMinutes, option.count) });
                     }}
-                    className={`inline-flex min-h-[44px] items-center rounded-xl border px-4 text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 disabled:opacity-50 ${
+                    className={`inline-flex min-h-[44px] items-center rounded-xl border px-4 text-[length:var(--font-size-body-sm)] font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 disabled:opacity-50 ${
                       selected
                         ? 'border-blue-500 bg-blue-500 text-white'
                         : 'border-[var(--border)] bg-[var(--card-surface)] text-[var(--text-body)] hover:border-blue-500'
@@ -1054,7 +1063,7 @@ function ParticipationStep({
             </div>
             <div className="grid gap-3 sm:grid-cols-2">
               {state.periodMinutes.map((value, index) => (
-                <label key={periodNames[index]} className="grid gap-1 text-xs font-medium text-[var(--text-muted)]">
+                <label key={periodNames[index]} className="grid gap-1 text-[length:var(--font-size-caption)] font-medium text-[var(--text-muted)]">
                   {periodNames[index]} (분)
                   <input
                     id={index === 0 ? 'period-minutes' : undefined}
@@ -1071,12 +1080,12 @@ function ParticipationStep({
                       next[index] = event.target.value;
                       dispatch({ type: 'set-period-minutes', value: next });
                     }}
-                    className="h-[44px] rounded-xl border border-[var(--border)] bg-[var(--card-surface)] px-3 text-sm text-[var(--text-strong)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
+                    className="h-[44px] rounded-xl border border-[var(--border)] bg-[var(--card-surface)] px-3 text-[length:var(--font-size-body-sm)] text-[var(--text-strong)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
                   />
                 </label>
               ))}
             </div>
-            <p className="text-xs text-[var(--text-caption)]">한 경기 총 {periodTotal}분</p>
+            <p className="text-[length:var(--font-size-caption)] text-[var(--text-caption)]">한 경기 총 {periodTotal}분</p>
           </div>
         </Field>
       ) : null}

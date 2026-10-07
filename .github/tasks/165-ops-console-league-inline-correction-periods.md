@@ -177,3 +177,19 @@
 1. **"대시보드"가 어느 화면인가.** `/admin/live/:id` 개요로 본다(결과 검토 링크가 거기 있다). `/admin` 홈이 아니다. 다르면 3안 제시 때 사용자에게 확인.
 2. **피리어드 수 상한.** 서버에 상한이 없다. 화면은 1·2 프리셋 + 직접 입력(최대 4)으로 잡되 서버는 그대로 둔다 — 아이스하키 3피리어드가 실제 종목이다.
 3. **리그 전용 모달의 "몰수" 가 콘솔 사후 입력에 없을 때.** 콘솔 DTO 에 옮긴다(BE-3). 기능을 떨어뜨리지 않는다.
+
+## Progress Snapshot — PR #1642 생성 마법사 경기 시간 저장 (2026-10-07)
+
+- 기존 피리어드 설정 계약을 생성 마법사까지 연결한 PR의 후속 검토다. 이 기록은 위 전체 Task 165 완료를 뜻하지 않는다.
+- Owned files: `apps/v1_web/src/app/admin/tournaments/new/{page.tsx,page.test.tsx,tournament-create-model.ts}`, 이 task 문서. API·DB·작성자의 다른 변경은 보존한다. 병렬 에이전트 작업 없음.
+- [x] 생성 POST 성공 뒤 피리어드 PATCH 대기/실패에도 접수 시작 버튼이 열리는 결함을 실제 페이지 테스트 2건으로 RED 확인.
+- [x] 초안 ID/수정 버전을 유지하고, 피리어드 저장 성공 후에만 공개 확인을 열도록 수정. 실패 시 입력 유지·같은 초안 재시도·최신 CAS 버전을 회귀 검증.
+- [x] 신규 경기 시간 UI의 typography 4곳을 기존 토큰으로 치환. CI 허용 baseline은 변경하지 않음.
+- [x] 생성 마법사 81건 PASS(단일 worker). 실패 테스트 두 건이 GREEN으로 전환됨.
+- [x] 리그 대진 화면 71건·Web 타입 검사 PASS. 패턴 검사는 Git Bash로 원본 스크립트를 실행해 PASS(Windows 기본 find 명령 오류는 별도 기록).
+- [ ] 명시 scope 커밋과 기존 PR 브랜치 일반 push.
+- [ ] 최신 head 직접 재리뷰·정식 GitHub 리뷰, 일반 CI와 dev 머지 조건 재확인.
+- [ ] dev 머지 뒤 alpha 서빙 SHA 확인, 실제 로그인 390/768/1440 사용자 흐름·console/network·갤러리 증거.
+- Acceptance Criteria: 시간 저장이 실패하면 공개 확인/접수 시작을 실행할 수 없고, 재시도는 기존 초안 PATCH를 사용하며 이후 수정은 피리어드 저장 응답의 최신 버전을 사용한다.
+- Security Notes: 관리자 전용 API의 권한·감사로그·CAS 계약을 그대로 사용한다. 실패를 성공으로 표시하지 않고 생성된 초안을 유지한다.
+- Risks & Dependencies: 로컬 Docker daemon 접근이 없어 DB 통합 검증은 GitHub CI 증거와 구분한다. alpha QA와 갤러리는 배포 이후 단계로 남긴다.

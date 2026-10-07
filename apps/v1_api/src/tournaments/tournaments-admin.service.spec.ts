@@ -735,6 +735,38 @@ describe('TournamentsAdminService', () => {
 
   // ─── update ──────────────────────────────────────────────────────────────────
 
+  it.each(['sport-1', 'sport-2'])('update: resaving sportId %s uses a scalar FK supported by atomic updateMany', async (sportId) => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+    prisma.v1Tournament.findFirst
+      .mockResolvedValueOnce(tournamentRow())
+      .mockResolvedValueOnce({ ...tournamentRow({ sportId }), _count: { registrations: 0 } });
+    prisma.v1Sport.findUnique.mockResolvedValue({ id: sportId, code: 'futsal' });
+    prisma.v1Tournament.updateMany.mockResolvedValue({ count: 1 });
+
+    await service.update(ownerAuthUser, 'tournament-1', { expectedVersion: TOURNAMENT_ROW_UPDATED_AT, sportId });
+
+    expect(prisma.v1Tournament.updateMany).toHaveBeenCalledWith({
+      where: { id: 'tournament-1', updatedAt: new Date(TOURNAMENT_ROW_UPDATED_AT) },
+      data: { sportId },
+    });
+    if (sportId !== 'sport-1') {
+      expect(prisma.v1Sport.findUnique).toHaveBeenCalledWith({ where: { id: sportId } });
+    }
+    expect(prisma.v1AdminActionLog.create).toHaveBeenCalled();
+  });
+
+  it('update: an unknown changed sport is rejected before the CAS write or audit log', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+    prisma.v1Tournament.findFirst.mockResolvedValue(tournamentRow());
+    prisma.v1Sport.findUnique.mockResolvedValue(null);
+
+    await expect(service.update(ownerAuthUser, 'tournament-1', {
+      expectedVersion: TOURNAMENT_ROW_UPDATED_AT, sportId: 'unknown-sport',
+    })).rejects.toMatchObject({ response: { code: 'SPORT_NOT_FOUND' } });
+    expect(prisma.v1Tournament.updateMany).not.toHaveBeenCalled();
+    expect(prisma.v1AdminActionLog.create).not.toHaveBeenCalled();
+  });
+
   it('update: partial field (title only) persists updated value', async () => {
     // Arrange: admin resolves, existing tournament found, update returns patched row,
     // and get() (called at the end of update()) also resolves via findFirst+_count.

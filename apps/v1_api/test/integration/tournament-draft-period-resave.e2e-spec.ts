@@ -29,6 +29,50 @@ describe('Tournament draft custom periods survive HTTP re-save', () => {
 
   afterAll(async () => cleanupApp?.());
 
+  it('retries the full wizard payload including sportId and preserves saved custom periods with CAS', async () => {
+    const payload = {
+      sportId, title: '마법사 전체 폼 재시도 초안', format: 'knockout', genderCategory: 'male',
+      scheduledAt: '2026-11-15T00:00:00.000Z', scheduledEndAt: null,
+      registrationDeadlineAt: '2026-11-12T14:59:00.000Z', rosterDeadlineAt: null,
+      coverImageUrl: null, teamCount: 8, minPlayers: 6, maxPlayers: 10,
+      lineupMaxPlayers: 6, substitutionMode: 'limited', maxSubstitutions: 5, entryFee: 0,
+      prizeBreakdown: '1위 / 2위 / 3위',
+      promoHomeEnabled: false, promoHomeTitle: '', promoHomeSubtitle: '', promoHomeImageUrl: '',
+      promoHomeBadgeText: '', promoHomeDateText: '', promoHomeTeamsText: '',
+      promoHomeLocationText: '', promoHomePrizeText: '', promoHomePriority: 0,
+      promoListEnabled: false, promoListTitle: '', promoListSubtitle: '', promoListImageUrl: '',
+      promoListBadgeText: '', promoListDateText: '', promoListTeamsText: '',
+      promoListLocationText: '', promoListPrizeText: '', promoListPriority: 0,
+    };
+    const created = await request(app.getHttpServer())
+      .post('/api/v1/admin/tournaments').set('x-v1-user-id', ownerId).send(payload).expect(201);
+    const id: string = created.body.data.id;
+    const retry = await request(app.getHttpServer())
+      .patch(`/api/v1/admin/tournaments/${id}`).set('x-v1-user-id', ownerId)
+      .send({ ...payload, expectedVersion: created.body.data.updatedAt }).expect(200);
+    expect(retry.body.data).toMatchObject({ id, sportId, title: payload.title });
+    expect(retry.body.data.updatedAt).not.toBe(created.body.data.updatedAt);
+    const periods = await request(app.getHttpServer())
+      .patch(`/api/v1/admin/tournaments/${id}/periods`).set('x-v1-user-id', ownerId)
+      .send({ expectedVersion: retry.body.data.updatedAt, periods: [{ durationMinutes: 35 }] }).expect(200);
+    const saved = await request(app.getHttpServer())
+      .patch(`/api/v1/admin/tournaments/${id}`).set('x-v1-user-id', ownerId)
+      .send({ ...payload, expectedVersion: periods.body.data.expectedVersion }).expect(200);
+    expect(saved.body.data.updatedAt).not.toBe(periods.body.data.expectedVersion);
+    const read = await request(app.getHttpServer())
+      .get(`/api/v1/admin/tournaments/${id}/periods`).set('x-v1-user-id', ownerId).expect(200);
+    expect(read.body.data.periods).toEqual(periods.body.data.periods);
+    const row = await prisma.v1Tournament.findUniqueOrThrow({ where: { id }, include: { competitionConfig: true } });
+    expect(row.sportId).toBe(sportId);
+    expect(row.updatedAt.toISOString()).toBe(saved.body.data.updatedAt);
+    expect(row.competitionConfig?.periods).toEqual(periods.body.data.periods);
+    expect(await prisma.v1Tournament.count({ where: { title: payload.title } })).toBe(1);
+    const stale = await request(app.getHttpServer())
+      .patch(`/api/v1/admin/tournaments/${id}`).set('x-v1-user-id', ownerId)
+      .send({ ...payload, expectedVersion: periods.body.data.expectedVersion }).expect(409);
+    expect(stale.body.code).toBe('TOURNAMENT_VERSION_CONFLICT');
+  });
+
   it('keeps the single 30-minute period after identical lineup re-save and an actual lineup change', async () => {
     const created = await request(app.getHttpServer())
       .post('/api/v1/admin/tournaments')

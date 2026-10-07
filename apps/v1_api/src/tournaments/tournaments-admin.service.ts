@@ -504,7 +504,7 @@ export class TournamentsAdminService {
       });
     }
 
-    // 종목 변경: 존재하는 종목인지 검증 후 relation 연결
+    // 종목 변경: 존재하는 종목인지 검증 후 FK 갱신
     if (dto.sportId !== undefined && dto.sportId !== existing.sportId) {
       const sport = await this.prisma.v1Sport.findUnique({ where: { id: dto.sportId } });
       if (!sport) {
@@ -517,8 +517,8 @@ export class TournamentsAdminService {
     const venueChanged = dto.venue !== undefined && dto.venue !== existing.venue;
     const coordinates = venueChanged && dto.venue ? await this.geocodeVenueSafe(dto.venue) : null;
 
-    const data: Prisma.V1TournamentUpdateInput = {};
-    if (dto.sportId !== undefined) data.sport = { connect: { id: dto.sportId } };
+    const data: Prisma.V1TournamentUncheckedUpdateManyInput = {};
+    if (dto.sportId !== undefined) data.sportId = dto.sportId;
     if (dto.title !== undefined) data.title = dto.title;
     if (dto.format !== undefined) data.format = dto.format;
     if (dto.minMatchesPerTeam !== undefined) data.minMatchesPerTeam = dto.minMatchesPerTeam ?? null;

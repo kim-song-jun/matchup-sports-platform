@@ -79,11 +79,12 @@ export class LeagueFixtureScheduleDto {
 // 15분 경기·5분 휴식으로 22:00~00:00 사이 하루 6경기(팀당 3경기)를 치르는 식으로,
 // 경기 시간·휴식·팀당 하루 경기 수를 설정하면 매치데이 안에서 경기별 시각이 계산된다.
 export class LeagueFixtureTimingDto {
-  /** 경기당 소요 시간(분). */
+  /** 경기당 소요 시간(분). 생략하면 경기 설정의 정규 시간(연장 제외 피리어드 합계). */
+  @IsOptional()
   @IsInt()
   @Min(5)
   @Max(240)
-  gameDurationMinutes!: number;
+  gameDurationMinutes?: number;
 
   /** 경기 간 휴식(분). 생략 시 0. */
   @IsOptional()

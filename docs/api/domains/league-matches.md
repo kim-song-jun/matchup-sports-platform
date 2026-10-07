@@ -79,6 +79,15 @@ LEAGUE_REGION_INVALID` for an unknown or unsuitable region.
 - `POST /api/v1/admin/league-matches/:leagueId/fixtures/manual` creates one
   fixture with `homeTeamId`, `awayTeamId`, `startsAt`, and optional
   `durationMinutes`, `placeName`, and `title`.
+  Omitting `durationMinutes` fills `endAt` with `startsAt` + the fixture's
+  regulation time (non-extra-time period total: both halves, or the single
+  period of a one-period match).
+- `POST /api/v1/admin/league-matches/:leagueId/fixtures` (and `preview`,
+  `regenerate`) accept `timing.gameDurationMinutes` as optional. When omitted,
+  the regulation time of the fixture's competition config is used; a legacy
+  config without period lengths fails with
+  `422 LEAGUE_FIXTURE_DURATION_REQUIRED`. Without any `timing`, fixtures of a
+  matchday share one kickoff and `endAt` is kickoff + regulation time.
 - `POST /api/v1/admin/league-matches/:leagueId/fixtures/:teamMatchId/cancel`
   (`{ reason }`) cancels one fixture; an already-cancelled fixture returns
   `alreadyProcessed: true`. A fixture whose game is in progress (`LIVE` or

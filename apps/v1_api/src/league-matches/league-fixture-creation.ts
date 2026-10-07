@@ -5,6 +5,7 @@ import { scheduleLeagueResultEntryReminder } from '../jobs/league-reminders/leag
 import { participantDisplayName } from '../tournaments/participant-display-name';
 import type { GameRosterBaseEntry } from '../games/roster/game-roster-computation';
 import { findTournamentOnSurfaceOrThrow } from '../tournaments/tournament-surface-lookup';
+import { defaultFixtureEndAt } from '../tournaments/competition-config/fixture-end-at';
 import {
   fillLeagueTeamRoster,
   notifyLeagueRosterFillOutcomes,
@@ -238,7 +239,10 @@ export async function createLeagueFixture(
   games: GamesService,
   input: LeagueFixtureCreationInput,
 ): Promise<string> {
-  const { home, away, title, startAt, endAt } = input;
+  const { home, away, title, startAt } = input;
+  // 종료 시각을 안 받았으면(대진 생성에서 경기 시간을 비움·수동 대진 길이 미입력) 시작 + 경기 설정의
+  // 정규 시간(연장 제외 피리어드 합계)으로 채운다 — 비워 두면 일정·캘린더가 끝을 모르는 경기가 된다.
+  const endAt = input.endAt ?? await defaultFixtureEndAt(tx, input.competitionConfigId, startAt);
 
   // ① 팀매치. 리그 대진은 생성 시점에 양 팀이 확정이므로 곧바로 matched 다.
   const teamMatch = await tx.v1TeamMatch.create({

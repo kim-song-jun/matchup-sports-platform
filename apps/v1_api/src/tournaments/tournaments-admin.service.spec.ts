@@ -14,6 +14,8 @@ import { KakaoGeocodingService } from './kakao-geocoding.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { CompetitionConfigRegistry } from './competition-config/competition-config-registry';
 import { TournamentCompetitionConfig } from './competition-config/tournament-competition-config';
+import { FUTSAL_V1_CONFIG } from './competition-config/competition-config.presets';
+import { competitionConfigContentHash, validateCompetitionConfig } from './competition-config/competition-config';
 import { TournamentsAdminService } from './tournaments-admin.service';
 import { kindAwareFindFirst } from '../../test/helpers/kind-aware-find-first';
 
@@ -1296,7 +1298,8 @@ describe('TournamentsAdminService', () => {
       contentHash: 'hash-6-new',
     });
     prisma.v1CompetitionConfigVersion.findUnique.mockResolvedValue({
-      lineup: { minPlayers: 3, maxPlayers: 6 },
+      ...FUTSAL_V1_CONFIG,
+      lineup: { ...FUTSAL_V1_CONFIG.lineup, minPlayers: 3, maxPlayers: 6 },
     });
     prisma.v1Tournament.updateMany.mockResolvedValue({ count: 1 });
 
@@ -1466,7 +1469,63 @@ describe('TournamentsAdminService', () => {
     });
   });
 
-  it('update: changing only substitutionMode preserves the currently pinned lineup size instead of resetting it to canonical', async () => {
+  it('update: identical named config re-save reuses the pinned version without a content-hash collision', async () => {
+    const config = { ...FUTSAL_V1_CONFIG, periods: [{ code: 'SINGLE_PERIOD', label: '단일', durationMinutes: 31, extraTime: false }] };
+    const pin = { ...config, id: 'named-pin', name: '운영자 지정 풋살', version: 1, contentHash: competitionConfigContentHash(config) };
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+    prisma.v1Sport.findUnique.mockResolvedValue({ id: 'sport-1', code: 'futsal' });
+    prisma.v1Tournament.findFirst.mockResolvedValue(tournamentRow({ competitionConfigVersionId: pin.id, sport: { code: 'futsal' }, _count: { registrations: 0, fixtures: 0, announcements: 0 } }));
+    prisma.v1CompetitionConfigVersion.findUnique.mockResolvedValue(pin);
+    prisma.v1CompetitionConfigVersion.findFirst.mockImplementation(async ({ where }) => {
+      if (where.name === pin.name) return pin;
+      return where.contentHash ? null : { id: 'canonical-pin' };
+    });
+    prisma.v1Tournament.updateMany.mockResolvedValue({ count: 1 });
+    const createVersion = jest.spyOn(CompetitionConfigRegistry.prototype, 'createVersion');
+    const change = jest.spyOn(TournamentCompetitionConfig.prototype, 'change');
+    try {
+      await expect(service.update(ownerAuthUser, 'tournament-1', {
+        expectedVersion: TOURNAMENT_ROW_UPDATED_AT, title: '새 제목', lineupMaxPlayers: 6, substitutionMode: 'rolling',
+      })).resolves.toMatchObject({ id: 'tournament-1' });
+      expect(createVersion).not.toHaveBeenCalled();
+      expect(change).not.toHaveBeenCalled();
+      expect(prisma.v1Tournament.updateMany).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ title: '새 제목' }) }));
+    } finally {
+      createVersion.mockRestore();
+      change.mockRestore();
+    }
+  });
+
+  it('update: changing a v1 config without catalog keys remains valid through the version write guard', async () => {
+    const { positions: _positions, formations: _formations, ...lineup } = FUTSAL_V1_CONFIG.lineup;
+    const pin = { ...FUTSAL_V1_CONFIG, lineup, id: 'old-v1-pin', name: '기존 풋살 설정' };
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+    prisma.v1Sport.findUnique.mockResolvedValue({ id: 'sport-1', code: 'futsal' });
+    prisma.v1Tournament.findFirst.mockResolvedValue(tournamentRow({ competitionConfigVersionId: pin.id, sport: { code: 'futsal' }, _count: { registrations: 0, fixtures: 0, announcements: 0 } }));
+    prisma.v1CompetitionConfigVersion.findUnique.mockResolvedValueOnce(pin).mockResolvedValueOnce(null).mockResolvedValue(pin);
+    prisma.v1CompetitionConfigVersion.findFirst.mockResolvedValueOnce(null).mockResolvedValueOnce({ id: pin.id });
+    prisma.v1Tournament.updateMany.mockResolvedValue({ count: 1 });
+    const createVersion = jest.spyOn(CompetitionConfigRegistry.prototype, 'createVersion').mockImplementation(async (_user, _id, dto) => {
+      validateCompetitionConfig(dto.config);
+      expect(dto.config.lineup).not.toHaveProperty('positions');
+      expect(dto.config.lineup).not.toHaveProperty('formations');
+      return { id: 'new-v1-pin', version: 2, contentHash: 'new-v1-hash' } as never;
+    });
+    const change = jest.spyOn(TournamentCompetitionConfig.prototype, 'change').mockResolvedValue({
+      confirmationRequired: false, expectedVersion: TOURNAMENT_ROW_UPDATED_AT,
+    } as never);
+    try {
+      await expect(service.update(ownerAuthUser, 'tournament-1', {
+        expectedVersion: TOURNAMENT_ROW_UPDATED_AT, substitutionMode: 'limited', maxSubstitutions: 5,
+      })).resolves.toMatchObject({ id: 'tournament-1' });
+      expect(createVersion).toHaveBeenCalledWith(ownerAuthUser, pin.id, expect.objectContaining({ config: expect.objectContaining({ lineup: expect.objectContaining({ substitutions: 'limited', maxSubstitutions: 5 }) }) }));
+    } finally {
+      createVersion.mockRestore();
+      change.mockRestore();
+    }
+  });
+
+  it.each([false, true])('update: resaving or changing substitutionMode preserves pinned periods and other sections (change=%s)', async (changeSubstitution) => {
     prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
     const existing = tournamentRow({
       sportId: 'sport-1',
@@ -1485,7 +1544,10 @@ describe('TournamentsAdminService', () => {
     // 값(5명/제한 3회)이다 — substitutionMode만 바꿔도 이 5명이 그대로 유지돼야 한다.
     prisma.v1CompetitionConfigVersion.findUnique
       .mockResolvedValueOnce({
-        lineup: { minPlayers: 3, maxPlayers: 5, substitutions: 'limited', maxSubstitutions: 3 },
+        ...FUTSAL_V1_CONFIG,
+        periods: [{ code: 'P1', label: '단판', durationMinutes: 30, extraTime: false }, { code: 'ET1', label: '연장', durationMinutes: 10, extraTime: true }],
+        result: { ...FUTSAL_V1_CONFIG.result, penaltyShootout: { earlyStop: false } },
+        lineup: { ...FUTSAL_V1_CONFIG.lineup, minPlayers: 3, maxPlayers: 5, substitutions: 'limited', maxSubstitutions: 3 },
       }) // update()가 override 병합 전에 읽는 "지금 pin된 값"
       .mockResolvedValueOnce(undefined) // findOrCreateVersion의 content_hash 충돌 검사(충돌 없음)
       .mockResolvedValue({
@@ -1514,16 +1576,23 @@ describe('TournamentsAdminService', () => {
     });
 
     try {
-      await service.update(ownerAuthUser, 'tournament-1', { expectedVersion: TOURNAMENT_ROW_UPDATED_AT, substitutionMode: 'rolling' });
+      await service.update(ownerAuthUser, 'tournament-1', changeSubstitution
+        ? { expectedVersion: TOURNAMENT_ROW_UPDATED_AT, substitutionMode: 'rolling' }
+        : { expectedVersion: TOURNAMENT_ROW_UPDATED_AT, title: '수정 제목', lineupMaxPlayers: 5, substitutionMode: 'limited', maxSubstitutions: 3 });
       expect(createVersionSpy).toHaveBeenCalledWith(
         ownerAuthUser,
         'latest-version-id',
         expect.objectContaining({
           config: expect.objectContaining({
+            periods: [{ code: 'P1', label: '단판', durationMinutes: 30, extraTime: false }, { code: 'ET1', label: '연장', durationMinutes: 10, extraTime: true }],
+            events: FUTSAL_V1_CONFIG.events,
+            result: { ...FUTSAL_V1_CONFIG.result, penaltyShootout: { earlyStop: false } },
+            tieBreak: FUTSAL_V1_CONFIG.tieBreak,
+            visibility: FUTSAL_V1_CONFIG.visibility,
             lineup: expect.objectContaining({
               maxPlayers: 5, // 그대로 유지 — canonical(6)로 리셋되지 않는다
-              substitutions: 'rolling',
-              maxSubstitutions: null,
+              substitutions: changeSubstitution ? 'rolling' : 'limited',
+              maxSubstitutions: changeSubstitution ? null : 3,
             }),
           }),
         }),

@@ -112,6 +112,17 @@ describe('validateCompetitionConfig — lineup.positions/formations (T1-5)', () 
     expect(config.lineup.formations).toEqual([]);
   });
 
+  it('preserves missing v1 catalog keys for writes so the stored result can be validated again', () => {
+    const valid = validateCompetitionConfig(baseConfig({}));
+    const { positions: _positions, formations: _formations, ...lineup } = valid.lineup;
+    const input = { ...valid, lineup };
+    const written = validateCompetitionConfig(input, { preserveMissingCatalogKeys: true });
+    expect(written.lineup).not.toHaveProperty('positions');
+    expect(written.lineup).not.toHaveProperty('formations');
+    expect(validateCompetitionConfig(written).lineup.positions).toEqual([]);
+    expectInvalid(() => validateCompetitionConfig(baseConfig({ positions: [] }), { preserveMissingCatalogKeys: true }), 'lineup.positions');
+  });
+
   it('still rejects a lineup where positions is explicitly present but malformed, even without formations', () => {
     expectInvalid(
       () =>

@@ -1065,10 +1065,10 @@ describe('LeagueMatchFixturesClient', () => {
     it('입력이 잘못됐으면 확인 창을 띄우지 않고 검증 안내를 먼저 보인다', async () => {
       const mutateAsync = renderEmptyLeague();
 
-      fireEvent.change(screen.getByLabelText('팀당 하루 경기'), { target: { value: '3' } });
+      fireEvent.change(screen.getByLabelText('팀당 하루 경기'), { target: { value: '11' } });
       fireEvent.click(screen.getByRole('button', { name: '라운드로빈 대진 생성' }));
 
-      expect(await screen.findByText(/경기 시간\(분\)을 입력/)).toBeInTheDocument();
+      expect(await screen.findByText(/팀당 하루 경기는 1~10 사이/)).toBeInTheDocument();
       expect(screen.queryByRole('dialog')).toBeNull();
       expect(mutateAsync).not.toHaveBeenCalled();
     });
@@ -1489,8 +1489,8 @@ describe('LeagueMatchFixturesClient — 대진 timing 설정', () => {
     expect(screen.getAllByText(/1시간 55분/).length).toBeGreaterThan(0);
   });
 
-  it('경기 시간 없이 팀당 하루 경기만 넣고 생성하면 안내 토스트를 띄우고 제출하지 않는다', async () => {
-    const mutateAsync = vi.fn();
+  it('경기 시간을 비우고 팀당 하루 경기만 넣으면 경기 시간 없이 timing을 보내 서버 기본값(경기 설정 시간)을 쓴다', async () => {
+    const mutateAsync = vi.fn().mockResolvedValue({ leagueId: 'league-1', createdCount: 6, teamMatchIds: [], warnings: [] });
     useV1GenerateLeagueFixturesMock.mockReturnValue({ mutateAsync, isPending: false } as never);
 
     render(
@@ -1499,11 +1499,12 @@ describe('LeagueMatchFixturesClient — 대진 timing 설정', () => {
       </Providers>,
     );
 
+    expect(screen.getByLabelText('경기 시간(분)')).toHaveAccessibleDescription(/비우면 경기 설정 시간/);
     fireEvent.change(screen.getByLabelText('팀당 하루 경기'), { target: { value: '3' } });
-    fireEvent.click(screen.getByRole('button', { name: '라운드로빈 대진 생성' }));
+    await generateAndConfirm();
 
-    expect(await screen.findByText(/경기 시간\(분\)을 입력/)).toBeInTheDocument();
-    expect(mutateAsync).not.toHaveBeenCalled();
+    await waitFor(() => expect(mutateAsync).toHaveBeenCalledWith(expect.objectContaining({ timing: { gamesPerTeamPerDay: 3 } })));
+    expect(screen.queryByText(/경기 시간\(분\)을 입력/)).not.toBeInTheDocument();
   });
 
   it('경기 시간이 서버 허용 범위(5~240분)를 벗어나면 범위 안내 토스트를 띄우고 제출하지 않는다', async () => {
@@ -1577,7 +1578,7 @@ describe('LeagueMatchFixturesClient — 대진 timing 설정', () => {
     expect(mutateAsync).not.toHaveBeenCalled();
   });
 
-  it('재생성 확인 모달에서도 timing 선제 검증이 동작한다(경기 시간 없이 팀당만 입력하면 미호출)', async () => {
+  it('재생성 확인 모달에서도 timing 선제 검증이 동작한다(범위를 벗어난 팀당 경기 수면 미호출)', async () => {
     useV1AdminLeagueMatchMock.mockReturnValue({
       data: {
         leagueId: 'league-1',
@@ -1603,7 +1604,7 @@ describe('LeagueMatchFixturesClient — 대진 timing 설정', () => {
     );
 
     openFixtureManage();
-    fireEvent.change(screen.getByLabelText('팀당 하루 경기'), { target: { value: '3' } });
+    fireEvent.change(screen.getByLabelText('팀당 하루 경기'), { target: { value: '11' } });
     fireEvent.click(screen.getAllByRole('button', { name: '대진 재생성' })[0]);
     fireEvent.change(
       screen.getByPlaceholderText('이 작업이 왜 필요한지 남겨 주세요. 감사 로그에 그대로 기록돼요.'),
@@ -1612,7 +1613,7 @@ describe('LeagueMatchFixturesClient — 대진 timing 설정', () => {
     fireEvent.change(screen.getByPlaceholderText('재생성'), { target: { value: '재생성' } });
     fireEvent.click(screen.getAllByRole('button', { name: '대진 재생성' })[screen.getAllByRole('button', { name: '대진 재생성' }).length - 1]);
 
-    expect(await screen.findByText(/경기 시간\(분\)을 입력/)).toBeInTheDocument();
+    expect(await screen.findByText(/팀당 하루 경기는 1~10 사이/)).toBeInTheDocument();
     expect(regenMutate).not.toHaveBeenCalled();
   });
 

@@ -106,7 +106,7 @@ export class TournamentPeriodSettingsService {
         result: row.competitionConfig.result,
         tieBreak: row.competitionConfig.tieBreak,
         visibility: row.competitionConfig.visibility,
-      });
+      }, { preserveMissingCatalogKeys: true });
       const contentHash = competitionConfigContentHash(config);
       const existingVersion = await tx.v1CompetitionConfigVersion.findUnique({ where: { contentHash } });
       if (

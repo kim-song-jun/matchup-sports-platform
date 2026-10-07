@@ -64,6 +64,13 @@ export type TournamentCreateState = {
   substitutionMode: '' | 'limited' | 'rolling';
   /** "교체 횟수" — substitutionMode가 'limited'일 때만 의미가 있다. */
   maxSubstitutions: string;
+  /**
+   * "경기 시간" — 피리어드별 길이(분). 2개면 전·후반, 1개면 단판. 비어 있으면 아직 기본값을 못 받은
+   * 상태다(종목 선택 전·미지원 종목). 종목 기본값(또는 초안의 저장값)으로 채워지고, 운영자가 고치면
+   * periodMinutesDirty 가 서서 생성/수정 직후 피리어드 설정으로 저장된다.
+   */
+  periodMinutes: string[];
+  periodMinutesDirty: boolean;
   genderMinMale: string;
   genderMaxMale: string;
   genderMinFemale: string;
@@ -126,6 +133,8 @@ export const INITIAL_TOURNAMENT_CREATE_STATE: TournamentCreateState = {
   lineupMaxPlayers: '',
   substitutionMode: '',
   maxSubstitutions: '',
+  periodMinutes: [],
+  periodMinutesDirty: false,
   genderMinMale: '',
   genderMaxMale: '',
   genderMinFemale: '',
@@ -159,7 +168,7 @@ export const INITIAL_TOURNAMENT_CREATE_STATE: TournamentCreateState = {
 
 type FormField = Exclude<
   keyof TournamentCreateState,
-  'step' | 'prizeRows' | 'promoHome' | 'promoList' | 'promoFactsDirty'
+  'step' | 'prizeRows' | 'promoHome' | 'promoList' | 'promoFactsDirty' | 'periodMinutes' | 'periodMinutesDirty'
 >;
 
 export type TournamentCreateAction =
@@ -178,6 +187,13 @@ export type TournamentCreateAction =
   /** 한 홍보 카드의 사실 문구를 앞 단계 값 기준으로 되돌린다("대회 정보로 다시 채우기"). */
   | { type: 'reset-promo-facts'; slot: 'promoHome' | 'promoList' }
   | { type: 'copy-bank'; bankName: string; bankAccount: string; bankHolder: string }
+  /** 운영자가 경기 시간(피리어드 수·길이)을 고쳤다 — 생성/수정 직후 피리어드 설정으로 저장한다. */
+  | { type: 'set-period-minutes'; value: string[] }
+  /** 종목 기본값·초안 저장값으로 채운다. 운영자가 이미 고쳤으면 덮어쓰지 않는다. */
+  | { type: 'prefill-period-minutes'; value: string[] }
+  /** 피리어드 설정 저장 성공 — 다음 PATCH 의 expectedVersion 을 새 updatedAt 으로 맞춘다. */
+  | { type: 'periods-saved'; updatedAt: string }
+  | { type: 'draft-saved'; tournament: V1Tournament }
   /** 초안 생성/수정 성공 직후 — draftId를 고정하고 확인 단계로 넘어간다. */
   | { type: 'draft-created'; tournament: V1Tournament }
   /** 새로고침으로 돌아온 admin/tournaments/new?draftId=… — 서버 값으로 폼 전체를 복원한다. */
@@ -195,7 +211,8 @@ export function tournamentCreateReducer(
       // 아닐 수 있다(예: 풋살 6명 → 축구로 바꾸면 6명은 선택 불가) — 함께 초기화해
       // 새 종목의 선택지 목록이 로드되면 컴포넌트가 canonical 기본값으로 다시 채운다.
       if (action.field === 'sportId' && action.value !== state.sportId) {
-        return { ...state, sportId: action.value as string, lineupMaxPlayers: '' };
+        // 경기 시간도 종목 기본값이 다르다(축구 45·45, 풋살 20·20) — 새 종목 기본값으로 다시 채운다.
+        return { ...state, sportId: action.value as string, lineupMaxPlayers: '', periodMinutes: [], periodMinutesDirty: false };
       }
       return syncPromoFacts({ ...state, [action.field]: action.value }, action.field);
     case 'set-scheduled-at': {
@@ -240,6 +257,13 @@ export function tournamentCreateReducer(
           [action.slot]: { ...EMPTY_PROMO_FACTS_DIRTY },
         },
       };
+    case 'set-period-minutes':
+      return { ...state, periodMinutes: action.value, periodMinutesDirty: true };
+    case 'prefill-period-minutes':
+      if (state.periodMinutesDirty || state.periodMinutes.join(',') === action.value.join(',')) return state;
+      return { ...state, periodMinutes: action.value };
+    case 'periods-saved':
+      return { ...state, draftUpdatedAt: action.updatedAt, periodMinutesDirty: false };
     case 'copy-bank':
       return {
         ...state,
@@ -247,6 +271,9 @@ export function tournamentCreateReducer(
         bankAccount: action.bankAccount,
         bankHolder: action.bankHolder,
       };
+    case 'draft-saved':
+      // 피리어드 저장 실패 후에도 같은 초안으로 재시도하고 입력 단계는 유지한다.
+      return { ...state, draftId: action.tournament.id, draftUpdatedAt: action.tournament.updatedAt };
     case 'draft-created':
       // 지금 폼에 입력된 값은 이미 서버에 그대로 반영됐다 — id·updatedAt만 고정하고
       // 확인 단계로 이동한다. updatedAt은 다음 PATCH의 expectedVersion으로 쓰인다.
@@ -372,6 +399,9 @@ export function mapTournamentToWizardFields(tournament: V1Tournament): Tournamen
     lineupMaxPlayers: tournament.lineupMaxPlayers !== null ? String(tournament.lineupMaxPlayers) : '',
     substitutionMode: tournament.substitutionMode ?? '',
     maxSubstitutions: tournament.maxSubstitutions !== null ? String(tournament.maxSubstitutions) : '',
+    // 경기 시간은 대회 응답에 없다 — 화면이 초안의 피리어드 설정을 읽어 채운다(prefill-period-minutes).
+    periodMinutes: [],
+    periodMinutesDirty: false,
     genderMinMale: tournament.genderMinMale !== null ? String(tournament.genderMinMale) : '',
     genderMaxMale: tournament.genderMaxMale !== null ? String(tournament.genderMaxMale) : '',
     genderMinFemale: tournament.genderMinFemale !== null ? String(tournament.genderMinFemale) : '',
@@ -573,6 +603,9 @@ export function validateTournamentCreateStep(state: TournamentCreateState, step 
       errors.maxPlayers = '최대 선수 수는 1~50명이어야 해요.';
     } else if (minPlayers !== null && minPlayers > maxPlayers) {
       errors.maxPlayers = '최대 선수 수는 최소 선수 수보다 작을 수 없어요.';
+    }
+    if (state.periodMinutes.some((value) => !/^\d+$/.test(value.trim()) || Number(value) < 1 || Number(value) > 240)) {
+      errors.periodMinutes = '경기 시간은 피리어드마다 1~240분 사이의 정수로 입력해 주세요.';
     }
     if (state.substitutionMode === 'limited') {
       // 비워두면 여기서 막는다. 예전엔 통과시켰는데, 그러면 canonical 이 무제한인
@@ -829,4 +862,19 @@ function numeric(value: string) {
 function optionalNumeric(value: string) {
   if (!value.trim()) return null;
   return numeric(value);
+}
+
+/** 경기 시간 입력칸 이름 — 2개면 전·후반, 1개면 단판, 그 밖(옛 설정)은 n피리어드. */
+export function periodLabels(count: number): string[] {
+  if (count === 1) return ['단판'];
+  if (count === 2) return ['전반', '후반'];
+  return Array.from({ length: count }, (_, index) => `${index + 1}피리어드`);
+}
+
+/** 전·후반 ↔ 단판 전환. 합계는 지킨다 — 20+20 을 단판으로 바꾸면 40, 단판 40 을 나누면 20+20. */
+export function switchPeriodCount(periodMinutes: readonly string[], count: 1 | 2): string[] {
+  const total = periodMinutes.reduce((sum, value) => sum + (Number(value) || 0), 0);
+  if (count === 1) return [String(total)];
+  const first = Math.ceil(total / 2);
+  return [String(first), String(total - first)];
 }

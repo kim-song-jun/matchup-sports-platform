@@ -23,7 +23,7 @@ import {
   TournamentStatus,
   UpdateTournamentDto,
 } from './dto/admin-tournament.dto';
-import { normalizeCompetitionSportCode, tryNormalizeCompetitionSportCode } from './competition-config/competition-config';
+import { normalizeCompetitionSportCode, tryNormalizeCompetitionSportCode, validateCompetitionConfig } from './competition-config/competition-config';
 import { parseLineupLimits } from './competition-config/competition-config.parse';
 import { LineupSizeConfigResolver } from './competition-config/lineup-size-config-resolver';
 import { TournamentCompetitionConfig } from './competition-config/tournament-competition-config';
@@ -603,21 +603,29 @@ export class TournamentsAdminService {
       if (!sport) {
         throw new NotFoundException({ code: 'SPORT_NOT_FOUND', message: '종목을 찾을 수 없어요.' });
       }
-      // 출전 인원/교체 방식/교체 횟수 세 필드 중 이번 요청에 없는 필드는 canonical
-      // 기본값이 아니라 "지금 pin된 값"을 그대로 넘겨야 한다 — resolveVersionForLineupConfig는
-      // 생략된 override를 canonical로 채우므로, 안 그러면 예를 들어 출전 인원만 바꿀 때
-      // 관리자가 이미 골라둔 교체 정책이 조용히 canonical로 리셋된다.
+      // 기존 버전 전체를 원본으로 사용한다. 라인업 필드만 보내더라도 피리어드·결과 정책 등
+      // 관리자가 저장한 다른 섹션을 종목 기본값으로 되돌리면 안 된다.
       const pinnedVersion = existing.competitionConfigVersionId
         ? await this.prisma.v1CompetitionConfigVersion.findUnique({
             where: { id: existing.competitionConfigVersionId },
-            select: { lineup: true },
+            select: { name: true, periods: true, events: true, lineup: true, result: true, tieBreak: true, visibility: true },
           })
         : null;
       const pinnedLineup = pinnedVersion ? parseLineupLimits(pinnedVersion.lineup) : null;
+      const pinnedConfig = pinnedVersion ? validateCompetitionConfig({
+        periods: pinnedVersion.periods,
+        events: pinnedVersion.events,
+        lineup: pinnedVersion.lineup,
+        result: pinnedVersion.result,
+        tieBreak: pinnedVersion.tieBreak,
+        visibility: pinnedVersion.visibility,
+      }, { preserveMissingCatalogKeys: true }) : undefined;
       const resolved = await this.lineupSizeConfigResolver.resolveVersionForLineupConfig(
         user,
         normalizeCompetitionSportCode(sport.code),
         {
+          baseConfig: pinnedConfig,
+          baseConfigName: pinnedVersion?.name,
           maxPlayers: dto.lineupMaxPlayers ?? pinnedLineup?.maxPlayers,
           substitutionMode: dto.substitutionMode ?? pinnedLineup?.substitutions,
           maxSubstitutions:
@@ -651,6 +659,11 @@ export class TournamentsAdminService {
     }
 
     await this.prisma.$transaction(async (tx) => {
+      // lineup만 저장하면 일반 필드 data가 비어 Prisma updateMany가 SQL 없이 count=0을
+      // 반환한다. 이 경우에도 실제 CAS 쓰기를 수행하고 기존 버전보다 새 버전을 발행한다.
+      if (Object.keys(data).length === 0) {
+        data.updatedAt = new Date(Math.max(Date.now(), casBaseline.getTime() + 1));
+      }
       // 원자적 CAS 시행부 — where절의 updatedAt이 그 사이 이미 바뀌었으면 count가 0이라
       // "쓴 줄 없음"으로 걸린다. 이게 X03(관리자 두 명 동시 편집 시 나중 저장이 CAS 충돌
       // 경고 없이 앞선 저장을 조용히 덮어쓰던 결함)의 근본 수정이다. updateMany는 갱신된

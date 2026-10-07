@@ -52,7 +52,10 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-export function validateCompetitionConfig(value: unknown): CompetitionConfig {
+export function validateCompetitionConfig(
+  value: unknown,
+  options: { preserveMissingCatalogKeys?: boolean } = {},
+): CompetitionConfig {
   if (!isRecord(value)) invalidConfig('경기 설정은 객체여야 해요.');
   const periods = value.periods;
   if (
@@ -216,13 +219,17 @@ export function validateCompetitionConfig(value: unknown): CompetitionConfig {
   ) {
     invalidConfig('visibility는 live와 official 상태를 지원해야 해요.');
   }
-  // positions/formations는 legacy row에서 키 자체가 없을 수 있으므로(위 참고), 반환값은
-  // 항상 CompetitionConfig 타입 계약대로 배열을 채워서 내보낸다 — 그렇지 않으면 이 함수를
-  // 호출하는 쪽(tournament-bracket.service.ts 등)이 타입은 배열을 약속받았는데 런타임엔
-  // undefined를 받는 모순이 생긴다.
+  // 읽기 경로는 기존 v1 row의 없는 catalog를 배열로 정규화한다. 쓰기/버전 파생은
+  // preserveMissingCatalogKeys로 저장 형태의 부재를 유지하고 같은 유효성 검증을 적용한다.
   return {
     ...value,
-    lineup: { ...(lineup as Record<string, unknown>), positions, formations },
+    // 쓰기/버전 파생에서는 부재를 유지한다. 읽기용 []를 저장하면 다음 검증에서
+    // 명시적으로 잘못된 positions로 취급되므로, read 정규화와 write 형태를 구분한다.
+    lineup: {
+      ...(lineup as Record<string, unknown>),
+      ...(!options.preserveMissingCatalogKeys || positionsProvided ? { positions } : {}),
+      ...(!options.preserveMissingCatalogKeys || formationsProvided ? { formations } : {}),
+    },
   } as CompetitionConfig;
 }
 

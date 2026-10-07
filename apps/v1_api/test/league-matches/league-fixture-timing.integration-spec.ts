@@ -161,7 +161,16 @@ describe('리그 대진 timing(경기 시간·휴식·팀당 하루 경기 수)'
     expect(await prisma.v1TeamMatch.count({ where: { leagueId } })).toBe(0);
   });
 
-  it('timing 없이 생성하면 기존 계약 그대로다(같은 주차 동시 시작·endAt 없음·주차 제목)', async () => {
+  /** 픽스처가 쓰는 경기 설정의 정규 시간(연장 제외 피리어드 합계, 분). */
+  async function regulationOf(configVersionId: string | null): Promise<number> {
+    const config = await prisma.v1CompetitionConfigVersion.findUniqueOrThrow({ where: { id: configVersionId! } });
+    const periods = config.periods as Array<{ durationMinutes: number; extraTime: boolean }>;
+    const total = periods.filter((period) => !period.extraTime).reduce((sum, period) => sum + period.durationMinutes, 0);
+    expect(total).toBeGreaterThan(0);
+    return total;
+  }
+
+  it('timing 없이 생성하면 같은 주차 동시 시작·주차 제목이고, 종료는 시작 + 전·후반 합계다', async () => {
     const leagueId = await createLeague('레거시 리그');
     const res = await request(app.getHttpServer())
       .post(`/api/v1/admin/league-matches/${leagueId}/fixtures`)
@@ -175,17 +184,27 @@ describe('리그 대진 timing(경기 시간·휴식·팀당 하루 경기 수)'
       if (f.startAt === null) throw new Error('fixture timing test requires persisted startAt');
       return f.startAt.toISOString();
     })).size).toBe(1);
-    expect(fixtures.every((f) => f.endAt === null)).toBe(true);
+    const regulation = await regulationOf(fixtures[0].competitionConfigVersionId);
+    expect(fixtures.every((f) => f.endAt !== null && f.startAt !== null
+      && f.endAt.getTime() - f.startAt.getTime() === regulation * 60_000)).toBe(true);
     expect(fixtures.every((f) => f.title === '레거시 리그 1주차')).toBe(true);
   });
 
-  it('경기 시간 없이 팀당 하루 경기 수만 보내면 400으로 거부한다', async () => {
-    const leagueId = await createLeague('불완전 타이밍 리그');
+  it('경기 시간을 비우고 팀당 하루 경기 수만 보내면 전·후반 합계를 경기 시간으로 순차 배치한다', async () => {
+    const leagueId = await createLeague('기본 경기 시간 리그');
     const res = await request(app.getHttpServer())
       .post(`/api/v1/admin/league-matches/${leagueId}/fixtures`)
       .set('x-v1-user-id', ownerUserId)
-      .send({ weeksCount: 1, timing: { gamesPerTeamPerDay: 3 } });
-    expect(res.status).toBe(400);
+      .send({ weeksCount: 1, schedule: wednesday22, timing: { gamesPerTeamPerDay: 2 } });
+    expect(res.status).toBe(201);
+
+    const fixtures = await prisma.v1TeamMatch.findMany({ where: { leagueId }, orderBy: { startAt: 'asc' } });
+    expect(fixtures).toHaveLength(4); // 4팀 × 팀당 2경기 = 하루 4경기
+    const regulation = await regulationOf(fixtures[0].competitionConfigVersionId);
+    for (const [index, fixture] of fixtures.entries()) {
+      expect(fixture.endAt!.getTime() - fixture.startAt!.getTime()).toBe(regulation * 60_000);
+      if (index > 0) expect(fixture.startAt!.getTime()).toBe(fixtures[index - 1].endAt!.getTime()); // 휴식 0분
+    }
   });
 
   it('주차 수 × 팀당 하루 경기 수가 총 라운드 상한을 넘으면 422로 거부한다', async () => {

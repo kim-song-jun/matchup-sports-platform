@@ -11,7 +11,7 @@ const REGISTRATIONS: Record<string, { id: string; teamId: string; team: { name: 
 };
 
 /** 대진 X(tm-x, 경기 game-m)는 team-a 대 team-b. */
-function detailRow() {
+function detailRow(startAt: Date | null = null) {
   return {
     teamMatchId: 'tm-x',
     tournamentId: 'tour-1',
@@ -29,8 +29,9 @@ function detailRow() {
       title: 'X',
       hostTeamId: 'team-a',
       approvedApplicantTeamId: 'team-b',
-      startAt: null,
+      startAt,
       endAt: null,
+      competitionConfigVersionId: 'config-1',
       placeName: null,
       status: 'matched',
       createdAt: new Date('2026-09-01T00:00:00Z'),
@@ -46,7 +47,7 @@ function detailRow() {
   };
 }
 
-function fakeTx() {
+function fakeTx(startAt: Date | null = null) {
   const calls: string[] = [];
   const events: unknown[] = [];
   const tx = {
@@ -75,8 +76,8 @@ function fakeTx() {
     }),
     v1TournamentMatchDetails: {
       findFirst: jest.fn(async () => null),
-      findUnique: jest.fn(async () => detailRow()),
-      findUniqueOrThrow: jest.fn(async () => detailRow()),
+      findUnique: jest.fn(async () => detailRow(startAt)),
+      findUniqueOrThrow: jest.fn(async () => detailRow(startAt)),
       update: jest.fn(async () => {
         calls.push('write');
         return {};
@@ -125,12 +126,30 @@ function fakeTx() {
     },
     v1TeamSchedule: { updateMany: jest.fn(async () => ({ count: 0 })), findUnique: jest.fn(async () => ({ id: 'schedule-1' })), update: jest.fn(async () => ({})) },
   };
-  return { tx: tx as unknown as Prisma.TransactionClient, calls, events };
+  return { tx: tx as unknown as Prisma.TransactionClient, mocks: tx, calls, events };
 }
 
 beforeEach(() => jest.clearAllMocks());
 
 describe('updateTournamentMatchInTx — 자기 경기만 잠그고 명단은 후속 이벤트로', () => {
+  it.each([{ venue: '새 구장' }, { fixtureNumber: 7 }])('종료 없는 경기의 부분 수정은 경기와 양 팀 캘린더 종료를 함께 보충한다: %j', async (patch) => {
+    const startAt = new Date('2026-11-15T09:00:00Z');
+    const endAt = new Date('2026-11-15T09:40:00Z');
+    const { tx, mocks } = fakeTx(startAt);
+    mocks.v1CompetitionConfigVersion.findUnique.mockResolvedValue({ periods: [
+      { durationMinutes: 20, extraTime: false }, { durationMinutes: 20, extraTime: false }, { durationMinutes: 10, extraTime: true },
+    ] });
+    await updateTournamentMatchInTx(tx, { teamMatchId: 'tm-x', ...patch });
+    expect(tx.v1TeamMatch.update).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ startAt, endAt }) }));
+    expect(tx.v1TeamSchedule.findUnique).toHaveBeenCalledTimes(2);
+    for (const teamId of ['team-a', 'team-b']) {
+      expect(tx.v1TeamSchedule.findUnique).toHaveBeenCalledWith({ where: { teamId_teamMatchId: { teamId, teamMatchId: 'tm-x' } }, select: { id: true } });
+    }
+    expect(tx.v1TeamSchedule.update).toHaveBeenCalledTimes(2);
+    expect(tx.v1TeamSchedule.update).toHaveBeenNthCalledWith(1, expect.objectContaining({ data: expect.objectContaining({ startAt, endAt }) }));
+    expect(tx.v1TeamSchedule.update).toHaveBeenNthCalledWith(2, expect.objectContaining({ data: expect.objectContaining({ startAt, endAt }) }));
+  });
+
   it('팀을 바꾸면 자기 경기 → 상세 → 팀 매치 순으로 잡고, 새 팀 사이드와 옛·새 팀 재계산 이벤트만 남긴다', async () => {
     const { tx, calls, events } = fakeTx();
     await updateTournamentMatchInTx(tx, { teamMatchId: 'tm-x', homeRegistrationId: 'reg-c' });

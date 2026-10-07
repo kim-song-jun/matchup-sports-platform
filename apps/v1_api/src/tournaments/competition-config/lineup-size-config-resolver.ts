@@ -14,7 +14,7 @@ import { CompetitionConfig } from './competition-config.types';
  * 옮기는 orchestration 계층. Prisma 스키마를 바꾸지 않는다 — 새 컬럼 대신 기존 불변
  * 버전 체계를 find-or-create로 재사용한다:
  *
- *   canonical config의 lineup.maxPlayers만 n으로 맞춘 content 구성
+ *   신규 생성은 canonical, 기존 수정은 고정된 config의 lineup만 바꾼 content 구성
  *   → content_hash로 같은 (sportCode, name) 계열에 이미 그 내용의 버전이 있으면 재사용
  *   → 없으면 CompetitionConfigRegistry.createVersion()(기존 관리자 API가 이미 쓰는 경로)으로
  *     새 버전 발행
@@ -59,7 +59,8 @@ export class LineupSizeConfigResolver {
    * find-or-create한다. 두 설정 모두 같은 `lineup` 섹션에 있고 content_hash는 config
    * 전체를 해시하므로, 각각 따로 resolve하면 한쪽이 다른 쪽을 canonical 값으로 되돌려버린다
    * — 그래서 호출부(TournamentsAdminService)는 "지금 바뀌지 않는 필드"도 현재 pin된 값을
-   * 명시적으로 넘겨야 한다(생략 = canonical 기본값, "생략 = 기존 값 유지"가 아니다).
+   * 명시적으로 넘겨야 한다. 기존 대회 수정은 baseConfig에 현재 고정된 전체 설정을 넘겨
+   * 피리어드·결과 정책 등 출전 인원과 무관한 설정도 보존한다. 신규 생성은 canonical을 쓴다.
    *
    * `normalizedSportCode`는 `normalizeCompetitionSportCode()`를 이미 거친 값이어야 한다 —
    * 호출부가 어떤 예외(MISSING_SPORT/UNSUPPORTED_SPORT)를 관리자에게 보여줄지 스스로
@@ -72,11 +73,13 @@ export class LineupSizeConfigResolver {
       maxPlayers?: number;
       substitutionMode?: CompetitionConfig['lineup']['substitutions'];
       maxSubstitutions?: number | null;
+      baseConfig?: CompetitionConfig;
     },
   ): Promise<{ id: string; version: number; contentHash: string }> {
     const canonical = canonicalCompetitionConfigForSport(normalizedSportCode);
+    const source = overrides.baseConfig ?? canonical;
     const options = selectableLineupSizes(canonical);
-    const targetMaxPlayers = overrides.maxPlayers ?? canonical.lineup.maxPlayers;
+    const targetMaxPlayers = overrides.maxPlayers ?? source.lineup.maxPlayers;
     if (!options.includes(targetMaxPlayers)) {
       throw new UnprocessableEntityException({
         code: 'LINEUP_SIZE_UNSUPPORTED',
@@ -84,7 +87,7 @@ export class LineupSizeConfigResolver {
       });
     }
 
-    const targetMode = overrides.substitutionMode ?? canonical.lineup.substitutions;
+    const targetMode = overrides.substitutionMode ?? source.lineup.substitutions;
     let targetMaxSubstitutions: number | null;
     if (targetMode === 'rolling') {
       // 무제한은 항상 null — 아래 buildSubstitutionPolicyConfig도 같은 강제를 하지만,
@@ -98,9 +101,9 @@ export class LineupSizeConfigResolver {
       // `TournamentsAdminService.assertSubstitutionPolicyPair()` 담당이고, 이 분기는
       // 후자를 깨지 않기 위해 값을 그대로 흘린다.
       targetMaxSubstitutions = overrides.maxSubstitutions;
-    } else if (canonical.lineup.substitutions === 'limited') {
-      // 개수를 안 줬지만 canonical 자체가 제한형이면(football) 그 기본 횟수를 쓴다.
-      targetMaxSubstitutions = canonical.lineup.maxSubstitutions;
+    } else if (source.lineup.substitutions === 'limited') {
+      // 이미 제한형인 원본 설정의 횟수를 유지한다(신규 생성은 종목 기본값).
+      targetMaxSubstitutions = source.lineup.maxSubstitutions;
     } else {
       // canonical이 무제한(futsal)인데 제한형으로 바꾸면서 개수를 안 줬다 — 라인업 인원과
       // 달리 파생시킬 실제 카탈로그가 없으므로(위 모듈 주석 참고) 지어내지 않고 명확한
@@ -119,7 +122,7 @@ export class LineupSizeConfigResolver {
     // 새로 만들어내지 않을 뿐 강제로 막지 않고 그대로 이어간다.
 
     const targetConfig = buildSubstitutionPolicyConfig(
-      buildLineupSizeConfig(canonical, targetMaxPlayers),
+      buildLineupSizeConfig(source, targetMaxPlayers),
       targetMode,
       targetMaxSubstitutions,
     );

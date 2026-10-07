@@ -165,6 +165,7 @@ export async function updateTournamentMatchInTx(
     : detail.teamMatch.startAt !== null && detail.teamMatch.endAt !== null
       ? new Date(nextStartAt.getTime() + (detail.teamMatch.endAt.getTime() - detail.teamMatch.startAt.getTime()))
       : detail.teamMatch.endAt ?? await defaultFixtureEndAt(tx, detail.teamMatch.competitionConfigVersionId, nextStartAt);
+  const endChanged = (detail.teamMatch.endAt?.getTime() ?? null) !== (nextEndAt?.getTime() ?? null);
 
   try {
     await tx.v1TournamentMatchDetails.update({
@@ -226,9 +227,9 @@ export async function updateTournamentMatchInTx(
         });
       }
     }
-    if ((teamsChanged || timeChanged) && sideChange.nextTeamId !== null && nextStartAt !== null) {
+    if ((teamsChanged || timeChanged || endChanged) && sideChange.nextTeamId !== null && nextStartAt !== null) {
       await upsertSchedule(tx, sideChange.nextTeamId, input.teamMatchId, updated.title, nextStartAt, nextEndAt);
-    } else if ((teamsChanged || timeChanged) && nextStartAt === null && sideChange.nextTeamId !== null) {
+    } else if ((teamsChanged || timeChanged || endChanged) && nextStartAt === null && sideChange.nextTeamId !== null) {
       await tx.v1TeamSchedule.updateMany({
         where: { teamMatchId: input.teamMatchId, teamId: sideChange.nextTeamId, state: 'SCHEDULED' },
         data: { state: 'CANCELLED', cancelReason: 'BRACKET_SCHEDULE_REMOVED', version: { increment: 1 } },

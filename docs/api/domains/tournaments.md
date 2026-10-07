@@ -121,7 +121,11 @@ Admin-created tournaments require `teamCount` per tournament. The API does not t
 
 경기 시간(피리어드): `GET /api/v1/admin/competition-configs/lineup-size-options?sportId=` 응답의 `defaultPeriods`(`[{ label, durationMinutes }]`, 연장 제외)가 종목 기본값이다 — 축구 전반 45·후반 45, 풋살 20·20, 미지원 종목 `[]`. 생성 마법사는 이 값을 채워 두고 전·후반 또는 단판(피리어드 1개)으로 고칠 수 있게 하며, 고친 경우에만 대회 생성/수정 직후 `PATCH /api/v1/admin/tournaments/:tournamentId/periods`(피리어드 설정)로 저장한다. 생성 API 자체는 종목 기본 피리어드로 만든다.
 
+초안 재저장: `PATCH /api/v1/admin/tournaments/:tournamentId`에 출전 인원·교체 정책을 다시 보내거나 변경해도 현재 고정된 설정의 피리어드·이벤트·결과·순위·공개 정책은 유지한다. 동일한 설정이면 기존 버전을 재사용하고, 실제 라인업 변경은 다른 섹션을 보존한 불변 새 버전으로 처리한다. 생성 마법사는 피리어드 PATCH 성공 전에는 공개 확인·접수 시작을 허용하지 않는다. 실패 시 초안 ID와 입력을 유지하며 같은 초안에서 재시도한다.
+
 경기 종료 시각 기본값: 대회·리그 대진을 만들거나 일정을 옮길 때 종료 시각(`endAt`)을 받지 않았으면 **시작 + 그 경기가 쓰는 경기 설정의 정규 시간**(연장 제외 피리어드 합계 — 전·후반이면 둘의 합, 단판이면 그 한 피리어드)으로 채운다. 길이를 아는 경기를 옮기면 기존 길이를 그대로 옮긴다. 피리어드 길이를 모르는 레거시 설정(`{ count }`)이면 지어내지 않고 `null` 로 둔다.
+
+종료 시각이 없는 기존 대진을 장소·번호만 PATCH해 기본 종료가 보충되는 경우에도 같은 트랜잭션에서 양 팀 캘린더의 종료 시각을 함께 갱신한다. 시작 시각 변경 여부와 무관하게 경기와 팀 일정의 시간 계약을 유지한다.
 
 ## Competition Configuration
 

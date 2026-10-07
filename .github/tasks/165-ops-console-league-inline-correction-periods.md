@@ -187,9 +187,21 @@
 - [x] 신규 경기 시간 UI의 typography 4곳을 기존 토큰으로 치환. CI 허용 baseline은 변경하지 않음.
 - [x] 생성 마법사 81건 PASS(단일 worker). 실패 테스트 두 건이 GREEN으로 전환됨.
 - [x] 리그 대진 화면 71건·Web 타입 검사 PASS. 패턴 검사는 Git Bash로 원본 스크립트를 실행해 PASS(Windows 기본 find 명령 오류는 별도 기록).
-- [ ] 명시 scope 커밋과 기존 PR 브랜치 일반 push.
+- [x] Web 수정 4파일을 `b5199614f`로 명시 scope 커밋하고 기존 PR 브랜치에 일반 push. 해당 head의 일반 CI PASS.
 - [ ] 최신 head 직접 재리뷰·정식 GitHub 리뷰, 일반 CI와 dev 머지 조건 재확인.
 - [ ] dev 머지 뒤 alpha 서빙 SHA 확인, 실제 로그인 390/768/1440 사용자 흐름·console/network·갤러리 증거.
 - Acceptance Criteria: 시간 저장이 실패하면 공개 확인/접수 시작을 실행할 수 없고, 재시도는 기존 초안 PATCH를 사용하며 이후 수정은 피리어드 저장 응답의 최신 버전을 사용한다.
 - Security Notes: 관리자 전용 API의 권한·감사로그·CAS 계약을 그대로 사용한다. 실패를 성공으로 표시하지 않고 생성된 초안을 유지한다.
 - Risks & Dependencies: 로컬 Docker daemon 접근이 없어 DB 통합 검증은 GitHub CI 증거와 구분한다. alpha QA와 갤러리는 배포 이후 단계로 남긴다.
+
+### PR #1642 추가 리뷰 회귀 수정
+
+- Owned files: `apps/v1_api/src/tournaments/competition-config/lineup-size-config-resolver.ts`, `apps/v1_api/src/tournaments/{tournaments-admin.service.ts,tournaments-admin.service.spec.ts,tournament-match-update.ts,tournament-match-update.spec.ts}`, `apps/v1_api/test/integration/tournament-draft-period-resave.e2e-spec.ts`, `docs/api/domains/tournaments.md`, 이 task 문서. 병렬 에이전트 작업 없음.
+- [x] 초안 재저장/교체 변경 시 사용자 지정 피리어드와 결과 정책이 canonical로 돌아가는 실제 서비스 단언 2건 RED 확인.
+- [x] 종료 없는 기존 대진의 장소/번호 PATCH 시 양 팀 캘린더가 갱신되지 않는 트랜잭션 helper 단언 2건 RED 확인.
+- [x] 현재 고정된 전체 config를 원본으로 라인업만 변경하고, endAt 변화도 팀 일정 동기화 조건에 포함.
+- [x] 관련 API 단위 테스트 5파일 169건 PASS(직렬). DB HTTP 회귀는 초안 생성 → 단판 30분 저장 → 동일 설정 재저장 2회 → 실제 출전 인원 변경 후 API/DB 피리어드·버전 유지 여부를 검증하도록 CI 대상에 추가.
+- [x] API 타입 검사·표면 계약 검사 PASS. 표면 계약 스크립트는 Windows 기본 find 오류를 구분해 Git Bash에서 원본 스크립트를 실행했다.
+- [ ] 추가 API 수정 명시 scope 커밋·일반 push, 최신 head CI의 실제 PostgreSQL 통합 테스트 확인.
+- Acceptance Criteria: 동일 라인업 재저장은 config pin을 유지하고, 실제 라인업 변경도 피리어드/이벤트/결과/순위/공개 설정을 보존한다. 종료 시각을 보충하면 같은 트랜잭션에서 두 팀 일정도 같은 종료를 저장한다.
+- Validation limitation: Windows Jest의 절대 경로 glob 문제는 원본 설정을 변경하지 않고 상대 glob CLI override로 우회했다. 최초 array 옵션이 파일 필터를 소비해 불필요한 스위트 컴파일을 시작한 실행은 네 실패 단언을 기록한 후 해당 소유 프로세스만 종료했다. 그 실행을 전체 검증 완료로 표시하지 않는다. 로컬 DB 통합 테스트는 Docker 접근 부재로 미실행이다.

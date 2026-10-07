@@ -20,7 +20,9 @@ import { usePublicTournamentPlayerRecords } from '@/components/public-game-recor
 import { ProfileAvatar } from '@/components/users/public-profile-client';
 import { TournamentPlayerRecordsSections } from '@/components/public-game-records/player-records-sections';
 import { extractErrorMessage } from '@/lib/error-message';
-import { hasStoredV1Session, withFromPath } from '@/lib/session-storage';
+import { hasStoredV1Session, sanitizeRedirectPath, withFromPath } from '@/lib/session-storage';
+import { useSearchParams } from 'next/navigation';
+import { useShellOverride } from '@/components/v1-ui/shell-override';
 import { trackEvent } from '@/lib/analytics';
 import { V1ApiError, v1Get } from '@/lib/api-client';
 import { TournamentFlowNav } from '@/components/tournaments/tournament-flow-nav';
@@ -825,6 +827,8 @@ export function useTournamentReviewWriteGate(tournamentId: string, status: V1Tou
 
 /* ── 리뷰 섹션 (실제 데이터 + 권한 gate) ── */
 function ReviewsSection({ tournament }: { tournament: V1TournamentDetail }) {
+  // 후기 화면의 뒤로가기가 이 시상 화면(받은 출처 포함)으로 돌아오게 한다.
+  const currentHref = useCurrentHref();
   const [showForm, setShowForm] = useState(false);
   const { hasSession, isCompleted, isParticipant, alreadyReviewed, canWrite } =
     useTournamentReviewWriteGate(tournament.id, tournament.status);
@@ -906,7 +910,7 @@ function ReviewsSection({ tournament }: { tournament: V1TournamentDetail }) {
             ))}
             {reviews.length > REVIEW_EMBED_CAP && (
               <Link
-                href={`/tournaments/${tournament.id}/reviews`}
+                href={withFromPath(`/tournaments/${tournament.id}/reviews`, currentHref)}
                 className="tm-btn tm-btn-sm tm-btn-outline"
                 style={{ justifyContent: 'center' }}
               >
@@ -1096,6 +1100,9 @@ export function AwardsPageClient({
   tournamentId: string;
   seed?: V1TournamentDetail | null;
 }) {
+  // route-chrome 표는 awards 뒤로가기를 results 로 고정한다 — 개요 등에서 from 을 달고 왔으면 그곳으로 돌아간다.
+  const backFrom = sanitizeRedirectPath(useSearchParams()?.get('from'));
+  useShellOverride({ backHref: backFrom ?? undefined });
   const { data, isPending, isError, error, refetch } = useV1Tournament(tournamentId, { seed });
 
   // isPending — 서버 렌더에서 isLoading 은 false 라 오류 분기로 떨어진다(대회 상세와 같다).

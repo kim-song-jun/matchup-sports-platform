@@ -53,6 +53,8 @@ import {
   RegenerateLeagueFixturesDto,
   OpenLeagueRegistrationDto,
   RevertLeagueCompletionDto,
+  HoldLeagueDto,
+  ResumeLeagueDto,
   UpdateLeagueDisciplineDto,
   UpdateLeagueFixtureDto,
   UpdateLeagueVisibilityDto,
@@ -433,8 +435,8 @@ export class LeagueMatchAdminService {
   async updateVisibility(user: V1AuthUser, leagueId: string, dto: UpdateLeagueVisibilityDto) {
     const admin = await this.adminContext.getMutationAdmin(user.id);
     return this.prisma.$transaction(async (tx) => {
-      const locked = await tx.$queryRaw<Array<{ id: string; isPublic: boolean }>>`
-        SELECT "id", "is_public" AS "isPublic"
+      const locked = await tx.$queryRaw<Array<{ id: string; isPublic: boolean; status: string }>>`
+        SELECT "id", "is_public" AS "isPublic", "status"::text AS "status"
         FROM "v1_tournaments"
         WHERE "id" = ${leagueId}
           AND "kind" = 'regular_league'
@@ -447,6 +449,10 @@ export class LeagueMatchAdminService {
       }
 
       if (current.isPublic === dto.isPublic) return { leagueId, isPublic: current.isPublic };
+      // 보류 중인 리그는 숨겨 두는 게 보류의 일부다 — 공개하려면 보류부터 해제한다(해제가 공개도 되돌린다).
+      if (current.status === 'on_hold' && dto.isPublic) {
+        throw new ConflictException({ code: 'LEAGUE_ON_HOLD', message: '보류 중인 리그는 공개할 수 없어요. 먼저 보류를 해제해 주세요.' });
+      }
 
       await tx.v1Tournament.update({ where: { id: leagueId }, data: { isPublic: dto.isPublic } });
       await this.adminContext.logAdminAction(
@@ -566,6 +572,7 @@ export class LeagueMatchAdminService {
       // 보호가 **조용히** 사라지고, ② 그 테이블이 사라지는 릴리스에서 relation does not exist
       // 로 깨진다. BE-5 drop 이 정확히 ②를 일으켰다 — 통합 스펙이 500 으로 잡았다.
       await tx.$queryRaw`SELECT id FROM "v1_tournaments" WHERE id = ${leagueId} FOR UPDATE`;
+      await this.assertFixtureGenerationAllowedInTx(tx, leagueId);
       const existingCount = await tx.v1TeamMatch.count({ where: { leagueId } });
       if (existingCount > 0) {
         throw new ConflictException({ code: 'LEAGUE_FIXTURES_EXIST', message: '이미 대진이 생성된 리그예요.' });
@@ -1055,6 +1062,7 @@ export class LeagueMatchAdminService {
 
     const result = await this.prisma.$transaction(async (tx) => {
       await tx.$queryRaw`SELECT id FROM "v1_tournaments" WHERE id = ${leagueId} FOR UPDATE`;
+      await this.assertFixtureGenerationAllowedInTx(tx, leagueId);
       const existingFixtures = await tx.v1TeamMatch.findMany({
         where: { leagueId },
         select: {
@@ -1570,6 +1578,96 @@ export class LeagueMatchAdminService {
     };
   }
 
+  /**
+   * 리그 보류 — 리그 "취소" 대신 쓴다(2026-10-07 사용자 확정). 상태를 on_hold 로 바꾸고 리그와
+   * 그 경기를 공개 화면에서 숨긴다(isPublic=false — 공개 목록·상세·기록이 모두 이 값을 본다).
+   * 대진·결과·참가는 그대로 두고, 보류 직전 상태·공개 여부를 기억해 resumeLeague 가 되돌린다.
+   * 끝난(완료·취소) 리그는 보류할 수 없다. 이미 보류면 멱등하게 alreadyProcessed 다.
+   */
+  async holdLeague(user: V1AuthUser, leagueId: string, dto: HoldLeagueDto) {
+    const admin = await this.adminContext.getMutationAdmin(user.id);
+    return this.prisma.$transaction(async (tx) => {
+      const league = await findTournamentOnSurface(tx, ['regular_league'], {
+        where: { id: leagueId, deletedAt: null },
+        select: { id: true, status: true, isPublic: true },
+      });
+      if (league === null) {
+        throw new NotFoundException({ code: 'LEAGUE_NOT_FOUND', message: '리그를 찾을 수 없어요.' });
+      }
+      if (league.status === 'on_hold') {
+        return { leagueId, state: LeagueStateValue.on_hold, isPublic: league.isPublic, alreadyProcessed: true };
+      }
+      if (league.status === 'completed' || league.status === 'cancelled') {
+        throw new ConflictException({ code: 'LEAGUE_NOT_HOLDABLE', message: '끝난 리그는 보류할 수 없어요.' });
+      }
+      // 조건부 UPDATE 가 승자 판정이다 — 그 사이 상태가 바뀌었으면 0행이라 덮어쓰지 않는다.
+      const held = await tx.v1Tournament.updateMany({
+        where: { id: leagueId, kind: 'regular_league', deletedAt: null, status: league.status, isPublic: league.isPublic },
+        data: { status: 'on_hold', heldFromStatus: league.status, heldFromPublic: league.isPublic, isPublic: false },
+      });
+      if (held.count !== 1) {
+        throw new ConflictException({ code: 'LEAGUE_STATE_CHANGED', message: '리그 상태가 방금 바뀌었어요. 새로고침한 뒤 다시 시도해 주세요.' });
+      }
+      await this.adminContext.logAdminAction(
+        admin,
+        {
+          action: 'league_match.hold',
+          targetType: 'league_match',
+          targetId: leagueId,
+          reason: dto.reason,
+          fromStatus: LEAGUE_STATE_BY_STATUS[league.status],
+          toStatus: LeagueStateValue.on_hold,
+          beforeJson: { status: league.status, isPublic: league.isPublic },
+          afterJson: { status: 'on_hold', isPublic: false },
+        },
+        tx,
+      );
+      return { leagueId, state: LeagueStateValue.on_hold, isPublic: false, alreadyProcessed: false };
+    });
+  }
+
+  /** 보류 해제 — 보류 직전 상태·공개 여부로 되돌린다. 보류 중이 아니면 멱등하게 alreadyProcessed 다. */
+  async resumeLeague(user: V1AuthUser, leagueId: string, dto: ResumeLeagueDto) {
+    const admin = await this.adminContext.getMutationAdmin(user.id);
+    return this.prisma.$transaction(async (tx) => {
+      const league = await findTournamentOnSurface(tx, ['regular_league'], {
+        where: { id: leagueId, deletedAt: null },
+        select: { id: true, status: true, isPublic: true, heldFromStatus: true, heldFromPublic: true },
+      });
+      if (league === null) {
+        throw new NotFoundException({ code: 'LEAGUE_NOT_FOUND', message: '리그를 찾을 수 없어요.' });
+      }
+      if (league.status !== 'on_hold') {
+        return { leagueId, state: LEAGUE_STATE_BY_STATUS[league.status], isPublic: league.isPublic, alreadyProcessed: true };
+      }
+      // 기억한 값이 없으면(직접 DB 로 보류한 행 등) 준비 중·공개로 되돌린다 — 끝난 상태로 되살리지 않는다.
+      const restoreStatus = league.heldFromStatus ?? 'draft';
+      const restorePublic = league.heldFromPublic ?? true;
+      const resumed = await tx.v1Tournament.updateMany({
+        where: { id: leagueId, kind: 'regular_league', status: 'on_hold' },
+        data: { status: restoreStatus, isPublic: restorePublic, heldFromStatus: null, heldFromPublic: null },
+      });
+      if (resumed.count !== 1) {
+        throw new ConflictException({ code: 'LEAGUE_STATE_CHANGED', message: '리그 상태가 방금 바뀌었어요. 새로고침한 뒤 다시 시도해 주세요.' });
+      }
+      await this.adminContext.logAdminAction(
+        admin,
+        {
+          action: 'league_match.resume',
+          targetType: 'league_match',
+          targetId: leagueId,
+          reason: dto.reason ?? null,
+          fromStatus: LeagueStateValue.on_hold,
+          toStatus: LEAGUE_STATE_BY_STATUS[restoreStatus],
+          beforeJson: { status: 'on_hold', isPublic: league.isPublic },
+          afterJson: { status: restoreStatus, isPublic: restorePublic },
+        },
+        tx,
+      );
+      return { leagueId, state: LEAGUE_STATE_BY_STATUS[restoreStatus], isPublic: restorePublic, alreadyProcessed: false };
+    });
+  }
+
   async revertCompletion(user: V1AuthUser, leagueId: string, dto: RevertLeagueCompletionDto) {
     const admin = await this.adminContext.getMutationAdmin(user.id);
     const league = await findTournamentOnSurface(this.prisma, ['regular_league'], {
@@ -1640,6 +1738,20 @@ export class LeagueMatchAdminService {
       tx,
     );
     return false;
+  }
+
+  private async assertFixtureGenerationAllowedInTx(tx: Prisma.TransactionClient, leagueId: string) {
+    // 계획 계산 뒤 보류가 커밋될 수 있으므로 정본 행 잠금 뒤의 최신 상태로 판정한다.
+    const league = await findTournamentOnSurface(tx, ['regular_league'], {
+      where: { id: leagueId, deletedAt: null },
+      select: { status: true },
+    });
+    if (league === null) {
+      throw new NotFoundException({ code: 'LEAGUE_NOT_FOUND', message: '리그를 찾을 수 없어요.' });
+    }
+    if (league.status === 'on_hold') {
+      throw new ConflictException({ code: 'LEAGUE_ON_HOLD', message: '보류 중에는 대진을 만들거나 다시 만들 수 없어요. 먼저 보류를 해제해 주세요.' });
+    }
   }
 
   private async loadLeague(leagueId: string) {

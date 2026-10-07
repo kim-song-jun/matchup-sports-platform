@@ -2,10 +2,24 @@
 
 ## Read Endpoints
 
-Regular league publication is independently controlled by `V1Tournament.isPublic`.
-Unpublished leagues are excluded from unified public tournament reads, including
-direct detail and overall standings, while admin operations remain available.
-The default is public; this gate does not change lifecycle or bracket publication.
+Publication of both regular tournaments and regular leagues is independently
+controlled by `V1Tournament.isPublic` (default `true`). Unpublished competitions are
+excluded from public tournament lists (every `kind`), direct detail, overall standings,
+schedule, match detail, player records, public reviews and published campaigns
+(`GET /tournaments/:id/announcements/me` returns `404 TOURNAMENT_NOT_FOUND` unless the
+caller has an active registration; active participants keep their audience-scoped
+announcements), and
+their fixtures are excluded from public team/user records, profile activity counts
+and the public game record. Admin operations remain available, and the gate does not
+change lifecycle, registrations, fixtures or bracket publication.
+
+`PATCH /api/v1/admin/tournaments/:tournamentId/visibility` accepts only
+`{ "isPublic": boolean }` (same validation as the league endpoint — non-boolean JSON
+values return `400`) and returns `{ tournamentId, isPublic }`. It requires an active
+mutation administrator, is a no-op without audit when the value is unchanged, records
+`tournament.visibility` in the admin audit otherwise, and returns
+`409 TOURNAMENT_VERSION_CONFLICT` if a concurrent request changed the value first.
+The admin tournament detail includes `isPublic`.
 See [the league visibility contract](./league-matches.md#public-visibility).
 
 | Method | Path | Auth | Request | Response |

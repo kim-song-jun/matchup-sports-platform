@@ -8,6 +8,7 @@ import {
   CreateTournamentDto,
   PublishBracketDto,
   UpdateTournamentDto,
+  UpdateTournamentVisibilityDto,
 } from './dto/admin-tournament.dto';
 import { TournamentsAdminService } from './tournaments-admin.service';
 
@@ -38,6 +39,16 @@ export class TournamentsAdminController {
     @Body() dto: UpdateTournamentDto,
   ) {
     return this.tournamentsAdminService.update(user, tournamentId, dto);
+  }
+
+  /** 공개/비공개 전환 — 비공개면 일반 사용자의 목록·검색·상세·기록에서 숨고, 관리자 운영은 그대로다. */
+  @Patch(':tournamentId/visibility')
+  updateVisibility(
+    @CurrentUser() user: V1AuthUser,
+    @Param('tournamentId') tournamentId: string,
+    @Body() dto: UpdateTournamentVisibilityDto,
+  ) {
+    return this.tournamentsAdminService.updateVisibility(user, tournamentId, dto);
   }
 
   @Post(':tournamentId/status')

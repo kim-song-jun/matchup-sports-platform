@@ -11,7 +11,7 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { V1AuthUser } from '../auth/v1-auth-user';
 import { ArrayMaxSize, IsArray, IsIn, IsInt, IsOptional, IsString, IsUUID, Max, MaxLength, Min, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
-import { findTournamentOnSurface, TOURNAMENT_KINDS } from './tournament-surface-lookup';
+import { findPublicTournamentOnSurface, findTournamentOnSurface, TOURNAMENT_KINDS } from './tournament-surface-lookup';
 import { TOURNAMENT_SURFACE_KIND } from './tournament-surface';
 
 export class ListTournamentReviewsQueryDto {
@@ -238,6 +238,14 @@ export class TournamentReviewsService {
 
   /** 대회 리뷰 목록 (공개, 최신순, 페이지네이션 + 검색). 숨김 처리된 리뷰는 제외. */
   async listReviews(tournamentId: string, query: ListTournamentReviewsQueryDto = {}) {
+    // 공개 후기 목록 — 비공개(또는 없는) 대회는 상세와 같이 404 다. 후기만 따로 새지 않게 한다.
+    const tournament = await findPublicTournamentOnSurface(this.prisma, TOURNAMENT_KINDS, {
+      where: { id: tournamentId, deletedAt: null },
+      select: { id: true },
+    });
+    if (tournament === null) {
+      throw new NotFoundException({ code: 'TOURNAMENT_NOT_FOUND', message: '대회를 찾을 수 없어요.' });
+    }
     const { rows, total, page, pageSize } = await this.queryReviews(tournamentId, query, true);
     return {
       items: rows.map((r) => this.mapReviewRow(r)),

@@ -6,6 +6,7 @@ import { trackEvent } from '@/lib/analytics';
 import type { V1LeagueOverallStandingsResponse, V1TournamentDetail } from '@/types/api';
 import type { V1LeaguePlayerRecordRow } from '@/types/league-match';
 import type { PublicTournamentPlayerRecordRow } from '@/components/public-game-records/types';
+import { useShellOverrideForRoute } from '@/components/v1-ui/shell-override';
 import { AwardsPageClient, ReviewFormModal } from './awards-page-client';
 
 const { v1GetMock } = vi.hoisted(() => ({ v1GetMock: vi.fn() }));
@@ -64,13 +65,15 @@ vi.mock('@/lib/analytics', () => ({
   trackEvent: vi.fn(),
 }));
 
+const navState = vi.hoisted(() => ({ search: '' }));
+
 vi.mock('next/navigation', () => ({
   usePathname: () => '/tournaments/tournament-1/awards',
   useRouter: () => ({
     push: vi.fn(),
     replace: vi.fn(),
   }),
-  useSearchParams: () => new URLSearchParams(),
+  useSearchParams: () => new URLSearchParams(navState.search),
 }));
 
 function render(ui: ReactElement) {
@@ -611,5 +614,74 @@ describe('ReviewFormModal — 모달 a11y(useModalA11y) 배선', () => {
     const backdrop = screen.getByRole('dialog', { name: '리뷰 작성' }).parentElement as HTMLElement;
     fireEvent.click(backdrop);
     expect(onClose).toHaveBeenCalledTimes(1);
+  });
+});
+
+function ShellBackProbe() {
+  const { backHref } = useShellOverrideForRoute('/tournaments/tournament-1/awards');
+  return <output data-testid="shell-back">{backHref ?? ''}</output>;
+}
+
+const manyReviews = Array.from({ length: 4 }, (_, i) => ({
+  id: `review-${i}`,
+  authorId: `author-${i}`,
+  authorNickname: `작성자${i}`,
+  authorProfileImageUrl: null,
+  teamName: null,
+  rating: 5,
+  comment: '좋았어요',
+  photoUrls: [],
+  createdAt: '2026-01-01T00:00:00.000Z',
+}));
+
+describe('AwardsPageClient — 상단 뒤로가기 출처(MD-QA #33·#34)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    navState.search = '';
+    awardsApiMocks.useV1Tournament.mockReturnValue({
+      data: makeCompletedTournament({ reviews: manyReviews, reviewsTotalCount: 4 }),
+      isLoading: false,
+      isPending: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+  });
+
+  function renderAwards() {
+    return render(
+      <>
+        <AwardsPageClient tournamentId="tournament-1" />
+        <ShellBackProbe />
+      </>,
+    );
+  }
+
+  it('유효한 from 이 있으면 셸 뒤로가기가 그 주소(개요)로 바뀐다', () => {
+    navState.search = 'from=%2Ftournaments%2Ftournament-1';
+    renderAwards();
+    expect(screen.getByTestId('shell-back')).toHaveTextContent('/tournaments/tournament-1');
+  });
+
+  it('from 이 없으면 셸 뒤로가기를 덮어쓰지 않는다(표의 기본값 유지)', () => {
+    renderAwards();
+    expect(screen.getByTestId('shell-back')).toBeEmptyDOMElement();
+  });
+
+  it.each(['https://evil.example', '//evil.example'])('외부 주소 from(%s)은 무시한다', (evil) => {
+    navState.search = `from=${encodeURIComponent(evil)}`;
+    renderAwards();
+    expect(screen.getByTestId('shell-back')).toBeEmptyDOMElement();
+  });
+
+  it('후기 전체보기 링크는 자기 from 을 포함한 시상 화면 주소를 출처로 싣는다', () => {
+    navState.search = 'from=%2Ftournaments%2Ftournament-1';
+    renderAwards();
+    const href = screen.getByRole('link', { name: /후기 전체보기/ }).getAttribute('href') as string;
+    const url = new URL(href, 'https://x.test');
+    expect(url.pathname).toBe('/tournaments/tournament-1/reviews');
+    expect(url.searchParams.get('from')).toBe(
+      '/tournaments/tournament-1/awards?from=%2Ftournaments%2Ftournament-1',
+    );
   });
 });

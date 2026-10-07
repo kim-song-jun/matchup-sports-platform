@@ -12,6 +12,8 @@ import {
   OpenLeagueRegistrationDto,
   RegenerateLeagueFixturesDto,
   RevertLeagueCompletionDto,
+  HoldLeagueDto,
+  ResumeLeagueDto,
   UpdateLeagueDisciplineDto,
   UpdateLeagueFixtureDto,
   UpdateLeagueVisibilityDto,
@@ -207,6 +209,28 @@ export class LeagueMatchAdminController {
   // 이 라우트만 PATCH 였던 탓에 재감사 중 POST 로 호출했다가 404 INTERNAL_ERROR 를
   // 받았다 — 한 컨트롤러 안에서 같은 성격의 액션이 서로 다른 메서드를 쓰면 호출부가 매번
   // 파일을 열어봐야 한다. @HttpCode(200) 도 cancelFixture 와 맞춘다(생성이 아니라 상태 전이).
+  /** 리그 보류 — 취소 대신 쓴다. 상태 on_hold + 리그·경기 비공개, 대진·결과는 그대로. 사유 필수. */
+  @Post(':leagueId/hold')
+  @HttpCode(200)
+  holdLeague(
+    @CurrentUser() user: V1AuthUser,
+    @Param('leagueId', leagueIdPipe) leagueId: string,
+    @Body() dto: HoldLeagueDto,
+  ) {
+    return this.service.holdLeague(user, leagueId, dto);
+  }
+
+  /** 보류 해제 — 보류 직전 상태·공개 여부로 되돌린다. */
+  @Post(':leagueId/resume')
+  @HttpCode(200)
+  resumeLeague(
+    @CurrentUser() user: V1AuthUser,
+    @Param('leagueId', leagueIdPipe) leagueId: string,
+    @Body() dto: ResumeLeagueDto,
+  ) {
+    return this.service.resumeLeague(user, leagueId, dto);
+  }
+
   @Post(':leagueId/revert-completion')
   @HttpCode(200)
   revertCompletion(

@@ -305,12 +305,14 @@ export function gameRosterStatusLabel(status: string, remainingMatches?: number 
 // ── Task 180 G13 상태 모델 — 리그·경기·종류 ─────────────────────────────────────
 // 문구만 여기 둔다. 칩 톤·아이콘·노출 조건은 `lib/competition-status.ts` 가 이 라벨로 만든다.
 
-export type LeagueStateKey = 'draft' | 'active' | 'completed';
+export type LeagueStateKey = 'draft' | 'active' | 'completed' | 'on_hold';
 
 const LEAGUE_STATE_LABEL: Record<LeagueStateKey, string> = {
   draft: '준비 중',
   active: '진행 중',
   completed: '종료',
+  // 리그 취소 대신 쓰는 보류 — 공개 화면에선 숨겨져 있고 관리자가 다시 열 수 있다.
+  on_hold: '보류',
 };
 
 /** 리그(시즌) 자체의 상태. 경기 상태와 한 화면에 함께 나오면 `LEAGUE_SUBJECT_LABEL` 을 앞에 붙인다. */

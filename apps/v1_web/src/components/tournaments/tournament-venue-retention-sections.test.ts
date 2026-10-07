@@ -208,6 +208,9 @@ describe('TournamentVenuePrepSection — rendered venue info (regression guard f
 
 const NO_FIXTURES: V1TournamentFixture[] = [];
 
+// 시상·후기 행은 ?from= 을 싣는다 — 도착 경로만 비교하고 from 은 아래 전용 테스트가 본다.
+const hrefPath = (el: HTMLElement) => (el.getAttribute('href') ?? '').split('?')[0];
+
 describe('TournamentPostEventHubSection — completed action list vs default hub (regression guard)', () => {
   it('renders the 3-row completed action list with correct hrefs for a completed tournament', () => {
     render(
@@ -224,10 +227,7 @@ describe('TournamentPostEventHubSection — completed action list vs default hub
     // 행마다 라벨이 약속하는 화면으로 가야 한다 — 한때 "최종 결과·시상"이 경기별 결과
     // 목록(/results)으로, "대회 후기"가 시상 화면(/awards)으로 가서 두 행이 서로의
     // 화면을 가리키고 있었다(오너 지적: "이건 대회 후기를 보러가는거고").
-    expect(screen.getByRole('link', { name: /최종 결과·시상/ })).toHaveAttribute(
-      'href',
-      '/tournaments/tour-42/awards',
-    );
+    expect(hrefPath(screen.getByRole('link', { name: /최종 결과·시상/ }))).toBe('/tournaments/tour-42/awards');
     expect(screen.getByRole('link', { name: /대진표·조별 순위/ })).toHaveAttribute(
       'href',
       '/tournaments/tour-42/bracket',
@@ -238,11 +238,29 @@ describe('TournamentPostEventHubSection — completed action list vs default hub
     );
     // 후기 행은 대회 컨텍스트를 유지해야 한다 — 예전엔 '/my/reviews'로 보내 "어느 대회의
     // 후기를 쓰려던 건지"가 사라졌고, 사용자가 목록에서 대회를 다시 찾아야 했다.
-    expect(screen.getByRole('link', { name: /대회 후기/ })).toHaveAttribute(
-      'href',
-      '/tournaments/tour-42/reviews',
-    );
+    expect(hrefPath(screen.getByRole('link', { name: /대회 후기/ }))).toBe('/tournaments/tour-42/reviews');
     expect(screen.getByText('대회 후 더보기')).toBeInTheDocument();
+  });
+
+  it('시상·후기 행은 지금 개요 주소를 출처(from)로 싣는다 — 상단 뒤로가기가 개요로 돌아오게', () => {
+    render(
+      createElement(TournamentPostEventHubSection, {
+        tournamentId: 'tour-42',
+        status: 'completed',
+        fixtures: NO_FIXTURES,
+        hasAnnouncements: false,
+        sponsorCount: 0,
+        announcements: [],
+      }),
+    );
+    for (const [name, path] of [
+      [/최종 결과·시상/, '/tournaments/tour-42/awards'],
+      [/대회 후기/, '/tournaments/tour-42/reviews'],
+    ] as const) {
+      const url = new URL(screen.getByRole('link', { name }).getAttribute('href') as string, 'https://x.test');
+      expect(url.pathname).toBe(path);
+      expect(url.searchParams.get('from')).toBe('/tournaments/t1?from=%2Fhome');
+    }
   });
 
   it('renders nothing for draft/open/closed tournaments — too early for any "대회 후" content', () => {

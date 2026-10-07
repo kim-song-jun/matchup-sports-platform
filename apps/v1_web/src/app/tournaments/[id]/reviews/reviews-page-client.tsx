@@ -5,7 +5,9 @@ import { ChevronLeft, ChevronRight, Search } from 'lucide-react';
 import { Card, EmptyState, ErrorState } from '@/components/v1-ui/primitives';
 import { useV1Reviews, useV1Tournament, useV1TournamentReviews } from '@/hooks/use-v1-api';
 import { extractErrorMessage } from '@/lib/error-message';
-import { hasStoredV1Session } from '@/lib/session-storage';
+import { useSearchParams } from 'next/navigation';
+import { hasStoredV1Session, sanitizeRedirectPath } from '@/lib/session-storage';
+import { useShellOverride } from '@/components/v1-ui/shell-override';
 import { TournamentFixtureReviewEntrySection } from '@/components/tournaments/tournament-venue-retention-sections';
 import { ReviewCard, ReviewFormModal, useTournamentReviewWriteGate } from '../awards/awards-page-client';
 import type { V1TournamentDetail } from '@/types/api';
@@ -117,6 +119,9 @@ function FixtureReviewsSection({ tournament }: { tournament: V1TournamentDetail 
 }
 
 export function TournamentReviewsPageClient({ tournamentId }: { tournamentId: string }) {
+  // route-chrome 표는 reviews 뒤로가기를 awards 로 고정한다 — from 이 있으면 그 출처로 돌아간다.
+  const backFrom = sanitizeRedirectPath(useSearchParams()?.get('from'));
+  useShellOverride({ backHref: backFrom ?? undefined });
   const [page, setPage] = useState(1);
   const [searchInput, setSearchInput] = useState('');
   const [showForm, setShowForm] = useState(false);

@@ -53,6 +53,122 @@ While on hold, fixture generation and regeneration return `409 LEAGUE_ON_HOLD`
 without creating or cancelling fixtures. Both actions recheck the status after
 locking the parent league row, including a hold committed during plan calculation.
 
+## Close registration (즉시 마감)
+
+`POST /api/v1/admin/league-matches/:leagueId/close-registration` (HTTP 200) takes an
+optional `{ "reason": string }` (max 200 chars; whitespace-only becomes `null`) and
+requires an active mutation administrator (support and non-admins get
+`403 PERMISSION_DENIED`). The server moves `registrationDeadlineAt` to the current
+time; the deadline stays the single judge of "open", so the public CTA, `/apply` and
+the submit API close together. `status` is not touched, `on_hold` leagues can be
+closed, and nothing is sent to teams. Submitted registrations stay as they are; only
+new submissions are blocked. Reopening is the existing
+`POST .../open-registration` (deadline moved into the future) — close and open are
+not mixed into one endpoint.
+
+Response `data`: `{ leagueId, registrationOpen: false, registrationDeadlineAt, alreadyProcessed }`.
+A league whose deadline is already past or never set returns `alreadyProcessed: true`
+with no write and no audit row (an unset deadline is not rewritten to "now").
+Same-millisecond boundary: a submit with `deadline == now` is still accepted; the next
+judgement is closed.
+
+| Case | Response |
+|---|---|
+| unknown league id, or a tournament id | `404 LEAGUE_NOT_FOUND` |
+| soft-deleted league | `409 LEAGUE_MIRROR_MISSING` |
+| `completed` / `cancelled` | `409 LEAGUE_REGISTRATION_NOT_ALLOWED` |
+| deadline changed between read and write | `409 LEAGUE_STATE_CHANGED` |
+
+The write records `league_match.close_registration` with `reason`,
+`beforeJson.registrationDeadlineAt` and `afterJson.registrationDeadlineAt`
+(no status transition fields).
+
+## Entry fee and payment instructions (참가비)
+
+The fee is a per-team amount for the season (the league row). Payment stays bank
+transfer with manual confirmation by an admin; there is no payment gateway.
+`PATCH /api/v1/admin/league-matches/:leagueId/entry-fee` requires
+`{ "entryFee": integer 0..100000000 }`; `bankName`, `bankAccount`, `bankHolder`
+(1–60 chars, trimmed, no control characters) are optional and keep their current
+value when omitted — there is no way to clear an account, only to change it.
+`entryFee` is validated on the raw JSON value, so `""`, `"0"`, `null`, `false` and `[]`
+are rejected with 400 instead of being coerced to a free league. `reason` is optional
+(max 500; whitespace-only becomes `null`). Unknown fields return 400.
+
+- `entryFee > 0` needs all three bank fields after merging with the stored values,
+  otherwise `422 LEAGUE_PAYMENT_INSTRUCTIONS_REQUIRED`. A free league needs no account.
+- `entryFeeConfiguredAt` is `null` until an admin saves the fee. `null` means "not
+  set yet"; a value with `entryFee: 0` means "free, confirmed". Saving the same
+  values while it is still `null` is a real change (it confirms), so it writes.
+  Saving identical values when it is already set returns `alreadyProcessed: true`
+  with no write and no audit.
+- A reason is required (`422 LEAGUE_ENTRY_FEE_REASON_REQUIRED`, nothing saved) only
+  when the amount or an account field actually changes **and** at least one active
+  registration exists. Active means applied by the team itself
+  (`entrySource` is `applied` or legacy `null`; operator-placed `seeded`/`promoted`
+  teams do not count) and status not `draft` or `cancelled`. The count runs after the
+  conditional UPDATE took the row lock, so a concurrent submit cannot slip past.
+- `completed` / `cancelled` leagues return `409 LEAGUE_ENTRY_FEE_NOT_ALLOWED`; other
+  codes match close-registration (`LEAGUE_NOT_FOUND`, `LEAGUE_MIRROR_MISSING`,
+  `LEAGUE_STATE_CHANGED`).
+- Existing registrations keep the amount they were created with: `payment.amount` is
+  a snapshot taken at submit time and this endpoint never writes registration or
+  payment rows. The payment-instruction block in a registration response is shown
+  when that registration's own `payment.amount > 0`, not when the current league fee
+  is positive (this also applies to tournaments). The bank account itself is read from
+  the league row on every response.
+- The server does not block opening registration while the fee is unset; the web
+  confirmation modal ("무료로 열기") is the only guard.
+- Audit action `league_match.entry_fee_updated`. Account number and holder are
+  never written to the audit (the tournament admin update path does not either); the
+  after snapshot carries `entryFee`, `entryFeeConfigured`, `bankName`,
+  `hasBankAccount`, `hasBankHolder`, `bankAccountChanged`, `bankHolderChanged`.
+  Request-body logging masks `bankAccount` and `bankHolder` (`[REDACTED]`).
+
+Response `data`: `{ leagueId, entryFee, entryFeeConfiguredAt, bankName, bankAccount, bankHolder, alreadyProcessed }`.
+Example payload (fake values): `{ "entryFee": 150000, "bankName": "국민은행", "bankAccount": "123-456-789012", "bankHolder": "팀밋", "reason": "참가비 조정" }`.
+
+## Cover image (대표 이미지)
+
+`PATCH /api/v1/admin/league-matches/:leagueId/cover-image` takes
+`{ "coverImageUrl": string | null }`. The key is required; `null` removes the image.
+Only paths created by the upload endpoint are accepted (`/uploads/…`, max 1000 chars);
+external URLs, `javascript:`, `..` segments and empty strings return 400. The check is
+the shared `common/safe-image-url.ts` validator (campaign and sponsor behaviour is
+unchanged). Allowed in every status including `on_hold`, `completed` and `cancelled`.
+Last write wins. The old file is never deleted because the next season may have
+inherited the same URL. A value equal to the stored one returns
+`alreadyProcessed: true` without audit. Response `data`:
+`{ leagueId, coverImageUrl, alreadyProcessed }`; errors `404 LEAGUE_NOT_FOUND`,
+`409 LEAGUE_MIRROR_MISSING`. Audit action `league_match.cover_image_updated`
+(before/after `coverImageUrl`).
+
+`PATCH /api/v1/admin/tournaments/:id` stays regular-tournament only (the #863
+lock); it is intentionally not opened for leagues.
+
+## Detail fields and season carry-over
+
+- Admin detail (`GET /api/v1/admin/league-matches/:leagueId`) adds `sportCode`,
+  `coverImageUrl`, `entryFee`, `entryFeeConfiguredAt` (ISO or `null`), `bankName`,
+  `bankAccount`, `bankHolder` and `activeRegistrationCount` (a screen hint; the final
+  reason-required decision is the save transaction's own count). Bank fields are
+  admin-only.
+- Public detail (`GET /api/v1/league-matches/:leagueId`) adds `sportCode`,
+  `coverImageUrl`, `entryFee` and `entryFeeConfigured` (`entryFeeConfiguredAt != null`).
+  The raw timestamp, the bank fields and registration counts are never in any public
+  league response or in `/tournaments` responses. Clients must not render the fee
+  when `entryFeeConfigured` is `false` — an unset fee is not "free".
+- Season carry-over: `commitPromotions` (promotion/relegation commit) copies
+  `coverImageUrl`, `entryFee` and the three bank fields from the previous season's
+  league of the **same tier** into the new season. `entryFeeConfiguredAt` is left
+  `null`, so the new season shows as "inherited — please confirm". Values are copied,
+  not linked: later edits to either season do not affect the other. First-season
+  seeding and single-league creation have no previous season and are unchanged.
+
+Rollout: the migration (`entry_fee_configured_at`, nullable add) is additive and the
+screens use it after the API is deployed. Promotion from dev to main is performed by
+the user.
+
 ## Create a league
 
 Creation requires an authenticated active owner/ops administrator. The existing

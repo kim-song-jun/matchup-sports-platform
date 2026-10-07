@@ -29,6 +29,30 @@ Production rollout requires the additive migration and API/web deployment before
 changing a league setting. A database-only change ahead of the serving API cannot
 enforce publication. Production promotion from dev to main is performed by the user.
 
+## Hold and resume (보류)
+
+A regular league is put on hold instead of being cancelled (2026-10-07).
+`POST /api/v1/admin/league-matches/:leagueId/hold` requires `{ "reason": string }`
+(1–500 chars) and an active mutation administrator. It sets the stored status to
+`on_hold` (league `state: "on_hold"`), sets `isPublic` to `false` so the league and
+its fixtures disappear from every public read, and keeps fixtures, results and
+registrations untouched — remaining fixtures are **not** cancelled. The previous
+status and visibility are kept in `held_from_status` / `held_from_public`.
+Completed or cancelled leagues return `409 LEAGUE_NOT_HOLDABLE`; holding an
+already-held league returns `alreadyProcessed: true`.
+
+`POST /api/v1/admin/league-matches/:leagueId/resume` (optional `reason`) restores the
+remembered status and visibility and clears both columns. A league that is not on
+hold returns `alreadyProcessed: true`. While on hold,
+`PATCH .../visibility` with `isPublic: true` returns `409 LEAGUE_ON_HOLD`; resuming
+restores visibility. Both actions record `league_match.hold` / `league_match.resume`
+in the admin audit and return `{ leagueId, state, isPublic, alreadyProcessed }`.
+A concurrent status or visibility change returns `409 LEAGUE_STATE_CHANGED`;
+hold compares both values so a newly private league is never restored as public.
+While on hold, fixture generation and regeneration return `409 LEAGUE_ON_HOLD`
+without creating or cancelling fixtures. Both actions recheck the status after
+locking the parent league row, including a hold committed during plan calculation.
+
 ## Create a league
 
 Creation requires an authenticated active owner/ops administrator. The existing

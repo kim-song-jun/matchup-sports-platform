@@ -563,7 +563,10 @@ export const gameSchemaSourceManifest = {
   // 2026-10-07: additive V1Tournament.isPublic backed by
   // 20261007120000_v1_tournament_public_visibility. Game models and the bound
   // historical game-operations migration are unchanged; re-pin the schema bytes only.
-  schema: '21f6da3c1a609b9352d662260064a63553145127fb124560156d8279ba074409',
+  // 2026-10-08: additive league hold (V1TournamentStatus.on_hold + held_from_status/held_from_public)
+  // backed by 20261008090000_v1_league_hold. Game models and the bound historical
+  // game-operations migration are unchanged; re-pin the schema bytes only.
+  schema: 'a43ac1dfb626b82f27406c6335a77b03e75ae5c6fc9991e9b0ea1072549de6e1',
   migration: '6bd7fae42e9ee7debff71d26f7252d220ad2c12ae6f14745d103fc7fa61e8f64',
 } as const;
 

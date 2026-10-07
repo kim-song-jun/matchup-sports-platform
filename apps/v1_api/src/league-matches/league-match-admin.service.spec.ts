@@ -403,6 +403,30 @@ async function createModule(prisma: PrismaService, games: GamesService) {
 }
 
 describe('LeagueMatchAdminService.generateFixtures — 자동 로스터와 신원 연결', () => {
+  it.each(['generateFixtures', 'regenerateFixtures'] as const)('보류 중 %s 호출은 대진이나 상태를 바꾸지 않는다', async (action) => {
+    const fake = createFake();
+    const findFirst = fake.tx.v1Tournament.findFirst;
+    fake.tx.v1Tournament.findFirst = async () => ({ ...(await findFirst()), status: 'on_hold' });
+    fake.tx.v1TeamMatch.findMany = async () => [];
+    const heldService = await createModule(fake.prisma, fake.games);
+    await expect(heldService[action](adminUser, 'league-1', { weeksCount: 1, reason: '재생성' }))
+      .rejects.toMatchObject({ response: { code: 'LEAGUE_ON_HOLD' } });
+    expect(fake.state.teamMatchCreates).toEqual([]);
+    expect(fake.state.mirrorUpdates).toEqual([]);
+  });
+
+  it('대진 계획 계산 중 보류가 커밋되면 행 잠금 뒤 다시 확인해 생성을 거부한다', async () => {
+    const fake = createFake();
+    const findFirst = fake.tx.v1Tournament.findFirst;
+    let reads = 0;
+    fake.tx.v1Tournament.findFirst = async () => ({ ...(await findFirst()), status: ++reads === 1 ? 'draft' : 'on_hold' });
+    const heldService = await createModule(fake.prisma, fake.games);
+    await expect(heldService.generateFixtures(adminUser, 'league-1', { weeksCount: 1 }))
+      .rejects.toMatchObject({ response: { code: 'LEAGUE_ON_HOLD' } });
+    expect(fake.state.teamMatchCreates).toEqual([]);
+    expect(fake.state.mirrorUpdates).toEqual([]);
+  });
+
   let state: FakeState;
   let service: LeagueMatchAdminService;
 

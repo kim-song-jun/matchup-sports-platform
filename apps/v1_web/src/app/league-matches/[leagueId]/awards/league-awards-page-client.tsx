@@ -27,11 +27,13 @@ import type {
 import { playerRecordEmptySub, playerRecordEmptyTitle } from '@/lib/player-record-empty-copy';
 
 /** 아직 종료되지 않은 리그로 딥링크했을 때 — 빈 화면 대신 안내 + 되돌아갈 동선. */
-function NotCompletedNotice({ parentHref, state }: { parentHref: string; state: 'draft' | 'active' }) {
+function NotCompletedNotice({ parentHref, state }: { parentHref: string; state: 'draft' | 'active' | 'on_hold' }) {
   const msg =
     state === 'draft'
       ? '리그가 아직 시작되지 않았어요. 시즌이 끝나면 시상 결과를 볼 수 있어요.'
-      : '리그가 진행 중이에요. 시즌이 끝나면 시상 결과가 공개돼요.';
+      : state === 'on_hold'
+        ? '리그가 잠시 보류 중이에요. 다시 열리면 시즌이 이어져요.'
+        : '리그가 진행 중이에요. 시즌이 끝나면 시상 결과가 공개돼요.';
   return (
     <Card pad={24} className="text-center">
       <div className="mb-2 flex justify-center" aria-hidden="true">

@@ -1,8 +1,9 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import { TournamentTitle } from '@/components/tournaments/tournament-title';
 import { Trophy } from 'lucide-react';
-import { pendingCapacityLabel } from '@/lib/tournament-registration-availability';
+import { pendingCapacityLabel, resolveTournamentRegistrationBlock } from '@/lib/tournament-registration-availability';
 import { getTournamentStatusConfig } from '@/lib/v1-tournament-status';
 import { getSportAccent } from '@/lib/v1-sport-accent';
 import { formatTournamentDateRangeShort, formatEntryFee } from '@/lib/date-utils';
@@ -87,6 +88,8 @@ export function TournamentCard({
    */
   interactive?: boolean;
 }) {
+  const [, refreshClock] = useState(0);
+  const now = Date.now();
   const sportAccent = getSportAccent(item.sport.code);
   const pendingPaymentCount = getPendingPaymentCount(item);
   /**
@@ -102,14 +105,26 @@ export function TournamentCard({
      `format` 은 "어떻게 치르나", `kind` 는 "무엇인가"이고 여기 질문은 뒤쪽이다. */
   const isLeague = item.kind === 'regular_league';
   const reservedTeamCount = capacity === null ? 0 : getReservedTeamCount(capacity);
-  // 예약에는 정원을 점유하는 입금/확인 대기도 포함한다. 실제 진행·종료 상태는 덮지 않는다.
-  const isCapacityFull = capacity !== null && capacity.teamCount > 0 && reservedTeamCount >= capacity.teamCount;
+  // 저장된 open 상태는 마감 후에도 남을 수 있어 상세와 같은 신청 게이트를 쓴다.
+  // 정원이 생략된 리그에는 대회 정원 판정을 적용하지 않는다.
+  const registrationBlocked = capacity !== null && resolveTournamentRegistrationBlock(capacity, new Date(now)) !== null;
+  const deadline = item.registrationDeadlineAt ? new Date(item.registrationDeadlineAt).getTime() : null;
+  const hasUpcomingDeadline = capacity !== null && !registrationBlocked
+    && deadline !== null && Number.isFinite(deadline) && deadline >= now;
+
+  useEffect(() => {
+    if (!hasUpcomingDeadline) return;
+    // 홈과 같은 1분 주기로 체류 중 마감을 갱신하고, 닫힌 카드에는 타이머를 남기지 않는다.
+    const timer = window.setInterval(() => refreshClock((tick) => tick + 1), 60_000);
+    return () => window.clearInterval(timer);
+  }, [hasUpcomingDeadline]);
+
   const isNearlyFull = capacity !== null && capacity.teamCount > 0 && reservedTeamCount / capacity.teamCount >= 0.8;
-  const status = item.status === 'closed' || (item.status === 'open' && isCapacityFull)
+  const status = item.status === 'closed'
     ? { ...getTournamentStatusConfig('closed'), label: '모집 마감' }
-    : item.status === 'open' && isNearlyFull
+    : item.status === 'open' && !registrationBlocked && isNearlyFull
       ? { badgeClass: 'tm-badge-orange', label: '거의 마감' }
-      : getTournamentStatusConfig(item.status);
+      : getTournamentStatusConfig(item.status, registrationBlocked);
   const displayedTeamCount = capacity ? reservedTeamCount : item.confirmedCount + pendingPaymentCount;
   // 커버가 없는 대회도 홍보용으로 등록한 실사진이 있으면 아이콘 대신 그 사진을 썸네일로
   // 재사용한다 (셋 다 없으면 종목색 그라디언트+아이콘 폴백).

@@ -55,11 +55,11 @@ import { endsWithFinalConsonant } from '../common/korean-josa';
 /** 팀 명단 관리 권한 — 명단 편집과 선수 개인정보(실명·생년월일·성별) 열람이 같은 선에서 갈린다. */
 const ROSTER_MANAGEMENT_ROLES: readonly V1TeamMembershipRole[] = ['owner', 'manager'];
 
-/** 팀별 명단 CSV 의 선수 열. */
-const PLAYER_CSV_HEADER = 'realName,birthDate,gender,eligibility,nickname,jerseyNumber';
+/** 팀별 명단 CSV 의 선수 열. 기존 열 위치를 유지하고 전화번호를 마지막에 붙인다. */
+const PLAYER_CSV_HEADER = 'realName,birthDate,gender,eligibility,nickname,jerseyNumber,phone';
 
 /** 전체 명단 CSV(운영자가 엑셀로 여는 파일)의 팀 블록 머리글. */
-const FULL_ROSTER_CSV_HEADER = '순번,등번호,이름,생년월일,성별,선출 여부,닉네임,비고';
+const FULL_ROSTER_CSV_HEADER = '순번,등번호,이름,생년월일,성별,선출 여부,닉네임,비고,전화번호';
 
 // 전체 명단 CSV 의 값 라벨 — 어드민 화면과 같은 말을 쓴다. 신청 상태는 신청 카드의 상태 배지
 // (`components/admin/admin-status-pill.tsx`), 선출 여부·성별은 명단 검토 모달
@@ -693,7 +693,7 @@ export class TournamentPlayersService {
 
     const players = await this.prisma.v1TournamentPlayer.findMany({
       where: { registrationId, removedAt: null },
-      include: { user: { select: { profile: { select: { nickname: true } } } } },
+      include: { user: { select: { profile: { select: { nickname: true } }, phone: true } } },
       orderBy: { addedAt: 'asc' },
     });
 
@@ -718,8 +718,8 @@ export class TournamentPlayersService {
    * 신청 팀,2팀 · 선수 12명
    *
    * [1] 번개팀 · 참가 확정 · 11명
-   * 순번,등번호,이름,생년월일,성별,선출 여부,닉네임,비고
-   * 1,7,홍길동,1995-03-15,남성,아마추어,번개맨,팀장
+   * 순번,등번호,이름,생년월일,성별,선출 여부,닉네임,비고,전화번호
+   * 1,7,홍길동,1995-03-15,남성,아마추어,번개맨,팀장,010-1234-5678
    *
    * [2] 천둥팀 · 입금 대기 · 명단 미등록
    * ```
@@ -749,7 +749,7 @@ export class TournamentPlayersService {
         team: { select: { name: true, ownerUserId: true } },
         players: {
           where: { removedAt: null },
-          include: { user: { select: { profile: { select: { nickname: true } } } } },
+          include: { user: { select: { profile: { select: { nickname: true } }, phone: true } } },
           // 등번호 순(없으면 뒤) → 같은 번호·번호 없음은 팀이 넣은 순서.
           orderBy: [{ jerseyNumber: { sort: 'asc', nulls: 'last' } }, { addedAt: 'asc' }],
         },
@@ -783,6 +783,7 @@ export class TournamentPlayersService {
             ELIGIBILITY_LABEL[p.eligibilityStatus] ?? p.eligibilityStatus,
             this.escapeCsvField(p.user.profile?.nickname ?? ''),
             p.userId === reg.team.ownerUserId ? '팀장' : '',
+            this.escapeCsvField(p.user.phone?.trim() ?? ''),
           ].join(','),
         );
       });
@@ -821,7 +822,7 @@ export class TournamentPlayersService {
     genderSnapshot: string | null;
     eligibilityStatus: string;
     jerseyNumber: number | null;
-    user: { profile: { nickname: string } | null };
+    user: { profile: { nickname: string } | null; phone: string | null };
   }): string[] {
     return [
       this.escapeCsvField(p.realName),
@@ -829,8 +830,9 @@ export class TournamentPlayersService {
       this.escapeCsvField(p.genderSnapshot ?? ''),
       this.escapeCsvField(p.eligibilityStatus),
       this.escapeCsvField(p.user.profile?.nickname ?? ''),
-      // 정본 §3 "명단은 등번호와 이름" — 뒤에 붙여 기존 열 위치는 그대로 둔다.
+      // 정본 §3 "명단은 등번호와 이름" — 기존 열 위치는 그대로 둔다.
       String(p.jerseyNumber ?? ''),
+      this.escapeCsvField(p.user.phone?.trim() ?? ''),
     ];
   }
 

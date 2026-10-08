@@ -57,7 +57,7 @@ Phase C root 직렬검증·Changeset·independentreview·commit/push/devPR/댓�
 - PR1668 실제 Copilot thread PRRT_kwDORrML2s6qRvRz / REST4216877672(08:48:35Z)의 리그 후기 route loader 누락 지적을 `docs/design/app-motion-system.md` §3.2.1 및 형제 league videos·tournament reviews loader와 교차 확인했다. mount 이후 client fetching skeleton은 route 전환 대기를 대신하지 못하므로 지적이 타당하다.
 - 신규 `admin/league-matches/[leagueId]/reviews/loading.tsx`에서 기존 `AdminBoardListSkeleton`을 그대로 반환한다. client의 실제 리그 조회·오류·관리자 권한·moderation 동작은 수정하지 않았다.
 - 단순 shared skeleton route export를 구현 그대로 비교하는 테스트는 추가하지 않았다. 정적 import·default export·형제 패턴 정합 확인 완료; 런타임 route loader render와 committed 검증은 root serial slot 승인 대기다.
-- Root 18:06 KST: dd2f68218의 실제 committed loader 모듈을 bundle·ReactDOM 렌더해 shared skeleton4261byte 출력 PASS를 확인했다. 첫 esbuild transitive 모듈 경로 조회 실패는 제품 RED나 성공으로 계산하지 않았고 실제 설치 경로 확인 뒤 재실행했다. 5b1bfcd의 API81/Web82·각 타입/게이트 검증 대상 source blob은 모두 동일하며 loader/task만 추가됐다. 최신 head 독립 backend/frontend 재리뷰·같은 PR push·댓글은 후속 단계다.
+- Root committed 검증: dd2f68218의 실제 committed loader 모듈을 bundle·ReactDOM 렌더해 shared skeleton4261byte 출력 PASS를 확인했다. 첫 esbuild transitive 모듈 경로 조회 실패는 제품 RED나 성공으로 계산하지 않았고 실제 설치 경로 확인 뒤 재실행했다. 5b1bfcd의 API81/Web82·각 타입/게이트 검증 대상 source blob은 모두 동일하며 loader/task만 추가됐다. 최신 head 독립 backend/frontend 재리뷰·같은 PR push·댓글은 후속 단계다.
 
 ### 실제 PR 리뷰 후속 — 2026-10-08 17:33 KST
 - PR1668 https://github.com/kim-song-jun/matchup-sports-platform/pull/1668 head2e759a465d37d1c28af46550308772e588e0217f 게시·원 리포트 댓글1 저장 성공. API72 committed/type/surface와 이전 exact head 독립 리뷰는 기록으로 보존한다.

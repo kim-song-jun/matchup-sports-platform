@@ -294,7 +294,7 @@ describe('TournamentBracketService', () => {
     v1GameRosterAdjustment: { updateMany: jest.Mock };
     v1TeamTacticsBoard: { deleteMany: jest.Mock };
     v1TournamentPlayer: { findMany: jest.Mock };
-    v1TournamentStanding: { deleteMany: jest.Mock; upsert: jest.Mock; findMany: jest.Mock };
+    v1TournamentStanding: { deleteMany: jest.Mock; upsert: jest.Mock; findMany: jest.Mock; count: jest.Mock };
     v1TournamentOverallStanding: { upsert: jest.Mock; deleteMany: jest.Mock };
     v1AdminActionLog: { create: jest.Mock };
     v1StatusChangeLog: { create: jest.Mock };
@@ -358,7 +358,7 @@ describe('TournamentBracketService', () => {
       v1GameRosterAdjustment: { updateMany: jest.fn().mockResolvedValue({ count: 0 }) },
       v1TeamTacticsBoard: { deleteMany: jest.fn().mockResolvedValue({ count: 0 }) },
       v1TournamentPlayer: { findMany: jest.fn().mockResolvedValue([]) },
-      v1TournamentStanding: { deleteMany: jest.fn(), upsert: jest.fn(), findMany: jest.fn() },
+      v1TournamentStanding: { deleteMany: jest.fn(), upsert: jest.fn(), findMany: jest.fn(), count: jest.fn().mockResolvedValue(0) },
       v1TournamentOverallStanding: {
         upsert: jest.fn().mockResolvedValue({}),
         deleteMany: jest.fn().mockResolvedValue({ count: 0 }),

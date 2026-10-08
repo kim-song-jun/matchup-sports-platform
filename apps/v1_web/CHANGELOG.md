@@ -1,5 +1,23 @@
 # v1_web
 
+## 1.3.7
+
+### Patch Changes
+
+- b3882f5: main 에 먼저 나간 1.3.6 핫픽스(회원 탈퇴 세션 정리)의 버전을 dev 기준에 반영해요. 코드 변경은 없어요.
+- 79807ac: 팀 일정 상세의 개인 응답·참석 현황·모집 및 운영을 구분하고 넓은 화면의 현황 행과 보조 영역을 정렬합니다.
+- 1dc0c71: 대회 후기와 시상 화면에서 서버 인증·참가 자격·내 후기 상태를 확인하여 유효한 쿠키 세션에 잘못된 로그인 안내를 표시하지 않습니다.
+- 25f070f: 홈 추천 팀매치와 개인 매치의 경기 시각 및 홈 날짜 표시를 상세와 같은 기존 KST 포맷터로 통일한다.
+- 29bbe32: 리그 경기 상세에서 일정 필터와 출처 주소를 유지해 돌아가도록 수정했습니다.
+- 9362995: 공개 팀 멤버 목록에서 검색 후 선수 프로필을 보고 돌아와도 검색어와 선택 탭을 유지한다. 팀별 검색 상태, 기존 query와 출처를 보존한다.
+- 4cf2240: 친선 경기 전적의 기록 화면에서 공개 정책을 지키며 현재 공식 결과의 점수와 득점을 읽을 수 있게 한다. 이전 공동 기록으로 점수를 대체하지 않고 기존 편집 권한과 리그·대회 이동을 유지한다.
+  공개 공식 기록을 읽을 수 없는 경우 상세 진입과 안내를 제공하고, 득점 합계와 상세 이벤트 부재를 구분한다. 알려진 피리어드를 보존해 전·후반 상대 분의 득점 순서를 정확히 표시한다.
+- f7e2b0b: 통합 검색의 개인 매치와 팀매치 경기 시각을 기존 KST 포맷터로 표시해 상세 시각과 일치시킨다.
+- b11b620: 알파 대회(리그 방식) E2E에서 나온 운영 문구·확인 창을 정리합니다: 자책골 확인 문구, 정정 확정 후 콘솔 스코어, 잠긴 명단의 등번호 칸, 접수 마감·대회 시작·완료 확인 창, 접수 마감 남은 시간·대진표 공개 경고·진행 방식 문구.
+- 0759c8c: 리그 방식으로 진행하는 단발 대회의 상세 '대회 진행 방식'에 정규 리그의 '시즌 주차 수' 문구 대신 대진표에서 맞붙는 횟수를 확인하라는 안내가 보여요.
+- 55430f5: Complete withdrawal session cleanup across open connections, clear identity immediately, bound the return to login, and reconcile lost responses without discarding confirmed active sessions.
+- 72c991a: Terminate the server session cookie and client identity after a successful account withdrawal so native shells reach a usable guest login screen.
+
 ## 1.3.5
 
 ### Patch Changes

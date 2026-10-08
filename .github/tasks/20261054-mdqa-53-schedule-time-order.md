@@ -83,3 +83,9 @@ Latest origin/dev base016847e; root fetch before worktree done. #50 shared hooks
 - Source-unchanged HTTP RED16:11failed/5passed,19:38:50,3.62s. Same contract GREEN16/16,3.90s,19:41:26 with fresh GET full detail/version/state preservation after rejection. Initial GREEN16 had unhandled telemetry; a dedicated test-only established logs204 sink removed that harness warning and the first log remains historical.
 - Evidence own worktree `tmp/qa/mdqa-53-msw/red.txt`, `green.txt`, `green-final.txt`. Preflight final CPU57/free9748MiB/Node95/browser7/pagefile472MiB; Docker0/no8121/5432 listeners/alphahealth200. Peer102 checks explained independent Node increase; no process command lines inspected or foreign processes terminated. Owned process/server/env fixtures cleaned and serial slot returned.
 - Backend25 and form9 proofs retained. Root latest-dev integration, committed25+25combinedWeb/types/gates and exact-head independent re-review pending; no alpha after or merged claim.
+
+### Root committed publication gate
+
+- Safely integrated latest dev f662fa2524523a3a9a7563d3917e8cf110e407ea. Committed d3edb9febd14301c554c1af3f691f4ce4aba1871 API25/25 and Web25/25(form9+global mock16) PASS; both TypeScript checks, API surface and Web pattern gates PASS. Receipt root run0550/report53-committed-final-result.json. No available DB integration runtime; no alpha after claim.
+- Independent full9/9 exact d3ed review Critical0 Warning0 OK/FindingsNone, previous MSW Critical1 resolved. Scope9 explicit paths, diff-check, markers and imports verified. Historical source-unchanged RED10 API+4 form+11MSW and harness repair records retained.
+- This task-only checkpoint preserves all validated source/spec blobs; final checkpoint read-only review and base-dev PR publication follow. Latest external review/CI, dev merge and actual served-SHA alpha remain separate gates.

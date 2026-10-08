@@ -2,6 +2,7 @@
 
 import { useSearchParams } from 'next/navigation';
 import { useV1MyMatchesInfinite, useV1MyTeamMatchesInfinite } from '@/hooks/use-v1-api';
+import { formatCardDate, formatCardTime } from '@/lib/date-utils';
 import { withFromPath } from '@/lib/session-storage';
 import { personalMatchLifecycleLabel } from '@/lib/v1-status-labels';
 import type { V1Match, V1MyTeamMatch } from '@/types/api';
@@ -168,7 +169,7 @@ function toPersonalMatch(match: V1Match, listHref: string): MyMatch {
     kindLabel: '개인 매치',
     startsAt: match.startsAt,
     title: match.title,
-    meta: `${formatDateTime(match.startsAt)} · ${match.place?.name ?? match.placeName ?? '장소 미정'}`,
+    meta: `${[formatCardDate(match.startsAt), formatCardTime(match.startsAt)].filter(Boolean).join(' ')} · ${match.place?.name ?? match.placeName ?? '장소 미정'}`,
     status,
     statusLabel: personalStatusLabel(status, match),
     note: buildPersonalNote(match, status),
@@ -193,7 +194,7 @@ function toTeamMatch(match: V1MyTeamMatch, mode: 'joined' | 'created', listHref:
     contextLabel: match.teamName ? `${match.teamName} · ${teamRelationLabel(match.relation)}` : teamRelationLabel(match.relation),
     startsAt: match.startsAt,
     title: match.title,
-    meta: `${formatDateTime(match.startsAt)} · ${match.sportName}`,
+    meta: `${[formatCardDate(match.startsAt), formatCardTime(match.startsAt)].filter(Boolean).join(' ')} · ${match.sportName}`,
     status,
     statusLabel: teamStatusLabel(match, mode),
     note: buildTeamNote(match, mode),
@@ -313,10 +314,4 @@ function buildTeamNote(match: V1MyTeamMatch, mode: 'joined' | 'created') {
   if (match.relation === 'withdrawn') return '우리 팀이 참가 신청을 취소했어요.';
   if (display === 'matched' || match.relation === 'approved') return '상대 팀이 확정됐어요. 팀 상세에서 라인업과 경기 준비 상태를 확인하세요.';
   return mode === 'created' ? '상대 팀 신청과 모집 상태를 확인할 수 있어요.' : '소속 팀과 연결된 팀 경기예요.';
-}
-
-function formatDateTime(value: string) {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleString('ko-KR', { month: 'long', day: 'numeric', weekday: 'short', hour: '2-digit', minute: '2-digit', hour12: false });
 }

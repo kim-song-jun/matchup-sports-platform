@@ -14,6 +14,9 @@ import {
   V1GameOutcomeReason,
   V1GameResultRevisionState,
   V1GameSourceType,
+  V1GameState,
+  V1OutboxStatus,
+  V1TeamMatchStatus,
 } from '@prisma/client';
 import {
   OperationAuditWriterService,
@@ -34,6 +37,7 @@ import {
   requiresDecisiveResult,
   type StoredPenalties,
 } from '../../games/core/knockout-penalties';
+import { COMPETITION_ROSTER_RESYNC_TYPE } from '../../games/roster/roster-resync-events';
 import { completeTeamMatchAtResultBoundary } from '../../games/team-match-result-boundary';
 import {
   projectCanonicalAdvancement,
@@ -51,6 +55,7 @@ import {
   assertRevisionTransition,
   GameContractError,
   resolveGameIdempotency,
+  selectLineupParticipantsWithDraftFallback,
   validateGameResultInvariants,
   type RevisionFlow,
   type RevisionSupersessionPurpose,
@@ -892,7 +897,92 @@ export class TournamentResultReviewService {
     if (game.teamMatchId === null) {
       throw this.notFound('GAME_NOT_FOUND');
     }
-    // 5b 가 입장 조건을, 5c 가 쓰기 흐름을 이 아래에 채운다. 그 전까지는 모든 경기를 거부해 확정본이 쓰이지 않게 한다.
+    const teamMatchId = game.teamMatchId;
+
+    // 1. 입장: 최초 입력(SCHEDULED + 리비전 없음) 또는 무효 뒤 재입력(ENDED + 현재 포인터가 마지막 VOID 리비전).
+    const latest = await tx.v1GameResultRevision.findFirst({
+      where: { gameId: game.id },
+      orderBy: { revision: 'desc' },
+      select: { id: true, revision: true, state: true },
+    });
+    const isFresh = game.state === V1GameState.SCHEDULED && latest === null;
+    const voidBase =
+      game.state === V1GameState.ENDED &&
+      latest !== null &&
+      latest.state === V1GameResultRevisionState.VOID &&
+      latest.id === game.currentOfficialRevisionId
+        ? latest
+        : null;
+    if (!isFresh && voidBase === null) {
+      throw quickResultConflict(
+        'QUICK_RESULT_NOT_AVAILABLE',
+        '진행 중이거나 결과가 이미 있는 경기는 점수를 바로 확정할 수 없어요. 확정된 결과는 정정을 써 주세요.',
+      );
+    }
+
+    // 2. 취소된 경기. 리그 취소는 게임을 건드리지 않아 게임 상태로는 못 거른다. 무효는 팀매치 상태를
+    //    되돌리지 않으므로 재입력만 completed 를 허용한다.
+    const teamMatch = await tx.v1TeamMatch.findUnique({ where: { id: teamMatchId }, select: { status: true } });
+    const playable =
+      teamMatch !== null &&
+      (teamMatch.status === V1TeamMatchStatus.matched ||
+        (voidBase !== null && teamMatch.status === V1TeamMatchStatus.completed));
+    if (!playable) {
+      throw quickResultConflict('QUICK_RESULT_FIXTURE_CANCELLED', '취소된 경기는 점수를 확정할 수 없어요.');
+    }
+
+    // 3. 득점 기록이 있으면 라이브 기록이 정본이다.
+    if ((await tx.v1GameEvent.count({ where: { gameId: game.id } })) > 0) {
+      throw quickResultConflict(
+        'QUICK_RESULT_HAS_LIVE_RECORDS',
+        '득점 기록이 있는 경기는 결과 정정 화면에서 고쳐 주세요.',
+      );
+    }
+
+    // 4. 양 팀 확정.
+    const sides = await tx.v1GameSide.findMany({
+      where: { gameId: game.id },
+      select: { id: true, teamId: true },
+    });
+    if (sides.length !== 2 || sides.some((side) => side.teamId === null)) {
+      throw quickResultConflict('QUICK_RESULT_TEAMS_REQUIRED', '두 팀이 모두 정해진 경기만 점수를 확정할 수 있어요.');
+    }
+
+    // 5. 명단: 양 사이드 출전자 1명 이상 + 이 경기의 명단 재계산이 끝나 있을 것. 자리 배정 직후 명단은
+    //    비동기로 채워져서, 그 사이에 확정하면 출전자 0명인 불변 확정본이 남는다.
+    const [lineups, candidates, pendingResync, config] = await Promise.all([
+      tx.v1GameLineup.findMany({
+        where: { gameId: game.id, invalidatedAt: null },
+        select: { id: true, sideId: true, revision: true, state: true },
+      }),
+      tx.v1GameParticipant.findMany({
+        where: { gameId: game.id },
+        orderBy: { id: 'asc' },
+        select: { id: true, sideId: true, lineupId: true, position: true },
+      }),
+      tx.v1OutboxEvent.count({
+        where: {
+          type: COMPETITION_ROSTER_RESYNC_TYPE,
+          aggregateType: 'GAME',
+          aggregateId: game.id,
+          status: { in: [V1OutboxStatus.PENDING, V1OutboxStatus.PROCESSING, V1OutboxStatus.RETRY] },
+        },
+      }),
+      tx.v1CompetitionConfigVersion.findUnique({
+        where: { id: game.competitionConfigVersionId },
+        select: { lineup: true },
+      }),
+    ]);
+    const roster = selectLineupParticipantsWithDraftFallback(candidates, lineups);
+    if (pendingResync > 0 || !sides.every((side) => roster.some((player) => player.sideId === side.id))) {
+      throw quickResultConflict(
+        'QUICK_RESULT_ROSTER_SYNCING',
+        '명단을 맞추는 중이에요. 잠시 뒤 다시 눌러 주세요.',
+      );
+    }
+
+
+    // 5c 가 승부차기 검증과 쓰기 흐름을 이 아래에 채운다. 그 전까지는 입장 조건을 통과한 경기도 거부한다.
     throw quickResultConflict('QUICK_RESULT_NOT_AVAILABLE', '아직 점수를 바로 확정할 수 없어요.');
   }
 

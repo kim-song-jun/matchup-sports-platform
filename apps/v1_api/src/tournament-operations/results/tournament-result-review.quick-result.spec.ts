@@ -323,3 +323,109 @@ describe('quickResult — 멱등 키 재사용', () => {
     expectNoWrites(harness);
   });
 });
+
+describe('quickResult — 무효(VOID) 뒤 재입력 — 거부 경로', () => {
+  const voided: StoredRevision = { id: 'void-rev', revision: 3, state: V1GameResultRevisionState.VOID };
+  const reentry = { gameState: 'ENDED', revisions: [voided], pointerId: 'void-rev', teamMatchStatus: 'completed' } as const;
+
+  it('대조군 — 최초 입력(SCHEDULED)은 팀매치가 completed 면 취소된 경기처럼 거부한다', async () => {
+    const harness = createHarness({ teamMatchStatus: 'completed' });
+
+    expectHttp(await captureFailure(() => harness.run({ home: 1, away: 0 })), 409, 'QUICK_RESULT_FIXTURE_CANCELLED');
+    expectNoWrites(harness);
+  });
+
+  it('무효 뒤 재입력이어도 취소된 팀매치는 거부한다', async () => {
+    const harness = createHarness({ ...reentry, teamMatchStatus: 'cancelled' });
+
+    expectHttp(await captureFailure(() => harness.run({ home: 1, away: 0 })), 409, 'QUICK_RESULT_FIXTURE_CANCELLED');
+    expectNoWrites(harness);
+  });
+
+  it('현재 포인터가 VOID 가 아니면 재입력이 아니다', async () => {
+    const harness = createHarness({ ...reentry, pointerId: null });
+
+    expectHttp(await captureFailure(() => harness.run({ home: 1, away: 0 })), 409, 'QUICK_RESULT_NOT_AVAILABLE');
+    expectNoWrites(harness);
+  });
+
+  it('대조군 — 팀매치가 completed 여도 현재 포인터가 확정본(OFFICIAL)이면 재입력이 아니라 QUICK_RESULT_NOT_AVAILABLE', async () => {
+    const harness = createHarness({
+      gameState: 'ENDED',
+      teamMatchStatus: 'completed',
+      revisions: [{ id: 'official-rev', revision: 1, state: V1GameResultRevisionState.OFFICIAL }],
+      pointerId: 'official-rev',
+    });
+
+    expectHttp(await captureFailure(() => harness.run({ home: 1, away: 0 })), 409, 'QUICK_RESULT_NOT_AVAILABLE');
+    expectNoWrites(harness);
+  });
+
+  it('대조군 — VOID 가 마지막 리비전이어도 그 위에 확정본이 포인터면 재입력이 아니다', async () => {
+    const harness = createHarness({
+      gameState: 'ENDED',
+      teamMatchStatus: 'completed',
+      revisions: [voided],
+      pointerId: 'some-other-official',
+    });
+
+    expectHttp(await captureFailure(() => harness.run({ home: 1, away: 0 })), 409, 'QUICK_RESULT_NOT_AVAILABLE');
+    expectNoWrites(harness);
+  });
+});
+
+describe('quickResult — 입장 조건 거부(거부된 요청은 아무 행도 쓰지 않는다)', () => {
+  const reject = async (options: HarnessOptions, status: number, code: string) => {
+    const harness = createHarness(options);
+    expectHttp(await captureFailure(() => harness.run({ home: 1, away: 0 })), status, code);
+    expectNoWrites(harness);
+  };
+
+  it('진행 중이거나 이미 끝난 경기는 QUICK_RESULT_NOT_AVAILABLE', async () => {
+    await reject({ gameState: 'LIVE' }, 409, 'QUICK_RESULT_NOT_AVAILABLE');
+    // 확정 전 결과(초안·제출)가 있으면 정정·확인 화면의 몫이다.
+    await reject({ revisions: [{ id: 'r1', revision: 1, state: V1GameResultRevisionState.DRAFT }] }, 409, 'QUICK_RESULT_NOT_AVAILABLE');
+    await reject(
+      { gameState: 'ENDED', revisions: [{ id: 'r1', revision: 1, state: V1GameResultRevisionState.SUBMITTED }] },
+      409,
+      'QUICK_RESULT_NOT_AVAILABLE',
+    );
+    // 이미 확정된 경기는 정정을 쓴다.
+    await reject(
+      { gameState: 'ENDED', revisions: [{ id: 'r1', revision: 1, state: V1GameResultRevisionState.OFFICIAL }], pointerId: 'r1' },
+      409,
+      'QUICK_RESULT_NOT_AVAILABLE',
+    );
+  });
+
+  it('취소된 팀매치는 게임이 SCHEDULED 여도 QUICK_RESULT_FIXTURE_CANCELLED', async () => {
+    await reject({ teamMatchStatus: 'cancelled' }, 409, 'QUICK_RESULT_FIXTURE_CANCELLED');
+  });
+
+  it('득점 기록이 하나라도 있으면 QUICK_RESULT_HAS_LIVE_RECORDS', async () => {
+    await reject({ eventCount: 1 }, 409, 'QUICK_RESULT_HAS_LIVE_RECORDS');
+  });
+
+  it('한쪽 팀이라도 미정이면 QUICK_RESULT_TEAMS_REQUIRED', async () => {
+    await reject({ sideTeamIds: [ids.homeTeam, null] }, 409, 'QUICK_RESULT_TEAMS_REQUIRED');
+    await reject({ sideTeamIds: [null, null] }, 409, 'QUICK_RESULT_TEAMS_REQUIRED');
+  });
+
+  it('한 사이드의 출전자가 0명이면 QUICK_RESULT_ROSTER_SYNCING — 출전자 0명 확정본이 남으면 안 된다', async () => {
+    await reject(
+      { participants: defaultParticipants.filter((row) => row.sideId !== ids.awaySide) },
+      409,
+      'QUICK_RESULT_ROSTER_SYNCING',
+    );
+    await reject({ participants: [] }, 409, 'QUICK_RESULT_ROSTER_SYNCING');
+  });
+
+  it('그 경기의 명단 재계산 이벤트가 처리 전이면 QUICK_RESULT_ROSTER_SYNCING', async () => {
+    await reject({ pendingResync: 1 }, 409, 'QUICK_RESULT_ROSTER_SYNCING');
+  });
+
+  it('입장 조건 순서 — 취소된 경기에서 팀 미정이어도 취소 코드가 먼저 나온다', async () => {
+    await reject({ teamMatchStatus: 'cancelled', sideTeamIds: [null, null] }, 409, 'QUICK_RESULT_FIXTURE_CANCELLED');
+  });
+});
+

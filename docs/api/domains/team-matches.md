@@ -28,6 +28,7 @@
   `ownGoal`, nullable `subMatchId`만 포함한다. 편집용 participant id와 변경 이력은 계속 공개하지 않는다.
   `STATUS_ONLY`처럼 점수가 가려진 응답과 공식 확정 전 응답에서는 빈 배열이다. 선수 이름은 대회
   경기결과와 같은 이름 공개 게이트 및 닉네임/실명 선택 정책을 사용한다.
+- 공개 득점의 `period?: number | null`은 읽기 전용 추가 필드다. 현재 공식 JSON이나 실제 경기 이벤트에서 알려진 양의 정수 period만 숫자로 제공한다. `minute`는 해당 period 안의 경과 분 그대로이며 전·후반 길이를 추정해 누적 분으로 바꾸지 않는다. JSON의 null·누락 period, period를 기록하지 않은 공동 기록, `GOAL_BACKFILL_V1`의 임시 period 값은 필드를 생략한다. 소비자는 null·누락을 모두 모름으로 처리하고 알려진 period와 minute 순으로 표시하며 같은 시각에는 원본 순서를 유지한다.
 - 기존 v1 공식 친선 결과(`phase=legacy`)도 공개 정책이 점수를 허용하면 같은 `goalEvents[]` 투영을 받는다. 공식 리비전의 JSON 득점을 우선하며, JSON이 `null`인 이벤트 기반 결과만 현재 경기의 취소되지 않은 GOAL/OWN_GOAL을 읽는다. 명시적 빈 JSON과 잘못된 JSON을 과거 이벤트로 대체하지 않는다. `OFFICIAL_ONLY`와 `PUBLIC_LIVE=off`는 공식 결과를 공개하고 `STATUS_ONLY`는 점수·득점을 가리며 `HIDDEN`은 공개 조회에 404다. 기존 참가자 private read 예외와 신원·이름 공개 정책은 유지한다. `legacy`의 `goals`·`subMatches`는 빈 배열로 두어 오래된 공동 기록을 공식 결과 앞에 표시하지 않는다.
 - 편집자는 최신 제출/잠금 라인업의 `userId` 또는 검증된 현재 identity link로 판정한다. 양쪽 라인업에 동시에 있는 계정은 확인자로 인정하지 않는다.
 - **명단 밖 팀장·매니저(Task 180 H5)**: 친선 경기에서 라인업에 없는 사용자가 한쪽 참가팀의 active owner/manager 이면 그 팀 쪽으로 기록·종료 확인을 할 수 있다. 응답에 `teamAuthority: true`, 이력·확인자 이름은 `"<닉네임> · 팀장 권한"`. 양 팀을 모두 관리하면 권한을 주지 않는다. **대회·리그 경기(`phase=managed`)에는 적용하지 않는다** — 참가팀은 결과를 만들거나 확인하지 않으므로 기존처럼 403 `RECORD_PARTICIPANT_REQUIRED`(정본 §4).

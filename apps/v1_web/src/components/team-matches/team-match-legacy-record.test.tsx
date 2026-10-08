@@ -128,7 +128,8 @@ describe('공개 친선 전적에서 기존 공식 기록 조회 (MD-QA #61)', (
   it('공개 STATUS_ONLY legacy는 숨긴 득점의 빈 제목과 빈 콘텐츠 영역을 남기지 않는다', async () => {
     record = { ...record, sides: record.sides.map((side) => ({ ...side, score: null })), goalEvents: [], officialAt: null };
     await renderRecord();
-    expect(screen.getByLabelText('점수 ? 대 ?')).toBeInTheDocument();
+    expect(screen.getByText('현재 공개 공식 경기 기록을 확인할 수 없어요.')).toBeInTheDocument();
+    expect(screen.queryByLabelText('점수 ? 대 ?')).not.toBeInTheDocument();
     expect(screen.queryByRole('heading', { level: 2, name: '득점 기록' })).not.toBeInTheDocument();
     expect(screen.queryByRole('complementary')).not.toBeInTheDocument();
     expect(screen.getByRole('main').querySelector(`.${styles.columns}, .${styles.stack}`)).toBeNull();
@@ -138,12 +139,71 @@ describe('공개 친선 전적에서 기존 공식 기록 조회 (MD-QA #61)', (
   it('받은 공개 정책이 점수와 이벤트를 숨기면 0:0이나 득점을 만들지 않는다', async () => {
     record = { ...record, sides: record.sides.map((side) => ({ ...side, score: null })), goalEvents: [], officialAt: null };
     await renderRecord();
-    expect(screen.getByLabelText('점수 ? 대 ?')).toHaveTextContent('? : ?');
+    expect(screen.getByText('현재 공개 공식 경기 기록을 확인할 수 없어요.')).toBeInTheDocument();
+    expect(screen.queryByLabelText('점수 ? 대 ?')).not.toBeInTheDocument();
     expect(screen.queryByRole('list', { name: '득점 기록' })).not.toBeInTheDocument();
     expect(screen.queryByLabelText('점수 0 대 0')).not.toBeInTheDocument();
     expect(screen.queryByText('아직 등록된 득점이 없어요.')).not.toBeInTheDocument();
     expect(screen.queryByText('참가자들의 공동 기록으로 점수가 갱신돼요.')).not.toBeInTheDocument();
     expect(navigation.replace).not.toHaveBeenCalled();
+    expectReadOnly();
+  });
+
+  it.each(['source', 'unsafe', 'direct', 'admin'] as const)('외부 리뷰 F1: 공개 공식 기록이 없을 때 %s 맥락에서 사실과 안전한 상세 진입을 보여 준다', async (entry) => {
+    const from = entry === 'unsafe' ? 'https://example.org/secret' : entry === 'direct' ? null : sourceHref;
+    window.history.replaceState({}, '', `/team-matches/${matchId}/record${from ? `?from=${encodeURIComponent(from)}` : ''}`);
+    const admin = entry === 'admin';
+    record = { ...record, sides: record.sides.map((side) => ({ ...side, score: null })), goalEvents: [], officialAt: null };
+    await renderRecord({ admin });
+    expect(screen.getByText('현재 공개 공식 경기 기록을 확인할 수 없어요.')).toBeInTheDocument();
+    expect(screen.queryByLabelText('점수 ? 대 ?')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('점수 0 대 0')).not.toBeInTheDocument();
+    const safeFrom = entry === 'source' ? `&from=${encodeURIComponent(sourceHref)}` : '';
+    expect(screen.getByRole('link', { name: '경기 상세 보기' })).toHaveAttribute('href', admin ? `/admin/team-matches/${matchId}` : `${fallbackHref}${safeFrom}`);
+    expect(screen.queryByRole('heading', { level: 2, name: '득점 기록' })).not.toBeInTheDocument();
+    expect(navigation.replace).not.toHaveBeenCalled();
+    expectReadOnly();
+  });
+
+  it.each([false, true])('외부 리뷰 F2: 득점자 상세가 없는 공식 3:1을 admin=%s에서도 득점 없음으로 단정하지 않는다', async (admin) => {
+    record = { ...record, sides: record.sides.map((side) => ({ ...side, score: side.key === 'HOME' ? 3 : 1 })), goalEvents: [] };
+    await renderRecord({ admin });
+    expect(screen.getByLabelText('점수 3 대 1')).toHaveTextContent('3 : 1');
+    expect(screen.getByText('득점 상세 기록을 확인할 수 없어요.')).toBeInTheDocument();
+    expect(screen.queryByText('아직 등록된 득점이 없어요.')).not.toBeInTheDocument();
+    expect(screen.queryByRole('list', { name: '득점 기록' })).not.toBeInTheDocument();
+    expectReadOnly();
+  });
+
+  it('외부 리뷰 F3: period-relative 득점은 피리어드와 분을 보존하고 동시간·미상 값은 안정적으로 정렬한다', async () => {
+    const base = record.goalEvents![0];
+    const periodEvents = [
+      { ...base, participantName: '후반첫골', period: 2, minute: 5 },
+      { ...base, participantName: '전반골', period: 1, minute: 40 },
+      { ...base, participantName: '후반동시간골', period: 2, minute: 5 },
+      { ...base, participantName: '전반시간미상', period: 1, minute: null },
+      { ...base, participantName: '피리어드미상골', period: null, minute: 1 },
+      { ...base, participantName: '구응답골', minute: 1 },
+      { ...base, participantName: '추가피리어드골', period: 3, minute: 0 },
+      { ...base, participantName: '전체시간미상골', period: null, minute: null },
+    ];
+    record = { ...record, sides: record.sides.map((side) => ({ ...side, score: side.key === 'HOME' ? 8 : 0 })), goalEvents: periodEvents };
+    await renderRecord();
+    const rows = within(screen.getByRole('list', { name: '득점 기록' })).getAllByRole('listitem');
+    expect(rows.map((row) => row.getAttribute('aria-label'))).toEqual([
+      '홈 전반 40분 전반골 골',
+      '홈 전반 전반시간미상 골',
+      '홈 후반 5분 후반첫골 골',
+      '홈 후반 5분 후반동시간골 골',
+      '홈 3피리어드 0분 추가피리어드골 골',
+      '홈 1분 피리어드미상골 골',
+      '홈 1분 구응답골 골',
+      '홈 전체시간미상골 골',
+    ]);
+    expect(rows[0]).toHaveTextContent('전반 40′ 전반골');
+    expect(rows[2]).toHaveTextContent('후반 5′ 후반첫골');
+    expect(rows[4]).toHaveTextContent('3피리어드 0′ 추가피리어드골');
+    expect(rows[2]).not.toHaveTextContent('50');
     expectReadOnly();
   });
 

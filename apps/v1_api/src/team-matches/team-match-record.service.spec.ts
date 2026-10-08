@@ -323,6 +323,11 @@ type ExistingEventWhere = {
   gameId?: string; type?: string | { in: string[] }; reversesEventId?: null | { not: null };
   AND?: ExistingEventWhere[]; OR?: ExistingEventWhere[];
 };
+type ExistingEventQuery = {
+  where?: ExistingEventWhere;
+  orderBy?: Array<Partial<Record<'period' | 'clockMs' | 'sequence', 'asc' | 'desc'>>>;
+  select?: Partial<Record<keyof ExistingEvent, boolean>>;
+};
 
 function matchesExistingEvent(event: ExistingEvent, where: ExistingEventWhere = {}): boolean {
   if (where.gameId !== undefined && event.gameId !== where.gameId) return false;
@@ -367,7 +372,7 @@ function createExistingResultFake(options: {
     events: events.slice(0, 1).map(({ id }) => ({ id })), resultRevisions: current ? [current] : [] as ExistingRevision[],
   };
   const lookups: Prisma.V1GameFindUniqueArgs[] = [];
-  const eventLookups: Array<{ where?: ExistingEventWhere }> = [];
+  const eventLookups: ExistingEventQuery[] = [];
   const transactionOptions: unknown[] = [];
   const tx = {
     $queryRaw: async () => [],
@@ -377,9 +382,19 @@ function createExistingResultFake(options: {
       // An unrequested relation is absent, just as Prisma omits it from a real response.
       return { ...game, ...(args.include?.currentOfficialRevision ? { currentOfficialRevision: current } : {}) };
     } },
-    v1GameEvent: { findMany: async (args: { where?: ExistingEventWhere }) => {
+    v1GameEvent: { findMany: async (args: ExistingEventQuery) => {
       eventLookups.push(args);
-      return events.filter((event) => matchesExistingEvent(event, args.where));
+      return events.filter((event) => matchesExistingEvent(event, args.where))
+        .sort((a, b) => {
+          for (const order of args.orderBy ?? []) {
+            for (const key of ['period', 'clockMs', 'sequence'] as const) {
+              if (order[key] && a[key] !== b[key]) return (a[key] - b[key]) * (order[key] === 'asc' ? 1 : -1);
+            }
+          }
+          return 0;
+        })
+        .map((event) => Object.fromEntries(Object.entries(event)
+          .filter(([key]) => !args.select || args.select[key as keyof ExistingEvent])));
     } },
     v1ParticipantIdentityLinkCurrent: { findMany: async (args: { where: { userId?: string; participantId?: { in: string[] } } }) =>
       participants.filter((participant) => (!args.where.userId || participant.userId === args.where.userId)
@@ -415,7 +430,9 @@ describe('TeamMatchRecordService — existing v1 official friendly public record
     expect(view).toMatchObject({ phase: 'legacy', canEdit: false, participant: false, operator: false, goals: [], participants: [], history: [], confirmations: [] });
     expect(view.goalEvents).toHaveLength(4);
     expect(view.goalEvents.map((event) => event.participantName)).toEqual(['side-home nickname', 'side-away nickname', 'side-away nickname', 'side-away nickname']);
-    for (const event of view.goalEvents) expect(Object.keys(event).sort()).toEqual(['minute', 'ownGoal', 'participantName', 'sideId', 'subMatchId']);
+    for (const event of view.goalEvents) expect(Object.keys(event).sort()).toEqual([
+      'minute', 'ownGoal', 'participantName', 'sideId', 'subMatchId', ...('period' in event ? ['period'] : []),
+    ].sort());
     expect(JSON.stringify(view)).not.toContain('private real name');
     expect(lookups[0].include).toHaveProperty('currentOfficialRevision');
     expect(transactionOptions).toEqual([{ isolationLevel: 'RepeatableRead' }]);
@@ -471,7 +488,7 @@ describe('TeamMatchRecordService — existing v1 official friendly public record
     const view = await fixture.service.read(null, 'existing-match');
     expect(view.sides.map((side) => side.score)).toEqual([1, 3]);
     expect(view.goalEvents).toHaveLength(3);
-    expect(view.goalEvents).toContainEqual({ sideId: 'side-away', participantName: 'side-home nickname', ownGoal: true, minute: 10, subMatchId: null });
+    expect(view.goalEvents).toContainEqual(expect.objectContaining({ sideId: 'side-away', participantName: 'side-home nickname', ownGoal: true, minute: 10, subMatchId: null }));
   });
 
   it.each(['OFFICIAL_ONLY', 'LIVE'] as const)('%s keeps official results visible with PUBLIC_LIVE off', async (policy) => {
@@ -528,5 +545,53 @@ describe('TeamMatchRecordService — existing v1 official friendly public record
     await expect(service.mutate(user('user-home'), 'existing-match', confirm())).rejects.toMatchObject({
       status: 409, response: { code: 'RECORD_NOT_EDITABLE' },
     });
+  });
+});
+
+describe('TeamMatchRecordService — public goal period metadata (#1694 finding 3)', () => {
+  it('preserves period-relative P1:40 then P2:5 and selects the real event period', async () => {
+    const fixture = createExistingResultFake();
+    const first = { ...fixture.events[0], period: 1, clockMs: 40 * 60_000, sequence: 1 };
+    const second = { ...fixture.events[1], period: 2, clockMs: 5 * 60_000, sequence: 2 };
+    fixture.events.splice(0, fixture.events.length, second, first);
+
+    const view = await fixture.service.read(null, 'existing-match');
+    expect(view.goalEvents).toMatchObject([{ period: 1, minute: 40 }, { period: 2, minute: 5 }]);
+    expect(fixture.eventLookups[0].select).toMatchObject({ period: true });
+    expect(fixture.eventLookups[0].orderBy).toEqual([{ period: 'asc' }, { clockMs: 'asc' }, { sequence: 'asc' }]);
+  });
+
+  it('retains known official JSON periods without changing the JSON source order or relative minute', async () => {
+    const fixture = createExistingResultFake();
+    fixture.current!.goalEvents = [
+      { id: 'json-p2', sideId: 'side-away', participantId: 'participant-away', period: 2, minute: 5, ownGoal: false },
+      { id: 'json-p1', sideId: 'side-home', participantId: 'participant-home', period: 1, minute: 40, ownGoal: false },
+    ];
+    const view = await fixture.service.read(null, 'existing-match');
+    expect(view.goalEvents).toMatchObject([{ period: 2, minute: 5 }, { period: 1, minute: 40 }]);
+    expect(fixture.eventLookups).toHaveLength(0);
+  });
+
+  it.each([null, undefined])('keeps unknown JSON period %s optional and its unknown minute null', async (period) => {
+    const fixture = createExistingResultFake();
+    fixture.current!.goalEvents = [{ id: 'json-unknown', sideId: 'side-home', participantId: 'participant-home', minute: null, ownGoal: false,
+      ...(period === undefined ? {} : { period }),
+    }];
+    const view = await fixture.service.read(null, 'existing-match');
+    expect(view.goalEvents).toEqual([{ sideId: 'side-home', participantName: 'side-home nickname', minute: null, ownGoal: false, subMatchId: null }]);
+  });
+
+  it('does not turn a GOAL_BACKFILL placeholder into a known first period or zero minute', async () => {
+    const fixture = createExistingResultFake();
+    fixture.events.splice(1);
+    fixture.events[0] = { ...fixture.events[0], period: 1, clockMs: 0, payload: { source: 'GOAL_BACKFILL_V1', minuteKnown: false } };
+    const view = await fixture.service.read(null, 'existing-match');
+    expect(view.goalEvents).toEqual([{ sideId: 'side-home', participantName: 'side-home nickname', minute: null, ownGoal: false, subMatchId: null }]);
+  });
+
+  it('keeps shared-record goals without period metadata compatible', async () => {
+    const { service } = createFake({ memberships: [], official: true });
+    const view = await service.read(null, 'tm-1');
+    expect(view.goalEvents).toEqual([{ sideId: 'side-home', participantName: '홈 선수', minute: 10, ownGoal: false, subMatchId: null }]);
   });
 });

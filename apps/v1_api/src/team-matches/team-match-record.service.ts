@@ -21,12 +21,12 @@ import {
 import { MutateTeamMatchRecordDto } from './dto/team-match-record.dto';
 import { friendlyResultCorrector, platformMatchOperator } from './platform-match-operator';
 import { assertRevisionSupersession, assertRevisionTransition } from '../games/core/revision-state-machine';
-import { isMinuteUnknown, parseTournamentFixtureOfficialScore, parseTournamentFixtureRevisionGoals } from '../tournaments/tournament-fixture-official-result';
+import { isMinuteUnknown, isPeriodUnknown, parseTournamentFixtureOfficialScore, parseTournamentFixtureRevisionGoals } from '../tournaments/tournament-fixture-official-result';
 
 type Tx = Prisma.TransactionClient;
 export type SharedSubMatch = { id: string; title: string; order: number };
 export type SharedGoal = { id: string; sideId: string; participantId: string | null; ownGoal: boolean; minute: number | null; subMatchId: string | null };
-type PublicGoal = SharedGoal & { playerNameSnapshot?: string | null };
+type PublicGoal = SharedGoal & { playerNameSnapshot?: string | null; readonly period?: number | null };
 type Confirmation = { sideId: string; userId: string; name: string; at: string };
 const json = (value: unknown) => JSON.parse(JSON.stringify(value)) as Prisma.InputJsonValue;
 const conflict = (code: string, message: string) => new ConflictException({ code, message });
@@ -226,6 +226,7 @@ export class TeamMatchRecordService {
             : resolveParticipantDisplayName(participant, nameProfileByUserId)
           : null,
         minute: goal.minute,
+        ...(typeof goal.period === 'number' && Number.isSafeInteger(goal.period) && goal.period > 0 ? { period: goal.period } : {}),
         ownGoal: goal.ownGoal,
         subMatchId: goal.subMatchId,
       };
@@ -242,7 +243,7 @@ export class TeamMatchRecordService {
     const events = await tx.v1GameEvent.findMany({
       where: { gameId: game.id, OR: [{ type: { in: ['GOAL', 'OWN_GOAL'] } }, { reversesEventId: { not: null } }] },
       orderBy: [{ period: 'asc' }, { clockMs: 'asc' }, { sequence: 'asc' }],
-      select: { id: true, type: true, sideId: true, participantId: true, clockMs: true, payload: true, reversesEventId: true },
+      select: { id: true, type: true, sideId: true, participantId: true, period: true, clockMs: true, payload: true, reversesEventId: true },
     });
     const reversedIds = new Set(events.flatMap((event) => event.reversesEventId ? [event.reversesEventId] : []));
     return events.flatMap((event) => {
@@ -250,6 +251,7 @@ export class TeamMatchRecordService {
         || event.sideId === null || !game.sides.some((side) => side.id === event.sideId)) return [];
       return [{
         id: event.id, sideId: event.sideId, participantId: event.participantId, ownGoal: event.type === 'OWN_GOAL',
+        period: isPeriodUnknown(event.payload) ? null : event.period,
         minute: isMinuteUnknown(event.payload) ? null : Math.max(0, Math.ceil(event.clockMs / 60000)), subMatchId: null,
       }];
     });

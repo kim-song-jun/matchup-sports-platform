@@ -31,6 +31,7 @@ import { displayInitials } from '@/lib/display-initials';
 import {
   eventPresentation,
   presentGameEventParticipantName,
+  periodLabel,
 } from '@/components/public-game-records/format';
 import styles from './team-match-shared-record.module.css';
 
@@ -79,8 +80,10 @@ function GoalEventRow({
   const eventType = event.ownGoal ? 'OWN_GOAL' : 'GOAL';
   const presentation = eventPresentation({ type: eventType, cardColor: null });
   const playerName = presentGameEventParticipantName(eventType, event.participantName);
+  const periodText = event.period == null ? '' : `${periodLabel(event.period)} `;
   const content = (
     <span>
+      {periodText}
       {event.minute === null ? '' : `${event.minute}′ `}
       {playerName}
     </span>
@@ -89,7 +92,7 @@ function GoalEventRow({
   return (
     <div
       role="listitem"
-      aria-label={`${sideKey === 'HOME' ? '홈' : '원정'} ${event.minute === null ? '' : `${event.minute}분 `}${playerName} ${presentation.label}`}
+      aria-label={`${sideKey === 'HOME' ? '홈' : '원정'} ${periodText}${event.minute === null ? '' : `${event.minute}분 `}${playerName} ${presentation.label}`}
       className={styles.goalEventRow}
       style={{ gridTemplateColumns: RESULT_AXIS_COLUMNS }}
     >
@@ -114,7 +117,9 @@ function GoalEventList({
   const sideKeyById = new Map(sides.map((side) => [side.id, side.key] as const));
   const ordered = events
     .map((event, index) => ({ event, index }))
-    .sort((a, b) => (a.event.minute ?? Number.MAX_SAFE_INTEGER) - (b.event.minute ?? Number.MAX_SAFE_INTEGER) || a.index - b.index);
+    .sort((a, b) => (a.event.period ?? Number.MAX_SAFE_INTEGER) - (b.event.period ?? Number.MAX_SAFE_INTEGER)
+      || (a.event.minute ?? Number.MAX_SAFE_INTEGER) - (b.event.minute ?? Number.MAX_SAFE_INTEGER)
+      || a.index - b.index);
   return (
     <div role="list" aria-label="득점 기록" className={styles.goalEventList}>
       {ordered.map(({ event, index }) => {
@@ -266,7 +271,10 @@ export function TeamMatchSharedRecord({ teamMatchId, admin = false }: { teamMatc
   // Existing official results are readable here, but their actor identity does
   // not enable shared writing, confirmations, or promises of future changes.
   const legacyReadOnly = data.phase === 'legacy';
-  const showGoalSection = subMatches.length === 0 && (!legacyReadOnly || !data.sides.some((side) => side.score === null));
+  const legacyResultUnavailable = legacyReadOnly && (home?.score == null || away?.score == null);
+  const legacyDetailHref = admin ? `/admin/team-matches/${encodeURIComponent(teamMatchId)}`
+    : withFromPath(`/team-matches/${encodeURIComponent(teamMatchId)}?view=detail`, fromPath);
+  const showGoalSection = subMatches.length === 0 && !legacyResultUnavailable;
   const hasPrimaryContent = subMatches.length > 0 || data.canEdit || showGoalSection;
   const showConfirmations = !legacyReadOnly && data.participant && data.phase !== 'cancelled';
   const showHistory = (data.participant || data.operator) && (!legacyReadOnly || data.history.length > 0);
@@ -291,11 +299,14 @@ export function TeamMatchSharedRecord({ teamMatchId, admin = false }: { teamMatc
 
     <section className={styles.board} aria-label="공동 점수판">
       <div className={styles.muted}>{data.phase === 'official' ? (data.officialCorrected ? '운영팀이 정정한 최종 결과' : '양 팀이 확인한 최종 결과') : data.canEdit ? '양 팀 참가자가 함께 기록하고 있어요 · 2초마다 자동 반영' : '경기 현황'}</div>
-      <div className={styles.score}>
+      {legacyResultUnavailable ? <div className={styles.notice}>
+        <p>현재 공개 공식 경기 기록을 확인할 수 없어요.</p>
+        <Link className={styles.openLink} href={legacyDetailHref}>경기 상세 보기</Link>
+      </div> : <div className={styles.score}>
         <div className={styles.team}>{home?.name}</div>
         <strong aria-label={`점수 ${home?.score ?? '?'} 대 ${away?.score ?? '?'}`}>{home?.score ?? '?'} : {away?.score ?? '?'}</strong>
         <div className={styles.team}>{away?.name}</div>
-      </div>
+      </div>}
       {subMatches.length > 0 && <p className={styles.aggregateNote}>서브매치의 모든 골을 합산한 팀매치 최종 점수예요.</p>}
       {data.canEdit && subMatches.length === 0 && <Button block onClick={(event) => openGoalForm(event.currentTarget, null, null)} disabled={disabled || controlsOpen}>득점 추가</Button>}
       {!legacyReadOnly && data.teamAuthority && data.phase !== 'cancelled' && <p className={styles.muted}><span className="tm-badge tm-badge-sm tm-badge-blue">팀장 권한</span> 팀장·매니저는 명단에 없어도 기록하고 종료를 확인할 수 있어요.</p>}
@@ -514,6 +525,7 @@ function GoalRows({ data, goals, publicEvents, disabled, canEdit, onEdit, onDele
   // is not evidence that this finished game had no goals.
   if (data.phase === 'legacy' && data.sides.some((side) => side.score === null)) return null;
   if (goals.length === 0 && publicEvents !== undefined && publicEvents.length > 0) return <GoalEventList events={publicEvents} sides={data.sides} />;
+  if (goals.length === 0 && data.phase === 'legacy' && data.sides.some((side) => side.score !== null && side.score > 0)) return <p className={styles.muted}>득점 상세 기록을 확인할 수 없어요.</p>;
   if (goals.length === 0) return <p className={styles.muted}>{data.participant || data.phase === 'legacy' ? '아직 등록된 득점이 없어요.' : '참가자들의 공동 기록으로 점수가 갱신돼요.'}</p>;
   return <div className={styles.goalList}>{goals.map((goal) => {
     const participant = data.participants.find((row) => row.id === goal.participantId);

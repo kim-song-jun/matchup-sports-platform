@@ -372,3 +372,10 @@ All team roster mutations lock the registration row and re-read `rosterLockedAt`
 - 경기 UUID, 팀 배정, 진출 edge, parent ID 및 Game 결과/리비전은 유지한다. 결과 확정 경기에서도 번호만 수정할 수 있으며 팀 변경의 기존 결과 잠금은 유지한다. 감사 `tournament.bracket.fixture.update`에 변경 전·후 번호를 기록한다.
 - 번호 이동 후 비워진 옛 좌표에서 새 경기 생성은 다음 creation generation을 사용한다. 이전 멱등 기록 및 경기 UUID를 덮어쓰거나 옛 경기를 replay하지 않는다. 기존 좌표의 동일 요청 재시도 계약은 유지한다.
 - 관리자 경기 수정 모달에서 현재 번호를 채우고 실제 API로 저장한다. 오류 시 입력/모달 유지, 성공 후 관리자 및 공개 상세 캐시를 갱신한다. 기존 프론트 MSW에는 이 PATCH 핸들러가 없으며 번호가 없는 기존 수정 payload는 계속 유효하다.
+
+### 조별리그 경기와 조 편성 정합 (2026-10-08)
+
+- 조 순위는 조 편성(`groups[].groupTeams`)을 기준으로 계산·표시한다. 순위 행(`V1TournamentStanding`)은 결과 확정 뒤 재계산 때 만들어지며, 그 전에는 서버가 순위 행을 내리지 않고 화면이 `groupTeams`로 0값 기준선 행을 그린다. 즉 편성만 있으면 순위표에 팀이 나온다.
+- `POST /admin/tournaments/:id/fixtures`(그리고 팀을 바꾸는 `PATCH /admin/fixtures/:id`)는 `phase = group` 조 안의 경기에 들어가는 팀이 그 조에 편성돼 있지 않으면 같은 트랜잭션에서 편성한다. `sortOrder`는 조의 현재 최댓값 + 1이고 이미 편성된 팀은 건드리지 않는다. 결선 단계(`round12`~`third_place`) 조와 조 없는 경기는 편성을 바꾸지 않는다. 감사 `tournament.bracket.group_team.create`(`afterJson.auto = "fixture"`).
+- `DELETE /admin/group-teams/:id`는 `phase = group` 조에서 삭제되지 않은 경기가 남아 있는 팀이면 `409 GROUP_TEAM_HAS_FIXTURES`로 거부한다. 경기가 없는 팀, 결선 단계 조와 미정 부전승 자리는 기존대로 해제된다.
+- 공개 상세 `leagueFixtures[]`는 여전히 `kind = regular_league`에서만 채워진다. 리그 방식 일반 대회(`format = league`)의 일정은 `fixtures[]`로 그린다.

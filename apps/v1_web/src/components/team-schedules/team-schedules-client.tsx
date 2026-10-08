@@ -795,7 +795,7 @@ export function TeamScheduleFormPageClient({ teamId, scheduleId }: { teamId: str
       title: draft.title.trim(),
       startAt: startAtIso,
       endAt: endAtIso,
-      capacity: capacityNum,
+      capacity: capacityNum ?? null,
       // 필드가 비어있으면 명시적으로 null(서버가 SQL NULL로 지움), 값이 있으면 그 값,
       // 미로딩 상태에서 값이 있었는데 사용자가 손대지 않은 경우도 위 draft 값 그대로 보낸다.
       rsvpDeadlineAt: draft.rsvpDeadlineAt.trim() ? rsvpDeadlineIso : null,

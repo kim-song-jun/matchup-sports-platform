@@ -669,12 +669,12 @@ function ChatRoomRow({ room, selected = false }: { room: ChatRoomModel; selected
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
               <div className="tm-text-body-lg tm-chat-row-title">{room.title}</div>
               {room.pinned ? <span className="tm-badge tm-badge-blue tm-chat-pinned-badge">고정</span> : null}
-              {room.linkedTargetCancelled ? <span className="tm-badge tm-badge-grey tm-chat-pinned-badge">취소됨</span> : null}
+              {room.linkedTargetCancelled ? <span className="tm-badge tm-badge-grey">취소됨</span> : null}
               {/* 팀컨택 방: 컨택 상태를 텍스트 배지로 병기한다(컬러만으로 구분 금지). 받는 팀의 미응답 요청은 "답장 필요". */}
               {room.contactNeedsReply ? (
-                <span className="tm-badge tm-badge-orange tm-chat-pinned-badge">답장 필요</span>
+                <span className="tm-badge tm-badge-orange">답장 필요</span>
               ) : room.contactStatus ? (
-                <span className="tm-badge tm-badge-grey tm-chat-pinned-badge">{room.contactStatus === 'requested' ? '대기 중' : contactStatusLabel(room.contactStatus)}</span>
+                <span className="tm-badge tm-badge-grey">{room.contactStatus === 'requested' ? '대기 중' : contactStatusLabel(room.contactStatus)}</span>
               ) : null}
             </div>
             <div className="tm-chat-last-line" style={{ marginTop: 3 }}>

@@ -795,6 +795,8 @@ describe('ChatListPageClient — 취소된 개인매치 배지', () => {
     const activeRow = screen.getAllByText('진행 중 매치')[0].closest('.tm-chat-row-main') as HTMLElement;
     expect(within(cancelledRow).getByText('취소됨')).toBeInTheDocument();
     expect(within(activeRow).queryByText('취소됨')).toBeNull();
+    // desktop/chat.css 가 1024px 이상에서 tm-chat-pinned-badge 를 숨긴다 — '고정' 전용이라 다른 배지가 쓰면 데스크톱에서 사라진다.
+    expect(within(cancelledRow).getByText('취소됨')).not.toHaveClass('tm-chat-pinned-badge');
   });
 });
 
@@ -830,6 +832,9 @@ describe('ChatListPageClient — 팀컨택 필터·배지', () => {
     expect(screen.getAllByText('답장 필요').length).toBeGreaterThan(0);
     expect(screen.getAllByText('대기 중').length).toBeGreaterThan(0);
     expect(screen.getAllByText('수락됨').length).toBeGreaterThan(0);
+    for (const label of ['답장 필요', '대기 중', '수락됨']) {
+      screen.getAllByText(label).forEach((badge) => expect(badge).not.toHaveClass('tm-chat-pinned-badge'));
+    }
   });
 
   it('팀컨택 필터에서 "종료된 컨택 보기"를 켜면 archived 방을 서버에서 받아 별도 섹션에 보여준다', () => {

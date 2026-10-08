@@ -164,6 +164,8 @@ export type MatchCreateViewModel = {
     date: string;
     startTime: string;
     endTime: string;
+    /** 비우면 시작 날짜와 같아요. 기존 저장 초안에는 이 필드가 없을 수 있어요. */
+    endDate?: string;
     deadlineDate: string;
     deadlineTime: string;
   };

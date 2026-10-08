@@ -33,6 +33,72 @@ Tournament list/detail reads are public. Clients may call them without a stored 
 
 Public list/detail items include `campaignSlug` only while the related campaign is `published`; otherwise the field is `null`. The slug endpoint also requires a published campaign and a non-deleted tournament in `open`, `closed`, `in_progress`, or `completed`. Its tournament projection contains display facts, rules/refund policy, active sponsors, confirmed count, and public confirmed/waitlisted team summaries. It never returns bank account fields, player/contact PII, creator/admin identity, or deleted-row metadata.
 
+### Competition reviews
+
+Public review lists, submission and pending-review lists share the unified
+`V1Tournament` identity used by the public detail page: both `regular_tournament`
+and `regular_league` are supported. Historical rows with `kind = null` retain
+tournament compatibility. Other kinds are excluded from those lookups.
+
+| Method | Path | Auth | Contract |
+|---|---|---|---|
+| `GET` | `/api/v1/tournaments/:tournamentId/reviews` | optional user | public visible reviews; `page`, `pageSize`, `search` |
+| `POST` | `/api/v1/tournaments/:tournamentId/reviews` | user | submit a completed competition review |
+| `GET` | `/api/v1/tournaments/:tournamentId/reviews/me` | user | caller-authored review or `null` |
+| `GET` | `/api/v1/tournaments/:tournamentId/participant-check` | user | `{ isParticipant }` for review eligibility |
+| `GET` | `/api/v1/tournaments/me/pending-reviews` | user | eligible public completed competitions the caller has not reviewed |
+
+Public review lookup requires `isPublic = true` and `deletedAt = null`; private,
+deleted, unknown and unsupported competitions return `404 TOURNAMENT_NOT_FOUND`
+before review rows are queried. A valid competition with no visible reviews returns
+`{ items: [], total: 0, page, pageSize }`. Defaults are `page = 1`, `pageSize = 10`,
+with page size limited to 50. Reviews are newest first. Search is case-insensitive
+over team name, comment and author nickname; hidden reviews are excluded from both
+items and total. Public items contain only `id`, `authorId`, `authorNickname`,
+`authorProfileImageUrl`, `teamName`, `rating`, `comment`, `photoUrls` and `createdAt`.
+
+Submission accepts `rating` (integer 1–5), optional `comment` (at most 500 characters),
+up to three uploaded image `photoUrls`, and optional `teamId`. It requires a
+non-deleted supported competition in `completed` state, a `confirmed` registration,
+and the caller's active `owner` or `manager` membership in an active, non-deleted team.
+Incomplete competitions return `400 TOURNAMENT_NOT_COMPLETED`; ineligible callers
+return `403 NOT_PARTICIPANT`. Participant-check uses the same registration/team
+eligibility predicate; the client also checks completion and prior authorship before
+offering submission. Publication controls public reads; eligible participants retain
+the existing submission contract for non-public competitions.
+
+Reviews are unique per competition and author (`400 ALREADY_REVIEWED`), so another
+manager's review does not count as the caller's review. When more than one team is
+eligible, omitted `teamId` returns `400 TEAM_SELECTION_REQUIRED` with eligible teams
+in `details.teams`; an ineligible selection in that case returns `403 NOT_PARTICIPANT`.
+Each photo must be an image in the caller's upload ledger, otherwise submission
+returns `400 REVIEW_PHOTO_UPLOAD_NOT_FOUND`. Pending reviews include both supported
+kinds, require `isPublic = true`, exclude deleted/incomplete competitions and
+caller-authored reviews, and sort by scheduled end time (falling back to updated
+time). The home/my pending card links to the public `/tournaments/:id/awards`
+page, so unpublished tournaments and leagues are omitted to avoid a 404 destination.
+Eligible participants retain direct submission access to unpublished competitions.
+
+Admin review reads require an active administrator and include hidden rows with
+`hiddenAt`/`hiddenReason`. Hide/unhide requires a mutation administrator, verifies
+the review belongs to the requested competition, and records the change atomically
+with its audit log. Support administrators remain read-only.
+
+These shared admin review endpoints accept either kind's competition UUID without
+requiring the tournament-only admin detail endpoint:
+
+| Method | Path | Permission |
+|---|---|---|
+| `GET` | `/api/v1/admin/tournaments/:tournamentId/reviews` | active `owner`, `ops` or `support` administrator |
+| `PATCH` | `/api/v1/admin/tournaments/:tournamentId/reviews/:reviewId/hide` | active `owner` or `ops` administrator |
+| `PATCH` | `/api/v1/admin/tournaments/:tournamentId/reviews/:reviewId/unhide` | active `owner` or `ops` administrator |
+
+Publication does not limit admin review reads or moderation. A review outside the
+requested competition returns `404 REVIEW_NOT_FOUND` for hide/unhide without a
+mutation or audit record. The common review audit actions are
+`tournament.review_hide` and `tournament.review_unhide`, with target type
+`tournament_review`; both record the acting admin and before/after moderation values.
+
 Public detail applies the D-06 visibility matrix (see `docs/api/domains/public-records.md`) to both result lanes, but the two lanes drop and keep rows differently:
 
 - `fixtures[]` (tournament lane): a `hidden` fixture **is omitted entirely** -- there is no row with a null result. A `status_only` fixture **keeps its row** ("lifecycle only") with `result: null`.

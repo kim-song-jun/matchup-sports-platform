@@ -15,6 +15,7 @@ const codeOf = (fn: () => unknown) => {
 describe('ApplyBracketTemplateDto', () => {
   it('토너먼트 본문을 입력으로 바꾼다 — thirdPlace 생략은 false', async () => {
     expect(toBracketTemplateInput(await run({ kind: 'knockout', size: 8, thirdPlace: true }))).toEqual({ kind: 'knockout', size: 8, thirdPlace: true });
+    expect(toBracketTemplateInput(await run({ kind: 'knockout', size: 16, thirdPlace: true }))).toEqual({ kind: 'knockout', size: 16, thirdPlace: true });
     expect(toBracketTemplateInput(await run({ kind: 'knockout', size: 4 }))).toEqual({ kind: 'knockout', size: 4, thirdPlace: false });
   });
 

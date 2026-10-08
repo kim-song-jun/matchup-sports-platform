@@ -238,7 +238,7 @@ export function BracketGroupCard({
 
   const isKnockout = group.phase !== 'group';
   const roundOptions: string[] = isKnockout
-    ? ['12강', '8강', '4강', '결승', '3·4위전']
+    ? ['16강', '12강', '8강', '4강', '결승', '3·4위전']
     : ['조별 1라운드', '조별 2라운드', '조별 3라운드', '조별 4라운드', '조별 5라운드'];
 
   const byeGroup = allGroups.find((candidate) => candidate.id === group.id && byeRound(candidate.phase)?.label === fixtureRound)

@@ -4,7 +4,7 @@
  * 직접 재현·검증한다 — mutate 호출 스파이만 확인하는 게 아니라 실제로 서로 다른
  * registrationId로 N번 호출되는지, 성공 토스트 문구가 배정 개수에 맞는지까지 본다.
  */
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import type { V1AdminBracketFixture, V1AdminBracketGroup, V1AdminBracketStanding } from '@/types/api';
 import { BracketGroupCard } from './bracket-group-card';
@@ -92,6 +92,19 @@ describe('BracketGroupCard — 팀 일괄 배정', () => {
     expect(createFixture.mutate).not.toHaveBeenCalled();
     expect(screen.getByLabelText('대진표 위치')).toHaveValue(1);
     expect(screen.getByLabelText('부전승 팀 (선택 · 미정 가능)')).toHaveValue('');
+  });
+
+  it('16강 조의 수동 경기 라운드 선택지에 16강이 있고 부전승 유형은 쓸 수 없다', () => {
+    const group = { ...semiGroup, id: 'r16', name: '16강', phase: 'round16' as const };
+    const createBye = { mutate: vi.fn(), isPending: false } as unknown as ReturnType<typeof import('@/hooks/use-v1-api').useV1CreateBracketBye>;
+    render(<BracketGroupCard group={group} allGroups={[group]} allStandings={[]} fixtures={[]}
+      confirmedTeamItems={[{ id: 'reg-1', label: '강남FC' }]} assignGroupTeam={noopMutation() as unknown as ReturnType<typeof import('@/hooks/use-v1-api').useV1AssignGroupTeam>}
+      createFixture={noopMutation()} createBye={createBye} isAutoGenerating={false} onAutoGenerate={vi.fn()} onEditGroup={vi.fn()}
+      onDeleteGroup={vi.fn()} onRemoveGroupTeam={vi.fn()} autoFocus={false} showToast={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: /직접 입력/ }));
+    expect(within(screen.getByLabelText('라운드')).getAllByRole('option').map((o) => o.textContent)).toEqual(['라운드 선택', '16강', '12강', '8강', '4강', '결승', '3·4위전']);
+    fireEvent.change(screen.getByLabelText('라운드'), { target: { value: '16강' } });
+    expect(screen.getByLabelText('부전승')).toBeDisabled();
   });
 
   it('예선 상위 진출팀 추천칩 2개를 담고 "2팀 배정"을 누르면 서로 다른 registrationId로 두 번 순차 호출된다', async () => {

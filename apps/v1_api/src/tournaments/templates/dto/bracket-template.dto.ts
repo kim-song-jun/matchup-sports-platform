@@ -42,11 +42,11 @@ function required(value: number | undefined, field: string): number {
   return value;
 }
 
-/** 필수 필드 존재만 확인한다. 값의 범위(4/8/12강, 3~20팀 …)는 플래너가 같은 코드로 거부한다. */
+/** 필수 필드 존재만 확인한다. 값의 범위(4/8/12/16강, 3~20팀 …)는 플래너가 같은 코드로 거부한다. */
 export function toBracketTemplateInput(dto: ApplyBracketTemplateDto): BracketTemplateInput {
   switch (dto.kind) {
     case 'knockout':
-      return { kind: 'knockout', size: required(dto.size, 'size') as 4 | 8 | 12, thirdPlace: dto.thirdPlace ?? false };
+      return { kind: 'knockout', size: required(dto.size, 'size') as 4 | 8 | 12 | 16, thirdPlace: dto.thirdPlace ?? false };
     case 'league':
       return { kind: 'league', teamCount: required(dto.teamCount, 'teamCount'), legs: required(dto.legs, 'legs') as 1 | 2 };
     case 'group_knockout':

@@ -984,7 +984,7 @@ export class TournamentResultReviewService {
     }
 
     // 6. 승부차기: 기존 검증 순서·코드 그대로. base 점수는 null 로 넘겨 무효된 옛 승부차기를 승계하지 않고,
-    //    이벤트가 0건이라 킥 수는 요구되지 않는다(Task 3).
+    //    이벤트가 0건이라 킥 수는 요구되지 않는다.
     const score = await this.assertPenaltiesForRevision(tx, game, null, dto.score);
 
     if (voidBase !== null) {

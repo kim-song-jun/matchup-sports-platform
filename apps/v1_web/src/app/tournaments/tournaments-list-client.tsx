@@ -131,12 +131,11 @@ export function TournamentsListPageClient({ seed }: { readonly seed?: Tournament
   const rawPage = searchParams.get('page');
   const parsedPage = rawPage !== null && /^\d+$/.test(rawPage) ? Number(rawPage) : 1;
   const urlPage = Number.isSafeInteger(parsedPage) && parsedPage > 0 ? parsedPage : 1;
-  // URL 응답 전 연속 선택과 상세 진입도 마지막 선택을 사용한다. 새 URL/Back이 도착하면
+  // URL 응답 전 연속 페이지 선택은 마지막 선택을 사용한다. 새 URL/Back이 도착하면
   // 그 URL이 다시 권위가 되어 이전 목록의 draft가 복원된 페이지를 덮지 않는다.
   const [pageDraft, setPageDraft] = useState<{ readonly query: string; readonly page: number } | null>(null);
   const page = pageDraft?.query === listQuery ? pageDraft.page : urlPage;
   useEffect(() => { setPageDraft(null); }, [listQuery]);
-  const listPath = tournamentPagePath(new URLSearchParams(listQuery), page);
   const activeKind: CompetitionKind = parseCompetitionKind(searchParams.get('kind'), 'all');
   /* 빈 문자열은 **없는 것과 같다.** `?status=` 를 그대로 넘기면 서버가 400 을 내 목록이
      통째로 에러가 된다(실측). 아래 `??` 폴백만으로는 안 걸린다 — `''` 는 null 이 아니다. */
@@ -202,7 +201,7 @@ export function TournamentsListPageClient({ seed }: { readonly seed?: Tournament
     && cursor === undefined;
   // 로딩 판정은 isPending(데이터 없음)이다 — isLoading 은 서버·하이드레이션 첫 렌더(persist 복원 중,
   // fetchStatus 'idle')에 false 라 아직 안 받은 목록을 "대회가 없어요"로 그린다.
-  const { data, isPending, isError, error, isFetching, refetch } = useV1Tournaments(
+  const { data, isPending, isError, error, isFetching, isPlaceholderData, refetch } = useV1Tournaments(
     {
       ...(isDesktop ? { page } : { cursor }),
       limit: TOURNAMENT_LIST_PAGE_SIZE,
@@ -220,6 +219,9 @@ export function TournamentsListPageClient({ seed }: { readonly seed?: Tournament
   });
 
   const pageItems = data?.items ?? [];
+  // placeholder로 직전 카드를 유지하는 동안 복귀 주소도 그 카드의 페이지를 가리킨다.
+  const displayedPage = isDesktop ? data?.pageInfo?.page ?? page : page;
+  const listPath = tournamentPagePath(new URLSearchParams(listQuery), displayedPage);
   // 데스크톱은 페이지를 **교체**하고, 모바일은 **누적**한다.
   const displayItems: V1TournamentListItem[] =
     isDesktop || !cursor
@@ -229,6 +231,20 @@ export function TournamentsListPageClient({ seed }: { readonly seed?: Tournament
   const hasNext = data?.pageInfo?.hasNext ?? false;
   const totalPages = data?.pageInfo?.totalPages ?? 0;
   const total = data?.pageInfo?.total ?? 0;
+  const lastPage = Math.max(1, totalPages);
+  // 직전 응답의 범위로 새 요청을 보정하지 않는다. 성공한 현재 응답이 범위를 알려 준 뒤에만
+  // 저장 URL을 보정한다. 결과가 0개인 경우에도 조회 가능한 첫 페이지를 사용한다.
+  const needsPageNormalization = isDesktop && !isPending && !isError && !isPlaceholderData
+    && data?.pageInfo?.totalPages !== undefined && Number.isSafeInteger(totalPages) && totalPages >= 0
+    && page > lastPage;
+  useEffect(() => {
+    if (!needsPageNormalization) return;
+    setPageDraft({ query: listQuery, page: lastPage });
+    router.replace(tournamentPagePath(new URLSearchParams(listQuery), lastPage), { scroll: false });
+  }, [needsPageNormalization, lastPage, listQuery, router]);
+  // 범위 밖의 빈 응답을 placeholder로 받는 보정 요청은 기존 스켈레톤을 유지한다.
+  const emptyPreviousPage = isDesktop && isPlaceholderData && displayItems.length === 0
+    && data?.pageInfo?.page !== page;
 
   const handleLoadMore = () => {
     if (!data?.pageInfo?.nextCursor || isFetching) return;
@@ -300,7 +316,7 @@ export function TournamentsListPageClient({ seed }: { readonly seed?: Tournament
             구조적으로 성립한다. 칩 줄은 종목이 늘면 래핑돼 두 줄이 되지만 이 줄은 하나다. */}
         <CompetitionFilterSummary model={filterModel} />
 
-        {isPending ? (
+        {isPending || needsPageNormalization || emptyPreviousPage ? (
           <TournamentSkeletonList />
         ) : isError ? (
           <ErrorState

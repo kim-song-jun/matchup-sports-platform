@@ -1838,7 +1838,10 @@ function LeagueSections({ tournament }: { tournament: V1TournamentDetail }) {
     return map;
   }, [state]);
 
-  const fixtures = tournament.leagueFixtures;
+  // 정규 리그만 리그 축 대진(`leagueFixtures`)을 쓴다. 리그 방식 일반 대회의 경기는 대회 축
+  // `fixtures` 에 있고 `leagueFixtures` 는 항상 비어 있다.
+  const isRegularLeague = tournament.kind === 'regular_league';
+  const hasFixtures = isRegularLeague ? tournament.leagueFixtures.length > 0 : tournament.fixtures.length > 0;
 
   return (
     <>
@@ -1846,24 +1849,32 @@ function LeagueSections({ tournament }: { tournament: V1TournamentDetail }) {
           순위표가 영영 안 뜬다. 대회 쪽 동작(조 없으면 숨김)은 건드리지 않는다. */}
       <LeagueStandingsSection state={state} onRetry={retry} />
 
-      {fixtures.length > 0 ? (
+      {hasFixtures ? (
         <section aria-labelledby="fixtures-heading" style={{ marginTop: 24 }}>
           <div id="fixtures-heading" className="tm-text-body-lg" style={{ marginBottom: 8 }}>
             일정 · 대진
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 4 }}>
-            {fixtures.map((fixture) => (
-              <LeagueFixtureCard
-                key={fixture.teamMatchId}
-                fixture={fixture}
-                homeLabel={teamNameById.get(fixture.homeTeamId) ?? '홈팀 정보 없음'}
-                awayLabel={
-                  fixture.awayTeamId === null
-                    ? '상대팀 미정'
-                    : teamNameById.get(fixture.awayTeamId) ?? '상대팀 정보 없음'
-                }
-              />
-            ))}
+            {isRegularLeague
+              ? tournament.leagueFixtures.map((fixture) => (
+                  <LeagueFixtureCard
+                    key={fixture.teamMatchId}
+                    fixture={fixture}
+                    homeLabel={teamNameById.get(fixture.homeTeamId) ?? '홈팀 정보 없음'}
+                    awayLabel={
+                      fixture.awayTeamId === null
+                        ? '상대팀 미정'
+                        : teamNameById.get(fixture.awayTeamId) ?? '상대팀 정보 없음'
+                    }
+                  />
+                ))
+              : tournament.fixtures.map((fixture) => (
+                  <FixtureCard
+                    key={fixture.id}
+                    fixture={fixture}
+                    groupName={tournament.groups.find((group) => group.id === fixture.groupId)?.name ?? null}
+                  />
+                ))}
           </div>
         </section>
       ) : (

@@ -742,6 +742,45 @@ describe('BracketPageContent — 한쪽 칼럼만 있을 때는 2열로 펴지 �
     expect(grid).not.toHaveClass('tm-tourn-sub-grid-2col');
     expect(container.querySelectorAll('.tm-tourn-sub-col')).toHaveLength(1);
   });
+
+  it('리그 포맷: 조 편성·순위가 비어 있어도 경기가 있으면 탭이 비지 않고 순위 집계 전 안내를 보여 준다', () => {
+    const { container } = renderBracketStandingsTab(
+      makeTournament({
+        id: 'tour-league-unassigned',
+        status: 'in_progress',
+        format: 'league',
+        groups: [makeGroup({ id: 'group-1', phase: 'group', name: 'BUFF 리그', groupTeams: [], standings: [] })],
+        fixtures: [makeFixture({ id: 'fx-1', status: 'scheduled', groupId: 'group-1' })],
+      }),
+    );
+
+    expect(screen.getByText('순위 집계 전이에요')).toBeInTheDocument();
+    expect(container.querySelectorAll('.tm-tourn-sub-col')).toHaveLength(1);
+  });
+
+  it('리그 포맷: 조 편성이 있으면 경기가 있어도 안내 대신 팀 순위 행을 그린다', () => {
+    renderBracketStandingsTab(
+      makeTournament({
+        id: 'tour-league-assigned',
+        status: 'in_progress',
+        format: 'league',
+        groups: [
+          makeGroup({
+            id: 'group-1',
+            phase: 'group',
+            name: 'BUFF 리그',
+            groupTeams: [
+              { id: 'gt-1', registrationId: 'reg-1', teamId: 'team-1', teamName: '성수 FC', teamLogoUrl: null, sortOrder: 0 },
+            ],
+          }),
+        ],
+        fixtures: [makeFixture({ id: 'fx-1', status: 'scheduled', groupId: 'group-1' })],
+      }),
+    );
+
+    expect(screen.getByRole('link', { name: /성수 FC/ })).toBeInTheDocument();
+    expect(screen.queryByText('순위 집계 전이에요')).not.toBeInTheDocument();
+  });
 });
 
 

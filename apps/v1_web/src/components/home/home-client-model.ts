@@ -19,6 +19,7 @@ import type {
   HomeViewModel,
 } from './home.types';
 import { chatRoomTypeLabel } from '@/lib/chat-route';
+import { formatCardDate as formatDate, formatCardTime as formatTime } from '@/lib/date-utils';
 
 /** 위치 권한이 없거나 날씨를 아직 못 받았을 때 쓰는 빈 값. 목업 날씨('마포 18도 맑음')를
  *  실제 관측치처럼 보여주지 않는다 — 권한 안내 문구(getWeatherPermissionCopy)가 이유를 말한다. */
@@ -313,18 +314,6 @@ function parseCapacity(text: string) {
     current: current ?? 0,
     capacity: capacity ?? Math.max(current ?? 0, 1),
   };
-}
-
-function formatDate(value: string) {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleDateString('ko-KR', { month: 'long', day: 'numeric', weekday: 'short' });
-}
-
-function formatTime(value: string) {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return '';
-  return date.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false });
 }
 
 function shortcutKeyFromLabel(label: string): V1HomeShortcut['key'] {

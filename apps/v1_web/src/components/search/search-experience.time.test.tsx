@@ -27,8 +27,9 @@ function match(input: string): V1Match {
     sportName: '풋살', placeName: '합성 경기장', startsAt: input, capacityText: '2/12', status: 'recruiting' };
 }
 function teamMatch(input: string): V1TeamMatch {
-  return { ...match(input), id: TEAM_MATCH_ID, teamMatchId: TEAM_MATCH_ID,
-    title: '성수 아틀레틱 검색 경기', hostTeamName: SEARCH };
+  return { id: TEAM_MATCH_ID, teamMatchId: TEAM_MATCH_ID,
+    title: '성수 아틀레틱 검색 경기', hostTeamName: SEARCH,
+    sportName: '풋살', placeName: '합성 경기장', startsAt: input, capacityText: '2/12', status: 'recruiting' };
 }
 
 let startsAt: string | null | undefined = DATES[0][0];

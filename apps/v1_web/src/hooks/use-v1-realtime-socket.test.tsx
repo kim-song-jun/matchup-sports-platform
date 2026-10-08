@@ -1,5 +1,5 @@
 import { renderHook, waitFor } from '@testing-library/react';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryClient, QueryClientProvider, QueryObserver } from '@tanstack/react-query';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { ReactNode } from 'react';
 import { v1Keys } from '@/lib/query-keys';
@@ -50,6 +50,37 @@ describe('useV1NotificationSocket', () => {
 });
 
 describe('useV1ChatRoomSocket', () => {
+  it('one message event refreshes the current detail and nested message query once', async () => {
+    // Given active detail and message observers sharing the actual room key prefix.
+    const { useV1ChatRoomSocket } = await import('./use-v1-realtime-socket');
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    let detailReads = 0;
+    let messageReads = 0;
+    const detail = new QueryObserver(queryClient, {
+      queryKey: v1Keys.chatRoom('room-1'),
+      queryFn: async () => ({ revision: ++detailReads }),
+    });
+    const messages = new QueryObserver(queryClient, {
+      queryKey: [...v1Keys.chatMessages('room-1'), { limit: 50 }],
+      queryFn: async () => ({ revision: ++messageReads }),
+    });
+    const stopDetail = detail.subscribe(() => {});
+    const stopMessages = messages.subscribe(() => {});
+    const { unmount } = renderHook(() => useV1ChatRoomSocket('room-1'), { wrapper: createWrapper(queryClient) });
+    await waitFor(() => expect(messages.getCurrentResult().data).toEqual({ revision: 1 }));
+
+    // When one actual socket callback invalidates the open room.
+    listeners['chat:message']({ roomId: 'room-1', senderUserId: 'user-a' });
+
+    // Then the nested message request is not cancelled and restarted by a redundant second invalidation.
+    await waitFor(() => expect(messages.getCurrentResult().data).toEqual({ revision: 2 }));
+    expect(detail.getCurrentResult().data).toEqual({ revision: 2 });
+    expect({ detailReads, messageReads }).toEqual({ detailReads: 2, messageReads: 2 });
+    unmount();
+    stopDetail();
+    stopMessages();
+    queryClient.clear();
+  });
   it('clears cached messages when a remote participant changes a block, without the global bridge', async () => {
     const { useV1ChatRoomSocket } = await import('./use-v1-realtime-socket');
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -75,10 +106,38 @@ describe('useV1ChatRoomSocket', () => {
     listeners['chat:message']({ roomId: 'room-1', text: 'hi' });
 
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: v1Keys.chatRoom('room-1') });
-    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: v1Keys.chatMessages('room-1') });
 
     unmount();
 
+    expect(mockSocket.off).toHaveBeenCalledWith('chat:message', expect.any(Function));
+  });
+});
+
+describe('useV1ChatListSocket', () => {
+  it('refreshes bare and filtered list keys without refetching an open room subtree', async () => {
+    const { useV1ChatListSocket } = await import('./use-v1-realtime-socket');
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const reads = { base: 0, filtered: 0, room: 0, messages: 0 };
+    const keys = {
+      base: v1Keys.chatRooms(),
+      filtered: [...v1Keys.chatRooms(), 'list', { roomType: 'team', limit: 50 }],
+      room: v1Keys.chatRoom('room-1'),
+      messages: [...v1Keys.chatMessages('room-1'), { limit: 50 }],
+    };
+    const observers = Object.entries(keys).map(([name, queryKey]) => {
+      const key = name as keyof typeof reads;
+      return new QueryObserver(queryClient, { queryKey, queryFn: async () => ++reads[key] });
+    });
+    const stops = observers.map((observer) => observer.subscribe(() => {}));
+    const { unmount } = renderHook(() => useV1ChatListSocket(), { wrapper: createWrapper(queryClient) });
+    await waitFor(() => expect(reads).toEqual({ base: 1, filtered: 1, room: 1, messages: 1 }));
+
+    listeners['chat:message']({ roomId: 'room-1', senderUserId: 'user-a' });
+
+    await waitFor(() => expect(reads).toEqual({ base: 2, filtered: 2, room: 1, messages: 1 }));
+    unmount();
+    for (const stop of stops) stop();
+    queryClient.clear();
     expect(mockSocket.off).toHaveBeenCalledWith('chat:message', expect.any(Function));
   });
 });

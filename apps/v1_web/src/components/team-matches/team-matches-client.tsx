@@ -4,7 +4,7 @@ import { TeamMatchRecordEntry } from './team-match-shared-record';
 
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useQueryClient, type QueryClient } from '@tanstack/react-query';
+import { useCursorPagination, useCursorPaginationSnapshot } from '@/hooks/use-cursor-pagination';
 import {
   useV1ApplyTeamMatch,
   useV1ApproveTeamMatchApplication,
@@ -72,25 +72,8 @@ import {
   toTeamMatch,
 } from './team-matches.card-model';
 
-type TeamMatchPagination = { cursor?: string; accumulated: V1TeamMatch[] };
-
-function readTeamMatchPagination(
-  client: QueryClient,
-  key: readonly unknown[],
-  filters: Record<string, unknown> | undefined,
-): TeamMatchPagination {
-  const saved = client.getQueryData<TeamMatchPagination>(key);
-  if (saved) {
-    const page = client.getQueryState(v1Keys.teamMatches(saved.cursor ? { ...filters, cursor: saved.cursor } : filters));
-    // 페이지 캐시가 만료되거나 상세 액션이 무효화했다면 오래된 누적 목록을 복원하지 않는다.
-    if (page?.status === 'success' && !page.isInvalidated) return saved;
-  }
-  return { accumulated: [] };
-}
-
 export function TeamMatchListPageClient({ seed }: { readonly seed?: CursorListSeed<V1TeamMatch> } = {}) {
   const router = useRouter();
-  const queryClient = useQueryClient();
   const searchParams = useSearchParams();
   const selectedSportId = searchParams.get('sportId') ?? undefined;
   const selectedSort = toTeamMatchSort(searchParams.get('sort'));
@@ -133,18 +116,12 @@ export function TeamMatchListPageClient({ seed }: { readonly seed?: CursorListSe
   // useQuery로 첫 페이지만 받아 21번째부터는 볼 방법이 없었다(감사 결함 — matches-client.tsx의
   // 같은 수정과 동일 패턴, tournaments/tournaments-list-client.tsx 의 "더 보기" 누적 방식을 따른다).
   const teamMatchFiltersKey = teamMatchFilters ? JSON.stringify(teamMatchFilters) : '';
-  // API의 flat 페이지 캐시와 별개로, 상세 왕복에 필요한 마지막 성공 cursor/이전 페이지만
-  // 메모리에 보관한다. v1 identity clear와 기본 GC를 따르며 localStorage에는 저장하지 않는다.
-  const paginationKey = useMemo(() => [...v1Keys.teamMatchesAll(), 'pagination', teamMatchFiltersKey], [teamMatchFiltersKey]);
-  const [pagination, setPagination] = useState<TeamMatchPagination>(() => readTeamMatchPagination(queryClient, paginationKey, teamMatchFilters));
-  const { cursor, accumulated } = pagination;
-  // matches-client.tsx와 동일한 이유로 useEffect가 아니라 렌더 중에 되감는다 — 안 그러면
-  // "새 필터 + 이전 cursor"가 합쳐진 무효 요청이 한 번 나가는 중간 렌더가 생긴다.
-  const [pagedFiltersKey, setPagedFiltersKey] = useState(teamMatchFiltersKey);
-  if (pagedFiltersKey !== teamMatchFiltersKey) {
-    setPagedFiltersKey(teamMatchFiltersKey);
-    setPagination({ accumulated: [] });
-  }
+  // 필터 되감기·상세 복귀 복원은 매치·대회 목록과 같은 훅이다(useCursorPagination).
+  const { cursor, accumulated, setPagination, snapshotKey } = useCursorPagination<V1TeamMatch>(
+    v1Keys.teamMatchesAll(),
+    teamMatchFiltersKey,
+    (savedCursor) => v1Keys.teamMatches(savedCursor ? { ...teamMatchFilters, cursor: savedCursor } : teamMatchFilters),
+  );
   const allQueryFilters = useMemo(() => (!teamMatchFilters && cursor ? { cursor } : undefined), [teamMatchFilters, cursor]);
   const filteredQueryFilters = useMemo(
     () => (teamMatchFilters ? (cursor ? { ...teamMatchFilters, cursor } : teamMatchFilters) : undefined),
@@ -172,12 +149,7 @@ export function TeamMatchListPageClient({ seed }: { readonly seed?: CursorListSe
   const recordSearch = useV1RecordSearch();
   const query = teamMatchFilters ? filteredQuery : allQuery;
 
-  useEffect(() => {
-    // 더보기 중 previous-page placeholder 또는 실패 응답을 성공 snapshot으로 남기지 않는다.
-    if (query.isSuccess && !query.isPlaceholderData && !query.isFetching) {
-      queryClient.setQueryData<TeamMatchPagination>(paginationKey, pagination);
-    }
-  }, [queryClient, paginationKey, pagination, query.isSuccess, query.isPlaceholderData, query.isFetching, query.dataUpdatedAt]);
+  useCursorPaginationSnapshot(snapshotKey, { cursor, accumulated }, query);
 
   if (query.isError) return <TeamMatchStatePageView model={{ ...getTeamMatchStateViewModel('error'), retry: () => void query.refetch() }} />;
 

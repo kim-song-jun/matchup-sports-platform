@@ -1,9 +1,8 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { ClipboardEdit, Wallet, ListChecks, Grid2x2, GitFork, Trophy, Sparkles } from 'lucide-react';
 import {
   CompetitionKindSegment,
@@ -24,6 +23,7 @@ import { TournamentPromoCarousel } from '@/components/tournaments/tournament-pro
 import { useV1AllTournaments, useV1Tournaments, useV1MasterSports } from '@/hooks/use-v1-api';
 import { useMediaQuery, DESKTOP_LIST_MEDIA_QUERY } from '@/hooks/use-media-query';
 import { useInfiniteScroll } from '@/hooks/use-infinite-scroll';
+import { useCursorPagination, useCursorPaginationSnapshot } from '@/hooks/use-cursor-pagination';
 import { PaginationBar } from '@/components/v1-ui/pagination-bar';
 import { extractErrorMessage } from '@/lib/error-message';
 import { TOURNAMENT_LIST_PAGE_SIZE, type TournamentListSeed } from '@/lib/public-list-seed';
@@ -92,22 +92,6 @@ function tournamentPagePath(params: URLSearchParams, page: number): string {
 }
 
 type TournamentListFilters = NonNullable<Parameters<typeof useV1Tournaments>[0]>;
-type TournamentPagination = { readonly cursor?: string; readonly accumulated: V1TournamentListItem[] };
-
-function readTournamentPagination(
-  client: QueryClient,
-  key: readonly unknown[],
-  filters: TournamentListFilters,
-): TournamentPagination {
-  const saved = client.getQueryData<TournamentPagination>(key);
-  if (saved) {
-    const pageFilters = saved.cursor ? { ...filters, cursor: saved.cursor } : filters;
-    const page = client.getQueryState(v1Keys.tournaments(pageFilters as Record<string, unknown>));
-    // 상세의 mutation이나 GC가 페이지 캐시를 무효화했다면 오래된 누적 카드도 되살리지 않는다.
-    if (page?.status === 'success' && !page.isInvalidated) return saved;
-  }
-  return { accumulated: [] };
-}
 
 /**
  * 대회 목록의 페이지 이동은 화면 폭에 따라 **다른 방식**을 쓴다.
@@ -196,10 +180,7 @@ export function TournamentsListPageClient({ seed }: { readonly seed?: Tournament
     sportsLoaded: sportsData !== undefined,
   });
 
-  // 모바일은 커서 페이지를 누적한다. 상세 왕복에서 로컬 state가 사라져도 마지막으로 성공한
-  // 현재 페이지와 이전 카드만 React Query 메모리 캐시에서 되살린다. localStorage에는 남기지
-  // 않으며, 페이지 캐시가 invalidation/GC 되면 함께 폐기한다.
-  const queryClient = useQueryClient();
+  // 모바일은 커서 페이지를 누적한다 — 필터 되감기·상세 복귀 복원은 useCursorPagination(매치·팀매치와 같은 훅).
   const mobileFilters: TournamentListFilters = {
     limit: TOURNAMENT_LIST_PAGE_SIZE,
     sportId: querySportId,
@@ -207,21 +188,11 @@ export function TournamentsListPageClient({ seed }: { readonly seed?: Tournament
     kind: activeKind,
     genderCategory: knownGenderCategory,
   };
-  const mobileFiltersKey = JSON.stringify(mobileFilters);
-  const paginationKey = useMemo(
-    () => [...v1Keys.tournaments(), 'pagination', mobileFiltersKey] as const,
-    [mobileFiltersKey],
+  const { cursor, accumulated: allItems, setPagination, snapshotKey } = useCursorPagination<V1TournamentListItem>(
+    v1Keys.tournaments(),
+    JSON.stringify(mobileFilters),
+    (savedCursor) => v1Keys.tournaments((savedCursor ? { ...mobileFilters, cursor: savedCursor } : mobileFilters) as Record<string, unknown>),
   );
-  const [pagination, setPagination] = useState<TournamentPagination>(() => (
-    readTournamentPagination(queryClient, paginationKey, mobileFilters)
-  ));
-  const { cursor, accumulated: allItems } = pagination;
-  const [pagedFiltersKey, setPagedFiltersKey] = useState(mobileFiltersKey);
-  if (pagedFiltersKey !== mobileFiltersKey) {
-    // effect까지 기다리면 새 필터와 이전 cursor를 섞은 요청이 한 번 나가므로 렌더 중 즉시 되감는다.
-    setPagedFiltersKey(mobileFiltersKey);
-    setPagination({ accumulated: [] });
-  }
 
   // 서버 seed 는 무필터 첫 페이지다 — 같은 유형의 첫 화면 요청일 때만 쓴다.
   const seedMatches = seed !== undefined
@@ -256,12 +227,13 @@ export function TournamentsListPageClient({ seed }: { readonly seed?: Tournament
       ? pageItems
       : [...allItems, ...pageItems.filter((item) => !allItems.some((prev) => prev.id === item.id))];
 
-  useEffect(() => {
-    // pending placeholder나 실패한 다음 페이지를 복귀 snapshot으로 저장하지 않는다.
-    if (!isDesktop && isSuccess && !isPlaceholderData && !isFetching) {
-      queryClient.setQueryData<TournamentPagination>(paginationKey, pagination);
-    }
-  }, [dataUpdatedAt, isDesktop, isFetching, isPlaceholderData, isSuccess, pagination, paginationKey, queryClient]);
+  // 데스크톱은 페이지 번호가 URL 에 있어 복원할 누적분이 없다.
+  useCursorPaginationSnapshot(
+    snapshotKey,
+    { cursor, accumulated: allItems },
+    { isSuccess, isPlaceholderData, isFetching, dataUpdatedAt },
+    !isDesktop,
+  );
 
   const hasNext = data?.pageInfo?.hasNext ?? false;
   const totalPages = data?.pageInfo?.totalPages ?? 0;

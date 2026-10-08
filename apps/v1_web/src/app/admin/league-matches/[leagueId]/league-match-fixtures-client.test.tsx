@@ -162,6 +162,7 @@ describe('LeagueMatchFixturesClient', () => {
       </Providers>,
     );
 
+    expect(screen.getByRole('link', { name: '후기 관리' })).toHaveAttribute('href', '/admin/league-matches/league-1/reviews');
     expect(screen.getByRole('columnheader', { name: '결과' })).toBeInTheDocument();
     // 표는 일정 위주로 줄었다 — 경기 · 결과 · 일시 · 운영. 구장·주소는 '경기' 열의 보조 줄로,
     // 수정은 행의 ⋯ 로 물러났다. 상태(취소)는 결과 열이 대신 그린다(아래 취소 대진 테스트).

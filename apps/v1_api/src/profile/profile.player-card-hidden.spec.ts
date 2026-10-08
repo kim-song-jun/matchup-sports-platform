@@ -1,5 +1,13 @@
 import { NotFoundException } from '@nestjs/common';
 import { ProfileService } from './profile.service';
+import type { RealtimeGateway } from '../realtime/realtime.gateway';
+
+function createProfileService(
+  prisma: unknown,
+  realtimeGateway: Pick<RealtimeGateway, 'forceDisconnectUser'> = { forceDisconnectUser: jest.fn() },
+): ProfileService {
+  return new ProfileService(prisma as never, realtimeGateway);
+}
 
 /**
  * 선수 카드 숨김 토글 (Task 155).
@@ -21,14 +29,14 @@ describe('ProfileService 선수 카드 숨김 토글', () => {
   describe('조회', () => {
     it('프로필 row 가 없으면 컬럼 기본값과 같은 false 를 준다 -- 카드를 보여준다는 뜻', async () => {
       const prisma = { v1UserProfile: { findUnique: jest.fn().mockResolvedValue(null) } };
-      const service = new ProfileService(prisma as never);
+      const service = createProfileService(prisma as never);
 
       await expect(service.myPlayerCardHidden(authUser)).resolves.toEqual({ hidden: false });
     });
 
     it('저장된 값을 그대로 준다', async () => {
       const prisma = { v1UserProfile: { findUnique: jest.fn().mockResolvedValue({ playerCardHidden: true }) } };
-      const service = new ProfileService(prisma as never);
+      const service = createProfileService(prisma as never);
 
       await expect(service.myPlayerCardHidden(authUser)).resolves.toEqual({ hidden: true });
     });
@@ -40,7 +48,7 @@ describe('ProfileService 선수 카드 숨김 토글', () => {
       const prisma = {
         v1UserProfile: { findUnique: jest.fn().mockResolvedValue({ id: 'p-1' }), update },
       };
-      const service = new ProfileService(prisma as never);
+      const service = createProfileService(prisma as never);
 
       await expect(service.updateMyPlayerCardHidden(authUser, { hidden: true })).resolves.toEqual({ hidden: true });
       expect(update).toHaveBeenCalledWith(
@@ -53,7 +61,7 @@ describe('ProfileService 선수 카드 숨김 토글', () => {
       const prisma = {
         v1UserProfile: { findUnique: jest.fn().mockResolvedValue({ id: 'p-1' }), update },
       };
-      const service = new ProfileService(prisma as never);
+      const service = createProfileService(prisma as never);
 
       await expect(service.updateMyPlayerCardHidden(authUser, { hidden: false })).resolves.toEqual({ hidden: false });
       expect(update).toHaveBeenCalledWith(expect.objectContaining({ data: { playerCardHidden: false } }));
@@ -64,7 +72,7 @@ describe('ProfileService 선수 카드 숨김 토글', () => {
       const prisma = {
         v1UserProfile: { findUnique: jest.fn().mockResolvedValue(null), update },
       };
-      const service = new ProfileService(prisma as never);
+      const service = createProfileService(prisma as never);
 
       await expect(service.updateMyPlayerCardHidden(authUser, { hidden: true })).rejects.toBeInstanceOf(
         NotFoundException,

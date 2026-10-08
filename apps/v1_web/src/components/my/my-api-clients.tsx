@@ -71,7 +71,7 @@ import {
 } from '@/hooks/use-v1-api';
 import { usePendingIds } from '@/hooks/use-pending-ids';
 import { formatMonthDay, formatTournamentDateTimeLong } from '@/lib/date-utils';
-import { V1ApiError } from '@/lib/api-client';
+import { isV1NetworkError, v1Api, V1ApiError } from '@/lib/api-client';
 import { toDistrictRegionOptions } from '@/lib/v1-regions';
 import type { V1MyActivitySummary, V1MyJoinApplication, V1MyTeam, V1Profile, V1ReceivedInvitation, V1Region, V1Settings, V1Sport, V1TeamDetail, V1TeamJoinApplication, V1TeamMember } from '@/types/api';
 import {
@@ -112,6 +112,40 @@ type SettingsRegionGroup = {
 };
 
 const WITHDRAWAL_PUSH_CLEANUP_TIMEOUT_MS = 1_500;
+const WITHDRAWAL_RECONCILIATION_TIMEOUT_MS = 1_500;
+
+function requestWithAbortTimeout<T>(
+  request: (signal: AbortSignal) => Promise<T>,
+  timeoutMessage: string,
+): Promise<T> {
+  const controller = new AbortController();
+
+  return new Promise<T>((resolve, reject) => {
+    const timeoutId = window.setTimeout(() => {
+      controller.abort();
+      reject(new Error(timeoutMessage));
+    }, WITHDRAWAL_RECONCILIATION_TIMEOUT_MS);
+
+    void Promise.resolve()
+      .then(() => request(controller.signal))
+      .then(
+        (result) => {
+          window.clearTimeout(timeoutId);
+          resolve(result);
+        },
+        (error: unknown) => {
+          window.clearTimeout(timeoutId);
+          reject(error);
+        },
+      );
+  });
+}
+
+function isConfirmedInactiveSession(error: unknown): boolean {
+  return error instanceof V1ApiError
+    && ((error.statusCode === 401 && error.code === 'UNAUTHENTICATED')
+      || (error.statusCode === 403 && error.code === 'PERMISSION_DENIED'));
+}
 
 export function MyHomePageClient() {
   const profile = useV1Profile();
@@ -2283,9 +2317,9 @@ export function WithdrawalPageClient() {
       });
     }
 
-    // The server withdrawal already removed its push row. Skip its authenticated DELETE,
-    // but still remove this device's local PushManager subscription.
-    void pushRegistration.unsubscribe({ reason: 'sign-out', serverRegistrationRemoved: true }).then(
+    // Authenticated server cleanup cannot remove the registration after session termination;
+    // revoke this device locally and let the server-side account/push lifecycle own its row.
+    void pushRegistration.unsubscribe({ reason: 'sign-out', skipServerUnsubscribe: true }).then(
       () => finishWithdrawalNavigation(),
       (error) => {
         if (settled) return;
@@ -2305,9 +2339,57 @@ export function WithdrawalPageClient() {
     requestLockRef.current = false;
     setIsRequestLocked(false);
   };
+  const reconcileAmbiguousWithdrawal = async (error: Error) => {
+    const ambiguousWrite = isV1NetworkError(error)
+      || (error instanceof V1ApiError && (error.statusCode === 0 || error.statusCode >= 500));
+    if (!ambiguousWrite) {
+      releaseWithdrawalLock();
+      return;
+    }
+
+    try {
+      await requestWithAbortTimeout(
+        (signal) => v1Api('/auth/me', { method: 'GET', signal }),
+        'Withdrawal auth reconciliation timed out.',
+      );
+      // The cookie still authenticates. Keep the server outcome unknown and let the user retry.
+      releaseWithdrawalLock();
+    } catch (authError) {
+      if (!isConfirmedInactiveSession(authError)) {
+        reportClientError({
+          message: extractErrorMessage(authError, '탈퇴 요청 결과와 로그인 상태를 확인하지 못했어요.'),
+          level: 'warn',
+          context: { flow: 'withdrawal-outcome-reconciliation' },
+        });
+        releaseWithdrawalLock();
+        return;
+      }
+
+      try {
+        await requestWithAbortTimeout(
+          (signal) => v1Api<{ ok: boolean }>('/auth/logout', {
+            method: 'POST',
+            body: JSON.stringify({}),
+            signal,
+          }),
+          'Withdrawal logout cleanup timed out.',
+        );
+      } catch (logoutError) {
+        reportClientError({
+          message: extractErrorMessage(logoutError, '확인되지 않은 탈퇴 요청 뒤 서버 로그인 쿠키를 정리하지 못했어요.'),
+          level: 'warn',
+          context: { flow: 'withdrawal-outcome-logout' },
+        });
+      }
+
+      // Auth rejection confirms that this browser must become a guest, not that withdrawal
+      // committed. Keep the request error visible while clearing this browser's identity.
+      completeWithdrawal();
+    }
+  };
   const withdrawal = useV1WithdrawalRequest({
     onSuccess: completeWithdrawal,
-    onError: releaseWithdrawalLock,
+    onError: reconcileAmbiguousWithdrawal,
   });
   const handleWithdraw = () => {
     if (requestLockRef.current || finalizingRef.current || withdrawal.isPending) return;
@@ -2323,8 +2405,8 @@ export function WithdrawalPageClient() {
         releaseWithdrawalLock();
         return;
       }
-      // The mutation-level success callback survives observer unmounting. Rejections stay in
-      // mutation state for WithdrawalErrorCard; v1Api already records their warning telemetry.
+      // The mutation-level success callback survives observer unmounting. The error callback
+      // reconciles only ambiguous network/server failures; definitive errors stay in the card.
       withdrawal.mutate({ reason: reason || null });
     });
   };

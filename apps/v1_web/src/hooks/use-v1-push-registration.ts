@@ -15,8 +15,8 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array<ArrayBuffer> {
 export interface UnsubscribeOptions {
   /** `'sign-out'` from the logout button — the app shell keeps the reader's opt-in. */
   reason?: NativePushRevokeReason;
-  /** Successful account withdrawal already removed this user's server-side registration. */
-  serverRegistrationRemoved?: boolean;
+  /** The caller cannot use authenticated server cleanup and only needs local device revocation. */
+  skipServerUnsubscribe?: boolean;
 }
 
 export interface V1PushRegistration {
@@ -200,7 +200,7 @@ export function useV1PushRegistration(): V1PushRegistration {
         return true;
       }
 
-      if (!options.serverRegistrationRemoved) {
+      if (!options.skipServerUnsubscribe) {
         try {
           await v1Delete('/notifications/push-unsubscribe', { endpoint: subscription.endpoint });
         } catch (err) {

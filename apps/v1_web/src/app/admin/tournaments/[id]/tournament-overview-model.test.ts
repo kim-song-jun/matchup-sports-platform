@@ -67,6 +67,19 @@ describe('resolveNextMilestone', () => {
     expect(milestone.overdue).toBe(true);
   });
 
+  it('접수 마감이 24시간 안쪽이면 날짜가 아니라 남은 시각으로 말한다(2026-10 알파 실측)', () => {
+    const headline = (registrationDeadlineAt: string) =>
+      resolveNextMilestone(tournament({ registrationDeadlineAt }), new Date('2026-08-20T23:15:00+09:00')).headline;
+    expect(headline('2026-08-21T00:00:00+09:00')).toBe('접수 마감까지 45분 남았어요.');
+    expect(headline('2026-08-21T20:00:00+09:00')).toBe('접수 마감까지 20시간 남았어요.');
+    expect(headline('2026-08-23T09:00:00+09:00')).toBe('접수 마감까지 3일 남았어요.');
+  });
+
+  it('오늘 이미 지난 접수 마감은 "오늘 마감"이 아니라 확인이 필요하다고 본다', () => {
+    const milestone = resolveNextMilestone(tournament({ registrationDeadlineAt: '2026-08-20T09:00:00+09:00' }), NOW);
+    expect(milestone.overdue).toBe(true);
+  });
+
   it('마감 상태면 경기일을 기준으로 센다', () => {
     const milestone = resolveNextMilestone(
       tournament({ status: 'closed', scheduledAt: '2026-08-20T18:00:00+09:00' }),

@@ -174,6 +174,7 @@ export function createV1GameRosterMswHandlers() {
       baseSource: state.baseSource,
       jerseyRegistrationId:
         state.viewerRole === 'TEAM_MANAGER' && !fallback() ? GAME_ROSTER_MSW.registrationId : null,
+      jerseyEditable: state.viewerRole === 'TEAM_MANAGER' && !fallback() && !state.rosterLocked,
       base,
       participants,
       excluded,

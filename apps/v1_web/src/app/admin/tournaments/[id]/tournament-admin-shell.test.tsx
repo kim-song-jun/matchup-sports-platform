@@ -15,7 +15,7 @@ vi.mock('next/navigation', () => ({
   usePathname: () => '/admin/tournaments/tournament-1/info',
 }));
 
-const { visibilityMutate } = vi.hoisted(() => ({ visibilityMutate: vi.fn() }));
+const { visibilityMutate, statusMutate } = vi.hoisted(() => ({ visibilityMutate: vi.fn(), statusMutate: vi.fn() }));
 
 vi.mock('@/hooks/use-v1-api', () => ({
   useV1AdminTournament: () => ({
@@ -32,7 +32,7 @@ vi.mock('@/hooks/use-v1-api', () => ({
     refetch: vi.fn(),
   }),
   useV1AdminMe: () => ({ data: { capabilities: ['status:write'], adminRole: adminRoleMock.value } }),
-  useV1ChangeTournamentStatus: () => ({ mutate: vi.fn(), isPending: false }),
+  useV1ChangeTournamentStatus: () => ({ mutate: statusMutate, isPending: false }),
   useV1UpdateTournamentVisibility: () => ({ mutate: visibilityMutate, isPending: false, isError: false, isSuccess: false, error: null }),
   useV1TournamentStaffAssignments: () => ({ data: { items: [] }, isPending: false, isError: false, error: null }),
 }));
@@ -73,6 +73,20 @@ describe('TournamentAdminShell 섹션 내비', () => {
     adminRoleMock.value = 'ops';
     render(<TournamentAdminShell id="tournament-1"><div /></TournamentAdminShell>);
     expect(screen.getByRole('button', { name: '대회 완료하기' })).toBeInTheDocument();
+  });
+
+  it('대회 완료는 확인 창을 거쳐야 실행된다 — 모바일 오탭 방지(2026-10 알파 실측)', async () => {
+    adminRoleMock.value = 'ops';
+    statusMutate.mockClear();
+    render(<TournamentAdminShell id="tournament-1"><div /></TournamentAdminShell>);
+
+    fireEvent.click(screen.getByRole('button', { name: '대회 완료하기' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText('대회를 완료할까요?')).toBeInTheDocument();
+    expect(statusMutate).not.toHaveBeenCalled();
+
+    fireEvent.click(within(dialog).getByRole('button', { name: '대회 완료하기' }));
+    await vi.waitFor(() => expect(statusMutate).toHaveBeenCalledWith({ status: 'completed' }, expect.anything()));
   });
 
   it('대회 하위 섹션은 그대로 대회 경로를 가리킨다', () => {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { GameSide } from '@/types/game-operations';
+import type { GameLineup, GameSide } from '@/types/game-operations';
 import type { EventCaptureCommitInput } from './action-target-picker';
 import { commandConfirmCopy, commitActionConfirmCopy } from './confirm-copy';
 
@@ -34,6 +34,16 @@ describe('commitActionConfirmCopy — 받침에 맞는 조사', () => {
     expect(title(input({ type: 'FOUL' }))).toBe('파울을 기록할까요?');
     expect(title(input({ type: 'CARD', payload: { card: 'YELLOW' } }))).toBe('옐로카드를 기록할까요?');
     expect(title(input({ type: 'CARD', payload: { card: 'RED' } }))).toBe('레드카드를 기록할까요?');
+  });
+
+  it('자책골은 "기록"이 아니라 자책골로 묻고, 넣은 선수의 팀과 득점 팀을 구분한다', () => {
+    const twoSides: GameSide[] = [sides[0], { ...sides[0], id: 'side-away', sideKey: 'AWAY', displayNameSnapshot: '원정팀' }];
+    const lineups = [{ participants: [{ id: 'p-away', displayNameSnapshot: '김원정' }] }] as unknown as GameLineup[];
+    const copy = commitActionConfirmCopy(input({ type: 'OWN_GOAL', participantId: 'p-away' }), twoSides, lineups, null);
+
+    expect(copy.title).toBe('자책골을 기록할까요?');
+    expect(copy.confirmLabel).toBe('자책골 기록');
+    expect(copy.message).toBe('원정팀 · 김원정 (홈팀 득점) · 전반 1:00에 기록해요.');
   });
 
   it('시계 경고 병합 문구에도 같은 조사를 쓴다', () => {

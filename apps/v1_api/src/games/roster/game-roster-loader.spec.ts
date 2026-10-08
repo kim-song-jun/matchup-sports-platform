@@ -1,6 +1,6 @@
 import type { Prisma } from '@prisma/client';
 import { fillLeagueTeamRoster, notifyLeagueRosterFillOutcomes } from '../../league-matches/league-roster-autofill';
-import { loadGameRoster, loadJerseyRegistrationId } from './game-roster-loader';
+import { loadGameRoster, loadJerseyRegistration } from './game-roster-loader';
 
 // 조회가 자동 채움(쓰기·알림)을 부르는지 본다. 동기화 쓰기 경로의 호출은 game-roster-sync.spec 이 본다.
 jest.mock('../../league-matches/league-roster-autofill', () => ({
@@ -270,36 +270,55 @@ describe('loadGameRoster — 조회는 DB 를 바꾸지 않는다', () => {
   });
 });
 
-describe('loadJerseyRegistrationId — 등번호 원본 신청은 참가 명단 기준의 팀장·매니저에게만', () => {
+describe('loadJerseyRegistration — 등번호 원본 신청은 참가 명단 기준의 팀장·매니저에게만', () => {
   const scope = { competitionId: 'cup', isLeague: false, teamId: 'team-A' };
-  const registrationTx = (id: string | null) => {
-    const findFirst = jest.fn(async () => (id === null ? null : { id }));
+  const openTournament = { rosterDeadlineAt: null, status: 'in_progress', kind: 'tournament' };
+  const registrationRow = (overrides: Record<string, unknown> = {}) => ({
+    id: 'reg-1',
+    status: 'confirmed',
+    rosterLockedAt: null,
+    rosterDeadlineOverrideAt: null,
+    tournament: openTournament,
+    ...overrides,
+  });
+  const registrationTx = (row: ReturnType<typeof registrationRow> | null) => {
+    const findFirst = jest.fn(async () => row);
     return { tx: { v1TournamentRegistration: { findFirst } } as unknown as Prisma.TransactionClient, findFirst };
   };
+  const managerInput = { baseSource: 'REGISTRATION', isTeamManager: true } as const;
 
   it('팀장·매니저가 참가 명단 기준 경기를 보면 그 팀의 confirmed 신청 id 를 준다', async () => {
-    const { tx, findFirst } = registrationTx('reg-1');
-    await expect(loadJerseyRegistrationId(tx, scope, { baseSource: 'REGISTRATION', isTeamManager: true })).resolves.toBe('reg-1');
-    expect(findFirst).toHaveBeenCalledWith({
-      where: { tournamentId: 'cup', teamId: 'team-A', status: 'confirmed' },
-      select: { id: true },
-    });
+    const { tx, findFirst } = registrationTx(registrationRow());
+    await expect(loadJerseyRegistration(tx, scope, managerInput)).resolves.toEqual({ id: 'reg-1', editable: true });
+    expect(findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { tournamentId: 'cup', teamId: 'team-A', status: 'confirmed' } }),
+    );
+  });
+
+  it('명단이 잠겼거나 제출 마감이 지나면 저장이 409 라 편집을 막는다(2026-10 알파 실측)', async () => {
+    await expect(
+      loadJerseyRegistration(registrationTx(registrationRow({ rosterLockedAt: new Date() })).tx, scope, managerInput),
+    ).resolves.toEqual({ id: 'reg-1', editable: false });
+    const pastDeadline = { ...openTournament, rosterDeadlineAt: new Date('2020-01-01T00:00:00Z') };
+    await expect(
+      loadJerseyRegistration(registrationTx(registrationRow({ tournament: pastDeadline })).tx, scope, managerInput),
+    ).resolves.toEqual({ id: 'reg-1', editable: false });
   });
 
   it('팀장이 아닌 뷰어(팀원·운영자)에게는 신청이 있어도 주지 않고 조회도 하지 않는다', async () => {
-    const { tx, findFirst } = registrationTx('reg-1');
-    await expect(loadJerseyRegistrationId(tx, scope, { baseSource: 'REGISTRATION', isTeamManager: false })).resolves.toBeNull();
+    const { tx, findFirst } = registrationTx(registrationRow());
+    await expect(loadJerseyRegistration(tx, scope, { baseSource: 'REGISTRATION', isTeamManager: false })).resolves.toBeNull();
     expect(findFirst).not.toHaveBeenCalled();
   });
 
   it('참가 명단이 없어 팀원 전체가 기준인 팀은 고칠 원본이 없어 팀장에게도 null 이다', async () => {
-    const { tx, findFirst } = registrationTx('reg-1');
-    await expect(loadJerseyRegistrationId(tx, scope, { baseSource: 'TEAM_MEMBERS', isTeamManager: true })).resolves.toBeNull();
+    const { tx, findFirst } = registrationTx(registrationRow());
+    await expect(loadJerseyRegistration(tx, scope, { baseSource: 'TEAM_MEMBERS', isTeamManager: true })).resolves.toBeNull();
     expect(findFirst).not.toHaveBeenCalled();
   });
 
   it('confirmed 신청이 그 사이 사라졌으면 null', async () => {
     const { tx } = registrationTx(null);
-    await expect(loadJerseyRegistrationId(tx, scope, { baseSource: 'REGISTRATION', isTeamManager: true })).resolves.toBeNull();
+    await expect(loadJerseyRegistration(tx, scope, managerInput)).resolves.toBeNull();
   });
 });

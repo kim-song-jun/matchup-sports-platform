@@ -67,6 +67,8 @@ function eventActionNoun(input: Pick<EventCaptureCommitInput, 'type' | 'payload'
   switch (input.type) {
     case 'GOAL':
       return { noun: '골', tone: 'default' };
+    case 'OWN_GOAL':
+      return { noun: '자책골', tone: 'default' };
     case 'CARD':
       // 요구사항 3 — 레드카드는 파급이 커서(퇴장) danger, 옐로카드는 기본 톤.
       return input.payload.card === 'RED' ? { noun: '레드카드', tone: 'danger' } : { noun: '옐로카드', tone: 'default' };
@@ -88,6 +90,13 @@ function eventTargetDescription(
   if (input.type === 'SUBSTITUTION') {
     const outId = typeof input.payload.outParticipantId === 'string' ? input.payload.outParticipantId : null;
     return `${side} · ${playerLabel(outId, lineups)} → ${playerLabel(input.participantId, lineups)}`;
+  }
+  if (input.type === 'OWN_GOAL') {
+    // sideId는 점수를 받는 상대 팀이다(action-target-picker가 귀속을 뒤집는다) —
+    // 자책골을 넣은 선수는 반대편 팀 소속이라 그 팀명을 앞에 붙인다.
+    const ownSide = sideLabel(sides.find((candidate) => candidate.id !== input.sideId)?.id, sides);
+    const scorer = input.participantId === undefined ? ownSide : `${ownSide} · ${playerLabel(input.participantId, lineups)}`;
+    return `${scorer} (${side} 득점)`;
   }
   if (input.participantId === undefined) {
     return `${side} (선수 지정 없이)`;

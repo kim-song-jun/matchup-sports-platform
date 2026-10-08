@@ -505,7 +505,7 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
   const gameEnded = gameState === 'ENDED';
   const resultRevisions = useV1GameResultRevisions(gameId, { enabled: gameEnded });
 
-  const confirmedPenalties = useMemo(() => {
+  const confirmedResultScore = useMemo(() => {
     if (!gameEnded) return null;
     const revisions = resultRevisions.data ?? [];
     if (revisions.length === 0) return null;
@@ -522,8 +522,22 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
     // 화면이 공식 결과와 다른 값을 단언하게 된다. 결과 표시에서 그건 빈 칸보다 나쁘다.
     const officialId = gameDetail.data?.currentOfficialRevisionId ?? null;
     const chosen = officialId ? revisions.find((revision) => revision.id === officialId) : revisions[0];
-    return readGameResultScore(chosen?.score)?.penalties ?? null;
+    return readGameResultScore(chosen?.score);
   }, [gameEnded, resultRevisions.data, gameDetail.data?.currentOfficialRevisionId]);
+  const confirmedPenalties = confirmedResultScore?.penalties ?? null;
+
+  /* 헤더 스코어. 경기 중에는 이벤트 파생값이지만, 종료 후 결과 검수에서 "고치고 확인"으로
+   * 점수를 정정하면 이벤트 로그는 그대로라 헤더만 옛 점수(알파 실측 2:0 → 정정 3:0)로
+   * 남았다 — 결과 리비전이 있으면 그 점수를 따른다. */
+  const headerScoreBySideId = useMemo(() => {
+    if (confirmedResultScore === null) return scoreBySideId;
+    return new Map(
+      (gameDetail.data?.sides ?? []).map((side) => [
+        side.id,
+        side.sideKey === 'HOME' ? confirmedResultScore.home : confirmedResultScore.away,
+      ]),
+    );
+  }, [confirmedResultScore, gameDetail.data?.sides, scoreBySideId]);
 
   /**
    * F66 fix: 결과가 실제로 OFFICIAL(확정)까지 갔는지 — 게임이 끝났다고 곧바로
@@ -1375,7 +1389,7 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
               <span className="text-xs font-semibold text-[var(--text-muted)]">스코어</span>
               <span
                 className="flex items-center gap-2 text-4xl font-extrabold leading-none tabular-nums text-[var(--text-strong)]"
-                aria-label={`스코어 ${sides.map((side) => `${side.displayNameSnapshot} ${scoreBySideId.get(side.id) ?? 0}점`).join(', ')}`}
+                aria-label={`스코어 ${sides.map((side) => `${side.displayNameSnapshot} ${headerScoreBySideId.get(side.id) ?? 0}점`).join(', ')}`}
               >
                 {/* 점수 문자열("2 : 1")은 한 텍스트 노드로 유지한다 — 숫자 사이에
                     엘리먼트를 끼우면 화면은 같아 보여도 점수를 읽는 쪽(스크린리더,
@@ -1385,7 +1399,7 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
                   aria-hidden="true"
                   className="h-2.5 w-2.5 shrink-0 rounded-full bg-[var(--blue500)]"
                 />
-                <span>{sides.map((side) => scoreBySideId.get(side.id) ?? 0).join(' : ')}</span>
+                <span>{sides.map((side) => headerScoreBySideId.get(side.id) ?? 0).join(' : ')}</span>
                 {sides.length > 1 ? (
                   <span
                     aria-hidden="true"

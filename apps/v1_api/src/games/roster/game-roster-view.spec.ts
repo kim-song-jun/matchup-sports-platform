@@ -126,7 +126,7 @@ describe('buildGameRosterView', () => {
       computation,
       fixtureSnapshotUserIds: new Set(['u1', 'u2', 'u3', 'u4']),
       legacyLineupPending: false,
-      jerseyRegistrationId: 'reg-1',
+      jerseyRegistration: { id: 'reg-1', editable: true },
       displayNameByUserId: new Map([
         ['mgr', '팀장'],
         ['ops', '운영자'],
@@ -202,14 +202,22 @@ describe('buildGameRosterView', () => {
       gameStartAt: KICKOFF,
       suspensionVerdicts: new Map(),
     });
-    const result = view({ base: [fallbackEntry], computation: fallback, baseSource: 'TEAM_MEMBERS', jerseyRegistrationId: null });
+    const result = view({ base: [fallbackEntry], computation: fallback, baseSource: 'TEAM_MEMBERS', jerseyRegistration: null });
     expect(result.base[0].participantId).toBeNull();
     expect(result.participants[0].participantId).toBeNull();
   });
 
   it('등번호 원본 신청 id 는 입력값 그대로 싣는다(팀원 기준 폴백·팀장이 아닌 뷰어는 null)', () => {
     expect(view().jerseyRegistrationId).toBe('reg-1');
-    expect(view({ jerseyRegistrationId: null }).jerseyRegistrationId).toBeNull();
+    expect(view({ jerseyRegistration: null }).jerseyRegistrationId).toBeNull();
+  });
+
+  it('잠긴 명단은 신청 id 는 그대로 주되(참가 명단 링크) 등번호 편집은 막는다', () => {
+    const locked = view({ jerseyRegistration: { id: 'reg-1', editable: false } });
+    expect(locked.jerseyRegistrationId).toBe('reg-1');
+    expect(locked.jerseyEditable).toBe(false);
+    expect(view().jerseyEditable).toBe(true);
+    expect(view({ jerseyRegistration: null }).jerseyEditable).toBe(false);
   });
 
   it('편집 가능 = 쓰기 권한 있음 AND 경기 시작 전', () => {

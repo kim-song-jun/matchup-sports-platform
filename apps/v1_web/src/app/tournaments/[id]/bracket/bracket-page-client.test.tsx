@@ -830,8 +830,9 @@ describe('BracketPageContent — 정규 리그 거울 행(format=group_knockout,
   it('진행 방식 배지를 "리그 방식"으로 적는다 — format 을 그대로 읽으면 "조별리그 + 토너먼트"가 된다', () => {
     const { container } = renderBracketPage(mirrorLeague());
 
-    // 단계 표시기에도 "리그 방식" 칸이 있어 getByText 는 2건을 문다 — 헤더 배지로 좁힌다.
     expect(container.querySelector('.tm-bracket-page-format')).toHaveTextContent('리그 방식');
+    // 단계 표시기 칸은 "풀리그"다 — 배지와 같은 말이 헤더에 두 번 나오지 않는다(2026-10 알파 실측).
+    expect(screen.getAllByText('리그 방식')).toHaveLength(1);
     expect(screen.queryByText('조별리그 + 토너먼트')).not.toBeInTheDocument();
   });
 

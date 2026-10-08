@@ -130,7 +130,7 @@ function useChatListPageModel(): ChatListViewModel {
     })),
     pinnedRooms: visibleRooms.filter((room) => room.pinned),
     rooms: visibleRooms.filter((room) => !room.pinned),
-    status: isError ? 'error' : query.isPending ? 'loading' : 'ready',
+    status: isError ? 'error' : query.isPending || (activeQuery.isPending && visibleRooms.length === 0) ? 'loading' : 'ready',
     emptyTitle: isError ? '채팅방을 불러오지 못했어요' : isEmpty ? `${selectedCategory} 채팅방이 없어요` : undefined,
     emptyBody: isError ? extractErrorMessage(listError, '잠시 후 다시 시도해 주세요.') : isEmpty ? '매치에 참가하거나 팀에 가입하면 채팅방이 생겨요.' : undefined,
     emptyHref: isError || selectedCategory === '팀' || selectedCategory === '팀컨택' ? undefined : '/matches',

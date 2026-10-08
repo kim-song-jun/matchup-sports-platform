@@ -6,7 +6,10 @@ import type { ReactNode } from 'react';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ChatListPageClient, ChatRoomPageClient } from '@/components/community/community-api-clients';
 import { createV1QueryClient } from '@/lib/query-client';
-import type { V1ChatMessage, V1ChatRoom, V1ChatRoomDetail } from '@/types/api';
+import type { V1ChatRoomDetail } from '@/types/api';
+import {
+  api, archived, deferredMatchCategoryHandler, failedRead, matchRoom, message, messages, room,
+} from './use-v1-api.chat-refresh-consumer.fixtures';
 
 const navigation = vi.hoisted(() => ({ search: '', pathname: '/chat' }));
 vi.mock('next/navigation', () => ({
@@ -17,28 +20,6 @@ vi.mock('next/navigation', () => ({
 // Keep real query and consumer hooks; only the external socket connection is replaced.
 vi.mock('@/lib/v1-socket', () => ({ getV1Socket: () => ({ on: vi.fn(), off: vi.fn() }) }));
 
-const api = 'http://localhost/api/v1';
-const room: V1ChatRoom = {
-  roomId: 'room-1', roomType: 'team', title: '우리 팀', status: 'active',
-  teamContact: null, linkedTarget: { type: 'team', id: 'team-1', title: '우리 팀', route: '/teams/team-1' },
-  linkedTargetCancelled: false, lastMessage: null, unreadCount: 0, pinned: false, muted: false,
-};
-const archived: V1ChatRoom = {
-  ...room, roomId: 'room-archived', roomType: 'team_contact', status: 'archived', title: '종료된 컨택',
-  teamContact: {
-    contactId: 'contact-1', status: 'withdrawn', expiresAt: '2026-10-01T00:00:00Z', declineReason: null,
-    mySide: 'from', fromTeam: { id: 'team-1', name: '우리 팀' }, toTeam: { id: 'team-2', name: '상대 팀' },
-  },
-  linkedTarget: { type: 'team_contact', id: 'contact-1', title: '종료된 컨택', route: '/chat/room-archived' },
-};
-const message: V1ChatMessage = {
-  messageId: 'message-1', sender: { userId: 'user-2', displayName: '팀원', profileImageUrl: null },
-  content: '캐시에 남아 있는 대화', status: 'sent', sentAt: '2026-10-08T00:00:00Z', mine: false,
-};
-const messages = Array.from({ length: 20 }, (_, index) => ({
-  ...message, messageId: `message-${index + 1}`,
-  content: index === 0 ? message.content : `캐시 대화 ${index + 1}`,
-}));
 type FailedSurface = 'base' | 'filtered' | 'lists' | 'archived' | 'detail' | 'denied' | null;
 let failedSurface: FailedSurface = null;
 let serverPinned = false;
@@ -49,14 +30,6 @@ let holdFiltered = false;
 let releaseFiltered: (() => void) | undefined;
 const reads = { active: 0, archived: 0, base: 0, filtered: 0 };
 const clients: ReturnType<typeof createV1QueryClient>[] = [];
-
-function failedRead(denied = false) {
-  const statusCode = denied ? 403 : 503;
-  return HttpResponse.json({
-    status: 'error', statusCode, code: denied ? 'NOT_TEAM_MEMBER' : 'SERVICE_UNAVAILABLE',
-    message: denied ? '팀 멤버만 볼 수 있어요.' : '채팅 정보를 불러오지 못했어요.',
-  }, { status: statusCode });
-}
 
 const server = setupServer(
   http.get(`${api}/chat/rooms`, async ({ request }) => {
@@ -214,6 +187,27 @@ describe('chat list refresh failure with cached rooms', () => {
     fireEvent.click(pane.getByRole('button', { name: /^전체(?: \d+)?$/ }));
     expect(pane.queryByRole('alert')).not.toBeInTheDocument();
     expect(pane.getByText('최신 팀')).toBeVisible();
+  });
+
+  it('waits for a category outside the cached first page without showing a false empty state or CTA', async () => {
+    // Given: the first 50 rooms are teams, while a match room exists beyond that page.
+    server.use(deferredMatchCategoryHandler((release) => { releaseFiltered = release; }));
+    const { container, client } = renderConsumer(<ChatListPageClient />);
+    const pane = mobilePane(container);
+    await waitFor(() => expect(pane.getByRole('button', { name: '전체 50' })).toBeVisible());
+    await waitFor(() => expect(client.isFetching()).toBe(0));
+
+    // When: the category's first actual HTTP response remains pending without fallback rows.
+    fireEvent.click(pane.getByRole('button', { name: /^개인매치(?: \d+)?$/ }));
+    await waitFor(() => expect(releaseFiltered).toBeTypeOf('function'));
+
+    // Then: the list stays undecided until the server returns its real category rows.
+    expect(pane.queryByText('개인매치 채팅방이 없어요')).not.toBeInTheDocument();
+    expect(pane.queryByRole('link', { name: '매치 찾아보기' })).not.toBeInTheDocument();
+    await act(async () => { releaseFiltered?.(); });
+    await waitFor(() => expect(pane.getByText(matchRoom.title)).toBeVisible());
+    expect(pane.queryByText('개인매치 채팅방이 없어요')).not.toBeInTheDocument();
+    expect(pane.queryByRole('link', { name: '매치 찾아보기' })).not.toBeInTheDocument();
   });
 
   it('keeps cached fallback rows without stacking a skeleton during a delayed new filter load', async () => {

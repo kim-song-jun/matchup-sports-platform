@@ -203,7 +203,7 @@ describe('Tournament draft custom periods survive HTTP re-save', () => {
       const { id, updatedAt } = await createFutsal('종목 변경 대진 잠금 초안');
       const before = await prisma.v1Tournament.findUniqueOrThrow({ where: { id } });
       const match = await prisma.v1TeamMatch.create({
-        data: { tournamentId: id, sportId, platformManaged: true, title: '종목 변경 잠금 경기', status: 'scheduled' },
+        data: { tournamentId: id, sportId, platformManaged: true, title: '종목 변경 잠금 경기' },
       });
       await prisma.v1TournamentMatchDetails.create({ data: { teamMatchId: match.id, tournamentId: id, round: 'final', fixtureNumber: 1 } });
 

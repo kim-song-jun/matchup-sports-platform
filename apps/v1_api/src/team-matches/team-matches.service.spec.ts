@@ -602,6 +602,75 @@ describe('TeamMatchesService', () => {
     expect(result.items[0]).toMatchObject({ relation: 'host_team', manageRoute: null });
   });
 
+  it('myTeamMatches: created returns a platform recruitment before a host team is assigned', async () => {
+    // Given the persisted shape produced by AdminTeamMatchRecruitmentsService.create.
+    prisma.v1TeamMembership.findMany.mockResolvedValue([]);
+    prisma.v1TeamMatch.findMany.mockResolvedValue([{
+      ...teamMatchRow({ hostTeamId: null, platformManaged: true, tournamentId: null }),
+      sport: { name: '풋살' },
+      hostTeam: null,
+      league: null,
+      applications: [],
+    }]);
+
+    // When the creator opens their created-match history.
+    const result = await service.myTeamMatches(manager, { scope: 'created' });
+
+    // Then the real recruitment remains visible without inventing a team or granting management.
+    expect(result.items).toEqual([expect.objectContaining({
+      teamMatchId: 'tm-1',
+      startsAt: FUTURE,
+      relation: 'created_by_me',
+      teamId: null,
+      teamName: null,
+      manageRoute: null,
+      detailRoute: '/team-matches/tm-1',
+    })]);
+  });
+
+  it('myTeamMatches: applied keeps the applicant team context before the platform assigns a host', async () => {
+    // Given an active team with a pending application to a platform recruitment.
+    prisma.v1TeamMembership.findMany.mockResolvedValue([{ teamId: 'team-applicant', role: 'member' }]);
+    prisma.v1TeamMatch.findMany.mockResolvedValue([{
+      ...teamMatchRow({ hostTeamId: null, platformManaged: true, tournamentId: null }),
+      sport: { name: '풋살' },
+      hostTeam: null,
+      league: null,
+      applications: [{ ...applicationRow(), applicantTeam: { id: 'team-applicant', name: '망원 FC' } }],
+    }]);
+
+    // When a member opens their team's application history.
+    const result = await service.myTeamMatches(manager, { scope: 'applied' });
+
+    // Then the unassigned host does not hide the application or grant a host management action.
+    expect(result.items).toEqual([expect.objectContaining({
+      relation: 'requested', teamId: 'team-applicant', teamName: '망원 FC',
+      applicationId: 'app-1', manageRoute: null,
+    })]);
+  });
+
+  it.each([
+    { condition: 'a non-platform recruitment without a host', overrides: { hostTeamId: null, platformManaged: false } },
+    { condition: 'a platform recruitment without a start time', overrides: { hostTeamId: null, platformManaged: true, startAt: null } },
+    { condition: 'a platform recruitment with a mismatched host relation', overrides: { hostTeamId: 'team-host', platformManaged: true } },
+  ])('myTeamMatches: created preserves the integrity error for $condition', async ({ overrides }) => {
+    // Given an invalid persisted recruitment, rather than the supported platform no-host state.
+    prisma.v1TeamMembership.findMany.mockResolvedValue([]);
+    prisma.v1TeamMatch.findMany.mockResolvedValue([{
+      ...teamMatchRow({ ...overrides, tournamentId: null }),
+      sport: { name: '풋살' },
+      hostTeam: null,
+      league: null,
+      applications: [],
+    }]);
+
+    // When the creator queries the list, then the API keeps its actionable integrity failure.
+    await expect(service.myTeamMatches(manager, { scope: 'created' })).rejects.toMatchObject({
+      response: { code: 'TEAM_MATCH_OPERATIONAL_DATA_INVALID' },
+      status: 409,
+    });
+  });
+
   it('myTeamMatches: 현재 owner인 생성자의 관리 경로는 실제 상세 라우트로 연결한다', async () => {
     prisma.v1TeamMembership.findMany.mockResolvedValue([{ teamId: 'team-host', role: 'owner' }]);
     prisma.v1TeamMatch.findMany.mockResolvedValue([
@@ -1797,6 +1866,7 @@ describe('TeamMatchesService', () => {
         status: 'recruiting',
         startAt: FUTURE,
         hostTeamId: null,
+        platformManaged: true,
         createdByUserId: 'admin-user',
         leagueId: null,
         tournamentId: null,

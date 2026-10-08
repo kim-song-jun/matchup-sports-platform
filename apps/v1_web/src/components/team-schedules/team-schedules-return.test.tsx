@@ -136,6 +136,46 @@ async function goBack(action: string) {
 function params() { return new URL(navigation.path, 'https://teameet.example').searchParams; }
 
 describe('MD-QA #45 — 팀 일정 실제 상세 복귀', () => {
+  it.each([
+    { initialQuery: 'type=EVENT', label: '훈련', param: 'type', value: 'TRAINING', oldTitle: '팀 행사', newTitle: '10월 훈련' },
+    { initialQuery: 'state=SCHEDULED', label: '취소됨', param: 'state', value: 'CANCELLED', oldTitle: '10월 훈련', newTitle: '취소된 훈련' },
+  ])('지연된 $param 응답 중 이전 카드의 상세 진입을 막고 새 $value 카드의 복귀 조건을 유지한다', async ({ initialQuery, label, param, value, oldTitle, newTitle }) => {
+    // Given: 실제 query가 보관한 이전 결과와 아직 응답하지 않은 새 필터 HTTP 요청.
+    let release = () => {};
+    const delayed = new Promise<void>((resolve) => { release = resolve; });
+    let requestStarted = false;
+    server.use(http.get('*/api/v1/teams/:teamId/schedules', async ({ request }) => {
+      const url = new URL(request.url); requests.push(url);
+      if (url.searchParams.get(param) === value) { requestStarted = true; await delayed; }
+      return ok({ items: schedules.filter((item) => (!url.searchParams.get('type') || item.type === url.searchParams.get('type'))
+        && (!url.searchParams.get('state') || item.state === url.searchParams.get('state'))), nextCursor: null });
+    }));
+    renderRoute(`${LIST}?${initialQuery}`);
+    await screen.findByRole('link', { name: new RegExp(oldTitle) }); await idle();
+
+    try {
+      // When: 조건은 바뀌었지만 새 API 응답은 계속 지연한다.
+      await userEvent.click(screen.getByRole('button', { name: label }));
+      await waitFor(() => expect(requestStarted).toBe(true));
+      expect(client.isFetching()).toBe(1);
+      expect(params().get(param)).toBe(value);
+
+      // Then: 이전 카드로 새 목록에 잘못 복귀하는 진입점을 남기지 않는다.
+      expect(screen.queryByRole('link', { name: new RegExp(oldTitle) })).not.toBeInTheDocument();
+      expect(screen.queryByText('조건에 맞는 일정이 없어요')).not.toBeInTheDocument();
+      release();
+      await userEvent.click(await screen.findByRole('link', { name: new RegExp(newTitle) }));
+      await screen.findByRole('heading', { name: newTitle });
+      await goBack('header Back'); await screen.findByRole('heading', { name: '합성 복귀 팀 · 일정' }); await idle();
+      expect(screen.getByRole('button', { name: label })).toHaveAttribute('aria-pressed', 'true');
+      expect(params().get(param)).toBe(value);
+      expect(screen.getByRole('link', { name: new RegExp(newTitle) })).toBeInTheDocument();
+      expect(screen.queryByRole('link', { name: new RegExp(oldTitle) })).not.toBeInTheDocument();
+    } finally {
+      release(); await idle();
+    }
+  });
+
   it.each([LIST, `${LIST}?type=TRAINING&state=SCHEDULED`])('실제 history의 %s에서 헤더 복귀 후 browser Back 한 번으로 이전 home에 돌아간다', async (entry) => {
     // Given: 실제 추적기가 관리하는 home → month 없는 목록 → 상세 이력.
     renderRoute('/home'); act(() => navigation.navigate(entry));

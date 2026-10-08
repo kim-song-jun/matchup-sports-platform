@@ -67,3 +67,10 @@ managedWT는 fetch직후 origin/dev5948dfd6 기준. 다른 독립PR/peerQA 진�
 - Independent review a19250 actual findings: 초기 bare 또는 shared-filter-no-month entry와 카드 from 강제 month가 달라 actual AppBackLink가 replace하여 이전 목록 이력 중복. 신규 실제 installNavigationHistory/native history2cases RED2 FAIL → GREEN 관련 return16+empty14+route29=59/59. from을 동일 team의 실제 live entry/query/hash에 맞추고 SSR queryString 유지, 선택/local draft/native replace 계약은 보존.
 - Test typecheck11 errors(getByRole/findByRole exact:true) 제거. 해당 API의 기본 exact string 의미는 유지. 신규 href non-null assertion은 typed HTMLAnchorElement로 제거하고 path/from assertion 유지.
 - Root의 이전 committed14 PASS 뒤 tsc FAIL을 성공으로 표시하지 않음. 해당 test-only 타입 실패와 실제 리뷰 findings를 수정한 새 HEAD에서 committed tsc/pattern/독립 리뷰를 다시 수행해야 함. alpha after는 여전히 pending.
+
+### PR 게시 및 실제 리뷰 후속 — 2026-10-08 17:31 KST
+- PR https://github.com/kim-song-jun/matchup-sports-platform/pull/1666, head6dcf18260771327f1a2ecfa777a053c91a31912f, base dev11249574. 원 리포트 댓글1 저장 성공·표시 증거 report45-pr-comment-confirmed.txt/png.
+- 실제 P2 PRRT_kwDORrML2s6qQ1_A: 이전 필터 placeholder 카드가 새 필터 from으로 상세에 진입하여 복귀 시 해당 카드가 사라짐. 실제 delayed HTTP EVENT→TRAINING, SCHEDULED→CANCELLED 소비자 회귀2/2 RED 확정.
+- 기존 PageSkeleton loading 조건에 query.isPlaceholderData를 추가하는1줄 수정으로 잘못된 이전 카드 진입만 응답 대기 중 차단. 오류/필터/캘린더/이력/빈 결과 계약 유지.
+- Worker GREEN return18+empty14+기존route29=61/61, 최소 worker, mock hook 없는 실제 query/HTTP. Root scoped commit 후 committed 타입/패턴/회귀와 새 exact head 독립 리뷰·동일 PR push·답변·재리뷰 진행.
+- alpha after는 dev 머지·해당 수정 SHA 배포 대기이며 코드 검증과 구분한다.

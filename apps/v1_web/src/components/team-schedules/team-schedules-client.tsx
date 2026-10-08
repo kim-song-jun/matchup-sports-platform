@@ -223,7 +223,7 @@ export function TeamScheduleListPageClient({ teamId }: { teamId: string }) {
     onNextMonth: () => changeNavigation({ monthDate: new Date(draft.current.monthDate.getFullYear(), draft.current.monthDate.getMonth() + 1, 1) }),
     items: listItems,
     visibleItems,
-    loading: query.isLoading,
+    loading: query.isLoading || query.isPlaceholderData,
     error: query.isError,
     onRetry: () => void query.refetch(),
     emptyTitle: hasSelectedDate ? '선택한 날짜에 일정이 없어요'

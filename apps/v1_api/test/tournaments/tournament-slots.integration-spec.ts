@@ -1,3 +1,5 @@
+import type { Prisma } from '@prisma/client';
+import { lockCompetitionForBracketMutationInTx } from '../../src/tournaments/slots/competition-bracket-lock';
 import { PrismaService } from '../../src/prisma/prisma.service';
 import { AdminContextService } from '../../src/common/admin-context.service';
 import { OperationAuditWriterService } from '../../src/common/audit/operation-audit-writer.service';
@@ -5,7 +7,7 @@ import { GamesService } from '../../src/games/games.service';
 import { GameTakeoverService } from '../../src/games/game-takeover.service';
 import { BracketTemplateService } from '../../src/tournaments/templates/bracket-template.service';
 import { TournamentBracketService } from '../../src/tournaments/tournament-bracket.service';
-import { TournamentSlotService } from '../../src/tournaments/slots/tournament-slot.service';
+import { assignSlotInTx, assignSlotsBatchInTx, TournamentSlotService, type SlotMutationContext } from '../../src/tournaments/slots/tournament-slot.service';
 import { competitionConfigFixture as ids, seedCompetitionConfigFixture } from '../fixtures/competition-config.fixture';
 import { seedBracketTournament, type SeededBracketTournament } from '../helpers/bracket-canvas-fixture';
 
@@ -286,6 +288,103 @@ describe('자리 배정 (PostgreSQL)', () => {
       await slots.assignSlot(user, bye.id, registrationIds[1]);
       await expect(slots.assignSlot(user, (await slotAt(tournamentId, 2, 'ENTRY')).id, registrationIds[1]))
         .rejects.toMatchObject({ response: { code: 'SLOT_TEAM_ALREADY_PLACED' } });
+    });
+  });
+
+  async function inLane<T>(tournamentId: string, run: (tx: Prisma.TransactionClient, ctx: SlotMutationContext) => Promise<T>) {
+    const admin = await adminContext.getMutationAdmin(user.id);
+    return prisma.$transaction(async (tx) => {
+      await lockCompetitionForBracketMutationInTx(tx, { id: tournamentId, kind: 'regular_tournament' });
+      return run(tx, { admin, adminContext, games });
+    }, { timeout: 45_000 });
+  }
+  const placedBySlot = async (tournamentId: string) =>
+    (await prisma.v1TournamentSlot.findMany({ where: { tournamentId, kind: { in: ['ENTRY', 'BYE'] } } }))
+      .map((s) => s.registrationId).filter((r): r is string => r !== null);
+
+  describe('배치 변경(batch)', () => {
+    it('A↔B 맞바꾸기는 비우기 먼저라 충돌 없이 끝나고 편성은 그대로, 경기 사이드만 뒤집힌다', async () => {
+      const { tournamentId, registrationIds, teamIds } = await leagueOf4('batch-swap');
+      const [slot1, slot2] = [await slotAt(tournamentId, 1), await slotAt(tournamentId, 2)];
+      await slots.assignSlot(user, slot1.id, registrationIds[0]);
+      await slots.assignSlot(user, slot2.id, registrationIds[1]);
+      const groupBefore = await prisma.v1TournamentGroupTeam.findMany({ where: { group: { tournamentId } }, orderBy: { sortOrder: 'asc' } });
+
+      await inLane(tournamentId, (tx, ctx) => assignSlotsBatchInTx(tx, ctx, [
+        { slotId: slot1.id, registrationId: registrationIds[1] },
+        { slotId: slot2.id, registrationId: registrationIds[0] },
+      ]));
+
+      const fresh = await prisma.v1TournamentSlot.findMany({ where: { id: { in: [slot1.id, slot2.id] } } });
+      expect(fresh.find((s) => s.id === slot1.id)!.registrationId).toBe(registrationIds[1]);
+      expect(fresh.find((s) => s.id === slot2.id)!.registrationId).toBe(registrationIds[0]);
+      const fixtures = await allFixtures(tournamentId);
+      for (const fixture of fixtures.filter((f) => [f.homeSlotId, f.awaySlotId].includes(slot1.id))) {
+        expect(sideTeam(fixture, slot1.id)).toBe(teamIds[1]);
+      }
+      const groupAfter = await prisma.v1TournamentGroupTeam.findMany({ where: { group: { tournamentId } }, orderBy: { sortOrder: 'asc' } });
+      expect(groupAfter.map((g) => g.id)).toEqual(groupBefore.map((g) => g.id)); // 지웠다 다시 만들지 않는다
+    });
+
+    it('대조군 — 같은 맞바꾸기를 하나씩 순서대로 하면 SLOT_TEAM_ALREADY_PLACED 로 막힌다', async () => {
+      const { tournamentId, registrationIds } = await leagueOf4('batch-control');
+      const [slot1, slot2] = [await slotAt(tournamentId, 1), await slotAt(tournamentId, 2)];
+      await slots.assignSlot(user, slot1.id, registrationIds[0]);
+      await slots.assignSlot(user, slot2.id, registrationIds[1]);
+      await expect(inLane(tournamentId, (tx, ctx) => assignSlotInTx(tx, ctx, slot1.id, registrationIds[1])))
+        .rejects.toMatchObject({ response: { code: 'SLOT_TEAM_ALREADY_PLACED' } });
+    });
+
+    it('같은 자리를 두 번 담으면 422 SLOT_CHANGE_DUPLICATED', async () => {
+      const { tournamentId, registrationIds } = await leagueOf4('batch-dup');
+      const slot1 = await slotAt(tournamentId, 1);
+      await expect(inLane(tournamentId, (tx, ctx) => assignSlotsBatchInTx(tx, ctx, [
+        { slotId: slot1.id, registrationId: registrationIds[0] }, { slotId: slot1.id, registrationId: registrationIds[1] },
+      ]))).rejects.toMatchObject({ response: { code: 'SLOT_CHANGE_DUPLICATED' } });
+    });
+  });
+
+  describe('무작위 채우기', () => {
+    it('팀이 자리보다 적으면 팀 수만큼만 중복 없이 채우고, 이미 배치된 팀은 그 자리에 남는다', async () => {
+      const { tournamentId, registrationIds } = await seedBracketTournament(prisma, { label: 'rf-few', format: 'knockout', teamCount: 5 });
+      await templates.apply(user, tournamentId, { kind: 'knockout', size: 8, thirdPlace: false });
+      const slot3 = await slotAt(tournamentId, 3);
+      await slots.assignSlot(user, slot3.id, registrationIds[0]);
+
+      const { assignments } = await slots.randomFill(user, tournamentId);
+
+      expect(assignments).toHaveLength(4); // 5팀 중 1팀은 이미 배치
+      const placed = await placedBySlot(tournamentId);
+      expect([...placed].sort()).toEqual([...registrationIds].sort()); // 5팀 모두, 한 번씩
+      expect((await prisma.v1TournamentSlot.findUniqueOrThrow({ where: { id: slot3.id } })).registrationId).toBe(registrationIds[0]);
+      expect(await prisma.v1TournamentSlot.count({ where: { tournamentId, kind: 'ENTRY', registrationId: null } })).toBe(3);
+    });
+
+    it('팀이 자리보다 많으면 자리를 다 채우고 남는 팀은 배치하지 않는다', async () => {
+      const { tournamentId, registrationIds } = await seedBracketTournament(prisma, { label: 'rf-many', format: 'knockout', teamCount: 6 });
+      await templates.apply(user, tournamentId, { kind: 'knockout', size: 4, thirdPlace: false });
+      const { assignments } = await slots.randomFill(user, tournamentId);
+      expect(assignments).toHaveLength(4);
+      const placed = await placedBySlot(tournamentId);
+      expect(new Set(placed).size).toBe(4);
+      for (const id of placed) expect(registrationIds).toContain(id);
+      expect((await slots.randomFill(user, tournamentId)).assignments).toEqual([]); // 빈 자리가 없다
+    });
+
+    it('확정이 아닌 등록은 뽑지 않는다', async () => {
+      const { tournamentId, registrationIds } = await seedBracketTournament(prisma, { label: 'rf-unconfirmed', format: 'knockout', teamCount: 3 });
+      await templates.apply(user, tournamentId, { kind: 'knockout', size: 8, thirdPlace: false });
+      await prisma.v1TournamentRegistration.update({ where: { id: registrationIds[2] }, data: { status: 'cancelled' } });
+      const { assignments } = await slots.randomFill(user, tournamentId);
+      expect(assignments.map((a) => a.registrationId).sort()).toEqual([registrationIds[0], registrationIds[1]].sort());
+    });
+
+    it('정규 리그는 409 SLOT_LEAGUE_NOT_SUPPORTED_YET, 없는 대회는 404', async () => {
+      const league = await prisma.v1Tournament.create({
+        data: { sportId: ids.soccerSportId, title: 'rf-league', status: 'draft', kind: 'regular_league', competitionConfigVersionId: '11111111-1111-4111-8111-111111111111' },
+      });
+      await expect(slots.randomFill(user, league.id)).rejects.toMatchObject({ response: { code: 'SLOT_LEAGUE_NOT_SUPPORTED_YET' } });
+      await expect(slots.randomFill(user, '00000000-0000-4000-8000-00000000dead')).rejects.toMatchObject({ response: { code: 'TOURNAMENT_NOT_FOUND' } });
     });
   });
 });

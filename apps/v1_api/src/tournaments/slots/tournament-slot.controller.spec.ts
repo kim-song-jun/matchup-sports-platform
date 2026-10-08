@@ -11,4 +11,10 @@ describe('TournamentSlotController 라우트 계약', () => {
     expect(Reflect.getMetadata(METHOD_METADATA, handler)).toBe(RequestMethod.PUT);
     expect(Reflect.getMetadata(GUARDS_METADATA, TournamentSlotController)).toContain(V1AuthGuard);
   });
+
+  it('POST admin/tournaments/:tournamentId/slots/random-fill', () => {
+    const handler = TournamentSlotController.prototype.randomFill;
+    expect(Reflect.getMetadata(PATH_METADATA, handler)).toBe('admin/tournaments/:tournamentId/slots/random-fill');
+    expect(Reflect.getMetadata(METHOD_METADATA, handler)).toBe(RequestMethod.POST);
+  });
 });

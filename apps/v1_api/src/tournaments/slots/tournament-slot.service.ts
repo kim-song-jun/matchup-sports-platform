@@ -1,3 +1,4 @@
+import { randomInt } from 'node:crypto';
 import { ConflictException, Injectable, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
 import { Prisma, type V1CompetitionKind, type V1TournamentSlotKind } from '@prisma/client';
 import type { V1AuthUser } from '../../auth/v1-auth-user';
@@ -10,6 +11,7 @@ import { adminBracketSlotInclude, serializeAdminBracketSlot } from './admin-brac
 import { ALL_COMPETITION_KINDS, findTournamentOnSurface } from '../tournament-surface-lookup';
 import { syncByeSlotInTx } from './bye-slot-sync';
 import { lockCompetitionForBracketMutationInTx } from './competition-bracket-lock';
+import { pickRandomAssignments } from './random-assignment';
 import { assertSlotFixturesNotStarted, loadSlotUsingFixtures, sidesUsingSlot } from './slot-fixtures';
 
 type Tx = Prisma.TransactionClient;
@@ -147,6 +149,56 @@ export async function assignSlotInTx(
   return fixtureIds;
 }
 
+export type SlotChange = { slotId: string; registrationId: string | null };
+
+/**
+ * 여러 자리를 한 번에 바꾼다(맞바꾸기·무작위 채우기·순위대로 채우기). 바뀔 자리를 **먼저 모두 비운 뒤** 새 값을
+ * 넣어 같은 팀이 두 자리에 겹치는 순간을 만들지 않고, 이전 팀의 조 편성 해제는 마지막에 한 번만 판정한다.
+ * `assignSlotInTx` 와 같이 호출자가 레인 잠금을 이미 잡은 트랜잭션에서 부른다.
+ */
+export async function assignSlotsBatchInTx(
+  tx: Tx,
+  ctx: SlotMutationContext,
+  changes: readonly SlotChange[],
+): Promise<string[]> {
+  if (changes.length === 0) return [];
+  const slotIds = changes.map((change) => change.slotId);
+  if (new Set(slotIds).size !== slotIds.length) {
+    throw new UnprocessableEntityException({ code: 'SLOT_CHANGE_DUPLICATED', message: '같은 자리를 한 번에 두 번 바꿀 수 없어요.' });
+  }
+  const rows = await tx.v1TournamentSlot.findMany({
+    where: { id: { in: slotIds } },
+    select: { id: true, tournamentId: true, registrationId: true },
+  });
+  if (rows.length !== slotIds.length) throw slotNotFound();
+  const tournamentIds = new Set(rows.map((row) => row.tournamentId));
+  if (tournamentIds.size > 1) {
+    throw new UnprocessableEntityException({ code: 'SLOT_CHANGE_CROSS_TOURNAMENT', message: '한 번에 한 대회의 자리만 바꿀 수 있어요.' });
+  }
+  const tournamentId = rows[0].tournamentId;
+  const current = new Map(rows.map((row) => [row.id, row.registrationId]));
+  const ordered = [...changes].sort((a, b) => (a.slotId < b.slotId ? -1 : a.slotId > b.slotId ? 1 : 0));
+
+  // 게임 행을 한꺼번에 id 순으로 잡아 자리마다 따로 잡을 때 생기는 순서 뒤섞임을 없앤다.
+  const fixtures = await loadSlotUsingFixtures(tx, slotIds);
+  await lockGameRows(tx, fixtures.flatMap((fixture) => (fixture.game === null ? [] : [fixture.game.id])));
+
+  const releases: GroupTeamRelease[] = [];
+  const affected = new Set<string>();
+  for (const change of ordered) {
+    const before = current.get(change.slotId) ?? null;
+    if (before !== null && before !== change.registrationId) {
+      (await assignSlotCore(tx, ctx, change.slotId, null, releases)).fixtureIds.forEach((id) => affected.add(id));
+    }
+  }
+  for (const change of ordered) {
+    if (change.registrationId === null) continue;
+    (await assignSlotCore(tx, ctx, change.slotId, change.registrationId, releases)).fixtureIds.forEach((id) => affected.add(id));
+  }
+  await releaseGroupTeams(tx, ctx, tournamentId, releases);
+  return [...affected].sort();
+}
+
 @Injectable()
 export class TournamentSlotService {
   constructor(
@@ -180,6 +232,39 @@ export class TournamentSlotService {
       const affectedTeamMatchIds = await assignSlotInTx(tx, this.context(admin), slotId, registrationId);
       const row = await tx.v1TournamentSlot.findUniqueOrThrow({ where: { id: slotId }, include: adminBracketSlotInclude });
       return { slot: serializeAdminBracketSlot(row), affectedTeamMatchIds };
+    }, SLOT_TRANSACTION_OPTIONS);
+  }
+
+  async randomFill(user: V1AuthUser, competitionId: string) {
+    const admin = await this.adminContext.getMutationAdmin(user.id);
+    const competition = await this.loadCompetition(this.prisma, competitionId);
+    assertTournamentLane(competition.kind);
+    return this.prisma.$transaction(async (tx) => {
+      await lockCompetitionForBracketMutationInTx(tx, competition);
+      // 잠금 안에서 다시 읽는다 — 화면이 본 빈 자리가 아니라 지금의 빈 자리·미배치 팀이 기준이다.
+      const slotRows = await tx.v1TournamentSlot.findMany({
+        where: { tournamentId: competition.id, kind: { in: ['ENTRY', 'BYE'] } },
+        select: { id: true, registrationId: true },
+        orderBy: { id: 'asc' },
+      });
+      const placed = slotRows.flatMap((row) => (row.registrationId === null ? [] : [row.registrationId]));
+      const candidates = await tx.v1TournamentRegistration.findMany({
+        where: { tournamentId: competition.id, status: 'confirmed', id: { notIn: placed } },
+        select: { id: true },
+        orderBy: { id: 'asc' },
+      });
+      const assignments = pickRandomAssignments(
+        slotRows.filter((row) => row.registrationId === null).map((row) => row.id),
+        candidates.map((candidate) => candidate.id),
+        randomInt,
+      );
+      await assignSlotsBatchInTx(tx, this.context(admin), assignments);
+      await this.adminContext.logAdminAction(
+        admin,
+        { action: 'tournament.slot.random_fill', targetType: 'tournament', targetId: competition.id, afterJson: { assignments } },
+        tx,
+      );
+      return { assignments };
     }, SLOT_TRANSACTION_OPTIONS);
   }
 }

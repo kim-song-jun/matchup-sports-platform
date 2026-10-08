@@ -1,4 +1,4 @@
-import { Body, Controller, Param, Put, UseGuards } from '@nestjs/common';
+import { Body, Controller, Param, Post, Put, UseGuards } from '@nestjs/common';
 import { CurrentUser } from '../../auth/current-user.decorator';
 import { V1AuthGuard } from '../../auth/v1-auth.guard';
 import type { V1AuthUser } from '../../auth/v1-auth-user';
@@ -18,5 +18,10 @@ export class TournamentSlotController {
     @Body() dto: AssignSlotDto,
   ) {
     return this.slots.assignSlot(user, slotId, dto.registrationId);
+  }
+
+  @Post('admin/tournaments/:tournamentId/slots/random-fill')
+  randomFill(@CurrentUser() user: V1AuthUser, @Param('tournamentId') tournamentId: string) {
+    return this.slots.randomFill(user, tournamentId);
   }
 }

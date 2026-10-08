@@ -17,6 +17,8 @@ import { TournamentBracketController } from './tournament-bracket.controller';
 import { TournamentBracketService } from './tournament-bracket.service';
 import { BracketTemplateController } from './templates/bracket-template.controller';
 import { BracketTemplateService } from './templates/bracket-template.service';
+import { TournamentSlotController } from './slots/tournament-slot.controller';
+import { TournamentSlotService } from './slots/tournament-slot.service';
 import { LeagueFixtureGeneratorService } from './league-fixture-generator.service';
 import { TournamentPlayersController, TournamentPlayersAdminController } from './tournament-players.controller';
 import { TournamentPlayersService } from './tournament-players.service';
@@ -86,6 +88,7 @@ import { TeamCompetitionEntriesService } from './team-competition-entries.servic
     AdminRegistrationsController,
     TournamentBracketController,
     BracketTemplateController,
+    TournamentSlotController,
     TournamentPlayersController,
     TournamentPlayersAdminController,
     TournamentRegistrationsController,
@@ -104,6 +107,7 @@ import { TeamCompetitionEntriesService } from './team-competition-entries.servic
     AdminRegistrationsService,
     TournamentBracketService,
     BracketTemplateService,
+    TournamentSlotService,
     LeagueFixtureGeneratorService,
     TournamentPlayersService,
     TournamentsReadService,

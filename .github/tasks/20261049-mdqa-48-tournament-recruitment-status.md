@@ -59,3 +59,5 @@ serial 최소 worker slot root 승인 후만 실행. 최신 외부 리뷰 오류
 
 - 2026-10-08 Phase B 완료: 실제 카드 RED 3실패/11통과 → 전체48/48 GREEN(단일worker). API/공유helper/타입/MSW는 불변. IAB 인증 E2E관리자1280×720에서363a481c의 목록 모집중·상세 모집마감/비활성 신청을 실제 재확인했다. 마감 시각의 공개 API 관찰은 아직 보완 중이며 serving SHA미노출/미확인. Root committed 타입/패턴 및 exact-head 독립 리뷰 후 PR 게시 예정.
 - 실제 alpha After 및 dev 머지는 별도 대기. 완료/삭제/자동머지 실행하지 않음. 테스트 합성 fixture와 실제 API/브라우저 증거를 구분해 원 checkout0550에 보존한다.
+
+- 독립 리뷰가 touched 리그 정원 생략 fixture의 불필요한 타입 단언3곳을 발견했다. 현재 teamCount optional 정본에 맞게 직접 delete하여 같은범위 debt를 정리한다. 제품helper/source와 기존 assertion은 유지한다. 최종커밋 기준 재검증/재리뷰 예정.

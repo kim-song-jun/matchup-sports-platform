@@ -178,7 +178,7 @@ describe('TournamentCard — 리그는 정원을 그리지 않는다', () => {
   /** 리그 거울: 서버가 `teamCount` 를 생략하고 `kind` 로 종류를 말한다. */
   const leagueItem = () => {
     const item = buildItem({ kind: 'regular_league', confirmedCount: 2 });
-    delete (item as { teamCount?: number }).teamCount;
+    delete item.teamCount;
     return item;
   };
 
@@ -245,7 +245,7 @@ describe('TournamentCard — 정원이 다 찼으면 상태가 open이어도 마
 
   it('리그는 정원 개념이 없어 이 분기를 타지 않는다 — status 그대로', () => {
     const item = buildItem({ kind: 'regular_league', status: 'open', confirmedCount: 2 });
-    delete (item as { teamCount?: number }).teamCount;
+    delete item.teamCount;
     const { container } = render(<TournamentCard item={item} />);
     const text = (container.textContent ?? '').replace(/\s+/g, ' ');
     expect(text).toContain('모집 중');
@@ -259,7 +259,7 @@ describe('TournamentCard — 정원이 다 찼으면 상태가 open이어도 마
 describe('TournamentCard — 통합 목록에서 리그를 알아볼 수 있다', () => {
   const leagueItem = () => {
     const item = buildItem({ kind: 'regular_league', confirmedCount: 2 });
-    delete (item as { teamCount?: number }).teamCount;
+    delete item.teamCount;
     return item;
   };
 

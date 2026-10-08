@@ -5,7 +5,7 @@ import { AdminContextService, type V1ActiveAdmin } from '../../common/admin-cont
 import { GamesService } from '../../games/games.service';
 import { lockGameRows } from '../../games/roster/game-row-lock';
 import { PrismaService } from '../../prisma/prisma.service';
-import { assignTournamentFixtureSideInTx } from '../tournament-bracket-tx';
+import { assignTournamentFixtureSideInTx, releaseUnusedGroupTeamsInTx } from '../tournament-bracket-tx';
 import { adminBracketSlotInclude, serializeAdminBracketSlot } from './admin-bracket-view';
 import { ALL_COMPETITION_KINDS, findTournamentOnSurface } from '../tournament-surface-lookup';
 import { lockCompetitionForBracketMutationInTx } from './competition-bracket-lock';
@@ -18,6 +18,17 @@ export type SlotMutationContext = {
   adminContext: AdminContextService;
   games: GamesService;
 };
+
+export type GroupTeamRelease = { groupId: string; registrationId: string };
+
+/** 후보를 조별로 모아 조마다 한 번씩 해제한다 — 모든 자리 변경이 끝난 뒤에만 부른다. */
+async function releaseGroupTeams(tx: Tx, ctx: SlotMutationContext, tournamentId: string, releases: readonly GroupTeamRelease[]): Promise<void> {
+  const byGroup = new Map<string, string[]>();
+  for (const { groupId, registrationId } of releases) byGroup.set(groupId, [...(byGroup.get(groupId) ?? []), registrationId]);
+  for (const [groupId, registrationIds] of byGroup) {
+    await releaseUnusedGroupTeamsInTx(tx, ctx.admin, tournamentId, groupId, registrationIds);
+  }
+}
 
 // 자리 하나가 경기 수십 개에 닿고 조 편성은 순위 재계산까지 한다 — 템플릿 실행기와 같은 상한.
 const SLOT_TRANSACTION_OPTIONS = { timeout: 45_000, maxWait: 5_000 } as const;
@@ -66,6 +77,7 @@ async function assignSlotCore(
   ctx: SlotMutationContext,
   slotId: string,
   registrationId: string | null,
+  releases: GroupTeamRelease[],
 ): Promise<{ tournamentId: string; fixtureIds: string[] }> {
   const slot = await tx.v1TournamentSlot.findUnique({
     where: { id: slotId },
@@ -95,6 +107,9 @@ async function assignSlotCore(
     throw error;
   }
   for (const fixture of fixtures) {
+    if (fixture.groupPhase === 'group' && fixture.groupId !== null && slot.registrationId !== null) {
+      releases.push({ groupId: fixture.groupId, registrationId: slot.registrationId });
+    }
     for (const side of sidesUsingSlot(fixture, slot.id)) {
       await assignTournamentFixtureSideInTx(tx, ctx, ctx.admin, { fixtureId: fixture.id, side, registrationId });
     }
@@ -124,7 +139,9 @@ export async function assignSlotInTx(
   slotId: string,
   registrationId: string | null,
 ): Promise<string[]> {
-  const { fixtureIds } = await assignSlotCore(tx, ctx, slotId, registrationId);
+  const releases: GroupTeamRelease[] = [];
+  const { tournamentId, fixtureIds } = await assignSlotCore(tx, ctx, slotId, registrationId, releases);
+  await releaseGroupTeams(tx, ctx, tournamentId, releases);
   return fixtureIds;
 }
 

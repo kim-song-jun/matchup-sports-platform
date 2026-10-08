@@ -4,6 +4,7 @@ import { OperationAuditWriterService } from '../../src/common/audit/operation-au
 import { GamesService } from '../../src/games/games.service';
 import { GameTakeoverService } from '../../src/games/game-takeover.service';
 import { BracketTemplateService } from '../../src/tournaments/templates/bracket-template.service';
+import { TournamentBracketService } from '../../src/tournaments/tournament-bracket.service';
 import { TournamentSlotService } from '../../src/tournaments/slots/tournament-slot.service';
 import { competitionConfigFixture as ids, seedCompetitionConfigFixture } from '../fixtures/competition-config.fixture';
 import { seedBracketTournament, type SeededBracketTournament } from '../helpers/bracket-canvas-fixture';
@@ -14,6 +15,7 @@ const adminContext = new AdminContextService(prisma);
 const games = new GamesService(prisma, new OperationAuditWriterService(), new GameTakeoverService());
 const templates = new BracketTemplateService(prisma, adminContext, games);
 const slots = new TournamentSlotService(prisma, adminContext, games);
+const bracket = new TournamentBracketService(prisma, adminContext, games);
 
 const slotAt = (tournamentId: string, position: number, kind: 'ENTRY' | 'BYE' = 'ENTRY') =>
   prisma.v1TournamentSlot.findFirstOrThrow({ where: { tournamentId, kind, position } });
@@ -173,6 +175,65 @@ describe('자리 배정 (PostgreSQL)', () => {
       });
       const slot = await prisma.v1TournamentSlot.create({ data: { tournamentId: league.id, kind: 'ENTRY', position: 1 } });
       await expect(slots.assignSlot(user, slot.id, null)).rejects.toMatchObject({ response: { code: 'SLOT_LEAGUE_NOT_SUPPORTED_YET' } });
+    });
+  });
+
+  describe('조 편성 (phase=group)', () => {
+    const groupTeams = (tournamentId: string) =>
+      prisma.v1TournamentGroupTeam.findMany({ where: { group: { tournamentId } }, orderBy: { sortOrder: 'asc' } });
+
+    it('자리에 팀을 넣으면 조 편성이 생기고, 자리 3개를 채우면 중복 없이 3행이다', async () => {
+      const { tournamentId, registrationIds } = await leagueOf4('gt-create');
+      for (const position of [1, 2, 3]) await slots.assignSlot(user, (await slotAt(tournamentId, position)).id, registrationIds[position - 1]);
+      const rows = await groupTeams(tournamentId);
+      expect(rows.map((r) => [r.registrationId, r.isBye, r.sortOrder])).toEqual([
+        [registrationIds[0], false, 0], [registrationIds[1], false, 1], [registrationIds[2], false, 2],
+      ]);
+    });
+
+    it('비우면 편성과 그 팀의 순위 행이 지워진다 — 다른 팀의 편성은 그대로(대조군)', async () => {
+      const { tournamentId, registrationIds } = await leagueOf4('gt-clear');
+      const [slot1, slot2] = [await slotAt(tournamentId, 1), await slotAt(tournamentId, 2)];
+      await slots.assignSlot(user, slot1.id, registrationIds[0]);
+      await slots.assignSlot(user, slot2.id, registrationIds[1]);
+      const group = await prisma.v1TournamentGroup.findFirstOrThrow({ where: { tournamentId } });
+      await prisma.v1TournamentStanding.create({ data: { groupId: group.id, registrationId: registrationIds[0] } });
+
+      await slots.assignSlot(user, slot1.id, null);
+
+      expect((await groupTeams(tournamentId)).map((r) => r.registrationId)).toEqual([registrationIds[1]]);
+      expect(await prisma.v1TournamentStanding.count({ where: { groupId: group.id, registrationId: registrationIds[0] } })).toBe(0);
+    });
+
+    it('A → B 로 교체하면 A 의 편성은 지워지고 B 의 편성이 생긴다', async () => {
+      const { tournamentId, registrationIds } = await leagueOf4('gt-swap-team');
+      const slot1 = await slotAt(tournamentId, 1);
+      await slots.assignSlot(user, slot1.id, registrationIds[0]);
+      await slots.assignSlot(user, slot1.id, registrationIds[1]);
+      expect((await groupTeams(tournamentId)).map((r) => r.registrationId)).toEqual([registrationIds[1]]);
+    });
+
+    it('이전 팀이 그 조의 다른 경기(수동 생성)에 남아 있으면 편성을 지우지 않는다 (대조군)', async () => {
+      const { tournamentId, registrationIds } = await leagueOf4('gt-keep');
+      const slot1 = await slotAt(tournamentId, 1);
+      await slots.assignSlot(user, slot1.id, registrationIds[0]);
+      const group = await prisma.v1TournamentGroup.findFirstOrThrow({ where: { tournamentId } });
+      await bracket.createFixture(user, tournamentId, {
+        groupId: group.id, round: 'league_r9', fixtureNumber: 99,
+        homeRegistrationId: registrationIds[0], awayRegistrationId: registrationIds[2],
+      });
+
+      await slots.assignSlot(user, slot1.id, null);
+
+      expect((await groupTeams(tournamentId)).map((r) => r.registrationId).sort())
+        .toEqual([registrationIds[0], registrationIds[2]].sort());
+    });
+
+    it('결선 단계 조의 자리는 조 편성을 만들지 않는다', async () => {
+      const { tournamentId, registrationIds } = await seedBracketTournament(prisma, { label: 'gt-knockout', format: 'knockout', teamCount: 2 });
+      await templates.apply(user, tournamentId, { kind: 'knockout', size: 8, thirdPlace: false });
+      await slots.assignSlot(user, (await slotAt(tournamentId, 1)).id, registrationIds[0]);
+      expect(await groupTeams(tournamentId)).toEqual([]);
     });
   });
 });

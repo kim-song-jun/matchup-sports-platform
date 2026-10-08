@@ -362,3 +362,50 @@ export async function createEmptyTournamentFixtureInTx(
   });
   return { id: creation.teamMatchId };
 }
+
+/**
+ * 자리 교체·비우기로 조에서 빠진 팀의 편성을 정리한다. 후보가 그 조의 비삭제·비취소 경기 어디에도 없을 때만
+ * 지우고(수동으로 만든 다른 경기가 있으면 유지), 순위 행이 있던 조는 같은 트랜잭션에서 순위를 다시 계산한다.
+ * 모든 자리 변경이 끝난 뒤 한 번 부른다 — 맞바꾸기처럼 같은 조 안에서 팀이 옮겨 다니는 경우 중간 상태로 지우지 않게.
+ */
+export async function releaseUnusedGroupTeamsInTx(
+  tx: Tx,
+  admin: V1ActiveAdmin,
+  tournamentId: string,
+  groupId: string,
+  registrationIds: readonly string[],
+): Promise<void> {
+  let recalculate = false;
+  for (const registrationId of new Set(registrationIds)) {
+    const stillPlaying = await tx.v1TournamentMatchDetails.count({
+      where: {
+        groupId,
+        OR: [{ homeRegistrationId: registrationId }, { awayRegistrationId: registrationId }],
+        teamMatch: { deletedAt: null, status: { not: 'cancelled' } },
+      },
+    });
+    if (stillPlaying > 0) continue;
+    const groupTeam = await tx.v1TournamentGroupTeam.findFirst({ where: { groupId, registrationId, isBye: false }, select: { id: true } });
+    if (groupTeam === null) continue;
+    const hadStandings = (await tx.v1TournamentStanding.count({ where: { groupId } })) > 0;
+    await tx.v1TournamentGroupTeam.delete({ where: { id: groupTeam.id } });
+    await tx.v1TournamentStanding.deleteMany({ where: { groupId, registrationId } });
+    await writeAdminActionLog(tx, admin, {
+      action: 'tournament.bracket.group_team.remove',
+      targetType: 'tournament_group_team',
+      targetId: groupTeam.id,
+      beforeJson: { groupId, registrationId },
+      afterJson: { auto: 'slot', standingsRecalculated: hadStandings },
+    });
+    if (hadStandings) recalculate = true;
+  }
+  if (recalculate) {
+    const recalculated = await recalculateStandingsInTx(tx, tournamentId);
+    await writeAdminActionLog(tx, admin, {
+      action: 'tournament.bracket.standings.recalculate_auto',
+      targetType: 'tournament',
+      targetId: tournamentId,
+      afterJson: { trigger: 'slot_group_team_release', groupId, ...recalculated.audit },
+    });
+  }
+}

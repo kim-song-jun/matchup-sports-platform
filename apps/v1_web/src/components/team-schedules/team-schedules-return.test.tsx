@@ -1,4 +1,4 @@
-import { useState, type AnchorHTMLAttributes, type MouseEvent } from 'react';
+import { useEffect, useState, type AnchorHTMLAttributes, type MouseEvent } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -6,15 +6,16 @@ import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { clearStoredV1Session } from '@/lib/session-storage';
+import { __resetNavigationHistoryForTests, installNavigationHistory } from '@/lib/navigation-history';
 import type { V1TeamDetail, V1TeamScheduleDetail } from '@/types/api';
 import { TeamScheduleDetailPageClient, TeamScheduleListPageClient } from './team-schedules-client';
 
 // 라우터·Link 경계만 대체한다. 목록/상세/카드/뒤로가기/API/query는 실제 구현이다.
 const navigation = vi.hoisted((): {
-  path: string; history: string[]; index: number; reportedQuery: string | null;
+  path: string; reportedQuery: string | null; actions: Array<'push' | 'replace' | 'back'>;
   navigate: (path: string, replace?: boolean) => void; back: () => void; publish: () => void;
 } => ({
-  path: '', history: new Array<string>(), index: 0,
+  path: '', actions: [],
   reportedQuery: null,
   navigate: (_path: string, _replace = false) => {},
   back: () => {}, publish: () => {},
@@ -22,7 +23,11 @@ const navigation = vi.hoisted((): {
 vi.mock('next/navigation', () => ({
   usePathname: () => navigation.path.split('?')[0],
   useSearchParams: () => new URLSearchParams(navigation.reportedQuery ?? navigation.path.split('?')[1]),
-  useRouter: () => ({ push: (path: string) => navigation.navigate(path), replace: (path: string) => navigation.navigate(path, true), back: navigation.back, prefetch: vi.fn() }),
+  useRouter: () => ({
+    push: (path: string) => { navigation.actions.push('push'); navigation.navigate(path); },
+    replace: (path: string) => { navigation.actions.push('replace'); navigation.navigate(path, true); },
+    back: () => { navigation.actions.push('back'); navigation.back(); }, prefetch: vi.fn(),
+  }),
 }));
 vi.mock('next/link', () => ({
   default: ({ href, onClick, prefetch: _prefetch, ...props }: AnchorHTMLAttributes<HTMLAnchorElement> & { prefetch?: boolean }) => (
@@ -80,47 +85,48 @@ function PublicRoute() {
   const [path, setPath] = useState(navigation.path);
   navigation.publish = () => setPath(navigation.path);
   navigation.navigate = (next, replace = false) => {
-    if (replace) navigation.history[navigation.index] = next;
-    else { navigation.history = [...navigation.history.slice(0, navigation.index + 1), next]; navigation.index += 1; }
-    navigation.path = next;
-    originalReplace(null, '', next);
-    setPath(next);
+    if (replace) window.history.replaceState(null, '', next);
+    else window.history.pushState(null, '', next);
+    navigation.path = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+    setPath(navigation.path);
   };
-  navigation.back = () => {
-    const previous = navigation.history[navigation.index - 1];
-    if (!previous) return;
-    navigation.index -= 1;
-    navigation.path = previous;
-    originalReplace(null, '', previous);
-    setPath(previous);
-  };
+  navigation.back = () => window.history.back();
+  useEffect(() => {
+    const onPop = () => {
+      navigation.path = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+      setPath(navigation.path);
+    };
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  }, []);
   const pathname = path.split('?')[0];
   if (pathname === LIST) return <TeamScheduleListPageClient teamId={TEAM_ID} />;
   if (pathname.startsWith(`${LIST}/`)) return <TeamScheduleDetailPageClient teamId={TEAM_ID} scheduleId={pathname.slice(LIST.length + 1)} />;
   return <div>출처 화면 {pathname}</div>;
 }
 function renderRoute(path = LIST) {
-  navigation.path = path; navigation.history = [path]; navigation.index = 0;
+  navigation.path = path;
   originalReplace(null, '', path);
+  installNavigationHistory();
   return render(<QueryClientProvider client={client}><PublicRoute /></QueryClientProvider>);
 }
 beforeEach(() => {
+  __resetNavigationHistoryForTests(); window.sessionStorage.clear(); navigation.actions.length = 0;
   vi.stubEnv('NEXT_PUBLIC_API_URL', 'http://localhost/api/v1');
   vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(new Date('2026-10-08T03:00:00Z'));
   clearStoredV1Session(); requests.length = 0; failList = false; navigation.reportedQuery = null;
   client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
   vi.spyOn(window.history, 'replaceState').mockImplementation((data, unused, url) => {
-    originalReplace(data, unused, url);
+    History.prototype.replaceState.call(window.history, data, unused, url);
     if (url === null || url === undefined) return;
     navigation.path = `${window.location.pathname}${window.location.search}${window.location.hash}`;
-    navigation.history[navigation.index] = navigation.path;
     navigation.publish();
   });
   server.listen({ onUnhandledRequest: 'error' });
 });
 afterEach(() => {
   cleanup(); client.clear(); server.resetHandlers(); server.close();
-  vi.restoreAllMocks(); vi.useRealTimers(); vi.unstubAllEnvs(); originalReplace(null, '', '/');
+  vi.restoreAllMocks(); __resetNavigationHistoryForTests(); vi.useRealTimers(); vi.unstubAllEnvs(); originalReplace(null, '', '/');
 });
 async function idle() { await waitFor(() => expect(client.isFetching()).toBe(0)); }
 async function goBack(action: string) {
@@ -130,21 +136,36 @@ async function goBack(action: string) {
 function params() { return new URL(navigation.path, 'https://teameet.example').searchParams; }
 
 describe('MD-QA #45 — 팀 일정 실제 상세 복귀', () => {
+  it.each([LIST, `${LIST}?type=TRAINING&state=SCHEDULED`])('실제 history의 %s에서 헤더 복귀 후 browser Back 한 번으로 이전 home에 돌아간다', async (entry) => {
+    // Given: 실제 추적기가 관리하는 home → month 없는 목록 → 상세 이력.
+    renderRoute('/home'); act(() => navigation.navigate(entry));
+    await screen.findByRole('link', { name: /10월 훈련/ });
+    await userEvent.click(screen.getByRole('link', { name: /10월 훈련/ }));
+    await screen.findByRole('heading', { name: '10월 훈련' });
+    // When: 실제 AppBackLink 결정으로 복귀하고 실제 browser history를 한 번 더 뒤로 간다.
+    await goBack('header Back'); await screen.findByRole('heading', { name: '합성 복귀 팀 · 일정' });
+    act(() => navigation.back());
+    // Then: 목록 복사본에 멈추지 않고 원래 이전 화면에 도달한다.
+    await waitFor(() => expect(window.location.pathname).toBe('/home'));
+    expect(screen.getByText('출처 화면 /home')).toBeInTheDocument();
+    expect(navigation.actions).toEqual(['back']);
+  });
+
   it.each(['header Back', 'browser Back'])('훈련·예정 선택 후 %s하면 같은 선택과 실제 필터 결과를 복원한다', async (action) => {
     // Given: 실제 API 목록에서 종류와 상태를 고른다.
     renderRoute(); await screen.findByRole('link', { name: /10월 훈련/ });
-    await userEvent.click(screen.getByRole('button', { name: '훈련', exact: true }));
-    await userEvent.click(screen.getByRole('button', { name: '예정', exact: true })); await idle();
+    await userEvent.click(screen.getByRole('button', { name: '훈련' }));
+    await userEvent.click(screen.getByRole('button', { name: '예정' })); await idle();
     expect(screen.queryByRole('link', { name: /취소된 훈련|팀 행사/ })).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole('link', { name: /10월 훈련/ }));
-    await screen.findByRole('heading', { name: '10월 훈련', exact: true });
+    await screen.findByRole('heading', { name: '10월 훈련' });
 
     // When: 실제 상세의 헤더 링크 또는 직전 history entry로 돌아간다.
     await goBack(action); await screen.findByRole('heading', { name: '합성 복귀 팀 · 일정' }); await idle();
 
     // Then: remount에도 제어와 API 결과가 함께 복원된다.
-    expect(screen.getByRole('button', { name: '훈련', exact: true })).toHaveAttribute('aria-pressed', 'true');
-    expect(screen.getByRole('button', { name: '예정', exact: true })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: '훈련' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: '예정' })).toHaveAttribute('aria-pressed', 'true');
     expect(params().get('type')).toBe('TRAINING'); expect(params().get('state')).toBe('SCHEDULED');
     expect(requests.at(-1)?.searchParams.get('type')).toBe('TRAINING');
     expect(requests.at(-1)?.searchParams.get('state')).toBe('SCHEDULED');
@@ -158,7 +179,7 @@ describe('MD-QA #45 — 팀 일정 실제 상세 복귀', () => {
     await userEvent.click(screen.getByRole('button', { name: '다음 달' }));
     await userEvent.click(screen.getByRole('button', { name: '10일, 일정 1건' }));
     await userEvent.click(screen.getByRole('link', { name: /11월 훈련/ }));
-    await screen.findByRole('heading', { name: '11월 훈련', exact: true });
+    await screen.findByRole('heading', { name: '11월 훈련' });
 
     // When: 상세에서 목록으로 돌아간다.
     await goBack(action); await screen.findByRole('heading', { name: '합성 복귀 팀 · 일정' });
@@ -177,14 +198,14 @@ describe('MD-QA #45 — 팀 일정 실제 상세 복귀', () => {
 
     // When: 같은 React flush 전에 종류·상태·보기를 연속 바꾼다.
     act(() => {
-      fireEvent.click(screen.getByRole('button', { name: '훈련', exact: true }));
-      fireEvent.click(screen.getByRole('button', { name: '예정', exact: true }));
+      fireEvent.click(screen.getByRole('button', { name: '훈련' }));
+      fireEvent.click(screen.getByRole('button', { name: '예정' }));
       fireEvent.click(screen.getByRole('tab', { name: '캘린더' }));
     }); await idle();
 
     // Then: local draft 및 실제 URL/카드 출처가 마지막 조합을 유지한다.
-    expect(screen.getByRole('button', { name: '훈련', exact: true })).toHaveAttribute('aria-pressed', 'true');
-    expect(screen.getByRole('button', { name: '예정', exact: true })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: '훈련' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: '예정' })).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getByRole('tab', { name: '캘린더' })).toHaveAttribute('aria-selected', 'true');
     const href = screen.getByRole('link', { name: /10월 훈련/ }).getAttribute('href');
     const from = new URL(href ?? '', 'https://teameet.example').searchParams.get('from');
@@ -221,7 +242,7 @@ describe('MD-QA #45 — 팀 일정 실제 상세 복귀', () => {
   it.each([null, '/my/schedule?status=scheduled', '/notifications', 'https://outside.example'])('직접 상세의 출처 %s는 기존 안전한 뒤로가기 계약을 유지한다', async (from) => {
     // Given: 팀 목록 외부의 기존 상세 진입.
     renderRoute(`${LIST}/oct-training${from ? `?from=${encodeURIComponent(from)}` : ''}`);
-    await screen.findByRole('heading', { name: '10월 훈련', exact: true });
+    await screen.findByRole('heading', { name: '10월 훈련' });
     // When: 실제 헤더 뒤로가기 링크를 누른다.
     await userEvent.click(screen.getByRole('link', { name: '뒤로가기' }));
     // Then: 개인 일정·알림 출처와 안전한 팀 목록 fallback을 유지한다.

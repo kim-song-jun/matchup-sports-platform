@@ -71,7 +71,7 @@ describe('#1547 빈 일정의 조회 범위', () => {
   it('일정 있는 날짜→빈 날짜→해제로 같은 일정의 링크를 회복한다', () => {
     page(); fireEvent.click(screen.getByRole('tab', { name: '캘린더' }));
     fireEvent.click(screen.getByRole('button', { name: '4일, 일정 1건' }));
-    const detailHref = new URL(screen.getByRole('link', { name: /합성 기존 훈련/ }).getAttribute('href')!, window.location.origin);
+    const detailHref = new URL(screen.getByRole<HTMLAnchorElement>('link', { name: /합성 기존 훈련/ }).href);
     expect(detailHref.pathname).toBe('/teams/fixture-team/schedules/fixture-schedule');
     expect(detailHref.searchParams.get('from')).toBe('/teams/fixture-team/schedules?view=calendar&month=2026-10&date=2026-10-04');
     fireEvent.click(screen.getByRole('button', { name: '8일' }));

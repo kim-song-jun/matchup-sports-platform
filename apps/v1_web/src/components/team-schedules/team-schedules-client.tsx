@@ -175,7 +175,10 @@ export function TeamScheduleListPageClient({ teamId }: { teamId: string }) {
     setNavigation(next);
     window.history.replaceState(null, '', listPathForState(next));
   }
-  const returnPath = listPathForState(navigation);
+  // from은 실제 목록 이력과 같아야 AppBackLink가 replace 대신 back으로 복귀한다.
+  const listLocation = typeof window !== 'undefined' && window.location.pathname === basePath ? window.location : null;
+  const returnQuery = new URLSearchParams(listLocation?.search ?? queryString).toString();
+  const returnPath = `${basePath}${returnQuery ? `?${returnQuery}` : ''}${listLocation?.hash ?? ''}`;
 
   // 서버 캡(최대 100)을 그대로 사용 — 캘린더가 한 달 치를 필터 없이 훑어보려면
   // 목록 API의 종류/상태 필터를 그대로 쓰되 넉넉한 limit으로 한 페이지에 담는다.

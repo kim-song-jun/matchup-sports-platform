@@ -63,3 +63,7 @@ managedWT는 fetch직후 origin/dev5948dfd6 기준. 다른 독립PR/peerQA 진�
 - Actual HTTP/client/view RED: 14건 중9 FAIL/5 PASS → GREEN return14+empty14+기존route29 =57/57 PASS(13.54s,1worker).
 - Root alpha before: 실제 E2E관리자/1280×720/팀f39f.. 일정c57b.. 훈련·예정→header Back 전체·전체, 캘린더10/10→browser Back 목록으로 초기화 모두FAIL. report45-filter/header-back/calendar/browser-back-before 파일. 실제 데이터 저장·신청·삭제 없음.
 - task/Changeset/source/spec explicit commit 후 최신dev통합·committed 타입/패턴/좁은회귀·exacthead독립리뷰·PR·댓글 이어 진행. alpha after는 수정SHA배포 전pending.
+
+- Independent review a19250 actual findings: 초기 bare 또는 shared-filter-no-month entry와 카드 from 강제 month가 달라 actual AppBackLink가 replace하여 이전 목록 이력 중복. 신규 실제 installNavigationHistory/native history2cases RED2 FAIL → GREEN 관련 return16+empty14+route29=59/59. from을 동일 team의 실제 live entry/query/hash에 맞추고 SSR queryString 유지, 선택/local draft/native replace 계약은 보존.
+- Test typecheck11 errors(getByRole/findByRole exact:true) 제거. 해당 API의 기본 exact string 의미는 유지. 신규 href non-null assertion은 typed HTMLAnchorElement로 제거하고 path/from assertion 유지.
+- Root의 이전 committed14 PASS 뒤 tsc FAIL을 성공으로 표시하지 않음. 해당 test-only 타입 실패와 실제 리뷰 findings를 수정한 새 HEAD에서 committed tsc/pattern/독립 리뷰를 다시 수행해야 함. alpha after는 여전히 pending.

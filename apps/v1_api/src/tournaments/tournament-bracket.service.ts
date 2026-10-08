@@ -14,7 +14,7 @@ import {
   V1TournamentGroupTeam,
   V1TournamentStanding,
 } from '@prisma/client';
-import { AdminContextService, type V1ActiveAdmin } from '../common/admin-context.service';
+import { AdminContextService } from '../common/admin-context.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { V1AuthUser } from '../auth/v1-auth-user';
 import {
@@ -48,13 +48,8 @@ import {
   type TournamentFixtureGameForResult,
 } from './tournament-fixture-official-result';
 import { cascadeCancelTeamMatchSchedulesInTx } from '../team-schedules/team-schedules.service';
-import {
-  fairPlayByRegistrationFromGroups,
-  recalculateAndUpsertGroupStandings,
-} from './tournament-group-standings';
-import { recalculateAndUpsertOverallStandings } from './tournament-overall-standings';
 import { findTournamentOnSurface, TOURNAMENT_KINDS } from './tournament-surface-lookup';
-import { loadCanonicalStandingsSource } from './tournament-standings-source';
+import { createGroupInTx, ensureGroupPhaseTeamsInTx, recalculateStandingsInTx } from './tournament-bracket-tx';
 import { participantDisplayName } from './participant-display-name';
 import { readJerseyNumbers } from './tournament-player-jersey';
 import { createTournamentMatchInTx } from './tournament-match-creation';
@@ -239,28 +234,14 @@ export class TournamentBracketService {
     const tournament = await this.loadTournament(tournamentId);
     this.assertLeagueGroupShape(tournament.format, tournament.kind, dto.phase ?? 'group', dto.advanceCount);
 
-    const created = await this.prisma.$transaction(async (tx) => {
-      const group = await tx.v1TournamentGroup.create({
-        data: {
-          tournamentId,
-          name: dto.name,
-          phase: dto.phase ?? 'group',
-          sortOrder: dto.sortOrder ?? 0,
-          advanceCount: dto.advanceCount ?? null,
-        },
-      });
-      await this.adminContext.logAdminAction(
-        admin,
-        {
-          action: 'tournament.bracket.group.create',
-          targetType: 'tournament_group',
-          targetId: group.id,
-          afterJson: { tournamentId, name: group.name, phase: group.phase },
-        },
-        tx,
-      );
-      return group;
-    });
+    const created = await this.prisma.$transaction((tx) =>
+      createGroupInTx(tx, admin, tournamentId, {
+        name: dto.name,
+        phase: dto.phase ?? 'group',
+        sortOrder: dto.sortOrder ?? 0,
+        advanceCount: dto.advanceCount ?? null,
+      }),
+    );
 
     return this.serializeGroup(created);
   }
@@ -432,63 +413,6 @@ export class TournamentBracketService {
       return row;
     });
     return this.serializeGroupTeam(saved);
-  }
-
-  /**
-   * 조별 순위는 조 편성(V1TournamentGroupTeam) 기준으로 계산·표시된다. 조별리그(`group`) 조 안의
-   * 경기에 들어가는 팀이 편성에 없으면 순위표에서 빠지므로, 경기를 넣는 같은 트랜잭션에서 편성한다.
-   * 결선 단계 조는 편성이 대진 자리(부전승·정원)를 뜻해서 건드리지 않는다.
-   */
-  private async ensureGroupPhaseTeams(
-    tx: Prisma.TransactionClient,
-    admin: V1ActiveAdmin,
-    tournamentId: string,
-    groupId: string,
-    groupPhase: string,
-    registrationIds: ReadonlyArray<string | null | undefined>,
-  ) {
-    if (groupPhase !== 'group') return;
-    const ids = [...new Set(registrationIds.filter((id): id is string => typeof id === 'string'))];
-    if (ids.length === 0) return;
-    const assigned = await tx.v1TournamentGroupTeam.findMany({
-      where: { groupId },
-      select: { registrationId: true, sortOrder: true },
-    });
-    const assignedIds = new Set(assigned.map((team) => team.registrationId));
-    let nextSortOrder = assigned.length === 0 ? 0 : Math.max(...assigned.map((team) => team.sortOrder)) + 1;
-    // 순위 행이 하나라도 있는 조는 행만 보여 줘서, 새 편성 팀은 재계산 전까지 표에서 빠진다.
-    const groupHasStandings = (await tx.v1TournamentStanding.count({ where: { groupId } })) > 0;
-    const createdTeamIds: string[] = [];
-    for (const registrationId of ids) {
-      if (assignedIds.has(registrationId)) continue;
-      const created = await tx.v1TournamentGroupTeam.create({
-        data: { groupId, registrationId, isBye: false, sortOrder: nextSortOrder++ },
-      });
-      await this.adminContext.logAdminAction(
-        admin,
-        {
-          action: 'tournament.bracket.group_team.create',
-          targetType: 'tournament_group_team',
-          targetId: created.id,
-          afterJson: { groupId, registrationId, isBye: false, auto: 'fixture', standingsRecalculated: groupHasStandings },
-        },
-        tx,
-      );
-      createdTeamIds.push(created.id);
-    }
-    if (createdTeamIds.length > 0 && groupHasStandings) {
-      const recalculated = await this.recalculateStandingsInTx(tx, tournamentId);
-      await this.adminContext.logAdminAction(
-        admin,
-        {
-          action: 'tournament.bracket.standings.recalculate_auto',
-          targetType: 'tournament',
-          targetId: tournamentId,
-          afterJson: { trigger: 'fixture_group_team_enroll', groupId, ...recalculated.audit },
-        },
-        tx,
-      );
-    }
   }
 
   async createFixture(user: V1AuthUser, tournamentId: string, dto: CreateFixtureDto) {
@@ -724,7 +648,7 @@ export class TournamentBracketService {
       }
 
       if (dto.groupId && group) {
-        await this.ensureGroupPhaseTeams(tx, admin, tournamentId, dto.groupId, group.phase, [dto.homeRegistrationId, dto.awayRegistrationId]);
+        await ensureGroupPhaseTeamsInTx(tx, admin, tournamentId, dto.groupId, group.phase, [dto.homeRegistrationId, dto.awayRegistrationId]);
       }
 
       const [homeJerseys, awayJerseys] = await Promise.all([
@@ -963,7 +887,7 @@ export class TournamentBracketService {
           } });
           if (byeTeam) throw new ConflictException({ code: 'BYE_TEAM_HAS_MATCH', message: '부전승팀은 해당 라운드의 경기에 넣을 수 없어요. 다음 라운드에 직접 배정해 주세요.' });
           const group = await tx.v1TournamentGroup.findFirst({ where: { id: canonical.groupId }, select: { phase: true } });
-          if (group) await this.ensureGroupPhaseTeams(tx, admin, canonical.tournamentId, canonical.groupId, group.phase, [dto.homeRegistrationId, dto.awayRegistrationId]);
+          if (group) await ensureGroupPhaseTeamsInTx(tx, admin, canonical.tournamentId, canonical.groupId, group.phase, [dto.homeRegistrationId, dto.awayRegistrationId]);
         }
         const previousNumber = dto.fixtureNumber === undefined ? undefined : (await tx.v1TournamentMatchDetails.findUniqueOrThrow({
           where: { teamMatchId: fixtureId }, select: { fixtureNumber: true },
@@ -1207,51 +1131,10 @@ export class TournamentBracketService {
       message: '대회 결과는 Game 종료 명령과 결과 리비전으로만 기록할 수 있어요.',
     });
   }
-  /** 조별·통합 순위 전체 재계산. 호출자 tx 안에서 돌고 감사 로그는 호출자가 남긴다. */
-  private async recalculateStandingsInTx(tx: Prisma.TransactionClient, tournamentId: string) {
-    const source = await loadCanonicalStandingsSource(tx, tournamentId);
-    if (source === null) {
-      throw new NotFoundException({ code: 'TOURNAMENT_NOT_FOUND', message: '대회를 찾을 수 없어요.' });
-    }
-    const { groups, config, configVersionId: competitionConfigVersionId, recalculatedAt: now } = source;
-    // F5: 페어플레이 벌점 — 모든 조의 픽스처를 넘겨 한 번에 집계한 registrationId
-    // → 벌점 Map을 그룹별 upsert와 통합 upsert 양쪽에 그대로 넘긴다(그룹 픽스처는
-    // 조별로 분리돼 있으므로 그룹 하나만 넘겨 계산해도 값은 동일하다).
-    const fairPlayByRegistration = fairPlayByRegistrationFromGroups(groups);
-    for (const group of groups) {
-      // Calculation + upsert extracted to tournament-group-standings.ts —
-      // shared verbatim with the automatic per-result trigger
-      // (GameResultStandingsProjectionService), which recalculates just
-      // the one affected group instead of looping every group.
-      await recalculateAndUpsertGroupStandings(
-        tx,
-        { tournamentId, configVersionId: competitionConfigVersionId, config, group, fairPlayByRegistration },
-        now,
-      );
-    }
-
-    // Invariant: every path that calls recalculateAndUpsertGroupStandings
-    // must also call recalculateAndUpsertOverallStandings in the same tx,
-    // so the group view and the overall (통합) view never drift. This
-    // route already has every group-phase group loaded above, so it can
-    // feed them straight in.
-    await recalculateAndUpsertOverallStandings(
-      tx,
-      { tournamentId, configVersionId: competitionConfigVersionId, config, groups, fairPlayByRegistration },
-      now,
-    );
-    return {
-      groupCount: groups.length,
-      recalculatedAt: now,
-      competitionConfigVersionId,
-      audit: { groupCount: groups.length, recalculatedAt: now.toISOString(), competitionConfigVersionId },
-    };
-  }
-
   async recalculateStandings(user: V1AuthUser, tournamentId: string) {
     const admin = await this.adminContext.getMutationAdmin(user.id);
     const recalculated = await this.prisma.$transaction(async (tx) => {
-      const { audit, ...result } = await this.recalculateStandingsInTx(tx, tournamentId);
+      const { audit, ...result } = await recalculateStandingsInTx(tx, tournamentId);
       await this.adminContext.logAdminAction(
         admin,
         { action: 'tournament.bracket.standings.recalculate', targetType: 'tournament', targetId: tournamentId, afterJson: audit },

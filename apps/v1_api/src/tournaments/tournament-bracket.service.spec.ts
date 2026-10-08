@@ -26,6 +26,7 @@ import { TournamentBracketService } from './tournament-bracket.service';
 import { GamesService } from '../games/games.service';
 import { FOOTBALL_V1_CONFIG } from './competition-config/competition-config';
 import { kindAwareFindFirst } from '../../test/helpers/kind-aware-find-first';
+import { createGroupInTx } from './tournament-bracket-tx';
 
 // ─── fixtures ────────────────────────────────────────────────────────────────
 
@@ -2013,5 +2014,52 @@ describe('TournamentBracketService', () => {
     });
   });
 
+  // ─── 대진 …InTx 추출 함수 (tournament-bracket-tx.ts) ─────────────────────────
+
+  const activeAdmin = { id: 'owner-admin-id', userId: 'owner-user-id', adminRole: 'owner' as const, status: 'active' as const };
+
+  describe('createGroupInTx', () => {
+    function makeTx(created: Record<string, unknown>) {
+      return {
+        v1TournamentGroup: { create: jest.fn().mockResolvedValue(created) },
+        v1AdminActionLog: { create: jest.fn().mockResolvedValue({ id: 'log-1' }) },
+        v1StatusChangeLog: { create: jest.fn() },
+      };
+    }
+
+    it('입력을 빠짐없이 저장하고(결선 조의 advanceCount 포함) 감사 로그에 어드민 행 id 를 남긴다', async () => {
+      const tx = makeTx(groupRow({ id: 'group-9', name: '조별 A', phase: 'group', sortOrder: 3, advanceCount: 2 }));
+
+      const created = await createGroupInTx(tx as never, activeAdmin, 'tournament-1', {
+        name: '조별 A', phase: 'group', sortOrder: 3, advanceCount: 2,
+      });
+
+      expect(created.id).toBe('group-9');
+      expect(tx.v1TournamentGroup.create).toHaveBeenCalledWith({
+        data: { tournamentId: 'tournament-1', name: '조별 A', phase: 'group', sortOrder: 3, advanceCount: 2 },
+      });
+      expect(tx.v1AdminActionLog.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          adminUserId: 'owner-admin-id',
+          action: 'tournament.bracket.group.create',
+          targetType: 'tournament_group',
+          targetId: 'group-9',
+          afterJson: { tournamentId: 'tournament-1', name: '조별 A', phase: 'group' },
+        }),
+      });
+    });
+
+    it('advanceCount 가 null 이면 null 로 저장한다 (0 이나 undefined 로 바뀌지 않는다)', async () => {
+      const tx = makeTx(groupRow({ id: 'group-10', name: '결승', phase: 'final', advanceCount: null }));
+
+      await createGroupInTx(tx as never, activeAdmin, 'tournament-1', { name: '결승', phase: 'final', sortOrder: 0, advanceCount: null });
+
+      expect(tx.v1TournamentGroup.create).toHaveBeenCalledWith({
+        data: { tournamentId: 'tournament-1', name: '결승', phase: 'final', sortOrder: 0, advanceCount: null },
+      });
+    });
+  });
+
+  // ─── …InTx 추출 함수 끝 (새 describe 는 이 줄 위에 추가한다) ───
 
 });

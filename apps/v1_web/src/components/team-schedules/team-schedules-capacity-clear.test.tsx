@@ -59,7 +59,7 @@ const server = setupServer(
     if (typeof body !== 'object' || body === null || Array.isArray(body)) return new HttpResponse(null, { status: 400 });
     if (!('expectedVersion' in body) || body.expectedVersion !== stored.version) return new HttpResponse(null, { status: 409 });
     if ('capacity' in body) {
-      if (body.capacity !== null && (typeof body.capacity !== 'number' || !Number.isInteger(body.capacity) || body.capacity < 1)) return new HttpResponse(null, { status: 422 });
+      if (body.capacity !== null && (typeof body.capacity !== 'number' || !Number.isInteger(body.capacity) || body.capacity < 1)) return HttpResponse.json({ status: 'error', statusCode: 400, code: 'VALIDATION_ERROR', message: 'Invalid capacity' }, { status: 400 });
       stored = { ...stored, capacity: body.capacity };
     }
     if ('title' in body && typeof body.title === 'string') stored = { ...stored, title: body.title };

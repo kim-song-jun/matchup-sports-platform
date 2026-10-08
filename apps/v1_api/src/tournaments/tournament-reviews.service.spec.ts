@@ -362,23 +362,41 @@ describe('TournamentReviewsService — awards admin gate', () => {
 
   // ─── listMyPendingReviews (GET) ─────────────────────────────────────────
 
-  it('listMyPendingReviews: includes completed leagues while excluding draft, deleted, unsupported and already reviewed competitions', async () => {
+  it('listMyPendingReviews: advertises only public completed eligible competitions and excludes caller-authored reviews', async () => {
     // Given
     const competition = {
       id: 'league-1', kind: 'regular_league', isPublic: true, deletedAt: null, status: 'completed',
       title: '종료 리그', scheduledEndAt: new Date('2026-10-01'), updatedAt: new Date('2026-10-02'),
     };
+    const membership = { userId: plainUser.id, status: 'active', role: 'manager' };
+    const registration = {
+      tournamentId: competition.id, teamId: 'team-1', status: 'confirmed', tournament: competition,
+      team: { name: '참가팀', status: 'active', deletedAt: null, memberships: [membership] },
+    };
     const registrations = [
-      competition,
-      { ...competition, id: 'draft-league', status: 'draft' },
-      { ...competition, id: 'deleted-league', deletedAt: new Date('2026-10-03') },
-      { ...competition, id: 'unsupported', kind: 'unsupported_kind' },
-      { ...competition, id: 'reviewed-league' },
-      { ...competition, id: 'tournament-1', kind: 'regular_tournament', title: '종료 대회', scheduledEndAt: new Date('2026-09-30') },
-    ].map((tournament) => ({ teamId: 'team-1', tournament }));
+      ...[
+        competition,
+        { ...competition, id: 'private-league', isPublic: false },
+        { ...competition, id: 'private-tournament', kind: 'regular_tournament', isPublic: false },
+        { ...competition, id: 'draft-league', status: 'draft' },
+        { ...competition, id: 'deleted-league', deletedAt: new Date('2026-10-03') },
+        { ...competition, id: 'deleted-tournament', kind: 'regular_tournament', deletedAt: new Date('2026-10-03') },
+        { ...competition, id: 'unsupported', kind: 'unsupported_kind' },
+        { ...competition, id: 'reviewed-league' },
+        { ...competition, id: 'tournament-1', kind: 'regular_tournament', title: '종료 대회', scheduledEndAt: new Date('2026-09-30') },
+        { ...competition, id: 'null-kind-tournament', kind: null, title: '기존 대회', scheduledEndAt: new Date('2026-09-29') },
+      ].map((tournament) => ({ ...registration, tournament })),
+      { ...registration, status: 'pending', tournament: { ...competition, id: 'unconfirmed-league' } },
+      { ...registration, team: { ...registration.team, status: 'inactive' }, tournament: { ...competition, id: 'inactive-team-league' } },
+      { ...registration, team: { ...registration.team, deletedAt: new Date('2026-10-03') }, tournament: { ...competition, id: 'deleted-team-league' } },
+      { ...registration, team: { ...registration.team, memberships: [{ ...membership, role: 'member' }] }, tournament: { ...competition, id: 'ordinary-member-league' } },
+      { ...registration, team: { ...registration.team, memberships: [{ ...membership, status: 'inactive' }] }, tournament: { ...competition, id: 'inactive-membership-league' } },
+      { ...registration, team: { ...registration.team, memberships: [{ ...membership, userId: 'other-user' }] }, tournament: { ...competition, id: 'other-manager-league' } },
+    ].map((row) => ({ ...row, tournamentId: row.tournament.id }));
     prisma.v1TournamentRegistration.findMany.mockImplementation(
-      ({ where }: { where: { tournament: ReviewCompetitionWhere } }) => Promise.resolve(
-        registrations.filter((registration) => matchesReviewCompetition(registration.tournament, where.tournament)),
+      ({ where }: { where: ReviewRegistrationWhere & { tournament: ReviewCompetitionWhere } }) => Promise.resolve(
+        registrations.filter((row) => matchesReviewCompetition(row.tournament, where.tournament)
+          && matchesReviewRegistration(row, where)),
       ),
     );
     const authoredReviews = [
@@ -399,6 +417,7 @@ describe('TournamentReviewsService — awards admin gate', () => {
     expect(result).toEqual([
       { tournamentId: 'league-1', tournamentTitle: '종료 리그', completedAt: '2026-10-01T00:00:00.000Z' },
       { tournamentId: 'tournament-1', tournamentTitle: '종료 대회', completedAt: '2026-09-30T00:00:00.000Z' },
+      { tournamentId: 'null-kind-tournament', tournamentTitle: '기존 대회', completedAt: '2026-09-29T00:00:00.000Z' },
     ]);
   });
 
@@ -1068,6 +1087,106 @@ describe('TournamentReviewsService — review hide moderation', () => {
     expect(result).toEqual({ alreadyVisible: true });
     expect(prisma.$transaction).not.toHaveBeenCalled();
     expect(prisma.v1TournamentReview.update).not.toHaveBeenCalled();
+  });
+
+  describe('league review moderation', () => {
+    type ModerationReview = Omit<ReturnType<typeof reviewRow>, 'hiddenAt' | 'hiddenReason'> & {
+      hiddenAt: Date | null;
+      hiddenReason: string | null;
+    };
+    type ReviewWhere = { id?: string; tournamentId?: string; hiddenAt?: Date | null };
+    let leagueReview: ModerationReview;
+    const admins = [
+      { role: 'owner', user: ownerAuthUser, record: ownerAdminRecord },
+      { role: 'ops', user: { ...ownerAuthUser, id: 'ops-user' }, record: { ...ownerAdminRecord, id: 'ops-admin-id', userId: 'ops-user', adminRole: 'ops' } },
+    ];
+
+    beforeEach(() => {
+      leagueReview = { ...reviewRow(), tournamentId: 'league-1' };
+      const matchingRows = (where: ReviewWhere) =>
+        [leagueReview, reviewRow({ id: 'other-review', tournamentId: 'other-league' })].filter((row) =>
+          (where.id === undefined || row.id === where.id)
+          && (where.tournamentId === undefined || row.tournamentId === where.tournamentId)
+          && (where.hiddenAt === undefined || row.hiddenAt === where.hiddenAt));
+      prisma.v1TournamentReview.findMany.mockImplementation(({ where }: { where: ReviewWhere }) => Promise.resolve(matchingRows(where)));
+      prisma.v1TournamentReview.count.mockImplementation(({ where }: { where: ReviewWhere }) => Promise.resolve(matchingRows(where).length));
+      prisma.v1TournamentReview.findFirst.mockImplementation(({ where }: { where: ReviewWhere }) => Promise.resolve(matchingRows(where)[0] ?? null));
+      prisma.v1TournamentReview.update.mockImplementation(({ where, data }: {
+        where: { id: string }; data: { hiddenAt: Date | null; hiddenReason: string | null };
+      }) => {
+        if (where.id !== leagueReview.id) throw new Error('Unknown review fixture');
+        leagueReview = { ...leagueReview, ...data };
+        return Promise.resolve(leagueReview);
+      });
+    });
+
+    it('lets a support administrator read only the requested league including hidden reviews', async () => {
+      // Given
+      prisma.v1AdminUser.findUnique.mockResolvedValue(supportAdminRecord);
+      leagueReview = { ...leagueReview, hiddenAt: new Date('2026-10-01'), hiddenReason: '검토 중' };
+      // When
+      const result = await service.listReviewsAdmin(supportAuthUser, 'league-1');
+      // Then
+      expect(result).toMatchObject({ total: 1, items: [{ id: 'review-1', hiddenAt: '2026-10-01T00:00:00.000Z', hiddenReason: '검토 중' }] });
+    });
+
+    it.each(admins)('lets an active $role administrator hide a league review and records its actor and before/after values', async ({ user, record }) => {
+      // Given
+      prisma.v1AdminUser.findUnique.mockResolvedValue(record);
+      // When
+      const result = await service.hideReview(user, 'league-1', 'review-1', { reason: '  욕설 포함  ' });
+      // Then
+      expect(result).toEqual({ alreadyHidden: false });
+      expect(leagueReview.hiddenAt).toBeInstanceOf(Date);
+      expect(leagueReview.hiddenReason).toBe('욕설 포함');
+      expect(prisma.v1AdminActionLog.create).toHaveBeenCalledWith({ data: {
+        adminUserId: record.id, action: 'tournament.review_hide', targetType: 'tournament_review', targetId: 'review-1',
+        reason: '욕설 포함', beforeJson: { hiddenAt: null, hiddenReason: null },
+        afterJson: { hiddenAt: leagueReview.hiddenAt?.toISOString(), hiddenReason: '욕설 포함' },
+      } });
+    });
+
+    it.each(admins)('lets an active $role administrator restore a hidden league review with its prior moderation values audited', async ({ user, record }) => {
+      // Given
+      prisma.v1AdminUser.findUnique.mockResolvedValue(record);
+      leagueReview = { ...leagueReview, hiddenAt: new Date('2026-10-01'), hiddenReason: '검토 중' };
+      // When
+      const result = await service.unhideReview(user, 'league-1', 'review-1');
+      // Then
+      expect(result).toEqual({ alreadyVisible: false });
+      expect(leagueReview).toMatchObject({ hiddenAt: null, hiddenReason: null });
+      expect(prisma.v1AdminActionLog.create).toHaveBeenCalledWith({ data: {
+        adminUserId: record.id, action: 'tournament.review_unhide', targetType: 'tournament_review', targetId: 'review-1',
+        reason: null, beforeJson: { hiddenAt: '2026-10-01T00:00:00.000Z', hiddenReason: '검토 중' },
+        afterJson: { hiddenAt: null, hiddenReason: null },
+      } });
+    });
+
+    const mutations = [
+      { action: 'hide', invoke: (user: typeof ownerAuthUser, id: string) => service.hideReview(user, id, 'review-1', {}) },
+      { action: 'unhide', invoke: (user: typeof ownerAuthUser, id: string) => service.unhideReview(user, id, 'review-1') },
+    ];
+    it.each(mutations)('rejects a support administrator attempting to $action a league review', async ({ invoke }) => {
+      // Given
+      prisma.v1AdminUser.findUnique.mockResolvedValue(supportAdminRecord);
+      // When
+      const attempt = invoke(supportAuthUser, 'league-1');
+      // Then
+      await expect(attempt).rejects.toMatchObject({ response: { code: 'PERMISSION_DENIED' } });
+      expect(prisma.v1TournamentReview.update).not.toHaveBeenCalled();
+      expect(prisma.v1AdminActionLog.create).not.toHaveBeenCalled();
+    });
+
+    it.each(mutations)('rejects a $action request whose review belongs to a different league', async ({ invoke }) => {
+      // Given
+      prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+      // When
+      const attempt = invoke(ownerAuthUser, 'wrong-league');
+      // Then
+      await expect(attempt).rejects.toMatchObject({ response: { code: 'REVIEW_NOT_FOUND' } });
+      expect(prisma.v1TournamentReview.update).not.toHaveBeenCalled();
+      expect(prisma.v1AdminActionLog.create).not.toHaveBeenCalled();
+    });
   });
 });
 

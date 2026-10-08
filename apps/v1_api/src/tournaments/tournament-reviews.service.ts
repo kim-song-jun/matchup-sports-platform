@@ -350,7 +350,7 @@ export class TournamentReviewsService {
   }
 
   /**
-   * 내가 팀장·운영진인 팀이 참가 확정한 대회 중 종료됐지만 아직 리뷰가 없는 대회 목록
+   * 내가 팀장·운영진인 팀이 참가 확정한 공개 대회·리그 중 종료됐지만 아직 리뷰가 없는 목록
    * (최근 종료순). "리뷰가 없다"는 authorUserId(나) 기준 — 대회당 인당 1건 정책(2026-08-17)
    * 아래에서는 같은 팀 다른 운영진이 먼저 썼더라도 나는 여전히 별도로 쓸 수 있으므로 이
    * 대회는 내 pending 목록에 남아 있어야 한다(팀 기준으로 걸러내면 안 된다).
@@ -360,9 +360,10 @@ export class TournamentReviewsService {
       where: {
         status: 'confirmed',
         team: this.eligibleTeamWhere(userId),
+        // 카드가 공개 상세로 연결되므로 공개된 항목만 안내한다. 직접 제출 권한은 별도다.
         // 공개 상세·후기 제출과 같은 두 종류를 받되, 완료·삭제 조건은 직접 유지한다.
         // 새 종류가 추가되어도 이 목록에 자동으로 들어오지 않도록 화이트리스트를 쓴다.
-        tournament: { ...tournamentKindCondition(ALL_COMPETITION_KINDS), status: 'completed', deletedAt: null },
+        tournament: { ...tournamentKindCondition(ALL_COMPETITION_KINDS), isPublic: true, status: 'completed', deletedAt: null },
       },
       select: {
         teamId: true,

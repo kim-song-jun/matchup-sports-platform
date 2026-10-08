@@ -52,6 +52,15 @@ Phase C root 직렬검증·Changeset·independentreview·commit/push/devPR/댓�
 | 2026-10-08 | root | 존재하나404원인? | listReviews 공개surface가 TOURNAMENT_KINDS로 제한; 현재상세/쓰기계약 추가대조 필요 |
 
 ## Progress Snapshot
+
+### 실제 PR 리뷰 후속 — 2026-10-08 17:33 KST
+- PR1668 https://github.com/kim-song-jun/matchup-sports-platform/pull/1668 head2e759a465d37d1c28af46550308772e588e0217f 게시·원 리포트 댓글1 저장 성공. API72 committed/type/surface와 이전 exact head 독립 리뷰는 기록으로 보존한다.
+- 실제 P2 PRRT_kwDORrML2s6qQ2RZ: 비공개 종료 대회·리그 pending CTA가 공개 상세404로 연결됨. 실제 predicate를 평가하는 회귀 RED1FAIL/80PASS → 공개 조건 isPublic:true 최소 추가 → GREEN81/81. 직접 비공개 후기 제출 권한은 유지.
+- 실제 P2 PRRT_kwDORrML2s6qQ2Rc: 대회 전용 관리자 셸이 리그 UUID404로 막아 후기 모더레이션 UI가 없음. 기존 kind-agnostic admin review API와 역할·감사 기록을 재사용하고 리그 상세에서 후기 관리 entry+실제 리그 조회 client를 연결.
+- Frontend actual 기존 fixtures consumer missingentry RED1FAIL → 신규 league page→realhooks→MSW11 + 기존fixtures71 =82/82 GREEN. support readonly/ops reason·hide·unhide/403/404/503/listretry/partial failure를 확인. 기존 fixtures71의 act warning은 숨기지 않았으며 신규11에는 없음.
+- Backend 9 추가 테스트는 owner/ops hide/unhide actor·before/after audit, support 조회/쓰기거부, 다른 리그 review 거부를 actual service에서 증명. 서버 moderation source 확장 없음; ALL baseline3곳 유지. API 문서와 web/API Changeset sync.
+- Root scope commit·최신dev드리프트 통합·committed API81/Web82/type/surface/pattern·각 exact head 독립 리뷰 후 같은 PR push·실제스레드 답변·재리뷰를 진행. alpha 원문 public league 후기404 before 유지; 수정 SHA 배포 이후 public/private/admin persona 실측은 대기.
+
 - Absolute WT C:/Users/kinso/.codex/worktrees/mdqa-47-league-reviews/matchup-sports-platform; feature fix/mdqa-47-league-reviews; latestorigin/dev1e4da237.
 - Originalcheckout own ignored evidence 2026-10-08-heartbeat-0550/report47-before.txt + report47-claimed.txt/png.
 - Root actual alpha before: 공개 익명 UI가 표시된 실제 persona, 1280×760. 공개 종료 리그 상세에서 후기 링크 클릭 후 제목은 존재하지만 API404 TOURNAMENT_NOT_FOUND / 대회를 찾을 수 없어요. 실제 재시도 후도 동일. request response와 screenshot은 0550/report47-alpha-*. serving SHA는 UI/허용된 header에서 노출되지 않아 미확인. 로그인 prompt를 E2E 관리자 인증 증거로 사용하지 않음. 데이터 수정 없음.

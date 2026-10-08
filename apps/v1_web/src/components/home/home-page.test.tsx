@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { HomePageView } from './home-page';
-import type { V1TournamentListItem } from '@/types/api';
+import type { V1TeamMatch, V1TournamentListItem } from '@/types/api';
 import type { HomeMatchCard, HomeViewModel } from './home.types';
 
 vi.mock('next/navigation', () => ({
@@ -14,11 +14,20 @@ const useV1AllTournamentsMock = vi.hoisted(() =>
   vi.fn(() => ({ data: [] as V1TournamentListItem[], isPending: false, isError: false, isLoading: false, refetch: vi.fn() })),
 );
 
+const useV1TournamentsMock = vi.hoisted(() =>
+  vi.fn(() => ({ data: { items: [] as V1TournamentListItem[] }, isPending: false, isError: false })),
+);
+const useV1TeamMatchesMock = vi.hoisted(() =>
+  vi.fn(() => ({ data: { items: [] as V1TeamMatch[] }, isPending: false, isError: false })),
+);
+
 vi.mock('@/hooks/use-v1-api', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/hooks/use-v1-api')>();
   return {
     ...actual,
     useV1AllTournaments: useV1AllTournamentsMock,
+    useV1Tournaments: useV1TournamentsMock,
+    useV1TeamMatches: useV1TeamMatchesMock,
     useV1LeagueMatches: () => ({
       data: {
         items: [
@@ -93,6 +102,63 @@ function buildModel(overrides: Partial<HomeViewModel> = {}): HomeViewModel {
     ...overrides,
   };
 }
+
+describe('HomePageView — 오늘의 추천에 리그·팀매치', () => {
+  it('신청 가능한 리그(마감 가장 가까운 것)와 팀매치를 한 장씩 싣는다', () => {
+    const league = (id: string, registrationDeadlineAt: string) => ({
+      id,
+      title: `리그 ${id}`,
+      kind: 'regular_league',
+      status: 'open',
+      registrationDeadlineAt,
+      scheduledAt: null,
+      venue: '서울',
+      coverImageUrl: null,
+      campaignSlug: null,
+      sport: { code: 'futsal', name: '풋살' },
+    }) as unknown as V1TournamentListItem;
+    useV1TournamentsMock.mockReturnValue({
+      data: {
+        items: [
+          league('league-closed', '2000-01-01T00:00:00.000Z'),
+          league('league-later', '2099-12-01T00:00:00.000Z'),
+          league('league-soon', '2099-11-01T00:00:00.000Z'),
+        ],
+      },
+      isPending: false,
+      isError: false,
+    });
+    useV1TeamMatchesMock.mockReturnValue({
+      data: {
+        items: [{
+          // 목록 API 의 실제 모양 — id·sportName·placeName 없이 teamMatchId·sport·place 로 온다.
+          teamMatchId: 'tm-1',
+          title: '토요일 친선전',
+          sport: { sportId: 's1', name: '풋살' },
+          place: { name: '마포 풋살장' },
+          hostTeam: { teamId: 't1', name: 'FC 번개' },
+          startsAt: '2099-11-02T10:00:00.000Z',
+          imageUrl: null,
+        } as unknown as V1TeamMatch],
+      },
+      isPending: false,
+      isError: false,
+    });
+
+    render(<HomePageView model={buildModel()} />);
+
+    expect(screen.getByRole('link', { name: /리그 league-soon/ })).toHaveAttribute('href', '/league-matches/league-soon?from=%2Fhome');
+    expect(screen.queryByRole('link', { name: /리그 league-later/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /리그 league-closed/ })).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /토요일 친선전/ })).toHaveAttribute('href', '/team-matches/tm-1?from=%2Fhome');
+    expect(screen.getByText('마포 풋살장 · FC 번개')).toBeInTheDocument();
+    // 홈 방문자마다 팀매치 목록을 15초마다 다시 받지 않는다.
+    expect(useV1TeamMatchesMock).toHaveBeenCalledWith(
+      { status: 'recruiting', kind: 'friendly', sort: 'recommended', limit: 1 },
+      { refetchInterval: false },
+    );
+  });
+});
 
 describe('HomePageView back-navigation from=/home', () => {
   it('carries from=/home on the featured match card link', () => {

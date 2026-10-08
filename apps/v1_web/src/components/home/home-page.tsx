@@ -24,10 +24,11 @@ import { formatTournamentDateRangeShort } from '@/lib/date-utils';
 import { withFromPath } from '@/lib/session-storage';
 import { userRecordResultLabel } from '@/components/public-game-records/format';
 import { resultChipStyle } from '@/components/public-game-records/result-emphasis';
-import { useV1AllTournaments, useV1LeagueMatches } from '@/hooks/use-v1-api';
+import { useV1AllTournaments, useV1LeagueMatches, useV1TeamMatches, useV1Tournaments } from '@/hooks/use-v1-api';
 import type { V1TournamentListItem } from '@/types/api';
 import type { V1PublicLeagueListItem } from '@/types/league-match';
-import { TournamentHeroCard } from './tournament-hero-card';
+import { isRecruitingNow, TournamentHeroCard } from './tournament-hero-card';
+import { toFeaturedLeague, toFeaturedTeamMatch } from './home-client-model';
 import { FeaturedSlotSkeleton } from './featured-slot-skeleton';
 import type { HomeChatRoom, HomeMatchCard, HomeQuickAction, HomeViewModel } from './home.types';
 import { homeCapacity } from './home-capacity';
@@ -46,9 +47,26 @@ export function HomePageView({ model }: { model: HomeViewModel }) {
   // 하나만 추가해 대회 히어로 카드처럼 메인 컬럼 밀도(오늘의 추천)는 건드리지 않는다.
   const leagues = useV1LeagueMatches({ state: 'active', limit: 4 });
   const leagueItems = leagues.data?.items ?? [];
+  // "오늘의 추천"은 개인매치·대회·리그·팀매치를 모두 담는다 — 넷 다 **지금 신청할 수 있는 것**(모집 중,
+  // 시작·마감 전)만. 개인매치는 홈 응답이 이미 그렇게 고르고, 대회는 관리자 홈 홍보 중
+  // isRecruitingNow 인 것, 리그·팀매치는 홍보 토글이 없어 가장 가까운 한 건씩 자동으로 고른다.
+  const now = Date.now();
   // TournamentHeroCard owns the promoHomeEnabled filter + sort — this only needs
   // to know whether *any* eligible item exists, to decide the section's visibility.
-  const hasHomePromo = tournamentItems.some((item) => item.status === 'open' && item.promoHomeEnabled);
+  const hasHomePromo = tournamentItems.some((item) => item.promoHomeEnabled && isRecruitingNow(item, now));
+  // 신청 가능한 정규 리그 중 마감이 가장 가까운 것. 공개 목록이 비공개·보류 리그를 이미 뺀다.
+  const openLeagues = useV1Tournaments({ kind: 'league', status: 'open', limit: 50 });
+  const featuredLeagueItem = (openLeagues.data?.items ?? [])
+    .filter((item) => isRecruitingNow(item, now))
+    .sort((a, b) => (a.registrationDeadlineAt ?? '').localeCompare(b.registrationDeadlineAt ?? ''))[0];
+  const featuredLeague = featuredLeagueItem ? toFeaturedLeague(featuredLeagueItem) : null;
+  // 상대 팀을 구하는 일반 팀매치(리그 대진 제외) 중 시작이 가장 가까운 것. 서버가 모집 중·시작 전·마감 전만 준다.
+  const teamMatches = useV1TeamMatches(
+    { status: 'recruiting', kind: 'friendly', sort: 'recommended', limit: 1 },
+    { refetchInterval: false },
+  );
+  const featuredTeamMatchItem = teamMatches.data?.items[0];
+  const featuredTeamMatch = featuredTeamMatchItem ? toFeaturedTeamMatch(featuredTeamMatchItem) : null;
   // `isLoading`(= isPending && isFetching) 이 아니라 `isPending`(= 아직 데이터가 없다)을 본다.
   // 서버 렌더에서는 쿼리가 돌지 않아 isFetching 이 false → isLoading 도 false 라, 이 조건이
   // **"아직 모름"을 "없음"으로** 읽고 섹션을 통째로 빼 버렸다. 그래서 서버 HTML 에 슬롯이
@@ -64,7 +82,9 @@ export function HomePageView({ model }: { model: HomeViewModel }) {
     tournaments.isPending ||
     tournaments.isError ||
     model.statsLoading ||
-    hasHomePromo;
+    hasHomePromo ||
+    Boolean(featuredLeague) ||
+    Boolean(featuredTeamMatch);
   const hasRecommendedMatches = model.network || model.recommendedMatches.length > 0;
   const weatherPermission = model.weatherPermission ?? 'prompt';
   const weatherPermissionCopy = getWeatherPermissionCopy(weatherPermission);
@@ -187,7 +207,7 @@ export function HomePageView({ model }: { model: HomeViewModel }) {
             {/* 같은 화면의 "추천 매치"·"최근 채팅" 과 같은 역할인데 인라인 tm-text-label(13px)
                 이라 4px 작았다(2026-09-07 alpha 실측: 홈의 섹션 제목 역할 요소 28개 중 26개가
                 13px). 공유 SectionTitle 로 옮겨 17px/700 로 통일한다 — DESIGN.md §2.1. */}
-            <SectionTitle title="오늘의 추천" sub="지금 눈여겨볼 매치·대회" />
+            <SectionTitle title="오늘의 추천" sub="지금 신청할 수 있는 매치·대회·리그·팀매치" />
             <div className="tm-home-featured-carousel">
               {/* 추천 매치 슬롯도 **자리를 먼저 잡는다**. 이 카드는 /api/v1/home 응답으로 나타나는데
                   캐러셀의 0번 자리라, 늦게 끼어들면 이미 자리 잡은 대회 슬롯을 통째로 오른쪽으로
@@ -213,6 +233,26 @@ export function HomePageView({ model }: { model: HomeViewModel }) {
               ) : (
                 <TournamentHeroCard items={tournamentItems} loading={tournaments.isPending} />
               )}
+              {/* 리그·팀매치는 늦게 와도 **뒤에 붙는다** — 앞 칸에 끼어들면 이미 자리 잡은 카드를
+                  밀어낸다(위 추천 매치 슬롯의 CLS 사고와 같은 이유). */}
+              {featuredLeague ? (
+                <FeaturedMatchCard
+                  match={featuredLeague}
+                  network={false}
+                  signedOut={model.signedOut}
+                  eyebrow="정규 리그 · 모집 중"
+                  href={withFromPath(`/league-matches/${featuredLeague.id}`, '/home')}
+                />
+              ) : null}
+              {featuredTeamMatch ? (
+                <FeaturedMatchCard
+                  match={featuredTeamMatch}
+                  network={false}
+                  signedOut={model.signedOut}
+                  eyebrow="팀매치 · 상대 팀 모집 중"
+                  href={withFromPath(`/team-matches/${featuredTeamMatch.id}`, '/home')}
+                />
+              ) : null}
             </div>
           </div>
           ) : null}
@@ -667,13 +707,20 @@ function FeaturedMatchCard({
   network,
   signedOut,
   onRetry,
+  eyebrow,
+  href,
 }: {
   match: HomeMatchCard;
   network: boolean;
   signedOut: boolean;
   onRetry?: () => void;
+  /** 개인매치가 아닌 카드(리그·팀매치)의 머리말. 없으면 개인매치 추천 문구. */
+  eyebrow?: string;
+  /** 개인매치가 아닌 카드의 상세 경로. 없으면 개인매치 상세. */
+  href?: string;
 }) {
   const capacity = homeCapacity(match.currentParticipants, match.maxParticipants);
+  const eyebrowText = eyebrow ?? (signedOut ? '랜덤 추천 매치' : match.reason ?? '관심 종목 기반 추천');
   const card = (
     <Card pad={0} className="tm-featured-card" style={{ overflow: 'hidden' }}>
       {/* 사진이 없으면 목업 사진을 깔지 않고 종목 그래픽을 그린다 — 예전엔 모든 추천 카드가
@@ -694,7 +741,7 @@ function FeaturedMatchCard({
           <div className="tm-featured-overlay">
             <div className="tm-featured-text">
               <div className="tm-text-micro tm-featured-eyebrow">
-                {signedOut ? '랜덤 추천 매치' : match.reason ?? '관심 종목 기반 추천'}
+                {eyebrowText}
               </div>
               <div className="tm-text-subhead tm-featured-headline" style={{ marginTop: 4 }}>
                 {match.title}
@@ -707,7 +754,7 @@ function FeaturedMatchCard({
       {!network && !match.imageUrl ? (
         <div className="tm-featured-stack-copy">
           <div className="tm-text-micro tm-featured-eyebrow">
-            {signedOut ? '랜덤 추천 매치' : match.reason ?? '관심 종목 기반 추천'}
+            {eyebrowText}
           </div>
           <div className="tm-text-subhead tm-featured-headline" style={{ marginTop: 4 }}>
             {match.title}
@@ -757,7 +804,7 @@ function FeaturedMatchCard({
   );
 
   return network ? card : (
-    <Link className="tm-featured-link tm-pressable" href={withFromPath(`/matches/${match.id}`, '/home')}>
+    <Link className="tm-featured-link tm-pressable" href={href ?? withFromPath(`/matches/${match.id}`, '/home')}>
       {card}
     </Link>
   );

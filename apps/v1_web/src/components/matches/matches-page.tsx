@@ -1319,7 +1319,7 @@ function PlaceTimeFields({ model }: { model: MatchCreateViewModel }) {
       <CreateField id="field-date" error={errors?.date} label="날짜" value={draft.date} type="date" onChange={(value) => model.form?.onFieldChange('date', value)} />
       <div className="tm-create-two-col">
         <CreateField id="field-startTime" error={errors?.startTime} label="시작 시간" value={draft.startTime} type="time" onChange={(value) => model.form?.onFieldChange('startTime', value)} />
-        <CreateField label="종료 시간" value={draft.endTime} type="time" onChange={(value) => model.form?.onFieldChange('endTime', value)} />
+        <CreateField id="field-endTime" error={errors?.endTime} label="종료 시간" value={draft.endTime} type="time" onChange={(value) => model.form?.onFieldChange('endTime', value)} />
       </div>
       <div className="tm-create-two-col">
         <CreateField id="field-deadlineDate" error={errors?.deadlineDate} label="신청 마감일" value={draft.deadlineDate} type="date" onChange={(value) => model.form?.onFieldChange('deadlineDate', value)} />

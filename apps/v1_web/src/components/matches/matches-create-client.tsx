@@ -689,7 +689,7 @@ export function draftFromMatchEdit(edit: V1MatchEdit): MatchDraft {
     address: edit.form.addressText ?? '',
     date: toDateInput(start),
     startTime: toTimeInput(start),
-    endTime: end ? toTimeInput(end) : toTimeInput(start),
+    endTime: end ? toTimeInput(end) : '',
     deadlineDate: deadline ? toDateInput(deadline) : '',
     deadlineTime: deadline ? toTimeInput(deadline) : '',
   };

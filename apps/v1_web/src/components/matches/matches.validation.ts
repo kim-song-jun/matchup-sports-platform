@@ -62,6 +62,19 @@ const RULES: Array<{
     },
   },
   {
+    field: 'endTime',
+    label: '종료 시간은 시작 시간보다 늦어야 해요',
+    step: 'place-time',
+    isSatisfied: (ctx) => {
+      if (!ctx.draft.endTime) return true;
+      const startsAt = parseStartsAt(ctx.draft);
+      if (!startsAt) return true;
+      // 종료 날짜를 받지 않는 개인 매치는 같은 날로 검증한다. 역전 값을 익일이나 생략으로 바꾸지 않는다.
+      const endsAt = new Date(`${ctx.draft.date}T${ctx.draft.endTime}:00`);
+      return endsAt > startsAt;
+    },
+  },
+  {
     field: 'deadlineTime',
     label: '신청 마감은 시작 시간보다 빨라야 해요',
     step: 'place-time',
@@ -151,7 +164,7 @@ export function buildMatchPayloadResult(draft: MatchDraft, sportId: string, regi
       description: draft.description.trim() || null,
       imageUrl: draft.image || null,
       startsAt: startsAt.toISOString(),
-      endsAt: endsAt && endsAt > startsAt ? endsAt.toISOString() : null,
+      endsAt: endsAt ? endsAt.toISOString() : null,
       deadlineAt: deadlineAt ? deadlineAt.toISOString() : null,
       // 주최자가 참가하면 최소 정원은 2명(나 + 1명) — UI 스테퍼와 같은 하한을 여기서도 강제한다.
       capacity: Math.max(Number(draft.capacity) || 1, draft.hostParticipates ? 2 : 1),

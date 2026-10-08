@@ -35,7 +35,7 @@ Status: In Progress
 
 ## Acceptance Criteria
 - [x] 고정 및 해제 최신화 RED → GREEN 증거.
-- [x] 기존 채팅 권한·목록·오류 계약 유지.
+- [x] 기존 채팅 권한·목록·오류 계약 유지 (cached consumer 오류·복구 검증 포함).
 - [ ] 범위 내 검증 PASS 및 Critical/Warning 0 독립 리뷰.
 - [ ] task, Changeset, intended/committed diff scope 일치.
 - [ ] PR/원 리포트 댓글 게시 실제 확인.
@@ -67,3 +67,9 @@ Status: In Progress
 - GREEN (15:04:43 local): 같은 명령 6 passed (3.15s). 목록, 실제 filter params(`roomType=team&status=active&limit=50`), 상세 모두 fresh/stale × 고정/해제 최신화. signed-out `enabled=false`/빈 room idle, 실패의 HTTP503·SERVICE_UNAVAILABLE/기존 캐시 유지도 확인했다. 직전 preflight CPU57%, free13.71GiB, Node41/Edge10.
 - 구현 경로: `apps/v1_web/src/hooks/use-v1-api.ts` 두 chat query `refetchOnWindowFocus: 'always'`와 이유 주석; `apps/v1_web/src/hooks/use-v1-api.chat-focus.test.tsx` 신규 6-case 실제 query/API/focus 회귀. Global provider/API/DTO/MSW 계약 변경 없음. 외부 영속 저장/broadcast 추가 없음.
 - 제한/남은 gate: active query가 있는 탭 복귀 최신화를 증명했다. 비활성 탭에서 즉시 broadcast하지 않는다. lint/full suite/독립 리뷰/committed-tree/Changeset/PR은 root 후속 gate이며 alpha 2탭 실측은 dev 머지·배포 후 대기다. 임시 instrumentation/서버/브라우저는 생성하지 않았고 테스트는 client/MSW/visibility/env를 teardown했다.
+- 독립 리뷰 `0b1dfe872` followup: cache가 있으면 `community-page.tsx`의 list `!hasRooms`/detail `messages.length === 0` 조건이 ErrorState를 숨긴다. detail model은 error여서 composer는 잠기는데 오류/재시도는 보이지 않는다. filteredQuery 실패도 list model이 base query만 보아 숨기며, cached endedQuery의 data 우선 status도 archived 실패를 숨긴다.
+- 후속 분담: frontend-data 소유는 `hooks/use-v1-api.chat-refresh-consumer.test.tsx`/task evidence. `components/**` 수정은 frontend-ui worker가 담당한다. 실제 ChatListPageClient/ChatRoomPageClient + QueryClient/MSW/visibilitychange로 base/filter/archived failure와 retry, cached detail503의 입력 복구, detail403의 접근 거절/목록 이동을 검증한다. hooks/consumer/views는 mock하지 않으며 Next navigation과 외부 Socket 연결만 fixture한다. RED 실행/실제 UI 수정은 root serial slot 순서를 기다린다.
+- Consumer RED (15:18:18 local): `apps/v1_web`에서 bundled Node로 `node_modules/vitest/vitest.mjs run src/hooks/use-v1-api.chat-refresh-consumer.test.tsx --maxWorkers=1 --no-file-parallelism --reporter=verbose`, 5 failed (9.13s). 실제 cached DOM이 남아 있지만 `Unable to find role="alert"`; import/fixture 오류 없이 숨은 오류가 재현됐다. 직전 CPU14%, free14.06GiB, Node27/Edge10, Docker daemon 미가동.
+- Consumer GREEN (15:22:16 local): 동일 serial worker로 `... run src/hooks/use-v1-api.chat-focus.test.tsx src/hooks/use-v1-api.chat-refresh-consumer.test.tsx --maxWorkers=1 --no-file-parallelism --reporter=verbose`, 2 files / 11 passed (6.63s). base/filter/archived cached 실패의 표시·실제 재시도·최신 서버 데이터, cached 상세503의 표시/스크롤 상단 유지/재시도 후 composer 복구,403 권한 거절·목록 이동·network retry 미노출 모두 PASS. 초기 query/read mutation 완료 후 실패를 주입한다. 직전 CPU21%, free13.83GiB, Node27/Edge10.
+- 후속 범위의 UI 수정은 frontend-ui worker가 `community-api-clients.tsx`, `community-page.tsx`에서 수행했다. data worker는 신규 소비자 회귀 스펙과 task만 수정했다. 길어진 대화의 browser geometry/ResizeObserver는 jsdom fixture이며 alpha viewport 증거를 대체하지 않는다. 실제 서버/Next/브라우저/메시지 전송/계정 변경/Git mutation은 실행하지 않았고 root에 serial slot을 반환했다.
+- Root typecheck first exposed redundant `status !== error` after narrowed ErrorState ternary. Removed only the two unreachable comparisons; incremental tsc rerun PASS and unchanged pattern gate PASS. Consumer cases remain actual failure/retry, final committed 11-case rerun pending. Initial0b1d reviewer Critical cached-error failure addressed; exact followup head re-review required.

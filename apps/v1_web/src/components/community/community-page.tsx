@@ -58,14 +58,14 @@ function ChatListContent({ model, selectedRoomId }: { model: ChatListViewModel; 
             </div>
           ) : null}
           {model.status === 'loading' ? <PageSkeleton variant="list" /> : null}
-          {model.status === 'error' && !hasRooms ? (
+          {model.status === 'error' ? (
             <ErrorState
               title={model.emptyTitle ?? '채팅방을 불러오지 못했어요'}
               message={model.emptyBody ?? '잠시 후 다시 시도해 주세요.'}
               onRetry={model.onRetry}
               retryLabel="다시 불러오기"
             />
-          ) : model.status !== 'loading' && model.status !== 'error' && !hasRooms ? (
+          ) : model.status !== 'loading' && !hasRooms ? (
             /* [P2 UX 라이팅] cta 능동형 표현 */
             <EmptyState
               fill
@@ -128,20 +128,21 @@ export function ChatRoomPageView({ model, listModel, roomId }: { model: ChatRoom
   useLayoutEffect(() => {
     const thread = threadRef.current;
     if (!thread) return;
-    thread.scrollTop = thread.scrollHeight;
+    // 캐시 대화가 남은 재조회 실패에서도 위쪽 오류·재시도를 볼 수 있어야 한다.
+    thread.scrollTop = model.status === 'error' ? 0 : thread.scrollHeight;
   }, [lastMessageId, model.messages.length, model.status]);
 
   useEffect(() => {
     const thread = threadRef.current;
     if (!thread || typeof ResizeObserver === 'undefined') return undefined;
 
-    const keepAtBottom = () => {
-      thread.scrollTop = thread.scrollHeight;
+    const alignThread = () => {
+      thread.scrollTop = model.status === 'error' ? 0 : thread.scrollHeight;
     };
-    const observer = new ResizeObserver(keepAtBottom);
+    const observer = new ResizeObserver(alignThread);
     observer.observe(thread);
     return () => observer.disconnect();
-  }, []);
+  }, [model.status]);
 
   // 입력칸은 내용만큼 자란다(최대 높이는 CSS 가 막고 그 뒤로는 스크롤). 보내서 비면 한 줄로 돌아온다.
   useLayoutEffect(() => {
@@ -235,7 +236,7 @@ export function ChatRoomPageView({ model, listModel, roomId }: { model: ChatRoom
             </div>
           ) : null}
           {model.status === 'loading' ? <PageSkeleton variant="list" /> : null}
-          {model.status === 'error' && model.messages.length === 0 ? (
+          {model.status === 'error' ? (
             <ErrorState
               title={model.emptyTitle ?? '메시지를 불러오지 못했어요'}
               message={model.emptyBody ?? '잠시 후 다시 시도해 주세요.'}
@@ -243,7 +244,7 @@ export function ChatRoomPageView({ model, listModel, roomId }: { model: ChatRoom
               retryLabel="다시 불러오기"
               back={model.errorBack}
             />
-          ) : model.status !== 'loading' && model.status !== 'error' && model.messages.length === 0 ? (
+          ) : model.status !== 'loading' && model.messages.length === 0 ? (
             /* [P2 UX 라이팅] 능동형 */
             <EmptyState
               fill

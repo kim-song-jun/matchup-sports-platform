@@ -86,6 +86,12 @@ function useChatListPageModel(): ChatListViewModel {
     { enabled: endedEnabled },
     endedEnabled ? { roomType: 'team_contact', status: 'archived', limit: CHAT_LIST_PAGE_SIZE } : undefined,
   );
+  // 화면에 선택된 목록과 펼친 보관 목록의 실패가 실제 재시도 대상을 결정한다.
+  // 전체 목록이 성공했어도 카테고리 조회 실패를 ready로 숨기면 오래된 고정 상태가 남는다.
+  const activeQuery = selectedCategory === '전체' ? query : filteredQuery;
+  const endedError = endedEnabled && endedQuery.isError;
+  const isError = activeQuery.isError || endedError;
+  const listError = activeQuery.isError ? activeQuery.error : endedQuery.error;
   const updateMe = useV1UpdateChatRoomMe();
   const baseRooms = query.data?.items.map(toChatRoomModel) ?? [];
   const categoryRooms = filteredQuery.data?.items.map(toChatRoomModel);
@@ -98,8 +104,8 @@ function useChatListPageModel(): ChatListViewModel {
     // onToggleMute: () => updateMe.mutate({ roomId: room.id, mutedUntil: room.muted ? null : mutedUntilIndefinite() }),
   });
   const rooms = baseRooms.map(withActions);
-  // 서버 필터 응답이 아직 없거나(첫 로딩) 실패했으면 전체 목록을 클라이언트에서 걸러 보여 주고,
-  // 도착하면 서버 결과로 바꾼다 — 카테고리를 고를 때 목록이 스켈레톤으로 비지 않게 한다.
+  // 서버 결과가 없으면 전체 목록의 기존 방을 문맥으로 남긴다. 실패 상태·재시도는 별도로
+  // 노출하므로 이 캐시를 선택된 카테고리의 최신 조회 성공으로 표시하지 않는다.
   const visibleRooms =
     selectedCategory === '전체'
       ? rooms
@@ -124,18 +130,21 @@ function useChatListPageModel(): ChatListViewModel {
     })),
     pinnedRooms: visibleRooms.filter((room) => room.pinned),
     rooms: visibleRooms.filter((room) => !room.pinned),
-    status: query.isPending ? 'loading' : query.isError ? 'error' : 'ready',
-    emptyTitle: query.isError ? '채팅방을 불러오지 못했어요' : isEmpty ? `${selectedCategory} 채팅방이 없어요` : undefined,
-    emptyBody: query.isError ? '잠시 후 다시 시도해 주세요.' : isEmpty ? '매치에 참가하거나 팀에 가입하면 채팅방이 생겨요.' : undefined,
-    emptyHref: query.isError || selectedCategory === '팀' || selectedCategory === '팀컨택' ? undefined : '/matches',
-    onRetry: query.isError ? () => query.refetch() : undefined,
+    status: activeQuery.isPending ? 'loading' : isError ? 'error' : 'ready',
+    emptyTitle: isError ? '채팅방을 불러오지 못했어요' : isEmpty ? `${selectedCategory} 채팅방이 없어요` : undefined,
+    emptyBody: isError ? extractErrorMessage(listError, '잠시 후 다시 시도해 주세요.') : isEmpty ? '매치에 참가하거나 팀에 가입하면 채팅방이 생겨요.' : undefined,
+    emptyHref: isError || selectedCategory === '팀' || selectedCategory === '팀컨택' ? undefined : '/matches',
+    onRetry: isError ? () => {
+      if (activeQuery.isError) void activeQuery.refetch();
+      if (endedError) void endedQuery.refetch();
+    } : undefined,
     endedContacts:
       selectedCategory === '팀컨택'
         ? {
             visible: showEnded,
             onToggle: () => setShowEnded((v) => !v),
             rooms: showEnded ? (endedQuery.data?.items.map(toChatRoomModel) ?? []).map(withActions) : [],
-            status: !showEnded || endedQuery.data ? 'ready' : endedQuery.isError ? 'error' : 'loading',
+            status: !showEnded ? 'ready' : endedQuery.isError ? 'error' : endedQuery.isPending ? 'loading' : 'ready',
           }
         : undefined,
   };

@@ -7,6 +7,7 @@ import { compressImagesForUpload, type CompressOptions } from '@/lib/image-compr
 import { earliestPublicLivePollDelay } from '@/lib/public-live-polling';
 import { OPERATIONS_BOARD_POLL_INTERVAL_MS } from '@/lib/operations-board-polling';
 import { v1Keys } from '@/lib/query-keys';
+import { invalidateV1ChatMessageQueries } from './use-v1-realtime-socket';
 import { findInListCache } from '@/lib/list-cache-seed';
 import { randomUuid } from '@/lib/uuid';
 import type { GameLineup } from '@/types/game-operations';
@@ -2678,9 +2679,8 @@ export function useV1SendChatMessage(roomId: string) {
     // 텍스트 또는 사진(내가 올린 업로드 경로) 중 하나 — 서버가 둘 다·둘 다 없음을 400 으로 막는다.
     mutationFn: (body: { content: string } | { imageUrl: string } | { share: { kind: V1ChatShareKind; targetId: string } } | { fileId: string }) =>
       v1Post<V1ChatMessageSendResult>(`/chat/rooms/${roomId}/messages`, body),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: v1Keys.chatRooms() });
-      queryClient.invalidateQueries({ queryKey: v1Keys.chatMessages(roomId) });
+    onSuccess: (message) => {
+      invalidateV1ChatMessageQueries(queryClient, message);
       invalidateV1NotificationQueries(queryClient);
     },
   });

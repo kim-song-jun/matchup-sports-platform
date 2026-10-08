@@ -10,7 +10,7 @@ import { normalizeNotificationHref } from '@/lib/notification-route';
 import { withFromPath } from '@/lib/session-storage';
 import { useCurrentHref } from '@/components/v1-ui/use-current-href';
 import { ChatSafetyDialog, type ChatSafetyTarget } from './chat-safety-dialog';
-import { useV1ChatRoomSocket } from '@/hooks/use-v1-realtime-socket';
+import { useV1ChatListSocket, useV1ChatRoomSocket } from '@/hooks/use-v1-realtime-socket';
 import {
   useV1ChatMessages,
   useV1ChatRoom,
@@ -64,6 +64,7 @@ const CATEGORY_ROOM_TYPE: Record<Exclude<ChatCategory, '전체'>, V1ChatRoom['ro
 };
 
 function useChatListPageModel(): ChatListViewModel {
+  useV1ChatListSocket();
   const searchParams = useSearchParams();
   const categoryParam = searchParams.get('category');
   const [selectedCategory, setSelectedCategory] = useState<ChatCategory>(() => initialChatCategory(categoryParam));

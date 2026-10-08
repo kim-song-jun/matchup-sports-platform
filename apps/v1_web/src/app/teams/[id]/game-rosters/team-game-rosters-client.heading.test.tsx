@@ -135,9 +135,27 @@ describe('QA51 실제 route consumer·셸·CSS의 명단 관리 맥락', () => {
     expect(heading).not.toHaveStyle({ whiteSpace: 'nowrap', overflow: 'hidden' });
   });
 
-  it('팀 정보 응답 전에도 기본 제목·복귀·명단을 유지하고 로딩을 표시한다', async () => {
+  it.each([[390, 'pending'], [390, '503'], [768, 'pending'], [768, '503']] as const)('%spx에서 보조 팀 정보 %s 상태는 셸과 명단에 노출하지 않는다', async (width, status) => {
+    teamInfoPending = status === 'pending';
+    teamInfoFails = status === '503';
+    const view = renderAtWidth(width);
+    await screen.findByRole('group', { name: '김민재 경기별 출전' });
+    expect(await screen.findByText(status === 'pending' ? '팀 정보를 불러오고 있어요.' : '팀 정보를 불러오지 못했어요')).not.toBeVisible();
+    expect(view.container.querySelector('.tm-topbar-heading')).toHaveTextContent(PAGE_TITLE);
+    expect(view.container.querySelector('.tm-topbar-heading')).toBeVisible();
+    expect(screen.queryByRole('heading', { level: 1 })).not.toBeInTheDocument();
+    expect(screen.getAllByRole('link', { name: '뒤로가기' })).toHaveLength(1);
+    expect(screen.getByRole('link', { name: '뒤로가기' })).toHaveAttribute('href', `/teams/${teamId}`);
+    expect(screen.getByRole('group', { name: '김민재 경기별 출전' })).toBeVisible();
+
+    if (status === '503') expect(screen.getByText('팀 정보 조회 실패')).not.toBeVisible();
+    expect(screen.queryByRole('button', { name: '팀 정보 다시 불러오기' })).not.toBeInTheDocument();
+    expect(teamInfoGets).toBe(1);
+  });
+
+  it.each([1188, 1440] as const)('%spx 팀 정보 응답 전에도 기본 제목·복귀·명단을 유지하고 로딩을 표시한다', async (width) => {
     teamInfoPending = true;
-    renderAtWidth(1188);
+    renderAtWidth(width);
     await screen.findByRole('group', { name: '김민재 경기별 출전' });
     expect(screen.getByText('팀 정보를 불러오고 있어요.')).toBeVisible();
     expect(screen.getByRole('heading', { level: 1, name: PAGE_TITLE })).toBeVisible();
@@ -147,9 +165,9 @@ describe('QA51 실제 route consumer·셸·CSS의 명단 관리 맥락', () => {
     expect(screen.queryByText('팀 정보를 불러오고 있어요.')).not.toBeInTheDocument();
   });
 
-  it('팀 정보 실패는 명시적으로 재시도하면서 기존 명단을 차단하지 않는다', async () => {
+  it.each([1188, 1440] as const)('%spx 팀 정보 실패는 명시적으로 재시도하면서 기존 명단을 차단하지 않는다', async (width) => {
     teamInfoFails = true;
-    renderAtWidth(1188);
+    renderAtWidth(width);
     await screen.findByRole('group', { name: '김민재 경기별 출전' });
     expect(await screen.findByText('팀 정보를 불러오지 못했어요')).toBeVisible();
     expect(screen.getByText('팀 정보 조회 실패')).toBeVisible();

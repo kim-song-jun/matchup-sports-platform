@@ -56,7 +56,7 @@ export function TeamGameRostersClient({ teamId }: { teamId: string }) {
 
   // 모바일 셸 제목은 데스크톱에서 숨겨져요. 명단 응답 상태와 무관하게 팀 관리 맥락을 유지해요.
   const pageHeader = (
-    <>
+    <div className="tm-show-desktop">
       <div className="tm-desktop-page-head tm-show-desktop">
         <AppBackLink className="tm-desktop-back" fallbackHref={`/teams/${encodeURIComponent(teamId)}`}>
           <ChevronLeftIcon size={22} strokeWidth={2.2} aria-hidden="true" />
@@ -75,7 +75,7 @@ export function TeamGameRostersClient({ teamId }: { teamId: string }) {
           retryLabel="팀 정보 다시 불러오기"
         />
       ) : null}
-    </>
+    </div>
   );
 
   if (matrix.isError) return <>{pageHeader}<MatrixLoadError error={matrix.error} onRetry={() => void matrix.refetch()} /></>;

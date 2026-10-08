@@ -23,9 +23,11 @@ import { TournamentPromoCarousel } from '@/components/tournaments/tournament-pro
 import { useV1AllTournaments, useV1Tournaments, useV1MasterSports } from '@/hooks/use-v1-api';
 import { useMediaQuery, DESKTOP_LIST_MEDIA_QUERY } from '@/hooks/use-media-query';
 import { useInfiniteScroll } from '@/hooks/use-infinite-scroll';
+import { useCursorPagination, useCursorPaginationSnapshot } from '@/hooks/use-cursor-pagination';
 import { PaginationBar } from '@/components/v1-ui/pagination-bar';
 import { extractErrorMessage } from '@/lib/error-message';
 import { TOURNAMENT_LIST_PAGE_SIZE, type TournamentListSeed } from '@/lib/public-list-seed';
+import { v1Keys } from '@/lib/query-keys';
 import { TournamentCard } from './tournament-card';
 import type { V1TournamentListItem } from '@/types/api';
 
@@ -89,6 +91,8 @@ function tournamentPagePath(params: URLSearchParams, page: number): string {
   return `/tournaments${query ? `?${query}` : ''}`;
 }
 
+type TournamentListFilters = NonNullable<Parameters<typeof useV1Tournaments>[0]>;
+
 /**
  * 대회 목록의 페이지 이동은 화면 폭에 따라 **다른 방식**을 쓴다.
  *
@@ -107,12 +111,6 @@ function tournamentPagePath(params: URLSearchParams, page: number): string {
  */
 export function TournamentsListPageClient({ seed }: { readonly seed?: TournamentListSeed }) {
   const isDesktop = useMediaQuery(DESKTOP_LIST_MEDIA_QUERY);
-
-  // 데스크톱 = 페이지 번호, 모바일 = 커서 누적. 두 상태를 함께 두고 화면 폭에 맞는
-  // 쪽만 서버로 보낸다 — 폭이 바뀌어도(창 리사이즈·회전) 보던 목록이 사라지지 않는다.
-  const [cursor, setCursor] = useState<string | undefined>(undefined);
-  const [allItems, setAllItems] = useState<V1TournamentListItem[]>([]);
-
 
   /* 유형 필터(전체/정규 대회/정규 리그)는 **URL 이 소유한다** — 링크로 공유되고 뒤로가기가
      통해야 하기 때문이다.
@@ -167,15 +165,6 @@ export function TournamentsListPageClient({ seed }: { readonly seed?: Tournament
   // 시트 열림도 URL 이다 — 뒤로가기로 닫히고, 필터가 담긴 주소를 그대로 공유할 수 있다.
   const filterSheetOpen = searchParams.get('filter') === '1';
 
-  /* 필터 링크는 page를 제거하고, 모바일 누적분은 URL의 조회 조건이 바뀔 때 비운다.
-     페이지 URL 복귀는 위에서 읽으므로 첫 마운트에 page=2를 1로 덮어쓰지 않는다. */
-  useEffect(() => {
-    setCursor(undefined);
-    setAllItems([]);
-    // 상태·종목이 바뀌어도 같은 이유로 리셋한다 — 목록 내용이 갈리므로 누적분이 남으면
-    // 이전 필터의 카드가 섞인 채로 보인다.
-  }, [activeKind, activeStatus, activeSportId, activeGenderCategory]);
-
   /* D3: 데이터드리븐 종목 필터 — DB seed 기준 유효한 종목만 노출 (하드코딩 제거) */
   const { data: sportsData } = useV1MasterSports();
   const filterSports: Array<{ id: string; label: string }> = (sportsData ?? [])
@@ -191,6 +180,20 @@ export function TournamentsListPageClient({ seed }: { readonly seed?: Tournament
     sportsLoaded: sportsData !== undefined,
   });
 
+  // 모바일은 커서 페이지를 누적한다 — 필터 되감기·상세 복귀 복원은 useCursorPagination(매치·팀매치와 같은 훅).
+  const mobileFilters: TournamentListFilters = {
+    limit: TOURNAMENT_LIST_PAGE_SIZE,
+    sportId: querySportId,
+    status: knownStatus,
+    kind: activeKind,
+    genderCategory: knownGenderCategory,
+  };
+  const { cursor, accumulated: allItems, setPagination, snapshotKey } = useCursorPagination<V1TournamentListItem>(
+    v1Keys.tournaments(),
+    JSON.stringify(mobileFilters),
+    (savedCursor) => v1Keys.tournaments((savedCursor ? { ...mobileFilters, cursor: savedCursor } : mobileFilters) as Record<string, unknown>),
+  );
+
   // 서버 seed 는 무필터 첫 페이지다 — 같은 유형의 첫 화면 요청일 때만 쓴다.
   const seedMatches = seed !== undefined
     && seed.kind === activeKind
@@ -201,14 +204,10 @@ export function TournamentsListPageClient({ seed }: { readonly seed?: Tournament
     && cursor === undefined;
   // 로딩 판정은 isPending(데이터 없음)이다 — isLoading 은 서버·하이드레이션 첫 렌더(persist 복원 중,
   // fetchStatus 'idle')에 false 라 아직 안 받은 목록을 "대회가 없어요"로 그린다.
-  const { data, isPending, isError, error, isFetching, isPlaceholderData, refetch } = useV1Tournaments(
+  const { data, isPending, isError, error, isFetching, isPlaceholderData, isSuccess, dataUpdatedAt, refetch } = useV1Tournaments(
     {
+      ...mobileFilters,
       ...(isDesktop ? { page } : { cursor }),
-      limit: TOURNAMENT_LIST_PAGE_SIZE,
-      sportId: querySportId,
-      status: knownStatus,
-      kind: activeKind,
-      genderCategory: knownGenderCategory,
     },
     { seed: seedMatches ? seed.page : undefined },
   );
@@ -227,6 +226,14 @@ export function TournamentsListPageClient({ seed }: { readonly seed?: Tournament
     isDesktop || !cursor
       ? pageItems
       : [...allItems, ...pageItems.filter((item) => !allItems.some((prev) => prev.id === item.id))];
+
+  // 데스크톱은 페이지 번호가 URL 에 있어 복원할 누적분이 없다.
+  useCursorPaginationSnapshot(
+    snapshotKey,
+    { cursor, accumulated: allItems },
+    { isSuccess, isPlaceholderData, isFetching, dataUpdatedAt },
+    !isDesktop,
+  );
 
   const hasNext = data?.pageInfo?.hasNext ?? false;
   const totalPages = data?.pageInfo?.totalPages ?? 0;
@@ -248,8 +255,7 @@ export function TournamentsListPageClient({ seed }: { readonly seed?: Tournament
 
   const handleLoadMore = () => {
     if (!data?.pageInfo?.nextCursor || isFetching) return;
-    setAllItems(displayItems);
-    setCursor(data.pageInfo.nextCursor);
+    setPagination({ accumulated: displayItems, cursor: data.pageInfo.nextCursor });
   };
 
   // 목록 끝 감시자 — 화면에 들어오면 다음 페이지를 이어 붙인다(모바일 전용).

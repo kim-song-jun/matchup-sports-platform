@@ -59,7 +59,7 @@ export function SessionEntryGate({ mode, children }: SessionEntryGateProps) {
         clearStoredV1Session();
       } catch {
         reportClientError({
-          message: 'Failed to clear the stored session after authentication expired.',
+          message: '인증이 만료된 뒤 저장된 로그인 정보를 정리하지 못했어요.',
           level: 'warn',
           context: { flow: 'session-entry-gate-session-cleanup' },
         });

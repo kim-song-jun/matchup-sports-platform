@@ -25,6 +25,7 @@ export const GROUP_PHASE_TEMPLATES: { phase: V1TournamentGroupPhase; label: stri
 ];
 
 const KNOCKOUT_PHASE_BASE_NAME: Record<Exclude<V1TournamentGroupPhase, 'group'>, string> = {
+  round16: '16강',
   round12: '12강',
   quarter: '8강',
   semi: '4강',

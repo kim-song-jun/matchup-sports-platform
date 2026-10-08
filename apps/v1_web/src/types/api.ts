@@ -3453,7 +3453,7 @@ export type V1TournamentPaymentStatus =
 
 export type V1PlayerEligibilityStatus = 'non_pro' | 'pro' | 'needs_review';
 
-export type V1TournamentGroupPhase = 'group' | 'round12' | 'quarter' | 'semi' | 'final' | 'third_place';
+export type V1TournamentGroupPhase = 'group' | 'round16' | 'round12' | 'quarter' | 'semi' | 'final' | 'third_place';
 
 export type V1AnnouncementAudience =
   | 'public'

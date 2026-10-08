@@ -24,7 +24,7 @@ Status: In Progress
 - [x] 현재 제품 소스에서 실제 TournamentDetailPageClient 렌더 회귀 RED2/7 PASS; 원본 제품 blob 확인.
 - [x] regular_tournament+league와 null+league의 올바른 안내 GREEN9/9.
 - [x] regular_league mirrored format 및 기존 group_knockout/knockout 경계 유지.
-- [ ] 영향받는 기존 consumer test, 최소 worker 직렬, root 커밋 기준 검증.
+- [x] clean40fb35d1 커밋 기준 consumer28+classifier8=36/36, 최소 worker 직렬, 경고0.
 - [ ] 최신 head 독립 리뷰 및 외부 finding/threads/CI.
 - [ ] dev 머지 후 실제 alpha 증빙; 미머지 코드 테스트를 alpha PASS로 표현하지 않음.
 
@@ -36,7 +36,7 @@ Root owns task/Changeset/SSOT/Git/committed checks/PR/기존 리포트 댓글. �
 
 ## Acceptance Criteria
 - [x] 현재 v1 kind/format 계약을 확인하고 getFlowSteps 첫 조건만 regular_league로 구분.
-- [ ] 실제 소비자 RED→GREEN, 커밋 기준 scope/diff/type 영향 검증.
+- [x] 실제 소비자 RED→GREEN, clean 커밋36/36, Web 타입·primary pattern 검증; task EOF 지적도 정리.
 - [ ] 독립 최신 head Critical0 Warning0 FindingsNone.
 - [ ] base dev PR 및 원 #63 댓글 저장·실제 표시 확인.
 - [ ] 실제 alpha AFTER는 별도 증거로 검증.
@@ -61,3 +61,4 @@ UI 구조·토큰·primitive·상태는 변경하지 않는 기존 문구 선택
 
 2026-10-08T17:24Z: 커밋 직전 freshfetch origin/dev2edc863e와 drift0. Web TypeScript(noEmit, incremental false) EXIT0. primary v1-pattern-check.mjs는 Windows find.exe 셸 충돌의 EXIT1 원본을 보존한 뒤, 설치된 Git Bash를 해당 프로세스 ComSpec/PATH에만 지정해 동일 스크립트 EXIT0; 게이트 소스 변경·우회0. 제품 GREEN blob77c1ee3ccf1d88fe84f9383992a151fe222e60a4. owned2파일+task+Web patch Changeset 총4경로만 커밋하며 이후 실제 커밋 기준 consumer 및 독립 리뷰를 수행한다. alpha AFTER·dev 머지는 계속 PENDING.
 
+2026-10-08T17:28Z: clean40fb35d1540bab45205575fa9614e6dcf6c359d7 기준 상세28+전역classifier8=36/36 PASS(6.43s), dirtyAfter0, source77c1ee3c/test66e0130a blob 고정. 독립 리뷰는 제품·consumer에 실제 기능 finding을 발견하지 않았으며 새 task EOF 공백 1건을 지적했다. committed-diff-initial.log의 실패를 보존하고 task EOF만 정리했다. 제품·테스트·Changeset은 같은 blob이므로 검증을 중복하지 않으며 최종 SHA에서 독립 리뷰·전체 PR diff를 재확인한다. 외부 리뷰·CI·dev 머지·실제 alpha AFTER·원 리포트 PR 댓글은 아직 PENDING.

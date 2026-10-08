@@ -64,12 +64,14 @@ type FakeCanonicalScheduleRow = {
   round: string;
   fixtureNumber: number;
   legNumber: number;
-  homeRegistrationId: string;
-  awayRegistrationId: string;
+  homeRegistrationId: string | null;
+  awayRegistrationId: string | null;
   group: null;
-  homeRegistration: { team: { id: string; name: string } };
-  awayRegistration: { team: { id: string; name: string } };
+  homeRegistration: { team: { id: string; name: string } } | null;
+  awayRegistration: { team: { id: string; name: string } } | null;
   teamMatch: {
+    homeSlot?: Record<string, unknown> | null;
+    awaySlot?: Record<string, unknown> | null;
     startAt: Date;
     placeName: null;
     status: string;
@@ -992,4 +994,48 @@ describe('getSchedule — 몰수·중단 표기(outcome)', () => {
     expect(result.items[0].outcome).toEqual({ reason: 'FORFEIT', note: '원정팀 미출석' });
   });
 
+});
+
+describe('PublicTournamentRecordsService.getSchedule -- 자리 라벨 (homeSlotLabel / awaySlotLabel)', () => {
+  const groupRank = { kind: 'GROUP_RANK', position: 1, group: { name: '4강', phase: 'semi' }, sourceGroup: { name: 'A조' } };
+  const entry = { kind: 'ENTRY', position: 2, group: { name: 'A조', phase: 'group' }, sourceGroup: null };
+
+  async function scheduleWith(seed: Partial<FakeCanonicalScheduleRow>, slots: Pick<FakeCanonicalScheduleRow['teamMatch'], 'homeSlot' | 'awaySlot'>) {
+    const base = makeFixture({});
+    const row: FakeCanonicalScheduleRow = {
+      teamMatchId: base.id, tournamentId: TOURNAMENT_ID, groupId: null, round: base.round,
+      fixtureNumber: 1, legNumber: 1,
+      homeRegistrationId: base.homeRegistrationId, awayRegistrationId: base.awayRegistrationId,
+      group: null, homeRegistration: base.homeRegistration, awayRegistration: base.awayRegistration,
+      teamMatch: { startAt: base.scheduledAt, placeName: null, status: 'scheduled', fieldId: null, field: null, videos: [], game: base.game, ...slots },
+      ...seed,
+    };
+    const prisma = buildFakePrisma({ fixtures: [base], canonicalRows: [row], consentLinks: [], consentSnapshots: [], goalEvents: [] });
+    return new PublicTournamentRecordsService(prisma, UNUSED_ACCESS_SERVICE).getSchedule(TOURNAMENT_ID, {});
+  }
+
+  it('팀이 없고 자리가 있는 사이드는 자리 라벨을 낸다 (home/away 는 null 그대로)', async () => {
+    const result = await scheduleWith(
+      { homeRegistrationId: null, homeRegistration: null, awayRegistrationId: null, awayRegistration: null },
+      { homeSlot: groupRank, awaySlot: entry },
+    );
+    expect(result.items[0]).toMatchObject({ home: null, away: null, homeSlotLabel: 'A조 1위', awaySlotLabel: 'A조 2번' });
+  });
+
+  it('팀이 있으면 자리가 연결돼 있어도 라벨은 null 이다 — 한쪽만 비어 있으면 빈 쪽에만 붙는다 (대조군)', async () => {
+    const result = await scheduleWith(
+      { awayRegistrationId: null, awayRegistration: null },
+      { homeSlot: entry, awaySlot: groupRank },
+    );
+    expect(result.items[0]).toMatchObject({ homeSlotLabel: null, awaySlotLabel: 'A조 1위' });
+    expect(result.items[0].home).toMatchObject({ teamName: '홈팀' });
+  });
+
+  it('자리에 연결되지 않은 기존 빈 경기는 라벨이 null 이다', async () => {
+    const result = await scheduleWith(
+      { homeRegistrationId: null, homeRegistration: null, awayRegistrationId: null, awayRegistration: null },
+      { homeSlot: null, awaySlot: null },
+    );
+    expect(result.items[0]).toMatchObject({ homeSlotLabel: null, awaySlotLabel: null });
+  });
 });

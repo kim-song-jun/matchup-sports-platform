@@ -9,6 +9,7 @@ import { BracketTemplateService } from '../../src/tournaments/templates/bracket-
 import { AdminRegistrationsService } from '../../src/tournaments/admin-registrations.service';
 import { TournamentRegistrationsService } from '../../src/tournaments/tournament-registrations.service';
 import type { NotificationsService } from '../../src/notifications/notifications.service';
+import { LeagueFixtureGeneratorService } from '../../src/tournaments/league-fixture-generator.service';
 import { TournamentBracketService } from '../../src/tournaments/tournament-bracket.service';
 import { assignSlotInTx, assignSlotsBatchInTx, TournamentSlotService, type SlotMutationContext } from '../../src/tournaments/slots/tournament-slot.service';
 import { competitionConfigFixture as ids, seedCompetitionConfigFixture } from '../fixtures/competition-config.fixture';
@@ -21,6 +22,7 @@ const games = new GamesService(prisma, new OperationAuditWriterService(), new Ga
 const templates = new BracketTemplateService(prisma, adminContext, games);
 const slots = new TournamentSlotService(prisma, adminContext, games);
 const bracket = new TournamentBracketService(prisma, adminContext, games);
+const generator = new LeagueFixtureGeneratorService(prisma, adminContext, games);
 // 팀이 보내는 취소 요청(`cancelRequest`)은 prisma 만 쓴다 — 알림·약관 의존성은 이 경로에서 불리지 않는다.
 const registrations = new TournamentRegistrationsService(prisma, {} as never, {} as never);
 const adminRegistrations = new AdminRegistrationsService(
@@ -542,6 +544,30 @@ describe('자리 배정 (PostgreSQL)', () => {
       });
       await expect(bracket.updateFixture(user, manual.id, { homeRegistrationId: registrationIds[2] }))
         .resolves.toMatchObject({ homeRegistrationId: registrationIds[2] });
+    });
+  });
+
+  describe('일괄 재생성과 자리의 충돌', () => {
+    it('자리로 만든 조는 replaceExisting 재생성이 409 LEAGUE_SLOT_FIXTURES_USE_TEMPLATE 이고 경기는 그대로다', async () => {
+      const { tournamentId, registrationIds } = await leagueOf4('regen-slot');
+      for (const [index, registrationId] of registrationIds.entries()) {
+        await slots.assignSlot(user, (await slotAt(tournamentId, index + 1)).id, registrationId);
+      }
+      const group = await prisma.v1TournamentGroup.findFirstOrThrow({ where: { tournamentId } });
+      const before = await allFixtures(tournamentId);
+
+      await expect(generator.generate(user, tournamentId, { groupId: group.id, legs: 1, replaceExisting: true }))
+        .rejects.toMatchObject({ response: { code: 'LEAGUE_SLOT_FIXTURES_USE_TEMPLATE' } });
+      expect((await allFixtures(tournamentId)).map((f) => [f.id, f.hostTeamId, f.approvedApplicantTeamId]))
+        .toEqual(before.map((f) => [f.id, f.hostTeamId, f.approvedApplicantTeamId]));
+    });
+
+    it('대조군 — 자리 없이 조 편성으로 만드는 기존 흐름은 replaceExisting 이어도 막히지 않는다', async () => {
+      const { tournamentId, registrationIds } = await seedBracketTournament(prisma, { label: 'regen-plain', format: 'league', teamCount: 3 });
+      const group = await bracket.createGroup(user, tournamentId, { name: 'A조', phase: 'group' });
+      for (const registrationId of registrationIds) await bracket.createGroupTeam(user, tournamentId, { groupId: group.id, registrationId });
+      await expect(generator.generate(user, tournamentId, { groupId: group.id, legs: 1, replaceExisting: true }))
+        .resolves.toMatchObject({ created: 3 });
     });
   });
 });

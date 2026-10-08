@@ -309,6 +309,7 @@ describe('LeagueFixtureGeneratorService.generate', () => {
       update: jest.fn(),
       findUnique: jest.fn(),
       findUniqueOrThrow: jest.fn(),
+      count: jest.fn(),
     },
     v1TeamSchedule: { create: jest.fn(), updateMany: jest.fn(), count: jest.fn() },
     v1GameSide: { update: jest.fn() },
@@ -513,6 +514,7 @@ describe('LeagueFixtureGeneratorService.generate', () => {
       Promise.resolve({ id: where.id, tournamentId: 't1', title: 'updated', startAt: data.startAt ?? null, placeName: data.placeName ?? null, status: 'matched', createdAt: new Date(), updatedAt: new Date() }),
     );
     prisma.v1TeamMatch.findUnique.mockResolvedValue(null);
+    prisma.v1TeamMatch.count.mockResolvedValue(0);
     prisma.v1TeamMatch.findUniqueOrThrow.mockResolvedValue({ hostTeamId: 'team-r1', approvedApplicantTeamId: 'team-r2' });
     prisma.v1TeamSchedule.create.mockResolvedValue({});
     prisma.v1TeamSchedule.updateMany.mockResolvedValue({ count: 0 });

@@ -94,6 +94,165 @@ function reviewRow(overrides: Record<string, unknown> = {}) {
   };
 }
 
+type ReviewCompetitionFixture = {
+  readonly id: string;
+  readonly kind: string | null;
+  readonly isPublic: boolean;
+  readonly deletedAt: Date | null;
+  readonly status: string;
+};
+
+type ReviewCompetitionWhere = Partial<ReviewCompetitionFixture> & {
+  AND?: ReviewCompetitionWhere | ReviewCompetitionWhere[];
+  OR?: ReviewCompetitionWhere[];
+};
+
+// Evaluate the lookup's actual kind, identity, visibility and lifecycle predicates.
+// Omitting a predicate must admit its fixture, so the corresponding regression fails.
+function matchesReviewCompetition(row: ReviewCompetitionFixture, where: ReviewCompetitionWhere): boolean {
+  const and = where.AND === undefined ? [] : Array.isArray(where.AND) ? where.AND : [where.AND];
+  return and.every((clause) => matchesReviewCompetition(row, clause))
+    && (where.OR === undefined || where.OR.some((clause) => matchesReviewCompetition(row, clause)))
+    && (where.id === undefined || row.id === where.id)
+    && (where.kind === undefined || row.kind === where.kind)
+    && (where.isPublic === undefined || row.isPublic === where.isPublic)
+    && (where.deletedAt === undefined || row.deletedAt === where.deletedAt)
+    && (where.status === undefined || row.status === where.status);
+}
+
+type ReviewRegistrationFixture = {
+  readonly tournamentId: string;
+  readonly teamId: string;
+  readonly status: string;
+  readonly team: {
+    readonly name: string;
+    readonly status: string;
+    readonly deletedAt: Date | null;
+    readonly memberships: readonly { userId: string; status: string; role: string }[];
+  };
+};
+
+type ReviewRegistrationWhere = {
+  tournamentId?: string;
+  status?: string;
+  team?: {
+    status?: string;
+    deletedAt?: Date | null;
+    memberships?: { some: { userId?: string; status?: string; role?: { in: string[] } } };
+  };
+};
+
+function matchesReviewRegistration(row: ReviewRegistrationFixture, where: ReviewRegistrationWhere): boolean {
+  const membership = where.team?.memberships?.some;
+  return (where.tournamentId === undefined || row.tournamentId === where.tournamentId)
+    && (where.status === undefined || row.status === where.status)
+    && (where.team?.status === undefined || row.team.status === where.team.status)
+    && (where.team?.deletedAt === undefined || row.team.deletedAt === where.team.deletedAt)
+    && (membership === undefined || row.team.memberships.some((member) =>
+      (membership.userId === undefined || member.userId === membership.userId)
+      && (membership.status === undefined || member.status === membership.status)
+      && (membership.role === undefined || membership.role.in.includes(member.role))));
+}
+
+describe('TournamentReviewsService — public competition reviews', () => {
+  let service: TournamentReviewsService;
+  let competitions: ReviewCompetitionFixture[];
+  let reviews: ReturnType<typeof reviewRow>[];
+  let prisma: {
+    v1Tournament: { findFirst: jest.Mock };
+    v1TournamentReview: { findMany: jest.Mock; count: jest.Mock };
+  };
+
+  beforeEach(async () => {
+    competitions = [];
+    reviews = [];
+    const visibleReviews = (where: { tournamentId: string; hiddenAt?: Date | null }) =>
+      reviews.filter((review) => review.tournamentId === where.tournamentId
+        && (where.hiddenAt === undefined || review.hiddenAt === where.hiddenAt));
+    prisma = {
+      v1Tournament: {
+        findFirst: jest.fn().mockImplementation(({ where }: { where: ReviewCompetitionWhere }) =>
+          Promise.resolve(competitions.find((row) => matchesReviewCompetition(row, where)) ?? null)),
+      },
+      v1TournamentReview: {
+        findMany: jest.fn().mockImplementation(({ where, skip, take }) =>
+          Promise.resolve(visibleReviews(where).slice(skip, skip + take))),
+        count: jest.fn().mockImplementation(({ where }) => Promise.resolve(visibleReviews(where).length)),
+      },
+    };
+    const module = await Test.createTestingModule({
+      providers: [
+        TournamentReviewsService,
+        { provide: PrismaService, useValue: prisma },
+        { provide: AdminContextService, useValue: {} },
+        { provide: NotificationsService, useValue: notifications },
+      ],
+    }).compile();
+    service = module.get(TournamentReviewsService);
+  });
+
+  it.each(['regular_tournament', 'regular_league', null])(
+    'returns a genuine empty page for a public completed competition with kind %s',
+    async (kind) => {
+      // Given
+      competitions.push({ id: 'competition-1', kind, isPublic: true, deletedAt: null, status: 'completed' });
+
+      // When
+      const result = await service.listReviews('competition-1');
+
+      // Then
+      expect(result).toEqual({ items: [], total: 0, page: 1, pageSize: 10 });
+    },
+  );
+
+  it('returns only the requested league visible reviews and total with pagination', async () => {
+    // Given
+    competitions.push({ id: 'league-1', kind: 'regular_league', isPublic: true, deletedAt: null, status: 'completed' });
+    reviews.push(
+      reviewRow({ id: 'league-visible-1', tournamentId: 'league-1' }),
+      reviewRow({ id: 'league-visible-2', tournamentId: 'league-1', rating: 4 }),
+      reviewRow({ id: 'league-hidden', tournamentId: 'league-1', hiddenAt: new Date('2026-10-01') }),
+      reviewRow({ id: 'other-competition-review', tournamentId: 'other-competition' }),
+    );
+
+    // When
+    const result = await service.listReviews('league-1', { page: 2, pageSize: 1 });
+
+    // Then
+    expect(result).toEqual({
+      items: [{
+        id: 'league-visible-2', authorId: plainUser.id, authorNickname: '김철수',
+        authorProfileImageUrl: null, teamName: '레알마드리드', rating: 4,
+        comment: '좋은 대회였어요', photoUrls: [], createdAt: '2026-06-14T00:00:00.000Z',
+      }],
+      total: 2, page: 2, pageSize: 1,
+    });
+  });
+
+  it.each<{ label: string; overrides: Partial<ReviewCompetitionFixture> }>([
+    { label: 'private league', overrides: { kind: 'regular_league', isPublic: false } },
+    { label: 'private tournament', overrides: { isPublic: false } },
+    { label: 'deleted league', overrides: { kind: 'regular_league', deletedAt: new Date('2026-10-01') } },
+    { label: 'deleted tournament', overrides: { deletedAt: new Date('2026-10-01') } },
+    { label: 'unsupported kind', overrides: { kind: 'unsupported_kind' } },
+    { label: 'unknown id', overrides: { id: 'other-competition' } },
+  ])('rejects a $label without querying its reviews', async ({ overrides }) => {
+    // Given
+    competitions.push({
+      id: 'competition-1', kind: 'regular_tournament', isPublic: true,
+      deletedAt: null, status: 'completed', ...overrides,
+    });
+
+    // When
+    const attempt = service.listReviews('competition-1');
+
+    // Then
+    await expect(attempt).rejects.toMatchObject({ response: { code: 'TOURNAMENT_NOT_FOUND' } });
+    expect(prisma.v1TournamentReview.findMany).not.toHaveBeenCalled();
+    expect(prisma.v1TournamentReview.count).not.toHaveBeenCalled();
+  });
+});
+
 /** confirmed 등록 2건 — '레알마드리드'(김철수·이영희), '바르셀로나'(박지성) */
 const confirmedRegistrationRows = [
   {
@@ -203,25 +362,44 @@ describe('TournamentReviewsService — awards admin gate', () => {
 
   // ─── listMyPendingReviews (GET) ─────────────────────────────────────────
 
-  // `listMyPendingReviews` 는 `status: 'confirmed'` 를 쓰는 19곳 중 **유일하게
-  // `tournamentId` 스코프가 없는** 쿼리다 — 사용자의 팀이 확정 등록된 **모든** 대회를 훑는다.
-  // 참가팀 백필이 리그 시즌에 `confirmed` 등록을 만들 것이므로 실재하는 경로다.
-  //
-  // 지금까지 안 보였던 건 `tournament.status = 'completed'` 덕이지만(백필 리그는 draft),
-  // 그건 **다른 파일의 가드에 기댄 것**이다 — P0~P3 가 49곳에서 없앤 그 구조.
-  it('listMyPendingReviews: 종류 조건을 걸어 리그 시즌이 후기 대기 목록에 들어오지 않는다', async () => {
-    prisma.v1TournamentRegistration.findMany.mockResolvedValue([]);
-
-    await service.listMyPendingReviews(plainUser.id);
-
-    const where = prisma.v1TournamentRegistration.findMany.mock.calls[0][0].where as {
-      tournament: Record<string, unknown>;
+  it('listMyPendingReviews: includes completed leagues while excluding draft, deleted, unsupported and already reviewed competitions', async () => {
+    // Given
+    const competition = {
+      id: 'league-1', kind: 'regular_league', isPublic: true, deletedAt: null, status: 'completed',
+      title: '종료 리그', scheduledEndAt: new Date('2026-10-01'), updatedAt: new Date('2026-10-02'),
     };
-    // `OR` 이 있는지가 아니라 **그 OR 이 kind 조건인지**를 본다 — 존재만 보면 호출부가
-    // 자기 OR 을 쓰는 날 봉쇄가 빠져도 통과한다(#866 에서 같은 지적을 받았다).
-    expect(where.tournament.OR).toEqual([{ kind: 'regular_tournament' }, { kind: null }]);
-    // 기존 조건도 살아 있어야 한다 — 종류 조건을 넣다 이걸 덮으면 draft·삭제 대회가 샌다.
-    expect(where.tournament).toMatchObject({ status: 'completed', deletedAt: null });
+    const registrations = [
+      competition,
+      { ...competition, id: 'draft-league', status: 'draft' },
+      { ...competition, id: 'deleted-league', deletedAt: new Date('2026-10-03') },
+      { ...competition, id: 'unsupported', kind: 'unsupported_kind' },
+      { ...competition, id: 'reviewed-league' },
+      { ...competition, id: 'tournament-1', kind: 'regular_tournament', title: '종료 대회', scheduledEndAt: new Date('2026-09-30') },
+    ].map((tournament) => ({ teamId: 'team-1', tournament }));
+    prisma.v1TournamentRegistration.findMany.mockImplementation(
+      ({ where }: { where: { tournament: ReviewCompetitionWhere } }) => Promise.resolve(
+        registrations.filter((registration) => matchesReviewCompetition(registration.tournament, where.tournament)),
+      ),
+    );
+    const authoredReviews = [
+      { tournamentId: 'reviewed-league', authorUserId: plainUser.id },
+      { tournamentId: 'league-1', authorUserId: 'other-manager' },
+    ];
+    prisma.v1TournamentReview.findMany.mockImplementation(
+      ({ where }: { where: { tournamentId: { in: string[] }; authorUserId?: string } }) => Promise.resolve(
+        authoredReviews.filter((review) => where.tournamentId.in.includes(review.tournamentId)
+          && (where.authorUserId === undefined || review.authorUserId === where.authorUserId)),
+      ),
+    );
+
+    // When
+    const result = await service.listMyPendingReviews(plainUser.id);
+
+    // Then
+    expect(result).toEqual([
+      { tournamentId: 'league-1', tournamentTitle: '종료 리그', completedAt: '2026-10-01T00:00:00.000Z' },
+      { tournamentId: 'tournament-1', tournamentTitle: '종료 대회', completedAt: '2026-09-30T00:00:00.000Z' },
+    ]);
   });
 
   // ─── setAwards (PUT) ────────────────────────────────────────────────────
@@ -933,23 +1111,122 @@ describe('TournamentReviewsService — 팀 후기 권한 (팀장·운영진 mana
 
   afterEach(() => jest.clearAllMocks());
 
-  // 통합 백필(R3) 이후 리그 id 가 이 조회를 통과할 수 있게 됐다. 리뷰 생성은 **쓰기**이고,
-  // 만들어진 리뷰는 공개 조회(`listReviews`)로 그대로 나간다.
-  //
-  // **오늘 당장 뚫리지는 않는다** — 이 경로는 `status === 'completed'` 를 요구하는데 백필
-  // 리그는 `draft` 라 400 에서 걸린다. 다만 운영자가 `changeStatus` 로 상태를 바꾸면 그
-  // 게이트가 사라지고, 그 전이는 아직 종류 조건이 없다(감사 운영자 11건 중 하나).
-  // **이 지점은 P2 의 `changeStatus` 차단과 함께라야 닫힌다.**
-  it('submitReview: 리그 id 로는 열리지 않는다 (상태 게이트보다 먼저 막힌다)', async () => {
-    // status 를 completed 로 줘서 **상태 게이트를 무력화**한다 — 그래야 404 가 종류 조건
-    // 때문임이 증명된다. 상태로 막히는 걸 보고 "막혔다"고 하면 필터를 안 걸어도 통과한다.
-    prisma.v1Tournament.findFirst.mockImplementation(
-      kindAwareFindFirst({ ...completedTournament, id: 'league-1', kind: 'regular_league' }),
-    );
-    await expect(
-      service.submitReview('league-1', plainUser, { rating: 5, comment: '좋은 대회였어요' }),
-    ).rejects.toMatchObject({ response: { code: 'TOURNAMENT_NOT_FOUND' } });
-    expect(prisma.v1TournamentReview.create).not.toHaveBeenCalled();
+  describe('league review eligibility', () => {
+    let competition: ReviewCompetitionFixture;
+    let registration: ReviewRegistrationFixture;
+
+    beforeEach(() => {
+      competition = { id: 'league-1', kind: 'regular_league', isPublic: true, deletedAt: null, status: 'completed' };
+      registration = {
+        tournamentId: 'league-1', teamId: 'team-1', status: 'confirmed',
+        team: {
+          name: '리그 참가팀', status: 'active', deletedAt: null,
+          memberships: [{ userId: plainUser.id, status: 'active', role: 'manager' }],
+        },
+      };
+      prisma.v1Tournament.findFirst.mockImplementation(({ where }: { where: ReviewCompetitionWhere }) =>
+        Promise.resolve(matchesReviewCompetition(competition, where) ? competition : null));
+      prisma.v1TournamentRegistration.findMany.mockImplementation(({ where }: { where: ReviewRegistrationWhere }) =>
+        Promise.resolve(matchesReviewRegistration(registration, where) ? [registration] : []));
+      prisma.v1TournamentRegistration.findFirst.mockImplementation(({ where }: { where: ReviewRegistrationWhere }) =>
+        Promise.resolve(matchesReviewRegistration(registration, where) ? { id: 'registration-1' } : null));
+      prisma.v1TournamentReview.findFirst.mockResolvedValue(null);
+      prisma.v1TournamentReview.create.mockImplementation(({ data }) => Promise.resolve(reviewRow(data)));
+    });
+
+    it.each(['owner', 'manager'])('persists a completed league review from an active confirmed team %s', async (role) => {
+      // Given
+      registration = { ...registration, team: { ...registration.team, memberships: [{ userId: plainUser.id, status: 'active', role }] } };
+
+      // When
+      const result = await service.submitReview('league-1', plainUser, { rating: 4, comment: '좋은 리그였어요' });
+
+      // Then
+      expect(result).toMatchObject({ authorId: plainUser.id, teamName: '리그 참가팀', rating: 4, comment: '좋은 리그였어요' });
+      expect(prisma.v1TournamentReview.create).toHaveBeenCalledWith(expect.objectContaining({
+        data: expect.objectContaining({ tournamentId: 'league-1', authorUserId: plainUser.id, teamId: 'team-1' }),
+      }));
+    });
+
+    it('retains submission access for eligible participants of an unpublished league', async () => {
+      // Given
+      competition = { ...competition, isPublic: false };
+      // When
+      const result = await service.submitReview('league-1', plainUser, { rating: 5 });
+      // Then
+      expect(result).toMatchObject({ authorId: plainUser.id, teamName: '리그 참가팀', rating: 5 });
+    });
+
+    it.each<{ label: string; overrides: Partial<ReviewCompetitionFixture>; code: string }>([
+      { label: 'draft league', overrides: { status: 'draft' }, code: 'TOURNAMENT_NOT_COMPLETED' },
+      { label: 'in progress league', overrides: { status: 'in_progress' }, code: 'TOURNAMENT_NOT_COMPLETED' },
+      { label: 'deleted league', overrides: { deletedAt: new Date('2026-10-01') }, code: 'TOURNAMENT_NOT_FOUND' },
+      { label: 'unknown league', overrides: { id: 'other-league' }, code: 'TOURNAMENT_NOT_FOUND' },
+      { label: 'unsupported kind', overrides: { kind: 'unsupported_kind' }, code: 'TOURNAMENT_NOT_FOUND' },
+    ])('rejects a $label without persisting a review', async ({ overrides, code }) => {
+      // Given
+      competition = { ...competition, ...overrides };
+
+      // When
+      const attempt = service.submitReview('league-1', plainUser, { rating: 5 });
+
+      // Then
+      await expect(attempt).rejects.toMatchObject({ response: { code } });
+      expect(prisma.v1TournamentReview.create).not.toHaveBeenCalled();
+    });
+
+    it.each<{
+      label: string;
+      role?: string;
+      membershipStatus?: string;
+      userId?: string;
+      registrationStatus?: string;
+      tournamentId?: string;
+      teamStatus?: string;
+      teamDeletedAt?: Date;
+    }>([
+      { label: 'member', role: 'member' },
+      { label: 'inactive membership', membershipStatus: 'inactive' },
+      { label: 'another user', userId: 'other-user' },
+      { label: 'unconfirmed registration', registrationStatus: 'pending' },
+      { label: 'another competition registration', tournamentId: 'other-league' },
+      { label: 'inactive team', teamStatus: 'inactive' },
+      { label: 'deleted team', teamDeletedAt: new Date('2026-10-01') },
+    ])('rejects a $label from the completed league review write gate', async (fixture) => {
+      // Given
+      registration = {
+        ...registration, tournamentId: fixture.tournamentId ?? 'league-1', status: fixture.registrationStatus ?? 'confirmed',
+        team: {
+          ...registration.team, status: fixture.teamStatus ?? 'active', deletedAt: fixture.teamDeletedAt ?? null,
+          memberships: [{ userId: fixture.userId ?? plainUser.id, status: fixture.membershipStatus ?? 'active', role: fixture.role ?? 'manager' }],
+        },
+      };
+
+      // When
+      const attempt = service.submitReview('league-1', plainUser, { rating: 5 });
+
+      // Then
+      await expect(attempt).rejects.toMatchObject({ response: { code: 'NOT_PARTICIPANT' } });
+      expect(prisma.v1TournamentReview.create).not.toHaveBeenCalled();
+    });
+
+    it('retains the participant registration gate for a completed league manager', async () => {
+      // Given: the active confirmed manager registration above.
+      // When
+      const result = await service.isParticipant('league-1', plainUser.id);
+      // Then
+      expect(result).toBe(true);
+    });
+
+    it('rejects a duplicate league review from the same author', async () => {
+      // Given
+      prisma.v1TournamentReview.findFirst.mockResolvedValue(reviewRow({ tournamentId: 'league-1' }));
+      // When
+      const attempt = service.submitReview('league-1', plainUser, { rating: 5 });
+      // Then
+      await expect(attempt).rejects.toMatchObject({ response: { code: 'ALREADY_REVIEWED' } });
+      expect(prisma.v1TournamentReview.create).not.toHaveBeenCalled();
+    });
   });
 
   // (a) manager가 후기 작성 성공

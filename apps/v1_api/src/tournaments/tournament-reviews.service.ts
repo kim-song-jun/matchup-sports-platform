@@ -11,8 +11,13 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { V1AuthUser } from '../auth/v1-auth-user';
 import { ArrayMaxSize, IsArray, IsIn, IsInt, IsOptional, IsString, IsUUID, Max, MaxLength, Min, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
-import { findPublicTournamentOnSurface, findTournamentOnSurface, TOURNAMENT_KINDS } from './tournament-surface-lookup';
-import { TOURNAMENT_SURFACE_KIND } from './tournament-surface';
+import {
+  ALL_COMPETITION_KINDS,
+  findPublicTournamentOnSurface,
+  findTournamentOnSurface,
+  tournamentKindCondition,
+  TOURNAMENT_KINDS,
+} from './tournament-surface-lookup';
 
 export class ListTournamentReviewsQueryDto {
   @IsOptional()
@@ -236,10 +241,10 @@ export class TournamentReviewsService {
     return { rows, total, page, pageSize };
   }
 
-  /** 대회 리뷰 목록 (공개, 최신순, 페이지네이션 + 검색). 숨김 처리된 리뷰는 제외. */
+  /** 대회·리그 리뷰 목록 (공개, 최신순, 페이지네이션 + 검색). 숨김 처리된 리뷰는 제외. */
   async listReviews(tournamentId: string, query: ListTournamentReviewsQueryDto = {}) {
     // 공개 후기 목록 — 비공개(또는 없는) 대회는 상세와 같이 404 다. 후기만 따로 새지 않게 한다.
-    const tournament = await findPublicTournamentOnSurface(this.prisma, TOURNAMENT_KINDS, {
+    const tournament = await findPublicTournamentOnSurface(this.prisma, ALL_COMPETITION_KINDS, {
       where: { id: tournamentId, deletedAt: null },
       select: { id: true },
     });
@@ -255,14 +260,14 @@ export class TournamentReviewsService {
     };
   }
 
-  /** 리뷰 작성 (참가 확정 팀의 팀장·운영진 manager+ 누구나 가능, 대회 completed 상태) */
+  /** 리뷰 작성 (참가 확정 팀의 팀장·운영진 manager+ 누구나 가능, 대회·리그 completed 상태) */
   async submitReview(
     tournamentId: string,
     user: V1AuthUser,
     dto: SubmitTournamentReviewDto,
   ) {
     // 1. 대회 존재 확인
-    const tournament = await findTournamentOnSurface(this.prisma, TOURNAMENT_KINDS, {
+    const tournament = await findTournamentOnSurface(this.prisma, ALL_COMPETITION_KINDS, {
       where: { id: tournamentId, deletedAt: null },
     });
     if (!tournament) {
@@ -355,15 +360,9 @@ export class TournamentReviewsService {
       where: {
         status: 'confirmed',
         team: this.eligibleTeamWhere(userId),
-        // **`tournamentId` 스코프가 없는 유일한 `status: 'confirmed'` 쿼리다**(19곳 전수 분류).
-        // 사용자의 팀이 확정 등록된 **모든** 대회를 훑으므로, 리그 시즌 행에 확정 등록이
-        // 생기면 여기 걸린다 — 참가팀 백필이 `confirmed` 로 행을 만들 것이므로 실재하는 경로다.
-        //
-        // 지금까지 안 보였던 건 `status: 'completed'` 덕이다(백필 리그는 `draft` 이고
-        // 어드민 `changeStatus` 가 리그를 막는다). 그건 **다른 파일의 가드에 기댄 것**이고,
-        // 그 의존은 어디에도 안 적혀 있었다 — P0~P3 가 49곳에서 없앤 바로 그 구조다.
-        // 여기서도 종류를 직접 건다.
-        tournament: { ...TOURNAMENT_SURFACE_KIND, status: 'completed', deletedAt: null },
+        // 공개 상세·후기 제출과 같은 두 종류를 받되, 완료·삭제 조건은 직접 유지한다.
+        // 새 종류가 추가되어도 이 목록에 자동으로 들어오지 않도록 화이트리스트를 쓴다.
+        tournament: { ...tournamentKindCondition(ALL_COMPETITION_KINDS), status: 'completed', deletedAt: null },
       },
       select: {
         teamId: true,

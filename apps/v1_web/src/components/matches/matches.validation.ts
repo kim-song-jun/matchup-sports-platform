@@ -67,6 +67,8 @@ const RULES: Array<{
     step: 'place-time',
     isSatisfied: (ctx) => {
       if (!ctx.draft.endTime) return true;
+      // Date는 24:00을 익일로 정규화하므로 time 입력의 HH:mm 범위를 먼저 확인한다.
+      if (!/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(ctx.draft.endTime)) return false;
       const startsAt = parseStartsAt(ctx.draft);
       if (!startsAt) return true;
       // 종료 날짜를 받지 않는 개인 매치는 같은 날로 검증한다. 역전 값을 익일이나 생략으로 바꾸지 않는다.

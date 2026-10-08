@@ -7,6 +7,7 @@ import { trackEvent } from '@/lib/analytics';
 import { readExpiringDraft, writeExpiringDraft } from '@/lib/expiring-draft';
 import { __resetNavigationHistoryForTests } from '@/lib/navigation-history';
 import { __resetOverlayHistoryForTests } from '@/lib/overlay-history';
+import type { V1MatchEdit } from '@/types/api';
 import type { MatchCreateViewModel } from './matches.types';
 import { draftFromMatchEdit, MatchCreatePageClient, MatchEditPageClient } from './matches-create-client';
 
@@ -15,23 +16,11 @@ vi.mock('@/lib/analytics', () => ({ trackEvent: vi.fn() }));
 // 기존 단위 테스트의 얇은 view/hook을 유지하고, 시간 회귀만 실제 화면·API consumer로 검증한다.
 const realTimeConsumer = vi.hoisted(() => ({ enabled: false }));
 
-const { createMatchMutate, routerPush, uploadImagesMutateAsync, confirmMock, updateMatchMutate, cancelMatchMutate, closeMatchMutate, reopenMatchMutate, matchEditData, matchEditQueryState, matchEditRefetch } = vi.hoisted(() => ({
-  createMatchMutate: vi.fn(),
-  routerPush: vi.fn(),
-  uploadImagesMutateAsync: vi.fn(),
-  confirmMock: vi.fn(),
-  updateMatchMutate: vi.fn(),
-  cancelMatchMutate: vi.fn(),
-  closeMatchMutate: vi.fn(),
-  reopenMatchMutate: vi.fn(),
-  // 로드 실패(권한 없음 등) 케이스를 개별 테스트에서 켰다 끄는 스위치. 객체 프로퍼티만
-  // 바꾸면 되므로(재대입 아님) 아래 vi.mock 팩토리가 참조하는 값도 그대로 갱신된다.
-  matchEditQueryState: { isError: false },
-  matchEditRefetch: vi.fn(),
+const { createMatchMutate, routerPush, uploadImagesMutateAsync, confirmMock, updateMatchMutate, cancelMatchMutate, closeMatchMutate, reopenMatchMutate, matchEditData, matchEditQueryState, matchEditRefetch } = vi.hoisted(() => {
   // useEffect(..., [editQuery.data])가 참조로 비교하므로, 매 렌더마다 새 객체를 돌려주면
   // 훅이 재실행 → setDraft → 리렌더 → 훅 재실행의 무한 루프에 빠진다. 안정적인 참조 하나를
   // 모듈 스코프에 고정해 실제 React Query의 캐시된 참조 안정성을 흉내낸다.
-  matchEditData: {
+  const matchEditData: V1MatchEdit = {
     matchId: 'match-edit-1',
     editable: true,
     lockedReason: null,
@@ -43,15 +32,30 @@ const { createMatchMutate, routerPush, uploadImagesMutateAsync, confirmMock, upd
       startsAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
       // 마감 시각은 '모집 마감/다시 열기' 토글이 읽는 값이라 fixture 에 자리를 만들어 둔다
       // (테스트마다 과거/미래로 바꿔 넣는다).
-      deadlineAt: null as string | null,
+      deadlineAt: null,
       capacity: 10,
       manualPlaceName: '한강 풋살장',
     },
     status: 'recruiting',
     participantCount: 1,
     version: 'v1',
-  },
-}));
+  };
+  return {
+    createMatchMutate: vi.fn(),
+    routerPush: vi.fn(),
+    uploadImagesMutateAsync: vi.fn(),
+    confirmMock: vi.fn(),
+    updateMatchMutate: vi.fn(),
+    cancelMatchMutate: vi.fn(),
+    closeMatchMutate: vi.fn(),
+    reopenMatchMutate: vi.fn(),
+    // 로드 실패(권한 없음 등) 케이스를 개별 테스트에서 켰다 끄는 스위치. 객체 프로퍼티만
+    // 바꾸면 되므로(재대입 아님) 아래 vi.mock 팩토리가 참조하는 값도 그대로 갱신된다.
+    matchEditQueryState: { isError: false },
+    matchEditRefetch: vi.fn(),
+    matchEditData,
+  };
+});
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: routerPush }),
@@ -359,7 +363,7 @@ describe('개인 매치 종료 시간 — 실제 화면과 API 제출 계약', (
     await waitFor(() => expect(routerPush).toHaveBeenLastCalledWith('/matches/match-created'));
   });
 
-  it.each(['09:00', '10:00'])('잘못된 %s 종료 초안으로 확인에 직접 진입해도 오류와 수정 링크를 표시하고 POST하지 않는다', async (endTime) => {
+  it.each(['09:00', '10:00', '24:00'])('잘못된 %s 종료 초안으로 확인에 직접 진입해도 오류와 수정 링크를 표시하고 POST하지 않는다', async (endTime) => {
     const date = seedDraft(endTime);
     renderStep('confirm');
     await screen.findByText('서울 강남구');

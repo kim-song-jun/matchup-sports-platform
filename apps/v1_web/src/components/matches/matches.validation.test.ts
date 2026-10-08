@@ -71,7 +71,7 @@ describe('getMatchStepErrors — 스텝별 즉시 검증이 다른 스텝 필드
 });
 
 describe('개인 매치 종료 시간 — 단계와 제출이 같은 시간 순서를 검증한다', () => {
-  it.each(['09:00', '10:00', 'not-a-time'])('10:00 시작에 %s 종료는 endTime 오류로 다음과 payload를 차단한다', (endTime) => {
+  it.each(['09:00', '10:00', 'not-a-time', '24:00', '11:60'])('10:00 시작에 %s 종료는 endTime 오류로 다음과 payload를 차단한다', (endTime) => {
     const ctx = baseCtx({ draft: { ...baseCtx().draft, startTime: '10:00', endTime } });
     const before = { ...ctx.draft };
 
@@ -84,7 +84,7 @@ describe('개인 매치 종료 시간 — 단계와 제출이 같은 시간 순�
     expect(ctx.draft).toEqual(before);
   });
 
-  it.each(['11:00', ''])('10:00 시작에 종료가 %s이면 정상 시간과 종료 생략을 보존한다', (endTime) => {
+  it.each(['11:00', '23:59', ''])('10:00 시작에 종료가 %s이면 정상 시간과 종료 생략을 보존한다', (endTime) => {
     const ctx = baseCtx({ draft: { ...baseCtx().draft, startTime: '10:00', endTime } });
     const result = buildMatchPayloadResult(ctx.draft, ctx.sportId, ctx.regionId);
 

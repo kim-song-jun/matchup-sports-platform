@@ -95,7 +95,7 @@ function isNotFound(error: unknown): boolean {
 }
 
 /** 경기 기록 조회 재시도 판정 단일 소스: 404(비공개·숨김)는 재시도하지 않고, 그 외 오류는 최대 2회. */
-export function shouldRetryPublicRecord(failureCount: number, error: unknown): boolean {
+function shouldRetryPublicRecord(failureCount: number, error: unknown): boolean {
   return !isNotFound(error) && failureCount < RECORD_MAX_RETRIES;
 }
 
@@ -145,7 +145,7 @@ export function usePublicMatch(
  * 내려준다(tournamentId/tournamentTitle 자리에 리그 id/제목, round 에 'N주차' 라벨,
  * groupName 은 null — `getLeagueFixtureRecord` 주석 참고). 게임이 아직 없거나 숨김
  * 정책인 대진은 404 로 접힌다 -- 소비처(리그 경기 상세)는 그때 자체 요약 카드로
- * 폴백하므로 retry 하지 않는다.
+ * 폴백하므로 404 는 재시도하지 않는다(그 외 오류는 `shouldRetryPublicRecord` 기준으로 재시도).
  */
 export function usePublicLeagueFixtureRecord(leagueId: string, teamMatchId: string) {
   const query = useQuery({

@@ -2340,9 +2340,13 @@ export function WithdrawalPageClient() {
     setIsRequestLocked(false);
   };
   const reconcileAmbiguousWithdrawal = async (error: Error) => {
-    const ambiguousWrite = isV1NetworkError(error)
-      || (error instanceof V1ApiError && (error.statusCode === 0 || error.statusCode >= 500));
-    if (!ambiguousWrite) {
+    const needsReconciliation = isV1NetworkError(error)
+      || (error instanceof V1ApiError && (
+        error.statusCode === 0
+        || error.statusCode >= 500
+        || (error.statusCode === 403 && error.code === 'PERMISSION_DENIED')
+      ));
+    if (!needsReconciliation) {
       releaseWithdrawalLock();
       return;
     }

@@ -47,9 +47,8 @@ import {
   resolveTournamentFixtureOfficialResult,
   type TournamentFixtureGameForResult,
 } from './tournament-fixture-official-result';
-import { cascadeCancelTeamMatchSchedulesInTx } from '../team-schedules/team-schedules.service';
 import { findTournamentOnSurface, TOURNAMENT_KINDS } from './tournament-surface-lookup';
-import { assertSidesNotSlotLinked, createGroupInTx, ensureGroupPhaseTeamsInTx, recalculateStandingsInTx, updateTournamentFixtureInTx } from './tournament-bracket-tx';
+import { assertSidesNotSlotLinked, createGroupInTx, ensureGroupPhaseTeamsInTx, recalculateStandingsInTx, softDeleteTournamentFixtureInTx, updateTournamentFixtureInTx } from './tournament-bracket-tx';
 import { participantDisplayName } from './participant-display-name';
 import { readJerseyNumbers } from './tournament-player-jersey';
 import { createTournamentMatchInTx } from './tournament-match-creation';
@@ -916,35 +915,7 @@ export class TournamentBracketService {
       await tx.$queryRaw`SELECT id FROM v1_tournaments WHERE id = ${initial.tournamentId} FOR UPDATE`;
       const tournament = await findTournamentOnSurface(tx, TOURNAMENT_KINDS, { where: { id: initial.tournamentId, deletedAt: null } });
       if (!tournament) throw new NotFoundException({ code: 'TOURNAMENT_NOT_FOUND', message: '대회를 찾을 수 없어요.' });
-      await tx.$queryRaw`SELECT id FROM v1_games WHERE team_match_id = ${fixtureId} FOR UPDATE`;
-      await tx.$queryRaw`SELECT id FROM v1_team_matches WHERE id = ${fixtureId} FOR UPDATE`;
-      const canonical = await tx.v1TournamentMatchDetails.findUnique({ where: { teamMatchId: fixtureId },
-        include: { tournament: true, teamMatch: { include: { game: true } } } });
-      if (!canonical || canonical.teamMatch.deletedAt !== null) throw new NotFoundException({ code: 'FIXTURE_NOT_FOUND', message: '경기를 찾을 수 없어요.' });
-      const game = canonical.teamMatch.game;
-      if (!game || game.sourceType !== V1GameSourceType.TEAM_MATCH) throw new ConflictException({ code: 'TOURNAMENT_MATCH_GAME_MISSING', message: '대회 경기의 정본 TeamMatch 게임을 찾을 수 없어요.' });
-      if (game.currentOfficialRevisionId !== null) throw new ConflictException({ code: 'FIXTURE_HAS_RESULT', message: '결과가 기록된 경기는 삭제할 수 없어요.' });
-      if (!['draft', 'open', 'closed'].includes(canonical.tournament.status) || game.state !== 'SCHEDULED' || canonical.teamMatch.status !== 'matched') {
-        throw new ConflictException({ code: 'FIXTURE_ALREADY_STARTED', message: '대회 시작 전의 아직 시작하지 않은 경기만 삭제할 수 있어요.' });
-      }
-      await tx.$queryRaw`SELECT g.id FROM v1_games g JOIN v1_tournament_match_advancement_edges e ON g.team_match_id = e.target_team_match_id WHERE e.source_team_match_id = ${fixtureId} ORDER BY g.id FOR UPDATE OF g`;
-      const linked = await tx.v1TournamentMatchAdvancementEdge.findMany({ where: { sourceTeamMatchId: fixtureId }, include: { target: { include: { teamMatch: { include: { game: true } } } } } });
-      if (linked.some((edge) => edge.target.homeRegistrationId !== null || edge.target.awayRegistrationId !== null || edge.target.teamMatch.game?.state !== 'SCHEDULED' || edge.target.teamMatch.game.currentOfficialRevisionId !== null)) {
-        throw new ConflictException({ code: 'FIXTURE_DOWNSTREAM_ASSIGNED', message: '연결된 다음 경기의 팀 배정을 먼저 해제해 주세요. 시작된 다음 경기가 있으면 삭제할 수 없어요.' });
-      }
-      const children = await tx.v1TournamentMatchDetails.findMany({ where: { parentTeamMatchId: fixtureId, teamMatch: { deletedAt: null } }, select: { teamMatchId: true } });
-      if (children.length) throw new ConflictException({ code: 'FIXTURE_HAS_CHILDREN', message: '연결된 하위 경기를 먼저 삭제해 주세요.' });
-      await cascadeCancelTeamMatchSchedulesInTx(tx, fixtureId, 'admin_bracket_deleted_before_start');
-      await tx.v1Game.update({ where: { id: game.id }, data: { state: 'CANCELLED', version: { increment: 1 } } });
-      await tx.v1GameVisibilityPolicy.update({ where: { gameId: game.id }, data: { mode: 'STATUS_ONLY', lineupAt: null, version: { increment: 1 } } });
-      await tx.v1TeamMatch.update({ where: { id: fixtureId }, data: { status: 'archived', deletedAt: new Date() } });
-      await tx.v1TournamentMatchAdvancementEdge.deleteMany({ where: { OR: [{ sourceTeamMatchId: fixtureId }, { targetTeamMatchId: fixtureId }] } });
-      // Free the original round/number unique key; the original identity is retained in the audit below.
-      await tx.v1TournamentMatchDetails.update({ where: { teamMatchId: fixtureId }, data: { groupId: null, parentTeamMatchId: null, round: canonical.round + ':deleted:' + fixtureId } });
-      await tx.v1StatusChangeLog.create({ data: { targetType: 'team_match', targetId: fixtureId, fromStatus: canonical.teamMatch.status, toStatus: 'archived', actorType: 'admin', actorUserId: user.id, reason: 'admin_bracket_deleted_before_start' } });
-      await this.adminContext.logAdminAction(admin, { action: 'tournament.bracket.fixture.delete', targetType: 'team_match', targetId: fixtureId,
-        beforeJson: { tournamentId: canonical.tournamentId, groupId: canonical.groupId, round: canonical.round, fixtureNumber: canonical.fixtureNumber, legNumber: canonical.legNumber },
-        afterJson: { deleted: true, gameId: game.id, state: 'CANCELLED' } }, tx);
+      await softDeleteTournamentFixtureInTx(tx, admin, fixtureId);
       return { deleted: true };
     });
   }

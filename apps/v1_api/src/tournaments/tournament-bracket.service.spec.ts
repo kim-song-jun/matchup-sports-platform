@@ -26,7 +26,7 @@ import { TournamentBracketService } from './tournament-bracket.service';
 import { GamesService } from '../games/games.service';
 import { FOOTBALL_V1_CONFIG } from './competition-config/competition-config';
 import { kindAwareFindFirst } from '../../test/helpers/kind-aware-find-first';
-import { assertSidesNotSlotLinked, assignTournamentFixtureSideInTx, createGroupInTx } from './tournament-bracket-tx';
+import { assertSidesNotSlotLinked, assignTournamentFixtureSideInTx, createGroupInTx, softDeleteTournamentFixtureInTx } from './tournament-bracket-tx';
 
 // ─── fixtures ────────────────────────────────────────────────────────────────
 
@@ -1823,7 +1823,7 @@ describe('TournamentBracketService', () => {
     prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdmin);
     prisma.v1TournamentMatchDetails.findUnique.mockResolvedValue(canonicalDetailsRow());
     await expect(service.deleteFixture(ownerUser, 'fixture-1')).resolves.toEqual({ deleted: true });
-    expect(prisma.v1TeamMatch.update).toHaveBeenCalledWith({ where: { id: 'fixture-1' }, data: { status: 'archived', deletedAt: expect.any(Date) } });
+    expect(prisma.v1TeamMatch.update).toHaveBeenCalledWith({ where: { id: 'fixture-1' }, data: { status: 'archived', deletedAt: expect.any(Date), homeSlotId: null, awaySlotId: null } });
     expect(prisma.v1Game.update).toHaveBeenCalledWith({ where: { id: 'game-1' }, data: { state: 'CANCELLED', version: { increment: 1 } } });
     expect(prisma.v1TournamentMatchDetails.update).toHaveBeenCalledWith({ where: { teamMatchId: 'fixture-1' }, data: { groupId: null, parentTeamMatchId: null, round: 'group_a:deleted:fixture-1' } });
     expect(prisma.v1AdminActionLog.create).toHaveBeenCalled();
@@ -2059,6 +2059,52 @@ describe('TournamentBracketService', () => {
       expect(tx.v1TournamentGroup.create).toHaveBeenCalledWith({
         data: { tournamentId: 'tournament-1', name: '결승', phase: 'final', sortOrder: 0, advanceCount: null },
       });
+    });
+  });
+
+  describe('softDeleteTournamentFixtureInTx', () => {
+    const linkedRow = (overrides: { gameState?: string } = {}) => canonicalDetailsRow({
+      teamMatch: {
+        ...canonicalDetailsRow().teamMatch,
+        homeSlotId: 'slot-h',
+        awaySlotId: 'slot-a',
+        game: { ...canonicalDetailsRow().teamMatch.game, state: overrides.gameState ?? 'SCHEDULED' },
+      },
+    });
+
+    it('자리에 연결된 경기를 지우면 두 자리 연결이 같은 update 로 풀린다 (자리 삭제가 FK 로 막히지 않게)', async () => {
+      prisma.v1TournamentMatchDetails.findUnique.mockResolvedValue(linkedRow());
+
+      await softDeleteTournamentFixtureInTx(prisma as never, activeAdmin, 'fixture-1');
+
+      expect(prisma.v1TeamMatch.update).toHaveBeenCalledTimes(1);
+      expect(prisma.v1TeamMatch.update).toHaveBeenCalledWith({
+        where: { id: 'fixture-1' },
+        data: { status: 'archived', deletedAt: expect.any(Date), homeSlotId: null, awaySlotId: null },
+      });
+      expect(prisma.v1StatusChangeLog.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({ targetId: 'fixture-1', toStatus: 'archived', actorType: 'admin', actorUserId: 'owner-user-id' }),
+      });
+    });
+
+    it('시작된 경기는 지우지 못하고 자리 연결도 그대로 둔다', async () => {
+      prisma.v1TournamentMatchDetails.findUnique.mockResolvedValue(linkedRow({ gameState: 'LIVE' }));
+
+      await expect(softDeleteTournamentFixtureInTx(prisma as never, activeAdmin, 'fixture-1')).rejects.toMatchObject({
+        response: { code: 'FIXTURE_ALREADY_STARTED' },
+      });
+      expect(prisma.v1TeamMatch.update).not.toHaveBeenCalled();
+    });
+
+    it('대회 행 잠금은 호출자의 몫이다 — 이 함수는 v1_tournaments 를 raw 로 건드리지 않는다', async () => {
+      prisma.v1TournamentMatchDetails.findUnique.mockResolvedValue(linkedRow());
+
+      await softDeleteTournamentFixtureInTx(prisma as never, activeAdmin, 'fixture-1');
+
+      const sql = prisma.$queryRaw.mock.calls.map((call) => Array.from(call[0] as readonly string[]).join('?'));
+      expect(sql.length).toBeGreaterThan(0);
+      expect(sql.some((text) => /\bv1_tournaments\b/.test(text))).toBe(false);
+      expect(sql.some((text) => text.includes('v1_games'))).toBe(true);
     });
   });
 

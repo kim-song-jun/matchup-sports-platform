@@ -1,5 +1,5 @@
 import { Type } from 'class-transformer';
-import { IsInt, IsObject, IsUUID, Min, ValidateIf, ValidateNested } from 'class-validator';
+import { IsDefined, IsInt, IsObject, IsUUID, Min, ValidateIf, ValidateNested } from 'class-validator';
 
 /** 승부차기 점수. 킥 수·선축은 받지 않는다 — 득점 기록이 없는 경기라 대조할 대상이 없다. */
 export class QuickResultPenaltiesDto {
@@ -38,6 +38,8 @@ export class QuickResultDto {
   @Min(0)
   expectedVersion!: number;
 
+  @IsDefined()
+  @IsObject()
   @ValidateNested()
   @Type(() => QuickResultScoreDto)
   score!: QuickResultScoreDto;

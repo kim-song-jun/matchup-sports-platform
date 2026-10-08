@@ -53,6 +53,14 @@ describe('QuickResultDto', () => {
     }
   });
 
+  it('score 는 필수 객체다 — 누락·null·원시값이면 서비스가 undefined 를 읽기 전에 거부한다', async () => {
+    const { score: _omitted, ...withoutScore } = valid;
+    expect(await failures(withoutScore)).toContain('score');
+    expect(await failures({ ...valid, score: null })).toContain('score');
+    expect(await failures({ ...valid, score: 'x' })).toContain('score');
+    expect(await failures({ ...valid, score: { home: 1, away: 1, penalties: 'x' } })).toContain('score.penalties');
+  });
+
   it('최상위 여분 키(예: 참가자 목록)는 거부한다', async () => {
     expect(await failures({ ...valid, actualParticipants: [] })).toContain('actualParticipants');
   });

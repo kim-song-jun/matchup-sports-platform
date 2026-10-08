@@ -1,7 +1,7 @@
 import { V1GameResultRevisionState } from '@prisma/client';
 import { GameContractError } from './game-contract';
 
-export type RevisionFlow = 'STANDARD' | 'CORRECTION';
+export type RevisionFlow = 'STANDARD' | 'CORRECTION' | 'ADMIN_QUICK';
 export type RevisionMutation = 'CONTENT' | 'PARTICIPANTS' | 'STATE' | 'DELETE';
 export type AppendOnlyEventOperation = 'APPEND' | 'UPDATE' | 'DELETE';
 
@@ -88,7 +88,12 @@ export function assertRevisionTransition(input: RevisionTransitionInput): void {
       standardSubmittedTargets.has(input.to)) ||
     (input.flow === 'CORRECTION' &&
       input.from === V1GameResultRevisionState.DRAFT &&
-      correctionTargets.has(input.to));
+      correctionTargets.has(input.to)) ||
+    // 어드민 빠른 입력은 초안을 만든 같은 트랜잭션에서 곧바로 확정한다. 정정은 공식 base 를
+    // 전제하므로 CORRECTION 으로 위장하지 않고 별도 흐름으로 둔다.
+    (input.flow === 'ADMIN_QUICK' &&
+      input.from === V1GameResultRevisionState.DRAFT &&
+      input.to === V1GameResultRevisionState.OFFICIAL);
 
   if (!allowed) {
     throw new GameContractError(

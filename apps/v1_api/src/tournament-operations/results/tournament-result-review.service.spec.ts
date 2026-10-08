@@ -110,6 +110,11 @@ type HarnessOptions = {
    * 하므로, 1-1 무승부 재제출을 검증하려면 이벤트도 1-1이어야 한다.
    */
   readonly awayGoalEvent?: boolean;
+  /**
+   * 이 경기의 `v1_game_events` 행 수. 기본은 하네스가 실제로 돌려주는 GOAL 이벤트 수(1, `awayGoalEvent` 면 2)와
+   * 같다. `0` 이면 어드민 빠른 입력처럼 득점 기록이 전혀 없는 경기다.
+   */
+  readonly eventCount?: number;
   /** Use the canonical TEAM_MATCH source and Details bracket metadata. */
   readonly canonical?: boolean;
   /** Use the regular-league TEAM_MATCH shape (no Details bracket row). */
@@ -285,6 +290,7 @@ function createHarness(options: HarnessOptions = {}): Harness {
       ],
     },
     v1GameEvent: {
+      count: async () => options.eventCount ?? (options.awayGoalEvent === true ? 2 : 1),
       findMany: async () => [
         {
           id: 'event-goal-1',
@@ -1296,5 +1302,45 @@ describe('몰수·중단 표식(outcomeReason/outcomeNote) 승계', () => {
     expect(harness.createdRevisions[0].state).toBe(V1GameResultRevisionState.VOID);
     expect(harness.createdRevisions[0].outcomeReason).toBe('FORFEIT');
     expect(harness.createdRevisions[0].outcomeNote).toBe('상대팀 미출전');
+  });
+});
+
+describe('득점 기록이 없는 경기의 정정 — 승부차기 킥 수 면제', () => {
+  const tiedWithPenalties = { score: { home: 1, away: 1, penalties: { home: 5, away: 4 } } };
+
+  it('득점 기록이 없는 결선 경기는 킥 수 없이 승부차기를 정정할 수 있다', async () => {
+    const harness = createHarness({ phase: 'semi', hasAdvancementEdge: true, eventCount: 0 });
+
+    await harness.correct(tiedWithPenalties);
+
+    expect(harness.createdRevisions).toHaveLength(1);
+    expect(harness.createdRevisions[0].score).toEqual({
+      home: 1,
+      away: 1,
+      penalties: { home: 5, away: 4 },
+    });
+  });
+
+  it('대조군 — 같은 입력도 득점 기록이 있으면 여전히 킥 수를 요구한다', async () => {
+    const harness = createHarness({ phase: 'semi', hasAdvancementEdge: true, eventCount: 3 });
+
+    const error = await captureFailure(() => harness.correct(tiedWithPenalties));
+
+    expectHttp(error, 422, 'TOURNAMENT_PENALTY_KICK_COUNTS_REQUIRED');
+    expect(harness.createdRevisions).toHaveLength(0);
+  });
+
+  it('면제는 킥 수 필수만 푼다 — 킥 수를 실으면 미결 승부차기는 그대로 거부한다', async () => {
+    const harness = createHarness({ phase: 'semi', hasAdvancementEdge: true, eventCount: 0 });
+
+    // 2킥씩 2:1 은 기본 3킥 시리즈가 아직 안 끝나 어느 정책에서도 미결이다.
+    const error = await captureFailure(() =>
+      harness.correct({
+        score: { home: 1, away: 1, penalties: { home: 2, away: 1, takenHome: 2, takenAway: 2 } },
+      }),
+    );
+
+    expectHttp(error, 422, 'TOURNAMENT_PENALTY_UNDECIDED');
+    expect(harness.createdRevisions).toHaveLength(0);
   });
 });

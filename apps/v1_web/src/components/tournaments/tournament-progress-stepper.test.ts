@@ -327,9 +327,9 @@ describe('buildTournamentStages — 정규 리그 거울 행', () => {
       }),
     );
 
-    // 리그는 두 칸(리그 방식 · 시상)이다. 조별/4강/결승 칸이 하나라도 있으면 틀렸다.
+    // 리그는 두 칸(풀리그 · 시상)이다. 조별/4강/결승 칸이 하나라도 있으면 틀렸다.
     expect(shape(stages)).toEqual([
-      ['리그 방식', 'active'],
+      ['풀리그', 'active'],
       ['시상', 'upcoming'],
     ]);
   });
@@ -346,7 +346,7 @@ describe('buildTournamentStages — 정규 리그 거울 행', () => {
       }),
     );
 
-    expect(stages.map((s) => s.label)).not.toContain('리그 방식');
+    expect(stages.map((s) => s.label)).not.toContain('풀리그');
     expect(stages.map((s) => s.label)).toContain('조별리그');
   });
 });

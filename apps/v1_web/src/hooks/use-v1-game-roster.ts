@@ -52,6 +52,8 @@ export type V1GameRosterView = {
   baseSource: 'REGISTRATION' | 'TEAM_MEMBERS';
   /** 등번호의 원본인 확정 참가 신청 id — 참가 명단이 기준이고 뷰어가 이 팀 팀장·매니저일 때만 온다. */
   jerseyRegistrationId: string | null;
+  /** 그 신청의 명단이 잠겼거나 제출 마감이 지나 등번호 저장이 막히면 false. */
+  jerseyEditable: boolean;
   base: (V1GameRosterPerson & { status: V1GameRosterPlayerStatus })[];
   participants: (V1GameRosterPerson & { joinedAfterFixtureCreated: boolean })[];
   excluded: (V1GameRosterPerson & {

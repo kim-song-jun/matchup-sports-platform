@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { V1TeamScheduleSummary } from '@/types/api';
 import { TeamScheduleListPageClient } from './team-schedules-client';
 
+const replaceHistory = window.history.replaceState.bind(window.history);
 const state = vi.hoisted(() => ({ role: 'owner', items: [] as V1TeamScheduleSummary[],
   loading: false, error: false, refetch: vi.fn(), query: vi.fn() }));
 vi.mock('next/navigation', () => ({
@@ -22,6 +23,7 @@ vi.mock('@/hooks/use-v1-api', () => ({
 }));
 
 beforeEach(() => {
+  replaceHistory(null, '', '/teams/fixture-team/schedules');
   vi.clearAllMocks();
   vi.useFakeTimers({ toFake: ['Date'] });
   vi.setSystemTime(new Date('2026-10-02T12:00:00.000Z'));
@@ -32,7 +34,10 @@ beforeEach(() => {
     state: 'SCHEDULED', version: 1, teamMatchId: null, linkedMatch: null,
     matchConfirmed: null, goingCount: 0, waitlistedCount: 0 }];
 });
-afterEach(() => vi.useRealTimers());
+afterEach(() => {
+  vi.useRealTimers();
+  replaceHistory(null, '', '/');
+});
 function page() {
   render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
     <TeamScheduleListPageClient teamId="fixture-team" />
@@ -66,7 +71,9 @@ describe('#1547 빈 일정의 조회 범위', () => {
   it('일정 있는 날짜→빈 날짜→해제로 같은 일정의 링크를 회복한다', () => {
     page(); fireEvent.click(screen.getByRole('tab', { name: '캘린더' }));
     fireEvent.click(screen.getByRole('button', { name: '4일, 일정 1건' }));
-    expect(screen.getByRole('link', { name: /합성 기존 훈련/ })).toHaveAttribute('href', '/teams/fixture-team/schedules/fixture-schedule');
+    const detailHref = new URL(screen.getByRole('link', { name: /합성 기존 훈련/ }).getAttribute('href')!, window.location.origin);
+    expect(detailHref.pathname).toBe('/teams/fixture-team/schedules/fixture-schedule');
+    expect(detailHref.searchParams.get('from')).toBe('/teams/fixture-team/schedules?view=calendar&month=2026-10&date=2026-10-04');
     fireEvent.click(screen.getByRole('button', { name: '8일' }));
     expect(screen.queryByRole('link', { name: /합성 기존 훈련/ })).not.toBeInTheDocument();
     expect(screen.getByText('선택한 날짜에 일정이 없어요')).toBeInTheDocument();

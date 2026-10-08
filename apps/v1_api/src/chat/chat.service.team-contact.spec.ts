@@ -148,7 +148,11 @@ describe('ChatService — team_contact', () => {
 
   it('방 목록 항목에 teamContact 블록과 mySide 가 실린다 — 방마다 멤버십을 따로 조회하지 않는다', async () => {
     // u1 은 fromTeam(A) 의 owner 지 toTeam(B) 소속이 아니므로(include 된 toTeam.memberships 가 빈 배열) mySide 는 'from'.
-    prisma.v1ChatRoom.findMany.mockResolvedValue([makeRoom('accepted')]);
+    const room = makeRoom('accepted');
+    // 첫 findMany 는 정렬 키, 둘째가 include 를 실은 본 조회.
+    prisma.v1ChatRoom.findMany
+      .mockResolvedValueOnce([{ id: room.id, lastMessageAt: null, createdAt: new Date(0) }])
+      .mockResolvedValueOnce([room]);
 
     const result = await service.rooms(userU1, {});
 
@@ -164,7 +168,7 @@ describe('ChatService — team_contact', () => {
     expect(result.items[0].teamContact?.toTeam).toEqual({ id: 'B', name: '나팀' });
     // N+1 방지: 목록 조회 include 가 호출자 기준 멤버십을 실어 오므로 별도 findFirst 가 없다.
     expect(prisma.v1TeamMembership.findFirst).not.toHaveBeenCalled();
-    const include = prisma.v1ChatRoom.findMany.mock.calls[0][0].include;
+    const include = prisma.v1ChatRoom.findMany.mock.calls[1][0].include;
     expect(include.teamContact.select.toTeam.select.memberships.where).toMatchObject({ userId: 'u1', status: 'active' });
   });
 

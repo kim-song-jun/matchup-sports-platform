@@ -7,7 +7,7 @@ V1 session authentication and current room entitlement are required. Development
 
 | Method | Path | Contract |
 | --- | --- | --- |
-| GET | `/chat/rooms` | `roomType`, `status`, `cursor`, `limit` (1–50); `{ items, pageInfo: { nextCursor, hasNext } }` |
+| GET | `/chat/rooms` | `roomType`, `status`, `cursor`, `limit` (1–50); `{ items, pageInfo: { nextCursor, hasNext } }`. Order is `lastMessageAt` desc with rooms that have no message last, then `createdAt` desc. Each item carries `linkedTargetCancelled` (`true` only when the linked personal match is `cancelled`; the room stays listed). Platform team-match rooms with no real message (system lines excluded) are omitted — see below |
 | POST | `/chat/rooms/resolve` | `{ targetType: match \| team \| team_match \| team_contact, targetId }`; checks domain membership |
 | GET | `/chat/rooms/:roomId` | room, linked target, current participant and context |
 | GET | `/chat/rooms/:roomId/messages` | `cursor`, `limit` (1–100), `direction: before \| after`; cursor page, only messages since the participant's visibility boundary |
@@ -53,6 +53,9 @@ and therefore has no host participant row.
 - The creating operator needs an active, non-revoked `owner`/`ops` admin account and active user
   account. This is scoped to their own `platformManaged` match; other admins gain no implicit access.
   Operator entitlement is checked for list, resolve, detail, messages and delivery recipients.
+- A platform room is created at recruitment time but stays out of `GET /chat/rooms` until it holds at
+  least one sent, non-system message. `resolve` and room detail/entry still work for entitled users
+  at any time. Ordinary team-match, personal-match, team and team-contact rooms are always listed.
 - Platform chat is available during `recruiting`, `closed`, `matched`, and `completed`; cancelled,
   expired and deleted matches are excluded. Ordinary team matches still require both assigned teams
   and `matched`/`completed`. Failed team-match entitlement returns `403 PERMISSION_DENIED`.

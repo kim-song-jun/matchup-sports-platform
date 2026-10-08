@@ -9,6 +9,8 @@ export type ChatRoomModel = {
   contactStatus?: V1ChatRoomTeamContact['status'];
   /** 받는 팀 운영진이 아직 답하지 않은 요청 — 목록에서 "답장 필요" 로 강조한다. */
   contactNeedsReply?: boolean;
+  /** 연결된 개인매치가 취소됨 — 목록 제목 옆 '취소됨' 배지. */
+  linkedTargetCancelled?: boolean;
   last: string;
   time: string;
   unread: number;

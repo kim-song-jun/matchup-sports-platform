@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import type { ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { V1ApiError, V1_OFFLINE_WRITE_MESSAGE } from '@/lib/api-client';
@@ -761,6 +761,40 @@ describe('ChatRoomPageClient — 팀컨택 방', () => {
 
       expect(await screen.findByText(FALLBACK)).toBeInTheDocument();
     });
+  });
+});
+
+describe('ChatListPageClient — 취소된 개인매치 배지', () => {
+  const matchRoom = (id: string, title: string, linkedTargetCancelled: boolean) => ({
+    roomId: id,
+    roomType: 'match' as const,
+    title,
+    status: 'active',
+    teamContact: null,
+    linkedTarget: { type: 'match' as const, id: `m-${id}`, title, route: `/matches/m-${id}` },
+    linkedTargetCancelled,
+    lastMessage: null, unreadCount: 0, pinned: false, muted: false, mutedUntil: null,
+  });
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    navigation.search = '';
+    hooks.updateChatRoomMe.mockReturnValue({ isPending: false, variables: undefined, mutate: vi.fn() });
+  });
+
+  it('취소된 개인매치 방에만 "취소됨" 배지가 붙고 진행 중인 방에는 없다', () => {
+    hooks.chatRooms.mockReturnValue({
+      data: { items: [matchRoom('r1', '취소된 매치', true), matchRoom('r2', '진행 중 매치', false)] },
+      isPending: false, isError: false, refetch: vi.fn(),
+    });
+
+    renderWithClient(<ChatListPageClient />);
+
+    // 모바일·데스크톱 두 pane 이 렌더되므로 행 단위로 좁혀 본다.
+    const cancelledRow = screen.getAllByText('취소된 매치')[0].closest('.tm-chat-row-main') as HTMLElement;
+    const activeRow = screen.getAllByText('진행 중 매치')[0].closest('.tm-chat-row-main') as HTMLElement;
+    expect(within(cancelledRow).getByText('취소됨')).toBeInTheDocument();
+    expect(within(activeRow).queryByText('취소됨')).toBeNull();
   });
 });
 

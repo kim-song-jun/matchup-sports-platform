@@ -2108,6 +2108,8 @@ export type V1ChatRoom = {
     title: string;
     route: string | null;
   };
+  /** 연결된 개인매치가 취소됐으면 true(그 외·다른 방 종류는 false). */
+  linkedTargetCancelled: boolean;
   lastMessage: {
     messageId: string;
     contentPreview: string;

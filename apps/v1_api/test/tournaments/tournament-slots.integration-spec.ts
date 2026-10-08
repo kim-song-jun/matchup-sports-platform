@@ -503,4 +503,38 @@ describe('자리 배정 (PostgreSQL)', () => {
       expect((await prisma.v1TournamentRegistration.findUniqueOrThrow({ where: { id: registrationIds[0] } })).status).toBe('cancelled');
     });
   });
+
+  describe('SLOT_LINKED 가드', () => {
+    it('자리에 연결된 사이드의 팀 변경(지정·null)은 409 이고 아무것도 바뀌지 않는다', async () => {
+      const { tournamentId, registrationIds } = await leagueOf4('linked');
+      const slot1 = await slotAt(tournamentId, 1);
+      const [fixture] = await fixturesUsing(slot1.id);
+      const patch = fixture.homeSlotId === slot1.id ? 'homeRegistrationId' : 'awayRegistrationId';
+
+      for (const value of [registrationIds[2], null]) {
+        await expect(bracket.updateFixture(user, fixture.id, { [patch]: value }))
+          .rejects.toMatchObject({ response: { code: 'SLOT_LINKED' } });
+      }
+      const after = await prisma.v1TournamentMatchDetails.findUniqueOrThrow({ where: { teamMatchId: fixture.id } });
+      expect([after.homeRegistrationId, after.awayRegistrationId]).toEqual([null, null]);
+    });
+
+    it('대조군 — 같은 경기의 일정·장소 수정은 그대로 된다', async () => {
+      const { tournamentId } = await leagueOf4('linked-schedule');
+      const [fixture] = await fixturesUsing((await slotAt(tournamentId, 1)).id);
+      await expect(bracket.updateFixture(user, fixture.id, { venue: '새 경기장', scheduledAt: '2026-11-02T10:00:00.000Z' }))
+        .resolves.toMatchObject({ id: fixture.id, venue: '새 경기장' });
+    });
+
+    it('대조군 — 자리 없는 수동 경기의 팀 변경은 그대로 된다', async () => {
+      const { tournamentId, registrationIds } = await leagueOf4('linked-manual');
+      const group = await prisma.v1TournamentGroup.findFirstOrThrow({ where: { tournamentId } });
+      const manual = await bracket.createFixture(user, tournamentId, {
+        groupId: group.id, round: 'league_r9', fixtureNumber: 99,
+        homeRegistrationId: registrationIds[0], awayRegistrationId: registrationIds[1],
+      });
+      await expect(bracket.updateFixture(user, manual.id, { homeRegistrationId: registrationIds[2] }))
+        .resolves.toMatchObject({ homeRegistrationId: registrationIds[2] });
+    });
+  });
 });

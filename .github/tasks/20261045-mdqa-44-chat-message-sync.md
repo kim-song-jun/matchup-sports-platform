@@ -63,3 +63,5 @@ origin/dev5948dfd6에서 fetch 직후 managed전용 WT. #41은 별도 focus설�
 - API/web type checks, unchanged canonical gates, committed verification, exact-head independent review and dev PR remain in progress. Alpha after remains deployment-dependent.
 
 - Precommit: API/web TypeScript PASS; API surface616 and unchanged web pattern gates PASS via existing Git Bash shell adapter (initial mistaken gate path failed before correct package path). Diff/debt/import scope verified9 files. Independent exact commit review and committed regression next.
+
+- Independent frontend review found new unsafe typed-name assertion in regression helper. Replaced Object.entries cast with literal typed names and direct keys/reads access; runtime unchanged. Fresh head review and affected committed hook run required.

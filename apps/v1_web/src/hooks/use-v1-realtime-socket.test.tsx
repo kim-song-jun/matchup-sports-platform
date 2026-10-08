@@ -124,10 +124,10 @@ describe('useV1ChatListSocket', () => {
       room: v1Keys.chatRoom('room-1'),
       messages: [...v1Keys.chatMessages('room-1'), { limit: 50 }],
     };
-    const observers = Object.entries(keys).map(([name, queryKey]) => {
-      const key = name as keyof typeof reads;
-      return new QueryObserver(queryClient, { queryKey, queryFn: async () => ++reads[key] });
-    });
+    const names = ['base', 'filtered', 'room', 'messages'] as const;
+    const observers = names.map((name) => new QueryObserver(queryClient, {
+      queryKey: keys[name], queryFn: async () => ++reads[name],
+    }));
     const stops = observers.map((observer) => observer.subscribe(() => {}));
     const { unmount } = renderHook(() => useV1ChatListSocket(), { wrapper: createWrapper(queryClient) });
     await waitFor(() => expect(reads).toEqual({ base: 1, filtered: 1, room: 1, messages: 1 }));

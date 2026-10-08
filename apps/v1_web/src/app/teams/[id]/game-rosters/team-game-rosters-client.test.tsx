@@ -5,7 +5,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -22,6 +22,7 @@ const { teamId } = GAME_ROSTER_MSW;
 const [G1, G2] = GAME_ROSTER_MSW.games;
 const NOW = '2026-10-01T00:00:00.000Z';
 const BATCH = `/api/v1/teams/${teamId}/game-rosters/batch`;
+const clients: QueryClient[] = [];
 
 let mock: ReturnType<typeof createV1GameRosterMswHandlers>;
 let server: ReturnType<typeof setupServer>;
@@ -35,6 +36,10 @@ beforeEach(() => {
   mock = createV1GameRosterMswHandlers();
   server = setupServer(
     ...mock.handlers,
+    http.get('*/api/v1/teams/:requestedTeamId', ({ params }) => {
+      if (params.requestedTeamId !== teamId) return new HttpResponse(null, { status: 404 });
+      return HttpResponse.json({ status: 'success', data: { teamId, name: '현재 경로의 합성 팀' }, timestamp: NOW });
+    }),
     http.get('*/api/v1/auth/me', () =>
       HttpResponse.json({ status: 'success', data: { user: { id: GAME_ROSTER_MSW.viewerUserId } }, timestamp: NOW }),
     ),
@@ -44,6 +49,8 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  cleanup();
+  for (const client of clients.splice(0)) client.clear();
   server.close();
   vi.useRealTimers();
   vi.unstubAllEnvs();
@@ -51,6 +58,7 @@ afterEach(() => {
 
 function renderPage() {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
+  clients.push(queryClient);
   return render(
     <QueryClientProvider client={queryClient}>
       <TeamGameRostersClient teamId={teamId} />

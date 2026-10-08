@@ -55,5 +55,9 @@
   "src/league-matches/league-cover-image.service.ts": {
     "allowed": 1,
     "why": "대표 이미지 교체의 FOR UPDATE 행 잠금 — kind='regular_league' 로 걸고 소프트삭제는 값으로 읽어 404 와 409 를 가른다. 반환되는 건 id·cover_image_url·deleted_at 뿐이라 대회 표면이 노출되지 않는다."
+  },
+  "src/tournaments/slots/competition-bracket-lock.ts": {
+    "allowed": 1,
+    "why": "Regular-league lane: competition-row FOR UPDATE, the same lock the league service takes. It returns no data; the on-hold check runs after the lock through findTournamentOnSurface(['regular_league'])."
   }
 }

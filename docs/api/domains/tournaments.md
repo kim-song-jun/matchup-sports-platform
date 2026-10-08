@@ -454,3 +454,19 @@ All team roster mutations lock the registration row and re-read `rosterLockedAt`
 - 공개 상세 `fixtures[]` 에 `homeSlotLabel`·`awaySlotLabel` 이 추가된다. **그 사이드에 팀이 없고 자리가 연결돼 있을 때만** 값이 있고 그 밖에는 null 이다(팀이 있으면 팀 이름이 나온다). `homeTeamName`·`awayTeamName` 의 `'TBD'` 규칙은 바뀌지 않는다. 공개 일정 `GET /tournaments/:id/schedule` 의 `items[]`·`unscheduled[]` 항목에도 같은 두 필드가 같은 규칙으로 추가된다(리그 경기는 항상 null). 경기 단건 상세(`/matches/:fixtureId`)에는 라벨이 없다.
 - `PATCH /admin/fixtures/:fixtureId` 는 자리에 연결된 사이드의 팀을 현재 값과 다르게 바꾸거나 비우려 하면 `409 SLOT_LINKED` 를 돌려준다. 같은 값을 보내거나 보내지 않은 쪽, 자리에 연결되지 않은 쪽은 그대로 바꿀 수 있다.
 - `DELETE /admin/fixtures/:fixtureId` 는 경기를 숨기면서 `homeSlotId`·`awaySlotId` 도 같이 비운다. `DELETE /admin/groups/:groupId` 는 조에 속한 자리(`slots`)나 그 조를 원천으로 삼는 순위 자리(`rankSlots`)가 남아 있으면 `409 GROUP_HAS_SLOTS` 로 막는다(검사 순서: `GROUP_HAS_TEAMS` → `GROUP_HAS_FIXTURES` → `GROUP_HAS_SLOTS`).
+
+### 대진 템플릿과 자리 배정 (2026-10-08)
+
+모두 `V1AuthGuard` + `getMutationAdmin`(support 어드민 403). 대회 레인은 `league-fixture-generation:{tournamentId}` advisory lock, 정규 리그 레인은 `v1_tournaments` 행 `FOR UPDATE` + 보류 판정 — 이번 범위에서 정규 리그 자리는 만들어지지 않는다.
+
+- `POST /admin/tournaments/:tournamentId/bracket/template` — 본문 `{ kind: 'knockout' | 'group_knockout' | 'league', … , replaceExisting?: boolean }`. `knockout`: `size` 4·8·12, `thirdPlace`. `league`(리그 방식 대회): `teamCount` 3~20, `legs` 1·2. 한 트랜잭션(45초)에서 조·자리·빈 경기(팀 미정)·승자/패자 연결을 만든다. 응답 `{ groups, slots, fixtures, edges }`.
+  - 12강은 ENTRY 자리 8 + BYE 자리 4(position 1~4 ↔ `V1TournamentByeSlot.sortOrder` 0·3·4·7), 8강 i번 홈 = BYE 자리 i · 어웨이 = 12강 i번 WINNER 연결.
+  - 오류: 422 `BRACKET_TEMPLATE_UNSUPPORTED`(범위 밖·필수 필드 누락·`group_knockout` 은 아직 미지원)·`BRACKET_TEMPLATE_FORMAT_MISMATCH`·`BRACKET_TEMPLATE_TOO_LARGE`(경기 240 초과), 409 `COMPETITION_CONFIG_REQUIRED`·`BRACKET_NOT_EMPTY`(비삭제 경기·조·자리가 있음)·`BRACKET_LOCKED`(`replaceExisting` 인데 시작·결과가 있는 경기가 있음).
+  - `replaceExisting`: 모든 경기가 시작 전·결과 없음일 때만. 하류 경기부터 소프트 삭제 → 자리 → GroupTeam·Standing·ByeSlot → 조 순으로 지우고 새로 만든다(경기 번호는 1부터 다시, 생성 키는 소프트 삭제 이력 수를 반영).
+- `PUT /admin/tournament-slots/:slotId/assignment` — 본문 `{ registrationId: uuid | null }`(null = 비우기). 응답 `{ slot: { id, kind, groupId, sourceGroupId, position, label, registrationId, teamName }, affectedTeamMatchIds }`.
+  - 그 자리를 쓰는 경기(`deletedAt IS NULL AND status <> 'cancelled'`) 전부에 사이드를 반영한다. `phase = group` 조에서는 조 편성(`V1TournamentGroupTeam`)을 만들고, 교체·비우기 때 그 조의 다른 경기에 더 이상 없는 이전 팀의 편성·순위 행을 지운 뒤 순위를 다시 계산한다. BYE 자리는 `ByeSlot` ↔ `GroupTeam(isBye)` 를 전환한다(`createBye` 와 같은 의미).
+  - 오류: 404 `SLOT_NOT_FOUND`, 422 `SLOT_REGISTRATION_INVALID`(다른 대회·미확정 등록), 409 `SLOT_TEAM_ALREADY_PLACED`(ENTRY·BYE 교차 포함)·`SLOT_LOCKED`(자리를 쓰는 경기 중 시작·결과 있음)·`SLOT_LEAGUE_NOT_SUPPORTED_YET`(정규 리그 자리).
+- `POST /admin/tournaments/:tournamentId/slots/random-fill` — 본문 없음. 잠금 안에서 다시 읽은 빈 ENTRY·BYE 자리에, 아직 어느 자리에도 없는 확정 등록을 서버가 무작위로 배정한다(남는 쪽은 그대로). 응답 `{ assignments: [{ slotId, registrationId }] }`.
+- `PATCH /admin/fixtures/:id` 로 자리에 연결된 사이드의 팀을 바꾸면 409 `SLOT_LINKED`(일정·장소·번호 수정은 그대로).
+- `POST /admin/tournaments/:tournamentId/league/fixtures/generate` 의 `replaceExisting` 가 자리에 연결된 경기를 덮어쓰려 하면 409 `LEAGUE_SLOT_FIXTURES_USE_TEMPLATE` — 템플릿 교체를 쓴다.
+- `PATCH /admin/registrations/:registrationId/cancel`(참가 취소 요청 승인 포함)은 확정이었던 팀의 자리를 비운다. 자리를 쓰는 경기 중 시작된 것이 있으면 자리를 그대로 두고 등록만 취소한다. 팀이 보낸 취소 요청(`cancel_requested`)은 자리를 비우지 않는다 — 운영자가 승인할 때 비운다.

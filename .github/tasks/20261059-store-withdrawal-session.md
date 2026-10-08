@@ -28,18 +28,21 @@ An authenticated ordinary user confirms account withdrawal. The request succeeds
 - [x] Actual RequireAuth observer does not refetch the disabled account after successful withdrawal.
 - [x] Successful cleanup survives route unmount while the real withdrawal response is pending.
 - [x] Success unsubscribes the browser device push subscription; rejection preserves it and cleanup continues after a reported unsubscribe failure.
+- [x] Stalled browser cleanup cannot delay identity removal or navigation beyond 1.5 seconds; the withdrawal action remains locked.
+- [x] Storage cleanup failure cannot convert a successful server withdrawal into a mutation error or prevent login navigation.
+- [x] The actual login gate still shows its guest form after an expired cookie when persistent storage cleanup throws.
 - [ ] Real alpha and native production before/after UI, network, and admin state evidence.
 - No schema, DTO, fixture, or retention-policy change is planned.
 
 ## Parallel Work Breakdown
 - API worker owns `apps/v1_api/src/profile/profile.controller.ts`, relevant profile HTTP tests, and canonical `docs/api/domains/users.md`.
-- Web worker owns `apps/v1_web/src/components/my/my-api-clients.tsx`, its withdrawal test, and only `useV1WithdrawalRequest` in `use-v1-api.ts`; independent review found the hook's post-success invalidation race and root approved this scoped expansion.
+- Web worker owns `apps/v1_web/src/components/my/my-api-clients.tsx`, its withdrawal test, only `useV1WithdrawalRequest` in `use-v1-api.ts`, the withdrawal-only server-row-already-removed option in `use-v1-push-registration.ts`, and unauthenticated-session cleanup in `components/auth/session-entry-gate.tsx` with its existing test; other callers retain their behavior.
 - Root owns this task, Changeset, process tracking, git/CI/deployment, exact-account restoration, native recordings, store submission, and local STATUS.md.
 - Sol reviewer is read-only and independently verifies the final diff and evidence. Workers must not commit, push, deploy, mutate remote data, or touch one another's files.
 
 ## Acceptance Criteria
 - [x] Both success and rejection contracts are proven by meaningful narrow tests.
-- [x] Critical review findings = 0; no new hidden fallback or dead code. Follow-up lifecycle/push fixes independently reviewed by GPT-6 Sol: C0/W0.
+- [x] Critical review findings = 0 on the final revision; no new hidden fallback or dead code. GPT-6 Sol final9-file source verdict C0/W0; tests and CI are separate evidence.
 - [ ] Exact shipped commit and healthy service are verified before account restoration.
 - [ ] Both native platforms show usable login after withdrawal; no credential/OTP disclosure in uploaded media.
 - [ ] Apple final reply/submission receipt is observed, or an explicit external blocker is recorded without claiming completion.
@@ -73,3 +76,8 @@ Production CI/deployment gates; concurrent dev changes must not be silently prom
 - Scoped production PR #1689 excludes unrelated dev changes. Its version metadata was corrected to compute1.3.7 above the separately deployed baseline1.3.6. New head CI is running; no production merge/deployment of this fix yet.
 - External review then found per-call mutation cleanup may be skipped on route unmount, browser push cleanup is incomplete, and the public task contained an operational account identifier. Root removed the identifier from tracked task content; worker adds delayed-response and browser PushManager regression coverage before fixing the lifecycle/push edges. Exact account facts remain outside Git.
 - Follow-up RED: three new real regressions failed while the original four tests passed. After lifecycle/push correction, all seven passed. A focused two-case rerun then passed with the actual inactive-account403 guard fixture. Test response typing was corrected without unsafe casts. Final independent source/doc/Changeset review is C0/W0. Current task content is redacted; earlier Git history was not rewritten.
+- PR #1691 then received actual P1/P2 findings: awaited push cleanup could stall session teardown and duplicate rejection telemetry. It remains unmerged while these are corrected. The production PR #1689 stays draft.
+- Third correction RED proved redundant server Push DELETE, retained identity during stalled browser cleanup, and duplicate failure telemetry. GREEN selected 13 cases: eight real withdrawal regressions plus five existing unsubscribe cases. Sol identified a separate localStorage-removal failure edge; its focused RED and guarded correction are pending. Final typecheck and exact-head CI must be renewed after that correction.
+- Final guarded withdrawal revision passed14 selected cases (nine withdrawal and five existing unsubscribe;15 unrelated tests skipped) without React act warnings. The storage fixture now intercepts the actual Storage prototype and proves a throw; its earlier ineffective instance-spy failure is not storage-behavior RED evidence. Sol then found the same cleanup exception could propagate in the real login gate after401. That narrow guest-entry edge is being corrected before commit; no unrelated authentication flow or native change is planned.
+- Actual guest-entry RED: real MSW401 plus persistent Storage removal failure caused a SecurityError and React unmounted the login child. After the narrow gate guard, four gate cases passed (the new real-hook regression and three existing401/transient/retry contracts). MSW interception is closed at test-suite teardown. No native or unrelated authentication source was changed. Final web lint/typecheck and exact-head CI remain required.
+- Final source review C0/W0. Web typecheck found test-only implicit-this and MSW request-body types; explicit Storage/ClientErrorPayload annotations corrected them without casts or production-source changes. The single lint/typecheck rerun passed, including v1 pattern checks. No new debt marker was added. New exact-head CI and runtime deployment/replay remain pending.

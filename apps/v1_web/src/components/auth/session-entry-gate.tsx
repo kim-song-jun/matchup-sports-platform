@@ -11,6 +11,7 @@ import {
   shouldProbeV1Session,
 } from '@/lib/session-storage';
 import { disconnectV1Socket } from '@/lib/v1-socket';
+import { reportClientError } from '@/lib/client-error-reporter';
 import { BrandMark } from '@/components/v1-ui/brand-logo';
 import { ErrorState } from '@/components/v1-ui/primitives';
 
@@ -46,7 +47,15 @@ export function SessionEntryGate({ mode, children }: SessionEntryGateProps) {
     }
 
     if (authMe.isError && !authMe.isFetching && isUnauthenticatedError(authMe.error)) {
-      clearStoredV1Session();
+      try {
+        clearStoredV1Session();
+      } catch {
+        reportClientError({
+          message: 'Failed to clear the stored session after authentication expired.',
+          level: 'warn',
+          context: { flow: 'session-entry-gate-session-cleanup' },
+        });
+      }
       disconnectV1Socket();
       setHasSessionHint(false);
       if (mode === 'root') window.location.replace('/login');

@@ -16,7 +16,7 @@ import {
 } from '@/hooks/use-v1-api';
 import { extractErrorMessage, extractErrorCode } from '@/lib/error-message';
 import { formatWithComma, onlyDigits } from '@/lib/number-format';
-import type { V1TournamentFormat, V1TournamentGenderCategory } from '@/types/api';
+import type { V1Tournament, V1TournamentFormat, V1TournamentGenderCategory } from '@/types/api';
 import { AdminPageHeader, AdminToasts, useAdminToast } from '@/components/admin';
 import { CoverImageUploader } from '@/components/admin/tournaments/cover-image-uploader';
 import {
@@ -43,10 +43,13 @@ import {
   hasPromoFactEdits,
   tournamentCreateReducer,
   isShortLeadTime,
+  periodLabels,
+  switchPeriodCount,
   validateTournamentCreateStep,
   type TournamentCreateAction,
   type TournamentCreateState,
 } from './tournament-create-model';
+import { useSaveTournamentPeriodSettings, useTournamentPeriodSettings } from '@/hooks/use-tournament-period-settings';
 
 function scrollBehavior(): ScrollBehavior {
   return window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth';
@@ -77,7 +80,8 @@ export default function AdminTournamentsNewPage() {
   const updateTournament = useV1UpdateTournament(state.draftId ?? '');
   const changeStatus = useV1ChangeTournamentStatus(state.draftId ?? '');
   const uploadImages = useV1UploadImages();
-  const pending = createTournament.isPending || updateTournament.isPending;
+  const savePeriods = useSaveTournamentPeriodSettings();
+  const pending = createTournament.isPending || updateTournament.isPending || savePeriods.isPending;
   const selectedSport = sports?.find((sport) => sport.id === state.sportId);
   const previousWithBank = previousTournaments?.items.find(
     (tournament) => tournament.bankName || tournament.bankAccount || tournament.bankHolder,
@@ -178,7 +182,7 @@ export default function AdminTournamentsNewPage() {
     // "공개 확인" 단계는 초안이 실제로 만들어진 뒤에만 들어갈 수 있다 — 검증만 통과했다고
     // 스텝 버튼을 직접 눌러 건너뛸 수 있으면, 대회가 없는 채로 "접수 시작하기"를 누르는
     // 상황이 생긴다(잠김 상태, 스테퍼 버튼도 이 조건으로 disabled 처리).
-    if (nextStep === CONFIRM_STEP_INDEX && !state.draftId) return;
+    if (nextStep === CONFIRM_STEP_INDEX && (!state.draftId || state.periodMinutesDirty || pending)) return;
     if (nextStep < state.step) {
       dispatch({ type: 'set-step', step: nextStep });
       setErrors({});
@@ -245,6 +249,7 @@ export default function AdminTournamentsNewPage() {
    */
   const handleCreateOrUpdateDraft = (event: React.FormEvent) => {
     event.preventDefault();
+    if (pending) return;
     const allErrors = Object.assign(
       {},
       ...[0, 1, 2, 3].map((step) => validateTournamentCreateStep(state, step)),
@@ -262,6 +267,37 @@ export default function AdminTournamentsNewPage() {
 
     const payload = buildTournamentCreatePayload(state);
 
+    // 운영자가 경기 시간을 고쳤으면 대회 저장 직후 피리어드 설정으로 저장한다 — 생성 API 는 종목
+    // 기본 피리어드로 만들고, 피리어드는 감사·버전 검사를 갖춘 전용 API 가 소유한다.
+    const persistPeriods = (tournament: V1Tournament) => {
+      // 생성 ID는 즉시 유지하되 두 저장이 모두 끝나야 공개 확인을 허용한다.
+      dispatch({ type: 'draft-saved', tournament });
+      if (!state.periodMinutesDirty) {
+        dispatch({ type: 'draft-created', tournament });
+        return;
+      }
+      savePeriods.mutate(
+        {
+          tournamentId: tournament.id,
+          expectedVersion: tournament.updatedAt,
+          periods: state.periodMinutes.map((value) => ({ durationMinutes: Number(value) })),
+        },
+        {
+          onSuccess: (result) => {
+            if (!result.expectedVersion) {
+              showToast('경기 시간 저장 버전을 확인하지 못했어요. 초안을 다시 불러와 주세요.', 'error');
+              return;
+            }
+            dispatch({ type: 'periods-saved', updatedAt: result.expectedVersion });
+            dispatch({ type: 'draft-created', tournament: { ...tournament, updatedAt: result.expectedVersion } });
+          },
+          onError: (error) => {
+            showToast(extractErrorMessage(error, '대회는 초안으로 저장했지만 경기 시간을 저장하지 못했어요. 저장하고 계속하기로 다시 시도해 주세요.'), 'error');
+          },
+        },
+      );
+    };
+
     if (state.draftId) {
       if (!state.draftUpdatedAt) {
         showToast('초안 정보를 다시 불러온 뒤 시도해 주세요.', 'error');
@@ -269,7 +305,7 @@ export default function AdminTournamentsNewPage() {
       }
       updateTournament.mutate({ ...payload, expectedVersion: state.draftUpdatedAt }, {
         onSuccess: (tournament) => {
-          dispatch({ type: 'draft-created', tournament });
+          persistPeriods(tournament);
         },
         onError: (error) => {
           if (extractErrorCode(error) === 'TOURNAMENT_VERSION_CONFLICT') {
@@ -284,7 +320,7 @@ export default function AdminTournamentsNewPage() {
 
     createTournament.mutate(payload, {
       onSuccess: (tournament) => {
-        dispatch({ type: 'draft-created', tournament });
+        persistPeriods(tournament);
         // draftId를 URL에 남겨 새로고침해도 같은 초안을 이어가고, 다시 만들지 않게 한다.
         router.replace(`${pathname}?draftId=${tournament.id}`);
       },
@@ -302,7 +338,7 @@ export default function AdminTournamentsNewPage() {
 
   /** "확인" 단계의 주 CTA — 되돌리기 어려운 전환(초안 → 접수 중)이라 확인 모달을 거친다. */
   const handleStartRegistration = async () => {
-    if (!state.draftId) return;
+    if (!state.draftId || state.periodMinutesDirty || pending) return;
     const ok = await confirm({
       title: '접수를 시작할까요?',
       message:
@@ -345,7 +381,7 @@ export default function AdminTournamentsNewPage() {
       />
 
       <form ref={formRef} onSubmit={handleCreateOrUpdateDraft} noValidate className="pb-28">
-        <WizardStepper currentStep={state.step} hasDraft={state.draftId !== null} onSelect={goToStep} />
+        <WizardStepper currentStep={state.step} hasDraft={state.draftId !== null && !state.periodMinutesDirty} onSelect={goToStep} />
 
         <div className="mx-auto mt-5 max-w-4xl rounded-2xl border border-[var(--border)] bg-[var(--card-surface)]">
           <div className="border-b border-[var(--border)] px-5 py-5 sm:px-7">
@@ -895,6 +931,20 @@ function ParticipationStep({
     }
   }, [state.substitutionMode, lineupSizeOptions, dispatch]);
 
+  // 경기 시간 기본값 — 초안이 있으면 그 대회의 저장된 피리어드, 없으면 종목 기본값(축구 45·45,
+  // 풋살 20·20). 운영자가 고친 값은 reducer 가 덮어쓰지 않는다.
+  const draftPeriodSettings = useTournamentPeriodSettings(state.draftId ?? '');
+  const periodSource = state.draftId
+    ? draftPeriodSettings.data?.periods?.map((period) => period.durationMinutes)
+    : lineupSizeOptions?.supported ? lineupSizeOptions.defaultPeriods?.map((period) => period.durationMinutes) : undefined;
+  const periodSourceKey = periodSource?.join(',') ?? '';
+  useEffect(() => {
+    if (periodSourceKey === '') return;
+    dispatch({ type: 'prefill-period-minutes', value: periodSourceKey.split(',') });
+  }, [periodSourceKey, dispatch]);
+  const periodNames = periodLabels(state.periodMinutes.length);
+  const periodTotal = state.periodMinutes.reduce((sum, value) => sum + (Number(value) || 0), 0);
+
   return (
     <div className="grid gap-6">
       <div className="grid gap-4 sm:grid-cols-3">
@@ -976,6 +1026,69 @@ function ParticipationStep({
           </div>
         )}
       </Field>
+
+      {state.periodMinutes.length > 0 ? (
+        <Field
+          id="period-minutes"
+          label="경기 시간"
+          hint="경기 한 판의 정규 시간이에요(연장 제외). 대진의 끝나는 시간은 시작 + 이 시간 합계로 자동으로 채워요. 대회를 만든 뒤에도 대회 정보의 '피리어드 설정'에서 바꿀 수 있어요."
+          error={errors.periodMinutes}
+        >
+          <div className="flex flex-col gap-3">
+            <div className="flex flex-wrap gap-2" role="group" aria-label="경기 방식 선택">
+              {([
+                { count: 2, label: '전·후반' },
+                { count: 1, label: '단판' },
+              ] as const).map((option) => {
+                const selected = state.periodMinutes.length === option.count;
+                return (
+                  <button
+                    key={option.count}
+                    type="button"
+                    disabled={pending}
+                    aria-pressed={selected}
+                    onClick={() => {
+                      if (!selected) dispatch({ type: 'set-period-minutes', value: switchPeriodCount(state.periodMinutes, option.count) });
+                    }}
+                    className={`inline-flex min-h-[44px] items-center rounded-xl border px-4 text-[length:var(--font-size-body-sm)] font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 disabled:opacity-50 ${
+                      selected
+                        ? 'border-blue-500 bg-blue-500 text-white'
+                        : 'border-[var(--border)] bg-[var(--card-surface)] text-[var(--text-body)] hover:border-blue-500'
+                    }`}
+                  >
+                    {option.label}
+                  </button>
+                );
+              })}
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              {state.periodMinutes.map((value, index) => (
+                <label key={periodNames[index]} className="grid gap-1 text-[length:var(--font-size-caption)] font-medium text-[var(--text-muted)]">
+                  {periodNames[index]} (분)
+                  <input
+                    id={index === 0 ? 'period-minutes' : undefined}
+                    type="number"
+                    inputMode="numeric"
+                    min={1}
+                    max={240}
+                    value={value}
+                    disabled={pending}
+                    aria-label={`${periodNames[index]} 시간(분)`}
+                    aria-invalid={errors.periodMinutes ? true : undefined}
+                    onChange={(event) => {
+                      const next = [...state.periodMinutes];
+                      next[index] = event.target.value;
+                      dispatch({ type: 'set-period-minutes', value: next });
+                    }}
+                    className="h-[44px] rounded-xl border border-[var(--border)] bg-[var(--card-surface)] px-3 text-[length:var(--font-size-body-sm)] text-[var(--text-strong)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
+                  />
+                </label>
+              ))}
+            </div>
+            <p className="text-[length:var(--font-size-caption)] text-[var(--text-caption)]">한 경기 총 {periodTotal}분</p>
+          </div>
+        </Field>
+      ) : null}
 
       {/* 허용 횟수 오류는 입력칸이 있으면 그 아래(NumberField)에서만 보여요. 입력칸이 안 그려지는 동안에는 바깥 항목이 대신 보여 줘요. */}
       <Field

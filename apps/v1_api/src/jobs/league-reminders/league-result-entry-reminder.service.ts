@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { Prisma, V1GameResultRevisionState } from '@prisma/client';
 import type { GameOperationHandler } from '../v1-game-operations-worker.service';
 import { resolveResultStage } from '../../league-matches/league-result-stage';
+import { isTeamMatchInHeldLeague } from '../../league-matches/league-hold';
 
 export const LEAGUE_RESULT_ENTRY_REMINDER_TYPE = 'LEAGUE_RESULT_ENTRY_REMINDER';
 
@@ -59,6 +60,8 @@ export class LeagueResultEntryReminderService {
     // 세대의 행이 새 시각에 맞춰 따로 판정한다.
     if (fixture.startAt.toISOString() !== expectedStartAt) return;
     if (fixture.status === 'cancelled') return;
+    // 보류 리그의 경기 — 결과를 받을 경기가 멈춰 있다(league-hold.ts).
+    if (await isTeamMatchInHeldLeague(tx, teamMatchId)) return;
 
     const stage = resolveResultStage({
       currentOfficialRevisionId: fixture.currentOfficialRevisionId,

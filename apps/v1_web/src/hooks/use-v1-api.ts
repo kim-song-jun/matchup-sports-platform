@@ -4,7 +4,7 @@ import { keepPreviousData, useInfiniteQuery, useMutation, useQuery, useQueryClie
 import { getV1ApiBaseUrl, v1Api, v1Delete, v1Get, v1MultipartPost, v1Patch, v1Post, v1Put, V1ApiError } from '@/lib/api-client';
 import { trackEvent } from '@/lib/analytics';
 import { compressImagesForUpload, type CompressOptions } from '@/lib/image-compress';
-import { PUBLIC_LIVE_POLL_INTERVAL_MS } from '@/lib/public-live-polling';
+import { earliestPublicLivePollDelay } from '@/lib/public-live-polling';
 import { OPERATIONS_BOARD_POLL_INTERVAL_MS } from '@/lib/operations-board-polling';
 import { v1Keys } from '@/lib/query-keys';
 import { findInListCache } from '@/lib/list-cache-seed';
@@ -3961,14 +3961,12 @@ export function useV1AllTournaments(params?: AllTournamentListFilters) {
   });
 }
 
-/**
- * LIVE 픽스처가 있을 때만 폴링 — 주기 값과 근거(뷰어당 10초 하한, idle 페이지는 폴링 0,
- * 관전자 수에 비례하는 부하 모델)는 `@/lib/public-live-polling`이 단일 소스로 보유한다.
- * `/tournaments/:id/bracket`이 이 훅과 공개 일정 훅(`usePublicTournamentSchedule`)을
- * 같은 화면에서 동시에 쓰므로, 두 곳이 각자 숫자를 정의하면 한쪽만 수정될 때 어긋난 두
- * 주기로 이중 폴링이 된다 — 그래서 주석 규율 대신 공유 상수로 구조적으로 묶었다.
+/*
+ * 대진표 폴링 주기와 근거(뷰어당 10초 하한, idle 페이지는 폴링 0, 관전자 수에 비례하는 부하 모델)는
+ * `@/lib/public-live-polling`이 단일 소스로 보유한다 — 진행 중 경기와 킥오프가 가까운 시작 전 경기가
+ * 있을 때만 폴링한다(earliestPublicLivePollDelay). `/tournaments/:id/bracket`이 이 훅과 공개 일정 훅을
+ * 같은 화면에서 동시에 쓰므로 주기는 반드시 같은 상수에서 나와야 한다.
  */
-const V1_TOURNAMENT_LIVE_POLL_INTERVAL_MS = PUBLIC_LIVE_POLL_INTERVAL_MS;
 
 /**
  * `options.livePolling`은 opt-in — 기본값(false)에서는 기존 동작(폴링 없음)을 그대로
@@ -3999,8 +3997,11 @@ export function useV1Tournament(
           // 진행 중이어도 한 번도 자동 갱신되지 않았다(같은 화면의 공개 일정 훅은
           // `'live'` 어휘를 쓰는 다른 API라 정상 동작해서, 일정만 갱신되고 대진표는
           // 멈춰 있는 형태로 드러났다).
-          const hasLiveFixture = query.state.data?.fixtures.some((f) => f.liveStatus === 'live') ?? false;
-          return hasLiveFixture ? V1_TOURNAMENT_LIVE_POLL_INTERVAL_MS : false;
+          // 진행 중 경기가 있거나 시작 전 경기의 킥오프가 가까우면 폴링한다 — 경기 시작 전에 열어 둔
+          // 대진표도 첫 경기 시작을 스스로 발견한다(publicLivePollDelay).
+          return earliestPublicLivePollDelay(
+            (query.state.data?.fixtures ?? []).map((f) => ({ status: f.liveStatus, scheduledAt: f.scheduledAt })),
+          );
         }
       : undefined,
   });
@@ -5646,6 +5647,7 @@ import type {
   V1AdminLeagueDetail,
   V1AdminLeagueListItem,
   V1UpdateLeagueVisibilityResult,
+  V1LeagueHoldResult,
   V1AdminLeagueTeamsResponse,
   V1CancelLeagueFixturePayload,
   V1CancelLeagueFixtureResult,
@@ -5671,6 +5673,12 @@ import type {
   V1UpdateLeagueFixtureResult,
   V1OpenLeagueRegistrationPayload,
   V1OpenLeagueRegistrationResult,
+  V1CloseLeagueRegistrationPayload,
+  V1CloseLeagueRegistrationResult,
+  V1UpdateLeagueEntryFeePayload,
+  V1UpdateLeagueEntryFeeResult,
+  V1UpdateLeagueCoverImagePayload,
+  V1UpdateLeagueCoverImageResult,
 
   V1CreateManualLeagueFixturePayload,
 
@@ -5767,6 +5775,28 @@ export function useV1UpdateLeagueVisibility(leagueId: string) {
   });
 }
 
+/** 대회 공개 여부 변경 — 리그와 같은 규칙. 관리 데이터는 그대로, 공개 읽기 캐시만 다시 확인한다. */
+export function useV1UpdateTournamentVisibility(tournamentId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { isPublic: boolean }) =>
+      v1Patch<{ tournamentId: string; isPublic: boolean }>(
+        `/admin/tournaments/${encodeURIComponent(tournamentId)}/visibility`,
+        body,
+      ),
+    onSuccess: (result) => {
+      queryClient.setQueryData<V1Tournament>(v1Keys.adminTournament(tournamentId), (current) =>
+        current ? { ...current, isPublic: result.isPublic } : current,
+      );
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminTournament(tournamentId) });
+      queryClient.invalidateQueries({ queryKey: v1Keys.tournament(tournamentId) });
+      queryClient.invalidateQueries({ queryKey: v1Keys.tournaments() });
+      queryClient.invalidateQueries({ queryKey: ['tournament-reviews', tournamentId] });
+      queryClient.invalidateQueries({ queryKey: v1Keys.home() });
+    },
+  });
+}
+
 export function useV1CreateLeagueMatch() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -5800,10 +5830,51 @@ export function useV1OpenLeagueRegistration(leagueId: string) {
   return useMutation({
     mutationFn: (body: V1OpenLeagueRegistrationPayload) =>
       v1Post<V1OpenLeagueRegistrationResult>(`/admin/league-matches/${leagueId}/open-registration`, body),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: v1Keys.adminLeagueMatch(leagueId) });
-      queryClient.invalidateQueries({ queryKey: v1Keys.adminLeagueMatchList() });
-    },
+    onSuccess: () => invalidateLeagueSurfaces(queryClient, leagueId),
+  });
+}
+
+/**
+ * 리그 설정(신청 마감·참가비·대표 이미지) 변경이 비추는 화면 전부 — 어드민 상세·목록, 공개 상세(문자열 id 키는
+ * `leagueMatches()` 의 빈 객체 부분일치에 안 잡혀 따로 필요), `/tournaments/:id`, 통합 목록 카드.
+ */
+function invalidateLeagueSurfaces(queryClient: QueryClient, leagueId: string) {
+  queryClient.invalidateQueries({ queryKey: v1Keys.adminLeagueMatch(leagueId) });
+  queryClient.invalidateQueries({ queryKey: v1Keys.adminLeagueMatchList() });
+  queryClient.invalidateQueries({ queryKey: v1Keys.leagueMatches() });
+  queryClient.invalidateQueries({ queryKey: v1Keys.leagueMatch(leagueId) });
+  queryClient.invalidateQueries({ queryKey: v1Keys.tournament(leagueId) });
+  queryClient.invalidateQueries({ queryKey: v1Keys.tournaments() });
+}
+
+/** 리그 신청을 지금 마감한다(마감 시각을 지금으로). 다시 열기는 `useV1OpenLeagueRegistration`. */
+export function useV1CloseLeagueRegistration(leagueId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: V1CloseLeagueRegistrationPayload) =>
+      v1Post<V1CloseLeagueRegistrationResult>(
+        `/admin/league-matches/${encodeURIComponent(leagueId)}/close-registration`,
+        body,
+      ),
+    onSuccess: () => invalidateLeagueSurfaces(queryClient, leagueId),
+  });
+}
+
+export function useV1UpdateLeagueEntryFee(leagueId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: V1UpdateLeagueEntryFeePayload) =>
+      v1Patch<V1UpdateLeagueEntryFeeResult>(`/admin/league-matches/${encodeURIComponent(leagueId)}/entry-fee`, body),
+    onSuccess: () => invalidateLeagueSurfaces(queryClient, leagueId),
+  });
+}
+
+export function useV1UpdateLeagueCoverImage(leagueId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: V1UpdateLeagueCoverImagePayload) =>
+      v1Patch<V1UpdateLeagueCoverImageResult>(`/admin/league-matches/${encodeURIComponent(leagueId)}/cover-image`, body),
+    onSuccess: () => invalidateLeagueSurfaces(queryClient, leagueId),
   });
 }
 
@@ -5914,6 +5985,35 @@ export function useV1CancelLeagueFixture(leagueId: string) {
 
 // R6: 리그 종료 역전이 — POST /admin/league-matches/:leagueId/revert-completion.
 // 상태 뱃지(진행 중/종료)와 목록의 state 컬럼이 함께 바뀌므로 상세·목록 캐시를 모두 무효화한다.
+/**
+ * 리그 보류(취소 대신)·보류 해제. 보류는 리그와 경기를 공개 화면에서 숨기므로 공개 읽기 캐시도 다시
+ * 확인한다(공개 설정 변경과 같은 범위).
+ */
+function useLeagueHoldMutation(leagueId: string, action: 'hold' | 'resume') {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { reason?: string }) =>
+      v1Post<V1LeagueHoldResult>(`/admin/league-matches/${encodeURIComponent(leagueId)}/${action}`, body),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminLeagueMatch(leagueId) });
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminLeagueMatchList() });
+      queryClient.invalidateQueries({ queryKey: v1Keys.leagueMatches() });
+      queryClient.invalidateQueries({ queryKey: v1Keys.leagueMatch(leagueId) });
+      queryClient.invalidateQueries({ queryKey: v1Keys.tournament(leagueId) });
+      queryClient.invalidateQueries({ queryKey: v1Keys.home() });
+      queryClient.invalidateQueries({ queryKey: v1Keys.tournaments() });
+    },
+  });
+}
+
+export function useV1HoldLeague(leagueId: string) {
+  return useLeagueHoldMutation(leagueId, 'hold');
+}
+
+export function useV1ResumeLeague(leagueId: string) {
+  return useLeagueHoldMutation(leagueId, 'resume');
+}
+
 export function useV1RevertLeagueCompletion(leagueId: string) {
   const queryClient = useQueryClient();
   return useMutation({

@@ -120,7 +120,11 @@ describe('getMemberIneligibility', () => {
 
   it('blocks incomplete profiles with the same message the server uses', () => {
     const result = getMemberIneligibility({ realName: '', birthDate: '', phone: '', gender: null }, null);
-    expect(result?.message).toBe('실명, 생년월일, 휴대폰 번호가 모두 등록된 팀원만 선수로 등록할 수 있어요.');
+    // 빠진 칸과 채우는 곳(팀원 본인의 프로필 수정)을 함께 말한다 — 서버 evaluateRosterCandidate 와 같은 기준.
+    expect(result).toEqual({
+      listReason: '실명·생년월일·휴대폰 번호 미입력',
+      message: '이 팀원의 프로필에 실명·생년월일·휴대폰 번호가 없어 선수로 등록할 수 없어요. 팀원에게 마이 > 프로필 수정에서 입력해 달라고 요청해 주세요.',
+    });
   });
 
   it('blocks a male member in a female-only tournament', () => {
@@ -134,7 +138,7 @@ describe('getMemberIneligibility', () => {
 
   it('blocks a mixed-tournament member with no gender on file, even with a complete profile otherwise', () => {
     const result = getMemberIneligibility({ ...completeMaleMember, gender: null }, 'mixed');
-    expect(result?.message).toBe('실명, 생년월일, 휴대폰 번호, 성별이 모두 등록된 팀원만 선수로 등록할 수 있어요.');
+    expect(result?.message).toBe('이 팀원의 프로필에 성별이 없어 선수로 등록할 수 없어요. 팀원에게 마이 > 프로필 수정에서 입력해 달라고 요청해 주세요.');
   });
 
   it('allows a mixed-tournament member with any gender on file', () => {

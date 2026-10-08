@@ -30,6 +30,7 @@ function makeTournament(
 ): V1TournamentDetail {
   return {
     kind: 'regular_tournament',
+    entryFeeConfigured: true,
     sportId: 'sport-futsal',
     sport: { code: 'futsal', name: '풋살' },
     title: '테스트 대회',

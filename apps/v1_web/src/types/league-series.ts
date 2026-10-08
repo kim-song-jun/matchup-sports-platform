@@ -52,7 +52,7 @@ export interface V1LeagueSeriesSeasonTier {
   title: string;
   tier: number | null;
   tierLabel: string | null;
-  state: 'draft' | 'active' | 'completed';
+  state: 'draft' | 'active' | 'completed' | 'on_hold';
   startsOn: string;
   endsOn: string;
   teamCount: number;

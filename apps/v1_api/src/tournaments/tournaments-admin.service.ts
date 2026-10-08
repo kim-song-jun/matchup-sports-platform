@@ -18,12 +18,13 @@ import { findTournamentOnSurface, TOURNAMENT_KINDS } from './tournament-surface-
 import {
   AdminTournamentListQueryDto,
   ChangeTournamentStatusDto,
+  UpdateTournamentVisibilityDto,
   CreateTournamentDto,
   TournamentGenderCategory,
   TournamentStatus,
   UpdateTournamentDto,
 } from './dto/admin-tournament.dto';
-import { normalizeCompetitionSportCode, tryNormalizeCompetitionSportCode } from './competition-config/competition-config';
+import { normalizeCompetitionSportCode, tryNormalizeCompetitionSportCode, validateCompetitionConfig } from './competition-config/competition-config';
 import { parseLineupLimits } from './competition-config/competition-config.parse';
 import { LineupSizeConfigResolver } from './competition-config/lineup-size-config-resolver';
 import { TournamentCompetitionConfig } from './competition-config/tournament-competition-config';
@@ -137,7 +138,10 @@ export class TournamentsAdminService {
       (typeof TOURNAMENT_LIST_STATUSES)[number],
       number
     >;
-    for (const group of statusGroups) byStatus[group.status] = group._count._all;
+    // 대회 목록이 다루지 않는 상태(리그 보류 on_hold)는 집계에 넣지 않는다 — 이 목록은 대회만 본다.
+    for (const group of statusGroups) {
+      if (group.status in byStatus) byStatus[group.status as keyof typeof byStatus] = group._count._all;
+    }
 
     // status 필터가 걸리면 그 상태의 건수가, 없으면 전체가 곧 이 목록의 총 건수다.
     // groupBy 는 status 를 제외한 같은 필터로 집계하므로 추가 쿼리 없이 정확하다.
@@ -603,21 +607,29 @@ export class TournamentsAdminService {
       if (!sport) {
         throw new NotFoundException({ code: 'SPORT_NOT_FOUND', message: '종목을 찾을 수 없어요.' });
       }
-      // 출전 인원/교체 방식/교체 횟수 세 필드 중 이번 요청에 없는 필드는 canonical
-      // 기본값이 아니라 "지금 pin된 값"을 그대로 넘겨야 한다 — resolveVersionForLineupConfig는
-      // 생략된 override를 canonical로 채우므로, 안 그러면 예를 들어 출전 인원만 바꿀 때
-      // 관리자가 이미 골라둔 교체 정책이 조용히 canonical로 리셋된다.
+      // 기존 버전 전체를 원본으로 사용한다. 라인업 필드만 보내더라도 피리어드·결과 정책 등
+      // 관리자가 저장한 다른 섹션을 종목 기본값으로 되돌리면 안 된다.
       const pinnedVersion = existing.competitionConfigVersionId
         ? await this.prisma.v1CompetitionConfigVersion.findUnique({
             where: { id: existing.competitionConfigVersionId },
-            select: { lineup: true },
+            select: { name: true, periods: true, events: true, lineup: true, result: true, tieBreak: true, visibility: true },
           })
         : null;
       const pinnedLineup = pinnedVersion ? parseLineupLimits(pinnedVersion.lineup) : null;
+      const pinnedConfig = pinnedVersion ? validateCompetitionConfig({
+        periods: pinnedVersion.periods,
+        events: pinnedVersion.events,
+        lineup: pinnedVersion.lineup,
+        result: pinnedVersion.result,
+        tieBreak: pinnedVersion.tieBreak,
+        visibility: pinnedVersion.visibility,
+      }, { preserveMissingCatalogKeys: true }) : undefined;
       const resolved = await this.lineupSizeConfigResolver.resolveVersionForLineupConfig(
         user,
         normalizeCompetitionSportCode(sport.code),
         {
+          baseConfig: pinnedConfig,
+          baseConfigName: pinnedVersion?.name,
           maxPlayers: dto.lineupMaxPlayers ?? pinnedLineup?.maxPlayers,
           substitutionMode: dto.substitutionMode ?? pinnedLineup?.substitutions,
           maxSubstitutions:
@@ -651,6 +663,11 @@ export class TournamentsAdminService {
     }
 
     await this.prisma.$transaction(async (tx) => {
+      // lineup만 저장하면 일반 필드 data가 비어 Prisma updateMany가 SQL 없이 count=0을
+      // 반환한다. 이 경우에도 실제 CAS 쓰기를 수행하고 기존 버전보다 새 버전을 발행한다.
+      if (Object.keys(data).length === 0) {
+        data.updatedAt = new Date(Math.max(Date.now(), casBaseline.getTime() + 1));
+      }
       // 원자적 CAS 시행부 — where절의 updatedAt이 그 사이 이미 바뀌었으면 count가 0이라
       // "쓴 줄 없음"으로 걸린다. 이게 X03(관리자 두 명 동시 편집 시 나중 저장이 CAS 충돌
       // 경고 없이 앞선 저장을 조용히 덮어쓰던 결함)의 근본 수정이다. updateMany는 갱신된
@@ -680,6 +697,45 @@ export class TournamentsAdminService {
     });
 
     return this.get(user, tournamentId);
+  }
+
+  /**
+   * 공개 여부 전환. 진행 상태·참가·대진·결과는 그대로 두고 공개 조회에서만 숨긴다(리그의
+   * updateVisibility 와 같은 규칙). 같은 값이면 아무것도 바꾸지 않고 감사 기록도 남기지 않는다.
+   * 동시에 반대로 바꾸는 요청이 있으면 나중 요청을 409 로 돌려 감사 기록의 이전 값이 틀리지 않게 한다.
+   */
+  async updateVisibility(user: V1AuthUser, tournamentId: string, dto: UpdateTournamentVisibilityDto) {
+    const admin = await this.adminContext.getMutationAdmin(user.id);
+    return this.prisma.$transaction(async (tx) => {
+      const existing = await findTournamentOnSurface(tx, TOURNAMENT_KINDS, {
+        where: { id: tournamentId, deletedAt: null },
+        select: { id: true, isPublic: true },
+      });
+      if (!existing) {
+        throw new NotFoundException({ code: 'TOURNAMENT_NOT_FOUND', message: '대회를 찾을 수 없어요.' });
+      }
+      if (existing.isPublic === dto.isPublic) return { tournamentId, isPublic: existing.isPublic };
+
+      const updated = await tx.v1Tournament.updateMany({
+        where: { id: tournamentId, isPublic: existing.isPublic },
+        data: { isPublic: dto.isPublic },
+      });
+      if (updated.count !== 1) {
+        throw new ConflictException({ code: 'TOURNAMENT_VERSION_CONFLICT', message: '다른 요청이 먼저 공개 설정을 바꿨어요. 다시 확인해 주세요.' });
+      }
+      await this.adminContext.logAdminAction(
+        admin,
+        {
+          action: 'tournament.visibility',
+          targetType: 'tournament',
+          targetId: tournamentId,
+          beforeJson: { isPublic: existing.isPublic },
+          afterJson: { isPublic: dto.isPublic },
+        },
+        tx,
+      );
+      return { tournamentId, isPublic: dto.isPublic };
+    });
   }
 
   async changeStatus(user: V1AuthUser, tournamentId: string, dto: ChangeTournamentStatusDto) {
@@ -1230,6 +1286,8 @@ export class TournamentsAdminService {
       // 없이 노출하지만, lineupMaxPlayers/lineupMinPlayers/lineupSizeOptions는 조인이
       // 필요해 get()(대회 상세·수정 화면)에서만 채운다 — 그 외에는 null/[]로 둔다.
       competitionConfigVersionId: row.competitionConfigVersionId,
+      // 공개 여부 — false 면 일반 사용자 화면에서 숨겨져 있다(관리 화면의 공개 설정이 읽는다).
+      isPublic: row.isPublic,
       lineupMaxPlayers: lineup?.pinned?.maxPlayers ?? null,
       lineupMinPlayers: lineup?.pinned?.minPlayers ?? null,
       lineupSizeOptions: lineup?.sizeOptions ?? [],

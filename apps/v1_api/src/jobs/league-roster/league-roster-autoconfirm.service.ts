@@ -190,10 +190,12 @@ export class LeagueRosterReminderService {
 
     const league = await findTournamentOnSurface(tx, ['regular_league'], {
       where: { id: leagueId, deletedAt: null },
-      select: { id: true, title: true, scheduledAt: true },
+      select: { id: true, title: true, scheduledAt: true, status: true },
     });
     if (league === null || league.scheduledAt === null) return;
     if (league.scheduledAt.toISOString() !== value.expectedStartsOn) return;
+    // 보류 리그 — 명단 제출을 재촉하지 않는다(league-hold.ts).
+    if (league.status === 'on_hold') return;
 
     // 자동 확정과 **같은 조건**이어야 한다 — 리마인더가 더 넓으면 하루 뒤 아무 일도
     // 일어나지 않을 팀에게 "곧 자동으로 채워져요" 라고 알리게 된다.

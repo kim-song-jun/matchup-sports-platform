@@ -497,6 +497,11 @@ export class LeagueMatchPublicService {
       state: league.state,
       startsOn: league.startsOn,
       endsOn: league.endsOn,
+      sportCode: league.sport.code,
+      coverImageUrl: league.coverImageUrl,
+      // 미설정(entryFeeConfigured=false)이면 화면이 금액을 그리지 않는다 — 0원 '무료 확정'과 구분된다.
+      entryFee: league.entryFee,
+      entryFeeConfigured: league.entryFeeConfigured,
       // 참가 신청 상태 — 화면이 "모집 중" 배지와 신청 버튼을 그리는 근거다. 이 값이 없어서
       // 리그에는 **신청 입구가 아예 없었다**: BE 는
       // `POST /admin/league-matches/:leagueId/open-registration` 으로
@@ -769,6 +774,10 @@ export class LeagueMatchPublicService {
         seriesId: true,
         tier: true,
         seasonNo: true,
+        // 공개 allow-list — 입금 계좌(bank*)는 절대 select 하지 않는다. 설정 시각 원값도 응답에 싣지 않는다.
+        coverImageUrl: true,
+        entryFee: true,
+        entryFeeConfiguredAt: true,
         sport: { select: { id: true, code: true, name: true } },
         region: { select: { id: true, name: true } },
         // 로스터 = confirmed 등록.
@@ -790,9 +799,10 @@ export class LeagueMatchPublicService {
       throw new NotFoundException({ code: 'LEAGUE_NOT_FOUND', message: '리그를 찾을 수 없어요.' });
     }
     // 호출부의 어휘(`state`·`startsOn`·`endsOn`·`teams`)는 그대로 둔다 — 응답 계약 불변.
-    const { registrations, scheduledAt, scheduledEndAt, status, registrationDeadlineAt, ...rest } = row;
+    const { registrations, scheduledAt, scheduledEndAt, status, registrationDeadlineAt, entryFeeConfiguredAt, ...rest } = row;
     return {
       ...rest,
+      entryFeeConfigured: entryFeeConfiguredAt !== null,
       state: LEAGUE_STATE_BY_STATUS[status],
       startsOn: scheduledAt,
       endsOn: scheduledEndAt,

@@ -177,3 +177,51 @@
 1. **"대시보드"가 어느 화면인가.** `/admin/live/:id` 개요로 본다(결과 검토 링크가 거기 있다). `/admin` 홈이 아니다. 다르면 3안 제시 때 사용자에게 확인.
 2. **피리어드 수 상한.** 서버에 상한이 없다. 화면은 1·2 프리셋 + 직접 입력(최대 4)으로 잡되 서버는 그대로 둔다 — 아이스하키 3피리어드가 실제 종목이다.
 3. **리그 전용 모달의 "몰수" 가 콘솔 사후 입력에 없을 때.** 콘솔 DTO 에 옮긴다(BE-3). 기능을 떨어뜨리지 않는다.
+
+## Progress Snapshot — PR #1642 생성 마법사 경기 시간 저장 (2026-10-07)
+
+- 기존 피리어드 설정 계약을 생성 마법사까지 연결한 PR의 후속 검토다. 이 기록은 위 전체 Task 165 완료를 뜻하지 않는다.
+- Owned files: `apps/v1_web/src/app/admin/tournaments/new/{page.tsx,page.test.tsx,tournament-create-model.ts}`, 이 task 문서. API·DB·작성자의 다른 변경은 보존한다. 병렬 에이전트 작업 없음.
+- [x] 생성 POST 성공 뒤 피리어드 PATCH 대기/실패에도 접수 시작 버튼이 열리는 결함을 실제 페이지 테스트 2건으로 RED 확인.
+- [x] 초안 ID/수정 버전을 유지하고, 피리어드 저장 성공 후에만 공개 확인을 열도록 수정. 실패 시 입력 유지·같은 초안 재시도·최신 CAS 버전을 회귀 검증.
+- [x] 신규 경기 시간 UI의 typography 4곳을 기존 토큰으로 치환. CI 허용 baseline은 변경하지 않음.
+- [x] 생성 마법사 81건 PASS(단일 worker). 실패 테스트 두 건이 GREEN으로 전환됨.
+- [x] 리그 대진 화면 71건·Web 타입 검사 PASS. 패턴 검사는 Git Bash로 원본 스크립트를 실행해 PASS(Windows 기본 find 명령 오류는 별도 기록).
+- [x] Web 수정 4파일을 `b5199614f`로 명시 scope 커밋하고 기존 PR 브랜치에 일반 push. 해당 head의 일반 CI PASS.
+- [ ] 최신 head 직접 재리뷰·정식 GitHub 리뷰, 일반 CI와 dev 머지 조건 재확인.
+- [ ] dev 머지 뒤 alpha 서빙 SHA 확인, 실제 로그인 390/768/1440 사용자 흐름·console/network·갤러리 증거.
+- Acceptance Criteria: 시간 저장이 실패하면 공개 확인/접수 시작을 실행할 수 없고, 재시도는 기존 초안 PATCH를 사용하며 이후 수정은 피리어드 저장 응답의 최신 버전을 사용한다.
+- Security Notes: 관리자 전용 API의 권한·감사로그·CAS 계약을 그대로 사용한다. 실패를 성공으로 표시하지 않고 생성된 초안을 유지한다.
+- Risks & Dependencies: 로컬 Docker daemon 접근이 없어 DB 통합 검증은 GitHub CI 증거와 구분한다. alpha QA와 갤러리는 배포 이후 단계로 남긴다.
+
+### PR #1642 추가 리뷰 회귀 수정
+
+- Owned files: `apps/v1_api/src/tournaments/competition-config/lineup-size-config-resolver.ts`, `apps/v1_api/src/tournaments/{tournaments-admin.service.ts,tournaments-admin.service.spec.ts,tournament-match-update.ts,tournament-match-update.spec.ts}`, `apps/v1_api/test/integration/tournament-draft-period-resave.e2e-spec.ts`, `docs/api/domains/tournaments.md`, 이 task 문서. 병렬 에이전트 작업 없음.
+- [x] 초안 재저장/교체 변경 시 사용자 지정 피리어드와 결과 정책이 canonical로 돌아가는 실제 서비스 단언 2건 RED 확인.
+- [x] 종료 없는 기존 대진의 장소/번호 PATCH 시 양 팀 캘린더가 갱신되지 않는 트랜잭션 helper 단언 2건 RED 확인.
+- [x] 현재 고정된 전체 config를 원본으로 라인업만 변경하고, endAt 변화도 팀 일정 동기화 조건에 포함.
+- [x] 관련 API 단위 테스트 5파일 169건 PASS(직렬). DB HTTP 회귀는 초안 생성 → 단판 30분 저장 → 동일 설정 재저장 2회 → 실제 출전 인원 변경 후 API/DB 피리어드·버전 유지 여부를 검증하도록 CI 대상에 추가.
+- [x] API 타입 검사·표면 계약 검사 PASS. 표면 계약 스크립트는 Windows 기본 find 오류를 구분해 Git Bash에서 원본 스크립트를 실행했다.
+- [x] 추가 API 수정 `7e67af00d` 명시 scope 커밋·일반 push. 일반 CI37567727717 PASS, 실제 PostgreSQL 통합124스위트843건 PASS에 초안 재저장 HTTP 회귀 포함.
+- Acceptance Criteria: 동일 라인업 재저장은 config pin을 유지하고, 실제 라인업 변경도 피리어드/이벤트/결과/순위/공개 설정을 보존한다. 종료 시각을 보충하면 같은 트랜잭션에서 두 팀 일정도 같은 종료를 저장한다.
+- Validation limitation: Windows Jest의 절대 경로 glob 문제는 원본 설정을 변경하지 않고 상대 glob CLI override로 우회했다. 최초 array 옵션이 파일 필터를 소비해 불필요한 스위트 컴파일을 시작한 실행은 네 실패 단언을 기록한 후 해당 소유 프로세스만 종료했다. 그 실행을 전체 검증 완료로 표시하지 않는다. 로컬 DB 통합 테스트는 Docker 접근 부재로 미실행이다.
+
+### PR #1642 설정 계열·기존 v1 catalog 호환 재검증
+
+- Owned files: 위 API 후속 scope와 `competition-config/{competition-config.validator.ts,competition-config.validator.spec.ts,competition-config-registry.ts,tournament-period-settings.service.ts}`. 공유 main/dev 작업트리는 수정하지 않는다.
+- [x] 별도 이름 설정의 동일 재저장 contentHash 충돌과 catalog 키 없는 기존 v1 설정의 교체 변경 422를 실제 서비스 단언 2건 RED로 확인하고 SHA7e67af00d 정식 리뷰 #5437414727에 게시.
+- [x] 현재 고정한 설정의 종목/이름 계열에서 버전을 재사용·생성하고, 읽기 catalog 정규화가 버전 쓰기의 부재 의미를 바꾸지 않도록 수정. 명시적으로 잘못된 catalog는 계속 거절한다. 피리어드 버전 쓰기도 같은 원칙 적용.
+- [x] 서비스·config 관련 단위6파일140건 PASS(5파일132건 + validator8건, 직렬), API TypeScript PASS. 기존 v1 키 부재의 재검증과 명시 빈 포지션 거절 단언 포함.
+- [x] HTTP/DB 회귀에 named config 등록·pin → 동일 재저장2회 → 실제 교체 변경, catalog 부재 설정의 피리어드 변경 → 동일 라인업 재저장을 추가.
+- [x] 계열/catalog 수정 `3c156ee68` committed-tree 단위 회귀·타입 검사·일반 push·32/32파일 정식 재리뷰 완료. 최신 PostgreSQL CI의 lineup-only409 실패는 아래 후속 항목에서 추적한다.
+- Acceptance Criteria: 현재 계열의 동일 content는 현재 pin을 재사용한다. 실제 lineup/periods 변경도 원본 계열과 catalog 키 부재를 유지하고, 기존 읽기 정규화·권한·CAS·불변 버전·감사로그 계약을 보존한다.
+
+### PR #1642 lineup-only 저장 CAS 후속 검증
+
+- Owned files: `apps/v1_api/src/tournaments/tournaments-admin.service.ts`, 기존 `tournament-draft-period-resave.e2e-spec.ts`, API 도메인 문서, 이 task 문서. 작성자 변경·다른 작업트리 보존, 병렬 에이전트 없음.
+- [x] head3c156ee68의 실제 PostgreSQL CI에서 catalog=false 기간 변경 후 lineup-only 재저장이409인 RED 확인. 정식 리뷰5437515161 게시. Prisma6.19.2의 빈 updateMany는 SQL 없이 count=0을 반환하는 엔진 동작과 대조했다.
+- [x] 일반 필드가 비어도 기존 버전보다 새 updatedAt을 쓰는 원자적 CAS를 수행한다. count=0 경합·권한·감사 로그를 그대로 유지한다.
+- [x] 기존 HTTP/DB 회귀에서 제목 동반 저장을 제거해 동일 lineup 재저장과 실제 lineup 변경을 검증하고, 반환 버전/DB 일치·이전 버전409을 단언한다.
+- [x] 관련 서비스 단위85건·API TypeScript PASS. 단위 mock 통과를 실제 DB HTTP GREEN으로 간주하지 않는다.
+- [ ] committed-tree 좁은 검증·일반 push·최신 PostgreSQL CI GREEN과 정식 재리뷰. 이 체크는 alpha QA 완료를 뜻하지 않는다.
+- Validation limitation: 로컬 Docker 접근 부재. 외부 임시 SQLite 진단도 schema engine 오류로 실행되지 않아 성공 근거로 사용하지 않았다. 실제 DB GREEN은 새 head CI로 확인한다.

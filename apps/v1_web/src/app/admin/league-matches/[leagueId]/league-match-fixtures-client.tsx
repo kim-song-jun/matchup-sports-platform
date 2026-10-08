@@ -40,6 +40,9 @@ import { resolveWeeksCount, type WeeksPlan } from '@/lib/league-round-robin-plan
 import { formatKstDateShort, formatKstTime } from '@/lib/date-utils';
 import { RecentVenueChips } from '@/components/v1-ui/create-form-fields';
 import { LeagueVisibilityControl } from './league-visibility-control';
+import { LeagueHoldControl } from './league-hold-control';
+import { LeagueCloseRegistrationControl } from './league-close-registration-control';
+import { LeagueCoverImageControl } from './league-cover-image-control';
 import {
   computeDailyPlan,
   dayOffsetLabel,
@@ -138,9 +141,9 @@ export default function LeagueMatchFixturesClient({ leagueId, returnHref = '/adm
   const [time, setTime] = useState('18:00');
   const [placeName, setPlaceName] = useState('');
   // 대진 timing(2026-08-25 사용자 확정: C안 시간창 역산 + B안 계산기·타임라인). 기존 필드처럼
-  // 생성·재생성 두 폼이 같은 상태를 공유한다. ''=미입력 — 경기 시간이 비어 있으면 timing을
-  // 아예 안 보내 기존 동작(같은 주차 동시 시각)을 유지한다. 종료 시각은 서버로 가지 않고
-  // 팀당 하루 경기 수 역산 제안에만 쓴다.
+  // 생성·재생성 두 폼이 같은 상태를 공유한다. ''=미입력 — 셋 다 비어 있으면 timing을 아예 안 보내
+  // 같은 주차 동시 시각으로 만든다. 경기 시간만 비우면 서버가 경기 설정의 정규 시간(전·후반 합계,
+  // 단판이면 그 길이)으로 채운다. 종료 시각은 서버로 가지 않고 팀당 하루 경기 수 역산 제안에만 쓴다.
   const [endTime, setEndTime] = useState('');
   const [gameDurationMinutes, setGameDurationMinutes] = useState('');
   const [breakMinutes, setBreakMinutes] = useState('');
@@ -351,11 +354,11 @@ export default function LeagueMatchFixturesClient({ leagueId, returnHref = '/adm
       // 실을지 말지는 두 값이 **함께** 갖춰졌을 때만이다(서버 DTO 가 둘을 한 객체로 받는다).
       ...(dates.length === 0 || time.trim() === '' ? {} : { schedule: { dates, time: time.trim() } }),
       ...(placeName.trim() === '' ? {} : { placeName: placeName.trim() }),
-      ...(durationValue === null
+      ...(durationValue === null && breakValue === null && gamesPerDayValue === null
         ? {}
         : {
             timing: {
-              gameDurationMinutes: durationValue,
+              ...(durationValue === null ? {} : { gameDurationMinutes: durationValue }),
               ...(breakValue === null ? {} : { breakMinutes: breakValue }),
               ...(gamesPerDayValue === null ? {} : { gamesPerTeamPerDay: gamesPerDayValue }),
             },
@@ -363,16 +366,11 @@ export default function LeagueMatchFixturesClient({ leagueId, returnHref = '/adm
     };
   };
 
-  // 경기 시간 없이 휴식/팀당 경기 수만 채우면 서버가 400을 낸다(timing.gameDurationMinutes 필수) —
-  // 요일-시각 짝 검증과 같은 방식으로 제출 전에 먼저 알려준다. 정수가 아닌 입력도 여기서 차단한다
-  // (parseOptionalInt가 null로 만들면 timing이 조용히 누락돼 더 나쁘다).
+  // 정수가 아닌 입력은 제출 전에 차단한다(parseOptionalInt가 null로 만들면 timing이 조용히
+  // 누락돼 더 나쁘다). 경기 시간을 비운 채 휴식·팀당 경기 수만 채우는 건 정상 — 서버가 기본값을 쓴다.
   const validateTimingInputs = (): boolean => {
     if (hasInvalidTimingInput) {
       showToast('경기 시간·휴식·팀당 하루 경기 수는 정수로만 입력할 수 있어요.', 'error');
-      return false;
-    }
-    if (durationValue === null && (breakValue !== null || gamesPerDayValue !== null)) {
-      showToast('경기 시간(분)을 입력해야 휴식·팀당 하루 경기 수를 쓸 수 있어요.', 'error');
       return false;
     }
     // 서버 DTO 범위(@Min/@Max)와 동일한 상한을 제출 전에 안내한다 — number input의
@@ -658,7 +656,11 @@ export default function LeagueMatchFixturesClient({ leagueId, returnHref = '/adm
         }
       />
 
-      <LeagueVisibilityControl leagueId={leagueId} isPublic={series.isPublic} />
+      <LeagueHoldControl leagueId={leagueId} state={series.state} showToast={showToast} />
+      {/* 보류 중에는 공개 설정을 따로 바꾸지 않는다 — 보류 해제가 공개 여부까지 되돌린다(서버도 409). */}
+      {series.state === 'on_hold' ? null : <LeagueVisibilityControl leagueId={leagueId} isPublic={series.isPublic} />}
+      <LeagueCloseRegistrationControl leagueId={leagueId} state={series.state} registrationOpen={series.registrationOpen} registrationDeadlineAt={series.registrationDeadlineAt} activeRegistrationCount={series.activeRegistrationCount} confirmedCount={series.confirmedRegistrationCount} showToast={showToast} />
+      <LeagueCoverImageControl leagueId={leagueId} sportCode={series.sportCode} coverImageUrl={series.coverImageUrl} />
 
 {series.fixtures.length === 0 ? (
 <>
@@ -1596,11 +1598,15 @@ function FixtureTimingFields({
           type="number"
           min={5}
           max={240}
-          placeholder="예: 15"
+          placeholder="비우면 기본값"
           value={gameDurationMinutes}
           onChange={(e) => onGameDurationChange(e.target.value)}
+          aria-describedby={`${idPrefix}-game-duration-hint`}
           className={`${inputClass} w-full`}
         />
+        <p id={`${idPrefix}-game-duration-hint`} className="mt-1 text-[length:var(--font-size-caption)] text-[var(--text-muted)]">
+          비우면 경기 설정 시간(전·후반 합계, 단판이면 그 길이)으로 채워요.
+        </p>
       </div>
       <div>
         <label htmlFor={`${idPrefix}-break-minutes`} className="mb-1 block text-sm font-medium text-[var(--text-strong)]">휴식(분)</label>
@@ -1727,7 +1733,7 @@ function LeagueRegistrationSummary({
   registrationDeadlineAt,
 }: {
   leagueId: string;
-  state: 'draft' | 'active' | 'completed';
+  state: 'draft' | 'active' | 'completed' | 'on_hold';
   registrationOpen: boolean;
   registrationDeadlineAt: string | null;
 }) {

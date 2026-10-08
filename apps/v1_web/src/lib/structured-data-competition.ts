@@ -1,6 +1,6 @@
 import type { PublicMatchDetail } from '@/components/public-game-records/types';
 import { absoluteSiteUrl } from '@/lib/seo';
-import { organizationId, teamReference, type JsonLdNode } from '@/lib/structured-data';
+import { absoluteImageUrl, organizationId, teamReference, type JsonLdNode } from '@/lib/structured-data';
 import { competitionMatchLabel } from '@/lib/tournament-round-label';
 import type { V1LeagueStandingsResponse, V1PublicLeagueDetail } from '@/types/league-match';
 
@@ -28,6 +28,8 @@ export function buildLeagueEventLd(
     inLanguage: 'ko-KR',
     organizer: { '@id': organizationId() },
   };
+  // JSON-LD 는 metadataBase 가 상대 경로를 풀어 주지 않아 절대 URL 로 싣는다. 이미지가 없으면 키 자체를 넣지 않는다.
+  if (league.coverImageUrl) node.image = absoluteImageUrl(league.coverImageUrl);
   // 순위표에 이름이 보이는 팀만 참가 팀으로 싣는다(대진 없는 준비 중 리그는 순위표가 비어 있다).
   const competitors = (standings?.standings ?? [])
     .map((row) => teamReference(row.teamId, row.teamName))

@@ -19,6 +19,10 @@ import {
   useV1UnhideReview,
   useV1UpdateProfile,
   useV1UpdateLeagueVisibility,
+  useV1CloseLeagueRegistration,
+  useV1OpenLeagueRegistration,
+  useV1UpdateLeagueCoverImage,
+  useV1UpdateLeagueEntryFee,
 } from './use-v1-api';
 
 vi.mock('@/lib/api-client', async () => {
@@ -198,7 +202,7 @@ describe('useV1UpdateLeagueVisibility', () => {
         placeName: '미정',
         status: 'scheduled',
       }],
-    } as V1AdminLeagueDetail);
+    } as unknown as V1AdminLeagueDetail);
     const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
     const { result } = renderHook(() => useV1UpdateLeagueVisibility('league-1'), { wrapper });
 
@@ -428,5 +432,83 @@ describe('useV1UpdateProfile', () => {
     // 이동해 버려 저장 직후 이전 닉네임이 잠깐(혹은 리페치 실패 시 계속) 보였다 —
     // 응답으로 캐시를 직접 갱신해 새 닉네임이 동기적으로 반영돼야 한다.
     expect(queryClient.getQueryData<V1Profile>(v1Keys.profile())?.profile.nickname).toBe('새닉네임');
+  });
+});
+
+describe('league settings mutations', () => {
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  const surfaceKeys = (leagueId: string) => [
+    v1Keys.adminLeagueMatch(leagueId),
+    v1Keys.adminLeagueMatchList(),
+    v1Keys.leagueMatches(),
+    v1Keys.leagueMatch(leagueId),
+    v1Keys.tournament(leagueId),
+    v1Keys.tournaments(),
+  ];
+
+  const cases = [
+    {
+      name: 'close-registration',
+      use: () => useV1CloseLeagueRegistration('league 1'),
+      mock: v1PostMock,
+      body: { reason: '정원이 찼어요' },
+      url: '/admin/league-matches/league%201/close-registration',
+      result: { leagueId: 'league 1', registrationOpen: false, registrationDeadlineAt: null, alreadyProcessed: false },
+    },
+    {
+      name: 'entry-fee',
+      use: () => useV1UpdateLeagueEntryFee('league 1'),
+      mock: v1PatchMock,
+      body: { entryFee: 30000, bankName: '토스뱅크', bankAccount: '1000-1', bankHolder: '팀밋' },
+      url: '/admin/league-matches/league%201/entry-fee',
+      result: { leagueId: 'league 1', entryFee: 30000, entryFeeConfiguredAt: '2026-10-07T00:00:00.000Z', bankName: null, bankAccount: null, bankHolder: null, alreadyProcessed: false },
+    },
+    {
+      name: 'cover-image',
+      use: () => useV1UpdateLeagueCoverImage('league 1'),
+      mock: v1PatchMock,
+      body: { coverImageUrl: null },
+      url: '/admin/league-matches/league%201/cover-image',
+      result: { leagueId: 'league 1', coverImageUrl: null, alreadyProcessed: false },
+    },
+    {
+      name: 'open-registration (existing hook)',
+      use: () => useV1OpenLeagueRegistration('league-1'),
+      mock: v1PostMock,
+      body: { registrationDeadlineAt: '2026-12-01T00:00:00.000Z' },
+      url: '/admin/league-matches/league-1/open-registration',
+      result: {},
+    },
+  ];
+
+  it.each(cases)('$name sends the contract request and invalidates all six league surfaces on success', async ({ use, mock, body, url, result: response }) => {
+    mock.mockResolvedValue(response);
+    const { wrapper, queryClient } = createWrapperWithClient();
+    const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
+    const { result } = renderHook(use as () => ReturnType<typeof useV1CloseLeagueRegistration>, { wrapper });
+
+    result.current.mutate(body as never);
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+    expect(mock).toHaveBeenCalledWith(url, body);
+    const leagueId = url.includes('league%201') ? 'league 1' : 'league-1';
+    for (const queryKey of surfaceKeys(leagueId)) {
+      expect(invalidateSpy).toHaveBeenCalledWith({ queryKey });
+    }
+  });
+
+  it.each(cases)('$name invalidates nothing when the request fails', async ({ use, mock, body }) => {
+    mock.mockRejectedValue(new Error('409'));
+    const { wrapper, queryClient } = createWrapperWithClient();
+    const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
+    const { result } = renderHook(use as () => ReturnType<typeof useV1CloseLeagueRegistration>, { wrapper });
+
+    result.current.mutate(body as never);
+    await waitFor(() => expect(result.current.isError).toBe(true));
+
+    expect(invalidateSpy).not.toHaveBeenCalled();
   });
 });

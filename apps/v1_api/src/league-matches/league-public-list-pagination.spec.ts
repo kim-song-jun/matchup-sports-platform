@@ -42,8 +42,9 @@ function makeFetchGroup(fixtures: readonly FixtureLeague[]) {
 }
 
 describe('LEAGUE_STATE_PRIORITY_ORDER', () => {
-  it('진행 중 -> 준비 중 -> 종료 순서다 (listMine의 sortMyLeaguesByState와 동일 규칙)', () => {
-    expect(LEAGUE_STATE_PRIORITY_ORDER).toEqual(['active', 'draft', 'completed']);
+  it('진행 중 -> 준비 중 -> 종료 -> 보류 순서다 (listMine의 sortMyLeaguesByState와 동일 규칙)', () => {
+    // 보류 리그는 비공개라 공개 목록엔 안 나오고, 관리자 목록에서 맨 뒤에 모인다.
+    expect(LEAGUE_STATE_PRIORITY_ORDER).toEqual(['active', 'draft', 'completed', 'on_hold']);
   });
 });
 

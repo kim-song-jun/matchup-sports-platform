@@ -97,6 +97,24 @@ describe('maskSensitive', () => {
     });
   });
 
+  // entry-fee 요청이 4xx/5xx 면 본문이 V1ErrorLog 에 무기한 저장된다 — 계좌번호·예금주가 평문으로 남으면 안 된다.
+  it('masks league entry-fee bank account and holder (any key spelling), keeps bank name and amount', () => {
+    const result = maskSensitive({
+      entryFee: 70000,
+      bankName: '국민은행',
+      bankAccount: '123-456-789012',
+      bank_holder: '팀밋',
+      nested: { BankAccount: '999-888' },
+    });
+    expect(result).toEqual({
+      entryFee: 70000,
+      bankName: '국민은행',
+      bankAccount: '[REDACTED]',
+      bank_holder: '[REDACTED]',
+      nested: { BankAccount: '[REDACTED]' },
+    });
+  });
+
   it('does not mutate the original input', () => {
     const input = { password: 'hunter2', nested: { token: 'abc' } };
     const snapshot = JSON.parse(JSON.stringify(input));

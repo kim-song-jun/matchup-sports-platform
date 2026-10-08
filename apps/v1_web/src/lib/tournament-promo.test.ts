@@ -8,6 +8,7 @@ function tournament(
 ): V1TournamentListItem {
   return {
     id,
+    entryFeeConfigured: true,
     sportId: 'sport-1',
     sport: { code: 'futsal', name: '풋살' },
     title: id,

@@ -17,12 +17,14 @@ import {
   syncTeamMatchScheduleInTx,
 } from '../team-schedules/team-schedules.service';
 import { scheduleLeagueResultEntryReminder } from '../jobs/league-reminders/league-result-entry-reminder.service';
+import { countLeagueActiveRegistrations, countLeagueConfirmedApplications } from './league-active-registration';
 import { LeagueCompletionProjectionService } from './league-completion-projection.service';
 import {
   STATUS_BY_LEAGUE_STATE,
   leagueMirrorCreateData,
   toMirrorSource,
 } from '../tournaments/league-competition-mirror';
+import { defaultFixtureEndAt, regulationMinutesForConfigVersion } from '../tournaments/competition-config/fixture-end-at';
 import { buildOddTeamCountWarning, checkLeagueTeamRemovalAllowed } from './league-lifecycle-rules';
 import {
   createLeagueRosterRegistration,
@@ -52,6 +54,8 @@ import {
   RegenerateLeagueFixturesDto,
   OpenLeagueRegistrationDto,
   RevertLeagueCompletionDto,
+  HoldLeagueDto,
+  ResumeLeagueDto,
   UpdateLeagueDisciplineDto,
   UpdateLeagueFixtureDto,
   UpdateLeagueVisibilityDto,
@@ -406,6 +410,16 @@ export class LeagueMatchAdminService {
       // 하므로 0 으로 뭉개지 않고 그대로 내린다.
       yellowAccumulationLimit: league.yellowAccumulationLimit,
       redCardSuspensionMatches: league.redCardSuspensionMatches,
+      sportCode: league.sportCode,
+      coverImageUrl: league.coverImageUrl,
+      entryFee: league.entryFee,
+      entryFeeConfiguredAt: league.entryFeeConfiguredAt,
+      bankName: league.bankName,
+      bankAccount: league.bankAccount,
+      bankHolder: league.bankHolder,
+      // 화면 힌트 — 사유 필수의 최종 판정은 참가비 저장 트랜잭션의 쓰기 후 카운트가 한다.
+      activeRegistrationCount: await countLeagueActiveRegistrations(this.prisma, leagueId),
+      confirmedRegistrationCount: await countLeagueConfirmedApplications(this.prisma, leagueId),
       teamIds,
       recentVenues,
       fixtures: fixtures.map((fixture) => {
@@ -432,8 +446,8 @@ export class LeagueMatchAdminService {
   async updateVisibility(user: V1AuthUser, leagueId: string, dto: UpdateLeagueVisibilityDto) {
     const admin = await this.adminContext.getMutationAdmin(user.id);
     return this.prisma.$transaction(async (tx) => {
-      const locked = await tx.$queryRaw<Array<{ id: string; isPublic: boolean }>>`
-        SELECT "id", "is_public" AS "isPublic"
+      const locked = await tx.$queryRaw<Array<{ id: string; isPublic: boolean; status: string }>>`
+        SELECT "id", "is_public" AS "isPublic", "status"::text AS "status"
         FROM "v1_tournaments"
         WHERE "id" = ${leagueId}
           AND "kind" = 'regular_league'
@@ -446,6 +460,10 @@ export class LeagueMatchAdminService {
       }
 
       if (current.isPublic === dto.isPublic) return { leagueId, isPublic: current.isPublic };
+      // 보류 중인 리그는 숨겨 두는 게 보류의 일부다 — 공개하려면 보류부터 해제한다(해제가 공개도 되돌린다).
+      if (current.status === 'on_hold' && dto.isPublic) {
+        throw new ConflictException({ code: 'LEAGUE_ON_HOLD', message: '보류 중인 리그는 공개할 수 없어요. 먼저 보류를 해제해 주세요.' });
+      }
 
       await tx.v1Tournament.update({ where: { id: leagueId }, data: { isPublic: dto.isPublic } });
       await this.adminContext.logAdminAction(
@@ -466,10 +484,22 @@ export class LeagueMatchAdminService {
   // generateFixtures/previewFixtures/regenerateFixtures 공용: timing DTO를 기본값 채운
   // 계산 옵션으로 정규화하고, 총 라운드 수(주차 수 × 팀당 하루 경기 수)를 확정한다.
   // 상한 검증은 형식이 아니라 도메인 규칙이므로 DTO가 아니라 여기서 소유한다.
-  private resolveFixturePlan(dto: GenerateLeagueFixturesDto): { totalRounds: number; timing?: FixtureTimingOptions } {
+  // 경기 시간(gameDurationMinutes)을 비우면 경기 설정의 정규 시간(연장 제외 피리어드 합계)을 쓴다 — 그것도
+  // 모르면(레거시 설정) 지어내지 않고 입력을 요구한다.
+  private resolveFixturePlan(
+    dto: GenerateLeagueFixturesDto,
+    defaultGameMinutes: number | null,
+  ): { totalRounds: number; timing?: FixtureTimingOptions } {
+    const gameDurationMinutes = dto.timing ? dto.timing.gameDurationMinutes ?? defaultGameMinutes : null;
+    if (dto.timing && gameDurationMinutes === null) {
+      throw new UnprocessableEntityException({
+        code: 'LEAGUE_FIXTURE_DURATION_REQUIRED',
+        message: '이 리그의 기본 경기 시간을 알 수 없어요. 경기 시간(분)을 입력해 주세요.',
+      });
+    }
     const timing: FixtureTimingOptions | undefined = dto.timing
       ? {
-          gameDurationMinutes: dto.timing.gameDurationMinutes,
+          gameDurationMinutes: gameDurationMinutes!,
           breakMinutes: dto.timing.breakMinutes ?? 0,
           gamesPerTeamPerDay: dto.timing.gamesPerTeamPerDay ?? 1,
         }
@@ -540,7 +570,8 @@ export class LeagueMatchAdminService {
       throw new ConflictException({ code: 'COMPETITION_CONFIG_REQUIRED', message: '이 종목에 활성 경기 설정이 없어요.' });
     }
     const teamIds = league.teams.map((entry) => entry.teamId);
-    const { totalRounds, timing } = this.resolveFixturePlan(dto);
+    const regulation = await regulationMinutesForConfigVersion(this.prisma, config.id);
+    const { totalRounds, timing } = this.resolveFixturePlan(dto, regulation);
     const schedule = generateRoundRobinFixtures(teamIds, totalRounds);
     // 날짜 검증은 **트랜잭션 밖**에서 한다 — 도메인 거부가 락을 잡을 이유가 없다.
     const matchdayStartAts = this.resolveScheduleStartAts(dto, totalRounds, timing);
@@ -552,6 +583,7 @@ export class LeagueMatchAdminService {
       // 보호가 **조용히** 사라지고, ② 그 테이블이 사라지는 릴리스에서 relation does not exist
       // 로 깨진다. BE-5 drop 이 정확히 ②를 일으켰다 — 통합 스펙이 500 으로 잡았다.
       await tx.$queryRaw`SELECT id FROM "v1_tournaments" WHERE id = ${leagueId} FOR UPDATE`;
+      await this.assertFixtureGenerationAllowedInTx(tx, leagueId);
       const existingCount = await tx.v1TeamMatch.count({ where: { leagueId } });
       if (existingCount > 0) {
         throw new ConflictException({ code: 'LEAGUE_FIXTURES_EXIST', message: '이미 대진이 생성된 리그예요.' });
@@ -884,7 +916,8 @@ export class LeagueMatchAdminService {
         message: '공식 결과가 확정된 대진이 있어 대진을 다시 만들 수 없어요.',
       });
     }
-    const { totalRounds, timing } = this.resolveFixturePlan(dto);
+    const regulation = await regulationMinutesForConfigVersion(this.prisma, config.id);
+    const { totalRounds, timing } = this.resolveFixturePlan(dto, regulation);
     const schedule = generateRoundRobinFixtures(teamIds, totalRounds);
     const matchdayStartAts = this.resolveScheduleStartAts(dto, totalRounds, timing);
     const slots = timing
@@ -906,18 +939,24 @@ export class LeagueMatchAdminService {
             : new Set(schedule.map((fixture) => fixture.round)).size,
       fixtureCount: schedule.length,
       placeName,
-      fixtures: schedule.map((fixture, index) => ({
-        round: fixture.round,
-        matchday: slots !== undefined ? slots[index].matchday : fixture.round,
-        orderInDay: slots !== undefined ? slots[index].orderInDay : null,
-        homeTeamId: fixture.homeTeamId,
-        awayTeamId: fixture.awayTeamId,
-        startAt:
+      fixtures: schedule.map((fixture, index) => {
+        const startAt =
           slots !== undefined
             ? slots[index].startAt
-            : (matchdayStartAts?.[fixture.round - 1] ?? resolveFixtureStartAt(league.startsOn, fixture.round)),
-        endAt: slots !== undefined ? slots[index].endAt : null,
-      })),
+            : (matchdayStartAts?.[fixture.round - 1] ?? resolveFixtureStartAt(league.startsOn, fixture.round));
+        return {
+          round: fixture.round,
+          matchday: slots !== undefined ? slots[index].matchday : fixture.round,
+          orderInDay: slots !== undefined ? slots[index].orderInDay : null,
+          homeTeamId: fixture.homeTeamId,
+          awayTeamId: fixture.awayTeamId,
+          startAt,
+          // 실제 생성(createLeagueFixture)과 같은 기본값 — 경기 시간을 비우면 시작 + 정규 시간.
+          endAt: slots !== undefined
+            ? slots[index].endAt
+            : regulation === null ? null : new Date(startAt.getTime() + regulation * 60_000),
+        };
+      }),
       warnings: buildOddTeamCountWarning(teamIds.length),
     };
   }
@@ -1027,12 +1066,14 @@ export class LeagueMatchAdminService {
       throw new ConflictException({ code: 'COMPETITION_CONFIG_REQUIRED', message: '이 종목에 활성 경기 설정이 없어요.' });
     }
     const teamIds = league.teams.map((entry) => entry.teamId);
-    const { totalRounds, timing } = this.resolveFixturePlan(dto);
+    const regulation = await regulationMinutesForConfigVersion(this.prisma, config.id);
+    const { totalRounds, timing } = this.resolveFixturePlan(dto, regulation);
     const matchdayStartAts = this.resolveScheduleStartAts(dto, totalRounds, timing);
     const schedule = generateRoundRobinFixtures(teamIds, totalRounds);
 
     const result = await this.prisma.$transaction(async (tx) => {
       await tx.$queryRaw`SELECT id FROM "v1_tournaments" WHERE id = ${leagueId} FOR UPDATE`;
+      await this.assertFixtureGenerationAllowedInTx(tx, leagueId);
       const existingFixtures = await tx.v1TeamMatch.findMany({
         where: { leagueId },
         select: {
@@ -1289,14 +1330,18 @@ export class LeagueMatchAdminService {
     // 감사 결함(index 9): timing으로 생성된 대진은 startAt·endAt이 한 슬롯의 시작·끝이다.
     // startAt만 바꾸고 endAt을 그대로 두면 "종료가 시작보다 이전"인 옛 값이 남는다 — 원래
     // duration(endAt-startAt, generateFixtures가 resolveFixtureTimeSlots로 채운 값)을 새
-    // startAt에 그대로 적용해 유지한다. timing 없이 만들어져 endAt이 애초에 없는(null)
-    // 대진은 계속 없음으로 둔다 — duration 자체가 정의되지 않으므로 임의로 만들어내지 않는다.
+    // startAt에 그대로 적용해 유지한다. 종료 시각이 없던(이 규칙 이전에 만든) 대진은 새 시작 +
+    // 경기 설정의 정규 시간(연장 제외 피리어드 합계)으로 채운다 — 생성 경로와 같은 기준이다.
     const durationMs = teamMatch.endAt !== null && teamMatch.startAt !== null
       ? teamMatch.endAt.getTime() - teamMatch.startAt.getTime()
       : null;
     const nextStartAt = dto.startsAt === undefined ? undefined : new Date(dto.startsAt);
-    const nextEndAt = nextStartAt !== undefined && durationMs !== null ? new Date(nextStartAt.getTime() + durationMs) : undefined;
     const updated = await this.prisma.$transaction(async (tx) => {
+      const nextEndAt = nextStartAt === undefined
+        ? undefined
+        : durationMs !== null
+          ? new Date(nextStartAt.getTime() + durationMs)
+          : (await defaultFixtureEndAt(tx, teamMatch.competitionConfigVersionId, nextStartAt)) ?? undefined;
       // generateFixtures와 동일하게: 빈/공백 문자열로 지우는 요청은 "미지정"으로 되돌린다 —
       // 그대로 저장하면 loadRecentVenues distinct 집계에서 조용히 빠지는 값이 남는다.
       const trimmedPlaceName = dto.placeName === undefined ? undefined : dto.placeName.trim();
@@ -1544,6 +1589,96 @@ export class LeagueMatchAdminService {
     };
   }
 
+  /**
+   * 리그 보류 — 리그 "취소" 대신 쓴다(2026-10-07 사용자 확정). 상태를 on_hold 로 바꾸고 리그와
+   * 그 경기를 공개 화면에서 숨긴다(isPublic=false — 공개 목록·상세·기록이 모두 이 값을 본다).
+   * 대진·결과·참가는 그대로 두고, 보류 직전 상태·공개 여부를 기억해 resumeLeague 가 되돌린다.
+   * 끝난(완료·취소) 리그는 보류할 수 없다. 이미 보류면 멱등하게 alreadyProcessed 다.
+   */
+  async holdLeague(user: V1AuthUser, leagueId: string, dto: HoldLeagueDto) {
+    const admin = await this.adminContext.getMutationAdmin(user.id);
+    return this.prisma.$transaction(async (tx) => {
+      const league = await findTournamentOnSurface(tx, ['regular_league'], {
+        where: { id: leagueId, deletedAt: null },
+        select: { id: true, status: true, isPublic: true },
+      });
+      if (league === null) {
+        throw new NotFoundException({ code: 'LEAGUE_NOT_FOUND', message: '리그를 찾을 수 없어요.' });
+      }
+      if (league.status === 'on_hold') {
+        return { leagueId, state: LeagueStateValue.on_hold, isPublic: league.isPublic, alreadyProcessed: true };
+      }
+      if (league.status === 'completed' || league.status === 'cancelled') {
+        throw new ConflictException({ code: 'LEAGUE_NOT_HOLDABLE', message: '끝난 리그는 보류할 수 없어요.' });
+      }
+      // 조건부 UPDATE 가 승자 판정이다 — 그 사이 상태가 바뀌었으면 0행이라 덮어쓰지 않는다.
+      const held = await tx.v1Tournament.updateMany({
+        where: { id: leagueId, kind: 'regular_league', deletedAt: null, status: league.status, isPublic: league.isPublic },
+        data: { status: 'on_hold', heldFromStatus: league.status, heldFromPublic: league.isPublic, isPublic: false },
+      });
+      if (held.count !== 1) {
+        throw new ConflictException({ code: 'LEAGUE_STATE_CHANGED', message: '리그 상태가 방금 바뀌었어요. 새로고침한 뒤 다시 시도해 주세요.' });
+      }
+      await this.adminContext.logAdminAction(
+        admin,
+        {
+          action: 'league_match.hold',
+          targetType: 'league_match',
+          targetId: leagueId,
+          reason: dto.reason,
+          fromStatus: LEAGUE_STATE_BY_STATUS[league.status],
+          toStatus: LeagueStateValue.on_hold,
+          beforeJson: { status: league.status, isPublic: league.isPublic },
+          afterJson: { status: 'on_hold', isPublic: false },
+        },
+        tx,
+      );
+      return { leagueId, state: LeagueStateValue.on_hold, isPublic: false, alreadyProcessed: false };
+    });
+  }
+
+  /** 보류 해제 — 보류 직전 상태·공개 여부로 되돌린다. 보류 중이 아니면 멱등하게 alreadyProcessed 다. */
+  async resumeLeague(user: V1AuthUser, leagueId: string, dto: ResumeLeagueDto) {
+    const admin = await this.adminContext.getMutationAdmin(user.id);
+    return this.prisma.$transaction(async (tx) => {
+      const league = await findTournamentOnSurface(tx, ['regular_league'], {
+        where: { id: leagueId, deletedAt: null },
+        select: { id: true, status: true, isPublic: true, heldFromStatus: true, heldFromPublic: true },
+      });
+      if (league === null) {
+        throw new NotFoundException({ code: 'LEAGUE_NOT_FOUND', message: '리그를 찾을 수 없어요.' });
+      }
+      if (league.status !== 'on_hold') {
+        return { leagueId, state: LEAGUE_STATE_BY_STATUS[league.status], isPublic: league.isPublic, alreadyProcessed: true };
+      }
+      // 기억한 값이 없으면(직접 DB 로 보류한 행 등) 준비 중·공개로 되돌린다 — 끝난 상태로 되살리지 않는다.
+      const restoreStatus = league.heldFromStatus ?? 'draft';
+      const restorePublic = league.heldFromPublic ?? true;
+      const resumed = await tx.v1Tournament.updateMany({
+        where: { id: leagueId, kind: 'regular_league', status: 'on_hold' },
+        data: { status: restoreStatus, isPublic: restorePublic, heldFromStatus: null, heldFromPublic: null },
+      });
+      if (resumed.count !== 1) {
+        throw new ConflictException({ code: 'LEAGUE_STATE_CHANGED', message: '리그 상태가 방금 바뀌었어요. 새로고침한 뒤 다시 시도해 주세요.' });
+      }
+      await this.adminContext.logAdminAction(
+        admin,
+        {
+          action: 'league_match.resume',
+          targetType: 'league_match',
+          targetId: leagueId,
+          reason: dto.reason ?? null,
+          fromStatus: LeagueStateValue.on_hold,
+          toStatus: LEAGUE_STATE_BY_STATUS[restoreStatus],
+          beforeJson: { status: 'on_hold', isPublic: league.isPublic },
+          afterJson: { status: restoreStatus, isPublic: restorePublic },
+        },
+        tx,
+      );
+      return { leagueId, state: LEAGUE_STATE_BY_STATUS[restoreStatus], isPublic: restorePublic, alreadyProcessed: false };
+    });
+  }
+
   async revertCompletion(user: V1AuthUser, leagueId: string, dto: RevertLeagueCompletionDto) {
     const admin = await this.adminContext.getMutationAdmin(user.id);
     const league = await findTournamentOnSurface(this.prisma, ['regular_league'], {
@@ -1616,6 +1751,20 @@ export class LeagueMatchAdminService {
     return false;
   }
 
+  private async assertFixtureGenerationAllowedInTx(tx: Prisma.TransactionClient, leagueId: string) {
+    // 계획 계산 뒤 보류가 커밋될 수 있으므로 정본 행 잠금 뒤의 최신 상태로 판정한다.
+    const league = await findTournamentOnSurface(tx, ['regular_league'], {
+      where: { id: leagueId, deletedAt: null },
+      select: { status: true },
+    });
+    if (league === null) {
+      throw new NotFoundException({ code: 'LEAGUE_NOT_FOUND', message: '리그를 찾을 수 없어요.' });
+    }
+    if (league.status === 'on_hold') {
+      throw new ConflictException({ code: 'LEAGUE_ON_HOLD', message: '보류 중에는 대진을 만들거나 다시 만들 수 없어요. 먼저 보류를 해제해 주세요.' });
+    }
+  }
+
   private async loadLeague(leagueId: string) {
     const league = await findTournamentOnSurface(this.prisma, ['regular_league'], {
       where: { id: leagueId, deletedAt: null },
@@ -1638,6 +1787,14 @@ export class LeagueMatchAdminService {
         // 있다. 둘 다 null 이면 이 리그에는 규정이 적용되지 않는다.
         yellowAccumulationLimit: true,
         redCardSuspensionMatches: true,
+        // 대표 이미지·참가비 카드용(어드민 응답 전용 — 계좌는 공개 서비스에서 절대 select 하지 않는다).
+        coverImageUrl: true,
+        entryFee: true,
+        entryFeeConfiguredAt: true,
+        bankName: true,
+        bankAccount: true,
+        bankHolder: true,
+        sport: { select: { code: true } },
         // 거울이 `startsOn` 을 여기 담는다(leagueMirrorCreateData).
         scheduledAt: true,
         registrations: {
@@ -1662,10 +1819,12 @@ export class LeagueMatchAdminService {
     }
     // 호출부는 `league.teams`·`league.state`·`league.startsOn` 을 그대로 쓴다 — 이름과
     // 값만 맞춰 돌려주고 응답 계약은 건드리지 않는다(BE-5 는 저장소 축만 옮긴다).
-    const { registrations, scheduledAt, status, regionId, ...rest } = league;
+    const { registrations, scheduledAt, status, regionId, sport, entryFeeConfiguredAt, ...rest } = league;
     return {
       ...rest,
       regionId,
+      sportCode: sport.code,
+      entryFeeConfiguredAt: entryFeeConfiguredAt?.toISOString() ?? null,
       state: LEAGUE_STATE_BY_STATUS[status],
       startsOn: scheduledAt,
       teams: registrations,

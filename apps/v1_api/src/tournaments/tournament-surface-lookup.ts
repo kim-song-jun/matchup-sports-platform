@@ -37,12 +37,20 @@ export const ALL_COMPETITION_KINDS = [
   V1CompetitionKind.regular_league,
 ] as const;
 
-/** Kind-safe visibility condition for ordinary public tournament reads. */
-export const PUBLIC_TOURNAMENT_VISIBILITY_WHERE: Prisma.V1TournamentWhereInput = {
-  OR: [
-    { kind: V1CompetitionKind.regular_tournament },
-    { kind: null },
-    { kind: V1CompetitionKind.regular_league, isPublic: true },
+/**
+ * 공개 조회의 공개 여부 조건 — 대회·리그 모두 관리자가 비공개로 돌린 행은 일반 사용자에게 보이지
+ * 않는다(관리자 운영 조회는 findTournamentOnSurface 를 그대로 쓴다). 예전엔 리그에만 걸었다.
+ */
+export const PUBLIC_TOURNAMENT_VISIBILITY_WHERE: Prisma.V1TournamentWhereInput = { isPublic: true };
+
+/**
+ * 공개 기록·집계에 실어도 되는 팀매치 — 비공개 리그(`leagueId`)나 비공개 대회(`tournamentId`)에
+ * 속한 경기는 선수 기록·활동 수에서 뺀다. 일반 친선 팀매치는 둘 다 null 이라 그대로 통과한다.
+ */
+export const PUBLIC_COMPETITION_TEAM_MATCH_WHERE: Prisma.V1TeamMatchWhereInput = {
+  AND: [
+    { OR: [{ leagueId: null }, { league: { is: { isPublic: true } } }] },
+    { OR: [{ tournamentId: null }, { tournament: { is: { isPublic: true } } }] },
   ],
 };
 

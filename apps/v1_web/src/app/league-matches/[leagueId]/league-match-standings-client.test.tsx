@@ -95,7 +95,7 @@ describe('LeagueMatchStandingsClient', () => {
   // 앱의 다른 화면과 같은 곳으로 가야 같은 단어가 화면마다 다른 데로 가지 않는다.
   it('순위표의 팀 이름은 팀 상세로 가는 링크다', async () => {
     useV1LeagueMatchMock.mockReturnValue({
-      data: { leagueId: 'league-1', title: '가을 리그', state: 'active', startsOn: '2026-09-01T00:00:00.000Z', endsOn: '2026-10-20T00:00:00.000Z', teamIds: ['t1'], fixtures: [] },
+      data: { leagueId: 'league-1', title: '가을 리그', state: 'active', registrationOpen: false, registrationDeadlineAt: null, sportCode: 'futsal', coverImageUrl: null, entryFee: 0, entryFeeConfigured: false, startsOn: '2026-09-01T00:00:00.000Z', endsOn: '2026-10-20T00:00:00.000Z', teamIds: ['t1'], fixtures: [] },
     } as never);
     useV1LeagueMatchStandingsMock.mockReturnValue({
       data: {
@@ -118,7 +118,7 @@ describe('LeagueMatchStandingsClient', () => {
   // 있어야 한다. 시즌 시작 전이 오히려 "어떤 팀이 나오지?"를 가장 많이 누르는 시점이다.
   it('참가팀 목록의 팀 이름도 팀 상세로 간다', async () => {
     useV1LeagueMatchMock.mockReturnValue({
-      data: { leagueId: 'league-1', title: '가을 리그', state: 'active', startsOn: '2026-09-01T00:00:00.000Z', endsOn: '2026-10-20T00:00:00.000Z', teamIds: ['t1', 't2'], fixtures: [] },
+      data: { leagueId: 'league-1', title: '가을 리그', state: 'active', registrationOpen: false, registrationDeadlineAt: null, sportCode: 'futsal', coverImageUrl: null, entryFee: 0, entryFeeConfigured: false, startsOn: '2026-09-01T00:00:00.000Z', endsOn: '2026-10-20T00:00:00.000Z', teamIds: ['t1', 't2'], fixtures: [] },
     } as never);
     useV1LeagueMatchStandingsMock.mockReturnValue({
       data: {
@@ -144,7 +144,7 @@ describe('LeagueMatchStandingsClient', () => {
   it('순위표에서 저장된 팀 로고를 표시한다', async () => {
     useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false } as never);
     useV1LeagueMatchMock.mockReturnValue({
-      data: { leagueId: 'league-1', title: '가을 리그', state: 'active', startsOn: '2026-09-01T00:00:00.000Z', endsOn: '2026-10-20T00:00:00.000Z', teamIds: ['t1'], fixtures: [] },
+      data: { leagueId: 'league-1', title: '가을 리그', state: 'active', registrationOpen: false, registrationDeadlineAt: null, sportCode: 'futsal', coverImageUrl: null, entryFee: 0, entryFeeConfigured: false, startsOn: '2026-09-01T00:00:00.000Z', endsOn: '2026-10-20T00:00:00.000Z', teamIds: ['t1'], fixtures: [] },
     } as never);
     useV1LeagueMatchStandingsMock.mockReturnValue({
       data: {
@@ -171,7 +171,7 @@ describe('LeagueMatchStandingsClient', () => {
     useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false } as never);
     useV1LeagueMatchMock.mockReturnValue({
       data: {
-        leagueId: 'league-1', title: '가을 리그', state: 'active', startsOn: '2026-09-01T00:00:00.000Z', endsOn: '2026-10-20T00:00:00.000Z', teamIds: ['t1', 't2'],
+        leagueId: 'league-1', title: '가을 리그', state: 'active', registrationOpen: false, registrationDeadlineAt: null, sportCode: 'futsal', coverImageUrl: null, entryFee: 0, entryFeeConfigured: false, startsOn: '2026-09-01T00:00:00.000Z', endsOn: '2026-10-20T00:00:00.000Z', teamIds: ['t1', 't2'],
         fixtures: [{ teamMatchId: 'tm-1', title: '1주차', homeTeamId: 't1', awayTeamId: 't2', startAt: '2026-09-01T20:00:00.000Z', placeName: '망원', status: 'matched' }],
       },
     } as never);
@@ -228,7 +228,7 @@ describe('LeagueMatchStandingsClient', () => {
   it('순위표 조회만 실패하면 빈 문구가 아니라 에러 상태를 보여준다', async () => {
     useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false } as never);
     useV1LeagueMatchMock.mockReturnValue({
-      data: { leagueId: 'league-1', title: '가을 리그', state: 'active', startsOn: '2026-09-01T00:00:00.000Z', endsOn: '2026-10-20T00:00:00.000Z', teamIds: ['t1'], fixtures: [] },
+      data: { leagueId: 'league-1', title: '가을 리그', state: 'active', registrationOpen: false, registrationDeadlineAt: null, sportCode: 'futsal', coverImageUrl: null, entryFee: 0, entryFeeConfigured: false, startsOn: '2026-09-01T00:00:00.000Z', endsOn: '2026-10-20T00:00:00.000Z', teamIds: ['t1'], fixtures: [] },
     } as never);
     useV1LeagueMatchStandingsMock.mockReturnValue({ data: undefined, isError: true, error: new Error('순위표 서버 오류'), refetch: vi.fn() } as never);
     useV1LeagueMatchPlayerRecordsMock.mockReturnValue({ data: { leagueId: 'league-1', goals: [], assists: [] } } as never);
@@ -249,7 +249,7 @@ describe('LeagueMatchStandingsClient', () => {
       data: {
         leagueId: 'league-1',
         title: '가을 리그',
-        state: 'active',
+        state: 'active', registrationOpen: false, registrationDeadlineAt: null, sportCode: 'futsal', coverImageUrl: null, entryFee: 0, entryFeeConfigured: false,
         startsOn: '2026-09-01T00:00:00.000Z',
         endsOn: '2026-10-20T00:00:00.000Z',
         teamIds: ['t1', 't2'],
@@ -315,7 +315,7 @@ describe('LeagueMatchStandingsClient', () => {
   it('종료된 리그는 순위표에 최종 순위 표시가 붙는다', async () => {
     useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false } as never);
     useV1LeagueMatchMock.mockReturnValue({
-      data: { leagueId: 'league-1', title: '가을 리그', state: 'completed', startsOn: '2026-09-01T00:00:00.000Z', endsOn: '2026-10-20T00:00:00.000Z', teamIds: ['t1'], fixtures: [] },
+      data: { leagueId: 'league-1', title: '가을 리그', state: 'completed', registrationOpen: false, registrationDeadlineAt: null, sportCode: 'futsal', coverImageUrl: null, entryFee: 0, entryFeeConfigured: false, startsOn: '2026-09-01T00:00:00.000Z', endsOn: '2026-10-20T00:00:00.000Z', teamIds: ['t1'], fixtures: [] },
     } as never);
     useV1LeagueMatchStandingsMock.mockReturnValue({
       data: {
@@ -345,7 +345,7 @@ describe('LeagueMatchStandingsClient', () => {
     useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false } as never);
     useV1LeagueMatchMock.mockReturnValue({
       data: {
-        leagueId: 'league-1', title: '가을 리그', state: 'active', startsOn: '2026-09-01T00:00:00.000Z', endsOn: '2026-10-20T00:00:00.000Z', teamIds: ['t1', 't2'],
+        leagueId: 'league-1', title: '가을 리그', state: 'active', registrationOpen: false, registrationDeadlineAt: null, sportCode: 'futsal', coverImageUrl: null, entryFee: 0, entryFeeConfigured: false, startsOn: '2026-09-01T00:00:00.000Z', endsOn: '2026-10-20T00:00:00.000Z', teamIds: ['t1', 't2'],
         fixtures: [{ teamMatchId: 'tm-1', title: '1주차', homeTeamId: 't1', awayTeamId: 't2', startAt: '2026-09-01T10:00:00.000Z', placeName: '망원', status: 'matched' }],
       },
     } as never);
@@ -381,7 +381,7 @@ describe('LeagueMatchStandingsClient', () => {
     useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false } as never);
     useV1LeagueMatchMock.mockReturnValue({
       data: {
-        leagueId: 'league-1', title: '가을 리그', state: 'active',
+        leagueId: 'league-1', title: '가을 리그', state: 'active', registrationOpen: false, registrationDeadlineAt: null, sportCode: 'futsal', coverImageUrl: null, entryFee: 0, entryFeeConfigured: false,
         startsOn: '2026-09-01T00:00:00.000Z', endsOn: '2026-10-20T00:00:00.000Z',
         teamIds: ['t1', 't2'],
         fixtures: [{
@@ -418,7 +418,7 @@ describe('LeagueMatchStandingsClient', () => {
     useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false } as never);
     useV1LeagueMatchMock.mockReturnValue({
       data: {
-        leagueId: 'league-1', title: '가을 리그', state: 'active',
+        leagueId: 'league-1', title: '가을 리그', state: 'active', registrationOpen: false, registrationDeadlineAt: null, sportCode: 'futsal', coverImageUrl: null, entryFee: 0, entryFeeConfigured: false,
         startsOn: '2026-09-01T00:00:00.000Z', endsOn: '2026-10-20T00:00:00.000Z',
         teamIds: ['t1', 't2'],
         fixtures: [
@@ -474,7 +474,7 @@ describe('LeagueMatchStandingsClient', () => {
     useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false } as never);
     useV1LeagueMatchMock.mockReturnValue({
       data: {
-        leagueId: 'league-1', title: '가을 리그', state: 'active',
+        leagueId: 'league-1', title: '가을 리그', state: 'active', registrationOpen: false, registrationDeadlineAt: null, sportCode: 'futsal', coverImageUrl: null, entryFee: 0, entryFeeConfigured: false,
         startsOn: '2026-09-01T00:00:00.000Z', endsOn: '2026-10-20T00:00:00.000Z',
         teamIds: ['t1', 't2'],
         fixtures: [{
@@ -570,7 +570,7 @@ describe('LeagueMatchStandingsClient', () => {
     // 득점·도움은 서버가 등수를 안 주므로 클라이언트가 계산한다.
     useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false } as never);
     useV1LeagueMatchMock.mockReturnValue({
-      data: { leagueId: 'league-1', title: '가을 리그', state: 'active', startsOn: '2026-09-01T00:00:00.000Z', endsOn: '2026-10-20T00:00:00.000Z', teamIds: ['t1'], fixtures: [] },
+      data: { leagueId: 'league-1', title: '가을 리그', state: 'active', registrationOpen: false, registrationDeadlineAt: null, sportCode: 'futsal', coverImageUrl: null, entryFee: 0, entryFeeConfigured: false, startsOn: '2026-09-01T00:00:00.000Z', endsOn: '2026-10-20T00:00:00.000Z', teamIds: ['t1'], fixtures: [] },
     } as never);
     useV1LeagueMatchStandingsMock.mockReturnValue({
       data: { leagueId: 'league-1', tieBreakOrder: ['points'], standings: [], pendingFixtures: [] },
@@ -701,7 +701,7 @@ describe('LeagueMatchStandingsClient', () => {
   it('감사 H-5: tie-break 를 전부 소진한 팀 그룹은 임의 배정 안내가 뜨고, 빈 배열이면 안 뜬다', async () => {
     useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false } as never);
     useV1LeagueMatchMock.mockReturnValue({
-      data: { leagueId: 'league-1', title: '가을 리그', state: 'active', startsOn: '2026-09-01T00:00:00.000Z', endsOn: '2026-10-20T00:00:00.000Z', teamIds: ['t1', 't2'], fixtures: [] },
+      data: { leagueId: 'league-1', title: '가을 리그', state: 'active', registrationOpen: false, registrationDeadlineAt: null, sportCode: 'futsal', coverImageUrl: null, entryFee: 0, entryFeeConfigured: false, startsOn: '2026-09-01T00:00:00.000Z', endsOn: '2026-10-20T00:00:00.000Z', teamIds: ['t1', 't2'], fixtures: [] },
     } as never);
     useV1LeagueMatchStandingsMock.mockReturnValue({
       data: {
@@ -729,7 +729,7 @@ describe('LeagueMatchStandingsClient', () => {
   it('감사 H-5: 대부분의 시즌처럼 tieBreakGroups 가 빈 배열이면 안내가 뜨지 않는다', async () => {
     useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false } as never);
     useV1LeagueMatchMock.mockReturnValue({
-      data: { leagueId: 'league-1', title: '가을 리그', state: 'active', startsOn: '2026-09-01T00:00:00.000Z', endsOn: '2026-10-20T00:00:00.000Z', teamIds: ['t1'], fixtures: [] },
+      data: { leagueId: 'league-1', title: '가을 리그', state: 'active', registrationOpen: false, registrationDeadlineAt: null, sportCode: 'futsal', coverImageUrl: null, entryFee: 0, entryFeeConfigured: false, startsOn: '2026-09-01T00:00:00.000Z', endsOn: '2026-10-20T00:00:00.000Z', teamIds: ['t1'], fixtures: [] },
     } as never);
     useV1LeagueMatchStandingsMock.mockReturnValue({
       data: {
@@ -756,7 +756,7 @@ describe('LeagueMatchStandingsClient', () => {
     // 미확정인 정상 상태는 기존 "0경기 순위표+확인 중 배너" 테스트로 이미 보장돼 있다).
     useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false } as never);
     useV1LeagueMatchMock.mockReturnValue({
-      data: { leagueId: 'league-1', title: '가을 리그', state: 'draft', startsOn: '2026-09-01T00:00:00.000Z', endsOn: '2026-10-20T00:00:00.000Z', teamIds: ['t1', 't2'], fixtures: [] },
+      data: { leagueId: 'league-1', title: '가을 리그', state: 'draft', registrationOpen: false, registrationDeadlineAt: null, sportCode: 'futsal', coverImageUrl: null, entryFee: 0, entryFeeConfigured: false, startsOn: '2026-09-01T00:00:00.000Z', endsOn: '2026-10-20T00:00:00.000Z', teamIds: ['t1', 't2'], fixtures: [] },
     } as never);
     useV1LeagueMatchStandingsMock.mockReturnValue({
       data: {
@@ -789,7 +789,7 @@ describe('LeagueMatchStandingsClient', () => {
     useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false } as never);
     useV1LeagueMatchMock.mockReturnValue({
       data: {
-        leagueId: 'league-1', title: '가을 리그', state: 'active',
+        leagueId: 'league-1', title: '가을 리그', state: 'active', registrationOpen: false, registrationDeadlineAt: null, sportCode: 'futsal', coverImageUrl: null, entryFee: 0, entryFeeConfigured: false,
         startsOn: '2026-09-01T00:00:00.000Z', endsOn: '2026-10-20T00:00:00.000Z',
         teamIds: ['t1', 't2'],
         fixtures: [
@@ -838,7 +838,7 @@ describe('LeagueMatchStandingsClient', () => {
     useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false } as never);
     useV1LeagueMatchMock.mockReturnValue({
       data: {
-        leagueId: 'league-1', title: '가을 리그', state: 'active',
+        leagueId: 'league-1', title: '가을 리그', state: 'active', registrationOpen: false, registrationDeadlineAt: null, sportCode: 'futsal', coverImageUrl: null, entryFee: 0, entryFeeConfigured: false,
         startsOn: '2026-09-01T00:00:00.000Z', endsOn: '2026-10-20T00:00:00.000Z',
         teamIds: ['t1', 't2'],
         fixtures: [
@@ -953,7 +953,7 @@ describe('LeagueMatchStandingsClient', () => {
     useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false } as never);
     useV1LeagueMatchMock.mockReturnValue({
       data: {
-        leagueId: 'league-1', title: '단발 리그', state: 'active',
+        leagueId: 'league-1', title: '단발 리그', state: 'active', registrationOpen: false, registrationDeadlineAt: null, sportCode: 'futsal', coverImageUrl: null, entryFee: 0, entryFeeConfigured: false,
         startsOn: '2026-09-01T00:00:00.000Z', endsOn: '2026-10-20T00:00:00.000Z',
         teamIds: ['t1'], fixtures: [], seriesId: null, seriesSiblings: [],
       },
@@ -981,7 +981,7 @@ describe('LeagueMatchStandingsClient', () => {
     useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false } as never);
     useV1LeagueMatchMock.mockReturnValue({
       data: {
-        leagueId: 'league-1', title: '가을 리그', state: 'active',
+        leagueId: 'league-1', title: '가을 리그', state: 'active', registrationOpen: false, registrationDeadlineAt: null, sportCode: 'futsal', coverImageUrl: null, entryFee: 0, entryFeeConfigured: false,
         startsOn: '2026-09-01T00:00:00.000Z', endsOn: '2026-10-20T00:00:00.000Z',
         teamIds: ['t1', 't2'],
         fixtures: [
@@ -1026,7 +1026,7 @@ describe('LeagueMatchStandingsClient', () => {
     useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false } as never);
     useV1LeagueMatchMock.mockReturnValue({
       data: {
-        leagueId: 'league-1', title: '가을 리그', state: 'completed',
+        leagueId: 'league-1', title: '가을 리그', state: 'completed', registrationOpen: false, registrationDeadlineAt: null, sportCode: 'futsal', coverImageUrl: null, entryFee: 0, entryFeeConfigured: false,
         startsOn: '2026-09-01T00:00:00.000Z', endsOn: '2026-10-20T00:00:00.000Z',
         teamIds: ['t1'], fixtures: [],
       },
@@ -1054,7 +1054,7 @@ describe('LeagueMatchStandingsClient', () => {
     useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false } as never);
     useV1LeagueMatchMock.mockReturnValue({
       data: {
-        leagueId: 'league-1', title: '가을 리그', state: 'completed',
+        leagueId: 'league-1', title: '가을 리그', state: 'completed', registrationOpen: false, registrationDeadlineAt: null, sportCode: 'futsal', coverImageUrl: null, entryFee: 0, entryFeeConfigured: false,
         startsOn: '2026-09-01T00:00:00.000Z', endsOn: '2026-10-20T00:00:00.000Z',
         teamIds: ['t1'], fixtures: [],
       },
@@ -1083,7 +1083,7 @@ describe('LeagueMatchStandingsClient', () => {
     useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false } as never);
     useV1LeagueMatchMock.mockReturnValue({
       data: {
-        leagueId: 'league-1', title: '가을 리그', state: 'active',
+        leagueId: 'league-1', title: '가을 리그', state: 'active', registrationOpen: false, registrationDeadlineAt: null, sportCode: 'futsal', coverImageUrl: null, entryFee: 0, entryFeeConfigured: false,
         startsOn: '2026-09-01T00:00:00.000Z', endsOn: '2026-10-20T00:00:00.000Z',
         teamIds: ['t1'], fixtures: [],
       },
@@ -1113,7 +1113,7 @@ describe('LeagueMatchStandingsClient', () => {
     useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false } as never);
     useV1LeagueMatchMock.mockReturnValue({
       data: {
-        leagueId: 'league-1', title: '가을 리그', state: 'completed',
+        leagueId: 'league-1', title: '가을 리그', state: 'completed', registrationOpen: false, registrationDeadlineAt: null, sportCode: 'futsal', coverImageUrl: null, entryFee: 0, entryFeeConfigured: false,
         startsOn: '2026-09-01T00:00:00.000Z', endsOn: '2026-10-20T00:00:00.000Z',
         teamIds: ['t1', 't2', 't3'], fixtures: [],
       },
@@ -1175,7 +1175,7 @@ describe('LeagueMatchStandingsClient', () => {
     useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false } as never);
     useV1LeagueMatchMock.mockReturnValue({
       data: {
-        leagueId: 'league-1', title: '가을 리그', state: 'completed',
+        leagueId: 'league-1', title: '가을 리그', state: 'completed', registrationOpen: false, registrationDeadlineAt: null, sportCode: 'futsal', coverImageUrl: null, entryFee: 0, entryFeeConfigured: false,
         startsOn: '2026-09-01T00:00:00.000Z', endsOn: '2026-10-20T00:00:00.000Z',
         teamIds: ['t1', 't2'], fixtures: [],
       },
@@ -1198,7 +1198,7 @@ describe('LeagueMatchStandingsClient', () => {
   // 나타나요"는 거짓 안내가 된다 — hiddenByEligibility 가 문구를 갈라야 한다.
   it('hiddenByEligibility 면 득점·도움 빈 상태를 하나의 동의 안내로 합친다', async () => {
     useV1LeagueMatchMock.mockReturnValue({
-      data: { leagueId: 'league-1', title: '가을 리그', state: 'active', startsOn: '2026-09-01T00:00:00.000Z', endsOn: '2026-10-20T00:00:00.000Z', teamIds: ['t1'], fixtures: [] },
+      data: { leagueId: 'league-1', title: '가을 리그', state: 'active', registrationOpen: false, registrationDeadlineAt: null, sportCode: 'futsal', coverImageUrl: null, entryFee: 0, entryFeeConfigured: false, startsOn: '2026-09-01T00:00:00.000Z', endsOn: '2026-10-20T00:00:00.000Z', teamIds: ['t1'], fixtures: [] },
     } as never);
     useV1LeagueMatchStandingsMock.mockReturnValue({
       data: { leagueId: 'league-1', tieBreakOrder: ['points'], standings: [], pendingFixtures: [] },
@@ -1296,7 +1296,7 @@ describe('LeagueMatchStandingsClient', () => {
     leagueTeamIds: string[] = [LEAGUE_TEAM_ID],
   ) {
     useV1LeagueMatchMock.mockReturnValue({
-      data: { leagueId: 'league-1', title: '가을 리그', state: 'active', startsOn: '2026-09-01T00:00:00.000Z', endsOn: '2026-10-20T00:00:00.000Z', teamIds: ['t1'], fixtures: [] },
+      data: { leagueId: 'league-1', title: '가을 리그', state: 'active', registrationOpen: false, registrationDeadlineAt: null, sportCode: 'futsal', coverImageUrl: null, entryFee: 0, entryFeeConfigured: false, startsOn: '2026-09-01T00:00:00.000Z', endsOn: '2026-10-20T00:00:00.000Z', teamIds: ['t1'], fixtures: [] },
     } as never);
     useV1LeagueMatchStandingsMock.mockReturnValue({
       data: {
@@ -1682,7 +1682,7 @@ describe('리그 참가 신청 입구', () => {
     useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false } as never);
     useV1LeagueMatchMock.mockReturnValue({
       data: {
-        leagueId: 'league-1', title: '가을 리그', state: 'active',
+        leagueId: 'league-1', title: '가을 리그', state: 'active', registrationOpen: false, registrationDeadlineAt: null, sportCode: 'futsal', coverImageUrl: null, entryFee: 0, entryFeeConfigured: false,
         startsOn: '2026-09-01T00:00:00.000Z', endsOn: '2026-10-20T00:00:00.000Z',
         teamIds: [], fixtures: [], seriesId: null, tier: null, tierLabel: null, seasonNo: null,
         seriesSiblings: [],
@@ -1789,16 +1789,56 @@ describe('리그 참가 신청 입구', () => {
     expect(container.querySelector('a[href="/tournaments/league-1/apply"]')).toBeInTheDocument();
   });
 
-  it('신청을 안 받으면 입구를 아예 그리지 않는다 — 회색 버튼도 죽은 안내도 남기지 않는다', async () => {
+  it('마감이 지났으면 신청 버튼 대신 닫힘 안내 카드와 다른 리그 링크를 그린다', async () => {
     mockLeague({ registrationOpen: false, registrationDeadlineAt: '2020-01-01T00:00:00.000Z' });
     const { container } = render(
       <Providers>
         <LeagueMatchStandingsClient leagueId="league-1" />
       </Providers>,
     );
-    await waitFor(() => expect(screen.getByText('가을 리그')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('신청이 마감됐어요')).toBeInTheDocument());
     expect(screen.queryByText('모집 중')).not.toBeInTheDocument();
     expect(container.querySelector('a[href="/tournaments/league-1/apply"]')).not.toBeInTheDocument();
+    expect(container.querySelector('a[href="/tournaments?kind=league"]')).toBeInTheDocument();
+  });
+
+  it('마감도 참가비도 정하지 않은 리그는 참가 안내 카드를 그리지 않는다', async () => {
+    mockLeague({ registrationOpen: false, registrationDeadlineAt: null });
+    render(
+      <Providers>
+        <LeagueMatchStandingsClient leagueId="league-1" />
+      </Providers>,
+    );
+    await waitFor(() => expect(screen.getByText('가을 리그')).toBeInTheDocument());
+    expect(screen.queryByRole('heading', { name: '참가 안내' })).not.toBeInTheDocument();
+    expect(screen.queryByText('신청이 마감됐어요')).not.toBeInTheDocument();
+  });
+
+  it('제목 옆에 대표 이미지 썸네일을 그린다 — 있으면 사진, 없으면 같은 자리의 종목 그래픽', async () => {
+    mockLeague({ coverImageUrl: '/uploads/2026/10/cover.webp' });
+    const withImage = render(
+      <Providers>
+        <LeagueMatchStandingsClient leagueId="league-1" />
+      </Providers>,
+    );
+    await waitFor(() => expect(screen.getByText('가을 리그')).toBeInTheDocument());
+    const photo = withImage.container.querySelector('[data-testid="competition-thumbnail"]');
+    expect(photo?.querySelector('img')).toBeInTheDocument();
+    expect(photo?.nextElementSibling).toContainElement(screen.getByRole('heading', { name: '가을 리그' }));
+    withImage.unmount();
+
+    mockLeague({ coverImageUrl: null });
+    const without = render(
+      <Providers>
+        <LeagueMatchStandingsClient leagueId="league-1" />
+      </Providers>,
+    );
+    await waitFor(() => expect(screen.getByText('가을 리그')).toBeInTheDocument());
+    // 이미지가 없어도 같은 자리에 같은 썸네일(종목 그래픽)이 있어 제목 위치가 안 흔들린다.
+    const fallback = without.container.querySelector('[data-testid="competition-thumbnail"]');
+    expect(fallback).toBeInTheDocument();
+    expect(fallback?.querySelector('img')).not.toBeInTheDocument();
+    expect(fallback?.nextElementSibling).toContainElement(screen.getByRole('heading', { name: '가을 리그' }));
   });
 
   it('받는 중이면 마감이 비어 있어도 입구는 그린다 — 받는지는 registrationOpen 이 답한다', async () => {
@@ -1823,7 +1863,7 @@ describe('순위 규칙 줄', () => {
 
   function mockStandings(tieBreakOrder: string[]) {
     useV1LeagueMatchMock.mockReturnValue({
-      data: { leagueId: 'league-1', title: '가을 리그', state: 'active', startsOn: '2026-09-01T00:00:00.000Z', endsOn: '2026-10-20T00:00:00.000Z', teamIds: ['t1'], fixtures: [] },
+      data: { leagueId: 'league-1', title: '가을 리그', state: 'active', registrationOpen: false, registrationDeadlineAt: null, sportCode: 'futsal', coverImageUrl: null, entryFee: 0, entryFeeConfigured: false, startsOn: '2026-09-01T00:00:00.000Z', endsOn: '2026-10-20T00:00:00.000Z', teamIds: ['t1'], fixtures: [] },
     } as never);
     useV1LeagueMatchStandingsMock.mockReturnValue({
       data: {

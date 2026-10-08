@@ -110,3 +110,48 @@ describe('리그 QA 시드의 복제값 고정', () => {
     );
   });
 });
+
+describe('leagueMirrorCreateData — 시즌 승계(inherited)', () => {
+  const base = {
+    id: 'lg-next',
+    title: '2시즌',
+    sportId: 'sport-1',
+    regionId: 'region-1',
+    state: 'draft' as const,
+    startsOn: new Date('2026-11-01T00:00:00.000Z'),
+    endsOn: new Date('2027-01-31T00:00:00.000Z'),
+    seriesId: 'series-1',
+    tier: 1,
+    seasonNo: 2,
+    sportCode: 'futsal',
+    createdAt: new Date('2026-10-08T00:00:00.000Z'),
+  };
+  const inherited = {
+    coverImageUrl: '/uploads/2026/10/cover.webp',
+    entryFee: 70000,
+    bankName: '국민은행',
+    bankAccount: '123-456-789012',
+    bankHolder: '팀밋',
+  };
+
+  it('inherited 가 있으면 이미지·참가비·계좌만 싣고 설정 시각은 싣지 않는다', () => {
+    const data = leagueMirrorCreateData({ ...base, inherited });
+    expect(data).toMatchObject(inherited);
+    expect(data).not.toHaveProperty('entryFeeConfiguredAt');
+  });
+
+  it('inherited 가 없으면 승계 컬럼 키가 아예 없다(DB 기본값: 0원·null)', () => {
+    const data = leagueMirrorCreateData(base);
+    for (const key of ['coverImageUrl', 'entryFee', 'bankName', 'bankAccount', 'bankHolder', 'entryFeeConfiguredAt']) {
+      expect(data).not.toHaveProperty(key);
+    }
+  });
+
+  it('직전 시즌이 0원·이미지 없음이었다면 그 값(0, null)을 그대로 싣는다', () => {
+    const data = leagueMirrorCreateData({
+      ...base,
+      inherited: { coverImageUrl: null, entryFee: 0, bankName: null, bankAccount: null, bankHolder: null },
+    });
+    expect(data).toMatchObject({ entryFee: 0, coverImageUrl: null, bankName: null });
+  });
+});

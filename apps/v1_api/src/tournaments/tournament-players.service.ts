@@ -26,6 +26,7 @@ import {
 } from './tournament-player-jersey';
 import { ALL_COMPETITION_KINDS, findTournamentOnSurface } from './tournament-surface-lookup';
 import { competitionTeamTargets, enqueueRosterResync } from '../games/roster/roster-resync-events';
+import { endsWithFinalConsonant } from '../common/korean-josa';
 
 /**
  * 명단 표면은 **대회와 리그를 함께** 받는다.
@@ -1357,15 +1358,20 @@ export function evaluateRosterCandidate(input: {
 
   const { realName, birthDate, phone, gender, phoneVerifiedAt } = input.member;
   const requiresGender = input.genderCategory === 'mixed';
-  if (!realName || !birthDate || !phone || (requiresGender && !gender)) {
+  // 무엇이 빠졌는지와 누가 어디서 채우는지를 함께 말한다 — "모두 등록된 팀원만" 만으로는 운영자가
+  // 어떤 칸이 비었는지, 그 칸은 팀원 본인만 채울 수 있다는 것을 알 수 없어 막힌 채로 남았다.
+  const missing = [
+    !realName ? '실명' : null,
+    !birthDate ? '생년월일' : null,
+    !phone ? '휴대폰 번호' : null,
+    requiresGender && !gender ? '성별' : null,
+  ].filter((label): label is string => label !== null);
+  if (missing.length > 0) {
+    const fields = missing.join('·');
     return {
       code: 'PLAYER_REQUIRED_PROFILE_MISSING',
-      message: requiresGender
-        ? '실명, 생년월일, 휴대폰 번호, 성별이 모두 등록된 팀원만 선수로 등록할 수 있어요.'
-        : '실명, 생년월일, 휴대폰 번호가 모두 등록된 팀원만 선수로 등록할 수 있어요.',
-      listReason: requiresGender
-        ? '실명·생년월일·휴대폰·성별이 모두 필요해요'
-        : '실명·생년월일·휴대폰이 모두 필요해요',
+      message: `이 팀원의 프로필에 ${fields}${endsWithFinalConsonant(fields) ? '이' : '가'} 없어 선수로 등록할 수 없어요. 팀원이 마이 > 프로필 수정에서 입력하면 등록할 수 있어요.`,
+      listReason: `${fields} 미입력`,
       conflict: false,
     };
   }
@@ -1388,7 +1394,7 @@ export function evaluateRosterCandidate(input: {
   if (input.phoneEnforced && !phoneVerifiedAt) {
     return {
       code: 'PLAYER_PHONE_NOT_VERIFIED',
-      message: '휴대폰 본인인증을 마친 팀원만 선수로 등록할 수 있어요.',
+      message: '휴대폰 본인인증을 마친 팀원만 선수로 등록할 수 있어요. 팀원이 마이 > 프로필 수정에서 휴대폰 인증을 마치면 등록할 수 있어요.',
       listReason: '휴대폰 본인인증이 필요해요',
       conflict: false,
     };

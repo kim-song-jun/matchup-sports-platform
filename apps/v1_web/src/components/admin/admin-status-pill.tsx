@@ -227,6 +227,11 @@ export const STATUS_META: Record<string, StatusMeta> = {
     tone: 'amber',
     icon: <PauseCircle size={12} aria-hidden="true" />,
   },
+  league_on_hold: {
+    label: leagueStateLabel('on_hold'),
+    tone: 'amber',
+    icon: <PauseCircle size={12} aria-hidden="true" />,
+  },
 
 };
 
@@ -264,6 +269,7 @@ const LEAGUE_STATE_PILL_KEY: Record<LeagueStateKey, string> = {
   draft: 'draft',
   active: 'in_progress',
   completed: 'completed',
+  on_hold: 'league_on_hold',
 };
 
 export function AdminLeagueStatePill({ state }: { state: LeagueStateKey }) {

@@ -2,10 +2,24 @@
 
 ## Read Endpoints
 
-Regular league publication is independently controlled by `V1Tournament.isPublic`.
-Unpublished leagues are excluded from unified public tournament reads, including
-direct detail and overall standings, while admin operations remain available.
-The default is public; this gate does not change lifecycle or bracket publication.
+Publication of both regular tournaments and regular leagues is independently
+controlled by `V1Tournament.isPublic` (default `true`). Unpublished competitions are
+excluded from public tournament lists (every `kind`), direct detail, overall standings,
+schedule, match detail, player records, public reviews and published campaigns
+(`GET /tournaments/:id/announcements/me` returns `404 TOURNAMENT_NOT_FOUND` unless the
+caller has an active registration; active participants keep their audience-scoped
+announcements), and
+their fixtures are excluded from public team/user records, profile activity counts
+and the public game record. Admin operations remain available, and the gate does not
+change lifecycle, registrations, fixtures or bracket publication.
+
+`PATCH /api/v1/admin/tournaments/:tournamentId/visibility` accepts only
+`{ "isPublic": boolean }` (same validation as the league endpoint — non-boolean JSON
+values return `400`) and returns `{ tournamentId, isPublic }`. It requires an active
+mutation administrator, is a no-op without audit when the value is unchanged, records
+`tournament.visibility` in the admin audit otherwise, and returns
+`409 TOURNAMENT_VERSION_CONFLICT` if a concurrent request changed the value first.
+The admin tournament detail includes `isPublic`.
 See [the league visibility contract](./league-matches.md#public-visibility).
 
 | Method | Path | Auth | Request | Response |
@@ -119,6 +133,16 @@ Campaign admin routes inherit `V1AuthGuard`. Production accepts only the signed 
 
 Admin-created tournaments require `teamCount` per tournament. The API does not treat an omitted team count as unlimited; missing `teamCount` is rejected with `400 TOURNAMENT_TEAM_COUNT_REQUIRED`. Public capacity, registration blocking, and progress bars must use the saved tournament `teamCount`, not a hard-coded default.
 
+경기 시간(피리어드): `GET /api/v1/admin/competition-configs/lineup-size-options?sportId=` 응답의 `defaultPeriods`(`[{ label, durationMinutes }]`, 연장 제외)가 종목 기본값이다 — 축구 전반 45·후반 45, 풋살 20·20, 미지원 종목 `[]`. 생성 마법사는 이 값을 채워 두고 전·후반 또는 단판(피리어드 1개)으로 고칠 수 있게 하며, 고친 경우에만 대회 생성/수정 직후 `PATCH /api/v1/admin/tournaments/:tournamentId/periods`(피리어드 설정)로 저장한다. 생성 API 자체는 종목 기본 피리어드로 만든다.
+
+초안 재저장: `PATCH /api/v1/admin/tournaments/:tournamentId`에 출전 인원·교체 정책을 다시 보내거나 변경해도 현재 고정된 설정의 피리어드·이벤트·결과·순위·공개 정책은 유지한다. 별도 이름으로 등록한 설정도 현재 종목/이름 계열에서 동일 버전을 재사용하고, 실제 라인업 변경은 같은 계열의 다른 섹션을 보존한 불변 새 버전으로 처리한다. 기존 v1 설정에서 `lineup.positions/formations` 키가 없으면 버전 쓰기도 부재를 유지한다(읽기 응답은 `[]`로 정규화). 명시적으로 잘못된 포지션/대형 목록의 검증은 그대로 적용한다. 생성 마법사는 피리어드 PATCH 성공 전에는 공개 확인·접수 시작을 허용하지 않는다. 실패 시 초안 ID와 입력을 유지하며 같은 초안에서 재시도한다.
+
+출전 인원·교체 설정만 보내는 PATCH도 제목 등 다른 필드가 필요하지 않다. 동일 설정 재저장에도 원자적 CAS와 감사 로그를 적용하고 새 `updatedAt`을 반환한다. 후속 요청은 이 버전을 사용해야 하며 이전 버전은 `409 TOURNAMENT_VERSION_CONFLICT`로 거절한다.
+
+경기 종료 시각 기본값: 대회·리그 대진을 만들거나 일정을 옮길 때 종료 시각(`endAt`)을 받지 않았으면 **시작 + 그 경기가 쓰는 경기 설정의 정규 시간**(연장 제외 피리어드 합계 — 전·후반이면 둘의 합, 단판이면 그 한 피리어드)으로 채운다. 길이를 아는 경기를 옮기면 기존 길이를 그대로 옮긴다. 피리어드 길이를 모르는 레거시 설정(`{ count }`)이면 지어내지 않고 `null` 로 둔다.
+
+종료 시각이 없는 기존 대진을 장소·번호만 PATCH해 기본 종료가 보충되는 경우에도 같은 트랜잭션에서 양 팀 캘린더의 종료 시각을 함께 갱신한다. 시작 시각 변경 여부와 무관하게 경기와 팀 일정의 시간 계약을 유지한다.
+
 ## Competition Configuration
 
 | Method | Path | Auth | Request | Response |
@@ -191,6 +215,10 @@ Tournament promo cards are separate from prize fields and from the normal tourna
 
 Tournament announcement `audience` values are `public`, `all_registered`, `confirmed_only`, and `waitlist`. `public` means the announcement is visible on public tournament detail to logged-out users as soon as it is published. Public tournament detail (`GET /api/v1/tournaments/:tournamentId`) returns only announcements where `audience=public` and `publishedAt` is not null; team-scoped announcement values are retained for admin operations and targeted follow-up delivery.
 
+## Entry fee configured flag
+
+The list (`GET /api/v1/tournaments`) and detail (`GET /api/v1/tournaments/:tournamentId`) responses include `entryFeeConfigured: boolean`. For regular leagues it is `entryFeeConfiguredAt != null` — `false` means the fee has not been set yet and clients must not show `entryFee: 0` as "무료". For regular tournaments it is always `true`. `entryFee` keeps its numeric type, and bank account fields are not part of either response. Registration screens read the amount from the registration's own `payment.amount` (the snapshot at submit time), not from the tournament's current `entryFee`.
+
 ## Registration Endpoints
 
 | Method | Path | Auth | Request | Response |
@@ -255,7 +283,7 @@ The service reads the selected member's profile and phone from the team membersh
 - `profile.birthDate`
 - `user.phone`
 
-If any required source field is missing, the API rejects the request with `400 PLAYER_REQUIRED_PROFILE_MISSING`.
+If any required source field is missing, the API rejects the request with `400 PLAYER_REQUIRED_PROFILE_MISSING`. The message names exactly the missing fields and where they are filled (for example `이 팀원의 프로필에 생년월일·휴대폰 번호가 없어 선수로 등록할 수 없어요. 팀원이 마이 > 프로필 수정에서 입력하면 등록할 수 있어요.`), and the candidate list reason is `<fields> 미입력`. `PLAYER_PHONE_NOT_VERIFIED` likewise tells the member to finish phone verification in profile edit.
 
 The stored roster snapshot uses the server-side member profile values for `realName`, `birthDateSnapshot`, and nullable `genderSnapshot`; clients must not treat editable form values as the source of truth. Gender accepts the profile contract values `male` and `female`. A `mixed` tournament requires a profile gender when a player is added; missing gender is rejected with `400 PLAYER_REQUIRED_PROFILE_MISSING`. Legacy or non-mixed roster snapshots may still be `null` and are shown as `미등록`.
 

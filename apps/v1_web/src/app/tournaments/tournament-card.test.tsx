@@ -20,6 +20,7 @@ function buildItem(overrides: Partial<V1TournamentListItem> = {}): V1TournamentL
     teamCount: 16,
     genderCategory: 'mixed',
     entryFee: 0,
+    entryFeeConfigured: true,
     prizePool: null,
     prizeSummary: null,
     prizeBreakdown: null,
@@ -300,5 +301,38 @@ describe('TournamentCard — 모집 상태와 하단 정보', () => {
     expect(screen.getByText('무료', { exact: true })).toBeInTheDocument();
     expect(screen.getByText('확인대기 5팀', { exact: true })).toBeInTheDocument();
     expect(screen.queryByText(/입금대기/)).not.toBeInTheDocument();
+  });
+});
+
+describe('TournamentCard — 참가비 표시', () => {
+  it('미설정 리그는 "무료" 도 참가비 블록도 그리지 않고, 정원 요약은 남는다', () => {
+    render(
+      <TournamentCard
+        item={buildItem({ kind: 'regular_league', entryFee: 0, entryFeeConfigured: false, teamCount: 8, confirmedCount: 3 })}
+      />,
+    );
+
+    const footer = screen.getByTestId('tournament-card-footer');
+    expect(footer).not.toHaveTextContent('참가비');
+    expect(footer).not.toHaveTextContent('무료');
+    expect(footer).toHaveTextContent('3/8팀 확정');
+  });
+
+  it('설정된 리그는 금액을, 0원 확정이면 "무료" 를 그린다', () => {
+    const { rerender } = render(
+      <TournamentCard item={buildItem({ kind: 'regular_league', entryFee: 80000, entryFeeConfigured: true })} />,
+    );
+    expect(screen.getByTestId('tournament-card-footer')).toHaveTextContent('참가비80,000원');
+
+    rerender(<TournamentCard item={buildItem({ kind: 'regular_league', entryFee: 0, entryFeeConfigured: true })} />);
+    expect(screen.getByTestId('tournament-card-footer')).toHaveTextContent('참가비무료');
+  });
+
+  it('대조군: 대회는 무료든 유료든 참가비를 그대로 그린다', () => {
+    const { rerender } = render(<TournamentCard item={buildItem({ kind: 'regular_tournament', entryFee: 0 })} />);
+    expect(screen.getByTestId('tournament-card-footer')).toHaveTextContent('참가비무료');
+
+    rerender(<TournamentCard item={buildItem({ kind: 'regular_tournament', entryFee: 30000 })} />);
+    expect(screen.getByTestId('tournament-card-footer')).toHaveTextContent('참가비30,000원');
   });
 });

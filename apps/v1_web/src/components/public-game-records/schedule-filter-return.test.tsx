@@ -62,7 +62,7 @@ beforeEach(() => {
  __resetNavigationHistoryForTests(); window.sessionStorage.clear(); window.localStorage.clear();
  window.history.replaceState({qaMarker:'keep'},'',`${bracketPath}?from=%2Ftournaments%3Fq%3Dleague`);
  navigation.snapshot=null; vi.clearAllMocks(); client=new QueryClient({defaultOptions:{queries:{retry:false}}});
- vi.mocked(useV1LeagueMatch,{partial:true}).mockReturnValue({data:{leagueId:'league-one',title:'검증 리그',state:'completed',teamIds:[],startsOn:'2026-08-01',endsOn:'2026-08-02',registrationDeadlineAt:null,registrationOpen:false,seriesSiblings:[],fixtures:[{teamMatchId:'fixture-one',title:'검증 경기',homeTeamId:'team-home',awayTeamId:'team-away',startAt:'2026-08-01T10:00:00.000Z',placeName:'합성 경기장',status:'completed',homeScore:1,awayScore:0}]},isError:false});
+ vi.mocked(useV1LeagueMatch,{partial:true}).mockReturnValue({data:{leagueId:'league-one',title:'검증 리그',state:'completed',teamIds:[],startsOn:'2026-08-01',endsOn:'2026-08-02',registrationDeadlineAt:null,registrationOpen:false,sportCode:'futsal',coverImageUrl:null,entryFee:0,entryFeeConfigured:false,seriesSiblings:[],fixtures:[{teamMatchId:'fixture-one',title:'검증 경기',homeTeamId:'team-home',awayTeamId:'team-away',startAt:'2026-08-01T10:00:00.000Z',placeName:'합성 경기장',status:'completed',homeScore:1,awayScore:0}]},isError:false});
  vi.mocked(useV1LeagueMatchStandings,{partial:true}).mockReturnValue({data:{leagueId:'league-one',tier:null,tierLabel:null,tieBreakOrder:['points'],standings:[],pendingFixtures:[],champions:[],cancelledFixtureCount:0,promotionDecided:false,promotionForecast:null,tieBreakGroups:[]},isError:false});
  vi.mocked(useV1TeamMatch,{partial:true}).mockReturnValue({data:undefined,isPending:false,isError:false});
  vi.mocked(useV1ResolveChatRoom,{partial:true}).mockReturnValue({mutate:vi.fn(),isPending:false});
@@ -125,6 +125,7 @@ function makeTournament(overrides: Partial<V1TournamentDetail> & Pick<V1Tourname
     genderMinFemale: null,
     genderMaxFemale: null,
     entryFee: 0,
+    entryFeeConfigured: true,
     prizePool: null,
     prizeSummary: null,
     prizeBreakdown: null,

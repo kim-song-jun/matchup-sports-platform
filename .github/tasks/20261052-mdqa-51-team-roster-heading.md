@@ -51,6 +51,7 @@ managed WT는 즉시 fetch origin/dev9edd47d07606e5920cd28f1cd80b70e88857278a �
 | 2026-10-08 | Report51 | 로딩/실경기/모바일? | 원문범위밖. 현재consumer/adjacentpattern 계약을 조사하고 좁은회귀로 보완. |
 
 ## Progress Snapshot
+- Root committed540479638: 신규heading15+기존roster17=32/32 PASS, 웹 TypeScript·기존 패턴 게이트 PASS. 명시5경로 commit·Changeset·tracked import·diff --check 확인 완료. 신규 UI는 실제 route 팀 정보와 기존 인접 관리 header를 재사용한다. 최종 dev drift 통합·exacthead 독립 리뷰·PR/원문 댓글·수정 SHA 배포 후 alpha 검증은 후속 단계다.
 - WT C:/Users/kinso/.codex/worktrees/mdqa-51-team-roster-heading/matchup-sports-platform; branch fix/mdqa-51-team-roster-heading; base9edd47d07606e5920cd28f1cd80b70e88857278a.
 - 원 checkout0550/report51-detail-before-claim.txt, report51-claimed.txt/png. root17:36KST UI 선점 확인.
 - Phase B 최소 구현과 좁은 RED/GREEN 완료, root serial slot 반환. Phase C Changeset·committed-tree/type/pattern 검증·독립 리뷰·dev PR·원문 댓글·alpha after는 root 담당으로 남아 있다.

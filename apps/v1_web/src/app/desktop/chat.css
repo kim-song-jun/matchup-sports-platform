@@ -137,6 +137,7 @@
     display: none;
   }
 
+  /* '고정' 배지 전용 — 데스크톱은 고정 여부를 오른쪽 버튼으로 보여 준다. 다른 상태 배지에 붙이면 데스크톱에서 사라진다. */
   .tm-chat-pinned-badge {
     display: none;
   }

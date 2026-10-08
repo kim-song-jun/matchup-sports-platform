@@ -55,11 +55,11 @@ import { endsWithFinalConsonant } from '../common/korean-josa';
 /** 팀 명단 관리 권한 — 명단 편집과 선수 개인정보(실명·생년월일·성별) 열람이 같은 선에서 갈린다. */
 const ROSTER_MANAGEMENT_ROLES: readonly V1TeamMembershipRole[] = ['owner', 'manager'];
 
-/** 팀별 명단 CSV 의 선수 열. */
-const PLAYER_CSV_HEADER = 'realName,birthDate,gender,eligibility,nickname,jerseyNumber';
+/** 팀별 명단 CSV 의 선수 열. 기존 열 위치를 유지하고 전화번호를 마지막에 붙인다. */
+const PLAYER_CSV_HEADER = 'realName,birthDate,gender,eligibility,nickname,jerseyNumber,phone';
 
 /** 전체 명단 CSV(운영자가 엑셀로 여는 파일)의 팀 블록 머리글. */
-const FULL_ROSTER_CSV_HEADER = '순번,등번호,이름,생년월일,성별,선출 여부,닉네임,비고';
+const FULL_ROSTER_CSV_HEADER = '순번,등번호,이름,생년월일,성별,선출 여부,닉네임,비고,전화번호';
 
 // 전체 명단 CSV 의 값 라벨 — 어드민 화면과 같은 말을 쓴다. 신청 상태는 신청 카드의 상태 배지
 // (`components/admin/admin-status-pill.tsx`), 선출 여부·성별은 명단 검토 모달
@@ -86,6 +86,19 @@ const KST_MINUTE = new Intl.DateTimeFormat('sv-SE', {
   minute: '2-digit',
   hour12: false,
 });
+
+/**
+ * 명단 CSV 의 전화번호 칸 — 어드민 명단 화면(`formatPhoneNumber`)과 같은 하이픈 표기.
+ * 저장값 `01012345678` 을 그대로 쓰면 엑셀이 숫자로 읽어 앞 0 을 지운다. 탈퇴 회원은 번호 자리에
+ * `deleted-<id>` 가 남아 있으므로(어드민 계정 삭제) 빈칸. 번호가 없어도 빈칸.
+ */
+function rosterCsvPhone(user: { phone: string | null; deletedAt: Date | null }): string {
+  const phone = user.deletedAt ? '' : (user.phone?.trim() ?? '');
+  const digits = phone.replace(/\D/g, '');
+  if (digits.length === 11) return `${digits.slice(0, 3)}-${digits.slice(3, 7)}-${digits.slice(7)}`;
+  if (digits.length === 10) return `${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6)}`;
+  return phone;
+}
 
 @Injectable()
 export class TournamentPlayersService {
@@ -693,7 +706,7 @@ export class TournamentPlayersService {
 
     const players = await this.prisma.v1TournamentPlayer.findMany({
       where: { registrationId, removedAt: null },
-      include: { user: { select: { profile: { select: { nickname: true } } } } },
+      include: { user: { select: { profile: { select: { nickname: true } }, phone: true, deletedAt: true } } },
       orderBy: { addedAt: 'asc' },
     });
 
@@ -718,8 +731,8 @@ export class TournamentPlayersService {
    * 신청 팀,2팀 · 선수 12명
    *
    * [1] 번개팀 · 참가 확정 · 11명
-   * 순번,등번호,이름,생년월일,성별,선출 여부,닉네임,비고
-   * 1,7,홍길동,1995-03-15,남성,아마추어,번개맨,팀장
+   * 순번,등번호,이름,생년월일,성별,선출 여부,닉네임,비고,전화번호
+   * 1,7,홍길동,1995-03-15,남성,아마추어,번개맨,팀장,010-1234-5678
    *
    * [2] 천둥팀 · 입금 대기 · 명단 미등록
    * ```
@@ -749,7 +762,7 @@ export class TournamentPlayersService {
         team: { select: { name: true, ownerUserId: true } },
         players: {
           where: { removedAt: null },
-          include: { user: { select: { profile: { select: { nickname: true } } } } },
+          include: { user: { select: { profile: { select: { nickname: true } }, phone: true, deletedAt: true } } },
           // 등번호 순(없으면 뒤) → 같은 번호·번호 없음은 팀이 넣은 순서.
           orderBy: [{ jerseyNumber: { sort: 'asc', nulls: 'last' } }, { addedAt: 'asc' }],
         },
@@ -783,6 +796,7 @@ export class TournamentPlayersService {
             ELIGIBILITY_LABEL[p.eligibilityStatus] ?? p.eligibilityStatus,
             this.escapeCsvField(p.user.profile?.nickname ?? ''),
             p.userId === reg.team.ownerUserId ? '팀장' : '',
+            this.escapeCsvField(rosterCsvPhone(p.user)),
           ].join(','),
         );
       });
@@ -821,7 +835,7 @@ export class TournamentPlayersService {
     genderSnapshot: string | null;
     eligibilityStatus: string;
     jerseyNumber: number | null;
-    user: { profile: { nickname: string } | null };
+    user: { profile: { nickname: string } | null; phone: string | null; deletedAt: Date | null };
   }): string[] {
     return [
       this.escapeCsvField(p.realName),
@@ -829,8 +843,9 @@ export class TournamentPlayersService {
       this.escapeCsvField(p.genderSnapshot ?? ''),
       this.escapeCsvField(p.eligibilityStatus),
       this.escapeCsvField(p.user.profile?.nickname ?? ''),
-      // 정본 §3 "명단은 등번호와 이름" — 뒤에 붙여 기존 열 위치는 그대로 둔다.
+      // 정본 §3 "명단은 등번호와 이름" — 기존 열 위치는 그대로 둔다.
       String(p.jerseyNumber ?? ''),
+      this.escapeCsvField(rosterCsvPhone(p.user)),
     ];
   }
 

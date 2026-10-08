@@ -2647,11 +2647,15 @@ export type V1ChatRoomsFilters = { roomType?: V1ChatRoom['roomType']; status?: '
  * 키는 `chatRooms()` 접두사를 공유하므로 기존 무효화가 필터 버전까지 함께 갱신한다.
  * 채팅 화면은 다른 탭의 개인 고정 변경을 받기 위해 focus 재조회를 명시한다. 홈 등 다른 소비처의 기본 정책은 유지한다.
  */
-export function useV1ChatRooms(options?: QueryOptions & { refetchOnWindowFocus?: boolean | 'always' }, filters?: V1ChatRoomsFilters) {
+export function useV1ChatRooms(
+  options?: QueryOptions & { refetchOnWindowFocus?: boolean | 'always'; staleTime?: number },
+  filters?: V1ChatRoomsFilters,
+) {
   const query = useQuery({
     queryKey: filters ? ([...v1Keys.chatRooms(), 'list', filters] as const) : v1Keys.chatRooms(),
     queryFn: () => v1Get<CursorPage<V1ChatRoom>>('/chat/rooms', filters),
     refetchOnWindowFocus: options?.refetchOnWindowFocus ?? false,
+    ...(options?.staleTime === undefined ? {} : { staleTime: options.staleTime }),
     enabled: options?.enabled ?? true,
   });
   useV1WindowFocusRefetch(query, options?.enabled ?? true, options?.refetchOnWindowFocus ?? false);

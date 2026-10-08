@@ -7,7 +7,7 @@ import type { FormEvent } from 'react';
 import { useV1LeagueMatches, useV1Matches, useV1RecentSearches, useV1RecordSearch, useV1TeamMatches, useV1Teams } from '@/hooks/use-v1-api';
 import type { V1Match, V1Team, V1TeamMatch } from '@/types/api';
 import type { V1PublicLeagueListItem } from '@/types/league-match';
-import { formatTournamentDateRangeShort } from '@/lib/date-utils';
+import { formatTournamentDateRangeShort, formatTournamentDateTimeShort as formatDateTime } from '@/lib/date-utils';
 import { trackEvent } from '@/lib/analytics';
 import { EmptyState, ErrorState } from '@/components/v1-ui/primitives';
 import { AUTH_NOTICE_STAGE } from '@/components/auth/auth-page';
@@ -326,17 +326,4 @@ function toTeamResult(item: V1Team, from: string) {
     meta: [item.sport?.name ?? item.sportName, item.region?.name ?? item.regionName, `${item.memberCount}명`, teamRecruitmentLabel(item)].filter(Boolean).join(' · '),
     href: withFromPath(`/teams/${item.teamId ?? item.id}`, from),
   };
-}
-
-function formatDateTime(value?: string | null) {
-  if (!value) return null;
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return null;
-  return new Intl.DateTimeFormat('ko-KR', {
-    month: 'numeric',
-    day: 'numeric',
-    weekday: 'short',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(date);
 }

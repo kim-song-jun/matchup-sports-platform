@@ -1612,7 +1612,12 @@ function TeamFormPreview({
   );
 }
 
-export function TeamMembersPageView({ model, backHref = '/teams' }: { model: TeamMembersViewModel; backHref?: string }) {
+export function TeamMembersPageView({ model, backHref = '/teams', searchQuery, onSearchQueryChange }: {
+  model: TeamMembersViewModel;
+  backHref?: string;
+  searchQuery?: string;
+  onSearchQueryChange?: (query: string) => void;
+}) {
   const canManageMembers = isTeamOperatorRole(model.viewerRole);
   const visibleTabs = model.tabs.filter((tab) => tab.key === 'members' || canManageMembers);
   return (
@@ -1650,7 +1655,7 @@ export function TeamMembersPageView({ model, backHref = '/teams' }: { model: Tea
           </div>
         ) : null}
         {!canManageMembers || model.activeTab === 'members' ? (
-          <TeamMembersSection members={model.members} loading={model.membersLoading} />
+          <TeamMembersSection members={model.members} loading={model.membersLoading} searchQuery={searchQuery} onSearchQueryChange={onSearchQueryChange} />
         ) : model.activeTab === 'requests' ? (
           <JoinRequestSection model={model} />
         ) : model.invitations ? (

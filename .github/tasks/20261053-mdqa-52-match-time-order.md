@@ -39,12 +39,17 @@ Given 종료가 시작 이하인 입력, When 다음/최종 제출, Then 명확�
 인증·권한·API 저장 계약을 변경하지 않는다. .env/비밀을 읽거나 출력하지 않는다. 실제 alpha 최종 생성/신청/결제는 실행하지 않는다.
 
 ## Risks & Dependencies
-개인 매치에는 종료 날짜/익일 UI가 없으므로 임의 익일 보정하지 않는다. alpha after는 dev 머지·정확한 배포 SHA 후 검증해야 하며 코드 PASS로 대체하지 않는다.
+종료 날짜는 선택 입력이며 비워 둔 기존 초안은 시작 날짜와 같은 날로 검증한다. 역전 시각으로 익일을 추론하지 않고 사용자가 명시한 날짜나 실제 서버 종료 날짜만 보존한다. alpha after는 dev 머지·정확한 배포 SHA 후 검증해야 하며 코드 PASS로 대체하지 않는다.
 
 ## Ambiguity Log
 보고 당시 서빙 SHA 미확인, 모바일 미검증. 현재 API/controller/service 시간 계약을 읽고 same-day 규칙을 확정한다. 전체 폼 디자인 재설계는 범위 밖이다.
 
 ## Progress Snapshot
+- 실제 external 후속: OPEN PR1675 head `7d7`의 Codex thread `PRRT_kwDORrML2s6qTy4h` / REST4217718555를 현재 service·GET edit·draft mapper·RULES·payload와 대조했다. API는 full ISO 종료가 시작보다 늦으면 익일 종료도 허용하지만 draft mapper가 종료 날짜를 버리고 검증이 시작 날짜를 다시 붙여 유효한 23:00→익일01:00 수정을 막았다. production 유지 상태의 actual GET→hydrate→무변경/제목 수정 consumer2가 실제 장소시간 단계에서 차단되는 RED2/2(4.36s)를 확인했다. 증거 `tmp/qa/mdqa-52/red-explicit-end-date.txt`, client spec에 `--maxWorkers=1 --fileParallelism=false -t 'API 유효 익일 종료 매치'`.
+- Root는 A 기존 `CreateField` 종료 날짜 선택 입력을 승인했다. B datetime-local 통합은 입력 구조 변경이 크고 C 읽기전용 날짜 보존은 날짜 정정이 불가능하므로 최소 A를 선택했다. exact source scope는 local `matches.types.ts` optional endDate, client 기본값/실제 종료 날짜 hydrate, validation/ISO payload, 기존 CreateField와 확인 화면의 종료 날짜 표시다. 공용 API types/hooks/MSW/서버 계약은 변경하지 않았다.
+- 종료 날짜는 입력·복원된 실제 값만 사용하고, 생략된 과거 초안은 기존 시작 날짜로 검증한다. `HH:mm` 00–23/00–59 보호와 달력 날짜 round-trip 검사로 24:00/11:60/2월30일/잘못된 달을 차단한다. 날짜만 입력하면 종료 시간도 요구하며 손상 날짜를 시작 날짜나 익일로 대체하지 않는다. UI 전용 endDate/endTime은 POST/PATCH에 보내지 않는다.
+- 후속 local GREEN61/61(consumer31+validation30, 21.09s): 기존50 전부 유지+consumer5·validation6. actual GET의 익일 매치를 무변경 또는 제목 수정 후 원 ISO로 PATCH하고 이전 이동 시 표시 날짜를 유지하며, 사용자가 명시한 익일 날짜 생성과 확인/POST, 손상된 저장 날짜의 오류·수정 링크/POST 없음, 명시적 same-day 역전·날짜만 입력 차단을 확인했다. 증거 `tmp/qa/mdqa-52/green-explicit-end-date.txt`, 기존 2파일 1worker 명령. 새로운 helper/import는 local 소스만 사용한다.
+- 후속 preflight CPU39%, free physical10640MiB/virtual22880MiB, Node78/browser7, Docker daemon 없음, alpha landing HEAD200. 모든 테스트 process exit와 MSW·QueryClient·scroll stub·env·navigation/overlay cleanup 완료, serial slot 반환. tsc/fullsuite/Git/브라우저/서버 실행 없음. root committed/type·독립 재리뷰·PR·tracker·alpha gate 대기이며 기존 RED/GREEN50과 리뷰 이력은 아래에 보존한다.
 - Dedicated worktree: `C:/Users/kinso/.codex/worktrees/mdqa-52-match-time-order/matchup-sports-platform`.
 - Branch: `fix/mdqa-52-match-time-order`; fresh origin/dev base `016847e36093e775de71dd16e059d902df39602f`.
 - Phase: 최소 production 수정 및 local narrow GREEN 완료. root committed/type·독립 리뷰·PR·tracker·alpha 검증 대기; dev 머지·실측 완료로 간주하지 않는다.

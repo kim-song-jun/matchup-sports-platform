@@ -262,7 +262,8 @@ describe('개인 매치 종료 시간 — 실제 화면과 API 제출 계약', (
   const apiBase = 'http://localhost/api/v1';
   const postBodies: unknown[] = [];
   const patchBodies: unknown[] = [];
-  let editEndAt: null | undefined;
+  let editEndAt: string | null | undefined;
+  let editStartAt: string;
   const server = setupServer(
     http.get(`${apiBase}/master/sports`, () => HttpResponse.json({ data: [{ id: 'sport-futsal', code: 'futsal', name: '풋살', levels: [] }] })),
     http.get(`${apiBase}/master/regions`, () => HttpResponse.json({ data: [
@@ -276,7 +277,7 @@ describe('개인 매치 종료 시간 — 실제 화면과 API 제출 계약', (
       return HttpResponse.json({ data: { matchId: 'match-created', detailRoute: '/matches/match-created' } });
     }),
     http.get(`${apiBase}/matches/match-edit-1/edit`, () => HttpResponse.json({ data: {
-      ...matchEditData, form: { ...matchEditData.form, endsAt: editEndAt },
+      ...matchEditData, form: { ...matchEditData.form, startsAt: editStartAt, endsAt: editEndAt },
     } })),
     http.patch(`${apiBase}/matches/match-edit-1`, async ({ request }) => {
       patchBodies.push(await request.json());
@@ -303,6 +304,8 @@ describe('개인 매치 종료 시간 — 실제 화면과 API 제출 계약', (
     realTimeConsumer.enabled = true;
     postBodies.length = 0;
     patchBodies.length = 0;
+    editStartAt = matchEditData.form.startsAt;
+    editEndAt = undefined;
     queryClient = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
   });
   afterEach(() => {
@@ -413,6 +416,75 @@ describe('개인 매치 종료 시간 — 실제 화면과 API 제출 계약', (
     expect(patchBodies[0]).toMatchObject({ endsAt: null, title: '수정 중인 매치', manualPlaceName: '한강 풋살장' });
     expect(postBodies).toEqual([]);
     await waitFor(() => expect(routerPush).toHaveBeenLastCalledWith('/matches/match-edit-1'));
+  });
+
+  it.each([false, true])('API 유효 익일 종료 매치는 제목 변경 %s에서도 실제 수정 흐름과 PATCH 시각을 보존한다', async (changeTitle) => {
+    const date = seedDraft('');
+    const nextDay = new Date(`${date}T12:00:00`);
+    nextDay.setDate(nextDay.getDate() + 1);
+    const endDate = nextDay.toISOString().slice(0, 10);
+    editStartAt = new Date(`${date}T23:00:00`).toISOString();
+    editEndAt = new Date(`${endDate}T01:00:00`).toISOString();
+    render(<QueryClientProvider client={queryClient}><MatchEditPageClient matchId="match-edit-1" /></QueryClientProvider>);
+    await screen.findByRole('button', { name: '다음' });
+    fireEvent.click(screen.getByRole('button', { name: '다음' }));
+    await waitFor(() => expect(screen.getByLabelText('제목')).toHaveValue('수정 중인 매치'));
+    if (changeTitle) fireEvent.change(screen.getByLabelText('제목'), { target: { value: '밤 매치 제목 정정' } });
+    fireEvent.click(screen.getByRole('button', { name: '다음' }));
+    expect(screen.getByLabelText('시작 시간')).toHaveValue('23:00');
+    expect(screen.getByLabelText('종료 시간')).toHaveValue('01:00');
+    fireEvent.click(screen.getByRole('button', { name: '다음' }));
+    expect(screen.getByRole('button', { name: '변경사항 저장' })).toBeVisible();
+    expect(screen.getByText(`${date} 23:00-${endDate} 01:00`)).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: '이전' }));
+    expect(screen.getByLabelText('종료 날짜')).toHaveValue(endDate);
+    fireEvent.click(screen.getByRole('button', { name: '다음' }));
+    expect(screen.getByRole('button', { name: '변경사항 저장' })).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: '변경사항 저장' }));
+
+    await waitFor(() => expect(patchBodies).toHaveLength(1));
+    expect(patchBodies[0]).toMatchObject({ startsAt: editStartAt, endsAt: editEndAt, title: changeTitle ? '밤 매치 제목 정정' : '수정 중인 매치' });
+    expect(patchBodies[0]).not.toHaveProperty('endDate');
+    expect(patchBodies[0]).not.toHaveProperty('endTime');
+    expect(postBodies).toEqual([]);
+    await waitFor(() => expect(routerPush).toHaveBeenLastCalledWith('/matches/match-edit-1'));
+  });
+
+  it('사용자가 종료 날짜를 명시적으로 고르면 익일 종료를 확인 화면과 생성 POST에서 보존한다', async () => {
+    const date = seedDraft('09:00');
+    const nextDay = new Date(`${date}T12:00:00`);
+    nextDay.setDate(nextDay.getDate() + 1);
+    const endDate = nextDay.toISOString().slice(0, 10);
+    const view = renderStep('place-time');
+    await waitFor(() => expect(screen.getByLabelText('지역')).toHaveValue('region-gangnam'));
+    expect(screen.getByLabelText('종료 날짜')).toHaveValue('');
+    fireEvent.change(screen.getByLabelText('종료 날짜'), { target: { value: endDate } });
+    fireEvent.click(screen.getByRole('button', { name: '다음' }));
+    expect(routerPush).toHaveBeenCalledWith('/matches/new/confirm');
+    view.unmount();
+    renderStep('confirm');
+    expect(await screen.findByText(`${date} 10:00-${endDate} 09:00`)).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: '매치 만들기' }));
+
+    await waitFor(() => expect(postBodies).toHaveLength(1));
+    expect(postBodies[0]).toMatchObject({ startsAt: new Date(`${date}T10:00:00`).toISOString(), endsAt: new Date(`${endDate}T09:00:00`).toISOString() });
+    expect(postBodies[0]).not.toHaveProperty('endDate');
+    expect(postBodies[0]).not.toHaveProperty('endTime');
+    await waitFor(() => expect(routerPush).toHaveBeenLastCalledWith('/matches/match-created'));
+  });
+
+  it.each(['not-a-date', '2099-02-30'])('손상된 종료 날짜 %s를 복원한 확인 화면은 날짜 오류와 수정 링크를 표시하고 POST하지 않는다', async (endDate) => {
+    const date = seedDraft('11:00');
+    writeExpiringDraft('teameet:v1:match-draft', { title: '시간 검증 매치', venue: '한강 풋살장', date, startTime: '10:00', endTime: '11:00', endDate });
+    renderStep('confirm');
+    await screen.findByText('서울 강남구');
+    fireEvent.click(screen.getByRole('button', { name: '매치 만들기' }));
+    await screen.findByRole('button', { name: '매치 만들기' });
+
+    expect(postBodies).toEqual([]);
+    expect(screen.getByRole('link', { name: /종료 날짜를 확인해 주세요/ })).toHaveAttribute('href', '/matches/new/place-time');
+    expect(routerPush).not.toHaveBeenCalled();
+    expect(readExpiringDraft('teameet:v1:match-draft')).toMatchObject({ endDate, endTime: '11:00' });
   });
 });
 

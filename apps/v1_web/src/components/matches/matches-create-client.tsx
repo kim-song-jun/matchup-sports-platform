@@ -622,6 +622,7 @@ function buildDefaultDraft(): MatchDraft {
     date: '',
     startTime: '',
     endTime: '',
+    endDate: '',
     deadlineDate: '',
     deadlineTime: '',
   };
@@ -690,6 +691,7 @@ export function draftFromMatchEdit(edit: V1MatchEdit): MatchDraft {
     date: toDateInput(start),
     startTime: toTimeInput(start),
     endTime: end ? toTimeInput(end) : '',
+    endDate: end ? toDateInput(end) : '',
     deadlineDate: deadline ? toDateInput(deadline) : '',
     deadlineTime: deadline ? toTimeInput(deadline) : '',
   };

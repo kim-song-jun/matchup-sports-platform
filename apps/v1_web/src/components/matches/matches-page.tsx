@@ -1321,6 +1321,7 @@ function PlaceTimeFields({ model }: { model: MatchCreateViewModel }) {
         <CreateField id="field-startTime" error={errors?.startTime} label="시작 시간" value={draft.startTime} type="time" onChange={(value) => model.form?.onFieldChange('startTime', value)} />
         <CreateField id="field-endTime" error={errors?.endTime} label="종료 시간" value={draft.endTime} type="time" onChange={(value) => model.form?.onFieldChange('endTime', value)} />
       </div>
+      <CreateField id="field-endDate" error={errors?.endDate} label="종료 날짜" value={draft.endDate ?? ''} type="date" description="비워두면 시작 날짜와 같아요." onChange={(value) => model.form?.onFieldChange('endDate', value)} />
       <div className="tm-create-two-col">
         <CreateField id="field-deadlineDate" error={errors?.deadlineDate} label="신청 마감일" value={draft.deadlineDate} type="date" onChange={(value) => model.form?.onFieldChange('deadlineDate', value)} />
         <CreateField id="field-deadlineTime" error={errors?.deadlineTime} label="신청 마감시간" value={draft.deadlineTime} type="time" onChange={(value) => model.form?.onFieldChange('deadlineTime', value)} />
@@ -1348,7 +1349,9 @@ function ConfirmStep({ model }: { model: MatchCreateViewModel }) {
   const draft = model.draft;
   const regionName = model.form?.regions.find((region) => region.id === model.form?.regionId)?.name ?? '지역 선택 필요';
   const deadlineText = draft.deadlineDate && draft.deadlineTime ? `${draft.deadlineDate} ${draft.deadlineTime}` : '경기 시작 전까지';
-  const timeRangeText = draft.endTime ? `${draft.date} ${draft.startTime}-${draft.endTime}` : `${draft.date} ${draft.startTime}`;
+  const endDate = draft.endDate || draft.date;
+  const endText = endDate === draft.date ? draft.endTime : `${endDate} ${draft.endTime}`;
+  const timeRangeText = draft.endTime ? `${draft.date} ${draft.startTime}-${endText}` : `${draft.date} ${draft.startTime}`;
   return <div><h1 className="tm-text-heading">입력한 내용을 확인해 주세요</h1><Card pad={0} style={{ marginTop: 16, overflow: 'hidden' }}><div className="tm-create-image-preview" style={{ backgroundImage: cssUrl(draft.image) }} /><div style={{ padding: 16 }}><div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}><span className="tm-badge tm-badge-blue">{model.selectedSport}</span><span className="tm-badge tm-badge-grey">{draft.minLevel}-{draft.maxLevel}</span><span className="tm-badge tm-badge-grey">{matchGenderRuleLabel(draft.gender)}</span></div><div className="tm-text-subhead" style={{ marginTop: 12 }}>{draft.title}</div><div className="tm-text-caption" style={{ marginTop: 8 }}>{draft.description}</div></div></Card><Card pad={16} style={{ marginTop: 12 }}><InfoRow label="지역" value={regionName} sub="검색·추천에 사용돼요" /><InfoRow label="일시" value={timeRangeText} /><InfoRow label="신청 마감" value={deadlineText} /><InfoRow label="장소" value={draft.venue} sub={draft.address} /><InfoRow label="인원" value={`최대 ${draft.capacity}명`} /><InfoRow label="주최자 참가" value={draft.hostParticipates ? '참가해요' : '참가하지 않아요'} sub={draft.hostParticipates ? '주최자도 모집 인원에 포함돼요' : '용병만 모집하고 주최자는 운영만 해요'} />{draft.costNote ? <InfoRow label="참가비" value={draft.costNote} /> : null}<InfoRow label="이미지" value="대표 이미지" sub="목록과 상세 화면에 표시돼요" /></Card></div>;
 }
 

@@ -241,6 +241,7 @@ function DesktopRailSummary({
   selectedTeamId,
   hasManagerTeam,
   isCreating,
+  nextBlocked,
   onNext,
 }: {
   tournament: V1TournamentDetail;
@@ -253,6 +254,7 @@ function DesktopRailSummary({
   selectedTeamId: string;
   hasManagerTeam: boolean;
   isCreating: boolean;
+  nextBlocked: boolean;
   onNext: () => void;
 }) {
   return (
@@ -269,7 +271,7 @@ function DesktopRailSummary({
         <button
           type="button"
           className="tm-btn tm-btn-lg tm-btn-primary [--button-fill-primary:var(--static-blue)] hover:[--button-fill-primary-hover:color-mix(in_srgb,var(--static-blue)_88%,var(--static-black))] tm-btn-block"
-          disabled={!selectedTeamId || !hasManagerTeam || isCreating}
+          disabled={!selectedTeamId || !hasManagerTeam || isCreating || nextBlocked}
           onClick={onNext}
           aria-label="다음 단계: 동의 및 결제 수단 선택"
         >
@@ -313,6 +315,7 @@ function TeamSelectStep({
   onSelectTeam,
   onNext,
   isCreating,
+  nextBlocked,
   cancelHref,
 }: {
   tournament: V1TournamentDetail;
@@ -324,6 +327,7 @@ function TeamSelectStep({
   onSelectTeam: (teamId: string) => void;
   onNext: () => void;
   isCreating: boolean;
+  nextBlocked: boolean;
   cancelHref: string;
 }) {
   const managerTeams = teams.filter((t) => t.role === 'owner' || t.role === 'manager');
@@ -501,7 +505,7 @@ function TeamSelectStep({
           <button
             type="button"
             className="tm-btn tm-btn-lg tm-btn-primary [--button-fill-primary:var(--static-blue)] hover:[--button-fill-primary-hover:color-mix(in_srgb,var(--static-blue)_88%,var(--static-black))]"
-            disabled={!selectedTeamId || !hasManagerTeam || isCreating}
+            disabled={!selectedTeamId || !hasManagerTeam || isCreating || nextBlocked}
             onClick={onNext}
             aria-label="다음 단계: 동의 및 결제수단 선택"
           >
@@ -1767,6 +1771,9 @@ export function TournamentApplyPageClient({ tournamentId }: { tournamentId: stri
 
   const selectedTeam = eligibleTeams.find((t) => t.teamId === selectedTeamId);
   const selectedRegistration = myRegistrations.find((item) => item.teamId === selectedTeamId);
+  // 마감·정원 차단은 새 신청을 만드는 '다음'만 막는다. 이어 진행할 신청(초안·입금 대기 등)은 그대로 열어 둔다.
+  const nextBlocked = Boolean(newRegistrationBlockMessage)
+    && !(selectedRegistration && resolveRegistrationResumeAction(selectedRegistration.status));
 
   function handleSelectTeam(teamId: string) {
     const registration = myRegistrations.find((item) => item.teamId === teamId);
@@ -2001,6 +2008,7 @@ export function TournamentApplyPageClient({ tournamentId }: { tournamentId: stri
                   onSelectTeam={handleSelectTeam}
                   onNext={handleTeamNext}
                   isCreating={isCreating}
+                  nextBlocked={nextBlocked}
                   cancelHref={applyBackHref}
                 />
               </>
@@ -2054,6 +2062,7 @@ export function TournamentApplyPageClient({ tournamentId }: { tournamentId: stri
               selectedTeamId={selectedTeamId}
               hasManagerTeam={managerTeams.length > 0}
               isCreating={isCreating}
+              nextBlocked={nextBlocked}
               onNext={handleTeamNext}
             />
           </aside>

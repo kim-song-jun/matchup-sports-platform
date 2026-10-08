@@ -53,6 +53,11 @@ Phase C root 직렬검증·Changeset·independentreview·commit/push/devPR/댓�
 
 ## Progress Snapshot
 
+### 실제 PR 리뷰 후속 F2 — 2026-10-08
+- PR1668 실제 Copilot thread PRRT_kwDORrML2s6qRvRz / REST4216877672(08:48:35Z)의 리그 후기 route loader 누락 지적을 `docs/design/app-motion-system.md` §3.2.1 및 형제 league videos·tournament reviews loader와 교차 확인했다. mount 이후 client fetching skeleton은 route 전환 대기를 대신하지 못하므로 지적이 타당하다.
+- 신규 `admin/league-matches/[leagueId]/reviews/loading.tsx`에서 기존 `AdminBoardListSkeleton`을 그대로 반환한다. client의 실제 리그 조회·오류·관리자 권한·moderation 동작은 수정하지 않았다.
+- 단순 shared skeleton route export를 구현 그대로 비교하는 테스트는 추가하지 않았다. 정적 import·default export·형제 패턴 정합 확인 완료; 런타임 route loader render와 committed 검증은 root serial slot 승인 대기다.
+
 ### 실제 PR 리뷰 후속 — 2026-10-08 17:33 KST
 - PR1668 https://github.com/kim-song-jun/matchup-sports-platform/pull/1668 head2e759a465d37d1c28af46550308772e588e0217f 게시·원 리포트 댓글1 저장 성공. API72 committed/type/surface와 이전 exact head 독립 리뷰는 기록으로 보존한다.
 - 실제 P2 PRRT_kwDORrML2s6qQ2RZ: 비공개 종료 대회·리그 pending CTA가 공개 상세404로 연결됨. 실제 predicate를 평가하는 회귀 RED1FAIL/80PASS → 공개 조건 isPublic:true 최소 추가 → GREEN81/81. 직접 비공개 후기 제출 권한은 유지.

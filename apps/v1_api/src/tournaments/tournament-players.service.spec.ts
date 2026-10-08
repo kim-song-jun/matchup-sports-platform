@@ -1307,7 +1307,7 @@ describe('TournamentPlayersService', () => {
     prisma.v1TournamentPlayer.findMany.mockResolvedValue([
       {
         ...playerRow(),
-        user: { profile: { nickname: '번개맨' }, phone: '010-1234-5678' },
+        user: { profile: { nickname: '번개맨' }, phone: '01012345678', deletedAt: null },
       },
     ]);
 
@@ -1379,7 +1379,7 @@ describe('TournamentPlayersService', () => {
     prisma.v1AdminUser.findUnique.mockResolvedValue(opsAdminRecord);
     prisma.v1TournamentRegistration.findUnique.mockResolvedValue({ id: 'reg-1', team: { name: '번개팀' } });
     prisma.v1TournamentPlayer.findMany.mockResolvedValue([
-      { ...playerRow({ jerseyNumber: 7 }), user: { profile: { nickname: '번개맨' }, phone: '010-1234-5678' } },
+      { ...playerRow({ jerseyNumber: 7 }), user: { profile: { nickname: '번개맨' }, phone: '01012345678', deletedAt: null } },
       { ...playerRow({ id: 'player-2', realName: '김철수', jerseyNumber: null }), user: { profile: null, phone: null } },
     ]);
 
@@ -1413,6 +1413,26 @@ describe('TournamentPlayersService', () => {
     expect(csv.split('\n')[1]).toBe(`'\t=1+1,1995-03-15,male,needs_review,"a\rb",,`);
   });
 
+  it('exportCsv: 전화번호는 엑셀이 앞 0 을 지우지 않게 하이픈 표기, 탈퇴 회원·미등록은 빈칸', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(opsAdminRecord);
+    prisma.v1TournamentRegistration.findUnique.mockResolvedValue({ id: 'reg-1', team: { name: '번개팀' } });
+    prisma.v1TournamentPlayer.findMany.mockResolvedValue([
+      { ...playerRow({ realName: '가' }), user: { profile: null, phone: ' 01012345678 ', deletedAt: null } },
+      { ...playerRow({ realName: '나' }), user: { profile: null, phone: '0111234567', deletedAt: null } },
+      { ...playerRow({ realName: '다' }), user: { profile: null, phone: 'deleted-user-3', deletedAt: new Date() } },
+      { ...playerRow({ realName: '라' }), user: { profile: null, phone: null, deletedAt: null } },
+    ]);
+
+    const { csv } = await service.exportCsv(adminUser, 'reg-1');
+
+    expect(csv.split('\n').slice(1).map((line) => line.split(',').at(-1))).toEqual([
+      '010-1234-5678',
+      '011-123-4567',
+      '',
+      '',
+    ]);
+  });
+
   // ─── 전체 명단 CSV (대회·리그 단위) ─────────────────────────────────────────
   describe('exportTournamentCsv', () => {
     afterEach(() => jest.useRealTimers());
@@ -1443,7 +1463,7 @@ describe('TournamentPlayersService', () => {
           status: 'confirmed',
           team: { name: '번개팀', ownerUserId: 'player-user-id' },
           players: [
-            { ...playerRow({ jerseyNumber: 7, eligibilityStatus: 'non_pro' }), user: { profile: { nickname: '번개맨' }, phone: '010-1234-5678' } },
+            { ...playerRow({ jerseyNumber: 7, eligibilityStatus: 'non_pro' }), user: { profile: { nickname: '번개맨' }, phone: '01012345678', deletedAt: null } },
             {
               ...playerRow({ id: 'player-2', userId: 'user-2', realName: '이영희', genderSnapshot: 'female', eligibilityStatus: 'pro' }),
               user: { profile: null, phone: null },

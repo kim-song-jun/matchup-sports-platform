@@ -87,6 +87,19 @@ const KST_MINUTE = new Intl.DateTimeFormat('sv-SE', {
   hour12: false,
 });
 
+/**
+ * 명단 CSV 의 전화번호 칸 — 어드민 명단 화면(`formatPhoneNumber`)과 같은 하이픈 표기.
+ * 저장값 `01012345678` 을 그대로 쓰면 엑셀이 숫자로 읽어 앞 0 을 지운다. 탈퇴 회원은 번호 자리에
+ * `deleted-<id>` 가 남아 있으므로(어드민 계정 삭제) 빈칸. 번호가 없어도 빈칸.
+ */
+function rosterCsvPhone(user: { phone: string | null; deletedAt: Date | null }): string {
+  const phone = user.deletedAt ? '' : (user.phone?.trim() ?? '');
+  const digits = phone.replace(/\D/g, '');
+  if (digits.length === 11) return `${digits.slice(0, 3)}-${digits.slice(3, 7)}-${digits.slice(7)}`;
+  if (digits.length === 10) return `${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6)}`;
+  return phone;
+}
+
 @Injectable()
 export class TournamentPlayersService {
   constructor(
@@ -693,7 +706,7 @@ export class TournamentPlayersService {
 
     const players = await this.prisma.v1TournamentPlayer.findMany({
       where: { registrationId, removedAt: null },
-      include: { user: { select: { profile: { select: { nickname: true } }, phone: true } } },
+      include: { user: { select: { profile: { select: { nickname: true } }, phone: true, deletedAt: true } } },
       orderBy: { addedAt: 'asc' },
     });
 
@@ -749,7 +762,7 @@ export class TournamentPlayersService {
         team: { select: { name: true, ownerUserId: true } },
         players: {
           where: { removedAt: null },
-          include: { user: { select: { profile: { select: { nickname: true } }, phone: true } } },
+          include: { user: { select: { profile: { select: { nickname: true } }, phone: true, deletedAt: true } } },
           // 등번호 순(없으면 뒤) → 같은 번호·번호 없음은 팀이 넣은 순서.
           orderBy: [{ jerseyNumber: { sort: 'asc', nulls: 'last' } }, { addedAt: 'asc' }],
         },
@@ -783,7 +796,7 @@ export class TournamentPlayersService {
             ELIGIBILITY_LABEL[p.eligibilityStatus] ?? p.eligibilityStatus,
             this.escapeCsvField(p.user.profile?.nickname ?? ''),
             p.userId === reg.team.ownerUserId ? '팀장' : '',
-            this.escapeCsvField(p.user.phone?.trim() ?? ''),
+            this.escapeCsvField(rosterCsvPhone(p.user)),
           ].join(','),
         );
       });
@@ -822,7 +835,7 @@ export class TournamentPlayersService {
     genderSnapshot: string | null;
     eligibilityStatus: string;
     jerseyNumber: number | null;
-    user: { profile: { nickname: string } | null; phone: string | null };
+    user: { profile: { nickname: string } | null; phone: string | null; deletedAt: Date | null };
   }): string[] {
     return [
       this.escapeCsvField(p.realName),
@@ -832,7 +845,7 @@ export class TournamentPlayersService {
       this.escapeCsvField(p.user.profile?.nickname ?? ''),
       // 정본 §3 "명단은 등번호와 이름" — 기존 열 위치는 그대로 둔다.
       String(p.jerseyNumber ?? ''),
-      this.escapeCsvField(p.user.phone?.trim() ?? ''),
+      this.escapeCsvField(rosterCsvPhone(p.user)),
     ];
   }
 

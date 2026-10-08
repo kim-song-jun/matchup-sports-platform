@@ -465,7 +465,7 @@ All team roster mutations lock the registration row and re-read `rosterLockedAt`
   - `replaceExisting`: 모든 경기가 시작 전·결과 없음일 때만. 하류 경기부터 소프트 삭제 → 자리 → GroupTeam·Standing·ByeSlot → 조 순으로 지우고 새로 만든다(경기 번호는 1부터 다시, 생성 키는 소프트 삭제 이력 수를 반영).
 - `PUT /admin/tournament-slots/:slotId/assignment` — 본문 `{ registrationId: uuid | null }`(null = 비우기). 응답 `{ slot: { id, kind, groupId, sourceGroupId, position, label, registrationId, teamName }, affectedTeamMatchIds }`.
   - 그 자리를 쓰는 경기(`deletedAt IS NULL AND status <> 'cancelled'`) 전부에 사이드를 반영한다. `phase = group` 조에서는 조 편성(`V1TournamentGroupTeam`)을 만들고, 교체·비우기 때 그 조의 다른 경기에 더 이상 없는 이전 팀의 편성·순위 행을 지운 뒤 순위를 다시 계산한다. BYE 자리는 `ByeSlot` ↔ `GroupTeam(isBye)` 를 전환한다(`createBye` 와 같은 의미).
-  - 오류: 404 `SLOT_NOT_FOUND`, 422 `SLOT_REGISTRATION_INVALID`(다른 대회·미확정 등록), 409 `SLOT_TEAM_ALREADY_PLACED`(ENTRY·BYE 교차 포함)·`SLOT_LOCKED`(자리를 쓰는 경기 중 시작·결과 있음)·`SLOT_LEAGUE_NOT_SUPPORTED_YET`(정규 리그 자리).
+  - 오류: 404 `SLOT_NOT_FOUND`, 422 `SLOT_REGISTRATION_INVALID`(다른 대회·미확정 등록), 409 `SLOT_TEAM_ALREADY_PLACED`(ENTRY·BYE 교차 포함)·`SLOT_LOCKED`(자리를 쓰는 경기 중 시작·결과 있음).
 - `POST /admin/tournaments/:tournamentId/slots/random-fill` — 본문 없음. 잠금 안에서 다시 읽은 빈 ENTRY·BYE 자리에, 아직 어느 자리에도 없는 확정 등록을 서버가 무작위로 배정한다(남는 쪽은 그대로). 응답 `{ assignments: [{ slotId, registrationId }] }`.
 - `PATCH /admin/fixtures/:id` 로 자리에 연결된 사이드의 팀을 바꾸면 409 `SLOT_LINKED`(일정·장소·번호 수정은 그대로).
 - `POST /admin/tournaments/:tournamentId/league/fixtures/generate` 의 `replaceExisting` 가 자리에 연결된 경기를 덮어쓰려 하면 409 `LEAGUE_SLOT_FIXTURES_USE_TEMPLATE` — 템플릿 교체를 쓴다.

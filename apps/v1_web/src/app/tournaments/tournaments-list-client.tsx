@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { ClipboardEdit, Wallet, ListChecks, Grid2x2, GitFork, Trophy, Sparkles } from 'lucide-react';
 import {
   CompetitionKindSegment,
@@ -81,6 +81,14 @@ function getTournamentListErrorMessage(err: unknown): string {
 
 /* ── Main content (client component for data fetching) ── */
 
+function tournamentPagePath(params: URLSearchParams, page: number): string {
+  const next = new URLSearchParams(params);
+  if (page > 1) next.set('page', String(page));
+  else next.delete('page');
+  const query = next.toString();
+  return `/tournaments${query ? `?${query}` : ''}`;
+}
+
 /**
  * 대회 목록의 페이지 이동은 화면 폭에 따라 **다른 방식**을 쓴다.
  *
@@ -102,7 +110,6 @@ export function TournamentsListPageClient({ seed }: { readonly seed?: Tournament
 
   // 데스크톱 = 페이지 번호, 모바일 = 커서 누적. 두 상태를 함께 두고 화면 폭에 맞는
   // 쪽만 서버로 보낸다 — 폭이 바뀌어도(창 리사이즈·회전) 보던 목록이 사라지지 않는다.
-  const [page, setPage] = useState(1);
   const [cursor, setCursor] = useState<string | undefined>(undefined);
   const [allItems, setAllItems] = useState<V1TournamentListItem[]>([]);
 
@@ -119,9 +126,16 @@ export function TournamentsListPageClient({ seed }: { readonly seed?: Tournament
      `/league-matches` 가 아직 살아 있어 리그를 두 곳에서 볼 수 있는데, 그건 중복일 뿐
      깨지지 않는다 — **리다이렉트 PR 이 정리할 몫**이다. */
   const searchParams = useSearchParams();
-  // 상세의 앱 뒤로가기가 필터 없는 기본 목록으로 복귀하지 않도록 현재 목록 URL을 출처로 넘긴다.
+  const router = useRouter();
   const listQuery = searchParams.toString();
-  const listPath = `/tournaments${listQuery ? `?${listQuery}` : ''}`;
+  const rawPage = searchParams.get('page');
+  const parsedPage = rawPage !== null && /^\d+$/.test(rawPage) ? Number(rawPage) : 1;
+  const urlPage = Number.isSafeInteger(parsedPage) && parsedPage > 0 ? parsedPage : 1;
+  // URL 응답 전 연속 페이지 선택은 마지막 선택을 사용한다. 새 URL/Back이 도착하면
+  // 그 URL이 다시 권위가 되어 이전 목록의 draft가 복원된 페이지를 덮지 않는다.
+  const [pageDraft, setPageDraft] = useState<{ readonly query: string; readonly page: number } | null>(null);
+  const page = pageDraft?.query === listQuery ? pageDraft.page : urlPage;
+  useEffect(() => { setPageDraft(null); }, [listQuery]);
   const activeKind: CompetitionKind = parseCompetitionKind(searchParams.get('kind'), 'all');
   /* 빈 문자열은 **없는 것과 같다.** `?status=` 를 그대로 넘기면 서버가 400 을 내 목록이
      통째로 에러가 된다(실측). 아래 `??` 폴백만으로는 안 걸린다 — `''` 는 null 이 아니다. */
@@ -153,11 +167,9 @@ export function TournamentsListPageClient({ seed }: { readonly seed?: Tournament
   // 시트 열림도 URL 이다 — 뒤로가기로 닫히고, 필터가 담긴 주소를 그대로 공유할 수 있다.
   const filterSheetOpen = searchParams.get('filter') === '1';
 
-  /* 유형이 바뀌면 목록 자체가 갈리므로 페이지·누적을 리셋한다 — 종목 칩과 같은 처리지만,
-     이쪽은 클릭 핸들러가 아니라 **URL 변화**가 방아쇠라 effect 로 받는다(뒤로가기로 유형이
-     바뀌는 경우까지 덮어야 한다). */
+  /* 필터 링크는 page를 제거하고, 모바일 누적분은 URL의 조회 조건이 바뀔 때 비운다.
+     페이지 URL 복귀는 위에서 읽으므로 첫 마운트에 page=2를 1로 덮어쓰지 않는다. */
   useEffect(() => {
-    setPage(1);
     setCursor(undefined);
     setAllItems([]);
     // 상태·종목이 바뀌어도 같은 이유로 리셋한다 — 목록 내용이 갈리므로 누적분이 남으면
@@ -189,7 +201,7 @@ export function TournamentsListPageClient({ seed }: { readonly seed?: Tournament
     && cursor === undefined;
   // 로딩 판정은 isPending(데이터 없음)이다 — isLoading 은 서버·하이드레이션 첫 렌더(persist 복원 중,
   // fetchStatus 'idle')에 false 라 아직 안 받은 목록을 "대회가 없어요"로 그린다.
-  const { data, isPending, isError, error, isFetching, refetch } = useV1Tournaments(
+  const { data, isPending, isError, error, isFetching, isPlaceholderData, refetch } = useV1Tournaments(
     {
       ...(isDesktop ? { page } : { cursor }),
       limit: TOURNAMENT_LIST_PAGE_SIZE,
@@ -207,6 +219,9 @@ export function TournamentsListPageClient({ seed }: { readonly seed?: Tournament
   });
 
   const pageItems = data?.items ?? [];
+  // placeholder로 직전 카드를 유지하는 동안 복귀 주소도 그 카드의 페이지를 가리킨다.
+  const displayedPage = isDesktop ? data?.pageInfo?.page ?? page : page;
+  const listPath = tournamentPagePath(new URLSearchParams(listQuery), displayedPage);
   // 데스크톱은 페이지를 **교체**하고, 모바일은 **누적**한다.
   const displayItems: V1TournamentListItem[] =
     isDesktop || !cursor
@@ -216,6 +231,20 @@ export function TournamentsListPageClient({ seed }: { readonly seed?: Tournament
   const hasNext = data?.pageInfo?.hasNext ?? false;
   const totalPages = data?.pageInfo?.totalPages ?? 0;
   const total = data?.pageInfo?.total ?? 0;
+  const lastPage = Math.max(1, totalPages);
+  // 직전 응답의 범위로 새 요청을 보정하지 않는다. 성공한 현재 응답이 범위를 알려 준 뒤에만
+  // 저장 URL을 보정한다. 결과가 0개인 경우에도 조회 가능한 첫 페이지를 사용한다.
+  const needsPageNormalization = isDesktop && !isPending && !isError && !isPlaceholderData
+    && data?.pageInfo?.totalPages !== undefined && Number.isSafeInteger(totalPages) && totalPages >= 0
+    && page > lastPage;
+  useEffect(() => {
+    if (!needsPageNormalization) return;
+    setPageDraft({ query: listQuery, page: lastPage });
+    router.replace(tournamentPagePath(new URLSearchParams(listQuery), lastPage), { scroll: false });
+  }, [needsPageNormalization, lastPage, listQuery, router]);
+  // 범위 밖의 빈 응답을 placeholder로 받는 보정 요청은 기존 스켈레톤을 유지한다.
+  const emptyPreviousPage = isDesktop && isPlaceholderData && displayItems.length === 0
+    && data?.pageInfo?.page !== page;
 
   const handleLoadMore = () => {
     if (!data?.pageInfo?.nextCursor || isFetching) return;
@@ -231,7 +260,8 @@ export function TournamentsListPageClient({ seed }: { readonly seed?: Tournament
 
   const handlePageChange = (next: number) => {
     if (next < 1 || (totalPages > 0 && next > totalPages)) return;
-    setPage(next);
+    setPageDraft({ query: listQuery, page: next });
+    router.replace(tournamentPagePath(new URLSearchParams(listQuery), next), { scroll: false });
     // 페이지를 갈아끼우면 목록 머리로 올려준다 — 안 그러면 새 페이지의 중간부터 보인다.
     // `window.scrollTo` 가 아니라 `scrollIntoView` 인 이유: 이 앱의 스크롤 컨테이너는
     // window 가 아니라 `.tm-scroll-area` 라 window 스크롤은 아무 일도 하지 않는다.
@@ -243,15 +273,21 @@ export function TournamentsListPageClient({ seed }: { readonly seed?: Tournament
     }
   };
 
-  /** D3: 종목 칩 선택 — 페이지/누적 목록 리셋 후 필터 적용 */
-
   /* 필터 링크·요약 문구는 순수 함수가 만든다(`competition-filter-model`) — 화면 없이
      검증되고, 2단계 리다이렉트가 같은 매핑을 재사용한다. */
-  const filterModel = buildCompetitionFilterModel({
+  const filterParams = new URLSearchParams(listQuery);
+  // 조건이 바뀌면 새 결과의 첫 페이지를 조회한다. 시트 여닫기는 조회 조건이 아니므로
+  // 아래에서 페이지를 다시 붙인다 — 시트만 열었는데 2페이지가 사라지면 안 된다.
+  filterParams.delete('page');
+  const filterLinks = buildCompetitionFilterModel({
     basePath: '/tournaments',
-    params: new URLSearchParams(searchParams.toString()),
+    params: filterParams,
     sports: filterSports,
   });
+  filterParams.set('filter', '1');
+  const openHref = tournamentPagePath(filterParams, page);
+  filterParams.delete('filter');
+  const filterModel = { ...filterLinks, openHref, closeHref: tournamentPagePath(filterParams, page) };
 
   return (
     <div className="tm-tournament-list">
@@ -280,7 +316,7 @@ export function TournamentsListPageClient({ seed }: { readonly seed?: Tournament
             구조적으로 성립한다. 칩 줄은 종목이 늘면 래핑돼 두 줄이 되지만 이 줄은 하나다. */}
         <CompetitionFilterSummary model={filterModel} />
 
-        {isPending ? (
+        {isPending || needsPageNormalization || emptyPreviousPage ? (
           <TournamentSkeletonList />
         ) : isError ? (
           <ErrorState

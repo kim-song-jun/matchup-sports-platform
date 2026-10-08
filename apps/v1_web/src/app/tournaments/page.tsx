@@ -24,7 +24,12 @@ export async function generateMetadata({ searchParams }: { searchParams: SearchP
 export default async function TournamentsPage({ searchParams }: { searchParams: SearchParams }) {
   const params = await searchParams;
   const kind = parseCompetitionKind(firstSearchParam(params.kind), 'all');
-  const filtered = LIST_FILTER_PARAMS.some((key) => firstSearchParam(params[key]) !== null);
+  // 클라이언트와 같은 양의 안전한 정수 규칙. 두 번째 페이지부터는 첫 페이지 seed가
+  // 실제 화면과 다르므로 불필요한 조회와 잘못된 ItemList를 모두 생략한다.
+  const rawPage = firstSearchParam(params.page);
+  const parsedPage = rawPage !== null && /^\d+$/.test(rawPage) ? Number(rawPage) : 1;
+  const nonFirstPage = Number.isSafeInteger(parsedPage) && parsedPage > 1;
+  const filtered = nonFirstPage || LIST_FILTER_PARAMS.some((key) => firstSearchParam(params[key]) !== null);
   const page = filtered
     ? null
     : await fetchSeoSeed<V1TournamentListPage>(tournamentListSeedPath(kind), 'tournaments', { cache: 'no-store' });

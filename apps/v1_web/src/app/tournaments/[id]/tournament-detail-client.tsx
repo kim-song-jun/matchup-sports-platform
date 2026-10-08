@@ -1643,9 +1643,9 @@ function tournamentFormatLabel(competition: V1TournamentDetail): string {
 }
 
 function getFlowSteps(competition: V1TournamentDetail): Array<{ title: string; body: string }> {
-  // 리그를 **먼저** 걸러야 한다. 거울 행은 group_knockout 이라 아래 첫 분기에 걸려
-  // "조별 리그 → 결선 진출 → 결선 토너먼트" 를 리그 참가자에게 보여준다.
-  if (isLeagueCompetition(competition)) {
+  // 시즌 주차 안내는 정규 리그에만 쓴다. 리그 방식 단발 대회는 아래 format 안내를 따른다.
+  // 정규 리그 거울의 format이 group_knockout이어도 종류를 먼저 판정한다.
+  if (competition.kind === 'regular_league') {
     return [
       { title: '풀리그', body: '참가한 모든 팀이 서로 맞붙어요. 맞붙는 횟수는 시즌 주차 수에 따라 달라져요.' },
       { title: '순위 집계', body: '승점과 득실차로 최종 순위를 가려요.' },

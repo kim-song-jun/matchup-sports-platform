@@ -236,4 +236,56 @@ describe('자리 배정 (PostgreSQL)', () => {
       expect(await groupTeams(tournamentId)).toEqual([]);
     });
   });
+
+  describe('BYE 자리 (12강)', () => {
+    async function ko12(label: string, teamCount = 3) {
+      const seeded = await seedBracketTournament(prisma, { label, format: 'knockout', teamCount });
+      await templates.apply(user, seeded.tournamentId, { kind: 'knockout', size: 12, thirdPlace: false });
+      return seeded;
+    }
+    const byeRows = async (tournamentId: string) => ({
+      empty: (await prisma.v1TournamentByeSlot.findMany({ where: { group: { tournamentId } }, orderBy: { sortOrder: 'asc' } })).map((b) => b.sortOrder),
+      team: (await prisma.v1TournamentGroupTeam.findMany({ where: { group: { tournamentId }, isBye: true }, orderBy: { sortOrder: 'asc' } }))
+        .map((g) => [g.registrationId, g.sortOrder]),
+    });
+
+    it('BYE 자리 1 에 팀을 넣으면 ByeSlot(0) 이 GroupTeam(isBye) 로 바뀌고 8강 1번 홈에 팀이 들어간다, 비우면 원복', async () => {
+      const { tournamentId, registrationIds, teamIds } = await ko12('bye-sync');
+      const bye1 = await slotAt(tournamentId, 1, 'BYE');
+      const before = await prisma.v1TournamentByeSlot.findFirstOrThrow({ where: { group: { tournamentId }, sortOrder: 0 } });
+
+      await slots.assignSlot(user, bye1.id, registrationIds[0]);
+
+      expect(await byeRows(tournamentId)).toEqual({ empty: [3, 4, 7], team: [[registrationIds[0], 0]] });
+      const promoted = await prisma.v1TournamentGroupTeam.findFirstOrThrow({ where: { group: { tournamentId }, isBye: true } });
+      expect(promoted.id).toBe(before.id); // createBye 와 같이 id 를 승계한다
+      const [quarter1] = await fixturesUsing(bye1.id);
+      expect(quarter1.hostTeamId).toBe(teamIds[0]);
+      expect(quarter1.approvedApplicantTeamId).toBeNull(); // 어웨이는 12강 승자 연결이 채운다
+
+      await slots.assignSlot(user, bye1.id, null);
+
+      expect(await byeRows(tournamentId)).toEqual({ empty: [0, 3, 4, 7], team: [] });
+      expect((await fixturesUsing(bye1.id))[0].hostTeamId).toBeNull();
+    });
+
+    it('BYE 자리 팀 교체(A→B)는 GroupTeam 의 등록만 바꾼다', async () => {
+      const { tournamentId, registrationIds } = await ko12('bye-replace');
+      const bye2 = await slotAt(tournamentId, 2, 'BYE');
+      await slots.assignSlot(user, bye2.id, registrationIds[0]);
+      await slots.assignSlot(user, bye2.id, registrationIds[1]);
+      expect(await byeRows(tournamentId)).toEqual({ empty: [0, 4, 7], team: [[registrationIds[1], 3]] });
+    });
+
+    it('ENTRY 와 BYE 에 같은 팀을 동시에 넣을 수 없다 (양방향)', async () => {
+      const { tournamentId, registrationIds } = await ko12('bye-exclusive');
+      const entry = await slotAt(tournamentId, 1, 'ENTRY');
+      const bye = await slotAt(tournamentId, 1, 'BYE');
+      await slots.assignSlot(user, entry.id, registrationIds[0]);
+      await expect(slots.assignSlot(user, bye.id, registrationIds[0])).rejects.toMatchObject({ response: { code: 'SLOT_TEAM_ALREADY_PLACED' } });
+      await slots.assignSlot(user, bye.id, registrationIds[1]);
+      await expect(slots.assignSlot(user, (await slotAt(tournamentId, 2, 'ENTRY')).id, registrationIds[1]))
+        .rejects.toMatchObject({ response: { code: 'SLOT_TEAM_ALREADY_PLACED' } });
+    });
+  });
 });

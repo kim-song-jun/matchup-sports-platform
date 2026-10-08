@@ -8,6 +8,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { assignTournamentFixtureSideInTx, releaseUnusedGroupTeamsInTx } from '../tournament-bracket-tx';
 import { adminBracketSlotInclude, serializeAdminBracketSlot } from './admin-bracket-view';
 import { ALL_COMPETITION_KINDS, findTournamentOnSurface } from '../tournament-surface-lookup';
+import { syncByeSlotInTx } from './bye-slot-sync';
 import { lockCompetitionForBracketMutationInTx } from './competition-bracket-lock';
 import { assertSlotFixturesNotStarted, loadSlotUsingFixtures, sidesUsingSlot } from './slot-fixtures';
 
@@ -106,6 +107,7 @@ async function assignSlotCore(
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') throw alreadyPlaced();
     throw error;
   }
+  if (slot.kind === 'BYE') await syncByeSlotInTx(tx, slot, registrationId);
   for (const fixture of fixtures) {
     if (fixture.groupPhase === 'group' && fixture.groupId !== null && slot.registrationId !== null) {
       releases.push({ groupId: fixture.groupId, registrationId: slot.registrationId });

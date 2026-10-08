@@ -137,7 +137,7 @@ Status: Planning
     기존 「경기 하나 추가」(팀 지정 수동 생성)는 자리 없이 그대로 허용한다.
 - 정규 리그 상태: 템플릿은 리그 `status` 를 바꾸지 않는다(빈 경기만 있는 리그가 공개에 "진행 중"으로 보이지 않게). 자리 배정·경기 취소 뒤
   **자리를 쓰는 경기 중 팀이 빈 사이드가 하나도 없으면** 기존 일괄 생성과 같은 진행 상태로 바꾼다. 기존 코드엔 전이 함수가 없고
-  `generateFixtures` 안의 인라인 `updateMany` 이므로, 조건부(`status in (draft, open)`)로만 바꾸는 헬퍼를 새로 두고 보류·완료 리그는 건드리지 않는다.
+  `generateFixtures` 안의 인라인 `updateMany` 이므로, 조건부(`status in (draft, open, closed)` — 경기 시작 전 상태 전부)로만 바꾸는 헬퍼를 새로 두고 보류·완료 리그는 건드리지 않는다.
   팀 수가 자리 수보다 적으면 운영자가 남는 빈 경기를 취소해야 전이된다(그때까지 예정 상태 유지 — 의도된 동작).
 
 ### S3. 자리에 팀 넣기·빼기
@@ -164,6 +164,8 @@ Status: Planning
 - **등록이 confirmed 를 벗어나는 모든 전이**(리그 `removeTeam`, 어드민 등록 취소, 참가 취소 요청 승인 등 — 구현 시 전이 지점을 전수 확인)는
   공통 헬퍼 `releaseSlotsForRegistrationInTx` 로 그 팀의 자리를 비운다: 자리를 쓰는 경기가 전부 시작 전이면 S3 비우기와 같고, 시작된 경기가
   있으면 자리를 그대로 둔다(기록 보존). 자리 없는 기존 경기의 취소 동작은 지금 그대로. 팀 해체는 진행 중 등록이 있으면 이미 차단되므로 대상이 아니다.
+  팀의 **참가 취소 요청**(confirmed → cancel_requested)은 철회될 수 있으므로 자리를 비우지 않고, 운영자가 승인하는 순간 비운다.
+  리그 방식 대회(`format='league'`)도 자리를 쓰면 기존 조별 생성기의 `replaceExisting` 재생성을 409 `LEAGUE_SLOT_FIXTURES_USE_TEMPLATE` 로 막는다.
 
 ### S4. 조 순위로 결선 채우기 (D3=a)
 
@@ -172,8 +174,9 @@ Status: Planning
   조의 비취소 경기가 전부 OFFICIAL 이어야 `ready`/`tied`. 순위는 기존 `V1TournamentStanding`(공식 결과만),
   동률은 정본 §5 동점 처리(`league-tie-break.ts`) 5단계 뒤에도 갈리지 않는 **완전 동률 구간**에 그 순위 위치가 걸리면 `tied`
   (구간 크기·순위 무관 — 1위·2위 동률, 3팀 동률 포함). 정본 §5 의 "잔여 동률은 공동 순위"를 자동 배정이 임의로 깨지 않는다.
-- `POST /admin/tournaments/:id/slots/fill-from-standings` `{ overrides?: [{slotId, registrationId}] }`(`@ArrayMaxSize` = 그 대회 GROUP_RANK 자리 수,
-  uuid 검증) → `ready` 자리 + override 를 S3 규칙으로 한 번에 배정(바뀔 자리 먼저 비우기 — S1). `tied` 인데 override 가 없으면 그 자리는 건너뛴다.
+- `POST /admin/tournaments/:id/slots/fill-from-standings` `{ overrides?: [{slotId, registrationId}] }`(DTO 는 `@ArrayMaxSize` 상수 상한·uuid 검증, 서비스가 그 대회 GROUP_RANK 자리 소속·중복을 재검증) → `ready` 자리 + override 를 S3 규칙으로 한 번에 배정(바뀔 자리 먼저 비우기 — S1). `tied` 인데 override 가 없으면 그 자리는 건너뛴다.
+  override 는 `tied` 자리면 그 동률 팀 중에서만, `ready` 자리면 그 자리의 원천 조 팀 중에서만 받는다(422 `SLOT_REGISTRATION_INVALID`).
+  저장된 순위(`V1TournamentStanding.position`)와 §5 동점 처리 결과가 어긋나면 그 자리는 `tied` 로 돌려 운영자가 고르게 한다.
   결선 경기가 시작 전이면 다시 채우기 가능.
 - 공개 대진표: 팀이 없는 사이드에 자리 라벨(예: "A조 1위")을 보여 준다 — 공개 경기 직렬화에 `homeSlotLabel`·`awaySlotLabel` 추가.
 
@@ -185,7 +188,8 @@ Status: Planning
 - 대상: 대회 canonical 팀매치 경기와 정규 리그 팀매치 경기. 친선 등은 409 `QUICK_RESULT_UNSUPPORTED`.
 - 입장 조건(409): 게임이 SCHEDULED 이거나 ENDED 이면서 **현재 리비전이 없거나 VOID**(무효 뒤 재입력) —
   아니면 `QUICK_RESULT_NOT_AVAILABLE`(진행 중·확정 전 결과가 있음·이미 확정이면 정정을 쓴다) ·
-  팀매치 `status='matched'`, 아니면 `QUICK_RESULT_FIXTURE_CANCELLED`(리그 취소는 게임을 SCHEDULED 로 남기므로 게임 상태만으론 못 거른다) ·
+  팀매치 `status='matched'`(VOID 재입력이면 `completed` 도 허용 — 지금 무효 처리는 팀매치 상태를 되돌리지 않는다), 아니면
+  `QUICK_RESULT_FIXTURE_CANCELLED`(리그 취소는 게임을 SCHEDULED 로 남기므로 게임 상태만으론 못 거른다) ·
   게임 이벤트 0건, 아니면 `QUICK_RESULT_HAS_LIVE_RECORDS` · 양 사이드 팀 확정, 아니면 `QUICK_RESULT_TEAMS_REQUIRED` ·
   양 사이드 `V1GameParticipant` 1명 이상이고 그 게임의 미처리 `COMPETITION_ROSTER_RESYNC` outbox 가 없을 것, 아니면 `QUICK_RESULT_ROSTER_SYNCING`
   (자리 배정 직후 명단은 비동기로 채워진다 — 그 사이 확정하면 출전자 0명인 불변 OFFICIAL 이 남는다; 화면은 잠시 뒤 다시 시도 안내) ·
@@ -194,8 +198,8 @@ Status: Planning
   킥 수를 요구하므로(`tournament-result-review.service.ts:1280`), **득점 기록 0건 경기의 정정은 킥 수를 요구하지 않도록** 같은 규칙을 정정에도 넣는다
   (기록할 승부차기 이벤트가 없는 경기에서 킥 수는 대조할 대상이 없다).
 - 한 Serializable 트랜잭션(`withResultCommand` 확장, 같은 클래스에 메서드 추가): DRAFT 리비전(점수·`eventsHash=hash([])`·
-  `goalEvents=[]`·reason 마커 `[quick-result]`, VOID 재입력이면 `supersedesId`=VOID 리비전) → 참가자 = 현재 `V1GameParticipant`
-  전원 `started=true`·기록 0 → OFFICIAL(`submittedAt=officialAt=now`; 상태 머신에 새 흐름 `ADMIN_QUICK` 을 추가해 DRAFT→OFFICIAL 을
+  `goalEvents=[]`·reason 마커 `[quick-result]`, VOID 재입력이면 `supersedesId`=VOID 리비전) → 참가자 = 각 사이드의 **무효화되지 않은 최신 라인업 리비전**의 `V1GameParticipant`
+  전원 `started=true`·기록 0(명단 동기화는 옛 리비전 행을 지우지 않으므로 게임의 참가자 행 전부를 쓰면 이전 명단이 섞인다) → OFFICIAL(`submittedAt=officialAt=now`; 상태 머신에 새 흐름 `ADMIN_QUICK` 을 추가해 DRAFT→OFFICIAL 을
   이 흐름에만 허용 — CORRECTION 으로 위장하지 않는다) → 게임 ENDED·version+1·`currentOfficialRevisionId` → 열린 피리어드 닫기 →
   `completeTeamMatchAtResultBoundary` → 대회면 `projectCanonicalAdvancement`(다음 경기 시작됐으면 409 `NEXT_FIXTURE_CONFLICT`) →
   outbox `GAME_RESULT_OFFICIAL`(순위·전적·개인 기록(출전)·리그 완료·알림은 기존 워커) → 운영 감사 `QUICK_RESULT`.
@@ -233,7 +237,8 @@ Status: Planning
 - 새 컴포넌트(`components/admin/bracket-canvas/`): 캔버스(라운드 열 + 칸 + SVG 연결선 — 위치는 순수 함수
   `lib/bracket-canvas-layout.ts` 가 계산), 칸(선택·드롭 대상·상태 태그 예정/진행 중/확정 전/확정·"어드민 빠른 입력" 표시),
   참가팀 트레이(HTML5 끌어 놓기 + 누르고 고르기), 상세 패널(자리 배정·일정/장소·삭제·결과), 점수 입력(무승부 결선은 승부차기),
-  템플릿 창, 순위대로 채우기 창, 리그 일정 보드(라운드 열).
+  템플릿 창, 순위대로 채우기 창, 리그 일정 보드(열 = 경기 날짜 = 주차. 리그 경기엔 round 값이 없고 템플릿은 날짜 하나에 한 라운드를 만든다;
+  옛 일괄 생성 리그는 하루에 여러 라운드일 수 있다).
 - 툴바: 템플릿으로 시작 · 경기 추가 · 연결(기존 bracket-sources) · 빈 자리 무작위 채우기 · 대진표 공개 상태(대회 — 기존
   `useV1PublishTournamentBracket`·`useV1UnpublishTournamentBracket` 훅 재사용).
   이미 공개된 대회를 편집하면 "바꾸는 즉시 참가팀에게 보여요" 안내.
@@ -410,6 +415,7 @@ PR 은 순서대로 dev 에 머지하고 매번 alpha 에서 확인한다(dev �
 - 템플릿 트랜잭션 크기(최대 240 경기) — 45s timeout, 상한 초과 422.
 - 정규 리그 빈 경기는 영향 범위가 넓다(PR-5). 공개 게이트 대조군 테스트와 alpha 실데이터 전후 응답 비교로 회귀를 막는다.
 - alpha E2E 는 새 대회·결과를 만든다(결과 있는 경기는 지울 수 없음) — 실행 전 사용자 승인.
+- 참가 취소 요청 중인 팀은 운영자가 승인할 때까지 자리를 차지한다 — 그 사이 그 팀 경기가 시작되면 승인 시점에 자리를 비울 수 없다(`SLOT_LOCKED` 규칙, 기록 보존). 통합 테스트로 고정.
 
 ## Ambiguity Log
 
@@ -426,5 +432,12 @@ PR 은 순서대로 dev 에 머지하고 매번 alpha 에서 확인한다(dev �
 | 2026-10-08 | main | 리그 잠금 | 리그 레인은 기존 대회 행 `FOR UPDATE` + `assertFixtureGenerationAllowedInTx`, 대회 레인만 advisory lock(검증 워크플로 지적) |
 | 2026-10-08 | main | 자리 리그의 기존 재생성 | 409 로 막고 템플릿 교체로 단일화 |
 | 2026-10-08 | main | 빠른 결과 직전 명단 | 자리 배정 직후 비동기 명단 동기화가 끝나기 전엔 409 `QUICK_RESULT_ROSTER_SYNCING` |
+| 2026-10-08 | plan-writers | 리그 상태 전이 대상 | `draft·open` 만 적었던 것은 표현 오류 — 경기 시작 전 상태(`draft·open·closed`) 전부. 보류·완료는 제외 |
+| 2026-10-08 | plan-writers | 빠른 결과 VOID 재입력의 팀매치 상태 | 무효 처리가 팀매치를 `completed` 에서 되돌리지 않으므로 VOID 재입력에 한해 `completed` 허용(최초 입력은 `matched` 만) |
+| 2026-10-08 | plan-writers | 빠른 결과 참가자 원천 | 게임의 참가자 행 전부가 아니라 사이드별 무효화되지 않은 최신 라인업 리비전의 참가자(옛 리비전 행이 남아 있음) |
+| 2026-10-08 | plan-writers | 참가 취소 요청 시 자리 | 요청(철회 가능) 단계에선 유지, 운영자 승인 시 비움 |
+| 2026-10-08 | plan-writers | 리그 방식 대회의 재생성 | 자리를 쓰면 기존 조별 생성기 `replaceExisting` 도 409 — 템플릿 교체로 단일화(정규 리그와 같은 규칙) |
+| 2026-10-08 | plan-writers | 순위 채우기 override 범위 | tied 자리는 동률 팀 중, ready 자리는 원천 조 팀 중에서만. 저장 순위와 §5 결과가 어긋나면 tied |
+| 2026-10-08 | plan-writers | 리그 보드 열 | 리그 경기엔 round 가 없어 열 = 경기 날짜(주차). 템플릿 리그는 날짜당 한 라운드 |
 | 2026-10-08 | spec-verify workflow | 검증 결과 | 6관점·38 에이전트, 확인된 지적 44건(중복 포함) 전부 위 S1~S7·Test·PR 분해에 반영, 반박 2건 |
 

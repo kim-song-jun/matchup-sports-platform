@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import { TournamentTitle } from '@/components/tournaments/tournament-title';
 import { Trophy } from 'lucide-react';
 import { pendingCapacityLabel, resolveTournamentRegistrationBlock } from '@/lib/tournament-registration-availability';
@@ -87,6 +88,8 @@ export function TournamentCard({
    */
   interactive?: boolean;
 }) {
+  const [, refreshClock] = useState(0);
+  const now = Date.now();
   const sportAccent = getSportAccent(item.sport.code);
   const pendingPaymentCount = getPendingPaymentCount(item);
   /**
@@ -104,7 +107,18 @@ export function TournamentCard({
   const reservedTeamCount = capacity === null ? 0 : getReservedTeamCount(capacity);
   // 저장된 open 상태는 마감 후에도 남을 수 있어 상세와 같은 신청 게이트를 쓴다.
   // 정원이 생략된 리그에는 대회 정원 판정을 적용하지 않는다.
-  const registrationBlocked = capacity !== null && resolveTournamentRegistrationBlock(capacity) !== null;
+  const registrationBlocked = capacity !== null && resolveTournamentRegistrationBlock(capacity, new Date(now)) !== null;
+  const deadline = item.registrationDeadlineAt ? new Date(item.registrationDeadlineAt).getTime() : null;
+  const hasUpcomingDeadline = capacity !== null && !registrationBlocked
+    && deadline !== null && Number.isFinite(deadline) && deadline >= now;
+
+  useEffect(() => {
+    if (!hasUpcomingDeadline) return;
+    // 홈과 같은 1분 주기로 체류 중 마감을 갱신하고, 닫힌 카드에는 타이머를 남기지 않는다.
+    const timer = window.setInterval(() => refreshClock((tick) => tick + 1), 60_000);
+    return () => window.clearInterval(timer);
+  }, [hasUpcomingDeadline]);
+
   const isNearlyFull = capacity !== null && capacity.teamCount > 0 && reservedTeamCount / capacity.teamCount >= 0.8;
   const status = item.status === 'closed'
     ? { ...getTournamentStatusConfig('closed'), label: '모집 마감' }

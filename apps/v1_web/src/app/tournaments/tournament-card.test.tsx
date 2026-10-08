@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { publicAssetPath } from '@/lib/assets';
 import type { V1TournamentListItem } from '@/types/api';
@@ -97,6 +97,69 @@ describe('TournamentCard — 신청 마감 계약', () => {
     // Then: 보이는 배지와 스크린리더의 링크 이름이 같은 신청 상태를 말한다.
     expect(screen.getByText(expected, { exact: true })).toBeInTheDocument();
     expect(screen.getByRole('link')).toHaveAccessibleName(`${item.title} — 풋살 — ${expected}`);
+  });
+});
+
+describe('TournamentCard — 화면 체류 중 신청 마감', () => {
+  const deadline = '2026-10-08T00:00:30.000Z';
+
+  beforeEach(() => {
+    // Next Link의 별도 timeout은 제외하고 카드의 시계·반복 갱신만 측정해요.
+    vi.useFakeTimers({ toFake: ['Date', 'setInterval', 'clearInterval'] });
+    vi.setSystemTime(new Date('2026-10-08T00:00:00.000Z'));
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it.each([
+    { confirmedCount: 0, initialLabel: '모집 중' },
+    { confirmedCount: 5, initialLabel: '거의 마감' },
+  ])('$initialLabel 카드를 열어 둔 채 마감이 지나면 배지와 링크 이름을 갱신해요', ({ confirmedCount, initialLabel }) => {
+    // Given: 30초 뒤 마감될 실제 카드가 목록에 남아 있어요.
+    const item = buildItem({ teamCount: 6, confirmedCount, registrationDeadlineAt: deadline });
+    render(<TournamentCard item={item} />);
+    expect(screen.getByText(initialLabel, { exact: true })).toBeInTheDocument();
+
+    // When: 부모 rerender나 새 API 응답 없이 홈과 같은 갱신 주기가 지나가요.
+    act(() => { vi.advanceTimersByTime(60_000); });
+
+    // Then: 동일한 상세 링크를 유지하면서 보이는 상태와 접근성 이름만 마감으로 바꿔요.
+    expect(screen.getByText('모집 마감', { exact: true })).toBeInTheDocument();
+    expect(screen.queryByText(initialLabel, { exact: true })).not.toBeInTheDocument();
+    expect(screen.getByRole('link')).toHaveAccessibleName(`${item.title} — 풋살 — 모집 마감`);
+    expect(screen.getByRole('link')).toHaveAttribute('href', `/tournaments/${item.id}`);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it.each([
+    { condition: '닫힌 대회', overrides: { status: 'closed' } },
+    { condition: '준비 중 대회', overrides: { status: 'draft' } },
+    { condition: '진행 중 대회', overrides: { status: 'in_progress' } },
+    { condition: '종료된 대회', overrides: { status: 'completed' } },
+    { condition: '취소된 대회', overrides: { status: 'cancelled' } },
+    { condition: '지난 마감', overrides: { registrationDeadlineAt: '2026-10-07T23:59:59.999Z' } },
+    { condition: '유효하지 않은 마감', overrides: { registrationDeadlineAt: 'invalid-date' } },
+    { condition: '없는 마감', overrides: { registrationDeadlineAt: null } },
+    { condition: '정원이 찬 대회', overrides: { confirmedCount: 6 } },
+  ] as const)('$condition에는 갱신 타이머를 남기지 않아요', ({ overrides }) => {
+    // Given: 현재 시각을 따라 다시 판정할 미래 신청 게이트가 없어요.
+    const item = buildItem({ teamCount: 6, registrationDeadlineAt: deadline, ...overrides });
+    // When: 실제 카드를 렌더해요.
+    render(<TournamentCard item={item} />);
+    // Then: 상태를 바꿀 수 없는 카드에 반복 작업을 등록하지 않아요.
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('미래 마감 카드가 목록에서 제거되면 갱신 타이머도 정리해요', () => {
+    // Given: 미래 신청 마감을 기다리는 카드가 있어요.
+    const { unmount } = render(<TournamentCard item={buildItem({ registrationDeadlineAt: deadline })} />);
+    expect(vi.getTimerCount()).toBe(1);
+    // When: 목록 전환으로 카드가 사라져요.
+    unmount();
+    // Then: 사라진 카드의 갱신 작업이 계속 남아 있지 않아요.
+    expect(vi.getTimerCount()).toBe(0);
   });
 });
 

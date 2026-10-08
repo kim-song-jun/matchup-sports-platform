@@ -61,3 +61,10 @@ serial 최소 worker slot root 승인 후만 실행. 최신 외부 리뷰 오류
 - 실제 alpha After 및 dev 머지는 별도 대기. 완료/삭제/자동머지 실행하지 않음. 테스트 합성 fixture와 실제 API/브라우저 증거를 구분해 원 checkout0550에 보존한다.
 
 - 독립 리뷰가 touched 리그 정원 생략 fixture의 불필요한 타입 단언3곳을 발견했다. 현재 teamCount optional 정본에 맞게 직접 delete하여 같은범위 debt를 정리한다. 제품helper/source와 기존 assertion은 유지한다. 최종커밋 기준 재검증/재리뷰 예정.
+
+### PR 게시 및 실제 마감 시계 후속 — 2026-10-08 17:42 KST
+- PR1670 https://github.com/kim-song-jun/matchup-sports-platform/pull/1670 head da99004cb670d3d9c6b22e6614d95b15264a04df, 기존48 committed/type/pattern 및 exacthead 독립 OK. 원 리포트 댓글1 저장 성공.
+- 실제 P2 PRRT_kwDORrML2s6qRHCF: 화면을 열어둔 채 마감이 지나도 render가 없어 모집중/거의마감 유지. 실제 mounted clock 회귀 RED3FAIL/9PASS → 기존홈과 동일 미래·등록가능 조건의1분 tick/cleanup 연결 → 전체card60/60 GREEN.
+- 초기 fakeTimers는 Next Link 자체 timeout까지 세어 부수 실패(11FAIL)했으므로 숨기지 않고 별도 보존. Date/setInterval/clearInterval로 제한한 실제RED로 제품 결함을 확정했다. 새로 parent rerender/HTTP 성공을 흉내 내지 않는다.
+- 종료/무효/null deadline/nonopen/full 카드의 timer없음 및 마감·unmount cleanup을 검증. strict `<` 경계와 기존 API/공유helper 계약 유지. Root committed60/type/pattern·최신head독립리뷰·동일PRpush/답변/재리뷰 진행.
+- alpha after는 dev 머지·수정SHA배포 이후 대기이며 영구삭제/완료 처리하지 않는다.

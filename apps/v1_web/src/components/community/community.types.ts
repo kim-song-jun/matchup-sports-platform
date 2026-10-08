@@ -43,6 +43,8 @@ export type ChatListViewModel = {
     onToggle: () => void;
     rooms: ChatRoomModel[];
     status: 'loading' | 'error' | 'ready';
+    errorMessage?: string;
+    onRetry?: () => void;
   };
 };
 

@@ -7,6 +7,7 @@ import { compressImagesForUpload, type CompressOptions } from '@/lib/image-compr
 import { earliestPublicLivePollDelay } from '@/lib/public-live-polling';
 import { OPERATIONS_BOARD_POLL_INTERVAL_MS } from '@/lib/operations-board-polling';
 import { v1Keys } from '@/lib/query-keys';
+import { invalidateV1ChatMessageQueries } from './use-v1-realtime-socket';
 import { findInListCache } from '@/lib/list-cache-seed';
 import { randomUuid } from '@/lib/uuid';
 import type { GameLineup } from '@/types/game-operations';
@@ -2632,11 +2633,13 @@ export type V1ChatRoomsFilters = { roomType?: V1ChatRoom['roomType']; status?: '
  * 방 목록. `filters` 가 있으면 서버 필터(`roomType`)·페이지 크기를 그대로 넘긴다 — 목록 화면의
  * 카테고리 칩은 클라이언트 필터가 아니라 이 서버 필터를 써야 첫 페이지 바깥의 방을 놓치지 않는다.
  * 키는 `chatRooms()` 접두사를 공유하므로 기존 무효화가 필터 버전까지 함께 갱신한다.
+ * 채팅 화면은 다른 탭의 개인 고정 변경을 받기 위해 focus 재조회를 명시한다. 홈 등 다른 소비처의 기본 정책은 유지한다.
  */
-export function useV1ChatRooms(options?: QueryOptions, filters?: V1ChatRoomsFilters) {
+export function useV1ChatRooms(options?: QueryOptions & { refetchOnWindowFocus?: boolean | 'always' }, filters?: V1ChatRoomsFilters) {
   return useQuery({
     queryKey: filters ? ([...v1Keys.chatRooms(), 'list', filters] as const) : v1Keys.chatRooms(),
     queryFn: () => v1Get<CursorPage<V1ChatRoom>>('/chat/rooms', filters),
+    refetchOnWindowFocus: options?.refetchOnWindowFocus ?? false,
     enabled: options?.enabled ?? true,
   });
 }
@@ -2653,6 +2656,7 @@ export function useV1ChatRoom(roomId: string) {
   return useQuery({
     queryKey: v1Keys.chatRoom(roomId),
     queryFn: () => v1Get<V1ChatRoomDetail>(`/chat/rooms/${roomId}`),
+    refetchOnWindowFocus: 'always',
     enabled: Boolean(roomId),
   });
 }
@@ -2678,9 +2682,8 @@ export function useV1SendChatMessage(roomId: string) {
     // 텍스트 또는 사진(내가 올린 업로드 경로) 중 하나 — 서버가 둘 다·둘 다 없음을 400 으로 막는다.
     mutationFn: (body: { content: string } | { imageUrl: string } | { share: { kind: V1ChatShareKind; targetId: string } } | { fileId: string }) =>
       v1Post<V1ChatMessageSendResult>(`/chat/rooms/${roomId}/messages`, body),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: v1Keys.chatRooms() });
-      queryClient.invalidateQueries({ queryKey: v1Keys.chatMessages(roomId) });
+    onSuccess: (message) => {
+      invalidateV1ChatMessageQueries(queryClient, message);
       invalidateV1NotificationQueries(queryClient);
     },
   });

@@ -594,6 +594,72 @@ describe('ChatService', () => {
 
   // ─── 10. sendMessage: chat:message + notification:new 실시간 emit ───────────
 
+  it('sendMessage: a one-member team message reaches both sender tabs without a self notification', async () => {
+    // Given two tabs listening on the same authenticated user channel in a one-member team room.
+    const sentAt = new Date('2026-10-08T10:00:00Z');
+    prisma.v1ChatRoom.findFirst.mockResolvedValue(makeRoom({
+      matchId: null, match: null, teamId: 'team-1', team: { id: 'team-1', name: '동기화 테스트 팀' },
+    }));
+    prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'membership-a' });
+    prisma.v1ChatMessage.create.mockResolvedValue({
+      id: 'msg-own', chatRoomId: 'room-1', senderUserId: userA.id,
+      body: '두 탭에 보이는 메시지', messageType: 'text', status: 'sent', sentAt,
+    });
+    prisma.v1ChatRoom.update.mockResolvedValue({});
+    prisma.v1ChatRoomParticipant.findMany.mockResolvedValue([]);
+    const tabA: unknown[] = [];
+    const tabB: unknown[] = [];
+    realtimeGateway.emitToUser.mockImplementation((userId: string, event: string, payload: unknown) => {
+      if (userId === userA.id && event === 'chat:message') {
+        tabA.push(payload);
+        tabB.push(payload);
+      }
+    });
+
+    // When the real service persists a message from this account.
+    try {
+      await service.sendMessage(userA, 'room-1', { content: '두 탭에 보이는 메시지' });
+    } finally {
+      realtimeGateway.emitToUser.mockReset();
+    }
+
+    // Then both user-channel subscribers receive the committed message, without inbox or push work.
+    const expected = [expect.objectContaining({
+      messageId: 'msg-own', roomId: 'room-1', senderUserId: userA.id,
+      content: '두 탭에 보이는 메시지', messageType: 'text', status: 'sent', sentAt,
+    })];
+    expect(tabA).toEqual(expected);
+    expect(tabB).toEqual(expected);
+    expect(prisma.v1Notification.createMany).not.toHaveBeenCalled();
+    expect(prisma.v1NotificationPreference.findMany).not.toHaveBeenCalled();
+    expect(webPushService.sendToUser).not.toHaveBeenCalled();
+  });
+
+  it('sendMessage: a failed transaction broadcasts no sender message', async () => {
+    // Given an authorized participant and a transaction that cannot persist the message.
+    prisma.v1ChatRoom.findFirst.mockResolvedValue(makeRoomForParticipant(userA.id));
+    prisma.$transaction.mockRejectedValueOnce(new Error('transaction failed'));
+
+    // When sending fails, then no tab may see a message that was not stored.
+    await expect(service.sendMessage(userA, 'room-1', { content: '저장되지 않은 메시지' })).rejects.toThrow('transaction failed');
+    expect(realtimeGateway.emitToUser).not.toHaveBeenCalled();
+    expect(prisma.v1Notification.createMany).not.toHaveBeenCalled();
+    expect(webPushService.sendToUser).not.toHaveBeenCalled();
+  });
+
+  it('sendMessage: loss of team entitlement emits no sender event', async () => {
+    // Given an old active chat participant whose team membership was revoked.
+    prisma.v1ChatRoom.findFirst.mockResolvedValue(makeRoom({ matchId: null, match: null, teamId: 'team-1' }));
+    prisma.v1TeamMembership.findFirst.mockResolvedValue(null);
+
+    // When the old tab sends, then permission denial remains authoritative for persistence and realtime.
+    await expect(service.sendMessage(userA, 'room-1', { content: '권한이 끝난 메시지' })).rejects.toMatchObject({
+      response: { code: 'PERMISSION_DENIED' },
+    });
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+    expect(realtimeGateway.emitToUser).not.toHaveBeenCalled();
+  });
+
   it('sendMessage: emits chat:message and notification:new to every other active recipient', async () => {
     const sentAt = new Date('2026-06-21T10:00:00Z');
     const createdMessage = { id: 'msg-1', chatRoomId: 'room-1', senderUserId: userA.id, body: 'hello', status: 'sent', sentAt };
@@ -628,7 +694,11 @@ describe('ChatService', () => {
       'chat:message',
       expect.objectContaining({ roomId: 'room-1', content: 'hello' }),
     );
-    expect(realtimeGateway.emitToUser).not.toHaveBeenCalledWith(userA.id, expect.anything(), expect.anything());
+    expect(realtimeGateway.emitToUser).toHaveBeenCalledWith(
+      userA.id, 'chat:message', expect.objectContaining({ roomId: 'room-1', content: 'hello' }),
+    );
+    expect(realtimeGateway.emitToUser).not.toHaveBeenCalledWith(userA.id, 'notification:new', expect.anything());
+    expect(webPushService.sendToUser).not.toHaveBeenCalledWith(userA.id, expect.anything());
   });
 
   // ─── 11. sendMessage: WebPushService.sendToUser 웹 푸시 발송 ────────────────

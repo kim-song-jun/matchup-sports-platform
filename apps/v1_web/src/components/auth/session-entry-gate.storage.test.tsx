@@ -87,4 +87,64 @@ describe('SessionEntryGate storage failure handling', () => {
     }));
     expect(screen.getByText('이메일 로그인')).toBeInTheDocument();
   });
+
+  it('treats only the inactive-account permission response as a usable login entry', async () => {
+    let authRequestCount = 0;
+    server.use(http.get('*/api/v1/auth/me', () => {
+      authRequestCount += 1;
+      return HttpResponse.json({
+        status: 'error',
+        statusCode: 403,
+        code: 'PERMISSION_DENIED',
+        message: 'Account is not active',
+        details: null,
+        requestId: 'session-entry-gate-inactive-test',
+        timestamp: new Date().toISOString(),
+      }, { status: 403 });
+    }));
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <SessionEntryGate mode='login'>
+          <div>이메일 로그인</div>
+        </SessionEntryGate>
+      </QueryClientProvider>,
+    );
+
+    expect(await screen.findByText('이메일 로그인')).toBeInTheDocument();
+    await waitFor(() => expect(authRequestCount).toBe(1));
+    expect(localStorage.getItem(V1_SESSION_HINT_KEY)).toBeNull();
+    expect(localStorage.getItem(V1_USER_ID_KEY)).toBeNull();
+    expect(mocks.disconnectV1Socket).toHaveBeenCalledTimes(1);
+    expect(mocks.replace).not.toHaveBeenCalled();
+  });
+
+  it('keeps the session and retry screen for a different 403 auth restriction', async () => {
+    server.use(http.get('*/api/v1/auth/me', () => HttpResponse.json({
+      status: 'error',
+      statusCode: 403,
+      code: 'TERMS_RECONSENT_REQUIRED',
+      message: '약관 동의가 필요해요.',
+      details: null,
+      requestId: 'session-entry-gate-terms-test',
+      timestamp: new Date().toISOString(),
+    }, { status: 403 })));
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <SessionEntryGate mode='login'>
+          <div>이메일 로그인</div>
+        </SessionEntryGate>
+      </QueryClientProvider>,
+    );
+
+    expect(await screen.findByText('로그인 상태를 확인하지 못했어요. 잠시 후 다시 시도해 주세요.')).toBeInTheDocument();
+    expect(screen.queryByText('이메일 로그인')).not.toBeInTheDocument();
+    expect(localStorage.getItem(V1_SESSION_HINT_KEY)).toBe('active');
+    expect(localStorage.getItem(V1_USER_ID_KEY)).toBe('withdrawn-user');
+    expect(mocks.disconnectV1Socket).not.toHaveBeenCalled();
+    expect(mocks.replace).not.toHaveBeenCalled();
+  });
 });

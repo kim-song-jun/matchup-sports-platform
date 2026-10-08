@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation';
 import type { ReactNode } from 'react';
 import { useEffect, useState } from 'react';
 import { useV1AuthMe } from '@/hooks/use-v1-api';
-import { isUnauthenticatedError, retryTransientFailure } from '@/lib/api-client';
+import { isUnauthenticatedError, retryTransientFailure, V1ApiError } from '@/lib/api-client';
 import {
   clearStoredV1Session,
   sanitizeRedirectPath,
@@ -19,6 +19,14 @@ type SessionEntryGateProps = {
   mode: 'root' | 'login';
   children?: ReactNode;
 };
+
+function isInactiveAccountPermissionError(error: unknown): boolean {
+  return error instanceof V1ApiError && error.statusCode === 403 && error.code === 'PERMISSION_DENIED';
+}
+
+function isLoginEntryAuthError(error: unknown): boolean {
+  return isUnauthenticatedError(error) || isInactiveAccountPermissionError(error);
+}
 
 export function SessionEntryGate({ mode, children }: SessionEntryGateProps) {
   const router = useRouter();
@@ -46,7 +54,7 @@ export function SessionEntryGate({ mode, children }: SessionEntryGateProps) {
       return;
     }
 
-    if (authMe.isError && !authMe.isFetching && isUnauthenticatedError(authMe.error)) {
+    if (authMe.isError && !authMe.isFetching && isLoginEntryAuthError(authMe.error)) {
       try {
         clearStoredV1Session();
       } catch {
@@ -62,7 +70,7 @@ export function SessionEntryGate({ mode, children }: SessionEntryGateProps) {
     }
   }, [authMe.error, authMe.isError, authMe.isFetching, authMe.isSuccess, hasSessionHint, mode, router]);
 
-  if (mode === 'login' && (hasSessionHint === false || (authMe.isError && isUnauthenticatedError(authMe.error)))) {
+  if (mode === 'login' && (hasSessionHint === false || (authMe.isError && isLoginEntryAuthError(authMe.error)))) {
     return <>{children}</>;
   }
 

@@ -1,5 +1,6 @@
 ---
+'v1_api': patch
 'v1_web': patch
 ---
 
-Complete successful withdrawal session cleanup after route unmount, clear identity immediately, and bound the return to login while removing the device push subscription.
+Complete withdrawal session cleanup across open connections, clear identity immediately, bound the return to login, and reconcile lost responses without discarding confirmed active sessions.

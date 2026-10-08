@@ -1031,6 +1031,12 @@ export const v1MswHandlers = [
         { status: 400 },
       );
     }
+    if (!(new Date(body.endAt).getTime() > new Date(body.startAt).getTime())) {
+      return HttpResponse.json(
+        { status: 'error', statusCode: 422, code: 'SCHEDULE_INVALID_TIME_RANGE', message: 'Schedule end time must be after start time' },
+        { status: 422 },
+      );
+    }
     v1ScheduleFixture = {
       ...v1ScheduleFixture,
       teamId: String(params.teamId),
@@ -1055,6 +1061,30 @@ export const v1MswHandlers = [
   }),
   http.patch(`${api}/teams/:teamId/schedules/:scheduleId`, async ({ request }) => {
     const body = await request.json() as V1UpdateScheduleDto;
+    // 서버와 같은 version → terminal → effective range 순서로, fixture 변경 전에 거부한다.
+    if (body.expectedVersion !== v1ScheduleFixture.version) {
+      return HttpResponse.json(
+        {
+          status: 'error', statusCode: 409, code: 'VERSION_CONFLICT', message: 'Schedule version is stale',
+          details: { expectedVersion: body.expectedVersion, currentVersion: v1ScheduleFixture.version },
+        },
+        { status: 409 },
+      );
+    }
+    if (v1ScheduleFixture.state !== 'SCHEDULED') {
+      return HttpResponse.json(
+        { status: 'error', statusCode: 409, code: 'SCHEDULE_TERMINAL', message: 'Schedule is already terminal' },
+        { status: 409 },
+      );
+    }
+    const startAt = body.startAt || v1ScheduleFixture.startAt;
+    const endAt = body.endAt || v1ScheduleFixture.endAt;
+    if (!(new Date(endAt).getTime() > new Date(startAt).getTime())) {
+      return HttpResponse.json(
+        { status: 'error', statusCode: 422, code: 'SCHEDULE_INVALID_TIME_RANGE', message: 'Schedule end time must be after start time' },
+        { status: 422 },
+      );
+    }
     if (body.title !== undefined) v1ScheduleFixture.title = body.title;
     if (body.startAt !== undefined) v1ScheduleFixture.startAt = body.startAt;
     if (body.endAt !== undefined) v1ScheduleFixture.endAt = body.endAt;

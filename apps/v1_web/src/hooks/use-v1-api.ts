@@ -1684,12 +1684,16 @@ export function useV1MySchedule(filters?: ListFilters, options?: { enabled?: boo
   });
 }
 
-export function useV1TeamMatches(filters?: ListFilters, options?: QueryOptions & { seed?: CursorPage<V1TeamMatch> }) {
+export function useV1TeamMatches(
+  filters?: ListFilters,
+  options?: QueryOptions & { seed?: CursorPage<V1TeamMatch>; refetchInterval?: number | false },
+) {
   const seed = options?.seed;
   return useQuery({
     queryKey: v1Keys.teamMatches(filters),
     queryFn: () => v1Get<CursorPage<V1TeamMatch>>('/team-matches', filters),
-    refetchInterval: 15000,
+    // 홈 추천처럼 한 장만 보여 주는 곳은 끈다 — 모든 방문자가 15초마다 목록을 다시 받을 이유가 없다.
+    refetchInterval: options?.refetchInterval ?? 15000,
     enabled: options?.enabled,
     // useV1Matches와 동일한 이유 — cursor로 쿼리키가 바뀌는 "더 보기" 중 목록이 비지 않게 하고,
     // 첫 진입에만 서버 seed 를 쓴다.

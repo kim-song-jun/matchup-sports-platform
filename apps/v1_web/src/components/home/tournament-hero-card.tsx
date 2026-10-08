@@ -9,37 +9,39 @@ import { cssUrl } from '@/lib/assets';
 import { getSortedTournamentPromos, resolveTournamentImage } from '@/lib/tournament-promo';
 import { withFromPath } from '@/lib/session-storage';
 import { resolveTournamentRegistrationBlock } from '@/lib/tournament-registration-availability';
-import { getTournamentStatusConfig } from '@/lib/v1-tournament-status';
 import type { V1TournamentListItem } from '@/types/api';
+
+/**
+ * 홈 "오늘의 추천"에 올릴 수 있나 — **지금 신청할 수 있고(상태·마감·정원) 아직 시작 전**인 대회·리그.
+ * 닫힌 대회를 "모집 마감" 카드로 남기지 않는다: 추천 칸은 개인매치·팀매치처럼 지금 신청할 수
+ * 있는 것만 보여 준다(2026-10-08 확정). 홈의 정규 리그 추천도 같은 판정을 쓴다.
+ */
+export function isRecruitingNow(item: V1TournamentListItem, now: number): boolean {
+  const deadline = item.registrationDeadlineAt ? new Date(item.registrationDeadlineAt).getTime() : null;
+  const scheduledAt = item.scheduledAt ? new Date(item.scheduledAt).getTime() : null;
+  const registrationBlocked = item.teamCount === undefined
+    // 목록의 정규 리그는 정원 필드가 없다. 숫자를 채우지 않고 리그의 마감 게이트만 적용한다.
+    ? item.kind !== 'regular_league' || deadline === null || !Number.isFinite(deadline) || deadline < now
+    : resolveTournamentRegistrationBlock({ ...item, teamCount: item.teamCount }, new Date(now)) !== null;
+  // 캠페인 링크는 일반 신청 게이트보다 엄격하다: 마감 순간부터 접수를 닫는다.
+  const campaignBlocked = Boolean(item.campaignSlug)
+    && deadline !== null && (!Number.isFinite(deadline) || deadline <= now);
+  const started = scheduledAt !== null && scheduledAt <= now;
+  return !registrationBlocked && !campaignBlocked && !started;
+}
 
 /**
  * 홈 "오늘의 추천"의 대회 히어로.
  * 매치 히어로(FeaturedMatchCard)와 동일한 풀폭 미디어+오버레이 비중으로 모집중 대회를 노출한다.
- * 관리자가 홈 홍보를 켠 open 대회를 우선순위 순으로 모두 노출한다.
+ * 관리자가 홈 홍보를 켠 대회 중 지금 신청할 수 있는 것(isRecruitingNow)을 우선순위 순으로 모두 노출한다.
  */
 export function TournamentHeroCard({ items, loading = false }: { items: V1TournamentListItem[]; loading?: boolean }) {
   const [, refreshClock] = useState(0);
   // 목록이 늦게 도착하거나 바뀌어도 mount 시각이 아닌 현재 시각으로 판정한다.
   const now = Date.now();
-  const featuredCards = getSortedTournamentPromos(items, 'home').map((featured) => {
-    const deadline = featured.registrationDeadlineAt ? new Date(featured.registrationDeadlineAt).getTime() : null;
-    const scheduledAt = featured.scheduledAt ? new Date(featured.scheduledAt).getTime() : null;
-    const registrationBlocked = featured.teamCount === undefined
-      // open 홍보 목록의 정규 리그는 정원이 없다. 숫자를 채우지 않고 리그의 마감 게이트만 적용한다.
-      ? featured.kind !== 'regular_league' || deadline === null || !Number.isFinite(deadline) || deadline < now
-      : resolveTournamentRegistrationBlock({ ...featured, teamCount: featured.teamCount }, new Date(now)) !== null;
-    // 캠페인 링크는 일반 신청 게이트보다 엄격하다: 시작·마감 순간부터 접수를 닫는다.
-    const campaignBlocked = Boolean(featured.campaignSlug) && (
-      (scheduledAt !== null && scheduledAt <= now)
-      || (deadline !== null && (!Number.isFinite(deadline) || deadline <= now))
-    );
-    return { featured, deadline, scheduledAt, registrationBlocked: registrationBlocked || campaignBlocked };
-  });
-  const hasUpcomingGate = featuredCards.some(({ featured, deadline, scheduledAt, registrationBlocked }) =>
-    !registrationBlocked && (
-      (deadline !== null && Number.isFinite(deadline) && deadline >= now)
-      || (Boolean(featured.campaignSlug) && scheduledAt !== null && Number.isFinite(scheduledAt) && scheduledAt > now)
-    ));
+  const featuredCards = getSortedTournamentPromos(items, 'home').filter((featured) => isRecruitingNow(featured, now));
+  // 보이는 카드는 마감·시작이 모두 미래다 — 그중 하나라도 있으면 1분마다 다시 판정해 지난 카드를 내린다.
+  const hasUpcomingGate = featuredCards.some((featured) => featured.registrationDeadlineAt || featured.scheduledAt);
 
   useEffect(() => {
     if (loading || !hasUpcomingGate) return;
@@ -58,9 +60,9 @@ export function TournamentHeroCard({ items, loading = false }: { items: V1Tourna
 
   return (
     <>
-      {featuredCards.map(({ featured, registrationBlocked }) => {
+      {featuredCards.map((featured) => {
         const cardTitle = featured.promoHomeTitle?.trim() || featured.title;
-        const ctaLabel = registrationBlocked ? getTournamentStatusConfig(featured.status, true).label : '참가 신청하기';
+        const ctaLabel = '참가 신청하기';
         const cardBody = featured.promoHomeSubtitle?.trim() || featured.venue || `${featured.sport.name} 대회`;
         const badgeText = featured.promoHomeBadgeText?.trim() || '추천 대회';
         // 홈 홍보 이미지를 따로 지정하지 않았으면 대회 커버(기본 이미지)를 그대로 쓴다.

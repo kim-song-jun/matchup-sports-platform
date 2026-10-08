@@ -610,7 +610,7 @@ export function TeamMatchDetailPageView({ model, recordEntry, lifecyclePanel }: 
         <AppBackLink className="tm-desktop-back" fallbackHref="/team-matches">
           <ChevronLeftIcon size={22} strokeWidth={2.2} />
         </AppBackLink>
-        <h1 className="tm-text-heading">{match.title || '팀매치 상세'}</h1>
+        <h1 className="tm-text-heading" style={{ minWidth: 0, overflowWrap: 'anywhere' }}>{match.title || '팀매치 상세'}</h1>
       </div>
 
       {/* Desktop 2-column layout wrapper */}
@@ -696,6 +696,10 @@ export function TeamMatchDetailPageView({ model, recordEntry, lifecyclePanel }: 
             {/* 히어로(뒤로가기 포함) 다음, 본문 앞 — 내비게이션이 항상 먼저 보이게 유지한다. */}
             {recordEntry}
             <div className="tm-match-detail-body">
+              {/* 모바일 셸 제목은 비어 있으므로 실제 매치 제목을 본문에서도 보여준다. */}
+              <h1 className="tm-text-heading tm-hide-desktop" style={{ marginBlock: 'var(--spacing-3)', overflowWrap: 'anywhere' }}>
+                {match.title || '팀매치 상세'}
+              </h1>
               {/* 지금 할 일 — 데스크톱은 우측 CTA 카드가 맡고, 모바일은 하단 바 대신 본문 맨 위에도 둔다. */}
               {model.progress && nextAction?.href && nextAction.tone === 'primary' ? (
                 <div className="tm-hide-desktop" style={{ marginTop: 12 }}>

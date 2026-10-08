@@ -758,6 +758,33 @@ describe('TournamentDetailView — completed vs non-completed section rendering'
     expect(screen.queryByText('대진표 준비 중')).not.toBeInTheDocument();
   });
 
+  it('explains a one-off league-format tournament by its bracket, not by season weeks', () => {
+    const tournament = makeTournament({ id: 't1', status: 'open', format: 'league', groups: [], fixtures: [] });
+
+    render(createElement(TournamentDetailView, { tournament, myRegistration: null }));
+
+    expect(screen.getByText('대회 진행 방식')).toBeInTheDocument();
+    expect(screen.getByText('참가한 모든 팀이 서로 맞붙어요. 몇 번씩 맞붙는지는 대진표에서 확인할 수 있어요.')).toBeInTheDocument();
+    expect(screen.queryByText(/시즌 주차 수/)).not.toBeInTheDocument();
+  });
+
+  it('keeps the season-week explanation for a regular league mirror row (group_knockout format)', () => {
+    const tournament = makeTournament({
+      id: 't1',
+      status: 'open',
+      format: 'group_knockout',
+      kind: 'regular_league',
+      groups: [],
+      fixtures: [],
+    });
+
+    render(createElement(TournamentDetailView, { tournament, myRegistration: null }));
+
+    expect(screen.getByText('참가한 모든 팀이 서로 맞붙어요. 맞붙는 횟수는 시즌 주차 수에 따라 달라져요.')).toBeInTheDocument();
+    expect(screen.queryByText('결선 진출')).not.toBeInTheDocument();
+    expect(screen.queryByText(/대진표에서 확인할 수 있어요/)).not.toBeInTheDocument();
+  });
+
   it('keeps the application guide, flow explainer, and standings-moved notice for open tournaments (non-destructive)', () => {
     const group = makeGroup({ id: 'g1', phase: 'group', standings: [] });
     const tournament = makeTournament({

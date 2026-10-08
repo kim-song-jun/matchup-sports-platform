@@ -49,6 +49,8 @@ import { resolveLeagueWeekNumbers } from './league-week-number';
 import { loadFirstGamePlayerNotices } from './league-fixture-scheduled-notice';
 import {
   AddLeagueTeamDto,
+  ApplyLeagueTemplateDto,
+  LeagueFixtureScheduleDto,
   CancelLeagueFixtureDto,
   CreateLeagueMatchDto,
   CreateManualLeagueFixtureDto,
@@ -67,6 +69,9 @@ import { findTournamentOnSurface } from '../tournaments/tournament-surface-looku
 import { assertLeagueFixtureGenerationAllowedInTx } from './league-fixture-generation-guard';
 import { LEAGUE_STATE_BY_STATUS, isCompleteLeagueMirror } from '../tournaments/league-competition-mirror';
 import { randomUUID } from 'node:crypto';
+import { BRACKET_TEMPLATE_MAX_FIXTURES } from '../tournaments/templates/bracket-template-plan';
+import { lockCompetitionForBracketMutationInTx } from '../tournaments/slots/competition-bracket-lock';
+import { planLeagueTemplate } from './league-template-plan';
 import { LeagueStateValue } from './league-state';
 import { isLeagueRegistrationOpen } from './league-registration-open';
 import { competitionTeamTargets, enqueueRosterResync } from '../games/roster/roster-resync-events';
@@ -518,7 +523,17 @@ export class LeagueMatchAdminService {
    * 된다. 라운드 수로 요구하면 멀쩡한 입력을 거부한다.
    */
   private resolveScheduleStartAts(
-    dto: GenerateLeagueFixturesDto,
+    dto: { schedule: LeagueFixtureScheduleDto },
+    totalRounds: number,
+    timing: FixtureTimingOptions | undefined,
+  ): Date[];
+  private resolveScheduleStartAts(
+    dto: Pick<GenerateLeagueFixturesDto, 'schedule'>,
+    totalRounds: number,
+    timing: FixtureTimingOptions | undefined,
+  ): Date[] | undefined;
+  private resolveScheduleStartAts(
+    dto: Pick<GenerateLeagueFixturesDto, 'schedule'>,
     totalRounds: number,
     timing: FixtureTimingOptions | undefined,
   ): Date[] | undefined {
@@ -1190,6 +1205,91 @@ export class LeagueMatchAdminService {
       teamMatchIds: result.ids,
       warnings: buildOddTeamCountWarning(teamIds.length),
     };
+  }
+
+  /**
+   * 템플릿으로 대진 뼈대를 만든다 — 자리(ENTRY) N개와 라운드로빈 빈 경기. 팀은 이후 자리 배정으로 들어온다.
+   *
+   * 잠금은 일괄 생성과 같다: 리그 행 `FOR UPDATE` → 상태 가드 → "경기가 이미 있으면 409". 두 요청이 동시에
+   * 들어와도 먼저 잠근 쪽만 만들고 다른 쪽은 `LEAGUE_FIXTURES_EXIST` 를 받는다. 리그 `status` 는 바꾸지 않는다 —
+   * 자리가 모두 차는 순간 `promoteLeagueWhenSlotsFilledInTx` 가 올린다.
+   */
+  async applyTemplate(user: V1AuthUser, leagueId: string, dto: ApplyLeagueTemplateDto) {
+    const admin = await this.adminContext.getMutationAdmin(user.id);
+    const league = await this.loadLeague(leagueId);
+    const config = await resolveTeamMatchCompetitionConfig(this.prisma, league.sportId);
+    if (config === null) {
+      throw new ConflictException({ code: 'COMPETITION_CONFIG_REQUIRED', message: '이 종목에 활성 경기 설정이 없어요.' });
+    }
+    const plan = planLeagueTemplate({ teamCount: dto.teamCount, legs: dto.legs });
+    if (plan.fixtures.length > BRACKET_TEMPLATE_MAX_FIXTURES) {
+      throw new UnprocessableEntityException({
+        code: 'BRACKET_TEMPLATE_TOO_LARGE',
+        message: `경기가 ${BRACKET_TEMPLATE_MAX_FIXTURES}개를 넘어요. 팀 수나 회전 수를 줄여 주세요.`,
+      });
+    }
+    // 날짜 검증은 트랜잭션 밖 — 도메인 거부가 락을 잡을 이유가 없다.
+    const startAts = this.resolveScheduleStartAts({ schedule: dto.schedule }, plan.totalRounds, undefined);
+    const trimmedPlaceName = dto.placeName?.trim();
+    const placeName = trimmedPlaceName ? trimmedPlaceName : DEFAULT_FIXTURE_PLACE_NAME;
+
+    return this.prisma.$transaction(async (tx) => {
+      // 리그 레인 = 행 FOR UPDATE + 보류 가드(PR-1b). raw SQL 을 이 파일에 새로 넣지 않는다 —
+      // `tournament-raw-sql-baseline.json` 의 이 파일 허용치가 이미 꽉 차 있다.
+      await lockCompetitionForBracketMutationInTx(tx, { id: leagueId, kind: 'regular_league' });
+      if ((await tx.v1TeamMatch.count({ where: { leagueId } })) > 0) {
+        throw new ConflictException({ code: 'LEAGUE_FIXTURES_EXIST', message: '이미 대진이 생성된 리그예요.' });
+      }
+      const slotIds = plan.slotPositions.map(() => randomUUID());
+      await tx.v1TournamentSlot.createMany({
+        data: plan.slotPositions.map((position, index) => ({
+          id: slotIds[index],
+          tournamentId: leagueId,
+          kind: 'ENTRY' as const,
+          groupId: null,
+          position,
+        })),
+      });
+      for (const fixture of plan.fixtures) {
+        await createLeagueFixture(tx, this.games, {
+          leagueId: league.id,
+          adminUserId: admin.userId,
+          sportId: league.sportId,
+          regionId: league.regionId,
+          competitionConfigId: config.id,
+          title: leagueFixtureTitle({ leagueTitle: league.title, round: fixture.round }),
+          placeName,
+          startAt: startAts[fixture.round - 1],
+          endAt: null,
+          home: null,
+          away: null,
+          homeSlotId: slotIds[fixture.homePosition - 1],
+          awaySlotId: slotIds[fixture.awayPosition - 1],
+        });
+      }
+      await this.adminContext.logAdminAction(
+        admin,
+        {
+          action: 'league_match.apply_template',
+          targetType: 'league_match',
+          targetId: leagueId,
+          afterJson: {
+            teamCount: dto.teamCount,
+            legs: dto.legs,
+            slotCount: slotIds.length,
+            fixtureCount: plan.fixtures.length,
+            schedule: toKstScheduleLog(startAts),
+            placeName,
+          },
+        },
+        tx,
+      );
+      return { slots: slotIds.length, fixtures: plan.fixtures.length };
+    }, {
+      // 일괄 생성과 같은 이유 — ALB idle_timeout(60초)보다 낮아야 실패가 실제 실패와 일치한다.
+      timeout: 45_000,
+      maxWait: 5_000,
+    });
   }
 
   /**

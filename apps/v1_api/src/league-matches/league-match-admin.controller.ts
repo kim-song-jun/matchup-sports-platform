@@ -5,6 +5,7 @@ import { V1AuthGuard } from '../auth/v1-auth.guard';
 import { V1AuthUser } from '../auth/v1-auth-user';
 import {
   AddLeagueTeamDto,
+  ApplyLeagueTemplateDto,
   CancelLeagueFixtureDto,
   CreateLeagueMatchDto,
   CreateManualLeagueFixtureDto,
@@ -139,6 +140,16 @@ export class LeagueMatchAdminController {
     @Body() dto: CreateManualLeagueFixtureDto,
   ) {
     return this.service.createManualFixture(user, leagueId, dto);
+  }
+
+  // 자리 기반 빈 대진 템플릿. 정적 세그먼트('template')라 `POST :leagueId/fixtures`·`/manual`·`/regenerate` 와 충돌하지 않는다.
+  @Post(':leagueId/fixtures/template')
+  applyTemplate(
+    @CurrentUser() user: V1AuthUser,
+    @Param('leagueId', leagueIdPipe) leagueId: string,
+    @Body() dto: ApplyLeagueTemplateDto,
+  ) {
+    return this.service.applyTemplate(user, leagueId, dto);
   }
 
   // R13: 대진 재생성 — 기존 대진 전부를 취소하고 같은 팀 로스터로 새 라운드로빈 대진을 만든다.

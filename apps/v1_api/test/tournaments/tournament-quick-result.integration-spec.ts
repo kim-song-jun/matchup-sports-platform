@@ -579,6 +579,15 @@ describe('빠른 결과 — 입장 조건 거부(대회)', () => {
   });
 });
 
+function previewHash(revision: { score: unknown; goalEvents: unknown; eventsHash: string; mvpParticipantId: string | null }): string {
+  return canonicalGameCommandPayloadHash({
+    score: revision.score,
+    goalEvents: revision.goalEvents,
+    eventsHash: revision.eventsHash,
+    mvpParticipantId: revision.mvpParticipantId,
+  });
+}
+
 afterAll(async () => cleanup?.());
 
 describe('빠른 결과 — 권한', () => {
@@ -641,5 +650,121 @@ describe('빠른 결과 — 멱등 재생', () => {
     expect(conflicting.status).toBe(409);
     expect(conflicting.body.code).toBe('IDEMPOTENCY_PAYLOAD_CONFLICT');
     expect(await revisionCount(gameId)).toBe(1);
+  });
+});
+
+describe('빠른 결과 — 정정', () => {
+  it('승부차기 승자 정정은 킥 수 없이 통과하고 다음 칸을 다시 채우되 완료 알림은 다시 가지 않는다', async () => {
+    const bracket = await createBracket();
+    const { gameId, teamMatchId } = bracket.semi1;
+    const first = await quickResult(gameId, users.ops, { home: 1, away: 1, penalties: { home: 5, away: 4 } });
+    expect(first.status).toBe(201);
+    await drainOutboxWorker(prisma);
+    expect(await notifiedCount(teamMatchId)).toBe(2);
+    expect((await finalDetails(bracket.final.teamMatchId)).homeRegistrationId).toBe(bracket.registration.a);
+
+    // 같은 경기의 승부차기 승자를 바꾼다. 득점 기록이 없어 킥 수를 요구하지 않는다(Task 3).
+    const base = await prisma.v1GameResultRevision.findUniqueOrThrow({ where: { id: first.body.data.revisionId } });
+    const baseParticipants = await prisma.v1GameResultParticipant.findMany({ where: { resultRevisionId: base.id } });
+    const correctionKey = `qr-correction-${randomUUID()}`;
+    const draft = await resultReview.createResultCorrection(authUser(users.ops), gameId, correctionKey, {
+      expectedVersion: await gameVersion(gameId),
+      clientCommandId: correctionKey,
+      baseRevisionId: base.id,
+      reason: '승부차기 승자 정정',
+      changes: {
+        score: { home: 1, away: 1, penalties: { home: 4, away: 5 } },
+        actualParticipants: baseParticipants.map((row) => ({
+          participantId: row.participantId,
+          sideId: row.sideId,
+          started: true,
+          goals: 0,
+          cards: { yellow: 0, red: 0 },
+          goalkeeper: row.goalkeeper,
+        })),
+        eventsHash: canonicalGameCommandPayloadHash([]),
+      },
+    } as never);
+    const draftRow = await prisma.v1GameResultRevision.findUniqueOrThrow({ where: { id: draft.revisionId } });
+    const officializeKey = `qr-officialize-${randomUUID()}`;
+    await resultReview.officializeResultRevision(authUser(users.ops), gameId, draft.revisionId, officializeKey, {
+      expectedVersion: draft.version,
+      clientCommandId: officializeKey,
+      projectionPreviewHash: previewHash(draftRow),
+    } as never);
+    await drainOutboxWorker(prisma);
+
+    expect((await finalDetails(bracket.final.teamMatchId)).homeRegistrationId).toBe(bracket.registration.b);
+    expect(await notifiedCount(teamMatchId)).toBe(2);
+  });
+});
+
+describe('빠른 결과 — 이미 확정된 경기(재입력 허용의 대조군)', () => {
+  it('팀매치가 completed 여도 현재 포인터가 확정본(VOID 아님)이면 QUICK_RESULT_NOT_AVAILABLE 이고 리비전은 늘지 않는다', async () => {
+    const bracket = await createBracket();
+    const { gameId, teamMatchId } = bracket.semi1;
+    const first = await quickResult(gameId, users.ops, { home: 1, away: 0 });
+    expect(first.status).toBe(201);
+    // 무효 뒤 재입력이 completed 를 허용하는 것과 같은 상태(completed)인데도 VOID 가 아니라서 거부돼야 한다.
+    expect((await prisma.v1TeamMatch.findUniqueOrThrow({ where: { id: teamMatchId } })).status).toBe('completed');
+    expect((await prisma.v1Game.findUniqueOrThrow({ where: { id: gameId } })).currentOfficialRevisionId).toBe(
+      first.body.data.revisionId,
+    );
+
+    const again = await quickResult(gameId, users.ops, { home: 3, away: 0 });
+
+    expect(again.status).toBe(409);
+    expect(again.body.code).toBe('QUICK_RESULT_NOT_AVAILABLE');
+    expect(await revisionCount(gameId)).toBe(1);
+    expect((await finalDetails(bracket.final.teamMatchId)).homeRegistrationId).toBe(bracket.registration.a);
+  });
+});
+
+describe('빠른 결과 — 다음 경기가 이미 시작된 경우', () => {
+  it('다음 경기가 이미 시작됐으면 NEXT_FIXTURE_CONFLICT 이고 부분 적용 없이 전부 롤백된다', async () => {
+    const bracket = await createBracket();
+    const { gameId, teamMatchId } = bracket.semi1;
+    await prisma.v1Game.update({ where: { id: bracket.final.gameId }, data: { state: 'LIVE' } });
+
+    const response = await quickResult(gameId, users.ops, { home: 2, away: 0 });
+
+    expect(response.status).toBe(409);
+    expect(response.body.code).toBe('NEXT_FIXTURE_CONFLICT');
+    expect(await revisionCount(gameId)).toBe(0);
+    expect(await prisma.v1Game.findUniqueOrThrow({ where: { id: gameId } })).toMatchObject({
+      state: 'SCHEDULED',
+      currentOfficialRevisionId: null,
+    });
+    expect((await prisma.v1TeamMatch.findUniqueOrThrow({ where: { id: teamMatchId } })).status).toBe('matched');
+    expect(await outboxCount(gameId, 'GAME_RESULT_OFFICIAL')).toBe(0);
+  });
+});
+
+describe('빠른 결과 — 무효 뒤 재입력', () => {
+  it('무효 처리한 경기는 다시 점수를 넣을 수 있고, VOID 리비전을 승계하며 진출이 새 승자로 바뀐다', async () => {
+    const bracket = await createBracket();
+    const { gameId, teamMatchId } = bracket.semi1;
+    const first = await quickResult(gameId, users.ops, { home: 2, away: 1 });
+    expect(first.status).toBe(201);
+    expect((await finalDetails(bracket.final.teamMatchId)).homeRegistrationId).toBe(bracket.registration.a);
+
+    const voidKey = `qr-void-${randomUUID()}`;
+    const voided = await resultReview.voidResultRevision(authUser(users.ops), gameId, first.body.data.revisionId, voidKey, {
+      expectedVersion: await gameVersion(gameId),
+      clientCommandId: voidKey,
+      reason: '점수 오입력',
+    } as never);
+    expect((await finalDetails(bracket.final.teamMatchId)).homeRegistrationId).toBeNull();
+    // 무효는 팀매치 상태를 되돌리지 않는다 — 재입력 입장 조건이 completed 를 허용해야 하는 이유다.
+    expect((await prisma.v1TeamMatch.findUniqueOrThrow({ where: { id: teamMatchId } })).status).toBe('completed');
+
+    const reentry = await quickResult(gameId, users.ops, { home: 0, away: 3 });
+
+    expect(reentry.status).toBe(201);
+    const revision = await prisma.v1GameResultRevision.findUniqueOrThrow({ where: { id: reentry.body.data.revisionId } });
+    expect(revision).toMatchObject({ state: 'OFFICIAL', supersedesId: voided.revisionId, revision: 3, reason: '[quick-result]' });
+    expect((await prisma.v1Game.findUniqueOrThrow({ where: { id: gameId } })).currentOfficialRevisionId).toBe(revision.id);
+    expect((await finalDetails(bracket.final.teamMatchId)).homeRegistrationId).toBe(bracket.registration.b);
+    expect(await outboxCount(gameId, 'GAME_RESULT_OFFICIAL')).toBe(2);
   });
 });

@@ -1015,11 +1015,16 @@ export const v1MswHandlers = [
   http.get(`${api}/teams/:teamId/schedules/:scheduleId`, () => ok(scheduleDetail())),
   http.post(`${api}/teams/:teamId/schedules`, async ({ params, request }) => {
     const body = await request.json() as V1CreateScheduleDto;
+    // class-transformer는 String metadata의 스칼라를 변환하지만 null/omit과 배열은 유지한다.
+    const toDtoString = (value: unknown) => value == null || typeof value === 'object' ? value : String(value);
+    const dates = { startAt: toDtoString(body.startAt), endAt: toDtoString(body.endAt) };
+    const { startAt, endAt } = dates;
     // @IsDateString() 기본 옵션과 같은 validator를 사용해 DTO 오류를 service422와 구분한다.
-    const invalidDates = (['startAt', 'endAt'] as const).filter((field) =>
-      typeof body[field] !== 'string' || !isISO8601(body[field]),
-    );
-    if (invalidDates.length) {
+    const invalidDates = (['startAt', 'endAt'] as const).filter((field) => {
+      const value = dates[field];
+      return typeof value !== 'string' || !isISO8601(value);
+    });
+    if (typeof startAt !== 'string' || typeof endAt !== 'string' || invalidDates.length) {
       return HttpResponse.json(
         {
           status: 'error', statusCode: 400, code: 'VALIDATION_ERROR', message: '입력값을 다시 확인해 주세요.',
@@ -1045,7 +1050,9 @@ export const v1MswHandlers = [
         { status: 400 },
       );
     }
-    if (!(new Date(body.endAt).getTime() > new Date(body.startAt).getTime())) {
+    const startDate = new Date(startAt);
+    const endDate = new Date(endAt);
+    if (!(endDate.getTime() > startDate.getTime())) {
       return HttpResponse.json(
         { status: 'error', statusCode: 422, code: 'SCHEDULE_INVALID_TIME_RANGE', message: 'Schedule end time must be after start time' },
         { status: 422 },
@@ -1056,8 +1063,8 @@ export const v1MswHandlers = [
       teamId: String(params.teamId),
       title: body.title,
       type: body.type,
-      startAt: body.startAt,
-      endAt: body.endAt,
+      startAt: startDate.toISOString(),
+      endAt: endDate.toISOString(),
       timezone: body.timezone,
       capacity: body.capacity ?? null,
       rsvpDeadlineAt: body.rsvpDeadlineAt ?? null,
@@ -1075,26 +1082,40 @@ export const v1MswHandlers = [
   }),
   http.patch(`${api}/teams/:teamId/schedules/:scheduleId`, async ({ request }) => {
     const body = await request.json() as V1UpdateScheduleDto;
+    const toDtoString = (value: unknown) => value == null || typeof value === 'object' ? value : String(value);
+    const dates = { startAt: toDtoString(body.startAt), endAt: toDtoString(body.endAt) };
+    const { startAt, endAt } = dates;
+    const rawVersion: unknown = body.expectedVersion;
+    const expectedVersion = rawVersion == null || typeof rawVersion === 'object' ? rawVersion : Number(rawVersion);
+    const versionMessages: string[] = [];
+    if (typeof expectedVersion !== 'number' || !(expectedVersion >= 0)) {
+      versionMessages.push('expectedVersion must not be less than 0');
+    }
+    if (!Number.isInteger(expectedVersion)) versionMessages.push('expectedVersion must be an integer number');
     // @IsOptional()은 null/omit을 건너뛰며, supplied DTO 오류는 모든 service gate보다 먼저 거부한다.
     const invalidDates = (['startAt', 'endAt'] as const).filter((field) => {
-      const value = body[field];
+      const value = dates[field];
       return value != null && (typeof value !== 'string' || !isISO8601(value));
     });
-    if (invalidDates.length) {
+    if (typeof expectedVersion !== 'number' || versionMessages.length ||
+      (startAt != null && typeof startAt !== 'string') || (endAt != null && typeof endAt !== 'string') || invalidDates.length) {
       return HttpResponse.json(
         {
           status: 'error', statusCode: 400, code: 'VALIDATION_ERROR', message: '입력값을 다시 확인해 주세요.',
-          details: invalidDates.map((field) => ({ field, messages: [`${field} must be a valid ISO 8601 date string`] })),
+          details: [
+            ...(versionMessages.length ? [{ field: 'expectedVersion', messages: versionMessages }] : []),
+            ...invalidDates.map((field) => ({ field, messages: [`${field} must be a valid ISO 8601 date string`] })),
+          ],
         },
         { status: 400 },
       );
     }
     // 서버와 같은 version → terminal → effective range 순서로, fixture 변경 전에 거부한다.
-    if (body.expectedVersion !== v1ScheduleFixture.version) {
+    if (expectedVersion !== v1ScheduleFixture.version) {
       return HttpResponse.json(
         {
           status: 'error', statusCode: 409, code: 'VERSION_CONFLICT', message: 'Schedule version is stale',
-          details: { expectedVersion: body.expectedVersion, currentVersion: v1ScheduleFixture.version },
+          details: { expectedVersion, currentVersion: v1ScheduleFixture.version },
         },
         { status: 409 },
       );
@@ -1105,17 +1126,17 @@ export const v1MswHandlers = [
         { status: 409 },
       );
     }
-    const startAt = body.startAt || v1ScheduleFixture.startAt;
-    const endAt = body.endAt || v1ScheduleFixture.endAt;
-    if (!(new Date(endAt).getTime() > new Date(startAt).getTime())) {
+    const startDate = new Date(startAt ?? v1ScheduleFixture.startAt);
+    const endDate = new Date(endAt ?? v1ScheduleFixture.endAt);
+    if (!(endDate.getTime() > startDate.getTime())) {
       return HttpResponse.json(
         { status: 'error', statusCode: 422, code: 'SCHEDULE_INVALID_TIME_RANGE', message: 'Schedule end time must be after start time' },
         { status: 422 },
       );
     }
     if (body.title !== undefined) v1ScheduleFixture.title = body.title;
-    if (body.startAt != null) v1ScheduleFixture.startAt = body.startAt;
-    if (body.endAt != null) v1ScheduleFixture.endAt = body.endAt;
+    if (startAt != null) v1ScheduleFixture.startAt = startDate.toISOString();
+    if (endAt != null) v1ScheduleFixture.endAt = endDate.toISOString();
     if (body.capacity !== undefined) v1ScheduleFixture.capacity = body.capacity;
     if (body.rsvpDeadlineAt !== undefined) v1ScheduleFixture.rsvpDeadlineAt = body.rsvpDeadlineAt;
     if (body.visibility !== undefined) v1ScheduleFixture.visibility = body.visibility;

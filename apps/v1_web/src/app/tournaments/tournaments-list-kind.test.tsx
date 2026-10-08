@@ -16,6 +16,7 @@ const SWIMMING_ID = '10fe8a75-9824-4a09-824a-385b37266fff';
 
 vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(search),
+  useRouter: () => ({ replace: vi.fn() }),
 }));
 
 vi.mock('@/hooks/use-v1-api', () => ({

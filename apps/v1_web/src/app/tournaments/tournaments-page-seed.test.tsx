@@ -128,6 +128,33 @@ describe('/tournaments 서버 렌더', () => {
     // seed 가 없어도 첫 HTML 은 "조건에 맞는 대회가 없어요"가 아니라 로딩이어야 한다.
     expect(html).toContain('대회 목록 불러오는 중');
   });
+
+  it.each(['page=2', 'kind=league&page=3'])('첫 페이지가 아닌 %s의 서버 HTML은 첫 페이지 ItemList를 내지 않는다', async (query) => {
+    // Given: API가 첫 페이지 대회를 반환할 수 있는 페이지 2 이상의 URL.
+    stubApi(() => envelope({ items: [item('first-page', '첫 페이지에만 있는 대회')], pageInfo: { page: 1, totalPages: 3, hasNext: true, nextCursor: null } }));
+
+    // When: 실제 서버 페이지와 목록 consumer를 HTML로 렌더한다.
+    const html = await serverHtml(query);
+
+    // Then: 다른 페이지 데이터를 사실처럼 구조화하지 않고 실제 페이지 조회를 기다린다.
+    expect(requested.filter((url) => url.includes('/tournaments?'))).toEqual([]);
+    expect(itemListNames(html)).toEqual([]);
+    expect(markup(html)).not.toContain('첫 페이지에만 있는 대회');
+    expect(html).toContain('대회 목록 불러오는 중');
+  });
+
+  it.each(['1', '0', '-2', '2.5', 'text', 'Infinity', '1e2', '9007199254740992'])('page=%s는 클라이언트와 같은 안전한 첫 페이지 seed를 유지한다', async (page) => {
+    // Given: 첫 페이지 또는 클라이언트가 첫 페이지로 해석하는 잘못된 page.
+    stubApi(() => envelope({ items: [item('first-page', '정상 첫 페이지 대회')], pageInfo: { page: 1, totalPages: 3, hasNext: true, nextCursor: null } }));
+
+    // When: 같은 URL의 실제 서버 페이지를 렌더한다.
+    const html = await serverHtml(`kind=league&page=${page}`);
+
+    // Then: 첫 페이지 본문과 ItemList가 일치하고 복귀 주소에 잘못된 page가 없다.
+    expect(markup(html)).toContain('정상 첫 페이지 대회');
+    expect(itemListNames(html)).toEqual(['정상 첫 페이지 대회']);
+    expectFirstCardLink(html, '/tournaments/first-page', '/tournaments?kind=league');
+  });
 });
 
 describe('/tournaments 메타데이터', () => {

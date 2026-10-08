@@ -105,6 +105,7 @@
 
   .detailsWithAside > .aside {
     position: sticky;
-    top: var(--spacing-4);
+    /* 고정 데스크톱 내비게이션 아래에 보조 영역을 유지해요. */
+    top: calc(var(--spacing-12) + var(--spacing-8));
   }
 }

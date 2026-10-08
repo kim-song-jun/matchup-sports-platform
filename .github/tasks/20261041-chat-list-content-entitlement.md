@@ -85,11 +85,11 @@ Status: In Progress
 - Branch: fix/mdqa-chat-content-entitlement
 - Base: origin/dev @ ae8bf32a5cc15fe8234bb9244cdb35edb5d6afd1
 - Existing finding: PR1653 / review5450911328 / P2 current content-query entitlement gap.
-- Phase A COMPLETE; B intended diff PASS; C publication IN_PROGRESS; D actual alpha PENDING.
+- Phase A COMPLETE; B intended/committed source diff PASS; C PR publication COMPLETE, latest-head review/CI IN_PROGRESS; D actual alpha PENDING.
 - 실제 서비스 RED: 21건 중 12 FAIL / 9 PASS. 정상 대조군은 통과하고 권한 철회 뒤 실제 DTO 미리보기 반환을 재현했다.
 - 최종 GREEN: 21/21 PASS (8.554초), 기존 관련 3 spec 26/26 PASS (10.106초). 증거는 own ignored tmp/qa/mdqa-chat-entitlement-content/의 red-assertions.log, phase-b-green.log, existing-chat.log 및 phase-b-fixture-result.json.
-- 독립 intended review: Critical0 / Warning0 / FindingsNone. 컨택 expiresAt 날짜와 플랫폼/일반 팀 FK 관계 fixture 지적 2건을 수정하고 재검수했다. committed head 확인은 publication 이후 진행한다.
+- 독립 intended review: Critical0 / Warning0 / FindingsNone. 컨택 expiresAt 날짜와 플랫폼/일반 팀 FK 관계 fixture 지적 2건을 수정하고 재검수했다. 독립 committed review도 source SHA 7ce55ece309a4d84f698a4004579a4549b7a8e4a의 5-file 경계와 동일 source/spec blob, clean status, diff check에서 FindingsNone을 확인했다. 문서 진행 갱신 후 최신 PR head를 다시 확인한다.
 - API tsc --noEmit PASS 1회. 정본 surface checker도 GNU find PATH에서 616개 파일 스캔 PASS. 최초 pnpm launcher의 .pnpm 누락과 Windows find 오류는 원인별 로그로 보존하며 검증 성공으로 숨기지 않았다. 게이트 소스는 변경하지 않았다.
 - read-only 기존 dependency runtime은 source lock/schema hash가 같고 generated client에는 채팅과 무관한 V1TeamMatch unique selector 1건 차이가 있다. shared dependency는 변경하지 않았으며 canonical Prisma 생성은 CI에서 확인한다.
 - 실제 PostgreSQL 동시성·alpha·tracker 최신 읽기/선점/댓글: 미검증. DB daemon/IAB blocker를 보존하며 원 QA 종료 준비로 판단하지 않는다.
-- Root source commit/feature push/dev PR: publication pending. merge/main promotion: 0. 최신 PR/head/리뷰/CI cursor는 원 checkout ignored state.json에서 함께 추적한다.
+- Published dev PR: https://github.com/kim-song-jun/matchup-sports-platform/pull/1658 (OPEN, 수정 PR 생성, 머지 대기). Source commit: 7ce55ece309a4d84f698a4004579a4549b7a8e4a. root feature push와 PR attach 완료. merge/main promotion: 0. 최신 문서 갱신 head/리뷰/CI/merge cursor는 원 checkout ignored state.json에서 함께 추적한다.

@@ -1643,9 +1643,10 @@ function tournamentFormatLabel(competition: V1TournamentDetail): string {
 }
 
 function getFlowSteps(competition: V1TournamentDetail): Array<{ title: string; body: string }> {
-  // 리그를 **먼저** 걸러야 한다. 거울 행은 group_knockout 이라 아래 첫 분기에 걸려
-  // "조별 리그 → 결선 진출 → 결선 토너먼트" 를 리그 참가자에게 보여준다.
-  if (isLeagueCompetition(competition)) {
+  // 정규 리그를 **먼저** 걸러야 한다. 거울 행은 group_knockout 이라 아래 첫 분기에 걸려
+  // "조별 리그 → 결선 진출 → 결선 토너먼트" 를 리그 참가자에게 보여준다. isLeagueCompetition 은
+  // format=league 단발 대회도 참이라 쓰면 안 된다 — 단발 대회는 맨 아래 대진표 안내로 가야 한다.
+  if (competition.kind === 'regular_league') {
     return [
       { title: '풀리그', body: '참가한 모든 팀이 서로 맞붙어요. 맞붙는 횟수는 시즌 주차 수에 따라 달라져요.' },
       { title: '순위 집계', body: '승점과 득실차로 최종 순위를 가려요.' },
@@ -1667,8 +1668,9 @@ function getFlowSteps(competition: V1TournamentDetail): Array<{ title: string; b
       { title: '결승 · 시상', body: '마지막까지 이긴 팀이 우승해요. 3·4위전도 함께 진행돼요.' },
     ];
   }
+  // 단발 대회의 리그 방식에는 시즌·주차가 없다 — 몇 번 맞붙는지는 대진 생성 때 정한 회전 수다.
   return [
-    { title: '풀리그', body: '참가한 모든 팀이 서로 맞붙어요. 맞붙는 횟수는 시즌 주차 수에 따라 달라져요.' },
+    { title: '풀리그', body: '참가한 모든 팀이 서로 맞붙어요. 몇 번씩 맞붙는지는 대진표에서 확인할 수 있어요.' },
     { title: '순위 집계', body: '승점과 득실차로 최종 순위를 가려요.' },
     { title: '시상', body: '최종 순위에 따라 상금과 순위를 시상해요.' },
   ];

@@ -4048,9 +4048,12 @@ export function useV1TournamentReviews(
 }
 
 /** 내 리뷰 조회 (이미 작성했는지 확인) */
-export function useV1MyTournamentReview(tournamentId: string, enabled = true) {
+export function useV1MyTournamentReview(tournamentId: string, enabled = true, confirmedUserId?: string) {
   return useQuery({
-    queryKey: ['tournament-reviews-me', tournamentId],
+    // SPA 로그인 전환 때 남은 이전 사용자의 fresh 캐시를 확정 사용자와 분리해요.
+    queryKey: confirmedUserId
+      ? ['tournament-reviews-me', tournamentId, confirmedUserId]
+      : ['tournament-reviews-me', tournamentId],
     queryFn: () => v1Get<V1TournamentReview | null>(`/tournaments/${tournamentId}/reviews/me`),
     enabled: !!tournamentId && enabled,
   });
@@ -4066,9 +4069,12 @@ export function useV1PendingTournamentReviews(enabled = true) {
 }
 
 /** 참가팀 여부 확인 */
-export function useV1TournamentParticipantCheck(tournamentId: string, enabled = true) {
+export function useV1TournamentParticipantCheck(tournamentId: string, enabled = true, confirmedUserId?: string) {
   return useQuery({
-    queryKey: ['tournament-participant-check', tournamentId],
+    // SPA 로그인 전환 때 남은 이전 사용자의 자격을 새 사용자에게 재사용하지 않아요.
+    queryKey: confirmedUserId
+      ? ['tournament-participant-check', tournamentId, confirmedUserId]
+      : ['tournament-participant-check', tournamentId],
     queryFn: () => v1Get<{ isParticipant: boolean }>(`/tournaments/${tournamentId}/participant-check`),
     enabled: !!tournamentId && enabled,
   });

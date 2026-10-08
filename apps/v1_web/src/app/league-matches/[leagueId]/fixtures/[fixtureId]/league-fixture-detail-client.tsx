@@ -104,8 +104,11 @@ export default function LeagueFixtureDetailClient({ leagueId, fixtureId }: { lea
   const fromPath = sanitizeRedirectPath(useSearchParams().get('from'));
   // 선수·팀 상세로 넘길 출처에는 현재 query와 이벤트 앵커까지 보존한다.
   const selfHref = useCurrentHref() ?? undefined;
-  // 리그로 돌아가는 버튼은 받은 출처를 잇는다(받은 출처가 그 리그면 그대로 접힌다).
-  const parentHref = withFromPath(`/league-matches/${leagueId}`, fromPath);
+  const leagueHref = `/league-matches/${leagueId}`;
+  // 같은 리그의 필터/query/hash는 복귀 주소다. 다른 출처는 기존 상위 체인으로 잇는다.
+  const parentHref = fromPath?.split(/[?#]/, 1)[0] === leagueHref
+    ? fromPath
+    : withFromPath(leagueHref, fromPath);
   const router = useRouter();
   const seriesQuery = useV1LeagueMatch(leagueId);
   const standingsQuery = useV1LeagueMatchStandings(leagueId);

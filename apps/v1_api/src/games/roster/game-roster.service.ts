@@ -19,7 +19,7 @@ import { selectLineupParticipantsWithDraftFallback } from '../core/latest-lineup
 import { GamesService } from '../games.service';
 import type { CreateGameRosterAdjustmentDto } from './dto/game-roster-adjustment.dto';
 import type { GameRosterActorRole } from './game-roster-computation';
-import { loadGameRoster, loadJerseyRegistrationId } from './game-roster-loader';
+import { loadGameRoster, loadJerseyRegistration } from './game-roster-loader';
 import { isUnmigratedTeamAuthoredLineup, lockRosterWriteScope, syncPreparedGameSideRoster } from './game-roster-sync';
 import { buildGameRosterView, decideGameRosterAccess, type GameRosterAccess, type GameRosterView } from './game-roster-view';
 import { competitionOpponentName } from './team-roster-columns';
@@ -362,7 +362,7 @@ export class GameRosterService {
       ...computation.excluded.map((row) => row.actorUserId),
       ...computation.unavailable.map((row) => row.actorUserId),
     ]);
-    const jerseyRegistrationId = await loadJerseyRegistrationId(tx, context, {
+    const jerseyRegistration = await loadJerseyRegistration(tx, context, {
       baseSource: loaded.baseSource,
       isTeamManager: access.viewerRole === 'TEAM_MANAGER',
     });
@@ -370,7 +370,7 @@ export class GameRosterService {
       context,
       access,
       baseSource: loaded.baseSource,
-      jerseyRegistrationId,
+      jerseyRegistration,
       base: loaded.base,
       computation,
       fixtureSnapshotUserIds,

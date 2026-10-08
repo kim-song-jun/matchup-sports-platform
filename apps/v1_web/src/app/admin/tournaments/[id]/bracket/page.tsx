@@ -16,6 +16,7 @@ export default function AdminTournamentBracketPage() {
       showToast={showToast}
       registrations={regData?.items ?? []}
       registrationDeadlineAt={tournament?.registrationDeadlineAt}
+      tournamentStatus={tournament?.status}
       bracketPublishedAt={tournament?.bracketPublishedAt}
       bracketPublishScheduledAt={tournament?.bracketPublishScheduledAt}
       canWrite={canWrite}

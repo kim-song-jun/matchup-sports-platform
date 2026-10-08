@@ -10,7 +10,7 @@ import {
   AdminToasts,
   useAdminToast,
 } from '@/components/admin';
-import { useConfirm } from '@/components/v1-ui/confirm-modal';
+import { useConfirm, type ConfirmOptions } from '@/components/v1-ui/confirm-modal';
 import {
   useV1AdminMe,
   useV1AdminTournament,
@@ -138,6 +138,25 @@ function SectionLink({
   );
 }
 
+const STATUS_CHANGE_CONFIRM: Partial<Record<V1TournamentStatus, ConfirmOptions>> = {
+  closed: {
+    title: '접수를 마감할까요?',
+    message: '새 참가 신청을 더 받지 않아요. 필요하면 다시 접수를 열 수 있어요.',
+    confirmLabel: '접수 마감하기',
+  },
+  in_progress: {
+    title: '대회를 시작할까요?',
+    message: '시작하면 접수 단계로 되돌릴 수 없어요. 대진표와 경기 일정을 먼저 확인해 주세요.',
+    confirmLabel: '대회 시작하기',
+  },
+  completed: {
+    title: '대회를 완료할까요?',
+    message: '완료하면 되돌릴 수 없어요. 모든 경기 결과가 확정됐는지 먼저 확인해 주세요.',
+    confirmLabel: '대회 완료하기',
+    tone: 'danger',
+  },
+};
+
 export function TournamentAdminShell({ id, children }: { id: string; children: ReactNode }) {
   const { data: tournament, isPending, isError, error, refetch } = useV1AdminTournament(id);
   const { data: adminMe } = useV1AdminMe();
@@ -170,6 +189,9 @@ export function TournamentAdminShell({ id, children }: { id: string; children: R
       });
       if (!ok) return;
     }
+    // 마감·시작·완료는 모바일에서 오탭하면 참가팀 전체에 바로 반영된다(2026-10 알파 실측: 확인 없이 즉시 실행).
+    const forwardConfirm = STATUS_CHANGE_CONFIRM[nextStatus];
+    if (forwardConfirm && !(await confirmStatusChange(forwardConfirm))) return;
     changeStatus.mutate(
       { status: nextStatus },
       {

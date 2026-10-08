@@ -29,9 +29,16 @@ export function filterTeamMembers<T extends Pick<TeamMemberRowModel, 'name' | 'j
  * 멤버 탭 — 행 64px 에 ⋯ 하나, 동작은 시트에서 고른다(H2 A-1·A-2). 시트는 위험하지 않은 동작을 위에,
  * 되돌리기 어려운 동작(팀장 넘기기·내보내기·나가기)을 소제목 아래로 떼어 둔다.
  */
-export function TeamMembersSection({ members, loading = false }: { members: readonly TeamMemberRowModel[]; loading?: boolean }) {
+export function TeamMembersSection({ members, loading = false, searchQuery, onSearchQueryChange }: {
+  members: readonly TeamMemberRowModel[];
+  loading?: boolean;
+  searchQuery?: string;
+  onSearchQueryChange?: (query: string) => void;
+}) {
   const searchId = useId();
-  const [query, setQuery] = useState('');
+  const [localQuery, setLocalQuery] = useState('');
+  const query = searchQuery ?? localQuery;
+  const setQuery = onSearchQueryChange ?? setLocalQuery;
   const [openId, setOpenId] = useState<string | null>(null);
   const searchable = members.length >= MEMBER_SEARCH_MIN;
   const filtering = searchable && query.trim().length > 0;

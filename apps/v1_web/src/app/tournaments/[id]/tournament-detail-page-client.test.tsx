@@ -402,3 +402,81 @@ describe('TournamentDetailPageClient — 우리 팀 참가 카드(Task 180 R-1 A
     expect(screen.queryByRole('heading', { name: '우리 팀 참가' })).not.toBeInTheDocument();
   });
 });
+
+describe('TournamentDetailPageClient — 리그 방식 일정', () => {
+  function renderLeagueFormat(overrides: Partial<V1TournamentDetail>) {
+    tournamentApiMocks.useV1Tournament.mockReturnValue({
+      data: makeTournament({ status: 'in_progress', format: 'league', ...overrides }),
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+    render(<TournamentDetailPageClient tournamentId="tournament-1" />);
+  }
+
+  const tournamentFixture = {
+    id: 'fx-1',
+    groupId: 'group-1',
+    round: '리그 1라운드',
+    fixtureNumber: 1,
+    legNumber: 1,
+    status: 'scheduled',
+    scheduledAt: '2099-10-09T01:00:00.000Z',
+    venue: null,
+    liveStatus: 'scheduled',
+    homeRegistrationId: 'reg-1',
+    homeTeamId: 'team-1',
+    homeTeamName: '성수 FC',
+    homeTeamLogoUrl: null,
+    awayRegistrationId: 'reg-2',
+    awayTeamId: 'team-2',
+    awayTeamName: '마포 FC',
+    awayTeamLogoUrl: null,
+    result: null,
+    videos: [],
+  } as unknown as V1TournamentDetail['fixtures'][number];
+
+  it('리그 방식 일반 대회는 대회 축 경기를 일정으로 그린다 (leagueFixtures 는 비어 있다)', async () => {
+    renderLeagueFormat({
+      kind: 'regular_tournament',
+      groups: [{ id: 'group-1', name: 'BUFF 리그', phase: 'group', sortOrder: 0, advanceCount: null, groupTeams: [], standings: [] }],
+      fixtures: [tournamentFixture],
+      leagueFixtures: [],
+    });
+
+    await screen.findByRole('heading', { level: 1, name: '테스트 대회' });
+    expect(screen.getByText('성수 FC')).toBeInTheDocument();
+    expect(screen.getByText('마포 FC')).toBeInTheDocument();
+    expect(screen.queryByText('아직 등록된 경기가 없어요')).not.toBeInTheDocument();
+  });
+
+  it('대조군: 경기가 없는 리그 방식 대회는 빈 상태 안내를 그린다', async () => {
+    renderLeagueFormat({ kind: 'regular_tournament', fixtures: [], leagueFixtures: [] });
+
+    await screen.findByRole('heading', { level: 1, name: '테스트 대회' });
+    expect(screen.getByText('아직 등록된 경기가 없어요')).toBeInTheDocument();
+  });
+
+  it('대조군: 정규 리그는 리그 축 경기(leagueFixtures)로 일정을 그린다', async () => {
+    renderLeagueFormat({
+      kind: 'regular_league',
+      fixtures: [],
+      leagueFixtures: [
+        {
+          teamMatchId: 'tm-1',
+          title: '리그 1라운드',
+          homeTeamId: 'team-1',
+          awayTeamId: 'team-2',
+          startAt: '2099-10-09T01:00:00.000Z',
+          placeName: '서울 풋살장',
+          status: 'matched',
+        },
+      ],
+    });
+
+    await screen.findByRole('heading', { level: 1, name: '테스트 대회' });
+    expect(screen.getByText('서울 풋살장')).toBeInTheDocument();
+    expect(screen.queryByText('아직 등록된 경기가 없어요')).not.toBeInTheDocument();
+  });
+});

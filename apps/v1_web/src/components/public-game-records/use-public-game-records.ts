@@ -1,7 +1,7 @@
 'use client';
 
-import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
-import { v1Get } from '@/lib/api-client';
+import { useInfiniteQuery, useQuery, type Query, type UseQueryResult } from '@tanstack/react-query';
+import { V1ApiError, v1Get } from '@/lib/api-client';
 import { PUBLIC_LIVE_POLL_INTERVAL_MS, publicLivePollDelay } from '@/lib/public-live-polling';
 import type {
   PublicMatchDetail,
@@ -88,6 +88,33 @@ export function usePublicTournamentSchedule(
   });
 }
 
+const RECORD_MAX_RETRIES = 2;
+
+function isNotFound(error: unknown): boolean {
+  return error instanceof V1ApiError && error.statusCode === 404;
+}
+
+/** 경기 기록 조회 재시도 판정 단일 소스: 404(비공개·숨김)는 재시도하지 않고, 그 외 오류는 최대 2회. */
+function shouldRetryPublicRecord(failureCount: number, error: unknown): boolean {
+  return !isNotFound(error) && failureCount < RECORD_MAX_RETRIES;
+}
+
+/** 404 를 받은 기록은 더 묻지 않는다. 그 외 오류는 캐시된 상태 기준 폴링을 이어 가 성공하면 스스로 복구한다. */
+function publicRecordRefetchInterval(query: Query<PublicMatchDetail>): number | false {
+  if (isNotFound(query.state.error)) return false;
+  return publicLivePollDelay(query.state.data?.status, query.state.data?.scheduledAt);
+}
+
+/**
+ * React Query 는 재조회가 실패해도 이전 data 를 남긴다. 소비 화면이 data 분기를 먼저 보면 오류
+ * 뒤에도 옛 스코어가 성공 화면처럼 남으므로, 오류 상태에서는 data 를 비워 isError 분기가 이기게 한다.
+ */
+function hideStaleRecordOnError<T extends UseQueryResult<PublicMatchDetail>>(query: T): T {
+  // data 를 항상 읽어 옵저버가 data 변경도 추적하게 한다(오류일 때만 읽으면 그 전의 갱신 알림을 놓친다).
+  const hasData = query.data !== undefined;
+  return query.isError && hasData ? ({ ...query, data: undefined } as T) : query;
+}
+
 /**
  * `GET /tournaments/:id/matches/:fixtureId` -- single match projection.
  * A `hidden` fixture, an unpublished bracket, and a genuinely missing
@@ -99,16 +126,17 @@ export function usePublicMatch(
   fixtureId: string,
   options?: { seed?: PublicMatchDetail | null },
 ) {
-  return useQuery({
+  const query = useQuery({
     queryKey: publicGameRecordsKeys.match(tournamentId, fixtureId),
     queryFn: () => v1Get<PublicMatchDetail>(`/tournaments/${tournamentId}/matches/${fixtureId}`),
     enabled: Boolean(tournamentId) && Boolean(fixtureId),
     // 서버 page 가 404 판정용으로 이미 받은 공개 응답 — 첫 화면(서버 HTML 포함)에 쓴다.
     placeholderData: options?.seed ?? undefined,
-    retry: false,
+    retry: shouldRetryPublicRecord,
     // 진행 중이면 10초, 시작 전이면 킥오프가 가까워질 때부터 — 시작 전에 열어 둔 화면도 시작을 스스로 발견한다.
-    refetchInterval: (query) => publicLivePollDelay(query.state.data?.status, query.state.data?.scheduledAt),
+    refetchInterval: publicRecordRefetchInterval,
   });
+  return hideStaleRecordOnError(query);
 }
 
 /**
@@ -117,16 +145,17 @@ export function usePublicMatch(
  * 내려준다(tournamentId/tournamentTitle 자리에 리그 id/제목, round 에 'N주차' 라벨,
  * groupName 은 null — `getLeagueFixtureRecord` 주석 참고). 게임이 아직 없거나 숨김
  * 정책인 대진은 404 로 접힌다 -- 소비처(리그 경기 상세)는 그때 자체 요약 카드로
- * 폴백하므로 retry 하지 않는다.
+ * 폴백하므로 404 는 재시도하지 않는다(그 외 오류는 `shouldRetryPublicRecord` 기준으로 재시도).
  */
 export function usePublicLeagueFixtureRecord(leagueId: string, teamMatchId: string) {
-  return useQuery({
+  const query = useQuery({
     queryKey: [...publicGameRecordsKeys.all, 'league-fixture-record', leagueId, teamMatchId] as const,
     queryFn: () => v1Get<PublicMatchDetail>(`/league-matches/${leagueId}/fixtures/${teamMatchId}/record`),
     enabled: Boolean(leagueId) && Boolean(teamMatchId),
-    retry: false,
-    refetchInterval: (query) => publicLivePollDelay(query.state.data?.status, query.state.data?.scheduledAt),
+    retry: shouldRetryPublicRecord,
+    refetchInterval: publicRecordRefetchInterval,
   });
+  return hideStaleRecordOnError(query);
 }
 
 /**

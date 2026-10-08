@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import type { ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { V1ApiError, V1_OFFLINE_WRITE_MESSAGE } from '@/lib/api-client';
@@ -764,6 +764,42 @@ describe('ChatRoomPageClient — 팀컨택 방', () => {
   });
 });
 
+describe('ChatListPageClient — 취소된 개인매치 배지', () => {
+  const matchRoom = (id: string, title: string, linkedTargetCancelled: boolean) => ({
+    roomId: id,
+    roomType: 'match' as const,
+    title,
+    status: 'active',
+    teamContact: null,
+    linkedTarget: { type: 'match' as const, id: `m-${id}`, title, route: `/matches/m-${id}` },
+    linkedTargetCancelled,
+    lastMessage: null, unreadCount: 0, pinned: false, muted: false, mutedUntil: null,
+  });
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    navigation.search = '';
+    hooks.updateChatRoomMe.mockReturnValue({ isPending: false, variables: undefined, mutate: vi.fn() });
+  });
+
+  it('취소된 개인매치 방에만 "취소됨" 배지가 붙고 진행 중인 방에는 없다', () => {
+    hooks.chatRooms.mockReturnValue({
+      data: { items: [matchRoom('r1', '취소된 매치', true), matchRoom('r2', '진행 중 매치', false)] },
+      isPending: false, isError: false, refetch: vi.fn(),
+    });
+
+    renderWithClient(<ChatListPageClient />);
+
+    // 모바일·데스크톱 두 pane 이 렌더되므로 행 단위로 좁혀 본다.
+    const cancelledRow = screen.getAllByText('취소된 매치')[0].closest('.tm-chat-row-main') as HTMLElement;
+    const activeRow = screen.getAllByText('진행 중 매치')[0].closest('.tm-chat-row-main') as HTMLElement;
+    expect(within(cancelledRow).getByText('취소됨')).toBeInTheDocument();
+    expect(within(activeRow).queryByText('취소됨')).toBeNull();
+    // desktop/chat.css 가 1024px 이상에서 tm-chat-pinned-badge 를 숨긴다 — '고정' 전용이라 다른 배지가 쓰면 데스크톱에서 사라진다.
+    expect(within(cancelledRow).getByText('취소됨')).not.toHaveClass('tm-chat-pinned-badge');
+  });
+});
+
 describe('ChatListPageClient — 팀컨택 필터·배지', () => {
   const contactRoom = (status: 'requested' | 'accepted', mySide: 'from' | 'to') => ({
     roomId: `room-${status}-${mySide}`,
@@ -796,6 +832,9 @@ describe('ChatListPageClient — 팀컨택 필터·배지', () => {
     expect(screen.getAllByText('답장 필요').length).toBeGreaterThan(0);
     expect(screen.getAllByText('대기 중').length).toBeGreaterThan(0);
     expect(screen.getAllByText('수락됨').length).toBeGreaterThan(0);
+    for (const label of ['답장 필요', '대기 중', '수락됨']) {
+      screen.getAllByText(label).forEach((badge) => expect(badge).not.toHaveClass('tm-chat-pinned-badge'));
+    }
   });
 
   it('팀컨택 필터에서 "종료된 컨택 보기"를 켜면 archived 방을 서버에서 받아 별도 섹션에 보여준다', () => {

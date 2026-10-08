@@ -7,7 +7,7 @@ V1 session authentication and current room entitlement are required. Development
 
 | Method | Path | Contract |
 | --- | --- | --- |
-| GET | `/chat/rooms` | `roomType`, `status`, `cursor`, `limit` (1–50); `{ items, pageInfo: { nextCursor, hasNext } }` |
+| GET | `/chat/rooms` | `roomType`, `status`, `cursor`, `limit` (1–50); `{ items, pageInfo: { nextCursor, hasNext } }`. Order is `lastMessageAt` desc with rooms that have no message last, then `createdAt` desc. Each item carries `linkedTargetCancelled` (`true` only when the linked personal match is `cancelled`; the room stays listed). Platform team-match rooms with no real message (system lines excluded) are omitted — see below |
 | POST | `/chat/rooms/resolve` | `{ targetType: match \| team \| team_match \| team_contact, targetId }`; checks domain membership |
 | GET | `/chat/rooms/:roomId` | room, linked target, current participant and context |
 | GET | `/chat/rooms/:roomId/messages` | `cursor`, `limit` (1–100), `direction: before \| after`; cursor page, only messages since the participant's visibility boundary |
@@ -45,6 +45,14 @@ and therefore has no host participant row.
 
 ## Room entry and read state
 
+- `GET /chat/rooms` checks the same current entitlement, active chat participant, requested room
+  status and platform-room eligibility when fetching both ordering keys and room contents. A room
+  revoked, left or archived between those reads contributes no title or message preview. If candidates
+  disappear, the list refills from the remaining ordered keys in bounded batches. `hasNext` requires
+  an entitled lookahead row, and `nextCursor` names the last returned room. If no eligible candidate
+  remains, the page ends with `hasNext=false`, `nextCursor=null`. A cursor already absent at the next request remains
+  an end cursor rather than restarting the list. Ordering and participant history boundaries are unchanged.
+
 ### Platform team-match rooms
 
 - Platform recruitment creation atomically creates a `team_match` chat room and adds the creating
@@ -53,6 +61,9 @@ and therefore has no host participant row.
 - The creating operator needs an active, non-revoked `owner`/`ops` admin account and active user
   account. This is scoped to their own `platformManaged` match; other admins gain no implicit access.
   Operator entitlement is checked for list, resolve, detail, messages and delivery recipients.
+- A platform room is created at recruitment time but stays out of `GET /chat/rooms` until it holds at
+  least one sent, non-system message. `resolve` and room detail/entry still work for entitled users
+  at any time. Ordinary team-match, personal-match, team and team-contact rooms are always listed.
 - Platform chat is available during `recruiting`, `closed`, `matched`, and `completed`; cancelled,
   expired and deleted matches are excluded. Ordinary team matches still require both assigned teams
   and `matched`/`completed`. Failed team-match entitlement returns `403 PERMISSION_DENIED`.
@@ -154,6 +165,12 @@ and therefore has no host participant row.
   no Android binary permission change is required.
 
 ## Verification
+
+`src/chat/chat.service.rooms-entitlement.spec.ts` invokes the real service and serializer while an
+in-memory Prisma dependency evaluates current predicates before and after access changes. It covers
+all linked room types, revoked operator access, chat exit/archive/platform eligibility, refill/cursor
+and null-message boundaries, and database error propagation. It is query-contract regression coverage;
+actual PostgreSQL concurrency and authenticated alpha behavior require separate integration/QA evidence.
 
 `test/chat/chat-safety.integration-spec.ts` uses actual HTTP, DTO guards and PostgreSQL, with isolated
 fictional users. It verifies reporting, membership/self guards, bilateral history/preview/unread filtering,

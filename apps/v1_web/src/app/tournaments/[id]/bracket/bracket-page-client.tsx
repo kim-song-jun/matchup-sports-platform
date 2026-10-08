@@ -578,10 +578,9 @@ export function BracketPageContent({ tournament }: { tournament: V1TournamentDet
   const leagueHasNoFixtures = isRegularLeague
     ? leagueScheduleSettled && leagueScheduleItemCount === 0
     : fixtures.length === 0;
-  const hasStandingsColumn = isLeague
-    // 로딩·에러 중에도 칼럼은 유지한다 — 안 그러면 칼럼이 나타났다 사라지며 레이아웃이 튄다.
-    ? allLeagueRows.length > 0 || leagueHasNoFixtures || !leagueScheduleSettled
-    : format === 'group_knockout' && hasGroupStandings;
+  // 리그는 순위 행이 0이어도(편성 팀이 없고 경기만 있는 대회) 칼럼을 유지한다 — 순위표가 스스로 빈 상태
+  // 안내를 그린다. 칼럼을 빼면 리그에는 대진표 칼럼도 없어 이 탭이 통째로 비어 보인다.
+  const hasStandingsColumn = isLeague || (format === 'group_knockout' && hasGroupStandings);
   // 리그엔 토너먼트 대진이 없다. isLeague 를 안 빼면 거울 행(group_knockout)이 여기서
   // 참이 되어 **빈 대진표 칼럼**이 생긴다 — 이 화면이 리그에서 가장 크게 틀어지는 자리다.
   const hasBracketColumn = !isLeague && (format === 'knockout' || format === 'group_knockout');

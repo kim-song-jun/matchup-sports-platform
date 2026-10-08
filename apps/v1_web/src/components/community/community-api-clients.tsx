@@ -394,6 +394,7 @@ function toChatRoomModel(room: V1ChatRoom): ChatRoomModel {
     href: room.linkedTarget.route ?? '/chat',
     contactStatus: room.teamContact?.status,
     contactNeedsReply: room.teamContact?.status === 'requested' && room.teamContact.mySide === 'to',
+    linkedTargetCancelled: room.linkedTargetCancelled,
     last: room.lastMessage?.contentPreview ?? '아직 메시지가 없어요',
     time: room.lastMessage ? formatChatListTimestamp(room.lastMessage.sentAt) : '',
     unread: room.unreadCount,

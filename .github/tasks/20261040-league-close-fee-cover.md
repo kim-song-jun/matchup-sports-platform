@@ -1,6 +1,6 @@
 # Task 20261040: 리그 즉시 모집마감 · 참가비 · 대표 이미지 (MD-QA #35 · #36 · #37)
 
-Status: 완료 (2026-10-08 — PR #1649 dev 머지·alpha 실측, 후속 문구 PR #1650)
+Status: In Progress (2026-10-08 — 기능은 PR #1649·#1650 으로 dev 머지. 종료 리그 참가비 편집 결함 수정(`fix/league-fee-readonly-ended`)과 아래 "남은 일"의 alpha 확인이 남았다)
 **Owner**: Planning team → BE-2 → BE-1 → FE-data → FE-A·B·C·D → DOCS
 **Created**: 2026-10-07
 
@@ -91,7 +91,7 @@ Expected result: 같은 티어의 참가비·계좌·대표 이미지가 복사�
 - [x] 이미 닫힌/마감 미설정 리그의 `close-registration` 은 `alreadyProcessed:true`, 쓰기·감사 0. 같은 값의 `entry-fee`·`cover-image` 도 멱등.
 - [x] 0원 '무료 확정'은 계좌 없이 저장되고 `entryFeeConfiguredAt` 이 세팅된다. 같은 0원이라도 미설정이면 쓴다.
 - [x] 활성 신청이 있어도 값이 그대로인 '확인'(이어받은 설정 확정)은 사유가 필요 없다. 활성 신청 0 이면 금액 변경도 사유 불필요.
-- [x] 보류 중 리그도 마감·이미지 변경 가능. 종료 리그는 마감 불가·참가비 변경 불가·이미지 변경 가능.
+- [x] 보류 중 리그도 마감·이미지 변경 가능. 종료 리그는 마감 불가·참가비 변경 불가·이미지 변경 가능. — 서버 기준. 웹 참가비 카드는 #1649 머지본에서 종료 리그에도 입력·저장이 열려 있었다(리뷰 P2, alpha 재현) → `fix/league-fee-readonly-ended` 에서 읽기 전용으로 고침.
 - [x] KST 자정 경계에서 프리셋 23:59 계산이 로컬 타임존에 의존하지 않는다.
 - [ ] 같은 밀리초 경계: `마감 = now` 는 다음 판정부터 닫힘(응답은 `registrationOpen:false`). — 받아들인 위험으로 남김: 같은 밀리초 제출 1건 통과 가능, 응답 상수만 단위 테스트가 확인.
 ### Error paths
@@ -133,19 +133,25 @@ DB: `V1Tournament.entryFeeConfiguredAt DateTime?` 한 줄 + `ADD COLUMN IF NOT E
 ### Sequential (병렬 작업 이후에 실행)
 - [x] **DOCS** — `docs/api/domains/league-matches.md`·`tournaments.md`, 정본 6절 결정 이력 3행, `.changeset/league-close-fee-cover.md`(v1_api·v1_web patch), 이 문서 Status.
 - [x] 통합: 전체 `tsc`(두 앱)·`lint`·소유 테스트, PR(base `dev`, 한국어, 머지 방식은 `--merge`), Copilot 리뷰 clean, CI 통합 spec green.
-- [x] 머지 후 alpha 배포 SHA 확인 → ego-browser 로 Scenario 1~6 + 390/768/1440 갤러리를 같은 PR 에 게시 → 메인 트리 로컬 `dev` `--ff-only` 동기화.
+- [ ] 머지 후 alpha 배포 SHA 확인 → ego-browser 로 Scenario 1~6 + 390/768/1440 갤러리를 같은 PR 에 게시 → 메인 트리 로컬 `dev` `--ff-only` 동기화. — 배포 SHA 확인·로컬 동기화·10단계 갤러리는 했다. Scenario 4·5 일부와 6 은 "남은 일".
 
 ## Acceptance Criteria
 - [x] Original conditions 전부 충족
-- [x] User scenarios 전부 통과
+- [ ] User scenarios 전부 통과 — alpha 실화면으로 확인한 것은 아래 Verification 의 10단계뿐이다: Scenario 1·2·3 전체, 4 는 사유 모달까지, 5 는 업로드까지. 4 의 신청별 금액 유지, 5 의 교체·제거, 6(시즌 승계)은 통합 스펙만 있고 alpha 미확인.
 - [x] Test scenarios 전부 green (서버 통합 spec 은 CI 에서 확인)
 - [x] 범위 내 tech debt 해결됨 (새로운 부채 0) — `LeagueRegistrationCta` 삭제, 옛 주석 정정
 - [x] Security 리뷰 통과 (아래 노트 참조)
 - [x] Mock data 업데이트 완료, schema와 sync (스키마 변경이므로 migration 포함·핀 5곳 재고정)
 - [x] 디자인 시스템 준수 (token, component, naming) — 하드코딩 색·`transition-all` 0, 44px, 포커스 링, 해요체
 - [x] **UI 항목: 3안 제시→선택 완료(2026-10-07)** — #35 D1~D4 · #36 D1·D2·D4·D5 · #37 D1~D3 의 선택안(B·C·C·B / B·C·B·B / A·B·C)을 목업대로 구현, 구현 전에 목업 조각 대조
-- [x] 머지 후 alpha 에서 ego-browser 로 사용자 흐름·3폭(390/768/1440) before/after·콘솔/네트워크 확인, 목록 카드 푸터 재균형 확인
-- [x] Code review: Critical=0, Warning=0
+- [ ] 머지 후 alpha 에서 ego-browser 로 사용자 흐름·3폭(390/768/1440) before/after·콘솔/네트워크 확인, 목록 카드 푸터 재균형 확인 — 3폭 갤러리 19장은 위 10단계 범위만 담는다. 나머지 흐름은 "남은 일" 참고.
+- [x] Code review: Critical=0, Warning=0 — #1649 리뷰 P2 1건(종료 리그 참가비 편집이 열려 있고 저장하면 409)은 PR #1654 로 고쳐 dev 머지·alpha 확인(2026-10-08).
+
+## 남은 일 (2026-10-08 리뷰 정정)
+- [x] 종료 리그 참가비 카드 읽기 전용 — PR #1654 머지 후 alpha(`ae8bf32a5`)에서 종료 리그 2곳 입력·저장 비활성, 안내 문구, 저장 요청 0회 확인(2026-10-08). 두 곳 모두 참가비 미설정이라 설정된 값의 읽기 전용 표시는 단위 테스트로만 확인.
+- [ ] Scenario 4 신청별 금액 유지(기존 신청 70,000원·새 신청 80,000원) alpha 확인.
+- [ ] Scenario 5 대표 이미지 교체·제거 alpha 확인.
+- [ ] Scenario 6 시즌 승계(참가비·계좌·이미지 복사, '이어받았어요' 배지) alpha 확인.
 
 ## Tech Debt Resolved
 - 리그 참가비·대표 이미지 저장 경로가 없어 전 리그가 0원/이미지 null 이던 누락(이관 때 매핑이 필드를 안 옮긴 것 — 의도 아님)을 해소한다.

@@ -1307,17 +1307,18 @@ describe('TournamentPlayersService', () => {
     prisma.v1TournamentPlayer.findMany.mockResolvedValue([
       {
         ...playerRow(),
-        user: { profile: { nickname: '번개맨' } },
+        user: { profile: { nickname: '번개맨' }, phone: '01012345678', deletedAt: null },
       },
     ]);
 
     const result = await service.exportCsv(adminUser, 'reg-1');
 
     expect(result.filename).toMatch(/\.csv$/);
-    expect(result.csv).toContain('realName,birthDate,gender,eligibility,nickname');
+    expect(result.csv).toContain('realName,birthDate,gender,eligibility,nickname,jerseyNumber,phone');
     expect(result.csv).toContain('홍길동');
     expect(result.csv).toContain('male');
     expect(result.csv).toContain('번개맨');
+    expect(result.csv).toContain('010-1234-5678');
   });
 
   it('exportCsv: unknown registrationId → 404 REGISTRATION_NOT_FOUND', async () => {
@@ -1340,7 +1341,7 @@ describe('TournamentPlayersService', () => {
     prisma.v1TournamentPlayer.findMany.mockResolvedValue([
       {
         ...playerRow({ realName: '=CMD|"/C calc"!A0' }),
-        user: { profile: { nickname: '+악성닉네임' } },
+        user: { profile: { nickname: '+악성닉네임' }, phone: '+82-10-1234-5678' },
       },
     ]);
 
@@ -1350,6 +1351,7 @@ describe('TournamentPlayersService', () => {
     expect(result.csv).toContain("'=CMD|");
     // + 로 시작하는 nickname → 작은따옴표 prefix 처리되어야 함
     expect(result.csv).toContain("'+악성닉네임");
+    expect(result.csv).toContain("'+82-10-1234-5678");
     // 원본 수식 문자가 따옴표 없이 그대로 노출되면 안 됨
     expect(result.csv).not.toMatch(/^=CMD/m);
   });
@@ -1363,7 +1365,7 @@ describe('TournamentPlayersService', () => {
     prisma.v1TournamentPlayer.findMany.mockResolvedValue([
       {
         ...playerRow({ realName: '-1+2' }),
-        user: { profile: { nickname: '@악성닉' } },
+        user: { profile: { nickname: '@악성닉' }, phone: null },
       },
     ]);
 
@@ -1377,16 +1379,16 @@ describe('TournamentPlayersService', () => {
     prisma.v1AdminUser.findUnique.mockResolvedValue(opsAdminRecord);
     prisma.v1TournamentRegistration.findUnique.mockResolvedValue({ id: 'reg-1', team: { name: '번개팀' } });
     prisma.v1TournamentPlayer.findMany.mockResolvedValue([
-      { ...playerRow({ jerseyNumber: 7 }), user: { profile: { nickname: '번개맨' } } },
-      { ...playerRow({ id: 'player-2', realName: '김철수', jerseyNumber: null }), user: { profile: null } },
+      { ...playerRow({ jerseyNumber: 7 }), user: { profile: { nickname: '번개맨' }, phone: '01012345678', deletedAt: null } },
+      { ...playerRow({ id: 'player-2', realName: '김철수', jerseyNumber: null }), user: { profile: null, phone: null } },
     ]);
 
     const { csv } = await service.exportCsv(adminUser, 'reg-1');
 
     expect(csv.split('\n')).toEqual([
-      'realName,birthDate,gender,eligibility,nickname,jerseyNumber',
-      '홍길동,1995-03-15,male,needs_review,번개맨,7',
-      '김철수,1995-03-15,male,needs_review,,',
+      'realName,birthDate,gender,eligibility,nickname,jerseyNumber,phone',
+      '홍길동,1995-03-15,male,needs_review,번개맨,7,010-1234-5678',
+      '김철수,1995-03-15,male,needs_review,,,',
     ]);
     // 명단(PII) 내려받기는 감사 로그에 남는다 — 개인정보 없이 행 수만.
     expect(prisma.v1AdminActionLog.create).toHaveBeenCalledWith({
@@ -1403,12 +1405,32 @@ describe('TournamentPlayersService', () => {
     prisma.v1AdminUser.findUnique.mockResolvedValue(opsAdminRecord);
     prisma.v1TournamentRegistration.findUnique.mockResolvedValue({ id: 'reg-1', team: { name: '테스트팀' } });
     prisma.v1TournamentPlayer.findMany.mockResolvedValue([
-      { ...playerRow({ realName: '\t=1+1' }), user: { profile: { nickname: 'a\rb' } } },
+      { ...playerRow({ realName: '\t=1+1' }), user: { profile: { nickname: 'a\rb' }, phone: null } },
     ]);
 
     const { csv } = await service.exportCsv(adminUser, 'reg-1');
 
-    expect(csv.split('\n')[1]).toBe(`'\t=1+1,1995-03-15,male,needs_review,"a\rb",`);
+    expect(csv.split('\n')[1]).toBe(`'\t=1+1,1995-03-15,male,needs_review,"a\rb",,`);
+  });
+
+  it('exportCsv: 전화번호는 엑셀이 앞 0 을 지우지 않게 하이픈 표기, 탈퇴 회원·미등록은 빈칸', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(opsAdminRecord);
+    prisma.v1TournamentRegistration.findUnique.mockResolvedValue({ id: 'reg-1', team: { name: '번개팀' } });
+    prisma.v1TournamentPlayer.findMany.mockResolvedValue([
+      { ...playerRow({ realName: '가' }), user: { profile: null, phone: ' 01012345678 ', deletedAt: null } },
+      { ...playerRow({ realName: '나' }), user: { profile: null, phone: '0111234567', deletedAt: null } },
+      { ...playerRow({ realName: '다' }), user: { profile: null, phone: 'deleted-user-3', deletedAt: new Date() } },
+      { ...playerRow({ realName: '라' }), user: { profile: null, phone: null, deletedAt: null } },
+    ]);
+
+    const { csv } = await service.exportCsv(adminUser, 'reg-1');
+
+    expect(csv.split('\n').slice(1).map((line) => line.split(',').at(-1))).toEqual([
+      '010-1234-5678',
+      '011-123-4567',
+      '',
+      '',
+    ]);
   });
 
   // ─── 전체 명단 CSV (대회·리그 단위) ─────────────────────────────────────────
@@ -1441,10 +1463,10 @@ describe('TournamentPlayersService', () => {
           status: 'confirmed',
           team: { name: '번개팀', ownerUserId: 'player-user-id' },
           players: [
-            { ...playerRow({ jerseyNumber: 7, eligibilityStatus: 'non_pro' }), user: { profile: { nickname: '번개맨' } } },
+            { ...playerRow({ jerseyNumber: 7, eligibilityStatus: 'non_pro' }), user: { profile: { nickname: '번개맨' }, phone: '01012345678', deletedAt: null } },
             {
               ...playerRow({ id: 'player-2', userId: 'user-2', realName: '이영희', genderSnapshot: 'female', eligibilityStatus: 'pro' }),
-              user: { profile: null },
+              user: { profile: null, phone: null },
             },
           ],
         },
@@ -1461,9 +1483,9 @@ describe('TournamentPlayersService', () => {
         '신청 팀,2팀 · 선수 2명',
         '',
         '[1] 번개팀 · 참가 확정 · 2명',
-        '순번,등번호,이름,생년월일,성별,선출 여부,닉네임,비고',
-        '1,7,홍길동,1995-03-15,남성,아마추어,번개맨,팀장',
-        '2,,이영희,1995-03-15,여성,프로,,',
+        '순번,등번호,이름,생년월일,성별,선출 여부,닉네임,비고,전화번호',
+        '1,7,홍길동,1995-03-15,남성,아마추어,번개맨,팀장,010-1234-5678',
+        '2,,이영희,1995-03-15,여성,프로,,,',
         '',
         '"[2] 천둥, ""번개"" · 입금 대기 · 명단 미등록"',
       ]);

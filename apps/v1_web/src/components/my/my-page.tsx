@@ -225,8 +225,8 @@ export function MyMatchesPageView({ model }: { model: MyMatchesViewModel }) {
           </Card>
         ) : null}
         <div className="tm-my-list-stack">
-          {/* 로딩·오류 중에는 '매치 없어요' 빈 상태를 띄우지 않는다 — 스켈레톤·오류 화면과 모순 방지. */}
-          {!model.loading && !model.error && model.matches.length === 0 ? (
+          {/* 일부 소스라도 조회에 실패했다면 전체가 비었다고 확정하지 않는다. */}
+          {!model.loading && !model.error && !model.partialError && model.matches.length === 0 ? (
             <EmptyState
               fill
               illustration={{ name: 'matches-empty' }}

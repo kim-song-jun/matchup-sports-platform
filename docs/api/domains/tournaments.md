@@ -139,6 +139,10 @@ Admin-created tournaments require `teamCount` per tournament. The API does not t
 
 출전 인원·교체 설정만 보내는 PATCH도 제목 등 다른 필드가 필요하지 않다. 동일 설정 재저장에도 원자적 CAS와 감사 로그를 적용하고 새 `updatedAt`을 반환한다. 후속 요청은 이 버전을 사용해야 하며 이전 버전은 `409 TOURNAMENT_VERSION_CONFLICT`로 거절한다.
 
+종목 변경: `PATCH /api/v1/admin/tournaments/:tournamentId`에 현재와 다른 `sportId`를 보내면 같은 CAS 트랜잭션에서 `competitionConfigVersionId`를 새 종목의 기본 규정 버전(생성과 같은 경로, 규정을 쓰지 않는 종목은 `null`)으로 다시 연결하고, 감사 로그(`tournament.update`)의 before/after에 `sportId`·`competitionConfigVersionId`를 남긴다. 직전에 고친 경기 시간·출전 인원은 새 종목 기본값으로 돌아간다. 대진이 하나라도 있거나 상태가 `in_progress`/`completed`이면 `409 TOURNAMENT_SPORT_LOCKED`(변경 없음). 같은 종목 재전송은 pin을 건드리지 않는다. 출전 인원·교체 필드와 함께 보내면 `400 TOURNAMENT_LINEUP_SIZE_SPORT_CHANGE_CONFLICT`이므로 종목을 먼저 저장한 뒤 설정한다.
+
+생성 마법사의 전체 폼 재시도에는 변경하지 않은 `sportId`도 포함할 수 있다. 동일 종목의 초안 재저장은 정상 저장하며, 실제 종목 변경은 존재 여부 검증 후 처리한다. 종목 ID는 원자적 CAS `updateMany`에 scalar FK로 전달한다(중첩 relation `connect`는 이 연산에서 지원하지 않는다). 전체 폼 재저장도 사용자 지정 피리어드와 최신 버전·감사로그 계약을 유지한다.
+
 경기 종료 시각 기본값: 대회·리그 대진을 만들거나 일정을 옮길 때 종료 시각(`endAt`)을 받지 않았으면 **시작 + 그 경기가 쓰는 경기 설정의 정규 시간**(연장 제외 피리어드 합계 — 전·후반이면 둘의 합, 단판이면 그 한 피리어드)으로 채운다. 길이를 아는 경기를 옮기면 기존 길이를 그대로 옮긴다. 피리어드 길이를 모르는 레거시 설정(`{ count }`)이면 지어내지 않고 `null` 로 둔다.
 
 종료 시각이 없는 기존 대진을 장소·번호만 PATCH해 기본 종료가 보충되는 경우에도 같은 트랜잭션에서 양 팀 캘린더의 종료 시각을 함께 갱신한다. 시작 시각 변경 여부와 무관하게 경기와 팀 일정의 시간 계약을 유지한다.
@@ -269,8 +273,8 @@ Public tournament list/detail responses include both `confirmedCount` and `pendi
 | `PATCH` | `/api/v1/tournaments/:tournamentId/registrations/:registrationId/players/:playerId` | user, team manager+ | `UpdatePlayerEligibilityDto` | updated player |
 | `DELETE` | `/api/v1/tournaments/:tournamentId/registrations/:registrationId/players/:playerId` | user, team manager+ | path ids | removed player |
 | `GET` | `/api/v1/admin/registrations/:registrationId/players` | active admin | path id | admin roster detail including gender snapshot, current phone, `isTeamCaptain`, captain-first ordering, and minimum check |
-| `GET` | `/api/v1/admin/registrations/:registrationId/players/export` | active admin | path id | `{ filename, csv }` team roster export — columns `realName,birthDate,gender,eligibility,nickname,jerseyNumber`; audit `player.export` (targetType `tournament_registration`, row count only) |
-| `GET` | `/api/v1/admin/tournaments/:tournamentId/players/export` | active admin | path id (tournament or league) | `{ filename, csv }` full roster for Excel, split into **team blocks**: 3 summary lines (title · KST download time · team/player counts), then per registration (except `draft`/`cancelled`, registration order) a blank line + `[n] 팀명 · 신청 상태 · N명|명단 미등록` title row + Korean header `순번,등번호,이름,생년월일,성별,선출 여부,닉네임,비고` + player rows (jersey asc, nulls last; Korean labels for status/gender/eligibility; `팀장` in 비고). Filename `<title>_전체명단_<YYYYMMDD>.csv`; audit `player.export` (targetType `tournament`, row count only); `404 TOURNAMENT_NOT_FOUND` |
+| `GET` | `/api/v1/admin/registrations/:registrationId/players/export` | active admin | path id | `{ filename, csv }` team roster export — columns `realName,birthDate,gender,eligibility,nickname,jerseyNumber,phone` (`phone` hyphenated `010-1234-5678` so Excel keeps the leading 0; blank when unset or the account is deleted); audit `player.export` (targetType `tournament_registration`, row count only) |
+| `GET` | `/api/v1/admin/tournaments/:tournamentId/players/export` | active admin | path id (tournament or league) | `{ filename, csv }` full roster for Excel, split into **team blocks**: 3 summary lines (title · KST download time · team/player counts), then per registration (except `draft`/`cancelled`, registration order) a blank line + `[n] 팀명 · 신청 상태 · N명|명단 미등록` title row + Korean header `순번,등번호,이름,생년월일,성별,선출 여부,닉네임,비고,전화번호` + player rows (jersey asc, nulls last; Korean labels for status/gender/eligibility; `팀장` in 비고; 전화번호 formatted like the team export, blank when unset/deleted). Filename `<title>_전체명단_<YYYYMMDD>.csv`; audit `player.export` (targetType `tournament`, row count only); `404 TOURNAMENT_NOT_FOUND` |
 | `PATCH` | `/api/v1/admin/players/:playerId/eligibility` | owner/ops admin | `UpdatePlayerEligibilityDto` | updated eligibility and audit log |
 
 ## Player Add Contract
@@ -368,3 +372,10 @@ All team roster mutations lock the registration row and re-read `rosterLockedAt`
 - 경기 UUID, 팀 배정, 진출 edge, parent ID 및 Game 결과/리비전은 유지한다. 결과 확정 경기에서도 번호만 수정할 수 있으며 팀 변경의 기존 결과 잠금은 유지한다. 감사 `tournament.bracket.fixture.update`에 변경 전·후 번호를 기록한다.
 - 번호 이동 후 비워진 옛 좌표에서 새 경기 생성은 다음 creation generation을 사용한다. 이전 멱등 기록 및 경기 UUID를 덮어쓰거나 옛 경기를 replay하지 않는다. 기존 좌표의 동일 요청 재시도 계약은 유지한다.
 - 관리자 경기 수정 모달에서 현재 번호를 채우고 실제 API로 저장한다. 오류 시 입력/모달 유지, 성공 후 관리자 및 공개 상세 캐시를 갱신한다. 기존 프론트 MSW에는 이 PATCH 핸들러가 없으며 번호가 없는 기존 수정 payload는 계속 유효하다.
+
+### 조별리그 경기와 조 편성 정합 (2026-10-08)
+
+- 조 순위는 조 편성(`groups[].groupTeams`)을 기준으로 계산·표시한다. 순위 행(`V1TournamentStanding`)은 결과 확정 뒤 재계산 때 만들어진다. 순위 행이 하나도 없는 조는 공개 일정·기록 API(`public-tournament-records.service.ts`)가 편성 팀으로 0값 `baselineStandings`를 서버에서 내리고, 웹 대진 페이지도 `groupTeams`로 같은 0값 기준선을 만든다. 순위 행이 있는 조는 행만 내려서, 새로 편성된 팀은 재계산 전까지 표에서 빠진다.
+- `POST /admin/tournaments/:id/fixtures`(그리고 팀을 바꾸는 `PATCH /admin/fixtures/:id`)는 `phase = group` 조 안의 경기에 들어가는 팀이 그 조에 편성돼 있지 않으면 같은 트랜잭션에서 편성한다. `sortOrder`는 조의 현재 최댓값 + 1이고 이미 편성된 팀은 건드리지 않는다. 결선 단계(`round12`~`third_place`) 조와 조 없는 경기는 편성을 바꾸지 않는다. 감사 `tournament.bracket.group_team.create`(`afterJson.auto = "fixture"`). 자동 편성으로 새 편성이 생겼고 그 조에 순위 행이 이미 있으면 같은 트랜잭션에서 `recalculateStandings`와 같은 계산(조별 + 통합)을 돌리고 감사 `tournament.bracket.standings.recalculate_auto`를 남긴다. 순위 행이 없는 조는 재계산하지 않는다.
+- `DELETE /admin/group-teams/:id`는 `phase = group` 조에서 삭제되지 않은 경기가 남아 있는 팀이면 `409 GROUP_TEAM_HAS_FIXTURES`로 거부한다. 경기가 없는 팀, 결선 단계 조와 미정 부전승 자리는 기존대로 해제된다.
+- 공개 상세 `leagueFixtures[]`는 여전히 `kind = regular_league`에서만 채워진다. 리그 방식 일반 대회(`format = league`)의 일정은 `fixtures[]`로 그린다.

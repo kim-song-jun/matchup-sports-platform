@@ -74,9 +74,20 @@ const currentHref = () => `${window.location.pathname}${window.location.search}$
 function expectSelection(upcomingOnly: boolean) {
   expect(upcoming()).toHaveAttribute('aria-pressed', String(upcomingOnly));
   expect(all()).toHaveAttribute('aria-pressed', String(!upcomingOnly));
-  expect(document.querySelector(`a[href="${fixturePath}"]`) !== null).toBe(!upcomingOnly);
+  const fixtureLinks = Array.from(document.querySelectorAll<HTMLAnchorElement>('a'))
+    .filter((link) => new URL(link.href).pathname === fixturePath);
+  expect(fixtureLinks).toHaveLength(upcomingOnly ? 0 : 1);
   if (upcomingOnly) expect(screen.getByText('예정된 경기가 없어요')).toBeInTheDocument();
-  else expect(document.querySelector(`a[href="${fixturePath}"]`)).toHaveTextContent(/1\s*:\s*0/);
+  else {
+    expect(fixtureLinks[0]).toHaveTextContent(/1\s*:\s*0/);
+    const source = new URL(fixtureLinks[0].href).searchParams.get('from');
+    if (!source) throw new Error('실제 경기 링크에 리그 복귀 출처가 없어요.');
+    const returnUrl = new URL(source, window.location.origin);
+    const expected = new URL(currentHref(), window.location.origin);
+    expect(returnUrl.pathname).toBe(expected.pathname);
+    expect([...returnUrl.searchParams].sort()).toEqual([...expected.searchParams].sort());
+    expect(returnUrl.hash).toBe(expected.hash);
+  }
 }
 async function travel(direction: 'back' | 'forward') {
   await act(async () => {

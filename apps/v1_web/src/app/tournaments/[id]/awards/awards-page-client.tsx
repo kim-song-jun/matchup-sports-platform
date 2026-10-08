@@ -812,17 +812,35 @@ export function useTournamentReviewWriteGate(tournamentId: string, status: V1Tou
   // localStorage는 로그인 힌트일 뿐이에요. 쿠키만 남은 사용자도 서버 인증을 확인해야 해요.
   const shouldProbe = shouldProbeV1Session();
   const auth = useV1AuthMe({ enabled: shouldProbe, retry: retryTransientFailure });
-  const hasSession = shouldProbe && auth.isSuccess && !auth.isFetching && !!auth.data?.user;
+  const hasConfirmedSession = shouldProbe && auth.isSuccess && !auth.isFetching && !!auth.data?.user;
   const isCompleted = status === 'completed';
 
-  const confirmedUserId = hasSession ? auth.data?.user.id : undefined;
-  const participant = useV1TournamentParticipantCheck(tournamentId, hasSession && isCompleted, confirmedUserId);
-  const myReview = useV1MyTournamentReview(tournamentId, hasSession && isCompleted, confirmedUserId);
+  const confirmedUserId = hasConfirmedSession ? auth.data?.user.id : undefined;
+  const participant = useV1TournamentParticipantCheck(tournamentId, hasConfirmedSession && isCompleted, confirmedUserId);
+  const myReview = useV1MyTournamentReview(tournamentId, hasConfirmedSession && isCompleted, confirmedUserId);
+  const participantSessionExpired = participant.isError && isUnauthenticatedError(participant.error);
+  const myReviewSessionExpired = myReview.isError && isUnauthenticatedError(myReview.error);
+  const sessionExpired = participantSessionExpired || myReviewSessionExpired;
+  // 401을 안내에 반영해도 조회 키와 활성화 조건은 확정 사용자 기준을 유지해야 해요.
+  const hasSession = hasConfirmedSession && !sessionExpired;
+  const expiredAt = Math.max(
+    participantSessionExpired ? participant.errorUpdatedAt : 0,
+    myReviewSessionExpired ? myReview.errorUpdatedAt : 0,
+  );
+  const canRecheckExpiredSession = isCompleted && hasConfirmedSession && sessionExpired && auth.dataUpdatedAt > expiredAt;
+  useEffect(() => {
+    // 같은 계정의 재로그인에서도 fresh 성공 데이터와 함께 남은 오래된 401은 다시 확인해요.
+    // 새로운 401이 인증 성공보다 뒤에 오면 멈추므로 만료 세션을 반복 조회하지 않아요.
+    if (!canRecheckExpiredSession) return;
+    if (participantSessionExpired && !participant.isFetching) void participant.refetch();
+    if (myReviewSessionExpired && !myReview.isFetching) void myReview.refetch();
+  }, [canRecheckExpiredSession, participantSessionExpired, myReviewSessionExpired,
+    participant.isFetching, myReview.isFetching, participant.refetch, myReview.refetch]);
   const error = shouldProbe && auth.isError && !isUnauthenticatedError(auth.error)
     ? auth.error
-    : hasSession && participant.isError
+    : hasConfirmedSession && participant.isError && !participantSessionExpired
       ? participant.error
-      : hasSession && myReview.isError
+      : hasConfirmedSession && myReview.isError && !myReviewSessionExpired
         ? myReview.error
         : null;
 
@@ -830,7 +848,7 @@ export function useTournamentReviewWriteGate(tournamentId: string, status: V1Tou
   const isReady = hasSession && participant.isSuccess && myReview.isSuccess
     && !participant.isFetching && !myReview.isFetching;
   const isChecking = isCompleted && !error && (
-    (shouldProbe && (auth.isPending || auth.isFetching)) || (hasSession && !isReady)
+    (shouldProbe && (auth.isPending || auth.isFetching)) || (hasSession && !isReady) || canRecheckExpiredSession
   );
   const isParticipant = isReady && (participant.data?.isParticipant ?? false);
   const alreadyReviewed = isReady && !!myReview.data;

@@ -128,6 +128,53 @@ describe.each(['후기', '시상'] as const)('%s — 실제 서버 인증과 후
     expect(screen.queryByRole('button', { name: /후기 쓰기/ })).not.toBeInTheDocument();
   });
 
+  it.each(['participant-check', 'reviews/me'])('warm auth/me 성공 뒤 %s 401은 로그인 안내로 전환하고 재로그인으로 복구한다', async (endpoint) => {
+    // Given: 실제 auth/me HTTP 성공이 앱의 60초 freshness 안에 남았지만 쿠키 세션은 만료됐어요.
+    const client = createV1QueryClient();
+    client.setDefaultOptions({ ...client.getDefaultOptions(),
+      queries: { ...client.getDefaultOptions().queries, retryDelay: 0 },
+    });
+    const expiredPage = renderPage(page, client);
+    expect(await screen.findByRole('button', { name: '+ 후기 쓰기' })).toBeVisible();
+    let sessionActive = false;
+    const loginResponse: V1AuthSessionResponse = { ...auth, session: { userId: 'user-1', userEmail: 'first@example.test' } };
+    server.use(
+      http.get(`${api}/auth/me`, () => sessionActive ? ok(auth) : failure(401, '로그인이 필요해요.')),
+      http.get(`${api}/tournaments/t1/${endpoint}`, () => sessionActive
+        ? ok(endpoint === 'participant-check' ? { isParticipant: true } : null)
+        : failure(401, '로그인이 필요해요.')),
+      http.post(`${api}/auth/login`, () => {
+        sessionActive = true;
+        return ok(loginResponse);
+      }),
+    );
+
+    // When: auth/me와 두 private 성공 캐시가 아직 fresh인 상태에서 실제 보호 API만 다시 읽어 401을 받아요.
+    await act(async () => {
+      await client.refetchQueries({
+        queryKey: [endpoint === 'participant-check' ? 'tournament-participant-check' : 'tournament-reviews-me', 't1', 'user-1'],
+        exact: true,
+      });
+    });
+    expect(await screen.findByText(loginHint)).toBeVisible();
+    expect(screen.queryByRole('button', { name: /후기 쓰기/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /다시 시도/ })).not.toBeInTheDocument();
+    expiredPage.unmount();
+
+    // Then: 같은 계정으로 실제 로그인 소비자를 거쳐 돌아오면 서버 자격을 다시 확인해 작성할 수 있어요.
+    const loginPage = render(<QueryClientProvider client={client}><EmailLoginClient /></QueryClientProvider>);
+    fireEvent.change(screen.getByLabelText('이메일'), { target: { value: 'first@example.test' } });
+    fireEvent.change(screen.getByLabelText('비밀번호'), { target: { value: 'test-password' } });
+    const loginForm = screen.getByLabelText('이메일').closest('form');
+    if (loginForm === null) throw new Error('이메일 로그인 폼이 없어요.');
+    fireEvent.submit(loginForm);
+    await waitFor(() => expect(window.localStorage.getItem(V1_SESSION_HINT_KEY)).toBe('active'));
+    loginPage.unmount();
+    renderPage(page, client);
+    expect(await screen.findByRole('button', { name: '+ 후기 쓰기' })).toBeVisible();
+    expect(screen.queryByText(loginHint)).not.toBeInTheDocument();
+  });
+
   it('auth/me 응답을 기다리는 동안 익명 안내나 작성 액션을 표시하지 않는다', async () => {
     let release: (() => void) | undefined;
     const response = new Promise<void>((resolve) => { release = resolve; });

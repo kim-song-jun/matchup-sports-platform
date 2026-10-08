@@ -570,4 +570,82 @@ describe('자리 배정 (PostgreSQL)', () => {
         .resolves.toMatchObject({ created: 3 });
     });
   });
+
+  describe('동시성', () => {
+    it('같은 팀을 두 어드민이 서로 다른 자리에 동시에 넣으면 하나만 성공하고 경기 사이드가 일관된다', async () => {
+      const { tournamentId, registrationIds, teamIds } = await leagueOf4('race-same-team');
+      const [slotA, slotB] = [await slotAt(tournamentId, 1), await slotAt(tournamentId, 3)];
+
+      const results = await Promise.allSettled([
+        slots.assignSlot(user, slotA.id, registrationIds[0]),
+        slots.assignSlot(user, slotB.id, registrationIds[0]),
+      ]);
+
+      expect(results.filter((r) => r.status === 'fulfilled')).toHaveLength(1);
+      const rejected = results.find((r) => r.status === 'rejected') as PromiseRejectedResult;
+      expect(rejected.reason).toMatchObject({ response: { code: 'SLOT_TEAM_ALREADY_PLACED' } });
+      expect(await placedBySlot(tournamentId)).toEqual([registrationIds[0]]);
+      // 팀이 들어간 사이드는 승자 자리를 쓰는 경기 수(3)와 정확히 같다 — 진 쪽이 사이드를 남기지 않았다
+      const sides = (await allFixtures(tournamentId)).flatMap((f) => [f.hostTeamId, f.approvedApplicantTeamId]);
+      expect(sides.filter((team) => team === teamIds[0])).toHaveLength(3);
+    });
+
+    it('서로 다른 팀을 같은 자리에 동시에 넣어도 둘 다 끝나고 마지막 결과 하나로 일관된다 (자리·사이드·조 편성)', async () => {
+      const { tournamentId, registrationIds, teamIds } = await leagueOf4('race-same-slot');
+      const slot1 = await slotAt(tournamentId, 1);
+
+      const results = await Promise.allSettled([
+        slots.assignSlot(user, slot1.id, registrationIds[0]),
+        slots.assignSlot(user, slot1.id, registrationIds[1]),
+      ]);
+
+      expect(results.map((r) => r.status)).toEqual(['fulfilled', 'fulfilled']);
+      const winner = (await prisma.v1TournamentSlot.findUniqueOrThrow({ where: { id: slot1.id } })).registrationId!;
+      const winnerTeam = teamIds[registrationIds.indexOf(winner)];
+      for (const fixture of await fixturesUsing(slot1.id)) expect(sideTeam(fixture, slot1.id)).toBe(winnerTeam);
+      expect((await prisma.v1TournamentGroupTeam.findMany({ where: { group: { tournamentId } } })).map((g) => g.registrationId)).toEqual([winner]);
+    });
+
+    it('팀 취소와 자리 배정이 겹쳐도 교착 없이 끝나고 취소된 팀이 자리에 남지 않는다', async () => {
+      const { tournamentId, registrationIds } = await seedBracketTournament(prisma, { label: 'race-cancel', format: 'knockout', teamCount: 1 });
+      await templates.apply(user, tournamentId, { kind: 'knockout', size: 8, thirdPlace: false });
+      const slot1 = await slotAt(tournamentId, 1);
+
+      const results = await Promise.allSettled([
+        adminRegistrations.cancel(user, registrationIds[0], {}),
+        slots.assignSlot(user, slot1.id, registrationIds[0]),
+      ]);
+
+      const [cancelResult, assignResult] = results;
+      expect(cancelResult.status).toBe('fulfilled');
+      // 배정이 먼저면 성공하고 취소가 비운다, 취소가 먼저면 확정이 아니라서 422 — 어느 쪽이든 교착(40P01)은 없다
+      if (assignResult.status === 'rejected') {
+        expect(assignResult.reason).toMatchObject({ response: { code: 'SLOT_REGISTRATION_INVALID' } });
+      }
+      expect((await prisma.v1TournamentSlot.findUniqueOrThrow({ where: { id: slot1.id } })).registrationId).toBeNull();
+      expect((await fixturesUsing(slot1.id))[0].hostTeamId).toBeNull();
+    });
+  });
+
+  describe('팀이 들어간 대진의 교체', () => {
+    it('12강 대진에 팀·부전승이 들어가 있어도 교체되고, 자리·부전승·조 편성은 새 대진 기준으로 리셋된다', async () => {
+      const { tournamentId, registrationIds } = await seedBracketTournament(prisma, { label: 'replace-placed', format: 'knockout', teamCount: 3 });
+      await templates.apply(user, tournamentId, { kind: 'knockout', size: 12, thirdPlace: true });
+      await slots.assignSlot(user, (await slotAt(tournamentId, 1)).id, registrationIds[0]);
+      await slots.assignSlot(user, (await slotAt(tournamentId, 2)).id, registrationIds[1]);
+      await slots.assignSlot(user, (await slotAt(tournamentId, 1, 'BYE')).id, registrationIds[2]);
+
+      await expect(templates.apply(user, tournamentId, { kind: 'knockout', size: 12, thirdPlace: true, replaceExisting: true }))
+        .resolves.toEqual({ groups: 5, slots: 12, fixtures: 12, edges: 12 });
+
+      expect(await placedBySlot(tournamentId)).toEqual([]);
+      expect((await prisma.v1TournamentByeSlot.findMany({ where: { group: { tournamentId } }, orderBy: { sortOrder: 'asc' } })).map((b) => b.sortOrder)).toEqual([0, 3, 4, 7]);
+      expect(await prisma.v1TournamentGroupTeam.count({ where: { group: { tournamentId } } })).toBe(0);
+      for (const fixture of await prisma.v1TeamMatch.findMany({ where: { tournamentId, deletedAt: null } })) {
+        expect([fixture.hostTeamId, fixture.approvedApplicantTeamId]).toEqual([null, null]);
+      }
+      // 같은 등록으로 새 대진에 다시 배치할 수 있다
+      await expect(slots.assignSlot(user, (await slotAt(tournamentId, 1)).id, registrationIds[0])).resolves.toBeDefined();
+    });
+  });
 });

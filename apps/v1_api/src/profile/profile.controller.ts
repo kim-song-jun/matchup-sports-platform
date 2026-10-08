@@ -145,6 +145,7 @@ export class ProfileController {
 
   @Post('me/withdrawal-request')
   @UseGuards(V1AuthGuard)
+  @UseInterceptors(V1SessionLogoutInterceptor)
   async withdrawalRequest(@CurrentUser() user: V1AuthUser, @Body() dto: WithdrawalRequestDto) {
     const result = await this.profileService.withdrawalRequest(user, dto);
     // App Store 5.1.1(v): Apple 로그인 계정은 삭제 요청 시점에 토큰을 폐기한다. 운영자 최종 삭제는

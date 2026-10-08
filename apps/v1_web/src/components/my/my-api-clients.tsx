@@ -4,6 +4,7 @@ import { PreferredPositionPicker } from './preferred-position-picker';
 import { ProfilePhotoCropper } from './profile-photo-cropper';
 import { MyDissolvedTeamsSection } from './my-dissolved-teams-section';
 import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useShellOverride } from '@/components/v1-ui/shell-override';
@@ -19,6 +20,8 @@ import { useV1PushRegistration } from '@/hooks/use-v1-push-registration';
 import { UserAvatar } from '@/components/v1-ui/user-avatar';
 import { extractErrorMessage } from '@/lib/error-message';
 import { clearStoredV1Session, sanitizeRedirectPath, withFromPath } from '@/lib/session-storage';
+import { clearV1IdentityCache } from '@/lib/query-keys';
+import { disconnectV1Socket } from '@/lib/v1-socket';
 import { isTeamOperatorRole } from '@/lib/team-role';
 import type { ThemePreference } from '@/lib/theme';
 import { myJoinApplicationStatusLabel, teamJoinApplicationStatusLabel, teamMemberStatusLabel, teamRoleLabel } from '@/lib/v1-status-labels';
@@ -2210,7 +2213,7 @@ export function ThemeSettingsPageClient() {
 }
 
 export function WithdrawalPageClient() {
-  const router = useRouter();
+  const queryClient = useQueryClient();
   const withdrawal = useV1WithdrawalRequest();
   const [reason, setReason] = useState('');
   const [infoOpen, setInfoOpen] = useState(false);
@@ -2229,7 +2232,11 @@ export function WithdrawalPageClient() {
           {
             onSuccess: () => {
               clearStoredV1Session();
-              router.replace('/login');
+              disconnectV1Socket();
+              clearV1IdentityCache(queryClient);
+              // router.replace() can reuse a prefetched /login tree with stale auth state.
+              // A document navigation creates a fresh QueryClient and guest session probe.
+              window.location.replace('/login');
             },
           },
         );

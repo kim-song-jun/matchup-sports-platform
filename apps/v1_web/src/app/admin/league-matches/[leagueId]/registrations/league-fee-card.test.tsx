@@ -10,6 +10,7 @@ vi.mock('@/hooks/use-v1-api', () => ({
 
 const CONFIGURED_AT = '2026-10-01T00:00:00.000Z';
 const paid: LeagueFeeSource = {
+  state: 'active',
   entryFee: 70000,
   entryFeeConfiguredAt: CONFIGURED_AT,
   bankName: '국민은행',
@@ -18,6 +19,7 @@ const paid: LeagueFeeSource = {
   activeRegistrationCount: 0,
 };
 const unset: LeagueFeeSource = {
+  state: 'draft',
   entryFee: 0,
   entryFeeConfiguredAt: null,
   bankName: null,
@@ -54,6 +56,37 @@ describe('LeagueFeeCard', () => {
       renderCard(unset);
       expect(screen.getByText('미설정')).toBeInTheDocument();
       expect(screen.queryByText('직전 시즌 설정을 이어받았어요')).not.toBeInTheDocument();
+    });
+  });
+
+  describe('끝난 리그 읽기 전용 (서버는 completed·cancelled 만 409 — 취소는 state 로 completed)', () => {
+    it('completed 면 입력·저장이 꺼지고 안내가 뜨며 현재 값은 그대로 보인다', () => {
+      renderCard({ ...paid, state: 'completed' });
+      for (const label of ['팀당 참가비 (원)', '은행', '계좌번호', '예금주']) {
+        expect(screen.getByLabelText(label)).toBeDisabled();
+      }
+      expect(fee()).toHaveValue('70,000');
+      expect(screen.getByLabelText('은행')).toHaveValue('국민은행');
+      expect(screen.getByText('끝났거나 취소된 리그는 참가비를 바꿀 수 없어요.')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: '저장' })).toBeDisabled();
+      save();
+      expect(feeMutate).not.toHaveBeenCalled();
+    });
+
+    it('미설정 completed 도 저장할 수 없다 (미설정은 저장 버튼이 원래 켜지는 경로)', () => {
+      renderCard({ ...unset, state: 'completed' });
+      expect(screen.getByRole('button', { name: '저장' })).toBeDisabled();
+      save();
+      expect(feeMutate).not.toHaveBeenCalled();
+    });
+
+    it.each(['draft', 'active', 'on_hold'] as const)('%s 는 기존처럼 수정·저장되고 안내가 없다', (state) => {
+      renderCard({ ...paid, state });
+      expect(screen.queryByText('끝났거나 취소된 리그는 참가비를 바꿀 수 없어요.')).not.toBeInTheDocument();
+      type('팀당 참가비 (원)', '80000');
+      save();
+      expect(feeMutate).toHaveBeenCalledTimes(1);
+      expect(feeMutate.mock.calls[0][0]).toMatchObject({ entryFee: 80000 });
     });
   });
 

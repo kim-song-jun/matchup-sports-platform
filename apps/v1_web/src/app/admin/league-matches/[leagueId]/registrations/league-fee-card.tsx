@@ -15,8 +15,13 @@ const REASON_REQUIRED_CODE = 'LEAGUE_ENTRY_FEE_REASON_REQUIRED';
 
 export type LeagueFeeSource = Pick<
   V1AdminLeagueDetail,
-  'entryFee' | 'entryFeeConfiguredAt' | 'bankName' | 'bankAccount' | 'bankHolder' | 'activeRegistrationCount'
+  'state' | 'entryFee' | 'entryFeeConfiguredAt' | 'bankName' | 'bankAccount' | 'bankHolder' | 'activeRegistrationCount'
 >;
+
+const LOCKED_NOTICE = '끝났거나 취소된 리그는 참가비를 바꿀 수 없어요.';
+
+/** 서버(league-entry-fee.service)가 막는 completed·cancelled 와 같은 판정. 서버 응답은 취소를 `completed` 로 내린다. */
+const isFeeLocked = (state: LeagueFeeSource['state']) => state === 'completed';
 
 interface FormValues {
   fee: string;
@@ -169,7 +174,8 @@ export function LeagueFeeCard({
   const inputCls =
     'mt-2 block min-h-[44px] w-full rounded-xl border border-[var(--border)] bg-[var(--card-surface)] px-3 text-[length:var(--font-size-label)] text-[var(--text-strong)] disabled:opacity-60';
   const labelCls = 'text-[length:var(--font-size-caption)] font-semibold text-[var(--text-strong)]';
-  const disabled = !canWrite || updateFee.isPending;
+  const locked = isFeeLocked(league.state);
+  const disabled = !canWrite || locked || updateFee.isPending;
   const saveDisabled = disabled || (configured && !dirty);
   const bankInvalid = errors.bank !== undefined;
   const bankProps = (value: string) => ({
@@ -263,6 +269,9 @@ export function LeagueFeeCard({
       {errors.bank ? <p id={bankErrorId} role="alert" className="mt-3 text-[length:var(--font-size-caption)] text-[var(--red700)]">{errors.bank}</p> : null}
       {saveError ? <p role="alert" className="mt-3 text-[length:var(--font-size-caption)] text-[var(--red700)]">{saveError}</p> : null}
       {saved ? <p role="status" className="mt-3 text-[length:var(--font-size-caption)] text-[var(--green700)]">참가비를 저장했어요.</p> : null}
+      {locked ? (
+        <p className="mt-3 text-[length:var(--font-size-caption)] text-[var(--text-muted)]">{LOCKED_NOTICE}</p>
+      ) : null}
       {!canWrite ? (
         <p className="mt-3 text-[length:var(--font-size-caption)] text-[var(--text-muted)]">현재 계정은 참가비를 바꿀 권한이 없어요.</p>
       ) : null}

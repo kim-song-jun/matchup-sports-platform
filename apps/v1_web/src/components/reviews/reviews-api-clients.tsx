@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useV1MyTeams, useV1ReceivedReviews, useV1ReceivedReviewSummary, useV1Reviews, useV1ReviewSource, useV1SubmitReview } from '@/hooks/use-v1-api';
 import { extractErrorMessage } from '@/lib/error-message';
 import type { V1ReviewSourceType } from '@/types/api';
@@ -10,7 +10,17 @@ import type { ReviewMetricDraft, ReviewTargetDraft, ReviewsTab } from './reviews
 import { getReviewProgress, toReviewSourcePageModel, toReviewsPageModel, toReviewsReceivedPageModel } from './reviews.view-model';
 
 export function ReviewsPageClient({ initialTab }: { initialTab: ReviewsTab }) {
-  const [tab, setTab] = useState<ReviewsTab>(initialTab);
+  const urlTabs = useSearchParams().getAll('tab');
+  // Next 서버는 중복 tab을 배열로 받아 pending으로 정규화하므로 첫 값만 고르지 않는다.
+  const urlTab = urlTabs.length === 1 ? urlTabs[0] : null;
+  const routeTab: ReviewsTab = urlTab === 'written' || urlTab === 'received' ? urlTab : 'pending';
+  const [selection, setSelection] = useState({ routeTab: initialTab, tab: initialTab });
+  // 클릭은 즉시 반영하되, 이력 이동의 URL이 바뀌면 선택과 조회도 같은 렌더에서 복원한다.
+  // RSC의 initialTab은 늦게 도착할 수 있어 현재 URL을 다시 덮는 동기화 기준으로 쓰지 않는다.
+  const tab = selection.routeTab === routeTab ? selection.tab : routeTab;
+  if (selection.routeTab !== routeTab) {
+    setSelection({ routeTab, tab: routeTab });
+  }
   const [period, setPeriod] = useState<string | null>(null);
   const [teamPeriod, setTeamPeriod] = useState<string | null>(null);
   const reviewsQuery = useV1Reviews({ tab: tab === 'received' ? 'pending' : tab }, { enabled: tab !== 'received' });
@@ -31,7 +41,7 @@ export function ReviewsPageClient({ initialTab }: { initialTab: ReviewsTab }) {
       model={model}
       onPeriodChange={setPeriod}
       onRetry={() => void activeQuery.refetch()}
-      onTabChange={setTab}
+      onTabChange={(nextTab) => setSelection({ routeTab, tab: nextTab })}
       onTeamPeriodChange={setTeamPeriod}
       period={period}
       receivedModel={receivedModel}

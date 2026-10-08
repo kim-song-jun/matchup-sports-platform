@@ -725,7 +725,9 @@ describe('TournamentApplyPageClient GA events', () => {
       expect(await screen.findByText(/입금대기 3팀이 자리를 잡고 있어요/)).toBeInTheDocument();
 
       fireEvent.click((await screen.findAllByRole('radio'))[0]);
-      fireEvent.click((await screen.findAllByRole('button', { name: /^다음 단계/ }))[0]);
+      const nextButtons = await screen.findAllByRole('button', { name: /^다음 단계/ });
+      nextButtons.forEach((button) => expect(button).toBeDisabled());
+      fireEvent.click(nextButtons[0]);
 
       // 약관 단계로 넘기지 않고, 서버를 헛되게 호출하지도 않는다.
       await waitFor(() => {
@@ -748,10 +750,42 @@ describe('TournamentApplyPageClient GA events', () => {
 
       expect(await screen.findByText('신청이 마감돼서 새로 신청할 수 없어요.')).toBeInTheDocument();
       fireEvent.click((await screen.findAllByRole('radio'))[0]);
-      fireEvent.click((await screen.findAllByRole('button', { name: /^다음 단계/ }))[0]);
-      await waitFor(() => {
-        expect(createRegistrationMutateAsync).not.toHaveBeenCalled();
+      const nextButtons = await screen.findAllByRole('button', { name: /^다음 단계/ });
+      nextButtons.forEach((button) => expect(button).toBeDisabled());
+      fireEvent.click(nextButtons[0]);
+      expect(createRegistrationMutateAsync).not.toHaveBeenCalled();
+    });
+
+    it('마감된 대회라도 이미 낸 신청이 있는 팀은 \'다음\'이 켜져 있고 새 신청 팀만 꺼진다', async () => {
+      tournamentApplyApiMocks.useV1Tournament.mockReturnValue({
+        data: makeTournament({ registrationDeadlineAt: '2020-01-01T00:00:00.000Z' }),
+        isLoading: false,
+        isError: false,
+        error: null,
       });
+      tournamentApplyApiMocks.useV1MyTeams.mockReturnValue({
+        data: {
+          items: [makeTeam(), makeTeam({ teamId: 'team-2', membershipId: 'membership-2', name: '성수 2군' })],
+        },
+        isLoading: false,
+      });
+      // team-1 은 이미 확정(내 신청으로 이동), team-2 는 취소(새 신청 필요) — 새 신청만 막힌다.
+      tournamentApplyApiMocks.useV1MyRegistrations.mockReturnValue({
+        data: [
+          makeRegistration({ id: 'registration-confirmed', status: 'confirmed' }),
+          makeRegistration({ id: 'registration-cancelled', teamId: 'team-2', status: 'cancelled' }),
+        ],
+        isLoading: false,
+      });
+      tournamentApplyApiMocks.useV1CreateRegistration.mockReturnValue({ mutateAsync: vi.fn(), isPending: false });
+
+      render(<TournamentApplyPageClient tournamentId="tournament-1" />);
+
+      const radios = await screen.findAllByRole('radio');
+      fireEvent.click(radios[0]);
+      (await screen.findAllByRole('button', { name: /^다음 단계/ })).forEach((button) => expect(button).toBeEnabled());
+      fireEvent.click(radios[1]);
+      (await screen.findAllByRole('button', { name: /^다음 단계/ })).forEach((button) => expect(button).toBeDisabled());
     });
 
     it('정원에 여유가 있으면 그대로 재신청을 진행한다', async () => {
@@ -780,7 +814,9 @@ describe('TournamentApplyPageClient GA events', () => {
       render(<TournamentApplyPageClient tournamentId="tournament-1" />);
 
       fireEvent.click((await screen.findAllByRole('radio'))[0]);
-      fireEvent.click((await screen.findAllByRole('button', { name: /^다음 단계/ }))[0]);
+      const nextButtons = await screen.findAllByRole('button', { name: /^다음 단계/ });
+      nextButtons.forEach((button) => expect(button).toBeEnabled());
+      fireEvent.click(nextButtons[0]);
 
       await waitFor(() => {
         expect(createRegistrationMutateAsync).toHaveBeenCalledWith({ teamId: 'team-1' });

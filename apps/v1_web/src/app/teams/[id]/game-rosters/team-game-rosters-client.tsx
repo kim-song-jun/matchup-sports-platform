@@ -3,10 +3,12 @@
 import { useMemo, useState } from 'react';
 import { AlertBanner, Card, EmptyState, ErrorState } from '@/components/v1-ui/primitives';
 import { Button } from '@/components/v1-ui/button';
+import { AppBackLink } from '@/components/v1-ui/app-back-link';
+import { ChevronLeftIcon } from '@/components/v1-ui/icons';
 import { PageSkeleton } from '@/components/v1-ui/page-skeleton';
 import { useUnsavedChangesGuard } from '@/components/v1-ui/use-unsaved-changes-guard';
 import { MemberUnavailabilitySheet } from '@/components/game-roster/member-unavailability-sheet';
-import { useV1AuthMe } from '@/hooks/use-v1-api';
+import { useV1AuthMe, useV1TeamDetail } from '@/hooks/use-v1-api';
 import {
   useV1ApplyGameRosterBatch,
   useV1TeamGameRosters,
@@ -15,6 +17,7 @@ import {
 } from '@/hooks/use-v1-game-roster';
 import { V1ApiError } from '@/lib/api-client';
 import { formatKstMonthDaySlash, formatKstTime } from '@/lib/date-utils';
+import { extractErrorMessage } from '@/lib/error-message';
 import { gameRosterErrorMessage } from '@/lib/game-roster-errors';
 import { gameRosterReasonLabel, gameRosterStatusLabel } from '@/lib/v1-status-labels';
 import {
@@ -37,6 +40,7 @@ type Notice = { tone: 'info' | 'error'; message: string };
  */
 export function TeamGameRostersClient({ teamId }: { teamId: string }) {
   const matrix = useV1TeamGameRosters(teamId);
+  const team = useV1TeamDetail(teamId);
   const authMe = useV1AuthMe();
   const batch = useV1ApplyGameRosterBatch(teamId);
   const [draft, setDraft] = useState<TeamRosterDraft>({});
@@ -50,8 +54,32 @@ export function TeamGameRostersClient({ teamId }: { teamId: string }) {
   const dirty = changes.length > 0;
   const { UnsavedChangesModal } = useUnsavedChangesGuard(dirty);
 
-  if (matrix.isError) return <MatrixLoadError error={matrix.error} onRetry={() => void matrix.refetch()} />;
-  if (data === undefined) return <PageSkeleton variant="detail" />;
+  // 모바일 셸 제목은 데스크톱에서 숨겨져요. 명단 응답 상태와 무관하게 팀 관리 맥락을 유지해요.
+  const pageHeader = (
+    <>
+      <div className="tm-desktop-page-head tm-show-desktop">
+        <AppBackLink className="tm-desktop-back" fallbackHref={`/teams/${encodeURIComponent(teamId)}`}>
+          <ChevronLeftIcon size={22} strokeWidth={2.2} aria-hidden="true" />
+        </AppBackLink>
+        <h1 className="tm-text-heading" style={{ minWidth: 0, overflowWrap: 'anywhere' }}>
+          {team.data?.name ? `${team.data.name} · ` : ''}경기 명단 관리
+        </h1>
+      </div>
+      {team.isPending ? (
+        <p className="tm-text-caption" style={{ margin: 0, paddingInline: 'var(--v1-shell-page-x)' }}>팀 정보를 불러오고 있어요.</p>
+      ) : team.isError ? (
+        <ErrorState
+          title="팀 정보를 불러오지 못했어요"
+          message={extractErrorMessage(team.error, '잠시 후 다시 시도해 주세요.')}
+          onRetry={() => void team.refetch()}
+          retryLabel="팀 정보 다시 불러오기"
+        />
+      ) : null}
+    </>
+  );
+
+  if (matrix.isError) return <>{pageHeader}<MatrixLoadError error={matrix.error} onRetry={() => void matrix.refetch()} /></>;
+  if (data === undefined) return <>{pageHeader}<PageSkeleton variant="detail" /></>;
 
   const viewerUserId = authMe.data?.user?.id ?? null;
   // 팀장·매니저는 경기가 모두 시작됐어도 결장 기간을 등록할 수 있다. 플랫폼 운영자는 표만으로
@@ -73,6 +101,8 @@ export function TeamGameRostersClient({ teamId }: { teamId: string }) {
   }
 
   return (
+    <>
+    {pageHeader}
     <div
       style={{
         display: 'flex',
@@ -140,6 +170,7 @@ export function TeamGameRostersClient({ teamId }: { teamId: string }) {
       ) : null}
       {UnsavedChangesModal}
     </div>
+    </>
   );
 }
 

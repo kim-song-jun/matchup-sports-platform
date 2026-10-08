@@ -480,3 +480,70 @@ describe('TournamentDetailPageClient — 리그 방식 일정', () => {
     expect(screen.queryByText('아직 등록된 경기가 없어요')).not.toBeInTheDocument();
   });
 });
+
+describe('TournamentDetailPageClient — 대회 종류별 진행 안내', () => {
+  const tournamentLeagueSteps = [
+    ['풀리그', '참가한 모든 팀이 서로 맞붙어요. 몇 번씩 맞붙는지는 대진표에서 확인할 수 있어요.'],
+    ['순위 집계', '승점과 득실차로 최종 순위를 가려요.'],
+    ['시상', '최종 순위에 따라 상금과 순위를 시상해요.'],
+  ] as const;
+  const seasonLeagueSteps = [
+    ['풀리그', '참가한 모든 팀이 서로 맞붙어요. 맞붙는 횟수는 시즌 주차 수에 따라 달라져요.'],
+    ['순위 집계', '승점과 득실차로 최종 순위를 가려요.'],
+    ['시상', '최종 순위에 따라 상금과 순위를 시상해요.'],
+  ] as const;
+  const groupSteps = [
+    ['조별 리그', '같은 조 팀끼리 돌아가며 맞붙어 조 안에서 순위를 가려요.'],
+    ['결선 진출', '각 조 상위 팀이 결선 토너먼트에 올라가요.'],
+    ['결선 토너먼트', '편성된 12강·8강·4강을 거쳐 결승에서 우승팀을 가려요. 부전승 팀은 경기 없이 다음 단계로 올라가요.'],
+  ] as const;
+  const knockoutSteps = [
+    ['대진 편성', '참가 팀을 토너먼트 대진표에 배치해요.'],
+    ['토너먼트', '단판 승부로 이긴 팀만 다음 라운드에 올라가요.'],
+    ['결승 · 시상', '마지막까지 이긴 팀이 우승해요. 3·4위전도 함께 진행돼요.'],
+  ] as const;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    searchParamsRef.current = new URLSearchParams();
+    window.localStorage.clear();
+    tournamentApiMocks.useV1MyRegistrations.mockReturnValue({ data: [] });
+    tournamentApiMocks.useV1MyTeams.mockReturnValue({ data: undefined, isPending: true });
+    tournamentApiMocks.useV1Reviews.mockReturnValue({
+      data: undefined, isError: false, isPending: false, isFetching: false, refetch: vi.fn(),
+    });
+  });
+
+  it.each([
+    { condition: '리그 방식 단발 대회', kind: 'regular_tournament', format: 'league', steps: tournamentLeagueSteps, formatLabel: '리그 방식 (풀리그)' },
+    { condition: '종류가 비어 있는 리그 방식 단발 대회', kind: null, format: 'league', steps: tournamentLeagueSteps, formatLabel: '리그 방식 (풀리그)' },
+    { condition: '리그 형식 정규 시즌', kind: 'regular_league', format: 'league', steps: seasonLeagueSteps, formatLabel: '리그 방식 (풀리그)' },
+    { condition: '조별 형식 거울 행인 정규 시즌', kind: 'regular_league', format: 'group_knockout', steps: seasonLeagueSteps, formatLabel: '리그 방식 (풀리그)' },
+    { condition: '토너먼트 형식 거울 행인 정규 시즌', kind: 'regular_league', format: 'knockout', steps: seasonLeagueSteps, formatLabel: '리그 방식 (풀리그)' },
+    { condition: '조별 리그 후 토너먼트 단발 대회', kind: 'regular_tournament', format: 'group_knockout', steps: groupSteps, formatLabel: '조별 리그 후 토너먼트' },
+    { condition: '종류가 비어 있는 조별 리그 후 토너먼트', kind: null, format: 'group_knockout', steps: groupSteps, formatLabel: '조별 리그 후 토너먼트' },
+    { condition: '토너먼트 단발 대회', kind: 'regular_tournament', format: 'knockout', steps: knockoutSteps, formatLabel: '토너먼트 (단판 승부)' },
+    { condition: '종류가 비어 있는 토너먼트', kind: null, format: 'knockout', steps: knockoutSteps, formatLabel: '토너먼트 (단판 승부)' },
+  ] as const)('$condition의 실제 상세 안내를 선택해요', async ({ kind, format, steps, formatLabel }) => {
+    // Given: API가 구분하는 대회 종류와 진행 방식을 실제 상세에 전달해요.
+    tournamentApiMocks.useV1Tournament.mockReturnValue({
+      data: makeTournament({ kind, format }),
+      isLoading: false, isError: false, error: null, refetch: vi.fn(),
+    });
+
+    // When: 참가자가 읽는 상세 페이지를 렌더해요.
+    render(<TournamentDetailPageClient tournamentId="tournament-1" />);
+
+    // Then: 형식 라벨과 기존 세 단계는 유지하고 시즌 주차 안내는 실제 정규 리그에만 보여요.
+    const flow = within(await screen.findByRole('region', { name: '대회 진행 방식' }));
+    expect(flow.getByText(formatLabel, { exact: true })).toBeInTheDocument();
+    expect(flow.getAllByRole('listitem')).toHaveLength(3);
+    steps.forEach(([title, body]) => {
+      expect(flow.getByText(title, { exact: true })).toBeInTheDocument();
+      expect(flow.getByText(body, { exact: true })).toBeInTheDocument();
+    });
+    if (kind !== 'regular_league') {
+      expect(flow.queryByText(/시즌 주차 수/)).not.toBeInTheDocument();
+    }
+  });
+});

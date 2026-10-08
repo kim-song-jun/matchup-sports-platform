@@ -759,6 +759,10 @@ export function TeamScheduleFormPageClient({ teamId, scheduleId }: { teamId: str
       setError('제목과 시작·종료 시각을 모두 입력해 주세요.');
       return;
     }
+    if (Date.parse(endAtIso) <= Date.parse(startAtIso)) {
+      setError('종료 시각은 시작 시각보다 늦어야 해요.');
+      return;
+    }
     setError(null);
     const capacityNum = draft.capacity.trim() ? Number(draft.capacity) : undefined;
     const rsvpDeadlineIso = kstDatetimeLocalToIso(draft.rsvpDeadlineAt) ?? undefined;

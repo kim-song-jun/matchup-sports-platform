@@ -441,13 +441,17 @@ export class TeamSchedulesService {
 
       await this.assertManageableTeam(tx, user, teamId);
 
+      const startAt = new Date(dto.startAt);
+      const endAt = new Date(dto.endAt);
+      this.assertScheduleTimeRange(startAt, endAt);
+
       const created = await tx.v1TeamSchedule.create({
         data: {
           teamId,
           title: dto.title,
           type: dto.type,
-          startAt: new Date(dto.startAt),
-          endAt: new Date(dto.endAt),
+          startAt,
+          endAt,
           timezone: dto.timezone,
           capacity: dto.capacity ?? null,
           rsvpDeadlineAt: dto.rsvpDeadlineAt ? new Date(dto.rsvpDeadlineAt) : null,
@@ -495,6 +499,10 @@ export class TeamSchedulesService {
       if (schedule.state !== V1ScheduleState.SCHEDULED) {
         throw new ConflictException({ code: 'SCHEDULE_TERMINAL', message: 'Schedule is already terminal' });
       }
+
+      const nextStartAt = dto.startAt ? new Date(dto.startAt) : schedule.startAt;
+      const nextEndAt = dto.endAt ? new Date(dto.endAt) : schedule.endAt;
+      this.assertScheduleTimeRange(nextStartAt, nextEndAt);
 
       // CP1 fix: dto.rsvpDeadlineAt has three meaningful states — `undefined` (field omitted,
       // preserve the existing value), `null` (explicitly cleared, must persist as SQL NULL, NOT
@@ -547,8 +555,8 @@ export class TeamSchedulesService {
       const updated = await tx.$executeRaw`
         UPDATE v1_team_schedules
         SET title = ${dto.title ?? schedule.title},
-            start_at = ${dto.startAt ? new Date(dto.startAt) : schedule.startAt},
-            end_at = ${dto.endAt ? new Date(dto.endAt) : schedule.endAt},
+            start_at = ${nextStartAt},
+            end_at = ${nextEndAt},
             capacity = ${nextCapacity},
             rsvp_deadline_at = ${nextRsvpDeadlineAt},
             visibility = ${(dto.visibility ?? schedule.visibility)}::"V1ScheduleVisibility",
@@ -1203,6 +1211,15 @@ export class TeamSchedulesService {
         expiresAt: new Date(Date.now() + IDEMPOTENCY_RETENTION_MS),
       },
     });
+  }
+
+  private assertScheduleTimeRange(startAt: Date, endAt: Date): void {
+    if (!(endAt.getTime() > startAt.getTime())) {
+      throw new UnprocessableEntityException({
+        code: 'SCHEDULE_INVALID_TIME_RANGE',
+        message: 'Schedule end time must be after start time',
+      });
+    }
   }
 
   private assertActiveAccount(user: V1AuthUser): void {

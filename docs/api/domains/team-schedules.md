@@ -30,6 +30,14 @@ An external review (2026-08-03, two independent sources — GPT Pro W1-W10/T1-T3
 
 Reminders and escalation reuse the existing Task 5 DB-leased worker (`V1GameOperationsWorkerService`) and the existing `NotificationsService` — no second scheduler is used, but the notification **persistence path is not shared with the HTTP path** (see Deviation 8) — durable reminder delivery goes straight through the worker's own transaction, not through `NotificationsService.emitNotificationToMany`'s fire-and-forget path (`ScheduleReminderService`, registered in `v1-game-operations-worker.main.ts`).
 
+## Schedule date range and errors
+
+`POST /api/v1/teams/:teamId/schedules` and `PATCH /api/v1/teams/:teamId/schedules/:scheduleId` require `endAt` to be strictly later than `startAt`. The service compares parsed timestamps, so equal instants with different UTC offsets are rejected and a valid next-day end is accepted. For PATCH, omitted dates retain their values from the locked schedule row; the resulting full range is validated even when only one date is supplied or both dates are omitted.
+
+A fresh command with reversed, equal or unparseable effective dates returns HTTP `422` with code `SCHEDULE_INVALID_TIME_RANGE` and message `Schedule end time must be after start time`. Rejection persists no schedule/attendance mutation, notification outbox entry or idempotency result. DTO date-string validation still applies before the service is called.
+
+Existing precedence is preserved: the active-account and create-only `MATCH` restriction run first, an idempotency replay or payload conflict precedes management checks, and PATCH checks the expected version and terminal state before validating dates. A committed historical response is still replayed under its original key and payload. No Prisma model or migration change is required.
+
 ## Known gaps (post-review)
 
 None outstanding as of this revision. The three items a prior revision of this doc listed here — the guest-close reminder skipping the schedule/recruitment terminal check, a private schedule's `PUBLIC`-visibility recruitment being readable anonymously through the dedicated endpoint, and `GuestRecruitmentService`'s idempotency records never expiring out — have all been fixed; see Deviations 4, 10, and 11 below for the current behavior and the regression tests that guard each one. If you are reading this weeks later, check `git log` on `guest-recruitment.service.ts` / `team-schedules.service.ts` to confirm none of these have silently regressed.

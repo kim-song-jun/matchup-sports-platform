@@ -45,6 +45,12 @@ Given 종료가 시작 이하인 입력, When 다음/최종 제출, Then 명확�
 보고 당시 서빙 SHA 미확인, 모바일 미검증. 현재 API/controller/service 시간 계약을 읽고 same-day 규칙을 확정한다. 전체 폼 디자인 재설계는 범위 밖이다.
 
 ## Progress Snapshot
+
+### PR1675 latest overnight guidance followup
+
+- Actual Copilot comment4218064407 at b8e7f580 found no next-day selection guidance when the end date is blank and23:00->01:00 is entered. Existing team-match description provides the same instruction. Existing CreateField caption/aria-describedby is reused; only the personal-match end-date description changes, with no automatic next-day inference.
+- Source-unchanged real UI/hooks/HTTP RED1failed/31skipped (focused missing-guidance assertion),4.06s -> complete client GREEN32/32,5.97s. The new case proves visible/accessibly described guidance, blank date preserved, invalid next step blocked and no POST. Existing31 cases including actual overnight GET/edit PATCH retain their coverage. Logs own `tmp/qa/mdqa-52/red-overnight-guidance.txt` and `green-overnight-guidance.txt`; CPU52/free10274MiB/Node84/browser14 preflight, test process exited and serial slot released.
+- Root owns committed62 (client32+validation30), Web types/pattern, latest-dev integration, full8-file exact-head independent review, same PR push/reply/resolution and original tracker followup. No new worktree or PR for this existing open task; alpha after remains pending.
 - 실제 external 후속: OPEN PR1675 head `7d7`의 Codex thread `PRRT_kwDORrML2s6qTy4h` / REST4217718555를 현재 service·GET edit·draft mapper·RULES·payload와 대조했다. API는 full ISO 종료가 시작보다 늦으면 익일 종료도 허용하지만 draft mapper가 종료 날짜를 버리고 검증이 시작 날짜를 다시 붙여 유효한 23:00→익일01:00 수정을 막았다. production 유지 상태의 actual GET→hydrate→무변경/제목 수정 consumer2가 실제 장소시간 단계에서 차단되는 RED2/2(4.36s)를 확인했다. 증거 `tmp/qa/mdqa-52/red-explicit-end-date.txt`, client spec에 `--maxWorkers=1 --fileParallelism=false -t 'API 유효 익일 종료 매치'`.
 - Root는 A 기존 `CreateField` 종료 날짜 선택 입력을 승인했다. B datetime-local 통합은 입력 구조 변경이 크고 C 읽기전용 날짜 보존은 날짜 정정이 불가능하므로 최소 A를 선택했다. exact source scope는 local `matches.types.ts` optional endDate, client 기본값/실제 종료 날짜 hydrate, validation/ISO payload, 기존 CreateField와 확인 화면의 종료 날짜 표시다. 공용 API types/hooks/MSW/서버 계약은 변경하지 않았다.
 - 종료 날짜는 입력·복원된 실제 값만 사용하고, 생략된 과거 초안은 기존 시작 날짜로 검증한다. `HH:mm` 00–23/00–59 보호와 달력 날짜 round-trip 검사로 24:00/11:60/2월30일/잘못된 달을 차단한다. 날짜만 입력하면 종료 시간도 요구하며 손상 날짜를 시작 날짜나 익일로 대체하지 않는다. UI 전용 endDate/endTime은 POST/PATCH에 보내지 않는다.

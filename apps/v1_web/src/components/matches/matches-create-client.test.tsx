@@ -333,6 +333,25 @@ describe('개인 매치 종료 시간 — 실제 화면과 API 제출 계약', (
     return render(<QueryClientProvider client={queryClient}><MatchCreatePageClient step={step} /></QueryClientProvider>);
   }
 
+  it('자정을 넘는 경기의 종료 날짜 직접 선택 안내를 표시하고 날짜를 자동 변경하지 않는다', async () => {
+    seedDraft('');
+    renderStep('place-time');
+    await waitFor(() => expect(screen.getByLabelText('지역')).toHaveValue('region-gangnam'));
+    fireEvent.change(screen.getByLabelText('시작 시간'), { target: { value: '23:00' } });
+    fireEvent.change(screen.getByLabelText('종료 시간'), { target: { value: '01:00' } });
+
+    const guidance = '비워두면 시작 날짜와 같아요. 자정을 넘는 경기는 다음 날을 선택해 주세요.';
+    expect(screen.getByText(guidance)).toBeVisible();
+    expect(screen.getByLabelText('종료 날짜')).toHaveAccessibleDescription(guidance);
+    expect(screen.getByLabelText('종료 날짜')).toHaveValue('');
+    fireEvent.click(screen.getByRole('button', { name: '다음' }));
+
+    expect(screen.getByText('종료 시간은 시작 시간보다 늦어야 해요')).toBeVisible();
+    expect(screen.getByLabelText('종료 날짜')).toHaveValue('');
+    expect(routerPush).not.toHaveBeenCalled();
+    expect(postBodies).toEqual([]);
+  });
+
   it.each(['09:00', '10:00'])('10:00→%s 입력은 다음을 막고 종료 오류·값·포커스를 유지하며 정정 후 진행한다', async (endTime) => {
     const date = seedDraft('');
     const view = renderStep('place-time');

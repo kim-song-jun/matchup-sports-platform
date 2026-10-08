@@ -1321,7 +1321,7 @@ function PlaceTimeFields({ model }: { model: MatchCreateViewModel }) {
         <CreateField id="field-startTime" error={errors?.startTime} label="시작 시간" value={draft.startTime} type="time" onChange={(value) => model.form?.onFieldChange('startTime', value)} />
         <CreateField id="field-endTime" error={errors?.endTime} label="종료 시간" value={draft.endTime} type="time" onChange={(value) => model.form?.onFieldChange('endTime', value)} />
       </div>
-      <CreateField id="field-endDate" error={errors?.endDate} label="종료 날짜" value={draft.endDate ?? ''} type="date" description="비워두면 시작 날짜와 같아요." onChange={(value) => model.form?.onFieldChange('endDate', value)} />
+      <CreateField id="field-endDate" error={errors?.endDate} label="종료 날짜" value={draft.endDate ?? ''} type="date" description="비워두면 시작 날짜와 같아요. 자정을 넘는 경기는 다음 날을 선택해 주세요." onChange={(value) => model.form?.onFieldChange('endDate', value)} />
       <div className="tm-create-two-col">
         <CreateField id="field-deadlineDate" error={errors?.deadlineDate} label="신청 마감일" value={draft.deadlineDate} type="date" onChange={(value) => model.form?.onFieldChange('deadlineDate', value)} />
         <CreateField id="field-deadlineTime" error={errors?.deadlineTime} label="신청 마감시간" value={draft.deadlineTime} type="time" onChange={(value) => model.form?.onFieldChange('deadlineTime', value)} />

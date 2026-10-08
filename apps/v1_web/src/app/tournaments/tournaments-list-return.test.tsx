@@ -1,22 +1,33 @@
 import { useState, type AnchorHTMLAttributes, type MouseEvent } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { clearStoredV1Session } from '@/lib/session-storage';
-import type { V1TournamentDetail } from '@/types/api';
+import type { V1LeagueOverallStandingsResponse, V1TournamentDetail } from '@/types/api';
 import { TournamentDetailPageClient } from './[id]/tournament-detail-client';
 import { TournamentsListPageClient } from './tournaments-list-client';
 
 // jsdom에는 Next 라우터가 없으므로 이동 경계만 대체한다. 목록·카드·상세·뒤로가기와 API 훅은 실제 구현이다.
-const navigation = vi.hoisted(() => ({ path: '/tournaments', navigate: (_path: string) => {} }));
+const navigation = vi.hoisted(() => ({
+  path: '/tournaments',
+  history: new Array<string>(),
+  index: 0,
+  navigate: (_path: string, _replace = false) => {},
+  back: () => {},
+}));
 
 vi.mock('next/navigation', () => ({
   usePathname: () => navigation.path.split('?')[0],
   useSearchParams: () => new URLSearchParams(navigation.path.split('?')[1]),
-  useRouter: () => ({ push: navigation.navigate, replace: navigation.navigate, prefetch: vi.fn() }),
+  useRouter: () => ({
+    push: (path: string) => navigation.navigate(path),
+    replace: (path: string) => navigation.navigate(path, true),
+    back: navigation.back,
+    prefetch: vi.fn(),
+  }),
 }));
 vi.mock('next/link', () => ({
   default: ({ href, onClick, prefetch: _prefetch, ...props }: AnchorHTMLAttributes<HTMLAnchorElement> & { prefetch?: boolean }) => (
@@ -130,11 +141,14 @@ const server = setupServer(
   http.post('*/api/v1/logs/client-error', () => new HttpResponse(null, { status: 204 })),
 );
 let queryClient: QueryClient;
+const originalMatchMedia = window.matchMedia;
 
 beforeEach(() => {
   vi.stubEnv('NEXT_PUBLIC_API_URL', 'http://localhost/api/v1');
   clearStoredV1Session();
   navigation.path = FILTERED_LIST;
+  navigation.history = [];
+  navigation.index = 0;
   queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   server.listen({ onUnhandledRequest: 'error' });
 });
@@ -142,14 +156,29 @@ afterEach(() => {
   cleanup();
   queryClient.clear();
   server.close();
+  server.resetHandlers();
+  window.matchMedia = originalMatchMedia;
   vi.unstubAllEnvs();
 });
 
 function PublicRoute() {
   const [path, setPath] = useState(navigation.path);
-  navigation.navigate = (next) => {
+  if (navigation.history.length === 0) navigation.history = [navigation.path];
+  navigation.navigate = (next, replace = false) => {
+    if (replace) navigation.history[navigation.index] = next;
+    else {
+      navigation.history = [...navigation.history.slice(0, navigation.index + 1), next];
+      navigation.index += 1;
+    }
     navigation.path = next;
     setPath(next);
+  };
+  navigation.back = () => {
+    const previous = navigation.history[navigation.index - 1];
+    if (previous === undefined) return;
+    navigation.index -= 1;
+    navigation.path = previous;
+    setPath(previous);
   };
   return path.split('?')[0] === '/tournaments'
     ? <TournamentsListPageClient />
@@ -200,5 +229,104 @@ describe('MD-QA #22 — 공개 대회 상세 복귀', () => {
     // Then: 외부로 이동하지 않고 기본 전체 목록의 결과를 보여준다.
     expect(navigation.path).toBe('/tournaments');
     await waitFor(() => expect(within(screen.getByRole('list', { name: '대회 목록' })).getAllByRole('listitem')).toHaveLength(8));
+  });
+});
+
+describe('MD-QA #42 — 대회 목록 페이지 복귀', () => {
+  const leagueList = '/tournaments?kind=league';
+  const secondPage = `${leagueList}&page=2`;
+  const leagues = Array.from({ length: 22 }, (_, index) => ({
+    ...tournament,
+    id: index === 20 ? TOURNAMENT_ID : `league-${index + 1}`,
+    title: `정규 리그 ${index + 1}`,
+    kind: 'regular_league',
+  }));
+
+  beforeEach(() => {
+    window.matchMedia = (query: string) => ({
+      matches: query.includes('1024px'), media: query, onchange: null,
+      addListener: () => {}, removeListener: () => {},
+      addEventListener: () => {}, removeEventListener: () => {}, dispatchEvent: () => false,
+    });
+    server.use(
+      http.get('*/api/v1/tournaments', ({ request }) => {
+        const params = new URL(request.url).searchParams;
+        const page = Number(params.get('page') ?? 1);
+        const limit = Number(params.get('limit') ?? 20);
+        const filtered = leagues.filter((item) => !params.get('status') || item.status === params.get('status'));
+        return ok({
+          items: filtered.slice((page - 1) * limit, page * limit),
+          pageInfo: { page, total: filtered.length, totalPages: Math.ceil(filtered.length / limit), hasNext: page * limit < filtered.length, nextCursor: null },
+        });
+      }),
+      http.get('*/api/v1/tournaments/:id', () => ok(leagues[20])),
+      http.get('*/api/v1/tournaments/:id/standings/overall', () => ok({
+        standings: [], progress: { total: 0, played: 0, remaining: 0, percent: 0 },
+        magicNumber: null, recalculatedAt: null, champions: [], tieBreakGroups: [],
+      } satisfies V1LeagueOverallStandingsResponse)),
+    );
+  });
+
+  async function expectSecondPage() {
+    await screen.findByText(/전체 22건 중 21–22/);
+    const list = within(screen.getByRole('list', { name: '대회 목록' }));
+    expect(list.getAllByRole('listitem')).toHaveLength(2);
+    expect(list.getByRole('link', { name: /정규 리그 21/ })).toBeInTheDocument();
+    expect(list.queryByText('정규 리그 1', { exact: true })).not.toBeInTheDocument();
+  }
+
+  it.each(['상단 뒤로가기', '브라우저 Back'])('2페이지에서 상세를 보고 %s 하면 URL과 21–22/22 결과를 복원한다', async (backAction) => {
+    // Given: 실제 page API 응답으로 22개 리그의 두 번째 페이지를 선택한다.
+    navigation.path = leagueList;
+    const user = userEvent.setup();
+    renderRoute();
+    await screen.findByText(/전체 22건 중 1–20/);
+    await user.click(screen.getByRole('button', { name: '2페이지' }));
+    await expectSecondPage();
+    expect(navigation.path).toBe(secondPage);
+    await user.click(screen.getByRole('link', { name: /정규 리그 21/ }));
+    await screen.findByRole('heading', { level: 1, name: '정규 리그 21' });
+    expect(new URL(navigation.path, 'https://teameet.example').searchParams.get('from')).toBe(secondPage);
+
+    // When: 상세의 앱 링크 또는 브라우저의 직전 history entry로 돌아간다.
+    if (backAction === '상단 뒤로가기') await user.click(screen.getByRole('link', { name: '뒤로가기' }));
+    else act(() => navigation.back());
+
+    // Then: 같은 페이지의 URL과 실제 두 개 결과가 복원된다.
+    expect(navigation.path).toBe(secondPage);
+    await expectSecondPage();
+  });
+
+  it('page=2 URL로 직접 진입하면 두 번째 페이지를 조회한다', async () => {
+    // Given: 새 목록 인스턴스에 전달된 두 번째 페이지 URL.
+    navigation.path = secondPage;
+
+    // When: 실제 API 훅을 사용하는 목록을 마운트한다.
+    renderRoute();
+
+    // Then: 첫 페이지가 아닌 21–22/22 결과를 보여준다.
+    await expectSecondPage();
+  });
+
+  it('2페이지의 필터를 여닫을 때는 페이지를 유지하고 상태를 바꾸면 첫 페이지로 돌아간다', async () => {
+    // Given: 두 번째 페이지에서 연 필터 시트.
+    navigation.path = secondPage;
+    const user = userEvent.setup();
+    renderRoute();
+    await expectSecondPage();
+    await user.click(screen.getByRole('link', { name: '필터 열기 — 현재 전체' }));
+    await expectSecondPage();
+    await user.click(screen.getByRole('link', { name: '닫기' }));
+    await expectSecondPage();
+    await user.click(screen.getByRole('link', { name: '필터 열기 — 현재 전체' }));
+
+    // When: 상태 필터를 바꾼다.
+    await user.click(screen.getByRole('link', { name: '진행 중' }));
+
+    // Then: URL의 페이지도 지우고 바뀐 필터의 1–20 결과를 조회한다.
+    const params = new URL(navigation.path, 'https://teameet.example').searchParams;
+    expect(params.get('status')).toBe('in_progress');
+    expect(params.has('page')).toBe(false);
+    await screen.findByText(/전체 22건 중 1–20/);
   });
 });

@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { renderToStaticMarkup } from 'react-dom/server';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
@@ -22,7 +23,10 @@ const { teamId } = GAME_ROSTER_MSW;
 const TEAM_NAME = '현재 경로의 합성 팀';
 const PAGE_TITLE = '경기 명단 관리';
 const NOW = '2026-10-01T00:00:00.000Z';
-const desktopCss = readFileSync(resolve('src/app/desktop/_shell.css'), 'utf8');
+const mobileListCss = postcss.parse(readFileSync(resolve('src/app/globals.css'), 'utf8')).nodes
+  .filter((node) => node.type === 'rule' && node.selector === '.tm-team-list')
+  .map((node) => node.toString()).join('\n');
+const desktopCss = `${mobileListCss}\n${readFileSync(resolve('src/app/desktop/_shell.css'), 'utf8')}\n${readFileSync(resolve('src/app/desktop/teams.css'), 'utf8')}`;
 const clients: QueryClient[] = [];
 let mock: ReturnType<typeof createV1GameRosterMswHandlers>;
 let server: ReturnType<typeof setupServer>;
@@ -100,7 +104,69 @@ function emptyRoster() {
   }));
 }
 
+function horizontalPadding(element: Element) {
+  // jsdom은 var/calc가 있는 padding shorthand를 버린다. 실제 활성 CSS 선언을 비교한다.
+  // 좌표·레이아웃 계산이나 토큰 값 대체를 하지 않으며 브라우저 픽셀 증거를 대신하지 않는다.
+  const inset = { start: '0px', end: '0px' };
+  const zero = (value: string) => value === '0' ? '0px' : value;
+  const apply = (declaration: postcss.Declaration) => {
+    const values = postcss.list.space(declaration.value);
+    if (declaration.prop === 'padding') {
+      inset.start = zero(values[3] ?? values[1] ?? values[0]);
+      inset.end = zero(values[1] ?? values[0]);
+    } else if (declaration.prop === 'padding-inline') {
+      inset.start = zero(values[0]); inset.end = zero(values[1] ?? values[0]);
+    } else if (declaration.prop === 'padding-left' || declaration.prop === 'padding-inline-start') {
+      inset.start = zero(values[0]);
+    } else if (declaration.prop === 'padding-right' || declaration.prop === 'padding-inline-end') {
+      inset.end = zero(values[0]);
+    }
+  };
+  postcss.parse(viewportStyle?.textContent ?? '').walkRules((rule) => {
+    if (element.matches(rule.selector)) rule.walkDecls(apply);
+  });
+  postcss.parse(`.inline { ${element.getAttribute('style') ?? ''} }`).walkDecls(apply);
+  return inset;
+}
+
+function serializedParagraph(text: string) {
+  const client = clients.at(-1);
+  if (!client) throw new Error('실제 응답을 받은 QueryClient가 없어요.');
+  // 실제 HTTP로 채운 cache를 같은 consumer에서 직렬화해 ReactDOM/jsdom이 버린 CSS 값을 보존한다.
+  const markup = renderToStaticMarkup(<QueryClientProvider client={client}><AppShellFrame><TeamGameRostersClient teamId={teamId} /></AppShellFrame></QueryClientProvider>);
+  const document = new DOMParser().parseFromString(markup, 'text/html');
+  const paragraph = Array.from(document.querySelectorAll('p')).find((node) => node.textContent === text);
+  if (!paragraph) throw new Error('직렬화된 실제 본문 문구가 없어요.');
+  return paragraph;
+}
+
 describe('QA51 실제 route consumer·셸·CSS의 명단 관리 맥락', () => {
+  it.each([390, 768, 1188, 1440])('%spx 명단 본문 좌우 여백은 모바일 토큰과 데스크톱 헤더 기준을 따른다', async (width) => {
+    renderAtWidth(width);
+    await screen.findByRole('group', { name: '김민재 경기별 출전' });
+    const body = serializedParagraph('다가오는 대회·리그 경기 2개 · 칩을 누르면 그 경기에서 빠져요').parentElement;
+    if (!body) throw new Error('실제 명단 본문 컨테이너가 없어요.');
+    if (width >= 1024) {
+      const heading = await screen.findByRole('heading', { level: 1, name: `${TEAM_NAME} · ${PAGE_TITLE}` });
+      const header = heading.closest('.tm-desktop-page-head');
+      if (!header) throw new Error('실제 데스크톱 헤더가 없어요.');
+      expect(horizontalPadding(body)).toEqual(horizontalPadding(header));
+    } else {
+      expect(horizontalPadding(body)).toEqual({ start: 'var(--v1-shell-page-x)', end: 'var(--v1-shell-page-x)' });
+    }
+  });
+
+  it.each([1188, 1440])('%spx 팀 정보 로딩 문구 좌우 여백은 데스크톱 헤더 기준을 따른다', async (width) => {
+    teamInfoPending = true;
+    renderAtWidth(width);
+    await screen.findByRole('group', { name: '김민재 경기별 출전' });
+    const loading = screen.getByText('팀 정보를 불러오고 있어요.');
+    const header = screen.getByRole('heading', { level: 1, name: PAGE_TITLE }).closest('.tm-desktop-page-head');
+    if (!header) throw new Error('실제 데스크톱 헤더가 없어요.');
+    expect(loading).toBeVisible();
+    expect(horizontalPadding(serializedParagraph('팀 정보를 불러오고 있어요.'))).toEqual(horizontalPadding(header));
+  });
+
   it.each([
     [390, false], [502, false], [768, false], [1188, false], [1440, false],
     [390, true], [502, true], [768, true], [1188, true], [1440, true],

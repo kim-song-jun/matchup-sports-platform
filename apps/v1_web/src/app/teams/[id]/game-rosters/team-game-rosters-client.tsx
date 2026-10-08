@@ -66,7 +66,7 @@ export function TeamGameRostersClient({ teamId }: { teamId: string }) {
         </h1>
       </div>
       {team.isPending ? (
-        <p className="tm-text-caption" style={{ margin: 0, paddingInline: 'var(--v1-shell-page-x)' }}>팀 정보를 불러오고 있어요.</p>
+        <p className="tm-text-caption" style={{ margin: 0 }}>팀 정보를 불러오고 있어요.</p>
       ) : team.isError ? (
         <ErrorState
           title="팀 정보를 불러오지 못했어요"
@@ -104,12 +104,13 @@ export function TeamGameRostersClient({ teamId }: { teamId: string }) {
     <>
     {pageHeader}
     <div
+      className="tm-team-list"
       style={{
         display: 'flex',
         flexDirection: 'column',
         gap: 12,
         // 아래 고정 저장 바(.tm-fixed-cta)는 안전영역만큼 커진다 — 여백도 같이 늘린다.
-        padding: `16px var(--v1-shell-page-x) ${dirty || data.games.some((g) => g.editable) ? 'calc(112px + var(--v1-shell-safe-bottom))' : '16px'}`,
+        paddingBlock: `16px ${dirty || data.games.some((g) => g.editable) ? 'calc(112px + var(--v1-shell-safe-bottom))' : '16px'}`,
       }}
     >
       <p className="tm-text-caption" style={{ margin: 0 }}>

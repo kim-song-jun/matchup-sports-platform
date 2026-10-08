@@ -45,6 +45,14 @@ and therefore has no host participant row.
 
 ## Room entry and read state
 
+- `GET /chat/rooms` checks the same current entitlement, active chat participant, requested room
+  status and platform-room eligibility when fetching both ordering keys and room contents. A room
+  revoked, left or archived between those reads contributes no title or message preview. If candidates
+  disappear, the list refills from the remaining ordered keys in bounded batches. `hasNext` requires
+  an entitled lookahead row, and `nextCursor` names the last returned room. If no eligible candidate
+  remains, the page ends with `hasNext=false`, `nextCursor=null`. A cursor already absent at the next request remains
+  an end cursor rather than restarting the list. Ordering and participant history boundaries are unchanged.
+
 ### Platform team-match rooms
 
 - Platform recruitment creation atomically creates a `team_match` chat room and adds the creating
@@ -157,6 +165,12 @@ and therefore has no host participant row.
   no Android binary permission change is required.
 
 ## Verification
+
+`src/chat/chat.service.rooms-entitlement.spec.ts` invokes the real service and serializer while an
+in-memory Prisma dependency evaluates current predicates before and after access changes. It covers
+all linked room types, revoked operator access, chat exit/archive/platform eligibility, refill/cursor
+and null-message boundaries, and database error propagation. It is query-contract regression coverage;
+actual PostgreSQL concurrency and authenticated alpha behavior require separate integration/QA evidence.
 
 `test/chat/chat-safety.integration-spec.ts` uses actual HTTP, DTO guards and PostgreSQL, with isolated
 fictional users. It verifies reporting, membership/self guards, bilateral history/preview/unread filtering,

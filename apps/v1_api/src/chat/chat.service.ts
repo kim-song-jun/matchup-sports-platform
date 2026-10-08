@@ -201,15 +201,20 @@ export class ChatService {
     const cursorAt = query.cursor ? keys.findIndex((key) => key.id === query.cursor) : -1;
     // 목록에서 사라진 커서(숨김·퇴장)는 처음부터 다시 돌지 않고 끝으로 취급한다.
     const start = !query.cursor ? 0 : cursorAt < 0 ? keys.length : cursorAt + 1;
-    const pageKeys = keys.slice(start, start + limit + 1);
-    const found = await this.prisma.v1ChatRoom.findMany({
-      where: { id: { in: pageKeys.map((key) => key.id) } },
-      include: this.roomInclude(user.id),
-    });
-    const byId = new Map(found.map((room) => [room.id, room]));
-    const rooms = pageKeys.flatMap((key) => byId.get(key.id) ?? []);
+    const rooms: RoomWithRelations[] = [];
+    // 키 조회 뒤 권한·참가 상태가 바뀔 수 있다. 내용 조회도 같은 조건을 적용하고,
+    // 사라진 행은 건너뛰어 실제 접근 가능한 lookahead 와 커서를 확보한다.
+    for (let offset = start; offset < keys.length && rooms.length <= limit; offset += limit + 1) {
+      const pageKeys = keys.slice(offset, offset + limit + 1);
+      const found = await this.prisma.v1ChatRoom.findMany({
+        where: { ...where, id: { in: pageKeys.map((key) => key.id) } },
+        include: this.roomInclude(user.id),
+      });
+      const byId = new Map(found.map((room) => [room.id, room]));
+      rooms.push(...pageKeys.flatMap((key) => byId.get(key.id) ?? []));
+    }
     const pageItems = rooms.slice(0, limit);
-    const hasNext = keys.length > start + limit;
+    const hasNext = rooms.length > limit;
 
     return {
       items: await Promise.all(pageItems.map((room) => this.toRoomListItem(room, user.id))),

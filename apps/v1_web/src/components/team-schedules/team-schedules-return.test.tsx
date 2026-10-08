@@ -6,6 +6,7 @@ import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { clearStoredV1Session } from '@/lib/session-storage';
+import { v1Keys } from '@/lib/query-keys';
 import { __resetNavigationHistoryForTests, installNavigationHistory } from '@/lib/navigation-history';
 import type { V1TeamDetail, V1TeamScheduleDetail } from '@/types/api';
 import { TeamScheduleDetailPageClient, TeamScheduleListPageClient } from './team-schedules-client';
@@ -128,7 +129,8 @@ afterEach(() => {
   cleanup(); client.clear(); server.resetHandlers(); server.close();
   vi.restoreAllMocks(); __resetNavigationHistoryForTests(); vi.useRealTimers(); vi.unstubAllEnvs(); originalReplace(null, '', '/');
 });
-async function idle() { await waitFor(() => expect(client.isFetching()).toBe(0)); }
+// 현재 화면의 실제 응답을 기다린다. 상세가 unmount된 뒤 남은 auth 재시도는 목록 계약 밖이다.
+async function idle() { await waitFor(() => expect(client.isFetching({ type: 'active' })).toBe(0)); }
 async function goBack(action: string) {
   if (action === 'header Back') await userEvent.click(screen.getByRole('link', { name: '뒤로가기' }));
   else act(() => navigation.back());
@@ -136,6 +138,74 @@ async function goBack(action: string) {
 function params() { return new URL(navigation.path, 'https://teameet.example').searchParams; }
 
 describe('MD-QA #45 — 팀 일정 실제 상세 복귀', () => {
+  it('상세 auth 재시도가 남아도 복귀 목록의 실제 응답 완료를 기다린다', async () => {
+    // Given: 실제 401 재시도와 목록 재조회가 서로 독립적으로 응답한다.
+    let releaseAuth = () => {};
+    let releaseList = () => {};
+    const authResponse = new Promise<void>((resolve) => { releaseAuth = resolve; });
+    const listResponse = new Promise<void>((resolve) => { releaseList = resolve; });
+    let authAttempts = 0;
+    let authRetryStarted = false;
+    let holdList = false;
+    let returnedListStarted = false;
+    // 재시도 대기 시간만 생략한다. 실제 첫 401과 두 번째 HTTP 요청은 모두 실행한다.
+    client.setQueryDefaults(v1Keys.authMe(), { retryDelay: 0 });
+    server.use(
+      http.get('*/api/v1/auth/me', async () => {
+        authAttempts += 1;
+        if (authAttempts > 1) { authRetryStarted = true; await authResponse; }
+        return HttpResponse.json({ status: 'error', statusCode: 401, code: 'UNAUTHENTICATED', message: '로그인이 필요해요.' }, { status: 401 });
+      }),
+      http.get('*/api/v1/teams/:teamId/schedules', async ({ request }) => {
+        const url = new URL(request.url); requests.push(url);
+        if (holdList) { returnedListStarted = true; await listResponse; }
+        const items = schedules.filter((item) => (!url.searchParams.get('type') || item.type === url.searchParams.get('type'))
+          && (!url.searchParams.get('state') || item.state === url.searchParams.get('state')));
+        return ok({ items: items.map((item) => holdList && item.id === 'oct-training' ? { ...item, title: '복귀 응답 훈련' } : item), nextCursor: null });
+      }),
+    );
+    renderRoute(`${LIST}?type=TRAINING&state=SCHEDULED`);
+    await screen.findByRole('link', { name: /10월 훈련/ }); await idle();
+
+    try {
+      await userEvent.click(screen.getByRole('link', { name: /10월 훈련/ }));
+      await screen.findByRole('heading', { name: '10월 훈련' });
+      await waitFor(() => expect(authRetryStarted).toBe(true));
+      expect(authAttempts).toBe(2);
+      expect(client.getQueryState(v1Keys.authMe())?.fetchFailureCount).toBe(1);
+
+      // When: 실제 browser Back 뒤 현재 목록 응답은 보류하고 상세의 auth 재시도도 남긴다.
+      holdList = true; await goBack('browser Back');
+      await screen.findByRole('heading', { name: '합성 복귀 팀 · 일정' });
+      await waitFor(() => expect(returnedListStarted).toBe(true));
+      await waitFor(() => expect(client.isFetching({ type: 'active' })).toBe(1));
+      expect(client.isFetching()).toBe(2);
+      const authQuery = client.getQueryCache().find({ queryKey: v1Keys.authMe(), exact: true });
+      expect(authQuery?.getObserversCount()).toBe(0);
+      expect(authQuery?.state.fetchStatus).toBe('fetching');
+      let completed = false;
+      const completion = idle().then(() => { completed = true; return {}; }, (error: unknown) => ({ error }));
+      await act(async () => { await Promise.resolve(); });
+      expect(completed).toBe(false);
+
+      // Then: 실제 새 목록 데이터 이후에만 완료하며 비활성 상세 요청과 조건·카드를 혼동하지 않는다.
+      releaseList(); await screen.findByRole('link', { name: /복귀 응답 훈련/ });
+      const result = await completion;
+      if ('error' in result) throw result.error;
+      expect(completed).toBe(true);
+      expect(client.isFetching()).toBe(1);
+      expect(params().get('type')).toBe('TRAINING'); expect(params().get('state')).toBe('SCHEDULED');
+      expect(requests.at(-1)?.searchParams.get('type')).toBe('TRAINING');
+      expect(requests.at(-1)?.searchParams.get('state')).toBe('SCHEDULED');
+      expect(screen.getByRole('button', { name: '훈련' })).toHaveAttribute('aria-pressed', 'true');
+      expect(screen.getByRole('button', { name: '예정' })).toHaveAttribute('aria-pressed', 'true');
+      expect(screen.queryByRole('link', { name: /취소된 훈련|팀 행사/ })).not.toBeInTheDocument();
+    } finally {
+      releaseAuth(); releaseList();
+      await waitFor(() => expect(client.isFetching()).toBe(0));
+    }
+  });
+
   it.each([
     { initialQuery: 'type=EVENT', label: '훈련', param: 'type', value: 'TRAINING', oldTitle: '팀 행사', newTitle: '10월 훈련' },
     { initialQuery: 'state=SCHEDULED', label: '취소됨', param: 'state', value: 'CANCELLED', oldTitle: '10월 훈련', newTitle: '취소된 훈련' },

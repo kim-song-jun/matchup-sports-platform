@@ -3,7 +3,9 @@
 -- without enrolling its teams, leaving a group with fixtures and no standings rows.
 -- Enrol the confirmed teams of live group-phase fixtures that are missing from their group.
 -- Existing group-team rows (and their sort_order) are never touched; no standings rows are
--- written - the public page derives zero-value rows from group teams until a result recalculates.
+-- written. A group with no standings rows shows zero-value rows derived from its group teams,
+-- but a group that already has standings rows (e.g. confirmed results) needs one admin
+-- standings recalculation before the newly enrolled teams appear.
 BEGIN;
 
 INSERT INTO v1_tournament_group_teams (id, group_id, registration_id, sort_order, is_bye, created_at)

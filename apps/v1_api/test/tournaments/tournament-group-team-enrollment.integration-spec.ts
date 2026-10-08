@@ -110,5 +110,70 @@ describe('조별리그 경기와 조 편성 정합 (PostgreSQL)', () => {
       expect(teams.map((team) => team.registrationId)).toEqual([reg1, reg0, reg2]);
       expect(teams.map((team) => team.sortOrder)).toEqual([1, 2, 3]);
     });
+
+    it('확정이 아닌 신청의 팀은 편성하지 않는다', async () => {
+      const groupD = (await bracket.createGroup(user, ids.tournamentId, { name: 'D조', phase: 'group' })).id;
+      await bracket.createFixture(user, ids.tournamentId, {
+        groupId: groupD, round: 'D조 1라운드', fixtureNumber: 111, homeRegistrationId: reg1, awayRegistrationId: reg2,
+      });
+      await prisma.v1TournamentGroupTeam.deleteMany({ where: { groupId: groupD } });
+      await prisma.v1TournamentRegistration.update({ where: { id: reg1 }, data: { status: 'cancelled' } });
+      try {
+        await runBackfill();
+      } finally {
+        await prisma.v1TournamentRegistration.update({ where: { id: reg1 }, data: { status: 'confirmed' } });
+      }
+      expect((await teamsOf(groupD)).map((team) => team.registrationId)).toEqual([reg2]);
+    });
+
+    it('정규 리그(kind=regular_league) 대회의 조 경기는 편성하지 않는다', async () => {
+      const groupE = (await bracket.createGroup(user, ids.tournamentId, { name: 'E조', phase: 'group' })).id;
+      await bracket.createFixture(user, ids.tournamentId, {
+        groupId: groupE, round: 'E조 1라운드', fixtureNumber: 112, homeRegistrationId: reg0, awayRegistrationId: reg2,
+      });
+      await prisma.v1TournamentGroupTeam.deleteMany({ where: { groupId: groupE } });
+      await prisma.v1Tournament.update({ where: { id: ids.tournamentId }, data: { kind: 'regular_league' } });
+      try {
+        await runBackfill();
+      } finally {
+        await prisma.v1Tournament.update({ where: { id: ids.tournamentId }, data: { kind: 'regular_tournament' } });
+      }
+      expect(await teamsOf(groupE)).toEqual([]);
+    });
+  });
+  describe('자동 편성과 순위 행', () => {
+    const standingsOf = async (groupId: string) =>
+      (await prisma.v1TournamentStanding.findMany({ where: { groupId }, orderBy: { registrationId: 'asc' } }))
+        .map(({ registrationId, points, wins, draws, losses, goalsFor, goalsAgainst, fairPlayPoints, position }) => (
+          { registrationId, points, wins, draws, losses, goalsFor, goalsAgainst, fairPlayPoints, position }));
+
+    it('순위 행이 없는 조는 자동 편성해도 순위 행을 만들지 않는다 (공개 화면이 0값 기준선을 내린다)', async () => {
+      const groupC = (await bracket.createGroup(user, ids.tournamentId, { name: 'C조', phase: 'group' })).id;
+      await bracket.createFixture(user, ids.tournamentId, {
+        groupId: groupC, round: 'C조 1라운드', fixtureNumber: 121, homeRegistrationId: reg0, awayRegistrationId: reg1,
+      });
+      expect((await teamsOf(groupC)).map((team) => team.registrationId)).toEqual([reg0, reg1]);
+      expect(await prisma.v1TournamentStanding.count({ where: { groupId: groupC } })).toBe(0);
+    });
+
+    it('순위 행이 있는 조에 팀이 자동 편성되면 그 팀의 순위 행이 같은 요청에서 생기고 기존 팀 값은 그대로다', async () => {
+      await bracket.recalculateStandings(user, ids.tournamentId);
+      const before = await standingsOf(ids.groupId);
+      expect(before).toHaveLength(4);
+      expect(before.some((row) => row.points > 0)).toBe(true);
+
+      // reg3 의 편성과 순위 행을 지운 상태에서 reg3 가 들어간 새 경기를 만든다.
+      await prisma.v1TournamentStanding.deleteMany({ where: { groupId: ids.groupId, registrationId: reg3 } });
+      await prisma.v1TournamentGroupTeam.deleteMany({ where: { groupId: ids.groupId, registrationId: reg3 } });
+      await bracket.createFixture(user, ids.tournamentId, {
+        groupId: ids.groupId, round: 'A조 추가', fixtureNumber: 131, homeRegistrationId: reg3, awayRegistrationId: reg0,
+      });
+
+      expect(await teamsOf(ids.groupId)).toHaveLength(4);
+      const after = await standingsOf(ids.groupId);
+      expect(after.map((row) => row.registrationId)).toEqual(before.map((row) => row.registrationId));
+      expect(after.find((row) => row.registrationId === reg3)).toEqual(before.find((row) => row.registrationId === reg3));
+      expect(after.filter((row) => row.registrationId !== reg3)).toEqual(before.filter((row) => row.registrationId !== reg3));
+    });
   });
 });

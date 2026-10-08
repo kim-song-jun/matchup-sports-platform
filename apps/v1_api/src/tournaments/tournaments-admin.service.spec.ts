@@ -735,24 +735,95 @@ describe('TournamentsAdminService', () => {
 
   // ─── update ──────────────────────────────────────────────────────────────────
 
-  it.each(['sport-1', 'sport-2'])('update: resaving sportId %s uses a scalar FK supported by atomic updateMany', async (sportId) => {
-    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
-    prisma.v1Tournament.findFirst
-      .mockResolvedValueOnce(tournamentRow())
-      .mockResolvedValueOnce({ ...tournamentRow({ sportId }), _count: { registrations: 0 } });
-    prisma.v1Sport.findUnique.mockResolvedValue({ id: sportId, code: 'futsal' });
-    prisma.v1Tournament.updateMany.mockResolvedValue({ count: 1 });
+  describe('update: sport change re-pins the competition config', () => {
+    const sports: Record<string, { id: string; code: string }> = {
+      'sport-1': { id: 'sport-1', code: 'futsal' },
+      'sport-2': { id: 'sport-2', code: 'football' },
+    };
+    const versionBySportCode: Record<string, string> = { futsal: 'futsal-default-version', football: 'football-default-version' };
 
-    await service.update(ownerAuthUser, 'tournament-1', { expectedVersion: TOURNAMENT_ROW_UPDATED_AT, sportId });
-
-    expect(prisma.v1Tournament.updateMany).toHaveBeenCalledWith({
-      where: { id: 'tournament-1', updatedAt: new Date(TOURNAMENT_ROW_UPDATED_AT) },
-      data: { sportId },
-    });
-    if (sportId !== 'sport-1') {
-      expect(prisma.v1Sport.findUnique).toHaveBeenCalledWith({ where: { id: sportId } });
+    function arrange(row: Record<string, unknown>) {
+      prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+      prisma.v1Tournament.findFirst
+        .mockResolvedValueOnce(tournamentRow(row))
+        .mockResolvedValue({ ...tournamentRow(row), _count: { registrations: 0 } });
+      prisma.v1Sport.findUnique.mockImplementation(({ where }: { where: { id: string } }) => Promise.resolve(sports[where.id] ?? null));
+      prisma.v1CompetitionConfigVersion.findFirst.mockImplementation(
+        ({ where }: { where: { sportCode: string } }) => Promise.resolve({ id: versionBySportCode[where.sportCode], version: 1, contentHash: 'h' }),
+      );
+      prisma.v1Tournament.updateMany.mockResolvedValue({ count: 1 });
     }
-    expect(prisma.v1AdminActionLog.create).toHaveBeenCalled();
+
+    it('futsal pin without fixtures -> football: sportId and the football default version are written in one CAS update', async () => {
+      arrange({ sportId: 'sport-1', competitionConfigVersionId: 'futsal-default-version' });
+
+      await service.update(ownerAuthUser, 'tournament-1', { expectedVersion: TOURNAMENT_ROW_UPDATED_AT, sportId: 'sport-2' });
+
+      expect(prisma.v1Tournament.updateMany).toHaveBeenCalledTimes(1);
+      expect(prisma.v1Tournament.updateMany).toHaveBeenCalledWith({
+        where: { id: 'tournament-1', updatedAt: new Date(TOURNAMENT_ROW_UPDATED_AT) },
+        data: { sportId: 'sport-2', competitionConfigVersionId: 'football-default-version' },
+      });
+      expect(prisma.v1AdminActionLog.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          beforeJson: expect.objectContaining({ sportId: 'sport-1', competitionConfigVersionId: 'futsal-default-version' }),
+          afterJson: expect.objectContaining({ sportId: 'sport-2', competitionConfigVersionId: 'football-default-version' }),
+        }),
+      });
+    });
+
+    it('a CAS conflict leaves nothing to commit: the single updateMany carries both columns and no audit log is written', async () => {
+      arrange({ sportId: 'sport-1', competitionConfigVersionId: 'futsal-default-version' });
+      prisma.v1Tournament.updateMany.mockResolvedValue({ count: 0 });
+
+      await expect(
+        service.update(ownerAuthUser, 'tournament-1', { expectedVersion: TOURNAMENT_ROW_UPDATED_AT, sportId: 'sport-2' }),
+      ).rejects.toMatchObject({ response: { code: 'TOURNAMENT_VERSION_CONFLICT' } });
+      expect(prisma.v1AdminActionLog.create).not.toHaveBeenCalled();
+    });
+
+    it('fixtures exist -> 409 TOURNAMENT_SPORT_LOCKED, no config lookup and no write', async () => {
+      arrange({ sportId: 'sport-1', competitionConfigVersionId: 'futsal-default-version' });
+      prisma.v1TournamentMatchDetails.count.mockResolvedValue(1);
+
+      await expect(
+        service.update(ownerAuthUser, 'tournament-1', { expectedVersion: TOURNAMENT_ROW_UPDATED_AT, sportId: 'sport-2' }),
+      ).rejects.toMatchObject({ response: { code: 'TOURNAMENT_SPORT_LOCKED' } });
+      expect(prisma.v1CompetitionConfigVersion.findFirst).not.toHaveBeenCalled();
+      expect(prisma.v1Tournament.updateMany).not.toHaveBeenCalled();
+    });
+
+    it.each(['in_progress', 'completed'])('%s tournament -> 409 TOURNAMENT_SPORT_LOCKED', async (status) => {
+      arrange({ sportId: 'sport-1', status });
+
+      await expect(
+        service.update(ownerAuthUser, 'tournament-1', { expectedVersion: TOURNAMENT_ROW_UPDATED_AT, sportId: 'sport-2' }),
+      ).rejects.toMatchObject({ response: { code: 'TOURNAMENT_SPORT_LOCKED' } });
+      expect(prisma.v1Tournament.updateMany).not.toHaveBeenCalled();
+    });
+
+    it('fixtures that appear between the pre-check and the CAS still block the change', async () => {
+      arrange({ sportId: 'sport-1' });
+      prisma.v1TournamentMatchDetails.count.mockResolvedValueOnce(0).mockResolvedValueOnce(1);
+
+      await expect(
+        service.update(ownerAuthUser, 'tournament-1', { expectedVersion: TOURNAMENT_ROW_UPDATED_AT, sportId: 'sport-2' }),
+      ).rejects.toMatchObject({ response: { code: 'TOURNAMENT_SPORT_LOCKED' } });
+      expect(prisma.v1Tournament.updateMany).not.toHaveBeenCalled();
+    });
+
+    it('resending the same sportId leaves the pin untouched, even with fixtures', async () => {
+      arrange({ sportId: 'sport-1', competitionConfigVersionId: 'custom-pinned-version' });
+      prisma.v1TournamentMatchDetails.count.mockResolvedValue(3);
+
+      await service.update(ownerAuthUser, 'tournament-1', { expectedVersion: TOURNAMENT_ROW_UPDATED_AT, sportId: 'sport-1' });
+
+      expect(prisma.v1Tournament.updateMany).toHaveBeenCalledWith({
+        where: { id: 'tournament-1', updatedAt: new Date(TOURNAMENT_ROW_UPDATED_AT) },
+        data: { sportId: 'sport-1' },
+      });
+      expect(prisma.v1CompetitionConfigVersion.findFirst).not.toHaveBeenCalled();
+    });
   });
 
   it('update: an unknown changed sport is rejected before the CAS write or audit log', async () => {

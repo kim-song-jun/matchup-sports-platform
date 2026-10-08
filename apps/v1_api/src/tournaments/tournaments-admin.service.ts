@@ -508,12 +508,18 @@ export class TournamentsAdminService {
       });
     }
 
-    // 종목 변경: 존재하는 종목인지 검증 후 FK 갱신
-    if (dto.sportId !== undefined && dto.sportId !== existing.sportId) {
-      const sport = await this.prisma.v1Sport.findUnique({ where: { id: dto.sportId } });
+    // 종목 변경: 종목 FK 와 경기 규정 pin 은 항상 함께 움직여야 한다(이전 종목 pin 이 남으면
+    // 새 종목 경기가 이전 종목 규칙을 쓴다). pin 은 생성과 같은 경로로 새 종목 기본 버전을 고르고,
+    // 아래 CAS 쓰기에 같이 실린다. 버전 행 find-or-create 는 부수효과가 있으니 잠금 검사를 먼저 한다.
+    const sportChanged = dto.sportId !== undefined && dto.sportId !== existing.sportId;
+    let sportChangeConfigVersionId: string | null = null;
+    if (sportChanged) {
+      const sport = await this.prisma.v1Sport.findUnique({ where: { id: dto.sportId as string } });
       if (!sport) {
         throw new NotFoundException({ code: 'SPORT_NOT_FOUND', message: '종목을 찾을 수 없어요.' });
       }
+      await this.assertSportChangeAllowed(this.prisma, tournamentId, existing.status);
+      sportChangeConfigVersionId = await this.resolveLineupConfigVersionId(user, sport.code, {});
     }
 
     // venue가 새로 설정되거나 기존 값과 달라질 때만 재지오코딩(불필요한 외부 호출 방지).
@@ -523,6 +529,7 @@ export class TournamentsAdminService {
 
     const data: Prisma.V1TournamentUncheckedUpdateManyInput = {};
     if (dto.sportId !== undefined) data.sportId = dto.sportId;
+    if (sportChanged) data.competitionConfigVersionId = sportChangeConfigVersionId;
     if (dto.title !== undefined) data.title = dto.title;
     if (dto.format !== undefined) data.format = dto.format;
     if (dto.minMatchesPerTeam !== undefined) data.minMatchesPerTeam = dto.minMatchesPerTeam ?? null;
@@ -663,6 +670,8 @@ export class TournamentsAdminService {
     }
 
     await this.prisma.$transaction(async (tx) => {
+      // 사전 검사와 CAS 사이에 대진이 생길 수 있어 트랜잭션 안에서 한 번 더 확인한다.
+      if (sportChanged) await this.assertSportChangeAllowed(tx, tournamentId, existing.status);
       // lineup만 저장하면 일반 필드 data가 비어 Prisma updateMany가 SQL 없이 count=0을
       // 반환한다. 이 경우에도 실제 CAS 쓰기를 수행하고 기존 버전보다 새 버전을 발행한다.
       if (Object.keys(data).length === 0) {
@@ -689,8 +698,20 @@ export class TournamentsAdminService {
           action: 'tournament.update',
           targetType: 'tournament',
           targetId: tournamentId,
-          beforeJson: { title: existing.title },
-          afterJson: { title: data.title ?? existing.title },
+          beforeJson: {
+            title: existing.title,
+            ...(sportChanged && {
+              sportId: existing.sportId,
+              competitionConfigVersionId: existing.competitionConfigVersionId,
+            }),
+          },
+          afterJson: {
+            title: data.title ?? existing.title,
+            ...(sportChanged && {
+              sportId: dto.sportId,
+              competitionConfigVersionId: sportChangeConfigVersionId,
+            }),
+          },
         },
         tx,
       );
@@ -1065,6 +1086,27 @@ export class TournamentsAdminService {
     } catch (err) {
       this.logger.warn(`Venue geocoding failed for "${venue}" — saving venue without coordinates: ${err}`);
       return null;
+    }
+  }
+
+  /** 대진이 만들어졌거나 대회가 시작된 뒤에는 종목을 바꿀 수 없다(이미 그 종목 규칙으로 만든 경기가 있다). */
+  private async assertSportChangeAllowed(
+    client: Pick<Prisma.TransactionClient, 'v1TournamentMatchDetails'>,
+    tournamentId: string,
+    status: string,
+  ) {
+    if (status === 'in_progress' || status === 'completed') {
+      throw new ConflictException({
+        code: 'TOURNAMENT_SPORT_LOCKED',
+        message: '대회가 시작된 뒤에는 종목을 바꿀 수 없어요.',
+      });
+    }
+    const fixtureCount = await client.v1TournamentMatchDetails.count({ where: { tournamentId } });
+    if (fixtureCount > 0) {
+      throw new ConflictException({
+        code: 'TOURNAMENT_SPORT_LOCKED',
+        message: '대진이 만들어진 뒤에는 종목을 바꿀 수 없어요.',
+      });
     }
   }
 

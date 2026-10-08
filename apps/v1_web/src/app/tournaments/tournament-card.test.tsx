@@ -1,5 +1,5 @@
 import { render, screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { publicAssetPath } from '@/lib/assets';
 import type { V1TournamentListItem } from '@/types/api';
 import { TournamentCard } from './tournament-card';
@@ -12,6 +12,7 @@ function buildItem(overrides: Partial<V1TournamentListItem> = {}): V1TournamentL
     title: '2026 서울 풋살 오픈',
     status: 'open',
     format: 'knockout',
+    kind: 'regular_tournament',
     registrationDeadlineAt: null,
     scheduledAt: null,
     scheduledEndAt: null,
@@ -44,12 +45,60 @@ function buildItem(overrides: Partial<V1TournamentListItem> = {}): V1TournamentL
     promoListLocationText: null,
     promoListPrizeText: null,
     promoListPriority: 0,
+    campaignSlug: null,
     confirmedCount: 0,
     pendingPaymentCount: 0,
     createdAt: '2026-01-01T00:00:00.000Z',
+    updatedAt: '2026-01-01T00:00:00.000Z',
     ...overrides,
-  } as V1TournamentListItem;
+  };
 }
+
+describe('TournamentCard — 신청 마감 계약', () => {
+  const deadline = '2026-10-08T00:00:00.000Z';
+
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it.each([
+    { condition: '마감 직전', now: '2026-10-07T23:59:59.999Z', overrides: {}, expected: '모집 중' },
+    { condition: '마감과 같은 시각', now: deadline, overrides: {}, expected: '모집 중' },
+    { condition: '마감 직후', now: '2026-10-08T00:00:00.001Z', overrides: {}, expected: '모집 마감' },
+    { condition: '마감 후 정원이 거의 찬 대회', now: '2026-10-08T00:00:00.001Z', overrides: { confirmedCount: 5 }, expected: '모집 마감' },
+    { condition: '마감 전 정원이 거의 찬 대회', now: '2026-10-07T23:59:59.999Z', overrides: { confirmedCount: 5 }, expected: '거의 마감' },
+    { condition: '마감 전 정원이 찬 대회', now: '2026-10-07T23:59:59.999Z', overrides: { confirmedCount: 6 }, expected: '모집 마감' },
+    { condition: '마감 전 대기 팀으로 정원이 찬 대회', now: '2026-10-07T23:59:59.999Z', overrides: { pendingPaymentCount: 6 }, expected: '모집 마감' },
+    { condition: '정원이 0인 대회', now: deadline, overrides: { teamCount: 0 }, expected: '모집 마감' },
+    { condition: '마감을 정하지 않은 대회', now: '2026-10-08T00:00:00.001Z', overrides: { registrationDeadlineAt: null }, expected: '모집 중' },
+    { condition: '마감 후 준비 중인 대회', now: '2026-10-08T00:00:00.001Z', overrides: { status: 'draft' }, expected: '준비 중' },
+    { condition: '마감 후 닫힌 대회', now: '2026-10-08T00:00:00.001Z', overrides: { status: 'closed' }, expected: '모집 마감' },
+    { condition: '마감 후 진행 중인 대회', now: '2026-10-08T00:00:00.001Z', overrides: { status: 'in_progress' }, expected: '진행 중' },
+    { condition: '마감 후 종료된 대회', now: '2026-10-08T00:00:00.001Z', overrides: { status: 'completed' }, expected: '종료' },
+    { condition: '마감 후 취소된 대회', now: '2026-10-08T00:00:00.001Z', overrides: { status: 'cancelled' }, expected: '취소' },
+  ] as const)('$condition일 때 배지와 링크 이름은 $expected예요', ({ now, overrides, expected }) => {
+    // Given: #48 API의 모집 상태·마감·정원이며 시간만 경계별로 고정한다.
+    vi.setSystemTime(new Date(now));
+    const item = buildItem({
+      id: '363a481c-9b33-446f-b848-c78bd1d0ad7d',
+      title: '(테스트) 제2회 BUFF 백석대',
+      teamCount: 6,
+      registrationDeadlineAt: deadline,
+      ...overrides,
+    });
+
+    // When: 실제 목록이 소비하는 카드와 공유 UI를 렌더한다.
+    render(<TournamentCard item={item} />);
+
+    // Then: 보이는 배지와 스크린리더의 링크 이름이 같은 신청 상태를 말한다.
+    expect(screen.getByText(expected, { exact: true })).toBeInTheDocument();
+    expect(screen.getByRole('link')).toHaveAccessibleName(`${item.title} — 풋살 — ${expected}`);
+  });
+});
 
 describe('TournamentCard — 커버 이미지 fallback', () => {
   it('renders a sport-glyph SVG fallback (no <img>) when coverImageUrl is missing', () => {

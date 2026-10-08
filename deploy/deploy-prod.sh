@@ -360,6 +360,16 @@ fi
 v1_uploads_backup_dir="$(mktemp -d "${HOME}/.teameet-prod-upload-backup.XXXXXX")"
 if sudo docker ps -a --format '{{.Names}}' | grep -qx 'teameet_v1_api'; then
   echo "[prod-deploy] Backing up existing v1 uploads before recreating v1_api..."
+  # 루트 디스크를 다 채우지 않도록 업로드 크기 + 예비 2GiB 가 남아 있을 때만 복사한다.
+  # 크기를 못 재면(컨테이너 정지·디렉터리 없음) 아래 docker cp 의 오류 구분에 맡긴다.
+  uploads_kib="$(sudo docker exec teameet_v1_api du -sk /app/apps/v1_api/uploads 2>/dev/null | awk '{print $1}')" || uploads_kib=""
+  if [[ -n "${uploads_kib}" ]]; then
+    avail_kib="$(df -Pk "${v1_uploads_backup_dir}" | awk 'NR==2 {print $4}')"
+    if (( avail_kib < uploads_kib + 2097152 )); then
+      echo "[prod-deploy] 업로드 백업에 쓸 디스크 여유가 부족합니다 (업로드 ${uploads_kib}KiB + 예비 2GiB > 여유 ${avail_kib}KiB)" >&2
+      false
+    fi
+  fi
   # 실패 원인을 구분한다. 예전에는 stderr 를 버리고 모든 실패를 "업로드 디렉터리 없음"
   # 으로 보고했는데, 디스크 부족·권한 오류·docker 데몬 오류까지 같은 문구로 묻혔다.
   # 그 뒤 [[ -d ... ]] 가 false 가 되어 복원이 조용히 건너뛰어지므로, 진짜 실패였을 때

@@ -383,7 +383,7 @@ jobs:
       - name: Task168 deploy-prod had-active guard tests
         run: bash scripts/qa/test-task168-deploy-prod-had-active-guard.sh
 
-      - name: deploy-prod post-migrate steps (award backfill, standings recalculation) tests
+      - name: deploy-prod post-migrate steps (award backfill) tests
         run: bash scripts/qa/test-prod-deploy-post-migrate-steps.sh
 
       - name: Task168 deploy-prod Stage A release-metadata tests

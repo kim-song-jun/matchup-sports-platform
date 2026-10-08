@@ -2,13 +2,16 @@ import { ConflictException, NotFoundException } from '@nestjs/common';
 import { Prisma, V1GameSourceType, type V1TournamentGroup, type V1TournamentGroupPhase } from '@prisma/client';
 import { writeAdminActionLog, type V1ActiveAdmin } from '../common/admin-context.service';
 import { cascadeCancelTeamMatchSchedulesInTx } from '../team-schedules/team-schedules.service';
-import type { GamesService } from '../games/games.service';
+import { canonicalGameCommandPayloadHash, type GamesService } from '../games/games.service';
 import {
   fairPlayByRegistrationFromGroups,
   recalculateAndUpsertGroupStandings,
 } from './tournament-group-standings';
+import { nextFixtureCreationCommandId } from './tournament-fixture-generation';
+import { createTournamentMatchInTx } from './tournament-match-creation';
 import { updateTournamentMatchInTx } from './tournament-match-update';
 import { recalculateAndUpsertOverallStandings } from './tournament-overall-standings';
+import { competitionMatchLabel } from './tournament-round-label';
 import { loadCanonicalStandingsSource } from './tournament-standings-source';
 
 type Tx = Prisma.TransactionClient;
@@ -284,4 +287,78 @@ export async function deleteTournamentGroupInTx(tx: Tx, admin: V1ActiveAdmin, gr
     targetId: groupId,
     beforeJson: { name: group.name, phase: group.phase },
   });
+}
+
+/**
+ * 팀 없는 경기 하나를 만든다(템플릿용). 멱등 키는 `createFixture` 와 같은 규칙이라, 같은 좌표(라운드·번호·차수)를
+ * 소프트 삭제했다 다시 만들어도 옛 경기의 기록과 충돌하지 않는다. 자리 id 는 멱등 payload 에 넣지 않는다 —
+ * 자리는 템플릿을 적용할 때마다 새로 만들어지므로 키의 정체성이 아니다.
+ */
+export async function createEmptyTournamentFixtureInTx(
+  tx: Tx,
+  deps: BracketTxDeps,
+  admin: V1ActiveAdmin,
+  input: {
+    tournament: { id: string; sportId: string; regionId: string | null; venue: string | null; competitionConfigVersionId: string; title: string };
+    groupId: string;
+    round: string;
+    fixtureNumber: number;
+    legNumber: number;
+    homeSlotId: string | null;
+    awaySlotId: string | null;
+  },
+): Promise<{ id: string }> {
+  const { tournament } = input;
+  const group = await tx.v1TournamentGroup.findFirst({ where: { id: input.groupId, tournamentId: tournament.id }, select: { name: true } });
+  if (!group) throw new NotFoundException({ code: 'GROUP_NOT_FOUND', message: '해당 대회의 조를 찾을 수 없어요.' });
+  const taken = await tx.v1TournamentMatchDetails.findFirst({
+    where: { tournamentId: tournament.id, round: input.round, fixtureNumber: input.fixtureNumber, legNumber: input.legNumber },
+    select: { teamMatchId: true },
+  });
+  if (taken) throw new ConflictException({ code: 'FIXTURE_NUMBER_CONFLICT', message: '같은 라운드·차수에서 이미 사용 중인 대진 번호예요.' });
+
+  const baseCommandId = `tournament-fixture:${tournament.id}:${input.round}:${input.fixtureNumber}:${input.legNumber}`;
+  const archived = await tx.v1TournamentMatchDetails.findMany({
+    where: {
+      tournamentId: tournament.id, round: { startsWith: input.round + ':deleted:' },
+      fixtureNumber: input.fixtureNumber, legNumber: input.legNumber, teamMatch: { deletedAt: { not: null } },
+    },
+    select: { teamMatchId: true },
+  });
+  const durableCommandId = await nextFixtureCreationCommandId(tx, baseCommandId, tournament.id, archived.length, admin.userId);
+  const commandPayload = {
+    tournamentId: tournament.id, groupId: input.groupId, round: input.round, fixtureNumber: input.fixtureNumber, legNumber: input.legNumber,
+    parentFixtureId: null, homeRegistrationId: null, awayRegistrationId: null, scheduledAt: null, venue: tournament.venue,
+  };
+  const creation = await createTournamentMatchInTx(tx, deps.games, {
+    tournamentId: tournament.id,
+    groupId: input.groupId,
+    round: input.round,
+    fixtureNumber: input.fixtureNumber,
+    legNumber: input.legNumber,
+    parentTeamMatchId: null,
+    homeRegistrationId: null,
+    awayRegistrationId: null,
+    homeSlotId: input.homeSlotId,
+    awaySlotId: input.awaySlotId,
+    sportId: tournament.sportId,
+    regionId: tournament.regionId,
+    title: `${tournament.title} · ${competitionMatchLabel({ groupName: group.name, round: input.round, legNumber: input.legNumber })} ${input.fixtureNumber}`,
+    placeName: tournament.venue,
+    startAt: null,
+    createdByUserId: admin.userId,
+    competitionConfigVersionId: tournament.competitionConfigVersionId,
+    home: { id: null, name: '홈 팀 미정' },
+    away: { id: null, name: '어웨이 팀 미정' },
+    actor: { actorType: 'USER', actorUserId: admin.userId, role: 'platform_ops', tournamentId: tournament.id },
+    durableCommandId,
+    payloadHash: canonicalGameCommandPayloadHash(commandPayload),
+  });
+  await writeAdminActionLog(tx, admin, {
+    action: 'tournament.bracket.fixture.create',
+    targetType: 'team_match',
+    targetId: creation.teamMatchId,
+    afterJson: { tournamentId: tournament.id, round: input.round, fixtureNumber: input.fixtureNumber, status: 'matched' },
+  });
+  return { id: creation.teamMatchId };
 }

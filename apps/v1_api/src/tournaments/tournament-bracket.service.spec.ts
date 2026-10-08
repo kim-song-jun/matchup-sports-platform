@@ -26,7 +26,7 @@ import { TournamentBracketService } from './tournament-bracket.service';
 import { GamesService } from '../games/games.service';
 import { FOOTBALL_V1_CONFIG } from './competition-config/competition-config';
 import { kindAwareFindFirst } from '../../test/helpers/kind-aware-find-first';
-import { assertSidesNotSlotLinked, assignTournamentFixtureSideInTx, createGroupInTx, softDeleteTournamentFixtureInTx } from './tournament-bracket-tx';
+import { assertSidesNotSlotLinked, assignTournamentFixtureSideInTx, createEmptyTournamentFixtureInTx, createGroupInTx, softDeleteTournamentFixtureInTx } from './tournament-bracket-tx';
 
 // ─── fixtures ────────────────────────────────────────────────────────────────
 
@@ -2265,6 +2265,86 @@ describe('TournamentBracketService', () => {
 
       await expect(service.deleteGroup(ownerUser, 'ghost')).rejects.toMatchObject({ response: { code: 'GROUP_NOT_FOUND' } });
       expect(prisma.$transaction).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('createEmptyTournamentFixtureInTx', () => {
+    const tournament = {
+      id: 'tournament-1', sportId: 'sport-1', regionId: null, venue: '서울 경기장', title: '테스트 대회',
+      competitionConfigVersionId: '11111111-1111-4111-8111-111111111111',
+    };
+    const input = { tournament, groupId: 'group-1', round: 'league_r1', fixtureNumber: 1, legNumber: 1, homeSlotId: 'slot-h', awaySlotId: 'slot-a' };
+    const arrange = () => { prisma.v1TournamentGroup.findFirst.mockResolvedValue({ name: 'A조' }); };
+
+    it('팀 없이 자리 두 개에 연결된 경기를 만들고 Game 사이드는 "미정" 이름으로 시작한다', async () => {
+      arrange();
+
+      await expect(createEmptyTournamentFixtureInTx(prisma as never, { games } as never, activeAdmin, input)).resolves.toEqual({ id: 'fixture-1' });
+
+      expect(prisma.v1TeamMatch.create).toHaveBeenCalledWith(expect.objectContaining({
+        data: expect.objectContaining({
+          tournamentId: 'tournament-1', hostTeamId: null, approvedApplicantTeamId: null,
+          homeSlotId: 'slot-h', awaySlotId: 'slot-a', status: 'matched', placeName: '서울 경기장',
+          title: '테스트 대회 · A조 · 조별리그 1라운드 1',
+        }),
+      }));
+      expect(prisma.v1TournamentMatchDetails.create).toHaveBeenCalledWith(expect.objectContaining({
+        data: expect.objectContaining({ groupId: 'group-1', round: 'league_r1', fixtureNumber: 1, legNumber: 1, homeRegistrationId: null, awayRegistrationId: null }),
+      }));
+      expect(games.createFromSourceInTransaction).toHaveBeenCalledWith(
+        prisma,
+        expect.objectContaining({ sides: [
+          { sideKey: 'HOME', teamId: null, displayNameSnapshot: '홈 팀 미정' },
+          { sideKey: 'AWAY', teamId: null, displayNameSnapshot: '어웨이 팀 미정' },
+        ] }),
+        expect.objectContaining({ durableCommandId: 'tournament-fixture:tournament-1:league_r1:1:1' }),
+      );
+      expect(prisma.v1TeamSchedule.create).not.toHaveBeenCalled();
+      expect(prisma.v1AdminActionLog.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({ action: 'tournament.bracket.fixture.create', targetId: 'fixture-1' }),
+      });
+    });
+
+    it('자리가 없는 경기(null)는 슬롯 컬럼을 null 로 만든다 (대조군)', async () => {
+      arrange();
+
+      await createEmptyTournamentFixtureInTx(prisma as never, { games } as never, activeAdmin, { ...input, homeSlotId: null, awaySlotId: null });
+
+      expect(prisma.v1TeamMatch.create).toHaveBeenCalledWith(expect.objectContaining({
+        data: expect.objectContaining({ homeSlotId: null, awaySlotId: null }),
+      }));
+    });
+
+    it('같은 좌표를 지웠다 다시 만들면 소프트 삭제 이력 수를 반영한 새 멱등 키를 쓴다', async () => {
+      arrange();
+      prisma.v1TournamentMatchDetails.findMany.mockResolvedValue([{ teamMatchId: 'old-1' }]);
+
+      await createEmptyTournamentFixtureInTx(prisma as never, { games } as never, activeAdmin, input);
+
+      expect(games.createFromSourceInTransaction).toHaveBeenCalledWith(
+        prisma,
+        expect.anything(),
+        expect.objectContaining({ durableCommandId: 'tournament-fixture:tournament-1:league_r1:1:1:revision:1' }),
+      );
+    });
+
+    it('이미 쓰는 좌표는 409 FIXTURE_NUMBER_CONFLICT 이고 아무것도 만들지 않는다', async () => {
+      arrange();
+      prisma.v1TournamentMatchDetails.findFirst.mockResolvedValue({ teamMatchId: 'existing' });
+
+      await expect(createEmptyTournamentFixtureInTx(prisma as never, { games } as never, activeAdmin, input)).rejects.toMatchObject({
+        response: { code: 'FIXTURE_NUMBER_CONFLICT' },
+      });
+      expect(prisma.v1TeamMatch.create).not.toHaveBeenCalled();
+    });
+
+    it('이 대회에 없는 조는 404 GROUP_NOT_FOUND', async () => {
+      prisma.v1TournamentGroup.findFirst.mockResolvedValue(null);
+
+      await expect(createEmptyTournamentFixtureInTx(prisma as never, { games } as never, activeAdmin, input)).rejects.toMatchObject({
+        response: { code: 'GROUP_NOT_FOUND' },
+      });
+      expect(prisma.v1TeamMatch.create).not.toHaveBeenCalled();
     });
   });
 

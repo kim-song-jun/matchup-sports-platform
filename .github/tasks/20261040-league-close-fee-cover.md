@@ -145,10 +145,10 @@ DB: `V1Tournament.entryFeeConfiguredAt DateTime?` 한 줄 + `ADD COLUMN IF NOT E
 - [x] 디자인 시스템 준수 (token, component, naming) — 하드코딩 색·`transition-all` 0, 44px, 포커스 링, 해요체
 - [x] **UI 항목: 3안 제시→선택 완료(2026-10-07)** — #35 D1~D4 · #36 D1·D2·D4·D5 · #37 D1~D3 의 선택안(B·C·C·B / B·C·B·B / A·B·C)을 목업대로 구현, 구현 전에 목업 조각 대조
 - [ ] 머지 후 alpha 에서 ego-browser 로 사용자 흐름·3폭(390/768/1440) before/after·콘솔/네트워크 확인, 목록 카드 푸터 재균형 확인 — 3폭 갤러리 19장은 위 10단계 범위만 담는다. 나머지 흐름은 "남은 일" 참고.
-- [ ] Code review: Critical=0, Warning=0 — #1649 리뷰 P2 1건(종료 리그 참가비 편집이 열려 있고 저장하면 409) 미해결 상태로 머지됐다. `fix/league-fee-readonly-ended` 머지·alpha 확인 후 체크한다.
+- [x] Code review: Critical=0, Warning=0 — #1649 리뷰 P2 1건(종료 리그 참가비 편집이 열려 있고 저장하면 409)은 PR #1654 로 고쳐 dev 머지·alpha 확인(2026-10-08).
 
 ## 남은 일 (2026-10-08 리뷰 정정)
-- [ ] 종료 리그 참가비 카드 읽기 전용 — `fix/league-fee-readonly-ended` dev 머지 후 alpha 에서 저장 요청 0회·안내 문구 확인.
+- [x] 종료 리그 참가비 카드 읽기 전용 — PR #1654 머지 후 alpha(`ae8bf32a5`)에서 종료 리그 2곳 입력·저장 비활성, 안내 문구, 저장 요청 0회 확인(2026-10-08). 두 곳 모두 참가비 미설정이라 설정된 값의 읽기 전용 표시는 단위 테스트로만 확인.
 - [ ] Scenario 4 신청별 금액 유지(기존 신청 70,000원·새 신청 80,000원) alpha 확인.
 - [ ] Scenario 5 대표 이미지 교체·제거 alpha 확인.
 - [ ] Scenario 6 시즌 승계(참가비·계좌·이미지 복사, '이어받았어요' 배지) alpha 확인.

@@ -15,6 +15,7 @@ import { AwardsPageClient } from './awards-page-client';
 const mutateMock = vi.fn();
 
 const apiMocks = vi.hoisted(() => ({
+  useV1AuthMe: vi.fn(),
   useV1Tournament: vi.fn(),
   useV1TournamentParticipantCheck: vi.fn(),
   useV1MyTournamentReview: vi.fn(),
@@ -29,7 +30,7 @@ vi.mock('@/hooks/use-v1-api', async (importOriginal) => ({
 
 vi.mock('@/lib/session-storage', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/lib/session-storage')>()),
-  hasStoredV1Session: () => true,
+  shouldProbeV1Session: () => true,
 }));
 
 vi.mock('next/navigation', () => ({
@@ -122,6 +123,9 @@ function makeCompletedTournament(overrides: Partial<V1TournamentDetail> = {}): V
 describe('AwardsPageClient — 다중 팀 겸임 사용자의 리뷰 팀 선택', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    apiMocks.useV1AuthMe.mockReturnValue({
+      data: { user: { id: 'user-1' } }, isSuccess: true, isFetching: false, isPending: false, isError: false,
+    });
     apiMocks.useV1Tournament.mockReturnValue({
       data: makeCompletedTournament(),
       isLoading: false,
@@ -129,8 +133,8 @@ describe('AwardsPageClient — 다중 팀 겸임 사용자의 리뷰 팀 선택'
       error: null,
       refetch: vi.fn(),
     });
-    apiMocks.useV1TournamentParticipantCheck.mockReturnValue({ data: { isParticipant: true } });
-    apiMocks.useV1MyTournamentReview.mockReturnValue({ data: null });
+    apiMocks.useV1TournamentParticipantCheck.mockReturnValue({ data: { isParticipant: true }, isSuccess: true, isFetching: false });
+    apiMocks.useV1MyTournamentReview.mockReturnValue({ data: null, isSuccess: true, isFetching: false });
     apiMocks.useV1UploadImages.mockReturnValue({ mutateAsync: vi.fn(), isPending: false });
 
     // 첫 제출(teamId 없음)은 서버의 TEAM_SELECTION_REQUIRED를 흉내내고, teamId가 실린

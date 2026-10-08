@@ -74,24 +74,24 @@ function useChatListPageModel(): ChatListViewModel {
   }, [categoryParam]);
   // 서버 최대 페이지(50)로 받는다. 카테고리를 고르면 서버 roomType 필터로 다시 받는다 — 첫 페이지를
   // 클라이언트에서 거르면 "받은 컨택 3" 배지를 눌렀는데 목록이 비는 일이 생긴다(최종 리뷰 Important 2).
-  const query = useV1ChatRooms(undefined, { limit: CHAT_LIST_PAGE_SIZE });
+  const query = useV1ChatRooms({ refetchOnWindowFocus: 'always' }, { limit: CHAT_LIST_PAGE_SIZE });
   const filteredQuery = useV1ChatRooms(
-    { enabled: selectedCategory !== '전체' },
+    { enabled: selectedCategory !== '전체', refetchOnWindowFocus: 'always' },
     selectedCategory === '전체' ? undefined : { roomType: CATEGORY_ROOM_TYPE[selectedCategory], limit: CHAT_LIST_PAGE_SIZE },
   );
   // 종료된 컨택(archived 방)은 요청했을 때만 받는다 — 기본 목록은 서버가 이미 치운 상태다.
   const [showEnded, setShowEnded] = useState(false);
   const endedEnabled = selectedCategory === '팀컨택' && showEnded;
   const endedQuery = useV1ChatRooms(
-    { enabled: endedEnabled },
+    { enabled: endedEnabled, refetchOnWindowFocus: 'always' },
     endedEnabled ? { roomType: 'team_contact', status: 'archived', limit: CHAT_LIST_PAGE_SIZE } : undefined,
   );
   // 화면에 선택된 목록과 펼친 보관 목록의 실패가 실제 재시도 대상을 결정한다.
   // 전체 목록이 성공했어도 카테고리 조회 실패를 ready로 숨기면 오래된 고정 상태가 남는다.
   const activeQuery = selectedCategory === '전체' ? query : filteredQuery;
   const endedError = endedEnabled && endedQuery.isError;
-  const isError = activeQuery.isError || endedError;
-  const listError = activeQuery.isError ? activeQuery.error : endedQuery.error;
+  const isError = activeQuery.isError;
+  const listError = activeQuery.error;
   const updateMe = useV1UpdateChatRoomMe();
   const baseRooms = query.data?.items.map(toChatRoomModel) ?? [];
   const categoryRooms = filteredQuery.data?.items.map(toChatRoomModel);
@@ -130,13 +130,13 @@ function useChatListPageModel(): ChatListViewModel {
     })),
     pinnedRooms: visibleRooms.filter((room) => room.pinned),
     rooms: visibleRooms.filter((room) => !room.pinned),
-    status: activeQuery.isPending ? 'loading' : isError ? 'error' : 'ready',
+    status: isError ? 'error' : query.isPending ? 'loading' : 'ready',
     emptyTitle: isError ? '채팅방을 불러오지 못했어요' : isEmpty ? `${selectedCategory} 채팅방이 없어요` : undefined,
     emptyBody: isError ? extractErrorMessage(listError, '잠시 후 다시 시도해 주세요.') : isEmpty ? '매치에 참가하거나 팀에 가입하면 채팅방이 생겨요.' : undefined,
     emptyHref: isError || selectedCategory === '팀' || selectedCategory === '팀컨택' ? undefined : '/matches',
     onRetry: isError ? () => {
-      if (activeQuery.isError) void activeQuery.refetch();
-      if (endedError) void endedQuery.refetch();
+      void activeQuery.refetch();
+      if (selectedCategory !== '전체' && query.isError) void query.refetch();
     } : undefined,
     endedContacts:
       selectedCategory === '팀컨택'
@@ -145,6 +145,8 @@ function useChatListPageModel(): ChatListViewModel {
             onToggle: () => setShowEnded((v) => !v),
             rooms: showEnded ? (endedQuery.data?.items.map(toChatRoomModel) ?? []).map(withActions) : [],
             status: !showEnded ? 'ready' : endedQuery.isError ? 'error' : endedQuery.isPending ? 'loading' : 'ready',
+            errorMessage: endedError ? extractErrorMessage(endedQuery.error, '잠시 후 다시 시도해 주세요.') : undefined,
+            onRetry: endedError ? () => { void endedQuery.refetch(); } : undefined,
           }
         : undefined,
   };

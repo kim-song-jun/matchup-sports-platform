@@ -100,7 +100,7 @@ function ChatListContent({ model, selectedRoomId }: { model: ChatListViewModel; 
           ) : null}
           {ended?.visible && ended.status === 'loading' ? <PageSkeleton variant="list" /> : null}
           {ended?.visible && ended.status === 'error' ? (
-            <div role="status" className="tm-text-caption" style={{ color: 'var(--orange700)', padding: '4px 16px' }}>종료된 컨택을 불러오지 못했어요.</div>
+            <ErrorState title="종료된 컨택을 불러오지 못했어요" message={ended.errorMessage} onRetry={ended.onRetry} retryLabel="다시 불러오기" />
           ) : null}
           {ended?.visible && ended.status === 'ready' && ended.rooms.length === 0 ? (
             <div role="status" className="tm-text-caption" style={{ color: 'var(--text-muted)', padding: '4px 16px' }}>종료된 컨택이 없어요.</div>

@@ -39,12 +39,15 @@ const messages = Array.from({ length: 20 }, (_, index) => ({
   ...message, messageId: `message-${index + 1}`,
   content: index === 0 ? message.content : `캐시 대화 ${index + 1}`,
 }));
-type FailedSurface = 'base' | 'filtered' | 'archived' | 'detail' | 'denied' | null;
+type FailedSurface = 'base' | 'filtered' | 'lists' | 'archived' | 'detail' | 'denied' | null;
 let failedSurface: FailedSurface = null;
 let serverPinned = false;
 let serverTitle = room.title;
 let visibility: DocumentVisibilityState = 'visible';
 let resizeThread = () => {};
+let holdFiltered = false;
+let releaseFiltered: (() => void) | undefined;
+const reads = { active: 0, archived: 0, base: 0, filtered: 0 };
 const clients: ReturnType<typeof createV1QueryClient>[] = [];
 
 function failedRead(denied = false) {
@@ -56,12 +59,16 @@ function failedRead(denied = false) {
 }
 
 const server = setupServer(
-  http.get(`${api}/chat/rooms`, ({ request }) => {
+  http.get(`${api}/chat/rooms`, async ({ request }) => {
     const params = new URL(request.url).searchParams;
     const isArchived = params.get('status') === 'archived';
     const type = params.get('roomType');
+    if (isArchived) reads.archived += 1; else reads.active += 1;
+    if (!type) reads.base += 1; else if (type === 'team') reads.filtered += 1;
+    if (type === 'team' && holdFiltered) await new Promise<void>((resolve) => { releaseFiltered = resolve; });
     if ((failedSurface === 'base' && !type)
       || (failedSurface === 'filtered' && type === 'team')
+      || (failedSurface === 'lists' && !isArchived)
       || (failedSurface === 'archived' && isArchived)) return failedRead();
     const items = isArchived
       ? [{ ...archived, title: `${serverTitle} 종료된 컨택`, pinned: serverPinned }]
@@ -116,6 +123,9 @@ beforeEach(() => {
   serverTitle = room.title;
   visibility = 'visible';
   resizeThread = () => {};
+  holdFiltered = false;
+  releaseFiltered = undefined;
+  reads.active = reads.archived = reads.base = reads.filtered = 0;
   navigation.search = '';
   navigation.pathname = '/chat';
   vi.stubEnv('NEXT_PUBLIC_API_URL', api);
@@ -129,6 +139,7 @@ beforeEach(() => {
   focusManager.setFocused(undefined);
 });
 afterEach(() => {
+  releaseFiltered?.();
   cleanup();
   clients.splice(0).forEach((client) => client.clear());
   server.resetHandlers();
@@ -159,6 +170,12 @@ describe('chat list refresh failure with cached rooms', () => {
 
     // Then: the failure and real retry action stay visible next to cached content.
     await waitFor(() => expect(pane.getByRole('alert')).toHaveTextContent('불러오지 못했어요'));
+    if (surface === 'archived') {
+      expect(pane.queryByText('채팅방을 불러오지 못했어요')).not.toBeInTheDocument();
+      expect(pane.getByRole('alert')).toHaveTextContent('종료된 컨택을 불러오지 못했어요');
+      expect(pane.getAllByText(/^종료된 컨택을 불러오지 못했어요\.?$/)).toHaveLength(1);
+    }
+    const activeReads = reads.active;
     const retry = pane.getByRole('button', { name: '다시 불러오기' });
     failedSurface = null;
     fireEvent.click(retry);
@@ -167,6 +184,56 @@ describe('chat list refresh failure with cached rooms', () => {
       expect(pane.getByText(surface === 'archived' ? '최신 팀 종료된 컨택' : '최신 팀')).toBeVisible();
       if (surface !== 'archived') expect(pane.getByText('고정 1')).toBeVisible();
     });
+    if (surface === 'archived') expect(reads.active).toBe(activeReads);
+  });
+
+  it('recovers both failed list requests before switching from a retried category to all rooms', async () => {
+    // Given: both the ordinary list and the selected category have populated caches.
+    const { container, client } = renderConsumer(<ChatListPageClient />);
+    const pane = mobilePane(container);
+    await waitFor(() => expect(pane.getByText(room.title)).toBeVisible());
+    fireEvent.click(pane.getByRole('button', { name: /^팀(?: \d+)?$/ }));
+    await waitFor(() => expect(client.isFetching()).toBe(0));
+    const initialReads = { base: reads.base, filtered: reads.filtered };
+    await switchVisibility('hidden');
+    failedSurface = 'lists';
+    serverTitle = '최신 팀';
+
+    // When: focus refresh fails for both lists, then the selected category is retried.
+    await switchVisibility('visible');
+    await waitFor(() => expect(pane.getByRole('alert')).toHaveTextContent('채팅방을 불러오지 못했어요'));
+    await waitFor(() => expect(client.isFetching()).toBe(0));
+    expect(reads.base).toBeGreaterThan(initialReads.base);
+    expect(reads.filtered).toBeGreaterThan(initialReads.filtered);
+    failedSurface = null;
+    fireEvent.click(pane.getByRole('button', { name: '다시 불러오기' }));
+    await waitFor(() => expect(pane.queryByRole('alert')).not.toBeInTheDocument());
+    await waitFor(() => expect(client.isFetching()).toBe(0));
+
+    // Then: switching to all rooms also exposes the recovered server list without another error.
+    fireEvent.click(pane.getByRole('button', { name: /^전체(?: \d+)?$/ }));
+    expect(pane.queryByRole('alert')).not.toBeInTheDocument();
+    expect(pane.getByText('최신 팀')).toBeVisible();
+  });
+
+  it('keeps cached fallback rows without stacking a skeleton during a delayed new filter load', async () => {
+    // Given: the ordinary list is cached, but this category has never loaded.
+    const { container, client } = renderConsumer(<ChatListPageClient />);
+    const pane = mobilePane(container);
+    await waitFor(() => expect(pane.getByText(room.title)).toBeVisible());
+    await waitFor(() => expect(client.isFetching()).toBe(0));
+    holdFiltered = true;
+
+    // When: the category request is held at the HTTP boundary.
+    fireEvent.click(pane.getByRole('button', { name: /^팀(?: \d+)?$/ }));
+    await waitFor(() => expect(releaseFiltered).toBeTypeOf('function'));
+
+    // Then: cached rows remain available with no second skeleton layout above them.
+    expect(pane.getByText(room.title)).toBeVisible();
+    expect(container.querySelector('.tm-chat-mobile-pane .tm-skeleton-page')).not.toBeInTheDocument();
+    await act(async () => { releaseFiltered?.(); });
+    await waitFor(() => expect(client.isFetching()).toBe(0));
+    expect(pane.queryByRole('alert')).not.toBeInTheDocument();
   });
 });
 

@@ -105,8 +105,8 @@ describe.each([
     const tabB = createTab(staleTime);
     const mutation = renderHook(() => useV1UpdateChatRoomMe(), { wrapper: tabA.wrapper });
     const { result } = renderHook(() => ({
-      list: useV1ChatRooms(),
-      filtered: useV1ChatRooms(undefined, { roomType: 'team', status: 'active', limit: 50 }),
+      list: useV1ChatRooms({ refetchOnWindowFocus: 'always' }),
+      filtered: useV1ChatRooms({ refetchOnWindowFocus: 'always' }, { roomType: 'team', status: 'active', limit: 50 }),
       detail: useV1ChatRoom(room.roomId),
     }), { wrapper: tabB.wrapper });
     await waitFor(() => {
@@ -135,10 +135,29 @@ describe.each([
 });
 
 describe('chat tab return guards and errors', () => {
+  it('keeps the home caller\'s fresh default list on return without a forced request', async () => {
+    // Given: home uses the shared list hook without opting into chat focus refresh.
+    const tab = createTab();
+    const { result } = renderHook(() => useV1ChatRooms({ enabled: true }), { wrapper: tab.wrapper });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    await switchVisibility('hidden');
+    readsFail = true;
+    readQueries.length = 0;
+
+    // When: home returns while a fresh cached list exists and the API is unavailable.
+    await switchVisibility('visible');
+    await waitFor(() => expect(tab.client.isFetching()).toBe(0));
+
+    // Then: the default caller keeps its successful cache and sends no forced request.
+    expect(readQueries).toEqual([]);
+    expect(result.current.isSuccess).toBe(true);
+    expect(result.current.data?.items[0]?.title).toBe(room.title);
+  });
+
   it('keeps signed-out lists and missing-room details idle on return', async () => {
     // Given: the viewer is signed out and there is no room context.
     const { result } = renderHook(() => ({
-      list: useV1ChatRooms({ enabled: false }), detail: useV1ChatRoom(''),
+      list: useV1ChatRooms({ enabled: false, refetchOnWindowFocus: 'always' }), detail: useV1ChatRoom(''),
     }), { wrapper: createTab().wrapper });
     await switchVisibility('hidden');
 
@@ -156,7 +175,7 @@ describe('chat tab return guards and errors', () => {
   it('exposes refetch failures without inventing a successful pin update', async () => {
     // Given: a fresh original state is cached, then the server becomes unavailable.
     const { result } = renderHook(() => ({
-      list: useV1ChatRooms(), detail: useV1ChatRoom(room.roomId),
+      list: useV1ChatRooms({ refetchOnWindowFocus: 'always' }), detail: useV1ChatRoom(room.roomId),
     }), { wrapper: createTab().wrapper });
     await waitFor(() => {
       expect(result.current.list.isSuccess).toBe(true);

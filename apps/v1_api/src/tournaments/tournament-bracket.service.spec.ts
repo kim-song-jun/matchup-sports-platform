@@ -179,6 +179,9 @@ function canonicalDetailsRow(overrides: Record<string, unknown> = {}) {
         teamMatchId: 'fixture-1',
         currentOfficialRevisionId: null,
         currentOfficialRevision: null,
+        version: 3,
+        _count: { events: 0 },
+        resultRevisions: [],
         sides: [
           { id: 'side-home', sideKey: 'HOME', teamId: 'team-old' },
           { id: 'side-away', sideKey: 'AWAY', teamId: 'team-away' },
@@ -235,6 +238,9 @@ function gameOfficialResultRow(overrides: Record<string, unknown> = {}) {
     id: 'game-1',
     sourceType: 'TEAM_MATCH',
     teamMatchId: 'fixture-1',
+    version: 3,
+    _count: { events: 0 },
+    resultRevisions: [],
     sides: [
       { id: 'side-home', sideKey: 'HOME' },
       { id: 'side-away', sideKey: 'AWAY' },
@@ -280,6 +286,7 @@ describe('TournamentBracketService', () => {
   let prisma: {
     v1AdminUser: { findUnique: jest.Mock };
     v1Tournament: { findFirst: jest.Mock };
+    v1TournamentSlot: { findMany: jest.Mock };
     v1TournamentGroup: { findFirst: jest.Mock; create: jest.Mock; findMany: jest.Mock; findUnique: jest.Mock; delete: jest.Mock };
     v1TournamentByeSlot: { findMany: jest.Mock; findUnique: jest.Mock; count: jest.Mock; create: jest.Mock; update: jest.Mock; delete: jest.Mock };
     v1TournamentGroupTeam: { delete: jest.Mock; findUnique: jest.Mock; findFirst: jest.Mock; findMany: jest.Mock; create: jest.Mock; update: jest.Mock };
@@ -312,6 +319,7 @@ describe('TournamentBracketService', () => {
     prisma = {
       v1AdminUser: { findUnique: jest.fn() },
       v1Tournament: { findFirst: jest.fn().mockResolvedValue(tournamentRow({ status: 'closed' })) },
+      v1TournamentSlot: { findMany: jest.fn().mockResolvedValue([]) },
       v1TournamentGroup: { findFirst: jest.fn(), create: jest.fn(), findMany: jest.fn(), findUnique: jest.fn(), delete: jest.fn() },
       v1TournamentByeSlot: { findMany: jest.fn().mockResolvedValue([]), findUnique: jest.fn().mockResolvedValue(null), count: jest.fn().mockResolvedValue(0), create: jest.fn(), update: jest.fn(), delete: jest.fn() },
       v1TournamentGroupTeam: { delete: jest.fn(), findUnique: jest.fn(), findFirst: jest.fn().mockResolvedValue(null), findMany: jest.fn().mockResolvedValue([]), create: jest.fn().mockResolvedValue({ id: 'group-team-auto' }), update: jest.fn() },
@@ -2345,6 +2353,78 @@ describe('TournamentBracketService', () => {
         response: { code: 'GROUP_NOT_FOUND' },
       });
       expect(prisma.v1TeamMatch.create).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('getBracket — 자리·게임 블록', () => {
+    const slotRow = (overrides: Record<string, unknown>) => ({
+      id: 'slot-x', tournamentId: 'tournament-1', kind: 'ENTRY', groupId: null, position: 1, sourceGroupId: null, registrationId: null,
+      createdAt: new Date('2026-06-14T00:00:00Z'), updatedAt: new Date('2026-06-14T00:00:00Z'),
+      group: null, sourceGroup: null, registration: null, ...overrides,
+    });
+    const arrange = (fixtures: unknown[], slots: unknown[] = []) => {
+      prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdmin);
+      prisma.v1Tournament.findFirst.mockResolvedValue(tournamentRow());
+      prisma.v1TournamentGroup.findMany.mockResolvedValue([]);
+      prisma.v1TournamentMatchDetails.findMany.mockResolvedValue(fixtures);
+      prisma.v1TournamentStanding.findMany.mockResolvedValue([]);
+      prisma.v1TournamentSlot.findMany.mockResolvedValue(slots);
+    };
+
+    it('최상위 slots[] 에 라벨·팀 이름·등록 id 를 싣고, 이 대회 자리만 읽는다', async () => {
+      arrange([], [
+        slotRow({ id: 'slot-1', groupId: 'group-1', position: 1, group: { name: 'A조', phase: 'group' }, registrationId: 'reg-1', registration: { team: { name: '서울 FC' } } }),
+        slotRow({ id: 'slot-2', kind: 'GROUP_RANK', groupId: 'group-f', sourceGroupId: 'group-1', position: 1, group: { name: '4강', phase: 'semi' }, sourceGroup: { name: 'A조' } }),
+      ]);
+
+      const result = await service.getBracket(ownerUser, 'tournament-1');
+
+      expect(result.slots).toEqual([
+        { id: 'slot-1', kind: 'ENTRY', groupId: 'group-1', sourceGroupId: null, position: 1, label: 'A조 1번', registrationId: 'reg-1', teamName: '서울 FC' },
+        { id: 'slot-2', kind: 'GROUP_RANK', groupId: 'group-f', sourceGroupId: 'group-1', position: 1, label: 'A조 1위', registrationId: null, teamName: null },
+      ]);
+      expect(prisma.v1TournamentSlot.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: { tournamentId: 'tournament-1' } }));
+    });
+
+    it('경기마다 homeSlotId/awaySlotId 와 game 블록(버전·라이브 기록·최신 리비전)을 싣는다', async () => {
+      const base = canonicalBracketRow();
+      arrange([{
+        ...base,
+        teamMatch: {
+          ...base.teamMatch,
+          homeSlotId: 'slot-1',
+          awaySlotId: null,
+          game: {
+            ...base.teamMatch.game,
+            version: 5,
+            _count: { events: 2 },
+            resultRevisions: [{ id: 'rev-2', state: 'DRAFT', score: { home: 1, away: 1, penalties: { home: 4, away: 3 } }, reason: '[quick-result]', supersedesId: 'rev-void' }],
+          },
+        },
+      }]);
+
+      const result = await service.getBracket(ownerUser, 'tournament-1');
+
+      expect(result.fixtures[0]).toMatchObject({
+        homeSlotId: 'slot-1',
+        awaySlotId: null,
+        game: {
+          id: 'game-1', state: 'SCHEDULED', version: 5, hasLiveRecords: true,
+          latestRevision: { id: 'rev-2', state: 'DRAFT', score: { home: 1, away: 1, penalties: { home: 4, away: 3 } }, entryMethod: 'quick' },
+        },
+      });
+    });
+
+    it('자리도 리비전도 없는 경기는 null/빈 값을 그대로 낸다 (대조군 — 기존 경기 응답이 깨지지 않는다)', async () => {
+      arrange([canonicalBracketRow()]);
+
+      const result = await service.getBracket(ownerUser, 'tournament-1');
+
+      expect(result.slots).toEqual([]);
+      expect(result.fixtures[0]).toMatchObject({
+        homeSlotId: null, awaySlotId: null,
+        game: { version: 3, hasLiveRecords: false, latestRevision: null },
+      });
     });
   });
 

@@ -161,6 +161,24 @@ describe('대진 …InTx 함수 (PostgreSQL)', () => {
       await bracket.updateFixture(user, id, { awayRegistrationId: reg1 });
       expect((await prisma.v1TournamentMatchDetails.findUniqueOrThrow({ where: { teamMatchId: id } })).awayRegistrationId).toBe(reg1);
     });
+
+    it('getBracket 은 자리 목록과 경기별 슬롯 id·game 블록을 실DB 에서 내고, 확정 결과 경기의 최신 리비전은 OFFICIAL 이다', async () => {
+      const slot = await slotOf(31);
+      const { id } = await emptyFixture(7041, slot.id, null);
+
+      const view = await bracket.getBracket(user, ids.tournamentId);
+
+      expect(view.slots.find((candidate) => candidate.id === slot.id)).toEqual({
+        id: slot.id, kind: 'ENTRY', groupId, sourceGroupId: null, position: 31, label: 'empty-fixtures 31번', registrationId: null, teamName: null,
+      });
+      expect(view.fixtures.find((fixture) => fixture.id === id)).toMatchObject({
+        homeSlotId: slot.id, awaySlotId: null,
+        game: { state: 'SCHEDULED', hasLiveRecords: false, latestRevision: null },
+      });
+      const decided = view.fixtures.filter((fixture) => fixture.result !== null);
+      expect(decided.length).toBeGreaterThan(0);
+      expect(decided.every((fixture) => fixture.game?.latestRevision?.state === 'OFFICIAL')).toBe(true);
+    });
   });
 
   // ─── 통합 스펙 끝 (새 describe 는 이 줄 위에 추가한다) ───

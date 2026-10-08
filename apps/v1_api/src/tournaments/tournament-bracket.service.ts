@@ -54,6 +54,7 @@ import { readJerseyNumbers } from './tournament-player-jersey';
 import { createTournamentMatchInTx } from './tournament-match-creation';
 import { nextFixtureCreationCommandId } from './tournament-fixture-generation';
 import { competitionTeamTargets, enqueueRosterResync } from '../games/roster/roster-resync-events';
+import { adminBracketSlotInclude, serializeAdminBracketSlot } from './slots/admin-bracket-view';
 import { tournamentTeamMatchBracketInclude, serializeTournamentTeamMatchBracket } from './tournament-team-match-bracket.query';
 import { competitionMatchLabel } from './tournament-round-label';
 
@@ -1072,7 +1073,7 @@ export class TournamentBracketService {
     await this.adminContext.getActiveAdmin(user.id);
     const tournament = await this.loadTournament(tournamentId);
 
-    const [groups, standings, canonicalMatches, canonicalTeamMatchCandidates] = await Promise.all([
+    const [groups, standings, canonicalMatches, canonicalTeamMatchCandidates, slots] = await Promise.all([
       this.prisma.v1TournamentGroup.findMany({
         where: { tournamentId },
         include: {
@@ -1107,6 +1108,11 @@ export class TournamentBracketService {
           select: { id: true },
         })
         : Promise.resolve([]),
+      this.prisma.v1TournamentSlot.findMany({
+        where: { tournamentId },
+        include: adminBracketSlotInclude,
+        orderBy: [{ kind: 'asc' }, { position: 'asc' }, { id: 'asc' }],
+      }),
     ]);
 
     const invalidCanonicalIds = canonicalMatches
@@ -1174,6 +1180,7 @@ export class TournamentBracketService {
         ...this.serializeStanding(s),
         teamName: s.registration.team.name,
       })),
+      slots: slots.map(serializeAdminBracketSlot),
     };
   }
 

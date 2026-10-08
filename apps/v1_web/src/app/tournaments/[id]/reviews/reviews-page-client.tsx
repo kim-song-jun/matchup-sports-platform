@@ -6,7 +6,7 @@ import { Card, EmptyState, ErrorState } from '@/components/v1-ui/primitives';
 import { useV1Reviews, useV1Tournament, useV1TournamentReviews } from '@/hooks/use-v1-api';
 import { extractErrorMessage } from '@/lib/error-message';
 import { useSearchParams } from 'next/navigation';
-import { hasStoredV1Session, sanitizeRedirectPath } from '@/lib/session-storage';
+import { sanitizeRedirectPath } from '@/lib/session-storage';
 import { useShellOverride } from '@/components/v1-ui/shell-override';
 import { TournamentFixtureReviewEntrySection } from '@/components/tournaments/tournament-venue-retention-sections';
 import { ReviewCard, ReviewFormModal, useTournamentReviewWriteGate } from '../awards/awards-page-client';
@@ -98,8 +98,7 @@ function ReviewsPager({
  * 쓰러 온 사람이 시상 화면을 거쳐야 하는 건, 후기 링크가 시상 화면으로 가던 원래
  * 문제(오너 지적)를 방향만 바꿔 되풀이한 것이다. 후기는 후기 화면에 모은다.
  */
-function FixtureReviewsSection({ tournament }: { tournament: V1TournamentDetail }) {
-  const hasSession = hasStoredV1Session();
+function FixtureReviewsSection({ tournament, hasSession }: { tournament: V1TournamentDetail; hasSession: boolean }) {
   const hasCompletedFixture = tournament.fixtures.some(
     (fixture) => fixture.status === 'completed' && fixture.result !== null,
   );
@@ -140,8 +139,8 @@ export function TournamentReviewsPageClient({ tournamentId }: { tournamentId: st
   // "참가팀 후기" 한 줄뿐이라, 링크를 타고 들어온 사람은 어느 대회 후기를 보고 있는지
   // 화면 어디에서도 알 수 없었다(오너 지적: "참가팀 후기도 명확하게 나왔으면 좋겠고").
   const { data: tournament } = useV1Tournament(tournamentId);
-  const { canWrite, isCompleted, isParticipant, alreadyReviewed, hasSession } =
-    useTournamentReviewWriteGate(tournamentId, tournament?.status ?? 'draft');
+  const reviewGate = useTournamentReviewWriteGate(tournamentId, tournament?.status ?? 'draft');
+  const { canWrite, isCompleted, isParticipant, alreadyReviewed, hasSession } = reviewGate;
 
   const { data, isLoading, isFetching, isError, error, refetch } = useV1TournamentReviews(tournamentId, {
     page: effectivePage,
@@ -196,16 +195,22 @@ export function TournamentReviewsPageClient({ tournamentId }: { tournamentId: st
             >
               ✓ 이 대회 후기를 이미 남겼어요
             </div>
-          ) : isCompleted && !hasSession ? (
+          ) : isCompleted && reviewGate.error ? (
+            <ErrorState
+              message={extractErrorMessage(reviewGate.error, '후기 작성 자격을 확인하지 못했어요.')}
+              onRetry={reviewGate.onRetry}
+            />
+          ) : reviewGate.message ? (
             <div
               className="tm-text-caption"
+              role={reviewGate.isChecking ? 'status' : undefined}
               style={{ color: 'var(--text-caption)', lineHeight: 1.5, margin: '12px 0 4px' }}
             >
-              로그인하면 참가팀의 팀장·매니저는 후기를 작성할 수 있어요.
+              {reviewGate.message}
             </div>
           ) : null}
 
-          {tournament ? <FixtureReviewsSection tournament={tournament} /> : null}
+          {tournament ? <FixtureReviewsSection tournament={tournament} hasSession={hasSession} /> : null}
 
           {/* 소제목은 위의 "리뷰할 수 있는 경기"와 이 목록을 가르는 역할이라 필요하다. 다만
               문구는 "참가팀 후기"가 아니어야 한다 — alpha 실측에서 같은 말이 한 화면에 세 번

@@ -9,6 +9,7 @@ import { useModalA11y } from '@/components/v1-ui/use-modal-a11y';
 import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react';
 import { nextStarValue, STAR_VALUES } from '@/lib/star-rating-keys';
 import {
+  useV1AuthMe,
   useV1Tournament,
   useV1TournamentParticipantCheck,
   useV1MyTournamentReview,
@@ -20,11 +21,11 @@ import { usePublicTournamentPlayerRecords } from '@/components/public-game-recor
 import { ProfileAvatar } from '@/components/users/public-profile-client';
 import { TournamentPlayerRecordsSections } from '@/components/public-game-records/player-records-sections';
 import { extractErrorMessage } from '@/lib/error-message';
-import { hasStoredV1Session, sanitizeRedirectPath, withFromPath } from '@/lib/session-storage';
+import { shouldProbeV1Session, sanitizeRedirectPath, withFromPath } from '@/lib/session-storage';
 import { useSearchParams } from 'next/navigation';
 import { useShellOverride } from '@/components/v1-ui/shell-override';
 import { trackEvent } from '@/lib/analytics';
-import { V1ApiError, v1Get } from '@/lib/api-client';
+import { isUnauthenticatedError, retryTransientFailure, V1ApiError, v1Get } from '@/lib/api-client';
 import { TournamentFlowNav } from '@/components/tournaments/tournament-flow-nav';
 import { formatEntryFee } from '@/lib/date-utils';
 import { parsePrizeRows, isPrizeAmountValue, formatPrizeRowValue } from '@/lib/prize-breakdown';
@@ -808,20 +809,73 @@ export function ReviewCard({ review }: { review: V1TournamentReview }) {
  * 쓰이므로(왜 못 쓰는지를 상태별로 안내한다) 판정 결과를 통째로 돌려준다.
  */
 export function useTournamentReviewWriteGate(tournamentId: string, status: V1TournamentDetail['status']) {
-  const hasSession = hasStoredV1Session();
+  // localStorage는 로그인 힌트일 뿐이에요. 쿠키만 남은 사용자도 서버 인증을 확인해야 해요.
+  const shouldProbe = shouldProbeV1Session();
+  const auth = useV1AuthMe({ enabled: shouldProbe, retry: retryTransientFailure });
+  const hasConfirmedSession = shouldProbe && auth.isSuccess && !auth.isFetching && !!auth.data?.user;
   const isCompleted = status === 'completed';
 
-  const { data: participantData } = useV1TournamentParticipantCheck(tournamentId, hasSession && isCompleted);
-  const { data: myReview } = useV1MyTournamentReview(tournamentId, hasSession && isCompleted);
+  const confirmedUserId = hasConfirmedSession ? auth.data?.user.id : undefined;
+  const participant = useV1TournamentParticipantCheck(tournamentId, hasConfirmedSession && isCompleted, confirmedUserId);
+  const myReview = useV1MyTournamentReview(tournamentId, hasConfirmedSession && isCompleted, confirmedUserId);
+  const participantSessionExpired = participant.isError && isUnauthenticatedError(participant.error);
+  const myReviewSessionExpired = myReview.isError && isUnauthenticatedError(myReview.error);
+  const sessionExpired = participantSessionExpired || myReviewSessionExpired;
+  // 401을 안내에 반영해도 조회 키와 활성화 조건은 확정 사용자 기준을 유지해야 해요.
+  const hasSession = hasConfirmedSession && !sessionExpired;
+  const expiredAt = Math.max(
+    participantSessionExpired ? participant.errorUpdatedAt : 0,
+    myReviewSessionExpired ? myReview.errorUpdatedAt : 0,
+  );
+  const canRecheckExpiredSession = isCompleted && hasConfirmedSession && sessionExpired && auth.dataUpdatedAt > expiredAt;
+  useEffect(() => {
+    // 같은 계정의 재로그인에서도 fresh 성공 데이터와 함께 남은 오래된 401은 다시 확인해요.
+    // 새로운 401이 인증 성공보다 뒤에 오면 멈추므로 만료 세션을 반복 조회하지 않아요.
+    if (!canRecheckExpiredSession) return;
+    if (participantSessionExpired && !participant.isFetching) void participant.refetch();
+    if (myReviewSessionExpired && !myReview.isFetching) void myReview.refetch();
+  }, [canRecheckExpiredSession, participantSessionExpired, myReviewSessionExpired,
+    participant.isFetching, myReview.isFetching, participant.refetch, myReview.refetch]);
+  const error = shouldProbe && auth.isError && !isUnauthenticatedError(auth.error)
+    ? auth.error
+    : hasConfirmedSession && participant.isError && !participantSessionExpired
+      ? participant.error
+      : hasConfirmedSession && myReview.isError && !myReviewSessionExpired
+        ? myReview.error
+        : null;
 
-  const isParticipant = participantData?.isParticipant ?? false;
-  const alreadyReviewed = !!myReview;
+  // 내 후기 조회가 아직 pending이거나 실패했다면 undefined를 미작성으로 취급하면 안 돼요.
+  const isReady = hasSession && participant.isSuccess && myReview.isSuccess
+    && !participant.isFetching && !myReview.isFetching;
+  const isChecking = isCompleted && !error && (
+    (shouldProbe && (auth.isPending || auth.isFetching)) || (hasSession && !isReady) || canRecheckExpiredSession
+  );
+  const isParticipant = isReady && (participant.data?.isParticipant ?? false);
+  const alreadyReviewed = isReady && !!myReview.data;
+  const canWrite = isCompleted && isReady && isParticipant && !alreadyReviewed;
+  const message = !isCompleted || error || canWrite || (isParticipant && alreadyReviewed)
+    ? null
+    : isChecking
+      ? '후기 작성 자격을 확인하고 있어요.'
+      : !hasSession
+        ? '로그인하면 참가팀의 팀장·매니저는 후기를 작성할 수 있어요.'
+        : '대회 후기는 참가팀의 팀장·매니저가 작성해요. 팀원은 맞붙은 상대 선수에 대한 후기를 남길 수 있어요.';
   return {
     hasSession,
     isCompleted,
     isParticipant,
     alreadyReviewed,
-    canWrite: isCompleted && isParticipant && !alreadyReviewed,
+    canWrite,
+    isChecking,
+    message,
+    error,
+    onRetry: () => {
+      if (auth.isError) void auth.refetch();
+      else {
+        if (participant.isError) void participant.refetch();
+        if (myReview.isError) void myReview.refetch();
+      }
+    },
   };
 }
 
@@ -830,8 +884,8 @@ function ReviewsSection({ tournament }: { tournament: V1TournamentDetail }) {
   // 후기 화면의 뒤로가기가 이 시상 화면(받은 출처 포함)으로 돌아오게 한다.
   const currentHref = useCurrentHref();
   const [showForm, setShowForm] = useState(false);
-  const { hasSession, isCompleted, isParticipant, alreadyReviewed, canWrite } =
-    useTournamentReviewWriteGate(tournament.id, tournament.status);
+  const reviewGate = useTournamentReviewWriteGate(tournament.id, tournament.status);
+  const { isCompleted, isParticipant, alreadyReviewed, canWrite } = reviewGate;
 
   const reviews = tournament.reviews ?? [];
 
@@ -879,6 +933,17 @@ function ReviewsSection({ tournament }: { tournament: V1TournamentDetail }) {
           </div>
         </div>
 
+        {reviewGate.error && (
+          <ErrorState
+            message={extractErrorMessage(reviewGate.error, '후기 작성 자격을 확인하지 못했어요.')}
+            onRetry={reviewGate.onRetry}
+          />
+        )}
+        {reviews.length > 0 && reviewGate.message && (
+          <p className="tm-text-caption" role={reviewGate.isChecking ? 'status' : undefined}>
+            {reviewGate.message}
+          </p>
+        )}
         {reviews.length === 0 ? (
           <Card pad={20} className="tm-on-tint" style={{ background: 'var(--grey50)', textAlign: 'center' }}>
             {/* 왜 후기를 쓸 수 없는지(또는 어떻게 쓰는지)를 상태별로 안내한다.
@@ -889,17 +954,9 @@ function ReviewsSection({ tournament }: { tournament: V1TournamentDetail }) {
               illustration={{ name: 'journey-done' }}
               title="아직 등록된 후기가 없어요"
               sub={
-                isCompleted && isParticipant && !alreadyReviewed
+                canWrite
                   ? '첫 번째 후기를 남겨보세요!'
-                  : isCompleted && !hasSession
-                    ? '로그인하면 참가팀의 팀장·매니저는 후기를 작성할 수 있어요.'
-                    : isCompleted && hasSession && !isParticipant
-                      ? // 팀원(member)도 여기까지 온다 — 대회 완료 알림이 모든 활성 멤버에게
-                        // 가기 때문이다. 대회 후기는 설계상 팀장·운영진 전용이 맞지만, 팀원에게도
-                        // **쓸 수 있는 후기가 따로 있다**(상대 선수 후기). 그 사실을 함께 알려
-                        // 알림이 막다른 길로 끝나지 않게 한다 — 진입 카드는 이 섹션 위에 있다.
-                        '대회 후기는 참가팀의 팀장·매니저가 작성해요. 팀원은 맞붙은 상대 선수에 대한 후기를 남길 수 있어요.'
-                      : '참가팀의 후기가 등록되면 여기에서 볼 수 있어요.'
+                  : reviewGate.message ?? '참가팀의 후기가 등록되면 여기에서 볼 수 있어요.'
               }
             />
           </Card>

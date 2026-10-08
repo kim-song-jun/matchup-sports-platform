@@ -4,6 +4,7 @@
  * 판정의 대조군(명단 밖 멤버·상대 팀장·양 팀 겸직·대회 경기)을 가짜 tx 로 빠르게 가른다.
  */
 import { randomUUID } from 'node:crypto';
+import type { Prisma } from '@prisma/client';
 import type { PrismaService } from '../prisma/prisma.service';
 import type { V1AuthUser } from '../auth/v1-auth-user';
 import { TeamMatchRecordService } from './team-match-record.service';
@@ -308,4 +309,224 @@ it.each([
 ])('record read returns ownership for the correct detail handoff: %j', async (ownership) => {
   const { service } = createFake({ ...ownership, memberships: [] });
   await expect(service.read(null, 'tm-1')).resolves.toMatchObject(ownership);
+});
+
+type ExistingRevision = {
+  id: string; gameId: string; revision: number; state: 'OFFICIAL' | 'DRAFT' | 'VOID';
+  score: Prisma.JsonValue; goalEvents: Prisma.JsonValue | null; officialAt: Date | null;
+};
+type ExistingEvent = {
+  id: string; gameId: string; type: string; sideId: string; participantId: string | null;
+  period: number; clockMs: number; sequence: number; reversesEventId: string | null; payload: Prisma.JsonValue;
+};
+type ExistingEventWhere = {
+  gameId?: string; type?: string | { in: string[] }; reversesEventId?: null | { not: null };
+  AND?: ExistingEventWhere[]; OR?: ExistingEventWhere[];
+};
+
+function matchesExistingEvent(event: ExistingEvent, where: ExistingEventWhere = {}): boolean {
+  if (where.gameId !== undefined && event.gameId !== where.gameId) return false;
+  if (typeof where.type === 'string' && event.type !== where.type) return false;
+  if (typeof where.type === 'object' && !where.type.in.includes(event.type)) return false;
+  if (where.reversesEventId === null && event.reversesEventId !== null) return false;
+  if (where.reversesEventId?.not === null && event.reversesEventId === null) return false;
+  if (where.AND && !where.AND.every((clause) => matchesExistingEvent(event, clause))) return false;
+  return !where.OR || where.OR.some((clause) => matchesExistingEvent(event, clause));
+}
+
+/** Current v1 event producer: an official result without a shared score sheet or revision JSON goals. */
+function createExistingResultFake(options: {
+  policy?: 'LIVE' | 'OFFICIAL_ONLY' | 'STATUS_ONLY' | 'HIDDEN'; liveEnabled?: boolean;
+  revision?: ExistingRevision | null; submittedRoster?: boolean; deleted?: boolean;
+} = {}) {
+  const current: ExistingRevision | null = options.revision === undefined ? {
+    id: 'current-result', gameId: 'existing-game', revision: 1, state: 'OFFICIAL',
+    score: { home: 1, away: 3 }, goalEvents: null, officialAt: new Date('2026-10-01T10:00:00Z'),
+  } : options.revision;
+  const events: ExistingEvent[] = ['home', 'away', 'away', 'away'].map((side, index) => ({
+    id: `event-${index + 1}`, gameId: 'existing-game', type: 'GOAL', sideId: `side-${side}`,
+    participantId: `participant-${side}`, period: index < 2 ? 1 : 2, clockMs: (7 + index * 3) * 60_000,
+    sequence: index + 1, reversesEventId: null, payload: {},
+  }));
+  const participants = ['home', 'away'].map((side) => ({
+    id: `participant-${side}`, sideId: `side-${side}`, lineupId: `lineup-${side}`, userId: `user-${side}`,
+    displayNameSnapshot: `${side} private real name`, jerseyNumber: 7, position: null, started: true,
+  }));
+  const game = {
+    id: 'existing-game', teamMatchId: 'existing-match', state: 'ENDED', currentOfficialRevisionId: current?.id ?? null,
+    teamMatch: {
+      id: 'existing-match', title: '기존 친선', status: 'completed', startAt: new Date('2026-10-01T09:00:00Z'),
+      deletedAt: options.deleted ? new Date() : null, hostTeamId: 'team-home', approvedApplicantTeamId: 'team-away',
+      leagueId: null, tournamentId: null, platformManaged: false,
+    },
+    sides: ['home', 'away'].map((side) => ({ id: `side-${side}`, sideKey: side.toUpperCase(), teamId: `team-${side}`, displayNameSnapshot: `${side} FC` })),
+    lineups: ['home', 'away'].map((side) => ({
+      id: `lineup-${side}`, sideId: `side-${side}`, revision: 1, state: options.submittedRoster ? 'SUBMITTED' : 'DRAFT', invalidatedAt: null,
+    })),
+    participants, sharedRecord: null as FakeRecord | null, visibilityPolicy: { mode: options.policy ?? 'OFFICIAL_ONLY' },
+    events: events.slice(0, 1).map(({ id }) => ({ id })), resultRevisions: current ? [current] : [] as ExistingRevision[],
+  };
+  const lookups: Prisma.V1GameFindUniqueArgs[] = [];
+  const eventLookups: Array<{ where?: ExistingEventWhere }> = [];
+  const transactionOptions: unknown[] = [];
+  const tx = {
+    $queryRaw: async () => [],
+    v1Game: { findUnique: async (args: Prisma.V1GameFindUniqueArgs) => {
+      lookups.push(args);
+      if (args.where.teamMatchId !== game.teamMatchId) return null;
+      // An unrequested relation is absent, just as Prisma omits it from a real response.
+      return { ...game, ...(args.include?.currentOfficialRevision ? { currentOfficialRevision: current } : {}) };
+    } },
+    v1GameEvent: { findMany: async (args: { where?: ExistingEventWhere }) => {
+      eventLookups.push(args);
+      return events.filter((event) => matchesExistingEvent(event, args.where));
+    } },
+    v1ParticipantIdentityLinkCurrent: { findMany: async (args: { where: { userId?: string; participantId?: { in: string[] } } }) =>
+      participants.filter((participant) => (!args.where.userId || participant.userId === args.where.userId)
+        && (!args.where.participantId || args.where.participantId.in.includes(participant.id)))
+        .map((participant) => ({ participantId: participant.id, userId: participant.userId, linkId: `link-${participant.id}` })),
+    },
+    v1UserProfile: { findMany: async (args: { where: { userId: { in: string[] } } }) =>
+      participants.filter((participant) => args.where.userId.in.includes(participant.userId)).map((participant) => ({
+        userId: participant.userId, nickname: `${participant.sideId} nickname`, realName: participant.displayNameSnapshot,
+        displayName: participant.displayNameSnapshot, tournamentRealNameVisible: false, deletedAt: null, profileImageUrl: null,
+      })),
+    },
+    v1UserRecordConsent: { findMany: async () => [] },
+    v1ParticipantConsentSnapshot: { findMany: async () => [] },
+    v1TeamMembership: { findMany: async () => [], findFirst: async () => null },
+    v1AdminUser: { findFirst: async () => null },
+    v1GameOperationFlag: { findUnique: async () => ({ value: options.liveEnabled ? 'on' : 'off' }) },
+    v1TeamMatchRecordChange: { findMany: async () => [], findUnique: async () => null },
+  };
+  const prisma = { $transaction: async <T>(fn: (client: typeof tx) => Promise<T>, transaction: unknown) => {
+    transactionOptions.push(transaction);
+    return fn(tx);
+  } } as unknown as PrismaService;
+  return { service: new TeamMatchRecordService(prisma), game, current, events, lookups, eventLookups, transactionOptions };
+}
+
+describe('TeamMatchRecordService — existing v1 official friendly public record (MD-QA #61)', () => {
+  it('reads the actual 1:3 score and four events without a shared score sheet, and exposes no edit identities', async () => {
+    const { service, lookups, transactionOptions } = createExistingResultFake();
+    const view = await service.read(null, 'existing-match');
+
+    expect(view.sides.map((side) => side.score)).toEqual([1, 3]);
+    expect(view).toMatchObject({ phase: 'legacy', canEdit: false, participant: false, operator: false, goals: [], participants: [], history: [], confirmations: [] });
+    expect(view.goalEvents).toHaveLength(4);
+    expect(view.goalEvents.map((event) => event.participantName)).toEqual(['side-home nickname', 'side-away nickname', 'side-away nickname', 'side-away nickname']);
+    for (const event of view.goalEvents) expect(Object.keys(event).sort()).toEqual(['minute', 'ownGoal', 'participantName', 'sideId', 'subMatchId']);
+    expect(JSON.stringify(view)).not.toContain('private real name');
+    expect(lookups[0].include).toHaveProperty('currentOfficialRevision');
+    expect(transactionOptions).toEqual([{ isolationLevel: 'RepeatableRead' }]);
+  });
+
+  it.each([
+    { home: 1, away: 3 },
+    { regulation: { home: 1, away: 3 }, penalty: null },
+  ])('uses the canonical score JSON shape %j even when goal events do not tally to the score', async (score) => {
+    const fixture = createExistingResultFake();
+    fixture.current!.score = score;
+    fixture.events.splice(1);
+    expect((await fixture.service.read(null, 'existing-match')).sides.map((side) => side.score)).toEqual([1, 3]);
+  });
+
+  it('keeps the current official pointer when a newer draft or stale shared record exists', async () => {
+    const fixture = createExistingResultFake();
+    fixture.game.resultRevisions.unshift({ ...fixture.current!, id: 'newer-draft', revision: 2, state: 'DRAFT', score: { home: 9, away: 9 } });
+    fixture.game.sharedRecord = { version: 1, goals: OFFICIAL_RECORD().goals, subMatches: [], confirmations: [], officialAt: null };
+    const view = await fixture.service.read(null, 'existing-match');
+    expect(view.phase).toBe('legacy');
+    expect(view.sides.map((side) => side.score)).toEqual([1, 3]);
+    expect(view.goalEvents).toHaveLength(4);
+  });
+
+  it('never gives a private legacy viewer stale shared goals or submatches ahead of the official projection', async () => {
+    const fixture = createExistingResultFake({ submittedRoster: true });
+    fixture.game.sharedRecord = { version: 1, goals: OFFICIAL_RECORD().goals, subMatches: [{ id: 'stale-submatch', title: '이전 기록', order: 0 }], confirmations: [], officialAt: null };
+    const view = await fixture.service.read(user('user-home'), 'existing-match');
+    expect(view).toMatchObject({ phase: 'legacy', participant: true, canEdit: false });
+    expect(view.sides.map((side) => side.score)).toEqual([1, 3]);
+    expect(view.goalEvents).toHaveLength(4);
+    expect(view.goals).toEqual([]);
+    expect(view.subMatches).toEqual([]);
+  });
+
+  it('prefers explicit revision JSON goals to old raw events, including an explicitly empty list', async () => {
+    const fixture = createExistingResultFake();
+    fixture.current!.goalEvents = [{ id: 'corrected-goal', sideId: 'side-away', participantId: 'participant-away', ownGoal: true, minute: 15 }];
+    expect((await fixture.service.read(null, 'existing-match')).goalEvents).toEqual([
+      { sideId: 'side-away', participantName: 'side-away nickname', ownGoal: true, minute: 15, subMatchId: null },
+    ]);
+    fixture.current!.goalEvents = [];
+    expect((await fixture.service.read(null, 'existing-match')).goalEvents).toEqual([]);
+    expect(fixture.eventLookups).toHaveLength(0);
+  });
+
+  it('filters reversals while retaining the credited side and actual own-goal flag', async () => {
+    const fixture = createExistingResultFake();
+    fixture.events[1] = { ...fixture.events[1], type: 'OWN_GOAL', participantId: 'participant-home' };
+    fixture.events.push({ ...fixture.events[0], id: 'undo-goal', type: 'CORRECTION', sequence: 5, reversesEventId: fixture.events[0].id });
+    fixture.events.push({ ...fixture.events[0], id: 'other-game-goal', gameId: 'other-game' });
+    const view = await fixture.service.read(null, 'existing-match');
+    expect(view.sides.map((side) => side.score)).toEqual([1, 3]);
+    expect(view.goalEvents).toHaveLength(3);
+    expect(view.goalEvents).toContainEqual({ sideId: 'side-away', participantName: 'side-home nickname', ownGoal: true, minute: 10, subMatchId: null });
+  });
+
+  it.each(['OFFICIAL_ONLY', 'LIVE'] as const)('%s keeps official results visible with PUBLIC_LIVE off', async (policy) => {
+    const { service } = createExistingResultFake({ policy });
+    const view = await service.read(null, 'existing-match');
+    expect(view.sides.map((side) => side.score)).toEqual([1, 3]);
+    expect(view.goalEvents).toHaveLength(4);
+  });
+
+  it('STATUS_ONLY hides scores and goals before reading events', async () => {
+    const fixture = createExistingResultFake({ policy: 'STATUS_ONLY' });
+    const view = await fixture.service.read(null, 'existing-match');
+    expect(view.sides.map((side) => side.score)).toEqual([null, null]);
+    expect(view.goalEvents).toEqual([]);
+    expect(fixture.eventLookups).toHaveLength(0);
+  });
+
+  it('keeps the existing private read exception for submitted participants on a hidden result', async () => {
+    const { service } = createExistingResultFake({ policy: 'HIDDEN', submittedRoster: true });
+    const view = await service.read(user('user-home'), 'existing-match');
+    expect(view).toMatchObject({ phase: 'legacy', participant: true, canEdit: false });
+    expect(view.sides.map((side) => side.score)).toEqual([1, 3]);
+  });
+
+  it.each(['hidden', 'deleted', 'unknown'] as const)('%s records fail closed for public readers', async (condition) => {
+    const fixture = createExistingResultFake({ policy: condition === 'hidden' ? 'HIDDEN' : 'OFFICIAL_ONLY', deleted: condition === 'deleted' });
+    await expect(fixture.service.read(null, condition === 'unknown' ? 'wrong-match' : 'existing-match')).rejects.toMatchObject({
+      status: 404, response: { code: 'TEAM_MATCH_NOT_FOUND' },
+    });
+    expect(fixture.eventLookups).toHaveLength(0);
+  });
+
+  it.each(['missing', 'draft', 'void', 'malformed-score'] as const)('%s current result never invents 0:0 or revives old events', async (condition) => {
+    const fixture = createExistingResultFake({ ...(condition === 'missing' ? { revision: null } : {}), policy: 'LIVE', liveEnabled: true });
+    if (condition === 'draft') fixture.current!.state = 'DRAFT';
+    if (condition === 'void') fixture.current!.state = 'VOID';
+    if (condition === 'malformed-score') fixture.current!.score = { home: 1 };
+    const view = await fixture.service.read(null, 'existing-match');
+    expect(view.sides.map((side) => side.score)).toEqual([null, null]);
+    expect(view.goalEvents).toEqual([]);
+    expect(fixture.eventLookups).toHaveLength(0);
+  });
+
+  it('malformed JSON goals do not fall back to unrelated event history', async () => {
+    const fixture = createExistingResultFake();
+    fixture.current!.goalEvents = [{ id: 'invalid-goal', ownGoal: false }];
+    expect((await fixture.service.read(null, 'existing-match')).goalEvents).toEqual([]);
+    expect(fixture.eventLookups).toHaveLength(0);
+  });
+
+  it('keeps existing-result participants unable to write through the shared endpoint', async () => {
+    const { service } = createExistingResultFake({ submittedRoster: true });
+    expect(await service.read(user('user-home'), 'existing-match')).toMatchObject({ phase: 'legacy', canEdit: false, participant: true });
+    await expect(service.mutate(user('user-home'), 'existing-match', confirm())).rejects.toMatchObject({
+      status: 409, response: { code: 'RECORD_NOT_EDITABLE' },
+    });
+  });
 });

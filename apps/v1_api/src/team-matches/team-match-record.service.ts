@@ -21,10 +21,12 @@ import {
 import { MutateTeamMatchRecordDto } from './dto/team-match-record.dto';
 import { friendlyResultCorrector, platformMatchOperator } from './platform-match-operator';
 import { assertRevisionSupersession, assertRevisionTransition } from '../games/core/revision-state-machine';
+import { isMinuteUnknown, parseTournamentFixtureOfficialScore, parseTournamentFixtureRevisionGoals } from '../tournaments/tournament-fixture-official-result';
 
 type Tx = Prisma.TransactionClient;
 export type SharedSubMatch = { id: string; title: string; order: number };
 export type SharedGoal = { id: string; sideId: string; participantId: string | null; ownGoal: boolean; minute: number | null; subMatchId: string | null };
+type PublicGoal = SharedGoal & { playerNameSnapshot?: string | null };
 type Confirmation = { sideId: string; userId: string; name: string; at: string };
 const json = (value: unknown) => JSON.parse(JSON.stringify(value)) as Prisma.InputJsonValue;
 const conflict = (code: string, message: string) => new ConflictException({ code, message });
@@ -37,6 +39,7 @@ const include = {
   visibilityPolicy: true,
   events: { take: 1, select: { id: true } },
   resultRevisions: { orderBy: { revision: 'desc' as const }, take: 1 },
+  currentOfficialRevision: true,
 } satisfies Prisma.V1GameInclude;
 type Loaded = Prisma.V1GameGetPayload<{ include: typeof include }>;
 
@@ -182,13 +185,12 @@ export class TeamMatchRecordService {
   private async publicGoalEvents(
     tx: Tx,
     game: Loaded,
-    goals: readonly SharedGoal[],
-    phase: ReturnType<TeamMatchRecordService['phase']>,
+    goals: readonly PublicGoal[],
     showScore: boolean,
+    roster = this.roster(game),
   ) {
-    if (phase !== 'official' || !showScore || goals.length === 0) return [];
+    if (!showScore || goals.length === 0) return [];
 
-    const roster = this.roster(game);
     const participantIds = roster.map((participant) => participant.id);
     const identityLinks = participantIds.length === 0
       ? []
@@ -219,12 +221,37 @@ export class TeamMatchRecordService {
       return {
         sideId: goal.sideId,
         participantName: eligible
-          ? resolveParticipantDisplayName(participant, nameProfileByUserId)
+          ? goal.participantId === null
+            ? goal.playerNameSnapshot ?? null
+            : resolveParticipantDisplayName(participant, nameProfileByUserId)
           : null,
         minute: goal.minute,
         ownGoal: goal.ownGoal,
         subMatchId: goal.subMatchId,
       };
+    });
+  }
+
+  private async existingOfficialGoals(tx: Tx, game: Loaded, revision: NonNullable<Loaded['currentOfficialRevision']>): Promise<PublicGoal[]> {
+    if (revision.goalEvents !== null) {
+      return (parseTournamentFixtureRevisionGoals(revision.goalEvents) ?? [])
+        .filter((goal) => game.sides.some((side) => side.id === goal.sideId))
+        .map((goal) => ({ ...goal, subMatchId: null }));
+    }
+    // Current v1 event-based results have no revision JSON goals. Read reversals too so cancelled goals stay cancelled.
+    const events = await tx.v1GameEvent.findMany({
+      where: { gameId: game.id, OR: [{ type: { in: ['GOAL', 'OWN_GOAL'] } }, { reversesEventId: { not: null } }] },
+      orderBy: [{ period: 'asc' }, { clockMs: 'asc' }, { sequence: 'asc' }],
+      select: { id: true, type: true, sideId: true, participantId: true, clockMs: true, payload: true, reversesEventId: true },
+    });
+    const reversedIds = new Set(events.flatMap((event) => event.reversesEventId ? [event.reversesEventId] : []));
+    return events.flatMap((event) => {
+      if ((event.type !== 'GOAL' && event.type !== 'OWN_GOAL') || reversedIds.has(event.id)
+        || event.sideId === null || !game.sides.some((side) => side.id === event.sideId)) return [];
+      return [{
+        id: event.id, sideId: event.sideId, participantId: event.participantId, ownGoal: event.type === 'OWN_GOAL',
+        minute: isMinuteUnknown(event.payload) ? null : Math.max(0, Math.ceil(event.clockMs / 60000)), subMatchId: null,
+      }];
     });
   }
 
@@ -247,12 +274,18 @@ export class TeamMatchRecordService {
     const phase = this.phase(game);
     const record = game.sharedRecord;
     const goals = this.goals(game);
-    const subMatches = this.subMatches(game);
+    const subMatches = phase === 'legacy' ? [] : this.subMatches(game);
     const privateView = !!actor && phase !== 'managed';
     const visibility = privateView ? 'live' : effectivePublicVisibilityMode(game.visibilityPolicy?.mode ?? 'STATUS_ONLY', await isPublicLiveEnabled(tx));
     if (visibility === 'hidden') throw new NotFoundException({ code: 'TEAM_MATCH_NOT_FOUND', message: '경기를 찾을 수 없어요.' });
-    const showScore = privateView || visibility === 'live' || (visibility === 'official_only' && phase === 'official');
-    const goalEvents = await this.publicGoalEvents(tx, game, goals, phase, showScore);
+    const existingRevision = phase === 'legacy' && game.currentOfficialRevision?.state === 'OFFICIAL' ? game.currentOfficialRevision : null;
+    const existingScore = existingRevision ? parseTournamentFixtureOfficialScore(existingRevision.score) : null;
+    const showScore = privateView || visibility === 'live' || (visibility === 'official_only' && (phase === 'official' || existingScore !== null));
+    const goalEvents = phase === 'legacy'
+      ? showScore && existingScore && existingRevision
+        ? await this.publicGoalEvents(tx, game, await this.existingOfficialGoals(tx, game, existingRevision), true, game.participants)
+        : []
+      : phase === 'official' ? await this.publicGoalEvents(tx, game, goals, showScore) : [];
     const changes = privateView ? await tx.v1TeamMatchRecordChange.findMany({ where: { gameId: game.id }, orderBy: { version: 'desc' }, take: 100 }) : [];
     const participants = privateView ? await this.participantViews(tx, game) : [];
     return {
@@ -261,10 +294,12 @@ export class TeamMatchRecordService {
       phase, version: record?.version ?? 0, serverTime: new Date().toISOString(),
       canEdit: !!actor && ((phase === 'live' && readiness.lineupReady) || (phase === 'official' && actor.operator)), participant: !!actor && !actor.operator, operator: actor?.operator ?? false, teamAuthority: actor?.teamAuthority ?? false, ownSideId,
       ...readiness,
-      sides: game.sides.map((s) => ({ id: s.id, key: s.sideKey, name: s.displayNameSnapshot, score: showScore ? goals.filter((g) => g.sideId === s.id).length : null })),
+      sides: game.sides.map((s) => ({ id: s.id, key: s.sideKey, name: s.displayNameSnapshot, score: phase === 'legacy'
+        ? showScore && existingScore ? s.sideKey === 'HOME' ? existingScore.homeScore : existingScore.awayScore : null
+        : showScore ? goals.filter((g) => g.sideId === s.id).length : null })),
       subMatches: subMatches.map((subMatch) => ({ ...subMatch, scores: game.sides.map((side) => ({ sideId: side.id, score: showScore ? goals.filter((goal) => goal.subMatchId === subMatch.id && goal.sideId === side.id).length : null })) })),
       participants,
-      goals: privateView ? goals : [],
+      goals: privateView && phase !== 'legacy' ? goals : [],
       goalEvents,
       confirmations: privateView ? ((record?.confirmations ?? []) as Confirmation[]).map((c) => ({ sideId: c.sideId, name: c.name, at: c.at })) : [],
       history: changes.map((c) => ({ id: c.id, version: c.version, action: c.action, actorName: c.actorName, goalId: c.goalId, subMatchId: c.subMatchId, before: c.before, after: c.after, at: c.createdAt })),

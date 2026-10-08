@@ -200,9 +200,7 @@ export function TeamMatchSharedRecord({ teamMatchId, admin = false }: { teamMatc
   const competitionId = data?.leagueId ?? data?.tournamentId;
   const handoffHref = admin ? null : data?.phase === 'managed' && competitionId
     ? fixtureDetailHref({ isRegularLeague: !!data.leagueId, competitionId, fixtureId: teamMatchId, fromHref: fromPath })
-    : data?.phase === 'legacy'
-      ? withFromPath(`/team-matches/${encodeURIComponent(teamMatchId)}?view=detail`, fromPath)
-      : null;
+    : null;
   useEffect(() => {
     if (handoffHref) router.replace(handoffHref);
   }, [handoffHref, router]);
@@ -265,12 +263,15 @@ export function TeamMatchSharedRecord({ teamMatchId, admin = false }: { teamMatc
   const disabled = mutation.isPending || uncertain || query.isError;
   const ownConfirmed = data.confirmations.some((c) => c.sideId === data.ownSideId);
   const controlsOpen = !!editing || !!subMatchForm;
+  // Existing official results are readable here, but their actor identity does
+  // not enable shared writing, confirmations, or promises of future changes.
+  const legacyReadOnly = data.phase === 'legacy';
 
   return <main className={styles.page}>
     {admin && <Link className={styles.openLink} href={`/admin/team-matches/${teamMatchId}`}>팀매치 운영 상세로</Link>}
     <header className={styles.header}>
       <div>
-        <h1>함께 쓰는 경기 기록</h1>
+        <h1>{legacyReadOnly ? '경기 기록' : '함께 쓰는 경기 기록'}</h1>
         <p className={styles.muted}>{data.title}</p>
       </div>
       <span className={`tm-badge ${data.phase === 'cancelled' ? 'tm-badge-grey' : 'tm-badge-green'}`}>{sharedRecordPhaseLabel(data.phase)}</span>
@@ -292,12 +293,12 @@ export function TeamMatchSharedRecord({ teamMatchId, admin = false }: { teamMatc
       </div>
       {subMatches.length > 0 && <p className={styles.aggregateNote}>서브매치의 모든 골을 합산한 팀매치 최종 점수예요.</p>}
       {data.canEdit && subMatches.length === 0 && <Button block onClick={(event) => openGoalForm(event.currentTarget, null, null)} disabled={disabled || controlsOpen}>득점 추가</Button>}
-      {data.teamAuthority && data.phase !== 'cancelled' && <p className={styles.muted}><span className="tm-badge tm-badge-sm tm-badge-blue">팀장 권한</span> 팀장·매니저는 명단에 없어도 기록하고 종료를 확인할 수 있어요.</p>}
+      {!legacyReadOnly && data.teamAuthority && data.phase !== 'cancelled' && <p className={styles.muted}><span className="tm-badge tm-badge-sm tm-badge-blue">팀장 권한</span> 팀장·매니저는 명단에 없어도 기록하고 종료를 확인할 수 있어요.</p>}
       {data.phase === 'official' && !data.canEdit && <p className={styles.confirmed}>결과가 확정되어 기록이 잠겼어요.</p>}
-      {data.operator && (data.phase === 'official'
+      {!legacyReadOnly && data.operator && (data.phase === 'official'
         ? <p className={styles.muted}>확정된 결과를 Teameet 운영으로 고쳐요. 고칠 때마다 새 공식 결과로 남아 전적·개인 기록에 반영되고, 양 팀의 종료 확인과 이전 결과·변경 이력은 그대로예요.</p>
         : <p className={styles.muted}>Teameet 운영으로 양 팀과 함께 기록해요. 수정하면 기존 종료 확인이 초기화되며, 최종 확인은 양 팀이 직접 진행해요.</p>)}
-      {!data.participant && !data.operator && <p className={styles.muted}>기록 편집은 양 팀의 참석명단 참가자와 팀장·매니저, 플랫폼 주관 경기의 운영자에게 열려 있어요.</p>}
+      {!legacyReadOnly && !data.participant && !data.operator && <p className={styles.muted}>기록 편집은 양 팀의 참석명단 참가자와 팀장·매니저, 플랫폼 주관 경기의 운영자에게 열려 있어요.</p>}
       {admin && (data.phase === 'legacy' || data.phase === 'managed') && <p className={styles.muted}>이 경기는 공동 기록 대상이 아니에요. 기존 경기 운영 화면을 이용해 주세요.</p>}
       {data.phase === 'scheduled' && <p className={styles.muted}>상대팀 확정 후 경기 시작 시간이 되면 기록할 수 있어요.</p>}
     </section>
@@ -416,7 +417,7 @@ export function TeamMatchSharedRecord({ teamMatchId, admin = false }: { teamMatc
       </div>
 
       <aside className={styles.stack}>
-        {data.participant && data.phase !== 'cancelled' && <section className={styles.section}>
+        {!legacyReadOnly && data.participant && data.phase !== 'cancelled' && <section className={styles.section}>
           <h2>경기 종료 확인</h2>
           <p className={styles.muted}>각 팀에서 한 명씩 현재 기록을 확인하면 팀매치 한 경기의 최종 결과로 확정돼요. 기록을 수정하면 이전 확인은 취소돼요.</p>
           {data.sides.map((side) => <div className={styles.row} key={side.id}>
@@ -435,7 +436,7 @@ export function TeamMatchSharedRecord({ teamMatchId, admin = false }: { teamMatc
             : <Button block disabled={disabled || controlsOpen} variant={ownConfirmed ? 'outline' : 'primary'} onClick={() => ownConfirmed ? void command({ action: 'reopen' }) : setEndPrompt(data.version)}>{ownConfirmed ? '종료 확인 취소' : '우리 팀 종료 확인'}</Button>)}
         </section>}
 
-        {(data.participant || data.operator) && <details className={styles.section}>
+        {(data.participant || data.operator) && (!legacyReadOnly || data.history.length > 0) && <details className={styles.section}>
           <summary className={styles.historyTitle}>변경 이력 · {data.history.length}건</summary>
           <p className={styles.muted}>최근 100건 · 누가 바꿨는지 함께 확인해요.</p>
           <ul className={styles.history}>
@@ -504,8 +505,11 @@ function GoalRows({ data, goals, publicEvents, disabled, canEdit, onEdit, onDele
   onEdit: (goal: SharedGoal, opener: HTMLElement) => void;
   onDelete: (goal: SharedGoal) => void;
 }) {
+  // A hidden score means the public policy withheld events too; an empty array
+  // is not evidence that this finished game had no goals.
+  if (data.phase === 'legacy' && data.sides.some((side) => side.score === null)) return null;
   if (goals.length === 0 && publicEvents !== undefined && publicEvents.length > 0) return <GoalEventList events={publicEvents} sides={data.sides} />;
-  if (goals.length === 0) return <p className={styles.muted}>{data.participant ? '아직 등록된 득점이 없어요.' : '참가자들의 공동 기록으로 점수가 갱신돼요.'}</p>;
+  if (goals.length === 0) return <p className={styles.muted}>{data.participant || data.phase === 'legacy' ? '아직 등록된 득점이 없어요.' : '참가자들의 공동 기록으로 점수가 갱신돼요.'}</p>;
   return <div className={styles.goalList}>{goals.map((goal) => {
     const participant = data.participants.find((row) => row.id === goal.participantId);
     const participantName = participant?.name ?? '득점자 미상';

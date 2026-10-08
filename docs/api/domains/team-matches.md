@@ -21,12 +21,14 @@
 | POST | `/api/v1/team-matches/:id/record` | V1AuthGuard + 최신 유효 제출 라인업 참가자 | 득점 추가/수정/삭제/복구, 종료 확인/취소 |
 
 - 응답은 공통 `{ status, data, timestamp }`. `phase`: scheduled/live/official/cancelled/legacy/managed.
+- `phase=legacy`는 공동 기록 편집 대상이 아닌 기존 v1 경기 상태다. 조회는 `currentOfficialRevision.state=OFFICIAL`인 현재 리비전의 실제 점수를 flat/nested JSON 형태 모두에서 읽으며, 최신 초안이나 오래된 공동 기록으로 대체하지 않는다. 현재 공식 결과가 없거나 점수 JSON이 유효하지 않으면 점수는 `null`이며 0:0을 만들지 않는다. `legacy`의 쓰기는 계속 409 `RECORD_NOT_EDITABLE`이다.
 - GET은 일반 사용자에게 점수·팀·확정 여부와 아래의 최소 공식 득점 요약만 반환한다. 선수 명단·편집용 득점 원본·이력·확인자 이름은 참가자에게만 반환한다.
 - 공식 확정(`phase=official`) 결과에서 점수가 공개되는 조회자는 `goalEvents[]`도 받는다. 각 항목은
   `sideId`(점수를 얻은 팀), 공개 정책을 적용한 nullable `participantName`, nullable `minute`,
   `ownGoal`, nullable `subMatchId`만 포함한다. 편집용 participant id와 변경 이력은 계속 공개하지 않는다.
   `STATUS_ONLY`처럼 점수가 가려진 응답과 공식 확정 전 응답에서는 빈 배열이다. 선수 이름은 대회
   경기결과와 같은 이름 공개 게이트 및 닉네임/실명 선택 정책을 사용한다.
+- 기존 v1 공식 친선 결과(`phase=legacy`)도 공개 정책이 점수를 허용하면 같은 `goalEvents[]` 투영을 받는다. 공식 리비전의 JSON 득점을 우선하며, JSON이 `null`인 이벤트 기반 결과만 현재 경기의 취소되지 않은 GOAL/OWN_GOAL을 읽는다. 명시적 빈 JSON과 잘못된 JSON을 과거 이벤트로 대체하지 않는다. `OFFICIAL_ONLY`와 `PUBLIC_LIVE=off`는 공식 결과를 공개하고 `STATUS_ONLY`는 점수·득점을 가리며 `HIDDEN`은 공개 조회에 404다. 기존 참가자 private read 예외와 신원·이름 공개 정책은 유지한다. `legacy`의 `goals`·`subMatches`는 빈 배열로 두어 오래된 공동 기록을 공식 결과 앞에 표시하지 않는다.
 - 편집자는 최신 제출/잠금 라인업의 `userId` 또는 검증된 현재 identity link로 판정한다. 양쪽 라인업에 동시에 있는 계정은 확인자로 인정하지 않는다.
 - **명단 밖 팀장·매니저(Task 180 H5)**: 친선 경기에서 라인업에 없는 사용자가 한쪽 참가팀의 active owner/manager 이면 그 팀 쪽으로 기록·종료 확인을 할 수 있다. 응답에 `teamAuthority: true`, 이력·확인자 이름은 `"<닉네임> · 팀장 권한"`. 양 팀을 모두 관리하면 권한을 주지 않는다. **대회·리그 경기(`phase=managed`)에는 적용하지 않는다** — 참가팀은 결과를 만들거나 확인하지 않으므로 기존처럼 403 `RECORD_PARTICIPANT_REQUIRED`(정본 §4).
 - 참가자 응답의 `participants[].guest` 는 계정·연결이 없는 출전자다(개인 기록에 남지 않는다).
@@ -34,7 +36,7 @@
 - add/edit: `sideId`는 점수를 얻는 팀. `participantId`는 선택(null=미상), `ownGoal` 기본 false,
   `minute` 선택(null 또는 0..999 정수). 자책골 선수는 점수를 얻는 팀의 상대편 라인업에서 고른다.
 - edit/delete는 `goalId`, undo는 `changeId`. undo는 대상 변경 이후 해당 골이 다시 바뀌었으면 409로 거부한다.
-- 점수는 현재 득점 기록 개수로만 계산한다. 이력에는 주체·시각·전후 값이 영속되며 GET은 최근 100건을 반환한다.
+- 공동 기록 점수는 현재 득점 기록 개수로만 계산한다. `legacy` 조회 점수는 현재 공식 리비전의 점수다. 이력에는 주체·시각·전후 값이 영속되며 GET은 최근 100건을 반환한다.
 - 같은 commandId/사용자/payload 재전송은 재실행 없이 최신 상태를 반환한다. 다른 payload/사용자의 키 재사용은 409.
 - Game row lock + record version으로 동시 수정 유실을 방지한다. stale version은 409 `VERSION_CONFLICT`.
 - 득점 변경/복구/reopen은 기존 양 팀 확인을 초기화한다. 같은 팀의 중복 confirm은 409.
@@ -413,4 +415,4 @@ MSW 기본 픽스처의 라인업은 DRAFT이므로 공동 기록 조회는 편�
 
 `GET/POST /team-matches/:id/record` responses add `leagueId: string | null` and `tournamentId: string | null`. The response remains under the existing envelope and GET optional-auth / POST authorization and version gates are unchanged.
 
-On the public `/team-matches/:id/record` screen, `phase=managed` hands off to `/league-matches/:leagueId/fixtures/:id` when `leagueId` exists, otherwise `/tournaments/:tournamentId/matches/:id`. League ownership wins when both IDs exist. The sanitized `from` parameter is preserved. `phase=legacy` keeps `/team-matches/:id?view=detail`; the admin record screen stays in its admin shell. A managed response does not grant record mutation permissions.
+On the public `/team-matches/:id/record` screen, `phase=managed` hands off to `/league-matches/:leagueId/fixtures/:id` when `leagueId` exists, otherwise `/tournaments/:tournamentId/matches/:id`. League ownership wins when both IDs exist. The sanitized `from` parameter is preserved. `phase=legacy` displays the current official friendly result in the same read-only record screen; the admin record screen stays in its admin shell. Neither an existing official result nor a managed response grants shared record mutation permissions.

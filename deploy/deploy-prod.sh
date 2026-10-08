@@ -345,6 +345,9 @@ assert_task168_m11_guard "${PROD_SOURCE_DIR}"
   'cd /app/apps/v1_api && ./node_modules/.bin/prisma migrate deploy'
 "${compose[@]}" run --rm --no-deps -T v1_api sh -c \
   'cd /app/apps/v1_api && node dist/src/tournaments/migration/tournament-award-recipient-backfill.cli.js'
+# 마이그레이션·데이터 보정 뒤 순위를 결과로부터 다시 만든다(멱등). 설정이 깨진 대회는 CLI 가 격리하고, 그 밖의 오류만 exit 1 로 배포를 실패시킨다.
+"${compose[@]}" run --rm --no-deps -T v1_api sh -c \
+  'cd /app/apps/v1_api && node dist/src/tournaments/tournament-standings-recalculation.cli.js'
 fi
 
 # restart-containers.sh 의 업로드 백업/복원 왕복을 그대로 흡수한다(D 표에 없던 prod 전용

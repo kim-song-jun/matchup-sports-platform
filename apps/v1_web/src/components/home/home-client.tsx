@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useV1AuthMe, useV1ChatRooms, useV1Home } from '@/hooks/use-v1-api';
+import { useV1ChatListSocket } from '@/hooks/use-v1-realtime-socket';
 import { v1Post } from '@/lib/api-client';
 import { trackEvent } from '@/lib/analytics';
 import { buildPhoneVerifyHref } from '@/components/auth/phone-verification/phone-verify-route';
@@ -27,6 +28,7 @@ export function HomePageClient() {
   const onboardingCompleted = query.data?.viewer?.onboardingStatus === 'completed';
   const authMe = useV1AuthMe({ enabled: isAuthenticated });
   const chatRooms = useV1ChatRooms({ enabled: isAuthenticated });
+  useV1ChatListSocket(isAuthenticated);
   const {
     weather,
     permission: weatherPermission,

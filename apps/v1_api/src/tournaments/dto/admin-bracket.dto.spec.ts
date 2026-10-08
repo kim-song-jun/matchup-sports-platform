@@ -1,7 +1,7 @@
 import 'reflect-metadata';
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
-import { FixtureGoalDto, CreateGroupDto, CreateGroupTeamDto, UpdateFixtureDto } from './admin-bracket.dto';
+import { FixtureGoalDto, CreateGroupDto, CreateGroupTeamDto, UpdateFixtureDto, TOURNAMENT_GROUP_PHASES } from './admin-bracket.dto';
 
 describe('UpdateFixtureDto 번호 계약', () => {
   it('실제 whitelist 설정에서 새 번호를 받는다', async () => {
@@ -47,9 +47,16 @@ describe('FixtureGoalDto', () => {
   });
 });
 
-describe('12강·8강 입력 계약', () => {
-  it.each(['round12', 'quarter'])('%s를 정식 단계로 받는다', async (phase) => {
+describe('12강·16강·8강 입력 계약', () => {
+  it.each(['round12', 'round16', 'quarter'])('%s를 정식 단계로 받는다', async (phase) => {
     expect(await validate(plainToInstance(CreateGroupDto, { name: '결선', phase }))).toHaveLength(0);
+  });
+  it('모르는 단계는 거절한다', async () => {
+    const errors = await validate(plainToInstance(CreateGroupDto, { name: '결선', phase: 'round32' }));
+    expect(errors.some((error) => error.property === 'phase')).toBe(true);
+  });
+  it('단계 목록은 DB enum 순서와 같다', () => {
+    expect(TOURNAMENT_GROUP_PHASES).toEqual(['group', 'round16', 'round12', 'quarter', 'semi', 'final', 'third_place']);
   });
   it('부전승은 boolean만 받는다', async () => {
     const errors = await validate(plainToInstance(CreateGroupTeamDto, { groupId: '00000000-0000-4000-8000-000000000001', registrationId: '00000000-0000-4000-8000-000000000002', isBye: 'true' }));

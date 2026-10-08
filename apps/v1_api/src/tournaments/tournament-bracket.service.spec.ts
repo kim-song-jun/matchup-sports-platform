@@ -719,6 +719,15 @@ describe('TournamentBracketService', () => {
   });
 
 
+  it('16강에는 부전승이 없다 — 조 팀 부전승 지정은 BYE_PHASE_INVALID 이고 아무것도 만들지 않는다', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdmin);
+    prisma.v1Tournament.findFirst.mockResolvedValue(tournamentRow());
+    prisma.v1TournamentGroup.findFirst.mockResolvedValue(groupRow({ phase: 'round16' }));
+    await expect(service.createGroupTeam(ownerUser, 'tournament-1', { groupId: 'group-1', registrationId: 'reg-1', isBye: true }))
+      .rejects.toMatchObject({ response: { code: 'BYE_PHASE_INVALID' } });
+    expect(prisma.v1TournamentGroupTeam.create).not.toHaveBeenCalled();
+  });
+
   describe('라운드별 부전승 저장', () => {
     const dto = { groupId: 'group-1', registrationId: 'reg-1', sortOrder: 3 };
     beforeEach(() => {
@@ -784,6 +793,12 @@ describe('TournamentBracketService', () => {
     it('결승 부전승을 거절한다', async () => {
       prisma.v1TournamentGroup.findFirst.mockResolvedValue(groupRow({ phase: 'final' }));
       await expect(service.createBye(ownerUser, 'tournament-1', dto)).rejects.toMatchObject({ response: { code: 'BYE_PHASE_INVALID' } });
+    });
+    it('16강 부전승 자리 저장을 거절한다', async () => {
+      prisma.v1TournamentGroup.findFirst.mockResolvedValue(groupRow({ phase: 'round16' }));
+      await expect(service.createBye(ownerUser, 'tournament-1', dto)).rejects.toMatchObject({ response: { code: 'BYE_PHASE_INVALID' } });
+      expect(prisma.v1TournamentByeSlot.create).not.toHaveBeenCalled();
+      expect(prisma.v1TournamentGroupTeam.create).not.toHaveBeenCalled();
     });
     it('12강에 이미 부전승 네 팀이 있으면 다섯 번째를 거절한다', async () => {
       prisma.v1TournamentGroupTeam.findMany.mockResolvedValue(Array.from({ length: 4 }, (_, i) => ({ id: 'gt-' + i, registrationId: 'other-' + i, isBye: true })));

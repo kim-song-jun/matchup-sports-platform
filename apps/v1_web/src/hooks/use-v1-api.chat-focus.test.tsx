@@ -17,6 +17,7 @@ const room: V1ChatRoom = {
 let serverPinned = false;
 let readsFail = false;
 let visibility: DocumentVisibilityState = 'visible';
+let detailReads = 0;
 const readQueries: string[] = [];
 const clients: ReturnType<typeof createV1QueryClient>[] = [];
 
@@ -36,6 +37,7 @@ const server = setupServer(
     return HttpResponse.json({ status: 'success', data });
   }),
   http.get(`${api}/chat/rooms/room-1`, () => {
+    detailReads += 1;
     if (readsFail) return readFailure();
     const data: V1ChatRoomDetail = {
       roomId: room.roomId, roomType: room.roomType, title: room.title, status: room.status,
@@ -73,13 +75,18 @@ async function switchVisibility(next: DocumentVisibilityState) {
   visibility = next;
   await act(async () => { window.dispatchEvent(new Event('visibilitychange')); });
 }
+const returnEvents = ['visibilitychange', 'focus'] as const;
+async function tabEvent(event: typeof returnEvents[number], returning: boolean) {
+  if (event === 'visibilitychange') return switchVisibility(returning ? 'visible' : 'hidden');
+  await act(async () => { window.dispatchEvent(new Event(returning ? 'focus' : 'blur')); });
+}
 
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
 beforeEach(() => {
   serverPinned = false;
   readsFail = false;
   visibility = 'visible';
-  readQueries.length = 0;
+  readQueries.length = detailReads = 0;
   vi.stubEnv('NEXT_PUBLIC_API_URL', api);
   vi.spyOn(document, 'visibilityState', 'get').mockImplementation(() => visibility);
   focusManager.setFocused(undefined);
@@ -98,7 +105,8 @@ describe.each([
   { cache: 'fresh', staleTime: Infinity },
   { cache: 'stale', staleTime: 0 },
 ])('chat tab return with a $cache cache', ({ staleTime }) => {
-  it.each([true, false])('refreshes list, filtered list and detail when another tab sets pinned=%s', async (pinned) => {
+  it.each([true, false].flatMap((pinned) => returnEvents.map((event) => ({ pinned, event }))))(
+    'refreshes list, filtered list and detail when another tab sets pinned=$pinned then $event returns', async ({ pinned, event }) => {
     // Given: independent tabs have read the same account's original pin state.
     serverPinned = !pinned;
     const tabA = createTab(staleTime);
@@ -114,14 +122,14 @@ describe.each([
       expect(result.current.filtered.data?.items[0]?.pinned).toBe(!pinned);
       expect(result.current.detail.data?.me.pinned).toBe(!pinned);
     });
-    await switchVisibility('hidden');
+    await tabEvent(event, false);
     await act(async () => { await mutation.result.current.mutateAsync({ roomId: room.roomId, pinned }); });
     expect(result.current.list.data?.items[0]?.pinned).toBe(!pinned);
     expect(result.current.detail.data?.me.pinned).toBe(!pinned);
     readQueries.length = 0;
 
     // When: tab B returns, without invalidation from tab A or a page reload.
-    await switchVisibility('visible');
+    await tabEvent(event, true);
 
     // Then: all active chat surfaces expose the persisted pin or unpin value.
     await waitFor(() => {
@@ -131,6 +139,7 @@ describe.each([
     });
     expect(readQueries).toContain('');
     expect(readQueries).toContain('?roomType=team&status=active&limit=50');
+    expect(detailReads).toBe(2);
   });
 });
 
@@ -146,6 +155,8 @@ describe('chat tab return guards and errors', () => {
 
     // When: home returns while a fresh cached list exists and the API is unavailable.
     await switchVisibility('visible');
+    await tabEvent('focus', false);
+    await tabEvent('focus', true);
     await waitFor(() => expect(tab.client.isFetching()).toBe(0));
 
     // Then: the default caller keeps its successful cache and sends no forced request.
@@ -163,6 +174,7 @@ describe('chat tab return guards and errors', () => {
 
     // When: the viewer returns to the tab.
     await switchVisibility('visible');
+    await tabEvent('focus', true);
 
     // Then: protected queries remain disabled and no chat request is sent.
     expect(result.current.list.fetchStatus).toBe('idle');
@@ -172,7 +184,7 @@ describe('chat tab return guards and errors', () => {
     expect(readQueries).toEqual([]);
   });
 
-  it('exposes refetch failures without inventing a successful pin update', async () => {
+  it.each(returnEvents)('exposes %s refetch failures and restores the persisted pin only after retry', async (event) => {
     // Given: a fresh original state is cached, then the server becomes unavailable.
     const { result } = renderHook(() => ({
       list: useV1ChatRooms({ refetchOnWindowFocus: 'always' }), detail: useV1ChatRoom(room.roomId),
@@ -181,12 +193,12 @@ describe('chat tab return guards and errors', () => {
       expect(result.current.list.isSuccess).toBe(true);
       expect(result.current.detail.isSuccess).toBe(true);
     });
-    await switchVisibility('hidden');
+    await tabEvent(event, false);
     serverPinned = true;
     readsFail = true;
 
     // When: the viewer returns and the refresh fails.
-    await switchVisibility('visible');
+    await tabEvent(event, true);
 
     // Then: the actual failure is visible and the cached pin remains unchanged.
     await waitFor(() => {
@@ -197,5 +209,75 @@ describe('chat tab return guards and errors', () => {
     expect(result.current.detail.error).toMatchObject({ statusCode: 503, code: 'SERVICE_UNAVAILABLE' });
     expect(result.current.list.data?.items[0]?.pinned).toBe(false);
     expect(result.current.detail.data?.me.pinned).toBe(false);
+    readsFail = false;
+    await act(async () => { await Promise.all([result.current.list.refetch(), result.current.detail.refetch()]); });
+    await waitFor(() => {
+      expect(result.current.list.isSuccess).toBe(true);
+      expect(result.current.detail.isSuccess).toBe(true);
+      expect(result.current.list.data?.items[0]?.pinned).toBe(true);
+      expect(result.current.detail.data?.me.pinned).toBe(true);
+    });
+  });
+
+  it('does not read hidden chat documents on a window focus event', async () => {
+    const { result } = renderHook(() => ({ list: useV1ChatRooms({ refetchOnWindowFocus: 'always' }),
+      detail: useV1ChatRoom(room.roomId) }), { wrapper: createTab().wrapper });
+    await waitFor(() => expect(result.current.list.isSuccess && result.current.detail.isSuccess).toBe(true));
+    await switchVisibility('hidden');
+    readsFail = true;
+    readQueries.length = detailReads = 0;
+    await tabEvent('focus', true);
+    expect(readQueries).toEqual([]);
+    expect(detailReads).toBe(0);
+    expect(result.current.list.isSuccess && result.current.detail.isSuccess).toBe(true);
+  });
+
+  it('cleans up focus refresh on account disable and unmount before a fresh home consumer mounts', async () => {
+    const tab = createTab();
+    const chat = renderHook(({ enabled }) => ({ list: useV1ChatRooms({ enabled, refetchOnWindowFocus: 'always' }),
+      detail: useV1ChatRoom(enabled ? room.roomId : '') }), { wrapper: tab.wrapper, initialProps: { enabled: true } });
+    await waitFor(() => expect([chat.result.current.list.data?.items[0]?.pinned, chat.result.current.detail.data?.me.pinned]).toEqual([false, false]));
+    serverPinned = true;
+    await tabEvent('focus', true);
+    await waitFor(() => expect(chat.result.current.list.data?.items[0]?.pinned).toBe(true));
+    await waitFor(() => expect(tab.client.isFetching()).toBe(0));
+    chat.rerender({ enabled: false });
+    readsFail = true;
+    readQueries.length = detailReads = 0;
+    await tabEvent('focus', true);
+    expect(readQueries).toEqual([]);
+    expect(detailReads).toBe(0);
+    chat.unmount();
+    const home = renderHook(() => useV1ChatRooms(), { wrapper: tab.wrapper });
+    await tabEvent('focus', true);
+    expect(readQueries).toEqual([]);
+    expect(detailReads).toBe(0);
+    expect(home.result.current.isSuccess).toBe(true);
+    expect(home.result.current.data?.items[0]?.pinned).toBe(true);
+  });
+
+  it('does not cancel or restart the same read when visibility and window focus arrive together', async () => {
+    let release = () => {};
+    const gate = new Promise<void>((resolve) => { release = resolve; });
+    let aborted = false;
+    let hold = false;
+    server.use(http.get(`${api}/chat/rooms`, async ({ request }) => {
+      readQueries.push(new URL(request.url).search);
+      request.signal.addEventListener('abort', () => { aborted = true; });
+      if (hold) await gate;
+      return HttpResponse.json({ status: 'success', data: { items: [{ ...room, pinned: serverPinned }], nextCursor: null, pageInfo: { hasNext: false, nextCursor: null } } });
+    }));
+    const chat = renderHook(() => useV1ChatRooms({ refetchOnWindowFocus: 'always' }), { wrapper: createTab().wrapper });
+    await waitFor(() => expect(chat.result.current.data?.items[0]?.pinned).toBe(false));
+    hold = serverPinned = true;
+    readQueries.length = 0;
+    try {
+      await switchVisibility('hidden'); await switchVisibility('visible');
+      await waitFor(() => expect(readQueries).toEqual(['']));
+      await tabEvent('focus', true);
+      expect(aborted).toBe(false);
+      await act(async () => { release(); });
+      await waitFor(() => expect({ pin: chat.result.current.data?.items[0]?.pinned, error: chat.result.current.error, reads: readQueries }).toEqual({ pin: true, error: null, reads: [''] }));
+    } finally { release(); }
   });
 });

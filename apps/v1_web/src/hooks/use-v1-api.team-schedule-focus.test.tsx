@@ -96,6 +96,11 @@ async function switchVisibility(next: DocumentVisibilityState) {
   visibility = next;
   await act(async () => { window.dispatchEvent(new Event('visibilitychange')); });
 }
+const returnEvents = ['visibilitychange', 'focus'] as const;
+async function tabEvent(event: typeof returnEvents[number], returning: boolean) {
+  if (event === 'visibilitychange') return switchVisibility(returning ? 'visible' : 'hidden');
+  await act(async () => { window.dispatchEvent(new Event(returning ? 'focus' : 'blur')); });
+}
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
 beforeEach(() => {
   serverTitle = '이전 훈련'; serverGoing = false; serverVersion = 0; failure = null; lastUpdate = undefined;
@@ -113,7 +118,7 @@ afterEach(() => {
 afterAll(() => server.close());
 
 describe.each([{ cache: 'fresh', staleTime: Infinity }, { cache: 'stale', staleTime: 0 }])('schedule tab return with $cache cache', ({ staleTime }) => {
-  it('refreshes saved title and RSVP in actual detail and filtered calendar without losing navigation', async () => {
+  it.each(returnEvents)('refreshes saved title and RSVP in actual detail and filtered calendar on %s without losing navigation', async (event) => {
     const actor = createTab(staleTime);
     const mutations = renderHook(() => ({ update: useV1UpdateTeamSchedule(teamId, scheduleId),
       rsvp: useV1SetMyScheduleAttendance(teamId, scheduleId), list: useV1TeamSchedules(teamId),
@@ -130,7 +135,7 @@ describe.each([{ cache: 'fresh', staleTime: Infinity }, { cache: 'stale', staleT
     await waitFor(() => expect(calendarUi.getByText('이전 훈련')).toBeVisible());
     fireEvent.click(calendarUi.getByRole('button', { name: '15일, 일정 1건' }));
     await waitFor(() => expect(clients.every((client) => client.isFetching() === 0)).toBe(true));
-    await switchVisibility('hidden');
+    await tabEvent(event, false);
     await act(async () => {
       await mutations.result.current.update.mutateAsync({ title: '새로운 훈련', expectedVersion: 0 });
       await mutations.result.current.rsvp.mutateAsync({ status: 'GOING', expectedVersion: 0 });
@@ -142,7 +147,7 @@ describe.each([{ cache: 'fresh', staleTime: Infinity }, { cache: 'stale', staleT
     expect(detailUi.getByRole('heading', { name: '이전 훈련' })).toBeVisible();
     expect(calendarUi.getByText('이전 훈련')).toBeVisible();
     reads.length = 0;
-    await switchVisibility('visible');
+    await tabEvent(event, true);
     await waitFor(() => {
       expect(detailUi.getByRole('heading', { name: '새로운 훈련' })).toBeVisible();
       expect(detailUi.getByText('정원 1/10명')).toBeVisible();
@@ -167,6 +172,7 @@ describe('schedule focus guards and real failure lifecycle', () => {
     fireEvent.change(ui.getByRole('textbox', { name: '제목' }), { target: { value: '저장 전 초안' } });
     await switchVisibility('hidden'); serverTitle = '다른 탭 제목'; serverVersion = 1; failure = 503; reads.length = 0;
     await switchVisibility('visible');
+    await tabEvent('focus', false); await tabEvent('focus', true);
     await waitFor(() => expect(tab.client.isFetching()).toBe(0));
     expect(reads).toEqual([]);
     expect(ui.getByRole('textbox', { name: '제목' })).toHaveValue('저장 전 초안');
@@ -183,33 +189,61 @@ describe('schedule focus guards and real failure lifecycle', () => {
       useV1TeamSchedules(teamId, undefined, { enabled: false, refetchOnWindowFocus: 'always' }),
       useV1TeamSchedule(teamId, scheduleId, { enabled: false, refetchOnWindowFocus: 'always' })], { wrapper: createTab().wrapper });
     await switchVisibility('hidden'); await switchVisibility('visible');
+    await tabEvent('focus', true);
     expect(result.current.every((query) => query.fetchStatus === 'idle' && query.data === undefined)).toBe(true);
     expect(reads).toEqual([]);
   });
 
-  it.each(['list', 'detail'] as const)('shows and retries a %s focus failure despite a cached schedule', async (surface) => {
+  it.each((['list', 'detail'] as const).flatMap((surface) => returnEvents.map((event) => ({ surface, event }))))(
+    'shows and retries a $surface $event failure despite a cached schedule', async ({ surface, event }) => {
     const tab = createTab();
     const ui = within(render(surface === 'list' ? <TeamScheduleListPageClient teamId={teamId} />
       : <TeamScheduleDetailPageClient teamId={teamId} scheduleId={scheduleId} />, { wrapper: tab.wrapper }).container);
     await waitFor(() => expect(ui.getAllByText('이전 훈련').length).toBeGreaterThan(0));
     await waitFor(() => expect(tab.client.isFetching()).toBe(0));
-    await switchVisibility('hidden'); failure = 503;
-    await switchVisibility('visible');
+    await tabEvent(event, false); failure = 503;
+    await tabEvent(event, true);
     await waitFor(() => expect(ui.getByRole('alert')).toHaveTextContent('일정을 불러오지 못했어요'));
     failure = null; serverTitle = '복구 훈련';
     fireEvent.click(ui.getByRole('button', { name: '다시 시도하기' }));
     await waitFor(() => { expect(ui.queryByRole('alert')).not.toBeInTheDocument(); expect(ui.getAllByText('복구 훈련').length).toBeGreaterThan(0); });
   });
 
-  it('exposes a cached detail access revocation as the existing 404 permission exit', async () => {
+  it.each(returnEvents)('exposes a cached detail access revocation as the existing 404 permission exit on %s', async (event) => {
     const tab = createTab();
     const ui = within(render(<TeamScheduleDetailPageClient teamId={teamId} scheduleId={scheduleId} />, { wrapper: tab.wrapper }).container);
     await waitFor(() => expect(ui.getByRole('heading', { name: '이전 훈련' })).toBeVisible());
     await waitFor(() => expect(tab.client.isFetching()).toBe(0));
-    await switchVisibility('hidden'); failure = 404;
-    await switchVisibility('visible');
+    await tabEvent(event, false); failure = 404;
+    await tabEvent(event, true);
     await waitFor(() => expect(ui.getByRole('alert')).toHaveTextContent('볼 수 없는 일정이에요'));
     expect(ui.queryByRole('button', { name: '다시 시도하기' })).not.toBeInTheDocument();
     expect(ui.getByRole('link', { name: '팀 상세로 돌아가기' })).toHaveAttribute('href', `/teams/${teamId}`);
+  });
+
+  it('guards hidden reads and removes read-only listeners before a cached edit form mounts', async () => {
+    const tab = createTab();
+    const readonly = render(<><TeamScheduleListPageClient teamId={teamId} />
+      <TeamScheduleDetailPageClient teamId={teamId} scheduleId={scheduleId} /></>, { wrapper: tab.wrapper });
+    const ui = within(readonly.container);
+    await waitFor(() => expect(ui.getByRole('heading', { name: '이전 훈련' })).toBeVisible());
+    await waitFor(() => expect(tab.client.isFetching()).toBe(0));
+    await switchVisibility('hidden'); failure = 503; reads.length = 0;
+    await tabEvent('focus', true);
+    expect(reads).toEqual([]);
+    expect(ui.queryByRole('alert')).not.toBeInTheDocument();
+    failure = null; visibility = 'visible'; serverTitle = '창 복귀 훈련';
+    await tabEvent('focus', true);
+    await waitFor(() => expect(ui.getByRole('heading', { name: '창 복귀 훈련' })).toBeVisible());
+    await waitFor(() => expect(tab.client.isFetching()).toBe(0));
+    readonly.unmount();
+    const edit = within(render(<TeamScheduleFormPageClient teamId={teamId} scheduleId={scheduleId} />, { wrapper: tab.wrapper }).container);
+    await waitFor(() => expect(edit.getByRole('textbox', { name: '제목' })).toHaveValue('창 복귀 훈련'));
+    fireEvent.change(edit.getByRole('textbox', { name: '제목' }), { target: { value: '보존할 편집 초안' } });
+    failure = 503; reads.length = 0;
+    await tabEvent('focus', false); await tabEvent('focus', true);
+    expect(reads).toEqual([]);
+    expect(edit.queryByRole('alert')).not.toBeInTheDocument();
+    expect(edit.getByRole('textbox', { name: '제목' })).toHaveValue('보존할 편집 초안');
   });
 });

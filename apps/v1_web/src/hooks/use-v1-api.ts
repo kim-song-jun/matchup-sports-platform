@@ -1506,7 +1506,7 @@ function idempotencyInit(): RequestInit {
 
 // 읽기 화면만 다른 탭의 저장을 focus 재조회로 받는다. 편집폼의 초안·기준 버전은 자동 갱신하지 않는다.
 export function useV1TeamSchedules(teamId: string, filters?: ListFilters, options?: QueryOptions & { refetchOnWindowFocus?: boolean | 'always' }) {
-  return useQuery({
+  const query = useQuery({
     queryKey: v1Keys.teamSchedules(teamId, filters),
     queryFn: () => v1Get<V1TeamSchedulesPage>(`/teams/${teamId}/schedules`, filters),
     refetchOnWindowFocus: options?.refetchOnWindowFocus ?? false,
@@ -1515,15 +1515,19 @@ export function useV1TeamSchedules(teamId: string, filters?: ListFilters, option
     // 유지한 채 새 쿼리를 백그라운드에서 가져온다.
     placeholderData: keepPreviousData,
   });
+  useV1WindowFocusRefetch(query, Boolean(teamId) && (options?.enabled ?? true), options?.refetchOnWindowFocus ?? false);
+  return query;
 }
 
 export function useV1TeamSchedule(teamId: string, scheduleId: string, options?: QueryOptions & { refetchOnWindowFocus?: boolean | 'always' }) {
-  return useQuery({
+  const query = useQuery({
     queryKey: v1Keys.teamSchedule(teamId, scheduleId),
     queryFn: () => v1Get<V1TeamScheduleDetail>(`/teams/${teamId}/schedules/${scheduleId}`),
     refetchOnWindowFocus: options?.refetchOnWindowFocus ?? false,
     enabled: Boolean(teamId) && Boolean(scheduleId) && (options?.enabled ?? true),
   });
+  useV1WindowFocusRefetch(query, Boolean(teamId) && Boolean(scheduleId) && (options?.enabled ?? true), options?.refetchOnWindowFocus ?? false);
+  return query;
 }
 
 export function useV1CreateTeamSchedule(teamId: string) {

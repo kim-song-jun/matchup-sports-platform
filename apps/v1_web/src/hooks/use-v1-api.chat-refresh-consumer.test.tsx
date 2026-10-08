@@ -124,7 +124,8 @@ afterEach(() => {
 afterAll(() => server.close());
 
 describe('chat list refresh failure with cached rooms', () => {
-  it.each(['base', 'filtered', 'archived'] as const)('shows and retries a failed %s list on tab return', async (surface) => {
+  it.each((['base', 'filtered', 'archived'] as const).flatMap((surface) => ['visibilitychange', 'focus'].map((event) => ({ surface, event }))))(
+    'shows and retries a failed $surface list on $event return', async ({ surface, event }) => {
     // Given: the real consumer has loaded an ordinary, filtered or archived list.
     if (surface === 'archived') navigation.search = 'category=team_contact';
     const { container, client } = renderConsumer(<ChatListPageClient />);
@@ -133,13 +134,13 @@ describe('chat list refresh failure with cached rooms', () => {
     if (surface === 'archived') fireEvent.click(pane.getByRole('button', { name: '종료된 컨택 보기' }));
     await waitFor(() => expect(pane.getByText(surface === 'archived' ? `${room.title} 종료된 컨택` : room.title)).toBeVisible());
     await waitFor(() => expect(client.isFetching()).toBe(0));
-    await switchVisibility('hidden');
+    if (event === 'focus') await act(async () => { window.dispatchEvent(new Event('blur')); }); else await switchVisibility('hidden');
     failedSurface = surface;
     serverPinned = true;
     serverTitle = '최신 팀';
 
     // When: return refresh fails while the old room cache is still populated.
-    await switchVisibility('visible');
+    if (event === 'focus') await act(async () => { window.dispatchEvent(new Event('focus')); }); else await switchVisibility('visible');
 
     // Then: the failure and real retry action stay visible next to cached content.
     await waitFor(() => expect(pane.getByRole('alert')).toHaveTextContent('불러오지 못했어요'));
@@ -232,7 +233,7 @@ describe('chat list refresh failure with cached rooms', () => {
 });
 
 describe('chat detail refresh failure with cached messages', () => {
-  it('offers retry and restores the composer only after a successful refresh', async () => {
+  it.each(['visibilitychange', 'focus'])('offers retry and restores the composer only after a successful %s refresh', async (event) => {
     // Given: the real room consumer has loaded a message and an enabled composer.
     navigation.pathname = '/chat/room-1';
     const { container, client } = renderConsumer(<ChatRoomPageClient roomId={room.roomId} />);
@@ -247,11 +248,11 @@ describe('chat detail refresh failure with cached messages', () => {
     // jsdom has no geometry: represent a long, already scrolled cached thread.
     Object.defineProperty(thread, 'scrollHeight', { configurable: true, value: 1000 });
     thread.scrollTop = 850;
-    await switchVisibility('hidden');
+    if (event === 'focus') await act(async () => { window.dispatchEvent(new Event('blur')); }); else await switchVisibility('hidden');
     failedSurface = 'detail';
 
     // When: the room detail refresh fails after returning to the tab.
-    await switchVisibility('visible');
+    if (event === 'focus') await act(async () => { window.dispatchEvent(new Event('focus')); }); else await switchVisibility('visible');
 
     // Then: cached messages do not hide the error, and retry recovers real readiness.
     await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('채팅방을 불러오지 못했어요'));

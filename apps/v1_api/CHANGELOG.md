@@ -1,5 +1,16 @@
 # v1_api
 
+## 1.3.7
+
+### Patch Changes
+
+- b3882f5: main 에 먼저 나간 1.3.6 핫픽스(회원 탈퇴 세션 정리)의 버전을 dev 기준에 반영해요. 코드 변경은 없어요.
+- 4cf2240: 친선 경기 전적의 기록 화면에서 공개 정책을 지키며 현재 공식 결과의 점수와 득점을 읽을 수 있게 한다. 이전 공동 기록으로 점수를 대체하지 않고 기존 편집 권한과 리그·대회 이동을 유지한다.
+  공개 공식 기록을 읽을 수 없는 경우 상세 진입과 안내를 제공하고, 득점 합계와 상세 이벤트 부재를 구분한다. 알려진 피리어드를 보존해 전·후반 상대 분의 득점 순서를 정확히 표시한다.
+- b11b620: 알파 대회(리그 방식) E2E에서 나온 운영 문구·확인 창을 정리합니다: 자책골 확인 문구, 정정 확정 후 콘솔 스코어, 잠긴 명단의 등번호 칸, 접수 마감·대회 시작·완료 확인 창, 접수 마감 남은 시간·대진표 공개 경고·진행 방식 문구.
+- 55430f5: Complete withdrawal session cleanup across open connections, clear identity immediately, bound the return to login, and reconcile lost responses without discarding confirmed active sessions.
+- 72c991a: Terminate the server session cookie and client identity after a successful account withdrawal so native shells reach a usable guest login screen.
+
 ## 1.3.5
 
 ### Patch Changes

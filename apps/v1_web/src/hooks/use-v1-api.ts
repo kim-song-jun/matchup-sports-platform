@@ -8,6 +8,7 @@ import { earliestPublicLivePollDelay } from '@/lib/public-live-polling';
 import { OPERATIONS_BOARD_POLL_INTERVAL_MS } from '@/lib/operations-board-polling';
 import { v1Keys } from '@/lib/query-keys';
 import { invalidateV1ChatMessageQueries } from './use-v1-realtime-socket';
+import { useV1WindowFocusRefetch } from './use-v1-window-focus-refetch';
 import { findInListCache } from '@/lib/list-cache-seed';
 import { randomUuid } from '@/lib/uuid';
 import type { GameLineup } from '@/types/game-operations';
@@ -1503,23 +1504,30 @@ function idempotencyInit(): RequestInit {
   return { headers: { 'Idempotency-Key': randomUuid() } };
 }
 
-export function useV1TeamSchedules(teamId: string, filters?: ListFilters, options?: QueryOptions) {
-  return useQuery({
+// 읽기 화면만 다른 탭의 저장을 focus 재조회로 받는다. 편집폼의 초안·기준 버전은 자동 갱신하지 않는다.
+export function useV1TeamSchedules(teamId: string, filters?: ListFilters, options?: QueryOptions & { refetchOnWindowFocus?: boolean | 'always' }) {
+  const query = useQuery({
     queryKey: v1Keys.teamSchedules(teamId, filters),
     queryFn: () => v1Get<V1TeamSchedulesPage>(`/teams/${teamId}/schedules`, filters),
+    refetchOnWindowFocus: options?.refetchOnWindowFocus ?? false,
     enabled: Boolean(teamId) && (options?.enabled ?? true),
     // 빠른 필터 전환(종류/상태 칩)에서 화면이 매번 깜빡이지 않도록 이전 페이지 데이터를
     // 유지한 채 새 쿼리를 백그라운드에서 가져온다.
     placeholderData: keepPreviousData,
   });
+  useV1WindowFocusRefetch(query, Boolean(teamId) && (options?.enabled ?? true), options?.refetchOnWindowFocus ?? false);
+  return query;
 }
 
-export function useV1TeamSchedule(teamId: string, scheduleId: string, options?: QueryOptions) {
-  return useQuery({
+export function useV1TeamSchedule(teamId: string, scheduleId: string, options?: QueryOptions & { refetchOnWindowFocus?: boolean | 'always' }) {
+  const query = useQuery({
     queryKey: v1Keys.teamSchedule(teamId, scheduleId),
     queryFn: () => v1Get<V1TeamScheduleDetail>(`/teams/${teamId}/schedules/${scheduleId}`),
+    refetchOnWindowFocus: options?.refetchOnWindowFocus ?? false,
     enabled: Boolean(teamId) && Boolean(scheduleId) && (options?.enabled ?? true),
   });
+  useV1WindowFocusRefetch(query, Boolean(teamId) && Boolean(scheduleId) && (options?.enabled ?? true), options?.refetchOnWindowFocus ?? false);
+  return query;
 }
 
 export function useV1CreateTeamSchedule(teamId: string) {
@@ -2636,12 +2644,14 @@ export type V1ChatRoomsFilters = { roomType?: V1ChatRoom['roomType']; status?: '
  * 채팅 화면은 다른 탭의 개인 고정 변경을 받기 위해 focus 재조회를 명시한다. 홈 등 다른 소비처의 기본 정책은 유지한다.
  */
 export function useV1ChatRooms(options?: QueryOptions & { refetchOnWindowFocus?: boolean | 'always' }, filters?: V1ChatRoomsFilters) {
-  return useQuery({
+  const query = useQuery({
     queryKey: filters ? ([...v1Keys.chatRooms(), 'list', filters] as const) : v1Keys.chatRooms(),
     queryFn: () => v1Get<CursorPage<V1ChatRoom>>('/chat/rooms', filters),
     refetchOnWindowFocus: options?.refetchOnWindowFocus ?? false,
     enabled: options?.enabled ?? true,
   });
+  useV1WindowFocusRefetch(query, options?.enabled ?? true, options?.refetchOnWindowFocus ?? false);
+  return query;
 }
 
 export function useV1ChatMessages(roomId: string, filters?: ListFilters) {
@@ -2653,12 +2663,14 @@ export function useV1ChatMessages(roomId: string, filters?: ListFilters) {
 }
 
 export function useV1ChatRoom(roomId: string) {
-  return useQuery({
+  const query = useQuery({
     queryKey: v1Keys.chatRoom(roomId),
     queryFn: () => v1Get<V1ChatRoomDetail>(`/chat/rooms/${roomId}`),
     refetchOnWindowFocus: 'always',
     enabled: Boolean(roomId),
   });
+  useV1WindowFocusRefetch(query, Boolean(roomId), 'always');
+  return query;
 }
 
 export function useV1ResolveChatRoom() {

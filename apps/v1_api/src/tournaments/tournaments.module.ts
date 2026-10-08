@@ -39,6 +39,7 @@ import { RealtimeModule } from '../realtime/realtime.module';
 import { TournamentStaffAccessService } from './staff/tournament-staff-access.service';
 import { TournamentStaffGuard } from './staff/tournament-staff.guard';
 import { TournamentStaffService } from './staff/tournament-staff.service';
+import { AdminQuickResultController } from '../tournament-operations/results/admin-quick-result.controller';
 import { TournamentResultReviewController } from '../tournament-operations/results/tournament-result-review.controller';
 import { TournamentResultReviewService } from '../tournament-operations/results/tournament-result-review.service';
 // Task 24: `apps/v1_api/src/games/public-records` is fully self-contained
@@ -90,6 +91,7 @@ import { TeamCompetitionEntriesService } from './team-competition-entries.servic
     TournamentSponsorsController,
     TournamentReviewsController,
     TournamentsReadController,
+    AdminQuickResultController,
     TournamentResultReviewController,
     TournamentPeriodSettingsController,
     TeamCompetitionEntriesController,

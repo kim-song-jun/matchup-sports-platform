@@ -4,6 +4,24 @@ The authoritative schedule, attendance, reminder, guest-recruitment, personal sc
 
 The additive schedule models and constraints are frozen in the [Game aggregate schema ledger](./games.md#frozen-additive-schema-ledger).
 
+## Optional capacity and explicit clear
+
+`PATCH /api/v1/teams/:teamId/schedules/:scheduleId` accepts `UpdateScheduleDto.capacity?: number | null`:
+
+| PATCH capacity | Meaning |
+|---|---|
+| Omitted | Keep the existing capacity. |
+| `null` | Remove the cap and persist SQL NULL. |
+| Positive integer (`>= 1`) | Set the capacity. |
+
+An editor that clears an existing capacity must send `capacity: null`; omitting the field preserves the saved value. Include the current `expectedVersion` and an `Idempotency-Key` as for other schedule updates. Both the mutation response and a subsequent schedule detail read expose the cleared capacity as `null`.
+
+The existing `@Type(() => Number)` transformation preserves `null`, and `@IsOptional()` accepts it. Non-null values still require `@IsInt()` and `@Min(1)`: zero, negative values, fractions, empty strings, and non-numeric strings fail with `400 VALIDATION_ERROR`. Numeric strings retain the existing conversion to numbers.
+
+The service distinguishes omitted capacity from explicit `null` inside its versioned transaction. Removing an existing cap promotes every remaining `WAITLISTED` attendance row to `GOING` and clears its waitlist position. Increasing a cap promotes attendees into the newly available slots; decreasing it below the active `GOING` count fails with `409 SCHEDULE_CAPACITY_BELOW_GOING_COUNT` before any update is persisted.
+
+`POST` creation keeps `CreateScheduleDto.capacity?: number` unchanged: omitting capacity creates an uncapped schedule, and supplied non-null values must be positive integers.
+
 ## Task 12 implementation status: BUILT (post-review hardening applied)
 
 Every route below is implemented, CI-integration-tested (`apps/v1_api/test/team-schedules/*.integration-spec.ts`), and wired into `AppModule` via `TeamSchedulesModule`. No new migration was required — the four models and seven enums already existed (migration `20260729000100_v1_game_operations`).

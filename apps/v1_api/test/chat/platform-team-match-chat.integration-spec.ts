@@ -46,9 +46,12 @@ describe('platform team match chat with PostgreSQL', () => {
     roomId = room.id;
     expect(await prisma.v1ChatRoomParticipant.findMany({ where: { chatRoomId: roomId } }))
       .toEqual([expect.objectContaining({ userId: ids.outsider, status: 'active' })]);
+    // 대화(시스템 줄 제외)가 생기기 전에는 목록에서 숨기고, 첫 메시지 뒤에 나타난다.
+    expect((await rooms(ids.outsider).expect(200)).body.data.items)
+      .not.toContainEqual(expect.objectContaining({ roomId }));
+    await send(ids.outsider).expect(201);
     expect((await rooms(ids.outsider).expect(200)).body.data.items)
       .toContainEqual(expect.objectContaining({ roomId }));
-    await send(ids.outsider).expect(201);
     await http().post(`/api/v1/chat/rooms/${roomId}/leave`).set('x-v1-user-id', ids.outsider)
       .send({}).expect(403);
     await send(ids.a).expect(403);

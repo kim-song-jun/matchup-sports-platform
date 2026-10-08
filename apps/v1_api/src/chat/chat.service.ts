@@ -59,7 +59,7 @@ const RECIPIENT_ROOM_SELECT = {
 
 type RoomWithRelations = Prisma.V1ChatRoomGetPayload<{
   include: {
-    match: { select: { id: true; title: true } };
+    match: { select: { id: true; title: true; status: true } };
     team: { select: { id: true; name: true } };
     teamMatch: { select: { id: true; title: true; hostTeamId: true; approvedApplicantTeamId: true; platformManaged: true; createdByUserId: true } };
     teamContact: {
@@ -169,23 +169,47 @@ export class ChatService {
       });
       await archiveEndedContactRooms(this.prisma, { chatRoom: { participants: { some: { userId: user.id } } } });
     }
-    const rooms = await this.prisma.v1ChatRoom.findMany({
-      where: {
-        status: query.status ?? 'active',
-        ...(query.roomType === 'match' ? { matchId: { not: null } } : {}),
-        ...(query.roomType === 'team' ? { teamId: { not: null } } : {}),
-        ...(query.roomType === 'team_match' ? { teamMatchId: { not: null } } : {}),
-        ...(query.roomType === 'team_contact' ? { teamContactId: { not: null } } : {}),
-        participants: { some: { userId: user.id, status: 'active' } },
-        AND: [currentChatEntitlementWhere(user.id)],
-      },
+    const where: Prisma.V1ChatRoomWhereInput = {
+      status: query.status ?? 'active',
+      ...(query.roomType === 'match' ? { matchId: { not: null } } : {}),
+      ...(query.roomType === 'team' ? { teamId: { not: null } } : {}),
+      ...(query.roomType === 'team_match' ? { teamMatchId: { not: null } } : {}),
+      ...(query.roomType === 'team_contact' ? { teamContactId: { not: null } } : {}),
+      participants: { some: { userId: user.id, status: 'active' } },
+      AND: [
+        currentChatEntitlementWhere(user.id),
+        // 팀밋 주관 팀매치 방은 모집 생성 시 만들어지지만 실제 대화(시스템 줄 제외)가 생길 때까지 목록에서 숨긴다.
+        // 매치 상세의 resolve·방 진입 경로는 이 필터와 무관하다.
+        {
+          OR: [
+            { teamMatch: { is: null } },
+            { teamMatch: { platformManaged: false } },
+            { messages: { some: { status: 'sent', messageType: { not: 'system' } } } },
+          ],
+        },
+      ],
+    };
+    // lastMessageAt DESC 는 PostgreSQL 에서 NULL 을 맨 앞에 둬 빈 방이 대화 중인 방 위로 온다.
+    // Prisma 커서도 null 경계에서 행을 빠뜨릴 수 있어, 정렬 키만 가볍게 읽어 메모리에서 정렬·커서를 자른다.
+    const keys = await this.prisma.v1ChatRoom.findMany({ where, select: { id: true, lastMessageAt: true, createdAt: true } });
+    keys.sort(
+      (a, b) =>
+        (b.lastMessageAt?.getTime() ?? Number.NEGATIVE_INFINITY) - (a.lastMessageAt?.getTime() ?? Number.NEGATIVE_INFINITY) ||
+        b.createdAt.getTime() - a.createdAt.getTime() ||
+        (a.id < b.id ? 1 : -1),
+    );
+    const cursorAt = query.cursor ? keys.findIndex((key) => key.id === query.cursor) : -1;
+    // 목록에서 사라진 커서(숨김·퇴장)는 처음부터 다시 돌지 않고 끝으로 취급한다.
+    const start = !query.cursor ? 0 : cursorAt < 0 ? keys.length : cursorAt + 1;
+    const pageKeys = keys.slice(start, start + limit + 1);
+    const found = await this.prisma.v1ChatRoom.findMany({
+      where: { id: { in: pageKeys.map((key) => key.id) } },
       include: this.roomInclude(user.id),
-      orderBy: [{ lastMessageAt: 'desc' }, { createdAt: 'desc' }],
-      take: limit + 1,
-      ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
     });
+    const byId = new Map(found.map((room) => [room.id, room]));
+    const rooms = pageKeys.flatMap((key) => byId.get(key.id) ?? []);
     const pageItems = rooms.slice(0, limit);
-    const hasNext = rooms.length > limit;
+    const hasNext = keys.length > start + limit;
 
     return {
       items: await Promise.all(pageItems.map((room) => this.toRoomListItem(room, user.id))),
@@ -1018,7 +1042,7 @@ export class ChatService {
 
   private roomInclude(userId: string) {
     return {
-      match: { select: { id: true, title: true } },
+      match: { select: { id: true, title: true, status: true } },
       team: { select: { id: true, name: true } },
       teamMatch: { select: { id: true, title: true, hostTeamId: true, approvedApplicantTeamId: true, platformManaged: true, createdByUserId: true } },
       teamContact: {
@@ -1079,6 +1103,7 @@ export class ChatService {
       title: getRoomTitle(room),
       status: room.status,
       linkedTarget: getLinkedTarget(room, counterpartTeamId(teamContact)),
+      linkedTargetCancelled: room.match?.status === 'cancelled',
       teamContact,
       lastMessage: lastMessage
         ? { messageId: lastMessage.id, contentPreview: lastMessage.body.slice(0, 80), sentAt: lastMessage.sentAt }

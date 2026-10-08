@@ -355,7 +355,9 @@ fi
 # 재생성한다. 여기서 별도로 --force-recreate 를 걸면 실패 시 restore_active_release() 의
 # `up -d --no-deps v1_api v1_web`(force-recreate 없음)과 동작이 갈려, 아직 정상 동작 중인
 # 컨테이너까지 복구 경로에서 불필요하게 재생성될 위험이 생긴다.
-v1_uploads_backup_dir="$(mktemp -d)"
+# 백업은 /tmp(1GB 미만 tmpfs)가 아니라 디스크에 둔다. 업로드보다 작은 tmpfs 에 사본이 쌓여
+# 백업이 "No space left on device" 로 끊긴 적이 있다. 실패 시 이 폴더는 복구 자료로 남긴다.
+v1_uploads_backup_dir="$(mktemp -d "${HOME}/.teameet-prod-upload-backup.XXXXXX")"
 if sudo docker ps -a --format '{{.Names}}' | grep -qx 'teameet_v1_api'; then
   echo "[prod-deploy] Backing up existing v1 uploads before recreating v1_api..."
   # 실패 원인을 구분한다. 예전에는 stderr 를 버리고 모든 실패를 "업로드 디렉터리 없음"
@@ -368,7 +370,7 @@ if sudo docker ps -a --format '{{.Names}}' | grep -qx 'teameet_v1_api'; then
       echo "[prod-deploy] No existing v1 uploads directory found to back up."
       rm -f "${cp_stderr}"
     else
-      echo "[prod-deploy] 기존 업로드 백업에 실패했습니다 — 복원 없이 진행하면 유실됩니다:" >&2
+      echo "[prod-deploy] 기존 업로드 백업에 실패했습니다 — 복원 없이 진행하면 유실됩니다 (부분 백업: ${v1_uploads_backup_dir}):" >&2
       cat "${cp_stderr}" >&2
       rm -f "${cp_stderr}"
       false
@@ -387,7 +389,10 @@ if [[ -d "${v1_uploads_backup_dir}/uploads" ]]; then
   echo "[prod-deploy] Re-applying v1 upload ownership after restore..."
   "${compose[@]}" run --rm --no-deps -T v1_uploads_init
 fi
-rm -rf "${v1_uploads_backup_dir}" 2>/dev/null || true
+# docker cp 로 받은 사본은 root 소유라 sudo 없이 지우면 조용히 실패하고 배포마다 쌓인다.
+if ! sudo rm -rf "${v1_uploads_backup_dir}"; then
+  echo "[prod-deploy] WARNING: 업로드 백업 폴더를 지우지 못했습니다 — 수동 정리 필요: ${v1_uploads_backup_dir}" >&2
+fi
 
 "${compose[@]}" up -d --force-recreate --no-deps nginx
 wait_for_prod_health_contract

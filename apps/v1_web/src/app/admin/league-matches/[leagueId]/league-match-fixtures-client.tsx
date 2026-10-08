@@ -640,6 +640,12 @@ export default function LeagueMatchFixturesClient({ leagueId, returnHref = '/adm
             >
               경기 영상 관리
             </Link>
+            <Link
+              href={`/admin/league-matches/${encodeURIComponent(leagueId)}/reviews`}
+              className="inline-flex min-h-[var(--size-touch-min)] items-center rounded-xl border border-[var(--border-strong)] px-4 text-[length:var(--font-size-label)] font-semibold text-[var(--text-strong)] focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+            >
+              후기 관리
+            </Link>
             {/* 되돌리기는 completed 일 때만 의미가 있다 — draft/active 에서는 서버가
                 409 LEAGUE_NOT_COMPLETED 로 막으므로 버튼 자체를 내지 않는다. */}
             {series.state === 'completed' && (

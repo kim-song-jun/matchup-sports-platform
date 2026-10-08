@@ -55,5 +55,9 @@
   "src/tournament-operations/fields/tournament-operations-fields.service.ts": {
     "allowed": 1,
     "why": "Field operations support both canonical tournament and league fixtures; the service resolves the kind-gated tournament before field scope and fixture ownership checks."
+  },
+  "src/tournaments/tournament-reviews.service.ts": {
+    "allowed": 3,
+    "why": "QA #47: 공용 대회·리그 상세와 후기 작성 입구가 같은 V1TournamentReview/confirmed registration 계약을 사용한다. 공개 후기 조회, completed 참가 운영진 제출, 사용자 미작성 목록의 세 조회만 두 kind를 허용하며 private/deleted/completed/membership/duplicate/upload/moderation gate와 awards 분리는 유지한다."
   }
 }

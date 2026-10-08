@@ -291,7 +291,7 @@ describe('Task 12 schedule CRUD/cancel/reminders lane — TeamSchedulesService',
         authUser(ids.ownerA),
         ids.teamA,
         scheduleId,
-        { expectedVersion: 0, capacity: null } as never,
+        { expectedVersion: 0, capacity: null },
         'p1-10-uncap-key',
       );
       expect(result).toMatchObject({ capacity: null, version: 1 });

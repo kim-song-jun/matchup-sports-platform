@@ -1276,9 +1276,10 @@ export class TournamentResultReviewService {
             )?.result ?? null,
           )
         : { earlyStop: true };
-      assertPenaltyShootoutPersistable(carriedOver, policy, {
-        requireKickCounts: !inheritedFromBase,
-      });
+      // 기록할 이벤트가 없는 경기(어드민 빠른 입력)는 킥 수를 대조할 대상이 없어 요구하지 않는다.
+      const requireKickCounts =
+        !inheritedFromBase && !needsPolicy && (await this.gameHasEvents(tx, game.id));
+      assertPenaltyShootoutPersistable(carriedOver, policy, { requireKickCounts });
       return applied;
     }
     // 승계는 "무승부를 그대로 두면 브래킷이 멈추는" 픽스처에서만 한다
@@ -1299,6 +1300,10 @@ export class TournamentResultReviewService {
     // 해결 불가한 무승부로 거부된다(`assertBracketResolvable`의 동점 분기).
     assertBracketResolvable({ ...regulation, penalties: carried }, facts);
     return assertPenaltiesNotAllowed(regulation, carried, facts);
+  }
+
+  private async gameHasEvents(tx: Transaction, gameId: string): Promise<boolean> {
+    return (await tx.v1GameEvent.count({ where: { gameId } })) > 0;
   }
 
   /** Canonical tournament bracket facts live on Details, not the legacy fixture. */

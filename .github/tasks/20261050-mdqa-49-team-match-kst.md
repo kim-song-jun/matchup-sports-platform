@@ -59,3 +59,5 @@ Phase C root: 직렬 최소 검사·Changeset·committed exacthead 독립 리뷰
 
 - 2026-10-08 Phase B 완료: 실제 HTTP consumer RED 2실패/16개날짜 assertion오류 → 같은3/3 GREEN(단일worker). 공유formatter/API/타입/MSW 불변. Root 기존인증IAB E2E관리자1280×720에서 실제5feba932의 목록·상세 API가 동일한2026-10-08T11:48:00.000Z임을 확인했고 LA 임시시간대에서 목록04:48/상세20:48 실제FAIL을 재현했다. 원래Asia/Seoul에서는20:48일치. 임시override는즉시해제했다. serving SHA미노출/미확인. Root committed타입/패턴·exact-head 독립리뷰후PR게시예정.
 - 실제 alpha After 및 dev 머지는 별도 대기. 완료/삭제/자동머지 실행하지 않음. 테스트 합성 fixture와 실제 API/브라우저 증거를 구분해 원 checkout0550에 보존한다.
+
+- Root committed9/9 소비자·query GREEN 뒤 tsc가 테스트에서 개인 viewerState를 팀 상세 fixture로 spread한 계약 오류1건을 드러냈다. 실제 팀 응답의 명시적인 필드로 fixture를 구성해 escape cast 없이 수정한다. 제품 소스는 불변이며 재커밋 뒤 같은검증을 갱신한다.

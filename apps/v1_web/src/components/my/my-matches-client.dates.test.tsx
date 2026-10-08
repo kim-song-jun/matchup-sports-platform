@@ -103,7 +103,8 @@ describe('내 매치 일시 — 실제 조회 훅·카드·상세 KST 계약 (MD
 
       const personalDetail = toMatchCard(personal, getMatchDetailViewModel().match);
       const teamDetail = toTeamMatch({
-        ...personal, teamMatchId: team.teamMatchId, title: team.title, startsAt: team.startsAt,
+        id: team.teamMatchId, teamMatchId: team.teamMatchId, title: team.title, startsAt: team.startsAt,
+        sportName: team.sportName, placeName: '테스트 구장', capacityText: '0/2',
         status: 'recruiting', displayState: 'matched',
       }, getTeamMatchDetailViewModel().match);
       // 고정된 기대값으로 목록과 상세가 함께 잘못된 시간대를 쓰는 회귀도 잡는다.

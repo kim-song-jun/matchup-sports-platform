@@ -31,7 +31,7 @@ Status: In Progress
 ## Parallel Work Breakdown
 - Phase A root: before/auth 원문, managed fresh origin/dev c3dadbe, task/deps setup.
 - Phase B frontend owner: `apps/v1_web/src/app/tournaments/[id]/awards/awards-page-client.tsx` shared review gate 및 안내, `reviews/reviews-page-client.tsx` 인증 의존 소비자와 두 경로 scoped specs. 필요시 같은 도메인의 새 작은 helper/spec만 허용.
-- Forbidden: shared hooks/types/MSW/session-storage/API/DTO/schema/global shell, 다른 자동화/다른 task, Git mutation/self-commit/browser mutation/dependency install. 공유 계약 변경 필요하면 root에게 근거를 보고한다.
+- Forbidden: shared hooks(단, 후속 Phase C1의 명시된 두 private 훅은 단일 data owner)/types/MSW/session-storage/API/DTO/schema/global shell, 다른 자동화/다른 task, Git mutation/self-commit/browser mutation/dependency install. 공유 계약 변경 필요하면 root에게 근거를 보고한다.
 - Phase C root: integration·committed checks·독립 리뷰·Git/PR·기존 댓글. No merged #47 branch push.
 
 ## Acceptance Criteria
@@ -58,3 +58,6 @@ Status: In Progress
 - Primary source gate uses hasStoredV1Session; production implementation only localStorage active hint while shouldProbeV1Session permits actual cookie probe. root 조사/worker 구현·검증·리뷰·PR·댓글 pending.
 
 - 21:08KST frontend implementation: shared awards review gate uses real auth/me via shouldProbeV1Session + existing transient retry, participant and my-review must both succeed/settle before write. Reviews fixture consumer shares confirmed auth. Anonymous401/checking/503+retry/unqualified/already-written/pending my-review stay distinct, no auth/permission/API bypass. Actual HTTP source-unchanged RED2 cookie-only UI assertions -> GREEN new20+existing reviews5+awards17+team-select4=46/46. New spec deferred-response cleanup adjusted after GREEN; root committed recheck pending. Owned4 paths only; no shared hooks/types/MSW/session-storage/backend edits. Root same-tab My E2E admin -> back still wrong login hint evidence saved; participant role not proven; alpha after pending.
+
+- Phase C1 독립 Critical1 실제 확인: 앱의 staleTime60초와 실제 SPA 이메일 로그인에서 ['v1']만 제거되므로 tournament-only private 캐시에 이전 계정 참가/기작성 판정이 남았다. 서버 권한 우회 주장은 아니다. Root가 단일 frontend-data owner에게 use-v1-api.ts의 useV1MyTournamentReview/useV1TournamentParticipantCheck 두 함수만 명시적으로 승인했다. optional confirmedUserId suffix, 기존 호출자의2항목key·서버 API·prefix invalidation을 보존; root가 shared gate에 확인된 auth.user.id만 전달했다. 전역 인증/cache 재설계 없음.
+- 실제 소비자+앱 createV1QueryClient60초+EmailLoginClient HTTP로그인/identity-clear 경로에서 A→B 전환4개 source-unchanged RED4 (후기/시상 × 기존작성유무) 확인. B의 두 실제 HTTP응답이 pending인 동안 A 버튼/완료표시가 노출됐고 수정 후 B 응답·역할에 맞춰 분기한다. GREEN 4files/50: session24+awards19+reviews5+teamselect2. 이전 worker 기대17/4 split은 실제 root/worker19/2로 정정하며 총46은 같았다. 기존 awards 두 act 경고는 보존; 새 session경고없음. Root 최신dev통합·committed검증·독립full7 재리뷰·PR/댓글 pending; 실제alpha after미확인.

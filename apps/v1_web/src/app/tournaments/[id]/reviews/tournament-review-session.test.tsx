@@ -1,10 +1,14 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { EmailLoginClient } from '@/components/auth/email-login-client';
+import { v1Get } from '@/lib/api-client';
+import { createV1QueryClient } from '@/lib/query-client';
+import { v1Keys } from '@/lib/query-keys';
 import { V1_SESSION_HINT_KEY, V1_USER_ID_KEY } from '@/lib/session-storage';
-import type { V1AuthMe, V1TournamentDetail, V1TournamentFixture, V1TournamentReview } from '@/types/api';
+import type { V1AuthMe, V1AuthSessionResponse, V1TournamentDetail, V1TournamentFixture, V1TournamentReview } from '@/types/api';
 import { AwardsPageClient } from '../awards/awards-page-client';
 import { TournamentReviewsPageClient } from './reviews-page-client';
 
@@ -62,10 +66,11 @@ function failure(statusCode: number, message: string) {
     message, timestamp: '2026-10-08T00:00:00.000Z' }, { status: statusCode });
 }
 const clients: QueryClient[] = [];
-function renderPage(page: '후기' | '시상') {
-  const client = new QueryClient({ defaultOptions: { queries: { retry: false, retryDelay: 0 }, mutations: { retry: false } } });
+function renderPage(page: '후기' | '시상', client = new QueryClient({
+  defaultOptions: { queries: { retry: false, retryDelay: 0 }, mutations: { retry: false } },
+})) {
   clients.push(client);
-  render(<QueryClientProvider client={client}>
+  return render(<QueryClientProvider client={client}>
     {page === '후기' ? <TournamentReviewsPageClient tournamentId="t1" /> : <AwardsPageClient tournamentId="t1" />}
   </QueryClientProvider>);
 }
@@ -179,6 +184,89 @@ describe.each(['후기', '시상'] as const)('%s — 실제 서버 인증과 후
     renderPage(page);
     expect(await screen.findByText(page === '후기' ? '✓ 이 대회 후기를 이미 남겼어요' : '✓ 작성완료')).toBeVisible();
     expect(screen.queryByRole('button', { name: /후기 쓰기/ })).not.toBeInTheDocument();
+  });
+
+  it.each([false, true])('SPA 이메일 로그인으로 계정을 바꾸면 이전 사용자의 기작성=%s 캐시를 재사용하지 않는다', async (previouslyWritten) => {
+    // Given: 앱의 실제 60초 freshness 안에 A의 HTTP 응답과 이전 버전 키가 모두 남아 있어요.
+    const client = createV1QueryClient();
+    const nextAuth: V1AuthSessionResponse = {
+      user: { ...auth.user, id: 'user-2', email: 'second@example.test' },
+      profile: { displayName: '다음 참가자', avatarUrl: null },
+      session: { userId: 'user-2', userEmail: 'second@example.test' },
+    };
+    let activeUser = 'user-1';
+    let nextParticipantRequested = false;
+    let nextReviewRequested = false;
+    let releaseParticipant: (() => void) | undefined;
+    let releaseReview: (() => void) | undefined;
+    const participantResponse = new Promise<void>((resolve) => { releaseParticipant = resolve; });
+    const reviewResponse = new Promise<void>((resolve) => { releaseReview = resolve; });
+    server.use(
+      http.get(`${api}/auth/me`, () => ok(activeUser === 'user-1' ? auth : nextAuth)),
+      http.post(`${api}/auth/login`, ({ request }) => {
+        expect(request.credentials).toBe('include');
+        activeUser = 'user-2';
+        return ok(nextAuth);
+      }),
+      http.get(`${api}/tournaments/t1/participant-check`, async () => {
+        if (activeUser === 'user-1') return ok({ isParticipant: true });
+        nextParticipantRequested = true;
+        await participantResponse;
+        return ok({ isParticipant: previouslyWritten });
+      }),
+      http.get(`${api}/tournaments/t1/reviews/me`, async () => {
+        if (activeUser === 'user-1') return ok(previouslyWritten ? writtenReview : null);
+        nextReviewRequested = true;
+        await reviewResponse;
+        return ok(null);
+      }),
+    );
+    await client.prefetchQuery({
+      queryKey: ['tournament-participant-check', 't1'],
+      queryFn: () => v1Get<{ isParticipant: boolean }>('/tournaments/t1/participant-check'),
+    });
+    await client.prefetchQuery({
+      queryKey: ['tournament-reviews-me', 't1'],
+      queryFn: () => v1Get<V1TournamentReview | null>('/tournaments/t1/reviews/me'),
+    });
+    const firstPage = renderPage(page, client);
+    const completedHint = page === '후기' ? '✓ 이 대회 후기를 이미 남겼어요' : '✓ 작성완료';
+    if (previouslyWritten) expect(await screen.findByText(completedHint)).toBeVisible();
+    else expect(await screen.findByRole('button', { name: '+ 후기 쓰기' })).toBeVisible();
+    firstPage.unmount();
+
+    // When: 실제 로그인 소비자가 HTTP 인증 후 clearV1IdentityCache를 호출하고 같은 SPA 캐시로 돌아와요.
+    const loginPage = render(<QueryClientProvider client={client}><EmailLoginClient /></QueryClientProvider>);
+    fireEvent.change(screen.getByLabelText('이메일'), { target: { value: 'second@example.test' } });
+    fireEvent.change(screen.getByLabelText('비밀번호'), { target: { value: 'test-password' } });
+    const loginForm = screen.getByLabelText('이메일').closest('form');
+    if (loginForm === null) throw new Error('이메일 로그인 폼이 없어요.');
+    fireEvent.submit(loginForm);
+    await waitFor(() => expect(window.localStorage.getItem(V1_SESSION_HINT_KEY)).toBe('active'));
+    loginPage.unmount();
+    try {
+      renderPage(page, client);
+      await waitFor(() => expect(client.getQueryData<V1AuthMe>(v1Keys.authMe())?.user.id).toBe('user-2'));
+
+      // Then: B의 두 응답이 확인될 때까지 A의 작성 버튼이나 완료 안내를 보여주지 않아요.
+      await waitFor(() => {
+        expect(screen.getByText('후기 작성 자격을 확인하고 있어요.')).toBeVisible();
+        expect(screen.queryByRole('button', { name: /후기 쓰기/ })).not.toBeInTheDocument();
+        expect(screen.queryByText(completedHint)).not.toBeInTheDocument();
+        expect(nextParticipantRequested).toBe(true);
+        expect(nextReviewRequested).toBe(true);
+      });
+      await act(async () => { releaseParticipant?.(); });
+      expect(screen.getByText('후기 작성 자격을 확인하고 있어요.')).toBeVisible();
+      expect(screen.queryByRole('button', { name: /후기 쓰기/ })).not.toBeInTheDocument();
+      expect(screen.queryByText(completedHint)).not.toBeInTheDocument();
+    } finally {
+      releaseParticipant?.();
+      releaseReview?.();
+    }
+    if (previouslyWritten) expect(await screen.findByRole('button', { name: '+ 후기 쓰기' })).toBeVisible();
+    else expect(await screen.findByText(roleHint)).toBeVisible();
+    expect(screen.queryByText(completedHint)).not.toBeInTheDocument();
   });
 });
 

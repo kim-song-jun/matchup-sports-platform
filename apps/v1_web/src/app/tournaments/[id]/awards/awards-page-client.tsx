@@ -815,8 +815,9 @@ export function useTournamentReviewWriteGate(tournamentId: string, status: V1Tou
   const hasSession = shouldProbe && auth.isSuccess && !auth.isFetching && !!auth.data?.user;
   const isCompleted = status === 'completed';
 
-  const participant = useV1TournamentParticipantCheck(tournamentId, hasSession && isCompleted);
-  const myReview = useV1MyTournamentReview(tournamentId, hasSession && isCompleted);
+  const confirmedUserId = hasSession ? auth.data?.user.id : undefined;
+  const participant = useV1TournamentParticipantCheck(tournamentId, hasSession && isCompleted, confirmedUserId);
+  const myReview = useV1MyTournamentReview(tournamentId, hasSession && isCompleted, confirmedUserId);
   const error = shouldProbe && auth.isError && !isUnauthenticatedError(auth.error)
     ? auth.error
     : hasSession && participant.isError

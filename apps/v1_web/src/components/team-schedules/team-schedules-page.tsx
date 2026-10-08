@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useId, useState } from 'react';
+import { useId, useRef, useState } from 'react';
 import { useShellOverride } from '@/components/v1-ui/shell-override';
 import { AlertBanner, Card, EmptyState, ErrorState, ListItem, SectionTitle, TextField } from '@/components/v1-ui/primitives';
 import { Check } from 'lucide-react';
@@ -224,6 +224,7 @@ function ScheduleCalendarGrid({ model }: { model: ScheduleListViewModel }) {
 
 export function ScheduleDetailPageView({ model }: { model: ScheduleDetailViewModel }) {
   const detailId = useId();
+  const managementRef = useRef<HTMLElement>(null);
   // loading/error 상태에선 테이블 기본값(desktopHead:true)을 쓰고, success 분기만 자기
   // `.tm-desktop-page-head`를 직접 그려 제너릭 데스크톱 헤더를 꺼야 한다(§1.9 표 R3).
   // Hooks 규칙 때문에 이 호출 자체는 조건부 return보다 위, 매 렌더 항상 실행한다 — 값만
@@ -363,12 +364,6 @@ export function ScheduleDetailPageView({ model }: { model: ScheduleDetailViewMod
           <div className={`${detailStyles.details} ${hasAttendanceDetails && hasManagementDetails ? detailStyles.detailsWithAside : ''}`}>
             {hasAttendanceDetails ? (
               <div className={detailStyles.main}>
-                {model.roster ? <Card style={{ padding: 'var(--spacing-4)' }}><ScheduleRosterSummary model={model.roster} /></Card> : null}
-                {model.attendees.visible ? (
-                  <Card style={{ padding: 'var(--spacing-4)' }}>
-                    <ScheduleAttendeeSection model={model.attendees} friendlyMatch={attendance.friendlyMatch} />
-                  </Card>
-                ) : null}
                 {model.history.length > 0 ? (
                   <section aria-labelledby={`${detailId}-history`}>
                     <Card style={{ padding: 'var(--spacing-4)' }}>
@@ -381,10 +376,20 @@ export function ScheduleDetailPageView({ model }: { model: ScheduleDetailViewMod
                     </Card>
                   </section>
                 ) : null}
+                {model.roster ? <Card style={{ padding: 'var(--spacing-4)' }}><ScheduleRosterSummary model={model.roster} /></Card> : null}
+                {model.attendees.visible ? (
+                  <Card style={{ padding: 'var(--spacing-4)' }}>
+                    <ScheduleAttendeeSection
+                      model={model.attendees}
+                      friendlyMatch={attendance.friendlyMatch}
+                      onJumpToManagement={hasManagementDetails ? () => managementRef.current?.focus() : undefined}
+                    />
+                  </Card>
+                ) : null}
               </div>
             ) : null}
             {hasManagementDetails ? (
-              <aside aria-label="모집 및 운영" className={detailStyles.aside}>
+              <aside ref={managementRef} tabIndex={-1} aria-label="모집 및 운영" className={detailStyles.aside}>
                 {showsGuestRecruitment(guestRecruitment) ? (
                   <Card style={{ padding: 'var(--spacing-4)' }}><GuestRecruitmentSection model={guestRecruitment} /></Card>
                 ) : null}
@@ -548,7 +553,11 @@ const ATTENDEE_STATUS_BADGE_CLASS: Record<string, string> = {
 };
 
 /** 내 응답을 바꾸는 액션과 분리한 팀원 응답 조회예요. */
-function ScheduleAttendeeSection({ model, friendlyMatch }: { model: ScheduleDetailViewModel['attendees']; friendlyMatch: boolean }) {
+function ScheduleAttendeeSection({ model, friendlyMatch, onJumpToManagement }: {
+  readonly model: ScheduleDetailViewModel['attendees'];
+  readonly friendlyMatch: boolean;
+  readonly onJumpToManagement?: () => void;
+}) {
   const [tab, setTab] = useState<'all' | 'going' | 'no_response'>('all');
   const headingId = useId();
   if (!model.visible) return null;
@@ -571,7 +580,16 @@ function ScheduleAttendeeSection({ model, friendlyMatch }: { model: ScheduleDeta
 
   return (
     <section aria-labelledby={headingId}>
-      <div className={detailStyles.sectionHeading}><SectionTitle id={headingId} title={friendlyMatch ? '응답 현황' : '참석 현황'} compact /></div>
+      <div className={detailStyles.attendanceHeading}>
+        <SectionTitle id={headingId} title={friendlyMatch ? '응답 현황' : '참석 현황'} compact />
+        {onJumpToManagement ? (
+          <div className="tm-show-desktop">
+            <button type="button" className="tm-btn tm-btn-sm tm-btn-ghost" onClick={onJumpToManagement}>
+              모집·운영으로 바로가기
+            </button>
+          </div>
+        ) : null}
+      </div>
       <div className={detailStyles.filters} role="group" aria-label={friendlyMatch ? '응답 현황 필터' : '참석 현황 필터'}>
         <button type="button" className={`tm-chip ${detailStyles.filterButton}`} aria-pressed={tab === 'all'} onClick={() => setTab('all')}>
           전체 {model.counts.all}

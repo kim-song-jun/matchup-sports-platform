@@ -31,8 +31,17 @@
   align-content: start;
 }
 
-.sectionHeading {
+.sectionHeading,
+.attendanceHeading {
   margin-bottom: var(--spacing-3);
+}
+
+.attendanceHeading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--spacing-3);
 }
 
 .filters {
@@ -104,8 +113,13 @@
   }
 
   .detailsWithAside > .aside {
-    position: sticky;
-    /* 고정 데스크톱 내비게이션 아래에 보조 영역을 유지해요. */
-    top: calc(var(--spacing-12) + var(--spacing-8));
+    /* 긴 모집 폼·신청자는 문서와 함께 스크롤하고, 바로가기 포커스는 내비게이션 아래에 둬요. */
+    scroll-margin-top: calc(var(--spacing-12) + var(--spacing-8));
+  }
+
+  .aside:focus-visible {
+    outline: 2px solid var(--blue500);
+    outline-offset: 2px;
+    border-radius: var(--radius-container);
   }
 }

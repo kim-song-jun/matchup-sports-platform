@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import userEvent from '@testing-library/user-event';
 import { useState } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { ScheduleDetailPageView } from './team-schedules-page';
@@ -111,6 +112,7 @@ describe('일정 상세 정보 구조 — 실제 상세 뷰 소비자', () => {
     expect(within(response).getByRole('button', { name: '미정' })).toHaveAttribute('aria-pressed', 'true');
     expect(within(attendance).getByRole('button', { name: '전체 2' })).toHaveAttribute('aria-pressed', 'true');
     expect(screen.queryByRole('complementary')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '모집·운영으로 바로가기' })).not.toBeInTheDocument();
     expect(within(attendance).queryByRole('button', { name: /대신 표시/ })).not.toBeInTheDocument();
   });
 
@@ -129,5 +131,60 @@ describe('일정 상세 정보 구조 — 실제 상세 뷰 소비자', () => {
     expect(within(response).getByRole('alert')).toHaveTextContent('응답을 저장하지 못했어요.');
     expect(within(screen.getByRole('region', { name: '참석 현황' })).getByText('해당하는 팀원이 없어요.')).toBeInTheDocument();
     expect(within(screen.getByRole('region', { name: '운영 관리' })).getByRole('button', { name: '완료 처리' })).toHaveAccessibleDescription('훈련이 끝난 뒤에 완료 처리할 수 있어요.');
+  });
+
+  it('취소 사유를 많은 참석자 응답보다 먼저 읽을 수 있다', () => {
+    // Given: 취소 이력과 팀원 50명의 응답이 있는 일정이에요.
+    const model = detailModel();
+    const items = Array.from({ length: 50 }, (_, index) => ({
+      userId: index === 0 ? 'me' : `member-${index}`, nickname: `팀원 ${index}`, profileImageUrl: null, status: 'GOING' as const,
+    }));
+
+    // When: 취소된 상세를 렌더해요.
+    renderDetail({
+      ...model, state: 'CANCELLED', stateLabel: '취소됨', stateTone: 'muted',
+      history: [{ label: '일정 취소', detail: '구장 운영이 중단돼서 취소했어요.' }],
+      attendance: { ...model.attendance, disabled: true, disabledReason: '취소된 일정이에요.', counts: { going: 50, waitlisted: 0 } },
+      attendees: { ...model.attendees, items, canProxy: false, counts: { all: 50, going: 50, noResponse: 0 } },
+      manage: { ...model.manage, visible: false },
+      guestRecruitment: { ...model.guestRecruitment, visible: false, manage: undefined },
+    });
+
+    // Then: 실제 사유가 목록 앞에 있고 모든 참석자 응답은 유지돼요.
+    const history = screen.getByRole('region', { name: '변경 이력' });
+    const attendance = screen.getByRole('region', { name: '참석 현황' });
+    expect(history).toHaveTextContent('구장 운영이 중단돼서 취소했어요.');
+    expect(history.compareDocumentPosition(attendance) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(within(attendance).getAllByRole('listitem')).toHaveLength(50);
+  });
+
+  it('관리자가 대리 참석 50개를 거치지 않고 운영 영역으로 이동하고 첫 액션을 탭한다', async () => {
+    // Given: 대리 표시가 가능한 팀원 50명과 실제 모집 관리 액션이 있어요.
+    const user = userEvent.setup();
+    const model = detailModel();
+    const items = [
+      ...model.attendees.items.filter((item) => item.status === 'GOING'),
+      ...Array.from({ length: 50 }, (_, index) => ({
+        userId: `member-${index}`, nickname: `팀원 ${index}`, profileImageUrl: null, status: 'NO_RESPONSE' as const,
+      })),
+    ];
+    renderDetail({ ...model, attendees: { ...model.attendees, items, counts: { all: 51, going: 1, noResponse: 50 } } });
+    const attendance = screen.getByRole('region', { name: '참석 현황' });
+    const jump = within(attendance).getByRole('button', { name: '모집·운영으로 바로가기' });
+    const proxyButtons = within(attendance).getAllByRole('button', { name: /참석으로 대신 표시/ });
+    expect(proxyButtons).toHaveLength(50);
+    for (const proxy of proxyButtons) {
+      expect(jump.compareDocumentPosition(proxy) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    }
+    jump.focus();
+
+    // When: 바로가기 버튼을 키보드로 활성화해요.
+    await user.keyboard('{Enter}');
+
+    // Then: 실제 보조 영역이 포커스를 받고 다음 Tab은 첫 모집 액션에 닿아요.
+    const management = screen.getByRole('complementary', { name: '모집 및 운영' });
+    expect(management).toHaveFocus();
+    await user.tab();
+    expect(within(management).getByRole('button', { name: '모집 정보 수정' })).toHaveFocus();
   });
 });

@@ -1052,6 +1052,7 @@ describe('LeagueMatchAdminService.regenerateFixtures — 진행 중 경기 (W4-V
         }),
       },
       v1Sport: { findFirst: jest.fn().mockResolvedValue({ code: 'futsal' }) },
+      v1TournamentSlot: { count: jest.fn().mockResolvedValue(0) },
       v1CompetitionConfigVersion: {
         findFirst: jest.fn().mockResolvedValue({ id: 'config-1' }),
         findUnique: jest.fn().mockResolvedValue({ periods: [] }),

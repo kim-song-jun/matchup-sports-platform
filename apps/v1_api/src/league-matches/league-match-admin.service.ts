@@ -1068,6 +1068,7 @@ export class LeagueMatchAdminService {
   // removeTeam()(그룹 B 감사 결함 1)으로 로스터를 먼저 바꾼 뒤 이 메서드를 호출하면 새
   // 로스터가 반영된다. 즉 "시즌 중 팀 교체"의 실제 운영 흐름은 addTeam/removeTeam으로
   // 로스터를 고치고 → regenerateFixtures로 대진표를 새 로스터에 맞게 다시 만드는 두 단계다.
+  // 자리가 있는 리그는 409 LEAGUE_SLOT_FIXTURES_USE_TEMPLATE — 템플릿 교체(replaceExisting)로 단일화한다.
   async regenerateFixtures(user: V1AuthUser, leagueId: string, dto: RegenerateLeagueFixturesDto) {
     const admin = await this.adminContext.getMutationAdmin(user.id);
     const league = await this.loadLeague(leagueId);
@@ -1090,6 +1091,13 @@ export class LeagueMatchAdminService {
     const result = await this.prisma.$transaction(async (tx) => {
       await tx.$queryRaw`SELECT id FROM "v1_tournaments" WHERE id = ${leagueId} FOR UPDATE`;
       await assertLeagueFixtureGenerationAllowedInTx(tx, leagueId);
+      // 자리로 만든 대진은 템플릿 교체로만 다시 만든다 — 팀 목록 기반 재생성이 자리 대진 위에 섞이지 않게.
+      if ((await tx.v1TournamentSlot.count({ where: { tournamentId: leagueId } })) > 0) {
+        throw new ConflictException({
+          code: 'LEAGUE_SLOT_FIXTURES_USE_TEMPLATE',
+          message: '자리로 만든 대진은 다시 만들 수 없어요. 대진 템플릿으로 바꿔 주세요.',
+        });
+      }
       const existingFixtures = await tx.v1TeamMatch.findMany({
         where: { leagueId },
         select: {

@@ -84,4 +84,46 @@ describe('리그 경기 취소 — 빈 경기·자리 연결', () => {
     const again = await cancel(leagueId, teamMatchId);
     expect(again.body.data).toMatchObject({ alreadyProcessed: true });
   });
+
+  describe('재생성', () => {
+    const regenerate = (leagueId: string) =>
+      request(app.getHttpServer())
+        .post(`/api/v1/admin/league-matches/${leagueId}/fixtures/regenerate`)
+        .set('x-v1-user-id', h.adminUserId)
+        .send({
+          weeksCount: 1,
+          reason: '재생성',
+          schedule: {
+            dates: [new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Seoul' }).format(new Date(Date.now() + 10 * 86_400_000))],
+            time: '19:00',
+          },
+        });
+
+    it('자리가 있는 리그는 409 LEAGUE_SLOT_FIXTURES_USE_TEMPLATE 이고 기존 경기를 취소하지 않는다', async () => {
+      const teamA = await h.makeTeam('lscr-r1');
+      const teamB = await h.makeTeam('lscr-r2');
+      const leagueId = await h.makeLeague({ teams: [teamA, teamB] });
+      const [s1, s2] = await h.makeSlots(leagueId, 2);
+      const teamMatchId = await h.createFixture(leagueId, { homeTeamId: teamA.id, awayTeamId: teamB.id, homeSlotId: s1.id, awaySlotId: s2.id });
+
+      const res = await regenerate(leagueId);
+
+      expect(res.status).toBe(409);
+      expect(res.body.code).toBe('LEAGUE_SLOT_FIXTURES_USE_TEMPLATE');
+      expect((await h.prisma.v1TeamMatch.findUniqueOrThrow({ where: { id: teamMatchId } })).status).toBe('matched');
+    });
+
+    it('대조군: 자리가 없는 일반 리그의 재생성은 그대로 동작한다', async () => {
+      const teamA = await h.makeTeam('lscr-r3');
+      const teamB = await h.makeTeam('lscr-r4');
+      const leagueId = await h.makeLeague({ teams: [teamA, teamB] });
+      const teamMatchId = await h.createFixture(leagueId, { homeTeamId: teamA.id, awayTeamId: teamB.id });
+
+      const res = await regenerate(leagueId);
+
+      expect(res.status).toBe(201);
+      expect((await h.prisma.v1TeamMatch.findUniqueOrThrow({ where: { id: teamMatchId } })).status).toBe('cancelled');
+      expect(await h.prisma.v1TeamMatch.count({ where: { leagueId, status: 'matched' } })).toBe(1);
+    });
+  });
 });

@@ -382,7 +382,12 @@ export function ScheduleDetailPageView({ model }: { model: ScheduleDetailViewMod
                     <ScheduleAttendeeSection
                       model={model.attendees}
                       friendlyMatch={attendance.friendlyMatch}
-                      onJumpToManagement={hasManagementDetails ? () => managementRef.current?.focus() : undefined}
+                      onJumpToManagement={hasManagementDetails ? () => {
+                        const target = managementRef.current;
+                        // 긴 보조 영역도 제목부터 보이도록 포커스 자동 스크롤과 시작점 이동을 나눠요.
+                        target?.focus({ preventScroll: true });
+                        target?.scrollIntoView({ block: 'start', inline: 'nearest', behavior: 'instant' });
+                      } : undefined}
                     />
                   </Card>
                 ) : null}

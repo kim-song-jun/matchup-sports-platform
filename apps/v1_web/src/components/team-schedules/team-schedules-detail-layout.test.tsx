@@ -176,14 +176,20 @@ describe('일정 상세 정보 구조 — 실제 상세 뷰 소비자', () => {
     for (const proxy of proxyButtons) {
       expect(jump.compareDocumentPosition(proxy) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     }
+    const management = screen.getByRole('complementary', { name: '모집 및 운영' });
+    const focus = vi.spyOn(management, 'focus');
+    // jsdom에 없는 스크롤 API만 이 요소 경계에서 관측하고, 실제 위치는 alpha에서 검증해요.
+    const scrollIntoView = vi.fn<HTMLElement['scrollIntoView']>();
+    management.scrollIntoView = scrollIntoView;
     jump.focus();
 
     // When: 바로가기 버튼을 키보드로 활성화해요.
     await user.keyboard('{Enter}');
 
     // Then: 실제 보조 영역이 포커스를 받고 다음 Tab은 첫 모집 액션에 닿아요.
-    const management = screen.getByRole('complementary', { name: '모집 및 운영' });
     expect(management).toHaveFocus();
+    expect(focus).toHaveBeenCalledWith({ preventScroll: true });
+    expect(scrollIntoView).toHaveBeenCalledExactlyOnceWith({ block: 'start', inline: 'nearest', behavior: 'instant' });
     await user.tab();
     expect(within(management).getByRole('button', { name: '모집 정보 수정' })).toHaveFocus();
   });

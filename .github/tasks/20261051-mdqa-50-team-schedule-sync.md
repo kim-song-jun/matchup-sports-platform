@@ -64,3 +64,5 @@ Status: In Progress
 - 명령(apps/v1_web 기준): bundled node.exe node_modules/vitest/vitest.mjs run src/hooks/use-v1-api.team-schedule-focus.test.tsx --maxWorkers=1 --no-file-parallelism --reporter=verbose. RED/GREEN 원문: tmp/qa/mdqa-50-team-schedule-red-20261008.txt, tmp/qa/mdqa-50-team-schedule-green-20261008.txt.
 - preflight RED CPU43%/free10.79GiB/Node62/browser10/Docker0, GREEN CPU37%/free10.98GiB/Node64/browser10/Docker0. 테스트 프로세스 종료 후 serial slot 반환. touched hook 구간·신규 test의 TODO/FIXME/HACK/XXX 없음.
 - 기존 제한: 실제 편집폼의 TextField action prop이 input으로 spread되어 React 경고가 출력된다(primitives.tsx); 이번 소유 범위 밖이며 억제하지 않았다. root의 type/pattern·committed scope·Changeset·독립 리뷰·dev PR·alpha 실측은 아직 대기 중이다. 이 로컬 결과만으로 alpha 해소를 선언하지 않는다.
+- Root 18:00–18:04 KST: 명시5경로 commit8b94e5592 후 dev9edd47d를 무충돌 통합한 eb96dc3c3에서 committed 신규7+기존 일정29=36/36 PASS, 웹 TypeScript·기존 패턴 게이트 PASS. 최초 dirty hook의 dev 통합은 Git이 안전하게 거부했고 변경을 보존한 채 scoped commit 후 통합했다. 공유 chat 변경은 dev 그대로 보존됐다.
+- Changeset·모든 import·committed5파일 범위·diff --check 확인 완료. exact final head 독립 리뷰와 PR 게시·tracker 댓글·수정 SHA 배포 후 alpha 실측은 후속 단계다. 코드 검증은 alpha 해결 PASS를 뜻하지 않는다.

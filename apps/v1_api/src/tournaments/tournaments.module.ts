@@ -15,6 +15,8 @@ import { AdminRegistrationsController } from './admin-registrations.controller';
 import { AdminRegistrationsService } from './admin-registrations.service';
 import { TournamentBracketController } from './tournament-bracket.controller';
 import { TournamentBracketService } from './tournament-bracket.service';
+import { BracketTemplateController } from './templates/bracket-template.controller';
+import { BracketTemplateService } from './templates/bracket-template.service';
 import { LeagueFixtureGeneratorService } from './league-fixture-generator.service';
 import { TournamentPlayersController, TournamentPlayersAdminController } from './tournament-players.controller';
 import { TournamentPlayersService } from './tournament-players.service';
@@ -83,6 +85,7 @@ import { TeamCompetitionEntriesService } from './team-competition-entries.servic
     MockTournamentSeedController,
     AdminRegistrationsController,
     TournamentBracketController,
+    BracketTemplateController,
     TournamentPlayersController,
     TournamentPlayersAdminController,
     TournamentRegistrationsController,
@@ -100,6 +103,7 @@ import { TeamCompetitionEntriesService } from './team-competition-entries.servic
     TournamentRegistrationsService,
     AdminRegistrationsService,
     TournamentBracketService,
+    BracketTemplateService,
     LeagueFixtureGeneratorService,
     TournamentPlayersService,
     TournamentsReadService,

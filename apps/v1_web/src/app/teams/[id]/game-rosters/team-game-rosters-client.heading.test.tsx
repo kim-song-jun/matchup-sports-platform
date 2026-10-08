@@ -8,9 +8,11 @@ import { setupServer } from 'msw/node';
 import postcss from 'postcss';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AppShellFrame } from '@/components/v1-ui/app-shell-frame';
+import { EmptyState } from '@/components/v1-ui/primitives';
 import { __resetNavigationHistoryForTests } from '@/lib/navigation-history';
 import { createV1GameRosterMswHandlers, GAME_ROSTER_MSW } from '@/test/msw/game-roster-handlers';
 import { TeamGameRostersClient } from './team-game-rosters-client';
+import rosterStyles from './team-game-rosters.module.css';
 
 const navigation = vi.hoisted(() => ({ replace: vi.fn(), back: vi.fn(), push: vi.fn() }));
 vi.mock('next/navigation', () => ({
@@ -24,9 +26,12 @@ const TEAM_NAME = '현재 경로의 합성 팀';
 const PAGE_TITLE = '경기 명단 관리';
 const NOW = '2026-10-01T00:00:00.000Z';
 const mobileListCss = postcss.parse(readFileSync(resolve('src/app/globals.css'), 'utf8')).nodes
-  .filter((node) => node.type === 'rule' && node.selector === '.tm-team-list')
+  .filter((node) => node.type === 'rule' && ['.tm-team-list', '.tm-empty-state'].includes(node.selector))
   .map((node) => node.toString()).join('\n');
-const desktopCss = `${mobileListCss}\n${readFileSync(resolve('src/app/desktop/_shell.css'), 'utf8')}\n${readFileSync(resolve('src/app/desktop/teams.css'), 'utf8')}`;
+// Vitest의 css:false 대신 실제 module 원문을 실제 export 클래스에 연결해 규칙을 적용한다.
+const rosterCss = postcss.parse(readFileSync(resolve('src/app/teams/[id]/game-rosters/team-game-rosters.module.css'), 'utf8'));
+rosterCss.walkRules((rule) => { rule.selector = rule.selector.replace(/\.body\b/g, `.${rosterStyles.body}`); });
+const desktopCss = `${mobileListCss}\n${readFileSync(resolve('src/app/desktop/_shell.css'), 'utf8')}\n${readFileSync(resolve('src/app/desktop/teams.css'), 'utf8')}\n${rosterCss.toString()}`;
 const clients: QueryClient[] = [];
 let mock: ReturnType<typeof createV1GameRosterMswHandlers>;
 let server: ReturnType<typeof setupServer>;
@@ -141,6 +146,32 @@ function serializedParagraph(text: string) {
 }
 
 describe('QA51 실제 route consumer·셸·CSS의 명단 관리 맥락', () => {
+  it.each([390, 768, 1188, 1440])('%spx 빈 명단은 공유 빈 상태의 세로 간격과 너비를 보존한다', async (width) => {
+    emptyRoster();
+    renderAtWidth(width);
+    const empty = (await screen.findByText('다가오는 대회·리그 경기가 없어요')).closest('.tm-empty-state');
+    render(<EmptyState title="공유 빈 상태 기준" sub="기본 빈 상태 간격을 비교해요." />);
+    const reference = screen.getByText('공유 빈 상태 기준').closest('.tm-empty-state');
+    if (!empty || !reference) throw new Error('실제 소비자 또는 공유 빈 상태가 없어요.');
+    expect(empty).toBeVisible();
+    // 실제 원본 CSS와 공유 primitive의 계산된 속성을 비교한다. 좌표나 가짜 크기를 넣지 않는다.
+    const actualStyle = getComputedStyle(empty);
+    const referenceStyle = getComputedStyle(reference);
+    expect({
+      paddingTop: actualStyle.paddingTop,
+      paddingBottom: actualStyle.paddingBottom,
+      maxWidth: actualStyle.maxWidth,
+      marginLeft: actualStyle.marginLeft,
+      marginRight: actualStyle.marginRight,
+    }).toEqual({
+      paddingTop: referenceStyle.paddingTop,
+      paddingBottom: referenceStyle.paddingBottom,
+      maxWidth: referenceStyle.maxWidth,
+      marginLeft: referenceStyle.marginLeft,
+      marginRight: referenceStyle.marginRight,
+    });
+  });
+
   it.each([390, 768, 1188, 1440])('%spx 명단 본문 좌우 여백은 모바일 토큰과 데스크톱 헤더 기준을 따른다', async (width) => {
     renderAtWidth(width);
     await screen.findByRole('group', { name: '김민재 경기별 출전' });

@@ -30,6 +30,7 @@ import {
   toggleCell,
   type TeamRosterDraft,
 } from '@/components/game-roster/game-roster-matrix-draft';
+import styles from './team-game-rosters.module.css';
 
 type Notice = { tone: 'info' | 'error'; message: string };
 
@@ -104,7 +105,7 @@ export function TeamGameRostersClient({ teamId }: { teamId: string }) {
     <>
     {pageHeader}
     <div
-      className="tm-team-list"
+      className={styles.body}
       style={{
         display: 'flex',
         flexDirection: 'column',

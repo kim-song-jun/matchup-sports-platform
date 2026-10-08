@@ -1,0 +1,9 @@
+.body {
+  padding-inline: var(--v1-shell-page-x);
+}
+
+@media (min-width: 1024px) {
+  .body {
+    padding-inline: 0;
+  }
+}

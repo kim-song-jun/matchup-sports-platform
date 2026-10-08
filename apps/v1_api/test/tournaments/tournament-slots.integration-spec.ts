@@ -6,6 +6,9 @@ import { OperationAuditWriterService } from '../../src/common/audit/operation-au
 import { GamesService } from '../../src/games/games.service';
 import { GameTakeoverService } from '../../src/games/game-takeover.service';
 import { BracketTemplateService } from '../../src/tournaments/templates/bracket-template.service';
+import { AdminRegistrationsService } from '../../src/tournaments/admin-registrations.service';
+import { TournamentRegistrationsService } from '../../src/tournaments/tournament-registrations.service';
+import type { NotificationsService } from '../../src/notifications/notifications.service';
 import { TournamentBracketService } from '../../src/tournaments/tournament-bracket.service';
 import { assignSlotInTx, assignSlotsBatchInTx, TournamentSlotService, type SlotMutationContext } from '../../src/tournaments/slots/tournament-slot.service';
 import { competitionConfigFixture as ids, seedCompetitionConfigFixture } from '../fixtures/competition-config.fixture';
@@ -18,6 +21,11 @@ const games = new GamesService(prisma, new OperationAuditWriterService(), new Ga
 const templates = new BracketTemplateService(prisma, adminContext, games);
 const slots = new TournamentSlotService(prisma, adminContext, games);
 const bracket = new TournamentBracketService(prisma, adminContext, games);
+// 팀이 보내는 취소 요청(`cancelRequest`)은 prisma 만 쓴다 — 알림·약관 의존성은 이 경로에서 불리지 않는다.
+const registrations = new TournamentRegistrationsService(prisma, {} as never, {} as never);
+const adminRegistrations = new AdminRegistrationsService(
+  prisma, adminContext, { emitNotification: async () => undefined } as unknown as NotificationsService, slots,
+);
 
 const slotAt = (tournamentId: string, position: number, kind: 'ENTRY' | 'BYE' = 'ENTRY') =>
   prisma.v1TournamentSlot.findFirstOrThrow({ where: { tournamentId, kind, position } });
@@ -385,6 +393,114 @@ describe('자리 배정 (PostgreSQL)', () => {
       });
       await expect(slots.randomFill(user, league.id)).rejects.toMatchObject({ response: { code: 'SLOT_LEAGUE_NOT_SUPPORTED_YET' } });
       await expect(slots.randomFill(user, '00000000-0000-4000-8000-00000000dead')).rejects.toMatchObject({ response: { code: 'TOURNAMENT_NOT_FOUND' } });
+    });
+  });
+  describe('등록이 확정을 벗어나면 자리가 비워진다', () => {
+    it('어드민 취소 → 그 팀의 자리와 경기 사이드가 비워지고 다른 팀의 자리는 그대로(대조군)', async () => {
+      const { tournamentId, registrationIds } = await seedBracketTournament(prisma, { label: 'rel-ko', format: 'knockout', teamCount: 2 });
+      await templates.apply(user, tournamentId, { kind: 'knockout', size: 8, thirdPlace: false });
+      const [slot1, slot2] = [await slotAt(tournamentId, 1), await slotAt(tournamentId, 2)];
+      await slots.assignSlot(user, slot1.id, registrationIds[0]);
+      await slots.assignSlot(user, slot2.id, registrationIds[1]);
+
+      await adminRegistrations.cancel(user, registrationIds[0], {});
+
+      expect((await prisma.v1TournamentSlot.findUniqueOrThrow({ where: { id: slot1.id } })).registrationId).toBeNull();
+      expect((await prisma.v1TournamentSlot.findUniqueOrThrow({ where: { id: slot2.id } })).registrationId).toBe(registrationIds[1]);
+      expect((await fixturesUsing(slot1.id))[0].hostTeamId).toBeNull();
+      expect((await prisma.v1TournamentRegistration.findUniqueOrThrow({ where: { id: registrationIds[0] } })).status).toBe('cancelled');
+    });
+
+    it('시작된 경기가 있으면 자리를 그대로 둔다 — 등록은 취소된다', async () => {
+      const { tournamentId, registrationIds, teamIds } = await seedBracketTournament(prisma, { label: 'rel-started', format: 'knockout', teamCount: 1 });
+      await templates.apply(user, tournamentId, { kind: 'knockout', size: 8, thirdPlace: false });
+      const slot1 = await slotAt(tournamentId, 1);
+      await slots.assignSlot(user, slot1.id, registrationIds[0]);
+      const [fixture] = await fixturesUsing(slot1.id);
+      await prisma.v1Game.update({ where: { teamMatchId: fixture.id }, data: { state: 'LIVE' } });
+
+      await adminRegistrations.cancel(user, registrationIds[0], {});
+
+      expect((await prisma.v1TournamentSlot.findUniqueOrThrow({ where: { id: slot1.id } })).registrationId).toBe(registrationIds[0]);
+      expect((await fixturesUsing(slot1.id))[0].hostTeamId).toBe(teamIds[0]);
+      expect((await prisma.v1TournamentRegistration.findUniqueOrThrow({ where: { id: registrationIds[0] } })).status).toBe('cancelled');
+    });
+
+    it('자리에 없던 팀의 취소는 아무 자리도 건드리지 않는다 (기존 동작)', async () => {
+      const { tournamentId, registrationIds } = await leagueOf4('rel-unplaced');
+      await slots.assignSlot(user, (await slotAt(tournamentId, 1)).id, registrationIds[0]);
+      await adminRegistrations.cancel(user, registrationIds[3], {});
+      expect(await placedBySlot(tournamentId)).toEqual([registrationIds[0]]);
+    });
+
+    it('보류(on_hold) 리그의 참가 거부도 막히지 않는다 — 해제는 잠금만 잡는다', async () => {
+      const league = await prisma.v1Tournament.create({
+        data: { sportId: ids.soccerSportId, title: 'rel-hold', status: 'on_hold', kind: 'regular_league', competitionConfigVersionId: '11111111-1111-4111-8111-111111111111' },
+      });
+      const team = await prisma.v1Team.create({ data: { ownerUserId: ids.adminUserId, sportId: ids.soccerSportId, regionId: ids.regionId, name: 'rel-hold 팀' } });
+      const registration = await prisma.v1TournamentRegistration.create({
+        data: { tournamentId: league.id, teamId: team.id, appliedByUserId: ids.adminUserId, status: 'confirmed' },
+      });
+      await expect(adminRegistrations.cancel(user, registration.id, { reason: '운영 사유' })).resolves.toMatchObject({ status: 'cancelled' });
+    });
+  });
+
+  describe('팀의 취소 요청은 자리를 비우지 않고, 운영자 승인 때 판정한다', () => {
+    const teamIdOf = async (registrationId: string) =>
+      (await prisma.v1TournamentRegistration.findUniqueOrThrow({ where: { id: registrationId }, select: { teamId: true } })).teamId;
+
+    // 팀 매니저 권한(`assertTeamManager`)을 갖춘 뒤 실제 `cancelRequest` 를 부른다 — 상태를 prisma 로 직접 바꾸지 않는다.
+    const teamRequestsCancel = async (tournamentId: string, registrationId: string) => {
+      await prisma.v1TeamMembership.create({ data: { teamId: await teamIdOf(registrationId), userId: ids.adminUserId, role: 'owner', status: 'active' } });
+      await registrations.cancelRequest(user, tournamentId, registrationId, {});
+    };
+
+    it('요청만으로는 자리와 경기 사이드가 그대로다 — 등록만 cancel_requested', async () => {
+      const { tournamentId, registrationIds, teamIds } = await seedBracketTournament(prisma, { label: 'req-keep', format: 'knockout', teamCount: 1 });
+      await templates.apply(user, tournamentId, { kind: 'knockout', size: 8, thirdPlace: false });
+      const slot1 = await slotAt(tournamentId, 1);
+      await slots.assignSlot(user, slot1.id, registrationIds[0]);
+
+      await teamRequestsCancel(tournamentId, registrationIds[0]);
+
+      expect((await prisma.v1TournamentRegistration.findUniqueOrThrow({ where: { id: registrationIds[0] } })).status).toBe('cancel_requested');
+      expect((await prisma.v1TournamentSlot.findUniqueOrThrow({ where: { id: slot1.id } })).registrationId).toBe(registrationIds[0]);
+      expect((await fixturesUsing(slot1.id))[0].hostTeamId).toBe(teamIds[0]);
+    });
+
+    it('승인 — 자리를 쓰는 경기가 모두 시작 전이면 자리·사이드·조 편성이 비워진다', async () => {
+      const { tournamentId, registrationIds } = await leagueOf4('req-approve');
+      const slot1 = await slotAt(tournamentId, 1);
+      await slots.assignSlot(user, slot1.id, registrationIds[0]);
+      await teamRequestsCancel(tournamentId, registrationIds[0]);
+
+      await adminRegistrations.cancel(user, registrationIds[0], {});
+
+      const using = await fixturesUsing(slot1.id);
+      expect(using.length).toBeGreaterThan(1); // 리그 자리는 여러 경기에 걸쳐 있다 — 하나만 검사하면 반쪽이다
+      for (const fixture of using) expect(fixture.homeSlotId === slot1.id ? fixture.hostTeamId : fixture.approvedApplicantTeamId).toBeNull();
+      expect((await prisma.v1TournamentSlot.findUniqueOrThrow({ where: { id: slot1.id } })).registrationId).toBeNull();
+      expect(await prisma.v1TournamentGroupTeam.count({ where: { group: { tournamentId } } })).toBe(0);
+      expect((await prisma.v1TournamentRegistration.findUniqueOrThrow({ where: { id: registrationIds[0] } })).status).toBe('cancelled');
+    });
+
+    it('승인 — 자리를 쓰는 경기 중 하나라도 이미 시작됐으면 자리·사이드·조 편성을 그대로 두고 등록만 취소된다', async () => {
+      const { tournamentId, registrationIds } = await leagueOf4('req-approve-started');
+      const slot1 = await slotAt(tournamentId, 1);
+      await slots.assignSlot(user, slot1.id, registrationIds[0]);
+      const teamId = await teamIdOf(registrationIds[0]);
+      const using = await fixturesUsing(slot1.id);
+      expect(using.length).toBeGreaterThan(1);
+      // 첫 경기가 아니라 마지막 경기를 시작시킨다 — "첫 경기만 본다"는 구현이 통과하지 못하게.
+      await prisma.v1Game.update({ where: { teamMatchId: using[using.length - 1].id }, data: { state: 'LIVE' } });
+      await teamRequestsCancel(tournamentId, registrationIds[0]);
+
+      await adminRegistrations.cancel(user, registrationIds[0], {});
+
+      expect((await prisma.v1TournamentSlot.findUniqueOrThrow({ where: { id: slot1.id } })).registrationId).toBe(registrationIds[0]);
+      for (const fixture of await fixturesUsing(slot1.id)) expect(fixture.homeSlotId === slot1.id ? fixture.hostTeamId : fixture.approvedApplicantTeamId).toBe(teamId);
+      expect(await prisma.v1TournamentGroupTeam.count({ where: { group: { tournamentId }, registrationId: registrationIds[0] } })).toBe(1);
+      expect((await prisma.v1TournamentRegistration.findUniqueOrThrow({ where: { id: registrationIds[0] } })).status).toBe('cancelled');
     });
   });
 });

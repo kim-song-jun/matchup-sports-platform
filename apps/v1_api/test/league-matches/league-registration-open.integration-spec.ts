@@ -231,6 +231,7 @@ describe('리그 참가 신청 — 대회 스택 재사용', () => {
       prisma,
       new AdminContextService(prisma),
       { emitNotification: jest.fn() } as never,
+      { releaseForRegistrationInTx: jest.fn() } as never,
     );
 
     // 이미 2팀이 confirmed 다. 8번째·9번째·10번째를 신청 → 확정까지 태운다.
@@ -382,6 +383,7 @@ describe('리그 참가 신청 — 대회 스택 재사용', () => {
       prisma,
       new AdminContextService(prisma),
       { emitNotification: jest.fn() } as never,
+      { releaseForRegistrationInTx: jest.fn() } as never,
     );
 
     // 확정된 등록 하나에만 자동 확정 표식을 남긴다 — 잡이 하는 것과 같은 raw UPDATE.

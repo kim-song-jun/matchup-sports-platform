@@ -10,9 +10,9 @@ import { assignTournamentFixtureSideInTx, releaseUnusedGroupTeamsInTx } from '..
 import { adminBracketSlotInclude, serializeAdminBracketSlot } from './admin-bracket-view';
 import { ALL_COMPETITION_KINDS, findTournamentOnSurface } from '../tournament-surface-lookup';
 import { syncByeSlotInTx } from './bye-slot-sync';
-import { lockCompetitionForBracketMutationInTx } from './competition-bracket-lock';
+import { lockCompetitionForBracketMutationInTx, lockCompetitionForSlotReleaseInTx } from './competition-bracket-lock';
 import { pickRandomAssignments } from './random-assignment';
-import { assertSlotFixturesNotStarted, loadSlotUsingFixtures, sidesUsingSlot } from './slot-fixtures';
+import { assertSlotFixturesNotStarted, isSlotFixtureStarted, loadSlotUsingFixtures, sidesUsingSlot } from './slot-fixtures';
 
 type Tx = Prisma.TransactionClient;
 
@@ -199,6 +199,40 @@ export async function assignSlotsBatchInTx(
   return [...affected].sort();
 }
 
+/**
+ * 등록이 `confirmed` 를 벗어나는 전이가 부른다. 그 팀이 들어간 자리를 비우되, 시작된 경기를 쓰는 자리는
+ * 기록을 지키려고 그대로 둔다. 잠금은 보류 리그도 통과하는 해제용 변형이다.
+ */
+export async function releaseSlotsForRegistrationInTx(
+  tx: Tx,
+  ctx: SlotMutationContext,
+  registrationId: string,
+): Promise<void> {
+  const registration = await tx.v1TournamentRegistration.findUnique({ where: { id: registrationId }, select: { tournamentId: true } });
+  if (registration === null) return;
+  const competition = await findTournamentOnSurface(tx, ALL_COMPETITION_KINDS, {
+    where: { id: registration.tournamentId },
+    select: { id: true, kind: true },
+  });
+  if (competition === null) return;
+  // 자리가 있는지 먼저 보고 잠금을 건너뛰면 안 된다 — 동시에 자리를 넣는 트랜잭션이 아직 이 등록을 confirmed 로 읽을 수 있다.
+  await lockCompetitionForSlotReleaseInTx(tx, competition);
+  const held = await tx.v1TournamentSlot.findMany({
+    where: { tournamentId: competition.id, registrationId },
+    select: { id: true },
+    orderBy: { id: 'asc' },
+  });
+  if (held.length === 0) return;
+  const fixtures = await loadSlotUsingFixtures(tx, held.map((slot) => slot.id));
+  const releases: GroupTeamRelease[] = [];
+  for (const slot of held) {
+    const using = fixtures.filter((fixture) => fixture.homeSlotId === slot.id || fixture.awaySlotId === slot.id);
+    if (using.some(isSlotFixtureStarted)) continue;
+    await assignSlotCore(tx, ctx, slot.id, null, releases);
+  }
+  await releaseGroupTeams(tx, ctx, competition.id, releases);
+}
+
 @Injectable()
 export class TournamentSlotService {
   constructor(
@@ -220,6 +254,11 @@ export class TournamentSlotService {
       throw new NotFoundException({ code: 'TOURNAMENT_NOT_FOUND', message: '대회를 찾을 수 없어요.' });
     }
     return competition;
+  }
+
+  /** `GamesService` 를 따로 받지 않는 호출자(등록 서비스)를 위한 얇은 래퍼. */
+  releaseForRegistrationInTx(tx: Tx, admin: V1ActiveAdmin, registrationId: string): Promise<void> {
+    return releaseSlotsForRegistrationInTx(tx, this.context(admin), registrationId);
   }
 
   async assignSlot(user: V1AuthUser, slotId: string, registrationId: string | null) {

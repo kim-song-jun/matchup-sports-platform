@@ -12,6 +12,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { PrismaService } from '../prisma/prisma.service';
 import { AdminContextService } from '../common/admin-context.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { TournamentSlotService } from './slots/tournament-slot.service';
 import { AdminRegistrationsService } from './admin-registrations.service';
 import { kindAwareFindFirst } from '../../test/helpers/kind-aware-find-first';
 
@@ -70,6 +71,7 @@ function paymentRow(overrides: Record<string, unknown> = {}) {
 describe('AdminRegistrationsService', () => {
   let service: AdminRegistrationsService;
   let notifications: { emitNotification: jest.Mock };
+  let slots: { releaseForRegistrationInTx: jest.Mock };
   let prisma: {
     v1AdminUser: { findUnique: jest.Mock };
     v1Tournament: { findFirst: jest.Mock };
@@ -110,6 +112,7 @@ describe('AdminRegistrationsService', () => {
     );
 
     notifications = { emitNotification: jest.fn().mockResolvedValue(undefined) };
+    slots = { releaseForRegistrationInTx: jest.fn().mockResolvedValue(undefined) };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -117,6 +120,7 @@ describe('AdminRegistrationsService', () => {
         AdminContextService,
         { provide: PrismaService, useValue: prisma },
         { provide: NotificationsService, useValue: notifications },
+        { provide: TournamentSlotService, useValue: slots },
       ],
     }).compile();
 
@@ -400,6 +404,42 @@ describe('AdminRegistrationsService', () => {
     await expect(service.cancel(opsAuth, 'reg-1', {})).rejects.toMatchObject({
       response: { code: 'REGISTRATION_NOT_CANCELLABLE' },
     });
+  });
+
+  it('cancel: 확정이었던 팀(confirmed·취소 요청 전 confirmed)은 등록을 바꾸기 전에 자리를 비운다', async () => {
+    for (const row of [
+      registrationRow({ status: 'confirmed' }),
+      registrationRow({ status: 'cancel_requested', cancelPreviousStatus: 'confirmed' }),
+    ]) {
+      slots.releaseForRegistrationInTx.mockClear();
+      prisma.v1AdminUser.findUnique.mockResolvedValue(opsAdminRecord);
+      prisma.v1TournamentRegistration.findUnique.mockResolvedValue(row);
+      prisma.v1TournamentRegistration.update.mockClear();
+      prisma.v1TournamentRegistration.update.mockResolvedValue(registrationRow({ status: 'cancelled' }));
+      prisma.v1TournamentPayment.findUnique.mockResolvedValue(null);
+
+      await service.cancel(opsAuth, 'reg-1', {});
+
+      expect(slots.releaseForRegistrationInTx).toHaveBeenCalledTimes(1);
+      expect(slots.releaseForRegistrationInTx).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ id: 'ops-admin-id' }), 'reg-1');
+      expect(slots.releaseForRegistrationInTx.mock.invocationCallOrder[0])
+        .toBeLessThan(prisma.v1TournamentRegistration.update.mock.invocationCallOrder[0]);
+    }
+  });
+
+  it('cancel: 확정된 적 없는 신청(대조군)은 자리 해제를 부르지 않는다', async () => {
+    for (const row of [
+      registrationRow({ status: 'awaiting_payment' }),
+      registrationRow({ status: 'cancel_requested', cancelPreviousStatus: 'paid' }),
+    ]) {
+      slots.releaseForRegistrationInTx.mockClear();
+      prisma.v1AdminUser.findUnique.mockResolvedValue(opsAdminRecord);
+      prisma.v1TournamentRegistration.findUnique.mockResolvedValue(row);
+      prisma.v1TournamentRegistration.update.mockResolvedValue(registrationRow({ status: 'cancelled' }));
+      prisma.v1TournamentPayment.findUnique.mockResolvedValue(null);
+      await service.cancel(opsAuth, 'reg-1', {});
+      expect(slots.releaseForRegistrationInTx).not.toHaveBeenCalled();
+    }
   });
 
   it('cancel: cancel_requested → cancelled + payment cancelled', async () => {

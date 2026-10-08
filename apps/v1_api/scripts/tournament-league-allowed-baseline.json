@@ -61,7 +61,7 @@
     "why": "QA #47: 공용 대회·리그 상세와 후기 작성 입구가 같은 V1TournamentReview/confirmed registration 계약을 사용한다. 공개 후기 조회, completed 참가 운영진 제출, 사용자 미작성 목록의 세 조회만 두 kind를 허용하며 private/deleted/completed/membership/duplicate/upload/moderation gate와 awards 분리는 유지한다."
   },
   "src/tournaments/slots/tournament-slot.service.ts": {
-    "allowed": 2,
-    "why": "자리는 대회와 정규 리그가 같은 모델을 공유한다 — 자리 배정·조회는 종류를 가르지 않고 불러온 뒤 lane 검사(assertTournamentLane)가 정규 리그 자리를 SLOT_LEAGUE_NOT_SUPPORTED_YET 로 막는다. PR-5a 가 리그 lane 을 연다."
+    "allowed": 3,
+    "why": "자리는 대회와 정규 리그가 같은 모델을 공유한다 — 자리 배정·조회는 종류를 가르지 않고 불러온 뒤 lane 검사(assertTournamentLane)가 정규 리그 자리를 SLOT_LEAGUE_NOT_SUPPORTED_YET 로 막는다. PR-5a 가 리그 lane 을 연다. 등록 이탈 해제(releaseSlotsForRegistrationInTx)도 리그 등록을 받는다."
   }
 }

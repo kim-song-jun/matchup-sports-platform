@@ -903,6 +903,8 @@ describe('LeagueMatchAdminService.removeTeam — 대진 취소 알림과 제외 
         title: '1주차 A vs B',
         hostTeamId: REMOVED_TEAM,
         approvedApplicantTeamId: OPPONENT_TEAM,
+        homeSlotId: null,
+        awaySlotId: null,
         game: { currentOfficialRevisionId: null },
       },
       {
@@ -911,6 +913,8 @@ describe('LeagueMatchAdminService.removeTeam — 대진 취소 알림과 제외 
         title: '2주차 C vs A',
         hostTeamId: OTHER_HOST_TEAM,
         approvedApplicantTeamId: REMOVED_TEAM,
+        homeSlotId: null,
+        awaySlotId: null,
         game: { currentOfficialRevisionId: null },
       },
     ];
@@ -1108,8 +1112,12 @@ describe('LeagueMatchAdminService.cancelFixture — 진행 중 경기의 대진 
           title: '1주차 A vs B',
           hostTeamId: 'team-a',
           approvedApplicantTeamId: 'team-b',
+          homeSlotId: null,
+          awaySlotId: null,
         }),
         update: jest.fn().mockResolvedValue({}),
+        // 자리를 쓰는 경기가 없는 리그라 상태 전이 판정은 아무것도 하지 않는다.
+        count: jest.fn().mockResolvedValue(0),
       },
       // settle() 이 조기 반환하도록 진행중이 아닌 리그를 둔다(removeTeam 스펙과 같은 이유).
       v1Tournament: { findFirst: jest.fn().mockResolvedValue({ id: LEAGUE_ID, status: 'draft' }) },

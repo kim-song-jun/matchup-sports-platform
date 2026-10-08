@@ -8,6 +8,8 @@ import {
 import { Prisma } from '@prisma/client';
 import { AdminContextService, type V1ActiveAdmin } from '../common/admin-context.service';
 import { GamesService } from '../games/games.service';
+import { isUnfilledSlotFixture } from '../common/competition/unfilled-slot-gate';
+import { promoteLeagueWhenSlotsFilledInTx } from './league-slot-status';
 import { PrismaService } from '../prisma/prisma.service';
 import { V1AuthUser } from '../auth/v1-auth-user';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -124,13 +126,6 @@ function totalRoundsOf(schedule: readonly RoundRobinFixture[]): number {
 function weeklyMatchdayStartAts(leagueStartsOn: Date, totalRounds: number, timing: FixtureTimingOptions): Date[] {
   const matchdayCount = Math.ceil(totalRounds / timing.gamesPerTeamPerDay);
   return Array.from({ length: matchdayCount }, (_, index) => resolveFixtureStartAt(leagueStartsOn, index + 1));
-}
-
-function requireLeagueHostTeamId(hostTeamId: string | null, message: string): string {
-  if (hostTeamId === null) {
-    throw new ConflictException({ code: 'LEAGUE_FIXTURE_INCOMPLETE', message });
-  }
-  return hostTeamId;
 }
 
 function requireLeagueStartAt(startAt: Date | null, message: string): Date {
@@ -797,6 +792,8 @@ export class LeagueMatchAdminService {
           title: true,
           hostTeamId: true,
           approvedApplicantTeamId: true,
+          homeSlotId: true,
+          awaySlotId: true,
           game: { select: { currentOfficialRevisionId: true } },
         },
       });
@@ -831,17 +828,19 @@ export class LeagueMatchAdminService {
       // (cascadeCancelFixtureInTx)와 별개로 알림 발송에 필요한 최소 필드를 tx 밖으로
       // 들고 나간다 — emitToManyDeferred는 커밋 후에 불러야 한다(notifyFixturesScheduled와
       // 동일한 관례, 이 파일 하단 주석 참고).
-      const cancelledFixtures: Array<{ id: string; title: string; hostTeamId: string; approvedApplicantTeamId: string | null }> = [];
+      const cancelledFixtures: Array<{ id: string; title: string; hostTeamId: string | null; approvedApplicantTeamId: string | null }> = [];
       for (const fixture of freshTeamFixtures) {
         if (fixture.status === 'cancelled') continue;
-        await tx.v1TeamMatch.update({ where: { id: fixture.id }, data: { status: 'cancelled', cancelledAt: new Date() } });
-        await this.cascadeCancelFixtureInTx(tx, fixture.id, TEAM_REMOVAL_CANCEL_REASON);
-        cancelledFixtures.push({
-          id: fixture.id,
-          title: fixture.title,
-          hostTeamId: requireLeagueHostTeamId(fixture.hostTeamId, '홈 팀이 없는 리그 대진은 취소 알림을 만들 수 없어요.'),
-          approvedApplicantTeamId: fixture.approvedApplicantTeamId,
-        });
+        await this.cancelLeagueFixtureRowInTx(tx, fixture.id, TEAM_REMOVAL_CANCEL_REASON);
+        // 자리에 연결됐는데 팀이 비어 있던 경기는 공개된 적이 없다 — 알림 대상이 아니다.
+        if (!isUnfilledSlotFixture(fixture)) {
+          cancelledFixtures.push({
+            id: fixture.id,
+            title: fixture.title,
+            hostTeamId: fixture.hostTeamId,
+            approvedApplicantTeamId: fixture.approvedApplicantTeamId,
+          });
+        }
         cancelled += 1;
       }
       // BE-5 drop: 로스터에서 뺀다 = confirmed 등록을 취소로 옮긴다. **행을 지우지 않는다**
@@ -993,11 +992,7 @@ export class LeagueMatchAdminService {
         [teamMatchId],
         "경기가 진행 중이에요. 운영 콘솔의 '몰수·중단으로 종료'로 먼저 끝낸 뒤 취소해 주세요.",
       );
-      await tx.v1TeamMatch.update({
-        where: { id: teamMatchId },
-        data: { status: 'cancelled', cancelledAt: new Date() },
-      });
-      const rejected = await this.cascadeCancelFixtureInTx(tx, teamMatchId, dto.reason);
+      const rejected = await this.cancelLeagueFixtureRowInTx(tx, teamMatchId, dto.reason);
       await this.adminContext.logAdminAction(
         admin,
         {
@@ -1014,6 +1009,8 @@ export class LeagueMatchAdminService {
       // 않은 대진이 전부 확정 상태가 됐을 수 있다. 결과 확정 경로와 정확히 같은 판정을
       // 같은 트랜잭션에서 다시 돌린다 -- 안 하면 마지막 미확정 대진을 취소로 끝낸 리그가
       // 완료 조건을 충족하면서도 영원히 active로 남는다(alpha 실측 재현).
+      // 남은 빈 경기를 취소하면 자리를 쓰는 경기가 모두 찬 상태가 될 수 있다.
+      await promoteLeagueWhenSlotsFilledInTx(tx, leagueId);
       const completed = await this.leagueCompletion.settle(tx, leagueId, 'remaining_fixture_cancelled');
       return { cancelledApplications: rejected, leagueCompleted: completed };
     });
@@ -1021,18 +1018,20 @@ export class LeagueMatchAdminService {
     // 그룹 B 감사 결함 4: 단건 취소는 운영상 가장 자주 쓰이는 취소 경로인데도 이전에는
     // 상대 팀에게 알림이 전혀 없었다 — team-matches.service.ts의 자가취소(team_match_cancelled)는
     // leagueId가 있는 대진을 하드 거부해 절대 이 알림에 도달하지 못한다(그 경로의 599-604행).
-    this.notifyFixturesCancelled(
-      leagueId,
-      [
-        {
-          id: teamMatch.id,
-          title: teamMatch.title,
-          hostTeamId: requireLeagueHostTeamId(teamMatch.hostTeamId, '홈 팀이 없는 리그 대진은 취소 알림을 만들 수 없어요.'),
-          approvedApplicantTeamId: teamMatch.approvedApplicantTeamId,
-        },
-      ],
-      dto.reason,
-    );
+    if (!isUnfilledSlotFixture(teamMatch)) {
+      this.notifyFixturesCancelled(
+        leagueId,
+        [
+          {
+            id: teamMatch.id,
+            title: teamMatch.title,
+            hostTeamId: teamMatch.hostTeamId,
+            approvedApplicantTeamId: teamMatch.approvedApplicantTeamId,
+          },
+        ],
+        dto.reason,
+      );
+    }
 
     return {
       teamMatchId: teamMatch.id,
@@ -1083,6 +1082,8 @@ export class LeagueMatchAdminService {
           title: true,
           hostTeamId: true,
           approvedApplicantTeamId: true,
+          homeSlotId: true,
+          awaySlotId: true,
           game: { select: { currentOfficialRevisionId: true } },
         },
       });
@@ -1107,20 +1108,18 @@ export class LeagueMatchAdminService {
       let cancelledCount = 0;
       // 그룹 B 감사 결함 4: 재생성으로 취소되는 옛 대진도 알림 대상이다 — 아래 notifyFixturesScheduled는
       // "새 대진이 배정됐다"만 알리지 "옛 대진이 취소됐다"는 알리지 않는다(별개 사실).
-      const cancelledFixtures: Array<{ id: string; title: string; hostTeamId: string; approvedApplicantTeamId: string | null }> = [];
+      const cancelledFixtures: Array<{ id: string; title: string; hostTeamId: string | null; approvedApplicantTeamId: string | null }> = [];
       for (const fixture of existingFixtures) {
         if (fixture.status === 'cancelled') continue;
-        await tx.v1TeamMatch.update({
-          where: { id: fixture.id },
-          data: { status: 'cancelled', cancelledAt: new Date() },
-        });
-        await this.cascadeCancelFixtureInTx(tx, fixture.id, dto.reason);
-        cancelledFixtures.push({
-          id: fixture.id,
-          title: fixture.title,
-          hostTeamId: requireLeagueHostTeamId(fixture.hostTeamId, '홈 팀이 없는 리그 대진은 취소 알림을 만들 수 없어요.'),
-          approvedApplicantTeamId: fixture.approvedApplicantTeamId,
-        });
+        await this.cancelLeagueFixtureRowInTx(tx, fixture.id, dto.reason);
+        if (!isUnfilledSlotFixture(fixture)) {
+          cancelledFixtures.push({
+            id: fixture.id,
+            title: fixture.title,
+            hostTeamId: fixture.hostTeamId,
+            approvedApplicantTeamId: fixture.approvedApplicantTeamId,
+          });
+        }
         cancelledCount += 1;
       }
 
@@ -1960,6 +1959,18 @@ export class LeagueMatchAdminService {
     }
   }
 
+  /**
+   * 대진 한 건을 취소 상태로 접는 단일 경로. 자리 연결도 같이 푼다 — 취소된 경기가 자리를 붙들고 있으면
+   * 템플릿 교체의 자리 삭제가 FK(Restrict)로 막히고, 자리를 쓰는 경기 판정에 취소 경기가 섞인다.
+   */
+  private async cancelLeagueFixtureRowInTx(tx: Prisma.TransactionClient, teamMatchId: string, reason: string): Promise<number> {
+    await tx.v1TeamMatch.update({
+      where: { id: teamMatchId },
+      data: { status: 'cancelled', cancelledAt: new Date(), homeSlotId: null, awaySlotId: null },
+    });
+    return this.cascadeCancelFixtureInTx(tx, teamMatchId, reason);
+  }
+
   // cancelFixture()·regenerateFixtures() 공용 취소 후처리. team-matches.service.ts의
   // cancel()이 호스트 자가취소에서 하는 것과 동일하게: 대기 중(requested) 신청을 반려하고
   // 연결된 SCHEDULED 팀일정을 cascade 취소한다(cascadeCancelTeamMatchSchedulesInTx, row는
@@ -2062,20 +2073,17 @@ export class LeagueMatchAdminService {
    */
   private notifyFixturesCancelled(
     leagueId: string,
-    fixtures: Array<{ id: string; title: string; hostTeamId: string; approvedApplicantTeamId: string | null }>,
+    fixtures: Array<{ id: string; title: string; hostTeamId: string | null; approvedApplicantTeamId: string | null }>,
     reason: string,
   ): void {
     if (fixtures.length === 0) return;
     const fixtureCountByTeamId = new Map<string, number>();
     for (const fixture of fixtures) {
-      fixtureCountByTeamId.set(fixture.hostTeamId, (fixtureCountByTeamId.get(fixture.hostTeamId) ?? 0) + 1);
-      if (fixture.approvedApplicantTeamId !== null) {
-        fixtureCountByTeamId.set(
-          fixture.approvedApplicantTeamId,
-          (fixtureCountByTeamId.get(fixture.approvedApplicantTeamId) ?? 0) + 1,
-        );
+      for (const teamId of [fixture.hostTeamId, fixture.approvedApplicantTeamId]) {
+        if (teamId !== null) fixtureCountByTeamId.set(teamId, (fixtureCountByTeamId.get(teamId) ?? 0) + 1);
       }
     }
+    if (fixtureCountByTeamId.size === 0) return;
     const body =
       fixtures.length === 1
         ? `"${fixtures[0].title}" 대진이 취소됐어요. 사유: ${reason}`

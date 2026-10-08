@@ -100,7 +100,7 @@ export class UpdateScheduleDto {
   @Type(() => Number)
   @IsInt()
   @Min(1)
-  capacity?: number;
+  capacity?: number | null;
 
   /**
    * CP1 fix: the type is explicitly `string | null` because `null` and "omitted" are two

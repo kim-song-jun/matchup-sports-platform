@@ -136,6 +136,7 @@
 - `scope=applied`: 사용자의 현재 active 소속 팀이 신청한 팀매치. 개인 출전 확정이 아니라 `우리 팀 신청/확정` 관계다.
 - `scope=hosted`: 사용자의 현재 active 소속 팀이 호스트인 팀매치.
 - `scope=created`: 현재 팀 소속 여부와 관계없이 `V1TeamMatch.createdByUserId`가 로그인 사용자와 같은 팀매치. 마이페이지 `생성한 매치`의 팀매치 소스다.
+- 플랫폼 모집(`platformManaged=true`)도 생성 이력에 포함한다. 첫 팀 승인 전 독립 플랫폼 모집의 호스트 팀이 없어도 시작 시간이 있으면 정상 조회하며, 생성자 항목의 `teamId`·`teamName`은 `null`이다. `scope=applied`는 같은 상태에서도 신청 팀의 정보를 유지한다. 시작 시간 누락, 비플랫폼 모집의 호스트 누락, 호스트 관계 불일치는 `409 TEAM_MATCH_OPERATIONAL_DATA_INVALID`로 유지하며, 플랫폼 생성 이력만으로 관리 권한을 부여하지 않는다.
 - `scope=all` 또는 생략: 현재 소속 팀 기준 hosted + applied 워크리스트. `created` 이력까지 합치는 의미는 아니다.
 
 응답의 `relation`은 `host_team`, `created_by_me`, `requested`, `approved`, `rejected`, `withdrawn` 중 하나다. `manageRoute`는 현재 호스트팀의 active owner/manager에게만 내려가며 실제 v1 팀매치 상세(`/team-matches/:id`)로 연결된다. 과거 생성자이지만 현재 관리 권한이 없으면 생성 이력은 보이되 `manageRoute=null`이다.

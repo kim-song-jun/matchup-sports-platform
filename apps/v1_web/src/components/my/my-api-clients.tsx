@@ -19,6 +19,7 @@ import { useTheme } from '@/components/providers/theme-provider';
 import { useV1PushRegistration } from '@/hooks/use-v1-push-registration';
 import { UserAvatar } from '@/components/v1-ui/user-avatar';
 import { extractErrorMessage } from '@/lib/error-message';
+import { reportClientError } from '@/lib/client-error-reporter';
 import { clearStoredV1Session, sanitizeRedirectPath, withFromPath } from '@/lib/session-storage';
 import { clearV1IdentityCache } from '@/lib/query-keys';
 import { disconnectV1Socket } from '@/lib/v1-socket';
@@ -2215,10 +2216,31 @@ export function ThemeSettingsPageClient() {
 export function WithdrawalPageClient() {
   const queryClient = useQueryClient();
   const withdrawal = useV1WithdrawalRequest();
+  const pushRegistration = useV1PushRegistration();
   const [reason, setReason] = useState('');
   const [infoOpen, setInfoOpen] = useState(false);
   // #4: 비가역 작업이므로 confirm 모달로 이중 확인한다.
   const { confirm, ConfirmModal } = useConfirm();
+  const completeWithdrawal = async () => {
+    try {
+      // The server withdrawal already removed its push row. The established unsubscribe
+      // contract also removes this browser's PushManager subscription (and reports a missing
+      // server row while continuing with local removal).
+      await pushRegistration.unsubscribe({ reason: 'sign-out' });
+    } catch (error) {
+      reportClientError({
+        message: extractErrorMessage(error, '탈퇴 후 기기 알림 구독을 해제하지 못했어요.'),
+        level: 'warn',
+        context: { flow: 'withdrawal-push-unsubscribe' },
+      });
+    } finally {
+      clearStoredV1Session();
+      disconnectV1Socket();
+      clearV1IdentityCache(queryClient);
+      // A document navigation creates a fresh QueryClient and guest session probe.
+      window.location.replace('/login');
+    }
+  };
   const handleWithdraw = () => {
     confirm({
       title: '탈퇴 요청',
@@ -2227,18 +2249,16 @@ export function WithdrawalPageClient() {
       tone: 'danger',
     }).then((ok) => {
       if (ok) {
-        withdrawal.mutate(
-          { reason: reason || null },
-          {
-            onSuccess: () => {
-              clearStoredV1Session();
-              disconnectV1Socket();
-              clearV1IdentityCache(queryClient);
-              // router.replace() can reuse a prefetched /login tree with stale auth state.
-              // A document navigation creates a fresh QueryClient and guest session probe.
-              window.location.replace('/login');
-            },
-          },
+        // mutateAsync's promise continuation survives unmounting this observer while the HTTP
+        // request is pending. Only success reaches identity/push cleanup; rejection stays in
+        // mutation state for WithdrawalErrorCard and is reported if the page has left.
+        void withdrawal.mutateAsync({ reason: reason || null }).then(
+          () => completeWithdrawal(),
+          (error) => reportClientError({
+            message: extractErrorMessage(error, '탈퇴 요청을 접수하지 못했어요. 잠시 후 다시 시도해 주세요.'),
+            level: 'error',
+            context: { flow: 'withdrawal-request' },
+          }),
         );
       }
     });

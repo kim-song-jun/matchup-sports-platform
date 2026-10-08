@@ -9,6 +9,7 @@ import { RequireAuth } from '@/components/auth/require-auth';
 import { server } from '@/test/msw/server';
 import { clearStoredV1Session, saveStoredV1Session, V1_SESSION_HINT_KEY, V1_USER_ID_KEY } from '@/lib/session-storage';
 import { v1Keys } from '@/lib/query-keys';
+import type { ClientErrorPayload } from '@/lib/client-error-reporter';
 
 const socket = vi.hoisted(() => ({ disconnect: vi.fn() }));
 const documentNavigation = vi.hoisted(() => ({ replace: vi.fn() }));
@@ -35,6 +36,7 @@ describe('WithdrawalPageClient session termination', () => {
   let deferWithdrawalResponse: boolean;
   let resolveWithdrawalResponse: ((response: Response) => void) | null;
   let pushUnsubscribeRequestCount: number;
+  let clientErrorPayloads: ClientErrorPayload[];
 
   beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
   afterAll(() => server.close());
@@ -49,6 +51,7 @@ describe('WithdrawalPageClient session termination', () => {
     deferWithdrawalResponse = false;
     resolveWithdrawalResponse = null;
     pushUnsubscribeRequestCount = 0;
+    clientErrorPayloads = [];
     vi.stubEnv('NEXT_PUBLIC_API_URL', 'http://localhost/api/v1');
     server.use(http.post('*/api/v1/me/withdrawal-request', async () => {
       requestCount += 1;
@@ -71,9 +74,13 @@ describe('WithdrawalPageClient session termination', () => {
         status: 'error', statusCode: 403, code: 'PERMISSION_DENIED', message: 'Account is not active', details: null,
       }, { status: 403 });
     }),
-    http.post('*/api/v1/logs/client-error', () => new HttpResponse(null, { status: 204 })));
+    http.post<never, ClientErrorPayload>('*/api/v1/logs/client-error', async ({ request }) => {
+      clientErrorPayloads.push(await request.json());
+      return new HttpResponse(null, { status: 204 });
+    }));
   });
   afterEach(() => {
+    vi.restoreAllMocks();
     clearStoredV1Session();
     vi.unstubAllEnvs();
     vi.unstubAllGlobals();
@@ -171,9 +178,98 @@ describe('WithdrawalPageClient session termination', () => {
     await user.click(within(await screen.findByRole('dialog')).getByRole('button', { name: /^탈퇴 요청$/ }));
 
     await waitFor(() => expect(documentNavigation.replace).toHaveBeenCalledWith('/login'));
-    expect(pushUnsubscribeRequestCount).toBe(1);
+    expect(pushUnsubscribeRequestCount).toBe(0);
     expect(subscription.unsubscribe).toHaveBeenCalledTimes(1);
     expect(localStorage.getItem(V1_SESSION_HINT_KEY)).toBeNull();
+  });
+
+  it('clears identity immediately, keeps withdrawal locked, and bounds navigation when browser cleanup stalls', async () => {
+    let authRequestCount = 0;
+    server.use(http.get('*/api/v1/auth/me', () => {
+      authRequestCount += 1;
+      if (authRequestCount > 1) {
+        return HttpResponse.json({
+          status: 'error', statusCode: 403, code: 'PERMISSION_DENIED', message: 'Account is not active', details: null,
+        }, { status: 403 });
+      }
+      return HttpResponse.json({ status: 'success', data: {
+        user: { id: 'withdrawal-user', email: 'user@example.test', onboardingStatus: 'completed' },
+        profile: { displayName: '테스트 사용자' },
+        verification: { emailVerified: true, phoneVerified: true },
+        termsCompliance: { compliant: true, pendingRequiredDocumentIds: [], nextRoute: null },
+      } });
+    }));
+    let releaseRegistration: ((registration: ServiceWorkerRegistration | undefined) => void) | null = null;
+    let registrationLookupCount = 0;
+    vi.stubGlobal('navigator', {
+      serviceWorker: { getRegistration: vi.fn(() => {
+        registrationLookupCount += 1;
+        if (registrationLookupCount === 1) {
+          return Promise.resolve({ pushManager: { getSubscription: vi.fn().mockResolvedValue(null) } });
+        }
+        return new Promise((resolve) => { releaseRegistration = resolve; });
+      }) },
+    });
+    vi.stubGlobal('PushManager', class PushManager {});
+    vi.stubGlobal('Notification', { permission: 'default' });
+    const user = userEvent.setup();
+    const { queryClient } = renderWithClient(<RequireAuth><WithdrawalPageClient /></RequireAuth>);
+    queryClient.setQueryData(v1Keys.profile(), { userId: 'withdrawal-user' });
+
+    await user.click(await screen.findByRole('button', { name: '탈퇴 요청' }));
+    expect(authRequestCount).toBe(1);
+    await user.click(within(await screen.findByRole('dialog')).getByRole('button', { name: /^탈퇴 요청$/ }));
+    await waitFor(() => expect(navigator.serviceWorker.getRegistration).toHaveBeenCalledTimes(2));
+
+    expect(localStorage.getItem(V1_SESSION_HINT_KEY)).toBeNull();
+    expect(queryClient.getQueryData(v1Keys.profile())).toBeUndefined();
+    expect(socket.disconnect).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole('button', { name: '탈퇴 요청' })).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: '탈퇴 요청' }));
+    expect(requestCount).toBe(1);
+    await act(async () => new Promise((resolve) => setTimeout(resolve, 100)));
+    expect(authRequestCount).toBe(1);
+    expect(registrationLookupCount).toBe(2);
+    expect(screen.queryByText('로그인 상태를 확인하지 못했어요. 잠시 후 다시 시도해 주세요.')).not.toBeInTheDocument();
+    expect(documentNavigation.replace).not.toHaveBeenCalled();
+
+    await waitFor(() => expect(documentNavigation.replace).toHaveBeenCalledWith('/login'), { timeout: 2000 });
+    await waitFor(() => expect(clientErrorPayloads).toContainEqual(
+      expect.objectContaining({ level: 'warn', context: { flow: 'withdrawal-push-unsubscribe-timeout' } }),
+    ));
+    await act(async () => {
+      releaseRegistration?.(undefined);
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(documentNavigation.replace).toHaveBeenCalledTimes(1);
+    expect(clientErrorPayloads.filter((payload) => payload.context?.flow === 'withdrawal-push-unsubscribe-timeout')).toHaveLength(1);
+  });
+
+  it('reports stored-session cleanup failure but still clears socket/cache and navigates after server success', async () => {
+    const originalRemoveItem = Storage.prototype.removeItem;
+    const removeItemSpy = vi.spyOn(Storage.prototype, 'removeItem').mockImplementation(function (this: Storage, key: string) {
+      if (this === localStorage && key === V1_SESSION_HINT_KEY) {
+        throw new DOMException('Storage is unavailable', 'SecurityError');
+      }
+      originalRemoveItem.call(this, key);
+    });
+    const user = userEvent.setup();
+    const { queryClient } = renderWithClient(<WithdrawalPageClient />);
+    queryClient.setQueryData(v1Keys.profile(), { userId: 'withdrawal-user' });
+
+    await user.click(screen.getByRole('button', { name: '탈퇴 요청' }));
+    await user.click(within(await screen.findByRole('dialog')).getByRole('button', { name: /^탈퇴 요청$/ }));
+
+    await waitFor(() => expect(documentNavigation.replace).toHaveBeenCalledWith('/login'));
+    expect(requestCount).toBe(1);
+    expect(removeItemSpy).toHaveBeenCalledWith(V1_SESSION_HINT_KEY);
+    expect(socket.disconnect).toHaveBeenCalledTimes(1);
+    expect(queryClient.getQueryData(v1Keys.profile())).toBeUndefined();
+    expect(screen.queryByText('탈퇴 요청을 접수하지 못했어요')).not.toBeInTheDocument();
+    await waitFor(() => expect(clientErrorPayloads).toContainEqual(
+      expect.objectContaining({ level: 'warn', context: { flow: 'withdrawal-session-cleanup' } }),
+    ));
   });
 
   it('still clears the withdrawn session and navigates when browser subscription removal rejects', async () => {
@@ -217,5 +313,7 @@ describe('WithdrawalPageClient session termination', () => {
     expect(socket.disconnect).not.toHaveBeenCalled();
     expect(pushUnsubscribeRequestCount).toBe(0);
     expect(subscription.unsubscribe).not.toHaveBeenCalled();
+    await waitFor(() => expect(clientErrorPayloads).toHaveLength(1));
+    expect(clientErrorPayloads[0]).toMatchObject({ level: 'warn', context: { path: '/me/withdrawal-request', statusCode: 403 } });
   });
 });

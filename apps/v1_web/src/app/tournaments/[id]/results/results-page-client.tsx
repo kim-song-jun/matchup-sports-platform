@@ -396,6 +396,7 @@ function CoChampionBanner({ names }: { names: string[] }) {
 /* ── 최종 순위 테이블 ── */
 const ROUND_LABEL_MAP: Record<string, string> = {
   final: '결승', '결승': '결승',
+  round16: '16강', '16강': '16강',
   round12: '12강', '12강': '12강',
   quarter: '8강', '8강': '8강',
   semi: '4강', '4강': '4강',
@@ -438,6 +439,7 @@ function KnockoutResultsTable({
         semiByMatchup.set(key, bucket);
         break;
       }
+      case 'round16':
       case 'round12':
       case 'quarter':
         earlierFixtures.push(f);
@@ -817,13 +819,14 @@ function VideoGallerySection({
  * 폴백으로만 남긴다.
  */
 /** 결선 카드의 종류. 이 화면이 실제로 그릴 수 있는 세 가지뿐이다. */
-export type KnockoutKind = 'final' | 'semi' | 'quarter' | 'round12' | 'third_place';
+export type KnockoutKind = 'final' | 'semi' | 'quarter' | 'round16' | 'round12' | 'third_place';
 
 /** 결선 섹션 정렬 순서(결승 → 4강 → 3·4위전). */
-const KNOCKOUT_KIND_ORDER: Record<KnockoutKind, number> = { final: 0, semi: 1, quarter: 2, round12: 3, third_place: 4 };
+const KNOCKOUT_KIND_ORDER: Record<KnockoutKind, number> = { final: 0, semi: 1, quarter: 2, round12: 3, round16: 4, third_place: 5 };
 
 /** 편성에 붙지 못한(groupId 없음/편성 삭제됨) 경기용 폴백 — 알려진 라벨만 인정한다. */
 const KNOCKOUT_KIND_BY_LABEL: Record<string, KnockoutKind> = {
+  round16: 'round16', '16강': 'round16',
   round12: 'round12', '12강': 'round12',
   quarter: 'quarter', '8강': 'quarter',
   final: 'final', '결승': 'final',

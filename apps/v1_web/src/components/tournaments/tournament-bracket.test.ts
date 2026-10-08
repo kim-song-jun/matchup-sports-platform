@@ -139,7 +139,7 @@ describe('groupFixturesByRound', () => {
 
     expect(rounds).toHaveLength(1);
     expect(rounds[0].key).toBe('quarter');
-    expect(rounds[0].sortIndex).toBe(1);
+    expect(rounds[0].sortIndex).toBe(2);
   });
 
   it('uses fixture.round as fallback when groupId is present but group is not found', () => {
@@ -214,5 +214,34 @@ describe('12강·8강 결선 정렬', () => {
       makeFixture({ id: 'r', fixtureNumber: 1, round: '12강', groupId: 'r12' }),
     ], groups);
     expect(rounds.map((round) => round.label)).toEqual(['12강', '8강', '4강', '결승']);
+  });
+});
+
+describe('16강 결선 정렬', () => {
+  it('한글 라운드와 정식 단계를 같은 순서로 묶는다 (16강 → 8강 → 4강 → 결승 → 3·4위전)', () => {
+    const groups = [makeGroup({ id: 'r16', phase: 'round16' }), makeGroup({ id: 'q', phase: 'quarter' })];
+    const rounds = groupFixturesByRound([
+      makeFixture({ id: 'third', fixtureNumber: 1, round: '3·4위전' }),
+      makeFixture({ id: 'f', fixtureNumber: 1, round: '결승' }),
+      makeFixture({ id: 's', fixtureNumber: 1, round: '4강' }),
+      makeFixture({ id: 'q', fixtureNumber: 3, round: '8강', groupId: 'q' }),
+      makeFixture({ id: 'r', fixtureNumber: 1, round: '16강', groupId: 'r16' }),
+    ], groups);
+    expect(rounds.map((round) => round.label)).toEqual(['16강', '8강', '4강', '결승', '3·4위전']);
+  });
+
+  it('영문 단계 코드(round16)와 한글 라운드(16강)는 한 열로 합쳐진다', () => {
+    const rounds = groupFixturesByRound([
+      makeFixture({ id: 'a', fixtureNumber: 2, round: 'round16' }),
+      makeFixture({ id: 'b', fixtureNumber: 1, round: '16강' }),
+    ], []);
+    expect(rounds).toHaveLength(1);
+    expect(rounds[0].label).toBe('16강');
+    expect(rounds[0].fixtures.map((f) => f.id)).toEqual(['b', 'a']);
+  });
+
+  it('운영자가 라운드 이름을 임의로 적어도 16강 조에 속하면 16강 열이 된다', () => {
+    const rounds = groupFixturesByRound([makeFixture({ id: 'x', fixtureNumber: 1, round: 'A매치', groupId: 'r16' })], [makeGroup({ id: 'r16', phase: 'round16' })]);
+    expect(rounds.map((round) => round.label)).toEqual(['16강']);
   });
 });

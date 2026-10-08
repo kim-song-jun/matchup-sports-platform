@@ -158,10 +158,10 @@ describe('팀장·매니저 — 번호 칸이 곧 입력 버튼', () => {
     expect(within(dialog).queryByRole('alert')).toBeNull();
   });
 
-  it('명단이 잠겨 거절되면 서버 안내를 보이고 시트를 닫지 않는다', async () => {
-    mock.lockRoster();
+  it('화면을 연 뒤 명단이 잠겨 거절되면 서버 안내를 보이고 시트를 닫지 않는다', async () => {
     renderScreen();
     const dialog = await openSheet('한도윤 등번호 넣기');
+    mock.lockRoster();
     fireEvent.change(within(dialog).getByLabelText('등번호'), { target: { value: '9' } });
     fireEvent.click(within(dialog).getByRole('button', { name: '9번으로 저장' }));
     expect(await within(dialog).findByText('명단이 잠겼어요. 운영진에게 문의해 주세요.')).toBeInTheDocument();
@@ -171,6 +171,13 @@ describe('팀장·매니저 — 번호 칸이 곧 입력 버튼', () => {
 });
 
 describe('대조군 — 번호 칸이 버튼이 아닌 경우', () => {
+  it('이미 잠긴 명단은 번호 칸이 버튼이 아니고 잠긴 이유를 안내한다(2026-10 알파 실측)', async () => {
+    mock.lockRoster();
+    renderScreen();
+    expect(await screen.findByText(/대회 참가 명단이 마감돼 번호를 바꿀 수 없어요\. 운영진에게 문의해 주세요\./)).toBeInTheDocument();
+    expect(jerseyButtons()).toHaveLength(0);
+  });
+
   it('일반 팀원은 번호를 글자로만 보고 등번호 버튼이 없다', async () => {
     mock.setViewerRole('TEAM_MEMBER');
     renderScreen();

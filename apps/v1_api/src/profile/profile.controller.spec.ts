@@ -1,5 +1,7 @@
-import { Logger } from '@nestjs/common';
+import { ForbiddenException, Logger } from '@nestjs/common';
+import type { ExecutionContext, INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
+import request = require('supertest');
 import { generateKeyPairSync, randomBytes } from 'node:crypto';
 import { AppleIdentityService } from '../auth/apple-identity.service';
 import { sealAppleToken } from '../auth/apple-token-cipher';
@@ -187,3 +189,90 @@ describe('ProfileController', () => {
     });
   });
 });
+
+describe('Profile withdrawal HTTP session contract', () => {
+  let app: INestApplication;
+  const withdrawalRequest = jest.fn();
+  const user = {
+    id: 'withdrawal-user',
+    email: 'withdrawal@teameet.v1',
+    accountStatus: 'active' as const,
+    onboardingStatus: 'completed' as const,
+  };
+
+  beforeAll(async () => {
+    const module = await Test.createTestingModule({
+      controllers: [ProfileController],
+      providers: [
+        { provide: ProfileService, useValue: { withdrawalRequest } },
+        { provide: AppleTokenService, useValue: { revokeForUser: jest.fn().mockResolvedValue(undefined) } },
+      ],
+    })
+      .overrideGuard(V1AuthGuard)
+      .useValue({
+        canActivate: (context: ExecutionContext) => {
+          context.switchToHttp().getRequest().v1User = user;
+          return true;
+        },
+      })
+      .overrideGuard(OptionalV1AuthGuard)
+      .useValue({ canActivate: () => true })
+      .compile();
+
+    app = module.createNestApplication();
+    app.setGlobalPrefix('api/v1');
+    await app.init();
+  });
+
+  afterAll(async () => {
+    if (app) await app.close();
+  });
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('expires the session cookie after a successful withdrawal HTTP request', async () => {
+    withdrawalRequest.mockResolvedValue({ userId: user.id, accountStatus: 'withdrawal_pending' });
+
+    const response = await request(app.getHttpServer())
+      .post('/api/v1/me/withdrawal-request')
+      .set('Cookie', 'teameet_v1_session=existing-session')
+      .send({ reason: '서비스를 더 이상 이용하지 않음' })
+      .expect(201);
+
+    const setCookieHeader: unknown = response.headers['set-cookie'];
+    if (!isStringArray(setCookieHeader)) {
+      throw new Error('Expected withdrawal response to contain Set-Cookie headers');
+    }
+    const clearedCookies = setCookieHeader;
+    expect(clearedCookies).toHaveLength(3);
+    for (const cookie of clearedCookies) {
+      expect(cookie).toMatch(/^teameet_v1_session=;/);
+      const expiresAt = cookie.match(/(?:^|;)\s*Expires=([^;]+)/i)?.[1];
+      expect(Date.parse(expiresAt ?? '')).toBe(0);
+    }
+    expect(new Set(clearedCookies.map((cookie) => cookie.match(/(?:^|;)\s*Domain=([^;]+)/i)?.[1] ?? null)))
+      .toEqual(new Set([null, '.teameet.co.kr', 'teameet.co.kr']));
+    expect(response.body).toMatchObject({ userId: user.id, accountStatus: 'withdrawal_pending' });
+  });
+
+  it('preserves the session cookie when withdrawal fails over HTTP', async () => {
+    withdrawalRequest.mockRejectedValue(new ForbiddenException('ADMIN_WITHDRAWAL_FORBIDDEN'));
+
+    const response = await request(app.getHttpServer())
+      .post('/api/v1/me/withdrawal-request')
+      .set('Cookie', 'teameet_v1_session=existing-session')
+      .send({ reason: '서비스를 더 이상 이용하지 않음' })
+      .expect(403);
+
+    expect(response.headers['set-cookie']).toBeUndefined();
+  });
+});
+
+function isStringArray(value: unknown): value is string[] {
+  return (
+    Array.isArray(value) &&
+    value.every((entry: unknown): entry is string => typeof entry === 'string')
+  );
+}

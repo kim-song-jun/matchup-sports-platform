@@ -178,6 +178,30 @@ describe('BracketTab — 대진표 전체 공개', () => {
     expect(screen.queryByText(/접수 마감 전이에요/)).not.toBeInTheDocument();
   });
 
+  it('마감 시각 전이라도 접수를 수동으로 마감했으면 마감 전 경고가 없다(2026-10 알파 실측)', async () => {
+    vi.mocked(useV1PublishTournamentBracket).mockReturnValue(noopMutationHook());
+
+    render(
+      <BracketTab
+        tournamentId="tournament-1"
+        showToast={showToast}
+        registrations={[]}
+        registrationDeadlineAt="2099-01-01T00:00:00.000Z"
+        tournamentStatus="closed"
+        bracketPublishedAt={null}
+        bracketPublishScheduledAt={null}
+        canWrite
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '지금 전체 공개' }));
+
+    await waitFor(() => {
+      expect(screen.getByRole('dialog')).toBeInTheDocument();
+    });
+    expect(screen.queryByText(/접수 마감 전이에요/)).not.toBeInTheDocument();
+  });
+
   it('bracketPublishedAt이 이미 있으면 버튼 대신 공개 시각 안내만 노출한다', () => {
     vi.mocked(useV1PublishTournamentBracket).mockReturnValue(noopMutationHook());
     render(

@@ -52,6 +52,10 @@ export function daysUntil(target: string | null | undefined, now: Date): number 
   return Math.round((seoulDayStart(at) - seoulDayStart(now)) / DAY_MS);
 }
 
+function hoursOrMinutes(ms: number): string {
+  return ms < 60 * 60 * 1000 ? `${Math.ceil(ms / 60_000)}분` : `${Math.floor(ms / 3_600_000)}시간`;
+}
+
 export function resolveNextMilestone(tournament: V1Tournament, now: Date): TournamentNextMilestone {
   const { status } = tournament;
   if (status === 'completed' || status === 'cancelled') {
@@ -83,7 +87,10 @@ export function resolveNextMilestone(tournament: V1Tournament, now: Date): Tourn
         overdue: false,
       };
     }
-    if (left < 0) {
+    // 접수 마감은 시각이 중요하다 — 날짜로만 세면 자정 마감 45분 전에도 "1일 남았어요"가 되고(2026-10 알파 실측),
+    // 오늘 오전에 지난 마감은 "오늘 마감돼요"로 보인다. 24시간 안쪽은 시각으로 센다.
+    const msLeft = Date.parse(tournament.registrationDeadlineAt!) - now.getTime();
+    if (left < 0 || msLeft <= 0) {
       return {
         phase: 'recruiting',
         headline: '접수 마감 시각이 지났는데 아직 접수 중이에요.',
@@ -93,7 +100,7 @@ export function resolveNextMilestone(tournament: V1Tournament, now: Date): Tourn
     }
     return {
       phase: 'recruiting',
-      headline: left === 0 ? '오늘 접수가 마감돼요.' : `접수 마감까지 ${left}일 남았어요.`,
+      headline: `접수 마감까지 ${msLeft < DAY_MS ? hoursOrMinutes(msLeft) : `${left}일`} 남았어요.`,
       daysLeft: left,
       overdue: false,
     };

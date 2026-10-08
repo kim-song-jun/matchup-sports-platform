@@ -301,9 +301,11 @@ const RECORD_CONSENT_SETTINGS_PATH = '/my/settings/record-consent';
 function ClaimFixturesCard({
   leagueId,
   fixtures,
+  from,
 }: {
   leagueId: string;
   fixtures: { teamMatchId: string; title: string; startAt: string; claimableCount: number }[];
+  from?: string | null;
 }) {
   const shown = fixtures.slice(0, CLAIM_FIXTURE_PREVIEW_LIMIT);
   const restCount = fixtures.length - shown.length;
@@ -318,7 +320,7 @@ function ClaimFixturesCard({
         {shown.map((fixture) => (
           <li key={fixture.teamMatchId}>
             <Link
-              href={`/league-matches/${leagueId}/fixtures/${fixture.teamMatchId}`}
+              href={withFromPath(`/league-matches/${leagueId}/fixtures/${fixture.teamMatchId}`, from)}
               className="tm-pressable tm-list-row-interactive flex min-h-[44px] flex-wrap items-center justify-between gap-x-2 gap-y-1 rounded-lg px-2 text-sm"
               // 링크 텍스트만으로는 "연결 안 된 참가자 N명"이 무슨 뜻인지 화면 낭독에서
               // 끊겨 읽힌다 — 목적지를 한 문장으로 붙여 준다.
@@ -444,9 +446,11 @@ function LeagueClaimRecordBanner({
   leagueId,
   enabled,
   leagueTeamIds,
+  from,
 }: {
   leagueId: string;
   enabled: boolean;
+  from?: string | null;
   /**
    * 이 리그 참가팀 id. 순위표 응답에서 그대로 온다 — 이 판정 때문에 새로 조회하지 않는다.
    * 순위표를 아직 못 받았거나 조회가 실패했으면 빈 배열이라 안내가 뜨지 않는다(참가자를
@@ -483,7 +487,7 @@ function LeagueClaimRecordBanner({
   const showClaimCard = fixtures.length > 0;
   return (
     <>
-      {showClaimCard ? <ClaimFixturesCard leagueId={leagueId} fixtures={fixtures} /> : null}
+      {showClaimCard ? <ClaimFixturesCard leagueId={leagueId} fixtures={fixtures} from={from} /> : null}
       {/* 동의 조회는 참가자로 확인된 뒤에만 보낸다 — 훅이 마운트될 때 바로 요청하므로
           조건부 렌더가 곧 조건부 조회다. */}
       {isLeagueParticipant ? <RecordConsentPointerCard tightTop={showClaimCard} /> : null}
@@ -518,6 +522,7 @@ export default function LeagueMatchStandingsClient({
   const query = searchParams.toString();
   const upcomingFromUrl = searchParams.get('schedule') === 'upcoming';
   const fromPath = sanitizeRedirectPath(searchParams.get('from'));
+  const currentHref = useCurrentHref();
   // 팀 이름 링크의 뒤로가기 출처 — 이 화면 자기 자신(상위에서 받은 from까지 포함해서 이어 붙인다).
   const selfHref = withFromPath(`/league-matches/${leagueId}`, fromPath);
   const seriesQuery = useV1LeagueMatch(leagueId, { seed: seed?.league });
@@ -587,11 +592,14 @@ export default function LeagueMatchStandingsClient({
   // "예정만 보기" 필터로 지난 경기를 걷어내고, 필터를 안 켜도 다음 경기 행 자체에
   // 뱃지+강조 테두리를 얹어 스크롤 없이 눈에 띄게 한다.
   const [showUpcomingOnly, setUpcomingDraft] = useState(upcomingFromUrl);
+  const [fixtureSourceHref, setFixtureSourceHref] = useState(currentHref);
   useEffect(() => {
     // 늦게 도착한 router snapshot이 연속 선택의 마지막 draft를 덮지 않게 한다.
     if (query !== new URLSearchParams(window.location.search).toString()) return;
     setUpcomingDraft(upcomingFromUrl);
-  }, [query, upcomingFromUrl, leagueId]);
+    // 출처도 같은 draft에 맞춘다. 첫 HTML은 router URL, 마운트 후에는 hash까지 보존한다.
+    setFixtureSourceHref(currentHref ? `${window.location.pathname}${window.location.search}${window.location.hash}` : null);
+  }, [query, upcomingFromUrl, leagueId, currentHref]);
 
   function setShowUpcomingOnly(upcomingOnly: boolean) {
     setUpcomingDraft(upcomingOnly);
@@ -599,7 +607,10 @@ export default function LeagueMatchStandingsClient({
     const url = new URL(window.location.href);
     if (upcomingOnly) url.searchParams.set('schedule', 'upcoming');
     else url.searchParams.delete('schedule');
-    window.history.replaceState(null, '', `${url.pathname}${url.search}${url.hash}`);
+    const href = `${url.pathname}${url.search}${url.hash}`;
+    window.history.replaceState(null, '', href);
+    // Next query 반영을 기다리지 않아 빠른 선택 직후의 경기 링크도 최신 출처를 가진다.
+    setFixtureSourceHref(currentHref ? href : null);
   }
   const fixtures = series?.fixtures ?? [];
   const visibleFixtures = showUpcomingOnly ? fixtures.filter(isUpcomingFixture) : fixtures;
@@ -960,7 +971,7 @@ export default function LeagueMatchStandingsClient({
               return (
                 <li key={fixture.teamMatchId}>
                   <Link
-                    href={`/league-matches/${leagueId}/fixtures/${fixture.teamMatchId}`}
+                    href={withFromPath(`/league-matches/${leagueId}/fixtures/${fixture.teamMatchId}`, fixtureSourceHref)}
                     className={`tm-pressable tm-list-row-interactive flex min-h-[44px] flex-col gap-2 rounded-xl border bg-[var(--card-surface)] p-3 text-sm sm:flex-row sm:items-center sm:justify-between ${isNextUpcoming ? 'border-[var(--blue500)]' : 'border-[var(--border)]'}`}
                   >
                     <span className="inline-flex flex-wrap items-center gap-2">
@@ -1085,6 +1096,7 @@ export default function LeagueMatchStandingsClient({
         leagueId={leagueId}
         enabled={rankingsHiddenByEligibility}
         leagueTeamIds={leagueTeamIds}
+        from={fixtureSourceHref}
       />
     </div>
   );

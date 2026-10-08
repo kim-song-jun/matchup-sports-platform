@@ -1,9 +1,9 @@
 'use client';
 
 import Link from 'next/link';
-import { useState } from 'react';
+import { useId, useRef, useState } from 'react';
 import { useShellOverride } from '@/components/v1-ui/shell-override';
-import { AlertBanner, Card, EmptyState, ErrorState, ListItem, TextField } from '@/components/v1-ui/primitives';
+import { AlertBanner, Card, EmptyState, ErrorState, ListItem, SectionTitle, TextField } from '@/components/v1-ui/primitives';
 import { Check } from 'lucide-react';
 import { ChevronLeftIcon, ChevronRightIcon, PlusIcon } from '@/components/v1-ui/icons';
 import { josa } from '@/lib/korean';
@@ -19,6 +19,7 @@ import type {
   ScheduleListViewModel,
 } from './team-schedules.types';
 import { AppBackLink } from '@/components/v1-ui/app-back-link';
+import detailStyles from './team-schedules-detail.module.css';
 
 // ── 목록 (calendar/list 토글 + type/state 필터) ───────────────────────────────
 
@@ -222,6 +223,8 @@ function ScheduleCalendarGrid({ model }: { model: ScheduleListViewModel }) {
 // ── 상세 ──────────────────────────────────────────────────────────────────────
 
 export function ScheduleDetailPageView({ model }: { model: ScheduleDetailViewModel }) {
+  const detailId = useId();
+  const managementRef = useRef<HTMLElement>(null);
   // loading/error 상태에선 테이블 기본값(desktopHead:true)을 쓰고, success 분기만 자기
   // `.tm-desktop-page-head`를 직접 그려 제너릭 데스크톱 헤더를 꺼야 한다(§1.9 표 R3).
   // Hooks 규칙 때문에 이 호출 자체는 조건부 return보다 위, 매 렌더 항상 실행한다 — 값만
@@ -245,6 +248,8 @@ export function ScheduleDetailPageView({ model }: { model: ScheduleDetailViewMod
   }
 
   const { attendance, guestRecruitment, manage } = model;
+  const hasAttendanceDetails = Boolean(model.roster) || model.attendees.visible || model.history.length > 0;
+  const hasManagementDetails = showsGuestRecruitment(guestRecruitment) || manage.visible;
 
   return (
     <>
@@ -255,7 +260,7 @@ export function ScheduleDetailPageView({ model }: { model: ScheduleDetailViewMod
         <h1 className="tm-text-heading">{model.title}</h1>
       </div>
 
-      <div className="tm-team-detail-section" style={{ padding: '16px 20px 40px', display: 'flex', flexDirection: 'column', gap: 20 }}>
+      <div className={`tm-team-detail-section ${detailStyles.page}`}>
         {model.conflictBanner ? (
           <div style={{ marginBottom: 12, display: 'flex', gap: 8, alignItems: 'flex-start' }}>
             <div style={{ flex: 1 }}>
@@ -300,31 +305,17 @@ export function ScheduleDetailPageView({ model }: { model: ScheduleDetailViewMod
           ) : null}
         </Card>
 
-        {/* 변경 이력·내 참석·용병 모집·운영 관리를 카드마다 따로 감싸면 화면이 상자
-            더미로 보인다(DESIGN.md: 카드 구분은 배경색 대비로, 카드마다 개별 보더 금지).
-            팀/유저 공개 기록 화면(team-records-content.tsx)이 이미 쓰는 "카드 하나 +
-            내부 구분선" 관례를 그대로 따른다. */}
-        {(() => {
-          const sections = [
-            model.history.length > 0 ? (
-              <div key="history">
-                <div className="tm-text-label" style={{ marginBottom: 8 }}>변경 이력</div>
-                {model.history.map((entry, index) => (
-                  <div key={`${entry.label}-${index}`} className="tm-text-caption" style={{ marginBottom: 4 }}>
-                    {entry.label}{entry.detail ? ` · ${entry.detail}` : ''}
-                  </div>
-                ))}
-              </div>
-            ) : null,
-            model.roster ? <ScheduleRosterSummary key="roster" model={model.roster} /> : null,
-            attendance.visible ? (
-              <div key="attendance">
-                <div className="tm-text-label" style={{ marginBottom: 8 }}>
-                  {attendance.friendlyMatch ? (
-                    <>올 수 있어요? <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(팀장 참고용)</span></>
-                  ) : '내 참석'}
-                </div>
-                <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+        {attendance.visible ? (
+          <section aria-labelledby={`${detailId}-response`}>
+            <Card style={{ padding: 'var(--spacing-4)' }}>
+              <div className={detailStyles.responseTop}>
+                <SectionTitle
+                  id={`${detailId}-response`}
+                  title={attendance.friendlyMatch ? '올 수 있어요?' : '내 참석'}
+                  sub={attendance.friendlyMatch ? '(팀장 참고용)' : undefined}
+                  compact
+                />
+                <div className={detailStyles.responseActions}>
                   {(['GOING', 'MAYBE', 'NOT_GOING'] as const).map((status) => (
                     <button
                       key={status}
@@ -332,7 +323,7 @@ export function ScheduleDetailPageView({ model }: { model: ScheduleDetailViewMod
                       aria-pressed={attendance.myStatus === status}
                       disabled={attendance.disabled || attendance.pending}
                       className={`tm-btn tm-btn-sm ${attendance.myStatus === status ? 'tm-btn-primary' : 'tm-btn-neutral'}`}
-                      style={{ minHeight: 44, fontWeight: attendance.myStatus === status ? 700 : undefined }}
+                      style={{ minHeight: 'var(--size-control-sm)', fontWeight: attendance.myStatus === status ? 700 : undefined }}
                       onClick={() => attendance.onSetStatus(status)}
                     >
                       {/* 잠긴(취소·마감) 일정은 비활성 배경이 색을 덮어 내 응답이 안 보였다(W2-V3) — 체크로도 표시한다. */}
@@ -341,95 +332,126 @@ export function ScheduleDetailPageView({ model }: { model: ScheduleDetailViewMod
                     </button>
                   ))}
                 </div>
-                {/* 위 참석명단 요약이 "나가는 사람은 명단으로 정해진다"를 이미 말하면 되풀이하지 않는다 —
-                    요약은 상대가 확정된 뒤에만 있어, 그 전엔 이 한 줄이 같은 구분을 맡는다. */}
-                {attendance.friendlyMatch && !model.roster ? (
-                  <div className="tm-text-caption" style={{ color: 'var(--text-muted)', lineHeight: 1.6 }}>
-                    이 응답은 출전을 정하지 않아요. 출전 선수는 팀장·매니저가 참석명단으로 정해요.
-                  </div>
-                ) : null}
-                {attendance.myStatus === 'WAITLISTED' ? (
-                  <div className="tm-text-caption" role="status">대기 {attendance.waitlistPosition}번째예요.</div>
-                ) : null}
-                <div className="tm-text-caption" style={{ marginTop: 4 }}>
-                  {attendance.friendlyMatch ? '올 수 있어요' : '참석'} {attendance.counts.going}명
-                  {attendance.counts.waitlisted > 0 ? ` · 대기 ${attendance.counts.waitlisted}명` : ''}
-                </div>
-                {attendance.deadlineLabel ? (
-                  <div className="tm-text-caption" style={{ marginTop: 4, color: attendance.deadlinePassed ? 'var(--red700)' : undefined }}>
-                    {attendance.deadlineLabel}
-                  </div>
-                ) : null}
-                {attendance.disabledReason ? (
-                  <div className="tm-text-caption" style={{ marginTop: 4 }} role="status">{attendance.disabledReason}</div>
-                ) : null}
-                {attendance.error ? <div style={{ marginTop: 8 }}><AlertBanner tone="error" message={attendance.error} /></div> : null}
               </div>
-            ) : null,
-            model.attendees.visible ? <ScheduleAttendeeSection key="attendees" model={model.attendees} friendlyMatch={attendance.friendlyMatch} /> : null,
-            showsGuestRecruitment(guestRecruitment) ? (
-              <GuestRecruitmentSection key="guest" model={guestRecruitment} />
-            ) : null,
-            manage.visible ? (
-              <div key="manage">
-                <div className="tm-text-label" style={{ marginBottom: 8 }}>운영 관리</div>
-                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                  <Link className="tm-btn tm-btn-sm tm-btn-neutral" href={manage.editHref}>일정 수정</Link>
-                  {/* 완료 처리는 항상 렌더한다 — canComplete가 false여도 버튼을 감추지 않고
-                      disabled + 사유로 보여준다("버튼이 왜 안 되는지 항상 설명"). */}
-                  <button
-                    type="button"
-                    className="tm-btn tm-btn-sm tm-btn-neutral"
-                    disabled={!manage.canComplete || manage.completePending}
-                    aria-describedby={!manage.canComplete && manage.completeDisabledReason ? 'schedule-complete-disabled-reason' : undefined}
-                    onClick={manage.onComplete}
-                  >
-                    {manage.completePending ? '처리 중…' : '완료 처리'}
-                  </button>
-                  {/* 취소는 이 카드에서 유일한 파괴적 액션인데 ghost(배경 없음)라 평문처럼 보여
-                      형제 버튼들보다 오히려 덜 눌러 보였다. 테두리를 줘 버튼임이 드러나게 하되,
-                      꽉 찬 danger 로 만들면 수정·완료 처리보다 시선을 끌어 잘못 유도하므로
-                      outline 에 위험 색만 얹는다. */}
-                  <button
-                    type="button"
-                    className="tm-btn tm-btn-sm tm-btn-outline"
-                    style={{ color: 'var(--red700)' }}
-                    disabled={manage.cancelPending}
-                    onClick={manage.onCancel}
-                  >
-                    일정 취소
-                  </button>
-                  {manage.reminders.filter((reminder) => reminder.visible).map((reminder) => (
-                    <button
-                      key={reminder.kind}
-                      type="button"
-                      className="tm-btn tm-btn-sm tm-btn-neutral"
-                      disabled={reminder.pending}
-                      onClick={reminder.onTrigger}
-                    >
-                      {reminder.pending ? '전송 중…' : reminder.label}
-                    </button>
-                  ))}
+              {/* 참석명단 요약이 "나가는 사람은 명단으로 정해진다"를 이미 말하면 되풀이하지 않는다 —
+                  요약은 상대가 확정된 뒤에만 있어, 그 전엔 이 한 줄이 같은 구분을 맡는다. */}
+              {attendance.friendlyMatch && !model.roster ? (
+                <div className="tm-text-caption" style={{ color: 'var(--text-muted)', lineHeight: 1.6 }}>
+                  이 응답은 출전을 정하지 않아요. 출전 선수는 팀장·매니저가 참석명단으로 정해요.
                 </div>
-                {!manage.canComplete && manage.completeDisabledReason ? (
-                  <div id="schedule-complete-disabled-reason" className="tm-text-caption" style={{ marginTop: 8 }} role="status">
-                    {manage.completeDisabledReason}
-                  </div>
-                ) : null}
+              ) : null}
+              {attendance.myStatus === 'WAITLISTED' ? (
+                <div className="tm-text-caption" role="status">대기 {attendance.waitlistPosition}번째예요.</div>
+              ) : null}
+              <div className="tm-text-caption" style={{ marginTop: 'var(--spacing-1)' }}>
+                {attendance.friendlyMatch ? '올 수 있어요' : '참석'} {attendance.counts.going}명
+                {attendance.counts.waitlisted > 0 ? ` · 대기 ${attendance.counts.waitlisted}명` : ''}
               </div>
-            ) : null,
-          ].filter(Boolean);
-
-          return sections.length > 0 ? (
-            <Card pad={16} style={{ marginTop: 12 }}>
-              {sections.map((section, index) => (
-                <div key={index} style={index > 0 ? { marginTop: 16, paddingTop: 16, borderTop: '1px solid var(--border)' } : undefined}>
-                  {section}
+              {attendance.deadlineLabel ? (
+                <div className="tm-text-caption" style={{ marginTop: 'var(--spacing-1)', color: attendance.deadlinePassed ? 'var(--red700)' : undefined }}>
+                  {attendance.deadlineLabel}
                 </div>
-              ))}
+              ) : null}
+              {attendance.disabledReason ? (
+                <div className="tm-text-caption" style={{ marginTop: 'var(--spacing-1)' }} role="status">{attendance.disabledReason}</div>
+              ) : null}
+              {attendance.error ? <div style={{ marginTop: 'var(--spacing-2)' }}><AlertBanner tone="error" message={attendance.error} /></div> : null}
             </Card>
-          ) : null;
-        })()}
+          </section>
+        ) : null}
+
+        {hasAttendanceDetails || hasManagementDetails ? (
+          <div className={`${detailStyles.details} ${hasAttendanceDetails && hasManagementDetails ? detailStyles.detailsWithAside : ''}`}>
+            {hasAttendanceDetails ? (
+              <div className={detailStyles.main}>
+                {model.history.length > 0 ? (
+                  <section aria-labelledby={`${detailId}-history`}>
+                    <Card style={{ padding: 'var(--spacing-4)' }}>
+                      <div className={detailStyles.sectionHeading}><SectionTitle id={`${detailId}-history`} title="변경 이력" compact /></div>
+                      {model.history.map((entry, index) => (
+                        <div key={`${entry.label}-${index}`} className="tm-text-caption" style={{ marginBottom: 'var(--spacing-1)' }}>
+                          {entry.label}{entry.detail ? ` · ${entry.detail}` : ''}
+                        </div>
+                      ))}
+                    </Card>
+                  </section>
+                ) : null}
+                {model.roster ? <Card style={{ padding: 'var(--spacing-4)' }}><ScheduleRosterSummary model={model.roster} /></Card> : null}
+                {model.attendees.visible ? (
+                  <Card style={{ padding: 'var(--spacing-4)' }}>
+                    <ScheduleAttendeeSection
+                      model={model.attendees}
+                      friendlyMatch={attendance.friendlyMatch}
+                      onJumpToManagement={hasManagementDetails ? () => {
+                        const target = managementRef.current;
+                        // 긴 보조 영역도 제목부터 보이도록 포커스 자동 스크롤과 시작점 이동을 나눠요.
+                        target?.focus({ preventScroll: true });
+                        target?.scrollIntoView({ block: 'start', inline: 'nearest', behavior: 'instant' });
+                      } : undefined}
+                    />
+                  </Card>
+                ) : null}
+              </div>
+            ) : null}
+            {hasManagementDetails ? (
+              <aside ref={managementRef} tabIndex={-1} aria-label="모집 및 운영" className={detailStyles.aside}>
+                {showsGuestRecruitment(guestRecruitment) ? (
+                  <Card style={{ padding: 'var(--spacing-4)' }}><GuestRecruitmentSection model={guestRecruitment} /></Card>
+                ) : null}
+                {manage.visible ? (
+                  <section aria-labelledby={`${detailId}-manage`}>
+                    <Card style={{ padding: 'var(--spacing-4)' }}>
+                      <div className={detailStyles.sectionHeading}><SectionTitle id={`${detailId}-manage`} title="운영 관리" compact /></div>
+                      <div className={detailStyles.managementActions}>
+                        <Link className="tm-btn tm-btn-sm tm-btn-neutral" href={manage.editHref}>일정 수정</Link>
+                        {/* 완료 처리는 항상 렌더한다 — canComplete가 false여도 버튼을 감추지 않고
+                            disabled + 사유로 보여준다("버튼이 왜 안 되는지 항상 설명"). */}
+                        <button
+                          type="button"
+                          className="tm-btn tm-btn-sm tm-btn-neutral"
+                          disabled={!manage.canComplete || manage.completePending}
+                          aria-describedby={!manage.canComplete && manage.completeDisabledReason ? `${detailId}-complete-reason` : undefined}
+                          onClick={manage.onComplete}
+                        >
+                          {manage.completePending ? '처리 중…' : '완료 처리'}
+                        </button>
+                        {/* 취소는 이 카드에서 유일한 파괴적 액션인데 ghost(배경 없음)라 평문처럼 보여
+                            형제 버튼들보다 오히려 덜 눌러 보였다. 테두리를 줘 버튼임이 드러나게 하되,
+                            꽉 찬 danger 로 만들면 수정·완료 처리보다 시선을 끌어 잘못 유도하므로
+                            outline 에 위험 색만 얹는다. */}
+                        <button
+                          type="button"
+                          className="tm-btn tm-btn-sm tm-btn-outline"
+                          style={{ color: 'var(--red700)' }}
+                          disabled={manage.cancelPending}
+                          onClick={manage.onCancel}
+                        >
+                          일정 취소
+                        </button>
+                        {manage.reminders.filter((reminder) => reminder.visible).map((reminder) => (
+                          <button
+                            key={reminder.kind}
+                            type="button"
+                            className="tm-btn tm-btn-sm tm-btn-neutral"
+                            disabled={reminder.pending}
+                            onClick={reminder.onTrigger}
+                          >
+                            {reminder.pending ? '전송 중…' : reminder.label}
+                          </button>
+                        ))}
+                      </div>
+                      {!manage.canComplete && manage.completeDisabledReason ? (
+                        <div id={`${detailId}-complete-reason`} className="tm-text-caption" style={{ marginTop: 'var(--spacing-2)' }} role="status">
+                          {manage.completeDisabledReason}
+                        </div>
+                      ) : null}
+                    </Card>
+                  </section>
+                ) : null}
+              </aside>
+            ) : null}
+          </div>
+        ) : null}
 
         <ScheduleCancelConfirm model={model.cancelModal} recruitmentOpen={guestRecruitment.isOpen} />
       </div>
@@ -439,6 +461,7 @@ export function ScheduleDetailPageView({ model }: { model: ScheduleDetailViewMod
 
 /** 친선 경기의 참석명단(누가 뛰나) 요약 — 아래 참석 응답(올 수 있나)과 이름으로 나눈다(H9 D-1). */
 function ScheduleRosterSummary({ model }: { model: NonNullable<ScheduleDetailViewModel['roster']> }) {
+  const headingId = useId();
   const summary =
     model.count === null
       ? '팀장·매니저가 정해요'
@@ -464,8 +487,8 @@ function ScheduleRosterSummary({ model }: { model: NonNullable<ScheduleDetailVie
   const rowStyle = { display: 'flex', alignItems: 'center', gap: 12, minHeight: 44 } as const;
 
   return (
-    <div>
-      <div className="tm-text-label" style={{ marginBottom: 4 }}>참석명단</div>
+    <section aria-labelledby={headingId}>
+      <div className={detailStyles.sectionHeading}><SectionTitle id={headingId} title="참석명단" compact /></div>
       {model.href ? (
         <Link href={model.href} style={{ ...rowStyle, color: 'inherit' }}>
           {row}
@@ -474,7 +497,7 @@ function ScheduleRosterSummary({ model }: { model: NonNullable<ScheduleDetailVie
         <div style={rowStyle}>{row}</div>
       )}
       <div className="tm-text-caption">경기에 나가는 사람은 이 명단으로 정해져요.</div>
-    </div>
+    </section>
   );
 }
 
@@ -534,11 +557,14 @@ const ATTENDEE_STATUS_BADGE_CLASS: Record<string, string> = {
   NO_RESPONSE: 'tm-badge-orange',
 };
 
-/** 원본 목업(preview.html "02 · 일정 상세와 참석 현황")의 전체/참석/미응답 탭 명단 —
- * 매니저가 "누가 오는지"를 한 명씩 보고 미응답자를 식별할 수 있어야 한다는 설계였는데,
- * 실제 구현은 그동안 goingCount 등 집계 숫자와 내 참석 여부만 보여줬다. */
-function ScheduleAttendeeSection({ model, friendlyMatch }: { model: ScheduleDetailViewModel['attendees']; friendlyMatch: boolean }) {
+/** 내 응답을 바꾸는 액션과 분리한 팀원 응답 조회예요. */
+function ScheduleAttendeeSection({ model, friendlyMatch, onJumpToManagement }: {
+  readonly model: ScheduleDetailViewModel['attendees'];
+  readonly friendlyMatch: boolean;
+  readonly onJumpToManagement?: () => void;
+}) {
   const [tab, setTab] = useState<'all' | 'going' | 'no_response'>('all');
+  const headingId = useId();
   if (!model.visible) return null;
   const statusLabel = (status: string) => (friendlyMatch ? friendlyRsvpLabel(status) : ATTENDEE_STATUS_LABEL[status] ?? status);
 
@@ -558,16 +584,25 @@ function ScheduleAttendeeSection({ model, friendlyMatch }: { model: ScheduleDeta
   const goingLabel = statusLabel('GOING');
 
   return (
-    <div>
-      <div className="tm-text-label" style={{ marginBottom: 8 }}>{friendlyMatch ? '응답 현황' : '참석 현황'}</div>
-      <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
-        <button type="button" className={`tm-btn tm-btn-sm ${tab === 'all' ? 'tm-btn-primary' : 'tm-btn-neutral'}`} onClick={() => setTab('all')}>
+    <section aria-labelledby={headingId}>
+      <div className={detailStyles.attendanceHeading}>
+        <SectionTitle id={headingId} title={friendlyMatch ? '응답 현황' : '참석 현황'} compact />
+        {onJumpToManagement ? (
+          <div className="tm-show-desktop">
+            <button type="button" className="tm-btn tm-btn-sm tm-btn-ghost" onClick={onJumpToManagement}>
+              모집·운영으로 바로가기
+            </button>
+          </div>
+        ) : null}
+      </div>
+      <div className={detailStyles.filters} role="group" aria-label={friendlyMatch ? '응답 현황 필터' : '참석 현황 필터'}>
+        <button type="button" className={`tm-chip ${detailStyles.filterButton}`} aria-pressed={tab === 'all'} onClick={() => setTab('all')}>
           전체 {model.counts.all}
         </button>
-        <button type="button" className={`tm-btn tm-btn-sm ${tab === 'going' ? 'tm-btn-primary' : 'tm-btn-neutral'}`} onClick={() => setTab('going')}>
+        <button type="button" className={`tm-chip ${detailStyles.filterButton}`} aria-pressed={tab === 'going'} onClick={() => setTab('going')}>
           {statusLabel('GOING')} {model.counts.going}
         </button>
-        <button type="button" className={`tm-btn tm-btn-sm ${tab === 'no_response' ? 'tm-btn-primary' : 'tm-btn-neutral'}`} onClick={() => setTab('no_response')}>
+        <button type="button" className={`tm-chip ${detailStyles.filterButton}`} aria-pressed={tab === 'no_response'} onClick={() => setTab('no_response')}>
           미응답 {model.counts.noResponse}
         </button>
       </div>
@@ -585,20 +620,15 @@ function ScheduleAttendeeSection({ model, friendlyMatch }: { model: ScheduleDeta
       {filtered.length === 0 ? (
         <div className="tm-text-caption">해당하는 팀원이 없어요.</div>
       ) : (
-        // A안(사용자 확정): 데스크톱에서 이름은 왼쪽 끝, 액션은 오른쪽 끝으로 벌어져
-        // 사이가 통째로 비었다(1440 실화면). 행마다 다른 구조를 만들지 않고 목록 자체의
-        // 폭을 모바일 리듬에 맞춰 묶는다 -- 코드 경로가 하나로 유지된다.
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxWidth: 560 }}>
+        <ul className={detailStyles.attendeeList}>
           {filtered.map((item) => (
-            <div key={item.userId} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 0' }}>
+            <li key={item.userId} className={detailStyles.attendeeRow}>
               <UserAvatar imageUrl={item.profileImageUrl} size={32} />
-              {/* 이름이 버튼·배지에 밀려 "QA0929선수/10" 처럼 꺾이지 않게 최소 폭을 준다. */}
-              <div className="tm-text-body" style={{ flex: '1 1 auto', minWidth: '7rem', wordBreak: 'keep-all' }}>{item.nickname}</div>
+              <div className={`tm-text-body ${detailStyles.attendeeName}`}>{item.nickname}</div>
               {canProxyItem(item) ? (
                 <button
                   type="button"
-                  className="tm-btn tm-btn-sm tm-btn-neutral"
-                  style={{ minHeight: 44, padding: '0 12px', whiteSpace: 'nowrap', flexShrink: 0 }}
+                  className={`tm-btn tm-btn-sm tm-btn-neutral ${detailStyles.proxyButton}`}
                   disabled={model.proxyPendingUserId !== null}
                   aria-label={`${item.nickname} ${josa(goingLabel, ['으로', '로'])} 대신 표시`}
                   onClick={() => model.onProxyGoing(item.userId)}
@@ -606,14 +636,14 @@ function ScheduleAttendeeSection({ model, friendlyMatch }: { model: ScheduleDeta
                   {model.proxyPendingUserId === item.userId ? '처리 중…' : '대신 표시'}
                 </button>
               ) : null}
-              <span className={`tm-badge ${ATTENDEE_STATUS_BADGE_CLASS[item.status] ?? 'tm-badge-grey'}`}>
+              <span className={`tm-badge ${ATTENDEE_STATUS_BADGE_CLASS[item.status] ?? 'tm-badge-grey'} ${detailStyles.attendeeStatus}`}>
                 {statusLabel(item.status)}
               </span>
-            </div>
+            </li>
           ))}
-        </div>
+        </ul>
       )}
-    </div>
+    </section>
   );
 }
 
@@ -626,11 +656,12 @@ function showsGuestRecruitment(model: ScheduleDetailViewModel['guestRecruitment'
 }
 
 function GuestRecruitmentSection({ model }: { model: ScheduleDetailViewModel['guestRecruitment'] }) {
+  const headingId = useId();
   const scheduleActive = model.manage?.scheduleActive ?? false;
 
   return (
-    <div>
-      <div className="tm-text-label" style={{ marginBottom: 8 }}>용병 모집</div>
+    <section aria-labelledby={headingId}>
+      <div className={detailStyles.sectionHeading}><SectionTitle id={headingId} title="용병 모집" compact /></div>
       {model.visible ? (
         <>
           <div className="tm-text-body">
@@ -779,7 +810,7 @@ function GuestRecruitmentSection({ model }: { model: ScheduleDetailViewModel['gu
           ) : null}
         </div>
       ) : null}
-    </div>
+    </section>
   );
 }
 

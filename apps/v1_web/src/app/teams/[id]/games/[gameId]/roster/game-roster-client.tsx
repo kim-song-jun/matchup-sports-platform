@@ -119,8 +119,10 @@ export function GameRosterClient({ teamId, gameId }: { teamId: string; gameId: s
   const pendingRevokes = changes.length - pendingExcludes;
   // 등번호 칸은 팀장·매니저의 편집 목록에서만 버튼이다. 참가 명단이 없는 팀은 칸을 눌러도 입력 대신 이유를 안내한다.
   // 시작한 경기는 편집 목록 자체가 없어 번호가 읽기 전용이고, 그 이유는 아래 `jerseyLocked` 가 말한다.
+  // 잠기거나 제출 마감이 지난 참가 명단은 저장이 409 라 칸을 열지 않는다(`jerseyEditable`).
   const jerseyPressable =
-    data.viewerRole === 'TEAM_MANAGER' && (data.jerseyRegistrationId !== null || data.baseSource === 'TEAM_MEMBERS');
+    data.viewerRole === 'TEAM_MANAGER' &&
+    ((data.jerseyRegistrationId !== null && data.jerseyEditable) || data.baseSource === 'TEAM_MEMBERS');
   const jerseyLocked = started && data.viewerRole === 'TEAM_MANAGER' && data.baseSource === 'REGISTRATION';
   const jerseyTarget = jersey === null ? null : (data.base.find((row) => row.userId === jersey.userId) ?? null);
   const competitionNoun = data.competitionKind === 'LEAGUE' ? '리그' : '대회';
@@ -230,7 +232,9 @@ export function GameRosterClient({ teamId, gameId }: { teamId: string; gameId: s
               {data.jerseyRegistrationId !== null ? (
                 <>
                   <br />
-                  {`번호 칸을 눌러 등번호를 넣어요. ${competitionNoun} 참가 명단에 저장돼요.`}
+                  {data.jerseyEditable
+                    ? `번호 칸을 눌러 등번호를 넣어요. ${competitionNoun} 참가 명단에 저장돼요.`
+                    : `${competitionNoun} 참가 명단이 마감돼 번호를 바꿀 수 없어요. 운영진에게 문의해 주세요.`}
                 </>
               ) : null}
             </>

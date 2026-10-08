@@ -11,6 +11,7 @@ import type {
   V1AdminBracketGroup,
   V1AdminBracketFixture,
   V1GenerateLeagueFixturesResponse,
+  V1TournamentStatus,
 } from '@/types/api';
 import { extractErrorMessage } from '@/lib/error-message';
 import { V1ApiError, v1Post, v1Patch } from '@/lib/api-client';
@@ -113,6 +114,7 @@ export function BracketTab({
   showToast,
   registrations,
   registrationDeadlineAt,
+  tournamentStatus,
   bracketPublishedAt,
   bracketPublishScheduledAt,
   canWrite,
@@ -121,6 +123,8 @@ export function BracketTab({
   showToast: (msg: string, v?: 'success' | 'error') => void;
   registrations: V1AdminTournamentRegistration[];
   registrationDeadlineAt: string | null | undefined;
+  /** 접수를 마감 시각 전에 수동으로 닫으면(closed 이후) 마감 시각이 미래여도 접수는 끝난 것이다. */
+  tournamentStatus?: V1TournamentStatus;
   bracketPublishedAt: string | null | undefined;
   bracketPublishScheduledAt: string | null | undefined;
   canWrite: boolean;
@@ -465,9 +469,9 @@ export function BracketTab({
   const isBracketPublished = isBracketPublishedNow(bracketPublishedAt, bracketPublishScheduledAt);
   // 아직 오지 않은 예약만 "예약됨" 안내·취소 대상이다.
   const hasPendingSchedule = !!bracketPublishScheduledAt && !isBracketPublished;
-  const deadlinePassed = registrationDeadlineAt
-    ? new Date(registrationDeadlineAt).getTime() < Date.now()
-    : false;
+  const deadlinePassed =
+    (tournamentStatus !== undefined && tournamentStatus !== 'draft' && tournamentStatus !== 'open') ||
+    (registrationDeadlineAt ? new Date(registrationDeadlineAt).getTime() < Date.now() : false);
   // 조가 하나도 없으면 공개해도 참가팀에게 보여줄 대진이 없다. 실수로 빈 대진표를
   // 공개하는 사고를 막기 위해 공개·예약 진입 자체를 닫는다.
   const publishBlockedReason = groups.length === 0 ? '조를 먼저 만들어야 공개할 수 있어요.' : null;

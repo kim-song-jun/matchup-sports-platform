@@ -2383,6 +2383,22 @@ describe('OperateConsole — 승부차기 (과제 2)', () => {
       expect(screen.queryByText('승부차기 5:4')).toBeNull();
     });
 
+    it('결과 검수에서 점수를 정정해 확정하면 헤더는 이벤트가 아니라 확정본 점수를 보여준다', () => {
+      // 이벤트 로그는 1:1 그대로지만 "고치고 확인"으로 확정본이 3:0이 됐다.
+      setupEnded(
+        [
+          { id: 'rev-2', revision: 2, state: 'OFFICIAL', score: { home: 3, away: 0 } },
+          { id: 'rev-1', revision: 1, state: 'SUPERSEDED', score: { home: 1, away: 1 } },
+        ],
+        'rev-2',
+      );
+
+      render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+
+      expect(screen.getByText('3 : 0')).toBeInTheDocument();
+      expect(screen.queryByText('1 : 1')).toBeNull();
+    });
+
     it('승부차기 없이 끝난 경기에는 승부차기 표기를 만들지 않는다', () => {
       setupEnded([{ id: 'rev-1', revision: 1, state: 'DRAFT', score: { home: 2, away: 1 } }]);
 

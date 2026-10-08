@@ -4,13 +4,14 @@ import { useRouter } from 'next/navigation';
 import type { ReactNode } from 'react';
 import { useEffect, useState } from 'react';
 import { useV1AuthMe } from '@/hooks/use-v1-api';
-import { isUnauthenticatedError, retryTransientFailure } from '@/lib/api-client';
+import { isUnauthenticatedError, retryTransientFailure, V1ApiError } from '@/lib/api-client';
 import {
   clearStoredV1Session,
   sanitizeRedirectPath,
   shouldProbeV1Session,
 } from '@/lib/session-storage';
 import { disconnectV1Socket } from '@/lib/v1-socket';
+import { reportClientError } from '@/lib/client-error-reporter';
 import { BrandMark } from '@/components/v1-ui/brand-logo';
 import { ErrorState } from '@/components/v1-ui/primitives';
 
@@ -18,6 +19,14 @@ type SessionEntryGateProps = {
   mode: 'root' | 'login';
   children?: ReactNode;
 };
+
+function isInactiveAccountPermissionError(error: unknown): boolean {
+  return error instanceof V1ApiError && error.statusCode === 403 && error.code === 'PERMISSION_DENIED';
+}
+
+function isLoginEntryAuthError(error: unknown): boolean {
+  return isUnauthenticatedError(error) || isInactiveAccountPermissionError(error);
+}
 
 export function SessionEntryGate({ mode, children }: SessionEntryGateProps) {
   const router = useRouter();
@@ -45,15 +54,23 @@ export function SessionEntryGate({ mode, children }: SessionEntryGateProps) {
       return;
     }
 
-    if (authMe.isError && !authMe.isFetching && isUnauthenticatedError(authMe.error)) {
-      clearStoredV1Session();
+    if (authMe.isError && !authMe.isFetching && isLoginEntryAuthError(authMe.error)) {
+      try {
+        clearStoredV1Session();
+      } catch {
+        reportClientError({
+          message: '인증이 만료된 뒤 저장된 로그인 정보를 정리하지 못했어요.',
+          level: 'warn',
+          context: { flow: 'session-entry-gate-session-cleanup' },
+        });
+      }
       disconnectV1Socket();
       setHasSessionHint(false);
       if (mode === 'root') window.location.replace('/login');
     }
   }, [authMe.error, authMe.isError, authMe.isFetching, authMe.isSuccess, hasSessionHint, mode, router]);
 
-  if (mode === 'login' && (hasSessionHint === false || (authMe.isError && isUnauthenticatedError(authMe.error)))) {
+  if (mode === 'login' && (hasSessionHint === false || (authMe.isError && isLoginEntryAuthError(authMe.error)))) {
     return <>{children}</>;
   }
 

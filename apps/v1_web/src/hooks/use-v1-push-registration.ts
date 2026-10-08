@@ -15,6 +15,8 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array<ArrayBuffer> {
 export interface UnsubscribeOptions {
   /** `'sign-out'` from the logout button — the app shell keeps the reader's opt-in. */
   reason?: NativePushRevokeReason;
+  /** The caller cannot use authenticated server cleanup and only needs local device revocation. */
+  skipServerUnsubscribe?: boolean;
 }
 
 export interface V1PushRegistration {
@@ -198,15 +200,17 @@ export function useV1PushRegistration(): V1PushRegistration {
         return true;
       }
 
-      try {
-        await v1Delete('/notifications/push-unsubscribe', { endpoint: subscription.endpoint });
-      } catch (err) {
-        // 서버 요청은 best-effort — 실패해도 브라우저 쪽 구독 해지는 항상 진행한다.
-        reportClientError({
-          message: extractErrorMessage(err, '푸시 구독 해지 요청이 서버에 전달되지 않았어요.'),
-          level: 'warn',
-          context: { flow: 'push-unsubscribe-server' },
-        });
+      if (!options.skipServerUnsubscribe) {
+        try {
+          await v1Delete('/notifications/push-unsubscribe', { endpoint: subscription.endpoint });
+        } catch (err) {
+          // 서버 요청은 best-effort — 실패해도 브라우저 쪽 구독 해지는 항상 진행한다.
+          reportClientError({
+            message: extractErrorMessage(err, '푸시 구독 해지 요청이 서버에 전달되지 않았어요.'),
+            level: 'warn',
+            context: { flow: 'push-unsubscribe-server' },
+          });
+        }
       }
 
       await subscription.unsubscribe();

@@ -246,11 +246,13 @@ describe('shared record participant flow', () => {
     expect(state.replace).not.toHaveBeenCalled();
   });
 
-  it('공동 기록 이전 경기(legacy)는 출처를 실은 채 매치 상세로 넘긴다', () => {
-    state.data = { ...state.data, phase: 'legacy' };
+  it('공동 기록 이전 경기(legacy)도 현재 화면에서 공개 결과를 읽고 일반 상세로 넘기지 않는다', () => {
+    state.data = { ...state.data, phase: 'legacy', canEdit: false, participant: false, ownSideId: null };
     state.search = `from=${encodeURIComponent('/users/u1/records')}`;
     render(<TeamMatchSharedRecord teamMatchId="match" />);
-    expect(state.replace).toHaveBeenCalledWith(`/team-matches/match?view=detail&from=${encodeURIComponent('/users/u1/records')}`);
+    expect(state.replace).not.toHaveBeenCalled();
+    expect(screen.getByLabelText('점수 0 대 0')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '득점 추가' })).not.toBeInTheDocument();
     expect(screen.queryByText('이 경기는 기존 경기 기록 화면에서 확인할 수 있어요.')).toBeNull();
   });
 

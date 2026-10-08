@@ -41,6 +41,7 @@ import { teamErrorMessage } from '@/lib/team-error-messages';
 import { isTeamOperatorRole, normalizeMyTeamsResponse, TEAM_MANAGER_LIMIT } from '@/lib/team-role';
 import { getLoginPathForRedirect, withFromPath, sanitizeRedirectPath } from '@/lib/session-storage';
 import { useShellOverride } from '@/components/v1-ui/shell-override';
+import { useCurrentHref } from '@/components/v1-ui/use-current-href';
 import { teamSharePath } from '@/lib/team-share-route';
 import { V1_LEVELS, levelRangeMatches, toLevelCodes, toggleLevelCode } from '@/lib/v1-levels';
 import { sentInvitationStatusLabel, teamGenderRuleLabel, teamRecruitmentLabel, teamRoleLabel } from '@/lib/v1-status-labels';
@@ -476,9 +477,43 @@ function membersTabFromQuery(value: string | null): TeamMembersViewModel['active
 export function TeamMembersPageClient({ teamId }: { teamId: string }) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  // 팀 상세가 받은 출처를 이어받아 왔으면 뒤로가기를 그 팀 상세(출처 포함)로 돌린다.
-  const fromPath = sanitizeRedirectPath(searchParams.get('from'));
-  const membersHref = withFromPath(`/teams/${teamId}/members`, fromPath);
+  const queryString = searchParams.toString();
+  const membersPath = `/teams/${teamId}/members`;
+  const initialMembersHref = `${membersPath}${queryString ? `?${queryString}` : ''}`;
+  const currentHref = useCurrentHref();
+  // 첫 렌더는 서버가 아는 query만 사용한다. hash와 실제 history 항목은 마운트 뒤에 읽는다.
+  const [searchDraft, setSearchDraft] = useState(() => ({ teamId, query: searchParams.get('q') ?? '', href: initialMembersHref }));
+  const draftTeamId = useRef(teamId);
+  const memberSearch = searchDraft.teamId === teamId
+    ? searchDraft
+    : { teamId, query: searchParams.get('q') ?? '', href: initialMembersHref };
+  useEffect(() => {
+    const location = window.location.pathname === membersPath ? window.location : null;
+    // 같은 팀의 빠른 입력을 늦은 Next snapshot으로 덮지 않는다. 다른 팀은 새 URL로 초기화한다.
+    if (location && draftTeamId.current === teamId && new URLSearchParams(location.search).toString() !== queryString) return;
+    const params = new URLSearchParams(location?.search ?? queryString);
+    const restored = { teamId, query: params.get('q') ?? '', href: location ? `${membersPath}${location.search}${location.hash}` : initialMembersHref };
+    draftTeamId.current = teamId;
+    setSearchDraft((current) => current.teamId === restored.teamId && current.query === restored.query && current.href === restored.href ? current : restored);
+  }, [currentHref, teamId, membersPath, queryString, initialMembersHref]);
+
+  function changeMemberLocation(change: { query?: string; tab?: TeamMembersViewModel['activeTab'] }) {
+    const location = window.location.pathname === membersPath ? window.location : null;
+    const params = new URLSearchParams(location?.search ?? queryString);
+    if (change.query !== undefined) {
+      if (change.query) params.set('q', change.query); else params.delete('q');
+    }
+    if (change.tab) {
+      params.set('tab', change.tab);
+      setActiveTab(change.tab);
+    }
+    const nextQuery = params.toString();
+    const href = `${membersPath}${nextQuery ? `?${nextQuery}` : ''}${location?.hash ?? ''}`;
+    draftTeamId.current = teamId;
+    setSearchDraft({ teamId, query: params.get('q') ?? '', href });
+    window.history.replaceState(null, '', href);
+  }
+  const membersHref = memberSearch.href;
   const [activeTab, setActiveTab] = useState<TeamMembersViewModel['activeTab']>(() => membersTabFromQuery(searchParams.get('tab')));
   const team = useV1TeamDetail(teamId);
   const canViewMembers = Boolean(team.data?.canViewMembers);
@@ -676,12 +711,12 @@ export function TeamMembersPageClient({ teamId }: { teamId: string }) {
   }
 
   const tabs: TeamMembersViewModel['tabs'] = [
-    { key: 'members', label: '멤버', count: members.data?.summary.memberCount ?? memberItems.length, onSelect: () => setActiveTab('members') },
+    { key: 'members', label: '멤버', count: members.data?.summary.memberCount ?? memberItems.length, onSelect: () => changeMemberLocation({ tab: 'members' }) },
     ...(canReviewApplications
-      ? [{ key: 'requests' as const, label: '가입 신청', count: requestItems.length, onSelect: () => setActiveTab('requests') }]
+      ? [{ key: 'requests' as const, label: '가입 신청', count: requestItems.length, onSelect: () => changeMemberLocation({ tab: 'requests' }) }]
       : []),
     ...(canManageInvitations
-      ? [{ key: 'invitations' as const, label: '초대', count: invitationItems.length, onSelect: () => setActiveTab('invitations') }]
+      ? [{ key: 'invitations' as const, label: '초대', count: invitationItems.length, onSelect: () => changeMemberLocation({ tab: 'invitations' }) }]
       : []),
   ];
 
@@ -852,7 +887,7 @@ export function TeamMembersPageClient({ teamId }: { teamId: string }) {
     <>
       {/* 확인 모달 — window.confirm 대체 */}
       {ConfirmModal}
-      <TeamMembersPageView model={model} backHref={`/teams/${teamId}`} />
+      <TeamMembersPageView model={model} backHref={`/teams/${teamId}`} searchQuery={memberSearch.query} onSearchQueryChange={(query) => changeMemberLocation({ query })} />
       {toast}
       {unavailabilityTarget !== null ? (
         <MemberUnavailabilitySheet

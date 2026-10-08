@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -118,13 +118,67 @@ function mapReviewApplicationErrorMessage(err: unknown, fallback: string): strin
 
 // ── 목록 ──────────────────────────────────────────────────────────────────────
 
+type ScheduleListNavigationState = {
+  readonly view: 'list' | 'calendar';
+  readonly typeFilter: ScheduleTypeFilter;
+  readonly stateFilter: ScheduleStateFilter;
+  readonly monthDate: Date;
+  readonly selectedDateKey: string | null;
+};
+
+function scheduleListStateFrom(params: URLSearchParams): ScheduleListNavigationState {
+  const month = params.get('month');
+  const monthDate = month && /^[1-9]\d{3}-(0[1-9]|1[0-2])$/.test(month) ? new Date(`${month}-01T00:00:00`) : kstMonthStart(new Date());
+  const date = params.get('date');
+  const parsedDate = date && /^[1-9]\d{3}-\d{2}-\d{2}$/.test(date) ? new Date(`${date}T00:00:00Z`) : null;
+  return {
+    view: params.get('view') === 'calendar' ? 'calendar' : 'list',
+    typeFilter: scheduleTypeFilterOptions().find((option) => option.value === params.get('type'))?.value ?? 'all',
+    stateFilter: scheduleStateFilterOptions().find((option) => option.value === params.get('state'))?.value ?? 'all',
+    monthDate,
+    // Date는 2월 30일도 다음 달로 넘긴다. 원문과 왕복 비교해 존재하는 날짜만 선택한다.
+    selectedDateKey: parsedDate && !Number.isNaN(parsedDate.getTime()) && parsedDate.toISOString().slice(0, 10) === date ? date : null,
+  };
+}
+
 export function TeamScheduleListPageClient({ teamId }: { teamId: string }) {
   const team = useV1TeamDetail(teamId);
-  const [view, setView] = useState<'list' | 'calendar'>('list');
-  const [typeFilter, setTypeFilter] = useState<ScheduleTypeFilter>('all');
-  const [stateFilter, setStateFilter] = useState<ScheduleStateFilter>('all');
-  const [monthDate, setMonthDate] = useState(() => kstMonthStart(new Date()));
-  const [selectedDateKey, setSelectedDateKey] = useState<string | null>(null);
+  const searchParams = useSearchParams();
+  const queryString = searchParams.toString();
+  const basePath = `/teams/${teamId}/schedules`;
+  const [navigation, setNavigation] = useState(() => scheduleListStateFrom(new URLSearchParams(queryString)));
+  const draft = useRef(navigation);
+  const { view, typeFilter, stateFilter, monthDate, selectedDateKey } = navigation;
+  useEffect(() => {
+    // native history가 이미 반영한 마지막 선택을 늦게 도착한 Next query로 덮지 않는다.
+    if (window.location.pathname === basePath && new URLSearchParams(window.location.search).toString() !== queryString) return;
+    const restored = scheduleListStateFrom(new URLSearchParams(queryString));
+    draft.current = restored;
+    setNavigation(restored);
+  }, [basePath, queryString]);
+
+  function listPathForState(state: ScheduleListNavigationState) {
+    const currentLocation = typeof window !== 'undefined' && window.location.pathname === basePath ? window.location : null;
+    const params = new URLSearchParams(currentLocation?.search ?? queryString);
+    if (state.typeFilter === 'all') params.delete('type'); else params.set('type', state.typeFilter);
+    if (state.stateFilter === 'all') params.delete('state'); else params.set('state', state.stateFilter);
+    if (state.view === 'list') params.delete('view'); else params.set('view', state.view);
+    params.set('month', `${state.monthDate.getFullYear()}-${String(state.monthDate.getMonth() + 1).padStart(2, '0')}`);
+    if (state.selectedDateKey) params.set('date', state.selectedDateKey); else params.delete('date');
+    return `${basePath}?${params}${currentLocation?.hash ?? ''}`;
+  }
+
+  function changeNavigation(change: Partial<ScheduleListNavigationState>) {
+    // 같은 React flush 안의 연속 입력도 draft로 합성하고, 이력 갱신은 setState 밖에서 수행한다.
+    const next = { ...draft.current, ...change };
+    draft.current = next;
+    setNavigation(next);
+    window.history.replaceState(null, '', listPathForState(next));
+  }
+  // from은 실제 목록 이력과 같아야 AppBackLink가 replace 대신 back으로 복귀한다.
+  const listLocation = typeof window !== 'undefined' && window.location.pathname === basePath ? window.location : null;
+  const returnQuery = new URLSearchParams(listLocation?.search ?? queryString).toString();
+  const returnPath = `${basePath}${returnQuery ? `?${returnQuery}` : ''}${listLocation?.hash ?? ''}`;
 
   // 서버 캡(최대 100)을 그대로 사용 — 캘린더가 한 달 치를 필터 없이 훑어보려면
   // 목록 API의 종류/상태 필터를 그대로 쓰되 넉넉한 limit으로 한 페이지에 담는다.
@@ -135,12 +189,15 @@ export function TeamScheduleListPageClient({ teamId }: { teamId: string }) {
     return next;
   }, [typeFilter, stateFilter]);
 
-  const query = useV1TeamSchedules(teamId, filters);
+  const query = useV1TeamSchedules(teamId, filters, { refetchOnWindowFocus: 'always' });
   const items = query.data?.items ?? [];
   const canManage = isScheduleManagerRole(team.data?.viewer.role);
   const todayKey = dateKeyOf(new Date().toISOString());
   const calendar = buildScheduleCalendarMonth(items, monthDate, todayKey);
-  const listItems = items.map((item) => toScheduleListItemModel(item, teamId));
+  const listItems = items.map((item) => {
+    const model = toScheduleListItemModel(item, teamId);
+    return { ...model, href: withFromPath(model.href, returnPath) };
+  });
   const visibleItems =
     view === 'calendar' && selectedDateKey ? listItems.filter((item) => item.dateKey === selectedDateKey) : listItems;
   const hasSelectedDate = view === 'calendar' && selectedDateKey !== null;
@@ -152,21 +209,21 @@ export function TeamScheduleListPageClient({ teamId }: { teamId: string }) {
     canManage,
     createHref: `/teams/${teamId}/schedules/new`,
     view,
-    onViewChange: setView,
+    onViewChange: (view) => changeNavigation({ view }),
     typeFilter,
-    onTypeFilterChange: setTypeFilter,
+    onTypeFilterChange: (typeFilter) => changeNavigation({ typeFilter }),
     stateFilter,
-    onStateFilterChange: setStateFilter,
+    onStateFilterChange: (stateFilter) => changeNavigation({ stateFilter }),
     typeOptions: scheduleTypeFilterOptions(),
     stateOptions: scheduleStateFilterOptions(),
     calendar,
     selectedDateKey,
-    onSelectDate: setSelectedDateKey,
-    onPrevMonth: () => setMonthDate((current) => new Date(current.getFullYear(), current.getMonth() - 1, 1)),
-    onNextMonth: () => setMonthDate((current) => new Date(current.getFullYear(), current.getMonth() + 1, 1)),
+    onSelectDate: (selectedDateKey) => changeNavigation({ selectedDateKey }),
+    onPrevMonth: () => changeNavigation({ monthDate: new Date(draft.current.monthDate.getFullYear(), draft.current.monthDate.getMonth() - 1, 1) }),
+    onNextMonth: () => changeNavigation({ monthDate: new Date(draft.current.monthDate.getFullYear(), draft.current.monthDate.getMonth() + 1, 1) }),
     items: listItems,
     visibleItems,
-    loading: query.isLoading,
+    loading: query.isLoading || query.isPlaceholderData,
     error: query.isError,
     onRetry: () => void query.refetch(),
     emptyTitle: hasSelectedDate ? '선택한 날짜에 일정이 없어요'
@@ -187,7 +244,7 @@ export function TeamScheduleDetailPageClient({ teamId, scheduleId }: { teamId: s
   // 내 일정·알림처럼 팀 일정 목록이 아닌 곳에서 들어왔으면 그 화면으로 돌아간다.
   const fromPath = sanitizeRedirectPath(useSearchParams().get('from'));
   const team = useV1TeamDetail(teamId);
-  const detail = useV1TeamSchedule(teamId, scheduleId);
+  const detail = useV1TeamSchedule(teamId, scheduleId, { refetchOnWindowFocus: 'always' });
   // M-M 감사: 상태 배지가 "상대팀 확정"이라 말하면서도 화면 어디에도 그 상대팀 이름·
   // 장소가 없었다. 확정된 매치일 때만(그 전엔 상대가 비어 헛수고다) 경기 상세를 한 번 더
   // 불러 요약을 보여준다. 친선·리그는 팀 매치 상세, 대회 경기는 그 조회가 404 라 공개 경기
@@ -702,6 +759,10 @@ export function TeamScheduleFormPageClient({ teamId, scheduleId }: { teamId: str
       setError('제목과 시작·종료 시각을 모두 입력해 주세요.');
       return;
     }
+    if (Date.parse(endAtIso) <= Date.parse(startAtIso)) {
+      setError('종료 시각은 시작 시각보다 늦어야 해요.');
+      return;
+    }
     setError(null);
     const capacityNum = draft.capacity.trim() ? Number(draft.capacity) : undefined;
     const rsvpDeadlineIso = kstDatetimeLocalToIso(draft.rsvpDeadlineAt) ?? undefined;
@@ -738,7 +799,7 @@ export function TeamScheduleFormPageClient({ teamId, scheduleId }: { teamId: str
       title: draft.title.trim(),
       startAt: startAtIso,
       endAt: endAtIso,
-      capacity: capacityNum,
+      capacity: capacityNum ?? null,
       // 필드가 비어있으면 명시적으로 null(서버가 SQL NULL로 지움), 값이 있으면 그 값,
       // 미로딩 상태에서 값이 있었는데 사용자가 손대지 않은 경우도 위 draft 값 그대로 보낸다.
       rsvpDeadlineAt: draft.rsvpDeadlineAt.trim() ? rsvpDeadlineIso : null,

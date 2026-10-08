@@ -70,6 +70,82 @@ describe('getMatchStepErrors — 스텝별 즉시 검증이 다른 스텝 필드
   });
 });
 
+describe('개인 매치 종료 시간 — 단계와 제출이 같은 시간 순서를 검증한다', () => {
+  it.each(['09:00', '10:00', 'not-a-time', '24:00', '11:60'])('10:00 시작에 %s 종료는 endTime 오류로 다음과 payload를 차단한다', (endTime) => {
+    const ctx = baseCtx({ draft: { ...baseCtx().draft, startTime: '10:00', endTime } });
+    const before = { ...ctx.draft };
+
+    expect(buildMatchPayloadResult(ctx.draft, ctx.sportId, ctx.regionId)).toEqual({
+      missingFields: [{ field: 'endTime', label: '종료 시간은 시작 시간보다 늦어야 해요', step: 'place-time' }],
+    });
+    expect(getMatchStepErrors(ctx, 'place-time')).toEqual({ endTime: '종료 시간은 시작 시간보다 늦어야 해요' });
+    expect(getMatchStepErrors(ctx, 'info')).toEqual({});
+    expect(getCompleteMatchSteps(ctx, ['sport', 'info', 'place-time'])).not.toContain('place-time');
+    expect(ctx.draft).toEqual(before);
+  });
+
+  it.each(['11:00', '23:59', ''])('10:00 시작에 종료가 %s이면 정상 시간과 종료 생략을 보존한다', (endTime) => {
+    const ctx = baseCtx({ draft: { ...baseCtx().draft, startTime: '10:00', endTime } });
+    const result = buildMatchPayloadResult(ctx.draft, ctx.sportId, ctx.regionId);
+
+    expect(getMatchStepErrors(ctx, 'place-time')).toEqual({});
+    expect(getCompleteMatchSteps(ctx, ['sport', 'info', 'place-time'])).toContain('place-time');
+    expect(result.missingFields).toBeUndefined();
+    expect(result.payload).toMatchObject({
+      startsAt: new Date(`${ctx.draft.date}T10:00:00`).toISOString(),
+      endsAt: endTime ? new Date(`${ctx.draft.date}T${endTime}:00`).toISOString() : null,
+    });
+  });
+});
+
+describe('명시적 종료 날짜 — API가 지원하는 익일 시각과 손상된 초안을 구분한다', () => {
+  it('종료 날짜를 다음 날로 명시한 10:00→09:00은 실제 다음 날 ISO만 payload로 보낸다', () => {
+    const base = baseCtx();
+    const nextDay = new Date(`${base.draft.date}T12:00:00`);
+    nextDay.setDate(nextDay.getDate() + 1);
+    const endDate = nextDay.toISOString().slice(0, 10);
+    const draft = { ...base.draft, startTime: '10:00', endTime: '09:00', endDate };
+    const ctx = baseCtx({ draft });
+
+    expect(getMatchStepErrors(ctx, 'place-time')).toEqual({});
+    const result = buildMatchPayloadResult(draft, ctx.sportId, ctx.regionId);
+    expect(result.missingFields).toBeUndefined();
+    expect(result.payload).toMatchObject({
+      startsAt: new Date(`${draft.date}T10:00:00`).toISOString(), endsAt: new Date(`${endDate}T09:00:00`).toISOString(),
+    });
+    expect(result.payload).not.toHaveProperty('endDate');
+    expect(result.payload).not.toHaveProperty('endTime');
+  });
+
+  it('같은 종료 날짜를 명시해도 시작 이하 종료를 익일로 보정하지 않는다', () => {
+    const base = baseCtx();
+    const draft = { ...base.draft, startTime: '10:00', endTime: '09:00', endDate: base.draft.date };
+    const ctx = baseCtx({ draft });
+
+    expect(buildMatchPayloadResult(draft, ctx.sportId, ctx.regionId).missingFields).toContainEqual({
+      field: 'endTime', label: '종료 시간은 시작 시간보다 늦어야 해요', step: 'place-time',
+    });
+  });
+
+  it.each(['not-a-date', '2099-02-30', '2099-13-01'])('손상된 종료 날짜 %s는 시작 날짜로 대체하거나 정규화해 저장하지 않는다', (endDate) => {
+    const draft = { ...baseCtx().draft, startTime: '10:00', endTime: '11:00', endDate };
+    const ctx = baseCtx({ draft });
+    const result = buildMatchPayloadResult(draft, ctx.sportId, ctx.regionId);
+
+    expect(result.payload).toBeUndefined();
+    expect(result.missingFields).toContainEqual({ field: 'endDate', label: '종료 날짜를 확인해 주세요', step: 'place-time' });
+  });
+
+  it('종료 날짜만 있으면 종료 시간도 요구하고 null 종료로 저장하지 않는다', () => {
+    const base = baseCtx();
+    const draft = { ...base.draft, endDate: base.draft.date, endTime: '' };
+    const result = buildMatchPayloadResult(draft, base.sportId, base.regionId);
+
+    expect(result.payload).toBeUndefined();
+    expect(result.missingFields).toContainEqual({ field: 'endTime', label: '종료 시간도 입력해 주세요', step: 'place-time' });
+  });
+});
+
 describe('getCompleteMatchSteps — CreateProgress 체크 배지 판정', () => {
   it('필수 필드를 채운 스텝만 완료로 표시한다', () => {
     const ctx = baseCtx({ draft: { ...baseCtx().draft, venue: '' } });

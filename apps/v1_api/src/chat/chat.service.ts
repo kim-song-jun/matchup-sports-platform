@@ -536,7 +536,9 @@ export class ChatService {
     // Fire-and-forget, matching NotificationsService's emitNotificationFireAndForget:
     // the message and any notification rows are settled above, so realtime or push
     // delivery failures must never surface as an error for a successful send.
-    for (const recipientUserId of recipientUserIds) {
+    // 같은 계정의 다른 탭도 저장된 메시지를 갱신해야 한다. 발신자는 메시지 변경만
+    // 받고, 알림함·배지·푸시는 위에서 계산한 다른 수신자 집합으로 제한한다.
+    for (const recipientUserId of [user.id, ...recipientUserIds]) {
       try {
         this.realtimeGateway.emitToUser(recipientUserId, 'chat:message', chatMessagePayload);
         if (notificationEnabledRecipientIds.has(recipientUserId)) {

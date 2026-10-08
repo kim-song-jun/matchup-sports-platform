@@ -1,6 +1,14 @@
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { fireEvent, render as rtlRender, screen, within } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import type { ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MatchListPageClient } from './matches-client';
+
+// 목록은 상세 복귀 복원에 QueryClient 를 쓴다(useCursorPagination) — API 훅을 mock 해도 provider 는 필요하다.
+function render(ui: ReactElement) {
+  const client = new QueryClient();
+  return rtlRender(ui, { wrapper: ({ children }) => <QueryClientProvider client={client}>{children}</QueryClientProvider> });
+}
 
 const BUSAN = 'a75f6cce-70da-4082-88fc-8f28a62c0aa2';
 const SEOUL = 'seoul-control';

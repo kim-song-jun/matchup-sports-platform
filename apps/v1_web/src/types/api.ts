@@ -1103,7 +1103,7 @@ export type V1UpdateScheduleDto = {
   title?: string;
   startAt?: string;
   endAt?: string;
-  capacity?: number;
+  capacity?: number | null;
   /** 명시적으로 null이면 서버가 SQL NULL로 지운다 — omit이면 기존 값 유지 */
   rsvpDeadlineAt?: string | null;
   visibility?: V1ScheduleVisibility;

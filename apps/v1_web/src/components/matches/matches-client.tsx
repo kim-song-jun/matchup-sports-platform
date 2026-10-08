@@ -14,7 +14,9 @@ import {
   useV1ResolveChatRoom,
   useV1WithdrawMatchApplication,
 } from '@/hooks/use-v1-api';
+import { useCursorPagination, useCursorPaginationSnapshot } from '@/hooks/use-cursor-pagination';
 import { trackEvent } from '@/lib/analytics';
+import { v1Keys } from '@/lib/query-keys';
 import { chatRoomHref } from '@/lib/chat-route';
 import { extractErrorMessage } from '@/lib/error-message';
 import { sanitizeRedirectPath, withFromPath } from '@/lib/session-storage';
@@ -85,21 +87,14 @@ export function MatchListPageClient({ seed }: { readonly seed?: CursorListSeed<V
   // 단발 useQuery로 첫 페이지만 받아 21번째 매치부터는 볼 방법이 아예 없었다(감사 결함).
   // 대회 목록(tournaments/tournaments-list-client.tsx)과 같은 "더 보기" 누적 방식 — 다만 그 화면 수준의
   // 데스크톱 페이지 번호 분기까지는 아직 이 화면 규모에 근거가 없다.
-  const [cursor, setCursor] = useState<string | undefined>(undefined);
-  const [accumulated, setAccumulated] = useState<V1Match[]>([]);
-  // 필터가 바뀌면(종목·성별·레벨·검색·정렬·보기) 새 조건의 1페이지부터 다시 쌓는다.
-  // useEffect가 아니라 렌더 중에 직접 되감는다("prop이 바뀔 때 state 조정" — React 공식
-  // 패턴): useEffect로 하면 effect가 도는 다음 렌더까지 "새 필터 + 이전 cursor"가 합쳐진
-  // 요청이 한 번 나간다 — 그 cursor는 이전 필터 기준 토큰이라 새 필터에서는 무효하고,
-  // 서버가 그 조합을 어떻게 처리할지도 검증된 바 없다. 렌더 중 set을 호출하면 이 렌더의
-  // 출력은 버려지고 즉시 다시 렌더되므로 그 중간 상태가 화면에도, 요청에도 나타나지 않는다.
+  // 필터가 바뀌면 새 조건의 1페이지부터 다시 쌓고(렌더 중 되감기), 상세에 다녀와도 누적분을
+  // 되살린다 — 팀매치·대회 목록과 같은 훅이다(useCursorPagination).
   const matchFiltersKey = matchFilters ? JSON.stringify(matchFilters) : '';
-  const [pagedFiltersKey, setPagedFiltersKey] = useState(matchFiltersKey);
-  if (pagedFiltersKey !== matchFiltersKey) {
-    setPagedFiltersKey(matchFiltersKey);
-    setCursor(undefined);
-    setAccumulated([]);
-  }
+  const { cursor, accumulated, setPagination, snapshotKey } = useCursorPagination<V1Match>(
+    v1Keys.matchesAll(),
+    matchFiltersKey,
+    (savedCursor) => v1Keys.matches(savedCursor ? { ...matchFilters, cursor: savedCursor } : matchFilters),
+  );
   const allMatchesFilters = useMemo(() => (!matchFilters && cursor ? { cursor } : undefined), [matchFilters, cursor]);
   const filteredMatchesFilters = useMemo(
     () => (matchFilters ? (cursor ? { ...matchFilters, cursor } : matchFilters) : undefined),
@@ -122,6 +117,7 @@ export function MatchListPageClient({ seed }: { readonly seed?: CursorListSeed<V
   const sports = useV1MasterSports({ seed: seed?.sports });
   const regions = useV1MasterRegions();
   const query = matchFilters ? filteredMatches : allMatches;
+  useCursorPaginationSnapshot(snapshotKey, { cursor, accumulated }, query);
 
   if (query.isError) return <MatchStatePageView model={{ ...getMatchStateViewModel('error'), retry: () => void query.refetch() }} />;
 
@@ -157,8 +153,7 @@ export function MatchListPageClient({ seed }: { readonly seed?: CursorListSeed<V
       : [];
   const handleLoadMore = () => {
     if (!query.data?.pageInfo?.nextCursor || query.isFetching) return;
-    setAccumulated(orderedItems ?? []);
-    setCursor(query.data.pageInfo.nextCursor);
+    setPagination({ accumulated: orderedItems ?? [], cursor: query.data.pageInfo.nextCursor });
   };
   const searchModel: NonNullable<MatchListViewModel['search']> = {
     value: searchValue,

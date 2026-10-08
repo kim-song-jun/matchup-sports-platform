@@ -7,6 +7,8 @@ import { compressImagesForUpload, type CompressOptions } from '@/lib/image-compr
 import { earliestPublicLivePollDelay } from '@/lib/public-live-polling';
 import { OPERATIONS_BOARD_POLL_INTERVAL_MS } from '@/lib/operations-board-polling';
 import { v1Keys } from '@/lib/query-keys';
+import { invalidateV1ChatMessageQueries } from './use-v1-realtime-socket';
+import { useV1WindowFocusRefetch } from './use-v1-window-focus-refetch';
 import { findInListCache } from '@/lib/list-cache-seed';
 import { randomUuid } from '@/lib/uuid';
 import type { GameLineup } from '@/types/game-operations';
@@ -1502,23 +1504,30 @@ function idempotencyInit(): RequestInit {
   return { headers: { 'Idempotency-Key': randomUuid() } };
 }
 
-export function useV1TeamSchedules(teamId: string, filters?: ListFilters, options?: QueryOptions) {
-  return useQuery({
+// 읽기 화면만 다른 탭의 저장을 focus 재조회로 받는다. 편집폼의 초안·기준 버전은 자동 갱신하지 않는다.
+export function useV1TeamSchedules(teamId: string, filters?: ListFilters, options?: QueryOptions & { refetchOnWindowFocus?: boolean | 'always' }) {
+  const query = useQuery({
     queryKey: v1Keys.teamSchedules(teamId, filters),
     queryFn: () => v1Get<V1TeamSchedulesPage>(`/teams/${teamId}/schedules`, filters),
+    refetchOnWindowFocus: options?.refetchOnWindowFocus ?? false,
     enabled: Boolean(teamId) && (options?.enabled ?? true),
     // 빠른 필터 전환(종류/상태 칩)에서 화면이 매번 깜빡이지 않도록 이전 페이지 데이터를
     // 유지한 채 새 쿼리를 백그라운드에서 가져온다.
     placeholderData: keepPreviousData,
   });
+  useV1WindowFocusRefetch(query, Boolean(teamId) && (options?.enabled ?? true), options?.refetchOnWindowFocus ?? false);
+  return query;
 }
 
-export function useV1TeamSchedule(teamId: string, scheduleId: string, options?: QueryOptions) {
-  return useQuery({
+export function useV1TeamSchedule(teamId: string, scheduleId: string, options?: QueryOptions & { refetchOnWindowFocus?: boolean | 'always' }) {
+  const query = useQuery({
     queryKey: v1Keys.teamSchedule(teamId, scheduleId),
     queryFn: () => v1Get<V1TeamScheduleDetail>(`/teams/${teamId}/schedules/${scheduleId}`),
+    refetchOnWindowFocus: options?.refetchOnWindowFocus ?? false,
     enabled: Boolean(teamId) && Boolean(scheduleId) && (options?.enabled ?? true),
   });
+  useV1WindowFocusRefetch(query, Boolean(teamId) && Boolean(scheduleId) && (options?.enabled ?? true), options?.refetchOnWindowFocus ?? false);
+  return query;
 }
 
 export function useV1CreateTeamSchedule(teamId: string) {
@@ -1675,12 +1684,16 @@ export function useV1MySchedule(filters?: ListFilters, options?: { enabled?: boo
   });
 }
 
-export function useV1TeamMatches(filters?: ListFilters, options?: QueryOptions & { seed?: CursorPage<V1TeamMatch> }) {
+export function useV1TeamMatches(
+  filters?: ListFilters,
+  options?: QueryOptions & { seed?: CursorPage<V1TeamMatch>; refetchInterval?: number | false },
+) {
   const seed = options?.seed;
   return useQuery({
     queryKey: v1Keys.teamMatches(filters),
     queryFn: () => v1Get<CursorPage<V1TeamMatch>>('/team-matches', filters),
-    refetchInterval: 15000,
+    // 홈 추천처럼 한 장만 보여 주는 곳은 끈다 — 모든 방문자가 15초마다 목록을 다시 받을 이유가 없다.
+    refetchInterval: options?.refetchInterval ?? 15000,
     enabled: options?.enabled,
     // useV1Matches와 동일한 이유 — cursor로 쿼리키가 바뀌는 "더 보기" 중 목록이 비지 않게 하고,
     // 첫 진입에만 서버 seed 를 쓴다.
@@ -2632,13 +2645,17 @@ export type V1ChatRoomsFilters = { roomType?: V1ChatRoom['roomType']; status?: '
  * 방 목록. `filters` 가 있으면 서버 필터(`roomType`)·페이지 크기를 그대로 넘긴다 — 목록 화면의
  * 카테고리 칩은 클라이언트 필터가 아니라 이 서버 필터를 써야 첫 페이지 바깥의 방을 놓치지 않는다.
  * 키는 `chatRooms()` 접두사를 공유하므로 기존 무효화가 필터 버전까지 함께 갱신한다.
+ * 채팅 화면은 다른 탭의 개인 고정 변경을 받기 위해 focus 재조회를 명시한다. 홈 등 다른 소비처의 기본 정책은 유지한다.
  */
-export function useV1ChatRooms(options?: QueryOptions, filters?: V1ChatRoomsFilters) {
-  return useQuery({
+export function useV1ChatRooms(options?: QueryOptions & { refetchOnWindowFocus?: boolean | 'always' }, filters?: V1ChatRoomsFilters) {
+  const query = useQuery({
     queryKey: filters ? ([...v1Keys.chatRooms(), 'list', filters] as const) : v1Keys.chatRooms(),
     queryFn: () => v1Get<CursorPage<V1ChatRoom>>('/chat/rooms', filters),
+    refetchOnWindowFocus: options?.refetchOnWindowFocus ?? false,
     enabled: options?.enabled ?? true,
   });
+  useV1WindowFocusRefetch(query, options?.enabled ?? true, options?.refetchOnWindowFocus ?? false);
+  return query;
 }
 
 export function useV1ChatMessages(roomId: string, filters?: ListFilters) {
@@ -2650,11 +2667,14 @@ export function useV1ChatMessages(roomId: string, filters?: ListFilters) {
 }
 
 export function useV1ChatRoom(roomId: string) {
-  return useQuery({
+  const query = useQuery({
     queryKey: v1Keys.chatRoom(roomId),
     queryFn: () => v1Get<V1ChatRoomDetail>(`/chat/rooms/${roomId}`),
+    refetchOnWindowFocus: 'always',
     enabled: Boolean(roomId),
   });
+  useV1WindowFocusRefetch(query, Boolean(roomId), 'always');
+  return query;
 }
 
 export function useV1ResolveChatRoom() {
@@ -2678,9 +2698,8 @@ export function useV1SendChatMessage(roomId: string) {
     // 텍스트 또는 사진(내가 올린 업로드 경로) 중 하나 — 서버가 둘 다·둘 다 없음을 400 으로 막는다.
     mutationFn: (body: { content: string } | { imageUrl: string } | { share: { kind: V1ChatShareKind; targetId: string } } | { fileId: string }) =>
       v1Post<V1ChatMessageSendResult>(`/chat/rooms/${roomId}/messages`, body),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: v1Keys.chatRooms() });
-      queryClient.invalidateQueries({ queryKey: v1Keys.chatMessages(roomId) });
+    onSuccess: (message) => {
+      invalidateV1ChatMessageQueries(queryClient, message);
       invalidateV1NotificationQueries(queryClient);
     },
   });

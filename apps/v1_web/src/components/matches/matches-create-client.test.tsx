@@ -1,29 +1,26 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { http, HttpResponse } from 'msw';
+import { setupServer } from 'msw/node';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { trackEvent } from '@/lib/analytics';
-import { writeExpiringDraft } from '@/lib/expiring-draft';
+import { readExpiringDraft, writeExpiringDraft } from '@/lib/expiring-draft';
+import { __resetNavigationHistoryForTests } from '@/lib/navigation-history';
+import { __resetOverlayHistoryForTests } from '@/lib/overlay-history';
+import type { V1MatchEdit } from '@/types/api';
 import type { MatchCreateViewModel } from './matches.types';
 import { draftFromMatchEdit, MatchCreatePageClient, MatchEditPageClient } from './matches-create-client';
 
 vi.mock('@/lib/analytics', () => ({ trackEvent: vi.fn() }));
 
-const { createMatchMutate, routerPush, uploadImagesMutateAsync, confirmMock, updateMatchMutate, cancelMatchMutate, closeMatchMutate, reopenMatchMutate, matchEditData, matchEditQueryState, matchEditRefetch } = vi.hoisted(() => ({
-  createMatchMutate: vi.fn(),
-  routerPush: vi.fn(),
-  uploadImagesMutateAsync: vi.fn(),
-  confirmMock: vi.fn(),
-  updateMatchMutate: vi.fn(),
-  cancelMatchMutate: vi.fn(),
-  closeMatchMutate: vi.fn(),
-  reopenMatchMutate: vi.fn(),
-  // 로드 실패(권한 없음 등) 케이스를 개별 테스트에서 켰다 끄는 스위치. 객체 프로퍼티만
-  // 바꾸면 되므로(재대입 아님) 아래 vi.mock 팩토리가 참조하는 값도 그대로 갱신된다.
-  matchEditQueryState: { isError: false },
-  matchEditRefetch: vi.fn(),
+// 기존 단위 테스트의 얇은 view/hook을 유지하고, 시간 회귀만 실제 화면·API consumer로 검증한다.
+const realTimeConsumer = vi.hoisted(() => ({ enabled: false }));
+
+const { createMatchMutate, routerPush, uploadImagesMutateAsync, confirmMock, updateMatchMutate, cancelMatchMutate, closeMatchMutate, reopenMatchMutate, matchEditData, matchEditQueryState, matchEditRefetch } = vi.hoisted(() => {
   // useEffect(..., [editQuery.data])가 참조로 비교하므로, 매 렌더마다 새 객체를 돌려주면
   // 훅이 재실행 → setDraft → 리렌더 → 훅 재실행의 무한 루프에 빠진다. 안정적인 참조 하나를
   // 모듈 스코프에 고정해 실제 React Query의 캐시된 참조 안정성을 흉내낸다.
-  matchEditData: {
+  const matchEditData: V1MatchEdit = {
     matchId: 'match-edit-1',
     editable: true,
     lockedReason: null,
@@ -35,15 +32,30 @@ const { createMatchMutate, routerPush, uploadImagesMutateAsync, confirmMock, upd
       startsAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
       // 마감 시각은 '모집 마감/다시 열기' 토글이 읽는 값이라 fixture 에 자리를 만들어 둔다
       // (테스트마다 과거/미래로 바꿔 넣는다).
-      deadlineAt: null as string | null,
+      deadlineAt: null,
       capacity: 10,
       manualPlaceName: '한강 풋살장',
     },
     status: 'recruiting',
     participantCount: 1,
     version: 'v1',
-  },
-}));
+  };
+  return {
+    createMatchMutate: vi.fn(),
+    routerPush: vi.fn(),
+    uploadImagesMutateAsync: vi.fn(),
+    confirmMock: vi.fn(),
+    updateMatchMutate: vi.fn(),
+    cancelMatchMutate: vi.fn(),
+    closeMatchMutate: vi.fn(),
+    reopenMatchMutate: vi.fn(),
+    // 로드 실패(권한 없음 등) 케이스를 개별 테스트에서 켰다 끄는 스위치. 객체 프로퍼티만
+    // 바꾸면 되므로(재대입 아님) 아래 vi.mock 팩토리가 참조하는 값도 그대로 갱신된다.
+    matchEditQueryState: { isError: false },
+    matchEditRefetch: vi.fn(),
+    matchEditData,
+  };
+});
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: routerPush }),
@@ -54,90 +66,97 @@ vi.mock('@/components/v1-ui/confirm-modal', () => ({
   useConfirm: () => ({ confirm: confirmMock, ConfirmModal: null }),
 }));
 
-vi.mock('@/hooks/use-v1-api', () => ({
-  useV1MasterSports: () => ({
-    data: [{ id: 'sport-futsal', code: 'futsal', name: '풋살', levels: [] }],
-  }),
-  useV1MasterRegions: () => ({
-    data: [
-      {
-        id: 'region-seoul',
-        code: 'seoul',
-        name: '서울',
-        parentId: null,
-        level: 1,
-        children: [
-          { id: 'region-gangnam', code: 'gangnam', name: '강남구', parentId: 'region-seoul', level: 2 },
-        ],
-      },
-    ],
-  }),
-  useV1CreateMatch: () => ({ mutate: createMatchMutate, isPending: false }),
-  useV1UploadImages: () => ({ mutateAsync: uploadImagesMutateAsync, isPending: false }),
-  useV1MyRecentVenues: () => ({ data: undefined }),
-  useV1MatchEdit: () => ({
-    data: matchEditQueryState.isError ? undefined : matchEditData,
-    isError: matchEditQueryState.isError,
-    isLoading: false,
-    refetch: matchEditRefetch,
-  }),
-  useV1UpdateMatch: () => ({ mutate: updateMatchMutate, isPending: false }),
-  useV1CancelMatch: () => ({ mutate: cancelMatchMutate, isPending: false }),
-  useV1CloseMatch: () => ({ mutate: closeMatchMutate, isPending: false }),
-  useV1ReopenMatch: () => ({ mutate: reopenMatchMutate, isPending: false }),
-}));
+vi.mock('@/hooks/use-v1-api', async () => {
+  const actual = await vi.importActual<typeof import('@/hooks/use-v1-api')>('@/hooks/use-v1-api');
+  return {
+    useV1MasterSports: (...args: Parameters<typeof actual.useV1MasterSports>) => realTimeConsumer.enabled ? actual.useV1MasterSports(...args) : ({
+      data: [{ id: 'sport-futsal', code: 'futsal', name: '풋살', levels: [] }],
+    }),
+    useV1MasterRegions: () => realTimeConsumer.enabled ? actual.useV1MasterRegions() : ({
+      data: [
+        {
+          id: 'region-seoul',
+          code: 'seoul',
+          name: '서울',
+          parentId: null,
+          level: 1,
+          children: [
+            { id: 'region-gangnam', code: 'gangnam', name: '강남구', parentId: 'region-seoul', level: 2 },
+          ],
+        },
+      ],
+    }),
+    useV1CreateMatch: () => realTimeConsumer.enabled ? actual.useV1CreateMatch() : ({ mutate: createMatchMutate, isPending: false }),
+    useV1UploadImages: () => realTimeConsumer.enabled ? actual.useV1UploadImages() : ({ mutateAsync: uploadImagesMutateAsync, isPending: false }),
+    useV1MyRecentVenues: () => realTimeConsumer.enabled ? actual.useV1MyRecentVenues() : ({ data: undefined }),
+    useV1MatchEdit: (matchId: string) => realTimeConsumer.enabled ? actual.useV1MatchEdit(matchId) : ({
+      data: matchEditQueryState.isError ? undefined : matchEditData,
+      isError: matchEditQueryState.isError,
+      isLoading: false,
+      refetch: matchEditRefetch,
+    }),
+    useV1UpdateMatch: (matchId: string) => realTimeConsumer.enabled ? actual.useV1UpdateMatch(matchId) : ({ mutate: updateMatchMutate, isPending: false }),
+    useV1CancelMatch: () => ({ mutate: cancelMatchMutate, isPending: false }),
+    useV1CloseMatch: () => ({ mutate: closeMatchMutate, isPending: false }),
+    useV1ReopenMatch: () => ({ mutate: reopenMatchMutate, isPending: false }),
+  };
+});
 
-vi.mock('./matches-page', () => ({
-  MatchCreatePageView: ({ model }: { model: MatchCreateViewModel }) => {
-    const form = model.form;
-    if (!form) return null;
-    return (
-      <div>
-        <span data-testid="match-step">{model.step}</span>
-        <label htmlFor="title">제목</label>
-        <input id="title" value={model.draft.title} onChange={(event) => form.onFieldChange('title', event.target.value)} />
-        <label htmlFor="venue">장소</label>
-        <input id="venue" value={model.draft.venue} onChange={(event) => form.onFieldChange('venue', event.target.value)} />
-        <label htmlFor="date">날짜</label>
-        <input id="date" value={model.draft.date} onChange={(event) => form.onFieldChange('date', event.target.value)} />
-        <label htmlFor="startTime">시작 시간</label>
-        <input
-          id="startTime"
-          value={model.draft.startTime}
-          onChange={(event) => form.onFieldChange('startTime', event.target.value)}
-        />
-        <label htmlFor="image">대표 이미지</label>
-        <input
-          id="image"
-          type="file"
-          onChange={async (event) => {
-            const file = event.target.files?.[0];
-            if (file && form.uploadImage) form.onFieldChange('image', await form.uploadImage(file));
-          }}
-        />
-        <button type="button" onClick={form.onSubmit}>
-          매치 만들기
-        </button>
-        <button type="button" onClick={form.onNext}>
-          다음
-        </button>
-        <button type="button" onClick={form.onBack}>
-          이전
-        </button>
-        {form.onCancel ? (
-          <button type="button" onClick={form.onCancel}>
-            매치 취소
+vi.mock('./matches-page', async () => {
+  const actual = await vi.importActual<typeof import('./matches-page')>('./matches-page');
+  return {
+    MatchCreatePageView: ({ model }: { model: MatchCreateViewModel }) => {
+      if (realTimeConsumer.enabled) return <actual.MatchCreatePageView model={model} />;
+      const form = model.form;
+      if (!form) return null;
+      return (
+        <div>
+          <span data-testid="match-step">{model.step}</span>
+          <label htmlFor="title">제목</label>
+          <input id="title" value={model.draft.title} onChange={(event) => form.onFieldChange('title', event.target.value)} />
+          <label htmlFor="venue">장소</label>
+          <input id="venue" value={model.draft.venue} onChange={(event) => form.onFieldChange('venue', event.target.value)} />
+          <label htmlFor="date">날짜</label>
+          <input id="date" value={model.draft.date} onChange={(event) => form.onFieldChange('date', event.target.value)} />
+          <label htmlFor="startTime">시작 시간</label>
+          <input
+            id="startTime"
+            value={model.draft.startTime}
+            onChange={(event) => form.onFieldChange('startTime', event.target.value)}
+          />
+          <label htmlFor="image">대표 이미지</label>
+          <input
+            id="image"
+            type="file"
+            onChange={async (event) => {
+              const file = event.target.files?.[0];
+              if (file && form.uploadImage) form.onFieldChange('image', await form.uploadImage(file));
+            }}
+          />
+          <button type="button" onClick={form.onSubmit}>
+            매치 만들기
           </button>
-        ) : null}
-        {form.recruitingToggle ? (
-          <button type="button" onClick={form.recruitingToggle.onClick}>
-            {form.recruitingToggle.label}
+          <button type="button" onClick={form.onNext}>
+            다음
           </button>
-        ) : null}
-      </div>
-    );
-  },
-}));
+          <button type="button" onClick={form.onBack}>
+            이전
+          </button>
+          {form.onCancel ? (
+            <button type="button" onClick={form.onCancel}>
+              매치 취소
+            </button>
+          ) : null}
+          {form.recruitingToggle ? (
+            <button type="button" onClick={form.recruitingToggle.onClick}>
+              {form.recruitingToggle.label}
+            </button>
+          ) : null}
+        </div>
+      );
+    },
+  };
+});
 
 describe('MatchCreatePageClient — GA events', () => {
   afterEach(cleanup);
@@ -239,7 +258,260 @@ describe('MatchCreatePageClient — GA events', () => {
   });
 });
 
+describe('개인 매치 종료 시간 — 실제 화면과 API 제출 계약', () => {
+  const apiBase = 'http://localhost/api/v1';
+  const postBodies: unknown[] = [];
+  const patchBodies: unknown[] = [];
+  let editEndAt: string | null | undefined;
+  let editStartAt: string;
+  const server = setupServer(
+    http.get(`${apiBase}/master/sports`, () => HttpResponse.json({ data: [{ id: 'sport-futsal', code: 'futsal', name: '풋살', levels: [] }] })),
+    http.get(`${apiBase}/master/regions`, () => HttpResponse.json({ data: [
+      { id: 'region-seoul', code: 'seoul', name: '서울', parentId: null, level: 1, children: [
+        { id: 'region-gangnam', code: 'gangnam', name: '강남구', parentId: 'region-seoul', level: 2 },
+      ] },
+    ] })),
+    http.get(`${apiBase}/matches/me/recent-venues`, () => HttpResponse.json({ data: { items: [] } })),
+    http.post(`${apiBase}/matches`, async ({ request }) => {
+      postBodies.push(await request.json());
+      return HttpResponse.json({ data: { matchId: 'match-created', detailRoute: '/matches/match-created' } });
+    }),
+    http.get(`${apiBase}/matches/match-edit-1/edit`, () => HttpResponse.json({ data: {
+      ...matchEditData, form: { ...matchEditData.form, startsAt: editStartAt, endsAt: editEndAt },
+    } })),
+    http.patch(`${apiBase}/matches/match-edit-1`, async ({ request }) => {
+      patchBodies.push(await request.json());
+      return HttpResponse.json({ data: { matchId: 'match-edit-1', detailRoute: '/matches/match-edit-1' } });
+    }),
+  );
+  let queryClient: QueryClient;
+  const originalScrollIntoView = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'scrollIntoView');
+
+  beforeAll(() => {
+    server.listen({ onUnhandledRequest: 'error' });
+    // jsdom에는 스크롤 API가 없지만 오류 필드 focus는 실제 DOM에서 검증한다.
+    Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', { configurable: true, value: vi.fn() });
+  });
+  afterAll(() => {
+    server.close();
+    if (originalScrollIntoView) Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', originalScrollIntoView);
+    else Reflect.deleteProperty(HTMLElement.prototype, 'scrollIntoView');
+  });
+  beforeEach(() => {
+    vi.clearAllMocks();
+    window.localStorage.clear();
+    vi.stubEnv('NEXT_PUBLIC_API_URL', apiBase);
+    realTimeConsumer.enabled = true;
+    postBodies.length = 0;
+    patchBodies.length = 0;
+    editStartAt = matchEditData.form.startsAt;
+    editEndAt = undefined;
+    queryClient = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
+  });
+  afterEach(() => {
+    cleanup();
+    queryClient.clear();
+    realTimeConsumer.enabled = false;
+    server.resetHandlers();
+    vi.unstubAllEnvs();
+    __resetOverlayHistoryForTests();
+    __resetNavigationHistoryForTests();
+  });
+
+  function seedDraft(endTime: string) {
+    const future = new Date();
+    future.setDate(future.getDate() + 7);
+    const date = future.toISOString().slice(0, 10);
+    writeExpiringDraft('teameet:v1:match-draft', {
+      title: '시간 검증 매치', venue: '한강 풋살장', date, startTime: '10:00', endTime,
+    });
+    writeExpiringDraft('teameet:v1:match-selection', { sportId: 'sport-futsal', regionId: 'region-gangnam' });
+    return date;
+  }
+
+  function renderStep(step: 'place-time' | 'confirm') {
+    return render(<QueryClientProvider client={queryClient}><MatchCreatePageClient step={step} /></QueryClientProvider>);
+  }
+
+  it('자정을 넘는 경기의 종료 날짜 직접 선택 안내를 표시하고 날짜를 자동 변경하지 않는다', async () => {
+    seedDraft('');
+    renderStep('place-time');
+    await waitFor(() => expect(screen.getByLabelText('지역')).toHaveValue('region-gangnam'));
+    fireEvent.change(screen.getByLabelText('시작 시간'), { target: { value: '23:00' } });
+    fireEvent.change(screen.getByLabelText('종료 시간'), { target: { value: '01:00' } });
+
+    const guidance = '비워두면 시작 날짜와 같아요. 자정을 넘는 경기는 다음 날을 선택해 주세요.';
+    expect(screen.getByText(guidance)).toBeVisible();
+    expect(screen.getByLabelText('종료 날짜')).toHaveAccessibleDescription(guidance);
+    expect(screen.getByLabelText('종료 날짜')).toHaveValue('');
+    fireEvent.click(screen.getByRole('button', { name: '다음' }));
+
+    expect(screen.getByText('종료 시간은 시작 시간보다 늦어야 해요')).toBeVisible();
+    expect(screen.getByLabelText('종료 날짜')).toHaveValue('');
+    expect(routerPush).not.toHaveBeenCalled();
+    expect(postBodies).toEqual([]);
+  });
+
+  it.each(['09:00', '10:00'])('10:00→%s 입력은 다음을 막고 종료 오류·값·포커스를 유지하며 정정 후 진행한다', async (endTime) => {
+    const date = seedDraft('');
+    const view = renderStep('place-time');
+    await waitFor(() => expect(screen.getByLabelText('지역')).toHaveValue('region-gangnam'));
+    fireEvent.change(screen.getByLabelText('종료 시간'), { target: { value: endTime } });
+    fireEvent.click(screen.getByRole('button', { name: '다음' }));
+
+    expect(screen.getByText('종료 시간은 시작 시간보다 늦어야 해요')).toBeVisible();
+    expect(screen.getByLabelText('종료 시간')).toHaveAttribute('aria-invalid', 'true');
+    expect(screen.getByLabelText('종료 시간')).toHaveAccessibleDescription('종료 시간은 시작 시간보다 늦어야 해요');
+    expect(screen.getByLabelText('종료 시간')).toHaveFocus();
+    expect(screen.getByLabelText('날짜')).toHaveValue(date);
+    expect(screen.getByLabelText('시작 시간')).toHaveValue('10:00');
+    expect(screen.getByLabelText('종료 시간')).toHaveValue(endTime);
+    expect(routerPush).not.toHaveBeenCalled();
+    expect(postBodies).toEqual([]);
+
+    fireEvent.change(screen.getByLabelText('종료 시간'), { target: { value: '11:00' } });
+    expect(screen.queryByText('종료 시간은 시작 시간보다 늦어야 해요')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '다음' }));
+    expect(routerPush).toHaveBeenCalledWith('/matches/new/confirm');
+    view.unmount();
+    renderStep('confirm');
+    expect(await screen.findByText(`${date} 10:00-11:00`)).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: '이전' }));
+    expect(routerPush).toHaveBeenLastCalledWith('/matches/new/place-time');
+    expect(readExpiringDraft('teameet:v1:match-draft')).toMatchObject({ date, startTime: '10:00', endTime: '11:00', venue: '한강 풋살장' });
+    fireEvent.click(screen.getByRole('button', { name: '매치 만들기' }));
+    await waitFor(() => expect(postBodies).toHaveLength(1));
+    expect(postBodies[0]).toMatchObject({ startsAt: new Date(`${date}T10:00:00`).toISOString(), endsAt: new Date(`${date}T11:00:00`).toISOString() });
+    await waitFor(() => expect(routerPush).toHaveBeenLastCalledWith('/matches/match-created'));
+  });
+
+  it.each(['09:00', '10:00', '24:00'])('잘못된 %s 종료 초안으로 확인에 직접 진입해도 오류와 수정 링크를 표시하고 POST하지 않는다', async (endTime) => {
+    const date = seedDraft(endTime);
+    renderStep('confirm');
+    await screen.findByText('서울 강남구');
+    fireEvent.click(screen.getByRole('button', { name: '매치 만들기' }));
+    await screen.findByRole('button', { name: '매치 만들기' });
+
+    expect(postBodies).toEqual([]);
+    const correction = screen.getByRole('link', { name: /종료 시간은 시작 시간보다 늦어야 해요/ });
+    expect(correction).toHaveAttribute('href', '/matches/new/place-time');
+    expect(screen.getByText(`${date} 10:00-${endTime}`)).toBeVisible();
+    expect(routerPush).not.toHaveBeenCalled();
+    expect(readExpiringDraft('teameet:v1:match-draft')).toMatchObject({ date, startTime: '10:00', endTime });
+  });
+
+  it.each(['11:00', ''])('정상 종료 %s와 종료 생략은 다음·확인·실제 POST에서 값을 유지한다', async (endTime) => {
+    const date = seedDraft(endTime);
+    const view = renderStep('place-time');
+    await waitFor(() => expect(screen.getByLabelText('지역')).toHaveValue('region-gangnam'));
+    fireEvent.click(screen.getByRole('button', { name: '다음' }));
+    expect(routerPush).toHaveBeenCalledWith('/matches/new/confirm');
+    view.unmount();
+    renderStep('confirm');
+    await screen.findByText('서울 강남구');
+    fireEvent.click(screen.getByRole('button', { name: '매치 만들기' }));
+
+    await waitFor(() => expect(postBodies).toHaveLength(1));
+    expect(postBodies[0]).toMatchObject({
+      title: '시간 검증 매치', manualPlaceName: '한강 풋살장',
+      startsAt: new Date(`${date}T10:00:00`).toISOString(),
+      endsAt: endTime ? new Date(`${date}T${endTime}:00`).toISOString() : null,
+    });
+    await waitFor(() => expect(routerPush).toHaveBeenLastCalledWith('/matches/match-created'));
+  });
+
+  it.each([undefined, null])('종료가 %s인 수정 데이터는 종료 입력을 비워 두고 실제 저장 payload에도 생략을 보존한다', async (endsAt) => {
+    editEndAt = endsAt;
+    render(<QueryClientProvider client={queryClient}><MatchEditPageClient matchId="match-edit-1" /></QueryClientProvider>);
+    await screen.findByRole('button', { name: '다음' });
+    fireEvent.click(screen.getByRole('button', { name: '다음' }));
+    await waitFor(() => expect(screen.getByLabelText('제목')).toHaveValue('수정 중인 매치'));
+    fireEvent.click(screen.getByRole('button', { name: '다음' }));
+    expect(screen.getByLabelText('종료 시간')).toHaveValue('');
+    fireEvent.click(screen.getByRole('button', { name: '다음' }));
+    fireEvent.click(screen.getByRole('button', { name: '변경사항 저장' }));
+
+    await waitFor(() => expect(patchBodies).toHaveLength(1));
+    expect(patchBodies[0]).toMatchObject({ endsAt: null, title: '수정 중인 매치', manualPlaceName: '한강 풋살장' });
+    expect(postBodies).toEqual([]);
+    await waitFor(() => expect(routerPush).toHaveBeenLastCalledWith('/matches/match-edit-1'));
+  });
+
+  it.each([false, true])('API 유효 익일 종료 매치는 제목 변경 %s에서도 실제 수정 흐름과 PATCH 시각을 보존한다', async (changeTitle) => {
+    const date = seedDraft('');
+    const nextDay = new Date(`${date}T12:00:00`);
+    nextDay.setDate(nextDay.getDate() + 1);
+    const endDate = nextDay.toISOString().slice(0, 10);
+    editStartAt = new Date(`${date}T23:00:00`).toISOString();
+    editEndAt = new Date(`${endDate}T01:00:00`).toISOString();
+    render(<QueryClientProvider client={queryClient}><MatchEditPageClient matchId="match-edit-1" /></QueryClientProvider>);
+    await screen.findByRole('button', { name: '다음' });
+    fireEvent.click(screen.getByRole('button', { name: '다음' }));
+    await waitFor(() => expect(screen.getByLabelText('제목')).toHaveValue('수정 중인 매치'));
+    if (changeTitle) fireEvent.change(screen.getByLabelText('제목'), { target: { value: '밤 매치 제목 정정' } });
+    fireEvent.click(screen.getByRole('button', { name: '다음' }));
+    expect(screen.getByLabelText('시작 시간')).toHaveValue('23:00');
+    expect(screen.getByLabelText('종료 시간')).toHaveValue('01:00');
+    fireEvent.click(screen.getByRole('button', { name: '다음' }));
+    expect(screen.getByRole('button', { name: '변경사항 저장' })).toBeVisible();
+    expect(screen.getByText(`${date} 23:00-${endDate} 01:00`)).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: '이전' }));
+    expect(screen.getByLabelText('종료 날짜')).toHaveValue(endDate);
+    fireEvent.click(screen.getByRole('button', { name: '다음' }));
+    expect(screen.getByRole('button', { name: '변경사항 저장' })).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: '변경사항 저장' }));
+
+    await waitFor(() => expect(patchBodies).toHaveLength(1));
+    expect(patchBodies[0]).toMatchObject({ startsAt: editStartAt, endsAt: editEndAt, title: changeTitle ? '밤 매치 제목 정정' : '수정 중인 매치' });
+    expect(patchBodies[0]).not.toHaveProperty('endDate');
+    expect(patchBodies[0]).not.toHaveProperty('endTime');
+    expect(postBodies).toEqual([]);
+    await waitFor(() => expect(routerPush).toHaveBeenLastCalledWith('/matches/match-edit-1'));
+  });
+
+  it('사용자가 종료 날짜를 명시적으로 고르면 익일 종료를 확인 화면과 생성 POST에서 보존한다', async () => {
+    const date = seedDraft('09:00');
+    const nextDay = new Date(`${date}T12:00:00`);
+    nextDay.setDate(nextDay.getDate() + 1);
+    const endDate = nextDay.toISOString().slice(0, 10);
+    const view = renderStep('place-time');
+    await waitFor(() => expect(screen.getByLabelText('지역')).toHaveValue('region-gangnam'));
+    expect(screen.getByLabelText('종료 날짜')).toHaveValue('');
+    fireEvent.change(screen.getByLabelText('종료 날짜'), { target: { value: endDate } });
+    fireEvent.click(screen.getByRole('button', { name: '다음' }));
+    expect(routerPush).toHaveBeenCalledWith('/matches/new/confirm');
+    view.unmount();
+    renderStep('confirm');
+    expect(await screen.findByText(`${date} 10:00-${endDate} 09:00`)).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: '매치 만들기' }));
+
+    await waitFor(() => expect(postBodies).toHaveLength(1));
+    expect(postBodies[0]).toMatchObject({ startsAt: new Date(`${date}T10:00:00`).toISOString(), endsAt: new Date(`${endDate}T09:00:00`).toISOString() });
+    expect(postBodies[0]).not.toHaveProperty('endDate');
+    expect(postBodies[0]).not.toHaveProperty('endTime');
+    await waitFor(() => expect(routerPush).toHaveBeenLastCalledWith('/matches/match-created'));
+  });
+
+  it.each(['not-a-date', '2099-02-30'])('손상된 종료 날짜 %s를 복원한 확인 화면은 날짜 오류와 수정 링크를 표시하고 POST하지 않는다', async (endDate) => {
+    const date = seedDraft('11:00');
+    writeExpiringDraft('teameet:v1:match-draft', { title: '시간 검증 매치', venue: '한강 풋살장', date, startTime: '10:00', endTime: '11:00', endDate });
+    renderStep('confirm');
+    await screen.findByText('서울 강남구');
+    fireEvent.click(screen.getByRole('button', { name: '매치 만들기' }));
+    await screen.findByRole('button', { name: '매치 만들기' });
+
+    expect(postBodies).toEqual([]);
+    expect(screen.getByRole('link', { name: /종료 날짜를 확인해 주세요/ })).toHaveAttribute('href', '/matches/new/place-time');
+    expect(routerPush).not.toHaveBeenCalled();
+    expect(readExpiringDraft('teameet:v1:match-draft')).toMatchObject({ endDate, endTime: '11:00' });
+  });
+});
+
 describe('match edit hydration', () => {
+  it.each([undefined, null])('종료 시각이 %s이면 시작 시각을 복사하지 않고 종료 생략을 유지한다', (endsAt) => {
+    const draft = draftFromMatchEdit({ ...matchEditData, form: { ...matchEditData.form, endsAt } });
+    expect(draft.endTime).toBe('');
+  });
   it('keeps a persisted null image empty instead of injecting sample imagery', () => {
     const startsAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
     const draft = draftFromMatchEdit({

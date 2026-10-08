@@ -143,6 +143,12 @@ and therefore has no host participant row.
   re-encodes chat photos before upload (`useV1UploadImages({ stripMetadata: true })`) so EXIF (GPS location, device)
   does not travel with them. Chat **files** (Task 181 ③) use a participant-only download route; photos stay on the public path for now.
 
+## Realtime message delivery
+
+- After `sendMessage` persists successfully, `chat:message` is emitted to the sender's authenticated `user:<id>` channel as well as the existing eligible other recipients. All tabs/devices of that account can refresh their own stored message; this event does not mark it read.
+- The sender remains excluded from notification rows, `notification:new` and web push. Existing other-recipient mute, current entitlement, blocking and notification preference checks remain in effect. Storage/permission failures emit no sender message; a realtime delivery failure after commit is logged and does not turn the persisted send into an API failure.
+- Both the open room and standalone chat list subscribe to `chat:message`. The room refreshes its detail/message subtree once; the list refreshes base and filtered list queries without also refreshing that subtree. This works without sending a self notification or relying on a focus change. System-line delivery retains its existing actor-excluded recipient contract above.
+
 ## Reporting and blocking
 
 - Report reasons: `spam`, `harassment`, `impersonation`, `inappropriate`, `other`; detail max 500.

@@ -4,6 +4,24 @@ The authoritative schedule, attendance, reminder, guest-recruitment, personal sc
 
 The additive schedule models and constraints are frozen in the [Game aggregate schema ledger](./games.md#frozen-additive-schema-ledger).
 
+## Optional capacity and explicit clear
+
+`PATCH /api/v1/teams/:teamId/schedules/:scheduleId` accepts `UpdateScheduleDto.capacity?: number | null`:
+
+| PATCH capacity | Meaning |
+|---|---|
+| Omitted | Keep the existing capacity. |
+| `null` | Remove the cap and persist SQL NULL. |
+| Positive integer (`>= 1`) | Set the capacity. |
+
+An editor that clears an existing capacity must send `capacity: null`; omitting the field preserves the saved value. Include the current `expectedVersion` and an `Idempotency-Key` as for other schedule updates. Both the mutation response and a subsequent schedule detail read expose the cleared capacity as `null`.
+
+The existing `@Type(() => Number)` transformation preserves `null`, and `@IsOptional()` accepts it. Non-null values still require `@IsInt()` and `@Min(1)`: zero, negative values, fractions, empty strings, and non-numeric strings fail with `400 VALIDATION_ERROR`. Numeric strings retain the existing conversion to numbers.
+
+The service distinguishes omitted capacity from explicit `null` inside its versioned transaction. Removing an existing cap promotes every remaining `WAITLISTED` attendance row to `GOING` and clears its waitlist position. Increasing a cap promotes attendees into the newly available slots; decreasing it below the active `GOING` count fails with `409 SCHEDULE_CAPACITY_BELOW_GOING_COUNT` before any update is persisted.
+
+`POST` creation keeps `CreateScheduleDto.capacity?: number` unchanged: omitting capacity creates an uncapped schedule, and supplied non-null values must be positive integers.
+
 ## Task 12 implementation status: BUILT (post-review hardening applied)
 
 Every route below is implemented, CI-integration-tested (`apps/v1_api/test/team-schedules/*.integration-spec.ts`), and wired into `AppModule` via `TeamSchedulesModule`. No new migration was required — the four models and seven enums already existed (migration `20260729000100_v1_game_operations`).
@@ -29,6 +47,14 @@ An external review (2026-08-03, two independent sources — GPT Pro W1-W10/T1-T3
 `POST .../complete` is new: the frozen contract's `scheduled -> cancelled|completed` transition table had no code path that ever produced `COMPLETED` until this route was added (see "Deviation 7" below). It is a versioned, idempotent, owner/manager-only mutation mirroring `cancel()`'s CAS shape — team owner/manager explicitly marks a past-`endAt` schedule complete; there is no background completion worker.
 
 Reminders and escalation reuse the existing Task 5 DB-leased worker (`V1GameOperationsWorkerService`) and the existing `NotificationsService` — no second scheduler is used, but the notification **persistence path is not shared with the HTTP path** (see Deviation 8) — durable reminder delivery goes straight through the worker's own transaction, not through `NotificationsService.emitNotificationToMany`'s fire-and-forget path (`ScheduleReminderService`, registered in `v1-game-operations-worker.main.ts`).
+
+## Schedule date range and errors
+
+`POST /api/v1/teams/:teamId/schedules` and `PATCH /api/v1/teams/:teamId/schedules/:scheduleId` require `endAt` to be strictly later than `startAt`. The service compares parsed timestamps, so equal instants with different UTC offsets are rejected and a valid next-day end is accepted. For PATCH, omitted dates retain their values from the locked schedule row; the resulting full range is validated even when only one date is supplied or both dates are omitted.
+
+A supplied non-ISO `startAt` or `endAt` is rejected by `@IsDateString()` and the global validation pipe as HTTP `400 VALIDATION_ERROR` before service version/state checks. The existing implicit String transformation runs first: non-null scalar years such as numeric `2026` become the valid ISO year string `"2026"`; arrays remain arrays and fail validation. Accepted dates are persisted as `Date` values and returned in canonical UTC ISO form. Optional PATCH dates preserve their values for `null` or omission. `expectedVersion` follows the existing Number transformation and then `@IsInt()`/`@Min(0)` validation; numeric strings such as `"0"` are accepted, while missing, null, fractional and negative versions fail `400` before service CAS checks. A fresh command that reaches the service with reversed, equal or unparseable effective dates returns HTTP `422` with code `SCHEDULE_INVALID_TIME_RANGE` and message `Schedule end time must be after start time`. Rejection persists no schedule/attendance mutation, notification outbox entry or idempotency result. A newly created schedule starts at `version: 0`; PATCH uses the version returned by the latest entity response.
+
+Existing precedence is preserved: the active-account and create-only `MATCH` restriction run first, an idempotency replay or payload conflict precedes management checks, and PATCH checks the expected version and terminal state before validating dates. A committed historical response is still replayed under its original key and payload. No Prisma model or migration change is required.
 
 ## Known gaps (post-review)
 

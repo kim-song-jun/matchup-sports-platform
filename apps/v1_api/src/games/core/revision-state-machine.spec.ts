@@ -1,5 +1,5 @@
 import { V1GameResultRevisionState } from '@prisma/client';
-import { assertRevisionSupersession } from './revision-state-machine';
+import { assertRevisionSupersession, assertRevisionTransition } from './revision-state-machine';
 
 /**
  * 리비전 승계(supersession) 규칙.
@@ -107,5 +107,38 @@ describe('assertRevisionSupersession', () => {
         baseState: V1GameResultRevisionState.DRAFT,
       }),
     ).toThrow();
+  });
+});
+
+describe('assertRevisionTransition — ADMIN_QUICK', () => {
+  const { DRAFT, OFFICIAL, VOID } = V1GameResultRevisionState;
+
+  it('어드민 빠른 입력 흐름만 초안을 곧바로 확정할 수 있다', () => {
+    expect(() => assertRevisionTransition({ from: DRAFT, to: OFFICIAL, flow: 'ADMIN_QUICK' })).not.toThrow();
+  });
+
+  it('대조군 — STANDARD 는 초안 직행 확정이 여전히 막혀 있다', () => {
+    expect(() => assertRevisionTransition({ from: DRAFT, to: OFFICIAL, flow: 'STANDARD' })).toThrow(
+      expect.objectContaining({ code: 'REVISION_MUST_BE_SUPERSEDED' }),
+    );
+  });
+
+  it('대조군 — CORRECTION 의 기존 허용은 그대로다', () => {
+    expect(() => assertRevisionTransition({ from: DRAFT, to: OFFICIAL, flow: 'CORRECTION' })).not.toThrow();
+  });
+
+  it('빠른 입력 흐름도 초안 → 무효 직행은 열지 않는다', () => {
+    expect(() => assertRevisionTransition({ from: DRAFT, to: VOID, flow: 'ADMIN_QUICK' })).toThrow(
+      expect.objectContaining({ code: 'REVISION_MUST_BE_SUPERSEDED' }),
+    );
+  });
+
+  it('이미 확정된 리비전은 빠른 입력 흐름으로도 고칠 수 없다', () => {
+    expect(() => assertRevisionTransition({ from: OFFICIAL, to: DRAFT, flow: 'ADMIN_QUICK' })).toThrow(
+      expect.objectContaining({ code: 'REVISION_MUST_BE_SUPERSEDED' }),
+    );
+    expect(() => assertRevisionTransition({ from: OFFICIAL, to: OFFICIAL, flow: 'ADMIN_QUICK' })).toThrow(
+      expect.objectContaining({ code: 'TERMINAL_REVISION_IMMUTABLE' }),
+    );
   });
 });

@@ -1,7 +1,15 @@
-import { render, screen, within } from '@testing-library/react';
+import { render as rtlRender, screen, within } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import type { ReactElement } from 'react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { TournamentsListPageClient as TournamentsPage } from './tournaments-list-client';
+
+// 목록은 상세 복귀 복원에 QueryClient 를 쓴다(useCursorPagination) — API 훅을 mock 해도 provider 는 필요하다.
+function render(ui: ReactElement) {
+  const client = new QueryClient();
+  return rtlRender(ui, { wrapper: ({ children }) => <QueryClientProvider client={client}>{children}</QueryClientProvider> });
+}
 
 /**
  * 통합 목록의 유형 축(`?kind=`)이 **주소에서 서버까지 실제로 이어지는가**를 잠근다.

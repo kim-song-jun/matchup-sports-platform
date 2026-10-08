@@ -39,6 +39,22 @@ function parseDeadlineAt(draft: MatchDraft): Date | null {
   return Number.isNaN(value.getTime()) ? null : value;
 }
 
+function parseEndDate(value: string): Date | null {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
+  const parsed = new Date(`${value}T00:00:00`);
+  const [year, month, day] = value.split('-').map(Number);
+  // Date는 2월 30일도 다음 달로 정규화하므로 입력한 달력 날짜와 일치해야 한다.
+  return parsed.getFullYear() === year && parsed.getMonth() + 1 === month && parsed.getDate() === day ? parsed : null;
+}
+
+function parseEndsAt(draft: MatchDraft): Date | null {
+  if (!draft.endTime) return null;
+  const date = draft.endDate || draft.date;
+  if (!parseEndDate(date)) return null;
+  const value = new Date(`${date}T${draft.endTime}:00`);
+  return Number.isNaN(value.getTime()) ? null : value;
+}
+
 const RULES: Array<{
   field: MatchFieldKey;
   label: string;
@@ -59,6 +75,34 @@ const RULES: Array<{
       const startsAt = parseStartsAt(ctx.draft);
       if (!startsAt) return true;
       return startsAt > new Date();
+    },
+  },
+  {
+    field: 'endDate',
+    label: '종료 날짜를 확인해 주세요',
+    step: 'place-time',
+    isSatisfied: (ctx) => !ctx.draft.endDate || Boolean(parseEndDate(ctx.draft.endDate)),
+  },
+  {
+    field: 'endTime',
+    label: '종료 시간도 입력해 주세요',
+    step: 'place-time',
+    isSatisfied: (ctx) => !ctx.draft.endDate || Boolean(ctx.draft.endTime),
+  },
+  {
+    field: 'endTime',
+    label: '종료 시간은 시작 시간보다 늦어야 해요',
+    step: 'place-time',
+    isSatisfied: (ctx) => {
+      if (!ctx.draft.endTime) return true;
+      // Date는 24:00을 익일로 정규화하므로 time 입력의 HH:mm 범위를 먼저 확인한다.
+      if (!/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(ctx.draft.endTime)) return false;
+      if (ctx.draft.endDate && !parseEndDate(ctx.draft.endDate)) return true;
+      const startsAt = parseStartsAt(ctx.draft);
+      if (!startsAt) return true;
+      // 명시한 종료 날짜만 사용하고, 날짜가 없는 기존 초안은 같은 날로 검증한다. 역전 시각으로 익일을 추론하지 않는다.
+      const endsAt = parseEndsAt(ctx.draft);
+      return Boolean(endsAt && endsAt > startsAt);
     },
   },
   {
@@ -140,7 +184,7 @@ export function buildMatchPayloadResult(draft: MatchDraft, sportId: string, regi
     // 단언 후 크래시 대신 결측 필드로 되돌려 상위 UI가 그 스텝으로 안내하게 한다.
     return { missingFields: [missingFieldFor('date'), missingFieldFor('startTime')] };
   }
-  const endsAt = draft.endTime ? new Date(`${draft.date}T${draft.endTime}:00`) : null;
+  const endsAt = parseEndsAt(draft);
   const deadlineAt = parseDeadlineAt(draft);
 
   return {
@@ -151,7 +195,7 @@ export function buildMatchPayloadResult(draft: MatchDraft, sportId: string, regi
       description: draft.description.trim() || null,
       imageUrl: draft.image || null,
       startsAt: startsAt.toISOString(),
-      endsAt: endsAt && endsAt > startsAt ? endsAt.toISOString() : null,
+      endsAt: endsAt ? endsAt.toISOString() : null,
       deadlineAt: deadlineAt ? deadlineAt.toISOString() : null,
       // 주최자가 참가하면 최소 정원은 2명(나 + 1명) — UI 스테퍼와 같은 하한을 여기서도 강제한다.
       capacity: Math.max(Number(draft.capacity) || 1, draft.hostParticipates ? 2 : 1),

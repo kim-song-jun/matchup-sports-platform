@@ -1,5 +1,5 @@
 {
-  "_comment": "`ALL_COMPETITION_KINDS` 를 넘겨 **리그를 대회 표면에 허용하는** 자리. 원시 호출을 0 으로 만든 뒤 남는 구멍은 이것뿐이라, 정당하더라도 언제나 리뷰를 거치게 개수를 묶는다. 늘리려면 why 를 함께 적어라. (2026-09-01 KST: 설정 축 1곳 + read-swap 준비로 넓힌 3곳 + 통합 순위 리그 경로 1 + 공개 상세(문) 1 + 공개 일정(리그 대진) 1 = 7곳. 2026-09-03 KST: D7 참가 신청이 리그를 등록 스택에 올리며 신청자 경로 4 + 어드민 경로 4 = 8곳 추가, 합계 16곳. 2026-09-04 KST: 명단 표면 5곳 추가(호출부 단위) — 리그가 명단을 만들 방법이 아예 없던 것을 연다, 합계 21곳. 2026-09-30 KST: 어드민 전체 명단 CSV 1곳 추가(명단 표면 6 → 7), v1-surface-check 실측 합계 27곳)",
+  "_comment": "`ALL_COMPETITION_KINDS` 를 넘겨 **리그를 대회 표면에 허용하는** 자리. 원시 호출을 0 으로 만든 뒤 남는 구멍은 이것뿐이라, 정당하더라도 언제나 리뷰를 거치게 개수를 묶는다. 늘리려면 why 를 함께 적어라. (2026-09-01 KST: 설정 축 1곳 + read-swap 준비로 넓힌 3곳 + 통합 순위 리그 경로 1 + 공개 상세(문) 1 + 공개 일정(리그 대진) 1 = 7곳. 2026-09-03 KST: D7 참가 신청이 리그를 등록 스택에 올리며 신청자 경로 4 + 어드민 경로 4 = 8곳 추가, 합계 16곳. 2026-09-04 KST: 명단 표면 5곳 추가(호출부 단위) — 리그가 명단을 만들 방법이 아예 없던 것을 연다, 합계 21곳. 2026-09-30 KST: 어드민 전체 명단 CSV 1곳 추가(명단 표면 6 → 7), v1-surface-check 실측 합계 27곳. 2026-10-08 KST: 대진 자리 서비스 2곳 추가)",
   "src/tournaments/competition-config/competition-config-version-repoint.ts": {
     "allowed": 1,
     "why": "설정 축 — 설정은 대회와 리그가 이미 공유하므로 여기서 종류를 가르면 리그만 옛 설정에 남거나 설정 없는 상태로 방치된다(tournament-surface.ts 의 '여기 걸지 않는 곳' 참조)."
@@ -59,5 +59,9 @@
   "src/tournaments/tournament-reviews.service.ts": {
     "allowed": 3,
     "why": "QA #47: 공용 대회·리그 상세와 후기 작성 입구가 같은 V1TournamentReview/confirmed registration 계약을 사용한다. 공개 후기 조회, completed 참가 운영진 제출, 사용자 미작성 목록의 세 조회만 두 kind를 허용하며 private/deleted/completed/membership/duplicate/upload/moderation gate와 awards 분리는 유지한다."
+  },
+  "src/tournaments/slots/tournament-slot.service.ts": {
+    "allowed": 2,
+    "why": "자리는 대회와 정규 리그가 같은 모델을 공유한다 — 자리 배정·조회는 종류를 가르지 않고 불러온 뒤 lane 검사(assertTournamentLane)가 정규 리그 자리를 SLOT_LEAGUE_NOT_SUPPORTED_YET 로 막는다. PR-5a 가 리그 lane 을 연다."
   }
 }

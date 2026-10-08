@@ -59,7 +59,7 @@ describe('PUT /admin/tournament-slots/:slotId/assignment — 정규 리그 레�
     const untouched = (await fixturesOf(leagueId)).filter((f) => !using.includes(f));
     expect(untouched).toHaveLength(1);
     expect([untouched[0].hostTeamId, untouched[0].approvedApplicantTeamId]).toEqual([null, null]);
-    expect(await h.prisma.v1TeamSchedule.count({ where: { teamMatch: { leagueId } } })).toBe(0);
+    expect(await h.prisma.v1TeamSchedule.count({ where: { teamMatchId: { in: (await fixturesOf(leagueId)).map((f) => f.id) } } })).toBe(0);
     expect(await statusOf(leagueId)).toBe('draft');
   });
 
@@ -79,7 +79,7 @@ describe('PUT /admin/tournament-slots/:slotId/assignment — 정규 리그 레�
     await put(slots[2].id, regs[2]);
 
     expect(await statusOf(leagueId)).toBe('in_progress');
-    expect(await h.prisma.v1TeamSchedule.count({ where: { teamMatch: { leagueId }, state: 'SCHEDULED' } })).toBe(6);
+    expect(await h.prisma.v1TeamSchedule.count({ where: { teamMatchId: { in: (await fixturesOf(leagueId)).map((f) => f.id) }, state: 'SCHEDULED' } })).toBe(6);
   });
 
   it('자리를 비우면 그 경기들이 다시 미정으로 돌아가고 팀 일정이 취소된다 — 진행 상태는 되돌리지 않는다', async () => {
@@ -93,7 +93,7 @@ describe('PUT /admin/tournament-slots/:slotId/assignment — 정규 리그 레�
     const using = (await fixturesOf(leagueId)).filter((f) => f.homeSlotId === slots[1].id || f.awaySlotId === slots[1].id);
     expect(using).toHaveLength(2);
     expect(await h.prisma.v1TeamSchedule.count({ where: { teamMatchId: { in: using.map((f) => f.id) }, state: 'SCHEDULED' } })).toBe(0);
-    expect(await h.prisma.v1TeamSchedule.count({ where: { teamMatch: { leagueId }, state: 'SCHEDULED' } })).toBe(2);
+    expect(await h.prisma.v1TeamSchedule.count({ where: { teamMatchId: { in: (await fixturesOf(leagueId)).map((f) => f.id) }, state: 'SCHEDULED' } })).toBe(2);
     expect(await statusOf(leagueId)).toBe('in_progress');
   });
 

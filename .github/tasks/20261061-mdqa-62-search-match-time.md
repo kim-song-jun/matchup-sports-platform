@@ -26,7 +26,7 @@ Owned product apps/v1_web/src/components/search/search-experience.tsx formatter 
 
 ## Acceptance Criteria
 - [x] Test fails actual timestamp source unchanged; all threeTZ verify intended KST contract.
-- [ ] Current committed diff scope/type/pattern/independent fullreview FindingsNone.
+- [x] Current committed diff scope/type/pattern/independent fullreview FindingsNone.
 - [ ] Actualalpha AFTER separate pending exactdeployment/login/viewports; noDone/delete/automerge.
 
 ## Tech Debt Resolved
@@ -47,3 +47,10 @@ Fresh fetch then managed ref origin/dev base c88c57a2a3980b3059b4ae3856e94743526
 Worker unchanged-product source SHA256 B4F1ABA5F057DA18F874290EA0D1658DCD879CBE7DD235DCD041DF347695C099: isolated actual America/Los_Angeles consumer RED 4 failures / 5 passes. Both personal/team cards rendered 07:57 for the ISO that the existing detail model renders 23:57; KST midnight rollover was also wrong. CLI zero-run and initial navigation-expectation harness failures are excluded from RED evidence. Raw: tmp/qa/mdqa-62/red-la-isolated.txt.
 
 Minimal product change: existing formatTournamentDateTimeShort import alias; remove private Intl formatter. Shared date-utils/hook/types/MSW unchanged. Actual process timezone guard passed. GREEN: America/Los_Angeles 9/9, UTC 20/20 (new time9 + existing search8 + state3), Asia/Seoul 9/9, total38/38. Raw: tmp/qa/mdqa-62/green-{la,utc,seoul}.txt and green-matrix-result.json. Missing/invalid dates remain omitted; real HTTP query and detail navigation retain the existing contract. diff --check PASS. Root committed gate, independent full diff review, PR and original comment pending. Actual alpha AFTER remains pending; no source test is claimed as alpha verification.
+
+### Root committed checkpoint 23:43 KST
+Fresh remote dev advanced to c1fbb55d3d12d85fc56e32872b51f6d85ce374af via independent withdrawal fix. Root preserved that work and safely FF-integrated it; the changed hook function was withdrawal-only, with no search contract drift. Actual dev checkout branchdev clean and FF synchronized.
+
+Initial commit f7e2b0b277a672778e32048b11dbff08b646d599 passed the committed3TZ38 matrix but failed typecheck TS2322: a V1Match fixture spread inherited broader displayState into V1TeamMatch. That failure is preserved in own0550/report62-f7e2b0b-gate-failure.json and f7e2b0b logs; it was never marked PASS. Corrected spec uses explicit V1TeamMatch fields without casts or contract weakening. Commit65858a94e4a04eb567ab59d97c2ac094ea3f026f then passed the committed3TZ38 matrix, web typecheck and unchanged primary v1 pattern gate. Evidence own0550/report62-committed-{la,utc,seoul}-tests.txt, report62-committed-types.txt, report62-committed-pattern.txt, report62-committed-result.json.
+
+Independent frontend review of exact65858a94 full4/4 paths: Critical0 Warning0 FindingsNone. Final task-only checkpoint keeps product/spec/Changeset blobs identical to the validated commit; pinned final head review and prepublication remote drift check remain required. PR creation/attachment, original report comment, CI/Copilot monitoring and actual alpha AFTER are pending. No dev merge or Done action was executed by root.

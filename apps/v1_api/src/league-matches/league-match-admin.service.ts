@@ -10,6 +10,7 @@ import { AdminContextService, type V1ActiveAdmin } from '../common/admin-context
 import { GamesService } from '../games/games.service';
 import { isUnfilledSlotFixture } from '../common/competition/unfilled-slot-gate';
 import { promoteLeagueWhenSlotsFilledInTx } from './league-slot-status';
+import { releaseSlotsForRegistrationInTx } from '../tournaments/slots/tournament-slot.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { V1AuthUser } from '../auth/v1-auth-user';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -808,8 +809,6 @@ export class LeagueMatchAdminService {
           title: true,
           hostTeamId: true,
           approvedApplicantTeamId: true,
-          homeSlotId: true,
-          awaySlotId: true,
           game: { select: { currentOfficialRevisionId: true } },
         },
       });
@@ -839,14 +838,36 @@ export class LeagueMatchAdminService {
         "이 팀의 경기가 진행 중이에요. 운영 콘솔의 '몰수·중단으로 종료'로 먼저 끝낸 뒤 제외해 주세요.",
       );
 
+      // 이 팀이 자리에 들어 있으면: 그 자리를 쓰는 경기가 전부 시작 전일 때 경기를 취소하지 않고 자리만 비운다.
+      // 시작된 경기가 있으면 헬퍼가 자리를 그대로 두고, 그 경기는 아래 루프가 기존처럼 접는다.
+      const registration = await tx.v1TournamentRegistration.findFirst({
+        where: { tournamentId: leagueId, teamId, status: 'confirmed' },
+        select: { id: true },
+      });
+      if (registration !== null) {
+        await releaseSlotsForRegistrationInTx(
+          tx,
+          { admin, adminContext: this.adminContext, games: this.games },
+          registration.id,
+        );
+      }
+      // 비운 뒤 다시 읽는다 — 비워진 경기는 더 이상 이 팀의 경기가 아니다.
+      const teamFixturesToCancel = await tx.v1TeamMatch.findMany({
+        where: {
+          leagueId,
+          status: { not: 'cancelled' },
+          OR: [{ hostTeamId: teamId }, { approvedApplicantTeamId: teamId }],
+        },
+        select: { id: true, title: true, hostTeamId: true, approvedApplicantTeamId: true, homeSlotId: true, awaySlotId: true },
+      });
+
       let cancelled = 0;
       // 그룹 B 감사 결함 4: 취소되는 대진마다 상대 팀(들)에게 알려야 하므로, 취소 후처리
       // (cascadeCancelFixtureInTx)와 별개로 알림 발송에 필요한 최소 필드를 tx 밖으로
       // 들고 나간다 — emitToManyDeferred는 커밋 후에 불러야 한다(notifyFixturesScheduled와
       // 동일한 관례, 이 파일 하단 주석 참고).
       const cancelledFixtures: Array<{ id: string; title: string; hostTeamId: string | null; approvedApplicantTeamId: string | null }> = [];
-      for (const fixture of freshTeamFixtures) {
-        if (fixture.status === 'cancelled') continue;
+      for (const fixture of teamFixturesToCancel) {
         await this.cancelLeagueFixtureRowInTx(tx, fixture.id, TEAM_REMOVAL_CANCEL_REASON);
         // 자리에 연결됐는데 팀이 비어 있던 경기는 공개된 적이 없다 — 알림 대상이 아니다.
         if (!isUnfilledSlotFixture(fixture)) {

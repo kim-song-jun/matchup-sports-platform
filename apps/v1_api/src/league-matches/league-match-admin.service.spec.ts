@@ -25,6 +25,10 @@ import { PrismaService } from '../prisma/prisma.service';
 import { leagueActiveRegistrationWhere } from './league-active-registration';
 import { LeagueMatchAdminService } from './league-match-admin.service';
 
+jest.mock('../tournaments/slots/tournament-slot.service', () => ({
+  releaseSlotsForRegistrationInTx: jest.fn().mockResolvedValue(undefined),
+}));
+
 const adminUser: V1AuthUser = {
   id: 'admin-user-id',
   email: 'admin@test.v1',
@@ -933,6 +937,7 @@ describe('LeagueMatchAdminService.removeTeam — 대진 취소 알림과 제외 
           // stillPresent: where.teamId = teamId(원시값) → 아직 로스터에 있음(1).
           return 1;
         }),
+        findFirst: jest.fn().mockResolvedValue({ id: 'registration-a' }),
         updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
       // 리그 조회도 통합 축이다. `settle()` 이 조기 반환하도록 진행중이 아닌 status 를 둔다.

@@ -37,6 +37,7 @@ describe('WithdrawalPageClient session termination', () => {
   let deferWithdrawalResponse: boolean;
   let resolveWithdrawalResponse: ((response: Response) => void) | null;
   let loseWithdrawalResponseAfterCommit: boolean;
+  let commitWithdrawalAfterActiveAuthProbe: boolean;
   let withdrawalCommitted: boolean;
   let pushUnsubscribeRequestCount: number;
   let logoutRequestCount: number;
@@ -67,6 +68,7 @@ describe('WithdrawalPageClient session termination', () => {
     deferWithdrawalResponse = false;
     resolveWithdrawalResponse = null;
     loseWithdrawalResponseAfterCommit = false;
+    commitWithdrawalAfterActiveAuthProbe = false;
     withdrawalCommitted = false;
     pushUnsubscribeRequestCount = 0;
     logoutRequestCount = 0;
@@ -74,6 +76,18 @@ describe('WithdrawalPageClient session termination', () => {
     vi.stubEnv('NEXT_PUBLIC_API_URL', 'http://localhost/api/v1');
     server.use(http.post('*/api/v1/me/withdrawal-request', async () => {
       requestCount += 1;
+      if (commitWithdrawalAfterActiveAuthProbe && requestCount === 1) {
+        return HttpResponse.json({
+          status: 'error', statusCode: 502, code: 'BAD_GATEWAY',
+          message: 'The proxy timed out while the request was still processing.', details: null,
+        }, { status: 502 });
+      }
+      if (commitWithdrawalAfterActiveAuthProbe && withdrawalCommitted) {
+        return HttpResponse.json({
+          status: 'error', statusCode: 403, code: 'PERMISSION_DENIED',
+          message: 'Account is not active', details: null,
+        }, { status: 403 });
+      }
       if (loseWithdrawalResponseAfterCommit) {
         withdrawalCommitted = true;
         return HttpResponse.error();
@@ -253,6 +267,51 @@ describe('WithdrawalPageClient session termination', () => {
     expect(queryClient.getQueryData(v1Keys.profile())).toEqual({ userId: 'withdrawal-user' });
     expect(documentNavigation.replace).not.toHaveBeenCalled();
     expect(socket.disconnect).not.toHaveBeenCalled();
+  });
+
+  it('rechecks auth when a retry is denied after a proxy timeout and late withdrawal commit', async () => {
+    commitWithdrawalAfterActiveAuthProbe = true;
+    let authRequestCount = 0;
+    server.use(http.get('*/api/v1/auth/me', () => {
+      authRequestCount += 1;
+      if (withdrawalCommitted) {
+        return HttpResponse.json({
+          status: 'error', statusCode: 403, code: 'PERMISSION_DENIED',
+          message: 'Account is not active', details: null,
+        }, { status: 403 });
+      }
+      return HttpResponse.json({
+        status: 'success',
+        data: {
+          user: { id: 'withdrawal-user', email: 'user@example.test', onboardingStatus: 'completed' },
+          profile: { displayName: '테스트 사용자' },
+        },
+      });
+    }));
+    const { queryClient } = renderWithClient(<WithdrawalPageClient />);
+    queryClient.setQueryData(v1Keys.profile(), { userId: 'withdrawal-user' });
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole('button', { name: '탈퇴 요청' }));
+    await user.click(within(await screen.findByRole('dialog')).getByRole('button', { name: /^탈퇴 요청$/ }));
+    expect(await screen.findByRole('alert')).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByRole('button', { name: '탈퇴 요청' })).toBeEnabled());
+    expect(requestCount).toBe(1);
+    expect(authRequestCount).toBe(1);
+    expect(localStorage.getItem(V1_SESSION_HINT_KEY)).toBe('active');
+
+    withdrawalCommitted = true;
+    await user.click(screen.getByRole('button', { name: '탈퇴 요청' }));
+    await user.click(within(await screen.findByRole('dialog')).getByRole('button', { name: /^탈퇴 요청$/ }));
+
+    await waitFor(() => expect(documentNavigation.replace).toHaveBeenCalledWith('/login'));
+    expect(requestCount).toBe(2);
+    expect(authRequestCount).toBe(2);
+    expect(logoutRequestCount).toBe(1);
+    expect(localStorage.getItem(V1_SESSION_HINT_KEY)).toBeNull();
+    expect(localStorage.getItem(V1_USER_ID_KEY)).toBeNull();
+    expect(queryClient.getQueryData(v1Keys.profile())).toBeUndefined();
+    expect(socket.disconnect).toHaveBeenCalledTimes(1);
   });
 
   it('bounds a stalled auth reconciliation and keeps identity when the outcome remains unknown', async () => {

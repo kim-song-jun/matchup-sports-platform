@@ -95,7 +95,7 @@ beforeEach(() => {
   vi.mocked(useV1LeagueMatch, { partial: true }).mockReturnValue({
     data: {
       leagueId: 'league-one', title: '검증 리그', state: 'completed', teamIds: ['team-home', 'team-away'],
-      startsOn: '2026-08-01T00:00:00.000Z', endsOn: '2026-08-02T00:00:00.000Z', registrationDeadlineAt: null, registrationOpen: false, seriesSiblings: [],
+      startsOn: '2026-08-01T00:00:00.000Z', endsOn: '2026-08-02T00:00:00.000Z', registrationDeadlineAt: null, registrationOpen: false, sportCode: 'futsal', coverImageUrl: null, entryFee: 0, entryFeeConfigured: false, seriesSiblings: [],
       fixtures: [{ teamMatchId: 'fixture-one', title: '검증 경기', homeTeamId: 'team-home', awayTeamId: 'team-away', startAt: '2026-08-01T10:00:00.000Z', placeName: '합성 검증장', status: 'completed', homeScore: 1, awayScore: 0 }],
     }, isError: false,
   });

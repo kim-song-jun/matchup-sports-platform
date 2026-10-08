@@ -4,6 +4,7 @@ import { formatKstMonthDayTime } from '../../common/kst-datetime';
 import { nightPushAllowed } from '../../common/quiet-hours';
 import { NotificationsService, notificationCopyFor, type NotificationEventType } from '../../notifications/notifications.service';
 import { WebPushService } from '../../notifications/web-push.service';
+import { isScheduleInHeldLeague } from '../../league-matches/league-hold';
 
 type LockedSchedule = {
   id: string;
@@ -114,6 +115,8 @@ export class ScheduleReminderService {
     const scheduleId = this.scheduleId(claim.payload);
     const schedule = await this.lockSchedule(tx, scheduleId);
     if (schedule === null || schedule.state !== 'SCHEDULED') return;
+    // 보류 리그 경기의 일정이면 응답 마감 알림을 보내지 않는다(league-hold.ts).
+    if (await isScheduleInHeldLeague(tx, scheduleId)) return;
 
     // P1-2 fix: team-schedules.service.ts's triggerReminder() now folds the rsvpDeadlineAt value
     // that was current at trigger-time into both the outbox business key AND this payload field
@@ -148,6 +151,7 @@ export class ScheduleReminderService {
     // let this handler notify managers about a "closing soon" recruitment on a schedule that has
     // already ended.
     if (recruitment.scheduleState !== 'SCHEDULED') return;
+    if (await isScheduleInHeldLeague(tx, scheduleId)) return;
 
     // P1-2 fix: same generation check as rsvpDeadlineReminderHandler above, scoped to the
     // recruitment's own `version` (which bumps on every mutation of that row — see

@@ -119,6 +119,8 @@ const TOURNAMENT_STATUS_PRIORITY: Record<V1TournamentStatus, number> = {
   draft: 3,
   completed: 4,
   cancelled: 5,
+  // 보류된 리그 — 다시 열릴 때까지 할 일이 없다.
+  on_hold: 6,
 };
 
 // 한 대회에 여러 배정(예: 필드 담당자로 두 구장)이 있으면 책임이 큰 역할부터 보여준다.

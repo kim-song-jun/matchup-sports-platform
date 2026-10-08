@@ -826,7 +826,7 @@ describe('ProfileService tournament appearance aggregation', () => {
             resultRevision: expect.objectContaining({
               game: expect.objectContaining({
                 teamMatch: {
-                  is: { OR: [{ leagueId: null }, { league: { is: { isPublic: true } } }] },
+                  is: { AND: [{ OR: [{ leagueId: null }, { league: { is: { isPublic: true } } }] }, { OR: [{ tournamentId: null }, { tournament: { is: { isPublic: true } } }] }] },
                 },
               }),
             }),

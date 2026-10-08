@@ -18,6 +18,7 @@ import { findTournamentOnSurface, TOURNAMENT_KINDS } from './tournament-surface-
 import {
   AdminTournamentListQueryDto,
   ChangeTournamentStatusDto,
+  UpdateTournamentVisibilityDto,
   CreateTournamentDto,
   TournamentGenderCategory,
   TournamentStatus,
@@ -137,7 +138,10 @@ export class TournamentsAdminService {
       (typeof TOURNAMENT_LIST_STATUSES)[number],
       number
     >;
-    for (const group of statusGroups) byStatus[group.status] = group._count._all;
+    // 대회 목록이 다루지 않는 상태(리그 보류 on_hold)는 집계에 넣지 않는다 — 이 목록은 대회만 본다.
+    for (const group of statusGroups) {
+      if (group.status in byStatus) byStatus[group.status as keyof typeof byStatus] = group._count._all;
+    }
 
     // status 필터가 걸리면 그 상태의 건수가, 없으면 전체가 곧 이 목록의 총 건수다.
     // groupBy 는 status 를 제외한 같은 필터로 집계하므로 추가 쿼리 없이 정확하다.
@@ -695,6 +699,45 @@ export class TournamentsAdminService {
     return this.get(user, tournamentId);
   }
 
+  /**
+   * 공개 여부 전환. 진행 상태·참가·대진·결과는 그대로 두고 공개 조회에서만 숨긴다(리그의
+   * updateVisibility 와 같은 규칙). 같은 값이면 아무것도 바꾸지 않고 감사 기록도 남기지 않는다.
+   * 동시에 반대로 바꾸는 요청이 있으면 나중 요청을 409 로 돌려 감사 기록의 이전 값이 틀리지 않게 한다.
+   */
+  async updateVisibility(user: V1AuthUser, tournamentId: string, dto: UpdateTournamentVisibilityDto) {
+    const admin = await this.adminContext.getMutationAdmin(user.id);
+    return this.prisma.$transaction(async (tx) => {
+      const existing = await findTournamentOnSurface(tx, TOURNAMENT_KINDS, {
+        where: { id: tournamentId, deletedAt: null },
+        select: { id: true, isPublic: true },
+      });
+      if (!existing) {
+        throw new NotFoundException({ code: 'TOURNAMENT_NOT_FOUND', message: '대회를 찾을 수 없어요.' });
+      }
+      if (existing.isPublic === dto.isPublic) return { tournamentId, isPublic: existing.isPublic };
+
+      const updated = await tx.v1Tournament.updateMany({
+        where: { id: tournamentId, isPublic: existing.isPublic },
+        data: { isPublic: dto.isPublic },
+      });
+      if (updated.count !== 1) {
+        throw new ConflictException({ code: 'TOURNAMENT_VERSION_CONFLICT', message: '다른 요청이 먼저 공개 설정을 바꿨어요. 다시 확인해 주세요.' });
+      }
+      await this.adminContext.logAdminAction(
+        admin,
+        {
+          action: 'tournament.visibility',
+          targetType: 'tournament',
+          targetId: tournamentId,
+          beforeJson: { isPublic: existing.isPublic },
+          afterJson: { isPublic: dto.isPublic },
+        },
+        tx,
+      );
+      return { tournamentId, isPublic: dto.isPublic };
+    });
+  }
+
   async changeStatus(user: V1AuthUser, tournamentId: string, dto: ChangeTournamentStatusDto) {
     const admin = await this.adminContext.getMutationAdmin(user.id);
     const existing = await findTournamentOnSurface(this.prisma, TOURNAMENT_KINDS, {
@@ -1243,6 +1286,8 @@ export class TournamentsAdminService {
       // 없이 노출하지만, lineupMaxPlayers/lineupMinPlayers/lineupSizeOptions는 조인이
       // 필요해 get()(대회 상세·수정 화면)에서만 채운다 — 그 외에는 null/[]로 둔다.
       competitionConfigVersionId: row.competitionConfigVersionId,
+      // 공개 여부 — false 면 일반 사용자 화면에서 숨겨져 있다(관리 화면의 공개 설정이 읽는다).
+      isPublic: row.isPublic,
       lineupMaxPlayers: lineup?.pinned?.maxPlayers ?? null,
       lineupMinPlayers: lineup?.pinned?.minPlayers ?? null,
       lineupSizeOptions: lineup?.sizeOptions ?? [],

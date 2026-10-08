@@ -2469,6 +2469,8 @@ enum V1TournamentStatus {
   in_progress
   completed
   cancelled
+  /// 정규 리그 보류 — 공개 화면에서 숨기고(경기 포함) 관리자가 다시 열 수 있다. 대회는 쓰지 않는다.
+  on_hold
 }
 
 enum V1TournamentCampaignStatus {
@@ -2574,6 +2576,9 @@ model V1Tournament {
   title                      String
   isPublic                   Boolean                     @default(true) @map("is_public")
   status                     V1TournamentStatus          @default(draft)
+  /// 리그 보류(on_hold) 직전 상태·공개 여부 — 보류 해제가 되돌린다. 보류 중이 아니면 null.
+  heldFromStatus             V1TournamentStatus?         @map("held_from_status")
+  heldFromPublic             Boolean?                    @map("held_from_public")
   format                     V1TournamentFormat          @default(group_knockout)
   registrationDeadlineAt     DateTime?                   @map("registration_deadline_at")
   rosterDeadlineAt           DateTime?                   @map("roster_deadline_at")
@@ -2600,6 +2605,8 @@ model V1Tournament {
   genderMinFemale            Int?                        @map("gender_min_female")
   genderMaxFemale            Int?                        @map("gender_max_female")
   entryFee                   Int                         @default(0) @map("entry_fee")
+  /// 리그 참가비를 운영자가 확정한 시각. null = 미설정(0원 '무료 확정'과 구분). 대회는 쓰지 않는다(항상 null).
+  entryFeeConfiguredAt       DateTime?                   @map("entry_fee_configured_at")
   // 상금: prizeSummary=대표 상품/상금 문구, prizeBreakdown=순위별 안내 텍스트(예: "1위 100만원 · 2위 50만원"). prizePool은 하위 호환용 숫자 필드.
   prizePool                  Int?                        @map("prize_pool")
   prizeSummary               String?                     @map("prize_summary")

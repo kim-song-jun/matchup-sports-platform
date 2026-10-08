@@ -1,7 +1,7 @@
 export interface V1AdminLeagueListItem {
   leagueId: string;
   title: string;
-  state: 'draft' | 'active' | 'completed';
+  state: 'draft' | 'active' | 'completed' | 'on_hold';
   teamCount: number;
   fixtureCount: number;
   startsOn: string;
@@ -24,7 +24,7 @@ export interface V1AdminLeagueListItem {
 export interface V1PublicLeagueListItem {
   leagueId: string;
   title: string;
-  state: 'draft' | 'active' | 'completed';
+  state: 'draft' | 'active' | 'completed' | 'on_hold';
   startsOn: string;
   endsOn: string;
   sport: { sportId: string; code: string; name: string };
@@ -104,7 +104,7 @@ export type V1LeagueMatchesFilters = {
   teamId?: string;
   sportId?: string;
   regionId?: string;
-  state?: 'draft' | 'active' | 'completed';
+  state?: 'draft' | 'active' | 'completed' | 'on_hold';
   cursor?: string;
   limit?: number;
 };
@@ -157,7 +157,7 @@ export interface V1LeagueFixture {
 export interface V1AdminLeagueDetail {
   leagueId: string;
   title: string;
-  state: 'draft' | 'active' | 'completed';
+  state: 'draft' | 'active' | 'completed' | 'on_hold';
   /** 공개 리그 목록·상세에 노출되는지 여부. 관리자 상세는 항상 값을 내려준다. */
   isPublic: boolean;
   /**
@@ -191,6 +191,20 @@ export interface V1AdminLeagueDetail {
    * "버튼은 보이는데 누르면 409" 로 갈린다. 공개 상세도 같은 함수를 쓴다.
    */
   registrationOpen: boolean;
+  /** 대표 이미지의 종목 그래픽 폴백(`CompetitionThumbnail`)에 쓴다. */
+  sportCode: string;
+  coverImageUrl: string | null;
+  entryFee: number;
+  /** 참가비를 운영자가 확정한 시각. `null` = 미설정(0원 '무료 확정'과 다르다). */
+  entryFeeConfiguredAt: string | null;
+  /** 입금 계좌 — 어드민 응답에만 있다(공개 응답·타입에는 없다). */
+  bankName: string | null;
+  bankAccount: string | null;
+  bankHolder: string | null;
+  /** 팀이 직접 낸 활성 신청 수. 사유 필수 판정은 서버가 하고 이 값은 화면 힌트다. */
+  activeRegistrationCount: number;
+  /** 같은 모집단(팀이 직접 낸 신청) 중 확정 수 — 운영자 시드 팀은 넣지 않는다. */
+  confirmedRegistrationCount: number;
   fixtures: V1LeagueFixture[];
 }
 
@@ -210,10 +224,22 @@ export interface V1LeagueSeriesSibling {
   tier: number;
   tierLabel: string;
   seasonNo: number;
-  state: 'draft' | 'active' | 'completed';
+  state: 'draft' | 'active' | 'completed' | 'on_hold';
 }
 
-export interface V1PublicLeagueDetail extends Omit<V1AdminLeagueDetail, 'isPublic'> {
+/** 어드민 전용 필드 — 공개 타입으로 새면 안 된다(계좌·신청 수·확정 시각). */
+type V1AdminOnlyLeagueFields =
+  | 'isPublic'
+  | 'bankName'
+  | 'bankAccount'
+  | 'bankHolder'
+  | 'entryFeeConfiguredAt'
+  | 'activeRegistrationCount'
+  | 'confirmedRegistrationCount';
+
+export interface V1PublicLeagueDetail extends Omit<V1AdminLeagueDetail, V1AdminOnlyLeagueFields> {
+  /** 참가비를 운영자가 확정했는가. `false` 면 참가비를 '무료'로 말하지 않는다. */
+  entryFeeConfigured: boolean;
   // startsOn 은 V1AdminLeagueDetail 로 올라갔다(대진 폼이 기준일로 쓴다) — 여기서 다시
   // 선언하면 두 곳이 갈릴 수 있어 상속만 받는다.
   endsOn: string;
@@ -235,6 +261,46 @@ export interface V1PublicLeagueDetail extends Omit<V1AdminLeagueDetail, 'isPubli
   seriesSiblings: V1LeagueSeriesSibling[];
 }
 
+export interface V1CloseLeagueRegistrationPayload {
+  reason?: string;
+}
+
+export interface V1CloseLeagueRegistrationResult {
+  leagueId: string;
+  registrationOpen: false;
+  registrationDeadlineAt: string | null;
+  alreadyProcessed: boolean;
+}
+
+export interface V1UpdateLeagueEntryFeePayload {
+  entryFee: number;
+  bankName?: string;
+  bankAccount?: string;
+  bankHolder?: string;
+  reason?: string;
+}
+
+export interface V1UpdateLeagueEntryFeeResult {
+  leagueId: string;
+  entryFee: number;
+  entryFeeConfiguredAt: string;
+  bankName: string | null;
+  bankAccount: string | null;
+  bankHolder: string | null;
+  alreadyProcessed: boolean;
+}
+
+export interface V1UpdateLeagueCoverImagePayload {
+  /** `null` = 대표 이미지 제거. */
+  coverImageUrl: string | null;
+}
+
+export interface V1UpdateLeagueCoverImageResult {
+  leagueId: string;
+  coverImageUrl: string | null;
+  alreadyProcessed: boolean;
+}
+
 export interface V1CreateLeaguePayload {
   title: string;
   sportId: string;
@@ -247,7 +313,7 @@ export interface V1CreateLeaguePayload {
 export interface V1CreateLeagueResult {
   leagueId: string;
   title: string;
-  state: 'draft' | 'active' | 'completed';
+  state: 'draft' | 'active' | 'completed' | 'on_hold';
 }
 
 /**
@@ -385,6 +451,14 @@ export interface V1CancelLeagueFixtureResult {
 // 사유는 선택(감사 로그용). 이미 active 면 alreadyProcessed: true 로 멱등 응답한다.
 export interface V1RevertLeagueCompletionPayload {
   reason?: string;
+}
+
+/** 리그 보류·보류 해제 응답 — state 는 바뀐 뒤 상태, alreadyProcessed 는 이미 그 상태였는지. */
+export interface V1LeagueHoldResult {
+  leagueId: string;
+  state: 'draft' | 'active' | 'completed' | 'on_hold';
+  isPublic: boolean;
+  alreadyProcessed: boolean;
 }
 
 export interface V1RevertLeagueCompletionResult {

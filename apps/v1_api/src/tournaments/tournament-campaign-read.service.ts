@@ -185,6 +185,8 @@ export class TournamentCampaignReadService {
         tournament: {
           deletedAt: null,
           status: { in: [...PUBLIC_TOURNAMENT_STATUSES] },
+          // 관리자가 비공개로 돌린 대회의 캠페인은 공개 목록·페이지에서도 숨긴다.
+          isPublic: true,
           ...(params.sportCode
             ? { sport: { code: params.sportCode } }
             : {}),
@@ -251,6 +253,8 @@ export class TournamentCampaignReadService {
       tournament: {
         deletedAt: null,
         status: { in: [...PUBLIC_TOURNAMENT_STATUSES] },
+          // 관리자가 비공개로 돌린 대회의 캠페인은 공개 목록·페이지에서도 숨긴다.
+          isPublic: true,
       },
     });
   }
@@ -263,6 +267,8 @@ export class TournamentCampaignReadService {
         tournament: {
           deletedAt: null,
           status: { in: [...PUBLIC_TOURNAMENT_STATUSES] },
+          // 관리자가 비공개로 돌린 대회의 캠페인은 공개 목록·페이지에서도 숨긴다.
+          isPublic: true,
         },
       },
       select: { id: true },

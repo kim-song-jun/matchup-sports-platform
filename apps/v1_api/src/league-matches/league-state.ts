@@ -13,7 +13,7 @@
  * 적고 싶어진다 — 그러면 한 곳만 고쳐진 채로 나가도 타입이 잡아 주지 않는다. 소비처는 전부
  * 이 모듈을 import 한다.
  */
-export const LEAGUE_STATES = ['draft', 'active', 'completed'] as const;
+export const LEAGUE_STATES = ['draft', 'active', 'completed', 'on_hold'] as const;
 
 export type LeagueState = (typeof LEAGUE_STATES)[number];
 
@@ -25,4 +25,5 @@ export const LeagueStateValue = {
   draft: 'draft',
   active: 'active',
   completed: 'completed',
+  on_hold: 'on_hold',
 } as const satisfies Record<LeagueState, LeagueState>;

@@ -1,4 +1,5 @@
 import type { PrismaService } from '../prisma/prisma.service';
+import { PUBLIC_COMPETITION_TEAM_MATCH_WHERE } from '../tournaments/tournament-surface-lookup';
 
 const KST_OFFSET_MS = 9 * 60 * 60 * 1000;
 
@@ -101,9 +102,7 @@ export async function countOfficialGameAppearances(
           ...(publicOnly
             ? {
                 teamMatch: {
-                  is: {
-                    OR: [{ leagueId: null }, { league: { is: { isPublic: true } } }],
-                  },
+                  is: PUBLIC_COMPETITION_TEAM_MATCH_WHERE,
                 },
               }
             : {}),

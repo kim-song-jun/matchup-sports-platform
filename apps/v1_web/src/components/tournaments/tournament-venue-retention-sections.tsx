@@ -381,6 +381,8 @@ type CompletedActionItem = {
  * 더하거나 고칠 때는 라벨이 약속하는 화면과 `href`가 같은 곳인지 먼저 확인한다.
  */
 function TournamentCompletedActionList({ tournamentId }: { tournamentId: string }) {
+  // 시상·후기 화면의 상단 뒤로가기가 이 개요로 돌아오도록 지금 주소를 출처로 싣는다.
+  const currentHref = useCurrentHref();
   const items: CompletedActionItem[] = [
     {
       key: 'results',
@@ -388,7 +390,7 @@ function TournamentCompletedActionList({ tournamentId }: { tournamentId: string 
       caption: '최종 순위와 시상 내역을 확인해요',
       // 이 라벨이 약속하는 화면(시상대·상금·개인 어워드)은 `/awards`다 — `/results`는
       // 경기별 결과·기록 페이지라, 시상을 보러 누른 사람이 경기 목록에 떨어졌다.
-      href: `/tournaments/${tournamentId}/awards`,
+      href: withFromPath(`/tournaments/${tournamentId}/awards`, currentHref),
       icon: <Trophy size={18} strokeWidth={2} aria-hidden="true" />,
     },
     {
@@ -413,7 +415,7 @@ function TournamentCompletedActionList({ tournamentId }: { tournamentId: string 
       // '/awards'(시상·리뷰)로 보냈다 — "대회 후기"를 눌렀는데 시상대·상금이 먼저 나오고
       // 후기는 스크롤 아래에 있어서, 라벨이 약속한 것과 도착지가 어긋났다(오너 지적).
       // 이제 후기 목록 그 자체로 보낸다.
-      href: `/tournaments/${tournamentId}/reviews`,
+      href: withFromPath(`/tournaments/${tournamentId}/reviews`, currentHref),
       icon: <Star size={18} strokeWidth={2} aria-hidden="true" />,
     },
   ];

@@ -21,11 +21,12 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   }
   if (!league.data) return buildNoIndexMetadata('리그를 찾을 수 없어요');
 
-  const { title, tierLabel, startsOn, endsOn } = league.data;
+  const { title, tierLabel, startsOn, endsOn, coverImageUrl } = league.data;
   return buildPublicMetadata({
     title,
     description: `${tierLabel ? `${tierLabel} ` : ''}정규 리그 · ${formatTournamentDateLong(startsOn)} ~ ${formatTournamentDateLong(endsOn)}. 순위표와 경기 일정·결과를 확인해 보세요.`,
     path,
+    image: coverImageUrl,
   });
 }
 

@@ -5,7 +5,7 @@
  * 항목은 대회 하위 탭이 아니라 **경로를 프리필한 전역 화면 링크**여야 한다 — 이 링크가
  * 사라지거나 옛 하위 경로로 되돌아가면 운영자는 그 대회의 팝업을 만들 길이 없어진다.
  */
-import { render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { TournamentAdminShell } from './tournament-admin-shell';
 
@@ -14,6 +14,8 @@ const { adminRoleMock } = vi.hoisted(() => ({ adminRoleMock: { value: 'ops' as '
 vi.mock('next/navigation', () => ({
   usePathname: () => '/admin/tournaments/tournament-1/info',
 }));
+
+const { visibilityMutate } = vi.hoisted(() => ({ visibilityMutate: vi.fn() }));
 
 vi.mock('@/hooks/use-v1-api', () => ({
   useV1AdminTournament: () => ({
@@ -31,6 +33,7 @@ vi.mock('@/hooks/use-v1-api', () => ({
   }),
   useV1AdminMe: () => ({ data: { capabilities: ['status:write'], adminRole: adminRoleMock.value } }),
   useV1ChangeTournamentStatus: () => ({ mutate: vi.fn(), isPending: false }),
+  useV1UpdateTournamentVisibility: () => ({ mutate: visibilityMutate, isPending: false, isError: false, isSuccess: false, error: null }),
   useV1TournamentStaffAssignments: () => ({ data: { items: [] }, isPending: false, isError: false, error: null }),
 }));
 
@@ -79,5 +82,16 @@ describe('TournamentAdminShell 섹션 내비', () => {
       'href',
       '/admin/tournaments/tournament-1/registrations',
     );
+  });
+});
+
+describe('TournamentAdminShell 공개 설정', () => {
+  it('공개 대회는 "비공개로 전환"을 보여 주고, 누르면 isPublic=false 로 저장한다', () => {
+    render(<TournamentAdminShell id="tournament-1"><div /></TournamentAdminShell>);
+
+    const section = screen.getByRole('region', { name: '공개 설정' });
+    expect(section).toHaveTextContent('현재 상태: 공개');
+    fireEvent.click(within(section).getByRole('button', { name: '비공개로 전환' }));
+    expect(visibilityMutate).toHaveBeenCalledWith({ isPublic: false });
   });
 });

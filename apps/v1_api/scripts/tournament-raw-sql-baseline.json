@@ -50,6 +50,10 @@
   },
   "src/games/public-records/public-team-records.service.ts": {
     "allowed": 3,
-    "why": "Public team-record page, summary, and available-season queries join the regular-league parent to filter is_public in SQL before pagination or aggregation. This prevents hidden league fixtures from leaking titles/results or revealing their existence through totals and season options; each query is a read-only public parent filter."
+    "why": "Public team-record page, summary, and available-season queries join the parent competition (regular league via league_id, otherwise the tournament via tournament_id) to filter is_public in SQL before pagination or aggregation. This prevents hidden league/tournament fixtures from leaking titles/results or revealing their existence through totals and season options; each query is a read-only public parent filter."
+  },
+  "src/league-matches/league-cover-image.service.ts": {
+    "allowed": 1,
+    "why": "대표 이미지 교체의 FOR UPDATE 행 잠금 — kind='regular_league' 로 걸고 소프트삭제는 값으로 읽어 404 와 409 를 가른다. 반환되는 건 id·cover_image_url·deleted_at 뿐이라 대회 표면이 노출되지 않는다."
   }
 }

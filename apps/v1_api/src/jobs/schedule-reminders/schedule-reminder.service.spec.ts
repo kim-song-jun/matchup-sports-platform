@@ -52,6 +52,9 @@ describe('ScheduleReminderService', () => {
     preferenceRows?: Array<{ userId: string; teamEnabled: boolean }>;
     createMany?: jest.Mock;
     alreadyDeliveredBusinessKeys?: string[];
+    /** 일정이 연결된 팀매치와 그 리그가 보류인지 — 기본은 리그 경기 아님. */
+    teamMatchId?: string | null;
+    heldLeague?: boolean;
   }) {
     const queryRaw = jest
       .fn()
@@ -59,6 +62,8 @@ describe('ScheduleReminderService', () => {
       .mockResolvedValueOnce(overrides.memberRows ?? []);
     return {
       $queryRaw: queryRaw,
+      v1TeamSchedule: { findUnique: jest.fn().mockResolvedValue({ teamMatchId: overrides.teamMatchId ?? null }) },
+      v1TeamMatch: { count: jest.fn().mockResolvedValue(overrides.heldLeague ? 1 : 0) },
       v1NotificationPreference: {
         findMany: jest.fn().mockResolvedValue(overrides.preferenceRows ?? []),
       },
@@ -74,6 +79,23 @@ describe('ScheduleReminderService', () => {
       },
     };
   }
+
+  it('rsvpDeadlineReminderHandler is a no-op when the schedule belongs to a fixture of a league on hold', async () => {
+    const service = new ScheduleReminderService(fakeNotifications() as never, fakeWebPush() as never);
+    const createMany = jest.fn();
+    const tx = txWith({
+      lockRows: [{ id: 'schedule-1', teamId: 'team-1', state: 'SCHEDULED', rsvpDeadlineAt: null }],
+      memberRows: [{ userId: 'u1' }],
+      createMany,
+      teamMatchId: 'tm-1',
+      heldLeague: true,
+    });
+
+    await service.rsvpDeadlineReminderHandler(claim('schedule-1') as never, tx as never);
+
+    expect(tx.v1TeamMatch.count).toHaveBeenCalledWith({ where: { id: 'tm-1', league: { is: { status: 'on_hold' } } } });
+    expect(createMany).not.toHaveBeenCalled();
+  });
 
   it('rsvpDeadlineReminderHandler is a no-op once the schedule is no longer SCHEDULED (already cancelled)', async () => {
     const service = new ScheduleReminderService(fakeNotifications() as never, fakeWebPush() as never);

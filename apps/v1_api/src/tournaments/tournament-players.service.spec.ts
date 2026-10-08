@@ -23,7 +23,7 @@ import {
 import { Test, TestingModule } from '@nestjs/testing';
 import { PrismaService } from '../prisma/prisma.service';
 import { AdminContextService } from '../common/admin-context.service';
-import { TournamentPlayersService } from './tournament-players.service';
+import { TournamentPlayersService, evaluateRosterCandidate } from './tournament-players.service';
 import { kindAwareFindFirst } from '../../test/helpers/kind-aware-find-first';
 
 // ─── 테스트 픽스처 ───────────────────────────────────────────────────────────────
@@ -1606,7 +1606,8 @@ describe('TournamentPlayersService', () => {
 
     expect(member).toMatchObject({
       eligible: false,
-      ineligibleReason: '실명·생년월일·휴대폰이 모두 필요해요',
+      // 빠진 칸만 짚는다 — 운영자가 무엇을 채워 달라고 할지 바로 안다.
+      ineligibleReason: '실명·생년월일 미입력',
     });
   });
 
@@ -1624,8 +1625,30 @@ describe('TournamentPlayersService', () => {
 
     expect(member).toMatchObject({
       eligible: false,
-      ineligibleReason: '실명·생년월일·휴대폰·성별이 모두 필요해요',
+      ineligibleReason: '성별 미입력',
     });
+  });
+
+  it('evaluateRosterCandidate: 프로필이 빠진 팀원은 빠진 칸과 채우는 곳을 함께 알려 준다', () => {
+    const base = {
+      alreadyOnRoster: false, alreadyOnOtherTeamInTournament: false, tournamentMutable: true, registrationMutable: true,
+      rosterCount: 0, maxPlayers: 10, genderCategory: null, phoneEnforced: false,
+    };
+    const block = evaluateRosterCandidate({
+      ...base,
+      member: { realName: '홍길동', birthDate: null, phone: null, gender: null, phoneVerifiedAt: null },
+    } as never);
+    expect(block).toMatchObject({
+      code: 'PLAYER_REQUIRED_PROFILE_MISSING',
+      message: '이 팀원의 프로필에 생년월일·휴대폰 번호가 없어 선수로 등록할 수 없어요. 팀원이 마이 > 프로필 수정에서 입력하면 등록할 수 있어요.',
+      listReason: '생년월일·휴대폰 번호 미입력',
+    });
+    const genderOnly = evaluateRosterCandidate({
+      ...base,
+      genderCategory: 'mixed',
+      member: { realName: '홍길동', birthDate: new Date('1995-03-15'), phone: '01012345678', gender: null, phoneVerifiedAt: null },
+    } as never);
+    expect(genderOnly?.message).toContain('프로필에 성별이 없어');
   });
 
   it('listEligiblePlayersForAdmin: 어드민이 아니면 거부한다', async () => {

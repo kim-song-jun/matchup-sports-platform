@@ -14,60 +14,13 @@ import {
   MaxLength,
   Min,
   MinLength,
-  Validate,
   ValidateIf,
   ValidateNested,
-  ValidatorConstraint,
-  type ValidatorConstraintInterface,
 } from 'class-validator';
+import { IsSafeImageUrl } from '../../common/safe-image-url';
 
 const PLAIN_TEXT = /^(?=[\s\S]*\S)(?![\s\S]*(?:javascript\s*:|(?:alert|eval|fetch|Function|setTimeout|setInterval)\s*\(|(?:document|window)\s*\.|on[a-z]+\s*=|(?:^|[;\s])(?:color|background(?:-color)?|font(?:-size|-family|-weight)?|display|position|margin|padding|width|height|border|transform|animation|opacity)\s*:))[^<>{}]*$/iu;
 const SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
-const SAFE_MEDIA_SEGMENT = /^[\p{L}\p{N}._-]+$/u;
-const UNSAFE_URL_CHARACTERS = /[\\'"<>{}\u0000-\u001f\u007f]/u;
-const ENCODED_CSS_BREAKOUT = /%(?:22|27|5c)/iu;
-
-@ValidatorConstraint({ name: 'isTournamentCampaignImageUrl', async: false })
-class TournamentCampaignImageUrlConstraint implements ValidatorConstraintInterface {
-  validate(value: unknown): boolean {
-    if (typeof value !== 'string' || UNSAFE_URL_CHARACTERS.test(value)) return false;
-    if (value.startsWith('/uploads/')) {
-      const segments = value.slice('/uploads/'.length).split('/');
-      return (
-        segments.length > 0 &&
-        segments.every(
-          (segment) => segment !== '.' && segment !== '..' && SAFE_MEDIA_SEGMENT.test(segment),
-        )
-      );
-    }
-    if (ENCODED_CSS_BREAKOUT.test(value)) return false;
-
-    try {
-      const url = new URL(value);
-      return (
-        url.protocol === 'https:' &&
-        !url.username &&
-        !url.password &&
-        !isPrivateHostname(url.hostname)
-      );
-    } catch {
-      return false;
-    }
-  }
-
-  defaultMessage(): string {
-    return 'imageUrl must be an HTTPS URL or a local /uploads/ path';
-  }
-}
-
-function isPrivateHostname(hostname: string): boolean {
-  const host = hostname.toLowerCase().replace(/^\[|\]$/gu, '');
-  if (host === 'localhost' || host.endsWith('.localhost') || host === '::1') return true;
-  if (/^(?:0|10|127|169\.254|192\.168)\./u.test(host)) return true;
-  const private172 = /^172\.(\d{1,2})\./u.exec(host);
-  if (private172 && Number(private172[1]) >= 16 && Number(private172[1]) <= 31) return true;
-  return /^(?:fc|fd|fe8|fe9|fea|feb)[0-9a-f:]*$/u.test(host);
-}
 
 export const TOURNAMENT_CAMPAIGN_STATUSES = ['draft', 'published', 'archived'] as const;
 export type TournamentCampaignStatus = (typeof TOURNAMENT_CAMPAIGN_STATUSES)[number];
@@ -108,7 +61,7 @@ export class TournamentCampaignHeroDto {
   @IsOptional()
   @IsString()
   @MaxLength(2048)
-  @Validate(TournamentCampaignImageUrlConstraint)
+  @IsSafeImageUrl()
   readonly imageUrl?: string;
 }
 
@@ -142,7 +95,7 @@ export class TournamentCampaignHighlightDto {
   @IsOptional()
   @IsString()
   @MaxLength(2048)
-  @Validate(TournamentCampaignImageUrlConstraint)
+  @IsSafeImageUrl()
   readonly imageUrl?: string;
 }
 

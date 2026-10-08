@@ -63,6 +63,7 @@ const tournament: V1TournamentDetail = {
   genderMinFemale: null,
   genderMaxFemale: null,
   entryFee: 0,
+  entryFeeConfigured: true,
   prizePool: null,
   prizeSummary: null,
   prizeBreakdown: null,

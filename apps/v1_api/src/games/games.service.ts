@@ -1182,10 +1182,16 @@ export class GamesService {
         },
         events: { orderBy: { sequence: 'asc' } },
         currentOfficialRevision: true,
-        teamMatch: { select: { league: { select: { isPublic: true } } } },
+        teamMatch: { select: { league: { select: { isPublic: true } }, tournament: { select: { isPublic: true } } } },
       },
       });
-    if (game === null || game.visibilityPolicy === null || game.teamMatch?.league?.isPublic === false) {
+    // 비공개 리그·대회의 경기는 공개 기록 화면에서도 없는 경기다.
+    if (
+      game === null ||
+      game.visibilityPolicy === null ||
+      game.teamMatch?.league?.isPublic === false ||
+      game.teamMatch?.tournament?.isPublic === false
+    ) {
       throw this.notFound();
     }
     const publicLiveEnabled = await isPublicLiveEnabled(this.prisma);

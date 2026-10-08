@@ -4,6 +4,7 @@ import { loadCompetitionRosterBase, loadGameRoster, type GameRosterPreload } fro
 import { notificationCopyFor } from '../../notifications/notifications.service';
 import { loadTeamCompetitionGameOrder } from '../../tournaments/discipline/team-game-order';
 import { isQuietHour, kstMidnight } from '../../common/quiet-hours';
+import { NOT_IN_HELD_LEAGUE_WHERE } from '../../league-matches/league-hold';
 
 type Tx = Prisma.TransactionClient;
 
@@ -60,6 +61,8 @@ export async function loadReminderGameSides(tx: Tx, startAt: Prisma.DateTimeNull
       hostTeamId: { not: null },
       approvedApplicantTeamId: { not: null },
       game: { isNot: null },
+      // 보류 리그의 경기는 전날·킥오프 알림을 보내지 않는다(league-hold.ts).
+      AND: [NOT_IN_HELD_LEAGUE_WHERE],
     },
     select: {
       id: true,

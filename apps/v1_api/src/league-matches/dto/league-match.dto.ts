@@ -170,6 +170,21 @@ export class RevertLeagueCompletionDto {
 
 // R12: 리그 대진 취소는 되돌릴 수 없는 운영 조작이라 사유를 필수로 받는다
 // (프론트 GateConfirmModal의 REASON_MAX=500과 동일 상한).
+// 리그 보류는 공개 화면에서 리그와 경기를 숨기는 운영 조작이라 사유를 필수로 받는다(대진 취소와 같은 상한).
+export class HoldLeagueDto {
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(500)
+  reason!: string;
+}
+
+export class ResumeLeagueDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  reason?: string;
+}
+
 export class CancelLeagueFixtureDto {
   @IsString()
   @IsNotEmpty()

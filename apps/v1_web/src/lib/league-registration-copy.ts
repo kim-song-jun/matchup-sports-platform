@@ -26,7 +26,7 @@ import { formatTournamentDateTimeShort } from './date-utils';
  */
 export function describeLeagueRegistrationWindow(input: {
   /** 리그 수명주기. `'completed'` 는 끝난 리그와 취소된 리그를 함께 가리킨다. */
-  state: 'draft' | 'active' | 'completed';
+  state: 'draft' | 'active' | 'completed' | 'on_hold';
   /** 지금 신청을 받는가 — **서버 판정값**을 그대로 받는다(화면이 다시 계산하지 않는다). */
   registrationOpen: boolean;
   registrationDeadlineAt: string | null;

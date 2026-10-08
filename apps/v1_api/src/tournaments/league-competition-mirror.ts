@@ -31,6 +31,7 @@ export const STATUS_BY_LEAGUE_STATE: Record<LeagueState, V1TournamentStatus> = {
   [LeagueStateValue.draft]: V1TournamentStatus.draft,
   [LeagueStateValue.active]: V1TournamentStatus.in_progress,
   [LeagueStateValue.completed]: V1TournamentStatus.completed,
+  [LeagueStateValue.on_hold]: V1TournamentStatus.on_hold,
 };
 
 
@@ -71,6 +72,17 @@ export interface LeagueMirrorSource {
    * 원래 그래야 했던 상태다.
    */
   createdAt: Date;
+  /**
+   * 직전 시즌(같은 시리즈·같은 티어)에서 이어받는 값. 승강 확정으로 만드는 새 시즌에서만 채운다.
+   * `toMirrorSource` 는 이 필드를 모르므로 호출부가 `{ ...toMirrorSource(row), inherited }` 로 붙인다.
+   */
+  inherited?: {
+    coverImageUrl: string | null;
+    entryFee: number;
+    bankName: string | null;
+    bankAccount: string | null;
+    bankHolder: string | null;
+  };
 }
 
 /**
@@ -98,6 +110,16 @@ export function leagueMirrorCreateData(
     // 원본 시각을 그대로 쓴다 — 생략하면 `@default(now())` 가 백필/생성 시각을 박고,
     // 그 값이 목록 정렬(`createdAt desc`)을 지배한다. 위 필드 주석 참조.
     createdAt: league.createdAt,
+    // `entryFeeConfiguredAt` 은 어떤 경우에도 싣지 않는다 — null 이어야 이어받은 금액이 '확인 전'으로 보인다.
+    ...(league.inherited === undefined
+      ? {}
+      : {
+          coverImageUrl: league.inherited.coverImageUrl,
+          entryFee: league.inherited.entryFee,
+          bankName: league.inherited.bankName,
+          bankAccount: league.inherited.bankAccount,
+          bankHolder: league.inherited.bankHolder,
+        }),
   };
 }
 
@@ -233,6 +255,8 @@ export const LEAGUE_STATE_BY_STATUS: Record<V1TournamentStatus, LeagueState> = {
   [V1TournamentStatus.in_progress]: LeagueStateValue.active,
   [V1TournamentStatus.completed]: LeagueStateValue.completed,
   [V1TournamentStatus.cancelled]: LeagueStateValue.completed,
+  // 보류 — 공개 화면에선 비공개라 보이지 않고, 관리 화면이 '보류'로 그린다. 보류 해제가 직전 상태로 되돌린다.
+  [V1TournamentStatus.on_hold]: LeagueStateValue.on_hold,
 };
 
 /**
@@ -273,5 +297,6 @@ export const STATUSES_BY_LEAGUE_STATE: Record<LeagueState, V1TournamentStatus[]>
       [LeagueStateValue.draft]: [] as V1TournamentStatus[],
       [LeagueStateValue.active]: [] as V1TournamentStatus[],
       [LeagueStateValue.completed]: [] as V1TournamentStatus[],
+      [LeagueStateValue.on_hold]: [] as V1TournamentStatus[],
     },
   );

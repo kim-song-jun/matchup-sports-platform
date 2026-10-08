@@ -347,11 +347,11 @@ export function getMemberIneligibility(
     requiresAnyGender && !member.gender ? '성별' : null,
   ].filter((v): v is string => v !== null);
   if (missing.length > 0) {
+    // 서버(evaluateRosterCandidate)와 같은 말 — 빠진 칸과, 그 칸은 팀원 본인이 채운다는 것을 함께 알린다.
+    const fields = missing.join('·');
     return {
-      listReason: `${missing.join(', ')} 미입력`,
-      message: requiresAnyGender
-        ? '실명, 생년월일, 휴대폰 번호, 성별이 모두 등록된 팀원만 선수로 등록할 수 있어요.'
-        : '실명, 생년월일, 휴대폰 번호가 모두 등록된 팀원만 선수로 등록할 수 있어요.',
+      listReason: `${fields} 미입력`,
+      message: `이 팀원의 프로필에 ${josa(fields, ['이', '가'])} 없어 선수로 등록할 수 없어요. 팀원에게 마이 > 프로필 수정에서 입력해 달라고 요청해 주세요.`,
     };
   }
   const requiredGender = genderRequiredByCategory(genderCategory);
@@ -584,10 +584,10 @@ function AddPlayerForm({
               {unavailableMembers.length > 0 ? (
                 <p className="tm-text-micro" style={{ color: 'var(--text-muted)', margin: '0 0 8px' }}>
                   {genderCategory === 'mixed'
-                    ? '프로필(생년월일·휴대폰·성별)이 완성되고 대회 성별 구분에 맞는 팀원만 명단에 올릴 수 있어요. 팀원에게 프로필 완성을 요청해 주세요.'
+                    ? '프로필(실명·생년월일·휴대폰·성별)이 완성되고 대회 성별 구분에 맞는 팀원만 명단에 올릴 수 있어요. 팀원에게 프로필 완성을 요청해 주세요.'
                     : genderCategory === 'male' || genderCategory === 'female'
-                      ? `프로필(생년월일·휴대폰)이 완성된 ${genderCategory === 'male' ? '남성' : '여성'} 팀원만 명단에 올릴 수 있어요. 팀원에게 프로필 완성을 요청해 주세요.`
-                      : '프로필(생년월일·휴대폰)이 완성된 팀원만 명단에 올릴 수 있어요. 팀원에게 프로필 완성을 요청해 주세요.'}
+                      ? `프로필(실명·생년월일·휴대폰)이 완성된 ${genderCategory === 'male' ? '남성' : '여성'} 팀원만 명단에 올릴 수 있어요. 팀원에게 프로필 완성을 요청해 주세요.`
+                      : '프로필(실명·생년월일·휴대폰)이 완성된 팀원만 명단에 올릴 수 있어요. 팀원에게 프로필 완성을 요청해 주세요.'}
                 </p>
               ) : null}
               <select

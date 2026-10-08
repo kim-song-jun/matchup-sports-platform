@@ -49,6 +49,11 @@ vi.mock('@/hooks/use-v1-api', () => ({
   // R6/D-3: 종료 역전이. 대부분의 테스트는 state !== 'completed' 라 버튼 자체가 안 뜨므로
   // 기본값으로 충분하고, 역전이 테스트만 mutate 를 들여다본다.
   useV1RevertLeagueCompletion: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
+  useV1HoldLeague: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
+  useV1ResumeLeague: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
+  useV1CloseLeagueRegistration: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
+  useV1UpdateLeagueCoverImage: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
+  useV1UploadImages: vi.fn(() => ({ mutateAsync: vi.fn(), isPending: false })),
   // 팀 추가 EntityPicker의 검색 후보 — 빈 목록이면 아무것도 렌더하지 않아 무해하다.
   useV1Teams: vi.fn(() => ({ data: undefined, isFetching: false })),
   useV1UpdateLeagueFixture: vi.fn(),

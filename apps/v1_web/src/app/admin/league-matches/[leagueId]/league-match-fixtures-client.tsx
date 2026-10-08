@@ -40,6 +40,9 @@ import { resolveWeeksCount, type WeeksPlan } from '@/lib/league-round-robin-plan
 import { formatKstDateShort, formatKstTime } from '@/lib/date-utils';
 import { RecentVenueChips } from '@/components/v1-ui/create-form-fields';
 import { LeagueVisibilityControl } from './league-visibility-control';
+import { LeagueHoldControl } from './league-hold-control';
+import { LeagueCloseRegistrationControl } from './league-close-registration-control';
+import { LeagueCoverImageControl } from './league-cover-image-control';
 import {
   computeDailyPlan,
   dayOffsetLabel,
@@ -653,7 +656,11 @@ export default function LeagueMatchFixturesClient({ leagueId, returnHref = '/adm
         }
       />
 
-      <LeagueVisibilityControl leagueId={leagueId} isPublic={series.isPublic} />
+      <LeagueHoldControl leagueId={leagueId} state={series.state} showToast={showToast} />
+      {/* 보류 중에는 공개 설정을 따로 바꾸지 않는다 — 보류 해제가 공개 여부까지 되돌린다(서버도 409). */}
+      {series.state === 'on_hold' ? null : <LeagueVisibilityControl leagueId={leagueId} isPublic={series.isPublic} />}
+      <LeagueCloseRegistrationControl leagueId={leagueId} state={series.state} registrationOpen={series.registrationOpen} registrationDeadlineAt={series.registrationDeadlineAt} activeRegistrationCount={series.activeRegistrationCount} confirmedCount={series.confirmedRegistrationCount} showToast={showToast} />
+      <LeagueCoverImageControl leagueId={leagueId} sportCode={series.sportCode} coverImageUrl={series.coverImageUrl} />
 
 {series.fixtures.length === 0 ? (
 <>
@@ -1726,7 +1733,7 @@ function LeagueRegistrationSummary({
   registrationDeadlineAt,
 }: {
   leagueId: string;
-  state: 'draft' | 'active' | 'completed';
+  state: 'draft' | 'active' | 'completed' | 'on_hold';
   registrationOpen: boolean;
   registrationDeadlineAt: string | null;
 }) {

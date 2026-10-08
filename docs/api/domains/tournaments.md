@@ -2,10 +2,24 @@
 
 ## Read Endpoints
 
-Regular league publication is independently controlled by `V1Tournament.isPublic`.
-Unpublished leagues are excluded from unified public tournament reads, including
-direct detail and overall standings, while admin operations remain available.
-The default is public; this gate does not change lifecycle or bracket publication.
+Publication of both regular tournaments and regular leagues is independently
+controlled by `V1Tournament.isPublic` (default `true`). Unpublished competitions are
+excluded from public tournament lists (every `kind`), direct detail, overall standings,
+schedule, match detail, player records, public reviews and published campaigns
+(`GET /tournaments/:id/announcements/me` returns `404 TOURNAMENT_NOT_FOUND` unless the
+caller has an active registration; active participants keep their audience-scoped
+announcements), and
+their fixtures are excluded from public team/user records, profile activity counts
+and the public game record. Admin operations remain available, and the gate does not
+change lifecycle, registrations, fixtures or bracket publication.
+
+`PATCH /api/v1/admin/tournaments/:tournamentId/visibility` accepts only
+`{ "isPublic": boolean }` (same validation as the league endpoint — non-boolean JSON
+values return `400`) and returns `{ tournamentId, isPublic }`. It requires an active
+mutation administrator, is a no-op without audit when the value is unchanged, records
+`tournament.visibility` in the admin audit otherwise, and returns
+`409 TOURNAMENT_VERSION_CONFLICT` if a concurrent request changed the value first.
+The admin tournament detail includes `isPublic`.
 See [the league visibility contract](./league-matches.md#public-visibility).
 
 | Method | Path | Auth | Request | Response |
@@ -203,6 +217,10 @@ Tournament promo cards are separate from prize fields and from the normal tourna
 
 Tournament announcement `audience` values are `public`, `all_registered`, `confirmed_only`, and `waitlist`. `public` means the announcement is visible on public tournament detail to logged-out users as soon as it is published. Public tournament detail (`GET /api/v1/tournaments/:tournamentId`) returns only announcements where `audience=public` and `publishedAt` is not null; team-scoped announcement values are retained for admin operations and targeted follow-up delivery.
 
+## Entry fee configured flag
+
+The list (`GET /api/v1/tournaments`) and detail (`GET /api/v1/tournaments/:tournamentId`) responses include `entryFeeConfigured: boolean`. For regular leagues it is `entryFeeConfiguredAt != null` — `false` means the fee has not been set yet and clients must not show `entryFee: 0` as "무료". For regular tournaments it is always `true`. `entryFee` keeps its numeric type, and bank account fields are not part of either response. Registration screens read the amount from the registration's own `payment.amount` (the snapshot at submit time), not from the tournament's current `entryFee`.
+
 ## Registration Endpoints
 
 | Method | Path | Auth | Request | Response |
@@ -267,7 +285,7 @@ The service reads the selected member's profile and phone from the team membersh
 - `profile.birthDate`
 - `user.phone`
 
-If any required source field is missing, the API rejects the request with `400 PLAYER_REQUIRED_PROFILE_MISSING`.
+If any required source field is missing, the API rejects the request with `400 PLAYER_REQUIRED_PROFILE_MISSING`. The message names exactly the missing fields and where they are filled (for example `이 팀원의 프로필에 생년월일·휴대폰 번호가 없어 선수로 등록할 수 없어요. 팀원이 마이 > 프로필 수정에서 입력하면 등록할 수 있어요.`), and the candidate list reason is `<fields> 미입력`. `PLAYER_PHONE_NOT_VERIFIED` likewise tells the member to finish phone verification in profile edit.
 
 The stored roster snapshot uses the server-side member profile values for `realName`, `birthDateSnapshot`, and nullable `genderSnapshot`; clients must not treat editable form values as the source of truth. Gender accepts the profile contract values `male` and `female`. A `mixed` tournament requires a profile gender when a player is added; missing gender is rejected with `400 PLAYER_REQUIRED_PROFILE_MISSING`. Legacy or non-mixed roster snapshots may still be `null` and are shown as `미등록`.
 

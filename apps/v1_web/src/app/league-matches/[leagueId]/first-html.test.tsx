@@ -13,12 +13,12 @@ vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: vi.fn(), replace: vi.fn(), prefetch: vi.fn(), back: vi.fn() }),
 }));
 
-import LeagueMatchPage from './page';
+import LeagueMatchPage, { generateMetadata } from './page';
 
 const LEAGUE = {
   leagueId: 'lg-1', title: '송파 풋살 리그 1시즌', state: 'active',
   startsOn: '2026-09-17T00:00:00.000Z', endsOn: '2026-12-16T00:00:00.000Z',
-  registrationDeadlineAt: null, registrationOpen: false, seriesId: null, seriesTitle: null,
+  registrationDeadlineAt: null, registrationOpen: false, sportCode: 'futsal', coverImageUrl: null as string | null, entryFee: 0, entryFeeConfigured: false, seriesId: null, seriesTitle: null,
   tier: null, tierLabel: null, seasonNo: null, seriesSiblings: [], teamIds: ['team-a', 'team-b'],
   fixtures: [{
     teamMatchId: 'fx-1', title: '송파 풋살 리그 1주차', homeTeamId: 'team-a', awayTeamId: 'team-b',
@@ -73,5 +73,20 @@ describe('리그 상세 첫 HTML', () => {
     // 일정 행(장소·확정 스코어)도 본문에 있어야 한다. 선수 기록(득점 순위)은 따로 불러와 스켈레톤이 정상이다.
     expect(html).toContain('송파 풋살파크');
     expect(html).toMatch(/2\s*:\s*1/);
+  });
+});
+
+describe('리그 상세 링크 미리보기', () => {
+  const meta = async () => generateMetadata({ params: Promise.resolve({ leagueId: 'lg-1' }) });
+
+  it('대표 이미지가 있으면 OG·트위터 이미지로 쓰고, 없으면 기본 이미지로 둔다', async () => {
+    LEAGUE.coverImageUrl = '/uploads/2026/10/cover.webp';
+    const withCover = await meta();
+    expect(withCover.openGraph?.images).toEqual([expect.objectContaining({ url: '/uploads/2026/10/cover.webp' })]);
+    expect(withCover.twitter?.images).toEqual(['/uploads/2026/10/cover.webp']);
+
+    LEAGUE.coverImageUrl = null;
+    const without = await meta();
+    expect(without.openGraph?.images).toEqual([expect.objectContaining({ url: '/opengraph-image' })]);
   });
 });

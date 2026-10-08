@@ -29,7 +29,7 @@ beforeEach(() => {
   vi.mocked(useV1LeagueMatch, { partial: true }).mockReturnValue({
     data: { leagueId: 'league-contract', title: '합성 계약 리그', state: 'completed', teamIds: [], fixtures: [],
       startsOn: '2026-08-01T00:00:00.000Z', endsOn: '2026-08-02T00:00:00.000Z',
-      registrationDeadlineAt: null, registrationOpen: false, seriesSiblings: [] }, isError: false,
+      registrationDeadlineAt: null, registrationOpen: false, sportCode: 'futsal', coverImageUrl: null, entryFee: 0, entryFeeConfigured: false, seriesSiblings: [] }, isError: false,
   });
   vi.mocked(useV1LeagueMatchStandings, { partial: true }).mockReturnValue({
     data: { leagueId: 'league-contract', tier: null, tierLabel: null, tieBreakOrder: ['points'], standings: [],

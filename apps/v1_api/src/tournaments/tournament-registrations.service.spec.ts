@@ -1203,6 +1203,31 @@ describe('TournamentRegistrationsService', () => {
     );
   });
 
+  // 입금 안내는 현재 참가비가 아니라 신청 당시 금액(payment.amount)으로 판정한다 — 참가비를 바꾼 뒤에도 이미 낸 신청의 계좌가 보여야 한다.
+  describe('getMyRegistration: 입금 안내 판정은 payment.amount 기준', () => {
+    const run = async (entryFee: number, amount: number) => {
+      prisma.v1TournamentRegistration.findFirst.mockResolvedValue(
+        registrationRow({ appliedByUserId: manager.id, status: 'awaiting_payment' }),
+      );
+      prisma.v1TournamentPayment.findUnique.mockResolvedValue(paymentRow({ amount, status: 'ready' }));
+      prisma.v1Tournament.findFirst.mockResolvedValue(openTournament({ entryFee }));
+      return service.getMyRegistration(manager, 'tournament-1');
+    };
+
+    it('현재 참가비가 0 으로 바뀌어도 70,000원으로 신청한 팀의 안내는 유지된다', async () => {
+      const result = await run(0, 70000);
+      expect(result.paymentInstructions).toMatchObject({ bankAccount: '123-456' });
+    });
+
+    it('대조: 신청 금액이 0 이면 현재 참가비가 올라도 안내가 없다', async () => {
+      expect((await run(80000, 0)).paymentInstructions).toBeNull();
+    });
+
+    it('대조: 유료 신청 + 유료 현재 참가비는 안내가 있다(현행 유지)', async () => {
+      expect((await run(120000, 120000)).paymentInstructions).not.toBeNull();
+    });
+  });
+
   it('getMyRegistration: 입금 안내 후 오래 지난 awaiting_payment 신청도 자동 취소되지 않고 그대로 유지된다', async () => {
     jest.useFakeTimers().setSystemTime(new Date('2026-06-20T00:00:00.000Z'));
     const createdAt = new Date('2026-06-14T00:00:00.000Z');

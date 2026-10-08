@@ -348,7 +348,7 @@ export class PublicTournamentRecordsService {
    * 참가자 스탯 행 자체가 없어 자연히 집계되지 않는다.
    */
   async getPlayerRecords(tournamentId: string) {
-    const tournament = await findTournamentOnSurface(this.prisma, TOURNAMENT_KINDS, {
+    const tournament = await findPublicTournamentOnSurface(this.prisma, TOURNAMENT_KINDS, {
       where: { id: tournamentId },
       select: { id: true, bracketPublishedAt: true, bracketPublishScheduledAt: true },
     });

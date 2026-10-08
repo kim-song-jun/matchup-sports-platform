@@ -49,12 +49,11 @@ import {
 } from './tournament-fixture-official-result';
 import { cascadeCancelTeamMatchSchedulesInTx } from '../team-schedules/team-schedules.service';
 import { findTournamentOnSurface, TOURNAMENT_KINDS } from './tournament-surface-lookup';
-import { createGroupInTx, ensureGroupPhaseTeamsInTx, recalculateStandingsInTx } from './tournament-bracket-tx';
+import { createGroupInTx, ensureGroupPhaseTeamsInTx, recalculateStandingsInTx, updateTournamentFixtureInTx } from './tournament-bracket-tx';
 import { participantDisplayName } from './participant-display-name';
 import { readJerseyNumbers } from './tournament-player-jersey';
 import { createTournamentMatchInTx } from './tournament-match-creation';
 import { nextFixtureCreationCommandId } from './tournament-fixture-generation';
-import { updateTournamentMatchInTx } from './tournament-match-update';
 import { competitionTeamTargets, enqueueRosterResync } from '../games/roster/roster-resync-events';
 import { tournamentTeamMatchBracketInclude, serializeTournamentTeamMatchBracket } from './tournament-team-match-bracket.query';
 import { competitionMatchLabel } from './tournament-round-label';
@@ -880,44 +879,16 @@ export class TournamentBracketService {
         // Same lock as assignment/creation: a concurrent bye designation cannot
         // race between the participant check and the canonical match update.
         await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`league-fixture-generation:${canonical.tournamentId}`}, 0))`;
-        if (canonical.groupId && changesTeams) {
-          const byeTeam = await tx.v1TournamentGroupTeam.findFirst({ where: {
-            groupId: canonical.groupId, isBye: true,
-            registrationId: { in: [dto.homeRegistrationId, dto.awayRegistrationId].filter((id): id is string => typeof id === 'string') },
-          } });
-          if (byeTeam) throw new ConflictException({ code: 'BYE_TEAM_HAS_MATCH', message: '부전승팀은 해당 라운드의 경기에 넣을 수 없어요. 다음 라운드에 직접 배정해 주세요.' });
-          const group = await tx.v1TournamentGroup.findFirst({ where: { id: canonical.groupId }, select: { phase: true } });
-          if (group) await ensureGroupPhaseTeamsInTx(tx, admin, canonical.tournamentId, canonical.groupId, group.phase, [dto.homeRegistrationId, dto.awayRegistrationId]);
-        }
-        const previousNumber = dto.fixtureNumber === undefined ? undefined : (await tx.v1TournamentMatchDetails.findUniqueOrThrow({
-          where: { teamMatchId: fixtureId }, select: { fixtureNumber: true },
-        })).fixtureNumber;
-        const row = await updateTournamentMatchInTx(tx, {
-          teamMatchId: fixtureId,
+        return updateTournamentFixtureInTx(tx, admin, {
+          fixtureId,
+          tournamentId: canonical.tournamentId,
+          groupId: canonical.groupId,
           fixtureNumber: dto.fixtureNumber,
           scheduledAt: dto.scheduledAt !== undefined ? new Date(dto.scheduledAt) : undefined,
           venue: dto.venue,
           homeRegistrationId: dto.homeRegistrationId,
           awayRegistrationId: dto.awayRegistrationId,
         });
-        await this.adminContext.logAdminAction(
-          admin,
-          {
-            action: 'tournament.bracket.fixture.update',
-            targetType: 'team_match',
-            targetId: fixtureId,
-            ...(previousNumber === undefined ? {} : { beforeJson: { fixtureNumber: previousNumber } }),
-            afterJson: {
-              fixtureNumber: row.fixtureNumber,
-              scheduledAt: row.startAt?.toISOString() ?? null,
-              venue: row.placeName,
-              homeRegistrationId: row.homeRegistrationId,
-              awayRegistrationId: row.awayRegistrationId,
-            },
-          },
-          tx,
-        );
-        return row;
       });
       return this.serializeCanonicalFixture(updated);
     }

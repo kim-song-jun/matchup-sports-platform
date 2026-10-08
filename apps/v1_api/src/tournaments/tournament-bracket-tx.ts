@@ -1,10 +1,12 @@
-import { NotFoundException } from '@nestjs/common';
+import { ConflictException, NotFoundException } from '@nestjs/common';
 import { Prisma, type V1TournamentGroup, type V1TournamentGroupPhase } from '@prisma/client';
 import { writeAdminActionLog, type V1ActiveAdmin } from '../common/admin-context.service';
+import type { GamesService } from '../games/games.service';
 import {
   fairPlayByRegistrationFromGroups,
   recalculateAndUpsertGroupStandings,
 } from './tournament-group-standings';
+import { updateTournamentMatchInTx } from './tournament-match-update';
 import { recalculateAndUpsertOverallStandings } from './tournament-overall-standings';
 import { loadCanonicalStandingsSource } from './tournament-standings-source';
 
@@ -118,4 +120,85 @@ export async function ensureGroupPhaseTeamsInTx(
       afterJson: { trigger: 'fixture_group_team_enroll', groupId, ...recalculated.audit },
     });
   }
+}
+
+/** `createEmptyTournamentFixtureInTx` 와 같은 자리에 쓰는 외부 의존. 사이드 배정은 이 중 아무것도 쓰지 않는다. */
+export type BracketTxDeps = { games: GamesService };
+
+export type TournamentFixtureUpdateInput = {
+  fixtureId: string;
+  tournamentId: string;
+  groupId: string | null;
+  fixtureNumber?: number;
+  scheduledAt?: Date | null;
+  venue?: string;
+  homeRegistrationId?: string | null;
+  awayRegistrationId?: string | null;
+};
+
+/**
+ * 일정·장소·번호·두 사이드를 한 번에 바꾼다(`PATCH /admin/fixtures/:id` 의 tx 본문). 팀을 바꾸는 요청이면
+ * 부전승 팀을 거절하고 조별리그 조에 편성한 뒤, 사이드·팀 일정·명단 재계산 이벤트는 `updateTournamentMatchInTx` 가 맡는다.
+ * undefined 인 필드는 건드리지 않고 null 은 "미정으로 비움" 이다.
+ */
+export async function updateTournamentFixtureInTx(tx: Tx, admin: V1ActiveAdmin, input: TournamentFixtureUpdateInput) {
+  const changesTeams = input.homeRegistrationId !== undefined || input.awayRegistrationId !== undefined;
+  if (input.groupId && changesTeams) {
+    const byeTeam = await tx.v1TournamentGroupTeam.findFirst({ where: {
+      groupId: input.groupId, isBye: true,
+      registrationId: { in: [input.homeRegistrationId, input.awayRegistrationId].filter((id): id is string => typeof id === 'string') },
+    } });
+    if (byeTeam) throw new ConflictException({ code: 'BYE_TEAM_HAS_MATCH', message: '부전승팀은 해당 라운드의 경기에 넣을 수 없어요. 다음 라운드에 직접 배정해 주세요.' });
+    const group = await tx.v1TournamentGroup.findFirst({ where: { id: input.groupId }, select: { phase: true } });
+    if (group) await ensureGroupPhaseTeamsInTx(tx, admin, input.tournamentId, input.groupId, group.phase, [input.homeRegistrationId, input.awayRegistrationId]);
+  }
+  const previousNumber = input.fixtureNumber === undefined ? undefined : (await tx.v1TournamentMatchDetails.findUniqueOrThrow({
+    where: { teamMatchId: input.fixtureId }, select: { fixtureNumber: true },
+  })).fixtureNumber;
+  const row = await updateTournamentMatchInTx(tx, {
+    teamMatchId: input.fixtureId,
+    fixtureNumber: input.fixtureNumber,
+    scheduledAt: input.scheduledAt,
+    venue: input.venue,
+    homeRegistrationId: input.homeRegistrationId,
+    awayRegistrationId: input.awayRegistrationId,
+  });
+  await writeAdminActionLog(tx, admin, {
+    action: 'tournament.bracket.fixture.update',
+    targetType: 'team_match',
+    targetId: input.fixtureId,
+    ...(previousNumber === undefined ? {} : { beforeJson: { fixtureNumber: previousNumber } }),
+    afterJson: {
+      fixtureNumber: row.fixtureNumber,
+      scheduledAt: row.startAt?.toISOString() ?? null,
+      venue: row.placeName,
+      homeRegistrationId: row.homeRegistrationId,
+      awayRegistrationId: row.awayRegistrationId,
+    },
+  });
+  return row;
+}
+
+/**
+ * 한 경기의 한쪽 사이드에 팀을 넣거나(null 이면 비운다) 반대쪽은 그대로 둔다. 자리 서비스(PR-1b)가 자리에 연결된
+ * 경기마다 부른다. 호출자가 대회 advisory lock 을 잡고 있어야 한다. `deps` 는 계약 시그니처를 맞추는 자리로,
+ * 사이드 배정 자체는 `GamesService` 를 쓰지 않는다.
+ */
+export async function assignTournamentFixtureSideInTx(
+  tx: Tx,
+  _deps: BracketTxDeps,
+  admin: V1ActiveAdmin,
+  input: { fixtureId: string; side: 'HOME' | 'AWAY'; registrationId: string | null },
+): Promise<void> {
+  const details = await tx.v1TournamentMatchDetails.findUnique({
+    where: { teamMatchId: input.fixtureId },
+    select: { tournamentId: true, groupId: true },
+  });
+  if (details === null) throw new NotFoundException({ code: 'FIXTURE_NOT_FOUND', message: '경기를 찾을 수 없어요.' });
+  await updateTournamentFixtureInTx(tx, admin, {
+    fixtureId: input.fixtureId,
+    tournamentId: details.tournamentId,
+    groupId: details.groupId,
+    ...(input.side === 'HOME' ? { homeRegistrationId: input.registrationId } : { awayRegistrationId: input.registrationId }),
+  });
 }

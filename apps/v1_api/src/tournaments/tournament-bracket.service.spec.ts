@@ -26,7 +26,7 @@ import { TournamentBracketService } from './tournament-bracket.service';
 import { GamesService } from '../games/games.service';
 import { FOOTBALL_V1_CONFIG } from './competition-config/competition-config';
 import { kindAwareFindFirst } from '../../test/helpers/kind-aware-find-first';
-import { createGroupInTx } from './tournament-bracket-tx';
+import { assignTournamentFixtureSideInTx, createGroupInTx } from './tournament-bracket-tx';
 
 // ─── fixtures ────────────────────────────────────────────────────────────────
 
@@ -2057,6 +2057,62 @@ describe('TournamentBracketService', () => {
       expect(tx.v1TournamentGroup.create).toHaveBeenCalledWith({
         data: { tournamentId: 'tournament-1', name: '결승', phase: 'final', sortOrder: 0, advanceCount: null },
       });
+    });
+  });
+
+  describe('assignTournamentFixtureSideInTx', () => {
+    const resultRow = { id: 'fixture-1', tournamentId: 'tournament-1', title: '테스트 경기', startAt: null, placeName: null, status: 'matched', createdAt: new Date('2026-06-14T00:00:00Z'), updatedAt: new Date('2026-06-14T00:00:00Z') };
+    const arrange = () => {
+      prisma.v1TournamentMatchDetails.findUnique.mockResolvedValue({ tournamentId: 'tournament-1', groupId: 'group-1' });
+      queueFixtureUpdateRaw(prisma.$queryRaw, { id: 'game-1', state: 'SCHEDULED', sourceType: 'TEAM_MATCH', currentOfficialRevisionId: null }, { id: 'fixture-1', deletedAt: null });
+      prisma.v1TeamMatch.update.mockResolvedValue(resultRow);
+    };
+
+    it('어웨이를 null 로 비우면 어웨이 사이드만 "미정" 으로 돌아가고 홈은 건드리지 않는다', async () => {
+      arrange();
+      prisma.v1TournamentRegistration.findMany.mockResolvedValue([{ id: 'reg-1', teamId: 'team-old', team: { name: '홈' } }]);
+
+      await assignTournamentFixtureSideInTx(prisma as never, { games } as never, activeAdmin, { fixtureId: 'fixture-1', side: 'AWAY', registrationId: null });
+
+      expect(prisma.v1TournamentMatchDetails.update).toHaveBeenCalledWith({
+        where: { teamMatchId: 'fixture-1' },
+        data: { homeRegistrationId: 'reg-1', awayRegistrationId: null },
+      });
+      expect(prisma.v1GameSide.update).toHaveBeenCalledTimes(1);
+      expect(prisma.v1GameSide.update).toHaveBeenCalledWith({
+        where: { id: 'side-away' },
+        data: { teamId: null, displayNameSnapshot: '어웨이 팀 미정' },
+      });
+      expect(prisma.v1AdminActionLog.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({ adminUserId: 'owner-admin-id', action: 'tournament.bracket.fixture.update', targetId: 'fixture-1' }),
+      });
+    });
+
+    it('홈에 팀을 넣으면 홈 사이드만 바뀌고 어웨이 배정은 그대로다 (대조군)', async () => {
+      arrange();
+      prisma.v1TournamentRegistration.findMany.mockResolvedValue([
+        { id: 'reg-3', teamId: 'team-new', team: { name: '새 팀' } },
+        { id: 'reg-2', teamId: 'team-away', team: { name: '어웨이 팀' } },
+      ]);
+
+      await assignTournamentFixtureSideInTx(prisma as never, { games } as never, activeAdmin, { fixtureId: 'fixture-1', side: 'HOME', registrationId: 'reg-3' });
+
+      expect(prisma.v1TournamentMatchDetails.update).toHaveBeenCalledWith({
+        where: { teamMatchId: 'fixture-1' },
+        data: { homeRegistrationId: 'reg-3', awayRegistrationId: 'reg-2' },
+      });
+      expect(prisma.v1GameSide.update).toHaveBeenCalledTimes(1);
+      expect(prisma.v1GameSide.update).toHaveBeenCalledWith({ where: { id: 'side-home' }, data: expect.objectContaining({ teamId: 'team-new' }) });
+    });
+
+    it('없는 경기는 404 이고 아무것도 쓰지 않는다', async () => {
+      prisma.v1TournamentMatchDetails.findUnique.mockResolvedValue(null);
+
+      await expect(
+        assignTournamentFixtureSideInTx(prisma as never, { games } as never, activeAdmin, { fixtureId: 'ghost', side: 'HOME', registrationId: 'reg-1' }),
+      ).rejects.toMatchObject({ response: { code: 'FIXTURE_NOT_FOUND' } });
+      expect(prisma.v1TournamentMatchDetails.update).not.toHaveBeenCalled();
+      expect(prisma.v1AdminActionLog.create).not.toHaveBeenCalled();
     });
   });
 

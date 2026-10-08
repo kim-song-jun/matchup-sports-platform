@@ -132,6 +132,7 @@ PROFILE_COMPLETION_REQUIRED`와 `details.missingFields`, `details.next.route = "
 - active 운영자는 이 self-service 경로로 사용자 계정을 비활성화할 수 없다. owner가 먼저 운영자 접근을 revoke해야 하며, 위반하면 `403 ADMIN_WITHDRAWAL_FORBIDDEN`이다.
 - 성공 응답은 `{ userId, accountStatus: "withdrawal_pending", requestedAt }`이다.
 - 탈퇴 요청이 성공하면 응답과 함께 `teameet_v1_session` 쿠키를 만료한다. 요청이 거부되거나 실패하면 세션 쿠키는 유지된다.
+- 웹 클라이언트는 성공 후 기기의 Push 구독 해제를 시도하고, 세션 힌트·사용자 캐시·소켓을 정리한 뒤 `/login` 문서를 새로 연다. 요청 중 화면을 떠나도 성공 정리는 이어진다. 이미 탈퇴 대기 상태인 기기의 추가 Push 해제 API는 인증 가드에서 거부될 수 있으므로, 브라우저 구독 해제는 서버 요청 실패 후에도 진행하며 오류를 기록한다.
 - 관리자 최종 삭제는 FCM/APNs 토큰과 웹 Push endpoint를 영구 제거하고, 프로필의 실명·생년월일·성별·표시 지역 및 활동 지역·선호 종목·검색 기록·인증 토큰을 삭제 또는 비식별화한다. 완료 경기·결제·분쟁·감사 기록처럼 별도 보관 근거가 있는 데이터는 해당 정책을 따른다.
 
 ## Permission / Error Rules

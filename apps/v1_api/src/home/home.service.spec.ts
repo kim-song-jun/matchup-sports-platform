@@ -121,7 +121,7 @@ describe('HomeService', () => {
         { id: 'user-1' } as never,
         {} as never,
       );
-      const my = await new ProfileService(prisma as never).activitySummary({ id: 'user-1' } as never);
+      const my = await new ProfileService(prisma as never, { forceDisconnectUser: jest.fn() }).activitySummary({ id: 'user-1' } as never);
 
       expect(my.monthly.matchCount).toBe(2);
       expect(home.summary.monthlyMatches).toBe(my.monthly.matchCount);

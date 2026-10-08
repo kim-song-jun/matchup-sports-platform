@@ -118,6 +118,7 @@ describe('Task 8 game-operations realtime protocol', () => {
 
   beforeEach(async () => {
     jest.clearAllMocks();
+    prisma.v1User.findFirst.mockResolvedValue(USER);
     prisma.v1Game.findUnique.mockResolvedValue({
       id: GAME_ID,
       state: 'LIVE',

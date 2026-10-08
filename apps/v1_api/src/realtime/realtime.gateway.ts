@@ -38,6 +38,8 @@ type V1Socket = Socket & {
   };
 };
 
+const DENIED_SOCKET_ACCOUNT_STATUSES: readonly string[] = ['suspended', 'blocked', 'deleted', 'withdrawal_pending'];
+
 /**
  * Explicit expiresAt deadlines use server timers. This slower heartbeat pass is
  * retained as insurance for out-of-band assignment changes that do not publish a
@@ -357,6 +359,17 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
         throw new Error('SOCKET_AUTH_STATE_INVALID');
       }
       await client.join(`user:${userId}`);
+      const currentUser = await this.prisma.v1User.findFirst({
+        where: { id: userId },
+        select: { accountStatus: true },
+      });
+      if (
+        currentUser === null ||
+        DENIED_SOCKET_ACCOUNT_STATUSES.includes(currentUser.accountStatus)
+      ) {
+        await client.leave(`user:${userId}`);
+        throw new Error('SOCKET_ACCOUNT_DENIED');
+      }
       if (this.shuttingDown || client.connected === false) {
         await client.leave(`user:${userId}`);
         return;
@@ -401,7 +414,10 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
       where: identity.kind === 'user_id' ? { id: identity.userId } : { email: identity.email },
       select: { id: true, email: true, accountStatus: true, onboardingStatus: true },
     });
-    if (user === null || ['suspended', 'blocked', 'deleted'].includes(user.accountStatus)) {
+    if (
+      user === null ||
+      DENIED_SOCKET_ACCOUNT_STATUSES.includes(user.accountStatus)
+    ) {
       throw new Error('SOCKET_ACCOUNT_DENIED');
     }
     if (getPendingSocialSignupRoute(user.onboardingStatus)) {

@@ -2,6 +2,7 @@ import {
   BadRequestException,
   ConflictException,
   ForbiddenException,
+  Inject,
   Injectable,
   Logger,
   NotFoundException,
@@ -21,6 +22,7 @@ import {
   type PlayerCard,
 } from './player-card';
 import { PrismaService } from '../prisma/prisma.service';
+import { RealtimeGateway } from '../realtime/realtime.gateway';
 import { activityMonth, countMonthlyPersonalMatches, countOfficialGameAppearances } from './activity-counts';
 import { canonicalCompetitionConfigForSport } from '../tournaments/competition-config/lineup-size';
 import { tryNormalizeCompetitionSportCode } from '../tournaments/competition-config/competition-config.validator';
@@ -64,7 +66,11 @@ const DEFAULT_NOTIFICATION_PREFERENCES = {
 export class ProfileService {
   private readonly logger = new Logger(ProfileService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Inject(RealtimeGateway)
+    private readonly realtimeGateway: Pick<RealtimeGateway, 'forceDisconnectUser'>,
+  ) {}
 
   async me(user: V1AuthUser) {
     const snapshot = await this.getUserSnapshot(user.id);
@@ -1076,6 +1082,15 @@ export class ProfileService {
       });
       return { next, removedRosterCount, leftTeamCount: memberships.length };
     });
+
+    try {
+      this.realtimeGateway.forceDisconnectUser(user.id);
+    } catch (error) {
+      this.logger.error(
+        `Withdrawal committed but socket disconnect failed user=${user.id}`,
+        error instanceof Error ? error.stack : String(error),
+      );
+    }
 
     if (updated.removedRosterCount > 0 || updated.leftTeamCount > 0) {
       this.logger.log(

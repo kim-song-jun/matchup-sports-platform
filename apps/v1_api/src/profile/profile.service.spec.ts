@@ -2,6 +2,14 @@ import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { issuePhoneProofToken } from '../verification/phone-proof-token';
 import { ProfileService } from './profile.service';
+import type { RealtimeGateway } from '../realtime/realtime.gateway';
+
+function createProfileService(
+  prisma: unknown,
+  realtimeGateway: Pick<RealtimeGateway, 'forceDisconnectUser'> = { forceDisconnectUser: jest.fn() },
+): ProfileService {
+  return new ProfileService(prisma as PrismaService, realtimeGateway);
+}
 
 const user = {
   id: 'user-1',
@@ -45,7 +53,7 @@ describe('ProfileService identity binding', () => {
       $transaction: jest.fn(),
     };
     prisma.$transaction.mockImplementation((callback: (tx: typeof prisma) => Promise<unknown>) => callback(prisma));
-    const service = new ProfileService(prisma as unknown as PrismaService);
+    const service = createProfileService(prisma);
 
     await service.updateMe(user, {
       displayName: profile.displayName,
@@ -112,7 +120,7 @@ describe('ProfileService settings theme preference', () => {
 
   it('persists an explicit theme choice and echoes it back without touching notifications', async () => {
     const prisma = buildPrisma({ updateResolvedTheme: 'dark' });
-    const service = new ProfileService(prisma as unknown as PrismaService);
+    const service = createProfileService(prisma as unknown as PrismaService);
 
     const result = await service.updateSettings(user, { theme: 'dark' });
 
@@ -128,7 +136,7 @@ describe('ProfileService settings theme preference', () => {
   // 나가면 @updatedAt만 갱신되는 무의미한 쓰기가 발생한다 — 읽기만 해야 한다.
   it('테마만 바꿀 때는 알림설정 row에 쓰지 않고 읽기만 한다', async () => {
     const prisma = buildPrisma({ updateResolvedTheme: 'dark' });
-    const service = new ProfileService(prisma as unknown as PrismaService);
+    const service = createProfileService(prisma as unknown as PrismaService);
 
     await service.updateSettings(user, { theme: 'dark' });
 
@@ -138,7 +146,7 @@ describe('ProfileService settings theme preference', () => {
 
   it('leaves the stored theme untouched and echoes the current value when the request omits theme', async () => {
     const prisma = buildPrisma({ findUniqueResolvedTheme: 'system' });
-    const service = new ProfileService(prisma as unknown as PrismaService);
+    const service = createProfileService(prisma as unknown as PrismaService);
 
     const result = await service.updateSettings(user, { notifications: { chatEnabled: false } });
 
@@ -153,7 +161,7 @@ describe('ProfileService settings theme preference', () => {
 
   it('persists activityEnabled so the grouped 경기·대회 setting controls tournament notifications', async () => {
     const prisma = buildPrisma();
-    const service = new ProfileService(prisma as unknown as PrismaService);
+    const service = createProfileService(prisma as unknown as PrismaService);
 
     await service.updateSettings(user, { notifications: { activityEnabled: false } });
 
@@ -185,7 +193,7 @@ describe('ProfileService settings theme preference', () => {
         findUnique: jest.fn().mockResolvedValue(null),
       },
     };
-    const service = new ProfileService(prisma as unknown as PrismaService);
+    const service = createProfileService(prisma as unknown as PrismaService);
 
     const result = await service.settings(user);
 
@@ -266,7 +274,7 @@ describe('ProfileService phone change proof gate', () => {
 
   it('증명 없이 번호를 바꾸려 하면 400 PHONE_NOT_VERIFIED 로 막고 아무것도 저장하지 않는다', async () => {
     const { prisma } = buildPrisma();
-    const service = new ProfileService(prisma as unknown as PrismaService);
+    const service = createProfileService(prisma as unknown as PrismaService);
 
     await expect(service.updateMe(user, payload(NEW_PHONE))).rejects.toMatchObject({
       response: { code: 'PHONE_NOT_VERIFIED' },
@@ -277,7 +285,7 @@ describe('ProfileService phone change proof gate', () => {
 
   it('다른 번호로 발급된 증명은 거부한다 (토큰 재사용 차단)', async () => {
     const { prisma } = buildPrisma();
-    const service = new ProfileService(prisma as unknown as PrismaService);
+    const service = createProfileService(prisma as unknown as PrismaService);
     const tokenForOtherPhone = issuePhoneProofToken('01099998888');
 
     await expect(service.updateMe(user, payload(NEW_PHONE, tokenForOtherPhone))).rejects.toMatchObject({
@@ -288,7 +296,7 @@ describe('ProfileService phone change proof gate', () => {
 
   it('유효한 증명이면 번호를 바꾸고 phoneVerifiedAt 을 새로 세운다 (인증 직후 미인증으로 떨어지지 않음)', async () => {
     const { prisma } = buildPrisma();
-    const service = new ProfileService(prisma as unknown as PrismaService);
+    const service = createProfileService(prisma as unknown as PrismaService);
 
     await service.updateMe(user, payload(NEW_PHONE, issuePhoneProofToken(NEW_PHONE)));
 
@@ -300,7 +308,7 @@ describe('ProfileService phone change proof gate', () => {
 
   it('번호를 바꾸지 않는 저장은 증명 없이 통과하고 phoneVerifiedAt 을 건드리지 않는다', async () => {
     const { prisma } = buildPrisma();
-    const service = new ProfileService(prisma as unknown as PrismaService);
+    const service = createProfileService(prisma as unknown as PrismaService);
 
     await service.updateMe(user, payload(OLD_PHONE));
 
@@ -311,7 +319,7 @@ describe('ProfileService phone change proof gate', () => {
   it('인증 강제가 꺼진 환경(V1_PHONE_VERIFICATION_DISABLED=true)에서는 증명 없이 바꾸되 미인증으로 떨어뜨린다', async () => {
     process.env.V1_PHONE_VERIFICATION_DISABLED = 'true';
     const { prisma } = buildPrisma();
-    const service = new ProfileService(prisma as unknown as PrismaService);
+    const service = createProfileService(prisma as unknown as PrismaService);
 
     await service.updateMe(user, payload(NEW_PHONE));
 
@@ -361,7 +369,7 @@ describe('ProfileService activitySummary', () => {
         },
         v1ParticipantIdentityLinkCurrent: { findMany: jest.fn().mockResolvedValue([]) },
       };
-      const service = new ProfileService(prisma as never);
+      const service = createProfileService(prisma as never);
 
       const result = await service.activitySummary(user);
 
@@ -413,7 +421,7 @@ describe('ProfileService activitySummary', () => {
         v1MatchParticipant: { count: jest.fn().mockResolvedValue(0) },
         v1ParticipantIdentityLinkCurrent: { findMany: jest.fn().mockResolvedValue([]) },
       };
-      const service = new ProfileService(prisma as never);
+      const service = createProfileService(prisma as never);
 
       const result = await service.activitySummary(user);
 
@@ -453,7 +461,7 @@ describe('ProfileService activitySummary', () => {
         v1MatchParticipant: { count: jest.fn().mockResolvedValue(0) },
         v1ParticipantIdentityLinkCurrent: { findMany: jest.fn().mockResolvedValue([]) },
       };
-      const service = new ProfileService(prisma as never);
+      const service = createProfileService(prisma as never);
 
       const result = await service.activitySummary(user);
 
@@ -533,7 +541,7 @@ describe('ProfileService tournament appearance aggregation', () => {
         v1ParticipantIdentityLinkCurrent: { findMany: jest.fn().mockResolvedValue([]) },
         v1GameResultParticipant: { findMany: gameResultParticipantFindMany },
       };
-      const service = new ProfileService(prisma as never);
+      const service = createProfileService(prisma as never);
 
       const result = await service.activitySummary(user);
 
@@ -601,7 +609,7 @@ describe('ProfileService tournament appearance aggregation', () => {
         },
         v1GameResultParticipant: { findMany: jest.fn().mockResolvedValue(rows) },
       };
-      const service = new ProfileService(prisma as never);
+      const service = createProfileService(prisma as never);
 
       const result = await service.activitySummary(user);
 
@@ -674,7 +682,7 @@ describe('ProfileService tournament appearance aggregation', () => {
         },
         v1GameResultParticipant: { findMany: jest.fn().mockResolvedValue(rows) },
       };
-      const service = new ProfileService(prisma as never);
+      const service = createProfileService(prisma as never);
 
       const result = await service.activitySummary(user);
 
@@ -730,7 +738,7 @@ describe('ProfileService tournament appearance aggregation', () => {
         },
         v1GameResultParticipant: { findMany: jest.fn().mockResolvedValue(rows) },
       };
-      const service = new ProfileService(prisma as never);
+      const service = createProfileService(prisma as never);
 
       const result = await service.activitySummary(user);
 
@@ -810,7 +818,7 @@ describe('ProfileService tournament appearance aggregation', () => {
         v1GameParticipant: { findUnique: jest.fn().mockResolvedValue(null) },
         v1GameSide: { findUnique: jest.fn().mockResolvedValue(null) },
       };
-      const service = new ProfileService(prisma as never);
+      const service = createProfileService(prisma as never);
 
       const result = await service.publicProfile(null, targetUserId);
 
@@ -891,7 +899,7 @@ describe('ProfileService 내 프로필 응답의 bio 왕복', () => {
   } as never;
 
   it('저장한 bio 를 응답으로 다시 돌려준다', async () => {
-    const service = new ProfileService(buildMePrisma('풋살 좋아하는 미드필더예요.') as never);
+    const service = createProfileService(buildMePrisma('풋살 좋아하는 미드필더예요.') as never);
     const result = await service.me(authUser);
     expect(result.profile.bio).toBe('풋살 좋아하는 미드필더예요.');
   });
@@ -899,7 +907,7 @@ describe('ProfileService 내 프로필 응답의 bio 왕복', () => {
   it('bio 가 없으면 키를 빼지 않고 null 로 내려준다', async () => {
     // undefined 로 새면 JSON 직렬화에서 키 자체가 사라져, 클라이언트가 "필드를 모르는
     // 옛 서버"와 "값이 비어 있음"을 구분하지 못한다.
-    const service = new ProfileService(buildMePrisma(null) as never);
+    const service = createProfileService(buildMePrisma(null) as never);
     const result = await service.me(authUser);
     expect(result.profile).toHaveProperty('bio');
     expect(result.profile.bio).toBeNull();
@@ -954,7 +962,7 @@ describe('ProfileService 내 프로필의 선수 카드 자리', () => {
   }
 
   it('숨기지 않은 사용자에게는 카드가 올 자리를 알려준다', async () => {
-    const service = new ProfileService(buildPrisma({ playerCardHidden: false, playerCardShape: 'rect' }, 3) as never);
+    const service = createProfileService(buildPrisma({ playerCardHidden: false, playerCardShape: 'rect' }, 3) as never);
 
     const result = await service.me(authUser);
 
@@ -962,7 +970,7 @@ describe('ProfileService 내 프로필의 선수 카드 자리', () => {
   });
 
   it('카드를 숨긴 사용자는 hidden 으로 내려 프론트가 자리를 잡지 않게 한다', async () => {
-    const service = new ProfileService(buildPrisma({ playerCardHidden: true, playerCardShape: 'shield' }, 30) as never);
+    const service = createProfileService(buildPrisma({ playerCardHidden: true, playerCardShape: 'shield' }, 30) as never);
 
     const result = await service.me(authUser);
 
@@ -972,7 +980,7 @@ describe('ProfileService 내 프로필의 선수 카드 자리', () => {
   it('저장된 모양이 아니라 **지금 적용되는** 모양을 내려준다', async () => {
     // 방패는 후기 10건부터 열린다. 조건이 깨졌는데 저장값 그대로 내려주면 프론트가
     // 488px 를 예약했다가 424px 짜리 카드를 받아, 없애려던 시프트가 반대로 생긴다.
-    const service = new ProfileService(buildPrisma({ playerCardHidden: false, playerCardShape: 'shield' }, 3) as never);
+    const service = createProfileService(buildPrisma({ playerCardHidden: false, playerCardShape: 'shield' }, 3) as never);
 
     const result = await service.me(authUser);
 
@@ -980,7 +988,7 @@ describe('ProfileService 내 프로필의 선수 카드 자리', () => {
   });
 
   it('후기가 충분하면 저장된 방패 모양을 그대로 쓴다', async () => {
-    const service = new ProfileService(buildPrisma({ playerCardHidden: false, playerCardShape: 'shield' }, 10) as never);
+    const service = createProfileService(buildPrisma({ playerCardHidden: false, playerCardShape: 'shield' }, 10) as never);
 
     const result = await service.me(authUser);
 
@@ -988,7 +996,7 @@ describe('ProfileService 내 프로필의 선수 카드 자리', () => {
   });
 
   it('평판 캐시가 아직 없는 계정도 자리를 계산할 수 있다', async () => {
-    const service = new ProfileService(buildPrisma({ playerCardHidden: false, playerCardShape: null }, null) as never);
+    const service = createProfileService(buildPrisma({ playerCardHidden: false, playerCardShape: null }, null) as never);
 
     const result = await service.me(authUser);
 
@@ -1001,7 +1009,7 @@ describe('ProfileService public profile moderation', () => {
     const prisma = {
       v1User: { findFirst: jest.fn().mockResolvedValue(null) },
     };
-    const service = new ProfileService(prisma as unknown as PrismaService);
+    const service = createProfileService(prisma as unknown as PrismaService);
 
     await expect(service.publicProfile(null, 'blocked-user')).rejects.toBeInstanceOf(
       NotFoundException,
@@ -1087,7 +1095,7 @@ describe('ProfileService public profile activity summary (reveal filtering)', ()
       const reverse = [{ sourceId: 'source-a', reviewerUserId: targetUserId, targetUserId: 'reviewer-a' }];
 
       const prisma = buildPrisma({ allTimeCandidates: [revealedByPartner, hidden], reverse });
-      const service = new ProfileService(prisma as never);
+      const service = createProfileService(prisma as never);
 
       const result = await service.publicProfile(null, targetUserId);
 
@@ -1110,11 +1118,11 @@ describe('ProfileService public profile activity summary (reveal filtering)', ()
     try {
       const revealed = [review('a', old, tag('manner')), review('b', old, tag('manner')), review('c', old, tag('punctual'))];
       const hidden = [review('d', now, tag('punctual')), review('e', now, tag('punctual'))];
-      const service = new ProfileService(buildPrisma({ allTimeCandidates: [...revealed, ...hidden] }) as never);
+      const service = createProfileService(buildPrisma({ allTimeCandidates: [...revealed, ...hidden] }) as never);
       const result = await service.publicProfile(null, targetUserId);
       expect(result.reputation.highlight).toEqual({ tagCode: 'manner', label: 'label:manner', rate: 0.67, reviewCount: 3 });
 
-      const few = new ProfileService(buildPrisma({ allTimeCandidates: revealed.slice(0, 2) }) as never);
+      const few = createProfileService(buildPrisma({ allTimeCandidates: revealed.slice(0, 2) }) as never);
       expect((await few.publicProfile(null, targetUserId)).reputation.highlight).toBeNull();
     } finally {
       jest.useRealTimers();
@@ -1136,7 +1144,7 @@ describe('ProfileService public profile activity summary (reveal filtering)', ()
       };
       // reverse가 비어있어도(상대가 끝까지 반대 방향 리뷰를 제출하지 않아도) 시간 경과만으로 공개돼야 한다
       const prisma = buildPrisma({ allTimeCandidates: [staleRevealed], reverse: [] });
-      const service = new ProfileService(prisma as never);
+      const service = createProfileService(prisma as never);
 
       const result = await service.publicProfile(null, targetUserId);
 
@@ -1171,7 +1179,7 @@ describe('ProfileService public profile activity summary (reveal filtering)', ()
         monthlyCandidates: [revealedReview, hiddenReview],
         reverse: [reverseReview],
       });
-      const service = new ProfileService(prisma as never);
+      const service = createProfileService(prisma as never);
 
       const result = await service.publicProfile(null, targetUserId);
 
@@ -1203,7 +1211,7 @@ describe('ProfileService public profile activity summary (reveal filtering)', ()
       };
       const reverse = [{ sourceId: 'source-a', reviewerUserId: targetUserId, targetUserId: 'reviewer-a' }];
       const prisma = buildPrisma({ allTimeCandidates: [revealedByPartner], reverse });
-      const service = new ProfileService(prisma as never);
+      const service = createProfileService(prisma as never);
 
       const result = await service.publicProfile(null, targetUserId);
 
@@ -1270,7 +1278,7 @@ describe('ProfileService public profile activity summary (reveal filtering)', ()
           ]),
         },
       };
-      const service = new ProfileService(prisma as never);
+      const service = createProfileService(prisma as never);
 
       const result = await service.publicProfile(null, targetUserId);
 
@@ -1344,7 +1352,7 @@ describe('ProfileService withdrawal admin lockout', () => {
       return { count: 1 };
     });
 
-    const service = new ProfileService(prisma as unknown as PrismaService);
+    const service = createProfileService(prisma as unknown as PrismaService);
     await service.withdrawalRequest(user, { reason: 'leave' });
 
     expect(order).toEqual(['membership-off', 'roster-cleanup']);
@@ -1358,7 +1366,7 @@ describe('ProfileService withdrawal admin lockout', () => {
 
   it('fails closed with a stable error before mutating an active admin account', async () => {
     const prisma = createPrisma({ id: 'admin-record-1' });
-    const service = new ProfileService(prisma as unknown as PrismaService);
+    const service = createProfileService(prisma as unknown as PrismaService);
     const request = service.withdrawalRequest(user, { reason: 'leave' });
 
     await expect(request).rejects.toBeInstanceOf(ForbiddenException);
@@ -1375,7 +1383,18 @@ describe('ProfileService withdrawal admin lockout', () => {
 
   it('allows a non-admin active user to request withdrawal after the locked-state check', async () => {
     const prisma = createPrisma(null);
-    const service = new ProfileService(prisma as unknown as PrismaService);
+    let transactionCommitted = false;
+    prisma.$transaction.mockImplementation(async (callback: (tx: typeof prisma) => Promise<unknown>) => {
+      const result = await callback(prisma);
+      transactionCommitted = true;
+      return result;
+    });
+    const realtimeGateway = {
+      forceDisconnectUser: jest.fn(() => {
+        expect(transactionCommitted).toBe(true);
+      }),
+    };
+    const service = createProfileService(prisma, realtimeGateway);
 
     await expect(service.withdrawalRequest(user, { reason: 'leave' })).resolves.toMatchObject({
       userId: user.id,
@@ -1393,12 +1412,52 @@ describe('ProfileService withdrawal admin lockout', () => {
       where: { userId: user.id, revokedAt: null },
       data: { revokedAt: expect.any(Date) },
     });
+    expect(realtimeGateway.forceDisconnectUser).toHaveBeenCalledWith(user.id);
+  });
+
+  it('does not disconnect user sockets when the withdrawal transaction fails', async () => {
+    const prisma = createPrisma(null);
+    prisma.$transaction.mockRejectedValue(new Error('transaction failed'));
+    const realtimeGateway = { forceDisconnectUser: jest.fn() };
+    const service = createProfileService(prisma, realtimeGateway);
+
+    await expect(service.withdrawalRequest(user, { reason: 'leave' })).rejects.toThrow('transaction failed');
+    expect(realtimeGateway.forceDisconnectUser).not.toHaveBeenCalled();
+  });
+
+  it('keeps a committed withdrawal successful and logs a socket disconnect failure with its cause', async () => {
+    const prisma = createPrisma(null);
+    let transactionCommitted = false;
+    prisma.$transaction.mockImplementation(async (callback: (tx: typeof prisma) => Promise<unknown>) => {
+      const result = await callback(prisma);
+      transactionCommitted = true;
+      return result;
+    });
+    const socketError = new Error('socket transport unavailable');
+    const realtimeGateway = {
+      forceDisconnectUser: jest.fn(() => {
+        expect(transactionCommitted).toBe(true);
+        throw socketError;
+      }),
+    };
+    const service = createProfileService(prisma, realtimeGateway);
+    const logger = (service as unknown as { logger: { error: jest.Mock } }).logger;
+    const logError = jest.spyOn(logger, 'error');
+
+    await expect(service.withdrawalRequest(user, { reason: 'leave' })).resolves.toMatchObject({
+      userId: user.id,
+      accountStatus: 'withdrawal_pending',
+    });
+    expect(logError).toHaveBeenCalledWith(
+      expect.stringContaining(user.id),
+      socketError.stack,
+    );
   });
 
   it('rejects when the transaction-time account status is no longer active', async () => {
     const prisma = createPrisma(null);
     prisma.v1User.findUnique.mockResolvedValue({ accountStatus: 'suspended' });
-    const service = new ProfileService(prisma as unknown as PrismaService);
+    const service = createProfileService(prisma as unknown as PrismaService);
 
     await expect(service.withdrawalRequest(user, { reason: 'stale auth' })).rejects.toMatchObject({
       response: { code: 'PERMISSION_DENIED' },
@@ -1411,7 +1470,7 @@ describe('ProfileService withdrawal admin lockout', () => {
   it('진행 중인 매치가 있으면 409 WITHDRAWAL_BLOCKED_ACTIVE_MATCH — 트랜잭션 진입 전 차단, soft-delete된 매치는 제외 조회', async () => {
     const prisma = createPrisma(null);
     prisma.v1MatchParticipant.findFirst.mockResolvedValue({ id: 'participant-1' });
-    const service = new ProfileService(prisma as unknown as PrismaService);
+    const service = createProfileService(prisma as unknown as PrismaService);
 
     await expect(service.withdrawalRequest(user, { reason: 'leave' })).rejects.toMatchObject({
       status: 409,
@@ -1431,7 +1490,7 @@ describe('ProfileService withdrawal admin lockout', () => {
   it('운영 중인 팀(owner/manager)이 있으면 409 WITHDRAWAL_BLOCKED_TEAM_AUTHORITY — 트랜잭션 진입 전 차단, soft-delete/비활성 팀은 제외 조회', async () => {
     const prisma = createPrisma(null);
     prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'membership-1' });
-    const service = new ProfileService(prisma as unknown as PrismaService);
+    const service = createProfileService(prisma as unknown as PrismaService);
 
     await expect(service.withdrawalRequest(user, { reason: 'leave' })).rejects.toMatchObject({
       status: 409,
@@ -1463,7 +1522,7 @@ describe('ProfileService logout — 웹 푸시 구독 정리', () => {
 
   it('인증된 사용자로 로그아웃하면 그 사용자의 모든 웹 푸시 구독을 지운다', async () => {
     const prisma = createPrisma();
-    const service = new ProfileService(prisma as unknown as PrismaService);
+    const service = createProfileService(prisma as unknown as PrismaService);
 
     await expect(service.logout(user)).resolves.toEqual({ ok: true });
 
@@ -1472,7 +1531,7 @@ describe('ProfileService logout — 웹 푸시 구독 정리', () => {
 
   it('세션이 이미 무효라 사용자를 식별할 수 없어도(OptionalV1AuthGuard 결과 undefined) 에러 없이 성공한다', async () => {
     const prisma = createPrisma();
-    const service = new ProfileService(prisma as unknown as PrismaService);
+    const service = createProfileService(prisma as unknown as PrismaService);
 
     await expect(service.logout(undefined)).resolves.toEqual({ ok: true });
 

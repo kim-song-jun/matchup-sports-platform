@@ -1,5 +1,13 @@
 import { PrismaService } from '../prisma/prisma.service';
 import { ProfileService } from './profile.service';
+import type { RealtimeGateway } from '../realtime/realtime.gateway';
+
+function createProfileService(
+  prisma: unknown,
+  realtimeGateway: Pick<RealtimeGateway, 'forceDisconnectUser'> = { forceDisconnectUser: jest.fn() },
+): ProfileService {
+  return new ProfileService(prisma as PrismaService, realtimeGateway);
+}
 
 /**
  * [D14] 선호 포지션 검증이 **실제 저장 경로에 연결돼 있는지** 확인한다.
@@ -54,7 +62,7 @@ async function save(
   sport: { preferredPosition?: string | null; secondaryPreferredPosition?: string | null },
 ) {
   const { prisma, created } = buildPrisma(sportCode);
-  const service = new ProfileService(prisma as unknown as PrismaService);
+  const service = createProfileService(prisma as unknown as PrismaService);
   // `updateMyPreferences` 는 저장 후 스냅샷을 다시 읽는다. 이 스펙의 관심사는 **저장
   // 직전 검증**이므로 스냅샷 단계에서 나는 목 미비 오류는 무시한다 -- 검증이 막았어야 할
   // 값이면 그 전에 던지므로 아래 rejects 단언은 여전히 유효하다.

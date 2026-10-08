@@ -129,6 +129,7 @@ describe('RealtimeGateway', () => {
   };
   const logger = { debug: jest.fn(), warn: jest.fn(), error: jest.fn() };
   const staffAccess = { assertAccess: jest.fn() };
+  const managedTerms = { signupCompliance: jest.fn() };
 
   beforeEach(async () => {
     jest.clearAllMocks();
@@ -138,6 +139,7 @@ describe('RealtimeGateway', () => {
     gamesService.listEvents.mockReset().mockResolvedValue({ version: 4, state: 'LIVE', events: [], lastSequence: 0 });
     gamesService.assertReadAccess.mockReset().mockResolvedValue(undefined);
     staffAccess.assertAccess.mockReset();
+    managedTerms.signupCompliance.mockReset().mockResolvedValue({ compliant: true });
     delete process.env.NODE_ENV;
     process.env.NODE_ENV = 'test';
     moduleRef = await Test.createTestingModule({
@@ -146,7 +148,7 @@ describe('RealtimeGateway', () => {
         // 핸드셰이크가 REST 와 같은 기준으로 약관 재동의를 본다. 이 스위트들의 관심사는
         // 약관이 아니므로 "동의 완료" 로 고정한 더블을 넣는다 — 재동의 차단 자체는
         // 전용 테스트가 따로 덮는다.
-        { provide: ManagedTermsRuntimeService, useValue: { signupCompliance: async () => ({ compliant: true }) } },
+        { provide: ManagedTermsRuntimeService, useValue: managedTerms },
         { provide: PrismaService, useValue: prisma },
         { provide: TournamentStaffAccessService, useValue: staffAccess },
         { provide: GamesService, useValue: gamesService },
@@ -222,6 +224,48 @@ describe('RealtimeGateway', () => {
     await handleConnection(gateway, socket);
 
     expect(socket.join).not.toHaveBeenCalled();
+    expect(socket.disconnect).toHaveBeenCalledWith(true);
+  });
+
+  it('disconnects a socket for an account with a pending withdrawal', async () => {
+    prisma.v1User.findFirst.mockResolvedValue({
+      id: 'user-1',
+      accountStatus: 'withdrawal_pending',
+      onboardingStatus: 'completed',
+    });
+    const socket = buildSocket({}, { 'x-v1-user-id': 'user-1' });
+
+    await handleConnection(gateway, socket);
+
+    expect(socket.join).not.toHaveBeenCalled();
+    expect(socket.disconnect).toHaveBeenCalledWith(true);
+  });
+
+  it('rechecks account status after delayed terms validation closes the pre-connect withdrawal race', async () => {
+    const userRecord = {
+      id: 'user-1',
+      email: 'user-1@example.test',
+      accountStatus: 'active',
+      onboardingStatus: 'completed',
+    };
+    prisma.v1User.findFirst.mockImplementation(async () => ({ ...userRecord }));
+    const termsStarted = deferred<void>();
+    const termsResult = deferred<{ compliant: boolean }>();
+    managedTerms.signupCompliance.mockImplementation(() => {
+      termsStarted.resolve();
+      return termsResult.promise;
+    });
+    const socket = buildSocket({}, { 'x-v1-user-id': 'user-1' });
+    const connection = handleConnection(gateway, socket);
+
+    await termsStarted.promise;
+    userRecord.accountStatus = 'withdrawal_pending';
+    gateway.forceDisconnectUser('user-1');
+    termsResult.resolve({ compliant: true });
+    await connection;
+
+    expect(prisma.v1User.findFirst).toHaveBeenCalledTimes(2);
+    expect(socket.join).toHaveBeenCalledWith('user:user-1');
     expect(socket.disconnect).toHaveBeenCalledWith(true);
   });
 

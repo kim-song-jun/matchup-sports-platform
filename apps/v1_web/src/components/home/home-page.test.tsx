@@ -1,5 +1,5 @@
-import { render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { act, cleanup, render, screen } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { HomePageView } from './home-page';
 import type { V1TeamMatch, V1TournamentListItem } from '@/types/api';
 import type { HomeMatchCard, HomeViewModel } from './home.types';
@@ -361,5 +361,100 @@ describe('HomePageView — 팀 초대·가입 신청 유도 배너 (Task 180 G7)
     expect(screen.getByText('2경기가 공개를 기다려요')).toBeInTheDocument();
     expect(screen.queryByText(/팀 초대 \d+건/)).not.toBeInTheDocument();
     expect(screen.queryByText(/가입 신청 \d+건/)).not.toBeInTheDocument();
+  });
+});
+function promo(id: string, priority: number, enabled = true): V1TournamentListItem {
+  return {
+    id,
+    sportId: 'sport-futsal',
+    title: id,
+    status: 'open',
+    kind: 'regular_tournament',
+    entryFeeConfigured: true,
+    format: 'knockout',
+    registrationDeadlineAt: null,
+    // 홈 추천은 시작 전 대회만 싣는다 — 실제 시계로 도는 테스트도 깨지지 않게 먼 미래.
+    scheduledAt: '2099-10-07T09:00:00.000Z',
+    scheduledEndAt: null,
+    sport: { code: 'futsal', name: '풋살' },
+    venue: '서울',
+    coverImageUrl: null,
+    teamCount: 4,
+    confirmedCount: 0,
+    pendingPaymentCount: 0,
+    genderCategory: 'mixed',
+    entryFee: 0,
+    prizePool: null,
+    prizeSummary: null,
+    prizeBreakdown: null,
+    promoHomeEnabled: enabled,
+    promoHomePriority: priority,
+    promoHomeTitle: `홈 ${id}`,
+    promoHomeSubtitle: null,
+    promoHomeImageUrl: null,
+    promoHomeBadgeText: null,
+    promoHomeDateText: null,
+    promoHomeTeamsText: null,
+    promoHomeLocationText: null,
+    promoHomePrizeText: null,
+    promoListEnabled: false,
+    promoListPriority: 0,
+    promoListTitle: null,
+    promoListSubtitle: null,
+    promoListImageUrl: null,
+    promoListBadgeText: null,
+    promoListDateText: null,
+    promoListTeamsText: null,
+    promoListLocationText: null,
+    promoListPrizeText: null,
+    campaignSlug: null,
+    createdAt: '2026-08-01T00:00:00.000Z',
+    updatedAt: '2026-08-01T00:00:00.000Z',
+  };
+}
+
+describe('independent #1679 cached recommendation expiry', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-10-08T12:00:00.000Z'));
+    useV1AllTournamentsMock.mockReturnValue({ data: [], isPending: false, isError: false, isLoading: false, refetch: vi.fn() });
+    useV1TournamentsMock.mockReturnValue({ data: { items: [] }, isPending: false, isError: false });
+    useV1TeamMatchesMock.mockReturnValue({ data: { items: [] }, isPending: false, isError: false });
+  });
+  afterEach(() => { cleanup(); vi.useRealTimers(); });
+
+  it.each(['registrationDeadlineAt', 'scheduledAt'] as const)('removes a cached league after %s passes without parent rerender', (gate) => {
+    // Given: an eligible league from the cached API response, expiring in 30 seconds.
+    const item: V1TournamentListItem = {
+      ...promo('expiring-league', 0), kind: 'regular_league',
+      registrationDeadlineAt: '2026-10-08T13:00:00.000Z',
+      scheduledAt: '2026-10-08T14:00:00.000Z',
+      [gate]: '2026-10-08T12:00:30.000Z',
+    };
+    delete item.teamCount;
+    useV1TournamentsMock.mockReturnValue({ data: { items: [item] }, isPending: false, isError: false });
+    render(<HomePageView model={buildModel()} />);
+    expect(screen.getByRole('link', { name: /expiring-league/ })).toBeInTheDocument();
+    // When: time advances without an API response or explicit rerender.
+    act(() => { vi.advanceTimersByTime(60_000); });
+    // Then: the expired offer is removed from the real home surface.
+    expect(screen.queryByRole('link', { name: /expiring-league/ })).not.toBeInTheDocument();
+  });
+
+  it.each(['deadlineAt', 'startsAt'] as const)('removes a cached team match after %s passes without parent rerender', (gate) => {
+    // Given: the team-match list response initially allows application.
+    const item: V1TeamMatch = {
+      id: 'expiring-team', teamMatchId: 'expiring-team', title: 'expiring-team',
+      status: 'recruiting', sportName: '풋살', placeName: '서울', capacityText: '',
+      startsAt: '2026-10-08T14:00:00.000Z', deadlineAt: '2026-10-08T13:00:00.000Z',
+      [gate]: '2026-10-08T12:00:30.000Z',
+    };
+    useV1TeamMatchesMock.mockReturnValue({ data: { items: [item] }, isPending: false, isError: false });
+    render(<HomePageView model={buildModel()} />);
+    expect(screen.getByRole('link', { name: /expiring-team/ })).toBeInTheDocument();
+    // When: the application gate expires during this visit.
+    act(() => { vi.advanceTimersByTime(60_000); });
+    // Then: users no longer see an ineligible application link.
+    expect(screen.queryByRole('link', { name: /expiring-team/ })).not.toBeInTheDocument();
   });
 });

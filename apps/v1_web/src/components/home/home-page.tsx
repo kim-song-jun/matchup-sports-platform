@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Eye, ShieldAlert, X } from 'lucide-react';
 import { useShellOverride } from '@/components/v1-ui/shell-override';
@@ -34,6 +35,7 @@ import type { HomeChatRoom, HomeMatchCard, HomeQuickAction, HomeViewModel } from
 import { homeCapacity } from './home-capacity';
 
 export function HomePageView({ model }: { model: HomeViewModel }) {
+  const [, refreshClock] = useState(0);
   const dash = model.signedOut || model.network;
   const tournaments = useV1AllTournaments({ status: 'open' });
   const tournamentItems = tournaments.data ?? [];
@@ -66,7 +68,16 @@ export function HomePageView({ model }: { model: HomeViewModel }) {
     { refetchInterval: false },
   );
   const featuredTeamMatchItem = teamMatches.data?.items[0];
-  const featuredTeamMatch = featuredTeamMatchItem ? toFeaturedTeamMatch(featuredTeamMatchItem) : null;
+  const featuredTeamMatch = featuredTeamMatchItem
+    && Date.parse(featuredTeamMatchItem.startsAt) > now
+    && (!featuredTeamMatchItem.deadlineAt || Date.parse(featuredTeamMatchItem.deadlineAt) > now)
+    ? toFeaturedTeamMatch(featuredTeamMatchItem) : null;
+  const hasUpcomingRecommendation = hasHomePromo || Boolean(featuredLeague) || Boolean(featuredTeamMatch);
+  useEffect(() => {
+    if (!hasUpcomingRecommendation) return;
+    const timer = window.setInterval(() => refreshClock((tick) => tick + 1), 60_000);
+    return () => window.clearInterval(timer);
+  }, [hasUpcomingRecommendation]);
   // `isLoading`(= isPending && isFetching) 이 아니라 `isPending`(= 아직 데이터가 없다)을 본다.
   // 서버 렌더에서는 쿼리가 돌지 않아 isFetching 이 false → isLoading 도 false 라, 이 조건이
   // **"아직 모름"을 "없음"으로** 읽고 섹션을 통째로 빼 버렸다. 그래서 서버 HTML 에 슬롯이

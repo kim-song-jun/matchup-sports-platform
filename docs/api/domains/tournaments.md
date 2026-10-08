@@ -139,6 +139,10 @@ Admin-created tournaments require `teamCount` per tournament. The API does not t
 
 출전 인원·교체 설정만 보내는 PATCH도 제목 등 다른 필드가 필요하지 않다. 동일 설정 재저장에도 원자적 CAS와 감사 로그를 적용하고 새 `updatedAt`을 반환한다. 후속 요청은 이 버전을 사용해야 하며 이전 버전은 `409 TOURNAMENT_VERSION_CONFLICT`로 거절한다.
 
+종목 변경: `PATCH /api/v1/admin/tournaments/:tournamentId`에 현재와 다른 `sportId`를 보내면 같은 CAS 트랜잭션에서 `competitionConfigVersionId`를 새 종목의 기본 규정 버전(생성과 같은 경로, 규정을 쓰지 않는 종목은 `null`)으로 다시 연결하고, 감사 로그(`tournament.update`)의 before/after에 `sportId`·`competitionConfigVersionId`를 남긴다. 직전에 고친 경기 시간·출전 인원은 새 종목 기본값으로 돌아간다. 대진이 하나라도 있거나 상태가 `in_progress`/`completed`이면 `409 TOURNAMENT_SPORT_LOCKED`(변경 없음). 같은 종목 재전송은 pin을 건드리지 않는다. 출전 인원·교체 필드와 함께 보내면 `400 TOURNAMENT_LINEUP_SIZE_SPORT_CHANGE_CONFLICT`이므로 종목을 먼저 저장한 뒤 설정한다.
+
+생성 마법사의 전체 폼 재시도에는 변경하지 않은 `sportId`도 포함할 수 있다. 동일 종목의 초안 재저장은 정상 저장하며, 실제 종목 변경은 존재 여부 검증 후 처리한다. 종목 ID는 원자적 CAS `updateMany`에 scalar FK로 전달한다(중첩 relation `connect`는 이 연산에서 지원하지 않는다). 전체 폼 재저장도 사용자 지정 피리어드와 최신 버전·감사로그 계약을 유지한다.
+
 경기 종료 시각 기본값: 대회·리그 대진을 만들거나 일정을 옮길 때 종료 시각(`endAt`)을 받지 않았으면 **시작 + 그 경기가 쓰는 경기 설정의 정규 시간**(연장 제외 피리어드 합계 — 전·후반이면 둘의 합, 단판이면 그 한 피리어드)으로 채운다. 길이를 아는 경기를 옮기면 기존 길이를 그대로 옮긴다. 피리어드 길이를 모르는 레거시 설정(`{ count }`)이면 지어내지 않고 `null` 로 둔다.
 
 종료 시각이 없는 기존 대진을 장소·번호만 PATCH해 기본 종료가 보충되는 경우에도 같은 트랜잭션에서 양 팀 캘린더의 종료 시각을 함께 갱신한다. 시작 시각 변경 여부와 무관하게 경기와 팀 일정의 시간 계약을 유지한다.

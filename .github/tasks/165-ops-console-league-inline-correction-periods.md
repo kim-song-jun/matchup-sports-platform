@@ -216,6 +216,17 @@
 - [x] 계열/catalog 수정 `3c156ee68` committed-tree 단위 회귀·타입 검사·일반 push·32/32파일 정식 재리뷰 완료. 최신 PostgreSQL CI의 lineup-only409 실패는 아래 후속 항목에서 추적한다.
 - Acceptance Criteria: 현재 계열의 동일 content는 현재 pin을 재사용한다. 실제 lineup/periods 변경도 원본 계열과 catalog 키 부재를 유지하고, 기존 읽기 정규화·권한·CAS·불변 버전·감사로그 계약을 보존한다.
 
+### PR #1642 alpha 전체 생성 폼 재시도 500 후속 수정
+
+- [x] dev 머지 `2777618c8`의 alpha 배포·정확한 서빙 SHA 확인 후 실제 로그인 생성 마법사에서 전체 폼 재시도 PATCH 500(`INTERNAL_ERROR`, requestId1704)을 관측. 초안 ID/입력은 유지되고 공개 확인은 잠긴 상태다. 정식 SHA 고정 리뷰5437801381에 새 P1을 게시했다.
+- [x] `sportId` 포함 전체 폼이 `updateMany`에 지원하지 않는 중첩 `sport.connect`를 전달하는 경로 확인. 생성된 Prisma6.19.2 타입과 대조하고 `V1TournamentUncheckedUpdateManyInput`의 scalar `sportId`로 수정했다. 종목 존재 확인·관리자 권한·원자적 CAS·감사로그는 유지했다.
+- [x] 동일 종목/실제 종목 변경 단위 단언2건 RED → GREEN, 알 수 없는 종목의 쓰기·감사로그 차단 PASS. 관련 서비스 단위88건 및 API 타입 검사 PASS(직렬, 1회).
+- [x] 기존 lineup-only HTTP/DB 회귀를 유지하고 마법사 전체 필드의 생성 → 같은 초안 재시도 → 단판35분 저장 → 전체 폼 재저장 → API/DB 시간·버전 유지·초안 중복0·이전 버전409 회귀를 추가했다.
+- [ ] 후속 committed SHA의 일반 CI·실제 PostgreSQL 회귀, dev 머지·alpha 재배포·실제 브라우저 재시도 검증. 기존 alpha QA는 실패로 유지하며 자동 롤백하지 않는다.
+- Owned files: `apps/v1_api/src/tournaments/tournaments-admin.service.ts`, 해당 service spec, `apps/v1_api/test/integration/tournament-draft-period-resave.e2e-spec.ts`, `docs/api/domains/tournaments.md`, 이 task 문서, `.changeset/fix-tournament-wizard-draft-resave.md`.
+- Acceptance Criteria: 전체 폼에 동일 `sportId`가 있어도 재시도200, 사용자 지정35분과 초안 ID 보존, 최신 `updatedAt` 반환, 이전 버전409, 관리자 권한·종목 존재 확인·감사로그 유지. 새 schema/migration은 필요하지 않다(기존 V1Tournament.sportId FK만 사용).
+- Validation limits: 로컬 Docker DB가 없어 실제 HTTP/DB 회귀는 CI에서 실행한다. alpha 화면 캡처의 간헐적 시간 초과와 파일 첨부 권한 문제는 기능 결과와 별도로 추적한다. 실제 API500은 외부 보안 모델 unavailable 서비스 오류와 다른 결함이다.
+
 ### PR #1642 lineup-only 저장 CAS 후속 검증
 
 - Owned files: `apps/v1_api/src/tournaments/tournaments-admin.service.ts`, 기존 `tournament-draft-period-resave.e2e-spec.ts`, API 도메인 문서, 이 task 문서. 작성자 변경·다른 작업트리 보존, 병렬 에이전트 없음.

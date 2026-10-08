@@ -49,7 +49,7 @@ import {
 } from './tournament-fixture-official-result';
 import { cascadeCancelTeamMatchSchedulesInTx } from '../team-schedules/team-schedules.service';
 import { findTournamentOnSurface, TOURNAMENT_KINDS } from './tournament-surface-lookup';
-import { createGroupInTx, ensureGroupPhaseTeamsInTx, recalculateStandingsInTx, updateTournamentFixtureInTx } from './tournament-bracket-tx';
+import { assertSidesNotSlotLinked, createGroupInTx, ensureGroupPhaseTeamsInTx, recalculateStandingsInTx, updateTournamentFixtureInTx } from './tournament-bracket-tx';
 import { participantDisplayName } from './participant-display-name';
 import { readJerseyNumbers } from './tournament-player-jersey';
 import { createTournamentMatchInTx } from './tournament-match-creation';
@@ -823,6 +823,8 @@ export class TournamentBracketService {
         teamMatch: {
           select: {
             deletedAt: true,
+            homeSlotId: true,
+            awaySlotId: true,
             game: { select: { id: true, sourceType: true, state: true, currentOfficialRevision: { select: { state: true } } } },
           },
         },
@@ -835,6 +837,15 @@ export class TournamentBracketService {
       if (canonical.teamMatch.game === null || canonical.teamMatch.game.sourceType !== V1GameSourceType.TEAM_MATCH) {
         throw new ConflictException({ code: 'TOURNAMENT_MATCH_GAME_MISSING', message: '대회 경기의 정본 게임을 찾을 수 없어요.' });
       }
+      assertSidesNotSlotLinked(
+        {
+          homeSlotId: canonical.teamMatch.homeSlotId,
+          awaySlotId: canonical.teamMatch.awaySlotId,
+          homeRegistrationId: canonical.homeRegistrationId,
+          awayRegistrationId: canonical.awayRegistrationId,
+        },
+        { homeRegistrationId: dto.homeRegistrationId, awayRegistrationId: dto.awayRegistrationId },
+      );
       const changesTeams = dto.homeRegistrationId !== undefined || dto.awayRegistrationId !== undefined;
       if (changesTeams && (canonical.teamMatch.game.state !== 'SCHEDULED' || canonical.teamMatch.game.currentOfficialRevision?.state === 'OFFICIAL')) {
         throw new ConflictException({

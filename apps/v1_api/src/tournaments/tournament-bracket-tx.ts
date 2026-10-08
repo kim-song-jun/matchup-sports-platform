@@ -202,3 +202,21 @@ export async function assignTournamentFixtureSideInTx(
     ...(input.side === 'HOME' ? { homeRegistrationId: input.registrationId } : { awayRegistrationId: input.registrationId }),
   });
 }
+
+/**
+ * 자리(slot)에 연결된 사이드의 팀은 자리 서비스만 바꾼다. 경기 수정 API 가 직접 바꾸면 자리와 경기가 어긋난다.
+ * 현재 값과 같은 값이거나 보내지 않은 쪽은 허용한다(일정·장소만 고치는 요청이 막히면 안 된다).
+ */
+export function assertSidesNotSlotLinked(
+  current: { homeSlotId: string | null; awaySlotId: string | null; homeRegistrationId: string | null; awayRegistrationId: string | null },
+  change: { homeRegistrationId?: string | null; awayRegistrationId?: string | null },
+): void {
+  const homeChanged = change.homeRegistrationId !== undefined && change.homeRegistrationId !== current.homeRegistrationId;
+  const awayChanged = change.awayRegistrationId !== undefined && change.awayRegistrationId !== current.awayRegistrationId;
+  if ((current.homeSlotId !== null && homeChanged) || (current.awaySlotId !== null && awayChanged)) {
+    throw new ConflictException({
+      code: 'SLOT_LINKED',
+      message: '대진 자리에 연결된 팀은 경기에서 직접 바꿀 수 없어요. 자리에서 팀을 바꿔 주세요.',
+    });
+  }
+}

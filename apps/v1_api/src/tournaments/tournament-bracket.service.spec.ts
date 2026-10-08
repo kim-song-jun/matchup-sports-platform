@@ -26,7 +26,7 @@ import { TournamentBracketService } from './tournament-bracket.service';
 import { GamesService } from '../games/games.service';
 import { FOOTBALL_V1_CONFIG } from './competition-config/competition-config';
 import { kindAwareFindFirst } from '../../test/helpers/kind-aware-find-first';
-import { assignTournamentFixtureSideInTx, createGroupInTx } from './tournament-bracket-tx';
+import { assertSidesNotSlotLinked, assignTournamentFixtureSideInTx, createGroupInTx } from './tournament-bracket-tx';
 
 // ─── fixtures ────────────────────────────────────────────────────────────────
 
@@ -167,6 +167,8 @@ function canonicalDetailsRow(overrides: Record<string, unknown> = {}) {
       endAt: null,
       placeName: null,
       status: 'matched',
+      homeSlotId: null,
+      awaySlotId: null,
       createdAt: new Date('2026-06-14T00:00:00Z'),
       updatedAt: new Date('2026-06-14T00:00:00Z'),
       _count: { operationAudits: 0 },
@@ -2113,6 +2115,66 @@ describe('TournamentBracketService', () => {
       ).rejects.toMatchObject({ response: { code: 'FIXTURE_NOT_FOUND' } });
       expect(prisma.v1TournamentMatchDetails.update).not.toHaveBeenCalled();
       expect(prisma.v1AdminActionLog.create).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('assertSidesNotSlotLinked', () => {
+    const current = { homeSlotId: 'slot-h', awaySlotId: null, homeRegistrationId: 'reg-1', awayRegistrationId: 'reg-2' };
+
+    it('자리에 연결된 사이드를 다른 팀으로 바꾸거나 비우려 하면 SLOT_LINKED', () => {
+      expect(() => assertSidesNotSlotLinked(current, { homeRegistrationId: 'reg-3' })).toThrow(
+        expect.objectContaining({ response: expect.objectContaining({ code: 'SLOT_LINKED' }) }),
+      );
+      expect(() => assertSidesNotSlotLinked(current, { homeRegistrationId: null })).toThrow(
+        expect.objectContaining({ response: expect.objectContaining({ code: 'SLOT_LINKED' }) }),
+      );
+    });
+
+    it('자리에 연결되지 않은 반대쪽 사이드는 자유롭게 바꾼다 (대조군)', () => {
+      expect(() => assertSidesNotSlotLinked(current, { awayRegistrationId: 'reg-3' })).not.toThrow();
+      expect(() => assertSidesNotSlotLinked(current, { awayRegistrationId: null })).not.toThrow();
+    });
+
+    it('연결된 사이드라도 현재와 같은 값이거나 보내지 않았으면 통과한다 (일정·장소만 고치는 요청)', () => {
+      expect(() => assertSidesNotSlotLinked(current, { homeRegistrationId: 'reg-1' })).not.toThrow();
+      expect(() => assertSidesNotSlotLinked(current, {})).not.toThrow();
+    });
+
+    it('원정 쪽만 연결돼 있으면 원정만 막는다', () => {
+      const awayLinked = { ...current, homeSlotId: null, awaySlotId: 'slot-a' };
+      expect(() => assertSidesNotSlotLinked(awayLinked, { awayRegistrationId: 'reg-9' })).toThrow(
+        expect.objectContaining({ response: expect.objectContaining({ code: 'SLOT_LINKED' }) }),
+      );
+      expect(() => assertSidesNotSlotLinked(awayLinked, { homeRegistrationId: 'reg-9' })).not.toThrow();
+    });
+  });
+
+  describe('updateFixture 의 SLOT_LINKED 배선', () => {
+    const linkedRow = (slots: { homeSlotId: string | null; awaySlotId: string | null }, official = false) => canonicalDetailsRow({
+      teamMatch: {
+        ...canonicalDetailsRow().teamMatch,
+        ...slots,
+        game: { ...canonicalDetailsRow().teamMatch.game, ...(official ? { currentOfficialRevisionId: 'revision-1', currentOfficialRevision: { state: 'OFFICIAL' } } : {}) },
+      },
+    });
+
+    it('홈이 자리에 연결된 경기의 홈을 PATCH 로 바꾸면 409 SLOT_LINKED 이고 트랜잭션도 열지 않는다', async () => {
+      prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdmin);
+      prisma.v1TournamentMatchDetails.findUnique.mockResolvedValue(linkedRow({ homeSlotId: 'slot-h', awaySlotId: null }));
+
+      await expect(service.updateFixture(ownerUser, 'fixture-1', { homeRegistrationId: 'reg-3' })).rejects.toMatchObject({
+        response: { code: 'SLOT_LINKED' },
+      });
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+    });
+
+    it('연결되지 않은 홈을 바꾸는 요청은 SLOT_LINKED 를 거치지 않고 다음 가드(결과 잠금)까지 간다 (대조군)', async () => {
+      prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdmin);
+      prisma.v1TournamentMatchDetails.findUnique.mockResolvedValue(linkedRow({ homeSlotId: null, awaySlotId: 'slot-a' }, true));
+
+      await expect(service.updateFixture(ownerUser, 'fixture-1', { homeRegistrationId: 'reg-3' })).rejects.toMatchObject({
+        response: { code: 'FIXTURE_HAS_RESULT' },
+      });
     });
   });
 

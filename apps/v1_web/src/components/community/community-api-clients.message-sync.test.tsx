@@ -1,9 +1,10 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
-import { setupServer } from 'msw/node';
+
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { V1ChatMessage, V1ChatRoom, V1ChatRoomDetail } from '@/types/api';
+
+import { clients, deferred, message, pageInfo, releaseMessageSyncRequests, renderSendConsumer, renderSender, sendResult, server, state, timestamp } from './community-api-clients.message-sync.fixture';
 import { ChatListPageClient, ChatRoomPageClient } from './community-api-clients';
 
 const socket = vi.hoisted(() => ({ listeners: new Map<string, Set<(payload: unknown) => void>>() }));
@@ -23,59 +24,18 @@ vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(),
 }));
 
-const linkedTarget = { type: 'team', id: 'team-1', title: '동기화 테스트 팀', route: '/teams/team-1' } as const;
-const roomDetail: V1ChatRoomDetail = {
-  roomId: 'room-1', roomType: 'team', title: '동기화 테스트 팀', status: 'active', teamContact: null,
-  linkedTarget,
-  me: { participantId: 'participant-a', status: 'active', pinned: false, mutedUntil: null, lastReadMessageId: null },
-  participants: [{ userId: 'user-a', displayName: '나', role: 'owner' }],
-};
-function message(messageId: string, content: string): V1ChatMessage {
-  return {
-    messageId, content, sender: { userId: 'user-a', displayName: '나', profileImageUrl: null },
-    messageType: 'text', mine: true, status: 'sent', sentAt: '2026-10-08T10:00:00.000Z', unreadCount: 0,
-  };
-}
-let messages: V1ChatMessage[] = [];
-let roomListRequests = 0;
-const clients: QueryClient[] = [];
-const timestamp = '2026-10-08T10:00:00.000Z';
-const pageInfo = { nextCursor: null, hasNext: false };
-function roomListItem(): V1ChatRoom {
-  const last = messages.at(-1);
-  return {
-    roomId: 'room-1', roomType: 'team', title: roomDetail.title, status: 'active', linkedTarget,
-    linkedTargetCancelled: false, teamContact: null, unreadCount: 0, pinned: false, muted: false,
-    lastMessage: last ? { messageId: last.messageId, contentPreview: last.content ?? '', sentAt: last.sentAt } : null,
-  };
-}
-const server = setupServer(
-  http.get('*/api/v1/chat/rooms', () => {
-    roomListRequests += 1;
-    return HttpResponse.json({ status: 'success', data: { items: [roomListItem()], pageInfo }, timestamp });
-  }),
-  http.get('*/api/v1/chat/rooms/room-1', () => HttpResponse.json({ status: 'success', data: roomDetail, timestamp })),
-  http.get('*/api/v1/chat/rooms/room-1/messages', () => HttpResponse.json({
-    status: 'success', data: { items: [...messages].reverse(), pageInfo }, timestamp,
-  })),
-  http.patch('*/api/v1/chat/rooms/room-1/me', async ({ request }) => {
-    const body = await request.json();
-    const lastReadMessageId = typeof body === 'object' && body !== null && 'lastReadMessageId' in body
-      ? body.lastReadMessageId : null;
-    return HttpResponse.json({ status: 'success', data: {
-      roomId: 'room-1', status: 'active', pinned: false, mutedUntil: null, lastReadMessageId,
-    }, timestamp });
-  }),
-  http.post('*/api/v1/logs/client-error', () => new HttpResponse(null, { status: 204 })),
-);
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
 afterAll(() => server.close());
 beforeEach(() => {
   vi.stubEnv('NEXT_PUBLIC_API_URL', 'http://localhost/api/v1');
-  messages = [message('msg-old', '이전 메시지')];
-  roomListRequests = 0;
+  state.messages = [message('msg-old', '이전 메시지')];
+  state.listRequests = 0;
+  state.reads.detail = 0;
+  state.reads.messages = 0;
+  state.refreshGate = undefined;
 });
 afterEach(() => {
+  releaseMessageSyncRequests();
   cleanup();
   for (const client of clients) client.clear();
   clients.length = 0;
@@ -90,20 +50,184 @@ function renderPage(page: 'list' | 'room') {
     {page === 'list' ? <ChatListPageClient /> : <ChatRoomPageClient roomId="room-1" />}
   </QueryClientProvider>);
 }
-function emitSenderMessage() {
+function emitSenderMessage(messageId = 'msg-new') {
   act(() => {
     for (const listener of socket.listeners.get('chat:message') ?? []) {
-      listener({ roomId: 'room-1', messageId: 'msg-new', senderUserId: 'user-a' });
+      listener({ roomId: 'room-1', messageId, senderUserId: 'user-a' });
     }
   });
 }
 
 describe('채팅 메시지 동기화 — 실제 화면·조회 훅·HTTP', () => {
+  it('첫 HTTP 메시지 조회가 진행 중일 때 도착한 고유 이벤트도 최신 데이터를 표시한다', async () => {
+    // Given the initial cold history request holds a snapshot from before the new message.
+    const initialGate = deferred();
+    server.use(http.get('*/api/v1/chat/rooms/room-1/messages', async () => {
+      state.reads.messages += 1;
+      const items = [...state.messages].reverse();
+      await initialGate.promise;
+      return HttpResponse.json({ status: 'success', data: { items, pageInfo }, timestamp });
+    }));
+    const client = renderSendConsumer();
+    await waitFor(() => expect(state.reads.messages).toBe(1));
+    // When a committed message arrives before the first HTTP response is released.
+    state.messages.push(message('msg-new', '초기 조회 중 도착한 메시지'));
+    emitSenderMessage();
+    await act(async () => { initialGate.resolve(); });
+    await waitFor(() => expect(client.isFetching()).toBe(0));
+    // Then the real message consumer renders the latest data, not the joined pre-event snapshot.
+    await waitFor(() => expect(screen.getByLabelText('history')).toHaveTextContent('초기 조회 중 도착한 메시지'));
+    expect(state.reads.messages).toBe(2);
+  });
+
+  it('같은 메시지의 HTTP 조회 실패를 숨기지 않고 재수신 시 실패한 조회만 재시도한다', async () => {
+    // Given an already hydrated consumer and a single failed message refresh.
+    const client = await renderSender();
+    let failRead = true;
+    server.use(http.get('*/api/v1/chat/rooms/room-1/messages', () => {
+      state.reads.messages += 1;
+      if (failRead) {
+        failRead = false;
+        return HttpResponse.json({ status: 'error', statusCode: 503,
+          code: 'CHAT_READ_FAILED', message: '메시지 조회 실패', details: null, timestamp }, { status: 503 });
+      }
+      return HttpResponse.json({ status: 'success', data: { items: [...state.messages].reverse(), pageInfo }, timestamp });
+    }));
+    state.messages.push(message('msg-new', '재조회한 메시지'));
+    emitSenderMessage();
+    await waitFor(() => expect(screen.getByLabelText('history-error')).toHaveTextContent('메시지 조회 실패'));
+    await waitFor(() => expect(client.isFetching()).toBe(0));
+    // When the same persisted identity arrives again after the failed HTTP read.
+    emitSenderMessage();
+    await waitFor(() => expect(client.isFetching()).toBe(0));
+    // Then only the failed query retries, and the actual new message replaces its old data.
+    await waitFor(() => expect(screen.getByLabelText('history')).toHaveTextContent('재조회한 메시지'));
+    expect(screen.getByLabelText('history-error')).toBeEmptyDOMElement();
+    expect({ list: state.listRequests, ...state.reads }).toEqual({ list: 4, detail: 2, messages: 3 });
+  });
+
+  it.each(['in-flight', 'completed'] as const)('POST 완료 전 socket 조회가 %s 상태여도 같은 메시지는 한 번만 갱신한다', async (refreshState) => {
+    // Given actual room, base/filtered list and send hooks, with a delayed POST response.
+    const postGate = deferred();
+    server.use(http.post('*/api/v1/chat/rooms/room-1/messages', async () => {
+      state.messages.push(message('msg-new', '보낸 메시지'));
+      emitSenderMessage();
+      await postGate.promise;
+      return sendResult();
+    }));
+    const client = await renderSender();
+    if (refreshState === 'in-flight') state.refreshGate = deferred();
+    // When the persisted event starts/completes its GETs before the POST succeeds.
+    fireEvent.click(screen.getByRole('button', { name: 'HTTP 메시지 보내기' }));
+    await waitFor(() => expect(state.reads.messages).toBe(2));
+    if (refreshState === 'completed') await waitFor(() => expect(screen.getByLabelText('history')).toHaveTextContent('보낸 메시지'));
+    await act(async () => { postGate.resolve(); });
+    await waitFor(() => expect(screen.getByLabelText('send')).toHaveTextContent('success'));
+    await act(async () => { state.refreshGate?.resolve(); });
+    await waitFor(() => expect(client.isFetching()).toBe(0));
+    // Then list variants, detail and history each make one refresh, with no cancelled restart.
+    expect(screen.getByLabelText('preview')).toHaveTextContent('보낸 메시지');
+    expect(screen.getByLabelText('history')).toHaveTextContent('보낸 메시지');
+    expect({ list: state.listRequests, ...state.reads }).toEqual({ list: 4, detail: 2, messages: 2 });
+  });
+
+  it('POST 갱신 완료 뒤 도착한 동일 socket 이벤트는 HTTP를 반복하지 않는다', async () => {
+    // Given the sender POST finishes before the corresponding socket delivery.
+    server.use(http.post('*/api/v1/chat/rooms/room-1/messages', () => {
+      state.messages.push(message('msg-new', '보낸 메시지'));
+      return sendResult();
+    }));
+    const client = await renderSender();
+    fireEvent.click(screen.getByRole('button', { name: 'HTTP 메시지 보내기' }));
+    await waitFor(() => expect(screen.getByLabelText('history')).toHaveTextContent('보낸 메시지'));
+    await waitFor(() => expect(client.isFetching()).toBe(0));
+    // When the delayed event repeats the same persisted message identity.
+    emitSenderMessage();
+    await act(async () => {});
+    await waitFor(() => expect(client.isFetching()).toBe(0));
+    // Then the actual HTTP reads remain one per active query.
+    expect({ list: state.listRequests, ...state.reads }).toEqual({ list: 4, detail: 2, messages: 2 });
+  });
+
+  it('조회 진행 중 새 고유 이벤트가 연속 도착해도 최종 메시지를 놓치지 않는다', async () => {
+    // Given a snapshot of the first socket refresh is held at the HTTP boundary.
+    const client = await renderSender();
+    state.refreshGate = deferred();
+    state.messages.push(message('msg-new', '첫 새 메시지'));
+    emitSenderMessage();
+    await waitFor(() => expect(state.reads.messages).toBe(2));
+    // When another tab persists a different message while those reads are pending.
+    state.messages.push(message('msg-next', '최종 새 메시지'));
+    emitSenderMessage('msg-next');
+    await waitFor(() => expect(state.reads.messages).toBe(3));
+    await act(async () => { state.refreshGate?.resolve(); });
+    await waitFor(() => expect(client.isFetching()).toBe(0));
+    // Then the latest unique event supersedes the stale first response on both surfaces.
+    expect(screen.getByLabelText('preview')).toHaveTextContent('최종 새 메시지');
+    expect(screen.getByLabelText('history')).toHaveTextContent('최종 새 메시지');
+    expect({ list: state.listRequests, ...state.reads }).toEqual({ list: 6, detail: 3, messages: 3 });
+  });
+
+  it('늦은 POST 완료가 더 새로운 다른 탭 메시지 조회를 재시작하지 않는다', async () => {
+    // Given this tab's committed send event arrives before its delayed POST response.
+    const postGate = deferred();
+    server.use(http.post('*/api/v1/chat/rooms/room-1/messages', async () => {
+      state.messages.push(message('msg-new', '보낸 메시지'));
+      emitSenderMessage();
+      await postGate.promise;
+      return sendResult();
+    }));
+    const client = await renderSender();
+    state.refreshGate = deferred();
+    fireEvent.click(screen.getByRole('button', { name: 'HTTP 메시지 보내기' }));
+    await waitFor(() => expect(state.reads.messages).toBe(2));
+    // When a newer cross-tab message supersedes those GETs before the old POST resolves.
+    state.messages.push(message('msg-next', '더 새로운 다른 탭 메시지'));
+    emitSenderMessage('msg-next');
+    await waitFor(() => expect(state.reads.messages).toBe(3));
+    await act(async () => { postGate.resolve(); });
+    await waitFor(() => expect(screen.getByLabelText('send')).toHaveTextContent('success'));
+    await act(async () => { state.refreshGate?.resolve(); });
+    await waitFor(() => expect(client.isFetching()).toBe(0));
+    // Then the newest actual HTTP data wins, with exactly one refresh per unique identity.
+    expect(screen.getByLabelText('preview')).toHaveTextContent('더 새로운 다른 탭 메시지');
+    expect(screen.getByLabelText('history')).toHaveTextContent('더 새로운 다른 탭 메시지');
+    expect({ list: state.listRequests, ...state.reads }).toEqual({ list: 6, detail: 3, messages: 3 });
+  });
+
+  it('실패한 POST는 오류를 표시하고 실제 재전송과 다른 탭 이벤트를 처리한다', async () => {
+    // Given the first persisted send is rejected, with no emitted message.
+    let posts = 0;
+    server.use(http.post('*/api/v1/chat/rooms/room-1/messages', () => {
+      if (++posts === 1) return HttpResponse.json({ status: 'error', statusCode: 503,
+        code: 'CHAT_SEND_FAILED', message: '저장 실패', details: null, timestamp }, { status: 503 });
+      state.messages.push(message('msg-new', '보낸 메시지'));
+      emitSenderMessage();
+      return sendResult();
+    }));
+    const client = await renderSender();
+    fireEvent.click(screen.getByRole('button', { name: 'HTTP 메시지 보내기' }));
+    await waitFor(() => expect(screen.getByLabelText('send')).toHaveTextContent('저장 실패'));
+    expect(screen.getByLabelText('history')).not.toHaveTextContent('보낸 메시지');
+    expect({ list: state.listRequests, ...state.reads }).toEqual({ list: 2, detail: 1, messages: 1 });
+    // When the same action is retried successfully and another tab then sends a unique message.
+    fireEvent.click(screen.getByRole('button', { name: 'HTTP 메시지 보내기' }));
+    await waitFor(() => expect(screen.getByLabelText('history')).toHaveTextContent('보낸 메시지'));
+    await waitFor(() => expect(screen.getByLabelText('send')).toHaveTextContent('success'));
+    state.messages.push(message('msg-other-tab', '다른 탭 후속 메시지'));
+    emitSenderMessage('msg-other-tab');
+    await waitFor(() => expect(client.isFetching()).toBe(0));
+    // Then failure visibility, retry and subsequent cross-tab updates all remain real.
+    expect(screen.getByLabelText('preview')).toHaveTextContent('다른 탭 후속 메시지');
+    expect(screen.getByLabelText('history')).toHaveTextContent('다른 탭 후속 메시지');
+    expect(posts).toBe(2);
+  });
+
   it('발신자 메시지 이벤트만으로 열려 있는 본문과 사이드 목록 미리보기를 함께 갱신한다', async () => {
     // Given the same account's other tab has loaded the old message and preview.
     renderPage('room');
     await waitFor(() => expect(screen.getAllByText('이전 메시지')).toHaveLength(2));
-    messages.push(message('msg-new', '다른 탭에서 보낸 메시지'));
+    state.messages.push(message('msg-new', '다른 탭에서 보낸 메시지'));
     // When the persisted sender event arrives, with no notification:new event.
     emitSenderMessage();
     // Then real HTTP responses update both surfaces.
@@ -115,13 +239,13 @@ describe('채팅 메시지 동기화 — 실제 화면·조회 훅·HTTP', () =>
     // Given a standalone list with an already loaded preview.
     renderPage('list');
     await screen.findAllByText('이전 메시지');
-    const initialRequests = roomListRequests;
-    messages.push(message('msg-new', '목록에 갱신된 메시지'));
+    const initialRequests = state.listRequests;
+    state.messages.push(message('msg-new', '목록에 갱신된 메시지'));
     // When only the sender's message event arrives.
     emitSenderMessage();
     // Then the mounted list consumes it and makes one HTTP refresh.
     expect(await screen.findAllByText('목록에 갱신된 메시지')).toHaveLength(2);
-    expect(roomListRequests).toBe(initialRequests + 1);
+    expect(state.listRequests).toBe(initialRequests + 1);
   });
 
   it('팀 필터를 연 목록은 전체·필터 캐시를 각각 한 번 갱신한다', async () => {
@@ -129,12 +253,12 @@ describe('채팅 메시지 동기화 — 실제 화면·조회 훅·HTTP', () =>
     renderPage('list');
     await screen.findAllByText('이전 메시지');
     fireEvent.click(screen.getAllByRole('button', { name: '팀' })[0]);
-    await waitFor(() => expect(roomListRequests).toBe(2));
-    messages.push(message('msg-new', '필터에도 갱신된 메시지'));
+    await waitFor(() => expect(state.listRequests).toBe(2));
+    state.messages.push(message('msg-new', '필터에도 갱신된 메시지'));
     // When the sender's message event arrives.
     emitSenderMessage();
     // Then both actual query variants refresh, without duplicate requests.
     expect(await screen.findAllByText('필터에도 갱신된 메시지')).toHaveLength(2);
-    expect(roomListRequests).toBe(4);
+    expect(state.listRequests).toBe(4);
   });
 });

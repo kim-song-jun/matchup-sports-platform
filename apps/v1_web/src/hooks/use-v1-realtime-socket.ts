@@ -1,7 +1,55 @@
 import { useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
+import type { QueryClient } from '@tanstack/react-query';
 import { getV1Socket } from '@/lib/v1-socket';
 import { v1Keys } from '@/lib/query-keys';
+
+type ChatMessageIdentity = { readonly roomId: string; readonly messageId: string };
+const MAX_RECENT_CHAT_MESSAGES = 100;
+// Query removal (including logout) releases identities; each cache entry keeps a bounded recent set.
+const refreshedChatMessages = new WeakMap<QueryClient, WeakMap<object, Set<string>>>();
+
+function chatMessageIdentity(payload: unknown): ChatMessageIdentity | null {
+  if (typeof payload !== 'object' || payload === null
+    || !('roomId' in payload) || typeof payload.roomId !== 'string'
+    || !('messageId' in payload) || typeof payload.messageId !== 'string') return null;
+  return { roomId: payload.roomId, messageId: payload.messageId };
+}
+
+export function invalidateV1ChatMessageQueries(
+  queryClient: QueryClient,
+  message: ChatMessageIdentity,
+  scope: 'list' | 'room' | 'all' = 'all',
+): void {
+  const refreshedQueries = refreshedChatMessages.get(queryClient) ?? new WeakMap<object, Set<string>>();
+  refreshedChatMessages.set(queryClient, refreshedQueries);
+  const root = v1Keys.chatRooms();
+  const refresh = new Set<object>();
+  for (const query of queryClient.getQueryCache().findAll({ queryKey: root })) {
+    const isList = query.queryKey.length === root.length
+      || (query.queryKey.length === root.length + 2 && query.queryKey[root.length] === 'list'
+        && typeof query.queryKey[root.length + 1] === 'object');
+    const isRoom = query.queryKey[root.length] === message.roomId;
+    if (!((scope !== 'room' && isList) || (scope !== 'list' && isRoom))) continue;
+    const recent = refreshedQueries.get(query) ?? new Set<string>();
+    // A failed read remains visible and retryable; an in-flight/successful read coalesces the POST/event.
+    if (recent.has(message.messageId)
+      && !(query.state.status === 'error' && query.state.fetchStatus === 'idle')) continue;
+    recent.add(message.messageId);
+    if (recent.size > MAX_RECENT_CHAT_MESSAGES) {
+      const oldest = recent.values().next().value;
+      if (oldest !== undefined) recent.delete(oldest);
+    }
+    refreshedQueries.set(query, recent);
+    // TanStack otherwise joins a cold request whose snapshot can predate this committed message.
+    if (query.state.data === undefined && query.state.fetchStatus === 'fetching') {
+      void queryClient.cancelQueries({ queryKey: query.queryKey, exact: true });
+    }
+    refresh.add(query);
+  }
+  // TanStack evaluates the predicate for invalidation and again for refetching; keep it pure.
+  void queryClient.invalidateQueries({ queryKey: root, predicate: (query) => refresh.has(query) });
+}
 
 export function useV1NotificationSocket(): void {
   const queryClient = useQueryClient();
@@ -30,10 +78,9 @@ export function useV1ChatRoomSocket(roomId: string): void {
 
   useEffect(() => {
     const socket = getV1Socket();
-    const handler = () => {
-      // 메시지 쿼리도 이 prefix 아래에 있다. 두 번 무효화하면 진행 중인 요청을
-      // 취소하고 다시 시작하므로 현재 방의 subtree를 한 번만 갱신한다.
-      queryClient.invalidateQueries({ queryKey: v1Keys.chatRoom(roomId) });
+    const handler = (payload: unknown) => {
+      const message = chatMessageIdentity(payload);
+      if (message?.roomId === roomId) invalidateV1ChatMessageQueries(queryClient, message, 'room');
     };
     // The global bridge may have mounted before login; the active room must
     // also clear cached content when either participant changes a block.
@@ -49,24 +96,17 @@ export function useV1ChatRoomSocket(roomId: string): void {
   }, [queryClient, roomId]);
 }
 
-export function useV1ChatListSocket(): void {
+export function useV1ChatListSocket(enabled = true): void {
   const queryClient = useQueryClient();
 
   useEffect(() => {
+    if (!enabled) return;
     const socket = getV1Socket();
-    const root = v1Keys.chatRooms();
-    const handler = () => {
-      void queryClient.invalidateQueries({
-        queryKey: root,
-        // 필터 목록은 prefix 뒤에 'list'와 filters가 붙고, 상세는 roomId가 붙는다.
-        // 같은 화면의 방 listener와 겹치지 않게 전체·필터 목록만 갱신한다.
-        predicate: (query) => query.queryKey.length === root.length
-          || (query.queryKey.length === root.length + 2
-            && query.queryKey[root.length] === 'list'
-            && typeof query.queryKey[root.length + 1] === 'object'),
-      });
+    const handler = (payload: unknown) => {
+      const message = chatMessageIdentity(payload);
+      if (message) invalidateV1ChatMessageQueries(queryClient, message, 'list');
     };
     socket.on('chat:message', handler);
     return () => { socket.off('chat:message', handler); };
-  }, [queryClient]);
+  }, [queryClient, enabled]);
 }

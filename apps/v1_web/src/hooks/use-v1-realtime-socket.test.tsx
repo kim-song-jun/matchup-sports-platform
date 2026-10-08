@@ -70,7 +70,7 @@ describe('useV1ChatRoomSocket', () => {
     await waitFor(() => expect(messages.getCurrentResult().data).toEqual({ revision: 1 }));
 
     // When one actual socket callback invalidates the open room.
-    listeners['chat:message']({ roomId: 'room-1', senderUserId: 'user-a' });
+    listeners['chat:message']({ roomId: 'room-1', messageId: 'msg-1', senderUserId: 'user-a' });
 
     // Then the nested message request is not cancelled and restarted by a redundant second invalidation.
     await waitFor(() => expect(messages.getCurrentResult().data).toEqual({ revision: 2 }));
@@ -103,9 +103,9 @@ describe('useV1ChatRoomSocket', () => {
     // broadcasts on the per-user room joined in handleConnection.
     expect(mockSocket.emit).not.toHaveBeenCalled();
 
-    listeners['chat:message']({ roomId: 'room-1', text: 'hi' });
+    listeners['chat:message']({ roomId: 'room-1', messageId: 'msg-1', text: 'hi' });
 
-    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: v1Keys.chatRoom('room-1') });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: v1Keys.chatRooms(), predicate: expect.any(Function) });
 
     unmount();
 
@@ -114,6 +114,38 @@ describe('useV1ChatRoomSocket', () => {
 });
 
 describe('useV1ChatListSocket', () => {
+  it('keeps dedupe bounded and forgets identities when the cached query is removed', async () => {
+    // Given a real active query and the actual message listener.
+    const { useV1ChatListSocket } = await import('./use-v1-realtime-socket');
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    let reads = 0;
+    const options = { queryKey: v1Keys.chatRooms(), queryFn: async () => ++reads };
+    const first = new QueryObserver(queryClient, options);
+    const stopFirst = first.subscribe(() => {});
+    const { unmount } = renderHook(() => useV1ChatListSocket(), { wrapper: createWrapper(queryClient) });
+    await waitFor(() => expect(first.getCurrentResult().data).toBe(1));
+    // When more than the recent identity budget arrives, the newest duplicate still coalesces.
+    for (let index = 0; index <= 100; index += 1) {
+      listeners['chat:message']({ roomId: 'room-1', messageId: `msg-${index}` });
+    }
+    await waitFor(() => expect(first.getCurrentResult().data).toBe(102));
+    listeners['chat:message']({ roomId: 'room-1', messageId: 'msg-100' });
+    expect(reads).toBe(102);
+    // Then the oldest identity has been evicted instead of accumulating forever.
+    listeners['chat:message']({ roomId: 'room-1', messageId: 'msg-0' });
+    await waitFor(() => expect(first.getCurrentResult().data).toBe(103));
+    stopFirst();
+    queryClient.removeQueries({ queryKey: v1Keys.chatRooms() });
+    const second = new QueryObserver(queryClient, options);
+    const stopSecond = second.subscribe(() => {});
+    await waitFor(() => expect(second.getCurrentResult().data).toBe(104));
+    listeners['chat:message']({ roomId: 'room-1', messageId: 'msg-100' });
+    await waitFor(() => expect(second.getCurrentResult().data).toBe(105));
+    unmount();
+    stopSecond();
+    queryClient.clear();
+  });
+
   it('refreshes bare and filtered list keys without refetching an open room subtree', async () => {
     const { useV1ChatListSocket } = await import('./use-v1-realtime-socket');
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -132,7 +164,7 @@ describe('useV1ChatListSocket', () => {
     const { unmount } = renderHook(() => useV1ChatListSocket(), { wrapper: createWrapper(queryClient) });
     await waitFor(() => expect(reads).toEqual({ base: 1, filtered: 1, room: 1, messages: 1 }));
 
-    listeners['chat:message']({ roomId: 'room-1', senderUserId: 'user-a' });
+    listeners['chat:message']({ roomId: 'room-1', messageId: 'msg-1', senderUserId: 'user-a' });
 
     await waitFor(() => expect(reads).toEqual({ base: 2, filtered: 2, room: 1, messages: 1 }));
     unmount();

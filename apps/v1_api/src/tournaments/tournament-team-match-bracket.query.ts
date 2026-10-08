@@ -1,4 +1,5 @@
 import { Prisma } from '@prisma/client';
+import { serializeAdminBracketGame } from './slots/admin-bracket-view';
 
 type PublicFixtureStatus = 'scheduled' | 'in_progress' | 'completed' | 'cancelled';
 
@@ -15,9 +16,20 @@ export const tournamentTeamMatchBracketInclude = {
       placeName: true,
       status: true,
       updatedAt: true,
+      homeSlotId: true,
+      awaySlotId: true,
       videos: { orderBy: { sortOrder: 'asc' }, select: { id: true, title: true, url: true, sortOrder: true } },
       game: {
         select: {
+          id: true,
+          version: true,
+          // Counts all game events (independent of the filtered `events` below); drives the "live records exist" flag.
+          _count: { select: { events: true } },
+          resultRevisions: {
+            orderBy: { revision: 'desc' },
+            take: 1,
+            select: { id: true, state: true, score: true, reason: true, supersedesId: true },
+          },
           sourceType: true,
           teamMatchId: true,
           state: true,
@@ -62,6 +74,8 @@ export function serializeTournamentTeamMatchBracket(row: TournamentTeamMatchBrac
     bracketSources: (row.advancementTargets ?? []).map((edge) => ({ fixtureId: edge.sourceTeamMatchId, outcome: edge.sourceOutcome, side: edge.targetSide })),
     homeRegistrationId: row.homeRegistrationId,
     awayRegistrationId: row.awayRegistrationId,
+    homeSlotId: match.homeSlotId,
+    awaySlotId: match.awaySlotId,
     scheduledAt: match.startAt?.toISOString() ?? null,
     venue: match.placeName,
     status,
@@ -69,5 +83,6 @@ export function serializeTournamentTeamMatchBracket(row: TournamentTeamMatchBrac
     updatedAt: new Date(Math.max(row.updatedAt.getTime(), match.updatedAt.getTime())).toISOString(),
     homeTeamName: row.homeRegistration?.team.name ?? 'TBD',
     awayTeamName: row.awayRegistration?.team.name ?? 'TBD',
+    game: match.game === null ? null : serializeAdminBracketGame(match.game),
   };
 }

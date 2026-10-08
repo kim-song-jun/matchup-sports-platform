@@ -61,6 +61,8 @@ describe('presentTournamentDetail — fixtures[].result (신규 경로)', () => 
     homeRegistration: { team: { id: string; name: string; profile: null } } | null;
     awayRegistration: { team: { id: string; name: string; profile: null } } | null;
     competitionConfigVersionId?: string | null;
+    homeSlot?: Record<string, unknown> | null;
+    awaySlot?: Record<string, unknown> | null;
     result?: null;
     game: (Record<string, unknown> & {
       visibilityPolicy?: { mode: string } | null;
@@ -95,6 +97,8 @@ describe('presentTournamentDetail — fixtures[].result (신규 경로)', () => 
         placeName: fixture.venue ?? null,
         status: fixture.status ?? 'completed',
         competitionConfigVersionId: fixture.competitionConfigVersionId ?? 'config-1',
+        homeSlot: fixture.homeSlot ?? null,
+        awaySlot: fixture.awaySlot ?? null,
           game: fixture.game === null
           ? null
           : { ...fixture.game, visibilityPolicy: fixture.game.visibilityPolicy ?? { mode: 'LIVE' } },
@@ -190,6 +194,37 @@ describe('presentTournamentDetail — fixtures[].result (신규 경로)', () => 
       game,
     };
   }
+
+  describe('자리 라벨 (homeSlotLabel / awaySlotLabel)', () => {
+    const game = { state: 'SCHEDULED', sides: [], participants: [], events: [], currentOfficialRevision: null };
+    const groupRank = { kind: 'GROUP_RANK', position: 1, group: { name: '4강', phase: 'semi' }, sourceGroup: { name: 'A조' } };
+    const entry = { kind: 'ENTRY', position: 2, group: { name: 'A조', phase: 'group' }, sourceGroup: null };
+    const present = (seed: Record<string, unknown>) =>
+      presentTournamentDetail(baseRow({ detailSeeds: [{ ...fixtureRow(game, 'scheduled'), ...seed }] } as never), true).fixtures[0];
+    const empty = { homeRegistrationId: null, homeRegistration: null, awayRegistrationId: null, awayRegistration: null };
+
+    it('팀이 없고 자리가 있으면 사이드마다 자리 라벨을 낸다 (팀 이름은 기존대로 TBD)', () => {
+      expect(present({ ...empty, homeSlot: groupRank, awaySlot: entry })).toMatchObject({
+        homeSlotLabel: 'A조 1위', awaySlotLabel: 'A조 2번', homeTeamName: 'TBD', awayTeamName: 'TBD',
+      });
+    });
+
+    it('팀이 있으면 자리가 연결돼 있어도 라벨은 null 이다 — 팀 이름이 나온다 (대조군)', () => {
+      expect(present({ homeSlot: entry, awaySlot: groupRank })).toMatchObject({
+        homeSlotLabel: null, awaySlotLabel: null, homeTeamName: '서울 FC', awayTeamName: '부산 SC',
+      });
+    });
+
+    it('한쪽만 비어 있으면 빈 쪽에만 라벨이 붙는다', () => {
+      expect(present({ awayRegistrationId: null, awayRegistration: null, homeSlot: entry, awaySlot: groupRank })).toMatchObject({
+        homeSlotLabel: null, awaySlotLabel: 'A조 1위', homeTeamName: '서울 FC', awayTeamName: 'TBD',
+      });
+    });
+
+    it('자리에 연결되지 않은 기존 빈 경기는 라벨이 null 이고 TBD 그대로다', () => {
+      expect(present({ ...empty })).toMatchObject({ homeSlotLabel: null, awaySlotLabel: null, homeTeamName: 'TBD', awayTeamName: 'TBD' });
+    });
+  });
 
   it('OFFICIAL 리비전(신규 경로)에서 homeScore/awayScore/goals가 채워진다', () => {
     const row = baseRow({

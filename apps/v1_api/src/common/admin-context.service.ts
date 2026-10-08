@@ -58,47 +58,62 @@ export class AdminContextService {
    */
   async logAdminAction(
     admin: V1ActiveAdmin,
-    input: {
-      action: string;
-      targetType: string;
-      targetId: string;
-      reason?: string | null;
-      beforeJson?: Prisma.InputJsonValue;
-      afterJson?: Prisma.InputJsonValue;
-      fromStatus?: string | null;
-      toStatus?: string;
-    },
+    input: AdminActionLogInput,
     tx?: Prisma.TransactionClient,
-  ): Promise<{ actionLogId: string; statusChangeLogId: string | null }> {
-    const client = tx ?? this.prisma;
-    const actionLog = await client.v1AdminActionLog.create({
+  ): Promise<AdminActionLogResult> {
+    return writeAdminActionLog(tx ?? this.prisma, admin, input);
+  }
+}
+
+export type AdminActionLogInput = {
+  action: string;
+  targetType: string;
+  targetId: string;
+  reason?: string | null;
+  beforeJson?: Prisma.InputJsonValue;
+  afterJson?: Prisma.InputJsonValue;
+  fromStatus?: string | null;
+  toStatus?: string;
+};
+
+export type AdminActionLogResult = { actionLogId: string; statusChangeLogId: string | null };
+
+/**
+ * 서비스 인스턴스 없이 호출자 client(대개 트랜잭션)에 감사 로그를 남긴다. `…InTx` 함수가 쓰고,
+ * `logAdminAction` 도 이 함수에 위임하므로 기록 모양은 하나다.
+ */
+export async function writeAdminActionLog(
+  client: Prisma.TransactionClient | PrismaService,
+  admin: V1ActiveAdmin,
+  input: AdminActionLogInput,
+): Promise<AdminActionLogResult> {
+  const actionLog = await client.v1AdminActionLog.create({
+    data: {
+      adminUserId: admin.id,
+      action: input.action,
+      targetType: input.targetType,
+      targetId: input.targetId,
+      reason: input.reason ?? null,
+      beforeJson: input.beforeJson,
+      afterJson: input.afterJson,
+    },
+  });
+
+  let statusChangeLogId: string | null = null;
+  if (input.toStatus) {
+    const statusLog = await client.v1StatusChangeLog.create({
       data: {
-        adminUserId: admin.id,
-        action: input.action,
         targetType: input.targetType,
         targetId: input.targetId,
+        fromStatus: input.fromStatus ?? null,
+        toStatus: input.toStatus,
+        actorType: 'admin',
+        adminUserId: admin.id,
         reason: input.reason ?? null,
-        beforeJson: input.beforeJson,
-        afterJson: input.afterJson,
       },
     });
-
-    let statusChangeLogId: string | null = null;
-    if (input.toStatus) {
-      const statusLog = await client.v1StatusChangeLog.create({
-        data: {
-          targetType: input.targetType,
-          targetId: input.targetId,
-          fromStatus: input.fromStatus ?? null,
-          toStatus: input.toStatus,
-          actorType: 'admin',
-          adminUserId: admin.id,
-          reason: input.reason ?? null,
-        },
-      });
-      statusChangeLogId = statusLog.id;
-    }
-
-    return { actionLogId: actionLog.id, statusChangeLogId };
+    statusChangeLogId = statusLog.id;
   }
+
+  return { actionLogId: actionLog.id, statusChangeLogId };
 }

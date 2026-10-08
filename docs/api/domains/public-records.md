@@ -349,6 +349,12 @@ identity/side itself:
   game, never one query per fixture. `status_only` fixtures always get `[]`
   (that mode hides events/scores entirely).
 
+- `GET /tournaments/:id/schedule` `items[]`/`unscheduled[]` gained
+  `homeSlotLabel`/`awaySlotLabel: string | null` -- the bracket slot label
+  (for example "A조 1위") of a side that has no team yet. Non-null only when that
+  side has no team **and** is linked to a slot; always null for league fixtures.
+  `GET /tournaments/:id/matches/:fixtureId` does not carry it. Details: `tournaments.md`.
+
 - `GET /tournaments/:id/schedule` `items[]`/`unscheduled[]` and
   `GET /tournaments/:id/matches/:fixtureId` both carry
   `outcome: { reason: 'FORFEIT' | 'ABANDONED', note: string | null } | null` --

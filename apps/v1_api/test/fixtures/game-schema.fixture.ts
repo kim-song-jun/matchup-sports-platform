@@ -569,7 +569,10 @@ export const gameSchemaSourceManifest = {
   // 2026-10-08: additive V1Tournament.entryFeeConfiguredAt backed by
   // 20261008100000_v1_league_entry_fee_configured. Game models and the bound historical
   // game-operations migration are unchanged; re-pin the schema bytes only.
-  schema: 'f0a8ce6e02421b02b5e36772dec0f183121064a02e2a976e7f9ee8d9965c954a',
+  // 2026-10-09: additive V1TournamentSlot + V1TeamMatch.homeSlotId/awaySlotId + the round16
+  // group phase value, all backed by 20261009090000_v1_tournament_slots. Game models and the bound historical
+  // game-operations migration are unchanged; re-pin the schema bytes only.
+  schema: '6643bf1329ddb0303c952c349d99965a200d79573660c39af027007da822834d',
   migration: '6bd7fae42e9ee7debff71d26f7252d220ad2c12ae6f14745d103fc7fa61e8f64',
 } as const;
 

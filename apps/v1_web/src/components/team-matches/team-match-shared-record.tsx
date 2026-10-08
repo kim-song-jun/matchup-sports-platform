@@ -266,6 +266,11 @@ export function TeamMatchSharedRecord({ teamMatchId, admin = false }: { teamMatc
   // Existing official results are readable here, but their actor identity does
   // not enable shared writing, confirmations, or promises of future changes.
   const legacyReadOnly = data.phase === 'legacy';
+  const showGoalSection = subMatches.length === 0 && (!legacyReadOnly || !data.sides.some((side) => side.score === null));
+  const hasPrimaryContent = subMatches.length > 0 || data.canEdit || showGoalSection;
+  const showConfirmations = !legacyReadOnly && data.participant && data.phase !== 'cancelled';
+  const showHistory = (data.participant || data.operator) && (!legacyReadOnly || data.history.length > 0);
+  const hasAsideContent = showConfirmations || showHistory;
 
   return <main className={styles.page}>
     {admin && <Link className={styles.openLink} href={`/admin/team-matches/${teamMatchId}`}>팀매치 운영 상세로</Link>}
@@ -303,8 +308,8 @@ export function TeamMatchSharedRecord({ teamMatchId, admin = false }: { teamMatc
       {data.phase === 'scheduled' && <p className={styles.muted}>상대팀 확정 후 경기 시작 시간이 되면 기록할 수 있어요.</p>}
     </section>
 
-    <div className={styles.columns}>
-      <div className={styles.stack}>
+    {(hasPrimaryContent || hasAsideContent) && <div className={hasPrimaryContent && hasAsideContent ? styles.columns : styles.stack}>
+      {hasPrimaryContent && <div className={styles.stack}>
         {!admin && data.phase === 'live' && <LateAdditionSection teamMatchId={teamMatchId} data={data} />}
         {(subMatches.length > 0 || data.canEdit) && <section className={styles.section} aria-labelledby="submatch-heading">
           <div className={styles.sectionHead}>
@@ -399,7 +404,7 @@ export function TeamMatchSharedRecord({ teamMatchId, admin = false }: { teamMatc
             </div>}
         </section>}
 
-        {subMatches.length === 0 && <section className={styles.section}>
+        {showGoalSection && <section className={styles.section}>
           <h2>득점 기록</h2>
           {editing && data.canEdit && <GoalForm
             key={editing.goal?.id ?? 'new'}
@@ -414,10 +419,10 @@ export function TeamMatchSharedRecord({ teamMatchId, admin = false }: { teamMatc
           />}
           <GoalRows data={data} goals={data.goals} publicEvents={data.goalEvents} disabled={disabled || controlsOpen} canEdit={data.canEdit} onEdit={(goal, opener) => openGoalForm(opener, goal, null)} onDelete={deleteGoal} />
         </section>}
-      </div>
+      </div>}
 
-      <aside className={styles.stack}>
-        {!legacyReadOnly && data.participant && data.phase !== 'cancelled' && <section className={styles.section}>
+      {hasAsideContent && <aside className={styles.stack}>
+        {showConfirmations && <section className={styles.section}>
           <h2>경기 종료 확인</h2>
           <p className={styles.muted}>각 팀에서 한 명씩 현재 기록을 확인하면 팀매치 한 경기의 최종 결과로 확정돼요. 기록을 수정하면 이전 확인은 취소돼요.</p>
           {data.sides.map((side) => <div className={styles.row} key={side.id}>
@@ -436,7 +441,7 @@ export function TeamMatchSharedRecord({ teamMatchId, admin = false }: { teamMatc
             : <Button block disabled={disabled || controlsOpen} variant={ownConfirmed ? 'outline' : 'primary'} onClick={() => ownConfirmed ? void command({ action: 'reopen' }) : setEndPrompt(data.version)}>{ownConfirmed ? '종료 확인 취소' : '우리 팀 종료 확인'}</Button>)}
         </section>}
 
-        {(data.participant || data.operator) && (!legacyReadOnly || data.history.length > 0) && <details className={styles.section}>
+        {showHistory && <details className={styles.section}>
           <summary className={styles.historyTitle}>변경 이력 · {data.history.length}건</summary>
           <p className={styles.muted}>최근 100건 · 누가 바꿨는지 함께 확인해요.</p>
           <ul className={styles.history}>
@@ -450,8 +455,8 @@ export function TeamMatchSharedRecord({ teamMatchId, admin = false }: { teamMatc
           </ul>
           {!data.history.length && <p className={styles.muted}>첫 기록을 기다리고 있어요.</p>}
         </details>}
-      </aside>
-    </div>
+      </aside>}
+    </div>}
     {/* 이름만 올라간 게스트를 본인으로 연결하는 입구 — 리그 경기 상세와 같은 컴포넌트다. 경기 기록이 생긴 뒤에만 뜻이 있다. */}
     {!admin && (data.phase === 'live' || data.phase === 'official') ? <TeamMatchClaimEntry teamMatchId={teamMatchId} /> : null}
     {confirmModal}

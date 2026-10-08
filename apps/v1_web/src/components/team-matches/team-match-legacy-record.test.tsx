@@ -7,6 +7,7 @@ import RecordPage from '@/app/team-matches/[id]/record/page';
 import { AppBackLink } from '@/components/v1-ui/app-back-link';
 import type { SharedRecord } from '@/hooks/use-team-match-record';
 import { TeamMatchSharedRecord } from './team-match-shared-record';
+import styles from './team-match-shared-record.module.css';
 
 // Only Next navigation and HTTP transport are replaced. The route, record view,
 // API client, React Query hooks, goal renderer, and source-back link stay real.
@@ -114,6 +115,26 @@ describe('공개 친선 전적에서 기존 공식 기록 조회 (MD-QA #61)', (
     expectReadOnly();
   });
 
+  it('공개 legacy 득점은 빈 aside 없이 기존 한 열 stack을 사용한다', async () => {
+    await renderRecord();
+    expect(screen.queryByRole('complementary')).not.toBeInTheDocument();
+    const goalsSection = screen.getByRole('heading', { level: 2, name: '득점 기록' }).closest('section');
+    const content = goalsSection?.parentElement?.parentElement;
+    expect(content).toHaveClass(styles.stack);
+    expect(content).not.toHaveClass(styles.columns);
+    expect(screen.getByRole('list', { name: '득점 기록' })).toBeInTheDocument();
+  });
+
+  it('공개 STATUS_ONLY legacy는 숨긴 득점의 빈 제목과 빈 콘텐츠 영역을 남기지 않는다', async () => {
+    record = { ...record, sides: record.sides.map((side) => ({ ...side, score: null })), goalEvents: [], officialAt: null };
+    await renderRecord();
+    expect(screen.getByLabelText('점수 ? 대 ?')).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { level: 2, name: '득점 기록' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('complementary')).not.toBeInTheDocument();
+    expect(screen.getByRole('main').querySelector(`.${styles.columns}, .${styles.stack}`)).toBeNull();
+    expectReadOnly();
+  });
+
   it('받은 공개 정책이 점수와 이벤트를 숨기면 0:0이나 득점을 만들지 않는다', async () => {
     record = { ...record, sides: record.sides.map((side) => ({ ...side, score: null })), goalEvents: [], officialAt: null };
     await renderRecord();
@@ -146,7 +167,11 @@ describe('공개 친선 전적에서 기존 공식 기록 조회 (MD-QA #61)', (
     if (operator) {
       expect(screen.queryByText(/변경 이력/)).not.toBeInTheDocument();
       expect(screen.queryByText('첫 기록을 기다리고 있어요.')).not.toBeInTheDocument();
-    } else expect(screen.getByText('변경 이력 · 1건')).toBeInTheDocument();
+    } else {
+      const history = screen.getByText('변경 이력 · 1건');
+      expect(screen.getByRole('complementary')).toContainElement(history);
+      expect(history.closest('aside')?.parentElement).toHaveClass(styles.columns);
+    }
     expect(screen.queryByText(/각 팀에서 한 명씩 현재 기록을 확인/)).not.toBeInTheDocument();
     expect(screen.queryByText(/명단에 없어도 기록하고 종료를 확인/)).not.toBeInTheDocument();
     expect(screen.queryByText(/Teameet 운영으로 양 팀과 함께 기록/)).not.toBeInTheDocument();

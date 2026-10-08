@@ -33,7 +33,7 @@ Status: In Progress
 - Phase C root: 검수·Changeset·최신dev안전통합·committed 검증·독립리뷰·Git/PR·원 댓글 저장·alpha after 구분. root가 exact pathspec 승인 없이 subagent commit 금지.
 
 ## Acceptance Criteria
-- [ ] 실제 v1 계약 근거·RED/GREEN·committed narrow/types/pattern PASS.
+- [x] 실제 v1 계약 근거·RED/GREEN·committed narrow/types/pattern PASS.
 - [ ] latest exact-head 전체경로 독립 Critical0 Warning0/FindingsNone.
 - [ ] 한국어 base dev PR 게시/attach·기존 리포트 댓글 저장/실제 표시 확인.
 - [ ] 실제 alpha AFTER 미검증을 코드 tests/review/CI/merge PASS로 대신하지 않는다.
@@ -59,3 +59,4 @@ Status: In Progress
 - source-unchanged 실제 native Intl timezone/hours 증명과 model·상세·actual HTTP 홈 카드10건: America/Los_Angeles 7 FAIL/3 PASS, UTC 7 FAIL/3 PASS, Asia/Seoul10 PASS. 수정 후 같은 실제 matrix LA10/10, UTC 신규10+기존home-page20+home-wave8 8=38/38, Seoul10/10. raw logs는 own worktree tmp/qa/mdqa-58/red-{la,utc,seoul}.txt 및 green-{la,utc,seoul}.txt, base Vitest 전체 상속·test.env.TZ만 변경한 ignored config를 보존한다. formatter/HTTP hook/view를 mock하지 않는다. 원 실제 경기 ISO 값·원 브라우저 timezone을 합성 fixture로 확정하지 않는다.
 - Root가 실제 alpha 원 첨부2/2 pixels(natural500×757)과 배포37776097712/head8050cec4/public identity SUCCESS를 검수했다. 실제 홈07:02/상세23:02–23:59 BEFORE 증거이며 API raw·원 browserTZ·수정 AFTER는 미검증이다.
 - Root fresh fetch 및 feature 초기 FF로 실제 dev bfecbd122af2bde295ab054fc3d77136d0d19ddc(1673 merge)을 안전하게 통합했다. 들어오는6명단 경로와 본 source/spec의 overlap0, 타인 WIP 변경 없음. root explicit4 paths commit 후 committed narrow/types/pattern·독립 full4 review·dev PR/attach/원 댓글을 진행한다. 현재 PR/alpha/Done은 아직 없다.
+- Root committed25f070f7345a03ce79809e5d68d7baec32e05d94 on latest bfec: UTC home-model10+home-page20+home-wave8 8=38/38, Web TypeScript and primary pattern PASS (own0550/report58-followup-committed-tests.txt, report58-followup-committed-result.json, report58-followup-pattern.txt). Clean intended4 paths, diffcheck/marker0, all imported files tracked. Exact25f full4 independent Critical0Warning0 FindingsNone and raw LA/UTC/Seoul matrix reviewed; no additional reviewer execution. This task-only checkpoint leaves product/test blobs unchanged; final checkpoint head review before fresh base-dev publication. PR/attachment/original comment publication pending; real alpha AFTER/merge/Done remain pending.

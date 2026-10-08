@@ -9,6 +9,7 @@ export type SharedPublicGoalEvent = {
   sideId: string;
   participantName: string | null;
   minute: number | null;
+  readonly period?: number | null;
   ownGoal: boolean;
   subMatchId: string | null;
 };

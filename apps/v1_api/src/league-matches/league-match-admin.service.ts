@@ -79,6 +79,7 @@ import { competitionTeamTargets, enqueueRosterResync } from '../games/roster/ros
 // 그룹 B 감사 결함 1: 팀 제외로 인한 대진 취소는 운영자 개별 사유가 아니라 시스템이
 // 판단한 부수효과다 — cancelFixture(운영자 사유 필수)와 구분되는 고정 사유 문자열.
 const TEAM_REMOVAL_CANCEL_REASON = '리그 참가팀에서 제외돼 자동으로 취소했어요.';
+const TEMPLATE_REPLACE_CANCEL_REASON = '대진 템플릿으로 다시 만들면서 취소했어요.';
 
 const DEFAULT_FIXTURE_PLACE_NAME = '장소 미정';
 
@@ -1233,12 +1234,28 @@ export class LeagueMatchAdminService {
     const trimmedPlaceName = dto.placeName?.trim();
     const placeName = trimmedPlaceName ? trimmedPlaceName : DEFAULT_FIXTURE_PLACE_NAME;
 
-    return this.prisma.$transaction(async (tx) => {
+    const result = await this.prisma.$transaction(async (tx) => {
       // 리그 레인 = 행 FOR UPDATE + 보류 가드(PR-1b). raw SQL 을 이 파일에 새로 넣지 않는다 —
       // `tournament-raw-sql-baseline.json` 의 이 파일 허용치가 이미 꽉 차 있다.
       await lockCompetitionForBracketMutationInTx(tx, { id: leagueId, kind: 'regular_league' });
-      if ((await tx.v1TeamMatch.count({ where: { leagueId } })) > 0) {
-        throw new ConflictException({ code: 'LEAGUE_FIXTURES_EXIST', message: '이미 대진이 생성된 리그예요.' });
+      const existing = await tx.v1TeamMatch.findMany({
+        where: { leagueId },
+        select: {
+          id: true,
+          status: true,
+          title: true,
+          hostTeamId: true,
+          approvedApplicantTeamId: true,
+          homeSlotId: true,
+          awaySlotId: true,
+        },
+      });
+      let replaced: Array<{ id: string; title: string; hostTeamId: string | null; approvedApplicantTeamId: string | null }> = [];
+      if (existing.length > 0) {
+        if (dto.replaceExisting !== true) {
+          throw new ConflictException({ code: 'LEAGUE_FIXTURES_EXIST', message: '이미 대진이 생성된 리그예요.' });
+        }
+        replaced = await this.replaceLeagueFixturesInTx(tx, leagueId, existing);
       }
       const slotIds = plan.slotPositions.map(() => randomUUID());
       await tx.v1TournamentSlot.createMany({
@@ -1280,16 +1297,19 @@ export class LeagueMatchAdminService {
             fixtureCount: plan.fixtures.length,
             schedule: toKstScheduleLog(startAts),
             placeName,
+            replacedCount: replaced.length,
           },
         },
         tx,
       );
-      return { slots: slotIds.length, fixtures: plan.fixtures.length };
+      return { slots: slotIds.length, fixtures: plan.fixtures.length, replaced };
     }, {
       // 일괄 생성과 같은 이유 — ALB idle_timeout(60초)보다 낮아야 실패가 실제 실패와 일치한다.
       timeout: 45_000,
       maxWait: 5_000,
     });
+    if (result.replaced.length > 0) this.notifyFixturesCancelled(leagueId, result.replaced, TEMPLATE_REPLACE_CANCEL_REASON);
+    return { slots: result.slots, fixtures: result.fixtures };
   }
 
   /**
@@ -2057,6 +2077,52 @@ export class LeagueMatchAdminService {
     if (games.some((game) => game.state === 'LIVE' || game.state === 'PAUSED')) {
       throw new ConflictException({ code: 'LEAGUE_FIXTURE_GAME_IN_PROGRESS', message });
     }
+  }
+
+  /**
+   * 템플릿 교체 — 취소 안 된 경기가 **전부** 시작 전·결과 없음일 때만 접는다. 게임 행을 먼저 id 순으로
+   * 잠근 뒤 판정해서, 판정과 취소 사이에 콘솔이 경기를 시작하지 못하게 한다. 리그엔 소프트 삭제가 없다
+   * (게임이 `Restrict` 로 붙어 있다) — 취소가 곧 "접기"이고, 취소는 자리 연결도 풀기 때문에 옛 자리를 지울 수 있다.
+   */
+  private async replaceLeagueFixturesInTx(
+    tx: Prisma.TransactionClient,
+    leagueId: string,
+    existing: ReadonlyArray<{
+      id: string;
+      status: string;
+      title: string;
+      hostTeamId: string | null;
+      approvedApplicantTeamId: string | null;
+      homeSlotId: string | null;
+      awaySlotId: string | null;
+    }>,
+  ) {
+    const live = existing.filter((fixture) => fixture.status !== 'cancelled').sort((a, b) => (a.id < b.id ? -1 : 1));
+    if (live.length > 0) {
+      const games = await tx.$queryRaw<Array<{ state: string; currentOfficialRevisionId: string | null; revisionCount: number }>>`
+        SELECT game.state::text AS state,
+               game.current_official_revision_id AS "currentOfficialRevisionId",
+               (SELECT COUNT(*)::int FROM v1_game_result_revisions revision WHERE revision.game_id = game.id) AS "revisionCount"
+        FROM v1_games game
+        WHERE game.team_match_id = ANY(${live.map((fixture) => fixture.id)}::text[])
+        ORDER BY game.id
+        FOR UPDATE OF game`;
+      if (games.some((game) => game.state !== 'SCHEDULED' || game.currentOfficialRevisionId !== null || game.revisionCount > 0)) {
+        throw new ConflictException({
+          code: 'BRACKET_LOCKED',
+          message: '이미 시작했거나 결과가 있는 경기가 있어 대진 템플릿으로 바꿀 수 없어요.',
+        });
+      }
+    }
+    const notices: Array<{ id: string; title: string; hostTeamId: string | null; approvedApplicantTeamId: string | null }> = [];
+    for (const fixture of live) {
+      await this.cancelLeagueFixtureRowInTx(tx, fixture.id, TEMPLATE_REPLACE_CANCEL_REASON);
+      if (!isUnfilledSlotFixture(fixture)) {
+        notices.push({ id: fixture.id, title: fixture.title, hostTeamId: fixture.hostTeamId, approvedApplicantTeamId: fixture.approvedApplicantTeamId });
+      }
+    }
+    await tx.v1TournamentSlot.deleteMany({ where: { tournamentId: leagueId } });
+    return notices;
   }
 
   /**

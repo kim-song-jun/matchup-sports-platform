@@ -149,4 +149,86 @@ describe('POST /admin/league-matches/:leagueId/fixtures/template', () => {
     // 둘 중 한 갈래의 결과만 남는다 — 템플릿(자리 4 · 경기 6) 아니면 일괄 생성(자리 0 · 경기 1).
     expect(`${slotRows}:${fixtureRows}`).toMatch(/^(4:6|0:1)$/);
   });
+
+  describe('replaceExisting', () => {
+    const body = (overrides: Record<string, unknown> = {}) => ({
+      teamCount: 5, legs: 1, schedule: { dates: kstDates(5), time: '19:00' }, replaceExisting: true, ...overrides,
+    });
+
+    it('시작 전 템플릿 대진을 취소로 접고 옛 자리를 지운 뒤 새로 만든다', async () => {
+      const leagueId = await h.makeLeague();
+      expect((await post(leagueId, { teamCount: 4, legs: 1, schedule: { dates: kstDates(3), time: '19:00' } })).status).toBe(201);
+      const oldSlotIds = (await h.prisma.v1TournamentSlot.findMany({ where: { tournamentId: leagueId } })).map((slot) => slot.id);
+
+      const res = await post(leagueId, body());
+
+      expect(res.status).toBe(201);
+      expect(res.body.data).toEqual({ slots: 5, fixtures: 10 });
+      const fixtures = await h.prisma.v1TeamMatch.findMany({ where: { leagueId } });
+      const cancelled = fixtures.filter((f) => f.status === 'cancelled');
+      expect(cancelled).toHaveLength(6);
+      expect(cancelled.every((f) => f.homeSlotId === null && f.awaySlotId === null)).toBe(true);
+      expect(fixtures.filter((f) => f.status === 'matched')).toHaveLength(10);
+      const slots = await h.prisma.v1TournamentSlot.findMany({ where: { tournamentId: leagueId } });
+      expect(slots).toHaveLength(5);
+      expect(slots.some((slot) => oldSlotIds.includes(slot.id))).toBe(false);
+      expect((await h.prisma.v1Tournament.findUniqueOrThrow({ where: { id: leagueId } })).status).toBe('draft');
+    });
+
+    it('팀이 찬 시작 전 경기도 교체되고 그 팀의 팀 일정은 취소된다', async () => {
+      const teamA = await h.makeTeam('lstp-r1');
+      const teamB = await h.makeTeam('lstp-r2');
+      const leagueId = await h.makeLeague({ teams: [teamA, teamB] });
+      const teamMatchId = await h.createFixture(leagueId, { homeTeamId: teamA.id, awayTeamId: teamB.id });
+
+      expect((await post(leagueId, body({ teamCount: 3, schedule: { dates: kstDates(3), time: '19:00' } }))).status).toBe(201);
+
+      expect((await h.prisma.v1TeamMatch.findUniqueOrThrow({ where: { id: teamMatchId } })).status).toBe('cancelled');
+      const schedules = await h.prisma.v1TeamSchedule.findMany({ where: { teamMatchId } });
+      expect(schedules).toHaveLength(2);
+      expect(schedules.every((row) => row.state === 'CANCELLED')).toBe(true);
+    });
+
+    it('시작했거나 결과가 있는 경기가 하나라도 있으면 409 BRACKET_LOCKED 이고 아무것도 바뀌지 않는다', async () => {
+      for (const state of ['LIVE', 'ENDED'] as const) {
+        const leagueId = await h.makeLeague();
+        await post(leagueId, { teamCount: 4, legs: 1, schedule: { dates: kstDates(3), time: '19:00' } });
+        const fixtures = await h.prisma.v1TeamMatch.findMany({ where: { leagueId }, orderBy: { id: 'asc' } });
+        await h.prisma.v1Game.update({ where: { teamMatchId: fixtures[3].id }, data: { state } });
+
+        const res = await post(leagueId, body());
+
+        expect(res.status).toBe(409);
+        expect(res.body.code).toBe('BRACKET_LOCKED');
+        const after = await h.prisma.v1TeamMatch.findMany({ where: { leagueId } });
+        expect(after).toHaveLength(6);
+        expect(after.every((f) => f.status === 'matched' && f.homeSlotId !== null)).toBe(true);
+        expect(await h.prisma.v1TournamentSlot.count({ where: { tournamentId: leagueId } })).toBe(4);
+      }
+    });
+
+    it('이전에 취소된 경기는 교체를 막지 않고 그대로 남는다', async () => {
+      const leagueId = await h.makeLeague();
+      await post(leagueId, { teamCount: 3, legs: 1, schedule: { dates: kstDates(3), time: '19:00' } });
+      const [first] = await h.prisma.v1TeamMatch.findMany({ where: { leagueId }, orderBy: { id: 'asc' } });
+      await request(app.getHttpServer())
+        .post(`/api/v1/admin/league-matches/${leagueId}/fixtures/${first.id}/cancel`)
+        .set('x-v1-user-id', h.adminUserId)
+        .send({ reason: '사전 취소' });
+
+      const res = await post(leagueId, body({ teamCount: 3, schedule: { dates: kstDates(3), time: '19:00' } }));
+
+      expect(res.status).toBe(201);
+      expect(await h.prisma.v1TeamMatch.count({ where: { leagueId, status: 'cancelled' } })).toBe(3);
+      expect(await h.prisma.v1TeamMatch.count({ where: { leagueId, status: 'matched' } })).toBe(3);
+    });
+
+    it('대조군: replaceExisting 을 안 주거나 false 면 기존 대진이 있을 때 그대로 409 LEAGUE_FIXTURES_EXIST', async () => {
+      const leagueId = await h.makeLeague();
+      await post(leagueId, { teamCount: 3, legs: 1, schedule: { dates: kstDates(3), time: '19:00' } });
+      const res = await post(leagueId, body({ teamCount: 3, replaceExisting: false }));
+      expect(res.status).toBe(409);
+      expect(res.body.code).toBe('LEAGUE_FIXTURES_EXIST');
+    });
+  });
 });

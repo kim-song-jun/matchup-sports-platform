@@ -331,4 +331,9 @@ export class ApplyLeagueTemplateDto {
   @IsString()
   @MaxLength(120)
   placeName?: string;
+
+  // true 면 취소 안 된 경기가 전부 시작 전·결과 없음일 때 기존 대진을 취소로 접고 다시 만든다.
+  @IsOptional()
+  @IsBoolean()
+  replaceExisting?: boolean;
 }

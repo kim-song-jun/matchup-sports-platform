@@ -35,7 +35,7 @@
 | 파일 | 책임 |
 |---|---|
 | `apps/v1_web/src/lib/bracket-canvas-layout.ts` | 순수 레이아웃: 열 구성·칸 y 위치·연결선 경로·`fixtureNodeState`·`isFixtureLocked`·`fixtureSideLabel` |
-| `apps/v1_web/src/lib/bracket-canvas-layout.test.ts` | 위 함수의 계약 테스트(4팀·12팀 대진, 리그 모드, 겹침 없음) |
+| `apps/v1_web/src/lib/bracket-canvas-layout.test.ts` | 위 함수의 계약 테스트(4팀·12팀·16팀 대진, 열 단계 순서, 리그 모드, 겹침 없음) |
 | `apps/v1_web/src/lib/bracket-template-counts.ts` | 템플릿 입력 → 만들어질 그룹·자리·경기·연결 수(대화상자 미리보기, 240 상한) |
 | `apps/v1_web/src/lib/bracket-template-counts.test.ts` | 스펙 Test Scenarios 의 개수 계약 |
 | `apps/v1_web/src/lib/bracket-quick-score.ts` | 점수 입력 문자열 → 검증된 `{home,away,penalties?}`, 정정용 점수 병합, 정정 참가자 매핑 |
@@ -59,7 +59,7 @@
 | `apps/v1_web/src/components/admin/bracket-canvas/bracket-result-actions.test.tsx` | 정정 두 단계 payload·무효·`NEXT_FIXTURE_CONFLICT` 안내 테스트 |
 | `apps/v1_web/src/components/admin/bracket-canvas/bracket-node-panel.tsx` | 칸 상세 패널: 자리 배정 선택·일정/장소·삭제·결과 구역 |
 | `apps/v1_web/src/components/admin/bracket-canvas/bracket-node-panel.test.tsx` | 배정·저장·삭제·결과 구역 분기 테스트 |
-| `apps/v1_web/src/components/admin/bracket-canvas/bracket-template-dialog.tsx` | 템플릿 대화상자(토너먼트 4/8/12+3·4위전, 리그 팀 수/회전) + 교체 확인 |
+| `apps/v1_web/src/components/admin/bracket-canvas/bracket-template-dialog.tsx` | 템플릿 대화상자(토너먼트 4/8/12/16+3·4위전, 리그 팀 수/회전) + 교체 확인 |
 | `apps/v1_web/src/components/admin/bracket-canvas/bracket-template-dialog.test.tsx` | 미리보기 수·교체 확인 흐름 테스트 |
 | `apps/v1_web/src/lib/bracket-fixture-tools.ts` | 경기 추가용 라운드 이름·다음 번호, 진출 연결 후보(바로 앞 단계 예정 경기) |
 | `apps/v1_web/src/lib/bracket-fixture-tools.test.ts` | 라운드 이름·번호·후보 규칙 테스트 |
@@ -103,6 +103,8 @@
 - Produces(훅이 쓰는 보조 타입): `V1AdminBracketRevisionSummary`, `V1ApplyBracketTemplatePayload`, `V1ApplyBracketTemplateResult`, `V1AssignSlotResult`, `V1RandomFillResult`, `V1QuickResultScore`, `V1QuickResultResult`
 
 - [ ] **Step 1: 타입을 추가한다(고정 데이터는 아직 안 고침)**
+
+`V1TournamentGroupPhase` 의 `'round16'`, `KNOCKOUT_PHASES`/`isKnockoutPhase`, `tournamentRoundLabel` 의 16강 라벨, `BRACKET_SOURCE_PHASES` 는 모두 PR-1c(Task 6·8) 소유다 — 이 PR 은 `types/api.ts` 의 이 유니온을 고치지 않는다. 같은 웨이브에서 병렬로 구현하더라도 **PR-1c 가 먼저 dev 에 머지된 뒤 이 PR 이 `origin/dev` 를 3-way merge 해 받는다**(Task 11 의 import 가 그 심볼에 의존). 머지 전 `grep -n "round16" apps/v1_web/src/types/api.ts` 와 `grep -n "BRACKET_SOURCE_PHASES" apps/v1_web/src/lib/tournament-bracket-rounds.ts` 로 둘 다 있는지 확인하고, 없으면 PR-1c 머지를 기다린다.
 
 `apps/v1_web/src/types/api.ts` 에서 `V1AdminBracketFixture` 의 마지막 필드 `videos: V1TournamentFixtureVideo[];` 바로 아래(닫는 `};` 앞)에 세 줄을 넣는다.
 
@@ -154,9 +156,9 @@ export type V1AdminTournamentBracket = {
   slots: V1AdminBracketSlot[];
 };
 
-/** 서버 `BracketTemplateInput` 과 같은 모양. group_knockout 은 PR-4 에서 화면이 열린다. */
+/** 서버 `BracketTemplateInput` 과 같은 모양(knockout 16 의 서버 planner 확장은 PR-1c). group_knockout 은 PR-4 에서 화면이 열린다. */
 export type BracketTemplateInput =
-  | { kind: 'knockout'; size: 4 | 8 | 12; thirdPlace: boolean }
+  | { kind: 'knockout'; size: 4 | 8 | 12 | 16; thirdPlace: boolean }
   | {
       kind: 'group_knockout';
       groupCount: number;
@@ -904,6 +906,56 @@ describe('buildCanvasLayout — 12강 부전승 대진', () => {
   });
 });
 
+describe('buildCanvasLayout — 16강 대진', () => {
+  // 그룹을 일부러 섞어 넘겨도 열 순서는 sortOrder 가 아니라 단계(round16 > quarter > semi > final > third_place)를 따른다.
+  const groups = [
+    makeGroup({ id: 'g-t', name: '3·4위전', phase: 'third_place', sortOrder: 0 }),
+    makeGroup({ id: 'g-f', name: '결승', phase: 'final', sortOrder: 1 }),
+    makeGroup({ id: 'g-sf', name: '4강', phase: 'semi', sortOrder: 2 }),
+    makeGroup({ id: 'g-qf', name: '8강', phase: 'quarter', sortOrder: 3 }),
+    makeGroup({ id: 'g-r16', name: '16강', phase: 'round16', sortOrder: 4 }),
+  ];
+  const r16 = Array.from({ length: 8 }, (_, i) => makeFixture({ id: `r${i + 1}`, groupId: 'g-r16', fixtureNumber: i + 1, round: '16강' }));
+  const pair = (target: string, a: string, b: string, groupId: string, fixtureNumber: number) =>
+    makeFixture({
+      id: target,
+      groupId,
+      fixtureNumber,
+      bracketSources: [
+        { fixtureId: a, outcome: 'WINNER', side: 'HOME' },
+        { fixtureId: b, outcome: 'WINNER', side: 'AWAY' },
+      ],
+    });
+  const qf = [1, 2, 3, 4].map((n) => pair(`q${n}`, `r${2 * n - 1}`, `r${2 * n}`, 'g-qf', 8 + n));
+  const sf = [pair('s1', 'q1', 'q2', 'g-sf', 13), pair('s2', 'q3', 'q4', 'g-sf', 14)];
+  const fin = pair('fin', 's1', 's2', 'g-f', 15);
+  const third = makeFixture({
+    id: 'th',
+    groupId: 'g-t',
+    fixtureNumber: 16,
+    bracketSources: [
+      { fixtureId: 's1', outcome: 'LOSER', side: 'HOME' },
+      { fixtureId: 's2', outcome: 'LOSER', side: 'AWAY' },
+    ],
+  });
+  const layout = buildCanvasLayout({ groups, fixtures: [...r16, ...qf, ...sf, fin, third], slots: [], mode: 'bracket' });
+
+  it('16강 열이 8강보다 앞에 오고 열 순서는 16강 > 8강 > 4강 > 결승 > 3·4위전이다', () => {
+    expect(layout.columns.map((c) => c.label)).toEqual(['16강', '8강', '4강', '결승', '3·4위전']);
+    const xs = layout.columns.map((c) => c.x);
+    expect([...xs].sort((a, b) => a - b)).toEqual(xs);
+  });
+
+  it('16강 8경기는 겹치지 않고, 8강은 원천 두 경기의 가운데에 놓인다', () => {
+    const y = (id: string) => layout.nodes.find((n) => n.fixtureId === id)!.y;
+    const ys = Array.from({ length: 8 }, (_, i) => y(`r${i + 1}`));
+    ys.slice(1).forEach((value, index) => expect(value - ys[index]).toBeGreaterThanOrEqual(180));
+    expect(y('q1')).toBe((y('r1') + y('r2')) / 2);
+    expect(layout.edges.filter((e) => e.kind === 'WINNER')).toHaveLength(14);
+    expect(layout.edges.filter((e) => e.kind === 'LOSER')).toHaveLength(2);
+  });
+});
+
 describe('buildCanvasLayout — 예외 입력', () => {
   it('조에 속하지 않은 경기는 "조 미정" 열에 모아 잃지 않는다', () => {
     const orphan = makeFixture({ id: 'x1', groupId: null, fixtureNumber: 1 });
@@ -1051,8 +1103,8 @@ export type CanvasLayout = {
   edges: CanvasEdgeLayout[];
 };
 
-// 조별리그(group)는 결선보다 앞 열이다. 모르는 단계는 맨 뒤.
-const PHASE_ORDER: Readonly<Record<string, number>> = { group: 0, round12: 1, quarter: 2, semi: 3, final: 4, third_place: 5 };
+// 조별리그(group)는 결선보다 앞 열이고, 결선은 round16 > round12 > quarter > semi > final > third_place 순이다(한 대회에 16강·12강이 함께 있지는 않다). 모르는 단계는 맨 뒤.
+const PHASE_ORDER: Readonly<Record<string, number>> = { group: 0, round16: 1, round12: 2, quarter: 3, semi: 4, final: 5, third_place: 6 };
 
 type ColumnSeed = { key: string; groupId: string | null; label: string; fixtures: V1AdminBracketFixture[] };
 
@@ -1220,7 +1272,7 @@ export function fixtureSideLabel(fixture: V1AdminBracketFixture, side: SideKey, 
 - [ ] **Step 5: Run to verify it passes**
 
 Run (apps/v1_web): `./node_modules/.bin/vitest run src/lib/bracket-canvas-layout.test.ts`
-Expected: PASS (27 tests). `./node_modules/.bin/tsc --noEmit -p tsconfig.json` 0 오류.
+Expected: PASS (29 tests). `./node_modules/.bin/tsc --noEmit -p tsconfig.json` 0 오류.
 
 - [ ] **Step 6: Commit**
 
@@ -1258,6 +1310,9 @@ describe('planBracketTemplateCounts', () => {
     // 12강: 12강 4 + 8강 4 + 4강 2 + 결승 1 + 3·4위전 1, 자리는 ENTRY 8 + 부전승 4
     ['12팀 + 3·4위전', { kind: 'knockout', size: 12, thirdPlace: true }, { groups: 5, slots: 12, fixtures: 12, edges: 12 }],
     ['12팀 3·4위전 없음', { kind: 'knockout', size: 12, thirdPlace: false }, { groups: 4, slots: 12, fixtures: 11, edges: 10 }],
+    // 16강: 16강 8 + 8강 4 + 4강 2 + 결승 1 + 3·4위전 1, 부전승 없이 ENTRY 16
+    ['16팀 + 3·4위전', { kind: 'knockout', size: 16, thirdPlace: true }, { groups: 5, slots: 16, fixtures: 16, edges: 16 }],
+    ['16팀 3·4위전 없음', { kind: 'knockout', size: 16, thirdPlace: false }, { groups: 4, slots: 16, fixtures: 15, edges: 14 }],
     ['리그 6팀 2회전', { kind: 'league', teamCount: 6, legs: 2 }, { groups: 1, slots: 6, fixtures: 30, edges: 0 }],
     ['리그 4팀 1회전', { kind: 'league', teamCount: 4, legs: 1 }, { groups: 1, slots: 4, fixtures: 6, edges: 0 }],
   ] as const)('%s', (_name, input, expected) => {
@@ -1298,10 +1353,11 @@ export const BRACKET_TEMPLATE_MAX_FIXTURES = 240;
 export type TemplatePlanCounts = { groups: number; slots: number; fixtures: number; edges: number };
 
 // 첫 라운드부터 결승까지 경기 수.
-const KNOCKOUT_ROUNDS: Readonly<Record<4 | 8 | 12, readonly number[]>> = {
+const KNOCKOUT_ROUNDS: Readonly<Record<4 | 8 | 12 | 16, readonly number[]>> = {
   4: [2, 1],
   8: [4, 2, 1],
   12: [4, 4, 2, 1],
+  16: [8, 4, 2, 1],
 };
 
 export function planBracketTemplateCounts(input: BracketTemplateInput): TemplatePlanCounts | null {
@@ -1334,7 +1390,7 @@ export function exceedsFixtureLimit(counts: TemplatePlanCounts): boolean {
 - [ ] **Step 4: Run to verify it passes**
 
 Run (apps/v1_web): `./node_modules/.bin/vitest run src/lib/bracket-template-counts.test.ts`
-Expected: PASS (8 tests).
+Expected: PASS (10 tests).
 
 - [ ] **Step 5: Commit**
 
@@ -3873,7 +3929,7 @@ git show --stat HEAD
 
 ### Task 13: 템플릿 대화상자(`BracketTemplateDialog`)
 
-토너먼트(4/8/12팀 + 3·4위전)와 리그 방식 대회(팀 수 3~20 + 회전 수)의 뼈대를 한 번에 만든다. 만들기 전에 경기·자리·연결 수를 미리 보여 주고, 240경기를 넘으면 막는다. 이미 대진이 있으면 `replaceExisting` 을 보내기 전에 `useConfirm` 으로 한 번 더 묻는다. 조별+결선(`group_knockout`)은 PR-4 가 이 대화상자를 확장하므로 이 PR 의 `format` prop 은 `'knockout' | 'league'` 만 받고, 워크스페이스(Task 15)가 조별+결선에서는 이 대화상자를 열지 않는다.
+토너먼트(4/8/12/16팀 + 3·4위전)와 리그 방식 대회(팀 수 3~20 + 회전 수)의 뼈대를 한 번에 만든다. 만들기 전에 경기·자리·연결 수를 미리 보여 주고, 240경기를 넘으면 막는다. 이미 대진이 있으면 `replaceExisting` 을 보내기 전에 `useConfirm` 으로 한 번 더 묻는다. 조별+결선(`group_knockout`)은 PR-4 가 이 대화상자를 확장하므로 이 PR 의 `format` prop 은 `'knockout' | 'league'` 만 받고, 워크스페이스(Task 15)가 조별+결선에서는 이 대화상자를 열지 않는다.
 
 **Files:**
 - Create: `apps/v1_web/src/components/admin/bracket-canvas/bracket-template-dialog.tsx`
@@ -3935,6 +3991,18 @@ describe('BracketTemplateDialog — 토너먼트', () => {
     expect(screen.getByText('경기 11개 · 자리 12개 · 연결 10개')).toBeInTheDocument();
     fireEvent.click(screen.getByLabelText('4팀'));
     expect(screen.getByText('경기 3개 · 자리 4개 · 연결 2개')).toBeInTheDocument();
+  });
+
+  it('16팀은 부전승 안내 없이 경기 16개(3·4위전 없으면 15개)를 미리 보여 준다', () => {
+    renderDialog();
+    fireEvent.click(screen.getByLabelText('16팀'));
+    expect(screen.getByText('경기 16개 · 자리 16개 · 연결 16개')).toBeInTheDocument();
+    expect(screen.queryByText(/부전승/)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByLabelText('3·4위전도 만들기'));
+    expect(screen.getByText('경기 15개 · 자리 16개 · 연결 14개')).toBeInTheDocument();
+    fireEvent.click(screen.getByLabelText('3·4위전도 만들기'));
+    create();
+    expect(mocks.apply).toHaveBeenCalledWith({ kind: 'knockout', size: 16, thirdPlace: true }, expect.any(Object));
   });
 
   it('대진이 비어 있으면 replaceExisting 없이 만들고, 성공하면 개수를 알리고 닫는다', () => {
@@ -4053,7 +4121,7 @@ export type BracketTemplateDialogProps = {
 };
 
 const TEAM_COUNT_PATTERN = /^\d{1,2}$/;
-const KNOCKOUT_SIZES = [4, 8, 12] as const;
+const KNOCKOUT_SIZES = [4, 8, 12, 16] as const;
 
 function radioRow(id: string, name: string, label: string, checked: boolean, onChange: () => void) {
   return (
@@ -4069,7 +4137,7 @@ export function BracketTemplateDialog({ open, tournamentId, format, hasExistingB
   const apply = useV1ApplyBracketTemplate(tournamentId);
   const { confirm, ConfirmModal } = useConfirm();
   const { dialogRef, onBackdropClick, mounted, closing } = useModalA11y({ open, onClose, pending: apply.isPending });
-  const [size, setSize] = useState<4 | 8 | 12>(8);
+  const [size, setSize] = useState<4 | 8 | 12 | 16>(8);
   const [thirdPlace, setThirdPlace] = useState(true);
   const [teamCountText, setTeamCountText] = useState('6');
   const [legs, setLegs] = useState<1 | 2>(1);
@@ -4219,7 +4287,7 @@ export function BracketTemplateDialog({ open, tournamentId, format, hasExistingB
 - [ ] **Step 4: Run to verify it passes**
 
 Run (apps/v1_web): `./node_modules/.bin/vitest run src/components/admin/bracket-canvas/bracket-template-dialog.test.tsx`
-Expected: PASS (13 tests).
+Expected: PASS (12 tests).
 
 Run (apps/v1_web): `./node_modules/.bin/tsc --noEmit -p tsconfig.json && node scripts/v1-pattern-check.mjs` — 통과해야 한다. (`useModalA11y` 의 `initialFocusRef` 는 쓰지 않아 패널 안 첫 포커스 가능한 요소로 포커스가 간다.)
 
@@ -4247,9 +4315,9 @@ git show --stat HEAD
 **Interfaces:**
 - Consumes: `useV1CreateFixture(tournamentId)` (`hooks/use-v1-api.ts:4969`, 본문 `V1CreateFixturePayload`), `describeBracketCanvasError` (Task 2), `useModalA11y`, `Button`, 테스트 데이터 빌더(Task 4)
 - Produces:
-  - `knockoutRoundLabel(phase: string): string | null` — round12 `12강` · quarter `8강` · semi `4강` · final `결승` · third_place `3·4위전` · 그 밖(`group`) null
+  - `knockoutRoundLabel(phase: string): string | null` — PR-1c 의 `isKnockoutPhase`·`tournamentRoundLabel`(`lib/tournament-round-label.ts`) 위의 얇은 래퍼: 결선 단계면 그 라벨(round16 `16강` … third_place `3·4위전`), 그 밖(`group`)은 null. 라벨 표를 새로 들지 않는다
   - `nextFixtureNumber(fixtures: readonly Pick<V1AdminBracketFixture, 'fixtureNumber'>[]): number` — 최대값 + 1(없으면 1)
-  - `bracketSourceCandidates(input: { target: V1AdminBracketFixture; groups: readonly V1AdminBracketGroup[]; fixtures: readonly V1AdminBracketFixture[] }): V1AdminBracketFixture[]` — 대상 경기 그룹의 바로 앞 단계(quarter←round12, semi←quarter, final·third_place←semi)에서 1회전·부모 없음·`scheduled`·결과 없는 경기
+  - `bracketSourceCandidates(input: { target: V1AdminBracketFixture; groups: readonly V1AdminBracketGroup[]; fixtures: readonly V1AdminBracketFixture[] }): V1AdminBracketFixture[]` — 대상 경기 그룹의 바로 앞 단계(PR-1c 의 `BRACKET_SOURCE_PHASES` — quarter←round16|round12, semi←quarter, final·third_place←semi)에서 1회전·부모 없음·`scheduled`·결과 없는 경기
   - `useV1SetBracketSources(tournamentId: string)` → `mutate({ fixtureId: string; homeSourceFixtureId: string | null; awaySourceFixtureId: string | null })`
   - `BracketFixtureToolsDialog(props: { open: boolean; mode: 'add' | 'link'; tournamentId: string; bracket: V1AdminTournamentBracket; onClose: () => void; showToast: (message: string, variant?: 'success' | 'error') => void })`
 
@@ -4265,6 +4333,7 @@ import { bracketSourceCandidates, knockoutRoundLabel, nextFixtureNumber } from '
 
 describe('knockoutRoundLabel', () => {
   it.each([
+    ['round16', '16강'],
     ['round12', '12강'],
     ['quarter', '8강'],
     ['semi', '4강'],
@@ -4320,7 +4389,14 @@ describe('bracketSourceCandidates', () => {
     expect(candidates.map((f) => f.id)).toEqual(['q1']);
   });
 
-  it('앞 단계가 없는 8강 경기(12강 없는 대진)나 조별리그 경기는 후보가 없다', () => {
+  it('8강 경기의 후보는 16강 경기다(quarter ← round16)', () => {
+    const r16 = makeGroup({ id: 'g-r16', name: '16강', phase: 'round16' });
+    const r1 = makeFixture({ id: 'r1', groupId: 'g-r16', fixtureNumber: 1 });
+    const r2 = makeFixture({ id: 'r2', groupId: 'g-r16', fixtureNumber: 2 });
+    expect(bracketSourceCandidates({ target: q1, groups: [r16, qf], fixtures: [r1, r2, q1] }).map((f) => f.id)).toEqual(['r1', 'r2']);
+  });
+
+  it('앞 단계가 없는 8강 경기(12강·16강 없는 대진)나 조별리그 경기는 후보가 없다', () => {
     expect(bracketSourceCandidates({ target: q1, groups, fixtures: [q1, q2] })).toEqual([]);
   });
 });
@@ -4336,26 +4412,12 @@ Expected: FAIL — `Failed to resolve import "./bracket-fixture-tools"`.
 `apps/v1_web/src/lib/bracket-fixture-tools.ts`
 
 ```ts
+import { BRACKET_SOURCE_PHASES } from '@/lib/tournament-bracket-rounds';
+import { isKnockoutPhase, tournamentRoundLabel } from '@/lib/tournament-round-label';
 import type { V1AdminBracketFixture, V1AdminBracketGroup } from '@/types/api';
 
-const ROUND_LABEL: Record<string, string> = {
-  round12: '12강',
-  quarter: '8강',
-  semi: '4강',
-  final: '결승',
-  third_place: '3·4위전',
-};
-
-/** 이 단계의 승자(3·4위전은 4강 패자)가 올라오는 바로 앞 단계. */
-const PREVIOUS_PHASE: Record<string, string> = {
-  quarter: 'round12',
-  semi: 'quarter',
-  final: 'semi',
-  third_place: 'semi',
-};
-
 export function knockoutRoundLabel(phase: string): string | null {
-  return ROUND_LABEL[phase] ?? null;
+  return isKnockoutPhase(phase) ? tournamentRoundLabel(phase) : null;
 }
 
 export function nextFixtureNumber(fixtures: readonly Pick<V1AdminBracketFixture, 'fixtureNumber'>[]): number {
@@ -4370,11 +4432,11 @@ export function bracketSourceCandidates(input: {
   const { target, groups, fixtures } = input;
   const phaseByGroup = new Map(groups.map((group) => [group.id, group.phase]));
   const targetPhase = phaseByGroup.get(target.groupId ?? '') ?? '';
-  const previousPhase = PREVIOUS_PHASE[targetPhase];
-  if (previousPhase === undefined) return [];
+  const previousPhases = BRACKET_SOURCE_PHASES[targetPhase];
+  if (previousPhases === undefined) return [];
   return fixtures.filter(
     (fixture) =>
-      phaseByGroup.get(fixture.groupId ?? '') === previousPhase &&
+      previousPhases.includes(phaseByGroup.get(fixture.groupId ?? '') ?? '') &&
       fixture.legNumber === 1 &&
       !fixture.parentFixtureId &&
       fixture.status === 'scheduled' &&
@@ -4385,7 +4447,7 @@ export function bracketSourceCandidates(input: {
 ```
 
 Run (apps/v1_web): `./node_modules/.bin/vitest run src/lib/bracket-fixture-tools.test.ts`
-Expected: PASS (11 tests).
+Expected: PASS (15 tests).
 
 - [ ] **Step 4: 훅 테스트 (RED)**
 
@@ -5884,7 +5946,7 @@ git show --stat HEAD
 "v1_web": minor
 ---
 
-어드민 대진 관리에서 대진을 그림으로 만들고 고칠 수 있어요. 템플릿으로 토너먼트(4·8·12팀)와 리그 방식 대회의 경기와 팀 자리를 한 번에 만든 뒤, 참가팀을 눌러서 또는 끌어서 자리에 넣고, 빈 자리는 무작위로 채울 수 있어요. 칸에서 점수만 넣어 바로 확정하고, 확정한 점수는 사유를 남겨 고치거나 무효로 되돌릴 수 있어요. 기존 카드 화면은 [목록] 보기로 그대로 쓸 수 있어요. 공개 대진표·일정 카드·일정 탭에서는 아직 팀이 없는 칸에 "A조 1위" 같은 자리 이름이 보여요.
+어드민 대진 관리에서 대진을 그림으로 만들고 고칠 수 있어요. 템플릿으로 토너먼트(4·8·12·16팀)와 리그 방식 대회의 경기와 팀 자리를 한 번에 만든 뒤, 참가팀을 눌러서 또는 끌어서 자리에 넣고, 빈 자리는 무작위로 채울 수 있어요. 칸에서 점수만 넣어 바로 확정하고, 확정한 점수는 사유를 남겨 고치거나 무효로 되돌릴 수 있어요. 기존 카드 화면은 [목록] 보기로 그대로 쓸 수 있어요. 공개 대진표·일정 카드·일정 탭에서는 아직 팀이 없는 칸에 "A조 1위" 같은 자리 이름이 보여요.
 ```
 
 - [ ] **Step 2: PR-3 전체를 한 번에 검증한다(이 PR 의 통합 게이트 — 태스크마다 풀스위트를 돌리지 않는다)**
@@ -5955,7 +6017,7 @@ Expected: 배포 `success`, 헤더 SHA 가 내 머지 커밋을 포함("포함�
 | S7 참가팀 트레이(끌어 놓기 + 누르고 고르기, 키보드 경로) | 9, 14 (통합 테스트) |
 | S7 상세 패널(자리 배정·일정/장소·삭제·결과) | 12 |
 | S7 점수 입력(무승부 결선은 승부차기) | 6, 10 |
-| S7 템플릿 창(토너먼트 4/8/12 + 3·4위전, 리그 팀 수/회전, 개수 미리보기, `replaceExisting` 확인) | 5, 13 |
+| S7 템플릿 창(토너먼트 4/8/12/16 + 3·4위전, 리그 팀 수/회전, 개수 미리보기, `replaceExisting` 확인) | 5, 13 |
 | S7 툴바(템플릿·경기 추가·연결(`bracket-sources`)·무작위 채우기·공개 상태, 이미 공개된 대회 편집 안내) | 13b, 14 |
 | S7 상태(로딩 스켈레톤, 에러 `ErrorState` + 템플릿 버튼 숨김, 빈 대진 `EmptyState`) | 14 |
 | S7 `canWrite=false` 읽기 전용(툴바·끌어 놓기·패널 쓰기·점수 입력 숨김) | 7, 9, 11, 12, 14 |

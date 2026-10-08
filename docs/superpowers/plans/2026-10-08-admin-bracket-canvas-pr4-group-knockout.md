@@ -44,9 +44,10 @@
 
 | 파일 | 책임 |
 |---|---|
-| `src/tournaments/templates/group-rank-pairings.ts` (새) | 스펙 S2 교차 대진 표 5종 + 미지원 조합 422 + `MAX_GROUP_RANK_SLOTS` |
+| `src/tournaments/templates/group-rank-pairings.ts` (새) | 스펙 S2 교차 대진 표 6종(8조 x 2팀 → 16강 포함) + 미지원 조합 422 + `MAX_GROUP_RANK_SLOTS` |
+| `src/tournaments/templates/knockout-phase-labels.ts` (새) | PR-1b/1c 의 `GROUP_NAME`·`ROUND_LABEL`·`FIXTURES_IN_PHASE` 표와 `KnockoutPhase` 를 `bracket-template-plan.ts` 에서 그대로 옮겨 export — 라벨 소유는 이 파일 한 곳(순환 import 방지) |
 | `src/tournaments/templates/group-knockout-plan.ts` (새) | `planGroupKnockoutTemplate` — 조·ENTRY·라운드로빈·GROUP_RANK·결선·연결선 계획(순수) |
-| `src/tournaments/templates/bracket-template-plan.ts` (수정, PR-1b) | `build()` 의 `group_knockout` 분기가 새 함수를 호출 |
+| `src/tournaments/templates/bracket-template-plan.ts` (수정, PR-1b) | `build()` 의 `group_knockout` 분기가 새 함수를 호출 · 라벨 표 3벌과 `KnockoutPhase` 정의를 지우고 `knockout-phase-labels.ts` 에서 import |
 | `src/tournaments/slots/group-rank-preview.ts` (새) | `resolveGroupRank` — 한 조·한 순위의 ready/tied/group_incomplete 판정(순수) |
 | `src/tournaments/slots/load-group-rank-preview.ts` (새) | `loadGroupRankPreview` — GROUP_RANK 자리별 미리보기 행 로드 |
 | `src/tournaments/slots/group-rank-fill.ts` (새) | `planFillFromStandings`(순수) · `previewGroupRankStandings`·`fillSlotsFromStandings`(서비스 본문) |
@@ -111,13 +112,15 @@ grep -n "function invalidateCompetitionViews\|BracketCompetitionScope" apps/v1_w
 grep -n "^function elbowPath\|^function sideAnchorY\|export const CANVAS_HEADER_HEIGHT\|export const CANVAS_ROW_HEIGHT" apps/v1_web/src/lib/bracket-canvas-layout.ts
 grep -n "export function buildCanvasLayout\|CanvasEdgeKind" apps/v1_web/src/lib/bracket-canvas-layout.ts
 grep -n "V1TournamentSlot " apps/v1_api/prisma/schema.prisma
+grep -n "round16" apps/v1_api/prisma/schema.prisma apps/v1_api/src/tournaments/templates/bracket-template-plan.ts
+grep -rn "'round16'" apps/v1_web/src/lib apps/v1_web/src/types | head -5
 # 조 편성·순위 재계산 함수는 색인 보충 계약의 이름·파일만 쓴다 (PR-4 는 직접 부르지 않고 import 도 하지 않는다 — 아래 메모)
 grep -n "export async function ensureGroupPhaseTeamsInTx\|export async function recalculateStandingsInTx\|export async function releaseUnusedGroupTeamsInTx" apps/v1_api/src/tournaments/tournament-bracket-tx.ts
 grep -rn "group-phase-teams\|recalculateTournamentStandingsInTx" apps/v1_api/src apps/v1_api/test; echo "위 grep 은 출력이 비어 있어야 한다(옛 이름·옛 파일 0)"
 grep -n "ensureGroupPhaseTeamsInTx\|releaseUnusedGroupTeamsInTx" apps/v1_api/src/tournaments/slots/tournament-slot.service.ts
 ```
 
-Expected: 전부 `OK`, `case 'group_knockout'` 줄이 나오고(PR-1b 는 여기서 422 를 던진다), `assignSlotsBatchInTx`·`SlotMutationContext`·`private context(`·`SLOT_TRANSACTION_OPTIONS` 가 나오고, executor 에서 `sourceGroupKey`(GROUP_RANK 자리의 `sourceGroupId` 를 그룹 키에서 푸는 줄)가 나오고, 웹 훅 파일에 `invalidateCompetitionViews` 가 나오고, 스키마에 모델이 있다.
+Expected: 전부 `OK`, `case 'group_knockout'` 줄이 나오고(PR-1b 는 여기서 422 를 던진다), 스키마 enum 에 `round16` 이 있고(PR-1a) 웹 단계 타입·정렬에 `'round16'` 이 나오고(PR-1c — Task 2·12 의 16강 테스트가 이 값에 기대므로 PR-1c 가 먼저 머지돼 있어야 한다), `assignSlotsBatchInTx`·`SlotMutationContext`·`private context(`·`SLOT_TRANSACTION_OPTIONS` 가 나오고, executor 에서 `sourceGroupKey`(GROUP_RANK 자리의 `sourceGroupId` 를 그룹 키에서 푸는 줄)가 나오고, 웹 훅 파일에 `invalidateCompetitionViews` 가 나오고, 스키마에 모델이 있다.
 `tournament-bracket-tx.ts` 에서 `ensureGroupPhaseTeamsInTx`·`recalculateStandingsInTx`(PR-1a) 와 `releaseUnusedGroupTeamsInTx`(PR-1b) 정의 3줄이 나오고, `group-phase-teams`·`recalculateTournamentStandingsInTx` 검색은 **0건**이며, 슬롯 서비스가 앞의 두 함수를 쓰는 줄이 나온다.
 옛 이름 검색을 뺀 확인이 하나라도 비거나, 옛 이름 검색이 1건이라도 나오면 **멈추고** `BLOCKED: PR-1a/1b/3 미머지 또는 계획과 다름 — <빈 항목>` 을 보고한다. 옛 이름이 나오면 선행 PR 이 색인 보충 계약(2026-10-09)을 어긴 것이므로 이 PR 에서 사본을 만들거나 옛 파일을 import 하지 말고 그 PR 에 되돌린다.
 
@@ -130,7 +133,7 @@ Expected: 전부 `OK`, `case 'group_knockout'` 줄이 나오고(PR-1b 는 여기
 - Test: `apps/v1_api/src/tournaments/templates/group-rank-pairings.spec.ts`
 
 **Interfaces:**
-- Produces: `type GroupRankRef = { group: number; rank: number }`(group 은 0부터 A=0, rank 는 1위=1), `groupRankPairings(groupCount: number, advancePerGroup: 1 | 2): Array<[GroupRankRef, GroupRankRef]>`, `MAX_GROUP_RANK_SLOTS: number`(= 8)
+- Produces: `type GroupRankRef = { group: number; rank: number }`(group 은 0부터 A=0, rank 는 1위=1), `groupRankPairings(groupCount: number, advancePerGroup: 1 | 2): Array<[GroupRankRef, GroupRankRef]>`, `MAX_GROUP_RANK_SLOTS: number`(= 16)
 
 - [ ] **Step 1: 실패하는 테스트 작성**
 
@@ -160,6 +163,15 @@ describe('groupRankPairings — 스펙 S2 교차 대진 표', () => {
     ['4조 x 1팀 → 4강', 4, 1, [['A1', 'D1'], ['B1', 'C1']]],
     ['4조 x 2팀 → 8강', 4, 2, [['A1', 'B2'], ['C1', 'D2'], ['B1', 'A2'], ['D1', 'C2']]],
     ['8조 x 1팀 → 8강', 8, 1, [['A1', 'H1'], ['D1', 'E1'], ['B1', 'G1'], ['C1', 'F1']]],
+    [
+      '8조 x 2팀 → 16강',
+      8,
+      2,
+      [
+        ['A1', 'B2'], ['C1', 'D2'], ['E1', 'F2'], ['G1', 'H2'],
+        ['B1', 'A2'], ['D1', 'C2'], ['F1', 'E2'], ['H1', 'G2'],
+      ],
+    ],
   ] as const)('%s', (_name, groupCount, advance, expected) => {
     expect(labelsOf(groupCount, advance)).toEqual(expected);
   });
@@ -170,6 +182,7 @@ describe('groupRankPairings — 스펙 S2 교차 대진 표', () => {
     [4, 1],
     [4, 2],
     [8, 1],
+    [8, 2],
   ] as const)('%i조 x %i팀: 올라오는 모든 (조, 순위)가 정확히 한 번씩 나오고 같은 조끼리 붙지 않는다', (groupCount, advance) => {
     const refs = groupRankPairings(groupCount, advance).flat();
     expect(refs).toHaveLength(groupCount * advance);
@@ -190,7 +203,7 @@ describe('groupRankPairings — 스펙 S2 교차 대진 표', () => {
     [5, 1],
     [6, 1],
     [7, 1],
-    [8, 2],
+    [7, 2],
     [16, 1],
     [2.5, 1],
   ] as const)('지원하지 않는 %i조 x %i팀은 422 BRACKET_TEMPLATE_UNSUPPORTED', (groupCount, advance) => {
@@ -214,8 +227,17 @@ describe('groupRankPairings — 스펙 S2 교차 대진 표', () => {
     expect(labelsOf(2, 2)).toEqual([['A1', 'B2'], ['B1', 'A2']]);
   });
 
-  it('MAX_GROUP_RANK_SLOTS 는 표에서 가장 큰 결선 크기(8)다', () => {
-    expect(MAX_GROUP_RANK_SLOTS).toBe(8);
+  it('8조 x 2팀 16강: 8경기 모두 홈 1위·어웨이 2위이고, 앞 4경기는 A-B·C-D·E-F·G-H 조 쌍, 뒤 4경기는 같은 쌍의 반대 방향이다', () => {
+    const pairs = groupRankPairings(8, 2);
+    expect(pairs).toHaveLength(8);
+    pairs.forEach(([home, away]) => expect([home.rank, away.rank]).toEqual([1, 2]));
+    // 앞 4경기는 A-B·C-D·E-F·G-H 조 쌍, 뒤 4경기는 같은 쌍의 반대 방향
+    expect(pairs.slice(0, 4).map(([h, a]) => [h.group, a.group])).toEqual([[0, 1], [2, 3], [4, 5], [6, 7]]);
+    expect(pairs.slice(4).map(([h, a]) => [h.group, a.group])).toEqual([[1, 0], [3, 2], [5, 4], [7, 6]]);
+  });
+
+  it('MAX_GROUP_RANK_SLOTS 는 표에서 가장 큰 결선 크기(16)다', () => {
+    expect(MAX_GROUP_RANK_SLOTS).toBe(16);
   });
 });
 ```
@@ -244,6 +266,10 @@ const PAIRINGS: Readonly<Record<string, ReadonlyArray<readonly [string, string]>
   '4x1': [['A1', 'D1'], ['B1', 'C1']],
   '4x2': [['A1', 'B2'], ['C1', 'D2'], ['B1', 'A2'], ['D1', 'C2']],
   '8x1': [['A1', 'H1'], ['D1', 'E1'], ['B1', 'G1'], ['C1', 'F1']],
+  '8x2': [
+    ['A1', 'B2'], ['C1', 'D2'], ['E1', 'F2'], ['G1', 'H2'],
+    ['B1', 'A2'], ['D1', 'C2'], ['F1', 'E2'], ['H1', 'G2'],
+  ],
 };
 
 export const MAX_GROUP_RANK_SLOTS = Math.max(...Object.values(PAIRINGS).map((pairs) => pairs.length * 2));
@@ -252,7 +278,7 @@ function parseRef(text: string): GroupRankRef {
   return { group: text.charCodeAt(0) - 65, rank: Number(text.slice(1)) };
 }
 
-/** 결선 첫 라운드 경기 순서대로 [홈 자리, 어웨이 자리]. 표에 없는 조합(결선 크기 ∉ {2,4,8})은 422. */
+/** 결선 첫 라운드 경기 순서대로 [홈 자리, 어웨이 자리]. 표에 없는 조합(결선 크기 ∉ {2,4,8,16})은 422. */
 export function groupRankPairings(
   groupCount: number,
   advancePerGroup: 1 | 2,
@@ -261,7 +287,7 @@ export function groupRankPairings(
   if (pairs === undefined) {
     throw new UnprocessableEntityException({
       code: 'BRACKET_TEMPLATE_UNSUPPORTED',
-      message: '결선은 2·4·8팀이 올라가는 조합만 만들 수 있어요. 조 수와 진출 팀 수를 다시 골라 주세요.',
+      message: '결선은 2·4·8·16팀이 올라가는 조합만 만들 수 있어요. 조 수와 진출 팀 수를 다시 골라 주세요.',
     });
   }
   return pairs.map(([home, away]) => [parseRef(home), parseRef(away)]);
@@ -274,7 +300,7 @@ export function groupRankPairings(
 cd apps/v1_api && TZ=UTC ./node_modules/.bin/jest -c "$ISO/jest.iso.config.cjs" --maxWorkers=1 src/tournaments/templates/group-rank-pairings.spec.ts
 ```
 
-Expected: PASS (5 + 5 + 9 + 1 + 1 + 1 케이스).
+Expected: PASS (6 + 6 + 9 + 1 + 1 + 1 + 1 케이스).
 
 - [ ] **Step 5: 커밋**
 
@@ -287,14 +313,39 @@ git show --stat HEAD
 ## Task 2: group_knockout 계획 함수 `planGroupKnockoutTemplate`
 
 **Files:**
+- Create: `apps/v1_api/src/tournaments/templates/knockout-phase-labels.ts`
+- Modify: `apps/v1_api/src/tournaments/templates/bracket-template-plan.ts` (라벨 표 3벌·`KnockoutPhase` 정의를 지우고 위 파일에서 import — 값 변경 없는 이동)
 - Create: `apps/v1_api/src/tournaments/templates/group-knockout-plan.ts`
 - Test: `apps/v1_api/src/tournaments/templates/group-knockout-plan.spec.ts`
 
 **Interfaces:**
-- Consumes: `groupRankPairings`(Task 1) · `buildLeagueFixtureRows`(`apps/v1_api/src/tournaments/league-fixture-generator.service.ts:261`, 순수 — 자리 키 문자열을 `registrationIds` 자리에 그대로 넣는다) · PR-1b 타입 `BracketTemplateInput`·`BracketTemplatePlan`·`PlanGroup`·`PlanSlot`·`PlanFixture`·`PlanEdge`(`bracket-template-plan.ts`, `import type` 만 — 값 import 를 하면 이 파일과 순환한다)
+- Consumes: `groupRankPairings`(Task 1) · `buildLeagueFixtureRows`(`apps/v1_api/src/tournaments/league-fixture-generator.service.ts:261`, 순수 — 자리 키 문자열을 `registrationIds` 자리에 그대로 넣는다) · `knockout-phase-labels.ts` 의 `GROUP_NAME`·`ROUND_LABEL`·`FIXTURES_IN_PHASE`·`KnockoutPhase`(Step 0 에서 PR-1b/1c 표를 이동 — 라벨 문자열의 유일한 소유처) · PR-1b 타입 `BracketTemplateInput`·`BracketTemplatePlan`·`PlanGroup`·`PlanSlot`·`PlanFixture`·`PlanEdge`(`bracket-template-plan.ts`, `import type` 만 — 값 import 를 하면 이 파일과 순환한다)
 - Produces: `planGroupKnockoutTemplate(input: Extract<BracketTemplateInput, { kind: 'group_knockout' }>, ctx: { fixtureNumberOffset: number }): BracketTemplatePlan`
 
-계획 규칙(스펙 S2): 조 `A조…`(phase `group`, `advanceCount` = advancePerGroup) · 조마다 ENTRY 자리 `teamsPerGroup`개 · 조별 라운드로빈 빈 경기(`league_r{n}`, legs) · 결선 크기 K = 조 수 × 진출 팀 수 ∈ {2,4,8} · 결선 첫 라운드의 사이드 = GROUP_RANK 자리(표는 Task 1) · 이후 라운드는 WINNER 연결 · 3·4위전은 4강 LOSER 연결. 경기 번호는 조별(A조부터)→결선(8강→4강→3·4위전→결승) 순으로 `ctx.fixtureNumberOffset` 뒤부터 연속.
+계획 규칙(스펙 S2): 조 `A조…`(phase `group`, `advanceCount` = advancePerGroup) · 조마다 ENTRY 자리 `teamsPerGroup`개 · 조별 라운드로빈 빈 경기(`league_r{n}`, legs) · 결선 크기 K = 조 수 × 진출 팀 수 ∈ {2,4,8,16} · 결선 첫 라운드의 사이드 = GROUP_RANK 자리(표는 Task 1) · 이후 라운드는 WINNER 연결 · 3·4위전은 4강 LOSER 연결. 경기 번호는 조별(A조부터)→결선(K=16 이면 16강→8강→4강→결승→3·4위전 — PR-1b/1c 의 `knockout` 템플릿과 같은 순서) 순으로 `ctx.fixtureNumberOffset` 뒤부터 연속.
+
+- [ ] **Step 0: 라벨 표를 한 곳으로 옮긴다 (순수 이동, 값 변경 없음)** — PR-1b/1c 의 `bracket-template-plan.ts` 에는 `type KnockoutPhase`·`GROUP_NAME`·`ROUND_LABEL`·`FIXTURES_IN_PHASE` 가 모듈 내부 `const` 로 있다. PR-4 가 같은 표를 다시 쓰면 라벨이 두 벌이 되므로, 아래 명령으로 정의 위치를 찾아 **머지된 현재 내용(1c 의 `round16`·`round12` 포함) 그대로** 새 파일로 옮기고 `export` 를 붙인다. 손으로 다시 타이핑하지 않는다.
+
+```bash
+grep -nE "^type KnockoutPhase|^const (GROUP_NAME|ROUND_LABEL|FIXTURES_IN_PHASE)\b" apps/v1_api/src/tournaments/templates/bracket-template-plan.ts
+```
+
+```ts
+// apps/v1_api/src/tournaments/templates/knockout-phase-labels.ts
+import type { V1TournamentGroupPhase } from '@prisma/client';
+
+export type KnockoutPhase = Exclude<V1TournamentGroupPhase, 'group'>;
+
+// <bracket-template-plan.ts 에서 잘라낸 GROUP_NAME / ROUND_LABEL / FIXTURES_IN_PHASE 를 그대로 붙이고 앞에 export 만 추가>
+export const GROUP_NAME: Record<KnockoutPhase, string> = { /* 이동한 값 */ };
+export const ROUND_LABEL: Record<KnockoutPhase, string> = { /* 이동한 값 */ };
+export const FIXTURES_IN_PHASE: Record<KnockoutPhase, number> = { /* 이동한 값 */ };
+```
+
+`bracket-template-plan.ts` 에는 원래 정의 4개를 지우고 `import { FIXTURES_IN_PHASE, GROUP_NAME, ROUND_LABEL, type KnockoutPhase } from './knockout-phase-labels';` 한 줄을 넣는다(`V1TournamentGroupPhase` import 가 다른 곳에서 안 쓰이면 함께 지운다). 이동만으로 기존 knockout·league 테스트가 그대로 통과해야 한다.
+
+Run: `cd apps/v1_api && TZ=UTC ./node_modules/.bin/jest -c "$ISO/jest.iso.config.cjs" --maxWorkers=1 src/tournaments/templates/bracket-template-plan.spec.ts` 후 `./node_modules/.bin/tsc --noEmit -p "$ISO/tsconfig.isocheck.json"`
+Expected: PASS(이동 전과 같은 통과 수), tsc 0. 이 파일에서 `@prisma/client` 값 import 는 없다(타입만).
 
 - [ ] **Step 1: 실패하는 테스트 작성**
 
@@ -350,6 +401,10 @@ describe('planGroupKnockoutTemplate — 개수 계약', () => {
     [4, 4, 2, 2, true, 56, 8, 8, 24],
     [8, 3, 1, 1, false, 31, 6, 11, 32],
     [4, 5, 1, 2, false, 83, 2, 6, 24],
+    // K=16: 16강 8 + 8강 4 + 4강 2 + 결승 1 (+ 3·4위전 1), 연결 8+4+2 (+2), 결선 그룹 4 (+1), GROUP_RANK 16
+    [8, 4, 2, 1, false, 63, 14, 12, 48],
+    [8, 4, 2, 1, true, 64, 16, 13, 48],
+    [8, 5, 2, 2, true, 176, 16, 13, 56],
   ] as const)('%i조 x %i팀(진출 %i, %i회전, 3위전 %s) → 경기 %i · 연결 %i · 그룹 %i · 자리 %i', (groupCount, teamsPerGroup, advancePerGroup, legs, thirdPlace, fixtures, edges, groups, slots) => {
     const p = plan({ groupCount, teamsPerGroup, advancePerGroup, legs, thirdPlace });
     expect(p.fixtures).toHaveLength(fixtures);
@@ -406,7 +461,8 @@ describe('planGroupKnockoutTemplate — 조별 라운드로빈', () => {
     expect(Math.max(...numbers)).toBe(10 + p.fixtures.length);
     const lastStage = Math.max(...stageFixtures(p).map((f) => f.fixtureNumber));
     expect(Math.min(...knockoutFixtures(p, '4강').map((f) => f.fixtureNumber))).toBeGreaterThan(lastStage);
-    expect(knockoutFixtures(p, '3·4위전')[0].fixtureNumber).toBeLessThan(knockoutFixtures(p, '결승')[0].fixtureNumber);
+    // PR-1b/1c knockout 템플릿과 같은 순서: 결승 다음이 3·4위전
+    expect(knockoutFixtures(p, '3·4위전')[0].fixtureNumber).toBe(knockoutFixtures(p, '결승')[0].fixtureNumber + 1);
   });
 
   it('(round, fixtureNumber, legNumber) 가 유일하다 — DB 유일 제약과 같은 조건', () => {
@@ -509,6 +565,77 @@ describe('planGroupKnockoutTemplate — 결선 자리와 연결', () => {
   });
 });
 
+describe('planGroupKnockoutTemplate — 16강 (8조 x 2팀, 스펙 S1-b·S2)', () => {
+  const sixteen = (overrides: Partial<GroupKnockoutTemplateInput> = {}) =>
+    plan({ groupCount: 8, teamsPerGroup: 4, advancePerGroup: 2, ...overrides });
+
+  it('결선 그룹은 16강(phase round16) → 8강 → 4강 → 결승 → (thirdPlace 일 때만) 3위 결정전 순이고 sortOrder 는 0부터 그 순서다', () => {
+    const p = sixteen({ thirdPlace: true });
+    expect(p.groups.slice(8).map((g) => [g.name, g.phase])).toEqual([
+      ['16강', 'round16'],
+      ['8강', 'quarter'],
+      ['4강', 'semi'],
+      ['결승', 'final'],
+      ['3위 결정전', 'third_place'],
+    ]);
+    expect(p.groups.slice(8).map((g) => g.sortOrder)).toEqual([0, 1, 2, 3, 4]);
+    expect(sixteen().groups.slice(8).map((g) => g.phase)).toEqual(['round16', 'quarter', 'semi', 'final']);
+  });
+
+  it('라운드별 경기 수 8·4·2·1(+1)이고 조별 경기(8조 x 6) 뒤 번호로 이어진다', () => {
+    const p = sixteen({ thirdPlace: true });
+    expect(['16강', '8강', '4강', '결승', '3·4위전'].map((r) => knockoutFixtures(p, r).length)).toEqual([8, 4, 2, 1, 1]);
+    expect(stageFixtures(p)).toHaveLength(48);
+    const lastStage = Math.max(...stageFixtures(p).map((f) => f.fixtureNumber));
+    expect(Math.min(...knockoutFixtures(p, '16강').map((f) => f.fixtureNumber))).toBe(lastStage + 1);
+  });
+
+  it('16강 8경기가 스펙 S2 표 그대로 GROUP_RANK 자리를 사이드로 쓴다(자리 16개)', () => {
+    const p = sixteen();
+    expect(p.slots.filter((s) => s.kind === 'GROUP_RANK')).toHaveLength(16);
+    expect(knockoutFixtures(p, '16강').map((f) => [rankLabel(p, f.homeSlotKey), rankLabel(p, f.awaySlotKey)])).toEqual([
+      ['A1', 'B2'], ['C1', 'D2'], ['E1', 'F2'], ['G1', 'H2'],
+      ['B1', 'A2'], ['D1', 'C2'], ['F1', 'E2'], ['H1', 'G2'],
+    ]);
+    const firstGroup = groupKeyByName(p, '16강');
+    expect(p.slots.filter((s) => s.kind === 'GROUP_RANK').every((s) => s.groupKey === firstGroup)).toBe(true);
+  });
+
+  it('16강 2i-1·2i 번 경기 승자 → 8강 i 번 경기 홈·어웨이, 8강→4강→결승도 같은 규칙이고 16강으로 들어오는 연결·부전승은 없다', () => {
+    const p = sixteen();
+    const r16 = knockoutFixtures(p, '16강');
+    const quarters = knockoutFixtures(p, '8강');
+    for (let i = 1; i <= 4; i += 1) {
+      expect(p.edges.filter((e) => e.targetFixtureKey === quarters[i - 1].key)).toEqual([
+        { sourceFixtureKey: r16[2 * i - 2].key, outcome: 'WINNER', targetFixtureKey: quarters[i - 1].key, targetSide: 'HOME' },
+        { sourceFixtureKey: r16[2 * i - 1].key, outcome: 'WINNER', targetFixtureKey: quarters[i - 1].key, targetSide: 'AWAY' },
+      ]);
+    }
+    expect(p.edges).toHaveLength(8 + 4 + 2);
+    expect(p.edges.every((e) => e.outcome === 'WINNER')).toBe(true);
+    expect(p.edges.some((e) => r16.some((f) => f.key === e.targetFixtureKey))).toBe(false);
+    expect(p.byeSlots).toEqual([]);
+    expect(quarters.every((f) => f.homeSlotKey === null && f.awaySlotKey === null)).toBe(true);
+  });
+
+  it('3·4위전은 4강 패자 연결만 받고(16강·8강 패자는 연결 없음) 연결 16개다', () => {
+    const p = sixteen({ thirdPlace: true });
+    const [match] = knockoutFixtures(p, '3·4위전');
+    const semis = knockoutFixtures(p, '4강');
+    expect(p.edges.filter((e) => e.outcome === 'LOSER')).toEqual([
+      { sourceFixtureKey: semis[0].key, outcome: 'LOSER', targetFixtureKey: match.key, targetSide: 'HOME' },
+      { sourceFixtureKey: semis[1].key, outcome: 'LOSER', targetFixtureKey: match.key, targetSide: 'AWAY' },
+    ]);
+    expect(p.edges).toHaveLength(16);
+  });
+
+  it('(round, fixtureNumber, legNumber) 유일 — 2회전 8조 x 5팀 포함', () => {
+    const p = sixteen({ teamsPerGroup: 5, legs: 2, thirdPlace: true });
+    const triples = p.fixtures.map((f) => `${f.round}|${f.fixtureNumber}|${f.legNumber}`);
+    expect(new Set(triples).size).toBe(triples.length);
+  });
+});
+
 describe('planGroupKnockoutTemplate — 거절', () => {
   const codeOf = (operation: () => unknown) => {
     try {
@@ -522,7 +649,8 @@ describe('planGroupKnockoutTemplate — 거절', () => {
 
   it.each([
     ['결선 크기 3 (3조 x 1)', { groupCount: 3, advancePerGroup: 1 as const }],
-    ['결선 크기 16 (8조 x 2)', { groupCount: 8, advancePerGroup: 2 as const }],
+    ['결선 크기 7 (7조 x 1)', { groupCount: 7, advancePerGroup: 1 as const }],
+    ['결선 크기 14 (7조 x 2)', { groupCount: 7, advancePerGroup: 2 as const }],
     ['결선 크기 6 (3조 x 2)', { groupCount: 3, advancePerGroup: 2 as const }],
     ['조 1개', { groupCount: 1 }],
     ['조 9개', { groupCount: 9 }],
@@ -536,6 +664,11 @@ describe('planGroupKnockoutTemplate — 거절', () => {
 
   it('결선이 결승 한 경기뿐(2조 x 1)인데 3·4위전을 넣으면 422 — 3·4위전의 패자 원천은 4강뿐', () => {
     expect(codeOf(() => plan({ advancePerGroup: 1, thirdPlace: true }))).toBe('BRACKET_TEMPLATE_UNSUPPORTED');
+  });
+
+  it('결선 16(8조 x 2)은 거절하지 않는다 — 대조: 조 9개(결선 18)는 거절', () => {
+    expect(() => plan({ groupCount: 8, advancePerGroup: 2 })).not.toThrow();
+    expect(codeOf(() => plan({ groupCount: 9, advancePerGroup: 2 }))).toBe('BRACKET_TEMPLATE_UNSUPPORTED');
   });
 });
 ```
@@ -562,21 +695,15 @@ import type {
   PlanGroup,
   PlanSlot,
 } from './bracket-template-plan';
+import { FIXTURES_IN_PHASE, GROUP_NAME, ROUND_LABEL, type KnockoutPhase } from './knockout-phase-labels';
 import { groupRankPairings } from './group-rank-pairings';
 
 export type GroupKnockoutTemplateInput = Extract<BracketTemplateInput, { kind: 'group_knockout' }>;
 
-type KnockoutPhase = 'quarter' | 'semi' | 'third_place' | 'final';
+type MainPhase = Extract<KnockoutPhase, 'round16' | 'quarter' | 'semi' | 'final'>;
 
-// 그룹 이름은 어드민 화면의 templateFor 규칙, round 는 공개 화면이 읽는 한글 라벨(tournament-round-label.ts)과 같다.
-const KNOCKOUT_META: Record<KnockoutPhase, { groupName: string; round: string; fixtureCount: number }> = {
-  quarter: { groupName: '8강', round: '8강', fixtureCount: 4 },
-  semi: { groupName: '4강', round: '4강', fixtureCount: 2 },
-  third_place: { groupName: '3위 결정전', round: '3·4위전', fixtureCount: 1 },
-  final: { groupName: '결승', round: '결승', fixtureCount: 1 },
-};
-const MAIN_CHAIN: readonly KnockoutPhase[] = ['quarter', 'semi', 'final'];
-const FIRST_PHASE_BY_SIZE: Readonly<Record<number, KnockoutPhase>> = { 8: 'quarter', 4: 'semi', 2: 'final' };
+const MAIN_CHAIN: readonly MainPhase[] = ['round16', 'quarter', 'semi', 'final'];
+const FIRST_PHASE_BY_SIZE: Readonly<Record<number, MainPhase>> = { 16: 'round16', 8: 'quarter', 4: 'semi', 2: 'final' };
 
 const stageGroupKey = (index: number) => `group:${index}`;
 const entryKey = (group: number, position: number) => `entry:${group}:${position}`;
@@ -599,7 +726,7 @@ function assertSupported(input: GroupKnockoutTemplateInput): void {
   ) {
     unsupported('조는 2~8개, 조당 팀은 3~6팀, 진출은 1~2팀, 회전은 1~2회로 입력해 주세요.');
   }
-  groupRankPairings(groupCount, advancePerGroup); // 결선 크기가 2·4·8 이 아니면 여기서 422
+  groupRankPairings(groupCount, advancePerGroup); // 결선 크기가 2·4·8·16 이 아니면 여기서 422
   if (groupCount * advancePerGroup === 2 && thirdPlace) {
     unsupported('결선이 결승 한 경기뿐이면 3·4위전을 만들 수 없어요.');
   }
@@ -613,9 +740,8 @@ export function planGroupKnockoutTemplate(
   const { groupCount, teamsPerGroup, advancePerGroup, legs, thirdPlace } = input;
   const size = groupCount * advancePerGroup;
   const mainPhases = MAIN_CHAIN.slice(MAIN_CHAIN.indexOf(FIRST_PHASE_BY_SIZE[size]));
-  const phases: KnockoutPhase[] = thirdPlace
-    ? [...mainPhases.slice(0, -1), 'third_place', 'final']
-    : [...mainPhases];
+  // 결승 다음이 3·4위전 — PR-1b/1c knockout 템플릿과 같은 번호·그룹 순서
+  const phases: KnockoutPhase[] = thirdPlace ? [...mainPhases, 'third_place'] : [...mainPhases];
   const firstPhase = phases[0];
 
   const groups: PlanGroup[] = [];
@@ -632,9 +758,9 @@ export function planGroupKnockoutTemplate(
       slots.push({ key: entryKey(g, position), kind: 'ENTRY', groupKey: stageGroupKey(g), position, sourceGroupKey: null });
     }
   }
-  for (const phase of phases) {
-    groups.push({ key: knockoutGroupKey(phase), name: KNOCKOUT_META[phase].groupName, phase, sortOrder: 0, advanceCount: null });
-  }
+  phases.forEach((phase, index) => {
+    groups.push({ key: knockoutGroupKey(phase), name: GROUP_NAME[phase], phase, sortOrder: index, advanceCount: null });
+  });
   for (let g = 0; g < groupCount; g += 1) {
     for (let rank = 1; rank <= advancePerGroup; rank += 1) {
       slots.push({ key: rankKey(g, rank), kind: 'GROUP_RANK', groupKey: knockoutGroupKey(firstPhase), position: rank, sourceGroupKey: stageGroupKey(g) });
@@ -668,14 +794,13 @@ export function planGroupKnockoutTemplate(
 
   const pairings = groupRankPairings(groupCount, advancePerGroup);
   for (const phase of phases) {
-    const meta = KNOCKOUT_META[phase];
-    for (let index = 1; index <= meta.fixtureCount; index += 1) {
+    for (let index = 1; index <= FIXTURES_IN_PHASE[phase]; index += 1) {
       lastNumber += 1;
       const pair = phase === firstPhase ? pairings[index - 1] : null;
       fixtures.push({
         key: knockoutFixtureKey(phase, index),
         groupKey: knockoutGroupKey(phase),
-        round: meta.round,
+        round: ROUND_LABEL[phase],
         fixtureNumber: lastNumber,
         legNumber: 1,
         homeSlotKey: pair ? rankKey(pair[0].group, pair[0].rank) : null,
@@ -688,7 +813,7 @@ export function planGroupKnockoutTemplate(
   for (let i = 0; i < mainPhases.length - 1; i += 1) {
     const from = mainPhases[i];
     const to = mainPhases[i + 1];
-    for (let j = 1; j <= KNOCKOUT_META[to].fixtureCount; j += 1) {
+    for (let j = 1; j <= FIXTURES_IN_PHASE[to]; j += 1) {
       edges.push({ sourceFixtureKey: knockoutFixtureKey(from, 2 * j - 1), outcome: 'WINNER', targetFixtureKey: knockoutFixtureKey(to, j), targetSide: 'HOME' });
       edges.push({ sourceFixtureKey: knockoutFixtureKey(from, 2 * j), outcome: 'WINNER', targetFixtureKey: knockoutFixtureKey(to, j), targetSide: 'AWAY' });
     }
@@ -713,8 +838,8 @@ Expected: PASS. `kind: 'ENTRY'` 같은 리터럴이 `PlanSlot['kind']`(Prisma en
 - [ ] **Step 5: 커밋**
 
 ```bash
-git add apps/v1_api/src/tournaments/templates/group-knockout-plan.ts apps/v1_api/src/tournaments/templates/group-knockout-plan.spec.ts
-git commit -m "feat(v1_api): 조별+결선 대진 계획 planGroupKnockoutTemplate" -- apps/v1_api/src/tournaments/templates/group-knockout-plan.ts apps/v1_api/src/tournaments/templates/group-knockout-plan.spec.ts
+git add apps/v1_api/src/tournaments/templates/knockout-phase-labels.ts apps/v1_api/src/tournaments/templates/group-knockout-plan.ts apps/v1_api/src/tournaments/templates/group-knockout-plan.spec.ts
+git commit -m "feat(v1_api): 조별+결선 대진 계획 planGroupKnockoutTemplate" -- apps/v1_api/src/tournaments/templates/knockout-phase-labels.ts apps/v1_api/src/tournaments/templates/bracket-template-plan.ts apps/v1_api/src/tournaments/templates/group-knockout-plan.ts apps/v1_api/src/tournaments/templates/group-knockout-plan.spec.ts
 git show --stat HEAD
 ```
 
@@ -739,7 +864,7 @@ PR-1b 는 `group_knockout` 을 422 `BRACKET_TEMPLATE_UNSUPPORTED` 로 거절하�
     [{ kind: 'group_knockout', groupCount: 2, teamsPerGroup: 4, advancePerGroup: 2, legs: 1, thirdPlace: false }],
 ```
 
-② 파일 끝에 추가한다(위 두 헬퍼를 그대로 쓴다).
+② 파일 끝에 추가한다(위 두 헬퍼를 그대로 쓴다). 240 상한은 조별 경기와 결선 경기를 **합쳐** 센다 — 16강이 들어가면 극단 조합의 한계가 8조 x 6팀 x 2회전(240 + 16 = 256)에서 이미 넘는다.
 
 ```ts
 describe('planBracketTemplate — group_knockout', () => {
@@ -777,6 +902,26 @@ describe('planBracketTemplate — group_knockout', () => {
 
   it('결선 크기 6 (3조 x 2팀)은 422 BRACKET_TEMPLATE_UNSUPPORTED', () => {
     expect(codeOf(() => plan({ ...groupKnockout, groupCount: 3 }))).toBe('BRACKET_TEMPLATE_UNSUPPORTED');
+  });
+
+  describe('16강 (8조 x 2팀)', () => {
+    const sixteen = { ...groupKnockout, groupCount: 8, teamsPerGroup: 4 };
+
+    it('현실적인 8조 x 4팀 x 1회전: 조별 48 + 16강 8 + 8강 4 + 4강 2 + 결승 1 = 63경기(3·4위전 포함 64), 16강 그룹 phase round16', () => {
+      const p = plan(sixteen);
+      expect(p.fixtures).toHaveLength(63);
+      expect(plan({ ...sixteen, thirdPlace: true }).fixtures).toHaveLength(64);
+      expect(p.groups.find((g) => g.name === '16강')?.phase).toBe('round16');
+      expect(p.fixtures.filter((f) => f.round === '16강')).toHaveLength(8);
+    });
+
+    it('상한 경계: 8조 x 6팀 x 2회전은 조별 240 + 결선 16 = 256경기라 422 BRACKET_TEMPLATE_TOO_LARGE(3·4위전 유무와 무관), 8조 x 5팀 x 2회전(176경기)·8조 x 6팀 x 1회전(136경기)은 통과', () => {
+      const extreme = { ...sixteen, teamsPerGroup: 6, legs: 2 as const };
+      expect(codeOf(() => plan(extreme))).toBe('BRACKET_TEMPLATE_TOO_LARGE');
+      expect(codeOf(() => plan({ ...extreme, thirdPlace: true }))).toBe('BRACKET_TEMPLATE_TOO_LARGE');
+      expect(plan({ ...extreme, teamsPerGroup: 5 }).fixtures).toHaveLength(176);
+      expect(plan({ ...extreme, legs: 1 }).fixtures).toHaveLength(136);
+    });
   });
 });
 ```
@@ -858,6 +1003,35 @@ Expected: PASS (1b 의 knockout·league·DTO·교체 순서 스펙 회귀 없음
     await expect(templates.apply(user, tournamentId, {
       kind: 'group_knockout', groupCount: 2, teamsPerGroup: 3, advancePerGroup: 1, legs: 1, thirdPlace: true,
     })).rejects.toMatchObject({ response: { code: 'BRACKET_TEMPLATE_UNSUPPORTED' } });
+    expect(await counts(tournamentId)).toEqual({ fixtures: 0, groups: 0, slots: 0, edges: 0 });
+  });
+
+  it('조별+결선 8조 x 4팀(2팀 진출) + 3·4위전: 16강 phase round16 그룹 · 경기 64 · 연결 16 · 자리 48, 16강 사이드는 순위 자리 A1–B2 … H1–G2', async () => {
+    const { tournamentId } = await seedBracketTournament(prisma, { label: 'gk16', format: 'group_knockout', teamCount: 0 });
+    await expect(templates.apply(user, tournamentId, {
+      kind: 'group_knockout', groupCount: 8, teamsPerGroup: 4, advancePerGroup: 2, legs: 1, thirdPlace: true,
+    })).resolves.toEqual({ groups: 13, slots: 48, fixtures: 64, edges: 16 });
+    expect(await counts(tournamentId)).toEqual({ fixtures: 64, groups: 13, slots: 48, edges: 16 });
+
+    const round16 = await prisma.v1TournamentGroup.findFirstOrThrow({ where: { tournamentId, phase: 'round16' } });
+    expect(round16.name).toBe('16강');
+    const fixtures = (await liveFixtures(tournamentId)).filter((f) => f.round === '16강');
+    expect(fixtures).toHaveLength(8);
+    const rankLabel = async (slotId: string | null) => {
+      const slot = await prisma.v1TournamentSlot.findUniqueOrThrow({ where: { id: slotId as string }, include: { sourceGroup: true } });
+      return `${slot.sourceGroup?.name}${slot.position}`;
+    };
+    expect(await Promise.all(fixtures.map(async (f) => [await rankLabel(f.teamMatch.homeSlotId), await rankLabel(f.teamMatch.awaySlotId)]))).toEqual([
+      ['A조1', 'B조2'], ['C조1', 'D조2'], ['E조1', 'F조2'], ['G조1', 'H조2'],
+      ['B조1', 'A조2'], ['D조1', 'C조2'], ['F조1', 'E조2'], ['H조1', 'G조2'],
+    ]);
+  });
+
+  it('8조 x 6팀 x 2회전 + 16강(256경기)은 422 BRACKET_TEMPLATE_TOO_LARGE 이고 아무것도 만들지 않는다', async () => {
+    const { tournamentId } = await seedBracketTournament(prisma, { label: 'gk-large', format: 'group_knockout', teamCount: 0 });
+    await expect(templates.apply(user, tournamentId, {
+      kind: 'group_knockout', groupCount: 8, teamsPerGroup: 6, advancePerGroup: 2, legs: 2, thirdPlace: false,
+    })).rejects.toMatchObject({ response: { code: 'BRACKET_TEMPLATE_TOO_LARGE' } });
     expect(await counts(tournamentId)).toEqual({ fixtures: 0, groups: 0, slots: 0, edges: 0 });
   });
 ```
@@ -1986,7 +2160,7 @@ git show --stat HEAD
 - Consumes: `TournamentSlotService.standingsPreview/fillFromStandings`(Task 7) · `MAX_GROUP_RANK_SLOTS`(Task 1) · `CurrentUser`·`V1AuthGuard`
 - Produces: `GET /admin/tournaments/:tournamentId/slots/standings-preview`, `POST /admin/tournaments/:tournamentId/slots/fill-from-standings` (계약 표 그대로)
 
-DTO 의 `@ArrayMaxSize` 는 정적 값이라 "그 대회 자리 수" 대신 가능한 최대치(결선 크기 상한 8)를 쓰고, 실제 자리 수 검증은 서비스가 한다(`planFillFromStandings` 가 자리가 아닌 slotId 를 404 로 거절).
+DTO 의 `@ArrayMaxSize` 는 정적 값이라 "그 대회 자리 수" 대신 가능한 최대치(결선 크기 상한 16)을 쓰고, 실제 자리 수 검증은 서비스가 한다(`planFillFromStandings` 가 자리가 아닌 slotId 를 404 로 거절).
 
 - [ ] **Step 1: DTO 테스트 작성**
 
@@ -2015,10 +2189,10 @@ describe('FillFromStandingsDto', () => {
     expect(await check({ overrides: [{ slotId: UUID_A, registrationId: UUID_B }] })).toHaveLength(0);
   });
 
-  it('8개까지 받고 9개부터 거절한다 (결선 크기 상한)', async () => {
+  it('16개까지 받고 17개부터 거절한다 (결선 크기 상한, 16강 포함)', async () => {
     const item = { slotId: UUID_A, registrationId: UUID_B };
-    expect(await check({ overrides: Array.from({ length: 8 }, () => item) })).toHaveLength(0);
-    expect(paths(await check({ overrides: Array.from({ length: 9 }, () => item) }))).toContain('overrides');
+    expect(await check({ overrides: Array.from({ length: 16 }, () => item) })).toHaveLength(0);
+    expect(paths(await check({ overrides: Array.from({ length: 17 }, () => item) }))).toContain('overrides');
   });
 
   it.each([
@@ -2178,8 +2352,8 @@ Expected: PASS (마지막은 모듈 로드가 깨지지 않았다는 회귀 대�
 
 ### 조별+결선 템플릿과 순위대로 채우기 (2026-10)
 
-- `POST /admin/tournaments/:tournamentId/bracket/template` 에 `kind: 'group_knockout'` 이 추가됐다: `{ kind, groupCount: 2..8, teamsPerGroup: 3..6, advancePerGroup: 1|2, legs: 1|2, thirdPlace: boolean, replaceExisting? }`. 대회 `format` 이 `group_knockout` 이어야 한다(아니면 422 `BRACKET_TEMPLATE_FORMAT_MISMATCH`). 결선 크기 `groupCount × advancePerGroup` 는 2·4·8 만 가능하고(그 밖은 422 `BRACKET_TEMPLATE_UNSUPPORTED`) 결승 한 경기뿐(2조×1팀)이면 `thirdPlace` 를 켤 수 없다(422 같은 코드). 계획 경기 수가 240 을 넘으면 422 `BRACKET_TEMPLATE_TOO_LARGE`.
-- 만들어지는 것: 조 `A조…`(`advanceCount` = advancePerGroup) · 조마다 ENTRY 자리와 라운드로빈 빈 경기(`league_r{n}`, 회전 `legs`) · 결선 그룹(8강/4강/3위 결정전/결승)과 빈 경기 · 결선 첫 라운드 사이드에 GROUP_RANK 자리(교차 대진: 2조×1 A1–B1 / 2조×2 A1–B2·B1–A2 / 4조×1 A1–D1·B1–C1 / 4조×2 A1–B2·C1–D2·B1–A2·D1–C2 / 8조×1 A1–H1·D1–E1·B1–G1·C1–F1) · 이후 라운드 WINNER 연결(3·4위전은 4강 LOSER).
+- `POST /admin/tournaments/:tournamentId/bracket/template` 에 `kind: 'group_knockout'` 이 추가됐다: `{ kind, groupCount: 2..8, teamsPerGroup: 3..6, advancePerGroup: 1|2, legs: 1|2, thirdPlace: boolean, replaceExisting? }`. 대회 `format` 이 `group_knockout` 이어야 한다(아니면 422 `BRACKET_TEMPLATE_FORMAT_MISMATCH`). 결선 크기 `groupCount × advancePerGroup` 는 2·4·8·16 만 가능하고(그 밖은 422 `BRACKET_TEMPLATE_UNSUPPORTED`) 결승 한 경기뿐(2조×1팀)이면 `thirdPlace` 를 켤 수 없다(422 같은 코드). 계획 경기 수가 240 을 넘으면 422 `BRACKET_TEMPLATE_TOO_LARGE`.
+- 만들어지는 것: 조 `A조…`(`advanceCount` = advancePerGroup) · 조마다 ENTRY 자리와 라운드로빈 빈 경기(`league_r{n}`, 회전 `legs`) · 결선 그룹(16강/8강/4강/결승/3위 결정전 — 16강은 8조×2 일 때만, 결승 다음이 3위 결정전)과 빈 경기 · 결선 첫 라운드 사이드에 GROUP_RANK 자리(교차 대진: 2조×1 A1–B1 / 2조×2 A1–B2·B1–A2 / 4조×1 A1–D1·B1–C1 / 4조×2 A1–B2·C1–D2·B1–A2·D1–C2 / 8조×1 A1–H1·D1–E1·B1–G1·C1–F1 / 8조×2 16강 A1–B2·C1–D2·E1–F2·G1–H2·B1–A2·D1–C2·F1–E2·H1–G2) · 이후 라운드 WINNER 연결(3·4위전은 4강 LOSER).
 - `GET /admin/tournaments/:tournamentId/slots/standings-preview`: 어드민(support 포함). 응답 `{ slots: [{ slotId, label, state: 'ready'|'tied'|'group_incomplete', candidateRegistrationId, candidateTeamName, tiedRegistrationIds, currentRegistrationId }] }`, 올라올 조 순서 → 순위 순. 조의 비삭제·비취소 경기가 전부 OFFICIAL 이고 조 순위표가 그 결과를 반영했을 때만 `ready`/`tied`. 정본 §5 동점 처리(승점 → 득실 → 다득점 → 맞대결 → 적은 실점)를 다 쓰고도 갈리지 않은 완전 동률 구간에 그 순위가 걸리면 `tied`(`tiedRegistrationIds` = 동률 팀 전체, 후보 없음). 대회 설정 규칙의 저장 순위와 §5 가 어긋나는 자리도 `tied`. 정규 리그 id 는 404 `TOURNAMENT_NOT_FOUND`.
 - `POST /admin/tournaments/:tournamentId/slots/fill-from-standings` `{ overrides?: [{ slotId, registrationId }] }`(최대 8개, uuid): mutation admin. 응답 `{ assignments: [{ slotId, registrationId }], skipped: [{ slotId, reason: 'tied'|'group_incomplete' }] }`. `ready` 자리 + override 를 한 트랜잭션에서 배정한다 — 바뀔 자리를 먼저 모두 비운 뒤 넣어 A1↔A2 맞바꾸기가 유일 제약에 걸리지 않는다. override 허용 범위: `tied` 자리는 `tiedRegistrationIds` 안의 팀, `ready` 자리는 그 조 소속 팀, `group_incomplete` 자리는 불가(422 `SLOT_REGISTRATION_INVALID`). 같은 팀이 두 자리에 배정되면 409 `SLOT_TEAM_ALREADY_PLACED`, 결선 경기가 시작된 자리가 바뀌어야 하면 409 `SLOT_LOCKED`(이미 맞게 들어 있는 자리는 건드리지 않는다). 시작 전이면 다시 채울 수 있다. 감사 `tournament.slots.fill_from_standings`.
 ```
@@ -2912,12 +3086,22 @@ describe('buildCanvasLayout — 조별+결선 조 편성 블록과 순위 연결
 });
 
 // 스펙 S2 교차 대진 표 — 서버 group-rank-pairings.spec.ts 와 같은 표다.
-const RANK_COMBOS: Array<[string, number, number, string[][], 'quarter' | 'semi' | 'final']> = [
+const RANK_COMBOS: Array<[string, number, number, string[][], 'round16' | 'quarter' | 'semi' | 'final']> = [
   ['2조 x 1팀', 2, 1, [['A1', 'B1']], 'final'],
   ['2조 x 2팀', 2, 2, [['A1', 'B2'], ['B1', 'A2']], 'semi'],
   ['4조 x 1팀', 4, 1, [['A1', 'D1'], ['B1', 'C1']], 'semi'],
   ['4조 x 2팀', 4, 2, [['A1', 'B2'], ['C1', 'D2'], ['B1', 'A2'], ['D1', 'C2']], 'quarter'],
   ['8조 x 1팀', 8, 1, [['A1', 'H1'], ['D1', 'E1'], ['B1', 'G1'], ['C1', 'F1']], 'quarter'],
+  [
+    '8조 x 2팀(16강)',
+    8,
+    2,
+    [
+      ['A1', 'B2'], ['C1', 'D2'], ['E1', 'F2'], ['G1', 'H2'],
+      ['B1', 'A2'], ['D1', 'C2'], ['F1', 'E2'], ['H1', 'G2'],
+    ],
+    'round16',
+  ],
 ];
 
 describe.each(RANK_COMBOS)('순위 연결선 — %s', (_name, groupCount, advance, pairs, firstPhase) => {
@@ -3725,7 +3909,7 @@ git show --stat HEAD
 
 ## Task 15: 템플릿 미리보기 개수에 조별+결선 추가 (`planBracketTemplateCounts`)
 
-PR-3 의 `lib/bracket-template-counts.ts` 는 `group_knockout` 에 `null`(미리보기 없음)을 돌려주고 "PR-4 가 채운다"고 적어 두었다. 서버가 거절하는 조합(결선 크기 ∉ {2,4,8}, 결승만인데 3·4위전)도 `null` 이다 — 템플릿 창이 이 `null` 로 만들기 버튼을 막는다.
+PR-3 의 `lib/bracket-template-counts.ts` 는 `group_knockout` 에 `null`(미리보기 없음)을 돌려주고 "PR-4 가 채운다"고 적어 두었다. 서버가 거절하는 조합(결선 크기 ∉ {2,4,8,16}, 결승만인데 3·4위전)도 `null` 이다 — 템플릿 창이 이 `null` 로 만들기 버튼을 막는다.
 
 **Files:**
 - Modify: `apps/v1_web/src/lib/bracket-template-counts.ts`
@@ -3758,13 +3942,15 @@ PR-3 의 `lib/bracket-template-counts.ts` 는 `group_knockout` 에 `null`(미리
     ['8조 x 3팀 1팀 진출', { groupCount: 8, teamsPerGroup: 3, advancePerGroup: 1, legs: 1, thirdPlace: false }, { groups: 11, slots: 32, fixtures: 31, edges: 6 }],
     ['2조 x 3팀 1팀 진출(결승만)', { groupCount: 2, teamsPerGroup: 3, advancePerGroup: 1, legs: 1, thirdPlace: false }, { groups: 3, slots: 8, fixtures: 7, edges: 0 }],
     ['4조 x 5팀 1팀 진출 2회전', { groupCount: 4, teamsPerGroup: 5, advancePerGroup: 1, legs: 2, thirdPlace: false }, { groups: 6, slots: 24, fixtures: 83, edges: 2 }],
+    ['8조 x 4팀 2팀 진출(16강)', { groupCount: 8, teamsPerGroup: 4, advancePerGroup: 2, legs: 1, thirdPlace: false }, { groups: 12, slots: 48, fixtures: 63, edges: 14 }],
+    ['8조 x 4팀 2팀 진출(16강) + 3·4위전', { groupCount: 8, teamsPerGroup: 4, advancePerGroup: 2, legs: 1, thirdPlace: true }, { groups: 13, slots: 48, fixtures: 64, edges: 16 }],
   ] as const)('조별+결선 %s', (_name, rest, expected) => {
     expect(planBracketTemplateCounts({ kind: 'group_knockout', ...rest })).toEqual(expected);
   });
 
   it.each([
     ['결선 크기 3 (3조 x 1팀)', { groupCount: 3, teamsPerGroup: 4, advancePerGroup: 1, legs: 1, thirdPlace: false }],
-    ['결선 크기 16 (8조 x 2팀)', { groupCount: 8, teamsPerGroup: 4, advancePerGroup: 2, legs: 1, thirdPlace: false }],
+    ['결선 크기 6 (3조 x 2팀)', { groupCount: 3, teamsPerGroup: 4, advancePerGroup: 2, legs: 1, thirdPlace: false }],
     ['결승만인데 3·4위전', { groupCount: 2, teamsPerGroup: 4, advancePerGroup: 1, legs: 1, thirdPlace: true }],
   ] as const)('서버가 거절하는 조별+결선 조합은 미리보기가 없다(null) — %s', (_name, rest) => {
     expect(planBracketTemplateCounts({ kind: 'group_knockout', ...rest })).toBeNull();
@@ -3788,6 +3974,17 @@ PR-3 의 `lib/bracket-template-counts.ts` 는 `group_knockout` 에 `null`(미리
     expect(exceedsFixtureLimit(planBracketTemplateCounts({ ...big, teamsPerGroup: 5 })!)).toBe(false);
   });
 
+  it('조별+결선 16강(8조 x 2팀)은 조별 경기와 결선 16경기를 합쳐 센다 — 8조 x 6팀 x 2회전은 256경기로 초과, 8조 x 5팀 x 2회전(176)·8조 x 6팀 x 1회전(136)·8조 x 4팀 x 1회전(64)은 허용', () => {
+    const extreme = { kind: 'group_knockout', groupCount: 8, teamsPerGroup: 6, advancePerGroup: 2, legs: 2, thirdPlace: true } as const;
+    expect(planBracketTemplateCounts(extreme)!.fixtures).toBe(257);
+    expect(exceedsFixtureLimit(planBracketTemplateCounts(extreme)!)).toBe(true);
+    expect(exceedsFixtureLimit(planBracketTemplateCounts({ ...extreme, thirdPlace: false })!)).toBe(true);
+    expect(planBracketTemplateCounts({ ...extreme, teamsPerGroup: 5, thirdPlace: false })!.fixtures).toBe(176);
+    expect(exceedsFixtureLimit(planBracketTemplateCounts({ ...extreme, teamsPerGroup: 5 })!)).toBe(false);
+    expect(exceedsFixtureLimit(planBracketTemplateCounts({ ...extreme, legs: 1 })!)).toBe(false);
+    expect(exceedsFixtureLimit(planBracketTemplateCounts({ ...extreme, teamsPerGroup: 4, legs: 1 })!)).toBe(false);
+  });
+
   it('경계: 16팀 2회전은 정확히 240경기라 허용, 17팀 2회전은 272경기라 초과', () => {
 ```
 
@@ -3797,7 +3994,7 @@ PR-3 의 `lib/bracket-template-counts.ts` 는 `group_knockout` 에 `null`(미리
 cd apps/v1_web && ./node_modules/.bin/vitest run src/lib/bracket-template-counts.test.ts
 ```
 
-Expected: FAIL — `group_knockout` 이 `null` 이라 새 `it.each` 6건과 경계 1건이 red.
+Expected: FAIL — `group_knockout` 이 `null` 이라 새 `it.each` 8건과 경계 2건이 red.
 
 - [ ] **Step 3: 구현** — `bracket-template-counts.ts` 의 마지막 `return null;` 을 교체:
 
@@ -3816,9 +4013,9 @@ Expected: FAIL — `group_knockout` 이 `null` 이라 새 `it.each` 6건과 경�
   if (input.kind === 'league') {
     return { groups: 1, slots: input.teamCount, fixtures: ((input.teamCount * (input.teamCount - 1)) / 2) * input.legs, edges: 0 };
   }
-  // 결선 크기(조 수 x 진출 팀 수)가 2·4·8 이 아니거나 결승만인데 3·4위전이면 서버가 거절하는 조합 — 미리보기도 없다.
+  // 결선 크기(조 수 x 진출 팀 수)가 2·4·8·16 이 아니거나 결승만인데 3·4위전이면 서버가 거절하는 조합 — 미리보기도 없다.
   const size = input.groupCount * input.advancePerGroup;
-  if (![2, 4, 8].includes(size) || (size === 2 && input.thirdPlace)) return null;
+  if (![2, 4, 8, 16].includes(size) || (size === 2 && input.thirdPlace)) return null;
   const third = input.thirdPlace ? 1 : 0;
   const stageFixtures = input.groupCount * ((input.teamsPerGroup * (input.teamsPerGroup - 1)) / 2) * input.legs;
   return {
@@ -3836,7 +4033,7 @@ Expected: FAIL — `group_knockout` 이 `null` 이라 새 `it.each` 6건과 경�
 cd apps/v1_web && ./node_modules/.bin/vitest run src/lib/bracket-template-counts.test.ts && ./node_modules/.bin/tsc --noEmit -p tsconfig.json
 ```
 
-Expected: PASS (17건 = PR-3 8 중 1건 교체 + 새 10건), tsc 0.
+Expected: PASS (PR-3 8건 중 1건 교체 + 새 12건), tsc 0.
 
 - [ ] **Step 5: 커밋**
 
@@ -3855,7 +4052,7 @@ git show --stat HEAD
 **Interfaces:**
 - Produces:
   - `type GroupKnockoutTemplateValue = { groupCount: number; teamsPerGroup: number; advancePerGroup: 1 | 2; legs: 1 | 2; thirdPlace: boolean }` · `DEFAULT_GROUP_KNOCKOUT_VALUE`(2조·4팀·2팀 진출·1회전·3위전 없음)
-  - `groupKnockoutShapeIssue(value): string | null` — 서버가 422 `BRACKET_TEMPLATE_UNSUPPORTED` 로 거절할 조합(결선 크기 ∉ {2,4,8}, 결승만인데 3·4위전)을 보내기 전에 해요체로 알린다. 경기 수 상한(240)은 다루지 않는다 — 대화상자가 Task 15 의 `planBracketTemplateCounts`/`exceedsFixtureLimit` 로 막는다.
+  - `groupKnockoutShapeIssue(value): string | null` — 서버가 422 `BRACKET_TEMPLATE_UNSUPPORTED` 로 거절할 조합(결선 크기 ∉ {2,4,8,16}, 결승만인데 3·4위전)을 보내기 전에 해요체로 알린다. 경기 수 상한(240)은 다루지 않는다 — 대화상자가 Task 15 의 `planBracketTemplateCounts`/`exceedsFixtureLimit` 로 막는다.
   - `applyGroupKnockoutChange(value, patch)` — 결선이 결승 한 경기뿐이 되면 `thirdPlace` 를 끈다
   - `GroupKnockoutFields(props: { value; onChange: (next) => void; disabled?: boolean })`
 
@@ -3877,16 +4074,17 @@ import {
 const v = (patch: Partial<GroupKnockoutTemplateValue>): GroupKnockoutTemplateValue => ({ ...DEFAULT_GROUP_KNOCKOUT_VALUE, ...patch });
 
 describe('groupKnockoutShapeIssue', () => {
-  it('기본값과 지원하는 조합(2x1·2x2·4x1·4x2·8x1)은 문제없다', () => {
-    for (const [groupCount, advancePerGroup] of [[2, 1], [2, 2], [4, 1], [4, 2], [8, 1]] as const) {
+  it('기본값과 지원하는 조합(2x1·2x2·4x1·4x2·8x1·8x2)은 문제없다', () => {
+    for (const [groupCount, advancePerGroup] of [[2, 1], [2, 2], [4, 1], [4, 2], [8, 1], [8, 2]] as const) {
       expect(groupKnockoutShapeIssue(v({ groupCount, advancePerGroup }))).toBeNull();
     }
   });
 
   it.each([
-    ['결선 크기 3', v({ groupCount: 3, advancePerGroup: 1 }), /2·4·8팀.*3팀/],
-    ['결선 크기 6', v({ groupCount: 3, advancePerGroup: 2 }), /2·4·8팀.*6팀/],
-    ['결선 크기 16', v({ groupCount: 8, advancePerGroup: 2 }), /2·4·8팀.*16팀/],
+    ['결선 크기 3', v({ groupCount: 3, advancePerGroup: 1 }), /2·4·8·16팀.*3팀/],
+    ['결선 크기 6', v({ groupCount: 3, advancePerGroup: 2 }), /2·4·8·16팀.*6팀/],
+    ['결선 크기 12', v({ groupCount: 6, advancePerGroup: 2 }), /2·4·8·16팀.*12팀/],
+    ['결선 크기 7', v({ groupCount: 7, advancePerGroup: 1 }), /2·4·8·16팀.*7팀/],
     ['결승만인데 3·4위전', v({ advancePerGroup: 1, thirdPlace: true }), /3·4위전/],
   ])('%s → 안내 문장', (_name, value, pattern) => {
     expect(groupKnockoutShapeIssue(value)).toMatch(pattern);
@@ -3928,7 +4126,7 @@ describe('GroupKnockoutFields', () => {
     render(<Harness onChange={onChange} />);
     fireEvent.change(screen.getByLabelText('조 수'), { target: { value: '3' } });
     expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ groupCount: 3, advancePerGroup: 2 }));
-    expect(screen.getByRole('alert')).toHaveTextContent('2·4·8팀');
+    expect(screen.getByRole('alert')).toHaveTextContent('2·4·8·16팀');
   });
 
   it('진출 팀을 1팀으로 줄여 결승만 남으면 3·4위전 체크가 꺼지고 비활성화되며 안내가 붙는다 (경고는 아니다)', () => {
@@ -3990,7 +4188,7 @@ export const DEFAULT_GROUP_KNOCKOUT_VALUE: GroupKnockoutTemplateValue = {
   thirdPlace: false,
 };
 
-const SUPPORTED_KNOCKOUT_SIZES = [2, 4, 8];
+const SUPPORTED_KNOCKOUT_SIZES = [2, 4, 8, 16];
 
 const knockoutSize = (value: GroupKnockoutTemplateValue) => value.groupCount * value.advancePerGroup;
 
@@ -4001,7 +4199,7 @@ const knockoutSize = (value: GroupKnockoutTemplateValue) => value.groupCount * v
 export function groupKnockoutShapeIssue(value: GroupKnockoutTemplateValue): string | null {
   const size = knockoutSize(value);
   if (!SUPPORTED_KNOCKOUT_SIZES.includes(size)) {
-    return `결선에 올라가는 팀은 2·4·8팀이어야 해요. 지금은 ${size}팀이에요.`;
+    return `결선에 올라가는 팀은 2·4·8·16팀이어야 해요. 지금은 ${size}팀이에요.`;
   }
   if (size === 2 && value.thirdPlace) return '결선이 결승 한 경기뿐이면 3·4위전을 만들 수 없어요.';
   return null;
@@ -4162,7 +4360,7 @@ describe('BracketTemplateDialog — 조별+결선', () => {
     renderDialog({ format: 'group_knockout' });
     change('조 수', '3');
     expect(screen.getByRole('button', { name: '대진 만들기' })).toBeDisabled();
-    expect(screen.getByRole('alert')).toHaveTextContent('2·4·8팀');
+    expect(screen.getByRole('alert')).toHaveTextContent('2·4·8·16팀');
     expect(screen.queryByText(/^경기 \d+개/)).not.toBeInTheDocument();
     change('조별 진출 팀 수', '1');
     change('조 수', '4');
@@ -4179,6 +4377,34 @@ describe('BracketTemplateDialog — 조별+결선', () => {
     change('조당 팀 수', '6');
     expect(screen.getByRole('button', { name: '대진 만들기' })).toBeDisabled();
     expect(screen.getByText('경기가 240개를 넘어서 만들 수 없어요. 팀 수나 회전 수를 줄여 주세요.')).toBeInTheDocument();
+  });
+
+  it('8조 x 4팀 2팀 진출은 16강을 만든다 — 개수 미리보기 63개(3·4위전 64개), 본문은 groupCount 8 · advancePerGroup 2', () => {
+    renderDialog({ format: 'group_knockout' });
+    change('조 수', '8');
+    expect(screen.getByRole('button', { name: '대진 만들기' })).toBeEnabled();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(screen.getByText('경기 63개 · 자리 48개 · 연결 14개')).toBeInTheDocument();
+    fireEvent.click(screen.getByLabelText('3·4위전도 만들기'));
+    expect(screen.getByText('경기 64개 · 자리 48개 · 연결 16개')).toBeInTheDocument();
+    create();
+    expect(mocks.apply).toHaveBeenCalledWith(
+      { kind: 'group_knockout', groupCount: 8, teamsPerGroup: 4, advancePerGroup: 2, legs: 1, thirdPlace: true },
+      expect.any(Object),
+    );
+  });
+
+  it('16강 조합도 경기가 240개를 넘으면 막는다 (8조 x 6팀 x 2회전 + 16강 = 256개, 5팀이면 176개로 가능)', () => {
+    renderDialog({ format: 'group_knockout' });
+    change('조 수', '8');
+    change('조별 회전', '2');
+    change('조당 팀 수', '5');
+    expect(screen.getByRole('button', { name: '대진 만들기' })).toBeEnabled();
+    change('조당 팀 수', '6');
+    expect(screen.getByRole('button', { name: '대진 만들기' })).toBeDisabled();
+    expect(screen.getByText('경기가 240개를 넘어서 만들 수 없어요. 팀 수나 회전 수를 줄여 주세요.')).toBeInTheDocument();
+    change('조별 회전', '1');
+    expect(screen.getByRole('button', { name: '대진 만들기' })).toBeEnabled();
   });
 
   it('기존 대진이 있으면 확인을 거쳐 replaceExisting: true 로 보낸다', async () => {
@@ -5295,9 +5521,9 @@ git merge-base --is-ancestor "$M" <x-teameet-commit 값> && echo "포함됨"
 | 스펙 / 테스트 시나리오 | 태스크 |
 |---|---|
 | S2 group_knockout 템플릿: 조 A.., ENTRY 자리, 라운드로빈 `league_r{n}` + legs, advanceCount | 2, 3 |
-| S2 교차 대진 표 5종(2x1·2x2·4x1·4x2·8x1) 전수, GROUP_RANK 자리 ↔ 결선 사이드 | 1, 2, 3(통합), 12(웹 연결선 5종) |
-| S2 결선 크기 ∉ {2,4,8} → 422 `BRACKET_TEMPLATE_UNSUPPORTED`, K=2 + 3·4위전 → 422 | 1, 2, 3, 15(미리보기 null), 16(사전 안내) |
-| S2 상한 240 → 422 `BRACKET_TEMPLATE_TOO_LARGE` | 3(공개 진입점), 15, 17(웹 차단) |
+| S2 교차 대진 표 6종(2x1·2x2·4x1·4x2·8x1·8x2→16강) 전수, GROUP_RANK 자리 ↔ 결선 사이드 | 1, 2, 3(통합), 12(웹 연결선 6종) |
+| S2 결선 크기 ∉ {2,4,8,16} → 422 `BRACKET_TEMPLATE_UNSUPPORTED`, K=2 + 3·4위전 → 422 | 1, 2, 3, 15(미리보기 null), 16(사전 안내) |
+| S2 상한 240 → 422 `BRACKET_TEMPLATE_TOO_LARGE` (8조 x 6팀 x 2회전 + 16강 = 256 포함, 8조 x 4팀 x 1회전 = 63 통과) | 3(공개 진입점·통합), 15, 17(웹 차단) |
 | S2 kind ↔ format 불일치 422 | PR-1b executor 확인(Task 0), 20(작업 영역이 대회 자기 형식만 넘김) |
 | Test 개수 계약: 2x4·adv2·legs1 = 조별 12 + 4강 2 + 결승 1 (+3위 1), ENTRY 8, GROUP_RANK 4 | 2, 3(단위·통합), 15 |
 | S2 결선 연결: WINNER 연결, 3·4위전 4강 LOSER | 2 |
@@ -5306,7 +5532,7 @@ git merge-base --is-ancestor "$M" <x-teameet-commit 값> && echo "포함됨"
 | S4 override 범위: tied 자리 = 동률 팀만, ready 자리 = 원천 조 팀만, 그 밖(group_incomplete 포함) 422 `SLOT_REGISTRATION_INVALID`; 저장 순위 ≠ §5 → `tied` | 4(어긋남 → tied), 6(범위 4케이스 + 중복·404), 7(잘못된 override 는 쓰기 전 거절), 9 |
 | S4 조 편성·순위 재계산 이름(`ensureGroupPhaseTeamsInTx`·`recalculateStandingsInTx`·`releaseUnusedGroupTeamsInTx`, `tournament-bracket-tx.ts`) | 0(존재·옛 이름 0건 확인; PR-4 는 읽기 전용이라 호출하지 않음), 9 |
 | S4 채우기: override, 비우고 넣기(맞바꾸기 유일 제약), 시작 전 다시 채우기, tied+override 없으면 건너뜀 | 6, 7 (+ PR-1b `assignSlotsBatchInTx` 통합 스펙) |
-| S4 `@ArrayMaxSize`, uuid 검증 | 8 |
+| S4 `@ArrayMaxSize`(16), uuid 검증 | 8 |
 | S3 규칙 재사용(`SLOT_LOCKED`·`SLOT_TEAM_ALREADY_PLACED` 등은 `assignSlotsBatchInTx` 가 던짐) + 레인 잠금 + 감사 로그 | 7 |
 | 라우트 `GET …/slots/standings-preview`, `POST …/slots/fill-from-standings`, 권한(support 는 미리보기만) | 7, 8, 9 |
 | Test: swap A1<->A2 에서 유일 제약 위반 없음 | 6(계획이 두 자리 모두 writes), 7(한 번의 배치로 전달), PR-1b 배치 통합 스펙, 18(UI 맞바꾸기) |
@@ -5320,7 +5546,7 @@ git merge-base --is-ancestor "$M" <x-teameet-commit 값> && echo "포함됨"
 | S7 접근성: 44px, aria-label, aria-pressed, 모달 a11y(`useModalA11y`), 색 + 텍스트/아이콘, 점선(모양) | 13, 14, 16, 18 |
 | Scenario 3(조별리그 + 결선) 전체 흐름의 alpha 확인 — 머지 후 확인(배포 SHA → 읽기 스모크 → 승인 후 쓰기 E2E → 3폭 갤러리) | 21 |
 
-스펙 S4(2026-10-09 확정)가 정한 것을 그대로 구현한 곳: override 허용 범위(Task 6 — tied 자리는 동률 팀만·ready 자리는 원천 조 팀만·그 밖 422), 저장 순위와 §5 가 어긋날 때 `tied`(Task 4). 이 계획이 정한 해석(스펙이 비워 둔 곳): 순위표가 낡았으면 `group_incomplete`(Task 4), 이 대회의 순위 자리가 아닌 slotId 는 404(Task 6), 결선 경기 번호 순서 8강→4강→3·4위전→결승(Task 2), 조 편성 블록을 마지막 조별 열과 결선 첫 열 사이에 두는 배치(Task 12 — 긴 순위선이 다른 열을 가로지르지 않게). PR-1b 의 `knockout` 번호 순서와 다르면 그쪽에 맞춘다.
+스펙 S4(2026-10-09 확정)가 정한 것을 그대로 구현한 곳: override 허용 범위(Task 6 — tied 자리는 동률 팀만·ready 자리는 원천 조 팀만·그 밖 422), 저장 순위와 §5 가 어긋날 때 `tied`(Task 4). 이 계획이 정한 해석(스펙이 비워 둔 곳): 순위표가 낡았으면 `group_incomplete`(Task 4), 이 대회의 순위 자리가 아닌 slotId 는 404(Task 6), 조 편성 블록을 마지막 조별 열과 결선 첫 열 사이에 두는 배치(Task 12 — 긴 순위선이 다른 열을 가로지르지 않게). 결선 경기 번호·그룹 순서(…→4강→결승→3·4위전)와 라벨 표는 PR-1b/1c 가 정한 것을 그대로 쓴다(Task 2·3).
 
 알려진 한계: PR-3 의 칸이 잠금을 경기 단위로 판정해 조별 자리 공유 경기에서는 서버 409 가 마지막 방어선이다(Task 14 끝). 순위 `ready`/`tied` 의 end-to-end(실제 OFFICIAL 결과 → 순위 → 채우기)는 DB 에 결과를 손으로 심을 수 없어 통합 스펙이 아니라 단위(실제 순위 계산) + alpha 확인(Task 21)이 맡는다.
 

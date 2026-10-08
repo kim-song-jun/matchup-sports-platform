@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** 대진 자리(slot) 스키마를 깔고, 대진 변경 서비스의 내장 트랜잭션을 `…InTx` 함수로 분리해(동작 보존) 이후 PR(자리 서비스·템플릿)이 한 트랜잭션에 여러 변경을 묶을 수 있게 하며, 어드민 대진 응답과 공개 경기 직렬화에 자리 정보를 싣는다.
+**Goal:** 대진 자리(slot) 스키마를 깔고(같은 스키마 변경·같은 마이그레이션에 16강 단계 enum 값 `round16` 도 함께 넣는다 — 스펙 S1-b, 색인 "16강"), 대진 변경 서비스의 내장 트랜잭션을 `…InTx` 함수로 분리해(동작 보존) 이후 PR(자리 서비스·템플릿)이 한 트랜잭션에 여러 변경을 묶을 수 있게 하며, 어드민 대진 응답과 공개 경기 직렬화에 자리 정보를 싣는다.
 
 **Architecture:** `V1TournamentSlot` 표와 `V1TeamMatch.homeSlotId/awaySlotId` 를 additive 마이그레이션으로 추가한다. `tournament-bracket.service.ts` 의 그룹 생성·경기 수정(사이드 배정)·경기 삭제·그룹 삭제 본문을 새 파일 `tournament-bracket-tx.ts` 의 함수로 옮기고 서비스는 그 함수를 호출만 한다. 어드민 `getBracket` 은 `slots[]`·경기별 `homeSlotId/awaySlotId/game` 을, 공개 상세는 `homeSlotLabel/awaySlotLabel` 을 추가로 내려준다. 이 PR 에는 새 엔드포인트가 없다.
 
@@ -21,6 +21,7 @@
 3. **계약 함수 외에 export 되는 보조 함수**(모두 `tournament-bracket-tx.ts`): `recalculateStandingsInTx`, `ensureGroupPhaseTeamsInTx`(서비스의 private 메서드를 옮김 — 사이드 배정이 쓰므로 필요), `updateTournamentFixtureInTx`(일정·장소·번호·두 사이드를 한 번에 바꾸는 일반형 — `updateFixture` 가 쓰고 `assignTournamentFixtureSideInTx` 는 그 얇은 래퍼), `assertSidesNotSlotLinked`(순수 가드).
 4. **`createGroupInTx` 반환값.** 계약은 `Promise<{ id: string }>` 이지만 서비스가 응답 직렬화에 전체 행이 필요해 `Promise<V1TournamentGroup>` 를 돌려준다(`{ id }` 의 상위 집합이라 호출부 호환).
 5. **새 에러 코드 `GROUP_HAS_SLOTS`(409).** 자리가 남은 조를 지우면 FK(Restrict)가 500 을 내므로 `deleteGroup` 이 미리 막는다(Task 10). 코드 표(색인)에 없는 추가분이다.
+6. **`V1TournamentGroupPhase` 에 `round16` 값 추가(스펙 S1-b).** 스키마 변경은 PR-1a 에서 한 번만 하므로(색인 웨이브 표) 자리 스키마와 같은 `schema.prisma` 편집·같은 마이그레이션(`20261009090000_v1_tournament_slots`)에 넣는다. **enum 값만 추가한다 — 16강 업무 규칙(DTO `TOURNAMENT_GROUP_PHASES`, 인접 규칙, 라벨 `tournament-round-label.ts`, 템플릿, 웹)은 PR-1c 소관이라 이 PR 에서 건드리지 않는다.** 그래서 DB 는 `round16` 을 받지만 API DTO 는 아직 거부한다(1c 가 열 때까지 의도된 상태).
 
 ## 1a 가 export 하는 이름 (색인 보충 계약 — 1b·4·5a 는 import 만 한다)
 
@@ -64,8 +65,8 @@ export ISO=/Users/sungjun/.cache/bracket-canvas-iso
 | 파일 | 구분 | 책임 |
 |---|---|---|
 | `docs/design/competition-canonical-flow.md` | Modify | §6 결정 이력에 4행(자리·템플릿 / 리그 빈 경기 / 어드민 빠른 결과 / 킥 수 면제) |
-| `apps/v1_api/prisma/schema.prisma` | Modify | `V1TournamentSlotKind`·`V1TournamentSlot`, `V1TeamMatch.homeSlotId/awaySlotId` + 역관계 |
-| `apps/v1_api/prisma/migrations/20261009090000_v1_tournament_slots/migration.sql` | Create | additive 마이그레이션(enum·표·nullable 컬럼 2·FK·인덱스) |
+| `apps/v1_api/prisma/schema.prisma` | Modify | `V1TournamentSlotKind`·`V1TournamentSlot`, `V1TeamMatch.homeSlotId/awaySlotId` + 역관계, `V1TournamentGroupPhase.round16` |
+| `apps/v1_api/prisma/migrations/20261009090000_v1_tournament_slots/migration.sql` | Create | additive 마이그레이션(`ALTER TYPE … ADD VALUE 'round16'`·enum·표·nullable 컬럼 2·FK·인덱스) |
 | `deploy/Dockerfile.v1-api` · `deploy/alpha-manifest-common.sh` · `scripts/release/create-alpha-release-manifest.sh` · `scripts/release/prepare-task168-final-steady-inputs.sh` · `apps/v1_api/test/fixtures/game-schema.fixture.ts` | Modify | 스키마 해시 5곳 재고정(alpha-manifest 는 허용 목록에 추가) |
 | `apps/v1_api/src/common/admin-context.service.ts` (+`.spec.ts`) | Modify | `writeAdminActionLog` 함수 추출(메서드는 위임) |
 | `apps/v1_api/src/tournaments/slots/tournament-slot-label.ts` (+`.spec.ts`) | Create | 자리 라벨 순수 함수 + 공개/어드민 공용 select 모양 |
@@ -143,15 +144,15 @@ cd $WT && git commit -m "docs(design): 정본 §6 결정 이력에 대진 자리
 
 ---
 
-### Task 2: 스키마 + 마이그레이션 + 스키마 해시 5곳 + 격리 검증 하네스
+### Task 2: 스키마(자리 + `round16`) + 마이그레이션 + 스키마 해시 5곳 + 격리 검증 하네스
 
 **Files:**
-- Modify: `apps/v1_api/prisma/schema.prisma` (`V1TeamMatch` ≈:1793-1860, `V1Tournament` ≈:2573-2710, `V1TournamentRegistration` ≈:2803-2850, `V1TournamentGroup` ≈:2913-2935, 파일 끝의 `V1TournamentByeSlot` ≈:4000 뒤)
+- Modify: `apps/v1_api/prisma/schema.prisma` (`V1TournamentGroupPhase` ≈:2546, `V1TeamMatch` ≈:1793-1860, `V1Tournament` ≈:2573-2710, `V1TournamentRegistration` ≈:2803-2850, `V1TournamentGroup` ≈:2913-2935, 파일 끝의 `V1TournamentByeSlot` ≈:4000 뒤)
 - Create: `apps/v1_api/prisma/migrations/20261009090000_v1_tournament_slots/migration.sql`
 - Modify: `apps/v1_api/test/fixtures/game-schema.fixture.ts:569-572`, `deploy/Dockerfile.v1-api:27-28`, `deploy/alpha-manifest-common.sh:123`, `scripts/release/create-alpha-release-manifest.sh:116,304`, `scripts/release/prepare-task168-final-steady-inputs.sh:29`
 - Test: `apps/v1_api/src/games/game-schema-source-snapshot.spec.ts`(기존, 수정 없음)
 
-**Interfaces:** Consumes: 색인 "공유 계약 > Prisma". Produces: Prisma 모델 `V1TournamentSlot`, enum `V1TournamentSlotKind`, `V1TeamMatch.homeSlotId/awaySlotId/homeSlot/awaySlot` — 이후 모든 Task 와 PR-1b~5a 가 소비한다.
+**Interfaces:** Consumes: 색인 "공유 계약 > Prisma". Produces: Prisma 모델 `V1TournamentSlot`, enum `V1TournamentSlotKind`, enum 값 `V1TournamentGroupPhase.round16`(PR-1c 가 소비), `V1TeamMatch.homeSlotId/awaySlotId/homeSlot/awaySlot` — 이후 모든 Task 와 PR-1b~5a 가 소비한다.
 
 - [ ] **Step 1: 마이그레이션 폴더 이름이 최신보다 뒤인지 확인한다**
 
@@ -163,7 +164,7 @@ cd $WT/apps/v1_api && ls prisma/migrations | grep -v migration_lock | tail -1
 
 기대: `20261008120000_v1_group_team_backfill_for_fixtures` (다르면 더 뒤 번호를 보고 폴더 타임스탬프를 그 뒤로 정한다 — 이 계획은 `20261009090000` 을 쓴다).
 
-- [ ] **Step 2: `schema.prisma` 를 고친다 (Edit 7번, 각각 `old_string` 이 파일에서 한 번만 나온다)**
+- [ ] **Step 2: `schema.prisma` 를 고친다 (Edit 8번, 각각 `old_string` 이 파일에서 한 번만 나온다)**
 
 (a) `V1TeamMatch` 컬럼 — `old_string`:
 
@@ -310,6 +311,27 @@ model V1TournamentSlot {
 }
 ```
 
+(h) 16강 단계 enum 값 — `round12` 앞에 둔다(단계 순서: group < round16 < round12 < quarter …). `old_string`:
+
+```
+enum V1TournamentGroupPhase {
+  group
+  round12
+  quarter
+```
+
+`new_string`:
+
+```
+enum V1TournamentGroupPhase {
+  group
+  round16
+  round12
+  quarter
+```
+
+이 편집은 값 추가뿐이다. `@default` 나 다른 모델이 `round16` 을 참조하게 만들지 않는다(마이그레이션 트랜잭션 주의는 Step 4).
+
 - [ ] **Step 3: 스키마가 유효한지 오프라인으로 확인한다**
 
 ```bash
@@ -322,12 +344,17 @@ cd $WT/apps/v1_api && DATABASE_URL=postgresql://x:x@localhost:5432/x ./node_modu
 
 - [ ] **Step 4: 마이그레이션 SQL 을 만든다**
 
-`apps/v1_api/prisma/migrations/20261009090000_v1_tournament_slots/migration.sql` 을 Write 로 만든다. 본문은 `prisma migrate diff` 가 내는 SQL 그대로이고(Step 5 에서 대조), 맨 위 주석 3줄만 사람이 붙인다:
+`apps/v1_api/prisma/migrations/20261009090000_v1_tournament_slots/migration.sql` 을 Write 로 만든다. 본문은 `prisma migrate diff` 가 내는 SQL 과 같고(Step 5 에서 대조), 맨 위 주석과 `AlterEnum` 의 `IF NOT EXISTS … BEFORE 'round12'` 만 사람이 붙인다. `round12`/`quarter` 마이그레이션(`20261004110000_v1_tournament_round12_quarter`)이 같은 형태(`ADD VALUE IF NOT EXISTS … BEFORE …`)를 썼고, 값 순서는 스키마 enum 순서와 맞춘다:
 
 ```sql
--- Additive only: team slots for the admin bracket canvas. A new enum, the v1_tournament_slots
--- table, two nullable v1_team_matches columns that point at it, and their indexes and foreign keys.
--- No existing row is read, written, or backfilled.
+-- Additive only: team slots for the admin bracket canvas plus the round16 group phase.
+-- A new enum, the v1_tournament_slots table, two nullable v1_team_matches columns that point at it,
+-- and their indexes and foreign keys. No existing row is read, written, or backfilled.
+-- The round16 value is added and never referenced in this file: Postgres cannot use a new enum
+-- value inside the transaction that added it.
+
+-- AlterEnum
+ALTER TYPE "V1TournamentGroupPhase" ADD VALUE IF NOT EXISTS 'round16' BEFORE 'round12';
 
 -- CreateEnum
 CREATE TYPE "V1TournamentSlotKind" AS ENUM ('ENTRY', 'BYE', 'GROUP_RANK');
@@ -382,6 +409,16 @@ ALTER TABLE "v1_tournament_slots" ADD CONSTRAINT "v1_tournament_slots_source_gro
 ALTER TABLE "v1_tournament_slots" ADD CONSTRAINT "v1_tournament_slots_registration_id_fkey" FOREIGN KEY ("registration_id") REFERENCES "v1_tournament_registrations"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 ```
 
+**트랜잭션 주의(Postgres 12+ / Prisma):** `prisma migrate deploy` 는 마이그레이션 파일 하나를 한 번에 실행하므로 `ALTER TYPE … ADD VALUE` 는 같은 트랜잭션 안에서 실행된다. PG 12 이상(이 저장소는 16)은 이를 허용하지만, **그 트랜잭션이 커밋되기 전에는 새 값 `'round16'` 을 쓸 수 없다**(컬럼 `DEFAULT`·`INSERT`·부분 인덱스 조건·`CHECK` 에 쓰면 `unsafe use of new value`). 그래서 이 파일은 `round16` 을 값으로 참조하는 문장이 하나도 없어야 한다. `round16` 행을 만드는 코드(PR-1c 템플릿)는 마이그레이션이 이미 커밋된 뒤에 돈다. 아래로 확인한다:
+
+```bash
+export WT=/Users/sungjun/Dev/projects/matchup-sports-platform/.claude/worktrees/admin-bracket-canvas
+export ISO=/Users/sungjun/.cache/bracket-canvas-iso
+cd $WT/apps/v1_api && grep -n "round16" prisma/migrations/20261009090000_v1_tournament_slots/migration.sql
+```
+
+기대: `ALTER TYPE` 한 줄과 주석 줄만 나온다(`DEFAULT`·`INSERT`·`WHERE` 문맥 없음).
+
 - [ ] **Step 5: 마이그레이션이 스키마 변경분과 정확히 같은지 대조한다 (드리프트 0 의 로컬 근거)**
 
 ```bash
@@ -396,13 +433,15 @@ export ISO=/Users/sungjun/.cache/bracket-canvas-iso
   DATABASE_URL=postgresql://x:x@localhost:5432/x ./node_modules/.bin/prisma migrate diff \
     --from-schema-datamodel "$ISO/old.prisma" --to-schema-datamodel prisma/schema.prisma --script > "$ISO/slots.diff.sql"
   test -s "$ISO/slots.diff.sql"   # diff 명령이 실패하거나 빈 출력이면 여기서 멈춘다 (stderr 를 숨기지 않는다)
-  diff <(grep -v '^--' "$ISO/slots.diff.sql" | sed '/^$/d') \
-       <(grep -v '^--' prisma/migrations/20261009090000_v1_tournament_slots/migration.sql | sed '/^$/d')
+  # Prisma emits a bare `ADD VALUE 'round16';`; the hand-written line adds IF NOT EXISTS / BEFORE, so strip those two before comparing.
+  norm() { grep -v '^--' "$1" | sed -E "s/ADD VALUE IF NOT EXISTS/ADD VALUE/; s/ BEFORE '[a-z0-9_]+'//" | sed '/^$/d'; }
+  grep -q "ADD VALUE 'round16'" "$ISO/slots.diff.sql"   # 스키마 편집 (h) 가 빠졌으면 여기서 멈춘다
+  diff <(norm "$ISO/slots.diff.sql") <(norm prisma/migrations/20261009090000_v1_tournament_slots/migration.sql)
   echo "OK: migration == schema delta"
 )
 ```
 
-기대: `OK: migration == schema delta`(서브셸이라 `set -e` 가 호출 셸에 번지지 않는다). `prisma migrate diff` 가 실패하면 그 에러가 그대로 보이고 `test -s` 에서 멈춘다 — 빈 diff 를 "일치"로 읽지 않는다. 차이가 나면 Step 2 의 스키마 편집이 위 SQL 과 다른 것이다(컬럼 순서·`@map` 오타) — 스키마를 고친다. 마이그레이션을 스키마에 맞추려고 SQL 을 손으로 고치지 않는다.
+기대: `OK: migration == schema delta` — `round16` enum 값과 자리 스키마가 한 번에 대조된다(서브셸이라 `set -e` 가 호출 셸에 번지지 않는다). `prisma migrate diff` 가 실패하면 그 에러가 그대로 보이고 `test -s` 에서 멈춘다 — 빈 diff 를 "일치"로 읽지 않는다. 차이가 나면 Step 2 의 스키마 편집이 위 SQL 과 다른 것이다(컬럼 순서·`@map` 오타) — 스키마를 고친다. 마이그레이션을 스키마에 맞추려고 SQL 을 손으로 고치지 않는다. 드리프트 0 의 최종 근거는 CI 의 "V1 migration replay + drift gate"(빈 DB 에 체인 전체 재생 + `schema.prisma` 드리프트 0)이며, 위 대조는 그 로컬 근거다.
 
 - [ ] **Step 6: 실패하는 테스트를 확인한다 — 스키마 바이트가 고정 해시와 달라졌다**
 
@@ -425,8 +464,8 @@ cd $WT/apps/v1_api && TZ=UTC ./node_modules/.bin/jest --maxWorkers=1 src/games/g
 `new_string`:
 
 ```
-  // 2026-10-09: additive V1TournamentSlot + V1TeamMatch.homeSlotId/awaySlotId backed by
-  // 20261009090000_v1_tournament_slots. Game models and the bound historical
+  // 2026-10-09: additive V1TournamentSlot + V1TeamMatch.homeSlotId/awaySlotId + the round16
+  // group phase value, all backed by 20261009090000_v1_tournament_slots. Game models and the bound historical
   // game-operations migration are unchanged; re-pin the schema bytes only.
   schema: 'f0a8ce6e02421b02b5e36772dec0f183121064a02e2a976e7f9ee8d9965c954a',
 ```
@@ -445,7 +484,7 @@ perl -pi -e 's/$ENV{OLD}/$ENV{NEW}/g' deploy/Dockerfile.v1-api scripts/release/c
 perl -pi -e 's/(\.database\.task168\.schemaSha256 == "\Q$ENV{OLD}\E")\) and/$1 or\n       .database.task168.schemaSha256 == "$ENV{NEW}") and/' deploy/alpha-manifest-common.sh
 ```
 
-(이 계획을 쓴 시점의 `NEW` 는 `3b93a336fcb09a0019fd9ec7db80a5c42bfdc266f8ab199a7891225a9f652883` 이다. 다르면 base 가 움직였거나 Step 2 편집이 다른 것이니 `sha256sum` 결과를 그대로 쓰면 된다.)
+(`NEW` 는 Step 2 의 편집 (a)~(h) 를 **전부** 적용한 뒤의 `schema.prisma` 해시여야 한다 — (h) `round16` 을 빼고 계산한 해시는 틀리다. 고정 기대값은 적지 않는다(자리 스키마만 반영한 이전 계획값 `3b93a336…` 는 `round16` 때문에 더 이상 맞지 않는다). Step 6 에서 FAIL, Step 9 에서 PASS 로 바뀌는지로 확인한다.)
 
 - [ ] **Step 8: 5곳이 모두 바뀌었고 이전 해시가 허용 목록 말고는 남지 않았는지 확인한다**
 
@@ -535,6 +574,16 @@ cd $WT/apps/v1_api && ./node_modules/.bin/tsc --noEmit -p "$ISO/tsconfig.isochec
 ```
 
 기대: 출력 없음(타입 오류 0). 오류가 나면 이 Task 의 변경이 아니라 하네스 경로(`$ISO`·`$WT`)가 틀린 것부터 본다.
+
+`round16` 이 새 enum 값으로 생겨도 `Record<V1TournamentGroupPhase, …>` 처럼 전 값을 강제하는 서버 코드가 없어 tsc 0 이 유지된다. 범위 가드 — 16강 업무 규칙이 이 PR 에 새지 않았는지 확인한다:
+
+```bash
+export WT=/Users/sungjun/Dev/projects/matchup-sports-platform/.claude/worktrees/admin-bracket-canvas
+export ISO=/Users/sungjun/.cache/bracket-canvas-iso
+cd $WT && git diff HEAD --name-only | grep -E '^apps/v1_(api/src|web)/' ; grep -rn "round16" apps/v1_api/src apps/v1_web/src | head -3
+```
+
+기대: 두 출력 모두 비어 있다(`round16` 은 `schema.prisma`·마이그레이션 SQL 에만 있다). DTO `TOURNAMENT_GROUP_PHASES`·`tournament-round-label.ts`·웹 타입은 PR-1c 가 바꾼다.
 
 - [ ] **Step 12: 커밋한다**
 

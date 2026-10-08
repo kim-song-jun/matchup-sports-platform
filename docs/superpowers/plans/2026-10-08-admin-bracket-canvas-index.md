@@ -18,6 +18,7 @@
 |---|---|---|
 | PR-1a | `2026-10-08-admin-bracket-canvas-pr1a-schema-tx.md` | 정본 §6 기록 · 스키마·마이그레이션·해시 5곳 · `…InTx` 추출 · 어드민/공개 대진 응답 확장 |
 | PR-1b | `2026-10-08-admin-bracket-canvas-pr1b-slots-templates.md` | 자리 서비스(배정·비우기·무작위·조 편성·BYE·SLOT_LINKED·등록 이탈) · 대회 템플릿(knockout 4/8/12, league 대회) |
+| PR-1c | `2026-10-08-admin-bracket-canvas-pr1c-round16.md` | 16강 단계 서버 규칙(인접·라벨·DTO·정렬) · knockout 16 템플릿 · 웹 16강 라벨/공개 라운드 순서/진행 단계/"+16강" (enum 값은 1a) |
 | PR-2 | `2026-10-08-admin-bracket-canvas-pr2-quick-result.md` | `ADMIN_QUICK` 흐름 · 빠른 결과 · 정정 킥 수 면제 |
 | PR-3 | `2026-10-08-admin-bracket-canvas-pr3-canvas-ui.md` | 웹 캔버스(토너먼트) · 트레이 · 패널 · 점수/정정/무효/확인 · 템플릿 창 · [그림\|목록] · 공개 자리 라벨 |
 | PR-4 | `2026-10-08-admin-bracket-canvas-pr4-group-knockout.md` | group_knockout 템플릿 · GROUP_RANK · 순위 미리보기/채우기 (BE+FE) |
@@ -25,7 +26,18 @@
 | PR-5b | `2026-10-08-admin-bracket-canvas-pr5b-league-ui.md` | 리그 어드민 일정 보드 · 리그 타입 nullable · 참가팀 registrationId |
 | PR-6 | `2026-10-08-admin-bracket-canvas-pr6-mobile-finish.md` | 390 라운드 탭 + 바텀시트 · 구조 편집 숨김 · 마감 |
 
-PR-1a·1b 는 한 PR(PR-1)로 머지해도 되고 나눠도 된다(1a 가 먼저). 각 PR 은 dev 머지 → alpha 배포 확인 → 새 테스트 대회로 ego-browser E2E(alpha 데이터 쓰기는 **실행 전 사용자 승인**) → 390/768/1440 갤러리를 그 PR 코멘트에 게시.
+**병렬 실행 웨이브(2026-10-09 사용자: Ultracode 병렬)** — 같은 웨이브의 PR 은 각자 worktree 에서 동시에 구현하고, 머지는 웨이브 안에서 순서대로(뒤 PR 은 앞 PR 머지 뒤 `origin/dev` 를 3-way merge 해 충돌 해결·재검증):
+
+| 웨이브 | PR | 선행 |
+|---|---|---|
+| 1 | 1a | — (스키마 변경은 여기 한 번: 자리 + `round16`) |
+| 2 | 1b · 2 | 1a |
+| 3 | 1c · 5a | 1b |
+| 4 | 3 | 1b·1c·2 (3 은 1c 의 `tournamentRoundLabel`·`BRACKET_SOURCE_PHASES` 를 import) |
+| 5 | 4 · 5b | 1b·1c·3(4), 5a·3(5b) |
+| 6 | 6 | 3·4·5b |
+
+PR-1a·1b 는 순서상 1a 가 먼저다. 각 PR 은 dev 머지 → alpha 배포 확인 → 새 테스트 대회로 ego-browser E2E(alpha 데이터 쓰기는 **실행 전 사용자 승인**) → 390/768/1440 갤러리를 그 PR 코멘트에 게시.
 
 ## Global Constraints (모든 태스크에 적용)
 
@@ -48,8 +60,10 @@ PR-1a·1b 는 한 PR(PR-1)로 머지해도 되고 나눠도 된다(1a 가 먼저
    `git -C /Users/sungjun/Dev/projects/matchup-sports-platform worktree add .claude/worktrees/<slug> -b feat/<slug> origin/dev`.
 2. node_modules 심링크(읽기 전용, **절대 `git add` 하지 않는다** — `.gitignore` 의 `node_modules/` 는 심링크를 못 잡는다):
    `ln -s <main>/node_modules <wt>/node_modules`, `apps/v1_web`·`apps/v1_api` 도 같게.
-3. 격리 Prisma 하네스를 **새 worktree 경로로 다시 만든다** — PR-1a Task 2 Step 10 의 명령을 `WT=<새 worktree>` 로 재실행
-   (`ISO=/Users/sungjun/.cache/bracket-canvas-iso`; rootDir·paths 가 worktree 절대경로라 PR 마다 재생성 필요). 실행 전후 공유 client 오염 확인.
+3. 격리 Prisma 하네스를 **새 worktree 경로로 다시 만든다** — PR-1a Task 2 Step 10 의 명령을 `WT=<새 worktree>` 로 재실행.
+   **`ISO` 는 worktree 마다 따로**: `ISO=/Users/sungjun/.cache/bracket-canvas-iso/<slug>`(병렬 웨이브에서 하네스가 서로 덮이지 않게 — 계획 본문의
+   `ISO=/Users/sungjun/.cache/bracket-canvas-iso` 는 이 값으로 바꿔 읽는다). rootDir·paths 가 worktree 절대경로라 PR 마다 재생성 필요. 실행 전후 공유 client 오염 확인.
+   내가 띄운 프로세스(postgres·dev 서버 등)는 태스크 끝에 PID 로 직접 종료한다.
 4. 계획의 Task 0(있으면)로 선행 PR 심볼이 실제 코드에 있는지 grep 확인 — 없으면 BLOCKED 로 멈춘다.
 
 ## 머지 후 확인 (PR 마다)
@@ -152,11 +166,13 @@ model V1TournamentSlot {
 | 공개 일정 `PublicScheduleEntry.homeSlotLabel/awaySlotLabel: string \| null`(`items[]`·`unscheduled[]`) | `games/public-records/*` | 1a | 3(`schedule-content.tsx` 가 라벨 우선 표시) |
 | `ApplyLeagueTemplateDto.placeName?: string` | `league-matches/dto/*` | 5a | 5b |
 
+**16강(2026-10-09 추가):** `V1TournamentGroupPhase` 에 `'round16'`(1a 마이그레이션), round 문자열 `'16강'`, 인접 `quarter ← round12 | round16`, `BracketTemplateInput` knockout `size: 4 | 8 | 12 | 16`(1c 가 planner 확장), `groupRankPairings(8, 2)` → 16강 8경기 (결선 크기 K = 조 수 × 진출 팀 수 ∈ {2,4,8,16}). 결선 번호·그룹 순서는 `… → 4강 → 결승 → 3·4위전`(결승 다음 3·4위전), 라벨 표는 `knockout-phase-labels.ts` 한 곳(4). 웹 단계 순서 상수는 `round16 > round12 > quarter > semi > final > third_place`(실제로 한 대회에 16강·12강이 함께 있지는 않다).
+
 `BracketTemplatePlan`(1b, 4 에서 확장):
 
 ```ts
 export type BracketTemplateInput =
-  | { kind: 'knockout'; size: 4 | 8 | 12; thirdPlace: boolean }
+  | { kind: 'knockout'; size: 4 | 8 | 12 | 16; thirdPlace: boolean }
   | { kind: 'group_knockout'; groupCount: number; teamsPerGroup: number; advancePerGroup: 1 | 2; legs: 1 | 2; thirdPlace: boolean }
   | { kind: 'league'; teamCount: number; legs: 1 | 2 };
 export type PlanGroup = { key: string; name: string; phase: V1TournamentGroupPhase; sortOrder: number; advanceCount: number | null };

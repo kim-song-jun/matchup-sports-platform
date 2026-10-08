@@ -97,12 +97,18 @@ Status: Planning
 - 승자/패자 자리는 자리 행을 만들지 않는다 — 기존 연결선(edge)이 정본이다.
 - 마이그레이션은 additive 만: 새 enum·새 표·새 nullable 컬럼 2개·새 FK·인덱스. 백필 없음. 기존 경기는 slot null 로 그대로 동작.
 
+### S1-b. 16강 단계 (2026-10-09 사용자 확정)
+
+- `V1TournamentGroupPhase` 에 `round16` 을 추가한다(자리 마이그레이션과 같은 스키마 변경 — `ALTER TYPE … ADD VALUE`, additive).
+- 연결 인접표: `quarter ← round12 | round16`. 라벨 '16강'(round 문자열 '16강', 단계 라벨 표·공개 대진표 라운드 순서·진행 단계 표시·어드민 조 추가 템플릿 "+16강").
+- 16강엔 부전승이 없다(부전승은 12강 전용 그대로).
+
 ### S2. 템플릿으로 뼈대 만들기
 
 - 대회: `POST /admin/tournaments/:tournamentId/bracket/template`
-  - `{ kind: 'knockout', size: 4 | 8 | 12, thirdPlace: boolean, replaceExisting?: boolean }`
+  - `{ kind: 'knockout', size: 4 | 8 | 12 | 16, thirdPlace: boolean, replaceExisting?: boolean }`
   - `{ kind: 'group_knockout', groupCount: 2..8, teamsPerGroup: 3..6, advancePerGroup: 1 | 2, legs: 1 | 2, thirdPlace: boolean, replaceExisting? }`
-    — 결선 크기 K = groupCount × advancePerGroup ∈ {2, 4, 8} 만 허용(그 밖은 422 `BRACKET_TEMPLATE_UNSUPPORTED`).
+    — 결선 크기 K = groupCount × advancePerGroup ∈ {2, 4, 8, 16} 만 허용(그 밖은 422 `BRACKET_TEMPLATE_UNSUPPORTED`).
   - `{ kind: 'league', teamCount: 3..20, legs: 1 | 2, replaceExisting? }` — 리그 방식 대회(`format='league'`).
   - `kind` 는 대회 `format` 과 맞아야 한다(knockout↔knockout, group_knockout↔group_knockout, league↔league), 아니면 422 `BRACKET_TEMPLATE_FORMAT_MISMATCH`.
 - 정규 리그: `POST /admin/league-matches/:leagueId/fixtures/template`
@@ -114,12 +120,14 @@ Status: Planning
     `assertFixtureGenerationAllowedInTx`(보류·완료 등 불허 상태 거부)를 먼저 한다. advisory lock 은 리그 경로와 서로 직렬화되지 않으므로 쓰지 않는다.
   - 한 변경이 여러 경기를 갱신하면 대상 경기를 **id 순으로 정렬해** 잠근다(`updateBracketSources` 의 관례).
 - 한 트랜잭션(timeout 45s, 생성 경기 상한 240)에서 만든다:
-  - knockout 4/8: 첫 결선 그룹 ENTRY 자리 2K개 + 각 라운드 빈 경기 + WINNER 연결(+ 3·4위전 LOSER 연결).
+  - knockout 4/8/16: 첫 결선 그룹 ENTRY 자리 size 개 + 각 라운드 빈 경기 + WINNER 연결(+ 3·4위전 LOSER 연결). 16 은 그룹 16강(phase `round16`)·8강·4강·결승(·3위 결정전),
+    16강 2i-1·2i 번 경기 승자 → 8강 i 번 경기 홈·어웨이.
   - knockout 12: 그룹 12강·8강·4강·결승(·3위 결정전) + 12강 ENTRY 8개(12강 4경기) + BYE 자리 4개(position 1~4 ↔ ByeSlot sortOrder 0,3,4,7)
     + 8강 i번 경기: 홈 = BYE 자리 i, 어웨이 = 12강 i번 경기 WINNER 연결. 이후 라운드는 WINNER 연결.
   - group_knockout: 조 A.. 각 ENTRY 자리 teamsPerGroup개 + 라운드로빈 빈 경기('league_r{n}', legs) + 조 advanceCount
     + 첫 결선 라운드 사이드 = GROUP_RANK 자리(교차 대진: 2조×2 → 4강 A1–B2, B1–A2 / 4조×2 → 8강 A1–B2, C1–D2, B1–A2, D1–C2 /
-    4조×1 → 4강 A1–D1, B1–C1 / 8조×1 → 8강 A1–H1, D1–E1, B1–G1, C1–F1 / 2조×1 → 결승 A1–B1) + 이후 WINNER 연결.
+    4조×1 → 4강 A1–D1, B1–C1 / 8조×1 → 8강 A1–H1, D1–E1, B1–G1, C1–F1 / 8조×2 → 16강 A1–B2, C1–D2, E1–F2, G1–H2, B1–A2, D1–C2, F1–E2, H1–G2 /
+    2조×1 → 결승 A1–B1) + 이후 WINNER 연결.
     K=2(결승만)에서 `thirdPlace=true` 는 422 `BRACKET_TEMPLATE_UNSUPPORTED`(3·4위전의 패자 원천은 4강뿐).
   - league(대회): 그룹 "리그" 1개(phase group) + ENTRY 자리 teamCount개 + 라운드로빈 빈 경기.
   - 정규 리그: ENTRY 자리 teamCount개(groupId null) + 라운드로빈 빈 경기(시각·장소는 schedule 로 계산, 팀 null).
@@ -268,6 +276,7 @@ Status: Planning
 - [ ] 모바일은 보기·팀 넣기·결과 입력, 구조 편집은 768px 이상.
 - [ ] 사용자는 플랫폼 어드민(owner·ops)만. 대회 운영 콘솔(스태프)은 바꾸지 않는다.
 - [ ] 목적: 대회 만들기·테스트가 쉬워진다 — 8강 대회를 새로 만들어 결승까지 클릭만으로 한 바퀴 돌 수 있다.
+- [ ] 16강 템플릿도 포함한다(토너먼트 16팀, 조별 8조×2 → 16강) — 2026-10-09 사용자 확정.
 
 ## User Scenarios
 
@@ -315,7 +324,8 @@ Expected: 공개 대진표에 조별 진행 중엔 "A조 1위", 채운 뒤엔 �
 - [ ] 무효 뒤 재입력: VOID → 빠른 결과 가능, `supersedesId`=VOID 리비전.
 - [ ] 정정(그림): corrections → officialize 로 점수 바뀌고 다음 칸 재투영.
 - [ ] 웹 레이아웃 순수 함수: 라운드 열 순서·칸 y 위치·연결선(WINNER/LOSER/BYE/GROUP_RANK 점선) 계산.
-- [ ] 교차 대진 표 전수: (2조×1)·(2조×2)·(4조×1)·(4조×2)·(8조×1) 각각의 GROUP_RANK 자리 ↔ 결선 사이드 매핑.
+- [ ] 교차 대진 표 전수: (2조×1)·(2조×2)·(4조×1)·(4조×2)·(8조×1)·(8조×2) 각각의 GROUP_RANK 자리 ↔ 결선 사이드 매핑.
+- [ ] knockout 16+3위전 = 경기 8+4+2+1+1=16·연결(8강←16강 8, 4강←8강 4, 결승←4강 2, 3위←4강 2)=16·ENTRY 16. 16강→8강 연결 인접 허용, 16강 부전승 거부.
 - [ ] 조 편성: 조 자리 배정 시 GroupTeam 생성·순위 행 생성, 교체·비우기 시 이전 팀 GroupTeam 제거(다른 경기에 남아 있으면 유지).
 - [ ] 공개 경기 직렬화 `homeSlotLabel`/`awaySlotLabel`: 팀이 없을 때만 라벨, 팀이 있으면 null. 공개 대진표는 라벨을 'TBD' 보다 우선.
 - [ ] 빠른 결과 → 워커 소비(통합): 순위·팀 전적·개인 기록(출전)·완료 알림 1회. 같은 경기 정정 후 알림 재발송 없음.
@@ -363,13 +373,16 @@ PR 은 순서대로 dev 에 머지하고 매번 alpha 에서 확인한다(dev �
 - [ ] **첫 커밋: 정본 `docs/design/competition-canonical-flow.md` §6 결정 이력 행 추가**(정본 §8 — 구현보다 먼저):
       ① 대진 자리(slot)와 템플릿 ② 정규 리그 빈 경기(자리 미배정 경기는 공개 제외) ③ 어드민 빠른 결과(어드민 입력 = 어드민 확인, §4 확인 한 단계의 어드민 단축 경로,
       득점자 없음 → 개인 기록은 출전만) ④ 득점 기록 0건 경기의 승부차기 킥 수 면제.
-- [ ] 스키마·마이그레이션(S1) + 스키마 해시 5곳(`deploy/Dockerfile.v1-api`, `deploy/alpha-manifest-common.sh`(추가),
+- [ ] 스키마·마이그레이션(S1 + S1-b 의 `round16` enum 값 — 스키마 변경은 이 PR 한 번) + 스키마 해시 5곳(`deploy/Dockerfile.v1-api`, `deploy/alpha-manifest-common.sh`(추가),
       `scripts/release/create-alpha-release-manifest.sh`, `scripts/release/prepare-task168-final-steady-inputs.sh`, `apps/v1_api/test/fixtures/game-schema.fixture.ts`).
 - [ ] `…InTx` 추출(동작 보존 리팩터): 그룹 생성, 빈 경기 생성, 사이드 배정(`assignTournamentFixtureSideInTx`), 경기·그룹 삭제(자리 연결 해제 포함).
 - [ ] 자리 서비스(S3): 배정·비우기·무작위 채우기, 조 편성·해제 + 순위 재계산, `SLOT_LINKED` 가드, BYE 전환, 대회 레인 잠금·id 순 잠금,
       `releaseSlotsForRegistrationInTx`(대회 등록 취소 경로 연결).
 - [ ] 대회 템플릿(S2): knockout 4/8/12 + league(대회).
 - [ ] 어드민 대진 응답 확장(S5 마지막 항목) + 공개 경기 직렬화 `home/awaySlotLabel`.
+### PR-1c 16강 (PR-1b 뒤)
+- [ ] 단계 `round16` 의 서버 규칙(인접표·라벨·DTO 단계 목록·대진 정렬)·knockout 16 템플릿·웹 라벨/공개 라운드 순서/진행 단계/어드민 "+16강". enum 값 자체는 PR-1a 마이그레이션.
+
 ### PR-2 Backend 빠른 결과 (PR-1 과 병렬 가능, 머지는 PR-1 뒤)
 - [ ] 상태 머신 흐름 `ADMIN_QUICK` + `quickResult` 메서드(S5, 입장 조건 전부 — 취소·명단 동기화 포함) + 컨트롤러 `admin/games/:gameId/quick-result` + DTO.
 - [ ] 정정 경로의 승부차기 검증: 득점 기록 0건 경기면 킥 수 면제(S5).
@@ -421,7 +434,7 @@ PR 은 순서대로 dev 에 머지하고 매번 alpha 에서 확인한다(dev �
 
 | Date | Raised by | Question | Resolution |
 |------|-----------|----------|------------|
-| 2026-10-08 | main | 16강 템플릿? 결정 페이지 C안 목업에 "16강"이 있었다 | 현재 phase 체계(group·round12·quarter·semi·final·third_place)에 16강이 없어 이번 범위 밖. 필요하면 phase 추가 태스크로(사용자 확인 대기) |
+| 2026-10-08 | main | 16강 템플릿? 결정 페이지 C안 목업에 "16강"이 있었다 | **2026-10-09 사용자 확정: 포함.** phase `round16` 추가(S1-b), knockout 16 · 조별 8조×2 결선 16강, PR-1a 스키마 변경에 enum 값 포함 + PR-1c 에서 로직·템플릿·라벨 |
 | 2026-10-08 | main | D2=b 의 "리그 공개 게이트"를 무엇으로? | 별도 공개 버튼 대신 "자리에 연결됐는데 팀이 빈 경기는 공개에서 제외"(S6). 팀이 다 차면 자동 공개. 자리 없는 기존 경기 동작 불변 |
 | 2026-10-08 | main | 리그 빈 경기의 시각·장소 | 정규 리그 템플릿은 일정 입력 필수 — 공개 가드의 startAt·placeName 계약 유지 |
 | 2026-10-08 | main | 리그 템플릿 후 status | 템플릿은 바꾸지 않고, 자리를 쓰는 경기에 빈 사이드가 없어지는 순간 조건부(draft·open 만) 전이. 기존 코드엔 전이 함수가 없어 헬퍼 신설 |

@@ -3,16 +3,16 @@
 import { useEffect } from 'react';
 import type { RefetchOptions } from '@tanstack/react-query';
 
-type ChatFocusQuery = {
+type WindowFocusRefetchQuery = {
   isStale: boolean;
   refetch: (options: RefetchOptions) => Promise<unknown>;
 };
 
-export function useV1ChatWindowFocus(query: ChatFocusQuery, enabled: boolean, policy: boolean | 'always') {
+export function useV1WindowFocusRefetch(query: WindowFocusRefetchQuery, enabled: boolean, policy: boolean | 'always') {
   const { isStale, refetch } = query;
   useEffect(() => {
     if (!enabled || !policy) return;
-    // Query v5는 visibilitychange만 듣는다. visible 상태에서 창만 돌아오는 채팅 복귀도 읽는다.
+    // Query v5는 visibilitychange만 듣는다. visible 상태에서 창만 돌아오는 화면 복귀도 읽는다.
     const onFocus = () => {
       if (document.visibilityState === 'hidden' || (policy !== 'always' && !isStale)) return;
       // visibility 복귀와 함께 발생해도 진행 중인 같은 GET을 취소·재시작하지 않는다.

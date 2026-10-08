@@ -8,7 +8,7 @@ import { earliestPublicLivePollDelay } from '@/lib/public-live-polling';
 import { OPERATIONS_BOARD_POLL_INTERVAL_MS } from '@/lib/operations-board-polling';
 import { v1Keys } from '@/lib/query-keys';
 import { invalidateV1ChatMessageQueries } from './use-v1-realtime-socket';
-import { useV1ChatWindowFocus } from './use-v1-chat-window-focus';
+import { useV1WindowFocusRefetch } from './use-v1-window-focus-refetch';
 import { findInListCache } from '@/lib/list-cache-seed';
 import { randomUuid } from '@/lib/uuid';
 import type { GameLineup } from '@/types/game-operations';
@@ -2643,7 +2643,7 @@ export function useV1ChatRooms(options?: QueryOptions & { refetchOnWindowFocus?:
     refetchOnWindowFocus: options?.refetchOnWindowFocus ?? false,
     enabled: options?.enabled ?? true,
   });
-  useV1ChatWindowFocus(query, options?.enabled ?? true, options?.refetchOnWindowFocus ?? false);
+  useV1WindowFocusRefetch(query, options?.enabled ?? true, options?.refetchOnWindowFocus ?? false);
   return query;
 }
 
@@ -2662,7 +2662,7 @@ export function useV1ChatRoom(roomId: string) {
     refetchOnWindowFocus: 'always',
     enabled: Boolean(roomId),
   });
-  useV1ChatWindowFocus(query, Boolean(roomId), 'always');
+  useV1WindowFocusRefetch(query, Boolean(roomId), 'always');
   return query;
 }
 

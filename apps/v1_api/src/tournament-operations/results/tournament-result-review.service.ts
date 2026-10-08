@@ -56,8 +56,10 @@ import {
   type RevisionSupersessionPurpose,
 } from '../../games/core';
 import type {
+  DurableGameCommandRecord,
   GameActorScope,
   GameCommandContext,
+  GameIdempotencyDecision,
   GameResultEvent,
   GameResultInvariantInput,
   GameResultParticipant,
@@ -65,6 +67,7 @@ import type {
   GameScore,
 } from '../../games/games.types';
 import { PrismaService } from '../../prisma/prisma.service';
+import type { QuickResultDto } from './quick-result.dto';
 import { V1AuthUser } from '../../auth/v1-auth-user';
 import { TournamentStaffAccessService } from '../../tournaments/staff/tournament-staff-access.service';
 import type {
@@ -152,10 +155,19 @@ type ResultRevisionContentInput = {
   mvpParticipantId?: string;
 };
 
+type QuickResultMutation = GameRevisionMutationResult & { score: GameScore };
+export type QuickResultResponse = { gameId: string; revisionId: string; version: number; score: GameScore };
+
+function quickResultConflict(code: string, message: string): ConflictException {
+  return new ConflictException({ code, message });
+}
+
 type ResultCommandBoundaryInput = {
   gameId: string;
   action: string;
   staffAction: 'result_review' | 'result_officialize';
+  /** 지정하면 권한 검사가 돌려준 역할이 이것일 때만 통과한다(어드민 전용 명령). */
+  requiredRole?: 'platform_ops';
   userId: string;
   expectedVersion: number;
   headerIdempotencyKey: string | undefined;
@@ -822,6 +834,68 @@ export class TournamentResultReviewService {
     );
   }
 
+  /**
+   * 플랫폼 어드민이 점수만으로 경기를 곧바로 공식 확정한다(대진 편집기의 빠른 입력).
+   *
+   * 득점 기록이 없는 경기에서만 열린다 — 기록이 있으면 정정 화면의 몫이다. 확정 이후의 모든 후속 처리
+   * (진출·순위·전적·알림)는 일반 확정과 같은 `GAME_RESULT_OFFICIAL` 워커가 한다.
+   */
+  async quickResult(
+    user: V1AuthUser,
+    gameId: string,
+    dto: QuickResultDto,
+    idempotencyKey: string | undefined,
+  ): Promise<QuickResultResponse> {
+    await this.assertQuickResultSupported(gameId);
+    const result = await this.withResultCommand<QuickResultMutation>(
+      {
+        gameId,
+        action: 'quick_result',
+        staffAction: 'result_officialize',
+        requiredRole: 'platform_ops',
+        userId: user.id,
+        expectedVersion: dto.expectedVersion,
+        headerIdempotencyKey: idempotencyKey,
+        bodyCommandId: dto.clientCommandId,
+        payload: dto,
+      },
+      (tx, game, context) => this.enterQuickResult(tx, game, context, user.id, dto),
+    );
+    return { gameId: result.gameId, revisionId: result.revisionId, version: result.version, score: result.score };
+  }
+
+  /**
+   * 대회·정규 리그 팀매치가 아니면(친선 등) 409 로 닫는다. `withResultCommand` 는 이런 게임을 404 로
+   * 닫으므로 거기서는 이 코드를 낼 수 없다 — 어드민 게이트를 지난 호출자에게만 닿도록 컨트롤러가
+   * 이 메서드보다 먼저 `getMutationAdmin` 을 호출한다.
+   */
+  private async assertQuickResultSupported(gameId: string): Promise<void> {
+    const game = await this.prisma.v1Game.findUnique({
+      where: { id: gameId },
+      select: { sourceType: true, teamMatchId: true },
+    });
+    if (game === null) {
+      throw this.notFound();
+    }
+    if ((await resolveGameSource(this.prisma, game)) === null) {
+      throw quickResultConflict('QUICK_RESULT_UNSUPPORTED', '대회와 정규 리그 경기만 점수를 바로 확정할 수 있어요.');
+    }
+  }
+
+  private async enterQuickResult(
+    tx: Transaction,
+    game: LockedTournamentGame,
+    context: GameCommandContext,
+    userId: string,
+    dto: QuickResultDto,
+  ): Promise<QuickResultMutation> {
+    if (game.teamMatchId === null) {
+      throw this.notFound('GAME_NOT_FOUND');
+    }
+    // 5b 가 입장 조건을, 5c 가 쓰기 흐름을 이 아래에 채운다. 그 전까지는 모든 경기를 거부해 확정본이 쓰이지 않게 한다.
+    throw quickResultConflict('QUICK_RESULT_NOT_AVAILABLE', '아직 점수를 바로 확정할 수 없어요.');
+  }
+
   // ─── command boundary ─────────────────────────────────────────────────────
 
   /**
@@ -893,6 +967,12 @@ export class TournamentResultReviewService {
             },
             tx,
           );
+          if (input.requiredRole !== undefined && principal.role !== input.requiredRole) {
+            throw new ForbiddenException({
+              code: 'PERMISSION_DENIED',
+              message: '플랫폼 운영자만 쓸 수 있는 기능이에요.',
+            });
+          }
           const actor: GameActorScope = {
             actorType: 'USER',
             actorUserId: input.userId,
@@ -959,7 +1039,7 @@ export class TournamentResultReviewService {
               },
             },
           });
-          const decision = resolveGameIdempotency<T>(
+          const decision = this.resolveIdempotency<T>(
             existing === null
               ? null
               : {
@@ -1036,6 +1116,20 @@ export class TournamentResultReviewService {
           code: 'COMMAND_CONCURRENCY_CONFLICT',
           message: 'A concurrent command won; reload the current game version and retry',
         });
+      }
+      throw error;
+    }
+  }
+
+  private resolveIdempotency<T>(
+    existing: DurableGameCommandRecord<T> | null,
+    payloadHash: string,
+  ): GameIdempotencyDecision<T> {
+    try {
+      return resolveGameIdempotency<T>(existing, payloadHash);
+    } catch (error) {
+      if (error instanceof GameContractError) {
+        throw toGameHttpException(error);
       }
       throw error;
     }

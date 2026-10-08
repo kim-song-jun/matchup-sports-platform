@@ -851,7 +851,7 @@ describe('ChatListPageClient — 팀컨택 필터·배지', () => {
     expect(screen.queryByText(/종료된 컨택 1/)).not.toBeInTheDocument();
     fireEvent.click(screen.getAllByRole('button', { name: '종료된 컨택 보기' })[0]);
 
-    expect(hooks.chatRooms).toHaveBeenCalledWith({ enabled: true, refetchOnWindowFocus: 'always' }, { roomType: 'team_contact', status: 'archived', limit: 50 });
+    expect(hooks.chatRooms).toHaveBeenCalledWith({ enabled: true, refetchOnWindowFocus: 'always', staleTime: 0 }, { roomType: 'team_contact', status: 'archived', limit: 50 });
     expect(screen.getAllByText(/종료된 컨택 1/).length).toBeGreaterThan(0);
     expect(screen.getAllByText('거절됨').length).toBeGreaterThan(0);
     expect(screen.getAllByRole('button', { name: '종료된 컨택 숨기기' }).length).toBeGreaterThan(0);
@@ -896,7 +896,7 @@ describe('ChatListPageClient — 팀컨택 필터·배지', () => {
     const allChips = screen.getAllByRole('button', { name: /^전체 / });
     expect(allChips[0]).toHaveAttribute('aria-pressed', 'false');
     // 첫 페이지를 클라이언트에서 거르지 않는다 — 서버에 roomType 필터와 최대 페이지를 요청해야 한다.
-    expect(hooks.chatRooms).toHaveBeenCalledWith({ enabled: true, refetchOnWindowFocus: 'always' }, { roomType: 'team_contact', limit: 50 });
+    expect(hooks.chatRooms).toHaveBeenCalledWith({ enabled: true, refetchOnWindowFocus: 'always', staleTime: 0 }, { roomType: 'team_contact', limit: 50 });
     expect(hooks.chatRooms).toHaveBeenCalledWith({ refetchOnWindowFocus: 'always' }, { limit: 50 });
   });
 });

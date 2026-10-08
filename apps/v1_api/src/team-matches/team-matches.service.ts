@@ -536,8 +536,9 @@ export class TeamMatchesService {
     });
 
     const pageItems = teamMatches.slice(0, limit).map((teamMatch) => {
-      assertTeamMatchHasHostAndStart(teamMatch);
-      assertTeamMatchHasHostRelation(teamMatch);
+      // 플랫폼 모집은 첫 팀 승인 전에도 생성·신청 이력이 있다. 공개 조회와 같은 읽기
+      // 계약을 적용하고, 실제 팀이 필요한 쓰기 경로의 operational 가드는 유지한다.
+      assertTeamMatchReadInvariant(teamMatch);
       return teamMatch;
     });
     const hasNext = teamMatches.length > limit;
@@ -546,7 +547,7 @@ export class TeamMatchesService {
       items: pageItems.map((teamMatch) => {
         const application = teamMatch.applications[0] ?? null;
         const createdByMe = query.scope === 'created' && teamMatch.createdByUserId === user.id;
-        const hostTeamRelation = teamIds.includes(teamMatch.hostTeamId);
+        const hostTeamRelation = teamMatch.hostTeamId !== null && teamIds.includes(teamMatch.hostTeamId);
         const relation = createdByMe
           ? 'created_by_me'
           : hostTeamRelation
@@ -554,7 +555,7 @@ export class TeamMatchesService {
           : application?.status === 'approved'
             ? 'approved'
             : application?.status ?? 'requested';
-        const teamId = createdByMe || hostTeamRelation ? teamMatch.hostTeamId : application?.applicantTeamId;
+        const teamId = createdByMe || hostTeamRelation ? teamMatch.hostTeamId : application?.applicantTeamId ?? null;
         return {
           teamMatchId: teamMatch.id,
           title: teamMatch.title,
@@ -570,13 +571,13 @@ export class TeamMatchesService {
           isLive: teamMatch.status === 'matched' && !teamMatch.leagueId && !teamMatch.tournamentId && !!teamMatch.startAt && teamMatch.startAt <= new Date(),
           relation,
           teamId,
-          teamName: createdByMe || hostTeamRelation ? teamMatch.hostTeam.name : application?.applicantTeam.name,
+          teamName: createdByMe || hostTeamRelation ? teamMatch.hostTeam?.name ?? null : application?.applicantTeam.name ?? null,
           applicationId: application?.id ?? null,
           league: teamMatch.league ? { leagueId: teamMatch.league.id, title: teamMatch.league.title } : null,
           // 호스트팀의 일반 멤버에게 관리 경로를 내려주면 눌렀을 때 서버 가드에서 막히는
           // dead-end CTA가 된다. 생성자여도 현재 owner/manager 권한이 없으면 이력 상세만 본다.
           manageRoute:
-            (relation === 'host_team' || relation === 'created_by_me') && manageableTeamIds.has(teamMatch.hostTeamId)
+            (relation === 'host_team' || relation === 'created_by_me') && teamMatch.hostTeamId !== null && manageableTeamIds.has(teamMatch.hostTeamId)
               ? `/team-matches/${teamMatch.id}`
               : null,
           detailRoute: `/team-matches/${teamMatch.id}`,
@@ -2161,11 +2162,15 @@ type TeamMatchOperationalFields = {
   startAt: Date | null;
 };
 
-type TeamMatchPublicFields = TeamMatchOperationalFields & {
+type TeamMatchReadFields = TeamMatchOperationalFields & {
   hostTeam: { id: string } | null;
-  region: { id: string; name: string } | null;
+  platformManaged: boolean;
   leagueId: string | null;
   tournamentId: string | null;
+};
+
+type TeamMatchPublicFields = TeamMatchReadFields & {
+  region: { id: string; name: string } | null;
 };
 
 type TeamMatchHostFields = {
@@ -2194,9 +2199,9 @@ function assertTeamMatchHasHostRelation<T extends TeamMatchHostFields>(
   }
 }
 
-function assertTeamMatchPublicInvariant<T extends TeamMatchPublicFields>(
+function assertTeamMatchReadInvariant<T extends TeamMatchReadFields>(
   teamMatch: T,
-): asserts teamMatch is T & { startAt: Date; region: NonNullable<T['region']> } {
+): asserts teamMatch is T & { startAt: Date } {
   if (teamMatch.startAt === null) {
     throw new ConflictException({
       code: 'TEAM_MATCH_OPERATIONAL_DATA_INVALID',
@@ -2209,12 +2214,18 @@ function assertTeamMatchPublicInvariant<T extends TeamMatchPublicFields>(
       message: '팀 매치의 호스트 팀 정보가 일치하지 않습니다.',
     });
   }
-  if (teamMatch.hostTeamId === null && (teamMatch.hostTeam !== null || teamMatch.leagueId !== null || teamMatch.tournamentId !== null)) {
+  if (teamMatch.hostTeamId === null && (!teamMatch.platformManaged || teamMatch.hostTeam !== null || teamMatch.leagueId !== null || teamMatch.tournamentId !== null)) {
     throw new ConflictException({
       code: 'TEAM_MATCH_OPERATIONAL_DATA_INVALID',
       message: '플랫폼 모집 팀매치의 팀 정보가 올바르지 않습니다.',
     });
   }
+}
+
+function assertTeamMatchPublicInvariant<T extends TeamMatchPublicFields>(
+  teamMatch: T,
+): asserts teamMatch is T & { startAt: Date; region: NonNullable<T['region']> } {
+  assertTeamMatchReadInvariant(teamMatch);
   if (teamMatch.region === null) {
     throw new ConflictException({
       code: 'TEAM_MATCH_OPERATIONAL_DATA_INVALID',

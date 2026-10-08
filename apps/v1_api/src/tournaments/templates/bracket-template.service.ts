@@ -6,9 +6,12 @@ import { AdminContextService, type V1ActiveAdmin } from '../../common/admin-cont
 import { GamesService } from '../../games/games.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { lockCompetitionForBracketMutationInTx, type LockableCompetition } from '../slots/competition-bracket-lock';
-import { createEmptyTournamentFixtureInTx, createGroupInTx } from '../tournament-bracket-tx';
+import {
+  createEmptyTournamentFixtureInTx, createGroupInTx, deleteTournamentGroupInTx, softDeleteTournamentFixtureInTx,
+} from '../tournament-bracket-tx';
 import { createTournamentMatchAdvancementEdgeInTx } from '../tournament-match-creation';
 import { findTournamentOnSurface, TOURNAMENT_KINDS } from '../tournament-surface-lookup';
+import { orderFixturesForTeardown } from './bracket-teardown-order';
 import { planBracketTemplate, type BracketTemplateInput, type BracketTemplatePlan } from './bracket-template-plan';
 import { ApplyBracketTemplateDto, toBracketTemplateInput } from './dto/bracket-template.dto';
 
@@ -71,9 +74,14 @@ export class BracketTemplateService {
     const pinned = await this.loadPinnedTournament(tx, tournament.id);
 
     const existing = await this.loadExisting(tx, tournament.id);
+    let replaced = false;
     if (!existing.isEmpty) {
-      // replaceExisting 교체는 Task 6 에서 이 분기에 들어온다.
-      throw new ConflictException({ code: 'BRACKET_NOT_EMPTY', message: '이미 대진이 있어요. 비어 있는 대진에서만 템플릿으로 시작할 수 있어요.' });
+      if (!replaceExisting) {
+        throw new ConflictException({ code: 'BRACKET_NOT_EMPTY', message: '이미 대진이 있어요. 비어 있는 대진에서만 템플릿으로 시작할 수 있어요.' });
+      }
+      this.assertReplaceable(existing.fixtures);
+      await this.teardown(tx, admin, tournament.id, existing);
+      replaced = true;
     }
 
     const maxNumber = await tx.v1TournamentMatchDetails.aggregate({
@@ -88,7 +96,7 @@ export class BracketTemplateService {
       action: 'tournament.bracket.template.apply',
       targetType: 'tournament',
       targetId: tournament.id,
-      afterJson: { input: { ...input }, replaced: false, ...counts },
+      afterJson: { input: { ...input }, replaced, ...counts },
     }, tx);
     return counts;
   }
@@ -120,6 +128,43 @@ export class BracketTemplateService {
     const groups = await tx.v1TournamentGroup.findMany({ where: { tournamentId }, select: { id: true }, orderBy: { id: 'asc' } });
     const slotCount = await tx.v1TournamentSlot.count({ where: { tournamentId } });
     return { fixtures, groups, isEmpty: fixtures.length === 0 && groups.length === 0 && slotCount === 0 };
+  }
+
+  /** 하나라도 시작·결과가 있으면 아무것도 지우기 전에 끊는다. */
+  private assertReplaceable(fixtures: Awaited<ReturnType<BracketTemplateService['loadExisting']>>['fixtures']) {
+    const locked = fixtures.filter(({ teamMatch }) =>
+      teamMatch.status !== 'matched' ||
+      teamMatch.game === null ||
+      teamMatch.game.state !== 'SCHEDULED' ||
+      teamMatch.game.currentOfficialRevisionId !== null);
+    if (locked.length > 0) {
+      throw new ConflictException({
+        code: 'BRACKET_LOCKED',
+        message: '시작했거나 결과가 있는 경기가 있어 대진을 새로 만들 수 없어요.',
+        details: { lockedFixtureCount: locked.length },
+      });
+    }
+  }
+
+  /** 스펙 S2 순서: 경기(하류 먼저) → 자리 → GroupTeam·Standing·ByeSlot → 조. */
+  private async teardown(
+    tx: Tx,
+    admin: V1ActiveAdmin,
+    tournamentId: string,
+    existing: Awaited<ReturnType<BracketTemplateService['loadExisting']>>,
+  ) {
+    const edges = await tx.v1TournamentMatchAdvancementEdge.findMany({
+      where: { tournamentId },
+      select: { sourceTeamMatchId: true, targetTeamMatchId: true },
+    });
+    for (const fixtureId of orderFixturesForTeardown(existing.fixtures.map((fixture) => fixture.teamMatchId), edges)) {
+      await softDeleteTournamentFixtureInTx(tx, admin, fixtureId);
+    }
+    await tx.v1TournamentSlot.deleteMany({ where: { tournamentId } });
+    await tx.v1TournamentStanding.deleteMany({ where: { group: { tournamentId } } });
+    await tx.v1TournamentGroupTeam.deleteMany({ where: { group: { tournamentId } } });
+    await tx.v1TournamentByeSlot.deleteMany({ where: { group: { tournamentId } } });
+    for (const group of existing.groups) await deleteTournamentGroupInTx(tx, admin, group.id);
   }
 
   private async materialize(tx: Tx, admin: V1ActiveAdmin, tournament: PinnedTournament, plan: BracketTemplatePlan) {

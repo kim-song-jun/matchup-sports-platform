@@ -134,4 +134,69 @@ describe('대진 템플릿 실행기 (PostgreSQL)', () => {
     expect(rejected.reason).toMatchObject({ response: { code: 'BRACKET_NOT_EMPTY' } });
     expect(await counts(tournamentId)).toEqual({ fixtures: 8, groups: 4, slots: 8, edges: 8 });
   });
+
+  describe('replaceExisting', () => {
+    const archived = (tournamentId: string) => prisma.v1TeamMatch.count({ where: { tournamentId, deletedAt: { not: null } } });
+
+    it('시작 전 대진을 새 템플릿으로 교체한다 — 옛 경기는 소프트 삭제, 자리·조·연결은 새것만 남는다', async () => {
+      const { tournamentId } = await seedBracketTournament(prisma, { label: 'replace', format: 'knockout', teamCount: 0 });
+      await templates.apply(user, tournamentId, { kind: 'knockout', size: 8, thirdPlace: true });
+
+      await expect(templates.apply(user, tournamentId, { kind: 'knockout', size: 4, thirdPlace: false, replaceExisting: true }))
+        .resolves.toEqual({ groups: 2, slots: 4, fixtures: 3, edges: 2 });
+
+      expect(await counts(tournamentId)).toEqual({ fixtures: 3, groups: 2, slots: 4, edges: 2 });
+      expect(await archived(tournamentId)).toBe(8);
+      expect((await liveFixtures(tournamentId)).map((f) => f.fixtureNumber)).toEqual([1, 2, 3]); // 번호는 offset 0 부터 다시
+      const names = (await prisma.v1TournamentGroup.findMany({ where: { tournamentId }, orderBy: { sortOrder: 'asc' } })).map((g) => g.name);
+      expect(names).toEqual(['4강', '결승']);
+    });
+
+    it('같은 대회를 연달아 두 번 교체해도 생성 키가 충돌하지 않는다 (소프트 삭제 이력 수 반영)', async () => {
+      const { tournamentId } = await seedBracketTournament(prisma, { label: 'replace-twice', format: 'knockout', teamCount: 0 });
+      await templates.apply(user, tournamentId, { kind: 'knockout', size: 8, thirdPlace: true });
+      await templates.apply(user, tournamentId, { kind: 'knockout', size: 8, thirdPlace: true, replaceExisting: true });
+      await templates.apply(user, tournamentId, { kind: 'knockout', size: 8, thirdPlace: true, replaceExisting: true });
+      expect(await counts(tournamentId)).toEqual({ fixtures: 8, groups: 4, slots: 8, edges: 8 });
+      expect(await archived(tournamentId)).toBe(16);
+    });
+
+    it('경기가 시작됐거나(game ≠ SCHEDULED) 완료된 대진은 409 BRACKET_LOCKED 이고 아무것도 지우지 않는다', async () => {
+      for (const [label, mutate] of [
+        ['locked-live', (teamMatchId: string) => prisma.v1Game.update({ where: { teamMatchId }, data: { state: 'LIVE' } })],
+        ['locked-completed', (teamMatchId: string) => prisma.v1TeamMatch.update({ where: { id: teamMatchId }, data: { status: 'completed' } })],
+      ] as const) {
+        const { tournamentId } = await seedBracketTournament(prisma, { label, format: 'knockout', teamCount: 0 });
+        await templates.apply(user, tournamentId, { kind: 'knockout', size: 8, thirdPlace: true });
+        const before = await counts(tournamentId);
+        const target = (await liveFixtures(tournamentId))[5]; // 4강 한 경기
+        await mutate(target.teamMatchId);
+
+        await expect(templates.apply(user, tournamentId, { kind: 'knockout', size: 4, thirdPlace: false, replaceExisting: true }))
+          .rejects.toMatchObject({ response: { code: 'BRACKET_LOCKED' } });
+        expect(await counts(tournamentId)).toEqual(before);
+        expect(await archived(tournamentId)).toBe(0);
+      }
+    });
+
+    it('대진이 비어 있으면 replaceExisting 이어도 그냥 만든다', async () => {
+      const { tournamentId } = await seedBracketTournament(prisma, { label: 'replace-empty', format: 'knockout', teamCount: 0 });
+      await expect(templates.apply(user, tournamentId, { kind: 'knockout', size: 4, thirdPlace: false, replaceExisting: true }))
+        .resolves.toEqual({ groups: 2, slots: 4, fixtures: 3, edges: 2 });
+    });
+
+    it('조 편성·순위 행이 남은 리그 방식 대회도 교체되고 그 행들은 지워진다', async () => {
+      const { tournamentId, registrationIds } = await seedBracketTournament(prisma, { label: 'replace-league', format: 'league', teamCount: 1 });
+      await templates.apply(user, tournamentId, { kind: 'league', teamCount: 4, legs: 1 });
+      const group = await prisma.v1TournamentGroup.findFirstOrThrow({ where: { tournamentId } });
+      await prisma.v1TournamentGroupTeam.create({ data: { groupId: group.id, registrationId: registrationIds[0] } });
+      await prisma.v1TournamentStanding.create({ data: { groupId: group.id, registrationId: registrationIds[0] } });
+
+      await templates.apply(user, tournamentId, { kind: 'league', teamCount: 3, legs: 1, replaceExisting: true });
+
+      expect(await prisma.v1TournamentGroupTeam.count({ where: { group: { tournamentId } } })).toBe(0);
+      expect(await prisma.v1TournamentStanding.count({ where: { group: { tournamentId } } })).toBe(0);
+      expect(await counts(tournamentId)).toEqual({ fixtures: 3, groups: 1, slots: 3, edges: 0 });
+    });
+  });
 });

@@ -16,6 +16,8 @@ vi.mock('@/components/tournaments/pending-review-card', () => ({ PendingReviewsC
 vi.mock('@/hooks/use-v1-api', () => ({
   useV1AllTournaments: () => ({ data: undefined, isLoading: false, isError: false }),
   useV1LeagueMatches: () => ({ data: undefined, isLoading: false, isError: false }),
+  useV1Tournaments: () => ({ data: undefined, isPending: false, isError: false }),
+  useV1TeamMatches: () => ({ data: undefined, isPending: false, isError: false }),
 }));
 
 describe('홈 최근 채팅 빈 상태', () => {

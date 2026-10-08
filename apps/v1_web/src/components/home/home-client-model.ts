@@ -6,6 +6,8 @@ import type {
   V1Match,
   V1Notice,
   V1Popup,
+  V1TeamMatch,
+  V1TournamentListItem,
 } from '@/types/api';
 import type {
   HomeChatRoom,
@@ -219,6 +221,43 @@ function toHomeRecommendation(match: V1HomeRecommendation): HomeMatchCard {
     currentParticipants: match.participantCount ?? null,
     maxParticipants: match.capacity ?? null,
     actionLabel: '승인제 신청',
+  };
+}
+
+/** 홈 "오늘의 추천"의 팀매치 카드 — 상대 팀을 구하는 모집 글. 인원 대신 경기 시각·장소만. */
+export function toFeaturedTeamMatch(teamMatch: V1TeamMatch): HomeMatchCard {
+  return {
+    ...emptyMatchCard(),
+    // 목록 API 는 teamMatchId·sport.name·place.name 으로 준다(V1Match 의 평평한 필드는 비어 온다 — 검색 화면과 같은 처리).
+    id: teamMatch.teamMatchId ?? teamMatch.id,
+    sportLabel: teamMatch.sport?.name ?? teamMatch.sportName,
+    title: teamMatch.title,
+    venue: [teamMatch.place?.name ?? teamMatch.placeName, teamMatch.hostTeam?.name ?? teamMatch.hostTeamName]
+      .filter(Boolean)
+      .join(' · '),
+    imageUrl: teamMatch.listImageUrl ?? teamMatch.imageUrl ?? null,
+    date: formatDate(teamMatch.startsAt),
+    time: formatTime(teamMatch.startsAt),
+    currentParticipants: null,
+    maxParticipants: null,
+    actionLabel: '경기 신청하기',
+  };
+}
+
+/** 홈 "오늘의 추천"의 정규 리그 카드 — 시즌 경기 시각이 아니라 신청 마감을 보여 준다. */
+export function toFeaturedLeague(league: V1TournamentListItem): HomeMatchCard {
+  return {
+    ...emptyMatchCard(),
+    id: league.id,
+    sportLabel: league.sport.name,
+    title: league.title,
+    venue: league.venue ?? `${league.sport.name} 리그`,
+    imageUrl: league.coverImageUrl,
+    date: league.registrationDeadlineAt ? `${formatDate(league.registrationDeadlineAt)} 신청 마감` : '',
+    time: '',
+    currentParticipants: null,
+    maxParticipants: null,
+    actionLabel: '참가 신청하기',
   };
 }
 

@@ -1,0 +1,66 @@
+# Task 20261051: MD-QA #50 열린 팀 일정 상세·캘린더 최신 상태 복구
+
+Status: In Progress
+**Owner**: root → frontend-data-dev
+**Created**: 2026-10-08
+**Report**: https://teameet.jmandu.kr/issues/50/
+
+## Context
+동일 E2E관리자 다중 탭에서 팀 f39f5962-38e9-4a41-9553-6156924c56d1 일정 c57b2eef-abfc-43dd-a867-a60a08a19e6c 제목과 RSVP를 저장한 뒤 다른 상세·캘린더는 이전 제목·참석 수를 유지한다. 실제 포커스 복귀도 회복하지 않고 전체 reload만 회복한다. 작성자가 데이터 복원을 확인했다. 원문 CSS1188×760/alpha/serving SHA 미확인. 저장 실패·데이터 손실은 관측하지 않았다.
+
+## Goal
+탭 재활성화 시 실제 일정·참석 데이터를 재조회하여 상세와 목록·캘린더를 갱신하고 실패를 명확하게 보여준다.
+
+## Original Conditions (must all be satisfied)
+- [x] 미배정 접수·댓글0, canonical task/활성 실행/worktree/branch/열린 PR 중복 없음 확인.
+- [x] root UI ‘내가 처리하기’ 저장 성공·김성준 담당·확인 중 실제 표시 확인.
+- [ ] 같은 실행에서 실제 결함·최소 수정·RED→GREEN·독립 리뷰·dev PR·원 리포트 댓글.
+
+## User Scenarios
+- 다른 탭에서 제목·RSVP 저장 → 열린 상세 탭 재활성화 → 최신 제목·참석 수.
+- 열린 캘린더 재활성화 → 현재 조건과 선택 날짜를 유지하며 최신 제목.
+- 조회 실패·권한 실패는 오류와 재시도를 유지하며 저장 성공으로 숨기지 않는다.
+
+## Test Scenarios
+- 실제 consumer+QueryClient+HTTP MSW로 이전 응답 hydrate, 서버 상태 변경, focus 이벤트 후 새 요청·새 제목·참석 표시를 검증한다.
+- 인증·enabled·ID·필터·오류/재시도·disabled query 계약 유지. hook 호출 옵션 mock만 검증하는 테스트는 주 근거가 아니다.
+- 기존 직접 저장 mutation invalidation과 일정 상세·목록 회귀 유지.
+
+## Parallel Work Breakdown
+- Wave A 단일 frontend-data-dev Owned: apps/v1_web/src/hooks/use-v1-api.ts의 팀 일정 조회 hooks만; 좁은 신규 팀 일정 focus HTTP 소비자 test. 호출부 변경 필요 시 root에게 exact 경로를 요청한다.
+- Forbidden: 다른 도메인 hooks/types/MSW 공유handler/API/DTO/schema/session/provider/다른 WT/정책/state/.env. #45는 별도 WT에서 목록 복귀를 수정 중이므로 동시 공유 구현 금지.
+- Wave B consumer 수정이 필요하면 Wave A 완료 후 root가 독립 소유권 지정. Root task/Changeset/브라우저/Git/PR/SSOT 소유.
+- 혼자가 아니다. 타인 변경 보존, 자체 stage/commit/push 금지. 테스트는 root 단일 serial slot 승인 뒤 최소 worker.
+
+## Acceptance Criteria
+- [ ] 열린 상세·캘린더의 실제 서버 변경을 focus 복귀로 회복.
+- [ ] 인증·권한·오류·필터·탐색 상태 보존, 반복 요청 폭주 없음.
+- [ ] 실제 RED→GREEN, committed scope/test/type/pattern, exact head 독립 OK/FindingsNone.
+- [ ] base dev PR와 기존50 댓글 저장 성공·실제 표시.
+- [ ] alpha 실측·persona·viewport·수정 SHA의 미확인 한계를 정확하게 구분.
+
+## Tech Debt Resolved
+조회 정책과 실제 탭 복귀 계약의 불일치를 기존 QueryClient 패턴으로 정리한다. 새 전역 정책·polling·가짜 websocket은 추가하지 않는다.
+
+## Security Notes
+기존 인증·팀 멤버십·참석/관리 권한을 우회하지 않는다. 사용자 데이터/비밀 출력과 .env 읽기 금지. 전용 QA fixture 원문의 근거만 사용하며 별도 실제 저장은 root가 판단한다.
+
+## Risks & Dependencies
+새 managed WT는 fetch 직후 origin/dev de61d66c100c44d2618a14cda1ef15949aa2557a에서 생성. #45 복귀 정책과 #44 채팅 갱신은 다른 증상이다. dev 머지·수정 SHA 배포 전 alpha 해소로 표현하지 않는다.
+
+## Ambiguity Log
+| Date | Raised by | Question | Resolution |
+|---|---|---|---|
+| 2026-10-08 | Report50 | 다른 사용자/기기 서버 원인? | 원문은 동일 계정 다중 탭만 검증. 현행 v1 실제 hook/API/consumer 조사로 범위 확정. |
+
+## Progress Snapshot
+- WT C:/Users/kinso/.codex/worktrees/mdqa-50-team-schedule-sync/matchup-sports-platform; branch fix/mdqa-50-team-schedule-sync; base de61d66c100c44d2618a14cda1ef15949aa2557a.
+- 원문·선점 근거: 원 checkout tmp/qa/mdqa-assigned-monitor/2026-10-08-heartbeat-0550/report50-detail-before-claim.txt, report50-claimed.txt/png.
+- root claim 2026-10-08 17:26 KST. 단일 공유 hook worker의 로컬 수정·회귀 검증 완료. 아직 PR 없음.
+- 실제 원인: 전역 QueryClient focus 재조회 기본값 false, 일정 list/detail hook에 개별 override 없음. 저장·RSVP mutation은 현재 탭 QueryClient만 invalidate한다. 참석 목록·집계·본인 RSVP는 detail GET에 포함되므로 별도 attendee hook 변경은 필요하지 않다.
+- 최소 수정: use-v1-api.ts의 팀 일정 list/detail 조회 hook에 선택적 refetchOnWindowFocus 옵션(default false)을 추가. root가 team-schedules-client.tsx의 읽기 목록·상세 2곳만 always opt-in했다. 편집폼 enabled 호출·초안·기준 버전·전역 provider는 변경하지 않았다.
+- 실제 소비자 HTTP RED: 2026-10-08 17:46:30 KST, 신규 use-v1-api.team-schedule-focus.test.tsx 5 FAIL/2 PASS(exit 1, 10.00s). 성공한 실제 PATCH·RSVP PUT과 로컬 invalidation 이후에도 다른 QueryClient의 상세·필터 캘린더 제목/참석이 유지됐고 cached 503·404 오류가 focus에서 노출되지 않았다. 편집 초안/expectedVersion 및 disabled/ID 보호 2건은 통과했다.
+- 동일 회귀 GREEN: 2026-10-08 17:55:04 KST, 7/7 PASS(exit 0, 4.78s). fresh/stale 캐시의 실제 상세·필터 캘린더 제목/RSVP 갱신, 선택 달·날짜·필터 유지, edit 초안+expectedVersion 0 충돌 보호, disabled/ID guard, cached 503 재시도, cached 404 권한 exit를 검증했다.
+- 명령(apps/v1_web 기준): bundled node.exe node_modules/vitest/vitest.mjs run src/hooks/use-v1-api.team-schedule-focus.test.tsx --maxWorkers=1 --no-file-parallelism --reporter=verbose. RED/GREEN 원문: tmp/qa/mdqa-50-team-schedule-red-20261008.txt, tmp/qa/mdqa-50-team-schedule-green-20261008.txt.
+- preflight RED CPU43%/free10.79GiB/Node62/browser10/Docker0, GREEN CPU37%/free10.98GiB/Node64/browser10/Docker0. 테스트 프로세스 종료 후 serial slot 반환. touched hook 구간·신규 test의 TODO/FIXME/HACK/XXX 없음.
+- 기존 제한: 실제 편집폼의 TextField action prop이 input으로 spread되어 React 경고가 출력된다(primitives.tsx); 이번 소유 범위 밖이며 억제하지 않았다. root의 type/pattern·committed scope·Changeset·독립 리뷰·dev PR·alpha 실측은 아직 대기 중이다. 이 로컬 결과만으로 alpha 해소를 선언하지 않는다.

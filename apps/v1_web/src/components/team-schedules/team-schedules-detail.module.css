@@ -1,0 +1,110 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-5);
+  padding: var(--spacing-4) var(--spacing-5) var(--spacing-10);
+}
+
+.responseTop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--spacing-3);
+  margin-bottom: var(--spacing-2);
+}
+
+.responseActions,
+.managementActions,
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-2);
+}
+
+.details,
+.main,
+.aside {
+  display: grid;
+  min-width: 0;
+  gap: var(--spacing-5);
+  align-content: start;
+}
+
+.sectionHeading {
+  margin-bottom: var(--spacing-3);
+}
+
+.filters {
+  margin-bottom: var(--spacing-3);
+}
+
+.filterButton[aria-pressed='true'] {
+  background: var(--grey100);
+  color: var(--text-strong);
+  border-color: var(--grey300);
+}
+
+.attendeeList {
+  display: grid;
+  gap: var(--spacing-1);
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.attendeeRow {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--spacing-2) var(--spacing-3);
+  padding: var(--spacing-2) 0;
+}
+
+.attendeeName {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.attendeeStatus {
+  grid-column: 3;
+  grid-row: 1;
+  justify-self: end;
+  white-space: nowrap;
+}
+
+.proxyButton {
+  grid-column: 2 / -1;
+  justify-self: end;
+  min-height: var(--size-control-sm);
+  padding: 0 var(--spacing-3);
+  white-space: nowrap;
+}
+
+@media (min-width: 640px) {
+  .attendeeRow {
+    grid-template-columns: auto minmax(0, 1fr) auto auto;
+  }
+
+  .attendeeStatus {
+    grid-column: 4;
+  }
+
+  .proxyButton {
+    grid-column: 3;
+    grid-row: 1;
+  }
+}
+
+@media (min-width: 1024px) {
+  /* DESIGN.md §9의 상세 main + 380px 보조 영역을 사용해요. */
+  .detailsWithAside {
+    grid-template-columns: minmax(0, 1fr) 380px;
+    align-items: start;
+  }
+
+  .detailsWithAside > .aside {
+    position: sticky;
+    top: var(--spacing-4);
+  }
+}

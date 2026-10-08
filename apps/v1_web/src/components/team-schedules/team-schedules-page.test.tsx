@@ -359,8 +359,10 @@ describe('일정 상세 — 용병 모집 열기', () => {
     expect(screen.queryByText('용병 모집')).not.toBeInTheDocument();
     expect(screen.queryByText(/아직 용병 모집이/)).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '용병 모집 열기' })).not.toBeInTheDocument();
-    // 칸이 빠진 자리에 구분선만 남지 않는다 — 운영 관리 칸이 마지막이다.
-    expect(screen.getByText('운영 관리').closest('.tm-card')?.lastElementChild).toHaveTextContent('운영 관리');
+    // 모집이 없으면 보조 영역에는 실제 운영 섹션만 남고 수정 동선이 유지돼요.
+    const management = screen.getByRole('complementary', { name: '모집 및 운영' });
+    expect(within(management).getAllByRole('region')).toHaveLength(1);
+    expect(within(management).getByRole('region', { name: '운영 관리' })).toContainElement(screen.getByRole('link', { name: '일정 수정' }));
   });
 
   it('취소된 일정의 모집 기록은 읽기만 남고, 서버가 거절할 수정·마감 버튼은 없다', () => {

@@ -1,6 +1,14 @@
 import { V1ConsentState } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { ProfileService } from './profile.service';
+import type { RealtimeGateway } from '../realtime/realtime.gateway';
+
+function createProfileService(
+  prisma: unknown,
+  realtimeGateway: Pick<RealtimeGateway, 'forceDisconnectUser'> = { forceDisconnectUser: jest.fn() },
+): ProfileService {
+  return new ProfileService(prisma as PrismaService, realtimeGateway);
+}
 
 const user = {
   id: 'user-1',
@@ -52,7 +60,7 @@ function createFakePrisma() {
 describe('ProfileService record consent', () => {
   it('GET reflects a granted PUT, and a later granted=false PUT flips the row to REVOKED', async () => {
     const prisma = createFakePrisma();
-    const service = new ProfileService(prisma);
+    const service = createProfileService(prisma);
 
     const granted = await service.updateMyRecordConsent(user, { granted: true, policyHash: 'policy-v1' });
     // 이미 GRANTED 면 유도할 이유가 없으므로 서버가 카운트를 세지 않고 0 으로 둔다.
@@ -84,7 +92,7 @@ describe('ProfileService record consent', () => {
 
   it('GET returns granted:false with a null effectiveAt when the user never responded', async () => {
     const prisma = createFakePrisma();
-    const service = new ProfileService(prisma);
+    const service = createProfileService(prisma);
 
     const result = await service.myRecordConsent(user);
     // `granted:false` 만으로는 "거부"와 "아직 안 물어봄"이 구분되지 않는다.

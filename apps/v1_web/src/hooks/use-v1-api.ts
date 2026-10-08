@@ -3000,15 +3000,15 @@ export function useV1UpdateSettings() {
   });
 }
 
-export function useV1WithdrawalRequest() {
-  const queryClient = useQueryClient();
+export function useV1WithdrawalRequest(options?: {
+  onSuccess?: (result: { userId: string; accountStatus: string; requestedAt: string }) => void;
+  onError?: (error: Error) => void;
+}) {
   return useMutation({
     mutationFn: (body?: { reason?: string | null }) =>
       v1Post<{ userId: string; accountStatus: string; requestedAt: string }>('/me/withdrawal-request', body ?? {}),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: v1Keys.settings() });
-      queryClient.invalidateQueries({ queryKey: v1Keys.authMe() });
-    },
+    onSuccess: options?.onSuccess,
+    onError: options?.onError,
   });
 }
 

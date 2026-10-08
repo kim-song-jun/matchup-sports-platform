@@ -14,3 +14,8 @@
 - Tournament staff revoke가 commit되면 해당 사용자의 해당 tournament 구독만 대상으로, 추적된 game마다 `game.permission.revoked`를 그 사용자의 socket에 먼저 보내고 그 socket만 해당 room에서 퇴장시킨다. 다른 사용자와 다른 tournament 구독은 유지되며, 이후 stale `authorizationSubjectVersion` subscribe는 `STAFF_SCOPE_DENIED`다. 계정 정지·차단·삭제는 별도 user-room 강제 disconnect 경계다.
 
 <!-- API_CONTRACT_SECTION_END:Frozen realtime contract -->
+
+## Account withdrawal
+
+- A successful withdrawal commits `withdrawal_pending` before disconnecting the user's active user-room sockets. New connections for a pending account are rejected, and the user-room join path checks the current account state again after joining to close the race with a concurrent withdrawal commit.
+- A failed withdrawal transaction preserves existing sockets. If disconnecting sockets fails after commit, the error is logged while the committed withdrawal state and successful API response remain authoritative.

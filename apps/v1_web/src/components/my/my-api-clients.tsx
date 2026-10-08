@@ -3,7 +3,8 @@
 import { PreferredPositionPicker } from './preferred-position-picker';
 import { ProfilePhotoCropper } from './profile-photo-cropper';
 import { MyDissolvedTeamsSection } from './my-dissolved-teams-section';
-import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from 'react';
+import { ChangeEvent, FormEvent, useEffect, useMemo, useRef, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useShellOverride } from '@/components/v1-ui/shell-override';
@@ -18,7 +19,10 @@ import { useTheme } from '@/components/providers/theme-provider';
 import { useV1PushRegistration } from '@/hooks/use-v1-push-registration';
 import { UserAvatar } from '@/components/v1-ui/user-avatar';
 import { extractErrorMessage } from '@/lib/error-message';
+import { reportClientError } from '@/lib/client-error-reporter';
 import { clearStoredV1Session, sanitizeRedirectPath, withFromPath } from '@/lib/session-storage';
+import { clearV1IdentityCache } from '@/lib/query-keys';
+import { disconnectV1Socket } from '@/lib/v1-socket';
 import { isTeamOperatorRole } from '@/lib/team-role';
 import type { ThemePreference } from '@/lib/theme';
 import { myJoinApplicationStatusLabel, teamJoinApplicationStatusLabel, teamMemberStatusLabel, teamRoleLabel } from '@/lib/v1-status-labels';
@@ -67,7 +71,7 @@ import {
 } from '@/hooks/use-v1-api';
 import { usePendingIds } from '@/hooks/use-pending-ids';
 import { formatMonthDay, formatTournamentDateTimeLong } from '@/lib/date-utils';
-import { V1ApiError } from '@/lib/api-client';
+import { isV1NetworkError, v1Api, V1ApiError } from '@/lib/api-client';
 import { toDistrictRegionOptions } from '@/lib/v1-regions';
 import type { V1MyActivitySummary, V1MyJoinApplication, V1MyTeam, V1Profile, V1ReceivedInvitation, V1Region, V1Settings, V1Sport, V1TeamDetail, V1TeamJoinApplication, V1TeamMember } from '@/types/api';
 import {
@@ -106,6 +110,42 @@ type SettingsRegionGroup = {
   name: string;
   options: SettingsRegionOption[];
 };
+
+const WITHDRAWAL_PUSH_CLEANUP_TIMEOUT_MS = 1_500;
+const WITHDRAWAL_RECONCILIATION_TIMEOUT_MS = 1_500;
+
+function requestWithAbortTimeout<T>(
+  request: (signal: AbortSignal) => Promise<T>,
+  timeoutMessage: string,
+): Promise<T> {
+  const controller = new AbortController();
+
+  return new Promise<T>((resolve, reject) => {
+    const timeoutId = window.setTimeout(() => {
+      controller.abort();
+      reject(new Error(timeoutMessage));
+    }, WITHDRAWAL_RECONCILIATION_TIMEOUT_MS);
+
+    void Promise.resolve()
+      .then(() => request(controller.signal))
+      .then(
+        (result) => {
+          window.clearTimeout(timeoutId);
+          resolve(result);
+        },
+        (error: unknown) => {
+          window.clearTimeout(timeoutId);
+          reject(error);
+        },
+      );
+  });
+}
+
+function isConfirmedInactiveSession(error: unknown): boolean {
+  return error instanceof V1ApiError
+    && ((error.statusCode === 401 && error.code === 'UNAUTHENTICATED')
+      || (error.statusCode === 403 && error.code === 'PERMISSION_DENIED'));
+}
 
 export function MyHomePageClient() {
   const profile = useV1Profile();
@@ -2210,30 +2250,168 @@ export function ThemeSettingsPageClient() {
 }
 
 export function WithdrawalPageClient() {
-  const router = useRouter();
-  const withdrawal = useV1WithdrawalRequest();
+  const queryClient = useQueryClient();
+  const pushRegistration = useV1PushRegistration();
   const [reason, setReason] = useState('');
   const [infoOpen, setInfoOpen] = useState(false);
+  const [isRequestLocked, setIsRequestLocked] = useState(false);
+  const [isFinalizing, setIsFinalizing] = useState(false);
+  const requestLockRef = useRef(false);
+  const finalizingRef = useRef(false);
   // #4: 비가역 작업이므로 confirm 모달로 이중 확인한다.
   const { confirm, ConfirmModal } = useConfirm();
+  const completeWithdrawal = () => {
+    if (finalizingRef.current) return;
+    finalizingRef.current = true;
+    setIsFinalizing(true);
+
+    let settled = false;
+    let timeoutId: number | undefined;
+    const finishWithdrawalNavigation = () => {
+      if (settled) return;
+      settled = true;
+      if (timeoutId !== undefined) window.clearTimeout(timeoutId);
+      // A document navigation creates a fresh QueryClient and guest session probe.
+      window.location.replace('/login');
+    };
+
+    // Arm the hard navigation deadline before storage or device APIs can fail or stall.
+    timeoutId = window.setTimeout(() => {
+      if (settled) return;
+      try {
+        reportClientError({
+          message: '탈퇴 후 기기 알림 구독 해제가 제한 시간 안에 끝나지 않았어요.',
+          level: 'warn',
+          context: { flow: 'withdrawal-push-unsubscribe-timeout' },
+        });
+      } finally {
+        finishWithdrawalNavigation();
+      }
+    }, WITHDRAWAL_PUSH_CLEANUP_TIMEOUT_MS);
+
+    try {
+      clearStoredV1Session();
+    } catch (error) {
+      reportClientError({
+        message: extractErrorMessage(error, '탈퇴 후 저장된 로그인 정보를 정리하지 못했어요.'),
+        level: 'warn',
+        context: { flow: 'withdrawal-session-cleanup' },
+      });
+    }
+    try {
+      disconnectV1Socket();
+    } catch (error) {
+      reportClientError({
+        message: extractErrorMessage(error, '탈퇴 후 실시간 연결을 종료하지 못했어요.'),
+        level: 'warn',
+        context: { flow: 'withdrawal-socket-cleanup' },
+      });
+    }
+    try {
+      clearV1IdentityCache(queryClient);
+    } catch (error) {
+      reportClientError({
+        message: extractErrorMessage(error, '탈퇴 후 계정 정보를 정리하지 못했어요.'),
+        level: 'warn',
+        context: { flow: 'withdrawal-cache-cleanup' },
+      });
+    }
+
+    // Authenticated server cleanup cannot remove the registration after session termination;
+    // revoke this device locally and let the server-side account/push lifecycle own its row.
+    void pushRegistration.unsubscribe({ reason: 'sign-out', skipServerUnsubscribe: true }).then(
+      () => finishWithdrawalNavigation(),
+      (error) => {
+        if (settled) return;
+        try {
+          reportClientError({
+            message: extractErrorMessage(error, '탈퇴 후 기기 알림 구독을 해제하지 못했어요.'),
+            level: 'warn',
+            context: { flow: 'withdrawal-push-unsubscribe' },
+          });
+        } finally {
+          finishWithdrawalNavigation();
+        }
+      },
+    );
+  };
+  const releaseWithdrawalLock = () => {
+    requestLockRef.current = false;
+    setIsRequestLocked(false);
+  };
+  const reconcileAmbiguousWithdrawal = async (error: Error) => {
+    const needsReconciliation = isV1NetworkError(error)
+      || (error instanceof V1ApiError && (
+        error.statusCode === 0
+        || error.statusCode >= 500
+        || (error.statusCode === 403 && error.code === 'PERMISSION_DENIED')
+      ));
+    if (!needsReconciliation) {
+      releaseWithdrawalLock();
+      return;
+    }
+
+    try {
+      await requestWithAbortTimeout(
+        (signal) => v1Api('/auth/me', { method: 'GET', signal }),
+        'Withdrawal auth reconciliation timed out.',
+      );
+      // The cookie still authenticates. Keep the server outcome unknown and let the user retry.
+      releaseWithdrawalLock();
+    } catch (authError) {
+      if (!isConfirmedInactiveSession(authError)) {
+        reportClientError({
+          message: extractErrorMessage(authError, '탈퇴 요청 결과와 로그인 상태를 확인하지 못했어요.'),
+          level: 'warn',
+          context: { flow: 'withdrawal-outcome-reconciliation' },
+        });
+        releaseWithdrawalLock();
+        return;
+      }
+
+      try {
+        await requestWithAbortTimeout(
+          (signal) => v1Api<{ ok: boolean }>('/auth/logout', {
+            method: 'POST',
+            body: JSON.stringify({}),
+            signal,
+          }),
+          'Withdrawal logout cleanup timed out.',
+        );
+      } catch (logoutError) {
+        reportClientError({
+          message: extractErrorMessage(logoutError, '확인되지 않은 탈퇴 요청 뒤 서버 로그인 쿠키를 정리하지 못했어요.'),
+          level: 'warn',
+          context: { flow: 'withdrawal-outcome-logout' },
+        });
+      }
+
+      // Auth rejection confirms that this browser must become a guest, not that withdrawal
+      // committed. Keep the request error visible while clearing this browser's identity.
+      completeWithdrawal();
+    }
+  };
+  const withdrawal = useV1WithdrawalRequest({
+    onSuccess: completeWithdrawal,
+    onError: reconcileAmbiguousWithdrawal,
+  });
   const handleWithdraw = () => {
-    confirm({
+    if (requestLockRef.current || finalizingRef.current || withdrawal.isPending) return;
+    requestLockRef.current = true;
+    setIsRequestLocked(true);
+    void confirm({
       title: '탈퇴 요청',
       message: '정말 탈퇴 요청할까요? 신청 후에는 직접 취소할 수 없고, 운영팀 확인을 거쳐 처리돼요.',
       confirmLabel: '탈퇴 요청',
       tone: 'danger',
     }).then((ok) => {
-      if (ok) {
-        withdrawal.mutate(
-          { reason: reason || null },
-          {
-            onSuccess: () => {
-              clearStoredV1Session();
-              router.replace('/login');
-            },
-          },
-        );
+      if (!ok) {
+        releaseWithdrawalLock();
+        return;
       }
+      // The mutation-level success callback survives observer unmounting. The error callback
+      // reconciles only ambiguous network/server failures; definitive errors stay in the card.
+      withdrawal.mutate({ reason: reason || null });
     });
   };
 
@@ -2302,7 +2480,7 @@ export function WithdrawalPageClient() {
         <button
           className="tm-btn tm-btn-lg tm-btn-danger tm-btn-block"
           type="button"
-          disabled={withdrawal.isPending}
+          disabled={withdrawal.isPending || isRequestLocked || isFinalizing}
           onClick={handleWithdraw}
         >
           {withdrawal.isPending ? '요청 중' : '탈퇴 요청'}

@@ -8,6 +8,7 @@ import { earliestPublicLivePollDelay } from '@/lib/public-live-polling';
 import { OPERATIONS_BOARD_POLL_INTERVAL_MS } from '@/lib/operations-board-polling';
 import { v1Keys } from '@/lib/query-keys';
 import { invalidateV1ChatMessageQueries } from './use-v1-realtime-socket';
+import { useV1WindowFocusRefetch } from './use-v1-window-focus-refetch';
 import { findInListCache } from '@/lib/list-cache-seed';
 import { randomUuid } from '@/lib/uuid';
 import type { GameLineup } from '@/types/game-operations';
@@ -2639,12 +2640,14 @@ export type V1ChatRoomsFilters = { roomType?: V1ChatRoom['roomType']; status?: '
  * 채팅 화면은 다른 탭의 개인 고정 변경을 받기 위해 focus 재조회를 명시한다. 홈 등 다른 소비처의 기본 정책은 유지한다.
  */
 export function useV1ChatRooms(options?: QueryOptions & { refetchOnWindowFocus?: boolean | 'always' }, filters?: V1ChatRoomsFilters) {
-  return useQuery({
+  const query = useQuery({
     queryKey: filters ? ([...v1Keys.chatRooms(), 'list', filters] as const) : v1Keys.chatRooms(),
     queryFn: () => v1Get<CursorPage<V1ChatRoom>>('/chat/rooms', filters),
     refetchOnWindowFocus: options?.refetchOnWindowFocus ?? false,
     enabled: options?.enabled ?? true,
   });
+  useV1WindowFocusRefetch(query, options?.enabled ?? true, options?.refetchOnWindowFocus ?? false);
+  return query;
 }
 
 export function useV1ChatMessages(roomId: string, filters?: ListFilters) {
@@ -2656,12 +2659,14 @@ export function useV1ChatMessages(roomId: string, filters?: ListFilters) {
 }
 
 export function useV1ChatRoom(roomId: string) {
-  return useQuery({
+  const query = useQuery({
     queryKey: v1Keys.chatRoom(roomId),
     queryFn: () => v1Get<V1ChatRoomDetail>(`/chat/rooms/${roomId}`),
     refetchOnWindowFocus: 'always',
     enabled: Boolean(roomId),
   });
+  useV1WindowFocusRefetch(query, Boolean(roomId), 'always');
+  return query;
 }
 
 export function useV1ResolveChatRoom() {

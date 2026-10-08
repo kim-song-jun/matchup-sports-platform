@@ -508,15 +508,22 @@ describe('자리 배정 (PostgreSQL)', () => {
     it('자리에 연결된 사이드의 팀 변경(지정·null)은 409 이고 아무것도 바뀌지 않는다', async () => {
       const { tournamentId, registrationIds } = await leagueOf4('linked');
       const slot1 = await slotAt(tournamentId, 1);
+      await slots.assignSlot(user, slot1.id, registrationIds[0]);
       const [fixture] = await fixturesUsing(slot1.id);
       const patch = fixture.homeSlotId === slot1.id ? 'homeRegistrationId' : 'awayRegistrationId';
+      const snapshot = async () => {
+        const details = await prisma.v1TournamentMatchDetails.findUniqueOrThrow({ where: { teamMatchId: fixture.id } });
+        const match = await prisma.v1TeamMatch.findUniqueOrThrow({ where: { id: fixture.id } });
+        return { home: details.homeRegistrationId, away: details.awayRegistrationId, host: match.hostTeamId, applicant: match.approvedApplicantTeamId };
+      };
+      const before = await snapshot();
+      expect(before[patch === 'homeRegistrationId' ? 'home' : 'away']).toBe(registrationIds[0]);
 
       for (const value of [registrationIds[2], null]) {
         await expect(bracket.updateFixture(user, fixture.id, { [patch]: value }))
           .rejects.toMatchObject({ response: { code: 'SLOT_LINKED' } });
       }
-      const after = await prisma.v1TournamentMatchDetails.findUniqueOrThrow({ where: { teamMatchId: fixture.id } });
-      expect([after.homeRegistrationId, after.awayRegistrationId]).toEqual([null, null]);
+      expect(await snapshot()).toEqual(before);
     });
 
     it('대조군 — 같은 경기의 일정·장소 수정은 그대로 된다', async () => {

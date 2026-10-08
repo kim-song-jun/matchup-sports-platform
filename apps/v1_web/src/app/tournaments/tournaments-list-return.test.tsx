@@ -469,3 +469,65 @@ describe('MD-QA #42 — 대회 목록 페이지 복귀', () => {
     await screen.findByText(/전체 22건 중 1–20/);
   });
 });
+
+describe('MD-QA #55 — 모바일 대회 목록 더 보기 복귀', () => {
+  const mobileItems = Array.from({ length: 45 }, (_, index) => ({
+    ...tournament,
+    id: index === 0 ? TOURNAMENT_ID : `mobile-${index + 1}`,
+    title: `모바일 대회 ${index + 1}`,
+  }));
+
+  beforeEach(() => {
+    window.matchMedia = (query: string) => ({
+      matches: false, media: query, onchange: null,
+      addListener: () => {}, removeListener: () => {},
+      addEventListener: () => {}, removeEventListener: () => {}, dispatchEvent: () => false,
+    });
+    navigation.path = '/tournaments?kind=tournament';
+    server.use(
+      http.get('*/api/v1/tournaments', ({ request }) => {
+        const params = new URL(request.url).searchParams;
+        const cursor = params.get('cursor');
+        const offset = cursor ? Number(cursor.split('-')[1]) : 0;
+        const limit = Number(params.get('limit') ?? 20);
+        const end = Math.min(offset + limit, mobileItems.length);
+        return ok({
+          items: mobileItems.slice(offset, end),
+          pageInfo: {
+            hasNext: end < mobileItems.length,
+            nextCursor: end < mobileItems.length ? `offset-${end}` : null,
+          },
+        });
+      }),
+      http.get('*/api/v1/tournaments/:id', () => ok(mobileItems[0])),
+    );
+  });
+
+  async function expectMobileCards(count: number) {
+    await waitFor(() => {
+      expect(within(screen.getByRole('list', { name: '대회 목록' })).getAllByRole('listitem')).toHaveLength(count);
+    });
+  }
+
+  it.each(['상단 뒤로가기', '브라우저 Back'])('40개까지 더 본 뒤 상세에서 %s 하면 같은 40개 목록을 복원한다', async (backAction) => {
+    // Given: 모바일 목록에서 두 번째 커서 페이지까지 실제 API 응답을 이어 붙였다.
+    const user = userEvent.setup();
+    renderRoute();
+    await expectMobileCards(20);
+    await user.click(screen.getByRole('button', { name: '더 보기' }));
+    await expectMobileCards(40);
+    await user.click(screen.getByRole('link', { name: '모바일 대회 1 — 풋살 — 진행 중' }));
+    await screen.findByRole('heading', { level: 1, name: '모바일 대회 1' });
+
+    // When: 상세 상단 액션 또는 브라우저 history로 목록에 돌아간다.
+    if (backAction === '상단 뒤로가기') await user.click(screen.getByRole('link', { name: '뒤로가기' }));
+    else act(() => navigation.back());
+
+    // Then: 첫 20개로 초기화되지 않고 다음 커서와 누적 40개를 그대로 이어서 쓸 수 있다.
+    expect(navigation.path).toBe('/tournaments?kind=tournament');
+    await expectMobileCards(40);
+    await user.click(await screen.findByRole('button', { name: '더 보기' }));
+    await expectMobileCards(45);
+    expect(screen.queryByRole('button', { name: '더 보기' })).not.toBeInTheDocument();
+  });
+});

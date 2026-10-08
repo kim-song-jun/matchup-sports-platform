@@ -1,7 +1,15 @@
-import { render } from '@testing-library/react';
+import { render as rtlRender } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import type { ReactElement } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import type { V1TournamentListItem } from '@/types/api';
 import { TournamentsListPageClient as TournamentsPage } from './tournaments-list-client';
+
+// 목록은 상세 복귀 복원에 QueryClient 를 쓴다(useCursorPagination) — API 훅을 mock 해도 provider 는 필요하다.
+function render(ui: ReactElement) {
+  const client = new QueryClient();
+  return rtlRender(ui, { wrapper: ({ children }) => <QueryClientProvider client={client}>{children}</QueryClientProvider> });
+}
 
 // motion-audit 그룹3(F1 subtab) — CompetitionKindSegment 는 kind='tab' 으로 정확히 분류돼
 // route-progress.tsx 가 진행바를 켜지 않는다. useV1Tournaments 는 placeholderData:

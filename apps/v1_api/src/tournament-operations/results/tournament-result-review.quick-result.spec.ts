@@ -429,3 +429,169 @@ describe('quickResult — 입장 조건 거부(거부된 요청은 아무 행도
   });
 });
 
+
+describe('quickResult — 정상 입력은 한 번에 공식 확정된다', () => {
+  it('최초 입력: 초안(승계 없음) → 참가자 → 확정 순으로 쓴다', async () => {
+    const harness = createHarness();
+
+    const response = await harness.run({ home: 2, away: 1 });
+
+    expect(response).toEqual({ gameId: ids.game, revisionId: 'quick-rev-1', version: GAME_VERSION + 1, score: { home: 2, away: 1 } });
+    expect(harness.created).toHaveLength(1);
+    expect(harness.created[0]).toMatchObject({
+      gameId: ids.game,
+      revision: 1,
+      reason: QUICK_RESULT_REASON_MARKER,
+      goalEvents: [],
+      eventsHash: canonicalGameCommandPayloadHash([]),
+      missingScorer: false,
+      createdByActorType: 'USER',
+      createdByUserId: ids.user,
+    });
+    expect(harness.created[0].score).toEqual({ home: 2, away: 1 });
+    // 초안으로 만든 뒤(참가자 insert 트리거가 DRAFT 만 허용한다) 같은 행을 확정으로 올린다.
+    expect(harness.created[0]).not.toHaveProperty('state');
+    expect(harness.created[0]).not.toHaveProperty('supersedesId');
+    expect(harness.revisionUpdates).toHaveLength(1);
+    expect(harness.revisionUpdates[0].data).toMatchObject({
+      state: V1GameResultRevisionState.OFFICIAL,
+      submittedAt: expect.any(Date),
+      officialAt: expect.any(Date),
+    });
+    // 확정 뒤 게임 상태·포인터·팀매치 completed·다음 경기 칸은 DB 로 관측되는 결과라 통합 스펙 7b 가 단언한다.
+  });
+
+  it('GAME_RESULT_OFFICIAL 하나만 남기고 검토 알림 대상인 GAME_RESULT_SUBMITTED 는 쓰지 않는다', async () => {
+    const harness = createHarness();
+
+    await harness.run({ home: 2, away: 1 });
+
+    expect(harness.outbox).toHaveLength(1);
+    expect(harness.outbox[0]).toMatchObject({
+      businessKey: `game:${ids.game}:revision:1:officialize`,
+      aggregateType: 'GAME',
+      aggregateId: ids.game,
+      type: 'GAME_RESULT_OFFICIAL',
+      revisionId: 'quick-rev-1',
+    });
+  });
+
+  it('참가자는 사이드별 최신 무효화되지 않은 라인업 리비전의 선수 전원이고 기록은 0 이다 — 옛 명단·무효화된 명단은 섞이지 않는다', async () => {
+    const harness = createHarness();
+
+    await harness.run({ home: 2, away: 1 });
+
+    expect(harness.participantRows.map((row) => row.participantId)).toEqual(['p-home-gk', 'p-home-fw', 'p-away-gk']);
+    for (const row of harness.participantRows) {
+      expect(row).toMatchObject({
+        resultRevisionId: 'quick-rev-1',
+        started: true,
+        goals: 0,
+        assists: 0,
+        fouls: 0,
+        cards: { yellow: 0, red: 0 },
+      });
+    }
+    expect(Object.fromEntries(harness.participantRows.map((row) => [row.participantId, row.goalkeeper]))).toEqual({
+      'p-home-gk': true,
+      'p-home-fw': false,
+      'p-away-gk': true,
+    });
+  });
+
+  it('권한 검사는 result_officialize 로, 그 경기의 대회를 대상으로 한다', async () => {
+    const harness = createHarness();
+
+    await harness.run({ home: 2, away: 1 });
+
+    expect(harness.staffAccessInputs[0]).toMatchObject({ action: 'result_officialize', resource: { tournamentId: ids.tournament } });
+  });
+
+  it('정규 리그 경기도 같은 경로로 확정된다', async () => {
+    const harness = createHarness({ source: 'league' });
+
+    await harness.run({ home: 0, away: 0 });
+
+    expect(harness.revisionUpdates[0].data).toMatchObject({ state: V1GameResultRevisionState.OFFICIAL });
+    expect(harness.outbox.map((row) => row.type)).toEqual(['GAME_RESULT_OFFICIAL']);
+  });
+});
+
+
+describe('quickResult — 무효(VOID) 뒤 재입력 — 쓰기', () => {
+  const voided: StoredRevision = { id: 'void-rev', revision: 3, state: V1GameResultRevisionState.VOID };
+  const reentry = { gameState: 'ENDED', revisions: [voided], pointerId: 'void-rev', teamMatchStatus: 'completed' } as const;
+
+  it('VOID 리비전을 승계하는 새 리비전을 만들고, 번호는 이어서 센다', async () => {
+    const harness = createHarness(reentry);
+
+    await harness.run({ home: 0, away: 3 });
+
+    expect(harness.created[0]).toMatchObject({ revision: 4, supersedesId: 'void-rev', reason: QUICK_RESULT_REASON_MARKER });
+    expect(harness.revisionUpdates[0].data).toMatchObject({ state: V1GameResultRevisionState.OFFICIAL });
+  });
+});
+
+describe('quickResult — 승부차기(킥 수는 요구하지 않는다)', () => {
+  it('결선 무승부에 승부차기가 없으면 TOURNAMENT_PENALTY_REQUIRED', async () => {
+    const harness = createHarness({ phase: 'semi' });
+
+    expectHttp(await captureFailure(() => harness.run({ home: 1, away: 1 })), 409, 'TOURNAMENT_PENALTY_REQUIRED');
+    expectNoWrites(harness);
+  });
+
+  it('결선 무승부 + 점수만 있는 승부차기는 저장된다 — 킥 수·선축 키 없이 정확히 그 값만', async () => {
+    const harness = createHarness({ phase: 'semi' });
+
+    const response = await harness.run({ home: 1, away: 1, penalties: { home: 5, away: 4 } });
+
+    expect(harness.created[0].score).toEqual({ home: 1, away: 1, penalties: { home: 5, away: 4 } });
+    expect(response.score).toEqual({ home: 1, away: 1, penalties: { home: 5, away: 4 } });
+  });
+
+  it('조별 경기의 무승부는 정상이고, 승부차기를 실으면 TOURNAMENT_PENALTY_NOT_ALLOWED', async () => {
+    const group = createHarness({ phase: 'group', hasAdvancementEdge: false });
+    await group.run({ home: 1, away: 1 });
+    expect(group.created).toHaveLength(1);
+
+    const withPenalties = createHarness({ phase: 'group', hasAdvancementEdge: false });
+    expectHttp(
+      await captureFailure(() => withPenalties.run({ home: 1, away: 1, penalties: { home: 5, away: 4 } })),
+      409,
+      'TOURNAMENT_PENALTY_NOT_ALLOWED',
+    );
+    expectNoWrites(withPenalties);
+  });
+
+  it('정규시간에 승부가 난 결선 경기에 승부차기를 실으면 TOURNAMENT_PENALTY_NOT_ALLOWED', async () => {
+    const harness = createHarness({ phase: 'semi' });
+
+    expectHttp(
+      await captureFailure(() => harness.run({ home: 2, away: 1, penalties: { home: 5, away: 4 } })),
+      409,
+      'TOURNAMENT_PENALTY_NOT_ALLOWED',
+    );
+    expectNoWrites(harness);
+  });
+
+  it('무효 뒤 재입력은 옛 승부차기를 승계하지 않는다 — 결선 무승부는 다시 입력해야 한다', async () => {
+    const harness = createHarness({
+      phase: 'semi',
+      gameState: 'ENDED',
+      teamMatchStatus: 'completed',
+      pointerId: 'void-rev',
+      revisions: [
+        {
+          id: 'void-rev',
+          revision: 2,
+          state: V1GameResultRevisionState.VOID,
+          score: { home: 1, away: 1, penalties: { home: 5, away: 4 } },
+        },
+      ],
+    });
+
+    expectHttp(await captureFailure(() => harness.run({ home: 1, away: 1 })), 409, 'TOURNAMENT_PENALTY_REQUIRED');
+    expectNoWrites(harness);
+  });
+});
+

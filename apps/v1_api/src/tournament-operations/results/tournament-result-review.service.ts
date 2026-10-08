@@ -7,10 +7,11 @@ import {
 } from '@nestjs/common';
 import { resolveGameSource } from '../resolve-game-source';
 import { assertPenaltyShootoutPersistable } from '../../games/core/penalty-shootout-outcome';
-import { parseResultPolicy } from '../../tournaments/competition-config/competition-config.parse';
+import { parseLineupCatalog, parseResultPolicy } from '../../tournaments/competition-config/competition-config.parse';
 import {
   Prisma,
   V1GameEventType,
+  V1GamePeriodState,
   V1GameOutcomeReason,
   V1GameResultRevisionState,
   V1GameSourceType,
@@ -72,6 +73,7 @@ import type {
   GameScore,
 } from '../../games/games.types';
 import { PrismaService } from '../../prisma/prisma.service';
+import { QUICK_RESULT_REASON_MARKER } from './quick-result.constants';
 import type { QuickResultDto } from './quick-result.dto';
 import { V1AuthUser } from '../../auth/v1-auth-user';
 import { TournamentStaffAccessService } from '../../tournaments/staff/tournament-staff-access.service';
@@ -981,9 +983,104 @@ export class TournamentResultReviewService {
       );
     }
 
+    // 6. 승부차기: 기존 검증 순서·코드 그대로. base 점수는 null 로 넘겨 무효된 옛 승부차기를 승계하지 않고,
+    //    이벤트가 0건이라 킥 수는 요구되지 않는다(Task 3).
+    const score = await this.assertPenaltiesForRevision(tx, game, null, dto.score);
 
-    // 5c 가 승부차기 검증과 쓰기 흐름을 이 아래에 채운다. 그 전까지는 입장 조건을 통과한 경기도 거부한다.
-    throw quickResultConflict('QUICK_RESULT_NOT_AVAILABLE', '아직 점수를 바로 확정할 수 없어요.');
+    if (voidBase !== null) {
+      try {
+        assertRevisionSupersession({
+          baseGameId: game.id,
+          successorGameId: game.id,
+          baseRevisionId: voidBase.id,
+          supersedesRevisionId: voidBase.id,
+          baseState: voidBase.state,
+          successorState: V1GameResultRevisionState.DRAFT,
+          purpose: 'VOID_REENTRY',
+        });
+      } catch (error) {
+        if (error instanceof GameContractError) {
+          throw toGameHttpException(error);
+        }
+        throw error;
+      }
+    }
+
+    // 7. 쓰기. 참가자 insert 트리거가 DRAFT 리비전만 허용하므로 초안 → 참가자 → 확정 순서다.
+    const goalkeeperPositionCode =
+      parseLineupCatalog(config?.lineup ?? null).positions.find((position) => position.goalkeeper === true)?.code ??
+      'GK';
+    const now = new Date();
+    const draft = await tx.v1GameResultRevision.create({
+      data: {
+        gameId: game.id,
+        revision: (latest?.revision ?? 0) + 1,
+        score: jsonInput(score),
+        goalEvents: jsonInput([]),
+        eventsHash: canonicalGameCommandPayloadHash([]),
+        missingScorer: false,
+        reason: QUICK_RESULT_REASON_MARKER,
+        createdByActorType: 'USER',
+        createdByUserId: userId,
+        ...(voidBase === null ? {} : { supersedesId: voidBase.id }),
+      },
+    });
+    await tx.v1GameResultParticipant.createMany({
+      data: roster.map((player) => ({
+        resultRevisionId: draft.id,
+        participantId: player.id,
+        sideId: player.sideId,
+        started: true,
+        goals: 0,
+        assists: 0,
+        fouls: 0,
+        cards: jsonInput({ yellow: 0, red: 0 }),
+        goalkeeper: player.position === goalkeeperPositionCode,
+      })),
+    });
+    this.assertTransition({ from: draft.state, to: V1GameResultRevisionState.OFFICIAL, flow: 'ADMIN_QUICK' });
+    const officialized = await tx.v1GameResultRevision.update({
+      where: { id: draft.id },
+      data: { state: V1GameResultRevisionState.OFFICIAL, submittedAt: now, officialAt: now },
+    });
+    const updated = await tx.v1Game.update({
+      where: { id: game.id },
+      data: {
+        state: V1GameState.ENDED,
+        version: { increment: 1 },
+        currentOfficialRevisionId: officialized.id,
+      },
+    });
+    await tx.v1GamePeriod.updateMany({
+      where: { gameId: game.id, state: { in: [V1GamePeriodState.LIVE, V1GamePeriodState.HALFTIME] } },
+      data: { state: V1GamePeriodState.ENDED, endedAt: now },
+    });
+
+    // 8. 일반 확정과 같은 후속 호출. 진출은 결과 경계(팀매치 completed)가 먼저 서야 한다.
+    await completeTeamMatchAtResultBoundary(tx, teamMatchId, userId, 'admin_quick_result');
+    const canonicalRevision = await this.loadOfficialRevisionRow(tx, officialized.id);
+    if (canonicalRevision !== null && canonicalRevision.tournamentTeamMatchId !== null) {
+      await projectCanonicalAdvancement(tx, canonicalRevision, parseOfficialScore(canonicalRevision.score));
+    }
+    await this.writeOutbox(
+      tx,
+      `game:${game.id}:revision:${officialized.revision}:officialize`,
+      game.id,
+      'GAME_RESULT_OFFICIAL',
+      { revisionId: officialized.id },
+      officialized.id,
+    );
+    return {
+      gameId: game.id,
+      state: updated.state,
+      version: updated.version,
+      durableCommandId: context.durableCommandId,
+      replayed: false,
+      revisionId: officialized.id,
+      revision: officialized.revision,
+      revisionState: officialized.state,
+      score,
+    };
   }
 
   // ─── command boundary ─────────────────────────────────────────────────────

@@ -48,7 +48,7 @@ import {
   type TournamentFixtureGameForResult,
 } from './tournament-fixture-official-result';
 import { findTournamentOnSurface, TOURNAMENT_KINDS } from './tournament-surface-lookup';
-import { assertSidesNotSlotLinked, createGroupInTx, ensureGroupPhaseTeamsInTx, recalculateStandingsInTx, softDeleteTournamentFixtureInTx, updateTournamentFixtureInTx } from './tournament-bracket-tx';
+import { assertSidesNotSlotLinked, createGroupInTx, deleteTournamentGroupInTx, ensureGroupPhaseTeamsInTx, recalculateStandingsInTx, softDeleteTournamentFixtureInTx, updateTournamentFixtureInTx } from './tournament-bracket-tx';
 import { participantDisplayName } from './participant-display-name';
 import { readJerseyNumbers } from './tournament-player-jersey';
 import { createTournamentMatchInTx } from './tournament-match-creation';
@@ -968,54 +968,16 @@ export class TournamentBracketService {
     return this.serializeGroup(updated);
   }
 
-  /** 조 삭제. 팀 배정·경기가 남아 있으면 실수 방지를 위해 409로 막는다. */
+  /** 조 삭제. 팀 배정·경기·자리가 남아 있으면 실수 방지를 위해 409로 막는다. */
   async deleteGroup(user: V1AuthUser, groupId: string) {
     const admin = await this.adminContext.getMutationAdmin(user.id);
-    const group = await this.prisma.v1TournamentGroup.findUnique({
-      where: { id: groupId },
-      include: { _count: { select: { groupTeams: true, byeSlots: true, tournamentMatchDetails: true } } },
-    });
+    const group = await this.prisma.v1TournamentGroup.findUnique({ where: { id: groupId }, select: { tournamentId: true } });
     if (!group) {
       throw new NotFoundException({ code: 'GROUP_NOT_FOUND', message: '조를 찾을 수 없어요.' });
     }
-    if (group._count.groupTeams > 0 || (group._count.byeSlots ?? 0) > 0) {
-      throw new ConflictException({
-        code: 'GROUP_HAS_TEAMS',
-        message: '조에 배정된 팀이 있어요. 팀 배정을 먼저 해제해 주세요.',
-      });
-    }
-    if (group._count.tournamentMatchDetails > 0) {
-      throw new ConflictException({
-        code: 'GROUP_HAS_FIXTURES',
-        message: '조에 연결된 경기가 있어요. 경기를 먼저 삭제해 주세요.',
-      });
-    }
     await this.prisma.$transaction(async (tx) => {
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`league-fixture-generation:${group.tournamentId}`}, 0))`;
-      const current = await tx.v1TournamentGroup.findUnique({
-        where: { id: groupId },
-        include: { _count: { select: { groupTeams: true, byeSlots: true, tournamentMatchDetails: true } } },
-      });
-      if (!current) {
-        throw new NotFoundException({ code: 'GROUP_NOT_FOUND', message: '조를 찾을 수 없어요.' });
-      }
-      if (current._count.groupTeams > 0 || (current._count.byeSlots ?? 0) > 0) {
-        throw new ConflictException({ code: 'GROUP_HAS_TEAMS', message: '조에 배정된 팀이 있어요. 팀 배정을 먼저 해제해 주세요.' });
-      }
-      if (current._count.tournamentMatchDetails > 0) {
-        throw new ConflictException({ code: 'GROUP_HAS_FIXTURES', message: '조에 연결된 경기가 있어요. 경기를 먼저 삭제해 주세요.' });
-      }
-      await tx.v1TournamentGroup.delete({ where: { id: groupId } });
-      await this.adminContext.logAdminAction(
-        admin,
-        {
-          action: 'tournament.bracket.group.delete',
-          targetType: 'tournament_group',
-          targetId: groupId,
-          beforeJson: { name: group.name, phase: group.phase },
-        },
-        tx,
-      );
+      await deleteTournamentGroupInTx(tx, admin, groupId);
     });
     return { deleted: true };
   }

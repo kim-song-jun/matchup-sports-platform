@@ -280,7 +280,7 @@ describe('TournamentBracketService', () => {
   let prisma: {
     v1AdminUser: { findUnique: jest.Mock };
     v1Tournament: { findFirst: jest.Mock };
-    v1TournamentGroup: { findFirst: jest.Mock; create: jest.Mock; findMany: jest.Mock };
+    v1TournamentGroup: { findFirst: jest.Mock; create: jest.Mock; findMany: jest.Mock; findUnique: jest.Mock; delete: jest.Mock };
     v1TournamentByeSlot: { findMany: jest.Mock; findUnique: jest.Mock; count: jest.Mock; create: jest.Mock; update: jest.Mock; delete: jest.Mock };
     v1TournamentGroupTeam: { delete: jest.Mock; findUnique: jest.Mock; findFirst: jest.Mock; findMany: jest.Mock; create: jest.Mock; update: jest.Mock };
     v1TournamentMatchDetails: { findUnique: jest.Mock; findUniqueOrThrow: jest.Mock; findFirst: jest.Mock; findMany: jest.Mock; count: jest.Mock; create: jest.Mock; update: jest.Mock };
@@ -312,7 +312,7 @@ describe('TournamentBracketService', () => {
     prisma = {
       v1AdminUser: { findUnique: jest.fn() },
       v1Tournament: { findFirst: jest.fn().mockResolvedValue(tournamentRow({ status: 'closed' })) },
-      v1TournamentGroup: { findFirst: jest.fn(), create: jest.fn(), findMany: jest.fn() },
+      v1TournamentGroup: { findFirst: jest.fn(), create: jest.fn(), findMany: jest.fn(), findUnique: jest.fn(), delete: jest.fn() },
       v1TournamentByeSlot: { findMany: jest.fn().mockResolvedValue([]), findUnique: jest.fn().mockResolvedValue(null), count: jest.fn().mockResolvedValue(0), create: jest.fn(), update: jest.fn(), delete: jest.fn() },
       v1TournamentGroupTeam: { delete: jest.fn(), findUnique: jest.fn(), findFirst: jest.fn().mockResolvedValue(null), findMany: jest.fn().mockResolvedValue([]), create: jest.fn().mockResolvedValue({ id: 'group-team-auto' }), update: jest.fn() },
       v1TournamentMatchDetails: {
@@ -2221,6 +2221,50 @@ describe('TournamentBracketService', () => {
       await expect(service.updateFixture(ownerUser, 'fixture-1', { homeRegistrationId: 'reg-3' })).rejects.toMatchObject({
         response: { code: 'FIXTURE_HAS_RESULT' },
       });
+    });
+  });
+
+  describe('deleteGroup (deleteTournamentGroupInTx)', () => {
+    const arrange = (count: Partial<Record<'groupTeams' | 'byeSlots' | 'tournamentMatchDetails' | 'slots' | 'rankSlots', number>> = {}) => {
+      prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdmin);
+      prisma.v1TournamentGroup.findUnique.mockResolvedValue({
+        ...groupRow(),
+        _count: { groupTeams: 0, byeSlots: 0, tournamentMatchDetails: 0, slots: 0, rankSlots: 0, ...count },
+      });
+    };
+
+    it.each([
+      { name: '조 편성 팀', count: { groupTeams: 1 }, code: 'GROUP_HAS_TEAMS' },
+      { name: '미정 부전승 자리', count: { byeSlots: 1 }, code: 'GROUP_HAS_TEAMS' },
+      { name: '경기', count: { tournamentMatchDetails: 2 }, code: 'GROUP_HAS_FIXTURES' },
+      { name: '이 조에 속한 자리', count: { slots: 3 }, code: 'GROUP_HAS_SLOTS' },
+      { name: '다른 조의 순위 자리가 이 조를 원천으로 삼는 경우', count: { rankSlots: 1 }, code: 'GROUP_HAS_SLOTS' },
+      { name: '팀과 자리가 함께 있으면 팀이 먼저 (기존 우선순위 유지)', count: { groupTeams: 1, slots: 1 }, code: 'GROUP_HAS_TEAMS' },
+    ])('$name → 409 $code 이고 조를 지우지 않는다', async ({ count, code }) => {
+      arrange(count);
+
+      await expect(service.deleteGroup(ownerUser, 'group-1')).rejects.toMatchObject({ response: { code } });
+      expect(prisma.v1TournamentGroup.delete).not.toHaveBeenCalled();
+      expect(prisma.v1AdminActionLog.create).not.toHaveBeenCalled();
+    });
+
+    it('아무것도 매달려 있지 않으면 지우고 감사 로그에 이전 이름·단계를 남긴다 (대조군)', async () => {
+      arrange();
+
+      await expect(service.deleteGroup(ownerUser, 'group-1')).resolves.toEqual({ deleted: true });
+
+      expect(prisma.v1TournamentGroup.delete).toHaveBeenCalledWith({ where: { id: 'group-1' } });
+      expect(prisma.v1AdminActionLog.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({ action: 'tournament.bracket.group.delete', targetId: 'group-1', beforeJson: { name: 'A조', phase: 'group' } }),
+      });
+    });
+
+    it('없는 조는 404 이고 트랜잭션을 열지 않는다', async () => {
+      prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdmin);
+      prisma.v1TournamentGroup.findUnique.mockResolvedValue(null);
+
+      await expect(service.deleteGroup(ownerUser, 'ghost')).rejects.toMatchObject({ response: { code: 'GROUP_NOT_FOUND' } });
+      expect(prisma.$transaction).not.toHaveBeenCalled();
     });
   });
 

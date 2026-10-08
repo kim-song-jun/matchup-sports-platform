@@ -44,5 +44,41 @@ describe('대진 …InTx 함수 (PostgreSQL)', () => {
     });
   });
 
+  describe('deleteGroup + 자리', () => {
+    const makeSlot = (data: { groupId: string | null; position: number; kind?: 'ENTRY' | 'GROUP_RANK'; sourceGroupId?: string }) =>
+      prisma.v1TournamentSlot.create({
+        data: { tournamentId: ids.tournamentId, kind: data.kind ?? 'ENTRY', groupId: data.groupId, position: data.position, sourceGroupId: data.sourceGroupId ?? null },
+      });
+
+    it('자리가 남은 조는 409 GROUP_HAS_SLOTS 로 막히고(500 이 아니다), 자리를 지우면 지워진다', async () => {
+      const group = await bracket.createGroup(user, ids.tournamentId, { name: 'slot-group', phase: 'group' });
+      const slot = await makeSlot({ groupId: group.id, position: 1 });
+
+      await expect(bracket.deleteGroup(user, group.id)).rejects.toMatchObject({ response: { code: 'GROUP_HAS_SLOTS' } });
+      expect(await prisma.v1TournamentGroup.count({ where: { id: group.id } })).toBe(1);
+
+      await prisma.v1TournamentSlot.delete({ where: { id: slot.id } });
+      await expect(bracket.deleteGroup(user, group.id)).resolves.toEqual({ deleted: true });
+    });
+
+    it('다른 조의 순위 자리가 원천으로 삼는 조도 막힌다', async () => {
+      const source = await bracket.createGroup(user, ids.tournamentId, { name: 'rank-source', phase: 'group' });
+      const finals = await bracket.createGroup(user, ids.tournamentId, { name: 'rank-finals', phase: 'semi' });
+      const rank = await makeSlot({ kind: 'GROUP_RANK', groupId: finals.id, position: 1, sourceGroupId: source.id });
+
+      await expect(bracket.deleteGroup(user, source.id)).rejects.toMatchObject({ response: { code: 'GROUP_HAS_SLOTS' } });
+
+      await prisma.v1TournamentSlot.delete({ where: { id: rank.id } });
+      await expect(bracket.deleteGroup(user, source.id)).resolves.toEqual({ deleted: true });
+      await expect(bracket.deleteGroup(user, finals.id)).resolves.toEqual({ deleted: true });
+    });
+
+    it('자리가 없는 빈 조는 기존대로 지워진다 (대조군)', async () => {
+      const group = await bracket.createGroup(user, ids.tournamentId, { name: 'plain-group', phase: 'group' });
+      await expect(bracket.deleteGroup(user, group.id)).resolves.toEqual({ deleted: true });
+      expect(await prisma.v1TournamentGroup.count({ where: { id: group.id } })).toBe(0);
+    });
+  });
+
   // ─── 통합 스펙 끝 (새 describe 는 이 줄 위에 추가한다) ───
 });

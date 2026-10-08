@@ -54,10 +54,8 @@ describe('team schedule MSW date-order API contract', () => {
   ])('rejects $label create dates without changing the stored schedule', async ({ endAt }) => {
     // Given: a stored schedule with an increasing range.
     const before = await v1Get<V1TeamScheduleDetail>(schedulePath);
-
     // When: a create request supplies a non-increasing range.
     const mutation = v1Post(collectionPath, { ...baseline, title: '저장되면 안 되는 일정', endAt });
-
     // Then: the API rejects it and preserves every detail field, including state/version.
     await expect(mutation).rejects.toMatchObject(invalidRangeError);
     expect(await v1Get<V1TeamScheduleDetail>(schedulePath)).toEqual(before);
@@ -78,14 +76,12 @@ describe('team schedule MSW date-order API contract', () => {
   it.each(invalidPatches)('rejects $label PATCH dates without changing the stored schedule', async ({ changes }) => {
     // Given: omitted PATCH dates must be combined with the stored range.
     const before = await v1Get<V1TeamScheduleDetail>(schedulePath);
-
     // When: that effective range is not increasing.
     const mutation = v1Patch(schedulePath, {
       expectedVersion: before.version,
       title: '저장되면 안 되는 수정',
       ...changes,
     } satisfies V1UpdateScheduleDto);
-
     // Then: date rejection does not mutate either the fixture or its version.
     await expect(mutation).rejects.toMatchObject(invalidRangeError);
     expect(await v1Get<V1TeamScheduleDetail>(schedulePath)).toEqual(before);
@@ -98,19 +94,17 @@ describe('team schedule MSW date-order API contract', () => {
       startAt: '2026-05-24T23:00:00.000Z',
       endAt: '2026-05-25T01:00:00.000Z',
     } satisfies V1CreateScheduleDto;
-
     // When: the schedule is created.
     const result = await v1Post<V1TeamScheduleMutationResult>(collectionPath, payload);
-
     // Then: a fresh GET exposes the accepted dates and initial version.
-    expect(result).toMatchObject({ startAt: payload.startAt, endAt: payload.endAt, state: 'SCHEDULED', version: 1 });
+    expect(result).toMatchObject({ startAt: payload.startAt, endAt: payload.endAt, state: 'SCHEDULED', version: 0 });
     expect(await v1Get<V1TeamScheduleDetail>(schedulePath)).toMatchObject({
       id: result.id,
       title: payload.title,
       startAt: payload.startAt,
       endAt: payload.endAt,
       state: 'SCHEDULED',
-      version: 1,
+      version: 0,
     });
   });
 
@@ -142,16 +136,14 @@ describe('team schedule MSW date-order API contract', () => {
   }[];
 
   it.each(validPatches)('persists $label PATCH semantics', async ({ changes, startAt, endAt }) => {
-    // Given: the existing schedule has version 1 and a valid range.
+    // Given: the existing schedule has its returned version and a valid range.
     const before = await v1Get<V1TeamScheduleDetail>(schedulePath);
-
     // When: a current-version update supplies an increasing effective range.
     const result = await v1Patch<V1TeamScheduleMutationResult>(schedulePath, {
       expectedVersion: before.version,
       title: '유효한 수정',
       ...changes,
     } satisfies V1UpdateScheduleDto);
-
     // Then: a fresh GET preserves omitted dates and exposes exactly one version increment.
     expect(result).toMatchObject({ startAt, endAt, title: '유효한 수정', state: 'SCHEDULED', version: before.version + 1 });
     expect(await v1Get<V1TeamScheduleDetail>(schedulePath)).toEqual({
@@ -166,14 +158,12 @@ describe('team schedule MSW date-order API contract', () => {
   it('rejects a stale-version invalid range before date validation without mutation', async () => {
     // Given: the submitted version differs from the stored schedule.
     const before = await v1Get<V1TeamScheduleDetail>(schedulePath);
-
     // When: the stale request also supplies an invalid effective range.
     const mutation = v1Patch(schedulePath, {
-      expectedVersion: before.version - 1,
+      expectedVersion: before.version + 1,
       endAt: baseline.startAt,
       title: '저장되면 안 되는 충돌',
     } satisfies V1UpdateScheduleDto);
-
     // Then: version precedence matches the service and the schedule remains intact.
     await expect(mutation).rejects.toMatchObject({ statusCode: 409, code: 'VERSION_CONFLICT' });
     expect(await v1Get<V1TeamScheduleDetail>(schedulePath)).toEqual(before);
@@ -181,20 +171,79 @@ describe('team schedule MSW date-order API contract', () => {
 
   it.each(['cancel', 'complete'])('rejects an invalid range on a %s terminal schedule before date validation', async (action) => {
     // Given: the schedule is terminal with its latest version.
+    const initial = await v1Get<V1TeamScheduleDetail>(schedulePath);
     await v1Post(`${schedulePath}/${action}`, action === 'cancel'
-      ? { expectedVersion: 1, cancelReason: '테스트 종료' }
-      : { expectedVersion: 1 });
+      ? { expectedVersion: initial.version, cancelReason: '테스트 종료' }
+      : { expectedVersion: initial.version });
     const before = await v1Get<V1TeamScheduleDetail>(schedulePath);
-
     // When: a current-version PATCH also supplies an invalid range.
     const mutation = v1Patch(schedulePath, {
       expectedVersion: before.version,
       endAt: baseline.startAt,
       title: '저장되면 안 되는 종료 일정',
     } satisfies V1UpdateScheduleDto);
-
     // Then: terminal-state precedence matches the service and preserves every field.
     await expect(mutation).rejects.toMatchObject({ statusCode: 409, code: 'SCHEDULE_TERMINAL' });
+    expect(await v1Get<V1TeamScheduleDetail>(schedulePath)).toEqual(before);
+  });
+
+  const malformedCreates = ['startAt', 'endAt'].flatMap((field) =>
+    ['not-a-date', '05/24/2026 10:00'].map((value) => ({ field, value })),
+  );
+  it.each(malformedCreates)('rejects malformed create $field=$value at DTO validation', async ({ field, value }) => {
+    // Given: a valid stored schedule and a malformed supplied date string.
+    const before = await v1Get<V1TeamScheduleDetail>(schedulePath);
+    // When: create supplies a timestamp that IsDateString rejects, including Date.parse-compatible syntax.
+    const mutation = v1Post(collectionPath, { ...baseline, [field]: value });
+    // Then: validation wins before service checks or fixture writes.
+    await expect(mutation).rejects.toMatchObject({
+      statusCode: 400, code: 'VALIDATION_ERROR', message: '입력값을 다시 확인해 주세요.',
+      details: [{ field, messages: [`${field} must be a valid ISO 8601 date string`] }],
+    });
+    expect(await v1Get<V1TeamScheduleDetail>(schedulePath)).toEqual(before);
+  });
+
+  const malformedPatches = ['current', 'stale', 'cancel', 'complete'].flatMap((state) => [
+    { state, field: 'startAt', value: 'not-a-date' },
+    { state, field: 'endAt', value: '05/24/2026 10:00' },
+  ]);
+  it.each(malformedPatches)('rejects malformed PATCH $field before $state service checks', async ({ state, field, value }) => {
+    // Given: a current, stale or terminal schedule request with malformed supplied input.
+    const initial = await v1Get<V1TeamScheduleDetail>(schedulePath);
+    if (state === 'cancel' || state === 'complete') {
+      await v1Post(`${schedulePath}/${state}`, state === 'cancel'
+        ? { expectedVersion: initial.version, cancelReason: '테스트 종료' }
+        : { expectedVersion: initial.version });
+    }
+    const before = await v1Get<V1TeamScheduleDetail>(schedulePath);
+    // When: PATCH sends the malformed date, with a stale version where requested.
+    const mutation = v1Patch(schedulePath, { expectedVersion: before.version + (state === 'stale' ? 1 : 0), [field]: value });
+    // Then: supplied-field DTO validation precedes version, state and effective-range checks.
+    await expect(mutation).rejects.toMatchObject({
+      statusCode: 400, code: 'VALIDATION_ERROR', message: '입력값을 다시 확인해 주세요.',
+      details: [{ field, messages: [`${field} must be a valid ISO 8601 date string`] }],
+    });
+    expect(await v1Get<V1TeamScheduleDetail>(schedulePath)).toEqual(before);
+  });
+
+  it.each(['startAt', 'endAt'])('preserves %s when the optional PATCH date is null', async (field) => {
+    // Given: IsOptional skips both null and omitted date fields.
+    const before = await v1Get<V1TeamScheduleDetail>(schedulePath);
+    // When: a current-version PATCH supplies null for that optional field.
+    await v1Patch(schedulePath, { expectedVersion: before.version, [field]: null });
+    // Then: the effective date and every other field are preserved except the version increment.
+    expect(await v1Get<V1TeamScheduleDetail>(schedulePath)).toEqual({ ...before, version: before.version + 1 });
+  });
+
+  it.each(['create', 'patch'])('keeps service422 for a DTO-valid but unparseable ISO week date on %s', async (method) => {
+    // Given: IsDateString default options accept ISO week syntax, but Date cannot parse it.
+    const before = await v1Get<V1TeamScheduleDetail>(schedulePath);
+    // When: valid DTO syntax reaches the effective Date-epoch guard.
+    const mutation = method === 'create'
+      ? v1Post(collectionPath, { ...baseline, startAt: '2026-W21-7' })
+      : v1Patch(schedulePath, { expectedVersion: before.version, startAt: '2026-W21-7' });
+    // Then: the service error remains distinct from DTO validation and writes nothing.
+    await expect(mutation).rejects.toMatchObject(invalidRangeError);
     expect(await v1Get<V1TeamScheduleDetail>(schedulePath)).toEqual(before);
   });
 });

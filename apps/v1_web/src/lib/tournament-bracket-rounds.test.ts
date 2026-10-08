@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { byeRound } from './tournament-bracket-rounds';
+import { BRACKET_SOURCE_PHASES, byeRound } from './tournament-bracket-rounds';
 
 describe('byeRound — 부전승이 가능한 단계', () => {
   it('12강·8강·4강만 부전승 단계이고 다음 단계가 이어진다', () => {
@@ -12,5 +12,13 @@ describe('byeRound — 부전승이 가능한 단계', () => {
     expect(byeRound('round16')).toBeUndefined();
     expect(byeRound('final')).toBeUndefined();
     expect(byeRound('group')).toBeUndefined();
+  });
+});
+
+describe('BRACKET_SOURCE_PHASES — 서버 tournament-bracket-phases.ts 와 같은 표', () => {
+  it('8강은 16강·12강을, 4강은 8강을, 결승·3·4위전은 4강을 원천으로 받는다', () => {
+    expect(BRACKET_SOURCE_PHASES).toEqual({
+      quarter: ['round16', 'round12'], semi: ['quarter'], final: ['semi'], third_place: ['semi'],
+    });
   });
 });

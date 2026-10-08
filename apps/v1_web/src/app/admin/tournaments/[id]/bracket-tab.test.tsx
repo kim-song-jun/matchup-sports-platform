@@ -577,12 +577,12 @@ describe('BracketTab — 12강·8강 토너먼트 자동 생성', () => {
     createFixtureMutate.mockReset();
   });
 
-  function setKnockoutGroup(phase: 'round12' | 'quarter', byes = 0) {
-    const count = phase === 'round12' ? 12 : 8;
+  function setKnockoutGroup(phase: 'round16' | 'round12' | 'quarter', byes = 0) {
+    const count = phase === 'round16' ? 16 : phase === 'round12' ? 12 : 8;
     bracketGroups = [{
       ...bracket.groups[0],
       id: 'knockout',
-      name: phase === 'round12' ? '12강' : '8강',
+      name: phase === 'round16' ? '16강' : phase === 'round12' ? '12강' : '8강',
       phase,
       advanceCount: null,
       groupTeams: Array.from({ length: count }, (_, index) => ({
@@ -597,24 +597,30 @@ describe('BracketTab — 12강·8강 토너먼트 자동 생성', () => {
     }];
   }
 
-  it.each(['round12', 'quarter'] as const)('%s 조는 리그 회전수 모달 없이 일반 경기 4개만 생성해 화면에 표시한다', async (phase) => {
-    setKnockoutGroup(phase, phase === 'round12' ? 4 : 0);
+  const ROUND_META = {
+    round16: { label: '16강', fixtures: 8, participants: 16, byes: 0 },
+    round12: { label: '12강', fixtures: 4, participants: 8, byes: 4 },
+    quarter: { label: '8강', fixtures: 4, participants: 8, byes: 0 },
+  } as const;
+
+  it.each(['round16', 'round12', 'quarter'] as const)('%s 조는 리그 회전수 모달 없이 일반 경기만 생성해 화면에 표시한다', async (phase) => {
+    const meta = ROUND_META[phase];
+    setKnockoutGroup(phase, meta.byes);
     const showToast = renderTab();
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: '대진 자동 생성' }));
     });
 
-    const label = phase === 'round12' ? '12강' : '8강';
     expect(screen.queryByRole('dialog', { name: '조별리그 대진 자동 생성' })).not.toBeInTheDocument();
-    expect(showToast).toHaveBeenCalledWith(`${label} 경기 일정 4개를 자동으로 만들었어요.`, 'success');
-    expect(bracketFixtures).toHaveLength(4);
-    expect(bracketFixtures.every((fixture) => fixture.groupId === 'knockout' && fixture.round === label)).toBe(true);
+    expect(showToast).toHaveBeenCalledWith(`${meta.label} 경기 일정 ${meta.fixtures}개를 자동으로 만들었어요.`, 'success');
+    expect(bracketFixtures).toHaveLength(meta.fixtures);
+    expect(bracketFixtures.every((fixture) => fixture.groupId === 'knockout' && fixture.round === meta.label)).toBe(true);
     const participants = bracketFixtures.flatMap((fixture) => [fixture.homeRegistrationId, fixture.awayRegistrationId]);
-    expect(new Set(participants).size).toBe(8);
+    expect(new Set(participants).size).toBe(meta.participants);
     expect([...participants].sort()).toEqual(bracketGroups[0].groupTeams.filter((team) => !team.isBye).map((team) => team.registrationId).sort());
-    expect(bracketGroups[0].groupTeams.filter((team) => team.isBye)).toHaveLength(phase === 'round12' ? 4 : 0);
-    expect(screen.getByText(/대진 4경기/)).toBeInTheDocument();
-    expect(screen.getAllByRole('button', { name: `${label} 4번 경기 수정` }).length).toBeGreaterThan(0);
+    expect(bracketGroups[0].groupTeams.filter((team) => team.isBye)).toHaveLength(meta.byes);
+    expect(screen.getByText(new RegExp(`대진 ${meta.fixtures}경기`))).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: `${meta.label} ${meta.fixtures}번 경기 수정` }).length).toBeGreaterThan(0);
     expect(v1Post).not.toHaveBeenCalled();
   });
 

@@ -18,7 +18,8 @@ import { V1ApiError, v1Post, v1Patch } from '@/lib/api-client';
 // 조별리그 라운드로빈은 서버(POST /admin/tournaments/:id/league/fixtures/generate)로 이관했다.
 // 여기 남는 knockoutSeedPairs 는 녹아웃 시드 페어링 전용이다.
 import { knockoutSeedPairs, round12Pairs } from '@/lib/tournament-bracket-gen';
-import { competitionMatchLabel } from '@/lib/tournament-round-label';
+import { BRACKET_SOURCE_PHASES } from '@/lib/tournament-bracket-rounds';
+import { competitionMatchLabel, tournamentRoundLabel } from '@/lib/tournament-round-label';
 import { AdminDataTable, AdminEmpty } from '@/components/admin';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
 import { BracketGroupQuickAdd } from './bracket-group-quick-add';
@@ -319,7 +320,7 @@ export function BracketTab({
     // KNOCKOUT phase — 아래는 전부 녹아웃 시드 페어링 경로다.
     // Check for existing fixtures in this group
     const existingInGroup = allFixtures.filter((f) => f.groupId === targetGroupId);
-    if (existingInGroup.length > 0 && (group.phase === 'round12' || group.phase === 'quarter')) {
+    if (existingInGroup.length > 0 && ['round16', 'round12', 'quarter'].includes(group.phase)) {
       showToast('이미 경기 일정이 있어요. 기존 대진을 수정하거나 빠진 경기를 직접 추가해 주세요.', 'error');
       return;
     }
@@ -345,16 +346,7 @@ export function BracketTab({
           showToast('12팀을 배정하고 부전승 4팀을 지정해 주세요. 나머지 8팀의 4경기를 만들어요.', 'error');
           return;
         }
-        const roundLabel =
-          group.phase === 'round12'
-            ? '12강'
-            : group.phase === 'quarter'
-            ? '8강'
-            : group.phase === 'semi'
-            ? '4강'
-            : group.phase === 'final'
-            ? '결승'
-            : '3·4위전';
+        const roundLabel = tournamentRoundLabel(group.phase);
 
         if (teams.length === 0) {
           // Produce a single TBD fixture for the phase
@@ -780,7 +772,7 @@ export function BracketTab({
                   >
                     <Pencil size={12} aria-hidden="true" /> 수정
                   </button>
-                  {['quarter', 'semi', 'final', 'third_place'].includes(groups.find((group) => group.id === f.groupId)?.phase ?? '') && (
+                  {Object.keys(BRACKET_SOURCE_PHASES).includes(groups.find((group) => group.id === f.groupId)?.phase ?? '') && (
                     <button type="button" className="tm-chip" onClick={() => {
                       setSourceFixture(f);
                       setHomeSource(f.bracketSources?.find((source) => source.side === 'HOME')?.fixtureId ?? '');
@@ -849,8 +841,7 @@ export function BracketTab({
           <p className="tm-text-caption">미정인 자리에 이전 경기의 승자를 연결해요. 3·4위전에는 4강 패자가 연결돼요. 결과 확정 시 기존 진출 처리로 팀이 배정돼요.</p>
           {(['HOME', 'AWAY'] as const).map((side) => {
             const targetPhase = groups.find((group) => group.id === sourceFixture?.groupId)?.phase ?? '';
-            const previous: Record<string, string> = { quarter: 'round12', semi: 'quarter', final: 'semi', third_place: 'semi' };
-            const candidates = (bracket?.fixtures ?? []).filter((fixture) => groups.find((group) => group.id === fixture.groupId)?.phase === previous[targetPhase] && fixture.legNumber === 1 && !fixture.parentFixtureId && fixture.status === 'scheduled' && !fixture.result);
+            const candidates = (bracket?.fixtures ?? []).filter((fixture) => BRACKET_SOURCE_PHASES[targetPhase]?.includes(groups.find((group) => group.id === fixture.groupId)?.phase ?? '') && fixture.legNumber === 1 && !fixture.parentFixtureId && fixture.status === 'scheduled' && !fixture.result);
             return <label key={side} className="block tm-text-label">{side === 'HOME' ? '홈 자리' : '어웨이 자리'}
               <select className={inputCls} disabled={savingSources} value={side === 'HOME' ? homeSource : awaySource} onChange={(event) => side === 'HOME' ? setHomeSource(event.target.value) : setAwaySource(event.target.value)}>
                 <option value="">연결 없음 · 직접 배정</option>

@@ -1044,8 +1044,18 @@ button:disabled {
   background-image: url('/apple/sign-in-mark-on-white.png');
 }
 
-.tm-auth-apple:disabled {
+/* 처리 중에도 Apple 버튼 색을 지킨다. 공용 .tm-btn:disabled 가 배경을 회색으로 바꾸면 마크 아트워크의
+ * 버튼색 사각 바탕이 통째로 드러나 사과가 커 보인다. 버튼 전체만 흐리게 하고(자식은 aria-busy 예외로
+ * 공용 흐림 규칙을 피한다), 특이도로 .tm-btn:disabled 를 이긴다. */
+.tm-btn.tm-auth-apple:disabled {
+  background: var(--static-black);
+  color: var(--static-white);
   opacity: 0.58;
+}
+
+:root.dark .tm-btn.tm-auth-apple:disabled {
+  background: var(--static-white);
+  color: var(--static-black);
 }
 
 .tm-auth-provider-note {

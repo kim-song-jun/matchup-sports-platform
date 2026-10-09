@@ -263,7 +263,7 @@ export class LeagueMatchAdminService {
    * seriesId: 체계 id 로 소속 리그만, 'independent' 로 무소속(단발) 리그만 필터한다.
    * 리그 허브(B안, 2026-08-25)의 체계 칩 필터가 쓰는 파라미터 — 없으면 전체.
    */
-  async list(user: V1AuthUser, seriesId?: string) {
+  async list(user: V1AuthUser, seriesId?: string, visibility?: 'public' | 'hidden') {
     await this.adminContext.getActiveAdmin(user.id);
     // DTO 검증이 /i 라 'INDEPENDENT'·대문자 uuid 도 통과한다 — 소문자로 정규화해야
     // 리터럴 비교와 (소문자로 저장되는) uuid 매칭이 어긋나지 않는다.
@@ -271,7 +271,12 @@ export class LeagueMatchAdminService {
     const seriesFilter =
       normalized === 'independent' ? { seriesId: null } : normalized ? { seriesId: normalized } : {};
     const rows = await this.prisma.v1Tournament.findMany({
-      where: { kind: 'regular_league', deletedAt: null, ...seriesFilter },
+      where: {
+        kind: 'regular_league',
+        deletedAt: null,
+        ...seriesFilter,
+        ...(visibility ? { isPublic: visibility === 'public' } : {}),
+      },
       orderBy: { createdAt: 'desc' },
       select: {
         id: true,

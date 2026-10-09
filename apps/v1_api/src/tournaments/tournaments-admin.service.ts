@@ -110,6 +110,7 @@ export class TournamentsAdminService {
       // 목록 행 수와 어긋난다. 아래 `where` 가 이 객체를 spread 하므로 둘 다 적용된다.
       ...TOURNAMENT_SURFACE_KIND,
       deletedAt: null,
+      ...(query.visibility ? { isPublic: query.visibility === 'public' } : {}),
       ...(query.sportId ? { sportId: query.sportId } : {}),
       ...(query.q ? { title: { contains: query.q, mode: 'insensitive' } } : {}),
     };

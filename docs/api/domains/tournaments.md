@@ -20,6 +20,9 @@ mutation administrator, is a no-op without audit when the value is unchanged, re
 `tournament.visibility` in the admin audit otherwise, and returns
 `409 TOURNAMENT_VERSION_CONFLICT` if a concurrent request changed the value first.
 The admin tournament detail includes `isPublic`.
+`GET /api/v1/admin/tournaments` accepts an optional `visibility=public|hidden` filter
+(any other value returns `400`); it narrows the rows, `pageInfo` and the `summary` status
+counts together, and omitting it keeps every row.
 See [the league visibility contract](./league-matches.md#public-visibility).
 
 | Method | Path | Auth | Request | Response |

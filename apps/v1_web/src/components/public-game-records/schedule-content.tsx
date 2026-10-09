@@ -38,6 +38,7 @@ import {
 } from './schedule-grouping';
 import type { PublicScheduleEntry, PublicStandingRow, PublicTournamentScheduleResponse } from './types';
 import { competitionMatchLabel } from '@/lib/tournament-round-label';
+import { publicFixtureSideLabel } from '@/lib/public-fixture-side-label';
 import { compareTournamentGroupNames } from '@/lib/tournament-display-order';
 
 /**
@@ -46,9 +47,9 @@ import { compareTournamentGroupNames } from '@/lib/tournament-display-order';
  * 이 함수가 둘 다 "미정"으로 뭉뚱그렸다 — 사용자가 "대진이 아직 안 정해졌다"와
  * "정해졌는데 안 보여준다"를 구분 못 하게 된다.
  */
-function sideLabel(side: PublicScheduleEntry['home']): string {
-  if (side === null) return '미정';
-  return side.teamName ?? '비공개';
+function sideLabel(side: PublicScheduleEntry['home'], slotLabel: string | null): string {
+  // side 가 null 이면 팀이 아직 없는 것(헬퍼의 빈 이름), teamName 이 null 이면 모집 중이라 가려진 것이다.
+  return publicFixtureSideLabel(side === null ? '' : side.teamName, slotLabel);
 }
 
 /**
@@ -57,7 +58,9 @@ function sideLabel(side: PublicScheduleEntry['home']): string {
  * 데이터라도 실제 기록을 숨기지 않는다).
  */
 function matchupUndecided(entry: PublicScheduleEntry): boolean {
-  return entry.home === null && entry.away === null && entry.score === null;
+  return entry.home === null && entry.away === null
+    && entry.homeSlotLabel === null && entry.awaySlotLabel === null
+    && entry.score === null;
 }
 
 function ScheduleResultBadge({ entry }: { entry: PublicScheduleEntry }) {
@@ -434,7 +437,7 @@ function ScheduleRow({
         }}
       >
         <span style={{ textAlign: 'right', fontSize: 14, fontWeight: 600, color: 'var(--text-strong)' }}>
-          {sideLabel(entry.home)}
+          {sideLabel(entry.home, entry.homeSlotLabel)}
         </span>
         <span
           className="tab-num"
@@ -451,7 +454,7 @@ function ScheduleRow({
           {formatScoreline(entry.score, entry.scoreStatus)}
         </span>
         <span style={{ textAlign: 'left', fontSize: 14, fontWeight: 600, color: 'var(--text-strong)' }}>
-          {sideLabel(entry.away)}
+          {sideLabel(entry.away, entry.awaySlotLabel)}
         </span>
       </div>
       )}

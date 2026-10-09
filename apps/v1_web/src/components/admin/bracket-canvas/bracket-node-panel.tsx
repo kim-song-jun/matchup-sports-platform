@@ -26,6 +26,8 @@ export type BracketNodePanelProps = {
   groups: V1AdminBracketGroup[];
   slots: V1AdminBracketSlot[];
   registrations: V1AdminTournamentRegistration[];
+  /** 신청 목록이 아직 없거나 실패한 상태에서는 팀 선택창을 잠근다("팀 0개"처럼 보이지 않게). */
+  registrationsLoaded: boolean;
   sideLabels: Record<SideKey, string>;
   canWrite: boolean;
   showToast: (message: string, variant?: 'success' | 'error') => void;
@@ -40,6 +42,7 @@ export function BracketNodePanel({
   groups,
   slots,
   registrations,
+  registrationsLoaded,
   sideLabels,
   canWrite,
   showToast,
@@ -101,7 +104,7 @@ export function BracketNodePanel({
           <select
             aria-label={`${SIDE_NAME[side]} 팀 선택`}
             value={current ?? ''}
-            disabled={updateFixture.isPending}
+            disabled={!registrationsLoaded || updateFixture.isPending}
             onChange={(event) => handleAssignDirect(side, event.target.value)}
             className="tm-input"
             style={{ minHeight: 44 }}
@@ -132,7 +135,7 @@ export function BracketNodePanel({
         <select
           aria-label={`${SIDE_NAME[side]} 팀 선택`}
           value={slot.registrationId ?? ''}
-          disabled={assignSlot.isPending}
+          disabled={!registrationsLoaded || assignSlot.isPending}
           onChange={(event) => handleAssign(slot, event.target.value)}
           className="tm-input"
           style={{ minHeight: 44 }}

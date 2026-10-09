@@ -40,7 +40,7 @@ describe('BracketFixtureToolsDialog — 경기 추가', () => {
     fireEvent.click(screen.getByRole('button', { name: '경기 추가' }));
     expect(mocks.create).toHaveBeenCalledWith({ groupId: 'g-sf', round: '4강', fixtureNumber: 4 }, expect.any(Object));
     mocks.create.mock.calls[0][1].onSuccess();
-    expect(props.showToast).toHaveBeenCalledWith('4강 경기를 추가했어요. 팀은 자리에서 정해 주세요.', 'success');
+    expect(props.showToast).toHaveBeenCalledWith('4강 경기를 추가했어요. 칸을 눌러 팀을 넣어 주세요.', 'success');
     expect(props.onClose).toHaveBeenCalledTimes(1);
   });
 

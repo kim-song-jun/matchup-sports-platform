@@ -2,6 +2,7 @@ import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { makeBracket, makeFixture, makeGroup, makeRegistration, makeSlot } from '@/test/bracket-canvas-fixtures';
 import type { V1AdminTournamentBracket } from '@/types/api';
+import type { RegistrationsLoadState } from './bracket-team-tray';
 import { BracketCanvasWorkspace } from './bracket-canvas-workspace';
 
 const mocks = vi.hoisted(() => ({
@@ -61,11 +62,14 @@ function setBracket(data: V1AdminTournamentBracket | undefined, state: Partial<t
   Object.assign(mocks.bracket, { data, isPending: false, isError: false, error: null, ...state });
 }
 
+const loaded: RegistrationsLoadState = { status: 'success', truncated: false, error: null, onRetry: vi.fn() };
+
 function renderWorkspace(overrides: Partial<React.ComponentProps<typeof BracketCanvasWorkspace>> = {}) {
   const props = {
     tournamentId: 't-1',
     format: 'knockout' as const,
     registrations,
+    registrationsState: loaded,
     bracketPublishedAt: null,
     bracketPublishScheduledAt: null,
     canWrite: true,
@@ -262,5 +266,29 @@ describe('BracketCanvasWorkspace — 공개 상태', () => {
     expect(screen.getByText('공개 중')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '공개 취소' })).not.toBeInTheDocument();
     expect(screen.queryByText(/바꾸는 즉시/)).not.toBeInTheDocument();
+  });
+});
+
+describe('BracketCanvasWorkspace — 신청 목록 조회 상태', () => {
+  it('불러오는 중에는 무작위 채우기를 이유와 함께 막는다("팀이 없어요"라고 하지 않는다)', () => {
+    renderWorkspace({ registrations: [], registrationsState: { ...loaded, status: 'pending' } });
+    const fill = screen.getByRole('button', { name: /빈 자리 무작위 채우기/ });
+    expect(fill).toBeDisabled();
+    expect(document.getElementById(fill.getAttribute('aria-describedby')!)).toHaveTextContent('참가팀을 불러오는 중이에요.');
+    expect(screen.queryByText('배정할 수 있는 팀이 없어요.')).not.toBeInTheDocument();
+  });
+
+  it('실패하면 이유를 알리고 다시 시도가 재조회를 부른다', () => {
+    const onRetry = vi.fn();
+    renderWorkspace({ registrations: [], registrationsState: { ...loaded, status: 'error', onRetry } });
+    expect(screen.getByRole('button', { name: /빈 자리 무작위 채우기/ })).toBeDisabled();
+    expect(screen.getAllByText('참가팀을 불러오지 못했어요.').length).toBeGreaterThan(0);
+    fireEvent.click(screen.getByRole('button', { name: '다시 시도' }));
+    expect(onRetry).toHaveBeenCalledTimes(1);
+  });
+
+  it('성공이면 기존처럼 무작위 채우기가 열려 있다', () => {
+    renderWorkspace();
+    expect(screen.getByRole('button', { name: /빈 자리 무작위 채우기/ })).toBeEnabled();
   });
 });

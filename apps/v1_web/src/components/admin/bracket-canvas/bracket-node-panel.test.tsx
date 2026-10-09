@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { V1ApiError } from '@/lib/api-client';
 import { makeFixture, makeGame, makeGroup, makeRegistration, makeSlot } from '@/test/bracket-canvas-fixtures';
@@ -59,6 +59,7 @@ function renderPanel(fixture = fixtureOf(), overrides: Partial<React.ComponentPr
     groups: [knockout, groupStage],
     slots,
     registrations,
+    registrationsLoaded: true,
     sideLabels: {
       HOME: fixture.homeRegistrationId === null ? '1번 자리' : fixture.homeTeamName,
       AWAY: fixture.awayRegistrationId === null ? '2번 자리' : fixture.awayTeamName,
@@ -118,6 +119,15 @@ describe('BracketNodePanel — 자리 배정', () => {
     renderPanel(fixtureOf({ awaySlotId: null, bracketSources: [{ fixtureId: 'f0', outcome: 'WINNER', side: 'AWAY' }] }));
     expect(screen.queryByLabelText('어웨이 팀 선택')).not.toBeInTheDocument();
     expect(screen.getByText('이전 경기 결과로 채워져요.')).toBeInTheDocument();
+  });
+
+  it('신청 목록을 아직 못 불러왔으면 슬롯·직접 지정 선택창을 모두 잠근다', () => {
+    renderPanel(fixtureOf(), { registrationsLoaded: false });
+    expect(screen.getByLabelText('홈 팀 선택')).toBeDisabled();
+    expect(screen.getByLabelText('어웨이 팀 선택')).toBeDisabled();
+    cleanup();
+    renderPanel(fixtureOf({ homeSlotId: null, awaySlotId: null }), { registrationsLoaded: false });
+    expect(screen.getByLabelText('홈 팀 선택')).toBeDisabled();
   });
 
   describe('자리 없이 팀을 직접 지정한 줄', () => {

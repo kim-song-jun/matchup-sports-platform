@@ -13,6 +13,8 @@ const registrations = [
   makeRegistration({ id: 'r4', teamName: '입금 대기 팀', status: 'awaiting_payment' }),
 ];
 
+const loaded = { status: 'success', truncated: false, error: null, onRetry: vi.fn() } as const;
+
 // 화면과 같은 경로로 직접 지정 팀을 계산해 넘긴다(워크스페이스가 하는 일).
 function renderTray({
   fixtures = [],
@@ -21,6 +23,7 @@ function renderTray({
   const slots = overrides.slots ?? [];
   const props = {
     registrations,
+    registrationsState: loaded,
     pendingRegistrationId: null,
     canWrite: true,
     onPick: vi.fn(),
@@ -86,6 +89,35 @@ describe('BracketTeamTray', () => {
   it('확정된 팀이 없으면 빈 안내를 보여 준다', () => {
     renderTray({ registrations: [registrations[3]] });
     expect(screen.getByText('확정된 참가팀이 아직 없어요.')).toBeInTheDocument();
+  });
+
+  describe('신청 목록 조회 상태', () => {
+    it('불러오는 중에는 "참가팀 없음"이 아니라 로딩 안내를 보이고 개수는 숨긴다', () => {
+      renderTray({ registrations: [], registrationsState: { ...loaded, status: 'pending' } });
+      expect(screen.getByText('참가팀을 불러오는 중이에요.')).toBeInTheDocument();
+      expect(screen.queryByText('확정된 참가팀이 아직 없어요.')).not.toBeInTheDocument();
+      expect(screen.queryByText(/미배정/)).not.toBeInTheDocument();
+    });
+
+    it('실패하면 이유와 "다시 시도"를 보이고 누르면 재조회한다', () => {
+      const onRetry = vi.fn();
+      renderTray({ registrations: [], registrationsState: { ...loaded, status: 'error', error: null, onRetry } });
+      expect(screen.getByRole('alert')).toHaveTextContent('참가팀을 불러오지 못했어요.');
+      expect(screen.queryByText('확정된 참가팀이 아직 없어요.')).not.toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: '다시 시도' }));
+      expect(onRetry).toHaveBeenCalledTimes(1);
+    });
+
+    it('잘렸으면 목록은 그대로 두고 일부만 불러왔다고 알린다', () => {
+      renderTray({ registrationsState: { ...loaded, truncated: true } });
+      expect(screen.getByText('참가팀이 많아 일부만 불러왔어요.')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /서울FC/ })).toBeEnabled();
+    });
+
+    it('정상이면 잘림 안내가 없다', () => {
+      renderTray();
+      expect(screen.queryByText('참가팀이 많아 일부만 불러왔어요.')).not.toBeInTheDocument();
+    });
   });
 
   describe('자리 없는 옛 대진', () => {

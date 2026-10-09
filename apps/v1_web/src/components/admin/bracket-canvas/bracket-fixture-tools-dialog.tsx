@@ -78,7 +78,7 @@ export function BracketFixtureToolsDialog({ open, mode, tournamentId, bracket, o
       { groupId: group.id, round, fixtureNumber: nextFixtureNumber(bracket.fixtures) },
       {
         onSuccess: () => {
-          showToast(`${round} 경기를 추가했어요. 팀은 자리에서 정해 주세요.`, 'success');
+          showToast(`${round} 경기를 추가했어요. 칸을 눌러 팀을 넣어 주세요.`, 'success');
           onClose();
         },
         onError: (error) => showToast(describeBracketCanvasError(error, '경기를 추가하지 못했어요.'), 'error'),
@@ -141,7 +141,7 @@ export function BracketFixtureToolsDialog({ open, mode, tournamentId, bracket, o
             ) : (
               <>
                 <p className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>
-                  고른 단계에 대진 미정 경기를 하나 만들어요. 팀은 만든 뒤 자리에서 정해요.
+                  고른 단계에 대진 미정 경기를 하나 만들어요. 팀은 만든 뒤 칸에서 넣어요.
                 </p>
                 <div className="flex flex-col gap-1">
                   <label htmlFor={`${idPrefix}-group`} className="tm-text-label font-semibold" style={{ color: 'var(--text-strong)' }}>추가할 단계</label>

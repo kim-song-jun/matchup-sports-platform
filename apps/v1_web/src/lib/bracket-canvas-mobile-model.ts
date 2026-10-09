@@ -1,5 +1,12 @@
-import { fixtureSideLabel, type FixtureNodeState, type SideKey, type SideLabelContext } from '@/lib/bracket-canvas-layout';
-import type { LeagueBoardSide } from '@/lib/league-board-model';
+import {
+  fixtureNodeState,
+  fixtureSideLabel,
+  type FixtureNodeState,
+  type SideKey,
+  type SideLabelContext,
+} from '@/lib/bracket-canvas-layout';
+import { formatGameResultScoreWithPenalties } from '@/lib/game-result-score';
+import type { LeagueBoardNode, LeagueBoardSide } from '@/lib/league-board-model';
 import type {
   V1AdminBracketFixture,
   V1AdminBracketFixtureGame,
@@ -77,6 +84,56 @@ export function leagueMobileSide(side: LeagueBoardSide, slotsById: ReadonlyMap<s
     registrationId: side.registrationId,
     teamName: side.filled ? side.label : null,
     slotLabel: side.filled ? null : side.label,
+  };
+}
+
+function scoreTextOf(state: FixtureNodeState, game: V1AdminBracketFixtureGame | null): string | null {
+  if (state !== 'official' && state !== 'submitted') return null;
+  const score = game?.latestRevision?.score ?? null;
+  return score === null ? null : formatGameResultScoreWithPenalties(score);
+}
+
+function isQuickEntered(game: V1AdminBracketFixtureGame | null): boolean {
+  return game?.latestRevision?.entryMethod === 'quick';
+}
+
+export function bracketMobileNode(
+  fixture: V1AdminBracketFixture,
+  groupName: string | null,
+  knockout: boolean,
+  labels: SideLabelContext,
+): MobileNode {
+  const game = fixture.game;
+  // 취소는 게임을 SCHEDULED 로 남기는 경우가 있어 팀매치 status 가 먼저다(PR-5b `buildLeagueBoard` 와 같은 규칙).
+  const state = fixture.status === 'cancelled' ? 'cancelled' : fixtureNodeState(game);
+  return {
+    fixtureId: fixture.id,
+    title: groupName ? `${groupName} · ${fixture.fixtureNumber}번 경기` : `${fixture.fixtureNumber}번 경기`,
+    state,
+    home: bracketMobileSide(fixture, 'HOME', labels),
+    away: bracketMobileSide(fixture, 'AWAY', labels),
+    scoreText: scoreTextOf(state, game),
+    scheduledAt: fixture.scheduledAt,
+    venue: fixture.venue,
+    game,
+    knockout,
+    quickEntered: isQuickEntered(game),
+  };
+}
+
+export function leagueMobileNode(node: LeagueBoardNode, slotsById: ReadonlyMap<string, V1AdminBracketSlot>): MobileNode {
+  return {
+    fixtureId: node.fixtureId,
+    title: node.title,
+    state: node.state,
+    home: leagueMobileSide(node.home, slotsById),
+    away: leagueMobileSide(node.away, slotsById),
+    scoreText: scoreTextOf(node.state, node.game),
+    scheduledAt: node.startAt,
+    venue: node.placeName,
+    game: node.game,
+    knockout: false,
+    quickEntered: isQuickEntered(node.game),
   };
 }
 

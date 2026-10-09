@@ -33,7 +33,7 @@ describe('BracketLeagueGrid', () => {
   it('조마다 줄어들 수 있는 minmax 트랙을 둔다(2개 조가 1440 에서 스크롤 없이 들어가는 폭)', () => {
     renderGrid();
     const track = screen.getByRole('region', { name: '대진 그림' }).querySelector<HTMLElement>('div.grid')?.style.gridTemplateColumns;
-    expect(track).toBe('72px repeat(2, minmax(200px, 1fr))');
+    expect(track).toBe('72px repeat(2, minmax(190px, 1fr))');
   });
 
   it('조는 있는데 경기가 하나도 없으면 빈 안내를 보여 주고, 경기가 있으면 보이지 않는다', () => {

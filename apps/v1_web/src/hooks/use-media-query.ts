@@ -54,6 +54,6 @@ export const BRACKET_CANVAS_SIDE_PANEL_MEDIA_QUERY = '(min-width: 1024px)';
 
 /**
  * 리그 방식 대진 그림에서 순위표·칸 패널이 옆 열로 붙는 최소 폭. 어드민은 좌측 열이 둘(사이드바+하위 메뉴)이라
- * 1280 미만에선 옆 열을 두면 그림이 보이지 않아, 시트(순위표 버튼·칸 패널)로 대신한다.
+ * 1440 미만에선 옆 열을 두면 조 두 열이 다 들어가지 않아(alpha 실측 1280 에서 82px 잘림), 시트(순위표 버튼·칸 패널)로 대신한다.
  */
-export const BRACKET_LEAGUE_SIDE_COLUMN_MEDIA_QUERY = '(min-width: 1280px)';
+export const BRACKET_LEAGUE_SIDE_COLUMN_MEDIA_QUERY = '(min-width: 1440px)';

@@ -1,12 +1,19 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { AdminPageHeader, AdminToasts, useAdminToast } from '@/components/admin';
 import { EntityPicker, type EntityPickerItem } from '@/components/admin/entity-picker';
+import { periodLabels, switchPeriodCount } from '@/app/admin/tournaments/new/tournament-create-model';
+import { v1Get } from '@/lib/api-client';
+import {
+  useSaveTournamentPeriodSettings,
+  type TournamentPeriodSettingsResponse,
+} from '@/hooks/use-tournament-period-settings';
 import {
   useV1CreateLeagueMatch,
+  useV1LineupSizeOptions,
   useV1MasterRegions,
   useV1MasterSports,
   useV1Teams,
@@ -33,6 +40,9 @@ export default function AdminLeagueMatchNewPage() {
   const [selectedTeams, setSelectedTeams] = useState<LeagueTeamPick[]>([]);
   const [pickerValue, setPickerValue] = useState<EntityPickerItem | null>(null);
   const [teamSearch, setTeamSearch] = useState('');
+  // Period minutes start from the sport default and are saved after creation only when the operator edits them.
+  const [periodMinutes, setPeriodMinutes] = useState<string[]>([]);
+  const [periodsDirty, setPeriodsDirty] = useState(false);
 
   const { data: sports } = useV1MasterSports();
   const { data: regions } = useV1MasterRegions();
@@ -68,9 +78,20 @@ export default function AdminLeagueMatchNewPage() {
       } satisfies LeagueTeamPick;
     });
   const createLeague = useV1CreateLeagueMatch();
+  const savePeriods = useSaveTournamentPeriodSettings();
+  const { data: lineupSizeOptions } = useV1LineupSizeOptions(sportId || null);
+  const defaultPeriodsKey = lineupSizeOptions?.supported
+    ? (lineupSizeOptions.defaultPeriods?.map((period) => period.durationMinutes).join(',') ?? '')
+    : '';
+  useEffect(() => {
+    if (periodsDirty) return;
+    setPeriodMinutes(defaultPeriodsKey === '' ? [] : defaultPeriodsKey.split(','));
+  }, [defaultPeriodsKey, periodsDirty]);
+  const periodNames = periodLabels(periodMinutes.length);
+  const periodsInvalid = periodMinutes.some((value) => !/^\d+$/.test(value.trim()) || Number(value) < 1 || Number(value) > 240);
 
   const canSubmit =
-    title.trim().length > 0 && sportId !== '' && regionId !== '' && startsOn !== '' && endsOn !== '' && selectedTeams.length >= 2;
+    title.trim().length > 0 && sportId !== '' && regionId !== '' && startsOn !== '' && endsOn !== '' && selectedTeams.length >= 2 && !periodsInvalid;
 
   // 그룹 B 감사 결함 4: canSubmit이 false일 때 "왜"를 알려준다 — 지금까지는 버튼이 그냥
   // 비활성으로만 보여서 뭐가 덜 채워졌는지 화면에서 알 방법이 없었다. 위에서 아래로 채우는
@@ -82,6 +103,7 @@ export default function AdminLeagueMatchNewPage() {
     if (regionId === '') return '지역을 선택해 주세요.';
     if (startsOn === '' || endsOn === '') return '시작일·종료일을 입력해 주세요.';
     if (selectedTeams.length < 2) return `참가 팀을 2팀 이상 추가해 주세요. (현재 ${selectedTeams.length}팀)`;
+    if (periodsInvalid) return '경기 시간은 피리어드마다 1~240분 사이의 정수로 입력해 주세요.';
     return null;
   })();
 
@@ -109,6 +131,25 @@ export default function AdminLeagueMatchNewPage() {
         endsOn: new Date(`${endsOn}T23:59:59.999`).toISOString(),
         teamIds: selectedTeams.map((t) => t.id),
       });
+      if (periodsDirty) {
+        // The create API takes no periods; the league row only gets a config version afterwards, so read its version first.
+        try {
+          const current = await v1Get<TournamentPeriodSettingsResponse>(`/admin/tournaments/${result.leagueId}/periods`);
+          if (!current.expectedVersion) throw new Error('missing period settings version');
+          await savePeriods.mutateAsync({
+            tournamentId: result.leagueId,
+            expectedVersion: current.expectedVersion,
+            periods: periodMinutes.map((value) => ({ durationMinutes: Number(value) })),
+          });
+        } catch (periodError) {
+          showToast(
+            extractErrorMessage(periodError, '리그는 만들었지만 경기 시간을 저장하지 못했어요. 리그 상세에서 피리어드 설정을 다시 저장해 주세요.'),
+            'error',
+          );
+          router.push(`/admin/league-matches/${result.leagueId}`);
+          return;
+        }
+      }
       showToast('리그를 만들었어요.', 'success');
       router.push(`/admin/league-matches/${result.leagueId}`);
     } catch (error) {
@@ -143,7 +184,7 @@ export default function AdminLeagueMatchNewPage() {
             <select
               id="series-sport"
               value={sportId}
-              onChange={(e) => setSportId(e.target.value)}
+              onChange={(e) => { setSportId(e.target.value); setPeriodsDirty(false); }}
               disabled={isSportLocked}
               className={inputClass}
             >
@@ -207,6 +248,50 @@ export default function AdminLeagueMatchNewPage() {
             ))}
           </ul>
         </div>
+
+        {periodMinutes.length > 0 && (
+          <fieldset className="space-y-2">
+            <legend className="mb-1 block tm-text-body-sm font-medium text-[var(--text-strong)]">경기 시간</legend>
+            <div className="flex gap-2">
+              {([2, 1] as const).map((count) => (
+                <button
+                  key={count}
+                  type="button"
+                  aria-pressed={periodMinutes.length === count}
+                  onClick={() => {
+                    if (periodMinutes.length === count) return;
+                    setPeriodMinutes(switchPeriodCount(periodMinutes, count));
+                    setPeriodsDirty(true);
+                  }}
+                  className="min-h-[44px] rounded-xl border border-[var(--border-strong)] px-4 tm-text-body-sm font-medium text-[var(--text-strong)] aria-pressed:border-blue-500 aria-pressed:bg-[var(--blue50)] aria-pressed:text-[var(--blue700)]"
+                >
+                  {count === 2 ? '전·후반' : '단판'}
+                </button>
+              ))}
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              {periodMinutes.map((value, index) => (
+                <div key={periodNames[index]}>
+                  <label htmlFor={`league-period-${index}`} className="mb-1 block tm-text-caption text-[var(--text-muted)]">{periodNames[index]} (분)</label>
+                  <input
+                    id={`league-period-${index}`}
+                    type="number"
+                    inputMode="numeric"
+                    min={1}
+                    max={240}
+                    value={value}
+                    onChange={(e) => {
+                      setPeriodMinutes(periodMinutes.map((v, i) => (i === index ? e.target.value : v)));
+                      setPeriodsDirty(true);
+                    }}
+                    className={inputClass}
+                  />
+                </div>
+              ))}
+            </div>
+            <p className="tm-text-caption text-[var(--text-muted)]">종목 기본값을 채워 두었어요. 대진을 만들 때 이 시간이 기본으로 쓰여요.</p>
+          </fieldset>
+        )}
 
         <div className="tm-on-tint rounded-lg border border-[var(--border)] bg-[var(--surface-soft)] p-3 text-sm text-[var(--text-muted)]">
           순위 규칙: {formatTieBreakRule(LEAGUE_TIE_BREAK_ORDER)} (고정값 — 리그별 변경 미지원)

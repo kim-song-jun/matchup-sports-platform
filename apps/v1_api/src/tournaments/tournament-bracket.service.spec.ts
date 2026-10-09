@@ -809,6 +809,14 @@ describe('TournamentBracketService', () => {
         expect(mockAssignSlotInTx).not.toHaveBeenCalled();
         expect(prisma.v1TournamentGroupTeam.update).toHaveBeenCalled();
       });
+      it('팀으로 찾은 행이 부전승이 아니면 연결 위치여도 자리 트랜잭션에 위임하지 않는다', async () => {
+        const nonBye = { ...placed, isBye: false };
+        prisma.v1TournamentGroupTeam.findMany.mockResolvedValue([nonBye]);
+        prisma.v1TournamentGroupTeam.findFirst.mockResolvedValue(null);
+        prisma.v1TournamentGroupTeam.update.mockResolvedValue({ ...nonBye, isBye: true });
+        await service.createBye(ownerUser, 'tournament-1', { groupId: 'group-1', sortOrder: 0, registrationId: 'reg-A' });
+        expect(mockAssignSlotInTx).not.toHaveBeenCalled();
+      });
     });
     it('다른 조의 부전승 id를 수정하지 않는다', async () => {
       await expect(service.createBye(ownerUser, 'tournament-1', { ...dto, byeId: 'foreign-slot' })).rejects.toMatchObject({ response: { code: 'BYE_NOT_FOUND' } });

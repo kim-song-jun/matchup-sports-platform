@@ -388,7 +388,8 @@ export class TournamentBracketService {
         if (duplicate) throw new ConflictException({ code: 'BYE_ALREADY_IN_ROUND', message: '이 팀은 해당 라운드에 이미 배정되어 있어요. 기존 배정을 먼저 해제해 주세요.' });
       }
       // 템플릿이 만든 BYE 자리는 자리 트랜잭션(assignSlotInTx)만 바꾼다 — 그래야 자리·부전승 행·8강 사이드가 함께 움직인다.
-      const linked = existing ? await findLinkedByeSlotInTx(tx, group, existing.sortOrder) : null;
+      // 팀으로 찾은 행은 부전승이 아닐 수 있다 — 부전승 행만 BYE 자리와 대응한다.
+      const linked = existing?.isBye ? await findLinkedByeSlotInTx(tx, group, existing.sortOrder) : null;
       if (linked && existing) {
         if (dto.sortOrder !== existing.sortOrder) throw slotLinkedBye();
         await assignSlotInTx(tx, { admin, adminContext: this.adminContext, games: this.games }, linked.id, registrationId);

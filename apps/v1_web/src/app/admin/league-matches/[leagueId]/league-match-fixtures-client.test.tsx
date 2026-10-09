@@ -422,9 +422,9 @@ describe('LeagueMatchFixturesClient', () => {
       data: {
         leagueId: 'league-1',
         teams: [
-          { teamId: 't1', name: '독수리FC', status: 'active', memberCount: 5, logoUrl: null },
-          { teamId: 't2', name: '호랑이FC', status: 'active', memberCount: 5, logoUrl: null },
-          { teamId: 't3', name: '사자FC', status: 'active', memberCount: 5, logoUrl: null },
+          { teamId: 't1', name: '독수리FC', status: 'active', memberCount: 5, logoUrl: null, registrationId: 'r-t1' },
+          { teamId: 't2', name: '호랑이FC', status: 'active', memberCount: 5, logoUrl: null, registrationId: 'r-t2' },
+          { teamId: 't3', name: '사자FC', status: 'active', memberCount: 5, logoUrl: null, registrationId: 'r-t3' },
         ],
       },
     } as never);
@@ -990,8 +990,8 @@ describe('LeagueMatchFixturesClient', () => {
       data: {
         leagueId: 'league-1',
         teams: [
-          { teamId: 't1', name: 'A팀', status: 'active', memberCount: 5, logoUrl: null },
-          { teamId: 't2', name: 'B팀', status: 'active', memberCount: 5, logoUrl: null },
+          { teamId: 't1', name: 'A팀', status: 'active', memberCount: 5, logoUrl: null, registrationId: 'r-t1' },
+          { teamId: 't2', name: 'B팀', status: 'active', memberCount: 5, logoUrl: null, registrationId: 'r-t2' },
         ],
       },
     } as never);
@@ -1413,10 +1413,10 @@ describe('LeagueMatchFixturesClient — 대진 timing 설정', () => {
       data: {
         leagueId: 'league-1',
         teams: [
-          { teamId: 't1', name: '독수리FC', status: 'active', memberCount: 5, logoUrl: null },
-          { teamId: 't2', name: '호랑이FC', status: 'active', memberCount: 5, logoUrl: null },
-          { teamId: 't3', name: '사자FC', status: 'active', memberCount: 5, logoUrl: null },
-          { teamId: 't4', name: '표범FC', status: 'active', memberCount: 5, logoUrl: null },
+          { teamId: 't1', name: '독수리FC', status: 'active', memberCount: 5, logoUrl: null, registrationId: 'r-t1' },
+          { teamId: 't2', name: '호랑이FC', status: 'active', memberCount: 5, logoUrl: null, registrationId: 'r-t2' },
+          { teamId: 't3', name: '사자FC', status: 'active', memberCount: 5, logoUrl: null, registrationId: 'r-t3' },
+          { teamId: 't4', name: '표범FC', status: 'active', memberCount: 5, logoUrl: null, registrationId: 'r-t4' },
         ],
       },
     } as never);
@@ -1928,8 +1928,8 @@ describe('LeagueMatchFixturesClient — 지금 할 일 카드와 콘솔 열기',
   const W2 = '2026-10-07T01:10:00.000Z';
 
   const TEAMS = [
-    { teamId: 't1', name: '마포 FC', status: 'active', memberCount: 5, logoUrl: null },
-    { teamId: 't2', name: '합정 유나이티드', status: 'active', memberCount: 5, logoUrl: null },
+    { teamId: 't1', name: '마포 FC', status: 'active', memberCount: 5, logoUrl: null, registrationId: 'r-t1' },
+    { teamId: 't2', name: '합정 유나이티드', status: 'active', memberCount: 5, logoUrl: null, registrationId: 'r-t2' },
   ];
 
   function renderLeague(fixtures: Fixture[], teams = TEAMS) {
@@ -2077,7 +2077,7 @@ describe('LeagueMatchFixturesClient — 지금 할 일 카드와 콘솔 열기',
   });
 
   // 팀 제외·재생성도 대진을 취소한다 — 서버가 같은 409 로 막는 조건에서 버튼을 미리 막는다.
-  const THREE_TEAMS = [...TEAMS, { teamId: 't3', name: '성수 FC', status: 'active', memberCount: 5, logoUrl: null }];
+  const THREE_TEAMS = [...TEAMS, { teamId: 't3', name: '성수 FC', status: 'active', memberCount: 5, logoUrl: null, registrationId: 'r-t3' }];
   const regenerateButton = () => screen.getAllByRole('button', { name: '대진 재생성' })[0];
 
   it('경기가 진행 중이면 그 두 팀의 제외와 대진 재생성이 막히고 이유를 적는다', () => {

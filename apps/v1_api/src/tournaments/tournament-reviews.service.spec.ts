@@ -778,29 +778,26 @@ describe('TournamentReviewsService — awards admin gate', () => {
     expect(prisma.v1TournamentAward.deleteMany).not.toHaveBeenCalled();
   });
 
-  // recipientUserId는 유일하게 일치해도, 함께 제출된 recipientName이 그 계정의 실제
-  // 명단 실명과 다르면 여전히 거부한다 — userId를 신원의 1차 키로 승격했다고 해서
-  // 이름 검증까지 없앤 건 아니다.
-  it('setAwards: userId는 일치해도 recipientName이 명단 실명과 다르면 400', async () => {
+  // 추천 칩은 계정 표시 이름(닉네임)을 보내고 명단은 실명이라 다를 수 있다 — userId가 신원이고
+  // 저장 이름은 명단 실명으로 정규화된다.
+  it.each([
+    ['추천 이름(닉네임)이 명단 실명과 다르면', '김철수지오'],
+    ['이름이 명단 실명과 같으면', '김철수'],
+  ])('setAwards: %s userId로 확정하고 실명으로 저장', async (_label, submittedName) => {
     prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
     prisma.v1Tournament.findFirst.mockResolvedValue({ id: 'tournament-1', deletedAt: null });
     prisma.v1TournamentRegistration.findMany.mockResolvedValue(confirmedRegistrationRows);
+    prisma.v1TournamentAward.deleteMany.mockResolvedValue({ count: 0 });
+    prisma.v1TournamentAward.create.mockResolvedValue(awardRow({ recipientName: '김철수', recipientUserId: 'user-kim' }));
+    prisma.v1TournamentAward.findMany.mockResolvedValue([awardRow({ recipientName: '김철수', recipientUserId: 'user-kim' })]);
 
-    await expect(
-      service.setAwards(ownerAuthUser, 'tournament-1', {
-        awards: [
-          {
-            awardType: 'mvp',
-            awardLabel: 'MVP',
-            recipientName: '전혀다른이름',
-            recipientUserId: 'user-kim',
-            teamName: '미참가팀',
-          },
-        ],
-      }),
-    ).rejects.toMatchObject({ response: { code: 'AWARD_RECIPIENT_NOT_IN_ROSTER' } });
-    expect(prisma.$transaction).not.toHaveBeenCalled();
-    expect(prisma.v1TournamentAward.deleteMany).not.toHaveBeenCalled();
+    await service.setAwards(ownerAuthUser, 'tournament-1', {
+      awards: [{ awardType: 'mvp', awardLabel: 'MVP', recipientName: submittedName, recipientUserId: 'user-kim', teamName: '레알마드리드' }],
+    });
+
+    expect(prisma.v1TournamentAward.create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ recipientName: '김철수', recipientUserId: 'user-kim' }) }),
+    );
   });
 
   it('setAwards: roster recipient without teamName passes validation', async () => {

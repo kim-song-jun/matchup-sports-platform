@@ -4,6 +4,7 @@
  * - 768 미만: 라운드 탭 + 칸 목록 + "큰 화면에서 편집해요" 안내, 구조 편집 버튼 0개 (스펙 D8)
  * - 768~1023: 편집 캔버스 + 참가팀 트레이가 접힌 한 줄(펼치기 토글, aria-expanded=false). 칸 패널은 시트로 뜬다
  * - 1024 이상: 편집 캔버스 + 펼친 트레이(토글 없음) + 옆 패널
+ * - 리그 방식 대회(LEAGUE_TOURNAMENT_IDS): 768 이상 라운드×조 격자(data-league-grid)·「경기 연결」 없음·순위표(1024+ 옆 열 / 768~1023 「순위표」 버튼), 모바일은 「조별 순위」 접이식. 1440 격자 가로 넘침 없음
  * 칸 패널 시트는 칸을 눌러야 열려서 읽기 전용으로는 열지 못한다 — 트레이 접힘 상태를 768~1023 판정 신호로 쓴다.
  * 767·1023 은 경계 확인용(갤러리에는 올리지 않는다).
  *
@@ -22,6 +23,7 @@ const API = `${BASE}/api/v1`;
 const OUT = process.env.OUT_DIR ?? 'docs/visual-qa/admin-bracket-canvas';
 const TOURNAMENT_ID = process.env.TOURNAMENT_ID;
 const LEAGUE_ID = process.env.LEAGUE_ID;
+const LEAGUE_TOURNAMENT_IDS = (process.env.LEAGUE_TOURNAMENT_IDS ?? '').split(',').map((id) => id.trim()).filter(Boolean);
 
 /** mode: mobile(<768) · tablet(768~1023) · desktop(>=1024) */
 const WIDTHS = [
@@ -35,6 +37,7 @@ const WIDTHS = [
 const TARGETS = [
   TOURNAMENT_ID && { key: 'tournament', path: `/admin/tournaments/${TOURNAMENT_ID}/bracket`, hasToolbar: true },
   LEAGUE_ID && { key: 'league', path: `/admin/league-matches/${LEAGUE_ID}`, hasToolbar: false },
+  ...LEAGUE_TOURNAMENT_IDS.map((id, index) => ({ key: `league-grid-${index + 1}`, path: `/admin/tournaments/${id}/bracket`, hasToolbar: true, leagueGrid: true })),
 ].filter(Boolean);
 
 async function login() {
@@ -74,7 +77,18 @@ const READ = `(() => {
     const r = el.getBoundingClientRect();
     return Math.min(r.width, r.height) < 44;
   }).length;
-  return { roundNav, notice, structureButtons, trayToggle, trayCollapsed, overflowX, smallTargets };
+  const gridEl = document.querySelector('[data-league-grid]');
+  const leagueGrid = vis('[data-league-grid]').length;
+  const gridScrollX = gridEl ? gridEl.scrollWidth - gridEl.clientWidth > 1 : false;
+  const linkButtons = vis('button').filter((el) => text(el) === '경기 연결').length;
+  const standingsAside = vis('aside[aria-label="조별 순위"]').length;
+  const standingsTables = vis('table').filter((el) => /순위표$/.test(el.querySelector('caption')?.textContent ?? '')).length;
+  const standingsButton = vis('button').filter((el) => text(el) === '순위표').length;
+  const standingsDisclosure = vis('summary').filter((el) => text(el) === '조별 순위').length;
+  return {
+    roundNav, notice, structureButtons, trayToggle, trayCollapsed, overflowX, smallTargets,
+    leagueGrid, gridScrollX, linkButtons, standingsAside, standingsTables, standingsButton, standingsDisclosure,
+  };
 })()`;
 
 function judge(width, target, r) {
@@ -94,12 +108,24 @@ function judge(width, target, r) {
       problems.push('데스크톱인데 트레이 접기 토글이 보임');
     }
   }
+  if (target.leagueGrid) {
+    if (r.linkButtons !== 0) problems.push('리그인데 「경기 연결」 이 보임');
+    if (width.mode === 'mobile') {
+      if (r.leagueGrid !== 0) problems.push('모바일인데 격자가 보임');
+      if (r.standingsDisclosure < 1) problems.push('모바일 순위 접이식이 없음');
+    } else {
+      if (r.leagueGrid < 1) problems.push('리그 격자가 없음');
+      if (width.key === 'desktop' && r.gridScrollX) problems.push('1440 격자 가로 넘침');
+      if (width.mode === 'tablet' && r.standingsButton < 1) problems.push('태블릿 「순위표」 버튼이 없음');
+      if (width.mode === 'desktop' && (r.standingsAside < 1 || r.standingsTables < 1)) problems.push('데스크톱 옆 순위표가 없음');
+    }
+  }
   if (r.overflowX) problems.push('가로 넘침');
   return problems;
 }
 
 async function main() {
-  if (TARGETS.length === 0) throw new Error('TOURNAMENT_ID 또는 LEAGUE_ID 가 필요해요');
+  if (TARGETS.length === 0) throw new Error('TOURNAMENT_ID, LEAGUE_ID 또는 LEAGUE_TOURNAMENT_IDS 가 필요해요');
   const session = await login();
   mkdirSync(OUT, { recursive: true });
   const browser = await chromium.launch();
@@ -133,6 +159,7 @@ async function main() {
           화면: target.key, 폭: width.key, HTTP: status,
           라운드탭: r.roundNav, 안내: r.notice, 구조버튼: r.structureButtons, 트레이토글: r.trayToggle, 트레이접힘: r.trayCollapsed,
           가로넘침: r.overflowX, '44px미만': r.smallTargets,
+          격자: r.leagueGrid, 순위표: r.standingsTables, 연결버튼: r.linkButtons, 격자넘침: r.gridScrollX,
           판정: problems.length === 0 ? 'OK' : problems.join(' / '),
         });
         await new Promise((resolve) => setTimeout(resolve, 2000));

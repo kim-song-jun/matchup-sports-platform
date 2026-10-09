@@ -1,6 +1,7 @@
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { V1ApiError } from '@/lib/api-client';
 import { buildBracketMobileRounds, type MobilePickCandidate } from '@/lib/bracket-canvas-mobile-model';
 import {
   makeFixture,
@@ -10,10 +11,14 @@ import {
 } from '@/test/bracket-canvas-fixtures';
 import type { V1AdminBracketFixtureGame, V1AdminBracketSlot, V1TournamentGroupPhase } from '@/types/api';
 import { BracketCanvasMobile, type BracketCanvasMobileProps } from './bracket-canvas-mobile';
+import type { RegistrationsLoadState } from './bracket-team-tray';
 
-const { assignSlot, quickMutate } = vi.hoisted(() => ({ assignSlot: vi.fn(), quickMutate: vi.fn() }));
+const { assignSlot, quickMutate, updateFixture } = vi.hoisted(() => ({ assignSlot: vi.fn(), quickMutate: vi.fn(), updateFixture: vi.fn() }));
 
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn(), replace: vi.fn(), back: vi.fn() }) }));
+vi.mock('@/hooks/use-v1-api', () => ({
+  useV1UpdateFixture: () => ({ mutateAsync: updateFixture, isPending: false }),
+}));
 vi.mock('@/hooks/use-v1-bracket-canvas', () => ({
   useV1AssignTournamentSlot: () => ({ mutateAsync: assignSlot, isPending: false }),
   useV1QuickResult: () => ({ mutate: quickMutate, isPending: false }),
@@ -81,11 +86,13 @@ const fixtures = [
   makeFixture({ id: 'fx-8', groupId: 'g-f', fixtureNumber: 8, status: 'cancelled', game: makeGame('g-8') }),
 ];
 
+const loaded: RegistrationsLoadState = { status: 'success', truncated: false, refetchFailed: false, error: null, onRetry: vi.fn() };
+
 function renderMobile(overrides: Partial<BracketCanvasMobileProps> = {}) {
   const showToast = vi.fn();
   const rounds = buildBracketMobileRounds({ groups, fixtures, slots });
   const utils = render(
-    <BracketCanvasMobile competitionId="t-1" scope="tournament" rounds={rounds} slots={slots} candidates={candidates} canWrite showToast={showToast} {...overrides} />,
+    <BracketCanvasMobile competitionId="t-1" scope="tournament" rounds={rounds} slots={slots} candidates={candidates} canWrite registrationsState={loaded} showToast={showToast} {...overrides} />,
   );
   return { showToast, ...utils };
 }
@@ -314,5 +321,154 @@ describe('BracketCanvasMobile — 사이드 출처 안내', () => {
     fireEvent.click(screen.getByRole('tab', { name: '결승' }));
     fireEvent.click(card(/결승 · 7번 경기/));
     expect(within(screen.getByRole('dialog')).getAllByText('경기에 직접 지정하는 자리예요.')).toHaveLength(2);
+  });
+});
+
+describe('BracketCanvasMobile — 팀 넣기', () => {
+  beforeEach(() => {
+    assignSlot.mockReset();
+    assignSlot.mockResolvedValue({});
+    updateFixture.mockReset();
+    updateFixture.mockResolvedValue({});
+  });
+
+  const optionNames = () =>
+    within(screen.getByRole('list', { name: '넣을 수 있는 팀' }))
+      .getAllByRole('button')
+      .map((button) => button.textContent);
+
+  it('자리에 연결된 사이드에 고르기·바꾸기 버튼이 나오고, 후보에서 이미 다른 ENTRY·BYE 자리에 있는 팀은 빠진다', () => {
+    renderMobile();
+    fireEvent.click(card(/8강 · 1번 경기/));
+    expect(screen.getByRole('button', { name: '홈 팀 바꾸기' })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: '어웨이 팀 고르기' }));
+    // 강남FC(s-h1)·서초FC(s-x)는 ENTRY, 용산FC 는 BYE 자리에 있어 후보가 아니다
+    expect(optionNames()).toEqual(['마포FC', '송파FC']);
+  });
+
+  it('팀을 고르면 해당 자리로 배정을 요청하고 상세로 돌아온다', async () => {
+    const { showToast } = renderMobile();
+    fireEvent.click(card(/8강 · 1번 경기/));
+    fireEvent.click(screen.getByRole('button', { name: '어웨이 팀 고르기' }));
+    fireEvent.click(screen.getByRole('button', { name: '마포FC' }));
+
+    await waitFor(() => expect(assignSlot).toHaveBeenCalledWith({ slotId: 's-a1', registrationId: 'r2' }));
+    expect(assignSlot).toHaveBeenCalledTimes(1);
+    expect(updateFixture).not.toHaveBeenCalled();
+    await waitFor(() => expect(showToast).toHaveBeenCalledWith('자리에 팀을 넣었어요.'));
+    expect(screen.queryByRole('list', { name: '넣을 수 있는 팀' })).not.toBeInTheDocument();
+    expect(screen.getByRole('dialog', { name: '8강 · 1번 경기' })).toBeInTheDocument();
+  });
+
+  it('이미 있는 팀을 바꾸는 화면에서는 현재 팀을 비울 수 있고, 현재 팀은 후보에 다시 나오지 않는다', async () => {
+    const { showToast } = renderMobile();
+    fireEvent.click(card(/8강 · 1번 경기/));
+    fireEvent.click(screen.getByRole('button', { name: '홈 팀 바꾸기' }));
+    expect(optionNames()).toEqual(['마포FC', '송파FC']);
+
+    fireEvent.click(screen.getByRole('button', { name: '현재 팀 비우기' }));
+    await waitFor(() => expect(assignSlot).toHaveBeenCalledWith({ slotId: 's-h1', registrationId: null }));
+    await waitFor(() => expect(showToast).toHaveBeenCalledWith('자리를 비웠어요.'));
+  });
+
+  it('서버가 거절하면 그림 편집기 공용 안내 문구를 오류 토스트로 보여 주고 고르던 화면에 머문다', async () => {
+    assignSlot.mockRejectedValue(
+      new V1ApiError({
+        statusCode: 409, code: 'SLOT_TEAM_ALREADY_PLACED', message: '서버 원문이에요.', details: null, requestId: 'req-1', timestamp: '2026-10-08T00:00:00.000Z',
+      } as unknown as ConstructorParameters<typeof V1ApiError>[0]),
+    );
+    const { showToast } = renderMobile();
+    fireEvent.click(card(/8강 · 1번 경기/));
+    fireEvent.click(screen.getByRole('button', { name: '어웨이 팀 고르기' }));
+    fireEvent.click(screen.getByRole('button', { name: '송파FC' }));
+
+    await waitFor(() => expect(showToast).toHaveBeenCalledWith('이미 다른 자리에 들어간 팀이에요.', 'error'));
+    expect(screen.getByRole('list', { name: '넣을 수 있는 팀' })).toBeInTheDocument();
+  });
+
+  it('후보가 하나도 없으면 안내를 보여 준다', () => {
+    renderMobile({ candidates: [] });
+    fireEvent.click(card(/8강 · 1번 경기/));
+    fireEvent.click(screen.getByRole('button', { name: '어웨이 팀 고르기' }));
+    expect(screen.getByText(/넣을 수 있는 팀이 없어요/)).toBeInTheDocument();
+  });
+
+  it('자리 없이 직접 지정한 사이드는 경기를 고쳐 저장하고, 반대편 팀은 후보에서 뺀다', async () => {
+    const { showToast } = renderMobile();
+    // fx-2: 홈 서초FC(r3)·어웨이 송파FC(r4), 자리 연결 없음 — 자리 후보 필터(ENTRY 배치)는 적용되지 않는다
+    fireEvent.click(card(/8강 · 2번 경기/));
+    fireEvent.click(screen.getByRole('button', { name: '홈 팀 바꾸기' }));
+    expect(optionNames()).toEqual(['강남FC', '마포FC', '용산FC']);
+
+    fireEvent.click(screen.getByRole('button', { name: '마포FC' }));
+    await waitFor(() => expect(updateFixture).toHaveBeenCalledWith({ fixtureId: 'fx-2', homeRegistrationId: 'r2' }));
+    expect(assignSlot).not.toHaveBeenCalled();
+    await waitFor(() => expect(showToast).toHaveBeenCalledWith('자리에 팀을 넣었어요.'));
+  });
+
+  it('직접 지정 어웨이 팀을 비우면 어웨이 필드만 null 로 보낸다', async () => {
+    renderMobile();
+    fireEvent.click(card(/8강 · 2번 경기/));
+    fireEvent.click(screen.getByRole('button', { name: '어웨이 팀 바꾸기' }));
+    fireEvent.click(screen.getByRole('button', { name: '현재 팀 비우기' }));
+    await waitFor(() => expect(updateFixture).toHaveBeenCalledWith({ fixtureId: 'fx-2', awayRegistrationId: null }));
+  });
+
+  it('참가팀 조회가 끝나기 전에는 고르기를 막고, 실패하면 다시 시도를 보여 준다', () => {
+    const onRetry = vi.fn();
+    const { unmount } = renderMobile({ registrationsState: { ...loaded, status: 'pending' } });
+    fireEvent.click(card(/8강 · 1번 경기/));
+    fireEvent.click(screen.getByRole('button', { name: '어웨이 팀 고르기' }));
+    expect(screen.getByText('참가팀을 불러오는 중이에요.')).toBeInTheDocument();
+    expect(screen.queryByRole('list', { name: '넣을 수 있는 팀' })).not.toBeInTheDocument();
+    expect(screen.queryByText(/넣을 수 있는 팀이 없어요/)).not.toBeInTheDocument();
+    unmount();
+
+    renderMobile({ registrationsState: { ...loaded, status: 'error', error: new Error('x'), onRetry } });
+    fireEvent.click(card(/8강 · 1번 경기/));
+    fireEvent.click(screen.getByRole('button', { name: '홈 팀 바꾸기' }));
+    expect(screen.getByRole('button', { name: '현재 팀 비우기' })).toBeDisabled();
+    expect(screen.queryByText(/넣을 수 있는 팀이 없어요/)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '다시 시도' }));
+    expect(onRetry).toHaveBeenCalledTimes(1);
+  });
+
+  it('고르기 버튼이 없어야 하는 곳 — 조 순위 자리·앞 경기 결과 사이드·시작된 경기·읽기 전용', () => {
+    const settled = makeFixture({
+      id: 'fx-10', groupId: 'g-q', fixtureNumber: 10, homeSlotId: 's-x', homeRegistrationId: 'r3', homeTeamName: '서초FC',
+      awayRegistrationId: 'r4', awayTeamName: '송파FC',
+      game: makeGame('g-10', { state: 'ENDED', latestRevision: revision('OFFICIAL', 'console') as never }),
+    });
+    const feederFixture = makeFixture({
+      id: 'fx-f', groupId: 'g-q', fixtureNumber: 20, awayRegistrationId: 'r4', awayTeamName: '송파FC',
+      bracketSources: [{ fixtureId: 'fx-2', outcome: 'WINNER', side: 'HOME' }],
+    });
+    const rounds = buildBracketMobileRounds({ groups, fixtures: [...fixtures, settled, feederFixture], slots });
+    const { unmount } = renderMobile({ rounds });
+
+    // 조 순위 자리: 버튼 대신 안내
+    fireEvent.click(screen.getByRole('tab', { name: '4강' }));
+    fireEvent.click(card(/4강 · 6번 경기/));
+    expect(screen.queryByRole('button', { name: /^홈 팀 (고르기|바꾸기)/ })).not.toBeInTheDocument();
+    expect(screen.getByText(/큰 화면에서 순위대로 채워요/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '닫기' }));
+
+    // 앞 경기 결과 사이드(홈)는 버튼이 없고 직접 지정 사이드(어웨이 송파FC)에만 있다
+    fireEvent.click(screen.getByRole('tab', { name: '8강' }));
+    fireEvent.click(card(/8강 · 20번 경기/));
+    expect(screen.queryByRole('button', { name: '홈 팀 고르기' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '어웨이 팀 바꾸기' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '닫기' }));
+
+    // 시작된 경기(fx-10, 자리 연결이 있어도)
+    fireEvent.click(card(/8강 · 10번 경기/));
+    expect(screen.queryByRole('button', { name: /팀 (고르기|바꾸기)/ })).not.toBeInTheDocument();
+    unmount();
+
+    // 읽기 전용: 같은 fx-1 이 canWrite=true 일 때(위 테스트들)는 버튼이 있었다
+    renderMobile({ canWrite: false });
+    fireEvent.click(card(/8강 · 1번 경기/));
+    expect(screen.queryByRole('button', { name: /팀 (고르기|바꾸기)/ })).not.toBeInTheDocument();
   });
 });

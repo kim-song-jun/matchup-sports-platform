@@ -19,7 +19,8 @@ import {
 import { bracketNodeStateChip } from '@/lib/competition-status';
 import { formatKstDateShort, formatKstTime } from '@/lib/date-utils';
 import type { V1AdminBracketSlot } from '@/types/api';
-import { MobileNodeSheetBody } from './bracket-canvas-mobile-sheet';
+import { MobileNodeSheetBody, type MobileSheetView } from './bracket-canvas-mobile-sheet';
+import type { RegistrationsLoadState } from './bracket-team-tray';
 
 export interface BracketCanvasMobileProps {
   competitionId: string;
@@ -28,6 +29,7 @@ export interface BracketCanvasMobileProps {
   slots: V1AdminBracketSlot[];
   candidates: MobilePickCandidate[];
   canWrite: boolean;
+  registrationsState: RegistrationsLoadState;
   showToast: (message: string, variant?: AdminToastVariant) => void;
 }
 
@@ -101,11 +103,17 @@ function MobileNodeCard({ node, expanded, onOpen }: { node: MobileNode; expanded
   );
 }
 
-export function BracketCanvasMobile({ competitionId, scope, rounds, canWrite, showToast }: BracketCanvasMobileProps) {
+export function BracketCanvasMobile({ competitionId, scope, rounds, slots, candidates, canWrite, registrationsState, showToast }: BracketCanvasMobileProps) {
   const roundSelectId = useId();
   const [pickedRoundKey, setPickedRoundKey] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [view, setView] = useState<MobileSheetView>({ kind: 'detail' });
   const closeSheet = useCallback(() => setSelectedId(null), []);
+  // 다른 칸을 열 때 이전 칸의 팀 고르기 화면이 남지 않게 한다.
+  const openNode = useCallback((fixtureId: string) => {
+    setView({ kind: 'detail' });
+    setSelectedId(fixtureId);
+  }, []);
 
   const activeKey = rounds.some((round) => round.key === pickedRoundKey) ? pickedRoundKey : pickInitialRoundKey(rounds);
   const activeRound = rounds.find((round) => round.key === activeKey) ?? null;
@@ -165,7 +173,7 @@ export function BracketCanvasMobile({ competitionId, scope, rounds, canWrite, sh
               <ul role="list" className="flex flex-col gap-2">
                 {section.nodes.map((node) => (
                   <li key={node.fixtureId}>
-                    <MobileNodeCard node={node} expanded={selectedId === node.fixtureId} onOpen={setSelectedId} />
+                    <MobileNodeCard node={node} expanded={selectedId === node.fixtureId} onOpen={openNode} />
                   </li>
                 ))}
               </ul>
@@ -176,7 +184,19 @@ export function BracketCanvasMobile({ competitionId, scope, rounds, canWrite, sh
 
       {selected ? (
         <BottomSheet open onClose={closeSheet} title={selected.title}>
-          <MobileNodeSheetBody node={selected} competitionId={competitionId} scope={scope} canWrite={canWrite} showToast={showToast} onDone={closeSheet} />
+          <MobileNodeSheetBody
+            node={selected}
+            competitionId={competitionId}
+            scope={scope}
+            canWrite={canWrite}
+            slots={slots}
+            candidates={candidates}
+            registrationsState={registrationsState}
+            showToast={showToast}
+            view={view}
+            onViewChange={setView}
+            onDone={closeSheet}
+          />
         </BottomSheet>
       ) : null}
     </section>

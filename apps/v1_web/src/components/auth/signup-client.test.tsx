@@ -221,6 +221,28 @@ describe('SignupClient required profile contract', () => {
     );
   });
 
+  it.each([
+    ['기본(켜짐)', false, true],
+    ['끄고 가입', true, false],
+  ])('경기 기록 공개 스위치: %s → 공개 동의값을 보낸다', async (_label, toggle, granted) => {
+    render(<SignupClient />);
+    await advanceToProfile();
+    fireEvent.change(screen.getByLabelText(/^이름/), { target: { value: '홍길동' } });
+    fireEvent.change(screen.getByLabelText(/^생년월일/), { target: { value: '20000229' } });
+    fireEvent.click(screen.getByRole('radio', { name: '남' }));
+    const sw = screen.getByRole('switch', { name: '경기 기록 공개' });
+    expect(sw).toHaveAttribute('aria-checked', 'true');
+    if (toggle) fireEvent.click(sw);
+
+    fireEvent.click(screen.getByRole('button', { name: '가입하고 계속' }));
+
+    await waitFor(() =>
+      expect(hooks.registerMutateAsync).toHaveBeenCalledWith(
+        expect.objectContaining({ recordConsent: { granted, policyHash: 'v1-public-record-consent-1' } }),
+      ),
+    );
+  });
+
   it('tracks a sign_up_complete event with method=email once registration succeeds', async () => {
     // Given
     render(<SignupClient />);

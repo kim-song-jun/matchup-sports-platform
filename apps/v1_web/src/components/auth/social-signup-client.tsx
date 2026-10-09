@@ -1,6 +1,8 @@
 'use client';
 
 import { FormEvent, useEffect, useState } from 'react';
+import { RECORD_CONSENT_POLICY_HASH } from '@/lib/record-consent';
+import { SignupRecordConsentSwitch } from './signup-record-consent-switch';
 import { useRouter } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
 import { Card, DatePickerTextInput } from '@/components/v1-ui/primitives';
@@ -51,6 +53,7 @@ export function SocialSignupClient() {
   const [phoneVerified, setPhoneVerified] = useState(false);
   const [birthDateDigits, setBirthDateDigits] = useState('');
   const [gender, setGender] = useState<'male' | 'female' | ''>('');
+  const [recordPublic, setRecordPublic] = useState(true);
   const [nicknameCheck, setNicknameCheck] = useState<DuplicateCheckState>({ status: 'idle', value: '' });
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [error, setError] = useState<string | null>(null);
@@ -151,6 +154,7 @@ export function SocialSignupClient() {
         phone: profileDraft.phone,
         birthDate: profileDraft.birthDate,
         gender: profileDraft.gender,
+        recordConsent: { granted: recordPublic, policyHash: RECORD_CONSENT_POLICY_HASH },
       },
       {
         onSuccess: (result) => {
@@ -357,6 +361,7 @@ export function SocialSignupClient() {
               만 14세 이상만 가입할 수 있어요.
             </span>
           </label>
+          <SignupRecordConsentSwitch checked={recordPublic} onChange={setRecordPublic} />
         </div>
         {phoneConflict ? phoneConflictNotice : null}
         {error ? (

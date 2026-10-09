@@ -1,3 +1,4 @@
+import 'reflect-metadata';
 import { isSignupAgeEligible } from './required-signup-profile.dto';
 describe('signup age boundary', () => {
   const now = new Date('2026-09-19T00:00:00Z');

@@ -34,6 +34,7 @@ import { BracketStandingsFillButton } from './bracket-standings-fill-button';
 import { BracketTeamTray, type RegistrationsLoadState } from './bracket-team-tray';
 import { BracketFixtureToolsDialog } from './bracket-fixture-tools-dialog';
 import { BracketTemplateDialog } from './bracket-template-dialog';
+import { focusFixtureOpener } from './fixture-opener-focus';
 
 export type BracketCanvasWorkspaceProps = {
   tournamentId: string;
@@ -227,7 +228,10 @@ export function BracketCanvasWorkspace({
         sideLabels={selectedLabels}
         canWrite={canWrite}
         showToast={showToast}
-        onClose={() => setSelectedFixtureId(null)}
+        onClose={() => {
+          if (sidePanel) focusFixtureOpener(selectedFixture.id);
+          setSelectedFixtureId(null);
+        }}
       />
     ) : null;
 

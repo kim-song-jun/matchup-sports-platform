@@ -14,6 +14,7 @@ import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 import { isSignupAgeEligible, isValidBirthDateDigits, normalizeSignupDisplayName } from './dto/required-signup-profile.dto';
 import { SocialProfileDto, SocialTermsDto } from './dto/social-profile.dto';
+import { recordSignupConsent } from './signup-record-consent';
 import { hashPassword, verifyPassword } from './password-hash';
 import { ManagedTermsRuntimeService } from '../terms/managed-terms-runtime.service';
 import { PhoneVerificationService } from '../verification/phone-verification.service';
@@ -217,6 +218,7 @@ export class AuthService {
         created.id,
         signupTermsDecisions,
       );
+      await recordSignupConsent(transaction, created.id, dto.recordConsent);
       return created;
     });
 
@@ -967,6 +969,7 @@ export class AuthService {
         update: { currentStep: 'sport' },
         create: { userId, currentStep: 'sport' },
       });
+      await recordSignupConsent(transaction, userId, dto.recordConsent);
     });
 
     return this.sessionResponse(user.id, user.email, { social: true });

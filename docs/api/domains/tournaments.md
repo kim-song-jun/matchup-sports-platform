@@ -509,3 +509,14 @@ All team roster mutations lock the registration row and re-read `rosterLockedAt`
 - Admin create/update accept `venue` + `venueAddress`, `venueLatitude`, `venueLongitude`, `venueProvider`, `venueProviderId`; responses add `venueAddress`, `venueProvider`, `venueProviderId` next to `venue`, `latitude`, `longitude`. The server no longer geocodes `venue`.
 - PATCH: when the `venue` key is present the whole snapshot is replaced (a name-only PATCH clears coordinates and provider).
 - Bracket fixtures: `venue` + the same five `venue*` fields on create/update fixture DTOs map to the fixture's `place*` columns; fixtures created without a venue inherit the tournament's snapshot. Fixture responses keep `venue` and add `place: V1PlaceView | null`.
+
+## Public list default order (2026-10-10)
+
+`GET /tournaments` orders by status group, then date, then `id` ascending as the tie-breaker. The server is the only place this order is defined; clients render `items[]` as received.
+
+1. `open` (a regular league's `draft` "upcoming" is grouped here) - `scheduledAt` ascending
+2. `closed` - `scheduledAt` ascending
+3. `in_progress` - `scheduledAt` ascending
+4. `completed` - most recently finished first (`scheduledEndAt` descending, falling back to `scheduledAt`)
+
+Rows without a date sort last inside their group. `cursor` is still the id of the last row of the previous page and `page` is an offset into the same order, so pages never skip or repeat a row. A `cursor` that no longer matches a visible row returns an empty page. Passing `status` narrows to one group; the group's ordering above still applies. The visible set is unchanged (`draft`/`cancelled` tournaments stay hidden).

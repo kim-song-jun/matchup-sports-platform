@@ -21,6 +21,7 @@ import type { V1AdminBracketSlot } from '@/types/api';
 import type { V1AdminLeagueTeam, V1LeagueFixture } from '@/types/league-match';
 import { REGISTRATION_DRAG_MIME } from './bracket-canvas-dnd';
 import { BracketTeamTray, type RegistrationsLoadState } from './bracket-team-tray';
+import { fixtureOpenerProps, focusFixtureOpener } from './fixture-opener-focus';
 import { LeagueFixturePanel } from './league-fixture-panel';
 
 export interface LeagueScheduleBoardProps {
@@ -175,7 +176,10 @@ export function LeagueScheduleBoard({ leagueId, fixtures, slots, teams, canWrite
           setOpenFixtureId(null);
           onCancelFixture(openNode.fixtureId);
         }}
-        onClose={() => setOpenFixtureId(null)}
+        onClose={() => {
+          if (sidePanel) focusFixtureOpener(openNode.fixtureId);
+          setOpenFixtureId(null);
+        }}
       />
     );
 
@@ -259,6 +263,7 @@ export function LeagueScheduleBoard({ leagueId, fixtures, slots, teams, canWrite
                         type="button"
                         onClick={() => setOpenFixtureId(node.fixtureId)}
                         aria-label={`${node.home.label} 대 ${node.away.label} 경기 상세 열기`}
+                        {...fixtureOpenerProps(node.fixtureId)}
                         className="flex min-h-[44px] w-full items-center justify-between gap-2 rounded-lg px-1 text-left transition-colors hover:bg-[var(--surface-soft)] focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
                       >
                         <span className="text-[length:var(--font-size-caption)] text-[var(--text-muted)]">

@@ -96,8 +96,10 @@ export function AbnormalEndDialog({ open, sides, onCancel, onConfirm, submitting
           몰수·중단으로 종료
         </h2>
         <p className="mt-2 text-sm text-[var(--text-muted)]">
-          몰수는 기권한 팀의 상대가 이긴 점수로 확정돼요(적어 둔 점수가 이미 상대 승리면 그대로예요). 사유는 공개 경기 기록에 함께 남아, 나중에 이 결과가 왜
-          이런지 설명하는 유일한 근거가 돼요.
+          {needsForfeitSide
+            ? '몰수는 기권한 팀의 상대가 이긴 점수로 확정돼요(적어 둔 점수가 이미 상대 승리면 그대로예요).'
+            : '점수는 지금 기록된 값 그대로 확정돼요.'}{' '}
+          사유는 공개 경기 기록에 함께 남아, 나중에 이 결과가 왜 이런지 설명하는 유일한 근거가 돼요.
         </p>
 
         <fieldset className="mt-4">
@@ -132,7 +134,7 @@ export function AbnormalEndDialog({ open, sides, onCancel, onConfirm, submitting
 
         {needsForfeitSide ? (
           <fieldset className="mt-4">
-            <legend className="text-sm font-semibold">
+            <legend className="text-[length:var(--font-size-body-sm)] font-semibold">
               기권한 팀 <span className="text-[var(--red500)]">(필수)</span>
             </legend>
             <div className="mt-2 flex flex-col gap-2">
@@ -153,12 +155,12 @@ export function AbnormalEndDialog({ open, sides, onCancel, onConfirm, submitting
                     checked={forfeitSideId === side.id}
                     onChange={() => setForfeitSideId(side.id)}
                   />
-                  <span className="text-sm font-medium">{side.displayNameSnapshot}</span>
+                  <span className="text-[length:var(--font-size-body-sm)] font-medium">{side.displayNameSnapshot}</span>
                 </label>
               ))}
             </div>
             {forfeitSideId === '' ? (
-              <p className="mt-1 text-xs text-[var(--text-muted)]">기권한 팀을 골라야 종료할 수 있어요.</p>
+              <p className="mt-1 text-[length:var(--font-size-caption)] text-[var(--text-muted)]">기권한 팀을 골라야 종료할 수 있어요.</p>
             ) : null}
           </fieldset>
         ) : null}

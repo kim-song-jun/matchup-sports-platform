@@ -119,6 +119,7 @@ function PullToRefreshActive({ areaRef }: { areaRef: RefObject<HTMLElement | nul
 
     const endGesture = () => {
       area.removeEventListener('touchmove', onMove);
+      delete area.dataset.ptrArmed;
       const pulled = gesture?.intent === 'pull';
       gesture = null;
       return pulled;
@@ -156,6 +157,9 @@ function PullToRefreshActive({ areaRef }: { areaRef: RefObject<HTMLElement | nul
       if (window.matchMedia(DESKTOP_QUERY).matches) return;
       if (area.scrollTop > 0 || isBlockedByOverlay() || startsInsideScrolledScroller(event.target, area)) return;
       gesture = { startX: touch.clientX, startY: touch.clientY, baseY: touch.clientY, intent: 'undecided' };
+      // WebKit starts the area's own rubber-band on the first move, before the pull is recognized, and
+      // later moves are no longer cancelable, so the bounce is switched off from touchstart instead.
+      area.dataset.ptrArmed = '';
       // Non-passive only for the lifetime of a gesture that may become a pull.
       area.addEventListener('touchmove', onMove, { passive: false });
     };
@@ -177,6 +181,7 @@ function PullToRefreshActive({ areaRef }: { areaRef: RefObject<HTMLElement | nul
       area.removeEventListener('touchend', onEnd);
       area.removeEventListener('touchcancel', onEnd);
       area.removeEventListener('touchmove', onMove);
+      delete area.dataset.ptrArmed;
       clear();
     };
   }, [enabled, areaRef]);

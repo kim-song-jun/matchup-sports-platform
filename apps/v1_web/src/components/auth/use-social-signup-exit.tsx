@@ -22,16 +22,8 @@ export function useSocialSignupExit() {
   const { confirm, ConfirmModal } = useConfirm();
   const [error, setError] = useState<string | null>(null);
 
-  const exit = useCallback(async () => {
-    const confirmed = await confirm({
-      title: '가입을 그만둘까요?',
-      message: '지금까지 입력한 내용은 저장되지 않아요. 다시 카카오로 로그인하면 이어서 진행할 수 있어요.',
-      confirmLabel: '그만두기',
-      cancelLabel: '계속 쓰기',
-      tone: 'danger',
-    });
-    if (!confirmed) return;
-
+  /** 로그아웃 뒤 하드 내비게이션으로 나간다. 실패하면 서버 세션이 남아 게이트가 되돌려 보내므로 알린다. */
+  const leaveTo = useCallback(async (path: string) => {
     setError(null);
     try {
       await logout.mutateAsync();
@@ -47,8 +39,21 @@ export function useSocialSignupExit() {
     disconnectV1Socket();
     // router.replace 는 prefetch 된 /login 인스턴스를 재사용해 로그아웃 이전 스냅샷에
     // 멈출 수 있다(session-entry-gate 와 동일한 이유로 하드 내비게이션을 쓴다).
-    window.location.replace('/login');
-  }, [confirm, logout, queryClient]);
+    window.location.replace(path);
+  }, [logout, queryClient]);
 
-  return { exit, ConfirmModal, error, pending: logout.isPending };
+  const exit = useCallback(async () => {
+    const confirmed = await confirm({
+      title: '가입을 그만둘까요?',
+      message: '지금까지 입력한 내용은 저장되지 않아요. 다시 카카오로 로그인하면 이어서 진행할 수 있어요.',
+      confirmLabel: '그만두기',
+      cancelLabel: '계속 쓰기',
+      tone: 'danger',
+    });
+    if (!confirmed) return;
+
+    await leaveTo('/login');
+  }, [confirm, leaveTo]);
+
+  return { exit, leaveTo, ConfirmModal, error, pending: logout.isPending };
 }

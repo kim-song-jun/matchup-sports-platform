@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
 import { Card, DatePickerTextInput } from '@/components/v1-ui/primitives';
 import { Button } from '@/components/v1-ui/button';
+import { PhoneConflictNotice } from '@/components/auth/otp/phone-conflict-notice';
 import { PhoneVerificationCard } from '@/components/auth/phone-verification/phone-verification-card';
 import { useV1AuthMe, useV1CheckNickname, useV1CompleteSocialProfile } from '@/hooks/use-v1-api';
 import { useSocialSignupExit } from './use-social-signup-exit';
@@ -46,6 +47,14 @@ export function SocialSignupClient() {
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [error, setError] = useState<string | null>(null);
   const exitFlow = useSocialSignupExit();
+  const [phoneConflict, setPhoneConflict] = useState(false);
+  const phoneConflictNotice = (
+    <PhoneConflictNotice
+      pending={exitFlow.pending}
+      onLogin={() => void exitFlow.leaveTo('/login')}
+      onFindAccount={() => void exitFlow.leaveTo('/auth/find-account')}
+    />
+  );
 
   // 카카오가 동의항목 승인 하에 내려준 값(이름·번호·성별)을 자동으로 채운다.
   // 동의항목이 없으면 socialSignupPrefill 이 null 이라 아무것도 하지 않고 직접 입력 흐름 그대로다.
@@ -105,6 +114,7 @@ export function SocialSignupClient() {
     // 재클릭은 막는다(동시 클릭 방지가 필요하면 ref 락을 따로 둔다).
     if (completeProfile.isPending) return;
     setError(null);
+    setPhoneConflict(false);
     setFieldErrors({});
 
     if (!nicknameVerified) {
@@ -144,6 +154,11 @@ export function SocialSignupClient() {
           if (nextError instanceof V1ApiError && nextError.code === 'NICKNAME_CONFLICT') {
             setFieldErrors({ nickname: '이미 사용 중인 닉네임이에요.' });
             setError('다른 닉네임으로 다시 시도해 주세요.');
+            return;
+          }
+
+          if (nextError instanceof V1ApiError && nextError.code === 'PHONE_CONFLICT') {
+            setPhoneConflict(true);
             return;
           }
 
@@ -286,6 +301,7 @@ export function SocialSignupClient() {
               onChange={(event) => {
                 setPhoneDigits(normalizeSeparatedDigits(event.target.value));
                 setPhoneVerified(false);
+                setPhoneConflict(false);
               }}
               placeholder="010-0000-0000"
               required
@@ -294,7 +310,7 @@ export function SocialSignupClient() {
           </label>
 
           {phoneDigits.length === 11 && !phoneVerified ? (
-            <PhoneVerificationCard mode="authed" phone={phoneDigits} onVerified={() => setPhoneVerified(true)} surface="inset" />
+            <PhoneVerificationCard mode="authed" phone={phoneDigits} onVerified={() => setPhoneVerified(true)} surface="inset" conflictNotice={phoneConflictNotice} />
           ) : null}
 
           {phoneVerified ? (
@@ -331,6 +347,7 @@ export function SocialSignupClient() {
             </span>
           </label>
         </div>
+        {phoneConflict ? phoneConflictNotice : null}
         {error ? (
           <Card pad={16} className="tm-auth-soft-card tm-auth-soft-card-error">
             <div className="tm-text-body-lg">가입을 완료하지 못했어요</div>

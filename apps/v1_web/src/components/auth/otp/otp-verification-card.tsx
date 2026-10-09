@@ -3,6 +3,7 @@
 import { useEffect, useRef, type ReactNode } from 'react';
 import { CheckCircle2, KeyRound } from 'lucide-react';
 import { AlertBanner } from '@/components/v1-ui/primitives';
+import { PHONE_CONFLICT_CODE } from './phone-conflict-notice';
 import { OtpCodeInput, OtpErrorBanner, OtpRemainingRow } from './otp-parts';
 import { OTP_CODE_LENGTH, useOtpVerification, type OtpVerificationOptions } from './use-otp-verification';
 
@@ -28,6 +29,8 @@ type Props = OtpVerificationOptions & {
    * 흰 카드 대신 폼 내부 보조 영역(tint) 표면을 쓴다.
    */
   surface?: 'card' | 'inset';
+  /** 번호 중복(PHONE_CONFLICT)일 때 오류 배너 대신 보여 줄 안내와 출구. */
+  conflictNotice?: ReactNode;
 };
 
 export function OtpVerificationCard({
@@ -43,6 +46,7 @@ export function OtpVerificationCard({
   requestFailureMessage,
   verifyFailureMessage,
   surface = 'card',
+  conflictNotice,
 }: Props) {
   const rootRef = useRef<HTMLDivElement>(null);
   const otp = useOtpVerification({ resetKey, onRequestCode, onSubmitCode, requestFailureMessage, verifyFailureMessage });
@@ -109,7 +113,7 @@ export function OtpVerificationCard({
       ) : (
         <>
           <OtpCodeInput idPrefix={idPrefix} otp={otp} verifying={verifying} />
-          <OtpErrorBanner idPrefix={idPrefix} otp={otp} />
+          <OtpErrorBanner idPrefix={idPrefix} otp={otp} conflictNotice={conflictNotice} />
 
           <button
             type="button"
@@ -126,7 +130,11 @@ export function OtpVerificationCard({
       )}
 
       {/* idle 단계의 실패(발송 자체 실패·쿨다운)는 방금 누른 버튼의 결과이므로 버튼 아래에 남긴다. */}
-      {error && phase === 'idle' ? <AlertBanner message={error} tone={errorTone} /> : null}
+      {error && phase === 'idle'
+        ? (conflictNotice && otp.errorCode === PHONE_CONFLICT_CODE
+          ? conflictNotice
+          : <AlertBanner message={error} tone={errorTone} />)
+        : null}
     </div>
   );
 }

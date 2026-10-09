@@ -15,7 +15,7 @@ ALPHA_SESSION_TOKEN=... LEAGUE_TOURNAMENT_ID=... node scripts/capture_alpha_leag
 
 - 통합 순위 섹션 존재 여부와 순위 행 수
 - 진행률의 숫자 병기(`N / M`)와 퍼센트 — 색만으로 정보를 전달하지 않는지
-- 매직넘버 또는 우승 확정 배지
+- "1위 확정까지 승점 N" 또는 "1위 확정" 배지
 - `document.documentElement.scrollWidth > window.innerWidth` — 가로 스크롤 발생 여부
 
 ## 주의

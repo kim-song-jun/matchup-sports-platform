@@ -6,12 +6,14 @@ import {
   buildCanvasLayout,
   buildSideLabelContext,
   fixtureSideLabel,
+  isFixtureLocked,
   type CanvasEdgeKind,
   type CanvasMode,
 } from '@/lib/bracket-canvas-layout';
 import { competitionMatchLabel } from '@/lib/tournament-round-label';
 import type { V1AdminBracketFixture, V1AdminBracketGroup, V1AdminBracketSlot } from '@/types/api';
 import { BracketCanvasNode } from './bracket-canvas-node';
+import { BracketGroupBlock } from './bracket-group-block';
 
 export type BracketCanvasProps = {
   groups: V1AdminBracketGroup[];
@@ -35,6 +37,7 @@ const EDGE_STYLE: Record<CanvasEdgeKind, { dash: string | undefined }> = {
   WINNER: { dash: undefined },
   LOSER: { dash: '6 4' },
   BYE: { dash: '2 3' },
+  GROUP_RANK: { dash: '10 4 2 4' },
 };
 
 export function BracketCanvas({
@@ -52,6 +55,22 @@ export function BracketCanvas({
   const labelContext = useMemo(() => buildSideLabelContext(groups, fixtures, slots), [groups, fixtures, slots]);
   const fixturesById = useMemo(() => new Map(fixtures.map((fixture) => [fixture.id, fixture])), [fixtures]);
   const slotsById = useMemo(() => new Map(slots.map((slot) => [slot.id, slot])), [slots]);
+  // A group-block slot is locked once any fixture using it has started (same rule as the server's SLOT_LOCKED);
+  // pressing a slot without a picked team opens the lowest-numbered fixture that uses it.
+  const { lockedSlotIds, firstFixtureBySlot } = useMemo(() => {
+    const locked = new Set<string>();
+    const first = new Map<string, string>();
+    for (const fixture of [...fixtures].sort((a, b) => a.fixtureNumber - b.fixtureNumber || a.legNumber - b.legNumber)) {
+      for (const slotId of [fixture.homeSlotId, fixture.awaySlotId]) {
+        if (slotId === null) continue;
+        if (!first.has(slotId)) first.set(slotId, fixture.id);
+        if (isFixtureLocked(fixture)) locked.add(slotId);
+      }
+    }
+    return { lockedSlotIds: locked, firstFixtureBySlot: first };
+  }, [fixtures]);
+  const hasBracketEdges = layout.edges.some((edge) => edge.kind !== 'GROUP_RANK');
+  const hasRankEdges = layout.edges.some((edge) => edge.kind === 'GROUP_RANK');
 
   return (
     <div
@@ -104,10 +123,29 @@ export function BracketCanvas({
             />
           );
         })}
+        {layout.groupBlocks.map((block) => (
+          <BracketGroupBlock
+            key={block.groupId}
+            block={block}
+            canWrite={canWrite}
+            lockedSlotIds={lockedSlotIds}
+            pendingRegistrationId={pendingRegistrationId}
+            onPlace={onAssignSlot}
+            onOpenSlot={(slotId) => {
+              const fixtureId = firstFixtureBySlot.get(slotId);
+              if (fixtureId !== undefined) onSelectFixture(fixtureId);
+            }}
+          />
+        ))}
       </div>
-      {layout.edges.length > 0 ? (
+      {hasBracketEdges ? (
         <p className="tm-text-caption px-4 pb-3" style={{ color: 'var(--text-muted)' }}>
           실선은 승자, 점선은 패자가 가는 곳이에요.
+        </p>
+      ) : null}
+      {hasRankEdges ? (
+        <p className="tm-text-caption px-4 pb-3" style={{ color: 'var(--text-muted)' }}>
+          선과 점이 번갈아 나오는 점선은 조 순위로 올라오는 곳이에요.
         </p>
       ) : null}
     </div>

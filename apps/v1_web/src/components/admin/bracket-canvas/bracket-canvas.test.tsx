@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { makeFixture, makeGroup, makeSlot } from '@/test/bracket-canvas-fixtures';
+import { makeFixture, makeGame, makeGroup, makeSlot } from '@/test/bracket-canvas-fixtures';
+import { REGISTRATION_DRAG_MIME } from './bracket-canvas-dnd';
 import { BracketCanvas, fixtureTitle } from './bracket-canvas';
 
 const semi = makeGroup({ id: 'g-semi', name: '4강', phase: 'semi', sortOrder: 0 });
@@ -106,5 +107,101 @@ describe('BracketCanvas', () => {
       fixtures: [fixtures[0]],
     });
     expect(screen.queryByText(/실선은 승자/)).not.toBeInTheDocument();
+  });
+});
+
+describe('BracketCanvas — 조별+결선 조 편성 블록', () => {
+  const gA = makeGroup({ id: 'gA', name: 'A조', phase: 'group', sortOrder: 0, advanceCount: 2 });
+  const gB = makeGroup({ id: 'gB', name: 'B조', phase: 'group', sortOrder: 1, advanceCount: 2 });
+  const gSemi = makeGroup({ id: 'g-semi', name: '4강', phase: 'semi', sortOrder: 0 });
+  const gFinal = makeGroup({ id: 'g-final', name: '결승', phase: 'final', sortOrder: 1 });
+  const entry = (groupId: string, letter: string, position: number, team: string | null = null) =>
+    makeSlot({
+      id: `e${letter}${position}`, kind: 'ENTRY', groupId, position, label: `${letter}조 ${position}번`,
+      registrationId: team === null ? null : `reg-${letter}${position}`, teamName: team,
+    });
+  const rank = (letter: string, sourceGroupId: string, position: number) =>
+    makeSlot({ id: `r${letter}${position}`, kind: 'GROUP_RANK', groupId: 'g-semi', sourceGroupId, position, label: `${letter}조 ${position}위` });
+  const rankSlots = [rank('A', 'gA', 1), rank('A', 'gA', 2), rank('B', 'gB', 1), rank('B', 'gB', 2)];
+  const groupSlots = [
+    entry('gA', 'A', 1, '서울FC'), entry('gA', 'A', 2), entry('gA', 'A', 3), entry('gA', 'A', 4),
+    entry('gB', 'B', 1), entry('gB', 'B', 2), entry('gB', 'B', 3), entry('gB', 'B', 4),
+  ];
+  const groupFixtures = (aGame = makeGame()) => [
+    // 일부러 번호가 큰 경기를 앞에 둔다 — 첫 경기 판정은 입력 순서가 아니라 번호 순이어야 한다.
+    makeFixture({ id: 'fa2', groupId: 'gA', fixtureNumber: 6, round: 'league_r2', homeSlotId: 'eA1', awaySlotId: 'eA3' }),
+    makeFixture({ id: 'fa1', groupId: 'gA', fixtureNumber: 1, round: 'league_r1', homeSlotId: 'eA1', awaySlotId: 'eA2', game: aGame }),
+    makeFixture({ id: 'fb1', groupId: 'gB', fixtureNumber: 2, round: 'league_r1', homeSlotId: 'eB1', awaySlotId: 'eB2' }),
+    makeFixture({ id: 'sf1', groupId: 'g-semi', fixtureNumber: 7, round: '4강', homeSlotId: 'rA1', awaySlotId: 'rB2' }),
+    makeFixture({ id: 'sf2', groupId: 'g-semi', fixtureNumber: 8, round: '4강', homeSlotId: 'rB1', awaySlotId: 'rA2' }),
+    makeFixture({
+      id: 'fin', groupId: 'g-final', fixtureNumber: 9, round: '결승',
+      bracketSources: [{ fixtureId: 'sf1', outcome: 'WINNER', side: 'HOME' }, { fixtureId: 'sf2', outcome: 'WINNER', side: 'AWAY' }],
+    }),
+  ];
+  const stageProps = (aGame?: ReturnType<typeof makeGame>) => ({
+    groups: [gFinal, gSemi, gB, gA],
+    fixtures: groupFixtures(aGame),
+    slots: [...groupSlots, ...rankSlots],
+  });
+
+  it('조마다 편성 블록을 그리고 열 이름 "조 편성" 이 4강 앞에 온다', () => {
+    renderCanvas(stageProps());
+    expect(screen.getByRole('group', { name: 'A조 조 편성' })).toBeInTheDocument();
+    expect(screen.getByRole('group', { name: 'B조 조 편성' })).toBeInTheDocument();
+    expect(screen.getAllByRole('heading', { level: 3 }).map((h) => h.textContent)).toEqual(['A조', 'B조', '조 편성', '4강', '결승']);
+    expect(within(screen.getByRole('group', { name: 'A조 조 편성' })).getByRole('button', { name: 'A조 1번, 서울FC' })).toBeInTheDocument();
+    expect(within(screen.getByRole('group', { name: 'A조 조 편성' })).getByRole('button', { name: 'A조 2번, 빈 자리' })).toBeInTheDocument();
+  });
+
+  it('조 순위 연결선 4개는 선·점 점선이고 설명 문구가 따로 붙는다 (승자선 설명과 구분)', () => {
+    const { container } = renderCanvas(stageProps());
+    expect(container.querySelectorAll('svg path[stroke-dasharray="10 4 2 4"]')).toHaveLength(4);
+    expect(screen.getByText('선과 점이 번갈아 나오는 점선은 조 순위로 올라오는 곳이에요.')).toBeInTheDocument();
+    expect(screen.getByText(/실선은 승자, 점선은 패자/)).toBeInTheDocument();
+  });
+
+  it('팀을 고른 상태에서 빈 조 자리를 누르면 그 자리에 배정한다', () => {
+    const { props } = renderCanvas({ ...stageProps(), pendingRegistrationId: 'reg-9' });
+    fireEvent.click(screen.getByRole('button', { name: 'A조 2번, 빈 자리, 선택한 팀을 여기에 넣어요' }));
+    expect(props.onAssignSlot).toHaveBeenCalledWith('eA2', 'reg-9');
+    expect(props.onSelectFixture).not.toHaveBeenCalled();
+  });
+
+  it('팀을 고르지 않고 자리를 누르면 그 자리를 쓰는 경기 중 번호가 가장 앞선 경기를 연다', () => {
+    const { props } = renderCanvas(stageProps());
+    fireEvent.click(screen.getByRole('button', { name: 'A조 1번, 서울FC' }));
+    expect(props.onSelectFixture).toHaveBeenCalledWith('fa1'); // fa2(6번)도 eA1 을 쓰지만 1번 경기가 먼저
+  });
+
+  it('쓰는 경기가 하나라도 시작됐으면 그 자리는 팀을 고른 상태에서도 넣을 수 없다 — 시작 전 자리는 넣는다', () => {
+    const { props } = renderCanvas({ ...stageProps(makeGame({ state: 'LIVE' })), pendingRegistrationId: 'reg-9' });
+    // eA1·eA2 는 진행 중인 fa1 이 쓴다. eA3 은 시작 전 fa2 만 쓴다.
+    const block = within(screen.getByRole('group', { name: 'A조 조 편성' }));
+    expect(block.queryByRole('button', { name: /A조 1번.*선택한 팀을 여기에 넣어요/ })).not.toBeInTheDocument();
+    fireEvent.click(block.getByRole('button', { name: 'A조 1번, 서울FC' }));
+    expect(props.onAssignSlot).not.toHaveBeenCalled();
+    expect(props.onSelectFixture).toHaveBeenCalledWith('fa1');
+    fireEvent.click(block.getByRole('button', { name: 'A조 3번, 빈 자리, 선택한 팀을 여기에 넣어요' }));
+    expect(props.onAssignSlot).toHaveBeenCalledWith('eA3', 'reg-9');
+  });
+
+  it('끌어 놓은 팀을 조 자리에 넣는다', () => {
+    const { props } = renderCanvas(stageProps());
+    const row = screen.getByRole('button', { name: 'B조 2번, 빈 자리' }).closest('li')!;
+    fireEvent.drop(row, { dataTransfer: { getData: (type: string) => (type === REGISTRATION_DRAG_MIME ? 'reg-7' : '') } });
+    expect(props.onAssignSlot).toHaveBeenCalledWith('eB2', 'reg-7');
+  });
+
+  it('읽기 전용에서는 고른 팀이 있어도 넣을 수 없다', () => {
+    renderCanvas({ ...stageProps(), canWrite: false, pendingRegistrationId: 'reg-9' });
+    expect(screen.queryByRole('button', { name: /A조 2번.*선택한 팀을 여기에 넣어요/ })).not.toBeInTheDocument();
+  });
+
+  it('순위 자리가 없는 대진(토너먼트)에는 조 편성 블록도 순위 연결 설명도 없다 — 대조군', () => {
+    const { container } = renderCanvas();
+    expect(screen.queryByRole('group', { name: /조 편성/ })).not.toBeInTheDocument();
+    expect(container.querySelector('svg path[stroke-dasharray="10 4 2 4"]')).toBeNull();
+    expect(screen.queryByText(/조 순위로 올라오는 곳/)).not.toBeInTheDocument();
   });
 });

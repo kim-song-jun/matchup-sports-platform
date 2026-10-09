@@ -13,11 +13,12 @@ import {
   planBracketTemplateCounts,
 } from '@/lib/bracket-template-counts';
 import type { BracketTemplateInput } from '@/types/api';
+import { DEFAULT_GROUP_KNOCKOUT_VALUE, GroupKnockoutFields, type GroupKnockoutTemplateValue } from './bracket-group-knockout-fields';
 
 export type BracketTemplateDialogProps = {
   open: boolean;
   tournamentId: string;
-  format: 'knockout' | 'league';
+  format: 'knockout' | 'league' | 'group_knockout';
   hasExistingBracket: boolean;
   onClose: () => void;
   showToast: (message: string, variant?: 'success' | 'error') => void;
@@ -44,15 +45,18 @@ export function BracketTemplateDialog({ open, tournamentId, format, hasExistingB
   const [thirdPlace, setThirdPlace] = useState(true);
   const [teamCountText, setTeamCountText] = useState('6');
   const [legs, setLegs] = useState<1 | 2>(1);
+  const [groupKnockout, setGroupKnockout] = useState<GroupKnockoutTemplateValue>(DEFAULT_GROUP_KNOCKOUT_VALUE);
 
   const teamCount = TEAM_COUNT_PATTERN.test(teamCountText) ? Number(teamCountText) : null;
   const teamCountValid = teamCount !== null && teamCount >= 3 && teamCount <= 20;
   const input: BracketTemplateInput | null =
     format === 'knockout'
       ? { kind: 'knockout', size, thirdPlace }
-      : teamCountValid
-        ? { kind: 'league', teamCount, legs }
-        : null;
+      : format === 'group_knockout'
+        ? { kind: 'group_knockout', ...groupKnockout }
+        : teamCountValid
+          ? { kind: 'league', teamCount, legs }
+          : null;
   const counts = input === null ? null : planBracketTemplateCounts(input);
   const tooLarge = counts !== null && exceedsFixtureLimit(counts);
   const canSubmit = input !== null && counts !== null && !tooLarge;
@@ -133,6 +137,8 @@ export function BracketTemplateDialog({ open, tournamentId, format, hasExistingB
                   3·4위전도 만들기
                 </label>
               </>
+            ) : format === 'group_knockout' ? (
+              <GroupKnockoutFields value={groupKnockout} onChange={setGroupKnockout} disabled={apply.isPending} />
             ) : (
               <>
                 <div className="flex flex-col gap-1">

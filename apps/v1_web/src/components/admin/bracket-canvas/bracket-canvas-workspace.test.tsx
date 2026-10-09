@@ -1,7 +1,8 @@
-import { act, fireEvent, render, screen, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { makeBracket, makeFixture, makeGroup, makeRegistration, makeSlot } from '@/test/bracket-canvas-fixtures';
 import type { V1AdminTournamentBracket } from '@/types/api';
+import type { V1FillSlotsFromStandingsResult } from '@/types/bracket-standings-fill';
 import { BracketCanvasWorkspace } from './bracket-canvas-workspace';
 
 const mocks = vi.hoisted(() => ({
@@ -37,6 +38,30 @@ vi.mock('./bracket-fixture-tools-dialog', () => ({
 vi.mock('./bracket-template-dialog', () => ({
   BracketTemplateDialog: (props: { open: boolean; hasExistingBracket: boolean; format: string }) =>
     props.open ? <div data-testid="template-dialog" data-existing={String(props.hasExistingBracket)} data-format={props.format} /> : null,
+}));
+
+vi.mock('./bracket-standings-fill-button', () => ({
+  BracketStandingsFillButton: (props: {
+    tournamentId: string;
+    canWrite: boolean;
+    slots: unknown[];
+    teamNames: ReadonlyMap<string, string>;
+    onFilled: (result: V1FillSlotsFromStandingsResult) => void;
+    onError: (message: string) => void;
+  }) => (
+    <div
+      data-testid="fill-button"
+      data-tournament={props.tournamentId}
+      data-can-write={String(props.canWrite)}
+      data-slots={props.slots.length}
+      data-team-names={JSON.stringify([...props.teamNames])}
+    >
+      <button type="button" onClick={() => props.onFilled({ assignments: [{ slotId: 's1', registrationId: 'r1' }], skipped: [{ slotId: 's2', reason: 'tied' }] })}>
+        채움 성공
+      </button>
+      <button type="button" onClick={() => props.onError('이미 시작했어요.')}>채움 실패</button>
+    </div>
+  ),
 }));
 
 const group = makeGroup({ id: 'g-qf', name: '8강', phase: 'quarter' });
@@ -105,9 +130,16 @@ describe('BracketCanvasWorkspace — 로딩·에러·빈 상태', () => {
     expect(screen.getByTestId('template-dialog')).toHaveAttribute('data-existing', 'false');
   });
 
-  it('조별+결선 방식 대회는 템플릿 대신 목록으로 안내한다(대화상자를 열지 않는다)', () => {
+  it('조별+결선 방식 대회도 템플릿으로 시작한다 — 대화상자가 group_knockout 형식으로 열린다', () => {
     setBracket(makeBracket());
-    const props = renderWorkspace({ format: 'group_knockout' });
+    renderWorkspace({ format: 'group_knockout' });
+    fireEvent.click(screen.getByRole('button', { name: '템플릿으로 시작' }));
+    expect(screen.getByTestId('template-dialog')).toHaveAttribute('data-format', 'group_knockout');
+  });
+
+  it('형식을 알 수 없는 대회는 템플릿 대신 목록으로 안내한다(대화상자를 열지 않는다)', () => {
+    setBracket(makeBracket());
+    const props = renderWorkspace({ format: undefined });
     expect(screen.queryByRole('button', { name: '템플릿으로 시작' })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '목록으로 보기' }));
     expect(props.onShowList).toHaveBeenCalledTimes(1);
@@ -248,5 +280,52 @@ describe('BracketCanvasWorkspace — 공개 상태', () => {
     expect(screen.getByText('공개 중')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '공개 취소' })).not.toBeInTheDocument();
     expect(screen.queryByText(/바꾸는 즉시/)).not.toBeInTheDocument();
+  });
+});
+
+describe('BracketCanvasWorkspace — 조별+결선 순위 채우기', () => {
+  const stageGroup = makeGroup({
+    id: 'gA',
+    name: 'A조',
+    phase: 'group',
+    groupTeams: [
+      { id: 'gt1', groupId: 'gA', registrationId: 'r1', teamName: '서울FC', sortOrder: 0, createdAt: '2026-10-08T00:00:00.000Z' },
+      // 부전승 자리는 팀 이름이 없다 — 이름 표에 들어가면 안 된다.
+      { id: 'gt2', groupId: 'gA', registrationId: null, teamName: null, sortOrder: 1, createdAt: '2026-10-08T00:00:00.000Z', isBye: true },
+    ],
+  });
+  const withRanks = makeBracket({
+    groups: [stageGroup, group],
+    slots: [...slots, makeSlot({ id: 'rank1', kind: 'GROUP_RANK', label: 'A조 1위', sourceGroupId: 'gA' })],
+    fixtures: populated.fixtures,
+  });
+
+  it('순위 채우기 버튼에 대회·자리·권한·조 편성 팀 이름 표를 넘긴다', () => {
+    setBracket(withRanks);
+    renderWorkspace({ format: 'group_knockout' });
+    const button = screen.getByTestId('fill-button');
+    expect(button).toHaveAttribute('data-tournament', 't-1');
+    expect(button).toHaveAttribute('data-can-write', 'true');
+    expect(button).toHaveAttribute('data-slots', '5');
+    expect(JSON.parse(button.getAttribute('data-team-names')!)).toEqual([['r1', '서울FC']]);
+  });
+
+  it('채우기가 끝나면 채운 수를, 실패하면 이유를 토스트로 알린다', () => {
+    setBracket(withRanks);
+    const props = renderWorkspace({ format: 'group_knockout' });
+    fireEvent.click(screen.getByRole('button', { name: '채움 성공' }));
+    expect(props.showToast).toHaveBeenCalledWith('1개 자리를 순위대로 채웠어요. 1개 자리는 건너뛰었어요.', 'success');
+    fireEvent.click(screen.getByRole('button', { name: '채움 실패' }));
+    expect(props.showToast).toHaveBeenCalledWith('이미 시작했어요.', 'error');
+  });
+
+  it('빈 대진과 읽기 전용 화면에는 순위 채우기 버튼을 두지 않는다', () => {
+    setBracket(makeBracket());
+    renderWorkspace({ format: 'group_knockout' });
+    expect(screen.queryByTestId('fill-button')).not.toBeInTheDocument();
+    cleanup();
+    setBracket(withRanks);
+    renderWorkspace({ format: 'group_knockout', canWrite: false });
+    expect(screen.queryByTestId('fill-button')).not.toBeInTheDocument();
   });
 });

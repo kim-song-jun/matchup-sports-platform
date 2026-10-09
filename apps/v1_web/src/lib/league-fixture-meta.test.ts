@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { V1LeagueFixture } from '@/types/league-match';
-import { fixtureResultLabel, isUpcomingFixture } from './league-fixture-meta';
+import { fixtureResultLabel, isUpcomingFixture, leagueFixtureMatchupLabel, leagueSideLabel } from './league-fixture-meta';
 
 function fixture(overrides: Partial<V1LeagueFixture>): V1LeagueFixture {
   return {
@@ -83,5 +83,35 @@ describe('fixtureResultLabel / isUpcomingFixture', () => {
     const f = fixture({ startAt: '2026-08-01T20:00:00.000Z', status: 'cancelled' });
     expect(fixtureResultLabel(f).text).toBe('집계 제외');
     expect(isUpcomingFixture(f)).toBe(false);
+  });
+});
+
+describe('leagueSideLabel / leagueFixtureMatchupLabel', () => {
+  const names = new Map([['t1', '독수리FC'], ['t2', '호랑이FC']]);
+
+  it('팀 id 가 null 이면 자리만 있는 "미정"이고, 모르는 id 와 구분된다', () => {
+    const labels = { tbd: '홈팀 미정', unknown: '홈팀' };
+    expect(leagueSideLabel(null, names, labels)).toBe('홈팀 미정');
+    expect(leagueSideLabel('t1', names, labels)).toBe('독수리FC');
+    // 이름 맵에 없는 id 는 "미정"이 아니다 — 팀은 정해졌는데 이름을 못 읽은 것이다.
+    expect(leagueSideLabel('ghost', names, labels)).toBe('홈팀');
+  });
+
+  it('두 팀이 정해진 경기는 이름 vs 이름이다', () => {
+    expect(leagueFixtureMatchupLabel({ homeTeamId: 't1', awayTeamId: 't2', awaySlotId: null }, names)).toBe('독수리FC vs 호랑이FC');
+  });
+
+  it('원정 자리가 없는 기존 부전(bye) 경기는 예전대로 "부전승"이다 — 자리 도입이 기존 표기를 바꾸지 않는다', () => {
+    expect(leagueFixtureMatchupLabel({ homeTeamId: 't1', awayTeamId: null, awaySlotId: null }, names)).toBe('독수리FC 부전승');
+    // 구버전 응답처럼 필드 자체가 없는 경우도 같다.
+    expect(leagueFixtureMatchupLabel({ homeTeamId: 't1', awayTeamId: null }, names)).toBe('독수리FC 부전승');
+  });
+
+  it('원정 자리가 있는데 팀이 비면 부전승이 아니라 "원정팀 미정"이다', () => {
+    expect(leagueFixtureMatchupLabel({ homeTeamId: 't1', awayTeamId: null, awaySlotId: 'slot-2' }, names)).toBe('독수리FC vs 원정팀 미정');
+  });
+
+  it('양쪽이 모두 비면 홈팀 미정 vs 원정팀 미정이다', () => {
+    expect(leagueFixtureMatchupLabel({ homeTeamId: null, awayTeamId: null, awaySlotId: 'slot-2' }, names)).toBe('홈팀 미정 vs 원정팀 미정');
   });
 });

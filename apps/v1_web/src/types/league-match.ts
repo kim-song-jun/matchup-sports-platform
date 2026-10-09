@@ -1,3 +1,5 @@
+import type { V1AdminBracketFixtureGame, V1AdminBracketSlot } from './api';
+
 export interface V1AdminLeagueListItem {
   leagueId: string;
   title: string;
@@ -112,7 +114,7 @@ export type V1LeagueMatchesFilters = {
 export interface V1LeagueFixture {
   teamMatchId: string;
   title: string;
-  homeTeamId: string;
+  homeTeamId: string | null;
   awayTeamId: string | null;
   startAt: string;
   placeName: string;
@@ -152,6 +154,14 @@ export interface V1LeagueFixture {
    * 있을 때만** `true` 다(결과가 없는 대진은 가린 것이 아니라 아직 없는 것이다).
    */
   scoreHidden?: boolean;
+  /**
+   * 이 경기 사이드가 연결된 자리(slot). 어드민 상세에서만 채워지고, 자리 없이 만든 기존 경기는 null/없음이다.
+   * 자리가 있는데 팀 id 가 null 이면 "자리만 있고 팀은 아직 안 정해진" 경기다.
+   */
+  homeSlotId?: string | null;
+  awaySlotId?: string | null;
+  /** 경기(Game) 요약 — 어드민 상세에서만 채워진다. 칸의 상태 칩과 결과 패널이 쓴다. */
+  game?: V1AdminBracketFixtureGame | null;
 }
 
 export interface V1AdminLeagueDetail {
@@ -205,6 +215,11 @@ export interface V1AdminLeagueDetail {
   activeRegistrationCount: number;
   /** 같은 모집단(팀이 직접 낸 신청) 중 확정 수 — 운영자 시드 팀은 넣지 않는다. */
   confirmedRegistrationCount: number;
+  /**
+   * 대진 자리(slot) 목록 — 어드민 상세 전용. optional 은 API 가 먼저 배포되지 않은 창의 구버전 응답용이다.
+   * 자리를 쓰지 않는 기존 리그는 빈 배열로 온다.
+   */
+  slots?: V1AdminBracketSlot[];
   fixtures: V1LeagueFixture[];
 }
 
@@ -235,7 +250,8 @@ type V1AdminOnlyLeagueFields =
   | 'bankHolder'
   | 'entryFeeConfiguredAt'
   | 'activeRegistrationCount'
-  | 'confirmedRegistrationCount';
+  | 'confirmedRegistrationCount'
+  | 'slots';
 
 export interface V1PublicLeagueDetail extends Omit<V1AdminLeagueDetail, V1AdminOnlyLeagueFields> {
   /** 참가비를 운영자가 확정했는가. `false` 면 참가비를 '무료'로 말하지 않는다. */
@@ -423,6 +439,11 @@ export interface V1AdminLeagueTeam {
   status: string | null;
   memberCount: number;
   logoUrl: string | null;
+  /**
+   * 자리 배정(PUT /admin/tournament-slots/:slotId/assignment)에 보낼 확정 등록 id.
+   * 필수 필드다(색인 공유 계약) — 등록 행을 못 찾는 팀이면 값만 null.
+   */
+  registrationId: string | null;
 }
 
 export interface V1AdminLeagueTeamsResponse {
@@ -669,4 +690,22 @@ export interface V1CreateManualLeagueFixturePayload {
   durationMinutes?: number;
   placeName?: string;
   title?: string;
+}
+
+/** `POST /admin/league-matches/:leagueId/fixtures/template` */
+export interface V1ApplyLeagueTemplatePayload {
+  /** 3~20. */
+  teamCount: number;
+  legs: 1 | 2;
+  /** 기존 일괄 생성과 같은 모양 — 날짜 목록이 정본이다. */
+  schedule: V1LeagueFixtureScheduleTemplate;
+  /** 모든 경기의 기본 장소. 비우면(키 없음) 서버가 '장소 미정' 을 쓴다. */
+  placeName?: string;
+  /** 경기가 이미 있는 리그를 새 템플릿으로 바꿀 때만 true. */
+  replaceExisting?: boolean;
+}
+
+export interface V1ApplyLeagueTemplateResult {
+  slots: number;
+  fixtures: number;
 }

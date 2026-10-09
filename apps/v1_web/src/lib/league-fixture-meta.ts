@@ -56,3 +56,34 @@ export interface TeamLookupEntry {
   name: string;
   logoUrl: string | null;
 }
+
+export interface LeagueSideLabels {
+  /** 자리는 있는데 팀이 아직 없을 때. */
+  tbd: string;
+  /** 팀은 정해졌지만 이름 맵에서 못 찾았을 때. */
+  unknown: string;
+}
+
+export function leagueSideLabel(
+  teamId: string | null,
+  nameById: ReadonlyMap<string, string>,
+  labels: LeagueSideLabels,
+): string {
+  if (teamId === null) return labels.tbd;
+  return nameById.get(teamId) ?? labels.unknown;
+}
+
+/**
+ * 어드민 표·알림 문구의 "홈 vs 원정". 원정이 null 일 때 둘을 가른다: 원정 **자리**가 있으면 아직 안 정해진
+ * 경기("원정팀 미정"), 자리가 없으면 예전부터 있던 부전승이다.
+ */
+export function leagueFixtureMatchupLabel(
+  fixture: Pick<V1LeagueFixture, 'homeTeamId' | 'awayTeamId' | 'awaySlotId'>,
+  nameById: ReadonlyMap<string, string>,
+): string {
+  const home = leagueSideLabel(fixture.homeTeamId, nameById, { tbd: '홈팀 미정', unknown: '홈팀' });
+  if (fixture.awayTeamId !== null) {
+    return `${home} vs ${leagueSideLabel(fixture.awayTeamId, nameById, { tbd: '원정팀 미정', unknown: '원정팀' })}`;
+  }
+  return fixture.awaySlotId == null ? `${home} 부전승` : `${home} vs 원정팀 미정`;
+}

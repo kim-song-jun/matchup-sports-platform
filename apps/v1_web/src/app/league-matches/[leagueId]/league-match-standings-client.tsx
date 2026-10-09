@@ -977,7 +977,7 @@ export default function LeagueMatchStandingsClient({
                     <span className="inline-flex flex-wrap items-center gap-2">
                       {/* 다음 경기는 컬러(파란 테두리)만으로 구분하지 않는다 — 뱃지 텍스트를 함께 싣는다. */}
                       {isNextUpcoming && <span className="tm-badge tm-badge-sm tm-badge-blue">다음 경기</span>}
-                      <FixtureTeamLabel teamId={fixture.homeTeamId} lookup={teamLookup} fallback="홈팀 정보 없음" />
+                      <FixtureTeamLabel teamId={fixture.homeTeamId} lookup={teamLookup} fallback={fixture.homeTeamId === null ? '홈팀 미정' : '홈팀 정보 없음'} />
                       <span aria-hidden="true" className="text-[var(--text-muted)]">vs</span>
                       <FixtureTeamLabel teamId={fixture.awayTeamId} lookup={teamLookup} fallback="상대팀 미정" />
                     </span>

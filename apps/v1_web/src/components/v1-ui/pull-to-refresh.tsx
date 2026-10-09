@@ -38,18 +38,6 @@ function startsInsideScrolledScroller(target: EventTarget | null, area: HTMLElem
   return false;
 }
 
-/**
- * The pull moves the area's children with `transform`, which turns them into the containing block
- * of any `position: fixed` descendant (a bottom CTA would jump to the end of the content).
- * Screens that render one keep native behavior instead.
- */
-function hasFixedDescendant(area: HTMLElement): boolean {
-  for (const el of area.querySelectorAll<HTMLElement>('*')) {
-    if (window.getComputedStyle(el).position === 'fixed') return true;
-  }
-  return false;
-}
-
 /** Native app only: browsers keep their own refresh behavior and get none of this DOM. */
 export function PullToRefresh({ areaRef }: { areaRef: RefObject<HTMLElement | null> }) {
   const [inNativeShell, setInNativeShell] = useState(false);
@@ -146,7 +134,7 @@ function PullToRefreshActive({ areaRef }: { areaRef: RefObject<HTMLElement | nul
       if (gesture.intent === 'undecided') {
         const intent = classifyPullIntent(touch.clientX - gesture.startX, touch.clientY - gesture.startY);
         if (intent === 'undecided') return;
-        if (intent === 'ignore' || area.scrollTop > 0 || hasFixedDescendant(area)) {
+        if (intent === 'ignore' || area.scrollTop > 0) {
           endGesture();
           return;
         }

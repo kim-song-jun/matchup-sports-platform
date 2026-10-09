@@ -628,14 +628,16 @@ button:disabled {
   top: 0;
 }
 
-/* Pull-to-refresh (native app only, see pull-to-refresh.tsx). The offset is applied to the area's
-   children only while a pull is active, so no transform lingers as a containing block for fixed
-   descendants. The indicator is a sibling painted underneath the area, revealed by the gap. */
-.tm-scroll-area[data-ptr] > * {
+/* Pull-to-refresh (native app only, see pull-to-refresh.tsx). The transform goes on the scroll area
+   itself, not its children: a transformed ancestor becomes the containing block of `position: fixed`
+   descendants, and only the area's box (scrolled to the top during a pull) keeps a bottom CTA in
+   place. It is set only while a pull is active. The indicator is a sibling painted underneath the
+   area, revealed by the gap. */
+.tm-scroll-area[data-ptr] {
   transform: translate3d(0, var(--tm-ptr-offset, 0px), 0);
 }
 
-.tm-scroll-area[data-ptr='release'] > * {
+.tm-scroll-area[data-ptr='release'] {
   transition: transform var(--duration-slow) var(--ease-out);
 }
 

@@ -173,18 +173,14 @@ describe('PullToRefresh', () => {
     expect(fetchCount).toBe(1);
   });
 
-  it('고정 위치 요소(하단 CTA)가 있는 화면은 그 요소가 튀지 않도록 건드리지 않는다', async () => {
-    const { area } = mount(<button style={{ position: 'fixed', bottom: 0 }}>신청하기</button>);
+  // 매치·팀 상세처럼 하단 고정 CTA 가 있는 화면이 대부분이라, 그 화면에서도 새로고침돼야 한다.
+  it('하단 고정 CTA 가 있는 화면에서도 새로고침한다', async () => {
+    const { area } = mount(<div className="tm-fixed-cta" style={{ position: 'fixed', bottom: 0 }}><button>신청하기</button></div>);
     await settledFetchCount(1);
 
-    touch(area, 'touchstart', [[100, 100]]);
-    touch(area, 'touchmove', [[100, 110]]);
-    const move = touch(area, 'touchmove', [[100, 250]]);
-    touch(area, 'touchend', []);
+    drag(area, PAST_THRESHOLD);
 
-    expect(move.defaultPrevented).toBe(false);
-    expect(area.dataset.ptr).toBeUndefined();
-    expect(fetchCount).toBe(1);
+    await settledFetchCount(2);
   });
 
   it('안쪽 스크롤러가 이미 내려가 있으면 그 스크롤이 우선이다', async () => {

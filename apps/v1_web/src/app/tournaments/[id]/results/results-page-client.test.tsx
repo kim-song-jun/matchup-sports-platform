@@ -131,6 +131,8 @@ function leagueFixtureWithVideo(): V1TournamentFixture {
     awayTeamId: 'team-2',
     awayTeamName: '한강 유나이티드',
     awayTeamLogoUrl: null,
+    homeSlotLabel: null,
+    awaySlotLabel: null,
     result: {
       homeScore: 3,
       awayScore: 1,

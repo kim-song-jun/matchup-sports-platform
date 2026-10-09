@@ -50,6 +50,7 @@ const completedFixture: V1TournamentFixture = {
   scheduledAt: null, venue: null, status: 'completed', liveStatus: 'ended',
   homeRegistrationId: 'home', homeTeamId: 'home', homeTeamName: '홈팀', homeTeamLogoUrl: null,
   awayRegistrationId: 'away', awayTeamId: 'away', awayTeamName: '원정팀', awayTeamLogoUrl: null,
+  homeSlotLabel: null, awaySlotLabel: null,
   result: { homeScore: 1, awayScore: 0, hasPenalty: false, homePenaltyScore: null, awayPenaltyScore: null,
     note: null, recordedAt: '2026-10-08T00:00:00.000Z', goals: [] }, videos: [],
 };

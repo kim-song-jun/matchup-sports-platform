@@ -22,6 +22,8 @@ function makeGroupFixture(scheduledAt: string | null, round = 'group'): V1Tourna
     awayTeamId: 'team-away',
     awayTeamName: '부산 FC',
     awayTeamLogoUrl: null,
+    homeSlotLabel: null,
+    awaySlotLabel: null,
     result: null,
     videos: [],
   };

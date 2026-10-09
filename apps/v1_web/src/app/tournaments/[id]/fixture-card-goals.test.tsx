@@ -22,6 +22,8 @@ function makeFixture(overrides: Partial<V1TournamentFixture> = {}): V1Tournament
     awayTeamId: 'team-away',
     awayTeamName: '부산 FC',
     awayTeamLogoUrl: null,
+    homeSlotLabel: null,
+    awaySlotLabel: null,
     result: null,
     videos: [],
     ...overrides,

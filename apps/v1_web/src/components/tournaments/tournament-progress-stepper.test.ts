@@ -28,6 +28,8 @@ function fixture(over: Partial<V1TournamentFixture>): V1TournamentFixture {
     awayTeamId: null,
     awayTeamName: null,
     awayTeamLogoUrl: null,
+    homeSlotLabel: null,
+    awaySlotLabel: null,
     result: null,
     videos: [],
     ...over,

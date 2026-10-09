@@ -132,6 +132,9 @@ export interface PublicScheduleEntry {
   readonly fieldName: string | null;
   readonly home: PublicSideSummary | null;
   readonly away: PublicSideSummary | null;
+  /** Slot label shown instead of "TBD" when a side has no team yet; null once a team exists. */
+  readonly homeSlotLabel: string | null;
+  readonly awaySlotLabel: string | null;
   readonly visibilityMode: PublicVisibilityMode;
   readonly status: string;
   readonly resultState: PublicResultState;

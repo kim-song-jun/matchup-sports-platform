@@ -3410,7 +3410,13 @@ export function useV1PurgeGuestInquiries() {
   });
 }
 
-export function useV1AdminTeamMatches(filters?: AdminListFilters & { kind?: 'friendly' | 'league' | 'tournament' }) {
+export function useV1AdminTeamMatches(
+  filters?: AdminListFilters & {
+    kind?: 'friendly' | 'league' | 'tournament';
+    sort?: 'created_desc' | 'start_asc' | 'start_desc';
+    regionId?: string;
+  },
+) {
   return useQuery({
     queryKey: v1Keys.adminTeamMatches(filters as Record<string, unknown>),
     queryFn: () => v1Get<AdminCursorPage<V1AdminTeamMatchRow>>('/admin/team-matches', filters),

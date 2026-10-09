@@ -76,15 +76,16 @@ function useChatListPageModel(): ChatListViewModel {
   // 서버 최대 페이지(50)로 받는다. 카테고리를 고르면 서버 roomType 필터로 다시 받는다 — 첫 페이지를
   // 클라이언트에서 거르면 "받은 컨택 3" 배지를 눌렀는데 목록이 비는 일이 생긴다(최종 리뷰 Important 2).
   const query = useV1ChatRooms({ refetchOnWindowFocus: 'always' }, { limit: CHAT_LIST_PAGE_SIZE });
+  // 비활성 필터는 다른 탭의 변경을 놓칠 수 있어 버튼·URL 재진입 시 다시 조회한다.
   const filteredQuery = useV1ChatRooms(
-    { enabled: selectedCategory !== '전체', refetchOnWindowFocus: 'always' },
+    { enabled: selectedCategory !== '전체', refetchOnWindowFocus: 'always', staleTime: 0 },
     selectedCategory === '전체' ? undefined : { roomType: CATEGORY_ROOM_TYPE[selectedCategory], limit: CHAT_LIST_PAGE_SIZE },
   );
   // 종료된 컨택(archived 방)은 요청했을 때만 받는다 — 기본 목록은 서버가 이미 치운 상태다.
   const [showEnded, setShowEnded] = useState(false);
   const endedEnabled = selectedCategory === '팀컨택' && showEnded;
   const endedQuery = useV1ChatRooms(
-    { enabled: endedEnabled, refetchOnWindowFocus: 'always' },
+    { enabled: endedEnabled, refetchOnWindowFocus: 'always', staleTime: 0 },
     endedEnabled ? { roomType: 'team_contact', status: 'archived', limit: CHAT_LIST_PAGE_SIZE } : undefined,
   );
   // 화면에 선택된 목록과 펼친 보관 목록의 실패가 실제 재시도 대상을 결정한다.

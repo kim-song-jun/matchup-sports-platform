@@ -4,6 +4,8 @@ describe('tournamentRoundLabel', () => {
   it.each([
     ['league_r1', '조별리그 1라운드'],
     ['league_r12', '조별리그 12라운드'],
+    ['round16', '16강'],
+    ['16강', '16강'],
     ['semi', '4강'],
     ['final', '결승'],
     ['third_place', '3·4위전'],
@@ -25,6 +27,8 @@ describe('competitionMatchLabel', () => {
     ['조 이름이 머리에 있는 묶음 안', { groupName: 'A조', round: 'league_r2', legNumber: 2, withinGroup: true }, '조별리그 2라운드'],
     ['조 없는 결선', { groupName: null, round: 'semi', legNumber: 1 }, '4강'],
     ['결선 조(단계 이름이 곧 조 이름)', { groupName: '4강', round: '4강', legNumber: 1 }, '4강'],
+    ['16강은 결선이라 조 이름을 붙이지 않는다', { groupName: '16강', round: 'round16' }, '16강'],
+    ['16강 2차전은 차수만 붙는다', { groupName: '16강', round: '16강', legNumber: 2 }, '16강 2차'],
     ['결선 2차전', { groupName: null, round: 'semi', legNumber: 2 }, '4강 2차'],
     ['시드의 조별 키', { groupName: 'B조', round: 'group', legNumber: 1 }, 'B조 · 조별리그'],
     ['어드민이 고른 조별 라운드', { groupName: 'A조', round: '조별 3라운드' }, 'A조 · 조별 3라운드'],

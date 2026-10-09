@@ -386,7 +386,7 @@ All team roster mutations lock the registration row and re-read `rosterLockedAt`
 
 ## 12강·8강 수동 결선 (2026-10-04)
 
-- `CreateGroupDto.phase`: `group | round12 | quarter | semi | final | third_place`.
+- `CreateGroupDto.phase`: `group | round16 | round12 | quarter | semi | final | third_place`.
 - `POST /admin/tournaments/:id/group-teams`의 `isBye?: boolean`은 명시적인 12강 부전승이다. 생략하면 false. 다른 단계에서 true는 `BYE_PHASE_INVALID`(400).
 - 12강은 최대 12팀·부전승 최대 4팀이며 초과는 `ROUND12_CAPACITY`(409). 기존 12강 경기에 배정된 팀의 부전승 지정 및 부전승팀을 같은 단계 경기로 추가/수정하면 `BYE_TEAM_HAS_MATCH`(409).
 - 관리자/공개 `groups[].groupTeams[].isBye`는 저장된 명시적 부전승을 전달한다. 공개 여부와 팀 신원 공개 게이트는 기존 정책을 유지한다.
@@ -396,7 +396,7 @@ All team roster mutations lock the registration row and re-read `rosterLockedAt`
 ### 경기별 진출 연결 (12강·8강·4강)
 
 - `PATCH /admin/fixtures/:fixtureId/bracket-sources`: 인증 + mutation admin 필요. `{ homeSourceFixtureId?: UUID | null, awaySourceFixtureId?: UUID | null }`. 생략한 쪽은 유지, null은 해제. 결과 `{ fixtureId, bracketSources }`. 감사 action은 `tournament.bracket.sources.update`.
-- source는 같은 대회의 바로 이전 group.phase: round12→quarter→semi→final. third_place는 semi의 LOSER. 다른 단계·같은 소스를 양쪽에 쓰면 400 `BRACKET_SOURCE_PHASE_INVALID`/`BRACKET_SOURCE_INVALID`.
+- source는 같은 대회의 바로 이전 group.phase: round16 또는 round12 → quarter → semi → final(16강과 12강은 둘 다 8강의 앞 단계, 한 대회에 함께 쓰지 않는다). third_place는 semi의 LOSER. 다른 단계·같은 소스를 양쪽에 쓰면 400 `BRACKET_SOURCE_PHASE_INVALID`/`BRACKET_SOURCE_INVALID`.
 - 연결 자리는 팀이 미정이어야 함(409 `BRACKET_SOURCE_SLOT_ASSIGNED`). 하나의 source+outcome은 하나의 target만 허용(409 `BRACKET_SOURCE_ALREADY_LINKED`). 현재/기존/신규 source 모두 Game SCHEDULED + TeamMatch matched + official revision 없음 + 1차전이어야 함(409 `BRACKET_SOURCE_LOCKED`).
 - 참가팀 변경은 연결된 자리에 409 `BRACKET_SOURCE_SLOT_LINKED`; 먼저 연결 해제 후 직접 배정. 경기 삭제는 시작 전만 허용하며 미정 다음 경기 연결은 해제하고 배정/시작된 다음 경기가 있으면 거절한다.
 - 결과 확정 후 팀 배정은 기존 canonical advancement projection의 책임. 새 endpoint는 기록/점수를 만들거나 이미 끝난 경기의 결과를 추정하지 않음.
@@ -414,7 +414,7 @@ All team roster mutations lock the registration row and re-read `rosterLockedAt`
 
 - `POST /admin/tournaments/:tournamentId/byes`: 인증 + mutation admin. 입력 `{ groupId: UUID, registrationId?: UUID | null, byeId?: UUID, sortOrder: integer(0..7) }`, 반환은 groupTeam. 감사 action `tournament.bracket.bye.save`.
 - 그룹 phase로 12강·8강·4강을 구분한다. 팀 미정은 registrationId 생략/null로 저장하며, 팀을 선택하면 해당 대회의 confirmed 등록이어야 한다. 홈·어웨이 또는 경기 생성 없이 저장한다. byeId를 보내면 해당 조의 기존 부전승 id와 위치를 유지하며 팀 배정/미정 전환/위치 수정을 저장한다. byeId 생략 시 새 자리 생성 또는 기존 일반 배정을 변환한다.
-- 12강 정원 12팀/부전승 4팀, 8강 정원 8팀/부전승 4팀, 4강 정원 4팀/부전승 2팀. 초과 `409 BYE_CAPACITY`; group/final/third_place는 `400 BYE_PHASE_INVALID`.
+- 12강 정원 12팀/부전승 4팀, 8강 정원 8팀/부전승 4팀, 4강 정원 4팀/부전승 2팀. 초과 `409 BYE_CAPACITY`; group/final/third_place는 `400 BYE_PHASE_INVALID`. 16강은 부전승이 없어 `400 BYE_PHASE_INVALID`(group/final/third_place 와 같다).
 - 다른 조의 같은 단계 부전승 중복 `409 BYE_ALREADY_IN_ROUND`; 같은 단계 경기 참가 중인 팀 `409 BYE_TEAM_HAS_MATCH`. 기존 경기 생성/수정도 해당 단계 부전승팀을 거절한다.
 - 4강 위치는 0..3이며 초과는 `400 BYE_POSITION_INVALID`. 중복 위치는 `409 BYE_POSITION_OCCUPIED`, 다른 조/없는 byeId는 `404 BYE_NOT_FOUND`. 이전 명단 순번이 위치 범위를 벗어난 기존 부전승은 읽기 렌더링에서 경기 사이 위치로 호환하고 DB 값은 변경하지 않는다.
 - 부전승 groupTeam의 `sortOrder`는 해당 열의 일반 경기와 부전승을 합친 0부터의 삽입 위치다. UI에서는 1부터 표시한다. 예시 이미지의 12강은 위치 1·4·5·8에 부전승을 놓을 수 있다. 기존 일반 팀의 sortOrder 의미는 유지한다.
@@ -459,8 +459,10 @@ All team roster mutations lock the registration row and re-read `rosterLockedAt`
 
 모두 `V1AuthGuard` + `getMutationAdmin`(support 어드민 403). 대회 레인은 `league-fixture-generation:{tournamentId}` advisory lock, 정규 리그 레인은 `v1_tournaments` 행 `FOR UPDATE` + 보류 판정 — 이번 범위에서 정규 리그 자리는 만들어지지 않는다.
 
-- `POST /admin/tournaments/:tournamentId/bracket/template` — 본문 `{ kind: 'knockout' | 'group_knockout' | 'league', … , replaceExisting?: boolean }`. `knockout`: `size` 4·8·12, `thirdPlace`. `league`(리그 방식 대회): `teamCount` 3~20, `legs` 1·2. 한 트랜잭션(45초)에서 조·자리·빈 경기(팀 미정)·승자/패자 연결을 만든다. 응답 `{ groups, slots, fixtures, edges }`.
+- `POST /admin/tournaments/:tournamentId/bracket/template` — 본문 `{ kind: 'knockout' | 'group_knockout' | 'league', … , replaceExisting?: boolean }`. `knockout`: `size` 4·8·12·16, `thirdPlace`. `league`(리그 방식 대회): `teamCount` 3~20, `legs` 1·2. 한 트랜잭션(45초)에서 조·자리·빈 경기(팀 미정)·승자/패자 연결을 만든다. 응답 `{ groups, slots, fixtures, edges }`.
   - 12강은 ENTRY 자리 8 + BYE 자리 4(position 1~4 ↔ `V1TournamentByeSlot.sortOrder` 0·3·4·7), 8강 i번 홈 = BYE 자리 i · 어웨이 = 12강 i번 WINNER 연결.
+  - 16강은 ENTRY 자리 16(16강 8경기, 2i-1·2i 번 승자 → 8강 i 번 홈·어웨이), BYE 자리·ByeSlot 없음. 조 이름·round 는 '16강'(phase round16).
+  - `GET /admin/tournaments/:id/bracket`·공개 상세의 `groups[]` 는 `phase` enum 순서(조별 → 16강 → 12강 → 8강 → 4강 → 결승 → 3·4위전)로 나온다.
   - 오류: 422 `BRACKET_TEMPLATE_UNSUPPORTED`(범위 밖·필수 필드 누락·`group_knockout` 은 아직 미지원)·`BRACKET_TEMPLATE_FORMAT_MISMATCH`·`BRACKET_TEMPLATE_TOO_LARGE`(경기 240 초과), 409 `COMPETITION_CONFIG_REQUIRED`·`BRACKET_NOT_EMPTY`(비삭제 경기·조·자리가 있음)·`BRACKET_LOCKED`(`replaceExisting` 인데 시작·결과가 있는 경기가 있음).
   - `replaceExisting`: 모든 경기가 시작 전·결과 없음일 때만. 하류 경기부터 소프트 삭제 → 자리 → GroupTeam·Standing·ByeSlot → 조 순으로 지우고 새로 만든다(경기 번호는 1부터 다시, 생성 키는 소프트 삭제 이력 수를 반영).
 - `PUT /admin/tournament-slots/:slotId/assignment` — 본문 `{ registrationId: uuid | null }`(null = 비우기). 응답 `{ slot: { id, kind, groupId, sourceGroupId, position, label, registrationId, teamName }, affectedTeamMatchIds }`.

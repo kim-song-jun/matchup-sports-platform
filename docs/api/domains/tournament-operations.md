@@ -277,6 +277,36 @@ Every route requires `V1AuthGuard` and reuses the [game aggregate](./games.md)'s
 | `409` | `NEXT_FIXTURE_CONFLICT` | void blocked because a downstream bracket fixture already advanced past `scheduled` |
 | `422` | `PARTICIPANT_INVALID` \| `PARTICIPANT_SIDE_MISMATCH` \| `SCORE_EVENT_MISMATCH` \| `SCORE_INVALID` \| `EVENT_INVALID` | `supersede-and-submit`/`corrections` content invariant violations |
 
+## 어드민 빠른 결과 확정 (Task 20261057)
+
+대진 그림 편집기에서 점수만 넣어 경기를 곧바로 공식 확정하는 경로예요. 테스트·비상용이고, 실제 경기의 득점자는 라이브 콘솔이 정본이에요.
+
+| Method and route | Body | Result | Actor |
+|---|---|---|---|
+| `POST /api/v1/admin/games/:gameId/quick-result` + 헤더 `Idempotency-Key` | `QuickResultDto {clientCommandId(uuid),expectedVersion,score:{home,away,penalties?:{home,away}}}` | `201 {gameId,revisionId,version,score}` | 플랫폼 어드민 `owner`·`ops` 만. `support`·대회 디렉터·일반 사용자는 `403 PERMISSION_DENIED` |
+
+- 한 Serializable 트랜잭션에서 `DRAFT` 리비전(점수, `goalEvents=[]`, `eventsHash=hash([])`, `reason='[quick-result]'`) → 참가자(최신 라인업 리비전의 선수 전원, `started=true`, 기록 0) → `OFFICIAL`(상태 머신 흐름 `ADMIN_QUICK`)로 쓰고, 게임을 `ENDED` 로 옮긴 뒤 열린 피리어드를 닫고 팀매치를 `completed` 로 만들어요. 대회 경기는 같은 트랜잭션에서 승자를 다음 칸으로 진출시켜요(`409 NEXT_FIXTURE_CONFLICT` — 다음 경기가 이미 시작됐어요).
+- outbox 는 `GAME_RESULT_OFFICIAL` 하나뿐이에요(`GAME_RESULT_SUBMITTED` 없음). 순위·전적·개인 기록(출전)·리그 완료·알림은 일반 확정과 같은 워커가 처리해요. 운영 감사 액션은 `QUICK_RESULT` 예요.
+- 무효(void) 뒤 재입력이면 VOID 리비전을 `supersedesId` 로 승계해요. 무효는 팀매치 상태를 되돌리지 않으므로 이 경우에만 팀매치 `completed` 도 허용해요.
+- 승부차기는 점수 두 개만 받아요. 검증 순서와 코드는 `end` 와 같고(`TOURNAMENT_PENALTY_REQUIRED` / `TOURNAMENT_PENALTY_NOT_ALLOWED` / `TOURNAMENT_PENALTY_INVALID`) 킥 수는 요구하지 않아요. 무효된 옛 승부차기는 승계하지 않아요.
+- 득점 기록이 없는 경기의 `POST /games/:gameId/corrections`(와 `supersede-and-submit`)는 승부차기 킥 수(`takenHome`/`takenAway`)를 요구하지 않아요(`TOURNAMENT_PENALTY_KICK_COUNTS_REQUIRED` 면제). 킥 수를 실으면 결판 판정(`TOURNAMENT_PENALTY_UNDECIDED`)은 그대로 해요. 득점 기록이 있는 경기는 지금처럼 요구해요.
+
+### 오류
+
+| HTTP | Code | 언제 |
+|---|---|---|
+| `403` | `PERMISSION_DENIED` | 플랫폼 운영자(owner·ops)가 아니에요 |
+| `409` | `QUICK_RESULT_UNSUPPORTED` | 대회·정규 리그 팀매치가 아니에요(친선 등) |
+| `409` | `QUICK_RESULT_NOT_AVAILABLE` | 진행 중이거나 결과가 이미 있어요(확정 전 결과 포함 — 정정·확인을 써요) |
+| `409` | `QUICK_RESULT_FIXTURE_CANCELLED` | 팀매치가 취소됐어요 |
+| `409` | `QUICK_RESULT_HAS_LIVE_RECORDS` | 득점 기록이 있어요 |
+| `409` | `QUICK_RESULT_TEAMS_REQUIRED` | 한쪽이라도 팀이 정해지지 않았어요 |
+| `409` | `QUICK_RESULT_ROSTER_SYNCING` | 한 사이드의 출전자가 0명이거나 이 경기의 명단 재계산이 끝나지 않았어요 |
+| `409` | `NEXT_FIXTURE_CONFLICT` \| `VERSION_CONFLICT` \| `IDEMPOTENCY_PAYLOAD_CONFLICT` | 다음 경기 시작 / 낡은 `expectedVersion` / 같은 키에 다른 본문 |
+| `422` | `COMMAND_IDEMPOTENCY_KEY_MISMATCH` | `Idempotency-Key` 가 `clientCommandId` 와 달라요 |
+
+`withResultCommand` 의 멱등 충돌은 이제 원시 예외 대신 `409 IDEMPOTENCY_PAYLOAD_CONFLICT` 로 번역돼요(위 Task 22 표의 문서와 같은 동작).
+
 ## Fixture videos (highlight/broadcast clips)
 
 `apps/v1_api/src/tournaments/videos/**`. Writes to `V1TournamentFixtureVideo`, which had a read

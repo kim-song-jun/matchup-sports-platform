@@ -51,6 +51,23 @@ describe('planBracketTemplate — 개수 계약(스펙 Test Scenarios)', () => {
     expect([...perRound]).toEqual([['12강', 4], ['8강', 4], ['4강', 2], ['결승', 1], ['3·4위전', 1]]);
   });
 
+  it('knockout 16 + 3·4위전 = 경기 16(8+4+2+1+1) · 연결 16(8강←16강 8, 4강←8강 4, 결승←4강 2, 3위←4강 2) · ENTRY 16 · BYE 0', () => {
+    const p = plan({ kind: 'knockout', size: 16, thirdPlace: true });
+    expect(sizes(p)).toEqual({ groups: 5, fixtures: 16, edges: 16, entry: 16, bye: 0, byeSlots: 0 });
+    expect(p.groups.map((g) => [g.name, g.phase])).toEqual([
+      ['16강', 'round16'], ['8강', 'quarter'], ['4강', 'semi'], ['결승', 'final'], ['3위 결정전', 'third_place'],
+    ]);
+    const perRound = new Map<string, number>();
+    for (const f of p.fixtures) perRound.set(f.round, (perRound.get(f.round) ?? 0) + 1);
+    expect([...perRound]).toEqual([['16강', 8], ['8강', 4], ['4강', 2], ['결승', 1], ['3·4위전', 1]]);
+  });
+
+  it('knockout 16 (3·4위전 없음) = 경기 15 · 연결 14 · 조 4개', () => {
+    const p = plan({ kind: 'knockout', size: 16, thirdPlace: false });
+    expect(sizes(p)).toEqual({ groups: 4, fixtures: 15, edges: 14, entry: 16, bye: 0, byeSlots: 0 });
+    expect(p.groups.map((g) => g.phase)).toEqual(['round16', 'quarter', 'semi', 'final']);
+  });
+
   it('league 6팀 2회전 = 30경기, 같은 쌍이 정확히 두 번이고 홈/원정이 교대한다', () => {
     const p = plan({ kind: 'league', teamCount: 6, legs: 2 });
     expect(p.fixtures).toHaveLength(30);
@@ -106,6 +123,44 @@ describe('planBracketTemplate — 12강 배선(스펙 S2)', () => {
   });
 });
 
+describe('planBracketTemplate — 16강 배선(스펙 S2)', () => {
+  const p = plan({ kind: 'knockout', size: 16, thirdPlace: true });
+  const incoming = (key: string) => p.edges.filter((e) => e.targetFixtureKey === key);
+
+  it('16강 2i-1·2i 번 경기 승자 → 8강 i 번 경기 홈·어웨이', () => {
+    for (const i of [1, 2, 3, 4]) {
+      expect(incoming(`quarter-${i}`).map((e) => [e.sourceFixtureKey, e.outcome, e.targetSide]).sort()).toEqual([
+        [`round16-${2 * i - 1}`, 'WINNER', 'HOME'],
+        [`round16-${2 * i}`, 'WINNER', 'AWAY'],
+      ]);
+    }
+  });
+
+  it('16강 ENTRY 자리는 1~16 이 경기 i 번 홈=2i-1 · 어웨이=2i 번에 쓰이고 8강 이후 경기는 자리를 쓰지 않는다', () => {
+    const slotOf = (key: string | null) => p.slots.find((s) => s.key === key)?.position ?? null;
+    for (const f of p.fixtures.filter((x) => x.groupKey === 'round16')) {
+      const n = Number(f.key.split('-')[1]);
+      expect([slotOf(f.homeSlotKey), slotOf(f.awaySlotKey)]).toEqual([2 * n - 1, 2 * n]);
+    }
+    for (const f of p.fixtures.filter((x) => x.groupKey !== 'round16')) expect([f.homeSlotKey, f.awaySlotKey]).toEqual([null, null]);
+  });
+
+  it('16강엔 부전승이 없다 — BYE 자리·ByeSlot 이 없고 LOSER 연결은 4강 → 3·4위전 둘뿐이다', () => {
+    expect(p.slots.some((s) => s.kind === 'BYE')).toBe(false);
+    expect(p.byeSlots).toEqual([]);
+    expect(p.edges.filter((e) => e.outcome === 'LOSER').map((e) => e.sourceFixtureKey).sort()).toEqual(['semi-1', 'semi-2']);
+  });
+
+  it('경기 번호는 16강 1~8 → 8강 9~12 → 4강 13~14 → 결승 15 → 3·4위전 16 (offset 반영)', () => {
+    const shifted = plan({ kind: 'knockout', size: 16, thirdPlace: true }, 10);
+    expect(shifted.fixtures.map((f) => [f.round, f.fixtureNumber])).toEqual([
+      ...[11, 12, 13, 14, 15, 16, 17, 18].map((n) => ['16강', n]),
+      ...[19, 20, 21, 22].map((n) => ['8강', n]),
+      ['4강', 23], ['4강', 24], ['결승', 25], ['3·4위전', 26],
+    ]);
+  });
+});
+
 describe('planBracketTemplate — 모든 템플릿이 지켜야 할 DB 불변식', () => {
   const inputs: BracketTemplateInput[] = [
     { kind: 'knockout', size: 4, thirdPlace: false },
@@ -114,6 +169,8 @@ describe('planBracketTemplate — 모든 템플릿이 지켜야 할 DB 불변식
     { kind: 'knockout', size: 8, thirdPlace: true },
     { kind: 'knockout', size: 12, thirdPlace: false },
     { kind: 'knockout', size: 12, thirdPlace: true },
+    { kind: 'knockout', size: 16, thirdPlace: false },
+    { kind: 'knockout', size: 16, thirdPlace: true },
     { kind: 'league', teamCount: 3, legs: 1 },
     { kind: 'league', teamCount: 7, legs: 2 },
   ];
@@ -174,7 +231,8 @@ describe('planBracketTemplate — 거부', () => {
 
   it.each([
     [{ kind: 'knockout', size: 5, thirdPlace: false }],
-    [{ kind: 'knockout', size: 16, thirdPlace: true }],
+    [{ kind: 'knockout', size: 10, thirdPlace: false }],
+    [{ kind: 'knockout', size: 20, thirdPlace: true }],
     [{ kind: 'league', teamCount: 2, legs: 1 }],
     [{ kind: 'league', teamCount: 21, legs: 1 }],
     [{ kind: 'league', teamCount: 4, legs: 3 }],

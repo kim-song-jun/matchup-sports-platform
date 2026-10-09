@@ -21,7 +21,7 @@ import { extractErrorMessage } from '@/lib/error-message';
 import { hasStoredV1Session, sanitizeRedirectPath, withFromPath } from '@/lib/session-storage';
 import { getSportAccent } from '@/lib/v1-sport-accent';
 import { getTournamentStatusConfig } from '@/lib/v1-tournament-status';
-import { competitionMatchLabel } from '@/lib/tournament-round-label';
+import { KNOCKOUT_PHASES, competitionMatchLabel, tournamentRoundLabel } from '@/lib/tournament-round-label';
 import { compareTournamentGroupNames } from '@/lib/tournament-display-order';
 import { splitPrizeSegments, isPrizeAmountValue, formatPrizeRowValue } from '@/lib/prize-breakdown';
 import { TournamentBracket } from '@/components/tournaments/tournament-bracket';
@@ -1658,7 +1658,7 @@ function getFlowSteps(competition: V1TournamentDetail): Array<{ title: string; b
     return [
       { title: '조별 리그', body: '같은 조 팀끼리 돌아가며 맞붙어 조 안에서 순위를 가려요.' },
       { title: '결선 진출', body: '각 조 상위 팀이 결선 토너먼트에 올라가요.' },
-      { title: '결선 토너먼트', body: '편성된 12강·8강·4강을 거쳐 결승에서 우승팀을 가려요. 부전승 팀은 경기 없이 다음 단계로 올라가요.' },
+      { title: '결선 토너먼트', body: '편성된 16강·12강·8강·4강 중 해당하는 단계를 거쳐 결승에서 우승팀을 가려요. 부전승 팀은 경기 없이 다음 단계로 올라가요.' },
     ];
   }
   if (format === 'knockout') {
@@ -2030,7 +2030,7 @@ export function partitionTournamentSections(
 ) {
   const groupPhaseGroups = groups.filter((g) => g.phase === 'group')
     .sort((a, b) => compareTournamentGroupNames(a.name, b.name));
-  const knockoutPhases = new Set(['round12', 'quarter', 'semi', 'final', 'third_place']);
+  const knockoutPhases = new Set<string>(KNOCKOUT_PHASES);
   const knockoutGroupIds = new Set(
     groups.filter((g) => knockoutPhases.has(g.phase)).map((g) => g.id),
   );
@@ -2042,7 +2042,7 @@ export function partitionTournamentSections(
   // TB-3: group_knockout에서 groupId=null이지만 round가 녹아웃 단계인 픽스처가 결선 대진표에서
   // 누락되는 문제 수정 — knockoutFixtures에 fallback으로 포함. round 는 표시 라벨이라 한글('4강'·
   // '결승'·'3·4위전')이 정상값이므로 영문 키와 한글 라벨을 모두 매칭(어드민 자동생성은 한글 라벨 사용).
-  const knockoutRoundLabels = ['round12', 'quarter', 'semi', 'final', 'third_place', '12강', '8강', '4강', '결승', '3·4위전'];
+  const knockoutRoundLabels = [...KNOCKOUT_PHASES, ...KNOCKOUT_PHASES.map(tournamentRoundLabel)];
   const knockoutFixtures =
     format === 'knockout'
       ? fixtures

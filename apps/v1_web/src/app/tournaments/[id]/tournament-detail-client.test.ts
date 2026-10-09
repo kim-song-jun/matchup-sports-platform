@@ -501,6 +501,29 @@ describe('partitionTournamentSections', () => {
     });
   });
 
+  describe('group_knockout format — 16강', () => {
+    it('phase=round16 조의 경기는 조별 일정이 아니라 결선 대진으로 간다', () => {
+      const groupA = makeGroup({ id: 'gA', phase: 'group' });
+      const group16 = makeGroup({ id: 'g16', phase: 'round16' });
+      const result = partitionTournamentSections(
+        'group_knockout',
+        [makeFixture({ id: 'fA', groupId: 'gA' }), makeFixture({ id: 'f16', groupId: 'g16' })],
+        [groupA, group16],
+      );
+      expect(result.groupFixtures.map((f) => f.id)).toEqual(['fA']);
+      expect(result.knockoutFixtures.map((f) => f.id)).toEqual(['f16']);
+    });
+
+    it('조 없는 경기도 라운드가 16강·round16 이면 결선 대진에 들어가고, 조별 라운드는 들어가지 않는다', () => {
+      const result = partitionTournamentSections('group_knockout', [
+        makeFixture({ id: 'ko', groupId: null, round: '16강' }),
+        makeFixture({ id: 'ko-code', groupId: null, round: 'round16' }),
+        makeFixture({ id: 'grp', groupId: null, round: '조별 1라운드' }),
+      ], []);
+      expect(result.knockoutFixtures.map((f) => f.id).sort()).toEqual(['ko', 'ko-code']);
+    });
+  });
+
   describe('knockout format', () => {
     it('returns ALL fixtures as knockoutFixtures regardless of groupId', () => {
       const groupSemi = makeGroup({ id: 'g-semi', phase: 'semi' });

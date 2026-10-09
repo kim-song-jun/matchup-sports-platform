@@ -3,7 +3,7 @@ import type { V1TournamentGroupPhase, V1TournamentSlotKind } from '@prisma/clien
 import { buildLeagueFixtureRows } from '../league-fixture-generator.service';
 
 export type BracketTemplateInput =
-  | { kind: 'knockout'; size: 4 | 8 | 12; thirdPlace: boolean }
+  | { kind: 'knockout'; size: 4 | 8 | 12 | 16; thirdPlace: boolean }
   | { kind: 'group_knockout'; groupCount: number; teamsPerGroup: number; advancePerGroup: 1 | 2; legs: 1 | 2; thirdPlace: boolean }
   | { kind: 'league'; teamCount: number; legs: 1 | 2 };
 export type PlanGroup = { key: string; name: string; phase: V1TournamentGroupPhase; sortOrder: number; advanceCount: number | null };
@@ -18,18 +18,17 @@ export const BRACKET_TEMPLATE_MAX_FIXTURES = 240;
 /** BYE 자리 position(1부터) → 12강 그룹 `V1TournamentByeSlot.sortOrder`. 공개 그래프의 12강 기본 부전승 위치와 같다. */
 export const ROUND12_BYE_SORT_ORDERS = [0, 3, 4, 7] as const;
 
-// round16 is outside this template's scope (size 16 is rejected as BRACKET_TEMPLATE_UNSUPPORTED).
-type KnockoutPhase = Exclude<V1TournamentGroupPhase, 'group' | 'round16'>;
+type KnockoutPhase = Exclude<V1TournamentGroupPhase, 'group'>;
 
 // 조 이름은 웹 `templateFor`, 라운드 문자열은 `tournament-round-label.ts` 의 결선 라벨과 같다.
 // 순서 계약(1c·PR-4 가 그대로 따른다): 결선 그룹·경기 번호는 ... → 4강 → 결승 → 3·4위전 (결승이 3·4위전보다 앞).
 const GROUP_NAME: Record<KnockoutPhase, string> = {
-  round12: '12강', quarter: '8강', semi: '4강', final: '결승', third_place: '3위 결정전',
+  round16: '16강', round12: '12강', quarter: '8강', semi: '4강', final: '결승', third_place: '3위 결정전',
 };
 const ROUND_LABEL: Record<KnockoutPhase, string> = {
-  round12: '12강', quarter: '8강', semi: '4강', final: '결승', third_place: '3·4위전',
+  round16: '16강', round12: '12강', quarter: '8강', semi: '4강', final: '결승', third_place: '3·4위전',
 };
-const FIXTURES_IN_PHASE: Record<KnockoutPhase, number> = { round12: 4, quarter: 4, semi: 2, final: 1, third_place: 1 };
+const FIXTURES_IN_PHASE: Record<KnockoutPhase, number> = { round16: 8, round12: 4, quarter: 4, semi: 2, final: 1, third_place: 1 };
 
 function unsupported(message: string): never {
   throw new UnprocessableEntityException({ code: 'BRACKET_TEMPLATE_UNSUPPORTED', message });
@@ -43,6 +42,7 @@ function entrySlot(groupKey: string, position: number): PlanSlot {
 
 function planKnockout(input: Extract<BracketTemplateInput, { kind: 'knockout' }>, offset: number): BracketTemplatePlan {
   const phases: KnockoutPhase[] = [];
+  if (input.size === 16) phases.push('round16');
   if (input.size === 12) phases.push('round12');
   if (input.size >= 8) phases.push('quarter');
   phases.push('semi', 'final');
@@ -86,6 +86,10 @@ function planKnockout(input: Extract<BracketTemplateInput, { kind: 'knockout' }>
     edges.push({ sourceFixtureKey: source, outcome, targetFixtureKey: target, targetSide });
   };
   if (input.size === 12) for (const n of range(4)) link(`round12-${n}`, 'WINNER', `quarter-${n}`, 'AWAY');
+  // 16강 2i-1·2i 번 승자 → 8강 i 번 홈·어웨이. 16강엔 부전승 자리가 없다.
+  if (input.size === 16) {
+    for (const n of range(8)) link(`round16-${n}`, 'WINNER', `quarter-${Math.ceil(n / 2)}`, n % 2 === 1 ? 'HOME' : 'AWAY');
+  }
   if (input.size >= 8) {
     for (const j of range(2)) {
       link(`quarter-${2 * j - 1}`, 'WINNER', `semi-${j}`, 'HOME');
@@ -125,7 +129,7 @@ function planLeague(input: Extract<BracketTemplateInput, { kind: 'league' }>, of
 function build(input: BracketTemplateInput, offset: number): BracketTemplatePlan {
   switch (input.kind) {
     case 'knockout':
-      if (!([4, 8, 12] as readonly number[]).includes(input.size)) unsupported('토너먼트는 4강·8강·12강으로만 만들 수 있어요.');
+      if (!([4, 8, 12, 16] as readonly number[]).includes(input.size)) unsupported('토너먼트는 4강·8강·12강·16강으로만 만들 수 있어요.');
       return planKnockout(input, offset);
     case 'league':
       if (!Number.isInteger(input.teamCount) || input.teamCount < 3 || input.teamCount > 20) unsupported('리그는 3~20팀으로 만들 수 있어요.');

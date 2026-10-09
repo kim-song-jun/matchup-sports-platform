@@ -139,6 +139,7 @@ function classifyRound(round: string | null | undefined): RoundKind {
 const ROUND_LABEL: Record<string, string> = {
   group: '조별리그',
   semi: '4강',
+  round16: '16강',
   round12: '12강',
   quarter: '8강',
   final: '결승',

@@ -30,6 +30,7 @@ export class SignupRecordConsentDto {
 
   @IsString()
   @IsNotEmpty()
+  @MaxLength(64)
   policyHash!: string;
 }
 

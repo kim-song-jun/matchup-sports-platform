@@ -90,6 +90,16 @@ export function TeamMatchListPageClient({ seed }: { readonly seed?: CursorListSe
   useEffect(() => {
     setSearchValue(initialQuery);
     setSubmittedQuery(initialQuery);
+    // replace 커밋 전 Back/Forward는 q가 같은 history 항목으로 돌아갈 수 있다.
+    // q 의존성만으로는 취소된 local 검색이 남으므로 실제 복귀 URL을 즉시 읽는다.
+    const restoreSearch = () => {
+      const restoredQuery = new URLSearchParams(window.location.search).get('q') ?? '';
+      setSearchValue(restoredQuery);
+      setSubmittedQuery(restoredQuery);
+      setSearchOpen(false);
+    };
+    window.addEventListener('popstate', restoreSearch);
+    return () => window.removeEventListener('popstate', restoreSearch);
   }, [initialQuery]);
   // replace가 아직 URL에 반영되지 않아도 후속 탐색은 목록 조회에 적용한 검색어를 따른다.
   // 입력 draft 대신 submittedQuery를 덮어써 지운 검색어가 종목·필터 링크에서 되살아나지 않게 한다.

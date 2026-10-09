@@ -132,3 +132,54 @@ alpha 실측은 dev 머지·배포 후 수행. root는 자동 머지나 main 승
 - 선점 후 실제 웹 대조: 모든 담당자 미완료 16/16·접수 0/0, 실제 김성준 담당 전체 20/20·미완료 14/14, pagination 끝까지 확인. 기존 21개 상세와 신규 #32 상세를 읽어 22/22 확인했다. 기존 집계 안내의 머지/alpha PASS 이력은 위 역사 기록과 SSOT에 보존한다.
 - Base: origin/dev `2888193bdf3a741131ebc0480ff280f6d3e143d8`; worktree `C:/Users/kinso/.codex/worktrees/mdqa-30-search-sync/matchup-sports-platform`; branch `fix/mdqa-30-search-query-sync`.
 - Root evidence: `F:/user/documents/project/matchup-sports-platform/tmp/qa/mdqa-assigned-monitor/2026-10-06-heartbeat-1302/`.
+
+## MD-QA #32 사후 QA 재발 수정 (2026-10-09 heartbeat0242)
+
+### Context / Goal
+- https://teameet.jmandu.kr/issues/32/ 기존 검색 동기화 후속 리포트를 계속한다. 원 #30 집계 안내의 완료/검증 근거는 보존한다.
+- PR1640은 이미 dev MERGED(head e5e78b68e455b6aa7b0d299a960e3274074ed452, merge 0f788fd348043945ce5caa2b2d7a1624db8e06bd). 현재 dev aa9cc7febf23de1e28c10d03bbc7fc9d44d1e052에서 26/27 PASS, 1440 빠른 Back 1 FAIL.
+- 새 실제 리뷰 https://github.com/kim-song-jun/matchup-sports-platform/pull/1640#pullrequestreview-5465123981 및 갤러리 https://github.com/kim-song-jun/matchup-sports-platform/pull/1640#issuecomment-6073177544 원문을 root가 읽었다. author 코드 수정/push는 없고 active peer QA turn completed. 현재 열린 PR1709는 main 흡수 작업으로 별개다.
+- q 없는 축구 목록→전체→QA0930 검색 제출→replace 완료 전 실제 Back에서 q 없는 이전 URL인데 입력/요청/링크 q=QA0930가 남는다. 동일 URL reload는 빈 입력과 실제 축구2건. 원래 before/after390 동일파일은 비교 근거에서 제외하고 역사로 보존한다.
+- Goal: 실제 history 이동이 취소한 local 제출 검색을 즉시 재조정하면서 기존 제출 직후 종목/필터/상세 탐색 q overlay를 보존한다.
+
+### Phase / Owned / Forbidden
+- Phase A worker mdqa_32_history_recurrence: 원인 확인 및 실제 client/hook/view 회귀 RED→최소 수정→GREEN. Owned: `apps/v1_web/src/components/team-matches/team-matches-client.tsx`, `team-matches-search-sync.test.tsx`, 꼭 필요하면 `team-matches-page.tsx`, `.changeset/mdqa-32-search-history-recurrence.md`, 본 task.
+- Forbidden: shared hooks/types/MSW/DTO/schema, global CSS/다른 도메인, 원 #30/32 merged worktree 변경, root SSOT, 다른 자동화 정책/상태, Git staging/commit/push/PR/merge, 공유 브라우저.
+- Phase B root: 독립 리뷰·직렬 검증·최신 origin/dev drift·exact pathspec commit/push·base dev 후속 PR·기존 #32 리포트 댓글.
+- Phase C: dev 머지 후 실제 alpha 390/768/1440 재검증. 이전 27/27 PASS로 현재 실패를 덮지 않는다.
+- You are not alone; 타인 변경은 되돌리지 않고 공유 파일 필요 시 root와 조정한다. 단일 최소 worker 좁은 테스트, root의 #67 test slot 완료 전 검증 실행 금지.
+
+### Acceptance Criteria / Test Scenarios
+- [ ] 기존 URL 미커밋 직후 clear/submit→종목/필터/상세 조건 보존.
+- [ ] 검색 제출→replace URL commit 전 실제 popstate Back→q 없는 이전 URL에서 입력/조회/링크 동기화.
+- [ ] q 값이 같은 다른 필터 history 이동에서도 복귀 URL 일치.
+- [ ] 이후 늦게 도착하는 탐색 관측과 미제출 draft, source chain/hash, pagination 복귀 계약 유지.
+- [ ] real regression fails current code for this reason, GREEN after minimal repair; tests do not merely change q to force old effect.
+- [ ] 최신 head 독립 리뷰 actual finding0, diff/markers/typecheck 및 committed-tree scope 검수.
+- [ ] 기존 #32 tracker comment 저장 성공과 표시, 후속 PR의 미머지 상태 정확히 기록.
+
+### Security / Mock / Risks / Ambiguity
+- URLSearchParams 및 v1 검색 기록/인증/권한 계약 보존. API/DB/MSW 변경 없음.
+- Root actual browser/network 검증은 배포 후 가능; peer 최신 실제 실패 증거를 검수하여 코드 회귀에 연결하며 현재 alpha PASS 아님.
+- #32 tracker는 외부가 완료 처리한 역사 상태일 수 있다. root 재오픈/Done/첨부 삭제/담당 해제를 하지 않고 기존 담당 및 리포트에 후속 댓글만 기록한다.
+
+### Progress Snapshot
+- Phase: A / REVIEW_FINDING_INVESTIGATION
+- Base: latest fetched origin/dev aa9cc7febf23de1e28c10d03bbc7fc9d44d1e052
+- Worktree: C:/Users/kinso/.codex/worktrees/mdqa-32-search-history-recurrence/matchup-sports-platform
+- Branch: fix/mdqa-32-search-history-recurrence
+- Root evidence: F:/user/documents/project/matchup-sports-platform/tmp/qa/mdqa-assigned-monitor/2026-10-09-heartbeat-0242/report32-new-review.json
+- Original PR/head/merge and old QA remain historical; new follow-up PR pending. No duplicate tracker ticket.
+- Worker Phase A 조사: (H1) `initialQuery` 값만 구독하는 effect가 동일 q history 이동에서 local submitted 값을 복원하지 못함, (H2) Next가 실제 popstate URL과 다른 query를 늦게 관측함, (H3) cursor/query cache가 이전 검색 목록을 잔존시킴을 구분한다. 현재 client는 q-only effect이고 실제 view/API hook을 유지한 회귀에서 URL·입력·목록·종목/필터/카드 출처를 각각 관찰한다. H2의 실제 Next 시나리오 확인은 root의 머지 후 alpha 담당이며 jsdom 관측을 대체 근거로 사용하지 않는다.
+- Worker Phase A test-only: 기존 search-sync 파일에 same-q 실제 Back/Forward 및 clear 직후 Back 3건 추가. URL replace를 미커밋으로 유지하고 q 값은 이동 전후 동일하게 두므로 기존 effect가 실행되도록 q를 바꾸는 가짜 회귀가 아니다. Production 미변경, RED는 #67 직렬 슬롯 종료 후 실행 대기.
+- 환경: root가 lock/package hash 동일성을 검수한 `dev-pr-1708-review` dependency 두 경로로 own worktree junction만 연결했다. 설치/lock/env 변경·watcher·Next 서버·공유 브라우저·타 프로세스 정리 없음. 추가 임시 instrumentation 없음; 실제 테스트 결과는 root evidence 경로에 남긴다.
+- Worker RED (2026-10-09 03:04 UTC): 현재 dev production blob을 변경하지 않은 실제 client/view/API hook 테스트에서 **3 FAIL / 11 PASS (14)**. q가 없는 Back/Forward에서 입력 `새검색`이 남고, q=`이전검색`인 clear 취소 Back에서 입력이 빈 값으로 남는 실제 실패다. `report32-history-red.log`·`report32-history-red-result.json`에 원본 출력/exit1/blob을 보존했다. 테스트는 실제 jsdom history를 이동하며 Next 탐색과 HTTP 전송 경계만 대체한다. 실제 alpha/Next 네트워크 timing 검증은 아니다.
+- Worker 최소 수정: 기존 q hydration effect에 native `popstate` listener 10줄 추가. 복귀 시 실제 `window.location.search`의 q로 입력·submitted 검색을 즉시 복원하고 검색 dropdown을 닫는다. unmount/q 변경 시 listener를 정리한다. 기존 제출/지우기 직후 navigationParams 및 상세 from overlay·미제출 draft·검색 기록 API·SSR 초기 query는 변경하지 않았다.
+- Worker 첫 GREEN: search **13/14 PASS**, pagination/history **24/24 PASS**, 전체 **37/38**. 실패는 신규 clear 테스트의 `/^전체 /`가 실제 종목 칩과 `전체 팀매치 보기` CTA를 함께 찾은 하네스 selector 오류다. 입력/목록 복원은 통과했고 이 실패는 제품 실패나 GREEN으로 계산하지 않는다. `report32-history-green.log`·`report32-history-green-result.json` 그대로 보존한다.
+- Worker final GREEN (03:05 UTC): 신규 selector만 숫자 count 끝까지 좁힌 뒤 영향받는 search 파일 **14/14 PASS**, exit0, 6.07초. 동일 production blob의 직전 pagination/history **24/24 PASS**를 유지하며 변경 없는 파일을 중복 실행하지 않았다. `report32-history-green-search-final.log`·`report32-history-green-search-final-result.json`에 실제 결과/blob을 저장했다. 이전 검색 적용·필터 시트·nested source/hash·상세 카드 복귀·미제출 draft·실제 Back/Forward와 기존 pagination의 늦은 응답/실패/복귀 계약이 보존됐다.
+- 실행 환경/preflight: Node v24.21.0, Vitest3.2.4, 12 logical cores/CPU12%, free12,209,124KiB, Node217/브라우저14. Docker daemon pipe unavailable 원본을 `report32-history-preflight.json`에 보존하며 jsdom 검증에는 HTTP/DB 서비스를 요구하지 않는다. 최소 worker1·fileParallelism=false·no-cache 직렬 실행, 모든 프로세스 완료 및 test slot 반환. pnpm의 exit1 뒤 misleading `vitest not found` wrapper 출력도 RED/첫 GREEN의 원본에 보존하고 실제 Vitest 실패와 구분한다.
+- Worker handoff: client/test/Changeset/task **4개 경로**만 변경, scope 안 기존 debt marker 없음. shared hooks/types/MSW/DTO/schema·global CSS·타 도메인·merged branch·root state 미변경, Git stage/commit/push/PR·브라우저 실행0. root 최신 dev 통합/타입·패턴/독립 리뷰/committed-tree 검증/후속 PR/#32 댓글/머지 후 alpha는 pending이다. H1은 실제 RED→GREEN으로 확인했으며 H2의 실제 Next timing까지 검증했다고 주장하지 않는다.
+- Root Phase B: 독립 frontend-review 전체4/4 Critical0/Warning0/FindingsNone. production blob `e8c479da29daf5a2262ff86a673c90b72e7ce8c0`, test `ad82f9eba65e6eb7cc363d427e8edfe110897599`가 최종 GREEN 근거와 일치했다. 최신 dev `27342c6c5`는 aa9와 tree 동일, 추가 `dc7f4bb32ad36300da47a16d2114ab74f12b9282`는 별도 대회 결과 invalidation3파일이며 본 검색 계약 파일과 겹치지 않았다. 두 번의 안전한 FF와 실제 dev 동기화에서 WIP를 보존했다.
+- Root 타입 검사 `tsc --noEmit --incremental false` EXIT0. 원본 pattern 첫 실행은 Windows FIND 충돌로 EXIT1, 같은 원본 검사기에 Git GNU utilities PATH를 지정한 재실행은 EXIT0이었다. 검사기 수정/게이트 우회 없음. 원본 실패와 복구 로그 모두 heartbeat0242에 보존했다. committed-head narrow regression 및 exact-head 재리뷰 후 PR 게시한다.
+- Root 최신 갤러리 공개 원본8/8 픽셀을 읽었다. 1440 빠른 Back의 검색어/축구0 잔존과 동일 URL reload의 공란/축구2 대조를 확인했다. 기존27/27 이력은 보존하되 현재 새 실패를 PASS나 종료 준비로 표시하지 않는다.
+- Current Progress Snapshot: Phase B / SOURCE_REVIEWED_TYPECHECKED_PUBLICATION_PREP; current base `dc7f4bb32ad36300da47a16d2114ab74f12b9282`; follow-up PR/committed verification pending; original PR1640/head/merge와 task 이력은 유지하며 새 branch에서만 게시한다. 실제 Next/alpha AFTER는 머지·배포 뒤 대기한다.

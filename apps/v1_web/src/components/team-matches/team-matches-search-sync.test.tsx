@@ -291,4 +291,63 @@ describe('MD-QA #30 검색 적용과 탐색 URL 동기화', () => {
     expect(queryIn(screen.getByRole('link', { name: /^전체 / }))).toBe('새검색');
     expect(apiPost).not.toHaveBeenCalled();
   });
+
+  it.each(['back', 'forward'] as const)('검색 replace 커밋 전 실제 %s는 q가 같은 복귀 URL의 입력·목록·링크를 복원한다', async (direction) => {
+    // Given: 두 history 항목의 q는 모두 없고 종목만 다르다. replace는 아직 커밋되지 않는다.
+    const outerFrom = '/my?tab=matches#saved';
+    const allHref = `/team-matches?kind=friendly&sort=latest&from=${encodeURIComponent(outerFrom)}#list`;
+    const sportHref = `/team-matches?kind=friendly&sort=latest&from=${encodeURIComponent(outerFrom)}&sportId=futsal#list`;
+    window.history.replaceState({}, '', direction === 'back' ? sportHref : allHref);
+    act(() => router.push(direction === 'back' ? allHref : sportHref));
+    if (direction === 'forward') await browserNavigate('back');
+    mount();
+    await expectCards(20);
+    fireEvent.change(screen.getByRole('textbox', { name: '팀매치 검색어' }), { target: { value: '새검색' } });
+    fireEvent.click(screen.getByRole('button', { name: '검색' }));
+    await expectCards(3);
+    expect(new URL(navigation.pendingReplace ?? '', window.location.origin).searchParams.get('q')).toBe('새검색');
+    expect(new URLSearchParams(window.location.search).get('q')).toBeNull();
+    // When: replace 전에 실제 브라우저 history 항목으로 복귀한다.
+    await browserNavigate(direction);
+    // Then: 같은 q 값이어도 취소한 검색어를 적용하거나 후속 링크로 다시 전파하지 않는다.
+    expect(new URLSearchParams(window.location.search).get('q')).toBeNull();
+    expect(new URLSearchParams(window.location.search).get('sportId')).toBe('futsal');
+    expect(screen.getByRole('textbox', { name: '팀매치 검색어' })).toHaveValue('');
+    await expectCards(12);
+    for (const link of screen.getAllByRole('link').filter((link) => link.matches('.tm-sport-chip-row a, .tm-list-filter-button'))) {
+      expect(queryIn(link)).toBeNull();
+    }
+    for (const card of cards()) {
+      const detail = new URL(card.getAttribute('href') ?? '', window.location.origin);
+      const from = detail.searchParams.get('from');
+      expect(from).not.toBeNull();
+      const returned = new URL(from ?? '', window.location.origin);
+      expect(returned.searchParams.get('q')).toBeNull();
+      expect(returned.searchParams.get('sportId')).toBe('futsal');
+      expect(returned.searchParams.get('kind')).toBe('friendly');
+      expect(returned.searchParams.get('sort')).toBe('latest');
+      expect(returned.searchParams.get('from')).toBe(outerFrom);
+      expect(returned.hash).toBe('#list');
+    }
+  });
+
+  it('검색 지우기 replace 커밋 전 Back은 동일한 q의 다른 필터 항목도 다시 hydrate한다', async () => {
+    // Given: 두 history 항목은 같은 검색어지만 종목만 다르다.
+    window.history.replaceState({}, '', '/team-matches?q=이전검색&sportId=futsal');
+    act(() => router.push('/team-matches?q=이전검색'));
+    mount();
+    await screen.findByText('조건에 맞는 팀매치가 없어요');
+    fireEvent.click(screen.getByRole('button', { name: '검색어 지우기' }));
+    await expectCards(20);
+    expect(navigation.pendingReplace).toBe('/team-matches');
+    // When
+    await browserNavigate('back');
+    // Then: 지우기 요청이 취소되면 URL에 남은 기존 검색을 실제 목록과 링크에 복원한다.
+    expect(new URLSearchParams(window.location.search).get('q')).toBe('이전검색');
+    expect(screen.getByRole('textbox', { name: '팀매치 검색어' })).toHaveValue('이전검색');
+    await screen.findByText('조건에 맞는 팀매치가 없어요');
+    await expectCards(0);
+    expect(queryIn(screen.getByRole('link', { name: /^전체 \d+$/ }))).toBe('이전검색');
+    expect(queryIn(screen.getByRole('link', { name: '필터' }))).toBe('이전검색');
+  });
 });

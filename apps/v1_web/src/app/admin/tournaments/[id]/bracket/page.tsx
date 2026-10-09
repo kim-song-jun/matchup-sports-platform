@@ -34,10 +34,11 @@ function BracketPageBody() {
   const pathname = usePathname();
   const view: BracketView = searchParams.get('view') === 'list' ? 'list' : 'canvas';
   const registrations = regData?.items ?? [];
-  // 캐시된 목록이 있으면 재조회 실패여도 그 목록을 쓴다.
+  // 캐시된 목록은 재조회가 실패해도 쓰되, 실패는 refetchFailed 로 드러낸다.
   const registrationsState: RegistrationsLoadState = {
     status: regData !== undefined ? 'success' : regIsError ? 'error' : 'pending',
     truncated: regData?.truncated ?? false,
+    refetchFailed: regIsError && regData !== undefined,
     error: regError,
     onRetry: () => void refetchRegistrations(),
   };

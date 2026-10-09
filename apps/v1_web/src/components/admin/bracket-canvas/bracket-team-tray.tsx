@@ -11,6 +11,8 @@ export type RegistrationsLoadState = {
   status: 'pending' | 'error' | 'success';
   /** 안전 상한에 걸려 일부만 불러왔을 때 true */
   truncated: boolean;
+  /** 이미 받은 목록은 남아 있지만 최근 재조회가 실패했을 때 true — 화면의 목록은 이전 결과다. */
+  refetchFailed: boolean;
   error: unknown;
   onRetry: () => void;
 };
@@ -52,6 +54,17 @@ export function BracketTeamTray({
   );
   const unplacedCount = teams.filter((team) => !placedIds.has(team.id) && !directPlacedIds.has(team.id)).length;
 
+  const retryAlert = (
+    <div role="alert" className="flex flex-col items-start gap-2">
+      <p className="tm-text-label" style={{ color: 'var(--text-muted)' }}>
+        {extractErrorMessage(registrationsState.error, '참가팀을 불러오지 못했어요.')}
+      </p>
+      <button type="button" onClick={registrationsState.onRetry} className="tm-btn tm-btn-sm tm-btn-outline" style={{ minHeight: 44 }}>
+        다시 시도
+      </button>
+    </div>
+  );
+
   return (
     <section aria-label="참가팀" className="flex flex-col gap-2">
       <div className="flex items-baseline justify-between gap-2">
@@ -70,18 +83,15 @@ export function BracketTeamTray({
           참가팀을 불러오는 중이에요.
         </p>
       ) : registrationsState.status === 'error' ? (
-        <div role="alert" className="flex flex-col items-start gap-2">
-          <p className="tm-text-label" style={{ color: 'var(--text-muted)' }}>
-            {extractErrorMessage(registrationsState.error, '참가팀을 불러오지 못했어요.')}
-          </p>
-          <button type="button" onClick={registrationsState.onRetry} className="tm-btn tm-btn-sm tm-btn-outline" style={{ minHeight: 44 }}>
-            다시 시도
-          </button>
-        </div>
+        retryAlert
       ) : teams.length === 0 ? (
-        <p className="tm-text-label" style={{ color: 'var(--text-muted)' }}>
-          확정된 참가팀이 아직 없어요.
-        </p>
+        registrationsState.refetchFailed ? (
+          retryAlert
+        ) : (
+          <p className="tm-text-label" style={{ color: 'var(--text-muted)' }}>
+            확정된 참가팀이 아직 없어요.
+          </p>
+        )
       ) : (
         <ul className="flex flex-col gap-1">
           {teams.map((team) => {
@@ -128,6 +138,14 @@ export function BracketTeamTray({
           })}
         </ul>
       )}
+      {registrationsState.refetchFailed && teams.length > 0 ? (
+        <>
+          {retryAlert}
+          <p className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>
+            이전에 불러온 목록이에요.
+          </p>
+        </>
+      ) : null}
       {registrationsState.status === 'success' && registrationsState.truncated ? (
         <p className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>
           참가팀이 많아 일부만 불러왔어요.

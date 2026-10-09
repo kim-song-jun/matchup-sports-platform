@@ -62,7 +62,7 @@ function setBracket(data: V1AdminTournamentBracket | undefined, state: Partial<t
   Object.assign(mocks.bracket, { data, isPending: false, isError: false, error: null, ...state });
 }
 
-const loaded: RegistrationsLoadState = { status: 'success', truncated: false, error: null, onRetry: vi.fn() };
+const loaded: RegistrationsLoadState = { status: 'success', truncated: false, refetchFailed: false, error: null, onRetry: vi.fn() };
 
 function renderWorkspace(overrides: Partial<React.ComponentProps<typeof BracketCanvasWorkspace>> = {}) {
   const props = {

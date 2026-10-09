@@ -21,7 +21,7 @@ vi.mock('@/hooks/use-v1-api', () => ({
   useV1AdminTournamentRegistrations: () => mocks.registrations,
 }));
 vi.mock('@/components/admin/bracket-canvas/bracket-canvas-workspace', () => ({
-  BracketCanvasWorkspace: (props: { tournamentId: string; format: string | undefined; canWrite: boolean; registrations: unknown[]; registrationsState: { status: string; truncated: boolean; onRetry: () => void }; onShowList: () => void }) => (
+  BracketCanvasWorkspace: (props: { tournamentId: string; format: string | undefined; canWrite: boolean; registrations: unknown[]; registrationsState: { status: string; truncated: boolean; refetchFailed: boolean; onRetry: () => void }; onShowList: () => void }) => (
     <div data-testid="workspace" data-format={props.format ?? ''} data-can-write={String(props.canWrite)} data-registrations={props.registrations.length} data-reg-status={props.registrationsState.status} data-reg-truncated={String(props.registrationsState.truncated)}>
       <button type="button" onClick={props.registrationsState.onRetry}>재시도</button>
       <button type="button" onClick={props.onShowList}>목록으로 이동</button>

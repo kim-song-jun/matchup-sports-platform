@@ -13,7 +13,7 @@ const registrations = [
   makeRegistration({ id: 'r4', teamName: '입금 대기 팀', status: 'awaiting_payment' }),
 ];
 
-const loaded = { status: 'success', truncated: false, error: null, onRetry: vi.fn() } as const;
+const loaded = { status: 'success', truncated: false, refetchFailed: false, error: null, onRetry: vi.fn() } as const;
 
 // 화면과 같은 경로로 직접 지정 팀을 계산해 넘긴다(워크스페이스가 하는 일).
 function renderTray({

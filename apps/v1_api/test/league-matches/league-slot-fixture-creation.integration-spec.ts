@@ -33,8 +33,8 @@ describe('createLeagueFixture — 팀 null + 자리 id', () => {
       include: { sides: { orderBy: { sideKey: 'asc' } }, participants: true },
     });
     expect(game.sides.map((side) => [side.sideKey, side.teamId, side.displayNameSnapshot])).toEqual([
-      ['AWAY', null, '어웨이 팀 미정'],
       ['HOME', null, '홈 팀 미정'],
+      ['AWAY', null, '어웨이 팀 미정'],
     ]);
     expect(game.participants).toHaveLength(0);
     expect(await h.prisma.v1TeamSchedule.count({ where: { teamMatchId } })).toBe(0);

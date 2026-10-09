@@ -56,7 +56,8 @@ describe('PUT /admin/tournament-slots/:slotId/assignment — 정규 리그 레�
       const teamIds = [fixture.hostTeamId, fixture.approvedApplicantTeamId];
       expect(teamIds.filter((id) => id === teams[0].id)).toHaveLength(1);
     }
-    const untouched = (await fixturesOf(leagueId)).filter((f) => !using.includes(f));
+    const usingIds = new Set(using.map((f) => f.id));
+    const untouched = (await fixturesOf(leagueId)).filter((f) => !usingIds.has(f.id));
     expect(untouched).toHaveLength(1);
     expect([untouched[0].hostTeamId, untouched[0].approvedApplicantTeamId]).toEqual([null, null]);
     expect(await h.prisma.v1TeamSchedule.count({ where: { teamMatchId: { in: (await fixturesOf(leagueId)).map((f) => f.id) } } })).toBe(0);

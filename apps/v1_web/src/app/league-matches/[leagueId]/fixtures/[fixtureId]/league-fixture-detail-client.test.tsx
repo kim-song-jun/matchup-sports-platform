@@ -195,6 +195,22 @@ describe('LeagueFixtureDetailClient', () => {
     vi.useRealTimers();
   });
 
+  it('홈 팀이 비어 있는 경기도 깨지지 않고 "홈팀 미정" 으로 읽히며 팀 링크는 없다', () => {
+    mockLeague({
+      fixtures: [
+        { teamMatchId: 'fx-n', title: '3주차', homeTeamId: null, awayTeamId: null, startAt: '2026-09-15T10:00:00.000Z', placeName: '검증장', status: 'matched', homeScore: null, awayScore: null },
+        // 같은 쌍 필터가 null 을 만나도 터지지 않는지 — 팀이 다 찬 경기는 맞대결 후보에 남는다.
+        ...FIXTURES,
+      ],
+    });
+    mockViewer('none');
+    render(<LeagueFixtureDetailClient leagueId="lg-1" fixtureId="fx-n" />);
+
+    expect(screen.getByText('홈팀 미정')).toBeInTheDocument();
+    expect(screen.getByText('상대팀 미정')).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /팀 상세로 이동/ })).toBeNull();
+  });
+
   it('예정 경기: 양팀 실명·순위·전적과 경기 칩 "예정"을 보여주고, 리그명은 리그 상세로 링크한다', () => {
     mockLeague();
     mockViewer('none');

@@ -37,7 +37,7 @@
 | `GET` | `/api/v1/admin/teams/:teamId` | - | active admin | 팀 상세·활성 팀원 연락처/역할 목록 |
 | `POST` | `/api/v1/admin/teams/:teamId/status` | `ChangeTeamStatusDto` | owner/ops | 팀 상태 변경 |
 | `POST` | `/api/v1/admin/teams/:teamId/name` | `RenameArchivedTeamDto` `{ name(≤50), reason(≤500) }` | owner/ops | **보관된 팀만** 이름 변경 → `{ teamId, previousName, name, actionLogId }`. 새 이름은 팀 만들기·수정과 같은 규칙(정규화·같은 종목·지역 중복·팀장 해체 팀의 복구 기간 예약, 자기 자신 제외)이라 겹치면 `409 TEAM_NAME_TAKEN`. 보관 팀이 아니면 `409 TEAM_RENAME_NOT_ARCHIVED`, 앞뒤 공백을 뺀 이름이 비면 `400 TEAM_NAME_REQUIRED`, 지금 이름과 같으면 `400 TEAM_NAME_UNCHANGED`, support 는 `403 PERMISSION_DENIED`. 감사 로그 `team.rename`(before/after `{ name }`)만 남기고 상태 변경 기록은 남기지 않는다 |
-| `GET` | `/api/v1/admin/team-matches` | `AdminTeamMatchListQueryDto` | active admin | 팀 매치 목록. 각 행에 `platformManaged`, HOME/승인 팀 ID·이름, `pendingApplicationCount` 포함. 플랫폼 모집은 첫 팀만 승인된 단계에서도 그 팀을 승인 팀 필드에 반환하며, 검색은 제목과 참가·승인 팀명에 적용 |
+| `GET` | `/api/v1/admin/team-matches` | `AdminTeamMatchListQueryDto` | active admin | 팀 매치 목록. 각 행에 `platformManaged`, HOME/승인 팀 ID·이름, `pendingApplicationCount` 포함. 플랫폼 모집은 첫 팀만 승인된 단계에서도 그 팀을 승인 팀 필드에 반환하며, 검색은 제목과 참가·승인 팀명에 적용. `sort`=`created_desc`(기본)·`start_asc`·`start_desc`(startAt 없는 행은 항상 마지막, 동점은 `id`), `regionId`(UUID, 상위 지역은 하위 지역 포함). 각 행에 `region: { regionId, name } \| null`. 커서는 행 id이며 서버가 정렬 키로 위치를 복원하고, 모르는 커서는 400 `INVALID_CURSOR` |
 | `GET` | `/api/v1/admin/team-matches/:teamMatchId` | — | active admin | 팀 매치 상세 — 상대팀 신청(최근 50건)·확정 상대팀·소속 리그·대표 이미지·실력·경기 조건 포함. 라이브 경기 상태는 현장 콘솔 소관이라 `hasGame` 여부만 준다 |
 | `POST` | `/api/v1/admin/team-matches` | `CreateAdminTeamMatchRecruitmentDto` | owner/ops | 팀을 지정하지 않은 플랫폼 팀매치 모집 생성 |
 | `POST` | `/api/v1/admin/team-matches/:teamMatchId/applications/:applicationId/approve` | `ApproveAdminTeamMatchApplicationDto` | owner/ops | 신청 팀을 한 팀씩 승인. 두 번째 승인에서 경기 확정 |
@@ -55,6 +55,7 @@
 | `PATCH` | `/api/v1/admin/notices/:noticeId` | `UpdateAdminNoticeDto` | owner/ops | 공지 전체 필드 수정 |
 | `DELETE` | `/api/v1/admin/notices/:noticeId` | - | owner/ops | 공지 삭제 |
 | `GET` | `/api/v1/admin/inquiries` | `AdminInquiryListQueryDto` | active admin | 문의 목록 |
+| `GET` | `/api/v1/admin/team-matches/pending-application-count` | - | active admin | 운영자가 처리할 수 있는 대기(`requested`) 신청 수 — 플랫폼 운영·리그/대회 미연결·모집 중 팀 매치만 집계. 사이드바 '팀매치' 배지용. 응답 `{ count }` |
 | `GET` | `/api/v1/admin/inquiries/pending-count` | - | active admin | `received/reviewing` 문의 수 |
 | `GET` | `/api/v1/admin/inquiries/:inquiryId` | - | active admin | 문의 및 답변 상세 |
 | `POST` | `/api/v1/admin/inquiries/:inquiryId/replies` | `ReplyInquiryDto` | owner/ops | 답변 작성 |

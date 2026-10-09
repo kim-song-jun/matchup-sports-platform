@@ -641,6 +641,10 @@ button:disabled {
   transition: transform var(--duration-slow) var(--ease-out);
 }
 
+.tm-scroll-area[data-ptr-armed] {
+  overscroll-behavior-y: none;
+}
+
 .tm-ptr {
   position: absolute;
   top: var(--v1-shell-topbar-height);

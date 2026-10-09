@@ -102,3 +102,14 @@ export function expandWeeklyFixtureDates(input: ExpandWeeklyFixtureDatesInput): 
     toKstDateString(new Date(firstMidnight + week * 7 * DAY_MS - KST_OFFSET_MS)),
   );
 }
+
+/** 요일 선택 목록. 값은 `Date#getUTCDay` 와 같은 0(일)~6(토) — `expandWeeklyFixtureDates` 의 `dayOfWeek`. */
+export const WEEKDAY_OPTIONS: ReadonlyArray<{ value: number; label: string }> = [
+  { value: 0, label: '일요일' },
+  { value: 1, label: '월요일' },
+  { value: 2, label: '화요일' },
+  { value: 3, label: '수요일' },
+  { value: 4, label: '목요일' },
+  { value: 5, label: '금요일' },
+  { value: 6, label: '토요일' },
+];

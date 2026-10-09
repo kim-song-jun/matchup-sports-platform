@@ -1230,18 +1230,21 @@ function formatLoginProvider(provider: string | null | undefined) {
   if (provider === 'kakao') return '카카오 로그인';
   if (provider === 'email') return '이메일 로그인';
   if (provider === 'naver') return '네이버 로그인';
+  if (provider === 'apple') return 'Apple 로그인';
   return provider ?? null;
 }
 
 function formatAccountEmail(email: string | null, providers: string[]) {
   if (email) return email;
   if (providers.includes('kakao')) return '카카오 계정 이메일 미제공';
+  if (providers.includes('apple')) return 'Apple 계정 이메일 미제공';
   return '등록 안 됨';
 }
 
 function formatPasswordAvailability(hasPassword: boolean | undefined, providers: string[]) {
   if (hasPassword) return '이메일 계정에서 관리';
   if (providers.includes('kakao')) return '카카오 계정으로 로그인 중';
+  if (providers.includes('apple')) return 'Apple 계정으로 로그인 중';
   return '비밀번호 없음';
 }
 

@@ -1,4 +1,5 @@
 import { normalizeGenderRule } from '../common/gender-rule';
+import { OPERATOR_ACTIONABLE_APPLICATION_WHERE } from './admin-team-match-pending';
 import { completePersonalMatch } from '../matches/complete-personal-match';
 import {
   BadRequestException,
@@ -38,6 +39,7 @@ import {
   AdminGlobalSearchQueryDto,
   AdminTeamListQueryDto,
   AdminTeamMatchListQueryDto,
+  type AdminTeamMatchSort,
   AdminNoticeListQueryDto,
   AdminUserListQueryDto,
   ChangeMatchStatusDto,
@@ -84,6 +86,13 @@ function buildListSummary<K extends string>(keys: readonly K[], groups: readonly
 const USER_LIST_STATUSES = ['active', 'suspended', 'blocked', 'withdrawal_pending', 'deleted'] as const;
 const MATCH_LIST_STATUSES = ['recruiting', 'closed', 'cancelled', 'completed', 'archived'] as const;
 const TEAM_LIST_STATUSES = ['active', 'suspended', 'archived'] as const;
+/** Every sort ends on `id` so the cursor and page modes see one total order. */
+function teamMatchOrderBy(sort: AdminTeamMatchSort): Prisma.V1TeamMatchOrderByWithRelationInput[] {
+  if (sort === 'start_asc') return [{ startAt: { sort: 'asc', nulls: 'last' } }, { id: 'asc' }];
+  if (sort === 'start_desc') return [{ startAt: { sort: 'desc', nulls: 'last' } }, { id: 'desc' }];
+  return [{ createdAt: 'desc' }, { id: 'desc' }];
+}
+
 const TEAM_MATCH_LIST_STATUSES = ['recruiting', 'closed', 'matched', 'cancelled', 'completed', 'archived'] as const;
 const NOTICE_LIST_STATUSES = ['published', 'draft', 'archived'] as const;
 const NOTICE_AUDIENCES = ['public', 'users', 'admins'] as const;
@@ -2471,6 +2480,15 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
 
   // ─── Team-match list ───────────────────────────────────────────────────────
 
+  /** Sidebar badge — requested applications on matches the operator can still handle. */
+  async getTeamMatchPendingApplicationCount(user: V1AuthUser) {
+    await this.getActiveAdmin(user.id);
+    const count = await this.prisma.v1TeamMatchApplication.count({
+      where: OPERATOR_ACTIONABLE_APPLICATION_WHERE,
+    });
+    return { count };
+  }
+
   async listTeamMatches(user: V1AuthUser, query: AdminTeamMatchListQueryDto) {
     await this.getActiveAdmin(user.id);
     const limit = Math.min(Math.max(query.limit ?? 20, 1), 50);
@@ -2484,8 +2502,10 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
         : query.kind === 'friendly'
           ? { leagueId: null, tournamentId: null }
           : {};
+    const regionIds = query.regionId ? await this.resolveRegionFilterIds(query.regionId) : null;
     const statusFacetWhere: Prisma.V1TeamMatchWhereInput = {
       ...kindWhere,
+      ...(regionIds ? { regionId: { in: regionIds } } : {}),
       ...(query.q
         ? {
             OR: [
@@ -2505,18 +2525,28 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
         : {}),
     };
 
+    const sort = query.sort ?? 'created_desc';
+    // The cursor is a bare row id, so the keyset position is rebuilt from that row. Prisma's own
+    // cursor option cannot be used: it mis-compares rows when the sort column (startAt) is null.
+    // Nested under AND because the q search already owns the top-level OR.
+    const afterCursorWhere: Prisma.V1TeamMatchWhereInput = query.cursor && !(query.page && query.page > 1)
+      ? { AND: [await this.teamMatchAfterCursorWhere(sort, query.cursor)] }
+      : {};
+
     const [rows, statusGroups] = await Promise.all([this.prisma.v1TeamMatch.findMany({
       where: {
         ...(query.status ? { status: query.status } : {}),
         ...statusFacetWhere,
+        ...afterCursorWhere,
       },
-      orderBy: { createdAt: 'desc' },
+      orderBy: teamMatchOrderBy(sort),
       take: limit + 1,
-      ...paginationArgs(query, limit),
+      ...(query.page && query.page > 1 ? { skip: (query.page - 1) * limit } : {}),
       select: {
         id: true,
         title: true,
         startAt: true,
+        region: { select: { id: true, name: true } },
         status: true,
         platformManaged: true,
         createdAt: true,
@@ -2563,6 +2593,7 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
         league: row.league ? { leagueId: row.league.id, title: row.league.title } : null,
         tournament: row.tournament ? { tournamentId: row.tournament.id, title: row.tournament.title } : null,
         sportName: row.sport.name,
+        region: row.region ? { regionId: row.region.id, name: row.region.name } : null,
         platformManaged: row.platformManaged,
         pendingApplicationCount: row._count.applications,
         startAt: row.startAt,
@@ -2577,6 +2608,47 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
         nextCursor: hasNext ? pageItems.at(-1)?.id ?? null : null,
       }),
       summary,
+    };
+  }
+
+  /** A selected parent region also covers its direct child regions. */
+  private async resolveRegionFilterIds(regionId: string): Promise<string[]> {
+    const regions = await this.prisma.v1Region.findMany({
+      where: { OR: [{ id: regionId }, { parentId: regionId }] },
+      select: { id: true },
+    });
+    return regions.map((region) => region.id);
+  }
+
+  private async teamMatchAfterCursorWhere(
+    sort: AdminTeamMatchSort,
+    cursorId: string,
+  ): Promise<Prisma.V1TeamMatchWhereInput> {
+    const anchor = await this.prisma.v1TeamMatch.findUnique({
+      where: { id: cursorId },
+      select: { id: true, createdAt: true, startAt: true },
+    });
+    if (!anchor) {
+      throw new BadRequestException({ code: 'INVALID_CURSOR', message: '목록 위치를 찾을 수 없어요. 처음부터 다시 불러와 주세요.' });
+    }
+    if (sort === 'created_desc') {
+      return {
+        OR: [
+          { createdAt: { lt: anchor.createdAt } },
+          { createdAt: anchor.createdAt, id: { lt: anchor.id } },
+        ],
+      };
+    }
+    const asc = sort === 'start_asc';
+    const idAfter = asc ? { gt: anchor.id } : { lt: anchor.id };
+    // Rows without startAt sort last, so a null anchor only continues inside the null block.
+    if (!anchor.startAt) return { startAt: null, id: idAfter };
+    return {
+      OR: [
+        { startAt: asc ? { gt: anchor.startAt } : { lt: anchor.startAt } },
+        { startAt: anchor.startAt, id: idAfter },
+        { startAt: null },
+      ],
     };
   }
 

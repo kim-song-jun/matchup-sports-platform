@@ -127,6 +127,7 @@ describe('TeamMatchesService', () => {
     v1ParticipantIdentityLinkEvent: { createManyAndReturn: jest.Mock };
     v1ParticipantIdentityLinkCurrent: { createMany: jest.Mock };
     v1StatusChangeLog: { create: jest.Mock; createMany: jest.Mock };
+    v1AdminUser: { findFirst: jest.Mock; findMany: jest.Mock };
     v1PostEventReview: { findMany: jest.Mock };
     v1IdempotencyRecord: { findFirst: jest.Mock };
     v1CompetitionConfigVersion: { findFirst: jest.Mock };
@@ -178,6 +179,7 @@ describe('TeamMatchesService', () => {
       v1ParticipantIdentityLinkEvent: { createManyAndReturn: jest.fn().mockResolvedValue([]) },
       v1ParticipantIdentityLinkCurrent: { createMany: jest.fn().mockResolvedValue({ count: 0 }) },
       v1StatusChangeLog: { create: jest.fn(), createMany: jest.fn() },
+      v1AdminUser: { findFirst: jest.fn(), findMany: jest.fn() },
       v1PostEventReview: { findMany: jest.fn().mockResolvedValue([]) },
       v1IdempotencyRecord: { findFirst: jest.fn().mockResolvedValue(null) },
       v1CompetitionConfigVersion: { findFirst: jest.fn().mockResolvedValue({ id: 'config-1' }) },
@@ -1861,37 +1863,82 @@ describe('TeamMatchesService', () => {
     );
   });
 
-  it('createApplication: 플랫폼 모집에도 관리 중인 같은 종목 팀으로 신청할 수 있다', async () => {
-    prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'mem-applicant', team: { sportId: 'sport-1' } });
-    prisma.v1TeamMatch.findFirst.mockResolvedValue({
-      ...teamMatchRow({
-        status: 'recruiting',
-        startAt: FUTURE,
-        hostTeamId: null,
-        platformManaged: true,
-        createdByUserId: 'admin-user',
-        leagueId: null,
-        tournamentId: null,
-      }),
-      sport: { id: 'sport-1', name: '풋살' },
-      region: { id: 'region-1', name: '서울' },
-      minSportLevel: null,
-      maxSportLevel: null,
-      hostTeam: null,
-      approvedApplicantTeam: null,
-      applications: [],
-    });
-    prisma.v1TeamMatchApplication.create.mockResolvedValue({
-      id: 'app-platform',
-      teamMatchId: 'tm-1',
-      applicantTeamId: 'team-applicant',
-      status: 'requested',
+  describe('createApplication: 플랫폼 모집 운영자 알림', () => {
+    const operatorWhere = {
+      status: 'active', revokedAt: null, adminRole: { in: ['owner', 'ops'] }, user: { accountStatus: 'active' },
+    };
+
+    function arrange(overrides: Record<string, unknown> = {}) {
+      prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'mem-applicant', team: { sportId: 'sport-1', name: '신청 팀' } });
+      prisma.v1TeamMatch.findFirst.mockResolvedValue({
+        ...teamMatchRow({
+          status: 'recruiting', startAt: FUTURE, hostTeamId: null, platformManaged: true,
+          createdByUserId: 'admin-user', leagueId: null, tournamentId: null, title: '토요일 친선전', ...overrides,
+        }),
+        sport: { id: 'sport-1', name: '풋살' }, region: { id: 'region-1', name: '서울' },
+        minSportLevel: null, maxSportLevel: null, hostTeam: null, approvedApplicantTeam: null, applications: [],
+      });
+      prisma.v1TeamMatchApplication.create.mockResolvedValue({ id: 'app-platform', teamMatchId: 'tm-1', applicantTeamId: 'team-applicant', status: 'requested' });
+      prisma.v1StatusChangeLog.create.mockResolvedValue({ id: 'log-1' });
+    }
+
+    async function recipients() {
+      const [resolve] = notifications.emitToManyDeferred.mock.calls[0];
+      return (resolve as () => Promise<string[]>)();
+    }
+
+    it('생성자가 지금도 활성 운영자면 그 1명에게만, 신청 팀 이름과 모집 제목으로 보낸다', async () => {
+      arrange();
+      prisma.v1AdminUser.findFirst.mockResolvedValue({ userId: 'admin-user' });
+
+      const result = await service.createApplication(manager, 'tm-1', { applicantTeamId: 'team-applicant' });
+
+      expect(result).toMatchObject({ applicationId: 'app-platform', status: 'requested' });
+      expect(notifications.emitToManyDeferred).toHaveBeenCalledWith(
+        expect.any(Function), 'admin_team_match_application_received', 'tm-1', undefined,
+        { vars: { name: '신청 팀', title: '토요일 친선전' }, businessKey: 'tm-app-admin:log-1' },
+      );
+      expect(await recipients()).toEqual(['admin-user']);
+      expect(prisma.v1AdminUser.findFirst).toHaveBeenCalledWith({ where: { userId: 'admin-user', ...operatorWhere }, select: { userId: true } });
+      expect(prisma.v1AdminUser.findMany).not.toHaveBeenCalled();
     });
 
-    const result = await service.createApplication(manager, 'tm-1', { applicantTeamId: 'team-applicant' });
+    it('생성자의 운영 권한이 회수됐으면 활성 owner·ops 전원에게 보낸다(support 는 조회 기준에서 빠진다)', async () => {
+      arrange();
+      prisma.v1AdminUser.findFirst.mockResolvedValue(null);
+      prisma.v1AdminUser.findMany.mockResolvedValue([{ userId: 'op-1' }, { userId: 'op-2' }]);
 
-    expect(result).toMatchObject({ applicationId: 'app-platform', status: 'requested' });
-    expect(notifications.emitToManyDeferred).not.toHaveBeenCalled();
+      await service.createApplication(manager, 'tm-1', { applicantTeamId: 'team-applicant' });
+
+      expect(await recipients()).toEqual(['op-1', 'op-2']);
+      expect(prisma.v1AdminUser.findMany).toHaveBeenCalledWith({ where: operatorWhere, select: { userId: true } });
+    });
+
+    it('신청한 본인이 수신자면 제외하고, 생성자 본인 신청이면 전원 폴백 없이 아무에게도 보내지 않는다', async () => {
+      arrange();
+      prisma.v1AdminUser.findFirst.mockResolvedValue({ userId: manager.id });
+      await service.createApplication(manager, 'tm-1', { applicantTeamId: 'team-applicant' });
+      expect(await recipients()).toEqual([]);
+      expect(prisma.v1AdminUser.findMany).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      ['비플랫폼 모집', { platformManaged: false }],
+      ['리그 연결', { leagueId: 'league-1' }],
+      ['대회 연결', { tournamentId: 'tour-1' }],
+    ])('%s 는 운영자에게 보내지 않는다', async (_label, overrides) => {
+      arrange(overrides);
+      await service.createApplication(manager, 'tm-1', { applicantTeamId: 'team-applicant' }).catch(() => undefined);
+      expect(notifications.emitToManyDeferred).not.toHaveBeenCalledWith(
+        expect.anything(), 'admin_team_match_application_received', expect.anything(), undefined, expect.anything(),
+      );
+    });
+
+    it('모집이 마감된 매치는 신청 자체가 거부되어 알림도 없다', async () => {
+      arrange({ status: 'closed' });
+      await expect(service.createApplication(manager, 'tm-1', { applicantTeamId: 'team-applicant' })).rejects.toMatchObject({ response: { code: 'NOT_RECRUITING' } });
+      expect(notifications.emitToManyDeferred).not.toHaveBeenCalled();
+    });
   });
 
   it('createApplication: 신청 마감시간이 지나면 새 신청을 거부한다', async () => {

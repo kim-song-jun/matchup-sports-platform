@@ -32,6 +32,14 @@ type DuplicateCheckState = {
   value: string;
 };
 
+/** 가입 진행 중인 소셜 계정의 이름. 모르면 null — 문구가 특정 서비스를 단정하지 않게 한다. */
+function socialProviderLabel(provider: string | null | undefined): string | null {
+  if (provider === 'kakao') return '카카오';
+  if (provider === 'apple') return 'Apple';
+  if (provider === 'naver') return '네이버';
+  return null;
+}
+
 export function SocialSignupClient() {
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -60,6 +68,7 @@ export function SocialSignupClient() {
   // 동의항목이 없으면 socialSignupPrefill 이 null 이라 아무것도 하지 않고 직접 입력 흐름 그대로다.
   const authMe = useV1AuthMe();
   const prefill = authMe.data?.socialSignupPrefill ?? null;
+  const providerLabel = socialProviderLabel(authMe.data?.user?.authProvider);
   // 카카오가 확인해 준 값은 사용자가 임의로 바꾸지 못하게 잠근다. 단 전화번호는 예외 —
   // 카카오 계정 번호와 실제 쓰는 번호가 다를 수 있고, 잠그면 OTP 본인인증을 통과할 방법이
   // 사라져 가입 자체가 막힌다. 그래서 채워 주기만 하고 수정은 허용한다.
@@ -147,7 +156,7 @@ export function SocialSignupClient() {
         onSuccess: (result) => {
           saveStoredV1Session(result.session);
           clearV1IdentityCache(queryClient);
-          trackEvent('sign_up_complete', { method: 'kakao' });
+          trackEvent('sign_up_complete', { method: authMe.data?.user?.authProvider ?? 'social' });
           router.replace(result.next.route);
         },
         onError: (nextError) => {
@@ -173,7 +182,7 @@ export function SocialSignupClient() {
           }
 
           if (nextError instanceof V1ApiError && nextError.code === 'SOCIAL_SIGNUP_EXPIRED') {
-            setError('가입 가능 시간이 지났어요. 카카오 로그인부터 다시 시작해 주세요.');
+            setError(`가입 가능 시간이 지났어요. ${providerLabel ? `${providerLabel} 로그인부터` : '로그인 화면에서 처음부터'} 다시 시작해 주세요.`);
             return;
           }
 
@@ -192,7 +201,7 @@ export function SocialSignupClient() {
   return (
     <AuthFrame
       stage={AUTH_WELCOME_STAGE}
-      topTitle="카카오 가입"
+      topTitle={providerLabel ? `${providerLabel} 가입` : '간편 가입'}
       onBack={() => void exitFlow.exit()}
       backLabel="가입 그만두기"
       fixedAction={
@@ -214,7 +223,9 @@ export function SocialSignupClient() {
     >
       <form className="tm-auth-body" id="v1-social-signup-form" onSubmit={submit}>
         <h1 className="tm-text-heading tm-auth-heading">프로필을 완성해 주세요</h1>
-        <p className="tm-text-body tm-auth-sub">카카오 계정 확인이 됐어요. 가입에 필요한 프로필 정보를 입력해 주세요.</p>
+        <p className="tm-text-body tm-auth-sub">
+          {providerLabel ? `${providerLabel} 계정 확인이 됐어요.` : '계정 확인이 됐어요.'} 가입에 필요한 프로필 정보를 입력해 주세요.
+        </p>
         <div className="tm-auth-form tm-auth-signup-form">
           <label className="tm-auth-field">
             <span className="tm-text-label">닉네임</span>
@@ -269,7 +280,7 @@ export function SocialSignupClient() {
               </button>
             </div>
             {lockedGender ? (
-              <span className="tm-text-caption tm-auth-field-helper">카카오 계정에서 가져온 정보예요.</span>
+              <span className="tm-text-caption tm-auth-field-helper">{providerLabel ?? '소셜'} 계정에서 가져온 정보예요.</span>
             ) : null}
             {fieldErrors.gender ? (
               <span id="social-signup-gender-error" role="alert" className="tm-text-caption tm-auth-field-helper-error">
@@ -290,7 +301,7 @@ export function SocialSignupClient() {
               value={displayName}
             />
             {lockedName ? (
-              <span className="tm-text-caption tm-auth-field-helper">카카오 계정에서 가져온 정보예요.</span>
+              <span className="tm-text-caption tm-auth-field-helper">{providerLabel ?? '소셜'} 계정에서 가져온 정보예요.</span>
             ) : null}
           </label>
           <label className="tm-auth-field">

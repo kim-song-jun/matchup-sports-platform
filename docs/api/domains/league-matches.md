@@ -19,6 +19,9 @@ publication change in the existing admin audit. The admin league detail includes
 preserves the original JSON type for this field: strings (including `"false"`),
 numbers, arrays, objects, null and a missing value return `400 VALIDATION_ERROR`.
 
+`GET /api/v1/admin/league-matches` accepts an optional `visibility=public|hidden` filter next to
+`seriesId` (any other value returns `400`); omitting it lists every league.
+
 Unpublishing removes the league from home discovery, league and tournament public
 lists, API-backed search and sitemap discovery. Direct public league, standings,
 fixture and associated public game reads return the normal not-found error.
@@ -233,7 +236,10 @@ LEAGUE_REGION_INVALID` for an unknown or unsuitable region.
   period of a one-period match).
 - `POST /api/v1/admin/league-matches/:leagueId/fixtures` (and `preview`,
   `regenerate`) accept `timing.gameDurationMinutes` as optional. When omitted,
-  the regulation time of the fixture's competition config is used; a legacy
+  the regulation time of the league's own competition config (the version edited
+  through the period settings, not the sport default) is used, and new fixtures
+  are pinned to that version; a league without one returns
+  `409 COMPETITION_CONFIG_REQUIRED`. A legacy
   config without period lengths fails with
   `422 LEAGUE_FIXTURE_DURATION_REQUIRED`. Without any `timing`, fixtures of a
   matchday share one kickoff and `endAt` is kickoff + regulation time.

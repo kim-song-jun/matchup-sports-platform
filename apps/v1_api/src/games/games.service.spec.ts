@@ -7,6 +7,8 @@ import { GameCommandDto } from './dto/game-command.dto';
 import type { V1AuthUser } from '../auth/v1-auth-user';
 import {
   canonicalGameCommandPayloadHash,
+  applyForfeitScore,
+  extractEndForfeitSideId,
   extractEndOutcome,
   extractEndPenalties,
   gameAuthorizationAction,
@@ -229,6 +231,30 @@ describe('GamesService command boundary', () => {
   // 남지 않았다. 2026-08-23 사용자 결정(Q3)은 표준 스코어 자동 부여가 아니라
   // **운영자 입력 + 사유 필수**다 — 이 파서의 존재 이유가 그 "필수"이므로,
   // 사유 없는 몰수가 실제로 막히는지가 이 스위트의 핵심 계약이다.
+  describe('몰수 기권 팀 선택', () => {
+    it('몰수에는 기권한 팀이 필수라 없으면 422다', () => {
+      expect(() => extractEndForfeitSideId({}, 'FORFEIT')).toThrow(
+        expect.objectContaining({ response: expect.objectContaining({ code: 'GAME_FORFEIT_SIDE_REQUIRED' }) }),
+      );
+      expect(extractEndForfeitSideId({ forfeitSideId: 'side-1' }, 'FORFEIT')).toBe('side-1');
+    });
+
+    it('정상·중단 종료는 기권 팀을 요구하지도 읽지도 않는다', () => {
+      expect(extractEndForfeitSideId({}, 'NORMAL')).toBeUndefined();
+      expect(extractEndForfeitSideId({ forfeitSideId: 'side-1' }, 'ABANDONED')).toBeUndefined();
+    });
+
+    it('0:0 이나 기권 팀이 앞선 점수는 상대가 이기는 1:0 으로 정한다', () => {
+      expect(applyForfeitScore({ home: 0, away: 0 }, 'HOME')).toEqual({ home: 0, away: 1 });
+      expect(applyForfeitScore({ home: 2, away: 1 }, 'HOME')).toEqual({ home: 0, away: 1 });
+      expect(applyForfeitScore({ home: 1, away: 1 }, 'AWAY')).toEqual({ home: 1, away: 0 });
+    });
+
+    it('운영자가 이미 상대 승리 점수(3:0)를 적었으면 그대로 둔다', () => {
+      expect(applyForfeitScore({ home: 0, away: 3 }, 'HOME')).toEqual({ home: 0, away: 3 });
+    });
+  });
+
   describe('extractEndOutcome (몰수·중단 종결 사유 파싱)', () => {
     it('사유가 없으면 정상 종료다 — 기존 end 호출은 그대로 통과해야 한다', () => {
       expect(extractEndOutcome({})).toEqual({ outcomeReason: 'NORMAL', note: null });

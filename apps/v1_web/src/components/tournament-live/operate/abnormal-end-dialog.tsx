@@ -36,15 +36,17 @@ const REASON_OPTIONS: ReadonlyArray<{ value: AbnormalEndReason; label: string; h
 export interface AbnormalEndDialogProps {
   readonly open: boolean;
   readonly onCancel: () => void;
-  readonly onConfirm: (input: { reason: AbnormalEndReason; note: string }) => void;
+  readonly sides: readonly { id: string; displayNameSnapshot: string }[];
+  readonly onConfirm: (input: { reason: AbnormalEndReason; note: string; forfeitSideId?: string }) => void;
   readonly submitting?: boolean;
 }
 
-export function AbnormalEndDialog({ open, onCancel, onConfirm, submitting = false }: AbnormalEndDialogProps) {
+export function AbnormalEndDialog({ open, sides, onCancel, onConfirm, submitting = false }: AbnormalEndDialogProps) {
   const titleId = useId();
   const noteId = useId();
   const [reason, setReason] = useState<AbnormalEndReason>('FORFEIT');
   const [note, setNote] = useState('');
+  const [forfeitSideId, setForfeitSideId] = useState('');
 
   // ESC·backdrop 닫기, Tab 포커스 트랩, 스크롤 잠금, 초기 포커스는 공용 훅으로 이관했다.
   // (기존에 직접 두고 있던 ESC keydown 리스너와 Tab 트랩 querySelectorAll 루프는 제거 —
@@ -64,12 +66,14 @@ export function AbnormalEndDialog({ open, onCancel, onConfirm, submitting = fals
     if (!open) return;
     setReason('FORFEIT');
     setNote('');
+    setForfeitSideId('');
   }, [open]);
 
   if (!open) return null;
 
   const trimmed = note.trim();
-  const canSubmit = trimmed.length > 0 && !submitting;
+  const needsForfeitSide = reason === 'FORFEIT';
+  const canSubmit = trimmed.length > 0 && (!needsForfeitSide || forfeitSideId !== '') && !submitting;
 
   return (
     <div
@@ -92,8 +96,10 @@ export function AbnormalEndDialog({ open, onCancel, onConfirm, submitting = fals
           몰수·중단으로 종료
         </h2>
         <p className="mt-2 text-sm text-[var(--text-muted)]">
-          점수는 지금 기록된 값 그대로 확정돼요. 사유는 공개 경기 기록에 함께 남아, 나중에 이 결과가 왜
-          이런지 설명하는 유일한 근거가 돼요.
+          {needsForfeitSide
+            ? '몰수는 기권한 팀의 상대가 이긴 점수로 확정돼요(적어 둔 점수가 이미 상대 승리면 그대로예요).'
+            : '점수는 지금 기록된 값 그대로 확정돼요.'}{' '}
+          사유는 공개 경기 기록에 함께 남아, 나중에 이 결과가 왜 이런지 설명하는 유일한 근거가 돼요.
         </p>
 
         <fieldset className="mt-4">
@@ -126,6 +132,39 @@ export function AbnormalEndDialog({ open, onCancel, onConfirm, submitting = fals
           </div>
         </fieldset>
 
+        {needsForfeitSide ? (
+          <fieldset className="mt-4">
+            <legend className="text-[length:var(--font-size-body-sm)] font-semibold">
+              기권한 팀 <span className="text-[var(--red500)]">(필수)</span>
+            </legend>
+            <div className="mt-2 flex flex-col gap-2">
+              {sides.map((side) => (
+                <label
+                  key={side.id}
+                  className={[
+                    'flex min-h-[44px] cursor-pointer items-center gap-3 rounded-lg border px-3 py-2',
+                    forfeitSideId === side.id
+                      ? 'border-[var(--blue500)] bg-[var(--blue50)]'
+                      : 'border-[var(--border)]',
+                  ].join(' ')}
+                >
+                  <input
+                    type="radio"
+                    name="abnormal-end-forfeit-side"
+                    value={side.id}
+                    checked={forfeitSideId === side.id}
+                    onChange={() => setForfeitSideId(side.id)}
+                  />
+                  <span className="text-[length:var(--font-size-body-sm)] font-medium">{side.displayNameSnapshot}</span>
+                </label>
+              ))}
+            </div>
+            {forfeitSideId === '' ? (
+              <p className="mt-1 text-[length:var(--font-size-caption)] text-[var(--text-muted)]">기권한 팀을 골라야 종료할 수 있어요.</p>
+            ) : null}
+          </fieldset>
+        ) : null}
+
         <div className="mt-4">
           <label htmlFor={noteId} className="text-sm font-semibold">
             사유 <span className="text-[var(--red500)]">(필수)</span>
@@ -156,7 +195,7 @@ export function AbnormalEndDialog({ open, onCancel, onConfirm, submitting = fals
             block
             disabled={!canSubmit}
             loading={submitting}
-            onClick={() => onConfirm({ reason, note: trimmed })}
+            onClick={() => onConfirm(needsForfeitSide ? { reason, note: trimmed, forfeitSideId } : { reason, note: trimmed })}
           >
             이대로 종료
           </Button>

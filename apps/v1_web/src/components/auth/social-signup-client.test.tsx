@@ -1,7 +1,8 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { SocialSignupClient } from './social-signup-client';
+import { V1ApiError } from '@/lib/api-client';
 
 const router = vi.hoisted(() => ({
   replace: vi.fn(),
@@ -16,7 +17,10 @@ const hooks = vi.hoisted(() => ({
   authedPhoneConfirmMutateAsync: vi.fn(),
   logoutMutateAsync: vi.fn(),
   // 카카오 동의항목 미승인이 기본값 — 프리필 없이 직접 입력하는 기존 흐름.
-  authMe: { socialSignupPrefill: null as null | { name: string | null; phone: string | null; gender: 'male' | 'female' | null } },
+  authMe: {
+    socialSignupPrefill: null as null | { name: string | null; phone: string | null; gender: 'male' | 'female' | null },
+    user: { authProvider: 'kakao' as string | null },
+  },
 }));
 
 const analytics = vi.hoisted(() => ({
@@ -55,6 +59,7 @@ type CompleteProfileCallbacks = {
     readonly session: { readonly userId: string; readonly userEmail: string | null };
     readonly next: { readonly route: string };
   }) => void;
+  readonly onError?: (error: unknown) => void;
 };
 
 async function verifyNicknameAndSelectGender(): Promise<void> {
@@ -80,6 +85,7 @@ async function completePhoneVerification(): Promise<void> {
 describe('SocialSignupClient required profile contract', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    hooks.authMe.user.authProvider = 'kakao';
     hooks.checkNicknameMutate.mockImplementation(
       (_value: string, callbacks: AvailabilityCallbacks) => callbacks.onSuccess({ available: true }),
     );
@@ -164,6 +170,52 @@ describe('SocialSignupClient required profile contract', () => {
 
     // Then
     await waitFor(() => expect(analytics.trackEvent).toHaveBeenCalledWith('sign_up_complete', { method: 'kakao' }));
+  });
+
+  it('Apple 가입 완료는 method=apple 로 기록한다', async () => {
+    hooks.authMe.user.authProvider = 'apple';
+    hooks.completeProfileMutate.mockImplementation((_body: unknown, callbacks: CompleteProfileCallbacks) =>
+      callbacks.onSuccess({ session: { userId: 'social-user', userEmail: null }, next: { route: '/onboarding/region' } }),
+    );
+    render(<SocialSignupClient />);
+    await verifyNicknameAndSelectGender();
+    fireEvent.change(screen.getByLabelText(/^이름/), { target: { value: '김러너' } });
+    fireEvent.change(screen.getByLabelText(/^휴대폰 번호/), { target: { value: '01087654321' } });
+    fireEvent.change(screen.getByLabelText(/^생년월일/), { target: { value: '20000229' } });
+    await completePhoneVerification();
+
+    fireEvent.click(screen.getByRole('button', { name: '운동 설정으로 계속' }));
+
+    await waitFor(() => expect(analytics.trackEvent).toHaveBeenCalledWith('sign_up_complete', { method: 'apple' }));
+  });
+
+  it.each([
+    ['apple', 'Apple 로그인부터 다시 시작해 주세요.'],
+    ['kakao', '카카오 로그인부터 다시 시작해 주세요.'],
+    [null, '로그인 화면에서 처음부터 다시 시작해 주세요.'],
+  ])('가입 시간이 만료되면 가입 방식(%s)에 맞는 재시작 안내를 보여 준다', async (provider, expected) => {
+    hooks.authMe.user.authProvider = provider;
+    hooks.completeProfileMutate.mockImplementation((_body: unknown, callbacks: CompleteProfileCallbacks) =>
+      callbacks.onError?.(
+        new V1ApiError({
+          status: 'error',
+          statusCode: 401,
+          code: 'SOCIAL_SIGNUP_EXPIRED',
+          message: 'expired',
+          timestamp: new Date().toISOString(),
+        }),
+      ),
+    );
+    render(<SocialSignupClient />);
+    await verifyNicknameAndSelectGender();
+    fireEvent.change(screen.getByLabelText(/^이름/), { target: { value: '김러너' } });
+    fireEvent.change(screen.getByLabelText(/^휴대폰 번호/), { target: { value: '01087654321' } });
+    fireEvent.change(screen.getByLabelText(/^생년월일/), { target: { value: '20000229' } });
+    await completePhoneVerification();
+
+    fireEvent.click(screen.getByRole('button', { name: '운동 설정으로 계속' }));
+
+    await waitFor(() => expect(screen.getByText(`가입 가능 시간이 지났어요. ${expected}`)).toBeInTheDocument());
   });
 
   it('follows the exact API next route after social profile completion', async () => {
@@ -258,6 +310,7 @@ describe('SocialSignupClient 가입 중 탈출구', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     hooks.authMe.socialSignupPrefill = null;
+    hooks.authMe.user.authProvider = 'kakao';
     Object.defineProperty(window, 'location', {
       configurable: true,
       value: { ...window.location, replace: locationReplace },
@@ -356,5 +409,39 @@ describe('SocialSignupClient 카카오 자동 채움', () => {
     const phone = screen.getByLabelText(/^휴대폰 번호/);
     await waitFor(() => expect(phone).toHaveValue('010-1234-5678'));
     expect(phone).not.toHaveAttribute('readonly');
+  });
+});
+
+describe('SocialSignupClient 가입 방식 문구', () => {
+  afterEach(() => {
+    hooks.authMe.user.authProvider = 'kakao';
+    hooks.authMe.socialSignupPrefill = null;
+  });
+
+  it('Apple 로 들어온 가입은 카카오가 아니라 Apple 로 안내한다', () => {
+    hooks.authMe.user.authProvider = 'apple';
+    hooks.authMe.socialSignupPrefill = { name: '홍길동', phone: null, gender: null };
+    render(<SocialSignupClient />);
+
+    expect(screen.getAllByText('Apple 가입').length).toBeGreaterThan(0);
+    expect(screen.getByText(/Apple 계정 확인이 됐어요\./)).toBeInTheDocument();
+    expect(screen.getByText('Apple 계정에서 가져온 정보예요.')).toBeInTheDocument();
+    expect(screen.queryByText(/카카오/)).not.toBeInTheDocument();
+  });
+
+  it('카카오 가입은 기존처럼 카카오로 안내한다', () => {
+    hooks.authMe.user.authProvider = 'kakao';
+    render(<SocialSignupClient />);
+
+    expect(screen.getAllByText('카카오 가입').length).toBeGreaterThan(0);
+    expect(screen.getByText(/카카오 계정 확인이 됐어요\./)).toBeInTheDocument();
+  });
+
+  it('가입 방식을 아직 모르면 특정 서비스를 단정하지 않는다', () => {
+    hooks.authMe.user.authProvider = null;
+    render(<SocialSignupClient />);
+
+    expect(screen.getAllByText('간편 가입').length).toBeGreaterThan(0);
+    expect(screen.queryByText(/카카오 계정 확인/)).not.toBeInTheDocument();
   });
 });

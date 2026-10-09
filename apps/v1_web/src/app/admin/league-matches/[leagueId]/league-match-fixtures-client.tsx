@@ -26,6 +26,7 @@ import {
   useV1UpdateLeagueFixture,
 } from '@/hooks/use-v1-api';
 import { describeLeagueRegistrationWindow } from '@/lib/league-registration-copy';
+import { leagueFixtureMatchupLabel } from '@/lib/league-fixture-meta';
 import { LeagueManualFixtureModal } from './league-manual-fixture-modal';
 import { LeagueFixtureScheduleModal, type LeagueFixtureSchedulePatch } from './league-fixture-schedule-modal';
 import { TournamentPeriodSettingsEditor } from '@/components/admin/tournament-period-settings-editor';
@@ -36,7 +37,7 @@ import { describeLeaguePeriods, totalPeriodMinutes } from './league-period-defau
 import { pickLeagueNextAction } from '@/lib/league-next-action';
 import { leagueFixtureResultCell } from '@/lib/competition-status';
 import { extractErrorMessage } from '@/lib/error-message';
-import { expandWeeklyFixtureDates } from '@/lib/league-fixture-dates';
+import { expandWeeklyFixtureDates, WEEKDAY_OPTIONS } from '@/lib/league-fixture-dates';
 import { toKstDateString } from '@/lib/kst-calendar';
 import { LeagueFixtureDatePicker } from './league-fixture-date-picker';
 import { LeagueWeeksPlanField } from './league-weeks-plan-field';
@@ -47,6 +48,11 @@ import { LeagueVisibilityControl } from './league-visibility-control';
 import { LeagueHoldControl } from './league-hold-control';
 import { LeagueCloseRegistrationControl } from './league-close-registration-control';
 import { LeagueCoverImageControl } from './league-cover-image-control';
+import { LeagueScheduleBoard } from '@/components/admin/bracket-canvas/league-schedule-board';
+import { SegmentedTabs } from '@/components/v1-ui/segmented-tabs';
+import { useAdminCanWrite } from '@/hooks/use-admin-can-write';
+import { useV1ApplyLeagueTemplate } from '@/hooks/use-v1-bracket-canvas';
+import { LeagueTemplateDialog } from './league-template-dialog';
 import {
   computeDailyPlan,
   dayOffsetLabel,
@@ -64,6 +70,11 @@ function consoleHref(leagueId: string, teamMatchId: string): string {
   return `/admin/live/${encodeURIComponent(leagueId)}/fixtures/${encodeURIComponent(teamMatchId)}/operate`;
 }
 
+/** 양쪽 팀이 모두 정해진 경기만 콘솔·결과·몰수 대상이다. 자리만 있고 팀이 빈 경기는 아직 치를 수 없다. */
+function hasBothTeams(fixture: V1LeagueFixture): boolean {
+  return fixture.homeTeamId !== null && fixture.awayTeamId !== null;
+}
+
 /**
  * 서버가 대진 취소·팀 제외·재생성을 409 LEAGUE_FIXTURE_GAME_IN_PROGRESS 로 막는 조건과 같다 —
  * 아직 취소되지 않은 대진의 경기가 뛰는 중이다. 화면은 같은 조건에서 버튼을 미리 막고 이유를 적는다.
@@ -78,17 +89,17 @@ const ACTION_ROW_CLASS = 'col-span-full flex gap-2';
 const inputClass =
   'h-[44px] rounded-xl border border-[var(--border-strong)] bg-[var(--card-surface)] px-3 text-sm text-[var(--text-strong)] focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20';
 
-const WEEKDAY_OPTIONS = [
-  { value: 0, label: '일요일' },
-  { value: 1, label: '월요일' },
-  { value: 2, label: '화요일' },
-  { value: 3, label: '수요일' },
-  { value: 4, label: '목요일' },
-  { value: 5, label: '금요일' },
-  { value: 6, label: '토요일' },
-];
+export type LeagueFixturesView = 'board' | 'list';
 
-export default function LeagueMatchFixturesClient({ leagueId, returnHref = '/admin/league-matches' }: { leagueId: string; returnHref?: string }) {
+export default function LeagueMatchFixturesClient({
+  leagueId,
+  returnHref = '/admin/league-matches',
+  initialView = 'board',
+}: {
+  leagueId: string;
+  returnHref?: string;
+  initialView?: LeagueFixturesView;
+}) {
   const { data: series, isPending, isError, error, refetch } = useV1AdminLeagueMatch(leagueId);
   const revertCompletion = useV1RevertLeagueCompletion(leagueId);
   const [revertModalOpen, setRevertModalOpen] = useState(false);
@@ -97,6 +108,10 @@ export default function LeagueMatchFixturesClient({ leagueId, returnHref = '/adm
   const cancelFixture = useV1CancelLeagueFixture(leagueId);
   const regenerateFixtures = useV1RegenerateLeagueFixtures(leagueId);
   const { data: teamsData } = useV1AdminLeagueTeams(leagueId);
+  const canWrite = useAdminCanWrite();
+  const applyTemplate = useV1ApplyLeagueTemplate(leagueId);
+  const [view, setView] = useState<LeagueFixturesView>(initialView);
+  const [templateOpen, setTemplateOpen] = useState(false);
   const createManualFixture = useV1CreateManualLeagueFixture(leagueId);
   const [manualFixtureOpen, setManualFixtureOpen] = useState(false);
   const recordForfeit = useV1RecordLeagueForfeit(leagueId);
@@ -270,18 +285,15 @@ export default function LeagueMatchFixturesClient({ leagueId, returnHref = '/adm
   // 대진**이 실제로 생성된다(서버는 과거만 거부한다). 응답에 이 필드가 없는 건 서버가
   // 구버전일 때뿐이므로, 만들지 못하게 막고 새로고침을 안내하는 쪽이 맞다. 표·참가팀·취소는
   // 그대로 쓸 수 있다 — 잠그는 건 생성·미리보기·재생성 세 버튼뿐이다.
-  const matchupLabelOf = (fixture: V1LeagueFixture) => {
-    const homeName = teamNameById.get(fixture.homeTeamId) ?? '홈팀';
-    return fixture.awayTeamId
-      ? `${homeName} vs ${teamNameById.get(fixture.awayTeamId) ?? '원정팀'}`
-      : `${homeName} 부전승`;
-  };
+  const matchupLabelOf = (fixture: V1LeagueFixture) => leagueFixtureMatchupLabel(fixture, teamNameById);
   // 행 버튼의 접근 가능한 이름. 같은 주차·같은 두 팀이 두 번 붙으면 제목·매치업이 겹치므로 일시까지 넣는다.
   const fixtureNameOf = (fixture: V1LeagueFixture) =>
     `${matchupLabelOf(fixture)} ${formatKstDateShort(fixture.startAt)} ${formatKstTime(fixture.startAt)}`;
   const nextAction = pickLeagueNextAction(series.fixtures);
   const inProgressFixtures = series.fixtures.filter(isFixtureGameInProgress);
-  const teamIdsWithGameInProgress = new Set(inProgressFixtures.flatMap((fixture) => [fixture.homeTeamId, fixture.awayTeamId]));
+  const teamIdsWithGameInProgress = new Set(
+    inProgressFixtures.flatMap((fixture) => [fixture.homeTeamId, fixture.awayTeamId]).filter((id): id is string => id !== null),
+  );
 
   /**
    * 행의 ⋯ 시트 항목. 일정 수정·몰수패·취소는 표에서 물러나 여기 모였다. 결과 항목은 **결과가 있는
@@ -301,7 +313,7 @@ export default function LeagueMatchFixturesClient({ leagueId, returnHref = '/adm
       },
     ];
     const stage = row.resultStage ?? 'not_entered';
-    if (row.awayTeamId !== null && stage !== 'not_entered') {
+    if (hasBothTeams(row) && stage !== 'not_entered') {
       const officialStage = stage === 'official';
       actions.push({
         key: 'result',
@@ -313,7 +325,7 @@ export default function LeagueMatchFixturesClient({ leagueId, returnHref = '/adm
       });
     }
     // R11(C-6): 상대팀이 확정된(matched) 대진만 몰수 처리 대상이다.
-    if (row.status === 'matched' && row.awayTeamId !== null) {
+    if (row.status === 'matched' && hasBothTeams(row)) {
       actions.push({
         key: 'forfeit',
         label: '몰수패 처리',
@@ -465,6 +477,8 @@ export default function LeagueMatchFixturesClient({ leagueId, returnHref = '/adm
   // series.fixtures의 resultStage로 직접 판정한다 — detail()이 대진마다 resultStage를
   // 내려주므로 별도 조회 없이 "재생성 가능한가"를 정확히 알 수 있다.
   const leagueHasOfficialResult = series.fixtures.some((fixture) => fixture.resultStage === 'official');
+  // 서버는 자리 방식 리그의 기존 「재생성」을 409 LEAGUE_SLOT_FIXTURES_USE_TEMPLATE 로 막는다 — 누르면 실패할 버튼을 미리 잠근다.
+  const hasSlotFixtures = (series.slots?.length ?? 0) > 0;
 
   // 그룹 B 감사 결함 1: 참가팀 추가. EntityPicker의 onChange가 넘기는 item이 null이면
   // (검색 초기화 등) 아무것도 하지 않는다.
@@ -686,6 +700,36 @@ export default function LeagueMatchFixturesClient({ leagueId, returnHref = '/adm
       <LeagueCloseRegistrationControl leagueId={leagueId} state={series.state} registrationOpen={series.registrationOpen} registrationDeadlineAt={series.registrationDeadlineAt} activeRegistrationCount={series.activeRegistrationCount} confirmedCount={series.confirmedRegistrationCount} showToast={showToast} />
       <TournamentPeriodSettingsEditor tournamentId={leagueId} canWrite={canWritePeriods} showToast={showToast} />
       <LeagueCoverImageControl leagueId={leagueId} sportCode={series.sportCode} coverImageUrl={series.coverImageUrl} />
+      <div className="mb-4 md:max-w-xs">
+        <SegmentedTabs
+          ariaLabel="대진 보기 방식"
+          role="tablist"
+          activeId={view}
+          onSelect={(id) => setView(id === 'list' ? 'list' : 'board')}
+          items={[
+            { id: 'board', label: '일정 보드' },
+            { id: 'list', label: '목록' },
+          ]}
+        />
+      </div>
+      {view === 'board' ? (
+        <LeagueScheduleBoard
+          leagueId={leagueId}
+          fixtures={series.fixtures}
+          slots={series.slots ?? []}
+          teams={teamsData?.teams}
+          canWrite={canWrite}
+          showToast={showToast}
+          onOpenTemplate={() => setTemplateOpen(true)}
+          onEditSchedule={(teamMatchId) =>
+            setScheduleFixture(series.fixtures.find((fixture) => fixture.teamMatchId === teamMatchId) ?? null)
+          }
+          onCancelFixture={(teamMatchId) =>
+            setCancelTarget(series.fixtures.find((fixture) => fixture.teamMatchId === teamMatchId) ?? null)
+          }
+          onShowList={() => setView('list')}
+        />
+      ) : null}
 
 {series.fixtures.length === 0 ? (
 <>
@@ -794,7 +838,7 @@ export default function LeagueMatchFixturesClient({ leagueId, returnHref = '/adm
         />
       )}
 
-      {series.fixtures.length === 0 ? (
+      {view === 'board' ? null : series.fixtures.length === 0 ? (
         <div className="flex flex-col gap-3">
           <div className="grid grid-cols-2 items-start gap-x-3 gap-y-3 md:max-w-3xl md:grid-cols-4">
             <LeagueWeeksPlanField
@@ -953,7 +997,7 @@ export default function LeagueMatchFixturesClient({ leagueId, returnHref = '/adm
             fitContainer
             dense
             renderActions={(row) => {
-              const canOpenConsole = row.status !== 'cancelled' && row.awayTeamId !== null;
+              const canOpenConsole = row.status !== 'cancelled' && hasBothTeams(row);
               return (
                 <div className="flex items-center justify-end gap-2">
                   {/* 주 조작은 콘솔 열기 하나다. 콘솔이 종료·결과 확정까지 이어 주므로(Task 180 G6)
@@ -1243,7 +1287,7 @@ export default function LeagueMatchFixturesClient({ leagueId, returnHref = '/adm
                     <button
                       type="button"
                       onClick={() => setRegenerateModalOpen(true)}
-                      disabled={!hasLeagueStartsOn || inProgressFixtures.length > 0}
+                      disabled={!hasLeagueStartsOn || inProgressFixtures.length > 0 || hasSlotFixtures}
                       className="min-h-[44px] flex-[1.6] rounded-xl bg-[var(--button-fill-warning)] px-4 text-sm font-semibold text-white hover:bg-[var(--button-fill-warning-hover)] transition-colors disabled:opacity-50 md:flex-none"
                     >
                       대진 재생성
@@ -1254,6 +1298,11 @@ export default function LeagueMatchFixturesClient({ leagueId, returnHref = '/adm
                 {inProgressFixtures.length > 0 ? (
                   <p className="mt-2 text-[length:var(--font-size-body-sm)] text-[var(--orange700)]">
                     진행 중인 경기가 있어 대진을 다시 만들 수 없어요. 콘솔의 ‘몰수·중단으로 종료’로 먼저 끝내 주세요.
+                  </p>
+                ) : null}
+                {hasSlotFixtures ? (
+                  <p className="mt-2 text-[length:var(--font-size-body-sm)] text-[var(--orange700)]">
+                    자리 방식으로 만든 리그는 여기서 다시 만들 수 없어요. 일정 보드의 ‘템플릿으로 다시 만들기’를 써 주세요.
                   </p>
                 ) : null}
                 <div className="mt-3 flex flex-col gap-3">
@@ -1277,7 +1326,7 @@ export default function LeagueMatchFixturesClient({ leagueId, returnHref = '/adm
         open={forfeitFixture !== null}
         title="몰수패 처리"
         statusOptions={
-          forfeitFixture
+          forfeitFixture && forfeitFixture.homeTeamId !== null
             ? [
                 { value: forfeitFixture.homeTeamId, label: `${forfeitHostTeam.data?.name ?? '홈팀'} 불참` },
                 ...(forfeitFixture.awayTeamId
@@ -1305,6 +1354,21 @@ export default function LeagueMatchFixturesClient({ leagueId, returnHref = '/adm
           isSubmitting={updateFixture.isPending}
           onSubmit={onScheduleSubmit(scheduleFixture)}
           onClose={() => setScheduleFixture(null)}
+        />
+      ) : null}
+
+      {templateOpen ? (
+        <LeagueTemplateDialog
+          leagueStartsOn={series.startsOn}
+          initialTeamCount={Math.min(20, Math.max(3, teamCount))}
+          recentVenues={series.recentVenues ?? []}
+          replaceExisting={series.fixtures.some((fixture) => fixture.status !== 'cancelled')}
+          isSubmitting={applyTemplate.isPending}
+          onSubmit={async (payload) => {
+            const result = await applyTemplate.mutateAsync(payload);
+            showToast(`빈 경기 ${result.fixtures}개를 만들었어요. 자리에 팀을 넣어 보세요.`, 'success');
+          }}
+          onClose={() => setTemplateOpen(false)}
         />
       ) : null}
 

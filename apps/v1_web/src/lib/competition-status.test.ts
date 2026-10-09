@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   arrivalCheckInUsed,
+  bracketNodeStateChip,
   countLeagueFixturePhases,
   gameRosterStatusChip,
   gameStateChip,
@@ -164,5 +165,17 @@ describe('도착 확인 그룹', () => {
     const split = splitByArrival(people);
     expect(split.arrived.map((row) => row.id)).toEqual(['a']);
     expect(split.pending.map((row) => row.id)).toEqual(['b']);
+  });
+});
+
+describe('bracketNodeStateChip', () => {
+  it.each([
+    ['scheduled', '예정', 'grey', 'clock'],
+    ['live', '진행 중', 'blue', 'live'],
+    ['submitted', '확정 전', 'orange', 'hourglass'],
+    ['official', '확정', 'green', 'check'],
+    ['cancelled', '취소', 'red', 'cancel'],
+  ] as const)('%s → 글자 %s · 톤 %s · 아이콘 %s (색만으로 전달하지 않는다)', (state, label, tone, icon) => {
+    expect(bracketNodeStateChip(state)).toEqual({ label, tone, icon });
   });
 });

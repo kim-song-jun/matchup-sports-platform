@@ -185,6 +185,36 @@ it('3·4위전의 미정 두 자리에 저장된 4강 패자 출처를 표시한
   expect(within(card).getByText('4강 1경기 패자')).toBeVisible();
   expect(within(card).getByText('4강 2경기 패자')).toBeVisible();
 });
+describe('공개 대진표 — 자리 라벨', () => {
+  it('TBD 사이드에 자리 라벨이 있으면 라벨을 보여 주고 대기 모양으로 그린다', () => {
+    render(<TournamentBracket groups={[]} fixtures={[
+      makeFixture({ id: 'rank-one', round: 'semi', fixtureNumber: 1, homeTeamName: 'TBD', homeSlotLabel: 'A조 1위', awayTeamName: 'TBD', awaySlotLabel: 'B조 2위' }),
+    ]} />);
+    const card = screen.getByRole('group', { name: 'A조 1위 대 B조 2위' });
+    const label = within(card).getByText('A조 1위');
+    expect(label).toBeVisible();
+    // 아직 정해지지 않은 자리라 이긴 팀 모양(진한 글자)이 아니라 대기 색을 쓴다.
+    expect(label.getAttribute('style')).toContain('var(--text-caption)');
+    expect(within(card).getByText('B조 2위')).toBeVisible();
+  });
+
+  it('대조군: 라벨도 연결선도 없는 TBD 는 미정, 팀이 있는 사이드는 라벨이 와도 팀 이름', () => {
+    render(<TournamentBracket groups={[]} fixtures={[
+      makeFixture({ id: 'mixed', round: 'semi', fixtureNumber: 1, homeTeamName: '서울FC', homeSlotLabel: 'A조 1위', awayTeamName: 'TBD' }),
+    ]} />);
+    const card = screen.getByRole('group', { name: '서울FC 대 미정' });
+    expect(within(card).queryByText('A조 1위')).not.toBeInTheDocument();
+  });
+
+  it('대조군: 연결선 출처가 있는 TBD 는 지금처럼 이전 경기 설명을 보여 준다', () => {
+    render(<TournamentBracket groups={[]} fixtures={[
+      makeFixture({ id: 'q-source', round: 'quarter', fixtureNumber: 3 }),
+      makeFixture({ id: 's-target', round: 'semi', fixtureNumber: 1, homeTeamName: 'TBD', homeSlotLabel: null, bracketSources: [{ fixtureId: 'q-source', side: 'HOME', outcome: 'WINNER' }] }),
+    ]} />);
+    expect(screen.getByText('8강 3경기 승자')).toBeVisible();
+  });
+});
+
 it.each([['quarter', '8강', '4강'], ['semi', '4강', '결승']] as const)('%s 부전승도 해당 라운드와 다음 단계를 구분한다', (phase, label, nextLabel) => {
   render(<TournamentBracket fixtures={[]} groups={[{ id: phase, name: label, phase, sortOrder: 0, advanceCount: null, standings: [],
     groupTeams: [{ id: 'bye', registrationId: 'direct', teamId: 'direct-team', teamName: '직행팀', teamLogoUrl: null, sortOrder: 0, isBye: true }] }]} />);

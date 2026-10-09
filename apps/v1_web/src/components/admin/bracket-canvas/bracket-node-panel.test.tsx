@@ -1,0 +1,239 @@
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { V1ApiError } from '@/lib/api-client';
+import { makeFixture, makeGame, makeGroup, makeRegistration, makeSlot } from '@/test/bracket-canvas-fixtures';
+import type { V1AdminBracketFixture } from '@/types/api';
+import { BracketNodePanel } from './bracket-node-panel';
+
+const mocks = vi.hoisted(() => ({
+  assign: vi.fn(),
+  quick: vi.fn(),
+  updateFixture: vi.fn(),
+  deleteFixture: vi.fn(),
+}));
+
+vi.mock('@/hooks/use-v1-bracket-canvas', () => ({
+  useV1AssignTournamentSlot: () => ({ mutate: mocks.assign, isPending: false }),
+  useV1QuickResult: () => ({ mutate: mocks.quick, isPending: false }),
+}));
+vi.mock('@/hooks/use-v1-api', () => ({
+  useV1UpdateFixture: () => ({ mutate: mocks.updateFixture, isPending: false }),
+  useV1DeleteFixture: () => ({ mutate: mocks.deleteFixture, isPending: false }),
+}));
+// 정정·무효·확정은 Task 11 이 따로 검증한다 — 여기서는 어떤 게임으로 불리는지만 본다.
+vi.mock('./bracket-result-actions', () => ({
+  BracketResultActions: (props: { game: { id: string } }) => <div data-testid="result-actions">{props.game.id}</div>,
+}));
+
+const knockout = makeGroup({ id: 'g-qf', name: '8강', phase: 'quarter' });
+const groupStage = makeGroup({ id: 'g-a', name: 'A조', phase: 'group' });
+const slots = [
+  makeSlot({ id: 's-home', label: '1번 자리', registrationId: 'r1', teamName: '서울FC' }),
+  makeSlot({ id: 's-away', label: '2번 자리' }),
+  makeSlot({ id: 's-other', label: '3번 자리', registrationId: 'r2', teamName: '부산FC' }),
+];
+const registrations = [
+  makeRegistration({ id: 'r1', teamName: '서울FC' }),
+  makeRegistration({ id: 'r2', teamName: '부산FC' }),
+  makeRegistration({ id: 'r3', teamName: '대구FC' }),
+];
+
+const fixtureOf = (overrides: Partial<V1AdminBracketFixture> = {}) =>
+  makeFixture({
+    id: 'f1',
+    groupId: 'g-qf',
+    fixtureNumber: 1,
+    round: '8강',
+    homeSlotId: 's-home',
+    awaySlotId: 's-away',
+    homeRegistrationId: 'r1',
+    homeTeamName: '서울FC',
+    game: makeGame({ id: 'game-1', version: 3 }),
+    ...overrides,
+  });
+
+function renderPanel(fixture = fixtureOf(), overrides: Partial<React.ComponentProps<typeof BracketNodePanel>> = {}) {
+  const props = {
+    tournamentId: 't-1',
+    fixture,
+    groups: [knockout, groupStage],
+    slots,
+    registrations,
+    sideLabels: {
+      HOME: fixture.homeRegistrationId === null ? '1번 자리' : fixture.homeTeamName,
+      AWAY: fixture.awayRegistrationId === null ? '2번 자리' : fixture.awayTeamName,
+    },
+    canWrite: true,
+    showToast: vi.fn(),
+    onClose: vi.fn(),
+    ...overrides,
+  };
+  render(<BracketNodePanel {...props} />);
+  return props;
+}
+
+beforeEach(() => {
+  vi.clearAllMocks();
+});
+
+describe('BracketNodePanel — 자리 배정', () => {
+  it('다른 자리에 이미 들어간 팀은 고르지 못하고, 현재 자리의 팀과 비워 두기는 고를 수 있다', () => {
+    renderPanel();
+    const homeSelect = screen.getByLabelText('홈 팀 선택');
+    expect(within(homeSelect).getAllByRole('option').map((option) => option.textContent)).toEqual(['비워 두기', '서울FC', '대구FC']);
+    expect(homeSelect).toHaveValue('r1');
+    // 어웨이 자리는 비어 있으니 서울FC(홈)·부산FC(3번 자리)는 빠지고 대구FC 만 남는다.
+    expect(within(screen.getByLabelText('어웨이 팀 선택')).getAllByRole('option').map((option) => option.textContent)).toEqual(['비워 두기', '대구FC']);
+  });
+
+  it('팀을 고르면 그 자리에 배정하고, 비워 두기는 null 로 보낸다', () => {
+    const props = renderPanel();
+    fireEvent.change(screen.getByLabelText('어웨이 팀 선택'), { target: { value: 'r3' } });
+    expect(mocks.assign).toHaveBeenCalledWith({ slotId: 's-away', registrationId: 'r3' }, expect.any(Object));
+    fireEvent.change(screen.getByLabelText('홈 팀 선택'), { target: { value: '' } });
+    expect(mocks.assign).toHaveBeenLastCalledWith({ slotId: 's-home', registrationId: null }, expect.any(Object));
+
+    mocks.assign.mock.calls[0][1].onSuccess();
+    expect(props.showToast).toHaveBeenCalledWith('팀을 넣었어요.', 'success');
+    mocks.assign.mock.calls[1][1].onSuccess();
+    expect(props.showToast).toHaveBeenCalledWith('자리를 비웠어요.', 'success');
+  });
+
+  it('서버가 거절하면 해요체 안내를 토스트로 보여 준다', () => {
+    const props = renderPanel();
+    fireEvent.change(screen.getByLabelText('어웨이 팀 선택'), { target: { value: 'r3' } });
+    mocks.assign.mock.calls[0][1].onError(
+      new V1ApiError({ statusCode: 409, code: 'SLOT_TEAM_ALREADY_PLACED', message: 'x', details: null, requestId: 'r', timestamp: 't' } as unknown as ConstructorParameters<typeof V1ApiError>[0]),
+    );
+    expect(props.showToast).toHaveBeenCalledWith('이미 다른 자리에 들어간 팀이에요.', 'error');
+  });
+
+  it('시작된 칸은 선택창 대신 이유를 보여 준다', () => {
+    renderPanel(fixtureOf({ game: makeGame({ state: 'LIVE' }) }));
+    expect(screen.queryByLabelText('홈 팀 선택')).not.toBeInTheDocument();
+    expect(screen.getAllByText('경기가 시작됐거나 결과가 있어 팀을 바꿀 수 없어요.')).toHaveLength(2);
+  });
+
+  it('자리가 없는 줄은 연결 결과로 채워진다고 알린다', () => {
+    renderPanel(fixtureOf({ awaySlotId: null }));
+    expect(screen.queryByLabelText('어웨이 팀 선택')).not.toBeInTheDocument();
+    expect(screen.getByText('이전 경기 결과로 채워져요.')).toBeInTheDocument();
+  });
+
+  it('읽기 전용이면 선택창·저장·삭제·점수 입력이 모두 없다', () => {
+    renderPanel(fixtureOf({ awayRegistrationId: 'r3', awayTeamName: '대구FC' }), { canWrite: false });
+    expect(screen.queryByLabelText('홈 팀 선택')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '일정 저장' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '경기 삭제' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '점수 확정' })).not.toBeInTheDocument();
+  });
+});
+
+describe('BracketNodePanel — 일정·삭제', () => {
+  it('KST 로 입력한 시각을 UTC ISO 로 바꿔 저장한다', () => {
+    renderPanel();
+    fireEvent.change(screen.getByLabelText('경기 시각'), { target: { value: '2026-10-10T14:00' } });
+    fireEvent.change(screen.getByLabelText('장소'), { target: { value: ' 상암 보조구장 ' } });
+    fireEvent.click(screen.getByRole('button', { name: '일정 저장' }));
+    expect(mocks.updateFixture).toHaveBeenCalledWith(
+      { fixtureId: 'f1', scheduledAt: '2026-10-10T05:00:00.000Z', venue: '상암 보조구장' },
+      expect.any(Object),
+    );
+  });
+
+  it('삭제는 확인을 거치고, 성공하면 패널을 닫는다', async () => {
+    const props = renderPanel();
+    fireEvent.click(screen.getByRole('button', { name: '경기 삭제' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(mocks.deleteFixture).not.toHaveBeenCalled();
+    fireEvent.click(within(dialog).getByRole('button', { name: '삭제' }));
+    await vi.waitFor(() => expect(mocks.deleteFixture).toHaveBeenCalledWith('f1', expect.any(Object)));
+    mocks.deleteFixture.mock.calls[0][1].onSuccess();
+    expect(props.onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('닫기 버튼은 onClose 를 부른다', () => {
+    const props = renderPanel();
+    fireEvent.click(screen.getByRole('button', { name: '패널 닫기' }));
+    expect(props.onClose).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('BracketNodePanel — 결과 구역', () => {
+  const readyFixture = (overrides: Partial<V1AdminBracketFixture> = {}) =>
+    fixtureOf({ awayRegistrationId: 'r3', awayTeamName: '대구FC', ...overrides });
+
+  it('양쪽 팀이 정해진 예정 경기는 점수 입력 폼을 보여 주고 빠른 결과로 보낸다', () => {
+    renderPanel(readyFixture());
+    fireEvent.change(screen.getByLabelText('서울FC 점수'), { target: { value: '2' } });
+    fireEvent.change(screen.getByLabelText('대구FC 점수'), { target: { value: '1' } });
+    fireEvent.click(screen.getByRole('button', { name: '점수 확정' }));
+    expect(mocks.quick).toHaveBeenCalledWith({ gameId: 'game-1', expectedVersion: 3, score: { home: 2, away: 1 } }, expect.any(Object));
+  });
+
+  it('서버가 명단 동기화 중이라고 하면 입력을 둔 채 안내를 폼 안에 보여 준다', () => {
+    renderPanel(readyFixture());
+    fireEvent.change(screen.getByLabelText('서울FC 점수'), { target: { value: '2' } });
+    fireEvent.change(screen.getByLabelText('대구FC 점수'), { target: { value: '1' } });
+    fireEvent.click(screen.getByRole('button', { name: '점수 확정' }));
+    act(() => {
+      mocks.quick.mock.calls[0][1].onError(
+        new V1ApiError({ statusCode: 409, code: 'QUICK_RESULT_ROSTER_SYNCING', message: 'x', details: null, requestId: 'r', timestamp: 't' } as unknown as ConstructorParameters<typeof V1ApiError>[0]),
+      );
+    });
+    expect(screen.getByRole('alert')).toHaveTextContent('명단을 맞추는 중이에요. 잠시 뒤 다시 눌러 주세요.');
+    expect(screen.getByLabelText('서울FC 점수')).toHaveValue('2');
+  });
+
+  it('결선 경기 무승부에는 승부차기 입력란이 나온다', () => {
+    renderPanel(readyFixture());
+    fireEvent.change(screen.getByLabelText('서울FC 점수'), { target: { value: '1' } });
+    fireEvent.change(screen.getByLabelText('대구FC 점수'), { target: { value: '1' } });
+    expect(screen.getByLabelText('서울FC 승부차기')).toBeInTheDocument();
+  });
+
+  it('조별 경기는 무승부여도 승부차기 입력란이 없다', () => {
+    renderPanel(readyFixture({ groupId: 'g-a' }));
+    fireEvent.change(screen.getByLabelText('서울FC 점수'), { target: { value: '1' } });
+    fireEvent.change(screen.getByLabelText('대구FC 점수'), { target: { value: '1' } });
+    expect(screen.queryByLabelText('서울FC 승부차기')).not.toBeInTheDocument();
+  });
+
+  it('한쪽 팀이 비어 있으면 폼 대신 이유를 보여 준다', () => {
+    renderPanel(fixtureOf());
+    expect(screen.getByText('양쪽 팀이 정해지면 점수를 넣을 수 있어요.')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '점수 확정' })).not.toBeInTheDocument();
+  });
+
+  it('진행 중인 경기는 라이브 콘솔에서 입력하라고 안내한다', () => {
+    renderPanel(readyFixture({ game: makeGame({ state: 'LIVE' }) }));
+    expect(screen.getByText('진행 중인 경기는 라이브 콘솔에서 입력해요.')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '점수 확정' })).not.toBeInTheDocument();
+  });
+
+  it('라이브 득점 기록이 있고 결과가 없으면 정정 화면 링크를 준다', () => {
+    renderPanel(readyFixture({ game: makeGame({ id: 'game-1', state: 'ENDED', hasLiveRecords: true }) }));
+    expect(screen.getByRole('link', { name: '결과 정정 화면 열기' })).toHaveAttribute('href', '/admin/live/t-1/records/corrections?fixtureId=f1');
+    expect(screen.queryByRole('button', { name: '점수 확정' })).not.toBeInTheDocument();
+  });
+
+  it('결과가 있으면 폼 대신 확정·정정·무효 동작을 보여 준다', () => {
+    renderPanel(
+      readyFixture({
+        game: makeGame({ id: 'game-1', state: 'ENDED', latestRevision: { id: 'rev', state: 'OFFICIAL', entryMethod: 'quick', score: { home: 1, away: 0 } } }),
+      }),
+    );
+    expect(screen.getByTestId('result-actions')).toHaveTextContent('game-1');
+    expect(screen.queryByRole('button', { name: '점수 확정' })).not.toBeInTheDocument();
+  });
+
+  it('무효 처리된 결과는 다시 입력할 수 있게 폼을 연다', () => {
+    renderPanel(
+      readyFixture({
+        game: makeGame({ id: 'game-1', state: 'ENDED', latestRevision: { id: 'rev', state: 'VOID', entryMethod: 'quick', score: { home: 1, away: 0 } } }),
+      }),
+    );
+    expect(screen.getByText('무효 처리된 결과예요. 점수를 다시 넣을 수 있어요.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '점수 확정' })).toBeInTheDocument();
+  });
+});

@@ -253,6 +253,7 @@ import type {
   V1CreateGroupTeamPayload,
   V1CreateFixturePayload,
   V1UpdateFixturePayload,
+  V1UpdateFixtureResult,
   V1CreateAnnouncementPayload,
   V1CreateTournamentSponsorPayload,
   V1UpdateTournamentSponsorPayload,
@@ -4992,7 +4993,8 @@ export function useV1CreateFixture(tournamentId: string) {
 }
 
 /**
- * 경기 일정·장소·대진 수정 (`PATCH /admin/fixtures/:id`) — 결과 있는 경기의 팀 변경은 409 FIXTURE_HAS_RESULT.
+ * 경기 일정·장소·대진 수정 (`PATCH /admin/fixtures/:id`) — 시작된 경기도 공식 결과가 없으면 `teamChangeReason` 과 함께
+ * 팀을 바꾼다(옛 팀 기록이 지워진다). 공식 결과가 있으면 409 FIXTURE_RESULT_MUST_BE_VOIDED.
  *
  * `homeRegistrationId`/`awayRegistrationId`는 서버 계약상 `undefined`(필드 미전송) = 미변경,
  * `null` = 배정 해제(TBD로 되돌리기)로 갈린다(`UpdateFixtureDto`의 `@IsOptional()`은 null도
@@ -5008,7 +5010,7 @@ export function useV1UpdateFixture(tournamentId: string) {
     }: { fixtureId: string } & Omit<V1UpdateFixturePayload, 'homeRegistrationId' | 'awayRegistrationId'> & {
         homeRegistrationId?: string | null;
         awayRegistrationId?: string | null;
-      }) => v1Patch<V1AdminBracketFixture>(`/admin/fixtures/${fixtureId}`, body),
+      }) => v1Patch<V1UpdateFixtureResult>(`/admin/fixtures/${fixtureId}`, body),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: v1Keys.adminTournamentBracket(tournamentId) });
       queryClient.invalidateQueries({ queryKey: v1Keys.tournament(tournamentId) });

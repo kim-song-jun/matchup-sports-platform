@@ -148,12 +148,12 @@ describe('BracketNodePanel — 자리 배정', () => {
       fireEvent.change(screen.getByLabelText('어웨이 팀 선택'), { target: { value: 'r3' } });
       expect(mocks.updateFixture).toHaveBeenCalledWith({ fixtureId: 'f1', awayRegistrationId: 'r3' }, expect.any(Object));
       expect(mocks.assign).not.toHaveBeenCalled();
-      mocks.updateFixture.mock.calls[0][1].onSuccess();
+      mocks.updateFixture.mock.calls[0][1].onSuccess({ startedTeamChange: null });
       expect(props.showToast).toHaveBeenCalledWith('팀을 넣었어요.', 'success');
 
       fireEvent.change(screen.getByLabelText('홈 팀 선택'), { target: { value: '' } });
       expect(mocks.updateFixture).toHaveBeenLastCalledWith({ fixtureId: 'f1', homeRegistrationId: null }, expect.any(Object));
-      mocks.updateFixture.mock.calls[1][1].onSuccess();
+      mocks.updateFixture.mock.calls[1][1].onSuccess({ startedTeamChange: null });
       expect(props.showToast).toHaveBeenLastCalledWith('자리를 비웠어요.', 'success');
     });
 
@@ -164,10 +164,70 @@ describe('BracketNodePanel — 자리 배정', () => {
       expect(props.showToast).toHaveBeenCalledWith('팀을 넣지 못했어요.', 'error');
     });
 
-    it('시작된 칸은 선택창 없이 잠금 문구만 보여 준다', () => {
-      renderPanel(legacy({ game: makeGame({ state: 'LIVE' }) }));
-      expect(screen.queryByLabelText('홈 팀 선택')).not.toBeInTheDocument();
-      expect(screen.getAllByText('경기가 시작됐거나 결과가 있어 팀을 바꿀 수 없어요.')).toHaveLength(2);
+    describe('시작된 경기', () => {
+      const started = (overrides: Partial<V1AdminBracketFixture> = {}) =>
+        legacy({ awayRegistrationId: 'r2', awayTeamName: '부산FC', game: makeGame({ state: 'LIVE' }), ...overrides });
+      const revision = (state: 'OFFICIAL' | 'SUBMITTED' | 'VOID') => ({
+        id: 'rev-1', state, score: { home: 1, away: 0 }, entryMethod: 'console' as const,
+      });
+
+      it('팀 선택창을 그대로 쓰고, 고르면 요청을 보내기 전에 확인과 사유를 먼저 받는다', async () => {
+        renderPanel(started());
+        fireEvent.change(screen.getByLabelText('홈 팀 선택'), { target: { value: 'r3' } });
+        const dialog = await screen.findByRole('dialog', { name: '시작된 경기의 팀을 바꿀까요?' });
+        expect(dialog).toHaveTextContent('서울FC 쪽 명단과 기록');
+        expect(mocks.updateFixture).not.toHaveBeenCalled();
+        expect(within(dialog).getByRole('button', { name: '팀 바꾸기' })).toBeDisabled();
+      });
+
+      it('사유를 적고 확인하면 teamChangeReason 과 함께 보내고, 지운 기록 수를 토스트로 알린다', async () => {
+        const props = renderPanel(started());
+        fireEvent.change(screen.getByLabelText('홈 팀 선택'), { target: { value: 'r3' } });
+        const dialog = await screen.findByRole('dialog', { name: '시작된 경기의 팀을 바꿀까요?' });
+        fireEvent.change(within(dialog).getByLabelText('바꾸는 이유'), { target: { value: '  참가 팀 사정  ' } });
+        fireEvent.click(within(dialog).getByRole('button', { name: '팀 바꾸기' }));
+        await vi.waitFor(() => expect(mocks.updateFixture).toHaveBeenCalledTimes(1));
+        expect(mocks.updateFixture).toHaveBeenCalledWith(
+          { fixtureId: 'f1', homeRegistrationId: 'r3', teamChangeReason: '참가 팀 사정' },
+          expect.any(Object),
+        );
+        mocks.updateFixture.mock.calls[0][1].onSuccess({ startedTeamChange: { removedEventCount: 4, score: { home: 0, away: 1 } } });
+        expect(props.showToast).toHaveBeenCalledWith('팀을 바꿨어요. 옛 팀 기록 4건을 지웠어요.', 'success');
+      });
+
+      it('확인 창에서 취소하면 아무것도 보내지 않는다', async () => {
+        renderPanel(started());
+        fireEvent.change(screen.getByLabelText('홈 팀 선택'), { target: { value: 'r3' } });
+        const dialog = await screen.findByRole('dialog', { name: '시작된 경기의 팀을 바꿀까요?' });
+        fireEvent.click(within(dialog).getByRole('button', { name: '취소' }));
+        await vi.waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+        expect(mocks.updateFixture).not.toHaveBeenCalled();
+      });
+
+      it('시작 전 경기는 확인 창 없이 바로 보낸다', () => {
+        renderPanel(legacy());
+        fireEvent.change(screen.getByLabelText('어웨이 팀 선택'), { target: { value: 'r3' } });
+        expect(mocks.updateFixture).toHaveBeenCalledWith({ fixtureId: 'f1', awayRegistrationId: 'r3' }, expect.any(Object));
+        expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+      });
+
+      it('결과가 무효로 돌려진 종료 경기는 바꿀 수 있다', () => {
+        renderPanel(started({ game: makeGame({ state: 'ENDED', latestRevision: revision('VOID') }) }));
+        expect(screen.getByLabelText('홈 팀 선택')).toBeEnabled();
+      });
+
+      it('공식 결과가 있으면 선택창 대신 무효 안내와 정정 화면 링크를 보여 준다', () => {
+        renderPanel(started({ game: makeGame({ state: 'ENDED', latestRevision: revision('OFFICIAL') }) }));
+        expect(screen.queryByLabelText('홈 팀 선택')).not.toBeInTheDocument();
+        expect(screen.getAllByText('공식 결과가 확정된 경기예요. 결과를 먼저 무효로 돌려 주세요.')).toHaveLength(2);
+        expect(screen.getAllByRole('link', { name: '결과 정정 화면 열기' })[0]).toHaveAttribute('href', expect.stringContaining('/records/corrections?fixtureId=f1'));
+      });
+
+      it('제출만 된 결과가 있으면 선택창 없이 안내만 보여 준다', () => {
+        renderPanel(started({ game: makeGame({ state: 'ENDED', latestRevision: revision('SUBMITTED') }) }));
+        expect(screen.queryByLabelText('홈 팀 선택')).not.toBeInTheDocument();
+        expect(screen.getAllByText('제출된 결과가 있는 경기예요. 결과를 확정한 뒤 무효로 돌려 주세요.')).toHaveLength(2);
+      });
     });
 
     it('읽기 전용이면 선택창이 없다', () => {

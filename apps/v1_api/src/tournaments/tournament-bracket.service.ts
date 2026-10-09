@@ -828,7 +828,7 @@ export class TournamentBracketService {
     });
   }
 
-  /** 경기 일정·장소·대진(홈/어웨이) 수정. 결과가 기록된 경기는 팀 변경 불가(409). */
+  /** 경기 일정·장소·대진(홈/어웨이) 수정. 시작된 경기도 결과가 없으면 사유와 함께 팀을 바꾼다(공식 결과가 있으면 409). */
   async updateFixture(user: V1AuthUser, fixtureId: string, dto: UpdateFixtureDto) {
     const admin = await this.adminContext.getMutationAdmin(user.id);
     const canonical = await this.prisma.v1TournamentMatchDetails.findUnique({
@@ -865,10 +865,10 @@ export class TournamentBracketService {
         { homeRegistrationId: dto.homeRegistrationId, awayRegistrationId: dto.awayRegistrationId },
       );
       const changesTeams = dto.homeRegistrationId !== undefined || dto.awayRegistrationId !== undefined;
-      if (changesTeams && (canonical.teamMatch.game.state !== 'SCHEDULED' || canonical.teamMatch.game.currentOfficialRevision?.state === 'OFFICIAL')) {
+      if (changesTeams && canonical.teamMatch.game.currentOfficialRevision?.state === 'OFFICIAL') {
         throw new ConflictException({
-          code: 'FIXTURE_HAS_RESULT',
-          message: '진행 중이거나 결과가 확정된 경기는 팀을 바꿀 수 없어요. 결과를 먼저 처리해 주세요.',
+          code: 'FIXTURE_RESULT_MUST_BE_VOIDED',
+          message: '공식 결과가 확정된 경기예요. 결과를 먼저 무효로 돌려 주세요.',
         });
       }
       for (const [side, registrationId] of [['홈', dto.homeRegistrationId], ['어웨이', dto.awayRegistrationId]] as const) {
@@ -917,9 +917,14 @@ export class TournamentBracketService {
           venue: dto.venue,
           homeRegistrationId: dto.homeRegistrationId,
           awayRegistrationId: dto.awayRegistrationId,
+          allowStartedTeamChange: true,
+          teamChangeReason: dto.teamChangeReason,
         });
       });
-      return this.serializeCanonicalFixture(updated);
+      const startedTeamChange = updated.startedTeamChange === null
+        ? null
+        : { removedEventCount: updated.startedTeamChange.removedEventCount, score: updated.startedTeamChange.scoreAfter };
+      return { ...this.serializeCanonicalFixture(updated), startedTeamChange };
     }
     throw new NotFoundException({ code: 'FIXTURE_NOT_FOUND', message: '경기를 찾을 수 없어요.' });
   }

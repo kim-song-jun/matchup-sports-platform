@@ -302,7 +302,7 @@ describe('TournamentBracketService', () => {
     v1TournamentMatchAdvancementEdge: { findMany: jest.Mock; deleteMany: jest.Mock };
     v1TeamSchedule: { findMany: jest.Mock; findUnique: jest.Mock; update: jest.Mock; create: jest.Mock; updateMany: jest.Mock };
     v1TournamentRegistration: { findFirst: jest.Mock; findMany: jest.Mock; findUnique: jest.Mock };
-    v1GameResultRevision: { findUnique: jest.Mock };
+    v1GameResultRevision: { findUnique: jest.Mock; findFirst: jest.Mock };
     v1IdempotencyRecord: { findFirst: jest.Mock; findMany: jest.Mock };
     v1Game: { update: jest.Mock; findMany: jest.Mock };
     v1GameVisibilityPolicy: { update: jest.Mock };
@@ -363,7 +363,7 @@ describe('TournamentBracketService', () => {
         findMany: jest.fn().mockResolvedValue([]),
         findUnique: jest.fn(),
       },
-      v1GameResultRevision: { findUnique: jest.fn().mockResolvedValue({ state: 'VOID' }) },
+      v1GameResultRevision: { findUnique: jest.fn().mockResolvedValue({ state: 'VOID' }), findFirst: jest.fn().mockResolvedValue(null) },
       v1IdempotencyRecord: { findFirst: jest.fn().mockResolvedValue(null), findMany: jest.fn().mockResolvedValue([]) },
       v1GameVisibilityPolicy: { update: jest.fn().mockResolvedValue({}) },
       v1Game: { update: jest.fn().mockResolvedValue({}), findMany: jest.fn().mockResolvedValue([]) },
@@ -1776,7 +1776,7 @@ describe('TournamentBracketService', () => {
 
     await expect(
       service.updateFixture(ownerUser, 'fixture-1', { homeRegistrationId: 'reg-3' }),
-    ).rejects.toMatchObject({ response: { code: 'FIXTURE_HAS_RESULT' } });
+    ).rejects.toMatchObject({ response: { code: 'FIXTURE_RESULT_MUST_BE_VOIDED' } });
   });
 
   it('updateFixture: OFFICIAL 경기의 번호만 수정하고 변경 전·후 번호를 감사에 남긴다', async () => {
@@ -1824,6 +1824,24 @@ describe('TournamentBracketService', () => {
 
     const result = await service.updateFixture(ownerUser, 'fixture-1', { homeRegistrationId: 'reg-3' });
     expect(result).toMatchObject({ id: 'fixture-1' });
+  });
+
+  it('updateFixture: 진행 중 경기의 팀 교체는 서비스에서 막히지 않고 사유가 없으면 400 으로 거절된다', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdmin);
+    prisma.v1TournamentMatchDetails.findUnique.mockResolvedValue(canonicalDetailsRow({
+      teamMatch: { ...canonicalDetailsRow().teamMatch, game: { ...canonicalDetailsRow().teamMatch.game, state: 'LIVE' } },
+    }));
+    prisma.v1TournamentMatchDetails.findUniqueOrThrow.mockResolvedValue(canonicalDetailsRow());
+    prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow({ id: 'reg-3' }));
+    prisma.v1TournamentRegistration.findMany.mockResolvedValue([
+      { id: 'reg-3', teamId: 'team-new', team: { name: '새 팀' } },
+      { id: 'reg-2', teamId: 'team-away', team: { name: '어웨이 팀' } },
+    ]);
+    queueFixtureUpdateRaw(prisma.$queryRaw, { id: 'game-1', state: 'LIVE', sourceType: 'TEAM_MATCH', currentOfficialRevisionId: null }, { id: 'fixture-1', deletedAt: null });
+
+    await expect(service.updateFixture(ownerUser, 'fixture-1', { homeRegistrationId: 'reg-3' }))
+      .rejects.toMatchObject({ response: { code: 'TEAM_CHANGE_REASON_REQUIRED' } });
+    expect(prisma.v1TeamMatch.update).not.toHaveBeenCalled();
   });
 
   it('updateFixture: 사이드의 팀이 바뀌면 그 사이드의 전술보드를 같은 트랜잭션에서 지운다', async () => {
@@ -2315,7 +2333,7 @@ describe('TournamentBracketService', () => {
       prisma.v1TournamentMatchDetails.findUnique.mockResolvedValue(linkedRow({ homeSlotId: null, awaySlotId: 'slot-a' }, true));
 
       await expect(service.updateFixture(ownerUser, 'fixture-1', { homeRegistrationId: 'reg-3' })).rejects.toMatchObject({
-        response: { code: 'FIXTURE_HAS_RESULT' },
+        response: { code: 'FIXTURE_RESULT_MUST_BE_VOIDED' },
       });
     });
   });

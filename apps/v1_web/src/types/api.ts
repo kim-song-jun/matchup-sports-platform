@@ -4614,6 +4614,13 @@ export type V1UpdateFixturePayload = {
   venue?: string;
   homeRegistrationId?: string;
   awayRegistrationId?: string;
+  /** 이미 시작된 경기의 팀을 바꿀 때 필수(서버 400 TEAM_CHANGE_REASON_REQUIRED). 운영 기록에 남는다. */
+  teamChangeReason?: string;
+};
+
+/** 시작된 경기의 팀을 바꾸면 서버가 옛 팀 기록을 지우고 그 결과를 알려 준다. */
+export type V1UpdateFixtureResult = V1AdminBracketFixture & {
+  startedTeamChange: { removedEventCount: number; score: { home: number; away: number } } | null;
 };
 
 export type V1CreateFixturePayload = {

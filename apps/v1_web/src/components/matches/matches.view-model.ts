@@ -144,7 +144,7 @@ const matchDetailByMode: Record<MatchDetailViewModel['mode'], (typeof matches)[n
   mine: matches[4],
 };
 
-const detailCopy: Record<MatchDetailViewModel['mode'], Pick<MatchDetailViewModel['match'], 'description' | 'address' | 'rules' | 'participants'>> = {
+const detailCopy: Record<MatchDetailViewModel['mode'], Pick<MatchDetailViewModel['match'], 'description' | 'rules' | 'participants'> & { address: string }> = {
   default: {
     description: '초보도 편하게 참여할 수 있는 주말 풋살 매치예요. 경기 전 10분 일찍 모여 팀을 나누고 가볍게 몸을 풀어요.',
     address: '서울 양천구 안양천로 939',
@@ -205,8 +205,7 @@ const draft = {
   gender: '성별 무관',
   rules: '',
   costNote: '',
-  venue: '',
-  address: '',
+  place: null,
   date: '',
   startTime: '',
   endTime: '',
@@ -271,11 +270,13 @@ export function getMatchStateViewModel(state: MatchStateViewModel['state']): Mat
 
 export function getMatchDetailViewModel(mode: MatchDetailViewModel['mode'] = 'default'): MatchDetailViewModel {
   const match = matchDetailByMode[mode];
+  const { address, ...description } = detailCopy[mode];
   return {
     mode,
     match: {
       ...match,
-      ...detailCopy[mode],
+      ...description,
+      place: { name: match.venue, address, latitude: null, longitude: null, provider: null, providerPlaceId: null },
     },
   };
 }

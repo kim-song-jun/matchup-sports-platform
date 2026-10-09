@@ -16,6 +16,8 @@ vi.mock('next/navigation', () => ({
 }));
 vi.mock('@/lib/uuid', () => ({ randomUuid: () => '00000000-0000-4000-8000-000000000001' }));
 vi.mock('@/hooks/use-v1-api', () => ({
+  useV1PlaceSearch: () => ({ data: undefined, error: null, isFetching: false, isError: false, refetch: vi.fn() }),
+  useV1PublicKakaoMapsKey: () => ({ data: undefined }),
   useV1AdminMe: vi.fn(),
   useV1CreateAdminTeamMatchRecruitment: vi.fn(),
   useV1MasterRegions: vi.fn(),
@@ -28,6 +30,12 @@ const useCreate = vi.mocked(useV1CreateAdminTeamMatchRecruitment, { partial: tru
 const useRegions = vi.mocked(useV1MasterRegions, { partial: true });
 const useSports = vi.mocked(useV1MasterSports, { partial: true });
 const useUploadImages = vi.mocked(useV1UploadImages, { partial: true });
+
+/** 장소 필드는 검색 콤보박스다 — 검색 없이 이름만 직접 입력하는 경로로 값을 채운다. */
+async function enterManualPlace(name: string) {
+  fireEvent.change(screen.getByLabelText('경기 장소'), { target: { value: name } });
+  fireEvent.click(await screen.findByRole('button', { name: '이름만 직접 입력' }));
+}
 
 describe('AdminTeamMatchNewPage', () => {
   beforeEach(() => {
@@ -63,7 +71,7 @@ describe('AdminTeamMatchNewPage', () => {
     fireEvent.change(screen.getByLabelText('종목'), { target: { value: 'sport-futsal' } });
     fireEvent.change(screen.getByLabelText('지역'), { target: { value: 'region-gangnam' } });
     fireEvent.change(screen.getByLabelText('매치 제목'), { target: { value: '  관리자 모집전  ' } });
-    fireEvent.change(screen.getByLabelText('경기 장소'), { target: { value: '  잠실 풋살장  ' } });
+    await enterManualPlace('  잠실 풋살장  ');
     fireEvent.change(screen.getByLabelText('최소 등급'), { target: { value: 'intermediate' } });
     fireEvent.change(screen.getByLabelText('최대 등급'), { target: { value: 'advanced' } });
     fireEvent.change(screen.getByLabelText('경기방식'), { target: { value: '5:5' } });
@@ -98,6 +106,22 @@ describe('AdminTeamMatchNewPage', () => {
     expect(push).toHaveBeenCalledWith('/admin/team-matches/tm-1');
   });
 
+  it('직접 입력 칸에 이어서 친 장소 이름도 앞뒤 공백을 지우고 보낸다', async () => {
+    const mutateAsync = vi.fn().mockResolvedValue({ teamMatchId: 'tm-1', status: 'recruiting', detailRoute: '/admin/team-matches/tm-1', replayed: false });
+    useCreate.mockReturnValue({ mutateAsync, isPending: false } as never);
+    render(<AdminTeamMatchNewPage />);
+
+    fireEvent.change(screen.getByLabelText('종목'), { target: { value: 'sport-futsal' } });
+    fireEvent.change(screen.getByLabelText('지역'), { target: { value: 'region-gangnam' } });
+    fireEvent.change(screen.getByLabelText('매치 제목'), { target: { value: '모집전' } });
+    await enterManualPlace('잠실');
+    fireEvent.change(screen.getByLabelText('경기 장소'), { target: { value: '  잠실 풋살장  ' } });
+    fireEvent.change(screen.getByLabelText('경기 시작'), { target: { value: '2026-10-20T19:00' } });
+    fireEvent.click(screen.getByRole('button', { name: '팀 신청 모집 시작하기' }));
+
+    await waitFor(() => expect(mutateAsync).toHaveBeenCalledWith(expect.objectContaining({ manualPlaceName: '잠실 풋살장' })));
+  });
+
   it('matches the regular team-match condition inputs and permits no explicit deadline', () => {
     useCreate.mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as never);
     render(<AdminTeamMatchNewPage />);
@@ -129,9 +153,10 @@ describe('AdminTeamMatchNewPage', () => {
     const mutateAsync = vi.fn().mockResolvedValue({ detailRoute: '/admin/team-matches/tm-1' });
     useCreate.mockReturnValue({ mutateAsync, isPending: false } as never);
     render(<AdminTeamMatchNewPage />);
-    for (const [label, value] of Object.entries({ 종목: 'sport-futsal', 지역: 'region-gangnam', '매치 제목': '자정 경기', '경기 장소': '잠실', '경기 시작': '2026-10-20T23:00', '경기 종료 (선택)': '2026-10-21T01:00', '신청 마감': '2000-01-01T12:00' })) {
+    for (const [label, value] of Object.entries({ 종목: 'sport-futsal', 지역: 'region-gangnam', '매치 제목': '자정 경기', '경기 시작': '2026-10-20T23:00', '경기 종료 (선택)': '2026-10-21T01:00', '신청 마감': '2000-01-01T12:00' })) {
       fireEvent.change(screen.getByLabelText(label), { target: { value } });
     }
+    await enterManualPlace('잠실');
     const submit = screen.getByRole('button', { name: '팀 신청 모집 시작하기' });
     expect(submit).toBeDisabled();
     expect(screen.getByRole('alert')).toHaveTextContent('신청 마감은 지금 이후');

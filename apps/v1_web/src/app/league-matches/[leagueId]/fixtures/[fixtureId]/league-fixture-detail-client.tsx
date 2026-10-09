@@ -8,7 +8,9 @@ import { usePublicLeagueFixtureRecord } from '@/components/public-game-records/u
 import { MatchDetailContent } from '@/components/public-game-records/match-detail-content';
 import { AttestRequestsSection } from '@/components/public-game-records/attest-requests';
 import { LeagueClaimMyRecordSection } from '@/components/public-game-records/claim-my-record';
+import { PlaceCard } from '@/components/v1-ui/place-card';
 import { Card, ErrorState } from '@/components/v1-ui/primitives';
+import { isSamePlace } from '@/lib/same-place';
 import { TeamAvatar } from '@/components/v1-ui/team-avatar';
 import { useCurrentHref } from '@/components/v1-ui/use-current-href';
 import { MatchTeamRosterCard } from '@/components/game-roster/match-team-roster-card';
@@ -128,6 +130,11 @@ export default function LeagueFixtureDetailClient({ leagueId, fixtureId }: { lea
     () => series?.fixtures.find((item) => item.teamMatchId === fixtureId) ?? null,
     [series, fixtureId],
   );
+  // 기본 장소와 같은 곳이면 배지 없이 같은 카드만 보인다.
+  const placeBadge =
+    fixture?.place && series?.defaultPlace && !isSamePlace(fixture.place, series.defaultPlace) ? (
+      <span className="tm-badge tm-badge-orange tm-badge-sm">이 경기만 장소가 달라요</span>
+    ) : undefined;
 
   // 참가팀 팀원에게만 "우리 팀 출전" 카드가 뜬다. 게임이 비공개(기록 404)면 팀매치 상세의 gameId 로 찾는다.
   const rosterTeam = useMyMatchRosterTeam({
@@ -282,7 +289,7 @@ export default function LeagueFixtureDetailClient({ leagueId, fixtureId }: { lea
               MatchDetailContent 는 자체 좌우 패딩(20px)을 가진다 — 이 컨테이너의 px-4 와
               겹쳐 본문만 안으로 밀리지 않게 음수 마진으로 상쇄한다. */}
           <div className="-mx-4">
-            <MatchDetailContent data={recordQuery.data} from={selfHref} afterHeader={rosterCard} showInlineStatus={false} />
+            <MatchDetailContent data={recordQuery.data} from={selfHref} afterHeader={rosterCard} showInlineStatus={false} placeBadge={placeBadge} />
           </div>
           {/* 기록 연결 승인함 (attest UI C안): 다른 참가자의 연결 신청을 확인·승인하는
               반대쪽 절반. 신청 알림의 착지 화면이기도 하다 — 요청이 있을 때만 보인다. */}
@@ -328,6 +335,7 @@ export default function LeagueFixtureDetailClient({ leagueId, fixtureId }: { lea
       ) : (
         /* 기록 API 404(게임 미공개·숨김 정책) 폴백 — 리그 대진 요약 카드.
            양팀 실명·스코어/상태·일시·장소는 리그 공개 상세만으로도 보여줄 수 있다. */
+<>
         <Card pad={20}>
           <div className="flex items-start justify-between gap-3">
             <TeamSide teamId={fixture.homeTeamId} name={homeName} logoUrl={homeRow?.teamLogoUrl ?? null} record={recordLine(homeRow)} align="left" from={selfHref} />
@@ -346,9 +354,18 @@ export default function LeagueFixtureDetailClient({ leagueId, fixtureId }: { lea
           </div>
           <div className="mt-4 space-y-1 border-t border-[var(--border)] pt-3 text-sm text-[var(--text-muted)]">
             <p>{formatTournamentDateTimeLong(fixture.startAt) ?? '일정 미정'}</p>
-            <p>{fixture.placeName || '장소 미정'}</p>
+            <p>{fixture.place ? fixture.place.name : fixture.placeName || '장소 미정'}</p>
           </div>
         </Card>
+        {fixture.place ? (
+          <section>
+            <h2 className="tm-hub-section-title mb-3">장소</h2>
+            <Card pad={16}>
+              <PlaceCard place={fixture.place} badge={placeBadge} />
+            </Card>
+          </section>
+        ) : null}
+</>
       )}
       {/* 기록 본문이 없을 때(게임 미공개) 우리 팀 출전 카드는 요약 카드 아래에 둔다. */}
       {recordQuery.data || recordQuery.isPending ? null : rosterCard}

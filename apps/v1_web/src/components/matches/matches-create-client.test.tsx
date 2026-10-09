@@ -7,6 +7,7 @@ import { trackEvent } from '@/lib/analytics';
 import { readExpiringDraft, writeExpiringDraft } from '@/lib/expiring-draft';
 import { __resetNavigationHistoryForTests } from '@/lib/navigation-history';
 import { __resetOverlayHistoryForTests } from '@/lib/overlay-history';
+import { v1PlaceSearchFixture } from '@/test/msw/fixtures';
 import type { V1MatchEdit } from '@/types/api';
 import type { MatchCreateViewModel } from './matches.types';
 import { draftFromMatchEdit, MatchCreatePageClient, MatchEditPageClient } from './matches-create-client';
@@ -88,6 +89,8 @@ vi.mock('@/hooks/use-v1-api', async () => {
     }),
     useV1CreateMatch: () => realTimeConsumer.enabled ? actual.useV1CreateMatch() : ({ mutate: createMatchMutate, isPending: false }),
     useV1UploadImages: () => realTimeConsumer.enabled ? actual.useV1UploadImages() : ({ mutateAsync: uploadImagesMutateAsync, isPending: false }),
+    useV1PlaceSearch: actual.useV1PlaceSearch,
+    useV1PublicKakaoMapsKey: actual.useV1PublicKakaoMapsKey,
     useV1MyRecentVenues: () => realTimeConsumer.enabled ? actual.useV1MyRecentVenues() : ({ data: undefined }),
     useV1MatchEdit: (matchId: string) => realTimeConsumer.enabled ? actual.useV1MatchEdit(matchId) : ({
       data: matchEditQueryState.isError ? undefined : matchEditData,
@@ -115,7 +118,7 @@ vi.mock('./matches-page', async () => {
           <label htmlFor="title">제목</label>
           <input id="title" value={model.draft.title} onChange={(event) => form.onFieldChange('title', event.target.value)} />
           <label htmlFor="venue">장소</label>
-          <input id="venue" value={model.draft.venue} onChange={(event) => form.onFieldChange('venue', event.target.value)} />
+          <input id="venue" value={model.draft.place?.name ?? ''} onChange={(event) => form.onFieldChange('place', event.target.value ? { kind: 'manual', name: event.target.value } : null)} />
           <label htmlFor="date">날짜</label>
           <input id="date" value={model.draft.date} onChange={(event) => form.onFieldChange('date', event.target.value)} />
           <label htmlFor="startTime">시작 시간</label>
@@ -272,6 +275,8 @@ describe('개인 매치 종료 시간 — 실제 화면과 API 제출 계약', (
       ] },
     ] })),
     http.get(`${apiBase}/matches/me/recent-venues`, () => HttpResponse.json({ data: { items: [] } })),
+    http.get(`${apiBase}/public/integrations/kakao-maps-key`, () => HttpResponse.json({ data: { kakaoMapsJsKey: null } })),
+    http.get(`${apiBase}/places/search`, () => HttpResponse.json({ data: { items: v1PlaceSearchFixture.items, hasMore: false } })),
     http.post(`${apiBase}/matches`, async ({ request }) => {
       postBodies.push(await request.json());
       return HttpResponse.json({ data: { matchId: 'match-created', detailRoute: '/matches/match-created' } });
@@ -323,7 +328,7 @@ describe('개인 매치 종료 시간 — 실제 화면과 API 제출 계약', (
     future.setDate(future.getDate() + 7);
     const date = future.toISOString().slice(0, 10);
     writeExpiringDraft('teameet:v1:match-draft', {
-      title: '시간 검증 매치', venue: '한강 풋살장', date, startTime: '10:00', endTime,
+      title: '시간 검증 매치', place: { kind: 'manual', name: '한강 풋살장' }, date, startTime: '10:00', endTime,
     });
     writeExpiringDraft('teameet:v1:match-selection', { sportId: 'sport-futsal', regionId: 'region-gangnam' });
     return date;
@@ -421,7 +426,7 @@ describe('개인 매치 종료 시간 — 실제 화면과 API 제출 계약', (
     expect(await screen.findByText(`${date} 10:00-11:00`)).toBeVisible();
     fireEvent.click(screen.getByRole('button', { name: '이전' }));
     expect(routerPush).toHaveBeenLastCalledWith('/matches/new/place-time');
-    expect(readExpiringDraft('teameet:v1:match-draft')).toMatchObject({ date, startTime: '10:00', endTime: '11:00', venue: '한강 풋살장' });
+    expect(readExpiringDraft('teameet:v1:match-draft')).toMatchObject({ date, startTime: '10:00', endTime: '11:00', place: { kind: 'manual', name: '한강 풋살장' } });
     fireEvent.click(screen.getByRole('button', { name: '매치 만들기' }));
     await waitFor(() => expect(postBodies).toHaveLength(1));
     expect(postBodies[0]).toMatchObject({ startsAt: new Date(`${date}T10:00:00`).toISOString(), endsAt: new Date(`${date}T11:00:00`).toISOString() });
@@ -537,7 +542,7 @@ describe('개인 매치 종료 시간 — 실제 화면과 API 제출 계약', (
 
   it.each(['not-a-date', '2099-02-30'])('손상된 종료 날짜 %s를 복원한 확인 화면은 날짜 오류와 수정 링크를 표시하고 POST하지 않는다', async (endDate) => {
     const date = seedDraft('11:00');
-    writeExpiringDraft('teameet:v1:match-draft', { title: '시간 검증 매치', venue: '한강 풋살장', date, startTime: '10:00', endTime: '11:00', endDate });
+    writeExpiringDraft('teameet:v1:match-draft', { title: '시간 검증 매치', place: { kind: 'manual', name: '한강 풋살장' }, date, startTime: '10:00', endTime: '11:00', endDate });
     renderStep('confirm');
     await screen.findByText('서울 강남구');
     fireEvent.click(screen.getByRole('button', { name: '매치 만들기' }));
@@ -548,9 +553,67 @@ describe('개인 매치 종료 시간 — 실제 화면과 API 제출 계약', (
     expect(routerPush).not.toHaveBeenCalled();
     expect(readExpiringDraft('teameet:v1:match-draft')).toMatchObject({ endDate, endTime: '11:00' });
   });
+
+  it('검색 결과를 고르면 좌표·provider 가 생성 payload 에 실린다', async () => {
+    const date = seedDraft('11:00');
+    writeExpiringDraft('teameet:v1:match-draft', { title: '시간 검증 매치', date, startTime: '10:00', endTime: '11:00' });
+    const view = renderStep('place-time');
+    fireEvent.change(await screen.findByRole('combobox', { name: '장소' }), { target: { value: '망원' } });
+    // 검색어 하이라이트(<mark>)가 이름을 쪼개므로 접근성 이름 대신 텍스트로 찾는다.
+    const option = await waitFor(() => {
+      const found = screen.getAllByRole('option').find((item) => item.textContent?.includes('망원한강공원 풋살장'));
+      if (!found) throw new Error('option not found');
+      return found;
+    });
+    fireEvent.click(option);
+    view.unmount();
+    renderStep('confirm');
+    expect(await screen.findByText('서울 마포구 마포나루길 467')).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: '매치 만들기' }));
+
+    await waitFor(() => expect(postBodies).toHaveLength(1));
+    expect(postBodies[0]).toMatchObject({
+      manualPlaceName: '망원한강공원 풋살장',
+      addressText: '서울 마포구 마포나루길 467',
+      placeLatitude: 37.5558,
+      placeLongitude: 126.8985,
+      placeProvider: 'kakao',
+      placeProviderId: 'kakao-place-mangwon-hangang',
+    });
+  });
+
+  it('직접 입력한 장소는 이름만 보내고 좌표 필드는 보내지 않는다', async () => {
+    seedDraft('11:00');
+    renderStep('confirm');
+    await screen.findByText('서울 강남구');
+    fireEvent.click(screen.getByRole('button', { name: '매치 만들기' }));
+
+    await waitFor(() => expect(postBodies).toHaveLength(1));
+    expect(postBodies[0]).toMatchObject({ manualPlaceName: '한강 풋살장' });
+    for (const key of ['placeLatitude', 'placeLongitude', 'placeProvider', 'placeProviderId']) {
+      expect(postBodies[0]).not.toHaveProperty(key);
+    }
+  });
+
+  it('좌표 없는 옛 매치를 수정하면 장소가 직접 입력값으로 보인다', async () => {
+    render(<QueryClientProvider client={queryClient}><MatchEditPageClient matchId="match-edit-1" /></QueryClientProvider>);
+    await screen.findByRole('button', { name: '다음' });
+    fireEvent.click(screen.getByRole('button', { name: '다음' }));
+    await waitFor(() => expect(screen.getByLabelText('제목')).toHaveValue('수정 중인 매치'));
+    fireEvent.click(screen.getByRole('button', { name: '다음' }));
+
+    expect(screen.getByRole('textbox', { name: '장소' })).toHaveValue('한강 풋살장');
+  });
 });
 
 describe('match edit hydration', () => {
+  it('좌표·provider 가 모두 있는 수정 응답은 지도 핀이 있는 장소로 복원된다', () => {
+    const draft = draftFromMatchEdit({
+      ...matchEditData,
+      form: { ...matchEditData.form, addressText: '서울 마포구 마포나루길 467', placeLatitude: 37.5558, placeLongitude: 126.8985, placeProvider: 'kakao', placeProviderId: 'kakao-place-mangwon-hangang' },
+    });
+    expect(draft.place).toMatchObject({ kind: 'picked', latitude: 37.5558, providerPlaceId: 'kakao-place-mangwon-hangang' });
+  });
   it.each([undefined, null])('종료 시각이 %s이면 시작 시각을 복사하지 않고 종료 생략을 유지한다', (endsAt) => {
     const draft = draftFromMatchEdit({ ...matchEditData, form: { ...matchEditData.form, endsAt } });
     expect(draft.endTime).toBe('');

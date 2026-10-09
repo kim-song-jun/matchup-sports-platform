@@ -94,6 +94,8 @@ vi.mock('@/hooks/use-v1-api', () => ({
   useV1CreateTeamMatch: () => ({ mutate: createTeamMatchMutate, isPending: false }),
   useV1UploadImages: () => ({ mutateAsync: uploadImagesMutateAsync, isPending: false }),
   useV1TeamRecentVenues: () => ({ data: undefined }),
+  useV1PlaceSearch: () => ({ data: undefined, error: null, isFetching: false, isError: false, refetch: vi.fn() }),
+  useV1PublicKakaoMapsKey: () => ({ data: undefined }),
   useV1TeamMatchEdit: () => ({ data: teamMatchEditData, isError: false, isLoading: false }),
   useV1UpdateTeamMatch: () => ({ mutate: updateTeamMatchMutate, isPending: false }),
   useV1CancelTeamMatch: () => ({ mutate: cancelTeamMatchMutate, isPending: false }),
@@ -108,7 +110,7 @@ vi.mock('./team-matches-page', () => ({
         <label htmlFor="title">제목</label>
         <input id="title" value={model.draft.title} onChange={(event) => form.onFieldChange('title', event.target.value)} />
         <label htmlFor="venue">장소</label>
-        <input id="venue" value={model.draft.venue} onChange={(event) => form.onFieldChange('venue', event.target.value)} />
+        <input id="venue" value={model.draft.place?.name ?? ''} onChange={(event) => form.onFieldChange('place', event.target.value ? { kind: 'manual', name: event.target.value } : null)} />
         <label htmlFor="date">날짜</label>
         <input id="date" value={model.draft.date} onChange={(event) => form.onFieldChange('date', event.target.value)} />
         <label htmlFor="startTime">시작 시간</label>
@@ -305,8 +307,7 @@ describe('team match edit hydration', () => {
     expect(draft).toMatchObject({
       imageUrl: '/uploads/team-match-cover.webp',
       listImageUrl: '/uploads/team-match-list.webp',
-      venue: '잠실 풋살파크',
-      address: '서울 송파구 올림픽로 25',
+      place: { kind: 'manual', name: '잠실 풋살파크', address: '서울 송파구 올림픽로 25' },
     });
     expect(payload).toMatchObject({
       imageUrl: '/uploads/team-match-cover.webp',
@@ -355,9 +356,48 @@ describe('team match edit hydration', () => {
 
   it('maps a removed edit image to null instead of a fallback image', () => {
     const startsAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-    const draft = { ...getTeamMatchCreateViewModel('edit').draft, title: '이미지 제거', imageUrl: '', venue: '잠실', date: startsAt.toISOString().slice(0, 10), startTime: '19:00' };
+    const draft = { ...getTeamMatchCreateViewModel('edit').draft, title: '이미지 제거', imageUrl: '', place: { kind: 'manual' as const, name: '잠실' }, date: startsAt.toISOString().slice(0, 10), startTime: '19:00' };
 
     expect(buildTeamMatchPayloadResult(draft, 'team-1', 'sport-futsal', 'region-gangnam').payload?.imageUrl).toBeNull();
+  });
+});
+
+describe('team-match place payload', () => {
+  const future = () => {
+    const start = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+    return { date: toKstDateString(start), startTime: '18:00' };
+  };
+  const baseDraft = () => ({ ...getTeamMatchCreateViewModel('place-time').draft, title: '장소 팀매치', ...future() });
+  const build = (place: ReturnType<typeof baseDraft>['place']) =>
+    buildTeamMatchPayloadResult({ ...baseDraft(), place }, 'team-1', 'sport-futsal', 'region-gangnam').payload;
+
+  it('검색으로 고른 장소는 이름·주소와 좌표·provider 를 함께 보낸다', () => {
+    expect(build({ kind: 'picked', name: '망원한강공원 풋살장', address: '서울 마포구 마포나루길 467', latitude: 37.5558, longitude: 126.8985, provider: 'kakao', providerPlaceId: 'k-1' })).toMatchObject({
+      manualPlaceName: '망원한강공원 풋살장',
+      addressText: '서울 마포구 마포나루길 467',
+      placeLatitude: 37.5558,
+      placeLongitude: 126.8985,
+      placeProvider: 'kakao',
+      placeProviderId: 'k-1',
+    });
+  });
+
+  it('직접 입력한 장소는 이름만 보내고 좌표 필드를 싣지 않는다', () => {
+    const payload = build({ kind: 'manual', name: '동네 운동장' });
+    expect(payload).toMatchObject({ manualPlaceName: '동네 운동장' });
+    for (const key of ['placeLatitude', 'placeLongitude', 'placeProvider', 'placeProviderId']) expect(payload).not.toHaveProperty(key);
+  });
+
+  it('장소가 비어 있으면 payload 를 만들지 않는다', () => {
+    expect(build(null)).toBeUndefined();
+  });
+
+  it('좌표가 있는 수정 응답은 핀이 있는 장소로, 없는 옛 응답은 직접 입력 장소로 복원한다', () => {
+    const form = { ...teamMatchEditData.form, manualPlaceName: '망원한강공원 풋살장', addressText: '서울 마포구 마포나루길 467' };
+    expect(draftFromTeamMatchEdit({ ...teamMatchEditData, status: 'recruiting' as const, form: { ...form, placeLatitude: 37.5558, placeLongitude: 126.8985, placeProvider: 'kakao', placeProviderId: 'k-1' } }).place)
+      .toMatchObject({ kind: 'picked', providerPlaceId: 'k-1' });
+    expect(draftFromTeamMatchEdit({ ...teamMatchEditData, status: 'recruiting' as const, form }).place)
+      .toEqual({ kind: 'manual', name: '망원한강공원 풋살장', address: '서울 마포구 마포나루길 467' });
   });
 });
 
@@ -371,7 +411,7 @@ describe('team-match deadline payload', () => {
       {
         ...draft,
         title: '마감 시간이 있는 팀매치',
-        venue: '한강 풋살장',
+        place: { kind: 'manual' as const, name: '한강 풋살장' },
         date: startDate,
         startTime: '18:00',
         endTime: '20:00',

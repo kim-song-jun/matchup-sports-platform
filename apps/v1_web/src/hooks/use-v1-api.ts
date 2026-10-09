@@ -281,6 +281,7 @@ import type {
   V1PurgeGuestInquiriesPayload,
   V1PurgeGuestInquiriesResult,
   V1PublicKakaoMapsKeyResponse,
+  V1PlaceSearchResponse,
   V1TournamentOperationsBoardFilters,
   V1TournamentOperationsBoardPage,
   V1TournamentStaffListResponse,
@@ -5464,6 +5465,23 @@ export function useV1PublicKakaoMapsKey(options?: QueryOptions) {
   });
 }
 
+/**
+ * 카카오 장소 검색(서버 프록시). 입력이 비면 호출하지 않고, 입력이 바뀌는 동안은 직전 결과를
+ * 유지해 목록이 깜빡이지 않게 한다. 503 PLACE_SEARCH_UNAVAILABLE(키 없음)은 재시도해도 같으므로
+ * 재시도하지 않는다.
+ */
+export function useV1PlaceSearch(query: string, options?: QueryOptions) {
+  const trimmed = query.trim();
+  return useQuery({
+    queryKey: v1Keys.placeSearch(trimmed),
+    queryFn: () => v1Get<V1PlaceSearchResponse>('/places/search', { query: trimmed }),
+    enabled: (options?.enabled ?? true) && trimmed.length >= 1,
+    staleTime: 60 * 1000,
+    placeholderData: keepPreviousData,
+    retry: false,
+  });
+}
+
 // ─── 어드민: 콘텐츠(공지/팝업) 본문 이미지 업로드 ────────────────────────────
 
 export function useV1UploadAdminContentAsset() {
@@ -5733,6 +5751,8 @@ import type {
   V1UpdateLeagueEntryFeeResult,
   V1UpdateLeagueCoverImagePayload,
   V1UpdateLeagueCoverImageResult,
+  V1UpdateLeagueVenuePayload,
+  V1UpdateLeagueVenueResult,
 
   V1CreateManualLeagueFixturePayload,
 
@@ -5930,6 +5950,15 @@ export function useV1UpdateLeagueCoverImage(leagueId: string) {
   return useMutation({
     mutationFn: (body: V1UpdateLeagueCoverImagePayload) =>
       v1Patch<V1UpdateLeagueCoverImageResult>(`/admin/league-matches/${encodeURIComponent(leagueId)}/cover-image`, body),
+    onSuccess: () => invalidateLeagueSurfaces(queryClient, leagueId),
+  });
+}
+
+export function useV1UpdateLeagueVenue(leagueId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: V1UpdateLeagueVenuePayload) =>
+      v1Patch<V1UpdateLeagueVenueResult>(`/admin/league-matches/${encodeURIComponent(leagueId)}/venue`, body),
     onSuccess: () => invalidateLeagueSurfaces(queryClient, leagueId),
   });
 }

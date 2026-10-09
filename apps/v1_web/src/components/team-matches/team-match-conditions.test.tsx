@@ -40,6 +40,8 @@ vi.mock('@/hooks/use-v1-api', () => ({
   useV1CancelTeamMatch: () => ({ mutate: vi.fn(), isPending: false }),
   useV1UploadImages: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useV1TeamRecentVenues: () => ({ data: { items: [] } }),
+  useV1PlaceSearch: () => ({ data: undefined, error: null, isFetching: false, isError: false, refetch: vi.fn() }),
+  useV1PublicKakaoMapsKey: () => ({ data: undefined }),
 }));
 
 // 실제 client와 조건 폼을 실행한다. API 훅만 경계에서 대체하며 CSS/alpha 검증은 아니다.

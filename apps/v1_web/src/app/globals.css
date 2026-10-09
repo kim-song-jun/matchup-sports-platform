@@ -28,6 +28,11 @@
   --static-black: #000000;
   /* 테마와 무관하게 늘 어두운 지면(랜딩 CTA 배너·푸터·폰 목업 베젤). --grey900 은 다크에서 밝아진다. */
   --static-ink: #191f28;
+  /* 지도 앱 브랜드 마크 — 로고 색이라 다크 모드에서도 같은 값을 쓴다. */
+  --map-brand-kakao: #fee500;
+  --map-brand-naver: #03c75a;
+  --map-brand-tmap-from: #2d6bff;
+  --map-brand-tmap-to: #8a3ffc;
   /* 테마가 뒤집혀도 값이 고정되는 파랑. --static-white 배경 위에 얹는 텍스트처럼
    * "배경이 테마를 따라가지 않는" 자리에 쓴다 — 그런 곳에 --blue700 을 쓰면 다크에서
    * 파랑만 밝게 반전(#6ba8ff)해 흰 배경 위 2.42:1 로 무너진다.

@@ -48,6 +48,7 @@ import {
   v1HomeFixture,
   v1InquiriesFixture,
   v1MatchesFixture,
+  v1PlaceSearchFixture,
   v1NoticesFixture,
   v1NotificationsFixture,
   v1ProfileFixture,
@@ -452,6 +453,14 @@ export const v1MswHandlers = [
   http.post(`${api}/onboarding/defer`, () => ok({ status: 'deferred', next: { route: '/home', reason: 'onboarding_deferred' }, missing: ['sports'], limited: true })),
   http.get(`${api}/master/sports`, () => ok(v1SportsFixture)),
   http.get(`${api}/master/regions`, () => ok(v1RegionsFixture)),
+  http.get(`${api}/public/integrations/kakao-maps-key`, () => ok({ kakaoMapsJsKey: null })),
+  http.get(`${api}/places/search`, ({ request }) => {
+    const tokens = (new URL(request.url).searchParams.get('query') ?? '').trim().split(/\s+/).filter(Boolean);
+    const items = tokens.length === 0
+      ? []
+      : v1PlaceSearchFixture.items.filter((item) => tokens.some((token) => item.name.includes(token)));
+    return ok({ items, hasMore: false });
+  }),
   http.get(`${api}/search/recent`, () => ok({ items: v1RecentSearchesFixture })),
   http.post(`${api}/search/recent`, async ({ request }) => {
     const body = await request.json() as { query: string; filters?: unknown };

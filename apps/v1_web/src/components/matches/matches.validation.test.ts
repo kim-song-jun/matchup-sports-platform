@@ -23,7 +23,7 @@ function baseCtx(overrides: Partial<MatchValidationContext> = {}): MatchValidati
     draft: {
       ...getMatchCreateViewModel('sport').draft,
       title: '주말 풋살 매치',
-      venue: '한강 풋살장',
+      place: { kind: 'manual', name: '한강 풋살장' },
       date: start.toISOString().slice(0, 10),
       startTime: start.toTimeString().slice(0, 5),
     },
@@ -33,10 +33,10 @@ function baseCtx(overrides: Partial<MatchValidationContext> = {}): MatchValidati
 
 describe('getMatchMissingFields — 실제 결측 필드만 지목', () => {
   it('종목·지역·제목이 이미 채워졌으면 그 필드는 결측 목록에 없다(사용자가 겪은 사고 재현 방지)', () => {
-    const ctx = baseCtx({ draft: { ...baseCtx().draft, venue: '', date: '' } });
+    const ctx = baseCtx({ draft: { ...baseCtx().draft, place: null, date: '' } });
     const missingFieldNames = getMatchMissingFields(ctx).map((item) => item.field);
 
-    expect(missingFieldNames).toContain('venue');
+    expect(missingFieldNames).toContain('place');
     expect(missingFieldNames).toContain('date');
     expect(missingFieldNames).not.toContain('sportId');
     expect(missingFieldNames).not.toContain('title');
@@ -59,14 +59,14 @@ describe('getMatchMissingFields — 실제 결측 필드만 지목', () => {
 
 describe('getMatchStepErrors — 스텝별 즉시 검증이 다른 스텝 필드를 새지 않는다', () => {
   it('place-time 스텝에서 title 결측 에러를 보여주지 않는다', () => {
-    const ctx = baseCtx({ draft: { ...baseCtx().draft, title: '', venue: '' } });
+    const ctx = baseCtx({ draft: { ...baseCtx().draft, title: '', place: null } });
     const placeTimeErrors = getMatchStepErrors(ctx, 'place-time');
     const infoErrors = getMatchStepErrors(ctx, 'info');
 
-    expect(placeTimeErrors.venue).toBeDefined();
+    expect(placeTimeErrors.place).toBeDefined();
     expect(placeTimeErrors.title).toBeUndefined();
     expect(infoErrors.title).toBeDefined();
-    expect(infoErrors.venue).toBeUndefined();
+    expect(infoErrors.place).toBeUndefined();
   });
 });
 
@@ -148,7 +148,7 @@ describe('명시적 종료 날짜 — API가 지원하는 익일 시각과 손�
 
 describe('getCompleteMatchSteps — CreateProgress 체크 배지 판정', () => {
   it('필수 필드를 채운 스텝만 완료로 표시한다', () => {
-    const ctx = baseCtx({ draft: { ...baseCtx().draft, venue: '' } });
+    const ctx = baseCtx({ draft: { ...baseCtx().draft, place: null } });
     const complete = getCompleteMatchSteps(ctx, ['sport', 'info', 'place-time']);
 
     expect(complete).toEqual(expect.arrayContaining(['sport', 'info']));
@@ -158,11 +158,11 @@ describe('getCompleteMatchSteps — CreateProgress 체크 배지 판정', () => 
 
 describe('buildMatchPayloadResult — payload | missingFields 분기', () => {
   it('결측 필드가 있으면 payload 대신 missingFields를 반환한다', () => {
-    const ctx = baseCtx({ draft: { ...baseCtx().draft, venue: '' } });
+    const ctx = baseCtx({ draft: { ...baseCtx().draft, place: null } });
     const result = buildMatchPayloadResult(ctx.draft, ctx.sportId, ctx.regionId);
 
     expect(result.payload).toBeUndefined();
-    expect(result.missingFields?.some((item) => item.field === 'venue')).toBe(true);
+    expect(result.missingFields?.some((item) => item.field === 'place')).toBe(true);
   });
 
   it('모든 필수값이 채워지면 payload를 반환한다', () => {

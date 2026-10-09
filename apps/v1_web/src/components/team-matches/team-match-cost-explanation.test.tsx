@@ -95,7 +95,7 @@ describe('selected C: keep the payer label and explain the applicant perspective
 
   it.each([25000, 10000, 0])('keeps the preview and actual costNote payload for applicant cost %i', (opponentCost) => {
     const model = getTeamMatchCreateViewModel('confirm');
-    model.draft = { ...model.draft, cost: 50000, opponentCost, title: '합성 비용 매치', venue: '합성 경기장', date: '2099-10-10', startTime: '19:00', endTime: '', deadlineDate: '', deadlineTime: '' };
+    model.draft = { ...model.draft, cost: 50000, opponentCost, title: '합성 비용 매치', place: { kind: 'manual', name: '합성 경기장' }, date: '2099-10-10', startTime: '19:00', endTime: '', deadlineDate: '', deadlineTime: '' };
     renderPage(<TeamMatchCreatePageView model={model} />);
     expect(screen.getByText(explanation)).toBeVisible();
     expect(screen.getByText(`총 50,000원 · 상대팀 ${opponentCost.toLocaleString('ko-KR')}원`)).toBeInTheDocument();

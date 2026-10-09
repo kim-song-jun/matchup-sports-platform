@@ -135,6 +135,8 @@ function noopMutation() {
 }
 
 vi.mock('@/hooks/use-v1-api', () => ({
+  useV1PlaceSearch: () => ({ data: undefined, isFetching: false, isError: false, error: null }),
+  useV1PublicKakaoMapsKey: () => ({ data: { kakaoMapsJsKey: null }, isLoading: false }),
   useV1AdminBracket: () => ({
     data: { ...bracket, groups: bracketGroups, fixtures: bracketFixtures },
     isPending: false,

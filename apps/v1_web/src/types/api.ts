@@ -390,6 +390,50 @@ export type V1MatchLifecycle = {
   onHoldReason: 'NO_PARTICIPANTS' | 'UNDER_CAPACITY' | 'NO_OPPONENT' | null;
 };
 
+/** 서버가 내려주는 장소 스냅샷. 좌표·provider 가 없으면(이름만 직접 입력) 지도 없이 이름 검색 폴백으로 보여 준다. */
+export type V1PlaceView = {
+  name: string;
+  address: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  provider: 'kakao' | null;
+  providerPlaceId: string | null;
+};
+
+/** `GET /places/search` 한 건. */
+export type V1PlaceSearchItem = {
+  provider: 'kakao';
+  providerPlaceId: string;
+  name: string;
+  address: string | null;
+  jibunAddress: string | null;
+  category: string | null;
+  latitude: number;
+  longitude: number;
+};
+
+export type V1PlaceSearchResponse = {
+  items: V1PlaceSearchItem[];
+  hasMore: boolean;
+};
+
+/** 매치·팀매치·리그 경기 payload 가 공유하는 장소 스냅샷 4필드(`place*` 계열). */
+export type V1PlaceSnapshotPayload = {
+  placeLatitude?: number | null;
+  placeLongitude?: number | null;
+  placeProvider?: 'kakao' | null;
+  placeProviderId?: string | null;
+};
+
+/** 대회·대진 경기 payload 가 공유하는 장소 스냅샷(`venue*` 계열). */
+export type V1VenueSnapshotPayload = {
+  venueAddress?: string | null;
+  venueLatitude?: number | null;
+  venueLongitude?: number | null;
+  venueProvider?: 'kakao' | null;
+  venueProviderId?: string | null;
+};
+
 export type V1Match = {
   canComplete?: boolean;
   canWithdraw?: boolean;
@@ -408,7 +452,7 @@ export type V1Match = {
   regionName?: string | null;
   region?: { regionId: string; name: string; parentName?: string | null } | null;
   placeName: string;
-  place?: { name: string; addressText?: string | null };
+  place?: V1PlaceView | null;
   startsAt: string;
   endsAt?: string | null;
   deadlineAt?: string | null;
@@ -454,7 +498,14 @@ export type V1Match = {
 };
 
 /** #3 1단계: 위저드 장소 입력창 포커스 시 노출하는 최근 사용 장소 칩. */
-export type V1RecentVenue = { placeName: string; addressText: string | null };
+export type V1RecentVenue = {
+  placeName: string;
+  addressText: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  provider: 'kakao' | null;
+  providerPlaceId: string | null;
+};
 
 export type V1MatchEdit = {
   matchId: string;
@@ -473,6 +524,10 @@ export type V1MatchEdit = {
     hostParticipates?: boolean;
     manualPlaceName: string;
     addressText?: string | null;
+    placeLatitude?: number | null;
+    placeLongitude?: number | null;
+    placeProvider?: 'kakao' | null;
+    placeProviderId?: string | null;
     rulesText?: string | null;
     minLevelCode?: string | null;
     maxLevelCode?: string | null;
@@ -532,6 +587,10 @@ export type V1MatchMutationPayload = {
   hostParticipates: boolean;
   manualPlaceName: string;
   addressText?: string | null;
+  placeLatitude?: number | null;
+  placeLongitude?: number | null;
+  placeProvider?: 'kakao' | null;
+  placeProviderId?: string | null;
   rulesText?: string | null;
   minLevelCode?: string | null;
   maxLevelCode?: string | null;
@@ -1231,7 +1290,7 @@ export type V1TeamMatch = V1Match & {
   gameId?: string | null;
   sport?: { sportId: string; name: string };
   region?: { regionId: string; name: string; parentName?: string | null } | null;
-  place?: { name: string; addressText?: string | null };
+  place?: V1PlaceView | null;
   displayState?: V1TeamMatchApiStatus;
   lifecycle?: V1MatchLifecycle;
   costNote?: string | null;
@@ -1351,6 +1410,10 @@ export type V1TeamMatchMutationPayload = {
   deadlineAt?: string | null;
   manualPlaceName: string;
   addressText?: string | null;
+  placeLatitude?: number | null;
+  placeLongitude?: number | null;
+  placeProvider?: 'kakao' | null;
+  placeProviderId?: string | null;
   costNote?: string | null;
   rulesText?: string | null;
   minLevelCode?: string | null;
@@ -1392,6 +1455,10 @@ export type V1TeamMatchEdit = {
     deadlineAt?: string | null;
     manualPlaceName: string;
     addressText?: string | null;
+    placeLatitude?: number | null;
+    placeLongitude?: number | null;
+    placeProvider?: 'kakao' | null;
+    placeProviderId?: string | null;
     costNote?: string | null;
     rulesText?: string | null;
     minLevelCode?: string | null;
@@ -3053,6 +3120,7 @@ export type V1AdminTeamMatchDetail = Omit<V1AdminTeamMatchRow, 'pendingApplicati
   regionName: string | null;
   placeName: string;
   placeAddress: string | null;
+  place?: V1PlaceView | null;
   endAt: string | null;
   deadlineAt: string | null;
   approvedApplicantTeamId: string | null;
@@ -3084,6 +3152,10 @@ export type V1AdminTeamMatchRecruitmentPayload = {
   deadlineAt?: string | null;
   manualPlaceName: string;
   addressText?: string | null;
+  placeLatitude?: number | null;
+  placeLongitude?: number | null;
+  placeProvider?: 'kakao' | null;
+  placeProviderId?: string | null;
   costNote?: string | null;
   rulesText?: string | null;
   minLevelCode?: string | null;
@@ -3569,6 +3641,9 @@ export type V1Tournament = {
   /** venue를 카카오 로컬 API로 지오코딩한 좌표. 키 미설정/검색 실패 시 null(지도 임베드는 스킵, 네이버 지도 검색 링크로 폴백). */
   latitude: number | null;
   longitude: number | null;
+  venueAddress?: string | null;
+  venueProvider?: 'kakao' | null;
+  venueProviderId?: string | null;
   coverImageUrl: string | null;
   teamCount: number;
   minPlayers: number;
@@ -3740,6 +3815,7 @@ export type V1TournamentFixture = {
   legNumber: number;
   scheduledAt: string | null;
   venue: string | null;
+  place?: V1PlaceView | null;
   /**
    * 원본 `V1TournamentFixture.status` 컬럼. DB enum 은
    * `scheduled | in_progress | completed | cancelled` 네 값이지만, **실제로 기록되는
@@ -3857,6 +3933,9 @@ export type V1TournamentDetail = {
   /** venue를 카카오 로컬 API로 지오코딩한 좌표. 키 미설정/검색 실패 시 null(지도 임베드는 스킵, 네이버 지도 검색 링크로 폴백). */
   latitude: number | null;
   longitude: number | null;
+  venueAddress?: string | null;
+  venueProvider?: 'kakao' | null;
+  venueProviderId?: string | null;
   coverImageUrl: string | null;
   teamCount: number;
   minPlayers: number;
@@ -4155,6 +4234,7 @@ export type V1AdminBracketFixture = {
   awayTeamName: string;
   scheduledAt: string | null;
   venue: string | null;
+  place?: V1PlaceView | null;
   status: string;
   createdAt: string;
   updatedAt: string;
@@ -4459,6 +4539,11 @@ export type V1CreateTournamentPayload = {
   scheduledAt?: string;
   scheduledEndAt?: string | null;
   venue?: string;
+  venueAddress?: string | null;
+  venueLatitude?: number | null;
+  venueLongitude?: number | null;
+  venueProvider?: 'kakao' | null;
+  venueProviderId?: string | null;
   coverImageUrl?: string | null;
   teamCount?: number;
   minPlayers?: number;
@@ -4620,6 +4705,11 @@ export type V1UpdateFixturePayload = {
   fixtureNumber?: number;
   scheduledAt?: string;
   venue?: string;
+  venueAddress?: string | null;
+  venueLatitude?: number | null;
+  venueLongitude?: number | null;
+  venueProvider?: 'kakao' | null;
+  venueProviderId?: string | null;
   homeRegistrationId?: string;
   awayRegistrationId?: string;
   /** 이미 시작된 경기의 팀을 바꿀 때 필수(서버 400 TEAM_CHANGE_REASON_REQUIRED). 운영 기록에 남는다. */
@@ -4641,6 +4731,11 @@ export type V1CreateFixturePayload = {
   awayRegistrationId?: string;
   scheduledAt?: string;
   venue?: string;
+  venueAddress?: string | null;
+  venueLatitude?: number | null;
+  venueLongitude?: number | null;
+  venueProvider?: 'kakao' | null;
+  venueProviderId?: string | null;
 };
 
 export type V1CreateAnnouncementPayload = {

@@ -20,6 +20,7 @@ vi.mock('@/hooks/use-v1-api', () => ({
   useV1LeagueMatchStandings: vi.fn(),
   useV1TeamMatch: vi.fn(),
   useV1ResolveChatRoom: vi.fn(),
+  useV1PublicKakaoMapsKey: () => ({ data: { kakaoMapsJsKey: null }, isLoading: false }),
 }));
 
 // 우리 팀 판별·카드 내부는 match-team-roster-card.test.tsx 가 실제 훅으로 검증한다 — 여기서는
@@ -138,7 +139,7 @@ const FIXTURES = [
   { teamMatchId: 'fx-1', title: '2주차', homeTeamId: 't1', awayTeamId: 't2', startAt: '2026-09-08T10:00:00.000Z', placeName: '검증장', status: 'matched', homeScore: null, awayScore: null },
 ];
 
-function mockLeague(overrides?: { fixtures?: unknown[] }) {
+function mockLeague(overrides?: { fixtures?: unknown[]; defaultPlace?: unknown }) {
   useV1LeagueMatchMock.mockReturnValue({
     data: {
       leagueId: 'lg-1',
@@ -149,6 +150,7 @@ function mockLeague(overrides?: { fixtures?: unknown[] }) {
       teamIds: ['t1', 't2', 't3'],
       seriesSiblings: [],
       fixtures: overrides?.fixtures ?? FIXTURES,
+      defaultPlace: overrides?.defaultPlace ?? null,
     },
     isError: false,
   } as never);
@@ -193,6 +195,46 @@ describe('LeagueFixtureDetailClient', () => {
   });
   afterAll(() => {
     vi.useRealTimers();
+  });
+
+  describe('장소 카드', () => {
+    const place = (name: string, id: string | null) => ({
+      name,
+      address: `${name} 주소`,
+      latitude: id ? 37.5 : null,
+      longitude: id ? 127 : null,
+      provider: id ? 'kakao' : null,
+      providerPlaceId: id,
+    });
+    const withPlace = (p: unknown) => [{ ...FIXTURES[2], place: p }];
+
+    it('경기 장소가 리그 기본 장소와 다르면 장소 카드에 "이 경기만 장소가 달라요" 를 붙인다', () => {
+      mockLeague({ fixtures: withPlace(place('다른 구장', 'kakao-2')), defaultPlace: place('기본 구장', 'kakao-1') });
+      mockViewer('none');
+      render(<LeagueFixtureDetailClient leagueId="lg-1" fixtureId="fx-1" />);
+
+      expect(screen.getByRole('heading', { name: '장소' })).toBeInTheDocument();
+      expect(screen.getByText('이 경기만 장소가 달라요')).toBeInTheDocument();
+      expect(screen.getByRole('link', { name: '카카오맵으로 길찾기' })).toBeInTheDocument();
+    });
+
+    it('기본 장소와 같은 곳이면 같은 카드만 보이고 배지는 없다', () => {
+      mockLeague({ fixtures: withPlace(place('기본 구장', 'kakao-1')), defaultPlace: place('기본 구장', 'kakao-1') });
+      mockViewer('none');
+      render(<LeagueFixtureDetailClient leagueId="lg-1" fixtureId="fx-1" />);
+
+      expect(screen.getByRole('heading', { name: '장소' })).toBeInTheDocument();
+      expect(screen.queryByText('이 경기만 장소가 달라요')).toBeNull();
+    });
+
+    it('리그 기본 장소가 없으면 비교할 기준이 없으므로 배지를 붙이지 않는다', () => {
+      mockLeague({ fixtures: withPlace(place('다른 구장', null)) });
+      mockViewer('none');
+      render(<LeagueFixtureDetailClient leagueId="lg-1" fixtureId="fx-1" />);
+
+      expect(screen.queryByText('이 경기만 장소가 달라요')).toBeNull();
+      expect(screen.getByRole('link', { name: '카카오맵에서 이름 검색' })).toBeInTheDocument();
+    });
   });
 
   it('홈 팀이 비어 있는 경기도 깨지지 않고 "홈팀 미정" 으로 읽히며 팀 링크는 없다', () => {

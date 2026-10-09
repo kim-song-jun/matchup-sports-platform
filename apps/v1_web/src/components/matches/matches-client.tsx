@@ -306,7 +306,7 @@ export function MatchDetailPageClient({ matchId, seed }: { matchId: string; seed
       // '서울 양천구 안양천로 939'가 실제 주소처럼 뜨던 결함(2026-08-27 감사
       // M-A-personal-match-state)을 막는다.
       description: query.data.description ?? query.data.descriptionPreview ?? '',
-      address: query.data.place?.addressText ?? query.data.placeName ?? '',
+      place: query.data.place ?? (query.data.placeName ? { name: query.data.placeName, address: null, latitude: null, longitude: null, provider: null, providerPlaceId: null } : null),
       // API가 규칙을 안 주면 빈 배열 — 목업 규칙('풋살화 착용' 등)을 남의 매치에
       // 붙이지 않는다. 렌더 쪽(matches-page.tsx)이 `.length` 로 섹션을 숨긴다.
       rules: query.data.rulesText ? [query.data.rulesText] : [],

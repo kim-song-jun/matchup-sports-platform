@@ -1,4 +1,5 @@
-import type { V1MatchApiStatus } from '@/types/api';
+import type { PlaceValue } from '@/lib/place';
+import type { V1MatchApiStatus, V1PlaceView, V1RecentVenue } from '@/types/api';
 
 export type MatchCardModel = {
   id: string;
@@ -107,7 +108,8 @@ export type MatchDetailViewModel = {
   backHref?: string;
   match: MatchCardModel & {
     description: string;
-    address: string;
+    /** 서버가 내려준 장소 스냅샷(좌표 없으면 이름·주소만). */
+    place: V1PlaceView | null;
     rules: string[];
     editHref?: string;
     applicationsHref?: string;
@@ -159,8 +161,7 @@ export type MatchCreateViewModel = {
     gender: string;
     rules: string;
     costNote: string;
-    venue: string;
-    address: string;
+    place: PlaceValue | null;
     date: string;
     startTime: string;
     endTime: string;
@@ -174,7 +175,7 @@ export type MatchCreateViewModel = {
     regionId: string;
     regions: Array<{ id: string; name: string }>;
     onSelectSport: (sportName: string) => void;
-    onFieldChange: (field: keyof MatchCreateViewModel['draft'], value: string | number | boolean) => void;
+    onFieldChange: (field: keyof MatchCreateViewModel['draft'], value: string | number | boolean | PlaceValue | null) => void;
     onRegionChange: (regionId: string) => void;
     onBack: () => void;
     onNext: () => void;
@@ -203,6 +204,6 @@ export type MatchCreateViewModel = {
     /** CreateProgress 배지: 지나온 스텝 중 필수 필드를 전부 채운 스텝(체크 표시용). */
     completeSteps?: MatchCreateStep[];
     /** #3 1단계: 이 사용자가 과거에 실제로 입력했던 장소 — 장소 입력창 포커스 시 칩으로 노출. */
-    recentVenues?: Array<{ placeName: string; addressText: string | null }>;
+    recentVenues?: V1RecentVenue[];
   };
 };

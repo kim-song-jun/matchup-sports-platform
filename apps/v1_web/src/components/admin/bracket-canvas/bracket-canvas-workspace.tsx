@@ -17,12 +17,14 @@ import { useV1AssignTournamentSlot, useV1RandomFillSlots } from '@/hooks/use-v1-
 import { BRACKET_CANVAS_SIDE_PANEL_MEDIA_QUERY, useMediaQuery } from '@/hooks/use-media-query';
 import { describeBracketCanvasError } from '@/lib/bracket-canvas-errors';
 import { buildSideLabelContext, directPlacedRegistrationIds, fixtureSideLabel, type SideKey } from '@/lib/bracket-canvas-layout';
+import { buildLeagueStandings } from '@/lib/bracket-league-standings-model';
 import { describeStandingsFill } from '@/lib/bracket-standings-fill-message';
 import { isBracketPublished } from '@/lib/bracket-visibility';
 import { extractErrorMessage } from '@/lib/error-message';
 import type { V1AdminTournamentRegistration, V1TournamentFormat } from '@/types/api';
 import { BracketCanvas, fixtureTitle } from './bracket-canvas';
 import { BracketLeagueGrid } from './bracket-league-grid';
+import { BracketLeagueStandings } from './bracket-league-standings';
 import { BracketNodePanel } from './bracket-node-panel';
 import { BracketStandingsFillButton } from './bracket-standings-fill-button';
 import { BracketTeamTray, type RegistrationsLoadState } from './bracket-team-tray';
@@ -63,6 +65,7 @@ export function BracketCanvasWorkspace({
   const [pendingRegistrationId, setPendingRegistrationId] = useState<string | null>(null);
   const [templateOpen, setTemplateOpen] = useState(false);
   const [toolsMode, setToolsMode] = useState<'add' | 'link' | null>(null);
+  const [standingsSheetOpen, setStandingsSheetOpen] = useState(false);
   const toolbarHintId = useId();
   // 서버 기본값 true: 하이드레이션 전에는 지금 레이아웃(옆 패널)을 유지하고, 좁은 태블릿만 클라이언트에서 시트로 바뀐다.
   const sidePanel = useMediaQuery(BRACKET_CANVAS_SIDE_PANEL_MEDIA_QUERY, true);
@@ -78,6 +81,10 @@ export function BracketCanvasWorkspace({
           group.groupTeams.flatMap((team) => (team.registrationId && team.teamName ? [[team.registrationId, team.teamName] as const] : [])),
         ),
       ),
+    [bracket],
+  );
+  const standingsGroups = useMemo(
+    () => (bracket === undefined ? [] : buildLeagueStandings({ groups: bracket.groups, standings: bracket.standings })),
     [bracket],
   );
 
@@ -99,6 +106,7 @@ export function BracketCanvasWorkspace({
   }
 
   const leagueGrid = format === 'league';
+  const showStandings = leagueGrid && standingsGroups.length > 0;
   const isEmpty = bracket.groups.length === 0 && bracket.fixtures.length === 0;
   const templateFormat = format === 'knockout' || format === 'league' || format === 'group_knockout' ? format : null;
   const confirmedTeams = registrations.filter((registration) => registration.status === 'confirmed');
@@ -121,6 +129,7 @@ export function BracketCanvasWorkspace({
   const publishBlockedReason = isEmpty && !published ? '대진을 먼저 만들어야 공개할 수 있어요.' : null;
   const toolbarHint = !isEmpty ? randomFillBlockedReason : publishBlockedReason;
   const selectedFixture = bracket.fixtures.find((fixture) => fixture.id === selectedFixtureId) ?? null;
+  const rightColumn = sidePanel && (selectedFixture !== null || showStandings);
 
   const handleAssign = (slotId: string, registrationId: string) => {
     assignSlot.mutate(
@@ -299,7 +308,7 @@ export function BracketCanvasWorkspace({
           onCta={templateFormat === null ? onShowList : () => setTemplateOpen(true)}
         />
       ) : (
-        <div className={`grid gap-4 ${selectedFixture === null || !sidePanel ? 'lg:grid-cols-[240px_minmax(0,1fr)]' : 'lg:grid-cols-[240px_minmax(0,1fr)_320px]'}`}>
+        <div className={`grid gap-4 ${!rightColumn ? 'lg:grid-cols-[240px_minmax(0,1fr)]' : 'lg:grid-cols-[240px_minmax(0,1fr)_320px]'}`}>
           <BracketTeamTray
             registrations={registrations}
             registrationsState={registrationsState}
@@ -311,17 +320,32 @@ export function BracketCanvasWorkspace({
             onPick={setPendingRegistrationId}
           />
           {leagueGrid ? (
-            <BracketLeagueGrid
-              groups={bracket.groups}
-              fixtures={bracket.fixtures}
-              slots={bracket.slots}
-              selectedFixtureId={selectedFixture?.id ?? null}
-              pendingRegistrationId={canWrite ? pendingRegistrationId : null}
-              canWrite={canWrite}
-              onSelectFixture={setSelectedFixtureId}
-              onAssignSlot={handleAssign}
-              onAssignDirect={handleAssignDirect}
-            />
+            <div className="flex min-w-0 flex-col gap-3">
+              {showStandings && (sidePanel ? selectedFixture !== null : true) ? (
+                <div className="flex justify-end">
+                  {sidePanel ? (
+                    <Button variant="outline" size="md" onClick={() => setSelectedFixtureId(null)}>
+                      순위표 보기
+                    </Button>
+                  ) : (
+                    <Button variant="outline" size="md" onClick={() => setStandingsSheetOpen(true)}>
+                      순위표
+                    </Button>
+                  )}
+                </div>
+              ) : null}
+              <BracketLeagueGrid
+                groups={bracket.groups}
+                fixtures={bracket.fixtures}
+                slots={bracket.slots}
+                selectedFixtureId={selectedFixture?.id ?? null}
+                pendingRegistrationId={canWrite ? pendingRegistrationId : null}
+                canWrite={canWrite}
+                onSelectFixture={setSelectedFixtureId}
+                onAssignSlot={handleAssign}
+                onAssignDirect={handleAssignDirect}
+              />
+            </div>
           ) : (
             <BracketCanvas
               groups={bracket.groups}
@@ -335,13 +359,27 @@ export function BracketCanvasWorkspace({
               onAssignDirect={handleAssignDirect}
             />
           )}
-          {panel !== null && sidePanel ? panel : null}
+          {rightColumn ? (
+            panel !== null ? (
+              panel
+            ) : (
+              <aside aria-label="조별 순위" className="sticky top-4 self-start">
+                <BracketLeagueStandings groups={standingsGroups} />
+              </aside>
+            )
+          ) : null}
         </div>
       )}
 
       {panel !== null && selectedFixture !== null && !sidePanel ? (
         <BottomSheet open onClose={() => setSelectedFixtureId(null)} ariaLabel={fixtureTitle(selectedFixture, bracket.groups)}>
           {panel}
+        </BottomSheet>
+      ) : null}
+
+      {showStandings && !sidePanel && standingsSheetOpen ? (
+        <BottomSheet open onClose={() => setStandingsSheetOpen(false)} title="조별 순위">
+          <BracketLeagueStandings groups={standingsGroups} />
         </BottomSheet>
       ) : null}
 

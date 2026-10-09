@@ -1,7 +1,7 @@
 import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { installViewport, resizeViewport } from '@/test/viewport';
-import { makeBracket, makeFixture, makeGroup, makeRegistration, makeSlot } from '@/test/bracket-canvas-fixtures';
+import { makeBracket, makeFixture, makeGroup, makeRegistration, makeSlot, makeStanding } from '@/test/bracket-canvas-fixtures';
 import type { V1AdminTournamentBracket } from '@/types/api';
 import type { V1FillSlotsFromStandingsResult } from '@/types/bracket-standings-fill';
 import type { RegistrationsLoadState } from './bracket-team-tray';
@@ -477,6 +477,65 @@ describe('BracketCanvasWorkspace — 리그 방식 대회', () => {
     render(<BracketCanvasWorkspace {...leagueProps('league')} />);
     fireEvent.click(screen.getByRole('button', { name: /A조.*1번 경기 열기/ }));
     expect(screen.getByTestId('panel')).toHaveTextContent('l1');
+  });
+});
+
+const gt = (groupId: string, registrationId: string, teamName: string, sortOrder: number) => ({
+  id: `gt-${registrationId}`, groupId, registrationId, teamName, sortOrder, createdAt: '',
+});
+const standingGroupA = makeGroup({ id: 'lgA', name: 'A조', phase: 'group', sortOrder: 0, groupTeams: [gt('lgA', 'r1', '송파', 0), gt('lgA', 'r2', '마포', 1)] });
+const standingGroupB = makeGroup({ id: 'lgB', name: 'B조', phase: 'group', sortOrder: 1, groupTeams: [gt('lgB', 'r4', '알파8', 0)] });
+const withStandings = makeBracket({
+  ...leagueBracket,
+  groups: [standingGroupA, standingGroupB],
+  standings: [
+    makeStanding({ groupId: 'lgA', registrationId: 'r1', teamName: '송파', position: 1, wins: 1, goalDifference: 2, points: 3 }),
+    makeStanding({ groupId: 'lgB', registrationId: 'r4', teamName: '알파8', position: 1 }),
+  ],
+});
+
+describe('BracketCanvasWorkspace — 리그 순위표 배치', () => {
+  it('1024 이상: 선택이 없으면 옆 열에 조별 순위가 있고, 경기를 고르면 패널로 바뀌며 「순위표 보기」 로 돌아온다', () => {
+    setBracket(withStandings);
+    render(<BracketCanvasWorkspace {...leagueProps('league')} />);
+    const aside = screen.getByRole('complementary', { name: '조별 순위' });
+    expect(within(aside).getByRole('table', { name: 'A조 순위표' })).toBeInTheDocument();
+    expect(within(aside).getByRole('table', { name: 'B조 순위표' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '순위표 보기' })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /A조.*1번 경기 열기/ }));
+    expect(screen.getByTestId('panel')).toBeInTheDocument();
+    expect(screen.queryByRole('complementary', { name: '조별 순위' })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: '순위표 보기' }));
+    expect(screen.queryByTestId('panel')).not.toBeInTheDocument();
+    expect(screen.getByRole('complementary', { name: '조별 순위' })).toBeInTheDocument();
+  });
+
+  it('1024 와 1023 경계: 1024 는 옆 열, 1023 은 옆 열 없이 「순위표」 시트 버튼', () => {
+    setBracket(withStandings);
+    render(<BracketCanvasWorkspace {...leagueProps('league')} />);
+    resizeViewport(1024);
+    expect(screen.getByRole('complementary', { name: '조별 순위' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '순위표' })).not.toBeInTheDocument();
+
+    resizeViewport(1023);
+    expect(screen.queryByRole('complementary', { name: '조별 순위' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '순위표' }));
+    const dialog = screen.getByRole('dialog', { name: '조별 순위' });
+    expect(within(dialog).getByRole('table', { name: 'A조 순위표' })).toBeInTheDocument();
+  });
+
+  it('리그가 아니거나 편성 팀이 없으면 순위표도 버튼도 없다', () => {
+    setBracket(withStandings);
+    const { unmount } = render(<BracketCanvasWorkspace {...leagueProps('knockout')} />);
+    expect(screen.queryByRole('complementary', { name: '조별 순위' })).not.toBeInTheDocument();
+    unmount();
+    setBracket(leagueBracket);
+    render(<BracketCanvasWorkspace {...leagueProps('league')} />);
+    expect(screen.queryByRole('complementary', { name: '조별 순위' })).not.toBeInTheDocument();
+    resizeViewport(900);
+    expect(screen.queryByRole('button', { name: '순위표' })).not.toBeInTheDocument();
   });
 });
 

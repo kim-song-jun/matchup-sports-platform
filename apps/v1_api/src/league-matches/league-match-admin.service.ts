@@ -889,7 +889,7 @@ export class LeagueMatchAdminService {
       for (const fixture of teamFixturesToCancel) {
         await this.cancelLeagueFixtureRowInTx(tx, fixture.id, TEAM_REMOVAL_CANCEL_REASON);
         // 자리에 연결됐는데 팀이 비어 있던 경기는 공개된 적이 없다 — 알림 대상이 아니다.
-        if (!isUnfilledSlotFixture(fixture)) {
+        if (!isUnfilledSlotFixture({ ...fixture, leagueId })) {
           cancelledFixtures.push({
             id: fixture.id,
             title: fixture.title,
@@ -1170,7 +1170,7 @@ export class LeagueMatchAdminService {
       for (const fixture of existingFixtures) {
         if (fixture.status === 'cancelled') continue;
         await this.cancelLeagueFixtureRowInTx(tx, fixture.id, dto.reason);
-        if (!isUnfilledSlotFixture(fixture)) {
+        if (!isUnfilledSlotFixture({ ...fixture, leagueId })) {
           cancelledFixtures.push({
             id: fixture.id,
             title: fixture.title,
@@ -2154,7 +2154,7 @@ export class LeagueMatchAdminService {
     const notices: Array<{ id: string; title: string; hostTeamId: string | null; approvedApplicantTeamId: string | null }> = [];
     for (const fixture of live) {
       await this.cancelLeagueFixtureRowInTx(tx, fixture.id, TEMPLATE_REPLACE_CANCEL_REASON);
-      if (!isUnfilledSlotFixture(fixture)) {
+      if (!isUnfilledSlotFixture({ ...fixture, leagueId })) {
         notices.push({ id: fixture.id, title: fixture.title, hostTeamId: fixture.hostTeamId, approvedApplicantTeamId: fixture.approvedApplicantTeamId });
       }
     }

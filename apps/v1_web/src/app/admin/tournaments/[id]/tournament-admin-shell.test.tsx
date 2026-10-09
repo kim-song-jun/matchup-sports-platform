@@ -118,8 +118,9 @@ describe('TournamentAdminShell 섹션 내비', () => {
 
   it('진행 중 대회에는 되돌리기 버튼이 없고, 조회 전용 관리자에게는 완료 대회에서도 없다', () => {
     adminRoleMock.value = 'ops';
-    render(<TournamentAdminShell id="tournament-1"><div /></TournamentAdminShell>).unmount();
+    const { unmount } = render(<TournamentAdminShell id="tournament-1"><div /></TournamentAdminShell>);
     expect(screen.queryByRole('button', { name: /되돌리기|초안으로 복구/ })).not.toBeInTheDocument();
+    unmount();
 
     adminRoleMock.value = 'support';
     tournamentStatusMock.value = 'completed';

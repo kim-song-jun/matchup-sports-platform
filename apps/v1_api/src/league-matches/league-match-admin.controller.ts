@@ -1,10 +1,11 @@
 import { BadRequestException, Body, Controller, Delete, Get, HttpCode, Param, ParseUUIDPipe, Patch, Post, Query, UseGuards } from '@nestjs/common';
-import { IsOptional, Matches } from 'class-validator';
+import { IsIn, IsOptional, Matches } from 'class-validator';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { V1AuthGuard } from '../auth/v1-auth.guard';
 import { V1AuthUser } from '../auth/v1-auth-user';
 import {
   AddLeagueTeamDto,
+  ApplyLeagueTemplateDto,
   CancelLeagueFixtureDto,
   CreateLeagueMatchDto,
   CreateManualLeagueFixtureDto,
@@ -18,6 +19,7 @@ import {
   UpdateLeagueFixtureDto,
   UpdateLeagueVisibilityDto,
 } from './dto/league-match.dto';
+import { ADMIN_LIST_VISIBILITIES, type AdminListVisibility } from '../tournaments/dto/admin-tournament.dto';
 import { LeagueMatchAdminService } from './league-match-admin.service';
 
 // ParseUUIDPipe 기본 예외는 code 없는 영어 메시지라 AllExceptionsFilter 가 INTERNAL_ERROR 로
@@ -42,6 +44,10 @@ class AdminLeagueListQueryDto {
     message: '올바르지 않은 체계 필터예요.',
   })
   seriesId?: string;
+
+  @IsOptional()
+  @IsIn(ADMIN_LIST_VISIBILITIES)
+  visibility?: AdminListVisibility;
 }
 
 @Controller('admin/league-matches')
@@ -51,7 +57,7 @@ export class LeagueMatchAdminController {
 
   @Get()
   list(@CurrentUser() user: V1AuthUser, @Query() query: AdminLeagueListQueryDto) {
-    return this.service.list(user, query.seriesId);
+    return this.service.list(user, query.seriesId, query.visibility);
   }
 
   @Get(':leagueId')
@@ -139,6 +145,16 @@ export class LeagueMatchAdminController {
     @Body() dto: CreateManualLeagueFixtureDto,
   ) {
     return this.service.createManualFixture(user, leagueId, dto);
+  }
+
+  // 자리 기반 빈 대진 템플릿. 정적 세그먼트('template')라 `POST :leagueId/fixtures`·`/manual`·`/regenerate` 와 충돌하지 않는다.
+  @Post(':leagueId/fixtures/template')
+  applyTemplate(
+    @CurrentUser() user: V1AuthUser,
+    @Param('leagueId', leagueIdPipe) leagueId: string,
+    @Body() dto: ApplyLeagueTemplateDto,
+  ) {
+    return this.service.applyTemplate(user, leagueId, dto);
   }
 
   // R13: 대진 재생성 — 기존 대진 전부를 취소하고 같은 팀 로스터로 새 라운드로빈 대진을 만든다.

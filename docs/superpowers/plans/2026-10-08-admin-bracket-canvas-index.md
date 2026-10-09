@@ -25,6 +25,7 @@
 | PR-5a | `2026-10-08-admin-bracket-canvas-pr5a-league-backend.md` | 정규 리그 빈 경기·템플릿·리그 사이드 배정·공개 게이트·취소/재생성/리마인더·상태 전이 |
 | PR-5b | `2026-10-08-admin-bracket-canvas-pr5b-league-ui.md` | 리그 어드민 일정 보드 · 리그 타입 nullable · 참가팀 registrationId |
 | PR-6 | `2026-10-08-admin-bracket-canvas-pr6-mobile-finish.md` | 390 라운드 탭 + 바텀시트 · 구조 편집 숨김 · 마감 |
+| PR-7 | `2026-10-09-admin-bracket-canvas-pr7-league-grid.md` | 리그 방식 대회 라운드×조 격자 + 조별 순위표 · 모바일 라운드 탭 · 죽은 `mode: 'league'` 삭제 |
 
 **병렬 실행 웨이브(2026-10-09 사용자: Ultracode 병렬)** — 같은 웨이브의 PR 은 각자 worktree 에서 동시에 구현하고, 머지는 웨이브 안에서 순서대로(뒤 PR 은 앞 PR 머지 뒤 `origin/dev` 를 3-way merge 해 충돌 해결·재검증):
 
@@ -207,7 +208,7 @@ export const BRACKET_TEMPLATE_MAX_FIXTURES = 240;
 
 | 코드 | HTTP | 언제 |
 |---|---|---|
-| `BRACKET_TEMPLATE_UNSUPPORTED` | 422 | 결선 크기 K ∉ {2,4,8}, K=2 + 3위전, kind 별 필수 필드 누락·범위 밖 |
+| `BRACKET_TEMPLATE_UNSUPPORTED` | 422 | 결선 크기 K ∉ {2,4,8,16}(16강 = 8조×2팀), K=2 + 3위전, kind 별 필수 필드 누락·범위 밖 |
 | `BRACKET_TEMPLATE_FORMAT_MISMATCH` | 422 | 템플릿 kind ≠ 대회 format |
 | `BRACKET_TEMPLATE_TOO_LARGE` | 422 | 계획 경기 수 > 240 |
 | `BRACKET_NOT_EMPTY` | 409 | 대진이 비어 있지 않은데 `replaceExisting` 없음 |

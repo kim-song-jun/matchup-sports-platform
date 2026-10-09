@@ -8,7 +8,7 @@ import type { GameActorRole, GameResultRevisionState } from '@/hooks/use-tournam
  * Unknown codes fall back to the server's own message via
  * `extractErrorMessage` -- never a raw stack/technical string.
  */
-const KNOWN_ERROR_MESSAGES: Record<string, string> = {
+export const KNOWN_ERROR_MESSAGES: Record<string, string> = {
   DIRECTOR_OFFICIALIZE_DISABLED: '이 기능은 아직 활성화되지 않았어요. 플랫폼 운영팀에 문의해 주세요.',
   STAFF_SCOPE_DENIED: '이 대회의 담당자 권한이 없어졌거나 만료됐어요. 새로고침 후 다시 시도해 주세요.',
   PROJECTION_PREVIEW_MISMATCH: '결과 내용이 방금 바뀌었어요. 최신 내용을 다시 확인한 뒤 시도해 주세요.',

@@ -22,6 +22,8 @@ import { BRACKET_SOURCE_PHASES } from '@/lib/tournament-bracket-rounds';
 import { competitionMatchLabel, tournamentRoundLabel } from '@/lib/tournament-round-label';
 import { AdminDataTable, AdminEmpty } from '@/components/admin';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
+import { useStartedTeamChangeReason } from '@/components/admin/bracket-canvas/use-started-team-change-reason';
+import { fixtureTeamChangeAccess } from '@/lib/bracket-canvas-layout';
 import { BracketGroupQuickAdd } from './bracket-group-quick-add';
 import { BracketGroupCard } from './bracket-group-card';
 import { isGroupReady } from './bracket-group-helpers';
@@ -169,6 +171,7 @@ export function BracketTab({
   const [focusGroupId, setFocusGroupId] = useState<string | null>(null);
   const [isAutoGenerating, setIsAutoGenerating] = useState(false);
   const { confirm: confirmModal, ConfirmModal } = useConfirm();
+  const { requestReason, dialog: teamChangeDialog } = useStartedTeamChangeReason();
 
   // ── 조별리그 대진 자동 생성(서버 API, 회전 수 선택) ────────────────
   // 이 컴포넌트의 다른 mutation 은 전용 훅(`hooks/use-v1-api.ts`)이 React Query 캐시
@@ -189,7 +192,10 @@ export function BracketTab({
     label: r.teamName ?? r.id,
   }));
 
-  const handleUpdateFixture = (e: React.FormEvent) => {
+  const editFixtureAccess = editFixture ? fixtureTeamChangeAccess(editFixture) : 'free';
+  const editFixtureTeamsLocked = editFixtureAccess === 'official' || editFixtureAccess === 'cancelled';
+
+  const handleUpdateFixture = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editFixture) return;
     const fixtureNumber = Number(editFxNumber);
@@ -208,9 +214,14 @@ export function BracketTab({
     // 로컬 타임존으로 잘못 해석된다. 대칭 함수 kstDatetimeLocalToIso 로 KST 오프셋을 고정해야
     // 값을 안 건드리고 저장만 눌러도 킥오프가 밀리지 않는다.
     const scheduledAtIso = editFxScheduledAt ? kstDatetimeLocalToIso(editFxScheduledAt) : null;
+    // 시작된 경기의 팀 교체는 옛 팀 명단·기록이 지워지므로 확인과 사유를 먼저 받는다.
+    const changedSides = [homeChanged ? editFixture.homeTeamName : null, awayChanged ? editFixture.awayTeamName : null].filter((side): side is string => side !== null);
+    const teamChangeReason = changedSides.length > 0 && editFixtureAccess === 'started' ? await requestReason(changedSides) : undefined;
+    if (teamChangeReason === null) return;
     updateFixture.mutate(
       {
         fixtureId: editFixture.id,
+        ...(teamChangeReason === undefined ? {} : { teamChangeReason }),
         ...(fixtureNumber !== editFixture.fixtureNumber ? { fixtureNumber } : {}),
         ...(scheduledAtIso ? { scheduledAt: scheduledAtIso } : {}),
         venue: editFxVenue,
@@ -218,7 +229,13 @@ export function BracketTab({
         ...(awayChanged ? { awayRegistrationId: editFxAwayRegId || null } : {}),
       },
       {
-        onSuccess: () => { setEditFixture(null); showToast('경기 정보를 수정했어요.', 'success'); },
+        onSuccess: (result) => {
+          setEditFixture(null);
+          showToast(
+            result.startedTeamChange === null ? '경기 정보를 수정했어요.' : `팀을 바꿨어요. 옛 팀 기록 ${result.startedTeamChange.removedEventCount}건을 지웠어요.`,
+            'success',
+          );
+        },
         onError: (err) => showToast(extractErrorMessage(err, '경기 수정에 실패했어요.'), 'error'),
       },
     );
@@ -540,6 +557,7 @@ export function BracketTab({
     <>
       {/* 확인 모달 — window.confirm 대체 */}
       {ConfirmModal}
+      {teamChangeDialog}
 
       {/* ── 대진표 일괄 공개 ──────────────────────────────────────────── */}
       <div className="tm-content-enter bg-[var(--card-surface)] rounded-2xl border border-[var(--border)] px-5 py-4 mb-6 flex flex-col gap-3">
@@ -898,7 +916,7 @@ export function BracketTab({
                 value={editFixtureTeamItems.find((it) => it.id === editFxHomeRegId) ?? null}
                 onChange={(item) => setEditFxHomeRegId(item?.id ?? '')}
                 items={editFixtureTeamItems}
-                disabled={updateFixture.isPending || !!editFixture?.result}
+                disabled={updateFixture.isPending || editFixtureTeamsLocked}
                 clearLabel="미정"
                 placeholder="홈 팀 검색"
               />
@@ -910,14 +928,21 @@ export function BracketTab({
                 value={editFixtureTeamItems.find((it) => it.id === editFxAwayRegId) ?? null}
                 onChange={(item) => setEditFxAwayRegId(item?.id ?? '')}
                 items={editFixtureTeamItems}
-                disabled={updateFixture.isPending || !!editFixture?.result}
+                disabled={updateFixture.isPending || editFixtureTeamsLocked}
                 clearLabel="미정"
                 placeholder="어웨이 팀 검색"
               />
             </div>
           </div>
-          {editFixture?.result && (
-            <p className="text-[length:var(--font-size-caption)] text-[var(--text-muted)] m-0">결과가 기록된 경기는 팀을 바꿀 수 없어요. 팀을 바꾸려면 결과를 먼저 삭제해 주세요.</p>
+          {editFixtureTeamsLocked && (
+            <p className="text-[length:var(--font-size-caption)] text-[var(--text-muted)] m-0">
+              {editFixtureAccess === 'official'
+                ? '공식 결과가 확정된 경기는 팀을 바꿀 수 없어요. 결과를 먼저 무효로 돌려 주세요.'
+                : '취소된 경기는 팀을 바꿀 수 없어요.'}
+            </p>
+          )}
+          {editFixtureAccess === 'started' && (
+            <p className="text-[length:var(--font-size-caption)] text-[var(--text-muted)] m-0">시작된 경기예요. 팀을 바꾸면 그 팀의 명단과 기록이 지워져요.</p>
           )}
           <div className="flex gap-2 pt-1">
             <button

@@ -1,11 +1,12 @@
 'use client';
 
 import Link from 'next/link';
-import { Suspense, useState } from 'react';
+import { Suspense, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
   useV1AdminTeamMatches,
   useV1ChangeTeamMatchStatus,
+  useV1MasterRegions,
 } from '@/hooks/use-v1-api';
 import type { V1AdminTeamMatchRow } from '@/types/api';
 import { formatAdminDateTimeShort } from '@/lib/date-utils';
@@ -51,6 +52,25 @@ const KIND_OPTIONS = [
   { value: 'tournament', label: '대회' },
 ] as const;
 
+const SORT_OPTIONS = [
+  { value: 'created_desc', label: '최신 등록순' },
+  { value: 'start_asc', label: '경기일 빠른순' },
+  { value: 'start_desc', label: '경기일 늦은순' },
+] as const;
+
+type TeamMatchSort = (typeof SORT_OPTIONS)[number]['value'];
+
+const SELECT_CLASS =
+  'min-h-[44px] rounded-xl border border-[var(--border)] bg-[var(--card-surface)] px-3 text-[var(--text-strong)] focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2';
+
+/** Keeps a list condition in the URL (same approach as 경기 유형) without adding a history entry. */
+function writeQueryParam(name: string, value: string) {
+  const url = new URL(window.location.href);
+  if (value) url.searchParams.set(name, value);
+  else url.searchParams.delete(name);
+  window.history.replaceState(null, '', `${url.pathname}${url.search}${url.hash}`);
+}
+
 const PAGE_SIZE = 20;
 
 // ── Page ──────────────────────────────────────────────────────────────────
@@ -73,6 +93,23 @@ function AdminTeamMatchesPageContent() {
     KIND_OPTIONS.find((option) => option.value === searchParams.get('kind'))?.value ?? '',
   );
 
+  const [activeSort, setActiveSort] = useState<TeamMatchSort>(
+    SORT_OPTIONS.find((option) => option.value === searchParams.get('sort'))?.value ?? 'created_desc',
+  );
+  const [activeRegionId, setActiveRegionId] = useState(searchParams.get('regionId') ?? '');
+  const { data: regionData } = useV1MasterRegions();
+  const regionOptions = useMemo(() => {
+    const regions = regionData ?? [];
+    const byId = new Map(regions.map((region) => [region.id, region]));
+    return regions
+      .map((region) => {
+        const parent = region.parentId ? byId.get(region.parentId) : undefined;
+        return { value: region.id, label: parent ? `${parent.name} ${region.name}` : region.name };
+      })
+      .sort((a, b) => a.label.localeCompare(b.label, 'ko'));
+  }, [regionData]);
+  const activeRegionLabel = regionOptions.find((option) => option.value === activeRegionId)?.label;
+
   // ── Filter state — 검색 debounce·상태 필터·page 리셋은 공용 훅이 담당 ─────
   // (백엔드 q 지원이 이번에 추가되어 hideSearch도 함께 해제한다 — 제목·호스트 팀명 검색)
   // 조건은 URL에 남아 상세에 다녀와도 유지되고, 허용 목록에 없는 ?status= 는 '전체'로 떨어진다.
@@ -86,7 +123,13 @@ function AdminTeamMatchesPageContent() {
     buildPagination,
   } = useAdminUrlListQuery(STATUS_OPTIONS, PAGE_SIZE);
 
-  const { data, isPending, isFetching, isError, error, refetch } = useV1AdminTeamMatches({ ...filters, ...(activeKind ? { kind: activeKind } : {}) });
+  const { data, isPending, isFetching, isError, error, refetch } = useV1AdminTeamMatches({
+    ...filters,
+    ...(activeKind ? { kind: activeKind } : {}),
+    ...(activeRegionId ? { regionId: activeRegionId } : {}),
+    // The default sort is omitted so existing cache keys and URLs stay unchanged.
+    ...(activeSort !== 'created_desc' ? { sort: activeSort } : {}),
+  });
   const rows = data?.items ?? [];
   const pageInfo = data?.pageInfo;
   const statusOptions = STATUS_OPTIONS.map((option) => ({
@@ -151,28 +194,79 @@ function AdminTeamMatchesPageContent() {
           activeStatus={activeStatus}
           onStatusChange={setActiveStatus}
           rightSlot={
-            <label className="inline-flex min-h-[44px] items-center gap-2 text-[length:var(--font-size-label)] text-[var(--text-body)]">
-              경기 유형
-              <select
-                value={activeKind}
-                onChange={(event) => {
-                  const next = KIND_OPTIONS.find((option) => option.value === event.target.value);
-                  if (!next) return;
-                  setActiveKind(next.value);
-                  // 경기 유형도 URL에 남긴다 — 검색·상태와 함께 상세 왕복 뒤에 복원된다(MD-QA #21).
-                  const url = new URL(window.location.href);
-                  if (next.value) url.searchParams.set('kind', next.value);
-                  else url.searchParams.delete('kind');
-                  window.history.replaceState(null, '', `${url.pathname}${url.search}${url.hash}`);
-                  resetToFirstPage();
-                }}
-                className="min-h-[44px] rounded-xl border border-[var(--border)] bg-[var(--card-surface)] px-3 text-[var(--text-strong)] focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
-              >
-                {KIND_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-              </select>
-            </label>
+            <>
+              <label className="inline-flex min-h-[44px] items-center gap-2 whitespace-nowrap text-[length:var(--font-size-label)] text-[var(--text-body)]">
+                경기 유형
+                <select
+                  value={activeKind}
+                  onChange={(event) => {
+                    const next = KIND_OPTIONS.find((option) => option.value === event.target.value);
+                    if (!next) return;
+                    setActiveKind(next.value);
+                    // 경기 유형도 URL에 남긴다 — 검색·상태와 함께 상세 왕복 뒤에 복원된다(MD-QA #21).
+                    writeQueryParam('kind', next.value);
+                    resetToFirstPage();
+                  }}
+                  className={SELECT_CLASS}
+                >
+                  {KIND_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                </select>
+              </label>
+              <label className="inline-flex min-h-[44px] items-center gap-2 whitespace-nowrap text-[length:var(--font-size-label)] text-[var(--text-body)]">
+                지역
+                <select
+                  value={activeRegionId}
+                  onChange={(event) => {
+                    setActiveRegionId(event.target.value);
+                    writeQueryParam('regionId', event.target.value);
+                    resetToFirstPage();
+                  }}
+                  className={SELECT_CLASS}
+                >
+                  <option value="">전체 지역</option>
+                  {/* A region from the URL stays selectable until the master list arrives. */}
+                  {activeRegionId && !activeRegionLabel && <option value={activeRegionId}>선택한 지역</option>}
+                  {regionOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                </select>
+              </label>
+              <label className="inline-flex min-h-[44px] items-center gap-2 whitespace-nowrap text-[length:var(--font-size-label)] text-[var(--text-body)]">
+                정렬
+                <select
+                  value={activeSort}
+                  onChange={(event) => {
+                    const next = SORT_OPTIONS.find((option) => option.value === event.target.value);
+                    if (!next) return;
+                    setActiveSort(next.value);
+                    writeQueryParam('sort', next.value === 'created_desc' ? '' : next.value);
+                    resetToFirstPage();
+                  }}
+                  className={SELECT_CLASS}
+                >
+                  {SORT_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                </select>
+              </label>
+            </>
           }
         />
+        {activeRegionId && (
+          <div className="mt-2 flex items-center gap-2">
+            <span className="inline-flex min-h-[44px] items-center gap-1 rounded-full bg-[var(--blue50)] pl-3 pr-1 text-[length:var(--font-size-label)] font-medium text-[var(--blue700)]">
+              지역 · {activeRegionLabel ?? '선택한 지역'}
+              <button
+                type="button"
+                aria-label="지역 필터 해제"
+                onClick={() => {
+                  setActiveRegionId('');
+                  writeQueryParam('regionId', '');
+                  resetToFirstPage();
+                }}
+                className="inline-flex size-[44px] items-center justify-center rounded-full text-[var(--blue700)] focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+              >
+                <span aria-hidden="true">×</span>
+              </button>
+            </span>
+          </div>
+        )}
       </div>
 
       {/* Card list */}
@@ -237,6 +331,7 @@ function AdminTeamMatchesPageContent() {
                   </span>
                 </div>
                 <span className="block truncate text-[length:var(--font-size-micro)] text-[var(--text-muted)]">
+                  {row.region && <span>{row.region.name} · </span>}
                   {row.league ? `${row.league.title} · ` : row.tournament ? `${row.tournament.title} · ` : ''}
                   {row.hostTeamName && row.approvedApplicantTeamName
                     ? `${row.hostTeamName} vs ${row.approvedApplicantTeamName}`

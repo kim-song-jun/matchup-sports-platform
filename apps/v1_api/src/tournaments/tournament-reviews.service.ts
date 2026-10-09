@@ -634,7 +634,9 @@ export class TournamentReviewsService {
         const ambiguous =
           byUserId.length > 1 &&
           byUserId.filter((player) => award.teamName === null || player.teamName === award.teamName).length > 1;
-        if (recipient === null || ambiguous || recipient.realName !== award.recipientName) {
+        // 이름은 신원 키가 아니다 — 추천 칩은 계정 표시 이름을 보내고 명단은 실명이라 다를 수 있어
+        // userId로 확정하고 저장 이름은 명단 실명으로 덮어쓴다.
+        if (recipient === null || ambiguous) {
           throw new BadRequestException({
             code: 'AWARD_RECIPIENT_NOT_IN_ROSTER',
             message: `'${award.recipientName}' 수상자를 해당 대회 확정 명단에서 확인할 수 없어요. 명단에서 다시 선택해 주세요.`,

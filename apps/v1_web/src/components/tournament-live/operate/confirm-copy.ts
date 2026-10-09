@@ -32,7 +32,7 @@ import { formatMatchClock } from '@/lib/game-operations-clock';
 import { josa } from '@/lib/korean';
 import type { GameCommandName, GameLineup, GameSide } from '@/types/game-operations';
 import type { EventCaptureCommitInput } from './action-target-picker';
-import { periodLabel } from './period-label';
+import { periodPrefix } from './period-label';
 
 export interface ConfirmCopy {
   readonly title: string;
@@ -114,10 +114,11 @@ export function commitActionConfirmCopy(
   sides: readonly GameSide[],
   lineups: readonly GameLineup[],
   clockWarningPeriodMinutes: number | null,
+  periodCount?: number | null,
 ): ConfirmCopy {
   const { noun, tone } = eventActionNoun(input);
   const target = eventTargetDescription(input, sides, lineups);
-  const when = `${periodLabel(input.period)} ${formatMatchClock(input.clockMs)}`;
+  const when = `${periodPrefix(input.period, periodCount)}${formatMatchClock(input.clockMs)}`;
   if (clockWarningPeriodMinutes !== null) {
     return {
       title: '기록 시각을 확인해주세요',

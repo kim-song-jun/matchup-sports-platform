@@ -5,7 +5,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { V1AuthUser } from '../auth/v1-auth-user';
 import { RecordLeagueForfeitDto } from './dto/league-match-forfeit.dto';
 import { resolveStoredForfeit } from './league-lifecycle-rules';
-import { FORFEIT_REASON_MARKER } from './league-forfeit-result';
+import { FORFEIT_LOSER_SCORE, FORFEIT_REASON_MARKER, FORFEIT_WINNER_SCORE } from './league-forfeit-result';
 export { FORFEIT_REASON_MARKER, resolveIsForfeit } from './league-forfeit-result';
 
 /**
@@ -74,8 +74,6 @@ export { FORFEIT_REASON_MARKER, resolveIsForfeit } from './league-forfeit-result
  * (관전자 상세)와 `league-match-admin.service.ts`(운영자 정정 모달의 "현재 몰수예요"
  * 표시) 양쪽이 각자 인라인으로 다시 적으면 한쪽만 바뀌었을 때 조용히 어긋난다.
  */
-const WINNER_SCORE = 1;
-const LOSER_SCORE = 0;
 
 /**
  * 재시도 전 대기. alpha 실측에서 0ms 는 3/3 재충돌, 300ms 는 즉시 수렴했다. 이긴 쪽의
@@ -197,8 +195,8 @@ export class LeagueMatchForfeitService {
     const gameId = teamMatch.game.id;
     const initialGameVersion = teamMatch.game.version;
     const isHostNoShow = dto.noShowTeamId === teamMatch.hostTeamId;
-    const homeScore = isHostNoShow ? LOSER_SCORE : WINNER_SCORE;
-    const awayScore = isHostNoShow ? WINNER_SCORE : LOSER_SCORE;
+    const homeScore = isHostNoShow ? FORFEIT_LOSER_SCORE : FORFEIT_WINNER_SCORE;
+    const awayScore = isHostNoShow ? FORFEIT_WINNER_SCORE : FORFEIT_LOSER_SCORE;
     const winningTeamId = isHostNoShow ? teamMatch.approvedApplicantTeamId : teamMatch.hostTeamId;
     const persistedReason = `${FORFEIT_REASON_MARKER} ${dto.reason.trim()}`;
 

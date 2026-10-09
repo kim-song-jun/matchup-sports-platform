@@ -25,6 +25,10 @@ import { PrismaService } from '../prisma/prisma.service';
 import { leagueActiveRegistrationWhere } from './league-active-registration';
 import { LeagueMatchAdminService } from './league-match-admin.service';
 
+jest.mock('../tournaments/slots/tournament-slot.service', () => ({
+  releaseSlotsForRegistrationInTx: jest.fn().mockResolvedValue(undefined),
+}));
+
 const adminUser: V1AuthUser = {
   id: 'admin-user-id',
   email: 'admin@test.v1',
@@ -73,6 +77,8 @@ interface FakeState {
   rosterPlayers: Map<string, Array<{ id: string; userId: string; nickname: string; jerseyNumber?: number }>>;
   /** 명단 재계산 이벤트(outbox)를 남긴 팀. */
   rosterSyncTeamIds: string[];
+  /** The league row's own config version; the sport-wide default is `config-1`. */
+  leagueConfigId: string | null;
 }
 
 /** 리그에 등록된 두 팀 — 기존 스펙이 멤버십 이름으로 사이드 배정을 단언하므로 고정한다. */
@@ -90,6 +96,7 @@ function createFake() {
     applicationCreates: [],
     registeredTeamIds: new Set(['team-a', 'team-b']),
     rosterPlayers: new Map(),
+    leagueConfigId: 'config-1',
   };
   let seq = 0;
   let createdGameId: string | null = null;
@@ -125,6 +132,7 @@ function createFake() {
         // `undefined` 라 `=== null` 가드를 그냥 지나가고 `.getTime()` 에서 터진다** —
         // 이 스펙 12건이 그렇게 깨졌다. 실제 select 는 이 필드를 읽으므로 fake 도 준다.
         registrationDeadlineAt: null,
+        competitionConfigVersionId: state.leagueConfigId,
         sport: { code: 'futsal' },
         registrations: [{ teamId: 'team-a' }, { teamId: 'team-b' }],
       })),
@@ -135,11 +143,16 @@ function createFake() {
     },
     v1Sport: { findFirst: track('v1Sport.findFirst', async () => ({ code: 'futsal' })) },
     v1CompetitionConfigVersion: {
-      findFirst: track('v1CompetitionConfigVersion.findFirst', async () => ({ id: 'config-1' })),
-      findUnique: track('v1CompetitionConfigVersion.findUnique', async () => ({
-        id: 'config-1',
+      // Sport-wide default (futsal 20+20) — the old, wrong source for league fixtures.
+      findFirst: track('v1CompetitionConfigVersion.findFirst', async () => ({ id: 'config-20' })),
+      findUnique: track('v1CompetitionConfigVersion.findUnique', async (args: { where: { id: string } }) => ({
+        id: args.where.id,
         status: 'ACTIVE',
-        periods: { count: 2 },
+        periods: args.where.id === 'config-25'
+          ? [{ durationMinutes: 25 }, { durationMinutes: 25 }]
+          : args.where.id === 'config-20'
+            ? [{ durationMinutes: 20 }, { durationMinutes: 20 }]
+            : { count: 2 },
         visibility: { mode: 'live' },
       })),
     },
@@ -436,6 +449,44 @@ describe('LeagueMatchAdminService.generateFixtures — 자동 로스터와 신�
     const fake = createFake();
     state = fake.state;
     service = await createModule(fake.prisma, fake.games);
+  });
+
+  describe('league period settings drive fixture timing and pin', () => {
+    // config-20 equals the sport default (control); config-25 is a league-edited 25+25.
+    it.each([
+      ['config-25', 50],
+      ['config-20', 40],
+    ])('generateFixtures: league version %s -> %i minute fixtures pinned to it', async (leagueConfigId, minutes) => {
+      state.leagueConfigId = leagueConfigId;
+
+      await service.generateFixtures(adminUser, 'league-1', { weeksCount: 1 });
+
+      expect(state.teamMatchCreates).not.toHaveLength(0);
+      for (const created of state.teamMatchCreates as unknown as Array<{ startAt: Date; endAt?: Date; competitionConfigVersionId: string }>) {
+        expect(created.competitionConfigVersionId).toBe(leagueConfigId);
+        expect(created.endAt).toEqual(new Date(created.startAt.getTime() + minutes * 60_000));
+      }
+    });
+
+    it('createManualFixture: pins the league version, not the sport default', async () => {
+      state.leagueConfigId = 'config-25';
+
+      await service.createManualFixture(adminUser, 'league-1', {
+        homeTeamId: 'team-a',
+        awayTeamId: 'team-b',
+        startsAt: '2026-09-19T01:00:00.000Z',
+      });
+
+      expect(state.teamMatchCreates[0]).toMatchObject({ competitionConfigVersionId: 'config-25' });
+    });
+
+    it('rejects a league row without a config version instead of defaulting to the sport', async () => {
+      state.leagueConfigId = null;
+
+      await expect(service.generateFixtures(adminUser, 'league-1', { weeksCount: 1 }))
+        .rejects.toMatchObject({ response: { code: 'COMPETITION_CONFIG_REQUIRED' } });
+      expect(state.teamMatchCreates).toEqual([]);
+    });
   });
 
   it('참가 명단이 없는 팀은 팀원 전원을 계정 없이 넣고 신원 연결이 0건이다', async () => {
@@ -796,7 +847,7 @@ describe('LeagueMatchAdminService.addTeam — 형제 티어 중복 게이트', (
             registrationDeadlineAt: null,
             seriesId: SERIES_ID,
             seasonNo: 1,
-            sport: { code: 'futsal' },
+            competitionConfigVersionId: 'config-1', sport: { code: 'futsal' },
             registrations: [{ teamId: 'team-a' }],
           };
         }),
@@ -903,6 +954,8 @@ describe('LeagueMatchAdminService.removeTeam — 대진 취소 알림과 제외 
         title: '1주차 A vs B',
         hostTeamId: REMOVED_TEAM,
         approvedApplicantTeamId: OPPONENT_TEAM,
+        homeSlotId: null,
+        awaySlotId: null,
         game: { currentOfficialRevisionId: null },
       },
       {
@@ -911,6 +964,8 @@ describe('LeagueMatchAdminService.removeTeam — 대진 취소 알림과 제외 
         title: '2주차 C vs A',
         hostTeamId: OTHER_HOST_TEAM,
         approvedApplicantTeamId: REMOVED_TEAM,
+        homeSlotId: null,
+        awaySlotId: null,
         game: { currentOfficialRevisionId: null },
       },
     ];
@@ -929,6 +984,7 @@ describe('LeagueMatchAdminService.removeTeam — 대진 취소 알림과 제외 
           // stillPresent: where.teamId = teamId(원시값) → 아직 로스터에 있음(1).
           return 1;
         }),
+        findFirst: jest.fn().mockResolvedValue({ id: 'registration-a' }),
         updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
       // 리그 조회도 통합 축이다. `settle()` 이 조기 반환하도록 진행중이 아닌 status 를 둔다.
@@ -942,7 +998,7 @@ describe('LeagueMatchAdminService.removeTeam — 대진 취소 알림과 제외 
           scheduledEndAt: new Date('2026-11-05T00:00:00.000Z'),
           status: 'draft',
           registrationDeadlineAt: null,
-          sport: { code: 'futsal' },
+          competitionConfigVersionId: 'config-1', sport: { code: 'futsal' },
           registrations: [{ teamId: REMOVED_TEAM }, { teamId: OPPONENT_TEAM }, { teamId: OTHER_HOST_TEAM }],
         }),
         updateMany: jest.fn().mockResolvedValue({ count: 0 }),
@@ -1043,11 +1099,12 @@ describe('LeagueMatchAdminService.regenerateFixtures — 진행 중 경기 (W4-V
           yellowAccumulationLimit: null,
           redCardSuspensionMatches: null,
           scheduledAt: new Date('2026-09-05T00:00:00.000Z'),
-          sport: { code: 'futsal' },
+          competitionConfigVersionId: 'config-1', sport: { code: 'futsal' },
           registrations: [{ teamId: 'team-a' }, { teamId: 'team-b' }],
         }),
       },
       v1Sport: { findFirst: jest.fn().mockResolvedValue({ code: 'futsal' }) },
+      v1TournamentSlot: { count: jest.fn().mockResolvedValue(0) },
       v1CompetitionConfigVersion: {
         findFirst: jest.fn().mockResolvedValue({ id: 'config-1' }),
         findUnique: jest.fn().mockResolvedValue({ periods: [] }),
@@ -1108,8 +1165,12 @@ describe('LeagueMatchAdminService.cancelFixture — 진행 중 경기의 대진 
           title: '1주차 A vs B',
           hostTeamId: 'team-a',
           approvedApplicantTeamId: 'team-b',
+          homeSlotId: null,
+          awaySlotId: null,
         }),
         update: jest.fn().mockResolvedValue({}),
+        // 자리를 쓰는 경기가 없는 리그라 상태 전이 판정은 아무것도 하지 않는다.
+        count: jest.fn().mockResolvedValue(0),
       },
       // settle() 이 조기 반환하도록 진행중이 아닌 리그를 둔다(removeTeam 스펙과 같은 이유).
       v1Tournament: { findFirst: jest.fn().mockResolvedValue({ id: LEAGUE_ID, status: 'draft' }) },
@@ -1207,13 +1268,18 @@ describe('LeagueMatchAdminService.detail — 대진의 gameState', () => {
       placeName: '장소',
       placeAddress: null,
       status: 'matched',
-      game: game === null ? null : { id: `game-${id}`, state: game.state, currentOfficialRevisionId: null, resultRevisions: [] },
+      homeSlotId: null,
+      awaySlotId: null,
+      game: game === null
+        ? null
+        : { id: `game-${id}`, state: game.state, version: 1, currentOfficialRevisionId: null, _count: { events: 0 }, resultRevisions: [] },
     };
   }
 
   async function detailWith(fixtures: ReturnType<typeof fixtureRow>[]) {
     const prisma = {
       v1TeamMatch: { findMany: jest.fn().mockResolvedValue(fixtures) },
+      v1TournamentSlot: { findMany: jest.fn().mockResolvedValue([]) },
       v1GameOfficialFact: { findMany: jest.fn().mockResolvedValue([]) },
       v1TournamentRegistration: { count: jest.fn().mockResolvedValue(0) },
     };
@@ -1285,12 +1351,13 @@ describe('LeagueMatchAdminService.detail — 참가비·대표 이미지 필드'
         findFirst: jest.fn().mockResolvedValue({
           id: 'league-1', title: '리그', isPublic: true, status: 'draft', registrationDeadlineAt: null,
           sportId: 'sport-1', regionId: 'region-1', yellowAccumulationLimit: null, redCardSuspensionMatches: null,
-          scheduledAt: new Date('2026-10-30T00:00:00.000Z'), sport: { code: 'futsal' },
+          scheduledAt: new Date('2026-10-30T00:00:00.000Z'), competitionConfigVersionId: 'config-1', sport: { code: 'futsal' },
           coverImageUrl: null, entryFee: 0, entryFeeConfiguredAt: null, bankName: null, bankAccount: null, bankHolder: null,
           registrations: [{ teamId: 'team-a' }], ...row,
         }),
       },
       v1TeamMatch: { findMany: jest.fn().mockResolvedValue([]) },
+      v1TournamentSlot: { findMany: jest.fn().mockResolvedValue([]) },
       v1GameOfficialFact: { findMany: jest.fn().mockResolvedValue([]) },
       v1TournamentRegistration: { count: jest.fn().mockResolvedValue(activeCount) },
     };
@@ -1433,5 +1500,46 @@ describe('LeagueMatchAdminService.updateVisibility', () => {
       expect.objectContaining({ where: { userId: adminUser.id } }),
     );
     expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+});
+
+describe('LeagueMatchAdminService.list — visibility filter', () => {
+  const day = new Date('2026-10-01T00:00:00.000Z');
+  const stored = ['pub-1', 'pub-2', 'hid-1', 'hid-2'].map((id) => ({
+    id,
+    title: id,
+    isPublic: id.startsWith('pub'),
+    status: 'draft',
+    scheduledAt: day,
+    scheduledEndAt: day,
+    regionId: 'region-1',
+    seriesId: null,
+    tier: null,
+    seasonNo: null,
+    _count: { registrations: 0 },
+    series: null,
+  }));
+
+  function createService() {
+    const prisma = {
+      v1Tournament: {
+        // Applies the isPublic clause of the where the service builds.
+        findMany: jest.fn(async (args: { where: { isPublic?: boolean } }) =>
+          stored.filter((row) => args.where.isPublic === undefined || row.isPublic === args.where.isPublic)),
+      },
+      v1TeamMatch: { groupBy: jest.fn().mockResolvedValue([]) },
+    };
+    const adminContext = { getActiveAdmin: jest.fn().mockResolvedValue({ id: 'a' }) };
+    const service = new LeagueMatchAdminService(prisma as never, adminContext as never, {} as never, {} as never);
+    return service;
+  }
+
+  it.each([
+    ['hidden', ['hid-1', 'hid-2']],
+    ['public', ['pub-1', 'pub-2']],
+    [undefined, ['pub-1', 'pub-2', 'hid-1', 'hid-2']],
+  ] as const)('visibility=%s', async (visibility, ids) => {
+    const result = await createService().list(adminUser, undefined, visibility);
+    expect(result.items.map((item) => item.leagueId)).toEqual(ids);
   });
 });

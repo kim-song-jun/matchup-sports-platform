@@ -211,6 +211,25 @@ describe('후속 이벤트 워커 핸들러', () => {
     expect(raw.v1GameLineup.create).not.toHaveBeenCalled();
   });
 
+  it('시작된 경기: 팀이 바뀐 사이드는 명단 계산까지 가지만 일반 경기 대상 이벤트는 쓰지 않는다', async () => {
+    const tournamentGames: FakeGame[] = [{ id: 'g1', leagueId: null, tournamentId: 'tour-1', teamIds: ['team-A', 'team-B'] }];
+    const side = sideId('g1', 'team-A');
+    const started = fakeTx({ games: tournamentGames, stateAfterLock: 'LIVE' });
+    await handleCompetitionRosterResync(started.tx, { id: 'event-1', payload: { scope: 'startedGameSide', gameId: 'g1', sideId: side } });
+    expect(started.raw.v1TournamentRegistration.findFirst).toHaveBeenCalled();
+    expect(started.calls.filter((call) => call.startsWith('lock:'))).toEqual(['lock:g1']);
+
+    const ordinary = fakeTx({ games: tournamentGames, stateAfterLock: 'LIVE' });
+    await handleCompetitionRosterResync(ordinary.tx, { id: 'event-2', payload: { scope: 'game', gameId: 'g1' } });
+    expect(ordinary.raw.v1TournamentRegistration.findFirst).not.toHaveBeenCalled();
+  });
+
+  it('시작된 경기여도 취소된 경기의 명단은 맞추지 않는다', async () => {
+    const { tx, raw } = fakeTx({ games: [{ id: 'g1', leagueId: null, tournamentId: 'tour-1', teamIds: ['team-A', 'team-B'] }], stateAfterLock: 'CANCELLED' });
+    await handleCompetitionRosterResync(tx, { id: 'event-1', payload: { scope: 'startedGameSide', gameId: 'g1', sideId: sideId('g1', 'team-A') } });
+    expect(raw.v1TournamentRegistration.findFirst).not.toHaveBeenCalled();
+  });
+
   it('모양이 다른 payload 는 던진다 — 재시도 끝에 POISONED 로 드러난다', async () => {
     const { tx, calls } = fakeTx();
     await expect(handleCompetitionRosterResync(tx, { id: 'event-1', payload: { scope: 'competitionTeam' } })).rejects.toThrow(

@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Providers } from '@/app/providers';
 import {
@@ -17,13 +17,89 @@ import {
   useV1Teams,
   useV1UpdateLeagueFixture,
 } from '@/hooks/use-v1-api';
+import { installViewport, resizeViewport } from '@/test/viewport';
 import LeagueMatchFixturesClient from './league-match-fixtures-client';
 
 vi.mock('@/components/auth/pending-social-signup-gate', () => ({
   PendingSocialSignupGate: ({ children }: { children: React.ReactNode }) => children,
 }));
 
-vi.mock('@/hooks/use-admin-can-write', () => ({ useAdminCanWrite: () => true }));
+const adminCanWrite = vi.hoisted(() => ({ value: true }));
+vi.mock('@/hooks/use-admin-can-write', () => ({ useAdminCanWrite: () => adminCanWrite.value }));
+
+const canvasMocks = vi.hoisted(() => ({ applyTemplate: vi.fn() }));
+vi.mock('@/hooks/use-v1-bracket-canvas', () => ({
+  useV1ApplyLeagueTemplate: () => ({ mutateAsync: canvasMocks.applyTemplate, isPending: false }),
+  useV1AssignTournamentSlot: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useV1RandomFillSlots: () => ({ mutateAsync: vi.fn(), isPending: false }),
+}));
+
+vi.mock('@/components/admin/bracket-canvas/bracket-canvas-mobile', () => ({
+  BracketCanvasMobile: (props: {
+    scope: string;
+    competitionId: string;
+    canWrite: boolean;
+    rounds: Array<{ label: string }>;
+    candidates: Array<{ teamName: string }>;
+    slots: unknown[];
+    registrationsState: { status: string };
+  }) => (
+    <div
+      data-testid="mobile-board"
+      data-scope={props.scope}
+      data-competition={props.competitionId}
+      data-can-write={String(props.canWrite)}
+      data-rounds={props.rounds.map((round) => round.label).join(',')}
+      data-candidates={props.candidates.map((candidate) => candidate.teamName).join(',')}
+      data-slots={props.slots.length}
+      data-registrations-status={props.registrationsState.status}
+    />
+  ),
+}));
+// 트레이·패널 내부는 PR-3 와 Task 6 테스트가 지킨다. 여기서는 보드가 부모의 일정 수정·취소 모달로 이어지는 배선만 본다.
+vi.mock('@/components/admin/bracket-canvas/bracket-team-tray', () => ({
+  BracketTeamTray: () => <div data-testid="tray" />,
+}));
+vi.mock('@/components/admin/bracket-canvas/league-fixture-panel', () => ({
+  LeagueFixturePanel: ({ node, onEditSchedule, onCancelFixture }: {
+    node: { home: { label: string }; away: { label: string } };
+    onEditSchedule: () => void;
+    onCancelFixture: () => void;
+  }) => (
+    <div role="dialog" aria-label="경기 패널">
+      {`${node.home.label} vs ${node.away.label}`}
+      <button type="button" onClick={onEditSchedule}>일정 수정</button>
+      <button type="button" onClick={onCancelFixture}>경기 취소</button>
+    </div>
+  ),
+}));
+
+// League period settings: undefined data by default (editor shows its loading state); tests set a value.
+const { periodSettingsMock, updatePeriodsMutateMock } = vi.hoisted(() => ({
+  periodSettingsMock: vi.fn(),
+  updatePeriodsMutateMock: vi.fn(),
+}));
+vi.mock('@/hooks/use-tournament-period-settings', () => ({
+  useTournamentPeriodSettings: periodSettingsMock,
+  useUpdateTournamentPeriodSettings: () => ({ mutate: updatePeriodsMutateMock, isPending: false, error: null }),
+}));
+
+function periodSettingsOf(minutes: number[]) {
+  return {
+    data: {
+      tournamentId: 'league-1',
+      competitionConfigVersionId: 'cfg-1',
+      expectedVersion: 'v-1',
+      periods: minutes.map((durationMinutes, i) => ({ code: `P${i}`, label: `${i + 1}`, durationMinutes, extraTime: false })),
+      legacyPeriodCount: null,
+      requiresDurationInput: false,
+    },
+    isPending: false,
+    isError: false,
+    isFetching: false,
+    refetch: vi.fn(),
+  };
+}
 
 vi.mock('@/hooks/use-v1-api', () => ({
   useV1ActivePopup: vi.fn(),
@@ -33,6 +109,7 @@ vi.mock('@/hooks/use-v1-api', () => ({
   useV1AdminLeagueMatch: vi.fn(),
   // U1 확장: 득점자 선택 목록 — 기본은 빈 데이터(섹션 숨김). 필요한 테스트만 값을 채운다.
   useV1AdminLeagueTeams: vi.fn(),
+  useV1AdminTournamentRegistrations: vi.fn(() => ({ data: { items: [], truncated: false }, isError: false, refetch: vi.fn() })),
   useV1CreateManualLeagueFixture: vi.fn(() => ({ mutateAsync: vi.fn(), isPending: false })),
   // R11(C-6): 몰수 모달이 열릴 때만 의미 있는 데이터를 쓴다 — 다른 테스트들은 모달을
   // 열지 않으므로 data: undefined인 기본값으로 충분하다.
@@ -113,6 +190,7 @@ describe('LeagueMatchFixturesClient', () => {
   // R12/R13: 기존 테스트는 이 두 훅을 전혀 참조하지 않으므로, 매 테스트 전에 무해한 기본값을
   // 채워둔다 — 안 채우면 컴포넌트가 undefined에서 .data/.mutate를 읽다 그 10개 테스트가 전부 깨진다.
   beforeEach(() => {
+    periodSettingsMock.mockReturnValue({ data: undefined, isPending: true, isError: false, isFetching: false, refetch: vi.fn() });
     useV1AdminLeagueTeamsMock.mockReturnValue({ data: undefined } as never);
     useV1CancelLeagueFixtureMock.mockReturnValue({ mutate: vi.fn(), isPending: false } as never);
     useV1RegenerateLeagueFixturesMock.mockReturnValue({ mutate: vi.fn(), isPending: false } as never);
@@ -158,7 +236,7 @@ describe('LeagueMatchFixturesClient', () => {
 
     render(
       <Providers>
-        <LeagueMatchFixturesClient leagueId="league-1" />
+        <LeagueMatchFixturesClient leagueId="league-1" initialView="list" />
       </Providers>,
     );
 
@@ -217,7 +295,7 @@ describe('LeagueMatchFixturesClient', () => {
 
     render(
       <Providers>
-        <LeagueMatchFixturesClient leagueId="league-1" />
+        <LeagueMatchFixturesClient leagueId="league-1" initialView="list" />
       </Providers>,
     );
 
@@ -259,7 +337,7 @@ describe('LeagueMatchFixturesClient', () => {
 
     render(
       <Providers>
-        <LeagueMatchFixturesClient leagueId="league-1" />
+        <LeagueMatchFixturesClient leagueId="league-1" initialView="list" />
       </Providers>,
     );
 
@@ -311,7 +389,7 @@ describe('LeagueMatchFixturesClient', () => {
 
     render(
       <Providers>
-        <LeagueMatchFixturesClient leagueId="league-1" />
+        <LeagueMatchFixturesClient leagueId="league-1" initialView="list" />
       </Providers>,
     );
 
@@ -346,7 +424,7 @@ describe('LeagueMatchFixturesClient', () => {
 
     render(
       <Providers>
-        <LeagueMatchFixturesClient leagueId="league-1" />
+        <LeagueMatchFixturesClient leagueId="league-1" initialView="list" />
       </Providers>,
     );
 
@@ -380,7 +458,7 @@ describe('LeagueMatchFixturesClient', () => {
 
     render(
       <Providers>
-        <LeagueMatchFixturesClient leagueId="league-1" />
+        <LeagueMatchFixturesClient leagueId="league-1" initialView="list" />
       </Providers>,
     );
 
@@ -422,9 +500,9 @@ describe('LeagueMatchFixturesClient', () => {
       data: {
         leagueId: 'league-1',
         teams: [
-          { teamId: 't1', name: '독수리FC', status: 'active', memberCount: 5, logoUrl: null },
-          { teamId: 't2', name: '호랑이FC', status: 'active', memberCount: 5, logoUrl: null },
-          { teamId: 't3', name: '사자FC', status: 'active', memberCount: 5, logoUrl: null },
+          { teamId: 't1', name: '독수리FC', status: 'active', memberCount: 5, logoUrl: null, registrationId: 'r-t1' },
+          { teamId: 't2', name: '호랑이FC', status: 'active', memberCount: 5, logoUrl: null, registrationId: 'r-t2' },
+          { teamId: 't3', name: '사자FC', status: 'active', memberCount: 5, logoUrl: null, registrationId: 'r-t3' },
         ],
       },
     } as never);
@@ -433,7 +511,7 @@ describe('LeagueMatchFixturesClient', () => {
 
     render(
       <Providers>
-        <LeagueMatchFixturesClient leagueId="league-1" />
+        <LeagueMatchFixturesClient leagueId="league-1" initialView="list" />
       </Providers>,
     );
 
@@ -453,7 +531,7 @@ describe('LeagueMatchFixturesClient', () => {
 
     render(
       <Providers>
-        <LeagueMatchFixturesClient leagueId="league-1" />
+        <LeagueMatchFixturesClient leagueId="league-1" initialView="list" />
       </Providers>,
     );
 
@@ -474,7 +552,7 @@ describe('LeagueMatchFixturesClient', () => {
 
     render(
       <Providers>
-        <LeagueMatchFixturesClient leagueId="league-1" />
+        <LeagueMatchFixturesClient leagueId="league-1" initialView="list" />
       </Providers>,
     );
 
@@ -501,7 +579,7 @@ describe('LeagueMatchFixturesClient', () => {
 
     render(
       <Providers>
-        <LeagueMatchFixturesClient leagueId="league-1" />
+        <LeagueMatchFixturesClient leagueId="league-1" initialView="list" />
       </Providers>,
     );
 
@@ -525,7 +603,7 @@ describe('LeagueMatchFixturesClient', () => {
 
     render(
       <Providers>
-        <LeagueMatchFixturesClient leagueId="league-1" />
+        <LeagueMatchFixturesClient leagueId="league-1" initialView="list" />
       </Providers>,
     );
 
@@ -562,7 +640,7 @@ describe('LeagueMatchFixturesClient', () => {
 
     render(
       <Providers>
-        <LeagueMatchFixturesClient leagueId="league-1" />
+        <LeagueMatchFixturesClient leagueId="league-1" initialView="list" />
       </Providers>,
     );
 
@@ -593,7 +671,7 @@ describe('LeagueMatchFixturesClient', () => {
 
     render(
       <Providers>
-        <LeagueMatchFixturesClient leagueId="league-1" />
+        <LeagueMatchFixturesClient leagueId="league-1" initialView="list" />
       </Providers>,
     );
 
@@ -653,7 +731,7 @@ describe('LeagueMatchFixturesClient', () => {
 
       render(
         <Providers>
-          <LeagueMatchFixturesClient leagueId="league-1" />
+          <LeagueMatchFixturesClient leagueId="league-1" initialView="list" />
         </Providers>,
       );
 
@@ -686,7 +764,7 @@ describe('LeagueMatchFixturesClient', () => {
 
     render(
       <Providers>
-        <LeagueMatchFixturesClient leagueId="league-1" />
+        <LeagueMatchFixturesClient leagueId="league-1" initialView="list" />
       </Providers>,
     );
 
@@ -719,7 +797,7 @@ describe('LeagueMatchFixturesClient', () => {
 
     render(
       <Providers>
-        <LeagueMatchFixturesClient leagueId="league-1" />
+        <LeagueMatchFixturesClient leagueId="league-1" initialView="list" />
       </Providers>,
     );
 
@@ -747,7 +825,7 @@ describe('LeagueMatchFixturesClient', () => {
 
     render(
       <Providers>
-        <LeagueMatchFixturesClient leagueId="league-1" />
+        <LeagueMatchFixturesClient leagueId="league-1" initialView="list" />
       </Providers>,
     );
 
@@ -764,7 +842,7 @@ describe('LeagueMatchFixturesClient', () => {
 
     const { container } = render(
       <Providers>
-        <LeagueMatchFixturesClient leagueId="league-1" />
+        <LeagueMatchFixturesClient leagueId="league-1" initialView="list" />
       </Providers>,
     );
 
@@ -794,7 +872,7 @@ describe('LeagueMatchFixturesClient', () => {
 
     render(
       <Providers>
-        <LeagueMatchFixturesClient leagueId="league-1" />
+        <LeagueMatchFixturesClient leagueId="league-1" initialView="list" />
       </Providers>,
     );
 
@@ -824,7 +902,7 @@ describe('LeagueMatchFixturesClient', () => {
       useV1UpdateLeagueFixtureMock.mockReturnValue({ mutate, isPending: false } as never);
       render(
         <Providers>
-          <LeagueMatchFixturesClient leagueId="league-1" />
+          <LeagueMatchFixturesClient leagueId="league-1" initialView="list" />
         </Providers>,
       );
       fireEvent.click(within(openRowMenu()).getByRole('button', { name: /^일정 수정/ }));
@@ -880,7 +958,7 @@ describe('LeagueMatchFixturesClient', () => {
 
     render(
       <Providers>
-        <LeagueMatchFixturesClient leagueId="league-1" />
+        <LeagueMatchFixturesClient leagueId="league-1" initialView="list" />
       </Providers>,
     );
 
@@ -911,7 +989,7 @@ describe('LeagueMatchFixturesClient', () => {
 
     render(
       <Providers>
-        <LeagueMatchFixturesClient leagueId="league-1" />
+        <LeagueMatchFixturesClient leagueId="league-1" initialView="list" />
       </Providers>,
     );
 
@@ -959,7 +1037,7 @@ describe('LeagueMatchFixturesClient', () => {
 
     render(
       <Providers>
-        <LeagueMatchFixturesClient leagueId="league-1" />
+        <LeagueMatchFixturesClient leagueId="league-1" initialView="list" />
       </Providers>,
     );
 
@@ -990,8 +1068,8 @@ describe('LeagueMatchFixturesClient', () => {
       data: {
         leagueId: 'league-1',
         teams: [
-          { teamId: 't1', name: 'A팀', status: 'active', memberCount: 5, logoUrl: null },
-          { teamId: 't2', name: 'B팀', status: 'active', memberCount: 5, logoUrl: null },
+          { teamId: 't1', name: 'A팀', status: 'active', memberCount: 5, logoUrl: null, registrationId: 'r-t1' },
+          { teamId: 't2', name: 'B팀', status: 'active', memberCount: 5, logoUrl: null, registrationId: 'r-t2' },
         ],
       },
     } as never);
@@ -1002,7 +1080,7 @@ describe('LeagueMatchFixturesClient', () => {
 
     render(
       <Providers>
-        <LeagueMatchFixturesClient leagueId="league-1" />
+        <LeagueMatchFixturesClient leagueId="league-1" initialView="list" />
       </Providers>,
     );
 
@@ -1041,7 +1119,7 @@ describe('LeagueMatchFixturesClient', () => {
       useV1UpdateLeagueFixtureMock.mockReturnValue({ mutate: vi.fn() } as never);
       render(
         <Providers>
-          <LeagueMatchFixturesClient leagueId="league-1" />
+          <LeagueMatchFixturesClient leagueId="league-1" initialView="list" />
         </Providers>,
       );
       return mutateAsync;
@@ -1099,7 +1177,7 @@ describe('LeagueMatchFixturesClient', () => {
       useV1UpdateLeagueFixtureMock.mockReturnValue({ mutate: vi.fn() } as never);
       render(
         <Providers>
-          <LeagueMatchFixturesClient leagueId="league-1" />
+          <LeagueMatchFixturesClient leagueId="league-1" initialView="list" />
         </Providers>,
       );
     }
@@ -1156,7 +1234,7 @@ describe('LeagueMatchFixturesClient', () => {
 
     render(
       <Providers>
-        <LeagueMatchFixturesClient leagueId="league-1" />
+        <LeagueMatchFixturesClient leagueId="league-1" initialView="list" />
       </Providers>,
     );
 
@@ -1190,7 +1268,7 @@ describe('LeagueMatchFixturesClient', () => {
 
     render(
       <Providers>
-        <LeagueMatchFixturesClient leagueId="league-1" />
+        <LeagueMatchFixturesClient leagueId="league-1" initialView="list" />
       </Providers>,
     );
 
@@ -1252,7 +1330,7 @@ describe('LeagueMatchFixturesClient', () => {
 
     render(
       <Providers>
-        <LeagueMatchFixturesClient leagueId="league-1" />
+        <LeagueMatchFixturesClient leagueId="league-1" initialView="list" />
       </Providers>,
     );
 
@@ -1293,7 +1371,7 @@ describe('LeagueMatchFixturesClient', () => {
     useV1AdminLeagueMatchMock.mockReturnValue(detail('active') as never);
     const active = render(
       <Providers>
-        <LeagueMatchFixturesClient leagueId="league-1" />
+        <LeagueMatchFixturesClient leagueId="league-1" initialView="list" />
       </Providers>,
     );
     expect(screen.queryByRole('button', { name: '진행 중으로 되돌리기' })).not.toBeInTheDocument();
@@ -1304,7 +1382,7 @@ describe('LeagueMatchFixturesClient', () => {
     useV1AdminLeagueMatchMock.mockReturnValue(detail('completed') as never);
     render(
       <Providers>
-        <LeagueMatchFixturesClient leagueId="league-1" />
+        <LeagueMatchFixturesClient leagueId="league-1" initialView="list" />
       </Providers>,
     );
 
@@ -1348,7 +1426,7 @@ describe('LeagueMatchFixturesClient', () => {
 
     render(
       <Providers>
-        <LeagueMatchFixturesClient leagueId="league-1" />
+        <LeagueMatchFixturesClient leagueId="league-1" initialView="list" />
       </Providers>,
     );
 
@@ -1392,6 +1470,7 @@ describe('LeagueMatchFixturesClient', () => {
 // 대진 timing(경기 시간·휴식·팀당 하루 경기 수) — C안(시간창 역산) + B안(계산기 카드·타임라인) 결합.
 describe('LeagueMatchFixturesClient — 대진 timing 설정', () => {
   beforeEach(() => {
+    periodSettingsMock.mockReturnValue({ data: undefined, isPending: true, isError: false, isFetching: false, refetch: vi.fn() });
     useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false } as never);
     useV1CancelLeagueFixtureMock.mockReturnValue({ mutate: vi.fn(), isPending: false } as never);
     useV1RegenerateLeagueFixturesMock.mockReturnValue({ mutate: vi.fn(), isPending: false } as never);
@@ -1413,10 +1492,10 @@ describe('LeagueMatchFixturesClient — 대진 timing 설정', () => {
       data: {
         leagueId: 'league-1',
         teams: [
-          { teamId: 't1', name: '독수리FC', status: 'active', memberCount: 5, logoUrl: null },
-          { teamId: 't2', name: '호랑이FC', status: 'active', memberCount: 5, logoUrl: null },
-          { teamId: 't3', name: '사자FC', status: 'active', memberCount: 5, logoUrl: null },
-          { teamId: 't4', name: '표범FC', status: 'active', memberCount: 5, logoUrl: null },
+          { teamId: 't1', name: '독수리FC', status: 'active', memberCount: 5, logoUrl: null, registrationId: 'r-t1' },
+          { teamId: 't2', name: '호랑이FC', status: 'active', memberCount: 5, logoUrl: null, registrationId: 'r-t2' },
+          { teamId: 't3', name: '사자FC', status: 'active', memberCount: 5, logoUrl: null, registrationId: 'r-t3' },
+          { teamId: 't4', name: '표범FC', status: 'active', memberCount: 5, logoUrl: null, registrationId: 'r-t4' },
         ],
       },
     } as never);
@@ -1428,7 +1507,7 @@ describe('LeagueMatchFixturesClient — 대진 timing 설정', () => {
 
     render(
       <Providers>
-        <LeagueMatchFixturesClient leagueId="league-1" />
+        <LeagueMatchFixturesClient leagueId="league-1" initialView="list" />
       </Providers>,
     );
 
@@ -1455,7 +1534,7 @@ describe('LeagueMatchFixturesClient — 대진 timing 설정', () => {
 
     render(
       <Providers>
-        <LeagueMatchFixturesClient leagueId="league-1" />
+        <LeagueMatchFixturesClient leagueId="league-1" initialView="list" />
       </Providers>,
     );
 
@@ -1475,7 +1554,7 @@ describe('LeagueMatchFixturesClient — 대진 timing 설정', () => {
 
     render(
       <Providers>
-        <LeagueMatchFixturesClient leagueId="league-1" />
+        <LeagueMatchFixturesClient leagueId="league-1" initialView="list" />
       </Providers>,
     );
 
@@ -1501,7 +1580,7 @@ describe('LeagueMatchFixturesClient — 대진 timing 설정', () => {
 
     render(
       <Providers>
-        <LeagueMatchFixturesClient leagueId="league-1" />
+        <LeagueMatchFixturesClient leagueId="league-1" initialView="list" />
       </Providers>,
     );
 
@@ -1519,7 +1598,7 @@ describe('LeagueMatchFixturesClient — 대진 timing 설정', () => {
 
     render(
       <Providers>
-        <LeagueMatchFixturesClient leagueId="league-1" />
+        <LeagueMatchFixturesClient leagueId="league-1" initialView="list" />
       </Providers>,
     );
 
@@ -1539,7 +1618,7 @@ describe('LeagueMatchFixturesClient — 대진 timing 설정', () => {
 
     render(
       <Providers>
-        <LeagueMatchFixturesClient leagueId="league-1" />
+        <LeagueMatchFixturesClient leagueId="league-1" initialView="list" />
       </Providers>,
     );
 
@@ -1556,7 +1635,7 @@ describe('LeagueMatchFixturesClient — 대진 timing 설정', () => {
 
     render(
       <Providers>
-        <LeagueMatchFixturesClient leagueId="league-1" />
+        <LeagueMatchFixturesClient leagueId="league-1" initialView="list" />
       </Providers>,
     );
 
@@ -1573,7 +1652,7 @@ describe('LeagueMatchFixturesClient — 대진 timing 설정', () => {
 
     render(
       <Providers>
-        <LeagueMatchFixturesClient leagueId="league-1" />
+        <LeagueMatchFixturesClient leagueId="league-1" initialView="list" />
       </Providers>,
     );
 
@@ -1605,7 +1684,7 @@ describe('LeagueMatchFixturesClient — 대진 timing 설정', () => {
 
     render(
       <Providers>
-        <LeagueMatchFixturesClient leagueId="league-1" />
+        <LeagueMatchFixturesClient leagueId="league-1" initialView="list" />
       </Providers>,
     );
 
@@ -1641,7 +1720,7 @@ describe('LeagueMatchFixturesClient — 대진 timing 설정', () => {
 
     render(
       <Providers>
-        <LeagueMatchFixturesClient leagueId="league-1" />
+        <LeagueMatchFixturesClient leagueId="league-1" initialView="list" />
       </Providers>,
     );
 
@@ -1654,6 +1733,59 @@ describe('LeagueMatchFixturesClient — 대진 timing 설정', () => {
     expect(screen.getByText('22:20~22:35')).toBeInTheDocument();
     expect(screen.getByText('독수리FC vs 호랑이FC')).toBeInTheDocument();
   });
+  it('리그의 피리어드 설정(25·25)으로 경기 시간을 미리 채우고 출처를 알린다 — 종목 기본 20과 다른 값', () => {
+    periodSettingsMock.mockReturnValue(periodSettingsOf([25, 25]));
+    useV1GenerateLeagueFixturesMock.mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as never);
+    render(<Providers><LeagueMatchFixturesClient leagueId="league-1" initialView="list" /></Providers>);
+
+    expect(screen.getByLabelText('경기 시간(분)')).toHaveValue(50);
+    expect(screen.getByLabelText('경기 시간(분)')).toHaveAccessibleDescription(
+      '이 리그의 피리어드 설정(전·후반 25분)에서 가져왔어요. 바꾸면 이번 대진에만 적용돼요.',
+    );
+  });
+
+  it('대조군: 20·20 리그는 40분으로 채운다', () => {
+    periodSettingsMock.mockReturnValue(periodSettingsOf([20, 20]));
+    useV1GenerateLeagueFixturesMock.mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as never);
+    render(<Providers><LeagueMatchFixturesClient leagueId="league-1" initialView="list" /></Providers>);
+
+    expect(screen.getByLabelText('경기 시간(분)')).toHaveValue(40);
+  });
+
+  it('미리 채운 경기 시간을 건드리지 않으면 timing으로 보내지 않고, 고치면 그 값을 보낸다', async () => {
+    periodSettingsMock.mockReturnValue(periodSettingsOf([25, 25]));
+    const mutateAsync = vi.fn().mockResolvedValue({ leagueId: 'league-1', createdCount: 6, teamMatchIds: [], warnings: [] });
+    useV1GenerateLeagueFixturesMock.mockReturnValue({ mutateAsync, isPending: false } as never);
+    render(<Providers><LeagueMatchFixturesClient leagueId="league-1" initialView="list" /></Providers>);
+
+    fireEvent.change(screen.getByLabelText('요일'), { target: { value: '3' } });
+    fireEvent.change(screen.getByLabelText('시작 시각'), { target: { value: '22:00' } });
+    await generateAndConfirm();
+    await waitFor(() => expect(mutateAsync).toHaveBeenCalledTimes(1));
+    expect(mutateAsync.mock.calls[0][0]).not.toHaveProperty('timing');
+
+    fireEvent.change(screen.getByLabelText('경기 시간(분)'), { target: { value: '30' } });
+    await generateAndConfirm();
+    await waitFor(() => expect(mutateAsync).toHaveBeenCalledTimes(2));
+    expect(mutateAsync.mock.calls[1][0]).toMatchObject({ timing: { gameDurationMinutes: 30 } });
+  });
+
+  it('리그 상세의 피리어드 설정에서 수정하면 저장 API(expectedVersion 포함)를 호출한다', () => {
+    periodSettingsMock.mockReturnValue(periodSettingsOf([25, 25]));
+    useV1GenerateLeagueFixturesMock.mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as never);
+    render(<Providers><LeagueMatchFixturesClient leagueId="league-1" /></Providers>);
+
+    const section = screen.getByRole('region', { name: '피리어드 설정' });
+    fireEvent.click(within(section).getByRole('button', { name: '수정' }));
+    fireEvent.change(within(section).getByLabelText('피리어드 1'), { target: { value: '30' } });
+    fireEvent.click(within(section).getByRole('button', { name: '저장' }));
+
+    expect(updatePeriodsMutateMock).toHaveBeenCalledWith(
+      { expectedVersion: 'v-1', periods: [{ durationMinutes: 30 }, { durationMinutes: 25 }] },
+      expect.any(Object),
+    );
+  });
+
 });
 
 /**
@@ -1686,7 +1818,7 @@ describe('대진 날짜 — 달력에서 고른 값이 그대로 나간다', () 
 
     render(
       <Providers>
-        <LeagueMatchFixturesClient leagueId="league-1" />
+        <LeagueMatchFixturesClient leagueId="league-1" initialView="list" />
       </Providers>,
     );
 
@@ -1718,7 +1850,7 @@ describe('대진 날짜 — 달력에서 고른 값이 그대로 나간다', () 
 
     render(
       <Providers>
-        <LeagueMatchFixturesClient leagueId="league-1" />
+        <LeagueMatchFixturesClient leagueId="league-1" initialView="list" />
       </Providers>,
     );
 
@@ -1746,7 +1878,7 @@ describe('대진 날짜 — 달력에서 고른 값이 그대로 나간다', () 
 
     render(
       <Providers>
-        <LeagueMatchFixturesClient leagueId="league-1" />
+        <LeagueMatchFixturesClient leagueId="league-1" initialView="list" />
       </Providers>,
     );
 
@@ -1777,7 +1909,7 @@ describe('대진 날짜 — 달력에서 고른 값이 그대로 나간다', () 
 
     render(
       <Providers>
-        <LeagueMatchFixturesClient leagueId="league-1" />
+        <LeagueMatchFixturesClient leagueId="league-1" initialView="list" />
       </Providers>,
     );
 
@@ -1821,7 +1953,7 @@ describe('참가 신청 요약 카드', () => {
     } as never);
     render(
       <Providers>
-        <LeagueMatchFixturesClient leagueId="league-1" />
+        <LeagueMatchFixturesClient leagueId="league-1" initialView="list" />
       </Providers>,
     );
   }
@@ -1868,7 +2000,7 @@ describe('수동 대진 추가 입구 — 대진 유무와 무관하게 보인�
     useV1UpdateLeagueFixtureMock.mockReturnValue({ mutate: vi.fn() } as never);
     render(
       <Providers>
-        <LeagueMatchFixturesClient leagueId="league-1" />
+        <LeagueMatchFixturesClient leagueId="league-1" initialView="list" />
       </Providers>,
     );
   }
@@ -1928,8 +2060,8 @@ describe('LeagueMatchFixturesClient — 지금 할 일 카드와 콘솔 열기',
   const W2 = '2026-10-07T01:10:00.000Z';
 
   const TEAMS = [
-    { teamId: 't1', name: '마포 FC', status: 'active', memberCount: 5, logoUrl: null },
-    { teamId: 't2', name: '합정 유나이티드', status: 'active', memberCount: 5, logoUrl: null },
+    { teamId: 't1', name: '마포 FC', status: 'active', memberCount: 5, logoUrl: null, registrationId: 'r-t1' },
+    { teamId: 't2', name: '합정 유나이티드', status: 'active', memberCount: 5, logoUrl: null, registrationId: 'r-t2' },
   ];
 
   function renderLeague(fixtures: Fixture[], teams = TEAMS) {
@@ -1947,7 +2079,7 @@ describe('LeagueMatchFixturesClient — 지금 할 일 카드와 콘솔 열기',
     useV1UpdateLeagueFixtureMock.mockReturnValue({ mutate: vi.fn() } as never);
     render(
       <Providers>
-        <LeagueMatchFixturesClient leagueId="league-1" />
+        <LeagueMatchFixturesClient leagueId="league-1" initialView="list" />
       </Providers>,
     );
     return screen.queryByRole('region', { name: '지금 할 일' });
@@ -2059,6 +2191,33 @@ describe('LeagueMatchFixturesClient — 지금 할 일 카드와 콘솔 열기',
     expect(within(byeSheet).queryByRole('button', { name: /^몰수패 처리/ })).toBeNull();
   });
 
+  // 자리만 있고 팀이 비어 있는 경기 — 팀을 못 정했으니 콘솔·결과·몰수 대상이 아니다.
+  it('팀이 비어 있는 자리 경기는 미정으로 읽히고 콘솔 열기·몰수패가 없다 — 양쪽이 다 찬 경기는 그대로다', () => {
+    renderLeague([
+      { ...base, teamMatchId: 'tm-ready', title: '1주차', startAt: W1 },
+      { ...base, teamMatchId: 'tm-empty', title: '2주차', startAt: W2, homeTeamId: null, awayTeamId: null, homeSlotId: 'slot-1', awaySlotId: 'slot-2' },
+      { ...base, teamMatchId: 'tm-half', title: '3주차', startAt: W2, awayTeamId: null, awaySlotId: 'slot-4' },
+    ]);
+
+    expect(screen.getAllByText('홈팀 미정 vs 원정팀 미정').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('마포 FC vs 원정팀 미정').length).toBeGreaterThan(0);
+    // 대조군: 팀이 다 찬 1주차만 콘솔을 연다. 자리 경기 둘에는 링크가 없다.
+    const consoleLinks = screen.getAllByRole('link', { name: /콘솔 열기/ });
+    expect(consoleLinks.length).toBeGreaterThan(0);
+    for (const link of consoleLinks) {
+      expect(link.getAttribute('href')).toContain('/tm-ready/');
+    }
+
+    const emptySheet = openRowMenu('2주차');
+    expect(within(emptySheet).getByRole('button', { name: /^일정 수정/ })).toBeInTheDocument();
+    expect(within(emptySheet).getByRole('button', { name: /^대진 취소/ })).toBeInTheDocument();
+    expect(within(emptySheet).queryByRole('button', { name: /^몰수패 처리/ })).toBeNull();
+    fireEvent.click(within(emptySheet).getByRole('button', { name: '닫기' }));
+
+    // 대조군: 팀이 다 찬 경기는 몰수패 항목이 있다.
+    expect(within(openRowMenu('1주차')).getByRole('button', { name: /^몰수패 처리/ })).toBeInTheDocument();
+  });
+
   // W4-V14 — 진행 중 경기의 대진을 취소하면 게임이 진행 중으로 남는다. 서버가 409 로 막는 조건과 같다.
   it.each(['LIVE', 'PAUSED'])('경기가 %s 인 대진은 취소 항목이 비활성이고 이유를 적는다', (gameState) => {
     renderLeague([{ ...base, teamMatchId: 'tm-live', title: '1주차', startAt: W1, gameState }]);
@@ -2077,7 +2236,7 @@ describe('LeagueMatchFixturesClient — 지금 할 일 카드와 콘솔 열기',
   });
 
   // 팀 제외·재생성도 대진을 취소한다 — 서버가 같은 409 로 막는 조건에서 버튼을 미리 막는다.
-  const THREE_TEAMS = [...TEAMS, { teamId: 't3', name: '성수 FC', status: 'active', memberCount: 5, logoUrl: null }];
+  const THREE_TEAMS = [...TEAMS, { teamId: 't3', name: '성수 FC', status: 'active', memberCount: 5, logoUrl: null, registrationId: 'r-t3' }];
   const regenerateButton = () => screen.getAllByRole('button', { name: '대진 재생성' })[0];
 
   it('경기가 진행 중이면 그 두 팀의 제외와 대진 재생성이 막히고 이유를 적는다', () => {
@@ -2106,5 +2265,207 @@ describe('LeagueMatchFixturesClient — 지금 할 일 카드와 콘솔 열기',
     expect(regenerateButton()).not.toBeDisabled();
     expect(screen.queryByText(/경기가 진행 중인 팀은/)).toBeNull();
     expect(screen.queryByText(/진행 중인 경기가 있어 대진을 다시 만들 수 없어요/)).toBeNull();
+  });
+});
+
+describe('LeagueMatchFixturesClient — 일정 보드와 보기 전환', () => {
+  type Fixture = Record<string, unknown>;
+  const TEAMS = [
+    { teamId: 't1', name: '마포 FC', status: 'active', memberCount: 5, logoUrl: null, registrationId: 'r1' },
+    { teamId: 't2', name: '합정 유나이티드', status: 'active', memberCount: 5, logoUrl: null, registrationId: 'r2' },
+  ];
+  const SLOTS = [
+    { id: 's1', kind: 'ENTRY', groupId: null, sourceGroupId: null, position: 1, label: '1번 자리', registrationId: null, teamName: null },
+    { id: 's2', kind: 'ENTRY', groupId: null, sourceGroupId: null, position: 2, label: '2번 자리', registrationId: null, teamName: null },
+  ];
+  const EMPTY_FIXTURE: Fixture = {
+    teamMatchId: 'tm-empty', title: '1주차', homeTeamId: null, awayTeamId: null, homeSlotId: 's1', awaySlotId: 's2',
+    startAt: '2030-01-07T10:00:00.000Z', placeName: '장소 미정', status: 'matched',
+    resultStage: 'not_entered', gameState: 'SCHEDULED', game: null, homeScore: null, awayScore: null,
+  };
+
+  function renderClient(options: { fixtures?: Fixture[]; slots?: unknown[]; initialView?: 'board' | 'list'; teams?: unknown[]; teamsQuery?: Record<string, unknown> } = {}) {
+    const { fixtures = [EMPTY_FIXTURE], slots = SLOTS, initialView, teams = TEAMS, teamsQuery } = options;
+    useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false } as never);
+    useV1AdminLeagueMatchMock.mockReturnValue({
+      data: {
+        leagueId: 'league-1', isPublic: true, title: '마포 주말 리그', state: 'active', teamIds: ['t1', 't2'],
+        startsOn: '2030-01-07T00:00:00.000Z', recentVenues: [], fixtures, slots,
+      },
+      isPending: false,
+    } as never);
+    useV1AdminLeagueTeamsMock.mockReturnValue((teamsQuery ?? { data: { leagueId: 'league-1', teams } }) as never);
+    useV1GenerateLeagueFixturesMock.mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as never);
+    useV1UpdateLeagueFixtureMock.mockReturnValue({ mutate: vi.fn(), isPending: false } as never);
+    render(
+      <Providers>
+        <LeagueMatchFixturesClient leagueId="league-1" initialView={initialView} />
+      </Providers>,
+    );
+  }
+
+  let restoreViewport: (() => void) | null = null;
+
+  beforeEach(() => {
+    restoreViewport = installViewport(1280);
+  });
+
+  afterEach(() => {
+    adminCanWrite.value = true;
+    canvasMocks.applyTemplate.mockReset();
+    restoreViewport?.();
+    restoreViewport = null;
+  });
+
+  it('기본은 일정 보드이고, 목록 탭으로 바꾸면 기존 표가 나오며 다시 보드로 돌아온다', () => {
+    renderClient();
+
+    expect(screen.getByRole('tab', { name: '일정 보드', selected: true })).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: '리그 일정 보드' })).toBeInTheDocument();
+    expect(screen.queryByRole('table')).toBeNull();
+
+    fireEvent.click(screen.getByRole('tab', { name: '목록' }));
+    expect(screen.getByRole('table')).toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: '리그 일정 보드' })).toBeNull();
+
+    fireEvent.click(screen.getByRole('tab', { name: '일정 보드' }));
+    expect(screen.queryByRole('table')).toBeNull();
+    expect(screen.getByRole('region', { name: '리그 일정 보드' })).toBeInTheDocument();
+  });
+
+  it('initialView 가 list 면 처음부터 표를 보여 준다', () => {
+    renderClient({ initialView: 'list' });
+    expect(screen.getByRole('tab', { name: '목록', selected: true })).toBeInTheDocument();
+    expect(screen.getByRole('table')).toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: '리그 일정 보드' })).toBeNull();
+  });
+
+  it('대진이 없으면 보드가 템플릿을 권하고, 목록으로 가면 기존 라운드로빈 생성 폼이 그대로 있다', () => {
+    renderClient({ fixtures: [], slots: [] });
+
+    fireEvent.click(screen.getByRole('button', { name: '템플릿으로 시작' }));
+    expect(screen.getByRole('dialog', { name: '템플릿으로 빈 경기 만들기' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '닫기' }));
+
+    fireEvent.click(screen.getByRole('tab', { name: '목록' }));
+    expect(screen.getByRole('button', { name: '라운드로빈 대진 생성' })).toBeInTheDocument();
+  });
+
+  it('대진이 없으면 보드에서도 참가팀 관리·경기 하나 추가가 닿는다', () => {
+    renderClient({ fixtures: [], slots: [] });
+
+    expect(screen.getByRole('tab', { name: '일정 보드', selected: true })).toBeInTheDocument();
+    expect(screen.getByText('참가팀 관리')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '경기 하나 추가' })).toBeInTheDocument();
+  });
+
+  it('템플릿을 만들면 새 경기만 보내고(replaceExisting 없음) 개수를 알린다 — 참가팀 2팀이어도 팀 수 기본값은 최소 3', async () => {
+    canvasMocks.applyTemplate.mockResolvedValue({ slots: 3, fixtures: 3 });
+    renderClient({ fixtures: [], slots: [] });
+
+    fireEvent.click(screen.getByRole('button', { name: '템플릿으로 시작' }));
+    fireEvent.change(screen.getByLabelText('요일'), { target: { value: '1' } });
+    fireEvent.click(screen.getByRole('button', { name: '요일로 채우기' }));
+    fireEvent.click(screen.getByRole('button', { name: '빈 경기 만들기' }));
+
+    await waitFor(() => expect(canvasMocks.applyTemplate).toHaveBeenCalledTimes(1));
+    const payload = canvasMocks.applyTemplate.mock.calls[0][0];
+    expect(payload).toEqual({
+      teamCount: 3,
+      legs: 1,
+      schedule: { dates: ['2030-01-07', '2030-01-14', '2030-01-21'], time: '19:00' },
+    });
+    expect(Object.keys(payload)).not.toContain('replaceExisting');
+    expect(await screen.findByText(/빈 경기 3개를 만들었어요/)).toBeInTheDocument();
+  });
+
+  it('경기가 이미 있으면 템플릿 대화상자가 다시 만들기 모드로 열려 replaceExisting 을 보낸다', async () => {
+    canvasMocks.applyTemplate.mockResolvedValue({ slots: 3, fixtures: 3 });
+    renderClient();
+
+    fireEvent.click(screen.getByRole('button', { name: '템플릿으로 다시 만들기' }));
+    fireEvent.change(screen.getByLabelText('요일'), { target: { value: '1' } });
+    fireEvent.click(screen.getByRole('button', { name: '요일로 채우기' }));
+    fireEvent.click(screen.getByRole('button', { name: '다시 만들기' }));
+
+    await waitFor(() => expect(canvasMocks.applyTemplate).toHaveBeenCalledTimes(1));
+    expect(canvasMocks.applyTemplate.mock.calls[0][0]).toMatchObject({ teamCount: 3, legs: 1, replaceExisting: true });
+  });
+
+  it('보드 패널의 일정 수정·경기 취소가 기존 모달로 이어진다', () => {
+    renderClient();
+
+    fireEvent.click(screen.getByRole('button', { name: /경기 상세 열기/ }));
+    fireEvent.click(screen.getByRole('button', { name: '일정 수정' }));
+    expect(screen.getByRole('heading', { name: '일정 수정' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '취소' }));
+
+    fireEvent.click(screen.getByRole('button', { name: /경기 상세 열기/ }));
+    fireEvent.click(screen.getByRole('button', { name: '경기 취소' }));
+    expect(screen.getByRole('heading', { name: '대진을 취소할까요?' })).toBeInTheDocument();
+  });
+
+  it('쓰기 권한이 없으면 보드는 읽기 전용이다', () => {
+    adminCanWrite.value = false;
+    renderClient();
+
+    // 화면에는 다른 status 영역(대표 이미지 저장 안내 등)이 있을 수 있어 보드 안으로 좁힌다.
+    expect(within(screen.getByRole('region', { name: '리그 일정 보드' })).getByRole('status')).toHaveTextContent('읽기 전용');
+    expect(screen.queryByRole('button', { name: '빈 자리 무작위 채우기' })).toBeNull();
+    expect(screen.queryByRole('button', { name: '템플릿으로 다시 만들기' })).toBeNull();
+  });
+
+  it('자리 방식 리그는 목록의 대진 재생성을 막고 템플릿으로 안내한다 — 자리 없는 리그는 그대로 열려 있다', () => {
+    renderClient({ initialView: 'list', fixtures: [{ ...EMPTY_FIXTURE, homeTeamId: 't1', awayTeamId: 't2' }] });
+    openFixtureManage();
+    expect(screen.getAllByRole('button', { name: '대진 재생성' })[0]).toBeDisabled();
+    expect(screen.getByText(/일정 보드의 ‘템플릿으로 다시 만들기’/)).toBeInTheDocument();
+  });
+
+  it('390 에서는 보드 대신 모바일 목록이 마운트되고, 경기일 라운드와 registrationId 가 있는 팀만 후보로 넘어간다', () => {
+    resizeViewport(390);
+    renderClient({
+      teams: [...TEAMS, { teamId: 't3', name: '미연결 팀', status: 'active', memberCount: 5, logoUrl: null, registrationId: null }],
+    });
+
+    const mobile = screen.getByTestId('mobile-board');
+    expect(mobile).toHaveAttribute('data-scope', 'league');
+    expect(mobile).toHaveAttribute('data-competition', 'league-1');
+    expect(mobile).toHaveAttribute('data-rounds', '1주차');
+    expect(mobile).toHaveAttribute('data-candidates', '마포 FC,합정 유나이티드');
+    expect(mobile).toHaveAttribute('data-slots', '2');
+    expect(mobile).toHaveAttribute('data-can-write', 'true');
+    expect(screen.queryByRole('region', { name: '리그 일정 보드' })).toBeNull();
+  });
+
+  it('390 에서 참가팀(후보 출처) 조회가 끝나기 전에는 팀 고르기 상태가 pending 이고, 끝나면 success 다', () => {
+    resizeViewport(390);
+    renderClient({ teamsQuery: { data: undefined, isError: false } });
+    expect(screen.getByTestId('mobile-board')).toHaveAttribute('data-registrations-status', 'pending');
+    cleanup();
+
+    renderClient({ teamsQuery: { data: undefined, isError: true, error: new Error('x'), refetch: vi.fn() } });
+    expect(screen.getByTestId('mobile-board')).toHaveAttribute('data-registrations-status', 'error');
+    cleanup();
+
+    renderClient();
+    expect(screen.getByTestId('mobile-board')).toHaveAttribute('data-registrations-status', 'success');
+  });
+
+  it('390 에서도 [일정 보드|목록] 탭은 보이고 목록 탭은 기존 표를 연다 — 구조 편집은 목록에서 계속 할 수 있다', () => {
+    resizeViewport(390);
+    renderClient();
+
+    expect(screen.getByRole('tab', { name: '일정 보드', selected: true })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('tab', { name: '목록' }));
+    expect(screen.getByRole('table')).toBeInTheDocument();
+    expect(screen.queryByTestId('mobile-board')).toBeNull();
+  });
+
+  it('읽기 전용 어드민은 모바일에서도 canWrite=false 로 넘어간다', () => {
+    adminCanWrite.value = false;
+    resizeViewport(390);
+    renderClient();
+    expect(screen.getByTestId('mobile-board')).toHaveAttribute('data-can-write', 'false');
   });
 });

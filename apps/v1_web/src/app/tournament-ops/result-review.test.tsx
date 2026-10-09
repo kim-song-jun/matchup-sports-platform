@@ -762,6 +762,38 @@ describe('결선 무승부는 저장 전에 폼이 알려준다', () => {
   });
 });
 
+describe('VOID 재입력 폼의 미리 채움 출처', () => {
+  it('공식 결과를 무효로 돌린 경기는 무효 직전 공식 점수로 채운다', async () => {
+    hookMocks.game.data = buildGame('platform_ops', { version: 5, currentOfficialRevisionId: 'rev-2' });
+    hookMocks.revisions.data = [
+      buildRevision({ id: 'rev-2', revision: 2, state: 'VOID', supersedesId: 'rev-1', reason: '중복 경기로 확인' }),
+      buildRevision({ id: 'rev-1', revision: 1, state: 'OFFICIAL', score: { home: 2, away: 1 } }),
+    ];
+    const user = userEvent.setup();
+    renderWithClient(<GameResultCorrectionPanel gameId="game-1" />);
+
+    await user.click(screen.getByRole('button', { name: '결과 다시 입력' }));
+    const dialog = screen.getByRole('dialog');
+    expect(within(dialog).getByLabelText('홈 점수')).toHaveValue(2);
+    expect(within(dialog).getByLabelText('원정 점수')).toHaveValue(1);
+  });
+
+  it('팀 교체로 폐기된 결과(대체된 리비전이 OFFICIAL 이 아님) 뒤의 재입력 폼은 비어 있다', async () => {
+    hookMocks.game.data = buildGame('platform_ops', { version: 5, currentOfficialRevisionId: 'rev-2' });
+    hookMocks.revisions.data = [
+      buildRevision({ id: 'rev-2', revision: 2, state: 'VOID', supersedesId: 'rev-1', reason: '팀 교체', score: { home: 0, away: 0 } }),
+      buildRevision({ id: 'rev-1', revision: 1, state: 'VOID', score: { home: 2, away: 1 } }),
+    ];
+    const user = userEvent.setup();
+    renderWithClient(<GameResultCorrectionPanel gameId="game-1" />);
+
+    await user.click(screen.getByRole('button', { name: '결과 다시 입력' }));
+    const dialog = screen.getByRole('dialog');
+    expect(within(dialog).getByLabelText('홈 점수')).toHaveValue(0);
+    expect(within(dialog).getByLabelText('원정 점수')).toHaveValue(0);
+  });
+});
+
 describe('correction/void unavailable without an official result', () => {
   it('shows an explanatory notice when no official revision exists yet', () => {
     hookMocks.game.data = buildGame('platform_ops');

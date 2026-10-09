@@ -62,7 +62,7 @@ import { deriveFoulCounts } from '@/lib/team-foul-counter';
 import { deriveOnPitchParticipantIds, countActiveSubstitutions } from '@/lib/on-pitch-state';
 import { TeamFoulCounterBar } from '@/components/game-operations/team-foul-counter-bar';
 import { formatMatchClock } from '@/lib/game-operations-clock';
-import { periodLabel } from './period-label';
+import { endPeriodLabel, periodLabel, periodPrefix, regularPeriodCountOf } from './period-label';
 import {
   commandConfirmCopy,
   commitActionConfirmCopy,
@@ -117,8 +117,8 @@ const COMMAND_LABEL: Record<
  * `periodLabel`(UX 감사 item 4)을 그대로 써서 "전반 종료"/"후반 시작"/
  * "N피리어드 종료"를 만든다(이슈 #375: 구 `nextPeriodCommandLabel` 하나가
  * 종료+시작 라벨을 겸했던 것을 명령이 둘로 나뉜 만큼 함수도 나눈다). */
-function endPeriodCommandLabel(currentPeriodNumber: number): string {
-  return `${periodLabel(currentPeriodNumber)} 종료`;
+function endPeriodCommandLabel(currentPeriodNumber: number, periodCount: number | null): string {
+  return endPeriodLabel(currentPeriodNumber, periodCount);
 }
 
 /** `nextPeriodNumber`는 지금 HALFTIME인 피리어드의 번호다(halftimePeriod?.
@@ -132,9 +132,10 @@ function commandLabel(
   command: GameCommandName,
   currentPeriodNumber: number | null,
   nextPeriodNumber: number | null,
+  periodCount: number | null,
 ): string {
   if (command === 'end-period') {
-    return endPeriodCommandLabel(currentPeriodNumber ?? 1);
+    return endPeriodCommandLabel(currentPeriodNumber ?? 1, periodCount);
   }
   if (command === 'start-period') {
     return startPeriodCommandLabel(nextPeriodNumber ?? 2);
@@ -338,6 +339,12 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
     const periods = gameDetail.data?.periods ?? [];
     return periods.some((period) => period.number === currentPeriod.number + 1);
   }, [currentPeriod, gameDetail.data?.periods]);
+
+  // 정규 피리어드 수 — 1이면 단판이라 화면이 "전반" 대신 "경기"·"정규 시간 종료"로 부른다.
+  const periodCount = useMemo(
+    () => regularPeriodCountOf(gameDetail.data?.periods.length ?? 0, gameDetail.data?.periodDurations),
+    [gameDetail.data?.periods.length, gameDetail.data?.periodDurations],
+  );
 
   // 종료 흐름 개편(사용자 결정 2) — "후반은 끝났지만 결과는 아직 확정 전"인
   // 중간 단계. 새 상태 컬럼도 새 enum 값도 없다: 마지막 피리어드를
@@ -705,6 +712,7 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
         gameDetail.data?.sides ?? [],
         fixtureLineup.data?.lineups ?? [],
         clockWarningMinutes(input.clockMs),
+        periodCount,
       );
       if (!(await confirm(copy))) return;
       void ops.submitEvent(input);
@@ -809,7 +817,7 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
       // halftimePeriod가 곧장 바뀌어서(하프타임 진입/탈출), 완료 후에 다시
       // 계산하면 "방금 무엇을 끝냈는지"가 아니라 "다음에 뭘 할 수 있는지"로
       // 라벨이 뒤바뀐다.
-      const label = commandLabel(command, currentPeriod?.number ?? null, halftimePeriod?.number ?? null);
+      const label = commandLabel(command, currentPeriod?.number ?? null, halftimePeriod?.number ?? null, periodCount);
       const gate = commandGateRef.current;
       if (!gate.pathOpen || gate.token === null) {
         // 확인까지 누른 명령이 조용히 끝나면 운영자는 나간 줄 안다(G6-V6) — 보내지 않았다고 남긴다.
@@ -876,7 +884,9 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
             setCommandError(
               uncertain
                 ? null
-                : extractErrorMessage(error, '명령을 처리하지 못했어요. 다시 시도해주세요.'),
+                : error instanceof V1ApiError && error.code === 'VERSION_CONFLICT'
+                  ? '다른 화면에서 경기가 바뀌었어요. 새로고침해 주세요.'
+                  : extractErrorMessage(error, '명령을 처리하지 못했어요. 다시 시도해주세요.'),
             );
             setPendingCommandRetry(
               uncertain
@@ -944,7 +954,7 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
         if (ownsAttempt()) setCommandPending(false);
       }
     },
-    [gameId, myUserId, ops, gameDetail, currentPeriod, halftimePeriod, hasNextPeriod, pendingCommandRetry, showToast],
+    [gameId, myUserId, ops, gameDetail, currentPeriod, halftimePeriod, hasNextPeriod, periodCount, pendingCommandRetry, showToast],
   );
 
   // start/pause/resume/end-period/start-period/end 버튼이 실제로 부르는 진입점 —
@@ -955,7 +965,7 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
   const confirmAndRunCommand = useCallback(
     async (command: Exclude<GameCommandName, 'revert-period'>) => {
       if (commandBlocked) return;
-      const label = commandLabel(command, currentPeriod?.number ?? null, halftimePeriod?.number ?? null);
+      const label = commandLabel(command, currentPeriod?.number ?? null, halftimePeriod?.number ?? null, periodCount);
       const copy = commandConfirmCopy(command, label, {
         sides: gameDetail.data?.sides ?? [],
         scoreBySideId,
@@ -969,7 +979,7 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
       if (!(await confirm(copy))) return;
       await handleRunCommand(command);
     },
-    [commandBlocked, confirm, currentPeriod, halftimePeriod, hasNextPeriod, gameDetail.data?.sides, scoreBySideId, knockoutTied, substitutionTracked, handleRunCommand],
+    [commandBlocked, confirm, currentPeriod, halftimePeriod, hasNextPeriod, periodCount, gameDetail.data?.sides, scoreBySideId, knockoutTied, substitutionTracked, handleRunCommand],
   );
 
   // "전원 도착"은 도착 시각을 여러 명에게 한꺼번에 남기고, 일괄로 되돌리는 경로가 없다(시각은 분쟁 시 근거다).
@@ -1174,7 +1184,7 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
       ? periodProgressSteps({
           periods: (gameDetail.data?.periods ?? []).map((period) => ({
             number: period.number,
-            label: periodLabel(period.number),
+            label: periodLabel(period.number, periodCount),
           })),
           livePeriodNumber: currentPeriod?.number ?? null,
           halftimePeriodNumber: halftimePeriod?.number ?? null,
@@ -1241,7 +1251,7 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
         onClick={() => void (command === 'revert-period' ? handleRunCommand('revert-period') : confirmAndRunCommand(command))}
       >
         {!commandPending ? <Icon size={14} aria-hidden="true" /> : null}
-        {commandLabel(command, currentPeriod?.number ?? null, halftimePeriod?.number ?? null)}
+        {commandLabel(command, currentPeriod?.number ?? null, halftimePeriod?.number ?? null, periodCount)}
       </Button>
     );
   };
@@ -1351,7 +1361,7 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
                     onClick={() => void confirmAndRunCommand('end')}
                   >
                     {!commandPending ? <Square size={14} aria-hidden="true" /> : null}
-                    {commandLabel('end', currentPeriod?.number ?? null, halftimePeriod?.number ?? null)}
+                    {commandLabel('end', currentPeriod?.number ?? null, halftimePeriod?.number ?? null, periodCount)}
                   </Button>
                 )
               ) : null}
@@ -1441,6 +1451,7 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
                 offsetMs={ops.clockOffsetMs}
                 pausedTotalMs={currentPeriod.pausedTotalMs}
                 pausedAtMs={currentPeriod.pausedAt === null ? null : new Date(currentPeriod.pausedAt).getTime()}
+                periodCount={periodCount}
               />
             ) : halftimePeriod !== null ? (
               // 이슈 #375 — 어떤 피리어드도 LIVE가 아니므로 경과 시간 자체가
@@ -1680,14 +1691,17 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
       />
       <AbnormalEndDialog
         open={abnormalEndOpen}
+        sides={gameDetail.data?.sides ?? []}
         submitting={commandBlocked}
         onCancel={() => setAbnormalEndOpen(false)}
-        onConfirm={({ reason, note }: { reason: AbnormalEndReason; note: string }) => {
+        onConfirm={({ reason, note, forfeitSideId }: { reason: AbnormalEndReason; note: string; forfeitSideId?: string }) => {
           setAbnormalEndOpen(false);
-          // 점수는 지금 기록된 이벤트 그대로 확정된다 — 서버가 표준 스코어를 대신
-          // 정해 주지 않는다(2026-08-23 결정 Q3). 여기서 보내는 건 "정상 종료가
-          // 아니다"라는 사실과 그 사유뿐이다.
-          void handleRunCommand('end', { outcomeReason: reason, outcomeNote: note });
+          // 몰수 점수는 서버가 기권 팀 기준으로 정한다(적어 둔 점수가 이미 상대 승리면 유지).
+          void handleRunCommand('end', {
+            outcomeReason: reason,
+            outcomeNote: note,
+            ...(forfeitSideId !== undefined ? { forfeitSideId } : {}),
+          });
         }}
       />
       {/* 명단 검인은 **킥오프 전에만** 띄운다. 경기가 시작되면 이 자리는 이벤트 기록이
@@ -1735,6 +1749,7 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
           events={ops.liveEvents}
           sides={sides}
           lineups={lineups}
+          periodCount={periodCount}
           onAttachAssist={canOperate ? (event) => setAssistTarget({ event }) : undefined}
           onReverseEvent={canOperate ? (event) => void handleReverseEvent(event) : undefined}
           disabled={commandBlocked}
@@ -1759,6 +1774,7 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
           actionType={pendingAction.actionType}
           cardColor={pendingAction.cardColor}
           frozen={pendingAction.frozen}
+          periodCount={periodCount}
           sides={sides}
           lineups={lineups}
           allowTeamOnly={pendingAction.allowTeamOnly}
@@ -1776,7 +1792,7 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
           event={assistTarget.event}
           scorerName={playerLabel(assistTarget.event.participantId, lineups)}
           teamName={sides.find((side) => side.id === assistTarget.event.sideId)?.displayNameSnapshot}
-          whenLabel={`${periodLabel(assistTarget.event.period)} ${formatMatchClock(assistTarget.event.clockMs)}`}
+          whenLabel={`${periodPrefix(assistTarget.event.period, periodCount)}${formatMatchClock(assistTarget.event.clockMs)}`}
           teammates={teammatesForSide(assistTarget.event.sideId, lineups, assistTarget.event.participantId)}
           onAttach={(assistParticipantId) => attachAssist(assistTarget.event, assistParticipantId)}
           onClose={() => setAssistTarget(null)}

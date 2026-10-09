@@ -16,7 +16,7 @@ export type LeagueStandingsTableData = V1LeagueOverallStandingsResponse;
 
 /**
  * §4.1 통합 순위 테이블 — 리그(풀리그) 대회의 공개 상세에서 조별 순위가 아니라
- * 전체 통합 순위를 한 표로 보여준다. 진행률·매직넘버는 색만으로 상태를 전달하지
+ * 전체 통합 순위를 한 표로 보여준다. 진행률·1위 확정 조건은 색만으로 상태를 전달하지
  * 않도록 항상 숫자/텍스트를 병기한다(규칙: 컬러만으로 정보 전달 금지).
  */
 export function LeagueStandingsTable({ data }: { data: LeagueStandingsTableData }) {
@@ -87,7 +87,7 @@ export function LeagueStandingsTable({ data }: { data: LeagueStandingsTableData 
               color: magicNumber.clinched ? 'var(--blue700)' : 'var(--text)',
             }}
           >
-            <span>{magicNumber.clinched ? '우승 확정' : `매직넘버 ${magicNumber.value}`}</span>
+            <span>{magicNumber.clinched ? '1위 확정' : `1위 확정까지 승점 ${magicNumber.value}`}</span>
             {magicNumberRow ? (
               <span style={{ color: 'var(--text-caption)', fontWeight: 500 }}>
                 · {magicNumberRow.teamName}

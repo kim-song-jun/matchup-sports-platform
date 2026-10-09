@@ -20,6 +20,7 @@ import {
 } from '@/lib/query-persist';
 import { createV1QueryClient } from '@/lib/query-client';
 import { NativeAppSurface } from '@/components/providers/native-app-surface';
+import { OpenInAppSheet } from '@/components/app-promotion/open-in-app-sheet';
 
 export function Providers({ children }: { children: ReactNode }) {
   const [queryClient] = useState(createV1QueryClient);
@@ -43,6 +44,7 @@ export function Providers({ children }: { children: ReactNode }) {
       <ThemeProvider>
         <KeyboardViewportBridge />
         <NativeAppSurface />
+        <OpenInAppSheet />
         <ClientErrorListener />
         <NotificationSocketBridge />
         {getGaMeasurementId() && <GoogleAnalytics />}

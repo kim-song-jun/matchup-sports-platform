@@ -63,11 +63,12 @@ describe('parseRosterResyncTarget', () => {
     [{ scope: 'teamPeriod', teamId: 't', startsAt: '2099-01-01T00:00:00.000Z', endsAt: '2099-01-02T00:00:00.000Z' }],
     [{ scope: 'game', gameId: 'g' }],
     [{ scope: 'result', gameId: 'g' }],
+    [{ scope: 'startedGameSide', gameId: 'g', sideId: 's' }],
   ])('%j 를 그대로 읽는다', (payload) => {
     expect(parseRosterResyncTarget(payload)).toEqual(payload);
   });
 
-  it.each([[{}], [null], [{ scope: 'teamMembers' }], [{ scope: 'game', gameId: '' }], [{ scope: 'unknown', teamId: 't' }]])(
+  it.each([[{}], [null], [{ scope: 'teamMembers' }], [{ scope: 'game', gameId: '' }], [{ scope: 'unknown', teamId: 't' }], [{ scope: 'startedGameSide', gameId: 'g' }]])(
     '%j 는 던진다',
     (payload) => {
       expect(() => parseRosterResyncTarget(payload)).toThrow(`Invalid ${COMPETITION_ROSTER_RESYNC_TYPE} payload`);

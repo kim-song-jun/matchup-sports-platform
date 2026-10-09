@@ -236,8 +236,65 @@ describe('planBracketTemplate — 거부', () => {
     [{ kind: 'league', teamCount: 2, legs: 1 }],
     [{ kind: 'league', teamCount: 21, legs: 1 }],
     [{ kind: 'league', teamCount: 4, legs: 3 }],
-    [{ kind: 'group_knockout', groupCount: 2, teamsPerGroup: 4, advancePerGroup: 2, legs: 1, thirdPlace: false }],
   ] as unknown as Array<[BracketTemplateInput]>)('범위 밖·미지원 입력 %j → BRACKET_TEMPLATE_UNSUPPORTED', (input) => {
     expect(codeOf(() => plan(input))).toBe('BRACKET_TEMPLATE_UNSUPPORTED');
+  });
+});
+
+describe('planBracketTemplate — group_knockout', () => {
+  const groupKnockout = {
+    kind: 'group_knockout' as const,
+    groupCount: 2,
+    teamsPerGroup: 4,
+    advancePerGroup: 2 as const,
+    legs: 1 as const,
+    thirdPlace: false,
+  };
+
+  it('2조 x 4팀(2팀 진출): 조별 12 + 4강 2 + 결승 1 = 15경기, GROUP_RANK 자리 4개', () => {
+    const p = plan(groupKnockout);
+    expect(p.fixtures).toHaveLength(15);
+    expect(p.slots.filter((slot) => slot.kind === 'GROUP_RANK')).toHaveLength(4);
+    expect(p.slots.filter((slot) => slot.kind === 'ENTRY')).toHaveLength(8);
+  });
+
+  it('3·4위전 포함 시 16경기', () => {
+    expect(plan({ ...groupKnockout, thirdPlace: true }).fixtures).toHaveLength(16);
+  });
+
+  it('fixtureNumberOffset 이 첫 조별 경기 번호에 반영된다', () => {
+    const numbers = plan(groupKnockout, 20).fixtures.map((f) => f.fixtureNumber);
+    expect(Math.min(...numbers)).toBe(21);
+    expect(Math.max(...numbers)).toBe(35);
+  });
+
+  it('상한: 8조 x 6팀 x 2회전은 247경기라 422 BRACKET_TEMPLATE_TOO_LARGE, 8조 x 5팀 x 2회전(167경기)은 통과', () => {
+    const big = { ...groupKnockout, groupCount: 8, teamsPerGroup: 6, advancePerGroup: 1 as const, legs: 2 as const };
+    expect(codeOf(() => plan(big))).toBe('BRACKET_TEMPLATE_TOO_LARGE');
+    expect(plan({ ...big, teamsPerGroup: 5 }).fixtures).toHaveLength(167);
+  });
+
+  it('결선 크기 6 (3조 x 2팀)은 422 BRACKET_TEMPLATE_UNSUPPORTED', () => {
+    expect(codeOf(() => plan({ ...groupKnockout, groupCount: 3 }))).toBe('BRACKET_TEMPLATE_UNSUPPORTED');
+  });
+
+  describe('16강 (8조 x 2팀)', () => {
+    const sixteen = { ...groupKnockout, groupCount: 8, teamsPerGroup: 4 };
+
+    it('현실적인 8조 x 4팀 x 1회전: 조별 48 + 16강 8 + 8강 4 + 4강 2 + 결승 1 = 63경기(3·4위전 포함 64), 16강 그룹 phase round16', () => {
+      const p = plan(sixteen);
+      expect(p.fixtures).toHaveLength(63);
+      expect(plan({ ...sixteen, thirdPlace: true }).fixtures).toHaveLength(64);
+      expect(p.groups.find((g) => g.name === '16강')?.phase).toBe('round16');
+      expect(p.fixtures.filter((f) => f.round === '16강')).toHaveLength(8);
+    });
+
+    it('상한 경계: 8조 x 6팀 x 2회전은 조별 240 + 결선 16 = 256경기라 422 BRACKET_TEMPLATE_TOO_LARGE(3·4위전 유무와 무관), 8조 x 5팀 x 2회전(175경기)·8조 x 6팀 x 1회전(135경기)은 통과', () => {
+      const extreme = { ...sixteen, teamsPerGroup: 6, legs: 2 as const };
+      expect(codeOf(() => plan(extreme))).toBe('BRACKET_TEMPLATE_TOO_LARGE');
+      expect(codeOf(() => plan({ ...extreme, thirdPlace: true }))).toBe('BRACKET_TEMPLATE_TOO_LARGE');
+      expect(plan({ ...extreme, teamsPerGroup: 5 }).fixtures).toHaveLength(175);
+      expect(plan({ ...extreme, legs: 1 }).fixtures).toHaveLength(135);
+    });
   });
 });

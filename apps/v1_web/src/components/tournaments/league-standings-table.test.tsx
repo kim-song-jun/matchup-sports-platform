@@ -29,12 +29,20 @@ describe('LeagueStandingsTable', () => {
 
   it('우승이 확정되면 확정 배지를 보여준다', () => {
     render(<LeagueStandingsTable data={{ ...baseData, magicNumber: { registrationId: 'r1', value: 0, clinched: true } }} />);
-    expect(screen.getByText('우승 확정')).toBeInTheDocument();
+    expect(screen.getByText('1위 확정')).toBeInTheDocument();
+    expect(screen.queryByText(/승점 \d/)).not.toBeInTheDocument();
   });
 
-  it('아직 확정 전이면 매직넘버를 보여준다', () => {
+  it('아직 확정 전이면 1위 확정까지 필요한 승점을 풀어 쓴다', () => {
     render(<LeagueStandingsTable data={baseData} />);
-    expect(screen.getByText(/매직넘버 4/)).toBeInTheDocument();
+    expect(screen.getByText('1위 확정까지 승점 4')).toBeInTheDocument();
+    expect(screen.getByText('· 성수 블루웨이브')).toBeInTheDocument();
+    expect(screen.queryByText(/매직넘버/)).not.toBeInTheDocument();
+  });
+
+  it('매직넘버 값이 없으면 확정 줄을 그리지 않는다', () => {
+    render(<LeagueStandingsTable data={{ ...baseData, magicNumber: null }} />);
+    expect(screen.queryByText(/1위 확정/)).not.toBeInTheDocument();
   });
 
   it('순위가 비어 있으면 EmptyState를 보여준다', () => {

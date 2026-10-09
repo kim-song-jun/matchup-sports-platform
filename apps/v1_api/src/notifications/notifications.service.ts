@@ -26,6 +26,7 @@ export type NotificationEventType =
   | 'team_join_application_accepted'
   | 'team_join_application_rejected'
   | 'team_match_application_received'
+  | 'admin_team_match_application_received'
   | 'team_match_application_withdrawn'
   | 'team_match_application_approved'
   | 'team_match_application_rejected'
@@ -193,6 +194,8 @@ export type NotificationCopyVars = Readonly<
 
 export interface NotificationEmitOptions {
   readonly vars?: NotificationCopyVars;
+  /** Per-recipient dedupe: stored as `${businessKey}:${userId}`; a repeat emit is skipped. */
+  readonly businessKey?: string;
 }
 
 /** 알림 문구에 넣을 사람 이름 — 화면의 멤버 목록과 같은 우선순위(닉네임 → 표시 이름). */
@@ -246,6 +249,7 @@ function preferenceFieldForEvent(type: NotificationEventType): NotificationPrefF
   }
   if (
     type === 'team_match_application_received' ||
+    type === 'admin_team_match_application_received' ||
     type === 'team_match_application_withdrawn' ||
     type === 'team_match_application_approved' ||
     type === 'team_match_application_rejected' ||
@@ -436,6 +440,9 @@ function deepLinkForEvent(
   targetType: V1NotificationTargetType,
   targetId: string | null,
 ): string | null {
+  if (type === 'admin_team_match_application_received' && targetId) {
+    return `/admin/team-matches/${targetId}`;
+  }
   if (type === 'team_join_application_received' && targetId) {
     return `/teams/${targetId}/members?tab=requests`;
   }
@@ -564,6 +571,7 @@ const EVENT_TITLES: Record<NotificationEventType, string> = {
   team_contact_accepted: '팀 컨택이 수락됐어요',
   team_contact_declined: '팀 컨택이 거절됐어요',
   team_match_application_received: '{name} 팀이 팀매치를 신청했어요',
+  admin_team_match_application_received: '새 팀매치 신청이 왔어요',
   team_match_application_withdrawn: '팀매치 신청이 취소됐어요',
   team_match_application_approved: '팀매치 신청이 승인됐어요',
   team_match_application_rejected: '팀매치 신청이 거절됐어요',
@@ -640,6 +648,7 @@ const EVENT_BODIES: Record<NotificationEventType, string> = {
   team_contact_accepted: '이제 상대 팀과 대화할 수 있어요.',
   team_contact_declined: '아쉽지만 이번에는 성사되지 않았어요.',
   team_match_application_received: '"{team}" · 친선 팀매치 · {when} · 승인하거나 거절해 주세요.',
+  admin_team_match_application_received: '{name} → {title}',
   team_match_application_withdrawn: '상대팀 신청이 취소됐어요.',
   team_match_application_approved: '팀매치 신청이 승인됐어요.',
   team_match_application_rejected: '팀매치 신청이 거절됐어요.',
@@ -991,7 +1000,7 @@ export class NotificationsService {
     const prefField = preferenceFieldForEvent(type);
     void this.pushAllowedNow(type, targetType, targetId).then((pushAllowed) => {
       for (const userId of userIds) {
-        this.createNotificationWithPrefCheck(userId, message, prefField, pushAllowed).catch((err: unknown) => {
+        this.createNotificationWithPrefCheck(userId, message, prefField, pushAllowed, options?.businessKey).catch((err: unknown) => {
           this.logger.warn({ userId, targetType, targetId, err }, '알림 생성 실패');
         });
       }
@@ -1046,9 +1055,14 @@ export class NotificationsService {
     },
     prefField: NotificationPrefField,
     pushAllowed: boolean,
+    businessKey?: string,
   ): Promise<void> {
     if (!(await this.preferenceEnabled(userId, prefField))) return;
-    const notification = await this.prisma.v1Notification.create({ data: { recipientUserId: userId, ...message } });
+    const recipientKey = businessKey === undefined ? undefined : `${businessKey}:${userId}`;
+    if (recipientKey !== undefined && (await this.prisma.v1Notification.findUnique({ where: { businessKey: recipientKey }, select: { id: true } }))) return;
+    const notification = await this.prisma.v1Notification.create({
+      data: { recipientUserId: userId, ...message, ...(recipientKey === undefined ? {} : { businessKey: recipientKey }) },
+    });
     this.deliver(userId, notification, pushAllowed);
   }
 

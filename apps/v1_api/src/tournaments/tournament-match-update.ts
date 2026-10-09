@@ -5,6 +5,7 @@ import { competitionTeamTargets, enqueueRosterResync, type RosterResyncTarget } 
 import { revokeReplacedSideTeamAdjustments } from '../games/roster/side-team-change';
 import { competitionMatchLabel } from './tournament-round-label';
 import { defaultFixtureEndAt } from './competition-config/fixture-end-at';
+import { assertStartedTeamChangeAllowed, discardUnconfirmedResultRevisions, purgeReplacedSideEvents, type StartedTeamChangeSummary } from './tournament-started-team-change';
 
 type Tx = Prisma.TransactionClient;
 
@@ -15,6 +16,14 @@ export type TournamentMatchUpdateInput = {
   venue?: string;
   homeRegistrationId?: string | null;
   awayRegistrationId?: string | null;
+  /**
+   * Only the admin fixture edit opts in. Without it a team change on a started game stays a 409
+   * (`FIXTURE_HAS_RESULT`), so reconcilers never wipe a live game's records by accident.
+   */
+  allowStartedTeamChange?: boolean;
+  teamChangeReason?: string | null;
+  /** Recorded as the author of the VOID revision that replaces a discarded unconfirmed result. */
+  actorUserId?: string;
 };
 
 /**
@@ -43,6 +52,8 @@ export async function updateTournamentMatchInTx(
   status: string;
   createdAt: Date;
   updatedAt: Date;
+  /** Set when the team change happened on an already started game. */
+  startedTeamChange: StartedTeamChangeSummary | null;
 }> {
   // Lock Game first. Result review and advancement use the same order.
   const gameRows = await tx.$queryRaw<Array<{ id: string; state: string; sourceType: string; currentOfficialRevisionId: string | null }>>`
@@ -151,12 +162,20 @@ export async function updateTournamentMatchInTx(
   const teamsChanged = homeChanged || awayChanged;
   const nextStartAt = input.scheduledAt !== undefined ? input.scheduledAt : detail.teamMatch.startAt;
   const timeChanged = (detail.teamMatch.startAt?.getTime() ?? null) !== (nextStartAt?.getTime() ?? null);
-  if (teamsChanged && (gameRows[0].state !== 'SCHEDULED' || officialRevision?.state === 'OFFICIAL')) {
+  const gameStarted = gameRows[0].state !== 'SCHEDULED';
+  if (teamsChanged && (gameStarted || officialRevision?.state === 'OFFICIAL') && input.allowStartedTeamChange !== true) {
     throw new ConflictException({
       code: 'FIXTURE_HAS_RESULT',
       message: '진행 중이거나 결과가 확정된 경기는 팀을 바꿀 수 없어요. 결과를 먼저 처리해 주세요.',
     });
   }
+  const startedTeamChangeReason = teamsChanged && (gameStarted || officialRevision?.state === 'OFFICIAL')
+    ? await assertStartedTeamChangeAllowed(tx, {
+      gameState: gameRows[0].state,
+      officialRevisionState: officialRevision?.state ?? null,
+      reason: input.teamChangeReason,
+    })
+    : null;
   const nextPlaceName = input.venue !== undefined ? input.venue.trim() || null : detail.teamMatch.placeName;
   // 길이를 아는 경기는 그 길이를 새 시작에 그대로 옮기고, 종료 시각이 없던 경기는 새 시작 +
   // 경기 설정의 정규 시간(연장 제외 피리어드 합계)으로 채운다 — 대진 생성과 같은 기준이다.
@@ -208,6 +227,21 @@ export async function updateTournamentMatchInTx(
     { key: V1GameSideKey.AWAY, oldTeamId: detail.teamMatch.approvedApplicantTeamId, nextTeamId: nextAwayTeamId, name: away?.team.name ?? '어웨이 팀 미정', changed: awayChanged },
   ];
   const resync: RosterResyncTarget[] = [];
+  if (startedTeamChangeReason !== null && input.actorUserId === undefined) {
+    throw new Error('actorUserId is required to change teams on a started fixture');
+  }
+  const discardedRevisions = startedTeamChangeReason === null || input.actorUserId === undefined
+    ? []
+    : await discardUnconfirmedResultRevisions(tx, { gameId: game.id, actorUserId: input.actorUserId, reason: startedTeamChangeReason });
+  const startedPurge = startedTeamChangeReason === null
+    ? null
+    : await purgeReplacedSideEvents(tx, {
+      gameId: game.id,
+      sides: sideChanges.flatMap((sideChange) => {
+        const side = game.sides.find((candidate) => candidate.sideKey === sideChange.key);
+        return sideChange.changed && side !== undefined ? [{ id: side.id, sideKey: sideChange.key }] : [];
+      }),
+    });
   for (const sideChange of sideChanges) {
     const side = game.sides.find((candidate) => candidate.sideKey === sideChange.key);
     if (side === undefined) throw new ConflictException({ code: 'TOURNAMENT_MATCH_GAME_SIDE_MISSING', message: '대회 경기의 게임 사이드를 찾을 수 없어요.' });
@@ -217,7 +251,11 @@ export async function updateTournamentMatchInTx(
       await revokeReplacedSideTeamAdjustments(tx, { gameId: game.id, sideId: side.id });
       // 새 팀의 명단은 방금 만든 빈 리비전 위에 후속 이벤트가 채운다. 시각이 지난 경기도 SCHEDULED 면
       // 채워야 하므로 팀 단위가 아니라 이 경기를 대상으로 남긴다.
-      if (newLineupId !== null && sideChange.nextTeamId !== null) resync.push({ scope: 'game', gameId: game.id });
+      if (newLineupId !== null && sideChange.nextTeamId !== null) {
+        resync.push(startedPurge === null
+          ? { scope: 'game', gameId: game.id }
+          : { scope: 'startedGameSide', gameId: game.id, sideId: side.id });
+      }
     }
     if (teamsChanged && sideChange.oldTeamId !== sideChange.nextTeamId) {
       if (sideChange.oldTeamId !== null) {
@@ -265,6 +303,9 @@ export async function updateTournamentMatchInTx(
     status: updated.status,
     createdAt: updated.createdAt,
     updatedAt: updated.updatedAt,
+    startedTeamChange: startedPurge === null || startedTeamChangeReason === null
+      ? null
+      : { gameState: gameRows[0].state, reason: startedTeamChangeReason, discardedRevisions, ...startedPurge },
   };
 }
 
@@ -273,7 +314,7 @@ function fixtureNumberConflict() {
 }
 
 /** 새로 만든 대체 리비전의 id를 돌려준다 — 팀이 갓 배정된 것이면 후속 이벤트가 그 위에 명단을 채운다. */
-async function invalidateLineupAndTactics(tx: Tx, gameId: string, sideId: string): Promise<string | null> {
+export async function invalidateLineupAndTactics(tx: Tx, gameId: string, sideId: string): Promise<string | null> {
   const latest = await tx.v1GameLineup.findFirst({ where: { gameId, sideId }, orderBy: { revision: 'desc' }, select: { id: true, revision: true } });
   await tx.v1GameLineup.updateMany({ where: { gameId, sideId, invalidatedAt: null }, data: { invalidatedAt: new Date(), invalidationReason: 'SIDE_TEAM_CHANGED' } });
   let newLineupId: string | null = null;
@@ -285,7 +326,7 @@ async function invalidateLineupAndTactics(tx: Tx, gameId: string, sideId: string
   return newLineupId;
 }
 
-async function upsertSchedule(
+export async function upsertSchedule(
   tx: Tx,
   teamId: string,
   teamMatchId: string,

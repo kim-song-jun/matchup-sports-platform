@@ -125,6 +125,37 @@ describe('MatchDetailContent — 전반/후반 섹션 분리', () => {
   });
 });
 
+describe('MatchDetailContent — 단판 경기 구간 표기', () => {
+  const goal = (side: 'home' | 'away', name: string, period: number | null, clockMs: number | null) =>
+    ({ assist: null, type: 'GOAL', cardColor: null, sideId: `side-${side}`, side, participantId: name, participantName: name, profileHref: null, jerseyNumber: 9, period, clockMs }) as const;
+  const events = [goal('home', '김선수', 1, 600_000), goal('away', '이선수', 1, 300_000), goal('home', '박선수', null, null)];
+
+  it('단판이면 "경기 결과" 구간 하나에 시간대 없는 기록까지 목록 끝에 합치고 "전반"·"기타"가 없다', () => {
+    render(<MatchDetailContent data={makeDetail({ periodCount: 1, events })} />);
+
+    const group = screen.getByRole('group', { name: '경기 결과' });
+    expect(screen.getAllByRole('group').filter((node) => node.getAttribute('aria-labelledby')?.startsWith('match-events-'))).toHaveLength(1);
+    const text = group.textContent ?? '';
+    expect(text.indexOf('김선수')).toBeLessThan(text.indexOf('이선수'));
+    expect(text.indexOf('이선수')).toBeLessThan(text.indexOf('박선수'));
+    expect(screen.queryByText('전반')).toBeNull();
+    expect(screen.queryByText('기타')).toBeNull();
+  });
+
+  it.each([[2], [null], [undefined]])('periodCount=%s 이면 전반·기타 구간을 지금처럼 나눈다', (periodCount) => {
+    render(<MatchDetailContent data={makeDetail({ periodCount, events })} />);
+
+    expect(within(screen.getByRole('group', { name: '전반' })).getByText('김선수')).toBeInTheDocument();
+    expect(within(screen.getByRole('group', { name: '기타' })).getByText('박선수')).toBeInTheDocument();
+    expect(screen.queryByRole('group', { name: '경기 결과' })).toBeNull();
+  });
+
+  it('전반에만 기록이 있는 2피리어드 경기를 단판으로 오인하지 않는다', () => {
+    render(<MatchDetailContent data={makeDetail({ periodCount: 2, events: [events[0]] })} />);
+    expect(screen.getByRole('group', { name: '전반' })).toBeInTheDocument();
+  });
+});
+
 describe('MatchDetailContent — 카드 색상', () => {
   it('익명 골은 "익명", 익명 자책골은 "OG"로 표시한다', () => {
     const data = makeDetail({

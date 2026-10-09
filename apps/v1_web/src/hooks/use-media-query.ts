@@ -39,3 +39,15 @@ export function useMediaQuery(query: string, serverFallback = false): boolean {
  * 어긋나면 "카드는 이미 2열인데 하단은 아직 모바일용 무한 스크롤"처럼 화면이 갈린다.
  */
 export const DESKTOP_LIST_MEDIA_QUERY = '(min-width: 1024px)';
+
+/**
+ * 어드민 대진 그림이 편집 가능한 캔버스(데스크톱)로 바뀌는 폭. 스펙 D8 — 구조 편집은 768px 이상.
+ * Tailwind `md` 와 같은 값이다.
+ */
+export const BRACKET_CANVAS_WIDE_MEDIA_QUERY = '(min-width: 768px)';
+
+/**
+ * 대진 그림에서 칸 패널이 캔버스 옆 열로 붙는 최소 폭. 이보다 좁은 태블릿(768~1023)은 패널을
+ * 시트로 띄우고 참가팀 트레이를 접는다 — 옆 열이 없으면 패널이 그림 아래로 밀려 보이지 않는다.
+ */
+export const BRACKET_CANVAS_SIDE_PANEL_MEDIA_QUERY = '(min-width: 1024px)';

@@ -26,6 +26,7 @@ import {
   officializeAlwaysAllowed,
 } from './result-review-copy';
 import { AdminListSkeleton } from '@/components/admin/admin-skeleton';
+import { regularPeriodCountOf } from '@/components/tournament-live/operate/period-label';
 
 type DirectorGateStatus = 'unknown' | 'enabled' | 'disabled';
 type CorrectionSnapshot = {
@@ -33,6 +34,25 @@ type CorrectionSnapshot = {
   baseRevisionId: string;
   eventsHash: string;
 };
+
+type PrefillRevision = NonNullable<ReturnType<typeof useGameResultRevisions>['data']>[number];
+
+/**
+ * Form seed for editing the pointer revision. A VOID revision carries no participants, so an official void is seeded
+ * from the OFFICIAL revision it voided. A VOID that replaced anything else (an unconfirmed result discarded by a
+ * team change) is result-less on purpose: its predecessor belongs to the replaced team, so the pointer itself seeds
+ * an empty form.
+ */
+function resolveEditPrefill(
+  currentOfficial: PrefillRevision | null,
+  voidPointer: PrefillRevision | null,
+  revisions: PrefillRevision[],
+): PrefillRevision | null {
+  if (currentOfficial !== null) return currentOfficial;
+  if (voidPointer === null) return null;
+  const voided = revisions.find((revision) => revision.id === voidPointer.supersedesId);
+  return voided !== undefined && voided.state === 'OFFICIAL' ? voided : voidPointer;
+}
 
 /**
  * GameResultCorrectionPanel -- the records/corrections screen's per-game
@@ -120,12 +140,7 @@ export function GameResultCorrectionPanel({
       currentPointerRevision && currentPointerRevision.state === 'OFFICIAL' ? currentPointerRevision : null;
     const isVoided = currentPointerRevision?.state === 'VOID';
     const draftBase = currentOfficial ?? (isVoided ? currentPointerRevision : null);
-    const editPrefill =
-      currentOfficial ??
-      (isVoided && currentPointerRevision
-        ? revisions.find((revision) => revision.id === currentPointerRevision.supersedesId) ??
-          currentPointerRevision
-        : null);
+    const editPrefill = resolveEditPrefill(currentOfficial, isVoided ? currentPointerRevision : null, revisions);
     if (!draftBase || !editPrefill) return;
     setCorrectionSnapshot({
       expectedVersion: game.version,
@@ -166,12 +181,7 @@ export function GameResultCorrectionPanel({
   const draftBase = currentOfficial ?? (isVoided ? currentPointerRevision : null);
   // VOID 리비전에는 참가자 기록이 복사되지 않으므로, 폼 초기값은 무효화 직전
   // 공식 리비전에서 가져와요.
-  const editPrefill =
-    currentOfficial ??
-    (isVoided && currentPointerRevision
-      ? revisions.find((revision) => revision.id === currentPointerRevision.supersedesId) ??
-        currentPointerRevision
-      : null);
+  const editPrefill = resolveEditPrefill(currentOfficial, isVoided ? currentPointerRevision : null, revisions);
   const pendingCorrection =
     draftBase
       ? revisions.find(
@@ -268,6 +278,7 @@ export function GameResultCorrectionPanel({
         sides={game.sides}
         lineups={lineupsQuery.data ?? []}
         periods={game.periods}
+        periodCount={regularPeriodCountOf(game.periods.length, game.periodDurations)}
         isKnockoutFixture={game.isKnockoutFixture}
         presentation={inline ? 'inline' : 'modal'}
         submitting={createCorrection.isPending}

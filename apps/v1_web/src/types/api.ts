@@ -97,8 +97,8 @@ export type V1AuthMe = {
     onboardingStatus: string;
     lastLoginAt?: string | null;
     createdAt?: string;
-    authProvider?: 'email' | 'kakao' | 'naver' | null;
-    authProviders?: Array<'email' | 'kakao' | 'naver' | string>;
+    authProvider?: 'email' | 'kakao' | 'naver' | 'apple' | null;
+    authProviders?: Array<'email' | 'kakao' | 'naver' | 'apple' | string>;
     hasPassword?: boolean;
   };
   profile: {
@@ -2245,8 +2245,8 @@ export type V1Profile = {
   accountStatus: string;
   email: string | null;
   phone?: string | null;
-  authProvider: 'email' | 'kakao' | 'naver' | null;
-  authProviders?: Array<'email' | 'kakao' | 'naver' | string>;
+  authProvider: 'email' | 'kakao' | 'naver' | 'apple' | null;
+  authProviders?: Array<'email' | 'kakao' | 'naver' | 'apple' | string>;
   hasPassword?: boolean;
   onboardingStatus?: 'not_started' | 'terms_done' | 'social_terms_required' | 'social_profile_required' | 'signup_done' | 'sport_done' | 'level_done' | 'region_done' | 'completed' | 'deferred';
   regionName: string | null;
@@ -2880,6 +2880,11 @@ export type V1AdminInquiryStatusPayload = {
   reason?: string;
 };
 
+/** GET /admin/team-matches/pending-application-count — 운영자가 처리할 수 있는 대기 신청 수 */
+export type V1AdminTeamMatchPendingApplicationCount = {
+  count: number;
+};
+
 /** GET /admin/inquiries/pending-count — 미답변(received/reviewing) 문의 건수 */
 export type V1AdminInquiryPendingCount = {
   count: number;
@@ -2890,7 +2895,7 @@ export type V1AdminUserRow = {
   nickname: string | null;
   displayName: string | null;
   email: string | null;
-  authProviders: Array<'kakao' | 'naver' | 'email'>;
+  authProviders: Array<'kakao' | 'naver' | 'email' | 'apple'>;
   gender: 'male' | 'female' | null;
   accountStatus: 'active' | 'suspended' | 'blocked' | 'withdrawal_pending' | 'deleted';
   onboardingStatus: string;
@@ -3015,6 +3020,8 @@ export type V1AdminTeamMatchRow = {
   league: { leagueId: string; title: string } | null;
   tournament?: { tournamentId: string; title: string } | null;
   sportName: string;
+  /** Null for team matches created without a region. */
+  region: { regionId: string; name: string } | null;
   platformManaged: boolean;
   pendingApplicationCount: number;
   startAt: string;
@@ -3031,7 +3038,7 @@ export type V1AdminTeamMatchApplicationRow = {
   createdAt: string;
 };
 
-export type V1AdminTeamMatchDetail = Omit<V1AdminTeamMatchRow, 'pendingApplicationCount'> & {
+export type V1AdminTeamMatchDetail = Omit<V1AdminTeamMatchRow, 'pendingApplicationCount' | 'region'> & {
   platformManaged: boolean;
   sportId: string;
   regionId: string;
@@ -4220,6 +4227,7 @@ export type V1AdminBracketFixtureGame = {
   state: 'SCHEDULED' | 'LIVE' | 'PAUSED' | 'ENDED' | 'CANCELLED';
   version: number;
   hasLiveRecords: boolean;
+  hasOfficialResult: boolean;
   latestRevision: V1AdminBracketRevisionSummary | null;
 };
 
@@ -4228,6 +4236,37 @@ export type V1AdminTournamentBracket = {
   fixtures: V1AdminBracketFixture[];
   standings: V1AdminBracketStanding[];
   slots: V1AdminBracketSlot[];
+};
+
+/** 서버 `BracketTemplateInput` 과 같은 모양(knockout 16 의 서버 planner 확장은 PR-1c). group_knockout 은 PR-4 에서 화면이 열린다. */
+export type BracketTemplateInput =
+  | { kind: 'knockout'; size: 4 | 8 | 12 | 16; thirdPlace: boolean }
+  | {
+      kind: 'group_knockout';
+      groupCount: number;
+      teamsPerGroup: number;
+      advancePerGroup: 1 | 2;
+      legs: 1 | 2;
+      thirdPlace: boolean;
+    }
+  | { kind: 'league'; teamCount: number; legs: 1 | 2 };
+
+export type V1ApplyBracketTemplatePayload = BracketTemplateInput & { replaceExisting?: boolean };
+export type V1ApplyBracketTemplateResult = { groups: number; slots: number; fixtures: number; edges: number };
+export type V1AssignSlotResult = { slot: V1AdminBracketSlot; affectedTeamMatchIds: string[] };
+export type V1RandomFillResult = { assignments: { slotId: string; registrationId: string }[] };
+
+/** 빠른 결과·정정에 보내는 점수. 서버 `GameScoreDto` 와 같은 세 키만 쓴다. */
+export type V1QuickResultScore = {
+  home: number;
+  away: number;
+  penalties?: { home: number; away: number };
+};
+export type V1QuickResultResult = {
+  gameId: string;
+  revisionId: string;
+  version: number;
+  score: V1QuickResultScore;
 };
 
 /** POST /admin/tournaments/:tournamentId/league/fixtures/generate 응답 — 리그 대진 일괄 생성 결과 */
@@ -4583,6 +4622,13 @@ export type V1UpdateFixturePayload = {
   venue?: string;
   homeRegistrationId?: string;
   awayRegistrationId?: string;
+  /** 이미 시작된 경기의 팀을 바꿀 때 필수(서버 400 TEAM_CHANGE_REASON_REQUIRED). 운영 기록에 남는다. */
+  teamChangeReason?: string;
+};
+
+/** 시작된 경기의 팀을 바꾸면 서버가 옛 팀 기록을 지우고 그 결과를 알려 준다. */
+export type V1UpdateFixtureResult = V1AdminBracketFixture & {
+  startedTeamChange: { removedEventCount: number; score: { home: number; away: number } } | null;
 };
 
 export type V1CreateFixturePayload = {

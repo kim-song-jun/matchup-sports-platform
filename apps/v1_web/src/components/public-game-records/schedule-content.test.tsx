@@ -152,6 +152,35 @@ function fixtureEntry(overrides: Partial<import('./types').PublicScheduleEntry> 
   };
 }
 
+describe('ScheduleContent — 단판 경기 기록 요약', () => {
+  const scorers = [
+    { side: 'home' as const, participantName: '김선수', jerseyNumber: 9, period: 1, clockMs: 600_000 },
+    { side: 'away' as const, participantName: '이선수', jerseyNumber: 7, period: 1, clockMs: 300_000 },
+    { side: 'home' as const, participantName: '박선수', jerseyNumber: 5, period: null, clockMs: null },
+  ];
+  const renderWith = (periodCount: number | null | undefined) =>
+    render(<ScheduleContent tournamentId="tour-1" data={{ ...makeData(), items: [fixtureEntry({ periodCount, scorers })] }} />);
+
+  it('단판이면 "경기 결과" 구간 하나에 시간순으로, 시간대 없는 기록은 끝에 합친다', () => {
+    renderWith(1);
+
+    const group = screen.getByRole('group', { name: '경기 결과 기록' });
+    const text = group.textContent ?? '';
+    expect(text.indexOf('이선수')).toBeLessThan(text.indexOf('김선수'));
+    expect(text.indexOf('김선수')).toBeLessThan(text.indexOf('박선수'));
+    expect(screen.queryByRole('group', { name: '전반 기록' })).toBeNull();
+    expect(screen.queryByRole('group', { name: '기타 기록' })).toBeNull();
+  });
+
+  it.each([[2], [null], [undefined]])('periodCount=%s 이면 전반·기타 구간 그대로다', (periodCount) => {
+    renderWith(periodCount);
+
+    expect(screen.getByRole('group', { name: '전반 기록' })).toHaveTextContent('김선수');
+    expect(screen.getByRole('group', { name: '기타 기록' })).toHaveTextContent('박선수');
+    expect(screen.queryByRole('group', { name: '경기 결과 기록' })).toBeNull();
+  });
+});
+
 describe('ScheduleContent — 이상 클럭 경고 표식(alpha 452′ 사고)', () => {
   it('득점자의 clockMs가 이상값이면 분을 올림해 표시하고 경고 표식을 붙인다', () => {
     const data = { ...makeData(), items: [fixtureEntry({
@@ -660,6 +689,53 @@ describe('ScheduleContent — 시간 미정 경기', () => {
     expect(screen.getByText('홈팀')).toBeInTheDocument();
     expect(screen.getByText('미정')).toBeInTheDocument();
     expect(screen.queryByText('대진 확정 전')).not.toBeInTheDocument();
+  });
+
+  it('팀이 없고 자리가 있는 사이드는 "미정" 대신 자리 라벨을 보여 주고 "대진 확정 전" 한 줄로 접지 않는다', () => {
+    const data = makeData({
+      unscheduled: [
+        fixtureEntry({
+          fixtureId: 'u-slot', scheduledAt: null, groupName: null, round: '4강',
+          home: null, away: null, homeSlotLabel: 'A조 1위', awaySlotLabel: 'B조 2위',
+          score: null, scoreStatus: 'unavailable', status: 'scheduled', resultState: 'pending',
+        }),
+      ],
+    });
+
+    render(<ScheduleContent tournamentId="tour-1" data={data} />);
+
+    expect(screen.getByText('A조 1위')).toBeInTheDocument();
+    expect(screen.getByText('B조 2위')).toBeInTheDocument();
+    expect(screen.queryByText('대진 확정 전')).not.toBeInTheDocument();
+    expect(screen.queryByText('미정')).not.toBeInTheDocument();
+  });
+
+  it('items[] 의 경기도 같다: 라벨이 없는 사이드는 미정, 팀이 있는 사이드는 라벨이 와도 팀 이름, 가려진 팀은 비공개', () => {
+    const data = makeData({
+      items: [
+        fixtureEntry({
+          fixtureId: 'i-mixed', round: '4강',
+          home: { registrationId: 'reg-home', teamId: 'team-home', teamName: '홈팀' }, homeSlotLabel: 'A조 1위',
+          away: null, awaySlotLabel: null,
+          score: null, scoreStatus: 'unavailable', status: 'scheduled', resultState: 'pending',
+        }),
+        fixtureEntry({
+          fixtureId: 'i-masked', round: '4강', fixtureNumber: 2,
+          home: { registrationId: 'reg-x', teamId: null, teamName: null }, homeSlotLabel: 'B조 1위',
+          away: null, awaySlotLabel: '3번 자리',
+          score: null, scoreStatus: 'unavailable', status: 'scheduled', resultState: 'pending',
+        }),
+      ],
+    });
+
+    render(<ScheduleContent tournamentId="tour-1" data={data} />);
+
+    expect(screen.getByText('홈팀')).toBeInTheDocument();
+    expect(screen.queryByText('A조 1위')).not.toBeInTheDocument();
+    expect(screen.getByText('미정')).toBeInTheDocument();
+    expect(screen.getByText('비공개')).toBeInTheDocument();
+    expect(screen.queryByText('B조 1위')).not.toBeInTheDocument();
+    expect(screen.getByText('3번 자리')).toBeInTheDocument();
   });
 });
 

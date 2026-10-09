@@ -290,6 +290,13 @@ describe('MyTeamsPageView — 팀 카드 출처', () => {
 });
 
 
+describe('설정의 로그아웃 진입점', () => {
+  it('계정 설정은 로그아웃 버튼을 하나만 보여준다', () => {
+    render(<SettingsPageView model={settingsModel} />);
+    expect(screen.getAllByRole('button', { name: '로그아웃' })).toHaveLength(1);
+  });
+});
+
 describe('설정의 비밀번호·약관 진입 경로', () => {
   it('비밀번호 변경은 본인인증 재설정 화면과 설정 복귀 경로에 연결한다', () => {
     render(<SettingsPageView model={{ ...settingsModel, account: {

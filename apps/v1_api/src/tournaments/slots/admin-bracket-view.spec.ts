@@ -23,18 +23,31 @@ describe('serializeAdminBracketSlot', () => {
 
 describe('serializeAdminBracketGame', () => {
   const game = (overrides: Record<string, unknown> = {}) => ({
-    id: 'game-1', state: 'SCHEDULED', version: 3, _count: { events: 0 }, resultRevisions: [], ...overrides,
+    id: 'game-1', state: 'SCHEDULED', version: 3, _count: { events: 0 }, currentOfficialRevision: null, resultRevisions: [], ...overrides,
   }) as never;
   const revision = (overrides: Record<string, unknown> = {}) => ({
     id: 'rev-1', state: 'OFFICIAL', score: { home: 2, away: 1 }, reason: null, supersedesId: null, ...overrides,
   });
 
   it('리비전이 없으면 latestRevision 이 null 이고 이벤트가 없으면 hasLiveRecords 는 false', () => {
-    expect(serializeAdminBracketGame(game())).toEqual({ id: 'game-1', state: 'SCHEDULED', version: 3, hasLiveRecords: false, latestRevision: null });
+    expect(serializeAdminBracketGame(game())).toEqual({ id: 'game-1', state: 'SCHEDULED', version: 3, hasLiveRecords: false, hasOfficialResult: false, latestRevision: null });
   });
 
   it('게임 이벤트가 하나라도 있으면 hasLiveRecords (빠른 결과가 막히는 조건과 같은 기준)', () => {
     expect(serializeAdminBracketGame(game({ _count: { events: 1 } })).hasLiveRecords).toBe(true);
+  });
+
+  it.each([
+    ['OFFICIAL', true],
+    ['VOID', false],
+    [null, false],
+  ] as const)('hasOfficialResult: 공식 포인터가 %s 면 %s (최신 리비전이 정정 SUBMITTED 여도 포인터 기준)', (pointer, expected) => {
+    const result = serializeAdminBracketGame(game({
+      currentOfficialRevision: pointer === null ? null : { state: pointer },
+      resultRevisions: [revision({ state: 'SUBMITTED' })],
+    }));
+    expect(result.hasOfficialResult).toBe(expected);
+    expect(result.latestRevision?.state).toBe('SUBMITTED');
   });
 
   it('입력 방식: quick 마커 / 대체한 리비전 / 콘솔 첫 초안', () => {

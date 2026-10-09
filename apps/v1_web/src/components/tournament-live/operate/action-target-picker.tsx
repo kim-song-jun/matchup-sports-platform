@@ -6,7 +6,7 @@ import { Button } from '@/components/v1-ui/button';
 import { formatMatchClock } from '@/lib/game-operations-clock';
 import type { FrozenEventCapture } from '@/lib/game-operations-clock';
 import { LineupGrid } from './lineup-grid';
-import { periodLabel } from './period-label';
+import { periodPrefix } from './period-label';
 import { FOCUSABLE_SELECTOR, useModalA11y } from '@/components/v1-ui/use-modal-a11y';
 import type {
   GameCardColor,
@@ -41,6 +41,8 @@ export interface ActionTargetPickerProps {
    * 요건이다). SUBSTITUTION의 2단계(나갈 선수→들어올 선수)를 거치는 동안도
    * 동일하게 고정된 채 유지된다. */
   readonly frozen: FrozenEventCapture;
+  /** 정규 피리어드 수. 1이면 시각 앞에 "전반"을 붙이지 않는다. */
+  readonly periodCount?: number | null;
   readonly sides: readonly GameSide[];
   readonly lineups: readonly GameLineup[];
   /** 팀 단위 기록 경로. GOAL/OWN_GOAL은 `payload.anonymous=true`를 함께
@@ -87,6 +89,7 @@ export function ActionTargetPicker({
   actionType,
   cardColor,
   frozen,
+  periodCount,
   sides,
   lineups,
   allowTeamOnly,
@@ -230,7 +233,7 @@ export function ActionTargetPicker({
             ) : null}
             {/* 액션 탭 시점을 얼린 값 — 선수를 고르는 동안 흘러가지 않는다. */}
             <p className="mt-0.5 text-xs font-medium tabular-nums text-[var(--blue700)]" aria-live="polite">
-              {periodLabel(frozen.period)} · {formatMatchClock(frozen.clockMs)} 시점 기록 (고정됨)
+              {periodPrefix(frozen.period, periodCount) && `${periodPrefix(frozen.period, periodCount)}· `}{formatMatchClock(frozen.clockMs)} 시점 기록 (고정됨)
             </p>
           </div>
           <button

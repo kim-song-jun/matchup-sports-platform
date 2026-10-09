@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { Pause } from 'lucide-react';
 import { elapsedMatchMs, formatStopwatchClock, serverAlignedNowMs } from '@/lib/game-operations-clock';
-import { periodLabel } from './period-label';
+import { isSinglePeriod, periodLabel } from './period-label';
 
 export interface ElapsedMatchClockProps {
   readonly periodNumber: number;
@@ -23,6 +23,8 @@ export interface ElapsedMatchClockProps {
   /** `V1GamePeriod.pausedAt`, as ms — start of the currently open pause
    * segment, or `null` when not paused right now. */
   readonly pausedAtMs: number | null;
+  /** 정규 피리어드 수. 1이면 단판이라 시계 옆 "전반" 라벨을 뺀다. */
+  readonly periodCount?: number | null;
 }
 
 /**
@@ -44,6 +46,7 @@ export function ElapsedMatchClock({
   offsetMs,
   pausedTotalMs,
   pausedAtMs,
+  periodCount,
 }: ElapsedMatchClockProps) {
   const [nowMs, setNowMs] = useState(() => Date.now());
 
@@ -62,7 +65,9 @@ export function ElapsedMatchClock({
 
   return (
     <div className="flex items-center gap-2" aria-live="off">
-      <span className="text-xs font-semibold text-[var(--text-muted)]">{periodLabel(periodNumber)}</span>
+      {isSinglePeriod(periodCount) ? null : (
+        <span className="text-xs font-semibold text-[var(--text-muted)]">{periodLabel(periodNumber)}</span>
+      )}
       {/* 스톱워치 다이얼 — 자릿수가 고정된 큰 숫자를 살짝 어두운 배경 칩 안에
           담아 "지금 흐르고 있는 시각"과 주변 텍스트를 시각적으로 분리한다.
           초록 점(진행 중)/일시정지 아이콘을 숫자 바로 옆에 붙여 한눈에 상태를
@@ -73,7 +78,7 @@ export function ElapsedMatchClock({
             ? 'bg-orange-50 text-orange-600 dark:bg-orange-500/10 dark:text-orange-300'
             : 'bg-gray-900/[0.04] text-[var(--text-strong)] dark:bg-white/10'
         }`}
-        aria-label={`${periodLabel(periodNumber)} 경과 시간 ${formatStopwatchClock(elapsedMs)}${isPaused ? ' (일시 중지됨)' : ''}`}
+        aria-label={`${isSinglePeriod(periodCount) ? '' : `${periodLabel(periodNumber)} `}경과 시간 ${formatStopwatchClock(elapsedMs)}${isPaused ? ' (일시 중지됨)' : ''}`}
       >
         {isPaused ? (
           <Pause size={18} aria-hidden="true" className="shrink-0" />

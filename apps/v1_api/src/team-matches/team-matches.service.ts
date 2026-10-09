@@ -1,3 +1,4 @@
+import { excludeUnfilledSlotFixturesWhere } from '../common/competition/unfilled-slot-gate';
 import { genderRuleColumnFilter, normalizeGenderRule } from '../common/gender-rule';
 import { teamMatchChatEntitlementWhere } from '../chat/chat-entitlement';
 import { canConfirmTeamMatch, validateTeamMatchDates } from './team-match-dates';
@@ -24,6 +25,7 @@ import type {
   GameCommandContext,
   GameSourceCreationInput,
 } from '../games/games.types';
+import { activeChatOperator } from '../chat/platform-team-match-chat';
 import { NotificationsService, type NotificationEventType } from '../notifications/notifications.service';
 import { formatKstMonthDayTime } from '../common/kst-datetime';
 import { decodeReferenceTimeCursor, encodeReferenceTimeCursor } from '../common/pagination/reference-time-cursor';
@@ -140,6 +142,7 @@ export class TeamMatchesService {
       OR: [{ tournamentId: null }, { leagueId: { not: null } }],
       AND: [
         { OR: [{ leagueId: null }, { league: { is: { isPublic: true } } }] },
+        excludeUnfilledSlotFixturesWhere(),
         ...constraints,
         ...(isDefaultDiscovery
           ? [query.sort === 'recommended'
@@ -484,6 +487,7 @@ export class TeamMatchesService {
         AND: [
           { OR: [{ tournamentId: null }, { leagueId: { not: null } }] },
           { OR: [{ leagueId: null }, { league: { is: { isPublic: true } } }] },
+          excludeUnfilledSlotFixturesWhere(),
         ],
         // 'expired'는 계산 상태(getApiStatus)라 DB status 로 존재하지 않는다 — list()와
         // 동일하게 startAt 과거 조건으로 매핑한다.
@@ -1012,6 +1016,37 @@ export class TeamMatchesService {
     };
   }
 
+  /**
+   * Platform-run recruitments have no host team: tell the operator who created it, or every active
+   * owner/ops when that person no longer holds the role. Runs after commit; the log id keys the
+   * dedupe so a resubmission (new pending request) notifies again but a retry does not.
+   */
+  private notifyOperatorsOfApplication(
+    applicantUserId: string,
+    teamMatch: { id: string; title: string; createdByUserId: string | null },
+    applicantTeamName: string,
+    dedupeId: string,
+  ): void {
+    this.notifications.emitToManyDeferred(
+      async () => {
+        const creator = teamMatch.createdByUserId
+          ? await this.prisma.v1AdminUser.findFirst({
+              where: { userId: teamMatch.createdByUserId, ...activeChatOperator },
+              select: { userId: true },
+            })
+          : null;
+        const operators = creator
+          ? [creator]
+          : await this.prisma.v1AdminUser.findMany({ where: activeChatOperator, select: { userId: true } });
+        return [...new Set(operators.map((operator) => operator.userId))].filter((id) => id !== applicantUserId);
+      },
+      'admin_team_match_application_received',
+      teamMatch.id,
+      undefined,
+      { vars: { name: applicantTeamName, title: teamMatch.title }, businessKey: `tm-app-admin:${dedupeId}` },
+    );
+  }
+
   async createApplication(
     user: V1AuthUser,
     teamMatchId: string,
@@ -1096,7 +1131,7 @@ export class TeamMatchesService {
             },
           });
 
-      await tx.v1StatusChangeLog.create({
+      const log = await tx.v1StatusChangeLog.create({
         data: {
           targetType: 'team_match_application',
           targetId: nextApplication.id,
@@ -1106,9 +1141,10 @@ export class TeamMatchesService {
           actorUserId: user.id,
           reason: application ? 'team_match_application_resubmitted' : 'team_match_application_created',
         },
+        select: { id: true },
       });
 
-      return nextApplication;
+      return { ...nextApplication, logId: log.id };
     },
     {
       // 이 트랜잭션은 위 FOR UPDATE 에서 **다른 요청이 끝날 때까지 기다릴 수 있다** — 종전엔
@@ -1144,6 +1180,10 @@ export class TeamMatchesService {
         undefined,
         { vars: { name: applicantMembership.team.name, team: teamMatch.hostTeam.name, when: formatKstMonthDayTime(teamMatch.startAt) } },
       );
+    }
+
+    if (teamMatch.platformManaged && !teamMatch.leagueId && !teamMatch.tournamentId) {
+      this.notifyOperatorsOfApplication(user.id, teamMatch, applicantMembership.team.name, result.logId);
     }
 
     return {
@@ -1718,7 +1758,7 @@ export class TeamMatchesService {
             { hostTeam: { status: 'active', deletedAt: null } },
             { hostTeamId: null, leagueId: null, tournamentId: null },
           ],
-        }],
+        }, excludeUnfilledSlotFixturesWhere()],
       },
       include: this.teamMatchInclude(user),
     });

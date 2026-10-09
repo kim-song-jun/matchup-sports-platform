@@ -12,6 +12,9 @@ import {
   type LeagueRosterFillOutcome,
 } from './league-roster-autofill';
 
+/** 어드민 팀매치 상세(applications.message)에 그대로 노출되는 문구 — 생성·자리 배정이 같은 값을 쓴다. */
+export const LEAGUE_APPLICATION_MESSAGE = '리그 대진 편성';
+
 /**
  * 리그 대진 **한 경기**를 만드는 단일 경로.
  *
@@ -22,10 +25,10 @@ import {
  *
  * ## 한 경기를 만든다는 것은 다섯 가지를 만든다는 뜻이다
  * 1. `V1TeamMatch` — 양 팀이 이미 확정된 `status: 'matched'` 행
- * 2. **양 팀의 팀 일정 2건** — "매치가 곧 팀일정" 불변식(team-schedules.service.ts).
+ * 2. **양 팀의 팀 일정 2건**(팀이 모두 정해졌을 때만) — "매치가 곧 팀일정" 불변식(team-schedules.service.ts).
  *    일반 팀매치와 달리 호스트 먼저·상대 나중이 아니라 두 팀 것을 여기서 함께 만든다.
  * 3. `V1Game` + 사이드 2개 + **자동 로스터** — 아래 `participants` 주석 참고
- * 4. **승인된 신청서** — 재생성한 대진과 처음 생성한 대진이 같은 계약을 갖게 한다
+ * 4. **승인된 신청서**(원정 팀이 있을 때만) — 재생성한 대진과 처음 생성한 대진이 같은 계약을 갖게 한다
  * 5. **결과 입력 리마인더** — 시작 +24시간에도 결과가 없으면 운영자에게 1회
  *
  * 하나라도 빠지면 화면·알림·정산 중 한 곳이 조용히 비므로, 이 다섯을 각각 단언하는
@@ -44,8 +47,12 @@ export interface LeagueFixtureCreationInput {
   startAt: Date;
   /** 슬롯 계산이 있을 때만. 없으면 종료 시각을 저장하지 않는다. */
   endAt: Date | null;
-  home: LeagueFixtureTeam;
-  away: LeagueFixtureTeam;
+  /** null = 아직 팀이 정해지지 않은 사이드(정규 리그 템플릿의 빈 경기). */
+  home: LeagueFixtureTeam | null;
+  away: LeagueFixtureTeam | null;
+  /** 자리(`V1TournamentSlot`) 연결. 팀이 null 이어도 자리 id 는 채운다. */
+  homeSlotId?: string | null;
+  awaySlotId?: string | null;
 }
 
 type ParticipantProfile = { nickname: string | null; displayName: string | null };
@@ -234,6 +241,8 @@ export async function readLeagueTeamRosters(
   );
 }
 
+const UNDECIDED_SIDE_NAME = { HOME: '홈 팀 미정', AWAY: '어웨이 팀 미정' } as const;
+
 export async function createLeagueFixture(
   tx: Prisma.TransactionClient,
   games: GamesService,
@@ -244,10 +253,10 @@ export async function createLeagueFixture(
   // 정규 시간(연장 제외 피리어드 합계)으로 채운다 — 비워 두면 일정·캘린더가 끝을 모르는 경기가 된다.
   const endAt = input.endAt ?? await defaultFixtureEndAt(tx, input.competitionConfigId, startAt);
 
-  // ① 팀매치. 리그 대진은 생성 시점에 양 팀이 확정이므로 곧바로 matched 다.
+  // ① 팀매치. 리그 대진은 생성 시점에 곧바로 matched 다 — 팀이 비어 있어도 같다(대회 빈 경기와 같은 규칙).
   const teamMatch = await tx.v1TeamMatch.create({
     data: {
-      hostTeamId: home.id,
+      hostTeamId: home?.id ?? null,
       createdByUserId: input.adminUserId,
       sportId: input.sportId,
       regionId: input.regionId,
@@ -256,7 +265,9 @@ export async function createLeagueFixture(
       startAt,
       endAt: endAt ?? undefined,
       status: 'matched',
-      approvedApplicantTeamId: away.id,
+      approvedApplicantTeamId: away?.id ?? null,
+      homeSlotId: input.homeSlotId ?? null,
+      awaySlotId: input.awaySlotId ?? null,
       competitionConfigVersionId: input.competitionConfigId,
       // A league match is also an official tournament-scoped TeamMatch. Keep
       // the canonical ownership column populated at creation time so audit
@@ -267,16 +278,15 @@ export async function createLeagueFixture(
     },
   });
 
-  // ② 양 팀의 팀 일정. "매치가 곧 팀일정" 불변식(team-schedules.service.ts:37-41)이
-  //    리그 대진에는 지켜지지 않고 있었다 — 이 raw create 경로가 team-matches.service.ts 의
-  //    create()/approveApplication() 이 부르는 createTeamMatchScheduleInTx 를 우회해서,
-  //    참가 팀 캘린더에 리그 경기가 한 건도 안 뜨고 용병 모집도 못 열고 D-1 일정 리마인더
-  //    대상에서도 빠졌다. title/startAt/endAt 은 방금 create 에 넘긴 것과 **같은 로컬
-  //    변수**를 그대로 재사용한다 — create() 반환 행에서 되읽지 않는다.
-  await createTeamMatchScheduleInTx(tx, home.id, teamMatch.id, title, startAt, endAt);
-  await createTeamMatchScheduleInTx(tx, away.id, teamMatch.id, title, startAt, endAt);
+  // ② 양 팀의 팀 일정. 두 팀이 **모두** 정해졌을 때만 만든다 — 반쪽 경기는 공개 게이트로 숨겨져
+  //    일정 링크가 404 가 되기 때문이다(자리 배정이 양 팀이 찬 순간 만든다: league-fixture-side-assignment.ts).
+  //    title/startAt/endAt 은 방금 create 에 넘긴 것과 **같은 로컬 변수**를 재사용한다.
+  if (home !== null && away !== null) {
+    await createTeamMatchScheduleInTx(tx, home.id, teamMatch.id, title, startAt, endAt);
+    await createTeamMatchScheduleInTx(tx, away.id, teamMatch.id, title, startAt, endAt);
+  }
 
-  // ③ 게임 + 사이드 2개 + 자동 로스터.
+  // ③ 게임 + 사이드 2개 + 자동 로스터. 팀이 없는 사이드는 참가자 없이 '미정' 이름으로 둔다.
   await games.createFromSourceInTransaction(
     tx,
     {
@@ -284,10 +294,13 @@ export async function createLeagueFixture(
       sourceId: teamMatch.id,
       competitionConfigVersionId: input.competitionConfigId,
       sides: [
-        { sideKey: V1GameSideKey.HOME, teamId: home.id, displayNameSnapshot: home.name },
-        { sideKey: V1GameSideKey.AWAY, teamId: away.id, displayNameSnapshot: away.name },
+        { sideKey: V1GameSideKey.HOME, teamId: home?.id ?? null, displayNameSnapshot: home?.name ?? UNDECIDED_SIDE_NAME.HOME },
+        { sideKey: V1GameSideKey.AWAY, teamId: away?.id ?? null, displayNameSnapshot: away?.name ?? UNDECIDED_SIDE_NAME.AWAY },
       ],
-      participants: [...fixtureRoster(home, V1GameSideKey.HOME), ...fixtureRoster(away, V1GameSideKey.AWAY)],
+      participants: [
+        ...(home === null ? [] : fixtureRoster(home, V1GameSideKey.HOME)),
+        ...(away === null ? [] : fixtureRoster(away, V1GameSideKey.AWAY)),
+      ],
     },
     {
       actor: { actorType: 'USER', actorUserId: input.adminUserId, role: 'platform_ops' },
@@ -297,20 +310,22 @@ export async function createLeagueFixture(
     },
   );
 
-  // ④ 승인된 신청서.
-  await tx.v1TeamMatchApplication.create({
-    data: {
-      teamMatchId: teamMatch.id,
-      applicantTeamId: away.id,
-      appliedByUserId: input.adminUserId,
-      status: 'approved',
-      reviewedByUserId: input.adminUserId,
-      reviewedAt: new Date(),
-      // 자동 생성과 수동 추가가 **같은 함수**를 쓰므로 경로를 단정하지 않는다 —
-      // 이 문구는 어드민 화면(팀매치 상세의 applications.message)에 그대로 노출된다.
-      message: '리그 대진 편성',
-    },
-  });
+  // ④ 승인된 신청서 — 원정 팀이 있을 때만.
+  if (away !== null) {
+    await tx.v1TeamMatchApplication.create({
+      data: {
+        teamMatchId: teamMatch.id,
+        applicantTeamId: away.id,
+        appliedByUserId: input.adminUserId,
+        status: 'approved',
+        reviewedByUserId: input.adminUserId,
+        reviewedAt: new Date(),
+        // 자동 생성과 수동 추가가 **같은 함수**를 쓰므로 경로를 단정하지 않는다 —
+        // 이 문구는 어드민 화면(팀매치 상세의 applications.message)에 그대로 노출된다.
+        message: LEAGUE_APPLICATION_MESSAGE,
+      },
+    });
+  }
 
   // ⑤ 결과 입력 리마인더. 사용자 확정: 경기 시작 +24시간에도 결과 미입력이면 운영자
   //    리마인더 1회. updateFixture() 가 시작 시각을 바꾸면 새 세대로 다시 스케줄한다.

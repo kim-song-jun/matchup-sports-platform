@@ -610,6 +610,23 @@ describe('H5 — 기록 화면의 팀장 권한·게스트·공개 득점·늦�
     expect(screen.queryByText(/변경 이력/)).not.toBeInTheDocument();
   });
 
+  it.each([
+    [1, '홈 12분 김민수 골'],
+    [2, '홈 전반 12분 김민수 골'],
+    [null, '홈 전반 12분 김민수 골'],
+  ])('periodCount=%s 이면 공개 득점 행 이름이 "%s" 이다', (periodCount, label) => {
+    state.data = {
+      ...state.data,
+      phase: 'official', canEdit: false, participant: false, officialAt: state.data.serverTime,
+      participants: [], goals: [], history: [],
+      sides: [{ id: 'home', key: 'HOME', name: '한강', score: 1 }, { id: 'away', key: 'AWAY', name: '마포', score: 0 }],
+      periodCount,
+      goalEvents: [{ sideId: 'home', participantName: '김민수', minute: 12, period: 1, ownGoal: false, subMatchId: null }],
+    };
+    render(<TeamMatchSharedRecord teamMatchId="match" />);
+    expect(screen.getByRole('listitem', { name: label })).toBeInTheDocument();
+  });
+
   it('대조군 — 참가자는 공개 목록이 아니라 편집할 수 있는 득점 행을 본다', () => {
     state.data.goals = [{ id: 'g1', sideId: 'home', participantId: 'h1', ownGoal: false, minute: 3, subMatchId: null }];
     state.data.goalEvents = [{ sideId: 'home', participantName: '김민수', minute: 3, ownGoal: false, subMatchId: null }];

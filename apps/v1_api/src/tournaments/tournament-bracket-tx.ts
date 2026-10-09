@@ -138,6 +138,9 @@ export type TournamentFixtureUpdateInput = {
   venue?: string;
   homeRegistrationId?: string | null;
   awayRegistrationId?: string | null;
+  /** The admin fixture edit sets these; other callers keep the "started games keep their teams" rule. */
+  allowStartedTeamChange?: boolean;
+  teamChangeReason?: string | null;
 };
 
 /**
@@ -166,7 +169,27 @@ export async function updateTournamentFixtureInTx(tx: Tx, admin: V1ActiveAdmin, 
     venue: input.venue,
     homeRegistrationId: input.homeRegistrationId,
     awayRegistrationId: input.awayRegistrationId,
+    allowStartedTeamChange: input.allowStartedTeamChange,
+    teamChangeReason: input.teamChangeReason,
+    actorUserId: admin.userId,
   });
+  if (row.startedTeamChange !== null) {
+    await writeAdminActionLog(tx, admin, {
+      action: 'tournament.bracket.fixture.started_team_change',
+      targetType: 'team_match',
+      targetId: input.fixtureId,
+      reason: row.startedTeamChange.reason,
+      beforeJson: { gameState: row.startedTeamChange.gameState, score: row.startedTeamChange.scoreBefore },
+      afterJson: {
+        homeRegistrationId: row.homeRegistrationId,
+        awayRegistrationId: row.awayRegistrationId,
+        sides: row.startedTeamChange.sides,
+        removedEventCount: row.startedTeamChange.removedEventCount,
+        discardedRevisions: row.startedTeamChange.discardedRevisions,
+        score: row.startedTeamChange.scoreAfter,
+      },
+    });
+  }
   await writeAdminActionLog(tx, admin, {
     action: 'tournament.bracket.fixture.update',
     targetType: 'team_match',

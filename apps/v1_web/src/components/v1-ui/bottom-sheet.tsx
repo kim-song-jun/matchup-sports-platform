@@ -68,7 +68,8 @@ const DRAG_CLOSE_RATIO = 0.32;
 // 시트 안의 버튼·링크·스크롤 가능한 입력 위에서 시작한 포인터는 드래그로 삼지 않는다 —
 // 안 그러면 "적용하기" 버튼을 누르려는 손가락이 미세하게라도 움직일 때마다 시트가 따라
 // 흔들리고, 실기기에서는 탭 인식 자체가 씹힌다.
-const INTERACTIVE_SELECTOR = 'button, a, input, select, textarea, [role="button"]';
+// label 도 포함한다: 캡처하면 click 이 시트로 재지정돼 label 이 감싼 라디오·체크박스가 선택되지 않는다.
+const INTERACTIVE_SELECTOR = 'button, a, input, select, textarea, label, [role="button"]';
 
 /**
  * BottomSheet — URL 이 열림·닫힘을 소유하는 필터 시트에 드래그-닫기 손잡이를 더한

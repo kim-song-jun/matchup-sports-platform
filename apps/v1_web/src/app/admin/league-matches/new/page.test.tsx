@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { Providers } from '@/app/providers';
 import {
@@ -10,8 +10,23 @@ import {
 } from '@/hooks/use-v1-api';
 import AdminLeagueMatchNewPage from './page';
 
+const { pushMock, savePeriodsMock, v1GetMock } = vi.hoisted(() => ({
+  pushMock: vi.fn(),
+  savePeriodsMock: vi.fn(),
+  v1GetMock: vi.fn(),
+}));
+
+vi.mock('@/lib/api-client', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/api-client')>()),
+  v1Get: v1GetMock,
+}));
+
+vi.mock('@/hooks/use-tournament-period-settings', () => ({
+  useSaveTournamentPeriodSettings: () => ({ mutateAsync: savePeriodsMock, isPending: false }),
+}));
+
 vi.mock('next/navigation', () => ({
-  useRouter: () => ({ push: vi.fn(), replace: vi.fn(), back: vi.fn(), prefetch: vi.fn() }),
+  useRouter: () => ({ push: pushMock, replace: vi.fn(), back: vi.fn(), prefetch: vi.fn() }),
   usePathname: () => '/admin/league-matches/new',
   useSearchParams: () => new URLSearchParams(),
 }));
@@ -26,6 +41,22 @@ vi.mock('@/hooks/use-v1-api', () => ({
   useV1MasterRegions: vi.fn(),
   useV1MasterSports: vi.fn(),
   useV1Teams: vi.fn(),
+  // Sport default periods (futsal 20/20) are what the form prefills.
+  useV1LineupSizeOptions: vi.fn(() => ({
+    data: {
+      sportId: 'sport-futsal',
+      supported: true,
+      options: [],
+      defaultMaxPlayers: null,
+      substitutionModes: [],
+      defaultSubstitutionMode: null,
+      defaultMaxSubstitutions: null,
+      defaultPeriods: [
+        { label: '전반', durationMinutes: 20 },
+        { label: '후반', durationMinutes: 20 },
+      ],
+    },
+  })),
   // Providers 안의 ThemeProvider가 전역으로 호출한다 — 이 테스트가 <Providers>로 렌더하는 한 필요.
   useV1Settings: vi.fn(() => ({ data: undefined, isError: false, refetch: vi.fn() })),
   useV1UpdateSettings: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
@@ -196,5 +227,123 @@ describe('AdminLeagueMatchNewPage', () => {
 
     expect(await screen.findByLabelText('시작일')).toHaveAttribute('max', '9999-12-31');
     expect(screen.getByLabelText('종료일')).toHaveAttribute('max', '9999-12-31');
+  });
+
+  async function fillLeagueForm() {
+    useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false } as never);
+    useV1MasterSportsMock.mockReturnValue({ data: [{ id: 'sport-futsal', name: '풋살', levels: [] }] } as never);
+    useV1MasterRegionsMock.mockReturnValue({
+      data: [{
+        id: 'region-seoul', name: '서울특별시', parentId: null, level: 1,
+        children: [{ id: 'region-1', name: '중구', parentId: 'region-seoul', level: 2 }],
+      }],
+    } as never);
+    useV1TeamsMock.mockReturnValue({
+      data: { items: [
+        { id: 'team-a', name: '팀A', sportName: '풋살', sport: { sportId: 'sport-futsal', name: '풋살' }, regionName: '서울', memberCount: 8, trustState: 'none', joinPolicy: 'approval_required' },
+        { id: 'team-b', name: '팀B', sportName: '풋살', sport: { sportId: 'sport-futsal', name: '풋살' }, regionName: '서울', memberCount: 9, trustState: 'none', joinPolicy: 'approval_required' },
+      ], nextCursor: null },
+      isFetching: false,
+    } as never);
+    renderPage();
+    fireEvent.change(screen.getByLabelText('리그 이름'), { target: { value: '가을 풋살 리그' } });
+    fireEvent.change(screen.getByLabelText('종목'), { target: { value: 'sport-futsal' } });
+    fireEvent.change(screen.getByLabelText('지역'), { target: { value: 'region-1' } });
+    fireEvent.change(screen.getByLabelText('시작일'), { target: { value: '2026-09-01' } });
+    fireEvent.change(screen.getByLabelText('종료일'), { target: { value: '2026-10-20' } });
+    for (const name of ['팀A', '팀B']) {
+      const picker = screen.getByLabelText('참가 팀 추가 (최소 2팀)');
+      fireEvent.focus(picker);
+      fireEvent.change(picker, { target: { value: name } });
+      fireEvent.click(await screen.findByText(name));
+    }
+  }
+
+  it('경기 시간을 종목 기본값(20·20)으로 미리 채우고, 고치지 않으면 피리어드를 따로 저장하지 않는다', async () => {
+    pushMock.mockClear();
+    savePeriodsMock.mockReset();
+    useV1CreateLeagueMatchMock.mockReturnValue({ mutateAsync: vi.fn().mockResolvedValue({ leagueId: 'league-1', title: 't', state: 'draft' }), isPending: false } as never);
+    await fillLeagueForm();
+
+    expect(screen.getByLabelText('전반 (분)')).toHaveValue(20);
+    expect(screen.getByLabelText('후반 (분)')).toHaveValue(20);
+    fireEvent.click(screen.getByRole('button', { name: '리그 만들기' }));
+
+    await waitFor(() => expect(pushMock).toHaveBeenCalledWith('/admin/league-matches/league-1'));
+    expect(savePeriodsMock).not.toHaveBeenCalled();
+  });
+
+  it('경기 시간을 25분으로 고치면 리그를 만든 직후 그 값으로 피리어드 설정을 저장한다', async () => {
+    pushMock.mockClear();
+    savePeriodsMock.mockReset().mockResolvedValue({});
+    v1GetMock.mockReset().mockResolvedValue({ expectedVersion: 'v-created', periods: [], legacyPeriodCount: null });
+    useV1CreateLeagueMatchMock.mockReturnValue({ mutateAsync: vi.fn().mockResolvedValue({ leagueId: 'league-1', title: 't', state: 'draft' }), isPending: false } as never);
+    await fillLeagueForm();
+
+    fireEvent.change(screen.getByLabelText('전반 (분)'), { target: { value: '25' } });
+    fireEvent.change(screen.getByLabelText('후반 (분)'), { target: { value: '25' } });
+    fireEvent.click(screen.getByRole('button', { name: '리그 만들기' }));
+
+    await waitFor(() => expect(savePeriodsMock).toHaveBeenCalledWith({
+      tournamentId: 'league-1',
+      expectedVersion: 'v-created',
+      periods: [{ durationMinutes: 25 }, { durationMinutes: 25 }],
+    }));
+    expect(v1GetMock).toHaveBeenCalledWith('/admin/tournaments/league-1/periods');
+    expect(pushMock).toHaveBeenCalledWith('/admin/league-matches/league-1');
+  });
+
+  it('피리어드 저장이 실패하면 화면에 남아 실패와 상세 링크를 보여 주고 다시 만들지 못하게 잠근다', async () => {
+    pushMock.mockClear();
+    savePeriodsMock.mockReset().mockRejectedValue(new Error('boom'));
+    v1GetMock.mockReset().mockResolvedValue({ expectedVersion: 'v-created', periods: [], legacyPeriodCount: null });
+    useV1CreateLeagueMatchMock.mockReturnValue({ mutateAsync: vi.fn().mockResolvedValue({ leagueId: 'league-1', title: 't', state: 'draft' }), isPending: false } as never);
+    await fillLeagueForm();
+
+    fireEvent.change(screen.getByLabelText('전반 (분)'), { target: { value: '25' } });
+    fireEvent.click(screen.getByRole('button', { name: '리그 만들기' }));
+
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent(/경기 시간을 저장하지 못했어요|boom/);
+    expect(within(alert).getByRole('link', { name: '리그 상세로 이동' })).toHaveAttribute('href', '/admin/league-matches/league-1');
+    expect(pushMock).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: '리그 만들기' })).toBeDisabled();
+  });
+  it('피리어드 저장이 진행 중인 동안 버튼이 잠겨 두 번째 클릭이 리그를 다시 만들지 않는다', async () => {
+    pushMock.mockClear();
+    let releaseSave: () => void = () => {};
+    savePeriodsMock.mockReset().mockReturnValue(new Promise<void>((resolve) => { releaseSave = resolve; }));
+    v1GetMock.mockReset().mockResolvedValue({ expectedVersion: 'v-created', periods: [], legacyPeriodCount: null });
+    const createMock = vi.fn().mockResolvedValue({ leagueId: 'league-1', title: 't', state: 'draft' });
+    useV1CreateLeagueMatchMock.mockReturnValue({ mutateAsync: createMock, isPending: false } as never);
+    await fillLeagueForm();
+
+    fireEvent.change(screen.getByLabelText('전반 (분)'), { target: { value: '25' } });
+    const button = screen.getByRole('button', { name: '리그 만들기' });
+    fireEvent.click(button);
+
+    await waitFor(() => expect(savePeriodsMock).toHaveBeenCalled());
+    expect(button).toBeDisabled();
+    fireEvent.click(button);
+    expect(createMock).toHaveBeenCalledTimes(1);
+
+    releaseSave();
+    await waitFor(() => expect(pushMock).toHaveBeenCalledWith('/admin/league-matches/league-1'));
+  });
+
+  it('피리어드 설정 버전을 못 읽으면 영어 내부 메시지 대신 해요체 안내를 보여준다', async () => {
+    pushMock.mockClear();
+    savePeriodsMock.mockReset();
+    v1GetMock.mockReset().mockResolvedValue({ expectedVersion: null, periods: [], legacyPeriodCount: null });
+    useV1CreateLeagueMatchMock.mockReturnValue({ mutateAsync: vi.fn().mockResolvedValue({ leagueId: 'league-1', title: 't', state: 'draft' }), isPending: false } as never);
+    await fillLeagueForm();
+
+    fireEvent.change(screen.getByLabelText('전반 (분)'), { target: { value: '25' } });
+    fireEvent.click(screen.getByRole('button', { name: '리그 만들기' }));
+
+    expect(await screen.findByText(/리그는 만들었지만 경기 시간을 저장하지 못했어요/)).toBeInTheDocument();
+    expect(screen.queryByText(/missing period settings version/)).not.toBeInTheDocument();
+    expect(savePeriodsMock).not.toHaveBeenCalled();
+    expect(pushMock).not.toHaveBeenCalled();
   });
 });

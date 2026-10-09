@@ -103,7 +103,7 @@ describe('TournamentsAdminService', () => {
       groupBy: jest.Mock;
     };
     v1AdminActionLog: { create: jest.Mock };
-    v1StatusChangeLog: { create: jest.Mock };
+    v1StatusChangeLog: { create: jest.Mock; count: jest.Mock };
     v1CompetitionConfigVersion: { findFirst: jest.Mock; findUnique: jest.Mock };
     v1TournamentMatchDetails: { count: jest.Mock };
     v1TournamentStanding: { count: jest.Mock };
@@ -126,7 +126,7 @@ describe('TournamentsAdminService', () => {
         groupBy: jest.fn().mockResolvedValue([]),
       },
       v1AdminActionLog: { create: jest.fn().mockResolvedValue({ id: 'action-log-1' }) },
-      v1StatusChangeLog: { create: jest.fn().mockResolvedValue({ id: 'status-log-1' }) },
+      v1StatusChangeLog: { create: jest.fn().mockResolvedValue({ id: 'status-log-1' }), count: jest.fn().mockResolvedValue(0) },
       // "출전 인원" 기능(LineupSizeConfigResolver/TournamentCompetitionConfig.change) 전용
       // — 대부분의 기존 테스트는 lineupMaxPlayers를 전혀 안 보내거나 종목이 football/futsal이
       // 아니라 이 경로를 안 타므로 unconfigured mock(undefined 반환)으로 둬도 무해하다.
@@ -443,6 +443,74 @@ describe('TournamentsAdminService', () => {
     expect(prisma.v1Tournament.update).not.toHaveBeenCalled();
   });
 
+  it.each([
+    ['in_progress', 'open'],
+    ['in_progress', 'closed'],
+    ['completed', 'open'],
+    ['completed', 'closed'],
+    ['completed', 'cancelled'],
+    ['cancelled', 'open'],
+    ['cancelled', 'in_progress'],
+  ] as const)('changeStatus: %s → %s 는 여전히 409 TRANSITION_INVALID', async (from, to) => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+    prisma.v1Tournament.findFirst.mockResolvedValue(tournamentRow({ status: from, entryFee: 0 }));
+    await expect(service.changeStatus(ownerAuthUser, 'tournament-1', { status: to, reason: '사유' })).rejects.toMatchObject({
+      response: { code: 'TOURNAMENT_STATUS_TRANSITION_INVALID' },
+    });
+    expect(prisma.v1Tournament.update).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['completed', 'in_progress'],
+    ['cancelled', 'draft'],
+  ] as const)('changeStatus: %s → %s 되돌리기는 사유가 있어야 하고 감사 로그에 사유가 남는다', async (from, to) => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+    prisma.v1Tournament.findFirst.mockResolvedValue(tournamentRow({ status: from, entryFee: 0 }));
+    prisma.v1Tournament.update.mockResolvedValue(tournamentRow({ status: to }));
+
+    await expect(service.changeStatus(ownerAuthUser, 'tournament-1', { status: to, reason: '  ' })).rejects.toMatchObject({
+      response: { code: 'TOURNAMENT_STATUS_REASON_REQUIRED' },
+    });
+    expect(prisma.v1Tournament.update).not.toHaveBeenCalled();
+
+    const result = await service.changeStatus(ownerAuthUser, 'tournament-1', { status: to, reason: ' 잘못 눌렀어요 ' });
+
+    expect(result).toMatchObject({ previousStatus: from, status: to, alreadyInStatus: false });
+    expect(prisma.v1Tournament.update).toHaveBeenCalledWith({ where: { id: 'tournament-1' }, data: { status: to } });
+    expect(prisma.v1AdminActionLog.create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ action: 'tournament.status', reason: '잘못 눌렀어요' }) }),
+    );
+    expect(prisma.v1StatusChangeLog.create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ fromStatus: from, toStatus: to, reason: '잘못 눌렀어요' }) }),
+    );
+    expect(notifications.emitNotificationToMany).not.toHaveBeenCalled();
+  });
+
+  it('changeStatus: 복구한 초안은 다시 열 수 있다 (cancelled → draft → open)', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+    prisma.v1Tournament.findFirst.mockResolvedValue(tournamentRow({ status: 'draft', entryFee: 0 }));
+    prisma.v1Tournament.update.mockResolvedValue(tournamentRow({ status: 'open' }));
+    await expect(service.changeStatus(ownerAuthUser, 'tournament-1', { status: 'open' })).resolves.toMatchObject({
+      previousStatus: 'draft',
+      status: 'open',
+    });
+  });
+
+  it('changeStatus: 되돌렸다가 다시 완료해도 후기 요청 알림은 두 번 가지 않는다', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+    prisma.v1Tournament.findFirst.mockResolvedValue(tournamentRow({ status: 'in_progress', entryFee: 0 }));
+    prisma.v1Tournament.update.mockResolvedValue(tournamentRow({ status: 'completed' }));
+    prisma.v1StatusChangeLog.count.mockResolvedValue(1);
+    prisma.v1TournamentRegistration.findMany.mockResolvedValue([{ team: { memberships: [{ userId: 'owner-a' }] } }]);
+
+    await service.changeStatus(ownerAuthUser, 'tournament-1', { status: 'completed' });
+
+    expect(prisma.v1StatusChangeLog.count).toHaveBeenCalledWith({
+      where: { targetType: 'tournament', targetId: 'tournament-1', toStatus: 'completed' },
+    });
+    expect(notifications.emitNotificationToMany).not.toHaveBeenCalled();
+  });
+
   // 대회가 끝나는 순간이 후기를 쓰는 시점이다. 이 알림이 없으면 사용자가 대회 페이지를
   // 다시 찾아 들어오지 않는 한 후기를 쓸 계기가 없다. 수신자는 대회 후기 작성 권한과
   // 정확히 같아야 한다 — 넓으면 못 쓰는 알림, 좁으면 누락.
@@ -532,10 +600,10 @@ describe('TournamentsAdminService', () => {
     expect(prisma.v1Tournament.update).not.toHaveBeenCalled();
   });
 
-  it('changeStatus: completed is terminal → cannot go to in_progress (409)', async () => {
+  it('changeStatus: completed → draft is not a revert path (409)', async () => {
     prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
     prisma.v1Tournament.findFirst.mockResolvedValue(tournamentRow({ status: 'completed' }));
-    await expect(service.changeStatus(ownerAuthUser, 'tournament-1', { status: 'in_progress' })).rejects.toThrow(ConflictException);
+    await expect(service.changeStatus(ownerAuthUser, 'tournament-1', { status: 'draft', reason: '사유' })).rejects.toThrow(ConflictException);
   });
 
   // ─── bracket publish (Task 109 Track 6) ────────────────────────────────────────
@@ -705,6 +773,75 @@ describe('TournamentsAdminService', () => {
     expect(result.summary).toEqual({
       total: 6,
       byStatus: { draft: 0, open: 4, closed: 0, in_progress: 0, completed: 2, cancelled: 0 },
+    });
+  });
+
+  describe('list: visibility filter', () => {
+    type Clause = {
+      isPublic?: boolean;
+      status?: string | { not: string };
+      OR?: Clause[];
+      AND?: Clause[];
+    };
+    const row = (id: string, isPublic: boolean, status: string) => ({
+      ...tournamentRow({ id, status }),
+      isPublic,
+      _count: { registrations: 0 },
+    });
+    const stored = [
+      row('pub-1', true, 'open'),
+      row('pub-2', true, 'completed'),
+      row('hid-1', false, 'open'),
+      row('hid-2', false, 'draft'),
+      row('cancelled-pub-1', true, 'cancelled'),
+      row('cancelled-pub-2', true, 'cancelled'),
+      row('cancelled-hid', false, 'cancelled'),
+    ];
+
+    // Evaluates the visibility/status parts of the where the service builds, so assertions are on returned rows.
+    function matches(r: (typeof stored)[number], c: Clause): boolean {
+      if (c.isPublic !== undefined && r.isPublic !== c.isPublic) return false;
+      if (typeof c.status === 'string' && r.status !== c.status) return false;
+      if (c.status && typeof c.status === 'object' && r.status === c.status.not) return false;
+      if (c.OR && !c.OR.some((sub) => matches(r, sub))) return false;
+      if (c.AND && !c.AND.every((sub) => matches(r, sub))) return false;
+      return true;
+    }
+
+    beforeEach(() => {
+      prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+      prisma.v1Tournament.findMany.mockImplementation(async (args) => stored.filter((r) => matches(r, args.where)));
+      prisma.v1Tournament.groupBy.mockImplementation(async (args) => {
+        const counts = new Map<string, number>();
+        for (const r of stored.filter((x) => matches(x, args.where))) counts.set(r.status, (counts.get(r.status) ?? 0) + 1);
+        return [...counts].map(([status, count]) => ({ status, _count: { _all: count } }));
+      });
+    });
+
+    it('public means published and not cancelled; hidden is everything else', async () => {
+      const pub = await service.list(ownerAuthUser, { limit: 20, visibility: 'public' });
+      expect(pub.items.map((item) => item.id)).toEqual(['pub-1', 'pub-2']);
+      const hid = await service.list(ownerAuthUser, { limit: 20, visibility: 'hidden' });
+      expect(hid.items.map((item) => item.id)).toEqual(['hid-1', 'hid-2', 'cancelled-pub-1', 'cancelled-pub-2', 'cancelled-hid']);
+    });
+
+    it('status counts and total follow the same visibility filter', async () => {
+      const pub = await service.list(ownerAuthUser, { limit: 20, visibility: 'public' });
+      expect(pub.summary.byStatus.cancelled).toBe(0);
+      expect(pub.summary.total).toBe(2);
+      const hid = await service.list(ownerAuthUser, { limit: 20, visibility: 'hidden' });
+      expect(hid.summary.byStatus.cancelled).toBe(3);
+      expect(hid.summary.total).toBe(5);
+    });
+
+    it('a status filter combines with visibility instead of replacing it', async () => {
+      const result = await service.list(ownerAuthUser, { limit: 20, visibility: 'public', status: 'cancelled' });
+      expect(result.items).toEqual([]);
+    });
+
+    it('no visibility keeps every row', async () => {
+      const all = await service.list(ownerAuthUser, { limit: 20 });
+      expect(all.items).toHaveLength(7);
     });
   });
 

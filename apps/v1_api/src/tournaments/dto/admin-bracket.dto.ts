@@ -171,7 +171,7 @@ export class UpdateFixtureDto {
   @MaxLength(200)
   venue?: string;
 
-  /** 결과가 이미 기록된 경기는 팀 변경 불가 (409) — 결과를 먼저 삭제해야 한다 */
+  /** 공식 결과가 있는 경기는 팀 변경 불가(409) — 결과를 먼저 무효로 돌려야 한다 */
   @IsOptional()
   @IsUUID()
   homeRegistrationId?: string | null;
@@ -179,6 +179,12 @@ export class UpdateFixtureDto {
   @IsOptional()
   @IsUUID()
   awayRegistrationId?: string | null;
+
+  /** Required by the service (400 TEAM_CHANGE_REASON_REQUIRED) when the fixture's game already started. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  teamChangeReason?: string;
 }
 
 export class UpdateBracketSourcesDto {

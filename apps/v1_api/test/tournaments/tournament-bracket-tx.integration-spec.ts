@@ -173,7 +173,7 @@ describe('대진 …InTx 함수 (PostgreSQL)', () => {
       });
       expect(view.fixtures.find((fixture) => fixture.id === id)).toMatchObject({
         homeSlotId: slot.id, awaySlotId: null,
-        game: { state: 'SCHEDULED', hasLiveRecords: false, latestRevision: null },
+        game: { state: 'SCHEDULED', hasLiveRecords: false, hasOfficialResult: false, latestRevision: null },
       });
       const decided = view.fixtures.filter((fixture) => fixture.result !== null);
       expect(decided.length).toBeGreaterThan(0);

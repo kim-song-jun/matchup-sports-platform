@@ -104,6 +104,36 @@ describe('SignupClient required profile contract', () => {
     hooks.phoneVerifyMutateAsync.mockResolvedValue({ verified: true, proofToken: 'PROOF-TOKEN' });
   });
 
+  it('휴대폰 번호가 이미 가입돼 있으면 안내와 로그인·계정 찾기 출구를 보여 준다', async () => {
+    hooks.phoneIssueMutateAsync.mockRejectedValue(
+      new V1ApiError({ message: '이미 사용 중인 번호예요.', status: 'error', statusCode: 409, code: 'PHONE_CONFLICT', timestamp: '2026-10-09T00:00:00.000Z' }),
+    );
+    render(<SignupClient />);
+    await advanceToVerify();
+    fireEvent.change(screen.getByLabelText(/^휴대폰 번호/), { target: { value: '01012345678' } });
+    fireEvent.click(await screen.findByRole('button', { name: '인증번호 받기' }));
+
+    expect(await screen.findByText(/이 번호로 이미 가입한 계정이 있어요/)).toBeInTheDocument();
+    expect(screen.queryByText('이미 사용 중인 번호예요.')).not.toBeInTheDocument();
+    await userEvent.setup().click(screen.getByRole('button', { name: '기존 계정으로 로그인' }));
+    expect(router.push).toHaveBeenCalledWith('/login');
+    await userEvent.setup().click(screen.getByRole('button', { name: '계정 찾기' }));
+    expect(router.push).toHaveBeenCalledWith('/auth/find-account');
+  });
+
+  it('다른 인증 오류는 기존 문구 그대로 보인다', async () => {
+    hooks.phoneIssueMutateAsync.mockRejectedValue(
+      new V1ApiError({ message: '잠시 후 다시 시도해 주세요.', status: 'error', statusCode: 429, code: 'VERIFICATION_RESEND_COOLDOWN', timestamp: '2026-10-09T00:00:00.000Z' }),
+    );
+    render(<SignupClient />);
+    await advanceToVerify();
+    fireEvent.change(screen.getByLabelText(/^휴대폰 번호/), { target: { value: '01012345678' } });
+    fireEvent.click(await screen.findByRole('button', { name: '인증번호 받기' }));
+
+    expect(await screen.findByText('잠시 후 다시 시도해 주세요.')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '기존 계정으로 로그인' })).not.toBeInTheDocument();
+  });
+
   it('redirects direct signup entry to terms before accepting account input', async () => {
     window.sessionStorage.clear();
 

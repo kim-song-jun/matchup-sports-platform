@@ -24,6 +24,7 @@ import { BrandMark } from './brand-logo';
 import { AppBackLink } from './app-back-link';
 import { NotificationBellLink } from './notification-bell';
 import { useCurrentHref } from './use-current-href';
+import { PullToRefresh } from './pull-to-refresh';
 
 export type V1NavTab = 'home' | 'matches' | 'tournaments' | 'teams' | 'my';
 
@@ -124,6 +125,7 @@ function AppChromeInner({
   titleAsHeading = false,
   pageOwnsHeading = false,
 }: AppChromeProps) {
+  const scrollAreaRef = useRef<HTMLElement>(null);
   const frameClassName = [
     'tm-app-frame',
     topBar ? '' : 'tm-app-frame-no-topbar',
@@ -181,10 +183,12 @@ function AppChromeInner({
           </div>
         </header>
       ) : null}
+      <PullToRefresh areaRef={scrollAreaRef} />
       {/* floatingSlot(.tm-floating-fab)은 이 <main> 밖(아래 {floatingSlot})에 앵커되어 콘텐츠
           위로 떠 있으므로, 스크롤 콘텐츠 쪽에서 그 자리만큼 padding-bottom을 미리 비워둔다 —
           없으면 화면마다 소비처가 각자 여백을 챙겨야 하고 하나라도 빠뜨리면 마지막 줄이 가려진다. */}
       <main
+        ref={scrollAreaRef}
         className="tm-scroll-area"
         style={{ paddingBottom: bottomNav ? (floatingSlot ? 'var(--v1-shell-fab-clear-pad)' : 'var(--v1-shell-scroll-bottom-pad)') : 0 }}
       >

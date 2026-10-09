@@ -1,3 +1,4 @@
+import { closeRevisionReviewSla } from './close-review-sla';
 import {
   ConflictException,
   ForbiddenException,
@@ -1397,14 +1398,6 @@ export class TournamentResultReviewService {
     });
   }
 
-  /**
-   * Cancels pending/acknowledged review escalations and their not-yet-fired
-   * reminder/escalation outbox jobs for a revision whose review just ended
-   * terminally outside the OFFICIAL path (reject/request_supplement/void).
-   * Mirrors `GameResultEscalationTerminalService.close()` but runs inline in
-   * the same command transaction instead of the async projection worker,
-   * because reject/request_supplement/void never emit GAME_RESULT_OFFICIAL.
-   */
   private async loadOfficialRevisionRow(
     tx: Transaction,
     revisionId: string,
@@ -1419,27 +1412,7 @@ export class TournamentResultReviewService {
   }
 
   private async closeReviewSla(tx: Transaction, revisionId: string, reason: string): Promise<void> {
-    await tx.$executeRaw`
-      UPDATE v1_result_escalations
-      SET status = 'CLOSED'::"V1EscalationStatus",
-          reason = ${reason},
-          version = version + 1,
-          updated_at = CURRENT_TIMESTAMP
-      WHERE result_revision_id = ${revisionId}
-        AND status IN ('PENDING', 'ACKNOWLEDGED')
-    `;
-    await tx.$executeRaw`
-      UPDATE v1_outbox_events
-      SET status = 'COMPLETED'::"V1OutboxStatus",
-          lease_owner = NULL,
-          lease_until = NULL,
-          last_error = NULL,
-          version = version + 1,
-          updated_at = CURRENT_TIMESTAMP
-      WHERE revision_id = ${revisionId}
-        AND type IN ('GAME_RESULT_REVIEW_REMINDER', 'GAME_RESULT_REVIEW_ESCALATION')
-        AND status IN ('PENDING', 'RETRY')
-    `;
+    await closeRevisionReviewSla(tx, revisionId, reason);
   }
 
   /**
@@ -1723,8 +1696,14 @@ export class TournamentResultReviewService {
         });
       }
     }
+    // Participants of a lineup invalidated by a side team change belong to the replaced team; their rows stay for
+    // history (earlier revisions and identity links reference them) but cannot join a new revision.
+    const replacedLineups = await tx.v1GameLineup.findMany({
+      where: { gameId, invalidatedAt: { not: null }, invalidationReason: 'SIDE_TEAM_CHANGED' },
+      select: { id: true },
+    });
     const participants = await tx.v1GameParticipant.findMany({
-      where: { gameId },
+      where: { gameId, lineupId: { notIn: replacedLineups.map((lineup) => lineup.id) } },
       select: { id: true, sideId: true },
     });
     const sideByParticipantId = new Map(participants.map((participant) => [participant.id, participant.sideId]));

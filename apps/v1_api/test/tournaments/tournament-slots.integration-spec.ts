@@ -281,6 +281,56 @@ describe('자리 배정 (PostgreSQL)', () => {
       expect(await byeRows(tournamentId)).toEqual({ empty: [0, 4, 7], team: [[registrationIds[1], 3]] });
     });
 
+    describe('기존 부전승 API(createBye·removeGroupTeam) 와 자리의 일관성', () => {
+      const bye = (tournamentId: string, position: number) =>
+        prisma.v1TournamentGroup.findFirstOrThrow({ where: { tournamentId, phase: 'round12' } }).then(async (group) => ({
+          group, sortOrder: [0, 3, 4, 7][position - 1],
+        }));
+      const rowAt = async (groupId: string, sortOrder: number) =>
+        (await prisma.v1TournamentGroupTeam.findFirst({ where: { groupId, isBye: true, sortOrder } }))
+        ?? (await prisma.v1TournamentByeSlot.findFirstOrThrow({ where: { groupId, sortOrder } }));
+
+      it('연결된 부전승의 팀을 createBye 로 바꾸거나 비우면 자리·부전승 행·8강 홈이 함께 바뀐다', async () => {
+        const { tournamentId, registrationIds, teamIds } = await ko12('bye-legacy-edit');
+        const bye1 = await slotAt(tournamentId, 1, 'BYE');
+        const { group, sortOrder } = await bye(tournamentId, 1);
+        const empty = await rowAt(group.id, sortOrder);
+
+        await bracket.createBye(user, tournamentId, { groupId: group.id, byeId: empty.id, sortOrder, registrationId: registrationIds[0] });
+        expect((await prisma.v1TournamentSlot.findUniqueOrThrow({ where: { id: bye1.id } })).registrationId).toBe(registrationIds[0]);
+        expect((await fixturesUsing(bye1.id))[0].hostTeamId).toBe(teamIds[0]);
+
+        const changed = await bracket.createBye(user, tournamentId, { groupId: group.id, byeId: empty.id, sortOrder, registrationId: registrationIds[1] });
+        expect(changed).toMatchObject({ id: empty.id, registrationId: registrationIds[1], sortOrder });
+        expect((await prisma.v1TournamentSlot.findUniqueOrThrow({ where: { id: bye1.id } })).registrationId).toBe(registrationIds[1]);
+        expect((await fixturesUsing(bye1.id))[0].hostTeamId).toBe(teamIds[1]);
+
+        const cleared = await bracket.createBye(user, tournamentId, { groupId: group.id, byeId: empty.id, sortOrder, registrationId: null });
+        expect(cleared).toMatchObject({ id: empty.id, registrationId: null, isBye: true, sortOrder });
+        expect((await prisma.v1TournamentSlot.findUniqueOrThrow({ where: { id: bye1.id } })).registrationId).toBeNull();
+        expect((await fixturesUsing(bye1.id))[0].hostTeamId).toBeNull();
+      });
+
+      it('연결된 부전승의 위치 이동과 삭제는 409 SLOT_LINKED 이고 자리·행이 그대로다, 연결되지 않은 8강 부전승은 대조군으로 그대로 움직인다', async () => {
+        const { tournamentId, registrationIds } = await ko12('bye-legacy-move');
+        const { group, sortOrder } = await bye(tournamentId, 1);
+        const empty = await rowAt(group.id, sortOrder);
+        await bracket.createBye(user, tournamentId, { groupId: group.id, byeId: empty.id, sortOrder, registrationId: registrationIds[0] });
+
+        await expect(bracket.createBye(user, tournamentId, { groupId: group.id, byeId: empty.id, sortOrder: 1, registrationId: registrationIds[0] }))
+          .rejects.toMatchObject({ response: { code: 'SLOT_LINKED' } });
+        await expect(bracket.removeGroupTeam(user, empty.id)).rejects.toMatchObject({ response: { code: 'SLOT_LINKED' } });
+        expect((await rowAt(group.id, sortOrder)).id).toBe(empty.id);
+        expect((await slotAt(tournamentId, 1, 'BYE')).registrationId).toBe(registrationIds[0]);
+
+        // 대조군 — 자리에 연결되지 않은 수동 8강 조의 부전승은 위치를 옮기고 지울 수 있다
+        const quarter = await prisma.v1TournamentGroup.create({ data: { tournamentId, name: '수동 8강', phase: 'quarter', sortOrder: 99 } });
+        const manual = await bracket.createBye(user, tournamentId, { groupId: quarter.id, sortOrder: 0 });
+        expect(await bracket.createBye(user, tournamentId, { groupId: quarter.id, byeId: manual.id, sortOrder: 1 })).toMatchObject({ id: manual.id, sortOrder: 1 });
+        await expect(bracket.removeGroupTeam(user, manual.id)).resolves.toEqual({ deleted: true });
+      });
+    });
+
     it('ENTRY 와 BYE 에 같은 팀을 동시에 넣을 수 없다 (양방향)', async () => {
       const { tournamentId, registrationIds } = await ko12('bye-exclusive');
       const entry = await slotAt(tournamentId, 1, 'ENTRY');

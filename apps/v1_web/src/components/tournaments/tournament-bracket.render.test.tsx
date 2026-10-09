@@ -35,6 +35,8 @@ function makeFixture(
     awayTeamId: null,
     awayTeamName: '블루FC',
     awayTeamLogoUrl: null,
+    homeSlotLabel: null,
+    awaySlotLabel: null,
     result: null,
     videos: [],
     ...overrides,

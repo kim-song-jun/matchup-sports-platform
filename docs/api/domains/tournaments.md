@@ -414,6 +414,7 @@ All team roster mutations lock the registration row and re-read `rosterLockedAt`
 
 - `POST /admin/tournaments/:tournamentId/byes`: 인증 + mutation admin. 입력 `{ groupId: UUID, registrationId?: UUID | null, byeId?: UUID, sortOrder: integer(0..7) }`, 반환은 groupTeam. 감사 action `tournament.bracket.bye.save`.
 - 그룹 phase로 12강·8강·4강을 구분한다. 팀 미정은 registrationId 생략/null로 저장하며, 팀을 선택하면 해당 대회의 confirmed 등록이어야 한다. 홈·어웨이 또는 경기 생성 없이 저장한다. byeId를 보내면 해당 조의 기존 부전승 id와 위치를 유지하며 팀 배정/미정 전환/위치 수정을 저장한다. byeId 생략 시 새 자리 생성 또는 기존 일반 배정을 변환한다.
+- 템플릿이 만든 12강 BYE 자리(`V1TournamentSlot kind=BYE`, position 1~4 ↔ sortOrder 0·3·4·7)에 연결된 부전승은 같은 위치에서 팀을 바꾸거나 `registrationId: null` 로 비우는 요청을 자리 배정 트랜잭션(`assignSlotInTx`)에 위임한다 — 자리 `registrationId`·부전승 행·8강 홈 사이드가 함께 바뀌고 응답 형태는 그대로다. 위치를 옮기는 요청, 그리고 `DELETE /admin/group-teams/:id` 로 연결된 부전승 행을 지우는 요청은 `409 SLOT_LINKED`(삭제는 위치 자체를 없애 자리↔위치 대응을 깨므로 위임하지 않고 거절하며, 비우기는 수정 요청이 맡는다). 자리에 연결되지 않은 부전승은 기존 동작 그대로다.
 - 12강 정원 12팀/부전승 4팀, 8강 정원 8팀/부전승 4팀, 4강 정원 4팀/부전승 2팀. 초과 `409 BYE_CAPACITY`; group/final/third_place는 `400 BYE_PHASE_INVALID`. 16강은 부전승이 없어 `400 BYE_PHASE_INVALID`(group/final/third_place 와 같다).
 - 다른 조의 같은 단계 부전승 중복 `409 BYE_ALREADY_IN_ROUND`; 같은 단계 경기 참가 중인 팀 `409 BYE_TEAM_HAS_MATCH`. 기존 경기 생성/수정도 해당 단계 부전승팀을 거절한다.
 - 4강 위치는 0..3이며 초과는 `400 BYE_POSITION_INVALID`. 중복 위치는 `409 BYE_POSITION_OCCUPIED`, 다른 조/없는 byeId는 `404 BYE_NOT_FOUND`. 이전 명단 순번이 위치 범위를 벗어난 기존 부전승은 읽기 렌더링에서 경기 사이 위치로 호환하고 DB 값은 변경하지 않는다.

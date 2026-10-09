@@ -2,6 +2,8 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { v1Get, v1Post } from '@/lib/api-client';
+import { publicGameRecordsKeys } from '@/components/public-game-records/use-public-game-records';
+import { v1Keys } from '@/lib/query-keys';
 import { randomUuid } from '@/lib/uuid';
 import type { GameActorRole as FullGameActorRole, GamePeriod } from '@/types/game-operations';
 import type {
@@ -266,8 +268,12 @@ function invalidateGame(
 ) {
   queryClient.invalidateQueries({ queryKey: resultReviewKeys.game(gameId) });
   queryClient.invalidateQueries({ queryKey: resultReviewKeys.revisions(gameId) });
+  // 공개 화면(경기 상세·일정·득점 순위·전적)과 대회 상세/대진표는 별도 캐시(staleTime 60초)이고 종료된
+  // 경기는 폴링하지 않으므로, 확정·정정 직후 같은 브라우저에서 열면 옛 값이 그대로 서빙된다.
+  queryClient.invalidateQueries({ queryKey: publicGameRecordsKeys.all });
   if (tournamentId) {
     queryClient.invalidateQueries({ queryKey: resultReviewKeys.board(tournamentId, 'ENDED') });
+    queryClient.invalidateQueries({ queryKey: v1Keys.tournament(tournamentId) });
   }
 }
 

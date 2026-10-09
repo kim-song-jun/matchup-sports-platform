@@ -233,7 +233,10 @@ LEAGUE_REGION_INVALID` for an unknown or unsuitable region.
   period of a one-period match).
 - `POST /api/v1/admin/league-matches/:leagueId/fixtures` (and `preview`,
   `regenerate`) accept `timing.gameDurationMinutes` as optional. When omitted,
-  the regulation time of the fixture's competition config is used; a legacy
+  the regulation time of the league's own competition config (the version edited
+  through the period settings, not the sport default) is used, and new fixtures
+  are pinned to that version; a league without one returns
+  `409 COMPETITION_CONFIG_REQUIRED`. A legacy
   config without period lengths fails with
   `422 LEAGUE_FIXTURE_DURATION_REQUIRED`. Without any `timing`, fixtures of a
   matchday share one kickoff and `endAt` is kickoff + regulation time.

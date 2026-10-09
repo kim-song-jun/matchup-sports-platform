@@ -2,16 +2,20 @@ import { describe, expect, it } from 'vitest';
 import { buildSideLabelContext } from '@/lib/bracket-canvas-layout';
 import type { LeagueBoardNode } from '@/lib/league-board-model';
 import type { V1AdminBracketFixtureGame } from '@/types/api';
+import type { V1LeagueFixture } from '@/types/league-match';
 import { makeFixture, makeGame, makeGroup, makeSlot } from '@/test/bracket-canvas-fixtures';
 import {
   bracketMobileNode,
   bracketMobileSide,
+  buildBracketMobileRounds,
+  buildLeagueMobileRounds,
   candidatesFromLeagueTeams,
   candidatesFromRegistrations,
   hasTeam,
   leagueMobileNode,
   leagueMobileSide,
   pickableCandidates,
+  pickInitialRoundKey,
   sideDisplayName,
 } from './bracket-canvas-mobile-model';
 
@@ -204,5 +208,173 @@ describe('leagueMobileNode', () => {
     expect(node.scoreText).toBe('2:1 (승부차기 4:3)');
     expect(node.quickEntered).toBe(true);
     expect(leagueMobileNode(boardNode({ state: 'scheduled', game: makeGame() }), slotsById).scoreText).toBeNull();
+  });
+});
+
+describe('buildBracketMobileRounds', () => {
+  const knockoutGroups = [
+    // 3·4위전의 sortOrder 가 결승보다 앞서도 결승 탭 안에서는 결승이 먼저여야 한다.
+    makeGroup({ id: 'g-3', phase: 'third_place', name: '3위 결정전', sortOrder: 3 }),
+    makeGroup({ id: 'g-f', phase: 'final', name: '결승', sortOrder: 4 }),
+    makeGroup({ id: 'g-q', phase: 'quarter', name: '8강', sortOrder: 1 }),
+    makeGroup({ id: 'g-s', phase: 'semi', name: '4강', sortOrder: 2 }),
+  ];
+  const knockoutFixtures = [
+    makeFixture({ id: 'f-2', groupId: 'g-q', fixtureNumber: 2 }),
+    makeFixture({ id: 'f-1', groupId: 'g-q', fixtureNumber: 1 }),
+    makeFixture({ id: 'f-5', groupId: 'g-s', fixtureNumber: 5 }),
+    makeFixture({ id: 'f-7', groupId: 'g-f', fixtureNumber: 7 }),
+    makeFixture({ id: 'f-8', groupId: 'g-3', fixtureNumber: 8 }),
+  ];
+
+  it('탭은 단계 순서이고 3·4위전은 결승 탭 안의 두 번째 섹션이다', () => {
+    const rounds = buildBracketMobileRounds({ groups: knockoutGroups, fixtures: knockoutFixtures, slots: [] });
+    expect(rounds.map((r) => r.label)).toEqual(['8강', '4강', '결승']);
+    expect(rounds[2].sections.map((s) => s.heading)).toEqual(['결승', '3위 결정전']);
+    // 대조군: 8강 안에서 경기 번호 순
+    expect(rounds[0].sections[0].nodes.map((n) => n.fixtureId)).toEqual(['f-1', 'f-2']);
+    expect(rounds[0].sections[0].nodes[0].title).toBe('8강 · 1번 경기');
+    expect(rounds[0].sections[0].nodes[0].knockout).toBe(true);
+  });
+
+  it('같은 경기 번호는 차수(leg) 순이다', () => {
+    const [round] = buildBracketMobileRounds({
+      groups: [makeGroup({ id: 'g-q', phase: 'quarter', name: '8강', sortOrder: 1 })],
+      fixtures: [
+        makeFixture({ id: 'leg-2', groupId: 'g-q', fixtureNumber: 1, legNumber: 2 }),
+        makeFixture({ id: 'leg-1', groupId: 'g-q', fixtureNumber: 1, legNumber: 1 }),
+      ],
+      slots: [],
+    });
+    expect(round.sections[0].nodes.map((n) => n.fixtureId)).toEqual(['leg-1', 'leg-2']);
+  });
+
+  it('조별 조는 한 탭으로 묶이고, 조가 하나뿐이면 그 조 이름이 탭 이름이다', () => {
+    const multi = buildBracketMobileRounds({
+      groups: [
+        makeGroup({ id: 'g-a', phase: 'group', name: 'A조', sortOrder: 1 }),
+        makeGroup({ id: 'g-b', phase: 'group', name: 'B조', sortOrder: 2 }),
+        makeGroup({ id: 'g-s', phase: 'semi', name: '4강', sortOrder: 3 }),
+      ],
+      fixtures: [
+        makeFixture({ id: 'a1', groupId: 'g-a', fixtureNumber: 1 }),
+        makeFixture({ id: 'b1', groupId: 'g-b', fixtureNumber: 2 }),
+        makeFixture({ id: 's1', groupId: 'g-s', fixtureNumber: 3 }),
+      ],
+      slots: [],
+    });
+    expect(multi.map((r) => r.label)).toEqual(['조별', '4강']);
+    expect(multi[0].sections.map((s) => s.heading)).toEqual(['A조', 'B조']);
+    expect(multi[0].sections[0].nodes[0].knockout).toBe(false);
+
+    const single = buildBracketMobileRounds({
+      groups: [makeGroup({ id: 'g-l', phase: 'group', name: '리그', sortOrder: 1 })],
+      fixtures: [makeFixture({ id: 'l1', groupId: 'g-l', fixtureNumber: 1 })],
+      slots: [],
+    });
+    expect(single.map((r) => r.label)).toEqual(['리그']);
+  });
+
+  it('경기가 없는 조는 탭을 만들지 않고, 조에 속하지 않은 경기는 기타 탭으로 남긴다(조용히 버리지 않는다)', () => {
+    const rounds = buildBracketMobileRounds({
+      groups: [
+        makeGroup({ id: 'g-q', phase: 'quarter', name: '8강', sortOrder: 1 }),
+        makeGroup({ id: 'g-empty', phase: 'semi', name: '4강', sortOrder: 2 }),
+      ],
+      fixtures: [
+        makeFixture({ id: 'f-1', groupId: 'g-q', fixtureNumber: 1 }),
+        makeFixture({ id: 'orphan', groupId: null, fixtureNumber: 9 }),
+        makeFixture({ id: 'ghost', groupId: 'g-deleted', fixtureNumber: 10 }),
+      ],
+      slots: [],
+    });
+    expect(rounds.map((r) => r.label)).toEqual(['8강', '기타']);
+    expect(rounds[1].sections[0].nodes.map((n) => n.fixtureId)).toEqual(['orphan', 'ghost']);
+  });
+
+  it('칸의 사이드 라벨은 같은 응답의 자리·앞 경기 정보로 채워진다', () => {
+    const [quarterRound, semiRound] = buildBracketMobileRounds({
+      groups: [
+        makeGroup({ id: 'g-q', phase: 'quarter', name: '8강', sortOrder: 1 }),
+        makeGroup({ id: 'g-s', phase: 'semi', name: '4강', sortOrder: 2 }),
+      ],
+      fixtures: [
+        makeFixture({ id: 'f-1', groupId: 'g-q', fixtureNumber: 1, homeSlotId: 's-1' }),
+        makeFixture({ id: 'f-5', groupId: 'g-s', fixtureNumber: 5, bracketSources: [{ fixtureId: 'f-1', outcome: 'WINNER', side: 'AWAY' }] }),
+      ],
+      slots: [makeSlot({ id: 's-1', label: '1번 자리' })],
+    });
+    expect(sideDisplayName(quarterRound.sections[0].nodes[0].home)).toBe('1번 자리');
+    expect(sideDisplayName(semiRound.sections[0].nodes[0].away)).toBe('8강 1번 경기 승자');
+  });
+});
+
+describe('pickInitialRoundKey', () => {
+  const round = (key: string, states: Array<'scheduled' | 'official' | 'cancelled'>) => ({
+    key,
+    label: key,
+    sections: [{ key, heading: null, nodes: states.map((state, i) => ({ fixtureId: `${key}-${i}`, state }) as never) }],
+  });
+
+  it('아직 끝나지 않은 경기가 있는 첫 라운드를 고른다', () => {
+    expect(pickInitialRoundKey([round('a', ['official']), round('b', ['official', 'scheduled']), round('c', ['scheduled'])])).toBe('b');
+  });
+  it('전부 끝났으면 마지막 라운드, 비었으면 null', () => {
+    expect(pickInitialRoundKey([round('a', ['official']), round('b', ['cancelled', 'official'])])).toBe('b');
+    expect(pickInitialRoundKey([])).toBeNull();
+  });
+});
+
+describe('buildLeagueMobileRounds', () => {
+  const leagueFixture = (o: Partial<V1LeagueFixture> & { teamMatchId: string; startAt: string }): V1LeagueFixture =>
+    ({ title: '', homeTeamId: null, awayTeamId: null, placeName: '구장', status: 'matched', ...o }) as unknown as V1LeagueFixture;
+
+  it('KST 날짜별로 묶여 N주차 라운드가 된다 — 자정 직전·직후 경계의 양쪽 대조군 포함', () => {
+    const rounds = buildLeagueMobileRounds({
+      fixtures: [
+        leagueFixture({ teamMatchId: 'm-late', startAt: '2026-10-11T14:59:00.000Z' }), // KST 10/11 23:59
+        leagueFixture({ teamMatchId: 'm-0', startAt: '2026-10-11T15:00:00.000Z' }), // KST 10/12 00:00
+        leagueFixture({ teamMatchId: 'm-1', startAt: '2026-10-12T05:00:00.000Z' }), // KST 10/12 14:00
+      ],
+      slots: [],
+      teamNameById: new Map(),
+    });
+    expect(rounds.map((r) => [r.key, r.label])).toEqual([['2026-10-11', '1주차'], ['2026-10-12', '2주차']]);
+    expect(rounds[1].sections[0].nodes.map((n) => n.fixtureId)).toEqual(['m-0', 'm-1']);
+    expect(rounds[1].sections[0].nodes[0].knockout).toBe(false);
+  });
+
+  it('팀 이름은 자리에서, 자리가 없는 기존 경기는 팀 id 로 찾는다 — 빈 사이드는 자리 라벨', () => {
+    const slots = [
+      makeSlot({ id: 's-1', label: '1번 자리', registrationId: 'r-1', teamName: '강남FC' }),
+      makeSlot({ id: 's-2', label: '2번 자리' }),
+    ];
+    const [round] = buildLeagueMobileRounds({
+      fixtures: [
+        leagueFixture({ teamMatchId: 'm-slot', startAt: '2026-10-12T05:00:00.000Z', homeSlotId: 's-1', awaySlotId: 's-2', homeTeamId: 'team-1', awayTeamId: null }),
+        leagueFixture({ teamMatchId: 'm-legacy', startAt: '2026-10-12T06:00:00.000Z', homeTeamId: 'team-9', awayTeamId: 'team-8' }),
+      ],
+      slots,
+      teamNameById: new Map([['team-9', '서초FC'], ['team-8', '송파FC']]),
+    });
+    const [withSlots, legacy] = round.sections[0].nodes;
+    expect(sideDisplayName(withSlots.home)).toBe('강남FC');
+    expect(withSlots.home.registrationId).toBe('r-1');
+    expect(sideDisplayName(withSlots.away)).toBe('2번 자리');
+    expect(withSlots.away.slotKind).toBe('ENTRY');
+    expect(sideDisplayName(legacy.home)).toBe('서초FC');
+    expect(legacy.home.slotId).toBeNull();
+  });
+
+  it('취소된 경기는 취소 칸으로 남고 라운드에서 빠지지 않는다', () => {
+    const [round] = buildLeagueMobileRounds({
+      fixtures: [
+        leagueFixture({ teamMatchId: 'm-x', startAt: '2026-10-12T05:00:00.000Z', status: 'cancelled' }),
+        leagueFixture({ teamMatchId: 'm-y', startAt: '2026-10-12T06:00:00.000Z' }),
+      ],
+      slots: [],
+      teamNameById: new Map(),
+    });
+    expect(round.sections[0].nodes.map((n) => [n.fixtureId, n.state])).toEqual([['m-x', 'cancelled'], ['m-y', 'scheduled']]);
   });
 });

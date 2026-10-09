@@ -243,10 +243,12 @@ function ActiveTeamDetailPageClient({ teamId, seed }: { teamId: string; seed?: V
   const authPending = Boolean(authMe.isPending || (authMe.isFetching && !authMe.data?.user?.id));
   const authVerified = Boolean(authMe.data?.user?.id) && !authPending && !authMe.isError && !authUnauthorized;
   const authError = Boolean(authMe.isError && !authUnauthorized);
-  const query = useV1TeamDetail(teamId, { seed });
+  const query = useV1TeamDetail(teamId, { seed, refetchOnWindowFocus: 'always' });
   // override store는 한 칸이고 부모 effect가 자식(TeamStatePageView)보다 늦게 돈다 —
   // 에러 뷰의 제목까지 여기서 함께 게시하지 않으면 부모 값이 그 제목을 덮어쓴다.
-  const stateTitle = query.isError ? getTeamStateViewModel('error').title : undefined;
+  // 이미 받은 팀이 있으면 백그라운드 재조회 실패로 화면을 에러 뷰로 바꾸지 않는다 — 다음 복귀 때 다시 시도한다.
+  const loadFailed = query.isError && !query.data;
+  const stateTitle = loadFailed ? getTeamStateViewModel('error').title : undefined;
   // 뒤로가기는 AppBackLink 가 `?from=` 을 직접 읽으므로 여기서 backHref 로 따로 넘기지 않는다.
   useShellOverride(stateTitle ? { title: stateTitle } : {});
   const eligibility = useV1TeamJoinEligibility(teamId, { enabled: Boolean(query.data) && authVerified });
@@ -300,7 +302,7 @@ function ActiveTeamDetailPageClient({ teamId, seed }: { teamId: string; seed?: V
     resolveChat.mutate({ targetType: 'team', targetId: teamId });
   }, [authVerified, query.data, resolveChat, teamId]);
 
-  if (query.isError) return <TeamStatePageView model={getTeamStateViewModel('error')} />;
+  if (loadFailed) return <TeamStatePageView model={getTeamStateViewModel('error')} />;
 
   const regionParts = splitTeamRegion(query.data?.region);
   // 데이터가 오기 전에는 하드코딩 목업(`fallback`)을 화면 전체로 렌더하지 않는다 —

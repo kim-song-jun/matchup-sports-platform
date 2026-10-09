@@ -1,10 +1,11 @@
 import { ForbiddenException, Injectable, InternalServerErrorException, NotFoundException } from '@nestjs/common';
 import { Prisma, V1CompetitionKind, V1GameSourceType } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
-import { buildPageInfo, paginationArgs } from '../common/pagination/page-args';
+import { buildPageInfo } from '../common/pagination/page-args';
 import type { V1AuthUser } from '../auth/v1-auth-user';
 import { TournamentStaffAccessService } from './staff/tournament-staff-access.service';
 import { presentTournamentCard } from './tournament-card.presenter';
+import { sortTournamentListRows } from './tournament-list-order';
 import {
   isPubliclyListedRegistration,
   presentTournamentDetail,
@@ -114,7 +115,7 @@ export class TournamentsReadService {
    * - deletedAt=null + status in (open/closed/in_progress/completed)
    * - 각 카드에 confirmedCount(status=confirmed registration 수) 포함
    * - **두 가지 페이지네이션을 동시에 지원한다**: 모바일 무한 스크롤은 `cursor`,
-   *   데스크톱 페이지 번호는 `page`. 둘 다 오면 page 가 이긴다(`paginationArgs`).
+   *   데스크톱 페이지 번호는 `page`. 둘 다 오면 page 가 이긴다(`resolveListStart`).
    *   응답의 `nextCursor`/`hasNext` 는 그대로라 기존 호출자는 영향받지 않는다.
    */
   async list(query: TournamentListQueryDto) {
@@ -145,28 +146,36 @@ export class TournamentsReadService {
 
     where.AND = [...(Array.isArray(where.AND) ? where.AND : where.AND ? [where.AND] : []), PUBLIC_TOURNAMENT_VISIBILITY_WHERE];
 
-    // 전체 건수는 페이지 번호를 그릴 때만 센다 — 무한 스크롤은 "다음이 있는지"만 알면
-    // 되므로 매 스크롤마다 COUNT 를 한 번 더 때릴 이유가 없다.
+    // 전체 건수는 페이지 번호를 그릴 때만 돌려준다 — 무한 스크롤은 "다음이 있는지"만 알면 된다.
     const wantsPageNumbers = query.page !== undefined && query.page > 0;
 
-    const [rows, total] = await Promise.all([
-      this.prisma.v1Tournament.findMany({
-        where,
-        // createdAt 만으로는 전순서가 아니다 — 같은 시각에 만들어진 대회들(시드·일괄
-        // 생성에서 흔하다)의 상대 순서가 쿼리마다 달라지면, skip 기반 페이지에서는 행이
-        // 중복되거나 통째로 빠진다. id 를 tiebreaker 로 붙여 순서를 고정한다.
-        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
-        take: limit + 1,
-        ...paginationArgs(query, limit),
-        include: TOURNAMENT_LIST_INCLUDE,
-      }),
-      wantsPageNumbers ? this.prisma.v1Tournament.count({ where }) : Promise.resolve(null),
-    ]);
+    // The status-group order cannot be expressed as a Prisma `orderBy`, and the public list is
+    // small and bounded, so only the sort keys of every match are read, ordered in memory, and
+    // sliced; the full rows are then loaded for the page ids. `cursor` stays a plain row id.
+    const keyRows = await this.prisma.v1Tournament.findMany({
+      where,
+      select: { id: true, status: true, kind: true, scheduledAt: true, scheduledEndAt: true },
+    });
 
-    const hasNext = rows.length > limit;
-    const pageItems = hasNext ? rows.slice(0, limit) : rows;
+    const orderedIds = sortTournamentListRows(keyRows).map((row) => row.id);
+    // Every matching row's key is already loaded, so the total comes from it rather than a second COUNT.
+    const total = wantsPageNumbers ? orderedIds.length : null;
+    const start = this.resolveListStart(query, limit, orderedIds);
+    const window = start === null ? [] : orderedIds.slice(start, start + limit + 1);
+    const hasNext = window.length > limit;
+    const pageIds = hasNext ? window.slice(0, limit) : window;
 
-    const nextCursor = hasNext ? (pageItems.at(-1)?.id ?? null) : null;
+    const loaded =
+      pageIds.length === 0
+        ? []
+        : await this.prisma.v1Tournament.findMany({
+            where: { id: { in: pageIds } },
+            include: TOURNAMENT_LIST_INCLUDE,
+          });
+    const byId = new Map(loaded.map((row) => [row.id, row]));
+    const pageItems = pageIds.flatMap((id) => byId.get(id) ?? []);
+
+    const nextCursor = hasNext ? (pageIds.at(-1) ?? null) : null;
 
     return {
       items: pageItems.map(presentTournamentCard),
@@ -177,6 +186,16 @@ export class TournamentsReadService {
         ? buildPageInfo({ page: query.page, limit, total, hasNext, nextCursor })
         : { nextCursor, hasNext },
     };
+  }
+
+  /** Index of the first row of the requested page; `null` when the cursor no longer matches a row. */
+  private resolveListStart(query: TournamentListQueryDto, limit: number, orderedIds: string[]): number | null {
+    if (query.page && query.page > 1) return (query.page - 1) * limit;
+    if (query.cursor) {
+      const index = orderedIds.indexOf(query.cursor);
+      return index === -1 ? null : index + 1;
+    }
+    return 0;
   }
 
   /**

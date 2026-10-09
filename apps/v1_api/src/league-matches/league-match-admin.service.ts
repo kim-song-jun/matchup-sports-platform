@@ -76,6 +76,7 @@ import { planLeagueTemplate } from './league-template-plan';
 import { LeagueStateValue } from './league-state';
 import { isLeagueRegistrationOpen } from './league-registration-open';
 import { competitionTeamTargets, enqueueRosterResync } from '../games/roster/roster-resync-events';
+import { adminBracketSlotInclude, serializeAdminBracketGame, serializeAdminBracketSlot } from '../tournaments/slots/admin-bracket-view';
 
 // 그룹 B 감사 결함 1: 팀 제외로 인한 대진 취소는 운영자 개별 사유가 아니라 시스템이
 // 판단한 부수효과다 — cancelFixture(운영자 사유 필수)와 구분되는 고정 사유 문자열.
@@ -348,6 +349,8 @@ export class LeagueMatchAdminService {
         // 필요하다 — updateFixture()는 이미 이 필드를 쓰고 있었는데 조회 쪽만 빠져 있었다.
         placeAddress: true,
         status: true,
+        homeSlotId: true,
+        awaySlotId: true,
         // 결과 진행 단계(2026-08-24). 대진 표가 지금까지 팀매치 status(matched/cancelled)만
         // 보여줘서, 운영자는 "어느 경기가 아직 결과가 없는지 / 상대팀 승인을 기다리는지"를
         // 화면에서 알 방법이 없었다. 결과 단계는 팀매치가 아니라 경기(Game) 쪽에 있다:
@@ -359,8 +362,14 @@ export class LeagueMatchAdminService {
             // 진행 중 여부 — 어드민 "지금 할 일" 카드가 결과 단계(resultStage)와 별개로
             // 경기가 뛰는 중인지를 알아야 한다. 결과 단계만으로는 진행 중과 시작 전이 같은 not_entered 다.
             state: true,
+            version: true,
             currentOfficialRevisionId: true,
-            resultRevisions: { select: { state: true }, orderBy: { revision: 'desc' }, take: 1 },
+            _count: { select: { events: true } },
+            resultRevisions: {
+              select: { id: true, state: true, score: true, reason: true, supersedesId: true },
+              orderBy: { revision: 'desc' },
+              take: 1,
+            },
           },
         },
       },
@@ -391,6 +400,11 @@ export class LeagueMatchAdminService {
     // 대진을 아직 안 만든 리그에서만 필요하다(일괄 생성 폼의 "기본 장소" 추천용) —
     // 이미 대진이 있으면 관리자는 개별 행을 고치므로 이 쿼리를 건너뛴다.
     const recentVenues = fixtures.length === 0 ? await this.loadRecentVenues(teamIds) : [];
+    const slotRows = await this.prisma.v1TournamentSlot.findMany({
+      where: { tournamentId: leagueId },
+      orderBy: [{ position: 'asc' }],
+      include: adminBracketSlotInclude,
+    });
     return {
       leagueId: league.id,
       title: league.title,
@@ -425,6 +439,7 @@ export class LeagueMatchAdminService {
       confirmedRegistrationCount: await countLeagueConfirmedApplications(this.prisma, leagueId),
       teamIds,
       recentVenues,
+      slots: slotRows.map(serializeAdminBracketSlot),
       fixtures: fixtures.map((fixture) => {
         const fact = fixture.game === null ? undefined : factByGameId.get(fixture.game.id);
         return {
@@ -432,6 +447,9 @@ export class LeagueMatchAdminService {
           title: fixture.title,
           homeTeamId: fixture.hostTeamId,
           awayTeamId: fixture.approvedApplicantTeamId,
+          homeSlotId: fixture.homeSlotId,
+          awaySlotId: fixture.awaySlotId,
+          game: fixture.game === null ? null : serializeAdminBracketGame(fixture.game),
           startAt: fixture.startAt,
           placeName: fixture.placeName,
           placeAddress: fixture.placeAddress,
@@ -678,19 +696,18 @@ export class LeagueMatchAdminService {
     await this.adminContext.getActiveAdmin(user.id);
     const league = await this.loadLeague(leagueId);
     const teamIds = league.teams.map((entry) => entry.teamId);
-    const teams = teamIds.length === 0
-      ? []
-      : await this.prisma.v1Team.findMany({
-          where: { id: { in: teamIds } },
-          select: { id: true, name: true, status: true, memberCount: true, profile: { select: { logoUrl: true } } },
-        });
+    const teams = await this.prisma.v1Team.findMany({
+      where: { id: { in: teamIds } },
+      select: { id: true, name: true, status: true, memberCount: true, profile: { select: { logoUrl: true } } },
+    });
     const teamById = new Map(teams.map((team) => [team.id, team]));
     return {
       leagueId: league.id,
-      teams: teamIds.map((teamId) => {
-        const team = teamById.get(teamId);
+      teams: league.teams.map((entry) => {
+        const team = teamById.get(entry.teamId);
         return {
-          teamId,
+          teamId: entry.teamId,
+          registrationId: entry.id,
           // 팀이 그 사이 소프트삭제됐으면 findMany 결과에 없다 — 운영자에게 원인을 숨기지 않는다.
           name: team?.name ?? '(삭제된 팀)',
           status: team?.status ?? null,
@@ -1935,7 +1952,7 @@ export class LeagueMatchAdminService {
         registrations: {
           // 로스터 = confirmed 등록. 신청만 들어온 팀은 대진 대상이 아니다.
           where: { status: 'confirmed' },
-          select: { teamId: true },
+          select: { id: true, teamId: true },
           orderBy: [{ createdAt: 'asc' }, { teamId: 'asc' }],
         },
       },

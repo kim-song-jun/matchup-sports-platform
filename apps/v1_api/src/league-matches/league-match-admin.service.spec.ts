@@ -1221,13 +1221,18 @@ describe('LeagueMatchAdminService.detail — 대진의 gameState', () => {
       placeName: '장소',
       placeAddress: null,
       status: 'matched',
-      game: game === null ? null : { id: `game-${id}`, state: game.state, currentOfficialRevisionId: null, resultRevisions: [] },
+      homeSlotId: null,
+      awaySlotId: null,
+      game: game === null
+        ? null
+        : { id: `game-${id}`, state: game.state, version: 1, currentOfficialRevisionId: null, _count: { events: 0 }, resultRevisions: [] },
     };
   }
 
   async function detailWith(fixtures: ReturnType<typeof fixtureRow>[]) {
     const prisma = {
       v1TeamMatch: { findMany: jest.fn().mockResolvedValue(fixtures) },
+      v1TournamentSlot: { findMany: jest.fn().mockResolvedValue([]) },
       v1GameOfficialFact: { findMany: jest.fn().mockResolvedValue([]) },
       v1TournamentRegistration: { count: jest.fn().mockResolvedValue(0) },
     };
@@ -1305,6 +1310,7 @@ describe('LeagueMatchAdminService.detail — 참가비·대표 이미지 필드'
         }),
       },
       v1TeamMatch: { findMany: jest.fn().mockResolvedValue([]) },
+      v1TournamentSlot: { findMany: jest.fn().mockResolvedValue([]) },
       v1GameOfficialFact: { findMany: jest.fn().mockResolvedValue([]) },
       v1TournamentRegistration: { count: jest.fn().mockResolvedValue(activeCount) },
     };

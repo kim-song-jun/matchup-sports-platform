@@ -49,6 +49,7 @@ export function formatGender(gender: string | null | undefined): string {
 const AUTH_PROVIDER_LABEL: Record<string, string> = {
   kakao: '카카오',
   naver: '네이버',
+  apple: 'Apple',
   email: '이메일',
 };
 

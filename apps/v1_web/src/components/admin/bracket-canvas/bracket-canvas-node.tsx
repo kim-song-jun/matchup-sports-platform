@@ -18,6 +18,7 @@ import {
 } from '@/lib/bracket-canvas-layout';
 import type { V1AdminBracketFixture, V1AdminBracketSlot } from '@/types/api';
 import { REGISTRATION_DRAG_MIME } from './bracket-canvas-dnd';
+import { fixtureOpenerProps } from './fixture-opener-focus';
 
 const SIDE_NAME: Record<SideKey, string> = { HOME: '홈', AWAY: '어웨이' };
 
@@ -138,6 +139,7 @@ export function BracketCanvasNode({
         type="button"
         aria-pressed={selected}
         aria-label={`${accessibleTitle} 열기`}
+        {...fixtureOpenerProps(fixture.id)}
         onClick={() => onSelect(fixture.id)}
         className="flex w-full items-center justify-between gap-2 px-3 text-left transition-colors hover:bg-[var(--surface-soft)] focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-blue-500"
         style={{ height: CANVAS_HEADER_HEIGHT }}

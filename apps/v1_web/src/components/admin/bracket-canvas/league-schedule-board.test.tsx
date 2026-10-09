@@ -374,6 +374,30 @@ describe('LeagueScheduleBoard — 패널', () => {
   });
 });
 
+describe('LeagueScheduleBoard — 옆 패널 포커스', () => {
+  it('1440: 옆 패널을 닫으면 그 경기의 상세 열기 버튼으로 포커스가 돌아온다', () => {
+    resizeViewport(1440);
+    renderBoard();
+    const openers = screen.getAllByRole('button', { name: /경기 상세 열기$/ });
+    fireEvent.click(openers[1]);
+    openers[0].focus();
+
+    fireEvent.click(screen.getByRole('button', { name: '패널 닫기' }));
+    expect(screen.queryByRole('dialog', { name: '경기 패널' })).toBeNull();
+    expect(openers[1]).toHaveFocus();
+  });
+
+  it('1440: 팀 줄로 열었어도 닫으면 같은 경기의 상세 열기 버튼으로 돌아온다', () => {
+    resizeViewport(1440);
+    renderBoard();
+    const card = cardOf('1번 자리 대 2번 자리 경기');
+    fireEvent.click(within(card).getByRole('button', { name: '홈 1번 자리 비어 있음' }));
+
+    fireEvent.click(screen.getByRole('button', { name: '패널 닫기' }));
+    expect(within(card).getByRole('button', { name: /경기 상세 열기$/ })).toHaveFocus();
+  });
+});
+
 describe('LeagueScheduleBoard — 태블릿(768~1023)', () => {
   const openerName = /^1번 자리 대 2번 자리 경기 상세 열기$/;
 

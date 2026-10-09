@@ -435,3 +435,61 @@ describe('BracketCanvasWorkspace — 태블릿(768~1023) 칸 패널 시트·트�
     expect(screen.getByRole('button', { name: /서울FC/ })).toBeInTheDocument();
   });
 });
+
+const lgA = makeGroup({ id: 'lgA', name: 'A조', phase: 'group', sortOrder: 0 });
+const lgB = makeGroup({ id: 'lgB', name: 'B조', phase: 'group', sortOrder: 1 });
+const leagueBracket = makeBracket({
+  groups: [lgA, lgB],
+  fixtures: [
+    makeFixture({ id: 'l1', groupId: 'lgA', fixtureNumber: 1, round: 'league_r1' }),
+    makeFixture({ id: 'l2', groupId: 'lgB', fixtureNumber: 2, round: 'league_r1' }),
+    makeFixture({ id: 'l3', groupId: 'lgA', fixtureNumber: 3, round: 'league_r2' }),
+  ],
+});
+
+describe('BracketCanvasWorkspace — 리그 방식 대회', () => {
+  it('format 이 league 면 라운드×조 격자를 그리고 knockout 이면 캔버스를 그린다', () => {
+    setBracket(leagueBracket);
+    const { unmount } = render(<BracketCanvasWorkspace {...leagueProps('league')} />);
+    expect(screen.getByRole('region', { name: '대진 그림' })).toHaveAttribute('data-league-grid');
+    expect(screen.getByRole('heading', { level: 4, name: '2라운드' })).toBeInTheDocument();
+    unmount();
+    setBracket(populated);
+    render(<BracketCanvasWorkspace {...leagueProps('knockout')} />);
+    expect(screen.getByRole('region', { name: '대진 그림' })).not.toHaveAttribute('data-league-grid');
+  });
+
+  it('「경기 연결」 은 리그에서만 숨고 경기 추가·무작위 채우기·공개는 남는다', () => {
+    setBracket(leagueBracket);
+    const { unmount } = render(<BracketCanvasWorkspace {...leagueProps('league')} />);
+    expect(screen.queryByRole('button', { name: '경기 연결' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '경기 추가' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '빈 자리 무작위 채우기' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '지금 전체 공개' })).toBeInTheDocument();
+    unmount();
+    setBracket(populated);
+    render(<BracketCanvasWorkspace {...leagueProps('knockout')} />);
+    expect(screen.getByRole('button', { name: '경기 연결' })).toBeInTheDocument();
+  });
+
+  it('격자 칸을 누르면 캔버스와 같은 칸 패널이 그 경기로 열린다', () => {
+    setBracket(leagueBracket);
+    render(<BracketCanvasWorkspace {...leagueProps('league')} />);
+    fireEvent.click(screen.getByRole('button', { name: /A조.*1번 경기 열기/ }));
+    expect(screen.getByTestId('panel')).toHaveTextContent('l1');
+  });
+});
+
+function leagueProps(format: 'league' | 'knockout'): React.ComponentProps<typeof BracketCanvasWorkspace> {
+  return {
+    tournamentId: 't-1',
+    format,
+    registrations,
+    registrationsState: loaded,
+    bracketPublishedAt: null,
+    bracketPublishScheduledAt: null,
+    canWrite: true,
+    showToast: vi.fn(),
+    onShowList: vi.fn(),
+  };
+}

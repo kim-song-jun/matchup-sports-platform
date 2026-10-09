@@ -22,6 +22,7 @@ import { isBracketPublished } from '@/lib/bracket-visibility';
 import { extractErrorMessage } from '@/lib/error-message';
 import type { V1AdminTournamentRegistration, V1TournamentFormat } from '@/types/api';
 import { BracketCanvas, fixtureTitle } from './bracket-canvas';
+import { BracketLeagueGrid } from './bracket-league-grid';
 import { BracketNodePanel } from './bracket-node-panel';
 import { BracketStandingsFillButton } from './bracket-standings-fill-button';
 import { BracketTeamTray, type RegistrationsLoadState } from './bracket-team-tray';
@@ -97,6 +98,7 @@ export function BracketCanvasWorkspace({
     );
   }
 
+  const leagueGrid = format === 'league';
   const isEmpty = bracket.groups.length === 0 && bracket.fixtures.length === 0;
   const templateFormat = format === 'knockout' || format === 'league' || format === 'group_knockout' ? format : null;
   const confirmedTeams = registrations.filter((registration) => registration.status === 'confirmed');
@@ -256,10 +258,12 @@ export function BracketCanvasWorkspace({
                   <Plus size={16} aria-hidden="true" />
                   경기 추가
                 </Button>
-                <Button variant="outline" size="md" onClick={() => setToolsMode('link')}>
-                  <Link2 size={16} aria-hidden="true" />
-                  경기 연결
-                </Button>
+                {!leagueGrid ? (
+                  <Button variant="outline" size="md" onClick={() => setToolsMode('link')}>
+                    <Link2 size={16} aria-hidden="true" />
+                    경기 연결
+                  </Button>
+                ) : null}
               </>
             ) : null}
             {!published ? (
@@ -306,18 +310,31 @@ export function BracketCanvasWorkspace({
             collapsible={!sidePanel}
             onPick={setPendingRegistrationId}
           />
-          <BracketCanvas
-            groups={bracket.groups}
-            fixtures={bracket.fixtures}
-            slots={bracket.slots}
-            mode={format === 'league' ? 'league' : 'bracket'}
-            selectedFixtureId={selectedFixture?.id ?? null}
-            pendingRegistrationId={canWrite ? pendingRegistrationId : null}
-            canWrite={canWrite}
-            onSelectFixture={setSelectedFixtureId}
-            onAssignSlot={handleAssign}
-            onAssignDirect={handleAssignDirect}
-          />
+          {leagueGrid ? (
+            <BracketLeagueGrid
+              groups={bracket.groups}
+              fixtures={bracket.fixtures}
+              slots={bracket.slots}
+              selectedFixtureId={selectedFixture?.id ?? null}
+              pendingRegistrationId={canWrite ? pendingRegistrationId : null}
+              canWrite={canWrite}
+              onSelectFixture={setSelectedFixtureId}
+              onAssignSlot={handleAssign}
+              onAssignDirect={handleAssignDirect}
+            />
+          ) : (
+            <BracketCanvas
+              groups={bracket.groups}
+              fixtures={bracket.fixtures}
+              slots={bracket.slots}
+              selectedFixtureId={selectedFixture?.id ?? null}
+              pendingRegistrationId={canWrite ? pendingRegistrationId : null}
+              canWrite={canWrite}
+              onSelectFixture={setSelectedFixtureId}
+              onAssignSlot={handleAssign}
+              onAssignDirect={handleAssignDirect}
+            />
+          )}
           {panel !== null && sidePanel ? panel : null}
         </div>
       )}

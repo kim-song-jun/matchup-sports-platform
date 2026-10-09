@@ -64,7 +64,7 @@ async function shotStandings(page, out, file) {
         sectionFound: !!s,
         hasProgressNumbers: /\d+\s*\/\s*\d+/.test(text),
         hasPercent: /\d+%/.test(text),
-        hasMagicOrClinched: /매직넘버|우승 확정/.test(text),
+        hasMagicOrClinched: /1위 확정/.test(text),
         rowCount: s ? s.querySelectorAll('tbody tr').length : 0,
         overflowX: document.documentElement.scrollWidth > window.innerWidth + 1,
       };

@@ -1,5 +1,6 @@
 'use client';
 
+import type { ReactNode } from 'react';
 import { MessageSquare } from 'lucide-react';
 import { OtpVerificationCard } from '@/components/auth/otp/otp-verification-card';
 import { usePhoneVerificationRequests } from './use-phone-verification-requests';
@@ -14,13 +15,14 @@ type Props = {
    * inset: 이미 카드인 폼 안에 끼워질 때.
    */
   surface?: 'card' | 'inset';
+  conflictNotice?: ReactNode;
 };
 
 /**
  * 휴대폰 본인인증 카드 — 발급/대조 API 규칙은 usePhoneVerificationRequests, 화면 상태(카운트다운·
  * 재발송·만료·에러 톤)는 OtpVerificationCard 가 이메일 카드와 함께 소유한다.
  */
-export function PhoneVerificationCard({ mode, purpose, phone, onVerified, surface = 'card' }: Props) {
+export function PhoneVerificationCard({ mode, purpose, phone, onVerified, surface = 'card', conflictNotice }: Props) {
   const requests = usePhoneVerificationRequests({ mode, purpose, phone, onVerified });
 
   return (
@@ -30,6 +32,7 @@ export function PhoneVerificationCard({ mode, purpose, phone, onVerified, surfac
       idPrefix="phone-verification"
       requestIcon={<MessageSquare size={18} aria-hidden="true" />}
       surface={surface}
+      conflictNotice={conflictNotice}
       {...requests}
     />
   );

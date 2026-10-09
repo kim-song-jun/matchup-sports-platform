@@ -85,7 +85,8 @@ plutil -p "<DerivedData>/Build/Intermediates.noindex/Teameet.build/Alpha Debug-i
 
 ## Universal Links
 
-`/callback/*` 링크가 Safari 대신 앱을 열게 하는 것이 목적이다(카카오 로그인 리다이렉트).
+다른 앱(카카오톡·문자 등)에서 누른 팀밋 링크가 Safari 대신 설치된 앱의 같은 화면을 열게 한다 — 카카오 로그인
+리다이렉트(`/callback/*`)와 사용자 화면 전체(2026-10-09부터, 어드민·운영 콘솔·API·업로드 제외).
 서버 쪽 절차와 설정은 [`../../deploy/aasa/README.md`](../../deploy/aasa/README.md)에 있다.
 현재 association 파일에는 alpha와 production App ID가 모두 등록돼 있다. alpha는
 `U9J95Q6XD3.kr.co.teameet.alpha`, production은 `U9J95Q6XD3.kr.co.teameet`이다.

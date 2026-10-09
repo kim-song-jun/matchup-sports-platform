@@ -1713,7 +1713,7 @@ describe('LeagueMatchFixturesClient — 대진 timing 설정', () => {
   it('리그의 피리어드 설정(25·25)으로 경기 시간을 미리 채우고 출처를 알린다 — 종목 기본 20과 다른 값', () => {
     periodSettingsMock.mockReturnValue(periodSettingsOf([25, 25]));
     useV1GenerateLeagueFixturesMock.mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as never);
-    render(<Providers><LeagueMatchFixturesClient leagueId="league-1" /></Providers>);
+    render(<Providers><LeagueMatchFixturesClient leagueId="league-1" initialView="list" /></Providers>);
 
     expect(screen.getByLabelText('경기 시간(분)')).toHaveValue(50);
     expect(screen.getByLabelText('경기 시간(분)')).toHaveAccessibleDescription(
@@ -1724,7 +1724,7 @@ describe('LeagueMatchFixturesClient — 대진 timing 설정', () => {
   it('대조군: 20·20 리그는 40분으로 채운다', () => {
     periodSettingsMock.mockReturnValue(periodSettingsOf([20, 20]));
     useV1GenerateLeagueFixturesMock.mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as never);
-    render(<Providers><LeagueMatchFixturesClient leagueId="league-1" /></Providers>);
+    render(<Providers><LeagueMatchFixturesClient leagueId="league-1" initialView="list" /></Providers>);
 
     expect(screen.getByLabelText('경기 시간(분)')).toHaveValue(40);
   });
@@ -1733,7 +1733,7 @@ describe('LeagueMatchFixturesClient — 대진 timing 설정', () => {
     periodSettingsMock.mockReturnValue(periodSettingsOf([25, 25]));
     const mutateAsync = vi.fn().mockResolvedValue({ leagueId: 'league-1', createdCount: 6, teamMatchIds: [], warnings: [] });
     useV1GenerateLeagueFixturesMock.mockReturnValue({ mutateAsync, isPending: false } as never);
-    render(<Providers><LeagueMatchFixturesClient leagueId="league-1" /></Providers>);
+    render(<Providers><LeagueMatchFixturesClient leagueId="league-1" initialView="list" /></Providers>);
 
     fireEvent.change(screen.getByLabelText('요일'), { target: { value: '3' } });
     fireEvent.change(screen.getByLabelText('시작 시각'), { target: { value: '22:00' } });

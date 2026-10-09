@@ -50,7 +50,6 @@ import { LeagueCloseRegistrationControl } from './league-close-registration-cont
 import { LeagueCoverImageControl } from './league-cover-image-control';
 import { LeagueScheduleBoard } from '@/components/admin/bracket-canvas/league-schedule-board';
 import { SegmentedTabs } from '@/components/v1-ui/segmented-tabs';
-import { useAdminCanWrite } from '@/hooks/use-admin-can-write';
 import { useV1ApplyLeagueTemplate } from '@/hooks/use-v1-bracket-canvas';
 import { LeagueTemplateDialog } from './league-template-dialog';
 import {
@@ -168,7 +167,6 @@ export default function LeagueMatchFixturesClient({
   // The league's own period settings prefill the duration field. An untouched prefill is not sent:
   // the server resolves the same value, and sending it would switch the fixtures to timed scheduling.
   const [durationTouched, setDurationTouched] = useState(false);
-  const canWritePeriods = useAdminCanWrite();
   const periodSettings = useTournamentPeriodSettings(leagueId).data;
   const periodDefaultMinutes = totalPeriodMinutes(periodSettings);
   const periodDefaultHint = describeLeaguePeriods(periodSettings);
@@ -698,7 +696,7 @@ export default function LeagueMatchFixturesClient({
       {/* 보류 중에는 공개 설정을 따로 바꾸지 않는다 — 보류 해제가 공개 여부까지 되돌린다(서버도 409). */}
       {series.state === 'on_hold' ? null : <LeagueVisibilityControl leagueId={leagueId} isPublic={series.isPublic} />}
       <LeagueCloseRegistrationControl leagueId={leagueId} state={series.state} registrationOpen={series.registrationOpen} registrationDeadlineAt={series.registrationDeadlineAt} activeRegistrationCount={series.activeRegistrationCount} confirmedCount={series.confirmedRegistrationCount} showToast={showToast} />
-      <TournamentPeriodSettingsEditor tournamentId={leagueId} canWrite={canWritePeriods} showToast={showToast} />
+      <TournamentPeriodSettingsEditor tournamentId={leagueId} canWrite={canWrite} showToast={showToast} />
       <LeagueCoverImageControl leagueId={leagueId} sportCode={series.sportCode} coverImageUrl={series.coverImageUrl} />
       <div className="mb-4 md:max-w-xs">
         <SegmentedTabs

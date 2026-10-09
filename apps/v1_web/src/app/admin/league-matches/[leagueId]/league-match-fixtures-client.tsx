@@ -1253,7 +1253,7 @@ export default function LeagueMatchFixturesClient({
                     onEndTimeChange={setEndTime}
                     gameDurationMinutes={gameDurationMinutes}
                     onGameDurationChange={handleGameDurationChange}
-              prefilledHint={durationTouched ? null : periodDefaultHint}
+                    prefilledHint={durationTouched ? null : periodDefaultHint}
                     breakMinutes={breakMinutes}
                     onBreakMinutesChange={setBreakMinutes}
                     gamesPerTeamPerDay={gamesPerTeamPerDay}

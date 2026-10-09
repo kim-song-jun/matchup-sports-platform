@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { Providers } from '@/app/providers';
 import {
@@ -293,7 +293,7 @@ describe('AdminLeagueMatchNewPage', () => {
     expect(pushMock).toHaveBeenCalledWith('/admin/league-matches/league-1');
   });
 
-  it('피리어드 저장이 실패해도 만든 리그의 상세로 이동하고 실패를 알린다', async () => {
+  it('피리어드 저장이 실패하면 화면에 남아 실패와 상세 링크를 보여 주고 다시 만들지 못하게 잠근다', async () => {
     pushMock.mockClear();
     savePeriodsMock.mockReset().mockRejectedValue(new Error('boom'));
     v1GetMock.mockReset().mockResolvedValue({ expectedVersion: 'v-created', periods: [], legacyPeriodCount: null });
@@ -303,8 +303,11 @@ describe('AdminLeagueMatchNewPage', () => {
     fireEvent.change(screen.getByLabelText('전반 (분)'), { target: { value: '25' } });
     fireEvent.click(screen.getByRole('button', { name: '리그 만들기' }));
 
-    expect(await screen.findByText(/경기 시간을 저장하지 못했어요|boom/)).toBeInTheDocument();
-    await waitFor(() => expect(pushMock).toHaveBeenCalledWith('/admin/league-matches/league-1'));
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent(/경기 시간을 저장하지 못했어요|boom/);
+    expect(within(alert).getByRole('link', { name: '리그 상세로 이동' })).toHaveAttribute('href', '/admin/league-matches/league-1');
+    expect(pushMock).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: '리그 만들기' })).toBeDisabled();
   });
   it('피리어드 저장이 진행 중인 동안 버튼이 잠겨 두 번째 클릭이 리그를 다시 만들지 않는다', async () => {
     pushMock.mockClear();
@@ -341,6 +344,6 @@ describe('AdminLeagueMatchNewPage', () => {
     expect(await screen.findByText(/리그는 만들었지만 경기 시간을 저장하지 못했어요/)).toBeInTheDocument();
     expect(screen.queryByText(/missing period settings version/)).not.toBeInTheDocument();
     expect(savePeriodsMock).not.toHaveBeenCalled();
-    await waitFor(() => expect(pushMock).toHaveBeenCalledWith('/admin/league-matches/league-1'));
+    expect(pushMock).not.toHaveBeenCalled();
   });
 });

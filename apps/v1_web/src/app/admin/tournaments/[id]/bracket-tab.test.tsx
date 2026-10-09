@@ -566,15 +566,22 @@ describe('BracketTab — 경기 수정: 시작된 경기의 팀 교체', () => {
     expect(updateFixtureMutate.mock.calls[0][0]).not.toHaveProperty('teamChangeReason');
   });
 
-  it.each([
-    ['OFFICIAL', '공식 결과가 확정된 경기는 팀을 바꿀 수 없어요. 결과를 먼저 무효로 돌려 주세요.'],
-    ['SUBMITTED', '제출된 결과가 있는 경기는 팀을 바꿀 수 없어요. 결과를 확정한 뒤 무효로 돌려 주세요.'],
-  ] as const)('%s 결과가 있으면 팀 선택이 잠기고 안내를 보여 준다', async (revisionState, message) => {
-    bracketFixtures = [fixtureRow({ id: 'fx-1', game: gameOf('ENDED', revisionState) })];
+  it('공식 결과가 있으면 팀 선택이 잠기고 안내를 보여 준다', async () => {
+    bracketFixtures = [fixtureRow({ id: 'fx-1', game: gameOf('ENDED', 'OFFICIAL') })];
     renderTab(vi.fn(), registrations());
     const dialog = await openEdit();
-    expect(within(dialog).getByText(message)).toBeInTheDocument();
+    expect(within(dialog).getByText('공식 결과가 확정된 경기는 팀을 바꿀 수 없어요. 결과를 먼저 무효로 돌려 주세요.')).toBeInTheDocument();
     for (const clear of within(dialog).queryAllByRole('button', { name: '선택 해제' })) expect(clear).toBeDisabled();
+  });
+
+  it('제출만 된 결과는 서버가 교체 때 폐기하므로 시작된 경기처럼 팀을 바꿀 수 있다', async () => {
+    bracketFixtures = [fixtureRow({ id: 'fx-1', game: gameOf('ENDED', 'SUBMITTED') })];
+    renderTab(vi.fn(), registrations());
+    const dialog = await openEdit();
+    expect(within(dialog).getByText('시작된 경기예요. 팀을 바꾸면 그 팀의 명단과 기록이 지워져요.')).toBeInTheDocument();
+    const clears = within(dialog).queryAllByRole('button', { name: '선택 해제' });
+    expect(clears.length).toBeGreaterThan(0);
+    for (const clear of clears) expect(clear).toBeEnabled();
   });
 });
 

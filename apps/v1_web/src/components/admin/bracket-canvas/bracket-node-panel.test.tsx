@@ -223,10 +223,9 @@ describe('BracketNodePanel — 자리 배정', () => {
         expect(screen.getAllByRole('link', { name: '결과 정정 화면 열기' })[0]).toHaveAttribute('href', expect.stringContaining('/records/corrections?fixtureId=f1'));
       });
 
-      it('제출만 된 결과가 있으면 선택창 없이 안내만 보여 준다', () => {
+      it('제출만 된 결과는 서버가 교체 때 폐기하므로 바꿀 수 있다', () => {
         renderPanel(started({ game: makeGame({ state: 'ENDED', latestRevision: revision('SUBMITTED') }) }));
-        expect(screen.queryByLabelText('홈 팀 선택')).not.toBeInTheDocument();
-        expect(screen.getAllByText('제출된 결과가 있는 경기예요. 결과를 확정한 뒤 무효로 돌려 주세요.')).toHaveLength(2);
+        expect(screen.getByLabelText('홈 팀 선택')).toBeEnabled();
       });
     });
 

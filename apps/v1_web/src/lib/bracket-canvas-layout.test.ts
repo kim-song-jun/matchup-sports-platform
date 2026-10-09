@@ -254,8 +254,8 @@ describe('fixtureTeamChangeAccess — 서버 팀 교체 가드와 같은 기준'
     ['종료됐지만 결과 없음', ['ENDED', null], 'started'],
     ['결과가 무효로 돌려진 종료 경기', ['ENDED', 'VOID'], 'started'],
     ['공식 결과 확정', ['ENDED', 'OFFICIAL'], 'official'],
-    ['제출됐지만 미확정', ['ENDED', 'SUBMITTED'], 'pending'],
-    ['고쳐 달라는 요청 상태', ['ENDED', 'CHANGE_REQUESTED'], 'pending'],
+    ['제출됐지만 미확정', ['ENDED', 'SUBMITTED'], 'started'],
+    ['고쳐 달라는 요청 상태', ['ENDED', 'CHANGE_REQUESTED'], 'started'],
     ['취소', ['CANCELLED', null], 'cancelled'],
   ] as const)('%s → %s', (_name, input, expected) => {
     const fixture = input === null

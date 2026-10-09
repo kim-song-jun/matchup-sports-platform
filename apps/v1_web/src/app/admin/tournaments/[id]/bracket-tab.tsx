@@ -193,7 +193,7 @@ export function BracketTab({
   }));
 
   const editFixtureAccess = editFixture ? fixtureTeamChangeAccess(editFixture) : 'free';
-  const editFixtureTeamsLocked = editFixtureAccess === 'official' || editFixtureAccess === 'pending' || editFixtureAccess === 'cancelled';
+  const editFixtureTeamsLocked = editFixtureAccess === 'official' || editFixtureAccess === 'cancelled';
 
   const handleUpdateFixture = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -938,9 +938,7 @@ export function BracketTab({
             <p className="text-[length:var(--font-size-caption)] text-[var(--text-muted)] m-0">
               {editFixtureAccess === 'official'
                 ? '공식 결과가 확정된 경기는 팀을 바꿀 수 없어요. 결과를 먼저 무효로 돌려 주세요.'
-                : editFixtureAccess === 'pending'
-                  ? '제출된 결과가 있는 경기는 팀을 바꿀 수 없어요. 결과를 확정한 뒤 무효로 돌려 주세요.'
-                  : '취소된 경기는 팀을 바꿀 수 없어요.'}
+                : '취소된 경기는 팀을 바꿀 수 없어요.'}
             </p>
           )}
           {editFixtureAccess === 'started' && (

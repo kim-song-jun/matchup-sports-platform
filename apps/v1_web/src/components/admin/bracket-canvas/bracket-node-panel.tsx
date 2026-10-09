@@ -39,7 +39,6 @@ const SIDE_NAME: Record<SideKey, string> = { HOME: '홈', AWAY: '어웨이' };
 
 const DIRECT_SIDE_BLOCKED = {
   official: '공식 결과가 확정된 경기예요. 결과를 먼저 무효로 돌려 주세요.',
-  pending: '제출된 결과가 있는 경기예요. 결과를 확정한 뒤 무효로 돌려 주세요.',
   cancelled: '취소된 경기는 팀을 바꿀 수 없어요.',
 } as const;
 
@@ -119,7 +118,7 @@ export function BracketNodePanel({
     if (source === 'direct') {
       const current = side === 'HOME' ? fixture.homeRegistrationId : fixture.awayRegistrationId;
       const other = side === 'HOME' ? fixture.awayRegistrationId : fixture.homeRegistrationId;
-      if (teamChangeAccess === 'official' || teamChangeAccess === 'pending' || teamChangeAccess === 'cancelled') {
+      if (teamChangeAccess === 'official' || teamChangeAccess === 'cancelled') {
         body = (
           <div className="flex flex-col items-start gap-2">
             <p className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>{DIRECT_SIDE_BLOCKED[teamChangeAccess]}</p>

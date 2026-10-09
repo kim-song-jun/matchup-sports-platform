@@ -20,6 +20,7 @@ function serviceWith(input: {
   readonly mode: V1VisibilityMode;
   readonly publicLive: 'on' | 'off';
   readonly officialScore: { home: number; away: number } | null;
+  readonly officialState?: 'OFFICIAL' | 'VOID';
   readonly leagueIsPublic?: boolean;
 }) {
   const prisma = {
@@ -44,7 +45,9 @@ function serviceWith(input: {
         lineups: [LINEUP_ROW],
         events: [LIVE_GOAL],
         currentOfficialRevision:
-          input.officialScore === null ? null : { id: 'rev-1', score: input.officialScore },
+          input.officialScore === null
+            ? null
+            : { id: 'rev-1', state: input.officialState ?? 'OFFICIAL', score: input.officialScore },
         teamMatch: { league: input.leagueIsPublic === false ? { isPublic: false } : { isPublic: true } },
       }),
     },
@@ -95,6 +98,19 @@ describe('GET /games/:gameId/visibility resolves every stored policy mode', () =
         lineup: null,
       }),
     );
+  });
+
+  it('does not serve a voided pointer revision as the official score', async () => {
+    const service = serviceWith({
+      mode: V1VisibilityMode.OFFICIAL_ONLY,
+      publicLive: 'on',
+      officialScore: { home: 0, away: 1 },
+      officialState: 'VOID',
+    });
+
+    const projection = await service.getVisibility('game-1');
+
+    expect(projection).toEqual(expect.objectContaining({ scoreStatus: 'unavailable', score: null, events: [] }));
   });
 
   it('answers a HIDDEN game with the same 404 a missing game gets', async () => {

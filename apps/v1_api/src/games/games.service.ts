@@ -1234,12 +1234,13 @@ export class GamesService {
         lineup: game.lineups,
         liveScore: this.scoreFromEvents(game.events, game.sides),
         liveEvents: game.events,
+        // A VOID pointer (voided or discarded result) is not an official result.
         officialScore:
-          game.currentOfficialRevision === null
-            ? null
-            : scoreFromJson(game.currentOfficialRevision.score),
+          game.currentOfficialRevision?.state === 'OFFICIAL'
+            ? scoreFromJson(game.currentOfficialRevision.score)
+            : null,
         officialEvents:
-          game.currentOfficialRevision === null ? [] : game.events,
+          game.currentOfficialRevision?.state === 'OFFICIAL' ? game.events : [],
         officialRecords: [],
       },
       {

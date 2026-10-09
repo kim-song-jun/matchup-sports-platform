@@ -24,7 +24,6 @@ import {
   useV1RemoveLeagueTeam,
   useV1Teams,
   useV1UpdateLeagueFixture,
-  useV1AdminTournamentRegistrations,
 } from '@/hooks/use-v1-api';
 import { describeLeagueRegistrationWindow } from '@/lib/league-registration-copy';
 import { leagueFixtureMatchupLabel } from '@/lib/league-fixture-meta';
@@ -108,23 +107,18 @@ export default function LeagueMatchFixturesClient({
   const updateFixture = useV1UpdateLeagueFixture(leagueId);
   const cancelFixture = useV1CancelLeagueFixture(leagueId);
   const regenerateFixtures = useV1RegenerateLeagueFixtures(leagueId);
-  const { data: teamsData } = useV1AdminLeagueTeams(leagueId);
+  const { data: teamsData, isError: teamsIsError, error: teamsError, refetch: refetchTeams } = useV1AdminLeagueTeams(leagueId);
   const canWrite = useAdminCanWrite();
   const applyTemplate = useV1ApplyLeagueTemplate(leagueId);
   const [view, setView] = useState<LeagueFixturesView>(initialView);
   const [templateOpen, setTemplateOpen] = useState(false);
-  const {
-    data: registrationsData,
-    isError: registrationsIsError,
-    error: registrationsError,
-    refetch: refetchRegistrations,
-  } = useV1AdminTournamentRegistrations(leagueId);
+  // 모바일 팀 고르기의 후보는 참가팀 목록(teamsData)에서 오므로 로드 상태도 같은 조회를 따른다.
   const registrationsState: RegistrationsLoadState = {
-    status: registrationsData !== undefined ? 'success' : registrationsIsError ? 'error' : 'pending',
-    truncated: registrationsData?.truncated ?? false,
-    refetchFailed: registrationsIsError && registrationsData !== undefined,
-    error: registrationsError,
-    onRetry: () => void refetchRegistrations(),
+    status: teamsData !== undefined ? 'success' : teamsIsError ? 'error' : 'pending',
+    truncated: false,
+    refetchFailed: teamsIsError && teamsData !== undefined,
+    error: teamsError,
+    onRetry: () => void refetchTeams(),
   };
   const mobileRounds = useMemo(
     () =>

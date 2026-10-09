@@ -1,7 +1,9 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { V1ApiError } from '@/lib/api-client';
+import { v1Keys } from '@/lib/query-keys';
 import { buildBracketMobileRounds, type MobilePickCandidate } from '@/lib/bracket-canvas-mobile-model';
 import {
   makeFixture,
@@ -34,8 +36,11 @@ vi.mock('./bracket-quick-result-form', () => ({
   ),
 }));
 vi.mock('./bracket-result-actions', () => ({
-  BracketResultActions: (props: { tournamentId: string; fixtureId: string; isKnockout: boolean; canWrite: boolean; game: { id: string; latestRevision: { state: string } | null } }): ReactNode => (
-    <div data-testid="result-actions" data-tournament-id={props.tournamentId} data-fixture-id={props.fixtureId} data-game-id={props.game.id} data-can-write={String(props.canWrite)} data-revision-state={props.game.latestRevision?.state ?? ''} />
+  BracketResultActions: (props: { showToast: (message: string, variant?: 'success' | 'error') => void; tournamentId: string; fixtureId: string; isKnockout: boolean; canWrite: boolean; game: { id: string; latestRevision: { state: string } | null } }): ReactNode => (
+    <div data-testid="result-actions" data-tournament-id={props.tournamentId} data-fixture-id={props.fixtureId} data-game-id={props.game.id} data-can-write={String(props.canWrite)} data-revision-state={props.game.latestRevision?.state ?? ''}>
+      <button type="button" onClick={() => props.showToast('결과를 확정했어요.', 'success')}>성공 신호</button>
+      <button type="button" onClick={() => props.showToast('확정하지 못했어요.', 'error')}>실패 신호</button>
+    </div>
   ),
 }));
 
@@ -88,11 +93,13 @@ const fixtures = [
 
 const loaded: RegistrationsLoadState = { status: 'success', truncated: false, refetchFailed: false, error: null, onRetry: vi.fn() };
 
-function renderMobile(overrides: Partial<BracketCanvasMobileProps> = {}) {
+function renderMobile(overrides: Partial<BracketCanvasMobileProps> = {}, queryClient = new QueryClient()) {
   const showToast = vi.fn();
   const rounds = buildBracketMobileRounds({ groups, fixtures, slots });
   const utils = render(
-    <BracketCanvasMobile competitionId="t-1" scope="tournament" rounds={rounds} slots={slots} candidates={candidates} canWrite registrationsState={loaded} showToast={showToast} {...overrides} />,
+    <QueryClientProvider client={queryClient}>
+      <BracketCanvasMobile competitionId="t-1" scope="tournament" rounds={rounds} slots={slots} candidates={candidates} canWrite registrationsState={loaded} showToast={showToast} {...overrides} />
+    </QueryClientProvider>,
   );
   return { showToast, ...utils };
 }
@@ -241,6 +248,32 @@ describe('BracketCanvasMobile — 시트', () => {
     expect(actions).toHaveAttribute('data-can-write', 'true');
     expect(actions).toHaveAttribute('data-revision-state', 'SUBMITTED');
     expect(screen.queryByTestId('quick-form')).not.toBeInTheDocument();
+  });
+
+  it('리그에서 결과 확정이 성공하면 리그 경기 목록 캐시도 갱신한다 — 실패 신호와 대회 화면에서는 건드리지 않는다', () => {
+    const queryClient = new QueryClient();
+    const invalidate = vi.spyOn(queryClient, 'invalidateQueries');
+    const { showToast } = renderMobile({ scope: 'league', competitionId: 'league-1' }, queryClient);
+    fireEvent.click(screen.getByRole('tab', { name: '4강' }));
+    fireEvent.click(card(/4강 · 5번 경기/));
+
+    fireEvent.click(screen.getByRole('button', { name: '실패 신호' }));
+    expect(showToast).toHaveBeenLastCalledWith('확정하지 못했어요.', 'error');
+    expect(invalidate).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: '성공 신호' }));
+    expect(showToast).toHaveBeenLastCalledWith('결과를 확정했어요.', 'success');
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: v1Keys.adminLeagueMatch('league-1') });
+  });
+
+  it('대회 화면에서는 결과 확정 성공이 리그 캐시를 건드리지 않는다', () => {
+    const queryClient = new QueryClient();
+    const invalidate = vi.spyOn(queryClient, 'invalidateQueries');
+    renderMobile({}, queryClient);
+    fireEvent.click(screen.getByRole('tab', { name: '4강' }));
+    fireEvent.click(card(/4강 · 5번 경기/));
+    fireEvent.click(screen.getByRole('button', { name: '성공 신호' }));
+    expect(invalidate).not.toHaveBeenCalled();
   });
 
   it('빠른 입력으로 확정된 경기는 고치기·무효 액션과 득점자 없음 안내를 보여 준다', () => {

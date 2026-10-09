@@ -1,3 +1,4 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 /**
  * 시트가 열린 채 뒤로가기 → 시트만 닫히고 대진 화면에 남는다. 이 테스트가 잡는 버그: 뒤로가기가 시트를 건너뛰고
  * 화면을 떠나는 것, 시트를 ✕·폼 완료로 닫은 뒤 히스토리 항목이 남아 다음 뒤로가기가 헛도는 것.
@@ -53,6 +54,7 @@ beforeEach(() => {
   window.addEventListener('popstate', nextRouterPop);
   subscribeAppPop(appPop);
   render(
+    <QueryClientProvider client={new QueryClient()}>
     <BracketCanvasMobile
       competitionId="t-1"
       scope="tournament"
@@ -62,7 +64,8 @@ beforeEach(() => {
       canWrite
       registrationsState={loaded}
       showToast={vi.fn()}
-    />,
+    />
+    </QueryClientProvider>,
   );
 });
 afterEach(() => {

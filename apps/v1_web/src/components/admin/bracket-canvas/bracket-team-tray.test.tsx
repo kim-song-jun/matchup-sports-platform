@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { directPlacedRegistrationIds } from '@/lib/bracket-canvas-layout';
 import { makeFixture, makeGame, makeRegistration, makeSlot } from '@/test/bracket-canvas-fixtures';
@@ -189,6 +189,29 @@ describe('BracketTeamTray — collapsible(좁은 태블릿)', () => {
     expect(toggle).toHaveAttribute('aria-expanded', 'true');
     expect(toggle.getAttribute('aria-controls')).toBe(list.id);
     expect(screen.getByRole('button', { name: /서울FC/ })).toBeInTheDocument();
+  });
+
+  it('접힌 상태에서는 렌더되지 않은 목록을 aria-controls 로 가리키지 않는다', () => {
+    renderTray({ collapsible: true });
+    expect(screen.getByRole('button', { name: '펼치기' })).not.toHaveAttribute('aria-controls');
+    expect(screen.queryByRole('list')).not.toBeInTheDocument();
+  });
+
+  it('접힌 채로 팀을 골라 둔 상태면 선택된 팀 이름과 선택 해제를 요약 옆에 보이고, 해제하면 선택을 푼다', () => {
+    const { onPick } = renderTray({ collapsible: true, pendingRegistrationId: 'r2' });
+    expect(screen.getByText('선택됨: 부산FC')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '선택 해제' }));
+    expect(onPick).toHaveBeenCalledWith(null);
+  });
+
+  it('선택한 팀이 없으면 접힌 요약에 선택 안내를 내지 않고, 펼치면 목록의 선택됨 표시가 대신한다', () => {
+    renderTray({ collapsible: true });
+    expect(screen.queryByText(/^선택됨:/)).not.toBeInTheDocument();
+    cleanup();
+    renderTray({ collapsible: true, pendingRegistrationId: 'r2' });
+    fireEvent.click(screen.getByRole('button', { name: '펼치기' }));
+    expect(screen.queryByText(/^선택됨:/)).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /부산FC/ })).toHaveAttribute('aria-pressed', 'true');
   });
 
   it('collapsible 이 아니면 토글 없이 펼친 목록이다', () => {

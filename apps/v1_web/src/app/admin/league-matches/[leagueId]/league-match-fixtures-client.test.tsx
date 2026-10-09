@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Providers } from '@/app/providers';
 import {
@@ -42,6 +42,7 @@ vi.mock('@/components/admin/bracket-canvas/bracket-canvas-mobile', () => ({
     rounds: Array<{ label: string }>;
     candidates: Array<{ teamName: string }>;
     slots: unknown[];
+    registrationsState: { status: string };
   }) => (
     <div
       data-testid="mobile-board"
@@ -51,6 +52,7 @@ vi.mock('@/components/admin/bracket-canvas/bracket-canvas-mobile', () => ({
       data-rounds={props.rounds.map((round) => round.label).join(',')}
       data-candidates={props.candidates.map((candidate) => candidate.teamName).join(',')}
       data-slots={props.slots.length}
+      data-registrations-status={props.registrationsState.status}
     />
   ),
 }));
@@ -2200,8 +2202,8 @@ describe('LeagueMatchFixturesClient — 일정 보드와 보기 전환', () => {
     resultStage: 'not_entered', gameState: 'SCHEDULED', game: null, homeScore: null, awayScore: null,
   };
 
-  function renderClient(options: { fixtures?: Fixture[]; slots?: unknown[]; initialView?: 'board' | 'list'; teams?: unknown[] } = {}) {
-    const { fixtures = [EMPTY_FIXTURE], slots = SLOTS, initialView, teams = TEAMS } = options;
+  function renderClient(options: { fixtures?: Fixture[]; slots?: unknown[]; initialView?: 'board' | 'list'; teams?: unknown[]; teamsQuery?: Record<string, unknown> } = {}) {
+    const { fixtures = [EMPTY_FIXTURE], slots = SLOTS, initialView, teams = TEAMS, teamsQuery } = options;
     useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false } as never);
     useV1AdminLeagueMatchMock.mockReturnValue({
       data: {
@@ -2210,7 +2212,7 @@ describe('LeagueMatchFixturesClient — 일정 보드와 보기 전환', () => {
       },
       isPending: false,
     } as never);
-    useV1AdminLeagueTeamsMock.mockReturnValue({ data: { leagueId: 'league-1', teams } } as never);
+    useV1AdminLeagueTeamsMock.mockReturnValue((teamsQuery ?? { data: { leagueId: 'league-1', teams } }) as never);
     useV1GenerateLeagueFixturesMock.mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as never);
     useV1UpdateLeagueFixtureMock.mockReturnValue({ mutate: vi.fn(), isPending: false } as never);
     render(
@@ -2352,6 +2354,20 @@ describe('LeagueMatchFixturesClient — 일정 보드와 보기 전환', () => {
     expect(mobile).toHaveAttribute('data-slots', '2');
     expect(mobile).toHaveAttribute('data-can-write', 'true');
     expect(screen.queryByRole('region', { name: '리그 일정 보드' })).toBeNull();
+  });
+
+  it('390 에서 참가팀(후보 출처) 조회가 끝나기 전에는 팀 고르기 상태가 pending 이고, 끝나면 success 다', () => {
+    resizeViewport(390);
+    renderClient({ teamsQuery: { data: undefined, isError: false } });
+    expect(screen.getByTestId('mobile-board')).toHaveAttribute('data-registrations-status', 'pending');
+    cleanup();
+
+    renderClient({ teamsQuery: { data: undefined, isError: true, error: new Error('x'), refetch: vi.fn() } });
+    expect(screen.getByTestId('mobile-board')).toHaveAttribute('data-registrations-status', 'error');
+    cleanup();
+
+    renderClient();
+    expect(screen.getByTestId('mobile-board')).toHaveAttribute('data-registrations-status', 'success');
   });
 
   it('390 에서도 [일정 보드|목록] 탭은 보이고 목록 탭은 기존 표를 연다 — 구조 편집은 목록에서 계속 할 수 있다', () => {

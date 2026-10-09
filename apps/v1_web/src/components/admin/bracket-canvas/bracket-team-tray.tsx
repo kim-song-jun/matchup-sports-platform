@@ -58,6 +58,8 @@ export function BracketTeamTray({
     () => new Set(slots.filter((slot) => slot.kind !== 'GROUP_RANK' && slot.registrationId !== null).map((slot) => slot.registrationId)),
     [slots],
   );
+  const listRendered = registrationsState.status === 'success' && teams.length > 0;
+  const pendingTeam = teams.find((team) => team.id === pendingRegistrationId) ?? null;
   const unplacedCount = teams.filter((team) => !placedIds.has(team.id) && !directPlacedIds.has(team.id)).length;
 
   const retryAlert = (
@@ -81,7 +83,7 @@ export function BracketTeamTray({
           <button
             type="button"
             aria-expanded={expanded}
-            aria-controls={listId}
+            aria-controls={expanded && listRendered ? listId : undefined}
             onClick={() => setExpanded((value) => !value)}
             className="tm-btn tm-btn-sm tm-btn-outline shrink-0"
             style={{ minHeight: 44 }}
@@ -99,6 +101,16 @@ export function BracketTeamTray({
           </span>
         </div>
       )}
+      {listHidden && pendingTeam !== null ? (
+        <div className="flex min-h-[44px] items-center justify-between gap-2">
+          <p className="tm-text-label min-w-0 break-keep font-semibold" style={{ color: 'var(--blue700)' }}>
+            {`선택됨: ${pendingTeam.name}`}
+          </p>
+          <button type="button" onClick={() => onPick(null)} className="tm-btn tm-btn-sm tm-btn-outline shrink-0" style={{ minHeight: 44 }}>
+            선택 해제
+          </button>
+        </div>
+      ) : null}
       {listHidden ? null : (
         <p className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>
           {canWrite ? '팀을 고른 뒤 비어 있는 자리를 누르거나, 팀을 끌어서 자리에 놓으세요.' : '읽기 전용이라 팀을 넣을 수 없어요.'}

@@ -387,7 +387,7 @@ describe('LeagueScheduleBoard — 태블릿(768~1023)', () => {
     const sheet = screen.getByRole('dialog', { name: '1번 자리 vs 2번 자리' });
     expect(within(sheet).getByRole('dialog', { name: '경기 패널' })).toBeInTheDocument();
 
-    fireEvent.click(within(sheet).getByRole('button', { name: '닫기' }));
+    fireEvent.click(within(sheet).getByRole('button', { name: '패널 닫기' }));
     expect(screen.queryByRole('dialog')).toBeNull();
     expect(opener).toHaveFocus();
   });

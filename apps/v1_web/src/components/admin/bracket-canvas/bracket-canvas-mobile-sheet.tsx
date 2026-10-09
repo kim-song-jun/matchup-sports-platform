@@ -22,6 +22,7 @@ import type { V1AdminBracketSlot } from '@/types/api';
 import { BracketQuickResultForm } from './bracket-quick-result-form';
 import { BracketResultActions } from './bracket-result-actions';
 import type { RegistrationsLoadState } from './bracket-team-tray';
+import { useLeagueResultToast } from './use-league-result-toast';
 
 export type MobileSheetView = { kind: 'detail' } | { kind: 'pick'; side: 'HOME' | 'AWAY' };
 
@@ -77,6 +78,7 @@ function SideRow({ label, side, canPick, onPick }: { label: string; side: Mobile
 function ResultSection({ node, competitionId, scope, canWrite, showToast, onDone }: MobileNodeSheetBodyProps) {
   // 폼은 제출 로직을 갖지 않는다(PR-3 계약) — 변이를 여기서 소유하고 폼의 onSubmit 으로 잇는다.
   const quickResult = useV1QuickResult(competitionId, scope);
+  const notifyLeagueResult = useLeagueResultToast(competitionId, showToast);
   const [quickError, setQuickError] = useState<string | null>(null);
   const homeName = sideDisplayName(node.home);
   const awayName = sideDisplayName(node.away);
@@ -140,7 +142,7 @@ function ResultSection({ node, competitionId, scope, canWrite, showToast, onDone
         homeLabel={homeName}
         awayLabel={awayName}
         canWrite={canWrite}
-        showToast={showToast}
+        showToast={scope === 'league' ? notifyLeagueResult : showToast}
       />
     </div>
   );

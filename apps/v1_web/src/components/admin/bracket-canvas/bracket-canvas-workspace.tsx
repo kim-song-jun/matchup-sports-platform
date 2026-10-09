@@ -323,7 +323,7 @@ export function BracketCanvasWorkspace({
       )}
 
       {panel !== null && selectedFixture !== null && !sidePanel ? (
-        <BottomSheet open onClose={() => setSelectedFixtureId(null)} title={fixtureTitle(selectedFixture, bracket.groups)}>
+        <BottomSheet open onClose={() => setSelectedFixtureId(null)} ariaLabel={fixtureTitle(selectedFixture, bracket.groups)}>
           {panel}
         </BottomSheet>
       ) : null}

@@ -312,7 +312,7 @@ export function LeagueScheduleBoard({ leagueId, fixtures, slots, teams, canWrite
       </div>
 
       {openNode !== null && !sidePanel ? (
-        <BottomSheet open onClose={() => setOpenFixtureId(null)} title={`${openNode.home.label} vs ${openNode.away.label}`}>
+        <BottomSheet open onClose={() => setOpenFixtureId(null)} ariaLabel={`${openNode.home.label} vs ${openNode.away.label}`}>
           {panel}
         </BottomSheet>
       ) : null}

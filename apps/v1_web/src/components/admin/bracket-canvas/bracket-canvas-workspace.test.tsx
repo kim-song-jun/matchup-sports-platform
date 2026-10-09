@@ -393,7 +393,7 @@ describe('BracketCanvasWorkspace — 태블릿(768~1023) 칸 패널 시트·트�
     const sheet = screen.getByRole('dialog', { name: '8강 2번 경기' });
     expect(within(sheet).getByTestId('panel')).toHaveTextContent('f2');
 
-    fireEvent.click(within(sheet).getByRole('button', { name: '닫기' }));
+    fireEvent.click(within(sheet).getByRole('button', { name: '패널 닫기' }));
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     expect(screen.queryByTestId('panel')).not.toBeInTheDocument();
     expect(opener).toHaveFocus();

@@ -44,6 +44,7 @@ const ids = {
   homeSide: '7c1d0000-0000-4000-8000-000000000020',
   awaySide: '7c1d0000-0000-4000-8000-000000000021',
   homePlayer: '7c1d0000-0000-4000-8000-000000000030',
+  replacedTeamPlayer: '7c1d0000-0000-4000-8000-00000000003e',
   awayPlayer: '7c1d0000-0000-4000-8000-000000000031',
   /** 다른 경기의 참가자 — 이 경기의 정정에 등장할 수 없어야 한다. */
   foreignPlayer: '7c1d0000-0000-4000-8000-00000000003f',
@@ -110,6 +111,8 @@ type HarnessOptions = {
    * 하므로, 1-1 무승부 재제출을 검증하려면 이벤트도 1-1이어야 한다.
    */
   readonly awayGoalEvent?: boolean;
+  /** The home side's team was swapped: the old team's lineup is invalidated but its participant row remains. */
+  readonly homeTeamSwapped?: boolean;
   /**
    * 이 경기의 `v1_game_events` 행 수. 기본은 하네스가 실제로 돌려주는 GOAL 이벤트 수(1, `awayGoalEvent` 면 2)와
    * 같다. `0` 이면 어드민 빠른 입력처럼 득점 기록이 전혀 없는 경기다.
@@ -283,11 +286,16 @@ function createHarness(options: HarnessOptions = {}): Harness {
     // 이 경기의 실제 참가자 집합. 오늘 정정 레인은 이 접근자를 **한 번도
     // 호출하지 않는다**(그게 2-F 결함이다). 고친 코드가 부를 수 있도록 미리
     // 제공해 두되, 현행 동작에는 아무 영향이 없다.
+    v1GameLineup: {
+      findMany: async () => (options.homeTeamSwapped === true ? [{ id: 'lineup-replaced' }] : []),
+    },
     v1GameParticipant: {
-      findMany: async () => [
-        { id: ids.homePlayer, sideId: ids.homeSide },
-        { id: ids.awayPlayer, sideId: ids.awaySide },
-      ],
+      findMany: async (args: { where: { lineupId?: { notIn: string[] } } }) =>
+        [
+          { id: ids.homePlayer, sideId: ids.homeSide, lineupId: 'lineup-current' },
+          { id: ids.awayPlayer, sideId: ids.awaySide, lineupId: 'lineup-current' },
+          { id: ids.replacedTeamPlayer, sideId: ids.homeSide, lineupId: 'lineup-replaced' },
+        ].filter((row) => !(args.where.lineupId?.notIn ?? []).includes(row.lineupId)),
     },
     v1GameEvent: {
       count: async () => options.eventCount ?? (options.awayGoalEvent === true ? 2 : 1),
@@ -743,6 +751,29 @@ describe('2-F: 다른 경기의 participantId는 거부되어야 한다', () => 
 
     expectHttp(error, 422, 'PARTICIPANT_INVALID');
     expect(harness.createdRevisions).toHaveLength(0);
+  });
+});
+
+describe('팀 교체로 무효가 된 라인업의 참가자는 새 리비전에 들 수 없다', () => {
+  it('교체된 옛 팀 선수가 든 정정은 422 PARTICIPANT_INVALID', async () => {
+    const harness = createHarness({ homeTeamSwapped: true });
+
+    const error = await captureFailure(() =>
+      harness.correct({
+        actualParticipants: [{ ...validParticipants[0], participantId: ids.replacedTeamPlayer }, validParticipants[1]],
+      }),
+    );
+
+    expectHttp(error, 422, 'PARTICIPANT_INVALID');
+    expect(harness.createdParticipants).toHaveLength(0);
+  });
+
+  it('같은 사이드의 현재 팀 선수는 그대로 통과한다', async () => {
+    const harness = createHarness({ homeTeamSwapped: true });
+
+    await harness.correct({});
+
+    expect(harness.createdParticipants.map((row) => row.participantId)).toEqual([ids.homePlayer, ids.awayPlayer]);
   });
 });
 

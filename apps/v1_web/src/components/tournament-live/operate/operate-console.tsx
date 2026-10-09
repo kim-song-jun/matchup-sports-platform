@@ -884,7 +884,9 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
             setCommandError(
               uncertain
                 ? null
-                : extractErrorMessage(error, '명령을 처리하지 못했어요. 다시 시도해주세요.'),
+                : error instanceof V1ApiError && error.code === 'VERSION_CONFLICT'
+                  ? '다른 화면에서 경기가 바뀌었어요. 새로고침해 주세요.'
+                  : extractErrorMessage(error, '명령을 처리하지 못했어요. 다시 시도해주세요.'),
             );
             setPendingCommandRetry(
               uncertain

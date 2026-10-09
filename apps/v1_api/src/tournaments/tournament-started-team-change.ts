@@ -1,5 +1,6 @@
 import { BadRequestException, ConflictException } from '@nestjs/common';
 import { Prisma, V1GameResultRevisionState, V1GameSideKey } from '@prisma/client';
+import { canonicalGameCommandPayloadHash } from '../games/games.service';
 import { assertRevisionTransition } from '../games/core/revision-state-machine';
 import { tallyLiveScore } from '../games/public-records/public-live-score';
 import { closeRevisionReviewSla } from '../tournament-operations/results/close-review-sla';
@@ -145,13 +146,11 @@ export async function discardUnconfirmedResultRevisions(
       gameId: input.gameId,
       revision: latest.revision + 1,
       state: V1GameResultRevisionState.VOID,
-      score: latest.score as Prisma.InputJsonValue,
-      goalEvents: latest.goalEvents === null ? undefined : (latest.goalEvents as Prisma.InputJsonValue),
-      eventsHash: latest.eventsHash,
-      missingScorer: latest.missingScorer,
-      mvpParticipantId: latest.mvpParticipantId,
-      outcomeReason: latest.outcomeReason,
-      outcomeNote: latest.outcomeNote,
+      // Result-less snapshot: copying the discarded revision would leave its score on the pointer revision, which
+      // the operate console shows as the header score.
+      score: { regulation: null, penalty: null, goals: [], incomplete: true } satisfies Prisma.InputJsonObject,
+      eventsHash: canonicalGameCommandPayloadHash([]),
+      missingScorer: false,
       reason: input.reason,
       createdByActorType: 'USER',
       createdByUserId: input.actorUserId,

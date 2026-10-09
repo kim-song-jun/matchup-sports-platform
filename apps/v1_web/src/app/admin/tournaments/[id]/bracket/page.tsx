@@ -2,6 +2,8 @@
 
 import { Suspense } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { BracketCanvasMobileScreen } from '@/components/admin/bracket-canvas/bracket-canvas-mobile-screen';
+import { BracketCanvasResponsive } from '@/components/admin/bracket-canvas/bracket-canvas-responsive';
 import { BracketCanvasWorkspace } from '@/components/admin/bracket-canvas/bracket-canvas-workspace';
 import type { RegistrationsLoadState } from '@/components/admin/bracket-canvas/bracket-team-tray';
 import { SegmentedTabs } from '@/components/v1-ui/segmented-tabs';
@@ -62,16 +64,29 @@ function BracketPageBody() {
         onSelect={(id) => changeView(id === 'list' ? 'list' : 'canvas')}
       />
       {view === 'canvas' ? (
-        <BracketCanvasWorkspace
-          tournamentId={tournamentId}
-          format={tournament?.format}
-          registrations={registrations}
-          registrationsState={registrationsState}
-          bracketPublishedAt={tournament?.bracketPublishedAt}
-          bracketPublishScheduledAt={tournament?.bracketPublishScheduledAt}
-          canWrite={canWrite}
-          showToast={showToast}
-          onShowList={() => changeView('list')}
+        <BracketCanvasResponsive
+          wide={
+            <BracketCanvasWorkspace
+              tournamentId={tournamentId}
+              format={tournament?.format}
+              registrations={registrations}
+              registrationsState={registrationsState}
+              bracketPublishedAt={tournament?.bracketPublishedAt}
+              bracketPublishScheduledAt={tournament?.bracketPublishScheduledAt}
+              canWrite={canWrite}
+              showToast={showToast}
+              onShowList={() => changeView('list')}
+            />
+          }
+          narrow={
+            <BracketCanvasMobileScreen
+              tournamentId={tournamentId}
+              registrations={registrations}
+              registrationsState={registrationsState}
+              canWrite={canWrite}
+              showToast={showToast}
+            />
+          }
         />
       ) : (
         <BracketTab

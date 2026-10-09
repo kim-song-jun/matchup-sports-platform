@@ -1,7 +1,8 @@
 import { fireEvent, render, screen } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { BracketTeamTray, type RegistrationsLoadState } from '@/components/admin/bracket-canvas/bracket-team-tray';
 import type { V1AdminTournamentRegistration } from '@/types/api';
+import { installViewport } from '@/test/viewport';
 import AdminTournamentBracketPage from './page';
 
 const mocks = vi.hoisted(() => ({
@@ -20,6 +21,9 @@ vi.mock('@/hooks/use-v1-api', () => ({
   useV1AdminTournament: () => ({ data: { format: 'knockout' } }),
   useV1AdminTournamentRegistrations: () => mocks.registrations,
 }));
+vi.mock('@/components/admin/bracket-canvas/bracket-canvas-mobile-screen', () => ({
+  BracketCanvasMobileScreen: () => null,
+}));
 vi.mock('../bracket-tab', () => ({ BracketTab: () => null }));
 // 워크스페이스는 대진 조회가 얽혀 있어 트레이만 진짜로 세운다 — 페이지가 넘기는 값이 진짜 트레이에 닿는 경로를 본다.
 vi.mock('@/components/admin/bracket-canvas/bracket-canvas-workspace', () => ({
@@ -37,11 +41,19 @@ vi.mock('@/components/admin/bracket-canvas/bracket-canvas-workspace', () => ({
 
 const team = { id: 'r1', teamId: 't1', teamName: '서울FC', status: 'confirmed' };
 
+let restoreViewport: (() => void) | null = null;
+
 beforeEach(() => {
+  restoreViewport = installViewport(1280);
   vi.clearAllMocks();
   mocks.registrations.data = undefined;
   mocks.registrations.isError = false;
   mocks.registrations.error = null;
+});
+
+afterEach(() => {
+  restoreViewport?.();
+  restoreViewport = null;
 });
 
 describe('대진 그림 — 캐시가 있는 상태의 재조회 실패', () => {

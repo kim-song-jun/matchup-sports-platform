@@ -86,4 +86,29 @@ describe('정규 리그 빈 경기 공개 게이트', () => {
       expect(res.body.data.progress).toMatchObject({ total: visible.length, played: 0, remaining: visible.length });
     });
   });
+
+  describe('공개 경기 기록', () => {
+    it('GET /tournaments/:id/schedule — 가릴 셋은 빠지고 둘은 남으며, 남은 경기의 주차는 가려진 경기를 포함해 센다', async () => {
+      const res = await request(app.getHttpServer()).get(`/api/v1/tournaments/${leagueId}/schedule`);
+      expect(res.status).toBe(200);
+      const items: Array<{ fixtureId: string; round: string }> = res.body.data.items;
+      expect(sorted(items.map((item) => item.fixtureId))).toEqual(sorted(visible));
+      // 경기일 순서가 a<b<c<d<e 이므로 d=4주차, e=5주차 — 게이트가 주차 집합까지 걸렀다면 1주차·2주차가 된다.
+      expect(items.find((item) => item.fixtureId === ids.filled)?.round).toBe('4주차');
+      expect(items.find((item) => item.fixtureId === ids.legacy)?.round).toBe('5주차');
+    });
+
+    it('경기 상세: 가릴 셋은 404, 둘은 200 이고 주차는 일정과 같다', async () => {
+      for (const fixtureId of gated) {
+        expect((await request(app.getHttpServer()).get(`/api/v1/tournaments/${leagueId}/matches/${fixtureId}`)).status).toBe(404);
+        expect((await request(app.getHttpServer()).get(`/api/v1/league-matches/${leagueId}/fixtures/${fixtureId}/record`)).status).toBe(404);
+      }
+      const filled = await request(app.getHttpServer()).get(`/api/v1/tournaments/${leagueId}/matches/${ids.filled}`);
+      expect(filled.status).toBe(200);
+      expect(filled.body.data.round).toBe('4주차');
+      const legacy = await request(app.getHttpServer()).get(`/api/v1/league-matches/${leagueId}/fixtures/${ids.legacy}/record`);
+      expect(legacy.status).toBe(200);
+      expect(legacy.body.data.round).toBe('5주차');
+    });
+  });
 });

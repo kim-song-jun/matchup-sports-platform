@@ -52,7 +52,9 @@ import {
 import {
   leagueFixtureListOrder,
   leagueFixtureListWhere,
+  publicLeagueFixtureListWhere,
 } from '../../league-matches/league-fixture-list-source';
+import { excludeUnfilledSlotFixturesWhere } from '../../common/competition/unfilled-slot-gate';
 import { LEAGUE_TIE_BREAK_ORDER } from '../../league-matches/league-tie-break';
 import { SLOT_LABEL_SELECT, slotLabelFromRow } from '../../tournaments/slots/tournament-slot-label';
 import { PUBLIC_COMPETITION_STATUS_WHERE } from '../../tournaments/tournaments-read.query';
@@ -950,7 +952,7 @@ export class PublicTournamentRecordsService {
     const teamMatches = await this.prisma.v1TeamMatch.findMany({
       // 술어는 손으로 적지 않는다 — 같은 질문("이 리그의 대진은 무엇인가")에 답하는
       // 조회가 세 벌이었고 서로 달랐다. 이 파일의 것이 가장 옳아서 그것이 정본이 됐다.
-      where: leagueFixtureListWhere(leagueId),
+      where: publicLeagueFixtureListWhere(leagueId),
       orderBy: leagueFixtureListOrder(),
       select: LEAGUE_SCHEDULE_SELECT,
     });
@@ -960,7 +962,9 @@ export class PublicTournamentRecordsService {
       return fixture;
     });
 
-    const weekNumbers = leagueWeekNumbers(resolvedTeamMatches);
+    // 주차 집합은 게이트와 무관한 비삭제 전체다 — 가려진 경기의 경기일도 날짜를 센다. 표시 목록에서 세면
+    // 같은 경기가 일정 화면과 경기 상세(resolveLeagueWeekNumber)에서 다른 주차가 된다.
+    const weekNumbers = leagueWeekNumbers(await this.loadLeagueSiblingStartAts(leagueId), resolvedTeamMatches);
     const allRows = resolvedTeamMatches.map((fixture, index) =>
       toLeagueScheduleRow(fixture, weekNumbers[index], index + 1),
     );
@@ -1820,7 +1824,7 @@ export class PublicTournamentRecordsService {
     }
 
     const teamMatch = await this.prisma.v1TeamMatch.findFirst({
-      where: { id: teamMatchId, leagueId, deletedAt: null },
+      where: { id: teamMatchId, leagueId, deletedAt: null, ...excludeUnfilledSlotFixturesWhere() },
       select: {
         id: true,
         leagueId: true,
@@ -2039,6 +2043,21 @@ export class PublicTournamentRecordsService {
     };
   }
 
+  /** 주차 계산의 형제 집합 — 취소·가려진 경기까지 포함한 비삭제 전체(`leagueFixtureListWhere`, 게이트 없음). */
+  private async loadLeagueSiblingStartAts(leagueId: string): Promise<Date[]> {
+    const rows = await this.prisma.v1TeamMatch.findMany({ where: leagueFixtureListWhere(leagueId), select: { startAt: true } });
+    return rows.map((row) => {
+      if (row.startAt === null) {
+        throw new InternalServerErrorException({
+          code: 'LEAGUE_FIXTURE_INVALID',
+          message: '리그 경기의 시작 시간이 없습니다.',
+          leagueId,
+        });
+      }
+      return row.startAt;
+    });
+  }
+
   /**
    * 주차 라벨 — 리그 대진은 주 단위 템플릿으로 일괄 생성되므로(weeksCount) KST 기준
    * "몇 번째 경기 날짜인가"가 곧 주차다. 리그 상세 화면(league-fixture-detail-client)의
@@ -2181,9 +2200,11 @@ type LeagueScheduleRow = Prisma.V1TeamMatchGetPayload<{ select: typeof LEAGUE_SC
  *
  * 같은 규칙을 쓰는 곳이 셋이다 -- 이 목록, `resolveLeagueFixtureRecord`, 그리고 프론트의
  * 리그 상세. 규칙이 갈리면 **같은 경기가 화면마다 다른 주차로 불린다.**
+ *
+ * @param siblingStartAts 주차를 세는 날짜 집합 -- 표시 목록이 아니라 비삭제 전체(가려진 경기 포함).
  */
-function leagueWeekNumbers(fixtures: readonly { startAt: Date }[]): number[] {
-  const days = [...new Set(fixtures.map((fixture) => KST_DAY.format(fixture.startAt)))].sort();
+function leagueWeekNumbers(siblingStartAts: readonly Date[], fixtures: readonly { startAt: Date }[]): number[] {
+  const days = [...new Set(siblingStartAts.map((startAt) => KST_DAY.format(startAt)))].sort();
   const indexByDay = new Map(days.map((day, index) => [day, index + 1]));
   return fixtures.map((fixture) => indexByDay.get(KST_DAY.format(fixture.startAt)) ?? 1);
 }

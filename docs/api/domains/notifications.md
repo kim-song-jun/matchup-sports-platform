@@ -208,6 +208,7 @@ fan-out되며, 한 채널의 개별 발송 실패는 알림 row 자체나 다른
 | `team_schedule_created` | 활성 멤버(만든 사람 제외) | 새 일정이 올라왔어요 / `"팀명" · 제목 · 10/6 (화) 19:00. 참석 여부를 알려 주세요.` | 일정 상세 |
 | `team_schedule_cancelled` | '불참' 응답자·취소한 본인을 뺀 활성 멤버 + 승인된 용병(공개 일정일 때만) | 일정이 취소됐어요 / `"팀명" · 제목(10/6 (화) 19:00) · 취소 사유` | 일정 상세 |
 | `team_match_application_received` | 호스트 팀 팀장·매니저 | ○○ 팀이 팀매치를 신청했어요 / `"우리 팀명" · 친선 팀매치 · 일시 · 승인하거나 거절해 주세요.` | `/team-matches/:id` |
+| `admin_team_match_application_received` | 플랫폼 모집을 만든 운영자(지금도 활성 owner·ops일 때), 아니면 활성 owner·ops 전원. 신청한 본인은 제외. 리그·대회 연결 매치 제외. `businessKey` `tm-app-admin:{신청 상태 변경 로그 id}:{수신자}` 로 중복 방지 | 새 팀매치 신청이 왔어요 / `신청 팀 → 모집 제목` | `/admin/team-matches/:id` |
 | `team_match_lineup_included` | 제출된 친선 참석명단의 선수(지금도 활성 팀원) | 참석명단에 올랐어요 / `"팀명" · vs 상대팀 · 일시 · 장소` | `/team-matches/:id` |
 
 - **몰림 줄**: 가입 신청 줄은 `businessKey` `team-join-pending:{teamId}:{userId}`, 초대 수락 줄은

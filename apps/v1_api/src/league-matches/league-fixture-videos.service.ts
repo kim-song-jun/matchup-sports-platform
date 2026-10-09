@@ -73,11 +73,10 @@ export class LeagueFixtureVideosService {
     });
     const validFixtures = fixtures.map((fixture) => {
       const startAt = fixture.startAt;
-      const hostTeam = fixture.hostTeam;
-      if (startAt === null || hostTeam === null) {
-        throw new ConflictException({ code: 'LEAGUE_FIXTURE_INCOMPLETE', message: '리그 대진의 일정 또는 홈 팀 정보가 없어 영상을 표시할 수 없어요.' });
+      if (startAt === null) {
+        throw new ConflictException({ code: 'LEAGUE_FIXTURE_INCOMPLETE', message: '리그 대진의 일정 정보가 없어 영상을 표시할 수 없어요.' });
       }
-      return { ...fixture, startAt, hostTeam };
+      return { ...fixture, startAt };
     });
 
     // 주차 라벨 — 공개 기록(getLeagueFixtureRecord)의 resolveLeagueWeekNumber 와 같은
@@ -94,7 +93,7 @@ export class LeagueFixtureVideosService {
           legNumber: 1,
           scheduledAt: fixture.startAt.toISOString(),
           status: fixture.status,
-          homeTeamName: fixture.hostTeam.name,
+          homeTeamName: fixture.hostTeam?.name ?? null,
           awayTeamName: fixture.approvedApplicantTeam?.name ?? null,
           videos: fixture.videos.map((video) => this.serialize(video)),
         };

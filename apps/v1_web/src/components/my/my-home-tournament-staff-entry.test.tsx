@@ -58,6 +58,17 @@ function mockBaseHooks() {
   apiMocks.useV1AuthMe.mockReturnValue({ data: { verification: { phoneVerified: true } } });
 }
 
+describe('MyHomePageClient — 로그아웃 진입점', () => {
+  it('로그아웃 버튼은 계정 설정에만 두므로 마이페이지에는 없다', () => {
+    mockBaseHooks();
+    apiMocks.useV1MyTournamentStaffAssignments.mockReturnValue({ data: { items: [] } });
+
+    render(<MyHomePageClient />);
+
+    expect(screen.queryByRole('button', { name: '로그아웃' })).not.toBeInTheDocument();
+  });
+});
+
 describe('MyHomePageClient — 대회 운영 진입점 노출 조건', () => {
   it('유효한 스태프 배정이 없으면 "대회 운영" 메뉴가 보이지 않는다', () => {
     mockBaseHooks();

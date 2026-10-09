@@ -11,8 +11,8 @@ import { Button } from '@/components/v1-ui/button';
 
 type LogoutButtonProps = {
   /**
-   * 'default' — 기존 full-width neutral 버튼 (계정 설정 페이지 등에서 사용)
-   * 'ghost'   — 텍스트 링크 수준 ghost 버튼 (마이홈 하단 — 파괴 액션이 최강 CTA가 되지 않도록)
+   * 'default' — 기존 full-width neutral 버튼
+   * 'ghost'   — 텍스트 링크 수준 ghost 버튼 (계정 설정 하단 — 파괴 액션이 최강 CTA가 되지 않도록)
    */
   variant?: 'default' | 'ghost';
 };

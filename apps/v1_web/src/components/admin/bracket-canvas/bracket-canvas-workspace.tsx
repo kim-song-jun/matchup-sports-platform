@@ -14,7 +14,11 @@ import {
   useV1UnpublishTournamentBracket,
 } from '@/hooks/use-v1-api';
 import { useV1AssignTournamentSlot, useV1RandomFillSlots } from '@/hooks/use-v1-bracket-canvas';
-import { BRACKET_CANVAS_SIDE_PANEL_MEDIA_QUERY, useMediaQuery } from '@/hooks/use-media-query';
+import {
+  BRACKET_CANVAS_SIDE_PANEL_MEDIA_QUERY,
+  BRACKET_LEAGUE_SIDE_COLUMN_MEDIA_QUERY,
+  useMediaQuery,
+} from '@/hooks/use-media-query';
 import { describeBracketCanvasError } from '@/lib/bracket-canvas-errors';
 import { buildSideLabelContext, directPlacedRegistrationIds, fixtureSideLabel, type SideKey } from '@/lib/bracket-canvas-layout';
 import { buildLeagueStandings } from '@/lib/bracket-league-standings-model';
@@ -68,7 +72,10 @@ export function BracketCanvasWorkspace({
   const [standingsSheetOpen, setStandingsSheetOpen] = useState(false);
   const toolbarHintId = useId();
   // 서버 기본값 true: 하이드레이션 전에는 지금 레이아웃(옆 패널)을 유지하고, 좁은 태블릿만 클라이언트에서 시트로 바뀐다.
-  const sidePanel = useMediaQuery(BRACKET_CANVAS_SIDE_PANEL_MEDIA_QUERY, true);
+  const canvasSidePanel = useMediaQuery(BRACKET_CANVAS_SIDE_PANEL_MEDIA_QUERY, true);
+  const leagueSideColumn = useMediaQuery(BRACKET_LEAGUE_SIDE_COLUMN_MEDIA_QUERY, true);
+  const leagueGrid = format === 'league';
+  const sidePanel = leagueGrid ? leagueSideColumn : canvasSidePanel;
   // 넓은 화면에선 순위표가 옆 열에 있으니 열어 둔 시트를 닫아, 다시 좁혀도 저절로 뜨지 않게 한다.
   useEffect(() => {
     if (sidePanel) setStandingsSheetOpen(false);
@@ -109,7 +116,6 @@ export function BracketCanvasWorkspace({
     );
   }
 
-  const leagueGrid = format === 'league';
   const showStandings = leagueGrid && standingsGroups.length > 0;
   const isEmpty = bracket.groups.length === 0 && bracket.fixtures.length === 0;
   const templateFormat = format === 'knockout' || format === 'league' || format === 'group_knockout' ? format : null;
@@ -312,7 +318,18 @@ export function BracketCanvasWorkspace({
           onCta={templateFormat === null ? onShowList : () => setTemplateOpen(true)}
         />
       ) : (
-        <div className={`grid gap-4 ${!rightColumn ? 'lg:grid-cols-[240px_minmax(0,1fr)]' : 'lg:grid-cols-[240px_minmax(0,1fr)_320px]'}`}>
+        <div
+          className={`grid gap-4 ${
+            leagueGrid
+              ? rightColumn
+                ? 'grid-cols-[minmax(0,1fr)_320px]'
+                : 'grid-cols-1'
+              : !rightColumn
+                ? 'lg:grid-cols-[240px_minmax(0,1fr)]'
+                : 'lg:grid-cols-[240px_minmax(0,1fr)_320px]'
+          }`}
+        >
+          <div className={leagueGrid ? 'col-span-full' : 'contents'}>
           <BracketTeamTray
             registrations={registrations}
             registrationsState={registrationsState}
@@ -320,9 +337,10 @@ export function BracketCanvasWorkspace({
             directPlacedIds={directPlacedRegistrationIds(bracket.fixtures, bracket.slots)}
             pendingRegistrationId={pendingRegistrationId}
             canWrite={canWrite}
-            collapsible={!sidePanel}
+            collapsible={leagueGrid || !sidePanel}
             onPick={setPendingRegistrationId}
           />
+          </div>
           {leagueGrid ? (
             <div className="flex min-w-0 flex-col gap-3">
               {showStandings && (sidePanel ? selectedFixture !== null : true) ? (

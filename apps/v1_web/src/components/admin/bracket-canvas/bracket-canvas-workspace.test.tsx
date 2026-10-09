@@ -495,7 +495,7 @@ const withStandings = makeBracket({
 });
 
 describe('BracketCanvasWorkspace — 리그 순위표 배치', () => {
-  it('1024 이상: 선택이 없으면 옆 열에 조별 순위가 있고, 경기를 고르면 패널로 바뀌며 「순위표 보기」 로 돌아온다', () => {
+  it('1280 이상: 선택이 없으면 옆 열에 조별 순위가 있고, 경기를 고르면 패널로 바뀌며 「순위표 보기」 로 돌아온다', () => {
     setBracket(withStandings);
     render(<BracketCanvasWorkspace {...leagueProps('league')} />);
     const aside = screen.getByRole('complementary', { name: '조별 순위' });
@@ -512,31 +512,58 @@ describe('BracketCanvasWorkspace — 리그 순위표 배치', () => {
     expect(screen.getByRole('complementary', { name: '조별 순위' })).toBeInTheDocument();
   });
 
-  it('1024 와 1023 경계: 1024 는 옆 열, 1023 은 옆 열 없이 「순위표」 시트 버튼', () => {
+  it('1280 과 1279 경계: 1280 은 옆 열, 1279 는 옆 열 없이 「순위표」 시트 버튼', () => {
     setBracket(withStandings);
     render(<BracketCanvasWorkspace {...leagueProps('league')} />);
-    resizeViewport(1024);
+    resizeViewport(1280);
     expect(screen.getByRole('complementary', { name: '조별 순위' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '순위표' })).not.toBeInTheDocument();
 
-    resizeViewport(1023);
+    resizeViewport(1279);
     expect(screen.queryByRole('complementary', { name: '조별 순위' })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '순위표' }));
     const dialog = screen.getByRole('dialog', { name: '조별 순위' });
     expect(within(dialog).getByRole('table', { name: 'A조 순위표' })).toBeInTheDocument();
   });
 
-  it('1023 에서 연 「순위표」 시트는 1024 로 넓히면 닫히고, 다시 좁혀도 저절로 뜨지 않는다', () => {
+  it('1279: 경기를 고르면 패널이 시트(dialog)로 열리고, 1280 은 옆 열에서 순위표와 바뀐다', () => {
     setBracket(withStandings);
     render(<BracketCanvasWorkspace {...leagueProps('league')} />);
-    resizeViewport(1023);
+    resizeViewport(1279);
+    fireEvent.click(screen.getByRole('button', { name: /A조.*1번 경기 열기/ }));
+    expect(within(screen.getByRole('dialog')).getByTestId('panel')).toHaveTextContent('l1');
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: '패널 닫기' }));
+
+    resizeViewport(1280);
+    fireEvent.click(screen.getByRole('button', { name: /A조.*1번 경기 열기/ }));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(screen.getByTestId('panel')).toHaveTextContent('l1');
+    expect(screen.queryByRole('complementary', { name: '조별 순위' })).not.toBeInTheDocument();
+  });
+
+  it('1279 에서 연 「순위표」 시트는 1280 으로 넓히면 닫히고, 다시 좁혀도 저절로 뜨지 않는다', () => {
+    setBracket(withStandings);
+    render(<BracketCanvasWorkspace {...leagueProps('league')} />);
+    resizeViewport(1279);
     fireEvent.click(screen.getByRole('button', { name: '순위표' }));
     expect(screen.getByRole('dialog', { name: '조별 순위' })).toBeInTheDocument();
 
-    resizeViewport(1024);
-    resizeViewport(1023);
+    resizeViewport(1280);
+    resizeViewport(1279);
     expect(screen.queryByRole('dialog', { name: '조별 순위' })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: '순위표' })).toBeInTheDocument();
+  });
+
+  it('리그는 1440 에서도 트레이가 접힌 한 줄 요약이고, 토너먼트는 펼쳐 둔다(대조군)', () => {
+    setBracket(withStandings);
+    const { unmount } = render(<BracketCanvasWorkspace {...leagueProps('league')} />);
+    resizeViewport(1440);
+    expect(screen.getByRole('button', { name: '펼치기' })).toHaveAttribute('aria-expanded', 'false');
+    unmount();
+    setBracket(populated);
+    render(<BracketCanvasWorkspace {...leagueProps('knockout')} />);
+    expect(screen.queryByRole('button', { name: '펼치기' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /서울FC/ })).toBeInTheDocument();
   });
 
   it('리그가 아니거나 편성 팀이 없으면 순위표도 버튼도 없다', () => {

@@ -8,8 +8,8 @@ import { fixtureTitle } from './bracket-canvas';
 import { BracketCanvasNode } from './bracket-canvas-node';
 
 const ROW_LABEL_WIDTH = 72;
-// 1440 에서 트레이(240)+패널(320)을 빼고도 조 2개가 가로 스크롤 없이 들어가는 최소 폭. 조가 3개 이상이면 컨테이너 안에서만 스크롤한다.
-const COLUMN_MIN_WIDTH = 176;
+// 어드민 1440 에서 순위표 열(320)을 빼고도 조 2개가 가로 스크롤 없이 들어가는 최소 폭. 조가 3개 이상이면 컨테이너 안에서만 스크롤한다.
+const COLUMN_MIN_WIDTH = 200;
 
 export type BracketLeagueGridProps = {
   groups: V1AdminBracketGroup[];

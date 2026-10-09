@@ -12,6 +12,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
+import { excludeUnfilledSlotFixturesWhere } from '../common/competition/unfilled-slot-gate';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { formatKstMonthDayTime } from '../common/kst-datetime';
@@ -723,6 +724,7 @@ describe('TeamMatchesService', () => {
     expect(args.where.startAt).toBeUndefined();
     expect(args.where.AND).toEqual([
       { OR: [{ leagueId: null }, { league: { is: { isPublic: true } } }] },
+      excludeUnfilledSlotFixturesWhere(),
       {
         OR: [
           { status: { in: ['recruiting', 'closed'] }, startAt: { gte: expect.any(Date) } },
@@ -793,7 +795,7 @@ describe('TeamMatchesService', () => {
 
       const [upcoming] = callsArgs();
       expect(upcoming.where.AND[0].AND[0]).toEqual({ OR: [{ leagueId: null }, { league: { is: { isPublic: true } } }] });
-      const visibility = upcoming.where.AND[0].AND[1].OR;
+      const visibility = upcoming.where.AND[0].AND[2].OR;
       expect(visibility[0]).toEqual({ status: { in: ['recruiting', 'closed'] }, startAt: { gte: later } });
       expect(visibility[2].OR).toEqual([
         { completedAt: { gte: new Date(later.getTime() - 7 * DAY) } },
@@ -809,7 +811,7 @@ describe('TeamMatchesService', () => {
       const [past] = callsArgs();
       expect(past.where.AND[1]).toEqual({ startAt: { lt: tampered } });
       expect(past.where.AND[0].AND[0]).toEqual({ OR: [{ leagueId: null }, { league: { is: { isPublic: true } } }] });
-      expect(past.where.AND[0].AND[1].OR[2].OR[0]).toEqual({ completedAt: { gte: new Date(T0.getTime() - 7 * DAY) } });
+      expect(past.where.AND[0].AND[2].OR[2].OR[0]).toEqual({ completedAt: { gte: new Date(T0.getTime() - 7 * DAY) } });
     });
 
     it('미래 시각 커서는 현재 시각으로 내려 구간 경계를 앞당기지 못한다', async () => {
@@ -2251,6 +2253,7 @@ describe('TeamMatchesService', () => {
         where: expect.objectContaining({
           AND: expect.arrayContaining([
             { OR: [{ leagueId: null }, { league: { is: { isPublic: true } } }] },
+            excludeUnfilledSlotFixturesWhere(),
           ]),
         }),
       }),
@@ -2266,7 +2269,7 @@ describe('TeamMatchesService', () => {
 
     const where = prisma.v1TeamMatch.findMany.mock.calls[0][0].where.AND[0];
     expect(where.AND[0]).toEqual({ OR: [{ leagueId: null }, { league: { is: { isPublic: true } } }] });
-    const visibility = where.AND[1];
+    const visibility = where.AND[2];
     expect(where.status).toBeUndefined();
     expect(visibility).toEqual({
       OR: [

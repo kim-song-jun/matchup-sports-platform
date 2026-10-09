@@ -1,10 +1,12 @@
 import { randomInt } from 'node:crypto';
 import { ConflictException, Injectable, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
-import { Prisma, type V1CompetitionKind, type V1TournamentSlotKind } from '@prisma/client';
+import { Prisma, type V1TournamentSlotKind } from '@prisma/client';
 import type { V1AuthUser } from '../../auth/v1-auth-user';
 import { AdminContextService, type V1ActiveAdmin } from '../../common/admin-context.service';
 import { GamesService } from '../../games/games.service';
 import { lockGameRows } from '../../games/roster/game-row-lock';
+import { assignLeagueFixtureSideInTx } from '../../league-matches/league-fixture-side-assignment';
+import { promoteLeagueWhenSlotsFilledInTx } from '../../league-matches/league-slot-status';
 import { PrismaService } from '../../prisma/prisma.service';
 import { assignTournamentFixtureSideInTx, releaseUnusedGroupTeamsInTx } from '../tournament-bracket-tx';
 import { adminBracketSlotInclude, serializeAdminBracketSlot } from './admin-bracket-view';
@@ -39,17 +41,6 @@ const SLOT_TRANSACTION_OPTIONS = { timeout: 45_000, maxWait: 5_000 } as const;
 const slotNotFound = () => new NotFoundException({ code: 'SLOT_NOT_FOUND', message: '자리를 찾을 수 없어요.' });
 const alreadyPlaced = () =>
   new ConflictException({ code: 'SLOT_TEAM_ALREADY_PLACED', message: '이미 다른 자리에 들어간 팀이에요.' });
-
-/**
- * 정규 리그 사이드 배정(`assignLeagueFixtureSideInTx`)은 PR-5a 가 들여온다. 그 전에는 리그 자리를 만드는 경로가
- * 없으므로 이 분기에 닿지 않지만, 닿으면 대회용 배정이 리그 경기에 조용히 잘못 도는 것보다 막는 편이 낫다.
- * PR-5a 가 이 함수 한 곳을 리그 분기로 바꾼다.
- */
-function assertTournamentLane(kind: V1CompetitionKind | null): void {
-  if (kind === 'regular_league') {
-    throw new ConflictException({ code: 'SLOT_LEAGUE_NOT_SUPPORTED_YET', message: '정규 리그 자리 배정은 아직 지원하지 않아요.' });
-  }
-}
 
 async function assertPlaceable(
   tx: Tx,
@@ -94,7 +85,6 @@ async function assignSlotCore(
   if (competition === null) {
     throw new NotFoundException({ code: 'TOURNAMENT_NOT_FOUND', message: '대회를 찾을 수 없어요.' });
   }
-  assertTournamentLane(competition.kind);
   if (slot.registrationId === registrationId) return { tournamentId: slot.tournamentId, fixtureIds: [] };
   if (registrationId !== null) await assertPlaceable(tx, slot, registrationId);
 
@@ -115,7 +105,11 @@ async function assignSlotCore(
       releases.push({ groupId: fixture.groupId, registrationId: slot.registrationId });
     }
     for (const side of sidesUsingSlot(fixture, slot.id)) {
-      await assignTournamentFixtureSideInTx(tx, ctx, ctx.admin, { fixtureId: fixture.id, side, registrationId });
+      if (competition.kind === 'regular_league') {
+        await assignLeagueFixtureSideInTx(tx, ctx, ctx.admin, { teamMatchId: fixture.id, side, registrationId });
+      } else {
+        await assignTournamentFixtureSideInTx(tx, ctx, ctx.admin, { fixtureId: fixture.id, side, registrationId });
+      }
     }
   }
   const fixtureIds = fixtures.map((fixture) => fixture.id);
@@ -130,6 +124,8 @@ async function assignSlotCore(
     },
     tx,
   );
+  // League: once no side is empty, move to in-progress like the bulk generator (on-hold and finished are untouched).
+  if (competition.kind === 'regular_league') await promoteLeagueWhenSlotsFilledInTx(tx, competition.id);
   return { tournamentId: slot.tournamentId, fixtureIds };
 }
 
@@ -277,7 +273,6 @@ export class TournamentSlotService {
   async randomFill(user: V1AuthUser, competitionId: string) {
     const admin = await this.adminContext.getMutationAdmin(user.id);
     const competition = await this.loadCompetition(this.prisma, competitionId);
-    assertTournamentLane(competition.kind);
     return this.prisma.$transaction(async (tx) => {
       await lockCompetitionForBracketMutationInTx(tx, competition);
       // 잠금 안에서 다시 읽는다 — 화면이 본 빈 자리가 아니라 지금의 빈 자리·미배치 팀이 기준이다.

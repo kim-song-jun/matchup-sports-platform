@@ -254,3 +254,64 @@ LEAGUE_REGION_INVALID` for an unknown or unsuitable region.
   fixtures). Already-cancelled fixtures are skipped, so an orphaned live game
   on a cancelled fixture does not block them. The admin screen disables the
   team's remove button and the regenerate button on the same condition.
+
+## Template skeleton and slots (자리 기반 대진)
+
+A league can be drawn first and filled with teams later. A **slot** (`V1TournamentSlot`, `kind=ENTRY`,
+`groupId=null`) is a seat a team will take; a fixture points at its two seats with `homeSlotId` /
+`awaySlotId`.
+
+- `POST /api/v1/admin/league-matches/:leagueId/fixtures/template`
+  (`{ teamCount: 3..20, legs: 1|2, schedule: { dates: string[], time: string }, placeName?, replaceExisting? }`)
+  creates `teamCount` slots and the round-robin fixtures between them in one transaction (response
+  `{ slots, fixtures }`). `schedule` is required: one date per round (`LEAGUE_SCHEDULE_SLOTS_INSUFFICIENT`
+  / `LEAGUE_SCHEDULE_DATE_PAST` / `LEAGUE_SCHEDULE_DATE_INVALID` as in bulk generation). `placeName`
+  defaults to `장소 미정`. More than 240 fixtures returns `422 BRACKET_TEMPLATE_TOO_LARGE`. The league
+  `status` is **not** changed.
+  - Locks the league row (`FOR UPDATE`) and applies the same guard as bulk generation (`409 LEAGUE_ON_HOLD`).
+    A league that already has any fixture (cancelled ones included) returns `409 LEAGUE_FIXTURES_EXIST`, so
+    a concurrent bulk generation and a template cannot both succeed.
+  - `replaceExisting: true` cancels the existing non-cancelled fixtures (never deletes — games are
+    `Restrict`-linked), releases their slot links, deletes the old slots and builds the new ones. Allowed
+    only when **every** non-cancelled fixture is unstarted and has no result revision; otherwise
+    `409 BRACKET_LOCKED` and nothing changes.
+  - Support admins get `403`.
+- An empty fixture has `hostTeamId = approvedApplicantTeamId = null`, `status = matched`, side names
+  `홈 팀 미정` / `어웨이 팀 미정`, and no team schedules, participants or application.
+- `PUT /api/v1/admin/tournament-slots/:slotId/assignment` (shared with tournaments, see
+  `docs/api/domains/tournaments.md`) fills or empties a slot and updates every fixture that uses it
+  ("uses" = `deletedAt IS NULL AND status <> 'cancelled'`). League specifics: **team schedules are created
+  only when both sides are filled** (both are cancelled again if one side is emptied); the away side's
+  approved application is upserted on `(teamMatchId, applicantTeamId)` and the previous team's row becomes
+  `withdrawn`. When no slot-linked fixture has an empty side any more, a `draft`/`open`/`closed` league moves to the
+  same in-progress state as bulk generation (`on_hold` / `completed` are never touched; it never moves back).
+- Removing a team (`DELETE .../teams/:teamId`) or cancelling its registration releases its slots instead of
+  cancelling the fixtures **when every fixture using the slot is unstarted**; if one has started the slot is
+  kept. Fixtures without slots are cancelled exactly as before.
+- `POST .../fixtures/regenerate` returns `409 LEAGUE_SLOT_FIXTURES_USE_TEMPLATE` for a league that has slots
+  — use the template with `replaceExisting` instead.
+- `POST .../fixtures/:teamMatchId/cancel` works for empty fixtures (no team notification) and clears the
+  fixture's slot links. Cancelling the last empty fixture can promote the league (see above).
+
+### Public visibility of unfilled fixtures
+
+A fixture linked to a slot whose side has no team (`homeSlotId ≠ null ∧ hostTeamId = null`, or
+`awaySlotId ≠ null ∧ approvedApplicantTeamId = null` — a half-filled fixture included) is **excluded** from:
+`GET /league-matches/:id` and `/standings` (fixtures, pending fixtures), `GET /tournaments/:id` (`leagueFixtures`),
+`GET /tournaments/:id/standings/overall` (progress), `GET /tournaments/:id/schedule`,
+`GET /tournaments/:id/matches/:fixtureId` and `GET /league-matches/:id/fixtures/:fixtureId/record` (404),
+`GET /team-matches` (also the web sitemap source) and `/team-matches/:id` (404), and every scope of
+`GET /me/team-matches`. Fixtures without slots are unaffected, even when `approvedApplicantTeamId` is null.
+The week label ("N주차") is always counted over all non-deleted fixtures of the league, gated or not.
+The result-entry reminder skips such fixtures as well.
+
+### Admin response additions
+
+- `GET /admin/league-matches/:leagueId`: each fixture carries `homeSlotId`, `awaySlotId` and
+  `game: { id, state, version, hasLiveRecords, latestRevision: { id, state, score, entryMethod } | null } | null`;
+  `homeTeamId` / `awayTeamId` are `string | null`. Top level `slots[]`:
+  `{ id, kind, groupId, sourceGroupId, position, label, registrationId, teamName }` (label `N번 자리`).
+- `GET /admin/league-matches/:leagueId/teams`: each team carries `registrationId` (the confirmed
+  registration id the slot assignment endpoint takes).
+- `GET /admin/league-matches/:leagueId/videos`: `homeTeamName` is `string | null` (an unfilled fixture no
+  longer returns `409 LEAGUE_FIXTURE_INCOMPLETE`).

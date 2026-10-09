@@ -94,10 +94,18 @@ async function loadShownArrivals(tx: Tx, gameId: string, sideId: string): Promis
 
 /**
  * 리그 사이드의 최신 리비전이 팀장이 저장·제출한 것이고 아직 이관되지 않았으면 true.
- * 시스템 리비전 = 대진 생성 스냅샷(리비전 1 DRAFT) 또는 동기화 감사 행이 붙은 리비전.
+ * 시스템 리비전 = 대진 생성 스냅샷(리비전 1 DRAFT), 사이드 팀 변경이 남긴 빈 초안(직전 리비전이
+ * SIDE_TEAM_CHANGED 로 무효화된 DRAFT), 또는 동기화 감사 행이 붙은 리비전.
  */
 export async function isUnmigratedTeamAuthoredLineup(tx: Tx, gameId: string, sideId: string, latest: V1GameLineup) {
   if (latest.revision === 1 && latest.state === V1GameLineupState.DRAFT) return false;
+  if (latest.state === V1GameLineupState.DRAFT && latest.supersedesId !== null) {
+    const predecessor = await tx.v1GameLineup.findUnique({
+      where: { id: latest.supersedesId },
+      select: { invalidationReason: true },
+    });
+    if (predecessor?.invalidationReason === 'SIDE_TEAM_CHANGED') return false;
+  }
   const marker = await tx.v1OperationAudit.findFirst({
     where: {
       OR: [

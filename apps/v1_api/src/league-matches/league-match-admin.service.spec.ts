@@ -25,6 +25,10 @@ import { PrismaService } from '../prisma/prisma.service';
 import { leagueActiveRegistrationWhere } from './league-active-registration';
 import { LeagueMatchAdminService } from './league-match-admin.service';
 
+jest.mock('../tournaments/slots/tournament-slot.service', () => ({
+  releaseSlotsForRegistrationInTx: jest.fn().mockResolvedValue(undefined),
+}));
+
 const adminUser: V1AuthUser = {
   id: 'admin-user-id',
   email: 'admin@test.v1',
@@ -903,6 +907,8 @@ describe('LeagueMatchAdminService.removeTeam — 대진 취소 알림과 제외 
         title: '1주차 A vs B',
         hostTeamId: REMOVED_TEAM,
         approvedApplicantTeamId: OPPONENT_TEAM,
+        homeSlotId: null,
+        awaySlotId: null,
         game: { currentOfficialRevisionId: null },
       },
       {
@@ -911,6 +917,8 @@ describe('LeagueMatchAdminService.removeTeam — 대진 취소 알림과 제외 
         title: '2주차 C vs A',
         hostTeamId: OTHER_HOST_TEAM,
         approvedApplicantTeamId: REMOVED_TEAM,
+        homeSlotId: null,
+        awaySlotId: null,
         game: { currentOfficialRevisionId: null },
       },
     ];
@@ -929,6 +937,7 @@ describe('LeagueMatchAdminService.removeTeam — 대진 취소 알림과 제외 
           // stillPresent: where.teamId = teamId(원시값) → 아직 로스터에 있음(1).
           return 1;
         }),
+        findFirst: jest.fn().mockResolvedValue({ id: 'registration-a' }),
         updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
       // 리그 조회도 통합 축이다. `settle()` 이 조기 반환하도록 진행중이 아닌 status 를 둔다.
@@ -1048,6 +1057,7 @@ describe('LeagueMatchAdminService.regenerateFixtures — 진행 중 경기 (W4-V
         }),
       },
       v1Sport: { findFirst: jest.fn().mockResolvedValue({ code: 'futsal' }) },
+      v1TournamentSlot: { count: jest.fn().mockResolvedValue(0) },
       v1CompetitionConfigVersion: {
         findFirst: jest.fn().mockResolvedValue({ id: 'config-1' }),
         findUnique: jest.fn().mockResolvedValue({ periods: [] }),
@@ -1108,8 +1118,12 @@ describe('LeagueMatchAdminService.cancelFixture — 진행 중 경기의 대진 
           title: '1주차 A vs B',
           hostTeamId: 'team-a',
           approvedApplicantTeamId: 'team-b',
+          homeSlotId: null,
+          awaySlotId: null,
         }),
         update: jest.fn().mockResolvedValue({}),
+        // 자리를 쓰는 경기가 없는 리그라 상태 전이 판정은 아무것도 하지 않는다.
+        count: jest.fn().mockResolvedValue(0),
       },
       // settle() 이 조기 반환하도록 진행중이 아닌 리그를 둔다(removeTeam 스펙과 같은 이유).
       v1Tournament: { findFirst: jest.fn().mockResolvedValue({ id: LEAGUE_ID, status: 'draft' }) },
@@ -1207,13 +1221,18 @@ describe('LeagueMatchAdminService.detail — 대진의 gameState', () => {
       placeName: '장소',
       placeAddress: null,
       status: 'matched',
-      game: game === null ? null : { id: `game-${id}`, state: game.state, currentOfficialRevisionId: null, resultRevisions: [] },
+      homeSlotId: null,
+      awaySlotId: null,
+      game: game === null
+        ? null
+        : { id: `game-${id}`, state: game.state, version: 1, currentOfficialRevisionId: null, _count: { events: 0 }, resultRevisions: [] },
     };
   }
 
   async function detailWith(fixtures: ReturnType<typeof fixtureRow>[]) {
     const prisma = {
       v1TeamMatch: { findMany: jest.fn().mockResolvedValue(fixtures) },
+      v1TournamentSlot: { findMany: jest.fn().mockResolvedValue([]) },
       v1GameOfficialFact: { findMany: jest.fn().mockResolvedValue([]) },
       v1TournamentRegistration: { count: jest.fn().mockResolvedValue(0) },
     };
@@ -1291,6 +1310,7 @@ describe('LeagueMatchAdminService.detail — 참가비·대표 이미지 필드'
         }),
       },
       v1TeamMatch: { findMany: jest.fn().mockResolvedValue([]) },
+      v1TournamentSlot: { findMany: jest.fn().mockResolvedValue([]) },
       v1GameOfficialFact: { findMany: jest.fn().mockResolvedValue([]) },
       v1TournamentRegistration: { count: jest.fn().mockResolvedValue(activeCount) },
     };

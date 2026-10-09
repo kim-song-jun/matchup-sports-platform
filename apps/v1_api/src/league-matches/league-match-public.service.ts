@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { excludeUnfilledSlotFixturesWhere } from '../common/competition/unfilled-slot-gate';
 import { isParticipantPubliclyEligible, isRankedRecordHiddenByEligibility, loadParticipantConsentEligibility } from '../games/public-records/public-consent';
 import { isPublicLiveEnabled } from '../games/public-records/public-live-flag';
 import { LEAGUE_STATE_PRIORITY_ORDER, paginateByStatePriority, sortMyLeaguesByState } from './league-lifecycle-rules';
@@ -23,7 +24,7 @@ import {
   LEAGUE_FIXTURE_FACT_SELECT,
   leagueFixtureListOrder,
   LEAGUE_FIXTURE_LIST_SELECT,
-  leagueFixtureListWhere,
+  publicLeagueFixtureListWhere,
   toLeagueFixtureList,
 } from './league-fixture-list-source';
 import {
@@ -439,7 +440,7 @@ export class LeagueMatchPublicService {
   async detail(leagueId: string) {
     const league = await this.loadLeague(leagueId);
     const fixtures = await this.prisma.v1TeamMatch.findMany({
-      where: leagueFixtureListWhere(leagueId),
+      where: publicLeagueFixtureListWhere(leagueId),
       orderBy: leagueFixtureListOrder(),
       // select 를 손으로 적지 않는다 — 대회 표면의 리그 경로가 같은 목록을 만들어야 하고,
       // 두 곳이 서로 다른 select 를 쓰면 같은 대진이 화면마다 다른 모양으로 나온다.
@@ -543,7 +544,7 @@ export class LeagueMatchPublicService {
     const league = await this.loadLeague(leagueId);
     const teamIds = league.teams.map((entry) => entry.teamId);
     const teamMatches = await this.prisma.v1TeamMatch.findMany({
-      where: { leagueId },
+      where: { leagueId, ...excludeUnfilledSlotFixturesWhere() },
       select: {
         id: true,
         hostTeamId: true,

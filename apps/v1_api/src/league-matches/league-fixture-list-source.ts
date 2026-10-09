@@ -1,4 +1,5 @@
-import type { V1GameState, V1VisibilityMode } from '@prisma/client';
+import type { Prisma, V1GameState, V1VisibilityMode } from '@prisma/client';
+import { excludeUnfilledSlotFixturesWhere } from '../common/competition/unfilled-slot-gate';
 import { effectivePublicVisibilityMode } from '../games/public-records/public-visibility';
 import { resolveIsForfeit } from './league-forfeit-result';
 
@@ -167,6 +168,14 @@ function hidesScore(mode: ReturnType<typeof effectivePublicVisibilityMode>): boo
  */
 export function leagueFixtureListWhere(leagueId: string): { leagueId: string; deletedAt: null } {
   return { leagueId, deletedAt: null };
+}
+
+/**
+ * 공개 화면용 대진 술어: `leagueFixtureListWhere` + 자리에 연결됐는데 팀이 빈 경기 제외.
+ * 운영 콘솔·징계 경기 순서는 빈 경기까지 봐야 하므로 게이트 없는 `leagueFixtureListWhere` 를 쓴다.
+ */
+export function publicLeagueFixtureListWhere(leagueId: string): Prisma.V1TeamMatchWhereInput {
+  return { ...leagueFixtureListWhere(leagueId), ...excludeUnfilledSlotFixturesWhere() };
 }
 
 /**

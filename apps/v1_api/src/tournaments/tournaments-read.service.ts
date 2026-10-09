@@ -29,13 +29,14 @@ import {
   LEAGUE_FIXTURE_FACT_SELECT,
   leagueFixtureListOrder,
   LEAGUE_FIXTURE_LIST_SELECT,
-  leagueFixtureListWhere,
+  publicLeagueFixtureListWhere,
   toLeagueFixtureList,
 } from '../league-matches/league-fixture-list-source';
 import {
   calculateLeagueStandingsWithTieBreakInfo,
   resolveLeagueChampions,
 } from '../league-matches/league-standings';
+import { excludeUnfilledSlotFixturesWhere } from '../common/competition/unfilled-slot-gate';
 import { LEAGUE_TIE_BREAK_ORDER } from '../league-matches/league-tie-break';
 import { readPublicRostersForRegistrations, type PublicRosterPlayer } from './public-roster';
 import { isPublicLiveEnabled } from '../games/public-records/public-live-flag';
@@ -268,7 +269,7 @@ export class TournamentsReadService {
    */
   private async leagueCompetitionFixtures(leagueId: string, publicLiveEnabled: boolean) {
     const fixtures = await this.prisma.v1TeamMatch.findMany({
-      where: leagueFixtureListWhere(leagueId),
+      where: publicLeagueFixtureListWhere(leagueId),
       orderBy: leagueFixtureListOrder(),
       select: LEAGUE_FIXTURE_LIST_SELECT,
     });
@@ -464,7 +465,7 @@ export class TournamentsReadService {
     }
 
     const teamMatches = await this.prisma.v1TeamMatch.findMany({
-      where: { leagueId },
+      where: { leagueId, ...excludeUnfilledSlotFixturesWhere() },
       select: {
         id: true,
         hostTeamId: true,

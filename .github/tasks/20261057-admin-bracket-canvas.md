@@ -1,6 +1,6 @@
 # Task 20261057: 어드민 대진 그림 편집기 — 그림 먼저, 팀은 자리에, 결과는 칸에서
 
-Status: QA Pending — PR-1~6 dev 머지, alpha E2E(사용자 승인 후) 대기
+Status: In Progress — PR-1~5 dev 머지, PR-6 머지 후 alpha 갤러리·E2E(사용자 승인 후) 대기
 **Owner**: Planning(main) → backend-data-dev · backend-api-dev · frontend-data-dev · frontend-ui-dev
 **Created**: 2026-10-08
 **Base**: origin/dev `c62b5ec08`

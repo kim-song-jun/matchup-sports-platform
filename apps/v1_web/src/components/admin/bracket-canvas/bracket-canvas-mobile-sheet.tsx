@@ -51,7 +51,8 @@ const SIDE_SOURCE_NOTE: Record<'feeder' | 'direct', string> = {
 };
 
 function SideRow({ label, side, canPick, onPick }: { label: string; side: MobileSide; canPick: boolean; onPick: () => void }) {
-  const note = !hasTeam(side) && side.source !== 'slot' ? SIDE_SOURCE_NOTE[side.source] : null;
+  // feeder 는 팀이 이미 있어도 앞 경기 결과로 채워진다는 사실을 알린다(데스크톱 칸 패널과 같다).
+  const note = side.source === 'feeder' ? SIDE_SOURCE_NOTE.feeder : !hasTeam(side) && side.source === 'direct' ? SIDE_SOURCE_NOTE.direct : null;
   const verb = hasTeam(side) ? '바꾸기' : '고르기';
   return (
     <li className="flex min-h-[44px] flex-col justify-center gap-0.5 rounded-xl bg-[var(--grey50)] px-3 py-2">
@@ -176,7 +177,7 @@ function TeamPickerView({ sideLabel, heading, currentRegistrationId, options, re
   } else if (registrationsState.status === 'error') {
     list = retry;
   } else if (shown.length === 0) {
-    list = registrationsState.refetchFailed ? retry : (
+    list = registrationsState.refetchFailed ? null : (
       <p className="text-[length:var(--font-size-body-sm)] text-[var(--text-muted)]">
         넣을 수 있는 팀이 없어요. 확정된 참가팀이 모두 다른 자리에 있어요.
       </p>
@@ -226,6 +227,17 @@ function TeamPickerView({ sideLabel, heading, currentRegistrationId, options, re
         </button>
       ) : null}
       {list}
+      {registrationsState.refetchFailed ? (
+        <>
+          {retry}
+          {shown.length > 0 ? (
+            <p className="text-[length:var(--font-size-caption)] text-[var(--text-muted)]">이전에 불러온 목록이에요.</p>
+          ) : null}
+        </>
+      ) : null}
+      {registrationsState.status === 'success' && registrationsState.truncated ? (
+        <p className="text-[length:var(--font-size-caption)] text-[var(--text-muted)]">참가팀이 많아 일부만 불러왔어요.</p>
+      ) : null}
     </div>
   );
 }
@@ -245,7 +257,7 @@ async function runAssign(
 ) {
   try {
     await request();
-    showToast(registrationId === null ? '자리를 비웠어요.' : '자리에 팀을 넣었어요.');
+    showToast(registrationId === null ? '자리를 비웠어요.' : '팀을 넣었어요.');
     onBack();
   } catch (err) {
     showToast(describeBracketCanvasError(err, '팀을 바꾸지 못했어요. 잠시 뒤 다시 시도해 주세요.'), 'error');

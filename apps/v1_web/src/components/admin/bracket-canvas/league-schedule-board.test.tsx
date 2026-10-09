@@ -400,6 +400,26 @@ describe('LeagueScheduleBoard — 태블릿(768~1023)', () => {
     expect(screen.getByRole('dialog', { name: '경기 패널' })).toBeInTheDocument();
   });
 
+  it('1024: 패널이 보드와 같은 그리드의 세 번째 열이고, 선택 전에는 두 열이다', () => {
+    resizeViewport(1024);
+    renderBoard();
+    const grid = screen.getByTestId('league-board-grid');
+    expect(grid.className).toContain('lg:grid-cols-[16rem_minmax(0,1fr)]');
+    expect(grid.className).not.toContain('320px');
+    fireEvent.click(within(cardOf('1번 자리 대 2번 자리 경기')).getByRole('button', { name: openerName }));
+    expect(grid.className).toContain('lg:grid-cols-[16rem_minmax(0,1fr)_320px]');
+    expect(grid.lastElementChild).toBe(screen.getByRole('dialog', { name: '경기 패널' }));
+  });
+
+  it('1023: 패널은 그리드 밖 시트에 있고 그리드는 두 열을 유지한다(대조군)', () => {
+    resizeViewport(1023);
+    renderBoard();
+    fireEvent.click(within(cardOf('1번 자리 대 2번 자리 경기')).getByRole('button', { name: openerName }));
+    const grid = screen.getByTestId('league-board-grid');
+    expect(grid.className).not.toContain('320px');
+    expect(grid).not.toContainElement(screen.getByRole('dialog', { name: '경기 패널' }));
+  });
+
   it('트레이는 1023 에서만 접힌다', () => {
     resizeViewport(1023);
     const { unmount } = renderBoard();

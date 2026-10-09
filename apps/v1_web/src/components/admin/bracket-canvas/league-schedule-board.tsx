@@ -222,7 +222,10 @@ export function LeagueScheduleBoard({ leagueId, fixtures, slots, teams, canWrite
         </p>
       ) : null}
 
-      <div className="grid gap-3 lg:grid-cols-[16rem_minmax(0,1fr)]">
+      <div
+        data-testid="league-board-grid"
+        className={`grid gap-3 ${openNode === null || !sidePanel ? 'lg:grid-cols-[16rem_minmax(0,1fr)]' : 'lg:grid-cols-[16rem_minmax(0,1fr)_320px]'}`}
+      >
         <aside aria-label="참가팀 영역">
           <BracketTeamTray
             registrations={registrations ?? []}
@@ -305,16 +308,13 @@ export function LeagueScheduleBoard({ leagueId, fixtures, slots, teams, canWrite
           ))}
         </ol>
         </div>
+        {panel !== null && sidePanel ? panel : null}
       </div>
 
-      {openNode !== null ? (
-        sidePanel ? (
-          panel
-        ) : (
-          <BottomSheet open onClose={() => setOpenFixtureId(null)} title={`${openNode.home.label} vs ${openNode.away.label}`}>
-            {panel}
-          </BottomSheet>
-        )
+      {openNode !== null && !sidePanel ? (
+        <BottomSheet open onClose={() => setOpenFixtureId(null)} title={`${openNode.home.label} vs ${openNode.away.label}`}>
+          {panel}
+        </BottomSheet>
       ) : null}
     </section>
   );

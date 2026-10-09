@@ -316,6 +316,17 @@ describe('BracketCanvasMobile — 사이드 출처 안내', () => {
     expect(within(screen.getByRole('dialog')).queryByText('이전 경기 결과로 채워져요.')).not.toBeInTheDocument();
   });
 
+  it('팀이 이미 있는 앞 경기 사이드에도 안내를 보인다', () => {
+    const feederFixture = makeFixture({
+      id: 'fx-f', groupId: 'g-s', fixtureNumber: 20, ...{ homeRegistrationId: 'r3', homeTeamName: '서초FC', awayRegistrationId: 'r4', awayTeamName: '송파FC' },
+      bracketSources: [{ fixtureId: 'fx-2', outcome: 'WINNER', side: 'HOME' }],
+    });
+    renderMobile({ rounds: buildBracketMobileRounds({ groups, fixtures: [...fixtures, feederFixture], slots }) });
+    fireEvent.click(screen.getByRole('tab', { name: '4강' }));
+    fireEvent.click(card(/4강 · 20번 경기/));
+    expect(within(screen.getByRole('dialog')).getAllByText('이전 경기 결과로 채워져요.')).toHaveLength(1);
+  });
+
   it('자리도 앞 경기도 없이 비어 있는 사이드는 직접 지정 경기라고 안내한다', () => {
     renderMobile();
     fireEvent.click(screen.getByRole('tab', { name: '결승' }));
@@ -356,7 +367,7 @@ describe('BracketCanvasMobile — 팀 넣기', () => {
     await waitFor(() => expect(assignSlot).toHaveBeenCalledWith({ slotId: 's-a1', registrationId: 'r2' }));
     expect(assignSlot).toHaveBeenCalledTimes(1);
     expect(updateFixture).not.toHaveBeenCalled();
-    await waitFor(() => expect(showToast).toHaveBeenCalledWith('자리에 팀을 넣었어요.'));
+    await waitFor(() => expect(showToast).toHaveBeenCalledWith('팀을 넣었어요.'));
     expect(screen.queryByRole('list', { name: '넣을 수 있는 팀' })).not.toBeInTheDocument();
     expect(screen.getByRole('dialog', { name: '8강 · 1번 경기' })).toBeInTheDocument();
   });
@@ -404,7 +415,7 @@ describe('BracketCanvasMobile — 팀 넣기', () => {
     fireEvent.click(screen.getByRole('button', { name: '마포FC' }));
     await waitFor(() => expect(updateFixture).toHaveBeenCalledWith({ fixtureId: 'fx-2', homeRegistrationId: 'r2' }));
     expect(assignSlot).not.toHaveBeenCalled();
-    await waitFor(() => expect(showToast).toHaveBeenCalledWith('자리에 팀을 넣었어요.'));
+    await waitFor(() => expect(showToast).toHaveBeenCalledWith('팀을 넣었어요.'));
   });
 
   it('직접 지정 어웨이 팀을 비우면 어웨이 필드만 null 로 보낸다', async () => {
@@ -432,6 +443,41 @@ describe('BracketCanvasMobile — 팀 넣기', () => {
     expect(screen.queryByText(/넣을 수 있는 팀이 없어요/)).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '다시 시도' }));
     expect(onRetry).toHaveBeenCalledTimes(1);
+  });
+
+  it('재조회가 실패해도 캐시된 목록은 쓰되 오류·다시 시도·이전 목록 안내를 함께 보인다', () => {
+    const onRetry = vi.fn();
+    renderMobile({ registrationsState: { ...loaded, refetchFailed: true, error: new Error('x'), onRetry } });
+    fireEvent.click(card(/8강 · 2번 경기/));
+    fireEvent.click(screen.getByRole('button', { name: '홈 팀 바꾸기' }));
+    expect(optionNames()).toEqual(['강남FC', '마포FC', '용산FC']);
+    expect(screen.getByRole('alert')).toBeInTheDocument();
+    expect(screen.getByText('이전에 불러온 목록이에요.')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '다시 시도' }));
+    expect(onRetry).toHaveBeenCalledTimes(1);
+  });
+
+  it('재조회가 실패했고 캐시 목록도 비었으면 "팀이 없어요" 대신 오류와 다시 시도만 보인다', () => {
+    const onRetry = vi.fn();
+    renderMobile({ candidates: [], registrationsState: { ...loaded, refetchFailed: true, error: new Error('x'), onRetry } });
+    fireEvent.click(card(/8강 · 2번 경기/));
+    fireEvent.click(screen.getByRole('button', { name: '홈 팀 바꾸기' }));
+    expect(screen.queryByText(/넣을 수 있는 팀이 없어요/)).not.toBeInTheDocument();
+    expect(screen.queryByText('이전에 불러온 목록이에요.')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '다시 시도' }));
+    expect(onRetry).toHaveBeenCalledTimes(1);
+  });
+
+  it('참가팀이 상한에 걸려 일부만 불러왔으면 그렇게 알린다 — 아니면 알리지 않는다', () => {
+    const { unmount } = renderMobile({ registrationsState: { ...loaded, truncated: true } });
+    fireEvent.click(card(/8강 · 2번 경기/));
+    fireEvent.click(screen.getByRole('button', { name: '홈 팀 바꾸기' }));
+    expect(screen.getByText('참가팀이 많아 일부만 불러왔어요.')).toBeInTheDocument();
+    unmount();
+    renderMobile();
+    fireEvent.click(card(/8강 · 2번 경기/));
+    fireEvent.click(screen.getByRole('button', { name: '홈 팀 바꾸기' }));
+    expect(screen.queryByText('참가팀이 많아 일부만 불러왔어요.')).not.toBeInTheDocument();
   });
 
   it('고르기 버튼이 없어야 하는 곳 — 조 순위 자리·앞 경기 결과 사이드·시작된 경기·읽기 전용', () => {

@@ -61,6 +61,12 @@ export function OpenInAppSheet() {
     setOpen(false);
   }, []);
 
+  // App Store 에서 돌아왔을 때 시트가 남아 있지 않게 닫되, 링크 이동이 시작된 다음 태스크에서 닫는다.
+  const openAppStore = useCallback(() => {
+    recordDismissed();
+    window.setTimeout(() => setOpen(false), 0);
+  }, []);
+
   return (
     <BottomSheet open={open} onClose={dismiss} ariaLabel="팀밋 앱으로 열기">
       <div className="tm-filter-sheet-handle" aria-hidden="true" />
@@ -92,7 +98,7 @@ export function OpenInAppSheet() {
       </ul>
       <a
         href={IOS_APP_STORE_URL}
-        onClick={recordDismissed}
+        onClick={openAppStore}
         className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block"
       >
         앱으로 열기

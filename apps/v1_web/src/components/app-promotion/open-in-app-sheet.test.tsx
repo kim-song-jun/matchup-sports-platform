@@ -99,7 +99,7 @@ describe('OpenInAppSheet', () => {
     expect(screen.queryByRole('dialog')).toBeNull();
   });
 
-  it('"앱으로 열기" 클릭도 닫힘으로 기록한다', async () => {
+  it('"앱으로 열기" 클릭도 닫힘으로 기록하고, App Store 에서 돌아와도 시트가 남지 않게 닫는다', async () => {
     await mount();
     advance(1500);
     const link = screen.getByRole('link', { name: '앱으로 열기' });
@@ -107,6 +107,8 @@ describe('OpenInAppSheet', () => {
     fireEvent.click(link);
 
     expect(window.sessionStorage.getItem(KEY)).toBe('1');
+    advance(0);
+    expect(screen.queryByRole('link', { name: '앱으로 열기' })).not.toBeInTheDocument();
   });
 
   it('1.5초가 지나기 전에 제외 경로로 이동하면 열리지 않는다', async () => {

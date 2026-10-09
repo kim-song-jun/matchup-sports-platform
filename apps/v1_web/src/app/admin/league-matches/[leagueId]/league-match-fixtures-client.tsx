@@ -33,7 +33,7 @@ import { LeagueNextActionCard } from './league-next-action-card';
 import { pickLeagueNextAction } from '@/lib/league-next-action';
 import { leagueFixtureResultCell } from '@/lib/competition-status';
 import { extractErrorMessage } from '@/lib/error-message';
-import { expandWeeklyFixtureDates } from '@/lib/league-fixture-dates';
+import { expandWeeklyFixtureDates, WEEKDAY_OPTIONS } from '@/lib/league-fixture-dates';
 import { toKstDateString } from '@/lib/kst-calendar';
 import { LeagueFixtureDatePicker } from './league-fixture-date-picker';
 import { LeagueWeeksPlanField } from './league-weeks-plan-field';
@@ -79,16 +79,6 @@ const ACTION_ROW_CLASS = 'col-span-full flex gap-2';
 
 const inputClass =
   'h-[44px] rounded-xl border border-[var(--border-strong)] bg-[var(--card-surface)] px-3 text-sm text-[var(--text-strong)] focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20';
-
-const WEEKDAY_OPTIONS = [
-  { value: 0, label: '일요일' },
-  { value: 1, label: '월요일' },
-  { value: 2, label: '화요일' },
-  { value: 3, label: '수요일' },
-  { value: 4, label: '목요일' },
-  { value: 5, label: '금요일' },
-  { value: 6, label: '토요일' },
-];
 
 export default function LeagueMatchFixturesClient({ leagueId, returnHref = '/admin/league-matches' }: { leagueId: string; returnHref?: string }) {
   const { data: series, isPending, isError, error, refetch } = useV1AdminLeagueMatch(leagueId);

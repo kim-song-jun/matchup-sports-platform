@@ -1,5 +1,5 @@
-import { fireEvent, render, screen, within } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { makeGame, makeSlot } from '@/test/bracket-canvas-fixtures';
 import type { V1AdminBracketFixtureGame } from '@/types/api';
 import type { V1AdminLeagueTeam, V1LeagueFixture } from '@/types/league-match';
@@ -35,16 +35,25 @@ const FIXTURES: V1LeagueFixture[] = [
   fixture({ teamMatchId: 'fx-legacy', startAt: '2030-01-21T10:00:00.000Z' }),
 ];
 
+const mocks = vi.hoisted(() => ({ randomFill: vi.fn() }));
+
+vi.mock('@/hooks/use-v1-bracket-canvas', () => ({
+  useV1RandomFillSlots: () => ({ mutateAsync: mocks.randomFill, isPending: false }),
+}));
+
+const showToast = vi.fn();
 const onOpenTemplate = vi.fn();
 const onShowList = vi.fn();
 
 function renderBoard(overrides: Partial<LeagueScheduleBoardProps> = {}) {
   return render(
     <LeagueScheduleBoard
+      leagueId="league-1"
       fixtures={FIXTURES}
       slots={SLOTS}
       teams={TEAMS}
       canWrite
+      showToast={showToast}
       onOpenTemplate={onOpenTemplate}
       onShowList={onShowList}
       {...overrides}
@@ -53,6 +62,11 @@ function renderBoard(overrides: Partial<LeagueScheduleBoardProps> = {}) {
 }
 
 const cardOf = (name: string) => screen.getByRole('listitem', { name });
+
+beforeEach(() => {
+  vi.resetAllMocks();
+  mocks.randomFill.mockResolvedValue({ assignments: [] });
+});
 
 describe('LeagueScheduleBoard — 렌더', () => {
   it('경기일마다 "N주차 · 날짜" 열을 만들고 자리 라벨·팀 이름·상태를 카드에 싣는다', () => {
@@ -109,5 +123,44 @@ describe('LeagueScheduleBoard — 렌더', () => {
   it('경기가 있어도 자리가 없는 리그는 팀 넣기를 쓸 수 없다고 알린다', () => {
     renderBoard({ slots: [] });
     expect(screen.getByText(/자리 없이 만든 대진/)).toBeInTheDocument();
+  });
+});
+
+describe('LeagueScheduleBoard — 툴바', () => {
+  it('빈 자리 무작위 채우기: 넣은 팀 수를 알리고, 아무것도 못 넣으면 그렇게 말한다', async () => {
+    mocks.randomFill.mockResolvedValueOnce({ assignments: [{ slotId: 's1', registrationId: 'r1' }, { slotId: 's2', registrationId: 'r2' }] });
+    renderBoard();
+
+    fireEvent.click(screen.getByRole('button', { name: '빈 자리 무작위 채우기' }));
+    await waitFor(() => expect(showToast).toHaveBeenCalledWith('2팀을 빈 자리에 넣었어요.', 'success'));
+
+    fireEvent.click(screen.getByRole('button', { name: '빈 자리 무작위 채우기' }));
+    await waitFor(() => expect(showToast).toHaveBeenCalledWith('넣을 수 있는 팀이나 빈 자리가 없어요.', 'success'));
+  });
+
+  it('무작위 채우기가 거부되면 서버 사유를 오류 토스트로 보여 준다', async () => {
+    mocks.randomFill.mockRejectedValueOnce(new Error('참가팀이 모자라요.'));
+    renderBoard();
+
+    fireEvent.click(screen.getByRole('button', { name: '빈 자리 무작위 채우기' }));
+    await waitFor(() => expect(showToast).toHaveBeenCalledWith('참가팀이 모자라요.', 'error'));
+  });
+
+  it('빈 자리가 없으면 무작위 채우기 버튼이 잠긴다', () => {
+    renderBoard({ slots: SLOTS.map((slot) => ({ ...slot, registrationId: `r-${slot.id}`, teamName: slot.id })) });
+    expect(screen.getByRole('button', { name: '빈 자리 무작위 채우기' })).toBeDisabled();
+  });
+
+  it('읽기 전용에는 툴바가 없다', () => {
+    renderBoard({ canWrite: false });
+    expect(screen.queryByRole('button', { name: '빈 자리 무작위 채우기' })).toBeNull();
+    expect(screen.queryByRole('button', { name: /템플릿으로/ })).toBeNull();
+  });
+
+  it('자리가 없는 리그는 무작위 채우기 없이 템플릿으로 다시 만들기만 권한다', () => {
+    renderBoard({ slots: [] });
+    expect(screen.queryByRole('button', { name: '빈 자리 무작위 채우기' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: '템플릿으로 다시 만들기' }));
+    expect(onOpenTemplate).toHaveBeenCalledTimes(1);
   });
 });

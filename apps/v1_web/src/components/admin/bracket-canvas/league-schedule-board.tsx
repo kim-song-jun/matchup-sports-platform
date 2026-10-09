@@ -3,6 +3,8 @@
 import { useId, useMemo } from 'react';
 import { EyeOff } from 'lucide-react';
 import { EmptyState } from '@/components/v1-ui/primitives';
+import { useV1RandomFillSlots } from '@/hooks/use-v1-bracket-canvas';
+import { describeBracketCanvasError } from '@/lib/bracket-canvas-errors';
 import { StatusChip } from '@/components/v1-ui/status-chip';
 import { bracketNodeStateChip } from '@/lib/competition-status';
 import { formatKstDateShort, formatKstTime } from '@/lib/date-utils';
@@ -11,14 +13,18 @@ import type { V1AdminBracketSlot } from '@/types/api';
 import type { V1AdminLeagueTeam, V1LeagueFixture } from '@/types/league-match';
 
 export interface LeagueScheduleBoardProps {
+  leagueId: string;
   fixtures: readonly V1LeagueFixture[];
   slots: V1AdminBracketSlot[];
   /** 팀 id → 이름(자리 없는 기존 경기의 라벨). undefined 는 아직 로딩. */
   teams: readonly V1AdminLeagueTeam[] | undefined;
   canWrite: boolean;
+  showToast: (message: string, variant?: 'success' | 'error') => void;
   onOpenTemplate: () => void;
   onShowList: () => void;
 }
+
+const TOOLBAR_BUTTON = 'tm-btn tm-btn-sm tm-btn-outline';
 
 function scoreText(node: LeagueBoardNode): string | null {
   const score = node.game?.latestRevision?.score;
@@ -27,13 +33,15 @@ function scoreText(node: LeagueBoardNode): string | null {
   return `${score.home} : ${score.away}${penalties}`;
 }
 
-export function LeagueScheduleBoard({ fixtures, slots, teams, canWrite, onOpenTemplate, onShowList }: LeagueScheduleBoardProps) {
+export function LeagueScheduleBoard({ leagueId, fixtures, slots, teams, canWrite, showToast, onOpenTemplate, onShowList }: LeagueScheduleBoardProps) {
   const headingId = useId();
   const teamNameById = useMemo(() => new Map((teams ?? []).map((team) => [team.teamId, team.name])), [teams]);
   const { columns, summary } = useMemo(
     () => buildLeagueBoard({ fixtures, slots, teamNameById }),
     [fixtures, slots, teamNameById],
   );
+
+  const randomFill = useV1RandomFillSlots(leagueId, 'league');
 
   if (fixtures.length === 0) {
     return (
@@ -59,6 +67,21 @@ export function LeagueScheduleBoard({ fixtures, slots, teams, canWrite, onOpenTe
     );
   }
 
+
+  const onRandomFill = async () => {
+    try {
+      const result = await randomFill.mutateAsync();
+      showToast(
+        result.assignments.length === 0
+          ? '넣을 수 있는 팀이나 빈 자리가 없어요.'
+          : `${result.assignments.length}팀을 빈 자리에 넣었어요.`,
+        'success',
+      );
+    } catch (error) {
+      showToast(describeBracketCanvasError(error, '빈 자리를 채우지 못했어요.'), 'error');
+    }
+  };
+
   return (
     <section aria-labelledby={headingId} className="flex flex-col gap-3">
       <h2 id={headingId} className="sr-only">리그 일정 보드</h2>
@@ -68,11 +91,31 @@ export function LeagueScheduleBoard({ fixtures, slots, teams, canWrite, onOpenTe
         </p>
       ) : null}
 
-      <p className="text-[length:var(--font-size-body-sm)] text-[var(--text-strong)]">
-        {summary.slotCount > 0
-          ? `자리 ${summary.filledSlotCount}/${summary.slotCount} 배정${summary.hiddenFixtureCount > 0 ? ` · 공개 대기 ${summary.hiddenFixtureCount}경기` : ''}`
-          : '자리 없이 만든 대진이에요. 팀 넣기는 템플릿으로 다시 만든 뒤 쓸 수 있어요.'}
-      </p>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-[length:var(--font-size-body-sm)] text-[var(--text-strong)]">
+          {summary.slotCount > 0
+            ? `자리 ${summary.filledSlotCount}/${summary.slotCount} 배정${summary.hiddenFixtureCount > 0 ? ` · 공개 대기 ${summary.hiddenFixtureCount}경기` : ''}`
+            : '자리 없이 만든 대진이에요. 팀 넣기는 템플릿으로 다시 만든 뒤 쓸 수 있어요.'}
+        </p>
+        {canWrite ? (
+          <div className="flex flex-wrap items-center gap-2">
+            {summary.slotCount > 0 ? (
+              <button
+                type="button"
+                className={TOOLBAR_BUTTON}
+                style={{ minHeight: 44 }}
+                disabled={!summary.hasEmptySlot || randomFill.isPending}
+                onClick={() => void onRandomFill()}
+              >
+                빈 자리 무작위 채우기
+              </button>
+            ) : null}
+            <button type="button" className={TOOLBAR_BUTTON} style={{ minHeight: 44 }} onClick={onOpenTemplate}>
+              템플릿으로 다시 만들기
+            </button>
+          </div>
+        ) : null}
+      </div>
       {summary.hiddenFixtureCount > 0 ? (
         <p className="text-[length:var(--font-size-caption)] text-[var(--text-muted)]">
           팀이 다 정해지지 않은 경기는 공개 화면에 아직 나오지 않아요. 자리에 팀을 모두 넣으면 나타나요.

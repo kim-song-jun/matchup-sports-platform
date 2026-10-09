@@ -1,6 +1,6 @@
 # Task 20261057: 어드민 대진 그림 편집기 — 그림 먼저, 팀은 자리에, 결과는 칸에서
 
-Status: Planning
+Status: QA Pending — PR-1~6 dev 머지, alpha E2E(사용자 승인 후) 대기
 **Owner**: Planning(main) → backend-data-dev · backend-api-dev · frontend-data-dev · frontend-ui-dev
 **Created**: 2026-10-08
 **Base**: origin/dev `c62b5ec08`
@@ -398,7 +398,7 @@ PR 은 순서대로 dev 에 머지하고 매번 alpha 에서 확인한다(dev �
 - [ ] `releaseSlotsForRegistrationInTx` 를 리그 `removeTeam`·등록 취소 전이에 연결.
 - [ ] 리그 어드민 응답(빈 경기 nullable, 참가팀 `registrationId`)·웹 타입 + 일정 보드.
 ### PR-6 모바일·마감
-- [ ] 390 라운드 탭 + 바텀시트, 구조 편집 숨김. changeset. 태스크 문서 Status 갱신.
+- [x] 390 라운드 탭 + 바텀시트, 구조 편집 숨김. changeset. 태스크 문서 Status 갱신.
 ### Sequential
 - [ ] PR 마다 dev 머지 → alpha 배포 SHA 확인 → **새 테스트 대회로**(alpha 데이터 쓰기 — 사용자 승인 후) ego-browser E2E → 390/768/1440 갤러리를 그 PR 에 게시.
 

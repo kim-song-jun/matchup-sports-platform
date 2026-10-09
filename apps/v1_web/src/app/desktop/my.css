@@ -431,13 +431,13 @@
   }
 }
 
-/* 마이페이지 하단 로그아웃 버튼 여백.
+/* 계정 설정(/my/settings) 하단 로그아웃 버튼 여백.
  * ghost variant이므로 좌측 정렬·폭 제한 대신 텍스트 링크처럼 자연스럽게 표시.
  *
  * NOTE: 이 파일의 규약("ALL rules MUST be inside @media(min-width:1024px|1440px)")과
  * 달리 아래 3개 규칙(.tm-my-logout-row / .tm-my-logout-card / .tm-logout-ghost)은
  * 의도적으로 media query 밖에 둔다 — 로그아웃 버튼은 모바일·데스크톱 동일한 마크업
- * (my-page.tsx)에서 항상 렌더링되고, 두 뷰포트 모두에서 "파괴 액션을 낮은 시각 위계로"
+ * (my-page.tsx의 SettingsPageView)에서 항상 렌더링되고, 두 뷰포트 모두에서 "파괴 액션을 낮은 시각 위계로"
  * 라는 동일한 의도가 적용돼야 한다. @media로 감싸면 모바일에서 이 스타일이 사라져
  * (여백 0, 밑줄·caption 컬러 없는 기본 ghost 버튼으로 되돌아감) 오히려 회귀가 된다. */
 .tm-my-logout-row {
@@ -446,10 +446,10 @@
 
 /* 로그아웃 버튼을 Card로 감싸 메뉴 그리드 아래 "깜빡 잊고 남은 링크"처럼 보이지 않게 한다.
  * Card 자체는 이미 border/radius/surface 토큰을 갖고 있으므로(.tm-card) 여기서는 정렬만
- * 조정 — trailing 정렬로 InfoRow 액션 버튼과 동일한 "우측 액션" 관례를 따른다. */
+ * 조정 — 로그아웃은 화면에서 유일한 단독 액션이라 카드 가운데에 둔다. */
 .tm-my-logout-card {
   display: flex;
-  justify-content: flex-end;
+  justify-content: center;
 }
 
 /* ghost 로그아웃 버튼: 색=캡션, hover=text-strong. 파괴 액션이 primary CTA보다 낮은 시각 위계 유지 */

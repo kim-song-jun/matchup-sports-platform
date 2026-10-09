@@ -2,18 +2,20 @@
 
 import { useMemo, type DragEvent } from 'react';
 import { CheckCircle2, GripVertical } from 'lucide-react';
-import type { V1AdminBracketSlot, V1AdminTournamentRegistration } from '@/types/api';
+import { classifyFixtureSide, type SideKey } from '@/lib/bracket-canvas-layout';
+import type { V1AdminBracketFixture, V1AdminBracketSlot, V1AdminTournamentRegistration } from '@/types/api';
 import { REGISTRATION_DRAG_MIME } from './bracket-canvas-dnd';
 
 export type BracketTeamTrayProps = {
   registrations: V1AdminTournamentRegistration[];
   slots: V1AdminBracketSlot[];
+  fixtures: V1AdminBracketFixture[];
   pendingRegistrationId: string | null;
   canWrite: boolean;
   onPick: (registrationId: string | null) => void;
 };
 
-export function BracketTeamTray({ registrations, slots, pendingRegistrationId, canWrite, onPick }: BracketTeamTrayProps) {
+export function BracketTeamTray({ registrations, slots, fixtures, pendingRegistrationId, canWrite, onPick }: BracketTeamTrayProps) {
   const teams = useMemo(
     () =>
       registrations
@@ -27,7 +29,20 @@ export function BracketTeamTray({ registrations, slots, pendingRegistrationId, c
     () => new Set(slots.filter((slot) => slot.kind !== 'GROUP_RANK' && slot.registrationId !== null).map((slot) => slot.registrationId)),
     [slots],
   );
-  const unplacedCount = teams.filter((team) => !placedIds.has(team.id)).length;
+  // 자리 없이 경기에 직접 지정된 팀(옛 대진·경기 추가). 취소된 경기는 세지 않는다.
+  const inFixtureIds = useMemo(() => {
+    const slotsById = new Map(slots.map((slot) => [slot.id, slot]));
+    const ids = new Set<string>();
+    for (const fixture of fixtures) {
+      if (fixture.status === 'cancelled') continue;
+      for (const side of ['HOME', 'AWAY'] as SideKey[]) {
+        const id = side === 'HOME' ? fixture.homeRegistrationId : fixture.awayRegistrationId;
+        if (id !== null && classifyFixtureSide(fixture, side, slotsById) === 'direct') ids.add(id);
+      }
+    }
+    return ids;
+  }, [fixtures, slots]);
+  const unplacedCount = teams.filter((team) => !placedIds.has(team.id) && !inFixtureIds.has(team.id)).length;
 
   return (
     <section aria-label="참가팀" className="flex flex-col gap-2">
@@ -76,6 +91,10 @@ export function BracketTeamTray({ registrations, slots, pendingRegistrationId, c
                     <span className="tm-text-caption-strong inline-flex items-center gap-1">
                       <CheckCircle2 size={12} aria-hidden="true" />
                       배정됨
+                    </span>
+                  ) : inFixtureIds.has(team.id) && !selected ? (
+                    <span className="tm-text-caption-strong" style={{ color: 'var(--text-muted)' }}>
+                      경기에 있음
                     </span>
                   ) : selected ? (
                     <span className="tm-text-caption-strong" style={{ color: 'var(--blue700)' }}>

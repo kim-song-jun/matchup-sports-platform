@@ -8,12 +8,13 @@ import { useConfirm } from '@/components/v1-ui/confirm-modal';
 import { AlertBanner, EmptyState, ErrorState } from '@/components/v1-ui/primitives';
 import {
   useV1AdminBracket,
+  useV1UpdateFixture,
   useV1PublishTournamentBracket,
   useV1UnpublishTournamentBracket,
 } from '@/hooks/use-v1-api';
 import { useV1AssignTournamentSlot, useV1RandomFillSlots } from '@/hooks/use-v1-bracket-canvas';
 import { describeBracketCanvasError } from '@/lib/bracket-canvas-errors';
-import { buildSideLabelContext, fixtureSideLabel } from '@/lib/bracket-canvas-layout';
+import { buildSideLabelContext, fixtureSideLabel, type SideKey } from '@/lib/bracket-canvas-layout';
 import { isBracketPublished } from '@/lib/bracket-visibility';
 import { extractErrorMessage } from '@/lib/error-message';
 import type { V1AdminTournamentRegistration, V1TournamentFormat } from '@/types/api';
@@ -46,6 +47,7 @@ export function BracketCanvasWorkspace({
 }: BracketCanvasWorkspaceProps) {
   const { data: bracket, isPending, isError, error, refetch } = useV1AdminBracket(tournamentId);
   const assignSlot = useV1AssignTournamentSlot(tournamentId, 'tournament');
+  const updateFixture = useV1UpdateFixture(tournamentId);
   const randomFill = useV1RandomFillSlots(tournamentId, 'tournament');
   const publishBracket = useV1PublishTournamentBracket(tournamentId);
   const unpublishBracket = useV1UnpublishTournamentBracket(tournamentId);
@@ -95,6 +97,19 @@ export function BracketCanvasWorkspace({
   const handleAssign = (slotId: string, registrationId: string) => {
     assignSlot.mutate(
       { slotId, registrationId },
+      {
+        onSuccess: () => {
+          setPendingRegistrationId(null);
+          showToast('팀을 넣었어요.', 'success');
+        },
+        onError: (err) => showToast(describeBracketCanvasError(err, '팀을 넣지 못했어요.'), 'error'),
+      },
+    );
+  };
+
+  const handleAssignDirect = (fixtureId: string, side: SideKey, registrationId: string) => {
+    updateFixture.mutate(
+      { fixtureId, ...(side === 'HOME' ? { homeRegistrationId: registrationId } : { awayRegistrationId: registrationId }) },
       {
         onSuccess: () => {
           setPendingRegistrationId(null);
@@ -231,6 +246,7 @@ export function BracketCanvasWorkspace({
           <BracketTeamTray
             registrations={registrations}
             slots={bracket.slots}
+            fixtures={bracket.fixtures}
             pendingRegistrationId={pendingRegistrationId}
             canWrite={canWrite}
             onPick={setPendingRegistrationId}
@@ -245,6 +261,7 @@ export function BracketCanvasWorkspace({
             canWrite={canWrite}
             onSelectFixture={setSelectedFixtureId}
             onAssignSlot={handleAssign}
+            onAssignDirect={handleAssignDirect}
           />
           {selectedFixture !== null && selectedLabels !== null ? (
             <BracketNodePanel

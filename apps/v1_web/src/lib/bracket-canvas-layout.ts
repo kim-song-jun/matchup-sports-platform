@@ -177,6 +177,19 @@ export function isFixtureLocked(fixture: V1AdminBracketFixture): boolean {
   return game !== null && (game.state !== 'SCHEDULED' || game.latestRevision !== null);
 }
 
+export type SideSource = 'slot' | 'feeder' | 'direct';
+
+/** 사이드의 팀이 어디서 오는지: 자리(slot) · 이전 경기(feeder) · 경기에 직접 지정(direct). */
+export function classifyFixtureSide(
+  fixture: V1AdminBracketFixture,
+  side: SideKey,
+  slotsById: ReadonlyMap<string, V1AdminBracketSlot>,
+): SideSource {
+  const slotId = side === 'HOME' ? fixture.homeSlotId : fixture.awaySlotId;
+  if (slotId !== null && slotsById.has(slotId)) return 'slot';
+  return fixture.bracketSources?.some((source) => source.side === side) ? 'feeder' : 'direct';
+}
+
 export function isSlotAssignable(slot: V1AdminBracketSlot): boolean {
   return slot.kind !== 'GROUP_RANK';
 }

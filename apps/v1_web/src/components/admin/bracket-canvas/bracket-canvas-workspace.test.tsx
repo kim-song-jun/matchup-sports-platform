@@ -7,6 +7,7 @@ import { BracketCanvasWorkspace } from './bracket-canvas-workspace';
 const mocks = vi.hoisted(() => ({
   bracket: { data: undefined as unknown, isPending: false, isError: false, error: null as unknown, refetch: vi.fn() },
   assign: vi.fn(),
+  updateFixture: vi.fn(),
   randomFill: vi.fn(),
   publish: vi.fn(),
   unpublish: vi.fn(),
@@ -14,6 +15,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('@/hooks/use-v1-api', () => ({
   useV1AdminBracket: () => mocks.bracket,
+  useV1UpdateFixture: () => ({ mutate: mocks.updateFixture, isPending: false }),
   useV1PublishTournamentBracket: () => ({ mutate: mocks.publish, isPending: false }),
   useV1UnpublishTournamentBracket: () => ({ mutate: mocks.unpublish, isPending: false }),
 }));
@@ -132,6 +134,18 @@ describe('BracketCanvasWorkspace — 팀 배정(키보드 경로)', () => {
     expect(mocks.assign).toHaveBeenCalledWith({ slotId: 's1', registrationId: 'r1' }, expect.any(Object));
 
     act(() => mocks.assign.mock.calls[0][1].onSuccess());
+    expect(screen.getByRole('button', { name: /서울FC/ })).toHaveAttribute('aria-pressed', 'false');
+  });
+
+  it('자리 없는 옛 대진의 줄에는 경기 PATCH 로 팀을 넣고 고른 팀을 푼다(슬롯 배정은 부르지 않는다)', () => {
+    setBracket(makeBracket({ groups: [group], fixtures: [makeFixture({ id: 'f1', groupId: 'g-qf', fixtureNumber: 1 })] }));
+    renderWorkspace();
+    fireEvent.click(screen.getByRole('button', { name: /서울FC/ }));
+    fireEvent.click(screen.getByRole('button', { name: /^어웨이 .*선택한 팀을 여기에 넣어요$/ }));
+    expect(mocks.updateFixture).toHaveBeenCalledWith({ fixtureId: 'f1', awayRegistrationId: 'r1' }, expect.any(Object));
+    expect(mocks.assign).not.toHaveBeenCalled();
+
+    act(() => mocks.updateFixture.mock.calls[0][1].onSuccess());
     expect(screen.getByRole('button', { name: /서울FC/ })).toHaveAttribute('aria-pressed', 'false');
   });
 

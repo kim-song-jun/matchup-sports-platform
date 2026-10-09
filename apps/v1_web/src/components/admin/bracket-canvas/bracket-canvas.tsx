@@ -8,6 +8,7 @@ import {
   fixtureSideLabel,
   type CanvasEdgeKind,
   type CanvasMode,
+  type SideKey,
 } from '@/lib/bracket-canvas-layout';
 import { competitionMatchLabel } from '@/lib/tournament-round-label';
 import type { V1AdminBracketFixture, V1AdminBracketGroup, V1AdminBracketSlot } from '@/types/api';
@@ -23,6 +24,7 @@ export type BracketCanvasProps = {
   canWrite: boolean;
   onSelectFixture: (fixtureId: string) => void;
   onAssignSlot: (slotId: string, registrationId: string) => void;
+  onAssignDirect: (fixtureId: string, side: SideKey, registrationId: string) => void;
 };
 
 export function fixtureTitle(fixture: V1AdminBracketFixture, groups: readonly V1AdminBracketGroup[]): string {
@@ -47,6 +49,7 @@ export function BracketCanvas({
   canWrite,
   onSelectFixture,
   onAssignSlot,
+  onAssignDirect,
 }: BracketCanvasProps) {
   const layout = useMemo(() => buildCanvasLayout({ groups, fixtures, slots, mode }), [groups, fixtures, slots, mode]);
   const labelContext = useMemo(() => buildSideLabelContext(groups, fixtures, slots), [groups, fixtures, slots]);
@@ -101,6 +104,7 @@ export function BracketCanvas({
               pendingRegistrationId={pendingRegistrationId}
               onSelect={onSelectFixture}
               onAssign={onAssignSlot}
+              onAssignDirect={onAssignDirect}
             />
           );
         })}

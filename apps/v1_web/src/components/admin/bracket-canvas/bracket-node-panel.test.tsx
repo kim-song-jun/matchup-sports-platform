@@ -115,9 +115,62 @@ describe('BracketNodePanel — 자리 배정', () => {
   });
 
   it('자리가 없는 줄은 연결 결과로 채워진다고 알린다', () => {
-    renderPanel(fixtureOf({ awaySlotId: null }));
+    renderPanel(fixtureOf({ awaySlotId: null, bracketSources: [{ fixtureId: 'f0', outcome: 'WINNER', side: 'AWAY' }] }));
     expect(screen.queryByLabelText('어웨이 팀 선택')).not.toBeInTheDocument();
     expect(screen.getByText('이전 경기 결과로 채워져요.')).toBeInTheDocument();
+  });
+
+  describe('자리 없이 팀을 직접 지정한 줄', () => {
+    const legacy = (overrides: Partial<V1AdminBracketFixture> = {}) =>
+      fixtureOf({ homeSlotId: null, awaySlotId: null, homeRegistrationId: 'r1', homeTeamName: '서울FC', ...overrides });
+
+    it('연결 원천이 없으면 안내 문구 대신 선택창을 보여 주고, 반대편 팀은 목록에서 뺀다', () => {
+      renderPanel(legacy({ awayRegistrationId: 'r2', awayTeamName: '부산FC' }));
+      expect(screen.queryByText('이전 경기 결과로 채워져요.')).not.toBeInTheDocument();
+      const home = screen.getByLabelText('홈 팀 선택');
+      expect(home).toHaveValue('r1');
+      expect(within(home).getAllByRole('option').map((option) => option.textContent)).toEqual(['비워 두기', '서울FC', '대구FC']);
+      expect(within(screen.getByLabelText('어웨이 팀 선택')).getAllByRole('option').map((option) => option.textContent)).toEqual(['비워 두기', '부산FC', '대구FC']);
+    });
+
+    it('고른 쪽 한 줄만 PATCH 하고 슬롯 배정은 부르지 않는다', () => {
+      const props = renderPanel(legacy());
+      fireEvent.change(screen.getByLabelText('어웨이 팀 선택'), { target: { value: 'r3' } });
+      expect(mocks.updateFixture).toHaveBeenCalledWith({ fixtureId: 'f1', awayRegistrationId: 'r3' }, expect.any(Object));
+      expect(mocks.assign).not.toHaveBeenCalled();
+      mocks.updateFixture.mock.calls[0][1].onSuccess();
+      expect(props.showToast).toHaveBeenCalledWith('팀을 넣었어요.', 'success');
+
+      fireEvent.change(screen.getByLabelText('홈 팀 선택'), { target: { value: '' } });
+      expect(mocks.updateFixture).toHaveBeenLastCalledWith({ fixtureId: 'f1', homeRegistrationId: null }, expect.any(Object));
+      mocks.updateFixture.mock.calls[1][1].onSuccess();
+      expect(props.showToast).toHaveBeenLastCalledWith('자리를 비웠어요.', 'success');
+    });
+
+    it('서버가 거절하면 해요체 안내를 토스트로 보여 준다', () => {
+      const props = renderPanel(legacy());
+      fireEvent.change(screen.getByLabelText('어웨이 팀 선택'), { target: { value: 'r3' } });
+      mocks.updateFixture.mock.calls[0][1].onError({});
+      expect(props.showToast).toHaveBeenCalledWith('팀을 넣지 못했어요.', 'error');
+    });
+
+    it('시작된 칸은 선택창 없이 잠금 문구만 보여 준다', () => {
+      renderPanel(legacy({ game: makeGame({ state: 'LIVE' }) }));
+      expect(screen.queryByLabelText('홈 팀 선택')).not.toBeInTheDocument();
+      expect(screen.getAllByText('경기가 시작됐거나 결과가 있어 팀을 바꿀 수 없어요.')).toHaveLength(2);
+    });
+
+    it('읽기 전용이면 선택창이 없다', () => {
+      renderPanel(legacy(), { canWrite: false });
+      expect(screen.queryByLabelText('홈 팀 선택')).not.toBeInTheDocument();
+    });
+
+    it('한쪽만 연결 원천이 있으면 그쪽은 안내 문구, 다른 쪽은 선택창이다', () => {
+      renderPanel(legacy({ bracketSources: [{ fixtureId: 'f0', outcome: 'WINNER', side: 'AWAY' }] }));
+      expect(screen.getByLabelText('홈 팀 선택')).toBeInTheDocument();
+      expect(screen.queryByLabelText('어웨이 팀 선택')).not.toBeInTheDocument();
+      expect(screen.getAllByText('이전 경기 결과로 채워져요.')).toHaveLength(1);
+    });
   });
 
   it('읽기 전용이면 선택창·저장·삭제·점수 입력이 모두 없다', () => {

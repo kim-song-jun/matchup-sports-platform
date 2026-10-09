@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { makeRegistration, makeSlot } from '@/test/bracket-canvas-fixtures';
+import { makeFixture, makeRegistration, makeSlot } from '@/test/bracket-canvas-fixtures';
 import { BracketTeamTray } from './bracket-team-tray';
 import { REGISTRATION_DRAG_MIME } from './bracket-canvas-dnd';
 
@@ -15,6 +15,7 @@ function renderTray(overrides: Partial<React.ComponentProps<typeof BracketTeamTr
   const props = {
     registrations,
     slots: [],
+    fixtures: [],
     pendingRegistrationId: null,
     canWrite: true,
     onPick: vi.fn(),
@@ -78,5 +79,42 @@ describe('BracketTeamTray', () => {
   it('확정된 팀이 없으면 빈 안내를 보여 준다', () => {
     renderTray({ registrations: [registrations[3]] });
     expect(screen.getByText('확정된 참가팀이 아직 없어요.')).toBeInTheDocument();
+  });
+
+  describe('자리 없는 옛 대진', () => {
+    const legacy = [
+      makeFixture({ id: 'f1', groupId: 'g', fixtureNumber: 1, homeRegistrationId: 'r1', awayRegistrationId: 'r2' }),
+      makeFixture({ id: 'f2', groupId: 'g', fixtureNumber: 2, homeRegistrationId: 'r1', awayRegistrationId: 'r3', status: 'cancelled' }),
+    ];
+
+    it('경기에 직접 들어간 팀은 "경기에 있음"으로 표시하되 비활성이 아니고, 취소된 경기의 팀은 세지 않는다', () => {
+      renderTray({ fixtures: legacy });
+      expect(screen.getAllByText('경기에 있음')).toHaveLength(2);
+      expect(screen.getByRole('button', { name: /서울FC/ })).toBeEnabled();
+      expect(screen.getByRole('button', { name: /서울FC/ })).toHaveAttribute('draggable', 'true');
+      // 대구FC 는 취소된 경기에만 있어 미배정 그대로다.
+      expect(screen.getByRole('button', { name: /대구FC/ })).not.toHaveTextContent('경기에 있음');
+      expect(screen.getByText('미배정 1 / 전체 3')).toBeInTheDocument();
+    });
+
+    it('이전 경기 연결로 채워진 줄에 박힌 팀은 직접 지정이 아니라서 세지 않는다', () => {
+      const fed = makeFixture({
+        id: 'f3',
+        groupId: 'g',
+        fixtureNumber: 3,
+        homeRegistrationId: 'r1',
+        bracketSources: [{ fixtureId: 'f1', outcome: 'WINNER', side: 'HOME' }],
+      });
+      renderTray({ fixtures: [fed] });
+      expect(screen.queryByText('경기에 있음')).not.toBeInTheDocument();
+      expect(screen.getByText('미배정 3 / 전체 3')).toBeInTheDocument();
+    });
+
+    it('자리에 들어간 팀은 여전히 비활성 "배정됨"이다', () => {
+      renderTray({ fixtures: legacy, slots: [makeSlot({ id: 's1', kind: 'ENTRY', registrationId: 'r3' })] });
+      expect(screen.getByRole('button', { name: /대구FC/ })).toBeDisabled();
+      expect(screen.getByText('배정됨')).toBeInTheDocument();
+      expect(screen.getByText('미배정 0 / 전체 3')).toBeInTheDocument();
+    });
   });
 });

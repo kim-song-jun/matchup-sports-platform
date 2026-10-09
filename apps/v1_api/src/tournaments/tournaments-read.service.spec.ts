@@ -454,16 +454,6 @@ describe('TournamentsReadService', () => {
     expect(result.pageInfo).toMatchObject({ hasNext: true, nextCursor: 't-2' });
   });
 
-  it('list: cursor argument is forwarded to Prisma with skip:1', async () => {
-    prisma.v1Tournament.findMany.mockResolvedValue([]);
-
-    await service.list({ cursor: 'cursor-id', limit: 10 });
-
-    const callArgs = prisma.v1Tournament.findMany.mock.calls[0][0];
-    expect(callArgs.cursor).toEqual({ id: 'cursor-id' });
-    expect(callArgs.skip).toBe(1);
-  });
-
   it('list: sportId filter is forwarded as sportId UUID condition', async () => {
     prisma.v1Tournament.findMany.mockResolvedValue([]);
 
@@ -483,26 +473,6 @@ describe('TournamentsReadService', () => {
   });
 
   // ─── list — 페이지 번호(데스크톱) ────────────────────────────────────────────
-
-  it('list: page=3 → skip=(page-1)*limit, cursor 는 쓰지 않는다', async () => {
-    prisma.v1Tournament.findMany.mockResolvedValue([]);
-
-    await service.list({ page: 3, limit: 20 });
-
-    const callArgs = prisma.v1Tournament.findMany.mock.calls[0][0];
-    expect(callArgs.skip).toBe(40);
-    expect(callArgs.cursor).toBeUndefined();
-  });
-
-  it('list: page 와 cursor 가 함께 오면 page 가 이긴다', async () => {
-    prisma.v1Tournament.findMany.mockResolvedValue([]);
-
-    await service.list({ page: 2, cursor: 'cursor-id', limit: 10 });
-
-    const callArgs = prisma.v1Tournament.findMany.mock.calls[0][0];
-    expect(callArgs.skip).toBe(10);
-    expect(callArgs.cursor).toBeUndefined();
-  });
 
   it('list: page 요청이면 전체 건수를 세어 totalPages/hasPrev 를 채운다', async () => {
     prisma.v1Tournament.findMany.mockResolvedValue([tournamentCard({ id: 't-1' })]);
@@ -543,13 +513,74 @@ describe('TournamentsReadService', () => {
     expect(countWhere).toEqual(listWhere);
   });
 
-  it('list: 정렬은 createdAt 동률을 id 로 깨서 페이지 경계가 흔들리지 않게 한다', async () => {
-    prisma.v1Tournament.findMany.mockResolvedValue([]);
+  // ─── list — 기본 정렬(서버가 단일 출처) ──────────────────────────────────────
 
-    await service.list({ page: 1 });
+  describe('list default order', () => {
+    const day = (d: number) => new Date(Date.UTC(2026, 9, d));
+    // Deliberately shuffled; two rows per group, completed ones have end dates in reverse of start order.
+    const rows = [
+      tournamentCard({ id: 'c-old', status: 'completed', scheduledAt: day(1), scheduledEndAt: day(2) }),
+      tournamentCard({ id: 'ip-late', status: 'in_progress', scheduledAt: day(20) }),
+      tournamentCard({ id: 'o-late', status: 'open', scheduledAt: day(25) }),
+      tournamentCard({ id: 'cl-late', status: 'closed', scheduledAt: day(18) }),
+      tournamentCard({ id: 'c-new', status: 'completed', scheduledAt: day(3), scheduledEndAt: day(9) }),
+      tournamentCard({ id: 'o-soon', status: 'open', scheduledAt: day(11) }),
+      tournamentCard({ id: 'ip-soon', status: 'in_progress', scheduledAt: day(10) }),
+      tournamentCard({ id: 'cl-soon', status: 'closed', scheduledAt: day(12) }),
+      tournamentCard({ id: 'o-tie-b', status: 'open', scheduledAt: day(11) }),
+    ];
+    const expected = [
+      'o-soon', 'o-tie-b', 'o-late', 'cl-soon', 'cl-late', 'ip-soon', 'ip-late', 'c-new', 'c-old',
+    ];
 
-    const callArgs = prisma.v1Tournament.findMany.mock.calls[0][0];
-    expect(callArgs.orderBy).toEqual([{ createdAt: 'desc' }, { id: 'desc' }]);
+    function mockRows() {
+      prisma.v1Tournament.findMany.mockImplementation(async (args: { where: { id?: { in: string[] } } }) =>
+        args.where.id ? rows.filter((r) => args.where.id!.in.includes(r.id as string)) : rows,
+      );
+    }
+
+    it('groups open -> closed -> in_progress -> completed, ties by id, completed most recently ended first', async () => {
+      mockRows();
+      const result = await service.list({ limit: 50 });
+      expect(result.items.map((i) => i.id)).toEqual(expected);
+    });
+
+    it('cursor paging across group boundaries yields every row exactly once, in order', async () => {
+      mockRows();
+      const seen: string[] = [];
+      let cursor: string | undefined;
+      for (let guard = 0; guard < 20; guard += 1) {
+        const page = await service.list({ limit: 2, cursor });
+        seen.push(...page.items.map((i) => i.id));
+        cursor = page.pageInfo.nextCursor ?? undefined;
+        if (!cursor) break;
+      }
+      expect(seen).toEqual(expected);
+    });
+
+    it('page-number paging matches the same order with no gaps or duplicates', async () => {
+      mockRows();
+      prisma.v1Tournament.count.mockResolvedValue(rows.length);
+      const seen: string[] = [];
+      for (let page = 1; page <= 3; page += 1) {
+        const result = await service.list({ limit: 4, page });
+        seen.push(...result.items.map((i) => i.id));
+      }
+      expect(seen).toEqual(expected);
+    });
+
+    it('a status filter keeps its where and still orders inside the single group', async () => {
+      mockRows();
+      await service.list({ status: 'completed', limit: 50 });
+      expect(prisma.v1Tournament.findMany.mock.calls[0][0].where.status).toBe('completed');
+    });
+
+    it('a cursor that no longer matches a row returns an empty page instead of restarting', async () => {
+      mockRows();
+      const result = await service.list({ cursor: 'deleted-id', limit: 5 });
+      expect(result.items).toEqual([]);
+      expect(result.pageInfo).toEqual({ nextCursor: null, hasNext: false });
+    });
   });
 
   // ─── get — not found / hidden ────────────────────────────────────────────────

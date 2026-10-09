@@ -23,7 +23,7 @@ const EXCLUDED_PATTERNS: readonly RegExp[] = [
   /^\/chat\/[^/]+/, // chat room: reverse scroll + older-message loading
   /\/(new|edit)(\/|$)/, // create / edit forms
   /^\/team-matches\/[^/]+\/(lineup|record|result)(\/|$)/,
-  /^\/teams\/[^/]+\/(dissolve|invite|contact|tactics|games)(\/|$)/,
+  /^\/teams\/[^/]+\/(dissolve|invite|contact|tactics|games|game-rosters)(\/|$)/,
   /^\/tournaments\/[^/]+\/(apply|registrations)(\/|$)/,
   /^\/my\/reviews\/[^/]+\/[^/]+/, // review compose; the list and /received stay enabled
 ];

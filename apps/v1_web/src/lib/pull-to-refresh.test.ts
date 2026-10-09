@@ -50,6 +50,7 @@ describe('isPullToRefreshRoute', () => {
     '/teams/team1/dissolve',
     '/teams/team1/tactics/g1',
     '/teams/team1/games/g1/roster',
+    '/teams/team1/game-rosters',
     '/tournaments/t1/apply',
     '/tournaments/t1/registrations/r1/roster',
     '/my/reviews/team_match/t1',

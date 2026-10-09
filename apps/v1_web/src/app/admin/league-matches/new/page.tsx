@@ -43,6 +43,8 @@ export default function AdminLeagueMatchNewPage() {
   // Period minutes start from the sport default and are saved after creation only when the operator edits them.
   const [periodMinutes, setPeriodMinutes] = useState<string[]>([]);
   const [periodsDirty, setPeriodsDirty] = useState(false);
+  // Covers create + period lookup/save so the button stays locked until the whole flow settles.
+  const [submitting, setSubmitting] = useState(false);
 
   const { data: sports } = useV1MasterSports();
   const { data: regions } = useV1MasterRegions();
@@ -119,6 +121,8 @@ export default function AdminLeagueMatchNewPage() {
   };
 
   const submit = async () => {
+    if (submitting) return;
+    setSubmitting(true);
     try {
       const result = await createLeague.mutateAsync({
         title,
@@ -135,7 +139,10 @@ export default function AdminLeagueMatchNewPage() {
         // The create API takes no periods; the league row only gets a config version afterwards, so read its version first.
         try {
           const current = await v1Get<TournamentPeriodSettingsResponse>(`/admin/tournaments/${result.leagueId}/periods`);
-          if (!current.expectedVersion) throw new Error('missing period settings version');
+          if (!current.expectedVersion) {
+            // displayableMessage=false makes extractErrorMessage fall back to the Korean toast text.
+            throw Object.assign(new Error('missing period settings version'), { displayableMessage: false });
+          }
           await savePeriods.mutateAsync({
             tournamentId: result.leagueId,
             expectedVersion: current.expectedVersion,
@@ -154,6 +161,8 @@ export default function AdminLeagueMatchNewPage() {
       router.push(`/admin/league-matches/${result.leagueId}`);
     } catch (error) {
       showToast(extractErrorMessage(error, '리그를 만들지 못했어요.'), 'error');
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -300,7 +309,7 @@ export default function AdminLeagueMatchNewPage() {
         <button
           type="button"
           onClick={submit}
-          disabled={!canSubmit || createLeague.isPending}
+          disabled={!canSubmit || createLeague.isPending || submitting}
           aria-describedby={missingFieldHint ? 'league-submit-hint' : undefined}
           className="min-h-[44px] w-full rounded-xl bg-blue-500 text-sm font-semibold text-white disabled:opacity-50"
         >

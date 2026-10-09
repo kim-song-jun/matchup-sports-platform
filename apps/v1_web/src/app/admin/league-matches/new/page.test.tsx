@@ -306,4 +306,41 @@ describe('AdminLeagueMatchNewPage', () => {
     expect(await screen.findByText(/경기 시간을 저장하지 못했어요|boom/)).toBeInTheDocument();
     await waitFor(() => expect(pushMock).toHaveBeenCalledWith('/admin/league-matches/league-1'));
   });
+  it('피리어드 저장이 진행 중인 동안 버튼이 잠겨 두 번째 클릭이 리그를 다시 만들지 않는다', async () => {
+    pushMock.mockClear();
+    let releaseSave: () => void = () => {};
+    savePeriodsMock.mockReset().mockReturnValue(new Promise<void>((resolve) => { releaseSave = resolve; }));
+    v1GetMock.mockReset().mockResolvedValue({ expectedVersion: 'v-created', periods: [], legacyPeriodCount: null });
+    const createMock = vi.fn().mockResolvedValue({ leagueId: 'league-1', title: 't', state: 'draft' });
+    useV1CreateLeagueMatchMock.mockReturnValue({ mutateAsync: createMock, isPending: false } as never);
+    await fillLeagueForm();
+
+    fireEvent.change(screen.getByLabelText('전반 (분)'), { target: { value: '25' } });
+    const button = screen.getByRole('button', { name: '리그 만들기' });
+    fireEvent.click(button);
+
+    await waitFor(() => expect(savePeriodsMock).toHaveBeenCalled());
+    expect(button).toBeDisabled();
+    fireEvent.click(button);
+    expect(createMock).toHaveBeenCalledTimes(1);
+
+    releaseSave();
+    await waitFor(() => expect(pushMock).toHaveBeenCalledWith('/admin/league-matches/league-1'));
+  });
+
+  it('피리어드 설정 버전을 못 읽으면 영어 내부 메시지 대신 해요체 안내를 보여준다', async () => {
+    pushMock.mockClear();
+    savePeriodsMock.mockReset();
+    v1GetMock.mockReset().mockResolvedValue({ expectedVersion: null, periods: [], legacyPeriodCount: null });
+    useV1CreateLeagueMatchMock.mockReturnValue({ mutateAsync: vi.fn().mockResolvedValue({ leagueId: 'league-1', title: 't', state: 'draft' }), isPending: false } as never);
+    await fillLeagueForm();
+
+    fireEvent.change(screen.getByLabelText('전반 (분)'), { target: { value: '25' } });
+    fireEvent.click(screen.getByRole('button', { name: '리그 만들기' }));
+
+    expect(await screen.findByText(/리그는 만들었지만 경기 시간을 저장하지 못했어요/)).toBeInTheDocument();
+    expect(screen.queryByText(/missing period settings version/)).not.toBeInTheDocument();
+    expect(savePeriodsMock).not.toHaveBeenCalled();
+    await waitFor(() => expect(pushMock).toHaveBeenCalledWith('/admin/league-matches/league-1'));
+  });
 });

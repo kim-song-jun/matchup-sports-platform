@@ -3015,6 +3015,8 @@ export type V1AdminTeamMatchRow = {
   league: { leagueId: string; title: string } | null;
   tournament?: { tournamentId: string; title: string } | null;
   sportName: string;
+  /** Null for team matches created without a region. */
+  region: { regionId: string; name: string } | null;
   platformManaged: boolean;
   pendingApplicationCount: number;
   startAt: string;
@@ -3031,7 +3033,7 @@ export type V1AdminTeamMatchApplicationRow = {
   createdAt: string;
 };
 
-export type V1AdminTeamMatchDetail = Omit<V1AdminTeamMatchRow, 'pendingApplicationCount'> & {
+export type V1AdminTeamMatchDetail = Omit<V1AdminTeamMatchRow, 'pendingApplicationCount' | 'region'> & {
   platformManaged: boolean;
   sportId: string;
   regionId: string;

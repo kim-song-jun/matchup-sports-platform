@@ -9,15 +9,8 @@ import { disconnectV1Socket } from '@/lib/v1-socket';
 import { clearV1IdentityCache } from '@/lib/query-keys';
 import { Button } from '@/components/v1-ui/button';
 
-type LogoutButtonProps = {
-  /**
-   * 'default' — 기존 full-width neutral 버튼
-   * 'ghost'   — 텍스트 링크 수준 ghost 버튼 (계정 설정 하단 — 파괴 액션이 최강 CTA가 되지 않도록)
-   */
-  variant?: 'default' | 'ghost';
-};
-
-export function LogoutButton({ variant = 'default' }: LogoutButtonProps) {
+/** 계정 설정 하단의 텍스트 수준 ghost 버튼 — 파괴 액션이 그 화면의 가장 강한 CTA가 되지 않도록. */
+export function LogoutButton() {
   const queryClient = useQueryClient();
   const logout = useV1Logout();
   const pushRegistration = useV1PushRegistration();
@@ -32,12 +25,9 @@ export function LogoutButton({ variant = 'default' }: LogoutButtonProps) {
     window.location.replace('/login');
   };
 
-  const isGhost = variant === 'ghost';
-
   return (
     <Button
-      block={!isGhost}
-      className={isGhost ? 'tm-logout-ghost' : undefined}
+      className="tm-logout-ghost"
       loading={logout.isPending}
       onClick={() => {
         // 로딩 중 재클릭 시 중복 제출 방지 — isPending 은 disabled 속성과 동일하게 리렌더
@@ -60,9 +50,9 @@ export function LogoutButton({ variant = 'default' }: LogoutButtonProps) {
         const pushCleanup = pushRegistration.unsubscribe({ reason: 'sign-out' }).catch(() => undefined);
         logout.mutate(undefined, { onSettled: () => void pushCleanup.finally(clearAndRedirect) });
       }}
-      size={isGhost ? 'md' : 'lg'}
+      size="md"
       type="button"
-      variant={isGhost ? 'ghost' : 'neutral'}
+      variant="ghost"
     >
       로그아웃
     </Button>

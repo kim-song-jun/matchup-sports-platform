@@ -462,7 +462,7 @@ export function SettingsPageView({ model }: { model: SettingsViewModel }) {
           {/* 로그아웃의 유일한 진입점. 파괴 액션이 최강 CTA가 되지 않도록 ghost 텍스트 링크 수준으로 축소 */}
           <div className="tm-my-logout-row">
             <Card pad={16} className="tm-my-logout-card">
-              <LogoutButton variant="ghost" />
+              <LogoutButton />
             </Card>
           </div>
         </div>

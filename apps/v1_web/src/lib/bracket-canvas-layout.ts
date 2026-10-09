@@ -198,7 +198,8 @@ export function directPlacedRegistrationIds(
   const slotsById = new Map(slots.map((slot) => [slot.id, slot]));
   const ids = new Set<string>();
   for (const fixture of fixtures) {
-    if (fixture.status === 'cancelled') continue;
+    // 게임만 취소돼도(경기 상태는 그대로) 취소로 본다 — 칸의 상태 칩과 같은 기준.
+    if (fixture.status === 'cancelled' || fixtureNodeState(fixture.game) === 'cancelled') continue;
     for (const side of ['HOME', 'AWAY'] as const) {
       const id = side === 'HOME' ? fixture.homeRegistrationId : fixture.awayRegistrationId;
       if (id !== null && classifyFixtureSide(fixture, side, slotsById) === 'direct') ids.add(id);

@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { directPlacedRegistrationIds } from '@/lib/bracket-canvas-layout';
-import { makeFixture, makeRegistration, makeSlot } from '@/test/bracket-canvas-fixtures';
+import { makeFixture, makeGame, makeRegistration, makeSlot } from '@/test/bracket-canvas-fixtures';
 import type { V1AdminBracketFixture } from '@/types/api';
 import { BracketTeamTray } from './bracket-team-tray';
 import { REGISTRATION_DRAG_MIME } from './bracket-canvas-dnd';
@@ -134,6 +134,21 @@ describe('BracketTeamTray', () => {
       // 대구FC 는 취소된 경기에만 있어 미배정 그대로다.
       expect(screen.getByRole('button', { name: /대구FC/ })).not.toHaveTextContent('경기에 있음');
       expect(screen.getByText('미배정 1 / 전체 3')).toBeInTheDocument();
+    });
+
+    it('경기 상태가 예정이어도 게임이 취소된 경기의 팀은 세지 않는다', () => {
+      const gameCancelled = makeFixture({
+        id: 'f4',
+        groupId: 'g',
+        fixtureNumber: 4,
+        homeRegistrationId: 'r2',
+        awayRegistrationId: 'r3',
+        status: 'scheduled',
+        game: makeGame({ state: 'CANCELLED' }),
+      });
+      renderTray({ fixtures: [gameCancelled] });
+      expect(screen.queryByText('경기에 있음')).not.toBeInTheDocument();
+      expect(screen.getByText('미배정 3 / 전체 3')).toBeInTheDocument();
     });
 
     it('이전 경기 연결로 채워진 줄에 박힌 팀은 직접 지정이 아니라서 세지 않는다', () => {

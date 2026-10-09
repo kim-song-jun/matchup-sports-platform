@@ -2059,6 +2059,33 @@ describe('LeagueMatchFixturesClient — 지금 할 일 카드와 콘솔 열기',
     expect(within(byeSheet).queryByRole('button', { name: /^몰수패 처리/ })).toBeNull();
   });
 
+  // 자리만 있고 팀이 비어 있는 경기 — 팀을 못 정했으니 콘솔·결과·몰수 대상이 아니다.
+  it('팀이 비어 있는 자리 경기는 미정으로 읽히고 콘솔 열기·몰수패가 없다 — 양쪽이 다 찬 경기는 그대로다', () => {
+    renderLeague([
+      { ...base, teamMatchId: 'tm-ready', title: '1주차', startAt: W1 },
+      { ...base, teamMatchId: 'tm-empty', title: '2주차', startAt: W2, homeTeamId: null, awayTeamId: null, homeSlotId: 'slot-1', awaySlotId: 'slot-2' },
+      { ...base, teamMatchId: 'tm-half', title: '3주차', startAt: W2, awayTeamId: null, awaySlotId: 'slot-4' },
+    ]);
+
+    expect(screen.getAllByText('홈팀 미정 vs 원정팀 미정').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('마포 FC vs 원정팀 미정').length).toBeGreaterThan(0);
+    // 대조군: 팀이 다 찬 1주차만 콘솔을 연다. 자리 경기 둘에는 링크가 없다.
+    const consoleLinks = screen.getAllByRole('link', { name: /콘솔 열기/ });
+    expect(consoleLinks.length).toBeGreaterThan(0);
+    for (const link of consoleLinks) {
+      expect(link.getAttribute('href')).toContain('/tm-ready/');
+    }
+
+    const emptySheet = openRowMenu('2주차');
+    expect(within(emptySheet).getByRole('button', { name: /^일정 수정/ })).toBeInTheDocument();
+    expect(within(emptySheet).getByRole('button', { name: /^대진 취소/ })).toBeInTheDocument();
+    expect(within(emptySheet).queryByRole('button', { name: /^몰수패 처리/ })).toBeNull();
+    fireEvent.click(within(emptySheet).getByRole('button', { name: '닫기' }));
+
+    // 대조군: 팀이 다 찬 경기는 몰수패 항목이 있다.
+    expect(within(openRowMenu('1주차')).getByRole('button', { name: /^몰수패 처리/ })).toBeInTheDocument();
+  });
+
   // W4-V14 — 진행 중 경기의 대진을 취소하면 게임이 진행 중으로 남는다. 서버가 409 로 막는 조건과 같다.
   it.each(['LIVE', 'PAUSED'])('경기가 %s 인 대진은 취소 항목이 비활성이고 이유를 적는다', (gameState) => {
     renderLeague([{ ...base, teamMatchId: 'tm-live', title: '1주차', startAt: W1, gameState }]);

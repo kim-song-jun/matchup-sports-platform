@@ -114,7 +114,7 @@ export type V1LeagueMatchesFilters = {
 export interface V1LeagueFixture {
   teamMatchId: string;
   title: string;
-  homeTeamId: string;
+  homeTeamId: string | null;
   awayTeamId: string | null;
   startAt: string;
   placeName: string;

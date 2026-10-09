@@ -26,6 +26,7 @@ import {
   useV1UpdateLeagueFixture,
 } from '@/hooks/use-v1-api';
 import { describeLeagueRegistrationWindow } from '@/lib/league-registration-copy';
+import { leagueFixtureMatchupLabel } from '@/lib/league-fixture-meta';
 import { LeagueManualFixtureModal } from './league-manual-fixture-modal';
 import { LeagueFixtureScheduleModal, type LeagueFixtureSchedulePatch } from './league-fixture-schedule-modal';
 import { LeagueNextActionCard } from './league-next-action-card';
@@ -64,6 +65,11 @@ function consoleHref(leagueId: string, teamMatchId: string): string {
  * 서버가 대진 취소·팀 제외·재생성을 409 LEAGUE_FIXTURE_GAME_IN_PROGRESS 로 막는 조건과 같다 —
  * 아직 취소되지 않은 대진의 경기가 뛰는 중이다. 화면은 같은 조건에서 버튼을 미리 막고 이유를 적는다.
  */
+/** 양쪽 팀이 모두 정해진 경기만 콘솔·결과·몰수 대상이다. 자리만 있고 팀이 빈 경기는 아직 치를 수 없다. */
+function hasBothTeams(fixture: V1LeagueFixture): boolean {
+  return fixture.homeTeamId !== null && fixture.awayTeamId !== null;
+}
+
 function isFixtureGameInProgress(fixture: V1LeagueFixture): boolean {
   return fixture.status !== 'cancelled' && (fixture.gameState === 'LIVE' || fixture.gameState === 'PAUSED');
 }
@@ -252,18 +258,15 @@ export default function LeagueMatchFixturesClient({ leagueId, returnHref = '/adm
   // 대진**이 실제로 생성된다(서버는 과거만 거부한다). 응답에 이 필드가 없는 건 서버가
   // 구버전일 때뿐이므로, 만들지 못하게 막고 새로고침을 안내하는 쪽이 맞다. 표·참가팀·취소는
   // 그대로 쓸 수 있다 — 잠그는 건 생성·미리보기·재생성 세 버튼뿐이다.
-  const matchupLabelOf = (fixture: V1LeagueFixture) => {
-    const homeName = teamNameById.get(fixture.homeTeamId) ?? '홈팀';
-    return fixture.awayTeamId
-      ? `${homeName} vs ${teamNameById.get(fixture.awayTeamId) ?? '원정팀'}`
-      : `${homeName} 부전승`;
-  };
+  const matchupLabelOf = (fixture: V1LeagueFixture) => leagueFixtureMatchupLabel(fixture, teamNameById);
   // 행 버튼의 접근 가능한 이름. 같은 주차·같은 두 팀이 두 번 붙으면 제목·매치업이 겹치므로 일시까지 넣는다.
   const fixtureNameOf = (fixture: V1LeagueFixture) =>
     `${matchupLabelOf(fixture)} ${formatKstDateShort(fixture.startAt)} ${formatKstTime(fixture.startAt)}`;
   const nextAction = pickLeagueNextAction(series.fixtures);
   const inProgressFixtures = series.fixtures.filter(isFixtureGameInProgress);
-  const teamIdsWithGameInProgress = new Set(inProgressFixtures.flatMap((fixture) => [fixture.homeTeamId, fixture.awayTeamId]));
+  const teamIdsWithGameInProgress = new Set(
+    inProgressFixtures.flatMap((fixture) => [fixture.homeTeamId, fixture.awayTeamId]).filter((id): id is string => id !== null),
+  );
 
   /**
    * 행의 ⋯ 시트 항목. 일정 수정·몰수패·취소는 표에서 물러나 여기 모였다. 결과 항목은 **결과가 있는
@@ -283,7 +286,7 @@ export default function LeagueMatchFixturesClient({ leagueId, returnHref = '/adm
       },
     ];
     const stage = row.resultStage ?? 'not_entered';
-    if (row.awayTeamId !== null && stage !== 'not_entered') {
+    if (hasBothTeams(row) && stage !== 'not_entered') {
       const officialStage = stage === 'official';
       actions.push({
         key: 'result',
@@ -295,7 +298,7 @@ export default function LeagueMatchFixturesClient({ leagueId, returnHref = '/adm
       });
     }
     // R11(C-6): 상대팀이 확정된(matched) 대진만 몰수 처리 대상이다.
-    if (row.status === 'matched' && row.awayTeamId !== null) {
+    if (row.status === 'matched' && hasBothTeams(row)) {
       actions.push({
         key: 'forfeit',
         label: '몰수패 처리',
@@ -933,7 +936,7 @@ export default function LeagueMatchFixturesClient({ leagueId, returnHref = '/adm
             fitContainer
             dense
             renderActions={(row) => {
-              const canOpenConsole = row.status !== 'cancelled' && row.awayTeamId !== null;
+              const canOpenConsole = row.status !== 'cancelled' && hasBothTeams(row);
               return (
                 <div className="flex items-center justify-end gap-2">
                   {/* 주 조작은 콘솔 열기 하나다. 콘솔이 종료·결과 확정까지 이어 주므로(Task 180 G6)
@@ -1256,7 +1259,7 @@ export default function LeagueMatchFixturesClient({ leagueId, returnHref = '/adm
         open={forfeitFixture !== null}
         title="몰수패 처리"
         statusOptions={
-          forfeitFixture
+          forfeitFixture && forfeitFixture.homeTeamId !== null
             ? [
                 { value: forfeitFixture.homeTeamId, label: `${forfeitHostTeam.data?.name ?? '홈팀'} 불참` },
                 ...(forfeitFixture.awayTeamId

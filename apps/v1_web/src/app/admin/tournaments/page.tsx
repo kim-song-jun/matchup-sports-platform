@@ -28,12 +28,12 @@ import { MockSeedPanel } from '@/components/admin/tournaments/mock-seed-panel';
 
 // ── Helpers ───────────────────────────────────────────────────────────────
 
-function formatDateRange(startStr: string | null, endStr: string | null): string {
+function formatDateRange(startStr: string | null, endStr: string | null): { start: string; end: string | null } {
   const start = formatAdminKstDateTimeShort(startStr);
-  if (start === '—') return start;
+  if (start === '—') return { start, end: null };
   const end = formatAdminKstDateTimeShort(endStr);
-  if (end === '—' || end === start) return start;
-  return `${start} ~ ${end}`;
+  if (end === '—' || end === start) return { start, end: null };
+  return { start, end };
 }
 
 // ── Status filter options ─────────────────────────────────────────────────
@@ -160,12 +160,18 @@ function AdminTournamentsPageContent() {
               {
                 key: 'schedule',
                 header: '일정',
-                width: 'w-[168px]',
-                render: (row) => (
-                  <span className="whitespace-nowrap text-[var(--text-muted)]">
-                    {formatDateRange(row.scheduledAt, row.scheduledEndAt)}
-                  </span>
-                ),
+                // Start and end stack on two lines so the column's min width is one timestamp, not the whole range.
+                width: 'w-[112px]',
+                render: (row) => {
+                  const { start, end } = formatDateRange(row.scheduledAt, row.scheduledEndAt);
+                  return (
+                    <span className="block text-[var(--text-muted)]">
+                      <span className="block whitespace-nowrap">{start}</span>
+                      {' '}
+                      {end ? <span className="block whitespace-nowrap">~ {end}</span> : null}
+                    </span>
+                  );
+                },
               },
               {
                 key: 'status',

@@ -2,7 +2,7 @@
 
 import { useMutation, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { resultReviewKeys } from '@/hooks/use-tournament-result-review';
-import { v1Post, v1Put } from '@/lib/api-client';
+import { v1Patch, v1Post, v1Put } from '@/lib/api-client';
 import { v1Keys } from '@/lib/query-keys';
 import { randomUuid } from '@/lib/uuid';
 import type {
@@ -81,5 +81,22 @@ export function useV1QuickResult(competitionId: string, scope: BracketCompetitio
         queryClient.invalidateQueries({ queryKey: resultReviewKeys.revisions(gameId) }),
       ]);
     },
+  });
+}
+
+/** `PATCH /admin/fixtures/:id/bracket-sources` — 둘 다 null 이면 연결을 모두 해제한다. */
+export function useV1SetBracketSources(tournamentId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      fixtureId,
+      homeSourceFixtureId,
+      awaySourceFixtureId,
+    }: {
+      fixtureId: string;
+      homeSourceFixtureId: string | null;
+      awaySourceFixtureId: string | null;
+    }) => v1Patch(`/admin/fixtures/${encodeURIComponent(fixtureId)}/bracket-sources`, { homeSourceFixtureId, awaySourceFixtureId }),
+    onSuccess: () => invalidateCompetitionViews(queryClient, tournamentId, 'tournament'),
   });
 }

@@ -5,10 +5,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('@/lib/api-client', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/lib/api-client')>();
-  return { ...actual, v1Post: vi.fn(), v1Put: vi.fn() };
+  return { ...actual, v1Post: vi.fn(), v1Put: vi.fn(), v1Patch: vi.fn() };
 });
 
-import { v1Post, v1Put } from '@/lib/api-client';
+import { v1Patch, v1Post, v1Put } from '@/lib/api-client';
 import { v1Keys } from '@/lib/query-keys';
 import { resultReviewKeys } from '@/hooks/use-tournament-result-review';
 import {
@@ -16,10 +16,12 @@ import {
   useV1AssignTournamentSlot,
   useV1QuickResult,
   useV1RandomFillSlots,
+  useV1SetBracketSources,
 } from './use-v1-bracket-canvas';
 
 const postMock = vi.mocked(v1Post);
 const putMock = vi.mocked(v1Put);
+const patchMock = vi.mocked(v1Patch);
 
 function setup() {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
@@ -33,6 +35,7 @@ const invalidatedKeys = (spy: ReturnType<typeof setup>['invalidate']) => spy.moc
 beforeEach(() => {
   postMock.mockReset();
   putMock.mockReset();
+  patchMock.mockReset();
 });
 
 describe('useV1QuickResult', () => {
@@ -128,6 +131,24 @@ describe('useV1RandomFillSlots · useV1ApplyBracketTemplate', () => {
       size: 8,
       thirdPlace: false,
       replaceExisting: true,
+    });
+    expect(invalidatedKeys(invalidate)).toContainEqual(v1Keys.adminTournamentBracket('t1'));
+  });
+});
+
+describe('useV1SetBracketSources', () => {
+  it('경기별 bracket-sources 로 홈·어웨이 원천을 보내고 대진 캐시를 무효화한다', async () => {
+    patchMock.mockResolvedValue({});
+    const { wrapper, invalidate } = setup();
+    const { result } = renderHook(() => useV1SetBracketSources('t1'), { wrapper });
+
+    await act(async () => {
+      await result.current.mutateAsync({ fixtureId: 'f9', homeSourceFixtureId: 'q1', awaySourceFixtureId: null });
+    });
+
+    expect(patchMock).toHaveBeenCalledWith('/admin/fixtures/f9/bracket-sources', {
+      homeSourceFixtureId: 'q1',
+      awaySourceFixtureId: null,
     });
     expect(invalidatedKeys(invalidate)).toContainEqual(v1Keys.adminTournamentBracket('t1'));
   });

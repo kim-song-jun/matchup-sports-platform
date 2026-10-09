@@ -1689,14 +1689,17 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
       />
       <AbnormalEndDialog
         open={abnormalEndOpen}
+        sides={gameDetail.data?.sides ?? []}
         submitting={commandBlocked}
         onCancel={() => setAbnormalEndOpen(false)}
-        onConfirm={({ reason, note }: { reason: AbnormalEndReason; note: string }) => {
+        onConfirm={({ reason, note, forfeitSideId }: { reason: AbnormalEndReason; note: string; forfeitSideId?: string }) => {
           setAbnormalEndOpen(false);
-          // 점수는 지금 기록된 이벤트 그대로 확정된다 — 서버가 표준 스코어를 대신
-          // 정해 주지 않는다(2026-08-23 결정 Q3). 여기서 보내는 건 "정상 종료가
-          // 아니다"라는 사실과 그 사유뿐이다.
-          void handleRunCommand('end', { outcomeReason: reason, outcomeNote: note });
+          // 몰수 점수는 서버가 기권 팀 기준으로 정한다(적어 둔 점수가 이미 상대 승리면 유지).
+          void handleRunCommand('end', {
+            outcomeReason: reason,
+            outcomeNote: note,
+            ...(forfeitSideId !== undefined ? { forfeitSideId } : {}),
+          });
         }}
       />
       {/* 명단 검인은 **킥오프 전에만** 띄운다. 경기가 시작되면 이 자리는 이벤트 기록이

@@ -97,8 +97,8 @@ export type V1AuthMe = {
     onboardingStatus: string;
     lastLoginAt?: string | null;
     createdAt?: string;
-    authProvider?: 'email' | 'kakao' | 'naver' | null;
-    authProviders?: Array<'email' | 'kakao' | 'naver' | string>;
+    authProvider?: 'email' | 'kakao' | 'naver' | 'apple' | null;
+    authProviders?: Array<'email' | 'kakao' | 'naver' | 'apple' | string>;
     hasPassword?: boolean;
   };
   profile: {
@@ -2245,8 +2245,8 @@ export type V1Profile = {
   accountStatus: string;
   email: string | null;
   phone?: string | null;
-  authProvider: 'email' | 'kakao' | 'naver' | null;
-  authProviders?: Array<'email' | 'kakao' | 'naver' | string>;
+  authProvider: 'email' | 'kakao' | 'naver' | 'apple' | null;
+  authProviders?: Array<'email' | 'kakao' | 'naver' | 'apple' | string>;
   hasPassword?: boolean;
   onboardingStatus?: 'not_started' | 'terms_done' | 'social_terms_required' | 'social_profile_required' | 'signup_done' | 'sport_done' | 'level_done' | 'region_done' | 'completed' | 'deferred';
   regionName: string | null;
@@ -2890,7 +2890,7 @@ export type V1AdminUserRow = {
   nickname: string | null;
   displayName: string | null;
   email: string | null;
-  authProviders: Array<'kakao' | 'naver' | 'email'>;
+  authProviders: Array<'kakao' | 'naver' | 'email' | 'apple'>;
   gender: 'male' | 'female' | null;
   accountStatus: 'active' | 'suspended' | 'blocked' | 'withdrawal_pending' | 'deleted';
   onboardingStatus: string;

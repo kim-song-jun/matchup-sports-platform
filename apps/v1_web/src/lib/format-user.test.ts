@@ -55,7 +55,9 @@ describe('formatGender', () => {
 describe('formatAuthProviders', () => {
   it('알려진 provider는 한글, 모르는 값은 원문, 빈 배열은 안내 문구', () => {
     expect(formatAuthProviders(['kakao', 'email'])).toBe('카카오 · 이메일');
-    expect(formatAuthProviders(['apple'])).toBe('apple');
+    expect(formatAuthProviders(['apple'])).toBe('Apple');
+    expect(formatAuthProviders(['kakao', 'apple', 'email'])).toBe('카카오 · Apple · 이메일');
+    expect(formatAuthProviders(['google'])).toBe('google');
     expect(formatAuthProviders([])).toBe('로그인 수단 없음');
     expect(formatAuthProviders(null)).toBe('로그인 수단 없음');
   });

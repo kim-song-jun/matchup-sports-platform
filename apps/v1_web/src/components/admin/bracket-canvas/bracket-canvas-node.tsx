@@ -7,6 +7,7 @@ import { bracketNodeStateChip } from '@/lib/competition-status';
 import {
   CANVAS_FOOTER_HEIGHT,
   CANVAS_HEADER_HEIGHT,
+  CANVAS_NODE_HEIGHT,
   CANVAS_ROW_HEIGHT,
   classifyFixtureSide,
   fixtureNodeState,
@@ -22,8 +23,11 @@ const SIDE_NAME: Record<SideKey, string> = { HOME: '홈', AWAY: '어웨이' };
 
 export type BracketCanvasNodeProps = {
   fixture: V1AdminBracketFixture;
-  position: CanvasNodeLayout;
+  /** Absolute canvas placement; omitted when the node fills a parent grid cell. */
+  position?: CanvasNodeLayout;
   title: string;
+  /** Accessible name when the visible title is short because the grid cell already conveys group/round. */
+  fullTitle?: string;
   sideLabels: Record<SideKey, string>;
   slots: { HOME: V1AdminBracketSlot | null; AWAY: V1AdminBracketSlot | null };
   selected: boolean;
@@ -38,6 +42,7 @@ export function BracketCanvasNode({
   fixture,
   position,
   title,
+  fullTitle,
   sideLabels,
   slots,
   selected,
@@ -47,6 +52,11 @@ export function BracketCanvasNode({
   onAssign,
   onAssignDirect,
 }: BracketCanvasNodeProps) {
+  const accessibleTitle = fullTitle ?? title;
+  const placement =
+    position === undefined
+      ? { position: 'relative' as const, width: '100%', height: CANVAS_NODE_HEIGHT }
+      : { left: position.x, top: position.y, width: position.width, height: position.height };
   const state = fixtureNodeState(fixture.game);
   const chip = bracketNodeStateChip(state);
   const locked = isFixtureLocked(fixture);
@@ -113,15 +123,12 @@ export function BracketCanvasNode({
   return (
     <div
       role="group"
-      aria-label={`${title}, ${chip.label}`}
+      aria-label={`${accessibleTitle}, ${chip.label}`}
       data-fixture-id={fixture.id}
       data-state={state}
-      className="absolute overflow-hidden bg-[var(--card-surface)]"
+      className={`${position === undefined ? '' : 'absolute '}overflow-hidden bg-[var(--card-surface)]`}
       style={{
-        left: position.x,
-        top: position.y,
-        width: position.width,
-        height: position.height,
+        ...placement,
         borderRadius: 'var(--radius-container)',
         // 선택은 색만이 아니라 두께로도 구분한다(색만으로 정보 전달 금지).
         border: selected ? '2px solid var(--blue500)' : '1px solid var(--border-strong)',
@@ -130,7 +137,7 @@ export function BracketCanvasNode({
       <button
         type="button"
         aria-pressed={selected}
-        aria-label={`${title} 열기`}
+        aria-label={`${accessibleTitle} 열기`}
         onClick={() => onSelect(fixture.id)}
         className="flex w-full items-center justify-between gap-2 px-3 text-left transition-colors hover:bg-[var(--surface-soft)] focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-blue-500"
         style={{ height: CANVAS_HEADER_HEIGHT }}

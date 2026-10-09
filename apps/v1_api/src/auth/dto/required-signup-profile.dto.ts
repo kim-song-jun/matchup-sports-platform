@@ -1,4 +1,5 @@
-import { IsIn, IsOptional, IsString, Matches, MaxLength, ValidateBy, type ValidationArguments } from 'class-validator';
+import { IsBoolean, IsIn, IsNotEmpty, IsOptional, IsString, Matches, MaxLength, ValidateBy, ValidateNested, type ValidationArguments } from 'class-validator';
+import { Type } from 'class-transformer';
 
 const IsValidSignupName = ValidateBy({
   name: 'isValidSignupName',
@@ -21,6 +22,16 @@ const IsCalendarBirthDate = ValidateBy({
     defaultMessage: () => 'birthDate must be a real calendar date in YYYYMMDD format',
   },
 });
+
+/** Same shape as UpdateMyRecordConsentDto (PUT /me/record-consent). */
+export class SignupRecordConsentDto {
+  @IsBoolean()
+  granted!: boolean;
+
+  @IsString()
+  @IsNotEmpty()
+  policyHash!: string;
+}
 
 export abstract class RequiredSignupProfileDto {
   @IsOptional()
@@ -45,6 +56,12 @@ export abstract class RequiredSignupProfileDto {
   @IsOptional()
   @IsString()
   profileImageUrl?: string;
+
+  /** Omitted by older clients: no consent row is written (undecided). */
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => SignupRecordConsentDto)
+  recordConsent?: SignupRecordConsentDto;
 }
 
 export function isValidBirthDateDigits(value: string): boolean {

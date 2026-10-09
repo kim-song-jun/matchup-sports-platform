@@ -345,6 +345,7 @@ export function useV1Register() {
       requiredTermsAccepted: boolean;
       acceptedTermsDocumentIds: string[];
       phoneProofToken?: string;
+      recordConsent?: { granted: boolean; policyHash: string };
     }) =>
       v1Post<V1AuthSessionResponse>('/auth/register', body),
     onSuccess: (result) => queryClient.setQueryData<V1AuthMe>(v1Keys.authMe(), result),
@@ -362,6 +363,7 @@ export function useV1CompleteSocialProfile() {
       phone: string;
       birthDate: string;
       profileImageUrl?: string;
+      recordConsent?: { granted: boolean; policyHash: string };
     }) =>
       v1Post<V1AuthSessionResponse & { next: { route: string } }>('/auth/social-profile', body),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: v1Keys.authMe() }),

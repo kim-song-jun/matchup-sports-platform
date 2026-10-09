@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { makeBracket, makeFixture, makeGroup, makeRegistration, makeSlot } from '@/test/bracket-canvas-fixtures';
+import { makeBracket, makeFixture, makeGroup, makeRegistration, makeSlot, makeStanding } from '@/test/bracket-canvas-fixtures';
 import type { RegistrationsLoadState } from './bracket-team-tray';
 import { BracketCanvasMobileScreen } from './bracket-canvas-mobile-screen';
 
@@ -36,9 +36,9 @@ const bracket = makeBracket({
   slots: [makeSlot({ id: 's-1' })],
 });
 
-function renderScreen(canWrite = true) {
+function renderScreen(canWrite = true, format?: 'league' | 'knockout') {
   return render(
-    <BracketCanvasMobileScreen tournamentId="t-1" registrations={registrations} registrationsState={registrationsState} canWrite={canWrite} showToast={vi.fn()} />,
+    <BracketCanvasMobileScreen tournamentId="t-1" registrations={registrations} registrationsState={registrationsState} canWrite={canWrite} format={format} showToast={vi.fn()} />,
   );
 }
 
@@ -77,5 +77,29 @@ describe('BracketCanvasMobileScreen', () => {
     renderScreen();
     expect(screen.getByText('대진을 불러오지 못했어요')).toBeInTheDocument();
     expect(screen.queryByTestId('mobile-canvas')).not.toBeInTheDocument();
+  });
+
+  it('리그 대회는 라운드 탭이 「N라운드」 이고 조별 순위 접이식이 함께 나온다', () => {
+    bracketState.value = {
+      data: makeBracket({
+        groups: [makeGroup({ id: 'gA', name: 'A조', phase: 'group', sortOrder: 0 })],
+        fixtures: [
+          makeFixture({ id: 'f1', groupId: 'gA', fixtureNumber: 1, round: 'league_r1' }),
+          makeFixture({ id: 'f2', groupId: 'gA', fixtureNumber: 2, round: 'league_r2' }),
+        ],
+        standings: [makeStanding({ groupId: 'gA', registrationId: 'r1' })],
+      }),
+      isPending: false, isError: false, error: null, refetch,
+    };
+    renderScreen(true, 'league');
+    expect(screen.getByTestId('mobile-canvas')).toHaveAttribute('data-rounds', '1라운드,2라운드');
+    expect(screen.getByText('조별 순위')).toBeInTheDocument();
+    expect(screen.getByRole('table', { name: 'A조 순위표', hidden: true })).toBeInTheDocument();
+  });
+
+  it('토너먼트는 순위 접이식 없이 지금 탭 그대로다', () => {
+    renderScreen(true, 'knockout');
+    expect(screen.queryByText('조별 순위')).not.toBeInTheDocument();
+    expect(screen.getByTestId('mobile-canvas')).toHaveAttribute('data-rounds', '8강');
   });
 });

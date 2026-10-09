@@ -9,6 +9,7 @@ import {
   bracketMobileSide,
   buildBracketMobileRounds,
   buildLeagueMobileRounds,
+  buildLeagueTournamentMobileRounds,
   candidatesFromLeagueTeams,
   candidatesFromRegistrations,
   hasTeam,
@@ -378,5 +379,34 @@ describe('buildLeagueMobileRounds', () => {
       teamNameById: new Map(),
     });
     expect(round.sections[0].nodes.map((n) => [n.fixtureId, n.state])).toEqual([['m-x', 'cancelled'], ['m-y', 'scheduled']]);
+  });
+});
+
+describe('buildLeagueTournamentMobileRounds', () => {
+  const gA = makeGroup({ id: 'gA', name: 'A조', phase: 'group', sortOrder: 0 });
+  const gB = makeGroup({ id: 'gB', name: 'B조', phase: 'group', sortOrder: 1 });
+  const fixtures = [
+    makeFixture({ id: 'a10', groupId: 'gA', fixtureNumber: 5, round: 'league_r10' }),
+    makeFixture({ id: 'a1', groupId: 'gA', fixtureNumber: 1, round: 'league_r1' }),
+    makeFixture({ id: 'b1', groupId: 'gB', fixtureNumber: 2, round: 'league_r1' }),
+    makeFixture({ id: 'a2', groupId: 'gA', fixtureNumber: 3, round: 'league_r2' }),
+  ];
+
+  it('라운드 번호 순서의 탭이 되고 섹션은 그 라운드에 경기가 있는 조만 가진다', () => {
+    const rounds = buildLeagueTournamentMobileRounds({ groups: [gB, gA], fixtures, slots: [] });
+    expect(rounds.map((r) => r.label)).toEqual(['1라운드', '2라운드', '10라운드']);
+    expect(rounds[0].sections.map((s) => [s.heading, s.nodes.map((n) => n.fixtureId)])).toEqual([['A조', ['a1']], ['B조', ['b1']]]);
+    expect(rounds[1].sections.map((s) => s.heading)).toEqual(['A조']);
+  });
+
+  it('조가 하나면 섹션 제목이 없고 칸 제목은 번호만이다', () => {
+    const [round] = buildLeagueTournamentMobileRounds({ groups: [gA], fixtures: [fixtures[1]], slots: [] });
+    expect(round.sections[0].heading).toBeNull();
+    expect(round.sections[0].nodes[0].title).toBe('1번 경기');
+  });
+
+  it('여러 조면 칸 제목에 조 이름이 붙는다', () => {
+    const [round] = buildLeagueTournamentMobileRounds({ groups: [gA, gB], fixtures, slots: [] });
+    expect(round.sections[1].nodes[0].title).toBe('B조 · 2번 경기');
   });
 });

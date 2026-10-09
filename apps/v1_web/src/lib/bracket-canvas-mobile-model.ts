@@ -1,3 +1,4 @@
+import { buildLeagueGrid } from '@/lib/bracket-league-grid-model';
 import {
   buildSideLabelContext,
   classifyFixtureSide,
@@ -233,6 +234,26 @@ export function buildBracketMobileRounds(input: {
     .map((f) => bracketMobileNode(f, null, false, labels));
   if (orphans.length > 0) rounds.push({ key: 'etc', label: '기타', sections: [{ key: 'etc', heading: null, nodes: orphans }] });
   return rounds;
+}
+
+export function buildLeagueTournamentMobileRounds(input: {
+  groups: V1AdminBracketGroup[];
+  fixtures: V1AdminBracketFixture[];
+  slots: V1AdminBracketSlot[];
+}): MobileRound[] {
+  const labels = buildSideLabelContext(input.groups, input.fixtures, input.slots);
+  const grid = buildLeagueGrid({ groups: input.groups, fixtures: input.fixtures });
+  const multi = grid.columns.length > 1;
+  return grid.rows.map((row) => ({
+    key: row.key,
+    label: row.label,
+    sections: grid.columns.flatMap((column) => {
+      const list = row.cells[column.key] ?? [];
+      if (list.length === 0) return [];
+      const groupName = multi ? column.label : null;
+      return [{ key: column.key, heading: groupName, nodes: list.map((f) => bracketMobileNode(f, groupName, false, labels)) }];
+    }),
+  }));
 }
 
 // 리그 응답에는 라운드 번호가 없다 — 경기일(KST) 열이 라운드이고, 열 묶음과 'N주차' 번호는 PR-5b `buildLeagueBoard` 가 정한다.

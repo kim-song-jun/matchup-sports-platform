@@ -5,10 +5,12 @@ import type { AdminToastVariant } from '@/components/admin';
 import { AdminListSkeleton } from '@/components/admin/admin-skeleton';
 import { ErrorState } from '@/components/v1-ui/primitives';
 import { useV1AdminBracket } from '@/hooks/use-v1-api';
-import { buildBracketMobileRounds, candidatesFromRegistrations } from '@/lib/bracket-canvas-mobile-model';
+import { buildLeagueStandings } from '@/lib/bracket-league-standings-model';
+import { buildBracketMobileRounds, buildLeagueTournamentMobileRounds, candidatesFromRegistrations } from '@/lib/bracket-canvas-mobile-model';
 import { extractErrorMessage } from '@/lib/error-message';
-import type { V1AdminTournamentRegistration } from '@/types/api';
+import type { V1AdminTournamentRegistration, V1TournamentFormat } from '@/types/api';
 import { BracketCanvasMobile } from './bracket-canvas-mobile';
+import { BracketLeagueStandings } from './bracket-league-standings';
 import type { RegistrationsLoadState } from './bracket-team-tray';
 
 export interface BracketCanvasMobileScreenProps {
@@ -16,14 +18,20 @@ export interface BracketCanvasMobileScreenProps {
   registrations: V1AdminTournamentRegistration[];
   registrationsState: RegistrationsLoadState;
   canWrite: boolean;
+  format?: V1TournamentFormat;
   showToast: (message: string, variant?: AdminToastVariant) => void;
 }
 
 /** 768px 미만의 대진 그림 화면. 구조 편집 도구(툴바·트레이)는 두지 않고 목록과 시트만 보여 준다. */
-export function BracketCanvasMobileScreen({ tournamentId, registrations, registrationsState, canWrite, showToast }: BracketCanvasMobileScreenProps) {
+export function BracketCanvasMobileScreen({ tournamentId, registrations, registrationsState, canWrite, format, showToast }: BracketCanvasMobileScreenProps) {
   const { data: bracket, isPending, isError, error, refetch } = useV1AdminBracket(tournamentId);
-  const rounds = useMemo(
-    () => (bracket === undefined ? [] : buildBracketMobileRounds({ groups: bracket.groups, fixtures: bracket.fixtures, slots: bracket.slots })),
+  const rounds = useMemo(() => {
+    if (bracket === undefined) return [];
+    const input = { groups: bracket.groups, fixtures: bracket.fixtures, slots: bracket.slots };
+    return format === 'league' ? buildLeagueTournamentMobileRounds(input) : buildBracketMobileRounds(input);
+  }, [bracket, format]);
+  const standingsGroups = useMemo(
+    () => (bracket === undefined ? [] : buildLeagueStandings({ groups: bracket.groups, standings: bracket.standings })),
     [bracket],
   );
   const candidates = useMemo(() => candidatesFromRegistrations(registrations), [registrations]);
@@ -46,7 +54,16 @@ export function BracketCanvasMobileScreen({ tournamentId, registrations, registr
   }
 
   return (
-    <BracketCanvasMobile
+    <>
+      {format === 'league' && standingsGroups.length > 0 ? (
+        <details className="mb-3" style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius-container)', background: 'var(--card-surface)' }}>
+          <summary className="tm-text-label flex min-h-[44px] cursor-pointer items-center px-4 font-semibold">조별 순위</summary>
+          <div className="px-3 pb-3">
+            <BracketLeagueStandings groups={standingsGroups} />
+          </div>
+        </details>
+      ) : null}
+      <BracketCanvasMobile
       competitionId={tournamentId}
       scope="tournament"
       rounds={rounds}
@@ -56,5 +73,6 @@ export function BracketCanvasMobileScreen({ tournamentId, registrations, registr
       registrationsState={registrationsState}
       showToast={showToast}
     />
+    </>
   );
 }

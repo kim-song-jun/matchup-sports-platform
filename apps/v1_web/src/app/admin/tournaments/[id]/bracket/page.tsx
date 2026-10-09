@@ -84,6 +84,7 @@ function BracketPageBody() {
               registrations={registrations}
               registrationsState={registrationsState}
               canWrite={canWrite}
+              format={tournament?.format}
               showToast={showToast}
             />
           }

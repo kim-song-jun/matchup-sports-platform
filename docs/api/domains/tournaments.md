@@ -22,7 +22,8 @@ mutation administrator, is a no-op without audit when the value is unchanged, re
 The admin tournament detail includes `isPublic`.
 `GET /api/v1/admin/tournaments` accepts an optional `visibility=public|hidden` filter
 (any other value returns `400`); it narrows the rows, `pageInfo` and the `summary` status
-counts together, and omitting it keeps every row.
+counts together, and omitting it keeps every row. `public` means published (`isPublic`) and
+not `cancelled`; `hidden` is every other row (unpublished or cancelled), matching the row badge.
 See [the league visibility contract](./league-matches.md#public-visibility).
 
 | Method | Path | Auth | Request | Response |

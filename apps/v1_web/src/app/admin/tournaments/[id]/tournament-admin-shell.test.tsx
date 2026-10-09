@@ -93,9 +93,9 @@ describe('TournamentAdminShell 섹션 내비', () => {
   });
 
   it.each([
-    ['completed', '진행 중으로 되돌리기', 'in_progress'],
-    ['cancelled', '초안으로 복구', 'draft'],
-  ])('%s 대회는 사유를 받아 %s 로 되돌린다', async (status, buttonName, target) => {
+    ['completed', '진행 중으로 되돌리기', 'in_progress', '되돌리기'],
+    ['cancelled', '초안으로 복구', 'draft', '복구하기'],
+  ])('%s 대회는 사유를 받아 %s 로 되돌린다', async (status, buttonName, target, confirmName) => {
     adminRoleMock.value = 'ops';
     tournamentStatusMock.value = status;
     statusMutate.mockClear();
@@ -104,7 +104,7 @@ describe('TournamentAdminShell 섹션 내비', () => {
 
       fireEvent.click(screen.getByRole('button', { name: buttonName }));
       const dialog = await screen.findByRole('alertdialog');
-      const confirm = within(dialog).getByRole('button', { name: '되돌리기' });
+      const confirm = within(dialog).getByRole('button', { name: confirmName });
       expect(confirm).toBeDisabled();
       expect(statusMutate).not.toHaveBeenCalled();
 

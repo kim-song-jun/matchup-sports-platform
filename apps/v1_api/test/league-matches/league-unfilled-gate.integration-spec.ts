@@ -111,4 +111,40 @@ describe('정규 리그 빈 경기 공개 게이트', () => {
       expect(legacy.body.data.round).toBe('5주차');
     });
   });
+
+  describe('팀 매치 표면', () => {
+    const itemIds = (res: request.Response) => res.body.data.items.map((item: { teamMatchId: string }) => item.teamMatchId) as string[];
+    const only = (all: string[]) => all.filter((id) => Object.values(ids).includes(id));
+
+    it('GET /team-matches (sitemap 원천) — 홈만 찬 경기가 새지 않고 다 찬 경기·자리 없는 기존 경기는 남는다', async () => {
+      const res = await request(app.getHttpServer()).get('/api/v1/team-matches').query({ kind: 'competition', limit: 50 });
+      expect(res.status).toBe(200);
+      expect(sorted(only(itemIds(res)))).toEqual(sorted(visible));
+    });
+
+    it('GET /team-matches/:id — 가릴 셋은 404, 둘은 200', async () => {
+      for (const id of gated) {
+        expect((await request(app.getHttpServer()).get(`/api/v1/team-matches/${id}`)).status).toBe(404);
+      }
+      for (const id of visible) {
+        expect((await request(app.getHttpServer()).get(`/api/v1/team-matches/${id}`)).status).toBe(200);
+      }
+    });
+
+    it('GET /me/team-matches — created·hosted·applied·all 어느 범위에서도 409 없이 공개되는 경기만 나온다', async () => {
+      for (const team of Object.values(teams)) await h.joinTeam(h.adminUserId, team.id);
+      for (const scope of ['created', 'hosted', 'applied', 'all'] as const) {
+        const res = await request(app.getHttpServer())
+          .get('/api/v1/me/team-matches')
+          .set('x-v1-user-id', h.adminUserId)
+          .query({ scope, limit: 50 });
+        expect(res.status).toBe(200);
+        const found = only(itemIds(res));
+        for (const id of gated) expect(found).not.toContain(id);
+        if (scope === 'created' || scope === 'all') expect(sorted(found)).toEqual(expect.arrayContaining(sorted(visible)));
+        if (scope === 'hosted') expect(found).toContain(ids.legacy);
+        if (scope === 'applied') expect(found).toContain(ids.filled);
+      }
+    });
+  });
 });

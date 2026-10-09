@@ -3,7 +3,7 @@
 import { Handshake, Undo2 } from 'lucide-react';
 import { isBackfilledEvent, isBackfilledMinuteUnknown } from '@/lib/backfilled-goal-event';
 import { formatMatchClock } from '@/lib/game-operations-clock';
-import { periodLabel } from './period-label';
+import { periodPrefix } from './period-label';
 import type { GameEventRecord, GameLineup } from '@/types/game-operations';
 import { formatPlayerLabel } from './player-label';
 
@@ -16,9 +16,9 @@ import { formatPlayerLabel } from './player-label';
  * 이미 이 값들을 `null` 로 내려 억제하는데, 운영 콘솔만 원시 행을 받아 거짓 주장을
  * 되살리고 있었다. 결과 정정(correction)을 판단하는 화면이라 오히려 더 정확해야 한다.
  */
-function eventTimeLabel(event: GameEventRecord): string {
+function eventTimeLabel(event: GameEventRecord, periodCount?: number | null): string {
   if (!isBackfilledEvent(event.payload)) {
-    return `${periodLabel(event.period)} ${formatMatchClock(event.clockMs)}`;
+    return `${periodPrefix(event.period, periodCount)}${formatMatchClock(event.clockMs)}`;
   }
   // 전/후반은 어느 경우든 모른다. 분은 남아 있으면 그대로 쓴다.
   return isBackfilledMinuteUnknown(event.payload) ? '시각 미상' : formatMatchClock(event.clockMs);
@@ -78,6 +78,7 @@ export function RecordedEventList({
   resultOfficialized,
   disabled = false,
   order = 'chronological',
+  periodCount,
 }: {
   readonly events: readonly GameEventRecord[];
   /** 이 목록이 실제로 읽는 건 `id`·`displayNameSnapshot` 둘뿐이라 구조적
@@ -86,6 +87,8 @@ export function RecordedEventList({
    * 미러)도 같은 렌더러를 그대로 쓸 수 있게 하기 위함이다. */
   readonly sides: ReadonlyArray<{ id: string; displayNameSnapshot: string }>;
   readonly lineups: readonly GameLineup[];
+  /** 정규 피리어드 수. 1이면 기록 시각 앞에 "전반"을 붙이지 않는다. */
+  readonly periodCount?: number | null;
   readonly onAttachAssist?: (event: GameEventRecord) => void;
   /** 빠른 교체 모드의 오조작 복구 경로 — 되돌리기 버튼은 아직 되돌려지지
    * 않은 SUBSTITUTION 이벤트에만 뜬다. 새 되돌리기 API가 아니라 기존
@@ -199,7 +202,7 @@ export function RecordedEventList({
                     구분 가능하게 한다 — ms 는 여기서는 산만하기만 하다(초 단위로 이미
                     충분히 구분되고, 커맨드 왕복 지연처럼 액션 가능한 값이 아니다). */}
                 <span className="shrink-0 rounded bg-[var(--surface-soft)] px-2 py-0.5 text-xs font-medium tabular-nums text-[var(--text-muted)]">
-                  {eventTimeLabel(event)}
+                  {eventTimeLabel(event, periodCount)}
                 </span>
                 <span
                   aria-hidden="true"

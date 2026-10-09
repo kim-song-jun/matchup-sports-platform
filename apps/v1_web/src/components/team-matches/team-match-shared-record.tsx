@@ -31,7 +31,7 @@ import { displayInitials } from '@/lib/display-initials';
 import {
   eventPresentation,
   presentGameEventParticipantName,
-  periodLabel,
+  periodPrefix,
 } from '@/components/public-game-records/format';
 import styles from './team-match-shared-record.module.css';
 
@@ -73,14 +73,16 @@ function GoalIcon({ ownGoal }: { ownGoal: boolean }) {
 function GoalEventRow({
   event,
   sideKey,
+  periodCount,
 }: {
   event: SharedPublicGoalEvent;
   sideKey: 'HOME' | 'AWAY';
+  periodCount?: number | null;
 }) {
   const eventType = event.ownGoal ? 'OWN_GOAL' : 'GOAL';
   const presentation = eventPresentation({ type: eventType, cardColor: null });
   const playerName = presentGameEventParticipantName(eventType, event.participantName);
-  const periodText = event.period == null ? '' : `${periodLabel(event.period)} `;
+  const periodText = event.period == null ? '' : periodPrefix(event.period, periodCount);
   const content = (
     <span>
       {periodText}
@@ -110,9 +112,11 @@ function GoalEventRow({
 function GoalEventList({
   events,
   sides,
+  periodCount,
 }: {
   events: readonly SharedPublicGoalEvent[];
   sides: SharedRecord['sides'];
+  periodCount?: number | null;
 }) {
   const sideKeyById = new Map(sides.map((side) => [side.id, side.key] as const));
   const ordered = events
@@ -132,7 +136,7 @@ function GoalEventList({
             </div>
           );
         }
-        return <GoalEventRow key={key} event={event} sideKey={sideKey} />;
+        return <GoalEventRow key={key} event={event} sideKey={sideKey} periodCount={periodCount} />;
       })}
     </div>
   );
@@ -178,7 +182,7 @@ function GoalEventsAccordion({ data }: { data: SharedRecord }) {
           {sections.map((section) => (
             <section key={section.id} aria-label={section.title ?? '전체 득점 기록'}>
               {section.title ? <h3 className={styles.goalSectionTitle}>{section.title}</h3> : null}
-              <GoalEventList events={section.events} sides={data.sides} />
+              <GoalEventList events={section.events} sides={data.sides} periodCount={data.periodCount} />
             </section>
           ))}
         </div>
@@ -524,7 +528,7 @@ function GoalRows({ data, goals, publicEvents, disabled, canEdit, onEdit, onDele
   // A hidden score means the public policy withheld events too; an empty array
   // is not evidence that this finished game had no goals.
   if (data.phase === 'legacy' && data.sides.some((side) => side.score === null)) return null;
-  if (goals.length === 0 && publicEvents !== undefined && publicEvents.length > 0) return <GoalEventList events={publicEvents} sides={data.sides} />;
+  if (goals.length === 0 && publicEvents !== undefined && publicEvents.length > 0) return <GoalEventList events={publicEvents} sides={data.sides} periodCount={data.periodCount} />;
   if (goals.length === 0 && data.phase === 'legacy' && data.sides.some((side) => side.score !== null && side.score > 0)) return <p className={styles.muted}>득점 상세 기록을 확인할 수 없어요.</p>;
   if (goals.length === 0) return <p className={styles.muted}>{data.participant || data.phase === 'legacy' ? '아직 등록된 득점이 없어요.' : '참가자들의 공동 기록으로 점수가 갱신돼요.'}</p>;
   return <div className={styles.goalList}>{goals.map((goal) => {

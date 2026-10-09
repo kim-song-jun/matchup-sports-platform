@@ -26,4 +26,15 @@ describe('LiveBadge', () => {
     expect(screen.getByText('LIVE')).toBeInTheDocument();
     expect(screen.getByLabelText('진행 중')).toBeInTheDocument();
   });
+
+  it('단판이면 시간 앞의 피리어드명과 aria-label 의 피리어드명이 빠진다', () => {
+    const clock = { periodNumber: 1, elapsedMs: 125_000, isPaused: false };
+    const { rerender } = render(<LiveBadge clock={clock} periodBreak={null} periodCount={1} />);
+    expect(screen.getByText('2:05')).toBeInTheDocument();
+    expect(screen.getByRole('status')).toHaveAttribute('aria-label', '진행 중, 2:05');
+
+    rerender(<LiveBadge clock={clock} periodBreak={null} periodCount={2} />);
+    expect(screen.getByText('전반 2:05')).toBeInTheDocument();
+    expect(screen.getByRole('status')).toHaveAttribute('aria-label', '진행 중, 전반 2:05');
+  });
 });

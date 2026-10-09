@@ -353,6 +353,7 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
       pausedTotalMs?: number;
       pausedAt?: string | null;
     }>,
+    periodDurations?: Array<{ durationMinutes: number; extraTime: boolean } | null>,
   ) {
     mocks.useV1Game.mockReturnValue({
       data: {
@@ -375,6 +376,7 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
           },
         ],
         lineups: [],
+        periodDurations,
       },
       isLoading: false,
       isError: false,
@@ -494,6 +496,34 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
     expect(screen.getByRole('button', { name: '후반 종료' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '경기 종료' })).toBeNull();
     expect(screen.queryByRole('button', { name: '전반 종료' })).toBeNull();
+  });
+
+  describe('단판(정규 피리어드 1개)', () => {
+    const live = [{ number: 1, state: 'LIVE', startedAt: '2026-08-07T00:00:00.000Z', endedAt: null }];
+
+    it('진행 버튼은 "정규 시간 종료"이고 "전반 종료"는 없다', () => {
+      gameWithPeriods('LIVE', live, [{ durationMinutes: 40, extraTime: false }]);
+      render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+      expect(screen.getByRole('button', { name: '정규 시간 종료' })).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: '전반 종료' })).toBeNull();
+    });
+
+    it('시계 옆에 "전반" 라벨이 없고 진행 단계는 "경기 · 종료"다', () => {
+      gameWithPeriods('LIVE', live, [{ durationMinutes: 40, extraTime: false }]);
+      render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+      expect(screen.queryByText('전반')).toBeNull();
+      expect(screen.getByText('경기')).toBeInTheDocument();
+    });
+
+    it('연장 피리어드 행이 있어도 정규 1개면 단판이다', () => {
+      gameWithPeriods(
+        'LIVE',
+        [...live, { number: 2, state: 'SCHEDULED', startedAt: null, endedAt: null }],
+        [{ durationMinutes: 40, extraTime: false }, { durationMinutes: 5, extraTime: true }],
+      );
+      render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+      expect(screen.getByRole('button', { name: '정규 시간 종료' })).toBeInTheDocument();
+    });
   });
 
   // 마지막 피리어드 종료는 되돌릴 수 없다(서버 revert-period는 되감을 "다음

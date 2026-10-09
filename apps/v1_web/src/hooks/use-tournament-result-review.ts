@@ -5,7 +5,7 @@ import { v1Get, v1Post } from '@/lib/api-client';
 import { publicGameRecordsKeys } from '@/components/public-game-records/use-public-game-records';
 import { v1Keys } from '@/lib/query-keys';
 import { randomUuid } from '@/lib/uuid';
-import type { GameActorRole as FullGameActorRole, GamePeriod } from '@/types/game-operations';
+import type { GameActorRole as FullGameActorRole, GamePeriod, GamePeriodDuration } from '@/types/game-operations';
 import type {
   V1GameResultCards,
   V1GameResultGoalEventInput,
@@ -135,6 +135,8 @@ export type TournamentGameDetail = {
   sides: TournamentGameSide[];
   /** Pinned periods returned by GET /games/:gameId; result editing must use these numbers. */
   periods: Pick<GamePeriod, 'number'>[];
+  /** 같은 응답의 피리어드 길이 설정 — 연장을 뺀 정규 피리어드 수를 세는 데 쓴다. 못 읽었으면 null. */
+  periodDurations?: readonly GamePeriodDuration[] | null;
   actorRole: GameActorRole;
   /**
    * `V1TournamentGroup.phase !== 'group'` -- 서버가 `GET /games/:gameId` 응답에

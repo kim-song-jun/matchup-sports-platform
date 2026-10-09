@@ -186,6 +186,18 @@ export function periodLabel(periodNumber: number): string {
   return `${periodNumber}피리어드`;
 }
 
+/** 단판(정규 피리어드 1개) 경기의 득점·카드 구간 이름. `periodCount` 가 null·누락이면 단판으로 단정하지 않는다. */
+export const SINGLE_PERIOD_HEADING = '경기 결과';
+
+export function isSinglePeriod(periodCount: number | null | undefined): boolean {
+  return periodCount === 1;
+}
+
+/** 시각 앞에 붙는 피리어드 말머리. 단판이면 구분할 피리어드가 없으니 빈 문자열이다. */
+export function periodPrefix(periodNumber: number, periodCount: number | null | undefined): string {
+  return isSinglePeriod(periodCount) ? '' : `${periodLabel(periodNumber)} `;
+}
+
 /**
  * alpha 실측 사고(2026-08) -- 대회 픽스처 하나의 골 이벤트가 `clockMs`
  * 27,166,083ms(≈452분)로 기록돼 공개 일정 화면에 `452′`가 그대로 나갔다.

@@ -44,6 +44,12 @@ vi.mock('next/link', () => ({
     }}>{children}</a>
   ),
 }));
+// 상세의 기본 보기는 일정 보드다 — 이 스펙은 목록 복귀만 보므로 보드 훅은 비워 둔다.
+vi.mock('@/hooks/use-v1-bracket-canvas', () => ({
+  useV1ApplyLeagueTemplate: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useV1AssignTournamentSlot: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useV1RandomFillSlots: () => ({ mutateAsync: vi.fn(), isPending: false }),
+}));
 vi.mock('@/hooks/use-v1-api', () => ({
   useV1AdminLeagueMatchList: (seriesId?: string) => ({
     data: { items: LEAGUES.filter((league) => !seriesId || (
@@ -86,6 +92,7 @@ vi.mock('@/hooks/use-v1-api', () => ({
   useV1CreateManualLeagueFixture: () => ({ isPending: false }),
   useV1RecordLeagueForfeit: () => ({ isPending: false }),
   useV1PreviewLeagueFixtures: () => ({ isPending: false }),
+  useV1AdminTournamentRegistrations: () => ({ data: { items: [], truncated: false }, isError: false, error: null, refetch: vi.fn() }),
 }));
 
 async function renderDetail() {

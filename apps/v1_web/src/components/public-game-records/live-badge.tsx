@@ -1,7 +1,7 @@
 'use client';
 
 import { Timer } from 'lucide-react';
-import { formatElapsedClock, periodLabel } from './format';
+import { formatElapsedClock, periodPrefix } from './format';
 import type { PublicGameClock, PublicPeriodBreak } from './types';
 
 const PERIOD_BREAK_LABEL: Record<PublicPeriodBreak, string> = {
@@ -29,9 +29,11 @@ const PERIOD_BREAK_LABEL: Record<PublicPeriodBreak, string> = {
 export function LiveBadge({
   clock,
   periodBreak,
+  periodCount,
 }: {
   clock: PublicGameClock | null;
   periodBreak: PublicPeriodBreak | null;
+  periodCount?: number | null;
 }) {
   const breakLabel = clock === null && periodBreak !== null ? PERIOD_BREAK_LABEL[periodBreak] : null;
 
@@ -40,7 +42,7 @@ export function LiveBadge({
       role="status"
       aria-label={
         clock !== null
-          ? `진행 중, ${periodLabel(clock.periodNumber)} ${formatElapsedClock(clock.elapsedMs)}${clock.isPaused ? ' (일시 중지)' : ''}`
+          ? `진행 중, ${periodPrefix(clock.periodNumber, periodCount)}${formatElapsedClock(clock.elapsedMs)}${clock.isPaused ? ' (일시 중지)' : ''}`
           : breakLabel !== null
             ? `진행 중, ${breakLabel}`
             : '진행 중'
@@ -76,7 +78,7 @@ export function LiveBadge({
       </span>
       {clock !== null ? (
         <span className="tab-num" style={{ fontSize: 12, fontWeight: 700, color: 'var(--red700)' }}>
-          {periodLabel(clock.periodNumber)} {formatElapsedClock(clock.elapsedMs)}
+          {periodPrefix(clock.periodNumber, periodCount)}{formatElapsedClock(clock.elapsedMs)}
         </span>
       ) : null}
     </span>

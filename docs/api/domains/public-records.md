@@ -242,6 +242,14 @@ projection, computed only when there is no official revision yet:
   visibility mode withholds live detail. Mirrors the operations console's
   own `halftimePeriod`/`regulationEnded` derivation and its exact spectator
   wording ("하프타임"/"정규 시간 종료") so the two surfaces never disagree.
+- `periodCount` -- `number | null`, the game's *regular* period count (extra-time
+  periods excluded) read from the game's competition-config snapshot
+  (`regularPeriodCount`, `competition-config.parse.ts`). Extra time is a
+  `V1GamePeriod` row too, so counting rows would misread a 2-period game that
+  went to extra time. `1` marks a single-period game and the web renders its
+  events under one "경기 결과" heading instead of "전반"; `null` (no game or an
+  unreadable snapshot) keeps the legacy 전반/후반 wording. Present on
+  `getMatch`, `getLeagueFixtureRecord` and every `presentScheduleEntry` entry.
 
 None of these fields is a new privacy tier: all are derived purely from data
 the `live` mode already exposes elsewhere on the same response (`events[]`

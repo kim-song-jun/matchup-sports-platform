@@ -13,8 +13,38 @@
  * 번호 기반 폴백("N피리어드")을 쓴다 — `nextPeriodCommandLabel`이 이미 이
  * 폴백 필요성을 문서화해 뒀던 것과 같은 이유다.
  */
-export function periodLabel(periodNumber: number): string {
+export function periodLabel(periodNumber: number, periodCount?: number | null): string {
+  if (periodCount === 1 && periodNumber === 1) return '경기';
   if (periodNumber === 1) return '전반';
   if (periodNumber === 2) return '후반';
   return `${periodNumber}피리어드`;
+}
+
+/** 단판(정규 피리어드 1개) — 피리어드를 가를 이유가 없어 시각 앞의 "전반" 같은 말머리를 뺀다. */
+export function isSinglePeriod(periodCount: number | null | undefined): boolean {
+  return periodCount === 1;
+}
+
+/** "5:00" 같은 시각 앞에 붙는 말머리(끝 공백 포함). 단판이면 빈 문자열이다. */
+export function periodPrefix(periodNumber: number, periodCount?: number | null): string {
+  return isSinglePeriod(periodCount) ? '' : `${periodLabel(periodNumber)} `;
+}
+
+/** 현재 피리어드를 끝내는 버튼 문구. 단판의 유일한 정규 피리어드는 "정규 시간 종료"다. */
+export function endPeriodLabel(periodNumber: number, periodCount?: number | null): string {
+  return isSinglePeriod(periodCount) && periodNumber === 1 ? '정규 시간 종료' : `${periodLabel(periodNumber)} 종료`;
+}
+
+/**
+ * 운영 상태의 피리어드 행에서 정규 피리어드 수를 센다. 연장 피리어드도 행이 되므로 길이 설정(`periodDurations`)의
+ * `extraTime` 로 뺀다. 길이 설정이 없으면(레거시 `{count}` 설정) 연장 개념이 없으니 행 수가 곧 정규 수다.
+ */
+export function regularPeriodCountOf(
+  periodRowCount: number,
+  periodDurations: ReadonlyArray<{ extraTime: boolean } | null> | null | undefined,
+): number | null {
+  if (periodRowCount === 0) return null;
+  if (!periodDurations) return periodRowCount;
+  const regular = periodDurations.filter((entry) => entry === null || !entry.extraTime).length;
+  return regular > 0 ? regular : null;
 }

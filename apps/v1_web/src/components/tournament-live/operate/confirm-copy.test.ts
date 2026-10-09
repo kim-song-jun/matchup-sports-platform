@@ -96,3 +96,15 @@ describe('commandConfirmCopy — 경기 종류에 맞는 종료 문구', () => {
     expect(message).toContain('기록한 골·카드·교체를 먼저 확인해주세요.');
   });
 });
+
+describe('commitActionConfirmCopy — 기록 시각 말머리', () => {
+  const message = (periodCount: number | null | undefined) =>
+    commitActionConfirmCopy(input({ type: 'GOAL' }), sides, [], null, periodCount).message;
+
+  it('단판이면 "전반"을 붙이지 않고, 2피리어드·미상이면 지금처럼 붙인다', () => {
+    expect(message(1)).toContain('(선수 지정 없이) · 1:00에');
+    expect(message(1)).not.toContain('전반');
+    expect(message(2)).toContain('전반 1:00에');
+    expect(message(undefined)).toContain('전반 1:00에');
+  });
+});

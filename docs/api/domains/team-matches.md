@@ -54,6 +54,8 @@
   `TEAM_CONFIRMATION_REQUIRED`, support·revoked 어드민은 403 이다. 대회·리그 경기는 `/games/:gameId/corrections` 레인을 쓴다.
   GET/POST 응답의 `officialCorrected: boolean` 은 `phase=official` 이고 현재 공식 리비전이 정정 리비전(`supersedesId` 있음)일 때만
   `true` 다(관전자 응답 포함). 화면은 이 값으로 점수판 머리말을 "운영팀이 정정한 최종 결과"로 바꾼다.
+  `periodCount: number | null` 은 경기 설정 스냅샷의 정규 피리어드 수(연장 제외)다. `1`(단판)이면 화면이 득점 시각 앞에 "전반"을 붙이지 않는다.
+  자세한 산출 규칙은 `docs/api/domains/public-records.md` 의 `periodCount`.
 - 공동 기록이 생성된 경기에서 이전 host-only 결과/event/진행 command를 호출하면 `SHARED_RECORD_REQUIRED`.
 - 주요 오류: 403 RECORD_PARTICIPANT_REQUIRED; 404 TEAM_MATCH_NOT_FOUND;
   409 RECORD_NOT_EDITABLE/VERSION_CONFLICT/COMMAND_REUSED/ALREADY_CONFIRMED/GOAL_NOT_FOUND;

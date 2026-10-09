@@ -142,6 +142,8 @@ export interface PublicScheduleEntry {
   readonly score: PublicScore | null;
   readonly clock: PublicGameClock | null;
   readonly periodBreak: PublicPeriodBreak | null;
+  /** 정규 피리어드 수(연장 제외). 1이면 단판이라 "전반" 대신 "경기 결과"로 부른다. null·누락이면 전/후반 표기 그대로. */
+  readonly periodCount?: number | null;
   readonly scorers: readonly PublicScheduleScorer[];
   readonly cards: readonly PublicScheduleCard[];
   /** 몰수·중단 종결 표기. 경기 상세와 같은 규칙으로 서버가 채운다(정상 종료·공개 전이면 null). */
@@ -322,6 +324,8 @@ export interface PublicMatchDetail {
   readonly score: PublicScore | null;
   readonly clock: PublicGameClock | null;
   readonly periodBreak: PublicPeriodBreak | null;
+  /** 정규 피리어드 수(연장 제외). 1이면 단판이라 "전반" 대신 "경기 결과"로 부른다. null·누락이면 전/후반 표기 그대로. */
+  readonly periodCount?: number | null;
   readonly lineup: PublicLineup | null;
   readonly events: readonly PublicMatchEvent[];
   readonly mvp: PublicMatchMvp | null;

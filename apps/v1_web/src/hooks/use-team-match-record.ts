@@ -29,7 +29,10 @@ export type SharedRecord = {
   subMatches: SharedSubMatch[];
   /** `guest` — 계정 없는 출전자(개인 기록에 안 남는다). */
   participants: { id: string; sideId: string; name: string; jerseyNumber: number | null; profileImageUrl: string | null; guest?: boolean }[];
-  goals: SharedGoal[]; goalEvents?: SharedPublicGoalEvent[]; history: RecordChange[]; confirmations: { sideId: string; name: string | null; at: string }[]; officialAt: string | null;
+  goals: SharedGoal[]; goalEvents?: SharedPublicGoalEvent[];
+  /** 정규 피리어드 수(연장 제외). 1이면 단판이라 득점 시각 앞에 "전반"을 붙이지 않는다. */
+  periodCount?: number | null;
+  history: RecordChange[]; confirmations: { sideId: string; name: string | null; at: string }[]; officialAt: string | null;
   /** 지금 공식 결과가 운영자 정정 리비전이다(phase=official 일 때만 참). */
   officialCorrected: boolean;
 };

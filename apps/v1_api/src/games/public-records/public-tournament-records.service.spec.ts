@@ -127,6 +127,8 @@ function buildFakePrisma(options: {
    * 경기에서 라이브 전용 필드가 새는지 확인할 수 있다.
    */
   gameState?: string;
+  /** 경기 설정 스냅샷의 `periods`(JSON) — `periodCount` 산출 검증용. 기본값 undefined = 설정 없음. */
+  configPeriods?: unknown;
   lineups?: readonly { id: string; sideId: string; revision: number; state?: string; invalidatedAt?: Date | null }[];
   participants?: readonly FakeParticipant[];
   /**
@@ -187,6 +189,7 @@ function buildFakePrisma(options: {
               participants: options.participants ?? [ELIGIBLE_PARTICIPANT, INELIGIBLE_PARTICIPANT],
               currentOfficialRevision: options.officialRevision ?? null,
               periods: options.periods ?? [],
+              competitionConfig: options.configPeriods === undefined ? undefined : { periods: options.configPeriods },
             },
           },
         };
@@ -1023,6 +1026,51 @@ describe('PublicTournamentRecordsService.getMatch -- periodBreak 배선', () => 
 
     expect(result.status).toBe('live');
     expect(result.periodBreak).toBe('regulation_ended');
+  });
+});
+
+describe('PublicTournamentRecordsService.getMatch -- periodCount (정규 피리어드 수)', () => {
+  const periodCountFor = async (configPeriods: unknown, periods: readonly { number: number }[] = []) => {
+    const prisma = buildFakePrisma({
+      scheduledAt: new Date('2026-08-10T04:00:00.000Z'),
+      consentLinks: [],
+      consentSnapshots: [],
+      events: [],
+      configPeriods,
+      periods: periods.map(({ number }) => ({ number, state: 'ENDED', startedAt: null, pausedTotalMs: 0, pausedAt: null })),
+    });
+    const service = new PublicTournamentRecordsService(prisma, NO_ASSIGNMENTS_ACCESS);
+    return (await service.getMatch(TOURNAMENT_ID, FIXTURE_ID, undefined)).periodCount;
+  };
+
+  it('단판 설정이면 1이다', async () => {
+    expect(await periodCountFor([{ code: 'FULL', label: '경기', durationMinutes: 40, extraTime: false }], [{ number: 1 }])).toBe(1);
+  });
+
+  it('전·후반 설정이면 2다', async () => {
+    expect(
+      await periodCountFor([
+        { code: 'FIRST_HALF', label: '전반', durationMinutes: 20, extraTime: false },
+        { code: 'SECOND_HALF', label: '후반', durationMinutes: 20, extraTime: false },
+      ]),
+    ).toBe(2);
+  });
+
+  it('연장 피리어드 행이 있어도 정규 피리어드만 센다 — 단판+연장은 1, 전·후반+연장은 2', async () => {
+    const extra = { code: 'ET', label: '연장', durationMinutes: 5, extraTime: true };
+    const full = { code: 'FULL', label: '경기', durationMinutes: 40, extraTime: false };
+    expect(await periodCountFor([full, extra], [{ number: 1 }, { number: 2 }])).toBe(1);
+    expect(
+      await periodCountFor(
+        [{ ...full, code: 'H1' }, { ...full, code: 'H2' }, extra],
+        [{ number: 1 }, { number: 2 }, { number: 3 }],
+      ),
+    ).toBe(2);
+  });
+
+  it('설정 스냅샷이 없거나 읽을 수 없으면 null이라 화면은 지금 동작을 유지한다', async () => {
+    expect(await periodCountFor(undefined)).toBeNull();
+    expect(await periodCountFor('broken')).toBeNull();
   });
 });
 

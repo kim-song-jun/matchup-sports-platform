@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useId, useState } from 'react';
+import { useId, useMemo, useState } from 'react';
 import { AlertTriangle, ChevronDown, ChevronLeft, Ellipsis, X } from 'lucide-react';
 import { AdminPageHeader, AdminDataTable, AdminLeagueStatePill, AdminMatchPhasePill, AdminReasonModal, AdminStatusPill, AdminTableSkeleton, AdminToasts, useAdminToast } from '@/components/admin';
 import { EntityPicker, type EntityPickerItem } from '@/components/admin/entity-picker';
@@ -24,6 +24,7 @@ import {
   useV1RemoveLeagueTeam,
   useV1Teams,
   useV1UpdateLeagueFixture,
+  useV1AdminTournamentRegistrations,
 } from '@/hooks/use-v1-api';
 import { describeLeagueRegistrationWindow } from '@/lib/league-registration-copy';
 import { leagueFixtureMatchupLabel } from '@/lib/league-fixture-meta';
@@ -44,11 +45,15 @@ import { LeagueVisibilityControl } from './league-visibility-control';
 import { LeagueHoldControl } from './league-hold-control';
 import { LeagueCloseRegistrationControl } from './league-close-registration-control';
 import { LeagueCoverImageControl } from './league-cover-image-control';
+import { BracketCanvasMobile } from '@/components/admin/bracket-canvas/bracket-canvas-mobile';
+import { BracketCanvasResponsive } from '@/components/admin/bracket-canvas/bracket-canvas-responsive';
+import type { RegistrationsLoadState } from '@/components/admin/bracket-canvas/bracket-team-tray';
 import { LeagueScheduleBoard } from '@/components/admin/bracket-canvas/league-schedule-board';
 import { SegmentedTabs } from '@/components/v1-ui/segmented-tabs';
 import { useAdminCanWrite } from '@/hooks/use-admin-can-write';
 import { useV1ApplyLeagueTemplate } from '@/hooks/use-v1-bracket-canvas';
 import { LeagueTemplateDialog } from './league-template-dialog';
+import { buildLeagueMobileRounds, candidatesFromLeagueTeams } from '@/lib/bracket-canvas-mobile-model';
 import {
   computeDailyPlan,
   dayOffsetLabel,
@@ -108,6 +113,31 @@ export default function LeagueMatchFixturesClient({
   const applyTemplate = useV1ApplyLeagueTemplate(leagueId);
   const [view, setView] = useState<LeagueFixturesView>(initialView);
   const [templateOpen, setTemplateOpen] = useState(false);
+  const {
+    data: registrationsData,
+    isError: registrationsIsError,
+    error: registrationsError,
+    refetch: refetchRegistrations,
+  } = useV1AdminTournamentRegistrations(leagueId);
+  const registrationsState: RegistrationsLoadState = {
+    status: registrationsData !== undefined ? 'success' : registrationsIsError ? 'error' : 'pending',
+    truncated: registrationsData?.truncated ?? false,
+    refetchFailed: registrationsIsError && registrationsData !== undefined,
+    error: registrationsError,
+    onRetry: () => void refetchRegistrations(),
+  };
+  const mobileRounds = useMemo(
+    () =>
+      series
+        ? buildLeagueMobileRounds({
+            fixtures: series.fixtures,
+            slots: series.slots ?? [],
+            teamNameById: new Map((teamsData?.teams ?? []).map((team) => [team.teamId, team.name])),
+          })
+        : [],
+    [series, teamsData],
+  );
+  const mobileCandidates = useMemo(() => candidatesFromLeagueTeams(teamsData?.teams ?? []), [teamsData]);
   const createManualFixture = useV1CreateManualLeagueFixture(leagueId);
   const [manualFixtureOpen, setManualFixtureOpen] = useState(false);
   const recordForfeit = useV1RecordLeagueForfeit(leagueId);
@@ -694,21 +724,37 @@ export default function LeagueMatchFixturesClient({
         />
       </div>
       {view === 'board' ? (
-        <LeagueScheduleBoard
-          leagueId={leagueId}
-          fixtures={series.fixtures}
-          slots={series.slots ?? []}
-          teams={teamsData?.teams}
-          canWrite={canWrite}
-          showToast={showToast}
-          onOpenTemplate={() => setTemplateOpen(true)}
-          onEditSchedule={(teamMatchId) =>
-            setScheduleFixture(series.fixtures.find((fixture) => fixture.teamMatchId === teamMatchId) ?? null)
+        <BracketCanvasResponsive
+          wide={
+            <LeagueScheduleBoard
+              leagueId={leagueId}
+              fixtures={series.fixtures}
+              slots={series.slots ?? []}
+              teams={teamsData?.teams}
+              canWrite={canWrite}
+              showToast={showToast}
+              onOpenTemplate={() => setTemplateOpen(true)}
+              onEditSchedule={(teamMatchId) =>
+                setScheduleFixture(series.fixtures.find((fixture) => fixture.teamMatchId === teamMatchId) ?? null)
+              }
+              onCancelFixture={(teamMatchId) =>
+                setCancelTarget(series.fixtures.find((fixture) => fixture.teamMatchId === teamMatchId) ?? null)
+              }
+              onShowList={() => setView('list')}
+            />
           }
-          onCancelFixture={(teamMatchId) =>
-            setCancelTarget(series.fixtures.find((fixture) => fixture.teamMatchId === teamMatchId) ?? null)
+          narrow={
+            <BracketCanvasMobile
+              competitionId={leagueId}
+              scope="league"
+              rounds={mobileRounds}
+              slots={series.slots ?? []}
+              candidates={mobileCandidates}
+              canWrite={canWrite}
+              registrationsState={registrationsState}
+              showToast={showToast}
+            />
           }
-          onShowList={() => setView('list')}
         />
       ) : null}
 

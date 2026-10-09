@@ -17,6 +17,7 @@ import {
   useV1Teams,
   useV1UpdateLeagueFixture,
 } from '@/hooks/use-v1-api';
+import { installViewport, resizeViewport } from '@/test/viewport';
 import LeagueMatchFixturesClient from './league-match-fixtures-client';
 
 vi.mock('@/components/auth/pending-social-signup-gate', () => ({
@@ -33,6 +34,26 @@ vi.mock('@/hooks/use-v1-bracket-canvas', () => ({
   useV1RandomFillSlots: () => ({ mutateAsync: vi.fn(), isPending: false }),
 }));
 
+vi.mock('@/components/admin/bracket-canvas/bracket-canvas-mobile', () => ({
+  BracketCanvasMobile: (props: {
+    scope: string;
+    competitionId: string;
+    canWrite: boolean;
+    rounds: Array<{ label: string }>;
+    candidates: Array<{ teamName: string }>;
+    slots: unknown[];
+  }) => (
+    <div
+      data-testid="mobile-board"
+      data-scope={props.scope}
+      data-competition={props.competitionId}
+      data-can-write={String(props.canWrite)}
+      data-rounds={props.rounds.map((round) => round.label).join(',')}
+      data-candidates={props.candidates.map((candidate) => candidate.teamName).join(',')}
+      data-slots={props.slots.length}
+    />
+  ),
+}));
 // 트레이·패널 내부는 PR-3 와 Task 6 테스트가 지킨다. 여기서는 보드가 부모의 일정 수정·취소 모달로 이어지는 배선만 본다.
 vi.mock('@/components/admin/bracket-canvas/bracket-team-tray', () => ({
   BracketTeamTray: () => <div data-testid="tray" />,
@@ -2179,8 +2200,8 @@ describe('LeagueMatchFixturesClient — 일정 보드와 보기 전환', () => {
     resultStage: 'not_entered', gameState: 'SCHEDULED', game: null, homeScore: null, awayScore: null,
   };
 
-  function renderClient(options: { fixtures?: Fixture[]; slots?: unknown[]; initialView?: 'board' | 'list' } = {}) {
-    const { fixtures = [EMPTY_FIXTURE], slots = SLOTS, initialView } = options;
+  function renderClient(options: { fixtures?: Fixture[]; slots?: unknown[]; initialView?: 'board' | 'list'; teams?: unknown[] } = {}) {
+    const { fixtures = [EMPTY_FIXTURE], slots = SLOTS, initialView, teams = TEAMS } = options;
     useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false } as never);
     useV1AdminLeagueMatchMock.mockReturnValue({
       data: {
@@ -2189,7 +2210,7 @@ describe('LeagueMatchFixturesClient — 일정 보드와 보기 전환', () => {
       },
       isPending: false,
     } as never);
-    useV1AdminLeagueTeamsMock.mockReturnValue({ data: { leagueId: 'league-1', teams: TEAMS } } as never);
+    useV1AdminLeagueTeamsMock.mockReturnValue({ data: { leagueId: 'league-1', teams } } as never);
     useV1GenerateLeagueFixturesMock.mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as never);
     useV1UpdateLeagueFixtureMock.mockReturnValue({ mutate: vi.fn(), isPending: false } as never);
     render(
@@ -2199,9 +2220,17 @@ describe('LeagueMatchFixturesClient — 일정 보드와 보기 전환', () => {
     );
   }
 
+  let restoreViewport: (() => void) | null = null;
+
+  beforeEach(() => {
+    restoreViewport = installViewport(1280);
+  });
+
   afterEach(() => {
     adminCanWrite.value = true;
     canvasMocks.applyTemplate.mockReset();
+    restoreViewport?.();
+    restoreViewport = null;
   });
 
   it('기본은 일정 보드이고, 목록 탭으로 바꾸면 기존 표가 나오며 다시 보드로 돌아온다', () => {
@@ -2307,5 +2336,38 @@ describe('LeagueMatchFixturesClient — 일정 보드와 보기 전환', () => {
     openFixtureManage();
     expect(screen.getAllByRole('button', { name: '대진 재생성' })[0]).toBeDisabled();
     expect(screen.getByText(/일정 보드의 ‘템플릿으로 다시 만들기’/)).toBeInTheDocument();
+  });
+
+  it('390 에서는 보드 대신 모바일 목록이 마운트되고, 경기일 라운드와 registrationId 가 있는 팀만 후보로 넘어간다', () => {
+    resizeViewport(390);
+    renderClient({
+      teams: [...TEAMS, { teamId: 't3', name: '미연결 팀', status: 'active', memberCount: 5, logoUrl: null, registrationId: null }],
+    });
+
+    const mobile = screen.getByTestId('mobile-board');
+    expect(mobile).toHaveAttribute('data-scope', 'league');
+    expect(mobile).toHaveAttribute('data-competition', 'league-1');
+    expect(mobile).toHaveAttribute('data-rounds', '1주차');
+    expect(mobile).toHaveAttribute('data-candidates', '마포 FC,합정 유나이티드');
+    expect(mobile).toHaveAttribute('data-slots', '2');
+    expect(mobile).toHaveAttribute('data-can-write', 'true');
+    expect(screen.queryByRole('region', { name: '리그 일정 보드' })).toBeNull();
+  });
+
+  it('390 에서도 [일정 보드|목록] 탭은 보이고 목록 탭은 기존 표를 연다 — 구조 편집은 목록에서 계속 할 수 있다', () => {
+    resizeViewport(390);
+    renderClient();
+
+    expect(screen.getByRole('tab', { name: '일정 보드', selected: true })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('tab', { name: '목록' }));
+    expect(screen.getByRole('table')).toBeInTheDocument();
+    expect(screen.queryByTestId('mobile-board')).toBeNull();
+  });
+
+  it('읽기 전용 어드민은 모바일에서도 canWrite=false 로 넘어간다', () => {
+    adminCanWrite.value = false;
+    resizeViewport(390);
+    renderClient();
+    expect(screen.getByTestId('mobile-board')).toHaveAttribute('data-can-write', 'false');
   });
 });

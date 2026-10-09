@@ -9,7 +9,7 @@ import { TeamMatchListPageClient } from './team-matches-client';
 const { apiGet, apiPost, navigation, router } = vi.hoisted(() => ({
   apiGet: vi.fn(),
   apiPost: vi.fn(),
-  navigation: { pendingReplace: undefined as string | undefined },
+  navigation: { pendingReplace: undefined as string | undefined, routeHref: '' },
   router: {
     push: vi.fn((href: string) => {
       window.history.pushState({}, '', href);
@@ -25,8 +25,8 @@ vi.mock('@/lib/api-client', async (original) => ({
 }));
 vi.mock('next/navigation', () => ({
   useRouter: () => router,
-  usePathname: () => window.location.pathname,
-  useSearchParams: () => new URLSearchParams(window.location.search),
+  usePathname: () => new URL(navigation.routeHref || window.location.href).pathname,
+  useSearchParams: () => new URL(navigation.routeHref || window.location.href).searchParams,
 }));
 vi.mock('next/link', () => ({
   default: ({ href, onClick, prefetch: _prefetch, scroll: _scroll, ...props }: ComponentProps<'a'> & { href: string; prefetch?: boolean; scroll?: boolean }) => (
@@ -97,6 +97,7 @@ async function browserNavigate(direction: 'back' | 'forward') {
 beforeEach(() => {
   vi.clearAllMocks();
   navigation.pendingReplace = undefined;
+  navigation.routeHref = '';
   router.replace.mockImplementation((href: string) => { navigation.pendingReplace = href; });
   window.history.replaceState({}, '', '/team-matches?q=이전검색');
   client = newClient();
@@ -349,5 +350,23 @@ describe('MD-QA #30 검색 적용과 탐색 URL 동기화', () => {
     await expectCards(0);
     expect(queryIn(screen.getByRole('link', { name: /^전체 \d+$/ }))).toBe('이전검색');
     expect(queryIn(screen.getByRole('link', { name: '필터' }))).toBe('이전검색');
+  });
+
+  it.each(['/search?q=새검색', '/team-matches/search-sync-0?q=이전검색'])('다른 경로 %s로 Back할 때 unmount 대기 중인 목록은 외부 검색을 적용하거나 조회하지 않는다', async (destination) => {
+    // Given: 목록이 아직 마운트된 상태에서 Next가 다음 route tree로 교체하기 전이다.
+    window.history.replaceState({}, '', destination);
+    act(() => router.push('/team-matches?q=합성'));
+    mount();
+    await expectCards(20);
+    navigation.routeHref = window.location.href;
+    const previousCalls = apiGet.mock.calls.length;
+    // When: 실제 history는 이동하지만 Next route context는 unmount 전까지 현재 목록이다.
+    await browserNavigate('back');
+    // Then: 외부 경로의 q 때문에 불필요한 목록 요청·입력·결과 변경이 발생하지 않는다.
+    expect(window.location.pathname).toBe(new URL(destination, window.location.origin).pathname);
+    await waitFor(() => expect(client.isFetching()).toBe(0));
+    expect(apiGet.mock.calls.slice(previousCalls).filter(([path]) => path === '/team-matches')).toHaveLength(0);
+    expect(screen.getByRole('textbox', { name: '팀매치 검색어' })).toHaveValue('합성');
+    await expectCards(20);
   });
 });

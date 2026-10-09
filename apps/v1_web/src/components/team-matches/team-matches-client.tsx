@@ -93,6 +93,8 @@ export function TeamMatchListPageClient({ seed }: { readonly seed?: CursorListSe
     // replace 커밋 전 Back/Forward는 q가 같은 history 항목으로 돌아갈 수 있다.
     // q 의존성만으로는 취소된 local 검색이 남으므로 실제 복귀 URL을 즉시 읽는다.
     const restoreSearch = () => {
+      // 다른 화면의 q로 unmount 전 목록을 다시 조회하지 않는다.
+      if (window.location.pathname !== '/team-matches') return;
       const restoredQuery = new URLSearchParams(window.location.search).get('q') ?? '';
       setSearchValue(restoredQuery);
       setSubmittedQuery(restoredQuery);

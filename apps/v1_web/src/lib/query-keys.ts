@@ -161,6 +161,9 @@ export const v1Keys = {
     [...v1Keys.all, 'admin', 'registrations', registrationId, 'eligible-players'] as const,
   adminTournamentBracket: (tournamentId: string) =>
     [...v1Keys.all, 'admin', 'tournaments', tournamentId, 'bracket'] as const,
+  // Child of the bracket key, so invalidating the bracket also refetches the standings preview.
+  adminTournamentSlotStandings: (tournamentId: string) =>
+    [...v1Keys.adminTournamentBracket(tournamentId), 'slot-standings'] as const,
   adminTournamentAnnouncements: (tournamentId: string) =>
     [...v1Keys.all, 'admin', 'tournaments', tournamentId, 'announcements'] as const,
   adminTournamentSponsors: (tournamentId: string) =>

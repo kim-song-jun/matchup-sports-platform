@@ -2,7 +2,9 @@
 
 import { useId, useMemo, useState, type DragEvent } from 'react';
 import { EyeOff } from 'lucide-react';
+import { BottomSheet } from '@/components/v1-ui/bottom-sheet';
 import { EmptyState } from '@/components/v1-ui/primitives';
+import { BRACKET_CANVAS_SIDE_PANEL_MEDIA_QUERY, useMediaQuery } from '@/hooks/use-media-query';
 import { useV1AdminTournamentRegistrations } from '@/hooks/use-v1-api';
 import { useV1AssignTournamentSlot, useV1RandomFillSlots } from '@/hooks/use-v1-bracket-canvas';
 import { describeBracketCanvasError } from '@/lib/bracket-canvas-errors';
@@ -46,6 +48,8 @@ function scoreText(node: LeagueBoardNode): string | null {
 
 export function LeagueScheduleBoard({ leagueId, fixtures, slots, teams, canWrite, showToast, onOpenTemplate, onEditSchedule, onCancelFixture, onShowList }: LeagueScheduleBoardProps) {
   const headingId = useId();
+  // 서버 기본값 true — 하이드레이션 전엔 지금 배치를 유지하고 좁은 태블릿만 클라이언트에서 바뀐다.
+  const sidePanel = useMediaQuery(BRACKET_CANVAS_SIDE_PANEL_MEDIA_QUERY, true);
   const teamNameById = useMemo(() => new Map((teams ?? []).map((team) => [team.teamId, team.name])), [teams]);
   const { columns, summary } = useMemo(
     () => buildLeagueBoard({ fixtures, slots, teamNameById }),
@@ -153,6 +157,28 @@ export function LeagueScheduleBoard({ leagueId, fixtures, slots, teams, canWrite
     }
   };
 
+  const panel =
+    openNode === null ? null : (
+      <LeagueFixturePanel
+        key={openNode.fixtureId}
+        leagueId={leagueId}
+        node={openNode}
+        slots={slots}
+        registrations={registrations ?? []}
+        canWrite={canWrite}
+        showToast={showToast}
+        onEditSchedule={() => {
+          setOpenFixtureId(null);
+          onEditSchedule(openNode.fixtureId);
+        }}
+        onCancelFixture={() => {
+          setOpenFixtureId(null);
+          onCancelFixture(openNode.fixtureId);
+        }}
+        onClose={() => setOpenFixtureId(null)}
+      />
+    );
+
   return (
     <section aria-labelledby={headingId} className="flex flex-col gap-3">
       <h2 id={headingId} className="sr-only">리그 일정 보드</h2>
@@ -196,7 +222,10 @@ export function LeagueScheduleBoard({ leagueId, fixtures, slots, teams, canWrite
         </p>
       ) : null}
 
-      <div className="grid gap-3 lg:grid-cols-[16rem_minmax(0,1fr)]">
+      <div
+        data-testid="league-board-grid"
+        className={`grid gap-3 ${openNode === null || !sidePanel ? 'lg:grid-cols-[16rem_minmax(0,1fr)]' : 'lg:grid-cols-[16rem_minmax(0,1fr)_320px]'}`}
+      >
         <aside aria-label="참가팀 영역">
           <BracketTeamTray
             registrations={registrations ?? []}
@@ -205,6 +234,7 @@ export function LeagueScheduleBoard({ leagueId, fixtures, slots, teams, canWrite
             registrationsState={registrationsState}
             pendingRegistrationId={selectedRegistrationId}
             canWrite={canWrite}
+            collapsible={!sidePanel}
             onPick={setSelectedRegistrationId}
           />
         </aside>
@@ -278,27 +308,13 @@ export function LeagueScheduleBoard({ leagueId, fixtures, slots, teams, canWrite
           ))}
         </ol>
         </div>
+        {panel !== null && sidePanel ? panel : null}
       </div>
 
-      {openNode !== null ? (
-        <LeagueFixturePanel
-          key={openNode.fixtureId}
-          leagueId={leagueId}
-          node={openNode}
-          slots={slots}
-          registrations={registrations ?? []}
-          canWrite={canWrite}
-          showToast={showToast}
-          onEditSchedule={() => {
-            setOpenFixtureId(null);
-            onEditSchedule(openNode.fixtureId);
-          }}
-          onCancelFixture={() => {
-            setOpenFixtureId(null);
-            onCancelFixture(openNode.fixtureId);
-          }}
-          onClose={() => setOpenFixtureId(null)}
-        />
+      {openNode !== null && !sidePanel ? (
+        <BottomSheet open onClose={() => setOpenFixtureId(null)} ariaLabel={`${openNode.home.label} vs ${openNode.away.label}`}>
+          {panel}
+        </BottomSheet>
       ) : null}
     </section>
   );

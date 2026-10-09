@@ -1,5 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { installViewport } from '@/test/viewport';
 import AdminTournamentBracketPage from './page';
 
 const mocks = vi.hoisted(() => ({
@@ -28,19 +29,30 @@ vi.mock('@/components/admin/bracket-canvas/bracket-canvas-workspace', () => ({
     </div>
   ),
 }));
+vi.mock('@/components/admin/bracket-canvas/bracket-canvas-mobile-screen', () => ({
+  BracketCanvasMobileScreen: () => null,
+}));
 vi.mock('../bracket-tab', () => ({
   BracketTab: (props: { tournamentId: string; canWrite: boolean; bracketPublishedAt: string | null | undefined }) => (
     <div data-testid="list" data-published={props.bracketPublishedAt ?? ''}>{props.tournamentId}</div>
   ),
 }));
 
+let restoreViewport: (() => void) | null = null;
+
 beforeEach(() => {
+  restoreViewport = installViewport(1280);
   vi.clearAllMocks();
   mocks.searchParams = new URLSearchParams();
   mocks.tournament.data = { format: 'knockout', registrationDeadlineAt: null, bracketPublishedAt: '2026-10-01T00:00:00.000Z', bracketPublishScheduledAt: null };
   mocks.registrations.data = { items: [{ id: 'r1' }, { id: 'r2' }], truncated: false };
   mocks.registrations.isError = false;
   mocks.registrations.error = null;
+});
+
+afterEach(() => {
+  restoreViewport?.();
+  restoreViewport = null;
 });
 
 describe('AdminTournamentBracketPage — [그림 | 목록]', () => {

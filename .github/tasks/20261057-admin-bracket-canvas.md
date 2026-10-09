@@ -1,6 +1,6 @@
 # Task 20261057: 어드민 대진 그림 편집기 — 그림 먼저, 팀은 자리에, 결과는 칸에서
 
-Status: Planning
+Status: In Progress — PR-1~5 dev 머지, PR-6 머지 후 alpha 갤러리·E2E(사용자 승인 후) 대기
 **Owner**: Planning(main) → backend-data-dev · backend-api-dev · frontend-data-dev · frontend-ui-dev
 **Created**: 2026-10-08
 **Base**: origin/dev `c62b5ec08`
@@ -398,7 +398,7 @@ PR 은 순서대로 dev 에 머지하고 매번 alpha 에서 확인한다(dev �
 - [ ] `releaseSlotsForRegistrationInTx` 를 리그 `removeTeam`·등록 취소 전이에 연결.
 - [ ] 리그 어드민 응답(빈 경기 nullable, 참가팀 `registrationId`)·웹 타입 + 일정 보드.
 ### PR-6 모바일·마감
-- [ ] 390 라운드 탭 + 바텀시트, 구조 편집 숨김. changeset. 태스크 문서 Status 갱신.
+- [x] 390 라운드 탭 + 바텀시트, 구조 편집 숨김. changeset. 태스크 문서 Status 갱신.
 ### Sequential
 - [ ] PR 마다 dev 머지 → alpha 배포 SHA 확인 → **새 테스트 대회로**(alpha 데이터 쓰기 — 사용자 승인 후) ego-browser E2E → 390/768/1440 갤러리를 그 PR 에 게시.
 
@@ -453,4 +453,7 @@ PR 은 순서대로 dev 에 머지하고 매번 alpha 에서 확인한다(dev �
 | 2026-10-08 | plan-writers | 순위 채우기 override 범위 | tied 자리는 동률 팀 중, ready 자리는 원천 조 팀 중에서만. 저장 순위와 §5 결과가 어긋나면 tied |
 | 2026-10-08 | plan-writers | 리그 보드 열 | 리그 경기엔 round 가 없어 열 = 경기 날짜(주차). 템플릿 리그는 날짜당 한 라운드 |
 | 2026-10-08 | spec-verify workflow | 검증 결과 | 6관점·38 에이전트, 확인된 지적 44건(중복 포함) 전부 위 S1~S7·Test·PR 분해에 반영, 반박 2건 |
+| 2026-10-09 | 사용자 | 태블릿(768~1023) 칸 패널 위치 | **A** — 칸 패널을 BottomSheet 로, 참가팀 트레이는 한 줄 요약으로 접기. 1024 이상 옆 패널 그대로, D8(구조 편집 768+) 불변. 근거: alpha 768 에서 패널이 누른 칸보다 1,150px 아래 열림 |
+| 2026-10-09 | main | 자리 없이 만든 경기(옛 대진·「경기 추가」) | 서버 계약 그대로 — 자리 연결 사이드는 자리 API, 자리 없는 사이드는 `PATCH /admin/fixtures/:id`. 그림·시트는 `classifyFixtureSide`(slot/feeder/direct)로 갈라 direct 를 그 경로로 편집(#1725) |
+| 2026-10-09 | 사용자 | alpha 쓰기 E2E 범위 | **B** — 새 4팀 토너먼트 + 조별+결선(2조×3팀) 전체 흐름, QA 스쿼드 팀 사용. 두 단계 모두 PASS(#1723·#1727 코멘트) |
 

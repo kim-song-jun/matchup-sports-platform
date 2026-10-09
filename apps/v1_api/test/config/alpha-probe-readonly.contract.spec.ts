@@ -26,6 +26,7 @@ const READ_ONLY_SCRIPTS = [
   'scripts/capture-alpha-league-on-tournament-surface.mjs',
   'scripts/capture-alpha-competition-lists.mjs',
   'scripts/verify-alpha-unified-competition-list.mjs',
+  'scripts/capture-alpha-bracket-canvas.mjs',
 ];
 
 /**

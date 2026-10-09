@@ -1,6 +1,7 @@
 'use client';
 
-import { Suspense } from 'react';
+import { Suspense, useCallback, useEffect, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Plus, Calendar, Clock, Users, Coins } from 'lucide-react';
 import { useV1AdminTournaments } from '@/hooks/use-v1-api';
@@ -9,6 +10,7 @@ import { formatAdminKstDateTimeShort, formatEntryFee } from '@/lib/date-utils';
 import { extractErrorMessage } from '@/lib/error-message';
 import { useAdminCanWrite } from '@/hooks/use-admin-can-write';
 import { useAdminUrlListQuery } from '../use-admin-url-list-query';
+import { pickAllowedParam } from '../pick-allowed-param';
 import {
   AdminPageHeader,
   AdminDataTable,
@@ -19,6 +21,9 @@ import {
   AdminToasts,
   useAdminToast,
 } from '@/components/admin';
+import { ADMIN_VISIBILITY_OPTIONS, AdminVisibilityFilter } from '@/components/admin/admin-visibility-filter';
+import { AdminVisibilityBadge, TournamentRowVisibilityAction } from '@/components/admin/competition-visibility-row-action';
+import { tournamentVisibilityHiddenReason } from '@/components/admin/tournaments/tournament-visibility-control';
 import { MockSeedPanel } from '@/components/admin/tournaments/mock-seed-panel';
 
 // ── Helpers ───────────────────────────────────────────────────────────────
@@ -61,14 +66,31 @@ function AdminTournamentsPageContent() {
 
   // 검색 debounce·상태 필터·page 리셋은 공용 훅이 담당 (M1 표준 — users/teams와 동일).
   // 조건(?q=&status=&page=)은 URL에 남아 상세에 다녀와도 유지된다(MD-QA #21).
-  const { search, setSearch, activeStatus, setActiveStatus, filters, buildPagination } =
+  const { search, setSearch, activeStatus, setActiveStatus, filters, buildPagination, resetToFirstPage } =
     useAdminUrlListQuery(STATUS_OPTIONS, PAGE_SIZE);
 
-  const { toasts, showToast: _showToast } = useAdminToast();
-  // showToast is available for future use (e.g. after bulk actions)
+  // 공개 여부 필터도 ?visibility= 로 URL 에 남긴다. 공용 훅은 다른 URL 파라미터를 건드리지 않는다.
+  const query = useSearchParams().toString();
+  const [visibility, setVisibilityState] = useState(() =>
+    pickAllowedParam(new URLSearchParams(query).get('visibility'), ADMIN_VISIBILITY_OPTIONS));
+  useEffect(() => {
+    // Next 가 늦게 전달한 오래된 snapshot 은 실제 주소와 다르므로 무시한다(공용 훅과 같은 가드).
+    if (query !== new URLSearchParams(window.location.search).toString()) return;
+    setVisibilityState(pickAllowedParam(new URLSearchParams(query).get('visibility'), ADMIN_VISIBILITY_OPTIONS));
+  }, [query]);
+  const setVisibility = useCallback((next: string) => {
+    setVisibilityState(next);
+    const url = new URL(window.location.href);
+    if (next) url.searchParams.set('visibility', next);
+    else url.searchParams.delete('visibility');
+    window.history.replaceState(null, '', `${url.pathname}${url.search}${url.hash}`);
+    resetToFirstPage();
+  }, [resetToFirstPage]);
+
+  const { toasts, showToast } = useAdminToast();
 
   const { data, isPending, isFetching, isError, error, refetch } =
-    useV1AdminTournaments(filters);
+    useV1AdminTournaments(visibility ? { ...filters, visibility } : filters);
   const rows = data?.items ?? [];
   const pageInfo = data?.pageInfo;
   const statusOptions = STATUS_OPTIONS.map((option) => ({
@@ -117,6 +139,7 @@ function AdminTournamentsPageContent() {
           statusOptions={statusOptions}
           activeStatus={activeStatus}
           onStatusChange={setActiveStatus}
+          rightSlot={<AdminVisibilityFilter value={visibility} onChange={setVisibility} />}
         />
 
         {/* Card list */}
@@ -147,6 +170,17 @@ function AdminTournamentsPageContent() {
                 header: '상태',
                 width: 'w-[104px]',
                 render: (row) => <AdminStatusPill status={row.status} />,
+              },
+              {
+                key: 'visibility',
+                header: '공개',
+                width: 'w-[112px]',
+                render: (row) => (
+                  <AdminVisibilityBadge
+                    isPublic={row.isPublic ?? true}
+                    hiddenReason={tournamentVisibilityHiddenReason(row.status)}
+                  />
+                ),
               },
               {
                 key: 'title',
@@ -196,18 +230,27 @@ function AdminTournamentsPageContent() {
               },
             ]}
             renderActions={(row) => (
-              <Link
-                href={`/admin/tournaments/${row.id}`}
-                aria-label={`${row.title} 상세 보기`}
-                className={[
-                  'inline-flex items-center justify-center min-h-[44px] px-3 rounded-lg',
-                  'tm-on-tint text-[length:var(--font-size-label)] font-medium text-[var(--text-muted)] bg-[var(--surface-soft)]',
-                  'hover:bg-[var(--grey300)] transition-colors whitespace-nowrap',
-                  'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2',
-                ].join(' ')}
-              >
-                상세 보기
-              </Link>
+              <>
+                <TournamentRowVisibilityAction
+                  tournamentId={row.id}
+                  title={row.title}
+                  status={row.status}
+                  isPublic={row.isPublic ?? true}
+                  onToast={showToast}
+                />
+                <Link
+                  href={`/admin/tournaments/${row.id}`}
+                  aria-label={`${row.title} 상세 보기`}
+                  className={[
+                    'inline-flex items-center justify-center min-h-[44px] px-3 rounded-lg',
+                    'tm-on-tint text-[length:var(--font-size-label)] font-medium text-[var(--text-muted)] bg-[var(--surface-soft)]',
+                    'hover:bg-[var(--grey300)] transition-colors whitespace-nowrap',
+                    'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2',
+                  ].join(' ')}
+                >
+                  상세 보기
+                </Link>
+              </>
             )}
             loading={isInitialLoad}
             empty={

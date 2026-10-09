@@ -4,6 +4,11 @@ import { useV1UpdateTournamentVisibility } from '@/hooks/use-v1-api';
 import { CompetitionVisibilityControl } from '@/components/admin/competition-visibility-control';
 import type { V1TournamentStatus } from '@/types/api';
 
+/** 상태 때문에 공개 설정이 의미 없는 경우의 사유 — 상세 카드와 목록 행 액션이 같은 규칙을 쓴다. */
+export function tournamentVisibilityHiddenReason(status: V1TournamentStatus): string | undefined {
+  return status === 'cancelled' ? '취소된 대회는 공개 설정과 관계없이 일반 사용자 화면에 보이지 않아요.' : undefined;
+}
+
 /**
  * 공개 조회는 접수 중·마감·진행 중·종료 대회만 연다. 취소된 대회는 공개 설정과 관계없이 일반 화면에
  * 보이지 않고, 준비 중인 대회는 접수를 시작해야 이 설정대로 보인다 — 그 사실을 "현재 상태: 공개"
@@ -25,7 +30,7 @@ export function TournamentVisibilityControl({
       publicDescription="공개 대회 목록과 검색, 홈 화면에 표시돼요."
       privateDescription="일반 사용자에게 숨겨져요. 관리자 운영과 참가·대진 정보는 유지돼요."
       mutation={updateVisibility}
-      hiddenReason={status === 'cancelled' ? '취소된 대회는 공개 설정과 관계없이 일반 사용자 화면에 보이지 않아요.' : undefined}
+      hiddenReason={tournamentVisibilityHiddenReason(status)}
       exposureNote={
         status === 'draft'
           ? isPublic

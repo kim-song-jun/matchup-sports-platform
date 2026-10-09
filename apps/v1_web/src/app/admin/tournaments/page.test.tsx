@@ -23,6 +23,7 @@ vi.mock('next/navigation', () => ({
 
 vi.mock('@/hooks/use-v1-api', () => ({
   useV1AdminMe: () => ({ data: { capabilities: [] } }),
+  useV1UpdateTournamentVisibility: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useV1MockSeedAvailability: () => ({ data: { enabled: false } }),
   useV1CreateMockTournament: () => ({ mutate: vi.fn(), isPending: false }),
   useV1AdminTournaments: () => ({

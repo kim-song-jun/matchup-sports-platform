@@ -708,6 +708,42 @@ describe('TournamentsAdminService', () => {
     });
   });
 
+  describe('list: visibility filter', () => {
+    const stored = [
+      { ...tournamentRow({ id: 'pub-1', isPublic: true }), _count: { registrations: 0 } },
+      { ...tournamentRow({ id: 'pub-2', isPublic: true }), _count: { registrations: 0 } },
+      { ...tournamentRow({ id: 'hid-1', isPublic: false }), _count: { registrations: 0 } },
+      { ...tournamentRow({ id: 'hid-2', isPublic: false }), _count: { registrations: 0 } },
+    ] as Array<ReturnType<typeof tournamentRow> & { isPublic: boolean; _count: { registrations: number } }>;
+
+    // Applies the isPublic clause of the where the service builds, so the assertion is on rows returned.
+    function applyWhere(args: { where: { isPublic?: boolean } }) {
+      return stored.filter((row) => args.where.isPublic === undefined || row.isPublic === args.where.isPublic);
+    }
+
+    beforeEach(() => {
+      prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+      prisma.v1Tournament.findMany.mockImplementation(async (args) => applyWhere(args));
+    });
+
+    it.each([
+      ['hidden', ['hid-1', 'hid-2']],
+      ['public', ['pub-1', 'pub-2']],
+    ] as const)('visibility=%s returns only that side', async (visibility, ids) => {
+      const result = await service.list(ownerAuthUser, { limit: 20, visibility });
+      expect(result.items.map((item) => item.id)).toEqual(ids);
+    });
+
+    it('no visibility keeps every row, and status counts use the same visibility filter', async () => {
+      const all = await service.list(ownerAuthUser, { limit: 20 });
+      expect(all.items).toHaveLength(4);
+      await service.list(ownerAuthUser, { limit: 20, visibility: 'hidden' });
+      expect(prisma.v1Tournament.groupBy).toHaveBeenLastCalledWith(
+        expect.objectContaining({ where: expect.objectContaining({ isPublic: false }) }),
+      );
+    });
+  });
+
   it('get: returns collection counts for all operation tabs', async () => {
     prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
     prisma.v1Tournament.findFirst.mockResolvedValue({

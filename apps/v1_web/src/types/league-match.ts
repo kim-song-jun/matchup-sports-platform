@@ -1,6 +1,7 @@
 export interface V1AdminLeagueListItem {
   leagueId: string;
   title: string;
+  isPublic: boolean;
   state: 'draft' | 'active' | 'completed' | 'on_hold';
   teamCount: number;
   fixtureCount: number;

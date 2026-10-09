@@ -1455,3 +1455,44 @@ describe('LeagueMatchAdminService.updateVisibility', () => {
     expect(prisma.$transaction).not.toHaveBeenCalled();
   });
 });
+
+describe('LeagueMatchAdminService.list — visibility filter', () => {
+  const day = new Date('2026-10-01T00:00:00.000Z');
+  const stored = ['pub-1', 'pub-2', 'hid-1', 'hid-2'].map((id) => ({
+    id,
+    title: id,
+    isPublic: id.startsWith('pub'),
+    status: 'draft',
+    scheduledAt: day,
+    scheduledEndAt: day,
+    regionId: 'region-1',
+    seriesId: null,
+    tier: null,
+    seasonNo: null,
+    _count: { registrations: 0 },
+    series: null,
+  }));
+
+  function createService() {
+    const prisma = {
+      v1Tournament: {
+        // Applies the isPublic clause of the where the service builds.
+        findMany: jest.fn(async (args: { where: { isPublic?: boolean } }) =>
+          stored.filter((row) => args.where.isPublic === undefined || row.isPublic === args.where.isPublic)),
+      },
+      v1TeamMatch: { groupBy: jest.fn().mockResolvedValue([]) },
+    };
+    const adminContext = { getActiveAdmin: jest.fn().mockResolvedValue({ id: 'a' }) };
+    const service = new LeagueMatchAdminService(prisma as never, adminContext as never, {} as never, {} as never);
+    return service;
+  }
+
+  it.each([
+    ['hidden', ['hid-1', 'hid-2']],
+    ['public', ['pub-1', 'pub-2']],
+    [undefined, ['pub-1', 'pub-2', 'hid-1', 'hid-2']],
+  ] as const)('visibility=%s', async (visibility, ids) => {
+    const result = await createService().list(adminUser, undefined, visibility);
+    expect(result.items.map((item) => item.leagueId)).toEqual(ids);
+  });
+});

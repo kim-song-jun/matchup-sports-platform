@@ -19,6 +19,9 @@ publication change in the existing admin audit. The admin league detail includes
 preserves the original JSON type for this field: strings (including `"false"`),
 numbers, arrays, objects, null and a missing value return `400 VALIDATION_ERROR`.
 
+`GET /api/v1/admin/league-matches` accepts an optional `visibility=public|hidden` filter next to
+`seriesId` (any other value returns `400`); omitting it lists every league.
+
 Unpublishing removes the league from home discovery, league and tournament public
 lists, API-backed search and sitemap discovery. Direct public league, standings,
 fixture and associated public game reads return the normal not-found error.

@@ -23,7 +23,15 @@ export const TOURNAMENT_STATUSES = [
 ] as const;
 export type TournamentStatus = (typeof TOURNAMENT_STATUSES)[number];
 
+/** 어드민 목록의 공개 여부 필터 — 대회·리그 목록이 같은 값을 쓴다. */
+export const ADMIN_LIST_VISIBILITIES = ['public', 'hidden'] as const;
+export type AdminListVisibility = (typeof ADMIN_LIST_VISIBILITIES)[number];
+
 export class AdminTournamentListQueryDto {
+  @IsOptional()
+  @IsIn(ADMIN_LIST_VISIBILITIES)
+  visibility?: AdminListVisibility;
+
   @IsOptional()
   @IsIn(TOURNAMENT_STATUSES)
   status?: TournamentStatus;

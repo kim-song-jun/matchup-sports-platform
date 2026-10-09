@@ -4,6 +4,7 @@ import { Bell, CalendarDays, X, Zap } from 'lucide-react';
 import { usePathname } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { BottomSheet } from '@/components/v1-ui/bottom-sheet';
+import { BrandMark } from '@/components/v1-ui/brand-logo';
 import { IOS_APP_STORE_URL } from '@/lib/app-store-links';
 import { detectNativeShell } from '@/lib/native-bridge';
 import {
@@ -44,6 +45,9 @@ export function OpenInAppSheet() {
   const pathname = usePathname();
   const excluded = isExcludedOpenInAppPath(pathname);
   const [open, setOpen] = useState(false);
+  // 처음 열 때까지 BottomSheet 를 마운트하지 않는다 — 데스크톱·Android·셸에서는 시트(와 그 라우터 훅)가
+  // 아예 렌더되지 않고, 한 번 열린 뒤에는 남겨 닫힘 애니메이션을 지킨다.
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     if (excluded) return;
@@ -51,7 +55,9 @@ export function OpenInAppSheet() {
     if (!isIosMobileUserAgent(window.navigator.userAgent)) return;
     if (wasDismissed()) return;
     const timer = window.setTimeout(() => {
-      if (!wasDismissed()) setOpen(true);
+      if (wasDismissed()) return;
+      setMounted(true);
+      setOpen(true);
     }, OPEN_IN_APP_DELAY_MS);
     return () => window.clearTimeout(timer);
   }, [excluded]);
@@ -67,19 +73,14 @@ export function OpenInAppSheet() {
     window.setTimeout(() => setOpen(false), 0);
   }, []);
 
+  if (!mounted) return null;
+
   return (
     <BottomSheet open={open} onClose={dismiss} ariaLabel="팀밋 앱으로 열기">
       <div className="tm-filter-sheet-handle" aria-hidden="true" />
       <div className="tm-filter-sheet-head">
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src="/brand/icon-192.png"
-            alt=""
-            width={56}
-            height={56}
-            style={{ width: 56, height: 56, flexShrink: 0 }}
-          />
+          <BrandMark size={56} />
           <p className="tm-text-body-lg" style={{ fontWeight: 700, color: 'var(--text-strong)' }}>
             팀밋 앱에서 더 편하게 보세요
           </p>

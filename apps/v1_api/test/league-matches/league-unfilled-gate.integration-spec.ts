@@ -70,4 +70,20 @@ describe('정규 리그 빈 경기 공개 게이트', () => {
       expect(sorted(pending)).toEqual(sorted(visible));
     });
   });
+
+  describe('통합 대회 표면 (/tournaments/:id)', () => {
+    it('GET /tournaments/:id — leagueFixtures 에서 가려야 할 셋은 빠지고 둘은 그대로다', async () => {
+      const res = await request(app.getHttpServer()).get(`/api/v1/tournaments/${leagueId}`);
+      expect(res.status).toBe(200);
+      const fixtureIds: string[] = res.body.data.leagueFixtures.map((fixture: { teamMatchId: string }) => fixture.teamMatchId);
+      expect(sorted(fixtureIds)).toEqual(sorted(visible));
+    });
+
+    it('GET /tournaments/:id/standings/overall — 진행률 분모는 공개되는 경기만 센다', async () => {
+      const res = await request(app.getHttpServer()).get(`/api/v1/tournaments/${leagueId}/standings/overall`);
+      expect(res.status).toBe(200);
+      // (d)(e) 둘 다 결과가 없다 — 총 2건 · 치른 0건. 가려진 셋이 분모에 섞이면 5가 된다.
+      expect(res.body.data.progress).toMatchObject({ total: visible.length, played: 0, remaining: visible.length });
+    });
+  });
 });

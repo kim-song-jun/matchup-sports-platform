@@ -131,4 +131,21 @@ describe('ElapsedMatchClock — 경과 시간 표시', () => {
     );
     expect(screen.queryByText('일시 중지')).toBeNull();
   });
+
+  it('단판이면 시계 옆 "전반" 라벨과 aria-label 의 피리어드명이 없다 (2피리어드는 그대로)', () => {
+    const props = {
+      periodNumber: 1,
+      periodStartedAtMs: new Date('2026-08-08T00:00:00.000Z').getTime(),
+      offsetMs: 0,
+      pausedTotalMs: 0,
+      pausedAtMs: null,
+    };
+    const { rerender } = render(<ElapsedMatchClock {...props} periodCount={1} />);
+    expect(screen.queryByText('전반')).toBeNull();
+    expect(screen.getByLabelText('경과 시간 10:00')).toBeInTheDocument();
+
+    rerender(<ElapsedMatchClock {...props} periodCount={2} />);
+    expect(screen.getByText('전반')).toBeInTheDocument();
+    expect(screen.getByLabelText('전반 경과 시간 10:00')).toBeInTheDocument();
+  });
 });

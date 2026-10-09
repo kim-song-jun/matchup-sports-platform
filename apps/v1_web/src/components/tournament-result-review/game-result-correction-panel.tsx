@@ -26,6 +26,7 @@ import {
   officializeAlwaysAllowed,
 } from './result-review-copy';
 import { AdminListSkeleton } from '@/components/admin/admin-skeleton';
+import { regularPeriodCountOf } from '@/components/tournament-live/operate/period-label';
 
 type DirectorGateStatus = 'unknown' | 'enabled' | 'disabled';
 type CorrectionSnapshot = {
@@ -268,6 +269,7 @@ export function GameResultCorrectionPanel({
         sides={game.sides}
         lineups={lineupsQuery.data ?? []}
         periods={game.periods}
+        periodCount={regularPeriodCountOf(game.periods.length, game.periodDurations)}
         isKnockoutFixture={game.isKnockoutFixture}
         presentation={inline ? 'inline' : 'modal'}
         submitting={createCorrection.isPending}

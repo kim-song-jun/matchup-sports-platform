@@ -1,8 +1,8 @@
 'use client';
 
-import { useMutation, useQueryClient, type QueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { resultReviewKeys } from '@/hooks/use-tournament-result-review';
-import { v1Patch, v1Post, v1Put } from '@/lib/api-client';
+import { v1Get, v1Patch, v1Post, v1Put } from '@/lib/api-client';
 import { v1Keys } from '@/lib/query-keys';
 import { randomUuid } from '@/lib/uuid';
 import type {
@@ -14,6 +14,11 @@ import type {
   V1RandomFillResult,
 } from '@/types/api';
 import type { V1ApplyLeagueTemplatePayload, V1ApplyLeagueTemplateResult } from '@/types/league-match';
+import type {
+  V1FillSlotsFromStandingsInput,
+  V1FillSlotsFromStandingsResult,
+  V1SlotStandingsPreview,
+} from '@/types/bracket-standings-fill';
 
 export type BracketCompetitionScope = 'tournament' | 'league';
 
@@ -115,5 +120,26 @@ export function useV1ApplyLeagueTemplate(leagueId: string) {
       queryClient.invalidateQueries({ queryKey: v1Keys.leagueMatch(leagueId) });
       queryClient.invalidateQueries({ queryKey: v1Keys.tournament(leagueId) });
     },
+  });
+}
+
+/** `GET /admin/tournaments/:id/slots/standings-preview` — read fresh each time the dialog opens. */
+export function useV1SlotStandingsPreview(tournamentId: string, enabled: boolean) {
+  return useQuery({
+    queryKey: v1Keys.adminTournamentSlotStandings(tournamentId),
+    queryFn: () => v1Get<V1SlotStandingsPreview>(`/admin/tournaments/${tournamentId}/slots/standings-preview`),
+    enabled,
+    staleTime: 0,
+  });
+}
+
+/** `POST /admin/tournaments/:id/slots/fill-from-standings` — tied slots send the chosen team via overrides. */
+export function useV1FillSlotsFromStandings(tournamentId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: V1FillSlotsFromStandingsInput) =>
+      v1Post<V1FillSlotsFromStandingsResult>(`/admin/tournaments/${tournamentId}/slots/fill-from-standings`, input),
+    // The preview key is a child of the bracket key, so this refetches both.
+    onSuccess: () => invalidateCompetitionViews(queryClient, tournamentId, 'tournament'),
   });
 }

@@ -5,6 +5,7 @@ import type {
   V1AdminBracketGroup,
   V1AdminBracketSlot,
 } from '@/types/api';
+import { groupBlockGroups, groupRankAnchorY, layoutGroupBlocks, type GroupBlockLayout } from './bracket-canvas-group-layout';
 
 export const CANVAS_NODE_WIDTH = 232;
 export const CANVAS_HEADER_HEIGHT = 44;
@@ -32,7 +33,7 @@ export type CanvasLayoutInput = {
 };
 export type CanvasNodeLayout = { fixtureId: string; columnKey: string; x: number; y: number; width: number; height: number };
 export type CanvasColumnLayout = { key: string; groupId: string | null; label: string; x: number; width: number; fixtureIds: string[] };
-export type CanvasEdgeKind = 'WINNER' | 'LOSER' | 'BYE';
+export type CanvasEdgeKind = 'WINNER' | 'LOSER' | 'BYE' | 'GROUP_RANK';
 export type CanvasEdgeLayout = {
   id: string;
   kind: CanvasEdgeKind;
@@ -47,12 +48,28 @@ export type CanvasLayout = {
   columns: CanvasColumnLayout[];
   nodes: CanvasNodeLayout[];
   edges: CanvasEdgeLayout[];
+  /** 조별+결선 대진의 조 편성 블록. 순위 자리가 없는 대진은 빈 배열. */
+  groupBlocks: GroupBlockLayout[];
 };
 
 // 조별리그(group)는 결선보다 앞 열이고, 결선은 round16 > round12 > quarter > semi > final > third_place 순이다(한 대회에 16강·12강이 함께 있지는 않다). 모르는 단계는 맨 뒤.
 const PHASE_ORDER: Readonly<Record<string, number>> = { group: 0, round16: 1, round12: 2, quarter: 3, semi: 4, final: 5, third_place: 6 };
 
 type ColumnSeed = { key: string; groupId: string | null; label: string; fixtures: V1AdminBracketFixture[] };
+
+const GROUP_BLOCKS_COLUMN_KEY = 'group-blocks';
+
+/** 순위 자리가 있는 조별+결선 대진은 마지막 조별 열과 결선 첫 열 사이에 조 편성 블록 열을 끼운다. */
+function withGroupBlocksColumn(seeds: ColumnSeed[], input: CanvasLayoutInput): ColumnSeed[] {
+  if (input.mode !== 'bracket' || groupBlockGroups(input.groups, input.slots).length === 0) return seeds;
+  const phaseOf = new Map(input.groups.map((group) => [group.id, group.phase]));
+  const lastGroupColumn = seeds.reduce(
+    (last, seed, index) => (seed.groupId !== null && phaseOf.get(seed.groupId) === 'group' ? index : last),
+    -1,
+  );
+  const column: ColumnSeed = { key: GROUP_BLOCKS_COLUMN_KEY, groupId: null, label: '조 편성', fixtures: [] };
+  return [...seeds.slice(0, lastGroupColumn + 1), column, ...seeds.slice(lastGroupColumn + 1)];
+}
 
 function compareFixtures(a: V1AdminBracketFixture, b: V1AdminBracketFixture): number {
   return a.fixtureNumber - b.fixtureNumber || a.legNumber - b.legNumber || a.id.localeCompare(b.id);
@@ -95,13 +112,31 @@ function elbowPath(fromX: number, fromY: number, toX: number, toY: number): stri
 }
 
 export function buildCanvasLayout(input: CanvasLayoutInput): CanvasLayout {
-  const seeds = input.mode === 'league' ? leagueColumns(input.fixtures) : bracketColumns(input.groups, input.fixtures);
+  const baseSeeds = input.mode === 'league' ? leagueColumns(input.fixtures) : bracketColumns(input.groups, input.fixtures);
+  const seeds = withGroupBlocksColumn(baseSeeds, input);
   const slotsById = new Map(input.slots.map((slot) => [slot.id, slot]));
   const placed = new Map<string, CanvasNodeLayout>();
   const columns: CanvasColumnLayout[] = [];
+  const groupBlocks: GroupBlockLayout[] = [];
 
   seeds.forEach((seed, index) => {
     const x = CANVAS_PADDING + index * (CANVAS_NODE_WIDTH + CANVAS_COLUMN_GAP);
+    if (seed.key === GROUP_BLOCKS_COLUMN_KEY) {
+      groupBlocks.push(
+        ...layoutGroupBlocks({
+          groups: input.groups,
+          slots: input.slots,
+          x,
+          top: FIRST_NODE_Y,
+          width: CANVAS_NODE_WIDTH,
+          headerHeight: CANVAS_HEADER_HEIGHT,
+          rowHeight: CANVAS_ROW_HEIGHT,
+          gap: CANVAS_ROW_GAP,
+        }),
+      );
+      columns.push({ key: seed.key, groupId: null, label: seed.label, x, width: CANVAS_NODE_WIDTH, fixtureIds: [] });
+      return;
+    }
     let cursor = FIRST_NODE_Y;
     for (const fixture of seed.fixtures) {
       // 이미 놓인 원천 칸들의 연결 높이 평균에 맞추되, 위 칸과 겹치면 아래로 민다.
@@ -120,6 +155,7 @@ export function buildCanvasLayout(input: CanvasLayoutInput): CanvasLayout {
     columns.push({ key: seed.key, groupId: seed.groupId, label: seed.label, x, width: CANVAS_NODE_WIDTH, fixtureIds: seed.fixtures.map((fixture) => fixture.id) });
   });
 
+  const blockByGroup = new Map(groupBlocks.map((block) => [block.groupId, block]));
   const edges: CanvasEdgeLayout[] = [];
   for (const seed of seeds) {
     for (const fixture of seed.fixtures) {
@@ -139,7 +175,8 @@ export function buildCanvasLayout(input: CanvasLayoutInput): CanvasLayout {
       }
       for (const side of ['HOME', 'AWAY'] as const) {
         const slotId = side === 'HOME' ? fixture.homeSlotId : fixture.awaySlotId;
-        if (slotId !== null && slotsById.get(slotId)?.kind === 'BYE') {
+        const slot = slotId === null ? undefined : slotsById.get(slotId);
+        if (slot?.kind === 'BYE') {
           edges.push({
             id: `bye:${fixture.id}:${side}`,
             kind: 'BYE',
@@ -149,14 +186,26 @@ export function buildCanvasLayout(input: CanvasLayoutInput): CanvasLayout {
             path: `M${target.x - CANVAS_COLUMN_GAP / 2} ${sideAnchorY(target, side)} H${target.x}`,
           });
         }
+        const block = slot?.kind === 'GROUP_RANK' && slot.sourceGroupId !== null ? blockByGroup.get(slot.sourceGroupId) : undefined;
+        if (slot !== undefined && block !== undefined) {
+          edges.push({
+            id: `rank:${fixture.id}:${side}`,
+            kind: 'GROUP_RANK',
+            fromFixtureId: null,
+            toFixtureId: fixture.id,
+            side,
+            path: elbowPath(block.x + block.width, groupRankAnchorY(block, slot.position), target.x, sideAnchorY(target, side)),
+          });
+        }
       }
     }
   }
 
   const nodes = [...placed.values()];
   const width = seeds.length === 0 ? CANVAS_PADDING * 2 : CANVAS_PADDING * 2 + seeds.length * CANVAS_NODE_WIDTH + (seeds.length - 1) * CANVAS_COLUMN_GAP;
-  const bottom = nodes.reduce((max, node) => Math.max(max, node.y + node.height), FIRST_NODE_Y);
-  return { width, height: bottom + CANVAS_PADDING, columns, nodes, edges };
+  const nodesBottom = nodes.reduce((max, node) => Math.max(max, node.y + node.height), FIRST_NODE_Y);
+  const bottom = groupBlocks.reduce((max, block) => Math.max(max, block.y + block.height), nodesBottom);
+  return { width, height: bottom + CANVAS_PADDING, columns, nodes, edges, groupBlocks };
 }
 
 /** 확정 전 결과(제출됨·정정 초안)도 `submitted` — 무효는 다시 입력할 수 있는 `scheduled` 로 돌아간다. */
@@ -175,6 +224,37 @@ export function fixtureNodeState(game: V1AdminBracketFixtureGame | null): Fixtur
 export function isFixtureLocked(fixture: V1AdminBracketFixture): boolean {
   const game = fixture.game;
   return game !== null && (game.state !== 'SCHEDULED' || game.latestRevision !== null);
+}
+
+export type SideSource = 'slot' | 'feeder' | 'direct';
+
+/** 사이드의 팀이 어디서 오는지: 자리(slot) · 이전 경기(feeder) · 경기에 직접 지정(direct). */
+export function classifyFixtureSide(
+  fixture: V1AdminBracketFixture,
+  side: SideKey,
+  slotsById: ReadonlyMap<string, V1AdminBracketSlot>,
+): SideSource {
+  const slotId = side === 'HOME' ? fixture.homeSlotId : fixture.awaySlotId;
+  if (slotId !== null && slotsById.has(slotId)) return 'slot';
+  return fixture.bracketSources?.some((source) => source.side === side) ? 'feeder' : 'direct';
+}
+
+/** 자리 없이 경기에 직접 지정된 팀 id(옛 대진·경기 추가). 취소된 경기는 세지 않는다. */
+export function directPlacedRegistrationIds(
+  fixtures: readonly V1AdminBracketFixture[],
+  slots: readonly V1AdminBracketSlot[],
+): Set<string> {
+  const slotsById = new Map(slots.map((slot) => [slot.id, slot]));
+  const ids = new Set<string>();
+  for (const fixture of fixtures) {
+    // 게임만 취소돼도(경기 상태는 그대로) 취소로 본다 — 칸의 상태 칩과 같은 기준.
+    if (fixture.status === 'cancelled' || fixtureNodeState(fixture.game) === 'cancelled') continue;
+    for (const side of ['HOME', 'AWAY'] as const) {
+      const id = side === 'HOME' ? fixture.homeRegistrationId : fixture.awayRegistrationId;
+      if (id !== null && classifyFixtureSide(fixture, side, slotsById) === 'direct') ids.add(id);
+    }
+  }
+  return ids;
 }
 
 export function isSlotAssignable(slot: V1AdminBracketSlot): boolean {

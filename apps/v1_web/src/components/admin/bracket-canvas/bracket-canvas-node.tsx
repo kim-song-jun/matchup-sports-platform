@@ -8,6 +8,7 @@ import {
   CANVAS_FOOTER_HEIGHT,
   CANVAS_HEADER_HEIGHT,
   CANVAS_ROW_HEIGHT,
+  classifyFixtureSide,
   fixtureNodeState,
   isFixtureLocked,
   isSlotAssignable,
@@ -30,6 +31,7 @@ export type BracketCanvasNodeProps = {
   pendingRegistrationId: string | null;
   onSelect: (fixtureId: string) => void;
   onAssign: (slotId: string, registrationId: string) => void;
+  onAssignDirect: (fixtureId: string, side: SideKey, registrationId: string) => void;
 };
 
 export function BracketCanvasNode({
@@ -43,6 +45,7 @@ export function BracketCanvasNode({
   pendingRegistrationId,
   onSelect,
   onAssign,
+  onAssignDirect,
 }: BracketCanvasNodeProps) {
   const state = fixtureNodeState(fixture.game);
   const chip = bracketNodeStateChip(state);
@@ -54,11 +57,15 @@ export function BracketCanvasNode({
   const penalty = score?.penalties ? `승부차기 ${score.penalties.home}:${score.penalties.away}` : null;
   const footer = [voided ? '무효 처리됨' : quick ? '어드민 빠른 입력' : null, penalty].filter((part): part is string => part !== null);
 
+  const resolvedSlots = new Map([slots.HOME, slots.AWAY].filter((slot): slot is V1AdminBracketSlot => slot !== null).map((slot) => [slot.id, slot]));
+
   const renderSide = (side: SideKey) => {
     const slot = slots[side];
-    const assignable = canWrite && !locked && slot !== null && isSlotAssignable(slot);
+    const direct = classifyFixtureSide(fixture, side, resolvedSlots) === 'direct';
+    const assignable = canWrite && !locked && (direct || (slot !== null && isSlotAssignable(slot)));
     const placing = assignable && pendingRegistrationId !== null;
     const filled = (side === 'HOME' ? fixture.homeRegistrationId : fixture.awayRegistrationId) !== null;
+    const place = (registrationId: string) => (direct ? onAssignDirect(fixture.id, side, registrationId) : slot !== null && onAssign(slot.id, registrationId));
     const sideScore = score === null ? null : side === 'HOME' ? score.home : score.away;
     return (
       <div
@@ -68,11 +75,11 @@ export function BracketCanvasNode({
         style={{ height: CANVAS_ROW_HEIGHT }}
         onDragOver={assignable ? (event: DragEvent) => event.preventDefault() : undefined}
         onDrop={
-          assignable && slot !== null
+          assignable
             ? (event: DragEvent) => {
                 event.preventDefault();
                 const registrationId = event.dataTransfer.getData(REGISTRATION_DRAG_MIME);
-                if (registrationId !== '') onAssign(slot.id, registrationId);
+                if (registrationId !== '') place(registrationId);
               }
             : undefined
         }
@@ -80,7 +87,7 @@ export function BracketCanvasNode({
         <button
           type="button"
           aria-label={`${SIDE_NAME[side]} ${sideLabels[side]}${placing ? ', 선택한 팀을 여기에 넣어요' : ''}`}
-          onClick={() => (placing && slot !== null ? onAssign(slot.id, pendingRegistrationId) : onSelect(fixture.id))}
+          onClick={() => (placing ? place(pendingRegistrationId) : onSelect(fixture.id))}
           className={`flex h-full w-full items-center justify-between gap-2 px-3 text-left transition-colors hover:bg-[var(--surface-soft)] focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-blue-500${placing ? ' tm-on-tint bg-[var(--blue50)]' : ''}`}
         >
           <span

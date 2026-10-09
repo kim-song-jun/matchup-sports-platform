@@ -11,7 +11,7 @@ import type {
 } from '@/hooks/use-tournament-result-review';
 import type { GameLineup } from '@/types/game-operations';
 import { formatGameResultScoreWithPenalties, readGameResultScore } from '@/lib/game-result-score';
-import { periodLabel } from '@/components/tournament-live/operate/period-label';
+import { isSinglePeriod, periodLabel } from '@/components/tournament-live/operate/period-label';
 import { useOverlayHistory } from '@/components/v1-ui/use-overlay-history';
 import { useTopmostEscape } from '@/components/v1-ui/use-topmost-escape';
 import { lockBodyScroll } from '@/lib/body-scroll-lock';
@@ -55,6 +55,8 @@ export type ResultEditModalProps = {
   sides: readonly TournamentGameSide[];
   /** Pinned period rows from GET /games/:gameId. New goals may only use these numbers. */
   periods: readonly { number: number }[];
+  /** 정규 피리어드 수. 1이면 단판이라 골의 피리어드 칸을 숨긴다(새 골은 첫 피리어드로 들어간다). */
+  periodCount?: number | null;
   /** `GET /games/:gameId/lineups`(`GamesService.listLineups()`)의 라인업 스냅샷 --
    * 실명 표시에 쓴다. 아직 로딩 중이거나 없으면 빈 배열을 넘기면 된다(폴백은
    * `participantLabel`이 알아서 처리한다). */
@@ -283,6 +285,7 @@ export function ResultEditModal({
   base,
   sides,
   periods,
+  periodCount,
   lineups,
   isKnockoutFixture = false,
   submitting = false,
@@ -769,34 +772,36 @@ export function ResultEditModal({
                         }
                       />
                     </div>
-                    <div className="col-span-2 flex min-w-0 flex-col gap-1 sm:col-span-1">
-                      <label className="tm-text-caption" htmlFor={`${idPrefix}-goal-${index}-period`}>피리어드</label>
-                      <select
-                        id={`${idPrefix}-goal-${index}-period`}
-                        aria-label={`${index + 1}번째 득점 피리어드`}
-                        className="tm-input"
-                        value={goal.period ?? ''}
-                        onChange={(event) =>
-                          replaceGoalEvents(goalEvents.map((item, itemIndex) =>
-                            itemIndex === index
-                              ? {
-                                  ...item,
-                                  ...(event.target.value
-                                    ? { period: Number(event.target.value) }
-                                    : { period: undefined }),
-                                }
-                              : item,
-                          ))
-                        }
-                      >
-                        <option value="">선택 안 함</option>
-                        {periods.map((period) => (
-                          <option key={period.number} value={period.number}>
-                            {periodLabel(period.number)}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
+                    {isSinglePeriod(periodCount) ? null : (
+                      <div className="col-span-2 flex min-w-0 flex-col gap-1 sm:col-span-1">
+                        <label className="tm-text-caption" htmlFor={`${idPrefix}-goal-${index}-period`}>피리어드</label>
+                        <select
+                          id={`${idPrefix}-goal-${index}-period`}
+                          aria-label={`${index + 1}번째 득점 피리어드`}
+                          className="tm-input"
+                          value={goal.period ?? ''}
+                          onChange={(event) =>
+                            replaceGoalEvents(goalEvents.map((item, itemIndex) =>
+                              itemIndex === index
+                                ? {
+                                    ...item,
+                                    ...(event.target.value
+                                      ? { period: Number(event.target.value) }
+                                      : { period: undefined }),
+                                  }
+                                : item,
+                            ))
+                          }
+                        >
+                          <option value="">선택 안 함</option>
+                          {periods.map((period) => (
+                            <option key={period.number} value={period.number}>
+                              {periodLabel(period.number)}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 8 }}>
                     <button type="button" className="tm-btn tm-btn-sm tm-btn-ghost" disabled={index === 0} onClick={() => {

@@ -69,6 +69,26 @@ describe('AppleLoginButton', () => {
     });
   });
 
+  // aria-busy opts out of the shared `.tm-btn:disabled:not([aria-busy='true']) > *` rule, which
+  // would halve the mark and label again on top of the button's own dimming.
+  it('marks itself busy while connecting and clears it afterwards', async () => {
+    let releaseNonce!: (value: { nonce: string }) => void;
+    api.v1Post.mockImplementationOnce(() => new Promise((resolve) => { releaseNonce = resolve; }));
+    reply = { ok: false };
+    render(<AppleLoginButton />);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Apple로 계속하기' }));
+
+    const button = screen.getByRole('button', { name: 'Apple로 계속하기' });
+    expect(button).toBeDisabled();
+    expect(button).toHaveAttribute('aria-busy', 'true');
+    expect(button).toHaveTextContent('연결 중이에요…');
+
+    releaseNonce({ nonce: 'server-nonce' });
+    await waitFor(() => expect(button).not.toBeDisabled());
+    expect(button).not.toHaveAttribute('aria-busy');
+  });
+
   it('says nothing when the reader closes the sheet', async () => {
     reply = { ok: false };
     render(<AppleLoginButton />);

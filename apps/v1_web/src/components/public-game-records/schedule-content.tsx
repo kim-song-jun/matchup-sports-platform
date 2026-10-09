@@ -20,6 +20,8 @@ import {
   formatGoalMinute,
   formatScoreline,
   isClockAbnormal,
+  isSinglePeriod,
+  SINGLE_PERIOD_HEADING,
   isCorrectedOrVoid,
   presentGameEventParticipantName,
   resultStateLabel,
@@ -209,15 +211,18 @@ function MatchEventSummary({ entry }: { entry: PublicScheduleEntry }) {
   // (`goal-event-backfill.ts` -- 원본에 전/후반이 없었고, 서버가 `isPeriodUnknown`으로
   // null을 내려준다). `period !== 1`로 뭉뚱그리면 이 기록들이 전부 "후반"으로 렌더돼,
   // 모른다고 내려온 값이 화면에서는 단정으로 바뀐다.
-  const sections = [
-    { key: 'first', label: '전반', items: items.filter((item) => item.period === 1).sort(byClock) },
-    {
-      key: 'second',
-      label: '후반',
-      items: items.filter((item) => item.period !== null && item.period !== 1).sort(byClock),
-    },
-    { key: 'unknown', label: '기타', items: items.filter((item) => item.period === null).sort(byClock) },
-  ].filter((section) => section.items.length > 0);
+  const known = items.filter((item) => item.period !== null);
+  const unknown = items.filter((item) => item.period === null).sort(byClock);
+  // 단판은 구간이 하나다 — 시간대를 모르는 기록도 "기타"로 떼지 않고 목록 끝에 합친다.
+  const sections = (
+    isSinglePeriod(entry.periodCount)
+      ? [{ key: 'single', label: SINGLE_PERIOD_HEADING, items: [...known.sort(byClock), ...unknown] }]
+      : [
+          { key: 'first', label: '전반', items: items.filter((item) => item.period === 1).sort(byClock) },
+          { key: 'second', label: '후반', items: known.filter((item) => item.period !== 1).sort(byClock) },
+          { key: 'unknown', label: '기타', items: unknown },
+        ]
+  ).filter((section) => section.items.length > 0);
 
   return (
     <div
@@ -403,7 +408,7 @@ function ScheduleRow({
         <span style={{ fontSize: 12, color: 'var(--text-caption)', display: 'flex', gap: 8, alignItems: 'center', flexShrink: 0 }}>
           {dateLabel ?? '일정 미정'}
           {entry.status === 'live' ? (
-            <LiveBadge clock={entry.clock} periodBreak={entry.periodBreak} />
+            <LiveBadge clock={entry.clock} periodBreak={entry.periodBreak} periodCount={entry.periodCount} />
           ) : (
             ` · ${fixtureStatusLabel(entry.status)}`
           )}

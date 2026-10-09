@@ -16,6 +16,8 @@ import {
   formatScoreline,
   isClockAbnormal,
   periodLabel,
+  isSinglePeriod,
+  SINGLE_PERIOD_HEADING,
   presentGameEventParticipantName,
   presentParticipantName,
   resultStateLabel,
@@ -232,10 +234,12 @@ function EventsSection({
   events,
   isStatusOnly,
   from,
+  periodCount,
 }: {
   events: readonly PublicMatchEvent[];
   isStatusOnly: boolean;
   from?: string;
+  periodCount?: number | null;
 }) {
   if (events.length === 0) {
     // status_only는 "이벤트가 없었다"가 아니라 "이 대회는 진행 상태만 공개해서
@@ -267,41 +271,28 @@ function EventsSection({
   }
   const periodNumbers = Array.from(byPeriod.keys()).sort((a, b) => a - b);
 
+  // 단판은 구간이 하나다 — 시간대 없는 기록도 "기타"로 떼지 않고 목록 끝에 합친다.
+  const groups: Array<{ id: string; label: string; events: readonly PublicMatchEvent[] }> = isSinglePeriod(periodCount)
+    ? [{ id: 'match-events-single', label: SINGLE_PERIOD_HEADING, events: [...periodNumbers.flatMap((period) => byPeriod.get(period)!), ...unknownPeriodEvents] }]
+    : [
+        ...periodNumbers.map((period) => ({ id: `match-events-period-${period}`, label: periodLabel(period), events: byPeriod.get(period)! })),
+        ...(unknownPeriodEvents.length > 0 ? [{ id: 'match-events-period-unknown', label: '기타', events: unknownPeriodEvents }] : []),
+      ];
+
   return (
     <div role="list" aria-label="득점·카드" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-      {periodNumbers.map((period) => {
-        const headingId = `match-events-period-${period}`;
-        return (
-          <div key={period} role="group" aria-labelledby={headingId}>
-            <div
-              id={headingId}
-              style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-caption)', marginBottom: 8 }}
-            >
-              {periodLabel(period)}
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              {byPeriod.get(period)!.map((event, index) => (
-                <EventRow key={`${event.type}-${event.sideId}-${period}-${index}`} event={event} from={from} />
-              ))}
-            </div>
-          </div>
-        );
-      })}
-      {unknownPeriodEvents.length > 0 ? (
-        <div role="group" aria-labelledby="match-events-period-unknown">
-          <div
-            id="match-events-period-unknown"
-            style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-caption)', marginBottom: 8 }}
-          >
-            기타
+      {groups.map((group) => (
+        <div key={group.id} role="group" aria-labelledby={group.id}>
+          <div id={group.id} style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-caption)', marginBottom: 8 }}>
+            {group.label}
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            {unknownPeriodEvents.map((event, index) => (
-              <EventRow key={`${event.type}-${event.sideId}-unknown-${index}`} event={event} from={from} />
+            {group.events.map((event, index) => (
+              <EventRow key={`${event.type}-${event.sideId}-${group.id}-${index}`} event={event} from={from} />
             ))}
           </div>
         </div>
-      ) : null}
+      ))}
     </div>
   );
 }
@@ -420,7 +411,7 @@ export function MatchDetailContent({
               {data.venue ? ` · ${data.venue}` : ''}
               {data.fieldName ? ` (${data.fieldName})` : ''}
             </span>
-            {data.status === 'live' ? <LiveBadge clock={data.clock} periodBreak={data.periodBreak} /> : null}
+            {data.status === 'live' ? <LiveBadge clock={data.clock} periodBreak={data.periodBreak} periodCount={data.periodCount} /> : null}
           </div>
           {/* 서버의 pendingProjection 은 진행 중(live)에도 켜진다 — 확정을 "기다리는" 문장은 경기가 끝난 뒤에만 맞다. */}
           {data.pendingProjection && data.status !== 'live' ? (
@@ -478,7 +469,7 @@ export function MatchDetailContent({
       <section>
         <h3 className="tm-hub-section-title" style={{ marginBottom: 12 }}>득점·카드</h3>
         <Card pad={16}>
-          <EventsSection events={data.events} isStatusOnly={isStatusOnly} from={from} />
+          <EventsSection events={data.events} isStatusOnly={isStatusOnly} from={from} periodCount={data.periodCount} />
         </Card>
       </section>
 

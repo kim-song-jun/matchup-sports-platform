@@ -58,6 +58,7 @@ import { excludeUnfilledSlotFixturesWhere } from '../../common/competition/unfil
 import { LEAGUE_TIE_BREAK_ORDER } from '../../league-matches/league-tie-break';
 import { SLOT_LABEL_SELECT, slotLabelFromRow } from '../../tournaments/slots/tournament-slot-label';
 import { PUBLIC_COMPETITION_STATUS_WHERE } from '../../tournaments/tournaments-read.query';
+import { regularPeriodCount } from '../../tournaments/competition-config/competition-config.parse';
 
 /**
  * A fixture/match this route never returns individually and never lists in
@@ -147,6 +148,8 @@ const GAME_MATCH_SELECT = {
   },
   // Lane 1 addition -- see GAME_MATCH_SELECT above.
   periods: { select: { number: true, state: true, startedAt: true, pausedTotalMs: true, pausedAt: true } },
+  // 정규 피리어드 수(`periodCount`) 산출용 — 연장은 `V1GamePeriod` 행이라 행 수로는 셀 수 없다.
+  competitionConfig: { select: { periods: true } },
 } satisfies Prisma.V1GameSelect;
 
 type GameMatchRow = Prisma.V1GameGetPayload<{ select: typeof GAME_MATCH_SELECT }>;
@@ -1255,6 +1258,7 @@ export class PublicTournamentRecordsService {
       score,
       clock,
       periodBreak,
+      periodCount: gamePeriodCount(fixture.game),
       lineup,
       events,
       mvp,
@@ -1964,6 +1968,7 @@ export class PublicTournamentRecordsService {
       score,
       clock,
       periodBreak,
+      periodCount: gamePeriodCount(teamMatch.game),
       lineup,
       events,
       mvp,
@@ -2302,6 +2307,11 @@ function assertLeagueTeamMatchOperationalInvariant<T extends LeagueTeamMatchOper
   }
 }
 
+/** 경기의 정규 피리어드 수. 경기 레코드가 없거나 설정을 읽을 수 없으면 null — 화면은 지금 동작을 유지한다. */
+function gamePeriodCount(game: { competitionConfig?: { periods: Prisma.JsonValue } | null } | null | undefined): number | null {
+  return regularPeriodCount(game?.competitionConfig?.periods);
+}
+
 function presentScheduleEntry(
   fixture: FixtureScheduleRow,
   publicLiveEnabled: boolean,
@@ -2424,6 +2434,7 @@ function presentScheduleEntry(
     score,
     clock,
     periodBreak,
+    periodCount: gamePeriodCount(fixture.game),
     scorers,
     cards,
     // **이 뷰의 점수 공개 게이트를 그대로 따른다.** outcome 전용 조건을 따로 만들지

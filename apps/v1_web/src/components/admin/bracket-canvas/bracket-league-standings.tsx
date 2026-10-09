@@ -28,7 +28,7 @@ export function BracketLeagueStandings({ groups }: { groups: LeagueStandingsGrou
             <tbody>
               {group.rows.map((row) => (
                 <tr key={row.registrationId} className="border-t border-[var(--border)]">
-                  <td className="tab-num tm-text-caption px-1 py-2 text-center">{row.rank}</td>
+                  <th scope="row" className="tab-num tm-text-caption px-1 py-2 text-center font-normal">{row.rank}</th>
                   <td className="tm-text-label truncate px-1 py-2 font-semibold" title={row.teamName}>{row.teamName}</td>
                   {[row.played, row.wins, row.draws, row.losses].map((value, index) => (
                     <td key={index} className="tab-num tm-text-caption px-1 py-2 text-center">{value}</td>

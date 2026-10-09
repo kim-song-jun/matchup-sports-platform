@@ -30,6 +30,14 @@ describe('BracketLeagueGrid', () => {
     expect(within(cell).queryByText('2번 경기')).not.toBeInTheDocument();
   });
 
+  it('조는 있는데 경기가 하나도 없으면 빈 안내를 보여 주고, 경기가 있으면 보이지 않는다', () => {
+    const { unmount } = render(<BracketLeagueGrid groups={[gA]} fixtures={[]} slots={[]} selectedFixtureId={null} pendingRegistrationId={null} canWrite onSelectFixture={vi.fn()} onAssignSlot={vi.fn()} onAssignDirect={vi.fn()} />);
+    expect(screen.getByText('아직 경기가 없어요. 템플릿으로 시작하거나 경기를 추가해 주세요.')).toBeInTheDocument();
+    unmount();
+    renderGrid();
+    expect(screen.queryByText(/아직 경기가 없어요/)).not.toBeInTheDocument();
+  });
+
   it('칸의 보이는 제목은 짧고 취소된 경기도 제 칸에 취소 칩으로 남는다', () => {
     renderGrid();
     const cancelled = within(screen.getByRole('group', { name: '2라운드 A조' })).getByRole('group', { name: /3번 경기, 취소/ });

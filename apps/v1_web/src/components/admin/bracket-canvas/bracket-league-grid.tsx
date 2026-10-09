@@ -51,6 +51,14 @@ export function BracketLeagueGrid({
         {grid.columns.map((column) => (
           <h3 key={column.key} className="tm-text-caption-strong truncate">{column.label}</h3>
         ))}
+        {grid.rows.length === 0 ? (
+          <p
+            className="tm-text-caption px-3 py-6 text-center"
+            style={{ gridColumn: '1 / -1', color: 'var(--text-muted)', border: '1px dashed var(--border)', borderRadius: 'var(--radius-container)' }}
+          >
+            아직 경기가 없어요. 템플릿으로 시작하거나 경기를 추가해 주세요.
+          </p>
+        ) : null}
         {grid.rows.map((row) => (
           <Fragment key={row.key}>
             <h4 className="tm-text-caption-strong pt-3">{row.label}</h4>

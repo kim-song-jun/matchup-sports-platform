@@ -22,8 +22,14 @@ describe('BracketLeagueStandings', () => {
   it('행은 순위·팀·경기·승·무·패·득실·승점 순이고 득실에는 부호가 붙는다', () => {
     render(<BracketLeagueStandings groups={groups} />);
     const rows = within(screen.getByRole('table', { name: 'A조 순위표' })).getAllByRole('row').slice(1);
-    expect(within(rows[0]).getAllByRole('cell').map((c) => c.textContent)).toEqual(['1', '송파 유나이티드', '2', '2', '0', '0', '+3', '6']);
-    expect(within(rows[1]).getAllByRole('cell').map((c) => c.textContent)).toEqual(['2', '마포 레인저스', '2', '0', '0', '2', '-3', '0']);
+    expect(within(rows[0]).getAllByRole('cell').map((c) => c.textContent)).toEqual(['송파 유나이티드', '2', '2', '0', '0', '+3', '6']);
+    expect(within(rows[1]).getAllByRole('cell').map((c) => c.textContent)).toEqual(['마포 레인저스', '2', '0', '0', '2', '-3', '0']);
+  });
+
+  it('각 행의 순위 칸이 행 머리글이다', () => {
+    render(<BracketLeagueStandings groups={groups} />);
+    const rows = within(screen.getByRole('table', { name: 'A조 순위표' })).getAllByRole('row').slice(1);
+    expect(rows.map((r) => within(r).getByRole('rowheader').textContent)).toEqual(['1', '2']);
   });
 
   it('다른 조 팀이 섞이지 않는다', () => {

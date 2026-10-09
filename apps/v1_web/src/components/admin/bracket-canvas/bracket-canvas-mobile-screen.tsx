@@ -36,7 +36,8 @@ export function BracketCanvasMobileScreen({ tournamentId, registrations, registr
   );
   const candidates = useMemo(() => candidatesFromRegistrations(registrations), [registrations]);
 
-  if (isPending) {
+  // 대회 형식이 정해지기 전에 그리면 리그 대회가 토너먼트 라운드로 잠깐 보였다가 바뀐다.
+  if (isPending || format === undefined) {
     return (
       <div role="status" aria-busy="true" aria-label="대진을 불러오는 중이에요">
         <AdminListSkeleton rows={4} />

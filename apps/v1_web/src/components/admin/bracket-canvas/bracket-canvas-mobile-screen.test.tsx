@@ -36,7 +36,7 @@ const bracket = makeBracket({
   slots: [makeSlot({ id: 's-1' })],
 });
 
-function renderScreen(canWrite = true, format?: 'league' | 'knockout') {
+function renderScreen(canWrite = true, format: 'league' | 'knockout' | undefined = 'knockout') {
   return render(
     <BracketCanvasMobileScreen tournamentId="t-1" registrations={registrations} registrationsState={registrationsState} canWrite={canWrite} format={format} showToast={vi.fn()} />,
   );
@@ -95,6 +95,19 @@ describe('BracketCanvasMobileScreen', () => {
     expect(screen.getByTestId('mobile-canvas')).toHaveAttribute('data-rounds', '1라운드,2라운드');
     expect(screen.getByText('조별 순위')).toBeInTheDocument();
     expect(screen.getByRole('table', { name: 'A조 순위표', hidden: true })).toBeInTheDocument();
+  });
+
+  it('대회 형식을 알기 전에는 라운드 목록을 그리지 않고 로딩을 보여 준다', () => {
+    const { rerender } = render(
+      <BracketCanvasMobileScreen tournamentId="t-1" registrations={registrations} registrationsState={registrationsState} canWrite format={undefined} showToast={vi.fn()} />,
+    );
+    expect(screen.getByRole('status', { name: '대진을 불러오는 중이에요' })).toBeInTheDocument();
+    expect(screen.queryByTestId('mobile-canvas')).not.toBeInTheDocument();
+    rerender(
+      <BracketCanvasMobileScreen tournamentId="t-1" registrations={registrations} registrationsState={registrationsState} canWrite format="league" showToast={vi.fn()} />,
+    );
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    expect(screen.getByTestId('mobile-canvas').getAttribute('data-rounds')).toMatch(/^1라운드/);
   });
 
   it('토너먼트는 순위 접이식 없이 지금 탭 그대로다', () => {

@@ -66,15 +66,15 @@ function consoleHref(leagueId: string, teamMatchId: string): string {
   return `/admin/live/${encodeURIComponent(leagueId)}/fixtures/${encodeURIComponent(teamMatchId)}/operate`;
 }
 
-/**
- * 서버가 대진 취소·팀 제외·재생성을 409 LEAGUE_FIXTURE_GAME_IN_PROGRESS 로 막는 조건과 같다 —
- * 아직 취소되지 않은 대진의 경기가 뛰는 중이다. 화면은 같은 조건에서 버튼을 미리 막고 이유를 적는다.
- */
 /** 양쪽 팀이 모두 정해진 경기만 콘솔·결과·몰수 대상이다. 자리만 있고 팀이 빈 경기는 아직 치를 수 없다. */
 function hasBothTeams(fixture: V1LeagueFixture): boolean {
   return fixture.homeTeamId !== null && fixture.awayTeamId !== null;
 }
 
+/**
+ * 서버가 대진 취소·팀 제외·재생성을 409 LEAGUE_FIXTURE_GAME_IN_PROGRESS 로 막는 조건과 같다 —
+ * 아직 취소되지 않은 대진의 경기가 뛰는 중이다. 화면은 같은 조건에서 버튼을 미리 막고 이유를 적는다.
+ */
 function isFixtureGameInProgress(fixture: V1LeagueFixture): boolean {
   return fixture.status !== 'cancelled' && (fixture.gameState === 'LIVE' || fixture.gameState === 'PAUSED');
 }
@@ -712,7 +712,7 @@ export default function LeagueMatchFixturesClient({
         />
       ) : null}
 
-{view === 'list' && series.fixtures.length === 0 ? (
+{series.fixtures.length === 0 ? (
 <>
       {/* 참가 신청 관리 — 사용자 A안(FE-3). BE 는 진작에 `open-registration` 을 갖고
           있었는데 **부르는 화면이 없어** 리그는 신청을 열 방법이 API 직접 호출뿐이었다.
@@ -1341,7 +1341,7 @@ export default function LeagueMatchFixturesClient({
           leagueStartsOn={series.startsOn}
           initialTeamCount={Math.min(20, Math.max(3, teamCount))}
           recentVenues={series.recentVenues ?? []}
-          replaceExisting={series.fixtures.length > 0}
+          replaceExisting={series.fixtures.some((fixture) => fixture.status !== 'cancelled')}
           isSubmitting={applyTemplate.isPending}
           onSubmit={async (payload) => {
             const result = await applyTemplate.mutateAsync(payload);

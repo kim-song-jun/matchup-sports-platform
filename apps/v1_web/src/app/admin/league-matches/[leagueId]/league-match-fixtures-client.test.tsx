@@ -2238,6 +2238,14 @@ describe('LeagueMatchFixturesClient — 일정 보드와 보기 전환', () => {
     expect(screen.getByRole('button', { name: '라운드로빈 대진 생성' })).toBeInTheDocument();
   });
 
+  it('대진이 없으면 보드에서도 참가팀 관리·경기 하나 추가가 닿는다', () => {
+    renderClient({ fixtures: [], slots: [] });
+
+    expect(screen.getByRole('tab', { name: '일정 보드', selected: true })).toBeInTheDocument();
+    expect(screen.getByText('참가팀 관리')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '경기 하나 추가' })).toBeInTheDocument();
+  });
+
   it('템플릿을 만들면 새 경기만 보내고(replaceExisting 없음) 개수를 알린다 — 참가팀 2팀이어도 팀 수 기본값은 최소 3', async () => {
     canvasMocks.applyTemplate.mockResolvedValue({ slots: 3, fixtures: 3 });
     renderClient({ fixtures: [], slots: [] });

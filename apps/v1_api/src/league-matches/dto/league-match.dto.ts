@@ -1,5 +1,5 @@
 import { Transform, Type } from 'class-transformer';
-import { ArrayNotEmpty, IsArray, IsBoolean, IsDateString, IsIn, IsInt, IsNotEmpty, IsOptional, IsString, IsUUID, Matches, Max, MaxLength, Min, ValidateNested } from 'class-validator';
+import { ArrayNotEmpty, IsArray, IsBoolean, IsDateString, IsDefined, IsIn, IsInt, IsNotEmpty, IsOptional, IsString, IsUUID, Matches, Max, MaxLength, Min, ValidateNested } from 'class-validator';
 
 export class UpdateLeagueVisibilityDto {
   // Keep the JSON type: implicit Boolean conversion would turn the string "false" into true.
@@ -306,4 +306,34 @@ export class UpdateLeagueDisciplineDto {
   @Min(1, { message: '퇴장 정지 경기 수는 1경기 이상이어야 해요.' })
   @Max(20, { message: '퇴장 정지 경기 수는 20경기를 넘을 수 없어요.' })
   redCardSuspensionMatches?: number | null;
+}
+
+// 정규 리그 대진 템플릿(자리 기반 빈 경기). 팀은 나중에 자리에 넣으므로 teamIds 가 없다.
+// 일정은 필수다 — 공개 가드가 startAt·placeName 이 있는 경기만 내보내기 때문이다. 라운드마다 날짜 하나씩
+// 쓰므로(팀당 하루 1경기) 필요한 날짜 수는 총 라운드 수이고, 모자라면 422 LEAGUE_SCHEDULE_SLOTS_INSUFFICIENT.
+export class ApplyLeagueTemplateDto {
+  @IsInt()
+  @Min(3)
+  @Max(20)
+  teamCount!: number;
+
+  @IsInt()
+  @IsIn([1, 2])
+  legs!: 1 | 2;
+
+  @IsDefined()
+  @ValidateNested()
+  @Type(() => LeagueFixtureScheduleDto)
+  schedule!: LeagueFixtureScheduleDto;
+
+  // 비우면 일괄 생성과 같은 기본값('장소 미정')이다.
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  placeName?: string;
+
+  // true 면 취소 안 된 경기가 전부 시작 전·결과 없음일 때 기존 대진을 취소로 접고 다시 만든다.
+  @IsOptional()
+  @IsBoolean()
+  replaceExisting?: boolean;
 }

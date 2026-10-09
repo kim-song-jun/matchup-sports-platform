@@ -1,3 +1,4 @@
+import { excludeUnfilledSlotFixturesWhere } from '../common/competition/unfilled-slot-gate';
 import { genderRuleColumnFilter, normalizeGenderRule } from '../common/gender-rule';
 import { teamMatchChatEntitlementWhere } from '../chat/chat-entitlement';
 import { canConfirmTeamMatch, validateTeamMatchDates } from './team-match-dates';
@@ -140,6 +141,7 @@ export class TeamMatchesService {
       OR: [{ tournamentId: null }, { leagueId: { not: null } }],
       AND: [
         { OR: [{ leagueId: null }, { league: { is: { isPublic: true } } }] },
+        excludeUnfilledSlotFixturesWhere(),
         ...constraints,
         ...(isDefaultDiscovery
           ? [query.sort === 'recommended'
@@ -484,6 +486,7 @@ export class TeamMatchesService {
         AND: [
           { OR: [{ tournamentId: null }, { leagueId: { not: null } }] },
           { OR: [{ leagueId: null }, { league: { is: { isPublic: true } } }] },
+          excludeUnfilledSlotFixturesWhere(),
         ],
         // 'expired'는 계산 상태(getApiStatus)라 DB status 로 존재하지 않는다 — list()와
         // 동일하게 startAt 과거 조건으로 매핑한다.
@@ -1718,7 +1721,7 @@ export class TeamMatchesService {
             { hostTeam: { status: 'active', deletedAt: null } },
             { hostTeamId: null, leagueId: null, tournamentId: null },
           ],
-        }],
+        }, excludeUnfilledSlotFixturesWhere()],
       },
       include: this.teamMatchInclude(user),
     });

@@ -1696,8 +1696,14 @@ export class TournamentResultReviewService {
         });
       }
     }
+    // Participants of a lineup invalidated by a side team change belong to the replaced team; their rows stay for
+    // history (earlier revisions and identity links reference them) but cannot join a new revision.
+    const replacedLineups = await tx.v1GameLineup.findMany({
+      where: { gameId, invalidatedAt: { not: null }, invalidationReason: 'SIDE_TEAM_CHANGED' },
+      select: { id: true },
+    });
     const participants = await tx.v1GameParticipant.findMany({
-      where: { gameId },
+      where: { gameId, lineupId: { notIn: replacedLineups.map((lineup) => lineup.id) } },
       select: { id: true, sideId: true },
     });
     const sideByParticipantId = new Map(participants.map((participant) => [participant.id, participant.sideId]));

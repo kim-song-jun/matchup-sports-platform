@@ -28,6 +28,7 @@ const ids = {
   liveFixture: '92000000-0000-4000-8000-000000000040',
   endedFixture: '92000000-0000-4000-8000-000000000041',
   officialFixture: '92000000-0000-4000-8000-000000000042',
+  reentryFixture: '92000000-0000-4000-8000-000000000043',
   hostRegistration: '92000000-0000-4000-8000-000000000050',
   opponentRegistration: '92000000-0000-4000-8000-000000000051',
   newRegistration: '92000000-0000-4000-8000-000000000052',
@@ -227,7 +228,7 @@ describe('started tournament fixture team swap (PostgreSQL)', () => {
       where: { name: 'football-v1', status: 'ACTIVE' },
       orderBy: { version: 'desc' },
     });
-    const fixtures = [ids.liveFixture, ids.endedFixture, ids.officialFixture];
+    const fixtures = [ids.liveFixture, ids.endedFixture, ids.officialFixture, ids.reentryFixture];
     await prisma.v1TeamMatch.createMany({
       data: fixtures.map((id) => ({
         id,
@@ -313,10 +314,63 @@ describe('started tournament fixture team swap (PostgreSQL)', () => {
     const revisions = await prisma.v1GameResultRevision.findMany({ where: { gameId: setup.gameId }, orderBy: { revision: 'asc' } });
     expect(revisions.find((revision) => revision.id === submitted.id)?.state).toBe(V1GameResultRevisionState.VOID);
     expect(revisions.some((revision) => revision.state === V1GameResultRevisionState.SUBMITTED || revision.state === V1GameResultRevisionState.OFFICIAL)).toBe(false);
+    // The pointer revision must not carry the discarded result (the operate console header reads its score).
+    const pointer = revisions[revisions.length - 1];
+    expect((await prisma.v1Game.findUniqueOrThrow({ where: { id: setup.gameId } })).currentOfficialRevisionId).toBe(pointer.id);
+    expect(pointer.state).toBe(V1GameResultRevisionState.VOID);
+    expect(pointer.score).toEqual({ regulation: null, penalty: null, goals: [], incomplete: true });
+    expect(pointer.goalEvents).toBeNull();
+    expect(pointer.eventsHash).toBe(canonicalGameCommandPayloadHash([]));
+    // The replaced team's participant stays for history but its lineup is invalidated.
+    const replacedParticipant = await prisma.v1GameParticipant.findUniqueOrThrow({ where: { id: setup.homeParticipantId } });
+    expect((await prisma.v1GameLineup.findUniqueOrThrow({ where: { id: replacedParticipant.lineupId } })).invalidationReason).toBe('SIDE_TEAM_CHANGED');
     const afterSwap = await publicRecords.getMatch(ids.tournament, ids.endedFixture, undefined);
     expect(afterSwap.scoreStatus).not.toBe('official');
     expect(afterSwap.scoreStatus).not.toBe('pending');
     expect(afterSwap.score).toBeNull();
+  });
+
+  it('re-entry after the swap rejects the replaced team participant and accepts the new team participant', async () => {
+    const setup = await buildGame(ids.reentryFixture);
+    await startGame(setup, ids.reentryFixture);
+    await playAndEnd(setup, ids.reentryFixture, { home: 2, away: 1 }, false);
+    await swapHome(ids.reentryFixture, 'wrong team entered');
+
+    const game = await prisma.v1Game.findUniqueOrThrow({ where: { id: setup.gameId } });
+    const newLineup = await prisma.v1GameLineup.findFirstOrThrow({
+      where: { gameId: setup.gameId, sideId: setup.homeSideId, invalidatedAt: null },
+    });
+    const newTeamPlayer = await prisma.v1GameParticipant.create({
+      data: { gameId: setup.gameId, sideId: setup.homeSideId, lineupId: newLineup.id, displayNameSnapshot: 'Newcomer Player' },
+    });
+    const participant = (participantId: string, sideId: string, goals: number) => ({
+      participantId,
+      sideId,
+      started: true,
+      goals,
+      cards: { yellow: 0, red: 0 },
+      goalkeeper: false,
+    });
+    const reenter = (key: string, homePlayerId: string) =>
+      resultReview.createResultCorrection(authUser, setup.gameId, key, {
+        expectedVersion: game.version,
+        clientCommandId: key,
+        baseRevisionId: game.currentOfficialRevisionId as string,
+        reason: 'reenter after team change',
+        changes: {
+          score: { home: 0, away: 1 },
+          actualParticipants: [participant(homePlayerId, setup.homeSideId, 0), participant(setup.awayParticipantId, setup.awaySideId, 1)],
+          eventsHash: canonicalGameCommandPayloadHash([]),
+        },
+      });
+
+    const error = await captureFailure(() => reenter('swap-reentry-old', setup.homeParticipantId));
+    expect(error.getStatus()).toBe(422);
+    expect(error.getResponse()).toEqual(expect.objectContaining({ code: 'PARTICIPANT_INVALID' }));
+    expect(await prisma.v1GameResultRevision.count({ where: { gameId: setup.gameId, state: V1GameResultRevisionState.DRAFT } })).toBe(0);
+
+    const draft = await reenter('swap-reentry-new', newTeamPlayer.id);
+    expect(draft.revisionState).toBe(V1GameResultRevisionState.DRAFT);
   });
 
   it('OFFICIAL result: 409 FIXTURE_RESULT_MUST_BE_VOIDED and nothing changes', async () => {

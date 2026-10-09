@@ -291,3 +291,155 @@ describe('classifyFixtureSide', () => {
     expect(classifyFixtureSide(oneSide, 'AWAY', slotMap)).toBe('direct');
   });
 });
+
+describe('buildCanvasLayout — 조별+결선 조 편성 블록과 순위 연결선', () => {
+  const stage = (id: string, name: string, sortOrder: number) =>
+    makeGroup({ id, name, phase: 'group', sortOrder, advanceCount: 2 });
+  const gA = stage('gA', 'A조', 0);
+  const gB = stage('gB', 'B조', 1);
+  const gSemi = makeGroup({ id: 'g-semi', name: '4강', phase: 'semi', sortOrder: 0 });
+  const gFinal = makeGroup({ id: 'g-final', name: '결승', phase: 'final', sortOrder: 1 });
+  const entry = (groupId: string, letter: string, position: number) =>
+    makeSlot({ id: `e${letter}${position}`, kind: 'ENTRY', groupId, position, label: `${letter}조 ${position}번` });
+  const rank = (letter: string, sourceGroupId: string, position: number) =>
+    makeSlot({ id: `r${letter}${position}`, kind: 'GROUP_RANK', groupId: 'g-semi', sourceGroupId, position, label: `${letter}조 ${position}위` });
+  const slots = [
+    ...[1, 2, 3, 4].map((n) => entry('gA', 'A', n)),
+    ...[1, 2, 3, 4].map((n) => entry('gB', 'B', n)),
+    rank('A', 'gA', 1), rank('A', 'gA', 2), rank('B', 'gB', 1), rank('B', 'gB', 2),
+  ];
+  const fixtures = [
+    makeFixture({ id: 'fa1', groupId: 'gA', fixtureNumber: 1, round: 'league_r1', homeSlotId: 'eA1', awaySlotId: 'eA2' }),
+    makeFixture({ id: 'fb1', groupId: 'gB', fixtureNumber: 2, round: 'league_r1', homeSlotId: 'eB1', awaySlotId: 'eB2' }),
+    makeFixture({ id: 'sf1', groupId: 'g-semi', fixtureNumber: 3, round: '4강', homeSlotId: 'rA1', awaySlotId: 'rB2' }),
+    makeFixture({ id: 'sf2', groupId: 'g-semi', fixtureNumber: 4, round: '4강', homeSlotId: 'rB1', awaySlotId: 'rA2' }),
+    makeFixture({
+      id: 'fin',
+      groupId: 'g-final',
+      fixtureNumber: 5,
+      round: '결승',
+      bracketSources: [
+        { fixtureId: 'sf1', outcome: 'WINNER', side: 'HOME' },
+        { fixtureId: 'sf2', outcome: 'WINNER', side: 'AWAY' },
+      ],
+    }),
+  ];
+  const layout = buildCanvasLayout({ groups: [gFinal, gSemi, gB, gA], fixtures, slots, mode: 'bracket' });
+
+  it('마지막 조별 열과 결선 첫 열 사이에 "조 편성" 열이 끼고, 다음 열들은 한 칸씩 밀린다', () => {
+    expect(layout.columns.map((c) => [c.label, c.x])).toEqual([
+      ['A조', 24], ['B조', 328], ['조 편성', 632], ['4강', 936], ['결승', 1240],
+    ]);
+    expect(layout.columns.find((c) => c.key === 'group-blocks')?.fixtureIds).toEqual([]);
+    expect(layout.width).toBe(1496);
+  });
+
+  it('조 블록은 조 편성 열에 위에서부터 쌓이고 전체 높이에 반영된다', () => {
+    expect(layout.groupBlocks.map((b) => [b.groupId, b.x, b.y, b.width, b.height])).toEqual([
+      ['gA', 632, 56, 232, 228],
+      ['gB', 632, 308, 232, 228],
+    ]);
+    // 블록 맨 아래 536 + 바깥 여백 24 — 칸이 가장 낮은 곳(392)보다 깊다.
+    expect(layout.height).toBe(560);
+  });
+
+  it('순위 연결선: 블록 오른쪽 → 결선 칸 사이드, 4강 A1–B2 · B1–A2 교차', () => {
+    const ranks = layout.edges.filter((e) => e.kind === 'GROUP_RANK');
+    expect(ranks.map((e) => [e.id, e.fromFixtureId, e.toFixtureId, e.side, e.path])).toEqual([
+      ['rank:sf1:HOME', null, 'sf1', 'HOME', 'M864 132 H900 V122 H936'],
+      ['rank:sf1:AWAY', null, 'sf1', 'AWAY', 'M864 460 H900 V166 H936'],
+      ['rank:sf2:HOME', null, 'sf2', 'HOME', 'M864 384 H900 V302 H936'],
+      ['rank:sf2:AWAY', null, 'sf2', 'AWAY', 'M864 208 H900 V346 H936'],
+    ]);
+  });
+
+  it('기존 승자 연결선은 그대로 — 결승으로 가는 2개, 조별 칸 사이드(ENTRY 자리)에는 선이 없다', () => {
+    expect(layout.edges.filter((e) => e.kind === 'WINNER').map((e) => e.id)).toEqual(['sf1->fin:HOME', 'sf2->fin:AWAY']);
+    expect(layout.edges.some((e) => e.toFixtureId === 'fa1' || e.toFixtureId === 'fb1')).toBe(false);
+  });
+
+  it('순위 자리가 없는 조별 대진(수동으로 만든 조·리그 방식 조)에는 블록 열도 블록도 없다 — 대조군', () => {
+    const noRanks = slots.filter((slot) => slot.kind !== 'GROUP_RANK');
+    const plain = buildCanvasLayout({ groups: [gA, gB, gSemi], fixtures: fixtures.slice(0, 4), slots: noRanks, mode: 'bracket' });
+    expect(plain.groupBlocks).toEqual([]);
+    expect(plain.columns.map((c) => c.label)).toEqual(['A조', 'B조', '4강']);
+  });
+
+  it('리그 모드는 순위 자리가 있어도 블록을 만들지 않는다', () => {
+    const league = buildCanvasLayout({ groups: [gA, gB, gSemi], fixtures: fixtures.slice(0, 4), slots, mode: 'league' });
+    expect(league.groupBlocks).toEqual([]);
+    expect(league.columns.some((c) => c.key === 'group-blocks')).toBe(false);
+  });
+
+  it('블록이 없는 기존 대진의 결과에는 groupBlocks 가 빈 배열로 붙는다', () => {
+    const knockout = buildCanvasLayout({ groups: [semi], fixtures: [f1, f2], slots: [], mode: 'bracket' });
+    expect(knockout.groupBlocks).toEqual([]);
+  });
+});
+
+// 스펙 S2 교차 대진 표 — 서버 group-rank-pairings.spec.ts 와 같은 표다.
+const RANK_COMBOS: Array<[string, number, number, string[][], 'round16' | 'quarter' | 'semi' | 'final']> = [
+  ['2조 x 1팀', 2, 1, [['A1', 'B1']], 'final'],
+  ['2조 x 2팀', 2, 2, [['A1', 'B2'], ['B1', 'A2']], 'semi'],
+  ['4조 x 1팀', 4, 1, [['A1', 'D1'], ['B1', 'C1']], 'semi'],
+  ['4조 x 2팀', 4, 2, [['A1', 'B2'], ['C1', 'D2'], ['B1', 'A2'], ['D1', 'C2']], 'quarter'],
+  ['8조 x 1팀', 8, 1, [['A1', 'H1'], ['D1', 'E1'], ['B1', 'G1'], ['C1', 'F1']], 'quarter'],
+  [
+    '8조 x 2팀(16강)',
+    8,
+    2,
+    [
+      ['A1', 'B2'], ['C1', 'D2'], ['E1', 'F2'], ['G1', 'H2'],
+      ['B1', 'A2'], ['D1', 'C2'], ['F1', 'E2'], ['H1', 'G2'],
+    ],
+    'round16',
+  ],
+];
+
+describe.each(RANK_COMBOS)('순위 연결선 — %s', (_name, groupCount, advance, pairs, firstPhase) => {
+  const letters = Array.from({ length: groupCount }, (_, i) => String.fromCharCode(65 + i));
+  const stageGroups = letters.map((letter, i) => makeGroup({ id: `g${letter}`, name: `${letter}조`, phase: 'group', sortOrder: i, advanceCount: advance }));
+  const knockoutGroup = makeGroup({ id: 'ko', name: '결선', phase: firstPhase });
+  const entrySlots = letters.flatMap((letter) =>
+    [1, 2, 3, 4].map((p) => makeSlot({ id: `e${letter}${p}`, kind: 'ENTRY', groupId: `g${letter}`, position: p, label: `${letter}${p}` })),
+  );
+  const rankSlots = letters.flatMap((letter) =>
+    Array.from({ length: advance }, (_, i) =>
+      makeSlot({ id: `r${letter}${i + 1}`, kind: 'GROUP_RANK', groupId: 'ko', sourceGroupId: `g${letter}`, position: i + 1, label: `${letter}조 ${i + 1}위` }),
+    ),
+  );
+  const knockout = pairs.map(([home, away], index) =>
+    makeFixture({ id: `k${index}`, groupId: 'ko', fixtureNumber: index + 1, round: '결선', homeSlotId: `r${home}`, awaySlotId: `r${away}` }),
+  );
+  const layout = buildCanvasLayout({ groups: [...stageGroups, knockoutGroup], fixtures: knockout, slots: [...entrySlots, ...rankSlots], mode: 'bracket' });
+
+  it('올라오는 자리마다 선 하나, 올바른 조 블록 높이에서 올바른 사이드로 이어진다', () => {
+    const ranks = layout.edges.filter((e) => e.kind === 'GROUP_RANK');
+    expect(ranks).toHaveLength(groupCount * advance);
+    const blockX = 24 + groupCount * 304;
+    const koX = 24 + (groupCount + 1) * 304;
+    pairs.forEach(([home, away], index) => {
+      const nodeY = 56 + index * 180;
+      for (const [side, label] of [['HOME', home], ['AWAY', away]] as const) {
+        const block = layout.groupBlocks.find((b) => b.groupId === `g${label[0]}`)!;
+        const fromY = block.y + (228 * Number(label.slice(1))) / (advance + 1);
+        const toY = nodeY + 44 + (side === 'HOME' ? 22 : 66);
+        const edge = ranks.find((e) => e.id === `rank:k${index}:${side}`)!;
+        expect(edge.path).toBe(`M${blockX + 232} ${fromY} H${koX - 36} V${toY} H${koX}`);
+      }
+    });
+  });
+
+  it('블록은 조 순서로 쌓이고(간격 24) 같은 조의 선은 서로 다른 높이에서 나간다', () => {
+    expect(layout.groupBlocks.map((b) => b.groupId)).toEqual(letters.map((l) => `g${l}`));
+    layout.groupBlocks.forEach((b, i) => expect(b.y).toBe(56 + i * (228 + 24)));
+    const fromY = (path: string) => Number(path.split(' ')[1]);
+    for (const block of layout.groupBlocks) {
+      const ys = layout.edges
+        .filter((e) => e.kind === 'GROUP_RANK' && fromY(e.path) > block.y && fromY(e.path) < block.y + block.height)
+        .map((e) => fromY(e.path));
+      expect(ys).toHaveLength(advance);
+      expect(new Set(ys).size).toBe(advance);
+    }
+  });
+});

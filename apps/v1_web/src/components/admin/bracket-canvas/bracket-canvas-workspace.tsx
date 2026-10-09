@@ -15,11 +15,13 @@ import {
 import { useV1AssignTournamentSlot, useV1RandomFillSlots } from '@/hooks/use-v1-bracket-canvas';
 import { describeBracketCanvasError } from '@/lib/bracket-canvas-errors';
 import { buildSideLabelContext, directPlacedRegistrationIds, fixtureSideLabel, type SideKey } from '@/lib/bracket-canvas-layout';
+import { describeStandingsFill } from '@/lib/bracket-standings-fill-message';
 import { isBracketPublished } from '@/lib/bracket-visibility';
 import { extractErrorMessage } from '@/lib/error-message';
 import type { V1AdminTournamentRegistration, V1TournamentFormat } from '@/types/api';
 import { BracketCanvas } from './bracket-canvas';
 import { BracketNodePanel } from './bracket-node-panel';
+import { BracketStandingsFillButton } from './bracket-standings-fill-button';
 import { BracketTeamTray, type RegistrationsLoadState } from './bracket-team-tray';
 import { BracketFixtureToolsDialog } from './bracket-fixture-tools-dialog';
 import { BracketTemplateDialog } from './bracket-template-dialog';
@@ -63,6 +65,16 @@ export function BracketCanvasWorkspace({
     () => (bracket === undefined ? null : buildSideLabelContext(bracket.groups, bracket.fixtures, bracket.slots)),
     [bracket],
   );
+  // 순위 채우기 창이 동률 후보 이름을 그리는 데 쓴다 — 동률 팀은 모두 그 조의 조 편성에 들어 있다.
+  const teamNames = useMemo(
+    () =>
+      new Map(
+        (bracket?.groups ?? []).flatMap((group) =>
+          group.groupTeams.flatMap((team) => (team.registrationId && team.teamName ? [[team.registrationId, team.teamName] as const] : [])),
+        ),
+      ),
+    [bracket],
+  );
 
   if (isPending) {
     return (
@@ -82,7 +94,7 @@ export function BracketCanvasWorkspace({
   }
 
   const isEmpty = bracket.groups.length === 0 && bracket.fixtures.length === 0;
-  const templateFormat = format === 'knockout' || format === 'league' ? format : null;
+  const templateFormat = format === 'knockout' || format === 'league' || format === 'group_knockout' ? format : null;
   const confirmedTeams = registrations.filter((registration) => registration.status === 'confirmed');
   const placedIds = new Set(bracket.slots.filter((slot) => slot.kind !== 'GROUP_RANK' && slot.registrationId !== null).map((slot) => slot.registrationId));
   const emptySlotCount = bracket.slots.filter((slot) => slot.kind !== 'GROUP_RANK' && slot.registrationId === null).length;
@@ -206,6 +218,16 @@ export function BracketCanvasWorkspace({
                 <Shuffle size={16} aria-hidden="true" />
                 빈 자리 무작위 채우기
               </Button>
+            ) : null}
+            {!isEmpty && canWrite ? (
+              <BracketStandingsFillButton
+                tournamentId={tournamentId}
+                slots={bracket.slots}
+                teamNames={teamNames}
+                canWrite={canWrite}
+                onFilled={(result) => showToast(describeStandingsFill(result), 'success')}
+                onError={(message) => showToast(message, 'error')}
+              />
             ) : null}
             {!isEmpty ? (
               <>

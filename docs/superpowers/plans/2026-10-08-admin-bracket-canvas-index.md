@@ -207,7 +207,7 @@ export const BRACKET_TEMPLATE_MAX_FIXTURES = 240;
 
 | 코드 | HTTP | 언제 |
 |---|---|---|
-| `BRACKET_TEMPLATE_UNSUPPORTED` | 422 | 결선 크기 K ∉ {2,4,8}, K=2 + 3위전, kind 별 필수 필드 누락·범위 밖 |
+| `BRACKET_TEMPLATE_UNSUPPORTED` | 422 | 결선 크기 K ∉ {2,4,8,16}(16강 = 8조×2팀), K=2 + 3위전, kind 별 필수 필드 누락·범위 밖 |
 | `BRACKET_TEMPLATE_FORMAT_MISMATCH` | 422 | 템플릿 kind ≠ 대회 format |
 | `BRACKET_TEMPLATE_TOO_LARGE` | 422 | 계획 경기 수 > 240 |
 | `BRACKET_NOT_EMPTY` | 409 | 대진이 비어 있지 않은데 `replaceExisting` 없음 |

@@ -32,7 +32,18 @@ export function planBracketTemplateCounts(input: BracketTemplateInput): Template
   if (input.kind === 'league') {
     return { groups: 1, slots: input.teamCount, fixtures: ((input.teamCount * (input.teamCount - 1)) / 2) * input.legs, edges: 0 };
   }
-  return null;
+  // 결선 크기(조 수 x 진출 팀 수)가 2·4·8·16 이 아니거나 결승만인데 3·4위전이면 서버가 거절하는 조합 — 미리보기도 없다.
+  const size = input.groupCount * input.advancePerGroup;
+  if (![2, 4, 8, 16].includes(size) || (size === 2 && input.thirdPlace)) return null;
+  const third = input.thirdPlace ? 1 : 0;
+  const stageFixtures = input.groupCount * ((input.teamsPerGroup * (input.teamsPerGroup - 1)) / 2) * input.legs;
+  return {
+    groups: input.groupCount + Math.log2(size) + third,
+    slots: input.groupCount * input.teamsPerGroup + size,
+    fixtures: stageFixtures + (size - 1) + third,
+    // 결선 첫 라운드는 순위 자리가 대신해 연결선이 없다 — 둘째 라운드부터 양쪽 연결(size - 2) + 3·4위전 패자 2.
+    edges: size - 2 + third * 2,
+  };
 }
 
 export function exceedsFixtureLimit(counts: TemplatePlanCounts): boolean {

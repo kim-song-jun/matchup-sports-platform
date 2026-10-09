@@ -1,5 +1,4 @@
 ---
-"v1_api": minor
 "v1_web": minor
 ---
 

@@ -274,6 +274,7 @@ function invalidateGame(
   if (tournamentId) {
     queryClient.invalidateQueries({ queryKey: resultReviewKeys.board(tournamentId, 'ENDED') });
     queryClient.invalidateQueries({ queryKey: v1Keys.tournament(tournamentId) });
+    queryClient.invalidateQueries({ queryKey: v1Keys.adminTournamentBracket(tournamentId) });
   }
 }
 

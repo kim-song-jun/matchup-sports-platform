@@ -111,8 +111,8 @@ async function startGame(setup: Setup, fixtureId: string): Promise<void> {
 
 async function append(setup: Setup, clientEventId: string, event: {
   type: V1GameEventType;
-  sideId: string;
-  participantId: string;
+  sideId?: string;
+  participantId?: string;
   payload?: Record<string, unknown>;
 }): Promise<string> {
   await games.appendEvent(authUser, setup.gameId, clientEventId, {
@@ -272,6 +272,7 @@ describe('started tournament fixture team swap (PostgreSQL)', () => {
     await startGame(setup, ids.liveFixture);
     const home = { sideId: setup.homeSideId, participantId: setup.homeParticipantId };
     const away = { sideId: setup.awaySideId, participantId: setup.awayParticipantId };
+    const pause = await append(setup, 'live-pause', { type: V1GameEventType.PAUSE });
     const homeGoal = await append(setup, 'live-h1', { type: V1GameEventType.GOAL, ...home });
     const homeMistake = await append(setup, 'live-h2', { type: V1GameEventType.GOAL, ...home });
     const homeCard = await append(setup, 'live-hc', { type: V1GameEventType.CARD, ...home, payload: { card: 'YELLOW' } });
@@ -280,17 +281,12 @@ describe('started tournament fixture team swap (PostgreSQL)', () => {
     const awayCard = await append(setup, 'live-ac', { type: V1GameEventType.CARD, ...away, payload: { card: 'YELLOW' } });
     const homeReversal = await reverse(setup, 'live-rev-h2', homeMistake);
     const awayReversal = await reverse(setup, 'live-rev-a2', awayMistake);
-    const before = await prisma.v1GameEvent.findMany({ where: { gameId: setup.gameId }, select: { id: true, type: true } });
-    const clockEvents = before
-      .filter((event) => !([homeGoal, homeMistake, homeCard, awayGoal, awayMistake, awayCard, homeReversal, awayReversal] as string[]).includes(event.id))
-      .map((event) => event.id);
-    expect(clockEvents.length).toBeGreaterThan(0);
     const versionBefore = (await prisma.v1Game.findUniqueOrThrow({ where: { id: setup.gameId } })).version;
 
     const result = await swapHome(ids.liveFixture, 'wrong team entered');
 
     expect(result.startedTeamChange).toEqual({ removedEventCount: 4, score: { home: 0, away: 1 } });
-    expect(await eventIds(setup.gameId)).toEqual([awayGoal, awayMistake, awayCard, awayReversal, ...clockEvents].sort());
+    expect(await eventIds(setup.gameId)).toEqual([awayGoal, awayMistake, awayCard, awayReversal, pause].sort());
     const game = await prisma.v1Game.findUniqueOrThrow({ where: { id: setup.gameId } });
     expect(game.version).toBeGreaterThan(versionBefore);
     const homeSide = await prisma.v1GameSide.findUniqueOrThrow({ where: { id: setup.homeSideId } });

@@ -103,6 +103,7 @@ describe('buildLeagueBoard', () => {
       state: 'ENDED',
       version: 3,
       hasLiveRecords: false,
+      hasOfficialResult: true,
       latestRevision: { id: 'rev1', state: 'OFFICIAL', score: { home: 2, away: 1 }, entryMethod: 'quick' },
     };
     const { columns } = buildLeagueBoard({

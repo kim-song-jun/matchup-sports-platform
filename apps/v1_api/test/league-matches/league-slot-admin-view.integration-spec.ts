@@ -66,6 +66,7 @@ describe('어드민 리그 화면 — 빈 경기 허용', () => {
         id: game.id,
         state: 'SCHEDULED',
         hasLiveRecords: false,
+        hasOfficialResult: false,
         latestRevision: { id: draft.id, state: 'DRAFT', score: { home: 2, away: 1 }, entryMethod: 'console' },
       },
     });

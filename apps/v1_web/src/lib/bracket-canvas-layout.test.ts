@@ -6,6 +6,7 @@ import {
   classifyFixtureSide,
   fixtureNodeState,
   fixtureSideLabel,
+  fixtureTeamChangeAccess,
   isFixtureLocked,
   isSlotAssignable,
 } from './bracket-canvas-layout';
@@ -235,6 +236,48 @@ describe('isFixtureLocked · isSlotAssignable', () => {
     expect(isSlotAssignable(makeSlot({ id: 's', kind: 'ENTRY' }))).toBe(true);
     expect(isSlotAssignable(makeSlot({ id: 's', kind: 'BYE' }))).toBe(true);
     expect(isSlotAssignable(makeSlot({ id: 's', kind: 'GROUP_RANK' }))).toBe(false);
+  });
+});
+
+describe('fixtureTeamChangeAccess — 서버 팀 교체 가드와 같은 기준', () => {
+  const revision = (state: 'DRAFT' | 'SUBMITTED' | 'CHANGE_REQUESTED' | 'OFFICIAL' | 'VOID') => ({
+    id: 'rev', state, score: { home: 1, away: 0 }, entryMethod: 'console' as const,
+  });
+  const access = (
+    state: 'SCHEDULED' | 'LIVE' | 'PAUSED' | 'ENDED' | 'CANCELLED',
+    latest: ReturnType<typeof revision> | null,
+    hasOfficialResult: boolean,
+  ) => fixtureTeamChangeAccess(makeFixture({ id: 'a', groupId: 'g', fixtureNumber: 1, game: makeGame({ state, latestRevision: latest, hasOfficialResult }) }));
+
+  it.each([
+    ['게임이 없는 옛 경기', null, 'free'],
+    ['시작 전', ['SCHEDULED', null], 'free'],
+    ['진행 중', ['LIVE', null], 'started'],
+    ['일시정지', ['PAUSED', null], 'started'],
+    ['종료됐지만 결과 없음', ['ENDED', null], 'started'],
+    ['결과가 무효로 돌려진 종료 경기', ['ENDED', 'VOID'], 'started'],
+    ['공식 결과 확정', ['ENDED', 'OFFICIAL'], 'official'],
+    ['제출됐지만 미확정', ['ENDED', 'SUBMITTED'], 'started'],
+    ['고쳐 달라는 요청 상태', ['ENDED', 'CHANGE_REQUESTED'], 'started'],
+    ['취소', ['CANCELLED', null], 'cancelled'],
+  ] as const)('%s → %s', (_name, input, expected) => {
+    const fixture = input === null
+      ? makeFixture({ id: 'a', groupId: 'g', fixtureNumber: 1 })
+      : makeFixture({ id: 'a', groupId: 'g', fixtureNumber: 1, game: makeGame({ state: input[0], latestRevision: input[1] === null ? null : revision(input[1]), hasOfficialResult: input[1] === 'OFFICIAL' }) });
+    expect(fixtureTeamChangeAccess(fixture)).toBe(expected);
+  });
+
+  it('공식 결과 위에 정정이 진행 중이어도 포인터가 공식이면 잠긴다 (서버는 포인터 리비전을 본다)', () => {
+    expect(access('ENDED', revision('SUBMITTED'), true)).toBe('official');
+    expect(access('ENDED', revision('DRAFT'), true)).toBe('official');
+  });
+
+  it('공식 결과 없이 제출만 된 경기는 교체할 수 있다', () => {
+    expect(access('ENDED', revision('SUBMITTED'), false)).toBe('started');
+  });
+
+  it('공식 결과 포인터는 경기 상태와 무관하게 잠근다', () => {
+    expect(access('SCHEDULED', revision('OFFICIAL'), true)).toBe('official');
   });
 });
 

@@ -142,3 +142,14 @@ describe('assertRevisionTransition — ADMIN_QUICK', () => {
     );
   });
 });
+
+describe('assertRevisionTransition — TEAM_CHANGE', () => {
+  it.each([V1GameResultRevisionState.DRAFT, V1GameResultRevisionState.SUBMITTED])('%s 를 VOID 로 폐기할 수 있다', (from) => {
+    expect(() => assertRevisionTransition({ from, to: V1GameResultRevisionState.VOID, flow: 'TEAM_CHANGE' })).not.toThrow();
+  });
+
+  it('공식 결과는 이 흐름으로 무효화할 수 없고, 다른 흐름은 미확정 결과를 VOID 로 못 보낸다', () => {
+    expect(() => assertRevisionTransition({ from: V1GameResultRevisionState.OFFICIAL, to: V1GameResultRevisionState.VOID, flow: 'TEAM_CHANGE' })).toThrow();
+    expect(() => assertRevisionTransition({ from: V1GameResultRevisionState.SUBMITTED, to: V1GameResultRevisionState.VOID, flow: 'STANDARD' })).toThrow();
+  });
+});

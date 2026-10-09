@@ -63,7 +63,7 @@ export function makeSlot(overrides: Partial<V1AdminBracketSlot> & Pick<V1AdminBr
 }
 
 export function makeGame(overrides: Partial<V1AdminBracketFixtureGame> = {}): V1AdminBracketFixtureGame {
-  return { id: 'game-1', state: 'SCHEDULED', version: 1, hasLiveRecords: false, latestRevision: null, ...overrides };
+  return { id: 'game-1', state: 'SCHEDULED', version: 1, hasLiveRecords: false, hasOfficialResult: false, latestRevision: null, ...overrides };
 }
 
 export function makeBracket(overrides: Partial<V1AdminTournamentBracket> = {}): V1AdminTournamentBracket {

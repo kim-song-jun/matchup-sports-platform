@@ -226,6 +226,21 @@ export function isFixtureLocked(fixture: V1AdminBracketFixture): boolean {
   return game !== null && (game.state !== 'SCHEDULED' || game.latestRevision !== null);
 }
 
+export type FixtureTeamChangeAccess = 'free' | 'started' | 'official' | 'cancelled';
+
+/**
+ * 서버 `updateTournamentMatchInTx` 와 같은 기준 — 시작 전(`free`)과 시작 뒤 결과 없음/무효(`started`)는 바꿀 수 있고,
+ * 시작 뒤에는 사유와 확인이 필요하다. 제출됐지만 미확정인 결과는 서버가 교체 때 폐기하므로 `started` 다.
+ * 공식 결과(`official`)는 무효로 먼저 돌려야 하고, 취소된 경기는 바꿀 수 없다.
+ */
+export function fixtureTeamChangeAccess(fixture: V1AdminBracketFixture): FixtureTeamChangeAccess {
+  const game = fixture.game;
+  if (game === null) return 'free';
+  if (game.hasOfficialResult) return 'official';
+  if (game.state === 'CANCELLED') return 'cancelled';
+  return game.state === 'SCHEDULED' ? 'free' : 'started';
+}
+
 export type SideSource = 'slot' | 'feeder' | 'direct';
 
 /** 사이드의 팀이 어디서 오는지: 자리(slot) · 이전 경기(feeder) · 경기에 직접 지정(direct). */

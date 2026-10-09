@@ -370,6 +370,7 @@ export class LeagueMatchAdminService {
             version: true,
             currentOfficialRevisionId: true,
             _count: { select: { events: true } },
+            currentOfficialRevision: { select: { state: true } },
             resultRevisions: {
               select: { id: true, state: true, score: true, reason: true, supersedesId: true },
               orderBy: { revision: 'desc' },

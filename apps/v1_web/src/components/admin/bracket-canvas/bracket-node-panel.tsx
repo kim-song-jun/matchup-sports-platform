@@ -8,7 +8,7 @@ import { useConfirm } from '@/components/v1-ui/confirm-modal';
 import { useV1DeleteFixture, useV1UpdateFixture } from '@/hooks/use-v1-api';
 import { useV1AssignTournamentSlot, useV1QuickResult } from '@/hooks/use-v1-bracket-canvas';
 import { describeBracketCanvasError } from '@/lib/bracket-canvas-errors';
-import { classifyFixtureSide, isFixtureLocked, isSlotAssignable, type SideKey } from '@/lib/bracket-canvas-layout';
+import { classifyFixtureSide, fixtureTeamChangeAccess, isFixtureLocked, isSlotAssignable, type SideKey } from '@/lib/bracket-canvas-layout';
 import { isoToKstDatetimeLocal, kstDatetimeLocalToIso } from '@/lib/kst-calendar';
 import type {
   V1AdminBracketFixture,
@@ -19,6 +19,7 @@ import type {
 import { fixtureTitle } from './bracket-canvas';
 import { BracketQuickResultForm } from './bracket-quick-result-form';
 import { BracketResultActions } from './bracket-result-actions';
+import { useStartedTeamChangeReason } from './use-started-team-change-reason';
 
 export type BracketNodePanelProps = {
   tournamentId: string;
@@ -35,6 +36,11 @@ export type BracketNodePanelProps = {
 };
 
 const SIDE_NAME: Record<SideKey, string> = { HOME: '홈', AWAY: '어웨이' };
+
+const DIRECT_SIDE_BLOCKED = {
+  official: '공식 결과가 확정된 경기예요. 결과를 먼저 무효로 돌려 주세요.',
+  cancelled: '취소된 경기는 팀을 바꿀 수 없어요.',
+} as const;
 
 export function BracketNodePanel({
   tournamentId,
@@ -53,12 +59,14 @@ export function BracketNodePanel({
   const updateFixture = useV1UpdateFixture(tournamentId);
   const deleteFixture = useV1DeleteFixture(tournamentId);
   const { confirm, ConfirmModal } = useConfirm();
+  const { requestReason, dialog: teamChangeDialog } = useStartedTeamChangeReason();
   const [scheduledAt, setScheduledAt] = useState(() => isoToKstDatetimeLocal(fixture.scheduledAt));
   const [venue, setVenue] = useState(fixture.venue ?? '');
   const [quickError, setQuickError] = useState<string | null>(null);
 
   const title = fixtureTitle(fixture, groups);
   const locked = isFixtureLocked(fixture);
+  const teamChangeAccess = fixtureTeamChangeAccess(fixture);
   const group = groups.find((candidate) => candidate.id === fixture.groupId);
   const isKnockout = group !== undefined && group.phase !== 'group';
   const slotsById = new Map(slots.map((slot) => [slot.id, slot]));
@@ -76,12 +84,27 @@ export function BracketNodePanel({
     );
   };
 
-  const handleAssignDirect = (side: SideKey, registrationId: string) => {
+  const handleAssignDirect = async (side: SideKey, registrationId: string) => {
     const value = registrationId === '' ? null : registrationId;
+    // 시작된 경기는 명단·기록이 지워지므로 확인과 사유를 먼저 받는다.
+    const teamChangeReason = teamChangeAccess === 'started' ? await requestReason([sideLabels[side]]) : undefined;
+    if (teamChangeReason === null) return;
     updateFixture.mutate(
-      { fixtureId: fixture.id, ...(side === 'HOME' ? { homeRegistrationId: value } : { awayRegistrationId: value }) },
       {
-        onSuccess: () => showToast(value === null ? '자리를 비웠어요.' : '팀을 넣었어요.', 'success'),
+        fixtureId: fixture.id,
+        ...(side === 'HOME' ? { homeRegistrationId: value } : { awayRegistrationId: value }),
+        ...(teamChangeReason === undefined ? {} : { teamChangeReason }),
+      },
+      {
+        onSuccess: (result) => {
+          const removed = result.startedTeamChange?.removedEventCount ?? 0;
+          showToast(
+            result.startedTeamChange === null
+              ? value === null ? '자리를 비웠어요.' : '팀을 넣었어요.'
+              : `팀을 바꿨어요. 옛 팀 기록 ${removed}건을 지웠어요.`,
+            'success',
+          );
+        },
         onError: (error) => showToast(describeBracketCanvasError(error, '팀을 넣지 못했어요.'), 'error'),
       },
     );
@@ -95,8 +118,15 @@ export function BracketNodePanel({
     if (source === 'direct') {
       const current = side === 'HOME' ? fixture.homeRegistrationId : fixture.awayRegistrationId;
       const other = side === 'HOME' ? fixture.awayRegistrationId : fixture.homeRegistrationId;
-      if (locked) {
-        body = <p className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>경기가 시작됐거나 결과가 있어 팀을 바꿀 수 없어요.</p>;
+      if (teamChangeAccess === 'official' || teamChangeAccess === 'cancelled') {
+        body = (
+          <div className="flex flex-col items-start gap-2">
+            <p className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>{DIRECT_SIDE_BLOCKED[teamChangeAccess]}</p>
+            {teamChangeAccess === 'official' && canWrite ? (
+              <Link href={correctionsHref} className="tm-btn tm-btn-sm tm-btn-outline">결과 정정 화면 열기</Link>
+            ) : null}
+          </div>
+        );
       } else if (!canWrite) {
         body = null;
       } else {
@@ -105,7 +135,7 @@ export function BracketNodePanel({
             aria-label={`${SIDE_NAME[side]} 팀 선택`}
             value={current ?? ''}
             disabled={!registrationsLoaded || updateFixture.isPending}
-            onChange={(event) => handleAssignDirect(side, event.target.value)}
+            onChange={(event) => void handleAssignDirect(side, event.target.value)}
             className="tm-input"
             style={{ minHeight: 44 }}
           >
@@ -311,6 +341,7 @@ export function BracketNodePanel({
         </Button>
       ) : null}
       {ConfirmModal}
+      {teamChangeDialog}
     </aside>
   );
 }

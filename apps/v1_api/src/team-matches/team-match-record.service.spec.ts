@@ -34,6 +34,7 @@ function createFake(options: {
   memberships: Membership[];
   admins?: string[];
   official?: boolean;
+  configPeriods?: unknown;
 }) {
   const changes: Array<{ version: number; actorUserId: string; actorName: string; action: string }> = [];
   const writes = {
@@ -67,6 +68,7 @@ function createFake(options: {
     sharedRecord: (options.official ? OFFICIAL_RECORD() : null) as null | FakeRecord,
     visibilityPolicy: { mode: 'LIVE' },
     events: [],
+    competitionConfig: { periods: options.configPeriods ?? [{ extraTime: false }, { extraTime: false }] },
     resultRevisions: (options.official ? [{ id: 'rev-1', gameId: 'game-1', revision: 1, state: 'OFFICIAL' }] : []) as Revision[],
   };
   const tx = {
@@ -204,6 +206,17 @@ describe('TeamMatchRecordService — 명단 밖 팀장 권한 (H5 결정 A, 친�
 });
 
 // 2026-10-01 사용자 결정 "어드민은 언제든 수정" — 양 팀이 확인한 친선 결과도 플랫폼 어드민은 고친다.
+describe('TeamMatchRecordService — periodCount', () => {
+  it.each([
+    ['단판', [{ extraTime: false }], 1],
+    ['전·후반', [{ extraTime: false }, { extraTime: false }], 2],
+    ['단판+연장', [{ extraTime: false }, { extraTime: true }], 1],
+  ])('%s 설정이면 정규 피리어드 수 %i를 내려준다', async (_label, configPeriods, expected) => {
+    const { service } = createFake({ memberships: [], configPeriods });
+    expect(await service.read(null, 'tm-1')).toMatchObject({ periodCount: expected });
+  });
+});
+
 describe('TeamMatchRecordService — 확정 뒤 어드민 정정', () => {
   const editGoal = (expectedVersion: number) => ({
     action: 'edit' as const,

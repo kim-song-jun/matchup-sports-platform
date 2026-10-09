@@ -184,3 +184,19 @@ export function parseResultPolicy(
   const penaltyShootout = isRecord(result.penaltyShootout) ? result.penaltyShootout : {};
   return { earlyStop: penaltyShootout.earlyStop !== false };
 }
+
+/**
+ * 정규 피리어드 수 — 연장(extraTime)을 뺀 개수. `V1GamePeriod` 행은 연장 피리어드까지 만들어지므로
+ * 행 수가 아니라 경기 설정 스냅샷의 `periods` 에서 센다. 레거시 `{ count: N }` 는 N, 읽을 수 없으면 null.
+ */
+export function regularPeriodCount(value: Prisma.JsonValue | null | undefined): number | null {
+  if (Array.isArray(value)) {
+    const regular = value.filter((raw) => isRecord(raw) && raw.extraTime !== true).length;
+    return regular > 0 ? regular : null;
+  }
+  if (isRecord(value)) {
+    const count = value.count;
+    return typeof count === 'number' && Number.isSafeInteger(count) && count > 0 ? count : null;
+  }
+  return null;
+}

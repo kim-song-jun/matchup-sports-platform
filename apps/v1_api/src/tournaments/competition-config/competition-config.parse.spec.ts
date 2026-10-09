@@ -3,6 +3,7 @@ import {
   parseLineupLimits,
   parsePeriodDurations,
   parseResultPolicy,
+  regularPeriodCount,
   regulationMinutes,
 } from './competition-config.parse';
 import { FOOTBALL_V1_CONFIG, FUTSAL_V1_CONFIG } from './competition-config.presets';
@@ -245,4 +246,27 @@ describe('parseResultPolicy', () => {
   ])('%s이면 기본값으로 떨어진다', (_label, stored) => {
     expect(parseResultPolicy(stored as never)).toEqual({ earlyStop: true });
   });
+});
+
+describe('regularPeriodCount', () => {
+  const period = (extraTime: boolean) => ({ code: 'P', label: 'P', durationMinutes: 20, extraTime });
+
+  it('연장을 뺀 피리어드 수를 센다', () => {
+    expect(regularPeriodCount([period(false)])).toBe(1);
+    expect(regularPeriodCount([period(false), period(false)])).toBe(2);
+    expect(regularPeriodCount([period(false), period(true)])).toBe(1);
+    expect(regularPeriodCount([period(false), period(false), period(true)])).toBe(2);
+  });
+
+  it('레거시 { count } 모양은 count 를 쓴다', () => {
+    expect(regularPeriodCount({ count: 1 })).toBe(1);
+    expect(regularPeriodCount({ count: 2 })).toBe(2);
+  });
+
+  it.each([[null], [undefined], [[]], [[period(true)]], [{ count: 0 }], [{}], ['x']])(
+    '읽을 수 없으면 null이다 (%j)',
+    (value) => {
+      expect(regularPeriodCount(value as never)).toBeNull();
+    },
+  );
 });

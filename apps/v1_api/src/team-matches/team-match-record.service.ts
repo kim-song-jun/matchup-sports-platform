@@ -18,6 +18,7 @@ import {
   loadParticipantConsentEligibility,
   type ParticipantConsentEligibility,
 } from '../games/public-records/public-consent';
+import { regularPeriodCount } from '../tournaments/competition-config/competition-config.parse';
 import { MutateTeamMatchRecordDto } from './dto/team-match-record.dto';
 import { friendlyResultCorrector, platformMatchOperator } from './platform-match-operator';
 import { assertRevisionSupersession, assertRevisionTransition } from '../games/core/revision-state-machine';
@@ -40,6 +41,7 @@ const include = {
   events: { take: 1, select: { id: true } },
   resultRevisions: { orderBy: { revision: 'desc' as const }, take: 1 },
   currentOfficialRevision: true,
+  competitionConfig: { select: { periods: true } },
 } satisfies Prisma.V1GameInclude;
 type Loaded = Prisma.V1GameGetPayload<{ include: typeof include }>;
 
@@ -303,6 +305,7 @@ export class TeamMatchRecordService {
       participants,
       goals: privateView && phase !== 'legacy' ? goals : [],
       goalEvents,
+      periodCount: regularPeriodCount(game.competitionConfig?.periods),
       confirmations: privateView ? ((record?.confirmations ?? []) as Confirmation[]).map((c) => ({ sideId: c.sideId, name: c.name, at: c.at })) : [],
       history: changes.map((c) => ({ id: c.id, version: c.version, action: c.action, actorName: c.actorName, goalId: c.goalId, subMatchId: c.subMatchId, before: c.before, after: c.after, at: c.createdAt })),
       officialAt: record?.officialAt ?? null,

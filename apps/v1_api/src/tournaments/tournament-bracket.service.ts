@@ -54,6 +54,8 @@ import { readJerseyNumbers } from './tournament-player-jersey';
 import { createTournamentMatchInTx } from './tournament-match-creation';
 import { nextFixtureCreationCommandId } from './tournament-fixture-generation';
 import { competitionTeamTargets, enqueueRosterResync } from '../games/roster/roster-resync-events';
+import { findLinkedByeSlotInTx, slotLinkedBye } from './slots/bye-slot-sync';
+import { assignSlotInTx } from './slots/tournament-slot.service';
 import { adminBracketSlotInclude, serializeAdminBracketSlot } from './slots/admin-bracket-view';
 import { tournamentTeamMatchBracketInclude, serializeTournamentTeamMatchBracket } from './tournament-team-match-bracket.query';
 import { competitionMatchLabel } from './tournament-round-label';
@@ -384,6 +386,21 @@ export class TournamentBracketService {
           registrationId, group: { tournamentId, phase: group.phase }, NOT: { id: existing?.id ?? '' },
         } });
         if (duplicate) throw new ConflictException({ code: 'BYE_ALREADY_IN_ROUND', message: '이 팀은 해당 라운드에 이미 배정되어 있어요. 기존 배정을 먼저 해제해 주세요.' });
+      }
+      // 템플릿이 만든 BYE 자리는 자리 트랜잭션(assignSlotInTx)만 바꾼다 — 그래야 자리·부전승 행·8강 사이드가 함께 움직인다.
+      const linked = existing ? await findLinkedByeSlotInTx(tx, group, existing.sortOrder) : null;
+      if (linked && existing) {
+        if (dto.sortOrder !== existing.sortOrder) throw slotLinkedBye();
+        await assignSlotInTx(tx, { admin, adminContext: this.adminContext, games: this.games }, linked.id, registrationId);
+        const promoted = await tx.v1TournamentGroupTeam.findFirst({ where: { groupId: group.id, isBye: true, sortOrder: existing.sortOrder } });
+        const empty = promoted ? null : await tx.v1TournamentByeSlot.findUniqueOrThrow({ where: { id: existing.id } });
+        const synced = promoted ?? { ...empty!, registrationId: null, isBye: true };
+        await this.adminContext.logAdminAction(admin, {
+          action: 'tournament.bracket.bye.save', targetType: 'tournament_group_team', targetId: synced.id,
+          beforeJson: { registrationId: existing.registrationId, isBye: existing.isBye, sortOrder: existing.sortOrder },
+          afterJson: { tournamentId, groupId: group.id, phase: group.phase, registrationId, isBye: true, sortOrder: dto.sortOrder },
+        }, tx);
+        return synced;
       }
       let row: Parameters<TournamentBracketService['serializeGroupTeam']>[0];
       if (registrationId) {
@@ -1004,6 +1021,9 @@ export class TournamentBracketService {
       if (!current) {
         throw new NotFoundException({ code: 'GROUP_TEAM_NOT_FOUND', message: '조 팀 배정을 찾을 수 없어요.' });
       }
+      // 삭제는 위치 자체를 없애 자리↔위치 대응을 깨므로 위임 대신 거절한다 — 비우기는 부전승 수정(registrationId: null)이 맡는다.
+      const isBye = emptySlot !== null || assignedTeam?.isBye === true;
+      if (isBye && (await findLinkedByeSlotInTx(tx, { id: groupTeam.groupId, phase: groupTeam.group.phase }, groupTeam.sortOrder))) throw slotLinkedBye();
       if (groupTeam.registrationId && groupTeam.group.phase === 'group') {
         const booked = await tx.v1TournamentMatchDetails.count({
           where: {

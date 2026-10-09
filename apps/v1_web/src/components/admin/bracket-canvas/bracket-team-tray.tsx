@@ -135,26 +135,26 @@ export function BracketTeamTray({
                     event.dataTransfer.setData(REGISTRATION_DRAG_MIME, team.id);
                     event.dataTransfer.effectAllowed = 'move';
                   }}
-                  className={`tm-on-tint flex min-h-[44px] w-full items-center gap-2 border px-3 text-left transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 disabled:opacity-60 ${
+                  className={`tm-on-tint flex min-h-[44px] w-full items-center gap-2 border px-3 py-2 text-left transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 disabled:opacity-60 ${
                     selected ? 'bg-[var(--blue50)] border-[var(--blue500)]' : 'bg-[var(--card-surface)] border-[var(--border)] hover:bg-[var(--surface-soft)]'
                   }`}
                   style={{ borderRadius: 'var(--radius-control)' }}
                 >
                   <GripVertical size={16} aria-hidden="true" style={{ color: 'var(--text-muted)' }} />
-                  <span className="tm-text-label min-w-0 flex-1 truncate" style={{ color: 'var(--text-strong)' }}>
+                  <span className="tm-text-label line-clamp-2 min-w-0 flex-1 break-keep" style={{ color: 'var(--text-strong)' }}>
                     {team.name}
                   </span>
                   {placed ? (
-                    <span className="tm-text-caption-strong inline-flex items-center gap-1">
+                    <span className="tm-text-caption-strong inline-flex shrink-0 items-center gap-1">
                       <CheckCircle2 size={12} aria-hidden="true" />
                       배정됨
                     </span>
                   ) : directPlacedIds.has(team.id) && !selected ? (
-                    <span className="tm-text-caption-strong" style={{ color: 'var(--text-muted)' }}>
+                    <span className="tm-text-caption-strong shrink-0" style={{ color: 'var(--text-muted)' }}>
                       경기에 있음
                     </span>
                   ) : selected ? (
-                    <span className="tm-text-caption-strong" style={{ color: 'var(--blue700)' }}>
+                    <span className="tm-text-caption-strong shrink-0" style={{ color: 'var(--blue700)' }}>
                       선택됨
                     </span>
                   ) : null}

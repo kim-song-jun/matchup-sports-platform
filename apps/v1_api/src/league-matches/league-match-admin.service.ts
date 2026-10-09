@@ -877,7 +877,7 @@ export class LeagueMatchAdminService {
           status: { not: 'cancelled' },
           OR: [{ hostTeamId: teamId }, { approvedApplicantTeamId: teamId }],
         },
-        select: { id: true, title: true, hostTeamId: true, approvedApplicantTeamId: true, homeSlotId: true, awaySlotId: true },
+        select: { id: true, status: true, title: true, hostTeamId: true, approvedApplicantTeamId: true, homeSlotId: true, awaySlotId: true },
       });
 
       let cancelled = 0;

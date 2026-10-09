@@ -7,7 +7,7 @@ import { useModalA11y } from '@/components/v1-ui/use-modal-a11y';
 import { useV1CreateFixture } from '@/hooks/use-v1-api';
 import { useV1SetBracketSources } from '@/hooks/use-v1-bracket-canvas';
 import { describeBracketCanvasError } from '@/lib/bracket-canvas-errors';
-import { bracketSourceCandidates, knockoutRoundLabel, nextFixtureNumber } from '@/lib/bracket-fixture-tools';
+import { bracketSourceCandidates, isFixtureLinkable, knockoutRoundLabel, nextFixtureNumber } from '@/lib/bracket-fixture-tools';
 import type { V1AdminBracketFixture, V1AdminTournamentBracket } from '@/types/api';
 
 export type BracketFixtureToolsDialogProps = {
@@ -35,7 +35,7 @@ export function BracketFixtureToolsDialog({ open, mode, tournamentId, bracket, o
   const linkable = useMemo(
     () =>
       bracket.fixtures
-        .filter((fixture) => bracketSourceCandidates({ target: fixture, groups: bracket.groups, fixtures: bracket.fixtures }).length > 0)
+        .filter((fixture) => isFixtureLinkable(fixture) && bracketSourceCandidates({ target: fixture, groups: bracket.groups, fixtures: bracket.fixtures }).length > 0)
         .sort((a, b) => a.fixtureNumber - b.fixtureNumber),
     [bracket.fixtures, bracket.groups],
   );
@@ -51,6 +51,11 @@ export function BracketFixtureToolsDialog({ open, mode, tournamentId, bracket, o
 
   const target = linkable.find((fixture) => fixture.id === targetId) ?? null;
   const candidates = target === null ? [] : bracketSourceCandidates({ target, groups: bracket.groups, fixtures: bracket.fixtures });
+  const sourceOptions = (current: string) => {
+    if (current === '' || candidates.some((fixture) => fixture.id === current)) return candidates;
+    const linked = bracket.fixtures.find((fixture) => fixture.id === current);
+    return linked === undefined ? candidates : [linked, ...candidates];
+  };
   const targetPhase = target === null ? '' : (bracket.groups.find((group) => group.id === target.groupId)?.phase ?? '');
   const outcomeLabel = targetPhase === 'third_place' ? '패자' : '승자';
 
@@ -182,7 +187,7 @@ export function BracketFixtureToolsDialog({ open, mode, tournamentId, bracket, o
                       onChange={(event) => (side === 'HOME' ? setHomeSource(event.target.value) : setAwaySource(event.target.value))}
                     >
                       <option value="">연결 없음 · 직접 배정</option>
-                      {candidates.map((fixture) => (
+                      {sourceOptions(side === 'HOME' ? homeSource : awaySource).map((fixture) => (
                         <option key={fixture.id} value={fixture.id}>{`${fixtureTitle(fixture)} ${outcomeLabel}`}</option>
                       ))}
                     </select>

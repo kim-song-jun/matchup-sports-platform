@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { makeBracket, makeFixture, makeGroup } from '@/test/bracket-canvas-fixtures';
+import { makeBracket, makeFixture, makeGame, makeGroup } from '@/test/bracket-canvas-fixtures';
 import { BracketFixtureToolsDialog } from './bracket-fixture-tools-dialog';
 
 const mocks = vi.hoisted(() => ({ create: vi.fn(), setSources: vi.fn() }));
@@ -17,9 +17,9 @@ const bracket = makeBracket({
     makeGroup({ id: 'g-sf', name: '4강', phase: 'semi', sortOrder: 1 }),
   ],
   fixtures: [
-    makeFixture({ id: 'q1', groupId: 'g-qf', fixtureNumber: 1 }),
-    makeFixture({ id: 'q2', groupId: 'g-qf', fixtureNumber: 2 }),
-    makeFixture({ id: 's1', groupId: 'g-sf', fixtureNumber: 3, bracketSources: [{ fixtureId: 'q1', outcome: 'WINNER', side: 'HOME' }] }),
+    makeFixture({ id: 'q1', groupId: 'g-qf', fixtureNumber: 1, game: makeGame() }),
+    makeFixture({ id: 'q2', groupId: 'g-qf', fixtureNumber: 2, game: makeGame() }),
+    makeFixture({ id: 's1', groupId: 'g-sf', fixtureNumber: 3, game: makeGame(), bracketSources: [{ fixtureId: 'q1', outcome: 'WINNER', side: 'HOME' }] }),
   ],
 });
 
@@ -95,6 +95,49 @@ describe('BracketFixtureToolsDialog — 경기 연결', () => {
     mocks.setSources.mock.calls[0][1].onSuccess();
     expect(props.showToast).toHaveBeenCalledWith('진출 연결을 저장했어요.', 'success');
     expect(props.onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('현재 연결된 원천이 더는 후보가 아니어도(진행 중) 선택값과 표시가 어긋나지 않는다', () => {
+    render(
+      <BracketFixtureToolsDialog
+        open
+        mode="link"
+        tournamentId="t-1"
+        bracket={makeBracket({
+          groups: [makeGroup({ id: 'g-qf', name: '8강', phase: 'quarter' }), makeGroup({ id: 'g-sf', name: '4강', phase: 'semi' })],
+          fixtures: [
+            makeFixture({ id: 'q1', groupId: 'g-qf', fixtureNumber: 1, game: makeGame({ state: 'LIVE' }) }),
+            makeFixture({ id: 'q2', groupId: 'g-qf', fixtureNumber: 2, game: makeGame() }),
+            makeFixture({ id: 's1', groupId: 'g-sf', fixtureNumber: 3, game: makeGame(), bracketSources: [{ fixtureId: 'q1', outcome: 'WINNER', side: 'HOME' }] }),
+          ],
+        })}
+        onClose={vi.fn()}
+        showToast={vi.fn()}
+      />,
+    );
+    const home = screen.getByLabelText('홈 자리') as HTMLSelectElement;
+    expect(home.value).toBe('q1');
+    expect(home.selectedOptions[0].textContent).toBe('8강 1번 경기 승자');
+  });
+
+  it('이미 시작한 경기는 연결 대상에서 뺀다', () => {
+    render(
+      <BracketFixtureToolsDialog
+        open
+        mode="link"
+        tournamentId="t-1"
+        bracket={makeBracket({
+          groups: [makeGroup({ id: 'g-qf', name: '8강', phase: 'quarter' }), makeGroup({ id: 'g-sf', name: '4강', phase: 'semi' })],
+          fixtures: [
+            makeFixture({ id: 'q1', groupId: 'g-qf', fixtureNumber: 1, game: makeGame() }),
+            makeFixture({ id: 's1', groupId: 'g-sf', fixtureNumber: 3, game: makeGame({ state: 'LIVE' }) }),
+          ],
+        })}
+        onClose={vi.fn()}
+        showToast={vi.fn()}
+      />,
+    );
+    expect(screen.getByText('이전 단계 경기를 이어 줄 수 있는 경기가 없어요.')).toBeInTheDocument();
   });
 
   it('연결할 수 있는 경기(앞 단계가 있는 경기)가 없으면 안내하고 저장을 막는다', () => {

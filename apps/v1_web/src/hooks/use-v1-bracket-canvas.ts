@@ -13,6 +13,7 @@ import type {
   V1QuickResultScore,
   V1RandomFillResult,
 } from '@/types/api';
+import type { V1ApplyLeagueTemplatePayload, V1ApplyLeagueTemplateResult } from '@/types/league-match';
 
 export type BracketCompetitionScope = 'tournament' | 'league';
 
@@ -98,5 +99,21 @@ export function useV1SetBracketSources(tournamentId: string) {
       awaySourceFixtureId: string | null;
     }) => v1Patch(`/admin/fixtures/${encodeURIComponent(fixtureId)}/bracket-sources`, { homeSourceFixtureId, awaySourceFixtureId }),
     onSuccess: () => invalidateCompetitionViews(queryClient, tournamentId, 'tournament'),
+  });
+}
+
+/** 정규 리그 템플릿으로 빈 경기·자리를 한 번에 만든다. */
+export function useV1ApplyLeagueTemplate(leagueId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: V1ApplyLeagueTemplatePayload) =>
+      v1Post<V1ApplyLeagueTemplateResult>(`/admin/league-matches/${encodeURIComponent(leagueId)}/fixtures/template`, body),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminLeagueMatch(leagueId) });
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminLeagueMatchList() });
+      queryClient.invalidateQueries({ queryKey: v1Keys.leagueMatches() });
+      queryClient.invalidateQueries({ queryKey: v1Keys.leagueMatch(leagueId) });
+      queryClient.invalidateQueries({ queryKey: v1Keys.tournament(leagueId) });
+    },
   });
 }

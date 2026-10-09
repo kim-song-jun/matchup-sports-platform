@@ -67,3 +67,18 @@ describe('AdminFilterBar', () => {
     expect(screen.getByRole('button', { name: '서울 풋살 리그' })).not.toHaveTextContent('—');
   });
 });
+
+describe('AdminFilterBar rightSlot', () => {
+  it('lets the slot wrap inside the viewport instead of overflowing it', () => {
+    render(
+      <AdminFilterBar
+        hideSearch
+        searchValue=""
+        onSearchChange={vi.fn()}
+        rightSlot={<span>slot</span>}
+      />,
+    );
+    const wrapper = screen.getByText('slot').parentElement;
+    expect(wrapper).toHaveClass('flex-wrap', 'max-w-full');
+  });
+});

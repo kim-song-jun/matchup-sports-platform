@@ -123,7 +123,7 @@ export function AdminFilterBar({
               })}
             </div>
           )}
-          {rightSlot && <div className="ml-auto flex items-center gap-2">{rightSlot}</div>}
+          {rightSlot && <div className="ml-auto flex max-w-full flex-wrap items-center gap-2">{rightSlot}</div>}
         </div>
       ) : null}
     </div>

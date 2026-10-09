@@ -151,6 +151,8 @@ function AdminTournamentsPageContent() {
             keyExtractor={(r) => r.id}
             pagination={buildPagination(pageInfo, isFetching)}
             tableMaxWidth="max-w-none"
+            fitContainer
+            dense
             rowTone={(row) =>
               row.status === 'cancelled' ? 'danger' : row.status === 'closed' ? 'warning' : undefined
             }
@@ -186,7 +188,7 @@ function AdminTournamentsPageContent() {
                 key: 'title',
                 header: '대회',
                 render: (row) => (
-                  <div className="min-w-0">
+                  <div className="min-w-[160px]">
                     <span className="block truncate font-medium text-[var(--text-strong)]" title={row.title}>
                       {row.title}
                     </span>

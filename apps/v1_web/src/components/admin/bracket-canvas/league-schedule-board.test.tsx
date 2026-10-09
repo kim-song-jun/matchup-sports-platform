@@ -1,10 +1,13 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { installViewport, resizeViewport } from '@/test/viewport';
 import { makeGame, makeRegistration, makeSlot } from '@/test/bracket-canvas-fixtures';
 import type { V1AdminBracketFixtureGame } from '@/types/api';
 import type { V1AdminLeagueTeam, V1LeagueFixture } from '@/types/league-match';
 import { REGISTRATION_DRAG_MIME } from './bracket-canvas-dnd';
 import { LeagueScheduleBoard, type LeagueScheduleBoardProps } from './league-schedule-board';
+
+vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn(), replace: vi.fn(), back: vi.fn() }) }));
 
 const TEAMS: V1AdminLeagueTeam[] = [
   { teamId: 't1', name: '독수리FC', status: 'active', memberCount: 5, logoUrl: null, registrationId: 'r1' },
@@ -122,8 +125,15 @@ function renderBoard(overrides: Partial<LeagueScheduleBoardProps> = {}) {
 const cardOf = (name: string) => screen.getByRole('listitem', { name });
 const lastTray = () => mocks.trayProps[mocks.trayProps.length - 1];
 
+let restoreViewport: (() => void) | null = null;
+afterEach(() => {
+  restoreViewport?.();
+  restoreViewport = null;
+});
+
 beforeEach(() => {
   vi.resetAllMocks();
+  restoreViewport = installViewport(1280);
   mocks.trayProps.length = 0;
   mocks.panelProps.length = 0;
   mocks.registrations = { data: { items: REGISTRATIONS, truncated: false }, isError: false, error: null, refetch: vi.fn() };
@@ -361,5 +371,63 @@ describe('LeagueScheduleBoard — 패널', () => {
     fireEvent.click(screen.getByRole('button', { name: '경기 취소' }));
     expect(onCancelFixture).toHaveBeenCalledWith('fx-empty');
     expect(screen.queryByRole('dialog', { name: '경기 패널' })).toBeNull();
+  });
+});
+
+describe('LeagueScheduleBoard — 태블릿(768~1023)', () => {
+  const openerName = /^1번 자리 대 2번 자리 경기 상세 열기$/;
+
+  it('1023: 경기 패널이 시트로 열리고, 닫으면 경기 머리 버튼으로 포커스가 돌아온다', () => {
+    resizeViewport(1023);
+    renderBoard();
+    const opener = within(cardOf('1번 자리 대 2번 자리 경기')).getByRole('button', { name: openerName });
+    opener.focus();
+    fireEvent.click(opener);
+
+    const sheet = screen.getByRole('dialog', { name: '1번 자리 vs 2번 자리' });
+    expect(within(sheet).getByRole('dialog', { name: '경기 패널' })).toBeInTheDocument();
+
+    fireEvent.click(within(sheet).getByRole('button', { name: '패널 닫기' }));
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(opener).toHaveFocus();
+  });
+
+  it('1024: 시트 없이 옆(본문) 패널로 열린다(대조군)', () => {
+    resizeViewport(1024);
+    renderBoard();
+    fireEvent.click(within(cardOf('1번 자리 대 2번 자리 경기')).getByRole('button', { name: openerName }));
+    expect(screen.getAllByRole('dialog')).toHaveLength(1);
+    expect(screen.getByRole('dialog', { name: '경기 패널' })).toBeInTheDocument();
+  });
+
+  it('1024: 패널이 보드와 같은 그리드의 세 번째 열이고, 선택 전에는 두 열이다', () => {
+    resizeViewport(1024);
+    renderBoard();
+    const grid = screen.getByTestId('league-board-grid');
+    expect(grid.className).toContain('lg:grid-cols-[16rem_minmax(0,1fr)]');
+    expect(grid.className).not.toContain('320px');
+    fireEvent.click(within(cardOf('1번 자리 대 2번 자리 경기')).getByRole('button', { name: openerName }));
+    expect(grid.className).toContain('lg:grid-cols-[16rem_minmax(0,1fr)_320px]');
+    expect(grid.lastElementChild).toBe(screen.getByRole('dialog', { name: '경기 패널' }));
+  });
+
+  it('1023: 패널은 그리드 밖 시트에 있고 그리드는 두 열을 유지한다(대조군)', () => {
+    resizeViewport(1023);
+    renderBoard();
+    fireEvent.click(within(cardOf('1번 자리 대 2번 자리 경기')).getByRole('button', { name: openerName }));
+    const grid = screen.getByTestId('league-board-grid');
+    expect(grid.className).not.toContain('320px');
+    expect(grid).not.toContainElement(screen.getByRole('dialog', { name: '경기 패널' }));
+  });
+
+  it('트레이는 1023 에서만 접힌다', () => {
+    resizeViewport(1023);
+    const { unmount } = renderBoard();
+    expect(lastTray().collapsible).toBe(true);
+    unmount();
+    resizeViewport(1024);
+    mocks.trayProps.length = 0;
+    renderBoard();
+    expect(lastTray().collapsible).toBe(false);
   });
 });

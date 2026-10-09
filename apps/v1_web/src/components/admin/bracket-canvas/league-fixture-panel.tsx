@@ -1,17 +1,16 @@
 'use client';
 
 import Link from 'next/link';
-import { useQueryClient } from '@tanstack/react-query';
 import { X } from 'lucide-react';
 import { useState } from 'react';
 import { useV1AssignTournamentSlot, useV1QuickResult } from '@/hooks/use-v1-bracket-canvas';
 import { formatKstDateShort, formatKstTime } from '@/lib/date-utils';
 import { describeBracketCanvasError } from '@/lib/bracket-canvas-errors';
 import type { LeagueBoardNode, LeagueBoardSide } from '@/lib/league-board-model';
-import { v1Keys } from '@/lib/query-keys';
 import type { V1AdminBracketSlot, V1AdminTournamentRegistration } from '@/types/api';
 import { BracketQuickResultForm } from './bracket-quick-result-form';
 import { BracketResultActions } from './bracket-result-actions';
+import { useLeagueResultToast } from './use-league-result-toast';
 
 export interface LeagueFixturePanelProps {
   leagueId: string;
@@ -39,7 +38,6 @@ export function LeagueFixturePanel({
   onCancelFixture,
   onClose,
 }: LeagueFixturePanelProps) {
-  const queryClient = useQueryClient();
   const assignSlot = useV1AssignTournamentSlot(leagueId, 'league');
   const quickResult = useV1QuickResult(leagueId, 'league');
   const [quickError, setQuickError] = useState<string | null>(null);
@@ -57,10 +55,7 @@ export function LeagueFixturePanel({
   const consoleHref = `/admin/live/${encodeURIComponent(leagueId)}/fixtures/${encodeURIComponent(node.fixtureId)}/operate`;
 
   // 정정·무효·확정 훅은 결과 검토 캐시만 비운다 — 리그 보드의 점수·상태는 여기서 다시 읽게 한다.
-  const notifyResult = (message: string, variant: 'success' | 'error' = 'success') => {
-    showToast(message, variant);
-    if (variant === 'success') void queryClient.invalidateQueries({ queryKey: v1Keys.adminLeagueMatch(leagueId) });
-  };
+  const notifyResult = useLeagueResultToast(leagueId, showToast);
 
   const handleAssign = (slotId: string, value: string) => {
     const registrationId = value === '' ? null : value;

@@ -12,6 +12,7 @@ import { EyeIcon, EyeOffIcon } from '@/components/v1-ui/icons';
 import { useV1EmailLogin } from '@/hooks/use-v1-api';
 import { V1ApiError } from '@/lib/api-client';
 import { trackEvent } from '@/lib/analytics';
+import { isNativeAppleSignInAvailable } from '@/lib/native-apple';
 import { clearV1IdentityCache } from '@/lib/query-keys';
 import { sanitizeRedirectPath, saveStoredV1Session } from '@/lib/session-storage';
 import { AUTH_WELCOME_STAGE, AuthFrame } from './auth-page';
@@ -19,7 +20,11 @@ import { getEmailLoginViewModel } from './auth.view-model';
 
 function mapEmailLoginError(err: unknown): string {
   if (err instanceof V1ApiError) {
-    if (err.code === 'UNAUTHENTICATED') return '이메일이나 비밀번호를 다시 확인해 주세요.';
+    // 계정 존재·가입 경로를 드러내지 않도록 항상 같은 안내를 쓴다. Apple 버튼은 iOS 앱에만 있다.
+    if (err.code === 'UNAUTHENTICATED') {
+      const providers = isNativeAppleSignInAvailable() ? "'카카오' 또는 'Apple로 계속하기'" : "'카카오'";
+      return `이메일 또는 비밀번호가 맞지 않아요. 카카오${isNativeAppleSignInAvailable() ? '나 Apple' : ''}로 가입하셨다면 로그인 첫 화면의 ${providers} 버튼으로 로그인해 주세요.`;
+    }
     if (err.code === 'PERMISSION_DENIED') return '로그인이 제한된 계정이에요. 고객센터에서 상태를 확인해 주세요.';
   }
   return '지금은 로그인할 수 없어요. 잠시 후 다시 시도해 주세요.';

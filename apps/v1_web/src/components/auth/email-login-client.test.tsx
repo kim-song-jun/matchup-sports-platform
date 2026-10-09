@@ -107,8 +107,22 @@ describe('EmailLoginClient GA events', () => {
     await waitFor(() =>
       expect(analytics.trackEvent).toHaveBeenCalledWith('login_failed', { method: 'email', reason: 'UNAUTHENTICATED' }),
     );
-    expect(screen.getByRole('alert')).toHaveTextContent('이메일이나 비밀번호를 다시 확인해 주세요.');
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      "이메일 또는 비밀번호가 맞지 않아요. 카카오로 가입하셨다면 로그인 첫 화면의 '카카오' 버튼으로 로그인해 주세요.",
+    );
     expect(screen.getByLabelText('이메일')).toHaveAttribute('aria-describedby', 'email-login-error');
     expect(screen.getByLabelText('비밀번호')).toHaveAttribute('aria-describedby', 'email-login-error');
+  });
+
+  it('401 이 아닌 실패(네트워크 오류)는 소셜 안내 없이 일반 문구를 보여준다', async () => {
+    hooks.loginMutate.mockImplementation((_body: unknown, callbacks: LoginCallbacks) =>
+      callbacks.onError?.(new Error('Network Error')),
+    );
+    render(<EmailLoginClient />);
+
+    await submitLogin('me@example.com', 'wrongpass');
+
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('지금은 로그인할 수 없어요. 잠시 후 다시 시도해 주세요.'));
+    expect(screen.getByRole('alert')).not.toHaveTextContent('카카오');
   });
 });

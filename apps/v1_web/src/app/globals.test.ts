@@ -31,6 +31,15 @@ describe('Android bottom inset layout', () => {
     );
   });
 
+  it('lets sheets in the admin shell cover the whole viewport (no app-frame width, no tab-bar gap)', () => {
+    const rule = globalsCss.match(/\.tm-admin-shell \.tm-filter-scrim,\s*\.tm-admin-shell \.tm-filter-layer\s*\{([^}]*)\}/)?.[1];
+
+    expect(rule).toBeDefined();
+    expect(rule).toMatch(/bottom:\s*0;/);
+    expect(rule).toMatch(/width:\s*100%;/);
+    expect(rule).toMatch(/transform:\s*none;/);
+  });
+
   it('lets sheets cover the fixed CTA on pages without a bottom nav instead of leaving the tab-bar gap', () => {
     expect(globalsCss).toMatch(
       /\.tm-app-frame-no-bottom \.tm-filter-scrim,\s*\.tm-app-frame-no-bottom \.tm-filter-layer\s*\{\s*bottom:\s*0;/,

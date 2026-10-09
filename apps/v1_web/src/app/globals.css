@@ -3732,6 +3732,17 @@ label.tm-btn:focus-within {
   bottom: 0;
 }
 
+/* 어드민 셸은 앱 틀(가운데 고정 폭)도 하단 탭바도 없다 — 시트·배경이 화면 전체를 덮어야 한다. */
+.tm-admin-shell .tm-filter-scrim,
+.tm-admin-shell .tm-filter-layer {
+  bottom: 0;
+  left: 0;
+  right: 0;
+  width: 100%;
+  margin: 0;
+  transform: none;
+}
+
 .tm-filter-sheet {
   position: absolute;
   left: 0;

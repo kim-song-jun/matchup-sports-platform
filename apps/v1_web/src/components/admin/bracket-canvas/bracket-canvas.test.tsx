@@ -49,6 +49,7 @@ function renderCanvas(overrides: Partial<React.ComponentProps<typeof BracketCanv
     canWrite: true,
     onSelectFixture: vi.fn(),
     onAssignSlot: vi.fn(),
+    onAssignDirect: vi.fn(),
     ...overrides,
   };
   const view = render(<BracketCanvas {...props} />);

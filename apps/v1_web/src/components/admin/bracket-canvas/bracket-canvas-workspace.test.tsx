@@ -3,11 +3,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { makeBracket, makeFixture, makeGroup, makeRegistration, makeSlot } from '@/test/bracket-canvas-fixtures';
 import type { V1AdminTournamentBracket } from '@/types/api';
 import type { V1FillSlotsFromStandingsResult } from '@/types/bracket-standings-fill';
+import type { RegistrationsLoadState } from './bracket-team-tray';
 import { BracketCanvasWorkspace } from './bracket-canvas-workspace';
 
 const mocks = vi.hoisted(() => ({
   bracket: { data: undefined as unknown, isPending: false, isError: false, error: null as unknown, refetch: vi.fn() },
   assign: vi.fn(),
+  updateFixture: vi.fn(),
   randomFill: vi.fn(),
   publish: vi.fn(),
   unpublish: vi.fn(),
@@ -15,6 +17,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('@/hooks/use-v1-api', () => ({
   useV1AdminBracket: () => mocks.bracket,
+  useV1UpdateFixture: () => ({ mutate: mocks.updateFixture, isPending: false }),
   useV1PublishTournamentBracket: () => ({ mutate: mocks.publish, isPending: false }),
   useV1UnpublishTournamentBracket: () => ({ mutate: mocks.unpublish, isPending: false }),
 }));
@@ -84,11 +87,14 @@ function setBracket(data: V1AdminTournamentBracket | undefined, state: Partial<t
   Object.assign(mocks.bracket, { data, isPending: false, isError: false, error: null, ...state });
 }
 
+const loaded: RegistrationsLoadState = { status: 'success', truncated: false, refetchFailed: false, error: null, onRetry: vi.fn() };
+
 function renderWorkspace(overrides: Partial<React.ComponentProps<typeof BracketCanvasWorkspace>> = {}) {
   const props = {
     tournamentId: 't-1',
     format: 'knockout' as const,
     registrations,
+    registrationsState: loaded,
     bracketPublishedAt: null,
     bracketPublishScheduledAt: null,
     canWrite: true,
@@ -164,6 +170,18 @@ describe('BracketCanvasWorkspace — 팀 배정(키보드 경로)', () => {
     expect(mocks.assign).toHaveBeenCalledWith({ slotId: 's1', registrationId: 'r1' }, expect.any(Object));
 
     act(() => mocks.assign.mock.calls[0][1].onSuccess());
+    expect(screen.getByRole('button', { name: /서울FC/ })).toHaveAttribute('aria-pressed', 'false');
+  });
+
+  it('자리 없는 옛 대진의 줄에는 경기 PATCH 로 팀을 넣고 고른 팀을 푼다(슬롯 배정은 부르지 않는다)', () => {
+    setBracket(makeBracket({ groups: [group], fixtures: [makeFixture({ id: 'f1', groupId: 'g-qf', fixtureNumber: 1 })] }));
+    renderWorkspace();
+    fireEvent.click(screen.getByRole('button', { name: /서울FC/ }));
+    fireEvent.click(screen.getByRole('button', { name: /^어웨이 .*선택한 팀을 여기에 넣어요$/ }));
+    expect(mocks.updateFixture).toHaveBeenCalledWith({ fixtureId: 'f1', awayRegistrationId: 'r1' }, expect.any(Object));
+    expect(mocks.assign).not.toHaveBeenCalled();
+
+    act(() => mocks.updateFixture.mock.calls[0][1].onSuccess());
     expect(screen.getByRole('button', { name: /서울FC/ })).toHaveAttribute('aria-pressed', 'false');
   });
 
@@ -280,6 +298,30 @@ describe('BracketCanvasWorkspace — 공개 상태', () => {
     expect(screen.getByText('공개 중')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '공개 취소' })).not.toBeInTheDocument();
     expect(screen.queryByText(/바꾸는 즉시/)).not.toBeInTheDocument();
+  });
+});
+
+describe('BracketCanvasWorkspace — 신청 목록 조회 상태', () => {
+  it('불러오는 중에는 무작위 채우기를 이유와 함께 막는다("팀이 없어요"라고 하지 않는다)', () => {
+    renderWorkspace({ registrations: [], registrationsState: { ...loaded, status: 'pending' } });
+    const fill = screen.getByRole('button', { name: /빈 자리 무작위 채우기/ });
+    expect(fill).toBeDisabled();
+    expect(document.getElementById(fill.getAttribute('aria-describedby')!)).toHaveTextContent('참가팀을 불러오는 중이에요.');
+    expect(screen.queryByText('배정할 수 있는 팀이 없어요.')).not.toBeInTheDocument();
+  });
+
+  it('실패하면 이유를 알리고 다시 시도가 재조회를 부른다', () => {
+    const onRetry = vi.fn();
+    renderWorkspace({ registrations: [], registrationsState: { ...loaded, status: 'error', onRetry } });
+    expect(screen.getByRole('button', { name: /빈 자리 무작위 채우기/ })).toBeDisabled();
+    expect(screen.getAllByText('참가팀을 불러오지 못했어요.').length).toBeGreaterThan(0);
+    fireEvent.click(screen.getByRole('button', { name: '다시 시도' }));
+    expect(onRetry).toHaveBeenCalledTimes(1);
+  });
+
+  it('성공이면 기존처럼 무작위 채우기가 열려 있다', () => {
+    renderWorkspace();
+    expect(screen.getByRole('button', { name: /빈 자리 무작위 채우기/ })).toBeEnabled();
   });
 });
 

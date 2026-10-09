@@ -3,6 +3,7 @@ import { makeFixture, makeGame, makeGroup, makeSlot } from '@/test/bracket-canva
 import {
   buildCanvasLayout,
   buildSideLabelContext,
+  classifyFixtureSide,
   fixtureNodeState,
   fixtureSideLabel,
   isFixtureLocked,
@@ -258,6 +259,36 @@ describe('fixtureSideLabel — 팀 > 자리 > 연결 설명 > 미정', () => {
 
   it('아무것도 없으면 미정', () => {
     expect(fixtureSideLabel(f1, 'AWAY', ctx)).toBe('미정');
+  });
+});
+
+describe('classifyFixtureSide', () => {
+  const slotMap = new Map([['s-home', makeSlot({ id: 's-home' })]]);
+
+  it('자리가 있으면 slot, 자리 없이 연결 원천만 있으면 feeder, 둘 다 없으면 direct', () => {
+    const mixed = makeFixture({
+      id: 'x',
+      groupId: 'g-final',
+      fixtureNumber: 1,
+      homeSlotId: 's-home',
+      bracketSources: [{ fixtureId: 'f1', outcome: 'WINNER', side: 'AWAY' }],
+    });
+    expect(classifyFixtureSide(mixed, 'HOME', slotMap)).toBe('slot');
+    expect(classifyFixtureSide(mixed, 'AWAY', slotMap)).toBe('feeder');
+    const legacy = makeFixture({ id: 'y', groupId: 'g-final', fixtureNumber: 2 });
+    expect(classifyFixtureSide(legacy, 'HOME', slotMap)).toBe('direct');
+    expect(classifyFixtureSide(legacy, 'AWAY', slotMap)).toBe('direct');
+  });
+
+  it('slotId 가 있어도 슬롯 목록에서 못 찾으면 자리로 보지 않는다', () => {
+    const dangling = makeFixture({ id: 'z', groupId: 'g-final', fixtureNumber: 3, homeSlotId: 's-gone' });
+    expect(classifyFixtureSide(dangling, 'HOME', slotMap)).toBe('direct');
+  });
+
+  it('원천이 한쪽에만 있으면 그쪽만 feeder 다', () => {
+    const oneSide = makeFixture({ id: 'w', groupId: 'g-final', fixtureNumber: 4, bracketSources: [{ fixtureId: 'f1', outcome: 'LOSER', side: 'HOME' }] });
+    expect(classifyFixtureSide(oneSide, 'HOME', slotMap)).toBe('feeder');
+    expect(classifyFixtureSide(oneSide, 'AWAY', slotMap)).toBe('direct');
   });
 });
 

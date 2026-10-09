@@ -3,6 +3,7 @@
 import { Suspense } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { BracketCanvasWorkspace } from '@/components/admin/bracket-canvas/bracket-canvas-workspace';
+import type { RegistrationsLoadState } from '@/components/admin/bracket-canvas/bracket-team-tray';
 import { SegmentedTabs } from '@/components/v1-ui/segmented-tabs';
 import { useV1AdminTournament, useV1AdminTournamentRegistrations } from '@/hooks/use-v1-api';
 import { BracketTab } from '../bracket-tab';
@@ -27,12 +28,20 @@ function BracketPageBody() {
   const { tournamentId, canWrite, showToast } = useTournamentAdmin();
   const { data: tournament } = useV1AdminTournament(tournamentId);
   // 확정 팀 목록은 대진 편성에 필요하다. 셸이 아니라 이 섹션에서만 구독한다.
-  const { data: regData } = useV1AdminTournamentRegistrations(tournamentId);
+  const { data: regData, isError: regIsError, error: regError, refetch: refetchRegistrations } = useV1AdminTournamentRegistrations(tournamentId);
   const searchParams = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
   const view: BracketView = searchParams.get('view') === 'list' ? 'list' : 'canvas';
   const registrations = regData?.items ?? [];
+  // 캐시된 목록은 재조회가 실패해도 쓰되, 실패는 refetchFailed 로 드러낸다.
+  const registrationsState: RegistrationsLoadState = {
+    status: regData !== undefined ? 'success' : regIsError ? 'error' : 'pending',
+    truncated: regData?.truncated ?? false,
+    refetchFailed: regIsError && regData !== undefined,
+    error: regError,
+    onRetry: () => void refetchRegistrations(),
+  };
 
   // 주소가 보기 방식의 정본이다 — 새로고침·뒤로가기에서도 유지되고, 다른 쿼리는 건드리지 않는다.
   const changeView = (next: BracketView) => {
@@ -57,6 +66,7 @@ function BracketPageBody() {
           tournamentId={tournamentId}
           format={tournament?.format}
           registrations={registrations}
+          registrationsState={registrationsState}
           bracketPublishedAt={tournament?.bracketPublishedAt}
           bracketPublishScheduledAt={tournament?.bracketPublishScheduledAt}
           canWrite={canWrite}

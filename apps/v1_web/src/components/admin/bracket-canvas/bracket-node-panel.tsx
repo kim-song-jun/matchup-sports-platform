@@ -8,7 +8,7 @@ import { useConfirm } from '@/components/v1-ui/confirm-modal';
 import { useV1DeleteFixture, useV1UpdateFixture } from '@/hooks/use-v1-api';
 import { useV1AssignTournamentSlot, useV1QuickResult } from '@/hooks/use-v1-bracket-canvas';
 import { describeBracketCanvasError } from '@/lib/bracket-canvas-errors';
-import { isFixtureLocked, isSlotAssignable, type SideKey } from '@/lib/bracket-canvas-layout';
+import { classifyFixtureSide, isFixtureLocked, isSlotAssignable, type SideKey } from '@/lib/bracket-canvas-layout';
 import { isoToKstDatetimeLocal, kstDatetimeLocalToIso } from '@/lib/kst-calendar';
 import type {
   V1AdminBracketFixture,
@@ -26,6 +26,8 @@ export type BracketNodePanelProps = {
   groups: V1AdminBracketGroup[];
   slots: V1AdminBracketSlot[];
   registrations: V1AdminTournamentRegistration[];
+  /** 신청 목록이 아직 없거나 실패한 상태에서는 팀 선택창을 잠근다("팀 0개"처럼 보이지 않게). */
+  registrationsLoaded: boolean;
   sideLabels: Record<SideKey, string>;
   canWrite: boolean;
   showToast: (message: string, variant?: 'success' | 'error') => void;
@@ -40,6 +42,7 @@ export function BracketNodePanel({
   groups,
   slots,
   registrations,
+  registrationsLoaded,
   sideLabels,
   canWrite,
   showToast,
@@ -73,11 +76,52 @@ export function BracketNodePanel({
     );
   };
 
+  const handleAssignDirect = (side: SideKey, registrationId: string) => {
+    const value = registrationId === '' ? null : registrationId;
+    updateFixture.mutate(
+      { fixtureId: fixture.id, ...(side === 'HOME' ? { homeRegistrationId: value } : { awayRegistrationId: value }) },
+      {
+        onSuccess: () => showToast(value === null ? '자리를 비웠어요.' : '팀을 넣었어요.', 'success'),
+        onError: (error) => showToast(describeBracketCanvasError(error, '팀을 넣지 못했어요.'), 'error'),
+      },
+    );
+  };
+
   const renderSide = (side: SideKey) => {
     const slotId = side === 'HOME' ? fixture.homeSlotId : fixture.awaySlotId;
     const slot = slotId === null ? undefined : slotsById.get(slotId);
+    const source = classifyFixtureSide(fixture, side, slotsById);
     let body: React.ReactNode;
-    if (slot === undefined) {
+    if (source === 'direct') {
+      const current = side === 'HOME' ? fixture.homeRegistrationId : fixture.awayRegistrationId;
+      const other = side === 'HOME' ? fixture.awayRegistrationId : fixture.homeRegistrationId;
+      if (locked) {
+        body = <p className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>경기가 시작됐거나 결과가 있어 팀을 바꿀 수 없어요.</p>;
+      } else if (!canWrite) {
+        body = null;
+      } else {
+        body = (
+          <select
+            aria-label={`${SIDE_NAME[side]} 팀 선택`}
+            value={current ?? ''}
+            disabled={!registrationsLoaded || updateFixture.isPending}
+            onChange={(event) => handleAssignDirect(side, event.target.value)}
+            className="tm-input"
+            style={{ minHeight: 44 }}
+          >
+            <option value="">비워 두기</option>
+            {confirmed
+              .filter((registration) => registration.id !== other)
+              .map((registration) => (
+                <option key={registration.id} value={registration.id}>
+                  {registration.teamName ?? registration.teamId}
+                </option>
+              ))}
+          </select>
+        );
+      }
+    } else if (slot === undefined) {
+      // feeder: 슬롯 없이 이전 경기 결과로만 채워지는 사이드
       body = <p className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>이전 경기 결과로 채워져요.</p>;
     } else if (!isSlotAssignable(slot)) {
       body = <p className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>조 순위가 나오면 채워져요.</p>;
@@ -91,7 +135,7 @@ export function BracketNodePanel({
         <select
           aria-label={`${SIDE_NAME[side]} 팀 선택`}
           value={slot.registrationId ?? ''}
-          disabled={assignSlot.isPending}
+          disabled={!registrationsLoaded || assignSlot.isPending}
           onChange={(event) => handleAssign(slot, event.target.value)}
           className="tm-input"
           style={{ minHeight: 44 }}

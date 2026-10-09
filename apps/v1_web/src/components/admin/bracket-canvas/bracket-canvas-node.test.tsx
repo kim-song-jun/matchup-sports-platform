@@ -23,6 +23,7 @@ function renderNode(
     pendingRegistrationId: null,
     onSelect: vi.fn(),
     onAssign: vi.fn(),
+    onAssignDirect: vi.fn(),
     ...overrides,
   };
   render(<BracketCanvasNode {...props} />);
@@ -113,8 +114,12 @@ describe('BracketCanvasNode — 눌러서 배정', () => {
   it.each([
     ['경기가 시작된 칸', makeFixture({ ...base, game: makeGame({ state: 'LIVE' }) }), {}],
     ['읽기 전용 화면', base, { canWrite: false }],
-    ['순위 자리', base, { slots: { HOME: makeSlot({ id: 's-rank', kind: 'GROUP_RANK', label: 'A조 1위' }), AWAY: null } }],
-    ['자리가 없는 줄(연결선으로 채워지는 줄)', base, { slots: { HOME: null, AWAY: null } }],
+    ['순위 자리', base, { slots: { HOME: makeSlot({ id: 's-home', kind: 'GROUP_RANK', label: 'A조 1위' }), AWAY: null } }],
+    [
+      '자리가 없고 이전 경기 연결선으로 채워지는 줄',
+      makeFixture({ ...base, homeSlotId: null, awaySlotId: null, bracketSources: [{ fixtureId: 'f0', outcome: 'WINNER', side: 'HOME' }] }),
+      { slots: { HOME: null, AWAY: null } },
+    ],
   ] as const)('%s 에서는 고른 팀이 있어도 배정하지 않고 칸을 연다', (_name, fixture, overrides) => {
     const props = renderNode(fixture, { pendingRegistrationId: 'reg-9', ...overrides });
     fireEvent.click(screen.getByRole('button', { name: '홈 1번 자리' }));
@@ -146,5 +151,47 @@ describe('BracketCanvasNode — 끌어 놓기', () => {
     const row = document.querySelector('[data-side="HOME"]')!;
     fireEvent.drop(row, { dataTransfer: { getData: () => '' } });
     expect(props.onAssign).not.toHaveBeenCalled();
+  });
+});
+
+describe('BracketCanvasNode — 자리 없는 줄(경기에 팀을 직접 지정)', () => {
+  const slotless = makeFixture({
+    ...base,
+    homeSlotId: null,
+    awaySlotId: null,
+    bracketSources: [{ fixtureId: 'f0', outcome: 'WINNER', side: 'AWAY' }],
+  });
+  const noSlots = { slots: { HOME: null, AWAY: null } };
+
+  it('직접 지정 줄을 누르면 onAssignDirect 로 보내고 onAssign 은 부르지 않는다', () => {
+    const props = renderNode(slotless, { pendingRegistrationId: 'reg-9', ...noSlots });
+    fireEvent.click(screen.getByRole('button', { name: '홈 1번 자리, 선택한 팀을 여기에 넣어요' }));
+    expect(props.onAssignDirect).toHaveBeenCalledWith('f1', 'HOME', 'reg-9');
+    expect(props.onAssign).not.toHaveBeenCalled();
+  });
+
+  it('이전 경기로 채워지는 줄은 같은 상황에서도 배정하지 않고 칸을 연다', () => {
+    const props = renderNode(slotless, { pendingRegistrationId: 'reg-9', ...noSlots });
+    fireEvent.click(screen.getByRole('button', { name: '어웨이 2번 자리' }));
+    expect(props.onAssignDirect).not.toHaveBeenCalled();
+    expect(props.onSelect).toHaveBeenCalledWith('f1');
+  });
+
+  it('직접 지정 줄에 팀을 끌어 놓으면 onAssignDirect 로 보낸다', () => {
+    const props = renderNode(slotless, noSlots);
+    const row = document.querySelector('[data-side="HOME"]')!;
+    fireEvent.drop(row, { dataTransfer: { getData: (type: string) => (type === REGISTRATION_DRAG_MIME ? 'reg-7' : '') } });
+    expect(props.onAssignDirect).toHaveBeenCalledWith('f1', 'HOME', 'reg-7');
+    expect(props.onAssign).not.toHaveBeenCalled();
+  });
+
+  it('시작된 칸이나 읽기 전용에서는 직접 지정 줄도 배정하지 않는다', () => {
+    const live = renderNode(makeFixture({ ...slotless, game: makeGame({ state: 'LIVE' }) }), { pendingRegistrationId: 'reg-9', ...noSlots });
+    fireEvent.click(screen.getByRole('button', { name: '홈 1번 자리' }));
+    expect(live.onAssignDirect).not.toHaveBeenCalled();
+    cleanup();
+    const readOnly = renderNode(slotless, { pendingRegistrationId: 'reg-9', canWrite: false, ...noSlots });
+    fireEvent.click(screen.getByRole('button', { name: '홈 1번 자리' }));
+    expect(readOnly.onAssignDirect).not.toHaveBeenCalled();
   });
 });

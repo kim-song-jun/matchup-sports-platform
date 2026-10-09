@@ -226,6 +226,37 @@ export function isFixtureLocked(fixture: V1AdminBracketFixture): boolean {
   return game !== null && (game.state !== 'SCHEDULED' || game.latestRevision !== null);
 }
 
+export type SideSource = 'slot' | 'feeder' | 'direct';
+
+/** 사이드의 팀이 어디서 오는지: 자리(slot) · 이전 경기(feeder) · 경기에 직접 지정(direct). */
+export function classifyFixtureSide(
+  fixture: V1AdminBracketFixture,
+  side: SideKey,
+  slotsById: ReadonlyMap<string, V1AdminBracketSlot>,
+): SideSource {
+  const slotId = side === 'HOME' ? fixture.homeSlotId : fixture.awaySlotId;
+  if (slotId !== null && slotsById.has(slotId)) return 'slot';
+  return fixture.bracketSources?.some((source) => source.side === side) ? 'feeder' : 'direct';
+}
+
+/** 자리 없이 경기에 직접 지정된 팀 id(옛 대진·경기 추가). 취소된 경기는 세지 않는다. */
+export function directPlacedRegistrationIds(
+  fixtures: readonly V1AdminBracketFixture[],
+  slots: readonly V1AdminBracketSlot[],
+): Set<string> {
+  const slotsById = new Map(slots.map((slot) => [slot.id, slot]));
+  const ids = new Set<string>();
+  for (const fixture of fixtures) {
+    // 게임만 취소돼도(경기 상태는 그대로) 취소로 본다 — 칸의 상태 칩과 같은 기준.
+    if (fixture.status === 'cancelled' || fixtureNodeState(fixture.game) === 'cancelled') continue;
+    for (const side of ['HOME', 'AWAY'] as const) {
+      const id = side === 'HOME' ? fixture.homeRegistrationId : fixture.awayRegistrationId;
+      if (id !== null && classifyFixtureSide(fixture, side, slotsById) === 'direct') ids.add(id);
+    }
+  }
+  return ids;
+}
+
 export function isSlotAssignable(slot: V1AdminBracketSlot): boolean {
   return slot.kind !== 'GROUP_RANK';
 }

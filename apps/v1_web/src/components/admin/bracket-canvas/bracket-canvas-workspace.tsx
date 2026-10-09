@@ -8,12 +8,13 @@ import { useConfirm } from '@/components/v1-ui/confirm-modal';
 import { AlertBanner, EmptyState, ErrorState } from '@/components/v1-ui/primitives';
 import {
   useV1AdminBracket,
+  useV1UpdateFixture,
   useV1PublishTournamentBracket,
   useV1UnpublishTournamentBracket,
 } from '@/hooks/use-v1-api';
 import { useV1AssignTournamentSlot, useV1RandomFillSlots } from '@/hooks/use-v1-bracket-canvas';
 import { describeBracketCanvasError } from '@/lib/bracket-canvas-errors';
-import { buildSideLabelContext, fixtureSideLabel } from '@/lib/bracket-canvas-layout';
+import { buildSideLabelContext, directPlacedRegistrationIds, fixtureSideLabel, type SideKey } from '@/lib/bracket-canvas-layout';
 import { describeStandingsFill } from '@/lib/bracket-standings-fill-message';
 import { isBracketPublished } from '@/lib/bracket-visibility';
 import { extractErrorMessage } from '@/lib/error-message';
@@ -21,7 +22,7 @@ import type { V1AdminTournamentRegistration, V1TournamentFormat } from '@/types/
 import { BracketCanvas } from './bracket-canvas';
 import { BracketNodePanel } from './bracket-node-panel';
 import { BracketStandingsFillButton } from './bracket-standings-fill-button';
-import { BracketTeamTray } from './bracket-team-tray';
+import { BracketTeamTray, type RegistrationsLoadState } from './bracket-team-tray';
 import { BracketFixtureToolsDialog } from './bracket-fixture-tools-dialog';
 import { BracketTemplateDialog } from './bracket-template-dialog';
 
@@ -29,6 +30,7 @@ export type BracketCanvasWorkspaceProps = {
   tournamentId: string;
   format: V1TournamentFormat | undefined;
   registrations: V1AdminTournamentRegistration[];
+  registrationsState: RegistrationsLoadState;
   bracketPublishedAt: string | null | undefined;
   bracketPublishScheduledAt: string | null | undefined;
   canWrite: boolean;
@@ -40,6 +42,7 @@ export function BracketCanvasWorkspace({
   tournamentId,
   format,
   registrations,
+  registrationsState,
   bracketPublishedAt,
   bracketPublishScheduledAt,
   canWrite,
@@ -48,6 +51,7 @@ export function BracketCanvasWorkspace({
 }: BracketCanvasWorkspaceProps) {
   const { data: bracket, isPending, isError, error, refetch } = useV1AdminBracket(tournamentId);
   const assignSlot = useV1AssignTournamentSlot(tournamentId, 'tournament');
+  const updateFixture = useV1UpdateFixture(tournamentId);
   const randomFill = useV1RandomFillSlots(tournamentId, 'tournament');
   const publishBracket = useV1PublishTournamentBracket(tournamentId);
   const unpublishBracket = useV1UnpublishTournamentBracket(tournamentId);
@@ -96,7 +100,15 @@ export function BracketCanvasWorkspace({
   const emptySlotCount = bracket.slots.filter((slot) => slot.kind !== 'GROUP_RANK' && slot.registrationId === null).length;
   const unplacedTeamCount = confirmedTeams.filter((registration) => !placedIds.has(registration.id)).length;
   const randomFillBlockedReason =
-    emptySlotCount === 0 ? '비어 있는 자리가 없어요.' : unplacedTeamCount === 0 ? '배정할 수 있는 팀이 없어요.' : null;
+    registrationsState.status === 'pending'
+      ? '참가팀을 불러오는 중이에요.'
+      : registrationsState.status === 'error'
+        ? '참가팀을 불러오지 못했어요.'
+        : emptySlotCount === 0
+          ? '비어 있는 자리가 없어요.'
+          : unplacedTeamCount === 0
+            ? '배정할 수 있는 팀이 없어요.'
+            : null;
   const published = isBracketPublished(bracketPublishedAt, bracketPublishScheduledAt);
   const hasPendingSchedule = !!bracketPublishScheduledAt && !published;
   // 비활성 이유는 title 대신 화면에 보이게 둔다 — title 은 터치·키보드에서 보이지 않는다.
@@ -107,6 +119,19 @@ export function BracketCanvasWorkspace({
   const handleAssign = (slotId: string, registrationId: string) => {
     assignSlot.mutate(
       { slotId, registrationId },
+      {
+        onSuccess: () => {
+          setPendingRegistrationId(null);
+          showToast('팀을 넣었어요.', 'success');
+        },
+        onError: (err) => showToast(describeBracketCanvasError(err, '팀을 넣지 못했어요.'), 'error'),
+      },
+    );
+  };
+
+  const handleAssignDirect = (fixtureId: string, side: SideKey, registrationId: string) => {
+    updateFixture.mutate(
+      { fixtureId, ...(side === 'HOME' ? { homeRegistrationId: registrationId } : { awayRegistrationId: registrationId }) },
       {
         onSuccess: () => {
           setPendingRegistrationId(null);
@@ -252,7 +277,9 @@ export function BracketCanvasWorkspace({
         <div className={`grid gap-4 ${selectedFixture === null ? 'lg:grid-cols-[240px_minmax(0,1fr)]' : 'lg:grid-cols-[240px_minmax(0,1fr)_320px]'}`}>
           <BracketTeamTray
             registrations={registrations}
+            registrationsState={registrationsState}
             slots={bracket.slots}
+            directPlacedIds={directPlacedRegistrationIds(bracket.fixtures, bracket.slots)}
             pendingRegistrationId={pendingRegistrationId}
             canWrite={canWrite}
             onPick={setPendingRegistrationId}
@@ -267,6 +294,7 @@ export function BracketCanvasWorkspace({
             canWrite={canWrite}
             onSelectFixture={setSelectedFixtureId}
             onAssignSlot={handleAssign}
+            onAssignDirect={handleAssignDirect}
           />
           {selectedFixture !== null && selectedLabels !== null ? (
             <BracketNodePanel
@@ -276,6 +304,7 @@ export function BracketCanvasWorkspace({
               groups={bracket.groups}
               slots={bracket.slots}
               registrations={registrations}
+              registrationsLoaded={registrationsState.status === 'success'}
               sideLabels={selectedLabels}
               canWrite={canWrite}
               showToast={showToast}

@@ -1,7 +1,7 @@
 import { V1GameResultRevisionState } from '@prisma/client';
 import { GameContractError } from './game-contract';
 
-export type RevisionFlow = 'STANDARD' | 'CORRECTION' | 'ADMIN_QUICK';
+export type RevisionFlow = 'STANDARD' | 'CORRECTION' | 'ADMIN_QUICK' | 'TEAM_CHANGE';
 export type RevisionMutation = 'CONTENT' | 'PARTICIPANTS' | 'STATE' | 'DELETE';
 export type AppendOnlyEventOperation = 'APPEND' | 'UPDATE' | 'DELETE';
 
@@ -93,7 +93,11 @@ export function assertRevisionTransition(input: RevisionTransitionInput): void {
     // 전제하므로 CORRECTION 으로 위장하지 않고 별도 흐름으로 둔다.
     (input.flow === 'ADMIN_QUICK' &&
       input.from === V1GameResultRevisionState.DRAFT &&
-      input.to === V1GameResultRevisionState.OFFICIAL);
+      input.to === V1GameResultRevisionState.OFFICIAL) ||
+    // A fixture team swap discards a result nobody confirmed yet; only unconfirmed rows can go VOID this way.
+    (input.flow === 'TEAM_CHANGE' &&
+      (input.from === V1GameResultRevisionState.DRAFT || input.from === V1GameResultRevisionState.SUBMITTED) &&
+      input.to === V1GameResultRevisionState.VOID);
 
   if (!allowed) {
     throw new GameContractError(

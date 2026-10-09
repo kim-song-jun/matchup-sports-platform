@@ -36,7 +36,7 @@ export function useStartedTeamChangeReason(): {
     <ConfirmModal
       open={pending !== null}
       title="시작된 경기의 팀을 바꿀까요?"
-      message={`이 경기의 ${(pending?.sideNames ?? []).join('·')} 쪽 명단과 기록(득점·카드 등)이 지워지고 새 팀의 참가 명단으로 바뀌어요. 지운 기록은 되돌릴 수 없고, 상대 팀 기록은 그대로 남아요.`}
+      message={`이 경기의 ${(pending?.sideNames ?? []).join('·')} 쪽 명단과 기록(득점·카드 등)이 지워지고 새 팀의 참가 명단으로 바뀌어요. 제출됐지만 확정되지 않은 결과가 있으면 함께 폐기돼요. 지운 기록은 되돌릴 수 없고, 상대 팀 기록은 그대로 남아요.`}
       confirmLabel="팀 바꾸기"
       tone="danger"
       reasonField={{

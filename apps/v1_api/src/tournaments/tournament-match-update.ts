@@ -5,7 +5,7 @@ import { competitionTeamTargets, enqueueRosterResync, type RosterResyncTarget } 
 import { revokeReplacedSideTeamAdjustments } from '../games/roster/side-team-change';
 import { competitionMatchLabel } from './tournament-round-label';
 import { defaultFixtureEndAt } from './competition-config/fixture-end-at';
-import { assertStartedTeamChangeAllowed, purgeReplacedSideEvents, type StartedTeamChangeSummary } from './tournament-started-team-change';
+import { assertStartedTeamChangeAllowed, discardUnconfirmedResultRevisions, purgeReplacedSideEvents, type StartedTeamChangeSummary } from './tournament-started-team-change';
 
 type Tx = Prisma.TransactionClient;
 
@@ -22,6 +22,8 @@ export type TournamentMatchUpdateInput = {
    */
   allowStartedTeamChange?: boolean;
   teamChangeReason?: string | null;
+  /** Recorded as the author of the VOID revision that replaces a discarded unconfirmed result. */
+  actorUserId?: string;
 };
 
 /**
@@ -169,7 +171,6 @@ export async function updateTournamentMatchInTx(
   }
   const startedTeamChangeReason = teamsChanged && (gameStarted || officialRevision?.state === 'OFFICIAL')
     ? await assertStartedTeamChangeAllowed(tx, {
-      gameId: game.id,
       gameState: gameRows[0].state,
       officialRevisionState: officialRevision?.state ?? null,
       reason: input.teamChangeReason,
@@ -226,6 +227,12 @@ export async function updateTournamentMatchInTx(
     { key: V1GameSideKey.AWAY, oldTeamId: detail.teamMatch.approvedApplicantTeamId, nextTeamId: nextAwayTeamId, name: away?.team.name ?? '어웨이 팀 미정', changed: awayChanged },
   ];
   const resync: RosterResyncTarget[] = [];
+  if (startedTeamChangeReason !== null && input.actorUserId === undefined) {
+    throw new Error('actorUserId is required to change teams on a started fixture');
+  }
+  const discardedRevisions = startedTeamChangeReason === null || input.actorUserId === undefined
+    ? []
+    : await discardUnconfirmedResultRevisions(tx, { gameId: game.id, actorUserId: input.actorUserId, reason: startedTeamChangeReason });
   const startedPurge = startedTeamChangeReason === null
     ? null
     : await purgeReplacedSideEvents(tx, {
@@ -298,7 +305,7 @@ export async function updateTournamentMatchInTx(
     updatedAt: updated.updatedAt,
     startedTeamChange: startedPurge === null || startedTeamChangeReason === null
       ? null
-      : { gameState: gameRows[0].state, reason: startedTeamChangeReason, ...startedPurge },
+      : { gameState: gameRows[0].state, reason: startedTeamChangeReason, discardedRevisions, ...startedPurge },
   };
 }
 

@@ -171,6 +171,7 @@ export async function updateTournamentFixtureInTx(tx: Tx, admin: V1ActiveAdmin, 
     awayRegistrationId: input.awayRegistrationId,
     allowStartedTeamChange: input.allowStartedTeamChange,
     teamChangeReason: input.teamChangeReason,
+    actorUserId: admin.userId,
   });
   if (row.startedTeamChange !== null) {
     await writeAdminActionLog(tx, admin, {
@@ -184,6 +185,7 @@ export async function updateTournamentFixtureInTx(tx: Tx, admin: V1ActiveAdmin, 
         awayRegistrationId: row.awayRegistrationId,
         sides: row.startedTeamChange.sides,
         removedEventCount: row.startedTeamChange.removedEventCount,
+        discardedRevisions: row.startedTeamChange.discardedRevisions,
         score: row.startedTeamChange.scoreAfter,
       },
     });

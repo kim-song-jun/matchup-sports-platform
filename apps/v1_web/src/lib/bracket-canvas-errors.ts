@@ -26,7 +26,6 @@ const BRACKET_CANVAS_MESSAGES: Readonly<Record<string, string>> = {
   SLOT_CHANGE_DUPLICATED: '같은 자리를 한 번에 두 번 바꿀 수 없어요.',
   SLOT_CHANGE_CROSS_TOURNAMENT: '다른 대회의 자리는 함께 바꿀 수 없어요.',
   FIXTURE_RESULT_MUST_BE_VOIDED: '공식 결과가 확정된 경기예요. 결과를 먼저 무효로 돌려 주세요.',
-  FIXTURE_RESULT_PENDING: '제출된 결과가 있는 경기예요. 결과를 확정한 뒤 무효로 돌려 주세요.',
   FIXTURE_CANCELLED: '취소된 경기는 팀을 바꿀 수 없어요.',
   TEAM_CHANGE_REASON_REQUIRED: '시작된 경기의 팀을 바꾸려면 사유를 입력해 주세요.',
   LEAGUE_ON_HOLD: '보류 중인 리그라 대진을 바꿀 수 없어요.',

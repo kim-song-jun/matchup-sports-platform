@@ -57,7 +57,7 @@ describe('POST /admin/league-matches/:leagueId/fixtures/template', () => {
       expect(fixture.startAt?.toISOString()).toBe(new Date(`${dates[round - 1]}T19:00:00+09:00`).toISOString());
     }
     expect(await statusOf(leagueId)).toBe('draft');
-    expect(await h.prisma.v1TeamSchedule.count({ where: { teamMatch: { leagueId } } })).toBe(0);
+    expect(await h.prisma.v1TeamSchedule.count({ where: { teamMatchId: { in: fixtures.map((f) => f.id) } } })).toBe(0);
   });
 
   it('일정은 필수다 — 없으면 400, 날짜가 모자라면 422, 과거 날짜는 422 이고 아무것도 만들지 않는다', async () => {

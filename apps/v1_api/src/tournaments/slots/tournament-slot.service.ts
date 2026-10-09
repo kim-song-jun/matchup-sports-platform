@@ -273,7 +273,7 @@ export class TournamentSlotService {
   async randomFill(user: V1AuthUser, competitionId: string) {
     const admin = await this.adminContext.getMutationAdmin(user.id);
     const competition = await this.loadCompetition(this.prisma, competitionId);
-      return this.prisma.$transaction(async (tx) => {
+    return this.prisma.$transaction(async (tx) => {
       await lockCompetitionForBracketMutationInTx(tx, competition);
       // 잠금 안에서 다시 읽는다 — 화면이 본 빈 자리가 아니라 지금의 빈 자리·미배치 팀이 기준이다.
       const slotRows = await tx.v1TournamentSlot.findMany({

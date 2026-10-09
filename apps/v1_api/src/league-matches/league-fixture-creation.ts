@@ -12,6 +12,9 @@ import {
   type LeagueRosterFillOutcome,
 } from './league-roster-autofill';
 
+/** 어드민 팀매치 상세(applications.message)에 그대로 노출되는 문구 — 생성·자리 배정이 같은 값을 쓴다. */
+export const LEAGUE_APPLICATION_MESSAGE = '리그 대진 편성';
+
 /**
  * 리그 대진 **한 경기**를 만드는 단일 경로.
  *
@@ -32,9 +35,6 @@ import {
  * 스펙이 `league-match-admin.service.spec.ts` 에 있다(자동 경로 1건 + 수동 경로 1건).
  * "행 수가 같다" 로 뭉뚱그리지 않는다 — 하나가 빠지고 다른 하나가 두 번 생기면 총계는 같다.
  */
-/** 어드민 팀매치 상세(applications.message)에 그대로 노출되는 문구 — 생성·자리 배정이 같은 값을 쓴다. */
-export const LEAGUE_APPLICATION_MESSAGE = '리그 대진 편성';
-
 export interface LeagueFixtureCreationInput {
   leagueId: string;
   adminUserId: string;

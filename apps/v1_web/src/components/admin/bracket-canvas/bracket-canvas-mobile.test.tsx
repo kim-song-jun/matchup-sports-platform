@@ -173,3 +173,146 @@ describe('BracketCanvasMobile — 목록', () => {
     expect(screen.getByText('아직 대진이 없어요')).toBeInTheDocument();
   });
 });
+
+describe('BracketCanvasMobile — 시트', () => {
+  const sheet = () => screen.getByRole('dialog');
+
+  beforeEach(() => {
+    quickMutate.mockReset();
+    quickMutate.mockImplementation((_vars: unknown, options?: { onSuccess?: () => void }) => options?.onSuccess?.());
+  });
+
+  it('칸을 누르면 시트가 열리고, 두 팀이 정해진 예정 경기는 점수 폼에 결선 여부·팀 이름을 넘긴다', () => {
+    renderMobile();
+    expect(card(/8강 · 2번 경기/)).toHaveAttribute('aria-expanded', 'false');
+    fireEvent.click(card(/8강 · 2번 경기/));
+
+    expect(screen.getByRole('dialog', { name: '8강 · 2번 경기' })).toBeInTheDocument();
+    expect(card(/8강 · 2번 경기/)).toHaveAttribute('aria-expanded', 'true');
+    const form = screen.getByTestId('quick-form');
+    expect(form).toHaveAttribute('data-knockout', 'true');
+    expect(form).toHaveAttribute('data-home', '서초FC');
+    expect(form).toHaveAttribute('data-away', '송파FC');
+  });
+
+  it('폼을 제출하면 그 경기의 게임 id·버전으로 빠른 입력 변이를 부르고, 성공하면 토스트와 함께 시트가 닫힌다', () => {
+    const { showToast } = renderMobile();
+    fireEvent.click(card(/8강 · 2번 경기/));
+    fireEvent.click(screen.getByRole('button', { name: '폼 완료' }));
+
+    expect(quickMutate).toHaveBeenCalledTimes(1);
+    expect(quickMutate.mock.calls[0][0]).toEqual({ gameId: 'g-2', expectedVersion: 3, score: { home: 2, away: 1 } });
+    expect(showToast).toHaveBeenCalledWith('점수를 확정했어요.');
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('빠른 입력이 실패하면 시트를 닫지 않고 폼에 오류 문구를 보여 준다', () => {
+    quickMutate.mockImplementation((_vars: unknown, options?: { onError?: (err: unknown) => void }) => options?.onError?.({}));
+    renderMobile();
+    fireEvent.click(card(/8강 · 2번 경기/));
+    fireEvent.click(screen.getByRole('button', { name: '폼 완료' }));
+
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    expect(within(sheet()).getByRole('alert')).toHaveTextContent('점수를 확정하지 못했어요');
+  });
+
+  it('한쪽 팀이 미정이면 점수 폼 대신 안내만 나온다', () => {
+    renderMobile();
+    fireEvent.click(card(/8강 · 1번 경기/));
+    expect(screen.queryByTestId('quick-form')).not.toBeInTheDocument();
+    expect(within(sheet()).getByText('두 팀이 정해지면 점수를 넣을 수 있어요.')).toBeInTheDocument();
+  });
+
+  it('확정 전 결과는 확인 액션을 보여 주고 점수 폼은 숨긴다', () => {
+    renderMobile();
+    fireEvent.click(screen.getByRole('tab', { name: '4강' }));
+    fireEvent.click(card(/4강 · 5번 경기/));
+    const actions = screen.getByTestId('result-actions');
+    expect(actions).toHaveAttribute('data-tournament-id', 't-1');
+    expect(actions).toHaveAttribute('data-fixture-id', 'fx-5');
+    expect(actions).toHaveAttribute('data-game-id', 'g-5');
+    expect(actions).toHaveAttribute('data-can-write', 'true');
+    expect(actions).toHaveAttribute('data-revision-state', 'SUBMITTED');
+    expect(screen.queryByTestId('quick-form')).not.toBeInTheDocument();
+  });
+
+  it('빠른 입력으로 확정된 경기는 고치기·무효 액션과 득점자 없음 안내를 보여 준다', () => {
+    renderMobile();
+    fireEvent.click(card(/8강 · 3번 경기/));
+    expect(screen.getByTestId('result-actions')).toHaveAttribute('data-revision-state', 'OFFICIAL');
+    expect(within(sheet()).getByText(/득점자는 기록되지 않았어요/)).toBeInTheDocument();
+  });
+
+  it('라이브 득점 기록이 있는 확정 경기는 그림에서 고치지 않고 결과 정정 화면으로 보낸다', () => {
+    renderMobile();
+    fireEvent.click(card(/8강 · 4번 경기/));
+    expect(screen.queryByTestId('result-actions')).not.toBeInTheDocument();
+    expect(within(sheet()).getByRole('link', { name: /결과 정정 화면으로 가기/ })).toHaveAttribute(
+      'href',
+      '/admin/live/t-1/records/corrections?fixtureId=fx-4',
+    );
+  });
+
+  it('진행 중·취소된 경기에는 폼 없이 안내만 나온다', () => {
+    renderMobile();
+    fireEvent.click(screen.getByRole('tab', { name: '4강' }));
+    fireEvent.click(card(/4강 · 9번 경기/));
+    expect(within(sheet()).getByText(/라이브 콘솔에서 넣어요/)).toBeInTheDocument();
+    expect(screen.queryByTestId('quick-form')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('result-actions')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '닫기' }));
+
+    fireEvent.click(screen.getByRole('tab', { name: '결승' }));
+    fireEvent.click(card(/결승 · 8번 경기/));
+    expect(within(sheet()).getByText('취소된 경기예요.')).toBeInTheDocument();
+  });
+
+  it('읽기 전용이면 시트는 열리지만 입력 폼도 액션도 없다(canWrite=true 인 첫 테스트가 대조군)', () => {
+    renderMobile({ canWrite: false });
+    fireEvent.click(card(/8강 · 2번 경기/));
+    expect(sheet()).toBeInTheDocument();
+    expect(screen.queryByTestId('quick-form')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '닫기' }));
+    fireEvent.click(card(/8강 · 3번 경기/));
+    expect(screen.queryByTestId('result-actions')).not.toBeInTheDocument();
+  });
+
+  it('점수가 확정돼 시트가 닫히면 그 칸은 더 이상 펼쳐진 상태가 아니다', () => {
+    renderMobile();
+    fireEvent.click(card(/8강 · 2번 경기/));
+    fireEvent.click(screen.getByRole('button', { name: '폼 완료' }));
+    expect(card(/8강 · 2번 경기/)).toHaveAttribute('aria-expanded', 'false');
+  });
+
+  it('✕ 로 닫으면 시트가 사라진다', () => {
+    renderMobile();
+    fireEvent.click(card(/8강 · 1번 경기/));
+    fireEvent.click(screen.getByRole('button', { name: '닫기' }));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+});
+
+describe('BracketCanvasMobile — 사이드 출처 안내', () => {
+  it('앞 경기 결과로 채워지는 사이드는 그렇게 안내하고, 자리 연결 사이드에는 안내가 없다', () => {
+    const feederFixture = makeFixture({
+      id: 'fx-f', groupId: 'g-s', fixtureNumber: 20, ...{ awayRegistrationId: 'r4', awayTeamName: '송파FC' },
+      bracketSources: [{ fixtureId: 'fx-2', outcome: 'WINNER', side: 'HOME' }],
+    });
+    renderMobile({ rounds: buildBracketMobileRounds({ groups, fixtures: [...fixtures, feederFixture], slots }) });
+    fireEvent.click(screen.getByRole('tab', { name: '4강' }));
+    fireEvent.click(card(/4강 · 20번 경기/));
+    expect(within(screen.getByRole('dialog')).getAllByText('이전 경기 결과로 채워져요.')).toHaveLength(1);
+    fireEvent.click(screen.getByRole('button', { name: '닫기' }));
+
+    fireEvent.click(screen.getByRole('tab', { name: '8강' }));
+    fireEvent.click(card(/8강 · 1번 경기/));
+    expect(within(screen.getByRole('dialog')).queryByText('이전 경기 결과로 채워져요.')).not.toBeInTheDocument();
+  });
+
+  it('자리도 앞 경기도 없이 비어 있는 사이드는 직접 지정 경기라고 안내한다', () => {
+    renderMobile();
+    fireEvent.click(screen.getByRole('tab', { name: '결승' }));
+    fireEvent.click(card(/결승 · 7번 경기/));
+    expect(within(screen.getByRole('dialog')).getAllByText('경기에 직접 지정하는 자리예요.')).toHaveLength(2);
+  });
+});

@@ -38,14 +38,14 @@ describe('bracketMobileSide / sideDisplayName', () => {
 
   it('팀이 있으면 팀 이름이 보이고 자리 라벨은 숨는다', () => {
     const away = bracketMobileSide(quarter, 'AWAY', labels);
-    expect(away).toEqual({ slotId: 's-e', slotKind: 'ENTRY', registrationId: 'r-2', teamName: '마포FC', slotLabel: null });
+    expect(away).toEqual({ slotId: 's-e', slotKind: 'ENTRY', source: 'slot', registrationId: 'r-2', teamName: '마포FC', slotLabel: null });
     expect(hasTeam(away)).toBe(true);
     expect(sideDisplayName(away)).toBe('마포FC');
   });
 
   it('팀이 없고 자리가 있으면 자리 라벨 — 조 순위 자리는 종류도 보존한다', () => {
     const home = bracketMobileSide(quarter, 'HOME', labels);
-    expect(home).toEqual({ slotId: 's-gr', slotKind: 'GROUP_RANK', registrationId: null, teamName: null, slotLabel: 'A조 1위' });
+    expect(home).toEqual({ slotId: 's-gr', slotKind: 'GROUP_RANK', source: 'slot', registrationId: null, teamName: null, slotLabel: 'A조 1위' });
     expect(hasTeam(home)).toBe(false);
     expect(sideDisplayName(home)).toBe('A조 1위');
   });
@@ -54,6 +54,8 @@ describe('bracketMobileSide / sideDisplayName', () => {
     const waiting = bracketMobileSide(semi, 'HOME', labels);
     expect(waiting.slotId).toBeNull();
     expect(waiting.slotKind).toBeNull();
+    expect(waiting.source).toBe('feeder');
+    expect(bracketMobileSide(semi, 'AWAY', labels).source).toBe('direct');
     expect(sideDisplayName(waiting)).toBe('8강 1번 경기 승자');
     expect(sideDisplayName(bracketMobileSide(semi, 'AWAY', labels))).toBe('미정');
   });
@@ -64,10 +66,10 @@ describe('leagueMobileSide', () => {
 
   it('보드 사이드에서 팀 이름·자리 라벨을 갈라 받고 자리 종류를 자리 목록에서 찾는다', () => {
     expect(leagueMobileSide({ slotId: 's-1', label: '강남FC', filled: true, registrationId: 'r-1' }, slotsById)).toEqual({
-      slotId: 's-1', slotKind: 'ENTRY', registrationId: 'r-1', teamName: '강남FC', slotLabel: null,
+      slotId: 's-1', slotKind: 'ENTRY', source: 'slot', registrationId: 'r-1', teamName: '강남FC', slotLabel: null,
     });
     expect(leagueMobileSide({ slotId: 's-1', label: '1번 자리', filled: false, registrationId: null }, slotsById)).toEqual({
-      slotId: 's-1', slotKind: 'ENTRY', registrationId: null, teamName: null, slotLabel: '1번 자리',
+      slotId: 's-1', slotKind: 'ENTRY', source: 'slot', registrationId: null, teamName: null, slotLabel: '1번 자리',
     });
   });
 

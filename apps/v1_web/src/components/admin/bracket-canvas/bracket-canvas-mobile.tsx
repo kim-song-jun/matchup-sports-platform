@@ -1,9 +1,10 @@
 'use client';
 
-import { useId, useState } from 'react';
+import { useCallback, useId, useState } from 'react';
 import { Zap } from 'lucide-react';
 import type { AdminToastVariant } from '@/components/admin';
 import { AlertBanner, EmptyState } from '@/components/v1-ui/primitives';
+import { BottomSheet } from '@/components/v1-ui/bottom-sheet';
 import { SegmentedTabs } from '@/components/v1-ui/segmented-tabs';
 import { StatusChip } from '@/components/v1-ui/status-chip';
 import {
@@ -18,6 +19,7 @@ import {
 import { bracketNodeStateChip } from '@/lib/competition-status';
 import { formatKstDateShort, formatKstTime } from '@/lib/date-utils';
 import type { V1AdminBracketSlot } from '@/types/api';
+import { MobileNodeSheetBody } from './bracket-canvas-mobile-sheet';
 
 export interface BracketCanvasMobileProps {
   competitionId: string;
@@ -34,6 +36,16 @@ const ROUND_TABS_MAX = 5;
 
 const selectClass =
   'h-[44px] w-full rounded-xl border border-[var(--border)] bg-[var(--card-surface)] px-3 text-[length:var(--font-size-body-sm)] text-[var(--text-strong)] focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20';
+
+function findNode(rounds: MobileRound[], fixtureId: string): MobileNode | null {
+  for (const round of rounds) {
+    for (const section of round.sections) {
+      const hit = section.nodes.find((node) => node.fixtureId === fixtureId);
+      if (hit) return hit;
+    }
+  }
+  return null;
+}
 
 function whenText(node: MobileNode): string | null {
   const parts: string[] = [];
@@ -89,13 +101,16 @@ function MobileNodeCard({ node, expanded, onOpen }: { node: MobileNode; expanded
   );
 }
 
-export function BracketCanvasMobile({ rounds, canWrite }: BracketCanvasMobileProps) {
+export function BracketCanvasMobile({ competitionId, scope, rounds, canWrite, showToast }: BracketCanvasMobileProps) {
   const roundSelectId = useId();
   const [pickedRoundKey, setPickedRoundKey] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const closeSheet = useCallback(() => setSelectedId(null), []);
 
   const activeKey = rounds.some((round) => round.key === pickedRoundKey) ? pickedRoundKey : pickInitialRoundKey(rounds);
   const activeRound = rounds.find((round) => round.key === activeKey) ?? null;
+  // 칸이 사라지면(템플릿 교체·새로고침) 시트도 함께 닫힌다 — 없는 경기의 폼을 붙들지 않는다.
+  const selected = selectedId === null ? null : findNode(rounds, selectedId);
 
   if (rounds.length === 0) {
     return (
@@ -157,6 +172,12 @@ export function BracketCanvasMobile({ rounds, canWrite }: BracketCanvasMobilePro
             </section>
           ))}
         </div>
+      ) : null}
+
+      {selected ? (
+        <BottomSheet open onClose={closeSheet} title={selected.title}>
+          <MobileNodeSheetBody node={selected} competitionId={competitionId} scope={scope} canWrite={canWrite} showToast={showToast} onDone={closeSheet} />
+        </BottomSheet>
       ) : null}
     </section>
   );

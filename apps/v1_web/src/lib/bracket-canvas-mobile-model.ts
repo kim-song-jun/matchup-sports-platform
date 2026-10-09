@@ -1,9 +1,11 @@
 import {
   buildSideLabelContext,
+  classifyFixtureSide,
   fixtureNodeState,
   fixtureSideLabel,
   type FixtureNodeState,
   type SideKey,
+  type SideSource,
   type SideLabelContext,
 } from '@/lib/bracket-canvas-layout';
 import { formatGameResultScoreWithPenalties } from '@/lib/game-result-score';
@@ -21,6 +23,8 @@ import type { V1AdminLeagueTeam, V1LeagueFixture } from '@/types/league-match';
 export interface MobileSide {
   slotId: string | null;
   slotKind: V1AdminBracketSlot['kind'] | null;
+  /** 데스크톱 칸 패널과 같은 분류 — 자리(slot)·앞 경기 결과(feeder)·경기에 직접 지정(direct). */
+  source: SideSource;
   registrationId: string | null;
   teamName: string | null;
   slotLabel: string | null;
@@ -73,6 +77,7 @@ export function bracketMobileSide(fixture: V1AdminBracketFixture, side: SideKey,
   return {
     slotId,
     slotKind: slotId === null ? null : (labels.slotsById.get(slotId)?.kind ?? null),
+    source: classifyFixtureSide(fixture, side, labels.slotsById),
     registrationId,
     teamName: registrationId === null ? null : side === 'HOME' ? fixture.homeTeamName : fixture.awayTeamName,
     slotLabel: registrationId === null ? fixtureSideLabel(fixture, side, labels) : null,
@@ -84,6 +89,8 @@ export function leagueMobileSide(side: LeagueBoardSide, slotsById: ReadonlyMap<s
   return {
     slotId: side.slotId,
     slotKind: side.slotId === null ? null : (slotsById.get(side.slotId)?.kind ?? null),
+    // 리그 경기는 앞 경기 결과로 채워지지 않는다 — 자리가 없으면 직접 지정이다.
+    source: side.slotId !== null && slotsById.has(side.slotId) ? 'slot' : 'direct',
     registrationId: side.registrationId,
     teamName: side.filled ? side.label : null,
     slotLabel: side.filled ? null : side.label,

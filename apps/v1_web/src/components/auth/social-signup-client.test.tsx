@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { SocialSignupClient } from './social-signup-client';
+import { V1ApiError } from '@/lib/api-client';
 
 const router = vi.hoisted(() => ({
   replace: vi.fn(),
@@ -58,6 +59,7 @@ type CompleteProfileCallbacks = {
     readonly session: { readonly userId: string; readonly userEmail: string | null };
     readonly next: { readonly route: string };
   }) => void;
+  readonly onError?: (error: unknown) => void;
 };
 
 async function verifyNicknameAndSelectGender(): Promise<void> {
@@ -83,6 +85,7 @@ async function completePhoneVerification(): Promise<void> {
 describe('SocialSignupClient required profile contract', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    hooks.authMe.user.authProvider = 'kakao';
     hooks.checkNicknameMutate.mockImplementation(
       (_value: string, callbacks: AvailabilityCallbacks) => callbacks.onSuccess({ available: true }),
     );
@@ -167,6 +170,52 @@ describe('SocialSignupClient required profile contract', () => {
 
     // Then
     await waitFor(() => expect(analytics.trackEvent).toHaveBeenCalledWith('sign_up_complete', { method: 'kakao' }));
+  });
+
+  it('Apple 가입 완료는 method=apple 로 기록한다', async () => {
+    hooks.authMe.user.authProvider = 'apple';
+    hooks.completeProfileMutate.mockImplementation((_body: unknown, callbacks: CompleteProfileCallbacks) =>
+      callbacks.onSuccess({ session: { userId: 'social-user', userEmail: null }, next: { route: '/onboarding/region' } }),
+    );
+    render(<SocialSignupClient />);
+    await verifyNicknameAndSelectGender();
+    fireEvent.change(screen.getByLabelText(/^이름/), { target: { value: '김러너' } });
+    fireEvent.change(screen.getByLabelText(/^휴대폰 번호/), { target: { value: '01087654321' } });
+    fireEvent.change(screen.getByLabelText(/^생년월일/), { target: { value: '20000229' } });
+    await completePhoneVerification();
+
+    fireEvent.click(screen.getByRole('button', { name: '운동 설정으로 계속' }));
+
+    await waitFor(() => expect(analytics.trackEvent).toHaveBeenCalledWith('sign_up_complete', { method: 'apple' }));
+  });
+
+  it.each([
+    ['apple', 'Apple 로그인부터 다시 시작해 주세요.'],
+    ['kakao', '카카오 로그인부터 다시 시작해 주세요.'],
+    [null, '로그인 화면에서 처음부터 다시 시작해 주세요.'],
+  ])('가입 시간이 만료되면 가입 방식(%s)에 맞는 재시작 안내를 보여 준다', async (provider, expected) => {
+    hooks.authMe.user.authProvider = provider;
+    hooks.completeProfileMutate.mockImplementation((_body: unknown, callbacks: CompleteProfileCallbacks) =>
+      callbacks.onError?.(
+        new V1ApiError({
+          status: 'error',
+          statusCode: 401,
+          code: 'SOCIAL_SIGNUP_EXPIRED',
+          message: 'expired',
+          timestamp: new Date().toISOString(),
+        }),
+      ),
+    );
+    render(<SocialSignupClient />);
+    await verifyNicknameAndSelectGender();
+    fireEvent.change(screen.getByLabelText(/^이름/), { target: { value: '김러너' } });
+    fireEvent.change(screen.getByLabelText(/^휴대폰 번호/), { target: { value: '01087654321' } });
+    fireEvent.change(screen.getByLabelText(/^생년월일/), { target: { value: '20000229' } });
+    await completePhoneVerification();
+
+    fireEvent.click(screen.getByRole('button', { name: '운동 설정으로 계속' }));
+
+    await waitFor(() => expect(screen.getByText(`가입 가능 시간이 지났어요. ${expected}`)).toBeInTheDocument());
   });
 
   it('follows the exact API next route after social profile completion', async () => {

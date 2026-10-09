@@ -156,7 +156,7 @@ export function SocialSignupClient() {
         onSuccess: (result) => {
           saveStoredV1Session(result.session);
           clearV1IdentityCache(queryClient);
-          trackEvent('sign_up_complete', { method: 'kakao' });
+          trackEvent('sign_up_complete', { method: authMe.data?.user?.authProvider ?? 'social' });
           router.replace(result.next.route);
         },
         onError: (nextError) => {
@@ -182,7 +182,7 @@ export function SocialSignupClient() {
           }
 
           if (nextError instanceof V1ApiError && nextError.code === 'SOCIAL_SIGNUP_EXPIRED') {
-            setError('가입 가능 시간이 지났어요. 카카오 로그인부터 다시 시작해 주세요.');
+            setError(`가입 가능 시간이 지났어요. ${providerLabel ? `${providerLabel} 로그인부터` : '로그인 화면에서 처음부터'} 다시 시작해 주세요.`);
             return;
           }
 

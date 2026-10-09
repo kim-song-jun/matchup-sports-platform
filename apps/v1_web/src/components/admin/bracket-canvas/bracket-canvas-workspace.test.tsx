@@ -526,6 +526,19 @@ describe('BracketCanvasWorkspace — 리그 순위표 배치', () => {
     expect(within(dialog).getByRole('table', { name: 'A조 순위표' })).toBeInTheDocument();
   });
 
+  it('1023 에서 연 「순위표」 시트는 1024 로 넓히면 닫히고, 다시 좁혀도 저절로 뜨지 않는다', () => {
+    setBracket(withStandings);
+    render(<BracketCanvasWorkspace {...leagueProps('league')} />);
+    resizeViewport(1023);
+    fireEvent.click(screen.getByRole('button', { name: '순위표' }));
+    expect(screen.getByRole('dialog', { name: '조별 순위' })).toBeInTheDocument();
+
+    resizeViewport(1024);
+    resizeViewport(1023);
+    expect(screen.queryByRole('dialog', { name: '조별 순위' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '순위표' })).toBeInTheDocument();
+  });
+
   it('리그가 아니거나 편성 팀이 없으면 순위표도 버튼도 없다', () => {
     setBracket(withStandings);
     const { unmount } = render(<BracketCanvasWorkspace {...leagueProps('knockout')} />);

@@ -1,7 +1,7 @@
 'use client';
 
 import { Globe, LayoutTemplate, Link2, Plus, Shuffle } from 'lucide-react';
-import { useId, useMemo, useState } from 'react';
+import { useEffect, useId, useMemo, useState } from 'react';
 import { AdminListSkeleton } from '@/components/admin/admin-skeleton';
 import { BottomSheet } from '@/components/v1-ui/bottom-sheet';
 import { Button } from '@/components/v1-ui/button';
@@ -69,6 +69,10 @@ export function BracketCanvasWorkspace({
   const toolbarHintId = useId();
   // 서버 기본값 true: 하이드레이션 전에는 지금 레이아웃(옆 패널)을 유지하고, 좁은 태블릿만 클라이언트에서 시트로 바뀐다.
   const sidePanel = useMediaQuery(BRACKET_CANVAS_SIDE_PANEL_MEDIA_QUERY, true);
+  // 넓은 화면에선 순위표가 옆 열에 있으니 열어 둔 시트를 닫아, 다시 좁혀도 저절로 뜨지 않게 한다.
+  useEffect(() => {
+    if (sidePanel) setStandingsSheetOpen(false);
+  }, [sidePanel]);
   const labelContext = useMemo(
     () => (bracket === undefined ? null : buildSideLabelContext(bracket.groups, bracket.fixtures, bracket.slots)),
     [bracket],

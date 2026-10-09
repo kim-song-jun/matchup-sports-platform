@@ -64,15 +64,15 @@ export function BracketCanvasMobileScreen({ tournamentId, registrations, registr
         </details>
       ) : null}
       <BracketCanvasMobile
-      competitionId={tournamentId}
-      scope="tournament"
-      rounds={rounds}
-      slots={bracket.slots}
-      candidates={candidates}
-      canWrite={canWrite}
-      registrationsState={registrationsState}
-      showToast={showToast}
-    />
+        competitionId={tournamentId}
+        scope="tournament"
+        rounds={rounds}
+        slots={bracket.slots}
+        candidates={candidates}
+        canWrite={canWrite}
+        registrationsState={registrationsState}
+        showToast={showToast}
+      />
     </>
   );
 }

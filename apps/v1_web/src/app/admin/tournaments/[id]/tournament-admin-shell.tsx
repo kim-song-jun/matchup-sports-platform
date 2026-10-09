@@ -1,6 +1,6 @@
 'use client';
 
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { ChevronLeft, ExternalLink } from 'lucide-react';
@@ -10,6 +10,7 @@ import {
   AdminToasts,
   useAdminToast,
 } from '@/components/admin';
+import { GateConfirmModal } from '@/components/admin/operation-flag-gate-confirm-modal';
 import { useConfirm, type ConfirmOptions } from '@/components/v1-ui/confirm-modal';
 import {
   useV1AdminMe,
@@ -24,6 +25,8 @@ import { TournamentAdminProvider } from './tournament-admin-context';
 import {
   TOURNAMENT_STATUS_LABEL,
   allowedNextStatuses,
+  revertTargetStatus,
+  REVERT_COPY,
   formatDateRange,
 } from './tournament-admin-shared';
 import { useAdminListReturnHref } from '../../use-admin-url-list-query';
@@ -151,7 +154,7 @@ const STATUS_CHANGE_CONFIRM: Partial<Record<V1TournamentStatus, ConfirmOptions>>
   },
   completed: {
     title: '대회를 완료할까요?',
-    message: '완료하면 되돌릴 수 없어요. 모든 경기 결과가 확정됐는지 먼저 확인해 주세요.',
+    message: '완료하면 시상과 후기가 열리고 참가팀에 후기 요청 알림이 가요. 모든 경기 결과가 확정됐는지 먼저 확인해 주세요. 잘못 눌러도 진행 중으로 되돌릴 수 있어요.',
     confirmLabel: '대회 완료하기',
     tone: 'danger',
   },
@@ -167,6 +170,7 @@ export function TournamentAdminShell({ id, children }: { id: string; children: R
     : 'SUPPORT_READONLY';
   const canWrite = canWriteTournamentAdmin(role);
   const changeStatus = useV1ChangeTournamentStatus(id);
+  const [revertOpen, setRevertOpen] = useState(false);
   const { toasts, showToast } = useAdminToast();
   const { confirm: confirmStatusChange, ConfirmModal: StatusConfirmModal } = useConfirm();
   const pathname = usePathname();
@@ -182,7 +186,7 @@ export function TournamentAdminShell({ id, children }: { id: string; children: R
       // 두 버튼이 서로 다른 말이 되도록 닫기 쪽을 '돌아가기'로 바꾼다.
       const ok = await confirmStatusChange({
         title: '대회를 취소할까요?',
-        message: '취소하면 되돌릴 수 없어요. 참가 신청과 일정도 함께 무효가 돼요.',
+        message: '취소하면 참가 신청과 일정도 함께 무효가 돼요. 취소 후에도 초안으로 복구할 수 있어요.',
         confirmLabel: '대회 취소하기',
         cancelLabel: '돌아가기',
         tone: 'danger',
@@ -204,6 +208,21 @@ export function TournamentAdminShell({ id, children }: { id: string; children: R
         },
         onError: (err) =>
           showToast(extractErrorMessage(err, '상태 변경에 실패했어요.'), 'error'),
+      },
+    );
+  };
+
+  const onConfirmRevert = (reason: string) => {
+    const target = tournament ? revertTargetStatus(tournament.status) : null;
+    if (!tournament || !target) return;
+    changeStatus.mutate(
+      { status: target, reason: reason.trim() },
+      {
+        onSuccess: () => {
+          setRevertOpen(false);
+          showToast(REVERT_COPY[tournament.status]?.toast ?? '상태를 변경했어요.', 'success');
+        },
+        onError: (err) => showToast(extractErrorMessage(err, '상태를 되돌리지 못했어요.'), 'error'),
       },
     );
   };
@@ -237,6 +256,7 @@ export function TournamentAdminShell({ id, children }: { id: string; children: R
   }
 
   const nextStatuses = allowedNextStatuses(tournament.status);
+  const revertCopy = revertTargetStatus(tournament.status) ? REVERT_COPY[tournament.status] : undefined;
   const scheduleLabel = formatDateRange(tournament.scheduledAt, tournament.scheduledEndAt);
   const counts = tournament.operationCounts;
 
@@ -296,6 +316,19 @@ export function TournamentAdminShell({ id, children }: { id: string; children: R
         </div>
       )}
 
+      {canWrite && revertCopy && (
+        <div className="flex flex-wrap gap-2 mb-5">
+          <button
+            type="button"
+            onClick={() => setRevertOpen(true)}
+            disabled={changeStatus.isPending}
+            className="inline-flex items-center h-[44px] px-4 rounded-xl text-[length:var(--font-size-label)] font-semibold whitespace-nowrap text-[var(--text-strong)] border border-[var(--border)] bg-transparent hover:bg-[var(--surface-soft)] transition-colors disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+          >
+            {revertCopy.button}
+          </button>
+        </div>
+      )}
+
       {/* 공개 설정 — 비공개면 일반 사용자 화면에서 숨고 관리자 운영은 그대로다(리그와 같은 카드). */}
       <TournamentVisibilityControl tournamentId={id} isPublic={tournament.isPublic ?? true} status={tournament.status} />
 
@@ -344,6 +377,18 @@ export function TournamentAdminShell({ id, children }: { id: string; children: R
 
       {/* 대회 상태 변경 confirm modal (취소 등 비가역 액션) */}
       {StatusConfirmModal}
+      {revertCopy && (
+        <GateConfirmModal
+          open={revertOpen}
+          pending={changeStatus.isPending}
+          title={revertCopy.title}
+          description={revertCopy.description}
+          confirmLabel="되돌리기"
+          tone="blue"
+          onConfirm={onConfirmRevert}
+          onClose={() => setRevertOpen(false)}
+        />
+      )}
 
       <AdminToasts toasts={toasts} />
     </TournamentAdminProvider>

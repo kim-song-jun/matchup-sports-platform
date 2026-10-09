@@ -198,6 +198,24 @@ Status transitions are `draft -> published | archived`, `published -> draft | ar
 
 Campaign admin routes inherit `V1AuthGuard`. Production accepts only the signed HttpOnly v1 session, reloads current account status, ignores caller-controlled `x-v1-user-*` headers, and fails startup without a strong session secret. Development/test may retain persona headers for local QA only.
 
+## Admin tournament status transitions (2026-10-09)
+
+`POST /admin/tournaments/:id/status` `{ status, reason? }` follows this table (`TOURNAMENT_TRANSITIONS` in `tournaments-admin.service.ts`):
+
+| from | to |
+|---|---|
+| draft | open, cancelled |
+| open | closed, cancelled |
+| closed | open, in_progress, cancelled |
+| in_progress | completed, cancelled |
+| completed | **in_progress** (revert completion) |
+| cancelled | **draft** (restore) |
+
+- The two reverse transitions require a non-blank `reason` (`400 TOURNAMENT_STATUS_REASON_REQUIRED`); it is stored on the `tournament.status` admin action log and the status change log.
+- Everything else, including `in_progress -> open|closed`, still returns `409 TOURNAMENT_STATUS_TRANSITION_INVALID`.
+- Reverting completion changes only `status`. Awards, standings and reviews are derived from `status === 'completed'`, so they are hidden again until the tournament is completed again. Review-request notifications are sent on the first completion only (a prior `completed` status log suppresses re-sending).
+- A restored draft is not publicly listed or readable (draft/cancelled return 404 to consumers) until it is opened again, which re-runs the paid-tournament payment-instruction check.
+
 ## Admin Tournament Creation
 
 Admin-created tournaments require `teamCount` per tournament. The API does not treat an omitted team count as unlimited; missing `teamCount` is rejected with `400 TOURNAMENT_TEAM_COUNT_REQUIRED`. Public capacity, registration blocking, and progress bars must use the saved tournament `teamCount`, not a hard-coded default.

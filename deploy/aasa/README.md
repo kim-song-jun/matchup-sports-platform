@@ -18,7 +18,7 @@ The committed `apple-app-site-association` file contains both current App IDs:
 - alpha: `U9J95Q6XD3.kr.co.teameet.alpha`
 - production: `U9J95Q6XD3.kr.co.teameet`
 
-Both entries cover only `/callback/*`. If the production app moves to a new Apple
+Both entries share the path rules below. If the production app moves to a new Apple
 organization, update only the production App ID after the new Team ID is confirmed;
 preserve the alpha entry.
 
@@ -37,7 +37,20 @@ opening Safari.
 
 ## Paths
 
-Deliberately narrow: only `/callback/*`, the sign-in redirect this exists for. Every path
-listed here is a page the shell will render with the session cookie attached, so widening
-the list widens what a link someone else sends can put in front of the reader. Widen it
-only for a specific need.
+Since 2026-10-09 (product decision: links shared from other apps should open the installed
+app on the same page) every user-facing page is associated; the first matching component
+wins, so the exclusions come before the final `*`:
+
+- `/callback/*` — the Kakao sign-in redirect this file was created for.
+- excluded: `/admin*` (admin console and content preview), `/tournament-ops*`, `/api/*`,
+  `/uploads/*`, `/.well-known/*`, and file routes (`*.txt`, `*.xml`, `manifest.webmanifest`).
+
+Every associated path is a page the shell renders with the session cookie attached, so a link
+someone else sends lands signed in. Before associating a new kind of page, check that it does
+nothing on load — joining, accepting, paying, deleting must stay behind an explicit tap (the
+invite landing `/invite/[token]` joins only on its button). A page that acts on load must be
+added to the exclusions above.
+
+A link tapped on a teameet.co.kr page in Safari still stays in Safari — iOS only hands over
+links coming from another app or domain. The web's own "open in app" prompt therefore points
+to the App Store, not to a same-site link.

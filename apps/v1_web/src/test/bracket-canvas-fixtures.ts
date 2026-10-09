@@ -3,6 +3,7 @@ import type {
   V1AdminBracketFixtureGame,
   V1AdminBracketGroup,
   V1AdminBracketSlot,
+  V1AdminBracketStanding,
   V1AdminTournamentBracket,
   V1AdminTournamentRegistration,
 } from '@/types/api';
@@ -84,4 +85,23 @@ export function makeRegistration(
     payment: null,
     ...overrides,
   } as unknown as V1AdminTournamentRegistration;
+}
+
+export function makeStanding(
+  overrides: Partial<V1AdminBracketStanding> & Pick<V1AdminBracketStanding, 'groupId' | 'registrationId'>,
+): V1AdminBracketStanding {
+  return {
+    id: `st-${overrides.registrationId}`,
+    teamName: `팀 ${overrides.registrationId}`,
+    points: 0,
+    wins: 0,
+    draws: 0,
+    losses: 0,
+    goalsFor: 0,
+    goalsAgainst: 0,
+    goalDifference: 0,
+    position: 1,
+    recalculatedAt: STAMP,
+    ...overrides,
+  };
 }

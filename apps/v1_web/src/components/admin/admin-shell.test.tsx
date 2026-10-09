@@ -1,5 +1,5 @@
 import { render, screen, within } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { AdminShell } from './admin-shell';
 import { TAB_CONTAINER_SELECTOR, TAB_LINK_SELECTOR } from '@/components/v1-ui/navigation-tab-selectors';
 
@@ -9,11 +9,40 @@ vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: vi.fn() }),
 }));
 
+const badgeCounts = vi.hoisted(() => ({ inquiries: 0, teamMatches: 0 }));
+
 vi.mock('@/hooks/use-v1-api', () => ({
-  useV1AdminInquiriesPendingCount: () => ({ data: { count: 0 } }),
+  useV1AdminInquiriesPendingCount: () => ({ data: { count: badgeCounts.inquiries } }),
+  useV1AdminTeamMatchPendingApplicationCount: () => ({ data: { count: badgeCounts.teamMatches } }),
   // CommandPalette(전역 검색)가 셸에 포함되면서 필요해졌다
   useV1AdminGlobalSearch: () => ({ data: undefined, isFetching: false }),
 }));
+
+describe('AdminShell pending badges', () => {
+  afterEach(() => {
+    badgeCounts.inquiries = 0;
+    badgeCounts.teamMatches = 0;
+  });
+
+  it('attaches each count to its own menu item', () => {
+    badgeCounts.inquiries = 2;
+    badgeCounts.teamMatches = 5;
+    render(<AdminShell><div>content</div></AdminShell>);
+
+    const teamMatchLinks = screen.getAllByRole('link', { name: '팀매치 (대기 신청 5건)' });
+    for (const link of teamMatchLinks) expect(link).toHaveAttribute('href', '/admin/team-matches');
+    const inquiryLinks = screen.getAllByRole('link', { name: '문의 (미확인 문의 2건)' });
+    for (const link of inquiryLinks) expect(link).toHaveAttribute('href', '/admin/inquiries');
+  });
+
+  it('hides a badge whose count is 0 without hiding the other', () => {
+    badgeCounts.teamMatches = 3;
+    render(<AdminShell><div>content</div></AdminShell>);
+
+    expect(screen.getAllByRole('link', { name: '팀매치 (대기 신청 3건)' }).length).toBeGreaterThan(0);
+    expect(screen.queryByRole('link', { name: /미확인 문의/ })).toBeNull();
+  });
+});
 
 describe('AdminShell nav', () => {
   it('renders a reachable sidebar link to the monitoring hub (감시 4화면 통합, 2026-08-25)', () => {

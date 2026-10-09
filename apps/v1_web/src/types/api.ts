@@ -2880,6 +2880,11 @@ export type V1AdminInquiryStatusPayload = {
   reason?: string;
 };
 
+/** GET /admin/team-matches/pending-application-count — 운영자가 처리할 수 있는 대기 신청 수 */
+export type V1AdminTeamMatchPendingApplicationCount = {
+  count: number;
+};
+
 /** GET /admin/inquiries/pending-count — 미답변(received/reviewing) 문의 건수 */
 export type V1AdminInquiryPendingCount = {
   count: number;

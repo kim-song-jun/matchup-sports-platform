@@ -55,6 +55,7 @@
 | `PATCH` | `/api/v1/admin/notices/:noticeId` | `UpdateAdminNoticeDto` | owner/ops | 공지 전체 필드 수정 |
 | `DELETE` | `/api/v1/admin/notices/:noticeId` | - | owner/ops | 공지 삭제 |
 | `GET` | `/api/v1/admin/inquiries` | `AdminInquiryListQueryDto` | active admin | 문의 목록 |
+| `GET` | `/api/v1/admin/team-matches/pending-application-count` | - | active admin | 운영자가 처리할 수 있는 대기(`requested`) 신청 수 — 플랫폼 운영·리그/대회 미연결·모집 중 팀 매치만 집계. 사이드바 '팀매치' 배지용. 응답 `{ count }` |
 | `GET` | `/api/v1/admin/inquiries/pending-count` | - | active admin | `received/reviewing` 문의 수 |
 | `GET` | `/api/v1/admin/inquiries/:inquiryId` | - | active admin | 문의 및 답변 상세 |
 | `POST` | `/api/v1/admin/inquiries/:inquiryId/replies` | `ReplyInquiryDto` | owner/ops | 답변 작성 |

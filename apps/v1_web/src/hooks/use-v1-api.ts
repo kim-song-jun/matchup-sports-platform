@@ -2974,6 +2974,8 @@ export function useV1UpdateProfile() {
       queryClient.invalidateQueries({ queryKey: v1Keys.teams() });
       queryClient.invalidateQueries({ queryKey: [...v1Keys.all, 'teams'] });
       queryClient.invalidateQueries({ queryKey: [...v1Keys.all, 'me', 'teams'] });
+      // 공개 프로필·선수 카드(`publicProfile`)는 별도 캐시라 사진·닉네임을 바꾼 직후 옛 값이 보였다.
+      queryClient.invalidateQueries({ queryKey: [...v1Keys.all, 'users'] });
     },
   });
 }

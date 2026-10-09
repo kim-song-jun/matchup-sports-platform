@@ -433,6 +433,24 @@ describe('useV1UpdateProfile', () => {
     // 응답으로 캐시를 직접 갱신해 새 닉네임이 동기적으로 반영돼야 한다.
     expect(queryClient.getQueryData<V1Profile>(v1Keys.profile())?.profile.nickname).toBe('새닉네임');
   });
+
+  it('invalidates the cached public profile so the player card shows the new photo', async () => {
+    const { wrapper, queryClient } = createWrapperWithClient();
+    queryClient.setQueryData(v1Keys.publicProfile('user-1'), { userId: 'user-1', profileImageUrl: '/uploads/old.webp' });
+    queryClient.setQueryData(v1Keys.adminUser('user-9'), { id: 'user-9' });
+    v1PatchMock.mockResolvedValue({
+      profile: { displayName: '실명유저', realName: '실명유저', nickname: '닉', profileImageUrl: '/uploads/new.webp', gender: 'male' },
+      updatedAt: '2026-10-09T00:00:00.000Z',
+    });
+
+    const { result } = renderHook(() => useV1UpdateProfile(), { wrapper });
+    result.current.mutate({ nickname: '닉', gender: 'male', profileImageUrl: '/uploads/new.webp' });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(queryClient.getQueryState(v1Keys.publicProfile('user-1'))?.isInvalidated).toBe(true);
+    // 어드민 회원 캐시까지 흔들지는 않는다.
+    expect(queryClient.getQueryState(v1Keys.adminUser('user-9'))?.isInvalidated).toBe(false);
+  });
 });
 
 describe('league settings mutations', () => {

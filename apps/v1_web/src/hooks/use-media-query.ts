@@ -45,3 +45,9 @@ export const DESKTOP_LIST_MEDIA_QUERY = '(min-width: 1024px)';
  * Tailwind `md` 와 같은 값이다.
  */
 export const BRACKET_CANVAS_WIDE_MEDIA_QUERY = '(min-width: 768px)';
+
+/**
+ * 대진 그림에서 칸 패널이 캔버스 옆 열로 붙는 최소 폭. 이보다 좁은 태블릿(768~1023)은 패널을
+ * 시트로 띄우고 참가팀 트레이를 접는다 — 옆 열이 없으면 패널이 그림 아래로 밀려 보이지 않는다.
+ */
+export const BRACKET_CANVAS_SIDE_PANEL_MEDIA_QUERY = '(min-width: 1024px)';

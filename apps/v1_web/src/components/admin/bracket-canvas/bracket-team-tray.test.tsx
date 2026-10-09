@@ -172,3 +172,51 @@ describe('BracketTeamTray', () => {
     });
   });
 });
+
+describe('BracketTeamTray — collapsible(좁은 태블릿)', () => {
+  it('접힌 채로 전체 수·미배정 수 요약과 펼치기 토글만 보인다', () => {
+    renderTray({ collapsible: true });
+    expect(screen.getByRole('heading', { name: '참가팀 3 · 미배정 3' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '펼치기' })).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByRole('button', { name: /서울FC/ })).not.toBeInTheDocument();
+  });
+
+  it('펼치면 목록이 보이고 aria-controls 가 그 목록을 가리킨다', () => {
+    renderTray({ collapsible: true });
+    const toggle = screen.getByRole('button', { name: '펼치기' });
+    fireEvent.click(toggle);
+    const list = screen.getByRole('list');
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    expect(toggle.getAttribute('aria-controls')).toBe(list.id);
+    expect(screen.getByRole('button', { name: /서울FC/ })).toBeInTheDocument();
+  });
+
+  it('collapsible 이 아니면 토글 없이 펼친 목록이다', () => {
+    renderTray();
+    expect(screen.queryByRole('button', { name: '펼치기' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /서울FC/ })).toBeInTheDocument();
+  });
+
+  it('조회 실패 안내와 다시 시도는 접힌 상태에서도 보이고 재시도가 동작한다', () => {
+    const onRetry = vi.fn();
+    renderTray({
+      collapsible: true,
+      registrationsState: { status: 'error', truncated: false, refetchFailed: false, error: new Error('x'), onRetry },
+    });
+    expect(screen.getByRole('alert')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '다시 시도' }));
+    expect(onRetry).toHaveBeenCalledTimes(1);
+  });
+
+  it('재조회 실패(이전 목록 보유)도 접힌 상태에서 다시 시도를 보인다', () => {
+    const onRetry = vi.fn();
+    renderTray({
+      collapsible: true,
+      registrationsState: { status: 'success', truncated: false, refetchFailed: true, error: new Error('x'), onRetry },
+    });
+    expect(screen.getByRole('alert')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '다시 시도' }));
+    expect(onRetry).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole('button', { name: /서울FC/ })).not.toBeInTheDocument();
+  });
+});

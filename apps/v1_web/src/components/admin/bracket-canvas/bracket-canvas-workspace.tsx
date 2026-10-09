@@ -3,6 +3,7 @@
 import { Globe, LayoutTemplate, Link2, Plus, Shuffle } from 'lucide-react';
 import { useId, useMemo, useState } from 'react';
 import { AdminListSkeleton } from '@/components/admin/admin-skeleton';
+import { BottomSheet } from '@/components/v1-ui/bottom-sheet';
 import { Button } from '@/components/v1-ui/button';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
 import { AlertBanner, EmptyState, ErrorState } from '@/components/v1-ui/primitives';
@@ -13,13 +14,14 @@ import {
   useV1UnpublishTournamentBracket,
 } from '@/hooks/use-v1-api';
 import { useV1AssignTournamentSlot, useV1RandomFillSlots } from '@/hooks/use-v1-bracket-canvas';
+import { BRACKET_CANVAS_SIDE_PANEL_MEDIA_QUERY, useMediaQuery } from '@/hooks/use-media-query';
 import { describeBracketCanvasError } from '@/lib/bracket-canvas-errors';
 import { buildSideLabelContext, directPlacedRegistrationIds, fixtureSideLabel, type SideKey } from '@/lib/bracket-canvas-layout';
 import { describeStandingsFill } from '@/lib/bracket-standings-fill-message';
 import { isBracketPublished } from '@/lib/bracket-visibility';
 import { extractErrorMessage } from '@/lib/error-message';
 import type { V1AdminTournamentRegistration, V1TournamentFormat } from '@/types/api';
-import { BracketCanvas } from './bracket-canvas';
+import { BracketCanvas, fixtureTitle } from './bracket-canvas';
 import { BracketNodePanel } from './bracket-node-panel';
 import { BracketStandingsFillButton } from './bracket-standings-fill-button';
 import { BracketTeamTray, type RegistrationsLoadState } from './bracket-team-tray';
@@ -61,6 +63,8 @@ export function BracketCanvasWorkspace({
   const [templateOpen, setTemplateOpen] = useState(false);
   const [toolsMode, setToolsMode] = useState<'add' | 'link' | null>(null);
   const toolbarHintId = useId();
+  // 서버 기본값 true: 하이드레이션 전에는 지금 레이아웃(옆 패널)을 유지하고, 좁은 태블릿만 클라이언트에서 시트로 바뀐다.
+  const sidePanel = useMediaQuery(BRACKET_CANVAS_SIDE_PANEL_MEDIA_QUERY, true);
   const labelContext = useMemo(
     () => (bracket === undefined ? null : buildSideLabelContext(bracket.groups, bracket.fixtures, bracket.slots)),
     [bracket],
@@ -189,6 +193,23 @@ export function BracketCanvasWorkspace({
           AWAY: fixtureSideLabel(selectedFixture, 'AWAY', labelContext),
         };
 
+  const panel =
+    selectedFixture !== null && selectedLabels !== null ? (
+      <BracketNodePanel
+        key={selectedFixture.id}
+        tournamentId={tournamentId}
+        fixture={selectedFixture}
+        groups={bracket.groups}
+        slots={bracket.slots}
+        registrations={registrations}
+        registrationsLoaded={registrationsState.status === 'success'}
+        sideLabels={selectedLabels}
+        canWrite={canWrite}
+        showToast={showToast}
+        onClose={() => setSelectedFixtureId(null)}
+      />
+    ) : null;
+
   return (
     <div className="flex flex-col gap-4">
       {ConfirmModal}
@@ -274,7 +295,7 @@ export function BracketCanvasWorkspace({
           onCta={templateFormat === null ? onShowList : () => setTemplateOpen(true)}
         />
       ) : (
-        <div className={`grid gap-4 ${selectedFixture === null ? 'lg:grid-cols-[240px_minmax(0,1fr)]' : 'lg:grid-cols-[240px_minmax(0,1fr)_320px]'}`}>
+        <div className={`grid gap-4 ${selectedFixture === null || !sidePanel ? 'lg:grid-cols-[240px_minmax(0,1fr)]' : 'lg:grid-cols-[240px_minmax(0,1fr)_320px]'}`}>
           <BracketTeamTray
             registrations={registrations}
             registrationsState={registrationsState}
@@ -282,6 +303,7 @@ export function BracketCanvasWorkspace({
             directPlacedIds={directPlacedRegistrationIds(bracket.fixtures, bracket.slots)}
             pendingRegistrationId={pendingRegistrationId}
             canWrite={canWrite}
+            collapsible={!sidePanel}
             onPick={setPendingRegistrationId}
           />
           <BracketCanvas
@@ -296,23 +318,15 @@ export function BracketCanvasWorkspace({
             onAssignSlot={handleAssign}
             onAssignDirect={handleAssignDirect}
           />
-          {selectedFixture !== null && selectedLabels !== null ? (
-            <BracketNodePanel
-              key={selectedFixture.id}
-              tournamentId={tournamentId}
-              fixture={selectedFixture}
-              groups={bracket.groups}
-              slots={bracket.slots}
-              registrations={registrations}
-              registrationsLoaded={registrationsState.status === 'success'}
-              sideLabels={selectedLabels}
-              canWrite={canWrite}
-              showToast={showToast}
-              onClose={() => setSelectedFixtureId(null)}
-            />
-          ) : null}
+          {panel !== null && sidePanel ? panel : null}
         </div>
       )}
+
+      {panel !== null && selectedFixture !== null && !sidePanel ? (
+        <BottomSheet open onClose={() => setSelectedFixtureId(null)} title={fixtureTitle(selectedFixture, bracket.groups)}>
+          {panel}
+        </BottomSheet>
+      ) : null}
 
       <BracketFixtureToolsDialog
         key={toolsMode ?? 'closed'}

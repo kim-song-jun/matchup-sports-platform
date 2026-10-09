@@ -1,10 +1,13 @@
 import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { installViewport, resizeViewport } from '@/test/viewport';
 import { makeBracket, makeFixture, makeGroup, makeRegistration, makeSlot } from '@/test/bracket-canvas-fixtures';
 import type { V1AdminTournamentBracket } from '@/types/api';
 import type { V1FillSlotsFromStandingsResult } from '@/types/bracket-standings-fill';
 import type { RegistrationsLoadState } from './bracket-team-tray';
 import { BracketCanvasWorkspace } from './bracket-canvas-workspace';
+
+vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn(), replace: vi.fn(), back: vi.fn() }) }));
 
 const mocks = vi.hoisted(() => ({
   bracket: { data: undefined as unknown, isPending: false, isError: false, error: null as unknown, refetch: vi.fn() },
@@ -106,9 +109,16 @@ function renderWorkspace(overrides: Partial<React.ComponentProps<typeof BracketC
   return props;
 }
 
+// 기본은 옆 패널이 붙는 데스크톱 폭 — 태블릿 describe 만 폭을 바꾼다.
+let restoreViewport: (() => void) | null = null;
 beforeEach(() => {
   vi.clearAllMocks();
   setBracket(populated);
+  restoreViewport = installViewport(1280);
+});
+afterEach(() => {
+  restoreViewport?.();
+  restoreViewport = null;
 });
 
 describe('BracketCanvasWorkspace — 로딩·에러·빈 상태', () => {
@@ -369,5 +379,59 @@ describe('BracketCanvasWorkspace — 조별+결선 순위 채우기', () => {
     setBracket(withRanks);
     renderWorkspace({ format: 'group_knockout', canWrite: false });
     expect(screen.queryByTestId('fill-button')).not.toBeInTheDocument();
+  });
+});
+
+describe('BracketCanvasWorkspace — 태블릿(768~1023) 칸 패널 시트·트레이 접기', () => {
+  it('1023: 칸을 열면 시트(dialog)로 열리고, 닫으면 칸 머리 버튼으로 포커스가 돌아온다', () => {
+    resizeViewport(1023);
+    renderWorkspace();
+    const opener = screen.getByRole('button', { name: '8강 2번 경기 열기' });
+    opener.focus();
+    fireEvent.click(opener);
+
+    const sheet = screen.getByRole('dialog', { name: '8강 2번 경기' });
+    expect(within(sheet).getByTestId('panel')).toHaveTextContent('f2');
+
+    fireEvent.click(within(sheet).getByRole('button', { name: '닫기' }));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('panel')).not.toBeInTheDocument();
+    expect(opener).toHaveFocus();
+  });
+
+  it('1023: 패널의 닫기 버튼으로도 시트가 닫히고 선택이 풀린다', () => {
+    resizeViewport(1023);
+    renderWorkspace();
+    fireEvent.click(screen.getByRole('button', { name: '8강 1번 경기 열기' }));
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: '패널 닫기' }));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '8강 1번 경기 열기' })).toHaveAttribute('aria-pressed', 'false');
+  });
+
+  it('1024: 같은 동작이 시트 없이 옆 패널로 열린다(대조군)', () => {
+    resizeViewport(1024);
+    renderWorkspace();
+    fireEvent.click(screen.getByRole('button', { name: '8강 2번 경기 열기' }));
+    expect(screen.getByTestId('panel')).toHaveTextContent('f2');
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('1023: 트레이는 접혀 있고 펼치면 목록이 보인다', () => {
+    resizeViewport(1023);
+    renderWorkspace();
+    const toggle = screen.getByRole('button', { name: '펼치기' });
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByRole('button', { name: /서울FC/ })).not.toBeInTheDocument();
+
+    fireEvent.click(toggle);
+    expect(screen.getByRole('button', { name: '접기' })).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByRole('button', { name: /서울FC/ })).toBeInTheDocument();
+  });
+
+  it('1024: 트레이에 토글이 없고 목록이 바로 보인다', () => {
+    resizeViewport(1024);
+    renderWorkspace();
+    expect(screen.queryByRole('button', { name: '펼치기' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /서울FC/ })).toBeInTheDocument();
   });
 });

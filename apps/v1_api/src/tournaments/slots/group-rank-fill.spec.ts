@@ -1,6 +1,14 @@
-import { ConflictException, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
+import { ConflictException, ForbiddenException, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
 import type { GroupRankPreview, GroupRankPreviewRow } from './load-group-rank-preview';
-import { planFillFromStandings } from './group-rank-fill';
+import type { Prisma } from '@prisma/client';
+import { AdminContextService } from '../../common/admin-context.service';
+import type { PrismaService } from '../../prisma/prisma.service';
+import { kindAwareFindFirst } from '../../../test/helpers/kind-aware-find-first';
+import { loadGroupRankPreview } from './load-group-rank-preview';
+import { fillSlotsFromStandings, planFillFromStandings, previewGroupRankStandings } from './group-rank-fill';
+
+jest.mock('./load-group-rank-preview', () => ({ loadGroupRankPreview: jest.fn() }));
+const loadMock = loadGroupRankPreview as jest.MockedFunction<typeof loadGroupRankPreview>;
 
 const row = (slotId: string, state: GroupRankPreviewRow['state'], extra: Partial<GroupRankPreviewRow> = {}): GroupRankPreviewRow => ({
   slotId,
@@ -144,6 +152,118 @@ describe('planFillFromStandings', () => {
     expect(failure(() => planFillFromStandings(preview, [{ slotId: 's2', registrationId: 'X' }]))).toEqual({
       type: ConflictException.name,
       code: 'SLOT_TEAM_ALREADY_PLACED',
+    });
+  });
+});
+
+describe('서비스 본문 — 권한·대상·잠금 순서', () => {
+  const user = { id: 'user-1', email: 'a@test.v1', accountStatus: 'active' as const, onboardingStatus: 'completed' as const };
+  const adminRow = (adminRole: 'owner' | 'ops' | 'support') => ({
+    id: 'admin-1', userId: 'user-1', adminRole, status: 'active', user: { accountStatus: 'active' },
+  });
+  const swapPreview: GroupRankPreview = {
+    rows: [
+      row('a1', 'tied', { label: 'A조 1위', tiedRegistrationIds: ['X', 'Y'], currentRegistrationId: 'X' }),
+      row('a2', 'tied', { label: 'A조 2위', tiedRegistrationIds: ['X', 'Y'], currentRegistrationId: 'Y' }),
+    ],
+    groupMembers: new Map([['a1', new Set(['X', 'Y', 'Z'])], ['a2', new Set(['X', 'Y', 'Z'])]]),
+  };
+
+  function setup(options: { role?: 'owner' | 'ops' | 'support' | null; kind?: string; preview?: GroupRankPreview } = {}) {
+    const events: string[] = [];
+    const prisma = {
+      v1AdminUser: { findUnique: jest.fn().mockResolvedValue(options.role === null ? null : adminRow(options.role ?? 'ops')) },
+      v1Tournament: { findFirst: kindAwareFindFirst({ id: 'tournament-1', kind: options.kind ?? 'regular_tournament' }) },
+      v1AdminActionLog: { create: jest.fn(async () => { events.push('audit'); return { id: 'log-1' }; }) },
+      $transaction: jest.fn(async (fn: (tx: unknown) => Promise<unknown>): Promise<unknown> => { events.push('tx'); return fn(prisma); }),
+    };
+    loadMock.mockReset();
+    loadMock.mockImplementation(async () => { events.push('load'); return options.preview ?? swapPreview; });
+    const deps = {
+      prisma: prisma as unknown as PrismaService,
+      adminContext: new AdminContextService(prisma as unknown as PrismaService),
+      lock: jest.fn(async () => { events.push('lock'); }),
+      assignBatch: jest.fn(async (_tx: Prisma.TransactionClient, _admin: unknown, changes: readonly { slotId: string; registrationId: string | null }[]) => {
+        events.push(`batch:${changes.map((change) => `${change.slotId}=${change.registrationId}`).join(',')}`);
+      }),
+      transactionOptions: { timeout: 45_000, maxWait: 5_000 },
+    };
+    return { prisma, deps, events };
+  }
+
+  it('맞바꾸기: 트랜잭션 → 잠금 → 읽기 → 배치(바뀔 자리 전부 한 번에) → 감사 로그 순이고 트랜잭션 옵션을 그대로 쓴다', async () => {
+    const { prisma, deps, events } = setup();
+    const result = await fillSlotsFromStandings(deps, user, 'tournament-1', [
+      { slotId: 'a1', registrationId: 'Y' },
+      { slotId: 'a2', registrationId: 'X' },
+    ]);
+    expect(events).toEqual(['tx', 'lock', 'load', 'batch:a1=Y,a2=X', 'audit']);
+    expect(prisma.$transaction).toHaveBeenCalledWith(expect.any(Function), deps.transactionOptions);
+    expect(deps.lock).toHaveBeenCalledWith(prisma, { id: 'tournament-1', kind: 'regular_tournament' });
+    expect(result).toEqual({
+      assignments: [{ slotId: 'a1', registrationId: 'Y' }, { slotId: 'a2', registrationId: 'X' }],
+      skipped: [],
+    });
+    expect(prisma.v1AdminActionLog.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        adminUserId: 'admin-1',
+        action: 'tournament.slots.fill_from_standings',
+        targetType: 'tournament',
+        targetId: 'tournament-1',
+        afterJson: expect.objectContaining({ assignments: result.assignments, overridden: ['a1', 'a2'] }),
+      }),
+    });
+  });
+
+  it('바꿀 자리가 없으면(이미 맞게 들어 있거나 전부 건너뜀) 배치를 부르지 않는다 — 시작된 결선 경기 자리를 건드리지 않게', async () => {
+    const preview: GroupRankPreview = {
+      rows: [row('a1', 'ready', { candidateRegistrationId: 'X', currentRegistrationId: 'X' }), row('b1', 'group_incomplete')],
+      groupMembers: new Map([['a1', new Set(['X'])], ['b1', new Set(['Z'])]]),
+    };
+    const { deps, events } = setup({ preview });
+    await expect(fillSlotsFromStandings(deps, user, 'tournament-1', [])).resolves.toEqual({
+      assignments: [{ slotId: 'a1', registrationId: 'X' }],
+      skipped: [{ slotId: 'b1', reason: 'group_incomplete' }],
+    });
+    expect(deps.assignBatch).not.toHaveBeenCalled();
+    expect(events).toEqual(['tx', 'lock', 'load', 'audit']);
+  });
+
+  it('support 어드민은 403 — 트랜잭션도 읽기도 시작하지 않는다 (대조: ops 는 통과)', async () => {
+    const denied = setup({ role: 'support' });
+    await expect(fillSlotsFromStandings(denied.deps, user, 'tournament-1', [])).rejects.toBeInstanceOf(ForbiddenException);
+    expect(denied.prisma.$transaction).not.toHaveBeenCalled();
+    expect(loadMock).not.toHaveBeenCalled();
+    const allowed = setup({ role: 'ops', preview: { rows: [], groupMembers: new Map() } });
+    await expect(fillSlotsFromStandings(allowed.deps, user, 'tournament-1', [])).resolves.toEqual({ assignments: [], skipped: [] });
+  });
+
+  it('어드민이 아니면 403, 정규 리그 id 는 404 TOURNAMENT_NOT_FOUND (종류 조건이 실제로 걸린다)', async () => {
+    const stranger = setup({ role: null });
+    await expect(fillSlotsFromStandings(stranger.deps, user, 'tournament-1', [])).rejects.toBeInstanceOf(ForbiddenException);
+    const league = setup({ kind: 'regular_league' });
+    await expect(fillSlotsFromStandings(league.deps, user, 'tournament-1', [])).rejects.toMatchObject({
+      response: { code: 'TOURNAMENT_NOT_FOUND' },
+    });
+    expect(league.prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it('잘못된 override 는 잠금·읽기 뒤 배치·감사 로그 전에 거절한다 — 부분 적용 없음', async () => {
+    const { deps, events } = setup();
+    await expect(
+      fillSlotsFromStandings(deps, user, 'tournament-1', [{ slotId: 'a1', registrationId: 'OUTSIDER' }]),
+    ).rejects.toMatchObject({ response: { code: 'SLOT_REGISTRATION_INVALID' } });
+    expect(events).toEqual(['tx', 'lock', 'load']);
+  });
+
+  it('미리보기는 support 도 볼 수 있고(getActiveAdmin) 행을 slots 로 감싸 돌려준다, 정규 리그 id 는 404', async () => {
+    const support = setup({ role: 'support' });
+    await expect(previewGroupRankStandings(support.deps, user, 'tournament-1')).resolves.toEqual({ slots: swapPreview.rows });
+    const stranger = setup({ role: null });
+    await expect(previewGroupRankStandings(stranger.deps, user, 'tournament-1')).rejects.toBeInstanceOf(ForbiddenException);
+    const league = setup({ kind: 'regular_league' });
+    await expect(previewGroupRankStandings(league.deps, user, 'tournament-1')).rejects.toMatchObject({
+      response: { code: 'TOURNAMENT_NOT_FOUND' },
     });
   });
 });

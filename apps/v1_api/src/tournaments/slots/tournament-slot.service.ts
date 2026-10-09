@@ -11,6 +11,7 @@ import { adminBracketSlotInclude, serializeAdminBracketSlot } from './admin-brac
 import { ALL_COMPETITION_KINDS, findTournamentOnSurface } from '../tournament-surface-lookup';
 import { syncByeSlotInTx } from './bye-slot-sync';
 import { lockCompetitionForBracketMutationInTx, lockCompetitionForSlotReleaseInTx } from './competition-bracket-lock';
+import { fillSlotsFromStandings, previewGroupRankStandings, type FillOverride } from './group-rank-fill';
 import { pickRandomAssignments } from './random-assignment';
 import { assertSlotFixturesNotStarted, isSlotFixtureStarted, loadSlotUsingFixtures, sidesUsingSlot } from './slot-fixtures';
 
@@ -305,5 +306,30 @@ export class TournamentSlotService {
       );
       return { assignments };
     }, SLOT_TRANSACTION_OPTIONS);
+  }
+
+  /** GET /admin/tournaments/:tournamentId/slots/standings-preview */
+  standingsPreview(user: V1AuthUser, tournamentId: string) {
+    return previewGroupRankStandings(
+      { prisma: this.prisma, adminContext: this.adminContext },
+      user,
+      tournamentId,
+    );
+  }
+
+  /** POST /admin/tournaments/:tournamentId/slots/fill-from-standings */
+  fillFromStandings(user: V1AuthUser, tournamentId: string, overrides: readonly FillOverride[] = []) {
+    return fillSlotsFromStandings(
+      {
+        prisma: this.prisma,
+        adminContext: this.adminContext,
+        lock: lockCompetitionForBracketMutationInTx,
+        assignBatch: (tx, admin, changes) => assignSlotsBatchInTx(tx, this.context(admin), changes),
+        transactionOptions: SLOT_TRANSACTION_OPTIONS,
+      },
+      user,
+      tournamentId,
+      overrides,
+    );
   }
 }

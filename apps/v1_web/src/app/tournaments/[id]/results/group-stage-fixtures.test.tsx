@@ -54,6 +54,8 @@ function makeFixture(
     awayTeamId: 'team-away',
     awayTeamName: '원정 팀',
     awayTeamLogoUrl: null,
+    homeSlotLabel: null,
+    awaySlotLabel: null,
     result: null,
     videos: [],
     ...overrides,

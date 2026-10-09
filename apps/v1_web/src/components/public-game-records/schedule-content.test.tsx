@@ -135,6 +135,8 @@ function fixtureEntry(overrides: Partial<import('./types').PublicScheduleEntry> 
     fieldName: null,
     home: { registrationId: 'reg-home', teamId: 'team-home', teamName: '홈팀' },
     away: { registrationId: 'reg-away', teamId: 'team-away', teamName: '원정팀' },
+    homeSlotLabel: null,
+    awaySlotLabel: null,
     visibilityMode: 'live',
     status: 'ended',
     resultState: 'official',

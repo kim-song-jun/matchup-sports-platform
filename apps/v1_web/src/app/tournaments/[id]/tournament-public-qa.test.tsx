@@ -188,6 +188,8 @@ describe('public tournament QA regressions', () => {
           awayTeamId: 'team-away',
           awayTeamName: '부산 FC',
           awayTeamLogoUrl: '/uploads/teams/busan.png',
+          homeSlotLabel: null,
+          awaySlotLabel: null,
           awayRegistrationId: 'registration-away',
           status: 'completed',
           liveStatus: 'ended',

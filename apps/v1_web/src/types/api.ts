@@ -3757,6 +3757,9 @@ export type V1TournamentFixture = {
   awayTeamId: string | null;
   awayTeamName: string | null;
   awayTeamLogoUrl: string | null;
+  /** Slot label ("A조 1위") for a side with no team yet; null once a team exists or when there is no slot. */
+  homeSlotLabel: string | null;
+  awaySlotLabel: string | null;
   result: V1TournamentFixtureResult | null;
   videos: V1TournamentFixtureVideo[];
 };
@@ -4150,6 +4153,11 @@ export type V1AdminBracketFixture = {
   updatedAt: string;
   result: V1AdminBracketResult | null;
   videos: V1TournamentFixtureVideo[];
+  /** 이 사이드가 연결된 자리. 자리가 없는 경기(수동으로 만든 경기)는 null. */
+  homeSlotId: string | null;
+  awaySlotId: string | null;
+  /** 경기(게임) 요약. 게임이 없는 옛 경기는 null. */
+  game: V1AdminBracketFixtureGame | null;
 };
 
 export type V1AdminBracketResult = {
@@ -4185,10 +4193,41 @@ export type V1AdminBracketStanding = {
   recalculatedAt: string | null;
 };
 
+export type V1AdminBracketSlotKind = 'ENTRY' | 'BYE' | 'GROUP_RANK';
+
+/** 팀이 들어갈 칸. 라벨("A조 1번", "부전승 1")은 서버가 계산해서 준다. */
+export type V1AdminBracketSlot = {
+  id: string;
+  kind: V1AdminBracketSlotKind;
+  groupId: string | null;
+  sourceGroupId: string | null;
+  position: number;
+  label: string;
+  registrationId: string | null;
+  teamName: string | null;
+};
+
+export type V1AdminBracketRevisionSummary = {
+  id: string;
+  state: 'DRAFT' | 'SUBMITTED' | 'CHANGE_REQUESTED' | 'OFFICIAL' | 'VOID';
+  score: { home: number; away: number; penalties?: { home: number; away: number } } | null;
+  /** quick = 그림에서 점수만 넣어 확정, console = 라이브 콘솔, correction = 정정 */
+  entryMethod: 'quick' | 'console' | 'correction';
+};
+
+export type V1AdminBracketFixtureGame = {
+  id: string;
+  state: 'SCHEDULED' | 'LIVE' | 'PAUSED' | 'ENDED' | 'CANCELLED';
+  version: number;
+  hasLiveRecords: boolean;
+  latestRevision: V1AdminBracketRevisionSummary | null;
+};
+
 export type V1AdminTournamentBracket = {
   groups: V1AdminBracketGroup[];
   fixtures: V1AdminBracketFixture[];
   standings: V1AdminBracketStanding[];
+  slots: V1AdminBracketSlot[];
 };
 
 /** POST /admin/tournaments/:tournamentId/league/fixtures/generate 응답 — 리그 대진 일괄 생성 결과 */

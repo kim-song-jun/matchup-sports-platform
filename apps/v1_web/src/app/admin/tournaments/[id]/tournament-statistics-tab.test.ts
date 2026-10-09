@@ -41,6 +41,9 @@ function fixture({
     createdAt: '2026-08-01T00:00:00.000Z',
     updatedAt: '2026-08-01T00:00:00.000Z',
     videos: [],
+    homeSlotId: null,
+    awaySlotId: null,
+    game: null,
     result: {
       id: `result-${id}`,
       fixtureId: id,

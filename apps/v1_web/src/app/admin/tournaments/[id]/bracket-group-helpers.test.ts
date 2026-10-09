@@ -44,6 +44,9 @@ function fixture(overrides: Partial<V1AdminBracketFixture>): V1AdminBracketFixtu
     updatedAt: '2026-08-01T00:00:00.000Z',
     result: null,
     videos: [],
+    homeSlotId: null,
+    awaySlotId: null,
+    game: null,
     ...overrides,
   };
 }

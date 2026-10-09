@@ -95,6 +95,11 @@ vi.mock('@/hooks/use-v1-api', () => ({
   useV1AdminTournamentRegistrations: () => ({ data: { items: [], truncated: false }, isError: false, error: null, refetch: vi.fn() }),
 }));
 
+vi.mock('@/hooks/use-tournament-period-settings', () => ({
+  useTournamentPeriodSettings: () => ({ data: undefined, isPending: true, isError: false, isFetching: false, refetch: vi.fn() }),
+  useUpdateTournamentPeriodSettings: () => ({ mutate: vi.fn(), isPending: false, error: null }),
+}));
+
 async function renderDetail() {
   const leagueId = window.location.pathname.split('/').at(-1) ?? '';
   const props = {

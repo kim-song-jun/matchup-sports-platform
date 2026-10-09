@@ -74,6 +74,33 @@ vi.mock('@/components/admin/bracket-canvas/league-fixture-panel', () => ({
   ),
 }));
 
+// League period settings: undefined data by default (editor shows its loading state); tests set a value.
+const { periodSettingsMock, updatePeriodsMutateMock } = vi.hoisted(() => ({
+  periodSettingsMock: vi.fn(),
+  updatePeriodsMutateMock: vi.fn(),
+}));
+vi.mock('@/hooks/use-tournament-period-settings', () => ({
+  useTournamentPeriodSettings: periodSettingsMock,
+  useUpdateTournamentPeriodSettings: () => ({ mutate: updatePeriodsMutateMock, isPending: false, error: null }),
+}));
+
+function periodSettingsOf(minutes: number[]) {
+  return {
+    data: {
+      tournamentId: 'league-1',
+      competitionConfigVersionId: 'cfg-1',
+      expectedVersion: 'v-1',
+      periods: minutes.map((durationMinutes, i) => ({ code: `P${i}`, label: `${i + 1}`, durationMinutes, extraTime: false })),
+      legacyPeriodCount: null,
+      requiresDurationInput: false,
+    },
+    isPending: false,
+    isError: false,
+    isFetching: false,
+    refetch: vi.fn(),
+  };
+}
+
 vi.mock('@/hooks/use-v1-api', () => ({
   useV1ActivePopup: vi.fn(),
   // 그룹 B 감사 결함 1: 참가팀 추가·제거. 대부분의 테스트는 로스터 조작을 다루지 않으므로
@@ -163,6 +190,7 @@ describe('LeagueMatchFixturesClient', () => {
   // R12/R13: 기존 테스트는 이 두 훅을 전혀 참조하지 않으므로, 매 테스트 전에 무해한 기본값을
   // 채워둔다 — 안 채우면 컴포넌트가 undefined에서 .data/.mutate를 읽다 그 10개 테스트가 전부 깨진다.
   beforeEach(() => {
+    periodSettingsMock.mockReturnValue({ data: undefined, isPending: true, isError: false, isFetching: false, refetch: vi.fn() });
     useV1AdminLeagueTeamsMock.mockReturnValue({ data: undefined } as never);
     useV1CancelLeagueFixtureMock.mockReturnValue({ mutate: vi.fn(), isPending: false } as never);
     useV1RegenerateLeagueFixturesMock.mockReturnValue({ mutate: vi.fn(), isPending: false } as never);
@@ -1442,6 +1470,7 @@ describe('LeagueMatchFixturesClient', () => {
 // 대진 timing(경기 시간·휴식·팀당 하루 경기 수) — C안(시간창 역산) + B안(계산기 카드·타임라인) 결합.
 describe('LeagueMatchFixturesClient — 대진 timing 설정', () => {
   beforeEach(() => {
+    periodSettingsMock.mockReturnValue({ data: undefined, isPending: true, isError: false, isFetching: false, refetch: vi.fn() });
     useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false } as never);
     useV1CancelLeagueFixtureMock.mockReturnValue({ mutate: vi.fn(), isPending: false } as never);
     useV1RegenerateLeagueFixturesMock.mockReturnValue({ mutate: vi.fn(), isPending: false } as never);
@@ -1704,6 +1733,59 @@ describe('LeagueMatchFixturesClient — 대진 timing 설정', () => {
     expect(screen.getByText('22:20~22:35')).toBeInTheDocument();
     expect(screen.getByText('독수리FC vs 호랑이FC')).toBeInTheDocument();
   });
+  it('리그의 피리어드 설정(25·25)으로 경기 시간을 미리 채우고 출처를 알린다 — 종목 기본 20과 다른 값', () => {
+    periodSettingsMock.mockReturnValue(periodSettingsOf([25, 25]));
+    useV1GenerateLeagueFixturesMock.mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as never);
+    render(<Providers><LeagueMatchFixturesClient leagueId="league-1" initialView="list" /></Providers>);
+
+    expect(screen.getByLabelText('경기 시간(분)')).toHaveValue(50);
+    expect(screen.getByLabelText('경기 시간(분)')).toHaveAccessibleDescription(
+      '이 리그의 피리어드 설정(전·후반 25분)에서 가져왔어요. 바꾸면 이번 대진에만 적용돼요.',
+    );
+  });
+
+  it('대조군: 20·20 리그는 40분으로 채운다', () => {
+    periodSettingsMock.mockReturnValue(periodSettingsOf([20, 20]));
+    useV1GenerateLeagueFixturesMock.mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as never);
+    render(<Providers><LeagueMatchFixturesClient leagueId="league-1" initialView="list" /></Providers>);
+
+    expect(screen.getByLabelText('경기 시간(분)')).toHaveValue(40);
+  });
+
+  it('미리 채운 경기 시간을 건드리지 않으면 timing으로 보내지 않고, 고치면 그 값을 보낸다', async () => {
+    periodSettingsMock.mockReturnValue(periodSettingsOf([25, 25]));
+    const mutateAsync = vi.fn().mockResolvedValue({ leagueId: 'league-1', createdCount: 6, teamMatchIds: [], warnings: [] });
+    useV1GenerateLeagueFixturesMock.mockReturnValue({ mutateAsync, isPending: false } as never);
+    render(<Providers><LeagueMatchFixturesClient leagueId="league-1" initialView="list" /></Providers>);
+
+    fireEvent.change(screen.getByLabelText('요일'), { target: { value: '3' } });
+    fireEvent.change(screen.getByLabelText('시작 시각'), { target: { value: '22:00' } });
+    await generateAndConfirm();
+    await waitFor(() => expect(mutateAsync).toHaveBeenCalledTimes(1));
+    expect(mutateAsync.mock.calls[0][0]).not.toHaveProperty('timing');
+
+    fireEvent.change(screen.getByLabelText('경기 시간(분)'), { target: { value: '30' } });
+    await generateAndConfirm();
+    await waitFor(() => expect(mutateAsync).toHaveBeenCalledTimes(2));
+    expect(mutateAsync.mock.calls[1][0]).toMatchObject({ timing: { gameDurationMinutes: 30 } });
+  });
+
+  it('리그 상세의 피리어드 설정에서 수정하면 저장 API(expectedVersion 포함)를 호출한다', () => {
+    periodSettingsMock.mockReturnValue(periodSettingsOf([25, 25]));
+    useV1GenerateLeagueFixturesMock.mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as never);
+    render(<Providers><LeagueMatchFixturesClient leagueId="league-1" /></Providers>);
+
+    const section = screen.getByRole('region', { name: '피리어드 설정' });
+    fireEvent.click(within(section).getByRole('button', { name: '수정' }));
+    fireEvent.change(within(section).getByLabelText('피리어드 1'), { target: { value: '30' } });
+    fireEvent.click(within(section).getByRole('button', { name: '저장' }));
+
+    expect(updatePeriodsMutateMock).toHaveBeenCalledWith(
+      { expectedVersion: 'v-1', periods: [{ durationMinutes: 30 }, { durationMinutes: 25 }] },
+      expect.any(Object),
+    );
+  });
+
 });
 
 /**

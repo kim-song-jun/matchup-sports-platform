@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useId, useMemo, useState } from 'react';
+import { useEffect, useId, useMemo, useState } from 'react';
 import { AlertTriangle, ChevronDown, ChevronLeft, Ellipsis, X } from 'lucide-react';
 import { AdminPageHeader, AdminDataTable, AdminLeagueStatePill, AdminMatchPhasePill, AdminReasonModal, AdminStatusPill, AdminTableSkeleton, AdminToasts, useAdminToast } from '@/components/admin';
 import { EntityPicker, type EntityPickerItem } from '@/components/admin/entity-picker';
@@ -29,7 +29,11 @@ import { describeLeagueRegistrationWindow } from '@/lib/league-registration-copy
 import { leagueFixtureMatchupLabel } from '@/lib/league-fixture-meta';
 import { LeagueManualFixtureModal } from './league-manual-fixture-modal';
 import { LeagueFixtureScheduleModal, type LeagueFixtureSchedulePatch } from './league-fixture-schedule-modal';
+import { TournamentPeriodSettingsEditor } from '@/components/admin/tournament-period-settings-editor';
+import { useAdminCanWrite } from '@/hooks/use-admin-can-write';
+import { useTournamentPeriodSettings } from '@/hooks/use-tournament-period-settings';
 import { LeagueNextActionCard } from './league-next-action-card';
+import { describeLeaguePeriods, totalPeriodMinutes } from './league-period-defaults';
 import { pickLeagueNextAction } from '@/lib/league-next-action';
 import { leagueFixtureResultCell } from '@/lib/competition-status';
 import { extractErrorMessage } from '@/lib/error-message';
@@ -49,7 +53,6 @@ import { BracketCanvasResponsive } from '@/components/admin/bracket-canvas/brack
 import type { RegistrationsLoadState } from '@/components/admin/bracket-canvas/bracket-team-tray';
 import { LeagueScheduleBoard } from '@/components/admin/bracket-canvas/league-schedule-board';
 import { SegmentedTabs } from '@/components/v1-ui/segmented-tabs';
-import { useAdminCanWrite } from '@/hooks/use-admin-can-write';
 import { useV1ApplyLeagueTemplate } from '@/hooks/use-v1-bracket-canvas';
 import { LeagueTemplateDialog } from './league-template-dialog';
 import { buildLeagueMobileRounds, candidatesFromLeagueTeams } from '@/lib/bracket-canvas-mobile-model';
@@ -185,6 +188,19 @@ export default function LeagueMatchFixturesClient({
   // 단판이면 그 길이)으로 채운다. 종료 시각은 서버로 가지 않고 팀당 하루 경기 수 역산 제안에만 쓴다.
   const [endTime, setEndTime] = useState('');
   const [gameDurationMinutes, setGameDurationMinutes] = useState('');
+  // The league's own period settings prefill the duration field. An untouched prefill is not sent:
+  // the server resolves the same value, and sending it would switch the fixtures to timed scheduling.
+  const [durationTouched, setDurationTouched] = useState(false);
+  const periodSettings = useTournamentPeriodSettings(leagueId).data;
+  const periodDefaultMinutes = totalPeriodMinutes(periodSettings);
+  const periodDefaultHint = describeLeaguePeriods(periodSettings);
+  useEffect(() => {
+    if (!durationTouched && periodDefaultMinutes !== null) setGameDurationMinutes(String(periodDefaultMinutes));
+  }, [durationTouched, periodDefaultMinutes]);
+  const handleGameDurationChange = (value: string) => {
+    setDurationTouched(true);
+    setGameDurationMinutes(value);
+  };
   const [breakMinutes, setBreakMinutes] = useState('');
   const [gamesPerTeamPerDay, setGamesPerTeamPerDay] = useState('');
   // R12: 취소 확인 대상 대진. null이면 모달을 닫는다.
@@ -390,11 +406,11 @@ export default function LeagueMatchFixturesClient({
       // 실을지 말지는 두 값이 **함께** 갖춰졌을 때만이다(서버 DTO 가 둘을 한 객체로 받는다).
       ...(dates.length === 0 || time.trim() === '' ? {} : { schedule: { dates, time: time.trim() } }),
       ...(placeName.trim() === '' ? {} : { placeName: placeName.trim() }),
-      ...(durationValue === null && breakValue === null && gamesPerDayValue === null
+      ...((!durationTouched || durationValue === null) && breakValue === null && gamesPerDayValue === null
         ? {}
         : {
             timing: {
-              ...(durationValue === null ? {} : { gameDurationMinutes: durationValue }),
+              ...(!durationTouched || durationValue === null ? {} : { gameDurationMinutes: durationValue }),
               ...(breakValue === null ? {} : { breakMinutes: breakValue }),
               ...(gamesPerDayValue === null ? {} : { gamesPerTeamPerDay: gamesPerDayValue }),
             },
@@ -704,6 +720,7 @@ export default function LeagueMatchFixturesClient({
       {/* 보류 중에는 공개 설정을 따로 바꾸지 않는다 — 보류 해제가 공개 여부까지 되돌린다(서버도 409). */}
       {series.state === 'on_hold' ? null : <LeagueVisibilityControl leagueId={leagueId} isPublic={series.isPublic} />}
       <LeagueCloseRegistrationControl leagueId={leagueId} state={series.state} registrationOpen={series.registrationOpen} registrationDeadlineAt={series.registrationDeadlineAt} activeRegistrationCount={series.activeRegistrationCount} confirmedCount={series.confirmedRegistrationCount} showToast={showToast} />
+      <TournamentPeriodSettingsEditor tournamentId={leagueId} canWrite={canWrite} showToast={showToast} />
       <LeagueCoverImageControl leagueId={leagueId} sportCode={series.sportCode} coverImageUrl={series.coverImageUrl} />
       <div className="mb-4 md:max-w-xs">
         <SegmentedTabs
@@ -912,7 +929,8 @@ export default function LeagueMatchFixturesClient({
               endTime={endTime}
               onEndTimeChange={setEndTime}
               gameDurationMinutes={gameDurationMinutes}
-              onGameDurationChange={setGameDurationMinutes}
+              onGameDurationChange={handleGameDurationChange}
+              prefilledHint={durationTouched ? null : periodDefaultHint}
               breakMinutes={breakMinutes}
               onBreakMinutesChange={setBreakMinutes}
               gamesPerTeamPerDay={gamesPerTeamPerDay}
@@ -1274,7 +1292,8 @@ export default function LeagueMatchFixturesClient({
                     endTime={endTime}
                     onEndTimeChange={setEndTime}
                     gameDurationMinutes={gameDurationMinutes}
-                    onGameDurationChange={setGameDurationMinutes}
+                    onGameDurationChange={handleGameDurationChange}
+                    prefilledHint={durationTouched ? null : periodDefaultHint}
                     breakMinutes={breakMinutes}
                     onBreakMinutesChange={setBreakMinutes}
                     gamesPerTeamPerDay={gamesPerTeamPerDay}
@@ -1666,6 +1685,7 @@ function FixtureTimingFields({
   onEndTimeChange,
   gameDurationMinutes,
   onGameDurationChange,
+  prefilledHint,
   breakMinutes,
   onBreakMinutesChange,
   gamesPerTeamPerDay,
@@ -1677,6 +1697,8 @@ function FixtureTimingFields({
   onEndTimeChange: (value: string) => void;
   gameDurationMinutes: string;
   onGameDurationChange: (value: string) => void;
+  /** Set while the duration shows the league's period total; null once the operator edits it. */
+  prefilledHint: string | null;
   breakMinutes: string;
   onBreakMinutesChange: (value: string) => void;
   gamesPerTeamPerDay: string;
@@ -1715,7 +1737,9 @@ function FixtureTimingFields({
           className={`${inputClass} w-full`}
         />
         <p id={`${idPrefix}-game-duration-hint`} className="mt-1 text-[length:var(--font-size-caption)] text-[var(--text-muted)]">
-          비우면 경기 설정 시간(전·후반 합계, 단판이면 그 길이)으로 채워요.
+          {prefilledHint !== null
+            ? `이 리그의 피리어드 설정(${prefilledHint})에서 가져왔어요. 바꾸면 이번 대진에만 적용돼요.`
+            : '비우면 경기 설정 시간(전·후반 합계, 단판이면 그 길이)으로 채워요.'}
         </p>
       </div>
       <div>

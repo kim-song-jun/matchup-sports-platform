@@ -1,6 +1,8 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
+import { directPlacedRegistrationIds } from '@/lib/bracket-canvas-layout';
 import { makeFixture, makeRegistration, makeSlot } from '@/test/bracket-canvas-fixtures';
+import type { V1AdminBracketFixture } from '@/types/api';
 import { BracketTeamTray } from './bracket-team-tray';
 import { REGISTRATION_DRAG_MIME } from './bracket-canvas-dnd';
 
@@ -11,15 +13,20 @@ const registrations = [
   makeRegistration({ id: 'r4', teamName: '입금 대기 팀', status: 'awaiting_payment' }),
 ];
 
-function renderTray(overrides: Partial<React.ComponentProps<typeof BracketTeamTray>> = {}) {
+// 화면과 같은 경로로 직접 지정 팀을 계산해 넘긴다(워크스페이스가 하는 일).
+function renderTray({
+  fixtures = [],
+  ...overrides
+}: Partial<React.ComponentProps<typeof BracketTeamTray>> & { fixtures?: V1AdminBracketFixture[] } = {}) {
+  const slots = overrides.slots ?? [];
   const props = {
     registrations,
-    slots: [],
-    fixtures: [],
     pendingRegistrationId: null,
     canWrite: true,
     onPick: vi.fn(),
     ...overrides,
+    slots,
+    directPlacedIds: directPlacedRegistrationIds(fixtures, slots),
   };
   render(<BracketTeamTray {...props} />);
   return props;

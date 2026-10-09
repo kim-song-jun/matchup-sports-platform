@@ -14,7 +14,7 @@ import {
 } from '@/hooks/use-v1-api';
 import { useV1AssignTournamentSlot, useV1RandomFillSlots } from '@/hooks/use-v1-bracket-canvas';
 import { describeBracketCanvasError } from '@/lib/bracket-canvas-errors';
-import { buildSideLabelContext, fixtureSideLabel, type SideKey } from '@/lib/bracket-canvas-layout';
+import { buildSideLabelContext, directPlacedRegistrationIds, fixtureSideLabel, type SideKey } from '@/lib/bracket-canvas-layout';
 import { isBracketPublished } from '@/lib/bracket-visibility';
 import { extractErrorMessage } from '@/lib/error-message';
 import type { V1AdminTournamentRegistration, V1TournamentFormat } from '@/types/api';
@@ -246,7 +246,7 @@ export function BracketCanvasWorkspace({
           <BracketTeamTray
             registrations={registrations}
             slots={bracket.slots}
-            fixtures={bracket.fixtures}
+            directPlacedIds={directPlacedRegistrationIds(bracket.fixtures, bracket.slots)}
             pendingRegistrationId={pendingRegistrationId}
             canWrite={canWrite}
             onPick={setPendingRegistrationId}

@@ -107,6 +107,25 @@ describe('PullToRefresh', () => {
     expect(nav.refresh).not.toHaveBeenCalled();
   });
 
+  // iOS 는 첫 이동에서 스크롤 영역 자체의 고무줄 튕김을 시작하고 그 뒤 이동은 막을 수 없다 —
+  // 당김으로 판정되기 전부터 튕김이 꺼져 있어야 내용이 손가락보다 두 배로 내려가지 않는다.
+  it('맨 위에서 시작한 터치 동안에만 스크롤 영역의 튕김을 끈다', async () => {
+    const { area } = mount();
+    await settledFetchCount(1);
+
+    touch(area, 'touchstart', [[100, 100]]);
+    expect(area.dataset.ptrArmed).toBe('');
+    touch(area, 'touchmove', [[100, 103]]);
+    expect(area.dataset.ptrArmed).toBe('');
+    touch(area, 'touchend', []);
+    expect(area.dataset.ptrArmed).toBeUndefined();
+
+    Object.defineProperty(area, 'scrollTop', { value: 120, configurable: true });
+    touch(area, 'touchstart', [[100, 100]]);
+    expect(area.dataset.ptrArmed).toBeUndefined();
+    touch(area, 'touchend', []);
+  });
+
   it('스크롤이 내려가 있는 상태에서 시작하면 반응하지 않는다', async () => {
     const { area } = mount();
     await settledFetchCount(1);

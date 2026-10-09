@@ -10,19 +10,25 @@ import {
   AdminFilterBar,
   AdminPageHeader,
   AdminLeagueStatePill,
+  useAdminToast,
+  AdminToasts,
 } from '@/components/admin';
+import { ADMIN_VISIBILITY_OPTIONS, AdminVisibilityFilter } from '@/components/admin/admin-visibility-filter';
+import { AdminVisibilityBadge, LeagueRowVisibilityAction } from '@/components/admin/competition-visibility-row-action';
+import { pickAllowedParam } from '../pick-allowed-param';
 import { useV1AdminLeagueMatchList, useV1AdminLeagueSeriesList } from '@/hooks/use-v1-api';
 import type { V1AdminLeagueListItem } from '@/types/league-match';
 import { withFromPath } from '@/lib/session-storage';
 import { LeagueSeriesView } from './league-series-view';
 
 type TabKey = 'leagues' | 'series';
-type HubFilters = { readonly activeTab: TabKey; readonly seriesFilter: string };
+type HubFilters = { readonly activeTab: TabKey; readonly seriesFilter: string; readonly visibility: string };
 
 function readHubFilters(params: Pick<URLSearchParams, 'get'>): HubFilters {
   return {
     activeTab: params.get('tab') === 'series' ? 'series' : 'leagues',
     seriesFilter: params.get('seriesId') ?? '',
+    visibility: pickAllowedParam(params.get('visibility'), ADMIN_VISIBILITY_OPTIONS),
   };
 }
 
@@ -33,6 +39,8 @@ function buildListHref(pathname: string, query: string, filters: HubFilters): st
   else params.delete('tab');
   if (filters.seriesFilter) params.set('seriesId', filters.seriesFilter);
   else params.delete('seriesId');
+  if (filters.visibility) params.set('visibility', filters.visibility);
+  else params.delete('visibility');
   const nextQuery = params.toString();
   return `${pathname}${nextQuery ? `?${nextQuery}` : ''}${location?.hash ?? ''}`;
 }
@@ -64,7 +72,7 @@ function LeagueHub() {
   const query = searchParams.toString();
   const [filters, setFilters] = useState<HubFilters>(() => readHubFilters(searchParams));
   const latestFilters = useRef(filters);
-  const { activeTab, seriesFilter } = filters;
+  const { activeTab, seriesFilter, visibility } = filters;
   // 상세 복귀·Back/Forward는 URL에서 복원하고, 연속 선택은 최신 local draft에 병합한다.
   useEffect(() => {
     // Next가 이전 선택을 늦게 전달해도 실제 주소의 최신 선택과 ref를 덮지 않는다.
@@ -160,7 +168,13 @@ function LeagueHub() {
         {activeTab === 'series' ? (
           <LeagueSeriesView />
         ) : (
-          <LeaguesPanel seriesFilter={seriesFilter} onSeriesFilterChange={(value) => handleFiltersChange({ seriesFilter: value })} listHref={listHref} />
+          <LeaguesPanel
+            seriesFilter={seriesFilter}
+            onSeriesFilterChange={(value) => handleFiltersChange({ seriesFilter: value })}
+            visibility={visibility}
+            onVisibilityChange={(value) => handleFiltersChange({ visibility: value })}
+            listHref={listHref}
+          />
         )}
       </div>
     </div>
@@ -171,14 +185,19 @@ function LeagueHub() {
 function LeaguesPanel({
   seriesFilter,
   onSeriesFilterChange,
+  visibility,
+  onVisibilityChange,
   listHref,
 }: {
   seriesFilter: string;
   onSeriesFilterChange: (value: string) => void;
+  visibility: string;
+  onVisibilityChange: (value: string) => void;
   listHref: string;
 }) {
   const { data, isPending, isError, refetch } = useV1AdminLeagueMatchList(
     seriesFilter || undefined,
+    visibility === 'public' || visibility === 'hidden' ? visibility : undefined,
   );
   const items = data?.items ?? [];
   // 칩 목록용 — 리그 체계 탭 본문과 쿼리 키·캐시를 공유한다(전역 staleTime 30초 안의
@@ -202,6 +221,7 @@ function LeaguesPanel({
           ]}
           activeStatus={seriesFilter}
           onStatusChange={onSeriesFilterChange}
+          rightSlot={<AdminVisibilityFilter value={visibility} onChange={onVisibilityChange} />}
         />
       </div>
       <LeagueListTable
@@ -209,7 +229,7 @@ function LeaguesPanel({
         isPending={isPending}
         isError={isError}
         onRetry={() => void refetch()}
-        filtered={seriesFilter !== ''}
+        filtered={seriesFilter !== '' || visibility !== ''}
         listHref={listHref}
       />
     </>
@@ -232,7 +252,9 @@ function LeagueListTable({
   listHref: string;
 }) {
   const router = useRouter();
+  const { toasts, showToast } = useAdminToast();
   return (
+    <>
     <AdminDataTable<V1AdminLeagueListItem>
       rows={items}
       keyExtractor={(row) => row.leagueId}
@@ -244,7 +266,7 @@ function LeagueListTable({
           title={filtered ? '이 조건의 리그가 없어요' : '아직 리그가 없어요'}
           description={
             filtered
-              ? '다른 체계를 고르거나 전체로 돌아가 보세요.'
+              ? '다른 체계나 공개 여부를 고르거나 전체로 돌아가 보세요.'
               : '위 버튼으로 새 리그를 만들어 보세요.'
           }
         />
@@ -275,9 +297,20 @@ function LeagueListTable({
             ),
         },
         { key: 'state', header: '상태', render: (row) => <AdminLeagueStatePill state={row.state} /> },
+        { key: 'visibility', header: '공개', render: (row) => <AdminVisibilityBadge isPublic={row.isPublic} /> },
         { key: 'teamCount', header: '참가 팀', render: (row) => `${row.teamCount}팀` },
         { key: 'fixtureCount', header: '대진 수', render: (row) => `${row.fixtureCount}경기` },
       ]}
+      renderActions={(row) => (
+        <LeagueRowVisibilityAction
+          leagueId={row.leagueId}
+          title={row.title}
+          isPublic={row.isPublic}
+          onToast={showToast}
+        />
+      )}
     />
+    <AdminToasts toasts={toasts} />
+    </>
   );
 }

@@ -12,14 +12,14 @@ const LIST_PATH = '/admin/league-matches';
 const SERIES_ID = 'ad200000-0000-4000-8000-000000000001';
 const SERIES_TITLE = '서울 풋살 커뮤니티 리그';
 const LEAGUES: V1AdminLeagueListItem[] = [1, 2].map((tier) => ({
-  leagueId: `ad210000-0000-4000-8000-00000000000${tier}`,
+  leagueId: `ad210000-0000-4000-8000-00000000000${tier}`, isPublic: true,
   title: `${SERIES_TITLE} 1시즌 ${tier}부`,
   state: 'draft', teamCount: 2, fixtureCount: 0,
   startsOn: '2026-10-01', endsOn: '2026-12-31',
   seriesId: SERIES_ID, seriesTitle: SERIES_TITLE, tierLabel: `${tier}부`, seasonNo: 1,
 }));
 LEAGUES.push({
-  leagueId: 'independent-league', title: '독립 팀 리그',
+  leagueId: 'independent-league', isPublic: true, title: '독립 팀 리그',
   state: 'draft', teamCount: 2, fixtureCount: 0,
   startsOn: '2026-10-01', endsOn: '2026-12-31',
   seriesId: null, seriesTitle: null, tierLabel: null, seasonNo: null,
@@ -114,7 +114,7 @@ describe('MD-QA #25 관리자 리그 목록 복귀', () => {
     const user = userEvent.setup();
     const list = render(<AdminLeagueHubPage />);
     await user.click(screen.getByRole('button', { name: SERIES_TITLE }));
-    expect(within(screen.getByRole('table')).getAllByRole('button')).toHaveLength(2);
+    expect(within(screen.getByRole('table')).getAllByRole('button', { name: /상세 보기/ })).toHaveLength(2);
     expect(screen.queryByText('독립 팀 리그')).not.toBeInTheDocument();
 
     fireEvent.click(within(screen.getByRole('table')).getByRole('button', {
@@ -128,7 +128,7 @@ describe('MD-QA #25 관리자 리그 목록 복귀', () => {
 
     expect(new URLSearchParams(window.location.search).get('seriesId')).toBe(SERIES_ID);
     expect(screen.getByRole('button', { name: SERIES_TITLE })).toHaveAttribute('aria-pressed', 'true');
-    expect(within(screen.getByRole('table')).getAllByRole('button')).toHaveLength(2);
+    expect(within(screen.getByRole('table')).getAllByRole('button', { name: /상세 보기/ })).toHaveLength(2);
     expect(screen.queryByText('독립 팀 리그')).not.toBeInTheDocument();
   });
 
@@ -145,7 +145,7 @@ describe('MD-QA #25 관리자 리그 목록 복귀', () => {
 
     expect(new URLSearchParams(window.location.search).get('seriesId')).toBe('independent');
     expect(screen.getByRole('button', { name: '독립 리그' })).toHaveAttribute('aria-pressed', 'true');
-    expect(within(screen.getByRole('table')).getAllByRole('button')).toHaveLength(1);
+    expect(within(screen.getByRole('table')).getAllByRole('button', { name: /상세 보기/ })).toHaveLength(1);
     expect(screen.queryByText(`${SERIES_TITLE} 1시즌 1부`)).not.toBeInTheDocument();
   });
 
@@ -162,7 +162,7 @@ describe('MD-QA #25 관리자 리그 목록 복귀', () => {
     searchSnapshot = previousSeriesSnapshot;
     view.rerender(<AdminLeagueHubPage />);
     expect(screen.getByRole('button', { name: '독립 리그' })).toHaveAttribute('aria-pressed', 'true');
-    expect(within(screen.getByRole('table')).getAllByRole('button')).toHaveLength(1);
+    expect(within(screen.getByRole('table')).getAllByRole('button', { name: /상세 보기/ })).toHaveLength(1);
     expect(screen.queryByText(`${SERIES_TITLE} 1시즌 1부`)).not.toBeInTheDocument();
     await user.click(screen.getByRole('tab', { name: '리그 체계' }));
     expect(new URLSearchParams(window.location.search).get('seriesId')).toBe('independent');
@@ -188,7 +188,7 @@ describe('MD-QA #25 관리자 리그 목록 복귀', () => {
 
     expect(screen.getByRole('tab', { name: '정규 리그' })).toHaveAttribute('aria-selected', 'true');
     expect(screen.getByRole('button', { name: '독립 리그' })).toHaveAttribute('aria-pressed', 'true');
-    expect(within(screen.getByRole('table')).getAllByRole('button')).toHaveLength(1);
+    expect(within(screen.getByRole('table')).getAllByRole('button', { name: /상세 보기/ })).toHaveLength(1);
   });
 
   it('native Back/Forward로 체계를 복원하고 설치된 Next history 경계가 출처와 hash 및 내부 상태를 보존한다', async () => {
@@ -207,7 +207,7 @@ describe('MD-QA #25 관리자 리그 목록 복귀', () => {
       }));
       view.rerender(<AdminLeagueHubPage />);
       expect(screen.getByRole('button', { name: label })).toHaveAttribute('aria-pressed', 'true');
-      expect(within(screen.getByRole('table')).getAllByRole('button')).toHaveLength(count);
+      expect(within(screen.getByRole('table')).getAllByRole('button', { name: /상세 보기/ })).toHaveLength(count);
     }
     const tree = ['root', {}];
     window.history.replaceState({ __NA: true, __PRIVATE_NEXTJS_INTERNALS_TREE: tree }, '', window.location.href);
@@ -246,14 +246,14 @@ describe('MD-QA #25 관리자 리그 목록 복귀', () => {
     expect(new URLSearchParams(window.location.search).get('from')).toBe('/admin');
     await user.click(screen.getByRole('tab', { name: '정규 리그' }));
     expect(screen.getByRole('button', { name: SERIES_TITLE })).toHaveAttribute('aria-pressed', 'true');
-    expect(within(screen.getByRole('table')).getAllByRole('button')).toHaveLength(2);
+    expect(within(screen.getByRole('table')).getAllByRole('button', { name: /상세 보기/ })).toHaveLength(2);
 
     navigate(`${LIST_PATH}?seriesId=independent`);
     view.rerender(<AdminLeagueHubPage />);
     expect(screen.getByRole('button', { name: '독립 리그' })).toHaveAttribute('aria-pressed', 'true');
     await user.click(screen.getByRole('button', { name: '전체' }));
     expect(new URLSearchParams(window.location.search).has('seriesId')).toBe(false);
-    expect(within(screen.getByRole('table')).getAllByRole('button')).toHaveLength(3);
+    expect(within(screen.getByRole('table')).getAllByRole('button', { name: /상세 보기/ })).toHaveLength(3);
   });
 
   it('조건이 없는 직접 상세 진입은 기본 목록으로 돌아간다', async () => {

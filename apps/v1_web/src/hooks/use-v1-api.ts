@@ -3410,7 +3410,13 @@ export function useV1PurgeGuestInquiries() {
   });
 }
 
-export function useV1AdminTeamMatches(filters?: AdminListFilters & { kind?: 'friendly' | 'league' | 'tournament' }) {
+export function useV1AdminTeamMatches(
+  filters?: AdminListFilters & {
+    kind?: 'friendly' | 'league' | 'tournament';
+    sort?: 'created_desc' | 'start_asc' | 'start_desc';
+    regionId?: string;
+  },
+) {
   return useQuery({
     queryKey: v1Keys.adminTeamMatches(filters as Record<string, unknown>),
     queryFn: () => v1Get<AdminCursorPage<V1AdminTeamMatchRow>>('/admin/team-matches', filters),
@@ -4546,6 +4552,8 @@ type AdminTournamentListFilters = {
   /** 서버 DTO가 검증한다 — useAdminListQuery.filters(string)를 그대로 받기 위한 완화 */
   status?: string;
   sportId?: string;
+  /** 공개 여부 필터 — 서버 DTO 가 public|hidden 만 받는다 */
+  visibility?: string;
   /** 제목 검색 (백엔드 title contains, insensitive — tournaments-admin.service.ts list) */
   q?: string;
   cursor?: string;
@@ -5766,14 +5774,14 @@ export function useV1MyLeagues(options?: { enabled?: boolean }) {
 }
 
 /** seriesId: 체계 id 로 소속 리그만, 'independent' 로 무소속만. 없으면 전체 (리그 허브 칩 필터). */
-export function useV1AdminLeagueMatchList(seriesId?: string) {
+export function useV1AdminLeagueMatchList(seriesId?: string, visibility?: 'public' | 'hidden') {
   return useQuery({
-    queryKey: v1Keys.adminLeagueMatchList(seriesId),
+    queryKey: v1Keys.adminLeagueMatchList(seriesId, visibility),
     queryFn: () =>
-      v1Get<{ items: V1AdminLeagueListItem[] }>(
-        '/admin/league-matches',
-        seriesId ? { seriesId } : undefined,
-      ),
+      v1Get<{ items: V1AdminLeagueListItem[] }>('/admin/league-matches', {
+        ...(seriesId ? { seriesId } : {}),
+        ...(visibility ? { visibility } : {}),
+      }),
   });
 }
 
@@ -5833,6 +5841,8 @@ export function useV1UpdateTournamentVisibility(tournamentId: string) {
         current ? { ...current, isPublic: result.isPublic } : current,
       );
       queryClient.invalidateQueries({ queryKey: v1Keys.adminTournament(tournamentId) });
+      // 어드민 목록은 공개 여부 필터·배지를 들고 있다 — 빈 객체 프리픽스가 모든 필터 변형을 잡는다.
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminTournaments() });
       queryClient.invalidateQueries({ queryKey: v1Keys.tournament(tournamentId) });
       queryClient.invalidateQueries({ queryKey: v1Keys.tournaments() });
       queryClient.invalidateQueries({ queryKey: ['tournament-reviews', tournamentId] });

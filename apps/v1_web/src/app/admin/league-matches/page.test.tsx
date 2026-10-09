@@ -5,8 +5,15 @@ import AdminLeagueHubPage from './page';
 
 const leagueListMock = vi.fn();
 const seriesListMock = vi.fn();
+const visibilityMutateAsync = vi.fn();
+let canWrite = true;
 vi.mock('@/hooks/use-v1-api', () => ({
   useV1AdminLeagueMatchList: (...args: unknown[]) => leagueListMock(...args),
+  useV1AdminMe: () => ({ data: { capabilities: canWrite ? ['status:write'] : [] } }),
+  useV1UpdateLeagueVisibility: (leagueId: string) => ({
+    mutateAsync: (body: { isPublic: boolean }) => visibilityMutateAsync(leagueId, body),
+    isPending: false,
+  }),
   useV1AdminLeagueSeriesList: () => seriesListMock(),
 }));
 
@@ -20,6 +27,7 @@ vi.mock('next/navigation', () => ({
 const LEAGUES = [
   {
     leagueId: 'lg-1',
+    isPublic: true,
     title: '서울 풋살 정규 리그 1부',
     state: 'active' as const,
     teamCount: 8,
@@ -33,6 +41,7 @@ const LEAGUES = [
   },
   {
     leagueId: 'lg-2',
+    isPublic: false,
     title: '성남 야간 풋살 리그',
     state: 'draft' as const,
     teamCount: 6,
@@ -54,6 +63,8 @@ describe('AdminLeagueHubPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     searchParams = new URLSearchParams();
+    canWrite = true;
+    visibilityMutateAsync.mockResolvedValue({});
     window.history.replaceState(null, '', '/admin/league-matches');
     leagueListMock.mockReturnValue({ data: { items: LEAGUES }, isPending: false, isError: false, refetch: vi.fn() });
     seriesListMock.mockReturnValue({ data: { items: SERIES }, isPending: false, isError: false, refetch: vi.fn() });
@@ -73,13 +84,66 @@ describe('AdminLeagueHubPage', () => {
     const user = userEvent.setup();
     render(<AdminLeagueHubPage />);
 
-    expect(leagueListMock).toHaveBeenLastCalledWith(undefined);
+    expect(leagueListMock).toHaveBeenLastCalledWith(undefined, undefined);
 
     await user.click(screen.getByRole('button', { name: /서울 풋살 리그/ }));
-    expect(leagueListMock).toHaveBeenLastCalledWith('sr-1');
+    expect(leagueListMock).toHaveBeenLastCalledWith('sr-1', undefined);
 
     await user.click(screen.getByRole('button', { name: /독립 리그/ }));
-    expect(leagueListMock).toHaveBeenLastCalledWith('independent');
+    expect(leagueListMock).toHaveBeenLastCalledWith('independent', undefined);
+  });
+
+  it('passes the 공개 여부 filter to the list hook and keeps it in the URL', async () => {
+    const user = userEvent.setup();
+    render(<AdminLeagueHubPage />);
+
+    await user.selectOptions(screen.getByLabelText('공개 여부'), 'hidden');
+    expect(leagueListMock).toHaveBeenLastCalledWith(undefined, 'hidden');
+    expect(window.location.search).toBe('?visibility=hidden');
+
+    await user.selectOptions(screen.getByLabelText('공개 여부'), '');
+    expect(leagueListMock).toHaveBeenLastCalledWith(undefined, undefined);
+  });
+
+  it('shows each league 공개/숨김 as text and hides a public league only after the confirm modal', async () => {
+    const user = userEvent.setup();
+    render(<AdminLeagueHubPage />);
+
+    const table = screen.getByRole('table');
+    // 열 머리글 '공개' + 공개 배지 1개
+    expect(within(table).getAllByText('공개')).toHaveLength(2);
+    expect(within(table).getByText('숨김')).toBeInTheDocument();
+
+    await user.click(within(table).getByRole('button', { name: '서울 풋살 정규 리그 1부 숨기기' }));
+    expect(visibilityMutateAsync).not.toHaveBeenCalled();
+    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: '숨기기' }));
+    expect(visibilityMutateAsync).toHaveBeenCalledWith('lg-1', { isPublic: false });
+
+    await user.click(within(table).getByRole('button', { name: '성남 야간 풋살 리그 다시 보이기' }));
+    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: '다시 보이기' }));
+    expect(visibilityMutateAsync).toHaveBeenLastCalledWith('lg-2', { isPublic: true });
+  });
+
+  it('surfaces the server error (e.g. on-hold league 409) as a toast and does not claim success', async () => {
+    const user = userEvent.setup();
+    visibilityMutateAsync.mockRejectedValue(
+      Object.assign(new Error('x'), { response: { data: { message: '보류 중인 리그는 공개할 수 없어요.' } } }),
+    );
+    render(<AdminLeagueHubPage />);
+
+    await user.click(within(screen.getByRole('table')).getByRole('button', { name: '성남 야간 풋살 리그 다시 보이기' }));
+    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: '다시 보이기' }));
+
+    expect(await screen.findByText('보류 중인 리그는 공개할 수 없어요.')).toBeInTheDocument();
+    expect(screen.queryByText('리그를 다시 공개했어요.')).not.toBeInTheDocument();
+  });
+
+  it('disables the row action for read-only admins', () => {
+    canWrite = false;
+    render(<AdminLeagueHubPage />);
+
+    const button = within(screen.getByRole('table')).getByRole('button', { name: /서울 풋살 정규 리그 1부 숨기기/ });
+    expect(button).toBeDisabled();
   });
 
   it('switches to the series tab, mirrors ?tab=series into the URL, and swaps the create action', async () => {

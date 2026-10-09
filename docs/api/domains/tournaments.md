@@ -20,6 +20,9 @@ mutation administrator, is a no-op without audit when the value is unchanged, re
 `tournament.visibility` in the admin audit otherwise, and returns
 `409 TOURNAMENT_VERSION_CONFLICT` if a concurrent request changed the value first.
 The admin tournament detail includes `isPublic`.
+`GET /api/v1/admin/tournaments` accepts an optional `visibility=public|hidden` filter
+(any other value returns `400`); it narrows the rows, `pageInfo` and the `summary` status
+counts together, and omitting it keeps every row.
 See [the league visibility contract](./league-matches.md#public-visibility).
 
 | Method | Path | Auth | Request | Response |
@@ -194,6 +197,24 @@ The Web campaign route is `/tournaments/campaigns/:slug` with no browser `/v1` p
 Status transitions are `draft -> published | archived`, `published -> draft | archived`, and `archived -> draft`. Repeating the current status is an idempotent no-op. Every status request requires a non-empty audit `reason`. Publishing additionally requires the related tournament to be non-deleted and in a public status. Update/status reads, compare-and-swap writes, and admin audit logs run in serializable transactions; stale concurrent mutations return `TOURNAMENT_CAMPAIGN_CONCURRENT_UPDATE`. Empty or identical PATCH requests return `TOURNAMENT_CAMPAIGN_NO_CHANGES`. Other contract errors are `TOURNAMENT_CAMPAIGN_NOT_FOUND`, `TOURNAMENT_CAMPAIGN_EXISTS`, `TOURNAMENT_CAMPAIGN_SLUG_TAKEN`, `TOURNAMENT_CAMPAIGN_SLUG_LOCKED`, and `NOT_PUBLISHABLE`.
 
 Campaign admin routes inherit `V1AuthGuard`. Production accepts only the signed HttpOnly v1 session, reloads current account status, ignores caller-controlled `x-v1-user-*` headers, and fails startup without a strong session secret. Development/test may retain persona headers for local QA only.
+
+## Admin tournament status transitions (2026-10-09)
+
+`POST /admin/tournaments/:id/status` `{ status, reason? }` follows this table (`TOURNAMENT_TRANSITIONS` in `tournaments-admin.service.ts`):
+
+| from | to |
+|---|---|
+| draft | open, cancelled |
+| open | closed, cancelled |
+| closed | open, in_progress, cancelled |
+| in_progress | completed, cancelled |
+| completed | **in_progress** (revert completion) |
+| cancelled | **draft** (restore) |
+
+- The two reverse transitions require a non-blank `reason` (`400 TOURNAMENT_STATUS_REASON_REQUIRED`); it is stored on the `tournament.status` admin action log and the status change log.
+- Everything else, including `in_progress -> open|closed`, still returns `409 TOURNAMENT_STATUS_TRANSITION_INVALID`.
+- Reverting completion changes only `status`. Awards, standings and reviews are derived from `status === 'completed'`, so they are hidden again until the tournament is completed again. Review-request notifications are sent on the first completion only (a prior `completed` status log suppresses re-sending).
+- A restored draft is not publicly listed or readable (draft/cancelled return 404 to consumers) until it is opened again, which re-runs the paid-tournament payment-instruction check.
 
 ## Admin Tournament Creation
 

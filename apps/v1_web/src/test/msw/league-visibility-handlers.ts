@@ -35,6 +35,7 @@ export const v1LeagueVisibilityFixture: {
   adminListItem: {
     leagueId,
     title: '공개 설정 검증 리그',
+    isPublic: true,
     state: 'active',
     teamCount: 2,
     fixtureCount: 0,

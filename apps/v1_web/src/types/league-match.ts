@@ -3,6 +3,7 @@ import type { V1AdminBracketFixtureGame, V1AdminBracketSlot } from './api';
 export interface V1AdminLeagueListItem {
   leagueId: string;
   title: string;
+  isPublic: boolean;
   state: 'draft' | 'active' | 'completed' | 'on_hold';
   teamCount: number;
   fixtureCount: number;

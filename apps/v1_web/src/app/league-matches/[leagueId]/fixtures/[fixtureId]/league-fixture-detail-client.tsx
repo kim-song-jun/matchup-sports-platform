@@ -19,6 +19,7 @@ import { sanitizeRedirectPath, withFromPath } from '@/lib/session-storage';
 import { V1ApiError } from '@/lib/api-client';
 import { formatTournamentDateTimeLong, formatTournamentDateTimeShort } from '@/lib/date-utils';
 import { fixtureResultLabel } from '@/lib/league-fixture-meta';
+import { leagueFixtureWeekNumber } from '@/lib/league-fixture-week';
 import {
   leagueFixturePhase,
   leagueStateChip,
@@ -43,17 +44,12 @@ import type { V1LeagueFixture, V1LeagueStandingRow } from '@/types/league-match'
  */
 
 /**
- * 주차 라벨 — 공개 fixture 응답에는 round 필드가 없다(어드민 preview 전용). 리그 대진은
- * 주 단위 템플릿으로 일괄 생성되므로(V1GenerateLeagueFixturesPayload.weeksCount) KST
- * 기준 "몇 번째 경기 날짜인가"가 곧 주차다. 같은 날 여러 라운드를 몰아넣은 QA 시드류
- * 데이터에서는 어긋날 수 있어 단정 표기 대신 보조 정보로만 싣는다.
+ * 주차 라벨 — 공개 fixture 응답에는 round 필드가 없어 일정에서 파생한다(`leagueFixtureWeekNumber`).
+ * 같은 날 여러 라운드를 몰아넣은 QA 시드류 데이터에서는 어긋날 수 있어 단정 표기 대신 보조 정보로만 싣는다.
  */
-const KST_DAY = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Seoul' });
-
 function roundLabel(fixtures: V1LeagueFixture[], target: V1LeagueFixture): string | null {
-  const days = [...new Set(fixtures.map((fixture) => KST_DAY.format(new Date(fixture.startAt))))].sort();
-  const index = days.indexOf(KST_DAY.format(new Date(target.startAt)));
-  return index >= 0 ? `${index + 1}주차` : null;
+  const week = leagueFixtureWeekNumber(fixtures, target);
+  return week === null ? null : `${week}주차`;
 }
 
 function recordLine(row: V1LeagueStandingRow | undefined): string | null {

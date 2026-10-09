@@ -993,12 +993,18 @@ export function useV1Team(teamId: string) {
   });
 }
 
-export function useV1TeamDetail(teamId: string, options?: { seed?: V1TeamDetail | null }) {
+// 읽기 화면만 `refetchOnWindowFocus` 로 다른 탭의 팀 정보 저장을 받는다. 편집폼은 기본값(끔)을 유지한다.
+export function useV1TeamDetail(
+  teamId: string,
+  options?: { seed?: V1TeamDetail | null; refetchOnWindowFocus?: boolean | 'always' },
+) {
   const seed = options?.seed;
-  return useQuery({
+  const focusPolicy = options?.refetchOnWindowFocus ?? false;
+  const query = useQuery({
     queryKey: [...v1Keys.team(teamId), 'detail'] as const,
     queryFn: () => v1Get<V1TeamDetail>(`/teams/${teamId}`),
     enabled: Boolean(teamId),
+    refetchOnWindowFocus: focusPolicy,
     // 서버 컴포넌트가 구조화 데이터·메타데이터를 위해 이미 받아 둔 응답을 첫 표시값으로 쓴다
     // (추가 요청이 아니다). 팀 이름·로고·소개·지역·멤버 수는 그대로 맞다.
     //
@@ -1009,6 +1015,8 @@ export function useV1TeamDetail(teamId: string, options?: { seed?: V1TeamDetail 
     // `isPlaceholderData` 동안 뷰어 의존 UI(CTA·컨택)를 잠근다.
     placeholderData: seed ?? undefined,
   });
+  useV1WindowFocusRefetch(query, Boolean(teamId), focusPolicy);
+  return query;
 }
 
 export function useV1CreateTeam() {

@@ -3,9 +3,11 @@ import { notFound } from 'next/navigation';
 import LeagueFixtureDetailClient from './league-fixture-detail-client';
 import { JsonLd } from '@/components/seo/json-ld';
 import { formatTournamentDateTimeLong } from '@/lib/date-utils';
+import { leagueFixtureWeekNumber, withDerivedWeek } from '@/lib/league-fixture-week';
 import { buildNoIndexMetadata, buildPublicMetadata } from '@/lib/seo';
 import { buildBreadcrumbLd, buildTeamMatchEventLd } from '@/lib/structured-data';
 import type { V1TeamMatch } from '@/types/api';
+import type { V1PublicLeagueDetail } from '@/types/league-match';
 import { leaguePath, loadPublic } from '../../load-public';
 
 interface Props {
@@ -17,6 +19,17 @@ const fixtureApiPath = (fixtureId: string) => `/team-matches/${encodeURIComponen
 const fixturePath = (leagueId: string, fixtureId: string) =>
   `${leaguePath(leagueId)}/fixtures/${encodeURIComponent(fixtureId)}`;
 
+// 저장된 대진 제목의 주차는 생성 시점 값이다 — 본문 주차와 같도록 일정에서 파생한 값으로 바꾼다.
+// 리그 조회가 실패하면 저장된 제목을 그대로 쓴다(제목은 메타·LD 용이라 화면 오류가 아니다).
+async function resolveFixtureTitle(fixture: V1TeamMatch, fixtureId: string): Promise<string> {
+  if (!fixture.league) return fixture.title;
+  const league = await loadPublic<V1PublicLeagueDetail>(leaguePath(fixture.league.leagueId));
+  if (!league.ok || !league.data) return fixture.title;
+  const { fixtures } = league.data;
+  const target = fixtures.find((item) => item.teamMatchId === fixtureId);
+  return target ? withDerivedWeek(fixture.title, leagueFixtureWeekNumber(fixtures, target)) : fixture.title;
+}
+
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { leagueId, fixtureId } = await params;
   const path = fixturePath(leagueId, fixtureId);
@@ -26,7 +39,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   }
   if (!fixture.data) return buildNoIndexMetadata('경기를 찾을 수 없어요');
 
-  const { title, league, startsAt, place } = fixture.data;
+  const { league, startsAt, place } = fixture.data;
+  const title = await resolveFixtureTitle(fixture.data, fixtureId);
   // 주소의 leagueId 가 틀려도(깨진 링크) canonical 은 경기가 실제로 속한 리그를 가리킨다.
   const canonical = league ? fixturePath(league.leagueId, fixtureId) : path;
   const parts = [league?.title ?? '정규 리그', formatTournamentDateTimeLong(startsAt), place?.name].filter(Boolean);
@@ -48,8 +62,9 @@ export default async function LeagueFixturePage({ params }: Props) {
   const detail = fixture.ok ? fixture.data : null;
   // LD 는 주소가 아니라 경기가 실제로 속한 리그로 잇는다 — 리그가 아닌 경기면 리그 연결을 만들지 않는다.
   const league = detail?.league ?? null;
+  const title = detail ? await resolveFixtureTitle(detail, fixtureId) : '';
   const eventLd = detail
-    ? buildTeamMatchEventLd(detail, fixtureId, league
+    ? buildTeamMatchEventLd({ ...detail, title }, fixtureId, league
         ? { path: fixturePath(league.leagueId, fixtureId), superEventPath: leaguePath(league.leagueId) }
         : { path: fixturePath(leagueId, fixtureId) })
     : null;
@@ -63,7 +78,7 @@ export default async function LeagueFixturePage({ params }: Props) {
             { name: '대회', path: '/tournaments' },
             { name: '정규 리그', path: '/tournaments?kind=league' },
             { name: league.title, path: leaguePath(league.leagueId) },
-            { name: detail.title, path: fixturePath(league.leagueId, fixtureId) },
+            { name: title, path: fixturePath(league.leagueId, fixtureId) },
           ])}
         />
       ) : null}

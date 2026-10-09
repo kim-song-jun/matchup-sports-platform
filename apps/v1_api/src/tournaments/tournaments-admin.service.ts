@@ -30,17 +30,24 @@ import { LineupSizeConfigResolver } from './competition-config/lineup-size-confi
 import { TournamentCompetitionConfig } from './competition-config/tournament-competition-config';
 
 /**
- * 대회 status 전이 규칙. completed/cancelled는 종착(이후 전이 없음).
- * 운영 실수 회복을 위해 closed↔open 재오픈은 허용.
+ * 대회 status 전이 규칙. 운영 실수 회복을 위해 closed↔open 재오픈, completed→in_progress
+ * (완료 되돌리기), cancelled→draft(초안 복구)를 허용한다. in_progress→open/closed 는 이미
+ * 생긴 경기·결과가 새 신청과 섞이므로 계속 막는다.
  */
 const TOURNAMENT_TRANSITIONS: Record<TournamentStatus, TournamentStatus[]> = {
   draft: ['open', 'cancelled'],
   open: ['closed', 'cancelled'],
   closed: ['open', 'in_progress', 'cancelled'],
   in_progress: ['completed', 'cancelled'],
-  completed: [],
-  cancelled: [],
+  completed: ['in_progress'],
+  cancelled: ['draft'],
 };
+
+/** Reverse transitions undo an operator decision, so the audit trail must say why. */
+const REASON_REQUIRED_TRANSITIONS: ReadonlyArray<readonly [TournamentStatus, TournamentStatus]> = [
+  ['completed', 'in_progress'],
+  ['cancelled', 'draft'],
+];
 
 const TOURNAMENT_LIST_STATUSES = ['draft', 'open', 'closed', 'in_progress', 'completed', 'cancelled'] as const;
 
@@ -780,9 +787,22 @@ export class TournamentsAdminService {
         message: `${from} 상태에서 ${to}(으)로 변경할 수 없어요.`,
       });
     }
+    const reason = dto.reason?.trim() ? dto.reason.trim() : undefined;
+    if (!reason && REASON_REQUIRED_TRANSITIONS.some(([f, t]) => f === from && t === to)) {
+      throw new BadRequestException({
+        code: 'TOURNAMENT_STATUS_REASON_REQUIRED',
+        message: '되돌리는 사유를 입력해 주세요.',
+      });
+    }
     if (to === 'open') {
       this.assertPaidTournamentPaymentInstructions(existing);
     }
+    // Review-request notifications are sent on the first completion only; a revert + re-complete must not re-notify.
+    const alreadyCompletedBefore =
+      to === 'completed' &&
+      (await this.prisma.v1StatusChangeLog.count({
+        where: { targetType: 'tournament', targetId: tournamentId, toStatus: 'completed' },
+      })) > 0;
 
     await this.prisma.$transaction(async (tx) => {
       await tx.v1Tournament.update({ where: { id: tournamentId }, data: { status: to } });
@@ -792,7 +812,7 @@ export class TournamentsAdminService {
           action: 'tournament.status',
           targetType: 'tournament',
           targetId: tournamentId,
-          reason: dto.reason ?? null,
+          reason: reason ?? null,
           fromStatus: from,
           toStatus: to,
         },
@@ -800,7 +820,7 @@ export class TournamentsAdminService {
       );
     });
 
-    if (to === 'completed') {
+    if (to === 'completed' && !alreadyCompletedBefore) {
       // 후기 요청 알림은 상태 전이의 **부수 효과**다. 전이는 위 트랜잭션에서 이미 커밋됐으므로
       // 여기서 던지면 DB 는 completed 인데 API 만 실패로 응답한다 — 운영자는 "완료 처리가
       // 실패했다"고 읽고 재시도하게 되고, 두 번째 호출은 alreadyInStatus 로 돌아와 더 헷갈린다.

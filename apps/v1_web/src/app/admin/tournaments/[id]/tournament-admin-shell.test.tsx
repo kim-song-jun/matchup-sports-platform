@@ -9,7 +9,10 @@ import { fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { TournamentAdminShell } from './tournament-admin-shell';
 
-const { adminRoleMock } = vi.hoisted(() => ({ adminRoleMock: { value: 'ops' as 'owner' | 'ops' | 'support' } }));
+const { adminRoleMock, tournamentStatusMock } = vi.hoisted(() => ({
+  adminRoleMock: { value: 'ops' as 'owner' | 'ops' | 'support' },
+  tournamentStatusMock: { value: 'in_progress' as string },
+}));
 
 vi.mock('next/navigation', () => ({
   usePathname: () => '/admin/tournaments/tournament-1/info',
@@ -22,7 +25,7 @@ vi.mock('@/hooks/use-v1-api', () => ({
     data: {
       id: 'tournament-1',
       title: '서울 풋살 챔피언십',
-      status: 'in_progress',
+      status: tournamentStatusMock.value,
       sport: { code: 'futsal', name: '풋살' },
       operationCounts: { registrations: 3, fixtures: 4, announcements: 1 },
     },
@@ -87,6 +90,46 @@ describe('TournamentAdminShell 섹션 내비', () => {
 
     fireEvent.click(within(dialog).getByRole('button', { name: '대회 완료하기' }));
     await vi.waitFor(() => expect(statusMutate).toHaveBeenCalledWith({ status: 'completed' }, expect.anything()));
+  });
+
+  it.each([
+    ['completed', '진행 중으로 되돌리기', 'in_progress'],
+    ['cancelled', '초안으로 복구', 'draft'],
+  ])('%s 대회는 사유를 받아 %s 로 되돌린다', async (status, buttonName, target) => {
+    adminRoleMock.value = 'ops';
+    tournamentStatusMock.value = status;
+    statusMutate.mockClear();
+    try {
+      render(<TournamentAdminShell id="tournament-1"><div /></TournamentAdminShell>);
+
+      fireEvent.click(screen.getByRole('button', { name: buttonName }));
+      const dialog = await screen.findByRole('alertdialog');
+      const confirm = within(dialog).getByRole('button', { name: '되돌리기' });
+      expect(confirm).toBeDisabled();
+      expect(statusMutate).not.toHaveBeenCalled();
+
+      fireEvent.change(within(dialog).getByRole('textbox'), { target: { value: ' 잘못 눌렀어요 ' } });
+      fireEvent.click(confirm);
+      expect(statusMutate).toHaveBeenCalledWith({ status: target, reason: '잘못 눌렀어요' }, expect.anything());
+    } finally {
+      tournamentStatusMock.value = 'in_progress';
+    }
+  });
+
+  it('진행 중 대회에는 되돌리기 버튼이 없고, 조회 전용 관리자에게는 완료 대회에서도 없다', () => {
+    adminRoleMock.value = 'ops';
+    render(<TournamentAdminShell id="tournament-1"><div /></TournamentAdminShell>).unmount();
+    expect(screen.queryByRole('button', { name: /되돌리기|초안으로 복구/ })).not.toBeInTheDocument();
+
+    adminRoleMock.value = 'support';
+    tournamentStatusMock.value = 'completed';
+    try {
+      render(<TournamentAdminShell id="tournament-1"><div /></TournamentAdminShell>);
+      expect(screen.queryByRole('button', { name: '진행 중으로 되돌리기' })).not.toBeInTheDocument();
+    } finally {
+      tournamentStatusMock.value = 'in_progress';
+      adminRoleMock.value = 'ops';
+    }
   });
 
   it('대회 하위 섹션은 그대로 대회 경로를 가리킨다', () => {

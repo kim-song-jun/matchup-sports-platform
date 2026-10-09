@@ -7,6 +7,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Camera } from 'lucide-react';
 import { Card, DatePickerTextInput } from '@/components/v1-ui/primitives';
 import { EyeIcon, EyeOffIcon } from '@/components/v1-ui/icons';
+import { PhoneConflictNotice } from '@/components/auth/otp/phone-conflict-notice';
 import { OtpCodeInput, OtpErrorBanner, OtpRemainingRow } from '@/components/auth/otp/otp-parts';
 import { OTP_CODE_LENGTH, useOtpVerification } from '@/components/auth/otp/use-otp-verification';
 import { usePhoneVerificationRequests } from '@/components/auth/phone-verification/use-phone-verification-requests';
@@ -108,6 +109,7 @@ export function SignupClient() {
   const [termsReady, setTermsReady] = useState(false);
   const [profileError, setProfileError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [phoneConflict, setPhoneConflict] = useState(false);
   const nicknameHelperId = useId();
   const emailHelperId = useId();
   const normalizedNickname = nickname.trim();
@@ -149,6 +151,12 @@ export function SignupClient() {
   };
 
   const otpIdPrefix = useId();
+  const phoneConflictNotice = (
+    <PhoneConflictNotice
+      onLogin={() => router.push('/login')}
+      onFindAccount={() => router.push('/auth/find-account')}
+    />
+  );
   const phoneRequests = usePhoneVerificationRequests({ mode: 'public', phone: phoneDigits, onVerified: handlePhoneVerified });
   const otp = useOtpVerification(phoneRequests);
 
@@ -250,6 +258,7 @@ export function SignupClient() {
     if (profileBlocked) return;
     setError(null);
     setProfileError(null);
+    setPhoneConflict(false);
     if (!isCompleteSignupProfile(profileDraft)) {
       const nextProfileIssue = getSignupProfileIssue(profileDraft);
       if (nextProfileIssue) setProfileError(SIGNUP_PROFILE_ERROR_MESSAGES[nextProfileIssue]);
@@ -310,7 +319,7 @@ export function SignupClient() {
           return;
         }
         if (nextError.code === 'PHONE_CONFLICT') {
-          setProfileError('이미 가입된 휴대폰 번호예요.');
+          setPhoneConflict(true);
           return;
         }
         emailCheck.markTaken(normalizedEmail);
@@ -546,6 +555,7 @@ export function SignupClient() {
                     // 번호가 바뀌면 직전 번호로 받은 증명은 무효다.
                     setPhoneProofToken(null);
                     setProfileError(null);
+                    setPhoneConflict(false);
                   }}
                   placeholder="010-0000-0000"
                   required
@@ -558,7 +568,7 @@ export function SignupClient() {
                   {otp.phase === 'sent' ? (
                     <OtpCodeInput idPrefix={otpIdPrefix} otp={otp} verifying={phoneRequests.verifying} />
                   ) : null}
-                  <OtpErrorBanner idPrefix={otpIdPrefix} otp={otp} />
+                  <OtpErrorBanner idPrefix={otpIdPrefix} otp={otp} conflictNotice={phoneConflictNotice} />
                   {otp.phase === 'sent' ? (
                     <div style={{ marginTop: -4 }}>
                       <OtpRemainingRow idPrefix={otpIdPrefix} otp={otp} issuing={phoneRequests.issuing} />
@@ -685,6 +695,8 @@ export function SignupClient() {
             </>
           ) : null}
         </form>
+
+        {phoneConflict ? phoneConflictNotice : null}
 
         {profileError ? (
           <Card pad={16} className="tm-auth-soft-card tm-auth-soft-card-error">

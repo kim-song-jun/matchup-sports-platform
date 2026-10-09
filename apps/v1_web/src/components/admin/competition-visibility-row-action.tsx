@@ -16,7 +16,7 @@ type VisibilityMutation = UseMutationResult<unknown, unknown, { isPublic: boolea
 
 /** 공개 여부 표시 — 아이콘 + 텍스트를 함께 둬 색에만 의존하지 않는다. */
 export function AdminVisibilityBadge({ isPublic, hiddenReason }: { isPublic: boolean; hiddenReason?: string }) {
-  const Icon = hiddenReason || isPublic ? Eye : EyeOff;
+  const Icon = isPublic && !hiddenReason ? Eye : EyeOff;
   const label = hiddenReason ? '노출 안 됨' : isPublic ? '공개' : '숨김';
   return (
     <span

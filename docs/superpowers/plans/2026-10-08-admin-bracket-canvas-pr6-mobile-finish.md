@@ -3520,6 +3520,7 @@ Expected: 판정 표의 모든 행이 `OK`(390·767 은 라운드 탭 ≥1·구�
 - 워크스페이스·리그 보드는 `useMediaQuery(BRACKET_CANVAS_SIDE_PANEL_MEDIA_QUERY)` 가 false(768~1023)이면 선택한 칸의 패널(`BracketNodePanel`·`LeagueFixturePanel`)을 그리드 세 번째 열이 아니라 `BottomSheet`(onClose 모드, 제목 = 칸 제목, 시트 안에서 스크롤)로 연다. 닫으면(X·바깥 탭·ESC·뒤로가기) 선택을 풀고 포커스를 그 칸의 머리 버튼(`"<제목> 열기"`)으로 돌려준다. 그리드는 트레이 + 그림 두 영역만 쓴다.
 - 트레이는 선택 prop `collapsible?: boolean` 을 받는다. 768~1023 에서 기본 접힘: 44px 한 줄에 "참가팀 {전체 수} · 미배정 {N}"과 「펼치기」/「접기」 토글(`aria-expanded`·`aria-controls`). 펼치면 지금 목록 그대로. 조회 상태(`registrationsState`)의 로딩·실패·재조회 실패 안내와 「다시 시도」는 접힌 상태에서도 보인다. 1024 이상에서는 토글 없이 지금처럼 펼친 목록.
 - 시트는 기존 `BottomSheet` 만 쓴다(새 모달 금지). 뒤로가기 닫기는 `useModalA11y(closeOnBack)` 에 맡긴다.
+- **리그 보드 1024 이상(2026-10-09 alpha E2E 보강):** 지금 `LeagueScheduleBoard` 는 패널을 보드 **아래**에 전체 폭으로 붙인다(`league-schedule-board.tsx` 의 `lg:grid-cols-[16rem_minmax(0,1fr)]` 밖). 경기가 많은 리그에서는 대진 화면 768 과 같은 이유로 패널이 화면 밖에 열린다. 결정 A 의 원칙("칸을 누른 직후 같은 화면 안에 상세가 보인다")을 따라, 1024 이상에서는 대회 워크스페이스와 똑같이 그리드 세 번째 열(`lg:grid-cols-[16rem_minmax(0,1fr)_320px]`)에 패널을 둔다(선택 없으면 두 열). 테스트: 1024 에서 경기 머리를 누르면 패널이 보드와 같은 그리드 행의 세 번째 열에 렌더된다(시트 아님) — 대조군으로 1023 은 시트.
 
 **Tests(Task 1 의 `installViewport`/`resizeViewport` 로 경계를 실제로 바꾼다):**
 - 1023: 칸을 누르면 `role="dialog"` 시트에 그 칸 제목이 보이고, 닫으면 칸 머리 버튼에 포커스가 돌아온다. 1024: 같은 동작이 시트 없이 옆 패널로 열린다(대조군).

@@ -14,7 +14,7 @@ import { releaseSlotsForRegistrationInTx } from '../tournaments/slots/tournament
 import { PrismaService } from '../prisma/prisma.service';
 import { V1AuthUser } from '../auth/v1-auth-user';
 import { NotificationsService } from '../notifications/notifications.service';
-import { resolveTeamMatchCompetitionConfig } from '../team-matches/resolve-team-match-competition-config';
+import { leagueCompetitionConfig } from './league-competition-config';
 import {
   cascadeCancelTeamMatchSchedulesInTx,
   syncTeamMatchScheduleInTx,
@@ -596,10 +596,7 @@ export class LeagueMatchAdminService {
         message: '리그에 등록된 팀이 2개 미만이에요.',
       });
     }
-    const config = await resolveTeamMatchCompetitionConfig(this.prisma, league.sportId);
-    if (config === null) {
-      throw new ConflictException({ code: 'COMPETITION_CONFIG_REQUIRED', message: '이 종목에 활성 경기 설정이 없어요.' });
-    }
+    const config = leagueCompetitionConfig(league);
     const teamIds = league.teams.map((entry) => entry.teamId);
     const regulation = await regulationMinutesForConfigVersion(this.prisma, config.id);
     const { totalRounds, timing } = this.resolveFixturePlan(dto, regulation);
@@ -942,10 +939,7 @@ export class LeagueMatchAdminService {
         message: '리그에 등록된 팀이 2개 미만이에요.',
       });
     }
-    const config = await resolveTeamMatchCompetitionConfig(this.prisma, league.sportId);
-    if (config === null) {
-      throw new ConflictException({ code: 'COMPETITION_CONFIG_REQUIRED', message: '이 종목에 활성 경기 설정이 없어요.' });
-    }
+    const config = leagueCompetitionConfig(league);
     const teamIds = league.teams.map((entry) => entry.teamId);
     const activeTeamCount = await this.prisma.v1Team.count({ where: { id: { in: teamIds }, status: 'active', deletedAt: null } });
     if (activeTeamCount !== teamIds.length) {
@@ -1116,10 +1110,7 @@ export class LeagueMatchAdminService {
         message: '리그에 등록된 팀이 2개 미만이에요.',
       });
     }
-    const config = await resolveTeamMatchCompetitionConfig(this.prisma, league.sportId);
-    if (config === null) {
-      throw new ConflictException({ code: 'COMPETITION_CONFIG_REQUIRED', message: '이 종목에 활성 경기 설정이 없어요.' });
-    }
+    const config = leagueCompetitionConfig(league);
     const teamIds = league.teams.map((entry) => entry.teamId);
     const regulation = await regulationMinutesForConfigVersion(this.prisma, config.id);
     const { totalRounds, timing } = this.resolveFixturePlan(dto, regulation);
@@ -1264,10 +1255,7 @@ export class LeagueMatchAdminService {
   async applyTemplate(user: V1AuthUser, leagueId: string, dto: ApplyLeagueTemplateDto) {
     const admin = await this.adminContext.getMutationAdmin(user.id);
     const league = await this.loadLeague(leagueId);
-    const config = await resolveTeamMatchCompetitionConfig(this.prisma, league.sportId);
-    if (config === null) {
-      throw new ConflictException({ code: 'COMPETITION_CONFIG_REQUIRED', message: '이 종목에 활성 경기 설정이 없어요.' });
-    }
+    const config = leagueCompetitionConfig(league);
     const plan = planLeagueTemplate({ teamCount: dto.teamCount, legs: dto.legs });
     if (plan.fixtures.length > BRACKET_TEMPLATE_MAX_FIXTURES) {
       throw new UnprocessableEntityException({
@@ -1383,10 +1371,7 @@ export class LeagueMatchAdminService {
         message: '같은 팀끼리 경기를 만들 수 없어요.',
       });
     }
-    const config = await resolveTeamMatchCompetitionConfig(this.prisma, league.sportId);
-    if (config === null) {
-      throw new ConflictException({ code: 'COMPETITION_CONFIG_REQUIRED', message: '이 종목에 활성 경기 설정이 없어요.' });
-    }
+    const config = leagueCompetitionConfig(league);
 
     const startAt = new Date(dto.startsAt);
     const trimmedPlaceName = dto.placeName?.trim();
@@ -1934,6 +1919,7 @@ export class LeagueMatchAdminService {
         status: true,
         registrationDeadlineAt: true,
         sportId: true,
+        competitionConfigVersionId: true,
         regionId: true,
         // 징계(출전정지) 규정 — 어드민 화면이 **현재 값**을 보여줘야 옵트인 여부를 알 수
         // 있다. 둘 다 null 이면 이 리그에는 규정이 적용되지 않는다.

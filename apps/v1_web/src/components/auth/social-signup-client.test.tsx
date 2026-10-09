@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { SocialSignupClient } from './social-signup-client';
 
 const router = vi.hoisted(() => ({
@@ -16,7 +16,10 @@ const hooks = vi.hoisted(() => ({
   authedPhoneConfirmMutateAsync: vi.fn(),
   logoutMutateAsync: vi.fn(),
   // 카카오 동의항목 미승인이 기본값 — 프리필 없이 직접 입력하는 기존 흐름.
-  authMe: { socialSignupPrefill: null as null | { name: string | null; phone: string | null; gender: 'male' | 'female' | null } },
+  authMe: {
+    socialSignupPrefill: null as null | { name: string | null; phone: string | null; gender: 'male' | 'female' | null },
+    user: { authProvider: 'kakao' as string | null },
+  },
 }));
 
 const analytics = vi.hoisted(() => ({
@@ -258,6 +261,7 @@ describe('SocialSignupClient 가입 중 탈출구', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     hooks.authMe.socialSignupPrefill = null;
+    hooks.authMe.user.authProvider = 'kakao';
     Object.defineProperty(window, 'location', {
       configurable: true,
       value: { ...window.location, replace: locationReplace },
@@ -356,5 +360,39 @@ describe('SocialSignupClient 카카오 자동 채움', () => {
     const phone = screen.getByLabelText(/^휴대폰 번호/);
     await waitFor(() => expect(phone).toHaveValue('010-1234-5678'));
     expect(phone).not.toHaveAttribute('readonly');
+  });
+});
+
+describe('SocialSignupClient 가입 방식 문구', () => {
+  afterEach(() => {
+    hooks.authMe.user.authProvider = 'kakao';
+    hooks.authMe.socialSignupPrefill = null;
+  });
+
+  it('Apple 로 들어온 가입은 카카오가 아니라 Apple 로 안내한다', () => {
+    hooks.authMe.user.authProvider = 'apple';
+    hooks.authMe.socialSignupPrefill = { name: '홍길동', phone: null, gender: null };
+    render(<SocialSignupClient />);
+
+    expect(screen.getAllByText('Apple 가입').length).toBeGreaterThan(0);
+    expect(screen.getByText(/Apple 계정 확인이 됐어요\./)).toBeInTheDocument();
+    expect(screen.getByText('Apple 계정에서 가져온 정보예요.')).toBeInTheDocument();
+    expect(screen.queryByText(/카카오/)).not.toBeInTheDocument();
+  });
+
+  it('카카오 가입은 기존처럼 카카오로 안내한다', () => {
+    hooks.authMe.user.authProvider = 'kakao';
+    render(<SocialSignupClient />);
+
+    expect(screen.getAllByText('카카오 가입').length).toBeGreaterThan(0);
+    expect(screen.getByText(/카카오 계정 확인이 됐어요\./)).toBeInTheDocument();
+  });
+
+  it('가입 방식을 아직 모르면 특정 서비스를 단정하지 않는다', () => {
+    hooks.authMe.user.authProvider = null;
+    render(<SocialSignupClient />);
+
+    expect(screen.getAllByText('간편 가입').length).toBeGreaterThan(0);
+    expect(screen.queryByText(/카카오 계정 확인/)).not.toBeInTheDocument();
   });
 });

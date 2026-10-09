@@ -180,14 +180,6 @@ describe('자리 배정 (PostgreSQL)', () => {
         .rejects.toMatchObject({ response: { code: 'SLOT_REGISTRATION_INVALID' } });
       await expect(slots.assignSlot(user, slot1.id, registrationIds[0])).resolves.toBeDefined(); // 대조군
     });
-
-    it('정규 리그 자리는 이 PR 에서 409 SLOT_LEAGUE_NOT_SUPPORTED_YET (PR-5a 가 연다)', async () => {
-      const league = await prisma.v1Tournament.create({
-        data: { sportId: ids.soccerSportId, title: 'slot-league', status: 'draft', kind: 'regular_league', competitionConfigVersionId: '11111111-1111-4111-8111-111111111111' },
-      });
-      const slot = await prisma.v1TournamentSlot.create({ data: { tournamentId: league.id, kind: 'ENTRY', position: 1 } });
-      await expect(slots.assignSlot(user, slot.id, null)).rejects.toMatchObject({ response: { code: 'SLOT_LEAGUE_NOT_SUPPORTED_YET' } });
-    });
   });
 
   describe('조 편성 (phase=group)', () => {
@@ -439,11 +431,7 @@ describe('자리 배정 (PostgreSQL)', () => {
       expect(assignments.map((a) => a.registrationId).sort()).toEqual([registrationIds[0], registrationIds[1]].sort());
     });
 
-    it('정규 리그는 409 SLOT_LEAGUE_NOT_SUPPORTED_YET, 없는 대회는 404', async () => {
-      const league = await prisma.v1Tournament.create({
-        data: { sportId: ids.soccerSportId, title: 'rf-league', status: 'draft', kind: 'regular_league', competitionConfigVersionId: '11111111-1111-4111-8111-111111111111' },
-      });
-      await expect(slots.randomFill(user, league.id)).rejects.toMatchObject({ response: { code: 'SLOT_LEAGUE_NOT_SUPPORTED_YET' } });
+    it('없는 대회는 404', async () => {
       await expect(slots.randomFill(user, '00000000-0000-4000-8000-00000000dead')).rejects.toMatchObject({ response: { code: 'TOURNAMENT_NOT_FOUND' } });
     });
   });

@@ -1,0 +1,150 @@
+import type { INestApplication } from '@nestjs/common';
+import request = require('supertest');
+import {
+  excludeUnfilledSlotFixturesSql,
+  excludeUnfilledSlotFixturesWhere,
+} from '../../src/common/competition/unfilled-slot-gate';
+import { createV1IntegrationApp } from '../integration/integration-app';
+import { createLeagueSlotHarness, type LeagueSlotHarness } from './helpers/league-slot-harness';
+
+/**
+ * 정규 리그 빈 경기 공개 게이트 — 5종 fixture × 공개 경로 전부 (스펙 S6).
+ * 가려야 하는 (a)(b)(c) 와 그대로 보여야 하는 (d)(e) 를 **같은 응답에서** 함께 단언한다.
+ */
+describe('정규 리그 빈 경기 공개 게이트', () => {
+  let app: INestApplication;
+  let cleanup: (() => Promise<void>) | undefined;
+  let h: LeagueSlotHarness;
+  let leagueId: string;
+  let ids: { empty: string; homeOnly: string; awayOnly: string; filled: string; legacy: string };
+  let gated: string[];
+  let visible: string[];
+  const teams: Record<'A' | 'B' | 'C' | 'D' | 'E', { id: string; name: string }> = {} as never;
+
+  beforeAll(async () => {
+    ({ app, cleanup } = await createV1IntegrationApp());
+    h = await createLeagueSlotHarness(app, 'lsug');
+    for (const key of ['A', 'B', 'C', 'D', 'E'] as const) teams[key] = await h.makeTeam(`lsug-${key}`);
+    // 공개 상세는 draft 를 숨기므로 진행 중 리그로 만든다.
+    leagueId = await h.makeLeague({ teams: Object.values(teams), state: 'active' });
+    const slots = await h.makeSlots(leagueId, 8);
+    const day = (offset: number) => new Date(Date.now() + (10 + offset) * 86_400_000);
+    ids = {
+      empty: await h.createFixture(leagueId, { homeSlotId: slots[0].id, awaySlotId: slots[1].id, startAt: day(0) }),
+      homeOnly: await h.createFixture(leagueId, { homeTeamId: teams.A.id, homeSlotId: slots[2].id, awaySlotId: slots[3].id, startAt: day(1) }),
+      awayOnly: await h.createFixture(leagueId, { awayTeamId: teams.B.id, homeSlotId: slots[4].id, awaySlotId: slots[5].id, startAt: day(2) }),
+      filled: await h.createFixture(leagueId, { homeTeamId: teams.C.id, awayTeamId: teams.D.id, homeSlotId: slots[6].id, awaySlotId: slots[7].id, startAt: day(3) }),
+      legacy: await h.createFixture(leagueId, { homeTeamId: teams.E.id, startAt: day(4) }),
+    };
+    gated = [ids.empty, ids.homeOnly, ids.awayOnly];
+    visible = [ids.filled, ids.legacy];
+  });
+  afterAll(async () => cleanup?.());
+
+  const sorted = (values: string[]) => [...values].sort();
+
+  it('술어 parity: Prisma where 와 raw SQL 조각이 같은 경기 집합을 낸다', async () => {
+    const viaWhere = await h.prisma.v1TeamMatch.findMany({
+      where: { leagueId, ...excludeUnfilledSlotFixturesWhere() },
+      select: { id: true },
+    });
+    const viaSql = await h.prisma.$queryRaw<Array<{ id: string }>>`
+      SELECT team_match.id FROM v1_team_matches team_match
+      WHERE team_match.league_id = ${leagueId} AND ${excludeUnfilledSlotFixturesSql('team_match')}`;
+    expect(sorted(viaWhere.map((row) => row.id))).toEqual(sorted(visible));
+    expect(sorted(viaSql.map((row) => row.id))).toEqual(sorted(visible));
+  });
+
+  describe('리그 자기 페이지', () => {
+    it('GET /league-matches/:id — 일정에서 빈·반쪽 경기는 빠지고 다 찬 경기와 자리 없는 기존 경기는 그대로다', async () => {
+      const res = await request(app.getHttpServer()).get(`/api/v1/league-matches/${leagueId}`);
+      expect(res.status).toBe(200);
+      const fixtureIds: string[] = res.body.data.fixtures.map((fixture: { teamMatchId: string }) => fixture.teamMatchId);
+      expect(sorted(fixtureIds)).toEqual(sorted(visible));
+    });
+
+    it('GET /league-matches/:id/standings — 미확정 경기 목록도 같은 기준이고 500 으로 깨지지 않는다', async () => {
+      const res = await request(app.getHttpServer()).get(`/api/v1/league-matches/${leagueId}/standings`);
+      expect(res.status).toBe(200);
+      const pending: string[] = res.body.data.pendingFixtures.map((fixture: { teamMatchId: string }) => fixture.teamMatchId);
+      expect(sorted(pending)).toEqual(sorted(visible));
+    });
+  });
+
+  describe('통합 대회 표면 (/tournaments/:id)', () => {
+    it('GET /tournaments/:id — leagueFixtures 에서 가려야 할 셋은 빠지고 둘은 그대로다', async () => {
+      const res = await request(app.getHttpServer()).get(`/api/v1/tournaments/${leagueId}`);
+      expect(res.status).toBe(200);
+      const fixtureIds: string[] = res.body.data.leagueFixtures.map((fixture: { teamMatchId: string }) => fixture.teamMatchId);
+      expect(sorted(fixtureIds)).toEqual(sorted(visible));
+    });
+
+    it('GET /tournaments/:id/standings/overall — 진행률 분모는 공개되는 경기만 센다', async () => {
+      const res = await request(app.getHttpServer()).get(`/api/v1/tournaments/${leagueId}/standings/overall`);
+      expect(res.status).toBe(200);
+      // (d)(e) 둘 다 결과가 없다 — 총 2건 · 치른 0건. 가려진 셋이 분모에 섞이면 5가 된다.
+      expect(res.body.data.progress).toMatchObject({ total: visible.length, played: 0, remaining: visible.length });
+    });
+  });
+
+  describe('공개 경기 기록', () => {
+    it('GET /tournaments/:id/schedule — 가릴 셋은 빠지고 둘은 남으며, 남은 경기의 주차는 가려진 경기를 포함해 센다', async () => {
+      const res = await request(app.getHttpServer()).get(`/api/v1/tournaments/${leagueId}/schedule`);
+      expect(res.status).toBe(200);
+      const items: Array<{ fixtureId: string; round: string }> = res.body.data.items;
+      expect(sorted(items.map((item) => item.fixtureId))).toEqual(sorted(visible));
+      // 경기일 순서가 a<b<c<d<e 이므로 d=4주차, e=5주차 — 게이트가 주차 집합까지 걸렀다면 1주차·2주차가 된다.
+      expect(items.find((item) => item.fixtureId === ids.filled)?.round).toBe('4주차');
+      expect(items.find((item) => item.fixtureId === ids.legacy)?.round).toBe('5주차');
+    });
+
+    it('경기 상세: 가릴 셋은 404, 둘은 200 이고 주차는 일정과 같다', async () => {
+      for (const fixtureId of gated) {
+        expect((await request(app.getHttpServer()).get(`/api/v1/tournaments/${leagueId}/matches/${fixtureId}`)).status).toBe(404);
+        expect((await request(app.getHttpServer()).get(`/api/v1/league-matches/${leagueId}/fixtures/${fixtureId}/record`)).status).toBe(404);
+      }
+      const filled = await request(app.getHttpServer()).get(`/api/v1/tournaments/${leagueId}/matches/${ids.filled}`);
+      expect(filled.status).toBe(200);
+      expect(filled.body.data.round).toBe('4주차');
+      const legacy = await request(app.getHttpServer()).get(`/api/v1/league-matches/${leagueId}/fixtures/${ids.legacy}/record`);
+      expect(legacy.status).toBe(200);
+      expect(legacy.body.data.round).toBe('5주차');
+    });
+  });
+
+  describe('팀 매치 표면', () => {
+    const itemIds = (res: request.Response) => res.body.data.items.map((item: { teamMatchId: string }) => item.teamMatchId) as string[];
+    const only = (all: string[]) => all.filter((id) => Object.values(ids).includes(id));
+
+    it('GET /team-matches (sitemap 원천) — 홈만 찬 경기가 새지 않고 다 찬 경기·자리 없는 기존 경기는 남는다', async () => {
+      const res = await request(app.getHttpServer()).get('/api/v1/team-matches').query({ kind: 'competition', limit: 50 });
+      expect(res.status).toBe(200);
+      expect(sorted(only(itemIds(res)))).toEqual(sorted(visible));
+    });
+
+    it('GET /team-matches/:id — 가릴 셋은 404, 둘은 200', async () => {
+      for (const id of gated) {
+        expect((await request(app.getHttpServer()).get(`/api/v1/team-matches/${id}`)).status).toBe(404);
+      }
+      for (const id of visible) {
+        expect((await request(app.getHttpServer()).get(`/api/v1/team-matches/${id}`)).status).toBe(200);
+      }
+    });
+
+    it('GET /me/team-matches — created·hosted·applied·all 어느 범위에서도 409 없이 공개되는 경기만 나온다', async () => {
+      for (const team of Object.values(teams)) await h.joinTeam(h.adminUserId, team.id);
+      for (const scope of ['created', 'hosted', 'applied', 'all'] as const) {
+        const res = await request(app.getHttpServer())
+          .get('/api/v1/me/team-matches')
+          .set('x-v1-user-id', h.adminUserId)
+          .query({ scope, limit: 50 });
+        expect(res.status).toBe(200);
+        const found = only(itemIds(res));
+        for (const id of gated) expect(found).not.toContain(id);
+        if (scope === 'created' || scope === 'all') expect(sorted(found)).toEqual(expect.arrayContaining(sorted(visible)));
+        if (scope === 'hosted') expect(found).toContain(ids.legacy);
+        if (scope === 'applied') expect(found).toContain(ids.filled);
+      }
+    });
+  });
+});

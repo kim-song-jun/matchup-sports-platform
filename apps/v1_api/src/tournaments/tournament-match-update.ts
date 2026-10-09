@@ -273,7 +273,7 @@ function fixtureNumberConflict() {
 }
 
 /** 새로 만든 대체 리비전의 id를 돌려준다 — 팀이 갓 배정된 것이면 후속 이벤트가 그 위에 명단을 채운다. */
-async function invalidateLineupAndTactics(tx: Tx, gameId: string, sideId: string): Promise<string | null> {
+export async function invalidateLineupAndTactics(tx: Tx, gameId: string, sideId: string): Promise<string | null> {
   const latest = await tx.v1GameLineup.findFirst({ where: { gameId, sideId }, orderBy: { revision: 'desc' }, select: { id: true, revision: true } });
   await tx.v1GameLineup.updateMany({ where: { gameId, sideId, invalidatedAt: null }, data: { invalidatedAt: new Date(), invalidationReason: 'SIDE_TEAM_CHANGED' } });
   let newLineupId: string | null = null;
@@ -285,7 +285,7 @@ async function invalidateLineupAndTactics(tx: Tx, gameId: string, sideId: string
   return newLineupId;
 }
 
-async function upsertSchedule(
+export async function upsertSchedule(
   tx: Tx,
   teamId: string,
   teamMatchId: string,

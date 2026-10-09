@@ -3,6 +3,7 @@ import { Prisma, V1GameResultRevisionState } from '@prisma/client';
 import type { GameOperationHandler } from '../v1-game-operations-worker.service';
 import { resolveResultStage } from '../../league-matches/league-result-stage';
 import { isTeamMatchInHeldLeague } from '../../league-matches/league-hold';
+import { excludeUnfilledSlotFixturesSql } from '../../common/competition/unfilled-slot-gate';
 
 export const LEAGUE_RESULT_ENTRY_REMINDER_TYPE = 'LEAGUE_RESULT_ENTRY_REMINDER';
 
@@ -52,6 +53,7 @@ export class LeagueResultEntryReminderService {
   readonly handler: GameOperationHandler = async (claim, tx) => {
     const { teamMatchId, expectedStartAt } = this.payload(claim.payload);
     const fixture = await this.lockFixture(tx, teamMatchId);
+    // 자리에 연결됐는데 팀이 빈 경기도 여기서 null 이 된다 — 입력할 결과가 없으니 알리지 않는다.
     if (fixture === null) return;
     // 방어적: 이 잡은 리그 대진에만 스케줄된다(generateFixtures/regenerateFixtures/
     // updateFixture 세 호출부 전부 league fixture 컨텍스트에서만 부른다).
@@ -122,6 +124,7 @@ export class LeagueResultEntryReminderService {
         ORDER BY revision DESC LIMIT 1
       ) latest_revision ON true
       WHERE team_match.id = ${teamMatchId}
+        AND ${excludeUnfilledSlotFixturesSql('team_match')}
       FOR UPDATE OF team_match
     `;
     return rows[0] ?? null;

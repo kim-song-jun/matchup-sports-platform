@@ -20,7 +20,14 @@ const prisma = new PrismaService();
 // "이미 발화 시점이 된 것처럼" 트랜잭션 안에서 직접 호출한다 — 다른 result-escalation
 // 계열 스펙(game-result-league-escalation.integration-spec.ts)과 동일한 패턴.
 
-async function seedFixture(opts: { officialResult?: boolean; status?: 'matched' | 'cancelled' } = {}) {
+async function seedFixture(
+  opts: {
+    officialResult?: boolean;
+    status?: 'matched' | 'cancelled';
+    /** 자리 연결 경기 — 어느 사이드에 팀이 찼는지. 주지 않으면 기존처럼 양 팀이 찬 자리 없는 대진이다. */
+    slots?: { homeFilled: boolean; awayFilled: boolean };
+  } = {},
+) {
   await prisma.$connect();
   const suiteId = randomUUID().slice(0, 8);
   const sport = await prisma.v1Sport.upsert({ where: { code: 'futsal' }, update: {}, create: { code: 'futsal', name: '풋살' } });
@@ -47,9 +54,14 @@ async function seedFixture(opts: { officialResult?: boolean; status?: 'matched' 
     createdByAdminUserId: (await prisma.v1AdminUser.findUniqueOrThrow({ where: { userId: creatorAdminUserId } })).id,
   });
   const startAt = new Date();
+  const slotRows = opts.slots
+    ? await Promise.all(
+        [1, 2].map((position) => prisma.v1TournamentSlot.create({ data: { tournamentId: league.id, kind: 'ENTRY', position } })),
+      )
+    : null;
   const teamMatch = await prisma.v1TeamMatch.create({
     data: {
-      hostTeamId: homeTeam.id,
+      hostTeamId: opts.slots && !opts.slots.homeFilled ? null : homeTeam.id,
       createdByUserId: creatorAdminUserId,
       sportId: sport.id,
       regionId: region.id,
@@ -57,7 +69,8 @@ async function seedFixture(opts: { officialResult?: boolean; status?: 'matched' 
       placeName: '장소 미정',
       startAt,
       status: opts.status ?? 'matched',
-      approvedApplicantTeamId: awayTeam.id,
+      approvedApplicantTeamId: opts.slots && !opts.slots.awayFilled ? null : awayTeam.id,
+      ...(slotRows ? { homeSlotId: slotRows[0].id, awaySlotId: slotRows[1].id } : {}),
       leagueId: league.id,
     },
   });
@@ -205,6 +218,37 @@ describe('LeagueResultEntryReminderService — 리그 결과 미입력 24시간 
     }
   });
 
+
+  it.each([
+    { name: '양쪽 모두 빈 경기', slots: { homeFilled: false, awayFilled: false } },
+    { name: '홈만 찬 반쪽 경기', slots: { homeFilled: true, awayFilled: false } },
+    { name: '원정만 찬 반쪽 경기', slots: { homeFilled: false, awayFilled: true } },
+  ])('자리 연결 $name 은 24시간이 지나도 알리지 않는다 — 입력할 결과가 없다', async ({ slots }) => {
+    const service = new LeagueResultEntryReminderService();
+    const ctx = await seedFixture({ slots });
+    try {
+      await prisma.$transaction(async (tx) => {
+        await service.handler({ payload: { teamMatchId: ctx.teamMatchId, expectedStartAt: ctx.startAt.toISOString() } } as never, tx);
+      });
+      // 받을 사람(활성 ops creator)이 있는데도 0건이어야 "받을 사람이 없어서"가 아니라 게이트가 막은 것이다.
+      expect(await recipientsFor(ctx.teamMatchId)).toHaveLength(0);
+    } finally {
+      await cleanupFixture(ctx);
+    }
+  });
+
+  it('대조군: 자리 연결 경기라도 양 팀이 다 찼으면 지금처럼 알린다', async () => {
+    const service = new LeagueResultEntryReminderService();
+    const ctx = await seedFixture({ slots: { homeFilled: true, awayFilled: true } });
+    try {
+      await prisma.$transaction(async (tx) => {
+        await service.handler({ payload: { teamMatchId: ctx.teamMatchId, expectedStartAt: ctx.startAt.toISOString() } } as never, tx);
+      });
+      expect(await recipientsFor(ctx.teamMatchId)).toEqual([ctx.creatorAdminUserId]);
+    } finally {
+      await cleanupFixture(ctx);
+    }
+  });
   it('시작 시각을 바꾸면(updateFixture) 리마인더가 새 세대로 재스케줄되고, 옛 세대는 스스로 no-op 한다', async () => {
     const service = new LeagueResultEntryReminderService();
     const ctx = await seedFixture();

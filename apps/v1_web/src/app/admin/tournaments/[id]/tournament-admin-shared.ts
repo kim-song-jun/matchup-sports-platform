@@ -40,15 +40,17 @@ export function revertTargetStatus(current: V1TournamentStatus): V1TournamentSta
   return null;
 }
 
-export const REVERT_COPY: Partial<Record<V1TournamentStatus, { button: string; title: string; description: string; toast: string }>> = {
+export const REVERT_COPY: Partial<Record<V1TournamentStatus, { button: string; confirmLabel: string; title: string; description: string; toast: string }>> = {
   completed: {
     button: '진행 중으로 되돌리기',
+    confirmLabel: '되돌리기',
     title: '대회를 진행 중으로 되돌릴까요?',
     description: '완료된 대회를 다시 진행 중으로 바꿔요. 시상·후기 공개는 완료될 때까지 잠시 닫히고, 다시 완료하면 후기 요청 알림은 다시 가지 않아요.',
     toast: '대회를 진행 중으로 되돌렸어요.',
   },
   cancelled: {
     button: '초안으로 복구',
+    confirmLabel: '복구하기',
     title: '취소된 대회를 초안으로 복구할까요?',
     description: '초안은 공개 목록에 나오지 않아요. 내용을 확인한 뒤 접수를 다시 시작할 수 있어요.',
     toast: '대회를 초안으로 복구했어요.',

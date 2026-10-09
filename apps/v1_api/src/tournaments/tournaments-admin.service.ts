@@ -92,6 +92,16 @@ export function lineupLockedFieldLabel(dto: {
   return '출전 인원';
 }
 
+/**
+ * Admin list 'public' means actually shown to the public: published and not cancelled. Must match the
+ * web row badge (`tournamentVisibilityHiddenReason` in tournament-visibility-control.tsx).
+ */
+export function adminTournamentVisibilityWhere(visibility: 'public' | 'hidden'): Prisma.V1TournamentWhereInput {
+  return visibility === 'public'
+    ? { isPublic: true, status: { not: 'cancelled' } }
+    : { OR: [{ isPublic: false }, { status: 'cancelled' }] };
+}
+
 @Injectable()
 export class TournamentsAdminService {
   private readonly logger = new Logger(TournamentsAdminService.name);
@@ -117,7 +127,7 @@ export class TournamentsAdminService {
       // 목록 행 수와 어긋난다. 아래 `where` 가 이 객체를 spread 하므로 둘 다 적용된다.
       ...TOURNAMENT_SURFACE_KIND,
       deletedAt: null,
-      ...(query.visibility ? { isPublic: query.visibility === 'public' } : {}),
+      ...(query.visibility ? { AND: [adminTournamentVisibilityWhere(query.visibility)] } : {}),
       ...(query.sportId ? { sportId: query.sportId } : {}),
       ...(query.q ? { title: { contains: query.q, mode: 'insensitive' } } : {}),
     };

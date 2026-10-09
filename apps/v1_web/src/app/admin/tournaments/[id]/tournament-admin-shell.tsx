@@ -383,7 +383,7 @@ export function TournamentAdminShell({ id, children }: { id: string; children: R
           pending={changeStatus.isPending}
           title={revertCopy.title}
           description={revertCopy.description}
-          confirmLabel="되돌리기"
+          confirmLabel={revertCopy.confirmLabel}
           tone="blue"
           onConfirm={onConfirmRevert}
           onClose={() => setRevertOpen(false)}

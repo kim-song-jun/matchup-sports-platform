@@ -1835,6 +1835,9 @@ model V1TeamMatch {
   /// Tournament-owned matches are nullable until bracket registration resolves both sides.
   tournamentId               String?           @map("tournament_id")
   fieldId                    String?           @map("field_id")
+  /// 대진 편집기의 자리(V1TournamentSlot). 대회·정규 리그 경기가 같은 컬럼을 쓴다.
+  homeSlotId                 String?           @map("home_slot_id")
+  awaySlotId                 String?           @map("away_slot_id")
 
   hostTeam              V1Team?                     @relation("V1HostTeamMatches", fields: [hostTeamId], references: [id], onDelete: Restrict)
   createdByUser         V1User?                     @relation("V1TeamMatchCreator", fields: [createdByUserId], references: [id], onDelete: Restrict)
@@ -1854,6 +1857,8 @@ model V1TeamMatch {
   tournament             V1Tournament?               @relation("V1TeamMatchTournament", fields: [tournamentId], references: [id], onDelete: Restrict, map: "v1_team_matches_tournament_fk")
   field                 V1TournamentField?          @relation(fields: [tournamentId, fieldId], references: [tournamentId, id], onDelete: Restrict, map: "v1_team_matches_field_fk")
   tournamentDetails     V1TournamentMatchDetails?
+  homeSlot              V1TournamentSlot?           @relation("V1TeamMatchHomeSlot", fields: [homeSlotId], references: [id], onDelete: Restrict)
+  awaySlot              V1TournamentSlot?           @relation("V1TeamMatchAwaySlot", fields: [awaySlotId], references: [id], onDelete: Restrict)
   staffScopes            V1TournamentStaffFixtureScope[]
   operationAudits       V1OperationAudit[]
   resultLineages        V1TournamentResultLineage[]
@@ -1871,6 +1876,8 @@ model V1TeamMatch {
   @@index([leagueId, startAt], map: "v1_team_matches_league_start_at_idx")
   @@index([tournamentId, startAt], map: "v1_team_matches_tournament_start_at_idx")
   @@index([fieldId], map: "v1_team_matches_field_id_idx")
+  @@index([homeSlotId])
+  @@index([awaySlotId])
   @@unique([tournamentId, id], map: "v1_team_matches_tournament_id_id_key")
   @@map("v1_team_matches")
 }
@@ -2545,6 +2552,7 @@ enum V1TournamentPlayerEligibility {
 
 enum V1TournamentGroupPhase {
   group
+  round16
   round12
   quarter
   semi
@@ -2707,6 +2715,7 @@ model V1Tournament {
   officialResultCaches V1GameOfficialResultCache[]
   resultLineages      V1TournamentResultLineage[]
   overallStandings     V1TournamentOverallStanding[]
+  slots                V1TournamentSlot[]
 
   @@index([status, scheduledAt])
   @@index([sportId, status])
@@ -2847,6 +2856,7 @@ model V1TournamentRegistration {
   groupTeams       V1TournamentGroupTeam[]
   standings        V1TournamentStanding[]
   overallStandings V1TournamentOverallStanding[]
+  slots            V1TournamentSlot[]
 
   @@unique([tournamentId, teamId])
   @@unique([tournamentId, id], map: "v1_tournament_registrations_tournament_id_id_key")
@@ -2926,6 +2936,8 @@ model V1TournamentGroup {
   groupTeams V1TournamentGroupTeam[]
   byeSlots   V1TournamentByeSlot[]
   standings  V1TournamentStanding[]
+  slots      V1TournamentSlot[]     @relation("V1TournamentSlotGroup")
+  rankSlots  V1TournamentSlot[]     @relation("V1TournamentSlotSourceGroup")
 
   @@unique([tournamentId, name], map: "v1_tournament_groups_tournament_id_name_key")
   @@unique([tournamentId, id], map: "v1_tournament_groups_tournament_id_id_key")
@@ -4005,4 +4017,34 @@ model V1TournamentByeSlot {
   group     V1TournamentGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
   @@unique([groupId, sortOrder], map: "v1_tournament_bye_slots_group_id_sort_order_key")
   @@map("v1_tournament_bye_slots")
+}
+
+enum V1TournamentSlotKind {
+  ENTRY
+  BYE
+  GROUP_RANK
+}
+
+/// 팀이 들어갈 칸의 정본. 대회·정규 리그 공통(둘 다 V1Tournament). 라벨은 저장하지 않고 직렬화에서 계산한다.
+model V1TournamentSlot {
+  id             String               @id @default(uuid())
+  tournamentId   String               @map("tournament_id")
+  kind           V1TournamentSlotKind @default(ENTRY)
+  groupId        String?              @map("group_id")
+  position       Int
+  sourceGroupId  String?              @map("source_group_id")
+  registrationId String?              @map("registration_id")
+  createdAt      DateTime             @default(now()) @map("created_at")
+  updatedAt      DateTime             @updatedAt @map("updated_at")
+
+  tournament      V1Tournament              @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  group           V1TournamentGroup?        @relation("V1TournamentSlotGroup", fields: [groupId], references: [id], onDelete: Restrict)
+  sourceGroup     V1TournamentGroup?        @relation("V1TournamentSlotSourceGroup", fields: [sourceGroupId], references: [id], onDelete: Restrict)
+  registration    V1TournamentRegistration? @relation(fields: [registrationId], references: [id], onDelete: SetNull)
+  homeTeamMatches V1TeamMatch[]             @relation("V1TeamMatchHomeSlot")
+  awayTeamMatches V1TeamMatch[]             @relation("V1TeamMatchAwaySlot")
+
+  @@unique([tournamentId, kind, registrationId])
+  @@index([tournamentId, groupId])
+  @@map("v1_tournament_slots")
 }

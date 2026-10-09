@@ -46,7 +46,7 @@ function noopMutationHook<T>(): T {
   return { mutate: vi.fn(), isPending: false } as unknown as T;
 }
 
-const emptyBracket: V1AdminTournamentBracket = { groups: [], fixtures: [], standings: [] };
+const emptyBracket: V1AdminTournamentBracket = { groups: [], fixtures: [], standings: [], slots: [] };
 
 // 공개·예약은 조가 하나라도 있어야 열린다(빈 대진표 공개 사고 방지). 공개 흐름을 검증하는
 // 케이스는 조가 있는 대진표를 기본으로 쓴다.

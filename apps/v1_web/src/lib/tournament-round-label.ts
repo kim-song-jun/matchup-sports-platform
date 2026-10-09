@@ -5,6 +5,7 @@
  */
 const PHASE_LABEL: Readonly<Record<string, string>> = {
   group: '조별리그',
+  round16: '16강',
   round12: '12강',
   quarter: '8강',
   semi: '4강',
@@ -12,6 +13,13 @@ const PHASE_LABEL: Readonly<Record<string, string>> = {
   final: '결승',
   third_place: '3·4위전',
 };
+
+/** 결선 단계 코드, 큰 단계부터. 공개 대진표가 "결선 경기인가"를 판정할 때 쓴다. */
+export const KNOCKOUT_PHASES = ['round16', 'round12', 'quarter', 'semi', 'final', 'third_place'] as const;
+
+export function isKnockoutPhase(phase: string): boolean {
+  return (KNOCKOUT_PHASES as readonly string[]).includes(phase);
+}
 
 const LEAGUE_ROUND = /^league_r(\d+)$/;
 

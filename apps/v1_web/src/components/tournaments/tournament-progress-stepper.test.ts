@@ -28,6 +28,8 @@ function fixture(over: Partial<V1TournamentFixture>): V1TournamentFixture {
     awayTeamId: null,
     awayTeamName: null,
     awayTeamLogoUrl: null,
+    homeSlotLabel: null,
+    awaySlotLabel: null,
     result: null,
     videos: [],
     ...over,
@@ -81,6 +83,18 @@ describe('buildTournamentStages — 한국어 라운드 라벨', () => {
     }));
 
     expect(stages.map((stage) => stage.label)).toEqual(['조별리그', '12강', '8강', '4강', '결승']);
+  });
+
+  it.each([
+    ['group', 'semi', 'quarter', 'round16', 'final'],
+    ['조별리그', '4강', '8강', '16강', '결승'],
+  ])('16강이 있으면 16강 → 8강 → 4강 → 결승 순으로 세운다 (%s)', (...rounds) => {
+    const stages = buildTournamentStages(tournament({
+      format: 'group_knockout',
+      status: 'in_progress',
+      fixtures: rounds.map((round) => fixture({ round })),
+    }));
+    expect(stages.map((stage) => stage.label)).toEqual(['조별리그', '16강', '8강', '4강', '결승']);
   });
 
   it('종료된 group_knockout 대회의 모든 단계가 완료로 표시된다 (alpha 이승민의 찐막 실데이터)', () => {

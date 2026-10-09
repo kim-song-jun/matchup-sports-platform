@@ -131,6 +131,8 @@ function leagueFixtureWithVideo(): V1TournamentFixture {
     awayTeamId: 'team-2',
     awayTeamName: '한강 유나이티드',
     awayTeamLogoUrl: null,
+    homeSlotLabel: null,
+    awaySlotLabel: null,
     result: {
       homeScore: 3,
       awayScore: 1,
@@ -443,5 +445,28 @@ describe('ResultsPageContent — 대회 상세·경기 상세로 돌아가는 �
 
     const expectedHref = `/tournaments/tour-1/matches/fx-final?from=${encodeURIComponent('/tournaments/tour-1/results')}`;
     expect(screen.getByRole('link', { name: /성수 FC 3 대 1 한강 유나이티드/ })).toHaveAttribute('href', expectedHref);
+  });
+});
+
+describe('ResultsPageContent — 16강 결선 결과', () => {
+  it('라운드 이름이 16강인 완료 경기는 결선 결과에 남는다 (알려진 단계가 아니면 조용히 빠지던 자리)', () => {
+    const tournament = baseTournament({
+      format: 'knockout',
+      fixtures: [{ ...leagueFixtureWithVideo(), id: 'fx-r16', round: '16강', videos: [] }],
+    });
+    render(<ResultsPageContent tournament={tournament} />);
+    expect(screen.getByRole('link', { name: /성수 FC 3 대 1 한강 유나이티드/ })).toBeInTheDocument();
+    expect(screen.getAllByText('16강').length).toBeGreaterThan(0);
+  });
+
+  it('phase=round16 조에 속한 경기는 round 문자열과 무관하게 16강으로 보인다', () => {
+    const tournament = baseTournament({
+      format: 'group_knockout',
+      groups: [{ ...leagueGroup({ id: 'g-r16', name: '16강', standings: [] }), phase: 'round16' }],
+      fixtures: [{ ...leagueFixtureWithVideo(), id: 'fx-r16-g', groupId: 'g-r16', round: 'A매치', videos: [] }],
+    });
+    render(<ResultsPageContent tournament={tournament} />);
+    expect(screen.getByRole('link', { name: /성수 FC 3 대 1 한강 유나이티드/ })).toBeInTheDocument();
+    expect(screen.getAllByText('16강').length).toBeGreaterThan(0);
   });
 });

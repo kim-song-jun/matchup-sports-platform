@@ -15,6 +15,10 @@ import { AdminRegistrationsController } from './admin-registrations.controller';
 import { AdminRegistrationsService } from './admin-registrations.service';
 import { TournamentBracketController } from './tournament-bracket.controller';
 import { TournamentBracketService } from './tournament-bracket.service';
+import { BracketTemplateController } from './templates/bracket-template.controller';
+import { BracketTemplateService } from './templates/bracket-template.service';
+import { TournamentSlotController } from './slots/tournament-slot.controller';
+import { TournamentSlotService } from './slots/tournament-slot.service';
 import { LeagueFixtureGeneratorService } from './league-fixture-generator.service';
 import { TournamentPlayersController, TournamentPlayersAdminController } from './tournament-players.controller';
 import { TournamentPlayersService } from './tournament-players.service';
@@ -39,6 +43,7 @@ import { RealtimeModule } from '../realtime/realtime.module';
 import { TournamentStaffAccessService } from './staff/tournament-staff-access.service';
 import { TournamentStaffGuard } from './staff/tournament-staff.guard';
 import { TournamentStaffService } from './staff/tournament-staff.service';
+import { AdminQuickResultController } from '../tournament-operations/results/admin-quick-result.controller';
 import { TournamentResultReviewController } from '../tournament-operations/results/tournament-result-review.controller';
 import { TournamentResultReviewService } from '../tournament-operations/results/tournament-result-review.service';
 // Task 24: `apps/v1_api/src/games/public-records` is fully self-contained
@@ -83,6 +88,8 @@ import { TeamCompetitionEntriesService } from './team-competition-entries.servic
     MockTournamentSeedController,
     AdminRegistrationsController,
     TournamentBracketController,
+    BracketTemplateController,
+    TournamentSlotController,
     TournamentPlayersController,
     TournamentPlayersAdminController,
     TournamentRegistrationsController,
@@ -90,6 +97,7 @@ import { TeamCompetitionEntriesService } from './team-competition-entries.servic
     TournamentSponsorsController,
     TournamentReviewsController,
     TournamentsReadController,
+    AdminQuickResultController,
     TournamentResultReviewController,
     TournamentPeriodSettingsController,
     TeamCompetitionEntriesController,
@@ -100,6 +108,8 @@ import { TeamCompetitionEntriesService } from './team-competition-entries.servic
     TournamentRegistrationsService,
     AdminRegistrationsService,
     TournamentBracketService,
+    BracketTemplateService,
+    TournamentSlotService,
     LeagueFixtureGeneratorService,
     TournamentPlayersService,
     TournamentsReadService,

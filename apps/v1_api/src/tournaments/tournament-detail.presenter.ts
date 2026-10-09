@@ -8,6 +8,7 @@ import type { LeagueFixtureListItem } from '../league-matches/league-fixture-lis
 import type { TournamentDetailRow } from './tournaments-read.query';
 import { resolveTournamentFixtureOfficialResult } from './tournament-fixture-official-result';
 import type { PublicRosterPlayer } from './public-roster';
+import { slotLabelFromRow } from './slots/tournament-slot-label';
 
 type PublicFixtureStatus = 'scheduled' | 'in_progress' | 'completed' | 'cancelled';
 
@@ -137,6 +138,8 @@ type PresentedFixture = Pick<CanonicalTournamentMatchDetail, 'tournamentId' | 'g
   scheduledAt: Date | null;
   fieldId: string | null;
   venue: string | null;
+  homeSlotLabel: string | null;
+  awaySlotLabel: string | null;
   status: PublicFixtureStatus;
   createdAt: Date;
   updatedAt: Date;
@@ -199,6 +202,9 @@ function presentCanonicalFixture(
     scheduledAt: match.startAt,
     fieldId: match.fieldId,
     venue: match.placeName,
+    // The label replaces 'TBD' only when a side has no team, so it is null whenever a team exists.
+    homeSlotLabel: details.homeRegistration === null && match.homeSlot ? slotLabelFromRow(match.homeSlot) : null,
+    awaySlotLabel: details.awayRegistration === null && match.awaySlot ? slotLabelFromRow(match.awaySlot) : null,
     status: fixtureStatusFromTeamMatch(match.status),
     homeRegistration: details.homeRegistration,
     awayRegistration: details.awayRegistration,
@@ -493,11 +499,13 @@ export function presentTournamentDetail(
       homeTeamName:
         fixture.homeRegistration === null ? 'TBD' : hideIdentity ? null : fixture.homeRegistration.team.name,
       homeTeamLogoUrl: hideIdentity ? null : (fixture.homeRegistration?.team.profile?.logoUrl ?? null),
+      homeSlotLabel: fixture.homeSlotLabel,
       awayRegistrationId: fixture.awayRegistrationId,
       awayTeamId: hideIdentity ? null : (fixture.awayRegistration?.team.id ?? null),
       awayTeamName:
         fixture.awayRegistration === null ? 'TBD' : hideIdentity ? null : fixture.awayRegistration.team.name,
       awayTeamLogoUrl: hideIdentity ? null : (fixture.awayRegistration?.team.profile?.logoUrl ?? null),
+      awaySlotLabel: fixture.awaySlotLabel,
       // TeamMatch/Game의 현재 OFFICIAL 리비전만 공개한다. VOID 또는 미공식 상태는
       // 결과가 없으며, 과거 fixture result를 재사용하지 않는다.
       result: presentOfficialResult(fixture.game, staffBypass, publicLiveEnabled),

@@ -37,6 +37,8 @@ export type TournamentMatchCreationInput = {
   startAt: Date | null;
   endAt?: Date | null;
   fieldId?: string | null;
+  homeSlotId?: string | null;
+  awaySlotId?: string | null;
   status?: V1TeamMatchStatus;
   createdByUserId: string | null;
   competitionConfigVersionId: string;
@@ -217,6 +219,8 @@ export async function createTournamentMatchInTx(
       id: teamMatchId,
       tournamentId: input.tournamentId,
       fieldId: input.fieldId ?? null,
+      homeSlotId: input.homeSlotId ?? null,
+      awaySlotId: input.awaySlotId ?? null,
       hostTeamId: input.home.id,
       approvedApplicantTeamId: input.away.id,
       createdByUserId: input.createdByUserId,

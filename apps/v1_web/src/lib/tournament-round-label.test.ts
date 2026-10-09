@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { competitionMatchLabel, tournamentRoundLabel, type CompetitionMatchLabelInput } from './tournament-round-label';
+import type { V1TournamentGroupPhase } from '@/types/api';
+import { KNOCKOUT_PHASES, competitionMatchLabel, isKnockoutPhase, tournamentRoundLabel, type CompetitionMatchLabelInput } from './tournament-round-label';
 
 // 서버 tournament-round-label.spec.ts 와 같은 표 — 두 규칙이 갈리면 알림과 화면이 다른 이름을 쓴다.
 describe('tournamentRoundLabel', () => {
@@ -7,6 +8,8 @@ describe('tournamentRoundLabel', () => {
     ['league_r1', '조별리그 1라운드'],
     ['league_r12', '조별리그 12라운드'],
     ['group', '조별리그'],
+    ['round16', '16강'],
+    ['16강', '16강'],
     ['quarter', '8강'],
     ['semi', '4강'],
     ['final', '결승'],
@@ -37,7 +40,26 @@ describe('competitionMatchLabel', () => {
     ['조가 있는 예선(운영자 입력 라운드)', { groupName: 'A조', round: '예선' }, 'A조 · 예선'],
     ['조 안의 결선 키', { groupName: '본선', round: 'final' }, '결승'],
     ['조 안의 N강', { groupName: 'A조', round: '8강' }, '8강'],
+    ['16강은 결선이라 조 이름을 붙이지 않는다', { groupName: '16강', round: 'round16' }, '16강'],
+    ['16강 2차전은 차수만 붙는다', { groupName: '16강', round: '16강', legNumber: 2 }, '16강 2차'],
   ])('%s', (_case, input, label) => {
     expect(competitionMatchLabel(input)).toBe(label);
+  });
+});
+
+describe('KNOCKOUT_PHASES', () => {
+  // V1TournamentGroupPhase 에 값이 늘면 이 Record 가 컴파일 오류로 먼저 알려 준다(결선 단계 누락 = 공개 대진표에서 경기 소실).
+  const everyKnockoutPhase: Record<Exclude<V1TournamentGroupPhase, 'group'>, true> = {
+    round16: true, round12: true, quarter: true, semi: true, final: true, third_place: true,
+  };
+
+  it('조별을 뺀 모든 단계를 큰 단계부터 담는다', () => {
+    expect([...KNOCKOUT_PHASES].sort()).toEqual(Object.keys(everyKnockoutPhase).sort());
+    expect(KNOCKOUT_PHASES.map(tournamentRoundLabel)).toEqual(['16강', '12강', '8강', '4강', '결승', '3·4위전']);
+  });
+
+  it('isKnockoutPhase — 결선 단계만 참이다', () => {
+    expect(KNOCKOUT_PHASES.every((phase) => isKnockoutPhase(phase))).toBe(true);
+    expect(['group', '', 'league_r1', 'round32'].some((phase) => isKnockoutPhase(phase))).toBe(false);
   });
 });

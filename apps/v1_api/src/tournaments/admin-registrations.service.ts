@@ -23,6 +23,7 @@ import {
 } from '../league-matches/league-team-admission';
 import { capacityLimitOf, isCapacityFull } from './registration-capacity';
 import { ALL_COMPETITION_KINDS, findTournamentOnSurface, LEAGUE_KINDS } from './tournament-surface-lookup';
+import { TournamentSlotService } from './slots/tournament-slot.service';
 import { readRosterAutoConfirmedAt } from './registration-auto-confirm';
 import { competitionTeamTargets, enqueueRosterResync } from '../games/roster/roster-resync-events';
 
@@ -67,6 +68,7 @@ export class AdminRegistrationsService {
     private readonly prisma: PrismaService,
     private readonly adminContext: AdminContextService,
     private readonly notifications: NotificationsService,
+    private readonly slots: TournamentSlotService,
   ) {}
 
   async list(user: V1AuthUser, tournamentId: string, query: AdminRegistrationListQueryDto) {
@@ -342,6 +344,10 @@ export class AdminRegistrationsService {
     }
 
     const result = await this.prisma.$transaction(async (tx) => {
+      // 확정이었던 팀(취소 요청 중이던 확정 팀 포함)은 대진 자리에서 먼저 뺀다. 잠금 순서(대회 → 등록 행)를 자리 배정과 맞추려고 등록을 바꾸기 전에 한다.
+      const wasConfirmed = registration.status === 'confirmed'
+        || (registration.status === 'cancel_requested' && registration.cancelPreviousStatus === 'confirmed');
+      if (wasConfirmed) await this.slots.releaseForRegistrationInTx(tx, admin, registrationId);
       const updated = await tx.v1TournamentRegistration.update({
         where: { id: registrationId },
         // 팀이 남긴 취소 요청 사유는 어드민이 별도 사유를 주지 않는 한 보존한다 (감사 추적)

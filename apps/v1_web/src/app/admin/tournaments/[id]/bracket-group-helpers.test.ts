@@ -7,7 +7,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import type { V1AdminBracketFixture, V1AdminBracketGroup, V1AdminBracketStanding } from '@/types/api';
-import { computeQualifyingShortlist, isGroupReady, templateFor } from './bracket-group-helpers';
+import { computeQualifyingShortlist, GROUP_PHASE_TEMPLATES, isGroupReady, templateFor } from './bracket-group-helpers';
 
 function group(overrides: Partial<V1AdminBracketGroup>): V1AdminBracketGroup {
   return {
@@ -44,6 +44,9 @@ function fixture(overrides: Partial<V1AdminBracketFixture>): V1AdminBracketFixtu
     updatedAt: '2026-08-01T00:00:00.000Z',
     result: null,
     videos: [],
+    homeSlotId: null,
+    awaySlotId: null,
+    game: null,
     ...overrides,
   };
 }
@@ -92,6 +95,11 @@ describe('templateFor', () => {
     expect(templateFor('semi', [])).toEqual({ name: '4강', phase: 'semi' });
     expect(templateFor('final', [])).toEqual({ name: '결승', phase: 'final' });
     expect(templateFor('third_place', [])).toEqual({ name: '3위 결정전', phase: 'third_place' });
+  });
+
+  it('16강 템플릿: 단계 round16, 이름 "16강", 겹치면 번호를 붙인다', () => {
+    expect(templateFor('round16', [])).toEqual({ name: '16강', phase: 'round16' });
+    expect(templateFor('round16', [group({ name: '16강', phase: 'round16' })])).toEqual({ name: '16강 2', phase: 'round16' });
   });
 
   it('결선 단계 — 이름이 겹치면 번호를 붙이고, 그 번호도 겹치면 다음 번호로 넘어간다', () => {
@@ -181,5 +189,14 @@ describe('computeQualifyingShortlist', () => {
     ];
     const shortlist = computeQualifyingShortlist(semi, [groupA, groupB, semi], standings);
     expect(shortlist.map((c) => c.id)).toEqual(['r1', 'r2']);
+  });
+});
+
+describe('GROUP_PHASE_TEMPLATES', () => {
+  it('큰 단계부터 조별 → 16강 → 12강 → 8강 → 준결승 → 결승 → 3위 결정전 순서로 "+16강" 을 포함한다', () => {
+    expect(GROUP_PHASE_TEMPLATES.map((t) => [t.phase, t.label])).toEqual([
+      ['group', '조별'], ['round16', '16강'], ['round12', '12강'], ['quarter', '8강'],
+      ['semi', '준결승'], ['final', '결승'], ['third_place', '3위 결정전'],
+    ]);
   });
 });

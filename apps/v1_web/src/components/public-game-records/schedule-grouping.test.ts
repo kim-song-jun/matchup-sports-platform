@@ -57,6 +57,20 @@ describe('groupScheduleEntries', () => {
       .toEqual(['A조', 'B조', 'C조', '12강', '8강', '4강', '결승']);
   });
 
+  it('16강이 있으면 조별 다음 16강 → 8강 → 결승 순으로 정렬한다 (영문 코드·한글 라운드 혼재)', () => {
+    const entries = [
+      entry({ fixtureId: 'final', round: '결승', fixtureNumber: 1 }),
+      entry({ fixtureId: 'quarter', round: '8강', fixtureNumber: 1 }),
+      entry({ fixtureId: 'r16', round: '16강', fixtureNumber: 9 }),
+      entry({ fixtureId: 'r16-code', round: 'round16', fixtureNumber: 8 }),
+      entry({ fixtureId: 'a', round: 'group', groupName: 'A조', fixtureNumber: 1 }),
+    ];
+    expect(groupScheduleEntries(entries).flatMap(phase => phase.groups.map(group => group.label)))
+      .toEqual(['A조', '16강', '8강', '결승']);
+    expect(groupUnscheduledEntries(entries).map(group => group.label))
+      .toEqual(['A조', '16강', '8강', '결승']);
+  });
+
   it('시간 미정/확정 모두 여러 live 경기를 추출하고 이미 종료/예정 경기는 올리지 않는다', () => {
     const current = entry({ fixtureId: 'live-a', round: 'group', status: 'live', fixtureNumber: 1 });
     const next = entry({ fixtureId: 'scheduled', round: 'final', status: 'scheduled', fixtureNumber: 1, scheduledAt: '2020-01-01T00:00:00Z' });

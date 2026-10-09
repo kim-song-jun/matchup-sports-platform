@@ -19,7 +19,7 @@ import {
 
 // ─── Group phase constants ─────────────────────────────────────────────────────
 
-export const TOURNAMENT_GROUP_PHASES = ['group', 'round12', 'quarter', 'semi', 'final', 'third_place'] as const;
+export const TOURNAMENT_GROUP_PHASES = ['group', 'round16', 'round12', 'quarter', 'semi', 'final', 'third_place'] as const;
 export type TournamentGroupPhase = (typeof TOURNAMENT_GROUP_PHASES)[number];
 
 // ─── Group DTOs ───────────────────────────────────────────────────────────────

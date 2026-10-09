@@ -552,6 +552,21 @@ export class LeagueFixtureGeneratorService {
           where: { tournamentId, groupId: currentGroup.id },
           select: existingFixtureSelect,
         });
+        if (dto.replaceExisting && currentFixtures.length > 0) {
+          // Slot-built fixtures take their teams from the slots; template replace is the only regeneration path.
+          const slotLinked = await tx.v1TeamMatch.count({
+            where: {
+              id: { in: currentFixtures.map((fixture) => fixture.teamMatchId) },
+              OR: [{ homeSlotId: { not: null } }, { awaySlotId: { not: null } }],
+            },
+          });
+          if (slotLinked > 0) {
+            throw new ConflictException({
+              code: 'LEAGUE_SLOT_FIXTURES_USE_TEMPLATE',
+              message: '자리로 만든 대진은 다시 만들 수 없어요. 대진 템플릿으로 새로 시작해 주세요.',
+            });
+          }
+        }
         let deletedCount = 0;
 
         const maxFixtureNumber = await tx.v1TournamentMatchDetails.aggregate({

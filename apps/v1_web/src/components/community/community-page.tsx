@@ -590,27 +590,61 @@ function ChatRoomRow({ room, selected = false }: { room: ChatRoomModel; selected
   const [isOpen, setIsOpen] = useState(false);
   const [dragOffset, setDragOffset] = useState(0);
   const startXRef = useRef(0);
+  const startYRef = useRef(0);
+  const pointerIdRef = useRef<number | null>(null);
   const dragOffsetRef = useRef(0);
   const draggingRef = useRef(false);
   const movedRef = useRef(false);
   const actionWidth = 72;
 
-  const handlePointerDown = (event: PointerEvent<HTMLDivElement>) => {
-    if (window.matchMedia('(min-width: 1024px)').matches) return;
-    if ((event.target as HTMLElement).closest('button') && !isOpen) return;
-    startXRef.current = event.clientX;
-    draggingRef.current = true;
+  const resetPointerGesture = (element: HTMLDivElement) => {
+    const pointerId = pointerIdRef.current;
+    if (pointerId !== null && element.hasPointerCapture(pointerId)) {
+      element.releasePointerCapture(pointerId);
+    }
+    pointerIdRef.current = null;
+    draggingRef.current = false;
     movedRef.current = false;
+    dragOffsetRef.current = isOpen ? -actionWidth : 0;
+    setDragOffset(0);
+  };
+
+  const handlePointerDown = (event: PointerEvent<HTMLDivElement>) => {
+    if (!event.isPrimary || event.button !== 0) return;
+    // A release outside this row may be missed before capture; every new primary input starts clean.
+    resetPointerGesture(event.currentTarget);
+    if (window.matchMedia('(min-width: 1024px)').matches) return;
+    if (event.target instanceof Element && event.target.closest('button')) return;
+    startXRef.current = event.clientX;
+    startYRef.current = event.clientY;
+    pointerIdRef.current = event.pointerId;
+    draggingRef.current = true;
     const initialOffset = isOpen ? -actionWidth : 0;
     dragOffsetRef.current = initialOffset;
     setDragOffset(initialOffset);
-    event.currentTarget.setPointerCapture(event.pointerId);
+    // Capturing here would retarget an ordinary Link tap to this parent row.
   };
 
   const handlePointerMove = (event: PointerEvent<HTMLDivElement>) => {
-    if (!draggingRef.current) return;
+    if (!draggingRef.current || event.pointerId !== pointerIdRef.current) return;
+    // Hover after a missed mouse/pen release cannot continue the previous contact's drag.
+    if ((event.buttons & 1) === 0) {
+      resetPointerGesture(event.currentTarget);
+      return;
+    }
     const deltaX = event.clientX - startXRef.current;
-    if (Math.abs(deltaX) > 4) movedRef.current = true;
+    const deltaY = event.clientY - startYRef.current;
+    if (!movedRef.current) {
+      if (Math.max(Math.abs(deltaX), Math.abs(deltaY)) <= 8) return;
+      // Lock vertical intent to scrolling; later diagonal movement must not steal it.
+      if (Math.abs(deltaY) >= Math.abs(deltaX)) {
+        draggingRef.current = false;
+        pointerIdRef.current = null;
+        return;
+      }
+      movedRef.current = true;
+      event.currentTarget.setPointerCapture(event.pointerId);
+    }
     const baseOffset = isOpen ? -actionWidth : 0;
     const nextOffset = Math.max(-actionWidth, Math.min(0, baseOffset + deltaX));
     dragOffsetRef.current = nextOffset;
@@ -618,10 +652,15 @@ function ChatRoomRow({ room, selected = false }: { room: ChatRoomModel; selected
   };
 
   const handlePointerEnd = (event: PointerEvent<HTMLDivElement>) => {
-    if (!draggingRef.current) return;
+    if (!draggingRef.current || event.pointerId !== pointerIdRef.current) return;
     draggingRef.current = false;
+    pointerIdRef.current = null;
     const deltaX = event.clientX - startXRef.current;
-    const shouldOpen = deltaX < -16 || (deltaX <= 16 && dragOffsetRef.current < -actionWidth / 2);
+    const cancelled = event.type === 'pointercancel';
+    const shouldOpen = cancelled || !movedRef.current
+      ? isOpen
+      : deltaX < -16 || (deltaX <= 16 && dragOffsetRef.current < -actionWidth / 2);
+    if (cancelled) movedRef.current = false;
     setIsOpen(shouldOpen);
     const settledOffset = shouldOpen ? -actionWidth : 0;
     dragOffsetRef.current = settledOffset;
@@ -631,18 +670,19 @@ function ChatRoomRow({ room, selected = false }: { room: ChatRoomModel; selected
     }
   };
 
-  const handleClick = (event: MouseEvent<HTMLAnchorElement>) => {
-    if (!movedRef.current) return;
-    event.preventDefault();
-    movedRef.current = false;
-  };
-
-  const handleTogglePin = (event: MouseEvent<HTMLButtonElement>) => {
-    if (movedRef.current) {
-      event.preventDefault();
+  const handleClick = (event: MouseEvent<HTMLDivElement>) => {
+    // Keyboard activation has no pointer gesture, even if a drag emitted no click.
+    if (event.detail === 0) {
       movedRef.current = false;
       return;
     }
+    if (!movedRef.current) return;
+    event.preventDefault();
+    event.stopPropagation();
+    movedRef.current = false;
+  };
+
+  const handleTogglePin = () => {
     setIsOpen(false);
     setDragOffset(0);
     dragOffsetRef.current = 0;
@@ -663,8 +703,9 @@ function ChatRoomRow({ room, selected = false }: { room: ChatRoomModel; selected
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerEnd}
         onPointerCancel={handlePointerEnd}
+        onClickCapture={handleClick}
       >
-        <Link className="tm-chat-row-main" href={`/chat/${room.id}`} onClick={handleClick} aria-current={selected ? 'page' : undefined}>
+        <Link className="tm-chat-row-main" href={`/chat/${room.id}`} aria-current={selected ? 'page' : undefined}>
           <div className="tm-chat-avatar" style={room.avatarUrl ? { backgroundImage: cssUrl(room.avatarUrl) } : undefined}>{room.avatarUrl ? null : room.initials}</div>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>

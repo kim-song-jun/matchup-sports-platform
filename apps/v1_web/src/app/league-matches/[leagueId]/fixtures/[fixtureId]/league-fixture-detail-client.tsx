@@ -144,11 +144,12 @@ export default function LeagueFixtureDetailClient({ leagueId, fixtureId }: { lea
   // 이 리그 안에서 같은 두 팀이 붙은 다른 대진(맞대결 기록). 취소 대진은 순위표와
   // 동일하게 집계에서 제외한다.
   const headToHead = useMemo(() => {
-    if (!series || !fixture || fixture.awayTeamId === null) return [];
+    if (!series || !fixture || fixture.homeTeamId === null || fixture.awayTeamId === null) return [];
     const pair = new Set([fixture.homeTeamId, fixture.awayTeamId]);
     return series.fixtures
       .filter((item) =>
         item.teamMatchId !== fixture.teamMatchId &&
+        item.homeTeamId !== null &&
         item.awayTeamId !== null &&
         pair.has(item.homeTeamId) &&
         pair.has(item.awayTeamId) &&
@@ -200,9 +201,9 @@ export default function LeagueFixtureDetailClient({ leagueId, fixtureId }: { lea
   const phaseChip = matchPhaseChip(fixturePhase, { withSubject: true });
   const result = fixtureResultLabel(phaseFixture);
   const round = roundLabel(series.fixtures, fixture);
-  const homeRow = rowByTeam.get(fixture.homeTeamId);
+  const homeRow = fixture.homeTeamId !== null ? rowByTeam.get(fixture.homeTeamId) : undefined;
   const awayRow = fixture.awayTeamId !== null ? rowByTeam.get(fixture.awayTeamId) : undefined;
-  const homeName = homeRow?.teamName ?? '홈팀 정보 없음';
+  const homeName = fixture.homeTeamId === null ? '홈팀 미정' : homeRow?.teamName ?? '홈팀 정보 없음';
   const awayName = fixture.awayTeamId === null ? '상대팀 미정' : awayRow?.teamName ?? '상대팀 정보 없음';
 
   const viewerState = getViewerState(teamMatchQuery.data);
@@ -359,7 +360,7 @@ export default function LeagueFixtureDetailClient({ leagueId, fixtureId }: { lea
           <ul className="mt-2 space-y-1">
             {headToHead.map((item) => {
               const itemResult = fixtureResultLabel(item);
-              const itemHome = rowByTeam.get(item.homeTeamId)?.teamName ?? '홈팀';
+              const itemHome = item.homeTeamId !== null ? rowByTeam.get(item.homeTeamId)?.teamName ?? '홈팀' : '홈팀';
               const itemAway = item.awayTeamId !== null ? rowByTeam.get(item.awayTeamId)?.teamName ?? '상대팀' : '상대팀';
               return (
                 <li key={item.teamMatchId}>

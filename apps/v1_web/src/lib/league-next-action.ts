@@ -10,7 +10,7 @@ export type LeagueNextAction =
 
 /** 취소·부전승(상대 없음)은 콘솔이 열리는 경기가 아니다. */
 function isPlayable(fixture: V1LeagueFixture): boolean {
-  return fixture.status !== 'cancelled' && fixture.awayTeamId !== null;
+  return fixture.status !== 'cancelled' && fixture.homeTeamId !== null && fixture.awayTeamId !== null;
 }
 
 function startMs(fixture: V1LeagueFixture): number {

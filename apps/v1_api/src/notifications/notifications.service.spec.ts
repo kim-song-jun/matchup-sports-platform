@@ -934,6 +934,30 @@ describe('NotificationsService', () => {
 
   // ─── 팀 사건 알림 문구·착지(H1) ───────────────────────────────────────────
 
+  describe('운영자 팀매치 신청 알림', () => {
+    it('제목·본문·어드민 착지와 수신자별 businessKey 로 저장하고, 이미 있으면 다시 만들지 않는다', async () => {
+      prisma.v1NotificationPreference.findUnique.mockResolvedValue(null);
+      prisma.v1Notification.create.mockResolvedValue(makeNotification());
+      prisma.v1Notification.findUnique.mockResolvedValueOnce(null);
+      const options = { vars: { name: '합정 유나이티드', title: '토요일 친선전' }, businessKey: 'tm-app-admin:log-1' };
+      await service.emitNotificationToMany(['op-1'], 'admin_team_match_application_received', 'tm-1', undefined, options);
+      await new Promise(setImmediate);
+      expect(prisma.v1Notification.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          recipientUserId: 'op-1', targetType: 'team_match', targetId: 'tm-1',
+          title: '새 팀매치 신청이 왔어요', body: '합정 유나이티드 → 토요일 친선전',
+          deepLink: '/admin/team-matches/tm-1', businessKey: 'tm-app-admin:log-1:op-1',
+        }),
+      });
+
+      prisma.v1Notification.create.mockClear();
+      prisma.v1Notification.findUnique.mockResolvedValueOnce({ id: 'existing' });
+      await service.emitNotificationToMany(['op-1'], 'admin_team_match_application_received', 'tm-1', undefined, options);
+      await new Promise(setImmediate);
+      expect(prisma.v1Notification.create).not.toHaveBeenCalled();
+    });
+  });
+
   describe('팀 사건 알림 문구·착지', () => {
     async function rendered(
       type: Parameters<NotificationsService['emitNotification']>[1],

@@ -23,6 +23,18 @@ const W2 = '2026-10-07T01:10:00.000Z';
 const W3 = '2026-10-14T01:10:00.000Z';
 
 describe('pickLeagueNextAction', () => {
+  it('팀이 비어 있는 자리 경기는 콘솔을 열 수 없으므로 다음 경기로 가리키지 않는다 — 양쪽이 다 찬 경기는 그대로 가리킨다', () => {
+    const noTeams = fixture({ startAt: W1, homeTeamId: null, awayTeamId: null });
+    const onlyHomeEmpty = fixture({ startAt: W1, homeTeamId: null, awayTeamId: 't2' });
+    const ready = fixture({ startAt: W2 });
+    const action = pickLeagueNextAction([noTeams, onlyHomeEmpty, ready]);
+
+    expect(action).toMatchObject({ kind: 'next' });
+    expect(action?.fixture.teamMatchId).toBe(ready.teamMatchId);
+    // 팀이 빈 경기만 있으면 할 일이 없다.
+    expect(pickLeagueNextAction([noTeams, onlyHomeEmpty])).toBeNull();
+  });
+
   it('결과 확정 대기 경기가 있으면 그 경기를 먼저 가리킨다 — 다음 경기가 있어도', () => {
     const waiting = fixture({ startAt: W1, resultStage: 'awaiting_approval', gameState: 'ENDED' });
     const action = pickLeagueNextAction([fixture({ startAt: W2 }), waiting]);

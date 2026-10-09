@@ -63,6 +63,7 @@ vi.mock('next/link', () => ({
 
 vi.mock('@/hooks/use-v1-api', () => ({
   useV1AdminInquiriesPendingCount: () => ({ data: { count: 0 } }),
+  useV1AdminTeamMatchPendingApplicationCount: () => ({ data: { count: 0 } }),
   useV1AdminGlobalSearch: () => ({ data: undefined, isFetching: false }),
 }));
 

@@ -25,6 +25,7 @@ import { getTournamentStatusConfig } from '@/lib/v1-tournament-status';
 import { KNOCKOUT_PHASES, competitionMatchLabel, tournamentRoundLabel } from '@/lib/tournament-round-label';
 import { compareTournamentGroupNames } from '@/lib/tournament-display-order';
 import { splitPrizeSegments, isPrizeAmountValue, formatPrizeRowValue } from '@/lib/prize-breakdown';
+import { leagueSideLabel } from '@/lib/league-fixture-meta';
 import { TournamentBracket } from '@/components/tournaments/tournament-bracket';
 import { LeagueFixtureCard } from '@/components/tournaments/league-fixture-card';
 import {
@@ -1863,12 +1864,8 @@ function LeagueSections({ tournament }: { tournament: V1TournamentDetail }) {
                   <LeagueFixtureCard
                     key={fixture.teamMatchId}
                     fixture={fixture}
-                    homeLabel={teamNameById.get(fixture.homeTeamId) ?? '홈팀 정보 없음'}
-                    awayLabel={
-                      fixture.awayTeamId === null
-                        ? '상대팀 미정'
-                        : teamNameById.get(fixture.awayTeamId) ?? '상대팀 정보 없음'
-                    }
+                    homeLabel={leagueSideLabel(fixture.homeTeamId, teamNameById, { tbd: '홈팀 미정', unknown: '홈팀 정보 없음' })}
+                    awayLabel={leagueSideLabel(fixture.awayTeamId, teamNameById, { tbd: '상대팀 미정', unknown: '상대팀 정보 없음' })}
                   />
                 ))
               : tournament.fixtures.map((fixture) => (

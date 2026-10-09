@@ -41,6 +41,7 @@ import {
   parsePeriodDurations,
   parseResultPolicy,
 } from '../tournaments/competition-config/competition-config.parse';
+import { FORFEIT_LOSER_SCORE, FORFEIT_WINNER_SCORE } from '../league-matches/league-forfeit-result';
 import { assertPenaltyShootoutPersistable } from './core/penalty-shootout-outcome';
 import {
   areLatestTeamMatchLineupsSubmitted,
@@ -545,6 +546,8 @@ function assertClockNotDrifted(occurredAt: string): void {
  * 2026-08-23 사용자 결정(Q3): 종목별 표준 스코어를 자동 부여하지 않는다. 대신
  * **사유를 필수로** 걸어 임의성이 사람 판단에 남더라도 그 판단이 기록에 남게 한다 —
  * 이 함수의 존재 이유가 그 "필수"다. 사유 없는 몰수는 여기서 422 로 막힌다.
+ * 2026-10-09 사용자 결정(D1=A)이 Q3 를 일부 번복했다: 몰수는 기권 팀이 필수이고, 기록 점수가
+ * 상대 승리가 아니면 1:0 으로 확정한다(`applyForfeitScore`, 리그 몰수 선언과 같은 값).
  *
  * `extractEndPenalties` 와 같은 이유로 순수 함수다(payload 가 느슨한 레코드라 DTO
  * 검증을 못 거치고, DB 없이 단위 테스트할 수 있어야 한다).
@@ -572,6 +575,35 @@ export function extractEndOutcome(payload: Record<string, unknown>): {
     });
   }
   return { outcomeReason: raw, note };
+}
+
+/**
+ * 몰수 종료에서 기권한 쪽(side)을 뽑는다. 몰수에는 필수다 — 없으면 승자를 알 수 없어
+ * 0:0 무승부로 확정되기 때문이다. 몰수가 아니면 무시한다.
+ */
+export function extractEndForfeitSideId(
+  payload: Record<string, unknown>,
+  outcomeReason: 'NORMAL' | 'FORFEIT' | 'ABANDONED',
+): string | undefined {
+  if (outcomeReason !== 'FORFEIT') return undefined;
+  const raw = payload.forfeitSideId;
+  if (typeof raw !== 'string' || raw.length === 0) {
+    throw new UnprocessableEntityException({
+      code: 'GAME_FORFEIT_SIDE_REQUIRED',
+      message: '몰수로 종료할 때는 기권한 팀을 골라야 해요.',
+    });
+  }
+  return raw;
+}
+
+/** Keeps an operator-entered score that already favours the opponent; otherwise assigns the forfeit score. */
+export function applyForfeitScore(score: GameScore, forfeitSide: 'HOME' | 'AWAY'): GameScore {
+  const mine = forfeitSide === 'HOME' ? score.home : score.away;
+  const theirs = forfeitSide === 'HOME' ? score.away : score.home;
+  if (theirs > mine) return { home: score.home, away: score.away };
+  return forfeitSide === 'HOME'
+    ? { home: FORFEIT_LOSER_SCORE, away: FORFEIT_WINNER_SCORE }
+    : { home: FORFEIT_WINNER_SCORE, away: FORFEIT_LOSER_SCORE };
 }
 
 export function extractEndPenalties(payload: Record<string, unknown>): StoredPenalties | undefined {
@@ -1453,7 +1485,13 @@ export class GamesService {
             extractEndPenalties(dto.payload),
             // 몰수·중단 종결 사유. 정상 종료면 NORMAL/null 이라 기존 동작과 같다.
             // 사유가 비어 있는 몰수는 extractEndOutcome 이 422 로 먼저 막는다.
-            extractEndOutcome(dto.payload),
+            (() => {
+              const outcome = extractEndOutcome(dto.payload);
+              return {
+                ...outcome,
+                forfeitSideId: extractEndForfeitSideId(dto.payload, outcome.outcomeReason),
+              };
+            })(),
           );
         }
         return {
@@ -5905,7 +5943,12 @@ export class GamesService {
      * 몰수·중단 종결 사유. 생략하면 정상 종료(NORMAL)다 — 복구 레인(RECOVERY)은
      * 이미 저장된 결과를 승계하는 경로라 사유를 새로 만들지 않는다.
      */
-    outcome: { outcomeReason: 'NORMAL' | 'FORFEIT' | 'ABANDONED'; note: string | null } = {
+    outcome: {
+      outcomeReason: 'NORMAL' | 'FORFEIT' | 'ABANDONED';
+      note: string | null;
+      /** 몰수로 기권한 쪽. 있으면 상대가 이기도록 점수를 정한다. */
+      forfeitSideId?: string;
+    } = {
       outcomeReason: 'NORMAL',
       note: null,
     },
@@ -5946,7 +5989,18 @@ export class GamesService {
       parseLineupCatalog(config?.lineup ?? null).positions.find((position) => position.goalkeeper === true)?.code ??
       'GK';
     const regulationScore = this.scoreFromEvents(events, sides);
-    const score = await this.applyPenalties(tx, game, regulationScore, penalties, penaltyOrigin);
+    const forfeitSide =
+      outcome.forfeitSideId === undefined ? undefined : sides.find((side) => side.id === outcome.forfeitSideId);
+    if (outcome.forfeitSideId !== undefined && forfeitSide === undefined) {
+      throw new UnprocessableEntityException({
+        code: 'GAME_FORFEIT_SIDE_INVALID',
+        message: '기권한 팀이 이 경기의 팀이 아니에요.',
+      });
+    }
+    const score =
+      forfeitSide === undefined
+        ? await this.applyPenalties(tx, game, regulationScore, penalties, penaltyOrigin)
+        : applyForfeitScore(regulationScore, forfeitSide.sideKey);
     // Issue #392 fix: `missingScorer` must be derived from the SAME
     // reversed-event-excluding aggregation `aggregateGameParticipantStats`
     // already builds below for goals/cards/assists/fouls -- moved ahead of

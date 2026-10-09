@@ -35,6 +35,13 @@ vi.mock('@/hooks/use-v1-api', () => ({
   },
   useV1AdminMe: () => ({ data: { capabilities: ['status:write'] } }),
   useV1ChangeTeamMatchStatus: () => ({ mutate: vi.fn(), isPending: false }),
+  useV1MasterRegions: () => ({
+    data: [
+      { id: 'region-seoul', name: '서울', parentId: null },
+      { id: 'region-seongdong', name: '성동구', parentId: 'region-seoul' },
+      { id: 'region-busan', name: '부산', parentId: null },
+    ],
+  }),
 }));
 
 const BASE: V1AdminTeamMatchRow = {
@@ -46,6 +53,7 @@ const BASE: V1AdminTeamMatchRow = {
   approvedApplicantTeamName: null,
   league: null,
   sportName: '풋살',
+  region: { regionId: 'region-seongdong', name: '성동구' },
   platformManaged: false,
   pendingApplicationCount: 0,
   startAt: '2026-09-01T11:00:00.000Z',
@@ -148,6 +156,38 @@ it('경기 유형을 바꾸면 API 필터와 첫 페이지에 반영하고, 상�
   await user.selectOptions(screen.getByRole('combobox', { name: '경기 유형' }), '');
   expect(hooks.filters).not.toHaveProperty('kind');
   expect(window.location.search).toBe('?q=QA0930');
+  window.history.replaceState(null, '', '/');
+});
+
+it('지역·정렬을 고르면 API 필터와 URL에 반영하고, 기본 정렬과 전체 지역은 파라미터를 지운다', async () => {
+  hooks.rows = [];
+  window.history.replaceState(null, '', '/admin/team-matches?q=QA');
+  const user = userEvent.setup();
+  render(<AdminTeamMatchesPage />);
+  expect(hooks.filters).not.toHaveProperty('sort');
+  expect(hooks.filters).not.toHaveProperty('regionId');
+
+  await user.selectOptions(screen.getByRole('combobox', { name: '정렬' }), 'start_asc');
+  expect(hooks.filters).toMatchObject({ sort: 'start_asc', page: 1 });
+  await user.selectOptions(screen.getByRole('combobox', { name: '지역' }), 'region-seongdong');
+  expect(hooks.filters).toMatchObject({ sort: 'start_asc', regionId: 'region-seongdong', page: 1 });
+  expect(window.location.search).toBe('?q=QA&sort=start_asc&regionId=region-seongdong');
+  expect(screen.getByText('지역 · 서울 성동구')).toBeInTheDocument();
+
+  await user.click(screen.getByRole('button', { name: '지역 필터 해제' }));
+  await user.selectOptions(screen.getByRole('combobox', { name: '정렬' }), 'created_desc');
+  expect(hooks.filters).not.toHaveProperty('regionId');
+  expect(hooks.filters).not.toHaveProperty('sort');
+  expect(window.location.search).toBe('?q=QA');
+  window.history.replaceState(null, '', '/');
+});
+
+it('URL 의 정렬·지역으로 시작하고 행에 지역을 보여준다', () => {
+  hooks.rows = [BASE];
+  window.history.replaceState(null, '', '/admin/team-matches?sort=start_desc&regionId=region-busan');
+  render(<AdminTeamMatchesPage />);
+  expect(hooks.filters).toMatchObject({ sort: 'start_desc', regionId: 'region-busan' });
+  expect(screen.getAllByText(/성동구 ·/).length).toBeGreaterThan(0);
   window.history.replaceState(null, '', '/');
 });
 

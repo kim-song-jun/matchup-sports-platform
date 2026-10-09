@@ -1,5 +1,5 @@
 import { BadRequestException, Body, Controller, Delete, Get, HttpCode, Param, ParseUUIDPipe, Patch, Post, Query, UseGuards } from '@nestjs/common';
-import { IsOptional, Matches } from 'class-validator';
+import { IsIn, IsOptional, Matches } from 'class-validator';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { V1AuthGuard } from '../auth/v1-auth.guard';
 import { V1AuthUser } from '../auth/v1-auth-user';
@@ -19,6 +19,7 @@ import {
   UpdateLeagueFixtureDto,
   UpdateLeagueVisibilityDto,
 } from './dto/league-match.dto';
+import { ADMIN_LIST_VISIBILITIES, type AdminListVisibility } from '../tournaments/dto/admin-tournament.dto';
 import { LeagueMatchAdminService } from './league-match-admin.service';
 
 // ParseUUIDPipe 기본 예외는 code 없는 영어 메시지라 AllExceptionsFilter 가 INTERNAL_ERROR 로
@@ -43,6 +44,10 @@ class AdminLeagueListQueryDto {
     message: '올바르지 않은 체계 필터예요.',
   })
   seriesId?: string;
+
+  @IsOptional()
+  @IsIn(ADMIN_LIST_VISIBILITIES)
+  visibility?: AdminListVisibility;
 }
 
 @Controller('admin/league-matches')
@@ -52,7 +57,7 @@ export class LeagueMatchAdminController {
 
   @Get()
   list(@CurrentUser() user: V1AuthUser, @Query() query: AdminLeagueListQueryDto) {
-    return this.service.list(user, query.seriesId);
+    return this.service.list(user, query.seriesId, query.visibility);
   }
 
   @Get(':leagueId')

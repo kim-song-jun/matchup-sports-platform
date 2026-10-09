@@ -2,6 +2,7 @@
 
 import { useEffect, useId, useMemo, useState } from 'react';
 import { AlertTriangle, Check, Clock, X } from 'lucide-react';
+import { Button } from '@/components/v1-ui/button';
 import { ErrorState } from '@/components/v1-ui/primitives';
 import { useModalA11y } from '@/components/v1-ui/use-modal-a11y';
 import { useV1FillSlotsFromStandings, useV1SlotStandingsPreview } from '@/hooks/use-v1-bracket-canvas';
@@ -172,24 +173,12 @@ export function BracketStandingsFillDialog({
           ) : null}
           {blockedReason ? <p aria-live="polite" className="text-[length:var(--font-size-caption)] text-[var(--text-muted)]">{blockedReason}</p> : null}
           <div className="flex gap-2">
-            <button
-              type="button"
-              disabled={pending}
-              onClick={onClose}
-              className="h-[48px] flex-1 rounded-xl bg-[var(--surface-soft)] text-[length:var(--font-size-body)] font-semibold text-[var(--text-muted)] transition-colors disabled:opacity-50"
-            >
+            <Button type="button" variant="neutral" size="md" className="flex-1" onClick={onClose} disabled={pending}>
               취소
-            </button>
-            <button
-              type="button"
-              disabled={!canSubmit}
-              onClick={() => void handleSubmit()}
-              className={`h-[48px] flex-1 rounded-xl text-[length:var(--font-size-body)] font-semibold transition-colors ${
-                canSubmit ? 'bg-blue-500 text-white hover:bg-blue-600' : 'cursor-not-allowed bg-[var(--grey100)] text-[var(--text-caption)]'
-              }`}
-            >
-              {pending ? '채우는 중…' : '순위대로 채우기'}
-            </button>
+            </Button>
+            <Button type="button" variant="primary" size="md" className="flex-1" disabled={!canSubmit} loading={pending} onClick={() => void handleSubmit()}>
+              순위대로 채우기
+            </Button>
           </div>
         </div>
       </div>

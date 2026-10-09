@@ -1,7 +1,7 @@
 'use client';
 
 import { Globe, LayoutTemplate, Link2, Plus, Shuffle } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useId, useMemo, useState } from 'react';
 import { AdminListSkeleton } from '@/components/admin/admin-skeleton';
 import { Button } from '@/components/v1-ui/button';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
@@ -54,6 +54,7 @@ export function BracketCanvasWorkspace({
   const [pendingRegistrationId, setPendingRegistrationId] = useState<string | null>(null);
   const [templateOpen, setTemplateOpen] = useState(false);
   const [toolsMode, setToolsMode] = useState<'add' | 'link' | null>(null);
+  const toolbarHintId = useId();
   const labelContext = useMemo(
     () => (bracket === undefined ? null : buildSideLabelContext(bracket.groups, bracket.fixtures, bracket.slots)),
     [bracket],
@@ -86,6 +87,9 @@ export function BracketCanvasWorkspace({
     emptySlotCount === 0 ? '비어 있는 자리가 없어요.' : unplacedTeamCount === 0 ? '배정할 수 있는 팀이 없어요.' : null;
   const published = isBracketPublished(bracketPublishedAt, bracketPublishScheduledAt);
   const hasPendingSchedule = !!bracketPublishScheduledAt && !published;
+  // 비활성 이유는 title 대신 화면에 보이게 둔다 — title 은 터치·키보드에서 보이지 않는다.
+  const publishBlockedReason = isEmpty && !published ? '대진을 먼저 만들어야 공개할 수 있어요.' : null;
+  const toolbarHint = !isEmpty ? randomFillBlockedReason : publishBlockedReason;
   const selectedFixture = bracket.fixtures.find((fixture) => fixture.id === selectedFixtureId) ?? null;
 
   const handleAssign = (slotId: string, registrationId: string) => {
@@ -170,7 +174,7 @@ export function BracketCanvasWorkspace({
                 variant="outline"
                 size="md"
                 disabled={randomFillBlockedReason !== null}
-                title={randomFillBlockedReason ?? undefined}
+                aria-describedby={randomFillBlockedReason !== null ? toolbarHintId : undefined}
                 loading={randomFill.isPending}
                 onClick={handleRandomFill}
               >
@@ -191,7 +195,7 @@ export function BracketCanvasWorkspace({
               </>
             ) : null}
             {!published ? (
-              <Button variant="primary" size="md" disabled={isEmpty} title={isEmpty ? '대진을 먼저 만들어야 공개할 수 있어요.' : undefined} onClick={() => void handlePublish()}>
+              <Button variant="primary" size="md" disabled={isEmpty} aria-describedby={publishBlockedReason !== null ? toolbarHintId : undefined} onClick={() => void handlePublish()}>
                 지금 전체 공개
               </Button>
             ) : null}
@@ -201,6 +205,11 @@ export function BracketCanvasWorkspace({
               </Button>
             ) : null}
           </div>
+        ) : null}
+        {canWrite && toolbarHint !== null ? (
+          <p id={toolbarHintId} className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>
+            {toolbarHint}
+          </p>
         ) : null}
       </div>
 

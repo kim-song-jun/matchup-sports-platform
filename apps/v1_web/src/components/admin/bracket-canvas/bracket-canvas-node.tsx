@@ -116,7 +116,8 @@ export function BracketCanvasNode({
         width: position.width,
         height: position.height,
         borderRadius: 'var(--radius-container)',
-        border: `1px solid ${selected ? 'var(--blue500)' : 'var(--border-strong)'}`,
+        // 선택은 색만이 아니라 두께로도 구분한다(색만으로 정보 전달 금지).
+        border: selected ? '2px solid var(--blue500)' : '1px solid var(--border-strong)',
       }}
     >
       <button

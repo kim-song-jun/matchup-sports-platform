@@ -192,12 +192,18 @@ describe('BracketCanvasWorkspace — 도구 모음', () => {
       slots: slots.map((slot, index) => ({ ...slot, registrationId: `r${index + 1}`, teamName: `팀${index + 1}` })),
     });
     renderWorkspace();
-    expect(screen.getByRole('button', { name: '빈 자리 무작위 채우기' })).toBeDisabled();
+    const button = screen.getByRole('button', { name: '빈 자리 무작위 채우기' });
+    expect(button).toBeDisabled();
+    // 막힌 이유는 title 이 아니라 화면에 보이는 문구로, 버튼이 그 문구를 가리킨다.
+    expect(button).toHaveAccessibleDescription('비어 있는 자리가 없어요.');
+    expect(screen.getByText('비어 있는 자리가 없어요.')).toBeVisible();
   });
 
   it('배정할 팀이 하나도 없으면 무작위 채우기를 막는다', () => {
     renderWorkspace({ registrations: [] });
-    expect(screen.getByRole('button', { name: '빈 자리 무작위 채우기' })).toBeDisabled();
+    const button = screen.getByRole('button', { name: '빈 자리 무작위 채우기' });
+    expect(button).toBeDisabled();
+    expect(button).toHaveAccessibleDescription('배정할 수 있는 팀이 없어요.');
   });
 
   it('"경기 추가"와 "경기 연결"은 각각 대화상자를 add·link 모드로 연다', () => {

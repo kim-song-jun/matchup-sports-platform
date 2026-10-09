@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { makeFixture, makeGame, makeSlot } from '@/test/bracket-canvas-fixtures';
 import type { V1AdminBracketFixture, V1AdminBracketSlot } from '@/types/api';
@@ -84,6 +84,14 @@ describe('BracketCanvasNode — 표시', () => {
   it('머리 버튼은 선택 상태를 aria-pressed 로 알린다', () => {
     renderNode(base, { selected: true });
     expect(screen.getByRole('button', { name: '8강 1번 경기 열기' })).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('선택된 칸은 색만이 아니라 테두리 두께로도 구분된다', () => {
+    renderNode(base, { selected: true });
+    expect((document.querySelector('[data-fixture-id="f1"]') as HTMLElement).style.border).toContain('2px');
+    cleanup();
+    renderNode(base, { selected: false });
+    expect((document.querySelector('[data-fixture-id="f1"]') as HTMLElement).style.border).toContain('1px');
   });
 });
 

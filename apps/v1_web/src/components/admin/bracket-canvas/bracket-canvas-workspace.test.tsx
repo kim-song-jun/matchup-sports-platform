@@ -221,6 +221,29 @@ describe('BracketCanvasWorkspace — 칸 패널', () => {
     expect(screen.queryByTestId('panel')).not.toBeInTheDocument();
   });
 
+  it('1440: 옆 패널을 닫으면 그 칸의 열기 버튼으로 포커스가 돌아온다 — 포인터로 열어 포커스가 없어도 마찬가지', () => {
+    renderWorkspace();
+    const first = screen.getByRole('button', { name: '8강 1번 경기 열기' });
+    const second = screen.getByRole('button', { name: '8강 2번 경기 열기' });
+    fireEvent.click(second);
+    first.focus();
+
+    fireEvent.click(within(screen.getByTestId('panel')).getByRole('button', { name: '패널 닫기' }));
+    expect(screen.queryByTestId('panel')).not.toBeInTheDocument();
+    expect(second).toHaveFocus();
+  });
+
+  it('1440: 칸의 팀 줄로 열었어도 닫으면 같은 칸의 열기 버튼으로 돌아온다', () => {
+    renderWorkspace();
+    const second = screen.getByRole('button', { name: '8강 2번 경기 열기' });
+    const secondCard = second.closest('[data-fixture-id]') as HTMLElement;
+    fireEvent.click(within(secondCard).getAllByRole('button')[1]);
+    expect(screen.getByTestId('panel')).toHaveTextContent('f2');
+
+    fireEvent.click(within(screen.getByTestId('panel')).getByRole('button', { name: '패널 닫기' }));
+    expect(second).toHaveFocus();
+  });
+
   it('패널에 쓰기 권한을 그대로 넘긴다', () => {
     renderWorkspace({ canWrite: false });
     fireEvent.click(screen.getByRole('button', { name: '8강 1번 경기 열기' }));

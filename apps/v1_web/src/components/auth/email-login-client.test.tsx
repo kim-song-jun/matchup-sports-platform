@@ -15,6 +15,12 @@ const analytics = vi.hoisted(() => ({
   trackEvent: vi.fn(),
 }));
 
+const nativeApple = vi.hoisted(() => ({ available: false }));
+
+vi.mock('@/lib/native-apple', () => ({
+  isNativeAppleSignInAvailable: () => nativeApple.available,
+}));
+
 vi.mock('next/navigation', () => ({
   useRouter: () => router,
 }));
@@ -49,6 +55,7 @@ async function submitLogin(email: string, password: string): Promise<void> {
 describe('EmailLoginClient GA events', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    nativeApple.available = false;
   });
 
   it('tracks a login event with method=email on successful sign-in', async () => {
@@ -112,6 +119,30 @@ describe('EmailLoginClient GA events', () => {
     );
     expect(screen.getByLabelText('이메일')).toHaveAttribute('aria-describedby', 'email-login-error');
     expect(screen.getByLabelText('비밀번호')).toHaveAttribute('aria-describedby', 'email-login-error');
+  });
+
+  it('iOS 앱(Apple 로그인 가능)에서는 401 안내에 Apple 버튼도 함께 알려준다', async () => {
+    nativeApple.available = true;
+    hooks.loginMutate.mockImplementation((_body: unknown, callbacks: LoginCallbacks) =>
+      callbacks.onError?.(
+        new V1ApiError({
+          status: 'error',
+          statusCode: 401,
+          code: 'UNAUTHENTICATED',
+          message: 'invalid credentials',
+          timestamp: new Date().toISOString(),
+        }),
+      ),
+    );
+    render(<EmailLoginClient />);
+
+    await submitLogin('me@example.com', 'wrongpass');
+
+    await waitFor(() =>
+      expect(screen.getByRole('alert')).toHaveTextContent(
+        "이메일 또는 비밀번호가 맞지 않아요. 카카오나 Apple로 가입하셨다면 로그인 첫 화면의 '카카오' 또는 'Apple로 계속하기' 버튼으로 로그인해 주세요.",
+      ),
+    );
   });
 
   it('401 이 아닌 실패(네트워크 오류)는 소셜 안내 없이 일반 문구를 보여준다', async () => {

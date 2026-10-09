@@ -22,8 +22,10 @@ function mapEmailLoginError(err: unknown): string {
   if (err instanceof V1ApiError) {
     // 계정 존재·가입 경로를 드러내지 않도록 항상 같은 안내를 쓴다. Apple 버튼은 iOS 앱에만 있다.
     if (err.code === 'UNAUTHENTICATED') {
-      const providers = isNativeAppleSignInAvailable() ? "'카카오' 또는 'Apple로 계속하기'" : "'카카오'";
-      return `이메일 또는 비밀번호가 맞지 않아요. 카카오${isNativeAppleSignInAvailable() ? '나 Apple' : ''}로 가입하셨다면 로그인 첫 화면의 ${providers} 버튼으로 로그인해 주세요.`;
+      const withApple = isNativeAppleSignInAvailable();
+      const signupMethods = withApple ? '카카오나 Apple' : '카카오';
+      const buttons = withApple ? "'카카오' 또는 'Apple로 계속하기'" : "'카카오'";
+      return `이메일 또는 비밀번호가 맞지 않아요. ${signupMethods}로 가입하셨다면 로그인 첫 화면의 ${buttons} 버튼으로 로그인해 주세요.`;
     }
     if (err.code === 'PERMISSION_DENIED') return '로그인이 제한된 계정이에요. 고객센터에서 상태를 확인해 주세요.';
   }

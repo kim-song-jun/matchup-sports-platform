@@ -119,6 +119,9 @@ function buildPrismaMock() {
     v1UserOnboardingProgress: {
       upsert: jest.fn(),
     },
+    v1UserRecordConsent: {
+      upsert: jest.fn(),
+    },
     v1UserTermsConsent: {
       createMany: jest.fn(),
     },
@@ -683,6 +686,81 @@ describe('AuthService', () => {
       data: { onboardingStatus: 'social_profile_required' },
     });
     expect(prisma.v1UserOnboardingProgress.upsert).toHaveBeenCalledWith({ where: { userId: 'user-1' }, update: { currentStep: 'signup' }, create: { userId: 'user-1', currentStep: 'signup' } });
+  });
+
+  describe('signup record consent', () => {
+    function arrangeRegister() {
+      prisma.v1User.findUnique
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(completedUserRow({ id: 'new-user', email: 'new@teameet.v1' }));
+      prisma.v1UserProfile.findFirst.mockResolvedValue(null);
+      prisma.v1TermsDocument.findMany.mockResolvedValue([]);
+      prisma.v1User.create.mockResolvedValue({ id: 'new-user', email: 'new@teameet.v1' });
+    }
+
+    function arrangeSocialProfile() {
+      const activeTime = new Date();
+      prisma.v1User.findUnique
+        .mockResolvedValueOnce(pendingSocialUserRow({
+          onboardingStatus: 'social_profile_required',
+          onboardingProgress: { currentStep: 'signup' },
+          termsConsents: [],
+          createdAt: activeTime,
+          updatedAt: activeTime,
+        }))
+        .mockResolvedValueOnce(completedUserRow({ onboardingStatus: 'signup_done' }));
+      prisma.v1UserProfile.findFirst.mockResolvedValue(null);
+    }
+
+    const socialInput = {
+      nickname: '소셜유저',
+      gender: 'female' as const,
+      displayName: '소셜 유저',
+      phone: '01087654321',
+      birthDate: '19991231',
+    };
+
+    it.each([
+      [true, 'GRANTED'],
+      [false, 'REVOKED'],
+    ])('register: recordConsent.granted=%s 는 가입 트랜잭션에서 %s 로 저장한다', async (granted, state) => {
+      arrangeRegister();
+      await service.register(registerInput({ recordConsent: { granted, policyHash: 'v1-public-record-consent-1' } }));
+      expect(prisma.v1UserRecordConsent.upsert).toHaveBeenCalledWith({
+        where: { userId: 'new-user' },
+        update: expect.objectContaining({ state, policyHash: 'v1-public-record-consent-1' }),
+        create: { userId: 'new-user', state, policyHash: 'v1-public-record-consent-1' },
+      });
+    });
+
+    it('register: recordConsent 가 없으면(구 클라이언트) 동의 row 를 만들지 않는다', async () => {
+      arrangeRegister();
+      await service.register(registerInput());
+      expect(prisma.v1UserRecordConsent.upsert).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      [true, 'GRANTED'],
+      [false, 'REVOKED'],
+    ])('completeSocialProfile: recordConsent.granted=%s 는 %s 로 저장한다', async (granted, state) => {
+      arrangeSocialProfile();
+      await service.completeSocialProfile('user-1', {
+        ...socialInput,
+        recordConsent: { granted, policyHash: 'v1-public-record-consent-1' },
+      });
+      expect(prisma.v1UserRecordConsent.upsert).toHaveBeenCalledWith({
+        where: { userId: 'user-1' },
+        update: expect.objectContaining({ state, policyHash: 'v1-public-record-consent-1' }),
+        create: { userId: 'user-1', state, policyHash: 'v1-public-record-consent-1' },
+      });
+    });
+
+    it('completeSocialProfile: recordConsent 가 없으면 동의 row 를 만들지 않는다', async () => {
+      arrangeSocialProfile();
+      await service.completeSocialProfile('user-1', socialInput);
+      expect(prisma.v1UserRecordConsent.upsert).not.toHaveBeenCalled();
+    });
   });
 
   it('completeSocialProfile: consent row가 없어도 약관 단계 완료 상태면 프로필을 저장한다', async () => {

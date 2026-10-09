@@ -22,6 +22,14 @@
 | `apps/v1_web/src/test/viewport.ts` | 테스트용 뷰포트 스텁. PR-3 테스트도 `BracketCanvasResponsive` 를 거치면 필요하다 |
 | `apps/v1_web/src/components/admin/bracket-canvas/bracket-canvas-mobile-screen.tsx` | 토너먼트 모바일 화면. `BracketCanvasWorkspace` 가 데이터 조회까지 안에 가지므로, 좁은 화면용으로 같은 `useV1AdminBracket` 를 읽어 모바일 목록에 넘기는 얇은 컨테이너(툴바·트레이는 두지 않는다) |
 
+## 2026-10-09 보강 (이 계획보다 우선)
+
+PR-3·4·5b 와 #1725 가 dev 에 들어간 뒤 alpha 실화면에서 나온 결정·결함이다. 각 Task 는 아래를 함께 지킨다.
+
+1. **#1725 — 자리 없는 사이드와 참가팀 조회 상태.** 사이드는 `classifyFixtureSide(fixture, side, slotsById)`(`lib/bracket-canvas-layout.ts`)로 `slot`/`feeder`/`direct` 를 가른다. 모바일 시트(Task 6·7)도 데스크톱 칸 패널(`bracket-node-panel.tsx`)과 **같은 규칙**을 쓴다: `feeder` → "이전 경기 결과로 채워져요.", `direct` → 팀 선택을 `useV1UpdateFixture(tournamentId)` 로 저장(반대편 팀 제외, 잠금·읽기 전용 규칙 동일), `slot` → `useV1AssignTournamentSlot`. 팀 목록은 `RegistrationsLoadState`(`bracket-team-tray.tsx`)를 따른다 — 조회 성공 전에는 팀 선택을 막고, 실패·재조회 실패는 안내 + 「다시 시도」. 리그 모바일(Task 10)의 자리 없는 기존 경기는 `LeagueFixturePanel` 처럼 "자리 없이 만든 경기예요."로 안내만 한다.
+2. **태블릿(768~1023px) — 사용자 결정 A(2026-10-09).** alpha 768 에서 칸(y=1458)을 누르면 패널이 y=2608 에 열려 보이지 않았다. 768~1023 은 칸 패널을 `BottomSheet`(onClose 모드)로 띄우고 참가팀 트레이를 한 줄 요약으로 접는다. 1024 이상은 지금 그대로(옆 패널). 768 미만은 이 계획의 모바일 화면 그대로. → **Task 14**.
+3. **트레이 이름 잘림·툴바 버튼 불일치(alpha 1440 실측).** 트레이 폭 240px 에서 "배정됨"/"경기에 있음" 배지 때문에 팀 이름이 "(테스트) 12강 연습 0…"처럼 잘려 구분 번호가 사라진다. 「순위대로 채우기」 툴바 버튼만 공용 `Button` 이 아니어서 글자 크기가 다르다. → **Task 15**.
+
 ## 설계 결정 (왜 CSS 가 아니라 `useMediaQuery` 인가)
 
 - 이 저장소의 어드민 표(`admin-data-table.tsx:292,304`)는 `hidden lg:block`/`lg:hidden` 으로 두 DOM 을 모두 그린다. 표는 값싸다. 대진 캔버스는 끌어 놓기 핸들러·SVG 연결선·`BottomSheet` 의 오버레이 히스토리 항목을 갖고 있어 **둘 다 마운트하면 같은 aria-label·같은 칸이 두 벌**이 되고(스크린리더·테스트 모두 오염), 모바일에서 보이지 않는 캔버스가 레이아웃 계산을 계속 한다.
@@ -3503,6 +3511,29 @@ Expected: 판정 표의 모든 행이 `OK`(390·767 은 라운드 탭 ≥1·구�
 - 머지 후 메인 작업트리의 로컬 `dev` 동기화: `cd /Users/sungjun/Dev/projects/matchup-sports-platform && git fetch origin dev -q && git merge --ff-only origin/dev`. `dev → main` 승격은 사용자만 한다.
 
 ---
+
+### Task 14 (2026-10-09 추가): 태블릿 768~1023 — 칸 패널 시트 + 참가팀 트레이 접기 (사용자 결정 A)
+
+**Files:** Modify `apps/v1_web/src/hooks/use-media-query.ts`(상수 `BRACKET_CANVAS_SIDE_PANEL_MEDIA_QUERY = '(min-width: 1024px)'`), `apps/v1_web/src/components/admin/bracket-canvas/bracket-canvas-workspace.tsx`(+`.test.tsx`), `bracket-team-tray.tsx`(+`.test.tsx`), `league-schedule-board.tsx`(+`.test.tsx`).
+
+**동작(1024 이상은 한 줄도 바뀌지 않는다):**
+- 워크스페이스·리그 보드는 `useMediaQuery(BRACKET_CANVAS_SIDE_PANEL_MEDIA_QUERY)` 가 false(768~1023)이면 선택한 칸의 패널(`BracketNodePanel`·`LeagueFixturePanel`)을 그리드 세 번째 열이 아니라 `BottomSheet`(onClose 모드, 제목 = 칸 제목, 시트 안에서 스크롤)로 연다. 닫으면(X·바깥 탭·ESC·뒤로가기) 선택을 풀고 포커스를 그 칸의 머리 버튼(`"<제목> 열기"`)으로 돌려준다. 그리드는 트레이 + 그림 두 영역만 쓴다.
+- 트레이는 선택 prop `collapsible?: boolean` 을 받는다. 768~1023 에서 기본 접힘: 44px 한 줄에 "참가팀 {전체 수} · 미배정 {N}"과 「펼치기」/「접기」 토글(`aria-expanded`·`aria-controls`). 펼치면 지금 목록 그대로. 조회 상태(`registrationsState`)의 로딩·실패·재조회 실패 안내와 「다시 시도」는 접힌 상태에서도 보인다. 1024 이상에서는 토글 없이 지금처럼 펼친 목록.
+- 시트는 기존 `BottomSheet` 만 쓴다(새 모달 금지). 뒤로가기 닫기는 `useModalA11y(closeOnBack)` 에 맡긴다.
+
+**Tests(Task 1 의 `installViewport`/`resizeViewport` 로 경계를 실제로 바꾼다):**
+- 1023: 칸을 누르면 `role="dialog"` 시트에 그 칸 제목이 보이고, 닫으면 칸 머리 버튼에 포커스가 돌아온다. 1024: 같은 동작이 시트 없이 옆 패널로 열린다(대조군).
+- 1023: 트레이가 접혀 있고 토글이 `aria-expanded=false` → 누르면 목록이 보이고 true. 1024: 토글이 없고 목록이 보인다.
+- 1023 + 참가팀 조회 실패: 접힌 상태에서도 안내와 「다시 시도」가 보이고 재시도가 refetch 를 부른다.
+- 리그 보드도 1023/1024 각각 같은 두 가지(시트·트레이 접기)를 확인한다.
+
+### Task 15 (2026-10-09 추가): 트레이 팀 이름 두 줄 + 「순위대로 채우기」 버튼을 공용 Button 으로
+
+**Files:** Modify `apps/v1_web/src/components/admin/bracket-canvas/bracket-team-tray.tsx`, `bracket-standings-fill-button.tsx`(+ 기존 테스트가 깨지면 이름 기준으로 맞춘다).
+
+- 트레이 팀 이름: `truncate` 대신 두 줄까지 보이게(`line-clamp-2` + `break-keep`), 배지("배정됨"/"경기에 있음"/"선택됨")는 `shrink-0` 으로 오른쪽에 고정. 버튼 최소 높이 44px 유지, 줄이 늘면 높이가 늘어난다.
+- 「순위대로 채우기」 툴바 버튼: 직접 만든 마크업 대신 옆 버튼들과 같은 `<Button variant="outline" size="md">`(아이콘 포함). 접근 이름 "순위대로 채우기" 와 동작은 그대로.
+- 스타일 전용 변경이라 새 테스트는 쓰지 않는다(전역 규칙 24). 판정은 머지 뒤 alpha 1440 캡처로 한다(Task 13).
 
 ## Self-Review
 

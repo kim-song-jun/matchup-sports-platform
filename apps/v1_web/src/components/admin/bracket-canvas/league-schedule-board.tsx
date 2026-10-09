@@ -1,16 +1,25 @@
 'use client';
 
-import { useId, useMemo } from 'react';
+import { useId, useMemo, useState, type DragEvent } from 'react';
 import { EyeOff } from 'lucide-react';
 import { EmptyState } from '@/components/v1-ui/primitives';
-import { useV1RandomFillSlots } from '@/hooks/use-v1-bracket-canvas';
+import { useV1AdminTournamentRegistrations } from '@/hooks/use-v1-api';
+import { useV1AssignTournamentSlot, useV1RandomFillSlots } from '@/hooks/use-v1-bracket-canvas';
 import { describeBracketCanvasError } from '@/lib/bracket-canvas-errors';
 import { StatusChip } from '@/components/v1-ui/status-chip';
 import { bracketNodeStateChip } from '@/lib/competition-status';
 import { formatKstDateShort, formatKstTime } from '@/lib/date-utils';
-import { buildLeagueBoard, type LeagueBoardNode } from '@/lib/league-board-model';
+import {
+  buildLeagueBoard,
+  leagueDirectPlacedRegistrationIds,
+  type LeagueBoardNode,
+  type LeagueBoardSide,
+} from '@/lib/league-board-model';
 import type { V1AdminBracketSlot } from '@/types/api';
 import type { V1AdminLeagueTeam, V1LeagueFixture } from '@/types/league-match';
+import { REGISTRATION_DRAG_MIME } from './bracket-canvas-dnd';
+import { BracketTeamTray, type RegistrationsLoadState } from './bracket-team-tray';
+import { LeagueFixturePanel } from './league-fixture-panel';
 
 export interface LeagueScheduleBoardProps {
   leagueId: string;
@@ -21,6 +30,8 @@ export interface LeagueScheduleBoardProps {
   canWrite: boolean;
   showToast: (message: string, variant?: 'success' | 'error') => void;
   onOpenTemplate: () => void;
+  onEditSchedule: (teamMatchId: string) => void;
+  onCancelFixture: (teamMatchId: string) => void;
   onShowList: () => void;
 }
 
@@ -33,7 +44,7 @@ function scoreText(node: LeagueBoardNode): string | null {
   return `${score.home} : ${score.away}${penalties}`;
 }
 
-export function LeagueScheduleBoard({ leagueId, fixtures, slots, teams, canWrite, showToast, onOpenTemplate, onShowList }: LeagueScheduleBoardProps) {
+export function LeagueScheduleBoard({ leagueId, fixtures, slots, teams, canWrite, showToast, onOpenTemplate, onEditSchedule, onCancelFixture, onShowList }: LeagueScheduleBoardProps) {
   const headingId = useId();
   const teamNameById = useMemo(() => new Map((teams ?? []).map((team) => [team.teamId, team.name])), [teams]);
   const { columns, summary } = useMemo(
@@ -42,6 +53,36 @@ export function LeagueScheduleBoard({ leagueId, fixtures, slots, teams, canWrite
   );
 
   const randomFill = useV1RandomFillSlots(leagueId, 'league');
+  const assign = useV1AssignTournamentSlot(leagueId, 'league');
+  const {
+    data: registrationsData,
+    isError: registrationsIsError,
+    error: registrationsError,
+    refetch: refetchRegistrations,
+  } = useV1AdminTournamentRegistrations(leagueId);
+  const [selectedRegistrationId, setSelectedRegistrationId] = useState<string | null>(null);
+  const [openFixtureId, setOpenFixtureId] = useState<string | null>(null);
+
+  const registrations = registrationsData?.items;
+  // 대회 대진 화면과 같은 규칙 — 캐시된 목록은 재조회가 실패해도 쓰되 실패는 refetchFailed 로 드러낸다.
+  const registrationsState: RegistrationsLoadState = {
+    status: registrationsData !== undefined ? 'success' : registrationsIsError ? 'error' : 'pending',
+    truncated: registrationsData?.truncated ?? false,
+    refetchFailed: registrationsIsError && registrationsData !== undefined,
+    error: registrationsError,
+    onRetry: () => void refetchRegistrations(),
+  };
+  const directPlacedIds = useMemo(
+    () => leagueDirectPlacedRegistrationIds(fixtures, slots, teams ?? []),
+    [fixtures, slots, teams],
+  );
+  const openNode = columns.flatMap((column) => column.nodes).find((node) => node.fixtureId === openFixtureId) ?? null;
+  const randomFillBlockedReason =
+    registrationsState.status === 'pending'
+      ? '참가팀을 불러오는 중이에요.'
+      : registrationsState.status === 'error'
+        ? '참가팀을 불러오지 못했어요.'
+        : null;
 
   if (fixtures.length === 0) {
     return (
@@ -67,6 +108,36 @@ export function LeagueScheduleBoard({ leagueId, fixtures, slots, teams, canWrite
     );
   }
 
+
+  const place = async (slotId: string, registrationId: string) => {
+    try {
+      await assign.mutateAsync({ slotId, registrationId });
+      setSelectedRegistrationId(null);
+      showToast('자리에 팀을 넣었어요.', 'success');
+    } catch (error) {
+      // 선택을 유지한다 — 다른 자리로 바로 다시 시도할 수 있어야 한다.
+      showToast(describeBracketCanvasError(error, '자리에 팀을 넣지 못했어요.'), 'error');
+    }
+  };
+
+  const onSideClick = (node: LeagueBoardNode, side: LeagueBoardSide) => {
+    if (canWrite && selectedRegistrationId !== null && side.slotId !== null) {
+      void place(side.slotId, selectedRegistrationId);
+      return;
+    }
+    setOpenFixtureId(node.fixtureId);
+  };
+
+  const onSideDragOver = (event: DragEvent<HTMLButtonElement>, side: LeagueBoardSide) => {
+    if (canWrite && side.slotId !== null) event.preventDefault();
+  };
+
+  const onSideDrop = (event: DragEvent<HTMLButtonElement>, side: LeagueBoardSide) => {
+    if (!canWrite || side.slotId === null) return;
+    event.preventDefault();
+    const registrationId = event.dataTransfer.getData(REGISTRATION_DRAG_MIME);
+    if (registrationId !== '') void place(side.slotId, registrationId);
+  };
 
   const onRandomFill = async () => {
     try {
@@ -104,7 +175,7 @@ export function LeagueScheduleBoard({ leagueId, fixtures, slots, teams, canWrite
                 type="button"
                 className={TOOLBAR_BUTTON}
                 style={{ minHeight: 44 }}
-                disabled={!summary.hasEmptySlot || randomFill.isPending}
+                disabled={!summary.hasEmptySlot || randomFillBlockedReason !== null || randomFill.isPending}
                 onClick={() => void onRandomFill()}
               >
                 빈 자리 무작위 채우기
@@ -116,13 +187,29 @@ export function LeagueScheduleBoard({ leagueId, fixtures, slots, teams, canWrite
           </div>
         ) : null}
       </div>
+      {canWrite && summary.slotCount > 0 && randomFillBlockedReason !== null ? (
+        <p className="text-[length:var(--font-size-caption)] text-[var(--text-muted)]">{randomFillBlockedReason}</p>
+      ) : null}
       {summary.hiddenFixtureCount > 0 ? (
         <p className="text-[length:var(--font-size-caption)] text-[var(--text-muted)]">
           팀이 다 정해지지 않은 경기는 공개 화면에 아직 나오지 않아요. 자리에 팀을 모두 넣으면 나타나요.
         </p>
       ) : null}
 
-      <div className="overflow-x-auto">
+      <div className="grid gap-3 lg:grid-cols-[16rem_minmax(0,1fr)]">
+        <aside aria-label="참가팀 영역">
+          <BracketTeamTray
+            registrations={registrations ?? []}
+            slots={slots}
+            directPlacedIds={directPlacedIds}
+            registrationsState={registrationsState}
+            pendingRegistrationId={selectedRegistrationId}
+            canWrite={canWrite}
+            onPick={setSelectedRegistrationId}
+          />
+        </aside>
+
+        <div className="overflow-x-auto">
         <ol className="flex min-w-max gap-3" aria-label="경기일별 일정">
           {columns.map((column) => (
             <li key={column.key} className="w-64 shrink-0">
@@ -138,27 +225,37 @@ export function LeagueScheduleBoard({ leagueId, fixtures, slots, teams, canWrite
                       aria-label={`${node.home.label} 대 ${node.away.label} 경기`}
                       className="flex flex-col gap-1 rounded-xl border border-[var(--border)] bg-[var(--card-surface)] p-2"
                     >
-                      <div className="flex min-h-[44px] items-center justify-between gap-2 px-1">
+                      <button
+                        type="button"
+                        onClick={() => setOpenFixtureId(node.fixtureId)}
+                        aria-label={`${node.home.label} 대 ${node.away.label} 경기 상세 열기`}
+                        className="flex min-h-[44px] w-full items-center justify-between gap-2 rounded-lg px-1 text-left transition-colors hover:bg-[var(--surface-soft)] focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+                      >
                         <span className="text-[length:var(--font-size-caption)] text-[var(--text-muted)]">
                           {`${formatKstTime(node.startAt)} · ${node.placeName}`}
                         </span>
                         <StatusChip chip={bracketNodeStateChip(node.state)} />
-                      </div>
+                      </button>
                       {(['home', 'away'] as const).map((sideKey) => {
                         const side = node[sideKey];
+                        const sideName = sideKey === 'home' ? '홈' : '원정';
+                        const armed = canWrite && selectedRegistrationId !== null && side.slotId !== null;
                         return (
-                          <p
+                          <button
                             key={sideKey}
-                            className={`flex min-h-[44px] items-center gap-2 rounded-lg border border-[var(--border)] px-2 text-[length:var(--font-size-body-sm)] ${
-                              side.filled ? 'bg-[var(--card-surface)] text-[var(--text-strong)]' : 'bg-[var(--surface-soft)] text-[var(--text-muted)]'
-                            }`}
+                            type="button"
+                            aria-label={`${sideName} ${side.label}${side.filled ? '' : ' 비어 있음'}`}
+                            title={armed ? '선택한 팀을 이 자리에 넣어요' : undefined}
+                            onClick={() => onSideClick(node, side)}
+                            onDragOver={(event) => onSideDragOver(event, side)}
+                            onDrop={(event) => onSideDrop(event, side)}
+                            className={`flex min-h-[44px] w-full items-center gap-2 rounded-lg border px-2 text-left text-[length:var(--font-size-body-sm)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 ${
+                              armed ? 'border-[var(--blue500)]' : 'border-[var(--border)]'
+                            } ${side.filled ? 'bg-[var(--card-surface)] text-[var(--text-strong)]' : 'bg-[var(--surface-soft)] text-[var(--text-muted)]'}`}
                           >
-                            <span className="w-8 shrink-0 text-[length:var(--font-size-caption)] text-[var(--text-muted)]">
-                              {sideKey === 'home' ? '홈' : '원정'}
-                            </span>
+                            <span className="w-8 shrink-0 text-[length:var(--font-size-caption)] text-[var(--text-muted)]">{sideName}</span>
                             <span className="min-w-0 truncate">{side.label}</span>
-                            {side.filled ? null : <span className="sr-only">비어 있음</span>}
-                          </p>
+                          </button>
                         );
                       })}
                       {score !== null ? (
@@ -180,7 +277,29 @@ export function LeagueScheduleBoard({ leagueId, fixtures, slots, teams, canWrite
             </li>
           ))}
         </ol>
+        </div>
       </div>
+
+      {openNode !== null ? (
+        <LeagueFixturePanel
+          key={openNode.fixtureId}
+          leagueId={leagueId}
+          node={openNode}
+          slots={slots}
+          registrations={registrations ?? []}
+          canWrite={canWrite}
+          showToast={showToast}
+          onEditSchedule={() => {
+            setOpenFixtureId(null);
+            onEditSchedule(openNode.fixtureId);
+          }}
+          onCancelFixture={() => {
+            setOpenFixtureId(null);
+            onCancelFixture(openNode.fixtureId);
+          }}
+          onClose={() => setOpenFixtureId(null)}
+        />
+      ) : null}
     </section>
   );
 }

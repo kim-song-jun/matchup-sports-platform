@@ -1,5 +1,5 @@
 import type { V1AdminBracketFixtureGame, V1AdminBracketSlot } from '@/types/api';
-import type { V1LeagueFixture } from '@/types/league-match';
+import type { V1AdminLeagueTeam, V1LeagueFixture } from '@/types/league-match';
 import { fixtureNodeState } from './bracket-canvas-layout';
 import { toKstDateString } from './kst-calendar';
 
@@ -119,4 +119,34 @@ export function buildLeagueBoard({ fixtures, slots, teamNameById }: BuildInput):
       hasEmptySlot: filledSlotCount < slots.length,
     },
   };
+}
+
+/**
+ * 자리 없이 경기에 직접 들어간 팀의 등록 id. 취소된 경기와 자리에 연결된 사이드는 세지 않는다.
+ * 트레이가 이 팀들을 "경기에 있음"으로 보여 주고 미배정 수에서 뺀다.
+ */
+export function leagueDirectPlacedRegistrationIds(
+  fixtures: readonly V1LeagueFixture[],
+  slots: readonly V1AdminBracketSlot[],
+  teams: readonly V1AdminLeagueTeam[],
+): Set<string> {
+  const slotIds = new Set(slots.map((slot) => slot.id));
+  const registrationByTeamId = new Map<string, string>();
+  for (const team of teams) {
+    if (team.registrationId !== null) registrationByTeamId.set(team.teamId, team.registrationId);
+  }
+  const ids = new Set<string>();
+  for (const fixture of fixtures) {
+    if (fixture.status === 'cancelled' || fixtureNodeState(fixture.game ?? null) === 'cancelled') continue;
+    const sides = [
+      { teamId: fixture.homeTeamId, slotId: fixture.homeSlotId },
+      { teamId: fixture.awayTeamId, slotId: fixture.awaySlotId },
+    ];
+    for (const { teamId, slotId } of sides) {
+      if (teamId === null || (slotId != null && slotIds.has(slotId))) continue;
+      const registrationId = registrationByTeamId.get(teamId);
+      if (registrationId !== undefined) ids.add(registrationId);
+    }
+  }
+  return ids;
 }

@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import type { V1AdminBracketFixtureGame, V1AdminBracketSlot } from '@/types/api';
-import type { V1LeagueFixture } from '@/types/league-match';
+import type { V1AdminLeagueTeam, V1LeagueFixture } from '@/types/league-match';
 import { fixtureNodeState } from './bracket-canvas-layout';
-import { buildLeagueBoard } from './league-board-model';
+import { buildLeagueBoard, leagueDirectPlacedRegistrationIds } from './league-board-model';
 
 function fixture(overrides: Partial<V1LeagueFixture> & { teamMatchId: string }): V1LeagueFixture {
   return {
@@ -133,5 +133,41 @@ describe('buildLeagueBoard', () => {
     expect(buildLeagueBoard({ fixtures: [], slots: allFilled, teamNameById: NAMES }).summary.hasEmptySlot).toBe(false);
     // 자리가 없는 리그(기존 방식)는 빈 자리도 없다 — 무작위 채우기 버튼의 근거.
     expect(buildLeagueBoard({ fixtures: [], slots: [], teamNameById: NAMES }).summary.hasEmptySlot).toBe(false);
+  });
+});
+
+describe('leagueDirectPlacedRegistrationIds', () => {
+  const teams: V1AdminLeagueTeam[] = [
+    { teamId: 't1', name: '독수리FC', status: 'active', memberCount: 5, logoUrl: null, registrationId: 'r1' },
+    { teamId: 't2', name: '호랑이FC', status: 'active', memberCount: 5, logoUrl: null, registrationId: 'r2' },
+    { teamId: 't3', name: '사자FC', status: 'active', memberCount: 5, logoUrl: null, registrationId: 'r3' },
+    { teamId: 't4', name: '곰FC', status: 'active', memberCount: 5, logoUrl: null, registrationId: null },
+  ];
+  const slots = [slot({ id: 's1' }), slot({ id: 's2' })];
+
+  it('자리 없는 사이드의 팀만 모은다 — 자리에 연결된 사이드는 제외, 자리 없는 사이드는 포함', () => {
+    const ids = leagueDirectPlacedRegistrationIds(
+      [
+        fixture({ teamMatchId: 'slotted', homeTeamId: 't1', awayTeamId: 't2', homeSlotId: 's1', awaySlotId: 's2' }),
+        fixture({ teamMatchId: 'legacy', homeTeamId: 't3', awayTeamId: null, homeSlotId: null, awaySlotId: null }),
+      ],
+      slots,
+      teams,
+    );
+    expect([...ids]).toEqual(['r3']);
+  });
+
+  it('취소된 경기(경기 상태·게임 상태 모두)는 세지 않고, 등록 id 가 없는 팀은 건너뛴다', () => {
+    const cancelledGame = { state: 'CANCELLED', latestRevision: null } as unknown as V1AdminBracketFixtureGame;
+    const ids = leagueDirectPlacedRegistrationIds(
+      [
+        fixture({ teamMatchId: 'c1', homeTeamId: 't1', awayTeamId: 't2', status: 'cancelled' }),
+        fixture({ teamMatchId: 'c2', homeTeamId: 't1', awayTeamId: 't2', game: cancelledGame }),
+        fixture({ teamMatchId: 'no-reg', homeTeamId: 't4', awayTeamId: 't3' }),
+      ],
+      slots,
+      teams,
+    );
+    expect([...ids]).toEqual(['r3']);
   });
 });

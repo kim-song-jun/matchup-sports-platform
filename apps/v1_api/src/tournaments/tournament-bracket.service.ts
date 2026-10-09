@@ -15,6 +15,7 @@ import {
   V1TournamentStanding,
 } from '@prisma/client';
 import { AdminContextService } from '../common/admin-context.service';
+import { ROUND12_BYE_SORT_ORDERS } from './templates/bracket-template-plan';
 import { PrismaService } from '../prisma/prisma.service';
 import { V1AuthUser } from '../auth/v1-auth-user';
 import {
@@ -364,6 +365,11 @@ export class TournamentBracketService {
         ? assigned.find((team) => team.id === dto.byeId && team.isBye)
         : registrationId ? assigned.find((team) => team.registrationId === registrationId) : undefined;
       if (dto.byeId && !existing) throw new NotFoundException({ code: 'BYE_NOT_FOUND', message: '해당 조의 부전승 자리를 찾을 수 없어요.' });
+      const slotLinked = await tx.v1TournamentSlot.findMany({ where: { tournamentId, groupId: group.id, kind: 'BYE' }, select: { position: true } });
+      const linkedSortOrders = new Set<number | undefined>(slotLinked.map((slot) => ROUND12_BYE_SORT_ORDERS[slot.position - 1]));
+      if (linkedSortOrders.has(dto.sortOrder) || (existing !== undefined && linkedSortOrders.has(existing.sortOrder))) {
+        throw new ConflictException({ code: 'BYE_MANAGED_BY_SLOT', message: '대진 그림의 부전승 자리는 슬롯 배정에서만 바꿀 수 있어요.' });
+      }
       if ((!existing && assigned.length >= limit.teams) || assigned.filter((team) => team.isBye && team.id !== existing?.id).length >= limit.byes) {
         throw new ConflictException({ code: 'BYE_CAPACITY', message: '해당 라운드의 팀 또는 부전승 정원을 초과했어요.' });
       }

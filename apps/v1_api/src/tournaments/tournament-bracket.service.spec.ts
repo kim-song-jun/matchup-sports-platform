@@ -764,6 +764,20 @@ describe('TournamentBracketService', () => {
       expect(await service.createBye(ownerUser, 'tournament-1', { ...dto, byeId: 'slot-1', registrationId: null })).toMatchObject({ id: 'slot-1', registrationId: null, sortOrder: 3 });
       expect(prisma.v1TournamentGroupTeam.delete).toHaveBeenCalledWith({ where: { id: 'slot-1' } });
     });
+    it('대진 그림 슬롯과 연결된 부전승은 비우기·변경·위치 이동을 모두 거절한다', async () => {
+      const linked = { id: 'gt-1', groupId: 'group-1', registrationId: 'reg-1', isBye: true, sortOrder: 3, createdAt: new Date() };
+      prisma.v1TournamentGroupTeam.findMany.mockResolvedValue([linked]);
+      prisma.v1TournamentSlot.findMany.mockResolvedValue([{ position: 2 }]);
+      for (const body of [{ ...dto, byeId: 'gt-1', registrationId: null }, { ...dto, byeId: 'gt-1', registrationId: 'reg-2' }, { ...dto, byeId: 'gt-1', sortOrder: 5 }, { ...dto, byeId: undefined }]) {
+        await expect(service.createBye(ownerUser, 'tournament-1', body)).rejects.toMatchObject({ response: { code: 'BYE_MANAGED_BY_SLOT' } });
+      }
+      expect(prisma.v1TournamentGroupTeam.delete).not.toHaveBeenCalled();
+      expect(prisma.v1TournamentByeSlot.create).not.toHaveBeenCalled();
+    });
+    it('슬롯과 연결되지 않은 다른 위치의 부전승은 그대로 변경된다', async () => {
+      prisma.v1TournamentSlot.findMany.mockResolvedValue([{ position: 1 }]);
+      expect(await service.createBye(ownerUser, 'tournament-1', dto)).toMatchObject({ registrationId: 'reg-1', sortOrder: 3 });
+    });
     it('다른 조의 부전승 id를 수정하지 않는다', async () => {
       await expect(service.createBye(ownerUser, 'tournament-1', { ...dto, byeId: 'foreign-slot' })).rejects.toMatchObject({ response: { code: 'BYE_NOT_FOUND' } });
       expect(prisma.v1TournamentGroupTeam.update).not.toHaveBeenCalled();

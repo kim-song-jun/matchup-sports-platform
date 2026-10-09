@@ -35,6 +35,7 @@ const EDGE_STYLE: Record<CanvasEdgeKind, { dash: string | undefined }> = {
   WINNER: { dash: undefined },
   LOSER: { dash: '6 4' },
   BYE: { dash: '2 3' },
+  GROUP_RANK: { dash: '10 4 2 4' },
 };
 
 export function BracketCanvas({

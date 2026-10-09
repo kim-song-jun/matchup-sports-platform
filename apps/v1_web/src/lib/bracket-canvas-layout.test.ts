@@ -243,8 +243,11 @@ describe('fixtureTeamChangeAccess — 서버 팀 교체 가드와 같은 기준'
   const revision = (state: 'DRAFT' | 'SUBMITTED' | 'CHANGE_REQUESTED' | 'OFFICIAL' | 'VOID') => ({
     id: 'rev', state, score: { home: 1, away: 0 }, entryMethod: 'console' as const,
   });
-  const access = (state: 'SCHEDULED' | 'LIVE' | 'PAUSED' | 'ENDED' | 'CANCELLED', latest: ReturnType<typeof revision> | null) =>
-    fixtureTeamChangeAccess(makeFixture({ id: 'a', groupId: 'g', fixtureNumber: 1, game: makeGame({ state, latestRevision: latest }) }));
+  const access = (
+    state: 'SCHEDULED' | 'LIVE' | 'PAUSED' | 'ENDED' | 'CANCELLED',
+    latest: ReturnType<typeof revision> | null,
+    hasOfficialResult: boolean,
+  ) => fixtureTeamChangeAccess(makeFixture({ id: 'a', groupId: 'g', fixtureNumber: 1, game: makeGame({ state, latestRevision: latest, hasOfficialResult }) }));
 
   it.each([
     ['게임이 없는 옛 경기', null, 'free'],
@@ -260,12 +263,21 @@ describe('fixtureTeamChangeAccess — 서버 팀 교체 가드와 같은 기준'
   ] as const)('%s → %s', (_name, input, expected) => {
     const fixture = input === null
       ? makeFixture({ id: 'a', groupId: 'g', fixtureNumber: 1 })
-      : makeFixture({ id: 'a', groupId: 'g', fixtureNumber: 1, game: makeGame({ state: input[0], latestRevision: input[1] === null ? null : revision(input[1]) }) });
+      : makeFixture({ id: 'a', groupId: 'g', fixtureNumber: 1, game: makeGame({ state: input[0], latestRevision: input[1] === null ? null : revision(input[1]), hasOfficialResult: input[1] === 'OFFICIAL' }) });
     expect(fixtureTeamChangeAccess(fixture)).toBe(expected);
   });
 
-  it('최신 리비전이 무효가 아니면 상태와 무관하게 결과가 있는 것으로 본다', () => {
-    expect(access('SCHEDULED', revision('OFFICIAL'))).toBe('official');
+  it('공식 결과 위에 정정이 진행 중이어도 포인터가 공식이면 잠긴다 (서버는 포인터 리비전을 본다)', () => {
+    expect(access('ENDED', revision('SUBMITTED'), true)).toBe('official');
+    expect(access('ENDED', revision('DRAFT'), true)).toBe('official');
+  });
+
+  it('공식 결과 없이 제출만 된 경기는 교체할 수 있다', () => {
+    expect(access('ENDED', revision('SUBMITTED'), false)).toBe('started');
+  });
+
+  it('공식 결과 포인터는 경기 상태와 무관하게 잠근다', () => {
+    expect(access('SCHEDULED', revision('OFFICIAL'), true)).toBe('official');
   });
 });
 

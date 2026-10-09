@@ -4220,6 +4220,7 @@ export type V1AdminBracketFixtureGame = {
   state: 'SCHEDULED' | 'LIVE' | 'PAUSED' | 'ENDED' | 'CANCELLED';
   version: number;
   hasLiveRecords: boolean;
+  hasOfficialResult: boolean;
   latestRevision: V1AdminBracketRevisionSummary | null;
 };
 

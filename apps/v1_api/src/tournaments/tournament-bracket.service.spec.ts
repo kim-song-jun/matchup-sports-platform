@@ -2529,7 +2529,7 @@ describe('TournamentBracketService', () => {
       expect(result.slots).toEqual([]);
       expect(result.fixtures[0]).toMatchObject({
         homeSlotId: null, awaySlotId: null,
-        game: { version: 3, hasLiveRecords: false, latestRevision: null },
+        game: { version: 3, hasLiveRecords: false, hasOfficialResult: false, latestRevision: null },
       });
     });
   });

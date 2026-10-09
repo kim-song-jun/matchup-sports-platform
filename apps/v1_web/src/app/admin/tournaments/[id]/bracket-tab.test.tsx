@@ -519,6 +519,7 @@ describe('BracketTab — 경기 수정: 시작된 경기의 팀 교체', () => {
     makeGame({
       state,
       hasLiveRecords: true,
+      hasOfficialResult: revisionState === 'OFFICIAL',
       latestRevision: revisionState === null ? null : { id: 'rev-1', state: revisionState, score: { home: 1, away: 0 }, entryMethod: 'console' },
     });
 

@@ -217,7 +217,7 @@ describe('BracketNodePanel — 자리 배정', () => {
       });
 
       it('공식 결과가 있으면 선택창 대신 무효 안내와 정정 화면 링크를 보여 준다', () => {
-        renderPanel(started({ game: makeGame({ state: 'ENDED', latestRevision: revision('OFFICIAL') }) }));
+        renderPanel(started({ game: makeGame({ state: 'ENDED', hasOfficialResult: true, latestRevision: revision('OFFICIAL') }) }));
         expect(screen.queryByLabelText('홈 팀 선택')).not.toBeInTheDocument();
         expect(screen.getAllByText('공식 결과가 확정된 경기예요. 결과를 먼저 무효로 돌려 주세요.')).toHaveLength(2);
         expect(screen.getAllByRole('link', { name: '결과 정정 화면 열기' })[0]).toHaveAttribute('href', expect.stringContaining('/records/corrections?fixtureId=f1'));
@@ -342,7 +342,7 @@ describe('BracketNodePanel — 결과 구역', () => {
   it('결과가 있으면 폼 대신 확정·정정·무효 동작을 보여 준다', () => {
     renderPanel(
       readyFixture({
-        game: makeGame({ id: 'game-1', state: 'ENDED', latestRevision: { id: 'rev', state: 'OFFICIAL', entryMethod: 'quick', score: { home: 1, away: 0 } } }),
+        game: makeGame({ id: 'game-1', state: 'ENDED', hasOfficialResult: true, latestRevision: { id: 'rev', state: 'OFFICIAL', entryMethod: 'quick', score: { home: 1, away: 0 } } }),
       }),
     );
     expect(screen.getByTestId('result-actions')).toHaveTextContent('game-1');

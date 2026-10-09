@@ -308,7 +308,7 @@ The result-entry reminder skips such fixtures as well.
 ### Admin response additions
 
 - `GET /admin/league-matches/:leagueId`: each fixture carries `homeSlotId`, `awaySlotId` and
-  `game: { id, state, version, hasLiveRecords, latestRevision: { id, state, score, entryMethod } | null } | null`;
+  `game: { id, state, version, hasLiveRecords, hasOfficialResult, latestRevision: { id, state, score, entryMethod } | null } | null`;
   `homeTeamId` / `awayTeamId` are `string | null`. Top level `slots[]`:
   `{ id, kind, groupId, sourceGroupId, position, label, registrationId, teamName }` (label `N번 자리`).
 - `GET /admin/league-matches/:leagueId/teams`: each team carries `registrationId` (the confirmed

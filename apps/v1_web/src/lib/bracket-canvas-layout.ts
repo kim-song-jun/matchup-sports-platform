@@ -236,9 +236,8 @@ export type FixtureTeamChangeAccess = 'free' | 'started' | 'official' | 'cancell
 export function fixtureTeamChangeAccess(fixture: V1AdminBracketFixture): FixtureTeamChangeAccess {
   const game = fixture.game;
   if (game === null) return 'free';
+  if (game.hasOfficialResult) return 'official';
   if (game.state === 'CANCELLED') return 'cancelled';
-  const revision = game.latestRevision;
-  if (revision !== null && revision.state === 'OFFICIAL') return 'official';
   return game.state === 'SCHEDULED' ? 'free' : 'started';
 }
 

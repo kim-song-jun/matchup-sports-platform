@@ -120,6 +120,7 @@ export const v1Keys = {
   adminTermsPolicy: (id: string) => [...v1Keys.all, 'admin', 'terms', id] as const,
   adminInquiries: (filters?: Record<string, unknown>) => [...v1Keys.all, 'admin', 'inquiries', filters ?? {}] as const,
   adminInquiry: (id: string) => [...v1Keys.all, 'admin', 'inquiries', id] as const,
+  adminTeamMatchPendingApplicationCount: () => [...v1Keys.all, 'admin', 'team-matches', 'pending-application-count'] as const,
   adminInquiriesPendingCount: () => [...v1Keys.all, 'admin', 'inquiries', 'pending-count'] as const,
   adminGuestInquiryPurgeCandidates: () => [...v1Keys.all, 'admin', 'guest-inquiries', 'purge-candidates'] as const,
   adminReportedTeams: (limit?: number) => [...v1Keys.all, 'admin', 'reported-teams', limit ?? null] as const,

@@ -1,4 +1,5 @@
 import { normalizeGenderRule } from '../common/gender-rule';
+import { OPERATOR_ACTIONABLE_APPLICATION_WHERE } from './admin-team-match-pending';
 import { completePersonalMatch } from '../matches/complete-personal-match';
 import {
   BadRequestException,
@@ -2470,6 +2471,15 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
   }
 
   // ─── Team-match list ───────────────────────────────────────────────────────
+
+  /** Sidebar badge — requested applications on matches the operator can still handle. */
+  async getTeamMatchPendingApplicationCount(user: V1AuthUser) {
+    await this.getActiveAdmin(user.id);
+    const count = await this.prisma.v1TeamMatchApplication.count({
+      where: OPERATOR_ACTIONABLE_APPLICATION_WHERE,
+    });
+    return { count };
+  }
 
   async listTeamMatches(user: V1AuthUser, query: AdminTeamMatchListQueryDto) {
     await this.getActiveAdmin(user.id);

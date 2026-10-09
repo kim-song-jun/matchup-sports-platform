@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Fragment, useEffect, useRef, useState, useCallback, type ReactNode } from 'react';
-import { useV1AdminInquiriesPendingCount } from '@/hooks/use-v1-api';
+import { useV1AdminInquiriesPendingCount, useV1AdminTeamMatchPendingApplicationCount } from '@/hooks/use-v1-api';
 import { useOverlayHistory } from '@/components/v1-ui/use-overlay-history';
 import { useTopmostEscape } from '@/components/v1-ui/use-topmost-escape';
 import { overlayLinkClick } from '@/lib/overlay-history';
@@ -152,16 +152,22 @@ function useIsActive(pathname: string) {
 
 /**
  * Builds the grouped nav, appending the owner-only "관리자" item to the 설정 group and
- * injecting the "문의" pending-count badge.
+ * injecting pending-count badges ("문의", "팀매치").
  */
-function buildNavGroups(canManageAdmins: boolean, pendingInquiryCount?: number): NavGroup[] {
-  const hasBadge = typeof pendingInquiryCount === 'number' && pendingInquiryCount > 0;
+type NavBadgeCounts = { inquiries?: number; teamMatchApplications?: number };
+
+function buildNavGroups(canManageAdmins: boolean, counts: NavBadgeCounts = {}): NavGroup[] {
+  const badges: Record<string, { count?: number; label: (count: number) => string }> = {
+    '/admin/inquiries': { count: counts.inquiries, label: (n) => `미확인 문의 ${n}건` },
+    '/admin/team-matches': { count: counts.teamMatchApplications, label: (n) => `대기 신청 ${n}건` },
+  };
   return BASE_NAV_GROUPS.map((group) => {
-    const items = group.items.map((item) =>
-      hasBadge && item.href === '/admin/inquiries'
-        ? { ...item, badgeCount: pendingInquiryCount, badgeAriaLabel: `미확인 문의 ${pendingInquiryCount}건` }
-        : item,
-    );
+    const items = group.items.map((item) => {
+      const badge = badges[item.href];
+      return badge && typeof badge.count === 'number' && badge.count > 0
+        ? { ...item, badgeCount: badge.count, badgeAriaLabel: badge.label(badge.count) }
+        : item;
+    });
     return group.label === '설정' && canManageAdmins
       ? { ...group, items: [...items, OWNER_NAV_ITEM] }
       : { ...group, items };
@@ -169,8 +175,8 @@ function buildNavGroups(canManageAdmins: boolean, pendingInquiryCount?: number):
 }
 
 /** Flattens the grouped nav — used for pathname → label lookup. */
-function buildNavItems(canManageAdmins: boolean, pendingInquiryCount?: number): NavItem[] {
-  return buildNavGroups(canManageAdmins, pendingInquiryCount).flatMap((group) => group.items);
+function buildNavItems(canManageAdmins: boolean, counts?: NavBadgeCounts): NavItem[] {
+  return buildNavGroups(canManageAdmins, counts).flatMap((group) => group.items);
 }
 
 /** Current section label derived from pathname (for mobile appbar title) */
@@ -259,8 +265,8 @@ interface DrawerProps {
   adminRoleLabel?: string;
   pathname: string;
   canManageAdmins: boolean;
-  /** Pending (received/reviewing) 문의 count shown as a badge next to the "문의" nav item */
-  pendingInquiryCount?: number;
+  /** Pending counts shown as badges next to their nav items */
+  badgeCounts?: NavBadgeCounts;
   /** Ref to the hamburger button — focus is restored here when the drawer closes (WCAG 2.4.3) */
   triggerRef: React.RefObject<HTMLButtonElement | null>;
 }
@@ -272,12 +278,12 @@ function Drawer({
   adminRoleLabel,
   pathname,
   canManageAdmins,
-  pendingInquiryCount,
+  badgeCounts,
   triggerRef,
 }: DrawerProps) {
   useOverlayHistory({ open, onClose });
   const isActive = useIsActive(pathname);
-  const navGroups = buildNavGroups(canManageAdmins, pendingInquiryCount);
+  const navGroups = buildNavGroups(canManageAdmins, badgeCounts);
   const panelRef = useRef<HTMLDivElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
 
@@ -466,7 +472,12 @@ export function AdminShell({ children, adminName, adminRoleLabel, canManageAdmin
   const pathname = usePathname();
   const isActive = useIsActive(pathname);
   const { data: pendingInquiries } = useV1AdminInquiriesPendingCount();
-  const navGroups = buildNavGroups(canManageAdmins, pendingInquiries?.count);
+  const { data: pendingTeamMatchApplications } = useV1AdminTeamMatchPendingApplicationCount();
+  const badgeCounts: NavBadgeCounts = {
+    inquiries: pendingInquiries?.count,
+    teamMatchApplications: pendingTeamMatchApplications?.count,
+  };
+  const navGroups = buildNavGroups(canManageAdmins, badgeCounts);
   const sectionLabel = useSectionLabel(pathname, canManageAdmins);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
@@ -573,7 +584,7 @@ export function AdminShell({ children, adminName, adminRoleLabel, canManageAdmin
           adminRoleLabel={adminRoleLabel}
           pathname={pathname}
           canManageAdmins={canManageAdmins}
-          pendingInquiryCount={pendingInquiries?.count}
+          badgeCounts={badgeCounts}
           triggerRef={hamburgerRef}
         />
       </div>

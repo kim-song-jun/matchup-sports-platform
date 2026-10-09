@@ -23,6 +23,7 @@ import type {
   V1AdminGrantResult,
   V1AdminInquiryDetail,
   V1AdminInquiryPendingCount,
+  V1AdminTeamMatchPendingApplicationCount,
   V1AdminInquiryReplyPayload,
   V1AdminInquiryRow,
   V1AdminInquiryStatusPayload,
@@ -3306,6 +3307,18 @@ export function useV1AdminInquiriesPendingCount() {
     staleTime: 15_000,
     refetchInterval: 30_000,
     retry: false, // refetchInterval과 겹쳐 일시 실패 시 중복 요청 방지 (Copilot 리뷰 지적, PR #63)
+  });
+}
+
+/** 어드민 사이드바 "팀매치" 배지용 — 운영자가 처리할 수 있는 대기 신청 수 */
+export function useV1AdminTeamMatchPendingApplicationCount() {
+  return useQuery({
+    queryKey: v1Keys.adminTeamMatchPendingApplicationCount(),
+    queryFn: () =>
+      v1Get<V1AdminTeamMatchPendingApplicationCount>('/admin/team-matches/pending-application-count'),
+    staleTime: 15_000,
+    refetchInterval: 30_000,
+    retry: false,
   });
 }
 

@@ -323,6 +323,12 @@ export class AdminController {
 
   // ─── Team Matches ─────────────────────────────────────────────────────────
 
+  /** Sidebar badge — pending applications the operator can still act on */
+  @Get('team-matches/pending-application-count')
+  getTeamMatchPendingApplicationCount(@CurrentUser() user: V1AuthUser) {
+    return this.adminService.getTeamMatchPendingApplicationCount(user);
+  }
+
   @Get('team-matches')
   listTeamMatches(@CurrentUser() user: V1AuthUser, @Query() query: AdminTeamMatchListQueryDto) {
     return this.adminService.listTeamMatches(user, query);

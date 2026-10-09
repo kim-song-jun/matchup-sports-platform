@@ -12,7 +12,7 @@
 
 ## 계약 이탈 / 계약 보강
 
-색인의 이름은 하나도 바꾸지 않는다. 아래 셋은 색인에 없거나 실제 코드(PR-3 계획·현재 리그 코드)와 맞지 않아 이 PR 이 추가·대체하는 항목이다.
+색인의 이름은 하나도 바꾸지 않는다. 아래 넷은 색인에 없거나 실제 코드(PR-3 계획·현재 리그 코드)와 맞지 않아 이 PR 이 추가·대체하는 항목이다.
 
 1. **리그 열은 `buildCanvasLayout(mode:'league')` 대신 `buildLeagueBoard`(신규, `apps/v1_web/src/lib/league-board-model.ts`)로 계산한다.**
    코드 이유: PR-3 의 `buildCanvasLayout` 은 `V1AdminBracketFixture` 를 입력으로 받아 리그 모드에서는 `fixture.round` 문자열로 열을 묶는다(PR-3 계획 Task 4 `leagueColumns`). 그런데 리그 어드민 상세의 경기(`V1LeagueFixture`, `league-match-admin.service.ts` 의 `detail()`)에는 `round`·`groupId`·`fixtureNumber` 가 없다(`title` 의 "N주차"뿐이고 문자열 파싱은 취약하다). 억지로 끼우면 값을 지어내야 한다. 대신 열 = 경기 날짜(KST), 노드 상태는 PR-3 의 `fixtureNodeState(game)` 를 그대로 재사용한다.
@@ -20,6 +20,8 @@
 2. **PR-3 의 `BracketNodePanel` 은 리그 경기에 쓸 수 없어 `LeagueFixturePanel`(신규)을 둔다.**
    코드 이유: PR-3 계획 Task 12 의 `BracketNodePanel` props 는 `tournamentId`·`V1AdminBracketFixture`·`groups` 이고 내부에서 `useV1UpdateFixture(tournamentId)`·`useV1DeleteFixture` 를 직접 부른다(토너먼트 경기 PATCH/DELETE 경로). 리그 경기는 팀매치(`V1LeagueFixture`)이고 일정 수정·취소가 기존 리그 모달(`LeagueFixtureScheduleModal`·취소 `GateConfirmModal`)이다. 결과 구역은 PR-3 의 `BracketQuickResultForm`·`BracketResultActions` 와 `useV1QuickResult(leagueId, 'league')` 를 그대로 재사용한다. 또 정정·무효·확정 훅은 결과 검토 캐시만 무효화하므로(`use-tournament-result-review.ts` 의 정정·무효·확정 훅 `onSuccess`) 리그 패널이 성공 토스트를 가로채 `adminLeagueMatch` 를 함께 무효화한다.
 3. **템플릿 요청 본문의 선택 필드 `placeName`.** 색인 HTTP 표의 본문은 `{ teamCount, legs, schedule, replaceExisting? }` 지만 PR-5a 계획이 같은 이유(공개 가드는 장소가 있는 경기만 통과, 시나리오 4 의 일정 입력에 장소 포함)로 선택 필드 `placeName?: string` 을 더했다(PR-5a 계획 "계약 이탈" 2번, 추가만). 이 PR 의 대화상자는 장소를 비우면 키를 아예 보내지 않고(서버 기본 `'장소 미정'`), 채우면 `placeName` 을 보낸다.
+
+4. **(2026-10-09 보강) 참가팀 트레이의 "자리 없이 경기에 직접 들어간 팀".** PR-3 alpha 갤러리에서 자리 없이 만든 기존 대진이 트레이에 "미배정 12 / 전체 12"로 잘못 보이는 결함이 나왔고, 토너먼트 쪽은 #1725 가 `BracketTeamTray` 에 선택 prop `directPlacedIds?: ReadonlySet<string>`(그 팀은 "경기에 있음"으로 보이고 미배정 수에서 빠지되 계속 고를 수 있음)을 더해 고쳤다. 리그 보드(Task 7c)도 같은 결함을 피하려고, 취소되지 않은 리그 경기에서 **자리가 없는 사이드(`homeSlotId`/`awaySlotId` 가 null)에 팀이 있으면** 그 팀 id 를 `teams`(이름 조회용 `V1AdminLeagueTeam[]`)의 `registrationId` 로 바꿔 모은 집합을 `directPlacedIds` 로 넘긴다(`registrationId` 가 null 인 팀은 건너뛴다). 계산은 `league-board-model.ts` 의 순수 함수로 두고 단위 테스트한다(취소 경기 제외·자리 있는 사이드 제외·자리 없는 사이드 포함 — 양쪽 대조군). **#1725 가 아직 dev 에 없으면** 트레이에 이 prop 이 없으므로, Task 7c 시작 시 `git fetch origin dev && git merge origin/dev` 로 받아 온 뒤 진행하고, 그래도 없으면 BLOCKED 로 보고한다.
 
 ## PR-3 의존 계약 (이 PR 이 소비하는 것 — PR-3 계획 기준)
 

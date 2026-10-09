@@ -91,11 +91,71 @@ describe('대진 템플릿 실행기 (PostgreSQL)', () => {
     expect(await counts(tournamentId)).toEqual({ fixtures: 0, groups: 0, slots: 0, edges: 0 });
   });
 
-  it('조별+결선 템플릿은 이 PR 에서 422 BRACKET_TEMPLATE_UNSUPPORTED', async () => {
+  it('조별+결선 2조 x 4팀(2팀 진출): 조 4 · 자리 12 · 경기 15 · 연결 2, 4강 사이드는 순위 자리 A1–B2 · B1–A2', async () => {
     const { tournamentId } = await seedBracketTournament(prisma, { label: 'gk', format: 'group_knockout', teamCount: 0 });
     await expect(templates.apply(user, tournamentId, {
       kind: 'group_knockout', groupCount: 2, teamsPerGroup: 4, advancePerGroup: 2, legs: 1, thirdPlace: false,
+    })).resolves.toEqual({ groups: 4, slots: 12, fixtures: 15, edges: 2 });
+    expect(await counts(tournamentId)).toEqual({ fixtures: 15, groups: 4, slots: 12, edges: 2 });
+
+    const fixtures = await liveFixtures(tournamentId);
+    const rankLabel = async (slotId: string | null) => {
+      const slot = await prisma.v1TournamentSlot.findUniqueOrThrow({ where: { id: slotId as string }, include: { sourceGroup: true } });
+      return `${slot.kind}:${slot.sourceGroup?.name}${slot.position}`;
+    };
+    const semis = fixtures.filter((f) => f.round === '4강');
+    expect(await Promise.all(semis.map(async (f) => [await rankLabel(f.teamMatch.homeSlotId), await rankLabel(f.teamMatch.awaySlotId)]))).toEqual([
+      ['GROUP_RANK:A조1', 'GROUP_RANK:B조2'],
+      ['GROUP_RANK:B조1', 'GROUP_RANK:A조2'],
+    ]);
+
+    // 조별 경기는 자기 조 ENTRY 자리만 쓰고, 팀이 들어오기 전에는 조 편성(GroupTeam)이 없다.
+    const stage = fixtures.filter((f) => f.round.startsWith('league_r'));
+    expect(stage).toHaveLength(12);
+    for (const f of stage) {
+      expect(f.teamMatch.homeSlot?.kind).toBe('ENTRY');
+      expect(f.teamMatch.homeSlot?.groupId).toBe(f.groupId);
+      expect(f.teamMatch.awaySlot?.groupId).toBe(f.groupId);
+    }
+    expect(await prisma.v1TournamentGroupTeam.count({ where: { group: { tournamentId } } })).toBe(0);
+    const advance = await prisma.v1TournamentGroup.findMany({ where: { tournamentId, phase: 'group' }, select: { advanceCount: true } });
+    expect(advance.map((g) => g.advanceCount)).toEqual([2, 2]);
+  });
+
+  it('결승 한 경기뿐인 조합(2조 x 1팀)에 3·4위전을 넣으면 422 이고 아무것도 만들지 않는다', async () => {
+    const { tournamentId } = await seedBracketTournament(prisma, { label: 'gk-final', format: 'group_knockout', teamCount: 0 });
+    await expect(templates.apply(user, tournamentId, {
+      kind: 'group_knockout', groupCount: 2, teamsPerGroup: 3, advancePerGroup: 1, legs: 1, thirdPlace: true,
     })).rejects.toMatchObject({ response: { code: 'BRACKET_TEMPLATE_UNSUPPORTED' } });
+    expect(await counts(tournamentId)).toEqual({ fixtures: 0, groups: 0, slots: 0, edges: 0 });
+  });
+
+  it('조별+결선 8조 x 4팀(2팀 진출) + 3·4위전: 16강 phase round16 그룹 · 경기 64 · 연결 16 · 자리 48, 16강 사이드는 순위 자리 A1–B2 … H1–G2', async () => {
+    const { tournamentId } = await seedBracketTournament(prisma, { label: 'gk16', format: 'group_knockout', teamCount: 0 });
+    await expect(templates.apply(user, tournamentId, {
+      kind: 'group_knockout', groupCount: 8, teamsPerGroup: 4, advancePerGroup: 2, legs: 1, thirdPlace: true,
+    })).resolves.toEqual({ groups: 13, slots: 48, fixtures: 64, edges: 16 });
+    expect(await counts(tournamentId)).toEqual({ fixtures: 64, groups: 13, slots: 48, edges: 16 });
+
+    const round16 = await prisma.v1TournamentGroup.findFirstOrThrow({ where: { tournamentId, phase: 'round16' } });
+    expect(round16.name).toBe('16강');
+    const fixtures = (await liveFixtures(tournamentId)).filter((f) => f.round === '16강');
+    expect(fixtures).toHaveLength(8);
+    const rankLabel = async (slotId: string | null) => {
+      const slot = await prisma.v1TournamentSlot.findUniqueOrThrow({ where: { id: slotId as string }, include: { sourceGroup: true } });
+      return `${slot.sourceGroup?.name}${slot.position}`;
+    };
+    expect(await Promise.all(fixtures.map(async (f) => [await rankLabel(f.teamMatch.homeSlotId), await rankLabel(f.teamMatch.awaySlotId)]))).toEqual([
+      ['A조1', 'B조2'], ['C조1', 'D조2'], ['E조1', 'F조2'], ['G조1', 'H조2'],
+      ['B조1', 'A조2'], ['D조1', 'C조2'], ['F조1', 'E조2'], ['H조1', 'G조2'],
+    ]);
+  });
+
+  it('8조 x 6팀 x 2회전 + 16강(256경기)은 422 BRACKET_TEMPLATE_TOO_LARGE 이고 아무것도 만들지 않는다', async () => {
+    const { tournamentId } = await seedBracketTournament(prisma, { label: 'gk-large', format: 'group_knockout', teamCount: 0 });
+    await expect(templates.apply(user, tournamentId, {
+      kind: 'group_knockout', groupCount: 8, teamsPerGroup: 6, advancePerGroup: 2, legs: 2, thirdPlace: false,
+    })).rejects.toMatchObject({ response: { code: 'BRACKET_TEMPLATE_TOO_LARGE' } });
     expect(await counts(tournamentId)).toEqual({ fixtures: 0, groups: 0, slots: 0, edges: 0 });
   });
 

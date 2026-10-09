@@ -2,6 +2,7 @@ import { UnprocessableEntityException } from '@nestjs/common';
 import type { V1TournamentGroupPhase, V1TournamentSlotKind } from '@prisma/client';
 import { buildLeagueFixtureRows } from '../league-fixture-generator.service';
 import { FIXTURES_IN_PHASE, GROUP_NAME, ROUND_LABEL, type KnockoutPhase } from './knockout-phase-labels';
+import { planGroupKnockoutTemplate } from './group-knockout-plan';
 
 export type BracketTemplateInput =
   | { kind: 'knockout'; size: 4 | 8 | 12 | 16; thirdPlace: boolean }
@@ -125,7 +126,7 @@ function build(input: BracketTemplateInput, offset: number): BracketTemplatePlan
       if (input.legs !== 1 && input.legs !== 2) unsupported('회전 수는 1 또는 2예요.');
       return planLeague(input, offset);
     case 'group_knockout':
-      return unsupported('조별+결선 템플릿은 아직 지원하지 않아요.');
+      return planGroupKnockoutTemplate(input, { fixtureNumberOffset: offset });
   }
 }
 

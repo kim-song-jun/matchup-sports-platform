@@ -12,6 +12,8 @@ import { createTournamentMatchInTx } from './tournament-match-creation';
 import { updateTournamentMatchInTx } from './tournament-match-update';
 import { recalculateAndUpsertOverallStandings } from './tournament-overall-standings';
 import { competitionMatchLabel } from './tournament-round-label';
+import type { PlaceSnapshot } from '../places/place-snapshot';
+import { tournamentVenueSnapshot, type TournamentVenueRow } from '../places/tournament-venue';
 import { loadCanonicalStandingsSource } from './tournament-standings-source';
 
 type Tx = Prisma.TransactionClient;
@@ -135,7 +137,7 @@ export type TournamentFixtureUpdateInput = {
   groupId: string | null;
   fixtureNumber?: number;
   scheduledAt?: Date | null;
-  venue?: string;
+  place?: PlaceSnapshot | null;
   homeRegistrationId?: string | null;
   awayRegistrationId?: string | null;
   /** The admin fixture edit sets these; other callers keep the "started games keep their teams" rule. */
@@ -166,7 +168,7 @@ export async function updateTournamentFixtureInTx(tx: Tx, admin: V1ActiveAdmin, 
     teamMatchId: input.fixtureId,
     fixtureNumber: input.fixtureNumber,
     scheduledAt: input.scheduledAt,
-    venue: input.venue,
+    place: input.place,
     homeRegistrationId: input.homeRegistrationId,
     awayRegistrationId: input.awayRegistrationId,
     allowStartedTeamChange: input.allowStartedTeamChange,
@@ -322,7 +324,7 @@ export async function createEmptyTournamentFixtureInTx(
   deps: BracketTxDeps,
   admin: V1ActiveAdmin,
   input: {
-    tournament: { id: string; sportId: string; regionId: string | null; venue: string | null; competitionConfigVersionId: string; title: string };
+    tournament: { id: string; sportId: string; regionId: string | null; competitionConfigVersionId: string; title: string } & TournamentVenueRow;
     groupId: string;
     round: string;
     fixtureNumber: number;
@@ -353,6 +355,7 @@ export async function createEmptyTournamentFixtureInTx(
     tournamentId: tournament.id, groupId: input.groupId, round: input.round, fixtureNumber: input.fixtureNumber, legNumber: input.legNumber,
     parentFixtureId: null, homeRegistrationId: null, awayRegistrationId: null, scheduledAt: null, venue: tournament.venue,
   };
+  const place = tournamentVenueSnapshot(tournament);
   const creation = await createTournamentMatchInTx(tx, deps.games, {
     tournamentId: tournament.id,
     groupId: input.groupId,
@@ -367,7 +370,7 @@ export async function createEmptyTournamentFixtureInTx(
     sportId: tournament.sportId,
     regionId: tournament.regionId,
     title: `${tournament.title} · ${competitionMatchLabel({ groupName: group.name, round: input.round, legNumber: input.legNumber })} ${input.fixtureNumber}`,
-    placeName: tournament.venue,
+    place,
     startAt: null,
     createdByUserId: admin.userId,
     competitionConfigVersionId: tournament.competitionConfigVersionId,

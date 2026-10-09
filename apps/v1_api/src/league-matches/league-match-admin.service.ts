@@ -34,6 +34,7 @@ import {
   findLeagueAdmissionBlocker,
   leagueAdmissionBlockerMessage,
 } from './league-team-admission';
+import { TOURNAMENT_VENUE_SELECT, tournamentVenueSnapshot } from '../places/tournament-venue';
 import { tierLabel } from './league-tier-label';
 import { resolveResultStage } from './league-result-stage';
 import { resolveIsForfeit } from './league-match-forfeit.service';
@@ -66,6 +67,9 @@ import {
   UpdateLeagueVisibilityDto,
 } from './dto/league-match.dto';
 import { LEAGUE_TIE_BREAK_ORDER } from './league-tie-break';
+import { PLACE_SELECT } from '../places/place-select';
+import { toPlaceColumns, toPlaceView, type PlaceSnapshot, type PlaceView } from '../places/place-snapshot';
+import { DEFAULT_FIXTURE_PLACE_NAME, resolveLeagueFixturePlace, type LeagueFixturePlaceInput } from './league-fixture-place';
 import { findTournamentOnSurface } from '../tournaments/tournament-surface-lookup';
 import { assertLeagueFixtureGenerationAllowedInTx } from './league-fixture-generation-guard';
 import { LEAGUE_STATE_BY_STATUS, isCompleteLeagueMirror } from '../tournaments/league-competition-mirror';
@@ -83,7 +87,6 @@ import { adminBracketSlotInclude, serializeAdminBracketGame, serializeAdminBrack
 const TEAM_REMOVAL_CANCEL_REASON = '리그 참가팀에서 제외돼 자동으로 취소했어요.';
 const TEMPLATE_REPLACE_CANCEL_REASON = '대진 템플릿으로 다시 만들면서 취소했어요.';
 
-const DEFAULT_FIXTURE_PLACE_NAME = '장소 미정';
 
 /**
  * 날짜를 고르지 않은 리그의 **기본 매치데이 리듬**: 시작일부터 매주 한 매치데이.
@@ -349,10 +352,7 @@ export class LeagueMatchAdminService {
         hostTeamId: true,
         approvedApplicantTeamId: true,
         startAt: true,
-        placeName: true,
-        // placeAddress: 어드민 표의 주소 입력 컬럼이 기존 값을 보여주려면 조회 시점에도
-        // 필요하다 — updateFixture()는 이미 이 필드를 쓰고 있었는데 조회 쪽만 빠져 있었다.
-        placeAddress: true,
+        ...PLACE_SELECT,
         status: true,
         homeSlotId: true,
         awaySlotId: true,
@@ -435,6 +435,7 @@ export class LeagueMatchAdminService {
       redCardSuspensionMatches: league.redCardSuspensionMatches,
       sportCode: league.sportCode,
       coverImageUrl: league.coverImageUrl,
+      defaultPlace: tournamentVenueSnapshot(league),
       entryFee: league.entryFee,
       entryFeeConfiguredAt: league.entryFeeConfiguredAt,
       bankName: league.bankName,
@@ -459,6 +460,7 @@ export class LeagueMatchAdminService {
           startAt: fixture.startAt,
           placeName: fixture.placeName,
           placeAddress: fixture.placeAddress,
+          place: toPlaceView(fixture),
           status: fixture.status,
           resultStage: resolveResultStage(fixture.game),
           gameState: fixture.game?.state ?? null,
@@ -623,7 +625,7 @@ export class LeagueMatchAdminService {
         throw new ConflictException({ code: 'LEAGUE_FIXTURES_EXIST', message: '이미 대진이 생성된 리그예요.' });
       }
       const teamsById = await loadLeagueTeamRosters(tx,league.id, teamIds);
-      const { ids, placeName } = await this.createFixturesInTx(tx, {
+      const { ids, place } = await this.createFixturesInTx(tx, {
         leagueId: league.id,
         leagueTitle: league.title,
         leagueStartsOn: league.startsOn,
@@ -634,7 +636,7 @@ export class LeagueMatchAdminService {
         teamsById,
         schedule,
         matchdayStartAts,
-        placeNameInput: dto.placeName,
+        placeInput: dto,
         timing,
       });
       if (ids.length > 0) {
@@ -659,7 +661,7 @@ export class LeagueMatchAdminService {
             schedule: toKstScheduleLog(matchdayStartAts ?? []),
             // dto.placeName이 아니라 trim+기본값 폴백을 거쳐 실제로 저장된 placeName을 남긴다 —
             // 감사 로그가 요청 원문이 아니라 실제 결과와 일치해야 디버깅 시 혼선이 없다.
-            placeName,
+            placeName: place.name,
             // 같은 이유로 timing도 기본값(휴식 0분·팀당 1경기)까지 채워 실제 계산에 쓰인 값을
             // 남긴다. 스프레드는 Prisma InputJsonValue가 명명된 interface를 못 받아서다.
             timing: timing ? { ...timing } : null,
@@ -977,8 +979,7 @@ export class LeagueMatchAdminService {
     const slots = timing
       ? resolveFixtureTimeSlots(schedule, matchdayStartAts ?? weeklyMatchdayStartAts(league.startsOn, totalRounds, timing), timing)
       : undefined;
-    const trimmedPlaceName = dto.placeName?.trim();
-    const placeName = trimmedPlaceName ? trimmedPlaceName : DEFAULT_FIXTURE_PLACE_NAME;
+    const place = await resolveLeagueFixturePlace(this.prisma, leagueId, dto);
 
     return {
       leagueId,
@@ -992,7 +993,8 @@ export class LeagueMatchAdminService {
             ? 0
             : new Set(schedule.map((fixture) => fixture.round)).size,
       fixtureCount: schedule.length,
-      placeName,
+      placeName: place.name,
+      place,
       fixtures: schedule.map((fixture, index) => {
         const startAt =
           slots !== undefined
@@ -1183,7 +1185,7 @@ export class LeagueMatchAdminService {
       }
 
       const teamsById = await loadLeagueTeamRosters(tx,league.id, teamIds);
-      const { ids, placeName } = await this.createFixturesInTx(tx, {
+      const { ids, place } = await this.createFixturesInTx(tx, {
         leagueId: league.id,
         leagueTitle: league.title,
         leagueStartsOn: league.startsOn,
@@ -1194,7 +1196,7 @@ export class LeagueMatchAdminService {
         teamsById,
         schedule,
         matchdayStartAts,
-        placeNameInput: dto.placeName,
+        placeInput: dto,
         timing,
       });
       if (ids.length > 0) {
@@ -1216,7 +1218,7 @@ export class LeagueMatchAdminService {
           targetType: 'league_match',
           targetId: leagueId,
           reason: dto.reason,
-          afterJson: { cancelledCount, teamMatchIds: ids, weeksCount: dto.weeksCount, placeName, timing: timing ? { ...timing } : null },
+          afterJson: { cancelledCount, teamMatchIds: ids, weeksCount: dto.weeksCount, placeName: place.name, timing: timing ? { ...timing } : null },
         },
         tx,
       );
@@ -1271,8 +1273,6 @@ export class LeagueMatchAdminService {
     }
     // 날짜 검증은 트랜잭션 밖 — 도메인 거부가 락을 잡을 이유가 없다.
     const startAts = this.resolveScheduleStartAts({ schedule: dto.schedule }, plan.totalRounds, undefined);
-    const trimmedPlaceName = dto.placeName?.trim();
-    const placeName = trimmedPlaceName ? trimmedPlaceName : DEFAULT_FIXTURE_PLACE_NAME;
 
     const result = await this.prisma.$transaction(async (tx) => {
       // 리그 레인 = 행 FOR UPDATE + 보류 가드(PR-1b). raw SQL 을 이 파일에 새로 넣지 않는다 —
@@ -1297,6 +1297,7 @@ export class LeagueMatchAdminService {
         }
         replaced = await this.replaceLeagueFixturesInTx(tx, leagueId, existing);
       }
+      const place = await resolveLeagueFixturePlace(tx, leagueId, dto);
       const slotIds = plan.slotPositions.map(() => randomUUID());
       await tx.v1TournamentSlot.createMany({
         data: plan.slotPositions.map((position, index) => ({
@@ -1315,7 +1316,7 @@ export class LeagueMatchAdminService {
           regionId: league.regionId,
           competitionConfigId: config.id,
           title: leagueFixtureTitle({ leagueTitle: league.title, round: fixture.round }),
-          placeName,
+          place,
           startAt: startAts[fixture.round - 1],
           endAt: null,
           home: null,
@@ -1336,7 +1337,7 @@ export class LeagueMatchAdminService {
             slotCount: slotIds.length,
             fixtureCount: plan.fixtures.length,
             schedule: toKstScheduleLog(startAts),
-            placeName,
+            placeName: place.name,
             replacedCount: replaced.length,
           },
         },
@@ -1380,7 +1381,6 @@ export class LeagueMatchAdminService {
     const config = leagueCompetitionConfig(league);
 
     const startAt = new Date(dto.startsAt);
-    const trimmedPlaceName = dto.placeName?.trim();
     const trimmedTitle = dto.title?.trim();
 
     const teamMatchId = await this.prisma.$transaction(async (tx) => {
@@ -1427,7 +1427,7 @@ export class LeagueMatchAdminService {
         regionId: league.regionId,
         competitionConfigId: config.id,
         title: trimmedTitle ? trimmedTitle : await this.defaultManualFixtureTitle(tx, league.id, league.title, startAt),
-        placeName: trimmedPlaceName ? trimmedPlaceName : DEFAULT_FIXTURE_PLACE_NAME,
+        place: await resolveLeagueFixturePlace(tx, leagueId, dto),
         startAt,
         // `== null` 로 **null 도 미지정**으로 본다. `@IsOptional()` 은 null 을 통과시키고
         // `@Type(() => Number)` 도 null 을 숫자로 바꾸지 않아서(실측), `=== undefined` 만
@@ -1499,16 +1499,15 @@ export class LeagueMatchAdminService {
         : durationMs !== null
           ? new Date(nextStartAt.getTime() + durationMs)
           : (await defaultFixtureEndAt(tx, teamMatch.competitionConfigVersionId, nextStartAt)) ?? undefined;
-      // generateFixtures와 동일하게: 빈/공백 문자열로 지우는 요청은 "미지정"으로 되돌린다 —
-      // 그대로 저장하면 loadRecentVenues distinct 집계에서 조용히 빠지는 값이 남는다.
-      const trimmedPlaceName = dto.placeName === undefined ? undefined : dto.placeName.trim();
+      // 이름이 오면 스냅샷 전체를 교체한다(새 이름에 옛 좌표가 남지 않게). 빈 이름은 생성과 같이 리그 기본 장소로 되돌린다.
+      const nextPlace = dto.placeName === undefined ? undefined : await resolveLeagueFixturePlace(tx, leagueId, dto);
       const result = await tx.v1TeamMatch.update({
         where: { id: teamMatchId },
         data: {
           ...(nextStartAt === undefined ? {} : { startAt: nextStartAt }),
           ...(nextEndAt === undefined ? {} : { endAt: nextEndAt }),
-          ...(trimmedPlaceName === undefined ? {} : { placeName: trimmedPlaceName ? trimmedPlaceName : DEFAULT_FIXTURE_PLACE_NAME }),
-          ...(dto.placeAddress === undefined ? {} : { placeAddress: dto.placeAddress }),
+          ...(nextPlace === undefined ? {} : toPlaceColumns(nextPlace)),
+          ...(nextPlace !== undefined || dto.placeAddress === undefined ? {} : { placeAddress: dto.placeAddress }),
         },
       });
       const persistedStartAt = requireLeagueStartAt(result.startAt, '리그 대진의 시작 시각이 없어 수정할 수 없어요.');
@@ -1550,6 +1549,7 @@ export class LeagueMatchAdminService {
       endAt: updated.endAt,
       placeName: updated.placeName,
       placeAddress: updated.placeAddress,
+      place: toPlaceView(updated),
     };
   }
 
@@ -1933,6 +1933,7 @@ export class LeagueMatchAdminService {
         redCardSuspensionMatches: true,
         // 대표 이미지·참가비 카드용(어드민 응답 전용 — 계좌는 공개 서비스에서 절대 select 하지 않는다).
         coverImageUrl: true,
+        ...TOURNAMENT_VENUE_SELECT,
         entryFee: true,
         entryFeeConfiguredAt: true,
         bankName: true,
@@ -1980,9 +1981,9 @@ export class LeagueMatchAdminService {
   }
 
   // 참가 팀들이 (이 리그든 다른 리그든, 일반 팀매치든) 과거에 실제로 썼던 장소를
-  // 최신순으로 모아 distinct 5개까지 돌려준다 — 일괄 생성 폼의 "기본 장소" 추천 칩용.
+  // 최신순으로 모아 이름별 최신 스냅샷 5개까지 돌려준다 — 일괄 생성 폼의 "기본 장소" 추천 칩용.
   // v1_team_match는 리그 대진과 일반 팀매치가 같은 테이블이라 별도 이력 저장소가 필요 없다.
-  private async loadRecentVenues(teamIds: string[]): Promise<string[]> {
+  private async loadRecentVenues(teamIds: string[]): Promise<PlaceView[]> {
     if (teamIds.length === 0) return [];
     const rows = await this.prisma.v1TeamMatch.findMany({
       where: {
@@ -1990,17 +1991,18 @@ export class LeagueMatchAdminService {
         placeName: { notIn: ['', DEFAULT_FIXTURE_PLACE_NAME] },
       },
       orderBy: { startAt: 'desc' },
-      select: { placeName: true },
+      select: PLACE_SELECT,
       take: 30,
     });
-    // 쓰기 경로는 이제 trim+폴백을 하지만, 그 이전에 만들어진 레거시 행에 앞뒤 공백이
-    // 섞여 있을 수 있어 읽기 시점에도 한 번 더 trim한다(방어적 이중 처리).
-    const distinct: string[] = [];
+    // 레거시 행에 앞뒤 공백이 섞여 있을 수 있어 읽기 시점에도 trim한다. DB 필터는 trim 전 원문
+    // 기준이라 '장소 미정 '처럼 trim하면 기본값과 같아지는 값도 여기서 한 번 더 거른다.
+    const distinct: PlaceView[] = [];
     for (const row of rows) {
-      const trimmed = row.placeName?.trim();
-      // DB 필터는 trim 전 원문 기준이라, '장소 미정 '처럼 trim하면 기본값과 같아지는
-      // 레거시 값은 여기서 한 번 더 걸러야 한다.
-      if (trimmed && trimmed !== DEFAULT_FIXTURE_PLACE_NAME && !distinct.includes(trimmed)) distinct.push(trimmed);
+      const view = toPlaceView(row);
+      const name = view?.name.trim();
+      if (view && name && name !== DEFAULT_FIXTURE_PLACE_NAME && !distinct.some((place) => place.name === name)) {
+        distinct.push({ ...view, name });
+      }
       if (distinct.length >= 5) break;
     }
     return distinct;
@@ -2024,10 +2026,10 @@ export class LeagueMatchAdminService {
       schedule: RoundRobinFixture[];
       /** 매치데이 1..N 의 시작 시각(운영자가 고른 날짜 목록에서 푼 것). 미지정이면 주간 폴백. */
       matchdayStartAts?: readonly Date[];
-      placeNameInput?: string;
+      placeInput: LeagueFixturePlaceInput;
       timing?: FixtureTimingOptions;
     },
-  ): Promise<{ ids: string[]; placeName: string }> {
+  ): Promise<{ ids: string[]; place: PlaceSnapshot }> {
     // league.teams에는 남아 있어도 그 사이 비활성/소프트삭제된 팀은 teamsById 조회의 active
     // 필터에 걸려 여기 없다 — 그대로 진행하면 undefined 참조로 500이 나므로, 행을 만들기 전에
     // 도메인 오류로 거부한다(create()의 422 패턴과 동일).
@@ -2042,10 +2044,7 @@ export class LeagueMatchAdminService {
       }
       return { round: fixture.round, home, away };
     });
-    // 빈 문자열/공백만 있는 placeName 도 "미지정"으로 취급한다 — DTO 는 @IsOptional 문자열이라
-    // 통과하고, ?? 는 ''를 대체하지 않아 그대로면 recentVenues 집계에서 조용히 빠지는 값이 저장된다.
-    const trimmedPlaceName = input.placeNameInput?.trim();
-    const placeName = trimmedPlaceName ? trimmedPlaceName : DEFAULT_FIXTURE_PLACE_NAME;
+    const place = await resolveLeagueFixturePlace(tx, input.leagueId, input.placeInput);
     // timing이 있으면 "한 구장 순차 진행" 슬롯(경기별 시각·endAt·매치데이 순번)을 대진 순서
     // 그대로 미리 계산한다 — preview(previewFixtures)와 같은 함수를 쓰므로 미리보기에서 본
     // 시각이 그대로 저장된다.
@@ -2079,7 +2078,7 @@ export class LeagueMatchAdminService {
             matchday: slot?.matchday,
             orderInDay: slot?.orderInDay,
           }),
-          placeName,
+          place,
           startAt,
           endAt: slot !== undefined ? slot.endAt : null,
           home,
@@ -2095,7 +2094,7 @@ export class LeagueMatchAdminService {
         pairings.flatMap(({ home, away }) => [home.id, away.id]),
       ),
     );
-    return { ids, placeName };
+    return { ids, place };
   }
 
   /**

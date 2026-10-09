@@ -273,7 +273,7 @@ describe('POST /admin/league-matches + fixtures', () => {
         .get(`/api/v1/admin/league-matches/${leagueId}`)
         .set('x-v1-user-id', ownerUserId);
       expect(detailRes.status).toBe(200);
-      expect(detailRes.body.data.recentVenues).toContain('상암 풋살파크');
+      expect(detailRes.body.data.recentVenues.map((venue: { name: string }) => venue.name)).toContain('상암 풋살파크');
 
       // 대진을 생성하고 나면(이 화면이 더는 필요 없으므로) recentVenues는 빈 배열이다.
       await request(app.getHttpServer())

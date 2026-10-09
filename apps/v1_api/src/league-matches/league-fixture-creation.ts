@@ -4,6 +4,7 @@ import { createTeamMatchScheduleInTx } from '../team-schedules/team-schedules.se
 import { scheduleLeagueResultEntryReminder } from '../jobs/league-reminders/league-result-entry-reminder.service';
 import { participantDisplayName } from '../tournaments/participant-display-name';
 import type { GameRosterBaseEntry } from '../games/roster/game-roster-computation';
+import { toPlaceColumns, type PlaceSnapshot } from '../places/place-snapshot';
 import { findTournamentOnSurfaceOrThrow } from '../tournaments/tournament-surface-lookup';
 import { defaultFixtureEndAt } from '../tournaments/competition-config/fixture-end-at';
 import {
@@ -43,7 +44,7 @@ export interface LeagueFixtureCreationInput {
   competitionConfigId: string;
   /** 이 경기의 제목. 자동·수동 모두 `leagueFixtureTitle()` 로 만든다. */
   title: string;
-  placeName: string;
+  place: PlaceSnapshot;
   startAt: Date;
   /** 슬롯 계산이 있을 때만. 없으면 종료 시각을 저장하지 않는다. */
   endAt: Date | null;
@@ -261,7 +262,7 @@ export async function createLeagueFixture(
       sportId: input.sportId,
       regionId: input.regionId,
       title,
-      placeName: input.placeName,
+      ...toPlaceColumns(input.place),
       startAt,
       endAt: endAt ?? undefined,
       status: 'matched',

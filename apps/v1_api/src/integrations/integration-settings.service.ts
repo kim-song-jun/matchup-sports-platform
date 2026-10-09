@@ -11,7 +11,7 @@ const SETTINGS_ROW_ID = 'singleton';
  * 조회 우선순위: DB(V1IntegrationSettings singleton row) > 환경변수
  * (KAKAO_REST_API_KEY / NEXT_PUBLIC_KAKAO_MAPS_JS_KEY) > 없음. 배포 시 env var로
  * 기본값을 주고, 어드민이 나중에 화면에서 값을 바꿀 수도 있다 — 둘 다 없으면
- * 호출자(KakaoGeocodingService, 지도 임베드 public 엔드포인트)가 각자
+ * 호출자(장소 검색 PlaceSearchService, 지도 임베드 public 엔드포인트)가 각자
  * graceful-disable(WebPushService와 동일 패턴)로 처리한다.
  */
 @Injectable()

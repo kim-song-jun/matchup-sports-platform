@@ -396,3 +396,10 @@ The admin management API and `/admin/terms` UI are implemented. `subtitle` and `
 - `apps/v1_api/prisma/migrations/20260722130000_v1_managed_terms_reconsent_runtime/migration.sql`
 - `apps/v1_api/src/terms/terms.controller.ts`, `managed-terms-runtime.service.ts`
 - `apps/v1_web/src/hooks/use-v1-api.ts`, `apps/v1_web/src/types/api.ts`
+
+## Places search (`GET /places/search`)
+
+- `V1AuthGuard`, 30 requests per minute. Query: `query` (trimmed, 1..100), `page` (1..45, optional).
+- Proxies the Kakao Local keyword search with the server-side REST key. Response: `{ items: V1PlaceSearchItem[], hasMore }`; `address` prefers the road address, `jibunAddress` is the lot address. Documents without finite coordinates are dropped.
+- `503 PLACE_SEARCH_UNAVAILABLE` when no REST key is configured; `502 PLACE_SEARCH_FAILED` on a non-ok response, timeout (5 s), or network error. Clients fall back to name-only input.
+- Place snapshots (`name` + `address` + `latitude`/`longitude` + `provider` + `providerPlaceId`) are validated by `src/places/place-snapshot.ts`: provider, id, latitude, and longitude arrive together or not at all (`400 PLACE_SNAPSHOT_INCOMPLETE`). The server never geocodes a typed name.

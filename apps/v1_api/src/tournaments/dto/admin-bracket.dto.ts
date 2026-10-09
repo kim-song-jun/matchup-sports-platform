@@ -16,6 +16,7 @@ import {
   ValidateIf,
   ValidateNested,
 } from 'class-validator';
+import { IsPlaceLatitude, IsPlaceLongitude, IsPlaceProvider, IsPlaceProviderId } from '../../places/place-snapshot';
 
 // ─── Group phase constants ─────────────────────────────────────────────────────
 
@@ -152,6 +153,23 @@ export class CreateFixtureDto {
   @IsString()
   @MaxLength(200)
   venue?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  venueAddress?: string;
+
+  @IsPlaceLatitude()
+  venueLatitude?: number | null;
+
+  @IsPlaceLongitude()
+  venueLongitude?: number | null;
+
+  @IsPlaceProvider()
+  venueProvider?: string | null;
+
+  @IsPlaceProviderId()
+  venueProviderId?: string | null;
 }
 
 export class UpdateFixtureDto {
@@ -170,6 +188,23 @@ export class UpdateFixtureDto {
   @IsString()
   @MaxLength(200)
   venue?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  venueAddress?: string;
+
+  @IsPlaceLatitude()
+  venueLatitude?: number | null;
+
+  @IsPlaceLongitude()
+  venueLongitude?: number | null;
+
+  @IsPlaceProvider()
+  venueProvider?: string | null;
+
+  @IsPlaceProviderId()
+  venueProviderId?: string | null;
 
   /** 공식 결과가 있는 경기는 팀 변경 불가(409) — 결과를 먼저 무효로 돌려야 한다 */
   @IsOptional()

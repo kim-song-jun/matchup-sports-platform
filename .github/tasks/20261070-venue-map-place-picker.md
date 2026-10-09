@@ -122,3 +122,7 @@ alpha 에서 매치·팀매치·대회·리그를 만들 때 장소를 검색해
 ## Ambiguity Log
 
 - (2026-10-10) 매치 응답 `place.addressText` → `address` 로 통일(도메인마다 다른 이름을 남기지 않음). 웹 소비처는 같은 PR 에서 고친다.
+- (2026-10-10) 리그 어드민에는 장소를 정하는 곳이 없었다(공개 리그의 장소는 시드 값). D4 를 위해
+  `PATCH /admin/league-matches/:leagueId/venue` 와 어드민 상세 `defaultPlace` 를 추가한다. 기본 장소를 바꿔도 이미 만든 경기는 그대로다.
+- (2026-10-10) 사용자 생성·수정에서 빈 장소 이름은 서버도 400 `VALIDATION_FAILED`(`manualPlaceName`) — 웹 폼은 이미 필수였다.
+- (2026-10-10) 리그 생성기 멱등 해시는 `venue: null` 그대로 두고, 저장 값만 리그 기본 장소 스냅샷으로 바꾼다(재시도가 payload 불일치로 실패하지 않게).

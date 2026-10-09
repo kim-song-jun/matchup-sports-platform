@@ -11,7 +11,7 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { buildPageInfo, paginationArgs } from '../common/pagination/page-args';
 import { V1AuthUser } from '../auth/v1-auth-user';
-import { GeocodedCoordinates, KakaoGeocodingService } from './kakao-geocoding.service';
+import { resolvePlaceSnapshot } from '../places/place-snapshot';
 import { isBracketPublished } from './tournament-detail.presenter';
 import { TOURNAMENT_SURFACE_KIND } from './tournament-surface';
 import { findTournamentOnSurface, TOURNAMENT_KINDS } from './tournament-surface-lookup';
@@ -111,7 +111,6 @@ export class TournamentsAdminService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly adminContext: AdminContextService,
-    private readonly kakaoGeocoding: KakaoGeocodingService,
     private readonly notifications: NotificationsService,
   ) {
     this.lineupSizeConfigResolver = new LineupSizeConfigResolver(prisma, adminContext);
@@ -311,9 +310,7 @@ export class TournamentsAdminService {
       throw new BadRequestException({ code: 'SPORT_NOT_FOUND', message: '종목을 찾을 수 없어요.' });
     }
 
-    // 지오코딩은 네트워크 호출이라 DB 트랜잭션 밖에서 먼저 수행 — 트랜잭션을 붙잡아두지 않고,
-    // 실패해도(키 미설정 포함) venue 저장 자체는 절대 막지 않는다(좌표만 null).
-    const coordinates = dto.venue ? await this.geocodeVenueSafe(dto.venue) : null;
+    const venueSnapshot = this.resolveVenueSnapshot(dto);
 
     // "출전 인원"(V1CompetitionConfigVersion.lineup.maxPlayers) 을 위 minPlayers/maxPlayers
     // (대회 "등록" 로스터 크기)와 절대 섞지 않는다 — resolveLineupConfigVersionId()가
@@ -339,9 +336,7 @@ export class TournamentsAdminService {
           rosterDeadlineAt: dto.rosterDeadlineAt ? new Date(dto.rosterDeadlineAt) : null,
           scheduledAt: dto.scheduledAt ? new Date(dto.scheduledAt) : null,
           scheduledEndAt: dto.scheduledEndAt ? new Date(dto.scheduledEndAt) : null,
-          venue: dto.venue ?? null,
-          latitude: coordinates?.latitude ?? null,
-          longitude: coordinates?.longitude ?? null,
+          ...this.venueColumns(venueSnapshot),
           coverImageUrl: dto.coverImageUrl ?? null,
           teamCount: dto.teamCount,
           minPlayers: dto.minPlayers ?? 6,
@@ -540,10 +535,8 @@ export class TournamentsAdminService {
       sportChangeConfigVersionId = await this.resolveLineupConfigVersionId(user, sport.code, {});
     }
 
-    // venue가 새로 설정되거나 기존 값과 달라질 때만 재지오코딩(불필요한 외부 호출 방지).
-    // 트랜잭션 밖에서 먼저 수행 — 네트워크 호출로 트랜잭션을 붙잡아두지 않는다.
-    const venueChanged = dto.venue !== undefined && dto.venue !== existing.venue;
-    const coordinates = venueChanged && dto.venue ? await this.geocodeVenueSafe(dto.venue) : null;
+    // venue 키가 오면 스냅샷 전체를 교체한다 — 이름만 바뀌면 옛 핀(좌표·출처)을 남기지 않는다.
+    const venueSnapshot = dto.venue !== undefined ? this.resolveVenueSnapshot(dto) : undefined;
 
     const data: Prisma.V1TournamentUncheckedUpdateManyInput = {};
     if (dto.sportId !== undefined) data.sportId = dto.sportId;
@@ -559,12 +552,8 @@ export class TournamentsAdminService {
     }
     if (dto.scheduledAt !== undefined) data.scheduledAt = dto.scheduledAt ? new Date(dto.scheduledAt) : null;
     if (dto.scheduledEndAt !== undefined) data.scheduledEndAt = dto.scheduledEndAt ? new Date(dto.scheduledEndAt) : null;
-    if (dto.venue !== undefined) data.venue = dto.venue;
+    if (venueSnapshot !== undefined) Object.assign(data, this.venueColumns(venueSnapshot));
     if (dto.parkingInfo !== undefined) data.parkingInfo = nullableText(dto.parkingInfo);
-    if (venueChanged) {
-      data.latitude = coordinates?.latitude ?? null;
-      data.longitude = coordinates?.longitude ?? null;
-    }
     if (dto.coverImageUrl !== undefined) data.coverImageUrl = dto.coverImageUrl;
     if (dto.teamCount !== undefined) data.teamCount = dto.teamCount;
     if (dto.minPlayers !== undefined) data.minPlayers = dto.minPlayers;
@@ -1106,18 +1095,33 @@ export class TournamentsAdminService {
     });
   }
 
-  /**
-   * KakaoGeocodingService.geocode()는 이미 내부에서 모든 실패(키 미설정/네트워크
-   * 오류/응답 이상)를 잡아 null을 반환하지만, 여기서도 한 번 더 방어한다 —
-   * 지오코딩 실패가 venue 저장(대회 생성/수정) 자체를 절대 막아서는 안 된다.
-   */
-  private async geocodeVenueSafe(venue: string): Promise<GeocodedCoordinates | null> {
-    try {
-      return await this.kakaoGeocoding.geocode(venue);
-    } catch (err) {
-      this.logger.warn(`Venue geocoding failed for "${venue}" — saving venue without coordinates: ${err}`);
-      return null;
-    }
+  private resolveVenueSnapshot(dto: {
+    venue?: string | null;
+    venueAddress?: string | null;
+    venueLatitude?: number | null;
+    venueLongitude?: number | null;
+    venueProvider?: string | null;
+    venueProviderId?: string | null;
+  }) {
+    return resolvePlaceSnapshot({
+      name: dto.venue,
+      address: dto.venueAddress,
+      latitude: dto.venueLatitude,
+      longitude: dto.venueLongitude,
+      provider: dto.venueProvider,
+      providerPlaceId: dto.venueProviderId,
+    });
+  }
+
+  private venueColumns(snapshot: ReturnType<typeof resolvePlaceSnapshot>) {
+    return {
+      venue: snapshot?.name ?? null,
+      venueAddress: snapshot?.address ?? null,
+      latitude: snapshot?.latitude ?? null,
+      longitude: snapshot?.longitude ?? null,
+      venueProvider: snapshot?.provider ?? null,
+      venueProviderId: snapshot?.providerPlaceId ?? null,
+    };
   }
 
   /** 대진이 만들어졌거나 대회가 시작된 뒤에는 종목을 바꿀 수 없다(이미 그 종목 규칙으로 만든 경기가 있다). */
@@ -1347,6 +1351,9 @@ export class TournamentsAdminService {
       scheduledAt: row.scheduledAt?.toISOString() ?? null,
       scheduledEndAt: row.scheduledEndAt?.toISOString() ?? null,
       venue: row.venue,
+      venueAddress: row.venueAddress,
+      venueProvider: row.venueProvider,
+      venueProviderId: row.venueProviderId,
       parkingInfo: row.parkingInfo,
       latitude: row.latitude,
       longitude: row.longitude,

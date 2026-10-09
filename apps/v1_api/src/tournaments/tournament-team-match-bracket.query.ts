@@ -1,5 +1,7 @@
 import { Prisma } from '@prisma/client';
 import { serializeAdminBracketGame } from './slots/admin-bracket-view';
+import { PLACE_SELECT } from '../places/place-select';
+import { toPlaceView } from '../places/place-snapshot';
 
 type PublicFixtureStatus = 'scheduled' | 'in_progress' | 'completed' | 'cancelled';
 
@@ -13,7 +15,7 @@ export const tournamentTeamMatchBracketInclude = {
       tournamentId: true,
       deletedAt: true,
       startAt: true,
-      placeName: true,
+      ...PLACE_SELECT,
       status: true,
       updatedAt: true,
       homeSlotId: true,
@@ -78,6 +80,7 @@ export function serializeTournamentTeamMatchBracket(row: TournamentTeamMatchBrac
     awaySlotId: match.awaySlotId,
     scheduledAt: match.startAt?.toISOString() ?? null,
     venue: match.placeName,
+    place: toPlaceView(match),
     status,
     createdAt: row.createdAt.toISOString(),
     updatedAt: new Date(Math.max(row.updatedAt.getTime(), match.updatedAt.getTime())).toISOString(),

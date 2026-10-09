@@ -12,6 +12,7 @@ import {
   MaxLength,
   Min,
 } from 'class-validator';
+import { IsPlaceLatitude, IsPlaceLongitude, IsPlaceProvider, IsPlaceProviderId } from '../../places/place-snapshot';
 
 export const TOURNAMENT_STATUSES = [
   'draft',
@@ -112,6 +113,23 @@ export class CreateTournamentDto {
   @IsString()
   @MaxLength(200, { message: '장소명은 200자를 넘을 수 없어요.' })
   venue?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(200, { message: '장소 주소는 200자를 넘을 수 없어요.' })
+  venueAddress?: string | null;
+
+  @IsPlaceLatitude()
+  venueLatitude?: number | null;
+
+  @IsPlaceLongitude()
+  venueLongitude?: number | null;
+
+  @IsPlaceProvider()
+  venueProvider?: string | null;
+
+  @IsPlaceProviderId()
+  venueProviderId?: string | null;
 
   /** 목록 카드 썸네일용 커버 이미지 URL (/uploads 업로드 후 전달) */
   @IsOptional()
@@ -433,6 +451,23 @@ export class UpdateTournamentDto {
   @IsString()
   @MaxLength(200, { message: '장소명은 200자를 넘을 수 없어요.' })
   venue?: string | null;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(200, { message: '장소 주소는 200자를 넘을 수 없어요.' })
+  venueAddress?: string | null;
+
+  @IsPlaceLatitude()
+  venueLatitude?: number | null;
+
+  @IsPlaceLongitude()
+  venueLongitude?: number | null;
+
+  @IsPlaceProvider()
+  venueProvider?: string | null;
+
+  @IsPlaceProviderId()
+  venueProviderId?: string | null;
 
   @IsOptional()
   @IsString()

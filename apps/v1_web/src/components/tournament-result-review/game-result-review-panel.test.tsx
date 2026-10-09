@@ -205,6 +205,33 @@ describe('GameResultReviewPanel — 결과 확정 확인 모달은 캐시가 아
     expect(rows.map((row) => /전반 (\d+)/.exec(row.textContent ?? '')?.[1])).toEqual(['1', '7', '13']);
   });
 
+  it('단판 경기의 세부 기록은 "전반" 없이 시각만 보여준다', () => {
+    mocks.useTournamentGame.mockReturnValue({
+      data: gameDetail({ periods: [{ number: 1 }] }),
+      isPending: false,
+      isError: false,
+      refetch: gameRefetch,
+    });
+    eventsMock.state = {
+      data: {
+        events: [{
+          id: 'e1', gameId: GAME_ID, sequence: 1, clientEventId: 'c1', payloadHash: 'h', type: 'GOAL',
+          sideId: 'side-home', participantId: null, assistParticipantId: null, period: 1, clockMs: 12 * 60000,
+          occurredAt: '2026-08-11T00:05:00.000Z', receivedAt: '2026-08-11T00:05:00.000Z',
+          actorUserId: 'a', reversesEventId: null, payload: {},
+        }],
+        lastSequence: 1, gap: null,
+      },
+      isPending: false, isError: false, error: null, refetch: () => {},
+    };
+
+    render(<GameResultReviewPanel gameId={GAME_ID} />);
+
+    const [row] = within(screen.getByRole('list', { name: '기록된 이벤트 목록' })).getAllByRole('listitem');
+    expect(row.textContent).toMatch(/12:00/);
+    expect(row.textContent).not.toMatch(/전반/);
+  });
+
   it('조회 실패를 미기록과 구분해 표시하고 재시도 경로를 준다', () => {
     eventsMock.state = {
       data: undefined, isPending: false, isError: true,

@@ -474,14 +474,15 @@ describe('TournamentsReadService', () => {
 
   // ─── list — 페이지 번호(데스크톱) ────────────────────────────────────────────
 
-  it('list: page 요청이면 전체 건수를 세어 totalPages/hasPrev 를 채운다', async () => {
-    prisma.v1Tournament.findMany.mockResolvedValue([tournamentCard({ id: 't-1' })]);
-    prisma.v1Tournament.count.mockResolvedValue(42);
+  it('list: page 요청이면 목록과 같은 조건의 전체 건수로 totalPages/hasPrev 를 채운다', async () => {
+    const keys = Array.from({ length: 42 }, (_, i) => tournamentCard({ id: `t-${String(i).padStart(2, '0')}` }));
+    prisma.v1Tournament.findMany.mockResolvedValueOnce(keys).mockResolvedValueOnce(keys.slice(20, 40));
 
     const result = await service.list({ page: 2, limit: 20 });
 
-    expect(prisma.v1Tournament.count).toHaveBeenCalledTimes(1);
     expect(result.pageInfo).toMatchObject({ page: 2, total: 42, totalPages: 3, hasPrev: true });
+    // The total comes from the rows the sort already read — no second COUNT round-trip.
+    expect(prisma.v1Tournament.count).not.toHaveBeenCalled();
   });
 
   it('list: 커서(무한 스크롤) 요청에는 COUNT 를 돌리지 않는다', async () => {
@@ -500,17 +501,6 @@ describe('TournamentsReadService', () => {
     const result = await service.list({});
 
     expect(result.pageInfo).toEqual({ nextCursor: null, hasNext: false });
-  });
-
-  it('list: COUNT 필터는 목록 필터와 같은 where 를 쓴다', async () => {
-    prisma.v1Tournament.findMany.mockResolvedValue([]);
-    prisma.v1Tournament.count.mockResolvedValue(0);
-
-    await service.list({ page: 1, sportId: 'sport-uuid-1', status: 'in_progress' });
-
-    const listWhere = prisma.v1Tournament.findMany.mock.calls[0][0].where;
-    const countWhere = prisma.v1Tournament.count.mock.calls[0][0].where;
-    expect(countWhere).toEqual(listWhere);
   });
 
   // ─── list — 기본 정렬(서버가 단일 출처) ──────────────────────────────────────

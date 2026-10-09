@@ -146,22 +146,20 @@ export class TournamentsReadService {
 
     where.AND = [...(Array.isArray(where.AND) ? where.AND : where.AND ? [where.AND] : []), PUBLIC_TOURNAMENT_VISIBILITY_WHERE];
 
-    // 전체 건수는 페이지 번호를 그릴 때만 센다 — 무한 스크롤은 "다음이 있는지"만 알면
-    // 되므로 매 스크롤마다 COUNT 를 한 번 더 때릴 이유가 없다.
+    // 전체 건수는 페이지 번호를 그릴 때만 돌려준다 — 무한 스크롤은 "다음이 있는지"만 알면 된다.
     const wantsPageNumbers = query.page !== undefined && query.page > 0;
 
     // The status-group order cannot be expressed as a Prisma `orderBy`, and the public list is
     // small and bounded, so only the sort keys of every match are read, ordered in memory, and
     // sliced; the full rows are then loaded for the page ids. `cursor` stays a plain row id.
-    const [keyRows, total] = await Promise.all([
-      this.prisma.v1Tournament.findMany({
-        where,
-        select: { id: true, status: true, kind: true, scheduledAt: true, scheduledEndAt: true },
-      }),
-      wantsPageNumbers ? this.prisma.v1Tournament.count({ where }) : Promise.resolve(null),
-    ]);
+    const keyRows = await this.prisma.v1Tournament.findMany({
+      where,
+      select: { id: true, status: true, kind: true, scheduledAt: true, scheduledEndAt: true },
+    });
 
     const orderedIds = sortTournamentListRows(keyRows).map((row) => row.id);
+    // Every matching row's key is already loaded, so the total comes from it rather than a second COUNT.
+    const total = wantsPageNumbers ? orderedIds.length : null;
     const start = this.resolveListStart(query, limit, orderedIds);
     const window = start === null ? [] : orderedIds.slice(start, start + limit + 1);
     const hasNext = window.length > limit;

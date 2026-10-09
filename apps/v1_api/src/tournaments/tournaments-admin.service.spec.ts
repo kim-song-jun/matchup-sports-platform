@@ -777,38 +777,71 @@ describe('TournamentsAdminService', () => {
   });
 
   describe('list: visibility filter', () => {
+    type Clause = {
+      isPublic?: boolean;
+      status?: string | { not: string };
+      OR?: Clause[];
+      AND?: Clause[];
+    };
+    const row = (id: string, isPublic: boolean, status: string) => ({
+      ...tournamentRow({ id, status }),
+      isPublic,
+      _count: { registrations: 0 },
+    });
     const stored = [
-      { ...tournamentRow({ id: 'pub-1', isPublic: true }), _count: { registrations: 0 } },
-      { ...tournamentRow({ id: 'pub-2', isPublic: true }), _count: { registrations: 0 } },
-      { ...tournamentRow({ id: 'hid-1', isPublic: false }), _count: { registrations: 0 } },
-      { ...tournamentRow({ id: 'hid-2', isPublic: false }), _count: { registrations: 0 } },
-    ] as Array<ReturnType<typeof tournamentRow> & { isPublic: boolean; _count: { registrations: number } }>;
+      row('pub-1', true, 'open'),
+      row('pub-2', true, 'completed'),
+      row('hid-1', false, 'open'),
+      row('hid-2', false, 'draft'),
+      row('cancelled-pub-1', true, 'cancelled'),
+      row('cancelled-pub-2', true, 'cancelled'),
+      row('cancelled-hid', false, 'cancelled'),
+    ];
 
-    // Applies the isPublic clause of the where the service builds, so the assertion is on rows returned.
-    function applyWhere(args: { where: { isPublic?: boolean } }) {
-      return stored.filter((row) => args.where.isPublic === undefined || row.isPublic === args.where.isPublic);
+    // Evaluates the visibility/status parts of the where the service builds, so assertions are on returned rows.
+    function matches(r: (typeof stored)[number], c: Clause): boolean {
+      if (c.isPublic !== undefined && r.isPublic !== c.isPublic) return false;
+      if (typeof c.status === 'string' && r.status !== c.status) return false;
+      if (c.status && typeof c.status === 'object' && r.status === c.status.not) return false;
+      if (c.OR && !c.OR.some((sub) => matches(r, sub))) return false;
+      if (c.AND && !c.AND.every((sub) => matches(r, sub))) return false;
+      return true;
     }
 
     beforeEach(() => {
       prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
-      prisma.v1Tournament.findMany.mockImplementation(async (args) => applyWhere(args));
+      prisma.v1Tournament.findMany.mockImplementation(async (args) => stored.filter((r) => matches(r, args.where)));
+      prisma.v1Tournament.groupBy.mockImplementation(async (args) => {
+        const counts = new Map<string, number>();
+        for (const r of stored.filter((x) => matches(x, args.where))) counts.set(r.status, (counts.get(r.status) ?? 0) + 1);
+        return [...counts].map(([status, count]) => ({ status, _count: { _all: count } }));
+      });
     });
 
-    it.each([
-      ['hidden', ['hid-1', 'hid-2']],
-      ['public', ['pub-1', 'pub-2']],
-    ] as const)('visibility=%s returns only that side', async (visibility, ids) => {
-      const result = await service.list(ownerAuthUser, { limit: 20, visibility });
-      expect(result.items.map((item) => item.id)).toEqual(ids);
+    it('public means published and not cancelled; hidden is everything else', async () => {
+      const pub = await service.list(ownerAuthUser, { limit: 20, visibility: 'public' });
+      expect(pub.items.map((item) => item.id)).toEqual(['pub-1', 'pub-2']);
+      const hid = await service.list(ownerAuthUser, { limit: 20, visibility: 'hidden' });
+      expect(hid.items.map((item) => item.id)).toEqual(['hid-1', 'hid-2', 'cancelled-pub-1', 'cancelled-pub-2', 'cancelled-hid']);
     });
 
-    it('no visibility keeps every row, and status counts use the same visibility filter', async () => {
+    it('status counts and total follow the same visibility filter', async () => {
+      const pub = await service.list(ownerAuthUser, { limit: 20, visibility: 'public' });
+      expect(pub.summary.byStatus.cancelled).toBe(0);
+      expect(pub.summary.total).toBe(2);
+      const hid = await service.list(ownerAuthUser, { limit: 20, visibility: 'hidden' });
+      expect(hid.summary.byStatus.cancelled).toBe(3);
+      expect(hid.summary.total).toBe(5);
+    });
+
+    it('a status filter combines with visibility instead of replacing it', async () => {
+      const result = await service.list(ownerAuthUser, { limit: 20, visibility: 'public', status: 'cancelled' });
+      expect(result.items).toEqual([]);
+    });
+
+    it('no visibility keeps every row', async () => {
       const all = await service.list(ownerAuthUser, { limit: 20 });
-      expect(all.items).toHaveLength(4);
-      await service.list(ownerAuthUser, { limit: 20, visibility: 'hidden' });
-      expect(prisma.v1Tournament.groupBy).toHaveBeenLastCalledWith(
-        expect.objectContaining({ where: expect.objectContaining({ isPublic: false }) }),
-      );
+      expect(all.items).toHaveLength(7);
     });
   });
 

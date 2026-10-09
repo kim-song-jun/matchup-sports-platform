@@ -14,7 +14,8 @@
  */
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { V1AdminBracketFixture, V1AdminTournamentBracket, V1AdminTournamentRegistration } from '@/types/api';
+import type { V1AdminBracketFixture, V1AdminBracketFixtureGame, V1AdminTournamentBracket, V1AdminTournamentRegistration } from '@/types/api';
+import { makeGame } from '@/test/bracket-canvas-fixtures';
 import { V1ApiError } from '@/lib/api-client';
 import { BracketTab, describeLeagueReplace } from './bracket-tab';
 
@@ -45,6 +46,7 @@ function fixtureRow(overrides: Partial<V1AdminBracketFixture>): V1AdminBracketFi
     venue: null,
     status: 'scheduled',
     result: null,
+    game: null,
     createdAt: '2026-08-01T00:00:00.000Z',
     updatedAt: '2026-08-01T00:00:00.000Z',
     ...overrides,
@@ -96,7 +98,7 @@ describe('BracketTab — 대진 번호 수정', () => {
     fireEvent.change(input, { target: { value: '7' } });
     updateFixtureMutate.mockImplementation((payload, options) => {
       bracketFixtures = bracketFixtures.map((fixture) => fixture.id === payload.fixtureId ? { ...fixture, fixtureNumber: payload.fixtureNumber } : fixture);
-      options.onSuccess();
+      options.onSuccess({ startedTeamChange: null });
     });
     fireEvent.click(within(dialog).getByRole('button', { name: '저장' }));
     expect(updateFixtureMutate.mock.calls[0][0]).toMatchObject({ fixtureId: 'fx-1', fixtureNumber: 7 });
@@ -501,6 +503,86 @@ describe('BracketTab — 경기 수정: 팀 해제(TBD) 전송', () => {
     const [payload] = updateFixtureMutate.mock.calls[0] as [Record<string, unknown>, unknown];
     expect(payload).not.toHaveProperty('homeRegistrationId');
     expect(payload).not.toHaveProperty('awayRegistrationId');
+  });
+});
+
+describe('BracketTab — 경기 수정: 시작된 경기의 팀 교체', () => {
+  const registrations = () => [
+    confirmedRegistration({ id: 'r1', teamName: '강남FC' }),
+    confirmedRegistration({ id: 'r2', teamName: '서초유나이티드' }),
+  ];
+  const openEdit = async () => {
+    fireEvent.click(screen.getAllByRole('button', { name: 'A조 · 조별리그 1라운드 1번 경기 수정' })[0]);
+    return screen.findByRole('dialog', { name: '경기 수정' });
+  };
+  const gameOf = (state: V1AdminBracketFixtureGame['state'], revisionState: 'SUBMITTED' | 'OFFICIAL' | null) =>
+    makeGame({
+      state,
+      hasLiveRecords: true,
+      hasOfficialResult: revisionState === 'OFFICIAL',
+      latestRevision: revisionState === null ? null : { id: 'rev-1', state: revisionState, score: { home: 1, away: 0 }, entryMethod: 'console' },
+    });
+
+  beforeEach(() => {
+    updateFixtureMutate.mockReset();
+  });
+
+  it('진행 중인 경기의 팀을 바꾸면 확인 창에서 사유를 받은 뒤에만 teamChangeReason 과 함께 보낸다', async () => {
+    bracketFixtures = [fixtureRow({ id: 'fx-1', game: gameOf('LIVE', null) })];
+    renderTab(vi.fn(), registrations());
+    const dialog = await openEdit();
+    fireEvent.click(within(dialog).getAllByRole('button', { name: '선택 해제' })[0]);
+    fireEvent.click(within(dialog).getByRole('button', { name: '저장' }));
+
+    const confirmDialog = await screen.findByRole('dialog', { name: '시작된 경기의 팀을 바꿀까요?' });
+    expect(confirmDialog).toHaveTextContent('강남FC 쪽 명단과 기록');
+    expect(updateFixtureMutate).not.toHaveBeenCalled();
+    fireEvent.change(within(confirmDialog).getByLabelText('바꾸는 이유'), { target: { value: '참가 팀 사정' } });
+    fireEvent.click(within(confirmDialog).getByRole('button', { name: '팀 바꾸기' }));
+
+    await vi.waitFor(() => expect(updateFixtureMutate).toHaveBeenCalledTimes(1));
+    expect(updateFixtureMutate.mock.calls[0][0]).toMatchObject({ fixtureId: 'fx-1', homeRegistrationId: null, teamChangeReason: '참가 팀 사정' });
+  });
+
+  it('확인 창에서 취소하면 요청을 보내지 않는다', async () => {
+    bracketFixtures = [fixtureRow({ id: 'fx-1', game: gameOf('LIVE', null) })];
+    renderTab(vi.fn(), registrations());
+    const dialog = await openEdit();
+    fireEvent.click(within(dialog).getAllByRole('button', { name: '선택 해제' })[0]);
+    fireEvent.click(within(dialog).getByRole('button', { name: '저장' }));
+    const confirmDialog = await screen.findByRole('dialog', { name: '시작된 경기의 팀을 바꿀까요?' });
+    fireEvent.click(within(confirmDialog).getByRole('button', { name: '취소' }));
+    await vi.waitFor(() => expect(screen.queryByRole('dialog', { name: '시작된 경기의 팀을 바꿀까요?' })).not.toBeInTheDocument());
+    expect(updateFixtureMutate).not.toHaveBeenCalled();
+  });
+
+  it('시작된 경기여도 팀을 안 바꾸고 장소만 저장하면 확인 창 없이 바로 보낸다', async () => {
+    bracketFixtures = [fixtureRow({ id: 'fx-1', game: gameOf('LIVE', null) })];
+    renderTab(vi.fn(), registrations());
+    const dialog = await openEdit();
+    await act(async () => {
+      fireEvent.click(within(dialog).getByRole('button', { name: '저장' }));
+    });
+    expect(updateFixtureMutate).toHaveBeenCalledTimes(1);
+    expect(updateFixtureMutate.mock.calls[0][0]).not.toHaveProperty('teamChangeReason');
+  });
+
+  it('공식 결과가 있으면 팀 선택이 잠기고 안내를 보여 준다', async () => {
+    bracketFixtures = [fixtureRow({ id: 'fx-1', game: gameOf('ENDED', 'OFFICIAL') })];
+    renderTab(vi.fn(), registrations());
+    const dialog = await openEdit();
+    expect(within(dialog).getByText('공식 결과가 확정된 경기는 팀을 바꿀 수 없어요. 결과를 먼저 무효로 돌려 주세요.')).toBeInTheDocument();
+    for (const clear of within(dialog).queryAllByRole('button', { name: '선택 해제' })) expect(clear).toBeDisabled();
+  });
+
+  it('제출만 된 결과는 서버가 교체 때 폐기하므로 시작된 경기처럼 팀을 바꿀 수 있다', async () => {
+    bracketFixtures = [fixtureRow({ id: 'fx-1', game: gameOf('ENDED', 'SUBMITTED') })];
+    renderTab(vi.fn(), registrations());
+    const dialog = await openEdit();
+    expect(within(dialog).getByText('시작된 경기예요. 팀을 바꾸면 그 팀의 명단과 기록이 지워져요.')).toBeInTheDocument();
+    const clears = within(dialog).queryAllByRole('button', { name: '선택 해제' });
+    expect(clears.length).toBeGreaterThan(0);
+    for (const clear of clears) expect(clear).toBeEnabled();
   });
 });
 

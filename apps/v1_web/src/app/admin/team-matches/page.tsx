@@ -195,7 +195,7 @@ function AdminTeamMatchesPageContent() {
           onStatusChange={setActiveStatus}
           rightSlot={
             <>
-              <label className="inline-flex min-h-[44px] items-center gap-2 text-[length:var(--font-size-label)] text-[var(--text-body)]">
+              <label className="inline-flex min-h-[44px] items-center gap-2 whitespace-nowrap text-[length:var(--font-size-label)] text-[var(--text-body)]">
                 경기 유형
                 <select
                   value={activeKind}
@@ -212,7 +212,7 @@ function AdminTeamMatchesPageContent() {
                   {KIND_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
                 </select>
               </label>
-              <label className="inline-flex min-h-[44px] items-center gap-2 text-[length:var(--font-size-label)] text-[var(--text-body)]">
+              <label className="inline-flex min-h-[44px] items-center gap-2 whitespace-nowrap text-[length:var(--font-size-label)] text-[var(--text-body)]">
                 지역
                 <select
                   value={activeRegionId}
@@ -229,7 +229,7 @@ function AdminTeamMatchesPageContent() {
                   {regionOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
                 </select>
               </label>
-              <label className="inline-flex min-h-[44px] items-center gap-2 text-[length:var(--font-size-label)] text-[var(--text-body)]">
+              <label className="inline-flex min-h-[44px] items-center gap-2 whitespace-nowrap text-[length:var(--font-size-label)] text-[var(--text-body)]">
                 정렬
                 <select
                   value={activeSort}

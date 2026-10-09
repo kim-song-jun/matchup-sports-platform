@@ -21,10 +21,12 @@ export type RosterResyncTarget =
   /** 한 경기의 팀 배정된 사이드(시각 필터 없음 — 시각이 지나도 시작 전이면 맞춘다). */
   | { readonly scope: 'game'; readonly gameId: string }
   /** 결과가 바뀐 경기의 양 팀(출전정지 규정이 있을 때만). */
-  | { readonly scope: 'result'; readonly gameId: string };
+  | { readonly scope: 'result'; readonly gameId: string }
+  /** 시작된 경기에서 팀이 교체된 한 사이드(대진표 수정). 상태와 무관하게 그 사이드만 새 팀 명단으로 맞춘다. */
+  | { readonly scope: 'startedGameSide'; readonly gameId: string; readonly sideId: string };
 
 function aggregateOf(target: RosterResyncTarget): { type: 'GAME' | 'TEAM'; id: string } {
-  return target.scope === 'game' || target.scope === 'result'
+  return target.scope === 'game' || target.scope === 'result' || target.scope === 'startedGameSide'
     ? { type: 'GAME', id: target.gameId }
     : { type: 'TEAM', id: target.teamId };
 }
@@ -93,6 +95,11 @@ export function parseRosterResyncTarget(payload: unknown): RosterResyncTarget {
     case 'game':
     case 'result':
       if (isString(row.gameId)) return { scope: row.scope, gameId: row.gameId };
+      break;
+    case 'startedGameSide':
+      if (isString(row.gameId) && isString(row.sideId)) {
+        return { scope: 'startedGameSide', gameId: row.gameId, sideId: row.sideId };
+      }
       break;
   }
   throw new Error(`Invalid ${COMPETITION_ROSTER_RESYNC_TYPE} payload`);

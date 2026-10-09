@@ -227,9 +227,14 @@ async function syncLockedGameSide(
   tx: Tx,
   target: { gameId: string; sideId: string },
   preloaded: GameRosterPreload,
+  options: { allowStarted?: boolean } = {},
 ): Promise<boolean> {
   const context = await loadGameRosterContext(tx, target);
-  if (context === null || context.gameState !== V1GameState.SCHEDULED) return false;
+  if (context === null) return false;
+  if (context.gameState !== V1GameState.SCHEDULED) {
+    // Only a bracket team change on a started fixture rewrites a non-SCHEDULED lineup; any other trigger must not.
+    if (options.allowStarted !== true || context.gameState === V1GameState.CANCELLED) return false;
+  }
   const loaded = await loadGameRosterForContext(tx, context, preloaded);
   if (loaded === null) return false;
   const { computation } = loaded;
@@ -541,6 +546,12 @@ async function syncGameRosters(tx: Tx, gameId: string): Promise<number> {
   return synced;
 }
 
+/** 시작된 경기에서 팀이 바뀐 사이드 하나만 새 팀의 참가 명단으로 맞춘다(상대 사이드는 건드리지 않는다). */
+async function syncStartedGameSide(tx: Tx, target: { gameId: string; sideId: string }): Promise<number> {
+  await lockRosterWriteScope(tx, [target.gameId], [target.sideId]);
+  return (await syncLockedGameSide(tx, target, {}, { allowStarted: true })) ? 1 : 0;
+}
+
 /**
  * `COMPETITION_ROSTER_RESYNC` 워커 핸들러. 같은 대상의 대기 이벤트를 닫고(한 번에 처리), 대상 경기를
  * `lockRosterWriteScope` 로 잠근 뒤 다시 계산한다. 그 사이 시작된 경기는 잠근 뒤 판정으로 건너뛴다.
@@ -566,5 +577,7 @@ export async function handleCompetitionRosterResync(
       return syncGameRosters(tx, target.gameId);
     case 'result':
       return syncRostersAfterResultChange(tx, target.gameId);
+    case 'startedGameSide':
+      return syncStartedGameSide(tx, target);
   }
 }

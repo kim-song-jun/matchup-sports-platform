@@ -1,4 +1,4 @@
-import type { Prisma, V1GameResultRevisionState, V1GameState, V1TournamentSlotKind } from '@prisma/client';
+import { V1GameResultRevisionState, type Prisma, type V1GameState, type V1TournamentSlotKind } from '@prisma/client';
 import { revisionEntryMethod, type RevisionEntryMethod } from '../../tournament-operations/results/quick-result.constants';
 import { parseTournamentFixtureOfficialScore } from '../tournament-fixture-official-result';
 import { slotLabelFromRow } from './tournament-slot-label';
@@ -41,6 +41,8 @@ export type AdminBracketGameInput = {
   state: V1GameState;
   version: number;
   _count: { events: number };
+  /** The pointer revision, same basis as `assertStartedTeamChangeAllowed`. */
+  currentOfficialRevision: { state: V1GameResultRevisionState } | null;
   resultRevisions: ReadonlyArray<{
     id: string;
     state: V1GameResultRevisionState;
@@ -55,6 +57,8 @@ export type AdminBracketGame = {
   state: V1GameState;
   version: number;
   hasLiveRecords: boolean;
+  /** True while the official pointer revision is OFFICIAL, even if a newer correction draft is in progress. */
+  hasOfficialResult: boolean;
   latestRevision: {
     id: string;
     state: V1GameResultRevisionState;
@@ -82,6 +86,7 @@ export function serializeAdminBracketGame(game: AdminBracketGameInput): AdminBra
     state: game.state,
     version: game.version,
     hasLiveRecords: game._count.events > 0,
+    hasOfficialResult: game.currentOfficialRevision?.state === V1GameResultRevisionState.OFFICIAL,
     latestRevision: latest === undefined
       ? null
       : { id: latest.id, state: latest.state, score: revisionScore(latest.score), entryMethod: revisionEntryMethod(latest) },

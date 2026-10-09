@@ -782,6 +782,13 @@ describe('LeagueMatchAdminService.generateFixtures — 자동 로스터와 신�
       });
     });
 
+    it('경기 수정에서 이름 없이 주소만 오면 PLACE_NAME_REQUIRED 로 거부한다(옛 핀과 새 주소가 섞이지 않게)', async () => {
+      await expect(
+        service.updateFixture(adminUser, 'league-1', 'tm-1', { placeAddress: '서울 마포구 다른 주소 1' }),
+      ).rejects.toMatchObject({ response: { code: 'PLACE_NAME_REQUIRED' } });
+      expect(state.calls).not.toContain('v1TeamMatch.update');
+    });
+
     it('좌표 일부만 보내면 PLACE_SNAPSHOT_INCOMPLETE 로 거부하고 경기를 만들지 않는다', async () => {
       await expect(
         service.createManualFixture(adminUser, 'league-1', { ...manual, placeName: '망원', placeLatitude: 37.5 }),

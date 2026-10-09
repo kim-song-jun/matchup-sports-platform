@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
   Logger,
@@ -1480,6 +1481,12 @@ export class LeagueMatchAdminService {
 
   async updateFixture(user: V1AuthUser, leagueId: string, teamMatchId: string, dto: UpdateLeagueFixtureDto) {
     const admin = await this.adminContext.getMutationAdmin(user.id);
+    // 이름 없이 주소·좌표만 오면 옛 핀과 새 주소가 섞인 장소가 된다 — 부분 수정은 받지 않는다.
+    const orphanPlaceField = [dto.placeAddress, dto.placeLatitude, dto.placeLongitude, dto.placeProvider, dto.placeProviderId]
+      .some((value) => value !== undefined);
+    if (dto.placeName === undefined && orphanPlaceField) {
+      throw new BadRequestException({ code: 'PLACE_NAME_REQUIRED', message: '장소를 바꾸려면 장소를 다시 골라 주세요.' });
+    }
     const teamMatch = await this.prisma.v1TeamMatch.findFirst({ where: { id: teamMatchId, leagueId } });
     if (teamMatch === null) {
       throw new NotFoundException({ code: 'LEAGUE_NOT_FOUND', message: '이 리그의 대진이 아니에요.' });
@@ -1507,7 +1514,6 @@ export class LeagueMatchAdminService {
           ...(nextStartAt === undefined ? {} : { startAt: nextStartAt }),
           ...(nextEndAt === undefined ? {} : { endAt: nextEndAt }),
           ...(nextPlace === undefined ? {} : toPlaceColumns(nextPlace)),
-          ...(nextPlace !== undefined || dto.placeAddress === undefined ? {} : { placeAddress: dto.placeAddress }),
         },
       });
       const persistedStartAt = requireLeagueStartAt(result.startAt, '리그 대진의 시작 시각이 없어 수정할 수 없어요.');

@@ -1,5 +1,5 @@
 import { applyDecorators, BadRequestException } from '@nestjs/common';
-import { IsIn, IsLatitude, IsLongitude, IsOptional, IsString, MaxLength, ValidateIf } from 'class-validator';
+import { IsIn, IsLatitude, IsLongitude, IsNumber, IsOptional, IsString, MaxLength, ValidateIf } from 'class-validator';
 
 export const PLACE_PROVIDERS = ['kakao'] as const;
 export type PlaceProvider = (typeof PLACE_PROVIDERS)[number];
@@ -43,12 +43,20 @@ function blankToNull(value: string | null | undefined): string | null {
 }
 
 /**
- * 입력 묶음을 저장 가능한 스냅샷으로 정리한다. 이름이 비면 null(호출부가 '장소 미정' 등 기본값을 정한다).
- * 출처·좌표·id 가 일부만 오면 400 `PLACE_SNAPSHOT_INCOMPLETE` — 부분 저장은 하지 않는다.
+ * 입력 묶음을 저장 가능한 스냅샷으로 정리한다. 이름이 비고 다른 칸도 비면 null(호출부가 '장소 미정' 등 기본값을 정한다),
+ * 이름 없이 다른 칸만 오면 400 `PLACE_NAME_REQUIRED`. 출처·좌표·id 가 일부만 오면 400 `PLACE_SNAPSHOT_INCOMPLETE`.
  */
 export function resolvePlaceSnapshot(input: PlaceSnapshotInput): PlaceSnapshot | null {
   const name = blankToNull(input.name);
-  if (name === null) return null;
+  if (name === null) {
+    const orphan = [input.address, input.provider, input.providerPlaceId].some((v) => blankToNull(v) !== null) ||
+      input.latitude != null || input.longitude != null;
+    // 이름 없이 주소·핀만 온 요청을 null(=기본값·미변경)로 읽으면 고른 장소가 조용히 버려진다.
+    if (orphan) {
+      throw new BadRequestException({ code: 'PLACE_NAME_REQUIRED', message: '장소 이름이 없어요. 장소를 다시 골라 주세요.' });
+    }
+    return null;
+  }
 
   const provider = blankToNull(input.provider);
   const providerPlaceId = blankToNull(input.providerPlaceId);
@@ -110,8 +118,12 @@ export function toPlaceColumns(snapshot: PlaceSnapshot | null) {
 }
 
 // DTO 필드 데코레이터 — 도메인마다 필드 이름(place*/venue*)은 다르지만 규칙은 하나다.
-export const IsPlaceLatitude = () => applyDecorators(IsOptional(), ValidateIf((_o, v) => v !== null), IsLatitude());
-export const IsPlaceLongitude = () => applyDecorators(IsOptional(), ValidateIf((_o, v) => v !== null), IsLongitude());
+// IsLatitude 는 "37.5" 같은 문자열도 통과시킨다 — 그대로 Float 칸에 가면 400 이 아니라 500 이 난다.
+const FINITE_NUMBER = { allowNaN: false, allowInfinity: false };
+export const IsPlaceLatitude = () =>
+  applyDecorators(IsOptional(), ValidateIf((_o, v) => v !== null), IsNumber(FINITE_NUMBER), IsLatitude());
+export const IsPlaceLongitude = () =>
+  applyDecorators(IsOptional(), ValidateIf((_o, v) => v !== null), IsNumber(FINITE_NUMBER), IsLongitude());
 export const IsPlaceProvider = () => applyDecorators(IsOptional(), ValidateIf((_o, v) => v !== null), IsIn([...PLACE_PROVIDERS]));
 export const IsPlaceProviderId = () =>
   applyDecorators(IsOptional(), ValidateIf((_o, v) => v !== null), IsString(), MaxLength(64));

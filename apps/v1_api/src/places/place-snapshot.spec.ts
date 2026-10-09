@@ -44,7 +44,14 @@ describe('resolvePlaceSnapshot', () => {
   });
 
   it('returns null for a blank name so the caller can apply its own default', () => {
-    expect(resolvePlaceSnapshot({ name: '   ', ...{ latitude: 37.5 } })).toBeNull();
+    expect(resolvePlaceSnapshot({ name: '   ', address: ' ', latitude: null })).toBeNull();
+  });
+
+  it.each([
+    ['a pin', { latitude: 37.5, longitude: 127, provider: 'kakao', providerPlaceId: '1' }],
+    ['an address', { address: '서울 마포구 마포나루길 467' }],
+  ])('rejects %s without a name instead of silently dropping it', (_label, rest) => {
+    expect(() => resolvePlaceSnapshot({ name: '', ...rest })).toThrow(BadRequestException);
   });
 
   it.each([
@@ -101,6 +108,10 @@ describe('place DTO decorators', () => {
   it('accepts absent and null values', () => {
     expect(errorsOf({})).toEqual([]);
     expect(errorsOf({ lat: null, lng: null, provider: null, id: null })).toEqual([]);
+  });
+
+  it('rejects numeric strings so they never reach a Float column', () => {
+    expect(errorsOf({ lat: '37.5', lng: '126.9' }).sort()).toEqual(['lat', 'lng']);
   });
 
   it('rejects out-of-range coordinates, unknown providers and oversized ids', () => {

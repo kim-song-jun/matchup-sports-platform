@@ -499,6 +499,8 @@ export class TournamentBracketService {
       awayRegistrationId: dto.awayRegistrationId ?? null,
       scheduledAt: dto.scheduledAt ? new Date(dto.scheduledAt).toISOString() : null,
       venue: dto.venue ?? tournament.venue ?? null,
+      // 핀 없는 요청의 해시는 예전과 같게 둔다(재시도 중인 명령이 불일치로 막히지 않게).
+      ...(dto.venueProviderId ? { venueProviderId: dto.venueProviderId } : {}),
     };
     const durableCommandId = `tournament-fixture:${tournamentId}:${dto.round}:${dto.fixtureNumber}:${legNumber}`;
     const payloadHash = canonicalGameCommandPayloadHash(commandPayload);

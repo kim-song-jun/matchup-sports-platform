@@ -73,7 +73,7 @@ export class PlaceSearchService {
     }
 
     const items: PlaceSearchItem[] = [];
-    for (const doc of body.documents ?? []) {
+    for (const doc of Array.isArray(body.documents) ? body.documents : []) {
       const latitude = Number(doc.y);
       const longitude = Number(doc.x);
       if (!doc.id || !doc.place_name || !Number.isFinite(latitude) || !Number.isFinite(longitude)) continue;

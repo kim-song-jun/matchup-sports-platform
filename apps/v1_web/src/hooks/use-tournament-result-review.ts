@@ -192,7 +192,7 @@ export type GameRevisionMutationResult = V1GameRevisionMutationResult;
 
 // ── Query keys (local to this lane -- see module doc comment) ──────────────
 
-const resultReviewKeys = {
+export const resultReviewKeys = {
   board: (tournamentId: string, status: string) =>
     ['v1', 'tournament-ops', tournamentId, 'operations', { status }] as const,
   game: (gameId: string) => ['v1', 'games', gameId] as const,
@@ -274,6 +274,7 @@ function invalidateGame(
   if (tournamentId) {
     queryClient.invalidateQueries({ queryKey: resultReviewKeys.board(tournamentId, 'ENDED') });
     queryClient.invalidateQueries({ queryKey: v1Keys.tournament(tournamentId) });
+    queryClient.invalidateQueries({ queryKey: v1Keys.adminTournamentBracket(tournamentId) });
   }
 }
 

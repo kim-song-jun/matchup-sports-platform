@@ -38,6 +38,7 @@ import {
 } from './matches.validation';
 import { getMatchCreateViewModel } from './matches.view-model';
 import { extractErrorMessage } from '@/lib/error-message';
+import { focusInvalidMatchField } from './matches-invalid-field-focus';
 
 const CREATE_STEP_ORDER: MatchCreateStep[] = ['sport', 'info', 'place-time'];
 
@@ -120,11 +121,7 @@ export function MatchCreatePageClient({ step }: { step: Exclude<MatchCreateStep,
 
   useEffect(() => {
     if (!pendingFocusField) return;
-    const el = document.getElementById(`field-${pendingFocusField}`);
-    if (el) {
-      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      el.focus({ preventScroll: true });
-    }
+    focusInvalidMatchField(document.getElementById(`field-${pendingFocusField}`));
     setPendingFocusField(null);
   }, [pendingFocusField]);
 
@@ -280,11 +277,7 @@ export function MatchEditPageClient({ matchId }: { matchId: string }) {
 
   useEffect(() => {
     if (!pendingFocusField) return;
-    const el = document.getElementById(`field-${pendingFocusField}`);
-    if (el) {
-      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      el.focus({ preventScroll: true });
-    }
+    focusInvalidMatchField(document.getElementById(`field-${pendingFocusField}`));
     setPendingFocusField(null);
   }, [pendingFocusField, editStep]);
 

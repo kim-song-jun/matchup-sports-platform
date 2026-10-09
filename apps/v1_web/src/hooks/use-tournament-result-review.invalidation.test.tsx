@@ -26,7 +26,9 @@ describe('결과 정정 성공 후 캐시 무효화', () => {
     const mine = publicGameRecordsKeys.match('t-1', 'fx-1');
     const detail = v1Keys.tournament('t-1');
     const otherDetail = v1Keys.tournament('t-2');
-    for (const key of [mine, detail, otherDetail]) client.setQueryData(key, { score: '옛 값' });
+    const bracket = v1Keys.adminTournamentBracket('t-1');
+    const otherBracket = v1Keys.adminTournamentBracket('t-2');
+    for (const key of [mine, detail, otherDetail, bracket, otherBracket]) client.setQueryData(key, { score: '옛 값' });
     const wrapper = ({ children }: { children: ReactNode }) => (
       <QueryClientProvider client={client}>{children}</QueryClientProvider>
     );
@@ -44,5 +46,7 @@ describe('결과 정정 성공 후 캐시 무효화', () => {
     await waitFor(() => expect(client.getQueryState(mine)?.isInvalidated).toBe(true));
     expect(client.getQueryState(detail)?.isInvalidated).toBe(true);
     expect(client.getQueryState(otherDetail)?.isInvalidated).toBe(false);
+    expect(client.getQueryState(bracket)?.isInvalidated).toBe(true);
+    expect(client.getQueryState(otherBracket)?.isInvalidated).toBe(false);
   });
 });

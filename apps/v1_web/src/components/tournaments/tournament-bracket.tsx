@@ -53,9 +53,11 @@ function withBracketSourceNames(fixture: V1TournamentFixture, rounds: Pick<Round
     const source = stage?.fixtures.find((source) => source.id === edge?.fixtureId);
     return source ? `${stage!.label} ${source.fixtureNumber}경기 ${edge?.outcome === 'LOSER' ? '패자' : '승자'}` : 'TBD';
   };
+  // 자리 라벨("A조 1위")이 있으면 연결선 설명보다 먼저 쓴다 — 자리가 있는 사이드는 연결선 출처가 없다.
+  const placeholderName = (side: 'HOME' | 'AWAY') => (side === 'HOME' ? fixture.homeSlotLabel : fixture.awaySlotLabel) ?? sourceLabel(side);
   return { ...fixture,
-    homeTeamName: fixture.homeTeamName === 'TBD' ? sourceLabel('HOME') : fixture.homeTeamName,
-    awayTeamName: fixture.awayTeamName === 'TBD' ? sourceLabel('AWAY') : fixture.awayTeamName,
+    homeTeamName: fixture.homeTeamName === 'TBD' ? placeholderName('HOME') : fixture.homeTeamName,
+    awayTeamName: fixture.awayTeamName === 'TBD' ? placeholderName('AWAY') : fixture.awayTeamName,
   };
 }
 
@@ -447,14 +449,14 @@ function MatchCard({ fixture }: { fixture: V1TournamentFixture }) {
       <MatchTeamRow
         teamId={fixture.homeTeamId} logoUrl={fixture.homeTeamLogoUrl}
         name={fixture.homeTeamName} score={hasResult ? fixture.result!.homeScore : null}
-        isPending={fixture.homeRegistrationId === null && fixture.bracketSources?.some((source) => source.side === 'HOME')}
+        isPending={fixture.homeRegistrationId === null && (fixture.bracketSources?.some((source) => source.side === 'HOME') || fixture.homeSlotLabel !== null)}
         isWinner={winner === 'home'} isLoser={isDone && winner === 'away'}
       />
       <div className="tm-bk2-divider" aria-hidden="true" />
       <MatchTeamRow
         teamId={fixture.awayTeamId} logoUrl={fixture.awayTeamLogoUrl}
         name={fixture.awayTeamName} score={hasResult ? fixture.result!.awayScore : null}
-        isPending={fixture.awayRegistrationId === null && fixture.bracketSources?.some((source) => source.side === 'AWAY')}
+        isPending={fixture.awayRegistrationId === null && (fixture.bracketSources?.some((source) => source.side === 'AWAY') || fixture.awaySlotLabel !== null)}
         isWinner={winner === 'away'} isLoser={isDone && winner === 'home'}
       />
       {badges.length === 1 && <div className={badges[0].className}>{badges[0].label}</div>}

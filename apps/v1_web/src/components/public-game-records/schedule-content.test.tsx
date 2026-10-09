@@ -661,6 +661,53 @@ describe('ScheduleContent — 시간 미정 경기', () => {
     expect(screen.getByText('미정')).toBeInTheDocument();
     expect(screen.queryByText('대진 확정 전')).not.toBeInTheDocument();
   });
+
+  it('팀이 없고 자리가 있는 사이드는 "미정" 대신 자리 라벨을 보여 주고 "대진 확정 전" 한 줄로 접지 않는다', () => {
+    const data = makeData({
+      unscheduled: [
+        fixtureEntry({
+          fixtureId: 'u-slot', scheduledAt: null, groupName: null, round: '4강',
+          home: null, away: null, homeSlotLabel: 'A조 1위', awaySlotLabel: 'B조 2위',
+          score: null, scoreStatus: 'unavailable', status: 'scheduled', resultState: 'pending',
+        }),
+      ],
+    });
+
+    render(<ScheduleContent tournamentId="tour-1" data={data} />);
+
+    expect(screen.getByText('A조 1위')).toBeInTheDocument();
+    expect(screen.getByText('B조 2위')).toBeInTheDocument();
+    expect(screen.queryByText('대진 확정 전')).not.toBeInTheDocument();
+    expect(screen.queryByText('미정')).not.toBeInTheDocument();
+  });
+
+  it('items[] 의 경기도 같다: 라벨이 없는 사이드는 미정, 팀이 있는 사이드는 라벨이 와도 팀 이름, 가려진 팀은 비공개', () => {
+    const data = makeData({
+      items: [
+        fixtureEntry({
+          fixtureId: 'i-mixed', round: '4강',
+          home: { registrationId: 'reg-home', teamId: 'team-home', teamName: '홈팀' }, homeSlotLabel: 'A조 1위',
+          away: null, awaySlotLabel: null,
+          score: null, scoreStatus: 'unavailable', status: 'scheduled', resultState: 'pending',
+        }),
+        fixtureEntry({
+          fixtureId: 'i-masked', round: '4강', fixtureNumber: 2,
+          home: { registrationId: 'reg-x', teamId: null, teamName: null }, homeSlotLabel: 'B조 1위',
+          away: null, awaySlotLabel: '3번 자리',
+          score: null, scoreStatus: 'unavailable', status: 'scheduled', resultState: 'pending',
+        }),
+      ],
+    });
+
+    render(<ScheduleContent tournamentId="tour-1" data={data} />);
+
+    expect(screen.getByText('홈팀')).toBeInTheDocument();
+    expect(screen.queryByText('A조 1위')).not.toBeInTheDocument();
+    expect(screen.getByText('미정')).toBeInTheDocument();
+    expect(screen.getByText('비공개')).toBeInTheDocument();
+    expect(screen.queryByText('B조 1위')).not.toBeInTheDocument();
+    expect(screen.getByText('3번 자리')).toBeInTheDocument();
+  });
 });
 
 /**

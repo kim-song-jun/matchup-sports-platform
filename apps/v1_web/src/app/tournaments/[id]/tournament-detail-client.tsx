@@ -12,6 +12,7 @@ import { TeamAvatar } from '@/components/v1-ui/team-avatar';
 import { Trophy, Goal, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useV1Tournament, useV1MyRegistrations } from '@/hooks/use-v1-api';
 import { v1Get } from '@/lib/api-client';
+import { publicFixtureSideLabel } from '@/lib/public-fixture-side-label';
 import {
   LeagueStandingsTable,
   type LeagueStandingsTableData,
@@ -2196,11 +2197,9 @@ export function FixtureCard({ fixture, groupName = null }: { fixture: V1Tourname
   // invalid/누락이면 null 이 오는데, 그때 영역을 통째로 숨기면 "시간이 안 정해진 것"과
   // "화면이 빠뜨린 것"을 구분할 수 없다 — 미정임을 명시한다.
   const scheduledLabel = formatTournamentDateTimeShort(fixture.scheduledAt);
-  // 참가팀 공개 정책 통일(fix/v1-publish) — homeTeamName===null(배정은 됐지만
-  // 모집 중이라 가려짐)과 homeTeamName==='TBD'(아직 미배정)는 다른 상태다.
-  // `|| '미정'`은 둘 다 "미정"으로 뭉개 사용자가 구분할 수 없었다.
-  const homeLabel = fixture.homeTeamName === null ? '비공개' : fixture.homeTeamName || '미정';
-  const awayLabel = fixture.awayTeamName === null ? '비공개' : fixture.awayTeamName || '미정';
+  // 비공개(null)·미정(TBD)·자리 라벨은 publicFixtureSideLabel 이 가른다.
+  const homeLabel = publicFixtureSideLabel(fixture.homeTeamName, fixture.homeSlotLabel);
+  const awayLabel = publicFixtureSideLabel(fixture.awayTeamName, fixture.awaySlotLabel);
 
   return (
     <CompetitionFixtureCard

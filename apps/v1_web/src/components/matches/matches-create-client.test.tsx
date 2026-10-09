@@ -333,6 +333,49 @@ describe('개인 매치 종료 시간 — 실제 화면과 API 제출 계약', (
     return render(<QueryClientProvider client={queryClient}><MatchCreatePageClient step={step} /></QueryClientProvider>);
   }
 
+  it('500×757 내부 스크롤러에서 필수 시작 시간 입력과 오류를 고정 CTA 위에 함께 드러낸다', async () => {
+    seedDraft('');
+    render(<main className="tm-scroll-area" style={{ overflowY: 'auto' }}>
+      <QueryClientProvider client={queryClient}><MatchCreatePageClient step="place-time" /></QueryClientProvider>
+    </main>);
+    await waitFor(() => expect(screen.getByLabelText('지역')).toHaveValue('region-gangnam'));
+    const input = screen.getByLabelText('시작 시간');
+    const field = input.closest('.tm-create-field');
+    const scroller = screen.getByRole('main');
+    const footer = scroller.querySelector('.tm-create-fixed-cta');
+    if (!(field instanceof HTMLElement) || !(footer instanceof HTMLElement)) throw new Error('실제 필드/CTA가 필요해요');
+    // jsdom에는 레이아웃/네이티브 smooth 스크롤이 없다. 제보의 정착한 좌표를 geometry seam에
+    // 넣고 실제 다음→검증→포커스 consumer가 스크롤 소유자의 값을 바꿔 가림을 해소하는지 검증한다.
+    // 실제 브라우저의 smooth 중단 원인이나 viewport별 시각 PASS를 대신하는 테스트가 아니다.
+    footer.style.position = 'fixed';
+    Object.defineProperties(scroller, {
+      clientHeight: { configurable: true, value: 701 },
+      scrollHeight: { configurable: true, value: 1062 },
+      scrollTo: { configurable: true, value: (options: ScrollToOptions) => {
+        scroller.scrollTop = Math.max(0, Math.min(options.top ?? 0, 361));
+      } },
+    });
+    vi.spyOn(scroller, 'getBoundingClientRect').mockImplementation(() => new DOMRect(0, 56, 500, 701));
+    vi.spyOn(footer, 'getBoundingClientRect').mockImplementation(() => new DOMRect(0, 668, 500, 89));
+    vi.spyOn(field, 'getBoundingClientRect').mockImplementation(() => new DOMRect(20, 620 - scroller.scrollTop, 218, 110));
+    vi.spyOn(input, 'getBoundingClientRect').mockImplementation(() => new DOMRect(36, 668 - scroller.scrollTop, 186, 24));
+    fireEvent.change(input, { target: { value: '' } });
+    fireEvent.click(screen.getByRole('button', { name: '다음' }));
+
+    const message = screen.getByText('시작 시간을 입력해 주세요');
+    expect(input).toHaveFocus();
+    expect(input).toHaveAccessibleDescription(message.textContent ?? '');
+    expect(field.getBoundingClientRect().top).toBeGreaterThanOrEqual(scroller.getBoundingClientRect().top);
+    expect(field.getBoundingClientRect().bottom).toBeLessThan(footer.getBoundingClientRect().top);
+    expect(routerPush).not.toHaveBeenCalled();
+    expect(postBodies).toEqual([]);
+    fireEvent.change(input, { target: { value: '10:00' } });
+    fireEvent.change(screen.getByLabelText('종료 시간'), { target: { value: '11:00' } });
+    fireEvent.click(screen.getByRole('button', { name: '다음' }));
+    expect(routerPush).toHaveBeenCalledWith('/matches/new/confirm');
+    expect(postBodies).toEqual([]);
+  });
+
   it('자정을 넘는 경기의 종료 날짜 직접 선택 안내를 표시하고 날짜를 자동 변경하지 않는다', async () => {
     seedDraft('');
     renderStep('place-time');

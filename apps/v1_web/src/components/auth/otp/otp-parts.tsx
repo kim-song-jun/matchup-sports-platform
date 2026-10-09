@@ -1,5 +1,7 @@
+import type { ReactNode } from 'react';
 import { RefreshCw } from 'lucide-react';
 import { AlertBanner } from '@/components/v1-ui/primitives';
+import { PHONE_CONFLICT_CODE } from './phone-conflict-notice';
 import { OTP_CODE_LENGTH, type OtpVerification } from './use-otp-verification';
 
 /**
@@ -37,11 +39,12 @@ export function OtpCodeInput({ idPrefix, otp, verifying }: Parts & { verifying: 
 }
 
 /** 에러는 입력칸 바로 아래에 둔다 — 시선이 세 단계 떨어지면 "다시 받기"의 결과처럼 읽힌다. */
-export function OtpErrorBanner({ idPrefix, otp }: Parts) {
+export function OtpErrorBanner({ idPrefix, otp, conflictNotice }: Parts & { conflictNotice?: ReactNode }) {
   if (!otp.error) return null;
+  const showConflict = Boolean(conflictNotice) && otp.errorCode === PHONE_CONFLICT_CODE;
   return (
     <div id={otpErrorId(idPrefix)}>
-      <AlertBanner message={otp.error} tone={otp.errorTone} />
+      {showConflict ? conflictNotice : <AlertBanner message={otp.error} tone={otp.errorTone} />}
     </div>
   );
 }

@@ -4,7 +4,16 @@
       {
         "appIDs": ["TEAMID.kr.co.teameet.alpha", "TEAMID.kr.co.teameet"],
         "components": [
-          { "/": "/callback/*", "comment": "Kakao sign-in redirect" }
+          { "/": "/callback/*", "comment": "Kakao sign-in redirect" },
+          { "/": "/admin*", "exclude": true, "comment": "Admin console and content preview stay in the browser" },
+          { "/": "/tournament-ops*", "exclude": true, "comment": "Tournament operations console stays in the browser" },
+          { "/": "/api/*", "exclude": true },
+          { "/": "/uploads/*", "exclude": true },
+          { "/": "/.well-known/*", "exclude": true },
+          { "/": "/*.txt", "exclude": true },
+          { "/": "/*.xml", "exclude": true },
+          { "/": "/manifest.webmanifest", "exclude": true },
+          { "/": "*", "comment": "User-facing pages open in the app when it is installed" }
         ]
       }
     ]

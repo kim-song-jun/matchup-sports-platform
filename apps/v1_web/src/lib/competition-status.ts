@@ -1,3 +1,4 @@
+import type { FixtureNodeState } from '@/lib/bracket-canvas-layout';
 import type { V1LeagueFixture } from '@/types/league-match';
 import {
   ARRIVAL_PENDING_LABEL,
@@ -279,4 +280,17 @@ export function splitByArrival<T extends { arrivedAt: string | null }>(
     arrived: participants.filter((participant) => participant.arrivedAt !== null),
     pending: participants.filter((participant) => participant.arrivedAt === null),
   };
+}
+
+/** 어드민 대진 칸 상태 칩 — 데스크톱 캔버스·리그 보드·모바일이 같은 글자·아이콘·톤을 쓰는 단일 정의. */
+const BRACKET_NODE_CHIP: Record<FixtureNodeState, StatusChipModel> = {
+  scheduled: { label: '예정', tone: 'grey', icon: 'clock' },
+  live: { label: '진행 중', tone: 'blue', icon: 'live' },
+  submitted: { label: '확정 전', tone: 'orange', icon: 'hourglass' },
+  official: { label: '확정', tone: 'green', icon: 'check' },
+  cancelled: { label: '취소', tone: 'red', icon: 'cancel' },
+};
+
+export function bracketNodeStateChip(state: FixtureNodeState): StatusChipModel {
+  return BRACKET_NODE_CHIP[state];
 }

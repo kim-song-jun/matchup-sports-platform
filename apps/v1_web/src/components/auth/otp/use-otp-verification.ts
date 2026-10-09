@@ -53,6 +53,7 @@ export function useOtpVerification({
    * 사용자가 인증에 실패한 줄 알고 대상부터 다시 확인하게 되므로 info 톤으로 분리한다.
    */
   const [errorTone, setErrorTone] = useState<'error' | 'info'>('error');
+  const [errorCode, setErrorCode] = useState<string | null>(null);
   const [expiresAt, setExpiresAt] = useState<string | null>(null);
   const [resendAvailableAt, setResendAvailableAt] = useState<number | null>(null);
   const [remainingMs, setRemainingMs] = useState(0);
@@ -66,6 +67,7 @@ export function useOtpVerification({
     setCode('');
     setError(null);
     setErrorTone('error');
+    setErrorCode(null);
     setExpiresAt(null);
     setResendAvailableAt(null);
     setRemainingMs(0);
@@ -74,13 +76,16 @@ export function useOtpVerification({
   }, [resetKey]);
 
   const showFailure = useCallback((err: unknown, fallback: string) => {
+    const code = extractErrorCode(err);
     setError(extractErrorMessage(err, fallback));
-    setErrorTone(extractErrorCode(err) === 'VERIFICATION_RESEND_COOLDOWN' ? 'info' : 'error');
+    setErrorCode(code);
+    setErrorTone(code === 'VERIFICATION_RESEND_COOLDOWN' ? 'info' : 'error');
   }, []);
 
   const requestCode = useCallback(async () => {
     setError(null);
     setErrorTone('error');
+    setErrorCode(null);
     try {
       const res = await onRequestCode();
       if (res.alreadyVerified) {
@@ -103,6 +108,7 @@ export function useOtpVerification({
   const submitCode = useCallback(async () => {
     setError(null);
     setErrorTone('error');
+    setErrorCode(null);
     try {
       if (await onSubmitCode(code)) setVerified(true);
     } catch (err) {
@@ -130,6 +136,7 @@ export function useOtpVerification({
     setCode: (value: string) => setCode(value.replace(/\D/g, '').slice(0, OTP_CODE_LENGTH)),
     error,
     errorTone,
+    errorCode,
     verified,
     expired,
     remainingMs,

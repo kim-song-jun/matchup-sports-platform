@@ -4230,6 +4230,37 @@ export type V1AdminTournamentBracket = {
   slots: V1AdminBracketSlot[];
 };
 
+/** 서버 `BracketTemplateInput` 과 같은 모양(knockout 16 의 서버 planner 확장은 PR-1c). group_knockout 은 PR-4 에서 화면이 열린다. */
+export type BracketTemplateInput =
+  | { kind: 'knockout'; size: 4 | 8 | 12 | 16; thirdPlace: boolean }
+  | {
+      kind: 'group_knockout';
+      groupCount: number;
+      teamsPerGroup: number;
+      advancePerGroup: 1 | 2;
+      legs: 1 | 2;
+      thirdPlace: boolean;
+    }
+  | { kind: 'league'; teamCount: number; legs: 1 | 2 };
+
+export type V1ApplyBracketTemplatePayload = BracketTemplateInput & { replaceExisting?: boolean };
+export type V1ApplyBracketTemplateResult = { groups: number; slots: number; fixtures: number; edges: number };
+export type V1AssignSlotResult = { slot: V1AdminBracketSlot; affectedTeamMatchIds: string[] };
+export type V1RandomFillResult = { assignments: { slotId: string; registrationId: string }[] };
+
+/** 빠른 결과·정정에 보내는 점수. 서버 `GameScoreDto` 와 같은 세 키만 쓴다. */
+export type V1QuickResultScore = {
+  home: number;
+  away: number;
+  penalties?: { home: number; away: number };
+};
+export type V1QuickResultResult = {
+  gameId: string;
+  revisionId: string;
+  version: number;
+  score: V1QuickResultScore;
+};
+
 /** POST /admin/tournaments/:tournamentId/league/fixtures/generate 응답 — 리그 대진 일괄 생성 결과 */
 export interface V1GenerateLeagueFixturesResponse {
   created: number;

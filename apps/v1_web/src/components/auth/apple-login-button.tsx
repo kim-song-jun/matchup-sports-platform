@@ -69,6 +69,7 @@ export function AppleLoginButton({ className, style }: { className?: string; sty
         style={style}
         onClick={signIn}
         disabled={busy}
+        aria-busy={busy || undefined}
         aria-label="Apple로 계속하기"
       >
         {/* HIG 는 로고와 글자를 함께 놓는 형태를 요구한다. 아트워크는 Apple 이 내려준

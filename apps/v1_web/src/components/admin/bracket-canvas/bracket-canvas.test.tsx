@@ -43,7 +43,6 @@ function renderCanvas(overrides: Partial<React.ComponentProps<typeof BracketCanv
     groups: [third, final, semi],
     fixtures,
     slots,
-    mode: 'bracket' as const,
     selectedFixtureId: null,
     pendingRegistrationId: null,
     canWrite: true,
@@ -99,15 +98,6 @@ describe('BracketCanvas', () => {
     fireEvent.click(within(nodeOne).getByRole('button', { name: '어웨이 2번 자리, 선택한 팀을 여기에 넣어요' }));
     expect(props.onAssignSlot).toHaveBeenCalledWith('s2', 'reg-1');
     expect(props.onSelectFixture).not.toHaveBeenCalled();
-  });
-
-  it('연결선이 없는 대진(리그 모드)에는 선 설명을 숨긴다', () => {
-    renderCanvas({
-      mode: 'league',
-      groups: [makeGroup({ id: 'g-semi', name: '리그', phase: 'group' })],
-      fixtures: [fixtures[0]],
-    });
-    expect(screen.queryByText(/실선은 승자/)).not.toBeInTheDocument();
   });
 });
 

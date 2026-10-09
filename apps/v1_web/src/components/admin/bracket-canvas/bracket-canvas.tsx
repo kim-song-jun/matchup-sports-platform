@@ -8,7 +8,6 @@ import {
   fixtureSideLabel,
   isFixtureLocked,
   type CanvasEdgeKind,
-  type CanvasMode,
   type SideKey,
 } from '@/lib/bracket-canvas-layout';
 import { competitionMatchLabel } from '@/lib/tournament-round-label';
@@ -20,7 +19,6 @@ export type BracketCanvasProps = {
   groups: V1AdminBracketGroup[];
   fixtures: V1AdminBracketFixture[];
   slots: V1AdminBracketSlot[];
-  mode: CanvasMode;
   selectedFixtureId: string | null;
   pendingRegistrationId: string | null;
   canWrite: boolean;
@@ -46,7 +44,6 @@ export function BracketCanvas({
   groups,
   fixtures,
   slots,
-  mode,
   selectedFixtureId,
   pendingRegistrationId,
   canWrite,
@@ -54,7 +51,7 @@ export function BracketCanvas({
   onAssignSlot,
   onAssignDirect,
 }: BracketCanvasProps) {
-  const layout = useMemo(() => buildCanvasLayout({ groups, fixtures, slots, mode }), [groups, fixtures, slots, mode]);
+  const layout = useMemo(() => buildCanvasLayout({ groups, fixtures, slots }), [groups, fixtures, slots]);
   const labelContext = useMemo(() => buildSideLabelContext(groups, fixtures, slots), [groups, fixtures, slots]);
   const fixturesById = useMemo(() => new Map(fixtures.map((fixture) => [fixture.id, fixture])), [fixtures]);
   const slotsById = useMemo(() => new Map(slots.map((slot) => [slot.id, slot])), [slots]);

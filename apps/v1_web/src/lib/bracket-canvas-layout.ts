@@ -22,14 +22,12 @@ const FIRST_NODE_Y = CANVAS_PADDING + CANVAS_COLUMN_LABEL_HEIGHT;
 const NODE_ANCHOR_Y = CANVAS_HEADER_HEIGHT + CANVAS_ROW_HEIGHT;
 
 export type SideKey = 'HOME' | 'AWAY';
-export type CanvasMode = 'bracket' | 'league';
 export type FixtureNodeState = 'scheduled' | 'live' | 'submitted' | 'official' | 'cancelled';
 
 export type CanvasLayoutInput = {
   groups: readonly V1AdminBracketGroup[];
   fixtures: readonly V1AdminBracketFixture[];
   slots: readonly V1AdminBracketSlot[];
-  mode: CanvasMode;
 };
 export type CanvasNodeLayout = { fixtureId: string; columnKey: string; x: number; y: number; width: number; height: number };
 export type CanvasColumnLayout = { key: string; groupId: string | null; label: string; x: number; width: number; fixtureIds: string[] };
@@ -61,7 +59,7 @@ const GROUP_BLOCKS_COLUMN_KEY = 'group-blocks';
 
 /** 순위 자리가 있는 조별+결선 대진은 마지막 조별 열과 결선 첫 열 사이에 조 편성 블록 열을 끼운다. */
 function withGroupBlocksColumn(seeds: ColumnSeed[], input: CanvasLayoutInput): ColumnSeed[] {
-  if (input.mode !== 'bracket' || groupBlockGroups(input.groups, input.slots).length === 0) return seeds;
+  if (groupBlockGroups(input.groups, input.slots).length === 0) return seeds;
   const phaseOf = new Map(input.groups.map((group) => [group.id, group.phase]));
   const lastGroupColumn = seeds.reduce(
     (last, seed, index) => (seed.groupId !== null && phaseOf.get(seed.groupId) === 'group' ? index : last),
@@ -89,19 +87,6 @@ function bracketColumns(groups: readonly V1AdminBracketGroup[], fixtures: readon
   return orphans.length > 0 ? [...seeds, { key: 'ungrouped', groupId: null, label: '조 미정', fixtures: orphans }] : seeds;
 }
 
-function leagueColumns(fixtures: readonly V1AdminBracketFixture[]): ColumnSeed[] {
-  const byRound = new Map<string, V1AdminBracketFixture[]>();
-  for (const fixture of [...fixtures].sort(compareFixtures)) {
-    byRound.set(fixture.round, [...(byRound.get(fixture.round) ?? []), fixture]);
-  }
-  return [...byRound.entries()].map(([round, list]) => ({
-    key: `round:${round}`,
-    groupId: list[0].groupId,
-    label: tournamentRoundLabel(round),
-    fixtures: list,
-  }));
-}
-
 function sideAnchorY(node: CanvasNodeLayout, side: SideKey): number {
   return node.y + CANVAS_HEADER_HEIGHT + (side === 'HOME' ? CANVAS_ROW_HEIGHT / 2 : CANVAS_ROW_HEIGHT * 1.5);
 }
@@ -112,7 +97,7 @@ function elbowPath(fromX: number, fromY: number, toX: number, toY: number): stri
 }
 
 export function buildCanvasLayout(input: CanvasLayoutInput): CanvasLayout {
-  const baseSeeds = input.mode === 'league' ? leagueColumns(input.fixtures) : bracketColumns(input.groups, input.fixtures);
+  const baseSeeds = bracketColumns(input.groups, input.fixtures);
   const seeds = withGroupBlocksColumn(baseSeeds, input);
   const slotsById = new Map(input.slots.map((slot) => [slot.id, slot]));
   const placed = new Map<string, CanvasNodeLayout>();
@@ -140,13 +125,10 @@ export function buildCanvasLayout(input: CanvasLayoutInput): CanvasLayout {
     let cursor = FIRST_NODE_Y;
     for (const fixture of seed.fixtures) {
       // 이미 놓인 원천 칸들의 연결 높이 평균에 맞추되, 위 칸과 겹치면 아래로 민다.
-      const anchors =
-        input.mode === 'bracket'
-          ? (fixture.bracketSources ?? [])
-              .map((source) => placed.get(source.fixtureId))
-              .filter((node): node is CanvasNodeLayout => node !== undefined)
-              .map((node) => node.y + NODE_ANCHOR_Y)
-          : [];
+      const anchors = (fixture.bracketSources ?? [])
+        .map((source) => placed.get(source.fixtureId))
+        .filter((node): node is CanvasNodeLayout => node !== undefined)
+        .map((node) => node.y + NODE_ANCHOR_Y);
       const desired = anchors.length > 0 ? Math.round(anchors.reduce((sum, value) => sum + value, 0) / anchors.length) - NODE_ANCHOR_Y : cursor;
       const y = Math.max(desired, cursor);
       placed.set(fixture.id, { fixtureId: fixture.id, columnKey: seed.key, x, y, width: CANVAS_NODE_WIDTH, height: CANVAS_NODE_HEIGHT });
@@ -161,7 +143,7 @@ export function buildCanvasLayout(input: CanvasLayoutInput): CanvasLayout {
     for (const fixture of seed.fixtures) {
       const target = placed.get(fixture.id);
       if (target === undefined) continue;
-      for (const source of input.mode === 'bracket' ? fixture.bracketSources ?? [] : []) {
+      for (const source of fixture.bracketSources ?? []) {
         const from = placed.get(source.fixtureId);
         if (from === undefined) continue;
         edges.push({

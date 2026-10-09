@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { makeFixture, makeGame, makeSlot } from '@/test/bracket-canvas-fixtures';
 import type { V1AdminBracketFixture, V1AdminBracketSlot } from '@/types/api';
@@ -193,5 +193,45 @@ describe('BracketCanvasNode — 자리 없는 줄(경기에 팀을 직접 지정
     const readOnly = renderNode(slotless, { pendingRegistrationId: 'reg-9', canWrite: false, ...noSlots });
     fireEvent.click(screen.getByRole('button', { name: '홈 1번 자리' }));
     expect(readOnly.onAssignDirect).not.toHaveBeenCalled();
+  });
+});
+
+describe('BracketCanvasNode — 흐름 배치(position 없음)', () => {
+  const flowFixture = makeFixture({ id: 'f1', groupId: 'gA', fixtureNumber: 3, round: 'league_r1' });
+  const flowBase = {
+    fixture: flowFixture,
+    title: '3번 경기',
+    fullTitle: 'A조 · 조별리그 1라운드 3번 경기',
+    sideLabels: { HOME: '송파', AWAY: '마포' },
+    slots: { HOME: null, AWAY: null },
+    selected: false,
+    canWrite: true,
+    pendingRegistrationId: null,
+    onSelect: vi.fn(),
+    onAssign: vi.fn(),
+    onAssignDirect: vi.fn(),
+  };
+
+  it('좌표 없이 부모 칸을 채우고 보이는 제목은 짧지만 접근 이름은 조·라운드를 포함한다', () => {
+    render(<BracketCanvasNode {...flowBase} />);
+    const group = screen.getByRole('group', { name: 'A조 · 조별리그 1라운드 3번 경기, 예정' });
+    expect(group.style.position).not.toBe('absolute');
+    expect(group.style.left).toBe('');
+    expect(group.style.width).toBe('100%');
+    expect(within(group).getByText('3번 경기')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'A조 · 조별리그 1라운드 3번 경기 열기' })).toBeInTheDocument();
+    cleanup();
+  });
+
+  it('선택·직접 배정 콜백은 캔버스 칸과 같은 인자로 불린다', () => {
+    const onSelect = vi.fn();
+    const onAssignDirect = vi.fn();
+    render(<BracketCanvasNode {...flowBase} pendingRegistrationId="r9" onSelect={onSelect} onAssignDirect={onAssignDirect} />);
+    fireEvent.click(screen.getByRole('button', { name: /^홈 송파, 선택한 팀을 여기에 넣어요/ }));
+    expect(onAssignDirect).toHaveBeenCalledWith('f1', 'HOME', 'r9');
+    expect(onSelect).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'A조 · 조별리그 1라운드 3번 경기 열기' }));
+    expect(onSelect).toHaveBeenCalledWith('f1');
+    cleanup();
   });
 });

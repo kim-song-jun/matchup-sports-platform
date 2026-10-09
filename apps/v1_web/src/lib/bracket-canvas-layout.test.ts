@@ -41,7 +41,7 @@ const f4 = makeFixture({
 
 describe('buildCanvasLayout — 4팀 + 3·4위전', () => {
   // 입력 순서를 섞어도 열은 4강 > 결승 > 3·4위전이어야 한다.
-  const layout = buildCanvasLayout({ groups: [third, final, semi], fixtures: [f4, f2, f3, f1], slots: [], mode: 'bracket' });
+  const layout = buildCanvasLayout({ groups: [third, final, semi], fixtures: [f4, f2, f3, f1], slots: [] });
   const node = (id: string) => layout.nodes.find((n) => n.fixtureId === id)!;
 
   it('단계 순서로 열을 만들고 x 를 열 폭+간격으로 늘린다', () => {
@@ -99,7 +99,7 @@ describe('buildCanvasLayout — 12강 부전승 대진', () => {
     makeFixture({ id: 'f11', groupId: 'g-f', fixtureNumber: 11, bracketSources: [{ fixtureId: 'f9', outcome: 'WINNER', side: 'HOME' }, { fixtureId: 'f10', outcome: 'WINNER', side: 'AWAY' }] }),
     makeFixture({ id: 'f12', groupId: 'g-t', fixtureNumber: 12, bracketSources: [{ fixtureId: 'f9', outcome: 'LOSER', side: 'HOME' }, { fixtureId: 'f10', outcome: 'LOSER', side: 'AWAY' }] }),
   ];
-  const layout = buildCanvasLayout({ groups, fixtures: [...r12, ...qf, ...rest], slots, mode: 'bracket' });
+  const layout = buildCanvasLayout({ groups, fixtures: [...r12, ...qf, ...rest], slots });
   const y = (id: string) => layout.nodes.find((n) => n.fixtureId === id)!.y;
 
   it('8강은 12강 승자 칸과 같은 높이, 4강·결승은 원천 가운데에 놓는다', () => {
@@ -160,7 +160,7 @@ describe('buildCanvasLayout — 16강 대진', () => {
       { fixtureId: 's2', outcome: 'LOSER', side: 'AWAY' },
     ],
   });
-  const layout = buildCanvasLayout({ groups, fixtures: [...r16, ...qf, ...sf, fin, third], slots: [], mode: 'bracket' });
+  const layout = buildCanvasLayout({ groups, fixtures: [...r16, ...qf, ...sf, fin, third], slots: [] });
 
   it('16강 열이 8강보다 앞에 오고 열 순서는 16강 > 8강 > 4강 > 결승 > 3·4위전이다', () => {
     expect(layout.columns.map((c) => c.label)).toEqual(['16강', '8강', '4강', '결승', '3·4위전']);
@@ -181,26 +181,14 @@ describe('buildCanvasLayout — 16강 대진', () => {
 describe('buildCanvasLayout — 예외 입력', () => {
   it('조에 속하지 않은 경기는 "조 미정" 열에 모아 잃지 않는다', () => {
     const orphan = makeFixture({ id: 'x1', groupId: null, fixtureNumber: 1 });
-    const layout = buildCanvasLayout({ groups: [semi], fixtures: [f1, orphan], slots: [], mode: 'bracket' });
+    const layout = buildCanvasLayout({ groups: [semi], fixtures: [f1, orphan], slots: [] });
     expect(layout.columns.map((c) => c.label)).toEqual(['4강', '조 미정']);
     expect(layout.nodes).toHaveLength(2);
   });
 
   it('경기가 없으면 열 머리만 있는 최소 크기를 돌려준다', () => {
-    const layout = buildCanvasLayout({ groups: [], fixtures: [], slots: [], mode: 'bracket' });
+    const layout = buildCanvasLayout({ groups: [], fixtures: [], slots: [] });
     expect(layout).toMatchObject({ columns: [], nodes: [], edges: [], width: 48, height: 80 });
-  });
-
-  it('리그 모드는 라운드별 열로 쌓고 연결선은 만들지 않는다', () => {
-    const rounds = [
-      makeFixture({ id: 'a', groupId: 'g', fixtureNumber: 1, round: 'league_r1' }),
-      makeFixture({ id: 'b', groupId: 'g', fixtureNumber: 2, round: 'league_r1' }),
-      makeFixture({ id: 'c', groupId: 'g', fixtureNumber: 3, round: 'league_r2' }),
-    ];
-    const layout = buildCanvasLayout({ groups: [makeGroup({ id: 'g', name: '리그', phase: 'group' })], fixtures: rounds, slots: [], mode: 'league' });
-    expect(layout.columns.map((c) => [c.label, c.x])).toEqual([['조별리그 1라운드', 24], ['조별리그 2라운드', 328]]);
-    expect(layout.nodes.map((n) => [n.fixtureId, n.y])).toEqual([['a', 56], ['b', 236], ['c', 56]]);
-    expect(layout.edges).toEqual([]);
   });
 });
 
@@ -367,7 +355,7 @@ describe('buildCanvasLayout — 조별+결선 조 편성 블록과 순위 연결
       ],
     }),
   ];
-  const layout = buildCanvasLayout({ groups: [gFinal, gSemi, gB, gA], fixtures, slots, mode: 'bracket' });
+  const layout = buildCanvasLayout({ groups: [gFinal, gSemi, gB, gA], fixtures, slots });
 
   it('마지막 조별 열과 결선 첫 열 사이에 "조 편성" 열이 끼고, 다음 열들은 한 칸씩 밀린다', () => {
     expect(layout.columns.map((c) => [c.label, c.x])).toEqual([
@@ -403,19 +391,13 @@ describe('buildCanvasLayout — 조별+결선 조 편성 블록과 순위 연결
 
   it('순위 자리가 없는 조별 대진(수동으로 만든 조·리그 방식 조)에는 블록 열도 블록도 없다 — 대조군', () => {
     const noRanks = slots.filter((slot) => slot.kind !== 'GROUP_RANK');
-    const plain = buildCanvasLayout({ groups: [gA, gB, gSemi], fixtures: fixtures.slice(0, 4), slots: noRanks, mode: 'bracket' });
+    const plain = buildCanvasLayout({ groups: [gA, gB, gSemi], fixtures: fixtures.slice(0, 4), slots: noRanks });
     expect(plain.groupBlocks).toEqual([]);
     expect(plain.columns.map((c) => c.label)).toEqual(['A조', 'B조', '4강']);
   });
 
-  it('리그 모드는 순위 자리가 있어도 블록을 만들지 않는다', () => {
-    const league = buildCanvasLayout({ groups: [gA, gB, gSemi], fixtures: fixtures.slice(0, 4), slots, mode: 'league' });
-    expect(league.groupBlocks).toEqual([]);
-    expect(league.columns.some((c) => c.key === 'group-blocks')).toBe(false);
-  });
-
   it('블록이 없는 기존 대진의 결과에는 groupBlocks 가 빈 배열로 붙는다', () => {
-    const knockout = buildCanvasLayout({ groups: [semi], fixtures: [f1, f2], slots: [], mode: 'bracket' });
+    const knockout = buildCanvasLayout({ groups: [semi], fixtures: [f1, f2], slots: [] });
     expect(knockout.groupBlocks).toEqual([]);
   });
 });
@@ -454,7 +436,7 @@ describe.each(RANK_COMBOS)('순위 연결선 — %s', (_name, groupCount, advanc
   const knockout = pairs.map(([home, away], index) =>
     makeFixture({ id: `k${index}`, groupId: 'ko', fixtureNumber: index + 1, round: '결선', homeSlotId: `r${home}`, awaySlotId: `r${away}` }),
   );
-  const layout = buildCanvasLayout({ groups: [...stageGroups, knockoutGroup], fixtures: knockout, slots: [...entrySlots, ...rankSlots], mode: 'bracket' });
+  const layout = buildCanvasLayout({ groups: [...stageGroups, knockoutGroup], fixtures: knockout, slots: [...entrySlots, ...rankSlots] });
 
   it('올라오는 자리마다 선 하나, 올바른 조 블록 높이에서 올바른 사이드로 이어진다', () => {
     const ranks = layout.edges.filter((e) => e.kind === 'GROUP_RANK');

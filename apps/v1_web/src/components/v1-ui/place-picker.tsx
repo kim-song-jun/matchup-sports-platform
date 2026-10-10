@@ -128,6 +128,11 @@ export function PlacePicker({
   const unavailable = search.error instanceof V1ApiError && search.error.code === 'PLACE_SEARCH_UNAVAILABLE';
   const hasError = searchActive && search.isError;
   const listVisible = open && searchActive && !hasError && items.length > 0;
+  const listRef = useRef<HTMLUListElement>(null);
+  // 목록은 흐름 안에 그려져 하단 고정 버튼(만들기 CTA·모달 저장 줄)에 가릴 수 있다 — 열릴 때 한 번 보이게 한다.
+  useEffect(() => {
+    if (listVisible) listRef.current?.scrollIntoView?.({ block: 'nearest' });
+  }, [listVisible]);
   const manualOptionIndex = items.length;
   const recent = useMemo(() => (recentVenues ?? []).map(toRecentVenue), [recentVenues]);
 
@@ -295,11 +300,13 @@ export function PlacePicker({
             />
           </div>
           <ul
+            ref={listRef}
             id={listboxId}
             role="listbox"
             aria-label="장소 검색 결과"
             hidden={!listVisible}
             style={{
+              scrollMarginBottom: 120,
               listStyle: 'none',
               margin: '8px 0 0',
               padding: 0,

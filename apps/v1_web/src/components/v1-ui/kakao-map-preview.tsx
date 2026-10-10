@@ -27,9 +27,12 @@ export function KakaoMapPreview({
   const appKey = data?.kakaoMapsJsKey ?? null;
   const [visible, setVisible] = useState(false);
   const [loadFailed, setLoadFailed] = useState(false);
+  // 지도 키 조회는 브라우저 캐시에서 먼저 복원될 수 있다 — 서버 HTML(키 없음)과 첫 렌더를 맞추려고 마운트 뒤에만 그린다.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
 
   useEffect(() => {
-    if (!appKey || visible) return;
+    if (!mounted || !appKey || visible) return;
     const box = boxRef.current;
     if (!box) return;
     if (typeof IntersectionObserver === 'undefined') {
@@ -44,7 +47,7 @@ export function KakaoMapPreview({
     });
     observer.observe(box);
     return () => observer.disconnect();
-  }, [appKey, visible]);
+  }, [mounted, appKey, visible]);
 
   useEffect(() => {
     if (!appKey || !visible || !mapRef.current) return;
@@ -78,7 +81,7 @@ export function KakaoMapPreview({
     };
   }, [appKey, visible, latitude, longitude]);
 
-  if (!appKey || loadFailed) return null;
+  if (!mounted || !appKey || loadFailed) return null;
 
   return (
     <a

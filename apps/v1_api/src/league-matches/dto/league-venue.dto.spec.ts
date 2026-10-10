@@ -12,7 +12,7 @@ describe('UpdateLeagueVenueDto', () => {
     expect(await errorsOf(body)).toContain('venue');
   });
 
-  it.each([[{ venue: null }], [{ venue: '탄천 풋살장', venueAddress: '경기 성남시' }]])('venue 를 보낸 본문(%j)은 통과한다(null 은 지우기)', async (body) => {
+  it.each([[{ venue: null }], [{ venue: '   ' }], [{ venue: '탄천 풋살장', venueAddress: '경기 성남시' }]])('venue 를 보낸 본문(%j)은 통과한다(null·공백은 지우기)', async (body) => {
     expect(await errorsOf(body)).toEqual([]);
   });
 });

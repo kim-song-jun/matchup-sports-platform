@@ -165,7 +165,7 @@ longitude, provider, providerPlaceId } | null` built from the league's venue col
 `{ venue, venueAddress?, venueLatitude?, venueLongitude?, venueProvider?, venueProviderId? }`
 (same place-snapshot rules as other domains: `venue` max 200, pin fields all-or-none else
 400 `PLACE_SNAPSHOT_INCOMPLETE`). The `venue` key is required (`string | null`) — a body without it is
-400 `VALIDATION_FAILED` and changes nothing. `null` or blank `venue` clears the whole snapshot. Existing
+400 `VALIDATION_ERROR` and changes nothing. `null` or blank `venue` clears the whole snapshot. Existing
 fixtures are never touched; only fixtures created afterwards inherit the default. Response
 `data`: `{ leagueId, defaultPlace }`; errors `404 LEAGUE_NOT_FOUND`, `409 LEAGUE_MIRROR_MISSING`.
 Audit action `league_match.venue_updated` (before/after `defaultPlace`).

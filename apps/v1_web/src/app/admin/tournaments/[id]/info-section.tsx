@@ -15,7 +15,7 @@ import { PrizeBreakdownEditor, createPrizeRowId, serializeTournamentPrizeRows, t
 import { PromoCardFields, type TournamentPromoCardValue } from '@/components/admin/tournaments/promo-card-fields';
 import { TournamentDatetimeField } from '@/components/admin/tournaments/tournament-datetime-field';
 import { PlacePicker } from '@/components/v1-ui/place-picker';
-import { placeFromVenueFields, toVenuePayload, type PlaceValue } from '@/lib/place';
+import { placeFromVenueFields, toVenuePayload, type PlaceValue, PLACE_NAME_MAX_LENGTH } from '@/lib/place';
 import { useTournamentAdmin } from './tournament-admin-context';
 import { TournamentPeriodSettingsEditor } from '@/components/admin/tournament-period-settings-editor';
 import { TOURNAMENT_STATUS_LABEL, formatDate, formatDateRange } from './tournament-admin-shared';
@@ -748,6 +748,7 @@ export function TournamentInfoSection() {
           </div>
 
           <PlacePicker
+            maxLength={PLACE_NAME_MAX_LENGTH.tournament}
             id="edit-venue"
             label="장소"
             value={editVenue}

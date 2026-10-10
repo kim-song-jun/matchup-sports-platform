@@ -507,7 +507,7 @@ All team roster mutations lock the registration row and re-read `rosterLockedAt`
 
 ### Venue snapshot (Task 20261070)
 
-- Admin create/update accept `venue` + `venueAddress`, `venueLatitude`, `venueLongitude`, `venueProvider`, `venueProviderId`; responses add `venueAddress`, `venueProvider`, `venueProviderId` next to `venue`, `latitude`, `longitude`. The server no longer geocodes `venue`.
+- Admin create/update accept `venue` + `venueAddress`, `venueLatitude`, `venueLongitude`, `venueProvider`, `venueProviderId`; responses add `venueAddress`, `venueProvider`, `venueProviderId` next to `venue`, `latitude`, `longitude`. The server no longer geocodes `venue`. On update (tournament `PATCH` and fixture `PATCH /admin/fixtures/:id`), sending any address/pin field without `venue` is 400 `PLACE_NAME_REQUIRED` — the snapshot is replaced only as a whole.
 - PATCH: when the `venue` key is present the whole snapshot is replaced (a name-only PATCH clears coordinates and provider).
 - Bracket fixtures: `venue` + the same five `venue*` fields on create/update fixture DTOs map to the fixture's `place*` columns; fixtures created without a venue inherit the tournament's snapshot. Fixture responses keep `venue` and add `place: V1PlaceView | null`.
 

@@ -61,7 +61,7 @@ import { tournamentTeamMatchBracketInclude, serializeTournamentTeamMatchBracket 
 import { competitionMatchLabel } from './tournament-round-label';
 import { acceptsBracketSource } from './tournament-bracket-phases';
 import { PLACE_SELECT } from '../places/place-select';
-import { resolvePlaceSnapshot, toPlaceView, type PlaceView } from '../places/place-snapshot';
+import { rejectPartialPlaceUpdate, resolvePlaceSnapshot, toPlaceView, type PlaceView } from '../places/place-snapshot';
 import { TOURNAMENT_VENUE_SELECT, tournamentVenueSnapshot } from '../places/tournament-venue';
 
 type AdminBracketResult = {
@@ -845,6 +845,7 @@ export class TournamentBracketService {
   /** 경기 일정·장소·대진(홈/어웨이) 수정. 시작된 경기도 결과가 없으면 사유와 함께 팀을 바꾼다(공식 결과가 있으면 409). */
   async updateFixture(user: V1AuthUser, fixtureId: string, dto: UpdateFixtureDto) {
     const admin = await this.adminContext.getMutationAdmin(user.id);
+    rejectPartialPlaceUpdate(dto.venue, [dto.venueAddress, dto.venueLatitude, dto.venueLongitude, dto.venueProvider, dto.venueProviderId]);
     const canonical = await this.prisma.v1TournamentMatchDetails.findUnique({
       where: { teamMatchId: fixtureId },
       select: {

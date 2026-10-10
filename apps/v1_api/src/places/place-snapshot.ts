@@ -43,6 +43,16 @@ function blankToNull(value: string | null | undefined): string | null {
 }
 
 /**
+ * 수정(PATCH)에서 이름 키 없이 주소·핀 키만 온 요청을 거절한다 — 이름 키로 교체 여부를 정하는 경로에선 조용히
+ * 버려지고, 그렇지 않으면 옛 핀과 새 주소가 섞인다. `null` 도 보낸 것으로 친다(이름 없이 비우는 부분 수정).
+ */
+export function rejectPartialPlaceUpdate(name: string | null | undefined, others: readonly unknown[]): void {
+  if (name === undefined && others.some((value) => value !== undefined)) {
+    throw new BadRequestException({ code: 'PLACE_NAME_REQUIRED', message: '장소를 바꾸려면 장소를 다시 골라 주세요.' });
+  }
+}
+
+/**
  * 입력 묶음을 저장 가능한 스냅샷으로 정리한다. 이름이 비고 다른 칸도 비면 null(호출부가 '장소 미정' 등 기본값을 정한다),
  * 이름 없이 다른 칸만 오면 400 `PLACE_NAME_REQUIRED`. 출처·좌표·id 가 일부만 오면 400 `PLACE_SNAPSHOT_INCOMPLETE`.
  */

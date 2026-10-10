@@ -435,22 +435,28 @@ describe('자리 배정 (PostgreSQL)', () => {
       expect(await teamsIn(groupB)).toEqual([registrationIds[0]]);
     });
 
-    it('이미 겹친 팀은 이미 편성된 조의 자리에는 들어가고, 편성이 없는 조의 자리에는 409', async () => {
-      const { tournamentId, registrationIds, groupA, groupB, firstEntry, teamsIn } = await twoGroups('otg-legacy');
-      const reg = registrationIds[2];
+    it('이미 겹친 팀은 편성이 없는 조의 자리에는 409(롤백), 이미 편성된 조의 자리에는 들어간다', async () => {
+      const seeded = await seedBracketTournament(prisma, { label: 'otg-legacy', format: 'group_knockout', teamCount: 6 });
+      const { tournamentId } = seeded;
+      await templates.apply(user, tournamentId, { kind: 'group_knockout', groupCount: 3, teamsPerGroup: 2, advancePerGroup: 1, legs: 1, thirdPlace: false });
+      const [groupA, groupB, groupC] = (await prisma.v1TournamentGroup.findMany({ where: { tournamentId, phase: 'group' }, orderBy: { sortOrder: 'asc' } })).map((g) => g.id);
+      const firstEntry = (groupId: string) => prisma.v1TournamentSlot.findFirstOrThrow({ where: { tournamentId, groupId, kind: 'ENTRY' }, orderBy: { position: 'asc' } });
+      const teamsIn = async (groupId: string) =>
+        (await prisma.v1TournamentGroupTeam.findMany({ where: { groupId } })).map((row) => row.registrationId);
+      const reg = seeded.registrationIds[2];
       await prisma.v1TournamentGroupTeam.createMany({ data: [
         { groupId: groupA, registrationId: reg, sortOrder: 0 },
         { groupId: groupB, registrationId: reg, sortOrder: 0 },
       ] });
 
+      const slotC = await firstEntry(groupC);
+      await expect(slots.assignSlot(user, slotC.id, reg)).rejects.toMatchObject({ response: { code: 'TEAM_IN_OTHER_GROUP' } });
+      expect((await prisma.v1TournamentSlot.findUniqueOrThrow({ where: { id: slotC.id } })).registrationId).toBeNull();
+      expect(await teamsIn(groupC)).toEqual([]);
+
       await expect(slots.assignSlot(user, (await firstEntry(groupA)).id, reg)).resolves.toBeDefined();
       expect(await teamsIn(groupA)).toEqual([reg]);
       expect(await teamsIn(groupB)).toEqual([reg]);
-
-      // 편성이 없는 조: 같은 대회에 세 번째 조별 조를 직접 만들어 확인한다.
-      const groupC = (await bracket.createGroup(user, tournamentId, { name: '겹침 C조', phase: 'group' })).id;
-      const slotC = await prisma.v1TournamentSlot.create({ data: { tournamentId, kind: 'ENTRY', groupId: groupC, position: 1 } });
-      await expect(slots.assignSlot(user, slotC.id, reg)).rejects.toMatchObject({ response: { code: 'TEAM_IN_OTHER_GROUP' } });
     });
   });
 

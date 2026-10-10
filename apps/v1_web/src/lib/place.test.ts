@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   detectPlaceNavPlatform,
   placeFromEditForm,
@@ -25,22 +25,54 @@ const picked: PlaceValue = {
 describe('placeNavigationLinks', () => {
   const route = { name: '망원 풋살장', latitude: 37.5, longitude: 127.1 };
   const nameOnly = { name: '망원 풋살장', latitude: null, longitude: null };
+  const enc = encodeURIComponent('망원 풋살장');
+  const tmapRoute = `route?goalx=127.1&goaly=37.5&goalname=${enc}`;
 
-  it('모바일 + 좌표: 앱 길찾기 스킴 3개를 만든다', () => {
+  it('앱 셸 + 좌표: 앱 스킴 3개와 "앱으로 길찾기" 설명', () => {
     const links = placeNavigationLinks(route, 'android');
-    expect(links.map((l) => l.key)).toEqual(['kakao', 'naver', 'tmap']);
+    expect(links.map((l) => [l.key, l.label])).toEqual([
+      ['kakao', '카카오맵'],
+      ['naver', '네이버 지도'],
+      ['tmap', '티맵'],
+    ]);
     expect(links[0].href).toBe('kakaomap://route?ep=37.5,127.1&by=CAR');
     expect(links[1].href).toContain('nmap://route/car?dlat=37.5&dlng=127.1');
-    expect(links[1].href).toContain(`dname=${encodeURIComponent('망원 풋살장')}`);
-    expect(links[2].href).toBe(`tmap://route?goalx=127.1&goaly=37.5&goalname=${encodeURIComponent('망원 풋살장')}`);
-    expect(links.every((l) => l.mode === 'route')).toBe(true);
+    expect(links[1].href).toContain(`dname=${enc}`);
+    expect(links[2].href).toBe(`tmap://${tmapRoute}`);
+    expect(links.every((l) => l.mode === 'route' && l.description === '앱으로 길찾기' && !l.newTab)).toBe(true);
+    expect(links.map((l) => l.iconSrc)).toEqual(['/map-apps/kakaomap.webp', '/map-apps/navermap.webp', '/map-apps/tmap.webp']);
   });
 
-  it('데스크톱 + 좌표: 웹 URL 2개이고 티맵(웹 대상 없음)은 뺀다', () => {
+  it('데스크톱 + 좌표: 새 창 웹 URL 2개이고 티맵은 없다', () => {
     const links = placeNavigationLinks(route, 'web');
     expect(links.map((l) => l.key)).toEqual(['kakao', 'naver']);
-    expect(links[0].href).toBe(`https://map.kakao.com/link/to/${encodeURIComponent('망원 풋살장')},37.5,127.1`);
+    expect(links[0].href).toBe(`https://map.kakao.com/link/to/${enc},37.5,127.1`);
     expect(links[1].href).toBe('https://map.naver.com/v5/directions/-/-/-/car?destination=127.1,37.5');
+    expect(links.map((l) => [l.newTab, l.description])).toEqual([
+      [true, '새 창에서 카카오맵 길찾기'],
+      [true, '새 창에서 네이버 지도 길찾기'],
+    ]);
+  });
+
+  it('안드로이드 웹: 카카오·네이버는 웹 URL, 티맵은 스토어 폴백이 든 intent URL', () => {
+    const links = placeNavigationLinks(route, 'android-web');
+    expect(links[0].href).toMatch(/^https:\/\/map\.kakao\.com\/link\/to\//);
+    expect(links[1].href).toMatch(/^https:\/\/map\.naver\.com\//);
+    expect(links[0].description).toBe('웹에서 길찾기');
+    expect(links[0].newTab).toBe(false);
+    const play = encodeURIComponent('https://play.google.com/store/apps/details?id=com.skt.tmap.ku');
+    expect(links[2].href).toBe(
+      `intent://${tmapRoute}#Intent;scheme=tmap;package=com.skt.tmap.ku;S.browser_fallback_url=${play};end`,
+    );
+    expect(links[2].description).toBe('앱으로 길찾기 · 앱이 없으면 스토어로 이동해요');
+  });
+
+  it('iOS 웹: 티맵은 href 가 아니라 핸들러를 가진다', () => {
+    const links = placeNavigationLinks(nameOnly, 'ios-web');
+    expect(links.map((l) => l.key)).toEqual(['kakao', 'naver', 'tmap']);
+    expect(links[2].href).toBeUndefined();
+    expect(typeof links[2].onSelect).toBe('function');
+    expect(links[0].description).toBe('이름으로 검색');
   });
 
   it.each([
@@ -52,27 +84,81 @@ describe('placeNavigationLinks', () => {
     const encoded = encodeURIComponent(name);
     const web = placeNavigationLinks({ name, latitude: 37.5, longitude: 127.1 }, 'web');
     expect(web[0].href).toBe(`https://map.kakao.com/link/to/${encoded},37.5,127.1`);
-    // 쉼표로 split 하면 이름이 쪼개지지 않고 정확히 3조각(이름, 위도, 경도)이어야 한다.
-    expect(web[0].href.replace('https://map.kakao.com/link/to/', '').split(',')).toHaveLength(3);
+    expect(web[0].href!.replace('https://map.kakao.com/link/to/', '').split(',')).toHaveLength(3);
     const app = placeNavigationLinks({ name, latitude: 37.5, longitude: 127.1 }, 'android');
     expect(app[1].href).toContain(`dname=${encoded}&appname=`);
     expect(app[2].href).toBe(`tmap://route?goalx=127.1&goaly=37.5&goalname=${encoded}`);
   });
 
-  it('좌표 없음: 모바일은 앱 이름 검색, 데스크톱은 웹 검색 URL', () => {
-    const name = encodeURIComponent('망원 풋살장');
+  it('좌표 없음: 앱 셸은 앱 이름 검색, 데스크톱은 웹 검색 URL', () => {
     const mobile = placeNavigationLinks(nameOnly, 'ios');
     expect(mobile.map((l) => l.href)).toEqual([
-      `kakaomap://search?q=${name}`,
-      `nmap://search?query=${name}&appname=teameet.kr`,
-      `tmap://search?name=${name}`,
+      `kakaomap://search?q=${enc}`,
+      `nmap://search?query=${enc}&appname=teameet.kr`,
+      `tmap://search?name=${enc}`,
     ]);
-    expect(mobile.every((l) => l.mode === 'search')).toBe(true);
+    expect(mobile.every((l) => l.mode === 'search' && l.description === '이름으로 검색')).toBe(true);
     const desktop = placeNavigationLinks(nameOnly, 'web');
-    expect(desktop.map((l) => l.href)).toEqual([
-      `https://map.kakao.com/?q=${name}`,
-      `https://map.naver.com/p/search/${name}`,
-    ]);
+    expect(desktop.map((l) => l.href)).toEqual([`https://map.kakao.com/?q=${enc}`, `https://map.naver.com/p/search/${enc}`]);
+    expect(desktop[0].description).toBe('새 창에서 이름으로 검색');
+  });
+});
+
+describe('iOS 웹 티맵 핸들러', () => {
+  const originalLocation = window.location;
+  let assigned: string[];
+
+  function setVisibility(state: 'visible' | 'hidden') {
+    Object.defineProperty(document, 'visibilityState', { value: state, configurable: true });
+  }
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    assigned = [];
+    Object.defineProperty(window, 'location', {
+      configurable: true,
+      value: { set href(v: string) { assigned.push(v); } },
+    });
+    setVisibility('visible');
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+    Object.defineProperty(window, 'location', { configurable: true, value: originalLocation });
+    delete (document as { visibilityState?: unknown }).visibilityState;
+  });
+
+  const tmapLink = () =>
+    placeNavigationLinks({ name: '구장', latitude: 37.5, longitude: 127 }, 'ios-web').find((l) => l.key === 'tmap')!;
+
+  it('스킴으로 이동하고, 1.5초 뒤에도 화면이 보이면 App Store 로 보낸다', () => {
+    tmapLink().onSelect!();
+    expect(assigned).toEqual([`tmap://route?goalx=127&goaly=37.5&goalname=${encodeURIComponent('구장')}`]);
+    vi.advanceTimersByTime(1499);
+    expect(assigned).toHaveLength(1);
+    vi.advanceTimersByTime(1);
+    expect(assigned[1]).toBe('https://apps.apple.com/kr/app/tmap/id431589174');
+  });
+
+  it('앱이 떠서 탭이 숨겨지면 스토어로 보내지 않는다', () => {
+    tmapLink().onSelect!();
+    setVisibility('hidden');
+    document.dispatchEvent(new Event('visibilitychange'));
+    vi.advanceTimersByTime(3000);
+    expect(assigned).toHaveLength(1);
+  });
+
+  it('pagehide 가 오면 스토어로 보내지 않는다', () => {
+    tmapLink().onSelect!();
+    window.dispatchEvent(new Event('pagehide'));
+    vi.advanceTimersByTime(3000);
+    expect(assigned).toHaveLength(1);
+  });
+
+  it('타이머 시점에 이미 숨겨져 있으면 스토어로 보내지 않는다', () => {
+    tmapLink().onSelect!();
+    setVisibility('hidden');
+    vi.advanceTimersByTime(1500);
+    expect(assigned).toHaveLength(1);
   });
 });
 
@@ -146,21 +232,21 @@ describe('detectPlaceNavPlatform', () => {
     delete (window as { TeameetNative?: unknown }).TeameetNative;
   });
 
-  it('treats a phone browser outside the Teameet app as web, so links never depend on an installed map app', () => {
+  it('앱 밖 아이폰 브라우저는 ios-web', () => {
     vi.stubGlobal('navigator', { ...navigator, userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X)' });
-    expect(detectPlaceNavPlatform()).toBe('web');
-    expect(placeNavigationLinks({ name: '구장', latitude: 37.5, longitude: 127 }, detectPlaceNavPlatform())[0].href).toMatch(
-      /^https:\/\/map\.kakao\.com\//,
-    );
+    expect(detectPlaceNavPlatform()).toBe('ios-web');
   });
 
-  it('uses app schemes inside the Android app shell', () => {
+  it('앱 밖 안드로이드 브라우저는 android-web, 데스크톱은 web', () => {
+    vi.stubGlobal('navigator', { ...navigator, userAgent: 'Mozilla/5.0 (Linux; Android 14; Pixel 8)' });
+    expect(detectPlaceNavPlatform()).toBe('android-web');
+    vi.stubGlobal('navigator', { ...navigator, userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)' });
+    expect(detectPlaceNavPlatform()).toBe('web');
+  });
+
+  it('팀밋 앱 셸 안이면 UA 와 상관없이 셸 플랫폼', () => {
+    vi.stubGlobal('navigator', { ...navigator, userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X)' });
     (window as { TeameetNative?: unknown }).TeameetNative = { postMessage: () => undefined };
     expect(detectPlaceNavPlatform()).toBe('android');
-    expect(placeNavigationLinks({ name: '구장', latitude: 37.5, longitude: 127 }, 'android').map((l) => l.href.split(':')[0])).toEqual([
-      'kakaomap',
-      'nmap',
-      'tmap',
-    ]);
   });
 });

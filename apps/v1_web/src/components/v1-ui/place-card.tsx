@@ -1,40 +1,16 @@
 'use client';
 
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { Check, Copy, MapPin } from 'lucide-react';
+import { Check, Copy, MapPin, Navigation, Search } from 'lucide-react';
+import { ActionSheet, type ActionSheetAction } from '@/components/v1-ui/action-sheet';
 import { KakaoMapPreview } from '@/components/v1-ui/kakao-map-preview';
 import {
   detectPlaceNavPlatform,
   hasCoordinates,
   placeNavigationLinks,
-  type PlaceNavLink,
   type PlaceNavPlatform,
 } from '@/lib/place';
 import type { V1PlaceView } from '@/types/api';
-
-/** 지도 앱 브랜드 마크. 색은 의미 구분이 아니라 로고 표기라 이 한 곳에만 둔다(텍스트 라벨 병행). */
-const BRAND_DOT_BACKGROUND: Record<PlaceNavLink['key'], string> = {
-  kakao: 'var(--map-brand-kakao)',
-  naver: 'var(--map-brand-naver)',
-  tmap: 'linear-gradient(135deg, var(--map-brand-tmap-from), var(--map-brand-tmap-to))',
-};
-
-function BrandDot({ appKey }: { appKey: PlaceNavLink['key'] }) {
-  return (
-    <i
-      aria-hidden="true"
-      style={{
-        width: 16,
-        height: 16,
-        borderRadius: 'var(--radius-tight)',
-        flex: 'none',
-        display: 'inline-block',
-        background: BRAND_DOT_BACKGROUND[appKey],
-        boxShadow: 'inset 0 0 0 1px color-mix(in srgb, var(--static-ink) 8%, transparent)',
-      }}
-    />
-  );
-}
 
 type CopyState = 'idle' | 'copied' | 'failed';
 
@@ -53,6 +29,7 @@ export function PlaceCard({
   platform?: PlaceNavPlatform;
 }) {
   const [platform, setPlatform] = useState<PlaceNavPlatform>(platformOverride ?? 'web');
+  const [navOpen, setNavOpen] = useState(false);
   const [copyState, setCopyState] = useState<CopyState>('idle');
   const resetTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -68,7 +45,23 @@ export function PlaceCard({
   );
 
   const coords = hasCoordinates(place) ? place : null;
-  const links = placeNavigationLinks(place, platform);
+  const navTitle = coords ? '길찾기' : '지도 앱에서 찾기';
+  const navActions: ActionSheetAction[] = placeNavigationLinks(place, platform).map((link) => {
+    const base = {
+      key: link.key,
+      label: link.label,
+      description: link.description,
+      // 장식(alt="") — 라벨이 앱 이름을 말한다. 흰 바탕 아이콘(네이버·티맵)이 배경에 묻히지 않게 테두리를 둔다.
+      icon: (
+        <img src={link.iconSrc} alt="" width={36} height={36} style={{ borderRadius: 'var(--radius-chip)', border: '1px solid var(--border)' }} />
+      ),
+    };
+    if (link.onSelect) {
+      const open = link.onSelect;
+      return { ...base, onSelect: () => { setNavOpen(false); open(); } };
+    }
+    return { ...base, externalHref: link.href, newTab: link.newTab };
+  });
 
   async function copyAddress() {
     if (!place.address) return;
@@ -138,26 +131,22 @@ export function PlaceCard({
         </p>
       )}
 
-      <div
-        role="group"
-        aria-label={coords ? '길찾기 앱 선택' : '지도 앱에서 장소 찾기'}
-        style={{ display: 'grid', gridTemplateColumns: `repeat(${links.length}, minmax(0, 1fr))`, gap: 8, marginTop: 12 }}
+      <button
+        type="button"
+        onClick={() => setNavOpen(true)}
+        className="tm-btn tm-btn-md tm-btn-neutral"
+        style={{ width: '100%', marginTop: 12, gap: 6 }}
       >
-        {links.map((link) => (
-          <a
-            key={link.key}
-            href={link.href}
-            target={link.href.startsWith('http') ? '_blank' : undefined}
-            rel={link.href.startsWith('http') ? 'noopener noreferrer' : undefined}
-            aria-label={`${link.label}${link.mode === 'route' ? '으로 길찾기' : '에서 이름 검색'}`}
-            className="tm-btn tm-btn-sm tm-btn-neutral"
-            style={{ width: '100%', padding: '0 8px', gap: 6 }}
-          >
-            <BrandDot appKey={link.key} />
-            {link.label}
-          </a>
-        ))}
-      </div>
+        {coords ? <Navigation size={16} aria-hidden="true" /> : <Search size={16} aria-hidden="true" />}
+        {navTitle}
+      </button>
+      <ActionSheet
+        open={navOpen}
+        title={navTitle}
+        subtitle={place.address ? `${place.name} · ${place.address}` : place.name}
+        actions={navActions}
+        onClose={() => setNavOpen(false)}
+      />
     </div>
   );
 }

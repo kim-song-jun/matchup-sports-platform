@@ -1148,8 +1148,10 @@ describe('MatchDetailPageView — 일정·장소의 장소 카드', () => {
     );
     const body = mobileBody(container);
     expect(body.getAllByText('망원한강공원 풋살장')).toHaveLength(1);
-    expect(body.getByRole('link', { name: '카카오맵으로 길찾기' }).getAttribute('href')).toContain('37.5558,126.8985');
-    expect(body.getByRole('link', { name: '네이버맵으로 길찾기' })).toBeInTheDocument();
+    fireEvent.click(body.getByRole('button', { name: '길찾기' }));
+    const sheet = within(screen.getByRole('dialog', { name: '길찾기' }));
+    expect(sheet.getByRole('link', { name: /^카카오맵/ }).getAttribute('href')).toContain('37.5558,126.8985');
+    expect(sheet.getByRole('link', { name: /^네이버 지도/ })).toBeInTheDocument();
     expect(body.getByRole('button', { name: /주소 복사/ })).toBeInTheDocument();
     expect(body.queryByText(/정확한 위치가 등록되지 않았어요/)).not.toBeInTheDocument();
   });
@@ -1160,7 +1162,9 @@ describe('MatchDetailPageView — 일정·장소의 장소 카드', () => {
     );
     const body = mobileBody(container);
     expect(body.getByText(/정확한 위치가 등록되지 않았어요/)).toBeInTheDocument();
-    expect(body.getByRole('link', { name: '카카오맵에서 이름 검색' }).getAttribute('href')).toContain(encodeURIComponent('동네 운동장'));
-    expect(body.queryByRole('link', { name: /길찾기/ })).not.toBeInTheDocument();
+    expect(body.queryByRole('button', { name: '길찾기' })).not.toBeInTheDocument();
+    fireEvent.click(body.getByRole('button', { name: '지도 앱에서 찾기' }));
+    const sheet = within(screen.getByRole('dialog', { name: '지도 앱에서 찾기' }));
+    expect(sheet.getByRole('link', { name: /^카카오맵/ }).getAttribute('href')).toContain(encodeURIComponent('동네 운동장'));
   });
 });

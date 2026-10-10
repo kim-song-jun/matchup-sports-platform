@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 vi.mock('@/hooks/use-v1-api', () => ({
   useV1PublicKakaoMapsKey: () => ({ data: { kakaoMapsJsKey: null }, isLoading: false }),
@@ -528,7 +528,8 @@ describe('MatchDetailContent — 장소 카드', () => {
     const { unmount } = render(<MatchDetailContent data={makeDetail({ place })} />);
 
     expect(screen.getByRole('heading', { name: '장소' })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: '카카오맵으로 길찾기' })).toHaveAttribute(
+    fireEvent.click(screen.getByRole('button', { name: '길찾기' }));
+    expect(screen.getByRole('link', { name: /^카카오맵/ })).toHaveAttribute(
       'href',
       `https://map.kakao.com/link/to/${encodeURIComponent('잠실 보조구장')},37.5,127.07`,
     );

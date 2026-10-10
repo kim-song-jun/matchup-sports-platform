@@ -41,6 +41,28 @@ describe('ActionSheet', () => {
     expect(screen.queryByRole('button', { name: /레드팀 경기 명단/ })).toBeNull();
   });
 
+  it('icon 은 라벨 왼쪽에 그려지고 접근 이름을 바꾸지 않는다', () => {
+    setup([{ key: 'a', label: '카카오맵', icon: <img src="/x.webp" alt="" data-testid="ic" />, onSelect: vi.fn() }]);
+    const button = screen.getByRole('button', { name: '카카오맵' });
+    expect(within(button).getByTestId('ic')).toBeInTheDocument();
+  });
+
+  it('externalHref 항목은 순수 링크이고 newTab 일 때만 새 탭 속성을 가지며 누르면 시트를 닫는다', () => {
+    const { onClose } = setup([
+      { key: 'a', label: '앱으로', externalHref: 'kakaomap://route?ep=1,2' },
+      { key: 'b', label: '새 창으로', externalHref: 'https://map.kakao.com/', newTab: true },
+    ]);
+    const app = screen.getByRole('link', { name: '앱으로' });
+    expect(app).toHaveAttribute('href', 'kakaomap://route?ep=1,2');
+    expect(app).not.toHaveAttribute('target');
+    expect(app).not.toHaveAttribute('rel');
+    const web = screen.getByRole('link', { name: '새 창으로' });
+    expect(web).toHaveAttribute('target', '_blank');
+    expect(web).toHaveAttribute('rel', 'noopener noreferrer');
+    fireEvent.click(app);
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
   it('비활성 항목은 누를 수 없고 왜 못 누르는지를 설명 자리에 말한다', () => {
     const onSelect = vi.fn();
     setup([

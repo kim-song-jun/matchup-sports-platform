@@ -1,5 +1,5 @@
 import { createElement } from 'react';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { getTournamentPostEventCards } from './tournament-venue-retention-model';
 import {
@@ -42,7 +42,8 @@ describe('TournamentVenuePrepSection — 현장 안내', () => {
 
     expect(screen.getAllByText('잠실종합운동장')).toHaveLength(1);
     expect(screen.getByText('서울 송파구 올림픽로 25')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: '카카오맵으로 길찾기' })).toHaveAttribute(
+    fireEvent.click(screen.getByRole('button', { name: '길찾기' }));
+    expect(screen.getByRole('link', { name: /^카카오맵/ })).toHaveAttribute(
       'href',
       `https://map.kakao.com/link/to/${encodeURIComponent('잠실종합운동장')},37.5,127.07`,
     );
@@ -51,11 +52,12 @@ describe('TournamentVenuePrepSection — 현장 안내', () => {
   it('좌표가 없는 옛 대회도 이름 검색 링크로 폴백하고 길찾기 문구는 없다', () => {
     render(createElement(TournamentVenuePrepSection, { place: nameOnlyPlace, announcements: [] }));
 
-    expect(screen.getByRole('link', { name: '카카오맵에서 이름 검색' })).toHaveAttribute(
+    expect(screen.queryByRole('button', { name: '길찾기' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '지도 앱에서 찾기' }));
+    expect(screen.getByRole('link', { name: /^카카오맵/ })).toHaveAttribute(
       'href',
       `https://map.kakao.com/?q=${encodeURIComponent('데일리그라운드 청라국제도시점')}`,
     );
-    expect(screen.queryByRole('link', { name: /길찾기/ })).not.toBeInTheDocument();
   });
 
   it('주차 안내는 장소 카드 아래 행으로 보이고 비우면 사라진다', () => {

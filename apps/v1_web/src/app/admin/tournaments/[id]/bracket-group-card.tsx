@@ -6,6 +6,7 @@ import { EntityPicker, type EntityPickerItem } from '@/components/admin/entity-p
 import { AdminDataTable, AdminEmpty, type AdminTableColumn } from '@/components/admin';
 import { byeRound } from '@/lib/tournament-bracket-rounds';
 import { extractErrorMessage } from '@/lib/error-message';
+import { registrationIdsBlockedForGroup } from '@/lib/bracket-group-enrollment';
 import type { useV1AssignGroupTeam, useV1CreateFixture, useV1CreateBracketBye } from '@/hooks/use-v1-api';
 import type { V1AdminBracketFixture, V1AdminBracketGroup, V1AdminBracketStanding } from '@/types/api';
 import { computeQualifyingShortlist, isGroupReady } from './bracket-group-helpers';
@@ -212,7 +213,9 @@ export function BracketGroupCard({
   const suggestedTeams = computeQualifyingShortlist(group, allGroups, allStandings).filter(
     (c) => !assignedIds.has(c.id),
   );
-  const searchPoolItems = confirmedTeamItems.filter((it) => !assignedIds.has(it.id));
+  const blockedIds = registrationIdsBlockedForGroup(allGroups, group.id);
+  const searchPoolItems = confirmedTeamItems.filter((it) => !assignedIds.has(it.id) && !blockedIds.has(it.id));
+  const fixtureTeamItems = confirmedTeamItems.filter((it) => !blockedIds.has(it.id));
 
   function handleBatchAssign(registrationIds: string[]) {
     if (registrationIds.length === 0) return;
@@ -507,7 +510,7 @@ export function BracketGroupCard({
                     id={`fixture-home-${group.id}`}
                     value={confirmedTeamItems.find((it) => it.id === fixtureHomeRegId) ?? null}
                     onChange={(item) => setFixtureHomeRegId(item?.id ?? '')}
-                    items={confirmedTeamItems.filter((it) => it.id !== fixtureAwayRegId)}
+                    items={fixtureTeamItems.filter((it) => it.id !== fixtureAwayRegId)}
                     disabled={createFixture.isPending || byePending}
                     clearLabel="미정"
                     placeholder={entryType === 'bye' ? '부전승 팀 검색' : '홈 팀 검색'}
@@ -523,7 +526,7 @@ export function BracketGroupCard({
                     id={`fixture-away-${group.id}`}
                     value={confirmedTeamItems.find((it) => it.id === fixtureAwayRegId) ?? null}
                     onChange={(item) => setFixtureAwayRegId(item?.id ?? '')}
-                    items={confirmedTeamItems.filter((it) => it.id !== fixtureHomeRegId)}
+                    items={fixtureTeamItems.filter((it) => it.id !== fixtureHomeRegId)}
                     disabled={createFixture.isPending || byePending}
                     clearLabel="미정"
                     placeholder="어웨이 팀 검색"

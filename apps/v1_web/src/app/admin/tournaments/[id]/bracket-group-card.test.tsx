@@ -211,6 +211,55 @@ describe('BracketGroupCard — 팀 일괄 배정', () => {
     expect(screen.queryByText(/예선 상위 진출팀이에요/)).not.toBeInTheDocument();
     expect(screen.getByPlaceholderText('팀 검색')).toBeInTheDocument();
   });
+
+  describe('한 팀 한 조 — 후보에서 다른 조 팀 제외', () => {
+    const memberOf = (groupId: string, registrationId: string) => ({ id: `gt-${registrationId}`, groupId, registrationId, teamName: registrationId, sortOrder: 0, createdAt: '2026-08-01T00:00:00.000Z' });
+    const stageA = { ...groupA, groupTeams: [memberOf('group-a', 'r1')] };
+    const stageB = { ...groupA, id: 'group-b', name: 'B조', sortOrder: 1, groupTeams: [memberOf('group-b', 'r2')] };
+    const knockout = { ...semiGroup, groupTeams: [memberOf('semi-1', 'r2')] };
+    const renderCard = (group: V1AdminBracketGroup, allGroups: V1AdminBracketGroup[]) =>
+      render(
+        <BracketGroupCard
+          group={group} allGroups={allGroups} allStandings={[]} fixtures={[]}
+          confirmedTeamItems={[{ id: 'r2', label: '마포FC' }, { id: 'r3', label: '송파FC' }]}
+          assignGroupTeam={noopMutation() as unknown as ReturnType<typeof import('@/hooks/use-v1-api').useV1AssignGroupTeam>}
+          createFixture={noopMutation()} isAutoGenerating={false} onAutoGenerate={vi.fn()} onEditGroup={vi.fn()}
+          onDeleteGroup={vi.fn()} onRemoveGroupTeam={vi.fn()} autoFocus={false} showToast={vi.fn()}
+        />,
+      );
+    const searchFor = (placeholder: string) => fireEvent.change(screen.getByPlaceholderText(placeholder), { target: { value: 'FC' } });
+    const optionLabels = () => screen.queryAllByRole('option').map((option) => option.textContent ?? '');
+
+    it('조별 단계 조의 팀 검색에서 다른 조별 조에 편성된 팀(마포FC)은 빠지고 어느 조에도 없는 팀(송파FC)은 남는다', () => {
+      renderCard(stageA, [stageA, stageB]);
+      searchFor('팀 검색');
+      expect(optionLabels().join()).toContain('송파FC');
+      expect(optionLabels().join()).not.toContain('마포FC');
+    });
+
+    it('대조군 — 다른 조가 없으면 마포FC 도 보이고, 결선 단계 조에만 편성된 팀은 막지 않는다', () => {
+      const { unmount } = renderCard(stageA, [stageA]);
+      searchFor('팀 검색');
+      expect(optionLabels().join()).toContain('마포FC');
+      unmount();
+      renderCard(stageA, [stageA, knockout]);
+      searchFor('팀 검색');
+      expect(optionLabels().join()).toContain('마포FC');
+    });
+
+    it('「경기 일정 추가」 홈 팀 선택창도 같은 후보만 보여 주고, 결선 단계 조는 거르지 않는다', () => {
+      const { unmount } = renderCard(stageA, [stageA, stageB]);
+      fireEvent.click(screen.getByRole('button', { name: /직접 입력/ }));
+      fireEvent.change(screen.getByPlaceholderText('홈 팀 검색'), { target: { value: 'FC' } });
+      expect(optionLabels().join()).not.toContain('마포FC');
+      expect(optionLabels().join()).toContain('송파FC');
+      unmount();
+      renderCard(knockout, [stageA, stageB, knockout]);
+      fireEvent.click(screen.getByRole('button', { name: /직접 입력/ }));
+      fireEvent.change(screen.getByPlaceholderText('홈 팀 검색'), { target: { value: 'FC' } });
+      expect(optionLabels().join()).toContain('마포FC');
+    });
+  });
 });
 
 /**

@@ -11,7 +11,7 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { buildPageInfo, paginationArgs } from '../common/pagination/page-args';
 import { V1AuthUser } from '../auth/v1-auth-user';
-import { resolvePlaceSnapshot } from '../places/place-snapshot';
+import { rejectPartialPlaceUpdate, resolvePlaceSnapshot } from '../places/place-snapshot';
 import { isBracketPublished } from './tournament-detail.presenter';
 import { TOURNAMENT_SURFACE_KIND } from './tournament-surface';
 import { findTournamentOnSurface, TOURNAMENT_KINDS } from './tournament-surface-lookup';
@@ -536,6 +536,7 @@ export class TournamentsAdminService {
     }
 
     // venue 키가 오면 스냅샷 전체를 교체한다 — 이름만 바뀌면 옛 핀(좌표·출처)을 남기지 않는다.
+    rejectPartialPlaceUpdate(dto.venue, [dto.venueAddress, dto.venueLatitude, dto.venueLongitude, dto.venueProvider, dto.venueProviderId]);
     const venueSnapshot = dto.venue !== undefined ? this.resolveVenueSnapshot(dto) : undefined;
 
     const data: Prisma.V1TournamentUncheckedUpdateManyInput = {};

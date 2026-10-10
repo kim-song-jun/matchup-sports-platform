@@ -101,6 +101,13 @@ describe('LeagueVenueService.update', () => {
     });
   });
 
+  it.each([[{}], [{ venueAddress: '경기 성남시' }]])('venue 키가 없는 본문(%j)은 400 VENUE_REQUIRED 이고 기본 장소를 그대로 둔다', async (body) => {
+    const { service, rows, prisma } = setup([row({ id: 'l1', venue: '탄천', venueAddress: '주소' })]);
+    await expect(service.update(user, 'l1', body)).rejects.toMatchObject({ status: 400, response: { code: 'VENUE_REQUIRED' } });
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+    expect(rows[0]).toMatchObject({ venue: '탄천', venueAddress: '주소' });
+  });
+
   it('핀이 일부만 오면 400 PLACE_SNAPSHOT_INCOMPLETE 이고 저장하지 않는다', async () => {
     const { service, tx } = setup([row({ id: 'l1' })]);
     await expect(service.update(user, 'l1', { venue: '탄천', venueLatitude: 37.4, venueLongitude: 127.1 }))

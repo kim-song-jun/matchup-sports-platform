@@ -1,4 +1,4 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 import type { V1AuthUser } from '../auth/v1-auth-user';
 import { AdminContextService } from '../common/admin-context.service';
@@ -29,6 +29,10 @@ export class LeagueVenueService {
     dto: UpdateLeagueVenueDto,
   ): Promise<{ leagueId: string; defaultPlace: PlaceView | null }> {
     const admin = await this.adminContext.getMutationAdmin(user.id);
+    // 빈 본문이 기본 장소를 지우지 않게 한다 — 지우기는 화면처럼 `{ venue: null }` 로만.
+    if (dto.venue === undefined) {
+      throw new BadRequestException({ code: 'VENUE_REQUIRED', message: '바꿀 장소가 없어요. 장소를 다시 골라 주세요.' });
+    }
     const snapshot = resolvePlaceSnapshot({
       name: dto.venue,
       address: dto.venueAddress,

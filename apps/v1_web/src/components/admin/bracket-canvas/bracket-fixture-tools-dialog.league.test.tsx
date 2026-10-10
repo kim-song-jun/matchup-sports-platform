@@ -3,6 +3,7 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-li
 import { delay, http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
+import { buildLeagueGrid } from '@/lib/bracket-league-grid-model';
 import { v1Keys } from '@/lib/query-keys';
 import { makeBracket, makeFixture, makeGroup } from '@/test/bracket-canvas-fixtures';
 import type { V1AdminTournamentBracket } from '@/types/api';
@@ -132,6 +133,27 @@ describe('BracketFixtureToolsDialog — 리그 경기 추가', () => {
     await waitFor(() => expect(props.onClose).toHaveBeenCalledTimes(1));
     expect(bodies).toEqual([{ groupId: 'gL', round: 'league_r1', fixtureNumber: 4 }]);
     expect(props.showToast).toHaveBeenCalledWith('1라운드 리그 경기를 추가했어요. 칸을 눌러 팀을 넣어 주세요.', 'success');
+  });
+
+  it.each([
+    ['기존 라운드(B조에 2라운드)', 'r2', 'gB', 'r:2', '2라운드'],
+    ['새 라운드(A조에 11라운드)', 'new', 'gA', 'r:11', '11라운드'],
+  ])('실제로 보낸 요청대로 경기를 대진에 더하면 격자의 올바른 행·열에 놓인다 — %s', async (_name, roundValue, groupId, rowKey, rowLabel) => {
+    const { props } = renderLeagueDialog();
+    fireEvent.change(screen.getByLabelText('조'), { target: { value: groupId } });
+    fireEvent.change(screen.getByLabelText('라운드'), { target: { value: roundValue } });
+    fireEvent.click(screen.getByRole('button', { name: '경기 추가' }));
+    await waitFor(() => expect(props.onClose).toHaveBeenCalledTimes(1));
+
+    const sent = bodies[0] as { groupId: string; round: string; fixtureNumber: number };
+    const created = makeFixture({ id: 'created', groupId: sent.groupId, round: sent.round, fixtureNumber: sent.fixtureNumber });
+    const grid = buildLeagueGrid({ groups: numbered.groups, fixtures: [...numbered.fixtures, created] });
+
+    const row = grid.rows.find((candidate) => candidate.key === rowKey);
+    expect(row?.label).toBe(rowLabel);
+    expect(row?.cells[groupId].map((fixture) => fixture.id)).toEqual(['created']);
+    const otherCells = grid.rows.flatMap((candidate) => Object.entries(candidate.cells).filter(([column]) => candidate.key !== rowKey || column !== groupId));
+    expect(otherCells.flatMap(([, cell]) => cell).some((fixture) => fixture.id === 'created')).toBe(false);
   });
 
   it('연속으로 두 번 눌러도 요청은 한 건이다', async () => {

@@ -156,6 +156,68 @@ describe('PlacePicker', () => {
     expect(onValue).toHaveBeenLastCalledWith({ kind: 'manual', name: '가'.repeat(150) });
   });
 
+  describe('결과 더 보기', () => {
+    function place(id: string, name: string) {
+      return { provider: 'kakao', providerPlaceId: id, name, address: '서울 마포구', jibunAddress: null, category: null, latitude: 37.5, longitude: 126.9 };
+    }
+    function page(items: ReturnType<typeof place>[], hasMore: boolean) {
+      return HttpResponse.json({ status: 'success', data: { items, hasMore }, timestamp: '2026-10-11T00:00:00.000Z' });
+    }
+
+    it('결과가 더 있으면 다음 쪽을 목록 끝에 이어 붙이고, 마지막 쪽이면 「결과 더 보기」가 사라진다', async () => {
+      const pages: Array<string | null> = [];
+      server.use(
+        http.get('*/api/v1/places/search', ({ request }) => {
+          const requested = new URL(request.url).searchParams.get('page');
+          pages.push(requested);
+          return requested === '2'
+            ? page([place('p1', '망원 1구장'), place('p3', '망원 3구장')], false)
+            : page([place('p1', '망원 1구장'), place('p2', '망원 2구장')], true);
+        }),
+      );
+      const onValue = vi.fn();
+      renderPicker({ onValue });
+      fireEvent.change(screen.getByRole('combobox'), { target: { value: '망원' } });
+      await findOption('망원 2구장');
+
+      fireEvent.click(await findOption('결과 더 보기'));
+
+      const third = await findOption('망원 3구장');
+      // 쪽 경계에서 다시 온 1구장은 한 번만 보인다.
+      expect(screen.getAllByRole('option').filter((option) => option.textContent?.includes('망원 1구장'))).toHaveLength(1);
+      expect(screen.queryByText('결과 더 보기')).not.toBeInTheDocument();
+      expect(pages).toEqual([null, '2']);
+
+      fireEvent.click(third);
+      expect(onValue).toHaveBeenLastCalledWith(expect.objectContaining({ kind: 'picked', name: '망원 3구장', providerPlaceId: 'p3' }));
+    });
+
+    it('다음 쪽만 실패하면 받아 둔 결과는 남기고 같은 줄에서 다시 시도한다', async () => {
+      let secondPageCalls = 0;
+      server.use(
+        http.get('*/api/v1/places/search', ({ request }) => {
+          if (new URL(request.url).searchParams.get('page') !== '2') return page([place('p1', '망원 1구장')], true);
+          secondPageCalls += 1;
+          return secondPageCalls === 1
+            ? errorBody(502, 'PLACE_SEARCH_FAILED', '카카오 응답이 늦어요')
+            : page([place('p2', '망원 2구장')], false);
+        }),
+      );
+      renderPicker();
+      fireEvent.change(screen.getByRole('combobox'), { target: { value: '망원' } });
+      fireEvent.click(await findOption('결과 더 보기'));
+
+      const retry = await findOption('다시 시도');
+      expect(screen.getByRole('listbox')).toBeVisible();
+      expect(await findOption('망원 1구장')).toBeInTheDocument();
+      expect(screen.queryByText('카카오 응답이 늦어요')).not.toBeInTheDocument();
+
+      fireEvent.click(retry);
+      expect(await findOption('망원 2구장')).toBeInTheDocument();
+      expect(secondPageCalls).toBe(2);
+    });
+  });
+
   it('검색 결과가 없으면 안내와 직접 입력 버튼을 보여 준다', async () => {
     renderPicker();
     fireEvent.change(screen.getByRole('combobox'), { target: { value: '없는곳xyz' } });

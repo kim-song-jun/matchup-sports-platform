@@ -194,6 +194,8 @@ export function toLeaguePlacePayload(value: PlaceValue | null): {
 }
 
 /** 대회·대진 경기: `venue` + `venueAddress` + `venue*` 좌표·provider. 값이 없으면 키를 뺀다. */
+export function toVenuePayload(value: PlaceValue): { venue: string } & V1VenueSnapshotPayload;
+export function toVenuePayload(value: PlaceValue | null): { venue?: string } & V1VenueSnapshotPayload;
 export function toVenuePayload(value: PlaceValue | null): {
   venue?: string;
 } & V1VenueSnapshotPayload {

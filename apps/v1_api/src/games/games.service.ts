@@ -3385,8 +3385,8 @@ export class GamesService {
       include: { resultParticipants: true },
       orderBy: { revision: 'desc' },
     });
-    // The submitter is an operator, not a player: the roster name policy below does not apply,
-    // so show the nickname (a withdrawn account keeps only its display label).
+    // The creator (a team-match draft may be submitted by another manager) is an operator, not a player:
+    // the roster name policy below does not apply, so show the nickname (a withdrawn account keeps only its display label).
     const creatorProfiles = await loadParticipantNameProfiles(
       this.prisma,
       revisions.map((revision) => revision.createdByUserId),

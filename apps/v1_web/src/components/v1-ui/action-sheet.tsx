@@ -2,9 +2,9 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useId, type ReactNode } from 'react';
+import { useId, type MouseEvent as ReactMouseEvent, type ReactNode } from 'react';
 import { X } from 'lucide-react';
-import { overlayLinkClick } from '@/lib/overlay-history';
+import { closeOverlayThenNavigate, overlayLinkClick } from '@/lib/overlay-history';
 import { useModalA11y } from './use-modal-a11y';
 
 interface ActionSheetActionBase {
@@ -119,7 +119,7 @@ export function ActionSheet({ open, title, subtitle, actions, onClose }: ActionS
                   target={action.newTab ? '_blank' : undefined}
                   rel={action.newTab ? 'noopener noreferrer' : undefined}
                   className={ROW_CLASS}
-                  onClick={onClose}
+                  onClick={externalLinkClick(action.externalHref, Boolean(action.newTab), onClose)}
                 >
                   <ActionLabel action={action}>{action.description}</ActionLabel>
                 </a>
@@ -142,6 +142,21 @@ export function ActionSheet({ open, title, subtitle, actions, onClose }: ActionS
       </div>
     </div>
   );
+}
+
+/**
+ * 같은 탭에서 바깥으로 나가는 링크는 시트를 닫는 back 과 이동이 겹치면 브라우저가 이동을 취소하거나
+ * 되돌아온다 — 닫기의 back 이 끝난 뒤 이동한다. 새 탭·수정키 클릭은 이 페이지 기록을 건드리지 않아 그대로 둔다.
+ */
+function externalLinkClick(href: string, newTab: boolean, close: () => void) {
+  return (event: ReactMouseEvent<HTMLAnchorElement>) => {
+    if (newTab || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
+      close();
+      return;
+    }
+    event.preventDefault();
+    void closeOverlayThenNavigate(close, () => window.location.assign(href));
+  };
 }
 
 function ActionLabel({ action, children }: { action: ActionSheetAction; children: ReactNode }) {

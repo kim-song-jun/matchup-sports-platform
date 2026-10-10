@@ -84,7 +84,7 @@ describe('PlaceCard', () => {
     expect(screen.queryByText('티맵')).not.toBeInTheDocument();
   });
 
-  it('iOS 웹에서 티맵은 링크가 아니라 버튼이고, 누르면 시트가 닫힌다', () => {
+  it('iOS 웹에서 티맵은 링크가 아니라 버튼이고, 시트를 먼저 닫은 뒤 앱 주소로 이동한다', async () => {
     const assign = vi.fn();
     const original = window.location;
     Object.defineProperty(window, 'location', { configurable: true, value: { set href(v: string) { assign(v); } } });
@@ -92,8 +92,8 @@ describe('PlaceCard', () => {
       renderCard(<PlaceCard place={withCoords} platform="ios-web" />);
       fireEvent.click(screen.getByRole('button', { name: '길찾기' }));
       fireEvent.click(screen.getByRole('button', { name: /^티맵/ }));
-      expect(assign).toHaveBeenCalledWith(expect.stringMatching(/^tmap:\/\/route\?goalx=126\.8985/));
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+      await vi.waitFor(() => expect(assign).toHaveBeenCalledWith(expect.stringMatching(/^tmap:\/\/route\?goalx=126\.8985/)));
     } finally {
       Object.defineProperty(window, 'location', { configurable: true, value: original });
     }

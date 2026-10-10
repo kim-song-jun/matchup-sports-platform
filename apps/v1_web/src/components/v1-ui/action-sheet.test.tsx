@@ -63,6 +63,27 @@ describe('ActionSheet', () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
+  it('같은 탭 외부 링크는 기본 이동을 막고 시트를 닫은 뒤 이동한다 — 새 탭 링크는 막지 않는다', async () => {
+    const originalLocation = window.location;
+    const assign = vi.fn();
+    Object.defineProperty(window, 'location', { configurable: true, value: { ...originalLocation, assign } });
+    try {
+      const { onClose } = setup([
+        { key: 'a', label: '앱으로', externalHref: 'kakaomap://route?ep=1,2' },
+        { key: 'b', label: '새 창으로', externalHref: 'https://map.kakao.com/', newTab: true },
+      ]);
+      const notPrevented = fireEvent.click(screen.getByRole('link', { name: '앱으로' }));
+      expect(notPrevented).toBe(false);
+      expect(onClose).toHaveBeenCalledTimes(1);
+      await vi.waitFor(() => expect(assign).toHaveBeenCalledWith('kakaomap://route?ep=1,2'));
+
+      expect(fireEvent.click(screen.getByRole('link', { name: '새 창으로' }))).toBe(true);
+      expect(assign).toHaveBeenCalledTimes(1);
+    } finally {
+      Object.defineProperty(window, 'location', { configurable: true, value: originalLocation });
+    }
+  });
+
   it('비활성 항목은 누를 수 없고 왜 못 누르는지를 설명 자리에 말한다', () => {
     const onSelect = vi.fn();
     setup([

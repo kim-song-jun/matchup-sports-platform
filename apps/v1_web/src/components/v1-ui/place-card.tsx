@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Check, Copy, MapPin, Navigation, Search } from 'lucide-react';
 import { ActionSheet, type ActionSheetAction } from '@/components/v1-ui/action-sheet';
+import { closeOverlayThenNavigate } from '@/lib/overlay-history';
 import { KakaoMapPreview } from '@/components/v1-ui/kakao-map-preview';
 import {
   detectPlaceNavPlatform,
@@ -58,7 +59,7 @@ export function PlaceCard({
     };
     if (link.onSelect) {
       const open = link.onSelect;
-      return { ...base, onSelect: () => { setNavOpen(false); open(); } };
+      return { ...base, onSelect: () => void closeOverlayThenNavigate(() => setNavOpen(false), open) };
     }
     return { ...base, externalHref: link.href, newTab: link.newTab };
   });

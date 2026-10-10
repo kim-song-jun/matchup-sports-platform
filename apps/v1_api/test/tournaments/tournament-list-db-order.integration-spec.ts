@@ -3,6 +3,9 @@ import type { INestApplication } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 import { PrismaService } from '../../src/prisma/prisma.service';
 import { TournamentsReadService } from '../../src/tournaments/tournaments-read.service';
+import { PUBLIC_COMPETITION_STATUS_WHERE } from '../../src/tournaments/tournaments-read.query';
+import { TOURNAMENT_SURFACE_KIND } from '../../src/tournaments/tournament-surface';
+import { PUBLIC_TOURNAMENT_VISIBILITY_WHERE } from '../../src/tournaments/tournament-surface-lookup';
 import { createV1IntegrationApp } from '../integration/integration-app';
 
 /**
@@ -165,7 +168,7 @@ describe('대회 공개 목록 DB 정렬·페이지 계약', () => {
   /** Reference check: the SQL filter selects the same row set as the Prisma `where` the surface constants express. */
   it('selects the same rows as the equivalent Prisma where for every filter combination', async () => {
     const kinds: Record<string, Prisma.V1TournamentWhereInput[]> = {
-      tournament: [{ OR: [{ kind: 'regular_tournament' }, { kind: null }] }],
+      tournament: [TOURNAMENT_SURFACE_KIND],
       league: [{ kind: 'regular_league' }],
       all: [],
     };
@@ -177,9 +180,7 @@ describe('대회 공개 목록 DB 정렬·페이지 계약', () => {
         for (const genderCategory of [undefined, 'female'] as const) {
           let statusWhere: Prisma.V1TournamentWhereInput;
           if (status === undefined) {
-            statusWhere = {
-              OR: [{ status: { in: ['open', 'closed', 'in_progress', 'completed'] } }, { kind: 'regular_league', status: 'draft' }],
-            };
+            statusWhere = PUBLIC_COMPETITION_STATUS_WHERE;
           } else if (status === 'draft') {
             statusWhere = { kind: 'regular_league', status: 'draft' };
           } else {
@@ -187,10 +188,9 @@ describe('대회 공개 목록 DB 정렬·페이지 계약', () => {
           }
           const expected = await db.v1Tournament.findMany({
             where: {
-              AND: [...kinds[kind], statusWhere],
+              AND: [...kinds[kind], statusWhere, PUBLIC_TOURNAMENT_VISIBILITY_WHERE],
               sportId,
               deletedAt: null,
-              isPublic: true,
               ...(genderCategory ? { genderCategory } : {}),
             },
             select: { id: true },

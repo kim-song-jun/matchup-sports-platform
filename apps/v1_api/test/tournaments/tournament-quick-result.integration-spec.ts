@@ -343,6 +343,14 @@ function notifiedCount(teamMatchId: string): Promise<number> {
   return prisma.v1Notification.count({ where: { businessKey: { startsWith: `tournament-fixture-completed:${teamMatchId}:` } } });
 }
 
+/** 대진 경기의 "정정" 알림(양 팀 owner 1명씩이면 정정 한 번에 2). 완료 알림과 키 네임스페이스가 다르다(MD-QA #79). */
+function correctionNotices(teamMatchId: string) {
+  return prisma.v1Notification.findMany({
+    where: { businessKey: { startsWith: `tournament-fixture-corrected:${teamMatchId}:` } },
+    select: { recipientUserId: true, title: true, body: true },
+  });
+}
+
 describe('빠른 결과 — 대회 경기', () => {
   it('4강을 점수만으로 확정하면 승자가 결승 칸에 들어가고 확정본·감사·outbox 가 일반 확정과 같은 모양이다', async () => {
     const bracket = await createBracket();
@@ -828,7 +836,7 @@ async function officializeCorrection(gameId: string, draft: { revisionId: string
 }
 
 describe('빠른 결과 — 정정', () => {
-  it('승부차기 승자 정정은 킥 수 없이 통과하고 다음 칸을 다시 채우되 완료 알림은 다시 가지 않는다', async () => {
+  it('승부차기 승자 정정은 킥 수 없이 통과하고 다음 칸을 다시 채우되 완료 알림은 다시 가지 않고 정정 알림이 정정된 점수로 간다', async () => {
     const bracket = await createBracket();
     const { gameId, teamMatchId } = bracket.semi1;
     const first = await quickResult(gameId, users.ops, { home: 1, away: 1, penalties: { home: 5, away: 4 } });
@@ -845,6 +853,11 @@ describe('빠른 결과 — 정정', () => {
 
     expect((await finalDetails(bracket.final.teamMatchId)).homeRegistrationId).toBe(bracket.registration.b);
     expect(await notifiedCount(teamMatchId)).toBe(2);
+    // 정정은 새 알림으로 간다(MD-QA #79) — 완료 알림 수는 그대로고, 양 팀 팀장에게 정정된 승부차기 점수가 한 건씩 나간다.
+    const corrections = await correctionNotices(teamMatchId);
+    expect(corrections.map((notice) => notice.recipientUserId).sort()).toEqual([users.ownerA, users.ownerB].sort());
+    expect(corrections.every((notice) => notice.title === '대회 경기 결과가 정정됐어요')).toBe(true);
+    expect(corrections.every((notice) => (notice.body ?? '').includes('승부차기 4 : 5'))).toBe(true);
 
     // 정정본은 자기 전적 2건을 따로 남기고(승부차기 승자가 바뀌어 결과가 뒤집힌다), 첫 확정본의 전적은 그대로다.
     const corrected = await prisma.v1TeamRecordFact.findMany({ where: { revisionId: draft.revisionId } });
@@ -857,6 +870,9 @@ describe('빠른 결과 — 정정', () => {
     await redeliverOfficialEvents(gameId);
     expect(await prisma.v1TeamRecordFact.count({ where: { revisionId: draft.revisionId } })).toBe(2);
     expect(await prisma.v1TeamRecordFact.count({ where: { revisionId: base.id } })).toBe(2);
+    // 이벤트를 다시 받아도 완료·정정 알림 모두 늘지 않는다.
+    expect(await notifiedCount(teamMatchId)).toBe(2);
+    expect(await correctionNotices(teamMatchId)).toHaveLength(2);
     // 대체된 첫 확정본의 이벤트는 공개 캐시의 현재 포인터를 되돌리지 못한다(재전달 순서와 무관하게 정정본이 현재다).
     const cache = await prisma.v1GameOfficialResultCache.findMany({ where: { gameId }, select: { revisionId: true, isCurrent: true } });
     expect(cache.filter((row) => row.isCurrent).map((row) => row.revisionId)).toEqual([draft.revisionId]);

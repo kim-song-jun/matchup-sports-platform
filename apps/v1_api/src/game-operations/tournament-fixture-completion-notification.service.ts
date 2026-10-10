@@ -22,13 +22,16 @@ import { findTournamentOnSurface, TOURNAMENT_KINDS } from '../tournaments/tourna
  *   본문(스코어·받는 사람 팀 기준 승패·출전자 개인 기록)은 리그와 같은 `official-result-notice.ts` 가 만든다.
  * - 선호도: 대회 알림 7종+수상과 같은 `activityEnabled` 축
  *   (`preferenceFieldForEvent`의 tournament 그룹). 팀매치의 `teamMatchEnabled`가 아니다.
- * - businessKey는 (픽스처, 수신자) 쌍마다 한 번 — CORRECTION 리비전이 같은 픽스처를
- *   다시 OFFICIAL로 만들어도(오심 정정) 재알림하지 않는다. sibling과 같은 판단이다.
+ * - **정정은 따로 알린다 (MD-QA #79).** 같은 경기에 앞서 공식 확정한 리비전이 있으면 이번 확정은 정정이다 —
+ *   `tournament_match_result_corrected` 로 정정된 스코어를 새로 보낸다. 예전에는 sibling 처럼
+ *   (픽스처, 수신자) 쌍마다 한 번만 보내 정정이 아무에게도 닿지 않았고, 팀장 알림함에는 정정 전 점수가 남았다.
+ *   businessKey: 최초 확정은 (픽스처, 수신자) 쌍마다 한 번(기존 그대로), 정정은 (픽스처, 리비전, 수신자)마다 한 번이다.
+ *   같은 리비전을 다시 처리해도 중복되지 않는다.
  * - 알림 row는 outbox 트랜잭션(`tx`)으로 직접 쓴다. `NotificationsService.emit*`는
  *   별도 커넥션 fire-and-forget이라 outbox 커밋과 원자성이 없다
  *   (sibling 헤더의 W1 관례 설명 참조). Web Push는 커밋 밖 best-effort.
  * - `parseOfficialScore`는 핸들러 선두에서 같은 리비전으로 이미 성공한 뒤라 여기서 다시 던질 수 없다.
- * - 제목·딥링크는 `notificationCopyFor('tournament_match_completed')`, targetId 는 "${tournamentId}:${fixtureId}".
+ * - 제목·딥링크는 `notificationCopyFor('tournament_match_completed' | 'tournament_match_result_corrected')`, targetId 는 "${tournamentId}:${fixtureId}".
  *
  * **afterCommit 경계 (2026-08-27 감사 41/44)**: sibling(`TeamMatchCompletionNotificationService`)과
  * 같은 이유로 웹 푸시를 `claim.afterCommit`에 담아 커밋 확정 뒤에만 보낸다 — 자세한
@@ -82,11 +85,27 @@ export class TournamentFixtureCompletionNotificationService {
       throw new Error('Tournament completion notification requires a tournament-kind competition and its match details');
     }
 
-    const copy = notificationCopyFor('tournament_match_completed', 'tournament', `${tournamentId}:${fixtureId}`);
+    // 같은 경기를 이미 한 번 공식 확정한 적이 있으면 이번 확정은 정정이다(오심 정정 · 무효 뒤 재확정).
+    const corrected =
+      (await tx.v1GameResultRevision.findFirst({
+        where: {
+          gameId: revision.gameId,
+          id: { not: revision.revisionId },
+          officialAt: { not: null, lt: revision.officialAt },
+        },
+        select: { id: true },
+      })) !== null;
+    const copy = notificationCopyFor(
+      corrected ? 'tournament_match_result_corrected' : 'tournament_match_completed',
+      'tournament',
+      `${tournamentId}:${fixtureId}`,
+    );
     const label = `${tournament.title} · ${competitionMatchLabel({ groupName: details.group?.name, round: details.round, legNumber: details.legNumber })}`;
     const score = parseOfficialScore(revision.score);
     const businessKeyFor = (userId: string) =>
-      `tournament-fixture-completed:${fixtureId}:${userId}`;
+      corrected
+        ? `tournament-fixture-corrected:${fixtureId}:${revision.revisionId}:${userId}`
+        : `tournament-fixture-completed:${fixtureId}:${userId}`;
     const rows = enabledRecipients.map((recipient) => ({
       userId: recipient.userId,
       body: officialResultNoticeBody({ label, ...names, score, side: recipient.side, record: recipient.record }),

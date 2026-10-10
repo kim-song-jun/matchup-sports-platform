@@ -29,6 +29,7 @@ function registrationRow(overrides: Record<string, unknown> = {}) {
     tournamentId: 'tournament-1',
     tournament: { title: '테스트대회', kind: 'regular_tournament' },
     teamId: 'team-1',
+    team: { name: '성수FC' },
     appliedByUserId: 'manager-user',
     status: 'awaiting_payment',
     depositorName: '홍길동',
@@ -886,6 +887,46 @@ describe('AdminRegistrationsService', () => {
       'tournament-1',
       expect.any(String),
     );
+  });
+
+  // MD-QA #79 — 팀을 여러 개 가진 팀장은 대회명만으로 어느 팀 신청인지, 왜 취소됐는지 알 수 없었다.
+  describe('cancel 알림 본문은 팀명과 사유를 싣는다', () => {
+    async function cancelWith(dto: { reason?: string }, row: Record<string, unknown> = {}) {
+      prisma.v1AdminUser.findUnique.mockResolvedValue(opsAdminRecord);
+      prisma.v1TournamentRegistration.findUnique.mockResolvedValue(
+        registrationRow({ status: 'confirmed', appliedByUserId: 'manager-user', tournamentId: 'tournament-1', ...row }),
+      );
+      prisma.v1TournamentRegistration.update.mockResolvedValue(registrationRow({ status: 'cancelled' }));
+      prisma.v1TournamentPayment.findUnique.mockResolvedValue(null);
+      await service.cancel(opsAuth, 'reg-1', dto);
+      return notifications.emitNotification.mock.calls[0][3] as string;
+    }
+
+    it('팀명·대회명과 어드민이 적은 사유를 함께 보낸다', async () => {
+      expect(await cancelWith({ reason: '입금 기한 초과' })).toBe(
+        '"성수FC" 팀의 "테스트대회" 대회 참가 신청이 취소됐어요. 사유: 입금 기한 초과',
+      );
+    });
+
+    it('사유가 없으면 사유 문장을 붙이지 않는다', async () => {
+      expect(await cancelWith({})).toBe('"성수FC" 팀의 "테스트대회" 대회 참가 신청이 취소됐어요.');
+    });
+
+    it('어드민 사유가 공백뿐이면 없는 것으로 본다', async () => {
+      expect(await cancelWith({ reason: '   ' })).toBe('"성수FC" 팀의 "테스트대회" 대회 참가 신청이 취소됐어요.');
+    });
+
+    it('어드민이 사유를 안 적으면 팀이 취소 요청 때 남긴 사유를 쓴다', async () => {
+      expect(await cancelWith({}, { status: 'cancel_requested', cancelReason: '일정이 겹쳐요' })).toBe(
+        '"성수FC" 팀의 "테스트대회" 대회 참가 신청이 취소됐어요. 사유: 일정이 겹쳐요',
+      );
+    });
+
+    it('어드민 사유가 있으면 팀의 취소 요청 사유보다 우선한다', async () => {
+      expect(await cancelWith({ reason: '운영 사정' }, { status: 'cancel_requested', cancelReason: '일정이 겹쳐요' })).toBe(
+        '"성수FC" 팀의 "테스트대회" 대회 참가 신청이 취소됐어요. 사유: 운영 사정',
+      );
+    });
   });
 
   it('confirm: alreadyProcessed idempotent path does NOT emit notification', async () => {

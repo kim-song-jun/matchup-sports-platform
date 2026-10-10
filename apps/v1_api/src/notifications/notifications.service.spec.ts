@@ -401,6 +401,38 @@ describe('NotificationsService', () => {
     );
   });
 
+  // MD-QA #79 — 확정된 대회 경기 결과를 정정하면 보내는 알림. 매핑 함수 셋이 모두 파일 로컬이고 말미 폴백이 있어
+  // (targetType → 'team_match', 딥링크 → /team-matches/…, 선호도 → activityEnabled) 분기를 빠뜨리면 조용히 샌다.
+  describe('tournament_match_result_corrected 알림 매핑', () => {
+    it("targetType 이 'tournament' 이고 딥링크가 경기 상세로 가며 제목이 '정정'을 말한다", async () => {
+      prisma.v1NotificationPreference.findUnique.mockResolvedValue(null);
+      prisma.v1Notification.create.mockResolvedValue(makeNotification());
+
+      await service.emitNotification('user-1', 'tournament_match_result_corrected', 'tour-1:fixture-1');
+      await new Promise(setImmediate);
+
+      expect(prisma.v1Notification.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            targetType: 'tournament',
+            deepLink: '/tournaments/tour-1/matches/fixture-1',
+            title: '대회 경기 결과가 정정됐어요',
+            body: '정정된 경기 결과를 확인해 보세요.',
+          }),
+        }),
+      );
+    });
+
+    it('activityEnabled 를 끈 사용자에게는 발송되지 않는다', async () => {
+      prisma.v1NotificationPreference.findUnique.mockResolvedValue({ activityEnabled: false });
+
+      await service.emitNotification('user-1', 'tournament_match_result_corrected', 'tour-1:fixture-1');
+      await new Promise(setImmediate);
+
+      expect(prisma.v1Notification.create).not.toHaveBeenCalled();
+    });
+  });
+
   // team_match_completed(일반 팀매치) 문구·링크는 이 태스크로 인해 한 글자도 바뀌면 안 된다
   // -- 리그 전용 형제 타입을 새로 추가했을 뿐 기존 타입은 그대로다(회귀 고정).
   it('team_match_completed(일반) 문구·링크는 리그 전용 타입 추가 이후에도 그대로다', async () => {

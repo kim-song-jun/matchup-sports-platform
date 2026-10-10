@@ -55,6 +55,8 @@ hold compares both values so a newly private league is never restored as public.
 While on hold, fixture generation and regeneration return `409 LEAGUE_ON_HOLD`
 without creating or cancelling fixtures. Both actions recheck the status after
 locking the parent league row, including a hold committed during plan calculation.
+A completed or cancelled league rejects the same generation, template and slot-assignment
+actions with `409 LEAGUE_ENDED`; releasing slots on registration cancellation is not guarded.
 
 While a league is on hold, already-scheduled notifications for its fixtures are
 suppressed at fire time (the outbox rows are kept, so resuming re-enables the next

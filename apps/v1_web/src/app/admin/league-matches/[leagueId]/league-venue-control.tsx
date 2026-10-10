@@ -7,7 +7,7 @@ import { SectionTitle } from '@/components/v1-ui/primitives';
 import { useAdminCanWrite } from '@/hooks/use-admin-can-write';
 import { useV1UpdateLeagueVenue } from '@/hooks/use-v1-api';
 import { extractErrorMessage } from '@/lib/error-message';
-import { placeFromView, toVenuePayload, type PlaceValue } from '@/lib/place';
+import { placeFromView, toVenuePayload, type PlaceValue, PLACE_NAME_MAX_LENGTH } from '@/lib/place';
 import type { V1PlaceView } from '@/types/api';
 
 const OUTLINE_BUTTON =
@@ -66,6 +66,7 @@ export function LeagueVenueControl({
       {editing ? (
         <div className="flex flex-col gap-3">
           <PlacePicker
+            maxLength={PLACE_NAME_MAX_LENGTH.tournament}
             label="기본 장소"
             value={draft}
             onChange={setDraft}

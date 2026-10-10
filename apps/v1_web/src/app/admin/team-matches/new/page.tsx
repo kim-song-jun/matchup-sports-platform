@@ -17,7 +17,7 @@ import { teamMatchDateErrors } from '@/lib/team-match-dates';
 import { parseTeamMatchLevelRange } from '@/lib/team-match-level-range';
 import { GENDER_RULE_OPTIONS, matchGenderRuleLabel } from '@/lib/v1-status-labels';
 import { toDistrictRegionOptions } from '@/lib/v1-regions';
-import { toMatchPlacePayload, type PlaceValue } from '@/lib/place';
+import { toMatchPlacePayload, type PlaceValue, PLACE_NAME_MAX_LENGTH } from '@/lib/place';
 import { PlacePicker } from '@/components/v1-ui/place-picker';
 import { kstDatetimeLocalToIso } from '@/lib/kst-calendar';
 import { TeamMatchImagesField } from '@/components/team-matches/team-match-images';
@@ -231,7 +231,7 @@ export default function AdminTeamMatchNewPage() {
 
           <section className="space-y-4 rounded-2xl border border-[var(--border)] bg-[var(--card-surface)] p-4 md:p-5">
             <h2 className="text-[length:var(--font-size-body-lg)] font-bold text-[var(--text-strong)]">장소와 시간</h2>
-            <PlacePicker label="경기 장소" value={place} onChange={setPlace} />
+            <PlacePicker label="경기 장소" value={place} onChange={setPlace} maxLength={PLACE_NAME_MAX_LENGTH.match} />
             <div className="grid gap-4 md:grid-cols-2">
               <label className="text-[length:var(--font-size-body-sm)] font-medium text-[var(--text-strong)]">
                 경기 시작

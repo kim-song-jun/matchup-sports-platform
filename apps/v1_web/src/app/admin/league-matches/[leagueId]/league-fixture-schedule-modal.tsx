@@ -7,7 +7,7 @@ import { extractErrorMessage } from '@/lib/error-message';
 import type { V1LeagueFixture, V1UpdateLeagueFixturePayload } from '@/types/league-match';
 import type { V1PlaceView } from '@/types/api';
 import { isoToKstDatetimeLocal, kstDatetimeLocalToIso } from '@/lib/kst-calendar';
-import { placeFromView, toLeaguePlacePayload } from '@/lib/place';
+import { placeFromView, toLeaguePlacePayload, PLACE_NAME_MAX_LENGTH } from '@/lib/place';
 import { isSamePlace } from '@/lib/same-place';
 import {
   isLeaguePlaceChoiceIncomplete,
@@ -144,6 +144,7 @@ export function LeagueFixtureScheduleModal({
         </div>
         <div className="grid">
           <LeagueFixturePlaceField
+            maxLength={PLACE_NAME_MAX_LENGTH.leagueFixture}
             defaultPlace={defaultPlace}
             recentVenues={recentVenues}
             choice={placeChoice}

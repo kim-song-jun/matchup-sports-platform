@@ -1,5 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { useState } from 'react';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -13,10 +14,12 @@ function Harness({
   initial = null,
   recentVenues,
   onValue,
+  maxLength = 120,
 }: {
   initial?: PlaceValue | null;
   recentVenues?: V1RecentVenue[];
   onValue?: (value: PlaceValue | null) => void;
+  maxLength?: number;
 }) {
   const [value, setValue] = useState<PlaceValue | null>(initial);
   return (
@@ -24,6 +27,7 @@ function Harness({
       label="장소"
       value={value}
       recentVenues={recentVenues}
+      maxLength={maxLength}
       onChange={(next) => {
         setValue(next);
         onValue?.(next);
@@ -138,6 +142,20 @@ describe('PlacePicker', () => {
     expect(onValue).toHaveBeenLastCalledWith(null);
   });
 
+  it('직접 입력 이름은 화면이 넘긴 한도까지 받는다 — 대회 한도 200 이면 150자도 그대로 들어간다', async () => {
+    const user = userEvent.setup();
+    const onValue = vi.fn();
+    renderPicker({ onValue, maxLength: 200, initial: { kind: 'manual', name: '' } });
+
+    // user-event 는 브라우저처럼 maxlength 를 넘는 글자를 잘라 낸다 — 한도가 100 이면 100자만 남는다.
+    const manualInput = screen.getByRole('textbox', { name: '장소' });
+    await user.click(manualInput);
+    await user.paste('가'.repeat(150));
+
+    expect(manualInput).toHaveValue('가'.repeat(150));
+    expect(onValue).toHaveBeenLastCalledWith({ kind: 'manual', name: '가'.repeat(150) });
+  });
+
   it('검색 결과가 없으면 안내와 직접 입력 버튼을 보여 준다', async () => {
     renderPicker();
     fireEvent.change(screen.getByRole('combobox'), { target: { value: '없는곳xyz' } });
@@ -228,18 +246,13 @@ describe('PlacePicker', () => {
     expect(onValue).toHaveBeenLastCalledWith(null);
   });
 
-  it('직접 입력 칸은 100자까지만 받는다', () => {
-    renderPicker({ initial: { kind: 'manual', name: '동네 운동장' } });
-    expect(screen.getByRole('textbox', { name: '장소' })).toHaveAttribute('maxlength', '100');
-  });
-
   it('바깥에서 값을 null 로 초기화하면 직접 입력 모드에서 검색 모드로 돌아간다', () => {
     function Resettable() {
       const [value, setValue] = useState<PlaceValue | null>({ kind: 'manual', name: '동네 운동장' });
       return (
         <>
           <button type="button" onClick={() => setValue(null)}>초기화</button>
-          <PlacePicker label="장소" value={value} onChange={setValue} />
+          <PlacePicker label="장소" value={value} onChange={setValue} maxLength={120} />
         </>
       );
     }
@@ -266,7 +279,7 @@ describe('PlacePicker', () => {
     const client = new QueryClient();
     render(
       <QueryClientProvider client={client}>
-        <PlacePicker label="장소" value={null} onChange={() => {}} error="장소를 골라 주세요" />
+        <PlacePicker label="장소" value={null} onChange={() => {}} error="장소를 골라 주세요" maxLength={120} />
       </QueryClientProvider>,
     );
     expect(screen.getByRole('alert')).toHaveTextContent('장소를 골라 주세요');

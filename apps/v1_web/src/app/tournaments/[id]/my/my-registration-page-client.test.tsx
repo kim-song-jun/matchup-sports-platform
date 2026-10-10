@@ -956,6 +956,10 @@ describe('MyRegistrationPageClient — 신청 상세 상단 카드는 어떤 상
     const pass = screen.getByText('성수 풋살 크루').closest('[role="status"]');
     expect(pass).not.toBeNull();
     expect(pass).toHaveTextContent('봄 풋살 대회');
+    // 가드를 없애며 대기자 안내가 다른 상태에도 붙었다 — 취소된 신청에 "확정해 드려요" 를 약속하면 안 된다.
+    const waitlistNote = '앞 순위 팀이 취소하면 운영진이 확인 후 확정해 드려요.';
+    if (status === 'waitlisted') expect(pass).toHaveTextContent(waitlistNote);
+    else expect(pass).not.toHaveTextContent(waitlistNote);
   });
 });
 

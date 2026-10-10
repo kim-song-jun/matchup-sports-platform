@@ -22,16 +22,19 @@ export function registrationIdsBlockedForGroup(groups: readonly V1AdminBracketGr
 /**
  * Applies the one-team-one-group rule to a picker's candidates (already narrowed by every other rule, e.g.
  * "placed elsewhere"), so the hidden-team note reflects only teams this rule removed. `keepId` is the side's
- * current team, which stays selectable.
+ * current team, which stays selectable. `alsoExclude` (e.g. `registrationIdsInOppositeFinalStage`) drops teams
+ * without counting toward that note, which says "other group".
  */
 export function applyGroupRule<T>(
   candidates: readonly T[],
   idOf: (item: T) => string,
   blocked: ReadonlySet<string>,
   keepId: string | null,
+  alsoExclude: ReadonlySet<string> = NONE,
 ): { shown: T[]; hidesOtherGroupTeams: boolean } {
-  const shown = candidates.filter((item) => !blocked.has(idOf(item)) || idOf(item) === keepId);
-  return { shown, hidesOtherGroupTeams: shown.length < candidates.length };
+  const eligible = candidates.filter((item) => !alsoExclude.has(idOf(item)) || idOf(item) === keepId);
+  const shown = eligible.filter((item) => !blocked.has(idOf(item)) || idOf(item) === keepId);
+  return { shown, hidesOtherGroupTeams: shown.length < eligible.length };
 }
 
 const OPPOSITE_FINAL_PHASE: Readonly<Record<string, string>> = { third_place: 'final', final: 'third_place' };

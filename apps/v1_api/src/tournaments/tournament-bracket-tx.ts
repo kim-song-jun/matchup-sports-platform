@@ -10,6 +10,7 @@ import {
 import { nextFixtureCreationCommandId } from './tournament-fixture-generation';
 import { createTournamentMatchInTx } from './tournament-match-creation';
 import { updateTournamentMatchInTx } from './tournament-match-update';
+import { assertFixtureScheduleKeepsStageOrder } from './tournament-schedule-order';
 import { recalculateAndUpsertOverallStandings } from './tournament-overall-standings';
 import { competitionMatchLabel } from './tournament-round-label';
 import type { PlaceSnapshot } from '../places/place-snapshot';
@@ -197,6 +198,9 @@ export async function updateTournamentFixtureInTx(tx: Tx, admin: V1ActiveAdmin, 
         [input.homeRegistrationId, input.awayRegistrationId], { deferOtherGroupCheck: input.enrollmentSink !== undefined });
       input.enrollmentSink?.push(...enrolled);
     }
+  }
+  if (input.scheduledAt) {
+    await assertFixtureScheduleKeepsStageOrder(tx, { tournamentId: input.tournamentId, teamMatchId: input.fixtureId, startAt: input.scheduledAt });
   }
   const previousNumber = input.fixtureNumber === undefined ? undefined : (await tx.v1TournamentMatchDetails.findUniqueOrThrow({
     where: { teamMatchId: input.fixtureId }, select: { fixtureNumber: true },

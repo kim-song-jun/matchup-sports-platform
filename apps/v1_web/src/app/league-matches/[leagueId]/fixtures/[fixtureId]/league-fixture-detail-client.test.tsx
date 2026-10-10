@@ -215,7 +215,7 @@ describe('LeagueFixtureDetailClient', () => {
 
       expect(screen.getByRole('heading', { name: '장소' })).toBeInTheDocument();
       expect(screen.getByText('이 경기만 장소가 달라요')).toBeInTheDocument();
-      expect(screen.getByRole('link', { name: '카카오맵으로 길찾기' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: '길찾기' })).toBeInTheDocument();
     });
 
     it('기본 장소와 같은 곳이면 같은 카드만 보이고 배지는 없다', () => {
@@ -233,7 +233,7 @@ describe('LeagueFixtureDetailClient', () => {
       render(<LeagueFixtureDetailClient leagueId="lg-1" fixtureId="fx-1" />);
 
       expect(screen.queryByText('이 경기만 장소가 달라요')).toBeNull();
-      expect(screen.getByRole('link', { name: '카카오맵에서 이름 검색' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: '지도 앱에서 찾기' })).toBeInTheDocument();
     });
   });
 

@@ -2153,10 +2153,10 @@ describe('TeamMatchDetailPageView — 일정·장소의 장소 카드', () => {
       />,
     );
     expect(screen.getAllByText('망원한강공원 풋살장').length).toBeGreaterThan(0);
-    const kakao = screen.getAllByRole('link', { name: '카카오맵으로 길찾기' });
-    expect(kakao.length).toBeGreaterThan(0);
-    expect(kakao[0].getAttribute('href')).toContain('37.5558,126.8985');
-    expect(screen.getAllByRole('link', { name: '네이버맵으로 길찾기' }).length).toBeGreaterThan(0);
+    fireEvent.click(screen.getAllByRole('button', { name: '길찾기' })[0]);
+    const sheet = within(screen.getByRole('dialog', { name: '길찾기' }));
+    expect(sheet.getByRole('link', { name: /^카카오맵/ }).getAttribute('href')).toContain('37.5558,126.8985');
+    expect(sheet.getByRole('link', { name: /^네이버 지도/ })).toBeInTheDocument();
     expect(screen.queryByText(/정확한 위치가 등록되지 않았어요/)).not.toBeInTheDocument();
   });
 
@@ -2165,7 +2165,8 @@ describe('TeamMatchDetailPageView — 일정·장소의 장소 카드', () => {
       <TeamMatchDetailPageView model={withPlace({ name: '동네 운동장', address: null, latitude: null, longitude: null, provider: null, providerPlaceId: null })} />,
     );
     expect(screen.getAllByText(/정확한 위치가 등록되지 않았어요/).length).toBeGreaterThan(0);
-    expect(screen.getAllByRole('link', { name: '카카오맵에서 이름 검색' }).length).toBeGreaterThan(0);
-    expect(screen.queryByRole('link', { name: /길찾기/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '길찾기' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getAllByRole('button', { name: '지도 앱에서 찾기' })[0]);
+    expect(within(screen.getByRole('dialog', { name: '지도 앱에서 찾기' })).getByRole('link', { name: /^카카오맵/ })).toBeInTheDocument();
   });
 });

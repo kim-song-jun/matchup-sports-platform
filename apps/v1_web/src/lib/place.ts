@@ -228,63 +228,111 @@ export function hasCoordinates(
 
 // ── 길찾기 링크 ──────────────────────────────────────────────────────────────
 
-/** ios·android = 팀밋 앱 셸 안(앱 스킴 — 미설치면 셸이 스토어로 보낸다), web = 일반 브라우저(모바일 포함). */
-export type PlaceNavPlatform = 'ios' | 'android' | 'web';
+/**
+ * ios·android = 팀밋 앱 셸 안(앱 스킴 — 미설치면 셸이 스토어로 보낸다),
+ * ios-web·android-web = 앱 밖 휴대폰 브라우저, web = 데스크톱 브라우저.
+ */
+export type PlaceNavPlatform = 'ios' | 'android' | 'ios-web' | 'android-web' | 'web';
 
 export type PlaceNavLink = {
   key: 'kakao' | 'naver' | 'tmap';
   label: string;
-  href: string;
+  iconSrc: string;
+  description: string;
   /** route: 좌표 길찾기, search: 이름 검색(좌표 없을 때). */
   mode: 'route' | 'search';
-};
+} & (
+  | { href: string; newTab: boolean; onSelect?: undefined; storeHref?: undefined }
+  /** storeHref: 앱이 안 열렸을 때 사용자가 직접 누를 스토어 주소(iOS 브라우저 티맵). */
+  | { onSelect: () => void; storeHref: string; href?: undefined; newTab?: undefined }
+);
 
 const NAVER_MAP_APP_NAME = 'teameet.kr';
+const TMAP_ANDROID_PACKAGE = 'com.skt.tmap.ku';
+const TMAP_PLAY_STORE_URL = `https://play.google.com/store/apps/details?id=${TMAP_ANDROID_PACKAGE}`;
+const TMAP_APP_STORE_URL = 'https://apps.apple.com/kr/app/tmap/id431589174';
 
 type NavTarget = { name: string; latitude: number | null; longitude: number | null };
 
 /**
- * 카카오맵·네이버지도·티맵 링크. 앱 셸 안에서만 앱 스킴을 쓴다 — 일반 모바일 브라우저는 앱이 없을 때
- * 스킴 링크가 아무 반응도 없어서 웹 지도(앱 열기 버튼을 자체 제공)를 연다. 티맵은 웹 대상이 없어 앱 셸에서만 보인다.
+ * iOS 사파리는 앱 스킴으로 이동할 때 「앱에서 열기」 확인창을 띄우고, 앱이 없으면 「주소가 유효하지 않음」 경고만 띄운다 —
+ * 어느 쪽인지 페이지가 알 길이 없어(확인창이 떠 있는 동안에도 화면은 보이는 상태) 시간으로 스토어에 보내면 설치된
+ * 사람도 스토어로 간다. 이동만 하고, 스토어는 화면에 띄운 링크로 사용자가 고르게 한다(PlaceCard).
+ */
+export function openTmapOnIosWeb(schemeUrl: string): void {
+  window.location.href = schemeUrl;
+}
+
+/**
+ * 카카오맵·네이버 지도·티맵 링크. 앱 셸 안에서만 앱 스킴을 직접 쓴다 — 앱 밖 휴대폰 브라우저는
+ * 카카오·네이버를 웹 지도로 열고(앱 열기 버튼을 자체 제공), 티맵만 웹 대상이 없어 안드로이드는
+ * intent URL, iOS 는 스킴 + 스토어 폴백으로 연다. 데스크톱은 새 창의 웹 지도 둘뿐이다.
  */
 export function placeNavigationLinks(
   place: NavTarget,
   platform: PlaceNavPlatform = 'web',
 ): PlaceNavLink[] {
-  const mobile = platform !== 'web';
+  const inShell = platform === 'ios' || platform === 'android';
+  const desktop = platform === 'web';
   const name = encodeURIComponent(place.name);
+  const appName = encodeURIComponent(NAVER_MAP_APP_NAME);
   const { latitude, longitude } = place;
   const routable = typeof latitude === 'number' && typeof longitude === 'number';
   const mode: PlaceNavLink['mode'] = routable ? 'route' : 'search';
 
   const kakaoHref = routable
-    ? mobile
+    ? inShell
       ? `kakaomap://route?ep=${latitude},${longitude}&by=CAR`
       : `https://map.kakao.com/link/to/${name},${latitude},${longitude}`
-    : mobile
+    : inShell
       ? `kakaomap://search?q=${name}`
       : `https://map.kakao.com/?q=${name}`;
 
   const naverHref = routable
-    ? mobile
-      ? `nmap://route/car?dlat=${latitude}&dlng=${longitude}&dname=${name}&appname=${encodeURIComponent(NAVER_MAP_APP_NAME)}`
+    ? inShell
+      ? `nmap://route/car?dlat=${latitude}&dlng=${longitude}&dname=${name}&appname=${appName}`
       : `https://map.naver.com/v5/directions/-/-/-/car?destination=${longitude},${latitude}`
-    : mobile
-      ? `nmap://search?query=${name}&appname=${encodeURIComponent(NAVER_MAP_APP_NAME)}`
+    : inShell
+      ? `nmap://search?query=${name}&appname=${appName}`
       : `https://map.naver.com/p/search/${name}`;
 
+  const tmapPath = routable
+    ? `route?goalx=${longitude}&goaly=${latitude}&goalname=${name}`
+    : `search?name=${name}`;
+
+  const webDescription = (appLabel: string) =>
+    desktop
+      ? routable ? `새 창에서 ${appLabel} 길찾기` : '새 창에서 이름으로 검색'
+      : routable ? '웹에서 길찾기' : '이름으로 검색';
+  const appDescription = routable ? '앱으로 길찾기' : '이름으로 검색';
+
+  // /map-apps/*.webp 는 각사가 앱스토어에 올린 공식 앱 아이콘(2026-10-10 받음)이다 — 상표라 변형하지 말고, 바뀌면 파일을 교체한다.
   const links: PlaceNavLink[] = [
-    { key: 'kakao', label: '카카오맵', href: kakaoHref, mode },
-    { key: 'naver', label: '네이버맵', href: naverHref, mode },
+    {
+      key: 'kakao', label: '카카오맵', iconSrc: '/map-apps/kakaomap.webp', mode, href: kakaoHref, newTab: desktop,
+      description: inShell ? appDescription : webDescription('카카오맵'),
+    },
+    {
+      key: 'naver', label: '네이버 지도', iconSrc: '/map-apps/navermap.webp', mode, href: naverHref, newTab: desktop,
+      description: inShell ? appDescription : webDescription('네이버 지도'),
+    },
   ];
-  if (mobile) {
+  const tmapBase = { key: 'tmap', label: '티맵', iconSrc: '/map-apps/tmap.webp', mode } as const;
+  if (inShell) {
+    links.push({ ...tmapBase, href: `tmap://${tmapPath}`, newTab: false, description: appDescription });
+  } else if (platform === 'android-web') {
     links.push({
-      key: 'tmap',
-      label: '티맵',
-      href: routable
-        ? `tmap://route?goalx=${longitude}&goaly=${latitude}&goalname=${name}`
-        : `tmap://search?name=${name}`,
-      mode,
+      ...tmapBase,
+      href: `intent://${tmapPath}#Intent;scheme=tmap;package=${TMAP_ANDROID_PACKAGE};S.browser_fallback_url=${encodeURIComponent(TMAP_PLAY_STORE_URL)};end`,
+      newTab: false,
+      description: `${appDescription} · 앱이 없으면 스토어로 이동해요`,
+    });
+  } else if (platform === 'ios-web') {
+    links.push({
+      ...tmapBase,
+      onSelect: () => openTmapOnIosWeb(`tmap://${tmapPath}`),
+      storeHref: TMAP_APP_STORE_URL,
+      description: `${appDescription} · 앱이 없으면 앱스토어 링크를 보여 드려요`,
     });
   }
   return links;
@@ -296,5 +344,10 @@ export function placeKakaoMapUrl(place: { name: string; latitude: number; longit
 }
 
 export function detectPlaceNavPlatform(): PlaceNavPlatform {
-  return detectNativeShell() ?? 'web';
+  const shell = detectNativeShell();
+  if (shell) return shell;
+  if (typeof navigator === 'undefined') return 'web';
+  if (/iPhone|iPad|iPod/i.test(navigator.userAgent)) return 'ios-web';
+  if (/Android/i.test(navigator.userAgent)) return 'android-web';
+  return 'web';
 }

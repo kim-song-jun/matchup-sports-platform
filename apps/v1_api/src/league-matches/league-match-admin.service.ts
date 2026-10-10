@@ -76,7 +76,7 @@ import { assertLeagueFixtureGenerationAllowedInTx, assertLeagueNotEndedInTx } fr
 import { LEAGUE_STATE_BY_STATUS, isCompleteLeagueMirror } from '../tournaments/league-competition-mirror';
 import { randomUUID } from 'node:crypto';
 import { BRACKET_TEMPLATE_MAX_FIXTURES } from '../tournaments/templates/bracket-template-plan';
-import { lockCompetitionForBracketMutationInTx } from '../tournaments/slots/competition-bracket-lock';
+import { lockCompetitionForBracketMutationInTx, lockCompetitionForSlotReleaseInTx } from '../tournaments/slots/competition-bracket-lock';
 import { planLeagueTemplate } from './league-template-plan';
 import { LeagueStateValue } from './league-state';
 import { isLeagueRegistrationOpen } from './league-registration-open';
@@ -1045,7 +1045,8 @@ export class LeagueMatchAdminService {
 
     const { cancelledApplications, leagueCompleted } = await this.prisma.$transaction(async (tx) => {
       // 리그 행 락이 먼저 — updateFixture·removeTeam·generateFixtures 와 같은 순서라야 40P01 이 나지 않는다.
-      await tx.$queryRaw`SELECT id FROM "v1_tournaments" WHERE id = ${leagueId} FOR UPDATE`;
+      // raw SQL 허용치가 꽉 찬 파일이라 같은 행 락을 하는 공용 헬퍼(보류 검사 없음)를 쓴다.
+      await lockCompetitionForSlotReleaseInTx(tx, { id: leagueId, kind: 'regular_league' });
       await this.assertFixtureGamesNotInProgress(
         tx,
         [teamMatchId],
@@ -1506,7 +1507,7 @@ export class LeagueMatchAdminService {
     const nextStartAt = dto.startsAt === undefined ? undefined : new Date(dto.startsAt);
     const updated = await this.prisma.$transaction(async (tx) => {
       // 리그 행 락이 먼저(removeTeam·generateFixtures 와 같은 순서). 끝남·취소만 막고 보류 중 수정은 허용한다.
-      await tx.$queryRaw`SELECT id FROM "v1_tournaments" WHERE id = ${leagueId} FOR UPDATE`;
+      await lockCompetitionForSlotReleaseInTx(tx, { id: leagueId, kind: 'regular_league' });
       await assertLeagueNotEndedInTx(tx, leagueId);
       const nextEndAt = nextStartAt === undefined
         ? undefined

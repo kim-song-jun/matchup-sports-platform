@@ -172,6 +172,8 @@ function makeRegistration(overrides: Partial<V1TournamentRegistration> = {}): V1
     rosterDeadlineOverrideAt: null,
     cancelRequestedAt: '2026-07-01T00:00:00.000Z',
     cancelReason: '입금 미확인 자동 취소',
+    adminCancelReason: null,
+    cancelOutcome: null,
     playerCount: 0,
     payment: null,
     paymentInstructions: null,

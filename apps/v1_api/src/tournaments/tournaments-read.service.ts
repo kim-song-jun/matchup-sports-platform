@@ -152,7 +152,7 @@ export class TournamentsReadService {
       // 세지 않았으므로 `total: 0`/`totalPages: 0` 을 실어 보내면 "전체 0건"이라는 거짓말이
       // 되고, 커서 클라이언트가 그 값을 읽기 시작하면 조용히 틀린 화면이 나온다.
       pageInfo: wantsPageNumbers
-        ? buildPageInfo({ page: query.page, limit, total, hasNext, nextCursor })
+        ? buildPageInfo({ page, limit, total, hasNext, nextCursor })
         : { nextCursor, hasNext },
     };
   }

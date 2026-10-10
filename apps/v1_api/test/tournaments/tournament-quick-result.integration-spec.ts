@@ -864,12 +864,18 @@ describe('빠른 결과 — 정정', () => {
 });
 
 describe('빠른 결과 — 정정 vs 이미 시작된 다음 경기', () => {
-  /** 4강1(A 1-0 B) 확정 → 결승 HOME 에 A 진출 → 결승 게임 LIVE. 정정 대상 4강1 확정본을 돌려준다. */
+  /** 4강1(A 1-0 B)·4강2(C 0-2 D) 확정 → 결승 A 대 D → 결승 게임 LIVE. 정정 대상 4강1 확정본을 돌려준다. */
   async function startFinalAfterSemi1() {
     const bracket = await createBracket();
     const first = await quickResult(bracket.semi1.gameId, users.ops, { home: 1, away: 0 });
     expect(first.status).toBe(201);
-    expect((await finalDetails(bracket.final.teamMatchId)).homeRegistrationId).toBe(bracket.registration.a);
+    // 실제로 시작할 수 있는 결승은 양쪽이 다 차 있다 — 반대편 칸이 빈 채면 정정 판정이 다른 분기를 탄다.
+    const second = await quickResult(bracket.semi2.gameId, users.ops, { home: 0, away: 2 });
+    expect(second.status).toBe(201);
+    expect(await finalDetails(bracket.final.teamMatchId)).toMatchObject({
+      homeRegistrationId: bracket.registration.a,
+      awayRegistrationId: bracket.registration.d,
+    });
     await prisma.v1Game.update({ where: { id: bracket.final.gameId }, data: { state: 'LIVE' } });
     const finalGame = await prisma.v1Game.findUniqueOrThrow({ where: { id: bracket.final.gameId } });
     return { bracket, baseRevisionId: first.body.data.revisionId as string, finalGame };

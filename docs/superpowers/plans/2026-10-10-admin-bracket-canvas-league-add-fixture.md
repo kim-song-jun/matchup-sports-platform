@@ -1,5 +1,7 @@
 # 어드민 대진 그림 편집기 — 리그 방식 대회의 「경기 추가」(조 + 라운드 선택)
 
+> **Superseded (2026-10-10):** 옛 대진의 「round 이어 쓰기 + 라운드 선택 숨김」 예외(`isLegacyLeagueBracket`·`resolveLeagueRound`)와 「서버 무변경」은 후속 계획 `2026-10-10-admin-bracket-canvas-league-add-followup.md` 의 결정 3·4 로 대체됐다.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** 리그 방식 대회(`format === 'league'`, 라운드 × 조 격자)에서 툴바 「경기 추가」가 막다른 길(「경기를 추가할 수 있는 단계가 없어요…」)이 아니라 **조 + 라운드(기존 `N라운드` 또는 「새 라운드 (N+1라운드)」)** 를 고르는 대화상자를 열고, 고른 칸에 대진 미정 경기를 만든 뒤 「…경기를 추가했어요. 칸을 눌러 팀을 넣어 주세요.」를 알린다. 팀은 격자 카드를 눌러 직접 지정 경로(`PATCH /admin/fixtures/:id`)로 넣는다. 토너먼트·조별+결선 대화상자는 그대로다.

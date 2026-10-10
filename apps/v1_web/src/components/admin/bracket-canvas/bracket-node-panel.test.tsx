@@ -132,6 +132,31 @@ describe('BracketNodePanel — 자리 배정', () => {
     expect(screen.getByLabelText('홈 팀 선택')).toBeDisabled();
   });
 
+  it('자리 select 도 같은 기준으로 다른 조 팀을 뺀다 - 미편성 팀은 남고 다른 조 팀은 빠진다', () => {
+    const memberOfB = { id: 'gt-r3', groupId: 'g-b', registrationId: 'r3', teamName: '대구FC', sortOrder: 0, createdAt: '' };
+    const stageA = makeGroup({ id: 'g-a', name: 'A조', phase: 'group' });
+    const stageB = makeGroup({ id: 'g-b', name: 'B조', phase: 'group', sortOrder: 1, groupTeams: [memberOfB] });
+    renderPanel(fixtureOf({ groupId: 'g-a' }), {
+      groups: [stageA, stageB],
+      slots: [slots[0], makeSlot({ id: 's-away', label: '2번 자리', groupId: 'g-a' }), slots[2]],
+      registrations: [...registrations, makeRegistration({ id: 'r4', teamName: '인천FC' })],
+    });
+    const options = within(screen.getByLabelText('어웨이 팀 선택')).getAllByRole('option').map((option) => option.textContent);
+    expect(options).toContain('인천FC');
+    expect(options).not.toContain('대구FC');
+  });
+
+  it('대조군 - 슬롯 조가 결선 조이면 다른 조 편성 팀도 모두 보인다', () => {
+    const memberOfB = { id: 'gt-r3', groupId: 'g-b', registrationId: 'r3', teamName: '대구FC', sortOrder: 0, createdAt: '' };
+    const stageB = makeGroup({ id: 'g-b', name: 'B조', phase: 'group', sortOrder: 1, groupTeams: [memberOfB] });
+    renderPanel(fixtureOf(), {
+      groups: [knockout, stageB],
+      slots: [slots[0], makeSlot({ id: 's-away', label: '2번 자리', groupId: 'g-qf' }), slots[2]],
+    });
+    const options = within(screen.getByLabelText('어웨이 팀 선택')).getAllByRole('option').map((option) => option.textContent);
+    expect(options).toContain('대구FC');
+  });
+
   describe('자리 없이 팀을 직접 지정한 줄', () => {
     const legacy = (overrides: Partial<V1AdminBracketFixture> = {}) =>
       fixtureOf({ homeSlotId: null, awaySlotId: null, homeRegistrationId: 'r1', homeTeamName: '서울FC', ...overrides });
@@ -164,6 +189,40 @@ describe('BracketNodePanel — 자리 배정', () => {
       fireEvent.change(screen.getByLabelText('어웨이 팀 선택'), { target: { value: 'r3' } });
       mocks.updateFixture.mock.calls[0][1].onError({});
       expect(props.showToast).toHaveBeenCalledWith('팀을 넣지 못했어요.', 'error');
+    });
+
+    describe('한 팀 한 조', () => {
+      const member = (groupId: string, registrationId: string) => ({ id: `gt-${registrationId}`, groupId, registrationId, teamName: registrationId, sortOrder: 0, createdAt: '' });
+      const stageA = makeGroup({ id: 'g-a', name: 'A조', phase: 'group', groupTeams: [member('g-a', 'r1')] });
+      const stageB = makeGroup({ id: 'g-b', name: 'B조', phase: 'group', sortOrder: 1, groupTeams: [member('g-b', 'r2')] });
+      const quarter = makeGroup({ id: 'g-qf', name: '8강', phase: 'quarter', sortOrder: 2 });
+      const empty = (groupId: string) => legacy({ groupId, homeRegistrationId: null, homeTeamName: '홈 팀 미정' });
+      const homeOptions = () => within(screen.getByLabelText('홈 팀 선택')).getAllByRole('option').map((option) => option.textContent);
+
+      it('조별 경기의 후보에서 다른 조 팀을 빼고, 이 조 팀과 어느 조에도 없는 팀은 남기며, 빠졌다는 안내를 보여 준다', () => {
+        renderPanel(empty('g-a'), { groups: [stageA, stageB, quarter] });
+        expect(homeOptions()).toEqual(['비워 두기', '서울FC', '대구FC']);
+        expect(screen.getByText('다른 조에 있는 팀은 목록에서 빠져 있어요.')).toBeInTheDocument();
+      });
+
+      it('대조군 - B조 경기에서는 반대로 A조 팀이 빠지고, 빠진 팀이 없으면 안내도 없다', () => {
+        renderPanel(empty('g-b'), { groups: [stageA, stageB, quarter] });
+        expect(homeOptions()).toEqual(['비워 두기', '부산FC', '대구FC']);
+        cleanup();
+        renderPanel(empty('g-a'), { groups: [stageA, quarter] });
+        expect(screen.queryByText('다른 조에 있는 팀은 목록에서 빠져 있어요.')).not.toBeInTheDocument();
+      });
+
+      it('대조군 - 결선 단계 경기는 조 편성과 상관없이 모두 보인다', () => {
+        renderPanel(empty('g-qf'), { groups: [stageA, stageB, quarter] });
+        expect(homeOptions()).toEqual(['비워 두기', '서울FC', '부산FC', '대구FC']);
+      });
+
+      it('이미 들어 있는 팀이 다른 조 편성이어도 현재 값은 목록에 남는다', () => {
+        renderPanel(legacy({ groupId: 'g-a', homeRegistrationId: 'r2', homeTeamName: '부산FC' }), { groups: [stageA, stageB] });
+        expect(screen.getByLabelText('홈 팀 선택')).toHaveValue('r2');
+        expect(homeOptions()).toContain('부산FC');
+      });
     });
 
     describe('시작된 경기', () => {

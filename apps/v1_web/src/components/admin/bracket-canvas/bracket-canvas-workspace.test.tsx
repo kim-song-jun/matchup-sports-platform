@@ -211,6 +211,63 @@ describe('BracketCanvasWorkspace — 팀 배정(키보드 경로)', () => {
   });
 });
 
+describe('BracketCanvasWorkspace - 한 팀 한 조(탭 배정)', () => {
+  const member = (groupId: string, registrationId: string) => ({ id: `gt-${registrationId}`, groupId, registrationId, teamName: registrationId, sortOrder: 0, createdAt: '' });
+  const withTeams = makeBracket({
+    groups: [
+      makeGroup({ id: 'lgA', name: 'A조', phase: 'group', sortOrder: 0, groupTeams: [member('lgA', 'r1')] }),
+      makeGroup({ id: 'lgB', name: 'B조', phase: 'group', sortOrder: 1, groupTeams: [member('lgB', 'r2')] }),
+    ],
+    fixtures: [makeFixture({ id: 'l1', groupId: 'lgA', fixtureNumber: 1, round: 'league_r1' })],
+  });
+  const placeInto = (teamName: RegExp) => {
+    const props = leagueProps('league');
+    setBracket(withTeams);
+    render(<BracketCanvasWorkspace {...props} />);
+    fireEvent.click(screen.getByRole('button', { name: '펼치기' }));
+    fireEvent.click(screen.getByRole('button', { name: teamName }));
+    fireEvent.click(within(screen.getByRole('group', { name: '1라운드 A조' })).getByRole('button', { name: /^홈 .*선택한 팀을 여기에 넣어요/ }));
+    return props;
+  };
+
+  it('다른 조 팀을 A조 칸에 넣으려 하면 요청 없이 해요체로 막고 고른 팀을 유지한다', () => {
+    const props = placeInto(/부산FC/);
+    expect(mocks.updateFixture).not.toHaveBeenCalled();
+    expect(props.showToast).toHaveBeenCalledWith('다른 조에 있는 팀은 이 조에 넣을 수 없어요. 그 조에서 먼저 빼 주세요.', 'error');
+    expect(screen.getByRole('button', { name: /부산FC/ })).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('대조군 - 같은 조 팀과 어느 조에도 없는 팀은 그대로 PATCH 된다', () => {
+    placeInto(/서울FC/);
+    expect(mocks.updateFixture).toHaveBeenCalledWith({ fixtureId: 'l1', homeRegistrationId: 'r1' }, expect.any(Object));
+    cleanup();
+    mocks.updateFixture.mockClear();
+    placeInto(/대구FC/);
+    expect(mocks.updateFixture).toHaveBeenCalledWith({ fixtureId: 'l1', homeRegistrationId: 'r3' }, expect.any(Object));
+  });
+
+  it('조별 자리에 다른 조 팀을 넣으려 하면 assignSlot 호출 없이 같은 토스트, 결선 자리는 통과한다', () => {
+    const slotInA = makeSlot({ id: 'sa', label: 'A조 1번', groupId: 'lgA', position: 1 });
+    const slotInQf = makeSlot({ id: 'sq', label: '8강 1번', groupId: 'g-qf', position: 1 });
+    const bracket = makeBracket({
+      groups: [...withTeams.groups, group],
+      slots: [slotInA, slotInQf],
+      fixtures: [
+        makeFixture({ id: 'fa', groupId: 'lgA', fixtureNumber: 1, homeSlotId: 'sa', awaySlotId: null }),
+        makeFixture({ id: 'fq', groupId: 'g-qf', fixtureNumber: 2, homeSlotId: 'sq', awaySlotId: null }),
+      ],
+    });
+    setBracket(bracket);
+    const props = renderWorkspace();
+    fireEvent.click(screen.getByRole('button', { name: /부산FC/ }));
+    fireEvent.click(screen.getByRole('button', { name: /^홈 A조 1번, 선택한 팀을 여기에 넣어요/ }));
+    expect(mocks.assign).not.toHaveBeenCalled();
+    expect(props.showToast).toHaveBeenCalledWith('다른 조에 있는 팀은 이 조에 넣을 수 없어요. 그 조에서 먼저 빼 주세요.', 'error');
+    fireEvent.click(screen.getByRole('button', { name: /^홈 8강 1번, 선택한 팀을 여기에 넣어요/ }));
+    expect(mocks.assign).toHaveBeenCalledWith({ slotId: 'sq', registrationId: 'r2' }, expect.any(Object));
+  });
+});
+
 describe('BracketCanvasWorkspace — 칸 패널', () => {
   it('칸을 열면 패널이 그 칸으로 열리고, 닫으면 사라진다', () => {
     renderWorkspace();

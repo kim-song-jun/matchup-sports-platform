@@ -20,6 +20,7 @@ import {
   useMediaQuery,
 } from '@/hooks/use-media-query';
 import { describeBracketCanvasError } from '@/lib/bracket-canvas-errors';
+import { TEAM_IN_OTHER_GROUP_MESSAGE, registrationIdsBlockedForGroup } from '@/lib/bracket-group-enrollment';
 import { buildSideLabelContext, directPlacedRegistrationIds, fixtureSideLabel, type SideKey } from '@/lib/bracket-canvas-layout';
 import { buildLeagueStandings } from '@/lib/bracket-league-standings-model';
 import { describeStandingsFill } from '@/lib/bracket-standings-fill-message';
@@ -143,6 +144,11 @@ export function BracketCanvasWorkspace({
   const rightColumn = sidePanel && (selectedFixture !== null || showStandings);
 
   const handleAssign = (slotId: string, registrationId: string) => {
+    const slotGroupId = bracket.slots.find((slot) => slot.id === slotId)?.groupId ?? null;
+    if (registrationIdsBlockedForGroup(bracket.groups, slotGroupId).has(registrationId)) {
+      showToast(TEAM_IN_OTHER_GROUP_MESSAGE, 'error');
+      return;
+    }
     assignSlot.mutate(
       { slotId, registrationId },
       {
@@ -156,6 +162,11 @@ export function BracketCanvasWorkspace({
   };
 
   const handleAssignDirect = (fixtureId: string, side: SideKey, registrationId: string) => {
+    const fixtureGroupId = bracket.fixtures.find((fixture) => fixture.id === fixtureId)?.groupId ?? null;
+    if (registrationIdsBlockedForGroup(bracket.groups, fixtureGroupId).has(registrationId)) {
+      showToast(TEAM_IN_OTHER_GROUP_MESSAGE, 'error');
+      return;
+    }
     updateFixture.mutate(
       { fixtureId, ...(side === 'HOME' ? { homeRegistrationId: registrationId } : { awayRegistrationId: registrationId }) },
       {

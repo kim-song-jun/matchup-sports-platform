@@ -16,6 +16,9 @@ import {
 } from '@/lib/place';
 import type { V1PlaceSearchItem, V1PlaceView, V1RecentVenue } from '@/types/api';
 
+/** 결과 약 5줄 높이. 넘치면 목록 안에서 스크롤한다. */
+const LIST_MAX_HEIGHT = 'min(320px, 45vh)';
+
 const SEARCH_DEBOUNCE_MS = 300;
 const SEARCH_FALLBACK_MESSAGE = '장소를 찾지 못했어요. 잠시 후 다시 시도해 주세요.';
 const SEARCH_UNAVAILABLE_MESSAGE = '지금은 장소 검색을 쓸 수 없어요. 장소 이름을 직접 입력해 주세요.';
@@ -130,6 +133,7 @@ export function PlacePicker({
   const listVisible = open && searchActive && !hasError && items.length > 0;
   const listRef = useRef<HTMLUListElement>(null);
   // 목록은 흐름 안에 그려져 하단 고정 버튼(만들기 CTA·모달 저장 줄)에 가릴 수 있다 — 열릴 때 한 번 보이게 한다.
+  // 목록 높이를 LIST_MAX_HEIGHT 로 묶어 두어야 이 스크롤이 입력칸을 화면 위로 밀어내지 않는다.
   useEffect(() => {
     if (listVisible) listRef.current?.scrollIntoView?.({ block: 'nearest' });
   }, [listVisible]);
@@ -194,6 +198,9 @@ export function PlacePicker({
 
   const describedBy = [error ? errorId : null, searchActive ? statusId : null].filter(Boolean).join(' ') || undefined;
   const optionId = (index: number) => `${autoId}-option-${index}`;
+  useEffect(() => {
+    if (activeIndex >= 0) document.getElementById(`${autoId}-option-${activeIndex}`)?.scrollIntoView?.({ block: 'nearest' });
+  }, [activeIndex, autoId]);
 
   return (
     <div className={['tm-create-field', className].filter(Boolean).join(' ')}>
@@ -313,7 +320,9 @@ export function PlacePicker({
               border: '1px solid var(--border)',
               borderRadius: 'var(--radius-control)',
               background: 'var(--surface)',
-              overflow: 'hidden',
+              maxHeight: LIST_MAX_HEIGHT,
+              overflowY: 'auto',
+              overscrollBehavior: 'contain',
             }}
           >
             {items.map((item, index) => {
@@ -367,6 +376,9 @@ export function PlacePicker({
                 minHeight: 48,
                 padding: '12px 14px',
                 cursor: 'pointer',
+                // 결과가 많아 목록 안에서 스크롤해도 직접 입력 출구는 늘 보이게 바닥에 붙인다.
+                position: 'sticky',
+                bottom: 0,
                 background: activeIndex === manualOptionIndex ? 'var(--blue50)' : 'var(--grey50)',
               }}
             >

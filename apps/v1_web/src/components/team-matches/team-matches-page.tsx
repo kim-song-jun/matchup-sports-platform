@@ -1179,10 +1179,10 @@ function TeamMatchCard({ match, fromHref }: { match: TeamMatchModel; fromHref: s
 function DetailPlace({ place, fallbackName }: { place: V1PlaceView | null; fallbackName: string }) {
   if (!place) return <InfoRow label="장소" value={fallbackName} />;
   return (
-    // 행 구분선만 tm-info-row 에서 받는다 — 좌우 여백·오른쪽 정렬까지 물려받으면 카드가 테두리에 붙고 이름이 핀과 떨어진다.
+    // 행 구분선만 tm-info-row 에서 받는다 — 행의 좌우 여백 0(인라인으로 덮는다)을 물려받으면 카드가 테두리에 붙는다.
     <div className="tm-info-row" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 4, padding: '14px 16px' }}>
       <div className="tm-text-caption" style={{ color: 'var(--text-caption)' }}>장소</div>
-      <div style={{ width: '100%', textAlign: 'left' }}>
+      <div style={{ width: '100%' }}>
         <PlaceCard place={place} />
       </div>
     </div>

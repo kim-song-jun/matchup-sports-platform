@@ -10,7 +10,7 @@ Status: In Progress
 2026-10-10 실측 원인:
 
 1. 카카오 JS·REST 키가 alpha·운영 모두 미설정 — `/public/integrations/kakao-maps-key` 가 null, 대회 46개 좌표 0.
-2. nginx CSP `script-src` 에 `dapi.kakao.com`·`t1.daumcdn.net` 이 없어 키를 넣어도 지도 SDK 가 막힌다.
+2. nginx CSP `script-src` 에 카카오 지도 SDK 도메인이 없어 키를 넣어도 지도 SDK 가 막힌다.
 3. 좌표 칸이 대회(`V1Tournament.latitude/longitude`)뿐 — 개인 매치·팀매치·리그/대회 경기는 글자만 있다.
 4. 대회 저장 때 서버가 장소 글자로 카카오 검색 첫 결과를 그대로 저장한다(`KakaoGeocodingService`) — 사람이 확인하지 않는 추측.
 5. 좌표가 없으면 지도뿐 아니라 길찾기 버튼까지 숨는다.
@@ -111,7 +111,9 @@ alpha 에서 매치·팀매치·대회·리그를 만들 때 장소를 검색해
 - REST 키는 서버에만 둔다(검색은 서버 프록시). JS 키는 도메인 제한 키라 공개 API 로 내려도 된다(기존).
 - 장소 검색은 로그인 필수 + 분당 30회 제한 — 카카오 쿼터 소진 방어.
 - 클라이언트가 보낸 좌표는 범위 검증만 한다. 엉뚱한 좌표는 엉뚱한 장소 글자와 같은 수준의 위험(호스트가 쓰는 정보).
-- CSP 는 `script-src` 에 카카오 두 도메인만 추가. 지도 타일·요청은 기존 `img-src https:`·`connect-src https:` 로 충분.
+- CSP `script-src` 에 카카오 세 도메인을 둔다 — **셋 다 빼지 말 것**: `dapi.kakao.com`(SDK 로더), `t1.kakaocdn.net`(로더가 받는 지도 본체
+  `mapjsapi/js/main/<버전>/kakao.js` — 이게 빠지면 지도가 회색 상자만 남는다, #1767 alpha QA), `t1.daumcdn.net`(본체가 가리키는 로드뷰 자원 경로,
+  지금은 쓰지 않지만 SDK 가 같은 CDN 계열로 옮겨 다닌다). 지도 타일·요청은 기존 `img-src https:`·`connect-src https:` 로 충분.
 
 ## Risks & Dependencies
 
@@ -125,4 +127,6 @@ alpha 에서 매치·팀매치·대회·리그를 만들 때 장소를 검색해
 - (2026-10-10) 리그 어드민에는 장소를 정하는 곳이 없었다(공개 리그의 장소는 시드 값). D4 를 위해
   `PATCH /admin/league-matches/:leagueId/venue` 와 어드민 상세 `defaultPlace` 를 추가한다. 기본 장소를 바꿔도 이미 만든 경기는 그대로다.
 - (2026-10-10) 사용자 생성·수정에서 빈 장소 이름은 서버도 400 `VALIDATION_FAILED`(`manualPlaceName`) — 웹 폼은 이미 필수였다.
+- (2026-10-10, #1762 머지 후 alpha QA) 지도 SDK 본체가 `t1.kakaocdn.net` 에서 와서 CSP 에 추가(#1767). 지도 키 조회가 브라우저 캐시 저장 대상이라
+  지도 미리보기는 마운트 뒤에만 그린다(서버 렌더 대회 페이지 React #418).
 - (2026-10-10) 리그 생성기 멱등 해시는 `venue: null` 그대로 두고, 저장 값만 리그 기본 장소 스냅샷으로 바꾼다(재시도가 payload 불일치로 실패하지 않게).

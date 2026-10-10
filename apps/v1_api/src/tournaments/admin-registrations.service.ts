@@ -385,11 +385,14 @@ export class AdminRegistrationsService {
     });
 
     // 알림: 신청자에게 취소 안내 (fire-and-forget — 트랜잭션 실패와 무관)
+    // 팀을 여러 개 가진 팀장이 어느 팀 신청인지, 왜 취소됐는지 알 수 있게 팀명과 사유를 싣는다(MD-QA #79).
+    // 사유는 어드민이 적은 것을 먼저, 없으면 팀이 취소 요청 때 남긴 것을 쓴다 — 신청 상세의 '취소 사유'와 같은 값이다.
+    const reason = dto.reason?.trim() || registration.cancelReason?.trim();
     void this.notifications.emitNotification(
       registration.appliedByUserId,
       'tournament_registration_cancelled',
       registration.tournamentId,
-      `"${registration.tournament.title}" 대회 참가 신청이 취소됐어요.`,
+      `"${registration.team.name}" 팀의 "${registration.tournament.title}" 대회 참가 신청이 취소됐어요.${reason ? ` 사유: ${reason}` : ''}`,
     );
 
     const playerCount = await this.countPlayers(registrationId);
@@ -667,14 +670,18 @@ export class AdminRegistrationsService {
   private async loadRegistration(
     registrationId: string,
   ): Promise<
-    V1TournamentRegistration & { tournament: { title: string; kind: V1CompetitionKind | null } }
+    V1TournamentRegistration & {
+      tournament: { title: string; kind: V1CompetitionKind | null };
+      team: { name: string };
+    }
   > {
     const registration = await this.prisma.v1TournamentRegistration.findUnique({
       where: { id: registrationId },
       // `kind` 를 함께 싣는다 — 리그에만 걸리는 규칙(D9 거부 사유)이 이 값을 봐야 하는데,
       // 따로 조회하면 왕복이 하나 늘고 표면 게이트에 자리가 하나 더 생긴다. 이 조회는
       // 등록 id 로 시작하므로 **종류를 게이트로 쓰는 자리가 아니다**(무엇인지만 묻는다).
-      include: { tournament: { select: { title: true, kind: true } } },
+      // 팀명은 신청자 알림 본문용이다 — 팀을 여럿 가진 팀장이 어느 팀 신청인지 알아야 한다.
+      include: { tournament: { select: { title: true, kind: true } }, team: { select: { name: true } } },
     });
     if (!registration) {
       throw new NotFoundException({

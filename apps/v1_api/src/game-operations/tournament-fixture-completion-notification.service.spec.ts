@@ -34,6 +34,8 @@ function fakeTx(options: {
   /** 공식 결과 참가자(출전자). */
   resultRows?: Array<{ participantId: string; sideId: string; userId: string; goals: number; assists: number }>;
   details?: { round: string; legNumber: number; group: { name: string } | null };
+  /** 이 경기에 이번 리비전보다 먼저 공식 확정된 리비전이 있는가(= 이번 확정은 정정). */
+  earlierOfficialRevision?: boolean;
 }) {
   const createMany = jest.fn().mockResolvedValue({ count: 0 });
   const resultRows = options.resultRows ?? [];
@@ -52,6 +54,9 @@ function fakeTx(options: {
     v1ParticipantIdentityLinkEvent: { findMany: jest.fn().mockResolvedValue([]) },
     v1TournamentMatchDetails: {
       findUnique: jest.fn().mockResolvedValue(options.details ?? { round: 'final', legNumber: 1, group: null }),
+    },
+    v1GameResultRevision: {
+      findFirst: jest.fn().mockResolvedValue(options.earlierOfficialRevision ? { id: 'revision-1' } : null),
     },
     v1NotificationPreference: {
       findMany: jest.fn().mockResolvedValue(options.preferences),
@@ -72,7 +77,7 @@ function fakeTx(options: {
       createMany,
     },
   };
-  return { tx: tx as never, createMany };
+  return { tx: tx as never, createMany, findEarlierOfficial: tx.v1GameResultRevision.findFirst };
 }
 
 describe('TournamentFixtureCompletionNotificationService', () => {
@@ -199,7 +204,7 @@ describe('TournamentFixtureCompletionNotificationService', () => {
     ]);
   });
 
-  it('does not push again for a correction re-officialize (businessKey already delivered)', async () => {
+  it('does not push again when the same revision is projected twice (businessKey already delivered)', async () => {
     const sendToUser = jest.fn().mockResolvedValue(undefined);
     const { tx } = fakeTx({
       memberships: [{ userId: 'captain-home' }],
@@ -211,6 +216,100 @@ describe('TournamentFixtureCompletionNotificationService', () => {
       revisionFixture(),
     );
     expect(sendToUser).not.toHaveBeenCalled();
+  });
+
+  // MD-QA #79 — 확정된 결과를 어드민이 정정해도 새 알림이 가지 않아, 팀장 알림함에는 정정 전 점수가 그대로 남았다.
+  describe('정정(앞서 공식 확정한 리비전이 있음)', () => {
+    const corrected = () =>
+      revisionFixture({
+        revisionId: 'revision-2',
+        revision: 2,
+        officialAt: new Date('2026-08-02T00:00:00Z'),
+        score: { home: 2, away: 1 },
+        reason: '점수 오기 정정',
+      });
+
+    it('최초 확정은 먼저 확정된 리비전이 있는지 같은 경기·다른 리비전·더 이른 확정 시각으로 묻는다', async () => {
+      const { tx, findEarlierOfficial } = fakeTx({
+        memberships: [{ userId: 'captain-home' }],
+        preferences: [],
+        alreadyDelivered: [],
+      });
+      await new TournamentFixtureCompletionNotificationService().project(tx, corrected());
+      expect(findEarlierOfficial).toHaveBeenCalledWith({
+        where: {
+          gameId: 'game-1',
+          id: { not: 'revision-2' },
+          officialAt: { not: null, lt: new Date('2026-08-02T00:00:00Z') },
+        },
+        select: { id: true },
+      });
+    });
+
+    it('정정 제목과 정정된 점수로 리비전마다 한 번씩 새로 보낸다 — 이미 완료 알림을 받은 사람도 받는다', async () => {
+      const { tx, createMany } = fakeTx({
+        memberships: [{ userId: 'captain-home' }, { userId: 'captain-away', teamId: 'team-away' }],
+        preferences: [],
+        // 처음 확정 때 받은 완료 알림. 정정 알림은 이것과 별개다.
+        alreadyDelivered: ['tournament-fixture-completed:fixture-1:captain-home'],
+        earlierOfficialRevision: true,
+      });
+      await new TournamentFixtureCompletionNotificationService().project(tx, corrected());
+
+      const rows = createMany.mock.calls[0][0].data as Array<{ recipientUserId: string }>;
+      const home = rows.find((row) => row.recipientUserId === 'captain-home');
+      expect(home).toMatchObject({
+        title: '대회 경기 결과가 정정됐어요',
+        targetType: 'tournament',
+        targetId: 'tour-1:fixture-1',
+        body: '테스트 대회 · 결승 · 홈팀FC 2 : 1 원정팀FC · 승리.',
+        deepLink: '/tournaments/tour-1/matches/fixture-1',
+        businessKey: 'tournament-fixture-corrected:fixture-1:revision-2:captain-home',
+      });
+      expect(rows.find((row) => row.recipientUserId === 'captain-away')).toMatchObject({
+        body: '테스트 대회 · 결승 · 홈팀FC 2 : 1 원정팀FC · 패배.',
+        businessKey: 'tournament-fixture-corrected:fixture-1:revision-2:captain-away',
+      });
+    });
+
+    it('정정 알림도 웹 푸시로 보낸다 — 완료 알림을 이미 받은 사람에게도', async () => {
+      const sendToUser = jest.fn().mockResolvedValue(undefined);
+      const { tx } = fakeTx({
+        memberships: [{ userId: 'captain-home' }],
+        preferences: [],
+        alreadyDelivered: ['tournament-fixture-completed:fixture-1:captain-home'],
+        earlierOfficialRevision: true,
+      });
+      await new TournamentFixtureCompletionNotificationService({ sendToUser } as never).project(tx, corrected());
+      expect(sendToUser).toHaveBeenCalledWith('captain-home', {
+        title: '대회 경기 결과가 정정됐어요',
+        body: '테스트 대회 · 결승 · 홈팀FC 2 : 1 원정팀FC · 승리.',
+        url: '/tournaments/tour-1/matches/fixture-1',
+      });
+    });
+
+    it('같은 정정 리비전을 다시 처리하면 푸시를 또 보내지 않는다 (정정 키가 이미 배달됨)', async () => {
+      const sendToUser = jest.fn().mockResolvedValue(undefined);
+      const { tx } = fakeTx({
+        memberships: [{ userId: 'captain-home' }],
+        preferences: [],
+        alreadyDelivered: ['tournament-fixture-corrected:fixture-1:revision-2:captain-home'],
+        earlierOfficialRevision: true,
+      });
+      await new TournamentFixtureCompletionNotificationService({ sendToUser } as never).project(tx, corrected());
+      expect(sendToUser).not.toHaveBeenCalled();
+    });
+
+    it('수신 거부한 사람에게는 정정 알림도 보내지 않는다', async () => {
+      const { tx, createMany } = fakeTx({
+        memberships: [{ userId: 'muted' }],
+        preferences: [{ userId: 'muted', activityEnabled: false }],
+        alreadyDelivered: [],
+        earlierOfficialRevision: true,
+      });
+      await new TournamentFixtureCompletionNotificationService().project(tx, corrected());
+      expect(createMany).not.toHaveBeenCalled();
+    });
   });
 
   // 2026-08-27 감사 41/44: outbox 트랜잭션이 롤백되면 이미 나간 웹 푸시는 되돌릴 수

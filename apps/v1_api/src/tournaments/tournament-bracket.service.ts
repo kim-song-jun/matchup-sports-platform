@@ -48,7 +48,7 @@ import {
   type TournamentFixtureGameForResult,
 } from './tournament-fixture-official-result';
 import { findTournamentOnSurface, TOURNAMENT_KINDS } from './tournament-surface-lookup';
-import { assertSidesNotSlotLinked, createGroupInTx, deleteTournamentGroupInTx, ensureGroupPhaseTeamsInTx, recalculateStandingsInTx, softDeleteTournamentFixtureInTx, updateTournamentFixtureInTx } from './tournament-bracket-tx';
+import { assertNotInOtherGroupInTx, assertSidesNotSlotLinked, createGroupInTx, deleteTournamentGroupInTx, ensureGroupPhaseTeamsInTx, recalculateStandingsInTx, softDeleteTournamentFixtureInTx, updateTournamentFixtureInTx } from './tournament-bracket-tx';
 import { participantDisplayName } from './participant-display-name';
 import { readJerseyNumbers } from './tournament-player-jersey';
 import { createTournamentMatchInTx } from './tournament-match-creation';
@@ -307,6 +307,12 @@ export class TournamentBracketService {
         throw new ConflictException({
           code: 'TEAM_ALREADY_IN_GROUP',
           message: '이미 해당 조에 배정된 팀이에요.',
+        });
+      }
+
+      if (group.phase === 'group') {
+        await assertNotInOtherGroupInTx(tx, {
+          tournamentId, groupId: group.id, registrationIds: [dto.registrationId],
         });
       }
 

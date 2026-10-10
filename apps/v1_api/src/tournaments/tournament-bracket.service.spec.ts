@@ -686,6 +686,36 @@ describe('TournamentBracketService', () => {
     expect(prisma.v1TournamentGroupTeam.create).not.toHaveBeenCalled();
   });
 
+  it('createGroupTeam: 다른 조별 조에 이미 있는 팀 → 409 TEAM_IN_OTHER_GROUP, 만들지 않는다', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdmin);
+    prisma.v1Tournament.findFirst.mockResolvedValue(tournamentRow());
+    prisma.v1TournamentGroup.findFirst.mockResolvedValue(groupRow());
+    prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow());
+    prisma.v1TournamentGroupTeam.findUnique.mockResolvedValue(null);
+    prisma.v1TournamentGroupTeam.findFirst.mockResolvedValue({ id: 'gt-other' });
+
+    await expect(service.createGroupTeam(ownerUser, 'tournament-1', { groupId: 'group-1', registrationId: 'reg-1' }))
+      .rejects.toMatchObject({ response: { code: 'TEAM_IN_OTHER_GROUP', message: '다른 조에 있는 팀은 이 조에 넣을 수 없어요. 그 조에서 먼저 빼 주세요.' } });
+    expect(prisma.v1TournamentGroupTeam.findFirst).toHaveBeenCalledWith({
+      where: { registrationId: { in: ['reg-1'] }, groupId: { not: 'group-1' }, group: { tournamentId: 'tournament-1', phase: 'group' } },
+      select: { id: true },
+    });
+    expect(prisma.v1TournamentGroupTeam.create).not.toHaveBeenCalled();
+  });
+
+  it('createGroupTeam: 결선 단계 조는 다른 조 편성을 보지 않는다 (대조군)', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdmin);
+    prisma.v1Tournament.findFirst.mockResolvedValue(tournamentRow());
+    prisma.v1TournamentGroup.findFirst.mockResolvedValue(groupRow({ phase: 'quarter' }));
+    prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow());
+    prisma.v1TournamentGroupTeam.findUnique.mockResolvedValue(null);
+    prisma.v1TournamentGroupTeam.findFirst.mockResolvedValue({ id: 'gt-other' });
+    prisma.v1TournamentGroupTeam.create.mockResolvedValue({ id: 'gt-1', groupId: 'group-1', registrationId: 'reg-1', sortOrder: 0, createdAt: new Date('2026-06-14T00:00:00Z') });
+
+    await expect(service.createGroupTeam(ownerUser, 'tournament-1', { groupId: 'group-1', registrationId: 'reg-1' })).resolves.toMatchObject({ registrationId: 'reg-1' });
+    expect(prisma.v1TournamentGroupTeam.findFirst).not.toHaveBeenCalled();
+  });
+
   it('createGroupTeam: confirmed + not-duplicate → created', async () => {
     prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdmin);
     prisma.v1Tournament.findFirst.mockResolvedValue(tournamentRow());

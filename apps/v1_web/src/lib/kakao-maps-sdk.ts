@@ -1,6 +1,9 @@
 // 카카오맵 JS SDK 최소 타입 shim(실제로 쓰는 부분만)과 앱당 한 번 로더.
 interface KakaoLatLng {}
-interface KakaoMapInstance {}
+interface KakaoMapInstance {
+  relayout: () => void;
+  setCenter: (latlng: KakaoLatLng) => void;
+}
 interface KakaoMarkerInstance {
   setMap: (map: KakaoMapInstance | null) => void;
 }

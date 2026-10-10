@@ -306,20 +306,8 @@ describe('PlacePicker', () => {
       delete (Element.prototype as { scrollIntoView?: unknown }).scrollIntoView;
     });
 
-    it('데스크톱(1024px 이상)에서만 240px 로 키우고 모바일은 120px 그대로다', async () => {
-      restoreViewport = installViewport(1280);
-      const desktop = renderPicker({ initial: picked });
-      expect(await screen.findByRole('link', { name: '성산 풋살파크 지도 크게 보기' })).toHaveStyle({ height: '240px' });
-      desktop.unmount();
-      restoreViewport();
-
+    it('장소를 고른 직후에만 지도를 화면 안으로 스크롤한다 — 값이 채워진 채 열린 폼은 움직이지 않는다', async () => {
       restoreViewport = installViewport(390);
-      renderPicker({ initial: picked });
-      expect(await screen.findByRole('link', { name: '성산 풋살파크 지도 크게 보기' })).toHaveStyle({ height: '120px' });
-    });
-
-    it('데스크톱에서 장소를 고른 직후에만 지도를 화면 안으로 스크롤한다 — 값이 채워진 채 열린 폼은 움직이지 않는다', async () => {
-      restoreViewport = installViewport(1280);
       const prefilled = renderPicker({ initial: picked });
       await screen.findByRole('link', { name: '성산 풋살파크 지도 크게 보기' });
       expect(scrollIntoView).not.toHaveBeenCalled();
@@ -332,17 +320,6 @@ describe('PlacePicker', () => {
       const map = await screen.findByRole('link', { name: '망원한강공원 풋살장 지도 크게 보기' });
       // 검색 목록도 scrollIntoView 를 부르므로 호출 대상(this)이 지도 상자인지로 가린다.
       await waitFor(() => expect(scrollIntoView.mock.contexts).toContain(map));
-    });
-
-    it('모바일에서는 장소를 골라도 지도 때문에 스크롤하지 않는다', async () => {
-      restoreViewport = installViewport(390);
-      renderPicker();
-      fireEvent.change(screen.getByRole('combobox', { name: '장소' }), { target: { value: '망원 풋살' } });
-      fireEvent.click(await findOption('망원한강공원 풋살장'));
-
-      const map = await screen.findByRole('link', { name: '망원한강공원 풋살장 지도 크게 보기' });
-      expect(map).toHaveStyle({ height: '120px' });
-      expect(scrollIntoView.mock.contexts).not.toContain(map);
     });
   });
 });

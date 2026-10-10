@@ -30,6 +30,11 @@ export const publicGameRecordsKeys = {
     [...publicGameRecordsKeys.all, 'user-records', userId, season ?? null, type] as const,
   playerRecords: (tournamentId: string) =>
     [...publicGameRecordsKeys.all, 'player-records', tournamentId] as const,
+  /** 리그 하나의 모든 경기 기록 — `leagueFixtureRecord` 의 prefix. */
+  leagueFixtureRecords: (leagueId: string) =>
+    [...publicGameRecordsKeys.all, 'league-fixture-record', leagueId] as const,
+  leagueFixtureRecord: (leagueId: string, teamMatchId: string) =>
+    [...publicGameRecordsKeys.leagueFixtureRecords(leagueId), teamMatchId] as const,
 };
 
 export interface ScheduleFilters {
@@ -149,7 +154,7 @@ export function usePublicMatch(
  */
 export function usePublicLeagueFixtureRecord(leagueId: string, teamMatchId: string) {
   const query = useQuery({
-    queryKey: [...publicGameRecordsKeys.all, 'league-fixture-record', leagueId, teamMatchId] as const,
+    queryKey: publicGameRecordsKeys.leagueFixtureRecord(leagueId, teamMatchId),
     queryFn: () => v1Get<PublicMatchDetail>(`/league-matches/${leagueId}/fixtures/${teamMatchId}/record`),
     enabled: Boolean(leagueId) && Boolean(teamMatchId),
     retry: shouldRetryPublicRecord,

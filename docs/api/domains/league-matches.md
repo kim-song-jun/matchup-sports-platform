@@ -55,6 +55,8 @@ hold compares both values so a newly private league is never restored as public.
 While on hold, fixture generation and regeneration return `409 LEAGUE_ON_HOLD`
 without creating or cancelling fixtures. Both actions recheck the status after
 locking the parent league row, including a hold committed during plan calculation.
+A completed or cancelled league rejects the same generation, template and slot-assignment
+actions with `409 LEAGUE_ENDED`; releasing slots on registration cancellation is not guarded.
 
 While a league is on hold, already-scheduled notifications for its fixtures are
 suppressed at fire time (the outbox rows are kept, so resuming re-enables the next
@@ -288,8 +290,9 @@ A league can be drawn first and filled with teams later. A **slot** (`V1Tourname
   / `LEAGUE_SCHEDULE_DATE_PAST` / `LEAGUE_SCHEDULE_DATE_INVALID` as in bulk generation). `placeName`
   defaults to `장소 미정`. More than 240 fixtures returns `422 BRACKET_TEMPLATE_TOO_LARGE`. The league
   `status` is **not** changed.
-  - Locks the league row (`FOR UPDATE`) and applies the same guard as bulk generation (`409 LEAGUE_ON_HOLD`).
-    A league that already has any fixture (cancelled ones included) returns `409 LEAGUE_FIXTURES_EXIST`, so
+  - Locks the league row (`FOR UPDATE`) and applies the same guard as bulk generation: `409 LEAGUE_ON_HOLD`
+    while on hold, `409 LEAGUE_ENDED` for a completed or cancelled league (checked first, even when fixtures
+    exist). Otherwise a league that already has any fixture (cancelled ones included) returns `409 LEAGUE_FIXTURES_EXIST`, so
     a concurrent bulk generation and a template cannot both succeed.
   - `replaceExisting: true` cancels the existing non-cancelled fixtures (never deletes — games are
     `Restrict`-linked), releases their slot links, deletes the old slots and builds the new ones. Allowed

@@ -1201,8 +1201,8 @@ export class LeagueMatchAdminService {
         timing,
       });
       if (ids.length > 0) {
-        // completed였던 리그(전 대진 확정)라도 재생성으로 새 미확정 대진이 생겼으니
-        // active로 되돌린다 — revertCompletion을 별도로 먼저 호출할 필요가 없다.
+        // draft 리그는 첫 대진이 생기면 active 가 된다. completed·cancelled 는 위 가드(LEAGUE_ENDED)가
+        // 먼저 거부하므로 여기까지 오지 않는다.
         // BE-5 drop: 통합 축이 정본이라 이 update 하나가 상태 전이 전부다(예전엔 레거시
         // 테이블을 먼저 고치고 거울을 따라 고쳤다). `updateMany` + `kind` 가드인 이유:
         //   · `upsert` 는 `where` 에 unique 필드만 받아 `kind` 를 못 건다 — 같은 id 의 **진짜
@@ -2173,6 +2173,12 @@ export class LeagueMatchAdminService {
    * 템플릿 교체의 자리 삭제가 FK(Restrict)로 막히고, 자리를 쓰는 경기 판정에 취소 경기가 섞인다.
    */
   private async cancelLeagueFixtureRowInTx(tx: Prisma.TransactionClient, teamMatchId: string, reason: string): Promise<number> {
+    // 원정 자리가 비어 있던 경기는 공개된 적이 없다 - 홈 팀도 비워야 공개 게이트의 취소 절이 계속 가린다.
+    // 아래 update 가 awaySlotId 를 지우므로 반드시 먼저 실행한다.
+    await tx.v1TeamMatch.updateMany({
+      where: { id: teamMatchId, awaySlotId: { not: null }, approvedApplicantTeamId: null },
+      data: { hostTeamId: null },
+    });
     await tx.v1TeamMatch.update({
       where: { id: teamMatchId },
       data: { status: 'cancelled', cancelledAt: new Date(), homeSlotId: null, awaySlotId: null },

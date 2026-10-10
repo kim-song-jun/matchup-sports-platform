@@ -12,7 +12,6 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { PrismaService } from '../prisma/prisma.service';
 import { TournamentStaffAccessService } from './staff/tournament-staff-access.service';
 import { TournamentsReadService } from './tournaments-read.service';
-import { PUBLIC_TOURNAMENT_VISIBILITY_WHERE } from './tournament-surface-lookup';
 
 const authUser = {
   id: 'user-1',
@@ -283,15 +282,32 @@ describe('TournamentsReadService', () => {
   afterEach(() => jest.clearAllMocks());
 
   // ─── list ─────────────────────────────────────────────────────────────────────
+  // Filtering, group order and keyset/offset paging run in SQL (`tournament-list-query.ts`) and are
+  // pinned against a real database by `test/tournaments/tournament-list-db-order.integration-spec.ts`.
+  // These specs cover what the service does with the ids the query returns.
 
-  it('list: returns items with confirmedCount and pageInfo', async () => {
-    prisma.v1Tournament.findMany.mockResolvedValue([tournamentCard()]);
+  /** Routes `$queryRaw` calls: id-window queries get `ids`, COUNT queries get `total`. */
+  function mockListQueries(ids: string[], total = ids.length) {
+    prisma.$queryRaw.mockImplementation(async (strings: TemplateStringsArray) =>
+      strings.join('?').includes('COUNT(*)') ? [{ total: BigInt(total) }] : ids.map((id) => ({ id })),
+    );
+    prisma.v1Tournament.findMany.mockImplementation(async (args: { where: { id: { in: string[] } } }) =>
+      args.where.id.in.map((id) => tournamentCard({ id })),
+    );
+  }
+
+  it('list: returns the page in the order the query gave, with confirmedCount and pageInfo', async () => {
+    mockListQueries(['t-b', 't-a']);
+    // The database returns rows in arbitrary order; the service must restore the id order.
+    prisma.v1Tournament.findMany.mockImplementation(async () => [
+      tournamentCard({ id: 't-a' }),
+      tournamentCard({ id: 't-b' }),
+    ]);
 
     const result = await service.list({});
 
-    expect(result.items).toHaveLength(1);
+    expect(result.items.map((i) => i.id)).toEqual(['t-b', 't-a']);
     expect(result.items[0]).toMatchObject({
-      id: 'tournament-1',
       sportId: 'sport-1',
       sport: { code: 'futsal', name: '풋살' },
       status: 'open',
@@ -299,278 +315,46 @@ describe('TournamentsReadService', () => {
       pendingPaymentCount: 2,
       entryFee: 60000,
     });
-    expect(result.pageInfo).toMatchObject({ hasNext: false, nextCursor: null });
+    expect(result.pageInfo).toEqual({ nextCursor: null, hasNext: false });
   });
 
-  it('unified public list excludes hidden regular leagues while retaining tournaments', async () => {
-    prisma.v1Tournament.findMany.mockResolvedValue([]);
-
-    await service.list({ kind: 'all' });
-
-    expect(prisma.v1Tournament.findMany.mock.calls[0][0].where.AND).toEqual(
-      expect.arrayContaining([PUBLIC_TOURNAMENT_VISIBILITY_WHERE]),
-    );
-  });
-
-  /**
-   * **계약이 바뀌었다(2026-09-01 사용자 확정 A안).** 예전엔 `draft` 를 종류와 무관하게 걸렀는데,
-   * 정규 리그의 `draft` 는 **"예정"** 이고 사용자에게 보여야 하는 상태다. 대회의 `draft`
-   * (운영자 준비 중)는 **그대로 감춘다** — 그 둘을 한 조건 안에서 가른다.
-   *
-   * `cancelled` 는 **어느 쪽에도 없다.** 그건 이번 변경과 무관하고, 넓어지면 안 되는 자리다.
-   */
-  it('list: 리그의 draft 만 열고 대회의 draft·cancelled 는 계속 막는다', async () => {
-    prisma.v1Tournament.findMany.mockResolvedValue([]);
-
-    await service.list({});
-
-    const callArgs = prisma.v1Tournament.findMany.mock.calls[0][0];
-    const or = findStatusOr(callArgs.where);
-    expect(or).not.toBeNull();
-
-    // 리그 절 — 이것만 draft 를 연다.
-    expect(or).toEqual(
-      expect.arrayContaining([{ kind: 'regular_league', status: 'draft' }]),
-    );
-
-    // 대회 절 — 종류 조건이 없는 쪽. 여기엔 draft 가 없어야 한다.
-    const tournamentClause = or!.find((clause) => !('kind' in clause)) as {
-      status: { in: string[] };
-    };
-    expect(tournamentClause.status.in).toEqual(
-      expect.arrayContaining(['open', 'closed', 'in_progress', 'completed']),
-    );
-    expect(tournamentClause.status.in).not.toContain('draft');
-
-    // cancelled 는 조건 전체 어디에도 없다.
-    expect(statusesIn(or!)).not.toContain('cancelled');
-  });
-
-  /**
-   * **`?status=draft` 는 리그로 좁혀서만 적용된다.**
-   *
-   * 사용자 확정 칩은 *전체 · 진행 중 · 준비 중 · 종료* 인데, "준비 중"(draft)은 정규 리그에만
-   * 있는 개념이다. 대회의 `draft` 는 운영자 준비 중이라 계속 감춘다(사용자 명시).
-   *
-   * ⚠️ **이 분리가 없으면 `?status=draft` 한 줄로 대회 비공개가 통째로 열린다.** 지금까지는
-   * DTO 가 `draft` 를 400 으로 막아 줘서 안 샜는데(실측 확인), 칩을 만들려면 그 방어를
-   * 푸는 것이라 **서비스가 대신 막아야 한다.**
-   */
-  it('list: status=draft 는 정규 리그로 좁혀 적용된다 — 대회 draft 는 여전히 안 나온다', async () => {
-    prisma.v1Tournament.findMany.mockResolvedValue([]);
-
-    await service.list({ status: 'draft' } as never);
-
-    const callArgs = prisma.v1Tournament.findMany.mock.calls[0][0];
-    // 종류 조건 없이 status 만 걸리면 대회 draft 가 함께 나온다 — 그렇게 되면 안 된다.
-    expect(callArgs.where.status).toBeUndefined();
-    expect(callArgs.where.AND).toEqual(
-      expect.arrayContaining([{ kind: 'regular_league', status: 'draft' }]),
-    );
-  });
-
-  /**
-   * **`kind` 없이 `status=draft` 가 오면 어떻게 되나** — 정해서 여기 박는다.
-   *
-   * 답: **400 이 아니라 빈 결과다.** 그리고 그 안전성은 **구조적**이다 —
-   * `kind` 기본값이 `tournament` 라 surface 조건이 `OR[{regular_tournament},{null}]` 인데,
-   * 거기에 `AND {kind: regular_league}` 가 겹치면 **만족하는 행이 존재할 수 없다.**
-   * 즉 "막는 코드" 가 따로 있는 게 아니라 **조건이 서로 모순이라 새어나올 수가 없다.**
-   *
-   * 400 으로 막지 않는 이유: 다른 필터도 같은 성질이다(예: 대회 탭에서 리그 전용 종목을
-   * 고르면 400 이 아니라 빈 목록이다). 여기만 예외로 400 을 내면 교차 필터마다 규칙이
-   * 갈린다.
-   */
-  it('list: kind 없이 status=draft 면 빈 결과가 된다 — 대회 draft 가 샐 수 없는 구조다', async () => {
-    prisma.v1Tournament.findMany.mockResolvedValue([]);
-
-    await service.list({ status: 'draft' } as never);
-
-    const where = prisma.v1Tournament.findMany.mock.calls[0][0].where;
-    // 기본 surface(대회 + kind=null)와 리그 한정 절이 **함께** 걸려 있다 → 모순.
-    expect(where.OR).toEqual(
-      expect.arrayContaining([{ kind: 'regular_tournament' }, { kind: null }]),
-    );
-    expect(where.AND).toEqual(
-      expect.arrayContaining([{ kind: 'regular_league', status: 'draft' }]),
-    );
-  });
-
-  it('list: kind=tournament + status=draft 도 같은 모순이다 — 대회 draft 는 어떤 조합으로도 안 나온다', async () => {
-    prisma.v1Tournament.findMany.mockResolvedValue([]);
-
-    await service.list({ kind: 'tournament', status: 'draft' } as never);
-
-    const where = prisma.v1Tournament.findMany.mock.calls[0][0].where;
-    expect(where.AND).toEqual(
-      expect.arrayContaining([{ kind: 'regular_league', status: 'draft' }]),
-    );
-    expect(where.OR).toEqual(
-      expect.arrayContaining([{ kind: 'regular_tournament' }, { kind: null }]),
-    );
-  });
-
-  it('list: kind=league + status=draft 는 정상적으로 리그 예정만 담는다', async () => {
-    prisma.v1Tournament.findMany.mockResolvedValue([]);
-
-    await service.list({ kind: 'league', status: 'draft' } as never);
-
-    const where = prisma.v1Tournament.findMany.mock.calls[0][0].where;
-    expect(where.kind).toBe('regular_league');
-    expect(where.AND).toEqual(
-      expect.arrayContaining([{ kind: 'regular_league', status: 'draft' }]),
-    );
-  });
-
-  it('대조군: draft 가 아닌 status 는 종전대로 그대로 전달된다', async () => {
-    prisma.v1Tournament.findMany.mockResolvedValue([]);
-
-    await service.list({ status: 'in_progress' } as never);
-
-    const callArgs = prisma.v1Tournament.findMany.mock.calls[0][0];
-    expect(callArgs.where.status).toBe('in_progress');
-  });
-
-  it('list: status filter narrowing is forwarded as exact string', async () => {
-    prisma.v1Tournament.findMany.mockResolvedValue([]);
-
-    await service.list({ status: 'in_progress' });
-
-    const callArgs = prisma.v1Tournament.findMany.mock.calls[0][0];
-    expect(callArgs.where.status).toBe('in_progress');
-  });
-
-  it('list: cursor pagination — hasNext=true when rows exceed limit', async () => {
-    const rows = [
-      tournamentCard({ id: 't-1' }),
-      tournamentCard({ id: 't-2' }),
-      tournamentCard({ id: 't-3' }),
-    ];
-    prisma.v1Tournament.findMany.mockResolvedValue(rows);
+  it('list: one lookahead row beyond the limit sets hasNext and the cursor is the last returned id', async () => {
+    mockListQueries(['t-1', 't-2', 't-3']);
 
     const result = await service.list({ limit: 2 });
 
-    expect(result.items).toHaveLength(2);
+    expect(result.items.map((i) => i.id)).toEqual(['t-1', 't-2']);
     expect(result.pageInfo).toMatchObject({ hasNext: true, nextCursor: 't-2' });
+    expect(prisma.v1Tournament.findMany.mock.calls[0][0].where).toEqual({ id: { in: ['t-1', 't-2'] } });
   });
 
-  it('list: sportId filter is forwarded as sportId UUID condition', async () => {
-    prisma.v1Tournament.findMany.mockResolvedValue([]);
+  it('list: an empty window loads nothing and returns an empty page', async () => {
+    mockListQueries([]);
 
-    await service.list({ sportId: 'sport-uuid-1' });
+    const result = await service.list({ cursor: 'gone', limit: 5 });
 
-    const callArgs = prisma.v1Tournament.findMany.mock.calls[0][0];
-    expect(callArgs.where.sportId).toBe('sport-uuid-1');
+    expect(result.items).toEqual([]);
+    expect(result.pageInfo).toEqual({ nextCursor: null, hasNext: false });
+    expect(prisma.v1Tournament.findMany).not.toHaveBeenCalled();
   });
 
-  it('list: no sportId → sportId condition absent from where', async () => {
-    prisma.v1Tournament.findMany.mockResolvedValue([]);
-
-    await service.list({});
-
-    const callArgs = prisma.v1Tournament.findMany.mock.calls[0][0];
-    expect(callArgs.where.sportId).toBeUndefined();
-  });
-
-  // ─── list — 페이지 번호(데스크톱) ────────────────────────────────────────────
-
-  it('list: page 요청이면 목록과 같은 조건의 전체 건수로 totalPages/hasPrev 를 채운다', async () => {
-    const keys = Array.from({ length: 42 }, (_, i) => tournamentCard({ id: `t-${String(i).padStart(2, '0')}` }));
-    prisma.v1Tournament.findMany.mockResolvedValueOnce(keys).mockResolvedValueOnce(keys.slice(20, 40));
+  it('list: page requests count the total with a separate query and fill totalPages/hasPrev', async () => {
+    mockListQueries(Array.from({ length: 21 }, (_, i) => `t-${i}`), 42);
 
     const result = await service.list({ page: 2, limit: 20 });
 
     expect(result.pageInfo).toMatchObject({ page: 2, total: 42, totalPages: 3, hasPrev: true });
-    // The total comes from the rows the sort already read — no second COUNT round-trip.
-    expect(prisma.v1Tournament.count).not.toHaveBeenCalled();
   });
 
-  it('list: 커서(무한 스크롤) 요청에는 COUNT 를 돌리지 않는다', async () => {
-    prisma.v1Tournament.findMany.mockResolvedValue([]);
+  it('list: cursor requests never run the COUNT query and keep the two-field pageInfo', async () => {
+    mockListQueries([]);
 
-    await service.list({ cursor: 'cursor-id', limit: 20 });
+    const result = await service.list({ cursor: 'cursor-id', limit: 20 });
 
-    expect(prisma.v1Tournament.count).not.toHaveBeenCalled();
-  });
-
-  it('list: 커서 요청의 pageInfo 는 예전과 같은 두 필드만 갖는다', async () => {
-    // 통합 스펙(`test/integration/health.e2e-spec.ts`)이 이 응답 모양을 통째로 비교한다 —
-    // total 을 세지도 않고 `total: 0` 을 실어 보내면 "전체 0건"이라는 거짓말이 된다.
-    prisma.v1Tournament.findMany.mockResolvedValue([]);
-
-    const result = await service.list({});
-
+    const sql = prisma.$queryRaw.mock.calls.map(([strings]) => (strings as TemplateStringsArray).join('?'));
+    expect(sql.some((text) => text.includes('COUNT(*)'))).toBe(false);
+    // Reported as-is by the integration contract: no `total: 0` lie when nothing was counted.
     expect(result.pageInfo).toEqual({ nextCursor: null, hasNext: false });
-  });
-
-  // ─── list — 기본 정렬(서버가 단일 출처) ──────────────────────────────────────
-
-  describe('list default order', () => {
-    const day = (d: number) => new Date(Date.UTC(2026, 9, d));
-    // Deliberately shuffled; two rows per group, completed ones have end dates in reverse of start order.
-    const rows = [
-      tournamentCard({ id: 'c-old', status: 'completed', scheduledAt: day(1), scheduledEndAt: day(2) }),
-      tournamentCard({ id: 'ip-late', status: 'in_progress', scheduledAt: day(20) }),
-      tournamentCard({ id: 'o-late', status: 'open', scheduledAt: day(25) }),
-      tournamentCard({ id: 'cl-late', status: 'closed', scheduledAt: day(18) }),
-      tournamentCard({ id: 'c-new', status: 'completed', scheduledAt: day(3), scheduledEndAt: day(9) }),
-      tournamentCard({ id: 'o-soon', status: 'open', scheduledAt: day(11) }),
-      tournamentCard({ id: 'ip-soon', status: 'in_progress', scheduledAt: day(10) }),
-      tournamentCard({ id: 'cl-soon', status: 'closed', scheduledAt: day(12) }),
-      tournamentCard({ id: 'o-tie-b', status: 'open', scheduledAt: day(11) }),
-    ];
-    const expected = [
-      'o-soon', 'o-tie-b', 'o-late', 'cl-soon', 'cl-late', 'ip-soon', 'ip-late', 'c-new', 'c-old',
-    ];
-
-    function mockRows() {
-      prisma.v1Tournament.findMany.mockImplementation(async (args: { where: { id?: { in: string[] } } }) =>
-        args.where.id ? rows.filter((r) => args.where.id!.in.includes(r.id as string)) : rows,
-      );
-    }
-
-    it('groups open -> closed -> in_progress -> completed, ties by id, completed most recently ended first', async () => {
-      mockRows();
-      const result = await service.list({ limit: 50 });
-      expect(result.items.map((i) => i.id)).toEqual(expected);
-    });
-
-    it('cursor paging across group boundaries yields every row exactly once, in order', async () => {
-      mockRows();
-      const seen: string[] = [];
-      let cursor: string | undefined;
-      for (let guard = 0; guard < 20; guard += 1) {
-        const page = await service.list({ limit: 2, cursor });
-        seen.push(...page.items.map((i) => i.id));
-        cursor = page.pageInfo.nextCursor ?? undefined;
-        if (!cursor) break;
-      }
-      expect(seen).toEqual(expected);
-    });
-
-    it('page-number paging matches the same order with no gaps or duplicates', async () => {
-      mockRows();
-      prisma.v1Tournament.count.mockResolvedValue(rows.length);
-      const seen: string[] = [];
-      for (let page = 1; page <= 3; page += 1) {
-        const result = await service.list({ limit: 4, page });
-        seen.push(...result.items.map((i) => i.id));
-      }
-      expect(seen).toEqual(expected);
-    });
-
-    it('a status filter keeps its where and still orders inside the single group', async () => {
-      mockRows();
-      await service.list({ status: 'completed', limit: 50 });
-      expect(prisma.v1Tournament.findMany.mock.calls[0][0].where.status).toBe('completed');
-    });
-
-    it('a cursor that no longer matches a row returns an empty page instead of restarting', async () => {
-      mockRows();
-      const result = await service.list({ cursor: 'deleted-id', limit: 5 });
-      expect(result.items).toEqual([]);
-      expect(result.pageInfo).toEqual({ nextCursor: null, hasNext: false });
-    });
   });
 
   // ─── get — not found / hidden ────────────────────────────────────────────────

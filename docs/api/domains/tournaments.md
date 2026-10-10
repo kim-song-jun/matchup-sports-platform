@@ -506,7 +506,7 @@ All team roster mutations lock the registration row and re-read `rosterLockedAt`
 
 ## Public list default order (2026-10-10)
 
-`GET /tournaments` orders by status group, then date, then `id` ascending as the tie-breaker. The server is the only place this order is defined; clients render `items[]` as received.
+`GET /tournaments` orders by status group, then date, then `id` ascending as the tie-breaker. The server is the only place this order is defined; clients render `items[]` as received. The order, the cursor comparison and the `page` offset are all computed in the database (one `ORDER BY` over the status group, the group's date key and `id`), so request cost depends on the page size, not on how many tournaments exist. A `cursor` is still a row id: a cursor whose row is hidden, deleted or filtered out returns an empty page. `page=1` together with a `cursor` follows the cursor; `total` is counted only for `page` requests.
 
 1. `open` (a regular league's `draft` "upcoming" is grouped here) - `scheduledAt` ascending
 2. `closed` - `scheduledAt` ascending

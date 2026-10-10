@@ -494,6 +494,9 @@ export class TournamentBracketService {
     }
 
     const legNumber = dto.legNumber ?? 1;
+    const requestedVenueProviderId = dto.venueProviderId?.trim();
+    // 저장 쪽 resolvePlaceSnapshot 과 같은 정규화(trim, 빈 값은 대회 기본 장소로) — 안 맞추면 같은 번호 재시도가 해시 불일치 409 가 난다.
+    const requestedVenue = dto.venue?.trim() || null;
     const created = await this.prisma.$transaction(async (tx) => {
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`league-fixture-generation:${tournamentId}`}, 0))`;
       // Numbers are tournament-wide and archived fixtures keep theirs, so the allocation reads every row.
@@ -510,9 +513,9 @@ export class TournamentBracketService {
         homeRegistrationId: dto.homeRegistrationId ?? null,
         awayRegistrationId: dto.awayRegistrationId ?? null,
         scheduledAt: dto.scheduledAt ? new Date(dto.scheduledAt).toISOString() : null,
-        venue: dto.venue ?? tournament.venue ?? null,
+        venue: requestedVenue ?? tournament.venue ?? null,
         // 핀 없는 요청의 해시는 예전과 같게 둔다(재시도 중인 명령이 불일치로 막히지 않게).
-        ...(dto.venueProviderId ? { venueProviderId: dto.venueProviderId } : {}),
+        ...(requestedVenueProviderId ? { venueProviderId: requestedVenueProviderId } : {}),
       };
       const durableCommandId = `tournament-fixture:${tournamentId}:${dto.round}:${fixtureNumber}:${legNumber}`;
       const payloadHash = canonicalGameCommandPayloadHash(commandPayload);
@@ -618,6 +621,8 @@ export class TournamentBracketService {
           awayRegistrationId: existingDetails.awayRegistrationId,
           scheduledAt: existingDetails.teamMatch.startAt?.toISOString() ?? null,
           venue: existingDetails.teamMatch.placeName,
+          // 요청이 핀을 명시했을 때만 비교한다 — 핀 없는 요청은 대회 기본 장소의 id 를 물려받아 저장될 수 있다.
+          ...(requestedVenueProviderId ? { venueProviderId: existingDetails.teamMatch.placeProviderId } : {}),
         };
         if (canonicalGameCommandPayloadHash(existingPayload) !== payloadHash) {
           throw new ConflictException({

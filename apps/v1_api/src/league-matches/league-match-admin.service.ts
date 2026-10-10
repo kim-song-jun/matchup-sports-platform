@@ -72,7 +72,7 @@ import { PLACE_SELECT } from '../places/place-select';
 import { toPlaceColumns, toPlaceView, type PlaceSnapshot, type PlaceView } from '../places/place-snapshot';
 import { DEFAULT_FIXTURE_PLACE_NAME, resolveLeagueFixturePlace, type LeagueFixturePlaceInput } from './league-fixture-place';
 import { findTournamentOnSurface } from '../tournaments/tournament-surface-lookup';
-import { assertLeagueFixtureGenerationAllowedInTx } from './league-fixture-generation-guard';
+import { assertLeagueFixtureGenerationAllowedInTx, assertLeagueNotEndedInTx } from './league-fixture-generation-guard';
 import { LEAGUE_STATE_BY_STATUS, isCompleteLeagueMirror } from '../tournaments/league-competition-mirror';
 import { randomUUID } from 'node:crypto';
 import { BRACKET_TEMPLATE_MAX_FIXTURES } from '../tournaments/templates/bracket-template-plan';
@@ -1044,6 +1044,8 @@ export class LeagueMatchAdminService {
     }
 
     const { cancelledApplications, leagueCompleted } = await this.prisma.$transaction(async (tx) => {
+      // 리그 행 락이 먼저 — updateFixture·removeTeam·generateFixtures 와 같은 순서라야 40P01 이 나지 않는다.
+      await tx.$queryRaw`SELECT id FROM "v1_tournaments" WHERE id = ${leagueId} FOR UPDATE`;
       await this.assertFixtureGamesNotInProgress(
         tx,
         [teamMatchId],
@@ -1388,6 +1390,8 @@ export class LeagueMatchAdminService {
       // 일괄 생성과 같은 락. 같은 리그에 동시에 손대는 두 요청이 서로의 주차 계산을
       // 어긋나게 만들지 않는다 — 아래 형제 목록 조회가 이 락 안에서 일어나야 한다.
       await tx.$queryRaw`SELECT id FROM "v1_tournaments" WHERE id = ${leagueId} FOR UPDATE`;
+      // 끝남·취소만 막는다 — 보류 중 수동 추가는 허용이라 일괄 생성 가드(on_hold 도 막음)를 쓰지 않는다.
+      await assertLeagueNotEndedInTx(tx, leagueId);
       // **잠근 뒤에** 로스터를 다시 읽는다. 잠금 밖에서 읽은 `league.teams` 로 판정하면
       // TOCTOU 다 — 그 사이 `removeTeam` 이 커밋되면 **리그에서 이미 빠진 팀으로 대진이
       // 생기고**, 그 대진은 로스터에 없는 팀을 가리킨 채 남는다(제거 경로가 취소할 대상
@@ -1501,6 +1505,9 @@ export class LeagueMatchAdminService {
       : null;
     const nextStartAt = dto.startsAt === undefined ? undefined : new Date(dto.startsAt);
     const updated = await this.prisma.$transaction(async (tx) => {
+      // 리그 행 락이 먼저(removeTeam·generateFixtures 와 같은 순서). 끝남·취소만 막고 보류 중 수정은 허용한다.
+      await tx.$queryRaw`SELECT id FROM "v1_tournaments" WHERE id = ${leagueId} FOR UPDATE`;
+      await assertLeagueNotEndedInTx(tx, leagueId);
       const nextEndAt = nextStartAt === undefined
         ? undefined
         : durationMs !== null

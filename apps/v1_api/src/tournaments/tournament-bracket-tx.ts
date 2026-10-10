@@ -79,6 +79,26 @@ export async function recalculateStandingsInTx(tx: Tx, tournamentId: string) {
   };
 }
 
+export const TEAM_IN_OTHER_GROUP_MESSAGE = '다른 조에 있는 팀은 이 조에 넣을 수 없어요. 그 조에서 먼저 빼 주세요.';
+export type GroupEnrollment = { groupId: string; registrationId: string };
+
+/** 조별 단계(`phase = group`)는 한 팀이 한 조에만 있다 — 이 조에 없는 신청이 같은 대회의 다른 조별 조에 있으면 거절한다. */
+export async function assertNotInOtherGroupInTx(
+  tx: Tx,
+  input: { tournamentId: string; groupId: string; registrationIds: readonly string[] },
+): Promise<void> {
+  if (input.registrationIds.length === 0) return;
+  const elsewhere = await tx.v1TournamentGroupTeam.findFirst({
+    where: {
+      registrationId: { in: [...input.registrationIds] },
+      groupId: { not: input.groupId },
+      group: { tournamentId: input.tournamentId, phase: 'group' },
+    },
+    select: { id: true },
+  });
+  if (elsewhere !== null) throw new ConflictException({ code: 'TEAM_IN_OTHER_GROUP', message: TEAM_IN_OTHER_GROUP_MESSAGE });
+}
+
 /**
  * 조별 순위는 조 편성(V1TournamentGroupTeam) 기준으로 계산·표시된다. 조별리그(`group`) 조 안의
  * 경기에 들어가는 팀이 편성에 없으면 순위표에서 빠지므로, 경기를 넣는 같은 트랜잭션에서 편성한다.
@@ -91,21 +111,24 @@ export async function ensureGroupPhaseTeamsInTx(
   groupId: string,
   groupPhase: string,
   registrationIds: ReadonlyArray<string | null | undefined>,
-): Promise<void> {
-  if (groupPhase !== 'group') return;
+  options: { deferOtherGroupCheck?: boolean } = {},
+): Promise<GroupEnrollment[]> {
+  if (groupPhase !== 'group') return [];
   const ids = [...new Set(registrationIds.filter((id): id is string => typeof id === 'string'))];
-  if (ids.length === 0) return;
+  if (ids.length === 0) return [];
   const assigned = await tx.v1TournamentGroupTeam.findMany({
     where: { groupId },
     select: { registrationId: true, sortOrder: true },
   });
   const assignedIds = new Set(assigned.map((team) => team.registrationId));
+  const fresh = ids.filter((id) => !assignedIds.has(id));
+  // 자리 경로는 맞바꾸는 동안 한 팀이 잠시 두 조에 걸친다 — 호출자가 이전 편성을 푼 뒤(트랜잭션 끝)에 새 편성만 검사한다.
+  if (options.deferOtherGroupCheck !== true) await assertNotInOtherGroupInTx(tx, { tournamentId, groupId, registrationIds: fresh });
   let nextSortOrder = assigned.length === 0 ? 0 : Math.max(...assigned.map((team) => team.sortOrder)) + 1;
   // 순위 행이 하나라도 있는 조는 행만 보여 줘서, 새 편성 팀은 재계산 전까지 표에서 빠진다.
   const groupHasStandings = (await tx.v1TournamentStanding.count({ where: { groupId } })) > 0;
   const createdTeamIds: string[] = [];
-  for (const registrationId of ids) {
-    if (assignedIds.has(registrationId)) continue;
+  for (const registrationId of fresh) {
     const created = await tx.v1TournamentGroupTeam.create({
       data: { groupId, registrationId, isBye: false, sortOrder: nextSortOrder++ },
     });
@@ -126,6 +149,7 @@ export async function ensureGroupPhaseTeamsInTx(
       afterJson: { trigger: 'fixture_group_team_enroll', groupId, ...recalculated.audit },
     });
   }
+  return fresh.map((registrationId) => ({ groupId, registrationId }));
 }
 
 /** `createEmptyTournamentFixtureInTx` 와 같은 자리에 쓰는 외부 의존. 사이드 배정은 이 중 아무것도 쓰지 않는다. */
@@ -143,6 +167,8 @@ export type TournamentFixtureUpdateInput = {
   /** The admin fixture edit sets these; other callers keep the "started games keep their teams" rule. */
   allowStartedTeamChange?: boolean;
   teamChangeReason?: string | null;
+  /** 주어지면 다른 조 검사를 미루고 새 편성을 여기에 쌓는다 — 자리 경로 전용(호출자가 끝 상태를 검사한다). */
+  enrollmentSink?: GroupEnrollment[];
 };
 
 /**
@@ -159,7 +185,11 @@ export async function updateTournamentFixtureInTx(tx: Tx, admin: V1ActiveAdmin, 
     } });
     if (byeTeam) throw new ConflictException({ code: 'BYE_TEAM_HAS_MATCH', message: '부전승팀은 해당 라운드의 경기에 넣을 수 없어요. 다음 라운드에 직접 배정해 주세요.' });
     const group = await tx.v1TournamentGroup.findFirst({ where: { id: input.groupId }, select: { phase: true } });
-    if (group) await ensureGroupPhaseTeamsInTx(tx, admin, input.tournamentId, input.groupId, group.phase, [input.homeRegistrationId, input.awayRegistrationId]);
+    if (group) {
+      const enrolled = await ensureGroupPhaseTeamsInTx(tx, admin, input.tournamentId, input.groupId, group.phase,
+        [input.homeRegistrationId, input.awayRegistrationId], { deferOtherGroupCheck: input.enrollmentSink !== undefined });
+      input.enrollmentSink?.push(...enrolled);
+    }
   }
   const previousNumber = input.fixtureNumber === undefined ? undefined : (await tx.v1TournamentMatchDetails.findUniqueOrThrow({
     where: { teamMatchId: input.fixtureId }, select: { fixtureNumber: true },
@@ -217,7 +247,7 @@ export async function assignTournamentFixtureSideInTx(
   tx: Tx,
   _deps: BracketTxDeps,
   admin: V1ActiveAdmin,
-  input: { fixtureId: string; side: 'HOME' | 'AWAY'; registrationId: string | null },
+  input: { fixtureId: string; side: 'HOME' | 'AWAY'; registrationId: string | null; enrollmentSink: GroupEnrollment[] },
 ): Promise<void> {
   const details = await tx.v1TournamentMatchDetails.findUnique({
     where: { teamMatchId: input.fixtureId },
@@ -229,6 +259,7 @@ export async function assignTournamentFixtureSideInTx(
     tournamentId: details.tournamentId,
     groupId: details.groupId,
     ...(input.side === 'HOME' ? { homeRegistrationId: input.registrationId } : { awayRegistrationId: input.registrationId }),
+    enrollmentSink: input.enrollmentSink,
   });
 }
 

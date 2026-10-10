@@ -186,6 +186,8 @@ Email and social signup requests must submit every current required document ID 
 
 Email signup must accept required terms and submit `displayName`, an 11-digit `phone`, a real-calendar `birthDate` in `YYYYMMDD` format, and `gender = male | female` before `POST /api/v1/auth/register` creates the account. `displayName` is trimmed and cannot be blank. A successful email signup creates `v1_user_profiles`, sets `onboardingStatus = signup_done`, and sends the client through the signup complete screen before sport onboarding. `profileImageUrl` remains optional and nullable.
 
+`POST /api/v1/auth/register` and `POST /api/v1/auth/social-profile` (the last step of every signup path) also accept an optional `recordConsent: { granted: boolean, policyHash: string }`, the same shape as `PUT /me/record-consent`. When present it is upserted into `V1UserRecordConsent` (`GRANTED`/`REVOKED`) inside the signup transaction. When omitted (older clients) no consent row is written and the user stays undecided. Existing accounts are never backfilled.
+
 Kakao signup starts with `POST /api/v1/auth/kakao` because the provider user key is needed first. Teameet does not derive, parse, or persist a service nickname from the Kakao provider nickname, and never synthesizes a `k_{providerUserKey}` nickname. A new Kakao user is created as `onboardingStatus = social_terms_required` without a profile. If the user leaves here, admin surfaces should treat the row as `가입 진행 중 · 약관 미동의`.
 
 When `POST /api/v1/auth/social-terms` succeeds, the API does not create a profile. It sets `onboardingStatus = social_profile_required`, sets `currentStep = signup`, and returns `next.route = /signup/social`. The client must navigate to the returned route.

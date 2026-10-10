@@ -21,6 +21,8 @@ import {
 import { cssUrl } from '@/lib/assets';
 import { V1ApiError } from '@/lib/api-client';
 import { trackEvent } from '@/lib/analytics';
+import { RECORD_CONSENT_POLICY_HASH } from '@/lib/record-consent';
+import { SignupRecordConsentSwitch } from './signup-record-consent-switch';
 import { clearV1IdentityCache } from '@/lib/query-keys';
 import { saveStoredV1Session } from '@/lib/session-storage';
 import { displayInitials } from '@/lib/display-initials';
@@ -98,6 +100,7 @@ export function SignupClient() {
   const [showPassword, setShowPassword] = useState(false);
   const [showPasswordConfirm, setShowPasswordConfirm] = useState(false);
   const [profileImageUrl, setProfileImageUrl] = useState('');
+  const [recordPublic, setRecordPublic] = useState(true);
   const [profileImageFile, setProfileImageFile] = useState<File | null>(null);
   const [uploadingProfileImage, setUploadingProfileImage] = useState(false);
   const [realName, setRealName] = useState('');
@@ -284,6 +287,7 @@ export function SignupClient() {
         requiredTermsAccepted: true,
         acceptedTermsDocumentIds,
         phoneProofToken: phoneProofToken ?? undefined,
+        recordConsent: { granted: recordPublic, policyHash: RECORD_CONSENT_POLICY_HASH },
       });
 
       saveStoredV1Session(result.session);
@@ -692,6 +696,7 @@ export function SignupClient() {
                 </span>
               </label>
 
+              <SignupRecordConsentSwitch checked={recordPublic} onChange={setRecordPublic} />
             </>
           ) : null}
         </form>

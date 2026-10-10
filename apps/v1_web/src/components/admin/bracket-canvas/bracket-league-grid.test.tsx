@@ -30,6 +30,12 @@ describe('BracketLeagueGrid', () => {
     expect(within(cell).queryByText('2번 경기')).not.toBeInTheDocument();
   });
 
+  it('조마다 줄어들 수 있는 minmax 트랙을 둔다(2개 조가 1440 에서 스크롤 없이 들어가는 폭)', () => {
+    renderGrid();
+    const track = screen.getByRole('region', { name: '대진 그림' }).querySelector<HTMLElement>('div.grid')?.style.gridTemplateColumns;
+    expect(track).toBe('72px repeat(2, minmax(190px, 1fr))');
+  });
+
   it('조는 있는데 경기가 하나도 없으면 빈 안내를 보여 주고, 경기가 있으면 보이지 않는다', () => {
     const { unmount } = render(<BracketLeagueGrid groups={[gA]} fixtures={[]} slots={[]} selectedFixtureId={null} pendingRegistrationId={null} canWrite onSelectFixture={vi.fn()} onAssignSlot={vi.fn()} onAssignDirect={vi.fn()} />);
     expect(screen.getByText('아직 경기가 없어요. 템플릿으로 시작하거나 경기를 추가해 주세요.')).toBeInTheDocument();

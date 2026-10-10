@@ -139,4 +139,16 @@ describe('RegisterDto (required signup profile contract)', () => {
     // Then
     expect(failures).toContain('gender');
   });
+
+  it('accepts a missing recordConsent but rejects a malformed one', async () => {
+    expect(await failedProperties({ ...VALID_REGISTER_INPUT })).not.toContain('recordConsent');
+    expect(await failedProperties({
+      ...VALID_REGISTER_INPUT,
+      recordConsent: { granted: false, policyHash: 'v1-public-record-consent-1' },
+    })).not.toContain('recordConsent');
+    expect(await failedProperties({
+      ...VALID_REGISTER_INPUT,
+      recordConsent: { granted: 'yes', policyHash: '' },
+    })).toContain('recordConsent');
+  });
 });

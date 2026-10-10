@@ -51,3 +51,9 @@ export const BRACKET_CANVAS_WIDE_MEDIA_QUERY = '(min-width: 768px)';
  * 시트로 띄우고 참가팀 트레이를 접는다 — 옆 열이 없으면 패널이 그림 아래로 밀려 보이지 않는다.
  */
 export const BRACKET_CANVAS_SIDE_PANEL_MEDIA_QUERY = '(min-width: 1024px)';
+
+/**
+ * 리그 방식 대진 그림에서 순위표·칸 패널이 옆 열로 붙는 최소 폭. 어드민은 좌측 열이 둘(사이드바+하위 메뉴)이라
+ * 1440 미만에선 옆 열을 두면 조 두 열이 다 들어가지 않아(alpha 실측 1280 에서 82px 잘림), 시트(순위표 버튼·칸 패널)로 대신한다.
+ */
+export const BRACKET_LEAGUE_SIDE_COLUMN_MEDIA_QUERY = '(min-width: 1440px)';

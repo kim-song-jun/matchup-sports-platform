@@ -180,6 +180,7 @@ export class UpdateMyRecordConsentDto {
 
   @IsString()
   @IsNotEmpty()
+  @MaxLength(64)
   policyHash!: string;
 }
 

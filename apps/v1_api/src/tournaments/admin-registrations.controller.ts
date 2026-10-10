@@ -78,6 +78,7 @@ export class AdminRegistrationsController {
    * 취소 처리. body { reason? }.
    * 가드: status in [cancel_requested, awaiting_payment, payment_checking, paid, confirmed, waitlisted].
    * 동작: →cancelled, 결제 있으면 status→cancelled(refund는 운영 수동).
+   * cancel_requested 면 승인(cancelOutcome=approved), 그 외는 거부(rejected). reason 은 adminCancelReason 에 담고 팀의 cancelReason 은 보존한다.
    */
   @Patch('admin/registrations/:registrationId/cancel')
   cancel(

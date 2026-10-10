@@ -661,7 +661,7 @@ function RegistrationDetailView({
   const cancelBusyRef = useRef(false);
   const withdrawCancelBusyRef = useRef(false);
 
-  const statusConfig = registrationStatusConfig(registration.status);
+  const statusConfig = registrationStatusConfig(registration.status, registration.cancelOutcome);
   const players = rosterData?.players ?? [];
   const belowMinimum = rosterData?.belowMinimum ?? false;
   const isRosterLocked = Boolean(registration.rosterLockedAt);
@@ -986,24 +986,27 @@ function RegistrationDetailView({
                   <InfoRow
                     label="신청일"
                     value={formatDateShort(registration.createdAt)}
-                    isLast={!showConfirmedAt && !registration.cancelRequestedAt && !registration.cancelReason}
+                    isLast={!showConfirmedAt && !registration.cancelRequestedAt && !registration.cancelReason && !registration.adminCancelReason}
                   />
                   {showConfirmedAt ? (
                     <InfoRow
                       label="확정일"
                       value={formatDateShort(registration.confirmedAt)}
-                      isLast={!registration.cancelRequestedAt && !registration.cancelReason}
+                      isLast={!registration.cancelRequestedAt && !registration.cancelReason && !registration.adminCancelReason}
                     />
                   ) : null}
                   {registration.cancelRequestedAt ? (
                     <InfoRow
                       label="취소 요청일"
                       value={formatDateShort(registration.cancelRequestedAt)}
-                      isLast={!registration.cancelReason}
+                      isLast={!registration.cancelReason && !registration.adminCancelReason}
                     />
                   ) : null}
                   {registration.cancelReason ? (
-                    <InfoRow label="취소 사유" value={registration.cancelReason} isLast />
+                    <InfoRow label="취소 사유" value={registration.cancelReason} isLast={!registration.adminCancelReason} />
+                  ) : null}
+                  {registration.adminCancelReason ? (
+                    <InfoRow label="운영진 사유" value={registration.adminCancelReason} isLast />
                   ) : null}
                 </div>
 

@@ -326,6 +326,8 @@ The list (`GET /api/v1/tournaments`) and detail (`GET /api/v1/tournaments/:tourn
 
 `cancel-request` stores the status that existed before `cancel_requested`. It is rejected with `409 TOURNAMENT_ENDED` (registration unchanged) when the tournament or league is `completed` or `cancelled` — terminal states have nothing left to cancel; this applies to `draft` registrations too. Other non-cancellable registration statuses keep returning `409 REGISTRATION_NOT_CANCELLABLE`. `cancel-request/withdraw` is allowed only while the registration status is `cancel_requested`; it clears `cancelRequestedAt`, `cancelReason`, and the stored previous status after restoring the registration.
 
+Registration responses carry `cancelReason` (the team's reason from `cancel-request`), `adminCancelReason` (the reason an admin gave when processing the cancellation) and `cancelOutcome` (`approved` when an admin accepted a `cancel_requested` registration, `rejected` when an admin turned down a registration that had no cancel request, `null` for a draft the team cancelled itself and for rows older than the column). `PATCH /admin/registrations/:registrationId/cancel` writes the admin reason and outcome without touching `cancelReason`; the regular-league `400 LEAGUE_CANCEL_REASON_REQUIRED` applies only to a rejection, not to approving a team's own cancel request.
+
 `cancel-request/withdraw` re-reads the tournament under a row lock before restoring the registration, so it can reject after the outer checks passed. **Three** conflicts are possible there:
 
 | code | when | what the client should do |

@@ -330,18 +330,24 @@ export class AdminRegistrationsService {
       });
     }
 
-    // ## 정규 리그는 거부 사유가 필수다 (D9) — 대회는 선택 그대로
+    // 취소 요청 중인 신청을 받아 주면 승인, 그 외에는 운영자가 신청을 물리는 거부다.
+    const isApproval = registration.status === 'cancel_requested';
+
+    // ## 정규 리그의 거부는 사유가 필수다 (D9) — 대회는 선택 그대로
     // DTO 에서 `@IsNotEmpty()` 로 막지 않는 이유는 **같은 DTO 를 대회도 쓰기 때문**이다.
-    // 거기서 막으면 대회 운영이 함께 바뀐다. `kind` 로 갈라 리그에서만 요구한다.
-    //
-    // 리그 거부는 팀이 그 시즌을 통째로 못 뛰게 되는 조치라, 나중에 "왜 떨어졌나" 를
-    // 답할 수 있어야 한다(정본: "정원 초과는 운영자가 **사유와 함께** 조정").
-    if (registration.tournament.kind === V1CompetitionKind.regular_league && !dto.reason?.trim()) {
+    // 리그 거부는 팀이 그 시즌을 통째로 못 뛰게 되는 조치라 "왜 떨어졌나" 를 답할 수 있어야 한다.
+    // 팀이 스스로 요청한 취소를 승인할 땐 물릴 이유가 없어서 사유를 요구하지 않는다.
+    if (
+      !isApproval
+      && registration.tournament.kind === V1CompetitionKind.regular_league
+      && !dto.reason?.trim()
+    ) {
       throw new BadRequestException({
         code: 'LEAGUE_CANCEL_REASON_REQUIRED',
         message: '리그 참가를 거부하려면 사유를 입력해 주세요.',
       });
     }
+    const cancelOutcome = isApproval ? 'approved' : 'rejected';
 
     const result = await this.prisma.$transaction(async (tx) => {
       // 확정이었던 팀(취소 요청 중이던 확정 팀 포함)은 대진 자리에서 먼저 뺀다. 잠금 순서(대회 → 등록 행)를 자리 배정과 맞추려고 등록을 바꾸기 전에 한다.
@@ -350,8 +356,8 @@ export class AdminRegistrationsService {
       if (wasConfirmed) await this.slots.releaseForRegistrationInTx(tx, admin, registrationId);
       const updated = await tx.v1TournamentRegistration.update({
         where: { id: registrationId },
-        // 팀이 남긴 취소 요청 사유는 어드민이 별도 사유를 주지 않는 한 보존한다 (감사 추적)
-        data: { status: 'cancelled', cancelPreviousStatus: null, cancelReason: dto.reason ?? registration.cancelReason ?? null },
+        // `cancelReason` 은 팀이 취소 요청에 남긴 사유라 건드리지 않는다. 어드민 사유는 따로 담는다.
+        data: { status: 'cancelled', cancelPreviousStatus: null, cancelOutcome, adminCancelReason: dto.reason ?? null },
       });
 
       // 결제가 있고 아직 cancelled 아니면 payment도 cancelled로 변경.
@@ -375,7 +381,7 @@ export class AdminRegistrationsService {
           targetId: registrationId,
           reason: dto.reason ?? null,
           beforeJson: { status: registration.status },
-          afterJson: { status: 'cancelled' },
+          afterJson: { status: 'cancelled', cancelOutcome },
           fromStatus: registration.status,
           toStatus: 'cancelled',
         },
@@ -389,7 +395,9 @@ export class AdminRegistrationsService {
       registration.appliedByUserId,
       'tournament_registration_cancelled',
       registration.tournamentId,
-      `"${registration.tournament.title}" 대회 참가 신청이 취소됐어요.`,
+      isApproval
+        ? `"${registration.tournament.title}" 대회 참가 취소 요청이 승인됐어요.`
+        : `"${registration.tournament.title}" 대회 참가 신청이 거부돼 취소됐어요.`,
     );
 
     const playerCount = await this.countPlayers(registrationId);
@@ -711,6 +719,8 @@ export class AdminRegistrationsService {
       rosterDeadlineOverrideAt: row.rosterDeadlineOverrideAt?.toISOString() ?? null,
       cancelRequestedAt: row.cancelRequestedAt?.toISOString() ?? null,
       cancelReason: row.cancelReason,
+      adminCancelReason: row.adminCancelReason,
+      cancelOutcome: row.cancelOutcome,
       playerCount,
       payment: payment
         ? {

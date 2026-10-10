@@ -48,6 +48,8 @@ const registration: V1AdminTournamentRegistration = {
   rosterDeadlineOverrideAt: null,
   cancelRequestedAt: null,
   cancelReason: null,
+  adminCancelReason: null,
+  cancelOutcome: null,
   playerCount: 1,
   payment: null,
   confirmedByAdminUserId: 'admin-1',

@@ -9,10 +9,12 @@ export type LeagueGridModel = { columns: LeagueGridColumn[]; rows: LeagueGridRow
 
 const LEAGUE_ROUND = /^league_r(\d+)$/;
 
-const roundNumber = (round: string): number | null => {
+export const leagueRoundNumber = (round: string): number | null => {
   const hit = LEAGUE_ROUND.exec(round.trim());
   return hit === null ? null : Number(hit[1]);
 };
+
+export const leagueRoundLabel = (n: number): string => `${n}라운드`;
 
 const byFixtureOrder = (a: V1AdminBracketFixture, b: V1AdminBracketFixture) =>
   a.fixtureNumber - b.fixtureNumber || a.legNumber - b.legNumber || a.id.localeCompare(b.id);
@@ -57,7 +59,7 @@ export function buildLeagueGrid(input: {
     columns.push({ key: LEAGUE_UNGROUPED_COLUMN_KEY, groupId: null, label: groups.length === 0 ? '전체 경기' : '조 미정', fixtureCount: orphans.length });
   }
 
-  const numbered = fixtures.some((f) => roundNumber(f.round) !== null);
+  const numbered = fixtures.some((f) => leagueRoundNumber(f.round) !== null);
   const drafts = new Map<string, RowDraft>();
   const place = (columnKey: string, fixture: V1AdminBracketFixture, key: string, label: string, sort: number) => {
     const draft = drafts.get(key) ?? { key, label, sort, order: drafts.size, cells: new Map() };
@@ -71,11 +73,11 @@ export function buildLeagueGrid(input: {
     list.forEach((fixture, index) => {
       if (!numbered) {
         const row = Math.floor(index / chunk);
-        place(column.key, fixture, `c:${row}`, `${row + 1}라운드`, row);
+        place(column.key, fixture, `c:${row}`, leagueRoundLabel(row + 1), row);
         return;
       }
-      const n = roundNumber(fixture.round);
-      if (n !== null) place(column.key, fixture, `r:${n}`, `${n}라운드`, n);
+      const n = leagueRoundNumber(fixture.round);
+      if (n !== null) place(column.key, fixture, `r:${n}`, leagueRoundLabel(n), n);
       else place(column.key, fixture, `o:${fixture.round.trim()}`, tournamentRoundLabel(fixture.round), Number.POSITIVE_INFINITY);
     });
   }

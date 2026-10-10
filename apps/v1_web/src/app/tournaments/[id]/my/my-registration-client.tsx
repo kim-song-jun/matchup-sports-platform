@@ -221,10 +221,13 @@ function ReceiptIcon({ size }: { size?: number }) {
   );
 }
 
-/* ── Registration pass card (Direction A) — confirmed / waitlisted / paid ──
+/* ── Registration pass card (Direction A) ──
  * Replaces the old colored-box hero + orange roster-nudge box with a single
  * white "참가권" pass: sport chip + status pill + title, a dashed ticket-stub
- * divider, the show-up facts (일정·장소·결제), and a roster next-step footer. */
+ * divider, the show-up facts (일정·장소·결제), and a roster next-step footer.
+ * 머리(종목·상태·대회명·팀명)와 facts 는 **모든 상태**에서 그린다 — 입금 확인 중·취소 요청 중처럼
+ * 패스를 안 그리던 상태에서는 화면 상단에서 어느 대회의 어느 팀 신청인지가 사라졌다(MD-QA #80).
+ * 명단 푸터만 확정·결제 완료(confirmed/paid)에 붙는다. */
 
 function PassFact({ icon, label, value }: { icon: ReactNode; label: string; value: string }) {
   return (
@@ -326,8 +329,6 @@ function RegistrationPass({
     );
   }
 
-  if (status !== 'confirmed' && status !== 'waitlisted' && status !== 'paid') return null;
-
   const accent = getSportAccent(sportCode);
   const statusCfg = registrationStatusConfig(status);
   const dateStr = formatTournamentDateRangeMedium(scheduledAt, scheduledEndAt);
@@ -392,7 +393,7 @@ function RegistrationPass({
         {paymentSummary ? <PassFact icon={<ReceiptIcon />} label="결제" value={paymentSummary} /> : null}
       </div>
 
-      {/* Footer: roster next-step (confirmed/paid) or waitlist note */}
+      {/* Footer: roster next-step (confirmed/paid), waitlist note (waitlisted), or none */}
       {showRosterFooter ? (
         <div
           style={{
@@ -435,16 +436,17 @@ function RegistrationPass({
             <ChevronRight size={16} />
           </Link>
         </div>
-      ) : (
+      ) : status === 'waitlisted' ? (
         <div style={{ borderTop: '1px solid var(--border)', padding: '12px 20px' }}>
           {/* 감사 finding(reg-confirm-reapply-state-machine #1): "자동으로"라는 문구가 실제로
               존재하지 않는 자동 승격을 약속하고 있었다 — 대기→확정 전이는 운영자가 수동으로
-              처리한다(어드민 대기 신청 행의 "확정" 버튼). 이행 가능한 문구로 정정한다. */}
+              처리한다(어드민 대기 신청 행의 "확정" 버튼). 이행 가능한 문구로 정정한다.
+              대기자 전용이다 — 취소·취소 요청·확인 중 신청에 붙으면 없는 확정을 약속한다. */}
           <p className="tm-text-caption" style={{ color: 'var(--text-muted)', lineHeight: 1.6, margin: 0 }}>
             앞 순위 팀이 취소하면 운영진이 확인 후 확정해 드려요.
           </p>
         </div>
-      )}
+      ) : null}
     </div>
   );
 }

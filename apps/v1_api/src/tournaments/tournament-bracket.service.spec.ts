@@ -1909,6 +1909,21 @@ describe('TournamentBracketService', () => {
     expect(prisma.v1AdminActionLog.create).not.toHaveBeenCalled();
   });
 
+  it.each([
+    ['address only', { venueAddress: '서울 마포구' }],
+    ['pin only', { venueLatitude: 37.5, venueLongitude: 126.9, venueProvider: 'kakao', venueProviderId: 'p1' }],
+  ])('updateFixture: venue fields without venue (%s) → 400 PLACE_NAME_REQUIRED before any read or write', async (_label, place) => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdmin);
+    prisma.v1TournamentMatchDetails.findUnique.mockResolvedValue(canonicalDetailsRow());
+
+    await expect(service.updateFixture(ownerUser, 'fixture-1', place)).rejects.toMatchObject({
+      status: 400,
+      response: { code: 'PLACE_NAME_REQUIRED' },
+    });
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+    expect(prisma.v1TeamMatch.update).not.toHaveBeenCalled();
+  });
+
   it('updateFixture: TeamMatch deleted after the pre-read is rejected by the transaction lock', async () => {
     prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdmin);
     prisma.v1TournamentMatchDetails.findUnique.mockResolvedValue(canonicalDetailsRow());

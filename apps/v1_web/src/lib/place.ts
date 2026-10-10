@@ -7,6 +7,18 @@ import type {
 } from '@/types/api';
 import { detectNativeShell } from '@/lib/native-bridge';
 
+/** 직접 입력 장소 이름 길이 — 받는 API DTO 의 `MaxLength` 와 같아야 한다(좁히면 서버가 받는 이름을 화면이 막는다). */
+export const PLACE_NAME_MAX_LENGTH = {
+  /** 개인 매치·팀매치·어드민 팀매치 모집 `manualPlaceName` */
+  match: 120,
+  /** 리그 대진 생성·수정·템플릿 `placeName` */
+  leagueFixture: 120,
+  /** 리그 수동 대진 추가 `placeName` */
+  leagueManualFixture: 100,
+  /** 대회 `venue`·대진 경기 `venue`·리그 기본 장소 `venue` */
+  tournament: 200,
+} as const;
+
 /**
  * 폼이 들고 다니는 장소 값. `picked` 는 카카오 검색에서 고른 스냅샷(좌표 포함),
  * `manual` 은 "이름만 직접 입력"(좌표 없음 — 지도 앱 이름 검색으로 폴백).
@@ -182,6 +194,8 @@ export function toLeaguePlacePayload(value: PlaceValue | null): {
 }
 
 /** 대회·대진 경기: `venue` + `venueAddress` + `venue*` 좌표·provider. 값이 없으면 키를 뺀다. */
+export function toVenuePayload(value: PlaceValue): { venue: string } & V1VenueSnapshotPayload;
+export function toVenuePayload(value: PlaceValue | null): { venue?: string } & V1VenueSnapshotPayload;
 export function toVenuePayload(value: PlaceValue | null): {
   venue?: string;
 } & V1VenueSnapshotPayload {

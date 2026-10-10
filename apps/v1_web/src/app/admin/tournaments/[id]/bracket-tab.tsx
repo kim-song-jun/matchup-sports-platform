@@ -31,6 +31,7 @@ import { isGroupReady } from './bracket-group-helpers';
 import { EntityPicker, type EntityPickerItem } from '@/components/admin/entity-picker';
 import { formatDate } from './tournament-admin-shared';
 import { PlacePicker } from '@/components/v1-ui/place-picker';
+import { PLACE_NAME_MAX_LENGTH } from '@/lib/place';
 import type { PlaceValue } from '@/lib/place';
 import { fixtureVenuePatch, fixtureVenueValue } from '@/components/admin/bracket-canvas/fixture-venue-patch';
 import {
@@ -902,6 +903,7 @@ export function BracketTab({
             />
           </div>
           <PlacePicker
+            maxLength={PLACE_NAME_MAX_LENGTH.tournament}
             id="edit-fx-venue"
             label="장소"
             value={editFxVenue}

@@ -8,6 +8,7 @@ import { Card, EmptyState, ErrorState } from '@/components/v1-ui/primitives';
 import { PageSkeleton } from '@/components/v1-ui/page-skeleton';
 import { PlaceCard } from '@/components/v1-ui/place-card';
 import { PlacePicker } from '@/components/v1-ui/place-picker';
+import { PLACE_NAME_MAX_LENGTH } from '@/lib/place';
 import type { V1PlaceView } from '@/types/api';
 import { ChevronLeftIcon, ChevronRightIcon, FilterIcon, MoreIcon, PlusIcon, SearchIcon, ShareIcon } from '@/components/v1-ui/icons';
 import { MatchTypeSegment } from '@/components/v1-ui/match-type-segment';
@@ -1350,6 +1351,7 @@ function PlaceTimeFields({ model }: { model: TeamMatchCreateViewModel }) {
     <>
       <RegionSelect value={model.form?.regionId ?? ''} regions={model.form?.regions ?? []} onChange={model.form?.onRegionChange} error={errors?.regionId} />
       <PlacePicker
+        maxLength={PLACE_NAME_MAX_LENGTH.match}
         id="field-place"
         label="장소"
         value={d.place}

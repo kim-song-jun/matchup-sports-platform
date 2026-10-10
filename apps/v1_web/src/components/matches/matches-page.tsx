@@ -27,6 +27,7 @@ import { useCurrentHref } from '@/components/v1-ui/use-current-href';
 import { withFromPath } from '@/lib/session-storage';
 import { PlaceCard } from '@/components/v1-ui/place-card';
 import { PlacePicker } from '@/components/v1-ui/place-picker';
+import { PLACE_NAME_MAX_LENGTH } from '@/lib/place';
 import type { V1MatchApiStatus, V1PlaceView } from '@/types/api';
 import { extractErrorMessage } from '@/lib/error-message';
 import { matchGenderRuleLabel } from '@/lib/v1-status-labels';
@@ -1292,6 +1293,7 @@ function PlaceTimeFields({ model }: { model: MatchCreateViewModel }) {
     <>
       <RegionSelect value={model.form?.regionId ?? ''} regions={model.form?.regions ?? []} onChange={model.form?.onRegionChange} error={errors?.regionId} />
       <PlacePicker
+        maxLength={PLACE_NAME_MAX_LENGTH.match}
         id="field-place"
         label="장소"
         value={draft.place}

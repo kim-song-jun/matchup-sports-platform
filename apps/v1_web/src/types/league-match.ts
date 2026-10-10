@@ -323,7 +323,7 @@ export interface V1UpdateLeagueCoverImageResult {
 
 /** `null` venue = 기본 장소 지우기. 이미 만든 경기는 바뀌지 않는다. */
 export interface V1UpdateLeagueVenuePayload extends V1VenueSnapshotPayload {
-  venue?: string | null;
+  venue: string | null;
 }
 
 export interface V1UpdateLeagueVenueResult {

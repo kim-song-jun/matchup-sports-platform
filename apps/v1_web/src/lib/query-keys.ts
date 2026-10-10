@@ -1,4 +1,5 @@
 import type { QueryClient } from '@tanstack/react-query';
+import { publicGameRecordsKeys } from '@/components/public-game-records/use-public-game-records';
 import { PERSIST_STORAGE_KEY } from './query-persist';
 
 export const v1Keys = {
@@ -241,6 +242,7 @@ export const v1Keys = {
 /**
  * 리그 대진이 바뀔 때 함께 무효화할 키. 공개 `leagueMatch` 는 순위·선수 기록 하위 키를 prefix 로 포함하고,
  * `leagueMatches()` 는 칸 채우기로 바뀔 수 있는 리그 상태가 실린 공개 목록이다.
+ * 경기 상세 페이지는 팀매치 상세(`teamMatchesAll`)와 리그 경기 기록(`leagueFixtureRecords`)을 읽는다 — 팀매치 id 를 모르므로 prefix 로 덮는다.
  */
 export function leagueViewKeys(leagueId: string) {
   return [
@@ -250,6 +252,8 @@ export function leagueViewKeys(leagueId: string) {
     v1Keys.leagueMatch(leagueId),
     v1Keys.leagueClaimableFixtures(leagueId),
     v1Keys.tournament(leagueId),
+    v1Keys.teamMatchesAll(),
+    publicGameRecordsKeys.leagueFixtureRecords(leagueId),
   ];
 }
 

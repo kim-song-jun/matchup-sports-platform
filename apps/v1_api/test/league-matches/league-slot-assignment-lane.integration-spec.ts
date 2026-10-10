@@ -154,6 +154,20 @@ describe('PUT /admin/tournament-slots/:slotId/assignment — 정규 리그 레�
     expect(held.body.code).toBe('LEAGUE_ON_HOLD');
     expect((await h.prisma.v1TournamentSlot.findUniqueOrThrow({ where: { id: slots[0].id } })).registrationId).toBeNull();
   });
+  it.each(['completed', 'cancelled'] as const)('%s 리그는 자리 배정·무작위 채우기가 모두 409 LEAGUE_ENDED 이고 자리는 바뀌지 않는다', async (status) => {
+    const { leagueId, slots, regs } = await templateLeague();
+    await h.prisma.v1Tournament.update({ where: { id: leagueId }, data: { status } });
+
+    const assigned = await put(slots[0].id, regs[0]);
+    const filled = await request(app.getHttpServer())
+      .post(`/api/v1/admin/tournaments/${leagueId}/slots/random-fill`)
+      .set('x-v1-user-id', h.adminUserId);
+
+    expect([assigned.status, assigned.body.code]).toEqual([409, 'LEAGUE_ENDED']);
+    expect([filled.status, filled.body.code]).toEqual([409, 'LEAGUE_ENDED']);
+    expect(await h.prisma.v1TournamentSlot.count({ where: { tournamentId: leagueId, registrationId: { not: null } } })).toBe(0);
+  });
+
   describe('무작위 채우기 (POST /admin/tournaments/:id/slots/random-fill)', () => {
     const randomFill = (leagueId: string) =>
       request(app.getHttpServer())

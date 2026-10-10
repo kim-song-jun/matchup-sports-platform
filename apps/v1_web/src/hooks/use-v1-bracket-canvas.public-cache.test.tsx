@@ -10,6 +10,7 @@ vi.mock('@/lib/api-client', async (importOriginal) => {
 
 import { v1Delete, v1Post } from '@/lib/api-client';
 import { useLeagueResultToast } from '@/components/admin/bracket-canvas/use-league-result-toast';
+import { publicGameRecordsKeys } from '@/components/public-game-records/use-public-game-records';
 import { v1Keys } from '@/lib/query-keys';
 import { useV1CreateFixture, useV1DeleteFixture } from './use-v1-api';
 import { useV1ApplyLeagueTemplate, useV1RandomFillSlots } from './use-v1-bracket-canvas';
@@ -23,6 +24,7 @@ const publicKeys = (id: string) => [
   v1Keys.leagueMatchPlayerRecords(id),
   v1Keys.leagueClaimableFixtures(id),
   v1Keys.tournament(id),
+  publicGameRecordsKeys.leagueFixtureRecord(id, `${id}-fixture`),
 ];
 
 function setup() {
@@ -31,6 +33,8 @@ function setup() {
     for (const key of [...publicKeys(id), v1Keys.adminLeagueMatch(id), v1Keys.adminTournamentBracket(id)]) client.setQueryData(key, { id });
   }
   client.setQueryData(v1Keys.leagueMatches({ status: 'recruiting' }), { items: [] });
+  // 팀매치 id 만으로는 리그를 알 수 없어 팀매치 상세는 리그 단위로 좁힐 수 없다.
+  client.setQueryData(v1Keys.teamMatch('fixture-1'), { id: 'fixture-1' });
   const wrapper = ({ children }: { children: ReactNode }) => createElement(QueryClientProvider, { client }, children);
   const invalidated = (key: readonly unknown[]) => client.getQueryState(key)?.isInvalidated === true;
   return { client, wrapper, invalidated };
@@ -53,6 +57,7 @@ describe('리그 대진 변경 뒤 공개 캐시', () => {
     for (const key of [...publicKeys('target'), v1Keys.adminLeagueMatch('target')]) expect(invalidated(key)).toBe(true);
     for (const key of publicKeys('other')) expect(invalidated(key)).toBe(false);
     expect(invalidated(v1Keys.leagueMatches({ status: 'recruiting' }))).toBe(true);
+    expect(invalidated(v1Keys.teamMatch('fixture-1'))).toBe(true);
   });
 
   it('리그 템플릿 적용도 같은 공개 키 묶음을 무효화한다', async () => {
@@ -66,6 +71,7 @@ describe('리그 대진 변경 뒤 공개 캐시', () => {
     for (const key of [...publicKeys('target'), v1Keys.adminLeagueMatch('target')]) expect(invalidated(key)).toBe(true);
     for (const key of publicKeys('other')) expect(invalidated(key)).toBe(false);
     expect(invalidated(v1Keys.leagueMatches({ status: 'recruiting' }))).toBe(true);
+    expect(invalidated(v1Keys.teamMatch('fixture-1'))).toBe(true);
   });
 
   it('결과 토스트는 성공일 때만 공개 리그 키까지 무효화한다', () => {
@@ -75,10 +81,12 @@ describe('리그 대진 변경 뒤 공개 캐시', () => {
 
     act(() => result.current('실패했어요', 'error'));
     for (const key of [...publicKeys('target'), v1Keys.adminLeagueMatch('target')]) expect(invalidated(key)).toBe(false);
+    expect(invalidated(v1Keys.teamMatch('fixture-1'))).toBe(false);
 
     act(() => result.current('저장했어요'));
     for (const key of [...publicKeys('target'), v1Keys.adminLeagueMatch('target')]) expect(invalidated(key)).toBe(true);
     for (const key of publicKeys('other')) expect(invalidated(key)).toBe(false);
+    expect(invalidated(v1Keys.teamMatch('fixture-1'))).toBe(true);
   });
 });
 

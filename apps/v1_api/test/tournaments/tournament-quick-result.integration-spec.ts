@@ -847,6 +847,9 @@ describe('빠른 결과 — 정정', () => {
     await redeliverOfficialEvents(gameId);
     expect(await prisma.v1TeamRecordFact.count({ where: { revisionId: draft.revisionId } })).toBe(2);
     expect(await prisma.v1TeamRecordFact.count({ where: { revisionId: base.id } })).toBe(2);
+    // 대체된 첫 확정본의 이벤트는 공개 캐시의 현재 포인터를 되돌리지 못한다(재전달 순서와 무관하게 정정본이 현재다).
+    const cache = await prisma.v1GameOfficialResultCache.findMany({ where: { gameId }, select: { revisionId: true, isCurrent: true } });
+    expect(cache.filter((row) => row.isCurrent).map((row) => row.revisionId)).toEqual([draft.revisionId]);
   });
 });
 

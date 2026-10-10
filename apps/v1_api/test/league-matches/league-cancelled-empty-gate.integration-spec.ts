@@ -77,15 +77,24 @@ describe('팀 없이 취소된 리그 경기의 공개 게이트', () => {
     expect(detail.status).toBe(200);
     expect(detailFixtureIds(detail)).not.toContain(half);
 
-    const folded = await h.makeLeague({ teams: [await h.makeTeam('lceg-HB')] });
+    // 실제 운영 경로로 반쪽 경기를 만든다: 확정 참가팀을 첫 경기의 홈 자리에 배정한다.
+    const teamB = await h.makeTeam('lceg-HB');
+    const folded = await h.makeLeague({ teams: [teamB] });
     expect((await template(folded)).status).toBe(201);
-    const [firstSlot] = await h.prisma.v1TournamentSlot.findMany({ where: { tournamentId: folded }, orderBy: { position: 'asc' } });
-    const halfFolded = await h.prisma.v1TeamMatch.findFirstOrThrow({ where: { leagueId: folded, awaySlotId: { not: null } } });
-    await h.prisma.v1TeamMatch.update({ where: { id: halfFolded.id }, data: { hostTeamId: (await h.makeTeam('lceg-HC')).id, homeSlotId: firstSlot.id } });
+    const [halfFolded] = await h.prisma.v1TeamMatch.findMany({ where: { leagueId: folded }, orderBy: { id: 'asc' } });
+    const assign = await request(app.getHttpServer())
+      .put(`/api/v1/admin/tournament-slots/${halfFolded.homeSlotId}/assignment`)
+      .set('x-v1-user-id', h.adminUserId)
+      .send({ registrationId: await h.registrationId(folded, teamB.id) });
+    expect(assign.status).toBe(200);
+    const before = await h.prisma.v1TeamMatch.findUniqueOrThrow({ where: { id: halfFolded.id } });
+    expect([before.hostTeamId, before.approvedApplicantTeamId]).toEqual([teamB.id, null]);
+    expect(before.homeSlotId).not.toBe(before.awaySlotId);
+
     expect((await template(folded, { teamCount: 4, replaceExisting: true })).status).toBe(201);
     await publish(folded);
     const foldedRow = await h.prisma.v1TeamMatch.findUniqueOrThrow({ where: { id: halfFolded.id } });
-    expect([foldedRow.status, foldedRow.hostTeamId]).toEqual(['cancelled', null]);
+    expect([foldedRow.status, foldedRow.hostTeamId, foldedRow.approvedApplicantTeamId]).toEqual(['cancelled', null, null]);
     expect(detailFixtureIds(await publicDetail(folded))).not.toContain(halfFolded.id);
   });
 

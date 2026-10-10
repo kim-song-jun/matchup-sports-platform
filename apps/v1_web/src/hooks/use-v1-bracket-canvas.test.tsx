@@ -177,6 +177,21 @@ describe('useV1AddBracketFixture', () => {
     expect(client.getQueryData(v1Keys.adminTournamentBracket('t1'))).toEqual(fixtures(1, 2, 3, 4));
   });
 
+  it('만든 뒤 어드민 대진과 대회 상세·공개 일정 캐시를 같이 무효화한다', async () => {
+    getMock.mockResolvedValue(fixtures(1));
+    postMock.mockResolvedValue({ id: 'new' });
+    const { wrapper, invalidate } = setup();
+    const { result } = renderHook(() => useV1AddBracketFixture('t1'), { wrapper });
+
+    await act(async () => {
+      await result.current.mutateAsync({ groupId: 'g1', round: 'league_r1' });
+    });
+
+    const keys = invalidatedKeys(invalidate);
+    expect(keys).toContainEqual(v1Keys.adminTournamentBracket('t1'));
+    expect(keys).toContainEqual(v1Keys.tournament('t1'));
+  });
+
   it('대진을 새로 읽지 못하면 경기를 만들지 않는다', async () => {
     getMock.mockRejectedValue(new Error('network'));
     const { wrapper } = setup();

@@ -511,6 +511,22 @@ describe('BracketCanvasMobile — 팀 넣기', () => {
       expect(screen.getByText(hiddenNote)).toBeInTheDocument();
     });
 
+    it('자리 — 다른 조 팀이 이미 다른 자리에 있어 빠진 거라면 "다른 조" 안내는 없다', () => {
+      const stageSlots = [
+        buildSlot({ id: 's-gx', kind: 'ENTRY', groupId: 'g-a', label: '1번 자리' }),
+        buildSlot({ id: 's-gb', kind: 'ENTRY', groupId: 'g-b', label: '2번 자리', registrationId: 'r2', teamName: '마포FC' }),
+      ];
+      const stageFixtures = [makeFixture({ id: 'gx-1', groupId: 'g-a', fixtureNumber: 1, round: '조별 1라운드', homeSlotId: 's-gx', game: buildGame({ id: 'g-x1' }) })];
+      renderMobile({
+        rounds: buildBracketMobileRounds({ groups: stageGroups, fixtures: stageFixtures, slots: stageSlots }),
+        slots: stageSlots, groups: stageGroups,
+      });
+      fireEvent.click(card(/1번 경기/));
+      fireEvent.click(screen.getByRole('button', { name: '홈 팀 고르기' }));
+      expect(optionNames()).not.toContain('마포FC');
+      expect(screen.queryByText(hiddenNote)).not.toBeInTheDocument();
+    });
+
     it('자리 대조군 — 결선 단계 자리는 모두 보이고 안내도 없다', () => {
       openSlotPicker('g-q2');
       expect(optionNames()).toEqual(['강남FC', '마포FC', '서초FC', '송파FC', '용산FC']);

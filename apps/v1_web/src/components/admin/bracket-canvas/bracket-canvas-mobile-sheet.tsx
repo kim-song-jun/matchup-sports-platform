@@ -18,7 +18,7 @@ import {
 } from '@/lib/bracket-canvas-mobile-model';
 import { bracketNodeStateChip } from '@/lib/competition-status';
 import { extractErrorMessage } from '@/lib/error-message';
-import { TEAM_IN_OTHER_GROUP_HIDDEN_NOTE, registrationIdsBlockedForGroup } from '@/lib/bracket-group-enrollment';
+import { TEAM_IN_OTHER_GROUP_HIDDEN_NOTE, applyGroupRule, registrationIdsBlockedForGroup } from '@/lib/bracket-group-enrollment';
 import type { V1AdminBracketGroup, V1AdminBracketSlot } from '@/types/api';
 import { BracketQuickResultForm } from './bracket-quick-result-form';
 import { BracketResultActions } from './bracket-result-actions';
@@ -276,14 +276,19 @@ function SlotTeamPicker({
   slot, slots, groups, candidates, scope, ...common
 }: PickerCommon & { slot: V1AdminBracketSlot; slots: V1AdminBracketSlot[]; groups: readonly V1AdminBracketGroup[]; candidates: MobilePickCandidate[]; scope: 'tournament' | 'league' }) {
   const assign = useV1AssignTournamentSlot(common.competitionId, scope);
-  const blocked = registrationIdsBlockedForGroup(groups, slot.groupId);
+  const { shown, hidesOtherGroupTeams } = applyGroupRule(
+    pickableCandidates(candidates, slots, slot),
+    (candidate) => candidate.registrationId,
+    registrationIdsBlockedForGroup(groups, slot.groupId),
+    slot.registrationId,
+  );
   return (
     <TeamPickerView
       sideLabel={common.sideLabel}
       heading={slot.label}
       currentRegistrationId={slot.registrationId}
-      options={pickableCandidates(candidates, slots, slot).filter((candidate) => !blocked.has(candidate.registrationId))}
-      hiddenNote={candidates.some((candidate) => blocked.has(candidate.registrationId)) ? TEAM_IN_OTHER_GROUP_HIDDEN_NOTE : undefined}
+      options={shown}
+      hiddenNote={hidesOtherGroupTeams ? TEAM_IN_OTHER_GROUP_HIDDEN_NOTE : undefined}
       registrationsState={common.registrationsState}
       pending={assign.isPending}
       onSubmit={(registrationId) => void runAssign(() => assign.mutateAsync({ slotId: slot.id, registrationId }), registrationId, common)}
@@ -299,14 +304,19 @@ function DirectTeamPicker({
   const updateFixture = useV1UpdateFixture(common.competitionId);
   const mine = side === 'HOME' ? node.home : node.away;
   const other = side === 'HOME' ? node.away : node.home;
-  const blocked = registrationIdsBlockedForGroup(groups, node.groupId);
+  const { shown, hidesOtherGroupTeams } = applyGroupRule(
+    candidates.filter((candidate) => candidate.registrationId !== other.registrationId),
+    (candidate) => candidate.registrationId,
+    registrationIdsBlockedForGroup(groups, node.groupId),
+    mine.registrationId,
+  );
   return (
     <TeamPickerView
       sideLabel={common.sideLabel}
       heading="경기에 직접 지정"
       currentRegistrationId={mine.registrationId}
-      options={candidates.filter((candidate) => candidate.registrationId !== other.registrationId && !blocked.has(candidate.registrationId))}
-      hiddenNote={candidates.some((candidate) => blocked.has(candidate.registrationId)) ? TEAM_IN_OTHER_GROUP_HIDDEN_NOTE : undefined}
+      options={shown}
+      hiddenNote={hidesOtherGroupTeams ? TEAM_IN_OTHER_GROUP_HIDDEN_NOTE : undefined}
       registrationsState={common.registrationsState}
       pending={updateFixture.isPending}
       onSubmit={(registrationId) =>

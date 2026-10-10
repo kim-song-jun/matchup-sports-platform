@@ -538,6 +538,24 @@ describe('BracketTab — 경기 수정: 한 팀 한 조', () => {
     expect(labels).not.toContain('마포FC');
   });
 
+  it('어웨이 후보도 같은 기준으로 다른 조 팀(마포FC)을 거른다', async () => {
+    bracketGroups = [groupWith('group-a', 'A조', 'group', 0, ['r1']), groupWith('group-b', 'B조', 'group', 1, ['r2'])];
+    renderTab(vi.fn(), registrations());
+    const dialog = await openEdit();
+    fireEvent.change(within(dialog).getByPlaceholderText('어웨이 팀 검색'), { target: { value: 'FC' } });
+    const labels = screen.getAllByRole('option').map((option) => option.textContent ?? '').join();
+    expect(labels).toContain('송파FC');
+    expect(labels).not.toContain('마포FC');
+  });
+
+  it('이미 고른 팀이 다른 조 편성이어도 선택값으로 그대로 보인다', async () => {
+    bracketGroups = [groupWith('group-a', 'A조', 'group', 0, ['r1']), groupWith('group-b', 'B조', 'group', 1, ['r2'])];
+    bracketFixtures = [fixtureRow({ id: 'fx-1', round: 'league_r1', fixtureNumber: 1, homeRegistrationId: 'r2', awayRegistrationId: null })];
+    renderTab(vi.fn(), registrations());
+    const dialog = await openEdit();
+    expect(within(dialog).getByText('마포FC')).toBeInTheDocument();
+  });
+
   it('대조군 — 마포FC 가 결선 단계 조에만 있으면 보인다', async () => {
     bracketGroups = [groupWith('group-a', 'A조', 'group', 0, ['r1']), groupWith('semi-1', '4강', 'semi', 1, ['r2'])];
     renderTab(vi.fn(), registrations());

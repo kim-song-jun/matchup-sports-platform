@@ -130,7 +130,7 @@ export function useV1AddBracketFixture(tournamentId: string) {
         fixtureNumber: nextFixtureNumber(fresh.fixtures),
       });
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: v1Keys.adminTournamentBracket(tournamentId) }),
+    onSuccess: () => invalidateCompetitionViews(queryClient, tournamentId, 'tournament'),
   });
 }
 

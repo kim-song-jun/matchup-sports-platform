@@ -144,6 +144,18 @@ describe('BracketNodePanel — 자리 배정', () => {
     const options = within(screen.getByLabelText('어웨이 팀 선택')).getAllByRole('option').map((option) => option.textContent);
     expect(options).toContain('인천FC');
     expect(options).not.toContain('대구FC');
+    expect(screen.getByText('다른 조에 있는 팀은 목록에서 빠져 있어요.')).toBeInTheDocument();
+  });
+
+  it('다른 조 팀이 이미 다른 자리에 있어서 빠진 거라면 "다른 조" 안내는 보이지 않는다', () => {
+    // 부산FC(r2)는 B조 편성이면서 3번 자리에도 들어가 있다 — 자리 규칙이 먼저 숨기므로 조 규칙이 숨긴 팀은 없다.
+    const memberOfB = { id: 'gt-r2', groupId: 'g-b', registrationId: 'r2', teamName: '부산FC', sortOrder: 0, createdAt: '' };
+    renderPanel(fixtureOf({ groupId: 'g-a' }), {
+      groups: [makeGroup({ id: 'g-a', name: 'A조', phase: 'group' }), makeGroup({ id: 'g-b', name: 'B조', phase: 'group', sortOrder: 1, groupTeams: [memberOfB] })],
+      slots: [slots[0], makeSlot({ id: 's-away', label: '2번 자리', groupId: 'g-a' }), slots[2]],
+    });
+    expect(within(screen.getByLabelText('어웨이 팀 선택')).getAllByRole('option').map((option) => option.textContent)).toEqual(['비워 두기', '대구FC']);
+    expect(screen.queryByText('다른 조에 있는 팀은 목록에서 빠져 있어요.')).not.toBeInTheDocument();
   });
 
   it('대조군 - 슬롯 조가 결선 조이면 다른 조 편성 팀도 모두 보인다', () => {
@@ -216,6 +228,13 @@ describe('BracketNodePanel — 자리 배정', () => {
       it('대조군 - 결선 단계 경기는 조 편성과 상관없이 모두 보인다', () => {
         renderPanel(empty('g-qf'), { groups: [stageA, stageB, quarter] });
         expect(homeOptions()).toEqual(['비워 두기', '서울FC', '부산FC', '대구FC']);
+      });
+
+      it('다른 조 팀이 반대편 사이드라서 빠진 거라면 "다른 조" 안내는 보이지 않는다', () => {
+        // 부산FC(r2)는 B조 편성이지만 이 경기의 어웨이 팀이다 — 홈 목록에서는 반대편 규칙이 먼저 뺀다.
+        renderPanel(legacy({ groupId: 'g-a', homeRegistrationId: null, homeTeamName: '홈 팀 미정', awayRegistrationId: 'r2', awayTeamName: '부산FC' }), { groups: [stageA, stageB, quarter] });
+        expect(homeOptions()).toEqual(['비워 두기', '서울FC', '대구FC']);
+        expect(screen.queryByText('다른 조에 있는 팀은 목록에서 빠져 있어요.')).not.toBeInTheDocument();
       });
 
       it('이미 들어 있는 팀이 다른 조 편성이어도 현재 값은 목록에 남는다', () => {

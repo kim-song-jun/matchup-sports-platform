@@ -18,3 +18,18 @@ export function registrationIdsBlockedForGroup(groups: readonly V1AdminBracketGr
   }
   return blocked;
 }
+
+/**
+ * Applies the one-team-one-group rule to a picker's candidates (already narrowed by every other rule, e.g.
+ * "placed elsewhere"), so the hidden-team note reflects only teams this rule removed. `keepId` is the side's
+ * current team, which stays selectable.
+ */
+export function applyGroupRule<T>(
+  candidates: readonly T[],
+  idOf: (item: T) => string,
+  blocked: ReadonlySet<string>,
+  keepId: string | null,
+): { shown: T[]; hidesOtherGroupTeams: boolean } {
+  const shown = candidates.filter((item) => !blocked.has(idOf(item)) || idOf(item) === keepId);
+  return { shown, hidesOtherGroupTeams: shown.length < candidates.length };
+}

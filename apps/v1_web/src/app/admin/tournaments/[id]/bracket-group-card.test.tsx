@@ -259,6 +259,14 @@ describe('BracketGroupCard — 팀 일괄 배정', () => {
       fireEvent.change(screen.getByPlaceholderText('홈 팀 검색'), { target: { value: 'FC' } });
       expect(optionLabels().join()).toContain('마포FC');
     });
+
+    it('「경기 일정 추가」 어웨이 팀 선택창도 다른 조 팀(마포FC)을 거르고 미편성 팀(송파FC)은 남긴다', () => {
+      renderCard(stageA, [stageA, stageB]);
+      fireEvent.click(screen.getByRole('button', { name: /직접 입력/ }));
+      fireEvent.change(screen.getByPlaceholderText('어웨이 팀 검색'), { target: { value: 'FC' } });
+      expect(optionLabels().join()).toContain('송파FC');
+      expect(optionLabels().join()).not.toContain('마포FC');
+    });
   });
 });
 

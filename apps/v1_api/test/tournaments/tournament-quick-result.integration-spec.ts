@@ -194,6 +194,64 @@ async function createBracket(): Promise<Bracket> {
   return { tournamentId, registration, semi1, semi2, final };
 }
 
+/** 조별 리그 1경기(A–B). 조 단계(phase 'group')라 확정 시 순위 투영이 돈다. */
+async function createGroupFixture(): Promise<{ tournamentId: string; groupId: string; registration: Record<'a' | 'b', string>; gameId: string }> {
+  const tournamentId = randomUUID();
+  await prisma.v1Tournament.create({
+    data: {
+      id: tournamentId,
+      sportId,
+      regionId,
+      title: `QR 조별 ${suite} ${tournamentId.slice(0, 4)}`,
+      status: 'in_progress',
+      kind: 'regular_tournament',
+      format: 'group_knockout',
+      competitionConfigVersionId: configId,
+    },
+  });
+  const registration = { a: randomUUID(), b: randomUUID() };
+  await prisma.v1TournamentRegistration.createMany({
+    data: (['a', 'b'] as const).map((key) => ({
+      id: registration[key],
+      tournamentId,
+      teamId: teams[key],
+      appliedByUserId: users.ops,
+      status: 'confirmed' as const,
+    })),
+  });
+  const groupId = randomUUID();
+  await prisma.v1TournamentGroup.create({ data: { id: groupId, tournamentId, name: 'A조', phase: 'group' } });
+  await prisma.v1TournamentGroupTeam.createMany({
+    data: (['a', 'b'] as const).map((key, index) => ({ groupId, registrationId: registration[key], sortOrder: index })),
+  });
+  const teamMatchId = randomUUID();
+  await prisma.v1TeamMatch.create({
+    data: {
+      id: teamMatchId,
+      tournamentId,
+      sportId,
+      title: 'QR 조별 1',
+      status: 'matched',
+      competitionConfigVersionId: configId,
+      hostTeamId: teams.a,
+      approvedApplicantTeamId: teams.b,
+    },
+  });
+  await prisma.v1TournamentMatchDetails.create({
+    data: {
+      teamMatchId,
+      tournamentId,
+      groupId,
+      round: '조별',
+      fixtureNumber: 1,
+      homeRegistrationId: registration.a,
+      awayRegistrationId: registration.b,
+    },
+  });
+  const gameId = await createGameFor(teamMatchId, { teamId: teams.a, withPlayer: true }, { teamId: teams.b, withPlayer: true });
+  return { tournamentId, groupId, registration, gameId };
+}
+
 type QuickScore = { home: number; away: number; penalties?: { home: number; away: number } };
 
 async function gameVersion(gameId: string): Promise<number> {
@@ -309,6 +367,28 @@ describe('빠른 결과 — 대회 경기', () => {
     expect(await prisma.v1OperationAudit.count({ where: { resourceId: gameId, action: 'QUICK_RESULT' } })).toBe(1);
   });
 
+  it('조별 경기를 점수만으로 확정하면 워커가 그 조 순위에 이긴 팀 승 1·승점, 진 팀 패 1을 남기고 재소비해도 행이 늘지 않는다', async () => {
+    const group = await createGroupFixture();
+    const response = await quickResult(group.gameId, users.ops, { home: 2, away: 1 });
+    expect(response.status).toBe(201);
+
+    await drainOutboxWorker(prisma);
+
+    const rows = await prisma.v1TournamentStanding.findMany({ where: { groupId: group.groupId } });
+    expect(rows).toHaveLength(2);
+    expect(rows.find((row) => row.registrationId === group.registration.a)).toMatchObject({
+      wins: 1, draws: 0, losses: 0, points: 3, goalsFor: 2, goalsAgainst: 1, position: 1,
+    });
+    expect(rows.find((row) => row.registrationId === group.registration.b)).toMatchObject({
+      wins: 0, draws: 0, losses: 1, points: 0, goalsFor: 1, goalsAgainst: 2, position: 2,
+    });
+    expect(await prisma.v1TournamentOverallStanding.count({ where: { tournamentId: group.tournamentId } })).toBe(2);
+
+    await drainOutboxWorker(prisma);
+    expect(await prisma.v1TournamentStanding.count({ where: { groupId: group.groupId } })).toBe(2);
+    expect(await prisma.v1TournamentOverallStanding.count({ where: { tournamentId: group.tournamentId } })).toBe(2);
+  });
+
   it('결선 무승부는 점수만 있는 승부차기로 확정되고(킥 수 없음), 승부차기 승자가 진출한다', async () => {
     const bracket = await createBracket();
 
@@ -329,6 +409,13 @@ describe('빠른 결과 — 대회 경기', () => {
     const bracket = await createBracket();
     const first = await quickResult(bracket.semi1.gameId, users.ops, { home: 1, away: 1, penalties: { home: 5, away: 4 } });
     expect(first.status).toBe(201);
+
+    // 개인 기록(출전)은 워커가 아니라 명령 시점에 쓰인다 — 워커 소비 전에 이미 양 팀 명단 선수마다 1건이 확정본에 붙어 있어야 한다.
+    const roster = await prisma.v1GameParticipant.findMany({ where: { gameId: bracket.semi1.gameId } });
+    const appearances = await prisma.v1GameResultParticipant.findMany({ where: { resultRevisionId: first.body.data.revisionId } });
+    expect(roster).toHaveLength(2);
+    expect(appearances.map((row) => row.participantId).sort()).toEqual(roster.map((row) => row.id).sort());
+    expect(appearances.every((row) => row.started)).toBe(true);
 
     await drainOutboxWorker(prisma);
 
@@ -359,14 +446,7 @@ describe('빠른 결과 — 대회 경기', () => {
       goalsAgainst: 1,
     });
 
-    // 개인 기록(출전): 양 팀 명단 선수마다 출전 기록 1건이 확정본에 붙는다.
-    const roster = await prisma.v1GameParticipant.findMany({ where: { gameId: bracket.semi1.gameId } });
-    const appearances = await prisma.v1GameResultParticipant.findMany({ where: { resultRevisionId: first.body.data.revisionId } });
-    expect(roster).toHaveLength(2);
-    expect(appearances.map((row) => row.participantId).sort()).toEqual(roster.map((row) => row.id).sort());
-    expect(appearances.every((row) => row.started)).toBe(true);
-
-    // 4강은 조별 순위에 반영되지 않는다(phase !== 'group') — 순위 행이 생기면 진출 경기가 순위를 오염시킨 것이다.
+    // 4강은 조별 순위에 반영되지 않는다(phase !== 'group'). 통합 순위도 같은 투영기가 조 단계에서만 갱신하므로 함께 0이다.
     expect(await prisma.v1TournamentStanding.count({ where: { registration: { tournamentId: bracket.tournamentId } } })).toBe(0);
     expect(await prisma.v1TournamentOverallStanding.count({ where: { tournamentId: bracket.tournamentId } })).toBe(0);
 
@@ -736,6 +816,11 @@ describe('빠른 결과 — 정정', () => {
     expect(corrected.find((fact) => fact.teamId === teams.a)?.result).toBe('LOST');
     expect(corrected.find((fact) => fact.teamId === teams.b)?.result).toBe('WON');
     expect(corrected).toHaveLength(2);
+    expect(await prisma.v1TeamRecordFact.count({ where: { revisionId: base.id } })).toBe(2);
+
+    // 정정 뒤 다시 소비해도 두 확정본의 전적 행 수는 늘지 않는다.
+    await drainOutboxWorker(prisma);
+    expect(await prisma.v1TeamRecordFact.count({ where: { revisionId: draft.revisionId } })).toBe(2);
     expect(await prisma.v1TeamRecordFact.count({ where: { revisionId: base.id } })).toBe(2);
   });
 });

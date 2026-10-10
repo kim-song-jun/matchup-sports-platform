@@ -973,6 +973,7 @@ describe('LeagueMatchAdminService.removeTeam — 대진 취소 알림과 제외 
       // removeTeam은 트랜잭션 밖에서 한 번(초기 게이트 판정), 락을 잡은 트랜잭션 안에서
       // 다시 한 번(TOCTOU 재검증, :517) 같은 조건으로 대진을 읽는다 — 둘 다 이 목록을 본다.
       v1TeamMatch: {
+        updateMany: jest.fn().mockResolvedValue({ count: 0 }),
         findMany: jest.fn().mockResolvedValue(fixtures),
         update: jest.fn().mockResolvedValue({}),
       },
@@ -1110,6 +1111,7 @@ describe('LeagueMatchAdminService.regenerateFixtures — 진행 중 경기 (W4-V
         findUnique: jest.fn().mockResolvedValue({ periods: [] }),
       },
       v1TeamMatch: {
+        updateMany: jest.fn().mockResolvedValue({ count: 0 }),
         findMany: jest.fn().mockResolvedValue([
           {
             id: 'fixture-1',
@@ -1158,6 +1160,7 @@ describe('LeagueMatchAdminService.cancelFixture — 진행 중 경기의 대진 
   function makePrisma(gameState: string) {
     const prisma: any = {
       v1TeamMatch: {
+        updateMany: jest.fn().mockResolvedValue({ count: 0 }),
         findFirst: jest.fn().mockResolvedValue({
           id: FIXTURE_ID,
           leagueId: LEAGUE_ID,
@@ -1214,6 +1217,62 @@ describe('LeagueMatchAdminService.cancelFixture — 진행 중 경기의 대진 
     expect(prisma.v1TeamMatch.update).toHaveBeenCalledWith(
       expect.objectContaining({ where: { id: FIXTURE_ID }, data: expect.objectContaining({ status: 'cancelled' }) }),
     );
+  });
+});
+
+describe('LeagueMatchAdminService.cancelFixture - 반쪽 경기의 홈 팀 비우기', () => {
+  const LEAGUE_ID = 'league-1';
+  const FIXTURE_ID = 'fixture-1';
+
+  /** updateMany 의 where(awaySlotId not null · approvedApplicantTeamId null)를 저장된 행에 실제로 적용하는 인메모리 행. */
+  async function cancelWith(row: { hostTeamId: string; approvedApplicantTeamId: string | null; awaySlotId: string | null }) {
+    const stored: Record<string, unknown> = { id: FIXTURE_ID, leagueId: LEAGUE_ID, status: 'matched', title: 't', homeSlotId: 'slot-h', ...row };
+    const prisma: any = {
+      v1TeamMatch: {
+        findFirst: jest.fn().mockImplementation(async () => ({ ...stored })),
+        update: jest.fn().mockImplementation(async ({ data }: { data: Record<string, unknown> }) => Object.assign(stored, data)),
+        updateMany: jest.fn().mockImplementation(async ({ where, data }: { where: Record<string, any>; data: Record<string, unknown> }) => {
+          const matches =
+            where.id === stored.id &&
+            (where.awaySlotId?.not === null ? stored.awaySlotId !== null : true) &&
+            (where.approvedApplicantTeamId === null ? stored.approvedApplicantTeamId === null : true);
+          if (matches) Object.assign(stored, data);
+          return { count: matches ? 1 : 0 };
+        }),
+        count: jest.fn().mockResolvedValue(0),
+      },
+      v1Tournament: { findFirst: jest.fn().mockResolvedValue({ id: LEAGUE_ID, status: 'draft' }) },
+      v1TeamMatchApplication: { updateMany: jest.fn().mockResolvedValue({ count: 0 }) },
+      v1TeamSchedule: { findMany: jest.fn().mockResolvedValue([]) },
+      v1TeamMembership: { findMany: jest.fn().mockResolvedValue([]) },
+      $queryRaw: jest.fn().mockImplementation(async (strings: TemplateStringsArray) =>
+        strings.join('?').includes('v1_games') ? [{ state: 'SCHEDULED' }] : [{ id: LEAGUE_ID }],
+      ),
+      $executeRaw: jest.fn().mockResolvedValue(1),
+    };
+    prisma.$transaction = async (fn: (tx: unknown) => Promise<unknown>) => fn(prisma);
+    const adminContext = {
+      getMutationAdmin: jest.fn().mockResolvedValue({ id: 'admin-row-1', userId: adminUser.id, adminRole: 'ops' }),
+      logAdminAction: jest.fn().mockResolvedValue(undefined),
+    };
+    const service = new LeagueMatchAdminService(prisma, adminContext as any, {} as any, { emitToManyDeferred: jest.fn() } as any);
+    await service.cancelFixture(adminUser, LEAGUE_ID, FIXTURE_ID, { reason: '우천' });
+    return stored;
+  }
+
+  it('원정 자리가 비어 있던 반쪽 경기는 취소하면 홈 팀도 비워 공개 게이트의 취소 절이 가리게 한다', async () => {
+    const stored = await cancelWith({ hostTeamId: 'team-a', approvedApplicantTeamId: null, awaySlotId: 'slot-a' });
+    expect(stored).toMatchObject({ status: 'cancelled', hostTeamId: null });
+  });
+
+  it('대조군: 다 찬 자리 경기는 홈·원정 팀을 그대로 둔다', async () => {
+    const stored = await cancelWith({ hostTeamId: 'team-a', approvedApplicantTeamId: 'team-b', awaySlotId: 'slot-a' });
+    expect(stored).toMatchObject({ status: 'cancelled', hostTeamId: 'team-a', approvedApplicantTeamId: 'team-b' });
+  });
+
+  it('대조군: 자리 없는 기존 경기(원정 null)는 홈 팀을 그대로 둔다', async () => {
+    const stored = await cancelWith({ hostTeamId: 'team-a', approvedApplicantTeamId: null, awaySlotId: null });
+    expect(stored).toMatchObject({ status: 'cancelled', hostTeamId: 'team-a' });
   });
 });
 

@@ -64,6 +64,31 @@ describe('팀 없이 취소된 리그 경기의 공개 게이트', () => {
     expect((await publicStandings(leagueId)).status).toBe(200);
   });
 
+  it('홈 자리만 찬 반쪽 경기를 취소하면 공개에 나타나지 않고, 템플릿 replaceExisting 으로 접어도 같다', async () => {
+    const teamA = await h.makeTeam('lceg-HA');
+    const leagueId = await h.makeLeague({ teams: [teamA], state: 'active' });
+    const [homeSlot, awaySlot] = await h.makeSlots(leagueId, 2);
+    const half = await h.createFixture(leagueId, { homeTeamId: teamA.id, homeSlotId: homeSlot.id, awaySlotId: awaySlot.id });
+    expect((await adminPost(`${leagueId}/fixtures/${half}/cancel`, { reason: '일정 조정' })).status).toBe(200);
+
+    const row = await h.prisma.v1TeamMatch.findUniqueOrThrow({ where: { id: half } });
+    expect([row.status, row.hostTeamId, row.awaySlotId]).toEqual(['cancelled', null, null]);
+    const detail = await publicDetail(leagueId);
+    expect(detail.status).toBe(200);
+    expect(detailFixtureIds(detail)).not.toContain(half);
+
+    const folded = await h.makeLeague({ teams: [await h.makeTeam('lceg-HB')] });
+    expect((await template(folded)).status).toBe(201);
+    const [firstSlot] = await h.prisma.v1TournamentSlot.findMany({ where: { tournamentId: folded }, orderBy: { position: 'asc' } });
+    const halfFolded = await h.prisma.v1TeamMatch.findFirstOrThrow({ where: { leagueId: folded, awaySlotId: { not: null } } });
+    await h.prisma.v1TeamMatch.update({ where: { id: halfFolded.id }, data: { hostTeamId: (await h.makeTeam('lceg-HC')).id, homeSlotId: firstSlot.id } });
+    expect((await template(folded, { teamCount: 4, replaceExisting: true })).status).toBe(201);
+    await publish(folded);
+    const foldedRow = await h.prisma.v1TeamMatch.findUniqueOrThrow({ where: { id: halfFolded.id } });
+    expect([foldedRow.status, foldedRow.hostTeamId]).toEqual(['cancelled', null]);
+    expect(detailFixtureIds(await publicDetail(folded))).not.toContain(halfFolded.id);
+  });
+
   it('대조군: 팀이 있는 취소 경기와 자리 없는 기존 경기는 계속 보인다', async () => {
     const teamA = await h.makeTeam('lceg-A');
     const teamB = await h.makeTeam('lceg-B');

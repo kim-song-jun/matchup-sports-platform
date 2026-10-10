@@ -183,13 +183,13 @@ export function commandConfirmCopy(
       return ctx.isFinalPeriod === true
         ? {
             title: `${label}할까요?`,
-            message: `${scoreText ?? '현재 스코어'}로 정규 시간을 마쳐요. 이 단계는 되돌릴 수 없어요 — 다만 경기 결과는 아직 확정되지 않아요(다음 단계에서 ${ctx.penaltyShootoutPossible ? '승부차기 입력 또는 ' : ''}경기 종료).`,
+            message: `${josa(scoreText ?? '현재 스코어', ['으로', '로'])} 정규 시간을 마쳐요. 이 단계는 되돌릴 수 없어요 — 다만 경기 결과는 아직 확정되지 않아요(다음 단계에서 ${ctx.penaltyShootoutPossible ? '승부차기 입력 또는 ' : ''}경기 종료).`,
             confirmLabel: label,
             tone: 'danger',
           }
         : {
             title: `${label}할까요?`,
-            message: `${scoreText ?? '현재 스코어'}로 종료하고 하프타임으로 넘어가요. 다음 피리어드에 기록이 생기기 전까지는 되돌릴 수 있어요.`,
+            message: `${josa(scoreText ?? '현재 스코어', ['으로', '로'])} 종료하고 하프타임으로 넘어가요. 다음 피리어드에 기록이 생기기 전까지는 되돌릴 수 있어요.`,
             confirmLabel: label,
             tone: 'default',
           };
@@ -203,7 +203,7 @@ export function commandConfirmCopy(
     case 'end':
       return {
         title: '경기를 종료할까요?',
-        message: `${scoreText ?? '지금 스코어'}로 경기를 종료해요. 종료하면 되돌릴 수 없어요 — 기록한 ${ctx.substitutionTracked ? '골·카드·교체' : '골·카드'}를 먼저 확인해주세요.`,
+        message: `${josa(scoreText ?? '지금 스코어', ['으로', '로'])} 경기를 종료해요. 종료하면 되돌릴 수 없어요 — 기록한 ${ctx.substitutionTracked ? '골·카드·교체' : '골·카드'}를 먼저 확인해주세요.`,
         confirmLabel: label,
         tone: 'danger',
       };
@@ -223,7 +223,7 @@ export function penaltyShootoutStartConfirmCopy(
     sides.length > 0 ? sides.map((side) => `${side.displayNameSnapshot} ${scoreBySideId.get(side.id) ?? 0}`).join(' : ') : '동점';
   return {
     title: '승부차기를 시작할까요?',
-    message: `정규 시간이 ${scoreText}로 끝났어요. 승부차기로 승자를 가려요.`,
+    message: `정규 시간이 ${josa(scoreText, ['으로', '로'])} 끝났어요. 승부차기로 승자를 가려요.`,
     confirmLabel: '승부차기 시작',
     tone: 'default',
   };
@@ -245,7 +245,7 @@ export function penaltyShootoutFinishConfirmCopy(
 ): ConfirmCopy {
   return {
     title: '승부차기를 종료할까요?',
-    message: `${homeSide.displayNameSnapshot} ${homeScore} : ${awayScore} ${awaySide.displayNameSnapshot} 승부차기로 경기를 종료해요. 선축은 ${firstKickSide.displayNameSnapshot}이에요. 종료하면 되돌릴 수 없어요.`,
+    message: `${homeSide.displayNameSnapshot} ${homeScore} : ${awayScore} ${awaySide.displayNameSnapshot} 승부차기로 경기를 종료해요. 선축은 ${josa(firstKickSide.displayNameSnapshot, ['이에요', '예요'])}. 종료하면 되돌릴 수 없어요.`,
     confirmLabel: '승부차기 종료',
     tone: 'danger',
   };
@@ -261,10 +261,7 @@ export function penaltyShootoutFinishConfirmCopy(
  * 어긋난 것이 바로 자동 판정이 멈춘 이유이고, 운영자가 오조작을 알아채는 지점도
  * 거기다(예: 되돌리기를 한 번 덜 눌러 원정 킥이 하나 모자란 상태).
  *
- * 조사는 숫자가 아니라 **`승부차기`에 붙인다**(일반 종료 문구와 같은 방식). 한국어에서
- * 숫자에 붙는 조사는 받침에 따라 갈리는데(0 → "영으로", 2 → "이로", 3 → "삼으로")
- * 점수는 런타임 값이라 어느 쪽이 맞는지 코드가 알 수 없다 — 숫자 뒤에 조사를 붙이는
- * 순간 어떤 점수에서는 반드시 틀린 문장이 나온다.
+ * 점수 뒤 조사는 붙이지 않고 `승부차기`에 붙인다 — 문장이 점수로 끝나지 않게 짠 것이다.
  */
 export function penaltyShootoutOverrideFinishConfirmCopy(
   homeSide: GameSide,
@@ -277,7 +274,7 @@ export function penaltyShootoutOverrideFinishConfirmCopy(
 ): ConfirmCopy {
   return {
     title: '아직 안 끝난 승부차기예요',
-    message: `${homeSide.displayNameSnapshot} ${homeKicks}킥 ${homeScore}점 · ${awaySide.displayNameSnapshot} ${awayKicks}킥 ${awayScore}점 — 규칙상 아직 결판이 나지 않았어요. 이대로 ${homeScore} : ${awayScore} 승부차기로 종료할까요? 선축은 ${firstKickSide.displayNameSnapshot}이에요. 종료하면 되돌릴 수 없어요.`,
+    message: `${homeSide.displayNameSnapshot} ${homeKicks}킥 ${homeScore}점 · ${awaySide.displayNameSnapshot} ${awayKicks}킥 ${awayScore}점 — 규칙상 아직 결판이 나지 않았어요. 이대로 ${homeScore} : ${awayScore} 승부차기로 종료할까요? 선축은 ${josa(firstKickSide.displayNameSnapshot, ['이에요', '예요'])}. 종료하면 되돌릴 수 없어요.`,
     confirmLabel: '그래도 종료',
     tone: 'danger',
   };

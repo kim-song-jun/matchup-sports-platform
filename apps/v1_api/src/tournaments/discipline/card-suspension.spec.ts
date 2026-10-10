@@ -122,6 +122,23 @@ describe('evaluateSuspension — 두 규정을 함께 켠 경우', () => {
   });
 });
 
+describe('evaluateSuspension — 사유 문구의 조사', () => {
+  it('퇴장 사유는 받침 없는 "회" 뒤에 "로"가 붙는다', () => {
+    const verdict = evaluateSuspension({ rules: RED_ONLY, played: [game(1, 0, 1)], upcomingGameOrder: 2 });
+    expect(verdict.reason).toBe('퇴장 1회로 1경기 출전정지예요.');
+  });
+
+  it('경고 누적 사유는 받침 있는 "누적" 뒤에 "으로"가 붙는다', () => {
+    const verdict = evaluateSuspension({ rules: YELLOW_ONLY, played: [game(1, 2, 0)], upcomingGameOrder: 2 });
+    expect(verdict.reason).toBe('경고 2장 누적으로 1경기 출전정지예요.');
+  });
+
+  it('두 원인이 함께면 마지막 원인("누적")의 받침을 따른다', () => {
+    const verdict = evaluateSuspension({ rules: BOTH, played: [game(1, 2, 1)], upcomingGameOrder: 2 });
+    expect(verdict.reason).toBe('퇴장 1회 · 경고 2장 누적으로 2경기 출전정지예요.');
+  });
+});
+
 // ─────────────────────────────────────────────────────────────────────────────
 // 2026-08-24 alpha 실측으로 발견한 결함의 회귀 방어.
 //

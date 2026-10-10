@@ -2,6 +2,8 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen, waitFor } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { renderToString } from 'react-dom/server';
+import { v1Keys } from '@/lib/query-keys';
 import { server } from '@/test/msw/server';
 
 function mockKakaoKey(key: string | null) {
@@ -37,6 +39,18 @@ describe('KakaoMapPreview', () => {
     vi.unstubAllGlobals();
     document.head.querySelectorAll('script[src*="dapi.kakao.com"]').forEach((el) => el.remove());
     delete (window as { kakao?: unknown }).kakao;
+  });
+
+  it('키가 캐시에 이미 있어도 첫 렌더(서버 HTML)에는 지도 상자를 그리지 않는다 — 하이드레이션 불일치 방지', async () => {
+    const { KakaoMapPreview } = await import('./kakao-map-preview');
+    const client = new QueryClient();
+    client.setQueryData(v1Keys.publicKakaoMapsKey(), { kakaoMapsJsKey: 'cached-js-key' });
+    const html = renderToString(
+      <QueryClientProvider client={client}>
+        <KakaoMapPreview name="망원 풋살장" latitude={37.55} longitude={126.9} />
+      </QueryClientProvider>,
+    );
+    expect(html).not.toContain('망원 풋살장 지도 크게 보기');
   });
 
   it('SDK 가 준비되면 드래그·휠 확대를 끈 지도를 만들고 핀을 꽂는다', async () => {

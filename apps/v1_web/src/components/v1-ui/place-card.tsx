@@ -83,7 +83,8 @@ export function PlaceCard({
   }
 
   return (
-    <div>
+    // 정보 행 안에 놓이면 행의 `text-align: right !important`(데스크톱 팀매치 상세)를 물려받는다 — 카드가 스스로 정한다.
+    <div style={{ textAlign: 'left' }}>
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
         <MapPin size={18} strokeWidth={2} aria-hidden="true" style={{ color: 'var(--blue700)', marginTop: 2, flex: 'none' }} />
         <div style={{ flex: 1, minWidth: 0 }}>

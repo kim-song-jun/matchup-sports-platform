@@ -1179,9 +1179,12 @@ function TeamMatchCard({ match, fromHref }: { match: TeamMatchModel; fromHref: s
 function DetailPlace({ place, fallbackName }: { place: V1PlaceView | null; fallbackName: string }) {
   if (!place) return <InfoRow label="장소" value={fallbackName} />;
   return (
-    <div className="tm-info-row" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 4, padding: '14px 0' }}>
+    // 행 구분선만 tm-info-row 에서 받는다 — 행의 좌우 여백 0(인라인으로 덮는다)을 물려받으면 카드가 테두리에 붙는다.
+    <div className="tm-info-row" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 4, padding: '14px 16px' }}>
       <div className="tm-text-caption" style={{ color: 'var(--text-caption)' }}>장소</div>
-      <PlaceCard place={place} />
+      <div style={{ width: '100%' }}>
+        <PlaceCard place={place} />
+      </div>
     </div>
   );
 }
@@ -1386,7 +1389,7 @@ function RegionSelect({ value, regions, onChange, error }: { value: string; regi
   }, [selectedRegion?.parentName]);
 
   if (parentNames.length === 0) {
-    return <label className="tm-create-field"><div className="tm-text-label">지역</div><select id="field-regionId" className="tm-create-input tm-create-select-control" value={value} onChange={(event) => onChange?.(event.target.value)}><option value="">시/군/구 선택</option>{regions.map((region) => <option key={region.id} value={region.id}>{region.name}</option>)}</select><div className="tm-text-caption" style={{ marginTop: 8 }}>지역은 검색·추천 기준으로 사용돼요. 상세주소는 아래에 직접 입력해 주세요.</div><FieldErrorText message={error} /><RequiredHint shown={!error && !value} /></label>;
+    return <label className="tm-create-field"><div className="tm-text-label">지역</div><select id="field-regionId" className="tm-create-input tm-create-select-control" value={value} onChange={(event) => onChange?.(event.target.value)}><option value="">시/군/구 선택</option>{regions.map((region) => <option key={region.id} value={region.id}>{region.name}</option>)}</select><div className="tm-text-caption" style={{ marginTop: 8 }}>지역은 검색·추천에 쓰여요. 장소는 아래에서 검색해 골라 주세요.</div><FieldErrorText message={error} /><RequiredHint shown={!error && !value} /></label>;
   }
 
   return (
@@ -1417,7 +1420,7 @@ function RegionSelect({ value, regions, onChange, error }: { value: string; regi
           {districts.map((region) => <option key={region.id} value={region.id}>{region.shortName ?? region.name}</option>)}
         </select>
       </div>
-      <div className="tm-text-caption" style={{ marginTop: 8 }}>지역은 검색·추천 기준으로 사용돼요. 상세주소는 아래에 직접 입력해 주세요.</div>
+      <div className="tm-text-caption" style={{ marginTop: 8 }}>지역은 검색·추천에 쓰여요. 장소는 아래에서 검색해 골라 주세요.</div>
       <FieldErrorText message={error} />
       <RequiredHint shown={!error && !value} />
     </div>

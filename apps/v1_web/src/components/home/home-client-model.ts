@@ -221,7 +221,7 @@ function toHomeRecommendation(match: V1HomeRecommendation): HomeMatchCard {
     time: formatTime(match.startsAt),
     currentParticipants: match.participantCount ?? null,
     maxParticipants: match.capacity ?? null,
-    actionLabel: '승인제 신청',
+    actionLabel: '경기 신청하기',
   };
 }
 
@@ -276,7 +276,7 @@ function toHomeMatch(match: V1Match): HomeMatchCard {
     time: formatTime(match.startsAt),
     currentParticipants: capacity.current,
     maxParticipants: capacity.capacity,
-    actionLabel: '승인제 신청',
+    actionLabel: '경기 신청하기',
   };
 }
 

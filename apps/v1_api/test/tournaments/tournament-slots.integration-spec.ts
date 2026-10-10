@@ -396,6 +396,64 @@ describe('자리 배정 (PostgreSQL)', () => {
     });
   });
 
+  describe('한 팀 한 조 (결정 4) — 자리 경로는 트랜잭션 끝 상태를 검사한다', () => {
+    const twoGroups = async (label: string) => {
+      const seeded = await seedBracketTournament(prisma, { label, format: 'group_knockout', teamCount: 6 });
+      await templates.apply(user, seeded.tournamentId, { kind: 'group_knockout', groupCount: 2, teamsPerGroup: 3, advancePerGroup: 1, legs: 1, thirdPlace: false });
+      const groups = await prisma.v1TournamentGroup.findMany({ where: { tournamentId: seeded.tournamentId, phase: 'group' }, orderBy: { sortOrder: 'asc' } });
+      const firstEntry = (groupId: string) => prisma.v1TournamentSlot.findFirstOrThrow({
+        where: { tournamentId: seeded.tournamentId, groupId, kind: 'ENTRY' }, orderBy: { position: 'asc' },
+      });
+      const teamsIn = async (groupId: string) =>
+        (await prisma.v1TournamentGroupTeam.findMany({ where: { groupId } })).map((row) => row.registrationId);
+      return { ...seeded, groupA: groups[0].id, groupB: groups[1].id, firstEntry, teamsIn };
+    };
+
+    it('직접 경로로 B조에 편성된 팀을 A조 자리에 넣으면 409 TEAM_IN_OTHER_GROUP 이고 롤백된다', async () => {
+      const { tournamentId, registrationIds, groupA, groupB, firstEntry, teamsIn } = await twoGroups('otg-direct');
+      const slotA = await firstEntry(groupA);
+      await bracket.createGroupTeam(user, tournamentId, { groupId: groupB, registrationId: registrationIds[0] });
+
+      await expect(slots.assignSlot(user, slotA.id, registrationIds[0])).rejects.toMatchObject({ response: { code: 'TEAM_IN_OTHER_GROUP' } });
+
+      expect((await prisma.v1TournamentSlot.findUniqueOrThrow({ where: { id: slotA.id } })).registrationId).toBeNull();
+      expect(await teamsIn(groupA)).toEqual([]);
+    });
+
+    it('맞바꾸기는 통과한다 (대조군) — 중간 겹침은 끝 상태 검사 전에 풀린다', async () => {
+      const { tournamentId, registrationIds, groupA, groupB, firstEntry, teamsIn } = await twoGroups('otg-swap');
+      const [slotA, slotB] = [await firstEntry(groupA), await firstEntry(groupB)];
+      await slots.assignSlot(user, slotA.id, registrationIds[0]);
+      await slots.assignSlot(user, slotB.id, registrationIds[1]);
+
+      await inLane(tournamentId, (tx, ctx) => assignSlotsBatchInTx(tx, ctx, [
+        { slotId: slotA.id, registrationId: registrationIds[1] },
+        { slotId: slotB.id, registrationId: registrationIds[0] },
+      ]));
+
+      expect(await teamsIn(groupA)).toEqual([registrationIds[1]]);
+      expect(await teamsIn(groupB)).toEqual([registrationIds[0]]);
+    });
+
+    it('이미 겹친 팀은 이미 편성된 조의 자리에는 들어가고, 편성이 없는 조의 자리에는 409', async () => {
+      const { tournamentId, registrationIds, groupA, groupB, firstEntry, teamsIn } = await twoGroups('otg-legacy');
+      const reg = registrationIds[2];
+      await prisma.v1TournamentGroupTeam.createMany({ data: [
+        { groupId: groupA, registrationId: reg, sortOrder: 0 },
+        { groupId: groupB, registrationId: reg, sortOrder: 0 },
+      ] });
+
+      await expect(slots.assignSlot(user, (await firstEntry(groupA)).id, reg)).resolves.toBeDefined();
+      expect(await teamsIn(groupA)).toEqual([reg]);
+      expect(await teamsIn(groupB)).toEqual([reg]);
+
+      // 편성이 없는 조: 같은 대회에 세 번째 조별 조를 직접 만들어 확인한다.
+      const groupC = (await bracket.createGroup(user, tournamentId, { name: '겹침 C조', phase: 'group' })).id;
+      const slotC = await prisma.v1TournamentSlot.create({ data: { tournamentId, kind: 'ENTRY', groupId: groupC, position: 1 } });
+      await expect(slots.assignSlot(user, slotC.id, reg)).rejects.toMatchObject({ response: { code: 'TEAM_IN_OTHER_GROUP' } });
+    });
+  });
+
   describe('무작위 채우기', () => {
     it('팀이 자리보다 적으면 팀 수만큼만 중복 없이 채우고, 이미 배치된 팀은 그 자리에 남는다', async () => {
       const { tournamentId, registrationIds } = await seedBracketTournament(prisma, { label: 'rf-few', format: 'knockout', teamCount: 5 });

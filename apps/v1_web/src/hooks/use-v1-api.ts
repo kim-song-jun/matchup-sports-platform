@@ -5110,11 +5110,14 @@ export function useV1RecalculateStandings(tournamentId: string) {
   });
 }
 
+export function fetchV1AdminBracket(tournamentId: string) {
+  return v1Get<V1AdminTournamentBracket>(`/admin/tournaments/${tournamentId}/bracket`);
+}
+
 export function useV1AdminBracket(tournamentId: string) {
   return useQuery({
     queryKey: v1Keys.adminTournamentBracket(tournamentId),
-    queryFn: () =>
-      v1Get<V1AdminTournamentBracket>(`/admin/tournaments/${tournamentId}/bracket`),
+    queryFn: () => fetchV1AdminBracket(tournamentId),
     enabled: !!tournamentId,
   });
 }

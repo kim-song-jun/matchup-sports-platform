@@ -4,10 +4,8 @@ import { makeBracket, makeFixture, makeGame, makeGroup } from '@/test/bracket-ca
 import { BracketFixtureToolsDialog } from './bracket-fixture-tools-dialog';
 
 const mocks = vi.hoisted(() => ({ create: vi.fn(), setSources: vi.fn() }));
-vi.mock('@/hooks/use-v1-api', () => ({
-  useV1CreateFixture: () => ({ mutate: mocks.create, isPending: false }),
-}));
 vi.mock('@/hooks/use-v1-bracket-canvas', () => ({
+  useV1AddBracketFixture: () => ({ mutate: mocks.create, isPending: false }),
   useV1SetBracketSources: () => ({ mutate: mocks.setSources, isPending: false }),
 }));
 
@@ -34,11 +32,11 @@ beforeEach(() => {
 });
 
 describe('BracketFixtureToolsDialog — 경기 추가', () => {
-  it('고른 단계에 대진 미정 경기를 다음 번호로 만들고, 성공하면 알리고 닫는다', () => {
+  it('고른 단계의 round 로 경기 추가를 요청하고(번호는 훅이 새 대진으로 정한다), 성공하면 알리고 닫는다', () => {
     const props = renderDialog('add');
     fireEvent.change(screen.getByLabelText('추가할 단계'), { target: { value: 'g-sf' } });
     fireEvent.click(screen.getByRole('button', { name: '경기 추가' }));
-    expect(mocks.create).toHaveBeenCalledWith({ groupId: 'g-sf', round: '4강', fixtureNumber: 4 }, expect.any(Object));
+    expect(mocks.create).toHaveBeenCalledWith({ groupId: 'g-sf', round: '4강' }, expect.any(Object));
     mocks.create.mock.calls[0][1].onSuccess();
     expect(props.showToast).toHaveBeenCalledWith('4강 경기를 추가했어요. 칸을 눌러 팀을 넣어 주세요.', 'success');
     expect(props.onClose).toHaveBeenCalledTimes(1);

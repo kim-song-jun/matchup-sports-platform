@@ -1,13 +1,16 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
+import { fetchV1AdminBracket } from '@/hooks/use-v1-api';
 import { resultReviewKeys } from '@/hooks/use-tournament-result-review';
+import { nextFixtureNumber } from '@/lib/bracket-fixture-tools';
 import { v1Get, v1Patch, v1Post, v1Put } from '@/lib/api-client';
 import { v1Keys } from '@/lib/query-keys';
 import { randomUuid } from '@/lib/uuid';
 import type {
   V1ApplyBracketTemplatePayload,
   V1ApplyBracketTemplateResult,
+  V1AdminBracketFixture,
   V1AssignSlotResult,
   V1QuickResultResult,
   V1QuickResultScore,
@@ -104,6 +107,30 @@ export function useV1SetBracketSources(tournamentId: string) {
       awaySourceFixtureId: string | null;
     }) => v1Patch(`/admin/fixtures/${encodeURIComponent(fixtureId)}/bracket-sources`, { homeSourceFixtureId, awaySourceFixtureId }),
     onSuccess: () => invalidateCompetitionViews(queryClient, tournamentId, 'tournament'),
+  });
+}
+
+/**
+ * `POST /admin/tournaments/:id/fixtures` — 번호는 호출 직전에 대진을 새로 읽어 정한다.
+ * 서버가 (round, fixtureNumber, leg) 를 멱등 키로 쓰므로 캐시가 낡은 채 번호를 정하면 기존 경기가
+ * 그대로 돌아오거나(같은 내용) 409 COMMAND_IDEMPOTENCY_PAYLOAD_REUSE(다른 내용)가 된다.
+ */
+export function useV1AddBracketFixture(tournamentId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ groupId, round }: { groupId: string; round: string }) => {
+      const fresh = await queryClient.fetchQuery({
+        queryKey: v1Keys.adminTournamentBracket(tournamentId),
+        queryFn: () => fetchV1AdminBracket(tournamentId),
+        staleTime: 0,
+      });
+      return v1Post<V1AdminBracketFixture>(`/admin/tournaments/${tournamentId}/fixtures`, {
+        groupId,
+        round,
+        fixtureNumber: nextFixtureNumber(fresh.fixtures),
+      });
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: v1Keys.adminTournamentBracket(tournamentId) }),
   });
 }
 

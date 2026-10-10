@@ -4,10 +4,9 @@ import { X } from 'lucide-react';
 import { useId, useMemo, useRef, useState } from 'react';
 import { Button } from '@/components/v1-ui/button';
 import { useModalA11y } from '@/components/v1-ui/use-modal-a11y';
-import { useV1CreateFixture } from '@/hooks/use-v1-api';
-import { useV1SetBracketSources } from '@/hooks/use-v1-bracket-canvas';
+import { useV1AddBracketFixture, useV1SetBracketSources } from '@/hooks/use-v1-bracket-canvas';
 import { describeBracketCanvasError } from '@/lib/bracket-canvas-errors';
-import { bracketSourceCandidates, isFixtureLinkable, knockoutRoundLabel, nextFixtureNumber } from '@/lib/bracket-fixture-tools';
+import { bracketSourceCandidates, isFixtureLinkable, knockoutRoundLabel } from '@/lib/bracket-fixture-tools';
 import type { V1AdminBracketFixture, V1AdminTournamentBracket, V1TournamentFormat } from '@/types/api';
 import { BracketLeagueAddFixtureForm, type LeagueAddSubmit } from './bracket-league-add-fixture-form';
 
@@ -25,7 +24,7 @@ const SELECT_CLASS = 'tm-input';
 
 export function BracketFixtureToolsDialog({ open, mode, format, tournamentId, bracket, onClose, showToast }: BracketFixtureToolsDialogProps) {
   const idPrefix = useId();
-  const createFixture = useV1CreateFixture(tournamentId);
+  const createFixture = useV1AddBracketFixture(tournamentId);
   const setSources = useV1SetBracketSources(tournamentId);
   const pending = createFixture.isPending || setSources.isPending;
   const { dialogRef, onBackdropClick, mounted, closing } = useModalA11y({ open, onClose, pending });
@@ -78,7 +77,7 @@ export function BracketFixtureToolsDialog({ open, mode, format, tournamentId, br
     if (submitting.current) return;
     submitting.current = true;
     createFixture.mutate(
-      { groupId: target.groupId, round: target.round, fixtureNumber: nextFixtureNumber(bracket.fixtures) },
+      { groupId: target.groupId, round: target.round },
       {
         onSuccess: () => {
           showToast(`${target.toastLabel} 경기를 추가했어요. 칸을 눌러 팀을 넣어 주세요.`, 'success');

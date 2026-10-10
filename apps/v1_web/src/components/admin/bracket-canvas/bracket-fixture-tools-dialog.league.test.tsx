@@ -10,8 +10,10 @@ import { BracketFixtureToolsDialog } from './bracket-fixture-tools-dialog';
 
 const bodies: unknown[] = [];
 let failNext = false;
+let serverBracket: V1AdminTournamentBracket;
 const server = setupServer(
   http.post('*/api/v1/logs/client-error', () => HttpResponse.json({ status: 'success', data: null })),
+  http.get('*/api/v1/admin/tournaments/:id/bracket', () => HttpResponse.json({ status: 'success', data: serverBracket, timestamp: '2026-10-10T00:00:00Z' })),
   http.post('*/api/v1/admin/tournaments/:id/fixtures', async ({ request }) => {
     bodies.push(await request.json());
     await delay(30);
@@ -44,6 +46,7 @@ const numbered = makeBracket({
 const NO_GROUP_NOTICE = '조별 리그 조가 없어 경기를 추가할 수 없어요. 조 설정을 확인하거나 대진을 템플릿으로 다시 만들어 주세요.';
 
 function renderLeagueDialog(bracket: V1AdminTournamentBracket = numbered) {
+  serverBracket = bracket;
   const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
   const props = { open: true, mode: 'add' as const, format: 'league' as const, tournamentId: 't-1', bracket, onClose: vi.fn(), showToast: vi.fn() };
   render(
@@ -76,6 +79,32 @@ describe('BracketFixtureToolsDialog — 리그 경기 추가', () => {
     expect(bodies).toEqual([{ groupId: 'gA', round: 'league_r11', fixtureNumber: 10 }]);
     expect(props.showToast).toHaveBeenCalledWith('11라운드 A조 경기를 추가했어요. 칸을 눌러 팀을 넣어 주세요.', 'success');
     expect(client.getQueryState(key)?.isInvalidated).toBe(true);
+  });
+
+  it('화면 캐시가 낡아도 서버의 최신 대진에서 다음 경기 번호를 정한다', async () => {
+    const { props } = renderLeagueDialog();
+    // 다른 어드민이 그사이 9번 뒤로 두 경기를 더 추가했다
+    serverBracket = makeBracket({
+      groups: [gA, gB, gSemi],
+      fixtures: [...numbered.fixtures, makeFixture({ id: 'a11', groupId: 'gA', fixtureNumber: 10, round: 'league_r10' }), makeFixture({ id: 'a12', groupId: 'gB', fixtureNumber: 11, round: 'league_r10' })],
+    });
+    fireEvent.click(screen.getByRole('button', { name: '경기 추가' }));
+    await waitFor(() => expect(props.onClose).toHaveBeenCalledTimes(1));
+    expect(bodies).toEqual([{ groupId: 'gA', round: 'league_r10', fixtureNumber: 12 }]);
+  });
+
+  it('서버가 같은 경기 번호를 다른 내용으로 이미 처리했다고 답하면 다시 불러 오라고 안내하고 닫지 않는다', async () => {
+    server.use(
+      http.post('*/api/v1/admin/tournaments/:id/fixtures', () =>
+        HttpResponse.json({ status: 'error', statusCode: 409, code: 'COMMAND_IDEMPOTENCY_PAYLOAD_REUSE', message: 'reuse' }, { status: 409 }),
+      ),
+    );
+    const { props } = renderLeagueDialog();
+    fireEvent.click(screen.getByRole('button', { name: '경기 추가' }));
+    await waitFor(() =>
+      expect(props.showToast).toHaveBeenCalledWith('그사이 다른 경기가 먼저 추가됐어요. 대진을 새로 불러온 뒤 다시 눌러 주세요.', 'error'),
+    );
+    expect(props.onClose).not.toHaveBeenCalled();
   });
 
   it('빈 조에 기존 라운드로 넣는다', async () => {

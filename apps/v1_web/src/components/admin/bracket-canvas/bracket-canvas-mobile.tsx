@@ -18,7 +18,7 @@ import {
 } from '@/lib/bracket-canvas-mobile-model';
 import { bracketNodeStateChip } from '@/lib/competition-status';
 import { formatKstDateShort, formatKstTime } from '@/lib/date-utils';
-import type { V1AdminBracketSlot } from '@/types/api';
+import type { V1AdminBracketGroup, V1AdminBracketSlot } from '@/types/api';
 import { MobileNodeSheetBody, type MobileSheetView } from './bracket-canvas-mobile-sheet';
 import type { RegistrationsLoadState } from './bracket-team-tray';
 
@@ -27,6 +27,8 @@ export interface BracketCanvasMobileProps {
   scope: 'tournament' | 'league';
   rounds: MobileRound[];
   slots: V1AdminBracketSlot[];
+  /** 한 팀 한 조 후보 제외용 — tournament scope 에서만 넘긴다. */
+  groups?: readonly V1AdminBracketGroup[];
   candidates: MobilePickCandidate[];
   canWrite: boolean;
   registrationsState: RegistrationsLoadState;
@@ -103,7 +105,7 @@ function MobileNodeCard({ node, expanded, onOpen }: { node: MobileNode; expanded
   );
 }
 
-export function BracketCanvasMobile({ competitionId, scope, rounds, slots, candidates, canWrite, registrationsState, showToast }: BracketCanvasMobileProps) {
+export function BracketCanvasMobile({ competitionId, scope, rounds, slots, groups, candidates, canWrite, registrationsState, showToast }: BracketCanvasMobileProps) {
   const roundSelectId = useId();
   const [pickedRoundKey, setPickedRoundKey] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -190,6 +192,7 @@ export function BracketCanvasMobile({ competitionId, scope, rounds, slots, candi
             scope={scope}
             canWrite={canWrite}
             slots={slots}
+            groups={groups}
             candidates={candidates}
             registrationsState={registrationsState}
             showToast={showToast}

@@ -2532,7 +2532,8 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
     // The cursor is a bare row id, so the keyset position is rebuilt from that row. Prisma's own
     // cursor option cannot be used: it mis-compares rows when the sort column (startAt) is null.
     // Nested under AND because the q search already owns the top-level OR.
-    const afterCursorWhere: Prisma.V1TeamMatchWhereInput = query.cursor && !(query.page && query.page > 1)
+    // An explicit page (page 1 included) wins over a cursor sent with it, as in `paginationArgs`.
+    const afterCursorWhere: Prisma.V1TeamMatchWhereInput = query.cursor && query.page === undefined
       ? { AND: [await this.teamMatchAfterCursorWhere(sort, query.cursor)] }
       : {};
 

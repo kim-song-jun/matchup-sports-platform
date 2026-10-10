@@ -228,11 +228,12 @@ describe('대회 공개 목록 DB 정렬·페이지 계약', () => {
     }
   });
 
-  it('page 1 with a cursor keeps following the cursor, like page-less requests', async () => {
+  it('page 1 wins over a cursor sent with it: the first rows, reported as page 1 with the total', async () => {
     const first = await list({ limit: 1 });
     expect(ids(first)).toEqual(['o-soon']);
     const res = await list({ cursor: first.pageInfo.nextCursor, page: 1, limit: 2 });
-    expect(ids(res)).toEqual(['o-tie-a', 'o-tie-b']);
+    expect(ids(res)).toEqual(['o-soon', 'o-tie-a']);
+    expect(res.pageInfo).toMatchObject({ page: 1, total: TOURNAMENT_ORDER.length, hasPrev: false });
   });
 
   it('filters keep their meaning: status, gender, sport', async () => {

@@ -6,6 +6,7 @@ import { AlertTriangleIcon } from '@/components/v1-ui/icons';
 import { RecentVenueChips } from '@/components/v1-ui/create-form-fields';
 import { KakaoMapPreview } from '@/components/v1-ui/kakao-map-preview';
 import { useV1PlaceSearch } from '@/hooks/use-v1-api';
+import { DESKTOP_LIST_MEDIA_QUERY, useMediaQuery } from '@/hooks/use-media-query';
 import { V1ApiError } from '@/lib/api-client';
 import { extractErrorMessage } from '@/lib/error-message';
 import {
@@ -18,6 +19,10 @@ import type { V1PlaceSearchItem, V1PlaceView, V1RecentVenue } from '@/types/api'
 
 /** 결과 약 5줄 높이. 넘치면 목록 안에서 스크롤한다. */
 const LIST_MAX_HEIGHT = 'min(320px, 45vh)';
+
+/** 고른 장소 지도 미리보기 높이. 모바일은 그대로 두고 데스크톱(넓은 화면)에서만 키운다. */
+const MAP_HEIGHT = 120;
+const MAP_HEIGHT_DESKTOP = 240;
 
 const SEARCH_DEBOUNCE_MS = 300;
 const SEARCH_FALLBACK_MESSAGE = '장소를 찾지 못했어요. 잠시 후 다시 시도해 주세요.';
@@ -92,6 +97,9 @@ export function PlacePicker({
   const changeButtonRef = useRef<HTMLButtonElement>(null);
   const [focusInputNext, setFocusInputNext] = useState(false);
   const [focusChangeNext, setFocusChangeNext] = useState(false);
+  const desktop = useMediaQuery(DESKTOP_LIST_MEDIA_QUERY);
+  // 고른 직후에만 지도를 화면 안으로 끌어온다 — 값이 채워진 채 열린 수정 폼은 스크롤하지 않는다.
+  const [justPicked, setJustPicked] = useState(false);
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedQuery(query.trim()), SEARCH_DEBOUNCE_MS);
@@ -146,6 +154,7 @@ export function PlacePicker({
     setActiveIndex(-1);
     setQuery('');
     setDebouncedQuery('');
+    setJustPicked(false);
     keepManualRef.current = !initialName.trim() && value !== null;
     onChange(initialName.trim() ? { kind: 'manual', name: initialName.trim() } : null);
     setFocusInputNext(true);
@@ -155,6 +164,7 @@ export function PlacePicker({
     setMode('search');
     onChange(null);
     setQuery('');
+    setJustPicked(false);
     setFocusInputNext(true);
   }
 
@@ -165,6 +175,7 @@ export function PlacePicker({
     setOpen(false);
     setActiveIndex(-1);
     setFocusChangeNext(true);
+    setJustPicked(true);
   }
 
   function handleKeyDown(event: KeyboardEvent<HTMLInputElement>) {
@@ -237,7 +248,13 @@ export function PlacePicker({
             </button>
           </div>
           <div style={{ marginTop: 12 }}>
-            <KakaoMapPreview name={value.name} latitude={value.latitude} longitude={value.longitude} height={120} />
+            <KakaoMapPreview
+              name={value.name}
+              latitude={value.latitude}
+              longitude={value.longitude}
+              height={desktop ? MAP_HEIGHT_DESKTOP : MAP_HEIGHT}
+              revealOnShow={desktop && justPicked}
+            />
           </div>
         </div>
       ) : mode === 'manual' ? (
@@ -434,7 +451,10 @@ export function PlacePicker({
             if (!next) return;
             setMode(next.kind === 'manual' ? 'manual' : 'search');
             onChange(next);
-            if (next.kind === 'picked') setFocusChangeNext(true);
+            if (next.kind === 'picked') {
+              setFocusChangeNext(true);
+              setJustPicked(true);
+            }
           }}
         />
       ) : null}

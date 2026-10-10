@@ -2089,7 +2089,7 @@ export type V1LeagueClaimableFixtures = {
 
 export function useV1LeagueClaimableFixtures(leagueId: string, options?: { enabled?: boolean }) {
   return useQuery({
-    queryKey: ['v1', 'league-claimable-fixtures', leagueId] as const,
+    queryKey: v1Keys.leagueClaimableFixtures(leagueId),
     queryFn: () =>
       v1Get<V1LeagueClaimableFixtures>(`/league-matches/${leagueId}/claimable-fixtures`),
     enabled: Boolean(leagueId) && (options?.enabled ?? true),
@@ -5019,6 +5019,7 @@ export function useV1CreateFixture(tournamentId: string) {
       queryClient.invalidateQueries({
         queryKey: v1Keys.adminTournamentBracket(tournamentId),
       });
+      queryClient.invalidateQueries({ queryKey: v1Keys.tournament(tournamentId) });
     },
   });
 }
@@ -5826,7 +5827,7 @@ export function useV1UpdateLeagueVisibility(leagueId: string) {
       queryClient.invalidateQueries({ queryKey: v1Keys.adminLeagueMatchList() });
       queryClient.invalidateQueries({ queryKey: v1Keys.leagueMatches() });
       queryClient.invalidateQueries({ queryKey: v1Keys.leagueMatch(leagueId) });
-      queryClient.invalidateQueries({ queryKey: ['v1', 'league-claimable-fixtures', leagueId] });
+      queryClient.invalidateQueries({ queryKey: v1Keys.leagueClaimableFixtures(leagueId) });
       for (const fixtureId of fixtureIds) {
         queryClient.invalidateQueries({ queryKey: v1Keys.teamMatch(fixtureId) });
       }

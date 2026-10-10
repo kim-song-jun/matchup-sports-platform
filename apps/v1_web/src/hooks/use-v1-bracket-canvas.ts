@@ -113,13 +113,7 @@ export function useV1ApplyLeagueTemplate(leagueId: string) {
   return useMutation({
     mutationFn: (body: V1ApplyLeagueTemplatePayload) =>
       v1Post<V1ApplyLeagueTemplateResult>(`/admin/league-matches/${encodeURIComponent(leagueId)}/fixtures/template`, body),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: v1Keys.adminLeagueMatch(leagueId) });
-      queryClient.invalidateQueries({ queryKey: v1Keys.adminLeagueMatchList() });
-      queryClient.invalidateQueries({ queryKey: v1Keys.leagueMatches() });
-      queryClient.invalidateQueries({ queryKey: v1Keys.leagueMatch(leagueId) });
-      queryClient.invalidateQueries({ queryKey: v1Keys.tournament(leagueId) });
-    },
+    onSuccess: () => invalidateCompetitionViews(queryClient, leagueId, 'league'),
   });
 }
 

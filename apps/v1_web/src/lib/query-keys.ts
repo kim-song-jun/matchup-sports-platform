@@ -190,6 +190,7 @@ export const v1Keys = {
   leagueMatch: (leagueId: string) => [...v1Keys.all, 'league-matches', leagueId] as const,
   // R4: 내 리그. leagueMatch(leagueId) 와 같은 네임스페이스지만 'me' 는 UUID 가 아니라
   // 실제 리그 id 와 절대 충돌하지 않는다.
+  leagueClaimableFixtures: (leagueId: string) => [...v1Keys.all, 'league-claimable-fixtures', leagueId] as const,
   myLeagues: () => [...v1Keys.all, 'league-matches', 'me'] as const,
   leagueMatchStandings: (leagueId: string) => [...v1Keys.leagueMatch(leagueId), 'standings'] as const,
   leagueMatchPlayerRecords: (leagueId: string) => [...v1Keys.leagueMatch(leagueId), 'player-records'] as const,
@@ -236,9 +237,19 @@ export const v1Keys = {
   myTournamentOpsAssignments: () => [...v1Keys.all, 'tournament-ops', 'me', 'assignments'] as const,
 };
 
-/** 리그 대진이 바뀔 때 함께 무효화할 키. 공개 `leagueMatch` 는 순위·선수 기록 하위 키를 prefix 로 포함한다. */
+/**
+ * 리그 대진이 바뀔 때 함께 무효화할 키. 공개 `leagueMatch` 는 순위·선수 기록 하위 키를 prefix 로 포함하고,
+ * `leagueMatches()` 는 칸 채우기로 바뀔 수 있는 리그 상태가 실린 공개 목록이다.
+ */
 export function leagueViewKeys(leagueId: string) {
-  return [v1Keys.adminLeagueMatch(leagueId), v1Keys.leagueMatch(leagueId), v1Keys.tournament(leagueId)];
+  return [
+    v1Keys.adminLeagueMatch(leagueId),
+    v1Keys.adminLeagueMatchList(),
+    v1Keys.leagueMatches(),
+    v1Keys.leagueMatch(leagueId),
+    v1Keys.leagueClaimableFixtures(leagueId),
+    v1Keys.tournament(leagueId),
+  ];
 }
 
 // 로그인/회원가입 등 identity 전환 시 반드시 호출 — 캐시가 identity로 스코프되지 않아

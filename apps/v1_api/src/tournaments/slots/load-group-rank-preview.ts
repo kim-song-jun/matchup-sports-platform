@@ -93,7 +93,7 @@ async function loadGroupRankSources(
   });
   const standings = await client.v1TournamentStanding.findMany({
     where: { groupId: { in: [...groupIds] } },
-    select: { groupId: true, registrationId: true, position: true, wins: true, draws: true, losses: true },
+    select: { groupId: true, registrationId: true, position: true, wins: true, draws: true, losses: true, recalculatedAt: true },
   });
   const details = await client.v1TournamentMatchDetails.findMany({
     where: {
@@ -105,7 +105,7 @@ async function loadGroupRankSources(
       groupId: true,
       homeRegistrationId: true,
       awayRegistrationId: true,
-      teamMatch: { select: { game: { select: { currentOfficialRevision: { select: { state: true, score: true } } } } } },
+      teamMatch: { select: { game: { select: { currentOfficialRevision: { select: { state: true, score: true, officialAt: true } } } } } },
     },
   });
 
@@ -124,12 +124,18 @@ async function loadGroupRankSources(
             homeRegistrationId: row.homeRegistrationId,
             awayRegistrationId: row.awayRegistrationId,
             official: score === null ? null : { homeScore: score.homeScore, awayScore: score.awayScore },
+            officialAt: row.teamMatch.game?.currentOfficialRevision?.officialAt ?? null,
           };
         }),
     });
   }
   return sourceByGroup;
 }
+
+export type GroupStandingSummaryOptions = {
+  /** false 면 결선 대진 조회를 건너뛰고 qualification 을 계산하지 않는다(공동 순위만 필요한 일정 탭용). */
+  includeQualification?: boolean;
+};
 
 /**
  * 공개 순위표용 조별 요약(공동 순위·진출 팀). 조별 단계(phase=group) 조만 대상이고,
@@ -138,6 +144,7 @@ async function loadGroupRankSources(
 export async function loadGroupStandingSummaries(
   client: Prisma.TransactionClient,
   tournamentId: string,
+  { includeQualification = true }: GroupStandingSummaryOptions = {},
 ): Promise<Map<string, GroupStandingSummary>> {
   const groups = await client.v1TournamentGroup.findMany({
     where: { tournamentId, phase: 'group' },
@@ -150,25 +157,28 @@ export async function loadGroupStandingSummaries(
     tournamentId,
     groups.map((group) => group.id),
   );
-  // groupId null 은 조 없는 결선 경기. NOT 은 groupId null 행을 걸러 내므로 OR 로 둘 다 잡는다.
-  const knockoutDetails = await client.v1TournamentMatchDetails.findMany({
-    where: {
-      tournamentId,
-      OR: [{ groupId: null }, { group: { is: { phase: { not: 'group' } } } }],
-      teamMatch: { is: { deletedAt: null, status: { notIn: ['cancelled', 'archived'] } } },
-    },
-    select: { homeRegistrationId: true, awayRegistrationId: true },
-  });
   const placed = new Set<string>();
-  for (const row of knockoutDetails) {
-    if (row.homeRegistrationId !== null) placed.add(row.homeRegistrationId);
-    if (row.awayRegistrationId !== null) placed.add(row.awayRegistrationId);
+  if (includeQualification) {
+    // groupId null 은 조 없는 결선 경기. NOT 은 groupId null 행을 걸러 내므로 OR 로 둘 다 잡는다.
+    const knockoutDetails = await client.v1TournamentMatchDetails.findMany({
+      where: {
+        tournamentId,
+        OR: [{ groupId: null }, { group: { is: { phase: { not: 'group' } } } }],
+        teamMatch: { is: { deletedAt: null, status: { notIn: ['cancelled', 'archived'] } } },
+      },
+      select: { homeRegistrationId: true, awayRegistrationId: true },
+    });
+    for (const row of knockoutDetails) {
+      if (row.homeRegistrationId !== null) placed.add(row.homeRegistrationId);
+      if (row.awayRegistrationId !== null) placed.add(row.awayRegistrationId);
+    }
   }
 
   const summaries = new Map<string, GroupStandingSummary>();
   for (const group of groups) {
     const source = sourceByGroup.get(group.id);
-    const summary = source === undefined ? null : summarizeGroupStanding(source, group.advanceCount, placed);
+    const advanceCount = includeQualification ? group.advanceCount : null;
+    const summary = source === undefined ? null : summarizeGroupStanding(source, advanceCount, placed);
     if (summary !== null) summaries.set(group.id, summary);
   }
   return summaries;

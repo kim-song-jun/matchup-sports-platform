@@ -8,7 +8,13 @@ type Result = readonly [home: string, away: string, homeScore: number, awayScore
 function sourceOf(
   ids: string[],
   results: Result[],
-  options: { standingsFrom?: Result[]; dropStandingFor?: string; unofficialIndex?: number } = {},
+  options: {
+    standingsFrom?: Result[];
+    dropStandingFor?: string;
+    unofficialIndex?: number;
+    officialAt?: Date | null;
+    recalculatedAt?: Date | null;
+  } = {},
 ): GroupRankSource {
   const standings = calculateCompetitionStandings({
     tournamentId: 'tournament-1',
@@ -23,7 +29,7 @@ function sourceOf(
     config: FOOTBALL_V1_CONFIG,
   })
     .filter((row) => row.registrationId !== options.dropStandingFor)
-    .map((row) => ({ registrationId: row.registrationId, position: row.position, wins: row.wins, draws: row.draws, losses: row.losses }));
+    .map((row) => ({ registrationId: row.registrationId, position: row.position, wins: row.wins, draws: row.draws, losses: row.losses, recalculatedAt: options.recalculatedAt ?? null }));
   return {
     registrationIds: ids,
     standings,
@@ -31,6 +37,7 @@ function sourceOf(
       homeRegistrationId: home,
       awayRegistrationId: away,
       official: index === options.unofficialIndex ? null : { homeScore, awayScore },
+      officialAt: options.officialAt ?? null,
     })),
   };
 }
@@ -38,6 +45,10 @@ function sourceOf(
 const CLEAN: Result[] = [['A', 'B', 2, 0], ['A', 'C', 1, 0], ['B', 'C', 1, 0]];
 const TIE_FIRST_SECOND: Result[] = [['A', 'B', 0, 0], ['A', 'C', 1, 0], ['B', 'C', 1, 0]];
 const TIE_THREE: Result[] = [['A', 'B', 1, 0], ['B', 'C', 1, 0], ['C', 'A', 1, 0]];
+// 4팀 조: A·B 가 1·2위 완전 동률(승점 7), C·D 는 뚜렷이 3·4위.
+const FOUR_TIE_TOP: Result[] = [['A', 'B', 0, 0], ['A', 'C', 1, 0], ['A', 'D', 1, 0], ['B', 'C', 1, 0], ['B', 'D', 1, 0], ['C', 'D', 1, 0]];
+// 4팀 조: A 1위, B·C 가 2·3위 완전 동률, D 4위.
+const FOUR_TIE_MIDDLE: Result[] = [['A', 'B', 1, 0], ['A', 'C', 1, 0], ['A', 'D', 1, 0], ['B', 'C', 0, 0], ['B', 'D', 1, 0], ['C', 'D', 1, 0]];
 const TIE_SECOND_THIRD: Result[] = [['A', 'B', 1, 0], ['A', 'C', 1, 0], ['B', 'C', 0, 0]];
 // 저장 순위(설정: 승점 → 맞대결)는 B>A, §5(승점 → 득실)는 A>B 로 갈리는 4팀 조.
 const RULES_DISAGREE: Result[] = [
@@ -97,7 +108,7 @@ describe('resolveGroupRank', () => {
     const source = sourceOf(['A', 'B', 'C'], CLEAN);
     const withHole: GroupRankSource = {
       ...source,
-      fixtures: [...source.fixtures, { homeRegistrationId: null, awayRegistrationId: 'C', official: null }],
+      fixtures: [...source.fixtures, { homeRegistrationId: null, awayRegistrationId: 'C', official: null, officialAt: null }],
     };
     expect(resolveGroupRank(withHole, 1)).toEqual({ state: 'group_incomplete' });
   });
@@ -105,6 +116,37 @@ describe('resolveGroupRank', () => {
   it('저장된 순위표가 마지막 확정 결과를 아직 반영하지 못했으면(소화 경기 합이 모자람) group_incomplete', () => {
     const stale = sourceOf(['A', 'B', 'C'], CLEAN, { standingsFrom: CLEAN.slice(0, 2) });
     expect(resolveGroupRank(stale, 1)).toEqual({ state: 'group_incomplete' });
+  });
+
+  describe('정정 뒤 낡은 순위표 — 경기 수는 같아도 공식 리비전이 재계산보다 늦으면 group_incomplete', () => {
+    const RECALCULATED = new Date('2026-10-01T10:00:00Z');
+    const rank1 = (options: { officialAt: Date | null; recalculatedAt: Date | null }) =>
+      resolveGroupRank(sourceOf(['A', 'B', 'C'], CLEAN, options), 1);
+
+    it('officialAt 이 recalculatedAt 보다 뒤면 낡은 표', () => {
+      expect(rank1({ officialAt: new Date('2026-10-01T10:00:01Z'), recalculatedAt: RECALCULATED })).toEqual({ state: 'group_incomplete' });
+    });
+
+    it('같은 시각은 최신으로 본다 — 앞서거나 같으면 판정한다(대조)', () => {
+      for (const officialAt of [RECALCULATED, new Date('2026-10-01T09:59:59Z')]) {
+        expect(rank1({ officialAt, recalculatedAt: RECALCULATED })).toEqual({ state: 'ready', registrationId: 'A' });
+      }
+    });
+
+    it('재계산 시각이 가장 이른 행을 기준으로 삼는다 — 한 팀 행만 낡아도 낡은 표', () => {
+      const source = sourceOf(['A', 'B', 'C'], CLEAN, { officialAt: new Date('2026-10-01T10:00:00Z') });
+      const mixed = { ...source, standings: source.standings.map((row, index) => ({ ...row, recalculatedAt: new Date(index === 0 ? '2026-10-01T09:00:00Z' : '2026-10-01T11:00:00Z') })) };
+      expect(resolveGroupRank(mixed, 1)).toEqual({ state: 'group_incomplete' });
+    });
+
+    it('재계산 시각이 없는 옛 행이 있으면 시각 비교를 건너뛰고 경기 수 검사만 한다', () => {
+      expect(rank1({ officialAt: new Date('2030-01-01T00:00:00Z'), recalculatedAt: null })).toEqual({ state: 'ready', registrationId: 'A' });
+    });
+
+    it('summarizeGroupStanding 도 같은 판정 — 낡은 표는 null', () => {
+      const source = sourceOf(['A', 'B', 'C'], CLEAN, { officialAt: new Date('2026-10-01T10:00:01Z'), recalculatedAt: RECALCULATED });
+      expect(summarizeGroupStanding(source, 2, new Set())).toBeNull();
+    });
   });
 
   it('조 팀 중 순위 행이 없는 팀이 있으면 group_incomplete', () => {
@@ -163,6 +205,56 @@ describe('summarizeGroupStanding', () => {
     it('아무도 안 들어갔고 동률이 없으면 상위 N팀이 진출이다(지금과 같음)', () => {
       const summary = summarizeGroupStanding(sourceOf(['A', 'B', 'C'], CLEAN), 2, none);
       expect(summary?.qualification).toEqual({ advancingRegistrationIds: ['A', 'B'], undecided: false });
+    });
+
+    it('진출선 안쪽 동률(4팀 조 1·2위, 상위 2팀 진출): 누가 올라가는지는 정해졌으니 둘 다 진출이고 undecided 가 아니다', () => {
+      const summary = summarizeGroupStanding(sourceOf(['A', 'B', 'C', 'D'], FOUR_TIE_TOP), 2, none);
+      expect(summary?.sharedRankByRegistrationId.size).toBe(2);
+      expect(summary?.qualification).toEqual({ advancingRegistrationIds: ['A', 'B'], undecided: false });
+    });
+
+    it('진출선에 걸친 동률(4팀 조 2·3위, 상위 2팀 진출): 1위만 진출이고 걸친 팀은 칠하지 않으며 undecided 이다(대조)', () => {
+      const summary = summarizeGroupStanding(sourceOf(['A', 'B', 'C', 'D'], FOUR_TIE_MIDDLE), 2, none);
+      expect(summary?.qualification).toEqual({ advancingRegistrationIds: ['A'], undecided: true });
+    });
+
+    it('3팀 완전 동률에 상위 2팀 진출이면 진출선에 걸쳐 진출 팀 없이 undecided 를 유지한다', () => {
+      const summary = summarizeGroupStanding(sourceOf(['A', 'B', 'C'], TIE_THREE), 2, none);
+      expect(summary?.qualification).toEqual({ advancingRegistrationIds: [], undecided: true });
+    });
+
+    it('안쪽 동률이면 일부만 배정돼도 안쪽 동률은 미정이 아니다 — 배정된 팀만 진출이고 undecided 는 false', () => {
+      const summary = summarizeGroupStanding(sourceOf(['A', 'B', 'C', 'D'], FOUR_TIE_TOP), 2, new Set(['A']));
+      expect(summary?.qualification).toEqual({ advancingRegistrationIds: ['A'], undecided: false });
+    });
+
+    it('걸친 동률이면 일부만 배정됐을 때 undecided 가 남는다(대조)', () => {
+      const summary = summarizeGroupStanding(sourceOf(['A', 'B', 'C', 'D'], FOUR_TIE_MIDDLE), 2, new Set(['A']));
+      expect(summary?.qualification).toEqual({ advancingRegistrationIds: ['A'], undecided: true });
+    });
+
+    it('저장 순위와 §5 가 갈린 두 팀이 모두 진출선 안쪽이면(상위 3팀) 둘 다 진출이고 undecided 가 아니다', () => {
+      const summary = summarizeGroupStanding(sourceOf(['A', 'B', 'C', 'D'], RULES_DISAGREE), 3, none);
+      expect([...(summary?.qualification?.advancingRegistrationIds ?? [])].sort()).toEqual(['A', 'B', 'D']);
+      expect(summary?.qualification?.undecided).toBe(false);
+    });
+
+    it('저장 순위와 §5 가 갈린 두 팀 중 하나가 진출선 밖이면(상위 2팀) 걸친 것으로 보고 1위만 진출, undecided 이다(대조)', () => {
+      const summary = summarizeGroupStanding(sourceOf(['A', 'B', 'C', 'D'], RULES_DISAGREE), 2, none);
+      expect(summary?.qualification).toEqual({ advancingRegistrationIds: ['D'], undecided: true });
+    });
+
+    it('§5 순서로는 진출선 안쪽이어도 저장 순위가 선 밖이면 걸친 것이다 — 저장 position 검사가 이 경우를 가른다', () => {
+      // §5: D>A>B>C, 저장 순위: A·B·C·D — 1위 자리의 {A, D} 는 D 가 §5 로는 안쪽(0)이지만 저장 순위 4위라 선(3) 밖이다.
+      const base = sourceOf(['A', 'B', 'C', 'D'], [['D', 'A', 1, 0], ['D', 'B', 1, 0], ['D', 'C', 1, 0], ['A', 'B', 1, 0], ['A', 'C', 1, 0], ['B', 'C', 1, 0]]);
+      const storedOrder = ['A', 'B', 'C', 'D'];
+      const source: GroupRankSource = {
+        ...base,
+        standings: base.standings.map((row) => ({ ...row, position: storedOrder.indexOf(row.registrationId) + 1 })),
+      };
+      const summary = summarizeGroupStanding(source, 3, none);
+      expect([...(summary?.qualification?.advancingRegistrationIds ?? [])].sort()).toEqual(['A', 'B']);
+      expect(summary?.qualification?.undecided).toBe(true);
     });
 
     it('진출 팀 수가 정해지지 않았으면(advanceCount null) qualification 은 null — sharedRank 는 그대로', () => {

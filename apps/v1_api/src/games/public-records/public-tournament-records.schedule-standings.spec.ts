@@ -25,7 +25,7 @@ const standingRow = (groupId: string, registrationId: string, position: number) 
   registration: { team: { id: `team-${registrationId}`, name: `${registrationId}팀`, profile: null } },
 });
 
-function fakePrisma(options: { format: string; kind?: string; baselineGroups?: unknown[] }): PrismaService {
+function fakePrisma(options: { format: string; kind?: string; baselineGroups?: unknown[]; standingRows?: unknown[] }): PrismaService {
   return {
     v1Tournament: {
       async findFirst() {
@@ -52,7 +52,7 @@ function fakePrisma(options: { format: string; kind?: string; baselineGroups?: u
     },
     v1TournamentStanding: {
       async findMany() {
-        return [
+        return options.standingRows ?? [
           standingRow('g-tie', 'a', 1),
           standingRow('g-tie', 'b', 2),
           standingRow('g-tie', 'c', 3),
@@ -94,6 +94,8 @@ describe('PublicTournamentRecordsService.getSchedule -- 조별 순위 sharedRank
     const result = await schedule(fakePrisma({ format: 'group_knockout' }));
 
     expect(loadSummaries).toHaveBeenCalledTimes(1);
+    // 일정 탭은 진출 팀을 안 쓴다 — 결선 대진 조회를 건너뛰는 옵션으로 불러야 한다.
+    expect(loadSummaries).toHaveBeenCalledWith(expect.anything(), TOURNAMENT_ID, { includeQualification: false });
     expect(result.standings.map((row) => [row.registrationId, row.sharedRank])).toEqual([
       ['a', 1], ['b', 1], ['c', 1], ['d', null], ['e', null],
     ]);
@@ -111,6 +113,21 @@ describe('PublicTournamentRecordsService.getSchedule -- 조별 순위 sharedRank
     const result = await schedule(fakePrisma({ format: 'group_knockout', baselineGroups }));
 
     expect(result.standings.find((row) => row.registrationId === 'x')?.sharedRank).toBeNull();
+  });
+
+  it('순위 행이 하나도 없으면(기준선만 있는 대회) 로더를 부르지 않는다', async () => {
+    const baselineGroups = [
+      {
+        id: 'g-new',
+        name: 'g-new',
+        groupTeams: [{ registrationId: 'x', registration: { team: { id: 'team-x', name: 'x팀', profile: null } } }],
+      },
+    ];
+
+    const result = await schedule(fakePrisma({ format: 'group_knockout', baselineGroups, standingRows: [] }));
+
+    expect(loadSummaries).not.toHaveBeenCalled();
+    expect(result.standings.map((row) => [row.registrationId, row.sharedRank])).toEqual([['x', null]]);
   });
 
   it.each([['league'], ['knockout']])('%s 방식 대회는 로더를 부르지 않고 전부 null', async (format) => {

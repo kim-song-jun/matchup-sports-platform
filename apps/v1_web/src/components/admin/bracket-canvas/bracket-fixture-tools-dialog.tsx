@@ -1,18 +1,20 @@
 'use client';
 
 import { X } from 'lucide-react';
-import { useId, useMemo, useState } from 'react';
+import { useId, useMemo, useRef, useState } from 'react';
 import { Button } from '@/components/v1-ui/button';
 import { useModalA11y } from '@/components/v1-ui/use-modal-a11y';
 import { useV1CreateFixture } from '@/hooks/use-v1-api';
 import { useV1SetBracketSources } from '@/hooks/use-v1-bracket-canvas';
 import { describeBracketCanvasError } from '@/lib/bracket-canvas-errors';
 import { bracketSourceCandidates, isFixtureLinkable, knockoutRoundLabel, nextFixtureNumber } from '@/lib/bracket-fixture-tools';
-import type { V1AdminBracketFixture, V1AdminTournamentBracket } from '@/types/api';
+import type { V1AdminBracketFixture, V1AdminTournamentBracket, V1TournamentFormat } from '@/types/api';
+import { BracketLeagueAddFixtureForm, type LeagueAddSubmit } from './bracket-league-add-fixture-form';
 
 export type BracketFixtureToolsDialogProps = {
   open: boolean;
   mode: 'add' | 'link';
+  format: V1TournamentFormat | undefined;
   tournamentId: string;
   bracket: V1AdminTournamentBracket;
   onClose: () => void;
@@ -21,7 +23,7 @@ export type BracketFixtureToolsDialogProps = {
 
 const SELECT_CLASS = 'tm-input';
 
-export function BracketFixtureToolsDialog({ open, mode, tournamentId, bracket, onClose, showToast }: BracketFixtureToolsDialogProps) {
+export function BracketFixtureToolsDialog({ open, mode, format, tournamentId, bracket, onClose, showToast }: BracketFixtureToolsDialogProps) {
   const idPrefix = useId();
   const createFixture = useV1CreateFixture(tournamentId);
   const setSources = useV1SetBracketSources(tournamentId);
@@ -70,21 +72,39 @@ export function BracketFixtureToolsDialog({ open, mode, tournamentId, bracket, o
   const addDisabled = group === null || pending;
   const linkDisabled = target === null || pending;
 
+  const submitting = useRef(false);
+
+  const createFixtureAt = (target: { groupId: string; round: string; toastLabel: string }) => {
+    if (submitting.current) return;
+    submitting.current = true;
+    createFixture.mutate(
+      { groupId: target.groupId, round: target.round, fixtureNumber: nextFixtureNumber(bracket.fixtures) },
+      {
+        onSuccess: () => {
+          showToast(`${target.toastLabel} 경기를 추가했어요. 칸을 눌러 팀을 넣어 주세요.`, 'success');
+          onClose();
+        },
+        onError: (error) => showToast(describeBracketCanvasError(error, '경기를 추가하지 못했어요.'), 'error'),
+        onSettled: () => {
+          submitting.current = false;
+        },
+      },
+    );
+  };
+
   const handleAdd = () => {
     if (group === null) return;
     const round = knockoutRoundLabel(group.phase);
     if (round === null) return;
-    createFixture.mutate(
-      { groupId: group.id, round, fixtureNumber: nextFixtureNumber(bracket.fixtures) },
-      {
-        onSuccess: () => {
-          showToast(`${round} 경기를 추가했어요. 칸을 눌러 팀을 넣어 주세요.`, 'success');
-          onClose();
-        },
-        onError: (error) => showToast(describeBracketCanvasError(error, '경기를 추가하지 못했어요.'), 'error'),
-      },
-    );
+    createFixtureAt({ groupId: group.id, round, toastLabel: round });
   };
+
+  const handleAddLeague = (input: LeagueAddSubmit) =>
+    createFixtureAt({
+      groupId: input.groupId,
+      round: input.round,
+      toastLabel: [input.roundName, input.groupName].filter((part): part is string => part !== null).join(' '),
+    });
 
   const handleLink = () => {
     if (target === null) return;
@@ -133,30 +153,34 @@ export function BracketFixtureToolsDialog({ open, mode, tournamentId, bracket, o
         </div>
 
         {mode === 'add' ? (
-          <div className="flex flex-col gap-4 px-5 py-5">
-            {addableGroups.length === 0 ? (
-              <p className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>
-                경기를 추가할 수 있는 단계가 없어요. 템플릿으로 대진을 먼저 만들어 주세요.
-              </p>
-            ) : (
-              <>
+          format === 'league' ? (
+            <BracketLeagueAddFixtureForm bracket={bracket} pending={createFixture.isPending} onSubmit={handleAddLeague} />
+          ) : (
+            <div className="flex flex-col gap-4 px-5 py-5">
+              {addableGroups.length === 0 ? (
                 <p className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>
-                  고른 단계에 대진 미정 경기를 하나 만들어요. 팀은 만든 뒤 칸에서 넣어요.
+                  경기를 추가할 수 있는 단계가 없어요. 템플릿으로 대진을 먼저 만들어 주세요.
                 </p>
-                <div className="flex flex-col gap-1">
-                  <label htmlFor={`${idPrefix}-group`} className="tm-text-label font-semibold" style={{ color: 'var(--text-strong)' }}>추가할 단계</label>
-                  <select id={`${idPrefix}-group`} className={SELECT_CLASS} style={{ minHeight: 44 }} value={groupId} onChange={(event) => setGroupId(event.target.value)}>
-                    {addableGroups.map((candidate) => (
-                      <option key={candidate.id} value={candidate.id}>{candidate.name}</option>
-                    ))}
-                  </select>
-                </div>
-              </>
-            )}
-            <Button variant="primary" size="md" disabled={addDisabled} loading={createFixture.isPending} onClick={handleAdd}>
-              경기 추가
-            </Button>
-          </div>
+              ) : (
+                <>
+                  <p className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>
+                    고른 단계에 대진 미정 경기를 하나 만들어요. 팀은 만든 뒤 칸에서 넣어요.
+                  </p>
+                  <div className="flex flex-col gap-1">
+                    <label htmlFor={`${idPrefix}-group`} className="tm-text-label font-semibold" style={{ color: 'var(--text-strong)' }}>추가할 단계</label>
+                    <select id={`${idPrefix}-group`} className={SELECT_CLASS} style={{ minHeight: 44 }} value={groupId} onChange={(event) => setGroupId(event.target.value)}>
+                      {addableGroups.map((candidate) => (
+                        <option key={candidate.id} value={candidate.id}>{candidate.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                </>
+              )}
+              <Button variant="primary" size="md" disabled={addDisabled} loading={createFixture.isPending} onClick={handleAdd}>
+                경기 추가
+              </Button>
+            </div>
+          )
         ) : (
           <div className="flex flex-col gap-4 px-5 py-5">
             {linkable.length === 0 ? (

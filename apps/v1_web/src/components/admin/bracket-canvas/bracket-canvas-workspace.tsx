@@ -413,6 +413,7 @@ export function BracketCanvasWorkspace({
         key={toolsMode ?? 'closed'}
         open={toolsMode !== null}
         mode={toolsMode ?? 'add'}
+        format={format}
         tournamentId={tournamentId}
         bracket={bracket}
         onClose={() => setToolsMode(null)}

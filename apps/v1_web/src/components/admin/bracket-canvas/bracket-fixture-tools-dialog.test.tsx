@@ -24,7 +24,7 @@ const bracket = makeBracket({
 });
 
 function renderDialog(mode: 'add' | 'link') {
-  const props = { open: true, mode, tournamentId: 't-1', bracket, onClose: vi.fn(), showToast: vi.fn() };
+  const props = { open: true, mode, format: 'knockout' as const, tournamentId: 't-1', bracket, onClose: vi.fn(), showToast: vi.fn() };
   render(<BracketFixtureToolsDialog {...props} />);
   return props;
 }
@@ -56,6 +56,7 @@ describe('BracketFixtureToolsDialog — 경기 추가', () => {
     render(
       <BracketFixtureToolsDialog
         open
+        format="knockout"
         mode="add"
         tournamentId="t-1"
         bracket={makeBracket({ groups: [makeGroup({ id: 'g', name: 'A조', phase: 'group' })], fixtures: [] })}
@@ -65,6 +66,26 @@ describe('BracketFixtureToolsDialog — 경기 추가', () => {
     );
     expect(screen.getByText('경기를 추가할 수 있는 단계가 없어요. 템플릿으로 대진을 먼저 만들어 주세요.')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '경기 추가' })).toBeDisabled();
+  });
+
+  it('group_knockout 은 리그 폼이 아니라 결선 단계 목록 그대로이고, 조별 단계는 나열하지 않는다', () => {
+    render(
+      <BracketFixtureToolsDialog
+        open
+        mode="add"
+        format="group_knockout"
+        tournamentId="t-1"
+        bracket={makeBracket({
+          groups: [makeGroup({ id: 'g-a', name: 'A조', phase: 'group', sortOrder: 0 }), makeGroup({ id: 'g-sf', name: '4강', phase: 'semi', sortOrder: 1 })],
+          fixtures: [makeFixture({ id: 'a1', groupId: 'g-a', fixtureNumber: 1, round: 'league_r1' })],
+        })}
+        onClose={vi.fn()}
+        showToast={vi.fn()}
+      />,
+    );
+    const select = screen.getByLabelText('추가할 단계') as HTMLSelectElement;
+    expect(Array.from(select.options).map((option) => option.textContent)).toEqual(['4강']);
+    expect(screen.queryByLabelText('라운드')).not.toBeInTheDocument();
   });
 });
 
@@ -101,6 +122,7 @@ describe('BracketFixtureToolsDialog — 경기 연결', () => {
     render(
       <BracketFixtureToolsDialog
         open
+        format="knockout"
         mode="link"
         tournamentId="t-1"
         bracket={makeBracket({
@@ -124,6 +146,7 @@ describe('BracketFixtureToolsDialog — 경기 연결', () => {
     render(
       <BracketFixtureToolsDialog
         open
+        format="knockout"
         mode="link"
         tournamentId="t-1"
         bracket={makeBracket({
@@ -144,6 +167,7 @@ describe('BracketFixtureToolsDialog — 경기 연결', () => {
     render(
       <BracketFixtureToolsDialog
         open
+        format="knockout"
         mode="link"
         tournamentId="t-1"
         bracket={makeBracket({

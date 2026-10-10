@@ -273,6 +273,16 @@ function createFake() {
       // 수동 대진의 기본 제목이 주차를 파생할 때 읽는 형제 목록.
       // 기본값은 "이미 두 경기일이 있는 리그" — 새로 넣는 경기가 3번째 날이면 3주차다.
       findMany: track('v1TeamMatch.findMany', async () => state.siblingStartAts.map((startAt) => ({ startAt }))),
+      // updateFixture 의 잠금 밖 사전 조회 + 갱신. 장소만 바꾸는 요청이라 시각은 그대로 둔다.
+      findFirst: track('v1TeamMatch.findFirst', async () => ({
+        id: 'tm-1', leagueId: 'league-1', title: '테스트 리그 1주차',
+        startAt: new Date('2026-09-05T01:00:00.000Z'), endAt: new Date('2026-09-05T02:00:00.000Z'),
+        hostTeamId: 'team-a', approvedApplicantTeamId: 'team-b', competitionConfigVersionId: 'config-1',
+      })),
+      update: track('v1TeamMatch.update', async (args: { data: Record<string, unknown> }) => ({
+        id: 'tm-1', startAt: new Date('2026-09-05T01:00:00.000Z'), endAt: new Date('2026-09-05T02:00:00.000Z'),
+        placeName: null, placeAddress: null, ...args.data,
+      })),
     },
     v1TeamMatchApplication: {
       create: track('v1TeamMatchApplication.create', async (args: { data: { message: string; status: string } }) => {
@@ -847,6 +857,63 @@ describe('LeagueMatchAdminService.generateFixtures — 자동 로스터와 신�
         service.createManualFixture(adminUser, 'league-1', { ...manual, awayTeamId: 'team-a' }),
       ).rejects.toMatchObject({ response: { code: 'LEAGUE_TEAM_INVALID' } });
       expect(state.calls.filter((call) => call === 'v1TeamMatch.create')).toHaveLength(0);
+    });
+  });
+
+  /**
+   * 끝남·취소 리그는 수동 추가(리그 행 잠금 뒤 판정)·수정을 막고, 보류·진행 중은 허용한다.
+   * 잠금 밖 `loadLeague` 읽기는 진행 중으로 두고 이후 읽기(가드)만 대상 상태를 준다 —
+   * 사전 조회를 통과한 뒤 끝남이 커밋된 순간이다.
+   */
+  describe('끝난·취소된 리그의 수동 대진 추가·수정', () => {
+    const manual = { homeTeamId: 'team-a', awayTeamId: 'team-b', startsAt: '2026-09-19T01:00:00.000Z' } as const;
+
+    async function setup(guardStatus: string, preReads: number) {
+      const fake = createFake();
+      const findFirst = fake.tx.v1Tournament.findFirst;
+      let reads = 0;
+      fake.tx.v1Tournament.findFirst = async () => ({
+        ...(await findFirst()),
+        status: ++reads <= preReads ? 'in_progress' : guardStatus,
+      });
+      return { fake, svc: await createModule(fake.prisma, fake.games) };
+    }
+
+    it.each(['completed', 'cancelled'])('createManualFixture: %s 리그는 409 LEAGUE_ENDED 이고 아무것도 만들지 않는다', async (status) => {
+      const { fake, svc } = await setup(status, 1);
+      await expect(svc.createManualFixture(adminUser, 'league-1', { ...manual }))
+        .rejects.toMatchObject({ response: { code: 'LEAGUE_ENDED' } });
+      expect(fake.state.calls).not.toContain('v1TeamMatch.create');
+      expect(fake.state.scheduleCreates).toHaveLength(0);
+      expect(fake.state.calls).not.toContain('v1TournamentRegistration.findMany');
+      // 가드는 리그 행 잠금 뒤에 돈다 — 순서가 뒤집히면 끝남 커밋과 경합한다. loadLeague 의 사전 읽기(1회)와 구분해 마지막 읽기를 가드로 본다.
+      const calls = fake.state.calls;
+      expect(calls.filter((c: string) => c === 'v1Tournament.findFirst')).toHaveLength(2);
+      const lockAt = calls.indexOf('$queryRaw');
+      expect(lockAt).toBeGreaterThanOrEqual(0);
+      expect(calls.lastIndexOf('v1Tournament.findFirst')).toBeGreaterThan(lockAt);
+    });
+
+    it.each(['completed', 'cancelled'])('updateFixture: %s 리그는 409 LEAGUE_ENDED 이고 경기를 갱신하지 않는다', async (status) => {
+      const { fake, svc } = await setup(status, 0);
+      await expect(svc.updateFixture(adminUser, 'league-1', 'tm-1', { placeName: '망원 운동장' }))
+        .rejects.toMatchObject({ response: { code: 'LEAGUE_ENDED' } });
+      expect(fake.state.calls).not.toContain('v1TeamMatch.update');
+      // 수정은 리그 행을 잠그지 않는다 — 잠그면 취소·결과 확정(경기 → 리그)과 역순 교착이 난다.
+      expect(fake.state.calls).not.toContain('$queryRaw');
+    });
+
+    // 대조군: 보류 중 수동 추가·수정은 허용이다 — 일괄 생성 가드(LEAGUE_ON_HOLD)를 쓰면 여기서 깨진다.
+    it.each(['on_hold', 'in_progress'])('createManualFixture: %s 리그는 통과해 경기를 만든다', async (status) => {
+      const { fake, svc } = await setup(status, 1);
+      await svc.createManualFixture(adminUser, 'league-1', { ...manual });
+      expect(fake.state.calls.filter((call) => call === 'v1TeamMatch.create')).toHaveLength(1);
+    });
+
+    it.each(['on_hold', 'in_progress'])('updateFixture: %s 리그는 통과해 경기를 갱신한다', async (status) => {
+      const { fake, svc } = await setup(status, 0);
+      await svc.updateFixture(adminUser, 'league-1', 'tm-1', { placeName: '망원 운동장' });
+      expect(fake.state.calls.filter((call) => call === 'v1TeamMatch.update')).toHaveLength(1);
     });
   });
 

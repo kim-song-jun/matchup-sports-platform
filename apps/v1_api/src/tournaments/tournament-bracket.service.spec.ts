@@ -992,6 +992,89 @@ describe('TournamentBracketService', () => {
     });
   });
 
+  // 같은 번호 재시도(멱등 재생). 요청 해시와 저장된 경기에서 다시 만든 해시가 같아야 기존 경기를 돌려준다.
+  describe('createFixture: 장소 핀 명시 재시도', () => {
+    const request = {
+      groupId: 'group-1', round: 'group_a', fixtureNumber: 1,
+      homeRegistrationId: 'reg-1', awayRegistrationId: 'reg-2',
+      venue: '망원 구장', venueAddress: '서울 마포구', venueLatitude: 37.55, venueLongitude: 126.9,
+      venueProvider: 'kakao', venueProviderId: '555',
+    } as const;
+
+    /** 저장 행 = 위 요청을 resolvePlaceSnapshot 으로 저장한 모양. 바꿀 칸만 넘긴다. */
+    function arrangeReplay(stored: Partial<{
+      placeProviderId: string | null; placeProvider: string | null; placeAddress: string | null;
+      placeLatitude: number | null; placeLongitude: number | null;
+    }> = {}) {
+      prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdmin);
+      prisma.v1Tournament.findFirst.mockResolvedValue(tournamentRow());
+      prisma.v1TournamentGroup.findFirst.mockResolvedValue(groupRow());
+      prisma.v1TournamentRegistration.findFirst.mockResolvedValue({ id: 'reg-x' });
+      const stored_ = canonicalDetailsRow();
+      prisma.v1TournamentMatchDetails.findFirst.mockResolvedValue({
+        ...stored_,
+        teamMatch: {
+          ...stored_.teamMatch,
+          placeName: '망원 구장', placeAddress: '서울 마포구', placeLatitude: 37.55, placeLongitude: 126.9,
+          placeProvider: 'kakao', placeProviderId: '555',
+          ...stored,
+        },
+      });
+    }
+
+    it('번호+장소+핀을 그대로 다시 보내면 409 없이 기존 경기를 돌려주고 새로 만들지 않는다', async () => {
+      arrangeReplay();
+      const result = await service.createFixture(ownerUser, 'tournament-1', { ...request });
+      expect(result).toMatchObject({ id: 'fixture-1', fixtureNumber: 1 });
+      expect(prisma.v1TeamMatch.create).not.toHaveBeenCalled();
+    });
+
+    // 저장값은 resolvePlaceSnapshot 이 trim 한 값이라, 공백이 붙은 재시도도 같은 요청으로 읽혀야 한다.
+    it.each([
+      ['핀 id', { venueProviderId: ' 555 ' }],
+      ['장소 이름', { venue: ' 망원 구장 ' }],
+    ])('공백이 붙은 %s 로 다시 보내도 기존 경기를 돌려주고 새로 만들지 않는다', async (_case, padded) => {
+      arrangeReplay();
+      const result = await service.createFixture(ownerUser, 'tournament-1', { ...request, ...padded });
+      expect(result).toMatchObject({ id: 'fixture-1', fixtureNumber: 1 });
+      expect(prisma.v1TeamMatch.create).not.toHaveBeenCalled();
+    });
+
+    it('같은 번호에 다른 핀이면 COMMAND_IDEMPOTENCY_PAYLOAD_REUSE 로 거부한다', async () => {
+      arrangeReplay();
+      await expect(service.createFixture(ownerUser, 'tournament-1', { ...request, venueProviderId: '999' }))
+        .rejects.toMatchObject({ response: { code: 'COMMAND_IDEMPOTENCY_PAYLOAD_REUSE' } });
+      expect(prisma.v1TeamMatch.create).not.toHaveBeenCalled();
+    });
+
+    // 같은 핀 id 라도 저장된 주소·좌표와 다르면 다른 요청이다 — 성공 재생으로 돌려주면 새 장소가 반영된 줄 안다.
+    it.each([
+      ['좌표', { venueLatitude: 37.56 }],
+      ['주소', { venueAddress: '서울 마포구 망원동' }],
+    ])('같은 핀인데 %s 가 다르면 COMMAND_IDEMPOTENCY_PAYLOAD_REUSE 로 거부한다', async (_case, changed) => {
+      arrangeReplay();
+      await expect(service.createFixture(ownerUser, 'tournament-1', { ...request, ...changed }))
+        .rejects.toMatchObject({ response: { code: 'COMMAND_IDEMPOTENCY_PAYLOAD_REUSE' } });
+      expect(prisma.v1TeamMatch.create).not.toHaveBeenCalled();
+    });
+
+    it('저장된 경기에 핀이 없는데 핀을 명시한 요청이면 거부한다', async () => {
+      arrangeReplay({ placeProviderId: null, placeProvider: null, placeLatitude: null, placeLongitude: null });
+      await expect(service.createFixture(ownerUser, 'tournament-1', { ...request }))
+        .rejects.toMatchObject({ response: { code: 'COMMAND_IDEMPOTENCY_PAYLOAD_REUSE' } });
+    });
+
+    // 회귀 방지: 핀 없는 요청은 대회 기본 장소의 id 를 물려받아 저장될 수 있다 — 저장값을 무조건 해시에 넣으면 이 재시도가 새로 깨진다.
+    it('핀 없는 재시도는 저장된 경기에 provider id 가 있어도 기존 경기를 돌려준다', async () => {
+      arrangeReplay();
+      const { venueAddress, venueLatitude, venueLongitude, venueProvider, venueProviderId, ...unpinned } = request;
+      void [venueAddress, venueLatitude, venueLongitude, venueProvider, venueProviderId];
+      const result = await service.createFixture(ownerUser, 'tournament-1', unpinned);
+      expect(result).toMatchObject({ id: 'fixture-1' });
+      expect(prisma.v1TeamMatch.create).not.toHaveBeenCalled();
+    });
+  });
+
   // W9-V2 — 저장되는 팀매치 제목도 화면과 같은 경기 이름을 쓴다(조별은 조 이름 + 라운드, 결선은 라운드만).
   it.each([
     ['조별 경기', { groupId: 'group-1', round: '조별 2라운드', fixtureNumber: 1 }, '테스트 대회 · A조 · 조별 2라운드 1'],

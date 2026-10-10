@@ -72,7 +72,7 @@ import { PLACE_SELECT } from '../places/place-select';
 import { rejectPartialPlaceUpdate, toPlaceColumns, toPlaceView, type PlaceSnapshot, type PlaceView } from '../places/place-snapshot';
 import { DEFAULT_FIXTURE_PLACE_NAME, resolveLeagueFixturePlace, type LeagueFixturePlaceInput } from './league-fixture-place';
 import { findTournamentOnSurface } from '../tournaments/tournament-surface-lookup';
-import { assertLeagueFixtureGenerationAllowedInTx } from './league-fixture-generation-guard';
+import { assertLeagueFixtureGenerationAllowedInTx, assertLeagueNotEndedInTx } from './league-fixture-generation-guard';
 import { LEAGUE_STATE_BY_STATUS, isCompleteLeagueMirror } from '../tournaments/league-competition-mirror';
 import { randomUUID } from 'node:crypto';
 import { BRACKET_TEMPLATE_MAX_FIXTURES } from '../tournaments/templates/bracket-template-plan';
@@ -1388,6 +1388,8 @@ export class LeagueMatchAdminService {
       // 일괄 생성과 같은 락. 같은 리그에 동시에 손대는 두 요청이 서로의 주차 계산을
       // 어긋나게 만들지 않는다 — 아래 형제 목록 조회가 이 락 안에서 일어나야 한다.
       await tx.$queryRaw`SELECT id FROM "v1_tournaments" WHERE id = ${leagueId} FOR UPDATE`;
+      // 끝남·취소만 막는다 — 보류 중 수동 추가는 허용이라 일괄 생성 가드(on_hold 도 막음)를 쓰지 않는다.
+      await assertLeagueNotEndedInTx(tx, leagueId);
       // **잠근 뒤에** 로스터를 다시 읽는다. 잠금 밖에서 읽은 `league.teams` 로 판정하면
       // TOCTOU 다 — 그 사이 `removeTeam` 이 커밋되면 **리그에서 이미 빠진 팀으로 대진이
       // 생기고**, 그 대진은 로스터에 없는 팀을 가리킨 채 남는다(제거 경로가 취소할 대상
@@ -1440,6 +1442,11 @@ export class LeagueMatchAdminService {
       // 끼어든 경기로 팀 경기 순서(출전정지)가 바뀐다 — 대회 대진 생성과 같이 양 팀을 다시 계산한다.
       await enqueueRosterResync(tx, competitionTeamTargets(league.id, [dto.homeTeamId, dto.awayTeamId]));
       return created;
+    }, {
+      // 리그 행 락을 기다린다 — 템플릿·재생성이 그 락을 45초까지 쥘 수 있어 Prisma 기본 5초면 정상 대기도 만료된다.
+      // 그 리그 레인과 같은 45초 + maxWait 5초(ALB idle_timeout 60초 안, 위 generateFixtures 주석).
+      timeout: 45_000,
+      maxWait: 5_000,
     });
 
     return { leagueId, teamMatchId };
@@ -1496,6 +1503,9 @@ export class LeagueMatchAdminService {
       : null;
     const nextStartAt = dto.startsAt === undefined ? undefined : new Date(dto.startsAt);
     const updated = await this.prisma.$transaction(async (tx) => {
+      // 끝남·취소만 막고 보류 중 수정은 허용한다. 리그 행은 잠그지 않는다 — 시각·장소 수정은 완료 판정을
+      // 바꾸지 않고, 잠그면 취소·결과 확정(경기 → 리그 완료 갱신)과 역순으로 교착한다.
+      await assertLeagueNotEndedInTx(tx, leagueId);
       const nextEndAt = nextStartAt === undefined
         ? undefined
         : durationMs !== null

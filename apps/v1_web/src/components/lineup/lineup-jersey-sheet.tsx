@@ -29,13 +29,15 @@ interface Props {
   error: string | null;
   /** "이 경기만"이면 명단 초안만, "팀 번호도 함께"면 팀 번호 저장 뒤 초안까지 — 부모가 처리한다. */
   onSave: (jerseyNumber: number | null, scope: LineupJerseyScope) => void;
+  /** 번호나 저장 범위를 고칠 때 — 부모가 `error` 를 비운다(거절 사유는 이전 입력에 대한 것이다). */
+  onEdit: () => void;
 }
 
 /**
  * 친선 참석명단의 등번호 시트(H5 D-5). 팀 번호가 처음 값이고 이 경기만 덮어쓸 수 있다. "팀 번호도 함께"를 고르면
  * 팀 번호(전술보드·다음 경기·대회 신청의 처음 값)도 바뀐다 — 이미 낸 대회·리그 참가 명단 번호는 그 대회의 원본이라 따라가지 않는다.
  */
-export function LineupJerseySheet({ open, onClose, target, holderOf, pending, error, onSave }: Props) {
+export function LineupJerseySheet({ open, onClose, target, holderOf, pending, error, onSave, onEdit }: Props) {
   const titleId = useId();
   const { dialogRef, onBackdropClick, mounted, closing } = useModalA11y<HTMLElement, HTMLElement>({
     open,
@@ -70,14 +72,14 @@ export function LineupJerseySheet({ open, onClose, target, holderOf, pending, er
               닫기
             </button>
           </div>
-          <JerseyForm key={target.displayName} target={target} holderOf={holderOf} pending={pending} error={error} onSave={onSave} />
+          <JerseyForm key={target.displayName} target={target} holderOf={holderOf} pending={pending} error={error} onSave={onSave} onEdit={onEdit} />
         </section>
       </div>
     </>
   );
 }
 
-function JerseyForm({ target, holderOf, pending, error, onSave }: Omit<Props, 'open' | 'onClose'>) {
+function JerseyForm({ target, holderOf, pending, error, onSave, onEdit }: Omit<Props, 'open' | 'onClose'>) {
   const fieldId = useId();
   const scopeName = useId();
   const [text, setText] = useState(target.jerseyNumber === null ? '' : String(target.jerseyNumber));
@@ -108,6 +110,11 @@ function JerseyForm({ target, holderOf, pending, error, onSave }: Omit<Props, 'o
       ? `${value}번으로 저장`
       : '번호 지우고 저장';
 
+  function chooseScope(next: LineupJerseyScope) {
+    setScope(next);
+    onEdit();
+  }
+
   function submit(event: FormEvent) {
     event.preventDefault();
     if (changed && fieldError === null) onSave(value, scope);
@@ -127,7 +134,10 @@ function JerseyForm({ target, holderOf, pending, error, onSave }: Omit<Props, 'o
           value={text}
           error={fieldError}
           style={{ fontWeight: 700 }}
-          onChange={(event) => setText(event.target.value)}
+          onChange={(event) => {
+            setText(event.target.value);
+            onEdit();
+          }}
         />
         {fieldError === null ? (
           <p className="tm-text-micro" style={{ color: 'var(--text-caption)', margin: '4px 0 0' }}>
@@ -138,8 +148,8 @@ function JerseyForm({ target, holderOf, pending, error, onSave }: Omit<Props, 'o
       {target.canChangeTeamNumber ? (
         <fieldset style={{ border: 0, margin: 0, padding: 0, display: 'grid', gap: 4 }}>
           <legend className="sr-only">번호를 어디에 저장할까요</legend>
-          <ScopeOption name={scopeName} checked={scope === 'match'} onChange={() => setScope('match')} label="이 경기만 바꿔요" />
-          <ScopeOption name={scopeName} checked={scope === 'team'} onChange={() => setScope('team')} label="팀 번호도 함께 바꿔요" />
+          <ScopeOption name={scopeName} checked={scope === 'match'} onChange={() => chooseScope('match')} label="이 경기만 바꿔요" />
+          <ScopeOption name={scopeName} checked={scope === 'team'} onChange={() => chooseScope('team')} label="팀 번호도 함께 바꿔요" />
           {matchOnlyNotice !== null ? (
             <p className="tm-text-caption" style={{ color: 'var(--orange700)', margin: '4px 0 0', lineHeight: 1.5, fontWeight: 600 }}>
               {matchOnlyNotice}

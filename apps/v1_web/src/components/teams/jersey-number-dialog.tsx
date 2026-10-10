@@ -12,6 +12,8 @@ type JerseyNumberDialogProps = {
   saving: boolean;
   error: string | null;
   onClose: () => void;
+  /** 입력을 고칠 때 — 부모가 `error` 를 비운다(거절 사유는 이전 입력에 대한 것이다). */
+  onEdit: () => void;
   /** null이면 등번호 해제. */
   onSave: (jerseyNumber: number | null) => void;
 };
@@ -29,6 +31,7 @@ export function JerseyNumberDialog({
   saving,
   error,
   onClose,
+  onEdit,
   onSave,
 }: JerseyNumberDialogProps) {
   const idPrefix = useId();
@@ -93,7 +96,10 @@ export function JerseyNumberDialog({
             className="tm-input"
             placeholder="예: 7"
             value={value}
-            onChange={(event) => setValue(event.target.value)}
+            onChange={(event) => {
+              setValue(event.target.value);
+              onEdit();
+            }}
             onKeyDown={(event) => {
               if (event.key === 'Enter' && !invalid && !saving) onSave(parsed);
             }}

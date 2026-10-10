@@ -40,7 +40,7 @@ export function BracketLeagueGrid({
     >
       {grid.legacyChunking ? (
         <p className="tm-text-caption px-4 pt-3" style={{ color: 'var(--text-muted)' }}>
-          라운드 정보가 없어 경기 번호 순서로 나눴어요.
+          라운드 정보가 없는 경기는 경기 번호 순서로 나눴어요.
         </p>
       ) : null}
       <div

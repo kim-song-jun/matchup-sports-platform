@@ -29,3 +29,14 @@ describe('BracketLeagueAddFixtureForm — 고른 라운드가 사라졌을 때',
     expect(onSubmit).toHaveBeenCalledWith({ groupId: 'gA', groupName: 'A조', round: 'league_r3', roundName: '3라운드' });
   });
 });
+
+describe('BracketLeagueAddFixtureForm — 옛 대진', () => {
+  it('번호가 없어도 라운드 선택을 그리고 고른 라운드의 league_r{k} 와 이름으로 보낸다', () => {
+    const onSubmit = vi.fn();
+    const legacy = makeBracket({ groups: [group], fixtures: [1, 2].map((n) => makeFixture({ id: `o${n}`, groupId: 'gA', fixtureNumber: n, round: '조별 리그' })) });
+    render(<BracketLeagueAddFixtureForm bracket={legacy} pending={false} onSubmit={onSubmit} />);
+    fireEvent.change(screen.getByLabelText('라운드'), { target: { value: 'r1' } });
+    fireEvent.click(screen.getByRole('button', { name: '경기 추가' }));
+    expect(onSubmit).toHaveBeenCalledWith({ groupId: 'gA', groupName: 'A조', round: 'league_r1', roundName: '1라운드' });
+  });
+});

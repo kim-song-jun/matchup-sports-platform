@@ -178,19 +178,27 @@ describe('BracketFixtureToolsDialog — 리그 경기 추가', () => {
     expect(bodies).toHaveLength(2); // 실패 뒤 잠금이 풀려 재시도 요청이 나간다
   });
 
-  it('번호가 없는 옛 대진은 라운드 선택 없이 옛 round 값을 이어 쓴다', async () => {
-    const legacy = makeBracket({
-      groups: [gA, gB],
-      fixtures: [1, 2, 3].map((n) => makeFixture({ id: `f${n}`, groupId: 'gA', fixtureNumber: n, round: '조별 리그' })),
-    });
+  it('번호가 없는 옛 대진도 격자 줄과 같은 라운드를 고르고, 고른 라운드는 league_r{k} 로 저장되어 그 줄에 합쳐진다', async () => {
+    const legacyFixtures = [1, 2, 3].map((n) => makeFixture({ id: `f${n}`, groupId: 'gA', fixtureNumber: n, round: '조별 리그' }));
+    const legacy = makeBracket({ groups: [gA, gB], fixtures: legacyFixtures });
     const { props } = renderLeagueDialog(legacy);
-    expect(screen.queryByLabelText('라운드')).not.toBeInTheDocument();
-    expect(screen.getByText('라운드 정보가 없는 대진이라 이 조의 마지막 경기 뒤에 붙어요.')).toBeInTheDocument();
+    expect(screen.queryByText(/마지막 경기 뒤에 붙어요/)).not.toBeInTheDocument();
+    const round = screen.getByLabelText('라운드') as HTMLSelectElement;
+    expect(optionTexts(round)).toEqual(['1라운드', '2라운드', '3라운드', '새 라운드 (4라운드)']);
+    expect(round.selectedOptions[0].textContent).toBe('3라운드');
+
     fireEvent.change(screen.getByLabelText('조'), { target: { value: 'gB' } });
+    fireEvent.change(round, { target: { value: 'r1' } });
     fireEvent.click(screen.getByRole('button', { name: '경기 추가' }));
     await waitFor(() => expect(props.onClose).toHaveBeenCalled());
-    expect(bodies).toEqual([{ groupId: 'gB', round: '조별 리그', fixtureNumber: 4 }]);
-    expect(props.showToast).toHaveBeenCalledWith('B조 경기를 추가했어요. 칸을 눌러 팀을 넣어 주세요.', 'success');
+    expect(bodies).toEqual([{ groupId: 'gB', round: 'league_r1', fixtureNumber: 4 }]);
+    expect(props.showToast).toHaveBeenCalledWith('1라운드 B조 경기를 추가했어요. 칸을 눌러 팀을 넣어 주세요.', 'success');
+
+    const grid = buildLeagueGrid({ groups: legacy.groups, fixtures: [...legacyFixtures, makeFixture({ id: 'new-1', groupId: 'gB', fixtureNumber: 4, round: 'league_r1' })] });
+    expect(grid.legacyChunking).toBe(true);
+    expect(grid.rows.map((r) => r.label)).toEqual(['1라운드', '2라운드', '3라운드']);
+    expect(grid.rows[0].cells.gB.map((f) => f.id)).toEqual(['new-1']);
+    expect(grid.rows[0].cells.gA.map((f) => f.id)).toEqual(['f1']);
   });
 
   it.each([

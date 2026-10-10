@@ -2,15 +2,10 @@
 
 import { useId, useMemo, useState } from 'react';
 import { Button } from '@/components/v1-ui/button';
-import {
-  isLegacyLeagueBracket,
-  leagueAddableGroups,
-  leagueRoundPlan,
-  resolveLeagueRound,
-} from '@/lib/bracket-league-add-fixture';
+import { leagueAddableGroups, leagueRoundPlan } from '@/lib/bracket-league-add-fixture';
 import type { V1AdminTournamentBracket } from '@/types/api';
 
-export type LeagueAddSubmit = { groupId: string; groupName: string; round: string; roundName: string | null };
+export type LeagueAddSubmit = { groupId: string; groupName: string; round: string; roundName: string };
 
 export type BracketLeagueAddFixtureFormProps = {
   bracket: V1AdminTournamentBracket;
@@ -23,8 +18,7 @@ const SELECT_CLASS = 'tm-input';
 export function BracketLeagueAddFixtureForm({ bracket, pending, onSubmit }: BracketLeagueAddFixtureFormProps) {
   const idPrefix = useId();
   const groups = useMemo(() => leagueAddableGroups(bracket.groups), [bracket.groups]);
-  const plan = useMemo(() => leagueRoundPlan(bracket.fixtures), [bracket.fixtures]);
-  const legacy = isLegacyLeagueBracket(bracket.fixtures);
+  const plan = useMemo(() => leagueRoundPlan({ groups: bracket.groups, fixtures: bracket.fixtures }), [bracket.groups, bracket.fixtures]);
   const [groupId, setGroupId] = useState(groups[0]?.id ?? '');
   const [roundValue, setRoundValue] = useState(plan.defaultChoice.value);
 
@@ -34,8 +28,7 @@ export function BracketLeagueAddFixtureForm({ bracket, pending, onSubmit }: Brac
 
   const handleSubmit = () => {
     if (group === null || pending) return;
-    const resolved = resolveLeagueRound({ fixtures: bracket.fixtures, groupId: group.id, choice });
-    onSubmit({ groupId: group.id, groupName: group.name, round: resolved.round, roundName: resolved.roundName });
+    onSubmit({ groupId: group.id, groupName: group.name, round: choice.round, roundName: choice.name });
   };
 
   return (
@@ -57,18 +50,14 @@ export function BracketLeagueAddFixtureForm({ bracket, pending, onSubmit }: Brac
               ))}
             </select>
           </div>
-          {legacy ? (
-            <p className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>라운드 정보가 없는 대진이라 이 조의 마지막 경기 뒤에 붙어요.</p>
-          ) : (
-            <div className="flex flex-col gap-1">
-              <label htmlFor={`${idPrefix}-round`} className="tm-text-label font-semibold" style={{ color: 'var(--text-strong)' }}>라운드</label>
-              <select id={`${idPrefix}-round`} className={SELECT_CLASS} style={{ minHeight: 44 }} value={choice.value} onChange={(event) => setRoundValue(event.target.value)}>
-                {plan.choices.map((candidate) => (
-                  <option key={candidate.value} value={candidate.value}>{candidate.label}</option>
-                ))}
-              </select>
-            </div>
-          )}
+          <div className="flex flex-col gap-1">
+            <label htmlFor={`${idPrefix}-round`} className="tm-text-label font-semibold" style={{ color: 'var(--text-strong)' }}>라운드</label>
+            <select id={`${idPrefix}-round`} className={SELECT_CLASS} style={{ minHeight: 44 }} value={choice.value} onChange={(event) => setRoundValue(event.target.value)}>
+              {plan.choices.map((candidate) => (
+                <option key={candidate.value} value={candidate.value}>{candidate.label}</option>
+              ))}
+            </select>
+          </div>
         </>
       )}
       <Button variant="primary" size="md" disabled={group === null || pending} loading={pending} onClick={handleSubmit}>

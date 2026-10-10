@@ -102,7 +102,7 @@ export function BracketFixtureToolsDialog({ open, mode, format, tournamentId, br
     createFixtureAt({
       groupId: input.groupId,
       round: input.round,
-      toastLabel: [input.roundName, input.groupName].filter((part): part is string => part !== null).join(' '),
+      toastLabel: `${input.roundName} ${input.groupName}`,
     });
 
   const handleLink = () => {

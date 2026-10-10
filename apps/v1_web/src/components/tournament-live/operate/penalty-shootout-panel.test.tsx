@@ -288,5 +288,4 @@ describe('PenaltyShootoutPanel — 결판 뒤 킥 입력', () => {
     expect(screen.getByRole('button', { name: /성공/ })).toBeEnabled();
     expect(screen.queryByText(/결판이 났어요/)).toBeNull();
   });
-
 });

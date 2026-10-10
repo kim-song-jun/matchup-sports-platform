@@ -136,7 +136,6 @@ export function PenaltyShootoutPanel({
   // 방법이 아예 없었다.
   const availability = penaltyFinishAvailability(kicks, sides, firstKickSideId, policy);
   const decisive = availability === 'READY';
-  // 결판 뒤 킥을 더 받으면 킥 수가 어긋나 결판이 풀린다 — 잘못 눌렀다면 되돌리기로 고친다.
   // 선축은 첫 킥 전에만 고를 수 있다 — 킥이 하나라도 기록된 뒤에 바꾸면 이미 기록된
   // 킥들의 순서 해석이 통째로 달라진다. 되돌리기로 킥을 전부 지우면 다시 고를 수 있다.
   const firstKickLocked = kicks.length > 0;
@@ -280,6 +279,7 @@ export function PenaltyShootoutPanel({
             })}
           </div>
 
+          {/* 결판 뒤 킥을 더 받으면 킥 수가 어긋나 결판이 풀린다 — 잘못 눌렀다면 되돌리기로 고친다. */}
           <div className="mt-4 grid grid-cols-2 gap-2">
             <Button
               size="lg"

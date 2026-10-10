@@ -106,7 +106,23 @@ interface CursorKey {
   id: string;
 }
 
-const SORT_AT_TEXT = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}(\.\d{1,6})?$/;
+const SORT_AT_TEXT = /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})(\.\d{1,6})?$/;
+
+/** The shape alone admits `9999-99-99 99:99:99`, which Postgres rejects with a 500 at the `::timestamp` cast. */
+function isRealTimestampText(text: string): boolean {
+  const match = SORT_AT_TEXT.exec(text);
+  if (!match) return false;
+  const [year, month, day, hour, minute, second] = match.slice(1, 7).map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day, hour, minute, second));
+  return (
+    date.getUTCFullYear() === year &&
+    date.getUTCMonth() === month - 1 &&
+    date.getUTCDate() === day &&
+    date.getUTCHours() === hour &&
+    date.getUTCMinutes() === minute &&
+    date.getUTCSeconds() === second
+  );
+}
 
 /**
  * The cursor carries the sort key the row had when its page was served. Recomputing it from the row
@@ -127,7 +143,7 @@ function decodeCursor(token: string): CursorKey | null {
   if (!Array.isArray(parsed) || parsed.length !== 3) return null;
   const [grp, sortAt, id] = parsed;
   if (!Number.isInteger(grp) || grp < 0 || grp > 4) return null;
-  if (sortAt !== null && !(typeof sortAt === 'string' && SORT_AT_TEXT.test(sortAt))) return null;
+  if (sortAt !== null && !(typeof sortAt === 'string' && isRealTimestampText(sortAt))) return null;
   if (typeof id !== 'string' || id.length === 0 || id.length > 64) return null;
   return { grp, sortAt, id };
 }

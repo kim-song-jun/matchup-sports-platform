@@ -192,7 +192,14 @@ describe('대회 공개 목록 DB 정렬·페이지 계약', () => {
   });
 
   it('a cursor that is not one this list issued returns an empty page instead of restarting', async () => {
-    for (const cursor of [id('o-soon'), 'no-such-id', Buffer.from('[9,null,"x"]').toString('base64url')]) {
+    const forge = (value: unknown[]) => Buffer.from(JSON.stringify(value)).toString('base64url');
+    for (const cursor of [
+      id('o-soon'),
+      'no-such-id',
+      forge([9, null, 'x']),
+      forge([0, '9999-99-99 99:99:99', 'x']),
+      forge([0, '2026-02-30 10:00:00', 'x']),
+    ]) {
       const res = await list({ cursor, limit: 5 });
       expect(res.items).toEqual([]);
       expect(res.pageInfo).toEqual({ nextCursor: null, hasNext: false });

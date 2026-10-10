@@ -692,13 +692,17 @@ describe('TournamentBracketService', () => {
     prisma.v1TournamentGroup.findFirst.mockResolvedValue(groupRow());
     prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow());
     prisma.v1TournamentGroupTeam.findUnique.mockResolvedValue(null);
-    prisma.v1TournamentGroupTeam.findFirst.mockResolvedValue({ id: 'gt-other' });
+    prisma.v1TournamentGroupTeam.findFirst.mockResolvedValue({ registrationId: 'reg-1' });
 
     await expect(service.createGroupTeam(ownerUser, 'tournament-1', { groupId: 'group-1', registrationId: 'reg-1' }))
-      .rejects.toMatchObject({ response: { code: 'TEAM_IN_OTHER_GROUP', message: '다른 조에 있는 팀은 이 조에 넣을 수 없어요. 그 조에서 먼저 빼 주세요.' } });
+      .rejects.toMatchObject({ response: {
+        code: 'TEAM_IN_OTHER_GROUP',
+        message: '다른 조에 있는 팀은 이 조에 넣을 수 없어요. 그 조에서 먼저 빼 주세요.',
+        details: { registrationId: 'reg-1', groupId: 'group-1' },
+      } });
     expect(prisma.v1TournamentGroupTeam.findFirst).toHaveBeenCalledWith({
       where: { registrationId: { in: ['reg-1'] }, groupId: { not: 'group-1' }, group: { tournamentId: 'tournament-1', phase: 'group' } },
-      select: { id: true },
+      select: { registrationId: true },
     });
     expect(prisma.v1TournamentGroupTeam.create).not.toHaveBeenCalled();
   });
@@ -2165,7 +2169,7 @@ describe('TournamentBracketService', () => {
         await createIn('reg-1', 'reg-2');
 
         expect(registrationsOf()).toEqual(['group-2:reg-1']);
-        expect(prisma.v1TournamentGroupTeam.findFirst).not.toHaveBeenCalledWith(expect.objectContaining({ select: { id: true } }));
+        expect(prisma.v1TournamentGroupTeam.findFirst).not.toHaveBeenCalledWith(expect.objectContaining({ select: { registrationId: true } }));
       });
 
       it('PATCH 로 다른 조 팀을 넣어도 409 이고 경기는 바뀌지 않는다', async () => {

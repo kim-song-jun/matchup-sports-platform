@@ -94,9 +94,16 @@ export async function assertNotInOtherGroupInTx(
       groupId: { not: input.groupId },
       group: { tournamentId: input.tournamentId, phase: 'group' },
     },
-    select: { id: true },
+    select: { registrationId: true },
   });
-  if (elsewhere !== null) throw new ConflictException({ code: 'TEAM_IN_OTHER_GROUP', message: TEAM_IN_OTHER_GROUP_MESSAGE });
+  if (elsewhere !== null) {
+    // Bulk paths (batch slot changes, random fill) can't tell which team collided without the ids.
+    throw new ConflictException({
+      code: 'TEAM_IN_OTHER_GROUP',
+      message: TEAM_IN_OTHER_GROUP_MESSAGE,
+      details: { registrationId: elsewhere.registrationId, groupId: input.groupId },
+    });
+  }
 }
 
 /**

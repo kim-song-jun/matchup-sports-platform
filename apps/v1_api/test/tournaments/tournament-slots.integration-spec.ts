@@ -397,31 +397,34 @@ describe('자리 배정 (PostgreSQL)', () => {
   });
 
   describe('한 팀 한 조 (결정 4) — 자리 경로는 트랜잭션 끝 상태를 검사한다', () => {
-    const twoGroups = async (label: string) => {
+    // groupCount 는 템플릿이 지원하는 값(2·4·8)만 쓴다.
+    const groupedTournament = async (label: string, groupCount = 2) => {
       const seeded = await seedBracketTournament(prisma, { label, format: 'group_knockout', teamCount: 6 });
-      await templates.apply(user, seeded.tournamentId, { kind: 'group_knockout', groupCount: 2, teamsPerGroup: 3, advancePerGroup: 1, legs: 1, thirdPlace: false });
+      await templates.apply(user, seeded.tournamentId, { kind: 'group_knockout', groupCount, teamsPerGroup: 3, advancePerGroup: 1, legs: 1, thirdPlace: false });
       const groups = await prisma.v1TournamentGroup.findMany({ where: { tournamentId: seeded.tournamentId, phase: 'group' }, orderBy: { sortOrder: 'asc' } });
       const firstEntry = (groupId: string) => prisma.v1TournamentSlot.findFirstOrThrow({
         where: { tournamentId: seeded.tournamentId, groupId, kind: 'ENTRY' }, orderBy: { position: 'asc' },
       });
       const teamsIn = async (groupId: string) =>
         (await prisma.v1TournamentGroupTeam.findMany({ where: { groupId } })).map((row) => row.registrationId);
-      return { ...seeded, groupA: groups[0].id, groupB: groups[1].id, firstEntry, teamsIn };
+      return { ...seeded, groupIds: groups.map((group) => group.id), groupA: groups[0].id, groupB: groups[1].id, firstEntry, teamsIn };
     };
 
     it('직접 경로로 B조에 편성된 팀을 A조 자리에 넣으면 409 TEAM_IN_OTHER_GROUP 이고 롤백된다', async () => {
-      const { tournamentId, registrationIds, groupA, groupB, firstEntry, teamsIn } = await twoGroups('otg-direct');
+      const { tournamentId, registrationIds, groupA, groupB, firstEntry, teamsIn } = await groupedTournament('otg-direct');
       const slotA = await firstEntry(groupA);
       await bracket.createGroupTeam(user, tournamentId, { groupId: groupB, registrationId: registrationIds[0] });
 
-      await expect(slots.assignSlot(user, slotA.id, registrationIds[0])).rejects.toMatchObject({ response: { code: 'TEAM_IN_OTHER_GROUP' } });
+      await expect(slots.assignSlot(user, slotA.id, registrationIds[0])).rejects.toMatchObject({
+        response: { code: 'TEAM_IN_OTHER_GROUP', details: { registrationId: registrationIds[0], groupId: groupA } },
+      });
 
       expect((await prisma.v1TournamentSlot.findUniqueOrThrow({ where: { id: slotA.id } })).registrationId).toBeNull();
       expect(await teamsIn(groupA)).toEqual([]);
     });
 
     it('맞바꾸기는 통과한다 (대조군) — 중간 겹침은 끝 상태 검사 전에 풀린다', async () => {
-      const { tournamentId, registrationIds, groupA, groupB, firstEntry, teamsIn } = await twoGroups('otg-swap');
+      const { tournamentId, registrationIds, groupA, groupB, firstEntry, teamsIn } = await groupedTournament('otg-swap');
       const [slotA, slotB] = [await firstEntry(groupA), await firstEntry(groupB)];
       await slots.assignSlot(user, slotA.id, registrationIds[0]);
       await slots.assignSlot(user, slotB.id, registrationIds[1]);
@@ -436,14 +439,9 @@ describe('자리 배정 (PostgreSQL)', () => {
     });
 
     it('이미 겹친 팀은 편성이 없는 조의 자리에는 409(롤백), 이미 편성된 조의 자리에는 들어간다', async () => {
-      const seeded = await seedBracketTournament(prisma, { label: 'otg-legacy', format: 'group_knockout', teamCount: 6 });
-      const { tournamentId } = seeded;
-      await templates.apply(user, tournamentId, { kind: 'group_knockout', groupCount: 3, teamsPerGroup: 2, advancePerGroup: 1, legs: 1, thirdPlace: false });
-      const [groupA, groupB, groupC] = (await prisma.v1TournamentGroup.findMany({ where: { tournamentId, phase: 'group' }, orderBy: { sortOrder: 'asc' } })).map((g) => g.id);
-      const firstEntry = (groupId: string) => prisma.v1TournamentSlot.findFirstOrThrow({ where: { tournamentId, groupId, kind: 'ENTRY' }, orderBy: { position: 'asc' } });
-      const teamsIn = async (groupId: string) =>
-        (await prisma.v1TournamentGroupTeam.findMany({ where: { groupId } })).map((row) => row.registrationId);
-      const reg = seeded.registrationIds[2];
+      const { registrationIds, groupIds, firstEntry, teamsIn } = await groupedTournament('otg-legacy', 4);
+      const [groupA, groupB, groupC] = groupIds;
+      const reg = registrationIds[2];
       await prisma.v1TournamentGroupTeam.createMany({ data: [
         { groupId: groupA, registrationId: reg, sortOrder: 0 },
         { groupId: groupB, registrationId: reg, sortOrder: 0 },

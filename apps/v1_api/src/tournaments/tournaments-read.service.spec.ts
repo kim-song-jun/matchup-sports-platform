@@ -353,6 +353,23 @@ describe('TournamentsReadService', () => {
     expect(result.pageInfo).toMatchObject({ page: 2, total: 42, totalPages: 3, hasPrev: true });
   });
 
+  it('list: page 1 wins over a cursor sent with it — the window is the top of the list, not the rows after the cursor', async () => {
+    mockListQueries(['t-1', 't-2']);
+    const first = await service.list({ limit: 1 });
+    prisma.$queryRaw.mockClear();
+    mockListQueries(['t-1', 't-2'], 2);
+
+    const result = await service.list({ page: 1, cursor: first.pageInfo.nextCursor as string, limit: 1 });
+
+    const windowCall = prisma.$queryRaw.mock.calls.find(
+      ([strings]) => !(strings as TemplateStringsArray).join('?').includes('COUNT(*)'),
+    );
+    const [strings, ...params] = windowCall as [TemplateStringsArray, ...unknown[]];
+    expect(strings.join('?')).toContain('OFFSET');
+    expect(params.at(-1)).toBe(0);
+    expect(result.pageInfo).toMatchObject({ page: 1, total: 2, hasPrev: false });
+  });
+
   it('list: cursor requests never run the COUNT query and keep the two-field pageInfo', async () => {
     mockListQueries(['t-1', 't-2']);
     const first = await service.list({ limit: 1 });

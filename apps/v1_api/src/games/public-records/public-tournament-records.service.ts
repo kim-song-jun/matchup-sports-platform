@@ -5,6 +5,8 @@ import { PrismaService } from '../../prisma/prisma.service';
 import type { V1AuthUser } from '../../auth/v1-auth-user';
 import { compareRosterOrder } from '../../common/roster-order';
 import { isBracketPublished, shouldHideParticipantIdentity } from '../../tournaments/tournament-detail.presenter';
+import type { GroupStandingSummary } from '../../tournaments/slots/group-rank-preview';
+import { loadGroupStandingSummaries } from '../../tournaments/slots/load-group-rank-preview';
 import {
   ALL_COMPETITION_KINDS,
   findPublicTournamentOnSurface,
@@ -646,6 +648,7 @@ export class PublicTournamentRecordsService {
         id: true,
         title: true,
         kind: true,
+        format: true,
         status: true,
         bracketPublishedAt: true,
         bracketPublishScheduledAt: true,
@@ -862,6 +865,7 @@ export class PublicTournamentRecordsService {
         // 편성 순서일 뿐 성적 순위가 아니다. 표가 전부 0이면 프론트(TournamentStandingsTable)가
         // 메달 색·진출 강조를 스스로 끄고 "아직 경기 기록이 없어요" 안내를 붙인다.
         position: index + 1,
+        sharedRank: null,
         points: 0,
         wins: 0,
         draws: 0,
@@ -870,6 +874,13 @@ export class PublicTournamentRecordsService {
         goalsAgainst: 0,
       })),
     );
+
+    // 공동 순위는 조별+결선 대회에만 있다 — 「순위·대진표」 탭(대회 상세)과 같은 로더라 두 탭이 어긋나지 않는다.
+    // 진출 팀은 이 탭이 안 쓰므로 결선 대진 조회를 건너뛰고, 순위 행이 하나도 없으면 로더를 아예 부르지 않는다.
+    const groupStandingSummaries =
+      tournament.format === 'group_knockout' && standings.length > 0
+        ? await loadGroupStandingSummaries(this.prisma, tournamentId, { includeQualification: false })
+        : new Map<string, GroupStandingSummary>();
 
     const lastFixture = pageFixtures[pageFixtures.length - 1];
     const nextCursor: string | null =
@@ -892,6 +903,7 @@ export class PublicTournamentRecordsService {
           teamName: hideIdentity ? null : standing.registration.team.name,
           teamLogoUrl: hideIdentity ? null : (standing.registration.team.profile?.logoUrl ?? null),
           position: standing.position,
+          sharedRank: groupStandingSummaries.get(standing.groupId)?.sharedRankByRegistrationId.get(standing.registrationId) ?? null,
           points: standing.points,
           wins: standing.wins,
           draws: standing.draws,
@@ -1070,6 +1082,7 @@ export class PublicTournamentRecordsService {
         teamName: hideIdentity ? null : teamNameById.get(standing.teamId) ?? null,
         teamLogoUrl: hideIdentity ? null : teamLogoById.get(standing.teamId) ?? null,
         position: standing.position,
+        sharedRank: null,
         points: standing.points,
         wins: standing.wins,
         draws: standing.draws,

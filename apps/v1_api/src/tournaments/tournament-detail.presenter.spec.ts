@@ -1,6 +1,7 @@
 import { publicFixtureStatus } from '../games/public-records/public-visibility';
 import { isBracketPublished, presentTournamentDetail } from './tournament-detail.presenter';
 import type { TournamentDetailRow } from './tournaments-read.query';
+import type { GroupStandingSummary } from './slots/group-rank-preview';
 
 // 대진표 공개 판정은 스케줄러 없이 조회 시점에 이뤄진다. 경계(예약 시각 정각)와
 // 즉시/예약의 우선순위가 틀리면 비공개 대진표가 노출되거나 예약이 영원히 안 열린다.
@@ -1094,5 +1095,84 @@ describe('presentTournamentDetail — 공개 명단', () => {
       { id: 'player-1', jerseyNumber: null, nickname: '길동이' },
       { id: 'player-2', jerseyNumber: null, nickname: null },
     ]);
+  });
+});
+
+describe('presentTournamentDetail — 조별 공개 순위표 요약', () => {
+  const standing = (registrationId: string, position: number) => ({
+    registrationId,
+    position,
+    points: 3,
+    wins: 1,
+    draws: 0,
+    losses: 0,
+    goalsFor: 1,
+    goalsAgainst: 0,
+    recalculatedAt: null,
+    registration: { team: { id: `team-${registrationId}`, name: `${registrationId}팀`, profile: null } },
+  });
+  const group = (id: string, registrationIds: string[]) => ({
+    id,
+    name: id,
+    phase: 'group',
+    sortOrder: 0,
+    advanceCount: 2,
+    groupTeams: [],
+    byeSlots: [],
+    standings: registrationIds.map((registrationId, index) => standing(registrationId, index + 1)),
+  });
+  const row = (status: string) =>
+    ({
+      id: 'tournament-1',
+      sportId: 'sport-1',
+      sport: { code: 'football', name: '축구' },
+      title: '테스트 대회',
+      status,
+      format: 'group_knockout',
+      bracketPublishedAt: new Date('2026-06-01T00:00:00Z'),
+      bracketPublishScheduledAt: null,
+      _count: { registrations: 0, reviews: 0 },
+      registrations: [],
+      groups: [group('g-tie', ['a', 'b', 'c']), group('g-clean', ['d', 'e', 'f'])],
+      tournamentMatchDetails: [],
+      announcements: [],
+      sponsors: [],
+      reviews: [],
+      awards: [],
+      createdAt: new Date('2026-06-01T00:00:00Z'),
+      updatedAt: new Date('2026-06-01T00:00:00Z'),
+    }) as unknown as Parameters<typeof presentTournamentDetail>[0];
+  const summaries = new Map<string, GroupStandingSummary>([
+    [
+      'g-tie',
+      {
+        sharedRankByRegistrationId: new Map([['a', 1], ['b', 1], ['c', 1]]),
+        qualification: { advancingRegistrationIds: ['b', 'c'], undecided: false },
+      },
+    ],
+  ]);
+  const now = new Date('2026-06-10T00:00:00Z');
+
+  it('넘겨받은 요약을 조 id 로 찾아 싣고, 요약이 없는 조는 null 이다', () => {
+    const { groups } = presentTournamentDetail(row('in_progress'), true, now, false, [], new Map(), summaries);
+    expect(groups[0].qualification).toEqual({ advancingRegistrationIds: ['b', 'c'], undecided: false });
+    expect(groups[0].standings.map((s) => s.sharedRank)).toEqual([1, 1, 1]);
+    expect(groups[1].qualification).toBeNull();
+    expect(groups[1].standings.map((s) => s.sharedRank)).toEqual([null, null, null]);
+  });
+
+  it('요약 인자를 안 넘기면 전부 null — 그 밖 대회의 응답은 달라지지 않는다', () => {
+    const { groups } = presentTournamentDetail(row('in_progress'), true, now);
+    for (const g of groups) {
+      expect(g.qualification).toBeNull();
+      expect(g.standings.every((s) => s.sharedRank === null)).toBe(true);
+    }
+  });
+
+  it('모집 중이라 팀 식별 정보를 가려도 구조 정보(공동 순위·진출 registrationId)는 가리지 않는다', () => {
+    const { groups } = presentTournamentDetail(row('open'), true, now, false, [], new Map(), summaries);
+    expect(groups[0].standings.map((s) => s.teamName)).toEqual([null, null, null]);
+    expect(groups[0].standings.map((s) => s.sharedRank)).toEqual([1, 1, 1]);
+    expect(groups[0].qualification?.advancingRegistrationIds).toEqual(['b', 'c']);
   });
 });

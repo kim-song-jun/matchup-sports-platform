@@ -1,11 +1,11 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { renderBracketPage, renderBracketStandingsTab } from './bracket-test-utils';
 import { AppBackLink } from '@/components/v1-ui/app-back-link';
 import { __resetNavigationHistoryForTests } from '@/lib/navigation-history';
 import type { PublicScheduleEntry } from '@/components/public-game-records/types';
-import type { V1TournamentDetail, V1TournamentFixture, V1TournamentGroup } from '@/types/api';
+import type { V1TournamentDetail, V1TournamentFixture, V1TournamentGroup, V1TournamentStanding } from '@/types/api';
 
 // 순위표 링크의 출처는 현재 URL(받은 from 포함)이다 — 기본은 출처 없음으로 고정하고,
 // from 을 검증하는 테스트만 setMockSearchParams 로 override 한다.
@@ -121,6 +121,31 @@ function makeGroup(overrides: Partial<V1TournamentGroup> & Pick<V1TournamentGrou
     advanceCount: null,
     groupTeams: [],
     standings: [],
+    qualification: null,
+    ...overrides,
+  };
+}
+
+function makeStanding(
+  registrationId: string,
+  teamName: string,
+  position: number,
+  overrides: Partial<V1TournamentStanding> = {},
+): V1TournamentStanding {
+  return {
+    registrationId,
+    teamId: `team-${registrationId}`,
+    teamName,
+    teamLogoUrl: null,
+    position,
+    sharedRank: null,
+    points: 3,
+    wins: 1,
+    draws: 0,
+    losses: 0,
+    goalsFor: 2,
+    goalsAgainst: 0,
+    recalculatedAt: null,
     ...overrides,
   };
 }
@@ -182,6 +207,7 @@ describe('BracketPageContent — 기본 탭', () => {
               goalsFor: 2,
               goalsAgainst: 0,
               recalculatedAt: null,
+              sharedRank: null,
             },
           ],
         }),
@@ -248,12 +274,12 @@ describe('BracketPageContent — 순위표 팀 링크', () => {
             {
               registrationId: 'reg-1', teamId: 'team-1', teamName: '성수 FC', teamLogoUrl: null,
               position: 1, points: 3, wins: 1, draws: 0, losses: 0,
-              goalsFor: 4, goalsAgainst: 2, recalculatedAt: '2026-08-14T00:00:00.000Z',
+              goalsFor: 4, goalsAgainst: 2, recalculatedAt: '2026-08-14T00:00:00.000Z', sharedRank: null,
             },
             {
               registrationId: 'reg-2', teamId: 'team-2', teamName: '마포 FC', teamLogoUrl: null,
               position: 2, points: 0, wins: 0, draws: 0, losses: 1,
-              goalsFor: 2, goalsAgainst: 4, recalculatedAt: '2026-08-14T00:00:00.000Z',
+              goalsFor: 2, goalsAgainst: 4, recalculatedAt: '2026-08-14T00:00:00.000Z', sharedRank: null,
             },
           ],
         }),
@@ -294,6 +320,7 @@ describe('BracketPageContent — 순위표 팀 링크', () => {
               goalsFor: 10,
               goalsAgainst: 2,
               recalculatedAt: null,
+              sharedRank: null,
             },
           ],
         }),
@@ -335,6 +362,7 @@ describe('BracketPageContent — 순위표 팀 링크', () => {
               goalsFor: 5,
               goalsAgainst: 1,
               recalculatedAt: null,
+              sharedRank: null,
             },
           ],
         }),
@@ -399,6 +427,7 @@ describe('BracketPageContent — 순위표 팀 링크', () => {
               goalsFor: 3,
               goalsAgainst: 1,
               recalculatedAt: null,
+              sharedRank: null,
             },
           ],
         }),
@@ -470,7 +499,7 @@ describe('BracketPageContent — 순위표 팀 링크', () => {
             {
               registrationId: 'reg-381', teamId: 'team-99', teamName: '한강 유나이티드',
               teamLogoUrl: null, position: 1, points: 3, wins: 1, draws: 0, losses: 0,
-              goalsFor: 3, goalsAgainst: 1, recalculatedAt: null,
+              goalsFor: 3, goalsAgainst: 1, recalculatedAt: null, sharedRank: null,
             },
           ],
         }),
@@ -523,6 +552,7 @@ describe('BracketPageContent — 진출 배지는 조별리그 완료 후에만'
               goalsFor: 2,
               goalsAgainst: 0,
               recalculatedAt: null,
+              sharedRank: null,
             },
           ],
         }),
@@ -564,6 +594,7 @@ describe('BracketPageContent — 진출 배지는 조별리그 완료 후에만'
               goalsFor: 2,
               goalsAgainst: 0,
               recalculatedAt: null,
+              sharedRank: null,
             },
           ],
         }),
@@ -574,6 +605,120 @@ describe('BracketPageContent — 진출 배지는 조별리그 완료 후에만'
 
     expect(screen.getByText(/상위 2팀 진출/)).toBeInTheDocument();
     expect(screen.queryByText('조별리그가 끝나면 진출 팀이 정해져요')).not.toBeInTheDocument();
+  });
+
+  /* A안 — 진출 색·배지는 position 이 아니라 서버가 결선 대진 기준으로 알려 준 qualification 을 따른다.
+     완전 동률이면 position 은 임의 순서라, 어드민이 결선에 넣은 팀과 갈린다. */
+  const COMPLETE_FIXTURES = [
+    makeFixture({ id: 'fx-1', groupId: 'group-a', round: 'group', status: 'completed' }),
+    makeFixture({ id: 'fx-2', groupId: 'group-a', round: 'group', status: 'cancelled' }),
+  ];
+  const highlightedTeams = (container: HTMLElement) =>
+    Array.from(container.querySelectorAll('.tm-standings-row-highlight')).map(
+      (tr) => tr.querySelector('td:nth-child(2)')?.textContent?.replace('진출', '').trim(),
+    );
+  const tiedGroup = (qualification: V1TournamentGroup['qualification']) =>
+    makeGroup({
+      id: 'group-a',
+      phase: 'group',
+      name: 'A조',
+      advanceCount: 2,
+      qualification,
+      standings: [
+        makeStanding('reg-3', '03팀', 1, { sharedRank: 1, points: 1, wins: 0, draws: 1, goalsFor: 0 }),
+        makeStanding('reg-4', '04팀', 2, { sharedRank: 1, points: 1, wins: 0, draws: 1, goalsFor: 0 }),
+        makeStanding('reg-6', '06팀', 3, { sharedRank: 1, points: 1, wins: 0, draws: 1, goalsFor: 0 }),
+      ],
+    });
+  const controlGroup = makeGroup({
+    id: 'group-b',
+    phase: 'group',
+    name: 'B조',
+    advanceCount: 2,
+    qualification: { advancingRegistrationIds: ['reg-b1', 'reg-b2'], undecided: false },
+    standings: [
+      makeStanding('reg-b1', '대조1팀', 1, { points: 9 }),
+      makeStanding('reg-b2', '대조2팀', 2, { points: 6 }),
+      makeStanding('reg-b3', '대조3팀', 3, { points: 3 }),
+    ],
+  });
+  const completeFixturesBoth = [
+    ...COMPLETE_FIXTURES,
+    makeFixture({ id: 'fx-3', groupId: 'group-b', round: 'group', status: 'completed' }),
+  ];
+
+  it('완전 동률 조: position 1·2 가 아니라 qualification 의 팀(04·06)이 진출로 칠해지고, 동률 팀은 공동 배지를 단다', () => {
+    const tournament = makeTournament({
+      id: 'tour-tie',
+      status: 'in_progress',
+      format: 'group_knockout',
+      fixtures: completeFixturesBoth,
+      groups: [tiedGroup({ advancingRegistrationIds: ['reg-4', 'reg-6'], undecided: false }), controlGroup],
+    });
+
+    renderBracketStandingsTab(tournament);
+
+    const tiedTable = screen.getByRole('table', { name: 'A조 순위표' });
+    expect(highlightedTeams(tiedTable)).toEqual(['04팀', '06팀']);
+    expect(within(tiedTable).getAllByText('공동 1', { selector: '.tm-badge-orange' })).toHaveLength(3);
+    expect(within(tiedTable).getAllByText('진출')).toHaveLength(2);
+    expect(screen.queryByText('동률 — 운영자가 진출 팀을 정해요')).not.toBeInTheDocument();
+    // 대조군: 동률 없는 B조는 상위 N팀이 그대로 칠해지고 공동 배지가 없다
+    const controlTable = screen.getByRole('table', { name: 'B조 순위표' });
+    expect(highlightedTeams(controlTable)).toEqual(['대조1팀', '대조2팀']);
+    expect(within(controlTable).queryByText(/공동/)).toBeNull();
+  });
+
+  it('동률 때문에 진출 팀이 덜 정해졌으면 정해진 팀만 칠하고 안내 캡션을 보여 준다', () => {
+    const tournament = makeTournament({
+      id: 'tour-undecided',
+      status: 'in_progress',
+      format: 'group_knockout',
+      fixtures: completeFixturesBoth,
+      groups: [tiedGroup({ advancingRegistrationIds: ['reg-3'], undecided: true }), controlGroup],
+    });
+
+    renderBracketStandingsTab(tournament);
+
+    expect(highlightedTeams(screen.getByRole('table', { name: 'A조 순위표' }))).toEqual(['03팀']);
+    // 안내 캡션은 undecided 인 조에만 한 번 나온다
+    expect(screen.getAllByText('동률 — 운영자가 진출 팀을 정해요')).toHaveLength(1);
+  });
+
+  it('qualification 이 null 이면 조별리그가 끝났어도 position 으로 추정해 칠하지 않는다', () => {
+    const tournament = makeTournament({
+      id: 'tour-no-qualification',
+      status: 'in_progress',
+      format: 'group_knockout',
+      fixtures: COMPLETE_FIXTURES,
+      groups: [tiedGroup(null)],
+    });
+
+    renderBracketStandingsTab(tournament);
+
+    const table = screen.getByRole('table', { name: 'A조 순위표' });
+    expect(highlightedTeams(table)).toEqual([]);
+    expect(within(table).queryByText('진출')).toBeNull();
+    expect(screen.queryByText('동률 — 운영자가 진출 팀을 정해요')).not.toBeInTheDocument();
+  });
+
+  it('조별리그가 아직 안 끝났으면 qualification 이 와도 칠하지 않고 캡션도 없다 — 기존 안내만 남는다', () => {
+    const tournament = makeTournament({
+      id: 'tour-incomplete-with-qualification',
+      status: 'in_progress',
+      format: 'group_knockout',
+      fixtures: [
+        makeFixture({ id: 'fx-1', groupId: 'group-a', round: 'group', status: 'completed' }),
+        makeFixture({ id: 'fx-2', groupId: 'group-a', round: 'group', status: 'scheduled' }),
+      ],
+      groups: [tiedGroup({ advancingRegistrationIds: ['reg-4'], undecided: true })],
+    });
+
+    renderBracketStandingsTab(tournament);
+
+    expect(highlightedTeams(screen.getByRole('table', { name: 'A조 순위표' }))).toEqual([]);
+    expect(screen.queryByText('동률 — 운영자가 진출 팀을 정해요')).not.toBeInTheDocument();
+    expect(screen.getByText('조별리그가 끝나면 진출 팀이 정해져요')).toBeInTheDocument();
   });
 });
 
@@ -822,6 +967,7 @@ describe('BracketPageContent — 정규 리그 거울 행(format=group_knockout,
               goalsFor: 10,
               goalsAgainst: 2,
               recalculatedAt: null,
+              sharedRank: null,
             },
           ],
         }),
@@ -888,6 +1034,7 @@ describe('BracketPageContent — 정규 리그 거울 행(format=group_knockout,
         teamName: '성수 FC',
         teamLogoUrl: null,
         position: 1,
+        sharedRank: null,
         points: 9,
         wins: 3,
         draws: 0,

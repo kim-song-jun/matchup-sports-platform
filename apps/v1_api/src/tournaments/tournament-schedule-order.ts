@@ -7,8 +7,42 @@ type Tx = Prisma.TransactionClient;
 
 const STAGE_SELECT = { round: true, group: { select: { phase: true } } } as const;
 
-function stageLabel(detail: { round: string; group: { phase: string } | null }): string {
-  return (detail.group === null ? undefined : TOURNAMENT_PHASE_LABEL[detail.group.phase]) ?? tournamentRoundLabel(detail.round);
+function stageLabel(phase: string | null | undefined, round: string): string {
+  return (phase == null ? undefined : TOURNAMENT_PHASE_LABEL[phase]) ?? tournamentRoundLabel(round);
+}
+
+type Stage = { phase: string | null | undefined; round: string };
+
+async function assertStartKeepsStageOrder(
+  tx: Tx,
+  input: { tournamentId: string; excludeTeamMatchId: string | null; stage: Stage; startAt: Date },
+): Promise<void> {
+  const selfRank = competitionStageRank(input.stage);
+  if (selfRank === null) return;
+  const others = await tx.v1TeamMatch.findMany({
+    where: {
+      tournamentId: input.tournamentId, deletedAt: null, startAt: { not: null }, tournamentDetails: { isNot: null },
+      ...(input.excludeTeamMatchId === null ? {} : { id: { not: input.excludeTeamMatchId } }),
+    },
+    select: { startAt: true, tournamentDetails: { select: STAGE_SELECT } },
+  });
+  for (const other of others) {
+    if (other.startAt === null || other.tournamentDetails === null) continue;
+    const otherRank = competitionStageRank({ phase: other.tournamentDetails.group?.phase, round: other.tournamentDetails.round });
+    if (otherRank === null) continue;
+    const startsTooEarly = otherRank < selfRank && input.startAt.getTime() < other.startAt.getTime();
+    const startsTooLate = otherRank > selfRank && input.startAt.getTime() > other.startAt.getTime();
+    if (startsTooEarly || startsTooLate) {
+      const mine = stageLabel(input.stage.phase, input.stage.round);
+      const theirs = stageLabel(other.tournamentDetails.group?.phase, other.tournamentDetails.round);
+      throw new ConflictException({
+        code: 'FIXTURE_SCHEDULE_STAGE_ORDER',
+        message: startsTooEarly
+          ? `${mine} 경기는 ${theirs} 경기보다 늦게 시작해야 해요. 단계 순서에 맞게 시각을 정해 주세요.`
+          : `${mine} 경기는 ${theirs} 경기보다 먼저 시작해야 해요. 단계 순서에 맞게 시각을 정해 주세요.`,
+      });
+    }
+  }
 }
 
 /**
@@ -27,28 +61,21 @@ export async function assertFixtureScheduleKeepsStageOrder(
   });
   if (self === null || self.tournamentDetails === null) return;
   if (self.startAt?.getTime() === input.startAt.getTime()) return;
-  const selfRank = competitionStageRank({ phase: self.tournamentDetails.group?.phase, round: self.tournamentDetails.round });
-  if (selfRank === null) return;
-
-  const others = await tx.v1TeamMatch.findMany({
-    where: { tournamentId: input.tournamentId, deletedAt: null, id: { not: input.teamMatchId }, startAt: { not: null }, tournamentDetails: { isNot: null } },
-    select: { startAt: true, tournamentDetails: { select: STAGE_SELECT } },
+  await assertStartKeepsStageOrder(tx, {
+    tournamentId: input.tournamentId,
+    excludeTeamMatchId: input.teamMatchId,
+    stage: { phase: self.tournamentDetails.group?.phase, round: self.tournamentDetails.round },
+    startAt: input.startAt,
   });
-  for (const other of others) {
-    if (other.startAt === null || other.tournamentDetails === null) continue;
-    const otherRank = competitionStageRank({ phase: other.tournamentDetails.group?.phase, round: other.tournamentDetails.round });
-    if (otherRank === null) continue;
-    const startsTooEarly = otherRank < selfRank && input.startAt.getTime() < other.startAt.getTime();
-    const startsTooLate = otherRank > selfRank && input.startAt.getTime() > other.startAt.getTime();
-    if (startsTooEarly || startsTooLate) {
-      const mine = stageLabel(self.tournamentDetails);
-      const theirs = stageLabel(other.tournamentDetails);
-      throw new ConflictException({
-        code: 'FIXTURE_SCHEDULE_STAGE_ORDER',
-        message: startsTooEarly
-          ? `${mine} 경기는 ${theirs} 경기보다 늦게 시작해야 해요. 단계 순서에 맞게 시각을 정해 주세요.`
-          : `${mine} 경기는 ${theirs} 경기보다 먼저 시작해야 해요. 단계 순서에 맞게 시각을 정해 주세요.`,
-      });
-    }
-  }
+}
+
+/** 새로 만드는 경기용: 아직 저장 전이라 자기 자신을 뺄 필요가 없고 단계는 요청 값에서 온다. */
+export async function assertNewFixtureScheduleKeepsStageOrder(
+  tx: Tx,
+  input: { tournamentId: string; phase: string | null | undefined; round: string; startAt: Date | null },
+): Promise<void> {
+  if (input.startAt === null) return;
+  await assertStartKeepsStageOrder(tx, {
+    tournamentId: input.tournamentId, excludeTeamMatchId: null, stage: { phase: input.phase, round: input.round }, startAt: input.startAt,
+  });
 }

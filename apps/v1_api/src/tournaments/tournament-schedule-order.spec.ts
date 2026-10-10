@@ -1,5 +1,5 @@
 import type { Prisma } from '@prisma/client';
-import { assertFixtureScheduleKeepsStageOrder } from './tournament-schedule-order';
+import { assertFixtureScheduleKeepsStageOrder, assertNewFixtureScheduleKeepsStageOrder } from './tournament-schedule-order';
 
 const at = (hhmm: string) => new Date(`2026-10-10T${hhmm}:00.000Z`);
 
@@ -26,8 +26,8 @@ function fakeTx(matches: Match[]) {
         const match = matches.find((candidate) => candidate.id === where.id);
         return match === undefined ? null : shape(match);
       }),
-      findMany: jest.fn(async ({ where }: { where: { id: { not: string } } }) =>
-        matches.filter((candidate) => candidate.id !== where.id.not && candidate.startAt !== null).map(shape),
+      findMany: jest.fn(async ({ where }: { where: { id?: { not: string } } }) =>
+        matches.filter((candidate) => candidate.id !== where.id?.not && candidate.startAt !== null).map(shape),
       ),
     },
   } as unknown as Prisma.TransactionClient;
@@ -70,5 +70,25 @@ describe('assertFixtureScheduleKeepsStageOrder', () => {
     await expect(check('final', null)).resolves.toBeUndefined();
     await expect(check('free', at('22:00'))).resolves.toBeUndefined();
     await expect(check('g1', at('23:45'))).rejects.toMatchObject({ response: { code: 'FIXTURE_SCHEDULE_STAGE_ORDER' } });
+  });
+});
+
+describe('assertNewFixtureScheduleKeepsStageOrder', () => {
+  const create = (phase: string | null, round: string, startAt: Date | null) =>
+    assertNewFixtureScheduleKeepsStageOrder(fakeTx(MATCHES), { tournamentId: 't', phase, round, startAt });
+
+  it('새 결승을 조별 경기보다 이른 시각으로 만들면 막는다', async () => {
+    await expect(create('final', '결승', at('22:00'))).rejects.toMatchObject({ response: { code: 'FIXTURE_SCHEDULE_STAGE_ORDER' } });
+  });
+
+  it('새 조별 경기를 결선 경기보다 늦은 시각으로 만들면 막는다', async () => {
+    await expect(create('group', 'league_r4', at('23:45'))).rejects.toMatchObject({ response: { code: 'FIXTURE_SCHEDULE_STAGE_ORDER' } });
+  });
+
+  it('단계 순서를 지키거나 같은 단계이거나 시각이 없거나 단계를 모르면 통과한다', async () => {
+    await expect(create('final', '결승', at('23:45'))).resolves.toBeUndefined();
+    await expect(create('group', 'league_r4', at('23:25'))).resolves.toBeUndefined();
+    await expect(create('quarter', '8강', null)).resolves.toBeUndefined();
+    await expect(create(null, '친선 한마당', at('22:00'))).resolves.toBeUndefined();
   });
 });

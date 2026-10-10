@@ -48,6 +48,7 @@ import {
   type TournamentFixtureGameForResult,
 } from './tournament-fixture-official-result';
 import { findTournamentOnSurface, TOURNAMENT_KINDS } from './tournament-surface-lookup';
+import { assertNewFixtureScheduleKeepsStageOrder } from './tournament-schedule-order';
 import { assertNotInOtherGroupInTx, assertSidesNotSlotLinked, createGroupInTx, deleteTournamentGroupInTx, ensureGroupPhaseTeamsInTx, recalculateStandingsInTx, softDeleteTournamentFixtureInTx, updateTournamentFixtureInTx } from './tournament-bracket-tx';
 import { participantDisplayName } from './participant-display-name';
 import { readJerseyNumbers } from './tournament-player-jersey';
@@ -682,6 +683,10 @@ export class TournamentBracketService {
       if (dto.groupId && group) {
         await ensureGroupPhaseTeamsInTx(tx, admin, tournamentId, dto.groupId, group.phase, [dto.homeRegistrationId, dto.awayRegistrationId]);
       }
+
+      await assertNewFixtureScheduleKeepsStageOrder(tx, {
+        tournamentId, phase: group?.phase, round: dto.round, startAt: dto.scheduledAt ? new Date(dto.scheduledAt) : null,
+      });
 
       const [homeJerseys, awayJerseys] = await Promise.all([
         home ? readJerseyNumbers(tx, home.id) : Promise.resolve(new Map<string, number>()),

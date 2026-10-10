@@ -242,40 +242,24 @@ export type PlaceNavLink = {
   /** route: 좌표 길찾기, search: 이름 검색(좌표 없을 때). */
   mode: 'route' | 'search';
 } & (
-  | { href: string; newTab: boolean; onSelect?: undefined }
-  | { onSelect: () => void; href?: undefined; newTab?: undefined }
+  | { href: string; newTab: boolean; onSelect?: undefined; storeHref?: undefined }
+  /** storeHref: 앱이 안 열렸을 때 사용자가 직접 누를 스토어 주소(iOS 브라우저 티맵). */
+  | { onSelect: () => void; storeHref: string; href?: undefined; newTab?: undefined }
 );
 
 const NAVER_MAP_APP_NAME = 'teameet.kr';
 const TMAP_ANDROID_PACKAGE = 'com.skt.tmap.ku';
 const TMAP_PLAY_STORE_URL = `https://play.google.com/store/apps/details?id=${TMAP_ANDROID_PACKAGE}`;
 const TMAP_APP_STORE_URL = 'https://apps.apple.com/kr/app/tmap/id431589174';
-const TMAP_APP_STORE_FALLBACK_MS = 1500;
 
 type NavTarget = { name: string; latitude: number | null; longitude: number | null };
 
 /**
- * iOS Safari 는 스킴이 열리지 않으면 "주소가 유효하지 않다"는 경고창을 띄우고 대체 주소를 줄 수 없다.
- * 그래서 스킴으로 이동한 뒤 앱이 떴는지(탭이 숨겨졌는지)를 보고, 그대로 보이면 App Store 로 보낸다.
+ * iOS 사파리는 앱 스킴으로 이동할 때 「앱에서 열기」 확인창을 띄우고, 앱이 없으면 「주소가 유효하지 않음」 경고만 띄운다 —
+ * 어느 쪽인지 페이지가 알 길이 없어(확인창이 떠 있는 동안에도 화면은 보이는 상태) 시간으로 스토어에 보내면 설치된
+ * 사람도 스토어로 간다. 이동만 하고, 스토어는 화면에 띄운 링크로 사용자가 고르게 한다(PlaceCard).
  */
 export function openTmapOnIosWeb(schemeUrl: string): void {
-  let timer: ReturnType<typeof setTimeout> | null = null;
-  const cancel = () => {
-    if (timer) clearTimeout(timer);
-    timer = null;
-    document.removeEventListener('visibilitychange', onVisibility);
-    window.removeEventListener('pagehide', cancel);
-  };
-  function onVisibility() {
-    if (document.visibilityState === 'hidden') cancel();
-  }
-  document.addEventListener('visibilitychange', onVisibility);
-  window.addEventListener('pagehide', cancel);
-  timer = setTimeout(() => {
-    const stillHere = document.visibilityState === 'visible';
-    cancel();
-    if (stillHere) window.location.href = TMAP_APP_STORE_URL;
-  }, TMAP_APP_STORE_FALLBACK_MS);
   window.location.href = schemeUrl;
 }
 
@@ -347,7 +331,8 @@ export function placeNavigationLinks(
     links.push({
       ...tmapBase,
       onSelect: () => openTmapOnIosWeb(`tmap://${tmapPath}`),
-      description: `${appDescription} · 앱이 없으면 스토어로 이동해요`,
+      storeHref: TMAP_APP_STORE_URL,
+      description: `${appDescription} · 앱이 없으면 앱스토어 링크를 보여 드려요`,
     });
   }
   return links;

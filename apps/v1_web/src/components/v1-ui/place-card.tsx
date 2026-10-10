@@ -31,6 +31,7 @@ export function PlaceCard({
 }) {
   const [platform, setPlatform] = useState<PlaceNavPlatform>(platformOverride ?? 'web');
   const [navOpen, setNavOpen] = useState(false);
+  const [storeHint, setStoreHint] = useState<{ label: string; href: string } | null>(null);
   const [copyState, setCopyState] = useState<CopyState>('idle');
   const resetTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -58,8 +59,12 @@ export function PlaceCard({
       ),
     };
     if (link.onSelect) {
-      const open = link.onSelect;
-      return { ...base, onSelect: () => void closeOverlayThenNavigate(() => setNavOpen(false), open) };
+      const { onSelect: open, storeHref, label } = link;
+      const close = () => {
+        setNavOpen(false);
+        setStoreHint({ label, href: storeHref });
+      };
+      return { ...base, onSelect: () => void closeOverlayThenNavigate(close, open) };
     }
     return { ...base, externalHref: link.href, newTab: link.newTab };
   });
@@ -141,6 +146,14 @@ export function PlaceCard({
         {coords ? <Navigation size={16} aria-hidden="true" /> : <Search size={16} aria-hidden="true" />}
         {navTitle}
       </button>
+      {storeHint ? (
+        <div role="status" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginTop: 8 }}>
+          <span className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>{storeHint.label} 앱이 열리지 않았다면</span>
+          <a href={storeHint.href} className="tm-btn tm-btn-sm tm-btn-neutral" style={{ flex: 'none' }}>
+            앱스토어에서 받기
+          </a>
+        </div>
+      ) : null}
       <ActionSheet
         open={navOpen}
         title={navTitle}

@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   detectPlaceNavPlatform,
   placeFromEditForm,
@@ -106,59 +106,20 @@ describe('placeNavigationLinks', () => {
 
 describe('iOS 웹 티맵 핸들러', () => {
   const originalLocation = window.location;
-  let assigned: string[];
-
-  function setVisibility(state: 'visible' | 'hidden') {
-    Object.defineProperty(document, 'visibilityState', { value: state, configurable: true });
-  }
-
-  beforeEach(() => {
-    vi.useFakeTimers();
-    assigned = [];
-    Object.defineProperty(window, 'location', {
-      configurable: true,
-      value: { set href(v: string) { assigned.push(v); } },
-    });
-    setVisibility('visible');
-  });
   afterEach(() => {
-    vi.useRealTimers();
     Object.defineProperty(window, 'location', { configurable: true, value: originalLocation });
-    delete (document as { visibilityState?: unknown }).visibilityState;
   });
 
-  const tmapLink = () =>
-    placeNavigationLinks({ name: '구장', latitude: 37.5, longitude: 127 }, 'ios-web').find((l) => l.key === 'tmap')!;
-
-  it('스킴으로 이동하고, 1.5초 뒤에도 화면이 보이면 App Store 로 보낸다', () => {
-    tmapLink().onSelect!();
+  it('앱 주소로만 이동하고 스토어로 자동 이동하지 않으며, 스토어 주소는 사용자가 누르도록 함께 넘긴다', () => {
+    vi.useFakeTimers();
+    const assigned: string[] = [];
+    Object.defineProperty(window, 'location', { configurable: true, value: { set href(v: string) { assigned.push(v); } } });
+    const tmap = placeNavigationLinks({ name: '구장', latitude: 37.5, longitude: 127 }, 'ios-web').find((l) => l.key === 'tmap')!;
+    tmap.onSelect!();
+    vi.advanceTimersByTime(10_000);
+    vi.useRealTimers();
     expect(assigned).toEqual([`tmap://route?goalx=127&goaly=37.5&goalname=${encodeURIComponent('구장')}`]);
-    vi.advanceTimersByTime(1499);
-    expect(assigned).toHaveLength(1);
-    vi.advanceTimersByTime(1);
-    expect(assigned[1]).toBe('https://apps.apple.com/kr/app/tmap/id431589174');
-  });
-
-  it('앱이 떠서 탭이 숨겨지면 스토어로 보내지 않는다', () => {
-    tmapLink().onSelect!();
-    setVisibility('hidden');
-    document.dispatchEvent(new Event('visibilitychange'));
-    vi.advanceTimersByTime(3000);
-    expect(assigned).toHaveLength(1);
-  });
-
-  it('pagehide 가 오면 스토어로 보내지 않는다', () => {
-    tmapLink().onSelect!();
-    window.dispatchEvent(new Event('pagehide'));
-    vi.advanceTimersByTime(3000);
-    expect(assigned).toHaveLength(1);
-  });
-
-  it('타이머 시점에 이미 숨겨져 있으면 스토어로 보내지 않는다', () => {
-    tmapLink().onSelect!();
-    setVisibility('hidden');
-    vi.advanceTimersByTime(1500);
-    expect(assigned).toHaveLength(1);
+    expect(tmap.storeHref).toBe('https://apps.apple.com/kr/app/tmap/id431589174');
   });
 });
 

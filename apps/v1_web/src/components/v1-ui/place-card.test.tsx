@@ -84,7 +84,7 @@ describe('PlaceCard', () => {
     expect(screen.queryByText('티맵')).not.toBeInTheDocument();
   });
 
-  it('iOS 웹에서 티맵은 링크가 아니라 버튼이고, 시트를 먼저 닫은 뒤 앱 주소로 이동한다', async () => {
+  it('iOS 웹에서 티맵은 버튼이고, 시트를 닫은 뒤 앱 주소로 이동하며 앱스토어 링크를 띄운다', async () => {
     const assign = vi.fn();
     const original = window.location;
     Object.defineProperty(window, 'location', { configurable: true, value: { set href(v: string) { assign(v); } } });
@@ -94,6 +94,9 @@ describe('PlaceCard', () => {
       fireEvent.click(screen.getByRole('button', { name: /^티맵/ }));
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
       await vi.waitFor(() => expect(assign).toHaveBeenCalledWith(expect.stringMatching(/^tmap:\/\/route\?goalx=126\.8985/)));
+      expect(assign).toHaveBeenCalledTimes(1);
+      expect(screen.getByText('티맵 앱이 열리지 않았다면')).toBeInTheDocument();
+      expect(screen.getByRole('link', { name: '앱스토어에서 받기' })).toHaveAttribute('href', 'https://apps.apple.com/kr/app/tmap/id431589174');
     } finally {
       Object.defineProperty(window, 'location', { configurable: true, value: original });
     }

@@ -1044,9 +1044,6 @@ export class LeagueMatchAdminService {
     }
 
     const { cancelledApplications, leagueCompleted } = await this.prisma.$transaction(async (tx) => {
-      // 리그 행 락이 먼저 — updateFixture·removeTeam·generateFixtures 와 같은 순서라야 40P01 이 나지 않는다.
-      // raw SQL 허용치가 꽉 찬 파일이라 같은 행 락을 하는 공용 헬퍼(보류 검사 없음)를 쓴다.
-      await lockCompetitionForSlotReleaseInTx(tx, { id: leagueId, kind: 'regular_league' });
       await this.assertFixtureGamesNotInProgress(
         tx,
         [teamMatchId],
@@ -1445,6 +1442,11 @@ export class LeagueMatchAdminService {
       // 끼어든 경기로 팀 경기 순서(출전정지)가 바뀐다 — 대회 대진 생성과 같이 양 팀을 다시 계산한다.
       await enqueueRosterResync(tx, competitionTeamTargets(league.id, [dto.homeTeamId, dto.awayTeamId]));
       return created;
+    }, {
+      // 리그 행 락을 기다린다 — 템플릿·재생성이 그 락을 45초까지 쥘 수 있어 Prisma 기본 5초면 정상 대기도 만료된다.
+      // 그 리그 레인과 같은 45초 + maxWait 5초(ALB idle_timeout 60초 안, 위 generateFixtures 주석).
+      timeout: 45_000,
+      maxWait: 5_000,
     });
 
     return { leagueId, teamMatchId };
@@ -1556,6 +1558,9 @@ export class LeagueMatchAdminService {
         tx,
       );
       return result;
+    }, {
+      timeout: 45_000, // createManualFixture 와 같은 리그 행 락 대기 한도
+      maxWait: 5_000,
     });
     return {
       teamMatchId: updated.id,

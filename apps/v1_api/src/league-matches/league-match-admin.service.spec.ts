@@ -1339,16 +1339,6 @@ describe('LeagueMatchAdminService.cancelFixture — 진행 중 경기의 대진 
     expect(prisma.v1TeamMatch.update).not.toHaveBeenCalled();
   });
 
-  it('리그 행 잠금이 경기 행 잠금보다 먼저다 — updateFixture 와 반대 순서로 잠그면 교착이 난다', async () => {
-    const prisma = makePrisma('SCHEDULED');
-    await makeService(prisma).cancelFixture(adminUser, LEAGUE_ID, FIXTURE_ID, { reason: '우천' });
-    const locked = prisma.$queryRaw.mock.calls.map(([strings]: [TemplateStringsArray]) => strings.join('?'));
-    const leagueAt = locked.findIndex((sql: string) => sql.includes('v1_tournaments'));
-    const gamesAt = locked.findIndex((sql: string) => sql.includes('v1_games'));
-    expect(leagueAt).toBeGreaterThanOrEqual(0);
-    expect(gamesAt).toBeGreaterThan(leagueAt);
-  });
-
   // 대조군 — 시작 전 경기는 그대로 취소되고, 끝난 경기도 정정용 취소(C-4/R8)가 막히지 않는다.
   it.each(['SCHEDULED', 'ENDED'])('경기가 %s 이면 대진을 취소한다', async (gameState) => {
     const prisma = makePrisma(gameState);

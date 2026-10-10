@@ -266,7 +266,7 @@ an occupied coordinate with the same payload returns its current canonical fixtu
 
 | Method | Path | DTO | Result |
 |---|---|---|---|
-| `POST` | `/api/v1/admin/tournaments/:tournamentId/fixtures` | `CreateFixtureDto` | active admin fixture/Game source creation or the explicit pin/idempotency conflict above. |
+| `POST` | `/api/v1/admin/tournaments/:tournamentId/fixtures` | `CreateFixtureDto` | active admin fixture/Game source creation or the explicit pin/idempotency conflict above. `fixtureNumber` is optional: when omitted the server assigns the tournament-wide max (archived fixtures included) + 1 inside the creation transaction, under the same `league-fixture-generation` lock, and the durable command id uses the assigned number. A sent number keeps the existing idempotency behaviour. |
 | `PATCH` | `/api/v1/admin/fixtures/:fixtureId` | `UpdateFixtureDto` | fixture metadata including optional positive integer `fixtureNumber`; duplicate round/leg number returns `409 FIXTURE_NUMBER_CONFLICT`. See [대진 번호 수정](#대진-번호-수정-2026-10-05). |
 
 The legacy generic result paths remain registered only to reject unsafe writes:

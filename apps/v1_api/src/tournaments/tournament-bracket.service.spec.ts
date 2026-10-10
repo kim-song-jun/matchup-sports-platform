@@ -297,7 +297,7 @@ describe('TournamentBracketService', () => {
     v1TournamentGroup: { findFirst: jest.Mock; create: jest.Mock; findMany: jest.Mock; findUnique: jest.Mock; delete: jest.Mock };
     v1TournamentByeSlot: { findMany: jest.Mock; findUnique: jest.Mock; findUniqueOrThrow: jest.Mock; count: jest.Mock; create: jest.Mock; update: jest.Mock; delete: jest.Mock };
     v1TournamentGroupTeam: { delete: jest.Mock; findUnique: jest.Mock; findFirst: jest.Mock; findMany: jest.Mock; create: jest.Mock; update: jest.Mock };
-    v1TournamentMatchDetails: { findUnique: jest.Mock; findUniqueOrThrow: jest.Mock; findFirst: jest.Mock; findMany: jest.Mock; count: jest.Mock; create: jest.Mock; update: jest.Mock };
+    v1TournamentMatchDetails: { findUnique: jest.Mock; findUniqueOrThrow: jest.Mock; findFirst: jest.Mock; findMany: jest.Mock; count: jest.Mock; aggregate: jest.Mock; create: jest.Mock; update: jest.Mock };
     v1TeamMatch: { findUnique: jest.Mock; findUniqueOrThrow: jest.Mock; findMany: jest.Mock; create: jest.Mock; update: jest.Mock };
     v1TournamentMatchAdvancementEdge: { findMany: jest.Mock; deleteMany: jest.Mock };
     v1TeamSchedule: { findMany: jest.Mock; findUnique: jest.Mock; update: jest.Mock; create: jest.Mock; updateMany: jest.Mock };
@@ -336,6 +336,7 @@ describe('TournamentBracketService', () => {
         findFirst: jest.fn().mockResolvedValue(null),
         findMany: jest.fn().mockResolvedValue([]),
         count: jest.fn().mockResolvedValue(0),
+        aggregate: jest.fn().mockResolvedValue({ _max: { fixtureNumber: null } }),
         create: jest.fn().mockResolvedValue({ teamMatchId: 'fixture-1' }),
         update: jest.fn(),
       },
@@ -954,6 +955,41 @@ describe('TournamentBracketService', () => {
     await service.createFixture(ownerUser, 'tournament-1', { groupId: 'group-1', round: 'group_a', fixtureNumber: 1 });
     expect(prisma.v1IdempotencyRecord.findFirst).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ idempotencyKey: baseKey + ':revision:1' }) }));
     expect(prisma.v1TeamMatch.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ id: expect.not.stringMatching(/^old-match$/) }) }));
+  });
+
+  describe('createFixture: 경기 번호 할당', () => {
+    const arrange = () => {
+      prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdmin);
+      prisma.v1Tournament.findFirst.mockResolvedValue(tournamentRow());
+      prisma.v1TournamentGroup.findFirst.mockResolvedValue(groupRow());
+      prisma.v1TeamMatch.findUniqueOrThrow.mockResolvedValue({ ...canonicalDetailsRow().teamMatch, hostTeamId: null, approvedApplicantTeamId: null });
+    };
+    const createdTitles = () => prisma.v1TeamMatch.create.mock.calls.map((call: [{ data: { title: string } }]) => call[0].data.title);
+
+    it('번호를 생략하면 대회 전체(보관된 경기 포함)의 최대 번호 + 1 로 정하고, 그 번호로 멱등 좌표를 잡는다', async () => {
+      arrange();
+      prisma.v1TournamentMatchDetails.aggregate.mockResolvedValue({ _max: { fixtureNumber: 9 } });
+      await service.createFixture(ownerUser, 'tournament-1', { groupId: 'group-1', round: 'group_a' });
+      expect(prisma.v1TournamentMatchDetails.aggregate).toHaveBeenCalledWith({ where: { tournamentId: 'tournament-1' }, _max: { fixtureNumber: true } });
+      expect(prisma.v1TournamentMatchDetails.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { tournamentId: 'tournament-1', round: 'group_a', fixtureNumber: 10, legNumber: 1 } }),
+      );
+      expect(createdTitles()).toEqual(['테스트 대회 · A조 · group_a 10']);
+    });
+
+    it('경기가 하나도 없는 대회는 1번부터 시작한다', async () => {
+      arrange();
+      await service.createFixture(ownerUser, 'tournament-1', { groupId: 'group-1', round: 'group_a' });
+      expect(createdTitles()).toEqual(['테스트 대회 · A조 · group_a 1']);
+    });
+
+    it('번호를 보내면 그대로 쓰고 최대 번호를 읽지 않는다', async () => {
+      arrange();
+      prisma.v1TournamentMatchDetails.aggregate.mockResolvedValue({ _max: { fixtureNumber: 9 } });
+      await service.createFixture(ownerUser, 'tournament-1', { groupId: 'group-1', round: 'group_a', fixtureNumber: 3 });
+      expect(prisma.v1TournamentMatchDetails.aggregate).not.toHaveBeenCalled();
+      expect(createdTitles()).toEqual(['테스트 대회 · A조 · group_a 3']);
+    });
   });
 
   // W9-V2 — 저장되는 팀매치 제목도 화면과 같은 경기 이름을 쓴다(조별은 조 이름 + 라운드, 결선은 라운드만).

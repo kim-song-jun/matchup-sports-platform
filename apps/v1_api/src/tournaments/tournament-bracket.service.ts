@@ -494,25 +494,28 @@ export class TournamentBracketService {
     }
 
     const legNumber = dto.legNumber ?? 1;
-    const commandPayload = {
-      tournamentId,
-      groupId: dto.groupId ?? null,
-      round: dto.round,
-      fixtureNumber: dto.fixtureNumber,
-      legNumber,
-      parentFixtureId: dto.parentFixtureId ?? null,
-      homeRegistrationId: dto.homeRegistrationId ?? null,
-      awayRegistrationId: dto.awayRegistrationId ?? null,
-      scheduledAt: dto.scheduledAt ? new Date(dto.scheduledAt).toISOString() : null,
-      venue: dto.venue ?? tournament.venue ?? null,
-      // 핀 없는 요청의 해시는 예전과 같게 둔다(재시도 중인 명령이 불일치로 막히지 않게).
-      ...(dto.venueProviderId ? { venueProviderId: dto.venueProviderId } : {}),
-    };
-    const durableCommandId = `tournament-fixture:${tournamentId}:${dto.round}:${dto.fixtureNumber}:${legNumber}`;
-    const payloadHash = canonicalGameCommandPayloadHash(commandPayload);
-
     const created = await this.prisma.$transaction(async (tx) => {
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`league-fixture-generation:${tournamentId}`}, 0))`;
+      // Numbers are tournament-wide and archived fixtures keep theirs, so the allocation reads every row.
+      const fixtureNumber =
+        dto.fixtureNumber ??
+        ((await tx.v1TournamentMatchDetails.aggregate({ where: { tournamentId }, _max: { fixtureNumber: true } }))._max.fixtureNumber ?? 0) + 1;
+      const commandPayload = {
+        tournamentId,
+        groupId: dto.groupId ?? null,
+        round: dto.round,
+        fixtureNumber,
+        legNumber,
+        parentFixtureId: dto.parentFixtureId ?? null,
+        homeRegistrationId: dto.homeRegistrationId ?? null,
+        awayRegistrationId: dto.awayRegistrationId ?? null,
+        scheduledAt: dto.scheduledAt ? new Date(dto.scheduledAt).toISOString() : null,
+        venue: dto.venue ?? tournament.venue ?? null,
+        // 핀 없는 요청의 해시는 예전과 같게 둔다(재시도 중인 명령이 불일치로 막히지 않게).
+        ...(dto.venueProviderId ? { venueProviderId: dto.venueProviderId } : {}),
+      };
+      const durableCommandId = `tournament-fixture:${tournamentId}:${dto.round}:${fixtureNumber}:${legNumber}`;
+      const payloadHash = canonicalGameCommandPayloadHash(commandPayload);
       await tx.$executeRawUnsafe('SELECT pg_advisory_xact_lock(hashtextextended($1, 0))', durableCommandId);
       const group = dto.groupId
         ? await tx.v1TournamentGroup.findFirst({ where: { id: dto.groupId, tournamentId }, select: { name: true, phase: true } })
@@ -565,7 +568,7 @@ export class TournamentBracketService {
       }
 
       const existingDetails = await tx.v1TournamentMatchDetails.findFirst({
-        where: { tournamentId, round: dto.round, fixtureNumber: dto.fixtureNumber, legNumber },
+        where: { tournamentId, round: dto.round, fixtureNumber, legNumber },
         select: {
           teamMatchId: true,
           tournamentId: true,
@@ -636,7 +639,7 @@ export class TournamentBracketService {
       }
 
       const archived = await tx.v1TournamentMatchDetails.findMany({
-        where: { tournamentId, round: { startsWith: dto.round + ':deleted:' }, fixtureNumber: dto.fixtureNumber, legNumber, teamMatch: { deletedAt: { not: null } } },
+        where: { tournamentId, round: { startsWith: dto.round + ':deleted:' }, fixtureNumber, legNumber, teamMatch: { deletedAt: { not: null } } },
         select: { teamMatchId: true },
       });
       const creationCommandId = await nextFixtureCreationCommandId(tx, durableCommandId, tournamentId, archived.length, user.id);
@@ -688,14 +691,14 @@ export class TournamentBracketService {
         tournamentId,
         groupId: dto.groupId ?? null,
         round: dto.round,
-        fixtureNumber: dto.fixtureNumber,
+        fixtureNumber,
         legNumber,
         parentTeamMatchId,
         homeRegistrationId: dto.homeRegistrationId ?? null,
         awayRegistrationId: dto.awayRegistrationId ?? null,
         sportId: pinnedTournament.sportId,
         regionId: pinnedTournament.regionId ?? null,
-        title: `${pinnedTournament.title} · ${competitionMatchLabel({ groupName: group?.name, round: dto.round, legNumber })} ${dto.fixtureNumber}`,
+        title: `${pinnedTournament.title} · ${competitionMatchLabel({ groupName: group?.name, round: dto.round, legNumber })} ${fixtureNumber}`,
         place: this.fixturePlace(dto) ?? tournamentVenueSnapshot(pinnedTournament),
         startAt: dto.scheduledAt ? new Date(dto.scheduledAt) : null,
         createdByUserId: user.id,
@@ -758,7 +761,7 @@ export class TournamentBracketService {
           afterJson: {
             tournamentId,
             round: dto.round,
-            fixtureNumber: dto.fixtureNumber,
+            fixtureNumber,
             status: teamMatch.status,
           },
         },
@@ -769,7 +772,7 @@ export class TournamentBracketService {
         tournamentId,
         groupId: dto.groupId ?? null,
         round: dto.round,
-        fixtureNumber: dto.fixtureNumber,
+        fixtureNumber,
         legNumber,
         parentTeamMatchId,
         homeRegistrationId: dto.homeRegistrationId ?? null,

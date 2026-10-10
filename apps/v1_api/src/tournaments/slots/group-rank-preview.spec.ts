@@ -1,7 +1,7 @@
 // apps/v1_api/src/tournaments/slots/group-rank-preview.spec.ts
 import { FOOTBALL_V1_CONFIG } from '../competition-config/competition-config';
 import { calculateCompetitionStandings } from '../competition-config/competition-standings';
-import { resolveGroupRank, type GroupRankSource } from './group-rank-preview';
+import { resolveGroupRank, summarizeGroupStanding, type GroupRankSource } from './group-rank-preview';
 
 type Result = readonly [home: string, away: string, homeScore: number, awayScore: number];
 
@@ -113,5 +113,80 @@ describe('resolveGroupRank', () => {
 
   it('조 팀 수보다 큰 순위는 group_incomplete', () => {
     expect(resolveGroupRank(sourceOf(['A', 'B', 'C'], CLEAN), 4)).toEqual({ state: 'group_incomplete' });
+  });
+});
+
+describe('summarizeGroupStanding', () => {
+  const none: ReadonlySet<string> = new Set();
+
+  it('3팀 완전 동률: 전원이 같은 sharedRank(묶음 최소 position) 를 가진다', () => {
+    const source = sourceOf(['A', 'B', 'C'], TIE_THREE);
+    const summary = summarizeGroupStanding(source, 2, none);
+    expect([...(summary?.sharedRankByRegistrationId ?? [])].sort()).toEqual([['A', 1], ['B', 1], ['C', 1]]);
+  });
+
+  it('2·3위만 동률: 그 둘만 공동 2위이고 1위는 맵에 없다(대조)', () => {
+    const summary = summarizeGroupStanding(sourceOf(['A', 'B', 'C'], TIE_SECOND_THIRD), 2, none);
+    expect([...(summary?.sharedRankByRegistrationId ?? [])].sort()).toEqual([['B', 2], ['C', 2]]);
+  });
+
+  it('동률이 없으면 sharedRank 맵이 비어 있다', () => {
+    expect(summarizeGroupStanding(sourceOf(['A', 'B', 'C'], CLEAN), 2, none)?.sharedRankByRegistrationId.size).toBe(0);
+  });
+
+  it('조가 덜 끝났거나 순위표가 낡았으면 null', () => {
+    expect(summarizeGroupStanding(sourceOf(['A', 'B', 'C'], CLEAN, { unofficialIndex: 2 }), 2, none)).toBeNull();
+    expect(summarizeGroupStanding(sourceOf(['A', 'B', 'C'], CLEAN, { standingsFrom: CLEAN.slice(0, 2) }), 2, none)).toBeNull();
+  });
+
+  describe('qualification', () => {
+    it('결선에 들어간 팀이 있으면 순위와 무관하게 그 팀들이 진출 팀이다 — 다른 조 팀은 무시한다', () => {
+      const summary = summarizeGroupStanding(sourceOf(['A', 'B', 'C'], TIE_THREE), 2, new Set(['C', 'B', 'OTHER-GROUP']));
+      expect(summary?.qualification).toEqual({ advancingRegistrationIds: ['B', 'C'], undecided: false });
+    });
+
+    it('동률인데 자리가 일부만 채워졌으면 채운 팀만 진출이고 undecided 이다', () => {
+      const summary = summarizeGroupStanding(sourceOf(['A', 'B', 'C'], TIE_THREE), 2, new Set(['B']));
+      expect(summary?.qualification).toEqual({ advancingRegistrationIds: ['B'], undecided: true });
+    });
+
+    it('동률 없는 조도 결선에 들어간 팀을 그대로 따른다(어드민이 직접 고른 경우) — undecided 아님', () => {
+      const summary = summarizeGroupStanding(sourceOf(['A', 'B', 'C'], CLEAN), 2, new Set(['A', 'C']));
+      expect(summary?.qualification).toEqual({ advancingRegistrationIds: ['A', 'C'], undecided: false });
+    });
+
+    it('아무도 안 들어갔고 경계에 동률이 있으면 순위로 정해진 팀만 진출이고 undecided 이다', () => {
+      const summary = summarizeGroupStanding(sourceOf(['A', 'B', 'C'], TIE_SECOND_THIRD), 2, none);
+      expect(summary?.qualification).toEqual({ advancingRegistrationIds: ['A'], undecided: true });
+    });
+
+    it('아무도 안 들어갔고 동률이 없으면 상위 N팀이 진출이다(지금과 같음)', () => {
+      const summary = summarizeGroupStanding(sourceOf(['A', 'B', 'C'], CLEAN), 2, none);
+      expect(summary?.qualification).toEqual({ advancingRegistrationIds: ['A', 'B'], undecided: false });
+    });
+
+    it('진출 팀 수가 정해지지 않았으면(advanceCount null) qualification 은 null — sharedRank 는 그대로', () => {
+      const summary = summarizeGroupStanding(sourceOf(['A', 'B', 'C'], TIE_THREE), null, none);
+      expect(summary?.qualification).toBeNull();
+      expect(summary?.sharedRankByRegistrationId.size).toBe(3);
+    });
+
+    it('동률 없는 조에서 자리가 일부만 채워졌으면 채운 팀만 진출이고 undecided 가 아니다', () => {
+      const summary = summarizeGroupStanding(sourceOf(['A', 'B', 'C'], CLEAN), 2, new Set(['A']));
+      expect(summary?.qualification).toEqual({ advancingRegistrationIds: ['A'], undecided: false });
+    });
+
+    it('advanceCount 가 조 팀 수 이상이면 완전 동률이어도 조 전체가 진출이고 undecided 가 아니다', () => {
+      for (const placed of [none, new Set(['A'])]) {
+        const summary = summarizeGroupStanding(sourceOf(['A', 'B', 'C'], TIE_THREE), 5, placed);
+        expect(summary?.qualification).toEqual({ advancingRegistrationIds: ['A', 'B', 'C'], undecided: false });
+      }
+      expect(summarizeGroupStanding(sourceOf(['A', 'B', 'C'], TIE_THREE), 3, none)?.qualification?.undecided).toBe(false);
+    });
+
+    it('advanceCount 가 조 팀 수보다 크면 조 전체가 진출이다', () => {
+      const summary = summarizeGroupStanding(sourceOf(['A', 'B', 'C'], CLEAN), 5, none);
+      expect(summary?.qualification).toEqual({ advancingRegistrationIds: ['A', 'B', 'C'], undecided: false });
+    });
   });
 });

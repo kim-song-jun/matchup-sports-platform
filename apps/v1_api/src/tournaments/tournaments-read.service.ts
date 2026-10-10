@@ -7,6 +7,7 @@ import { TournamentStaffAccessService } from './staff/tournament-staff-access.se
 import { presentTournamentCard } from './tournament-card.presenter';
 import { countTournamentList, listTournamentIds } from './tournament-list-query';
 import {
+  isBracketPublished,
   isPubliclyListedRegistration,
   presentTournamentDetail,
   shouldHideParticipantIdentity,
@@ -17,6 +18,8 @@ import {
   findPublicTournamentOnSurface,
   ALL_COMPETITION_KINDS,
 } from './tournament-surface-lookup';
+import type { GroupStandingSummary } from './slots/group-rank-preview';
+import { loadGroupStandingSummaries } from './slots/load-group-rank-preview';
 import { hasTournamentFixtureOfficialResult } from './tournament-fixture-official-result';
 import {
   PUBLIC_COMPETITION_STATUS_WHERE,
@@ -222,13 +225,23 @@ export class TournamentsReadService {
             .map((registration) => registration.id),
         );
 
+    // 공동 순위·진출 팀은 조별+결선 대회의 공개된 대진표에만 있다 — 그 밖엔 읽지 않는다.
+    const now = new Date();
+    const groupStandingSummaries =
+      row.kind !== V1CompetitionKind.regular_league &&
+      row.format === 'group_knockout' &&
+      isBracketPublished(row.bracketPublishedAt, row.bracketPublishScheduledAt, now)
+        ? await loadGroupStandingSummaries(this.prisma, tournamentId)
+        : new Map<string, GroupStandingSummary>();
+
     return presentTournamentDetail(
       row,
       publicLiveEnabled,
-      new Date(),
+      now,
       staffBypass,
       leagueFixtures,
       rosterByRegistrationId,
+      groupStandingSummaries,
     );
   }
 

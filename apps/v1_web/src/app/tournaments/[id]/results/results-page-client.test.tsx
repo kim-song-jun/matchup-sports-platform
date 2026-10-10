@@ -185,6 +185,7 @@ function standing(overrides: Partial<V1TournamentStanding> & Pick<V1TournamentSt
     goalsFor: 0,
     goalsAgainst: 0,
     recalculatedAt: null,
+    sharedRank: null,
     ...overrides,
   };
 }
@@ -195,6 +196,7 @@ function leagueGroup(overrides: Partial<V1TournamentGroup> & Pick<V1TournamentGr
     sortOrder: 0,
     advanceCount: null,
     groupTeams: [],
+    qualification: null,
     ...overrides,
   };
 }

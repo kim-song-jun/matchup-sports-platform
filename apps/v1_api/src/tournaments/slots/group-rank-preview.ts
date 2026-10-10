@@ -71,3 +71,68 @@ export function resolveGroupRank(source: GroupRankSource, rank: number): GroupRa
   if (stored !== byRule) return { state: 'tied', tiedRegistrationIds: [stored, byRule].sort() };
   return { state: 'ready', registrationId: stored };
 }
+
+export type GroupQualification = { advancingRegistrationIds: string[]; undecided: boolean };
+export type GroupStandingSummary = {
+  /** §5 로 끝까지 안 갈린 팀만 들어간다. 값 = 그 동률 묶음 팀들의 저장 position 중 최솟값. */
+  sharedRankByRegistrationId: Map<string, number>;
+  /** advanceCount 가 null 이면 null. */
+  qualification: GroupQualification | null;
+};
+
+/**
+ * 공개 순위표용 요약. 어드민의 "동률 — 직접 고르기" 판정(resolveGroupRank)과 같은 settledResults 를 쓴다.
+ * 결선 대진에 실제로 들어간 팀이 하나라도 있으면 그 팀들이 진출 팀이다(어드민이 동률 자리에 직접 고른 결과).
+ */
+export function summarizeGroupStanding(
+  source: GroupRankSource,
+  advanceCount: number | null,
+  placedRegistrationIds: ReadonlySet<string>,
+): GroupStandingSummary | null {
+  const results = settledResults(source);
+  if (results === null) return null;
+  const league = calculateLeagueStandingsWithTieBreakInfo({
+    teamIds: source.registrationIds,
+    fixtures: results,
+    tieBreakOrder: LEAGUE_TIE_BREAK_ORDER,
+  });
+  const positionById = new Map(source.standings.map((row) => [row.registrationId, row.position]));
+  const sharedRankByRegistrationId = new Map<string, number>();
+  for (const tie of league.tieGroups) {
+    if (tie.teamIds.length < 2) continue;
+    const positions = tie.teamIds.flatMap((id) => positionById.get(id) ?? []);
+    if (positions.length === 0) continue;
+    const shared = Math.min(...positions);
+    for (const id of tie.teamIds) sharedRankByRegistrationId.set(id, shared);
+  }
+  return { sharedRankByRegistrationId, qualification: qualificationOf(source, advanceCount, placedRegistrationIds) };
+}
+
+function qualificationOf(
+  source: GroupRankSource,
+  advanceCount: number | null,
+  placedRegistrationIds: ReadonlySet<string>,
+): GroupQualification | null {
+  if (advanceCount === null) return null;
+  const resolutions: GroupRankResolution[] = [];
+  const effectiveCount = Math.min(advanceCount, source.registrationIds.length);
+  for (let rank = 1; rank <= effectiveCount; rank += 1) {
+    const resolution = resolveGroupRank(source, rank);
+    if (resolution.state === 'group_incomplete') return null;
+    resolutions.push(resolution);
+  }
+  // 조 전체가 올라가면 동률이 어디에 걸려도 진출 팀은 이미 정해졌다.
+  if (effectiveCount >= source.registrationIds.length) {
+    return { advancingRegistrationIds: [...source.registrationIds].sort(), undecided: false };
+  }
+  const anyTied = resolutions.some((resolution) => resolution.state === 'tied');
+  const members = new Set(source.registrationIds);
+  const placed = [...placedRegistrationIds].filter((id) => members.has(id)).sort();
+  if (placed.length > 0) {
+    return { advancingRegistrationIds: placed, undecided: placed.length < effectiveCount && anyTied };
+  }
+  return {
+    advancingRegistrationIds: resolutions.flatMap((resolution) => (resolution.state === 'ready' ? [resolution.registrationId] : [])),
+    undecided: anyTied,
+  };
+}

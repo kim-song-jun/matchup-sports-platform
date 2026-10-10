@@ -16,6 +16,7 @@ function standing(position: number, registrationId: string, teamName: string): V
     goalsFor: 0,
     goalsAgainst: 0,
     recalculatedAt: null,
+    sharedRank: null,
   };
 }
 

@@ -40,6 +40,8 @@ export interface TournamentStandingsRow {
   readonly teamName: string | null;
   readonly teamLogoUrl?: string | null;
   readonly position: number;
+  /** 끝까지 안 갈린 동률 묶음의 최고 순위(공동 n위). 동률 정보가 없는 표는 null. */
+  readonly sharedRank: number | null;
   readonly points: number;
   readonly wins: number;
   readonly draws: number;
@@ -54,8 +56,27 @@ export interface TournamentStandingsRow {
  * 색만 빼고 번호는 그대로 남겨 순서 정보는 유지하되, 없는 성적을 색으로 만들어내지
  * 않는다. 안내 문구는 표 하단에 텍스트로 함께 붙는다(색만으로 상태를 구분하지 않음).
  */
-function StandingRankBadge({ pos, advance, unranked }: { pos: number; advance: number | null; unranked: boolean }) {
-  const promoted = advance !== null && pos <= advance;
+function StandingRankBadge({
+  pos,
+  sharedRank,
+  promoted,
+  unranked,
+}: {
+  pos: number;
+  sharedRank: number | null;
+  promoted: boolean;
+  unranked: boolean;
+}) {
+  // 공동 순위는 저장 position(해시로 정한 임의 순서)이 아니라 묶음의 최고 순위를 보여준다 —
+  // 메달 색도 칠하지 않아야 동률 팀 중 한 팀만 1위처럼 읽히지 않는다.
+  if (sharedRank !== null && !unranked) {
+    return (
+      <span className="tm-badge tm-badge-orange tm-badge-sm">
+        공동 {sharedRank}
+        <span className="sr-only">위</span>
+      </span>
+    );
+  }
   if (!unranked) {
     if (pos === 1) return <span className="tm-standings-rank tm-standings-rank-gold">{pos}</span>;
     if (pos === 2) return <span className="tm-standings-rank tm-standings-rank-silver">{pos}</span>;
@@ -86,11 +107,13 @@ function GoalDiff({ gf, ga }: { gf: number; ga: number }) {
 }
 
 /**
- * `advance`는 §B-7 진출 게이트("그 조의 조별리그가 실제로 끝난 뒤에만 진출
+ * `advancingKeys`는 §B-7 진출 게이트("그 조의 조별리그가 실제로 끝난 뒤에만 진출
  * 배지·하이라이트를 보여준다")를 이미 반영해 호출측이 계산해서 넘긴다 — 이
- * 컴포넌트 자체는 게이트를 판단하지 않고 받은 값 그대로 하이라이트만 한다
- * (게이트 로직이 두 곳에 중복되는 걸 막기 위해). `null`이면 진출선 표시
- * 자체가 없는 표(리그 최종 순위, 경기 일정 탭의 조별 순위)다.
+ * 컴포넌트 자체는 게이트를 판단하지 않고 받은 `row.key` 집합 그대로 하이라이트와
+ * 진출 배지만 그린다(게이트 로직이 두 곳에 중복되는 걸 막기 위해). 순위(position)로
+ * 진출 여부를 추론하지 않는다 — 완전 동률이면 position 이 임의 순서라 실제 결선
+ * 진출 팀과 갈린다. `null`이면 진출 표시 자체가 없는 표(리그 최종 순위, 경기 일정
+ * 탭의 조별 순위)다.
  *
  * `renderDetail`을 주면 팀 행이 **링크 대신 펼침 토글**이 되고, 펼친 내용이 그 행
  * 바로 아래에 붙는다. 오너 지시: "각 클릭했을 때 그 팀의 경기 상세 페이지로
@@ -101,14 +124,14 @@ function GoalDiff({ gf, ga }: { gf: number; ga: number }) {
  */
 export function TournamentStandingsTable({
   rows,
-  advance,
+  advancingKeys,
   ariaLabel,
   emptyMessage = '순위 집계 전이에요',
   renderDetail,
   fromHref,
 }: {
   rows: readonly TournamentStandingsRow[];
-  advance: number | null;
+  advancingKeys: ReadonlySet<string> | null;
   ariaLabel: string;
   emptyMessage?: string;
   renderDetail?: (row: TournamentStandingsRow) => ReactNode;
@@ -118,6 +141,7 @@ export function TournamentStandingsTable({
   const sorted = [...rows].sort((a, b) => a.position - b.position);
   const [expandedKey, setExpandedKey] = useState<string | null>(null);
   const COLUMN_COUNT = 5;
+  const hasSharedRank = sorted.some((row) => row.sharedRank !== null);
   /**
    * "아직 한 경기도 집계되지 않았다"는 행 값만으로 정확히 판별된다 — 경기가 한 건이라도
    * 집계되면 최소 한 팀은 승/무/패 중 하나가 1 이상이 되기 때문에, 전 행이 전 지표 0이면
@@ -148,7 +172,7 @@ export function TournamentStandingsTable({
                   (768px 실측: 행 558px 중 319px = 57%가 공백). 비율로 주면 넓은 폭에서
                   숫자 블록도 같이 벌어져 그 공백이 줄고, min-width가 좁은 폭에서의
                   판독성(390px에서 기존과 동일한 56/44/44)을 지킨다. */}
-              <th style={{ width: 36, paddingLeft: 12 }}>#</th>
+              <th style={{ width: hasSharedRank ? 64 : 36, paddingLeft: 12 }}>#</th>
               <th>팀</th>
               <th className="num" style={{ width: '18%', minWidth: 56 }}>전적</th>
               <th className="num" style={{ width: '13%', minWidth: 44 }}>승점</th>
@@ -163,6 +187,7 @@ export function TournamentStandingsTable({
                 // 모집 중이라 비공개"의 단일 판정 기준(별도 boolean을 두지 않는다).
                 // 비공개 팀은 로고 없이 기본 팀 아이콘으로 표시한다.
                 const isHidden = row.teamName === null;
+                const promoted = advancingKeys?.has(row.key) ?? false;
                 const teamCell = (
                   <>
                     <TeamAvatar
@@ -171,14 +196,18 @@ export function TournamentStandingsTable({
                       logoUrl={isHidden ? null : (row.teamLogoUrl ?? null)}
                       size="sm"
                     />
-                    <span
-                      style={{
-                        fontSize: 13,
-                        fontWeight: isHidden ? 500 : 600,
-                        color: isHidden ? 'var(--text-caption)' : 'var(--text-strong)',
-                      }}
-                    >
-                      {isHidden ? '참가팀 비공개' : row.teamName}
+                    {/* 진출 배지는 팀명 아래 줄에 쌓는다 — 옆에 두면 공동 순위 열·chevron 과 겹치는 390px 에서 팀명 칸이 20px 대로 줄어 글자 단위로 접힌다. */}
+                    <span style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 2, minWidth: 0 }}>
+                      <span
+                        style={{
+                          fontSize: 13,
+                          fontWeight: isHidden ? 500 : 600,
+                          color: isHidden ? 'var(--text-caption)' : 'var(--text-strong)',
+                        }}
+                      >
+                        {isHidden ? '참가팀 비공개' : row.teamName}
+                      </span>
+                      {promoted ? <span className="tm-badge tm-badge-blue tm-badge-sm" style={{ flexShrink: 0 }}>진출</span> : null}
                     </span>
                   </>
                 );
@@ -193,10 +222,10 @@ export function TournamentStandingsTable({
                 return (
                   <Fragment key={row.key}>
                     <tr
-                      className={`tm-standings-row${advance !== null && row.position <= advance ? ' tm-standings-row-highlight' : ''}`}
+                      className={`tm-standings-row${promoted ? ' tm-standings-row-highlight' : ''}`}
                     >
                       <td style={{ paddingLeft: 12 }}>
-                        <StandingRankBadge pos={row.position} advance={advance} unranked={unranked} />
+                        <StandingRankBadge pos={row.position} sharedRank={row.sharedRank} promoted={promoted} unranked={unranked} />
                       </td>
                       <td>
                         {isHidden ? (

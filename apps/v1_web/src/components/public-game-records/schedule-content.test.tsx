@@ -59,6 +59,7 @@ describe('ScheduleContent — 순위표 팀 링크', () => {
           teamName: '망원 FC',
           teamLogoUrl: '/uploads/team-77-logo.png',
           position: 1,
+          sharedRank: null,
           points: 6,
           wins: 2,
           draws: 0,
@@ -73,6 +74,40 @@ describe('ScheduleContent — 순위표 팀 링크', () => {
 
     const link = screen.getByRole('link', { name: /망원 FC/ });
     expect(link).toHaveAttribute('href', '/teams/team-77/records');
+  });
+
+  it('동률 묶음의 공동 순위를 같은 순위표 컴포넌트가 "공동 n위"로 그린다 — 대조군 조는 번호 그대로', () => {
+    const row = (groupId: string, groupName: string, id: string, name: string, position: number, sharedRank: number | null) => ({
+      groupId,
+      groupName,
+      registrationId: `reg-${id}`,
+      teamId: `team-${id}`,
+      teamName: name,
+      teamLogoUrl: null,
+      position,
+      sharedRank,
+      points: 3,
+      wins: 1,
+      draws: 0,
+      losses: 0,
+      goalsFor: 2,
+      goalsAgainst: 1,
+    });
+    const data = makeData({
+      standings: [
+        row('group-a', 'A조', 'a1', '가 FC', 1, 1),
+        row('group-a', 'A조', 'a2', '나 FC', 2, 1),
+        row('group-b', 'B조', 'b1', '다 FC', 1, null),
+        row('group-b', 'B조', 'b2', '라 FC', 2, null),
+      ],
+    });
+
+    render(<ScheduleContent tournamentId="tour-1" data={data} />);
+
+    const tiedTable = screen.getByRole('table', { name: 'A조 순위표' });
+    expect(within(tiedTable).getAllByText('공동 1', { selector: '.tm-badge-orange' })).toHaveLength(2);
+    const controlTable = screen.getByRole('table', { name: 'B조 순위표' });
+    expect(within(controlTable).queryByText(/공동/)).toBeNull();
   });
 
   /**
@@ -91,6 +126,7 @@ describe('ScheduleContent — 순위표 팀 링크', () => {
           teamName: '망원 FC',
           teamLogoUrl: '/uploads/team-77-logo.png',
           position: 1,
+          sharedRank: null,
           points: 6,
           wins: 2,
           draws: 0,
@@ -875,6 +911,7 @@ describe('ScheduleContent — 정규 리그 순위 제목', () => {
     teamName,
     teamLogoUrl: null,
     position: 1,
+    sharedRank: null,
     points: 3,
     wins: 1,
     draws: 0,

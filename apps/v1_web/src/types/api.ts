@@ -3751,6 +3751,14 @@ export type V1TournamentStanding = {
   goalsFor: number;
   goalsAgainst: number;
   recalculatedAt: string | null;
+  /** 끝까지 안 갈린 동률 묶음이면 그 묶음의 최고 순위(공동 n위), 아니면 null. */
+  sharedRank: number | null;
+};
+
+/** 조별리그가 끝난 조의 결선 진출 팀. 동률로 자리가 안 정해졌으면 `undecided`. */
+export type V1TournamentGroupQualification = {
+  advancingRegistrationIds: string[];
+  undecided: boolean;
 };
 
 export type V1TournamentGroup = {
@@ -3761,6 +3769,7 @@ export type V1TournamentGroup = {
   advanceCount: number | null;
   groupTeams: V1TournamentGroupTeam[];
   standings: V1TournamentStanding[];
+  qualification: V1TournamentGroupQualification | null;
 };
 
 /** 경기 득점자 — 명단에 있으면 playerId, 비회원/대타는 playerId=null + playerName만 */

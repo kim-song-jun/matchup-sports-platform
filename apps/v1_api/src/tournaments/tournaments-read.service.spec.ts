@@ -12,6 +12,12 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { PrismaService } from '../prisma/prisma.service';
 import { TournamentStaffAccessService } from './staff/tournament-staff-access.service';
 import { TournamentsReadService } from './tournaments-read.service';
+import type { GroupStandingSummary } from './slots/group-rank-preview';
+import { loadGroupStandingSummaries } from './slots/load-group-rank-preview';
+
+// 로더 자체는 load-group-rank-preview.spec.ts 가 본다 — 여기서는 서비스가 언제 부르고 응답에 어떻게 싣는지만 본다.
+jest.mock('./slots/load-group-rank-preview', () => ({ loadGroupStandingSummaries: jest.fn() }));
+const loadSummaries = loadGroupStandingSummaries as jest.MockedFunction<typeof loadGroupStandingSummaries>;
 
 const authUser = {
   id: 'user-1',
@@ -640,6 +646,80 @@ describe('TournamentsReadService', () => {
 
     expect(result.bracketPublishedAt).toBe(publishedAt.toISOString());
     expect(result.groups).toHaveLength(1);
+  });
+
+  describe('get: 조별 공개 순위표 요약(공동 순위·진출 팀)', () => {
+    const standingRow = (registrationId: string, position: number) => ({
+      registrationId,
+      position,
+      points: 3,
+      wins: 1,
+      draws: 0,
+      losses: 0,
+      goalsFor: 1,
+      goalsAgainst: 0,
+      recalculatedAt: null,
+      registration: { team: { id: `team-${registrationId}`, name: `${registrationId}팀`, profile: null } },
+    });
+    const groupRow = (id: string, registrationIds: string[]) => ({
+      id,
+      name: id,
+      phase: 'group',
+      sortOrder: 0,
+      advanceCount: 2,
+      groupTeams: [],
+      standings: registrationIds.map((registrationId, index) => standingRow(registrationId, index + 1)),
+    });
+    const summaries = new Map<string, GroupStandingSummary>([
+      [
+        'g-tie',
+        {
+          sharedRankByRegistrationId: new Map([['a', 1], ['b', 1], ['c', 1]]),
+          qualification: { advancingRegistrationIds: [], undecided: true },
+        },
+      ],
+    ]);
+    const tournament = (overrides: Record<string, unknown> = {}) =>
+      fullTournamentRow({
+        kind: 'regular_tournament',
+        format: 'group_knockout',
+        groups: [groupRow('g-tie', ['a', 'b', 'c']), groupRow('g-clean', ['d', 'e', 'f'])],
+        ...overrides,
+      });
+
+    beforeEach(() => loadSummaries.mockReset().mockResolvedValue(summaries));
+
+    it('조별+결선 대회는 로더 결과를 조별로 싣는다 — 요약이 없는 조는 sharedRank·qualification 이 null(대조)', async () => {
+      prisma.v1Tournament.findFirst.mockResolvedValue(tournament());
+
+      const result = await service.get('tournament-1');
+
+      expect(loadSummaries).toHaveBeenCalledTimes(1);
+      const [tie, clean] = result.groups;
+      expect(tie.qualification).toEqual({ advancingRegistrationIds: [], undecided: true });
+      expect(tie.standings.map((row) => row.sharedRank)).toEqual([1, 1, 1]);
+      expect(clean.qualification).toBeNull();
+      expect(clean.standings.map((row) => row.sharedRank)).toEqual([null, null, null]);
+    });
+
+    it.each([
+      ['리그 방식 대회', { format: 'league' }],
+      ['토너먼트 방식 대회', { format: 'knockout' }],
+      ['정규 리그 거울 행', { kind: 'regular_league' }],
+      ['대진표 비공개', { bracketPublishedAt: null }],
+    ])('%s 은 로더를 부르지 않는다', async (_label, overrides) => {
+      prisma.v1Tournament.findFirst.mockResolvedValue(tournament(overrides));
+      // 거울 행의 리그 대진 조회는 이 케이스의 관심사가 아니다.
+      jest.spyOn(service as unknown as { leagueCompetitionFixtures: () => Promise<unknown[]> }, 'leagueCompetitionFixtures').mockResolvedValue([]);
+
+      const result = await service.get('tournament-1');
+
+      expect(loadSummaries).not.toHaveBeenCalled();
+      for (const group of result.groups) {
+        expect(group.qualification).toBeNull();
+        expect(group.standings.every((row) => row.sharedRank === null)).toBe(true);
+      }
+    });
   });
 
   it('get: returns public participant teams and filters to active registration statuses (status=closed, post-recruiting)', async () => {

@@ -110,6 +110,7 @@ function makeGroup(overrides: Partial<V1TournamentGroup> & Pick<V1TournamentGrou
     advanceCount: null,
     groupTeams: [],
     standings: [],
+    qualification: null,
     ...overrides,
   };
 }
@@ -303,6 +304,7 @@ describe('TournamentDetailView — 조별 순위 섹션이 상세에서 제거�
               goalsFor: 2,
               goalsAgainst: 0,
               recalculatedAt: null,
+              sharedRank: null,
             },
           ],
         }),

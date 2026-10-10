@@ -40,6 +40,7 @@ function makeGroup(
     advanceCount: null,
     groupTeams: [],
     standings: [],
+    qualification: null,
     ...overrides,
   };
 }

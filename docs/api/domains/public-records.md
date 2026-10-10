@@ -70,6 +70,8 @@ existing file changed.
 | `GET /teams/:id/records` | `cursor?`, `limit?`, `season? (YYYY)` | `{ teamId, teamName, teamLogoUrl, summary, availableSeasons[], items[] (including opponentTeamLogoUrl), nextCursor }` |
 | `GET /users/:id/records` | `cursor?`, `limit?`, `season? (YYYY)` | `{ userId, nickname, summary, tournamentAwards[], items[], nextCursor }` |
 
+`standings[].sharedRank: number | null` 은 조별+결선 대회에서 정본 §5 동점 처리로도 갈리지 않은 팀의 공동 순위(동률 묶음의 최소 `position`)이고, 그 밖(편성 기준선 행·리그 방식·토너먼트·정규 리그 거울)은 `null` 이다. 대회 상세 `groups[].standings[].sharedRank` 와 같은 값이다(`tournaments.md` 조 순위 항목).
+
 `cursor` is opaque (base64url JSON `{key,id}`); never construct it
 client-side.
 

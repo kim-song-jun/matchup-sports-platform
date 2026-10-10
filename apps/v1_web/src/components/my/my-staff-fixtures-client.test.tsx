@@ -88,7 +88,10 @@ function fixtureFromEntry(item: PublicScheduleEntry): V1MyTournamentStaffFixture
     fixtureId: item.fixtureId,
     gameId: 'game-1',
     tournamentId: 't-1',
-    title: `${item.home?.teamName ?? '팀 미정'} vs ${item.away?.teamName ?? '팀 미정'}`,
+    // 서버 title 은 팀 이름이 없는 "대회 · 조 · 라운드" 순번이다(alpha 실측).
+    title: '(테스트)1010 · A조 · 조별리그 3라운드 3',
+    homeTeamName: item.home?.teamName ?? null,
+    awayTeamName: item.away?.teamName ?? null,
     scheduledAt: item.scheduledAt,
     status: item.status,
     gameState: null,
@@ -162,6 +165,17 @@ describe('selectMyFixtures', () => {
 });
 
 describe('MyStaffFixturesPageClient', () => {
+  it('팀 이름이 아직 없는 경기는 서버 제목으로 보여준다', () => {
+    mockData(
+      [assignment({ fixtureIds: ['fx-1'] })],
+      [entry({ fixtureId: 'fx-1', home: null, away: null })] as PublicScheduleEntry[],
+    );
+
+    render(<MyStaffFixturesPageClient tournamentId="t-1" />);
+
+    expect(screen.getByRole('link', { name: /\(테스트\)1010 · A조 · 조별리그 3라운드 3, 경기 운영 콘솔 열기/ })).toBeInTheDocument();
+  });
+
   it('담당 경기만 보여주고 각 행이 경기 콘솔로 링크된다', () => {
     mockData(
       [assignment({ fixtureIds: ['fx-1'] })],
@@ -176,6 +190,7 @@ describe('MyStaffFixturesPageClient', () => {
     const link = screen.getByRole('link', { name: /성수 FC vs 망원 FC, 경기 운영 콘솔 열기/ });
     expect(link).toHaveAttribute('href', '/tournament-ops/tournaments/t-1/fixtures/fx-1/operate');
     expect(screen.queryByText(/남의 팀/)).toBeNull();
+    expect(screen.queryByText(/\(테스트\)1010/)).toBeNull();
   });
 
   it.each([

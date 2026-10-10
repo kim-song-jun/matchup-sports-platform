@@ -22,6 +22,7 @@ function revision(overrides: Partial<GameResultRevision> & { id: string }): Game
     outcomeNote: null,
     createdByActorType: 'SYSTEM',
     createdByUserId: null,
+    createdByName: null,
     createdBySystemActor: 'GAME_END_DERIVER',
     supersedesId: null,
     submittedAt: '2026-08-09T19:30:00.000Z',
@@ -152,5 +153,23 @@ describe('RevisionTimeline — 배지가 말하는 시각을 보여준다', () =
     );
 
     expect(screen.getByText(/2026\.\s*3\.\s*3|2026-03-03|3월 3일/)).toBeInTheDocument();
+  });
+});
+
+describe('RevisionTimeline — 처리한 사람', () => {
+  it('사람이 만든 리비전은 그 사람 이름으로, 이름을 모르면 담당자로, 시스템은 자동 처리로 보여준다', () => {
+    render(
+      <RevisionTimeline
+        revisions={[
+          revision({ id: 'r3', revision: 3, createdByActorType: 'USER', createdByUserId: 'u-1', createdByName: '김스태프', createdBySystemActor: null }),
+          revision({ id: 'r2', revision: 2, createdByActorType: 'USER', createdByUserId: 'u-2', createdByName: null, createdBySystemActor: null }),
+          revision({ id: 'r1', revision: 1 }),
+        ]}
+      />,
+    );
+
+    expect(screen.getByText('김스태프 처리 · 리비전 #3')).toBeInTheDocument();
+    expect(screen.getByText('담당자 처리 · 리비전 #2')).toBeInTheDocument();
+    expect(screen.getByText('자동 처리(GAME_END_DERIVER) · 리비전 #1')).toBeInTheDocument();
   });
 });

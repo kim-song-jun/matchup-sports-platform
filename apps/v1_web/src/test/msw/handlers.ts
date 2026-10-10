@@ -1313,6 +1313,7 @@ export const v1MswHandlers = [
       outcomeNote: null,
       createdByActorType: 'USER',
       createdByUserId: 'user-1',
+      createdByName: '스태프 닉네임',
       createdBySystemActor: null,
       supersedesId: null,
       submittedAt: null,

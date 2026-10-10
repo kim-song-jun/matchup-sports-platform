@@ -1,4 +1,5 @@
 import { labelToLevelCode } from '@/lib/v1-levels';
+import { toMatchPlacePayload } from '@/lib/place';
 import type { V1MatchMutationPayload } from '@/types/api';
 import type { MatchCreateStep, MatchCreateViewModel } from './matches.types';
 
@@ -64,7 +65,7 @@ const RULES: Array<{
   { field: 'sportId', label: '종목을 선택해 주세요', step: 'sport', isSatisfied: (ctx) => Boolean(ctx.sportId) },
   { field: 'title', label: '매치 제목을 입력해 주세요', step: 'info', isSatisfied: (ctx) => Boolean(ctx.draft.title.trim()) },
   { field: 'regionId', label: '지역을 선택해 주세요', step: 'place-time', isSatisfied: (ctx) => Boolean(ctx.regionId) },
-  { field: 'venue', label: '장소를 입력해 주세요', step: 'place-time', isSatisfied: (ctx) => Boolean(ctx.draft.venue.trim()) },
+  { field: 'place', label: '장소를 골라 주세요', step: 'place-time', isSatisfied: (ctx) => Boolean(ctx.draft.place?.name.trim()) },
   { field: 'date', label: '날짜를 입력해 주세요', step: 'place-time', isSatisfied: (ctx) => Boolean(ctx.draft.date) },
   { field: 'startTime', label: '시작 시간을 입력해 주세요', step: 'place-time', isSatisfied: (ctx) => Boolean(ctx.draft.startTime) },
   {
@@ -200,8 +201,7 @@ export function buildMatchPayloadResult(draft: MatchDraft, sportId: string, regi
       // 주최자가 참가하면 최소 정원은 2명(나 + 1명) — UI 스테퍼와 같은 하한을 여기서도 강제한다.
       capacity: Math.max(Number(draft.capacity) || 1, draft.hostParticipates ? 2 : 1),
       hostParticipates: draft.hostParticipates,
-      manualPlaceName: draft.venue.trim(),
-      addressText: draft.address.trim() || null,
+      ...toMatchPlacePayload(draft.place),
       rulesText: draft.rules.trim() || null,
       minLevelCode: labelToLevelCode(draft.minLevel),
       maxLevelCode: labelToLevelCode(draft.maxLevel),

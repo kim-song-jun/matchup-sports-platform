@@ -148,15 +148,16 @@ export function FieldErrorText({ id, message }: { id?: string; message?: string 
  * 모두 tm-chip 토큰을 쓰고, 선택 상태를 aria-pressed와 tm-chip-active(채움+테두리색,
  * 컬러 단독 아님) 양쪽으로 표시한다.
  */
-export function RecentVenueChips({
+export function RecentVenueChips<T extends { placeName: string }>({
   items,
   selectedValue,
   onSelect,
 }: {
-  items: Array<{ placeName: string; addressText?: string | null }>;
+  /** 칩이 항목 전체(좌표·provider 포함)를 그대로 돌려주도록 제네릭으로 받는다. */
+  items: readonly T[];
   /** 현재 입력창 값. items 중 placeName이 이 값과 같은 칩을 선택 상태로 강조한다. */
   selectedValue?: string;
-  onSelect: (venue: { placeName: string; addressText?: string | null }) => void;
+  onSelect: (venue: T) => void;
 }) {
   if (items.length === 0) return null;
   return (

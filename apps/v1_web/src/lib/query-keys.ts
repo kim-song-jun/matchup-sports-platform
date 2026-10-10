@@ -203,6 +203,7 @@ export const v1Keys = {
   adminReviewPolicySettings: () => [...v1Keys.all, 'admin', 'review-policy-settings'] as const,
   adminSiteInfo: () => [...v1Keys.all, 'admin', 'site-info'] as const,
   publicKakaoMapsKey: () => [...v1Keys.all, 'public', 'kakao-maps-key'] as const,
+  placeSearch: (query: string) => [...v1Keys.all, 'places', 'search', query] as const,
   // Task 21: live tournament operations console (fixture lineup + event backfill).
   // `game`은 위쪽에 이미 선언돼 있어 여기서 다시 정의하지 않는다 — 양쪽 브랜치가
   // 동일한 정의를 각각 추가해 머지 시 중복 키가 될 뻔했다.

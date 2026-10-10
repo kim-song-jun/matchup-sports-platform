@@ -273,7 +273,7 @@ describe('POST /admin/league-matches + fixtures', () => {
         .get(`/api/v1/admin/league-matches/${leagueId}`)
         .set('x-v1-user-id', ownerUserId);
       expect(detailRes.status).toBe(200);
-      expect(detailRes.body.data.recentVenues).toContain('상암 풋살파크');
+      expect(detailRes.body.data.recentVenues.map((venue: { name: string }) => venue.name)).toContain('상암 풋살파크');
 
       // 대진을 생성하고 나면(이 화면이 더는 필요 없으므로) recentVenues는 빈 배열이다.
       await request(app.getHttpServer())
@@ -972,10 +972,8 @@ describe('POST /admin/league-matches + fixtures', () => {
     });
   });
 
-  // placeAddress: UpdateLeagueFixtureDto에는 이미 있었지만 실제 저장 경로를 검증하는
-  // 테스트가 없었다(어드민 표에 입력 컬럼도 없었다 — 이 태스크에서 함께 추가).
-  describe('PATCH /admin/league-matches/:leagueId/fixtures/:teamMatchId — placeAddress', () => {
-    it('placeAddress를 보내면 저장되고, 응답에 그대로 반영된다', async () => {
+  describe('PATCH /admin/league-matches/:leagueId/fixtures/:teamMatchId — 장소', () => {
+    it('고른 장소를 보내면 주소·좌표가 저장되고, 주소만 보내면 400 PLACE_NAME_REQUIRED 로 옛 핀을 지킨다', async () => {
       const createRes = await request(app.getHttpServer())
         .post('/api/v1/admin/league-matches')
         .set('x-v1-user-id', ownerUserId)
@@ -997,15 +995,28 @@ describe('POST /admin/league-matches + fixtures', () => {
       const res = await request(app.getHttpServer())
         .patch(`/api/v1/admin/league-matches/${leagueId}/fixtures/${teamMatchId}`)
         .set('x-v1-user-id', ownerUserId)
-        .send({ placeAddress: '서울 마포구 상암동 1600' });
+        .send({
+          placeName: '상암 풋살파크', placeAddress: '서울 마포구 상암동 1600',
+          placeLatitude: 37.568, placeLongitude: 126.897, placeProvider: 'kakao', placeProviderId: 'kakao-1600',
+        });
       expect(res.status).toBe(200);
       expect(res.body.data.placeAddress).toBe('서울 마포구 상암동 1600');
 
       const updated = await prisma.v1TeamMatch.findUniqueOrThrow({ where: { id: teamMatchId } });
-      expect(updated.placeAddress).toBe('서울 마포구 상암동 1600');
+      expect(updated).toMatchObject({
+        placeName: '상암 풋살파크', placeAddress: '서울 마포구 상암동 1600', placeLatitude: 37.568, placeProviderId: 'kakao-1600',
+      });
 
-      // detail()도 placeAddress를 내려줘야 어드민 표가 기존 값을 채워 보여줄 수 있다 —
-      // updateFixture()는 이미 이 필드를 저장하고 있었는데 조회 경로(select)가 빠져 있었다.
+      const addressOnly = await request(app.getHttpServer())
+        .patch(`/api/v1/admin/league-matches/${leagueId}/fixtures/${teamMatchId}`)
+        .set('x-v1-user-id', ownerUserId)
+        .send({ placeAddress: '서울 마포구 다른 주소 1' });
+      expect(addressOnly.status).toBe(400);
+      expect(addressOnly.body.code).toBe('PLACE_NAME_REQUIRED');
+      const unchanged = await prisma.v1TeamMatch.findUniqueOrThrow({ where: { id: teamMatchId } });
+      expect(unchanged).toMatchObject({ placeAddress: '서울 마포구 상암동 1600', placeProviderId: 'kakao-1600' });
+
+      // detail()도 placeAddress를 내려줘야 어드민 표가 기존 값을 채워 보여줄 수 있다.
       const detailRes = await request(app.getHttpServer())
         .get(`/api/v1/admin/league-matches/${leagueId}`)
         .set('x-v1-user-id', ownerUserId);

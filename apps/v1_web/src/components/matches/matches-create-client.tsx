@@ -24,6 +24,7 @@ import {
 import { trackEvent } from '@/lib/analytics';
 import { clearExpiringDraft, draftStorageAvailable, readExpiringDraft, writeExpiringDraft } from '@/lib/expiring-draft';
 import { getCreatorProfilePrompt, profileEditHref } from '@/lib/creator-profile';
+import { placeFromEditForm, type PlaceValue } from '@/lib/place';
 import { toDistrictRegionOptions } from '@/lib/v1-regions';
 import { lockedReasonLabel } from '@/lib/v1-status-labels';
 import type { V1MatchEdit } from '@/types/api';
@@ -529,7 +530,7 @@ function buildCreateModel({
   lockedReason?: string | null;
   submitting?: boolean;
   onSelectSport: (sportName: string) => void;
-  onFieldChange: (field: keyof MatchDraft, value: string | number | boolean) => void;
+  onFieldChange: (field: keyof MatchDraft, value: string | number | boolean | PlaceValue | null) => void;
   onRegionChange: (regionId: string) => void;
   onBack: () => void;
   onNext: () => void;
@@ -590,7 +591,7 @@ function usePersistedDraft() {
   useEffect(() => {
     // 하루가 지난 드래프트는 readExpiringDraft가 알아서 버린다 — 예전에는 만료가 없어
     // 며칠 전 작성하다 만 내용이 새 매치 작성 화면에 그대로 되살아났다.
-    const stored = readExpiringDraft<Partial<MatchDraft>>(storageKey);
+    const stored = readExpiringDraft<StoredMatchDraft>(storageKey);
     if (stored === null) return;
     const hydrated = { ...buildDefaultDraft(), ...normalizeStoredDraft(stored) };
     draftRef.current = hydrated;
@@ -621,7 +622,11 @@ function buildDefaultDraft(): MatchDraft {
   };
 }
 
-function normalizeStoredDraft(stored: Partial<MatchDraft>): Partial<MatchDraft> {
+/** 장소 필드가 `venue`/`address` 문자열이던 시절의 저장 초안. */
+type StoredMatchDraft = Partial<MatchDraft> & { venue?: string; address?: string };
+
+function normalizeStoredDraft(storedWithLegacy: StoredMatchDraft): Partial<MatchDraft> {
+  const { venue: legacyVenue, address: legacyAddress, ...stored } = storedWithLegacy;
   const oldDefaults = {
     title: '주말 풋살 초보 환영 매치',
     description: '초보도 편하게 참여할 수 있는 주말 풋살 매치예요.',
@@ -635,25 +640,30 @@ function normalizeStoredDraft(stored: Partial<MatchDraft>): Partial<MatchDraft> 
     maxLevel: '중수',
   };
 
+  const legacyName = legacyVenue?.trim() ?? '';
+  const legacySample = legacyName === oldDefaults.venue && legacyAddress === oldDefaults.address;
+  const legacyPlace: PlaceValue | null =
+    legacyName && !legacySample
+      ? { kind: 'manual', name: legacyName, address: legacyAddress?.trim() || null }
+      : null;
+  const withPlace: Partial<MatchDraft> = legacyPlace && !stored.place ? { ...stored, place: legacyPlace } : stored;
+
   const isLegacySample =
     stored.title === oldDefaults.title &&
     stored.description === oldDefaults.description &&
     stored.rules === oldDefaults.rules &&
-    stored.venue === oldDefaults.venue &&
-    stored.address === oldDefaults.address &&
+    legacySample &&
     stored.date === oldDefaults.date &&
     stored.startTime === oldDefaults.startTime &&
     stored.endTime === oldDefaults.endTime;
 
-  if (!isLegacySample) return stored;
+  if (!isLegacySample) return withPlace;
 
   return {
     ...stored,
     title: stored.title === oldDefaults.title ? '' : stored.title,
     description: stored.description === oldDefaults.description ? '' : stored.description,
     rules: stored.rules === oldDefaults.rules ? '' : stored.rules,
-    venue: stored.venue === oldDefaults.venue ? '' : stored.venue,
-    address: stored.address === oldDefaults.address ? '' : stored.address,
     date: stored.date === oldDefaults.date ? '' : stored.date,
     startTime: stored.startTime === oldDefaults.startTime ? '' : stored.startTime,
     endTime: stored.endTime === oldDefaults.endTime ? '' : stored.endTime,
@@ -679,8 +689,7 @@ export function draftFromMatchEdit(edit: V1MatchEdit): MatchDraft {
     gender: normalizeGenderRule(edit.form.genderRule),
     minLevel: levelCodeToDraftLabel(edit.form.minLevelCode) ?? buildDefaultDraft().minLevel,
     maxLevel: levelCodeToDraftLabel(edit.form.maxLevelCode) ?? buildDefaultDraft().maxLevel,
-    venue: edit.form.manualPlaceName,
-    address: edit.form.addressText ?? '',
+    place: placeFromEditForm(edit.form),
     date: toDateInput(start),
     startTime: toTimeInput(start),
     endTime: end ? toTimeInput(end) : '',

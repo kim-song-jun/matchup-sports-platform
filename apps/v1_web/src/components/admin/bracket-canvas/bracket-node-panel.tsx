@@ -1,5 +1,8 @@
 'use client';
 
+import { PlacePicker } from '@/components/v1-ui/place-picker';
+import type { PlaceValue } from '@/lib/place';
+import { fixtureVenuePatch, fixtureVenueValue } from './fixture-venue-patch';
 import Link from 'next/link';
 import { X } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
@@ -61,7 +64,7 @@ export function BracketNodePanel({
   const { confirm, ConfirmModal } = useConfirm();
   const { requestReason, dialog: teamChangeDialog } = useStartedTeamChangeReason();
   const [scheduledAt, setScheduledAt] = useState(() => isoToKstDatetimeLocal(fixture.scheduledAt));
-  const [venue, setVenue] = useState(fixture.venue ?? '');
+  const [venue, setVenue] = useState<PlaceValue | null>(fixtureVenueValue(fixture));
   const [quickError, setQuickError] = useState<string | null>(null);
 
   const title = fixtureTitle(fixture, groups);
@@ -195,7 +198,7 @@ export function BracketNodePanel({
       return;
     }
     updateFixture.mutate(
-      { fixtureId: fixture.id, ...(iso === null ? {} : { scheduledAt: iso }), venue: venue.trim() },
+      { fixtureId: fixture.id, ...(iso === null ? {} : { scheduledAt: iso }), ...fixtureVenuePatch(venue, fixture) },
       {
         onSuccess: () => showToast('일정을 저장했어요.', 'success'),
         onError: (error) => showToast(describeBracketCanvasError(error, '일정을 저장하지 못했어요.'), 'error'),
@@ -322,10 +325,13 @@ export function BracketNodePanel({
               <label htmlFor={`${fixture.id}-scheduled`} className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>경기 시각</label>
               <input id={`${fixture.id}-scheduled`} type="datetime-local" value={scheduledAt} onChange={(event) => setScheduledAt(event.target.value)} className="tm-input" style={{ minHeight: 44 }} />
             </div>
-            <div className="flex flex-col gap-1">
-              <label htmlFor={`${fixture.id}-venue`} className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>장소</label>
-              <input id={`${fixture.id}-venue`} type="text" value={venue} onChange={(event) => setVenue(event.target.value)} className="tm-input" style={{ minHeight: 44 }} />
-            </div>
+            <PlacePicker
+              id={`${fixture.id}-venue`}
+              label="장소"
+              value={venue}
+              onChange={setVenue}
+              disabled={updateFixture.isPending}
+            />
             <Button type="submit" variant="outline" size="md" loading={updateFixture.isPending}>일정 저장</Button>
           </form>
         ) : (

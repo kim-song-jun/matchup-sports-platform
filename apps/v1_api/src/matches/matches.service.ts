@@ -12,6 +12,7 @@ import { decodeReferenceTimeCursor, encodeReferenceTimeCursor } from '../common/
 import { dropCursorRow, resumeAfterCursorArgs } from '../common/pagination/resume-after-cursor';
 import { paginateByStatePriority } from '../league-matches/league-lifecycle-rules';
 import { NotificationsService } from '../notifications/notifications.service';
+import { PlaceProvider, PlaceView, resolvePlaceSnapshot, toPlaceColumns, toPlaceView } from '../places/place-snapshot';
 import { PrismaService } from '../prisma/prisma.service';
 import { assertCreatorProfileComplete } from '../profile/creator-profile.guard';
 import { formatLevelRange, levelCodeWhere, parseLevelCodes, resolveSportLevelRange } from '../sports/level-range';
@@ -246,7 +247,7 @@ export class MatchesService {
       imageUrl: match.imageUrl,
       sport: { sportId: match.sport.id, name: match.sport.name },
       region: match.region ? { regionId: match.region.id, name: match.region.name } : null,
-      place: { name: match.placeName, addressText: match.placeAddress },
+      place: toPlaceView(match),
       startsAt: match.startAt,
       endsAt: match.endAt,
       deadlineAt: match.deadlineAt,
@@ -304,18 +305,25 @@ export class MatchesService {
       where: { hostUserId: user.id, deletedAt: null },
       orderBy: { createdAt: 'desc' },
       take: 30,
-      select: { placeName: true, placeAddress: true },
+      select: { placeName: true, placeAddress: true, placeLatitude: true, placeLongitude: true, placeProvider: true, placeProviderId: true },
     });
     // 레거시 행에 앞뒤 공백이 섞여 있을 수 있어 trim 후 dedup한다(league-match-admin
     // .service.ts의 loadRecentVenues와 동일한 방어) — 안 하면 공백만 다른 "중복" 장소가
     // 서로 다른 칩으로 뜨거나, 공백뿐인 값이 빈 칩으로 렌더될 수 있다.
     const seen = new Set<string>();
-    const items: { placeName: string; addressText: string | null }[] = [];
+    const items: (Omit<PlaceView, 'name' | 'address'> & { placeName: string; addressText: string | null })[] = [];
     for (const row of rows) {
       const placeName = row.placeName.trim();
       if (!placeName || seen.has(placeName)) continue;
       seen.add(placeName);
-      items.push({ placeName, addressText: row.placeAddress });
+      items.push({
+        placeName,
+        addressText: row.placeAddress,
+        latitude: row.placeLatitude,
+        longitude: row.placeLongitude,
+        provider: row.placeProvider as PlaceProvider | null,
+        providerPlaceId: row.placeProviderId,
+      });
       if (items.length >= 5) break;
     }
     return { items };
@@ -350,10 +358,25 @@ export class MatchesService {
     };
   }
 
+  /** 이름이 요청에 있으면 스냅샷 전체를 교체한다 — 좌표가 안 오면 null 이라 새 이름에 옛 핀이 남지 않는다. */
+  private resolvePlace(dto: MutateMatchDto) {
+    const snapshot = resolvePlaceSnapshot({
+      name: dto.manualPlaceName,
+      address: dto.addressText,
+      latitude: dto.placeLatitude,
+      longitude: dto.placeLongitude,
+      provider: dto.placeProvider,
+      providerPlaceId: dto.placeProviderId,
+    });
+    if (!snapshot) throw validationError('장소를 입력해 주세요', 'manualPlaceName');
+    return { snapshot, columns: { ...toPlaceColumns(snapshot), placeName: snapshot.name } };
+  }
+
   async create(user: V1AuthUser, dto: MutateMatchDto) {
     this.assertActiveAccount(user);
     await assertCreatorProfileComplete(this.prisma, user.id);
     const dates = this.validateMatchDates(dto);
+    const place = this.resolvePlace(dto);
     await this.validateMasterRefs(dto.sportId, dto.regionId);
 
     // 주최자가 참가하면 정원엔 나 + 1명 이상 자리가 있어야 한다 — 안 그러면 아무도 못 받는 매치가 된다.
@@ -371,8 +394,7 @@ export class MatchesService {
           title: dto.title,
           description: dto.description ?? null,
           imageUrl: dto.imageUrl ?? null,
-          placeName: dto.manualPlaceName,
-          placeAddress: dto.addressText ?? null,
+          ...place.columns,
           startAt: dates.startsAt,
           endAt: dates.endsAt,
           deadlineAt: dates.deadlineAt,
@@ -624,6 +646,10 @@ export class MatchesService {
         hostParticipates: activeHostParticipantCount > 0,
         manualPlaceName: match.placeName,
         addressText: match.placeAddress,
+        placeLatitude: match.placeLatitude,
+        placeLongitude: match.placeLongitude,
+        placeProvider: match.placeProvider,
+        placeProviderId: match.placeProviderId,
         rulesText: match.levelNote,
         minLevelCode: match.minSportLevel?.code ?? null,
         maxLevelCode: match.maxSportLevel?.code ?? null,
@@ -648,6 +674,7 @@ export class MatchesService {
     }
 
     const dates = this.validateMatchDates(dto);
+    const place = this.resolvePlace(dto);
     await this.validateMasterRefs(dto.sportId, dto.regionId);
     const levelRange = await resolveSportLevelRange(this.prisma, dto.sportId, dto.minLevelCode, dto.maxLevelCode);
     const hostParticipates = dto.hostParticipates !== false;
@@ -656,7 +683,7 @@ export class MatchesService {
     if (hostParticipates && dto.capacity < 2) {
       throw validationError('주최자가 참가하면 정원은 2명 이상이어야 해요', 'capacity');
     }
-    const requiresReconfirmation = match.startAt.getTime() !== dates.startsAt.getTime() || (match.endAt?.getTime() ?? null) !== (dates.endsAt?.getTime() ?? null) || match.placeName !== dto.manualPlaceName || match.placeAddress !== (dto.addressText ?? null);
+    const requiresReconfirmation = match.startAt.getTime() !== dates.startsAt.getTime() || (match.endAt?.getTime() ?? null) !== (dates.endsAt?.getTime() ?? null) || match.placeName !== place.snapshot.name || match.placeAddress !== place.snapshot.address || match.placeProviderId !== place.snapshot.providerPlaceId || match.placeLatitude !== place.snapshot.latitude || match.placeLongitude !== place.snapshot.longitude;
     const result = await this.prisma.$transaction(async (tx) => {
       await tx.$queryRaw`SELECT id FROM "v1_matches" WHERE id = ${match.id} FOR UPDATE`;
       const current = await tx.v1Match.findFirst({ where: { id: match.id, deletedAt: null } });
@@ -692,8 +719,7 @@ export class MatchesService {
           title: dto.title,
           description: dto.description ?? null,
           imageUrl: dto.imageUrl ?? null,
-          placeName: dto.manualPlaceName,
-          placeAddress: dto.addressText ?? null,
+          ...place.columns,
           startAt: dates.startsAt,
           endAt: dates.endsAt,
           deadlineAt: dates.deadlineAt,
@@ -1486,7 +1512,7 @@ export class MatchesService {
       imageUrl: match.imageUrl,
       sport: { sportId: match.sport.id, name: match.sport.name },
       region: match.region ? { regionId: match.region.id, name: match.region.name } : null,
-      place: { name: match.placeName, addressText: match.placeAddress },
+      place: toPlaceView(match),
       startsAt: match.startAt,
       endsAt: match.endAt,
       deadlineAt: match.deadlineAt,

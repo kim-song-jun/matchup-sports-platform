@@ -285,7 +285,7 @@ describe('D10 리그 명단 자동 확정', () => {
         regionId,
         competitionConfigId: config!.id,
         title: '이미 만든 대진',
-        placeName: '테스트 구장',
+        place: { name: '테스트 구장', address: null, latitude: null, longitude: null, provider: null, providerPlaceId: null },
         startAt: new Date(Date.now() + 7 * 86_400_000),
         endAt: null,
         home: teams.get(team.id)!,

@@ -155,6 +155,20 @@ inherited the same URL. A value equal to the stored one returns
 `409 LEAGUE_MIRROR_MISSING`. Audit action `league_match.cover_image_updated`
 (before/after `coverImageUrl`).
 
+## Default venue (기본 장소)
+
+`GET /admin/league-matches/:leagueId` returns `defaultPlace: { name, address, latitude,
+longitude, provider, providerPlaceId } | null` built from the league's venue columns
+(a pin without a `kakao` provider is dropped; name and address stay).
+
+`PATCH /api/v1/admin/league-matches/:leagueId/venue` takes
+`{ venue?, venueAddress?, venueLatitude?, venueLongitude?, venueProvider?, venueProviderId? }`
+(same place-snapshot rules as other domains: `venue` max 200, pin fields all-or-none else
+400 `PLACE_SNAPSHOT_INCOMPLETE`). `null` or blank `venue` clears the whole snapshot. Existing
+fixtures are never touched; only fixtures created afterwards inherit the default. Response
+`data`: `{ leagueId, defaultPlace }`; errors `404 LEAGUE_NOT_FOUND`, `409 LEAGUE_MIRROR_MISSING`.
+Audit action `league_match.venue_updated` (before/after `defaultPlace`).
+
 `PATCH /api/v1/admin/tournaments/:id` stays regular-tournament only (the #863
 lock); it is intentionally not opened for leagues.
 
@@ -324,3 +338,9 @@ The result-entry reminder skips such fixtures as well.
   registration id the slot assignment endpoint takes).
 - `GET /admin/league-matches/:leagueId/videos`: `homeTeamName` is `string | null` (an unfilled fixture no
   longer returns `409 LEAGUE_FIXTURE_INCOMPLETE`).
+
+### Fixture place snapshot (Task 20261070)
+
+- Generate / regenerate / manual / template / update-fixture DTOs accept `placeName`, `placeAddress`, `placeLatitude`, `placeLongitude`, `placeProvider`, `placeProviderId`.
+- A blank `placeName` inherits the league's default place (the mirror tournament's `venue` snapshot); with no default it falls back to `장소 미정` with no coordinates. On update, a present `placeName` replaces the whole snapshot.
+- Fixture rows (admin detail, `updateFixture`, public list/detail) keep `placeName` and add `place: V1PlaceView | null`; admin `recentVenues` is now `V1PlaceView[]` (most recent snapshot per name, default excluded).

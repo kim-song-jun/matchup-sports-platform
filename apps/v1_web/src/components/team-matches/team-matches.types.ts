@@ -1,4 +1,5 @@
-import type { V1TeamMatchApiStatus } from '@/types/api';
+import type { PlaceValue } from '@/lib/place';
+import type { V1PlaceView, V1RecentVenue, V1TeamMatchApiStatus } from '@/types/api';
 
 export type TeamMatchModel = {
   lifecycleLabel?: '보류';
@@ -120,7 +121,8 @@ export type TeamMatchDetailMode = 'default' | 'pending' | 'approved' | 'mine' | 
 export type TeamMatchDetailViewModel = {
   match: TeamMatchModel & {
     description: string;
-    address: string;
+    /** 서버가 내려준 장소 스냅샷(좌표 없으면 이름·주소만). */
+    place: V1PlaceView | null;
     hostTeamHref?: string;
     hostTeamId?: string | null;
     hostTeamLogoUrl?: string | null;
@@ -290,8 +292,7 @@ export type TeamMatchCreateViewModel = {
     listImageUrl?: string;
     cost: number;
     opponentCost: number;
-    venue: string;
-    address: string;
+    place: PlaceValue | null;
     date: string;
     startTime: string;
     endDate?: string;
@@ -306,7 +307,7 @@ export type TeamMatchCreateViewModel = {
     regions: Array<{ id: string; name: string; shortName?: string; parentName?: string }>;
     onSelectTeam: (teamName: string) => void;
     onSelectSport: (sportName: string) => void;
-    onFieldChange: (field: keyof TeamMatchCreateViewModel['draft'], value: string | number | string[]) => void;
+    onFieldChange: (field: keyof TeamMatchCreateViewModel['draft'], value: string | number | string[] | PlaceValue | null) => void;
     onRegionChange: (regionId: string) => void;
     uploadImage?: (file: File) => Promise<string>;
     onBack: () => void;
@@ -331,6 +332,6 @@ export type TeamMatchCreateViewModel = {
     /** CreateProgress 배지: 지나온 스텝 중 필수 필드를 전부 채운 스텝(체크 표시용). */
     completeSteps?: TeamMatchCreateStep[];
     /** #3 1단계: 이 팀이 호스트로 과거에 실제로 입력했던 장소 — 장소 입력창 포커스 시 칩으로 노출. */
-    recentVenues?: Array<{ placeName: string; addressText: string | null }>;
+    recentVenues?: V1RecentVenue[];
   };
 };

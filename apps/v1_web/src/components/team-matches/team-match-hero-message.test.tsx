@@ -43,6 +43,8 @@ function renderDetail(action: HeroAction = () => undefined, extra: Partial<TeamM
     match: {
       ...base.match,
       id: 'hero-message-fixture',
+      // 장소 카드의 주소 복사 라이브 영역(role=status)이 hero 안내 단언과 섞이지 않게 한다.
+      place: null,
       title: '합성 안내 수명 팀매치',
       hostTeam: '합성 홈팀',
       imageUrl: null,

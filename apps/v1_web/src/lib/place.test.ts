@@ -1,0 +1,166 @@
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import {
+  detectPlaceNavPlatform,
+  placeFromEditForm,
+  placeFromRecentVenue,
+  placeFromSearchItem,
+  placeFromView,
+  placeNavigationLinks,
+  toLeaguePlacePayload,
+  toMatchPlacePayload,
+  toVenuePayload,
+  type PlaceValue,
+} from './place';
+
+const picked: PlaceValue = {
+  kind: 'picked',
+  name: '망원한강공원 풋살장',
+  address: '서울 마포구 마포나루길 467',
+  latitude: 37.5558,
+  longitude: 126.8985,
+  provider: 'kakao',
+  providerPlaceId: 'kakao-1',
+};
+
+describe('placeNavigationLinks', () => {
+  const route = { name: '망원 풋살장', latitude: 37.5, longitude: 127.1 };
+  const nameOnly = { name: '망원 풋살장', latitude: null, longitude: null };
+
+  it('모바일 + 좌표: 앱 길찾기 스킴 3개를 만든다', () => {
+    const links = placeNavigationLinks(route, 'android');
+    expect(links.map((l) => l.key)).toEqual(['kakao', 'naver', 'tmap']);
+    expect(links[0].href).toBe('kakaomap://route?ep=37.5,127.1&by=CAR');
+    expect(links[1].href).toContain('nmap://route/car?dlat=37.5&dlng=127.1');
+    expect(links[1].href).toContain(`dname=${encodeURIComponent('망원 풋살장')}`);
+    expect(links[2].href).toBe(`tmap://route?goalx=127.1&goaly=37.5&goalname=${encodeURIComponent('망원 풋살장')}`);
+    expect(links.every((l) => l.mode === 'route')).toBe(true);
+  });
+
+  it('데스크톱 + 좌표: 웹 URL 2개이고 티맵(웹 대상 없음)은 뺀다', () => {
+    const links = placeNavigationLinks(route, 'web');
+    expect(links.map((l) => l.key)).toEqual(['kakao', 'naver']);
+    expect(links[0].href).toBe(`https://map.kakao.com/link/to/${encodeURIComponent('망원 풋살장')},37.5,127.1`);
+    expect(links[1].href).toBe('https://map.naver.com/v5/directions/-/-/-/car?destination=127.1,37.5');
+  });
+
+  it.each([
+    ['쉼표', '풋살장, 별관'],
+    ['앰퍼샌드', 'A&B 구장'],
+    ['해시', '#1 구장'],
+    ['공백', '망원 풋살 파크'],
+  ])('이름에 %s 가 있어도 구분자로 쓰이지 않게 인코딩한다', (_label, name) => {
+    const encoded = encodeURIComponent(name);
+    const web = placeNavigationLinks({ name, latitude: 37.5, longitude: 127.1 }, 'web');
+    expect(web[0].href).toBe(`https://map.kakao.com/link/to/${encoded},37.5,127.1`);
+    // 쉼표로 split 하면 이름이 쪼개지지 않고 정확히 3조각(이름, 위도, 경도)이어야 한다.
+    expect(web[0].href.replace('https://map.kakao.com/link/to/', '').split(',')).toHaveLength(3);
+    const app = placeNavigationLinks({ name, latitude: 37.5, longitude: 127.1 }, 'android');
+    expect(app[1].href).toContain(`dname=${encoded}&appname=`);
+    expect(app[2].href).toBe(`tmap://route?goalx=127.1&goaly=37.5&goalname=${encoded}`);
+  });
+
+  it('좌표 없음: 모바일은 앱 이름 검색, 데스크톱은 웹 검색 URL', () => {
+    const name = encodeURIComponent('망원 풋살장');
+    const mobile = placeNavigationLinks(nameOnly, 'ios');
+    expect(mobile.map((l) => l.href)).toEqual([
+      `kakaomap://search?q=${name}`,
+      `nmap://search?query=${name}&appname=teameet.kr`,
+      `tmap://search?name=${name}`,
+    ]);
+    expect(mobile.every((l) => l.mode === 'search')).toBe(true);
+    const desktop = placeNavigationLinks(nameOnly, 'web');
+    expect(desktop.map((l) => l.href)).toEqual([
+      `https://map.kakao.com/?q=${name}`,
+      `https://map.naver.com/p/search/${name}`,
+    ]);
+  });
+});
+
+describe('PlaceValue 변환', () => {
+  it('좌표·provider 가 모두 있는 view 만 picked 로 복원하고, 하나라도 빠지면 manual 로 둔다', () => {
+    expect(
+      placeFromView({ name: '구장', address: '주소', latitude: 1, longitude: 2, provider: 'kakao', providerPlaceId: 'p' }),
+    ).toMatchObject({ kind: 'picked', latitude: 1, longitude: 2, providerPlaceId: 'p' });
+    expect(
+      placeFromView({ name: '구장', address: '주소', latitude: 1, longitude: null, provider: 'kakao', providerPlaceId: 'p' }),
+    ).toEqual({ kind: 'manual', name: '구장', address: '주소' });
+    expect(placeFromView({ name: '  ', address: null, latitude: null, longitude: null, provider: null, providerPlaceId: null })).toBeNull();
+  });
+
+  it('최근 장소 칩과 수정 폼 프리필이 좌표까지 복원한다', () => {
+    expect(
+      placeFromRecentVenue({ placeName: '구장', addressText: null, latitude: 3, longitude: 4, provider: 'kakao', providerPlaceId: 'r1' }),
+    ).toMatchObject({ kind: 'picked', providerPlaceId: 'r1' });
+    expect(
+      placeFromEditForm({ manualPlaceName: '구장', addressText: '주소', placeLatitude: 3, placeLongitude: 4, placeProvider: 'kakao', placeProviderId: 'e1' }),
+    ).toMatchObject({ kind: 'picked', address: '주소', latitude: 3 });
+  });
+
+  it('검색 결과는 도로명 주소가 없으면 지번 주소를 쓴다', () => {
+    expect(
+      placeFromSearchItem({ provider: 'kakao', providerPlaceId: 'x', name: 'n', address: '', jibunAddress: '지번', category: null, latitude: 1, longitude: 2 }).address,
+    ).toBe('지번');
+  });
+});
+
+describe('payload 헬퍼', () => {
+  it('매치 계열: picked 는 4필드를 모두 보내고, manual 은 좌표 키를 빼 서버가 옛 핀을 지우게 한다', () => {
+    expect(toMatchPlacePayload(picked)).toEqual({
+      manualPlaceName: '망원한강공원 풋살장',
+      addressText: '서울 마포구 마포나루길 467',
+      placeLatitude: 37.5558,
+      placeLongitude: 126.8985,
+      placeProvider: 'kakao',
+      placeProviderId: 'kakao-1',
+    });
+    const manual = toMatchPlacePayload({ kind: 'manual', name: '동네 운동장' });
+    expect(manual).toEqual({ manualPlaceName: '동네 운동장', addressText: null });
+    expect('placeLatitude' in manual).toBe(false);
+    expect(toMatchPlacePayload(null)).toEqual({ manualPlaceName: '' });
+    expect(toMatchPlacePayload({ kind: 'manual', name: '  동네 운동장  ' }).manualPlaceName).toBe('동네 운동장');
+    expect(toLeaguePlacePayload({ kind: 'manual', name: '  동네 운동장 ' }).placeName).toBe('동네 운동장');
+    expect(toVenuePayload({ kind: 'manual', name: ' 동네 운동장  ' }).venue).toBe('동네 운동장');
+  });
+
+  it('리그 계열: 값이 없으면 키를 비워 기본 장소 상속을 허용한다', () => {
+    expect(toLeaguePlacePayload(null)).toEqual({});
+    expect(toLeaguePlacePayload(picked)).toMatchObject({ placeName: '망원한강공원 풋살장', placeAddress: '서울 마포구 마포나루길 467', placeProviderId: 'kakao-1' });
+  });
+
+  it('대회 계열: venue* 이름으로 좌표를 보낸다', () => {
+    expect(toVenuePayload(picked)).toEqual({
+      venue: '망원한강공원 풋살장',
+      venueAddress: '서울 마포구 마포나루길 467',
+      venueLatitude: 37.5558,
+      venueLongitude: 126.8985,
+      venueProvider: 'kakao',
+      venueProviderId: 'kakao-1',
+    });
+    expect(toVenuePayload({ kind: 'manual', name: '운동장' })).toEqual({ venue: '운동장' });
+  });
+});
+
+describe('detectPlaceNavPlatform', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    delete (window as { TeameetNative?: unknown }).TeameetNative;
+  });
+
+  it('treats a phone browser outside the Teameet app as web, so links never depend on an installed map app', () => {
+    vi.stubGlobal('navigator', { ...navigator, userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X)' });
+    expect(detectPlaceNavPlatform()).toBe('web');
+    expect(placeNavigationLinks({ name: '구장', latitude: 37.5, longitude: 127 }, detectPlaceNavPlatform())[0].href).toMatch(
+      /^https:\/\/map\.kakao\.com\//,
+    );
+  });
+
+  it('uses app schemes inside the Android app shell', () => {
+    (window as { TeameetNative?: unknown }).TeameetNative = { postMessage: () => undefined };
+    expect(detectPlaceNavPlatform()).toBe('android');
+    expect(placeNavigationLinks({ name: '구장', latitude: 37.5, longitude: 127 }, 'android').map((l) => l.href.split(':')[0])).toEqual([
+      'kakaomap',
+      'nmap',
+      'tmap',
+    ]);
+  });
+});

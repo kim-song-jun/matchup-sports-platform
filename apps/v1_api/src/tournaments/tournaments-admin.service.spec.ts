@@ -10,7 +10,6 @@ import { ConflictException, ForbiddenException, NotFoundException } from '@nestj
 import { Test, TestingModule } from '@nestjs/testing';
 import { PrismaService } from '../prisma/prisma.service';
 import { AdminContextService } from '../common/admin-context.service';
-import { KakaoGeocodingService } from './kakao-geocoding.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { CompetitionConfigRegistry } from './competition-config/competition-config-registry';
 import { TournamentCompetitionConfig } from './competition-config/tournament-competition-config';
@@ -36,6 +35,9 @@ function tournamentRow(overrides: Record<string, unknown> = {}) {
     scheduledAt: null,
     scheduledEndAt: null,
     venue: null,
+    venueAddress: null,
+    venueProvider: null,
+    venueProviderId: null,
     parkingInfo: '주차와 입장 동선은 지도에서 확인해요.',
     teamCount: 8,
     minPlayers: 6,
@@ -88,7 +90,7 @@ const TOURNAMENT_ROW_UPDATED_AT = '2026-06-14T00:00:00.000Z';
 
 describe('TournamentsAdminService', () => {
   let service: TournamentsAdminService;
-  let kakaoGeocoding: { geocode: jest.Mock };
+  let fetchSpy: jest.SpyInstance;
   let notifications: { emitNotificationToMany: jest.Mock };
   let prisma: {
     v1AdminUser: { findUnique: jest.Mock };
@@ -139,8 +141,8 @@ describe('TournamentsAdminService', () => {
     const p = prisma;
     (prisma.$transaction as jest.Mock).mockImplementation((cb: (tx: typeof p) => Promise<unknown>) => cb(p));
 
-    // 기본값: 키 미설정 상태와 동일하게 항상 null 반환(geocoding disabled). 개별 테스트에서 override.
-    kakaoGeocoding = { geocode: jest.fn().mockResolvedValue(null) };
+    // 장소 좌표는 클라이언트가 고른 값만 저장한다 — 서버가 외부 지오코딩을 부르면 안 된다.
+    fetchSpy = jest.spyOn(global, 'fetch');
     notifications = { emitNotificationToMany: jest.fn().mockResolvedValue(undefined) };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -148,7 +150,6 @@ describe('TournamentsAdminService', () => {
         TournamentsAdminService,
         AdminContextService,
         { provide: PrismaService, useValue: prisma },
-        { provide: KakaoGeocodingService, useValue: kakaoGeocoding },
         { provide: NotificationsService, useValue: notifications },
       ],
     }).compile();
@@ -156,7 +157,10 @@ describe('TournamentsAdminService', () => {
     service = module.get(TournamentsAdminService);
   });
 
-  afterEach(() => jest.clearAllMocks());
+  afterEach(() => {
+    jest.clearAllMocks();
+    fetchSpy.mockRestore();
+  });
 
   // ─── admin-role gates ───────────────────────────────────────────────────────
 
@@ -274,51 +278,77 @@ describe('TournamentsAdminService', () => {
     );
   });
 
-  // ─── venue geocoding wiring (KakaoGeocodingService) ────────────────────────────
+  // ─── venue snapshot (장소 검색에서 고른 값만 저장) ─────────────────────────────
 
-  it('create: venue provided + geocoding succeeds → coordinates saved with the tournament', async () => {
+  const PICKED_VENUE = {
+    venue: '잠실종합운동장',
+    venueAddress: '서울 송파구 올림픽로 25',
+    venueLatitude: 37.5,
+    venueLongitude: 127.07,
+    venueProvider: 'kakao',
+    venueProviderId: '8301',
+  };
+
+  it('create: stores the picked venue snapshot as-is and never calls an external geocoder', async () => {
     prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
     prisma.v1Sport.findUnique.mockResolvedValue({ id: 'sport-1' });
-    prisma.v1Tournament.create.mockResolvedValue(tournamentRow({ venue: '잠실종합운동장', latitude: 37.5, longitude: 127.07 }));
-    kakaoGeocoding.geocode.mockResolvedValue({ latitude: 37.5, longitude: 127.07 });
+    prisma.v1Tournament.create.mockResolvedValue(tournamentRow({ venue: '잠실종합운동장' }));
 
-    await service.create(ownerAuthUser, { sportId: 'sport-1', title: '테스트 대회', teamCount: 8, venue: '잠실종합운동장' });
+    await service.create(ownerAuthUser, { sportId: 'sport-1', title: '테스트 대회', teamCount: 8, ...PICKED_VENUE });
 
-    expect(kakaoGeocoding.geocode).toHaveBeenCalledWith('잠실종합운동장');
+    expect(fetchSpy).not.toHaveBeenCalled();
     expect(prisma.v1Tournament.create).toHaveBeenCalledWith(
-      expect.objectContaining({ data: expect.objectContaining({ latitude: 37.5, longitude: 127.07 }) }),
+      expect.objectContaining({
+        data: expect.objectContaining({
+          venue: '잠실종합운동장',
+          venueAddress: '서울 송파구 올림픽로 25',
+          latitude: 37.5,
+          longitude: 127.07,
+          venueProvider: 'kakao',
+          venueProviderId: '8301',
+        }),
+      }),
     );
   });
 
-  it('create: no venue → geocoding is never called and coordinates are null', async () => {
+  it('create: a typed-in venue name keeps every pin column null', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+    prisma.v1Sport.findUnique.mockResolvedValue({ id: 'sport-1' });
+    prisma.v1Tournament.create.mockResolvedValue(tournamentRow({ venue: '동네 운동장' }));
+
+    await service.create(ownerAuthUser, { sportId: 'sport-1', title: '테스트 대회', teamCount: 8, venue: '동네 운동장' });
+
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(prisma.v1Tournament.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          venue: '동네 운동장', venueAddress: null, latitude: null, longitude: null, venueProvider: null, venueProviderId: null,
+        }),
+      }),
+    );
+  });
+
+  it('create: a partial pin is rejected with PLACE_SNAPSHOT_INCOMPLETE before anything is written', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+    prisma.v1Sport.findUnique.mockResolvedValue({ id: 'sport-1' });
+
+    await expect(
+      service.create(ownerAuthUser, { sportId: 'sport-1', title: '테스트 대회', teamCount: 8, venue: '잠실', venueLatitude: 37.5 }),
+    ).rejects.toMatchObject({ response: { code: 'PLACE_SNAPSHOT_INCOMPLETE' } });
+    expect(prisma.v1Tournament.create).not.toHaveBeenCalled();
+  });
+
+  it('create: no venue → every venue column is null', async () => {
     prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
     prisma.v1Sport.findUnique.mockResolvedValue({ id: 'sport-1' });
     prisma.v1Tournament.create.mockResolvedValue(tournamentRow());
 
     await service.create(ownerAuthUser, { sportId: 'sport-1', title: '테스트 대회', teamCount: 8 });
 
-    expect(kakaoGeocoding.geocode).not.toHaveBeenCalled();
     expect(prisma.v1Tournament.create).toHaveBeenCalledWith(
-      expect.objectContaining({ data: expect.objectContaining({ latitude: null, longitude: null }) }),
-    );
-  });
-
-  it('create: geocoding disabled/failed (returns null) → venue still saves, coordinates stay null', async () => {
-    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
-    prisma.v1Sport.findUnique.mockResolvedValue({ id: 'sport-1' });
-    prisma.v1Tournament.create.mockResolvedValue(tournamentRow({ venue: '알 수 없는 장소' }));
-    kakaoGeocoding.geocode.mockResolvedValue(null);
-
-    const result = await service.create(ownerAuthUser, {
-      sportId: 'sport-1',
-      title: '테스트 대회',
-      teamCount: 8,
-      venue: '알 수 없는 장소',
-    });
-
-    expect(result).toMatchObject({ venue: '알 수 없는 장소' });
-    expect(prisma.v1Tournament.create).toHaveBeenCalledWith(
-      expect.objectContaining({ data: expect.objectContaining({ latitude: null, longitude: null }) }),
+      expect.objectContaining({
+        data: expect.objectContaining({ venue: null, venueAddress: null, latitude: null, longitude: null, venueProvider: null, venueProviderId: null }),
+      }),
     );
   });
 
@@ -997,41 +1027,46 @@ describe('TournamentsAdminService', () => {
     );
   });
 
-  it('update: venue changed → re-geocodes and persists new coordinates', async () => {
+  it('update: venue with a picked snapshot replaces the whole snapshot', async () => {
     prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
     const existing = tournamentRow({ venue: '기존 장소', latitude: 1, longitude: 1 });
-    const updated = tournamentRow({ venue: '새 장소', latitude: 37.4, longitude: 127.1 });
-    prisma.v1Tournament.findFirst
-      .mockResolvedValueOnce(existing)
-      .mockResolvedValueOnce({ ...updated, _count: { registrations: 0 } });
-    prisma.v1Tournament.updateMany.mockResolvedValue({ count: 1 });
-    kakaoGeocoding.geocode.mockResolvedValue({ latitude: 37.4, longitude: 127.1 });
-
-    await service.update(ownerAuthUser, 'tournament-1', { expectedVersion: TOURNAMENT_ROW_UPDATED_AT, venue: '새 장소' });
-
-    expect(kakaoGeocoding.geocode).toHaveBeenCalledWith('새 장소');
-    expect(prisma.v1Tournament.updateMany).toHaveBeenCalledWith(
-      expect.objectContaining({ data: expect.objectContaining({ venue: '새 장소', latitude: 37.4, longitude: 127.1 }) }),
-    );
-  });
-
-  it('update: venue unchanged (same value resent) → does not re-geocode or touch coordinates', async () => {
-    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
-    const existing = tournamentRow({ venue: '동일 장소', latitude: 5, longitude: 5 });
     prisma.v1Tournament.findFirst
       .mockResolvedValueOnce(existing)
       .mockResolvedValueOnce({ ...existing, _count: { registrations: 0 } });
     prisma.v1Tournament.updateMany.mockResolvedValue({ count: 1 });
 
-    await service.update(ownerAuthUser, 'tournament-1', { expectedVersion: TOURNAMENT_ROW_UPDATED_AT, venue: '동일 장소' });
+    await service.update(ownerAuthUser, 'tournament-1', { expectedVersion: TOURNAMENT_ROW_UPDATED_AT, ...PICKED_VENUE });
 
-    expect(kakaoGeocoding.geocode).not.toHaveBeenCalled();
-    const updateCallData = prisma.v1Tournament.updateMany.mock.calls[0][0].data;
-    expect(updateCallData).not.toHaveProperty('latitude');
-    expect(updateCallData).not.toHaveProperty('longitude');
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(prisma.v1Tournament.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          venue: '잠실종합운동장', venueAddress: '서울 송파구 올림픽로 25', latitude: 37.5, longitude: 127.07, venueProvider: 'kakao', venueProviderId: '8301',
+        }),
+      }),
+    );
   });
 
-  it('update: clearing venue and editable text fields persists null without geocoding', async () => {
+  it('update: renaming the venue without a pin clears the old coordinates and provider', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+    const existing = tournamentRow({ venue: '기존 장소', latitude: 5, longitude: 5, venueProvider: 'kakao', venueProviderId: '1' });
+    prisma.v1Tournament.findFirst
+      .mockResolvedValueOnce(existing)
+      .mockResolvedValueOnce({ ...existing, _count: { registrations: 0 } });
+    prisma.v1Tournament.updateMany.mockResolvedValue({ count: 1 });
+
+    await service.update(ownerAuthUser, 'tournament-1', { expectedVersion: TOURNAMENT_ROW_UPDATED_AT, venue: '다른 이름' });
+
+    expect(prisma.v1Tournament.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          venue: '다른 이름', venueAddress: null, latitude: null, longitude: null, venueProvider: null, venueProviderId: null,
+        }),
+      }),
+    );
+  });
+
+  it('update: clearing venue and editable text fields persists null, including the venue snapshot', async () => {
     prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
     const existing = tournamentRow({
       venue: '기존 장소',
@@ -1063,11 +1098,13 @@ describe('TournamentsAdminService', () => {
       rulesText: null,
     });
 
-    expect(kakaoGeocoding.geocode).not.toHaveBeenCalled();
     expect(prisma.v1Tournament.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
           venue: null,
+          venueAddress: null,
+          venueProvider: null,
+          venueProviderId: null,
           parkingInfo: null,
           latitude: null,
           longitude: null,
@@ -1078,7 +1115,7 @@ describe('TournamentsAdminService', () => {
     );
   });
 
-  it('update: venue not included in dto → does not re-geocode or touch coordinates', async () => {
+  it('update: venue not included in dto → leaves the venue snapshot untouched', async () => {
     prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
     const existing = tournamentRow({ venue: '기존 장소', latitude: 5, longitude: 5 });
     prisma.v1Tournament.findFirst
@@ -1088,28 +1125,10 @@ describe('TournamentsAdminService', () => {
 
     await service.update(ownerAuthUser, 'tournament-1', { expectedVersion: TOURNAMENT_ROW_UPDATED_AT, title: '제목만 변경' });
 
-    expect(kakaoGeocoding.geocode).not.toHaveBeenCalled();
     const updateCallData = prisma.v1Tournament.updateMany.mock.calls[0][0].data;
-    expect(updateCallData).not.toHaveProperty('latitude');
-    expect(updateCallData).not.toHaveProperty('longitude');
-  });
-
-  it('update: geocoding disabled/failed on venue change → clears coordinates to null (never blocks venue save)', async () => {
-    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
-    const existing = tournamentRow({ venue: '기존 장소', latitude: 5, longitude: 5 });
-    const updated = tournamentRow({ venue: '지오코딩 실패 장소', latitude: null, longitude: null });
-    prisma.v1Tournament.findFirst
-      .mockResolvedValueOnce(existing)
-      .mockResolvedValueOnce({ ...updated, _count: { registrations: 0 } });
-    prisma.v1Tournament.updateMany.mockResolvedValue({ count: 1 });
-    kakaoGeocoding.geocode.mockResolvedValue(null);
-
-    const result = await service.update(ownerAuthUser, 'tournament-1', { expectedVersion: TOURNAMENT_ROW_UPDATED_AT, venue: '지오코딩 실패 장소' });
-
-    expect(result).toMatchObject({ venue: '지오코딩 실패 장소' });
-    expect(prisma.v1Tournament.updateMany).toHaveBeenCalledWith(
-      expect.objectContaining({ data: expect.objectContaining({ latitude: null, longitude: null }) }),
-    );
+    for (const key of ['venue', 'venueAddress', 'latitude', 'longitude', 'venueProvider', 'venueProviderId']) {
+      expect(updateCallData).not.toHaveProperty(key);
+    }
   });
 
   it('update: rejects scheduledEndAt earlier than final scheduledAt', async () => {

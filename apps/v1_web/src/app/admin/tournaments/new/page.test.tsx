@@ -57,6 +57,8 @@ vi.mock('@/hooks/use-v1-api', () => ({
   useV1MasterSports: vi.fn(),
   useV1UpdateTournament: vi.fn(),
   useV1UploadImages: vi.fn(),
+  useV1PlaceSearch: () => ({ data: undefined, isFetching: false, isError: false, error: null }),
+  useV1PublicKakaoMapsKey: () => ({ data: { kakaoMapsJsKey: null }, isLoading: false }),
   // Providers 안의 ThemeProvider가 전역으로 호출한다 — 이 테스트가 <Providers>로 렌더하는 한 필요.
   useV1Settings: vi.fn(() => ({ data: undefined, isError: false, refetch: vi.fn() })),
   useV1UpdateSettings: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
@@ -1010,7 +1012,7 @@ describe('AdminTournamentsNewPage — 4단계(공개 확인)', () => {
         { type: 'set-scheduled-at', value: '2026-08-29T09:00' },
         { type: 'set-field', field: 'scheduledEndAt', value: '2026-08-29T18:00' },
         { type: 'set-field', field: 'teamCount', value: '16' },
-        { type: 'set-field', field: 'venue', value: '서울월드컵보조경기장' },
+        { type: 'set-field', field: 'venue', value: { kind: 'manual', name: '서울월드컵보조경기장' } },
         { type: 'set-field', field: 'prizePool', value: '3000000' },
       ].reduce<TournamentCreateState>(
         (state, action) => tournamentCreateReducer(state, action as TournamentCreateAction),
@@ -1047,7 +1049,7 @@ describe('AdminTournamentsNewPage — 4단계(공개 확인)', () => {
       const relocated = tournamentCreateReducer(edited, {
         type: 'set-field',
         field: 'venue',
-        value: '수원종합운동장',
+        value: { kind: 'manual', name: '수원종합운동장' },
       });
 
       expect(relocated.promoHome.locationText).toBe('수원 실내구장 A코트');
@@ -1125,7 +1127,7 @@ describe('AdminTournamentsNewPage — 4단계(공개 확인)', () => {
       const relocated = tournamentCreateReducer(hydrated, {
         type: 'set-field',
         field: 'venue',
-        value: '수원종합운동장',
+        value: { kind: 'manual', name: '수원종합운동장' },
       });
 
       expect(relocated.promoHome.locationText).toBe('수원종합운동장');

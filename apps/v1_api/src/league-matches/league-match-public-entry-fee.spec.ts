@@ -53,3 +53,23 @@ describe('LeagueMatchPublicService.detail — 참가비·대표 이미지', () =
     for (const key of ['bankName', 'bankAccount', 'bankHolder']) expect(select).not.toHaveProperty(key);
   });
 });
+
+describe('LeagueMatchPublicService.detail — 기본 장소', () => {
+  it('고른 기본 장소를 defaultPlace 하나로 내리고 원시 venue 칸은 따로 싣지 않는다', async () => {
+    const { service } = makeService({
+      venue: '망원한강공원 풋살장', venueAddress: '서울 마포구 마포나루길 467', latitude: 37.5551, longitude: 126.8946,
+      venueProvider: 'kakao', venueProviderId: '27355437',
+    });
+    const result = await service.detail('league-1');
+    expect(result.defaultPlace).toEqual({
+      name: '망원한강공원 풋살장', address: '서울 마포구 마포나루길 467', latitude: 37.5551, longitude: 126.8946,
+      provider: 'kakao', providerPlaceId: '27355437',
+    });
+    expect(result).not.toHaveProperty('venueProviderId');
+  });
+
+  it('기본 장소가 없는 리그는 defaultPlace=null', async () => {
+    const { service } = makeService({ venue: null, venueAddress: null, latitude: null, longitude: null, venueProvider: null, venueProviderId: null });
+    expect((await service.detail('league-1')).defaultPlace).toBeNull();
+  });
+});

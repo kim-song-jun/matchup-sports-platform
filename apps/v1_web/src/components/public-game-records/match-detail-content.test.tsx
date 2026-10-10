@@ -1,5 +1,9 @@
 import { render, screen, within } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+vi.mock('@/hooks/use-v1-api', () => ({
+  useV1PublicKakaoMapsKey: () => ({ data: { kakaoMapsJsKey: null }, isLoading: false }),
+}));
+
 import { MatchDetailContent } from './match-detail-content';
 import type { PublicMatchDetail } from './types';
 
@@ -515,5 +519,22 @@ describe('MatchDetailContent — 득점자 아래 도움 줄', () => {
     expect(row.firstElementChild).toBeEmptyDOMElement();
     expect(within(row.lastElementChild as HTMLElement).getByText('김득점')).toBeInTheDocument();
     expect(within(row.lastElementChild as HTMLElement).getByText(/^도움 ·/)).toHaveTextContent('도움 · 최도움');
+  });
+});
+
+describe('MatchDetailContent — 장소 카드', () => {
+  it('place 가 있으면 장소 섹션에 좌표 길찾기 링크를 보이고, 없으면 섹션을 만들지 않는다', () => {
+    const place = { name: '잠실 보조구장', address: '서울 송파구 올림픽로 25', latitude: 37.5, longitude: 127.07, provider: 'kakao' as const, providerPlaceId: 'k1' };
+    const { unmount } = render(<MatchDetailContent data={makeDetail({ place })} />);
+
+    expect(screen.getByRole('heading', { name: '장소' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: '카카오맵으로 길찾기' })).toHaveAttribute(
+      'href',
+      `https://map.kakao.com/link/to/${encodeURIComponent('잠실 보조구장')},37.5,127.07`,
+    );
+    unmount();
+
+    render(<MatchDetailContent data={makeDetail({ place: null })} />);
+    expect(screen.queryByRole('heading', { name: '장소' })).toBeNull();
   });
 });

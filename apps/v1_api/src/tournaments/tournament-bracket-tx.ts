@@ -106,6 +106,56 @@ export async function assertNotInOtherGroupInTx(
   }
 }
 
+const OPPOSITE_FINAL_STAGE: Readonly<Record<string, { phase: 'final' | 'third_place'; code: string; message: string }>> = {
+  third_place: {
+    phase: 'final',
+    code: 'FINALIST_IN_THIRD_PLACE',
+    message: '결승에 올라간 팀은 3·4위전에 넣을 수 없어요. 3·4위전에는 4강에서 진 팀을 넣어 주세요.',
+  },
+  final: {
+    phase: 'third_place',
+    code: 'THIRD_PLACE_TEAM_IN_FINAL',
+    message: '3·4위전에 들어간 팀은 결승에 넣을 수 없어요. 그 경기에서 먼저 빼 주세요.',
+  },
+};
+
+/**
+ * 한 팀이 결승과 3·4위전에 함께 있으면 최종 순위·시상대에 같은 팀이 두 번 나온다. 결승·3·4위전의 경기나 편성에 팀을 넣을 때
+ * 반대쪽 경기·편성에 이미 있는 팀을 거절한다. 이 경기가 이미 갖고 있는 팀은 그대로 둔다(기존 데이터를 막지 않는다).
+ */
+export async function assertNotInOppositeFinalStageInTx(
+  tx: Tx,
+  input: { tournamentId: string; fixtureId: string | null; groupPhase: string; registrationIds: ReadonlyArray<string | null | undefined> },
+): Promise<void> {
+  const rule = OPPOSITE_FINAL_STAGE[input.groupPhase];
+  const ids = input.registrationIds.filter((id): id is string => typeof id === 'string');
+  if (rule === undefined || ids.length === 0) return;
+  const own = input.fixtureId === null
+    ? null
+    : await tx.v1TournamentMatchDetails.findUnique({ where: { teamMatchId: input.fixtureId }, select: { homeRegistrationId: true, awayRegistrationId: true } });
+  const incoming = ids.filter((id) => id !== own?.homeRegistrationId && id !== own?.awayRegistrationId);
+  if (incoming.length === 0) return;
+  const clash = await tx.v1TournamentMatchDetails.findFirst({
+    where: {
+      tournamentId: input.tournamentId,
+      teamMatch: { deletedAt: null },
+      group: { phase: rule.phase },
+      OR: [{ homeRegistrationId: { in: incoming } }, { awayRegistrationId: { in: incoming } }],
+    },
+    select: { homeRegistrationId: true, awayRegistrationId: true },
+  });
+  const enrolled = clash
+    ? null
+    : await tx.v1TournamentGroupTeam.findFirst({
+      where: { registrationId: { in: incoming }, group: { tournamentId: input.tournamentId, phase: rule.phase } },
+      select: { groupId: true, registrationId: true },
+    });
+  if (!clash && !enrolled) return;
+  const registrationId = enrolled?.registrationId
+    ?? incoming.find((id) => id === clash?.homeRegistrationId || id === clash?.awayRegistrationId);
+  throw new ConflictException({ code: rule.code, message: rule.message, details: { registrationId } });
+}
+
 /**
  * 조별 순위는 조 편성(V1TournamentGroupTeam) 기준으로 계산·표시된다. 조별리그(`group`) 조 안의
  * 경기에 들어가는 팀이 편성에 없으면 순위표에서 빠지므로, 경기를 넣는 같은 트랜잭션에서 편성한다.
@@ -193,6 +243,10 @@ export async function updateTournamentFixtureInTx(tx: Tx, admin: V1ActiveAdmin, 
     if (byeTeam) throw new ConflictException({ code: 'BYE_TEAM_HAS_MATCH', message: '부전승팀은 해당 라운드의 경기에 넣을 수 없어요. 다음 라운드에 직접 배정해 주세요.' });
     const group = await tx.v1TournamentGroup.findFirst({ where: { id: input.groupId }, select: { phase: true } });
     if (group) {
+      await assertNotInOppositeFinalStageInTx(tx, {
+        tournamentId: input.tournamentId, fixtureId: input.fixtureId, groupPhase: group.phase,
+        registrationIds: [input.homeRegistrationId, input.awayRegistrationId],
+      });
       const enrolled = await ensureGroupPhaseTeamsInTx(tx, admin, input.tournamentId, input.groupId, group.phase,
         [input.homeRegistrationId, input.awayRegistrationId], { deferOtherGroupCheck: input.enrollmentSink !== undefined });
       input.enrollmentSink?.push(...enrolled);

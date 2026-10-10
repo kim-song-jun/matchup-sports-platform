@@ -76,7 +76,7 @@ import { assertLeagueFixtureGenerationAllowedInTx, assertLeagueNotEndedInTx } fr
 import { LEAGUE_STATE_BY_STATUS, isCompleteLeagueMirror } from '../tournaments/league-competition-mirror';
 import { randomUUID } from 'node:crypto';
 import { BRACKET_TEMPLATE_MAX_FIXTURES } from '../tournaments/templates/bracket-template-plan';
-import { lockCompetitionForBracketMutationInTx, lockCompetitionForSlotReleaseInTx } from '../tournaments/slots/competition-bracket-lock';
+import { lockCompetitionForBracketMutationInTx } from '../tournaments/slots/competition-bracket-lock';
 import { planLeagueTemplate } from './league-template-plan';
 import { LeagueStateValue } from './league-state';
 import { isLeagueRegistrationOpen } from './league-registration-open';
@@ -1503,8 +1503,8 @@ export class LeagueMatchAdminService {
       : null;
     const nextStartAt = dto.startsAt === undefined ? undefined : new Date(dto.startsAt);
     const updated = await this.prisma.$transaction(async (tx) => {
-      // 리그 행 락이 먼저(removeTeam·generateFixtures 와 같은 순서). 끝남·취소만 막고 보류 중 수정은 허용한다.
-      await lockCompetitionForSlotReleaseInTx(tx, { id: leagueId, kind: 'regular_league' });
+      // 끝남·취소만 막고 보류 중 수정은 허용한다. 리그 행은 잠그지 않는다 — 시각·장소 수정은 완료 판정을
+      // 바꾸지 않고, 잠그면 취소·결과 확정(경기 → 리그 완료 갱신)과 역순으로 교착한다.
       await assertLeagueNotEndedInTx(tx, leagueId);
       const nextEndAt = nextStartAt === undefined
         ? undefined
@@ -1553,9 +1553,6 @@ export class LeagueMatchAdminService {
         tx,
       );
       return result;
-    }, {
-      timeout: 45_000, // createManualFixture 와 같은 리그 행 락 대기 한도
-      maxWait: 5_000,
     });
     return {
       teamMatchId: updated.id,

@@ -861,9 +861,9 @@ describe('LeagueMatchAdminService.generateFixtures — 자동 로스터와 신�
   });
 
   /**
-   * 끝남·취소 리그는 잠금 뒤 판정으로 수동 추가·수정을 막고, 보류·진행 중은 허용한다.
-   * 판정은 잠금 뒤 최신 상태여야 하므로 잠금 밖 `loadLeague` 읽기는 진행 중으로 두고
-   * 이후 읽기(가드)만 대상 상태를 준다 — 사전 조회를 통과한 뒤 끝남이 커밋된 순간이다.
+   * 끝남·취소 리그는 수동 추가(리그 행 잠금 뒤 판정)·수정을 막고, 보류·진행 중은 허용한다.
+   * 잠금 밖 `loadLeague` 읽기는 진행 중으로 두고 이후 읽기(가드)만 대상 상태를 준다 —
+   * 사전 조회를 통과한 뒤 끝남이 커밋된 순간이다.
    */
   describe('끝난·취소된 리그의 수동 대진 추가·수정', () => {
     const manual = { homeTeamId: 'team-a', awayTeamId: 'team-b', startsAt: '2026-09-19T01:00:00.000Z' } as const;
@@ -899,10 +899,8 @@ describe('LeagueMatchAdminService.generateFixtures — 자동 로스터와 신�
       await expect(svc.updateFixture(adminUser, 'league-1', 'tm-1', { placeName: '망원 운동장' }))
         .rejects.toMatchObject({ response: { code: 'LEAGUE_ENDED' } });
       expect(fake.state.calls).not.toContain('v1TeamMatch.update');
-      const lockAt = fake.state.calls.indexOf('$queryRaw');
-      const guardAt = fake.state.calls.indexOf('v1Tournament.findFirst');
-      expect(lockAt).toBeGreaterThanOrEqual(0);
-      expect(guardAt).toBeGreaterThan(lockAt);
+      // 수정은 리그 행을 잠그지 않는다 — 잠그면 취소·결과 확정(경기 → 리그)과 역순 교착이 난다.
+      expect(fake.state.calls).not.toContain('$queryRaw');
     });
 
     // 대조군: 보류 중 수동 추가·수정은 허용이다 — 일괄 생성 가드(LEAGUE_ON_HOLD)를 쓰면 여기서 깨진다.

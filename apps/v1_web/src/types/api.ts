@@ -1669,6 +1669,8 @@ export type V1GameResultRevision = {
   outcomeNote: string | null;
   createdByActorType: 'USER' | 'SYSTEM';
   createdByUserId: string | null;
+  /** 만든 사람의 닉네임. 시스템이 만든 리비전은 `null`. */
+  createdByName: string | null;
   createdBySystemActor: string | null;
   supersedesId: string | null;
   submittedAt: string | null;
@@ -5117,6 +5119,9 @@ export type V1MyTournamentStaffFixture = {
   gameId: string;
   tournamentId: string;
   title: string;
+  /** 경기 콘솔과 같은 홈·원정 이름. 사이드가 아직 없으면 `null`. */
+  homeTeamName: string | null;
+  awayTeamName: string | null;
   scheduledAt: string | null;
   status: string;
   gameState: V1GameState | null;

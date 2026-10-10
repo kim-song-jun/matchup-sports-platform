@@ -153,6 +153,10 @@ describe('TeamDissolutionService.dissolve', () => {
 });
 
 describe('TeamDissolutionService.dissolve — 자동 정리와 알림', () => {
+  // FUTURE·PAST 가 고정 날짜라 "앞으로 있을 경기" 판정이 실제 시계를 따르면 FUTURE 가 지난 날부터 깨진다.
+  beforeEach(() => jest.useFakeTimers({ now: new Date('2026-10-01T09:00:00.000Z'), doNotFake: ['nextTick', 'setImmediate'] }));
+  afterEach(() => jest.useRealTimers());
+
   const candidates = [
     candidate('tm-open'),
     candidate('tm-closed', { status: 'closed' }),

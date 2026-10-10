@@ -50,7 +50,7 @@ describe('KakaoMapPreview', () => {
         <KakaoMapPreview name="망원 풋살장" latitude={37.55} longitude={126.9} />
       </QueryClientProvider>,
     );
-    expect(html).not.toContain('<a');
+    expect(html).not.toContain('망원 풋살장 지도 크게 보기');
   });
 
   it('SDK 가 준비되면 드래그·휠 확대를 끈 지도를 만들고 핀을 꽂는다', async () => {

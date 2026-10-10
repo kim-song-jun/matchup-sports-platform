@@ -342,6 +342,8 @@ export function PlacePicker({
                     alignItems: 'flex-start',
                     padding: '12px 14px',
                     minHeight: 56,
+                    // 키보드로 고른 항목이 바닥에 붙은 직접 입력 줄(48px)에 가리지 않게.
+                    scrollMarginBottom: 56,
                     cursor: 'pointer',
                     borderBottom: '1px solid var(--grey100)',
                     background: active ? 'var(--blue50)' : undefined,

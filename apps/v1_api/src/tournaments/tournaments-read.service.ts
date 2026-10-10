@@ -113,20 +113,21 @@ export class TournamentsReadService {
    * - deletedAt=null + status in (open/closed/in_progress/completed)
    * - 각 카드에 confirmedCount(status=confirmed registration 수) 포함
    * - **두 가지 페이지네이션을 동시에 지원한다**: 모바일 무한 스크롤은 `cursor`,
-   *   데스크톱 페이지 번호는 `page`. 둘 다 오면 page 가 이긴다(`resolveListStart`).
+   *   데스크톱 페이지 번호는 `page`. 둘 다 오면 page 가 이긴다(page=1 포함 — cursor 는 무시).
    *   응답의 `nextCursor`/`hasNext` 는 그대로라 기존 호출자는 영향받지 않는다.
    */
   async list(query: TournamentListQueryDto) {
     const limit = query.limit ?? 20;
 
     // Only page-number requests need the grand total; infinite scroll just needs "is there a next".
-    const wantsPageNumbers = query.page !== undefined && query.page > 0;
+    const page = query.page !== undefined && query.page > 0 ? query.page : undefined;
+    const wantsPageNumbers = page !== undefined;
 
     // Filtering, group order and paging all run in the database (`tournament-list-query.ts`); only
     // the page rows (id + resume cursor) come back, and the full rows are loaded for them below.
     const window = await listTournamentIds(this.prisma, query, {
       limit,
-      ...(query.page && query.page > 1 ? { offset: (query.page - 1) * limit } : { cursor: query.cursor }),
+      ...(page !== undefined ? { offset: (page - 1) * limit } : { cursor: query.cursor }),
     });
     const total = wantsPageNumbers ? await countTournamentList(this.prisma, query) : null;
     const hasNext = window.length > limit;

@@ -284,7 +284,8 @@ async function redeliverOfficialEvents(gameId: string): Promise<void> {
   expect(before.length).toBeGreaterThan(0);
   await prisma.v1OutboxEvent.updateMany({
     where: { id: { in: before.map((event) => event.id) } },
-    data: { status: 'PENDING', leaseOwner: null, leaseUntil: null, availableAt: new Date(Date.now() - 1_000) },
+    // v1_outbox_version_cas 트리거가 UPDATE 마다 version + 1 을 요구한다(어기면 40001).
+    data: { status: 'PENDING', leaseOwner: null, leaseUntil: null, availableAt: new Date(Date.now() - 1_000), version: { increment: 1 } },
   });
   await drainOutboxWorker(prisma);
   const after = await prisma.v1OutboxEvent.findMany({ where: { id: { in: before.map((event) => event.id) } } });

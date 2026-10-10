@@ -38,8 +38,8 @@ vi.mock('./bracket-node-panel', () => ({
   ),
 }));
 vi.mock('./bracket-fixture-tools-dialog', () => ({
-  BracketFixtureToolsDialog: (props: { open: boolean; mode: string }) =>
-    props.open ? <div data-testid="tools-dialog" data-mode={props.mode} /> : null,
+  BracketFixtureToolsDialog: (props: { open: boolean; mode: string; format?: string }) =>
+    props.open ? <div data-testid="tools-dialog" data-mode={props.mode} data-format={props.format ?? ''} /> : null,
 }));
 vi.mock('./bracket-template-dialog', () => ({
   BracketTemplateDialog: (props: { open: boolean; hasExistingBracket: boolean; format: string }) =>
@@ -615,3 +615,23 @@ function leagueProps(format: 'league' | 'knockout'): React.ComponentProps<typeof
     onShowList: vi.fn(),
   };
 }
+
+describe('BracketCanvasWorkspace — 리그 「경기 추가」', () => {
+  it('「경기 추가」 대화상자가 대회 방식(format)을 받는다 — 리그는 league, 토너먼트는 knockout', () => {
+    setBracket(leagueBracket);
+    const { unmount } = render(<BracketCanvasWorkspace {...leagueProps('league')} />);
+    fireEvent.click(screen.getByRole('button', { name: '경기 추가' }));
+    expect(screen.getByTestId('tools-dialog')).toHaveAttribute('data-format', 'league');
+    unmount();
+
+    render(<BracketCanvasWorkspace {...leagueProps('knockout')} />);
+    fireEvent.click(screen.getByRole('button', { name: '경기 추가' }));
+    expect(screen.getByTestId('tools-dialog')).toHaveAttribute('data-format', 'knockout');
+  });
+
+  it('읽기 전용 리그 화면에는 「경기 추가」 버튼이 없다', () => {
+    setBracket(leagueBracket);
+    render(<BracketCanvasWorkspace {...leagueProps('league')} canWrite={false} />);
+    expect(screen.queryByRole('button', { name: '경기 추가' })).not.toBeInTheDocument();
+  });
+});

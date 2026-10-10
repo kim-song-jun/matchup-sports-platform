@@ -444,7 +444,7 @@ export function TeamMatchDetailPageClient({ teamMatchId, seed }: { teamMatchId: 
       // ''로 둔다. 렌더 쪽(team-matches-page.tsx)이 falsy면 이미 섹션 자체를 숨긴다
       // (설명 카드: `{match.description ? ... : null}`, 주소: InfoRow의 `sub` optional 처리).
       description: query.data.description ?? query.data.descriptionPreview ?? '',
-      address: query.data.place?.addressText ?? query.data.placeName ?? '',
+      place: query.data.place ?? (query.data.placeName ? { name: query.data.placeName, address: null, latitude: null, longitude: null, provider: null, providerPlaceId: null } : null),
       hostTeamHref: query.data.hostTeam?.teamId ? `/teams/${query.data.hostTeam.teamId}` : undefined,
       hostTeamId: query.data.hostTeam?.teamId ?? null,
       hostTeamLogoUrl: query.data.hostTeam?.logoUrl ?? null,

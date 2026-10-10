@@ -59,6 +59,8 @@ import { LEAGUE_TIE_BREAK_ORDER } from '../../league-matches/league-tie-break';
 import { SLOT_LABEL_SELECT, slotLabelFromRow } from '../../tournaments/slots/tournament-slot-label';
 import { PUBLIC_COMPETITION_STATUS_WHERE } from '../../tournaments/tournaments-read.query';
 import { regularPeriodCount } from '../../tournaments/competition-config/competition-config.parse';
+import { PLACE_SELECT } from '../../places/place-select';
+import { toPlaceView, type PlaceView } from '../../places/place-snapshot';
 
 /**
  * A fixture/match this route never returns individually and never lists in
@@ -169,7 +171,7 @@ const CANONICAL_SCHEDULE_SELECT = {
   teamMatch: {
     select: {
       startAt: true,
-      placeName: true,
+      ...PLACE_SELECT,
       status: true,
       fieldId: true,
       homeSlot: { select: SLOT_LABEL_SELECT },
@@ -196,6 +198,7 @@ type FixtureScheduleRow = {
   groupId: string | null;
   scheduledAt: Date | null;
   venue: string | null;
+  place: PlaceView | null;
   status: TournamentFixtureStatus;
   homeRegistrationId: string | null;
   awayRegistrationId: string | null;
@@ -218,6 +221,7 @@ function presentCanonicalSchedule(row: CanonicalScheduleRow): FixtureScheduleRow
     groupId: row.groupId,
     scheduledAt: row.teamMatch.startAt,
     venue: row.teamMatch.placeName,
+    place: toPlaceView(row.teamMatch),
     status: canonicalFixtureStatus(row.teamMatch.status),
     homeRegistrationId: row.homeRegistrationId,
     awayRegistrationId: row.awayRegistrationId,
@@ -241,6 +245,7 @@ type PublicFixtureMatchRow = {
   groupId: string | null;
   scheduledAt: Date | null;
   venue: string | null;
+  place: PlaceView | null;
   status: TournamentFixtureStatus;
   homeRegistrationId: string | null;
   awayRegistrationId: string | null;
@@ -270,7 +275,7 @@ const CANONICAL_MATCH_SELECT = {
   teamMatch: {
     select: {
       startAt: true,
-      placeName: true,
+      ...PLACE_SELECT,
       status: true,
       fieldId: true,
       field: { select: { name: true } },
@@ -304,6 +309,7 @@ function presentCanonicalMatch(row: CanonicalMatchRow): FixtureMatchRow {
     groupId: row.groupId,
     scheduledAt: row.teamMatch.startAt,
     venue: row.teamMatch.placeName,
+    place: toPlaceView(row.teamMatch),
     status: canonicalFixtureStatus(row.teamMatch.status),
     homeRegistrationId: row.homeRegistrationId,
     awayRegistrationId: row.awayRegistrationId,
@@ -1248,6 +1254,7 @@ export class PublicTournamentRecordsService {
       groupName: fixture.group?.name ?? null,
       scheduledAt: fixture.scheduledAt?.toISOString() ?? null,
       venue: fixture.venue,
+      place: fixture.place,
       fieldName: fixture.field?.name ?? null,
       home: presentSide(fixture.homeRegistrationId, fixture.homeRegistration, hideIdentity),
       away: presentSide(fixture.awayRegistrationId, fixture.awayRegistration, hideIdentity),
@@ -1835,7 +1842,7 @@ export class PublicTournamentRecordsService {
         hostTeamId: true,
         approvedApplicantTeamId: true,
         startAt: true,
-        placeName: true,
+        ...PLACE_SELECT,
         status: true,
         hostTeam: { select: { id: true, name: true } },
         approvedApplicantTeam: { select: { id: true, name: true } },
@@ -1951,6 +1958,7 @@ export class PublicTournamentRecordsService {
       groupName: null,
       scheduledAt: teamMatch.startAt.toISOString(),
       venue: teamMatch.placeName,
+      place: toPlaceView(teamMatch),
       fieldName: null,
       // 리그 대진은 등록(registration) 개념이 없다 — teamId 를 그대로 안정적 id 로 쓴다.
       home: { registrationId: teamMatch.hostTeam.id, teamId: teamMatch.hostTeam.id, teamName: teamMatch.hostTeam.name },
@@ -2180,7 +2188,7 @@ const LEAGUE_SCHEDULE_SELECT = {
   id: true,
   leagueId: true,
   startAt: true,
-  placeName: true,
+  ...PLACE_SELECT,
   status: true,
   hostTeamId: true,
   approvedApplicantTeamId: true,
@@ -2248,6 +2256,7 @@ function toLeagueScheduleRow(
     groupId: null,
     scheduledAt: fixture.startAt,
     venue: fixture.placeName,
+    place: toPlaceView(fixture),
     status: LEAGUE_STATUS_TO_FIXTURE_STATUS[fixture.status],
     homeRegistrationId: fixture.hostTeamId,
     awayRegistrationId: fixture.approvedApplicantTeamId,
@@ -2414,6 +2423,7 @@ function presentScheduleEntry(
     groupName: fixture.group?.name ?? null,
     scheduledAt: fixture.scheduledAt?.toISOString() ?? null,
     venue: fixture.venue,
+    place: fixture.place,
     // finding #76: fieldId도 함께 내려준다 -- 위 canonical schedule select의 field.id 참고.
     // 소비처(my-staff-fixtures-client.tsx)가 이제 이 값으로 담당 경기를 매칭한다
     // (이름은 유일하지 않아 동명 필드가 생기면 오배정된다).

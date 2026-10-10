@@ -1,3 +1,4 @@
+import { IsPlaceLatitude, IsPlaceLongitude, IsPlaceProvider, IsPlaceProviderId } from '../../places/place-snapshot';
 import { GENDER_RULES } from '../../common/gender-rule';
 import { ArrayMaxSize, IsArray, IsDateString, IsNotEmpty, IsOptional, IsString, IsUUID, MaxLength, IsIn } from 'class-validator';
 import {
@@ -57,6 +58,18 @@ export class MutateTeamMatchDto {
   @IsString()
   @MaxLength(200)
   addressText?: string | null;
+
+  @IsPlaceLatitude()
+  placeLatitude?: number | null;
+
+  @IsPlaceLongitude()
+  placeLongitude?: number | null;
+
+  @IsPlaceProvider()
+  placeProvider?: string | null;
+
+  @IsPlaceProviderId()
+  placeProviderId?: string | null;
 
   @IsOptional()
   @IsString()

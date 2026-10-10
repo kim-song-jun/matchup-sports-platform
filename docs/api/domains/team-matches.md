@@ -157,7 +157,9 @@ Required body:
 - `regionId` (활성 시·군·구)
 - `title`, `startsAt`, `manualPlaceName`
 
-Optional body: `description`, `imageUrl`, `listImageUrl`, `endsAt`, `deadlineAt`, `addressText`, `costNote`, `rulesText`, `minLevelCode`, `maxLevelCode`, `genderRule`, `matchFormat`, `matchStyle`, `uniformColor`.
+Optional body: `description`, `imageUrl`, `listImageUrl`, `endsAt`, `deadlineAt`, `addressText`, `placeLatitude`, `placeLongitude`, `placeProvider`, `placeProviderId`, `costNote`, `rulesText`, `minLevelCode`, `maxLevelCode`, `genderRule`, `matchFormat`, `matchStyle`, `uniformColor`.
+
+장소 4필드(`placeLatitude`/`placeLongitude`/`placeProvider`/`placeProviderId`)는 모두 있거나 모두 없어야 해요(일부만 오면 400 `PLACE_SNAPSHOT_INCOMPLETE`). 수정 때 `manualPlaceName` 을 보내면 장소 전체를 교체해요. 응답의 `place` 는 `{ name, address, latitude, longitude, provider, providerPlaceId } | null` 이고 `recent-venues` 항목에도 좌표·provider 가 실려요(어드민 모집글도 같은 필드).
 
 Rules:
 

@@ -1,3 +1,4 @@
+import type { V1PlaceView } from '@/types/api';
 /**
  * Task 24 -- frontend-local mirror of the public-records response shapes
  * shipped in `apps/v1_api/src/games/public-records/**` (see
@@ -314,6 +315,8 @@ export interface PublicMatchDetail {
   readonly groupName: string | null;
   readonly scheduledAt: string | null;
   readonly venue: string | null;
+  /** 장소 스냅샷(지도·길찾기용). 옛 응답에는 없을 수 있다. */
+  readonly place?: V1PlaceView | null;
   readonly fieldName: string | null;
   readonly home: PublicSideSummary | null;
   readonly away: PublicSideSummary | null;

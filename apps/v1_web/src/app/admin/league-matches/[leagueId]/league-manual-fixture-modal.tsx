@@ -6,6 +6,15 @@ import { useModalA11y } from '@/components/v1-ui/use-modal-a11y';
 import { extractErrorMessage } from '@/lib/error-message';
 import type { V1CreateManualLeagueFixturePayload } from '@/types/league-match';
 import { kstDatetimeLocalToIso } from '@/lib/kst-calendar';
+import type { V1PlaceView } from '@/types/api';
+import {
+  DEFAULT_LEAGUE_PLACE_CHOICE,
+  isLeaguePlaceChoiceIncomplete,
+  LeagueFixturePlaceField,
+  leaguePlacePayload,
+  type LeaguePlaceChoice,
+} from './league-fixture-place-field';
+
 
 /**
  * 리그에 **한 경기만** 추가하는 모달(사용자 B안, 2026-09-04 — 전체화면 모달 + EntityPicker 재사용).
@@ -23,12 +32,17 @@ import { kstDatetimeLocalToIso } from '@/lib/kst-calendar';
  */
 export function LeagueManualFixtureModal({
   teams,
+  defaultPlace,
+  recentVenues,
   isSubmitting,
   onSubmit,
   onClose,
 }: {
   /** 리그 참가팀. 홈·어웨이 후보는 여기서만 고른다 — 리그 밖 팀은 서버가 거부한다. */
   teams: EntityPickerItem[];
+  /** 리그 기본 장소 — "기본 장소 사용" 이 가리키는 곳. */
+  defaultPlace: V1PlaceView | null;
+  recentVenues?: ReadonlyArray<V1PlaceView>;
   isSubmitting: boolean;
   /**
    * **계약 타입을 그대로 쓴다** — 인라인으로 다시 적으면 서버 DTO 가 바뀌었을 때
@@ -41,7 +55,7 @@ export function LeagueManualFixtureModal({
   const [away, setAway] = useState<EntityPickerItem | null>(null);
   const [startsAtLocal, setStartsAtLocal] = useState('');
   const [duration, setDuration] = useState('');
-  const [placeName, setPlaceName] = useState('');
+  const [placeChoice, setPlaceChoice] = useState<LeaguePlaceChoice>(DEFAULT_LEAGUE_PLACE_CHOICE);
   const [error, setError] = useState<string | null>(null);
   // ESC·focus trap·body 스크롤 잠금은 어드민 모달 공용 훅이 담당한다. **`pending` 을 넘기는
   // 것이 핵심** — 제출 중 ESC 로 닫히면 요청은 날아가는데 화면은 사라져, 운영자는 경기가
@@ -84,13 +98,17 @@ export function LeagueManualFixtureModal({
       setError('경기 시간은 1분에서 600분 사이로 입력해 주세요.');
       return;
     }
+    if (isLeaguePlaceChoiceIncomplete(placeChoice)) {
+      setError('다른 장소를 골라 주세요.');
+      return;
+    }
     try {
       await onSubmit({
         homeTeamId: home.id,
         awayTeamId: away.id,
         startsAt,
         ...(durationMinutes === undefined ? {} : { durationMinutes }),
-        ...(placeName.trim() === '' ? {} : { placeName: placeName.trim() }),
+        ...leaguePlacePayload(placeChoice),
       });
       onClose();
     } catch (err) {
@@ -189,18 +207,13 @@ export function LeagueManualFixtureModal({
           />
         </div>
 
-        <div className="mb-4">
-          <label htmlFor="manual-fixture-place" className="mb-1 block text-sm font-medium text-[var(--text-strong)]">
-            장소
-          </label>
-          <input
-            id="manual-fixture-place"
-            type="text"
-            maxLength={100}
-            value={placeName}
-            onChange={(event) => setPlaceName(event.target.value)}
-            placeholder="예: 성산 풋살파크 A구장"
-            className="tm-input min-h-[44px] w-full"
+        <div className="mb-4 grid">
+          <LeagueFixturePlaceField
+            defaultPlace={defaultPlace}
+            recentVenues={recentVenues}
+            choice={placeChoice}
+            onChange={setPlaceChoice}
+            disabled={isSubmitting}
           />
         </div>
 

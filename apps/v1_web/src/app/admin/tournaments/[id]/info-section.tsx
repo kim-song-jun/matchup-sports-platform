@@ -14,6 +14,8 @@ import { resolveTournamentImage } from '@/lib/tournament-promo';
 import { PrizeBreakdownEditor, createPrizeRowId, serializeTournamentPrizeRows, type TournamentPrizeRow } from '@/components/admin/tournaments/prize-breakdown-editor';
 import { PromoCardFields, type TournamentPromoCardValue } from '@/components/admin/tournaments/promo-card-fields';
 import { TournamentDatetimeField } from '@/components/admin/tournaments/tournament-datetime-field';
+import { PlacePicker } from '@/components/v1-ui/place-picker';
+import { placeFromVenueFields, toVenuePayload, type PlaceValue } from '@/lib/place';
 import { useTournamentAdmin } from './tournament-admin-context';
 import { TournamentPeriodSettingsEditor } from '@/components/admin/tournament-period-settings-editor';
 import { TOURNAMENT_STATUS_LABEL, formatDate, formatDateRange } from './tournament-admin-shared';
@@ -64,7 +66,7 @@ export function TournamentInfoSection() {
   const [editScheduledEndAt, setEditScheduledEndAt] = useState('');
   const [editDeadlineAt, setEditDeadlineAt] = useState('');
   const [editRosterDeadlineAt, setEditRosterDeadlineAt] = useState('');
-  const [editVenue, setEditVenue] = useState('');
+  const [editVenue, setEditVenue] = useState<PlaceValue | null>(null);
   const [editParkingInfo, setEditParkingInfo] = useState('');
   const [editEntryFee, setEditEntryFee] = useState('');
   const [editTeamCount, setEditTeamCount] = useState('');
@@ -136,7 +138,7 @@ export function TournamentInfoSection() {
     setEditScheduledEndAt(isoToKstDatetimeLocal(tournament.scheduledEndAt));
     setEditDeadlineAt(isoToKstDatetimeLocal(tournament.registrationDeadlineAt));
     setEditRosterDeadlineAt(isoToKstDatetimeLocal(tournament.rosterDeadlineAt));
-    setEditVenue(tournament.venue ?? '');
+    setEditVenue(placeFromVenueFields(tournament));
     setEditParkingInfo(tournament.parkingInfo ?? '');
     setEditEntryFee(String(tournament.entryFee));
     setEditTeamCount(String(tournament.teamCount));
@@ -296,8 +298,11 @@ export function TournamentInfoSection() {
     if (editRosterDeadlineAt !== isoToKstDatetimeLocal(tournament.rosterDeadlineAt)) {
       payload.rosterDeadlineAt = kstDatetimeLocalToIso(editRosterDeadlineAt);
     }
-    const normalizedVenue = editVenue.trim() || null;
-    if (normalizedVenue !== tournament.venue) payload.venue = normalizedVenue;
+    // 이름이 바뀌면 서버가 스냅샷 전체를 교체하므로, 바뀐 경우에만 장소 필드를 통째로 보낸다.
+    const originalVenue = placeFromVenueFields(tournament);
+    if (JSON.stringify(toVenuePayload(editVenue)) !== JSON.stringify(toVenuePayload(originalVenue))) {
+      Object.assign(payload, editVenue ? toVenuePayload(editVenue) : { venue: null });
+    }
     const normalizedParkingInfo = editParkingInfo.trim() || null;
     if (normalizedParkingInfo !== (tournament.parkingInfo ?? null)) {
       payload.parkingInfo = normalizedParkingInfo;
@@ -742,18 +747,13 @@ export function TournamentInfoSection() {
             />
           </div>
 
-          <div className="flex flex-col gap-2">
-            <label htmlFor="edit-venue" className="text-[length:var(--font-size-label)] text-[var(--text-strong)]">장소</label>
-            <input
-              id="edit-venue"
-              type="text"
-              value={editVenue}
-              onChange={(e) => setEditVenue(e.target.value)}
-              disabled={updateTournament.isPending}
-              maxLength={100}
-              className={inputCls}
-            />
-          </div>
+          <PlacePicker
+            id="edit-venue"
+            label="장소"
+            value={editVenue}
+            onChange={setEditVenue}
+            disabled={updateTournament.isPending}
+          />
 
           <div className="flex flex-col gap-2">
             <label htmlFor="edit-parking-info" className="text-[length:var(--font-size-label)] text-[var(--text-strong)]">주차 안내</label>

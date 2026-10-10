@@ -7,13 +7,17 @@ import { competitionMatchLabel } from './tournament-round-label';
 import { defaultFixtureEndAt } from './competition-config/fixture-end-at';
 import { assertStartedTeamChangeAllowed, discardUnconfirmedResultRevisions, purgeReplacedSideEvents, type StartedTeamChangeSummary } from './tournament-started-team-change';
 
+import { PLACE_SELECT } from '../places/place-select';
+import { toPlaceColumns, toPlaceView, type PlaceSnapshot, type PlaceView } from '../places/place-snapshot';
+
 type Tx = Prisma.TransactionClient;
 
 export type TournamentMatchUpdateInput = {
   teamMatchId: string;
   fixtureNumber?: number;
   scheduledAt?: Date | null;
-  venue?: string;
+  /** undefined 는 그대로 두고, null 은 장소를 비워요. 값이 오면 스냅샷 전체를 교체해요. */
+  place?: PlaceSnapshot | null;
   homeRegistrationId?: string | null;
   awayRegistrationId?: string | null;
   /**
@@ -49,6 +53,7 @@ export async function updateTournamentMatchInTx(
   awayRegistrationId: string | null;
   startAt: Date | null;
   placeName: string | null;
+  place: PlaceView | null;
   status: string;
   createdAt: Date;
   updatedAt: Date;
@@ -97,7 +102,7 @@ export async function updateTournamentMatchInTx(
           startAt: true,
           endAt: true,
           competitionConfigVersionId: true,
-          placeName: true,
+          ...PLACE_SELECT,
           status: true,
           createdAt: true,
           updatedAt: true,
@@ -176,7 +181,7 @@ export async function updateTournamentMatchInTx(
       reason: input.teamChangeReason,
     })
     : null;
-  const nextPlaceName = input.venue !== undefined ? input.venue.trim() || null : detail.teamMatch.placeName;
+  const nextPlaceColumns = input.place !== undefined ? toPlaceColumns(input.place) : null;
   // 길이를 아는 경기는 그 길이를 새 시작에 그대로 옮기고, 종료 시각이 없던 경기는 새 시작 +
   // 경기 설정의 정규 시간(연장 제외 피리어드 합계)으로 채운다 — 대진 생성과 같은 기준이다.
   const nextEndAt = nextStartAt === null
@@ -203,14 +208,14 @@ export async function updateTournamentMatchInTx(
       approvedApplicantTeamId: nextAwayTeamId,
       startAt: nextStartAt,
       endAt: nextEndAt,
-      placeName: nextPlaceName,
+      ...(nextPlaceColumns ?? {}),
     },
     select: {
       id: true,
       tournamentId: true,
       title: true,
       startAt: true,
-      placeName: true,
+      ...PLACE_SELECT,
       status: true,
       createdAt: true,
       updatedAt: true,
@@ -300,6 +305,7 @@ export async function updateTournamentMatchInTx(
     awayRegistrationId: nextAway,
     startAt: updated.startAt,
     placeName: updated.placeName,
+    place: toPlaceView(updated),
     status: updated.status,
     createdAt: updated.createdAt,
     updatedAt: updated.updatedAt,

@@ -102,7 +102,7 @@ describe('renderLlmsFull', () => {
   });
 
   it('구장별 묶음은 목록 상한(60건) 안에 실린 항목만 가리킨다', () => {
-    const many = Array.from({ length: 61 }, (_, i) => match({ matchId: `m${i}`, title: `매치 ${i}`, place: { name: `구장 ${i}` } }));
+    const many = Array.from({ length: 61 }, (_, i) => match({ matchId: `m${i}`, title: `매치 ${i}`, place: { name: `구장 ${i}`, address: null, latitude: null, longitude: null, provider: null, providerPlaceId: null } }));
     const text = renderLlmsFull({ ...empty, matches: many });
     expect(text).toContain('/matches/m59)');
     expect(text).not.toContain('/matches/m60)');

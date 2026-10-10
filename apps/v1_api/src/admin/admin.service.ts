@@ -14,6 +14,8 @@ import {
 import { Prisma } from '@prisma/client';
 import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 import { V1AuthUser } from '../auth/v1-auth-user';
+import { PLACE_SELECT } from '../places/place-select';
+import { toPlaceView } from '../places/place-snapshot';
 import { PrismaService } from '../prisma/prisma.service';
 import { buildPageInfo, paginationArgs } from '../common/pagination/page-args';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -1119,8 +1121,7 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
         description: true,
         imageUrl: true,
         listImageUrl: true,
-        placeName: true,
-        placeAddress: true,
+        ...PLACE_SELECT,
         startAt: true,
         endAt: true,
         deadlineAt: true,
@@ -1205,6 +1206,8 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
       regionName: row.region?.name ?? null,
       placeName: row.placeName,
       placeAddress: row.placeAddress ?? null,
+      // 수정 폼이 이 값으로 고른 장소를 복원한다 — 없으면 저장할 때 핀이 지워진다.
+      place: toPlaceView(row),
       startAt: row.startAt,
       endAt: row.endAt ?? null,
       deadlineAt: row.deadlineAt ?? null,

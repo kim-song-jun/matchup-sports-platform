@@ -68,7 +68,7 @@ interface FakeState {
   /** 수동 대진의 주차 파생이 읽는 형제 대진 시작 시각. 테스트가 갈아끼운다. */
   siblingStartAts: Date[];
   /** `v1TeamMatch.create` 에 실린 data — 제목·시각·장소를 그대로 본다. */
-  teamMatchCreates: Array<{ title: string; startAt: Date; endAt?: Date; placeName: string }>;
+  teamMatchCreates: Array<{ title: string; startAt: Date; endAt?: Date; placeName: string; placeAddress?: string | null; placeLatitude?: number | null; placeLongitude?: number | null; placeProvider?: string | null; placeProviderId?: string | null }>;
   /** 자동 승인 신청서에 실린 data — 어드민 화면에 그대로 노출되는 문구를 본다. */
   applicationCreates: Array<{ message: string; status: string }>;
   /** 잠금 뒤 재조회가 보는 **커밋된** 로스터. 기본은 등록된 두 팀. */
@@ -79,6 +79,8 @@ interface FakeState {
   rosterSyncTeamIds: string[];
   /** The league row's own config version; the sport-wide default is `config-1`. */
   leagueConfigId: string | null;
+  /** 리그(거울 대회 행)의 기본 장소 칸. null 이면 기본 장소 없음. */
+  leagueVenue: Record<string, unknown> | null;
 }
 
 /** 리그에 등록된 두 팀 — 기존 스펙이 멤버십 이름으로 사이드 배정을 단언하므로 고정한다. */
@@ -97,6 +99,7 @@ function createFake() {
     registeredTeamIds: new Set(['team-a', 'team-b']),
     rosterPlayers: new Map(),
     leagueConfigId: 'config-1',
+    leagueVenue: null,
   };
   let seq = 0;
   let createdGameId: string | null = null;
@@ -133,6 +136,7 @@ function createFake() {
         // 이 스펙 12건이 그렇게 깨졌다. 실제 select 는 이 필드를 읽으므로 fake 도 준다.
         registrationDeadlineAt: null,
         competitionConfigVersionId: state.leagueConfigId,
+        ...(state.leagueVenue ?? {}),
         sport: { code: 'futsal' },
         registrations: [{ teamId: 'team-a' }, { teamId: 'team-b' }],
       })),
@@ -739,9 +743,68 @@ describe('LeagueMatchAdminService.generateFixtures — 자동 로스터와 신�
       expect(state.teamMatchCreates[0].endAt).toBeUndefined();
     });
 
-    it('장소 미지정·공백은 "장소 미정" 으로 — 일괄 생성과 같은 규칙', async () => {
+    it('장소 미지정·공백이고 리그 기본 장소도 없으면 "장소 미정" + 좌표 없음', async () => {
       await service.createManualFixture(adminUser, 'league-1', { ...manual, placeName: '  ' });
-      expect(state.teamMatchCreates[0].placeName).toBe('장소 미정');
+      expect(state.teamMatchCreates[0]).toMatchObject({
+        placeName: '장소 미정', placeAddress: null, placeLatitude: null, placeLongitude: null, placeProvider: null, placeProviderId: null,
+      });
+    });
+
+    it('장소 이름이 비면 리그 기본 장소 스냅샷을 그대로 상속한다', async () => {
+      state.leagueVenue = {
+        venue: '상암 풋살파크', venueAddress: '서울 마포구 월드컵로 240', latitude: 37.57, longitude: 126.89, venueProvider: 'kakao', venueProviderId: '555',
+      };
+      await service.createManualFixture(adminUser, 'league-1', { ...manual });
+      expect(state.teamMatchCreates[0]).toMatchObject({
+        placeName: '상암 풋살파크', placeAddress: '서울 마포구 월드컵로 240', placeLatitude: 37.57, placeLongitude: 126.89, placeProvider: 'kakao', placeProviderId: '555',
+      });
+    });
+
+    it('경기가 직접 고른 장소는 리그 기본 장소를 덮어쓴다', async () => {
+      state.leagueVenue = {
+        venue: '상암 풋살파크', venueAddress: '서울 마포구 월드컵로 240', latitude: 37.57, longitude: 126.89, venueProvider: 'kakao', venueProviderId: '555',
+      };
+      await service.createManualFixture(adminUser, 'league-1', {
+        ...manual, placeName: '망원 풋살장', placeAddress: '서울 마포구 망원로 1', placeLatitude: 37.55, placeLongitude: 126.9, placeProvider: 'kakao', placeProviderId: '777',
+      });
+      expect(state.teamMatchCreates[0]).toMatchObject({
+        placeName: '망원 풋살장', placeAddress: '서울 마포구 망원로 1', placeLatitude: 37.55, placeLongitude: 126.9, placeProvider: 'kakao', placeProviderId: '777',
+      });
+    });
+
+    it('이름만 직접 입력하면 리그 기본 장소의 좌표를 따라 붙이지 않는다', async () => {
+      state.leagueVenue = {
+        venue: '상암 풋살파크', venueAddress: '서울 마포구 월드컵로 240', latitude: 37.57, longitude: 126.89, venueProvider: 'kakao', venueProviderId: '555',
+      };
+      await service.createManualFixture(adminUser, 'league-1', { ...manual, placeName: '동네 운동장' });
+      expect(state.teamMatchCreates[0]).toMatchObject({
+        placeName: '동네 운동장', placeLatitude: null, placeLongitude: null, placeProvider: null, placeProviderId: null,
+      });
+    });
+
+    it('경기 수정에서 이름 없이 주소만 오면 PLACE_NAME_REQUIRED 로 거부한다(옛 핀과 새 주소가 섞이지 않게)', async () => {
+      await expect(
+        service.updateFixture(adminUser, 'league-1', 'tm-1', { placeAddress: '서울 마포구 다른 주소 1' }),
+      ).rejects.toMatchObject({ response: { code: 'PLACE_NAME_REQUIRED' } });
+      expect(state.calls).not.toContain('v1TeamMatch.update');
+    });
+
+    it('좌표 일부만 보내면 PLACE_SNAPSHOT_INCOMPLETE 로 거부하고 경기를 만들지 않는다', async () => {
+      await expect(
+        service.createManualFixture(adminUser, 'league-1', { ...manual, placeName: '망원', placeLatitude: 37.5 }),
+      ).rejects.toMatchObject({ response: { code: 'PLACE_SNAPSHOT_INCOMPLETE' } });
+      expect(state.teamMatchCreates).toHaveLength(0);
+    });
+
+    it('일괄 생성도 빈 장소 이름이면 리그 기본 장소를 모든 경기에 상속한다', async () => {
+      state.leagueVenue = {
+        venue: '상암 풋살파크', venueAddress: null, latitude: 37.57, longitude: 126.89, venueProvider: 'kakao', venueProviderId: '555',
+      };
+      await service.generateFixtures(adminUser, 'league-1', { weeksCount: 1 });
+      expect(state.teamMatchCreates.length).toBeGreaterThan(0);
+      for (const created of state.teamMatchCreates) {
+        expect(created).toMatchObject({ placeName: '상암 풋살파크', placeLatitude: 37.57, placeProviderId: '555' });
+      }
     });
 
     it('이 리그에 등록되지 않은 팀은 422 로 거부하고 아무것도 만들지 않는다', async () => {
@@ -1381,6 +1444,18 @@ describe('LeagueMatchAdminService.detail — 참가비·대표 이미지 필드'
       entryFeeConfiguredAt: configuredAt.toISOString(), bankName: '국민은행', bankAccount: '123-456-789012',
       bankHolder: '팀밋', activeRegistrationCount: 3,
     });
+  });
+
+  it('리그 기본 장소를 defaultPlace 로 내리고 장소가 없으면 null 이다', async () => {
+    const { result } = await detailOf({
+      venue: '탄천 풋살장', venueAddress: '경기 성남시', latitude: 37.4, longitude: 127.1,
+      venueProvider: 'kakao', venueProviderId: '12345',
+    }, 0);
+    expect(result.defaultPlace).toEqual({
+      name: '탄천 풋살장', address: '경기 성남시', latitude: 37.4, longitude: 127.1,
+      provider: 'kakao', providerPlaceId: '12345',
+    });
+    expect((await detailOf({ venue: null }, 0)).result.defaultPlace).toBeNull();
   });
 
   it('대조: 미설정 리그는 설정 시각이 null 이고 0원이다(무료 확정과 구분된다)', async () => {

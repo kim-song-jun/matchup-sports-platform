@@ -21,6 +21,7 @@ import {
 import { trackEvent } from '@/lib/analytics';
 import { clearExpiringDraft, draftStorageAvailable, readExpiringDraft, writeExpiringDraft } from '@/lib/expiring-draft';
 import { extractErrorMessage } from '@/lib/error-message';
+import { placeFromEditForm, type PlaceValue } from '@/lib/place';
 import { getCreatorProfilePrompt, profileEditHref } from '@/lib/creator-profile';
 import { formatTeamMatchLevelRange } from '@/lib/team-match-level-range';
 import { toDistrictRegionOptions } from '@/lib/v1-regions';
@@ -519,7 +520,7 @@ function buildCreateModel({
   uploadImage?: (file: File) => Promise<string>;
   onSelectTeam: (teamName: string) => void;
   onSelectSport: (sportName: string) => void;
-  onFieldChange: (field: keyof TeamMatchDraft, value: string | number | string[]) => void;
+  onFieldChange: (field: keyof TeamMatchDraft, value: string | number | string[] | PlaceValue | null) => void;
   onRegionChange: (regionId: string) => void;
   onBack: () => void;
   onNext: () => void;
@@ -579,6 +580,9 @@ function buildCreateModel({
   };
 }
 
+/** 장소 필드가 `venue`/`address` 문자열이던 시절의 저장 초안. */
+type StoredTeamMatchDraft = Partial<TeamMatchDraft> & { venue?: string; address?: string };
+
 function usePersistedDraft() {
   const [draft, setDraft] = useState<TeamMatchDraft>(() => buildDefaultDraft());
   const draftRef = useRef(draft);
@@ -586,7 +590,7 @@ function usePersistedDraft() {
   useEffect(() => {
     // 하루가 지난 드래프트는 readExpiringDraft가 알아서 버린다 — 예전에는 만료가 없어
     // 며칠 전 작성하다 만 내용이 새 팀매치 작성 화면에 그대로 되살아났다.
-    const stored = readExpiringDraft<Partial<TeamMatchDraft>>(storageKey);
+    const stored = readExpiringDraft<StoredTeamMatchDraft>(storageKey);
     if (stored === null) return;
     // 저장소의 JSON은 타입 선언과 무관하다. 누락된 예전 필드는 기본값으로 두되,
     // 잘못된 등급은 확인 화면에서도 안전하게 표시하고 재선택 전 저장을 막는다.
@@ -594,7 +598,10 @@ function usePersistedDraft() {
     const grade = stored.grade === undefined
       ? defaults.grade
       : typeof stored.grade === 'string' ? stored.grade : '등급을 다시 선택해 주세요';
-    const hydrated = normalizeDraftDate({ ...defaults, ...stored, grade });
+    const { venue: legacyVenue, address: legacyAddress, ...current } = stored;
+    const legacyName = legacyVenue?.trim();
+    const place = current.place ?? (legacyName ? { kind: 'manual' as const, name: legacyName, address: legacyAddress?.trim() || null } : null);
+    const hydrated = normalizeDraftDate({ ...defaults, ...current, place, grade });
     draftRef.current = hydrated;
     setDraft(hydrated);
   }, []);
@@ -670,8 +677,7 @@ export function draftFromTeamMatchEdit(edit: V1TeamMatchEdit): TeamMatchDraft {
     listImageUrl: edit.form.listImageUrl ?? '',
     cost: costs.cost,
     opponentCost: costs.opponentCost,
-    venue: edit.form.manualPlaceName,
-    address: edit.form.addressText ?? '',
+    place: placeFromEditForm(edit.form),
     date: start.slice(0, 10),
     startTime: start.slice(11, 16),
     endDate: end.slice(0, 10),

@@ -12,6 +12,7 @@ import { TeamAvatar } from '@/components/v1-ui/team-avatar';
 import { Trophy, Goal, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useV1Tournament, useV1MyRegistrations } from '@/hooks/use-v1-api';
 import { v1Get } from '@/lib/api-client';
+import { placeFromVenueFields, placeToView } from '@/lib/place';
 import { publicFixtureSideLabel } from '@/lib/public-fixture-side-label';
 import {
   LeagueStandingsTable,
@@ -62,6 +63,7 @@ import {
   pendingCapacityLabel,
 } from '@/lib/tournament-registration-availability';
 import type {
+  V1PlaceView,
   V1TournamentDetail,
   V1TournamentFormat,
   V1TournamentGroup,
@@ -925,11 +927,9 @@ export function TournamentDetailView({
       />
 
       <TournamentVenuePrepSection
-        venue={tournament.venue}
+        place={tournamentPlaceView(tournament)}
         parkingInfo={tournament.parkingInfo}
         announcements={allAnnouncements}
-        latitude={tournament.latitude}
-        longitude={tournament.longitude}
       />
 
       {/* ── 대회 진행 방식 — format-aware step-by-step flow explanation ── */}
@@ -2280,4 +2280,9 @@ function TournamentDetailSkeleton() {
       </Card>
     </div>
   );
+}
+
+function tournamentPlaceView(tournament: V1TournamentDetail): V1PlaceView | null {
+  const value = placeFromVenueFields(tournament);
+  return value ? placeToView(value) : null;
 }

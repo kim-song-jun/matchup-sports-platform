@@ -1,3 +1,4 @@
+import { IsPlaceLatitude, IsPlaceLongitude, IsPlaceProvider, IsPlaceProviderId } from '../../places/place-snapshot';
 import { Type } from 'class-transformer';
 import {
   IsBoolean,
@@ -60,6 +61,18 @@ export class MutateMatchDto {
   @IsString()
   @MaxLength(200)
   addressText?: string | null;
+
+  @IsPlaceLatitude()
+  placeLatitude?: number | null;
+
+  @IsPlaceLongitude()
+  placeLongitude?: number | null;
+
+  @IsPlaceProvider()
+  placeProvider?: string | null;
+
+  @IsPlaceProviderId()
+  placeProviderId?: string | null;
 
   @IsOptional()
   @IsString()

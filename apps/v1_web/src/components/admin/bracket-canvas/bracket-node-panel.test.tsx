@@ -17,6 +17,8 @@ vi.mock('@/hooks/use-v1-bracket-canvas', () => ({
   useV1QuickResult: () => ({ mutate: mocks.quick, isPending: false }),
 }));
 vi.mock('@/hooks/use-v1-api', () => ({
+  useV1PlaceSearch: () => ({ data: undefined, isFetching: false, isError: false, error: null }),
+  useV1PublicKakaoMapsKey: () => ({ data: { kakaoMapsJsKey: null }, isLoading: false }),
   useV1UpdateFixture: () => ({ mutate: mocks.updateFixture, isPending: false }),
   useV1DeleteFixture: () => ({ mutate: mocks.deleteFixture, isPending: false }),
 }));
@@ -252,15 +254,21 @@ describe('BracketNodePanel — 자리 배정', () => {
 });
 
 describe('BracketNodePanel — 일정·삭제', () => {
-  it('KST 로 입력한 시각을 UTC ISO 로 바꿔 저장한다', () => {
-    renderPanel();
+  it('KST 로 입력한 시각을 UTC ISO 로 바꿔 저장하고, 장소를 안 건드렸으면 장소 필드는 보내지 않는다', () => {
+    renderPanel(fixtureOf({ venue: '탄천 보조구장' }));
     fireEvent.change(screen.getByLabelText('경기 시각'), { target: { value: '2026-10-10T14:00' } });
-    fireEvent.change(screen.getByLabelText('장소'), { target: { value: ' 상암 보조구장 ' } });
     fireEvent.click(screen.getByRole('button', { name: '일정 저장' }));
     expect(mocks.updateFixture).toHaveBeenCalledWith(
-      { fixtureId: 'f1', scheduledAt: '2026-10-10T05:00:00.000Z', venue: '상암 보조구장' },
+      { fixtureId: 'f1', scheduledAt: '2026-10-10T05:00:00.000Z' },
       expect.any(Object),
     );
+  });
+
+  it('장소 이름을 바꾸면 venue 를 함께 보낸다', () => {
+    renderPanel(fixtureOf({ venue: '탄천 보조구장' }));
+    fireEvent.change(screen.getByLabelText('장소'), { target: { value: '상암 보조구장' } });
+    fireEvent.click(screen.getByRole('button', { name: '일정 저장' }));
+    expect(mocks.updateFixture.mock.calls.at(-1)?.[0]).toMatchObject({ fixtureId: 'f1', venue: '상암 보조구장' });
   });
 
   it('삭제는 확인을 거치고, 성공하면 패널을 닫는다', async () => {

@@ -1,208 +1,105 @@
 import { createElement } from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { getTournamentPostEventCards, getVenueNavigationLinks } from './tournament-venue-retention-model';
+import { getTournamentPostEventCards } from './tournament-venue-retention-model';
 import {
   TournamentFixtureReviewEntrySection,
   TournamentPostEventHubSection,
   TournamentVenuePrepSection,
 } from './tournament-venue-retention-sections';
-import type { V1ReviewListItem, V1TournamentFixture } from '@/types/api';
+import type { V1PlaceView, V1ReviewListItem, V1TournamentFixture } from '@/types/api';
 
-// TournamentVenueMap fetches the Kakao Maps JS key via this hook — 이 스위트에서는
-// "키가 없다"는 (그래서 지도 임베드가 스킵되는) 상태를 고정해 규약대로 검증한다.
-// 키가 있는 경로(실제 지도 렌더)는 tournament-venue-map.test.tsx에서 별도로 검증.
 vi.mock('next/navigation', () => ({
   usePathname: () => '/tournaments/t1',
   useSearchParams: () => new URLSearchParams('from=%2Fhome'),
 }));
 
+// PlaceCard 의 지도 미리보기가 JS 키를 이 훅으로 받는다 — 키 없음 상태를 고정해 지도 SDK 를 건드리지 않는다.
 vi.mock('@/hooks/use-v1-api', () => ({
   useV1PublicKakaoMapsKey: () => ({ data: { kakaoMapsJsKey: null }, isLoading: false }),
 }));
 
-describe('getVenueNavigationLinks', () => {
-  it('builds correctly formatted kakao/naver/tmap route deep links + web fallbacks from venue + coordinates', () => {
-    const links = getVenueNavigationLinks('잠실종합운동장', 37.5, 127.07);
+const pickedPlace: V1PlaceView = {
+  name: '잠실종합운동장',
+  address: '서울 송파구 올림픽로 25',
+  latitude: 37.5,
+  longitude: 127.07,
+  provider: 'kakao',
+  providerPlaceId: 'kakao-1',
+};
+const nameOnlyPlace: V1PlaceView = {
+  name: '데일리그라운드 청라국제도시점',
+  address: null,
+  latitude: null,
+  longitude: null,
+  provider: null,
+  providerPlaceId: null,
+};
 
-    expect(links.find((l) => l.key === 'kakao')).toMatchObject({
-      appHref: 'kakaomap://route?ep=37.5,127.07&by=CAR',
-      fallbackHref: `https://map.kakao.com/link/to/${encodeURIComponent('잠실종합운동장')},37.5,127.07`,
-    });
-    expect(links.find((l) => l.key === 'naver')).toMatchObject({
-      appHref: `nmap://route/car?dlat=37.5&dlng=127.07&dname=${encodeURIComponent('잠실종합운동장')}&appname=${encodeURIComponent('teameet.kr')}`,
-      fallbackHref: 'https://map.naver.com/v5/directions/-/-/-/car?destination=127.07,37.5',
-    });
-    expect(links.find((l) => l.key === 'tmap')).toMatchObject({
-      appHref: `tmap://route?goalx=127.07&goaly=37.5&goalname=${encodeURIComponent('잠실종합운동장')}`,
-    });
-  });
+describe('TournamentVenuePrepSection — 현장 안내', () => {
+  it('좌표가 있는 장소는 이름·주소와 카카오맵 길찾기 링크(좌표 포함)를 PlaceCard 로 보여 준다', () => {
+    render(createElement(TournamentVenuePrepSection, { place: pickedPlace, announcements: [] }));
 
-  it('picks the iOS App Store link for tmap fallback on iOS, Android Play Store link otherwise', () => {
-    const iosLinks = getVenueNavigationLinks('장소', 37.5, 127.07, 'ios');
-    const androidLinks = getVenueNavigationLinks('장소', 37.5, 127.07, 'android');
-    const unknownLinks = getVenueNavigationLinks('장소', 37.5, 127.07, 'unknown');
-
-    expect(iosLinks.find((l) => l.key === 'tmap')?.fallbackHref).toContain('apps.apple.com');
-    expect(androidLinks.find((l) => l.key === 'tmap')?.fallbackHref).toContain('play.google.com');
-    // 알 수 없는 플랫폼은 안드로이드(Play Store)로 안전하게 폴백한다.
-    expect(unknownLinks.find((l) => l.key === 'tmap')?.fallbackHref).toContain('play.google.com');
-  });
-});
-
-describe('TournamentVenuePrepSection — rendered venue info (regression guard for #위치/지도 정보 요청)', () => {
-  it('renders the venue name with an external 지도에서 보기 link to a Naver map search when venue is set', () => {
-    render(
-      createElement(TournamentVenuePrepSection, {
-        venue: '데일리그라운드 청라국제도시점',
-        announcements: [],
-      }),
-    );
-
-    expect(screen.getByText('데일리그라운드 청라국제도시점')).toBeInTheDocument();
-    const mapLink = screen.getByRole('link', { name: '지도에서 보기' });
-    expect(mapLink).toHaveAttribute(
+    expect(screen.getAllByText('잠실종합운동장')).toHaveLength(1);
+    expect(screen.getByText('서울 송파구 올림픽로 25')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: '카카오맵으로 길찾기' })).toHaveAttribute(
       'href',
-      'https://map.naver.com/v5/search/' + encodeURIComponent('데일리그라운드 청라국제도시점'),
+      `https://map.kakao.com/link/to/${encodeURIComponent('잠실종합운동장')},37.5,127.07`,
     );
-    expect(mapLink).toHaveAttribute('target', '_blank');
-    expect(mapLink).toHaveAttribute('rel', 'noopener noreferrer');
   });
 
-  it('renders the tournament-managed parking info below the venue and hides it when cleared', () => {
+  it('좌표가 없는 옛 대회도 이름 검색 링크로 폴백하고 길찾기 문구는 없다', () => {
+    render(createElement(TournamentVenuePrepSection, { place: nameOnlyPlace, announcements: [] }));
+
+    expect(screen.getByRole('link', { name: '카카오맵에서 이름 검색' })).toHaveAttribute(
+      'href',
+      `https://map.kakao.com/?q=${encodeURIComponent('데일리그라운드 청라국제도시점')}`,
+    );
+    expect(screen.queryByRole('link', { name: /길찾기/ })).not.toBeInTheDocument();
+  });
+
+  it('주차 안내는 장소 카드 아래 행으로 보이고 비우면 사라진다', () => {
     const { unmount } = render(
       createElement(TournamentVenuePrepSection, {
-        venue: '데일리그라운드 청라국제도시점',
+        place: nameOnlyPlace,
         parkingInfo: '건물 지하 주차장 2시간 무료\n만차 시 인근 공영주차장을 이용해 주세요.',
         announcements: [],
       }),
     );
-
     expect(screen.getByText(/건물 지하 주차장 2시간 무료/)).toBeInTheDocument();
     unmount();
 
-    render(
-      createElement(TournamentVenuePrepSection, {
-        venue: '데일리그라운드 청라국제도시점',
-        parkingInfo: null,
-        announcements: [],
-      }),
-    );
-
-    expect(screen.queryByText('주차와 입장 동선은 지도에서 확인해요.')).not.toBeInTheDocument();
+    render(createElement(TournamentVenuePrepSection, { place: nameOnlyPlace, parkingInfo: null, announcements: [] }));
+    expect(screen.queryByText('주차')).not.toBeInTheDocument();
   });
 
-  it('keeps showing the venue + map link and adds the operator notice as a supplementary line (notice never hides venue info)', () => {
+  it('운영진 장소 공지는 장소 카드를 가리지 않고 공지 보기 링크로 덧붙는다', () => {
     render(
       createElement(TournamentVenuePrepSection, {
-        venue: '데일리그라운드 청라국제도시점',
+        place: pickedPlace,
         announcements: [{ id: 'ann-venue', title: '주차·입장·경기 준비 안내', category: 'venue' }],
       }),
     );
 
-    expect(screen.getByRole('link', { name: '지도에서 보기' })).toBeInTheDocument();
-    expect(screen.getByText('공지: 주차·입장·경기 준비 안내')).toBeInTheDocument();
+    expect(screen.getByText('잠실종합운동장')).toBeInTheDocument();
+    expect(screen.getByText('주차·입장·경기 준비 안내')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: '공지 보기' })).toHaveAttribute('href', '#announcement-ann-venue');
   });
 
-  it('falls back to the operator-notice-only copy when venue is null (rare edge case)', () => {
-    render(createElement(TournamentVenuePrepSection, { venue: null, announcements: [] }));
-
+  it('장소가 없는 극히 드문 경우에는 공지 확인 폴백만 보이고 지도 링크는 없다', () => {
+    const { unmount } = render(createElement(TournamentVenuePrepSection, { place: null, announcements: [] }));
     expect(screen.getByText('운영진 공지 확인')).toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: '지도에서 보기' })).not.toBeInTheDocument();
-  });
-
-  it('shows no "확인 가능" status badge on the venue row — the venue name + map link are already unconditionally visible, so the badge added no information (user feedback fix)', () => {
-    render(
-      createElement(TournamentVenuePrepSection, {
-        venue: '데일리그라운드 청라국제도시점',
-        announcements: [],
-      }),
-    );
-
-    expect(screen.getByText('데일리그라운드 청라국제도시점')).toBeInTheDocument();
-    expect(screen.queryByText('확인 가능')).not.toBeInTheDocument();
-  });
-
-  it('keeps the status badge for the rare no-venue fallback row, where the badge label genuinely varies with notice presence (out of this fix\'s scope)', () => {
-    const { unmount } = render(
-      createElement(TournamentVenuePrepSection, { venue: null, announcements: [] }),
-    );
     expect(screen.getByText('공지 대기')).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /카카오맵/ })).not.toBeInTheDocument();
     unmount();
 
     render(
       createElement(TournamentVenuePrepSection, {
-        venue: null,
+        place: null,
         announcements: [{ id: 'ann-venue', title: '주차 안내', category: 'venue' }],
       }),
     );
     expect(screen.getByText('확인 가능')).toBeInTheDocument();
-  });
-
-  it('coordinates present but no Kakao Maps JS key configured → 지도에서 보기 link is dropped, no map renders, but the navigation button still appears (key-less graceful fallback)', () => {
-    render(
-      createElement(TournamentVenuePrepSection, {
-        venue: '잠실종합운동장',
-        announcements: [],
-        latitude: 37.5,
-        longitude: 127.07,
-      }),
-    );
-
-    expect(screen.getByText('잠실종합운동장')).toBeInTheDocument();
-    // 좌표가 있으면 네이버 검색 링크(텍스트 검색)는 더 이상 노출하지 않는다 — 실제 지도/내비 버튼으로 대체.
-    expect(screen.queryByRole('link', { name: '지도에서 보기' })).not.toBeInTheDocument();
-    // JS 키가 없으므로(useV1PublicKakaoMapsKey mock이 null 반환) 지도 임베드 자체는 렌더되지 않는다.
-    expect(screen.queryByRole('img', { name: /위치 지도/ })).not.toBeInTheDocument();
-    // 하지만 좌표만 있으면 내비게이션 버튼은 키 유무와 무관하게 항상 노출된다.
-    expect(screen.getByRole('button', { name: /내비게이션 앱으로 길찾기/ })).toBeInTheDocument();
-  });
-
-  it('no coordinates (venue-only, geocoding disabled/failed) → keeps the pre-existing Naver search fallback and shows no navigation button (regression guard)', () => {
-    render(
-      createElement(TournamentVenuePrepSection, {
-        venue: '데일리그라운드 청라국제도시점',
-        announcements: [],
-        latitude: null,
-        longitude: null,
-      }),
-    );
-
-    expect(screen.getByRole('link', { name: '지도에서 보기' })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /내비게이션 앱으로 길찾기/ })).not.toBeInTheDocument();
-  });
-
-  it('clicking the navigation button reveals kakao/naver/tmap deep links with correctly formatted hrefs', () => {
-    render(
-      createElement(TournamentVenuePrepSection, {
-        venue: '잠실종합운동장',
-        announcements: [],
-        latitude: 37.5,
-        longitude: 127.07,
-      }),
-    );
-
-    fireEvent.click(screen.getByRole('button', { name: /내비게이션 앱으로 길찾기/ }));
-
-    const navigationMenu = screen.getByRole('menu');
-    expect(navigationMenu).toHaveStyle({
-      bottom: 'calc(100% + 8px)',
-      overflowY: 'auto',
-      overscrollBehavior: 'contain',
-    });
-    expect(screen.getByRole('menuitem', { name: '카카오맵' })).toHaveAttribute('href', 'kakaomap://route?ep=37.5,127.07&by=CAR');
-    expect(screen.getByRole('menuitem', { name: '네이버지도' })).toHaveAttribute(
-      'href',
-      `nmap://route/car?dlat=37.5&dlng=127.07&dname=${encodeURIComponent('잠실종합운동장')}&appname=${encodeURIComponent('teameet.kr')}`,
-    );
-    expect(screen.getByRole('menuitem', { name: '티맵' })).toHaveAttribute(
-      'href',
-      `tmap://route?goalx=127.07&goaly=37.5&goalname=${encodeURIComponent('잠실종합운동장')}`,
-    );
-    // 웹/설치 폴백 링크도 함께 노출된다("웹으로 보기" x2 카카오+네이버, "설치하기" x1 티맵).
-    expect(screen.getAllByRole('link', { name: '웹으로 보기' })).toHaveLength(2);
-    expect(screen.getByRole('link', { name: '설치하기' })).toBeInTheDocument();
   });
 });
 

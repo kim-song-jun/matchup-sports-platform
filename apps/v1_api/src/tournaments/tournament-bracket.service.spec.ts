@@ -1907,6 +1907,22 @@ describe('TournamentBracketService', () => {
     expect(prisma.v1TournamentMatchAdvancementEdge.deleteMany).not.toHaveBeenCalled();
   });
 
+  it('updateFixture: scheduledAt null 은 1970 시각이 아니라 일정 비우기로 저장되고 단계 순서 검사를 타지 않는다', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdmin);
+    const detail = canonicalDetailsRow({ group: { name: 'A조' } });
+    prisma.v1TournamentMatchDetails.findUnique.mockResolvedValue(detail);
+    prisma.v1TournamentMatchDetails.findUniqueOrThrow.mockResolvedValue(detail);
+    prisma.v1TournamentMatchDetails.findFirst.mockResolvedValue(null);
+    prisma.v1TournamentRegistration.findMany.mockResolvedValue([{ id: 'reg-1', teamId: 'team-old', team: { name: '홈' } }, { id: 'reg-2', teamId: 'team-away', team: { name: '어웨이' } }]);
+    queueFixtureUpdateRaw(prisma.$queryRaw, { id: 'game-1', state: 'SCHEDULED', sourceType: 'TEAM_MATCH', currentOfficialRevisionId: null }, { id: 'fixture-1', deletedAt: null });
+    prisma.v1TeamMatch.update.mockResolvedValue({ ...detail.teamMatch, startAt: null });
+
+    await service.updateFixture(ownerUser, 'fixture-1', { scheduledAt: null });
+
+    expect(prisma.v1TeamMatch.update).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ startAt: null }) }));
+    expect(prisma.v1TeamMatch.findMany).not.toHaveBeenCalled();
+  });
+
   it('updateFixture: 결과가 VOID면 팀 변경이 막히지 않는다(결과 없음과 동일 취급)', async () => {
     prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdmin);
     prisma.v1TournamentMatchDetails.findUnique.mockResolvedValue(canonicalDetailsRow({

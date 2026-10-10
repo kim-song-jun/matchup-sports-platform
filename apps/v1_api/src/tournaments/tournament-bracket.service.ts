@@ -933,7 +933,7 @@ export class TournamentBracketService {
           tournamentId: canonical.tournamentId,
           groupId: canonical.groupId,
           fixtureNumber: dto.fixtureNumber,
-          scheduledAt: dto.scheduledAt !== undefined ? new Date(dto.scheduledAt) : undefined,
+          scheduledAt: dto.scheduledAt == null ? dto.scheduledAt : new Date(dto.scheduledAt),
           place: dto.venue === undefined ? undefined : this.fixturePlace(dto),
           homeRegistrationId: dto.homeRegistrationId,
           awayRegistrationId: dto.awayRegistrationId,

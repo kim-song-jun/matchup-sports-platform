@@ -8,6 +8,7 @@ import { randomUuid } from '@/lib/uuid';
 import type {
   V1ApplyBracketTemplatePayload,
   V1ApplyBracketTemplateResult,
+  V1AdminBracketFixture,
   V1AssignSlotResult,
   V1QuickResultResult,
   V1QuickResultScore,
@@ -103,6 +104,16 @@ export function useV1SetBracketSources(tournamentId: string) {
       homeSourceFixtureId: string | null;
       awaySourceFixtureId: string | null;
     }) => v1Patch(`/admin/fixtures/${encodeURIComponent(fixtureId)}/bracket-sources`, { homeSourceFixtureId, awaySourceFixtureId }),
+    onSuccess: () => invalidateCompetitionViews(queryClient, tournamentId, 'tournament'),
+  });
+}
+
+/** `POST /admin/tournaments/:id/fixtures` — 번호는 서버가 대회 안의 최대 번호 다음으로 정한다. */
+export function useV1AddBracketFixture(tournamentId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ groupId, round }: { groupId: string; round: string }) =>
+      v1Post<V1AdminBracketFixture>(`/admin/tournaments/${tournamentId}/fixtures`, { groupId, round }),
     onSuccess: () => invalidateCompetitionViews(queryClient, tournamentId, 'tournament'),
   });
 }

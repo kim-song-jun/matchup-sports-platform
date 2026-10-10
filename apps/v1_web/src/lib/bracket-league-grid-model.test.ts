@@ -47,12 +47,6 @@ describe('buildLeagueGrid — 번호가 있는 라운드', () => {
     expect(ids(grid.rows[0].cells.gA)).toEqual(['c1']);
     expect(grid.columns[0].fixtureCount).toBe(2);
   });
-
-  it('league_r 형식이 아닌 round 값은 번호 행 뒤에 그 이름으로 붙는다(수동 추가 경기)', () => {
-    const grid = buildLeagueGrid({ groups: [gA], fixtures: [fx('m', 'gA', 9, 'final'), fx('a1', 'gA', 1, 'league_r1')] });
-    expect(grid.rows.map((row) => row.label)).toEqual(['1라운드', '결승']);
-    expect(grid.legacyChunking).toBe(false);
-  });
 });
 
 describe('buildLeagueGrid — 열', () => {
@@ -114,8 +108,45 @@ describe('buildLeagueGrid — 라운드 번호가 없는 옛 데이터', () => {
     expect(ids(grid.rows[1].cells.gB)).toEqual([]);
   });
 
-  it('번호가 있는 경기가 하나라도 있으면 끊기를 쓰지 않는다', () => {
-    const grid = buildLeagueGrid({ groups: [four], fixtures: [...six.slice(0, 2), fx('n', 'gA', 7, 'league_r1')] });
-    expect(grid.legacyChunking).toBe(false);
+  it('번호 경기가 섞여도 옛 경기는 계속 끊기고, k번째 묶음은 league_r{k} 와 같은 줄·같은 칸에 합쳐진다', () => {
+    const grid = buildLeagueGrid({ groups: [four], fixtures: [...six, fx('n2', 'gA', 7, 'league_r2')] });
+    expect(grid.legacyChunking).toBe(true);
+    expect(grid.rows.map((row) => [row.label, row.roundNumber])).toEqual([['1라운드', 1], ['2라운드', 2], ['3라운드', 3]]);
+    expect(grid.rows.map((row) => ids(row.cells.gA))).toEqual([['f1', 'f2'], ['f3', 'f4', 'n2'], ['f5', 'f6']]);
+  });
+
+  it('번호 경기는 옛 경기의 끊김 위치를 밀지 않는다 — 번호 경기를 더해도 옛 줄은 같다 (대조군)', () => {
+    const legacyIdsPerRow = (grid: ReturnType<typeof buildLeagueGrid>) => grid.rows.map((row) => ids(row.cells.gA).filter((id) => id.startsWith('f')));
+    const without = buildLeagueGrid({ groups: [four], fixtures: six });
+    const withNumbered = buildLeagueGrid({ groups: [four], fixtures: [fx('n0', 'gA', 0, 'league_r1'), ...six] });
+    expect(legacyIdsPerRow(withNumbered)).toEqual(legacyIdsPerRow(without));
+    expect(ids(withNumbered.rows[0].cells.gA)).toEqual(['n0', 'f1', 'f2']);
+  });
+
+  it('옛 묶음 수보다 큰 번호는 새 줄이 되고 줄은 숫자 순서다', () => {
+    const grid = buildLeagueGrid({ groups: [four], fixtures: [...six, fx('n9', 'gA', 8, 'league_r9')] });
+    expect(grid.rows.map((row) => row.label)).toEqual(['1라운드', '2라운드', '3라운드', '9라운드']);
+    expect(ids(grid.rows[3].cells.gA)).toEqual(['n9']);
+  });
+
+  it('결선 단계 코드(final)·한국어 이름(결승)으로 쓴 round 도 예외 없이 옛 경기로 끊긴다', () => {
+    const numbered = fx('a1', 'gA', 1, 'league_r1');
+    for (const round of ['final', '결승']) {
+      const grid = buildLeagueGrid({ groups: [gA], fixtures: [fx('m', 'gA', 9, round), numbered] });
+      expect(grid.rows.map((row) => [row.label, row.roundNumber])).toEqual([['1라운드', 1]]);
+      expect(ids(grid.rows[0].cells.gA)).toEqual(['a1', 'm']);
+      expect(grid.legacyChunking).toBe(true);
+    }
+  });
+
+  it('번호가 아닌 자유 문자열(예선)도 옛 경기로 끊긴다', () => {
+    const grid = buildLeagueGrid({ groups: [four], fixtures: [...six, fx('x', 'gA', 7, '예선')] });
+    expect(grid.rows.map((row) => row.label)).toEqual(['1라운드', '2라운드', '3라운드', '4라운드']);
+    expect(ids(grid.rows[3].cells.gA)).toEqual(['x']);
+    expect(grid.legacyChunking).toBe(true);
+  });
+
+  it('번호 경기만 있으면 안내 플래그는 꺼진다', () => {
+    expect(buildLeagueGrid({ groups: [four], fixtures: [fx('n1', 'gA', 1, 'league_r1')] }).legacyChunking).toBe(false);
   });
 });

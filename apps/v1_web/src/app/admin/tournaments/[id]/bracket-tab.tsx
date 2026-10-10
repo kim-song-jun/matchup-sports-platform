@@ -24,6 +24,7 @@ import { AdminDataTable, AdminEmpty } from '@/components/admin';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
 import { useStartedTeamChangeReason } from '@/components/admin/bracket-canvas/use-started-team-change-reason';
 import { fixtureTeamChangeAccess } from '@/lib/bracket-canvas-layout';
+import { registrationIdsBlockedForGroup } from '@/lib/bracket-group-enrollment';
 import { BracketGroupQuickAdd } from './bracket-group-quick-add';
 import { BracketGroupCard } from './bracket-group-card';
 import { isGroupReady } from './bracket-group-helpers';
@@ -194,6 +195,8 @@ export function BracketTab({
     id: r.id,
     label: r.teamName ?? r.id,
   }));
+  const editBlockedIds = registrationIdsBlockedForGroup(bracket?.groups ?? [], editFixture?.groupId ?? null);
+  const editPickerItems = (selectedId: string) => editFixtureTeamItems.filter((it) => !editBlockedIds.has(it.id) || it.id === selectedId);
 
   const editFixtureAccess = editFixture ? fixtureTeamChangeAccess(editFixture) : 'free';
   const editFixtureTeamsLocked = editFixtureAccess === 'official' || editFixtureAccess === 'cancelled';
@@ -913,7 +916,7 @@ export function BracketTab({
                 id="edit-fx-home"
                 value={editFixtureTeamItems.find((it) => it.id === editFxHomeRegId) ?? null}
                 onChange={(item) => setEditFxHomeRegId(item?.id ?? '')}
-                items={editFixtureTeamItems}
+                items={editPickerItems(editFxHomeRegId)}
                 disabled={updateFixture.isPending || editFixtureTeamsLocked}
                 clearLabel="미정"
                 placeholder="홈 팀 검색"
@@ -925,7 +928,7 @@ export function BracketTab({
                 id="edit-fx-away"
                 value={editFixtureTeamItems.find((it) => it.id === editFxAwayRegId) ?? null}
                 onChange={(item) => setEditFxAwayRegId(item?.id ?? '')}
-                items={editFixtureTeamItems}
+                items={editPickerItems(editFxAwayRegId)}
                 disabled={updateFixture.isPending || editFixtureTeamsLocked}
                 clearLabel="미정"
                 placeholder="어웨이 팀 검색"

@@ -399,6 +399,15 @@ describe('buildLeagueTournamentMobileRounds', () => {
     expect(rounds[1].sections.map((s) => s.heading)).toEqual(['A조']);
   });
 
+  it('옛 경기와 번호 경기가 섞여도 탭은 번호 줄 하나씩이고 옛 묶음은 같은 번호 탭에 합쳐진다', () => {
+    const legacy = [1, 2, 3].map((n) => makeFixture({ id: `o${n}`, groupId: 'gA', fixtureNumber: n, round: '조별 리그' }));
+    const rounds = buildLeagueTournamentMobileRounds({
+      groups: [gA], slots: [], fixtures: [...legacy, makeFixture({ id: 'n2', groupId: 'gA', fixtureNumber: 9, round: 'league_r2' })],
+    });
+    expect(rounds.map((round) => round.label)).toEqual(['1라운드', '2라운드', '3라운드']);
+    expect(rounds[1].sections[0].nodes.map((node) => node.fixtureId)).toEqual(['o2', 'n2']);
+  });
+
   it('조가 하나면 섹션 제목이 없고 칸 제목은 번호만이다', () => {
     const [round] = buildLeagueTournamentMobileRounds({ groups: [gA], fixtures: [fixtures[1]], slots: [] });
     expect(round.sections[0].heading).toBeNull();

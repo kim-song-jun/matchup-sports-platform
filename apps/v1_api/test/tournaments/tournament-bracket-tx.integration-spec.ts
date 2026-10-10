@@ -159,6 +159,8 @@ describe('대진 …InTx 함수 (PostgreSQL)', () => {
       await expect(bracket.updateFixture(user, id, { homeRegistrationId: reg0 })).rejects.toMatchObject({ response: { code: 'SLOT_LINKED' } });
       expect((await prisma.v1TeamMatch.findUniqueOrThrow({ where: { id } })).hostTeamId).toBeNull();
 
+      // reg1 은 시드 A조 편성에 있다 — empty-fixtures 조에 넣으려면 먼저 뗀다(한 팀 한 조).
+      await prisma.v1TournamentGroupTeam.deleteMany({ where: { groupId: ids.groupId, registrationId: reg1 } });
       await bracket.updateFixture(user, id, { awayRegistrationId: reg1 });
       expect((await prisma.v1TournamentMatchDetails.findUniqueOrThrow({ where: { teamMatchId: id } })).awayRegistrationId).toBe(reg1);
     });

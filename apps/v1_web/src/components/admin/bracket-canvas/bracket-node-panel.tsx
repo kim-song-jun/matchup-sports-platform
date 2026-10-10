@@ -10,6 +10,7 @@ import { Button } from '@/components/v1-ui/button';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
 import { useV1DeleteFixture, useV1UpdateFixture } from '@/hooks/use-v1-api';
 import { useV1AssignTournamentSlot, useV1QuickResult } from '@/hooks/use-v1-bracket-canvas';
+import { TEAM_IN_OTHER_GROUP_HIDDEN_NOTE, applyGroupRule, registrationIdsBlockedForGroup } from '@/lib/bracket-group-enrollment';
 import { describeBracketCanvasError } from '@/lib/bracket-canvas-errors';
 import { classifyFixtureSide, fixtureTeamChangeAccess, isFixtureLocked, isSlotAssignable, type SideKey } from '@/lib/bracket-canvas-layout';
 import { isoToKstDatetimeLocal, kstDatetimeLocalToIso } from '@/lib/kst-calendar';
@@ -113,6 +114,38 @@ export function BracketNodePanel({
     );
   };
 
+  const directCandidates = (side: SideKey) => {
+    const current = side === 'HOME' ? fixture.homeRegistrationId : fixture.awayRegistrationId;
+    const other = side === 'HOME' ? fixture.awayRegistrationId : fixture.homeRegistrationId;
+    return applyGroupRule(
+      confirmed.filter((registration) => registration.id !== other),
+      (registration) => registration.id,
+      registrationIdsBlockedForGroup(groups, fixture.groupId),
+      current,
+    );
+  };
+
+  const slotCandidates = (slot: V1AdminBracketSlot) =>
+    applyGroupRule(
+      confirmed.filter((registration) => registration.id === slot.registrationId || !placedIds.has(registration.id)),
+      (registration) => registration.id,
+      registrationIdsBlockedForGroup(groups, slot.groupId),
+      slot.registrationId,
+    );
+
+  // 선택창을 실제로 그리는 쪽과 같은 후보 계산에서 다른 조 팀 때문에 후보가 줄었는지 읽는다.
+  const hidesOtherGroupTeams = (['HOME', 'AWAY'] as const).some((side) => {
+    if (!canWrite) return false;
+    const slotId = side === 'HOME' ? fixture.homeSlotId : fixture.awaySlotId;
+    const slot = slotId === null ? undefined : slotsById.get(slotId);
+    if (classifyFixtureSide(fixture, side, slotsById) === 'direct') {
+      if (teamChangeAccess === 'official' || teamChangeAccess === 'cancelled') return false;
+      return directCandidates(side).hidesOtherGroupTeams;
+    }
+    if (slot === undefined || !isSlotAssignable(slot) || locked) return false;
+    return slotCandidates(slot).hidesOtherGroupTeams;
+  });
+
   const renderSide = (side: SideKey) => {
     const slotId = side === 'HOME' ? fixture.homeSlotId : fixture.awaySlotId;
     const slot = slotId === null ? undefined : slotsById.get(slotId);
@@ -120,7 +153,6 @@ export function BracketNodePanel({
     let body: React.ReactNode;
     if (source === 'direct') {
       const current = side === 'HOME' ? fixture.homeRegistrationId : fixture.awayRegistrationId;
-      const other = side === 'HOME' ? fixture.awayRegistrationId : fixture.homeRegistrationId;
       if (teamChangeAccess === 'official' || teamChangeAccess === 'cancelled') {
         body = (
           <div className="flex flex-col items-start gap-2">
@@ -133,6 +165,7 @@ export function BracketNodePanel({
       } else if (!canWrite) {
         body = null;
       } else {
+        const candidates = directCandidates(side).shown;
         body = (
           <select
             aria-label={`${SIDE_NAME[side]} 팀 선택`}
@@ -143,13 +176,11 @@ export function BracketNodePanel({
             style={{ minHeight: 44 }}
           >
             <option value="">비워 두기</option>
-            {confirmed
-              .filter((registration) => registration.id !== other)
-              .map((registration) => (
-                <option key={registration.id} value={registration.id}>
-                  {registration.teamName ?? registration.teamId}
-                </option>
-              ))}
+            {candidates.map((registration) => (
+              <option key={registration.id} value={registration.id}>
+                {registration.teamName ?? registration.teamId}
+              </option>
+            ))}
           </select>
         );
       }
@@ -163,7 +194,7 @@ export function BracketNodePanel({
     } else if (!canWrite) {
       body = null;
     } else {
-      const options = confirmed.filter((registration) => !placedIds.has(registration.id) || registration.id === slot.registrationId);
+      const options = slotCandidates(slot).shown;
       body = (
         <select
           aria-label={`${SIDE_NAME[side]} 팀 선택`}
@@ -310,6 +341,9 @@ export function BracketNodePanel({
         <h3 className={sectionTitle} style={{ color: 'var(--text-strong)' }}>팀 자리</h3>
         {renderSide('HOME')}
         {renderSide('AWAY')}
+        {hidesOtherGroupTeams ? (
+          <p className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>{TEAM_IN_OTHER_GROUP_HIDDEN_NOTE}</p>
+        ) : null}
       </section>
 
       <section aria-label="결과" className="flex flex-col gap-3">

@@ -18,7 +18,8 @@ import {
 } from '@/lib/bracket-canvas-mobile-model';
 import { bracketNodeStateChip } from '@/lib/competition-status';
 import { extractErrorMessage } from '@/lib/error-message';
-import type { V1AdminBracketSlot } from '@/types/api';
+import { TEAM_IN_OTHER_GROUP_HIDDEN_NOTE, applyGroupRule, registrationIdsBlockedForGroup } from '@/lib/bracket-group-enrollment';
+import type { V1AdminBracketGroup, V1AdminBracketSlot } from '@/types/api';
 import { BracketQuickResultForm } from './bracket-quick-result-form';
 import { BracketResultActions } from './bracket-result-actions';
 import type { RegistrationsLoadState } from './bracket-team-tray';
@@ -32,6 +33,8 @@ export interface MobileNodeSheetBodyProps {
   scope: 'tournament' | 'league';
   canWrite: boolean;
   slots: V1AdminBracketSlot[];
+  /** 한 팀 한 조 후보 제외용 — tournament scope 에서만 넘긴다. */
+  groups?: readonly V1AdminBracketGroup[];
   candidates: MobilePickCandidate[];
   /** 참가팀 조회 상태 — 성공 전에는 팀 고르기를 막는다("팀 0개"처럼 보이지 않게). */
   registrationsState: RegistrationsLoadState;
@@ -153,13 +156,14 @@ interface TeamPickerViewProps {
   heading: string;
   currentRegistrationId: string | null;
   options: MobilePickCandidate[];
+  hiddenNote?: string;
   registrationsState: RegistrationsLoadState;
   pending: boolean;
   onSubmit: (registrationId: string | null) => void;
   onBack: () => void;
 }
 
-function TeamPickerView({ sideLabel, heading, currentRegistrationId, options, registrationsState, pending, onSubmit, onBack }: TeamPickerViewProps) {
+function TeamPickerView({ sideLabel, heading, currentRegistrationId, options, hiddenNote, registrationsState, pending, onSubmit, onBack }: TeamPickerViewProps) {
   const ready = registrationsState.status === 'success';
   const retry = (
     <div role="alert" className="flex flex-col items-start gap-2">
@@ -229,6 +233,7 @@ function TeamPickerView({ sideLabel, heading, currentRegistrationId, options, re
         </button>
       ) : null}
       {list}
+      {hiddenNote ? <p className="text-[length:var(--font-size-caption)] text-[var(--text-muted)]">{hiddenNote}</p> : null}
       {registrationsState.refetchFailed ? (
         <>
           {retry}
@@ -268,15 +273,22 @@ async function runAssign(
 
 /** 자리(slot)에 연결된 사이드 — 서버 규칙(S3)과 같은 후보 필터. */
 function SlotTeamPicker({
-  slot, slots, candidates, scope, ...common
-}: PickerCommon & { slot: V1AdminBracketSlot; slots: V1AdminBracketSlot[]; candidates: MobilePickCandidate[]; scope: 'tournament' | 'league' }) {
+  slot, slots, groups, candidates, scope, ...common
+}: PickerCommon & { slot: V1AdminBracketSlot; slots: V1AdminBracketSlot[]; groups: readonly V1AdminBracketGroup[]; candidates: MobilePickCandidate[]; scope: 'tournament' | 'league' }) {
   const assign = useV1AssignTournamentSlot(common.competitionId, scope);
+  const { shown, hidesOtherGroupTeams } = applyGroupRule(
+    pickableCandidates(candidates, slots, slot),
+    (candidate) => candidate.registrationId,
+    registrationIdsBlockedForGroup(groups, slot.groupId),
+    slot.registrationId,
+  );
   return (
     <TeamPickerView
       sideLabel={common.sideLabel}
       heading={slot.label}
       currentRegistrationId={slot.registrationId}
-      options={pickableCandidates(candidates, slots, slot)}
+      options={shown}
+      hiddenNote={hidesOtherGroupTeams ? TEAM_IN_OTHER_GROUP_HIDDEN_NOTE : undefined}
       registrationsState={common.registrationsState}
       pending={assign.isPending}
       onSubmit={(registrationId) => void runAssign(() => assign.mutateAsync({ slotId: slot.id, registrationId }), registrationId, common)}
@@ -287,17 +299,24 @@ function SlotTeamPicker({
 
 /** 자리 없이 경기에 직접 지정하는 사이드 — 데스크톱 칸 패널처럼 경기를 고쳐 저장하고, 반대편 팀은 뺀다. */
 function DirectTeamPicker({
-  node, side, candidates, ...common
-}: PickerCommon & { node: MobileNode; side: 'HOME' | 'AWAY'; candidates: MobilePickCandidate[] }) {
+  node, side, groups, candidates, ...common
+}: PickerCommon & { node: MobileNode; side: 'HOME' | 'AWAY'; groups: readonly V1AdminBracketGroup[]; candidates: MobilePickCandidate[] }) {
   const updateFixture = useV1UpdateFixture(common.competitionId);
   const mine = side === 'HOME' ? node.home : node.away;
   const other = side === 'HOME' ? node.away : node.home;
+  const { shown, hidesOtherGroupTeams } = applyGroupRule(
+    candidates.filter((candidate) => candidate.registrationId !== other.registrationId),
+    (candidate) => candidate.registrationId,
+    registrationIdsBlockedForGroup(groups, node.groupId),
+    mine.registrationId,
+  );
   return (
     <TeamPickerView
       sideLabel={common.sideLabel}
       heading="경기에 직접 지정"
       currentRegistrationId={mine.registrationId}
-      options={candidates.filter((candidate) => candidate.registrationId !== other.registrationId)}
+      options={shown}
+      hiddenNote={hidesOtherGroupTeams ? TEAM_IN_OTHER_GROUP_HIDDEN_NOTE : undefined}
       registrationsState={common.registrationsState}
       pending={updateFixture.isPending}
       onSubmit={(registrationId) =>
@@ -324,6 +343,7 @@ function isNodeLocked(node: MobileNode): boolean {
 
 export function MobileNodeSheetBody(props: MobileNodeSheetBodyProps) {
   const { node, scope, canWrite, view, onViewChange } = props;
+  const groups = props.groups ?? [];
   const editable = canWrite && !isNodeLocked(node);
   const slotById = (id: string | null) => props.slots.find((candidate) => candidate.id === id) ?? null;
   const pickKind = (side: MobileSide): 'slot' | 'direct' | null => {
@@ -345,10 +365,10 @@ export function MobileNodeSheetBody(props: MobileNodeSheetBodyProps) {
     };
     const slot = slotById(side.slotId);
     if (kind === 'slot' && slot !== null) {
-      return <SlotTeamPicker {...common} slot={slot} slots={props.slots} candidates={props.candidates} scope={scope} />;
+      return <SlotTeamPicker {...common} slot={slot} slots={props.slots} groups={groups} candidates={props.candidates} scope={scope} />;
     }
     if (kind === 'direct') {
-      return <DirectTeamPicker {...common} node={node} side={view.side} candidates={props.candidates} />;
+      return <DirectTeamPicker {...common} node={node} side={view.side} groups={groups} candidates={props.candidates} />;
     }
   }
 

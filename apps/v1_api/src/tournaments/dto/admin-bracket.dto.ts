@@ -116,10 +116,12 @@ export class CreateFixtureDto {
   @MaxLength(60)
   round!: string;
 
+  /** 생략하면 서버가 대회 안의 최대 번호 + 1 을 트랜잭션 안에서 정한다. */
+  @IsOptional()
   @Type(() => Number)
   @IsInt()
   @Min(1)
-  fixtureNumber!: number;
+  fixtureNumber?: number;
 
   @IsOptional()
   @Type(() => Number)

@@ -341,6 +341,40 @@ describe('빠른 결과 — 대회 경기', () => {
       awayRegistrationId: null,
     });
 
+    // 팀 전적: 정규시간 1:1 이고 승부차기 5:4 — 득점 컬럼은 정규시간만, 승패는 승부차기로 가른다.
+    const facts = await prisma.v1TeamRecordFact.findMany({ where: { revisionId: first.body.data.revisionId } });
+    expect(facts).toHaveLength(2);
+    expect(facts.find((fact) => fact.teamId === teams.a)).toMatchObject({
+      gameId: bracket.semi1.gameId,
+      opponentTeamId: teams.b,
+      tournamentId: bracket.tournamentId,
+      result: 'WON',
+      goalsFor: 1,
+      goalsAgainst: 1,
+    });
+    expect(facts.find((fact) => fact.teamId === teams.b)).toMatchObject({
+      opponentTeamId: teams.a,
+      result: 'LOST',
+      goalsFor: 1,
+      goalsAgainst: 1,
+    });
+
+    // 개인 기록(출전): 양 팀 명단 선수마다 출전 기록 1건이 확정본에 붙는다.
+    const roster = await prisma.v1GameParticipant.findMany({ where: { gameId: bracket.semi1.gameId } });
+    const appearances = await prisma.v1GameResultParticipant.findMany({ where: { resultRevisionId: first.body.data.revisionId } });
+    expect(roster).toHaveLength(2);
+    expect(appearances.map((row) => row.participantId).sort()).toEqual(roster.map((row) => row.id).sort());
+    expect(appearances.every((row) => row.started)).toBe(true);
+
+    // 4강은 조별 순위에 반영되지 않는다(phase !== 'group') — 순위 행이 생기면 진출 경기가 순위를 오염시킨 것이다.
+    expect(await prisma.v1TournamentStanding.count({ where: { registration: { tournamentId: bracket.tournamentId } } })).toBe(0);
+    expect(await prisma.v1TournamentOverallStanding.count({ where: { tournamentId: bracket.tournamentId } })).toBe(0);
+
+    // 이미 소비한 이벤트를 다시 돌려도 전적·알림이 늘지 않는다.
+    await drainOutboxWorker(prisma);
+    expect(await prisma.v1TeamRecordFact.count({ where: { revisionId: first.body.data.revisionId } })).toBe(2);
+    expect(await notifiedCount(bracket.semi1.teamMatchId)).toBe(2);
+
     const second = await quickResult(bracket.semi2.gameId, users.ops, { home: 0, away: 2 });
     expect(second.status).toBe(201);
     await drainOutboxWorker(prisma);
@@ -696,6 +730,13 @@ describe('빠른 결과 — 정정', () => {
 
     expect((await finalDetails(bracket.final.teamMatchId)).homeRegistrationId).toBe(bracket.registration.b);
     expect(await notifiedCount(teamMatchId)).toBe(2);
+
+    // 정정본은 자기 전적 2건을 따로 남기고(승부차기 승자가 바뀌어 결과가 뒤집힌다), 첫 확정본의 전적은 그대로다.
+    const corrected = await prisma.v1TeamRecordFact.findMany({ where: { revisionId: draft.revisionId } });
+    expect(corrected.find((fact) => fact.teamId === teams.a)?.result).toBe('LOST');
+    expect(corrected.find((fact) => fact.teamId === teams.b)?.result).toBe('WON');
+    expect(corrected).toHaveLength(2);
+    expect(await prisma.v1TeamRecordFact.count({ where: { revisionId: base.id } })).toBe(2);
   });
 });
 

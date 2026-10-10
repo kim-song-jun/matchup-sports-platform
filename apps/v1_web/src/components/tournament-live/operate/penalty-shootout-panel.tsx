@@ -136,6 +136,7 @@ export function PenaltyShootoutPanel({
   // 방법이 아예 없었다.
   const availability = penaltyFinishAvailability(kicks, sides, firstKickSideId, policy);
   const decisive = availability === 'READY';
+  // 결판 뒤 킥을 더 받으면 킥 수가 어긋나 결판이 풀린다 — 잘못 눌렀다면 되돌리기로 고친다.
   // 선축은 첫 킥 전에만 고를 수 있다 — 킥이 하나라도 기록된 뒤에 바꾸면 이미 기록된
   // 킥들의 순서 해석이 통째로 달라진다. 되돌리기로 킥을 전부 지우면 다시 고를 수 있다.
   const firstKickLocked = kicks.length > 0;
@@ -283,7 +284,7 @@ export function PenaltyShootoutPanel({
             <Button
               size="lg"
               variant="success"
-              disabled={nextSideId === null}
+              disabled={nextSideId === null || decisive}
               onClick={() => nextSideId !== null && onRecordKick(nextSideId, 'SCORED')}
             >
               <Check size={16} aria-hidden="true" />
@@ -292,7 +293,7 @@ export function PenaltyShootoutPanel({
             <Button
               size="lg"
               variant="danger"
-              disabled={nextSideId === null}
+              disabled={nextSideId === null || decisive}
               onClick={() => nextSideId !== null && onRecordKick(nextSideId, 'MISSED')}
             >
               <X size={16} aria-hidden="true" />
@@ -321,11 +322,11 @@ export function PenaltyShootoutPanel({
           >
             승부차기 종료
           </Button>
-          {!decisive ? (
-            <p className="mt-2 text-center tm-text-caption text-[var(--text-muted)]">
-              {undecidedReason(sides, kicks, firstKickSideId)}
-            </p>
-          ) : null}
+          <p className="mt-2 text-center tm-text-caption text-[var(--text-muted)]">
+            {decisive
+              ? '결판이 났어요. 잘못 기록했다면 방금 킥 되돌리기를 눌러주세요.'
+              : undecidedReason(sides, kicks, firstKickSideId)}
+          </p>
           {/* 우회 종료는 `OVERRIDABLE`일 때만 — `BLOCKED`(사이드 미정 · 선축 미선택 · 동점)에서
               열어 주면 눌러도 서버가 되돌리거나 애초에 보낼 값이 없다. 자동 종료와 시각적으로
               분명히 갈라 두려고 primary가 아닌 outline이고, 위 사유 문구 바로 아래에 둬서

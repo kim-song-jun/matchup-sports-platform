@@ -55,7 +55,7 @@ export function TournamentCampaignRewards({
               <h3 id="campaign-prize-title" className={styles.prizeTitle}>
                 {tournament.prizeSummary ?? `${tournament.prizePool?.toLocaleString('ko-KR')}원`}
               </h3>
-              <p>순위와 개인 시상 결과는 대회 종료 후 결과 페이지에 투명하게 기록합니다.</p>
+              <p>순위와 개인 시상 결과는 대회 종료 후 결과 페이지에 투명하게 기록해요.</p>
             </div>
           </div>
           {prizeRows.length > 0 ? (

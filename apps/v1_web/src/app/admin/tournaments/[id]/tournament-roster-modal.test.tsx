@@ -189,6 +189,26 @@ describe('admin tournament roster modal', () => {
     expect(screen.getByRole('combobox', { name: '홍길동 자격 상태' })).toBeDisabled();
   });
 
+  // 팀 화면(명단 편집)의 자격 라벨은 아마추어 / 선출 이다 — 어드민 선택지가 같은 말을 써야 한다.
+  it('자격 상태 선택지는 팀 화면과 같은 "아마추어 / 선출" 이름을 쓴다', () => {
+    render(
+      <RosterModal
+        open
+        onClose={() => undefined}
+        registration={registration}
+        showToast={() => undefined}
+        canWrite
+      />,
+    );
+
+    const select = screen.getByRole('combobox', { name: '홍길동 자격 상태' });
+    expect(Array.from((select as HTMLSelectElement).options).map((o) => o.textContent)).toEqual([
+      '아마추어',
+      '선출',
+      '검토 필요',
+    ]);
+  });
+
   it('shows a retryable error instead of an empty roster when the request fails', async () => {
     queryState = {
       data: undefined,

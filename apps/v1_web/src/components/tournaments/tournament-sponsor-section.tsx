@@ -85,7 +85,7 @@ export function TournamentSponsorSection({
           <span className={styles.emptyIcon}><Handshake aria-hidden="true" /></span>
           <div>
             <strong>공식 후원사를 준비하고 있어요</strong>
-            <p>파트너 정보와 참가팀 혜택은 확정되는 대로 이곳에 공개합니다.</p>
+            <p>파트너 정보와 참가팀 혜택은 확정되는 대로 이곳에 공개해요.</p>
           </div>
         </div>
       ) : (

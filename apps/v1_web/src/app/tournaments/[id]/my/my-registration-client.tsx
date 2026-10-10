@@ -1081,7 +1081,7 @@ function RegistrationDetailView({
                   <p style={{ margin: '8px 0 0' }}>
                     안내된 계좌로 참가비를 입금해 주세요.
                     <br />
-                    입금 확인이 완료되면 참가가 최종 확정됩니다.
+                    입금 확인이 완료되면 참가가 최종 확정돼요.
                   </p>
                 </div>
               </Card>

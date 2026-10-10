@@ -7,12 +7,27 @@ import { PUBLIC_TOURNAMENT_STATUSES } from './tournaments-read.query';
 /**
  * Default public list order, evaluated by the database:
  * recruiting (open, plus a regular league's draft) -> recruitment closed -> in progress -> finished.
+ * "Recruitment closed" is the status the card shows: a stored `closed`, or a tournament still stored
+ * as `open` whose deadline has passed or whose capacity is full (the web's
+ * `resolveTournamentRegistrationBlock`; leagues have no capacity and keep their stored status).
  * Within the first three groups the earliest start comes first; the finished group is most recently
  * ended first (falling back to the start date). Rows without a date sort last in their group, and
  * `id` (byte order) breaks ties. This file is the single source of that order.
  */
+const CAPACITY_HOLD_STATUSES = ['confirmed', 'awaiting_payment', 'payment_checking', 'paid'];
+
+/** An `open` row the card renders as "모집 마감". `registration_deadline_at` is a UTC `timestamp`, so compare in UTC. */
+const OPEN_BUT_BLOCKED_SQL = Prisma.sql`(
+  t.kind::text IS DISTINCT FROM 'regular_league' AND (
+    t.registration_deadline_at < (now() AT TIME ZONE 'UTC')
+    OR (SELECT COUNT(*) FROM v1_tournament_registrations r
+          WHERE r.tournament_id = t.id AND r.status::text IN (${Prisma.join(CAPACITY_HOLD_STATUSES)})) >= t.team_count
+  )
+)`;
+
 const GROUP_RANK_SQL = Prisma.sql`CASE t.status::text
-  WHEN 'draft' THEN 0 WHEN 'open' THEN 0 WHEN 'closed' THEN 1 WHEN 'in_progress' THEN 2 WHEN 'completed' THEN 3
+  WHEN 'draft' THEN 0 WHEN 'open' THEN (CASE WHEN ${OPEN_BUT_BLOCKED_SQL} THEN 1 ELSE 0 END)
+  WHEN 'closed' THEN 1 WHEN 'in_progress' THEN 2 WHEN 'completed' THEN 3
   ELSE 4 END`;
 
 const FINISHED_RANK = Prisma.raw('3');

@@ -39,6 +39,7 @@ import { extractErrorMessage } from '@/lib/error-message';
 import { randomUuid } from '@/lib/uuid';
 import { isV1NetworkError, V1ApiError } from '@/lib/api-client';
 import { ActionTargetPicker, type EventCaptureCommitInput } from './action-target-picker';
+import { isSecondYellowWithoutRed } from './second-yellow';
 import { latestLineupForDisplay, latestOperableLineup } from './lineup-grid';
 import { MatchupTitle } from './matchup-title';
 import { ElapsedMatchClock } from './elapsed-match-clock';
@@ -66,6 +67,7 @@ import { endPeriodLabel, periodLabel, periodPrefix, regularPeriodCountOf } from 
 import {
   commandConfirmCopy,
   commitActionConfirmCopy,
+  secondYellowConfirmCopy,
   penaltyShootoutFinishConfirmCopy,
   penaltyShootoutOverrideFinishConfirmCopy,
   penaltyShootoutStartConfirmCopy,
@@ -697,6 +699,11 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
   useEffect(() => {
     liveEventsRef.current = ops.liveEvents;
   }, [ops.liveEvents]);
+  // 확인 시트를 기다리는 사이 버전이 올라가므로, 그 뒤의 큐 적재는 최신 `ops`로 한다.
+  const opsRef = useRef(ops);
+  useEffect(() => {
+    opsRef.current = ops;
+  }, [ops]);
 
   const handleCommit = useCallback(
     async (input: EventCaptureCommitInput) => {
@@ -715,7 +722,13 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
         periodCount,
       );
       if (!(await confirm(copy))) return;
-      void ops.submitEvent(input);
+      const askRed = isSecondYellowWithoutRed(liveEventsRef.current, opsRef.current.queue.items, input);
+      void opsRef.current.submitEvent(input);
+      if (askRed) {
+        const redInput: EventCaptureCommitInput = { ...input, payload: { card: 'RED' } };
+        const redCopy = secondYellowConfirmCopy(input, gameDetail.data?.sides ?? [], fixtureLineup.data?.lineups ?? [], periodCount);
+        if (await confirm(redCopy)) void opsRef.current.submitEvent(redInput);
+      }
       // 익명 GOAL에는 participantId가 없어 findRecentGoalEvent가 매칭할 수 없으므로
       // 어시스트 추가 액션을 달지 않는다(고아 토스트 액션을 만들지 않기 위한 가드).
       if (input.type === 'GOAL' && input.participantId !== undefined) {
@@ -732,7 +745,7 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
         });
       }
     },
-    [commandBlocked, ops, showToast, confirm, gameDetail.data?.sides, fixtureLineup.data?.lineups, clockWarningMinutes],
+    [commandBlocked, showToast, confirm, gameDetail.data?.sides, fixtureLineup.data?.lineups, clockWarningMinutes, periodCount],
   );
 
   // 이슈 #376 — 예전엔 ops.reverseEvent(되돌리기) + ops.submitEvent(재제출) 두 번

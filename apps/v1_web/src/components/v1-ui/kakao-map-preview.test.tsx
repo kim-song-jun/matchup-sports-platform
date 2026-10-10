@@ -14,21 +14,20 @@ function mockKakaoKey(key: string | null) {
   );
 }
 
-type PreviewProps = { height?: number; revealOnShow?: boolean };
+type PreviewProps = { revealOnShow?: boolean };
 
 async function renderPreview(props: PreviewProps = {}) {
   vi.resetModules();
   const { KakaoMapPreview } = await import('./kakao-map-preview');
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  const tree = (latitude: number, longitude: number, extra: PreviewProps = props) => (
+  const tree = (latitude: number, longitude: number) => (
     <QueryClientProvider client={client}>
-      <KakaoMapPreview name="망원 풋살장" latitude={latitude} longitude={longitude} {...extra} />
+      <KakaoMapPreview name="망원 풋살장" latitude={latitude} longitude={longitude} {...props} />
     </QueryClientProvider>
   );
   const view = render(tree(37.55, 126.9));
   return Object.assign(view, {
     rerenderAt: (lat: number, lng: number) => view.rerender(tree(lat, lng)),
-    rerenderWith: (extra: PreviewProps) => view.rerender(tree(37.55, 126.9, extra)),
   });
 }
 
@@ -113,7 +112,7 @@ describe('KakaoMapPreview', () => {
     expect(container.current?.querySelectorAll('canvas')).toHaveLength(1);
   });
 
-  describe('높이와 스크롤', () => {
+  describe('크기와 스크롤', () => {
     const LINK = { name: '망원 풋살장 지도 크게 보기' };
     let MapCtor: ReturnType<typeof vi.fn>;
     let scrollIntoView: ReturnType<typeof vi.fn>;
@@ -159,15 +158,33 @@ describe('KakaoMapPreview', () => {
       expect(scrollIntoView).not.toHaveBeenCalled();
     });
 
-    it('높이가 바뀌면 상자 높이를 바꾸고 지도를 다시 만든다', async () => {
-      const view = await renderPreview({ height: 120 });
-      expect(await screen.findByRole('link', LINK)).toHaveStyle({ height: '120px' });
+    it('상자 크기가 바뀌면 지도를 새로 만들지 않고 다시 맞춘 뒤 핀을 가운데로 되돌린다', async () => {
+      const relayout = vi.fn();
+      const setCenter = vi.fn();
+      MapCtor.mockImplementation(() => ({ relayout, setCenter }));
+      // jsdom 에는 ResizeObserver 가 없다 — 브라우저 API 스텁.
+      let onResize: (() => void) | undefined;
+      const disconnect = vi.fn();
+      vi.stubGlobal(
+        'ResizeObserver',
+        class {
+          constructor(callback: () => void) {
+            onResize = callback;
+          }
+          observe() {}
+          disconnect = disconnect;
+        },
+      );
+      const view = await renderPreview();
       await waitFor(() => expect(MapCtor).toHaveBeenCalledTimes(1));
 
-      view.rerenderWith({ height: 240 });
+      onResize?.();
 
-      await waitFor(() => expect(MapCtor).toHaveBeenCalledTimes(2));
-      expect(screen.getByRole('link', LINK)).toHaveStyle({ height: '240px' });
+      expect(relayout).toHaveBeenCalledTimes(1);
+      expect(setCenter).toHaveBeenCalledWith({ lat: 37.55, lng: 126.9 });
+      expect(MapCtor).toHaveBeenCalledTimes(1);
+      view.unmount();
+      expect(disconnect).toHaveBeenCalledTimes(1);
     });
   });
 

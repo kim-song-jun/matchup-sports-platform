@@ -9,18 +9,17 @@ import { placeKakaoMapUrl } from '@/lib/place';
  * 장소 미니 지도(비대화형). 상자 전체가 카카오맵 웹 페이지로 가는 링크라 지도 안에서는
  * 드래그·확대를 모두 끈다. 화면에 들어올 때 SDK 를 로드하고, JS 키가 없거나 로드가 실패하면
  * 아무것도 렌더하지 않는다(호출부 레이아웃에 빈 칸이 남지 않는다).
+ * 높이는 폭의 절반(160~240)이라 넓은 화면에서도 납작한 띠가 되지 않는다.
  */
 export function KakaoMapPreview({
   name,
   latitude,
   longitude,
-  height = 160,
   revealOnShow = false,
 }: {
   name: string;
   latitude: number;
   longitude: number;
-  height?: number;
   /** 지도 상자가 처음 나타날 때 한 번 화면 안으로 스크롤한다 — 하단 고정 바에 가리지 않게 장소를 고른 직후에만 켠다. */
   revealOnShow?: boolean;
 }) {
@@ -58,11 +57,11 @@ export function KakaoMapPreview({
     return () => observer.disconnect();
   }, [mounted, appKey, visible]);
 
-  // `height` 도 deps 다 — 창 폭이 데스크톱 경계를 넘어 높이가 바뀌어도 SDK 는 컨테이너 크기 변화를 모르므로 지도를 다시 만든다.
   useEffect(() => {
     if (!appKey || !visible || !mapRef.current) return;
     let cancelled = false;
     let marker: InstanceType<NonNullable<Window['kakao']>['maps']['Marker']> | null = null;
+    let resizeObserver: ResizeObserver | null = null;
     const container = mapRef.current;
     loadKakaoMapsSdk(appKey)
       .then(() => {
@@ -79,17 +78,26 @@ export function KakaoMapPreview({
         });
         marker = new maps.Marker({ position: center });
         marker.setMap(map);
+        // SDK 는 컨테이너 크기 변화를 모른다 — 창 폭이 바뀌어 상자가 커지면 늘어난 자리가 회색으로 남고 핀이 가운데서 밀린다.
+        if (typeof ResizeObserver !== 'undefined') {
+          resizeObserver = new ResizeObserver(() => {
+            map.relayout();
+            map.setCenter(center);
+          });
+          resizeObserver.observe(container);
+        }
       })
       .catch(() => {
         if (!cancelled) setLoadFailed(true);
       });
     return () => {
       cancelled = true;
+      resizeObserver?.disconnect();
       // 좌표가 바뀌면 같은 컨테이너에 두 번째 지도가 쌓이지 않도록 이전 핀과 DOM 을 비운다.
       marker?.setMap(null);
       container.replaceChildren();
     };
-  }, [appKey, visible, latitude, longitude, height]);
+  }, [appKey, visible, latitude, longitude]);
 
   if (!shown) return null;
 
@@ -105,7 +113,9 @@ export function KakaoMapPreview({
         display: 'block',
         position: 'relative',
         width: '100%',
-        height,
+        aspectRatio: '2 / 1',
+        minHeight: 160,
+        maxHeight: 240,
         // `revealOnShow` 가 하단 고정 바(약 70px)에 가리지 않을 만큼 띄워 스크롤한다.
         scrollMarginBottom: 120,
         borderRadius: 'var(--radius-control)',
@@ -114,7 +124,7 @@ export function KakaoMapPreview({
         border: '1px solid var(--border)',
       }}
     >
-      <div ref={mapRef} aria-hidden="true" style={{ width: '100%', height: '100%', pointerEvents: 'none' }} />
+      <div ref={mapRef} aria-hidden="true" style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }} />
     </a>
   );
 }

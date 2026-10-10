@@ -84,7 +84,7 @@ describe('POST /admin/league-matches/:leagueId/fixtures/template', () => {
     expect(await h.prisma.v1TeamMatch.count({ where: { leagueId } })).toBe(0);
   });
 
-  it('대진이 이미 있으면 409 LEAGUE_FIXTURES_EXIST — 템플릿 두 번째 호출·일반 대진·완료 리그 모두', async () => {
+  it('대진이 이미 있으면 409 LEAGUE_FIXTURES_EXIST — 템플릿 두 번째 호출·일반 대진, 대진이 있는 완료 리그는 LEAGUE_ENDED 가 먼저', async () => {
     const body = { teamCount: 3, legs: 1, schedule: { dates: kstDates(3), time: '19:00' } };
     const twice = await h.makeLeague();
     expect((await post(twice, body)).status).toBe(201);
@@ -103,6 +103,7 @@ describe('POST /admin/league-matches/:leagueId/fixtures/template', () => {
     await h.createFixture(completed, { homeTeamId: teamA.id, awayTeamId: teamB.id });
     const done = await post(completed, body);
     expect(done.status).toBe(409);
+    expect(done.body.code).toBe('LEAGUE_ENDED');
     expect(await h.prisma.v1TournamentSlot.count({ where: { tournamentId: completed } })).toBe(0);
   });
 

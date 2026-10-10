@@ -61,9 +61,36 @@ describe('lockCompetitionForBracketMutationInTx', () => {
   });
 });
 
+describe('lockCompetitionForBracketMutationInTx — ended leagues', () => {
+  it.each(['completed', 'cancelled'])('rejects a %s league with LEAGUE_ENDED 409 after taking the row lock', async (status) => {
+    const { tx, queried } = fakeTx(status);
+    await expect(
+      lockCompetitionForBracketMutationInTx(tx, { id: 'l-1', kind: 'regular_league' }),
+    ).rejects.toMatchObject({ response: { code: 'LEAGUE_ENDED' } });
+    expect(queried).toHaveLength(1);
+  });
+
+  it('does not apply the league status guard to the tournament lane', async () => {
+    const { tx, findFirst } = fakeTx('completed');
+    await expect(
+      lockCompetitionForBracketMutationInTx(tx, { id: 't-1', kind: 'regular_tournament' }),
+    ).resolves.toBeUndefined();
+    expect(findFirst).not.toHaveBeenCalled();
+  });
+});
+
 describe('lockCompetitionForSlotReleaseInTx', () => {
   it('does not reject an on_hold league — a withdrawn team must still free its slot', async () => {
     const { tx, queried, findFirst } = fakeTx('on_hold');
+    await expect(
+      lockCompetitionForSlotReleaseInTx(tx, { id: 'l-1', kind: 'regular_league' }),
+    ).resolves.toBeUndefined();
+    expect(queried).toHaveLength(1);
+    expect(findFirst).not.toHaveBeenCalled();
+  });
+
+  it.each(['completed', 'cancelled'])('does not reject a %s league — releasing a slot stays open after the league ends', async (status) => {
+    const { tx, queried, findFirst } = fakeTx(status);
     await expect(
       lockCompetitionForSlotReleaseInTx(tx, { id: 'l-1', kind: 'regular_league' }),
     ).resolves.toBeUndefined();

@@ -274,6 +274,25 @@ async function quickResult(
 const revisionCount = (gameId: string) => prisma.v1GameResultRevision.count({ where: { gameId } });
 const outboxCount = (gameId: string, type: string) =>
   prisma.v1OutboxEvent.count({ where: { aggregateType: 'GAME', aggregateId: gameId, type } });
+/**
+ * 이미 소비된 공식 결과 이벤트를 PENDING 으로 되돌려 워커가 다시 받게 한다(at-least-once 재전달 모사).
+ * 되돌릴 이벤트가 없거나 워커가 다시 처리하지 않았으면 그 자체로 실패한다 — 재소비 단언이 빈 드레인으로 통과하지 못하게 한다.
+ */
+async function redeliverOfficialEvents(gameId: string): Promise<void> {
+  const where = { aggregateType: 'GAME', aggregateId: gameId, type: 'GAME_RESULT_OFFICIAL' } as const;
+  const before = await prisma.v1OutboxEvent.findMany({ where: { ...where, status: 'COMPLETED' } });
+  expect(before.length).toBeGreaterThan(0);
+  await prisma.v1OutboxEvent.updateMany({
+    where: { id: { in: before.map((event) => event.id) } },
+    data: { status: 'PENDING', leaseOwner: null, leaseUntil: null, availableAt: new Date(Date.now() - 1_000) },
+  });
+  await drainOutboxWorker(prisma);
+  const after = await prisma.v1OutboxEvent.findMany({ where: { id: { in: before.map((event) => event.id) } } });
+  for (const event of after) {
+    expect(event.status).toBe('COMPLETED');
+    expect(event.attempts).toBeGreaterThan(before.find((row) => row.id === event.id)!.attempts);
+  }
+}
 const finalDetails = (teamMatchId: string) =>
   prisma.v1TournamentMatchDetails.findUniqueOrThrow({ where: { teamMatchId } });
 
@@ -367,7 +386,7 @@ describe('빠른 결과 — 대회 경기', () => {
     expect(await prisma.v1OperationAudit.count({ where: { resourceId: gameId, action: 'QUICK_RESULT' } })).toBe(1);
   });
 
-  it('조별 경기를 점수만으로 확정하면 워커가 그 조 순위에 이긴 팀 승 1·승점, 진 팀 패 1을 남기고 재소비해도 행이 늘지 않는다', async () => {
+  it('조별 경기를 점수만으로 확정하면 워커가 그 조 순위에 이긴 팀 승 1·승점, 진 팀 패 1을 남기고 이벤트를 다시 받아도 행·집계가 그대로다', async () => {
     const group = await createGroupFixture();
     const response = await quickResult(group.gameId, users.ops, { home: 2, away: 1 });
     expect(response.status).toBe(201);
@@ -384,8 +403,13 @@ describe('빠른 결과 — 대회 경기', () => {
     });
     expect(await prisma.v1TournamentOverallStanding.count({ where: { tournamentId: group.tournamentId } })).toBe(2);
 
-    await drainOutboxWorker(prisma);
-    expect(await prisma.v1TournamentStanding.count({ where: { groupId: group.groupId } })).toBe(2);
+    await redeliverOfficialEvents(group.gameId);
+    const stat = (row: (typeof rows)[number]) => ({
+      registrationId: row.registrationId, wins: row.wins, draws: row.draws, losses: row.losses,
+      points: row.points, goalsFor: row.goalsFor, goalsAgainst: row.goalsAgainst, position: row.position,
+    });
+    const afterRows = await prisma.v1TournamentStanding.findMany({ where: { groupId: group.groupId } });
+    expect(afterRows.map(stat).sort((x, y) => x.position! - y.position!)).toEqual(rows.map(stat).sort((x, y) => x.position! - y.position!));
     expect(await prisma.v1TournamentOverallStanding.count({ where: { tournamentId: group.tournamentId } })).toBe(2);
   });
 
@@ -450,8 +474,8 @@ describe('빠른 결과 — 대회 경기', () => {
     expect(await prisma.v1TournamentStanding.count({ where: { registration: { tournamentId: bracket.tournamentId } } })).toBe(0);
     expect(await prisma.v1TournamentOverallStanding.count({ where: { tournamentId: bracket.tournamentId } })).toBe(0);
 
-    // 이미 소비한 이벤트를 다시 돌려도 전적·알림이 늘지 않는다.
-    await drainOutboxWorker(prisma);
+    // 이미 소비한 이벤트를 다시 전달해도 전적·알림이 늘지 않는다.
+    await redeliverOfficialEvents(bracket.semi1.gameId);
     expect(await prisma.v1TeamRecordFact.count({ where: { revisionId: first.body.data.revisionId } })).toBe(2);
     expect(await notifiedCount(bracket.semi1.teamMatchId)).toBe(2);
 
@@ -818,8 +842,8 @@ describe('빠른 결과 — 정정', () => {
     expect(corrected).toHaveLength(2);
     expect(await prisma.v1TeamRecordFact.count({ where: { revisionId: base.id } })).toBe(2);
 
-    // 정정 뒤 다시 소비해도 두 확정본의 전적 행 수는 늘지 않는다.
-    await drainOutboxWorker(prisma);
+    // 정정 뒤 공식 결과 이벤트를 다시 전달해도 두 확정본의 전적 행 수는 늘지 않는다.
+    await redeliverOfficialEvents(gameId);
     expect(await prisma.v1TeamRecordFact.count({ where: { revisionId: draft.revisionId } })).toBe(2);
     expect(await prisma.v1TeamRecordFact.count({ where: { revisionId: base.id } })).toBe(2);
   });

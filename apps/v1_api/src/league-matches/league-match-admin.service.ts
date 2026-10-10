@@ -1198,8 +1198,8 @@ export class LeagueMatchAdminService {
         timing,
       });
       if (ids.length > 0) {
-        // completed였던 리그(전 대진 확정)라도 재생성으로 새 미확정 대진이 생겼으니
-        // active로 되돌린다 — revertCompletion을 별도로 먼저 호출할 필요가 없다.
+        // draft 리그는 첫 대진이 생기면 active 가 된다. completed·cancelled 는 위 가드(LEAGUE_ENDED)가
+        // 먼저 거부하므로 여기까지 오지 않는다.
         // BE-5 drop: 통합 축이 정본이라 이 update 하나가 상태 전이 전부다(예전엔 레거시
         // 테이블을 먼저 고치고 거울을 따라 고쳤다). `updateMany` + `kind` 가드인 이유:
         //   · `upsert` 는 `where` 에 unique 필드만 받아 `kind` 를 못 건다 — 같은 id 의 **진짜

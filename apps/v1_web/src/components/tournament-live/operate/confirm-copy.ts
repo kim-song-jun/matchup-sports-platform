@@ -135,6 +135,23 @@ export function commitActionConfirmCopy(
   };
 }
 
+/** 같은 경기에서 같은 선수에게 두 번째 옐로를 기록한 직후, 레드(경고 누적 퇴장)도 남길지 묻는 시트. */
+export function secondYellowConfirmCopy(
+  input: EventCaptureCommitInput,
+  sides: readonly GameSide[],
+  lineups: readonly GameLineup[],
+  periodCount?: number | null,
+): ConfirmCopy & { readonly cancelLabel: string } {
+  const when = `${periodPrefix(input.period, periodCount)}${formatMatchClock(input.clockMs)}`;
+  return {
+    title: `${josa(playerLabel(input.participantId, lineups), ['이', '가'])} 이 경기에서 옐로 2장이에요`,
+    message: `${sideLabel(input.sideId, sides)} · ${when}. 경고 누적 퇴장으로 레드카드도 기록할까요?`,
+    confirmLabel: '레드도 기록',
+    cancelLabel: '옐로만 둘게요',
+    tone: 'danger',
+  };
+}
+
 /**
  * start/pause/resume/end-period/start-period/end 확인 문구.
  * `revert-period`는 이 함수의 도메인이 아니다(사용자 결정으로 확인 자체가

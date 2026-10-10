@@ -289,7 +289,7 @@ describe('TournamentsReadService', () => {
   /** Routes `$queryRaw` calls: id-window queries get `ids`, COUNT queries get `total`. */
   function mockListQueries(ids: string[], total = ids.length) {
     prisma.$queryRaw.mockImplementation(async (strings: TemplateStringsArray) =>
-      strings.join('?').includes('COUNT(*)') ? [{ total: BigInt(total) }] : ids.map((id) => ({ id })),
+      strings.join('?').includes('COUNT(*)') ? [{ total: BigInt(total) }] : ids.map((id) => ({ id, grp: 0, sort_at: '2026-11-01 09:00:00' })),
     );
     prisma.v1Tournament.findMany.mockImplementation(async (args: { where: { id: { in: string[] } } }) =>
       args.where.id.in.map((id) => tournamentCard({ id })),
@@ -318,20 +318,27 @@ describe('TournamentsReadService', () => {
     expect(result.pageInfo).toEqual({ nextCursor: null, hasNext: false });
   });
 
-  it('list: one lookahead row beyond the limit sets hasNext and the cursor is the last returned id', async () => {
+  it('list: one lookahead row beyond the limit sets hasNext; the cursor resumes after the last returned row with its sort key', async () => {
     mockListQueries(['t-1', 't-2', 't-3']);
 
     const result = await service.list({ limit: 2 });
 
     expect(result.items.map((i) => i.id)).toEqual(['t-1', 't-2']);
-    expect(result.pageInfo).toMatchObject({ hasNext: true, nextCursor: 't-2' });
+    expect(result.pageInfo).toMatchObject({ hasNext: true });
     expect(prisma.v1Tournament.findMany.mock.calls[0][0].where).toEqual({ id: { in: ['t-1', 't-2'] } });
+
+    // Feeding the cursor back must key the next query on t-2 and the group/date it had on this page.
+    prisma.$queryRaw.mockClear();
+    mockListQueries([]);
+    await service.list({ cursor: result.pageInfo.nextCursor as string, limit: 2 });
+    const [, ...params] = prisma.$queryRaw.mock.calls[0];
+    expect(params).toEqual(expect.arrayContaining([0, '2026-11-01 09:00:00', 't-2']));
   });
 
   it('list: an empty window loads nothing and returns an empty page', async () => {
     mockListQueries([]);
 
-    const result = await service.list({ cursor: 'gone', limit: 5 });
+    const result = await service.list({ limit: 5 });
 
     expect(result.items).toEqual([]);
     expect(result.pageInfo).toEqual({ nextCursor: null, hasNext: false });
@@ -347,9 +354,12 @@ describe('TournamentsReadService', () => {
   });
 
   it('list: cursor requests never run the COUNT query and keep the two-field pageInfo', async () => {
+    mockListQueries(['t-1', 't-2']);
+    const first = await service.list({ limit: 1 });
+    prisma.$queryRaw.mockClear();
     mockListQueries([]);
 
-    const result = await service.list({ cursor: 'cursor-id', limit: 20 });
+    const result = await service.list({ cursor: first.pageInfo.nextCursor as string, limit: 20 });
 
     const sql = prisma.$queryRaw.mock.calls.map(([strings]) => (strings as TemplateStringsArray).join('?'));
     expect(sql.some((text) => text.includes('COUNT(*)'))).toBe(false);

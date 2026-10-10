@@ -191,16 +191,40 @@ describe('대회 공개 목록 DB 정렬·페이지 계약', () => {
     expect(ids(await list({ limit: 4, page: totalPages + 1 }))).toEqual([]);
   });
 
-  it('a cursor that is hidden or missing returns an empty page instead of restarting', async () => {
-    for (const cursor of [id('x-private'), id('x-deleted'), id('lg-open'), 'no-such-id']) {
+  it('a cursor that is not one this list issued returns an empty page instead of restarting', async () => {
+    for (const cursor of [id('o-soon'), 'no-such-id', Buffer.from('[9,null,"x"]').toString('base64url')]) {
       const res = await list({ cursor, limit: 5 });
       expect(res.items).toEqual([]);
       expect(res.pageInfo).toEqual({ nextCursor: null, hasNext: false });
     }
   });
 
+  it('a cursor row that turns into 모집 마감 between pages does not skip the rows still recruiting', async () => {
+    const first = await list({ limit: 7 });
+    expect(ids(first).at(-1)).toBe('o-room');
+    expect(first.pageInfo.hasNext).toBe(true);
+
+    await db.v1Tournament.update({ where: { id: id('o-room') }, data: { registrationDeadlineAt: PAST_DEADLINE } });
+    try {
+      const rest: string[] = [];
+      let cursor: string | undefined = first.pageInfo.nextCursor ?? undefined;
+      for (let guard = 0; cursor && guard < 40; guard += 1) {
+        const page = await list({ limit: 7, cursor });
+        rest.push(...ids(page));
+        cursor = page.pageInfo.nextCursor ?? undefined;
+      }
+      const expected = TOURNAMENT_ORDER.slice(TOURNAMENT_ORDER.indexOf('o-room') + 1);
+      // The cursor row itself reappears under its new group; every other row is returned exactly once.
+      expect(rest.filter((name) => name !== 'o-room')).toEqual(expected);
+    } finally {
+      await db.v1Tournament.update({ where: { id: id('o-room') }, data: { registrationDeadlineAt: null } });
+    }
+  });
+
   it('page 1 with a cursor keeps following the cursor, like page-less requests', async () => {
-    const res = await list({ cursor: id('o-soon'), page: 1, limit: 2 });
+    const first = await list({ limit: 1 });
+    expect(ids(first)).toEqual(['o-soon']);
+    const res = await list({ cursor: first.pageInfo.nextCursor, page: 1, limit: 2 });
     expect(ids(res)).toEqual(['o-tie-a', 'o-tie-b']);
   });
 

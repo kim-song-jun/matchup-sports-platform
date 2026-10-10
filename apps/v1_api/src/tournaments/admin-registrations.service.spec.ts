@@ -9,6 +9,7 @@
  */
 import { ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AdminContextService } from '../common/admin-context.service';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -460,6 +461,26 @@ describe('AdminRegistrationsService', () => {
     expect(prisma.v1AdminActionLog.create).toHaveBeenCalledWith(
       expect.objectContaining({ data: expect.objectContaining({ action: 'registration.cancel' }) }),
     );
+  });
+
+  it('cancel: 판정 뒤 팀이 요청을 철회했다면 승인으로 기록하지 않고 409 로 막는다', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(opsAdminRecord);
+    prisma.v1TournamentRegistration.findUnique.mockResolvedValue(
+      registrationRow({ status: 'cancel_requested', cancelPreviousStatus: 'paid', cancelRequestedAt: new Date() }),
+    );
+    prisma.v1TournamentRegistration.update.mockRejectedValue(
+      new Prisma.PrismaClientKnownRequestError('Record not found', { code: 'P2025', clientVersion: 'test' }),
+    );
+    prisma.v1TournamentPayment.findUnique.mockResolvedValue(null);
+    notifications.emitNotification.mockClear();
+
+    await expect(service.cancel(opsAuth, 'reg-1', {})).rejects.toMatchObject({
+      response: { code: 'REGISTRATION_STATUS_CHANGED' },
+    });
+
+    // 분류했던 상태(cancel_requested)를 where 에 걸어야 철회 뒤 갱신이 거부된다.
+    expect(prisma.v1TournamentRegistration.update.mock.calls[0][0].where).toEqual({ id: 'reg-1', status: 'cancel_requested' });
+    expect(notifications.emitNotification).not.toHaveBeenCalled();
   });
 
   it('cancel: 취소 요청 승인은 팀 사유를 보존하고 어드민 사유·승인 결과를 따로 남긴다', async () => {

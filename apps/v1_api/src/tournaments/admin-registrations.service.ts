@@ -355,8 +355,9 @@ export class AdminRegistrationsService {
         || (registration.status === 'cancel_requested' && registration.cancelPreviousStatus === 'confirmed');
       if (wasConfirmed) await this.slots.releaseForRegistrationInTx(tx, admin, registrationId);
       const updated = await tx.v1TournamentRegistration.update({
-        where: { id: registrationId },
         // `cancelReason` 은 팀이 취소 요청에 남긴 사유라 건드리지 않는다. 어드민 사유는 따로 담는다.
+        // status 를 where 에 걸어, 판정(승인/거부) 이후 팀이 요청을 철회했다면 P2025 로 막는다.
+        where: { id: registrationId, status: registration.status },
         data: { status: 'cancelled', cancelPreviousStatus: null, cancelOutcome, adminCancelReason: dto.reason ?? null },
       });
 
@@ -388,6 +389,14 @@ export class AdminRegistrationsService {
         tx,
       );
       return { updated, updatedPayment };
+    }).catch((error: unknown) => {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
+        throw new ConflictException({
+          code: 'REGISTRATION_STATUS_CHANGED',
+          message: '그 사이 신청 상태가 바뀌었어요. 새로고침한 뒤 다시 처리해 주세요.',
+        });
+      }
+      throw error;
     });
 
     // 알림: 신청자에게 취소 안내 (fire-and-forget — 트랜잭션 실패와 무관)

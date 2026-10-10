@@ -329,7 +329,7 @@ function RegistrationPass({
   if (status !== 'confirmed' && status !== 'waitlisted' && status !== 'paid') return null;
 
   const accent = getSportAccent(sportCode);
-  const statusCfg = registrationStatusConfig(status);
+  const statusCfg = registrationStatusConfig(status, null);
   const dateStr = formatTournamentDateRangeMedium(scheduledAt, scheduledEndAt);
   const rosterLink = rosterBlocked
     ? { text: '명단 확인', ariaLabel: '선수 명단 확인하기' }
@@ -1266,7 +1266,7 @@ function TeamRegistrationHub({
               (registration?.status === 'draft' || registration?.status === 'cancelled') &&
               canStartNewRegistration;
             const status = registration
-              ? registrationStatusConfig(registration.status)
+              ? registrationStatusConfig(registration.status, registration.cancelOutcome)
               : { badgeClass: 'tm-badge-grey', label: '미신청' };
             const actionLabel = !canManageTeam
               ? '권한 필요'

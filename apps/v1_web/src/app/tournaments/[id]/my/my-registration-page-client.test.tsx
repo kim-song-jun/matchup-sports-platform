@@ -492,7 +492,6 @@ describe('MyRegistrationPageClient — 명단 수정 가능 배지', () => {
   });
 });
 
-/** W8-V2 — 종료된 리그의 "내 신청"에 [참가 취소 요청]이 남아 있었다. 서버도 409 `TOURNAMENT_ENDED` 로 막는다. */
 describe('MyRegistrationPageClient — 어드민이 처리한 취소', () => {
   beforeEach(() => {
     searchParams = new URLSearchParams('reg=registration-1');
@@ -524,6 +523,24 @@ describe('MyRegistrationPageClient — 어드민이 처리한 취소', () => {
     expect(screen.getAllByText('취소 승인됨').length).toBeGreaterThan(0);
   });
 
+  it('`?reg=` 없는 목록 뷰의 배지도 처리 결과를 말한다', () => {
+    searchParams = new URLSearchParams('');
+    arrange({ status: 'cancelled', adminCancelReason: '자격 미달', cancelOutcome: 'rejected' });
+    render(<MyRegistrationPageClient tournamentId="tournament-1" />);
+
+    expect(screen.getByText('거부됨')).toBeInTheDocument();
+    expect(screen.queryByText('취소')).not.toBeInTheDocument();
+  });
+
+  it('대조군: 어드민이 처리하지 않은 취소는 목록에서도 그냥 "취소" 다', () => {
+    searchParams = new URLSearchParams('');
+    arrange({ status: 'cancelled', cancelOutcome: null });
+    render(<MyRegistrationPageClient tournamentId="tournament-1" />);
+
+    expect(screen.getByText('취소')).toBeInTheDocument();
+    expect(screen.queryByText('거부됨')).not.toBeInTheDocument();
+  });
+
   it('운영자가 거부한 신청은 "거부됨" 이다', () => {
     arrange({ status: 'cancelled', adminCancelReason: '자격 미달', cancelOutcome: 'rejected' });
     render(<MyRegistrationPageClient tournamentId="tournament-1" />);
@@ -533,6 +550,7 @@ describe('MyRegistrationPageClient — 어드민이 처리한 취소', () => {
   });
 });
 
+/** W8-V2 — 종료된 리그의 "내 신청"에 [참가 취소 요청]이 남아 있었다. 서버도 409 `TOURNAMENT_ENDED` 로 막는다. */
 describe('MyRegistrationPageClient — 참가 취소 요청 버튼', () => {
   beforeEach(() => {
     searchParams = new URLSearchParams('reg=registration-1');

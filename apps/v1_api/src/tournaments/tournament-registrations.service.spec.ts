@@ -37,7 +37,7 @@ function registrationRow(overrides: Record<string, unknown> = {}) {
     id: 'reg-1', tournamentId: 'tournament-1', teamId: 'team-1', appliedByUserId: 'manager-user',
     status: 'draft', depositorName: null, agreedRules: false, agreedPrivacy: false, agreedRefund: false,
     agreedMediaConsent: false, confirmedAt: null, rosterLockedAt: null, cancelRequestedAt: null,
-    cancelPreviousStatus: null, cancelReason: null,
+    cancelPreviousStatus: null, cancelReason: null, adminCancelReason: null, cancelOutcome: null,
     createdAt: new Date('2026-06-14T00:00:00Z'), updatedAt: new Date('2026-06-14T00:00:00Z'), ...overrides,
   };
 }

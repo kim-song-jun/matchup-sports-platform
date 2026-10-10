@@ -452,7 +452,7 @@ export function registrationCancelOutcomeLabel(outcome: V1RegistrationCancelOutc
  */
 export function tournamentRegistrationStatusConfig(
   status: V1TournamentRegistrationStatus,
-  cancelOutcome?: V1RegistrationCancelOutcome | null,
+  cancelOutcome: V1RegistrationCancelOutcome | null,
 ): {
   badgeClass: string;
   textColor: string;

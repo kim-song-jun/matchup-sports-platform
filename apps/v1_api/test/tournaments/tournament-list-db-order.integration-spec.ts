@@ -11,7 +11,8 @@ import { createV1IntegrationApp } from '../integration/integration-app';
 /**
  * Default public list order is computed by the database. The fixture mixes every group, null dates,
  * id ties, and rows the public surface must hide, so a wrong ORDER BY, keyset comparison or filter
- * changes the visible sequence.
+ * changes the visible sequence. A stored `open` row the card shows as "모집 마감" (deadline passed or
+ * capacity held) must sort with the closed group; leagues keep their stored status.
  */
 describe('대회 공개 목록 DB 정렬·페이지 계약', () => {
   let app: INestApplication;
@@ -20,9 +21,12 @@ describe('대회 공개 목록 DB 정렬·페이지 계약', () => {
   let read: TournamentsReadService;
   let sportId: string;
   let otherSportId: string;
+  let teamId: string;
   const prefix = randomUUID().slice(0, 8);
   const id = (name: string) => `${prefix}-${name}`;
   const day = (d: number) => new Date(Date.UTC(2026, 9, d));
+  const PAST_DEADLINE = new Date(Date.now() - 24 * 60 * 60 * 1000);
+  const FUTURE_DEADLINE = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
 
   type Seed = {
     name: string;
@@ -34,6 +38,10 @@ describe('대회 공개 목록 DB 정렬·페이지 계약', () => {
     deleted?: boolean;
     gender?: 'male' | 'female' | 'mixed';
     sport?: 'main' | 'other';
+    deadline?: Date;
+    capacity?: number;
+    /** Status of the single registration the row gets (one team per tournament). */
+    held?: 'confirmed' | 'awaiting_payment' | 'cancelled';
   };
   // Seeds in deliberately shuffled order. `kind` defaults to regular_tournament.
   const seeds: Seed[] = [
@@ -60,6 +68,17 @@ describe('대회 공개 목록 DB 정렬·페이지 계약', () => {
     { name: 'x-cancelled', status: 'cancelled', start: day(6) },
     { name: 'x-private', status: 'open', start: day(6), isPublic: false },
     { name: 'x-deleted', status: 'open', start: day(6), deleted: true },
+    // Stored open, but the card shows "모집 마감": deadline passed, or capacity held by confirmed / pending teams.
+    { name: 'o-expired', status: 'open', start: day(9), deadline: PAST_DEADLINE },
+    { name: 'o-full-confirmed', status: 'open', start: day(8), capacity: 1, held: 'confirmed' },
+    { name: 'o-full-pending', status: 'open', start: day(17), capacity: 1, held: 'awaiting_payment' },
+    // Controls on the other side of each rule: still recruiting.
+    { name: 'o-future-deadline', status: 'open', start: day(19), deadline: FUTURE_DEADLINE },
+    { name: 'o-room', status: 'open', start: day(21), capacity: 2, held: 'confirmed' },
+    { name: 'o-cancelled-reg', status: 'open', start: day(22), capacity: 1, held: 'cancelled' },
+    // Leagues have no capacity and keep their stored status even past the deadline.
+    { name: 'lg-expired', status: 'open', kind: 'regular_league', start: day(23), deadline: PAST_DEADLINE },
+    { name: 'lg-full', status: 'open', kind: 'regular_league', start: day(24), capacity: 1, held: 'confirmed' },
     // Filter coverage.
     { name: 'f-female', status: 'open', start: day(15), gender: 'female' },
     { name: 'f-other-sport', status: 'open', start: day(16), sport: 'other' },
@@ -71,6 +90,11 @@ describe('대회 공개 목록 DB 정렬·페이지 계약', () => {
     read = app.get(TournamentsReadService);
     sportId = (await db.v1Sport.create({ data: { code: `list-order-${prefix}`, name: '풋살' } })).id;
     otherSportId = (await db.v1Sport.create({ data: { code: `list-order-other-${prefix}`, name: '러닝' } })).id;
+    const owner = await db.v1User.create({
+      data: { email: `list-order-${prefix}@example.test`, accountStatus: 'active', onboardingStatus: 'completed' },
+    });
+    const region = await db.v1Region.create({ data: { code: `list-order-${prefix}`, name: 'list order', level: 1 } });
+    teamId = (await db.v1Team.create({ data: { ownerUserId: owner.id, sportId, regionId: region.id, name: `list order ${prefix}` } })).id;
     for (const seed of seeds) {
       await db.v1Tournament.create({
         data: {
@@ -84,9 +108,15 @@ describe('대회 공개 목록 DB 정렬·페이지 계약', () => {
           isPublic: seed.isPublic ?? true,
           deletedAt: seed.deleted ? new Date() : null,
           genderCategory: seed.gender ?? null,
-          teamCount: 8,
+          teamCount: seed.capacity ?? 8,
+          registrationDeadlineAt: seed.deadline ?? null,
         },
       });
+      if (seed.held) {
+        await db.v1TournamentRegistration.create({
+          data: { tournamentId: id(seed.name), teamId, appliedByUserId: owner.id, status: seed.held },
+        });
+      }
     }
   });
   afterAll(async () => cleanup?.());
@@ -96,8 +126,10 @@ describe('대회 공개 목록 DB 정렬·페이지 계약', () => {
 
   const TOURNAMENT_ORDER = [
     // recruiting: earliest start first, id ties, no date last
-    'o-soon', 'o-tie-a', 'o-tie-b', 'legacy-null-kind', 'f-female', 'o-late', 'o-nodate',
-    'cl-soon', 'cl-late',
+    'o-soon', 'o-tie-a', 'o-tie-b', 'legacy-null-kind', 'f-female', 'o-future-deadline', 'o-room', 'o-cancelled-reg',
+    'o-late', 'o-nodate',
+    // closed: stored closed plus stored-open rows past their deadline or at capacity, by start
+    'o-full-confirmed', 'o-expired', 'cl-soon', 'o-full-pending', 'cl-late',
     'ip-soon', 'ip-late',
     // finished: most recently ended first (end falls back to start), no date last
     'c-new', 'c-noend', 'c-old', 'c-nodate',
@@ -107,12 +139,27 @@ describe('대회 공개 목록 DB 정렬·페이지 계약', () => {
     expect(ids(await list({ limit: 50 }))).toEqual(TOURNAMENT_ORDER);
   });
 
+  it('sorts a stored-open row the card shows as 모집 마감 with the closed group, and leagues keep their stored status', async () => {
+    const order = ids(await list({ kind: 'all', limit: 50 }));
+    const closedNames = ['cl-soon', 'cl-late', 'o-expired', 'o-full-confirmed', 'o-full-pending'];
+    const firstClosed = Math.min(...closedNames.map((name) => order.indexOf(name)));
+    const lastClosed = Math.max(...closedNames.map((name) => order.indexOf(name)));
+    expect(firstClosed).toBe(order.indexOf('o-nodate') + 1);
+    expect(lastClosed).toBe(order.indexOf('ip-soon') - 1);
+    for (const name of ['o-future-deadline', 'o-room', 'o-cancelled-reg', 'lg-expired', 'lg-full']) {
+      expect(order.indexOf(name)).toBeLessThan(firstClosed);
+    }
+  });
+
   it('kind=league puts a league draft with recruiting and kind=all merges both kinds in one order', async () => {
-    expect(ids(await list({ kind: 'league', limit: 50 }))).toEqual(['lg-draft', 'lg-open', 'lg-done']);
+    expect(ids(await list({ kind: 'league', limit: 50 }))).toEqual([
+      'lg-draft', 'lg-open', 'lg-expired', 'lg-full', 'lg-done',
+    ]);
     const all = ids(await list({ kind: 'all', limit: 50 }));
     expect(all).toEqual([
-      'lg-draft', 'o-soon', 'o-tie-a', 'o-tie-b', 'legacy-null-kind', 'lg-open', 'f-female', 'o-late', 'o-nodate',
-      'cl-soon', 'cl-late', 'ip-soon', 'ip-late', 'c-new', 'c-noend', 'lg-done', 'c-old', 'c-nodate',
+      'lg-draft', 'o-soon', 'o-tie-a', 'o-tie-b', 'legacy-null-kind', 'lg-open', 'f-female', 'o-future-deadline',
+      'o-room', 'o-cancelled-reg', 'lg-expired', 'lg-full', 'o-late', 'o-nodate',
+      'o-full-confirmed', 'o-expired', 'cl-soon', 'o-full-pending', 'cl-late', 'ip-soon', 'ip-late', 'c-new', 'c-noend', 'lg-done', 'c-old', 'c-nodate',
     ]);
   });
 
@@ -134,25 +181,57 @@ describe('대회 공개 목록 DB 정렬·페이지 계약', () => {
 
   it('page-number paging matches the same order and reports the total', async () => {
     const seen: string[] = [];
-    for (let page = 1; page <= 4; page += 1) {
+    const totalPages = Math.ceil(TOURNAMENT_ORDER.length / 4);
+    for (let page = 1; page <= totalPages; page += 1) {
       const res = await list({ limit: 4, page });
-      expect(res.pageInfo).toMatchObject({ page, total: TOURNAMENT_ORDER.length, totalPages: 4 });
+      expect(res.pageInfo).toMatchObject({ page, total: TOURNAMENT_ORDER.length, totalPages });
       seen.push(...ids(res));
     }
     expect(seen).toEqual(TOURNAMENT_ORDER);
-    expect(ids(await list({ limit: 4, page: 5 }))).toEqual([]);
+    expect(ids(await list({ limit: 4, page: totalPages + 1 }))).toEqual([]);
   });
 
-  it('a cursor that is hidden or missing returns an empty page instead of restarting', async () => {
-    for (const cursor of [id('x-private'), id('x-deleted'), id('lg-open'), 'no-such-id']) {
+  it('a cursor that is not one this list issued returns an empty page instead of restarting', async () => {
+    const forge = (value: unknown[]) => Buffer.from(JSON.stringify(value)).toString('base64url');
+    for (const cursor of [
+      id('o-soon'),
+      'no-such-id',
+      forge([9, null, 'x']),
+      forge([0, '9999-99-99 99:99:99', 'x']),
+      forge([0, '2026-02-30 10:00:00', 'x']),
+    ]) {
       const res = await list({ cursor, limit: 5 });
       expect(res.items).toEqual([]);
       expect(res.pageInfo).toEqual({ nextCursor: null, hasNext: false });
     }
   });
 
+  it('a cursor row that turns into 모집 마감 between pages does not skip the rows still recruiting', async () => {
+    const first = await list({ limit: 7 });
+    expect(ids(first).at(-1)).toBe('o-room');
+    expect(first.pageInfo.hasNext).toBe(true);
+
+    await db.v1Tournament.update({ where: { id: id('o-room') }, data: { registrationDeadlineAt: PAST_DEADLINE } });
+    try {
+      const rest: string[] = [];
+      let cursor: string | undefined = first.pageInfo.nextCursor ?? undefined;
+      for (let guard = 0; cursor && guard < 40; guard += 1) {
+        const page = await list({ limit: 7, cursor });
+        rest.push(...ids(page));
+        cursor = page.pageInfo.nextCursor ?? undefined;
+      }
+      const expected = TOURNAMENT_ORDER.slice(TOURNAMENT_ORDER.indexOf('o-room') + 1);
+      // The cursor row itself reappears under its new group; every other row is returned exactly once.
+      expect(rest.filter((name) => name !== 'o-room')).toEqual(expected);
+    } finally {
+      await db.v1Tournament.update({ where: { id: id('o-room') }, data: { registrationDeadlineAt: null } });
+    }
+  });
+
   it('page 1 with a cursor keeps following the cursor, like page-less requests', async () => {
-    const res = await list({ cursor: id('o-soon'), page: 1, limit: 2 });
+    const first = await list({ limit: 1 });
+    expect(ids(first)).toEqual(['o-soon']);
+    const res = await list({ cursor: first.pageInfo.nextCursor, page: 1, limit: 2 });
     expect(ids(res)).toEqual(['o-tie-a', 'o-tie-b']);
   });
 

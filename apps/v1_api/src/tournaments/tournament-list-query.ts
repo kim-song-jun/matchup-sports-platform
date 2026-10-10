@@ -7,12 +7,27 @@ import { PUBLIC_TOURNAMENT_STATUSES } from './tournaments-read.query';
 /**
  * Default public list order, evaluated by the database:
  * recruiting (open, plus a regular league's draft) -> recruitment closed -> in progress -> finished.
+ * "Recruitment closed" is the status the card shows: a stored `closed`, or a tournament still stored
+ * as `open` whose deadline has passed or whose capacity is full (the web's
+ * `resolveTournamentRegistrationBlock`; leagues have no capacity and keep their stored status).
  * Within the first three groups the earliest start comes first; the finished group is most recently
  * ended first (falling back to the start date). Rows without a date sort last in their group, and
  * `id` (byte order) breaks ties. This file is the single source of that order.
  */
+const CAPACITY_HOLD_STATUSES = ['confirmed', 'awaiting_payment', 'payment_checking', 'paid'];
+
+/** An `open` row the card renders as "모집 마감". `registration_deadline_at` is a UTC `timestamp`, so compare in UTC. */
+const OPEN_BUT_BLOCKED_SQL = Prisma.sql`(
+  t.kind::text IS DISTINCT FROM 'regular_league' AND (
+    t.registration_deadline_at < (now() AT TIME ZONE 'UTC')
+    OR (SELECT COUNT(*) FROM v1_tournament_registrations r
+          WHERE r.tournament_id = t.id AND r.status::text IN (${Prisma.join(CAPACITY_HOLD_STATUSES)})) >= t.team_count
+  )
+)`;
+
 const GROUP_RANK_SQL = Prisma.sql`CASE t.status::text
-  WHEN 'draft' THEN 0 WHEN 'open' THEN 0 WHEN 'closed' THEN 1 WHEN 'in_progress' THEN 2 WHEN 'completed' THEN 3
+  WHEN 'draft' THEN 0 WHEN 'open' THEN (CASE WHEN ${OPEN_BUT_BLOCKED_SQL} THEN 1 ELSE 0 END)
+  WHEN 'closed' THEN 1 WHEN 'in_progress' THEN 2 WHEN 'completed' THEN 3
   ELSE 4 END`;
 
 const FINISHED_RANK = Prisma.raw('3');
@@ -74,27 +89,92 @@ export interface TournamentListWindow {
   limit: number;
   /** Rows to skip (page mode). */
   offset?: number;
-  /** Row id to continue after; an id that no longer matches the filter yields an empty window. */
+  /** Cursor token from a previous page's last row (see `encodeCursor`); anything else yields an empty window. */
   cursor?: string;
 }
 
-/** Ids of one page window plus one lookahead row, in default list order. */
+export interface TournamentListRow {
+  id: string;
+  /** Resumes the list right after this row. */
+  cursor: string;
+}
+
+interface CursorKey {
+  grp: number;
+  /** `timestamp` rendered as text, so microseconds survive the round trip. */
+  sortAt: string | null;
+  id: string;
+}
+
+const SORT_AT_TEXT = /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})(\.\d{1,6})?$/;
+
+/** The shape alone admits `9999-99-99 99:99:99`, which Postgres rejects with a 500 at the `::timestamp` cast. */
+function isRealTimestampText(text: string): boolean {
+  const match = SORT_AT_TEXT.exec(text);
+  if (!match) return false;
+  const [year, month, day, hour, minute, second] = match.slice(1, 7).map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day, hour, minute, second));
+  return (
+    date.getUTCFullYear() === year &&
+    date.getUTCMonth() === month - 1 &&
+    date.getUTCDate() === day &&
+    date.getUTCHours() === hour &&
+    date.getUTCMinutes() === minute &&
+    date.getUTCSeconds() === second
+  );
+}
+
+/**
+ * The cursor carries the sort key the row had when its page was served. Recomputing it from the row
+ * would move a cursor row between groups when its deadline passes or its capacity fills mid-scroll,
+ * and the next page would skip or repeat rows.
+ */
+function encodeCursor(key: CursorKey): string {
+  return Buffer.from(JSON.stringify([key.grp, key.sortAt, key.id])).toString('base64url');
+}
+
+function decodeCursor(token: string): CursorKey | null {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(Buffer.from(token, 'base64url').toString('utf8'));
+  } catch {
+    return null;
+  }
+  if (!Array.isArray(parsed) || parsed.length !== 3) return null;
+  const [grp, sortAt, id] = parsed;
+  if (!Number.isInteger(grp) || grp < 0 || grp > 4) return null;
+  if (sortAt !== null && !(typeof sortAt === 'string' && isRealTimestampText(sortAt))) return null;
+  if (typeof id !== 'string' || id.length === 0 || id.length > 64) return null;
+  return { grp, sortAt, id };
+}
+
+/** One page window plus one lookahead row, in default list order. */
 export async function listTournamentIds(
   prisma: Pick<PrismaService, '$queryRaw'>,
   query: TournamentListQueryDto,
   window: TournamentListWindow,
-): Promise<string[]> {
+): Promise<TournamentListRow[]> {
   const take = window.limit + 1;
-  const rows = window.cursor
-    ? await prisma.$queryRaw<Array<{ id: string }>>`
-        WITH ${FILTERED_SQL(query)}, c AS (SELECT * FROM filtered WHERE id = ${window.cursor})
-        SELECT f.id FROM filtered f, c WHERE ${AFTER_CURSOR_SQL}
-        ORDER BY ${ORDER_SQL} LIMIT ${take}`
-    : await prisma.$queryRaw<Array<{ id: string }>>`
+  type Row = { id: string; grp: number; sort_at: string | null };
+  let rows: Row[];
+  if (window.cursor !== undefined && window.cursor !== '') {
+    const key = decodeCursor(window.cursor);
+    if (!key) return [];
+    rows = await prisma.$queryRaw<Row[]>`
+        WITH ${FILTERED_SQL(query)},
+          c AS (SELECT ${key.grp}::int AS grp, ${key.sortAt}::timestamp AS sort_at, ${key.id}::text AS id)
+        SELECT f.id, f.grp, f.sort_at::text AS sort_at FROM filtered f, c WHERE ${AFTER_CURSOR_SQL}
+        ORDER BY ${ORDER_SQL} LIMIT ${take}`;
+  } else {
+    rows = await prisma.$queryRaw<Row[]>`
         WITH ${FILTERED_SQL(query)}
-        SELECT f.id FROM filtered f
+        SELECT f.id, f.grp, f.sort_at::text AS sort_at FROM filtered f
         ORDER BY ${ORDER_SQL} LIMIT ${take} OFFSET ${window.offset ?? 0}`;
-  return rows.map((row) => row.id);
+  }
+  return rows.map((row) => ({
+    id: row.id,
+    cursor: encodeCursor({ grp: row.grp, sortAt: row.sort_at, id: row.id }),
+  }));
 }
 
 export async function countTournamentList(

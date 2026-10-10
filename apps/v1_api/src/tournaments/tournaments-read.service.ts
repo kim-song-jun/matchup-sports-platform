@@ -123,14 +123,15 @@ export class TournamentsReadService {
     const wantsPageNumbers = query.page !== undefined && query.page > 0;
 
     // Filtering, group order and paging all run in the database (`tournament-list-query.ts`); only
-    // the page ids come back, and the full rows are loaded for them below. `cursor` stays a row id.
+    // the page rows (id + resume cursor) come back, and the full rows are loaded for them below.
     const window = await listTournamentIds(this.prisma, query, {
       limit,
       ...(query.page && query.page > 1 ? { offset: (query.page - 1) * limit } : { cursor: query.cursor }),
     });
     const total = wantsPageNumbers ? await countTournamentList(this.prisma, query) : null;
     const hasNext = window.length > limit;
-    const pageIds = hasNext ? window.slice(0, limit) : window;
+    const pageWindow = hasNext ? window.slice(0, limit) : window;
+    const pageIds = pageWindow.map((row) => row.id);
 
     const loaded =
       pageIds.length === 0
@@ -142,7 +143,7 @@ export class TournamentsReadService {
     const byId = new Map(loaded.map((row) => [row.id, row]));
     const pageItems = pageIds.flatMap((id) => byId.get(id) ?? []);
 
-    const nextCursor = hasNext ? (pageIds.at(-1) ?? null) : null;
+    const nextCursor = hasNext ? (pageWindow.at(-1)?.cursor ?? null) : null;
 
     return {
       items: pageItems.map(presentTournamentCard),

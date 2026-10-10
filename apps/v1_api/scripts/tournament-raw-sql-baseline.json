@@ -59,5 +59,9 @@
   "src/tournaments/slots/competition-bracket-lock.ts": {
     "allowed": 1,
     "why": "Regular-league lane: competition-row FOR UPDATE, the same lock the league service takes. It returns no data; the on-hold check runs after the lock through findTournamentOnSurface(['regular_league'])."
+  },
+  "src/tournaments/tournament-list-query.ts": {
+    "allowed": 1,
+    "why": "공개 목록 정렬·페이지를 DB 에서 한다(상태 그룹 순서는 Prisma orderBy 로 못 쓴다). 종류 조건은 COMPETITION_LIST_SURFACE 표를 거치고, 공개·상태·삭제 조건은 통합 스펙이 Prisma where 와 같은 결과인지 고정한다."
   }
 }

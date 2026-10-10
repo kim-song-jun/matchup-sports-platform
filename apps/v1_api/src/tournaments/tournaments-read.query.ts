@@ -1,8 +1,10 @@
 import { Prisma, V1GameSourceType } from '@prisma/client';
 import { SLOT_LABEL_SELECT } from './slots/tournament-slot-label';
 
+export const PUBLIC_TOURNAMENT_STATUSES = ['open', 'closed', 'in_progress', 'completed'] as const;
+
 export const PUBLIC_TOURNAMENT_STATUS_FILTER: Prisma.V1TournamentWhereInput['status'] = {
-  in: ['open', 'closed', 'in_progress', 'completed'],
+  in: [...PUBLIC_TOURNAMENT_STATUSES],
 };
 
 /**

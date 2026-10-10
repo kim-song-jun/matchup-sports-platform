@@ -1,9 +1,7 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
-import { fetchV1AdminBracket } from '@/hooks/use-v1-api';
 import { resultReviewKeys } from '@/hooks/use-tournament-result-review';
-import { nextFixtureNumber } from '@/lib/bracket-fixture-tools';
 import { v1Get, v1Patch, v1Post, v1Put } from '@/lib/api-client';
 import { leagueViewKeys, v1Keys } from '@/lib/query-keys';
 import { randomUuid } from '@/lib/uuid';
@@ -110,26 +108,12 @@ export function useV1SetBracketSources(tournamentId: string) {
   });
 }
 
-/**
- * `POST /admin/tournaments/:id/fixtures` — 번호는 호출 직전에 대진을 새로 읽어 정한다.
- * 서버가 (round, fixtureNumber, leg) 를 멱등 키로 쓰므로 캐시가 낡은 채 번호를 정하면 기존 경기가
- * 그대로 돌아오거나(같은 내용) 409 COMMAND_IDEMPOTENCY_PAYLOAD_REUSE(다른 내용)가 된다.
- */
+/** `POST /admin/tournaments/:id/fixtures` — 번호는 서버가 대회 안의 최대 번호 다음으로 정한다. */
 export function useV1AddBracketFixture(tournamentId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ groupId, round }: { groupId: string; round: string }) => {
-      const fresh = await queryClient.fetchQuery({
-        queryKey: v1Keys.adminTournamentBracket(tournamentId),
-        queryFn: () => fetchV1AdminBracket(tournamentId),
-        staleTime: 0,
-      });
-      return v1Post<V1AdminBracketFixture>(`/admin/tournaments/${tournamentId}/fixtures`, {
-        groupId,
-        round,
-        fixtureNumber: nextFixtureNumber(fresh.fixtures),
-      });
-    },
+    mutationFn: ({ groupId, round }: { groupId: string; round: string }) =>
+      v1Post<V1AdminBracketFixture>(`/admin/tournaments/${tournamentId}/fixtures`, { groupId, round }),
     onSuccess: () => invalidateCompetitionViews(queryClient, tournamentId, 'tournament'),
   });
 }

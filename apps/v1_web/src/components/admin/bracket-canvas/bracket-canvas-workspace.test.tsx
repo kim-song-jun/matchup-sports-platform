@@ -355,6 +355,17 @@ describe('BracketCanvasWorkspace — 도구 모음', () => {
     expect(screen.getByTestId('tools-dialog')).toHaveAttribute('data-mode', 'link');
   });
 
+  it('대회 방식을 아직 모르면 경기 추가·연결을 막고 이유를 알리며 대화상자를 열지 않는다', () => {
+    renderWorkspace({ format: undefined });
+    for (const name of ['경기 추가', '경기 연결']) {
+      const button = screen.getByRole('button', { name });
+      expect(button).toBeDisabled();
+      expect(button).toHaveAccessibleDescription(expect.stringContaining('대회 방식을 아직 확인하지 못해'));
+      fireEvent.click(button);
+    }
+    expect(screen.queryByTestId('tools-dialog')).not.toBeInTheDocument();
+  });
+
   it('읽기 전용에서는 경기 추가·연결 버튼이 없다', () => {
     renderWorkspace({ canWrite: false });
     expect(screen.queryByRole('button', { name: '경기 추가' })).not.toBeInTheDocument();

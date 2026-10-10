@@ -12,16 +12,18 @@ import { BracketFixtureToolsDialog } from './bracket-fixture-tools-dialog';
 const bodies: unknown[] = [];
 let failNext = false;
 let serverBracket: V1AdminTournamentBracket;
+let created: { id: string; fixtureNumber: number } | null = null;
 const server = setupServer(
   http.post('*/api/v1/logs/client-error', () => HttpResponse.json({ status: 'success', data: null })),
-  http.get('*/api/v1/admin/tournaments/:id/bracket', () => HttpResponse.json({ status: 'success', data: serverBracket, timestamp: '2026-10-10T00:00:00Z' })),
   http.post('*/api/v1/admin/tournaments/:id/fixtures', async ({ request }) => {
     bodies.push(await request.json());
     await delay(30);
     if (failNext) {
       return HttpResponse.json({ status: 'error', statusCode: 409, code: 'LEAGUE_ON_HOLD', message: 'on hold' }, { status: 409 });
     }
-    return HttpResponse.json({ status: 'success', data: { id: 'new-1' }, timestamp: '2026-10-10T00:00:00Z' });
+    // 서버가 정한 번호: 대회 안의 최대 번호 다음
+    created = { id: 'new-1', fixtureNumber: Math.max(0, ...serverBracket.fixtures.map((fixture) => fixture.fixtureNumber)) + 1 };
+    return HttpResponse.json({ status: 'success', data: created, timestamp: '2026-10-10T00:00:00Z' });
   }),
 );
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
@@ -29,6 +31,7 @@ afterEach(() => {
   cleanup();
   server.resetHandlers();
   bodies.length = 0;
+  created = null;
   failNext = false;
 });
 afterAll(() => server.close());
@@ -70,42 +73,16 @@ describe('BracketFixtureToolsDialog — 리그 경기 추가', () => {
     expect(screen.queryByText('경기를 추가할 수 있는 단계가 없어요. 템플릿으로 대진을 먼저 만들어 주세요.')).not.toBeInTheDocument();
   });
 
-  it('새 라운드를 고르면 groupId·league_r{N+1}·다음 경기 번호를 보내고, 알린 뒤 닫고, 대진 캐시를 무효화한다', async () => {
+  it('새 라운드를 고르면 groupId·league_r{N+1} 만 보내고(번호는 서버가 정한다), 알린 뒤 닫고, 대진 캐시를 무효화한다', async () => {
     const { props, client } = renderLeagueDialog();
     const key = v1Keys.adminTournamentBracket('t-1');
     client.setQueryData(key, numbered);
     fireEvent.change(screen.getByLabelText('라운드'), { target: { value: 'new' } });
     fireEvent.click(screen.getByRole('button', { name: '경기 추가' }));
     await waitFor(() => expect(props.onClose).toHaveBeenCalledTimes(1));
-    expect(bodies).toEqual([{ groupId: 'gA', round: 'league_r11', fixtureNumber: 10 }]);
+    expect(bodies).toEqual([{ groupId: 'gA', round: 'league_r11' }]);
     expect(props.showToast).toHaveBeenCalledWith('11라운드 A조 경기를 추가했어요. 칸을 눌러 팀을 넣어 주세요.', 'success');
     expect(client.getQueryState(key)?.isInvalidated).toBe(true);
-  });
-
-  it('화면 캐시가 낡아도 서버의 최신 대진에서 다음 경기 번호를 정한다', async () => {
-    const { props } = renderLeagueDialog();
-    // 다른 어드민이 그사이 9번 뒤로 두 경기를 더 추가했다
-    serverBracket = makeBracket({
-      groups: [gA, gB, gSemi],
-      fixtures: [...numbered.fixtures, makeFixture({ id: 'a11', groupId: 'gA', fixtureNumber: 10, round: 'league_r10' }), makeFixture({ id: 'a12', groupId: 'gB', fixtureNumber: 11, round: 'league_r10' })],
-    });
-    fireEvent.click(screen.getByRole('button', { name: '경기 추가' }));
-    await waitFor(() => expect(props.onClose).toHaveBeenCalledTimes(1));
-    expect(bodies).toEqual([{ groupId: 'gA', round: 'league_r10', fixtureNumber: 12 }]);
-  });
-
-  it('서버가 같은 경기 번호를 다른 내용으로 이미 처리했다고 답하면 다시 불러 오라고 안내하고 닫지 않는다', async () => {
-    server.use(
-      http.post('*/api/v1/admin/tournaments/:id/fixtures', () =>
-        HttpResponse.json({ status: 'error', statusCode: 409, code: 'COMMAND_IDEMPOTENCY_PAYLOAD_REUSE', message: 'reuse' }, { status: 409 }),
-      ),
-    );
-    const { props } = renderLeagueDialog();
-    fireEvent.click(screen.getByRole('button', { name: '경기 추가' }));
-    await waitFor(() =>
-      expect(props.showToast).toHaveBeenCalledWith('그사이 다른 경기가 먼저 추가됐어요. 대진을 새로 불러온 뒤 다시 눌러 주세요.', 'error'),
-    );
-    expect(props.onClose).not.toHaveBeenCalled();
   });
 
   it('빈 조에 기존 라운드로 넣는다', async () => {
@@ -114,7 +91,7 @@ describe('BracketFixtureToolsDialog — 리그 경기 추가', () => {
     fireEvent.change(screen.getByLabelText('라운드'), { target: { value: 'r2' } });
     fireEvent.click(screen.getByRole('button', { name: '경기 추가' }));
     await waitFor(() => expect(props.onClose).toHaveBeenCalled());
-    expect(bodies).toEqual([{ groupId: 'gB', round: 'league_r2', fixtureNumber: 10 }]);
+    expect(bodies).toEqual([{ groupId: 'gB', round: 'league_r2' }]);
     expect(props.showToast).toHaveBeenCalledWith('2라운드 B조 경기를 추가했어요. 칸을 눌러 팀을 넣어 주세요.', 'success');
   });
 
@@ -131,7 +108,7 @@ describe('BracketFixtureToolsDialog — 리그 경기 추가', () => {
     fireEvent.change(screen.getByLabelText('라운드'), { target: { value: 'r1' } });
     fireEvent.click(screen.getByRole('button', { name: '경기 추가' }));
     await waitFor(() => expect(props.onClose).toHaveBeenCalledTimes(1));
-    expect(bodies).toEqual([{ groupId: 'gL', round: 'league_r1', fixtureNumber: 4 }]);
+    expect(bodies).toEqual([{ groupId: 'gL', round: 'league_r1' }]);
     expect(props.showToast).toHaveBeenCalledWith('1라운드 리그 경기를 추가했어요. 칸을 눌러 팀을 넣어 주세요.', 'success');
   });
 
@@ -145,9 +122,9 @@ describe('BracketFixtureToolsDialog — 리그 경기 추가', () => {
     fireEvent.click(screen.getByRole('button', { name: '경기 추가' }));
     await waitFor(() => expect(props.onClose).toHaveBeenCalledTimes(1));
 
-    const sent = bodies[0] as { groupId: string; round: string; fixtureNumber: number };
-    const created = makeFixture({ id: 'created', groupId: sent.groupId, round: sent.round, fixtureNumber: sent.fixtureNumber });
-    const grid = buildLeagueGrid({ groups: numbered.groups, fixtures: [...numbered.fixtures, created] });
+    const sent = bodies[0] as { groupId: string; round: string };
+    const landed = makeFixture({ id: 'created', groupId: sent.groupId, round: sent.round, fixtureNumber: created!.fixtureNumber });
+    const grid = buildLeagueGrid({ groups: numbered.groups, fixtures: [...numbered.fixtures, landed] });
 
     const row = grid.rows.find((candidate) => candidate.key === rowKey);
     expect(row?.label).toBe(rowLabel);
@@ -191,10 +168,10 @@ describe('BracketFixtureToolsDialog — 리그 경기 추가', () => {
     fireEvent.change(round, { target: { value: 'r1' } });
     fireEvent.click(screen.getByRole('button', { name: '경기 추가' }));
     await waitFor(() => expect(props.onClose).toHaveBeenCalled());
-    expect(bodies).toEqual([{ groupId: 'gB', round: 'league_r1', fixtureNumber: 4 }]);
+    expect(bodies).toEqual([{ groupId: 'gB', round: 'league_r1' }]);
     expect(props.showToast).toHaveBeenCalledWith('1라운드 B조 경기를 추가했어요. 칸을 눌러 팀을 넣어 주세요.', 'success');
 
-    const grid = buildLeagueGrid({ groups: legacy.groups, fixtures: [...legacyFixtures, makeFixture({ id: 'new-1', groupId: 'gB', fixtureNumber: 4, round: 'league_r1' })] });
+    const grid = buildLeagueGrid({ groups: legacy.groups, fixtures: [...legacyFixtures, makeFixture({ id: 'new-1', groupId: 'gB', fixtureNumber: created!.fixtureNumber, round: 'league_r1' })] });
     expect(grid.legacyChunking).toBe(true);
     expect(grid.rows.map((r) => r.label)).toEqual(['1라운드', '2라운드', '3라운드']);
     expect(grid.rows[0].cells.gB.map((f) => f.id)).toEqual(['new-1']);

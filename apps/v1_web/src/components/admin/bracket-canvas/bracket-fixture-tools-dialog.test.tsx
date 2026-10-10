@@ -32,7 +32,7 @@ beforeEach(() => {
 });
 
 describe('BracketFixtureToolsDialog — 경기 추가', () => {
-  it('고른 단계의 round 로 경기 추가를 요청하고(번호는 훅이 새 대진으로 정한다), 성공하면 알리고 닫는다', () => {
+  it('고른 단계의 round 로 경기 추가를 요청하고(번호는 서버가 정한다), 성공하면 알리고 닫는다', () => {
     const props = renderDialog('add');
     fireEvent.change(screen.getByLabelText('추가할 단계'), { target: { value: 'g-sf' } });
     fireEvent.click(screen.getByRole('button', { name: '경기 추가' }));

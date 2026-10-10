@@ -13,7 +13,7 @@ import { BracketLeagueAddFixtureForm, type LeagueAddSubmit } from './bracket-lea
 export type BracketFixtureToolsDialogProps = {
   open: boolean;
   mode: 'add' | 'link';
-  format: V1TournamentFormat | undefined;
+  format: V1TournamentFormat;
   tournamentId: string;
   bracket: V1AdminTournamentBracket;
   onClose: () => void;

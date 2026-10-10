@@ -23,7 +23,6 @@ describe('describeBracketCanvasError', () => {
     ['BRACKET_TEMPLATE_TOO_LARGE', '경기가 너무 많아 한 번에 만들 수 없어요. 팀 수나 회전 수를 줄여 주세요.'],
     ['GROUP_HAS_SLOTS', '자리가 남아 있는 조는 지울 수 없어요. 자리를 먼저 비워 주세요.'],
     ['IDEMPOTENCY_PAYLOAD_CONFLICT', '같은 요청이 다른 내용으로 이미 처리됐어요. 새로고침한 뒤 다시 시도해 주세요.'],
-    ['COMMAND_IDEMPOTENCY_PAYLOAD_REUSE', '그사이 다른 경기가 먼저 추가됐어요. 대진을 새로 불러온 뒤 다시 눌러 주세요.'],
     ['LEAGUE_ON_HOLD', '보류 중인 리그라 대진을 바꿀 수 없어요.'],
     ['LEAGUE_ENDED', '끝났거나 취소된 리그라 대진을 바꿀 수 없어요.'],
   ])('%s 는 정해 둔 해요체 문구로 바꾼다', (code, expected) => {

@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { makeFixture, makeGroup } from '@/test/bracket-canvas-fixtures';
 import { buildLeagueGrid } from './bracket-league-grid-model';
-import { nextFixtureNumber } from './bracket-fixture-tools';
 import { leagueAddableGroups, leagueRoundPlan } from './bracket-league-add-fixture';
 
 const gA = makeGroup({ id: 'gA', name: 'A조', phase: 'group', sortOrder: 0 });
@@ -10,11 +9,11 @@ const fx = (id: string, groupId: string | null, n: number, round: string) =>
   makeFixture({ id, groupId, fixtureNumber: n, round });
 const ids = (list: { id: string }[] | undefined) => (list ?? []).map((f) => f.id);
 
-/** 대화상자가 하는 일 그대로 — 고른 선택지의 round 와 다음 경기 번호로 경기를 하나 붙인다. */
+/** 대화상자가 보내는 round 로, 서버처럼 최대 번호 다음 번호를 붙여 경기를 하나 더한다. */
 function addVia(groups: ReturnType<typeof makeGroup>[], fixtures: ReturnType<typeof fx>[], groupId: string, choiceValue: string) {
   const choice = leagueRoundPlan({ groups, fixtures }).choices.find((candidate) => candidate.value === choiceValue);
   if (choice === undefined) throw new Error(`선택지에 ${choiceValue} 가 없어요`);
-  return { round: choice.round, fixtures: [...fixtures, fx('new', groupId, nextFixtureNumber(fixtures), choice.round)] };
+  return { round: choice.round, fixtures: [...fixtures, fx('new', groupId, Math.max(0, ...fixtures.map((f) => f.fixtureNumber)) + 1, choice.round)] };
 }
 
 describe('leagueAddableGroups', () => {

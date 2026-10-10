@@ -9,7 +9,6 @@ vi.mock('@/lib/api-client', async (importOriginal) => {
 });
 
 import { v1Get, v1Patch, v1Post, v1Put } from '@/lib/api-client';
-import { makeBracket, makeFixture } from '@/test/bracket-canvas-fixtures';
 import { v1Keys } from '@/lib/query-keys';
 import { resultReviewKeys } from '@/hooks/use-tournament-result-review';
 import {
@@ -159,26 +158,20 @@ describe('useV1SetBracketSources', () => {
 });
 
 describe('useV1AddBracketFixture', () => {
-  const fixtures = (...numbers: number[]) => makeBracket({ fixtures: numbers.map((n) => makeFixture({ id: `f${n}`, groupId: 'g1', fixtureNumber: n })) });
-
-  it('캐시가 낡았어도 호출 직전에 대진을 새로 읽어 그 최대 번호 다음으로 보낸다', async () => {
-    getMock.mockResolvedValue(fixtures(1, 2, 3, 4));
+  it('경기 번호는 보내지 않고 조와 라운드만 보낸다 — 번호는 서버가 정한다', async () => {
     postMock.mockResolvedValue({ id: 'new' });
-    const { wrapper, client } = setup();
-    client.setQueryData(v1Keys.adminTournamentBracket('t1'), fixtures(1, 2));
+    const { wrapper } = setup();
     const { result } = renderHook(() => useV1AddBracketFixture('t1'), { wrapper });
 
     await act(async () => {
       await result.current.mutateAsync({ groupId: 'g1', round: 'league_r2' });
     });
 
-    expect(getMock).toHaveBeenCalledWith('/admin/tournaments/t1/bracket');
-    expect(postMock).toHaveBeenCalledWith('/admin/tournaments/t1/fixtures', { groupId: 'g1', round: 'league_r2', fixtureNumber: 5 });
-    expect(client.getQueryData(v1Keys.adminTournamentBracket('t1'))).toEqual(fixtures(1, 2, 3, 4));
+    expect(postMock).toHaveBeenCalledWith('/admin/tournaments/t1/fixtures', { groupId: 'g1', round: 'league_r2' });
+    expect(getMock).not.toHaveBeenCalled();
   });
 
   it('만든 뒤 어드민 대진과 대회 상세·공개 일정 캐시를 같이 무효화한다', async () => {
-    getMock.mockResolvedValue(fixtures(1));
     postMock.mockResolvedValue({ id: 'new' });
     const { wrapper, invalidate } = setup();
     const { result } = renderHook(() => useV1AddBracketFixture('t1'), { wrapper });
@@ -190,17 +183,5 @@ describe('useV1AddBracketFixture', () => {
     const keys = invalidatedKeys(invalidate);
     expect(keys).toContainEqual(v1Keys.adminTournamentBracket('t1'));
     expect(keys).toContainEqual(v1Keys.tournament('t1'));
-  });
-
-  it('대진을 새로 읽지 못하면 경기를 만들지 않는다', async () => {
-    getMock.mockRejectedValue(new Error('network'));
-    const { wrapper } = setup();
-    const { result } = renderHook(() => useV1AddBracketFixture('t1'), { wrapper });
-
-    await act(async () => {
-      await expect(result.current.mutateAsync({ groupId: 'g1', round: 'league_r2' })).rejects.toThrow('network');
-    });
-
-    expect(postMock).not.toHaveBeenCalled();
   });
 });

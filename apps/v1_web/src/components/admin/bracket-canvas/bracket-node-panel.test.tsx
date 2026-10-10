@@ -59,6 +59,7 @@ function renderPanel(fixture = fixtureOf(), overrides: Partial<React.ComponentPr
     tournamentId: 't-1',
     fixture,
     groups: [knockout, groupStage],
+    fixtures: [fixture],
     slots,
     registrations,
     registrationsLoaded: true,
@@ -241,6 +242,38 @@ describe('BracketNodePanel — 자리 배정', () => {
         renderPanel(legacy({ groupId: 'g-a', homeRegistrationId: 'r2', homeTeamName: '부산FC' }), { groups: [stageA, stageB] });
         expect(screen.getByLabelText('홈 팀 선택')).toHaveValue('r2');
         expect(homeOptions()).toContain('부산FC');
+      });
+    });
+
+    describe('결승과 3·4위전의 같은 팀', () => {
+      const finalGroup = makeGroup({ id: 'g-final', name: '결승', phase: 'final', sortOrder: 3 });
+      const thirdGroup = makeGroup({ id: 'g-third', name: '3·4위전', phase: 'third_place', sortOrder: 4 });
+      const finalMatch = legacy({ id: 'f-final', groupId: 'g-final', homeRegistrationId: 'r1', homeTeamName: '서울FC', awayRegistrationId: 'r2', awayTeamName: '부산FC' });
+      const optionsOf = (label: string) => within(screen.getByLabelText(label)).getAllByRole('option').map((option) => option.textContent);
+
+      it('3·4위전 후보에서 결승에 있는 팀이 빠지고, "다른 조" 안내는 보이지 않는다', () => {
+        const third = legacy({ id: 'f-third', groupId: 'g-third', homeRegistrationId: null, homeTeamName: '홈 팀 미정' });
+        renderPanel(third, { groups: [finalGroup, thirdGroup], fixtures: [finalMatch, third] });
+        expect(optionsOf('홈 팀 선택')).toEqual(['비워 두기', '대구FC']);
+        expect(screen.queryByText('다른 조에 있는 팀은 목록에서 빠져 있어요.')).not.toBeInTheDocument();
+      });
+
+      it('이미 들어 있는 팀은 현재 값으로 남는다 — 기존 데이터를 지우라고 강요하지 않는다', () => {
+        const third = legacy({ id: 'f-third', groupId: 'g-third', homeRegistrationId: 'r1', homeTeamName: '서울FC' });
+        renderPanel(third, { groups: [finalGroup, thirdGroup], fixtures: [finalMatch, third] });
+        expect(optionsOf('홈 팀 선택')).toEqual(['비워 두기', '서울FC', '대구FC']);
+      });
+
+      it('반대 방향 - 결승 후보에서는 3·4위전에 있는 팀이 빠진다', () => {
+        const third = legacy({ id: 'f-third', groupId: 'g-third', homeRegistrationId: 'r3', homeTeamName: '대구FC', awayRegistrationId: null });
+        const final = legacy({ id: 'f-final', groupId: 'g-final', homeRegistrationId: null, homeTeamName: '홈 팀 미정' });
+        renderPanel(final, { groups: [finalGroup, thirdGroup], fixtures: [final, third] });
+        expect(optionsOf('홈 팀 선택')).toEqual(['비워 두기', '서울FC', '부산FC']);
+      });
+
+      it('대조군 - 8강 경기 후보는 결승에 있는 팀도 그대로 보인다', () => {
+        renderPanel(legacy({ homeRegistrationId: null, homeTeamName: '홈 팀 미정' }), { groups: [knockout, finalGroup, thirdGroup], fixtures: [finalMatch] });
+        expect(optionsOf('홈 팀 선택')).toEqual(['비워 두기', '서울FC', '부산FC', '대구FC']);
       });
     });
 

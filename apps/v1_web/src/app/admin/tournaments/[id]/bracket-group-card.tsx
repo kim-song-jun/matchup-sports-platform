@@ -6,7 +6,7 @@ import { EntityPicker, type EntityPickerItem } from '@/components/admin/entity-p
 import { AdminDataTable, AdminEmpty, type AdminTableColumn } from '@/components/admin';
 import { byeRound } from '@/lib/tournament-bracket-rounds';
 import { extractErrorMessage } from '@/lib/error-message';
-import { registrationIdsBlockedForGroup } from '@/lib/bracket-group-enrollment';
+import { registrationIdsBlockedForGroup, registrationIdsInOppositeFinalStage } from '@/lib/bracket-group-enrollment';
 import type { useV1AssignGroupTeam, useV1CreateFixture, useV1CreateBracketBye } from '@/hooks/use-v1-api';
 import type { V1AdminBracketFixture, V1AdminBracketGroup, V1AdminBracketStanding } from '@/types/api';
 import { computeQualifyingShortlist, isGroupReady } from './bracket-group-helpers';
@@ -210,10 +210,11 @@ export function BracketGroupCard({
   const fixtureLabel = fixtureCount === 0 ? '대진 미생성' : `대진 ${fixtureCount}경기`;
 
   const assignedIds = new Set(group.groupTeams.map((gt) => gt.registrationId));
+  const finalStageIds = registrationIdsInOppositeFinalStage(allGroups, fixtures, group.id);
   const suggestedTeams = computeQualifyingShortlist(group, allGroups, allStandings).filter(
-    (c) => !assignedIds.has(c.id),
+    (c) => !assignedIds.has(c.id) && !finalStageIds.has(c.id),
   );
-  const blockedIds = registrationIdsBlockedForGroup(allGroups, group.id);
+  const blockedIds = new Set([...registrationIdsBlockedForGroup(allGroups, group.id), ...finalStageIds]);
   const searchPoolItems = confirmedTeamItems.filter((it) => !assignedIds.has(it.id) && !blockedIds.has(it.id));
   const fixtureTeamItems = confirmedTeamItems.filter((it) => !blockedIds.has(it.id));
 

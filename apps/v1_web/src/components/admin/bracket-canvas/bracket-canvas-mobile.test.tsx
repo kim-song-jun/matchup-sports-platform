@@ -534,6 +534,36 @@ describe('BracketCanvasMobile — 팀 넣기', () => {
     });
   });
 
+  describe('결승과 3·4위전의 같은 팀 — 후보 제외', () => {
+    const finalGroup = buildGroup({ id: 'g-fin', name: '결승', phase: 'final', sortOrder: 3 });
+    const thirdGroup = buildGroup({ id: 'g-thr', name: '3·4위전', phase: 'third_place', sortOrder: 4 });
+    const stageGroups = [finalGroup, thirdGroup];
+    const finalMatch = makeFixture({ id: 'fx-fin', groupId: 'g-fin', fixtureNumber: 1, homeRegistrationId: 'r1', homeTeamName: '강남FC', awayRegistrationId: 'r2', awayTeamName: '마포FC', game: buildGame({ id: 'g-fin' }) });
+    const hiddenNote = '다른 조에 있는 팀은 목록에서 빠져 있어요.';
+
+    function openPicker(groupId: 'g-fin' | 'g-thr') {
+      const target = makeFixture({ id: 'fx-target', groupId, fixtureNumber: 2, round: groupId === 'g-thr' ? '3·4위전' : '결승', game: buildGame({ id: 'g-target' }) });
+      const stageFixtures = groupId === 'g-thr' ? [finalMatch, target] : [target, makeFixture({ id: 'fx-thr', groupId: 'g-thr', fixtureNumber: 3, homeRegistrationId: 'r3', homeTeamName: '서초FC', game: buildGame({ id: 'g-thr' }) })];
+      renderMobile({
+        rounds: buildBracketMobileRounds({ groups: stageGroups, fixtures: stageFixtures, slots: [] }),
+        slots: [], groups: stageGroups, fixtures: stageFixtures,
+      });
+      fireEvent.click(card(/2번 경기/));
+      fireEvent.click(screen.getByRole('button', { name: '홈 팀 고르기' }));
+    }
+
+    it('3·4위전 후보에서 결승 팀(강남FC·마포FC)이 빠지고 "다른 조" 안내는 없다', () => {
+      openPicker('g-thr');
+      expect(optionNames()).toEqual(['서초FC', '송파FC', '용산FC']);
+      expect(screen.queryByText(hiddenNote)).not.toBeInTheDocument();
+    });
+
+    it('반대 방향 - 결승 후보에서는 3·4위전 팀(서초FC)이 빠진다', () => {
+      openPicker('g-fin');
+      expect(optionNames()).toEqual(['강남FC', '마포FC', '송파FC', '용산FC']);
+    });
+  });
+
   it('참가팀 조회가 끝나기 전에는 고르기를 막고, 실패하면 다시 시도를 보여 준다', () => {
     const onRetry = vi.fn();
     const { unmount } = renderMobile({ registrationsState: { ...loaded, status: 'pending' } });

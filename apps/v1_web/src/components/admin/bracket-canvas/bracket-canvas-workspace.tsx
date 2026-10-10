@@ -235,6 +235,7 @@ export function BracketCanvasWorkspace({
         tournamentId={tournamentId}
         fixture={selectedFixture}
         groups={bracket.groups}
+        fixtures={bracket.fixtures}
         slots={bracket.slots}
         registrations={registrations}
         registrationsLoaded={registrationsState.status === 'success'}

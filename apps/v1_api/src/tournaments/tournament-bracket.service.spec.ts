@@ -2071,7 +2071,7 @@ describe('TournamentBracketService', () => {
     type GroupTeamRow = { id: string; groupId: string; registrationId: string; sortOrder: number };
     let groupTeams: GroupTeamRow[];
 
-    const PHASES: Record<string, string> = { 'group-1': 'group', 'group-2': 'group', 'group-3': 'quarter' };
+    const PHASES: Record<string, string> = { 'group-1': 'group', 'group-2': 'group', 'group-3': 'quarter', 'group-final': 'final', 'group-third': 'third_place' };
 
     /** 조 편성 테이블을 메모리 상태로 흉내낸다 — 호출 횟수가 아니라 결과 행을 검증하기 위해서다. */
     function useStatefulGroupTeams(initial: GroupTeamRow[]) {
@@ -2087,14 +2087,14 @@ describe('TournamentBracketService', () => {
       prisma.v1TournamentGroupTeam.findFirst.mockImplementation(async ({ where }: { where: Where }) => {
         if (where.isBye === true) return null; // 부전승 검사 쿼리
         const { registrationId, groupId, group } = where;
-        if (registrationId === undefined || groupId === undefined || group === undefined) throw new Error('다른 조 편성 조회의 모양이 달라졌어요');
+        if (registrationId === undefined || group === undefined) throw new Error('조 편성 조회의 모양이 달라졌어요');
         return groupTeams.find((team) =>
-          registrationId.in.includes(team.registrationId) && team.groupId !== groupId.not &&
+          registrationId.in.includes(team.registrationId) && (groupId === undefined || team.groupId !== groupId.not) &&
           group.tournamentId === 'tournament-1' && PHASES[team.groupId] === group.phase) ?? null;
       });
     }
 
-    function arrangeCreateFixture(phase: 'group' | 'final') {
+    function arrangeCreateFixture(phase: 'group' | 'final' | 'third_place') {
       prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdmin);
       prisma.v1Tournament.findFirst.mockResolvedValue(tournamentRow({ format: 'league' }));
       prisma.v1TournamentGroup.findFirst.mockResolvedValue(groupRow({ phase }));
@@ -2235,6 +2235,118 @@ describe('TournamentBracketService', () => {
 
         expect(prisma.v1TournamentMatchDetails.update).not.toHaveBeenCalled();
         expect(registrationsOf()).toEqual(['group-2:reg-3']);
+      });
+    });
+
+    describe('결승 · 3·4위전 같은 팀 금지', () => {
+      type FixtureRow = { teamMatchId: string; groupPhase: string; home: string | null; away: string | null };
+      let placed: FixtureRow[];
+      type Where = { group?: { phase: string }; OR: Array<{ homeRegistrationId?: { in: string[] }; awayRegistrationId?: { in: string[] } }> };
+
+      /** 대회의 결승·3·4위전 경기를 메모리로 흉내낸다 — where 조건을 실제로 해석해 "누가 어디 있나"로 답한다. */
+      function useFixturesInStage(rows: FixtureRow[]) {
+        placed = rows;
+        prisma.v1TournamentMatchDetails.findFirst.mockImplementation(async ({ where }: { where: Where }) => {
+          if (where.group === undefined) return null;
+          const phase = where.group.phase;
+          const hit = placed.find((row) => row.groupPhase === phase && where.OR.some((side) =>
+            (side.homeRegistrationId?.in.includes(row.home ?? '') ?? false) || (side.awayRegistrationId?.in.includes(row.away ?? '') ?? false)));
+          return hit === undefined ? null : { homeRegistrationId: hit.home, awayRegistrationId: hit.away };
+        });
+      }
+      const createIn = (groupId: string, home: string | null, away: string | null) =>
+        service.createFixture(ownerUser, 'tournament-1', { groupId, round: '3·4위전', fixtureNumber: 1, homeRegistrationId: home, awayRegistrationId: away } as never);
+      const finalists = [{ teamMatchId: 'fx-final', groupPhase: 'final', home: 'reg-1', away: 'reg-2' }];
+
+      it('결승 경기에 있는 팀을 3·4위전에 넣으면 409 FINALIST_IN_THIRD_PLACE 이고 경기를 만들지 않는다', async () => {
+        arrangeCreateFixture('third_place');
+        useStatefulGroupTeams([]);
+        useFixturesInStage(finalists);
+
+        await expect(createIn('group-third', 'reg-3', 'reg-2')).rejects.toMatchObject({
+          response: { code: 'FINALIST_IN_THIRD_PLACE', details: { registrationId: 'reg-2' } },
+        });
+        expect(prisma.v1TeamMatch.create).not.toHaveBeenCalled();
+      });
+
+      it('결승 조에 편성만 된 팀도 3·4위전에 넣을 수 없다', async () => {
+        arrangeCreateFixture('third_place');
+        useStatefulGroupTeams([{ id: 'gt-f1', groupId: 'group-final', registrationId: 'reg-1', sortOrder: 0 }]);
+        useFixturesInStage([]);
+
+        await expect(createIn('group-third', 'reg-1', 'reg-3')).rejects.toMatchObject({ response: { code: 'FINALIST_IN_THIRD_PLACE' } });
+      });
+
+      it('결승에 없는 팀(4강 패자)끼리는 3·4위전을 만들 수 있다 — 대조군', async () => {
+        arrangeCreateFixture('third_place');
+        useStatefulGroupTeams([{ id: 'gt-f1', groupId: 'group-final', registrationId: 'reg-1', sortOrder: 0 }]);
+        useFixturesInStage(finalists);
+
+        await createIn('group-third', 'reg-3', 'reg-4');
+
+        expect(prisma.v1TeamMatch.create).toHaveBeenCalled();
+      });
+
+      it('3·4위전에 있는 팀을 결승에 넣어도 막는다 (반대 방향)', async () => {
+        arrangeCreateFixture('final');
+        useStatefulGroupTeams([]);
+        useFixturesInStage([{ teamMatchId: 'fx-third', groupPhase: 'third_place', home: 'reg-3', away: 'reg-4' }]);
+
+        await expect(createIn('group-final', 'reg-1', 'reg-4')).rejects.toMatchObject({
+          response: { code: 'THIRD_PLACE_TEAM_IN_FINAL', details: { registrationId: 'reg-4' } },
+        });
+      });
+
+      it('4강 같은 다른 단계 경기는 보지 않는다 — 결승 팀이 4강에도 있는 건 정상', async () => {
+        arrangeCreateFixture('third_place');
+        useStatefulGroupTeams([]);
+        useFixturesInStage([{ teamMatchId: 'fx-semi', groupPhase: 'semi', home: 'reg-1', away: 'reg-3' }]);
+
+        await createIn('group-third', 'reg-3', 'reg-4');
+
+        expect(prisma.v1TeamMatch.create).toHaveBeenCalled();
+      });
+
+      it('PATCH 로 결승 팀을 3·4위전 경기에 넣어도 409 이고 경기는 바뀌지 않는다', async () => {
+        arrangeCreateFixture('third_place');
+        useStatefulGroupTeams([]);
+        useFixturesInStage(finalists);
+        prisma.v1TournamentMatchDetails.findUnique.mockResolvedValue(canonicalDetailsRow({ groupId: 'group-third', homeRegistrationId: 'reg-3', awayRegistrationId: 'reg-4' }));
+        prisma.v1TournamentMatchDetails.findUniqueOrThrow.mockResolvedValue(canonicalDetailsRow());
+        queueFixtureUpdateRaw(prisma.$queryRaw, { id: 'game-1', state: 'SCHEDULED', sourceType: 'TEAM_MATCH', currentOfficialRevisionId: null }, { id: 'fixture-1', deletedAt: null });
+        prisma.v1TournamentRegistration.findUnique.mockResolvedValue({ team: { id: 'team-reg-3', name: 'reg-3' } });
+
+        await expect(service.updateFixture(ownerUser, 'fixture-1', { homeRegistrationId: 'reg-1' })).rejects.toMatchObject({
+          response: { code: 'FINALIST_IN_THIRD_PLACE' },
+        });
+        expect(prisma.v1TournamentMatchDetails.update).not.toHaveBeenCalled();
+      });
+
+      it('이 경기가 이미 갖고 있는 팀을 그대로 다시 보내면 막지 않는다 — 옛 데이터의 일정만 고칠 수 있다', async () => {
+        arrangeCreateFixture('third_place');
+        useStatefulGroupTeams([]);
+        useFixturesInStage(finalists);
+        prisma.v1TournamentMatchDetails.findUnique.mockResolvedValue(canonicalDetailsRow({ groupId: 'group-third', homeRegistrationId: 'reg-1', awayRegistrationId: 'reg-4' }));
+        prisma.v1TournamentMatchDetails.findUniqueOrThrow.mockResolvedValue(canonicalDetailsRow());
+        queueFixtureUpdateRaw(prisma.$queryRaw, { id: 'game-1', state: 'SCHEDULED', sourceType: 'TEAM_MATCH', currentOfficialRevisionId: null }, { id: 'fixture-1', deletedAt: null });
+        prisma.v1TeamMatch.update.mockResolvedValue({ id: 'fixture-1', tournamentId: 'tournament-1', title: '테스트 경기', startAt: null, placeName: null, status: 'matched', createdAt: new Date('2026-06-14T00:00:00Z'), updatedAt: new Date('2026-06-14T00:00:00Z') });
+        prisma.v1TournamentRegistration.findUnique.mockResolvedValue({ team: { id: 'team-reg-1', name: 'reg-1' } });
+
+        await expect(service.updateFixture(ownerUser, 'fixture-1', { homeRegistrationId: 'reg-1', awayRegistrationId: 'reg-4' })).resolves.toBeDefined();
+      });
+
+      it('결승·3·4위전 조에 팀을 직접 편성할 때도 반대쪽 팀은 409 다', async () => {
+        prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdmin);
+        prisma.v1Tournament.findFirst.mockResolvedValue(tournamentRow({ format: 'league' }));
+        prisma.v1TournamentGroup.findFirst.mockResolvedValue(groupRow({ id: 'group-third', phase: 'third_place' }));
+        prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow({ id: 'reg-1' }));
+        prisma.v1TournamentGroupTeam.findUnique.mockResolvedValue(null);
+        useStatefulGroupTeams([{ id: 'gt-f1', groupId: 'group-final', registrationId: 'reg-1', sortOrder: 0 }]);
+        useFixturesInStage([]);
+
+        await expect(service.createGroupTeam(ownerUser, 'tournament-1', { groupId: 'group-third', registrationId: 'reg-1' } as never))
+          .rejects.toMatchObject({ response: { code: 'FINALIST_IN_THIRD_PLACE' } });
+        expect(prisma.v1TournamentGroupTeam.create).not.toHaveBeenCalled();
       });
     });
 

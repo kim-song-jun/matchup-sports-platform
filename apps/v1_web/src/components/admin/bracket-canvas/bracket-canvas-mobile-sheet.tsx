@@ -18,8 +18,8 @@ import {
 } from '@/lib/bracket-canvas-mobile-model';
 import { bracketNodeStateChip } from '@/lib/competition-status';
 import { extractErrorMessage } from '@/lib/error-message';
-import { TEAM_IN_OTHER_GROUP_HIDDEN_NOTE, applyGroupRule, registrationIdsBlockedForGroup } from '@/lib/bracket-group-enrollment';
-import type { V1AdminBracketGroup, V1AdminBracketSlot } from '@/types/api';
+import { TEAM_IN_OTHER_GROUP_HIDDEN_NOTE, applyGroupRule, registrationIdsBlockedForGroup, registrationIdsInOppositeFinalStage } from '@/lib/bracket-group-enrollment';
+import type { V1AdminBracketFixture, V1AdminBracketGroup, V1AdminBracketSlot } from '@/types/api';
 import { BracketQuickResultForm } from './bracket-quick-result-form';
 import { BracketResultActions } from './bracket-result-actions';
 import type { RegistrationsLoadState } from './bracket-team-tray';
@@ -35,6 +35,7 @@ export interface MobileNodeSheetBodyProps {
   slots: V1AdminBracketSlot[];
   /** 한 팀 한 조 후보 제외용 — tournament scope 에서만 넘긴다. */
   groups?: readonly V1AdminBracketGroup[];
+  fixtures?: readonly V1AdminBracketFixture[];
   candidates: MobilePickCandidate[];
   /** 참가팀 조회 상태 — 성공 전에는 팀 고르기를 막는다("팀 0개"처럼 보이지 않게). */
   registrationsState: RegistrationsLoadState;
@@ -299,8 +300,8 @@ function SlotTeamPicker({
 
 /** 자리 없이 경기에 직접 지정하는 사이드 — 데스크톱 칸 패널처럼 경기를 고쳐 저장하고, 반대편 팀은 뺀다. */
 function DirectTeamPicker({
-  node, side, groups, candidates, ...common
-}: PickerCommon & { node: MobileNode; side: 'HOME' | 'AWAY'; groups: readonly V1AdminBracketGroup[]; candidates: MobilePickCandidate[] }) {
+  node, side, groups, fixtures, candidates, ...common
+}: PickerCommon & { node: MobileNode; side: 'HOME' | 'AWAY'; groups: readonly V1AdminBracketGroup[]; fixtures: readonly V1AdminBracketFixture[]; candidates: MobilePickCandidate[] }) {
   const updateFixture = useV1UpdateFixture(common.competitionId);
   const mine = side === 'HOME' ? node.home : node.away;
   const other = side === 'HOME' ? node.away : node.home;
@@ -309,6 +310,7 @@ function DirectTeamPicker({
     (candidate) => candidate.registrationId,
     registrationIdsBlockedForGroup(groups, node.groupId),
     mine.registrationId,
+    registrationIdsInOppositeFinalStage(groups, fixtures, node.groupId),
   );
   return (
     <TeamPickerView
@@ -368,7 +370,7 @@ export function MobileNodeSheetBody(props: MobileNodeSheetBodyProps) {
       return <SlotTeamPicker {...common} slot={slot} slots={props.slots} groups={groups} candidates={props.candidates} scope={scope} />;
     }
     if (kind === 'direct') {
-      return <DirectTeamPicker {...common} node={node} side={view.side} groups={groups} candidates={props.candidates} />;
+      return <DirectTeamPicker {...common} node={node} side={view.side} groups={groups} fixtures={props.fixtures ?? []} candidates={props.candidates} />;
     }
   }
 

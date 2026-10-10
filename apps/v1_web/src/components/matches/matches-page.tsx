@@ -14,7 +14,7 @@ import { cssUrl } from '@/lib/assets';
 import { SportIllustration } from '@/components/v1-ui/sport-illustration';
 import { MatchTypeSegment } from '@/components/v1-ui/match-type-segment';
 import { BottomSheet } from '@/components/v1-ui/bottom-sheet';
-import { CreateField, FieldErrorText, GenderRuleSelector, MissingFieldsBanner, RecentVenueChips } from '@/components/v1-ui/create-form-fields';
+import { CreateField, FieldErrorText, GenderRuleSelector, MissingFieldsBanner } from '@/components/v1-ui/create-form-fields';
 import type {
   MatchCardModel,
   MatchCreateViewModel,
@@ -25,7 +25,10 @@ import type {
 import { AppBackLink } from '@/components/v1-ui/app-back-link';
 import { useCurrentHref } from '@/components/v1-ui/use-current-href';
 import { withFromPath } from '@/lib/session-storage';
-import type { V1MatchApiStatus } from '@/types/api';
+import { PlaceCard } from '@/components/v1-ui/place-card';
+import { PlacePicker } from '@/components/v1-ui/place-picker';
+import { PLACE_NAME_MAX_LENGTH } from '@/lib/place';
+import type { V1MatchApiStatus, V1PlaceView } from '@/types/api';
 import { extractErrorMessage } from '@/lib/error-message';
 import { matchGenderRuleLabel } from '@/lib/v1-status-labels';
 
@@ -412,7 +415,7 @@ export function MatchDetailPageView({ model, lifecyclePanel }: { model: MatchDet
             <InfoRow label="지역" value={match.region} />
             <InfoRow label="날짜와 시간" value={`${match.date} ${timeRange}`} />
             <InfoRow label="신청 마감" value={match.deadlineDetail ?? match.deadline} sub={match.deadline} />
-            <InfoRow label="장소" value={match.venue} sub={match.address} />
+            <DetailPlace place={match.place} fallbackName={match.venue} />
             {/* [P1 숫자:단위 2:1 + tabular-nums] 인원 — 숫자(subhead/heading 크기) + 단위(body) 2:1 비율 */}
             <CapacityRow current={match.current} capacity={match.capacity} settled={capacitySettled} />
             <InfoRow label="레벨" value={match.level} />
@@ -508,7 +511,7 @@ export function MatchDetailPageView({ model, lifecyclePanel }: { model: MatchDet
           <InfoRow label="지역" value={match.region} />
           <InfoRow label="날짜와 시간" value={`${match.date} ${timeRange}`} />
           <InfoRow label="신청 마감" value={match.deadlineDetail ?? match.deadline} sub={match.deadline} />
-          <InfoRow label="장소" value={match.venue} sub={match.address} />
+          <DetailPlace place={match.place} fallbackName={match.venue} />
           {/* [P1 숫자:단위 2:1 + tabular-nums] 인원 (모바일) */}
           <CapacityRow current={match.current} capacity={match.capacity} settled={capacitySettled} />
           <InfoRow label="레벨" value={match.level} />
@@ -1286,36 +1289,18 @@ function PlaceTimeFields({ model }: { model: MatchCreateViewModel }) {
   const draft = model.draft;
   const errors = model.form?.fieldErrors;
   const recentVenues = model.form?.recentVenues ?? [];
-  // #3 1단계: 장소 입력창이 focus를 갖고 있는 동안만 최근 사용 장소 칩을 보여준다.
-  // 칩 버튼은 onMouseDown preventDefault로 이 blur보다 클릭이 먼저 처리되게 한다
-  // (EntityPicker 드롭다운과 동일한 패턴) — 그래서 탭 한 번으로 안전하게 채워진다.
-  const [venueFocused, setVenueFocused] = useState(false);
   return (
     <>
       <RegionSelect value={model.form?.regionId ?? ''} regions={model.form?.regions ?? []} onChange={model.form?.onRegionChange} error={errors?.regionId} />
-      <CreateField
-        id="field-venue"
-        error={errors?.venue}
+      <PlacePicker
+        maxLength={PLACE_NAME_MAX_LENGTH.match}
+        id="field-place"
         label="장소"
-        value={draft.venue}
-        placeholder="예: 한강공원 축구장, 동네 체육관 등"
-        onChange={(value) => model.form?.onFieldChange('venue', value)}
-        onFocus={() => setVenueFocused(true)}
-        onBlur={() => setVenueFocused(false)}
-      >
-        {venueFocused ? (
-          <RecentVenueChips
-            items={recentVenues}
-            selectedValue={draft.venue}
-            onSelect={(venue) => {
-              model.form?.onFieldChange('venue', venue.placeName);
-              model.form?.onFieldChange('address', venue.addressText ?? '');
-              setVenueFocused(false);
-            }}
-          />
-        ) : null}
-      </CreateField>
-      <CreateField label="상세 주소" value={draft.address} placeholder="예: 서울 영등포구 여의동로 330" onChange={(value) => model.form?.onFieldChange('address', value)} />
+        value={draft.place}
+        onChange={(place) => model.form?.onFieldChange('place', place)}
+        error={errors?.place}
+        recentVenues={recentVenues}
+      />
       <CreateField id="field-date" error={errors?.date} label="날짜" value={draft.date} type="date" onChange={(value) => model.form?.onFieldChange('date', value)} />
       <div className="tm-create-two-col">
         <CreateField id="field-startTime" error={errors?.startTime} label="시작 시간" value={draft.startTime} type="time" onChange={(value) => model.form?.onFieldChange('startTime', value)} />
@@ -1331,6 +1316,20 @@ function PlaceTimeFields({ model }: { model: MatchCreateViewModel }) {
   );
 }
 
+/** 일정·장소 그룹 안의 장소 행. 이름·주소는 카드가 보여 주므로 InfoRow 와 겹쳐 그리지 않는다. */
+function DetailPlace({ place, fallbackName }: { place: V1PlaceView | null; fallbackName: string }) {
+  if (!place) return <InfoRow label="장소" value={fallbackName} />;
+  return (
+    // 개인 매치 상세는 카드 없이 행을 나열해 행 좌우 여백이 0 이다(팀매치 상세의 카드형 그룹과 다르다).
+    <div className="tm-info-row" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 4, padding: '14px 0' }}>
+      <div className="tm-text-caption" style={{ color: 'var(--text-caption)' }}>장소</div>
+      <div style={{ width: '100%' }}>
+        <PlaceCard place={place} />
+      </div>
+    </div>
+  );
+}
+
 function RegionSelect({ value, regions, onChange, error }: { value: string; regions: Array<{ id: string; name: string }>; onChange?: (regionId: string) => void; error?: string }) {
   return (
     <label className="tm-create-field">
@@ -1339,7 +1338,7 @@ function RegionSelect({ value, regions, onChange, error }: { value: string; regi
         <option value="">시/군/구 선택</option>
         {regions.map((region) => <option key={region.id} value={region.id}>{region.name}</option>)}
       </select>
-      <div className="tm-text-caption" style={{ marginTop: 8 }}>지역은 검색·추천에 쓰이고, 장소와 주소는 아래에 직접 입력해 주세요.</div>
+      <div className="tm-text-caption" style={{ marginTop: 8 }}>지역은 검색·추천에 쓰여요. 장소는 아래에서 검색해 골라 주세요.</div>
       <FieldErrorText message={error} />
     </label>
   );
@@ -1352,7 +1351,7 @@ function ConfirmStep({ model }: { model: MatchCreateViewModel }) {
   const endDate = draft.endDate || draft.date;
   const endText = endDate === draft.date ? draft.endTime : `${endDate} ${draft.endTime}`;
   const timeRangeText = draft.endTime ? `${draft.date} ${draft.startTime}-${endText}` : `${draft.date} ${draft.startTime}`;
-  return <div><h1 className="tm-text-heading">입력한 내용을 확인해 주세요</h1><Card pad={0} style={{ marginTop: 16, overflow: 'hidden' }}><div className="tm-create-image-preview" style={{ backgroundImage: cssUrl(draft.image) }} /><div style={{ padding: 16 }}><div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}><span className="tm-badge tm-badge-blue">{model.selectedSport}</span><span className="tm-badge tm-badge-grey">{draft.minLevel}-{draft.maxLevel}</span><span className="tm-badge tm-badge-grey">{matchGenderRuleLabel(draft.gender)}</span></div><div className="tm-text-subhead" style={{ marginTop: 12 }}>{draft.title}</div><div className="tm-text-caption" style={{ marginTop: 8 }}>{draft.description}</div></div></Card><Card pad={16} style={{ marginTop: 12 }}><InfoRow label="지역" value={regionName} sub="검색·추천에 사용돼요" /><InfoRow label="일시" value={timeRangeText} /><InfoRow label="신청 마감" value={deadlineText} /><InfoRow label="장소" value={draft.venue} sub={draft.address} /><InfoRow label="인원" value={`최대 ${draft.capacity}명`} /><InfoRow label="주최자 참가" value={draft.hostParticipates ? '참가해요' : '참가하지 않아요'} sub={draft.hostParticipates ? '주최자도 모집 인원에 포함돼요' : '용병만 모집하고 주최자는 운영만 해요'} />{draft.costNote ? <InfoRow label="참가비" value={draft.costNote} /> : null}<InfoRow label="이미지" value="대표 이미지" sub="목록과 상세 화면에 표시돼요" /></Card></div>;
+  return <div><h1 className="tm-text-heading">입력한 내용을 확인해 주세요</h1><Card pad={0} style={{ marginTop: 16, overflow: 'hidden' }}><div className="tm-create-image-preview" style={{ backgroundImage: cssUrl(draft.image) }} /><div style={{ padding: 16 }}><div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}><span className="tm-badge tm-badge-blue">{model.selectedSport}</span><span className="tm-badge tm-badge-grey">{draft.minLevel}-{draft.maxLevel}</span><span className="tm-badge tm-badge-grey">{matchGenderRuleLabel(draft.gender)}</span></div><div className="tm-text-subhead" style={{ marginTop: 12 }}>{draft.title}</div><div className="tm-text-caption" style={{ marginTop: 8 }}>{draft.description}</div></div></Card><Card pad={16} style={{ marginTop: 12 }}><InfoRow label="지역" value={regionName} sub="검색·추천에 사용돼요" /><InfoRow label="일시" value={timeRangeText} /><InfoRow label="신청 마감" value={deadlineText} /><InfoRow label="장소" value={draft.place?.name ?? ''} sub={draft.place?.address ?? undefined} /><InfoRow label="인원" value={`최대 ${draft.capacity}명`} /><InfoRow label="주최자 참가" value={draft.hostParticipates ? '참가해요' : '참가하지 않아요'} sub={draft.hostParticipates ? '주최자도 모집 인원에 포함돼요' : '용병만 모집하고 주최자는 운영만 해요'} />{draft.costNote ? <InfoRow label="참가비" value={draft.costNote} /> : null}<InfoRow label="이미지" value="대표 이미지" sub="목록과 상세 화면에 표시돼요" /></Card></div>;
 }
 
 function stepToNumber(step: MatchCreateViewModel['step']) {

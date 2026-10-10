@@ -266,7 +266,7 @@ an occupied coordinate with the same payload returns its current canonical fixtu
 
 | Method | Path | DTO | Result |
 |---|---|---|---|
-| `POST` | `/api/v1/admin/tournaments/:tournamentId/fixtures` | `CreateFixtureDto` | active admin fixture/Game source creation or the explicit pin/idempotency conflict above. |
+| `POST` | `/api/v1/admin/tournaments/:tournamentId/fixtures` | `CreateFixtureDto` | active admin fixture/Game source creation or the explicit pin/idempotency conflict above. `fixtureNumber` is optional: when omitted the server assigns the tournament-wide max (archived fixtures included) + 1 inside the creation transaction, under the same `league-fixture-generation` lock, and the durable command id uses the assigned number. A sent number keeps the existing idempotency behaviour. |
 | `PATCH` | `/api/v1/admin/fixtures/:fixtureId` | `UpdateFixtureDto` | fixture metadata including optional positive integer `fixtureNumber`; duplicate round/leg number returns `409 FIXTURE_NUMBER_CONFLICT`. See [대진 번호 수정](#대진-번호-수정-2026-10-05). |
 
 The legacy generic result paths remain registered only to reject unsafe writes:
@@ -466,6 +466,7 @@ All team roster mutations lock the registration row and re-read `rosterLockedAt`
 
 - 조 순위는 조 편성(`groups[].groupTeams`)을 기준으로 계산·표시한다. 순위 행(`V1TournamentStanding`)은 결과 확정 뒤 재계산 때 만들어진다. 순위 행이 하나도 없는 조는 공개 일정·기록 API(`public-tournament-records.service.ts`)가 편성 팀으로 0값 `baselineStandings`를 서버에서 내리고, 웹 대진 페이지도 `groupTeams`로 같은 0값 기준선을 만든다. 순위 행이 있는 조는 행만 내려서, 새로 편성된 팀은 재계산 전까지 표에서 빠진다.
 - `POST /admin/tournaments/:id/fixtures`(그리고 팀을 바꾸는 `PATCH /admin/fixtures/:id`)는 `phase = group` 조 안의 경기에 들어가는 팀이 그 조에 편성돼 있지 않으면 같은 트랜잭션에서 편성한다. `sortOrder`는 조의 현재 최댓값 + 1이고 이미 편성된 팀은 건드리지 않는다. 결선 단계(`round12`~`third_place`) 조와 조 없는 경기는 편성을 바꾸지 않는다. 감사 `tournament.bracket.group_team.create`(`afterJson.auto = "fixture"`). 자동 편성으로 새 편성이 생겼고 그 조에 순위 행이 이미 있으면 같은 트랜잭션에서 `recalculateStandings`와 같은 계산(조별 + 통합)을 돌리고 감사 `tournament.bracket.standings.recalculate_auto`를 남긴다. 순위 행이 없는 조는 재계산하지 않는다.
+- **한 팀 한 조 (2026-10-10, 결정 4)**: 위 자동 편성은 그 팀이 **같은 대회의 다른 `phase = group` 조에 이미 편성돼 있지 않을 때만** 일어난다. 이 조에 없는 신청이 다른 조별 조에 있으면 `POST /admin/tournaments/:id/fixtures`·`PATCH /admin/fixtures/:id`·`POST /admin/tournaments/:id/group-teams` 는 `409 TEAM_IN_OTHER_GROUP`("다른 조에 있는 팀은 이 조에 넣을 수 없어요. 그 조에서 먼저 빼 주세요.")로 거절하고 아무것도 쓰지 않는다(상대 팀 자동 편성 포함). 응답 `details` 에 겹친 `registrationId` 와 들어가려던 `groupId` 가 담긴다. 자리 배정(`PUT /admin/tournament-slots/:slotId/assignment`·배치 변경·무작위 채우기)도 같은 코드로 거절하되, 맞바꾸기 도중의 일시적 겹침을 허용하려고 **트랜잭션 끝에서 이전 팀의 편성을 푼 뒤 이번 요청이 새로 만든 편성만** 검사한다(거절되면 자리 변경 전체가 롤백). 이미 이 조에도 편성된 팀은 다른 조와 겹쳐 있어도 허용하고(이미 겹친 데이터는 그대로), 결선 단계 조·조 없는 경기는 이 검사를 하지 않는다. 다른 조로 옮기려면 먼저 `DELETE /admin/group-teams/:id` 로 옛 조 편성을 뺀다(그 조에 경기가 남아 있으면 `GROUP_TEAM_HAS_FIXTURES`).
 - `DELETE /admin/group-teams/:id`는 `phase = group` 조에서 삭제되지 않은 경기가 남아 있는 팀이면 `409 GROUP_TEAM_HAS_FIXTURES`로 거부한다. 경기가 없는 팀, 결선 단계 조와 미정 부전승 자리는 기존대로 해제된다.
 - 공개 상세 `leagueFixtures[]`는 여전히 `kind = regular_league`에서만 채워진다. 리그 방식 일반 대회(`format = league`)의 일정은 `fixtures[]`로 그린다.
 
@@ -490,7 +491,7 @@ All team roster mutations lock the registration row and re-read `rosterLockedAt`
   - 오류: 422 `BRACKET_TEMPLATE_UNSUPPORTED`(범위 밖·필수 필드 누락·`group_knockout` 은 아직 미지원)·`BRACKET_TEMPLATE_FORMAT_MISMATCH`·`BRACKET_TEMPLATE_TOO_LARGE`(경기 240 초과), 409 `COMPETITION_CONFIG_REQUIRED`·`BRACKET_NOT_EMPTY`(비삭제 경기·조·자리가 있음)·`BRACKET_LOCKED`(`replaceExisting` 인데 시작·결과가 있는 경기가 있음).
   - `replaceExisting`: 모든 경기가 시작 전·결과 없음일 때만. 하류 경기부터 소프트 삭제 → 자리 → GroupTeam·Standing·ByeSlot → 조 순으로 지우고 새로 만든다(경기 번호는 1부터 다시, 생성 키는 소프트 삭제 이력 수를 반영).
 - `PUT /admin/tournament-slots/:slotId/assignment` — 본문 `{ registrationId: uuid | null }`(null = 비우기). 응답 `{ slot: { id, kind, groupId, sourceGroupId, position, label, registrationId, teamName }, affectedTeamMatchIds }`.
-  - 그 자리를 쓰는 경기(`deletedAt IS NULL AND status <> 'cancelled'`) 전부에 사이드를 반영한다. `phase = group` 조에서는 조 편성(`V1TournamentGroupTeam`)을 만들고, 교체·비우기 때 그 조의 다른 경기에 더 이상 없는 이전 팀의 편성·순위 행을 지운 뒤 순위를 다시 계산한다. BYE 자리는 `ByeSlot` ↔ `GroupTeam(isBye)` 를 전환한다(`createBye` 와 같은 의미).
+  - 그 자리를 쓰는 경기(`deletedAt IS NULL AND status <> 'cancelled'`) 전부에 사이드를 반영한다. `phase = group` 조에서는 조 편성(`V1TournamentGroupTeam`)을 만들고, 교체·비우기 때 그 조의 다른 경기에 더 이상 없는 이전 팀의 편성·순위 행을 지운 뒤 순위를 다시 계산한다. 새로 만든 편성이 같은 대회의 다른 `phase = group` 조 편성과 겹치면 `409 TEAM_IN_OTHER_GROUP` — 위 한 팀 한 조 문단. BYE 자리는 `ByeSlot` ↔ `GroupTeam(isBye)` 를 전환한다(`createBye` 와 같은 의미).
   - 오류: 404 `SLOT_NOT_FOUND`, 422 `SLOT_REGISTRATION_INVALID`(다른 대회·미확정 등록), 409 `SLOT_TEAM_ALREADY_PLACED`(ENTRY·BYE 교차 포함)·`SLOT_LOCKED`(자리를 쓰는 경기 중 시작·결과 있음).
 - `POST /admin/tournaments/:tournamentId/slots/random-fill` — 본문 없음. 잠금 안에서 다시 읽은 빈 ENTRY·BYE 자리에, 아직 어느 자리에도 없는 확정 등록을 서버가 무작위로 배정한다(남는 쪽은 그대로). 응답 `{ assignments: [{ slotId, registrationId }] }`.
 - `PATCH /admin/fixtures/:id` 로 자리에 연결된 사이드의 팀을 바꾸면 409 `SLOT_LINKED`(일정·장소·번호 수정은 그대로).
@@ -504,13 +505,19 @@ All team roster mutations lock the registration row and re-read `rosterLockedAt`
 - `GET /admin/tournaments/:tournamentId/slots/standings-preview`: 어드민(support 포함). 응답 `{ slots: [{ slotId, label, state: 'ready'|'tied'|'group_incomplete', candidateRegistrationId, candidateTeamName, tiedRegistrationIds, currentRegistrationId }] }`, 올라올 조 순서 → 순위 순. 조의 비삭제·비취소 경기가 전부 OFFICIAL 이고 조 순위표가 그 결과를 반영했을 때만 `ready`/`tied`. 정본 §5 동점 처리(승점 → 득실 → 다득점 → 맞대결 → 적은 실점)를 다 쓰고도 갈리지 않은 완전 동률 구간에 그 순위가 걸리면 `tied`(`tiedRegistrationIds` = 동률 팀 전체, 후보 없음). 대회 설정 규칙의 저장 순위와 §5 가 어긋나는 자리도 `tied`. 정규 리그 id 는 404 `TOURNAMENT_NOT_FOUND`.
 - `POST /admin/tournaments/:tournamentId/slots/fill-from-standings` `{ overrides?: [{ slotId, registrationId }] }`(최대 16개, uuid): mutation admin. 응답 `{ assignments: [{ slotId, registrationId }], skipped: [{ slotId, reason: 'tied'|'group_incomplete' }] }`. `ready` 자리 + override 를 한 트랜잭션에서 배정한다 — 바뀔 자리를 먼저 모두 비운 뒤 넣어 A1↔A2 맞바꾸기가 유일 제약에 걸리지 않는다. override 허용 범위: `tied` 자리는 `tiedRegistrationIds` 안의 팀, `ready` 자리는 그 조 소속 팀, `group_incomplete` 자리는 불가(422 `SLOT_REGISTRATION_INVALID`). 같은 팀이 두 자리에 배정되면 409 `SLOT_TEAM_ALREADY_PLACED`, 결선 경기가 시작된 자리가 바뀌어야 하면 409 `SLOT_LOCKED`(이미 맞게 들어 있는 자리는 건드리지 않는다). 시작 전이면 다시 채울 수 있다. 감사 `tournament.slots.fill_from_standings`.
 
+### Venue snapshot (Task 20261070)
+
+- Admin create/update accept `venue` + `venueAddress`, `venueLatitude`, `venueLongitude`, `venueProvider`, `venueProviderId`; responses add `venueAddress`, `venueProvider`, `venueProviderId` next to `venue`, `latitude`, `longitude`. The server no longer geocodes `venue`. On update (tournament `PATCH` and fixture `PATCH /admin/fixtures/:id`), sending any address/pin field without `venue` is 400 `PLACE_NAME_REQUIRED` — the snapshot is replaced only as a whole.
+- PATCH: when the `venue` key is present the whole snapshot is replaced (a name-only PATCH clears coordinates and provider).
+- Bracket fixtures: `venue` + the same five `venue*` fields on create/update fixture DTOs map to the fixture's `place*` columns; fixtures created without a venue inherit the tournament's snapshot. Fixture responses keep `venue` and add `place: V1PlaceView | null`.
+
 ## Public list default order (2026-10-10)
 
-`GET /tournaments` orders by status group, then date, then `id` ascending as the tie-breaker. The server is the only place this order is defined; clients render `items[]` as received.
+`GET /tournaments` orders by status group (recruiting, recruitment closed, in progress, finished), then date, then `id` ascending as the tie-breaker. "Recruitment closed" is the status the card shows: stored `closed`, plus a stored-`open` tournament whose `registrationDeadlineAt` has passed or whose capacity (confirmed + awaiting_payment/payment_checking/paid registrations vs `teamCount`) is full; regular leagues have no capacity and keep their stored status. The server is the only place this order is defined; clients render `items[]` as received. The order, the cursor comparison and the `page` offset are all computed in the database (one `ORDER BY` over the status group, the group's date key and `id`), so request cost depends on the page size, not on how many tournaments exist. A `cursor` is an opaque token (`pageInfo.nextCursor`) that carries the sort key its row had on the page that issued it, so a row that turns into 모집 마감 mid-scroll does not make the next page skip rows; a token the list did not issue returns an empty page. When `page` is present (including `page=1`) it wins and any `cursor` sent with it is ignored; `total` is counted only for `page` requests.
 
 1. `open` (a regular league's `draft` "upcoming" is grouped here) - `scheduledAt` ascending
 2. `closed` - `scheduledAt` ascending
 3. `in_progress` - `scheduledAt` ascending
 4. `completed` - most recently finished first (`scheduledEndAt` descending, falling back to `scheduledAt`)
 
-Rows without a date sort last inside their group. `cursor` is still the id of the last row of the previous page and `page` is an offset into the same order, so pages never skip or repeat a row. A `cursor` that no longer matches a visible row returns an empty page. Passing `status` narrows to one group; the group's ordering above still applies. The visible set is unchanged (`draft`/`cancelled` tournaments stay hidden).
+Rows without a date sort last inside their group. `page` is an offset into the same order, so page-number paging never skips or repeats a row. Passing `status` narrows to one group; the group's ordering above still applies. The visible set is unchanged (`draft`/`cancelled` tournaments stay hidden).

@@ -68,7 +68,7 @@ function currentModel(platformManaged = true, title = MATCH_TITLE, mode: TeamMat
     detailBackHref: BACK_HREF,
     match: {
       ...base.match, ...toTeamMatch(api, base.match),
-      hostTeamId: platformManaged ? null : 'synthetic-host', applicantTeams: [], description: '', address: '',
+      hostTeamId: platformManaged ? null : 'synthetic-host', applicantTeams: [], description: '', place: null,
     },
   };
 }

@@ -17,6 +17,8 @@ import { teamMatchDateErrors } from '@/lib/team-match-dates';
 import { parseTeamMatchLevelRange } from '@/lib/team-match-level-range';
 import { GENDER_RULE_OPTIONS, matchGenderRuleLabel } from '@/lib/v1-status-labels';
 import { toDistrictRegionOptions } from '@/lib/v1-regions';
+import { toMatchPlacePayload, type PlaceValue, PLACE_NAME_MAX_LENGTH } from '@/lib/place';
+import { PlacePicker } from '@/components/v1-ui/place-picker';
 import { kstDatetimeLocalToIso } from '@/lib/kst-calendar';
 import { TeamMatchImagesField } from '@/components/team-matches/team-match-images';
 import { TeamMatchLevelRangeField } from '@/components/team-matches/team-match-level-range-field';
@@ -52,8 +54,7 @@ export default function AdminTeamMatchNewPage() {
   const [description, setDescription] = useState('');
   const [imageUrl, setImageUrl] = useState('');
   const [listImageUrl, setListImageUrl] = useState('');
-  const [placeName, setPlaceName] = useState('');
-  const [addressText, setAddressText] = useState('');
+  const [place, setPlace] = useState<PlaceValue | null>(null);
   const [deadlineAt, setDeadlineAt] = useState('');
   const [startsAt, setStartsAt] = useState('');
   const [endsAt, setEndsAt] = useState('');
@@ -84,7 +85,7 @@ export default function AdminTeamMatchNewPage() {
     sportId !== '' &&
     regionId !== '' &&
     title.trim() !== '' &&
-    placeName.trim() !== '' &&
+    place !== null &&
     startsAt !== '' &&
     datesValid &&
     !uploadingImage && levelRange !== null;
@@ -109,8 +110,7 @@ export default function AdminTeamMatchNewPage() {
         startsAt: startIso,
         endsAt: kstDatetimeLocalToIso(endsAt),
         deadlineAt: kstDatetimeLocalToIso(deadlineAt),
-        manualPlaceName: placeName.trim(),
-        addressText: addressText.trim() || null,
+        ...toMatchPlacePayload(place),
         costNote: moneyNote(totalCost, opponentCost),
         rulesText: null,
         ...levelRange,
@@ -231,14 +231,7 @@ export default function AdminTeamMatchNewPage() {
 
           <section className="space-y-4 rounded-2xl border border-[var(--border)] bg-[var(--card-surface)] p-4 md:p-5">
             <h2 className="text-[length:var(--font-size-body-lg)] font-bold text-[var(--text-strong)]">장소와 시간</h2>
-            <label className="block text-[length:var(--font-size-body-sm)] font-medium text-[var(--text-strong)]">
-              경기 장소
-              <input aria-label="경기 장소" value={placeName} onChange={(event) => setPlaceName(event.target.value)} maxLength={120} placeholder="장소명" className={"mt-1 " + inputClass} />
-            </label>
-            <label className="block text-[length:var(--font-size-body-sm)] font-medium text-[var(--text-strong)]">
-              상세 주소 (선택)
-              <input aria-label="상세 주소 (선택)" value={addressText} onChange={(event) => setAddressText(event.target.value)} maxLength={200} placeholder="도로명 주소 또는 코트 안내" className={"mt-1 " + inputClass} />
-            </label>
+            <PlacePicker label="경기 장소" value={place} onChange={setPlace} maxLength={PLACE_NAME_MAX_LENGTH.match} />
             <div className="grid gap-4 md:grid-cols-2">
               <label className="text-[length:var(--font-size-body-sm)] font-medium text-[var(--text-strong)]">
                 경기 시작

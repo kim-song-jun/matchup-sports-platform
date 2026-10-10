@@ -36,6 +36,7 @@ import { LEAGUE_TIE_BREAK_ORDER } from './league-tie-break';
 import type { LeagueState } from './league-state';
 import { findPublicTournamentOnSurface } from '../tournaments/tournament-surface-lookup';
 import { isLeagueRegistrationOpen } from './league-registration-open';
+import { TOURNAMENT_VENUE_SELECT, tournamentVenueSnapshot } from '../places/tournament-venue';
 
 const PLAYER_RECORDS_LIMIT = 30;
 const LEAGUE_LIST_DEFAULT_LIMIT = 20;
@@ -500,6 +501,8 @@ export class LeagueMatchPublicService {
       endsOn: league.endsOn,
       sportCode: league.sport.code,
       coverImageUrl: league.coverImageUrl,
+      // 경기 상세가 "이 경기만 장소가 달라요" 를 판정하는 기준이다.
+      defaultPlace: league.defaultPlace,
       // 미설정(entryFeeConfigured=false)이면 화면이 금액을 그리지 않는다 — 0원 '무료 확정'과 구분된다.
       entryFee: league.entryFee,
       entryFeeConfigured: league.entryFeeConfigured,
@@ -779,6 +782,7 @@ export class LeagueMatchPublicService {
         coverImageUrl: true,
         entryFee: true,
         entryFeeConfiguredAt: true,
+        ...TOURNAMENT_VENUE_SELECT,
         sport: { select: { id: true, code: true, name: true } },
         region: { select: { id: true, name: true } },
         // 로스터 = confirmed 등록.
@@ -800,9 +804,13 @@ export class LeagueMatchPublicService {
       throw new NotFoundException({ code: 'LEAGUE_NOT_FOUND', message: '리그를 찾을 수 없어요.' });
     }
     // 호출부의 어휘(`state`·`startsOn`·`endsOn`·`teams`)는 그대로 둔다 — 응답 계약 불변.
-    const { registrations, scheduledAt, scheduledEndAt, status, registrationDeadlineAt, entryFeeConfiguredAt, ...rest } = row;
+    const {
+      registrations, scheduledAt, scheduledEndAt, status, registrationDeadlineAt, entryFeeConfiguredAt,
+      venue, venueAddress, latitude, longitude, venueProvider, venueProviderId, ...rest
+    } = row;
     return {
       ...rest,
+      defaultPlace: tournamentVenueSnapshot({ venue, venueAddress, latitude, longitude, venueProvider, venueProviderId }),
       entryFeeConfigured: entryFeeConfiguredAt !== null,
       state: LEAGUE_STATE_BY_STATUS[status],
       startsOn: scheduledAt,

@@ -891,6 +891,7 @@ describe('presentTournamentDetail — kind(종류)와 format(방식)은 독립�
           awayAssigned: false,
           startAt: new Date('2026-09-01T10:00:00Z'),
           placeName: '경기장',
+          place: null,
           status: 'matched',
           homeScore: null,
           awayScore: null,

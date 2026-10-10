@@ -43,11 +43,19 @@ import { LeagueFixtureDatePicker } from './league-fixture-date-picker';
 import { LeagueWeeksPlanField } from './league-weeks-plan-field';
 import { resolveWeeksCount, type WeeksPlan } from '@/lib/league-round-robin-plan';
 import { formatKstDateShort, formatKstTime } from '@/lib/date-utils';
-import { RecentVenueChips } from '@/components/v1-ui/create-form-fields';
 import { LeagueVisibilityControl } from './league-visibility-control';
 import { LeagueHoldControl } from './league-hold-control';
 import { LeagueCloseRegistrationControl } from './league-close-registration-control';
 import { LeagueCoverImageControl } from './league-cover-image-control';
+import { LeagueVenueControl } from './league-venue-control';
+import {
+  DEFAULT_LEAGUE_PLACE_CHOICE,
+  isLeaguePlaceChoiceIncomplete,
+  LeagueFixturePlaceField,
+  leaguePlacePayload,
+  type LeaguePlaceChoice,
+} from './league-fixture-place-field';
+import { PLACE_NAME_MAX_LENGTH } from '@/lib/place';
 import { BracketCanvasMobile } from '@/components/admin/bracket-canvas/bracket-canvas-mobile';
 import { BracketCanvasResponsive } from '@/components/admin/bracket-canvas/bracket-canvas-responsive';
 import type { RegistrationsLoadState } from '@/components/admin/bracket-canvas/bracket-team-tray';
@@ -164,7 +172,7 @@ export default function LeagueMatchFixturesClient({
     .map((team) => ({ id: team.id, label: team.name, description: `${team.sportName} · ${team.regionName}` }));
 
   // 그룹 B 감사 결함 3: 최초 대진 생성/재생성 미리보기(dry-run). generate/regenerate 두
-  // 폼이 같은 상태(weeksCount/dayOfWeek/time/placeName)를 공유하므로 미리보기 결과도
+  // 폼이 같은 상태(weeksCount/dayOfWeek/time/placeChoice)를 공유하므로 미리보기 결과도
   // 하나만 두고 어느 폼에서 눌렀는지는 결과 패널을 각 폼 바로 아래 두는 것으로 구분한다.
   const previewFixtures = useV1PreviewLeagueFixtures(leagueId);
   const [previewResult, setPreviewResult] = useState<V1PreviewLeagueFixturesResult | null>(null);
@@ -181,7 +189,7 @@ export default function LeagueMatchFixturesClient({
   // **날짜 목록이 정본이다.** 요일은 그것을 채우는 편의일 뿐 — 서버는 요일을 모른다.
   const [selectedDates, setSelectedDates] = useState<string[]>([]);
   const [time, setTime] = useState('18:00');
-  const [placeName, setPlaceName] = useState('');
+  const [placeChoice, setPlaceChoice] = useState<LeaguePlaceChoice>(DEFAULT_LEAGUE_PLACE_CHOICE);
   // 대진 timing(2026-08-25 사용자 확정: C안 시간창 역산 + B안 계산기·타임라인). 기존 필드처럼
   // 생성·재생성 두 폼이 같은 상태를 공유한다. ''=미입력 — 셋 다 비어 있으면 timing을 아예 안 보내
   // 같은 주차 동시 시각으로 만든다. 경기 시간만 비우면 서버가 경기 설정의 정규 시간(전·후반 합계,
@@ -250,7 +258,7 @@ export default function LeagueMatchFixturesClient({
   }
 
   // generate/regenerate/preview 세 호출이 전부 같은 폼 상태(weeksCount/dayOfWeek/time/
-  // placeName)에서 같은 모양의 body를 만든다 — 세 곳에서 조립 규칙이 갈리면(예: 트림 여부)
+  // placeChoice)에서 같은 모양의 body를 만든다 — 세 곳에서 조립 규칙이 갈리면(예: 트림 여부)
   // "미리보기는 통과했는데 실제 생성은 다르게 실패"가 생긴다.
   // 서버 DTO가 @IsInt라 '15.5'·'1e2' 같은 값은 400으로 튕긴다 — 정수 문자열만 값으로
   // 인정하고, "비어 있지 않은데 정수가 아님"은 제출 전에 별도로 걸러 안내한다.
@@ -405,7 +413,7 @@ export default function LeagueMatchFixturesClient({
       // **빈 `time` 이 그대로 나갔다** — 서버가 `time은 HH:mm 형식이어야 해요` 로 거부한다.
       // 실을지 말지는 두 값이 **함께** 갖춰졌을 때만이다(서버 DTO 가 둘을 한 객체로 받는다).
       ...(dates.length === 0 || time.trim() === '' ? {} : { schedule: { dates, time: time.trim() } }),
-      ...(placeName.trim() === '' ? {} : { placeName: placeName.trim() }),
+      ...leaguePlacePayload(placeChoice),
       ...((!durationTouched || durationValue === null) && breakValue === null && gamesPerDayValue === null
         ? {}
         : {
@@ -421,6 +429,10 @@ export default function LeagueMatchFixturesClient({
   // 정수가 아닌 입력은 제출 전에 차단한다(parseOptionalInt가 null로 만들면 timing이 조용히
   // 누락돼 더 나쁘다). 경기 시간을 비운 채 휴식·팀당 경기 수만 채우는 건 정상 — 서버가 기본값을 쓴다.
   const validateTimingInputs = (): boolean => {
+    if (isLeaguePlaceChoiceIncomplete(placeChoice)) {
+      showToast('다른 장소를 골라 주세요. 기본 장소를 쓰려면 \'기본 장소 사용\'을 선택해 주세요.', 'error');
+      return false;
+    }
     if (hasInvalidTimingInput) {
       showToast('경기 시간·휴식·팀당 하루 경기 수는 정수로만 입력할 수 있어요.', 'error');
       return false;
@@ -722,6 +734,7 @@ export default function LeagueMatchFixturesClient({
       <LeagueCloseRegistrationControl leagueId={leagueId} state={series.state} registrationOpen={series.registrationOpen} registrationDeadlineAt={series.registrationDeadlineAt} activeRegistrationCount={series.activeRegistrationCount} confirmedCount={series.confirmedRegistrationCount} showToast={showToast} />
       <TournamentPeriodSettingsEditor tournamentId={leagueId} canWrite={canWrite} showToast={showToast} />
       <LeagueCoverImageControl leagueId={leagueId} sportCode={series.sportCode} coverImageUrl={series.coverImageUrl} />
+      <LeagueVenueControl leagueId={leagueId} defaultPlace={series.defaultPlace ?? null} recentVenues={series.recentVenues} />
       <div className="mb-4 md:max-w-xs">
         <SegmentedTabs
           ariaLabel="대진 보기 방식"
@@ -862,6 +875,8 @@ export default function LeagueMatchFixturesClient({
       {manualFixtureOpen && (
         <LeagueManualFixtureModal
           teams={(teamsData?.teams ?? []).map((team) => ({ id: team.teamId, label: team.name }))}
+          defaultPlace={series.defaultPlace ?? null}
+          recentVenues={series.recentVenues}
           isSubmitting={createManualFixture.isPending}
           onSubmit={async (payload) => {
             try {
@@ -969,17 +984,15 @@ export default function LeagueMatchFixturesClient({
                 }
               />
             </div>
-            <div className="col-span-full">
-              <label htmlFor="fixture-place-name" className="mb-1 block text-sm font-medium text-[var(--text-strong)]">기본 장소</label>
-              <input
-                id="fixture-place-name"
-                type="text"
-                placeholder="장소 미정"
-                value={placeName}
-                onChange={(e) => setPlaceName(e.target.value)}
-                className={`${inputClass} w-full`}
-              />
-            </div>
+            <LeagueFixturePlaceField
+              maxLength={PLACE_NAME_MAX_LENGTH.leagueFixture}
+              legend="장소"
+              customLabel="다른 장소 사용"
+              defaultPlace={series.defaultPlace ?? null}
+              recentVenues={series.recentVenues}
+              choice={placeChoice}
+              onChange={setPlaceChoice}
+            />
             {/* 그룹 B 감사 결함 3: 실제 생성 전에 어떤 대진이 만들어질지 먼저 보여준다.
                 DB를 바꾸지 않는다 — generateFixtures와 완전히 같은 검증을 통과해야 결과가
                 나오므로, 미리보기가 성공했는데 실제 생성이 실패하는 불일치가 없다. */}
@@ -1009,11 +1022,6 @@ export default function LeagueMatchFixturesClient({
             onApply={(games) => setGamesPerTeamPerDay(String(games))}
           />
           {dailyPlan !== null && <DailyPlanCard plan={dailyPlan} />}
-          <RecentVenueChips
-            items={(series.recentVenues ?? []).map((venue) => ({ placeName: venue }))}
-            selectedValue={placeName}
-            onSelect={(venue) => setPlaceName(venue.placeName)}
-          />
           <FixturePreviewPanel result={previewResult} teamNameById={teamNameById} />
           <p className="text-xs text-[var(--text-muted)]">
             요일·시각을 정하면 매주 그 요일 그 시각으로 채워요. 비워두면 시작일 그대로 매주 반복돼요.
@@ -1299,17 +1307,15 @@ export default function LeagueMatchFixturesClient({
                     gamesPerTeamPerDay={gamesPerTeamPerDay}
                     onGamesPerTeamPerDayChange={setGamesPerTeamPerDay}
                   />
-                  <div className="col-span-full">
-                    <label htmlFor="regen-place-name" className="mb-1 block text-sm font-medium text-[var(--text-strong)]">기본 장소</label>
-                    <input
-                      id="regen-place-name"
-                      type="text"
-                      placeholder="장소 미정"
-                      value={placeName}
-                      onChange={(e) => setPlaceName(e.target.value)}
-                      className={`${inputClass} w-full`}
-                    />
-                  </div>
+                  <LeagueFixturePlaceField
+                    maxLength={PLACE_NAME_MAX_LENGTH.leagueFixture}
+                    legend="장소"
+                    customLabel="다른 장소 사용"
+                    defaultPlace={series.defaultPlace ?? null}
+                    recentVenues={series.recentVenues}
+                    choice={placeChoice}
+                    onChange={setPlaceChoice}
+                  />
                   {/* 그룹 B 감사 결함 3: 재생성도 같은 미리보기를 공유한다 — 새 로스터로
                       대진을 다시 계산했을 때 실제로 뭐가 만들어지는지 typedChallenge 확인
                       전에 먼저 보여준다. */}
@@ -1388,6 +1394,8 @@ export default function LeagueMatchFixturesClient({
         <LeagueFixtureScheduleModal
           key={scheduleFixture.teamMatchId}
           fixture={scheduleFixture}
+          defaultPlace={series.defaultPlace ?? null}
+          recentVenues={series.recentVenues}
           matchupLabel={matchupLabelOf(scheduleFixture)}
           isSubmitting={updateFixture.isPending}
           onSubmit={onScheduleSubmit(scheduleFixture)}
@@ -1399,6 +1407,7 @@ export default function LeagueMatchFixturesClient({
         <LeagueTemplateDialog
           leagueStartsOn={series.startsOn}
           initialTeamCount={Math.min(20, Math.max(3, teamCount))}
+          defaultPlace={series.defaultPlace ?? null}
           recentVenues={series.recentVenues ?? []}
           replaceExisting={series.fixtures.some((fixture) => fixture.status !== 'cancelled')}
           isSubmitting={applyTemplate.isPending}

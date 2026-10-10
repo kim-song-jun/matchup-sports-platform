@@ -215,7 +215,7 @@ describe('useV1UpdateLeagueVisibility', () => {
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: v1Keys.adminLeagueMatchList() });
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: v1Keys.leagueMatches() });
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: v1Keys.leagueMatch('league-1') });
-    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['v1', 'league-claimable-fixtures', 'league-1'] });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: v1Keys.leagueClaimableFixtures('league-1') });
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: v1Keys.teamMatch('fixture-1') });
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: v1Keys.tournament('league-1') });
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['tournament-reviews', 'league-1'] });

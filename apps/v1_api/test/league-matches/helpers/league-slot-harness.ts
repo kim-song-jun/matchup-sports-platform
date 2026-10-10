@@ -154,7 +154,7 @@ export async function createLeagueSlotHarness(app: INestApplication, label: stri
           regionId: region.id,
           competitionConfigId: config.id,
           title: input.title ?? `슬롯 하네스 대진 ${seq}`,
-          placeName: '테스트 구장',
+          place: { name: '테스트 구장', address: null, latitude: null, longitude: null, provider: null, providerPlaceId: null },
           startAt: input.startAt ?? new Date(Date.now() + (seq + 7) * 86_400_000),
           endAt: null,
           home: pick(input.homeTeamId),

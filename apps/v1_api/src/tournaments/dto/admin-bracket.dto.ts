@@ -16,6 +16,7 @@ import {
   ValidateIf,
   ValidateNested,
 } from 'class-validator';
+import { IsPlaceLatitude, IsPlaceLongitude, IsPlaceProvider, IsPlaceProviderId } from '../../places/place-snapshot';
 
 // ─── Group phase constants ─────────────────────────────────────────────────────
 
@@ -115,10 +116,12 @@ export class CreateFixtureDto {
   @MaxLength(60)
   round!: string;
 
+  /** 생략하면 서버가 대회 안의 최대 번호 + 1 을 트랜잭션 안에서 정한다. */
+  @IsOptional()
   @Type(() => Number)
   @IsInt()
   @Min(1)
-  fixtureNumber!: number;
+  fixtureNumber?: number;
 
   @IsOptional()
   @Type(() => Number)
@@ -152,6 +155,23 @@ export class CreateFixtureDto {
   @IsString()
   @MaxLength(200)
   venue?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  venueAddress?: string;
+
+  @IsPlaceLatitude()
+  venueLatitude?: number | null;
+
+  @IsPlaceLongitude()
+  venueLongitude?: number | null;
+
+  @IsPlaceProvider()
+  venueProvider?: string | null;
+
+  @IsPlaceProviderId()
+  venueProviderId?: string | null;
 }
 
 export class UpdateFixtureDto {
@@ -170,6 +190,23 @@ export class UpdateFixtureDto {
   @IsString()
   @MaxLength(200)
   venue?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  venueAddress?: string;
+
+  @IsPlaceLatitude()
+  venueLatitude?: number | null;
+
+  @IsPlaceLongitude()
+  venueLongitude?: number | null;
+
+  @IsPlaceProvider()
+  venueProvider?: string | null;
+
+  @IsPlaceProviderId()
+  venueProviderId?: string | null;
 
   /** 공식 결과가 있는 경기는 팀 변경 불가(409) — 결과를 먼저 무효로 돌려야 한다 */
   @IsOptional()

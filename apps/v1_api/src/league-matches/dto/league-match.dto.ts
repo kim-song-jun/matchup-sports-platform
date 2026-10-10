@@ -1,5 +1,26 @@
 import { Transform, Type } from 'class-transformer';
 import { ArrayNotEmpty, IsArray, IsBoolean, IsDateString, IsDefined, IsIn, IsInt, IsNotEmpty, IsOptional, IsString, IsUUID, Matches, Max, MaxLength, Min, ValidateNested } from 'class-validator';
+import { IsPlaceLatitude, IsPlaceLongitude, IsPlaceProvider, IsPlaceProviderId } from '../../places/place-snapshot';
+
+/** 경기 장소 스냅샷 입력(이름은 각 DTO 의 `placeName`). 규칙은 `places/place-snapshot.ts` 가 소유한다. */
+export abstract class LeaguePlaceSnapshotDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  placeAddress?: string;
+
+  @IsPlaceLatitude()
+  placeLatitude?: number | null;
+
+  @IsPlaceLongitude()
+  placeLongitude?: number | null;
+
+  @IsPlaceProvider()
+  placeProvider?: string | null;
+
+  @IsPlaceProviderId()
+  placeProviderId?: string | null;
+}
 
 export class UpdateLeagueVisibilityDto {
   // Keep the JSON type: implicit Boolean conversion would turn the string "false" into true.
@@ -101,7 +122,7 @@ export class LeagueFixtureTimingDto {
   gamesPerTeamPerDay?: number;
 }
 
-export class GenerateLeagueFixturesDto {
+export class GenerateLeagueFixturesDto extends LeaguePlaceSnapshotDto {
   @IsInt()
   @Min(1)
   @Max(52)
@@ -128,7 +149,7 @@ export class GenerateLeagueFixturesDto {
   timing?: LeagueFixtureTimingDto;
 }
 
-export class UpdateLeagueFixtureDto {
+export class UpdateLeagueFixtureDto extends LeaguePlaceSnapshotDto {
   @IsOptional()
   @IsDateString()
   startsAt?: string;
@@ -137,11 +158,6 @@ export class UpdateLeagueFixtureDto {
   @IsString()
   @MaxLength(120)
   placeName?: string;
-
-  @IsOptional()
-  @IsString()
-  @MaxLength(200)
-  placeAddress?: string;
 }
 
 // R6: 결과 정정 등으로 completed -> active 역전이할 때, 왜 되돌렸는지 감사 로그에
@@ -250,7 +266,7 @@ export class ListLeagueMatchesQueryDto {
  * (`league-week-number.ts`). 받아 봐야 저장되지 않는 값이라 API 표면에 두지 않는다
  * (2026-09-02 사용자 확정, Task 164 Ambiguity 3).
  */
-export class CreateManualLeagueFixtureDto {
+export class CreateManualLeagueFixtureDto extends LeaguePlaceSnapshotDto {
   @IsUUID()
   homeTeamId!: string;
 
@@ -311,7 +327,7 @@ export class UpdateLeagueDisciplineDto {
 // 정규 리그 대진 템플릿(자리 기반 빈 경기). 팀은 나중에 자리에 넣으므로 teamIds 가 없다.
 // 일정은 필수다 — 공개 가드가 startAt·placeName 이 있는 경기만 내보내기 때문이다. 라운드마다 날짜 하나씩
 // 쓰므로(팀당 하루 1경기) 필요한 날짜 수는 총 라운드 수이고, 모자라면 422 LEAGUE_SCHEDULE_SLOTS_INSUFFICIENT.
-export class ApplyLeagueTemplateDto {
+export class ApplyLeagueTemplateDto extends LeaguePlaceSnapshotDto {
   @IsInt()
   @Min(3)
   @Max(20)

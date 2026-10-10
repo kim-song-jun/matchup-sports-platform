@@ -194,6 +194,64 @@ async function createBracket(): Promise<Bracket> {
   return { tournamentId, registration, semi1, semi2, final };
 }
 
+/** 조별 리그 1경기(A–B). 조 단계(phase 'group')라 확정 시 순위 투영이 돈다. */
+async function createGroupFixture(): Promise<{ tournamentId: string; groupId: string; registration: Record<'a' | 'b', string>; gameId: string }> {
+  const tournamentId = randomUUID();
+  await prisma.v1Tournament.create({
+    data: {
+      id: tournamentId,
+      sportId,
+      regionId,
+      title: `QR 조별 ${suite} ${tournamentId.slice(0, 4)}`,
+      status: 'in_progress',
+      kind: 'regular_tournament',
+      format: 'group_knockout',
+      competitionConfigVersionId: configId,
+    },
+  });
+  const registration = { a: randomUUID(), b: randomUUID() };
+  await prisma.v1TournamentRegistration.createMany({
+    data: (['a', 'b'] as const).map((key) => ({
+      id: registration[key],
+      tournamentId,
+      teamId: teams[key],
+      appliedByUserId: users.ops,
+      status: 'confirmed' as const,
+    })),
+  });
+  const groupId = randomUUID();
+  await prisma.v1TournamentGroup.create({ data: { id: groupId, tournamentId, name: 'A조', phase: 'group' } });
+  await prisma.v1TournamentGroupTeam.createMany({
+    data: (['a', 'b'] as const).map((key, index) => ({ groupId, registrationId: registration[key], sortOrder: index })),
+  });
+  const teamMatchId = randomUUID();
+  await prisma.v1TeamMatch.create({
+    data: {
+      id: teamMatchId,
+      tournamentId,
+      sportId,
+      title: 'QR 조별 1',
+      status: 'matched',
+      competitionConfigVersionId: configId,
+      hostTeamId: teams.a,
+      approvedApplicantTeamId: teams.b,
+    },
+  });
+  await prisma.v1TournamentMatchDetails.create({
+    data: {
+      teamMatchId,
+      tournamentId,
+      groupId,
+      round: '조별',
+      fixtureNumber: 1,
+      homeRegistrationId: registration.a,
+      awayRegistrationId: registration.b,
+    },
+  });
+  const gameId = await createGameFor(teamMatchId, { teamId: teams.a, withPlayer: true }, { teamId: teams.b, withPlayer: true });
+  return { tournamentId, groupId, registration, gameId };
+}
+
 type QuickScore = { home: number; away: number; penalties?: { home: number; away: number } };
 
 async function gameVersion(gameId: string): Promise<number> {
@@ -216,6 +274,26 @@ async function quickResult(
 const revisionCount = (gameId: string) => prisma.v1GameResultRevision.count({ where: { gameId } });
 const outboxCount = (gameId: string, type: string) =>
   prisma.v1OutboxEvent.count({ where: { aggregateType: 'GAME', aggregateId: gameId, type } });
+/**
+ * 이미 소비된 공식 결과 이벤트를 PENDING 으로 되돌려 워커가 다시 받게 한다(at-least-once 재전달 모사).
+ * 되돌릴 이벤트가 없거나 워커가 다시 처리하지 않았으면 그 자체로 실패한다 — 재소비 단언이 빈 드레인으로 통과하지 못하게 한다.
+ */
+async function redeliverOfficialEvents(gameId: string): Promise<void> {
+  const where = { aggregateType: 'GAME', aggregateId: gameId, type: 'GAME_RESULT_OFFICIAL' } as const;
+  const before = await prisma.v1OutboxEvent.findMany({ where: { ...where, status: 'COMPLETED' } });
+  expect(before.length).toBeGreaterThan(0);
+  await prisma.v1OutboxEvent.updateMany({
+    where: { id: { in: before.map((event) => event.id) } },
+    // v1_outbox_version_cas 트리거가 UPDATE 마다 version + 1 을 요구한다(어기면 40001).
+    data: { status: 'PENDING', leaseOwner: null, leaseUntil: null, availableAt: new Date(Date.now() - 1_000), version: { increment: 1 } },
+  });
+  await drainOutboxWorker(prisma);
+  const after = await prisma.v1OutboxEvent.findMany({ where: { id: { in: before.map((event) => event.id) } } });
+  for (const event of after) {
+    expect(event.status).toBe('COMPLETED');
+    expect(event.attempts).toBeGreaterThan(before.find((row) => row.id === event.id)!.attempts);
+  }
+}
 const finalDetails = (teamMatchId: string) =>
   prisma.v1TournamentMatchDetails.findUniqueOrThrow({ where: { teamMatchId } });
 
@@ -309,6 +387,33 @@ describe('빠른 결과 — 대회 경기', () => {
     expect(await prisma.v1OperationAudit.count({ where: { resourceId: gameId, action: 'QUICK_RESULT' } })).toBe(1);
   });
 
+  it('조별 경기를 점수만으로 확정하면 워커가 그 조 순위에 이긴 팀 승 1·승점, 진 팀 패 1을 남기고 이벤트를 다시 받아도 행·집계가 그대로다', async () => {
+    const group = await createGroupFixture();
+    const response = await quickResult(group.gameId, users.ops, { home: 2, away: 1 });
+    expect(response.status).toBe(201);
+
+    await drainOutboxWorker(prisma);
+
+    const rows = await prisma.v1TournamentStanding.findMany({ where: { groupId: group.groupId } });
+    expect(rows).toHaveLength(2);
+    expect(rows.find((row) => row.registrationId === group.registration.a)).toMatchObject({
+      wins: 1, draws: 0, losses: 0, points: 3, goalsFor: 2, goalsAgainst: 1, position: 1,
+    });
+    expect(rows.find((row) => row.registrationId === group.registration.b)).toMatchObject({
+      wins: 0, draws: 0, losses: 1, points: 0, goalsFor: 1, goalsAgainst: 2, position: 2,
+    });
+    expect(await prisma.v1TournamentOverallStanding.count({ where: { tournamentId: group.tournamentId } })).toBe(2);
+
+    await redeliverOfficialEvents(group.gameId);
+    const stat = (row: (typeof rows)[number]) => ({
+      registrationId: row.registrationId, wins: row.wins, draws: row.draws, losses: row.losses,
+      points: row.points, goalsFor: row.goalsFor, goalsAgainst: row.goalsAgainst, position: row.position,
+    });
+    const afterRows = await prisma.v1TournamentStanding.findMany({ where: { groupId: group.groupId } });
+    expect(afterRows.map(stat).sort((x, y) => x.position! - y.position!)).toEqual(rows.map(stat).sort((x, y) => x.position! - y.position!));
+    expect(await prisma.v1TournamentOverallStanding.count({ where: { tournamentId: group.tournamentId } })).toBe(2);
+  });
+
   it('결선 무승부는 점수만 있는 승부차기로 확정되고(킥 수 없음), 승부차기 승자가 진출한다', async () => {
     const bracket = await createBracket();
 
@@ -330,6 +435,13 @@ describe('빠른 결과 — 대회 경기', () => {
     const first = await quickResult(bracket.semi1.gameId, users.ops, { home: 1, away: 1, penalties: { home: 5, away: 4 } });
     expect(first.status).toBe(201);
 
+    // 개인 기록(출전)은 워커가 아니라 명령 시점에 쓰인다 — 워커 소비 전에 이미 양 팀 명단 선수마다 1건이 확정본에 붙어 있어야 한다.
+    const roster = await prisma.v1GameParticipant.findMany({ where: { gameId: bracket.semi1.gameId } });
+    const appearances = await prisma.v1GameResultParticipant.findMany({ where: { resultRevisionId: first.body.data.revisionId } });
+    expect(roster).toHaveLength(2);
+    expect(appearances.map((row) => row.participantId).sort()).toEqual(roster.map((row) => row.id).sort());
+    expect(appearances.every((row) => row.started)).toBe(true);
+
     await drainOutboxWorker(prisma);
 
     expect(
@@ -340,6 +452,33 @@ describe('빠른 결과 — 대회 경기', () => {
       homeRegistrationId: bracket.registration.a,
       awayRegistrationId: null,
     });
+
+    // 팀 전적: 정규시간 1:1 이고 승부차기 5:4 — 득점 컬럼은 정규시간만, 승패는 승부차기로 가른다.
+    const facts = await prisma.v1TeamRecordFact.findMany({ where: { revisionId: first.body.data.revisionId } });
+    expect(facts).toHaveLength(2);
+    expect(facts.find((fact) => fact.teamId === teams.a)).toMatchObject({
+      gameId: bracket.semi1.gameId,
+      opponentTeamId: teams.b,
+      tournamentId: bracket.tournamentId,
+      result: 'WON',
+      goalsFor: 1,
+      goalsAgainst: 1,
+    });
+    expect(facts.find((fact) => fact.teamId === teams.b)).toMatchObject({
+      opponentTeamId: teams.a,
+      result: 'LOST',
+      goalsFor: 1,
+      goalsAgainst: 1,
+    });
+
+    // 4강은 조별 순위에 반영되지 않는다(phase !== 'group'). 통합 순위도 같은 투영기가 조 단계에서만 갱신하므로 함께 0이다.
+    expect(await prisma.v1TournamentStanding.count({ where: { registration: { tournamentId: bracket.tournamentId } } })).toBe(0);
+    expect(await prisma.v1TournamentOverallStanding.count({ where: { tournamentId: bracket.tournamentId } })).toBe(0);
+
+    // 이미 소비한 이벤트를 다시 전달해도 전적·알림이 늘지 않는다.
+    await redeliverOfficialEvents(bracket.semi1.gameId);
+    expect(await prisma.v1TeamRecordFact.count({ where: { revisionId: first.body.data.revisionId } })).toBe(2);
+    expect(await notifiedCount(bracket.semi1.teamMatchId)).toBe(2);
 
     const second = await quickResult(bracket.semi2.gameId, users.ops, { home: 0, away: 2 });
     expect(second.status).toBe(201);
@@ -653,6 +792,41 @@ describe('빠른 결과 — 멱등 재생', () => {
   });
 });
 
+/** 확정본의 점수만 바꾸는 정정 초안. 득점 기록이 없는 점수 입력본이 대상이라 선수 행은 그대로 옮긴다. */
+async function createCorrectionDraft(gameId: string, baseRevisionId: string, score: QuickScore, reason: string) {
+  const baseParticipants = await prisma.v1GameResultParticipant.findMany({ where: { resultRevisionId: baseRevisionId } });
+  const correctionKey = `qr-correction-${randomUUID()}`;
+  const draft = await resultReview.createResultCorrection(authUser(users.ops), gameId, correctionKey, {
+    expectedVersion: await gameVersion(gameId),
+    clientCommandId: correctionKey,
+    baseRevisionId,
+    reason,
+    changes: {
+      score,
+      actualParticipants: baseParticipants.map((row) => ({
+        participantId: row.participantId,
+        sideId: row.sideId,
+        started: true,
+        goals: 0,
+        cards: { yellow: 0, red: 0 },
+        goalkeeper: row.goalkeeper,
+      })),
+      eventsHash: canonicalGameCommandPayloadHash([]),
+    },
+  } as never);
+  return draft;
+}
+
+async function officializeCorrection(gameId: string, draft: { revisionId: string; version: number }) {
+  const draftRow = await prisma.v1GameResultRevision.findUniqueOrThrow({ where: { id: draft.revisionId } });
+  const officializeKey = `qr-officialize-${randomUUID()}`;
+  return resultReview.officializeResultRevision(authUser(users.ops), gameId, draft.revisionId, officializeKey, {
+    expectedVersion: draft.version,
+    clientCommandId: officializeKey,
+    projectionPreviewHash: previewHash(draftRow),
+  } as never);
+}
+
 describe('빠른 결과 — 정정', () => {
   it('승부차기 승자 정정은 킥 수 없이 통과하고 다음 칸을 다시 채우되 완료 알림은 다시 가지 않는다', async () => {
     const bracket = await createBracket();
@@ -665,37 +839,83 @@ describe('빠른 결과 — 정정', () => {
 
     // 같은 경기의 승부차기 승자를 바꾼다. 득점 기록이 없어 킥 수를 요구하지 않는다(Task 3).
     const base = await prisma.v1GameResultRevision.findUniqueOrThrow({ where: { id: first.body.data.revisionId } });
-    const baseParticipants = await prisma.v1GameResultParticipant.findMany({ where: { resultRevisionId: base.id } });
-    const correctionKey = `qr-correction-${randomUUID()}`;
-    const draft = await resultReview.createResultCorrection(authUser(users.ops), gameId, correctionKey, {
-      expectedVersion: await gameVersion(gameId),
-      clientCommandId: correctionKey,
-      baseRevisionId: base.id,
-      reason: '승부차기 승자 정정',
-      changes: {
-        score: { home: 1, away: 1, penalties: { home: 4, away: 5 } },
-        actualParticipants: baseParticipants.map((row) => ({
-          participantId: row.participantId,
-          sideId: row.sideId,
-          started: true,
-          goals: 0,
-          cards: { yellow: 0, red: 0 },
-          goalkeeper: row.goalkeeper,
-        })),
-        eventsHash: canonicalGameCommandPayloadHash([]),
-      },
-    } as never);
-    const draftRow = await prisma.v1GameResultRevision.findUniqueOrThrow({ where: { id: draft.revisionId } });
-    const officializeKey = `qr-officialize-${randomUUID()}`;
-    await resultReview.officializeResultRevision(authUser(users.ops), gameId, draft.revisionId, officializeKey, {
-      expectedVersion: draft.version,
-      clientCommandId: officializeKey,
-      projectionPreviewHash: previewHash(draftRow),
-    } as never);
+    const draft = await createCorrectionDraft(gameId, base.id, { home: 1, away: 1, penalties: { home: 4, away: 5 } }, '승부차기 승자 정정');
+    await officializeCorrection(gameId, draft);
     await drainOutboxWorker(prisma);
 
     expect((await finalDetails(bracket.final.teamMatchId)).homeRegistrationId).toBe(bracket.registration.b);
     expect(await notifiedCount(teamMatchId)).toBe(2);
+
+    // 정정본은 자기 전적 2건을 따로 남기고(승부차기 승자가 바뀌어 결과가 뒤집힌다), 첫 확정본의 전적은 그대로다.
+    const corrected = await prisma.v1TeamRecordFact.findMany({ where: { revisionId: draft.revisionId } });
+    expect(corrected.find((fact) => fact.teamId === teams.a)?.result).toBe('LOST');
+    expect(corrected.find((fact) => fact.teamId === teams.b)?.result).toBe('WON');
+    expect(corrected).toHaveLength(2);
+    expect(await prisma.v1TeamRecordFact.count({ where: { revisionId: base.id } })).toBe(2);
+
+    // 정정 뒤 공식 결과 이벤트를 다시 전달해도 두 확정본의 전적 행 수는 늘지 않는다.
+    await redeliverOfficialEvents(gameId);
+    expect(await prisma.v1TeamRecordFact.count({ where: { revisionId: draft.revisionId } })).toBe(2);
+    expect(await prisma.v1TeamRecordFact.count({ where: { revisionId: base.id } })).toBe(2);
+    // 대체된 첫 확정본의 이벤트는 공개 캐시의 현재 포인터를 되돌리지 못한다(재전달 순서와 무관하게 정정본이 현재다).
+    const cache = await prisma.v1GameOfficialResultCache.findMany({ where: { gameId }, select: { revisionId: true, isCurrent: true } });
+    expect(cache.filter((row) => row.isCurrent).map((row) => row.revisionId)).toEqual([draft.revisionId]);
+  });
+});
+
+describe('빠른 결과 — 정정 vs 이미 시작된 다음 경기', () => {
+  /** 4강1(A 1-0 B)·4강2(C 0-2 D) 확정 → 결승 A 대 D → 결승 게임 LIVE. 정정 대상 4강1 확정본을 돌려준다. */
+  async function startFinalAfterSemi1() {
+    const bracket = await createBracket();
+    const first = await quickResult(bracket.semi1.gameId, users.ops, { home: 1, away: 0 });
+    expect(first.status).toBe(201);
+    // 실제로 시작할 수 있는 결승은 양쪽이 다 차 있다 — 반대편 칸이 빈 채면 정정 판정이 다른 분기를 탄다.
+    const second = await quickResult(bracket.semi2.gameId, users.ops, { home: 0, away: 2 });
+    expect(second.status).toBe(201);
+    expect(await finalDetails(bracket.final.teamMatchId)).toMatchObject({
+      homeRegistrationId: bracket.registration.a,
+      awayRegistrationId: bracket.registration.d,
+    });
+    await prisma.v1Game.update({ where: { id: bracket.final.gameId }, data: { state: 'LIVE' } });
+    const finalGame = await prisma.v1Game.findUniqueOrThrow({ where: { id: bracket.final.gameId } });
+    return { bracket, baseRevisionId: first.body.data.revisionId as string, finalGame };
+  }
+
+  it('승자가 같은 정정은 다음 경기가 이미 LIVE 여도 확정되고 결승의 팀 배정·게임 상태는 그대로다', async () => {
+    const { bracket, baseRevisionId, finalGame } = await startFinalAfterSemi1();
+    const finalBefore = await finalDetails(bracket.final.teamMatchId);
+
+    const draft = await createCorrectionDraft(bracket.semi1.gameId, baseRevisionId, { home: 3, away: 1 }, '승자 그대로 점수만 정정');
+    const officialized = await officializeCorrection(bracket.semi1.gameId, draft);
+
+    expect(officialized.revisionId).toBe(draft.revisionId);
+    expect((await prisma.v1Game.findUniqueOrThrow({ where: { id: bracket.semi1.gameId } })).currentOfficialRevisionId).toBe(draft.revisionId);
+    expect((await prisma.v1GameResultRevision.findUniqueOrThrow({ where: { id: draft.revisionId } })).score).toMatchObject({ home: 3, away: 1 });
+    const finalAfter = await finalDetails(bracket.final.teamMatchId);
+    expect(finalAfter.homeRegistrationId).toBe(finalBefore.homeRegistrationId);
+    expect(finalAfter.awayRegistrationId).toBe(finalBefore.awayRegistrationId);
+    expect(await prisma.v1Game.findUniqueOrThrow({ where: { id: bracket.final.gameId } })).toMatchObject({
+      state: 'LIVE',
+      version: finalGame.version,
+    });
+  });
+
+  it('승자가 바뀌는 정정은 NEXT_FIXTURE_CONFLICT 이고 4강1 확정본·결승 배정은 그대로다 (같은 구성의 대조군)', async () => {
+    const { bracket, baseRevisionId, finalGame } = await startFinalAfterSemi1();
+
+    const draft = await createCorrectionDraft(bracket.semi1.gameId, baseRevisionId, { home: 0, away: 2 }, '승자 변경 정정');
+    await expect(officializeCorrection(bracket.semi1.gameId, draft)).rejects.toMatchObject({
+      status: 409,
+      response: { code: 'NEXT_FIXTURE_CONFLICT' },
+    });
+
+    expect((await prisma.v1Game.findUniqueOrThrow({ where: { id: bracket.semi1.gameId } })).currentOfficialRevisionId).toBe(baseRevisionId);
+    expect((await prisma.v1GameResultRevision.findUniqueOrThrow({ where: { id: draft.revisionId } })).state).not.toBe('OFFICIAL');
+    expect((await finalDetails(bracket.final.teamMatchId)).homeRegistrationId).toBe(bracket.registration.a);
+    expect(await prisma.v1Game.findUniqueOrThrow({ where: { id: bracket.final.gameId } })).toMatchObject({
+      state: 'LIVE',
+      version: finalGame.version,
+    });
   });
 });
 

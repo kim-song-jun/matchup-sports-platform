@@ -64,7 +64,7 @@ vi.mock('./matches-page', () => ({
       {model.onChat && <button onClick={model.onChat}>채팅</button>}
       {model.chatError && <div role="alert">{model.chatError}</div>}
       {model.reviewAction && <a href={model.reviewAction.href}>{model.reviewAction.label}</a>}
-      <div data-testid="address">{model.match.address}</div>
+      <div data-testid="address">{model.match.place?.address ?? ''}</div>
       <div data-testid="description">{model.match.description}</div>
       <div data-testid="title">{model.match.title}</div>
       <div data-testid="back-href">{model.backHref}</div>
@@ -90,7 +90,7 @@ vi.mock('./matches-page', () => ({
   MatchStatePageView: () => null,
 }));
 
-// place는 실제 detail API 응답 모양(`{ name, addressText }`) 그대로 둔다 — 예전 fixture는
+// place는 실제 detail API 응답 모양(`V1PlaceView`: name·address·좌표) 그대로 둔다 — 예전 fixture는
 // 실API가 절대 주지 않는 top-level `placeName`을 심어 뒀고, matches-client.tsx의
 // `?? query.data.placeName` 폴백 가지가 이 fixture 때문에만 값을 갖게 되어 실제로는 목업
 // fallback까지 내려가는 결함(2026-08-27 감사 M-A-personal-match-state)을 가리고 있었다.
@@ -100,7 +100,7 @@ const baseMatch = {
   title: '풋살 매치',
   sportName: '풋살',
   sport: { sportId: 'sport-futsal', name: '풋살' },
-  place: { name: '서울 풋살장', addressText: '서울 마포구 월드컵로 1' },
+  place: { name: '서울 풋살장', address: '서울 마포구 월드컵로 1', latitude: null, longitude: null, provider: null, providerPlaceId: null },
   startsAt: '2026-08-01T10:00:00.000Z',
   capacityText: '3/10',
   status: 'open' as const,
@@ -284,7 +284,7 @@ describe('MatchDetailPageClient — 주소·설명 목업 폴백 (2026-08-27 감
     useV1MatchMock.mockReturnValue({
       data: {
         ...baseMatch,
-        place: { name: '성수 실내체육관', addressText: null },
+        place: { name: '성수 실내체육관', address: null, latitude: null, longitude: null, provider: null, providerPlaceId: null },
         description: null,
         descriptionPreview: null,
         viewerState: 'none',
@@ -302,7 +302,7 @@ describe('MatchDetailPageClient — 주소·설명 목업 폴백 (2026-08-27 감
     useV1MatchMock.mockReturnValue({
       data: {
         ...baseMatch,
-        place: { name: '성수 실내체육관', addressText: '서울 성동구 아차산로 17' },
+        place: { name: '성수 실내체육관', address: '서울 성동구 아차산로 17', latitude: null, longitude: null, provider: null, providerPlaceId: null },
         description: '초보 환영 농구 매치예요.',
         viewerState: 'none',
       },

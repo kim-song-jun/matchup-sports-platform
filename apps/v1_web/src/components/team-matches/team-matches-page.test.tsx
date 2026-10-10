@@ -602,7 +602,7 @@ describe('team match full edit', () => {
     for (const label of [
       '매치 제목', '설명', '최소 등급', '최대 등급', '경기방식',
       '경기 스타일', '유니폼 색상', '장소',
-      '상세 주소', '날짜', '시작 시간', '종료 시간', '신청 마감일', '신청 마감시간',
+      '날짜', '시작 시간', '종료 시간', '신청 마감일', '신청 마감시간',
     ]) {
       expect(screen.getByLabelText(label)).toBeInTheDocument();
     }
@@ -636,7 +636,7 @@ describe('team match full edit', () => {
 
     renderPage(<TeamMatchCreatePageView model={model} />);
 
-    for (const label of ['매치 제목', '설명', '상세 주소', '날짜']) {
+    for (const label of ['매치 제목', '설명', '장소', '날짜']) {
       if (locked) expect(screen.getByLabelText(label)).toBeDisabled();
       else expect(screen.getByLabelText(label)).not.toBeDisabled();
     }
@@ -775,7 +775,7 @@ describe('경기 조건 — 값이 없는 항목', () => {
 describe('팀매치 만들기 confirm 단계 — 마지막 행 표기 결함', () => {
   it('상세 주소가 아니라 장소를 라벨로 값을 보여주고, 상세 주소는 sub로 노출한다', () => {
     const model = getTeamMatchCreateViewModel('confirm');
-    model.draft = { ...model.draft, venue: '잠실 풋살파크 A구장', address: '서울 송파구 올림픽로 25, 3층 2번 코트' };
+    model.draft = { ...model.draft, place: { kind: 'manual', name: '잠실 풋살파크 A구장', address: '서울 송파구 올림픽로 25, 3층 2번 코트' } };
 
     renderPage(<TeamMatchCreatePageView model={model} />);
 
@@ -2137,5 +2137,36 @@ describe('TeamMatchListPageView — 상세로 가는 카드는 지금 목록(검
     const hrefs = Array.from(container.querySelectorAll<HTMLAnchorElement>('a.tm-match-row')).map((a) => a.getAttribute('href'));
 
     expect(hrefs).toEqual(['/team-matches/tm-a', '/team-matches/tm-b']);
+  });
+});
+
+describe('TeamMatchDetailPageView — 일정·장소의 장소 카드', () => {
+  function withPlace(place: ReturnType<typeof getTeamMatchDetailViewModel>['match']['place']) {
+    const base = getTeamMatchDetailViewModel('default');
+    return { ...base, match: { ...base.match, place } };
+  }
+
+  it('좌표가 있으면 이름·주소를 한 번만 보여 주고 길찾기 링크가 좌표 경로를 연다', () => {
+    renderPage(
+      <TeamMatchDetailPageView
+        model={withPlace({ name: '망원한강공원 풋살장', address: '서울 마포구 마포나루길 467', latitude: 37.5558, longitude: 126.8985, provider: 'kakao', providerPlaceId: 'k-1' })}
+      />,
+    );
+    expect(screen.getAllByText('망원한강공원 풋살장').length).toBeGreaterThan(0);
+    fireEvent.click(screen.getAllByRole('button', { name: '길찾기' })[0]);
+    const sheet = within(screen.getByRole('dialog', { name: '길찾기' }));
+    expect(sheet.getByRole('link', { name: /^카카오맵/ }).getAttribute('href')).toContain('37.5558,126.8985');
+    expect(sheet.getByRole('link', { name: /^네이버 지도/ })).toBeInTheDocument();
+    expect(screen.queryByText(/정확한 위치가 등록되지 않았어요/)).not.toBeInTheDocument();
+  });
+
+  it('좌표가 없으면 위치 미등록 안내와 이름 검색 링크만 보여 준다', () => {
+    renderPage(
+      <TeamMatchDetailPageView model={withPlace({ name: '동네 운동장', address: null, latitude: null, longitude: null, provider: null, providerPlaceId: null })} />,
+    );
+    expect(screen.getAllByText(/정확한 위치가 등록되지 않았어요/).length).toBeGreaterThan(0);
+    expect(screen.queryByRole('button', { name: '길찾기' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getAllByRole('button', { name: '지도 앱에서 찾기' })[0]);
+    expect(within(screen.getByRole('dialog', { name: '지도 앱에서 찾기' })).getByRole('link', { name: /^카카오맵/ })).toBeInTheDocument();
   });
 });

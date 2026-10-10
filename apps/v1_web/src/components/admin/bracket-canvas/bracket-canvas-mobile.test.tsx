@@ -459,6 +459,81 @@ describe('BracketCanvasMobile — 팀 넣기', () => {
     await waitFor(() => expect(updateFixture).toHaveBeenCalledWith({ fixtureId: 'fx-2', awayRegistrationId: null }));
   });
 
+  describe('한 팀 한 조 — 후보 제외', () => {
+    const member = (groupId: string, registrationId: string) => ({ id: `gt-${registrationId}`, groupId, registrationId, teamName: registrationId, sortOrder: 0, createdAt: '' });
+    const stageA = buildGroup({ id: 'g-a', name: 'A조', phase: 'group', sortOrder: 0, groupTeams: [member('g-a', 'r1')] });
+    const stageB = buildGroup({ id: 'g-b', name: 'B조', phase: 'group', sortOrder: 1, groupTeams: [member('g-b', 'r2')] });
+    const quarter = buildGroup({ id: 'g-q2', name: '8강', phase: 'quarter', sortOrder: 2 });
+    const stageGroups = [stageA, stageB, quarter];
+    const hiddenNote = '다른 조에 있는 팀은 목록에서 빠져 있어요.';
+
+    function openHomePicker(groupId: string) {
+      const stageFixtures = [makeFixture({ id: 'gx-1', groupId, fixtureNumber: 1, round: '조별 1라운드', game: buildGame({ id: 'g-x1' }) })];
+      renderMobile({
+        rounds: buildBracketMobileRounds({ groups: stageGroups, fixtures: stageFixtures, slots: [] }),
+        slots: [], groups: stageGroups,
+      });
+      fireEvent.click(card(/1번 경기/));
+      fireEvent.click(screen.getByRole('button', { name: '홈 팀 고르기' }));
+    }
+
+    function openSlotPicker(groupId: string) {
+      const stageSlots = [buildSlot({ id: 's-gx', kind: 'ENTRY', groupId, label: '1번 자리' })];
+      const stageFixtures = [makeFixture({ id: 'gx-1', groupId, fixtureNumber: 1, round: '조별 1라운드', homeSlotId: 's-gx', game: buildGame({ id: 'g-x1' }) })];
+      renderMobile({
+        rounds: buildBracketMobileRounds({ groups: stageGroups, fixtures: stageFixtures, slots: stageSlots }),
+        slots: stageSlots, groups: stageGroups,
+      });
+      fireEvent.click(card(/1번 경기/));
+      fireEvent.click(screen.getByRole('button', { name: '홈 팀 고르기' }));
+    }
+
+    it('직접 지정 — A조 경기의 후보에서 B조 팀(마포FC)만 빠지고 안내가 보인다', () => {
+      openHomePicker('g-a');
+      expect(optionNames()).toEqual(['강남FC', '서초FC', '송파FC', '용산FC']);
+      expect(screen.getByText(hiddenNote)).toBeInTheDocument();
+    });
+
+    it('직접 지정 대조군 — B조 경기에서는 A조 팀(강남FC)이 빠진다', () => {
+      openHomePicker('g-b');
+      expect(optionNames()).toEqual(['마포FC', '서초FC', '송파FC', '용산FC']);
+    });
+
+    it('직접 지정 대조군 — 결선 단계 경기는 모두 보이고 안내도 없다', () => {
+      openHomePicker('g-q2');
+      expect(optionNames()).toEqual(['강남FC', '마포FC', '서초FC', '송파FC', '용산FC']);
+      expect(screen.queryByText(hiddenNote)).not.toBeInTheDocument();
+    });
+
+    it('자리 — A조 자리의 후보에서 B조 팀(마포FC)만 빠지고 안내가 보인다', () => {
+      openSlotPicker('g-a');
+      expect(optionNames()).toEqual(['강남FC', '서초FC', '송파FC', '용산FC']);
+      expect(screen.getByText(hiddenNote)).toBeInTheDocument();
+    });
+
+    it('자리 — 다른 조 팀이 이미 다른 자리에 있어 빠진 거라면 "다른 조" 안내는 없다', () => {
+      const stageSlots = [
+        buildSlot({ id: 's-gx', kind: 'ENTRY', groupId: 'g-a', label: '1번 자리' }),
+        buildSlot({ id: 's-gb', kind: 'ENTRY', groupId: 'g-b', label: '2번 자리', registrationId: 'r2', teamName: '마포FC' }),
+      ];
+      const stageFixtures = [makeFixture({ id: 'gx-1', groupId: 'g-a', fixtureNumber: 1, round: '조별 1라운드', homeSlotId: 's-gx', game: buildGame({ id: 'g-x1' }) })];
+      renderMobile({
+        rounds: buildBracketMobileRounds({ groups: stageGroups, fixtures: stageFixtures, slots: stageSlots }),
+        slots: stageSlots, groups: stageGroups,
+      });
+      fireEvent.click(card(/1번 경기/));
+      fireEvent.click(screen.getByRole('button', { name: '홈 팀 고르기' }));
+      expect(optionNames()).not.toContain('마포FC');
+      expect(screen.queryByText(hiddenNote)).not.toBeInTheDocument();
+    });
+
+    it('자리 대조군 — 결선 단계 자리는 모두 보이고 안내도 없다', () => {
+      openSlotPicker('g-q2');
+      expect(optionNames()).toEqual(['강남FC', '마포FC', '서초FC', '송파FC', '용산FC']);
+      expect(screen.queryByText(hiddenNote)).not.toBeInTheDocument();
+    });
+  });
+
   it('참가팀 조회가 끝나기 전에는 고르기를 막고, 실패하면 다시 시도를 보여 준다', () => {
     const onRetry = vi.fn();
     const { unmount } = renderMobile({ registrationsState: { ...loaded, status: 'pending' } });

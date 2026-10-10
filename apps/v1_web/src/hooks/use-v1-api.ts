@@ -281,6 +281,7 @@ import type {
   V1PurgeGuestInquiriesPayload,
   V1PurgeGuestInquiriesResult,
   V1PublicKakaoMapsKeyResponse,
+  V1PlaceSearchResponse,
   V1TournamentOperationsBoardFilters,
   V1TournamentOperationsBoardPage,
   V1TournamentStaffListResponse,
@@ -2089,7 +2090,7 @@ export type V1LeagueClaimableFixtures = {
 
 export function useV1LeagueClaimableFixtures(leagueId: string, options?: { enabled?: boolean }) {
   return useQuery({
-    queryKey: ['v1', 'league-claimable-fixtures', leagueId] as const,
+    queryKey: v1Keys.leagueClaimableFixtures(leagueId),
     queryFn: () =>
       v1Get<V1LeagueClaimableFixtures>(`/league-matches/${leagueId}/claimable-fixtures`),
     enabled: Boolean(leagueId) && (options?.enabled ?? true),
@@ -5019,6 +5020,7 @@ export function useV1CreateFixture(tournamentId: string) {
       queryClient.invalidateQueries({
         queryKey: v1Keys.adminTournamentBracket(tournamentId),
       });
+      queryClient.invalidateQueries({ queryKey: v1Keys.tournament(tournamentId) });
     },
   });
 }
@@ -5056,6 +5058,7 @@ export function useV1DeleteFixture(tournamentId: string) {
     mutationFn: (fixtureId: string) => v1Delete<{ deleted: boolean }>(`/admin/fixtures/${fixtureId}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: v1Keys.adminTournamentBracket(tournamentId) });
+      queryClient.invalidateQueries({ queryKey: v1Keys.tournament(tournamentId) });
     },
   });
 }
@@ -5110,11 +5113,14 @@ export function useV1RecalculateStandings(tournamentId: string) {
   });
 }
 
+export function fetchV1AdminBracket(tournamentId: string) {
+  return v1Get<V1AdminTournamentBracket>(`/admin/tournaments/${tournamentId}/bracket`);
+}
+
 export function useV1AdminBracket(tournamentId: string) {
   return useQuery({
     queryKey: v1Keys.adminTournamentBracket(tournamentId),
-    queryFn: () =>
-      v1Get<V1AdminTournamentBracket>(`/admin/tournaments/${tournamentId}/bracket`),
+    queryFn: () => fetchV1AdminBracket(tournamentId),
     enabled: !!tournamentId,
   });
 }
@@ -5474,6 +5480,23 @@ export function useV1PublicKakaoMapsKey(options?: QueryOptions) {
   });
 }
 
+/**
+ * 카카오 장소 검색(서버 프록시). 입력이 비면 호출하지 않고, 입력이 바뀌는 동안은 직전 결과를
+ * 유지해 목록이 깜빡이지 않게 한다. 503 PLACE_SEARCH_UNAVAILABLE(키 없음)은 재시도해도 같으므로
+ * 재시도하지 않는다.
+ */
+export function useV1PlaceSearch(query: string, options?: QueryOptions) {
+  const trimmed = query.trim();
+  return useQuery({
+    queryKey: v1Keys.placeSearch(trimmed),
+    queryFn: () => v1Get<V1PlaceSearchResponse>('/places/search', { query: trimmed }),
+    enabled: (options?.enabled ?? true) && trimmed.length >= 1,
+    staleTime: 60 * 1000,
+    placeholderData: keepPreviousData,
+    retry: false,
+  });
+}
+
 // ─── 어드민: 콘텐츠(공지/팝업) 본문 이미지 업로드 ────────────────────────────
 
 export function useV1UploadAdminContentAsset() {
@@ -5743,6 +5766,8 @@ import type {
   V1UpdateLeagueEntryFeeResult,
   V1UpdateLeagueCoverImagePayload,
   V1UpdateLeagueCoverImageResult,
+  V1UpdateLeagueVenuePayload,
+  V1UpdateLeagueVenueResult,
 
   V1CreateManualLeagueFixturePayload,
 
@@ -5825,7 +5850,7 @@ export function useV1UpdateLeagueVisibility(leagueId: string) {
       queryClient.invalidateQueries({ queryKey: v1Keys.adminLeagueMatchList() });
       queryClient.invalidateQueries({ queryKey: v1Keys.leagueMatches() });
       queryClient.invalidateQueries({ queryKey: v1Keys.leagueMatch(leagueId) });
-      queryClient.invalidateQueries({ queryKey: ['v1', 'league-claimable-fixtures', leagueId] });
+      queryClient.invalidateQueries({ queryKey: v1Keys.leagueClaimableFixtures(leagueId) });
       for (const fixtureId of fixtureIds) {
         queryClient.invalidateQueries({ queryKey: v1Keys.teamMatch(fixtureId) });
       }
@@ -5940,6 +5965,15 @@ export function useV1UpdateLeagueCoverImage(leagueId: string) {
   return useMutation({
     mutationFn: (body: V1UpdateLeagueCoverImagePayload) =>
       v1Patch<V1UpdateLeagueCoverImageResult>(`/admin/league-matches/${encodeURIComponent(leagueId)}/cover-image`, body),
+    onSuccess: () => invalidateLeagueSurfaces(queryClient, leagueId),
+  });
+}
+
+export function useV1UpdateLeagueVenue(leagueId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: V1UpdateLeagueVenuePayload) =>
+      v1Patch<V1UpdateLeagueVenueResult>(`/admin/league-matches/${encodeURIComponent(leagueId)}/venue`, body),
     onSuccess: () => invalidateLeagueSurfaces(queryClient, leagueId),
   });
 }

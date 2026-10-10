@@ -20,6 +20,7 @@ import {
   useMediaQuery,
 } from '@/hooks/use-media-query';
 import { describeBracketCanvasError } from '@/lib/bracket-canvas-errors';
+import { TEAM_IN_OTHER_GROUP_MESSAGE, registrationIdsBlockedForGroup } from '@/lib/bracket-group-enrollment';
 import { buildSideLabelContext, directPlacedRegistrationIds, fixtureSideLabel, type SideKey } from '@/lib/bracket-canvas-layout';
 import { buildLeagueStandings } from '@/lib/bracket-league-standings-model';
 import { describeStandingsFill } from '@/lib/bracket-standings-fill-message';
@@ -138,11 +139,18 @@ export function BracketCanvasWorkspace({
   const hasPendingSchedule = !!bracketPublishScheduledAt && !published;
   // 비활성 이유는 title 대신 화면에 보이게 둔다 — title 은 터치·키보드에서 보이지 않는다.
   const publishBlockedReason = isEmpty && !published ? '대진을 먼저 만들어야 공개할 수 있어요.' : null;
-  const toolbarHint = !isEmpty ? randomFillBlockedReason : publishBlockedReason;
+  // 방식을 모르면 리그에도 토너먼트 폼이 열리므로, 알 때까지 경기 추가·연결을 막는다.
+  const formatUnknownReason = format === undefined ? '대회 방식을 아직 확인하지 못해 경기를 추가하거나 연결할 수 없어요.' : null;
+  const toolbarHint = !isEmpty ? [randomFillBlockedReason, formatUnknownReason].filter((reason) => reason !== null).join(' ') || null : publishBlockedReason;
   const selectedFixture = bracket.fixtures.find((fixture) => fixture.id === selectedFixtureId) ?? null;
   const rightColumn = sidePanel && (selectedFixture !== null || showStandings);
 
   const handleAssign = (slotId: string, registrationId: string) => {
+    const slotGroupId = bracket.slots.find((slot) => slot.id === slotId)?.groupId ?? null;
+    if (registrationIdsBlockedForGroup(bracket.groups, slotGroupId).has(registrationId)) {
+      showToast(TEAM_IN_OTHER_GROUP_MESSAGE, 'error');
+      return;
+    }
     assignSlot.mutate(
       { slotId, registrationId },
       {
@@ -156,6 +164,11 @@ export function BracketCanvasWorkspace({
   };
 
   const handleAssignDirect = (fixtureId: string, side: SideKey, registrationId: string) => {
+    const fixtureGroupId = bracket.fixtures.find((fixture) => fixture.id === fixtureId)?.groupId ?? null;
+    if (registrationIdsBlockedForGroup(bracket.groups, fixtureGroupId).has(registrationId)) {
+      showToast(TEAM_IN_OTHER_GROUP_MESSAGE, 'error');
+      return;
+    }
     updateFixture.mutate(
       { fixtureId, ...(side === 'HOME' ? { homeRegistrationId: registrationId } : { awayRegistrationId: registrationId }) },
       {
@@ -277,12 +290,24 @@ export function BracketCanvasWorkspace({
             ) : null}
             {!isEmpty ? (
               <>
-                <Button variant="outline" size="md" onClick={() => setToolsMode('add')}>
+                <Button
+                  variant="outline"
+                  size="md"
+                  disabled={formatUnknownReason !== null}
+                  aria-describedby={formatUnknownReason !== null ? toolbarHintId : undefined}
+                  onClick={() => setToolsMode('add')}
+                >
                   <Plus size={16} aria-hidden="true" />
                   경기 추가
                 </Button>
                 {!leagueGrid ? (
-                  <Button variant="outline" size="md" onClick={() => setToolsMode('link')}>
+                  <Button
+                    variant="outline"
+                    size="md"
+                    disabled={formatUnknownReason !== null}
+                    aria-describedby={formatUnknownReason !== null ? toolbarHintId : undefined}
+                    onClick={() => setToolsMode('link')}
+                  >
                     <Link2 size={16} aria-hidden="true" />
                     경기 연결
                   </Button>
@@ -409,15 +434,18 @@ export function BracketCanvasWorkspace({
         </BottomSheet>
       ) : null}
 
-      <BracketFixtureToolsDialog
-        key={toolsMode ?? 'closed'}
-        open={toolsMode !== null}
-        mode={toolsMode ?? 'add'}
-        tournamentId={tournamentId}
-        bracket={bracket}
-        onClose={() => setToolsMode(null)}
-        showToast={showToast}
-      />
+      {format !== undefined ? (
+        <BracketFixtureToolsDialog
+          key={toolsMode ?? 'closed'}
+          open={toolsMode !== null}
+          mode={toolsMode ?? 'add'}
+          format={format}
+          tournamentId={tournamentId}
+          bracket={bracket}
+          onClose={() => setToolsMode(null)}
+          showToast={showToast}
+        />
+      ) : null}
 
       {templateFormat !== null ? (
         <BracketTemplateDialog

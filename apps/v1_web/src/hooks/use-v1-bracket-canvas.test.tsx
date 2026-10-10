@@ -5,13 +5,14 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('@/lib/api-client', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/lib/api-client')>();
-  return { ...actual, v1Post: vi.fn(), v1Put: vi.fn(), v1Patch: vi.fn() };
+  return { ...actual, v1Get: vi.fn(), v1Post: vi.fn(), v1Put: vi.fn(), v1Patch: vi.fn() };
 });
 
-import { v1Patch, v1Post, v1Put } from '@/lib/api-client';
+import { v1Get, v1Patch, v1Post, v1Put } from '@/lib/api-client';
 import { v1Keys } from '@/lib/query-keys';
 import { resultReviewKeys } from '@/hooks/use-tournament-result-review';
 import {
+  useV1AddBracketFixture,
   useV1ApplyBracketTemplate,
   useV1AssignTournamentSlot,
   useV1QuickResult,
@@ -19,6 +20,7 @@ import {
   useV1SetBracketSources,
 } from './use-v1-bracket-canvas';
 
+const getMock = vi.mocked(v1Get);
 const postMock = vi.mocked(v1Post);
 const putMock = vi.mocked(v1Put);
 const patchMock = vi.mocked(v1Patch);
@@ -27,12 +29,13 @@ function setup() {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
   const invalidate = vi.spyOn(client, 'invalidateQueries');
   const wrapper = ({ children }: { children: ReactNode }) => createElement(QueryClientProvider, { client }, children);
-  return { wrapper, invalidate };
+  return { wrapper, invalidate, client };
 }
 
 const invalidatedKeys = (spy: ReturnType<typeof setup>['invalidate']) => spy.mock.calls.map(([filters]) => filters?.queryKey);
 
 beforeEach(() => {
+  getMock.mockReset();
   postMock.mockReset();
   putMock.mockReset();
   patchMock.mockReset();
@@ -151,5 +154,34 @@ describe('useV1SetBracketSources', () => {
       awaySourceFixtureId: null,
     });
     expect(invalidatedKeys(invalidate)).toContainEqual(v1Keys.adminTournamentBracket('t1'));
+  });
+});
+
+describe('useV1AddBracketFixture', () => {
+  it('경기 번호는 보내지 않고 조와 라운드만 보낸다 — 번호는 서버가 정한다', async () => {
+    postMock.mockResolvedValue({ id: 'new' });
+    const { wrapper } = setup();
+    const { result } = renderHook(() => useV1AddBracketFixture('t1'), { wrapper });
+
+    await act(async () => {
+      await result.current.mutateAsync({ groupId: 'g1', round: 'league_r2' });
+    });
+
+    expect(postMock).toHaveBeenCalledWith('/admin/tournaments/t1/fixtures', { groupId: 'g1', round: 'league_r2' });
+    expect(getMock).not.toHaveBeenCalled();
+  });
+
+  it('만든 뒤 어드민 대진과 대회 상세·공개 일정 캐시를 같이 무효화한다', async () => {
+    postMock.mockResolvedValue({ id: 'new' });
+    const { wrapper, invalidate } = setup();
+    const { result } = renderHook(() => useV1AddBracketFixture('t1'), { wrapper });
+
+    await act(async () => {
+      await result.current.mutateAsync({ groupId: 'g1', round: 'league_r1' });
+    });
+
+    const keys = invalidatedKeys(invalidate);
+    expect(keys).toContainEqual(v1Keys.adminTournamentBracket('t1'));
+    expect(keys).toContainEqual(v1Keys.tournament('t1'));
   });
 });

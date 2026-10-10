@@ -25,7 +25,7 @@ function baseCtx(overrides: Partial<TeamMatchValidationContext> = {}): TeamMatch
     draft: {
       ...getTeamMatchCreateViewModel('team').draft,
       title: '주말 팀매치',
-      venue: '잠실 풋살파크',
+      place: { kind: 'manual', name: '잠실 풋살파크' },
       date: start.toISOString().slice(0, 10),
       startTime: start.toTimeString().slice(0, 5),
     },
@@ -38,11 +38,11 @@ describe('getTeamMatchMissingFields — 실제 결측 필드만 지목', () => {
     // 사용자가 실제로 겪은 상황: 종목(풋살)·지역(서울 종로구)·제목은 채워져 있었고
     // 실제로 빈 건 장소·일시뿐이었다. 예전엔 이 상황에서도 "종목, 지역, 제목, 장소, 날짜를
     // 모두 입력해 주세요"라는 고정 문구가 떴다 — 이 테스트가 그 회귀를 잡는다.
-    const ctx = baseCtx({ draft: { ...baseCtx().draft, venue: '', date: '' } });
+    const ctx = baseCtx({ draft: { ...baseCtx().draft, place: null, date: '' } });
     const missing = getTeamMatchMissingFields(ctx);
     const missingFieldNames = missing.map((item) => item.field);
 
-    expect(missingFieldNames).toContain('venue');
+    expect(missingFieldNames).toContain('place');
     expect(missingFieldNames).toContain('date');
     expect(missingFieldNames).not.toContain('hostTeamId');
     expect(missingFieldNames).not.toContain('sportId');
@@ -89,20 +89,20 @@ describe('getTeamMatchMissingFields — 실제 결측 필드만 지목', () => {
 
 describe('getTeamMatchStepErrors — 스텝별 즉시 검증이 다른 스텝 필드를 새지 않는다', () => {
   it('place-time 스텝에서 title 결측 에러를 보여주지 않는다', () => {
-    const ctx = baseCtx({ draft: { ...baseCtx().draft, title: '', venue: '' } });
+    const ctx = baseCtx({ draft: { ...baseCtx().draft, title: '', place: null } });
     const placeTimeErrors = getTeamMatchStepErrors(ctx, 'place-time');
     const infoErrors = getTeamMatchStepErrors(ctx, 'info');
 
-    expect(placeTimeErrors.venue).toBeDefined();
+    expect(placeTimeErrors.place).toBeDefined();
     expect(placeTimeErrors.title).toBeUndefined();
     expect(infoErrors.title).toBeDefined();
-    expect(infoErrors.venue).toBeUndefined();
+    expect(infoErrors.place).toBeUndefined();
   });
 });
 
 describe('getCompleteTeamMatchSteps — CreateProgress 체크 배지 판정', () => {
   it('필수 필드를 채운 스텝만 완료로 표시한다', () => {
-    const ctx = baseCtx({ draft: { ...baseCtx().draft, venue: '' } });
+    const ctx = baseCtx({ draft: { ...baseCtx().draft, place: null } });
     const complete = getCompleteTeamMatchSteps(ctx, ['team', 'sport', 'info', 'condition', 'place-time']);
 
     expect(complete).toEqual(expect.arrayContaining(['team', 'sport', 'info', 'condition']));
@@ -126,7 +126,7 @@ describe('firstIncompleteTeamMatchStep — 진행 표시줄 클릭 이동 가드
     // info로 가려는 클릭은 그 앞 단계(team/sport)만 검사하면 된다 — venue는
     // place-time 스텝의 필드라 검사 범위 밖이고, 비어 있어도 이 판정을 막지 않는다.
     // (범위를 place-time까지 넓히면 같은 ctx가 'place-time'을 반환한다 — 위 105행 케이스.)
-    const ctx = baseCtx({ draft: { ...baseCtx().draft, venue: '' } });
+    const ctx = baseCtx({ draft: { ...baseCtx().draft, place: null } });
     expect(firstIncompleteTeamMatchStep(ctx, ['team', 'sport'])).toBeNull();
   });
 });
@@ -150,11 +150,11 @@ describe('buildTeamMatchPayloadResult — payload | missingFields 분기', () =>
   });
 
   it('결측 필드가 있으면 payload 대신 missingFields를 반환한다', () => {
-    const ctx = baseCtx({ draft: { ...baseCtx().draft, venue: '' } });
+    const ctx = baseCtx({ draft: { ...baseCtx().draft, place: null } });
     const result = buildTeamMatchPayloadResult(ctx.draft, ctx.hostTeamId, ctx.sportId, ctx.regionId);
 
     expect(result.payload).toBeUndefined();
-    expect(result.missingFields?.some((item) => item.field === 'venue')).toBe(true);
+    expect(result.missingFields?.some((item) => item.field === 'place')).toBe(true);
   });
 
   it('모든 필수값이 채워지면 payload를 반환한다', () => {

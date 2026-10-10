@@ -29,6 +29,7 @@ const BRACKET_CANVAS_MESSAGES: Readonly<Record<string, string>> = {
   FIXTURE_CANCELLED: '취소된 경기는 팀을 바꿀 수 없어요.',
   TEAM_CHANGE_REASON_REQUIRED: '시작된 경기의 팀을 바꾸려면 사유를 입력해 주세요.',
   LEAGUE_ON_HOLD: '보류 중인 리그라 대진을 바꿀 수 없어요.',
+  LEAGUE_ENDED: '끝났거나 취소된 리그라 대진을 바꿀 수 없어요.',
 };
 
 export function describeBracketCanvasError(err: unknown, fallback: string): string {

@@ -113,6 +113,14 @@ describe('등록이 confirmed 를 벗어날 때 자리 해제', () => {
     expect((await h.prisma.v1TournamentSlot.findUniqueOrThrow({ where: { id: slots[2].id } })).registrationId).toBe(regs[2]);
   });
 
+  it('끝난 리그에서도 등록 취소의 자리 해제는 대진 생성 가드(LEAGUE_ENDED)에 막히지 않는다', async () => {
+    const { leagueId, slots, regs } = await filledLeague();
+    await h.prisma.v1Tournament.update({ where: { id: leagueId }, data: { status: 'completed' } });
+
+    expect((await cancelRegistration(regs[1])).status).toBe(200);
+    expect((await h.prisma.v1TournamentSlot.findUniqueOrThrow({ where: { id: slots[1].id } })).registrationId).toBeNull();
+  });
+
   it('보류 리그에서도 참가팀 제외는 지금처럼 된다 — 자리 해제가 대진 생성 가드(LEAGUE_ON_HOLD)에 막히지 않는다', async () => {
     const { leagueId, teams, slots } = await filledLeague();
     await h.prisma.v1Tournament.update({ where: { id: leagueId }, data: { status: 'on_hold' } });

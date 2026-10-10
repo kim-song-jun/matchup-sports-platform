@@ -30,6 +30,9 @@ import {
 import { resolveTournamentImage } from '@/lib/tournament-promo';
 import { TournamentDatetimeField } from '@/components/admin/tournaments/tournament-datetime-field';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
+import type { PlaceValue } from '@/lib/place';
+import { PlacePicker } from '@/components/v1-ui/place-picker';
+import { PLACE_NAME_MAX_LENGTH } from '@/lib/place';
 import { revealWizardControl, revealWizardStage } from './wizard-stage-viewport';
 import { TournamentCard } from '@/app/tournaments/tournament-card';
 import {
@@ -119,7 +122,7 @@ export default function AdminTournamentsNewPage() {
       keyof TournamentCreateState,
       'step' | 'prizeRows' | 'promoHome' | 'promoList'
     >,
-    value: string | boolean | null,
+    value: string | boolean | PlaceValue | null,
   ) => {
     dispatch({ type: 'set-field', field, value } as TournamentCreateAction);
     clearError(field);
@@ -446,7 +449,7 @@ export default function AdminTournamentsNewPage() {
                 onPromoUpload={handlePromoUpload}
                 fallback={{
                   title: state.title.trim() || '새 대회',
-                  venue: state.venue.trim() || null,
+                  venue: state.venue?.name ?? null,
                   sportName: selectedSport?.name ?? null,
                 }}
               />
@@ -631,7 +634,7 @@ type SetField = (
     keyof TournamentCreateState,
     'step' | 'prizeRows' | 'promoHome' | 'promoList'
   >,
-  value: string | boolean | null,
+  value: string | boolean | PlaceValue | null,
 ) => void;
 
 type SportOption = {
@@ -849,17 +852,15 @@ function ScheduleStep({
           hint="비워 두면 따로 마감하지 않아요. 정하면 신청 마감과 같거나 그 뒤여야 해요."
         />
       </div>
-      <Field id="venue" label="장소" hint="입력한 장소는 서버에서 지도 좌표를 찾아 저장해요.">
-        <input
-          id="venue"
-          value={state.venue}
-          onChange={(event) => setField('venue', event.target.value)}
-          disabled={pending}
-          maxLength={200}
-          placeholder="예: 서울월드컵경기장 보조구장"
-          className={inputClass}
-        />
-      </Field>
+      <PlacePicker
+        maxLength={PLACE_NAME_MAX_LENGTH.tournament}
+        id="venue"
+        label="장소"
+        value={state.venue}
+        onChange={(place) => setField('venue', place)}
+        disabled={pending}
+        placeholder="예: 서울월드컵경기장 보조구장"
+      />
     </div>
   );
 }

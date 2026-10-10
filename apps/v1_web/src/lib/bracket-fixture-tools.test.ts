@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { makeFixture, makeGame, makeGroup } from '@/test/bracket-canvas-fixtures';
 import type { V1AdminBracketResult } from '@/types/api';
-import { bracketSourceCandidates, knockoutRoundLabel, nextFixtureNumber } from './bracket-fixture-tools';
+import { bracketSourceCandidates, knockoutRoundLabel } from './bracket-fixture-tools';
 
 describe('knockoutRoundLabel', () => {
   it.each([
@@ -17,16 +17,6 @@ describe('knockoutRoundLabel', () => {
 
   it('조별리그 단계는 null — 캔버스에서 경기를 추가하지 않는다', () => {
     expect(knockoutRoundLabel('group')).toBeNull();
-  });
-});
-
-describe('nextFixtureNumber', () => {
-  it('가장 큰 번호 다음 번호를 돌려준다(번호가 비어 있어도 최대값 기준)', () => {
-    expect(nextFixtureNumber([{ fixtureNumber: 1 }, { fixtureNumber: 7 }, { fixtureNumber: 3 }])).toBe(8);
-  });
-
-  it('경기가 없으면 1', () => {
-    expect(nextFixtureNumber([])).toBe(1);
   });
 });
 

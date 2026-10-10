@@ -1,4 +1,4 @@
-import type { V1AdminBracketFixtureGame, V1AdminBracketSlot } from './api';
+import type { V1AdminBracketFixtureGame, V1AdminBracketSlot, V1PlaceSnapshotPayload, V1PlaceView, V1VenueSnapshotPayload } from './api';
 
 export interface V1AdminLeagueListItem {
   leagueId: string;
@@ -121,6 +121,7 @@ export interface V1LeagueFixture {
   placeName: string;
   /** 어드민 상세(V1AdminLeagueDetail)에서만 채워진다 — 공개 상세(V1PublicLeagueDetail)는 미포함. */
   placeAddress?: string | null;
+  place?: V1PlaceView | null;
   status: string;
   /**
    * 결과 진행 단계 — 어드민 상세에서만 채워진다. 팀매치 `status`(matched/cancelled)와는
@@ -184,7 +185,7 @@ export interface V1AdminLeagueDetail {
    * 생성 폼의 "기본 장소" 추천 칩에 쓴다. 대진이 이미 있으면 서버가 빈 배열을 준다.
    * public 조회(V1PublicLeagueDetail)에는 없어서 optional.
    */
-  recentVenues?: string[];
+  recentVenues?: V1PlaceView[];
   /**
    * 리그 시작일(ISO). **대진 일정 폼이 요일을 날짜 목록으로 전개하는 기준일이다** —
    * 서버는 요일을 모르고 `schedule.dates` 를 받으므로(Task 164 BE-2) 화면이 직접 펼친다.
@@ -205,6 +206,8 @@ export interface V1AdminLeagueDetail {
   /** 대표 이미지의 종목 그래픽 폴백(`CompetitionThumbnail`)에 쓴다. */
   sportCode: string;
   coverImageUrl: string | null;
+  /** 리그 기본 장소(새 경기가 상속한다). 경기 상세의 "이 경기만 장소가 달라요" 판정 기준이다. */
+  defaultPlace?: V1PlaceView | null;
   entryFee: number;
   /** 참가비를 운영자가 확정한 시각. `null` = 미설정(0원 '무료 확정'과 다르다). */
   entryFeeConfiguredAt: string | null;
@@ -318,6 +321,16 @@ export interface V1UpdateLeagueCoverImageResult {
   alreadyProcessed: boolean;
 }
 
+/** `null` venue = 기본 장소 지우기. 이미 만든 경기는 바뀌지 않는다. */
+export interface V1UpdateLeagueVenuePayload extends V1VenueSnapshotPayload {
+  venue: string | null;
+}
+
+export interface V1UpdateLeagueVenueResult {
+  leagueId: string;
+  defaultPlace: V1PlaceView | null;
+}
+
 export interface V1CreateLeaguePayload {
   title: string;
   sportId: string;
@@ -358,12 +371,13 @@ export interface V1LeagueFixtureTimingPayload {
   gamesPerTeamPerDay?: number;
 }
 
-export interface V1GenerateLeagueFixturesPayload {
+export interface V1GenerateLeagueFixturesPayload extends V1PlaceSnapshotPayload {
   weeksCount: number;
   /** 지정하지 않으면 시작일 그대로(자정) 매주 반복하는 기존 동작을 유지한다. */
   schedule?: V1LeagueFixtureScheduleTemplate;
   /** 지정하지 않으면 서버 기본값('장소 미정')을 사용한다. */
   placeName?: string;
+  placeAddress?: string;
   /** 지정하지 않으면 기존 동작(같은 주차 전 경기 동일 시각·endAt 없음)을 유지한다. */
   timing?: V1LeagueFixtureTimingPayload;
 }
@@ -502,7 +516,7 @@ export interface V1RegenerateLeagueFixturesResult {
   warnings: V1LeagueFixtureWarning[];
 }
 
-export interface V1UpdateLeagueFixturePayload {
+export interface V1UpdateLeagueFixturePayload extends V1PlaceSnapshotPayload {
   startsAt?: string;
   placeName?: string;
   placeAddress?: string;
@@ -513,6 +527,7 @@ export interface V1UpdateLeagueFixtureResult {
   startAt: string;
   placeName: string;
   placeAddress: string | null;
+  place?: V1PlaceView | null;
 }
 
 export interface V1LeagueStandingRow {
@@ -679,7 +694,7 @@ export interface V1OpenLeagueRegistrationResult {
 }
 
 /** 수동 대진 한 경기 — `POST /admin/league-matches/:leagueId/fixtures/manual` */
-export interface V1CreateManualLeagueFixturePayload {
+export interface V1CreateManualLeagueFixturePayload extends V1PlaceSnapshotPayload {
   homeTeamId: string;
   awayTeamId: string;
   /** ISO. 서버가 `@IsDateString` 로 받는다. */
@@ -690,11 +705,12 @@ export interface V1CreateManualLeagueFixturePayload {
    */
   durationMinutes?: number;
   placeName?: string;
+  placeAddress?: string;
   title?: string;
 }
 
 /** `POST /admin/league-matches/:leagueId/fixtures/template` */
-export interface V1ApplyLeagueTemplatePayload {
+export interface V1ApplyLeagueTemplatePayload extends V1PlaceSnapshotPayload {
   /** 3~20. */
   teamCount: number;
   legs: 1 | 2;
@@ -702,6 +718,7 @@ export interface V1ApplyLeagueTemplatePayload {
   schedule: V1LeagueFixtureScheduleTemplate;
   /** 모든 경기의 기본 장소. 비우면(키 없음) 서버가 '장소 미정' 을 쓴다. */
   placeName?: string;
+  placeAddress?: string;
   /** 경기가 이미 있는 리그를 새 템플릿으로 바꿀 때만 true. */
   replaceExisting?: boolean;
 }

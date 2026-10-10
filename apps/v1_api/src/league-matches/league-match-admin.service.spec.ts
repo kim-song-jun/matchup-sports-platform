@@ -68,7 +68,7 @@ interface FakeState {
   /** 수동 대진의 주차 파생이 읽는 형제 대진 시작 시각. 테스트가 갈아끼운다. */
   siblingStartAts: Date[];
   /** `v1TeamMatch.create` 에 실린 data — 제목·시각·장소를 그대로 본다. */
-  teamMatchCreates: Array<{ title: string; startAt: Date; endAt?: Date; placeName: string }>;
+  teamMatchCreates: Array<{ title: string; startAt: Date; endAt?: Date; placeName: string; placeAddress?: string | null; placeLatitude?: number | null; placeLongitude?: number | null; placeProvider?: string | null; placeProviderId?: string | null }>;
   /** 자동 승인 신청서에 실린 data — 어드민 화면에 그대로 노출되는 문구를 본다. */
   applicationCreates: Array<{ message: string; status: string }>;
   /** 잠금 뒤 재조회가 보는 **커밋된** 로스터. 기본은 등록된 두 팀. */
@@ -79,6 +79,8 @@ interface FakeState {
   rosterSyncTeamIds: string[];
   /** The league row's own config version; the sport-wide default is `config-1`. */
   leagueConfigId: string | null;
+  /** 리그(거울 대회 행)의 기본 장소 칸. null 이면 기본 장소 없음. */
+  leagueVenue: Record<string, unknown> | null;
 }
 
 /** 리그에 등록된 두 팀 — 기존 스펙이 멤버십 이름으로 사이드 배정을 단언하므로 고정한다. */
@@ -97,6 +99,7 @@ function createFake() {
     registeredTeamIds: new Set(['team-a', 'team-b']),
     rosterPlayers: new Map(),
     leagueConfigId: 'config-1',
+    leagueVenue: null,
   };
   let seq = 0;
   let createdGameId: string | null = null;
@@ -133,6 +136,7 @@ function createFake() {
         // 이 스펙 12건이 그렇게 깨졌다. 실제 select 는 이 필드를 읽으므로 fake 도 준다.
         registrationDeadlineAt: null,
         competitionConfigVersionId: state.leagueConfigId,
+        ...(state.leagueVenue ?? {}),
         sport: { code: 'futsal' },
         registrations: [{ teamId: 'team-a' }, { teamId: 'team-b' }],
       })),
@@ -739,9 +743,68 @@ describe('LeagueMatchAdminService.generateFixtures — 자동 로스터와 신�
       expect(state.teamMatchCreates[0].endAt).toBeUndefined();
     });
 
-    it('장소 미지정·공백은 "장소 미정" 으로 — 일괄 생성과 같은 규칙', async () => {
+    it('장소 미지정·공백이고 리그 기본 장소도 없으면 "장소 미정" + 좌표 없음', async () => {
       await service.createManualFixture(adminUser, 'league-1', { ...manual, placeName: '  ' });
-      expect(state.teamMatchCreates[0].placeName).toBe('장소 미정');
+      expect(state.teamMatchCreates[0]).toMatchObject({
+        placeName: '장소 미정', placeAddress: null, placeLatitude: null, placeLongitude: null, placeProvider: null, placeProviderId: null,
+      });
+    });
+
+    it('장소 이름이 비면 리그 기본 장소 스냅샷을 그대로 상속한다', async () => {
+      state.leagueVenue = {
+        venue: '상암 풋살파크', venueAddress: '서울 마포구 월드컵로 240', latitude: 37.57, longitude: 126.89, venueProvider: 'kakao', venueProviderId: '555',
+      };
+      await service.createManualFixture(adminUser, 'league-1', { ...manual });
+      expect(state.teamMatchCreates[0]).toMatchObject({
+        placeName: '상암 풋살파크', placeAddress: '서울 마포구 월드컵로 240', placeLatitude: 37.57, placeLongitude: 126.89, placeProvider: 'kakao', placeProviderId: '555',
+      });
+    });
+
+    it('경기가 직접 고른 장소는 리그 기본 장소를 덮어쓴다', async () => {
+      state.leagueVenue = {
+        venue: '상암 풋살파크', venueAddress: '서울 마포구 월드컵로 240', latitude: 37.57, longitude: 126.89, venueProvider: 'kakao', venueProviderId: '555',
+      };
+      await service.createManualFixture(adminUser, 'league-1', {
+        ...manual, placeName: '망원 풋살장', placeAddress: '서울 마포구 망원로 1', placeLatitude: 37.55, placeLongitude: 126.9, placeProvider: 'kakao', placeProviderId: '777',
+      });
+      expect(state.teamMatchCreates[0]).toMatchObject({
+        placeName: '망원 풋살장', placeAddress: '서울 마포구 망원로 1', placeLatitude: 37.55, placeLongitude: 126.9, placeProvider: 'kakao', placeProviderId: '777',
+      });
+    });
+
+    it('이름만 직접 입력하면 리그 기본 장소의 좌표를 따라 붙이지 않는다', async () => {
+      state.leagueVenue = {
+        venue: '상암 풋살파크', venueAddress: '서울 마포구 월드컵로 240', latitude: 37.57, longitude: 126.89, venueProvider: 'kakao', venueProviderId: '555',
+      };
+      await service.createManualFixture(adminUser, 'league-1', { ...manual, placeName: '동네 운동장' });
+      expect(state.teamMatchCreates[0]).toMatchObject({
+        placeName: '동네 운동장', placeLatitude: null, placeLongitude: null, placeProvider: null, placeProviderId: null,
+      });
+    });
+
+    it('경기 수정에서 이름 없이 주소만 오면 PLACE_NAME_REQUIRED 로 거부한다(옛 핀과 새 주소가 섞이지 않게)', async () => {
+      await expect(
+        service.updateFixture(adminUser, 'league-1', 'tm-1', { placeAddress: '서울 마포구 다른 주소 1' }),
+      ).rejects.toMatchObject({ response: { code: 'PLACE_NAME_REQUIRED' } });
+      expect(state.calls).not.toContain('v1TeamMatch.update');
+    });
+
+    it('좌표 일부만 보내면 PLACE_SNAPSHOT_INCOMPLETE 로 거부하고 경기를 만들지 않는다', async () => {
+      await expect(
+        service.createManualFixture(adminUser, 'league-1', { ...manual, placeName: '망원', placeLatitude: 37.5 }),
+      ).rejects.toMatchObject({ response: { code: 'PLACE_SNAPSHOT_INCOMPLETE' } });
+      expect(state.teamMatchCreates).toHaveLength(0);
+    });
+
+    it('일괄 생성도 빈 장소 이름이면 리그 기본 장소를 모든 경기에 상속한다', async () => {
+      state.leagueVenue = {
+        venue: '상암 풋살파크', venueAddress: null, latitude: 37.57, longitude: 126.89, venueProvider: 'kakao', venueProviderId: '555',
+      };
+      await service.generateFixtures(adminUser, 'league-1', { weeksCount: 1 });
+      expect(state.teamMatchCreates.length).toBeGreaterThan(0);
+      for (const created of state.teamMatchCreates) {
+        expect(created).toMatchObject({ placeName: '상암 풋살파크', placeLatitude: 37.57, placeProviderId: '555' });
+      }
     });
 
     it('이 리그에 등록되지 않은 팀은 422 로 거부하고 아무것도 만들지 않는다', async () => {
@@ -973,6 +1036,7 @@ describe('LeagueMatchAdminService.removeTeam — 대진 취소 알림과 제외 
       // removeTeam은 트랜잭션 밖에서 한 번(초기 게이트 판정), 락을 잡은 트랜잭션 안에서
       // 다시 한 번(TOCTOU 재검증, :517) 같은 조건으로 대진을 읽는다 — 둘 다 이 목록을 본다.
       v1TeamMatch: {
+        updateMany: jest.fn().mockResolvedValue({ count: 0 }),
         findMany: jest.fn().mockResolvedValue(fixtures),
         update: jest.fn().mockResolvedValue({}),
       },
@@ -1110,6 +1174,7 @@ describe('LeagueMatchAdminService.regenerateFixtures — 진행 중 경기 (W4-V
         findUnique: jest.fn().mockResolvedValue({ periods: [] }),
       },
       v1TeamMatch: {
+        updateMany: jest.fn().mockResolvedValue({ count: 0 }),
         findMany: jest.fn().mockResolvedValue([
           {
             id: 'fixture-1',
@@ -1158,6 +1223,7 @@ describe('LeagueMatchAdminService.cancelFixture — 진행 중 경기의 대진 
   function makePrisma(gameState: string) {
     const prisma: any = {
       v1TeamMatch: {
+        updateMany: jest.fn().mockResolvedValue({ count: 0 }),
         findFirst: jest.fn().mockResolvedValue({
           id: FIXTURE_ID,
           leagueId: LEAGUE_ID,
@@ -1214,6 +1280,62 @@ describe('LeagueMatchAdminService.cancelFixture — 진행 중 경기의 대진 
     expect(prisma.v1TeamMatch.update).toHaveBeenCalledWith(
       expect.objectContaining({ where: { id: FIXTURE_ID }, data: expect.objectContaining({ status: 'cancelled' }) }),
     );
+  });
+});
+
+describe('LeagueMatchAdminService.cancelFixture - 반쪽 경기의 홈 팀 비우기', () => {
+  const LEAGUE_ID = 'league-1';
+  const FIXTURE_ID = 'fixture-1';
+
+  /** updateMany 의 where(awaySlotId not null · approvedApplicantTeamId null)를 저장된 행에 실제로 적용하는 인메모리 행. */
+  async function cancelWith(row: { hostTeamId: string; approvedApplicantTeamId: string | null; awaySlotId: string | null }) {
+    const stored: Record<string, unknown> = { id: FIXTURE_ID, leagueId: LEAGUE_ID, status: 'matched', title: 't', homeSlotId: 'slot-h', ...row };
+    const prisma: any = {
+      v1TeamMatch: {
+        findFirst: jest.fn().mockImplementation(async () => ({ ...stored })),
+        update: jest.fn().mockImplementation(async ({ data }: { data: Record<string, unknown> }) => Object.assign(stored, data)),
+        updateMany: jest.fn().mockImplementation(async ({ where, data }: { where: Record<string, any>; data: Record<string, unknown> }) => {
+          const matches =
+            where.id === stored.id &&
+            (where.awaySlotId?.not === null ? stored.awaySlotId !== null : true) &&
+            (where.approvedApplicantTeamId === null ? stored.approvedApplicantTeamId === null : true);
+          if (matches) Object.assign(stored, data);
+          return { count: matches ? 1 : 0 };
+        }),
+        count: jest.fn().mockResolvedValue(0),
+      },
+      v1Tournament: { findFirst: jest.fn().mockResolvedValue({ id: LEAGUE_ID, status: 'draft' }) },
+      v1TeamMatchApplication: { updateMany: jest.fn().mockResolvedValue({ count: 0 }) },
+      v1TeamSchedule: { findMany: jest.fn().mockResolvedValue([]) },
+      v1TeamMembership: { findMany: jest.fn().mockResolvedValue([]) },
+      $queryRaw: jest.fn().mockImplementation(async (strings: TemplateStringsArray) =>
+        strings.join('?').includes('v1_games') ? [{ state: 'SCHEDULED' }] : [{ id: LEAGUE_ID }],
+      ),
+      $executeRaw: jest.fn().mockResolvedValue(1),
+    };
+    prisma.$transaction = async (fn: (tx: unknown) => Promise<unknown>) => fn(prisma);
+    const adminContext = {
+      getMutationAdmin: jest.fn().mockResolvedValue({ id: 'admin-row-1', userId: adminUser.id, adminRole: 'ops' }),
+      logAdminAction: jest.fn().mockResolvedValue(undefined),
+    };
+    const service = new LeagueMatchAdminService(prisma, adminContext as any, {} as any, { emitToManyDeferred: jest.fn() } as any);
+    await service.cancelFixture(adminUser, LEAGUE_ID, FIXTURE_ID, { reason: '우천' });
+    return stored;
+  }
+
+  it('원정 자리가 비어 있던 반쪽 경기는 취소하면 홈 팀도 비워 공개 게이트의 취소 절이 가리게 한다', async () => {
+    const stored = await cancelWith({ hostTeamId: 'team-a', approvedApplicantTeamId: null, awaySlotId: 'slot-a' });
+    expect(stored).toMatchObject({ status: 'cancelled', hostTeamId: null });
+  });
+
+  it('대조군: 다 찬 자리 경기는 홈·원정 팀을 그대로 둔다', async () => {
+    const stored = await cancelWith({ hostTeamId: 'team-a', approvedApplicantTeamId: 'team-b', awaySlotId: 'slot-a' });
+    expect(stored).toMatchObject({ status: 'cancelled', hostTeamId: 'team-a', approvedApplicantTeamId: 'team-b' });
+  });
+
+  it('대조군: 자리 없는 기존 경기(원정 null)는 홈 팀을 그대로 둔다', async () => {
+    const stored = await cancelWith({ hostTeamId: 'team-a', approvedApplicantTeamId: null, awaySlotId: null });
+    expect(stored).toMatchObject({ status: 'cancelled', hostTeamId: 'team-a' });
   });
 });
 
@@ -1381,6 +1503,18 @@ describe('LeagueMatchAdminService.detail — 참가비·대표 이미지 필드'
       entryFeeConfiguredAt: configuredAt.toISOString(), bankName: '국민은행', bankAccount: '123-456-789012',
       bankHolder: '팀밋', activeRegistrationCount: 3,
     });
+  });
+
+  it('리그 기본 장소를 defaultPlace 로 내리고 장소가 없으면 null 이다', async () => {
+    const { result } = await detailOf({
+      venue: '탄천 풋살장', venueAddress: '경기 성남시', latitude: 37.4, longitude: 127.1,
+      venueProvider: 'kakao', venueProviderId: '12345',
+    }, 0);
+    expect(result.defaultPlace).toEqual({
+      name: '탄천 풋살장', address: '경기 성남시', latitude: 37.4, longitude: 127.1,
+      provider: 'kakao', providerPlaceId: '12345',
+    });
+    expect((await detailOf({ venue: null }, 0)).result.defaultPlace).toBeNull();
   });
 
   it('대조: 미설정 리그는 설정 시각이 null 이고 0원이다(무료 확정과 구분된다)', async () => {

@@ -190,19 +190,20 @@ function matchEventStatusOf(status: string): string | null {
 }
 
 /**
- * 장소는 구장 이름과 구 단위 지역까지만 싣는다. 상세 주소(`place.addressText`)는 화면에
- * 보이더라도 호스트가 적은 집·직장 주소일 수 있어 기계가 긁어 가는 필드로 내보내지 않는다.
+ * 장소는 구장 이름과 구 단위 지역까지만 싣는다. 상세 주소(`place.address`)와 좌표는 화면에
+ * 보이더라도 호스트가 적은 집·직장 위치일 수 있어 기계가 긁어 가는 필드로 내보내지 않는다.
  * 지역 표기는 상세 화면과 같은 우선순위(`region.name` → `regionName`)를 쓴다.
  */
 function matchPlaceNode(match: V1Match): JsonLdNode | null {
   const venue = (match.place?.name ?? match.placeName)?.trim();
   const region = (match.region?.name ?? match.regionName)?.trim();
   if (!venue && !region) return null;
-  return {
+  const place: JsonLdNode = {
     '@type': 'Place',
     name: venue || region,
     address: { '@type': 'PostalAddress', addressCountry: 'KR', ...(region ? { addressLocality: region } : {}) },
   };
+  return place;
 }
 
 /**

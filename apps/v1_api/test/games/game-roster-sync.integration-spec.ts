@@ -674,7 +674,7 @@ describe('경기 명단 계산 동기화 (Task 179)', () => {
           regionId,
           competitionConfigId: config!.id,
           title: `명단 계산 ${key}`,
-          placeName: '테스트 구장',
+          place: { name: '테스트 구장', address: null, latitude: null, longitude: null, provider: null, providerPlaceId: null },
           startAt: new Date(Date.now() + days * DAY),
           endAt: null,
           home: teams.get(teamA.id)!,

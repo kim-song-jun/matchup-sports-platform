@@ -3,11 +3,12 @@
 import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { resultReviewKeys } from '@/hooks/use-tournament-result-review';
 import { v1Get, v1Patch, v1Post, v1Put } from '@/lib/api-client';
-import { v1Keys } from '@/lib/query-keys';
+import { leagueViewKeys, v1Keys } from '@/lib/query-keys';
 import { randomUuid } from '@/lib/uuid';
 import type {
   V1ApplyBracketTemplatePayload,
   V1ApplyBracketTemplateResult,
+  V1AdminBracketFixture,
   V1AssignSlotResult,
   V1QuickResultResult,
   V1QuickResultScore,
@@ -22,11 +23,11 @@ import type {
 
 export type BracketCompetitionScope = 'tournament' | 'league';
 
-/** 대진이 바뀌면 어드민 화면과 공개 화면 캐시를 같이 털어야 한다. 리그는 상세 키 하나가 전부다. */
+/** 대진이 바뀌면 어드민 화면과 공개 화면 캐시를 같이 털어야 한다. */
 function invalidateCompetitionViews(queryClient: QueryClient, competitionId: string, scope: BracketCompetitionScope) {
   const keys =
     scope === 'league'
-      ? [v1Keys.adminLeagueMatch(competitionId)]
+      ? leagueViewKeys(competitionId)
       : [v1Keys.adminTournamentBracket(competitionId), v1Keys.tournament(competitionId)];
   return Promise.all(keys.map((queryKey) => queryClient.invalidateQueries({ queryKey })));
 }
@@ -107,19 +108,23 @@ export function useV1SetBracketSources(tournamentId: string) {
   });
 }
 
+/** `POST /admin/tournaments/:id/fixtures` — 번호는 서버가 대회 안의 최대 번호 다음으로 정한다. */
+export function useV1AddBracketFixture(tournamentId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ groupId, round }: { groupId: string; round: string }) =>
+      v1Post<V1AdminBracketFixture>(`/admin/tournaments/${tournamentId}/fixtures`, { groupId, round }),
+    onSuccess: () => invalidateCompetitionViews(queryClient, tournamentId, 'tournament'),
+  });
+}
+
 /** 정규 리그 템플릿으로 빈 경기·자리를 한 번에 만든다. */
 export function useV1ApplyLeagueTemplate(leagueId: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (body: V1ApplyLeagueTemplatePayload) =>
       v1Post<V1ApplyLeagueTemplateResult>(`/admin/league-matches/${encodeURIComponent(leagueId)}/fixtures/template`, body),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: v1Keys.adminLeagueMatch(leagueId) });
-      queryClient.invalidateQueries({ queryKey: v1Keys.adminLeagueMatchList() });
-      queryClient.invalidateQueries({ queryKey: v1Keys.leagueMatches() });
-      queryClient.invalidateQueries({ queryKey: v1Keys.leagueMatch(leagueId) });
-      queryClient.invalidateQueries({ queryKey: v1Keys.tournament(leagueId) });
-    },
+    onSuccess: () => invalidateCompetitionViews(queryClient, leagueId, 'league'),
   });
 }
 

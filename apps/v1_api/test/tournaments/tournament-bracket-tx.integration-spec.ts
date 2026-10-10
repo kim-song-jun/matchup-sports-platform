@@ -1,4 +1,5 @@
 import { PrismaService } from '../../src/prisma/prisma.service';
+import { TOURNAMENT_VENUE_SELECT } from '../../src/places/tournament-venue';
 import { AdminContextService } from '../../src/common/admin-context.service';
 import { OperationAuditWriterService } from '../../src/common/audit/operation-audit-writer.service';
 import { GamesService } from '../../src/games/games.service';
@@ -104,7 +105,7 @@ describe('대진 …InTx 함수 (PostgreSQL)', () => {
       groupId = (await bracket.createGroup(user, ids.tournamentId, { name: 'empty-fixtures', phase: 'group' })).id;
       const row = await findTournamentOnSurface(prisma, TOURNAMENT_KINDS, {
         where: { id: ids.tournamentId },
-        select: { id: true, sportId: true, regionId: true, venue: true, title: true, competitionConfigVersionId: true },
+        select: { id: true, sportId: true, regionId: true, title: true, competitionConfigVersionId: true, ...TOURNAMENT_VENUE_SELECT },
       });
       if (!row?.competitionConfigVersionId) throw new Error('fixture tournament has no competition config');
       tournamentInfo = { ...row, competitionConfigVersionId: row.competitionConfigVersionId };
@@ -158,6 +159,8 @@ describe('대진 …InTx 함수 (PostgreSQL)', () => {
       await expect(bracket.updateFixture(user, id, { homeRegistrationId: reg0 })).rejects.toMatchObject({ response: { code: 'SLOT_LINKED' } });
       expect((await prisma.v1TeamMatch.findUniqueOrThrow({ where: { id } })).hostTeamId).toBeNull();
 
+      // reg1 은 시드 A조 편성에 있다 — empty-fixtures 조에 넣으려면 먼저 뗀다(한 팀 한 조).
+      await prisma.v1TournamentGroupTeam.deleteMany({ where: { groupId: ids.groupId, registrationId: reg1 } });
       await bracket.updateFixture(user, id, { awayRegistrationId: reg1 });
       expect((await prisma.v1TournamentMatchDetails.findUniqueOrThrow({ where: { teamMatchId: id } })).awayRegistrationId).toBe(reg1);
     });

@@ -24,6 +24,7 @@ describe('describeBracketCanvasError', () => {
     ['GROUP_HAS_SLOTS', '자리가 남아 있는 조는 지울 수 없어요. 자리를 먼저 비워 주세요.'],
     ['IDEMPOTENCY_PAYLOAD_CONFLICT', '같은 요청이 다른 내용으로 이미 처리됐어요. 새로고침한 뒤 다시 시도해 주세요.'],
     ['LEAGUE_ON_HOLD', '보류 중인 리그라 대진을 바꿀 수 없어요.'],
+    ['LEAGUE_ENDED', '끝났거나 취소된 리그라 대진을 바꿀 수 없어요.'],
   ])('%s 는 정해 둔 해요체 문구로 바꾼다', (code, expected) => {
     expect(describeBracketCanvasError(apiError(code), '실패했어요.')).toBe(expected);
   });

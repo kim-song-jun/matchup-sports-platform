@@ -28,7 +28,7 @@ const DATES = [
 function teamMatch(startsAt: string): V1TeamMatch {
   return { id: MATCH_ID, teamMatchId: MATCH_ID, title: 'UTC 경계 친선전',
     sportName: '풋살', sport: { sportId: 'futsal', name: '풋살' },
-    placeName: '합성 경기장', place: { name: '합성 경기장' },
+    placeName: '합성 경기장', place: { name: '합성 경기장', address: null, latitude: null, longitude: null, provider: null, providerPlaceId: null },
     hostTeam: { teamId: 'host-team', name: '현재 경기의 팀' },
     startsAt, endsAt: '2026-10-10T14:59:00.000Z', capacityText: '2/12', status: 'recruiting',
     imageUrl: '/uploads/current-match.webp', listImageUrl: '/uploads/current-list.webp' };

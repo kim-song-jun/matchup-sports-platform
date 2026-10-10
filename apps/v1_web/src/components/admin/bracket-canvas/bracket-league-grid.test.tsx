@@ -72,9 +72,16 @@ describe('BracketLeagueGrid', () => {
   it('옛 데이터는 경기 번호 순서로 나눴다는 안내를 보이고, 번호가 있으면 보이지 않는다', () => {
     const legacy = fixtures.map((f) => ({ ...f, round: '조별 리그' }));
     const { unmount } = render(<BracketLeagueGrid {...{ groups: [gA, gB], fixtures: legacy, slots: [], selectedFixtureId: null, pendingRegistrationId: null, canWrite: true, onSelectFixture: vi.fn(), onAssignSlot: vi.fn(), onAssignDirect: vi.fn() }} />);
-    expect(screen.getByText('라운드 정보가 없어 경기 번호 순서로 나눴어요.')).toBeInTheDocument();
+    expect(screen.getByText('라운드 정보가 없는 경기는 경기 번호 순서로 나눴어요.')).toBeInTheDocument();
     unmount();
     renderGrid();
     expect(screen.queryByText(/경기 번호 순서로 나눴어요/)).not.toBeInTheDocument();
+  });
+
+  it('옛 경기와 번호 경기가 섞이면 같은 줄에 합쳐 보이고 안내는 유지한다', () => {
+    const mixed = fixtures.map((f) => (f.id === 'a1' ? { ...f, round: '조별 리그' } : f));
+    render(<BracketLeagueGrid {...{ groups: [gA, gB], fixtures: mixed, slots: [], selectedFixtureId: null, pendingRegistrationId: null, canWrite: true, onSelectFixture: vi.fn(), onAssignSlot: vi.fn(), onAssignDirect: vi.fn() }} />);
+    expect(screen.getAllByRole('heading', { level: 4 }).map((h) => h.textContent)).toEqual(['1라운드', '2라운드']);
+    expect(screen.getByText('라운드 정보가 없는 경기는 경기 번호 순서로 나눴어요.')).toBeInTheDocument();
   });
 });

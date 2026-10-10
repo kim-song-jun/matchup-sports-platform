@@ -5,7 +5,7 @@ import { buildPageInfo } from '../common/pagination/page-args';
 import type { V1AuthUser } from '../auth/v1-auth-user';
 import { TournamentStaffAccessService } from './staff/tournament-staff-access.service';
 import { presentTournamentCard } from './tournament-card.presenter';
-import { sortTournamentListRows } from './tournament-list-order';
+import { countTournamentList, listTournamentIds } from './tournament-list-query';
 import {
   isPubliclyListedRegistration,
   presentTournamentDetail,
@@ -13,11 +13,9 @@ import {
 } from './tournament-detail.presenter';
 import { TournamentListQueryDto } from './dto/tournament-read.dto';
 import { leagueProgressOf, magicNumberOf } from './league-progress';
-import { COMPETITION_LIST_SURFACE } from './tournament-surface';
 import {
   findPublicTournamentOnSurface,
   ALL_COMPETITION_KINDS,
-  PUBLIC_TOURNAMENT_VISIBILITY_WHERE,
 } from './tournament-surface-lookup';
 import { hasTournamentFixtureOfficialResult } from './tournament-fixture-official-result';
 import {
@@ -115,55 +113,26 @@ export class TournamentsReadService {
    * - deletedAt=null + status in (open/closed/in_progress/completed)
    * - 각 카드에 confirmedCount(status=confirmed registration 수) 포함
    * - **두 가지 페이지네이션을 동시에 지원한다**: 모바일 무한 스크롤은 `cursor`,
-   *   데스크톱 페이지 번호는 `page`. 둘 다 오면 page 가 이긴다(`resolveListStart`).
+   *   데스크톱 페이지 번호는 `page`. 둘 다 오면 page 가 이긴다(page=1 포함 — cursor 는 무시).
    *   응답의 `nextCursor`/`hasNext` 는 그대로라 기존 호출자는 영향받지 않는다.
    */
   async list(query: TournamentListQueryDto) {
     const limit = query.limit ?? 20;
 
-    const where: Prisma.V1TournamentWhereInput = {
-      // 어느 종류를 담을지는 **표가 정한다**(`COMPETITION_LIST_SURFACE`) — 호출부가 조건을
-      // 조립하지 않는다. 기본값 `tournament` 는 지금까지의 동작 그대로다: 리그는 안 나온다.
-      // `kind=all` 로 여는 것은 표면 결정이라 `v1-surface-check` 가 사용처를 세어 묶는다.
-      ...COMPETITION_LIST_SURFACE[query.kind ?? 'tournament'],
-      deletedAt: null,
-      // 명시적으로 status 를 요청해도 **종류 경계는 그대로**다.
-      //
-      // `draft` 는 정규 리그에서만 의미가 있다("예정"). 대회의 `draft` 는 운영자 준비
-      // 중이라 계속 감춘다 — 그래서 `status=draft` 가 와도 **리그로 좁혀서** 적용한다.
-      // 이 한 줄이 없으면 `?status=draft` 하나로 대회 비공개가 통째로 열린다.
-      //
-      // 다른 값(open/closed/in_progress/completed)은 원래 공개 범위라 그대로 쓴다.
-      // ⚠️ `AND` 에 담는다 — 펴 넣으면 위 surface 상수의 `OR` 을 덮는다(그 doc comment 참조).
-      ...(query.status
-        ? query.status === 'draft'
-          ? { AND: [{ kind: V1CompetitionKind.regular_league, status: 'draft' as const }] }
-          : { status: query.status }
-        : { AND: [PUBLIC_COMPETITION_STATUS_WHERE] }),
-      ...(query.sportId ? { sportId: query.sportId } : {}),
-      ...(query.genderCategory ? { genderCategory: query.genderCategory } : {}),
-    };
+    // Only page-number requests need the grand total; infinite scroll just needs "is there a next".
+    const page = query.page !== undefined && query.page > 0 ? query.page : undefined;
+    const wantsPageNumbers = page !== undefined;
 
-    where.AND = [...(Array.isArray(where.AND) ? where.AND : where.AND ? [where.AND] : []), PUBLIC_TOURNAMENT_VISIBILITY_WHERE];
-
-    // 전체 건수는 페이지 번호를 그릴 때만 돌려준다 — 무한 스크롤은 "다음이 있는지"만 알면 된다.
-    const wantsPageNumbers = query.page !== undefined && query.page > 0;
-
-    // The status-group order cannot be expressed as a Prisma `orderBy`, and the public list is
-    // small and bounded, so only the sort keys of every match are read, ordered in memory, and
-    // sliced; the full rows are then loaded for the page ids. `cursor` stays a plain row id.
-    const keyRows = await this.prisma.v1Tournament.findMany({
-      where,
-      select: { id: true, status: true, kind: true, scheduledAt: true, scheduledEndAt: true },
+    // Filtering, group order and paging all run in the database (`tournament-list-query.ts`); only
+    // the page rows (id + resume cursor) come back, and the full rows are loaded for them below.
+    const window = await listTournamentIds(this.prisma, query, {
+      limit,
+      ...(page !== undefined ? { offset: (page - 1) * limit } : { cursor: query.cursor }),
     });
-
-    const orderedIds = sortTournamentListRows(keyRows).map((row) => row.id);
-    // Every matching row's key is already loaded, so the total comes from it rather than a second COUNT.
-    const total = wantsPageNumbers ? orderedIds.length : null;
-    const start = this.resolveListStart(query, limit, orderedIds);
-    const window = start === null ? [] : orderedIds.slice(start, start + limit + 1);
+    const total = wantsPageNumbers ? await countTournamentList(this.prisma, query) : null;
     const hasNext = window.length > limit;
-    const pageIds = hasNext ? window.slice(0, limit) : window;
+    const pageWindow = hasNext ? window.slice(0, limit) : window;
+    const pageIds = pageWindow.map((row) => row.id);
 
     const loaded =
       pageIds.length === 0
@@ -175,7 +144,7 @@ export class TournamentsReadService {
     const byId = new Map(loaded.map((row) => [row.id, row]));
     const pageItems = pageIds.flatMap((id) => byId.get(id) ?? []);
 
-    const nextCursor = hasNext ? (pageIds.at(-1) ?? null) : null;
+    const nextCursor = hasNext ? (pageWindow.at(-1)?.cursor ?? null) : null;
 
     return {
       items: pageItems.map(presentTournamentCard),
@@ -183,19 +152,9 @@ export class TournamentsReadService {
       // 세지 않았으므로 `total: 0`/`totalPages: 0` 을 실어 보내면 "전체 0건"이라는 거짓말이
       // 되고, 커서 클라이언트가 그 값을 읽기 시작하면 조용히 틀린 화면이 나온다.
       pageInfo: wantsPageNumbers
-        ? buildPageInfo({ page: query.page, limit, total, hasNext, nextCursor })
+        ? buildPageInfo({ page, limit, total, hasNext, nextCursor })
         : { nextCursor, hasNext },
     };
-  }
-
-  /** Index of the first row of the requested page; `null` when the cursor no longer matches a row. */
-  private resolveListStart(query: TournamentListQueryDto, limit: number, orderedIds: string[]): number | null {
-    if (query.page && query.page > 1) return (query.page - 1) * limit;
-    if (query.cursor) {
-      const index = orderedIds.indexOf(query.cursor);
-      return index === -1 ? null : index + 1;
-    }
-    return 0;
   }
 
   /**

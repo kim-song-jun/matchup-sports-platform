@@ -17,4 +17,7 @@ export async function assertLeagueFixtureGenerationAllowedInTx(
   if (league.status === 'on_hold') {
     throw new ConflictException({ code: 'LEAGUE_ON_HOLD', message: '보류 중에는 대진을 만들거나 다시 만들 수 없어요. 먼저 보류를 해제해 주세요.' });
   }
+  if (league.status === 'completed' || league.status === 'cancelled') {
+    throw new ConflictException({ code: 'LEAGUE_ENDED', message: '끝났거나 취소된 리그는 대진을 만들거나 바꿀 수 없어요.' });
+  }
 }

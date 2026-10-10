@@ -2,9 +2,9 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useId, type ReactNode } from 'react';
+import { useId, type MouseEvent as ReactMouseEvent, type ReactNode } from 'react';
 import { X } from 'lucide-react';
-import { overlayLinkClick } from '@/lib/overlay-history';
+import { closeOverlayThenNavigate, overlayLinkClick } from '@/lib/overlay-history';
 import { useModalA11y } from './use-modal-a11y';
 
 interface ActionSheetActionBase {
@@ -15,6 +15,8 @@ interface ActionSheetActionBase {
   readonly destructive?: boolean;
   /** 묶음 이름 — 앞 항목과 다르면 이 항목 위에 소제목을 둔다(예: 되돌리기 어려운 동작을 따로 떼기). */
   readonly groupLabel?: string;
+  /** 라벨 왼쪽에 놓는 아이콘/로고. 장식이면 `alt=""`·`aria-hidden` 으로 넘긴다(라벨이 의미를 말한다). */
+  readonly icon?: ReactNode;
 }
 
 export type ActionSheetAction =
@@ -24,10 +26,22 @@ export type ActionSheetAction =
       /** 비활성일 때 왜 못 누르는지. 비활성 버튼만 두면 현장에서 이유를 못 찾는다. */
       readonly disabledReason?: string | null;
       readonly href?: undefined;
+      readonly externalHref?: undefined;
     })
   | (ActionSheetActionBase & {
       /** 다른 화면으로 가는 항목 — 링크로 그려 새 탭·복사 같은 브라우저 기본 동작을 살린다. */
       readonly href: string;
+      readonly onSelect?: undefined;
+      readonly disabled?: undefined;
+      readonly disabledReason?: undefined;
+      readonly externalHref?: undefined;
+    })
+  | (ActionSheetActionBase & {
+      /** 앱 밖(다른 사이트·지도 앱)으로 가는 항목 — next/link 가 아닌 순수 `<a>` 로 그리고 누르면 시트를 닫는다. */
+      readonly externalHref: string;
+      /** true 면 새 탭(`noopener noreferrer`). */
+      readonly newTab?: boolean;
+      readonly href?: undefined;
       readonly onSelect?: undefined;
       readonly disabled?: undefined;
       readonly disabledReason?: undefined;
@@ -44,7 +58,7 @@ export interface ActionSheetProps {
 }
 
 const ROW_CLASS =
-  'flex min-h-[56px] w-full flex-col items-start justify-center rounded-xl border border-[var(--border)] px-4 py-2 text-left transition-colors hover:bg-[var(--surface-soft)] disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2';
+  'flex min-h-[56px] w-full flex-row items-center gap-3 rounded-xl border border-[var(--border)] px-4 py-2 text-left transition-colors hover:bg-[var(--surface-soft)] disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2';
 
 /**
  * ⋯ 더보기 시트 — 자주 누르지 않거나 잘못 누르면 되돌릴 수 없는 동작을 주 조작 줄에서 떼어
@@ -99,7 +113,17 @@ export function ActionSheet({ open, title, subtitle, actions, onClose }: ActionS
               {action.groupLabel && action.groupLabel !== actions[index - 1]?.groupLabel ? (
                 <p className="mb-2 mt-2 text-[length:var(--font-size-caption)] font-bold text-[var(--text-muted)]">{action.groupLabel}</p>
               ) : null}
-              {action.href !== undefined ? (
+              {action.externalHref !== undefined ? (
+                <a
+                  href={action.externalHref}
+                  target={action.newTab ? '_blank' : undefined}
+                  rel={action.newTab ? 'noopener noreferrer' : undefined}
+                  className={ROW_CLASS}
+                  onClick={externalLinkClick(action.externalHref, Boolean(action.newTab), onClose)}
+                >
+                  <ActionLabel action={action}>{action.description}</ActionLabel>
+                </a>
+              ) : action.href !== undefined ? (
                 // 오버레이 안 링크는 일반 push 가 아니라 이 경로로 이동한다 — 시트의 뒤로가기 표식 항목이 새
                 // 페이지 앞에 남아 다음 뒤로가기가 죽은 정류장에 서는 것을 막는다.
                 <Link href={action.href} className={ROW_CLASS} onClick={overlayLinkClick(action.href, pathname ?? '', onClose)}>
@@ -120,20 +144,38 @@ export function ActionSheet({ open, title, subtitle, actions, onClose }: ActionS
   );
 }
 
+/**
+ * 같은 탭에서 바깥으로 나가는 링크는 시트를 닫는 back 과 이동이 겹치면 브라우저가 이동을 취소하거나
+ * 되돌아온다 — 닫기의 back 이 끝난 뒤 이동한다. 새 탭·수정키 클릭은 이 페이지 기록을 건드리지 않아 그대로 둔다.
+ */
+function externalLinkClick(href: string, newTab: boolean, close: () => void) {
+  return (event: ReactMouseEvent<HTMLAnchorElement>) => {
+    if (newTab || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
+      close();
+      return;
+    }
+    event.preventDefault();
+    void closeOverlayThenNavigate(close, () => window.location.assign(href));
+  };
+}
+
 function ActionLabel({ action, children }: { action: ActionSheetAction; children: ReactNode }) {
   return (
     <>
-      <span
-        className={[
-          'text-[length:var(--font-size-body-sm)] font-bold',
-          action.destructive ? 'text-[var(--red700)]' : 'text-[var(--text-strong)]',
-        ].join(' ')}
-      >
-        {action.label}
+      {action.icon ? <span className="flex shrink-0 items-center">{action.icon}</span> : null}
+      <span className="flex min-w-0 flex-col items-start">
+        <span
+          className={[
+            'text-[length:var(--font-size-body-sm)] font-bold',
+            action.destructive ? 'text-[var(--red700)]' : 'text-[var(--text-strong)]',
+          ].join(' ')}
+        >
+          {action.label}
+        </span>
+        {children ? (
+          <span className="text-[length:var(--font-size-caption)] text-[var(--text-muted)]">{children}</span>
+        ) : null}
       </span>
-      {children ? (
-        <span className="text-[length:var(--font-size-caption)] text-[var(--text-muted)]">{children}</span>
-      ) : null}
     </>
   );
 }

@@ -236,6 +236,11 @@ export const v1Keys = {
   myTournamentOpsAssignments: () => [...v1Keys.all, 'tournament-ops', 'me', 'assignments'] as const,
 };
 
+/** 리그 대진이 바뀔 때 함께 무효화할 키. 공개 `leagueMatch` 는 순위·선수 기록 하위 키를 prefix 로 포함한다. */
+export function leagueViewKeys(leagueId: string) {
+  return [v1Keys.adminLeagueMatch(leagueId), v1Keys.leagueMatch(leagueId), v1Keys.tournament(leagueId)];
+}
+
 // 로그인/회원가입 등 identity 전환 시 반드시 호출 — 캐시가 identity로 스코프되지 않아
 // 이전 사용자 데이터(채팅방/알림 등)가 새 사용자에게 그대로 노출되는 것을 막는다.
 export function clearV1IdentityCache(queryClient: QueryClient) {

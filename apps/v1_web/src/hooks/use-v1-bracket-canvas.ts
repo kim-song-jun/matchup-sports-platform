@@ -3,7 +3,7 @@
 import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { resultReviewKeys } from '@/hooks/use-tournament-result-review';
 import { v1Get, v1Patch, v1Post, v1Put } from '@/lib/api-client';
-import { v1Keys } from '@/lib/query-keys';
+import { leagueViewKeys, v1Keys } from '@/lib/query-keys';
 import { randomUuid } from '@/lib/uuid';
 import type {
   V1ApplyBracketTemplatePayload,
@@ -22,11 +22,11 @@ import type {
 
 export type BracketCompetitionScope = 'tournament' | 'league';
 
-/** 대진이 바뀌면 어드민 화면과 공개 화면 캐시를 같이 털어야 한다. 리그는 상세 키 하나가 전부다. */
+/** 대진이 바뀌면 어드민 화면과 공개 화면 캐시를 같이 털어야 한다. */
 function invalidateCompetitionViews(queryClient: QueryClient, competitionId: string, scope: BracketCompetitionScope) {
   const keys =
     scope === 'league'
-      ? [v1Keys.adminLeagueMatch(competitionId)]
+      ? leagueViewKeys(competitionId)
       : [v1Keys.adminTournamentBracket(competitionId), v1Keys.tournament(competitionId)];
   return Promise.all(keys.map((queryKey) => queryClient.invalidateQueries({ queryKey })));
 }

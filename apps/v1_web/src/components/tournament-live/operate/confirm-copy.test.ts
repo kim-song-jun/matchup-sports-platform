@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import type { GameLineup, GameSide } from '@/types/game-operations';
 import type { EventCaptureCommitInput } from './action-target-picker';
-import { commandConfirmCopy, commitActionConfirmCopy } from './confirm-copy';
+import {
+  commandConfirmCopy,
+  commitActionConfirmCopy,
+  penaltyShootoutFinishConfirmCopy,
+  penaltyShootoutOverrideFinishConfirmCopy,
+  penaltyShootoutStartConfirmCopy,
+} from './confirm-copy';
 
 const sides: GameSide[] = [
   {
@@ -106,5 +112,57 @@ describe('commitActionConfirmCopy — 기록 시각 말머리', () => {
     expect(message(1)).not.toContain('전반');
     expect(message(2)).toContain('전반 1:00에');
     expect(message(undefined)).toContain('전반 1:00에');
+  });
+});
+
+describe('점수·팀 이름 뒤 조사는 받침을 따른다', () => {
+  const home: GameSide = { ...sides[0], displayNameSnapshot: '마포 레인저스' };
+  const away: GameSide = { ...sides[0], id: 'side-away', sideKey: 'AWAY', displayNameSnapshot: '송파 유나이티드' };
+  const scores = (homeScore: number, awayScore: number) =>
+    new Map([
+      ['side-home', homeScore],
+      ['side-away', awayScore],
+    ]);
+  const ctx = (awayScore: number) => ({
+    sides: [home, away],
+    scoreBySideId: scores(2, awayScore),
+    isFinalPeriod: true,
+    penaltyShootoutPossible: false,
+    substitutionTracked: true,
+  });
+
+  // 0=영, 3=삼 은 받침이 있어 "으로", 2=이·4=사·5=오·9=구 는 "로", 1=일·7=칠·8=팔 은 ㄹ 받침이라 "로".
+  it.each([
+    [0, '송파 유나이티드 0으로'],
+    [2, '송파 유나이티드 2로'],
+    [3, '송파 유나이티드 3으로'],
+    [8, '송파 유나이티드 8로'],
+  ])('경기 종료·후반 종료·전반 종료 확인 창: 원정 %i점 → "%s"', (awayScore, expected) => {
+    for (const [command, isFinalPeriod] of [
+      ['end', true],
+      ['end-period', true],
+      ['end-period', false],
+    ] as const) {
+      const { message } = commandConfirmCopy(command, '종료', { ...ctx(awayScore), isFinalPeriod });
+      expect(message).toContain(`${expected} `);
+    }
+  });
+
+  it('승부차기 시작 확인 창도 점수 받침을 따른다', () => {
+    const copy = (awayScore: number) => penaltyShootoutStartConfirmCopy([home, away], scores(awayScore, awayScore)).message;
+    expect(copy(0)).toContain('송파 유나이티드 0으로 끝났어요');
+    expect(copy(2)).toContain('송파 유나이티드 2로 끝났어요');
+  });
+
+  it.each([
+    ['송파 유나이티드', '송파 유나이티드예요'],
+    ['마포 레인저스', '마포 레인저스예요'],
+    ['서울 강남', '서울 강남이에요'],
+  ])('승부차기 종료 확인 창: 선축 %s → %s', (name, expected) => {
+    const firstKick: GameSide = { ...away, displayNameSnapshot: name };
+    expect(penaltyShootoutFinishConfirmCopy(home, firstKick, 3, 3, firstKick).message).toContain(`선축은 ${expected}.`);
+    expect(penaltyShootoutOverrideFinishConfirmCopy(home, firstKick, 3, 3, 4, 3, firstKick).message).toContain(
+      `선축은 ${expected}.`,
+    );
   });
 });

@@ -13,6 +13,8 @@
  * 이유). 판정 규칙 자체는 여기서 DB 없이 전수 검증한다.
  */
 
+import { withEuroRo } from '../../common/korean-josa';
+
 /** 한 경기에서 그 선수가 받은 카드. `V1GameResultParticipant.cards` 의 실제 저장 모양이다. */
 export interface GameCards {
   readonly yellow: number;
@@ -176,5 +178,5 @@ function describeReason(input: {
   }
   // 원인을 못 특정하는 경우는 규칙상 나올 수 없지만, 문구가 비는 것보다 낫다.
   const cause = causes.length > 0 ? causes.join(' · ') : '카드 누적';
-  return `${cause}으로 ${remainingMatches}경기 출전정지예요.`;
+  return `${withEuroRo(cause)} ${remainingMatches}경기 출전정지예요.`;
 }

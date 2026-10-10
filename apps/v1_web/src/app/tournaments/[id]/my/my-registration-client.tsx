@@ -221,10 +221,13 @@ function ReceiptIcon({ size }: { size?: number }) {
   );
 }
 
-/* ── Registration pass card (Direction A) — confirmed / waitlisted / paid ──
+/* ── Registration pass card (Direction A) ──
  * Replaces the old colored-box hero + orange roster-nudge box with a single
  * white "참가권" pass: sport chip + status pill + title, a dashed ticket-stub
- * divider, the show-up facts (일정·장소·결제), and a roster next-step footer. */
+ * divider, the show-up facts (일정·장소·결제), and a roster next-step footer.
+ * 머리(종목·상태·대회명·팀명)와 facts 는 **모든 상태**에서 그린다 — 입금 확인 중·취소 요청 중처럼
+ * 패스를 안 그리던 상태에서는 화면 상단에서 어느 대회의 어느 팀 신청인지가 사라졌다(MD-QA #80).
+ * 명단 푸터만 확정·결제 완료(confirmed/paid)에 붙는다. */
 
 function PassFact({ icon, label, value }: { icon: ReactNode; label: string; value: string }) {
   return (
@@ -325,8 +328,6 @@ function RegistrationPass({
       </div>
     );
   }
-
-  if (status !== 'confirmed' && status !== 'waitlisted' && status !== 'paid') return null;
 
   const accent = getSportAccent(sportCode);
   const statusCfg = registrationStatusConfig(status);

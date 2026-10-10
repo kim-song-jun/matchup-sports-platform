@@ -921,6 +921,44 @@ describe('MyRegistrationPageClient — payment_checking 안내는 참가비 유�
   });
 });
 
+describe('MyRegistrationPageClient — 신청 상세 상단 카드는 어떤 상태에서도 대회명·팀명을 보인다 (MD-QA #80)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    searchParams = new URLSearchParams({ reg: 'registration-1' });
+    myRegistrationApiMocks.useV1MyTeams.mockReturnValue({ data: { items: [makeTeam()] }, isLoading: false });
+    myRegistrationApiMocks.useV1TournamentPlayers.mockReturnValue({ data: { players: [], belowMinimum: false } });
+    myRegistrationApiMocks.useV1CancelRegistrationRequest.mockReturnValue({ mutateAsync: vi.fn(), isPending: false });
+    myRegistrationApiMocks.useV1WithdrawCancelRegistrationRequest.mockReturnValue({ mutateAsync: vi.fn(), isPending: false });
+    myRegistrationApiMocks.useV1Team.mockReturnValue({ data: { name: '성수 풋살 크루' } });
+    myRegistrationApiMocks.useV1Tournament.mockReturnValue({ data: makeTournament({ title: '봄 풋살 대회' }), isLoading: false });
+  });
+
+  // 팀명은 이 화면에서 상단 카드에만 나온다(레일은 대회명만) — 팀명을 찾아 올라가면 그 카드다.
+  it.each([
+    'draft',
+    'submitted',
+    'awaiting_payment',
+    'payment_checking',
+    'paid',
+    'confirmed',
+    'waitlisted',
+    'cancel_requested',
+    'cancelled',
+  ] as const)('%s 상태의 신청 상세 상단에 대회명과 팀명이 있다', (status) => {
+    myRegistrationApiMocks.useV1MyRegistrations.mockReturnValue({
+      data: [makeRegistration({ status })],
+      isLoading: false,
+      isError: false,
+      error: null,
+    });
+    render(<MyRegistrationPageClient tournamentId="tournament-1" />);
+
+    const pass = screen.getByText('성수 풋살 크루').closest('[role="status"]');
+    expect(pass).not.toBeNull();
+    expect(pass).toHaveTextContent('봄 풋살 대회');
+  });
+});
+
 describe('#1535 실제 선택 신청 카드의 대회 KST 일정', () => {
   const originalTimezone = process.env.TZ;
   beforeEach(() => {

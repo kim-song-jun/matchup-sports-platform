@@ -2,15 +2,36 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { LeagueManualFixtureModal } from './league-manual-fixture-modal';
 
+vi.mock('@/hooks/use-v1-api', () => ({
+  useV1PlaceSearch: () => ({ data: undefined, isFetching: false, isError: false, error: null }),
+  useV1PublicKakaoMapsKey: () => ({ data: { kakaoMapsJsKey: null }, isLoading: false }),
+}));
+
+const SANGAM = {
+  name: '상암 풋살파크',
+  address: '서울 마포구 월드컵로 240',
+  latitude: 37.5683,
+  longitude: 126.8972,
+  provider: 'kakao' as const,
+  providerPlaceId: 'kakao-sangam',
+};
+
 const TEAMS = [
   { id: 'team-a', label: 'A팀' },
   { id: 'team-b', label: 'B팀' },
 ];
 
-function setup(onSubmit = vi.fn().mockResolvedValue({})) {
+function setup(onSubmit = vi.fn().mockResolvedValue({}), defaultPlace: typeof SANGAM | null = null) {
   const onClose = vi.fn();
   render(
-    <LeagueManualFixtureModal teams={TEAMS} isSubmitting={false} onSubmit={onSubmit} onClose={onClose} />,
+    <LeagueManualFixtureModal
+      teams={TEAMS}
+      defaultPlace={defaultPlace}
+      recentVenues={[SANGAM]}
+      isSubmitting={false}
+      onSubmit={onSubmit}
+      onClose={onClose}
+    />,
   );
   return { onSubmit, onClose };
 }
@@ -98,6 +119,7 @@ describe('LeagueManualFixtureModal', () => {
     render(
       <LeagueManualFixtureModal
         teams={TEAMS}
+        defaultPlace={null}
         isSubmitting
         onSubmit={vi.fn()}
         onClose={vi.fn()}
@@ -105,5 +127,49 @@ describe('LeagueManualFixtureModal', () => {
     );
     expect(screen.getByRole('button', { name: '닫기' })).toBeDisabled();
     expect(screen.getByRole('button', { name: '취소' })).toBeDisabled();
+  });
+
+  function fillRequired() {
+    pick('홈 팀', 'A팀');
+    pick('어웨이 팀', 'B팀');
+    fireEvent.change(screen.getByLabelText('시작 일시'), { target: { value: '2026-09-30T19:00' } });
+  }
+
+  it('기본 장소 사용(기본값)이면 장소 필드를 보내지 않아 서버가 기본 장소를 상속한다', async () => {
+    const { onSubmit } = setup(vi.fn().mockResolvedValue({}), SANGAM);
+    expect(screen.getByRole('radio', { name: '기본 장소 사용 (상암 풋살파크)' })).toBeChecked();
+    fillRequired();
+    fireEvent.click(screen.getByRole('button', { name: '경기 만들기' }));
+
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
+    expect(Object.keys(onSubmit.mock.calls[0][0]).filter((key) => key.startsWith('place'))).toEqual([]);
+  });
+
+  it('이 경기만 다른 장소를 고르면 이름과 좌표 스냅샷을 함께 보낸다', async () => {
+    const { onSubmit } = setup();
+    fillRequired();
+    fireEvent.click(screen.getByRole('radio', { name: '이 경기만 다른 장소' }));
+    fireEvent.click(screen.getByRole('button', { name: SANGAM.name }));
+    fireEvent.click(screen.getByRole('button', { name: '경기 만들기' }));
+
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
+    expect(onSubmit.mock.calls[0][0]).toMatchObject({
+      placeName: '상암 풋살파크',
+      placeAddress: '서울 마포구 월드컵로 240',
+      placeLatitude: 37.5683,
+      placeLongitude: 126.8972,
+      placeProvider: 'kakao',
+      placeProviderId: 'kakao-sangam',
+    });
+  });
+
+  it('다른 장소를 골랐는데 장소가 없으면 보내지 않는다', async () => {
+    const { onSubmit } = setup();
+    fillRequired();
+    fireEvent.click(screen.getByRole('radio', { name: '이 경기만 다른 장소' }));
+    fireEvent.click(screen.getByRole('button', { name: '경기 만들기' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('다른 장소를 골라 주세요.');
+    expect(onSubmit).not.toHaveBeenCalled();
   });
 });

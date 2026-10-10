@@ -1,3 +1,4 @@
+import { toMatchPlacePayload } from '@/lib/place';
 import { teamMatchDateErrors } from '@/lib/team-match-dates';
 import { parseTeamMatchLevelRange } from '@/lib/team-match-level-range';
 import type { V1TeamMatchMutationPayload } from '@/types/api';
@@ -62,7 +63,7 @@ const RULES: Array<{
   { field: 'title', label: '매치 제목을 입력해 주세요', step: 'info', isSatisfied: (ctx) => Boolean(ctx.draft.title.trim()) },
   { field: 'grade', label: '실력등급을 다시 선택해 주세요', step: 'condition', isSatisfied: (ctx) => parseTeamMatchLevelRange(ctx.draft.grade) !== null },
   { field: 'regionId', label: '지역을 선택해 주세요', step: 'place-time', isSatisfied: (ctx) => Boolean(ctx.regionId) },
-  { field: 'venue', label: '장소를 입력해 주세요', step: 'place-time', isSatisfied: (ctx) => Boolean(ctx.draft.venue.trim()) },
+  { field: 'place', label: '장소를 골라 주세요', step: 'place-time', isSatisfied: (ctx) => Boolean(ctx.draft.place?.name.trim()) },
   { field: 'date', label: '날짜를 입력해 주세요', step: 'place-time', isSatisfied: (ctx) => Boolean(ctx.draft.date) },
   { field: 'startTime', label: '시작 시간을 입력해 주세요', step: 'place-time', isSatisfied: (ctx) => Boolean(ctx.draft.startTime) },
   // 마감일·마감시간은 "둘 다 비움(마감 없음)" 또는 "둘 다 채움" 두 상태만 유효하다.
@@ -174,8 +175,7 @@ export function buildTeamMatchPayloadResult(draft: TeamMatchDraft, hostTeamId: s
       deadlineAt,
       imageUrl: draft.imageUrl.trim() || null,
       listImageUrl: draft.listImageUrl?.trim() || null,
-      manualPlaceName: draft.venue.trim(),
-      addressText: draft.address.trim() || null,
+      ...toMatchPlacePayload(draft.place),
       costNote: draft.cost || draft.opponentCost ? `총 ${draft.cost.toLocaleString('ko-KR')}원 · 상대팀 ${draft.opponentCost.toLocaleString('ko-KR')}원` : null,
       // rulesText는 더 이상 쓰기 대상이 아니다 — 경기조건은 matchFormat/matchStyle/uniformColor
       // 구조화 컬럼으로만 쓴다(team-matches-create-client.tsx의 원래 buildTeamMatchMutationPayload

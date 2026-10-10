@@ -52,7 +52,7 @@ describe('MatchDetailPageView — 종료와 모집 마감 안내 분리 (#1587)'
       statusLabel: data.viewer?.participantStatus === 'no_show' ? '불참 기록' : undefined,
       applyLabel: applyLabel(viewer, status, false),
       match: {
-        ...toMatchCard(data, fallback.match), description: '', address: '', rules: [],
+        ...toMatchCard(data, fallback.match), description: '', place: null, rules: [],
         participants: [], applicationsHref: `/matches/${data.id}/applications`,
       },
     };
@@ -1129,5 +1129,38 @@ describe('MatchDetailPageView — desktop 제목 중복 정리 (#1588 A)', () =>
     expect(rowTitle).toHaveTextContent(title);
     expect(rowTitle).not.toHaveClass('tm-hide-desktop');
     expect(rowTitle?.closest('a')).toHaveAttribute('href', `/matches/title-fixture?from=${encodeURIComponent('/matches?q=QA&sport=futsal')}`);
+  });
+});
+
+describe('MatchDetailPageView — 일정·장소의 장소 카드', () => {
+  function withPlace(place: NonNullable<ReturnType<typeof getMatchDetailViewModel>['match']['place']> | null) {
+    const base = getMatchDetailViewModel('default');
+    return { ...base, match: { ...base.match, place } };
+  }
+  const mobileBody = (container: HTMLElement) =>
+    within(container.querySelector<HTMLElement>('.tm-match-detail-body.tm-hide-desktop')!);
+
+  it('좌표가 있으면 이름·주소를 한 번만 보여 주고 길찾기 링크가 좌표 경로를 연다', () => {
+    const { container } = render(
+      <MatchDetailPageView
+        model={withPlace({ name: '망원한강공원 풋살장', address: '서울 마포구 마포나루길 467', latitude: 37.5558, longitude: 126.8985, provider: 'kakao', providerPlaceId: 'k-1' })}
+      />,
+    );
+    const body = mobileBody(container);
+    expect(body.getAllByText('망원한강공원 풋살장')).toHaveLength(1);
+    expect(body.getByRole('link', { name: '카카오맵으로 길찾기' }).getAttribute('href')).toContain('37.5558,126.8985');
+    expect(body.getByRole('link', { name: '네이버맵으로 길찾기' })).toBeInTheDocument();
+    expect(body.getByRole('button', { name: /주소 복사/ })).toBeInTheDocument();
+    expect(body.queryByText(/정확한 위치가 등록되지 않았어요/)).not.toBeInTheDocument();
+  });
+
+  it('좌표가 없으면 위치 미등록 안내와 이름 검색 링크만 보여 준다', () => {
+    const { container } = render(
+      <MatchDetailPageView model={withPlace({ name: '동네 운동장', address: null, latitude: null, longitude: null, provider: null, providerPlaceId: null })} />,
+    );
+    const body = mobileBody(container);
+    expect(body.getByText(/정확한 위치가 등록되지 않았어요/)).toBeInTheDocument();
+    expect(body.getByRole('link', { name: '카카오맵에서 이름 검색' }).getAttribute('href')).toContain(encodeURIComponent('동네 운동장'));
+    expect(body.queryByRole('link', { name: /길찾기/ })).not.toBeInTheDocument();
   });
 });

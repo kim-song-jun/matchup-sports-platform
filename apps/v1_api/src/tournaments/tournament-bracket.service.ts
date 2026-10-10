@@ -60,6 +60,9 @@ import { adminBracketSlotInclude, serializeAdminBracketSlot } from './slots/admi
 import { tournamentTeamMatchBracketInclude, serializeTournamentTeamMatchBracket } from './tournament-team-match-bracket.query';
 import { competitionMatchLabel } from './tournament-round-label';
 import { acceptsBracketSource } from './tournament-bracket-phases';
+import { PLACE_SELECT } from '../places/place-select';
+import { resolvePlaceSnapshot, toPlaceView, type PlaceView } from '../places/place-snapshot';
+import { TOURNAMENT_VENUE_SELECT, tournamentVenueSnapshot } from '../places/tournament-venue';
 
 type AdminBracketResult = {
   id: string;
@@ -496,6 +499,8 @@ export class TournamentBracketService {
       awayRegistrationId: dto.awayRegistrationId ?? null,
       scheduledAt: dto.scheduledAt ? new Date(dto.scheduledAt).toISOString() : null,
       venue: dto.venue ?? tournament.venue ?? null,
+      // 핀 없는 요청의 해시는 예전과 같게 둔다(재시도 중인 명령이 불일치로 막히지 않게).
+      ...(dto.venueProviderId ? { venueProviderId: dto.venueProviderId } : {}),
     };
     const durableCommandId = `tournament-fixture:${tournamentId}:${dto.round}:${dto.fixtureNumber}:${legNumber}`;
     const payloadHash = canonicalGameCommandPayloadHash(commandPayload);
@@ -523,7 +528,7 @@ export class TournamentBracketService {
           sportId: true,
           regionId: true,
           title: true,
-          venue: true,
+          ...TOURNAMENT_VENUE_SELECT,
           competitionConfigVersionId: true,
         },
       });
@@ -574,7 +579,7 @@ export class TournamentBracketService {
               competitionConfigVersionId: true,
               game: { select: { sourceType: true, teamMatchId: true, competitionConfigVersionId: true, sides: { select: { sideKey: true, teamId: true } } } },
               startAt: true,
-              placeName: true,
+              ...PLACE_SELECT,
               status: true,
               createdAt: true,
               updatedAt: true,
@@ -685,7 +690,7 @@ export class TournamentBracketService {
         sportId: pinnedTournament.sportId,
         regionId: pinnedTournament.regionId ?? null,
         title: `${pinnedTournament.title} · ${competitionMatchLabel({ groupName: group?.name, round: dto.round, legNumber })} ${dto.fixtureNumber}`,
-        placeName: commandPayload.venue,
+        place: this.fixturePlace(dto) ?? tournamentVenueSnapshot(pinnedTournament),
         startAt: dto.scheduledAt ? new Date(dto.scheduledAt) : null,
         createdByUserId: user.id,
         competitionConfigVersionId: pinnedTournament.competitionConfigVersionId,
@@ -732,7 +737,7 @@ export class TournamentBracketService {
           hostTeamId: true,
           approvedApplicantTeamId: true,
           startAt: true,
-          placeName: true,
+          ...PLACE_SELECT,
           status: true,
           createdAt: true,
           updatedAt: true,
@@ -766,7 +771,7 @@ export class TournamentBracketService {
       };
     });
 
-    return this.serializeCanonicalFixture(created);
+    return this.serializeCanonicalFixture(created, toPlaceView(created));
   }
 
   /** Persist the next match's HOME/AWAY source. Existing result projection owns promotion. */
@@ -914,7 +919,7 @@ export class TournamentBracketService {
           groupId: canonical.groupId,
           fixtureNumber: dto.fixtureNumber,
           scheduledAt: dto.scheduledAt !== undefined ? new Date(dto.scheduledAt) : undefined,
-          venue: dto.venue,
+          place: dto.venue === undefined ? undefined : this.fixturePlace(dto),
           homeRegistrationId: dto.homeRegistrationId,
           awayRegistrationId: dto.awayRegistrationId,
           allowStartedTeamChange: true,
@@ -924,7 +929,7 @@ export class TournamentBracketService {
       const startedTeamChange = updated.startedTeamChange === null
         ? null
         : { removedEventCount: updated.startedTeamChange.removedEventCount, score: updated.startedTeamChange.scoreAfter };
-      return { ...this.serializeCanonicalFixture(updated), startedTeamChange };
+      return { ...this.serializeCanonicalFixture(updated, updated.place), startedTeamChange };
     }
     throw new NotFoundException({ code: 'FIXTURE_NOT_FOUND', message: '경기를 찾을 수 없어요.' });
   }
@@ -1236,6 +1241,17 @@ export class TournamentBracketService {
     };
   }
 
+  private fixturePlace(dto: Pick<CreateFixtureDto, 'venue' | 'venueAddress' | 'venueLatitude' | 'venueLongitude' | 'venueProvider' | 'venueProviderId'>) {
+    return resolvePlaceSnapshot({
+      name: dto.venue,
+      address: dto.venueAddress,
+      latitude: dto.venueLatitude,
+      longitude: dto.venueLongitude,
+      provider: dto.venueProvider,
+      providerPlaceId: dto.venueProviderId,
+    });
+  }
+
   /**
    * Canonical bracket creation stores a TeamMatch + TournamentMatchDetails pair.
    * Keep the admin DTO stable while the canonical read path is authoritative.
@@ -1255,7 +1271,7 @@ export class TournamentBracketService {
     status: string;
     createdAt: Date;
     updatedAt: Date;
-  }) {
+  }, place: PlaceView | null) {
     const status =
       row.status === 'completed'
         ? 'completed'
@@ -1274,6 +1290,7 @@ export class TournamentBracketService {
       awayRegistrationId: row.awayRegistrationId,
       scheduledAt: row.startAt?.toISOString() ?? null,
       venue: row.placeName,
+      place,
       status,
       createdAt: row.createdAt.toISOString(),
       updatedAt: row.updatedAt.toISOString(),

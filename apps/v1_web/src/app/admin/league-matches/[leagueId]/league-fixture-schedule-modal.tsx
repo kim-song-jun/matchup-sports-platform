@@ -4,45 +4,72 @@ import { useId, useState } from 'react';
 import { Button } from '@/components/v1-ui/button';
 import { useModalA11y } from '@/components/v1-ui/use-modal-a11y';
 import { extractErrorMessage } from '@/lib/error-message';
-import type { V1LeagueFixture } from '@/types/league-match';
+import type { V1LeagueFixture, V1UpdateLeagueFixturePayload } from '@/types/league-match';
+import type { V1PlaceView } from '@/types/api';
 import { isoToKstDatetimeLocal, kstDatetimeLocalToIso } from '@/lib/kst-calendar';
+import { placeFromView, toLeaguePlacePayload } from '@/lib/place';
+import { isSamePlace } from '@/lib/same-place';
+import {
+  isLeaguePlaceChoiceIncomplete,
+  LeagueFixturePlaceField,
+  type LeaguePlaceChoice,
+} from './league-fixture-place-field';
 
 /** 서버 PATCH 본문 — 바뀐 필드만 담는다. */
-export interface LeagueFixtureSchedulePatch {
-  startsAt?: string;
-  placeName?: string;
-  placeAddress?: string;
+export type LeagueFixtureSchedulePatch = V1UpdateLeagueFixturePayload;
+
+function fixtureCurrentPlace(fixture: V1LeagueFixture): V1PlaceView {
+  return (
+    fixture.place ?? {
+      name: fixture.placeName,
+      address: fixture.placeAddress ?? null,
+      latitude: null,
+      longitude: null,
+      provider: null,
+      providerPlaceId: null,
+    }
+  );
+}
+
+function placeChoiceKey(choice: LeaguePlaceChoice): string {
+  return choice.mode === 'default' ? 'default' : JSON.stringify(toLeaguePlacePayload(choice.place));
 }
 
 const fieldClass =
   'h-[44px] w-full rounded-xl border border-[var(--border-strong)] bg-[var(--card-surface)] px-3 text-[length:var(--font-size-body-sm)] text-[var(--text-strong)] focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20';
 
 /**
- * 한 경기의 일정(일시·구장·주소) 수정. 대진 표는 이제 일정 위주로 읽기만 하고, 고치는 일은 행의 ⋯ 에서
+ * 한 경기의 일정(일시·장소) 수정. 대진 표는 이제 일정 위주로 읽기만 하고, 고치는 일은 행의 ⋯ 에서
  * 이 모달로 한다 — 표 안 입력칸이 열 폭을 먹고 탭만 지나가도 저장이 나가던 자리를 한 번의 명시적
  * 저장으로 바꾼 것이다. 값이 그대로면 저장 버튼이 눌리지 않아 불필요한 쓰기가 나가지 않는다.
  */
 export function LeagueFixtureScheduleModal({
   fixture,
+  defaultPlace,
+  recentVenues,
   matchupLabel,
   isSubmitting,
   onSubmit,
   onClose,
 }: {
   fixture: V1LeagueFixture;
+  defaultPlace: V1PlaceView | null;
+  recentVenues?: ReadonlyArray<V1PlaceView>;
   matchupLabel: string;
   isSubmitting: boolean;
   onSubmit: (patch: LeagueFixtureSchedulePatch) => Promise<unknown>;
   onClose: () => void;
 }) {
   const startsAtId = useId();
-  const placeNameId = useId();
-  const placeAddressId = useId();
   const initialStartsAt = isoToKstDatetimeLocal(fixture.startAt);
-  const initialPlaceAddress = fixture.placeAddress ?? '';
+  const currentPlace = fixtureCurrentPlace(fixture);
+  // 리그 기본 장소와 다른 경기는 "다른 장소" 로 열어 지금 장소를 그대로 보여 준다.
+  const initialChoice: LeaguePlaceChoice =
+    defaultPlace !== null && isSamePlace(currentPlace, defaultPlace)
+      ? { mode: 'default', place: null }
+      : { mode: 'custom', place: placeFromView(currentPlace) };
   const [startsAtLocal, setStartsAtLocal] = useState(initialStartsAt);
-  const [placeName, setPlaceName] = useState(fixture.placeName);
-  const [placeAddress, setPlaceAddress] = useState(initialPlaceAddress);
+  const [placeChoice, setPlaceChoice] = useState<LeaguePlaceChoice>(initialChoice);
   const [error, setError] = useState<string | null>(null);
   // 제출 중 ESC·배경 클릭으로 닫히면 요청은 날아가는데 화면은 사라져 저장 여부를 알 수 없다.
   const { dialogRef, onBackdropClick } = useModalA11y<HTMLElement, HTMLDivElement>({
@@ -53,10 +80,9 @@ export function LeagueFixtureScheduleModal({
 
   const changed = {
     startAt: startsAtLocal !== initialStartsAt,
-    placeName: placeName !== fixture.placeName,
-    placeAddress: placeAddress !== initialPlaceAddress,
+    place: placeChoiceKey(placeChoice) !== placeChoiceKey(initialChoice),
   };
-  const dirty = changed.startAt || changed.placeName || changed.placeAddress;
+  const dirty = changed.startAt || changed.place;
 
   const submit = async () => {
     if (isSubmitting || !dirty) return;
@@ -70,8 +96,14 @@ export function LeagueFixtureScheduleModal({
       }
       patch.startsAt = startsAt;
     }
-    if (changed.placeName) patch.placeName = placeName;
-    if (changed.placeAddress) patch.placeAddress = placeAddress;
+    if (changed.place) {
+      if (isLeaguePlaceChoiceIncomplete(placeChoice)) {
+        setError('다른 장소를 골라 주세요.');
+        return;
+      }
+      // 수정에서 placeName 이 없으면 "변경 없음" 이다. 기본 장소로 되돌리려면 빈 문자열을 보내야 서버가 리셋한다.
+      Object.assign(patch, placeChoice.mode === 'custom' ? toLeaguePlacePayload(placeChoice.place) : { placeName: '' });
+    }
     try {
       await onSubmit(patch);
       onClose();
@@ -110,22 +142,13 @@ export function LeagueFixtureScheduleModal({
             className={fieldClass}
           />
         </div>
-        <div>
-          <label htmlFor={placeNameId} className="mb-1 block text-[length:var(--font-size-body-sm)] font-medium text-[var(--text-strong)]">
-            구장
-          </label>
-          <input id={placeNameId} value={placeName} onChange={(e) => setPlaceName(e.target.value)} className={fieldClass} />
-        </div>
-        <div>
-          <label htmlFor={placeAddressId} className="mb-1 block text-[length:var(--font-size-body-sm)] font-medium text-[var(--text-strong)]">
-            주소 <span className="font-normal text-[var(--text-muted)]">(선택)</span>
-          </label>
-          <input
-            id={placeAddressId}
-            value={placeAddress}
-            onChange={(e) => setPlaceAddress(e.target.value)}
-            placeholder="상세 주소"
-            className={fieldClass}
+        <div className="grid">
+          <LeagueFixturePlaceField
+            defaultPlace={defaultPlace}
+            recentVenues={recentVenues}
+            choice={placeChoice}
+            onChange={setPlaceChoice}
+            disabled={isSubmitting}
           />
         </div>
         {error ? (

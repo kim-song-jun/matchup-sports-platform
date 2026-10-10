@@ -25,7 +25,7 @@ function match(overrides: Partial<V1Match> = {}): V1Match {
     regionName: '서울 송파구',
     region: { regionId: 'region-1', name: '송파구', parentName: '서울' },
     placeName: '잠실 풋살파크',
-    place: { name: '잠실 풋살파크', addressText: '서울 송파구 올림픽로 25 101동 1203호' },
+    place: { name: '잠실 풋살파크', address: '서울 송파구 올림픽로 25 101동 1203호', latitude: null, longitude: null, provider: null, providerPlaceId: null },
     startsAt: '2026-10-03T00:00:00.000Z',
     endsAt: '2026-10-03T02:00:00.000Z',
     capacityText: '8/12명',
@@ -93,6 +93,12 @@ describe('buildMatchEventLd', () => {
     expect(buildMatchEventLd(match({ displayState: 'completed' }), 'match-1')).toMatchObject({
       eventStatus: 'https://schema.org/EventScheduled',
     });
+  });
+
+  it('좌표가 있는 장소여도 geo 를 싣지 않는다 — 호스트가 적은 집·직장 위치일 수 있다', () => {
+    const pinned = match({ place: { name: '잠실 풋살파크', address: null, latitude: 37.51, longitude: 127.07, provider: 'kakao', providerPlaceId: 'k-1' } });
+    expect(buildMatchEventLd(pinned, 'match-1')?.location).not.toHaveProperty('geo');
+    expect(buildMatchEventLd(match(), 'match-1')?.location).not.toHaveProperty('geo');
   });
 
   it('지역을 모르면 구장 이름만 싣고, 지역 미정 문구를 주소로 만들지 않는다', () => {

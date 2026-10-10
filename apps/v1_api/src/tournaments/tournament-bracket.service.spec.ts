@@ -2385,6 +2385,7 @@ describe('TournamentBracketService', () => {
   describe('createEmptyTournamentFixtureInTx', () => {
     const tournament = {
       id: 'tournament-1', sportId: 'sport-1', regionId: null, venue: '서울 경기장', title: '테스트 대회',
+      venueAddress: null, latitude: null, longitude: null, venueProvider: null, venueProviderId: null,
       competitionConfigVersionId: '11111111-1111-4111-8111-111111111111',
     };
     const input = { tournament, groupId: 'group-1', round: 'league_r1', fixtureNumber: 1, legNumber: 1, homeSlotId: 'slot-h', awaySlotId: 'slot-a' };
@@ -2417,6 +2418,34 @@ describe('TournamentBracketService', () => {
       expect(prisma.v1AdminActionLog.create).toHaveBeenCalledWith({
         data: expect.objectContaining({ action: 'tournament.bracket.fixture.create', targetId: 'fixture-1' }),
       });
+    });
+
+    it('대회 기본 장소의 주소·좌표·출처를 경기 장소 칸으로 그대로 복사한다', async () => {
+      arrange();
+      const pinned = {
+        ...tournament,
+        venueAddress: '서울 마포구 월드컵로 1', latitude: 37.55, longitude: 126.9, venueProvider: 'kakao', venueProviderId: '1234',
+      };
+
+      await createEmptyTournamentFixtureInTx(prisma as never, { games } as never, activeAdmin, { ...input, tournament: pinned });
+
+      expect(prisma.v1TeamMatch.create).toHaveBeenCalledWith(expect.objectContaining({
+        data: expect.objectContaining({
+          placeName: '서울 경기장', placeAddress: '서울 마포구 월드컵로 1',
+          placeLatitude: 37.55, placeLongitude: 126.9, placeProvider: 'kakao', placeProviderId: '1234',
+        }),
+      }));
+    });
+
+    it('출처 없이 좌표만 남은 옛 대회 행은 핀을 버리고 이름만 복사한다', async () => {
+      arrange();
+      const legacy = { ...tournament, latitude: 37.1, longitude: 127.1 };
+
+      await createEmptyTournamentFixtureInTx(prisma as never, { games } as never, activeAdmin, { ...input, tournament: legacy });
+
+      expect(prisma.v1TeamMatch.create).toHaveBeenCalledWith(expect.objectContaining({
+        data: expect.objectContaining({ placeName: '서울 경기장', placeLatitude: null, placeLongitude: null, placeProvider: null, placeProviderId: null }),
+      }));
     });
 
     it('자리가 없는 경기(null)는 슬롯 컬럼을 null 로 만든다 (대조군)', async () => {

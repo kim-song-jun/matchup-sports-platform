@@ -130,6 +130,9 @@ vi.mock('@/hooks/use-v1-api', () => ({
   useV1ResumeLeague: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
   useV1CloseLeagueRegistration: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
   useV1UpdateLeagueCoverImage: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
+  useV1UpdateLeagueVenue: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
+  useV1PublicKakaoMapsKey: vi.fn(() => ({ data: { kakaoMapsJsKey: null }, isLoading: false })),
+  useV1PlaceSearch: vi.fn(() => ({ data: undefined, isFetching: false, isError: false, error: null })),
   useV1UploadImages: vi.fn(() => ({ mutateAsync: vi.fn(), isPending: false })),
   // 팀 추가 EntityPicker의 검색 후보 — 빈 목록이면 아무것도 렌더하지 않아 무해하다.
   useV1Teams: vi.fn(() => ({ data: undefined, isFetching: false })),
@@ -139,6 +142,15 @@ vi.mock('@/hooks/use-v1-api', () => ({
   useV1Settings: vi.fn(() => ({ data: undefined, isError: false, refetch: vi.fn() })),
   useV1UpdateSettings: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
 }));
+
+const PICKED_VENUE = {
+  name: '상암 풋살파크',
+  address: '서울 마포구 월드컵로 240',
+  latitude: 37.5683,
+  longitude: 126.8972,
+  provider: 'kakao',
+  providerPlaceId: 'kakao-sangam',
+};
 
 const useV1ActivePopupMock = vi.mocked(useV1ActivePopup, { partial: true });
 const useV1AddLeagueTeamMock = vi.mocked(useV1AddLeagueTeam, { partial: true });
@@ -614,9 +626,7 @@ describe('LeagueMatchFixturesClient', () => {
       expect(input.className).toContain('w-full');
       expect(input.parentElement!.parentElement).toBe(grid);
     }
-    const place = screen.getByLabelText('기본 장소');
-    expect(place.className).toContain('w-full');
-    expect(place.parentElement!.className).toContain('col-span-full');
+    expect(screen.getByRole('group', { name: '장소' }).className).toContain('col-span-full');
     expect(screen.getByRole('button', { name: '미리보기' }).parentElement).toBe(
       screen.getByRole('button', { name: '라운드로빈 대진 생성' }).parentElement,
     );
@@ -662,7 +672,7 @@ describe('LeagueMatchFixturesClient', () => {
   it('요일·시각·장소를 채우고 생성하면 schedule과 placeName을 함께 전달한다', async () => {
     useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false } as never);
     useV1AdminLeagueMatchMock.mockReturnValue({
-      data: { leagueId: 'league-1', isPublic: true, title: '가을 풋살 리그', startsOn: '2026-09-01T00:00:00.000Z', state: 'draft', teamIds: ['t1', 't2'], fixtures: [] },
+      data: { leagueId: 'league-1', isPublic: true, title: '가을 풋살 리그', startsOn: '2026-09-01T00:00:00.000Z', state: 'draft', teamIds: ['t1', 't2'], fixtures: [], recentVenues: [PICKED_VENUE] },
       isPending: false,
     } as never);
     const mutateAsync = vi.fn().mockResolvedValue({ leagueId: 'league-1', createdCount: 7, teamMatchIds: [] });
@@ -679,7 +689,8 @@ describe('LeagueMatchFixturesClient', () => {
     fireEvent.change(screen.getByLabelText('주차 수'), { target: { value: '7' } });
     fireEvent.change(screen.getByLabelText('요일'), { target: { value: '6' } });
     fireEvent.change(screen.getByLabelText('시작 시각'), { target: { value: '19:30' } });
-    fireEvent.change(screen.getByLabelText('기본 장소'), { target: { value: '상암 풋살파크' } });
+    fireEvent.click(screen.getByRole('radio', { name: '다른 장소 사용' }));
+    fireEvent.click(screen.getByRole('button', { name: PICKED_VENUE.name }));
     await generateAndConfirm();
 
     // **서버는 요일을 모른다** — 화면이 날짜 목록으로 전개해 보내야 한다(Task 164 BE-2).
@@ -689,10 +700,17 @@ describe('LeagueMatchFixturesClient', () => {
     const payload = mutateAsync.mock.calls[0][0] as {
       weeksCount: number;
       schedule: { dates: string[]; time: string };
-      placeName: string;
     };
     expect(payload.weeksCount).toBe(7);
-    expect(payload.placeName).toBe('상암 풋살파크');
+    // 검색으로 고른 장소는 이름과 함께 좌표·provider 스냅샷 전체가 간다.
+    expect(payload).toMatchObject({
+      placeName: '상암 풋살파크',
+      placeAddress: '서울 마포구 월드컵로 240',
+      placeLatitude: 37.5683,
+      placeLongitude: 126.8972,
+      placeProvider: 'kakao',
+      placeProviderId: 'kakao-sangam',
+    });
     expect(payload.schedule.time).toBe('19:30');
     expect(payload.schedule).not.toHaveProperty('dayOfWeek');
     // 주차 수만큼, 전부 토요일(KST), 전부 미래 — 서버가 거부하지 않는 값이어야 한다.
@@ -787,7 +805,7 @@ describe('LeagueMatchFixturesClient', () => {
         teamIds: ['t1', 't2'],
         startsOn: '2026-09-01T00:00:00.000Z',
         fixtures: [],
-        recentVenues: ['상암 풋살파크', '잠실 종합운동장'],
+        recentVenues: [{ name: '상암 풋살파크', address: null, latitude: null, longitude: null, provider: null, providerPlaceId: null }, { name: '잠실 종합운동장', address: null, latitude: null, longitude: null, provider: null, providerPlaceId: null }],
       },
       isPending: false,
     } as never);
@@ -801,6 +819,7 @@ describe('LeagueMatchFixturesClient', () => {
       </Providers>,
     );
 
+    fireEvent.click(screen.getByRole('radio', { name: '다른 장소 사용' }));
     fireEvent.click(screen.getByRole('button', { name: '잠실 종합운동장' }));
     await generateAndConfirm();
 
@@ -808,6 +827,54 @@ describe('LeagueMatchFixturesClient', () => {
       weeksCount: 1,
       placeName: '잠실 종합운동장',
     }));
+  });
+
+  it('기본 장소 사용을 고르면(기본값) 장소 필드를 하나도 보내지 않아 서버가 리그 기본 장소를 상속한다', async () => {
+    useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false } as never);
+    useV1AdminLeagueMatchMock.mockReturnValue({
+      data: {
+        leagueId: 'league-1', isPublic: true, title: '가을 풋살 리그', state: 'draft', teamIds: ['t1', 't2'],
+        startsOn: '2026-09-01T00:00:00.000Z', fixtures: [], recentVenues: [PICKED_VENUE], defaultPlace: PICKED_VENUE,
+      },
+      isPending: false,
+    } as never);
+    const mutateAsync = vi.fn().mockResolvedValue({ leagueId: 'league-1', createdCount: 1, teamMatchIds: [] });
+    useV1GenerateLeagueFixturesMock.mockReturnValue({ mutateAsync, isPending: false } as never);
+    useV1UpdateLeagueFixtureMock.mockReturnValue({ mutate: vi.fn() } as never);
+
+    render(
+      <Providers>
+        <LeagueMatchFixturesClient leagueId="league-1" initialView="list" />
+      </Providers>,
+    );
+
+    expect(screen.getByRole('radio', { name: '기본 장소 사용 (상암 풋살파크)' })).toBeChecked();
+    await generateAndConfirm();
+
+    await waitFor(() => expect(mutateAsync).toHaveBeenCalledWith({ weeksCount: 1 }));
+  });
+
+  it('다른 장소를 골랐는데 장소를 고르지 않으면 생성하지 않고 안내한다', async () => {
+    useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false } as never);
+    useV1AdminLeagueMatchMock.mockReturnValue({
+      data: { leagueId: 'league-1', isPublic: true, title: '가을 풋살 리그', state: 'draft', teamIds: ['t1', 't2'], startsOn: '2026-09-01T00:00:00.000Z', fixtures: [] },
+      isPending: false,
+    } as never);
+    const mutateAsync = vi.fn();
+    useV1GenerateLeagueFixturesMock.mockReturnValue({ mutateAsync, isPending: false } as never);
+    useV1UpdateLeagueFixtureMock.mockReturnValue({ mutate: vi.fn() } as never);
+
+    render(
+      <Providers>
+        <LeagueMatchFixturesClient leagueId="league-1" initialView="list" />
+      </Providers>,
+    );
+
+    fireEvent.click(screen.getByRole('radio', { name: '다른 장소 사용' }));
+    fireEvent.click(screen.getByRole('button', { name: '라운드로빈 대진 생성' }));
+
+    expect(await screen.findByText(/다른 장소를 골라 주세요/)).toBeInTheDocument();
+    expect(mutateAsync).not.toHaveBeenCalled();
   });
 
   it('조회가 실패하면 에러 메시지와 재시도 버튼을 보여주고, 버튼을 누르면 refetch를 호출한다', () => {
@@ -886,12 +953,13 @@ describe('LeagueMatchFixturesClient', () => {
   });
 
   describe('일정 수정 모달', () => {
-    function renderOneFixture(mutate: ReturnType<typeof vi.fn>) {
+    function renderOneFixture(mutate: ReturnType<typeof vi.fn>, extra: Record<string, unknown> = {}) {
       useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false } as never);
       useV1AdminLeagueMatchMock.mockReturnValue({
         data: {
           leagueId: 'league-1', isPublic: true, title: '가을 풋살 리그', state: 'active', teamIds: ['t1', 't2'],
           startsOn: '2026-09-01T00:00:00.000Z',
+          ...extra,
           fixtures: [
             { teamMatchId: 'tm-1', title: '가을 풋살 리그 1주차', homeTeamId: 't1', awayTeamId: 't2', startAt: '2026-09-01T20:00:00.000Z', placeName: '탄천 보조구장', placeAddress: '성남시 탄천로 1', status: 'matched' },
           ],
@@ -909,17 +977,45 @@ describe('LeagueMatchFixturesClient', () => {
       return screen.getByRole('dialog', { name: '일정 수정' });
     }
 
-    it('현재 구장·주소를 채워 열고, 구장만 바꾸면 그 필드만 보낸다', async () => {
+    it('기본 장소가 없는 리그의 경기는 현재 장소로 열리고, 이름만 바꾸면 장소 필드만 보낸다', async () => {
       const mutate = vi.fn();
       const modal = renderOneFixture(mutate);
 
-      expect(within(modal).getByLabelText('구장')).toHaveValue('탄천 보조구장');
-      expect(within(modal).getByLabelText(/^주소/)).toHaveValue('성남시 탄천로 1');
-      fireEvent.change(within(modal).getByLabelText('구장'), { target: { value: '잠실 보조구장' } });
+      expect(within(modal).getByRole('radio', { name: '이 경기만 다른 장소' })).toBeChecked();
+      expect(within(modal).getByLabelText('다른 장소')).toHaveValue('탄천 보조구장');
+      fireEvent.change(within(modal).getByLabelText('다른 장소'), { target: { value: '잠실 보조구장' } });
       fireEvent.click(within(modal).getByRole('button', { name: '저장' }));
 
       await waitFor(() =>
-        expect(mutate).toHaveBeenCalledWith({ teamMatchId: 'tm-1', body: { placeName: '잠실 보조구장' } }, expect.anything()),
+        expect(mutate).toHaveBeenCalledWith(
+          { teamMatchId: 'tm-1', body: { placeName: '잠실 보조구장' } },
+          expect.anything(),
+        ),
+      );
+    });
+
+    it('시각만 바꾸면 장소 필드를 하나도 보내지 않는다', async () => {
+      const mutate = vi.fn();
+      const modal = renderOneFixture(mutate);
+
+      fireEvent.change(within(modal).getByLabelText('일시'), { target: { value: '2026-09-03T20:00' } });
+      fireEvent.click(within(modal).getByRole('button', { name: '저장' }));
+
+      await waitFor(() => expect(mutate).toHaveBeenCalledTimes(1));
+      const body = mutate.mock.calls[0][0].body as Record<string, unknown>;
+      expect(Object.keys(body)).toEqual(['startsAt']);
+    });
+
+    it('기본 장소와 다른 경기를 기본 장소 사용으로 바꾸면 placeName 을 빈 문자열로 보낸다', async () => {
+      const mutate = vi.fn();
+      const modal = renderOneFixture(mutate, { defaultPlace: PICKED_VENUE });
+
+      expect(within(modal).getByRole('radio', { name: '이 경기만 다른 장소' })).toBeChecked();
+      fireEvent.click(within(modal).getByRole('radio', { name: '기본 장소 사용 (상암 풋살파크)' }));
+      fireEvent.click(within(modal).getByRole('button', { name: '저장' }));
+
+      await waitFor(() =>
+        expect(mutate).toHaveBeenCalledWith({ teamMatchId: 'tm-1', body: { placeName: '' } }, expect.anything()),
       );
     });
 
@@ -927,7 +1023,7 @@ describe('LeagueMatchFixturesClient', () => {
       const mutate = vi.fn((_vars, opts) => opts.onSuccess({}));
       const modal = renderOneFixture(mutate);
 
-      fireEvent.change(within(modal).getByLabelText('구장'), { target: { value: '잠실 보조구장' } });
+      fireEvent.change(within(modal).getByLabelText('다른 장소'), { target: { value: '잠실 보조구장' } });
       fireEvent.click(within(modal).getByRole('button', { name: '저장' }));
 
       expect(await screen.findByText('일정을 저장했어요.')).toBeInTheDocument();
@@ -938,12 +1034,12 @@ describe('LeagueMatchFixturesClient', () => {
       const mutate = vi.fn((_vars, opts) => opts.onError(new Error('서버가 거부했어요')));
       const modal = renderOneFixture(mutate);
 
-      fireEvent.change(within(modal).getByLabelText('구장'), { target: { value: '잠실 보조구장' } });
+      fireEvent.change(within(modal).getByLabelText('다른 장소'), { target: { value: '잠실 보조구장' } });
       fireEvent.click(within(modal).getByRole('button', { name: '저장' }));
 
       expect(await within(modal).findByRole('alert')).toBeInTheDocument();
       expect(screen.getByRole('dialog', { name: '일정 수정' })).toBeInTheDocument();
-      expect(within(modal).getByLabelText('구장')).toHaveValue('잠실 보조구장');
+      expect(within(modal).getByLabelText('다른 장소')).toHaveValue('잠실 보조구장');
     });
   });
 

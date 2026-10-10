@@ -25,6 +25,7 @@ describe('describeBracketCanvasError', () => {
     ['IDEMPOTENCY_PAYLOAD_CONFLICT', '같은 요청이 다른 내용으로 이미 처리됐어요. 새로고침한 뒤 다시 시도해 주세요.'],
     ['COMMAND_IDEMPOTENCY_PAYLOAD_REUSE', '그사이 다른 경기가 먼저 추가됐어요. 대진을 새로 불러온 뒤 다시 눌러 주세요.'],
     ['LEAGUE_ON_HOLD', '보류 중인 리그라 대진을 바꿀 수 없어요.'],
+    ['LEAGUE_ENDED', '끝났거나 취소된 리그라 대진을 바꿀 수 없어요.'],
   ])('%s 는 정해 둔 해요체 문구로 바꾼다', (code, expected) => {
     expect(describeBracketCanvasError(apiError(code), '실패했어요.')).toBe(expected);
   });

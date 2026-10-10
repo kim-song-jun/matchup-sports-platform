@@ -1,7 +1,7 @@
 'use client';
 
 import { useId, useState } from 'react';
-import { RecentVenueChips } from '@/components/v1-ui/create-form-fields';
+import type { V1PlaceView } from '@/types/api';
 import { SegmentedTabs } from '@/components/v1-ui/segmented-tabs';
 import { useModalA11y } from '@/components/v1-ui/use-modal-a11y';
 import { extractErrorMessage } from '@/lib/error-message';
@@ -11,6 +11,13 @@ import { expandWeeklyFixtureDates, WEEKDAY_OPTIONS } from '@/lib/league-fixture-
 import { plannedGameCount, roundRobinRounds, type RoundRobinLegs } from '@/lib/league-round-robin-plan';
 import type { V1ApplyLeagueTemplatePayload } from '@/types/league-match';
 import { LeagueFixtureDatePicker } from './league-fixture-date-picker';
+import {
+  DEFAULT_LEAGUE_PLACE_CHOICE,
+  isLeaguePlaceChoiceIncomplete,
+  LeagueFixturePlaceField,
+  leaguePlacePayload,
+  type LeaguePlaceChoice,
+} from './league-fixture-place-field';
 
 const TEAM_COUNT_MIN = 3;
 const TEAM_COUNT_MAX = 20;
@@ -22,8 +29,10 @@ export interface LeagueTemplateDialogProps {
   /** 리그 시작일(ISO) — 요일로 채울 때 기준일. */
   leagueStartsOn: string;
   initialTeamCount: number;
+  /** 리그 기본 장소. 비워 두면 새 경기가 이 장소를 이어받는다. */
+  defaultPlace: V1PlaceView | null;
   /** 참가팀이 과거에 쓴 장소(추천 칩). 없으면 빈 배열. */
-  recentVenues: readonly string[];
+  recentVenues: readonly V1PlaceView[];
   /** 경기가 이미 있는 리그를 새 템플릿으로 바꾸는 중인가. */
   replaceExisting: boolean;
   isSubmitting: boolean;
@@ -34,6 +43,7 @@ export interface LeagueTemplateDialogProps {
 export function LeagueTemplateDialog({
   leagueStartsOn,
   initialTeamCount,
+  defaultPlace,
   recentVenues,
   replaceExisting,
   isSubmitting,
@@ -46,7 +56,7 @@ export function LeagueTemplateDialog({
   const [dayOfWeek, setDayOfWeek] = useState<number | ''>('');
   const [time, setTime] = useState('19:00');
   const [selectedDates, setSelectedDates] = useState<string[]>([]);
-  const [placeName, setPlaceName] = useState('');
+  const [placeChoice, setPlaceChoice] = useState<LeaguePlaceChoice>(DEFAULT_LEAGUE_PLACE_CHOICE);
   const [error, setError] = useState<string | null>(null);
   // pending 을 넘겨 제출 중 ESC 로 닫히지 않게 한다 — 요청은 날아가는데 화면만 사라지면 결과를 알 수 없다.
   const { dialogRef } = useModalA11y({ open: true, onClose, pending: isSubmitting });
@@ -81,12 +91,16 @@ export function LeagueTemplateDialog({
       setError(`경기 날짜가 ${rounds}일 필요해요. ${selectedDates.length}일 골랐어요.`);
       return;
     }
+    if (isLeaguePlaceChoiceIncomplete(placeChoice)) {
+      setError('다른 장소를 골라 주세요.');
+      return;
+    }
     try {
       await onSubmit({
         teamCount,
         legs,
         schedule: { dates: selectedDates, time: time.trim() },
-        ...(placeName.trim() === '' ? {} : { placeName: placeName.trim() }),
+        ...leaguePlacePayload(placeChoice),
         ...(replaceExisting ? { replaceExisting: true } : {}),
       });
       onClose();
@@ -121,7 +135,7 @@ export function LeagueTemplateDialog({
 
       <div className="flex-1 overflow-y-auto px-5 py-4">
         <p className="mb-4 text-[length:var(--font-size-caption)] text-[var(--text-muted)]">
-          팀 없이 경기 틀과 일정을 먼저 만들어요. 팀은 일정 보드에서 자리에 넣어요. 장소를 비우면 ‘장소 미정’으로 들어가고, 만든 뒤 경기마다 「일정 수정」에서 바꿀 수 있어요.
+          팀 없이 경기 틀과 일정을 먼저 만들어요. 팀은 일정 보드에서 자리에 넣어요. 기본 장소가 없으면 ‘장소 미정’으로 들어가고, 만든 뒤 경기마다 「일정 수정」에서 바꿀 수 있어요.
           자리에 팀을 모두 넣기 전에는 공개 화면에 경기가 나오지 않아요.
         </p>
         {replaceExisting ? (
@@ -190,21 +204,15 @@ export function LeagueTemplateDialog({
           </div>
         </div>
 
-        <div className="mb-4 md:max-w-xl">
-          <label htmlFor="league-template-place-name" className="mb-1 block text-[length:var(--font-size-body-sm)] font-medium text-[var(--text-strong)]">기본 장소</label>
-          <input
-            id="league-template-place-name"
-            type="text"
-            maxLength={120}
-            placeholder="장소 미정"
-            value={placeName}
-            onChange={(event) => setPlaceName(event.target.value)}
-            className={`${inputClass} w-full`}
-          />
-          <RecentVenueChips
-            items={recentVenues.map((venue) => ({ placeName: venue }))}
-            selectedValue={placeName}
-            onSelect={(venue) => setPlaceName(venue.placeName)}
+        <div className="mb-4 grid md:max-w-xl">
+          <LeagueFixturePlaceField
+            legend="장소"
+            customLabel="다른 장소 사용"
+            defaultPlace={defaultPlace}
+            recentVenues={recentVenues}
+            choice={placeChoice}
+            onChange={setPlaceChoice}
+            disabled={isSubmitting}
           />
         </div>
 

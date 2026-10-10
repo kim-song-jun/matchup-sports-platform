@@ -25,6 +25,7 @@ import type {
   V1ReviewSubmitResponse,
   V1Settings,
   V1Sport,
+  V1PlaceSearchResponse,
   V1Team,
   V1TeamCompetitionEntries,
   V1TeamMatch,
@@ -302,6 +303,43 @@ export const v1AdminPopupsFixture: V1AdminPopupRow[] = [{
   createdAt: '2026-05-18T00:00:00.000Z',
   updatedAt: '2026-05-18T00:00:00.000Z',
 }];
+/** `GET /places/search` 응답 원본. 핸들러가 검색어 토큰으로 이름을 걸러 돌려준다. */
+export const v1PlaceSearchFixture: V1PlaceSearchResponse = {
+  hasMore: false,
+  items: [
+    {
+      provider: 'kakao',
+      providerPlaceId: 'kakao-place-mangwon-hangang',
+      name: '망원한강공원 풋살장',
+      address: '서울 마포구 마포나루길 467',
+      jibunAddress: '서울 마포구 망원동 466-1',
+      category: '스포츠시설 > 풋살장',
+      latitude: 37.5558,
+      longitude: 126.8985,
+    },
+    {
+      provider: 'kakao',
+      providerPlaceId: 'kakao-place-mangwon-yusuji',
+      name: '망원유수지 체육공원 풋살장',
+      address: '서울 마포구 망원동 471',
+      jibunAddress: null,
+      category: '스포츠시설 > 풋살장',
+      latitude: 37.5562,
+      longitude: 126.9021,
+    },
+    {
+      provider: 'kakao',
+      providerPlaceId: 'kakao-place-seongsan',
+      name: '성산 풋살파크 A구장',
+      address: '서울 마포구 월드컵로 20',
+      jibunAddress: null,
+      category: '스포츠시설 > 풋살장',
+      latitude: 37.5602,
+      longitude: 126.9136,
+    },
+  ],
+};
+
 export const v1MatchesFixture: V1Match[] = [
   {
     id: 'match-1',
@@ -311,6 +349,14 @@ export const v1MatchesFixture: V1Match[] = [
     minLevel: { code: 'novice', name: '초보' },
     maxLevel: { code: 'intermediate', name: '중수' },
     placeName: '성수 실내풋살장',
+    place: {
+      name: '성수 실내풋살장',
+      address: '서울 성동구 아차산로 126',
+      latitude: 37.5446,
+      longitude: 127.0559,
+      provider: 'kakao',
+      providerPlaceId: 'kakao-place-seongsu',
+    },
     startsAt: '2026-05-18T20:00:00.000Z',
     capacityText: '7/10명',
     status: 'open',

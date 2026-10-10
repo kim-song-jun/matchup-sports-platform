@@ -61,6 +61,10 @@ function matchRow(overrides: Record<string, unknown> = {}) {
     imageUrl: null,
     placeName: '강남역',
     placeAddress: null,
+    placeLatitude: null,
+    placeLongitude: null,
+    placeProvider: null,
+    placeProviderId: null,
     startAt: FUTURE,
     endAt: null,
     deadlineAt: null,
@@ -207,15 +211,15 @@ describe('MatchesService', () => {
     // orderBy가 distinct 필드로 시작하지 않으면 의도한 순서를 보장 못 해 서비스가
     // 직접 dedup한다(회귀 방지).
     prisma.v1Match.findMany.mockResolvedValue([
-      { placeName: '한강공원 축구장', placeAddress: '서울 영등포구 여의동로 330' },
-      { placeName: '한강공원 축구장', placeAddress: '서울 영등포구 여의동로 330(구주소)' },
-      { placeName: '강남역', placeAddress: null },
+      { placeName: '한강공원 축구장', placeAddress: '서울 영등포구 여의동로 330', placeLatitude: 37.5282, placeLongitude: 126.9326, placeProvider: 'kakao', placeProviderId: '12345' },
+      { placeName: '한강공원 축구장', placeAddress: '서울 영등포구 여의동로 330(구주소)', placeLatitude: null, placeLongitude: null, placeProvider: null, placeProviderId: null },
+      { placeName: '강남역', placeAddress: null, placeLatitude: null, placeLongitude: null, placeProvider: null, placeProviderId: null },
     ]);
 
     await expect(service.recentVenues(host)).resolves.toEqual({
       items: [
-        { placeName: '한강공원 축구장', addressText: '서울 영등포구 여의동로 330' },
-        { placeName: '강남역', addressText: null },
+        { placeName: '한강공원 축구장', addressText: '서울 영등포구 여의동로 330', latitude: 37.5282, longitude: 126.9326, provider: 'kakao', providerPlaceId: '12345' },
+        { placeName: '강남역', addressText: null, latitude: null, longitude: null, provider: null, providerPlaceId: null },
       ],
     });
     expect(prisma.v1Match.findMany).toHaveBeenCalledWith(
@@ -962,6 +966,99 @@ describe('MatchesService', () => {
 
     expect(prisma.v1Match.create).toHaveBeenCalledWith(
       expect.objectContaining({ data: expect.objectContaining({ costNote: '10,000원/1인' }) }),
+    );
+  });
+
+  it('create: 고른 장소 스냅샷(좌표·provider·id)을 그대로 저장한다', async () => {
+    prisma.v1Sport.findFirst.mockResolvedValue({ id: 'sport-1' });
+    prisma.v1Region.findFirst.mockResolvedValue({ id: 'region-1' });
+    prisma.v1Match.create.mockResolvedValue(matchRow());
+    prisma.v1MatchParticipant.create.mockResolvedValue({ id: 'participant-1' });
+
+    await service.create(host, {
+      sportId: 'sport-1',
+      regionId: 'region-1',
+      title: '테스트 매치',
+      startsAt: FUTURE.toISOString(),
+      capacity: 10,
+      manualPlaceName: '망원 풋살장',
+      addressText: '서울 마포구 월드컵로 1',
+      placeLatitude: 37.55,
+      placeLongitude: 126.9,
+      placeProvider: 'kakao',
+      placeProviderId: '777',
+    });
+
+    expect(prisma.v1Match.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          placeName: '망원 풋살장',
+          placeAddress: '서울 마포구 월드컵로 1',
+          placeLatitude: 37.55,
+          placeLongitude: 126.9,
+          placeProvider: 'kakao',
+          placeProviderId: '777',
+        }),
+      }),
+    );
+  });
+
+  it('create: 핀 정보가 일부만 오면 400 PLACE_SNAPSHOT_INCOMPLETE 이고 저장하지 않는다', async () => {
+    prisma.v1Sport.findFirst.mockResolvedValue({ id: 'sport-1' });
+    prisma.v1Region.findFirst.mockResolvedValue({ id: 'region-1' });
+
+    await expect(
+      service.create(host, {
+        sportId: 'sport-1',
+        regionId: 'region-1',
+        title: '테스트 매치',
+        startsAt: FUTURE.toISOString(),
+        capacity: 10,
+        manualPlaceName: '망원 풋살장',
+        placeLatitude: 37.55,
+        placeLongitude: 126.9,
+      }),
+    ).rejects.toMatchObject({ response: { code: 'PLACE_SNAPSHOT_INCOMPLETE' } });
+    expect(prisma.v1Match.create).not.toHaveBeenCalled();
+  });
+
+  it('update: 이름만 보내면 옛 핀(좌표·provider·id)을 null 로 지운다', async () => {
+    prisma.v1Sport.findFirst.mockResolvedValue({ id: 'sport-1' });
+    prisma.v1Region.findFirst.mockResolvedValue({ id: 'region-1' });
+    const current = matchRow({
+      status: 'recruiting',
+      startAt: FUTURE,
+      placeName: '망원 풋살장',
+      placeLatitude: 37.55,
+      placeLongitude: 126.9,
+      placeProvider: 'kakao',
+      placeProviderId: '777',
+    });
+    prisma.v1Match.findFirst.mockResolvedValue(current);
+    prisma.v1Match.update.mockResolvedValue(current);
+    prisma.v1MatchParticipant.findMany.mockResolvedValue([]);
+    prisma.v1MatchApplication.findMany.mockResolvedValue([]);
+
+    await service.update(host, 'match-1', {
+      sportId: 'sport-1',
+      regionId: 'region-1',
+      title: '테스트 매치',
+      startsAt: FUTURE.toISOString(),
+      capacity: 10,
+      manualPlaceName: '동네 운동장',
+      version: current.updatedAt.toISOString(),
+    });
+
+    expect(prisma.v1Match.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          placeName: '동네 운동장',
+          placeLatitude: null,
+          placeLongitude: null,
+          placeProvider: null,
+          placeProviderId: null,
+        }),
+      }),
     );
   });
 

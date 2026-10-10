@@ -6,10 +6,13 @@ import { useEffect, useRef, useState } from 'react';
 import { useShellOverride } from '@/components/v1-ui/shell-override';
 import { Card, EmptyState, ErrorState } from '@/components/v1-ui/primitives';
 import { PageSkeleton } from '@/components/v1-ui/page-skeleton';
+import { PlaceCard } from '@/components/v1-ui/place-card';
+import { PlacePicker } from '@/components/v1-ui/place-picker';
+import type { V1PlaceView } from '@/types/api';
 import { ChevronLeftIcon, ChevronRightIcon, FilterIcon, MoreIcon, PlusIcon, SearchIcon, ShareIcon } from '@/components/v1-ui/icons';
 import { MatchTypeSegment } from '@/components/v1-ui/match-type-segment';
 import { TeamAvatar } from '@/components/v1-ui/team-avatar';
-import { CreateField, FieldErrorText, GenderRuleSelector, MissingFieldsBanner, MultiPresetChipSelector, PresetChipSelector, RecentVenueChips } from '@/components/v1-ui/create-form-fields';
+import { CreateField, FieldErrorText, GenderRuleSelector, MissingFieldsBanner, MultiPresetChipSelector, PresetChipSelector } from '@/components/v1-ui/create-form-fields';
 import { BottomSheet } from '@/components/v1-ui/bottom-sheet';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
 import { cssUrl } from '@/lib/assets';
@@ -711,7 +714,7 @@ export function TeamMatchDetailPageView({ model, recordEntry, lifecyclePanel }: 
               <div className="tm-info-group">
                 <div className="tm-info-group-label">일정 · 장소</div>
                 <InfoRow label="날짜와 시간" value={`${match.date} ${timeRange}`} />
-                <InfoRow label="장소" value={match.venue} sub={match.address} />
+                <DetailPlace place={match.place} fallbackName={match.venue} />
                 <InfoRow label="지역" value={match.region} />
               </div>
               {/* ── 그룹 2: 경기 조건 ── */}
@@ -1172,6 +1175,20 @@ function TeamMatchCard({ match, fromHref }: { match: TeamMatchModel; fromHref: s
  * (v1-ui/create-form-fields.tsx는 여러 화면이 공유하는 컴포넌트라 여기서 수정하지 않는다)
  * 필드 바깥의 별도 안내로 대신한다.
  */
+/** 일정·장소 그룹 안의 장소 행. 이름·주소는 카드가 보여 주므로 InfoRow 와 겹쳐 그리지 않는다. */
+function DetailPlace({ place, fallbackName }: { place: V1PlaceView | null; fallbackName: string }) {
+  if (!place) return <InfoRow label="장소" value={fallbackName} />;
+  return (
+    // 행 구분선만 tm-info-row 에서 받는다 — 행의 좌우 여백 0(인라인으로 덮는다)을 물려받으면 카드가 테두리에 붙는다.
+    <div className="tm-info-row" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 4, padding: '14px 16px' }}>
+      <div className="tm-text-caption" style={{ color: 'var(--text-caption)' }}>장소</div>
+      <div style={{ width: '100%' }}>
+        <PlaceCard place={place} />
+      </div>
+    </div>
+  );
+}
+
 function RequiredHint({ shown }: { shown: boolean }) {
   if (!shown) return null;
   return <div className="tm-text-micro" style={{ marginTop: 4, color: 'var(--text-caption)' }}>필수 입력이에요</div>;
@@ -1329,36 +1346,18 @@ function PlaceTimeFields({ model }: { model: TeamMatchCreateViewModel }) {
   const d = model.draft;
   const errors = model.form?.fieldErrors;
   const recentVenues = model.form?.recentVenues ?? [];
-  // #3 1단계: matches-page.tsx의 PlaceTimeFields와 동일한 focus/blur 칩 패턴 —
-  // 팀이 호스트로 과거에 실제로 쓴 장소를 재사용할 수 있게 한다.
-  const [venueFocused, setVenueFocused] = useState(false);
   return (
     <>
       <RegionSelect value={model.form?.regionId ?? ''} regions={model.form?.regions ?? []} onChange={model.form?.onRegionChange} error={errors?.regionId} />
-      <CreateField
-        id="field-venue"
-        error={errors?.venue}
+      <PlacePicker
+        id="field-place"
         label="장소"
-        value={d.venue}
-        placeholder="예: 잠실 풋살파크 A구장"
-        onChange={(value) => model.form?.onFieldChange('venue', value)}
-        onFocus={() => setVenueFocused(true)}
-        onBlur={() => setVenueFocused(false)}
-      >
-        {venueFocused ? (
-          <RecentVenueChips
-            items={recentVenues}
-            selectedValue={d.venue}
-            onSelect={(venue) => {
-              model.form?.onFieldChange('venue', venue.placeName);
-              model.form?.onFieldChange('address', venue.addressText ?? '');
-              setVenueFocused(false);
-            }}
-          />
-        ) : null}
-      </CreateField>
-      <RequiredHint shown={!errors?.venue && !d.venue.trim()} />
-      <CreateField label="상세 주소" value={d.address} placeholder="예: 서울 송파구 올림픽로 25, 3층 2번 코트" onChange={(value) => model.form?.onFieldChange('address', value)} />
+        value={d.place}
+        onChange={(place) => model.form?.onFieldChange('place', place)}
+        error={errors?.place}
+        recentVenues={recentVenues}
+      />
+      <RequiredHint shown={!errors?.place && !d.place} />
       <CreateField id="field-date" error={errors?.date} label="날짜" value={d.date} type="date" onChange={(value) => model.form?.onFieldChange('date', value)} />
       <RequiredHint shown={!errors?.date && !d.date} />
       <div className="tm-create-two-col">
@@ -1390,7 +1389,7 @@ function RegionSelect({ value, regions, onChange, error }: { value: string; regi
   }, [selectedRegion?.parentName]);
 
   if (parentNames.length === 0) {
-    return <label className="tm-create-field"><div className="tm-text-label">지역</div><select id="field-regionId" className="tm-create-input tm-create-select-control" value={value} onChange={(event) => onChange?.(event.target.value)}><option value="">시/군/구 선택</option>{regions.map((region) => <option key={region.id} value={region.id}>{region.name}</option>)}</select><div className="tm-text-caption" style={{ marginTop: 8 }}>지역은 검색·추천 기준으로 사용돼요. 상세주소는 아래에 직접 입력해 주세요.</div><FieldErrorText message={error} /><RequiredHint shown={!error && !value} /></label>;
+    return <label className="tm-create-field"><div className="tm-text-label">지역</div><select id="field-regionId" className="tm-create-input tm-create-select-control" value={value} onChange={(event) => onChange?.(event.target.value)}><option value="">시/군/구 선택</option>{regions.map((region) => <option key={region.id} value={region.id}>{region.name}</option>)}</select><div className="tm-text-caption" style={{ marginTop: 8 }}>지역은 검색·추천에 쓰여요. 장소는 아래에서 검색해 골라 주세요.</div><FieldErrorText message={error} /><RequiredHint shown={!error && !value} /></label>;
   }
 
   return (
@@ -1421,7 +1420,7 @@ function RegionSelect({ value, regions, onChange, error }: { value: string; regi
           {districts.map((region) => <option key={region.id} value={region.id}>{region.shortName ?? region.name}</option>)}
         </select>
       </div>
-      <div className="tm-text-caption" style={{ marginTop: 8 }}>지역은 검색·추천 기준으로 사용돼요. 상세주소는 아래에 직접 입력해 주세요.</div>
+      <div className="tm-text-caption" style={{ marginTop: 8 }}>지역은 검색·추천에 쓰여요. 장소는 아래에서 검색해 골라 주세요.</div>
       <FieldErrorText message={error} />
       <RequiredHint shown={!error && !value} />
     </div>
@@ -1438,7 +1437,7 @@ function ConfirmStep({ model }: { model: TeamMatchCreateViewModel }) {
   // 종료 시간은 선택 입력이라 비어 있을 수 있다 — 상세 화면(:349 InfoRow label="장소")과
   // 동일하게 분기해야 확인 화면에 하이픈만 매달려 남는 것을 막는다.
   const timeRangeText = d.endTime ? `${d.date} ${d.startTime} ~ ${d.endDate && d.endDate !== d.date ? `${d.endDate} ` : ''}${d.endTime}` : `${d.date} ${d.startTime}`;
-  return <div><h1 className="tm-text-heading">입력한 내용을 확인해 주세요</h1><Card pad={0} style={{ marginTop: 16, overflow: 'hidden' }}><TeamMatchImagesPreview images={d} sport={model.selectedSport} /><div style={{ padding: 16 }}><div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}><span className="tm-badge tm-badge-blue">{model.selectedSport}</span><span className="tm-badge tm-badge-grey">{d.grade}</span><span className="tm-badge tm-badge-grey">{d.format}</span><span className="tm-badge tm-badge-grey">{matchGenderRuleLabel(d.gender)}</span>{isFreeInvite ? <span className="tm-badge tm-badge-blue">무료초청</span> : null}</div><div className="tm-text-subhead" style={{ marginTop: 12 }}>{d.title}</div><div className="tm-text-caption" style={{ marginTop: 8, whiteSpace: 'pre-wrap' }}>{d.description}</div></div></Card><Card pad={16} style={{ marginTop: 12 }}><InfoRow label="지역" value={regionName} sub="검색과 추천에 사용돼요" /><InfoRow label="경기조건" value={`${d.grade} · ${d.format}${styleText ? ` · ${styleText}` : ''}`} sub={`${d.uniform} · ${matchGenderRuleLabel(d.gender)}`} /><InfoRow label="비용" value={`총 ${formatAmountNumber(d.cost)}원 · 상대팀 ${formatAmountNumber(d.opponentCost)}원`} sub={TEAM_MATCH_COST_EXPLANATION} /><InfoRow label="일시" value={timeRangeText} /><InfoRow label="신청 마감" value={deadlineText} /><InfoRow label="장소" value={d.venue} sub={d.address} /></Card></div>;
+  return <div><h1 className="tm-text-heading">입력한 내용을 확인해 주세요</h1><Card pad={0} style={{ marginTop: 16, overflow: 'hidden' }}><TeamMatchImagesPreview images={d} sport={model.selectedSport} /><div style={{ padding: 16 }}><div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}><span className="tm-badge tm-badge-blue">{model.selectedSport}</span><span className="tm-badge tm-badge-grey">{d.grade}</span><span className="tm-badge tm-badge-grey">{d.format}</span><span className="tm-badge tm-badge-grey">{matchGenderRuleLabel(d.gender)}</span>{isFreeInvite ? <span className="tm-badge tm-badge-blue">무료초청</span> : null}</div><div className="tm-text-subhead" style={{ marginTop: 12 }}>{d.title}</div><div className="tm-text-caption" style={{ marginTop: 8, whiteSpace: 'pre-wrap' }}>{d.description}</div></div></Card><Card pad={16} style={{ marginTop: 12 }}><InfoRow label="지역" value={regionName} sub="검색과 추천에 사용돼요" /><InfoRow label="경기조건" value={`${d.grade} · ${d.format}${styleText ? ` · ${styleText}` : ''}`} sub={`${d.uniform} · ${matchGenderRuleLabel(d.gender)}`} /><InfoRow label="비용" value={`총 ${formatAmountNumber(d.cost)}원 · 상대팀 ${formatAmountNumber(d.opponentCost)}원`} sub={TEAM_MATCH_COST_EXPLANATION} /><InfoRow label="일시" value={timeRangeText} /><InfoRow label="신청 마감" value={deadlineText} /><InfoRow label="장소" value={d.place?.name ?? ''} sub={d.place?.address ?? undefined} /></Card></div>;
 
 }
 

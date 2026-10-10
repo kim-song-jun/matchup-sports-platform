@@ -142,7 +142,7 @@ describe('summarizeLandingData', () => {
       startsAt: '2026-10-01T09:00:00.000Z',
       hostTeam: { teamId: 'h', name: '마포 레인저스', logoUrl: '/logo/h.png' },
       approvedOpponentTeam: { teamId: 'o', name: '한강 로버스', logoUrl: null },
-      place: { name: '케이풋살파크' },
+      place: { name: '케이풋살파크', address: null, latitude: null, longitude: null, provider: null, providerPlaceId: null },
       matchFormat: '4:4',
       levelLabel: '입문',
     });

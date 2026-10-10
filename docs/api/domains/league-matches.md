@@ -55,6 +55,8 @@ hold compares both values so a newly private league is never restored as public.
 While on hold, fixture generation and regeneration return `409 LEAGUE_ON_HOLD`
 without creating or cancelling fixtures. Both actions recheck the status after
 locking the parent league row, including a hold committed during plan calculation.
+A completed or cancelled league rejects the same generation, template and slot-assignment
+actions with `409 LEAGUE_ENDED`; releasing slots on registration cancellation is not guarded.
 
 While a league is on hold, already-scheduled notifications for its fixtures are
 suppressed at fire time (the outbox rows are kept, so resuming re-enables the next
@@ -152,6 +154,20 @@ inherited the same URL. A value equal to the stored one returns
 `{ leagueId, coverImageUrl, alreadyProcessed }`; errors `404 LEAGUE_NOT_FOUND`,
 `409 LEAGUE_MIRROR_MISSING`. Audit action `league_match.cover_image_updated`
 (before/after `coverImageUrl`).
+
+## Default venue (기본 장소)
+
+`GET /admin/league-matches/:leagueId` returns `defaultPlace: { name, address, latitude,
+longitude, provider, providerPlaceId } | null` built from the league's venue columns
+(a pin without a `kakao` provider is dropped; name and address stay).
+
+`PATCH /api/v1/admin/league-matches/:leagueId/venue` takes
+`{ venue?, venueAddress?, venueLatitude?, venueLongitude?, venueProvider?, venueProviderId? }`
+(same place-snapshot rules as other domains: `venue` max 200, pin fields all-or-none else
+400 `PLACE_SNAPSHOT_INCOMPLETE`). `null` or blank `venue` clears the whole snapshot. Existing
+fixtures are never touched; only fixtures created afterwards inherit the default. Response
+`data`: `{ leagueId, defaultPlace }`; errors `404 LEAGUE_NOT_FOUND`, `409 LEAGUE_MIRROR_MISSING`.
+Audit action `league_match.venue_updated` (before/after `defaultPlace`).
 
 `PATCH /api/v1/admin/tournaments/:id` stays regular-tournament only (the #863
 lock); it is intentionally not opened for leagues.
@@ -274,8 +290,9 @@ A league can be drawn first and filled with teams later. A **slot** (`V1Tourname
   / `LEAGUE_SCHEDULE_DATE_PAST` / `LEAGUE_SCHEDULE_DATE_INVALID` as in bulk generation). `placeName`
   defaults to `장소 미정`. More than 240 fixtures returns `422 BRACKET_TEMPLATE_TOO_LARGE`. The league
   `status` is **not** changed.
-  - Locks the league row (`FOR UPDATE`) and applies the same guard as bulk generation (`409 LEAGUE_ON_HOLD`).
-    A league that already has any fixture (cancelled ones included) returns `409 LEAGUE_FIXTURES_EXIST`, so
+  - Locks the league row (`FOR UPDATE`) and applies the same guard as bulk generation: `409 LEAGUE_ON_HOLD`
+    while on hold, `409 LEAGUE_ENDED` for a completed or cancelled league (checked first, even when fixtures
+    exist). Otherwise a league that already has any fixture (cancelled ones included) returns `409 LEAGUE_FIXTURES_EXIST`, so
     a concurrent bulk generation and a template cannot both succeed.
   - `replaceExisting: true` cancels the existing non-cancelled fixtures (never deletes — games are
     `Restrict`-linked), releases their slot links, deletes the old slots and builds the new ones. Allowed
@@ -321,3 +338,9 @@ The result-entry reminder skips such fixtures as well.
   registration id the slot assignment endpoint takes).
 - `GET /admin/league-matches/:leagueId/videos`: `homeTeamName` is `string | null` (an unfilled fixture no
   longer returns `409 LEAGUE_FIXTURE_INCOMPLETE`).
+
+### Fixture place snapshot (Task 20261070)
+
+- Generate / regenerate / manual / template / update-fixture DTOs accept `placeName`, `placeAddress`, `placeLatitude`, `placeLongitude`, `placeProvider`, `placeProviderId`.
+- A blank `placeName` inherits the league's default place (the mirror tournament's `venue` snapshot); with no default it falls back to `장소 미정` with no coordinates. On update, a present `placeName` replaces the whole snapshot.
+- Fixture rows (admin detail, `updateFixture`, public list/detail) keep `placeName` and add `place: V1PlaceView | null`; admin `recentVenues` is now `V1PlaceView[]` (most recent snapshot per name, default excluded).

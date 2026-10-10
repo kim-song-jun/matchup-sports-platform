@@ -9,6 +9,7 @@ import type { TournamentDetailRow } from './tournaments-read.query';
 import { resolveTournamentFixtureOfficialResult } from './tournament-fixture-official-result';
 import type { PublicRosterPlayer } from './public-roster';
 import { slotLabelFromRow } from './slots/tournament-slot-label';
+import { toPlaceView, type PlaceView } from '../places/place-snapshot';
 
 type PublicFixtureStatus = 'scheduled' | 'in_progress' | 'completed' | 'cancelled';
 
@@ -138,6 +139,7 @@ type PresentedFixture = Pick<CanonicalTournamentMatchDetail, 'tournamentId' | 'g
   scheduledAt: Date | null;
   fieldId: string | null;
   venue: string | null;
+  place: PlaceView | null;
   homeSlotLabel: string | null;
   awaySlotLabel: string | null;
   status: PublicFixtureStatus;
@@ -202,6 +204,7 @@ function presentCanonicalFixture(
     scheduledAt: match.startAt,
     fieldId: match.fieldId,
     venue: match.placeName,
+    place: toPlaceView(match),
     // The label replaces 'TBD' only when a side has no team, so it is null whenever a team exists.
     homeSlotLabel: details.homeRegistration === null && match.homeSlot ? slotLabelFromRow(match.homeSlot) : null,
     awaySlotLabel: details.awayRegistration === null && match.awaySlot ? slotLabelFromRow(match.awaySlot) : null,
@@ -345,6 +348,9 @@ export function presentTournamentDetail(
     scheduledAt: row.scheduledAt?.toISOString() ?? null,
     scheduledEndAt: row.scheduledEndAt?.toISOString() ?? null,
     venue: row.venue,
+    venueAddress: row.venueAddress,
+    venueProvider: row.venueProvider,
+    venueProviderId: row.venueProviderId,
     parkingInfo: row.parkingInfo,
     latitude: row.latitude,
     longitude: row.longitude,
@@ -473,6 +479,7 @@ export function presentTournamentDetail(
       bracketSources: fixture.bracketSources,
       scheduledAt: fixture.scheduledAt?.toISOString() ?? null,
       venue: fixture.venue,
+      place: fixture.place,
       status: fixture.status,
       /**
        * 라이브 여부를 말할 수 있는 유일한 필드. `status`는 아래 이유로 그 답을 낼 수

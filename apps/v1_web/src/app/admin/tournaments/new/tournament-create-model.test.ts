@@ -243,3 +243,44 @@ describe('대회 생성 — 입력값은 KST 벽시계', () => {
     expect(isShortLeadTime('2026-09-07T23:31')).toBe(false);
   });
 });
+
+describe('대회 생성 — 장소 스냅샷', () => {
+  const picked = {
+    kind: 'picked' as const,
+    name: '상암 풋살파크',
+    address: '서울 마포구 월드컵로 240',
+    latitude: 37.5683,
+    longitude: 126.8972,
+    provider: 'kakao' as const,
+    providerPlaceId: 'kakao-sangam',
+  };
+
+  it('검색으로 고른 장소는 이름·주소·좌표·provider 를 그대로 payload 에 싣는다', () => {
+    const payload = buildTournamentCreatePayload({ ...INITIAL_TOURNAMENT_CREATE_STATE, venue: picked });
+    expect(payload).toMatchObject({
+      venue: '상암 풋살파크',
+      venueAddress: '서울 마포구 월드컵로 240',
+      venueLatitude: 37.5683,
+      venueLongitude: 126.8972,
+      venueProvider: 'kakao',
+      venueProviderId: 'kakao-sangam',
+    });
+  });
+
+  it('이름만 직접 입력한 장소는 좌표 키 없이 이름만 보내고, 비우면 venue 키가 없다', () => {
+    const manual = buildTournamentCreatePayload({
+      ...INITIAL_TOURNAMENT_CREATE_STATE,
+      venue: { kind: 'manual', name: '동네 운동장' },
+    });
+    expect(manual.venue).toBe('동네 운동장');
+    expect(Object.keys(manual).filter((key) => key.startsWith('venue'))).toEqual(['venue']);
+
+    const none = buildTournamentCreatePayload(INITIAL_TOURNAMENT_CREATE_STATE);
+    expect(Object.keys(none)).not.toContain('venue');
+  });
+
+  it('장소를 고르면 홍보 카드 장소 문구가 그 이름으로 자동 채워진다', () => {
+    const next = tournamentCreateReducer(INITIAL_TOURNAMENT_CREATE_STATE, { type: 'set-field', field: 'venue', value: picked });
+    expect(next.promoHome.locationText).toBe('상암 풋살파크');
+  });
+});

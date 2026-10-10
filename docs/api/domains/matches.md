@@ -72,6 +72,8 @@
 | `hostParticipates` | boolean | No | `true` |
 | `manualPlaceName` | string | Yes | - |
 | `addressText` | string | No | - |
+| `placeLatitude`, `placeLongitude` | number | No | 장소 검색에서 고른 좌표. 4개(`placeProvider`·`placeProviderId` 포함)가 모두 있거나 모두 없어야 해요(일부만 오면 400 `PLACE_SNAPSHOT_INCOMPLETE`) |
+| `placeProvider`, `placeProviderId` | string | No | 현재 `kakao` 만 지원. 수정 시 `manualPlaceName` 을 보내면 장소 전체를 교체해요(좌표를 안 보내면 지워져요) |
 | `rulesText` | string | No | 안내/규칙 표시용 |
 | `minLevelCode` | level code | No | - |
 | `maxLevelCode` | level code | No | - |
@@ -217,3 +219,5 @@ revision flow has produced the applicable persisted result state.
 - PATCH 수정: 보류를 미래 일정으로 변경해 recruiting 재모집. 진행 결정 초기화. 일정/장소 변경 시 requested 신청 expired, approved 신청 withdrawn, 기존 참가자 cancelled로 전환하고 match_updated 알림으로 재신청 안내. row lock 및 stale version 검증.
 - 인증 + 주최자 권한의 `DELETE /matches/:id`: recruiting/closed/cancelled이며 모든 신청 이력 및 주최자 외 참가 이력이 없을 때 archived/deletedAt soft delete + 감사 로그. 이력이 있으면 409 STATE_CONFLICT, 취소를 안내한다.
 - 보류에서도 POST cancel 가능. 타인·비활성 계정 mutation은 기존 권한 검증으로 거절. 진행 중·완료·취소 상태를 보류로 역전하지 않는다. 새 상태는 read-derived 표시 상태이고 목록 query enum은 기존 계약 유지.
+
+응답의 `place` 는 `{ name, address, latitude, longitude, provider, providerPlaceId } | null` 이에요(`address` 는 예전 `addressText`). 수정 폼 `form` 과 `recent-venues` 항목에도 좌표·provider·providerPlaceId 가 실려요.

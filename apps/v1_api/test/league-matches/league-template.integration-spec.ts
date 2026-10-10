@@ -84,7 +84,7 @@ describe('POST /admin/league-matches/:leagueId/fixtures/template', () => {
     expect(await h.prisma.v1TeamMatch.count({ where: { leagueId } })).toBe(0);
   });
 
-  it('대진이 이미 있으면 409 LEAGUE_FIXTURES_EXIST — 템플릿 두 번째 호출·일반 대진·완료 리그 모두', async () => {
+  it('대진이 이미 있으면 409 LEAGUE_FIXTURES_EXIST — 템플릿 두 번째 호출·일반 대진, 대진이 있는 완료 리그는 LEAGUE_ENDED 가 먼저', async () => {
     const body = { teamCount: 3, legs: 1, schedule: { dates: kstDates(3), time: '19:00' } };
     const twice = await h.makeLeague();
     expect((await post(twice, body)).status).toBe(201);
@@ -103,7 +103,20 @@ describe('POST /admin/league-matches/:leagueId/fixtures/template', () => {
     await h.createFixture(completed, { homeTeamId: teamA.id, awayTeamId: teamB.id });
     const done = await post(completed, body);
     expect(done.status).toBe(409);
+    expect(done.body.code).toBe('LEAGUE_ENDED');
     expect(await h.prisma.v1TournamentSlot.count({ where: { tournamentId: completed } })).toBe(0);
+  });
+
+  it('경기가 없는 완료·취소 리그도 409 LEAGUE_ENDED 이고 대진은 생기지 않는다', async () => {
+    const body = { teamCount: 3, legs: 1, schedule: { dates: kstDates(3), time: '19:00' } };
+    for (const status of ['completed', 'cancelled'] as const) {
+      const ended = await h.makeLeague();
+      await h.prisma.v1Tournament.update({ where: { id: ended }, data: { status } });
+      const res = await post(ended, body);
+      expect(res.status).toBe(409);
+      expect(res.body.code).toBe('LEAGUE_ENDED');
+      expect(await h.prisma.v1TeamMatch.count({ where: { leagueId: ended } })).toBe(0);
+    }
   });
 
   it('보류 리그는 409 LEAGUE_ON_HOLD, support 어드민과 일반 사용자는 403', async () => {

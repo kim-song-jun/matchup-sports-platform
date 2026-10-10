@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PlaceValue } from '@/lib/place';
 import { server } from '@/test/msw/server';
+import { installViewport } from '@/test/viewport';
 import type { V1RecentVenue } from '@/types/api';
 import { PlacePicker } from './place-picker';
 
@@ -270,5 +271,78 @@ describe('PlacePicker', () => {
     );
     expect(screen.getByRole('alert')).toHaveTextContent('장소를 골라 주세요');
     expect(screen.getByRole('combobox')).toHaveAttribute('aria-invalid', 'true');
+  });
+  describe('고른 장소 지도 미리보기', () => {
+    const picked: PlaceValue = {
+      kind: 'picked', name: '성산 풋살파크', address: '서울 마포구', latitude: 37.5, longitude: 126.9, provider: 'kakao', providerPlaceId: 'p1',
+    };
+    let restoreViewport: (() => void) | undefined;
+    let scrollIntoView: ReturnType<typeof vi.fn>;
+
+    beforeEach(() => {
+      server.use(
+        http.get('*/api/v1/public/integrations/kakao-maps-key', () =>
+          HttpResponse.json({ status: 'success', data: { kakaoMapsJsKey: 'test-js-key' }, timestamp: '2026-10-10T00:00:00.000Z' }),
+        ),
+      );
+      Object.assign(window, {
+        kakao: {
+          maps: {
+            load: (cb: () => void) => cb(),
+            LatLng: vi.fn(() => ({})),
+            Map: vi.fn(() => ({})),
+            Marker: vi.fn(() => ({ setMap: vi.fn() })),
+          },
+        },
+      });
+      // jsdom 에는 scrollIntoView 가 없다 — 브라우저 API 스텁.
+      scrollIntoView = vi.fn();
+      Object.defineProperty(Element.prototype, 'scrollIntoView', { configurable: true, value: scrollIntoView });
+    });
+    afterEach(() => {
+      restoreViewport?.();
+      restoreViewport = undefined;
+      delete (window as { kakao?: unknown }).kakao;
+      delete (Element.prototype as { scrollIntoView?: unknown }).scrollIntoView;
+    });
+
+    it('데스크톱(1024px 이상)에서만 240px 로 키우고 모바일은 120px 그대로다', async () => {
+      restoreViewport = installViewport(1280);
+      const desktop = renderPicker({ initial: picked });
+      expect(await screen.findByRole('link', { name: '성산 풋살파크 지도 크게 보기' })).toHaveStyle({ height: '240px' });
+      desktop.unmount();
+      restoreViewport();
+
+      restoreViewport = installViewport(390);
+      renderPicker({ initial: picked });
+      expect(await screen.findByRole('link', { name: '성산 풋살파크 지도 크게 보기' })).toHaveStyle({ height: '120px' });
+    });
+
+    it('데스크톱에서 장소를 고른 직후에만 지도를 화면 안으로 스크롤한다 — 값이 채워진 채 열린 폼은 움직이지 않는다', async () => {
+      restoreViewport = installViewport(1280);
+      const prefilled = renderPicker({ initial: picked });
+      await screen.findByRole('link', { name: '성산 풋살파크 지도 크게 보기' });
+      expect(scrollIntoView).not.toHaveBeenCalled();
+      prefilled.unmount();
+
+      renderPicker();
+      fireEvent.change(screen.getByRole('combobox', { name: '장소' }), { target: { value: '망원 풋살' } });
+      fireEvent.click(await findOption('망원한강공원 풋살장'));
+
+      const map = await screen.findByRole('link', { name: '망원한강공원 풋살장 지도 크게 보기' });
+      // 검색 목록도 scrollIntoView 를 부르므로 호출 대상(this)이 지도 상자인지로 가린다.
+      await waitFor(() => expect(scrollIntoView.mock.contexts).toContain(map));
+    });
+
+    it('모바일에서는 장소를 골라도 지도 때문에 스크롤하지 않는다', async () => {
+      restoreViewport = installViewport(390);
+      renderPicker();
+      fireEvent.change(screen.getByRole('combobox', { name: '장소' }), { target: { value: '망원 풋살' } });
+      fireEvent.click(await findOption('망원한강공원 풋살장'));
+
+      const map = await screen.findByRole('link', { name: '망원한강공원 풋살장 지도 크게 보기' });
+      expect(map).toHaveStyle({ height: '120px' });
+      expect(scrollIntoView.mock.contexts).not.toContain(map);
+    });
   });
 });

@@ -14,17 +14,22 @@ function mockKakaoKey(key: string | null) {
   );
 }
 
-async function renderPreview() {
+type PreviewProps = { height?: number; revealOnShow?: boolean };
+
+async function renderPreview(props: PreviewProps = {}) {
   vi.resetModules();
   const { KakaoMapPreview } = await import('./kakao-map-preview');
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  const tree = (latitude: number, longitude: number) => (
+  const tree = (latitude: number, longitude: number, extra: PreviewProps = props) => (
     <QueryClientProvider client={client}>
-      <KakaoMapPreview name="망원 풋살장" latitude={latitude} longitude={longitude} />
+      <KakaoMapPreview name="망원 풋살장" latitude={latitude} longitude={longitude} {...extra} />
     </QueryClientProvider>
   );
   const view = render(tree(37.55, 126.9));
-  return Object.assign(view, { rerenderAt: (lat: number, lng: number) => view.rerender(tree(lat, lng)) });
+  return Object.assign(view, {
+    rerenderAt: (lat: number, lng: number) => view.rerender(tree(lat, lng)),
+    rerenderWith: (extra: PreviewProps) => view.rerender(tree(37.55, 126.9, extra)),
+  });
 }
 
 describe('KakaoMapPreview', () => {
@@ -106,6 +111,64 @@ describe('KakaoMapPreview', () => {
     // 이전 핀은 지도에서 떼였고, 컨테이너에는 새 지도의 캔버스 하나만 남는다.
     expect(setMap).toHaveBeenCalledWith(null);
     expect(container.current?.querySelectorAll('canvas')).toHaveLength(1);
+  });
+
+  describe('높이와 스크롤', () => {
+    const LINK = { name: '망원 풋살장 지도 크게 보기' };
+    let MapCtor: ReturnType<typeof vi.fn>;
+    let scrollIntoView: ReturnType<typeof vi.fn>;
+
+    beforeEach(() => {
+      mockKakaoKey('test-js-key');
+      MapCtor = vi.fn((el: HTMLElement) => {
+        el.appendChild(document.createElement('canvas'));
+        return {};
+      });
+      Object.assign(window, {
+        kakao: {
+          maps: {
+            load: (cb: () => void) => cb(),
+            LatLng: vi.fn((lat: number, lng: number) => ({ lat, lng })),
+            Map: MapCtor,
+            Marker: vi.fn(() => ({ setMap: vi.fn() })),
+          },
+        },
+      });
+      // jsdom 에는 scrollIntoView 가 없다 — 브라우저 API 스텁.
+      scrollIntoView = vi.fn();
+      Object.defineProperty(Element.prototype, 'scrollIntoView', { configurable: true, value: scrollIntoView });
+    });
+    afterEach(() => {
+      delete (Element.prototype as { scrollIntoView?: unknown }).scrollIntoView;
+    });
+
+    it('revealOnShow 를 켜면 상자가 나타날 때 한 번 화면 안으로 스크롤한다', async () => {
+      await renderPreview({ revealOnShow: true });
+      const link = await screen.findByRole('link', LINK);
+
+      await waitFor(() => expect(scrollIntoView).toHaveBeenCalledTimes(1));
+      expect(scrollIntoView).toHaveBeenCalledWith({ block: 'nearest' });
+      expect(scrollIntoView.mock.contexts[0]).toBe(link);
+    });
+
+    it('revealOnShow 를 켜지 않으면 스크롤하지 않는다', async () => {
+      await renderPreview();
+      await screen.findByRole('link', LINK);
+      await waitFor(() => expect(MapCtor).toHaveBeenCalledTimes(1));
+
+      expect(scrollIntoView).not.toHaveBeenCalled();
+    });
+
+    it('높이가 바뀌면 상자 높이를 바꾸고 지도를 다시 만든다', async () => {
+      const view = await renderPreview({ height: 120 });
+      expect(await screen.findByRole('link', LINK)).toHaveStyle({ height: '120px' });
+      await waitFor(() => expect(MapCtor).toHaveBeenCalledTimes(1));
+
+      view.rerenderWith({ height: 240 });
+
+      await waitFor(() => expect(MapCtor).toHaveBeenCalledTimes(2));
+      expect(screen.getByRole('link', LINK)).toHaveStyle({ height: '240px' });
+    });
   });
 
   it('스크립트 로드가 실패하면 상자를 접는다', async () => {

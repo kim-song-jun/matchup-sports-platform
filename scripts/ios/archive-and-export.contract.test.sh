@@ -108,7 +108,7 @@ run_correct_mapping TeameetProduction 'Production Release' 'Teameet Production A
 : > "$WORK/fake-key.p8"
 if env PATH="$WORK/bin:$PATH" CONTRACT_XCODEBUILD_LOG="$WORK/xcodebuild.log" \
   CONTRACT_ALTOOL_SENTINEL="$WORK/alttool.sentinel" CONTRACT_BUNDLE_ID=kr.co.wrong \
-  TEAMEET_ARCHIVE_SCHEME=TeameetProduction TEAMEET_ARCHIVE_OUTPUT="$WORK/wrong-export" APP_STORE_CONNECT_KEY_ID=fake \
+  TEAMEET_ARCHIVE_SCHEME=TeameetProduction TEAMEET_ARCHIVE_OUTPUT="$WORK/wrong-export" TEAMEET_KAKAO_NATIVE_APP_KEY=contractkey APP_STORE_CONNECT_KEY_ID=fake \
   APP_STORE_CONNECT_ISSUER_ID=fake APP_STORE_CONNECT_KEY_FILE="$WORK/fake-key.p8" \
   "$WORK/repo/scripts/ios/archive-and-export.sh" --upload >"$WORK/wrong-export.out" 2>&1; then
   echo 'wrong exported bundle unexpectedly succeeded' >&2
@@ -117,11 +117,25 @@ fi
 grep -q 'exported bundle id' "$WORK/wrong-export.out"
 [[ ! -s "$WORK/alttool.sentinel" ]]
 
+# A production upload without the Kakao native key is refused before anything is built.
+: > "$WORK/alttool.sentinel"
+if env PATH="$WORK/bin:$PATH" CONTRACT_XCODEBUILD_LOG="$WORK/xcodebuild.log" \
+  CONTRACT_ALTOOL_SENTINEL="$WORK/alttool.sentinel" CONTRACT_BUNDLE_ID=kr.co.teameet \
+  TEAMEET_ARCHIVE_SCHEME=TeameetProduction TEAMEET_ARCHIVE_OUTPUT="$WORK/no-kakao-key" \
+  APP_STORE_CONNECT_KEY_ID=fake APP_STORE_CONNECT_ISSUER_ID=fake \
+  APP_STORE_CONNECT_KEY_FILE="$WORK/fake-key.p8" \
+  "$WORK/repo/scripts/ios/archive-and-export.sh" --upload >"$WORK/no-kakao-key.out" 2>&1; then
+  echo 'production upload without the Kakao key unexpectedly succeeded' >&2
+  exit 1
+fi
+grep -q 'TEAMEET_KAKAO_NATIVE_APP_KEY is required' "$WORK/no-kakao-key.out"
+[[ ! -s "$WORK/alttool.sentinel" ]]
+
 # Positive upload control: all gates pass and only the stubbed altool is reached.
 set +e
 env PATH="$WORK/bin:$PATH" CONTRACT_XCODEBUILD_LOG="$WORK/xcodebuild.log" \
   CONTRACT_ALTOOL_SENTINEL="$WORK/alttool.sentinel" CONTRACT_BUNDLE_ID=kr.co.teameet \
-  TEAMEET_ARCHIVE_SCHEME=TeameetProduction TEAMEET_ARCHIVE_OUTPUT="$WORK/correct-upload" \
+  TEAMEET_ARCHIVE_SCHEME=TeameetProduction TEAMEET_ARCHIVE_OUTPUT="$WORK/correct-upload" TEAMEET_KAKAO_NATIVE_APP_KEY=contractkey \
   APP_STORE_CONNECT_KEY_ID=fake APP_STORE_CONNECT_ISSUER_ID=fake \
   APP_STORE_CONNECT_KEY_FILE="$WORK/fake-key.p8" \
   "$WORK/repo/scripts/ios/archive-and-export.sh" --upload >"$WORK/correct-upload.out" 2>&1

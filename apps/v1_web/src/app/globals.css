@@ -1059,6 +1059,7 @@ button:disabled {
 
 .tm-auth-provider-row {
   display: flex;
+  flex-wrap: wrap;
   gap: 12px;
 }
 
@@ -1142,6 +1143,12 @@ button:disabled {
 .tm-auth-provider-note {
   text-align: center;
   color: var(--text-caption);
+}
+
+/* 버튼 행 안에 렌더되는 오류 문구: 버튼 폭을 나누지 않고 행 아래 한 줄을 쓴다. */
+.tm-auth-provider-error {
+  flex: 1 1 100%;
+  order: 1;
 }
 
 .tm-auth-provider-disabled,

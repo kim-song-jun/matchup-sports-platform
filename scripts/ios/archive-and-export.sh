@@ -61,6 +61,13 @@ if [[ "$CONFIGURATION" != "$SCHEME_CONFIGURATION" || "$PROFILE_NAME" != "$SCHEME
 fi
 [[ "${1:-}" == "--upload" ]] && UPLOAD=true
 
+# An empty key still builds and signs; the app just never advertises Kakao sign-in. Uploading
+# that to the production record cannot be undone, so refuse it here (archive-only runs are fine).
+if [[ "$UPLOAD" == true && "$SCHEME" == TeameetProduction && -z "${TEAMEET_KAKAO_NATIVE_APP_KEY:-}" ]]; then
+  echo "[archive] TEAMEET_KAKAO_NATIVE_APP_KEY is required to upload a production build." >&2
+  exit 1
+fi
+
 # --- build number ------------------------------------------------------------------------
 # App Store Connect refuses a second upload with a build number it has already seen for the
 # same marketing version. The number lives in version.properties, which is also what the

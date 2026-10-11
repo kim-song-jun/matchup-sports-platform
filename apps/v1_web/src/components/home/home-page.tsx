@@ -142,7 +142,22 @@ export function HomePageView({ model }: { model: HomeViewModel }) {
                 차단성인 휴대폰 인증은 이 예산 밖이라 조건만 맞으면 항상 보인다 --
                 밀려서 안 보이면 사용자는 신청이 왜 거부되는지 알 길이 없다.
                 판정은 model.bannerDecision(lib/home-banner-policy.ts) 하나로 모았다. */}
-            {model.phoneVerifyNudge ? <PhoneVerifyBanner phoneVerifyNudge={model.phoneVerifyNudge} /> : null}
+            {model.phoneVerifyNudge ? (
+              <BlockingNudgeBanner
+                title="휴대폰 본인인증이 필요해요"
+                description="인증해야 대회 신청·팀 활동을 할 수 있어요."
+                actionLabel="인증하기"
+                onAction={model.phoneVerifyNudge.onVerify}
+              />
+            ) : null}
+            {model.activityProfileNudge ? (
+              <BlockingNudgeBanner
+                title="활동 정보를 입력해 주세요"
+                description="팀 만들기·참가 신청 전에 이름·생년월일·휴대폰 인증이 필요해요."
+                actionLabel="입력하기"
+                onAction={model.activityProfileNudge.onEnter}
+              />
+            ) : null}
             {showStarter ? null : invitationBanner}
             {model.bannerDecision.nudge === 'joinRequests' && model.teamActivity?.pendingJoinRequests ? (
               <TeamRequestBanner kind="joinRequests" joinRequests={model.teamActivity.pendingJoinRequests} />
@@ -615,7 +630,17 @@ function RecordConsentNudgeBanner({
   );
 }
 
-function PhoneVerifyBanner({ phoneVerifyNudge }: { phoneVerifyNudge: NonNullable<HomeViewModel['phoneVerifyNudge']> }) {
+function BlockingNudgeBanner({
+  title,
+  description,
+  actionLabel,
+  onAction,
+}: {
+  title: string;
+  description: string;
+  actionLabel: string;
+  onAction: () => void;
+}) {
   // 슬롯의 다른 카드처럼 아래 여백을 스스로 가진다 — 유도 배너와 함께 뜨면(별개 예산) 둘이 붙지 않게.
   return (
     <Card pad={16} style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
@@ -636,16 +661,16 @@ function PhoneVerifyBanner({ phoneVerifyNudge }: { phoneVerifyNudge: NonNullable
         <ShieldAlert size={18} strokeWidth={2} />
       </span>
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div className="tm-text-label">휴대폰 본인인증이 필요해요</div>
-        <div className="tm-text-caption" style={{ marginTop: 2 }}>인증해야 대회 신청·팀 활동을 할 수 있어요.</div>
+        <div className="tm-text-label">{title}</div>
+        <div className="tm-text-caption" style={{ marginTop: 2 }}>{description}</div>
       </div>
       <button
         type="button"
         className="tm-btn tm-btn-sm tm-btn-primary"
         style={{ whiteSpace: 'nowrap', flexShrink: 0 }}
-        onClick={phoneVerifyNudge.onVerify}
+        onClick={onAction}
       >
-        인증하기
+        {actionLabel}
       </button>
     </Card>
   );

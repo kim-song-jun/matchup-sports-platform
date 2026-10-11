@@ -11,6 +11,13 @@ export function getPendingSocialSignupRoute(status: V1OnboardingStatus | string)
   return null;
 }
 
+export const ACTIVITY_PROFILE_ROUTE = '/signup/social';
+
+/** Skipped the profile form at signup: reads are open, writes ask for the profile. */
+export function isActivityProfileRequired(status: V1OnboardingStatus | string) {
+  return status === 'social_profile_deferred';
+}
+
 export function isPendingSocialSignup(status: V1OnboardingStatus | string) {
   return getPendingSocialSignupRoute(status) !== null;
 }
@@ -38,6 +45,7 @@ export function isPendingSocialSignupRequestAllowed(
     // (옥토모 카카오 hard-block) + 최종 제출. 이 셋을 막으면 소셜 가입이 원천 봉쇄된다.
     return (
       pathname.endsWith('/auth/social-profile') ||
+      pathname.endsWith('/auth/social-profile/defer') ||
       pathname.endsWith('/auth/check-nickname') ||
       pathname.endsWith('/verification/phone/request') ||
       pathname.endsWith('/verification/phone/confirm')

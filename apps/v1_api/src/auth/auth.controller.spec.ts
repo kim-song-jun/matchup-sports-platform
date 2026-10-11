@@ -150,6 +150,7 @@ describe('AuthController', () => {
       birthDate: '19900102',
       profileImageUrl: 'data:image/png;base64,profile',
       requiredTermsAccepted: true,
+      ageConfirmed: true,
       acceptedTermsDocumentIds: ['11111111-1111-4111-8111-111111111111'],
     };
 
@@ -221,6 +222,7 @@ describe('AuthController', () => {
     };
     const dto = {
       requiredTermsAccepted: true,
+      ageConfirmed: true,
       acceptedTermsDocumentIds: ['11111111-1111-4111-8111-111111111111'],
     };
 

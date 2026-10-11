@@ -447,6 +447,18 @@ export const v1MswHandlers = [
     if (issue) return validationError(issue);
     return ok({ session: { userId: v1UserFixture.id, userEmail: v1UserFixture.email }, ...v1UserFixture });
   }),
+  http.post(`${api}/auth/social-terms`, async ({ request }) => {
+    const body = (await request.json()) as { ageConfirmed?: unknown };
+    if (body.ageConfirmed !== true) {
+      return HttpResponse.json(
+        { status: 'error', statusCode: 400, code: 'VALIDATION_ERROR', message: '만 14세 이상 확인이 필요해요.', timestamp: '2026-05-18T00:00:00.000Z' },
+        { status: 400 },
+      );
+    }
+    return ok({ session: { userId: v1UserFixture.id, userEmail: v1UserFixture.email }, ...v1UserFixture, next: { route: '/signup/social' } });
+  }),
+  http.post(`${api}/auth/social-profile/defer`, () =>
+    ok({ session: { userId: v1UserFixture.id, userEmail: v1UserFixture.email }, ...v1UserFixture, next: { route: null } })),
   http.get(`${api}/onboarding`, () => ok({ status: 'signup_done', currentStep: 'sport', canResume: true, missing: ['sports'], sports: [], regions: [], regionOptional: true })),
   http.patch(`${api}/onboarding/preferences`, async ({ request }) => ok(await request.json())),
   http.post(`${api}/onboarding/complete`, () => ok({ completed: true })),

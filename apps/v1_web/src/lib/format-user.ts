@@ -21,12 +21,13 @@ export function formatUserTitle(user: {
   return '프로필 없음';
 }
 
-/** V1UserProfile.onboardingStatus 10종 (types/api.ts) — 모르는 값은 원문 그대로 보여준다 */
+/** V1UserProfile.onboardingStatus 11종 (types/api.ts) — 모르는 값은 원문 그대로 보여준다 */
 const ONBOARDING_STATUS_LABEL: Record<string, string> = {
   not_started: '시작 전',
   terms_done: '약관 동의 완료',
   social_terms_required: '소셜 가입 · 약관 미동의',
   social_profile_required: '소셜 가입 · 프로필 미완료',
+  social_profile_deferred: '정보 입력 보류',
   signup_done: '가입 완료',
   sport_done: '종목 선택 완료',
   level_done: '실력 입력 완료',

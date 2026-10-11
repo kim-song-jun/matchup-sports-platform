@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { Fragment, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { ChevronRightIcon } from '@/components/v1-ui/icons';
 import { TermsDocumentSubtitleAndCard } from '@/components/auth/terms-document-body';
@@ -20,6 +20,8 @@ import { AUTH_WELCOME_STAGE, AuthFrame } from './auth-page';
 import { getTermsViewModel } from './auth.view-model';
 import { useSocialSignupExit } from './use-social-signup-exit';
 import { extractErrorMessage } from '@/lib/error-message';
+
+const AGREEMENT_TITLE_STYLE = { fontSize: 15, lineHeight: '20px', overflowWrap: 'anywhere' } as const;
 
 export function TermsClient() {
   const model = getTermsViewModel();
@@ -45,20 +47,25 @@ export function TermsClient() {
   const [openByDocumentId, setOpenByDocumentId] = useState<Record<string, boolean>>({});
   const [legalDialog, setLegalDialog] = useState<null | { title: string; sections: LegalDocumentSection[] }>(null);
   const [error, setError] = useState<string | null>(null);
+  // 서버 약관 문서가 아니라 소셜 가입 전용 로컬 확인 — ageConfirmed 로 따로 전송한다.
+  const [ageConfirmed, setAgeConfirmed] = useState(false);
 
   const agreements = useMemo(() => currentTerms.data?.items ?? [], [currentTerms.data?.items]);
   const requiredAgreements = agreements.filter((agreement) => agreement.requirement === 'required');
   const requiredAccepted = requiredAgreements.length > 0
     && requiredAgreements.every(
       (agreement) => agreement.accepted || checkedByDocumentId[agreement.documentId],
-    );
+    )
+    && (!isSocialMode || ageConfirmed);
   // 전체 동의는 선택 항목까지 포함한다. 그래서 버튼의 켜짐 상태도 필수만이 아니라
   // 모든 항목 기준이어야 한다 — 필수 기준으로 두면 선택 하나를 해제해도 버튼이 켜진 채라
   // 실제 상태와 어긋난다. 이미 동의한 항목(accepted)은 체크된 것으로 센다.
   const allChecked = agreements.length > 0
     && agreements.every(
       (agreement) => agreement.accepted || checkedByDocumentId[agreement.documentId],
-    );
+    )
+    && (!isSocialMode || ageConfirmed);
+  const lastRequiredDocumentId = requiredAgreements[requiredAgreements.length - 1]?.documentId;
 
   useEffect(() => {
     if (!currentTerms.data) return;
@@ -78,6 +85,7 @@ export function TermsClient() {
    * 막히지 않는다.
    */
   const setAllAgreements = (checked: boolean) => {
+    if (isSocialMode) setAgeConfirmed(checked);
     setCheckedByDocumentId((current) => ({
       ...current,
       ...Object.fromEntries(
@@ -121,7 +129,7 @@ export function TermsClient() {
       .map((agreement) => agreement.documentId);
     if (isSocialMode) {
       socialTerms.mutate(
-        { requiredTermsAccepted: true, acceptedTermsDocumentIds },
+        { requiredTermsAccepted: true, acceptedTermsDocumentIds, ageConfirmed: true },
         {
           onSuccess: (result) => router.replace(result.next.route),
           onError: (nextError) => {
@@ -282,7 +290,8 @@ export function TermsClient() {
             const open = openByDocumentId[item.documentId] ?? false;
 
             return (
-              <div key={item.documentId} className="tm-card tm-auth-agreement-card">
+              <Fragment key={item.documentId}>
+              <div className="tm-card tm-auth-agreement-card">
                 <div className="tm-auth-agreement">
                   <button
                     aria-label={`${item.title} 체크`}
@@ -303,7 +312,7 @@ export function TermsClient() {
                   >
                     <span
                       className="tm-text-body-lg"
-                      style={{ fontSize: 15, lineHeight: '20px', overflowWrap: 'anywhere' }}
+                      style={AGREEMENT_TITLE_STYLE}
                     >
                       {item.title} ({item.requirement === 'required' ? '필수' : '선택'})
                     </span>
@@ -339,6 +348,34 @@ export function TermsClient() {
                   </div>
                 ) : null}
               </div>
+              {isSocialMode && item.documentId === lastRequiredDocumentId ? (
+                <div className="tm-card tm-auth-agreement-card">
+                  <div className="tm-auth-agreement">
+                    <button
+                      aria-label="만 14세 이상이에요 체크"
+                      aria-pressed={ageConfirmed}
+                      className="tm-auth-check-button tm-pressable"
+                      onClick={() => setAgeConfirmed((current) => !current)}
+                      type="button"
+                    >
+                      <TermsCheck checked={ageConfirmed} />
+                    </button>
+                    <button
+                      className="tm-auth-agreement-main tm-pressable"
+                      onClick={() => setAgeConfirmed((current) => !current)}
+                      type="button"
+                    >
+                      <span
+                        className="tm-text-body-lg"
+                        style={AGREEMENT_TITLE_STYLE}
+                      >
+                        만 14세 이상이에요 (필수)
+                      </span>
+                    </button>
+                  </div>
+                </div>
+              ) : null}
+              </Fragment>
             );
           })}
         </div>

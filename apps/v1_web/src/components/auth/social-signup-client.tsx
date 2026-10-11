@@ -9,12 +9,12 @@ import { Card, DatePickerTextInput } from '@/components/v1-ui/primitives';
 import { Button } from '@/components/v1-ui/button';
 import { PhoneConflictNotice } from '@/components/auth/otp/phone-conflict-notice';
 import { PhoneVerificationCard } from '@/components/auth/phone-verification/phone-verification-card';
-import { useV1AuthMe, useV1CheckNickname, useV1CompleteSocialProfile } from '@/hooks/use-v1-api';
+import { useV1AuthMe, useV1CheckNickname, useV1CompleteSocialProfile, useV1DeferSocialProfile } from '@/hooks/use-v1-api';
 import { useSocialSignupExit } from './use-social-signup-exit';
 import { V1ApiError } from '@/lib/api-client';
 import { trackEvent } from '@/lib/analytics';
 import { clearV1IdentityCache } from '@/lib/query-keys';
-import { saveStoredV1Session } from '@/lib/session-storage';
+import { sanitizeRedirectPath, saveStoredV1Session } from '@/lib/session-storage';
 import { AUTH_WELCOME_STAGE, AuthFrame } from './auth-page';
 import {
   formatBirthDate,
@@ -46,6 +46,7 @@ export function SocialSignupClient() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const completeProfile = useV1CompleteSocialProfile();
+  const deferProfile = useV1DeferSocialProfile();
   const checkNickname = useV1CheckNickname();
   const [nickname, setNickname] = useState('');
   const [displayName, setDisplayName] = useState('');
@@ -78,6 +79,23 @@ export function SocialSignupClient() {
   const lockedName = Boolean(prefill?.name);
   const lockedGender = Boolean(prefill?.gender);
 
+  // 정보 입력을 미룬 계정이 활동 시도 중 돌아온 화면 — 가입 모드와 달리 건너뛰기가 없고 입력 뒤 원래 화면으로 간다.
+  const activityMode = authMe.data?.user?.onboardingStatus === 'social_profile_deferred';
+  const statusPending = authMe.isPending === true;
+  const [activitySeeded, setActivitySeeded] = useState(false);
+  useEffect(() => {
+    if (!activityMode || activitySeeded || !authMe.data) return;
+    // 자동 생성된 닉네임은 이미 서버에서 중복 검사를 통과했다. 바꾸면 기존처럼 다시 확인한다.
+    const currentNickname = authMe.data.profile.nickname ?? '';
+    if (currentNickname) {
+      setNickname(currentNickname);
+      setNicknameCheck({ status: 'available', value: currentNickname });
+    }
+    if (authMe.data.user.phone) setPhoneDigits(normalizeSeparatedDigits(authMe.data.user.phone));
+    if (authMe.data.verification?.phoneVerified) setPhoneVerified(true);
+    setActivitySeeded(true);
+  }, [activityMode, activitySeeded, authMe.data]);
+
   const [prefillApplied, setPrefillApplied] = useState(false);
   useEffect(() => {
     if (!prefill || prefillApplied) return;
@@ -94,7 +112,7 @@ export function SocialSignupClient() {
   const nicknameVerified = nicknameCheck.status === 'available' && nicknameCheck.value === nickname.trim();
   const profileDraft = { displayName, phone: phoneDigits, birthDate: birthDateDigits, gender };
   const profileIssue = getSignupProfileIssue(profileDraft);
-  const isBlocked = completeProfile.isPending || checkNickname.isPending || !nicknameVerified || profileIssue !== null;
+  const isBlocked = completeProfile.isPending || deferProfile.isPending || checkNickname.isPending || !nicknameVerified || profileIssue !== null;
   const disabledReason = !nicknameVerified ? '닉네임 중복 확인이 필요해요.' : null;
 
   const actionReason = disabledReason ?? (profileIssue ? SIGNUP_PROFILE_ERROR_MESSAGES[profileIssue] : null);
@@ -115,6 +133,36 @@ export function SocialSignupClient() {
       onError: () => {
         setNicknameCheck({ status: 'error', value: nextNickname });
         setFieldErrors((current) => ({ ...current, nickname: '중복 확인에 실패했어요. 다시 시도해 주세요.' }));
+      },
+    });
+  };
+
+  const readRedirect = () =>
+    sanitizeRedirectPath(new URLSearchParams(window.location.search).get('redirect'));
+
+  const deferSignup = () => {
+    if (deferProfile.isPending || completeProfile.isPending) return;
+    setError(null);
+    deferProfile.mutate(undefined, {
+      onSuccess: (result) => {
+        saveStoredV1Session(result.session);
+        clearV1IdentityCache(queryClient);
+        trackEvent('sign_up_complete', {
+          method: authMe.data?.user?.authProvider ?? 'social',
+          profile: 'deferred',
+        });
+        router.replace(readRedirect() ?? '/home');
+      },
+      onError: (nextError) => {
+        if (nextError instanceof V1ApiError && nextError.code === 'TERMS_REQUIRED') {
+          router.replace('/terms?mode=social');
+          return;
+        }
+        if (nextError instanceof V1ApiError && nextError.code === 'SOCIAL_SIGNUP_EXPIRED') {
+          setError(`가입 가능 시간이 지났어요. ${providerLabel ? `${providerLabel} 로그인부터` : '로그인 화면에서 처음부터'} 다시 시작해 주세요.`);
+          return;
+        }
+        setError(extractErrorMessage(nextError, '나중에 입력하기를 처리하지 못했어요.'));
       },
     });
   };
@@ -160,8 +208,14 @@ export function SocialSignupClient() {
         onSuccess: (result) => {
           saveStoredV1Session(result.session);
           clearV1IdentityCache(queryClient);
-          trackEvent('sign_up_complete', { method: authMe.data?.user?.authProvider ?? 'social' });
-          router.replace(result.next.route);
+          const method = authMe.data?.user?.authProvider ?? 'social';
+          if (activityMode) {
+            trackEvent('activity_profile_complete', { method });
+            router.replace(readRedirect() ?? '/home');
+            return;
+          }
+          trackEvent('sign_up_complete', { method });
+          router.replace(result.next.route ?? '/home');
         },
         onError: (nextError) => {
           if (nextError instanceof V1ApiError && nextError.code === 'NICKNAME_CONFLICT') {
@@ -205,9 +259,10 @@ export function SocialSignupClient() {
   return (
     <AuthFrame
       stage={AUTH_WELCOME_STAGE}
-      topTitle={providerLabel ? `${providerLabel} 가입` : '간편 가입'}
-      onBack={() => void exitFlow.exit()}
-      backLabel="가입 그만두기"
+      topTitle={activityMode ? '활동 정보 입력' : providerLabel ? `${providerLabel} 가입` : '간편 가입'}
+      onBack={activityMode ? undefined : () => void exitFlow.exit()}
+      exitFallbackHref={activityMode ? '/home' : undefined}
+      backLabel={activityMode ? undefined : '가입 그만두기'}
       fixedAction={
         <>
           <Button
@@ -219,17 +274,36 @@ export function SocialSignupClient() {
             type="submit"
             variant={isBlocked ? 'neutral' : 'primary'}
           >
-            {isBlocked ? '입력 확인 후 계속' : '운동 설정으로 계속'}
+            {isBlocked ? '입력 확인 후 계속' : activityMode ? '입력 완료하고 계속하기' : '운동 설정으로 계속'}
           </Button>
           {actionReason ? <div className="tm-text-micro tm-auth-fixed-reason">{actionReason}</div> : null}
+          {!activityMode && !statusPending ? (
+            <>
+              <div className="tm-auth-fixed-skip-row" style={{ justifyContent: 'center' }}>
+                <Button disabled={deferProfile.isPending} onClick={deferSignup} size="sm" type="button" variant="ghost">
+                  나중에 입력할게요
+                </Button>
+              </div>
+              <div className="tm-text-micro tm-auth-fixed-reason">팀 만들기·참가 신청처럼 활동을 시작할 때 다시 물어볼게요.</div>
+            </>
+          ) : null}
         </>
       }
     >
       <form className="tm-auth-body" id="v1-social-signup-form" onSubmit={submit}>
-        <h1 className="tm-text-heading tm-auth-heading">프로필을 완성해 주세요</h1>
-        <p className="tm-text-body tm-auth-sub">
-          {providerLabel ? `${providerLabel} 계정 확인이 됐어요.` : '계정 확인이 됐어요.'} 가입에 필요한 프로필 정보를 입력해 주세요.
-        </p>
+        {statusPending ? null : activityMode ? (
+          <>
+            <h1 className="tm-text-heading tm-auth-heading">활동 정보 입력</h1>
+            <p className="tm-text-body tm-auth-sub">입력을 마치면 하던 화면으로 돌아가요.</p>
+          </>
+        ) : (
+          <>
+            <h1 className="tm-text-heading tm-auth-heading">프로필을 완성해 주세요</h1>
+            <p className="tm-text-body tm-auth-sub">
+              {providerLabel ? `${providerLabel} 계정 확인이 됐어요.` : '계정 확인이 됐어요.'} 가입에 필요한 프로필 정보를 입력해 주세요.
+            </p>
+          </>
+        )}
         <div className="tm-auth-form tm-auth-signup-form">
           <label className="tm-auth-field">
             <span className="tm-text-label">닉네임</span>

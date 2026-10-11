@@ -559,7 +559,7 @@ describe('AuthService', () => {
 
   it('completeSocialTerms: requiredTermsAccepted=false → 400 VALIDATION_ERROR', async () => {
     await expect(
-      service.completeSocialTerms('user-1', { requiredTermsAccepted: false }),
+      service.completeSocialTerms('user-1', { requiredTermsAccepted: false, ageConfirmed: true }),
     ).rejects.toMatchObject({
       status: 400,
       response: { code: 'VALIDATION_ERROR' },
@@ -572,7 +572,7 @@ describe('AuthService', () => {
     prisma.v1User.findUnique.mockResolvedValue(null);
 
     await expect(
-      service.completeSocialTerms('ghost', { requiredTermsAccepted: true }),
+      service.completeSocialTerms('ghost', { requiredTermsAccepted: true, ageConfirmed: true }),
     ).rejects.toMatchObject({
       status: 404,
       response: { code: 'NOT_FOUND' },
@@ -589,7 +589,7 @@ describe('AuthService', () => {
     prisma.v1User.update.mockResolvedValue(expiredUser);
 
     await expect(
-      service.completeSocialTerms('user-1', { requiredTermsAccepted: true }),
+      service.completeSocialTerms('user-1', { requiredTermsAccepted: true, ageConfirmed: true }),
     ).rejects.toMatchObject({
       status: 401,
       response: { code: 'SOCIAL_SIGNUP_EXPIRED' },
@@ -617,7 +617,7 @@ describe('AuthService', () => {
       prisma.v1User.findUnique.mockResolvedValue(pendingSocialUserRow({ onboardingStatus }));
 
       // When
-      const action = service.completeSocialTerms('user-1', { requiredTermsAccepted: true });
+      const action = service.completeSocialTerms('user-1', { requiredTermsAccepted: true, ageConfirmed: true });
 
       // Then
       await expect(action).rejects.toMatchObject({ status: 400 });
@@ -636,7 +636,7 @@ describe('AuthService', () => {
     prisma.v1User.updateMany.mockResolvedValue({ count: 0 });
 
     // When
-    const action = service.completeSocialTerms('user-1', { requiredTermsAccepted: true });
+    const action = service.completeSocialTerms('user-1', { requiredTermsAccepted: true, ageConfirmed: true });
 
     // Then
     await expect(action).rejects.toMatchObject({ status: 400 });
@@ -657,7 +657,7 @@ describe('AuthService', () => {
     prisma.v1TermsDocument.findMany.mockResolvedValue([{ id: 'terms-1' }, { id: 'privacy-1' }]);
 
     // When
-    await service.completeSocialTerms('user-1', { requiredTermsAccepted: true });
+    await service.completeSocialTerms('user-1', { requiredTermsAccepted: true, ageConfirmed: true });
 
     // Then
     expect(prisma.$transaction).toHaveBeenCalledWith(expect.any(Function));
@@ -677,7 +677,7 @@ describe('AuthService', () => {
       .mockResolvedValueOnce(completedUserRow({ onboardingStatus: 'social_profile_required', onboardingProgress: { currentStep: 'signup' }, termsConsents: [], createdAt: activeTime, updatedAt: activeTime }));
     prisma.v1TermsDocument.findMany.mockResolvedValue([]);
 
-    const result = await service.completeSocialTerms('user-1', { requiredTermsAccepted: true });
+    const result = await service.completeSocialTerms('user-1', { requiredTermsAccepted: true, ageConfirmed: true });
 
     expect(result.next).toEqual({ route: '/signup/social' });
     expect(prisma.v1UserProfile.upsert).not.toHaveBeenCalled();
@@ -685,7 +685,12 @@ describe('AuthService', () => {
       where: { id: 'user-1', onboardingStatus: 'social_terms_required' },
       data: { onboardingStatus: 'social_profile_required' },
     });
-    expect(prisma.v1UserOnboardingProgress.upsert).toHaveBeenCalledWith({ where: { userId: 'user-1' }, update: { currentStep: 'signup' }, create: { userId: 'user-1', currentStep: 'signup' } });
+    const ageDraft = { ageConfirmedAt: expect.any(String) };
+    expect(prisma.v1UserOnboardingProgress.upsert).toHaveBeenCalledWith({
+      where: { userId: 'user-1' },
+      update: { currentStep: 'signup', draftJson: ageDraft },
+      create: { userId: 'user-1', currentStep: 'signup', draftJson: ageDraft },
+    });
   });
 
   describe('signup record consent', () => {
@@ -907,6 +912,199 @@ describe('AuthService', () => {
     });
   });
 
+  // ─── social profile deferral ─────────────────────────────────────────────
+
+  describe('social profile deferral', () => {
+    const freshProfileRequired = (overrides: Record<string, unknown> = {}) => {
+      const now = new Date();
+      return pendingSocialUserRow({
+        onboardingStatus: 'social_profile_required',
+        onboardingProgress: { currentStep: 'signup', draftJson: { kakaoNickname: '카카오닉' } },
+        createdAt: now,
+        updatedAt: now,
+        ...overrides,
+      });
+    };
+    const socialProfileInput = {
+      nickname: '카카오닉',
+      gender: 'female' as const,
+      displayName: '소셜 유저',
+      phone: '01087654321',
+      birthDate: '19991231',
+    };
+
+    it('completeSocialTerms: ageConfirmed=false → 400 VALIDATION_ERROR, DB 접근 없음', async () => {
+      await expect(
+        service.completeSocialTerms('user-1', { requiredTermsAccepted: true, ageConfirmed: false }),
+      ).rejects.toMatchObject({ status: 400, response: { code: 'VALIDATION_ERROR' } });
+      expect(prisma.v1User.findUnique).not.toHaveBeenCalled();
+    });
+
+    it('completeSocialTerms: 가입 시점 확인 기록을 기존 draftJson 을 지우지 않고 남긴다', async () => {
+      const now = new Date();
+      prisma.v1User.findUnique.mockResolvedValueOnce(pendingSocialUserRow({
+        onboardingStatus: 'social_terms_required',
+        onboardingProgress: { draftJson: { kakaoNickname: '카카오닉' } },
+        createdAt: now,
+        updatedAt: now,
+      })).mockResolvedValue(completedUserRow({ onboardingStatus: 'social_profile_required' }));
+      prisma.v1TermsDocument.findMany.mockResolvedValue([]);
+
+      await service.completeSocialTerms('user-1', {
+        requiredTermsAccepted: true,
+        ageConfirmed: true,
+        acceptedTermsDocumentIds: ['11111111-1111-4111-8111-111111111111'],
+      });
+
+      const call = prisma.v1UserOnboardingProgress.upsert.mock.calls[0][0];
+      expect(call.update.draftJson).toEqual({
+        kakaoNickname: '카카오닉',
+        ageConfirmedAt: expect.any(String),
+      });
+      expect(Number.isNaN(Date.parse(call.update.draftJson.ageConfirmedAt))).toBe(false);
+    });
+
+    it('deferSocialProfile: 카카오 닉네임으로 프로필을 만들고 social_profile_deferred 로 전이한다', async () => {
+      prisma.v1User.findUnique
+        .mockResolvedValueOnce(freshProfileRequired())
+        .mockResolvedValue(completedUserRow({ onboardingStatus: 'social_profile_deferred' }));
+      prisma.v1UserProfile.findFirst.mockResolvedValue(null);
+
+      const result = await service.deferSocialProfile('user-1');
+
+      expect(prisma.v1User.updateMany).toHaveBeenCalledWith({
+        where: { id: 'user-1', onboardingStatus: 'social_profile_required' },
+        data: { onboardingStatus: 'social_profile_deferred' },
+      });
+      expect(prisma.v1UserProfile.upsert).toHaveBeenCalledWith({
+        where: { userId: 'user-1' },
+        update: { nickname: '카카오닉', visibility: 'public' },
+        create: { userId: 'user-1', nickname: '카카오닉', visibility: 'public' },
+      });
+      expect(result.next).toBeUndefined();
+      expect(result.onboarding.status).toBe('social_profile_deferred');
+    });
+
+    it('deferSocialProfile: 닉네임이 겹치면 숫자 접미를 붙인다', async () => {
+      prisma.v1User.findUnique
+        .mockResolvedValueOnce(freshProfileRequired())
+        .mockResolvedValue(completedUserRow({ onboardingStatus: 'social_profile_deferred' }));
+      prisma.v1UserProfile.findFirst
+        .mockResolvedValueOnce({ id: 'someone' })
+        .mockResolvedValue(null);
+
+      await service.deferSocialProfile('user-1');
+
+      const { create } = prisma.v1UserProfile.upsert.mock.calls[0][0];
+      expect(create.nickname).toMatch(/^카카오닉\d{2}$/);
+    });
+
+    it('deferSocialProfile: 시드가 없으면 팀밋사용자 계열 닉네임을 쓴다', async () => {
+      prisma.v1User.findUnique
+        .mockResolvedValueOnce(freshProfileRequired({ onboardingProgress: { currentStep: 'signup', draftJson: {} } }))
+        .mockResolvedValue(completedUserRow({ onboardingStatus: 'social_profile_deferred' }));
+      prisma.v1UserProfile.findFirst.mockResolvedValue(null);
+
+      await service.deferSocialProfile('user-1');
+
+      expect(prisma.v1UserProfile.upsert.mock.calls[0][0].create.nickname).toMatch(/^팀밋사용자\d{4}$/);
+    });
+
+    it.each([
+      ['social_terms_required', 'TERMS_REQUIRED'],
+      ['social_profile_deferred', 'VALIDATION_ERROR'],
+      ['signup_done', 'VALIDATION_ERROR'],
+      ['completed', 'VALIDATION_ERROR'],
+    ])('deferSocialProfile: %s 상태는 400 %s 로 거부하고 write 가 없다', async (onboardingStatus, code) => {
+      prisma.v1User.findUnique.mockResolvedValue(freshProfileRequired({ onboardingStatus }));
+
+      await expect(service.deferSocialProfile('user-1')).rejects.toMatchObject({
+        status: 400,
+        response: { code },
+      });
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+      expect(prisma.v1UserProfile.upsert).not.toHaveBeenCalled();
+    });
+
+    it('deferSocialProfile: 소셜 identity 가 없는 계정은 403', async () => {
+      prisma.v1User.findUnique.mockResolvedValue(freshProfileRequired({ authIdentities: [] }));
+
+      await expect(service.deferSocialProfile('user-1')).rejects.toMatchObject({ status: 403 });
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+    });
+
+    it('deferSocialProfile: 24시간이 지난 가입은 리셋하고 401 SOCIAL_SIGNUP_EXPIRED', async () => {
+      const old = new Date(Date.now() - 25 * 60 * 60 * 1000);
+      const expired = freshProfileRequired({ createdAt: old, updatedAt: old });
+      prisma.v1User.findUnique.mockResolvedValue(expired);
+      prisma.v1User.update.mockResolvedValue(expired);
+
+      await expect(service.deferSocialProfile('user-1')).rejects.toMatchObject({
+        status: 401,
+        response: { code: 'SOCIAL_SIGNUP_EXPIRED' },
+      });
+      expect(prisma.v1UserProfile.upsert).not.toHaveBeenCalled();
+    });
+
+    it('deferSocialProfile: 상태 CAS 실패 시 프로필을 만들지 않는다', async () => {
+      prisma.v1User.findUnique.mockResolvedValue(freshProfileRequired());
+      prisma.v1UserProfile.findFirst.mockResolvedValue(null);
+      prisma.v1User.updateMany.mockResolvedValue({ count: 0 });
+
+      await expect(service.deferSocialProfile('user-1')).rejects.toMatchObject({ status: 400 });
+      expect(prisma.v1UserProfile.upsert).not.toHaveBeenCalled();
+    });
+
+    it('completeSocialProfile: deferred 에서 완료하면 상태가 deferred 로 가고 자기 닉네임은 중복이 아니다', async () => {
+      const old = new Date(Date.now() - 48 * 60 * 60 * 1000);
+      prisma.v1User.findUnique
+        .mockResolvedValueOnce(freshProfileRequired({
+          onboardingStatus: 'social_profile_deferred',
+          createdAt: old,
+          updatedAt: old,
+        }))
+        .mockResolvedValue(completedUserRow({ onboardingStatus: 'deferred' }));
+      prisma.v1UserProfile.findFirst.mockResolvedValue(null);
+      prisma.v1User.findFirst.mockResolvedValue(null);
+
+      await service.completeSocialProfile('user-1', socialProfileInput);
+
+      expect(prisma.v1UserProfile.findFirst).toHaveBeenCalledWith(expect.objectContaining({
+        where: expect.objectContaining({ userId: { not: 'user-1' } }),
+      }));
+      expect(prisma.v1User.updateMany).toHaveBeenCalledWith({
+        where: { id: 'user-1', onboardingStatus: 'social_profile_deferred' },
+        data: { onboardingStatus: 'deferred', phone: '01087654321' },
+      });
+      expect(prisma.v1UserOnboardingProgress.upsert).toHaveBeenCalledWith(expect.objectContaining({
+        update: { currentStep: 'confirm' },
+      }));
+      // 25h-old deferred account is a normal account: no reset, no expiry error.
+      expect(prisma.v1User.update).not.toHaveBeenCalled();
+    });
+
+    it('completeSocialProfile: deferred 에서도 만 14세 미만은 거부한다', async () => {
+      await expect(
+        service.completeSocialProfile('user-1', { ...socialProfileInput, birthDate: '20200101' }),
+      ).rejects.toMatchObject({ response: { code: 'SIGNUP_AGE_RESTRICTED' } });
+    });
+
+    it('completeSocialProfile: required 에서 완료하면 기존처럼 signup_done → sport', async () => {
+      prisma.v1User.findUnique
+        .mockResolvedValueOnce(freshProfileRequired())
+        .mockResolvedValue(completedUserRow({ onboardingStatus: 'signup_done' }));
+      prisma.v1UserProfile.findFirst.mockResolvedValue(null);
+      prisma.v1User.findFirst.mockResolvedValue(null);
+
+      await service.completeSocialProfile('user-1', socialProfileInput);
+
+      expect(prisma.v1User.updateMany).toHaveBeenCalledWith({
+        where: { id: 'user-1', onboardingStatus: 'social_profile_required' },
+        data: { onboardingStatus: 'signup_done', phone: '01087654321' },
+      });
+    });
+  });
+
   // ─── kakaoLogin ──────────────────────────────────────────────────────────
 
   describe('kakaoLogin', () => {
@@ -1108,6 +1306,42 @@ describe('AuthService', () => {
         data: { lastLoginAt: expect.any(Date) },
       }));
       expect(prisma.v1AuthIdentity.create).not.toHaveBeenCalled();
+    });
+
+    it('Kakao 닉네임을 가입 프리필(draftJson)에 보관한다', async () => {
+      global.fetch = jest
+        .fn()
+        .mockResolvedValueOnce({ ok: true, json: async () => ({ access_token: 'kakao-access-token' }) })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({
+            id: 782,
+            kakao_account: { profile: { nickname: '  카카오닉  ' } },
+          }),
+        }) as unknown as typeof fetch;
+      prisma.v1AuthIdentity.findUnique.mockResolvedValue(null);
+      prisma.v1User.findUnique.mockResolvedValue(pendingSocialUserRow());
+      prisma.v1User.create.mockResolvedValue({ id: 'new-social-user', email: null });
+
+      await service.kakaoLogin({ code: 'auth-code' });
+
+      const { data } = prisma.v1User.create.mock.calls[0][0];
+      expect(data.onboardingProgress.create.draftJson).toMatchObject({ kakaoNickname: '카카오닉' });
+    });
+
+    it('Kakao 닉네임이 없으면 kakaoNickname 키를 남기지 않는다', async () => {
+      global.fetch = jest
+        .fn()
+        .mockResolvedValueOnce({ ok: true, json: async () => ({ access_token: 'kakao-access-token' }) })
+        .mockResolvedValueOnce({ ok: true, json: async () => ({ id: 783, kakao_account: {} }) }) as unknown as typeof fetch;
+      prisma.v1AuthIdentity.findUnique.mockResolvedValue(null);
+      prisma.v1User.findUnique.mockResolvedValue(pendingSocialUserRow());
+      prisma.v1User.create.mockResolvedValue({ id: 'new-social-user', email: null });
+
+      await service.kakaoLogin({ code: 'auth-code' });
+
+      const { data } = prisma.v1User.create.mock.calls[0][0];
+      expect(data.onboardingProgress.create.draftJson).not.toHaveProperty('kakaoNickname');
     });
 
     it('만료된(>24h) 소셜 가입 계정으로 재로그인 → 삭제하지 않고 온보딩을 리셋한 뒤 세션을 반환한다', async () => {

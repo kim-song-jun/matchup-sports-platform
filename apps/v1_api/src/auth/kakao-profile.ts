@@ -75,3 +75,19 @@ export function readKakaoSignupPrefill(draftJson: unknown): KakaoSignupPrefill |
     gender: typeof draft.kakaoGender === 'string' ? draft.kakaoGender : null,
   });
 }
+
+export function normalizeKakaoNickname(nickname: string | null | undefined): string | null {
+  const trimmed = (nickname ?? '').trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
+/** Nickname seed for a signup that skips the profile form: Kakao nickname first, then Apple name. */
+export function readSocialNicknameSeed(draftJson: unknown): string | null {
+  if (!draftJson || typeof draftJson !== 'object' || Array.isArray(draftJson)) return null;
+  const draft = draftJson as Record<string, unknown>;
+
+  return (
+    normalizeKakaoNickname(typeof draft.kakaoNickname === 'string' ? draft.kakaoNickname : null) ??
+    normalizeKakaoNickname(typeof draft.appleName === 'string' ? draft.appleName : null)
+  );
+}

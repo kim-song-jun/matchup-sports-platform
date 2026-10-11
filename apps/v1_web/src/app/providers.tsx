@@ -2,6 +2,7 @@
 
 import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
 import { type ReactNode, useState } from 'react';
+import { ActivityProfileRequiredModal } from '@/components/auth/activity-profile-required-modal';
 import { PendingSocialSignupGate } from '@/components/auth/pending-social-signup-gate';
 import { PhoneVerificationRequiredModal } from '@/components/auth/phone-verification/phone-verification-required-modal';
 import { ClientErrorListener } from '@/components/providers/client-error-listener';
@@ -52,6 +53,7 @@ export function Providers({ children }: { children: ReactNode }) {
           <AppShellFrame>{children}</AppShellFrame>
           <GlobalPopup />
           <PhoneVerificationRequiredModal />
+          <ActivityProfileRequiredModal />
         </PendingSocialSignupGate>
       </ThemeProvider>
     </PersistQueryClientProvider>

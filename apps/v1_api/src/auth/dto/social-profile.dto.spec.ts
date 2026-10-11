@@ -1,7 +1,7 @@
 import 'reflect-metadata';
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
-import { SocialProfileDto } from './social-profile.dto';
+import { SocialProfileDto, SocialTermsDto } from './social-profile.dto';
 
 const VALID_SOCIAL_PROFILE_INPUT = {
   nickname: '카카오러너',
@@ -103,5 +103,28 @@ describe('SocialProfileDto (required signup profile contract)', () => {
 
     // Then
     expect(failures).toContain('gender');
+  });
+});
+
+describe('SocialTermsDto age confirmation', () => {
+  const VALID_TERMS = {
+    requiredTermsAccepted: true,
+    ageConfirmed: true,
+    acceptedTermsDocumentIds: ['11111111-1111-4111-8111-111111111111'],
+  };
+  const failed = async (input: Record<string, unknown>) =>
+    (await validate(plainToInstance(SocialTermsDto, input))).map((error) => error.property);
+
+  it('accepts a body with ageConfirmed', async () => {
+    expect(await failed(VALID_TERMS)).toEqual([]);
+  });
+
+  it('rejects a body without ageConfirmed', async () => {
+    const { ageConfirmed: _omitted, ...input } = VALID_TERMS;
+    expect(await failed(input)).toContain('ageConfirmed');
+  });
+
+  it('rejects a non-boolean ageConfirmed', async () => {
+    expect(await failed({ ...VALID_TERMS, ageConfirmed: 'yes' })).toContain('ageConfirmed');
   });
 });

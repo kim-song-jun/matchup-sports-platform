@@ -5,6 +5,9 @@ export class SocialTermsDto {
   @IsBoolean()
   requiredTermsAccepted!: boolean;
 
+  @IsBoolean()
+  ageConfirmed!: boolean;
+
   @IsArray()
   @IsDefined()
   @ArrayMinSize(1)

@@ -155,6 +155,7 @@ function stepFromStatus(status: V1OnboardingStatus): V1OnboardingStep {
     case 'completed':
       return 'done';
     case 'deferred':
+    case 'social_profile_deferred':
       return 'confirm';
   }
 }

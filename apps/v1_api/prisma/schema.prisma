@@ -20,6 +20,7 @@ enum V1OnboardingStatus {
   terms_done
   social_terms_required
   social_profile_required
+  social_profile_deferred
   signup_done
   sport_done
   level_done

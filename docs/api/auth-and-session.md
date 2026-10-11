@@ -75,6 +75,8 @@
 - `401`: 토큰 없음/만료/유효하지 않음
 - `403`: 인증은 되었지만 정책 위반(예: prod에서 dev-login)
 
+`V1AuthGuard` 의 403 판정 순서: 가입 진행 중(`SIGNUP_INCOMPLETE`) → 약관 재동의(`TERMS_RECONSENT_REQUIRED`) → 가입 정보 입력 보류(`ACTIVITY_PROFILE_REQUIRED`, `details.next.route = /signup/social`) → 휴대폰 인증(`PHONE_VERIFICATION_REQUIRED`). 뒤의 두 게이트는 같은 허용 목록(`isPhoneVerificationRequestAllowed`)과 관리자 면제를 공유하고, 조회(GET/HEAD/OPTIONS)는 항상 통과한다.
+
 ## Edge Cases
 
 - `register` 중복 이메일/닉네임은 `409`

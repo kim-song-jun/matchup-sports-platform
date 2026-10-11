@@ -139,4 +139,11 @@ export type HomeViewModel = {
   phoneVerifyNudge?: {
     onVerify: () => void;
   };
+  /**
+   * 소셜 가입 때 정보 입력을 미룬 계정에게 상시 노출하는 배너. 쓰기가 막힌 이유를 알려 주는
+   * 차단성 배너라 phoneVerifyNudge 와 같은 자리를 쓰고, 닫기를 제공하지 않는다.
+   */
+  activityProfileNudge?: {
+    onEnter: () => void;
+  };
 };

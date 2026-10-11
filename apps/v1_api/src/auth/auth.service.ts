@@ -1,5 +1,5 @@
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
-import { V1AccountStatus, V1AuthProvider } from '@prisma/client';
+import { Prisma, V1AccountStatus, V1AuthProvider } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { buildOnboardingSummary, hasAcceptedRequiredTerms } from '../onboarding/onboarding-summary';
 import { AppleLoginDto } from './dto/apple-login.dto';
@@ -7,7 +7,14 @@ import { AppleIdentityService } from './apple-identity.service';
 import type { AppleIdentityClaims } from './apple-identity-token';
 import { AppleTokenService } from './apple-token.service';
 import { KakaoLoginDto } from './dto/kakao-login.dto';
-import { buildKakaoSignupPrefill, readKakaoSignupPrefill, type KakaoSignupPrefill } from './kakao-profile';
+import {
+  buildKakaoSignupPrefill,
+  normalizeKakaoNickname,
+  readKakaoSignupPrefill,
+  readSocialNicknameSeed,
+  type KakaoSignupPrefill,
+} from './kakao-profile';
+import { generateSocialNickname } from './social-nickname';
 import { isPendingSocialSignup } from './social-signup-access';
 import { normalizeEmail } from './normalize-email';
 import { LoginDto } from './dto/login.dto';
@@ -67,6 +74,7 @@ type KakaoProfile = {
   emailValid: boolean;
   emailVerified: boolean;
   profileImageUrl: string | null;
+  nickname: string | null;
   /** 콘솔 동의항목이 승인된 앱에서만 값이 온다. 미승인이면 null. */
   signupPrefill: KakaoSignupPrefill | null;
 };
@@ -455,6 +463,7 @@ export class AuthService {
             // (별도 테이블 없이 기존 draftJson 을 확장 — 동의항목 미승인이면 kakao* 키가 아예 없다).
             draftJson: {
               kakaoProfileImageUrl: profile.profileImageUrl,
+              ...(profile.nickname ? { kakaoNickname: profile.nickname } : {}),
               ...(profile.signupPrefill
                 ? {
                     kakaoName: profile.signupPrefill.name,
@@ -707,6 +716,13 @@ export class AuthService {
       });
     }
 
+    if (!dto.ageConfirmed) {
+      throw new BadRequestException({
+        code: 'VALIDATION_ERROR',
+        message: 'Age confirmation is required before registration',
+      });
+    }
+
     const user = await this.prisma.v1User.findUnique({
       where: { id: userId },
       select: {
@@ -776,10 +792,14 @@ export class AuthService {
         where: { isRequired: true, status: 'published' },
         select: { id: true },
       });
+      const draft = {
+        ...draftObject(user.onboardingProgress?.draftJson),
+        ageConfirmedAt: new Date().toISOString(),
+      };
       await transaction.v1UserOnboardingProgress.upsert({
         where: { userId },
-        update: { currentStep: 'signup' },
-        create: { userId, currentStep: 'signup' },
+        update: { currentStep: 'signup', draftJson: draft },
+        create: { userId, currentStep: 'signup', draftJson: draft },
       });
       if (requiredTerms.length > 0) {
         await transaction.v1UserTermsConsent.createMany({
@@ -869,12 +889,14 @@ export class AuthService {
       });
     }
 
-    if (user.onboardingStatus !== 'social_profile_required') {
+    const previousStatus = user.onboardingStatus;
+    if (previousStatus !== 'social_profile_required' && previousStatus !== 'social_profile_deferred') {
       throw new BadRequestException({
         code: 'VALIDATION_ERROR',
-        message: 'Social profile can only be completed from the required profile state',
+        message: 'Social profile can only be completed from the required or deferred profile state',
       });
     }
+    const wasDeferred = previousStatus === 'social_profile_deferred';
 
     if (isExpiredSocialSignup(user)) {
       await this.resetExpiredSocialSignup(userId);
@@ -932,8 +954,8 @@ export class AuthService {
 
     await this.prisma.$transaction(async (transaction) => {
       const transition = await transaction.v1User.updateMany({
-        where: { id: userId, onboardingStatus: 'social_profile_required' },
-        data: { onboardingStatus: 'signup_done', phone },
+        where: { id: userId, onboardingStatus: previousStatus },
+        data: { onboardingStatus: wasDeferred ? 'deferred' : 'signup_done', phone },
       });
       if (transition.count !== 1) {
         throw new BadRequestException({
@@ -966,10 +988,100 @@ export class AuthService {
       });
       await transaction.v1UserOnboardingProgress.upsert({
         where: { userId },
-        update: { currentStep: 'sport' },
-        create: { userId, currentStep: 'sport' },
+        update: { currentStep: wasDeferred ? 'confirm' : 'sport' },
+        create: { userId, currentStep: wasDeferred ? 'confirm' : 'sport' },
       });
       await recordSignupConsent(transaction, userId, dto.recordConsent);
+    });
+
+    return this.sessionResponse(user.id, user.email, { social: true });
+  }
+
+  async deferSocialProfile(userId: string) {
+    const user = await this.prisma.v1User.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        email: true,
+        accountStatus: true,
+        onboardingStatus: true,
+        createdAt: true,
+        updatedAt: true,
+        onboardingProgress: { select: { draftJson: true } },
+        authIdentities: {
+          where: { provider: { in: SOCIAL_AUTH_PROVIDERS }, status: 'active' },
+          select: { id: true },
+        },
+      },
+    });
+
+    if (!user) {
+      throw new NotFoundException({
+        code: 'NOT_FOUND',
+        message: 'V1 user was not found',
+      });
+    }
+
+    if (user.accountStatus !== 'active' || user.authIdentities.length === 0) {
+      throw new ForbiddenException({
+        code: 'PERMISSION_DENIED',
+        message: 'This account cannot defer social signup',
+      });
+    }
+
+    if (user.onboardingStatus === 'social_terms_required') {
+      throw new BadRequestException({
+        code: 'TERMS_REQUIRED',
+        message: 'Required terms must be accepted before social profile registration',
+      });
+    }
+
+    if (user.onboardingStatus !== 'social_profile_required') {
+      throw new BadRequestException({
+        code: 'VALIDATION_ERROR',
+        message: 'Social profile can only be deferred from the required profile state',
+      });
+    }
+
+    if (isExpiredSocialSignup(user)) {
+      await this.resetExpiredSocialSignup(userId);
+      throw new UnauthorizedException({
+        code: 'SOCIAL_SIGNUP_EXPIRED',
+        message: 'Social signup session expired. Please sign in again.',
+      });
+    }
+
+    const nickname = await generateSocialNickname(
+      readSocialNicknameSeed(user.onboardingProgress?.draftJson),
+      async (candidate) =>
+        (await this.prisma.v1UserProfile.findFirst({
+          where: { nickname: candidate, deletedAt: null, userId: { not: userId } },
+          select: { id: true },
+        })) !== null,
+    );
+
+    await this.prisma.$transaction(async (transaction) => {
+      const transition = await transaction.v1User.updateMany({
+        where: { id: userId, onboardingStatus: 'social_profile_required' },
+        data: { onboardingStatus: 'social_profile_deferred' },
+      });
+      if (transition.count !== 1) {
+        throw new BadRequestException({
+          code: 'VALIDATION_ERROR',
+          message: 'Social signup state changed before profile deferral',
+        });
+      }
+
+      await transaction.v1UserProfile.upsert({
+        where: { userId },
+        update: { nickname, visibility: 'public' },
+        create: { userId, nickname, visibility: 'public' },
+      });
+      await transaction.v1UserOnboardingProgress.upsert({
+        where: { userId },
+        update: { currentStep: 'confirm' },
+        create: { userId, currentStep: 'confirm' },
+      });
     });
 
     return this.sessionResponse(user.id, user.email, { social: true });
@@ -1218,6 +1330,9 @@ export class AuthService {
         userData.kakao_account?.profile?.profile_image_url ??
         userData.properties?.profile_image ??
         null,
+      nickname: normalizeKakaoNickname(
+        userData.kakao_account?.profile?.nickname ?? userData.properties?.nickname,
+      ),
       signupPrefill: buildKakaoSignupPrefill({
         name: userData.kakao_account?.name,
         phone: userData.kakao_account?.phone_number,
@@ -1233,7 +1348,7 @@ function getAuthNextRoute(onboarding: { status: string; missing: string[]; curre
     return '/terms?mode=social';
   }
 
-  if (onboarding.status === 'deferred') {
+  if (onboarding.status === 'deferred' || onboarding.status === 'social_profile_deferred') {
     return null;
   }
 
@@ -1246,6 +1361,12 @@ function getAuthNextRoute(onboarding: { status: string; missing: string[]; curre
   }
 
   return null;
+}
+
+function draftObject(draftJson: unknown): Prisma.InputJsonObject {
+  return draftJson && typeof draftJson === 'object' && !Array.isArray(draftJson)
+    ? (draftJson as Prisma.InputJsonObject)
+    : {};
 }
 
 function isExpiredSocialSignup(user: { onboardingStatus: string; createdAt: Date; updatedAt: Date }) {

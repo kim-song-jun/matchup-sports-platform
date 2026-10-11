@@ -33,7 +33,7 @@ export class OnboardingService {
     await this.validateSports(sports);
     await this.validateRegions(regions.map((region) => region.regionId));
 
-    const nextStatus = derivePreferenceStatus({
+    const derivedStatus = derivePreferenceStatus({
       sportsCount: sports.length,
       missingLevels: sports.some((sport) => !sport.levelId),
       currentStep: dto.currentStep,
@@ -73,6 +73,10 @@ export class OnboardingService {
         where: { id: userId },
         select: { onboardingStatus: true },
       });
+      // Preferences are saved, but the status stays: the deferred profile gate only opens
+      // through POST /auth/social-profile.
+      const nextStatus =
+        user.onboardingStatus === 'social_profile_deferred' ? user.onboardingStatus : derivedStatus;
 
       await tx.v1User.update({
         where: { id: userId },
@@ -139,10 +143,12 @@ export class OnboardingService {
       });
     }
 
-    await this.changeStatus(userId, snapshot.onboardingStatus, 'completed', 'onboarding_complete');
+    const keepsProfileGate = snapshot.onboardingStatus === 'social_profile_deferred';
+    const nextStatus = keepsProfileGate ? snapshot.onboardingStatus : 'completed';
+    await this.changeStatus(userId, snapshot.onboardingStatus, nextStatus, 'onboarding_complete');
 
     return {
-      status: 'completed',
+      status: nextStatus,
       next: {
         route: '/home',
         reason: 'onboarding_completed',
@@ -155,7 +161,10 @@ export class OnboardingService {
   async defer(userId: string, reason: string) {
     await this.assertUserCanMutate(userId);
     const snapshot = await this.getUserSnapshot(userId);
-    const nextStatus = snapshot.onboardingStatus === 'completed' ? 'completed' : 'deferred';
+    const nextStatus =
+      snapshot.onboardingStatus === 'completed' || snapshot.onboardingStatus === 'social_profile_deferred'
+        ? snapshot.onboardingStatus
+        : 'deferred';
     const detail = getOnboardingDetail(snapshot);
 
     await this.changeStatus(userId, snapshot.onboardingStatus, nextStatus, `onboarding_defer:${reason}`);
@@ -258,6 +267,7 @@ export class OnboardingService {
       case 'region_done':
       case 'completed':
       case 'deferred':
+      case 'social_profile_deferred':
         return;
       default: {
         const exhaustiveStatus: never = user.onboardingStatus;

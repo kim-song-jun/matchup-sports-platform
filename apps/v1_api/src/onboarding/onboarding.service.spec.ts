@@ -183,3 +183,64 @@ describe('OnboardingService required social signup barrier', () => {
     },
   );
 });
+
+describe('OnboardingService with the profile gate still closed (social_profile_deferred)', () => {
+  it('saves preferences but keeps the status and writes no status-change log', async () => {
+    const { moduleRef, service, writeMocks } = await createHarness('social_profile_deferred');
+    const [, , , , userUpdate, , statusLog] = writeMocks;
+
+    try {
+      await service.updatePreferences(userId, {
+        sports: [],
+        regions: [],
+        currentStep: 'sport',
+      });
+
+      expect(userUpdate).toHaveBeenCalledWith({
+        where: { id: userId },
+        data: { onboardingStatus: 'social_profile_deferred' },
+      });
+      expect(statusLog).not.toHaveBeenCalled();
+    } finally {
+      await moduleRef.close();
+    }
+  });
+
+  it('control: a signed-up user still gets the derived status from the same payload', async () => {
+    const { moduleRef, service, writeMocks } = await createHarness('signup_done');
+    const [, , , , userUpdate] = writeMocks;
+
+    try {
+      await service.updatePreferences(userId, {
+        sports: [],
+        regions: [],
+        currentStep: 'sport',
+      });
+
+      expect(userUpdate).toHaveBeenCalledWith({
+        where: { id: userId },
+        data: { onboardingStatus: expect.not.stringMatching(/^social_profile_deferred$/) },
+      });
+    } finally {
+      await moduleRef.close();
+    }
+  });
+
+  it.each([
+    ['POST /onboarding/defer', (service: OnboardingService) => service.defer(userId, 'later')],
+    ['POST /onboarding/complete', (service: OnboardingService) => service.complete(userId)],
+  ])('%s does not open the gate', async (_name, invoke) => {
+    const { moduleRef, service, writeMocks } = await createHarness('social_profile_deferred');
+    const [, , , , userUpdate, , statusLog] = writeMocks;
+
+    try {
+      const result = (await invoke(service)) as { status: string };
+
+      expect(result.status).toBe('social_profile_deferred');
+      expect(userUpdate).not.toHaveBeenCalled();
+      expect(statusLog).not.toHaveBeenCalled();
+    } finally {
+      await moduleRef.close();
+    }
+  });
+});

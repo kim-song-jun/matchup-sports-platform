@@ -2319,7 +2319,7 @@ export type V1Profile = {
   authProvider: 'email' | 'kakao' | 'naver' | 'apple' | null;
   authProviders?: Array<'email' | 'kakao' | 'naver' | 'apple' | string>;
   hasPassword?: boolean;
-  onboardingStatus?: 'not_started' | 'terms_done' | 'social_terms_required' | 'social_profile_required' | 'signup_done' | 'sport_done' | 'level_done' | 'region_done' | 'completed' | 'deferred';
+  onboardingStatus?: 'not_started' | 'terms_done' | 'social_terms_required' | 'social_profile_required' | 'social_profile_deferred' | 'signup_done' | 'sport_done' | 'level_done' | 'region_done' | 'completed' | 'deferred';
   regionName: string | null;
   sports?: Array<{
     sportId: string;

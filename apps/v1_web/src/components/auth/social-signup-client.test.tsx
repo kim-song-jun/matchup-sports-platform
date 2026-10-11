@@ -11,6 +11,7 @@ const router = vi.hoisted(() => ({
 const hooks = vi.hoisted(() => ({
   checkNicknameMutate: vi.fn(),
   completeProfileMutate: vi.fn(),
+  deferMutate: vi.fn(),
   phoneIssueMutateAsync: vi.fn(),
   phoneVerifyMutateAsync: vi.fn(),
   authedPhoneRequestMutateAsync: vi.fn(),
@@ -19,7 +20,9 @@ const hooks = vi.hoisted(() => ({
   // 카카오 동의항목 미승인이 기본값 — 프리필 없이 직접 입력하는 기존 흐름.
   authMe: {
     socialSignupPrefill: null as null | { name: string | null; phone: string | null; gender: 'male' | 'female' | null },
-    user: { authProvider: 'kakao' as string | null },
+    user: { authProvider: 'kakao' as string | null, onboardingStatus: 'social_profile_required', phone: null as string | null },
+    profile: { nickname: null as string | null },
+    verification: { phoneVerified: false },
   },
 }));
 
@@ -40,6 +43,7 @@ vi.mock('@/hooks/use-v1-api', () => ({
   useV1Logout: () => ({ mutateAsync: hooks.logoutMutateAsync, isPending: false }),
   useV1CheckNickname: () => ({ mutate: hooks.checkNicknameMutate, isPending: false }),
   useV1CompleteSocialProfile: () => ({ mutate: hooks.completeProfileMutate, isPending: false }),
+  useV1DeferSocialProfile: () => ({ mutate: hooks.deferMutate, isPending: false }),
   useV1PhoneIssue: () => ({ mutateAsync: hooks.phoneIssueMutateAsync, isPending: false }),
   useV1PhoneVerify: () => ({ mutateAsync: hooks.phoneVerifyMutateAsync, isPending: false }),
   useV1AuthedPhoneRequest: () => ({ mutateAsync: hooks.authedPhoneRequestMutateAsync, isPending: false }),
@@ -57,7 +61,7 @@ type AvailabilityCallbacks = {
 type CompleteProfileCallbacks = {
   readonly onSuccess: (result: {
     readonly session: { readonly userId: string; readonly userEmail: string | null };
-    readonly next: { readonly route: string };
+    readonly next: { readonly route: string | null };
   }) => void;
   readonly onError?: (error: unknown) => void;
 };
@@ -86,6 +90,10 @@ describe('SocialSignupClient required profile contract', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     hooks.authMe.user.authProvider = 'kakao';
+    hooks.authMe.user.onboardingStatus = 'social_profile_required';
+    hooks.authMe.user.phone = null;
+    hooks.authMe.profile.nickname = null;
+    hooks.authMe.verification.phoneVerified = false;
     hooks.checkNicknameMutate.mockImplementation(
       (_value: string, callbacks: AvailabilityCallbacks) => callbacks.onSuccess({ available: true }),
     );
@@ -470,3 +478,99 @@ describe('SocialSignupClient 가입 방식 문구', () => {
     expect(screen.queryByText(/카카오 계정 확인/)).not.toBeInTheDocument();
   });
 });
+
+describe('SocialSignupClient 나중에 입력할게요', () => {
+  // 앞선 describe 가 window.location 을 스냅샷 객체로 바꿔 두므로 search 를 직접 지정한다.
+  const setSearch = (search: string) => {
+    Object.defineProperty(window, 'location', {
+      configurable: true,
+      value: { ...window.location, search },
+    });
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    hooks.authMe.user.authProvider = 'kakao';
+    hooks.authMe.user.onboardingStatus = 'social_profile_required';
+    hooks.authMe.user.phone = null;
+    hooks.authMe.profile.nickname = null;
+    hooks.authMe.verification.phoneVerified = false;
+    setSearch('');
+  });
+
+  const deferResult = {
+    session: { userId: 'u-1', userEmail: null },
+    next: { route: null },
+  };
+
+  it('입력 없이 건너뛰면 defer 를 호출하고 홈으로 가며 sign_up_complete(profile=deferred)를 남긴다', () => {
+    hooks.deferMutate.mockImplementation((_v: undefined, cb: CompleteProfileCallbacks) => cb.onSuccess(deferResult));
+    render(<SocialSignupClient />);
+
+    expect(screen.getByText('팀 만들기·참가 신청처럼 활동을 시작할 때 다시 물어볼게요.')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '나중에 입력할게요' }));
+
+    expect(hooks.deferMutate).toHaveBeenCalledTimes(1);
+    expect(router.replace).toHaveBeenCalledWith('/home');
+    expect(analytics.trackEvent).toHaveBeenCalledWith('sign_up_complete', { method: 'kakao', profile: 'deferred' });
+  });
+
+  it('저장된 redirect 가 같은 origin 의 경로면 홈 대신 거기로 간다, 외부 주소는 무시한다', () => {
+    hooks.deferMutate.mockImplementation((_v: undefined, cb: CompleteProfileCallbacks) => cb.onSuccess(deferResult));
+    setSearch('?redirect=%2Fteams%2Fnew');
+    const { unmount } = render(<SocialSignupClient />);
+    fireEvent.click(screen.getByRole('button', { name: '나중에 입력할게요' }));
+    expect(router.replace).toHaveBeenLastCalledWith('/teams/new');
+    unmount();
+
+    setSearch('?redirect=https%3A%2F%2Fevil.example');
+    render(<SocialSignupClient />);
+    fireEvent.click(screen.getByRole('button', { name: '나중에 입력할게요' }));
+    expect(router.replace).toHaveBeenLastCalledWith('/home');
+  });
+
+  it('defer 가 실패하면 서버 메시지를 화면에 보여 주고 이동하지 않는다', () => {
+    hooks.deferMutate.mockImplementation((_v: undefined, cb: CompleteProfileCallbacks) =>
+      cb.onError?.(new V1ApiError({
+        status: 'error', statusCode: 400, code: 'VALIDATION_ERROR', message: '지금은 건너뛸 수 없어요.', timestamp: '2026-10-11T00:00:00.000Z',
+      })));
+    render(<SocialSignupClient />);
+    fireEvent.click(screen.getByRole('button', { name: '나중에 입력할게요' }));
+
+    expect(screen.getByText('지금은 건너뛸 수 없어요.')).toBeInTheDocument();
+    expect(router.replace).not.toHaveBeenCalled();
+  });
+
+  it('이어 입력 모드는 건너뛰기 없이 제목·버튼이 바뀌고 닉네임이 채워져 있다', () => {
+    hooks.authMe.user.onboardingStatus = 'social_profile_deferred';
+    hooks.authMe.profile.nickname = '카카오러너';
+    render(<SocialSignupClient />);
+
+    expect(screen.getByRole('heading', { name: '활동 정보 입력' })).toBeInTheDocument();
+    expect(screen.getByText('입력을 마치면 하던 화면으로 돌아가요.')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '나중에 입력할게요' })).not.toBeInTheDocument();
+    expect(screen.getByLabelText(/^닉네임/)).toHaveValue('카카오러너');
+    expect(screen.getByRole('button', { name: /입력 확인 후 계속|입력 완료하고 계속하기/ })).toBeInTheDocument();
+  });
+
+  it('이어 입력 모드 완료는 activity_profile_complete 를 남기고 redirect 로 돌아간다', async () => {
+    hooks.authMe.user.onboardingStatus = 'social_profile_deferred';
+    hooks.authMe.profile.nickname = '카카오러너';
+    setSearch('?redirect=%2Fteams%2Fnew');
+    hooks.completeProfileMutate.mockImplementation((_b: unknown, cb: CompleteProfileCallbacks) =>
+      cb.onSuccess({ session: { userId: 'u-1', userEmail: null }, next: { route: null } }));
+    render(<SocialSignupClient />);
+
+    fireEvent.click(screen.getByRole('radio', { name: '여' }));
+    fireEvent.change(screen.getByLabelText(/^이름/), { target: { value: '김팀밋' } });
+    fireEvent.change(screen.getByLabelText(/^휴대폰 번호/), { target: { value: '01012345678' } });
+    await completePhoneVerification();
+    fireEvent.change(screen.getByLabelText(/^생년월일/), { target: { value: '1995-01-15' } });
+    fireEvent.click(await screen.findByRole('button', { name: '입력 완료하고 계속하기' }));
+
+    expect(analytics.trackEvent).toHaveBeenCalledWith('activity_profile_complete', { method: 'kakao' });
+    expect(analytics.trackEvent).not.toHaveBeenCalledWith('sign_up_complete', expect.anything());
+    expect(router.replace).toHaveBeenCalledWith('/teams/new');
+  });
+});
+

@@ -366,7 +366,16 @@ export function useV1CompleteSocialProfile() {
       profileImageUrl?: string;
       recordConsent?: { granted: boolean; policyHash: string };
     }) =>
-      v1Post<V1AuthSessionResponse & { next: { route: string } }>('/auth/social-profile', body),
+      v1Post<V1AuthSessionResponse & { next: { route: string | null } }>('/auth/social-profile', body),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: v1Keys.authMe() }),
+  });
+}
+
+export function useV1DeferSocialProfile() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () =>
+      v1Post<V1AuthSessionResponse & { next: { route: string | null } }>('/auth/social-profile/defer'),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: v1Keys.authMe() }),
   });
 }
@@ -374,7 +383,7 @@ export function useV1CompleteSocialProfile() {
 export function useV1CompleteSocialTerms() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (body: { requiredTermsAccepted: boolean; acceptedTermsDocumentIds: string[] }) =>
+    mutationFn: (body: { requiredTermsAccepted: boolean; acceptedTermsDocumentIds: string[]; ageConfirmed: boolean }) =>
       v1Post<V1AuthSessionResponse & { next: { route: string } }>('/auth/social-terms', body),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: v1Keys.authMe() }),
   });

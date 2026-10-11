@@ -93,6 +93,12 @@ export class AuthController {
     return this.authService.completeSocialProfile(user.id, dto);
   }
 
+  @Post('social-profile/defer')
+  @UseGuards(V1AuthGuard)
+  deferSocialProfile(@CurrentUser() user: V1AuthUser) {
+    return this.authService.deferSocialProfile(user.id);
+  }
+
   @Post('social-terms')
   @UseGuards(V1AuthGuard)
   completeSocialTerms(@CurrentUser() user: V1AuthUser, @Body() dto: SocialTermsDto) {

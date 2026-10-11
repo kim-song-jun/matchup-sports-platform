@@ -124,7 +124,9 @@ even if supplied. `V1AuthGuard` requires a valid signed session in production. `
 allows guests and hydrates a user only when a valid signed session is present.
 
 Common auth errors: `401 UNAUTHENTICATED`, `403 PERMISSION_DENIED`, `403 SIGNUP_INCOMPLETE` for
-authenticated social sessions that still require terms or profile completion, `422
+authenticated social sessions that still require terms or profile completion, `403
+ACTIVITY_PROFILE_REQUIRED` for writes by a social user who skipped the profile form (`POST
+/auth/social-profile/defer`; reads stay open), `422
 PROFILE_COMPLETION_REQUIRED` for the creator-profile gate (see [Users](./domains/users.md)).
 
 ## Pagination (Outside The Frozen Command Surface)
@@ -138,7 +140,7 @@ defaults.
 ## Common Error Codes
 
 Observed service/guard codes outside the frozen command surface: `UNAUTHENTICATED`,
-`PERMISSION_DENIED`, `SIGNUP_INCOMPLETE`, `PROFILE_COMPLETION_REQUIRED`, `VALIDATION_ERROR` (DTO shape,
+`PERMISSION_DENIED`, `SIGNUP_INCOMPLETE`, `ACTIVITY_PROFILE_REQUIRED`, `PROFILE_COMPLETION_REQUIRED`, `VALIDATION_ERROR` (DTO shape,
 from `ValidationPipe`), `VALIDATION_FAILED` (service-level business rules),
 `NOT_FOUND`, `NOT_FOUND_OR_ARCHIVED`, `ALREADY_PROCESSED`, `INTERNAL_ERROR`. State-changing callers
 must handle stale or duplicate action responses as either `ALREADY_PROCESSED` or a domain-specific

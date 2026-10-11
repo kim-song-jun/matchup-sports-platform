@@ -7,7 +7,7 @@
  * 값도 안전한 한글 fallback으로 떨어지게 한다. 새 상태값 추가 시 여기만 갱신한다.
  */
 
-import type { V1InquiryReportReason, V1RegistrationCancelOutcome, V1TournamentRegistrationStatus } from '@/types/api';
+import type { V1InquiryReportReason, V1PlayerEligibilityStatus, V1RegistrationCancelOutcome, V1TournamentRegistrationStatus } from '@/types/api';
 
 /**
  * 팀 가입 신청 상태 — **관리자(검토자) 관점** 라벨.
@@ -467,3 +467,10 @@ export function tournamentRegistrationStatusConfig(
   }
   return { ...REGISTRATION_TONE[entry.tone], label: entry.label };
 }
+
+/** 선수 자격(선출 여부) 라벨 — 팀 명단·어드민 명단 검토가 같은 말을 쓴다. 어드민은 `needs_review` 만 따로 쓴다. */
+export const PLAYER_ELIGIBILITY_LABEL: Record<V1PlayerEligibilityStatus, string> = {
+  non_pro: '아마추어',
+  pro: '선출',
+  needs_review: '확인 중',
+};

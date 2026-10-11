@@ -12,6 +12,7 @@ import {
 } from '@/hooks/use-v1-api';
 import { findMyTournamentGroup } from '@/hooks/use-v1-my-staff-assignments';
 import { getTournamentOpsOrigin, saveTournamentOpsOrigin } from '@/lib/session-storage';
+import { TOURNAMENT_STAFF_ENTRY_LABEL } from '@/lib/tournament-staff-entry-label';
 import { classifyTournamentStaffAccessError, isTournamentStaffScopeNotYetSupported } from '@/lib/tournament-ops-access';
 import type { V1MyTournamentStaffResponse, V1TournamentStaffRole } from '@/types/api';
 import { TournamentOpsShell } from '@/components/tournament-ops/tournament-ops-shell';
@@ -134,12 +135,12 @@ function AccessDenied({ scopeNotYetSupported, fixtureScope = false }: { scopeNot
         </h1>
         {/* 종전 문구는 "필드/경기 담당자용 화면은 아직 준비 중"이었다 — 담당 경기 콘솔로
             직행하는 경로가 생긴 지금은 사실이 아니다. 막힌 이유(대회 전체 화면)와 대신
-            갈 곳(내 대회 운영)을 그대로 적는다. */}
+            갈 곳(담당 대회 운영)을 그대로 적는다. */}
         <p className="text-[length:var(--font-size-body-sm)] text-[var(--text-muted)] leading-relaxed">
           {fixtureScope
             ? '이 경기는 담당 범위에 포함되어 있지 않아요. 담당 경기 목록에서 배정된 경기를 확인해 주세요.'
             : scopeNotYetSupported
-            ? '대회 전체 화면은 대회 운영자만 열 수 있어요. 담당 경기는 “내 대회 운영”에서 바로 들어갈 수 있어요.'
+            ? `대회 전체 화면은 대회 운영자만 열 수 있어요. 담당 경기는 “${TOURNAMENT_STAFF_ENTRY_LABEL}”에서 바로 들어갈 수 있어요.`
             : '이 화면은 이 대회에 배정된 운영 스태프만 접근할 수 있어요. 배정 상태를 확인해 주세요.'}
         </p>
         {/* `/tournament-ops` 에는 page.tsx 가 없다(layout.tsx 만 있음) — 예전 링크는 404 로
@@ -149,7 +150,7 @@ function AccessDenied({ scopeNotYetSupported, fixtureScope = false }: { scopeNot
           className="mt-2 inline-flex items-center justify-center h-[44px] px-6 bg-blue-500 hover:bg-blue-600 text-white text-[length:var(--font-size-body-sm)] font-semibold rounded-xl transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
           style={{ color: 'var(--static-white)' }}
         >
-          {scopeNotYetSupported ? '내 대회 운영으로 가기' : '서비스로 돌아가기'}
+          {scopeNotYetSupported ? `${TOURNAMENT_STAFF_ENTRY_LABEL}으로 가기` : '서비스로 돌아가기'}
         </Link>
       </div>
     </div>

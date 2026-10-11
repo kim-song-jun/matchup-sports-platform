@@ -56,7 +56,7 @@ Public review lookup requires `isPublic = true` and `deletedAt = null`; private,
 deleted, unknown and unsupported competitions return `404 TOURNAMENT_NOT_FOUND`
 before review rows are queried. A valid competition with no visible reviews returns
 `{ items: [], total: 0, page, pageSize }`. Defaults are `page = 1`, `pageSize = 10`,
-with page size limited to 50. Reviews are newest first. Search is case-insensitive
+with page size limited to 50 and `page` limited to 1–10,000 (`MAX_PAGE_NUMBER`; larger is 400). Reviews are newest first. Search is case-insensitive
 over team name, comment and author nickname; hidden reviews are excluded from both
 items and total. Public items contain only `id`, `authorId`, `authorNickname`,
 `authorProfileImageUrl`, `teamName`, `rating`, `comment`, `photoUrls` and `createdAt`.
@@ -522,7 +522,7 @@ All team roster mutations lock the registration row and re-read `rosterLockedAt`
 
 ## Public list default order (2026-10-10)
 
-`GET /tournaments` orders by status group (recruiting, recruitment closed, in progress, finished), then date, then `id` ascending as the tie-breaker. "Recruitment closed" is the status the card shows: stored `closed`, plus a stored-`open` tournament whose `registrationDeadlineAt` has passed or whose capacity (confirmed + awaiting_payment/payment_checking/paid registrations vs `teamCount`) is full; regular leagues have no capacity and keep their stored status. The server is the only place this order is defined; clients render `items[]` as received. The order, the cursor comparison and the `page` offset are all computed in the database (one `ORDER BY` over the status group, the group's date key and `id`), so request cost depends on the page size, not on how many tournaments exist. A `cursor` is an opaque token (`pageInfo.nextCursor`) that carries the sort key its row had on the page that issued it, so a row that turns into 모집 마감 mid-scroll does not make the next page skip rows; a token the list did not issue returns an empty page. When `page` is present (including `page=1`) it wins and any `cursor` sent with it is ignored; `total` is counted only for `page` requests.
+`GET /tournaments` orders by status group (recruiting, recruitment closed, in progress, finished), then date, then `id` ascending as the tie-breaker. "Recruitment closed" is the status the card shows: stored `closed`, plus a stored-`open` tournament whose `registrationDeadlineAt` has passed or whose capacity (confirmed + awaiting_payment/payment_checking/paid registrations vs `teamCount`) is full; regular leagues have no capacity and keep their stored status. The server is the only place this order is defined; clients render `items[]` as received. The order, the cursor comparison and the `page` offset are all computed in the database (one `ORDER BY` over the status group, the group's date key and `id`), so request cost depends on the page size, not on how many tournaments exist. A `cursor` is an opaque token (`pageInfo.nextCursor`) that carries the sort key its row had on the page that issued it, so a row that turns into 모집 마감 mid-scroll does not make the next page skip rows; a token the list did not issue returns an empty page. When `page` is present (including `page=1`) it wins and any `cursor` sent with it is ignored; `total` is counted only for `page` requests. `page` is capped at 10,000 (`MAX_PAGE_NUMBER`); a larger value is a 400 instead of an overflowing offset.
 
 1. `open` (a regular league's `draft` "upcoming" is grouped here) - `scheduledAt` ascending
 2. `closed` - `scheduledAt` ascending

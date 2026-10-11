@@ -168,6 +168,46 @@ describe('AwardsTab 추천 근거 chip (STATS-3)', () => {
     expect(setAwardsMutate).not.toHaveBeenCalled();
   });
 
+  it('동점이면 공동 순위로 표시하고, 같은 순위 선수를 3명에서 자르지 않는다', () => {
+    playerRecordsHolder.current = {
+      tournamentId: 'tournament-1',
+      goals: [
+        { userId: 'u1', name: '가선수', teamName: 'A팀', goals: 2, assists: 0 },
+        { userId: 'u2', name: '나선수', teamName: 'A팀', goals: 2, assists: 0 },
+        { userId: 'u3', name: '다선수', teamName: 'B팀', goals: 2, assists: 0 },
+        { userId: 'u4', name: '라선수', teamName: 'B팀', goals: 2, assists: 0 },
+        { userId: 'u5', name: '마선수', teamName: 'B팀', goals: 1, assists: 0 },
+      ],
+      assists: [],
+    };
+    render(<AwardsTab tournamentId="tournament-1" canWrite showToast={vi.fn()} />);
+
+    for (const name of ['가선수', '나선수', '다선수', '라선수']) {
+      expect(screen.getByRole('button', { name: new RegExp(`득점 상위 공동 1위 ${name} 2골`) })).toBeInTheDocument();
+    }
+    expect(screen.queryByRole('button', { name: /득점 상위 [23]위/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /마선수/ })).not.toBeInTheDocument();
+  });
+
+  it('동점이 아닌 선수는 그대로 단독 순위를 쓰고 뒤따르는 동점만 공동이 된다', () => {
+    playerRecordsHolder.current = {
+      tournamentId: 'tournament-1',
+      goals: [
+        { userId: 'u1', name: '가선수', teamName: 'A팀', goals: 5, assists: 0 },
+        { userId: 'u2', name: '나선수', teamName: 'A팀', goals: 3, assists: 0 },
+        { userId: 'u3', name: '다선수', teamName: 'B팀', goals: 3, assists: 0 },
+        { userId: 'u4', name: '라선수', teamName: 'B팀', goals: 1, assists: 0 },
+      ],
+      assists: [],
+    };
+    render(<AwardsTab tournamentId="tournament-1" canWrite showToast={vi.fn()} />);
+
+    expect(screen.getByRole('button', { name: /득점 상위 1위 가선수 5골/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /득점 상위 공동 2위 나선수 3골/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /득점 상위 공동 2위 다선수 3골/ })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /라선수/ })).not.toBeInTheDocument();
+  });
+
   it('읽기 전용 권한에서는 chip이 렌더되지 않는다', () => {
     render(<AwardsTab tournamentId="tournament-1" canWrite={false} showToast={vi.fn()} />);
     expect(screen.queryByText(/추천 근거/)).not.toBeInTheDocument();

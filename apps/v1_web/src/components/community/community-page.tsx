@@ -211,8 +211,10 @@ export function ChatRoomPageView({ model, listModel, roomId }: { model: ChatRoom
         </AppBackLink>
         {model.title ? (
           <h1 className="tm-text-heading" style={{ margin: 0 }}>{model.title}</h1>
-        ) : (
+        ) : model.status === 'loading' ? (
           <div className="tm-skeleton" aria-hidden="true" style={{ width: 160, height: 24, borderRadius: 'var(--radius-chip)' }} />
+        ) : (
+          <h1 className="tm-text-heading" style={{ margin: 0 }}>채팅방</h1>
         )}
         {roomMenuButton ? <div className="ml-auto">{roomMenuButton}</div> : null}
       </div>

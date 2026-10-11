@@ -64,13 +64,15 @@ function isChatMessagesQuery(query: Query): boolean {
   return query.queryKey.length > root.length + 1 && query.queryKey[root.length + 1] === 'messages';
 }
 
-// Block changes must not leave the other side's messages readable. A mounted room is refetched in place
-// (resetting it would flash the open room back to its skeleton); unmounted cache entries are dropped.
+// Block changes must not leave the other side's messages readable, even while the refetch is slow or fails:
+// message caches are reset (an open room falls back to its skeleton), the rest is dropped when unmounted
+// and refetched in place otherwise.
 function refreshChatAfterSafetyChange(queryClient: QueryClient): void {
   const root = v1Keys.chatRooms();
   void queryClient.cancelQueries({ queryKey: root }).then(() => {
     queryClient.removeQueries({ queryKey: root, type: 'inactive' });
-    void queryClient.invalidateQueries({ queryKey: root });
+    void queryClient.resetQueries({ queryKey: root, predicate: isChatMessagesQuery });
+    void queryClient.invalidateQueries({ queryKey: root, predicate: (query) => !isChatMessagesQuery(query) });
   });
   void queryClient.invalidateQueries({ queryKey: [...v1Keys.all, 'chat', 'blocked-users'] });
 }
@@ -89,23 +91,25 @@ function retainChatSync(queryClient: QueryClient, socket: Socket): () => void {
   if (!entry) {
     let timer: ReturnType<typeof setTimeout> | undefined;
     // A reconnect storm or quick tab switching collapses into one refetch.
-    const scheduleResync = () => {
+    let includeLists = false;
+    const scheduleResync = (lists: boolean) => {
+      includeLists ||= lists;
       clearTimeout(timer);
       timer = setTimeout(() => {
+        const withLists = includeLists;
+        includeLists = false;
         void queryClient.invalidateQueries({
           queryKey: v1Keys.chatRooms(),
-          predicate: (query) => isChatListQuery(query) || isChatMessagesQuery(query),
+          predicate: (query) => isChatMessagesQuery(query) || (withLists && isChatListQuery(query)),
         });
       }, RESYNC_DEBOUNCE_MS);
     };
-    // Messages emitted while the socket was down are never replayed, so every connect after the first resyncs.
-    let connectedBefore = socket.connected === true;
-    const onConnect = () => {
-      if (connectedBefore) scheduleResync();
-      connectedBefore = true;
-    };
+    // Messages emitted while the socket was down are never replayed, so every connect resyncs — including a
+    // first connect that arrives after the REST reads (a socket already connected here emits no first connect).
+    const onConnect = () => scheduleResync(true);
+    // Lists refetch themselves on window focus (refetchOnWindowFocus: 'always'); only messages need this.
     const onVisibility = () => {
-      if (document.visibilityState === 'visible') scheduleResync();
+      if (document.visibilityState === 'visible') scheduleResync(false);
     };
     const onSafety = () => refreshChatAfterSafetyChange(queryClient);
     socket.on('connect', onConnect);

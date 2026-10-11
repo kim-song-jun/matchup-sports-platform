@@ -104,6 +104,21 @@ describe('createV1QueryClient — 조회', () => {
     unsubscribe();
   });
 
+  it('408 요청 시간 초과는 일시 오류라 한 번 더 시도한다', async () => {
+    serverResponse = {
+      ok: false,
+      status: 408,
+      json: async () => ({ status: 'error', statusCode: 408, code: 'REQUEST_TIMEOUT', message: 'timeout', timestamp: '' }),
+    };
+    const observer = new QueryObserver(client, { queryKey: ['v1', 'test', 'timeout'], queryFn: () => v1Get('/chat/rooms/room-1'), retryDelay: 0 });
+    const unsubscribe = observer.subscribe(() => {});
+
+    await vi.waitFor(() => expect(observer.getCurrentResult().status).toBe('error'));
+    await flush();
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    unsubscribe();
+  });
+
   it('대조군 — 서버 오류(5xx)는 한 번만 더 시도하고 그래도 실패하면 오류가 된다', async () => {
     serverResponse = {
       ok: false,

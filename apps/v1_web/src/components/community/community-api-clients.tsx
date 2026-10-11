@@ -6,7 +6,10 @@ import { extractErrorMessage } from '@/lib/error-message';
 import { formatTournamentDateTimeShort } from '@/lib/date-utils';
 import { trackEvent } from '@/lib/analytics';
 import { normalizeNotificationHref } from '@/lib/notification-route';
-import { withFromPath } from '@/lib/session-storage';
+import { clearStoredV1Session, getCurrentRedirectPath, getLoginPathForRedirect, withFromPath } from '@/lib/session-storage';
+import { isUnauthenticatedError } from '@/lib/api-client';
+import { replaceDocument } from '@/lib/navigation-history';
+import { disconnectV1Socket } from '@/lib/v1-socket';
 import { useCurrentHref } from '@/components/v1-ui/use-current-href';
 import { ChatSafetyDialog, type ChatSafetyTarget } from './chat-safety-dialog';
 import { useV1ChatListSocket, useV1ChatRoomSocket } from '@/hooks/use-v1-realtime-socket';
@@ -33,7 +36,7 @@ import type { ChatListViewModel, ChatRoomModel, ChatRoomViewModel, ChatShareCand
 import { chatRoomContextSub, chatRoomTypeLabel } from '@/lib/chat-route';
 import { displayInitials } from '@/lib/display-initials';
 import { MAX_CHAT_IMAGES, formatFileSize } from './chat-plus-panel';
-import { describeChatRoomLoadError } from './chat-room-load-error';
+import { describeChatRoomLoadError, pickChatRoomLoadError } from './chat-room-load-error';
 
 type ChatCategory = ChatRoomModel['type'] | '전체';
 
@@ -201,7 +204,16 @@ export function ChatRoomPageClient({ roomId }: { roomId: string }) {
     : undefined;
   const isError = room.isError || messages.isError;
   // 4xx 는 다시 불러와도 같은 답이라 재시도 대신 나갈 길을 준다.
-  const loadError = isError ? describeChatRoomLoadError(room.error ?? messages.error) : null;
+  const loadErrorCause = isError ? pickChatRoomLoadError(room.error, messages.error) : null;
+  const loadError = isError ? describeChatRoomLoadError(loadErrorCause) : null;
+  const sessionExpired = isUnauthenticatedError(loadErrorCause);
+  // 만료된 세션은 RequireAuth 와 같이 정리하고 로그인으로 보낸다(채팅 레이아웃은 캐시된 /auth/me 로 계속 마운트돼 있다).
+  useEffect(() => {
+    if (!sessionExpired) return;
+    clearStoredV1Session();
+    disconnectV1Socket();
+    replaceDocument(getLoginPathForRedirect(getCurrentRedirectPath()));
+  }, [sessionExpired]);
   const isLoading = room.isPending || messages.isPending;
   // 말풍선은 실제 메시지를 받아온 뒤에만 그린다 — 불러오는 동안은 스켈레톤만 보인다(예시 대화를 깔면
   // 다른 채팅방의 대화처럼 잠깐 보였다).

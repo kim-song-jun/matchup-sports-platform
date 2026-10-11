@@ -191,7 +191,7 @@ describe('채팅 재동기화와 안전 이벤트', () => {
     vi.restoreAllMocks();
   });
 
-  it('첫 연결은 무시하고, 이후 재연결이 몰려도 방 목록과 열린 방 메시지를 한 번만 다시 받는다(상세는 그대로)', async () => {
+  it('재연결이 몰려도 방 목록과 열린 방 메시지를 한 번만 다시 받는다(상세는 그대로)', async () => {
     const { useV1ChatRoomSocket } = await import('./use-v1-realtime-socket');
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     const reads: Record<string, number> = {};
@@ -204,11 +204,8 @@ describe('채팅 재동기화와 안전 이벤트', () => {
     await waitFor(() => expect(reads).toEqual({ list: 1, detail: 1, messages: 1 }));
     vi.useFakeTimers();
 
-    listeners.connect(undefined); // 첫 연결
-    await vi.advanceTimersByTimeAsync(2000);
-    expect(reads).toEqual({ list: 1, detail: 1, messages: 1 });
-
-    listeners.connect(undefined); // 끊겼다 다시 붙기를 반복
+    // REST 읽기가 끝난 뒤에야 소켓이 처음 붙어도, 그 사이 이벤트는 재생되지 않으므로 다시 받는다.
+    listeners.connect(undefined);
     listeners.connect(undefined);
     listeners.connect(undefined);
     await vi.advanceTimersByTimeAsync(2000);
@@ -218,7 +215,7 @@ describe('채팅 재동기화와 안전 이벤트', () => {
     stops.forEach((stop) => stop());
   });
 
-  it('탭이 다시 보이면 방 목록과 열린 방 메시지를 다시 받고, 숨겨질 때는 받지 않는다', async () => {
+  it('탭이 다시 보이면 열린 방 메시지만 다시 받고(목록은 포커스 갱신 몫), 숨겨질 때는 받지 않는다', async () => {
     const { useV1ChatRoomSocket } = await import('./use-v1-realtime-socket');
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     const reads: Record<string, number> = {};
@@ -238,7 +235,7 @@ describe('채팅 재동기화와 안전 이벤트', () => {
     setVisibility('visible');
     document.dispatchEvent(new Event('visibilitychange'));
     await vi.advanceTimersByTimeAsync(2000);
-    expect(reads).toEqual({ list: 2, messages: 2 });
+    expect(reads).toEqual({ list: 1, messages: 2 });
 
     unmount();
     stops.forEach((stop) => stop());
@@ -261,7 +258,7 @@ describe('채팅 재동기화와 안전 이벤트', () => {
     expect(mockSocket.off.mock.calls.filter(([name]) => name === 'chat:safety-changed')).toHaveLength(1);
   });
 
-  it('차단이 바뀌어도 열려 있는 방은 로딩으로 되돌아가지 않고 보이던 내용 위에서 다시 받는다', async () => {
+  it('차단이 바뀌면 열려 있는 방의 메시지는 다시 받는 동안에도 보이지 않는다(느리거나 실패해도 남지 않는다)', async () => {
     const { useV1ChatRoomSocket } = await import('./use-v1-realtime-socket');
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     let reads = 0;
@@ -283,7 +280,7 @@ describe('채팅 재동기화와 안전 이벤트', () => {
     listeners['chat:safety-changed']({});
     await waitFor(() => expect(observer.getCurrentResult().isFetching).toBe(true));
 
-    expect(observer.getCurrentResult().data).toEqual({ revision: 1 });
+    expect(observer.getCurrentResult().data).toBeUndefined();
     release();
     await waitFor(() => expect(observer.getCurrentResult().data).toEqual({ revision: 2 }));
     unmount();

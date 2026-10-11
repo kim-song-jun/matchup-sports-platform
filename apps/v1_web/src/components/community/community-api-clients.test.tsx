@@ -50,7 +50,12 @@ socket.on.mockImplementation((event: string, cb: (payload: unknown) => void) => 
   socket.listeners[event] = cb;
 });
 
-vi.mock('@/lib/v1-socket', () => ({ getV1Socket: () => socket }));
+const navigationHistory = vi.hoisted(() => ({ replaceDocument: vi.fn() }));
+vi.mock('@/lib/navigation-history', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/navigation-history')>()),
+  replaceDocument: navigationHistory.replaceDocument,
+}));
+vi.mock('@/lib/v1-socket', () => ({ getV1Socket: () => socket, disconnectV1Socket: vi.fn() }));
 
 vi.mock('next/navigation', () => ({
   useRouter: () => router,
@@ -217,6 +222,53 @@ describe('ChatRoomPageClient', () => {
     expect(screen.queryByText(/네트워크/)).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '다시 불러오기' })).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: '채팅 목록으로' })).toHaveAttribute('href', '/chat');
+  });
+
+  const apiError = (statusCode: number, code: string) =>
+    new V1ApiError({ status: 'error', statusCode, code, message: code, timestamp: '2026-10-12T00:00:00.000Z' });
+
+  it('상세는 5xx 이고 메시지는 403 이면 일시 오류가 아니라 접근 불가 안내를 보인다', () => {
+    hooks.chatRoom.mockReturnValue({ data: undefined, isPending: false, isError: true, error: apiError(503, 'UNAVAILABLE'), refetch: vi.fn() });
+    hooks.chatMessages.mockReturnValue({ data: undefined, isPending: false, isError: true, error: apiError(403, 'PERMISSION_DENIED'), refetch: vi.fn() });
+
+    renderWithClient(<ChatRoomPageClient roomId="room-mixed" />);
+
+    expect(screen.getByText('참여 중인 멤버만 볼 수 있어요')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '다시 불러오기' })).not.toBeInTheDocument();
+  });
+
+  it('세션이 만료돼 401 이 오면 로그인으로 보낸다', () => {
+    navigationHistory.replaceDocument.mockClear();
+    const expired = apiError(401, 'UNAUTHENTICATED');
+    hooks.chatRoom.mockReturnValue({ data: undefined, isPending: false, isError: true, error: expired, refetch: vi.fn() });
+    hooks.chatMessages.mockReturnValue({ data: undefined, isPending: false, isError: true, error: expired, refetch: vi.fn() });
+
+    renderWithClient(<ChatRoomPageClient roomId="room-401" />);
+
+    expect(navigationHistory.replaceDocument).toHaveBeenCalledTimes(1);
+    expect(navigationHistory.replaceDocument.mock.calls[0][0]).toContain('/login');
+  });
+
+  it('대조군 — 403 은 로그인으로 보내지 않는다', () => {
+    navigationHistory.replaceDocument.mockClear();
+    const denied = apiError(403, 'PERMISSION_DENIED');
+    hooks.chatRoom.mockReturnValue({ data: undefined, isPending: false, isError: true, error: denied, refetch: vi.fn() });
+    hooks.chatMessages.mockReturnValue({ data: undefined, isPending: false, isError: true, error: denied, refetch: vi.fn() });
+
+    renderWithClient(<ChatRoomPageClient roomId="room-403" />);
+
+    expect(navigationHistory.replaceDocument).not.toHaveBeenCalled();
+  });
+
+  it('방을 불러오지 못한 뒤에는 데스크톱 제목 자리의 스켈레톤을 멈추고 고정 제목을 보인다', () => {
+    const denied = apiError(403, 'PERMISSION_DENIED');
+    hooks.chatRoom.mockReturnValue({ data: undefined, isPending: false, isError: true, error: denied, refetch: vi.fn() });
+    hooks.chatMessages.mockReturnValue({ data: undefined, isPending: false, isError: true, error: denied, refetch: vi.fn() });
+
+    const { container } = renderWithClient(<ChatRoomPageClient roomId="room-403" />);
+
+    expect(container.querySelector('.tm-chat-room-desktop-head .tm-skeleton')).toBeNull();
+    expect(container.querySelector('.tm-chat-room-desktop-head h1')?.textContent).toBe('채팅방');
   });
 
   it('서버 오류(5xx)는 여전히 다시 불러오기를 준다', () => {

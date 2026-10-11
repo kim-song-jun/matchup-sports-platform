@@ -1,4 +1,4 @@
-import { V1ApiError, isTransientFailure } from '@/lib/api-client';
+import { V1ApiError, isTransientFailure, isUnauthenticatedError } from '@/lib/api-client';
 import { isAccessDeniedError } from '@/lib/access-denied-error';
 
 export type ChatRoomLoadError = {
@@ -10,7 +10,19 @@ export type ChatRoomLoadError = {
 
 const CODE_MATCH_CHAT_PARTICIPANTS_REQUIRED = 'MATCH_CHAT_PARTICIPANTS_REQUIRED';
 
+/** 상세와 메시지가 함께 실패하면 다시 불러와도 소용없는 쪽(403·404 등)을 안내한다 — 일시 오류 문구가 앞서면 막힌 방에서 재시도만 반복하게 된다. */
+export function pickChatRoomLoadError(...errors: unknown[]): unknown {
+  return errors.find((error) => error != null && !isTransientFailure(error)) ?? errors.find((error) => error != null);
+}
+
 export function describeChatRoomLoadError(error: unknown): ChatRoomLoadError {
+  if (isUnauthenticatedError(error)) {
+    return {
+      title: '로그인이 만료됐어요',
+      body: '다시 로그인한 뒤 이어서 대화해 주세요.',
+      retryable: false,
+    };
+  }
   if (isAccessDeniedError(error)) {
     return {
       title: '참여 중인 멤버만 볼 수 있어요',

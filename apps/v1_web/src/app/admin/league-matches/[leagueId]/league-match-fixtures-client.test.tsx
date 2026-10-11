@@ -2137,13 +2137,13 @@ describe('참가 신청 요약 카드', () => {
  * 분기에 있는지**는 아무도 안 봤다. alpha 실화면에서 발견됐다(2026-09-04).
  */
 describe('수동 대진 추가 입구 — 대진 유무와 무관하게 보인다', () => {
-  function renderWithFixtures(fixtures: unknown[]) {
+  function renderWithFixtures(fixtures: unknown[], state: 'active' | 'completed' = 'active') {
     useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false } as never);
     useV1AdminLeagueMatchMock.mockReturnValue({
       data: {
         leagueId: 'league-1',
         isPublic: true, title: '가을 풋살 리그', startsOn: '2026-09-01T00:00:00.000Z',
-        state: 'active', teamIds: ['t1', 't2'], recentVenues: [], fixtures,
+        state, teamIds: ['t1', 't2'], recentVenues: [], fixtures,
       },
       isPending: false,
     } as never);
@@ -2191,6 +2191,53 @@ describe('수동 대진 추가 입구 — 대진 유무와 무관하게 보인�
     } as never);
     renderWithFixtures([]);
     expect(await screen.findByRole('button', { name: '경기 하나 추가' })).not.toBeDisabled();
+  });
+
+  describe('끝난 리그', () => {
+    const OFFICIAL_FIXTURE = {
+      teamMatchId: 'tm-1', title: '3주차', homeTeamId: 't1', awayTeamId: 't2',
+      startAt: '2026-09-01T20:00:00.000Z', placeName: '장소 미정', status: 'matched',
+      resultStage: 'official', homeScore: 3, awayScore: 1,
+    };
+
+    beforeEach(() => {
+      useV1AdminLeagueTeamsMock.mockReturnValue({
+        data: { teams: [{ teamId: 't1', name: 'A팀' }, { teamId: 't2', name: 'B팀' }] },
+      } as never);
+    });
+
+    it('경기 추가를 누를 수 없고, 폼을 열기 전에 이유와 풀 방법을 말해 준다', async () => {
+      renderWithFixtures([OFFICIAL_FIXTURE], 'completed');
+      openFixtureManage();
+      expect(await screen.findByRole('button', { name: '경기 하나 추가' })).toBeDisabled();
+      expect(screen.getByText(/끝난 리그에는 경기를 추가할 수 없어요/)).toBeInTheDocument();
+      expect(screen.queryByText(/우천 순연 재편성이나 대체 경기/)).toBeNull();
+    });
+
+    it('대진 재생성·미리보기를 누를 수 없고, 확정 결과가 있으면 되돌려도 안 된다고 적는다', async () => {
+      renderWithFixtures([OFFICIAL_FIXTURE], 'completed');
+      openFixtureManage();
+      expect(await screen.findByRole('button', { name: '대진 재생성' })).toBeDisabled();
+      expect(screen.getByRole('button', { name: '미리보기' })).toBeDisabled();
+      expect(screen.getByText(/확정된 결과가 있어 진행 중으로 되돌려도 다시 만들 수는 없어요/)).toBeInTheDocument();
+      expect(screen.queryByText(/끝난 리그라 대진을 다시 만들 수 없어요. 먼저/)).toBeNull();
+    });
+
+    it('확정 결과가 없는 끝난 리그는 되돌리면 풀린다고 안내한다', async () => {
+      renderWithFixtures([{ ...OFFICIAL_FIXTURE, resultStage: null, homeScore: null, awayScore: null }], 'completed');
+      openFixtureManage();
+      expect(await screen.findByRole('button', { name: '대진 재생성' })).toBeDisabled();
+      expect(screen.getByText(/끝난 리그라 대진을 다시 만들 수 없어요. 먼저 ‘진행 중으로 되돌리기’를 해 주세요/)).toBeInTheDocument();
+    });
+
+    it('진행 중인 리그는 둘 다 열려 있다 (회귀 방지 — 상태 조건이 항상 참이면 아무것도 못 한다)', async () => {
+      renderWithFixtures([OFFICIAL_FIXTURE], 'active');
+      openFixtureManage();
+      expect(await screen.findByRole('button', { name: '경기 하나 추가' })).not.toBeDisabled();
+      expect(screen.getByRole('button', { name: '대진 재생성' })).not.toBeDisabled();
+      expect(screen.getByRole('button', { name: '미리보기' })).not.toBeDisabled();
+      expect(screen.queryByText(/끝난 리그/)).toBeNull();
+    });
   });
 
   it('참가팀이 아직 안 왔으면(로딩) 누를 수 없다 — 빈 피커를 "팀 없음" 으로 오해한다', async () => {

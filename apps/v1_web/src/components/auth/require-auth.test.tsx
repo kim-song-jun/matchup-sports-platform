@@ -1,6 +1,7 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { V1ApiError } from '@/lib/api-client';
+import { __resetNavigationHistoryForTests, installNavigationHistory } from '@/lib/navigation-history';
 import { RequireAuth } from './require-auth';
 
 const mocks = vi.hoisted(() => ({
@@ -83,6 +84,25 @@ describe('RequireAuth', () => {
     // router.replace()(소프트 네비게이션)는 로그인 상태에서 prefetch된 /login 인스턴스를
     // 재사용해 로그아웃/세션만료 이전 스냅샷에 멈추는 버그가 있어 하드 네비게이션으로 전환했다.
     expect(replaceMock).toHaveBeenCalledWith('/login?redirect=%2Fmy');
+  });
+
+  it('marks the history mirror as replaced before the hard redirect so login leaves no ghost entry', async () => {
+    __resetNavigationHistoryForTests();
+    window.sessionStorage.clear();
+    installNavigationHistory();
+    mocks.useV1AuthMe.mockReturnValue({
+      isError: true,
+      isFetching: false,
+      isSuccess: false,
+      error: apiError(401, 'UNAUTHENTICATED'),
+      refetch: mocks.refetch,
+    });
+
+    render(<RequireAuth><div>마이페이지</div></RequireAuth>);
+
+    await waitFor(() => expect(replaceMock).toHaveBeenCalled());
+    const mirror = JSON.parse(window.sessionStorage.getItem('teameet.v1.navHistory') ?? '{}');
+    expect(mirror.replacing).toBe(true);
   });
 
   it('keeps the session and exposes retry for a temporary auth failure', async () => {

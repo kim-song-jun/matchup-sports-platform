@@ -25,6 +25,9 @@ export const KNOWN_ERROR_MESSAGES: Record<string, string> = {
   COMMAND_CONCURRENCY_CONFLICT: '다른 처리와 동시에 진행돼 반영하지 못했어요. 화면을 새로고침해 주세요.',
   VERSION_CONFLICT: '경기 정보가 그 사이 바뀌었어요. 화면을 새로고침해 주세요.',
   PARTICIPANT_INVALID: '선수 정보가 올바르지 않아요. 각 선수는 한 번씩만, 소속 진영에 맞게 입력해 주세요.',
+  // 서버가 같은 코드로 영문 문구를 5종 돌려준다(점수·선수 합계·귀속 팀·id 중복 등).
+  RESULT_GOAL_TIMELINE_INVALID:
+    '득점 기록이 점수나 선수별 득점과 맞지 않아요. 점수, 득점 기록, 선수별 득점 수를 다시 확인해 주세요.',
   MVP_INVALID: 'MVP는 입력한 선수 중 한 명이어야 해요.',
   SCORER_REQUIRED: '득점자를 입력해야 확정할 수 있어요.',
   COMMAND_IDEMPOTENCY_KEY_MISMATCH: '요청을 다시 시도하지 못했어요. 화면을 새로고침한 뒤 다시 시도해 주세요.',

@@ -11,6 +11,7 @@ import type {
 } from '@/hooks/use-tournament-result-review';
 import type { GameLineup } from '@/types/game-operations';
 import { formatGameResultScoreWithPenalties, readGameResultScore } from '@/lib/game-result-score';
+import { describeGoalTimelineMismatch } from './goal-timeline-consistency';
 import { isSinglePeriod, periodLabel } from '@/components/tournament-live/operate/period-label';
 import { useOverlayHistory } from '@/components/v1-ui/use-overlay-history';
 import { useTopmostEscape } from '@/components/v1-ui/use-topmost-escape';
@@ -295,6 +296,7 @@ export function ResultEditModal({
   presentation = 'modal',
 }: ResultEditModalProps) {
   const idPrefix = useId();
+  const timelineMismatchId = `${idPrefix}-timeline-mismatch`;
   const dialogRef = useRef<HTMLDivElement>(null);
   const previousFocusRef = useRef<Element | null>(null);
   const firstFieldRef = useRef<HTMLInputElement>(null);
@@ -502,8 +504,20 @@ export function ResultEditModal({
       }),
     [participants, base.participants],
   );
+  const homeSideId = sides.find((side) => side.sideKey === 'HOME')?.id;
+  const awaySideId = sides.find((side) => side.sideKey === 'AWAY')?.id;
+  const timelineMismatch = describeGoalTimelineMismatch({
+    score: { home, away },
+    homeSideId,
+    awaySideId,
+    goalEvents,
+    participants,
+  });
   const canSubmit =
-    trimmedReason.length > 0 && (!penaltiesAllowed || submittablePenalties !== null) && !submitting;
+    trimmedReason.length > 0 &&
+    (!penaltiesAllowed || submittablePenalties !== null) &&
+    timelineMismatch === null &&
+    !submitting;
 
   function updateParticipant(index: number, patch: Partial<EditableParticipant>) {
     setParticipants((current) =>
@@ -513,8 +527,8 @@ export function ResultEditModal({
 
   function replaceGoalEvents(next: GameResultGoalEventInput[]) {
     setGoalEvents(next);
-    setHome(next.filter((event) => event.sideId === sides.find((side) => side.sideKey === 'HOME')?.id).length);
-    setAway(next.filter((event) => event.sideId === sides.find((side) => side.sideKey === 'AWAY')?.id).length);
+    setHome(next.filter((event) => event.sideId === homeSideId).length);
+    setAway(next.filter((event) => event.sideId === awaySideId).length);
     setParticipants((current) =>
       current.map((participant) => ({
         ...participant,
@@ -938,6 +952,17 @@ export function ResultEditModal({
           ) : null}
         </div>
 
+        {timelineMismatch ? (
+          <p
+            id={timelineMismatchId}
+            role="alert"
+            className="tm-text-caption"
+            style={{ color: 'var(--red700)', padding: '12px 24px 0', flexShrink: 0 }}
+          >
+            {timelineMismatch}
+          </p>
+        ) : null}
+
         <div style={{ display: 'flex', gap: 8, padding: '16px 24px 24px', flexShrink: 0 }}>
           <button
             type="button"
@@ -953,6 +978,7 @@ export function ResultEditModal({
             className="tm-btn tm-btn-md tm-btn-primary"
             style={{ flex: 1, minHeight: 44 }}
             disabled={!canSubmit}
+            aria-describedby={timelineMismatch ? timelineMismatchId : undefined}
             aria-busy={submitting ? 'true' : undefined}
             onClick={() => {
               if (!canSubmit) return;

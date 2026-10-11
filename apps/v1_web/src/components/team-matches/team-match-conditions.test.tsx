@@ -1,4 +1,4 @@
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ComponentProps, ReactElement } from 'react';
@@ -118,14 +118,20 @@ describe('#1599 actual team-match create/edit conditions', () => {
     }), expect.any(Object)));
   });
 
-  it('consecutive changes keep ordered endpoints atomically and persist the latest range', async () => {
+  it('offers only orderable levels so a chosen endpoint is never rewritten', async () => {
     writeExpiringDraft(draftKey, storedDraft('초보-중수'));
     const user = userEvent.setup(); renderClient(<TeamMatchCreatePageClient step="condition" />);
+    const optionValues = (label: string) => within(screen.getByLabelText(label)).getAllByRole('option').map((option) => (option as HTMLOptionElement).value);
+    expect(optionValues('최소 등급')).toEqual(['', 'beginner', 'novice', 'intermediate']);
+    expect(optionValues('최대 등급')).toEqual(['', 'novice', 'intermediate', 'advanced']);
+    await user.selectOptions(screen.getByLabelText('최대 등급'), 'advanced');
+    expect(optionValues('최소 등급')).toEqual(['', 'beginner', 'novice', 'intermediate', 'advanced']);
     await user.selectOptions(screen.getByLabelText('최소 등급'), 'advanced');
     expect(screen.getByLabelText('최대 등급')).toHaveValue('advanced');
-    await user.selectOptions(screen.getByLabelText('최대 등급'), 'beginner');
-    expect(screen.getByLabelText('최소 등급')).toHaveValue('beginner');
-    await user.selectOptions(screen.getByLabelText('최대 등급'), 'advanced');
+    expect(optionValues('최대 등급')).toEqual(['', 'advanced']);
+    expect(readExpiringDraft<{ grade: string }>(draftKey)?.grade).toBe('고수');
+    await user.selectOptions(screen.getByLabelText('최소 등급'), 'beginner');
+    expect(screen.getByLabelText('최대 등급')).toHaveValue('advanced');
     expect(readExpiringDraft<{ grade: string }>(draftKey)?.grade).toBe('입문-고수');
   });
 

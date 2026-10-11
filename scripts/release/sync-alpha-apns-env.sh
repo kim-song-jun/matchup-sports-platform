@@ -101,7 +101,6 @@ for name in APNS_KEY_ID APNS_TEAM_ID APNS_BUNDLE_ID APNS_PRIVATE_KEY; do
   mv "\${next}" "\${tmp}"
 done
 cat "\${tmp}" > "\${env_file}"
-trap - EXIT
 REMOTE
 )
 

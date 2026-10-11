@@ -68,7 +68,6 @@ for name in ${names[*]}; do
   mv "\${next}" "\${tmp}"
 done
 cat "\${tmp}" > "\${env_file}"
-trap - EXIT
 REMOTE
 )
 

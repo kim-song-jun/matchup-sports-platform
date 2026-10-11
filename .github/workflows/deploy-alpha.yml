@@ -561,6 +561,27 @@ jobs:
           bash scripts/release/sync-alpha-apple-sign-in-env.sh \
             || echo "::warning::Sign in with Apple env sync did not complete; the host's env may be unchanged from before"
 
+      # Alpha shares prod's Kakao app. Skipped with a warning until the secrets exist, never blocks a deploy.
+      - name: Sync Kakao OAuth runtime env
+        env:
+          INSTANCE_ID: ${{ vars.ALPHA_EC2_INSTANCE_ID }}
+          AWS_REGION: ${{ vars.ALPHA_AWS_REGION }}
+          SECRET_KAKAO_CLIENT_ID: ${{ secrets.KAKAO_CLIENT_ID }}
+          SECRET_KAKAO_CLIENT_SECRET: ${{ secrets.KAKAO_CLIENT_SECRET }}
+          SECRET_ALPHA_KAKAO_REDIRECT_URI: ${{ secrets.ALPHA_KAKAO_REDIRECT_URI }}
+          SECRET_KAKAO_APP_ID: ${{ secrets.KAKAO_APP_ID }}
+        run: |
+          missing=()
+          for name in SECRET_KAKAO_CLIENT_ID SECRET_KAKAO_CLIENT_SECRET SECRET_ALPHA_KAKAO_REDIRECT_URI; do
+            [ -n "${!name:-}" ] || missing+=("${name#SECRET_}")
+          done
+          if [ ${#missing[@]} -gt 0 ]; then
+            echo "::warning::Kakao secrets are not set, so Kakao code login stays unconfigured on alpha — missing: ${missing[*]}"
+            exit 0
+          fi
+          bash scripts/release/sync-alpha-kakao-env.sh \
+            || echo "::warning::Kakao env sync did not complete; the host's env may be unchanged from before"
+
       - name: Deploy through AWS Systems Manager
         timeout-minutes: ${{ fromJSON(steps.task168.outputs.stepTimeoutMinutes) }}
         env:

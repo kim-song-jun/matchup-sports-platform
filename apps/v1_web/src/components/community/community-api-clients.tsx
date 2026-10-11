@@ -2,12 +2,14 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { isAccessDeniedError } from '@/lib/access-denied-error';
 import { extractErrorMessage } from '@/lib/error-message';
 import { formatTournamentDateTimeShort } from '@/lib/date-utils';
 import { trackEvent } from '@/lib/analytics';
 import { normalizeNotificationHref } from '@/lib/notification-route';
-import { withFromPath } from '@/lib/session-storage';
+import { clearStoredV1Session, getCurrentRedirectPath, getLoginPathForRedirect, withFromPath } from '@/lib/session-storage';
+import { isUnauthenticatedError } from '@/lib/api-client';
+import { replaceDocument } from '@/lib/navigation-history';
+import { disconnectV1Socket } from '@/lib/v1-socket';
 import { useCurrentHref } from '@/components/v1-ui/use-current-href';
 import { ChatSafetyDialog, type ChatSafetyTarget } from './chat-safety-dialog';
 import { useV1ChatListSocket, useV1ChatRoomSocket } from '@/hooks/use-v1-realtime-socket';
@@ -34,6 +36,7 @@ import type { ChatListViewModel, ChatRoomModel, ChatRoomViewModel, ChatShareCand
 import { chatRoomContextSub, chatRoomTypeLabel } from '@/lib/chat-route';
 import { displayInitials } from '@/lib/display-initials';
 import { MAX_CHAT_IMAGES, formatFileSize } from './chat-plus-panel';
+import { describeChatRoomLoadError, pickChatRoomLoadError } from './chat-room-load-error';
 
 type ChatCategory = ChatRoomModel['type'] | '전체';
 
@@ -200,8 +203,17 @@ export function ChatRoomPageClient({ roomId }: { roomId: string }) {
         : undefined
     : undefined;
   const isError = room.isError || messages.isError;
-  // 팀에서 내보내진 뒤 옛 팀 채팅 주소로 들어온 경우 — 다시 불러와도 같으니 재시도 대신 나갈 길을 준다.
-  const accessDenied = isAccessDeniedError(room.error) || isAccessDeniedError(messages.error);
+  // 4xx 는 다시 불러와도 같은 답이라 재시도 대신 나갈 길을 준다.
+  const loadErrorCause = isError ? pickChatRoomLoadError(room.error, messages.error) : null;
+  const loadError = isError ? describeChatRoomLoadError(loadErrorCause) : null;
+  const sessionExpired = isUnauthenticatedError(loadErrorCause);
+  // 만료된 세션은 RequireAuth 와 같이 정리하고 로그인으로 보낸다(채팅 레이아웃은 캐시된 /auth/me 로 계속 마운트돼 있다).
+  useEffect(() => {
+    if (!sessionExpired) return;
+    clearStoredV1Session();
+    disconnectV1Socket();
+    replaceDocument(getLoginPathForRedirect(getCurrentRedirectPath()));
+  }, [sessionExpired]);
   const isLoading = room.isPending || messages.isPending;
   // 말풍선은 실제 메시지를 받아온 뒤에만 그린다 — 불러오는 동안은 스켈레톤만 보인다(예시 대화를 깔면
   // 다른 채팅방의 대화처럼 잠깐 보였다).
@@ -210,7 +222,7 @@ export function ChatRoomPageClient({ roomId }: { roomId: string }) {
   const model: ChatRoomViewModel = {
     onMessageSafety: setSafety,
     onManageBlocked: () => setSafety('manage'),
-    title: room.data?.title ?? '채팅',
+    title: room.data?.title ?? '',
     context: room.data
       ? {
           title: room.data.linkedTarget.title,
@@ -225,20 +237,16 @@ export function ChatRoomPageClient({ roomId }: { roomId: string }) {
     inputLockedMessage,
     messages: messageItems,
     status: isLoading ? 'loading' : isError ? 'error' : 'ready',
-    emptyTitle: accessDenied
-      ? '참여 중인 멤버만 볼 수 있어요'
-      : isError
-        ? '채팅방을 불러오지 못했어요'
-        : messages.data && items.length === 0
-          ? '아직 메시지가 없어요'
-          : undefined,
-    emptyBody: accessDenied
-      ? '팀에서 빠졌거나 채팅방에서 나가면 이 대화를 볼 수 없어요. 다시 함께하려면 팀에 새로 신청해 주세요.'
-      : isError
-        ? '네트워크 상태를 확인하고 다시 시도해 주세요.'
-        : messages.data && items.length === 0
-          ? inputLockedMessage ?? '먼저 말을 걸어 대화를 시작해 보세요'
-          : undefined,
+    emptyTitle: loadError
+      ? loadError.title
+      : messages.data && items.length === 0
+        ? '아직 메시지가 없어요'
+        : undefined,
+    emptyBody: loadError
+      ? loadError.body
+      : messages.data && items.length === 0
+        ? inputLockedMessage ?? '먼저 말을 걸어 대화를 시작해 보세요'
+        : undefined,
     draft,
     sending: send.isPending,
     sendError: send.isError ? extractErrorMessage(send.error, '메시지를 전송하지 못했어요. 다시 시도해 주세요.') : undefined,
@@ -325,8 +333,8 @@ export function ChatRoomPageClient({ roomId }: { roomId: string }) {
       },
       onRetry: () => shareQueries.forEach((query) => void query.refetch()),
     },
-    errorBack: accessDenied ? { href: '/chat', label: '채팅 목록으로' } : undefined,
-    onRetry: isError && !accessDenied
+    errorBack: loadError && !loadError.retryable ? { href: '/chat', label: '채팅 목록으로' } : undefined,
+    onRetry: loadError?.retryable
       ? () => {
           room.refetch();
           messages.refetch();

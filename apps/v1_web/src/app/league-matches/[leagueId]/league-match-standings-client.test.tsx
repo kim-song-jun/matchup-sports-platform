@@ -1165,6 +1165,9 @@ describe('LeagueMatchStandingsClient', () => {
 
     const link = screen.getByRole('link', { name: /시즌 결산 자세히 보기/ });
     expect(link).toHaveAttribute('href', '/league-matches/league-1/awards');
+    // MD-QA #92: 리그 화면에는 참가팀 후기 입구가 없었다 — 대회와 같은 후기 화면으로 보낸다.
+    const reviewsLink = screen.getByRole('link', { name: /참가팀 후기 보기·쓰기/ });
+    expect(reviewsLink.getAttribute('href')).toMatch(/^\/tournaments\/league-1\/reviews/);
   });
   /**
    * Wave 4 재검토 — SeasonSummaryCard 가 로딩을 에러보다 먼저 검사하면, 호출부가 loading 을

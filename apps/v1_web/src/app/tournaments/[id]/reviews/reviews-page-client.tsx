@@ -139,7 +139,9 @@ export function TournamentReviewsPageClient({ tournamentId }: { tournamentId: st
   // "참가팀 후기" 한 줄뿐이라, 링크를 타고 들어온 사람은 어느 대회 후기를 보고 있는지
   // 화면 어디에서도 알 수 없었다(오너 지적: "참가팀 후기도 명확하게 나왔으면 좋겠고").
   const { data: tournament } = useV1Tournament(tournamentId);
-  const reviewGate = useTournamentReviewWriteGate(tournamentId, tournament?.status ?? 'draft');
+  // 리그도 같은 후기 화면을 쓴다(리그 상세 '이번 시즌 요약' 카드에서 들어온다) — 종류는 `kind`로만 가린다.
+  const noun = tournament?.kind === 'regular_league' ? '리그' : '대회';
+  const reviewGate = useTournamentReviewWriteGate(tournamentId, tournament?.status ?? 'draft', noun);
   const { canWrite, isCompleted, isParticipant, alreadyReviewed, hasSession } = reviewGate;
 
   const { data, isLoading, isFetching, isError, error, refetch } = useV1TournamentReviews(tournamentId, {
@@ -154,7 +156,7 @@ export function TournamentReviewsPageClient({ tournamentId }: { tournamentId: st
 
   return (
     <>
-      {showForm && <ReviewFormModal tournamentId={tournamentId} onClose={() => setShowForm(false)} />}
+      {showForm && <ReviewFormModal tournamentId={tournamentId} noun={noun} onClose={() => setShowForm(false)} />}
       <div className="tm-tourn-sub-page">
         <div className="tm-reviews-body" style={{ padding: '20px 20px 40px' }}>
           <header style={{ marginBottom: 16 }}>
@@ -165,7 +167,7 @@ export function TournamentReviewsPageClient({ tournamentId }: { tournamentId: st
               {tournament ? `${tournament.title} 참가팀 후기` : '참가팀 후기'}
             </h2>
             <p className="tm-text-caption" style={{ margin: '4px 0 0', color: 'var(--text-muted)', lineHeight: 1.5 }}>
-              이 대회에 참가한 팀의 팀장·매니저가 남긴 후기예요.
+              이 {noun}에 참가한 팀의 팀장·매니저가 남긴 후기예요.
             </p>
           </header>
 
@@ -193,7 +195,7 @@ export function TournamentReviewsPageClient({ tournamentId }: { tournamentId: st
                 margin: '12px 0 4px',
               }}
             >
-              ✓ 이 대회 후기를 이미 남겼어요
+              ✓ 이 {noun} 후기를 이미 남겼어요
             </div>
           ) : isCompleted && reviewGate.error ? (
             <ErrorState
@@ -242,7 +244,7 @@ export function TournamentReviewsPageClient({ tournamentId }: { tournamentId: st
               <EmptyState
                 illustration={{ name: 'chat-empty' }}
                 title={search ? '검색 결과가 없어요' : '아직 등록된 후기가 없어요'}
-                sub={search ? '다른 검색어로 다시 시도해보세요.' : '대회 참가팀의 후기가 등록되면 여기에서 볼 수 있어요.'}
+                sub={search ? '다른 검색어로 다시 시도해보세요.' : `${noun} 참가팀의 후기가 등록되면 여기에서 볼 수 있어요.`}
                 cta={!search && canWrite ? '후기 쓰기' : undefined}
                 onCta={!search && canWrite ? () => setShowForm(true) : undefined}
               />

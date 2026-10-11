@@ -155,7 +155,7 @@ describe('LeagueFixturePanel — 결과', () => {
     mocks.quick.mockImplementation((_vars: unknown, handlers: { onSuccess: () => void }) => handlers.onSuccess());
     renderPanel(nodeOf({ ...TEAMS_FILLED, game: READY_GAME }));
 
-    expect(mocks.formProps[0]).toMatchObject({ isKnockout: false, submitLabel: '점수 확정' });
+    expect(mocks.formProps[0]).toMatchObject({ isKnockout: false, submitLabel: '점수 확정', confirmBeforeSubmit: true });
     fireEvent.click(screen.getByRole('button', { name: '점수 확정 폼' }));
 
     expect(mocks.quick).toHaveBeenCalledWith({ gameId: 'g1', expectedVersion: 3, score: { home: 2, away: 1 } }, expect.any(Object));

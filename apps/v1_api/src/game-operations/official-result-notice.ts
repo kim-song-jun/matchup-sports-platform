@@ -21,6 +21,12 @@ export interface OfficialResultRecipient {
 
 const OUTCOME_LABEL = { WON: '승리', DRAWN: '무승부', LOST: '패배' } as const;
 
+function outcomeLabel(outcome: keyof typeof OUTCOME_LABEL, isForfeit: boolean): string {
+  // 몰수 스코어는 항상 승패가 갈리므로 무승부에는 몰수 라벨을 붙이지 않는다.
+  if (isForfeit && outcome !== 'DRAWN') return outcome === 'WON' ? '몰수승' : '몰수패';
+  return OUTCOME_LABEL[outcome];
+}
+
 function personalRecordText(record: PersonalRecord | null): string | null {
   if (record === null) return null;
   const parts = [record.goals > 0 ? `${record.goals}골` : null, record.assists > 0 ? `${record.assists}도움` : null];
@@ -40,6 +46,8 @@ export function officialResultNoticeBody(input: {
   score: OfficialScore;
   side: ResultSide;
   record: PersonalRecord | null;
+  /** 몰수로 확정된 결과인지. 1 : 0 이 실제 경기 결과처럼 읽히지 않도록 승패 라벨을 몰수로 바꾼다. */
+  isForfeit?: boolean;
 }): string {
   const { score } = input;
   const home = input.side === 'HOME';
@@ -50,7 +58,7 @@ export function officialResultNoticeBody(input: {
     home ? score.penalties?.away : score.penalties?.home,
   );
   const shootout = score.penalties === undefined ? '' : ` (승부차기 ${score.penalties.home} : ${score.penalties.away})`;
-  const headline = `${input.label} · ${input.homeName} ${score.home} : ${score.away} ${input.awayName}${shootout} · ${OUTCOME_LABEL[outcome]}.`;
+  const headline = `${input.label} · ${input.homeName} ${score.home} : ${score.away} ${input.awayName}${shootout} · ${outcomeLabel(outcome, input.isForfeit === true)}.`;
   const record = personalRecordText(input.record);
   // "골"·"도움" 모두 받침으로 끝나 조사는 항상 "이에요"다.
   return record === null ? headline : `${headline} 내 기록 ${record}이에요.`;

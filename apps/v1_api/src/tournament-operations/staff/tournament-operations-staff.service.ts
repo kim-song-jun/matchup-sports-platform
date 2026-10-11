@@ -85,6 +85,9 @@ export type MyTournamentStaffFixtureItem = {
   readonly gameId: string;
   readonly tournamentId: string;
   readonly title: string;
+  /** Operate-console side names (`V1GameSide.displayNameSnapshot`); `null` until the side exists. */
+  readonly homeTeamName: string | null;
+  readonly awayTeamName: string | null;
   readonly scheduledAt: Date | null;
   readonly status: string;
   readonly gameState: string | null;
@@ -261,7 +264,7 @@ export class TournamentOperationsStaffService {
             status: true,
             fieldId: true,
             field: { select: { name: true } },
-            game: { select: { id: true, state: true, sourceType: true } },
+            game: { select: { id: true, state: true, sourceType: true, sides: { select: { sideKey: true, displayNameSnapshot: true } } } },
             tournamentDetails: {
               select: { tournamentId: true, round: true, fixtureNumber: true, legNumber: true, group: { select: { name: true } } },
             },
@@ -294,6 +297,8 @@ export class TournamentOperationsStaffService {
               gameId: game.id,
               tournamentId: fixtureTournamentId,
               title: fixture.title,
+              homeTeamName: game.sides.find((side) => side.sideKey === 'HOME')?.displayNameSnapshot ?? null,
+              awayTeamName: game.sides.find((side) => side.sideKey === 'AWAY')?.displayNameSnapshot ?? null,
               scheduledAt: fixture.startAt,
               status: fixture.status,
               gameState: game.state,

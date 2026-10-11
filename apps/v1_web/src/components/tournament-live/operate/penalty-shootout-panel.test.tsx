@@ -44,25 +44,30 @@ function renderPanel(
     sides?: readonly GameSide[];
     onSelectFirstKicker?: (sideId: string) => void;
     onFinish?: (options: { readonly override: boolean }) => void;
+    onRecordKick?: (sideId: string, result: 'SCORED' | 'MISSED') => void;
+    onUndoLastKick?: () => void;
+    policy?: { readonly earlyStop: boolean };
   } = {},
 ) {
   const onSelectFirstKicker = overrides.onSelectFirstKicker ?? vi.fn();
   const onFinish = overrides.onFinish ?? vi.fn();
-  render(
+  const onRecordKick = overrides.onRecordKick ?? vi.fn();
+  const onUndoLastKick = overrides.onUndoLastKick ?? vi.fn();
+  const { unmount } = render(
     <PenaltyShootoutPanel
       sides={overrides.sides ?? [HOME, AWAY]}
       kicks={overrides.kicks ?? []}
       firstKickSideId={overrides.firstKickSideId ?? null}
       onSelectFirstKicker={onSelectFirstKicker}
-      onRecordKick={vi.fn()}
-      onUndoLastKick={vi.fn()}
+      onRecordKick={onRecordKick}
+      onUndoLastKick={onUndoLastKick}
       onFinish={onFinish}
       onCancel={vi.fn()}
-      policy={{ earlyStop: true }}
+      policy={overrides.policy ?? { earlyStop: true }}
       finishing={false}
     />,
   );
-  return { onSelectFirstKicker, onFinish };
+  return { onSelectFirstKicker, onFinish, onRecordKick, onUndoLastKick, unmount };
 }
 
 describe('PenaltyShootoutPanel — 키보드 접근성', () => {
@@ -235,5 +240,52 @@ describe('PenaltyShootoutPanel — 정규 시간 스코어 (2026-08-18 실화면
       />,
     );
     expect(screen.queryByText('정규 시간')).toBeNull();
+  });
+});
+
+/**
+ * 결판이 난 뒤에는 킥 입력이 막혀야 한다. 막히지 않으면 응답 킥이 한 번 더 기록되어
+ * 결판이 풀리고(킥 수 불일치) 자동 종료가 잠겨, "그래도 종료"로만 닫을 수 있게 된다.
+ */
+describe('PenaltyShootoutPanel — 결판 뒤 킥 입력', () => {
+  const kick = (sideId: string, result: 'SCORED' | 'MISSED'): PenaltyKick => ({ sideId, result });
+  // 각 3킥, 홈 3점 : 원정 0점 — earlyStop 이든 아니든 결판이다.
+  const decidedKicks = [
+    kick(HOME.id, 'SCORED'), kick(AWAY.id, 'MISSED'),
+    kick(HOME.id, 'SCORED'), kick(AWAY.id, 'MISSED'),
+    kick(HOME.id, 'SCORED'), kick(AWAY.id, 'MISSED'),
+  ];
+
+  it('결판이 나면 성공/실패가 잠기고, 되돌리기와 종료는 열려 있다', async () => {
+    const user = userEvent.setup();
+    const { onRecordKick, onUndoLastKick } = renderPanel({ firstKickSideId: HOME.id, kicks: decidedKicks });
+    const panel = screen.getByRole('dialog', { name: '승부차기' });
+
+    expect(within(panel).getByRole('button', { name: /성공/ })).toBeDisabled();
+    expect(within(panel).getByRole('button', { name: /실패/ })).toBeDisabled();
+    await user.click(within(panel).getByRole('button', { name: /성공/ }));
+    expect(onRecordKick).not.toHaveBeenCalled();
+
+    expect(within(panel).getByRole('button', { name: '승부차기 종료' })).toBeEnabled();
+    await user.click(within(panel).getByRole('button', { name: '방금 킥 되돌리기' }));
+    expect(onUndoLastKick).toHaveBeenCalledTimes(1);
+    expect(within(panel).getByText(/결판이 났어요/)).toBeInTheDocument();
+  });
+
+  it('끝까지 차는 정책에서도 같은 킥 수로 점수가 갈리면 잠기고, 아직 미결인 국면은 열려 있다', () => {
+    // 3킥씩 홈 3 : 원정 2 — 끝까지 차는 정책은 같은 횟수에 점수가 갈리면 결판이다.
+    const lead = [
+      kick(HOME.id, 'SCORED'), kick(AWAY.id, 'SCORED'),
+      kick(HOME.id, 'SCORED'), kick(AWAY.id, 'SCORED'),
+      kick(HOME.id, 'SCORED'), kick(AWAY.id, 'MISSED'),
+    ];
+    const { unmount } = renderPanel({ policy: { earlyStop: false }, firstKickSideId: HOME.id, kicks: lead });
+    expect(screen.getByRole('button', { name: /성공/ })).toBeDisabled();
+    unmount();
+
+    // 같은 점수 차라도 홈이 한 번 더 찬 국면(응답 킥 남음)은 미결이라 원정이 차야 한다.
+    renderPanel({ policy: { earlyStop: false }, firstKickSideId: HOME.id, kicks: lead.slice(0, 5) });
+    expect(screen.getByRole('button', { name: /성공/ })).toBeEnabled();
+    expect(screen.queryByText(/결판이 났어요/)).toBeNull();
   });
 });

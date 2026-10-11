@@ -9,6 +9,7 @@
  */
 import { ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AdminContextService } from '../common/admin-context.service';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -42,6 +43,8 @@ function registrationRow(overrides: Record<string, unknown> = {}) {
     rosterDeadlineOverrideAt: null,
     cancelRequestedAt: null,
     cancelReason: null,
+    adminCancelReason: null,
+    cancelOutcome: null,
     createdAt: new Date(),
     updatedAt: new Date(),
     ...overrides,
@@ -460,10 +463,73 @@ describe('AdminRegistrationsService', () => {
     );
   });
 
-  it('cancel: 리그 거부는 사유가 없으면 400 — 팀에게 시즌을 못 뛰게 하는 조치다', async () => {
+  it('cancel: 판정 뒤 팀이 요청을 철회했다면 승인으로 기록하지 않고 409 로 막는다', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(opsAdminRecord);
+    prisma.v1TournamentRegistration.findUnique.mockResolvedValue(
+      registrationRow({ status: 'cancel_requested', cancelPreviousStatus: 'paid', cancelRequestedAt: new Date() }),
+    );
+    prisma.v1TournamentRegistration.update.mockRejectedValue(
+      new Prisma.PrismaClientKnownRequestError('Record not found', { code: 'P2025', clientVersion: 'test' }),
+    );
+    prisma.v1TournamentPayment.findUnique.mockResolvedValue(null);
+    notifications.emitNotification.mockClear();
+
+    await expect(service.cancel(opsAuth, 'reg-1', {})).rejects.toMatchObject({
+      response: { code: 'REGISTRATION_STATUS_CHANGED' },
+    });
+
+    // 분류했던 상태(cancel_requested)를 where 에 걸어야 철회 뒤 갱신이 거부된다.
+    expect(prisma.v1TournamentRegistration.update.mock.calls[0][0].where).toEqual({ id: 'reg-1', status: 'cancel_requested' });
+    expect(notifications.emitNotification).not.toHaveBeenCalled();
+  });
+
+  it('cancel: 취소 요청 승인은 팀 사유를 보존하고 어드민 사유·승인 결과를 따로 남긴다', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(opsAdminRecord);
+    prisma.v1TournamentRegistration.findUnique.mockResolvedValue(
+      registrationRow({ status: 'cancel_requested', cancelPreviousStatus: 'paid', cancelRequestedAt: new Date(), cancelReason: '팀 사정으로 불참' }),
+    );
+    prisma.v1TournamentRegistration.update.mockResolvedValue(registrationRow({ status: 'cancelled' }));
+    prisma.v1TournamentPayment.findUnique.mockResolvedValue(null);
+
+    await service.cancel(opsAuth, 'reg-1', { reason: '환불 접수함' });
+
+    const { data } = prisma.v1TournamentRegistration.update.mock.calls[0][0];
+    expect(data).toMatchObject({ status: 'cancelled', cancelOutcome: 'approved', adminCancelReason: '환불 접수함' });
+    // 팀 사유는 같은 컬럼을 덮어쓰지 않는다 — 쓰기 자체가 없어야 한다.
+    expect(data).not.toHaveProperty('cancelReason');
+  });
+
+  it('cancel: 취소 요청이 없던 신청을 물리면 거부로 기록된다 (승인과 구분)', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(opsAdminRecord);
+    prisma.v1TournamentRegistration.findUnique.mockResolvedValue(registrationRow({ status: 'confirmed' }));
+    prisma.v1TournamentRegistration.update.mockResolvedValue(registrationRow({ status: 'cancelled' }));
+    prisma.v1TournamentPayment.findUnique.mockResolvedValue(null);
+
+    await service.cancel(opsAuth, 'reg-1', { reason: '자격 미달' });
+
+    const { data } = prisma.v1TournamentRegistration.update.mock.calls[0][0];
+    expect(data).toMatchObject({ cancelOutcome: 'rejected', adminCancelReason: '자격 미달' });
+  });
+
+  it('cancel: 리그라도 팀이 낸 취소 요청의 승인은 사유 없이 처리된다', async () => {
     prisma.v1AdminUser.findUnique.mockResolvedValue(opsAdminRecord);
     prisma.v1TournamentRegistration.findUnique.mockResolvedValue(
       registrationRow({ status: 'cancel_requested', tournament: { title: '리그', kind: 'regular_league' } }),
+    );
+    prisma.v1TournamentRegistration.update.mockResolvedValue(registrationRow({ status: 'cancelled' }));
+    prisma.v1TournamentPayment.findUnique.mockResolvedValue(null);
+
+    await expect(service.cancel(opsAuth, 'reg-1', {})).resolves.toMatchObject({ status: 'cancelled' });
+    expect(prisma.v1TournamentRegistration.update.mock.calls[0][0].data).toMatchObject({
+      cancelOutcome: 'approved',
+      adminCancelReason: null,
+    });
+  });
+
+  it('cancel: 리그 거부는 사유가 없으면 400 — 팀에게 시즌을 못 뛰게 하는 조치다', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(opsAdminRecord);
+    prisma.v1TournamentRegistration.findUnique.mockResolvedValue(
+      registrationRow({ status: 'confirmed', tournament: { title: '리그', kind: 'regular_league' } }),
     );
 
     await expect(service.cancel(opsAuth, 'reg-1', {})).rejects.toMatchObject({
@@ -477,7 +543,7 @@ describe('AdminRegistrationsService', () => {
   it('cancel: 공백만 있는 사유도 사유가 아니다', async () => {
     prisma.v1AdminUser.findUnique.mockResolvedValue(opsAdminRecord);
     prisma.v1TournamentRegistration.findUnique.mockResolvedValue(
-      registrationRow({ status: 'cancel_requested', tournament: { title: '리그', kind: 'regular_league' } }),
+      registrationRow({ status: 'confirmed', tournament: { title: '리그', kind: 'regular_league' } }),
     );
 
     await expect(service.cancel(opsAuth, 'reg-1', { reason: '   ' })).rejects.toMatchObject({
@@ -715,6 +781,8 @@ describe('AdminRegistrationsService', () => {
         rosterDeadlineOverrideAt: null,
         cancelRequestedAt: null,
         cancelReason: null,
+        adminCancelReason: null,
+        cancelOutcome: null,
         createdAt: new Date('2026-08-01T00:00:00.000Z'),
         updatedAt: new Date('2026-08-01T00:00:00.000Z'),
         payment: null,
@@ -744,6 +812,22 @@ describe('AdminRegistrationsService', () => {
 
     const result = await service.list(opsAuth, 'league-1', {});
     expect(result.items[0].rosterAutoConfirmedAt).toBeNull();
+  });
+
+  it('list: 팀 취소 사유와 어드민 사유·처리 결과를 각각 내려준다', async () => {
+    arrangeOneRegistration();
+    prisma.$queryRaw.mockResolvedValue([]);
+    const [row] = await prisma.v1TournamentRegistration.findMany();
+    prisma.v1TournamentRegistration.findMany.mockResolvedValue([
+      { ...row, status: 'cancelled', cancelReason: '팀 사유', adminCancelReason: '어드민 사유', cancelOutcome: 'approved' },
+    ]);
+
+    const result = await service.list(opsAuth, 'league-1', {});
+    expect(result.items[0]).toMatchObject({
+      cancelReason: '팀 사유',
+      adminCancelReason: '어드민 사유',
+      cancelOutcome: 'approved',
+    });
   });
 
   it('list: 신청이 하나도 없으면 자동 확정 조회를 아예 하지 않는다', async () => {

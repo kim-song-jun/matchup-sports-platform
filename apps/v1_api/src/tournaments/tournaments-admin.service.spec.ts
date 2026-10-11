@@ -788,6 +788,44 @@ describe('TournamentsAdminService', () => {
     await expect(service.get(ownerAuthUser, 'ghost')).rejects.toThrow(NotFoundException);
   });
 
+  // 신청 팀 수는 취소·미제출 신청을 세지 않는다 — 어드민 개요 "신청 팀"이 실제 참가 후보 수를 말해야 한다.
+  describe('신청 팀 수는 유효 신청만 센다', () => {
+    const activeRegistrationCount = { select: { registrations: { where: { status: { notIn: ['draft', 'cancelled'] } } } } };
+
+    it('list: 행마다 취소·미제출 신청을 뺀 수를 쓴다', async () => {
+      prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+      prisma.v1Tournament.findMany.mockResolvedValue([{ ...tournamentRow(), _count: { registrations: 3 } }]);
+      prisma.v1Tournament.groupBy.mockResolvedValue([]);
+
+      await service.list(ownerAuthUser, { limit: 20 });
+
+      expect(prisma.v1Tournament.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ include: { _count: activeRegistrationCount } }),
+      );
+    });
+
+    it('get: 개요 카드(operationCounts)와 신청 수(registrationCount)가 같은 유효 신청 수를 쓰고 공지 수는 그대로 센다', async () => {
+      prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+      prisma.v1Tournament.findFirst.mockResolvedValue({
+        ...tournamentRow(),
+        _count: { registrations: 3, announcements: 2 },
+      });
+      prisma.v1TournamentMatchDetails.count.mockResolvedValue(0);
+
+      const result = await service.get(ownerAuthUser, 'tournament-1');
+
+      expect(prisma.v1Tournament.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({
+          include: expect.objectContaining({
+            _count: { select: { ...activeRegistrationCount.select, announcements: true } },
+          }),
+        }),
+      );
+      expect(result.registrationCount).toBe(3);
+      expect(result.operationCounts).toMatchObject({ registrations: 3, announcements: 2 });
+    });
+  });
+
   // ─── list shape ───────────────────────────────────────────────────────────────
 
   it('list: returns items with registrationCount + pageInfo', async () => {

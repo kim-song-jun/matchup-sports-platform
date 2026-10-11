@@ -119,7 +119,7 @@ export default function AdminLeagueMatchNewPage() {
     if (sportId === '') return '종목을 선택해 주세요.';
     if (regionId === '') return '지역을 선택해 주세요.';
     if (startsOn === '' || endsOn === '') return '시작일·종료일을 입력해 주세요.';
-    if (periodRangeError) return periodRangeError;
+    if (periodRangeError) return '종료일을 바로잡아 주세요.';
     if (selectedTeams.length < 2) return `참가 팀을 2팀 이상 추가해 주세요. (현재 ${selectedTeams.length}팀)`;
     if (periodsInvalid) return '경기 시간은 피리어드마다 1~240분 사이의 정수로 입력해 주세요.';
     return null;

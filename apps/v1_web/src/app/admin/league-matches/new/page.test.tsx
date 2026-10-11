@@ -273,6 +273,7 @@ describe('AdminLeagueMatchNewPage', () => {
     expect(endsOn).toHaveAccessibleDescription(/종료일은 시작일보다 빠를 수 없어요/);
     const submit = screen.getByRole('button', { name: '리그 만들기' });
     expect(submit).toBeDisabled();
+    expect(submit).toHaveAccessibleDescription('종료일을 바로잡아 주세요.');
     fireEvent.click(submit);
     expect(mutateAsync).not.toHaveBeenCalled();
 

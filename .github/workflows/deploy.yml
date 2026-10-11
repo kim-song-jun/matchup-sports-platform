@@ -33,11 +33,13 @@ permissions:
 
 # PR 간 상호 취소 방지: 그룹을 PR/ref 단위로 분리
 # - pull_request: 같은 PR의 이전 attempt만 취소 (ci-pr-N)
-# - main push · workflow_dispatch: 취소 없이 직렬 큐
+# - dev push: 새 push가 이전 push CI를 취소 (서버 배포 job은 main 전용)
+# - dev 재실행/dispatch: 과거 SHA가 최신 CI를 취소하지 않도록 run별 격리
+# - main ref (push · workflow_dispatch): 취소 없이 직렬 큐
 # 프로덕션 배포 직렬화는 build-images/deploy job의 job-level concurrency가 담당
 concurrency:
-  group: ci-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  group: ci-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || (github.ref == 'refs/heads/dev' && (github.run_attempt > 1 || github.event_name == 'workflow_dispatch')) && format('dev-isolated-{0}', github.run_id) || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' || (github.ref == 'refs/heads/dev' && github.event_name == 'push' && github.run_attempt == 1) }}
 
 jobs:
   # ── Gates: 릴리스 계약 검사 ─────────────────────────────────────────────────
@@ -234,6 +236,9 @@ jobs:
       # deploy-alpha.yml 이 어떤 CI run 을 기다림 없이 믿고 어떤 것을 거절하는지 고정한다.
       - name: Alpha matching-CI selector tests
         run: bash scripts/qa/test-select-matching-ci-run.sh
+
+      - name: Latest dev deployment contract tests
+        run: node scripts/qa/test-current-alpha-release.mjs
 
       # 배포 실패를 되돌리는 restore_active_release() 는 ERR trap 안에서 돈다. bash 는 trap 안의
       # 인자 없는 `return` 에 trap 을 일으킨 종료코드를 돌려주므로, 정상 흐름에서 멀쩡한 함수가

@@ -5,24 +5,26 @@
 현재 작업: [Task 20261072](../../.github/tasks/20261072-production-search-ga4.md). 아래의 9월 기준선은 과거 기록이다.
 
 - Google Search Console에서 운영 URL 접두어 `https://teameet.co.kr/`의 소유권을 기존 HTML 메타로 확인했다. `/landing`은 이미 색인돼 있고, `/home`은 **색인이 생성되었으나 robots.txt에 의해 차단됨**으로 표시된다. 수집을 막으면 noindex도 읽히지 않아 URL만 검색에 남을 수 있다.
-- Google/Yeti UA의 운영 `/sitemap.xml` 응답은 200 `application/xml`, 271개 고유 운영 URL이다. Search Console에 제출했으나 최초 상태는 **사이트맵을 읽을 수 없음**이었다. 10월 12일 05:20:42의 Google 실시간 검사에서는 **크롤링 허용: 예 / 페이지 가져오기: 성공**이었다. 접근은 확인했지만 사이트맵 처리 성공은 아직 확인되지 않았다.
+- Google/Yeti UA의 운영 `/sitemap.xml` 응답은 200 `application/xml`, 271개 고유 운영 URL이다. 제출 직후의 **사이트맵을 읽을 수 없음** 상태는 처리 대기 후 해소됐다. 10월 12일 05:41 Search Console에서 **성공**, 읽은 날짜 10/12, 발견 URL 271을 확인했다. XML 문법·고유 URL·운영 호스트도 검증했으며 재제출하지 않았다.
 - 네이버 계정에는 운영 사이트가 9월 27일자로 등록돼 있으나 소유확인 미완료였다. 기존 운영 HTML의 인증 태그로 소유확인을 마쳤다. 10월 12일 운영 사이트맵(05:32:17), 공지 RSS `/notices/feed.xml`(05:34:13), `/landing` 수집 요청(05:34:32)이 각각 등록 목록에 나타나는 것을 확인했다. 시각은 네이버 화면 표시 기준이다. alpha는 제출하지 않았다. 요청 접수는 검색 색인 완료와 다르다.
-- 코드 변경: `/home`은 수집만 허용하고 noindex를 유지한다. `/landing`의 제목에 한글 브랜드와 실제 서비스 내용을 넣는다. alpha는 검색 봇이 HTTP noindex를 읽게 하고 그 외 크롤러는 차단하며 sitemap/RSS를 404로 처리한다. **아직 배포한 증거는 없다.**
+- 코드 변경: `/home`은 수집만 허용하고 noindex를 유지한다. `/landing`의 제목에 한글 브랜드와 실제 서비스 내용을 넣는다. alpha는 검색 봇이 HTTP noindex를 읽게 하고 그 외 크롤러는 차단하며 sitemap/RSS를 404로 처리한다. PR #1842의 alpha `8deac7bc16382b85615f70d98c1a91cd5ae858a7`에서 실측 완료. 운영은 배포 대기다.
 - 실제 운영 브라우저에서 `/landing`의 page_view, `landing_cta_click {cta: hero_browse_team_matches}`, SPA 이동 후 `/team-matches`의 page_view를 관찰했다. 이동 후 제목도 `팀매치 찾기 | Teameet`으로 전송됐다. 이 한 동선에서 수동 page_view 중복 전송은 보이지 않았다.
 - GA4 속성 `448147119`에 alpha와 운영 스트림이 같이 있다. 운영 스트림은 `teameet-prod` / `15280614121` / `G-LCZ6BNMMHV`다. **운영 사이트만 · teameet-prod** 비교를 저장했고, 실제 조건은 streamId `15280614121` 일치다.
 - GA4에 이벤트 범위 맞춤 측정기준 `cta`(랜딩 CTA 위치), `destination`(홈 이동 목적지), `destination_type`(홈 이동 화면 유형)을 저장했다. 신규 홈 이동 이벤트는 코드 배포 뒤 수집된다.
 - 운영 Google 태그의 원치 않는 추천 목록에는 이미 `accounts.kakao.com`, `kauth.kakao.com` 정확 일치 규칙이 있어 유지했다. 아래 기간 중 `kauth.kakao.com / referral` 127세션이 관찰됐지만 과거 데이터만으로 현재 설정이 없다고 판단하지 않았다.
 
-GA4 UI에서 읽은 2026-09-14~2026-10-11 기준선:
+GA4 Internal Traffic 필터는 Testing 상태다. 원본 수집을 보존하면서 운영 스트림과 `testDataFilterName=Internal Traffic` 제외 조건을 결합한 **운영 · 내부 트래픽 제외** 비교(ID `16108290729`)를 저장·적용했다. 식별되지 않은 내부 방문까지 제거됐다고 해석하지 않는다.
 
-| 항목 | 속성 전체 | 운영 스트림만 |
-|---|---:|---:|
-| 이벤트 수 | 103,966 | 93,779 |
-| page_view | 30,551 | 26,389 |
-| home_view | 3,038 | 2,194 |
-| home_view 총 사용자 | 727 | 713 |
-| landing_cta_click | 4 | 4 |
-| landing_cta_click 총 사용자 | 3 | 3 |
+GA4 UI에서 10/12 06:17경 다시 읽은 2026-09-14~2026-10-11 기준선(처리 지연에 따라 수치가 변할 수 있음):
+
+| 항목 | 속성 전체 | 운영 스트림만 | 운영·식별된 내부 제외 |
+|---|---:|---:|---:|
+| 이벤트 수 | 104,118 | 93,931 | 89,330 |
+| page_view | 30,588 | 26,426 | 24,769 |
+| home_view | 3,041 | 2,197 | 2,194 |
+| home_view 총 사용자 | 729 | 715 | 715 |
+
+최초 조회의 landing_cta_click은 전체·운영 모두 4회/3명이었다. Alpha 배포 후 실제 홈 → 팀 이동은 `home_navigation_click {destination: teams, destination_type: list}` 1회와 이동 페이지의 page_view 1회가 각각 HTTP 204로 전송됐다. 운영 신규 홈 이벤트 수집은 운영 배포 후 검증한다.
 
 기간 합계는 과거 계측 변경을 포함하므로 이벤트 수 차이만으로 중복·누락을 단정하지 않는다. 랜딩 방문 사용자 분모와 동일 여정 연결을 확인하지 않았으므로 CTA 클릭 수를 가입 전환율로 해석하지 않는다. 새 맞춤 측정기준의 과거 데이터 소급 집계를 약속하지 않는다.
 

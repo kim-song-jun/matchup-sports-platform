@@ -117,6 +117,7 @@ function buildPrismaMock() {
       findMany: jest.fn(),
     },
     v1UserOnboardingProgress: {
+      findUnique: jest.fn(),
       upsert: jest.fn(),
     },
     v1UserRecordConsent: {
@@ -1040,7 +1041,7 @@ describe('AuthService', () => {
 
       await service.deferSocialProfile('user-1');
 
-      expect(prisma.v1UserProfile.upsert.mock.calls[0][0].create.nickname).toMatch(/^팀밋사용자\d{4}$/);
+      expect(prisma.v1UserProfile.upsert.mock.calls[0][0].create.nickname).toMatch(/^팀밋사용자\d{6}$/);
     });
 
     it.each([
@@ -1394,6 +1395,88 @@ describe('AuthService', () => {
       expect(data.onboardingProgress.create.draftJson).toMatchObject({ kakaoNickname: '카카오닉' });
     });
 
+    describe('기존 identity 의 닉네임 시드', () => {
+      const withNickname = () => {
+        global.fetch = jest
+          .fn()
+          .mockResolvedValueOnce({ ok: true, json: async () => ({ access_token: 'kakao-access-token' }) })
+          .mockResolvedValueOnce({
+            ok: true,
+            json: async () => ({ id: 784, kakao_account: { profile: { nickname: ' 새닉네임 ' } } }),
+          }) as unknown as typeof fetch;
+      };
+      const identityWith = (onboardingStatus: string) => ({
+        id: 'seed-identity',
+        status: 'active',
+        user: {
+          id: 'seed-user', email: null, accountStatus: 'active',
+          onboardingStatus, createdAt: new Date(), updatedAt: new Date(),
+        },
+      });
+
+      it.each(['social_terms_required', 'social_profile_required'])(
+        '%s 사용자는 새로 받은 닉네임을 기존 draft 에 병합한다',
+        async (status) => {
+          withNickname();
+          prisma.v1AuthIdentity.findUnique.mockResolvedValue(identityWith(status));
+          prisma.v1User.findUnique.mockResolvedValue(pendingSocialUserRow());
+          prisma.v1UserOnboardingProgress.findUnique.mockResolvedValue({
+            draftJson: { ageConfirmedAt: '2026-10-11T00:00:00.000Z', kakaoName: '홍길동', kakaoNickname: '옛닉' },
+          });
+
+          await service.kakaoLogin({ code: 'auth-code' });
+
+          expect(prisma.v1UserOnboardingProgress.upsert).toHaveBeenCalledWith(expect.objectContaining({
+            where: { userId: 'seed-user' },
+            update: {
+              draftJson: {
+                ageConfirmedAt: '2026-10-11T00:00:00.000Z',
+                kakaoName: '홍길동',
+                kakaoNickname: '새닉네임',
+              },
+            },
+          }));
+        },
+      );
+
+      it('만료된 pending 사용자도 닉네임을 병합하고 약관 단계로 리셋한다', async () => {
+        withNickname();
+        const old = new Date(Date.now() - 25 * 60 * 60 * 1000);
+        const identity = identityWith('social_profile_required');
+        identity.user.createdAt = old;
+        identity.user.updatedAt = old;
+        prisma.v1AuthIdentity.findUnique.mockResolvedValue(identity);
+        prisma.v1User.findUnique.mockResolvedValue(pendingSocialUserRow({ onboardingStatus: 'social_terms_required' }));
+        prisma.v1UserOnboardingProgress.findUnique.mockResolvedValue({
+          draftJson: { ageConfirmedAt: '2026-10-11T00:00:00.000Z' },
+        });
+
+        await service.kakaoLogin({ code: 'auth-code' });
+
+        expect(prisma.v1User.update).toHaveBeenCalledWith({
+          where: { id: 'seed-user' },
+          data: { onboardingStatus: 'social_terms_required', lastLoginAt: expect.any(Date) },
+        });
+        expect(prisma.v1UserOnboardingProgress.upsert).toHaveBeenCalledWith(expect.objectContaining({
+          update: {
+            currentStep: 'terms',
+            draftJson: { ageConfirmedAt: '2026-10-11T00:00:00.000Z', kakaoNickname: '새닉네임' },
+          },
+        }));
+      });
+
+      it('완료된 사용자의 draft 는 건드리지 않는다', async () => {
+        withNickname();
+        prisma.v1AuthIdentity.findUnique.mockResolvedValue(identityWith('completed'));
+        prisma.v1User.findUnique.mockResolvedValue(completedUserRow({ id: 'seed-user', email: null }));
+
+        await service.kakaoLogin({ code: 'auth-code' });
+
+        expect(prisma.v1UserOnboardingProgress.findUnique).not.toHaveBeenCalled();
+        expect(prisma.v1UserOnboardingProgress.upsert).not.toHaveBeenCalled();
+      });
+    });
+
     it('Kakao 닉네임이 없으면 kakaoNickname 키를 남기지 않는다', async () => {
       global.fetch = jest
         .fn()
@@ -1448,6 +1531,73 @@ describe('AuthService', () => {
         data: { lastLoginAt: expect.any(Date) },
       });
       expect(result.session.userId).toBe('user-1');
+    });
+  });
+
+  describe('appleSignIn 기존 identity 의 이름 시드', () => {
+    const pendingIdentity = (onboardingStatus: string, createdAt = new Date()) => ({
+      id: 'apple-identity',
+      status: 'active',
+      user: {
+        id: 'apple-user', email: null, accountStatus: 'active',
+        onboardingStatus, createdAt, updatedAt: createdAt,
+      },
+    });
+    const signIn = (fullName?: string) => {
+      const appleIdentity = service['appleIdentity'] as unknown as { verifyIdentityToken: jest.Mock };
+      appleIdentity.verifyIdentityToken.mockResolvedValue({
+        subject: 'apple-sub', audience: 'app', email: null, emailVerified: false,
+      });
+      return service.appleSignIn({ identityToken: 't', nonce: 'n', fullName } as never);
+    };
+
+    beforeEach(() => {
+      prisma.v1User.findUnique.mockResolvedValue(pendingSocialUserRow());
+      prisma.v1UserOnboardingProgress.findUnique.mockResolvedValue({
+        draftJson: { ageConfirmedAt: '2026-10-11T00:00:00.000Z' },
+      });
+    });
+
+    it('fullName 이 있으면 기존 draft 에 appleName 을 병합한다', async () => {
+      prisma.v1AuthIdentity.findUnique.mockResolvedValue(pendingIdentity('social_terms_required'));
+
+      await signIn(' 김애플 ');
+
+      expect(prisma.v1UserOnboardingProgress.upsert).toHaveBeenCalledWith(expect.objectContaining({
+        update: { draftJson: { ageConfirmedAt: '2026-10-11T00:00:00.000Z', appleName: '김애플' } },
+      }));
+    });
+
+    it('만료된 pending 사용자도 appleName 을 병합하고 리셋한다', async () => {
+      const old = new Date(Date.now() - 25 * 60 * 60 * 1000);
+      prisma.v1AuthIdentity.findUnique.mockResolvedValue(pendingIdentity('social_profile_required', old));
+
+      await signIn('김애플');
+
+      expect(prisma.v1UserOnboardingProgress.upsert).toHaveBeenCalledWith(expect.objectContaining({
+        update: {
+          currentStep: 'terms',
+          draftJson: { ageConfirmedAt: '2026-10-11T00:00:00.000Z', appleName: '김애플' },
+        },
+      }));
+    });
+
+    it('fullName 이 없으면 draft 를 건드리지 않는다', async () => {
+      prisma.v1AuthIdentity.findUnique.mockResolvedValue(pendingIdentity('social_terms_required'));
+
+      await signIn(undefined);
+
+      expect(prisma.v1UserOnboardingProgress.findUnique).not.toHaveBeenCalled();
+      expect(prisma.v1UserOnboardingProgress.upsert).not.toHaveBeenCalled();
+    });
+
+    it('완료된 사용자의 draft 는 fullName 이 와도 건드리지 않는다', async () => {
+      prisma.v1AuthIdentity.findUnique.mockResolvedValue(pendingIdentity('completed'));
+      prisma.v1User.findUnique.mockResolvedValue(completedUserRow({ id: 'apple-user', email: null }));
+
+      await signIn('김애플');
+
+      expect(prisma.v1UserOnboardingProgress.upsert).not.toHaveBeenCalled();
     });
   });
 

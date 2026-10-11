@@ -1,7 +1,10 @@
+import { ConflictException } from '@nestjs/common';
+
 const MAX_NICKNAME_LENGTH = 20;
 const MIN_NICKNAME_LENGTH = 2;
 const SUFFIXED_ATTEMPTS = 8;
-const FALLBACK_ATTEMPTS = 5;
+const FALLBACK_ATTEMPTS = 10;
+const FALLBACK_DIGITS = 6;
 const FALLBACK_PREFIX = '팀밋사용자';
 
 export function normalizeSocialNicknameSeed(seed: string | null | undefined): string | null {
@@ -25,8 +28,8 @@ function randomDigits(length: number, random: () => number): string {
 
 /**
  * Picks an unused nickname for a social signup that skipped the profile form.
- * Nicknames have no unique constraint, so the check is best-effort; the loop is bounded and
- * always returns a value.
+ * Nicknames have no unique constraint, so the check is best-effort; every returned value was
+ * checked, and exhausting the bounded attempts throws instead of returning an unchecked name.
  */
 export async function generateSocialNickname(
   seed: string | null | undefined,
@@ -46,10 +49,12 @@ export async function generateSocialNickname(
     }
   }
 
-  let fallback = `${FALLBACK_PREFIX}${randomDigits(4, random)}`;
   for (let attempt = 0; attempt < FALLBACK_ATTEMPTS; attempt += 1) {
-    if (!(await isTaken(fallback))) return fallback;
-    fallback = `${FALLBACK_PREFIX}${randomDigits(4, random)}`;
+    const candidate = `${FALLBACK_PREFIX}${randomDigits(FALLBACK_DIGITS, random)}`;
+    if (!(await isTaken(candidate))) return candidate;
   }
-  return fallback;
+  throw new ConflictException({
+    code: 'NICKNAME_GENERATION_FAILED',
+    message: '닉네임을 자동으로 만들지 못했어요. 잠시 후 다시 시도해 주세요.',
+  });
 }

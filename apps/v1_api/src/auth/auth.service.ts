@@ -362,51 +362,13 @@ export class AuthService {
         });
       }
 
-      if (isExpiredSocialSignup(existingIdentity.user)) {
-        if (existingIdentity.status !== 'active' || existingIdentity.user.accountStatus !== 'active') {
-          this.assertNotWithdrawalPending(existingIdentity.user.accountStatus);
-          throw new ForbiddenException({
-            code: 'PERMISSION_DENIED',
-            message: 'This account cannot sign in',
-          });
-        }
+      await this.touchExistingSocialIdentity(
+        existingIdentity,
+        now,
+        profile.nickname ? { kakaoNickname: profile.nickname } : null,
+      );
 
-        await this.prisma.$transaction([
-          this.prisma.v1AuthIdentity.update({
-            where: { id: existingIdentity.id },
-            // An already-linked provider ID remains a valid login even when
-            // Kakao omits email consent. Preserve the stored identity email;
-            // never overwrite it with an untrusted provider payload.
-            data: { lastLoginAt: now },
-          }),
-          this.prisma.v1User.update({
-            where: { id: existingIdentity.user.id },
-            data: { onboardingStatus: 'social_terms_required', lastLoginAt: now },
-          }),
-          this.prisma.v1UserOnboardingProgress.upsert({
-            where: { userId: existingIdentity.user.id },
-            update: { currentStep: 'terms' },
-            create: { userId: existingIdentity.user.id, currentStep: 'terms' },
-          }),
-        ]);
-
-        return this.sessionResponse(existingIdentity.user.id, existingIdentity.user.email, { social: true });
-      } else {
-        await this.prisma.$transaction([
-          this.prisma.v1AuthIdentity.update({
-            where: { id: existingIdentity.id },
-            // The provider user key is the established identity. Keep its
-            // stored email stable when a later profile response is unverified.
-            data: { lastLoginAt: now },
-          }),
-          this.prisma.v1User.update({
-            where: { id: existingIdentity.user.id },
-            data: { lastLoginAt: now },
-          }),
-        ]);
-
-        return this.sessionResponse(existingIdentity.user.id, existingIdentity.user.email, { social: true });
-      }
+      return this.sessionResponse(existingIdentity.user.id, existingIdentity.user.email, { social: true });
     }
 
     const providerEmail = profile.email ? normalizeEmail(profile.email) : null;
@@ -556,40 +518,9 @@ export class AuthService {
         });
       }
 
-      // A signup that was started and abandoned goes back to the terms step rather than
-      // straight into the app, exactly as the Kakao path does — the account exists but has
-      // agreed to nothing yet.
-      if (isExpiredSocialSignup(existingIdentity.user)) {
-        await this.prisma.$transaction([
-          this.prisma.v1AuthIdentity.update({
-            where: { id: existingIdentity.id },
-            // Preserve the stored identity email for an already-linked Apple subject.
-            data: { lastLoginAt: now },
-          }),
-          this.prisma.v1User.update({
-            where: { id: existingIdentity.user.id },
-            data: { onboardingStatus: 'social_terms_required', lastLoginAt: now },
-          }),
-          this.prisma.v1UserOnboardingProgress.upsert({
-            where: { userId: existingIdentity.user.id },
-            update: { currentStep: 'terms' },
-            create: { userId: existingIdentity.user.id, currentStep: 'terms' },
-          }),
-        ]);
-
-        return this.sessionResponse(existingIdentity.user.id, existingIdentity.user.email, { social: true });
-      }
-
-      await this.prisma.$transaction([
-        this.prisma.v1AuthIdentity.update({
-          where: { id: existingIdentity.id },
-          data: { lastLoginAt: now },
-        }),
-        this.prisma.v1User.update({
-          where: { id: existingIdentity.user.id },
-          data: { lastLoginAt: now },
-        }),
-      ]);
+      // Apple sends the name on the first authorization only; later logins carry none.
+      const appleName = dto.fullName?.trim();
+      await this.touchExistingSocialIdentity(existingIdentity, now, appleName ? { appleName } : null);
 
       return this.sessionResponse(existingIdentity.user.id, existingIdentity.user.email, { social: true });
     }
@@ -649,6 +580,55 @@ export class AuthService {
     });
 
     return this.sessionResponse(user.id, user.email, { social: true });
+  }
+
+  /**
+   * Login bookkeeping for an already-linked social identity. A pending signup (and an abandoned,
+   * expired one, which restarts at the terms step) gets the provider seed merged into its onboarding
+   * draft. The draft is read and written in the same transaction so concurrent logins cannot
+   * overwrite each other's keys; completed users' drafts are never touched.
+   */
+  private async touchExistingSocialIdentity(
+    identity: {
+      id: string;
+      user: { id: string; onboardingStatus: string; createdAt: Date; updatedAt: Date };
+    },
+    now: Date,
+    seed: Record<string, string> | null,
+  ): Promise<void> {
+    const { user } = identity;
+    const expired = isExpiredSocialSignup(user);
+    const pending =
+      user.onboardingStatus === 'social_terms_required' || user.onboardingStatus === 'social_profile_required';
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.v1AuthIdentity.update({
+        where: { id: identity.id },
+        // The provider user key is the established identity; keep its stored email untouched.
+        data: { lastLoginAt: now },
+      });
+      await tx.v1User.update({
+        where: { id: user.id },
+        data: expired ? { onboardingStatus: 'social_terms_required', lastLoginAt: now } : { lastLoginAt: now },
+      });
+
+      const mergeSeed = pending && seed !== null;
+      if (!expired && !mergeSeed) return;
+
+      let draftJson: Prisma.InputJsonObject | undefined;
+      if (mergeSeed) {
+        const progress = await tx.v1UserOnboardingProgress.findUnique({
+          where: { userId: user.id },
+          select: { draftJson: true },
+        });
+        draftJson = { ...draftObject(progress?.draftJson), ...seed };
+      }
+      await tx.v1UserOnboardingProgress.upsert({
+        where: { userId: user.id },
+        update: { ...(expired ? { currentStep: 'terms' } : {}), ...(draftJson ? { draftJson } : {}) },
+        create: { userId: user.id, currentStep: 'terms', ...(draftJson ? { draftJson } : {}) },
+      });
+    });
   }
 
   /**

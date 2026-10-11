@@ -158,7 +158,7 @@ export class OnboardingService {
         reason: 'onboarding_completed',
       },
       missing: [],
-      limited: false,
+      limited: nextStatus !== 'completed',
     };
   }
 

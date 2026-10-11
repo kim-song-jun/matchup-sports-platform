@@ -233,6 +233,27 @@ describe('OnboardingService with the profile gate still closed (social_profile_d
     }
   });
 
+  it('complete() reports limited:true while the profile gate is closed', async () => {
+    const { moduleRef, service } = await createHarness('social_profile_deferred');
+    try {
+      await expect(service.complete(userId)).resolves.toMatchObject({
+        status: 'social_profile_deferred',
+        limited: true,
+      });
+    } finally {
+      await moduleRef.close();
+    }
+  });
+
+  it('control: complete() reports limited:false once the gate is open', async () => {
+    const { moduleRef, service } = await createHarness('level_done');
+    try {
+      await expect(service.complete(userId)).resolves.toMatchObject({ status: 'completed', limited: false });
+    } finally {
+      await moduleRef.close();
+    }
+  });
+
   it('control: a signed-up user still gets the derived status from the same payload', async () => {
     const { moduleRef, service, writeMocks } = await createHarness('signup_done');
     const [, , , , userUpdate] = writeMocks;

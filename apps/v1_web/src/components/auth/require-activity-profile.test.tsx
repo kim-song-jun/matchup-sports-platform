@@ -14,7 +14,8 @@ vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: mocks.push, back: mocks.back, replace: mocks.replace }),
 }));
 
-vi.mock('@/lib/navigation-history', () => ({
+vi.mock('@/lib/navigation-history', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/navigation-history')>()),
   hasPreviousInAppEntry: () => mocks.hasPrevious,
   markAppInitiatedBack: vi.fn(),
 }));
@@ -32,7 +33,7 @@ describe('RequireActivityProfile', () => {
     window.history.replaceState(null, '', '/teams/new');
   });
 
-  it('정보 입력을 미룬 계정에는 폼 대신 행동별 안내를 보여 주고 입력 화면으로 보낸다', () => {
+  it('정보 입력을 미룬 계정에는 폼 대신 행동별 시트를 띄우고 입력 화면으로 보낸다', () => {
     mocks.onboardingStatus = 'social_profile_deferred';
     render(
       <RequireActivityProfile title="팀을 만들려면 정보가 필요해요">
@@ -40,7 +41,7 @@ describe('RequireActivityProfile', () => {
       </RequireActivityProfile>,
     );
 
-    expect(screen.getByText('팀을 만들려면 정보가 필요해요')).toBeInTheDocument();
+    expect(screen.getByRole('dialog', { name: '팀을 만들려면 정보가 필요해요' })).toBeInTheDocument();
     expect(screen.queryByText('팀 만들기 폼')).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: '정보 입력하기' }));
@@ -61,6 +62,18 @@ describe('RequireActivityProfile', () => {
     );
     fireEvent.click(screen.getByRole('button', { name: '정보 입력하기' }));
     expect(mocks.push).toHaveBeenCalledWith('/signup/social?redirect=%2Fteams%2Fabc%23member-list');
+  });
+
+  it('ESC 로도 닫히며 같은 이탈 경로를 탄다', () => {
+    mocks.onboardingStatus = 'social_profile_deferred';
+    render(
+      <RequireActivityProfile title="팀을 만들려면 정보가 필요해요">
+        <div>팀 만들기 폼</div>
+      </RequireActivityProfile>,
+    );
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(mocks.back).toHaveBeenCalledTimes(1);
+    expect(mocks.push).not.toHaveBeenCalled();
   });
 
   it('앱 안에 이전 화면이 없으면(딥링크·새 탭) 다음에 할게요가 홈으로 보낸다', () => {
@@ -88,7 +101,7 @@ describe('RequireActivityProfile', () => {
       );
 
       expect(screen.getByText('팀 만들기 폼')).toBeInTheDocument();
-      expect(screen.queryByText('팀을 만들려면 정보가 필요해요')).not.toBeInTheDocument();
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     },
   );
 });

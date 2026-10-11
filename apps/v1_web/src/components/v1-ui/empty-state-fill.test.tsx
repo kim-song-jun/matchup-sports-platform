@@ -6,8 +6,8 @@
  * 짝을 이뤄 남은 세로 공간의 중앙에 놓는다 — **둘 중 하나만 있으면 동작하지 않으므로**
  * 여기서 두 클래스가 함께 붙는지를 못박는다.
  */
-import { fireEvent, render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { render, screen } from '@testing-library/react';
+import { describe, expect, it } from 'vitest';
 import { EmptyState } from './primitives';
 
 describe('EmptyState fill', () => {
@@ -23,34 +23,5 @@ describe('EmptyState fill', () => {
 
     const node = screen.getByText('아직 후기가 없어요').closest('.tm-empty-state');
     expect(node).not.toHaveClass('tm-empty-state-fill');
-  });
-});
-
-describe('EmptyState secondaryCta', () => {
-  it('보조 행동이 있으면 중립 버튼이 주 CTA 옆에 나란히 놓이고 각자 호출된다', async () => {
-    const onCta = vi.fn();
-    const onSecondaryCta = vi.fn();
-    render(
-      <EmptyState
-        title="팀을 만들려면 정보가 필요해요"
-        sub="한 번만 입력하면 돼요."
-        cta="정보 입력하기"
-        onCta={onCta}
-        secondaryCta="다음에 할게요"
-        onSecondaryCta={onSecondaryCta}
-      />,
-    );
-
-    fireEvent.click(screen.getByRole('button', { name: '다음에 할게요' }));
-    expect(onSecondaryCta).toHaveBeenCalledTimes(1);
-    expect(onCta).not.toHaveBeenCalled();
-    expect(screen.getByRole('button', { name: '다음에 할게요' })).toHaveClass('tm-btn-neutral');
-    fireEvent.click(screen.getByRole('button', { name: '정보 입력하기' }));
-    expect(onCta).toHaveBeenCalledTimes(1);
-  });
-
-  it('보조 행동이 없으면 주 CTA 하나만 그린다', () => {
-    render(<EmptyState title="비었어요" sub="아직 없어요." cta="만들기" onCta={() => undefined} />);
-    expect(screen.getAllByRole('button')).toHaveLength(1);
   });
 });

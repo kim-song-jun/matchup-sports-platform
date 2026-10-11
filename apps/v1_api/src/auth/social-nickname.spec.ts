@@ -1,3 +1,4 @@
+import { ConflictException } from '@nestjs/common';
 import { generateSocialNickname, normalizeSocialNicknameSeed } from './social-nickname';
 
 const never = async () => false;
@@ -56,13 +57,30 @@ describe('generateSocialNickname', () => {
     expect(nickname).not.toMatch(LONE_SURROGATE);
   });
 
-  it('falls back to a generic name when there is no seed', async () => {
-    await expect(generateSocialNickname(null, never, () => 0.5)).resolves.toBe('팀밋사용자5000');
+  it('only returns names that passed the availability check, even deep into the fallback', async () => {
+    const free = '팀밋사용자500000';
+    const checked: string[] = [];
+    const nickname = await generateSocialNickname(
+      '카카오닉',
+      async (candidate) => {
+        checked.push(candidate);
+        return candidate !== free;
+      },
+      () => 0.5,
+    );
+
+    expect(nickname).toBe(free);
+    expect(checked).toContain(nickname);
+    expect(checked.length).toBeGreaterThan(1);
   });
 
-  it('terminates with a fallback name even if every candidate is taken', async () => {
+  it('uses a 6-digit generic fallback', async () => {
+    await expect(generateSocialNickname(null, never, () => 0.5)).resolves.toBe('팀밋사용자500000');
+  });
+
+  it('throws NICKNAME_GENERATION_FAILED after bounded attempts when every candidate is taken', async () => {
     const calls: string[] = [];
-    const nickname = await generateSocialNickname(
+    const run = generateSocialNickname(
       '카카오닉',
       async (n) => {
         calls.push(n);
@@ -71,7 +89,8 @@ describe('generateSocialNickname', () => {
       () => 0.1,
     );
 
-    expect(nickname).toMatch(/^팀밋사용자\d{4}$/);
+    await expect(run).rejects.toBeInstanceOf(ConflictException);
+    await expect(run).rejects.toMatchObject({ response: { code: 'NICKNAME_GENERATION_FAILED' } });
     expect(calls.length).toBeLessThan(30);
   });
 });

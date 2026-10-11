@@ -1,6 +1,6 @@
 import { BadRequestException, ConflictException, ForbiddenException, GoneException, Injectable, NotFoundException } from '@nestjs/common';
 import { V1TeamMembershipRole } from '@prisma/client';
-import { isForfeitedGame } from '../league-matches/league-forfeit-result';
+import { isForfeitedGame, NOT_FORFEITED_GAME_WHERE } from '../league-matches/league-forfeit-result';
 import { V1AuthUser } from '../auth/v1-auth-user';
 import { PrismaService } from '../prisma/prisma.service';
 import { formatReviewWindow, reviewWindowClosed } from './review-deadline';
@@ -53,6 +53,8 @@ export class TournamentFixtureReviewsService {
         leagueId: null,
         status: 'completed',
         tournamentDetails: { isNot: null },
+        // 몰수 경기는 불참한 쪽이 뛰지 않았으므로 평가할 상대가 없다. take 전에 걸러야 최신 몰수가 후보를 채우지 않는다.
+        game: NOT_FORFEITED_GAME_WHERE,
         OR: [
           { tournamentDetails: { is: { homeRegistration: { is: { teamId: { in: teamIds } } } } } },
           { tournamentDetails: { is: { awayRegistration: { is: { teamId: { in: teamIds } } } } } },
@@ -62,9 +64,7 @@ export class TournamentFixtureReviewsService {
       take: limit * 4,
       select: tournamentFixtureSelect(),
     })).filter(isCanonicalTournamentFixture)
-      .filter((fixture) => officialResultTimestamp(fixture) !== null)
-      // 몰수 경기는 불참한 쪽이 뛰지 않았으므로 평가할 상대가 없다.
-      .filter((fixture) => !isForfeitedGame(fixture.game));
+      .filter((fixture) => officialResultTimestamp(fixture) !== null);
     const reviewed = await this.existingReviews(fixtures.map((fixture) => fixture.tournamentId), user.id);
     const seenKeys = new Set<string>();
 

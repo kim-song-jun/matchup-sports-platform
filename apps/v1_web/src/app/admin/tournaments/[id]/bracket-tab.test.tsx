@@ -202,6 +202,8 @@ function confirmedRegistration(overrides: Partial<V1AdminTournamentRegistration>
     rosterDeadlineOverrideAt: null,
     cancelRequestedAt: null,
     cancelReason: null,
+    adminCancelReason: null,
+    cancelOutcome: null,
     playerCount: 5,
     payment: null,
     paymentInstructions: null,

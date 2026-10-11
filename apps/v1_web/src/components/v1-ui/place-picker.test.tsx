@@ -183,6 +183,8 @@ describe('PlacePicker', () => {
       fireEvent.click(await findOption('결과 더 보기'));
 
       const third = await findOption('망원 3구장');
+      // 활성 줄은 누른 「더 보기」 자리, 곧 첫 새 결과로 이어진다.
+      expect(screen.getByRole('combobox')).toHaveAttribute('aria-activedescendant', third.id);
       // 쪽 경계에서 다시 온 1구장은 한 번만 보인다.
       expect(screen.getAllByRole('option').filter((option) => option.textContent?.includes('망원 1구장'))).toHaveLength(1);
       expect(screen.queryByText('결과 더 보기')).not.toBeInTheDocument();
@@ -208,6 +210,7 @@ describe('PlacePicker', () => {
       fireEvent.click(await findOption('결과 더 보기'));
 
       const retry = await findOption('다시 시도');
+      expect(screen.getByRole('status')).toHaveTextContent('결과를 더 불러오지 못했어요');
       expect(screen.getByRole('listbox')).toBeVisible();
       expect(await findOption('망원 1구장')).toBeInTheDocument();
       expect(screen.queryByText('카카오 응답이 늦어요')).not.toBeInTheDocument();

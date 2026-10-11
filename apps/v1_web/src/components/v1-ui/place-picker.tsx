@@ -189,6 +189,8 @@ export function PlacePicker({
 
   function loadMore() {
     if (!hasMore || loadingMore) return;
+    // 활성 줄을 「더 보기」에 두면 새 쪽이 붙은 뒤 같은 인덱스가 첫 새 결과가 된다 — 마우스로 눌러도 활성 줄이 엉뚱한 결과로 밀리지 않는다.
+    setActiveIndex(moreOptionIndex);
     void search.fetchNextPage();
   }
 
@@ -472,6 +474,9 @@ export function PlacePicker({
             {searchActive && search.isFetching && items.length === 0 ? (
               <div className="tm-text-caption" style={{ color: 'var(--text-muted)', marginTop: 8 }}>장소를 찾고 있어요…</div>
             ) : null}
+            {/* 「더 보기」 줄의 진행·실패 문구는 목록 안에 있어 읽히지 않으므로 여기서 한 번 더 알린다. */}
+            {loadingMore ? <span className="sr-only">결과를 더 불러오고 있어요</span> : null}
+            {moreFailed ? <span className="sr-only">결과를 더 불러오지 못했어요</span> : null}
             {hasError ? (
               <div className="tm-text-caption" style={{ color: 'var(--text-muted)', marginTop: 8, lineHeight: 1.5 }}>
                 <p style={{ margin: 0 }}>

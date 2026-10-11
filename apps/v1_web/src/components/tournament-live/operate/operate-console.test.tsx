@@ -1,4 +1,4 @@
-import { act, render, screen, within, fireEvent, waitFor } from '@testing-library/react';
+import { act, cleanup, render, screen, within, fireEvent, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { COMMAND_RESPONSE_TIMEOUT_MS, OperateConsole } from './operate-console';
 import type { GameEventRecord } from '@/types/game-operations';
@@ -478,6 +478,108 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
 
     expect(screen.queryByRole('dialog')).toBeNull();
     expect(mocks.useV1GameOperationsConsole().submitEvent).not.toHaveBeenCalled();
+  });
+
+  describe('두 번째 옐로 — 레드 기록 확인 시트 (MD-QA #81)', () => {
+    function yellow(sequence: number, participantId: string | null, overrides: Partial<GameEventRecord> = {}): GameEventRecord {
+      return { ...goal(sequence), type: 'CARD', participantId, payload: { card: 'YELLOW' }, ...overrides } as GameEventRecord;
+    }
+
+    async function recordYellow(liveEvents: GameEventRecord[]) {
+      gameWithPeriods('LIVE', [
+        { number: 1, state: 'LIVE', startedAt: '2026-08-07T00:00:00.000Z', endedAt: null },
+        { number: 2, state: 'SCHEDULED', startedAt: null, endedAt: null },
+      ]);
+      const state = consoleState({ liveEvents });
+      mocks.useV1GameOperationsConsole.mockReturnValue(state);
+      render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+      fireEvent.click(screen.getByRole('button', { name: /^옐로카드/ }));
+      fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'select-player' }));
+      fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: '옐로카드 기록' }));
+      return state.submitEvent;
+    }
+
+    it('같은 선수의 두 번째 옐로를 기록하면 레드도 기록할지 묻고, 확인하면 레드를 한 번 더 기록한다', async () => {
+      const submitEvent = await recordYellow([yellow(1, 'p-1')]);
+
+      const sheet = await screen.findByRole('dialog');
+      expect(sheet).toHaveTextContent('정우진이 이 경기에서 옐로 2장이에요');
+      expect(sheet).toHaveTextContent('경고 누적 퇴장으로 레드카드도 기록할까요?');
+      // 옐로 자체는 시트가 뜨기 전에 이미 기록 요청이 나갔다.
+      expect(submitEvent).toHaveBeenCalledTimes(1);
+      expect(submitEvent).toHaveBeenLastCalledWith(expect.objectContaining({ type: 'CARD', participantId: 'p-1', payload: { card: 'YELLOW' } }));
+
+      fireEvent.click(within(sheet).getByRole('button', { name: '레드도 기록' }));
+
+      await waitFor(() => expect(submitEvent).toHaveBeenCalledTimes(2));
+      expect(submitEvent).toHaveBeenLastCalledWith(
+        expect.objectContaining({ type: 'CARD', participantId: 'p-1', sideId: 'side-home', payload: { card: 'RED' } }),
+      );
+    });
+
+    it('앞선 옐로가 아직 전송 중이면 확정될 때까지 기다렸다가 레드를 기록한다(같은 버전으로 둘을 적재하면 서버가 거절한다)', async () => {
+      const pendingYellowItem = {
+        clientEventId: 'q-1', gameId: 'game-1', expectedVersion: 2, status: 'sending',
+        event: { type: 'CARD', sideId: SIDE_ID, participantId: 'p-1', period: 1, clockMs: 1, occurredAt: '', payload: { card: 'YELLOW' } },
+        payloadHash: 'h', queuedAt: '', attempts: 0, lastError: null, ackedSequence: null, ackedVersion: null,
+      };
+      gameWithPeriods('LIVE', [
+        { number: 1, state: 'LIVE', startedAt: '2026-08-07T00:00:00.000Z', endedAt: null },
+        { number: 2, state: 'SCHEDULED', startedAt: null, endedAt: null },
+      ]);
+      const state = consoleState({ liveEvents: [yellow(1, 'p-1')] });
+      mocks.useV1GameOperationsConsole.mockReturnValue(state);
+      const { rerender } = render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+      fireEvent.click(screen.getByRole('button', { name: /^옐로카드/ }));
+      fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'select-player' }));
+      fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: '옐로카드 기록' }));
+      const redButton = await screen.findByRole('button', { name: '레드도 기록' });
+      // 시트가 떠 있는 동안 방금 기록한 옐로가 큐에서 전송 중이다.
+      const sending = consoleState({ liveEvents: [yellow(1, 'p-1')], queue: { items: [pendingYellowItem] }, submitEvent: state.submitEvent });
+      mocks.useV1GameOperationsConsole.mockReturnValue(sending);
+      rerender(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+      fireEvent.click(redButton);
+
+      await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 20));
+      });
+      expect(state.submitEvent).toHaveBeenCalledTimes(1);
+
+      const acked = consoleState({
+        liveEvents: [yellow(1, 'p-1'), yellow(2, 'p-1')],
+        queue: { items: [{ ...pendingYellowItem, status: 'acked' }] },
+        gameSnapshot: { version: 3, state: 'LIVE' },
+        submitEvent: state.submitEvent,
+      });
+      mocks.useV1GameOperationsConsole.mockReturnValue(acked);
+      rerender(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+
+      await waitFor(() => expect(state.submitEvent).toHaveBeenCalledTimes(2));
+      expect(state.submitEvent).toHaveBeenLastCalledWith(expect.objectContaining({ payload: { card: 'RED' } }));
+    });
+
+    it('"옐로만 둘게요"를 고르면 레드를 기록하지 않는다', async () => {
+      const submitEvent = await recordYellow([yellow(1, 'p-1')]);
+
+      fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: '옐로만 둘게요' }));
+
+      await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+      expect(submitEvent).toHaveBeenCalledTimes(1);
+    });
+
+    it('첫 옐로·다른 선수의 옐로·이미 레드가 있는 선수에게는 시트를 띄우지 않는다', async () => {
+      for (const liveEvents of [
+        [],
+        [yellow(1, 'p-2')],
+        [yellow(1, 'p-1'), yellow(2, 'p-1', { payload: { card: 'RED' } })],
+      ]) {
+        const submitEvent = await recordYellow(liveEvents);
+        await waitFor(() => expect(submitEvent).toHaveBeenCalledTimes(1));
+        await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+        cleanup();
+      }
+    });
   });
 
   // 종료 흐름 개편(사용자 결정 2) — 예전엔 마지막 피리어드가 LIVE인 동안

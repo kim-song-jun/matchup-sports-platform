@@ -56,7 +56,7 @@ Public review lookup requires `isPublic = true` and `deletedAt = null`; private,
 deleted, unknown and unsupported competitions return `404 TOURNAMENT_NOT_FOUND`
 before review rows are queried. A valid competition with no visible reviews returns
 `{ items: [], total: 0, page, pageSize }`. Defaults are `page = 1`, `pageSize = 10`,
-with page size limited to 50. Reviews are newest first. Search is case-insensitive
+with page size limited to 50 and `page` limited to 1–10,000 (`MAX_PAGE_NUMBER`; larger is 400). Reviews are newest first. Search is case-insensitive
 over team name, comment and author nickname; hidden reviews are excluded from both
 items and total. Public items contain only `id`, `authorId`, `authorNickname`,
 `authorProfileImageUrl`, `teamName`, `rating`, `comment`, `photoUrls` and `createdAt`.

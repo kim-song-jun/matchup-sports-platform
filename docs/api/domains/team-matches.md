@@ -117,7 +117,7 @@
 | PATCH | `/team-matches/:teamMatchId` | Yes(host team owner/manager) | 모집글 수정 |
 | POST | `/team-matches/:teamMatchId/close` | Yes(host team owner/manager) | 모집 마감(대기 신청 `expired`) |
 | POST | `/team-matches/:teamMatchId/reopen` | Yes(host team owner/manager) | 마감 취소(시작 전만) |
-| POST | `/team-matches/:teamMatchId/cancel` | Yes(host team owner/manager) | 취소 |
+| POST | `/team-matches/:teamMatchId/cancel` | Yes(host team owner/manager) | 취소(`{ reason? }` ≤500자, 공백만이면 없음으로 취급 — 사유가 있으면 확정 상대팀 알림 본문에 `사유: …`로 담긴다) |
 | POST | `/team-matches/:teamMatchId/applications` | Yes(신청 팀 owner/manager) | 신청(`{ applicantTeamId, message? }`) |
 | GET | `/team-matches/:teamMatchId/applications` | Yes(host team owner/manager) | 신청 목록 |
 | POST | `/team-match-applications/:applicationId/withdraw` | Yes(신청 팀 owner/manager) | 신청 철회 |

@@ -592,6 +592,28 @@ describe('TeamMatchesService', () => {
     expect(result).toMatchObject({ teamMatchId: 'tm-1', status: 'cancelled', cancelledApplications: 0 });
   });
 
+  describe('cancel: 상대팀 알림의 취소 사유', () => {
+    const cancelMatched = async (dto: { reason?: string | null }) => {
+      prisma.v1TeamMatch.findFirst.mockResolvedValue(
+        teamMatchRow({ status: 'matched', approvedApplicantTeamId: 'team-applicant' }),
+      );
+      prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'mem-1' });
+      prisma.v1TeamMatchApplication.updateMany.mockResolvedValue({ count: 0 });
+      await service.cancel(manager, 'tm-1', dto);
+      return notifications.emitToManyDeferred.mock.calls.find(([, type]) => type === 'team_match_cancelled');
+    };
+
+    it('호스트가 적은 사유를 상대팀 알림 본문에 담는다', async () => {
+      const call = await cancelMatched({ reason: '  구장 사정으로 어려워졌어요  ' });
+      expect(call?.[3]).toBe(`"${teamMatchRow().title}" 팀매치가 취소됐어요. 사유: 구장 사정으로 어려워졌어요`);
+    });
+
+    it.each([undefined, null, '', '   '])('사유가 %j 이면 알림에 사유 문구를 붙이지 않는다', async (reason) => {
+      const call = await cancelMatched({ reason });
+      expect(call?.[3]).toBe(`"${teamMatchRow().title}" 팀매치가 취소됐어요.`);
+    });
+  });
+
   it('cancel: 리그 대진(leagueId 有)은 호스트 팀이 직접 취소할 수 없다 → 409 LEAGUE_FIXTURE_HOST_CANCEL_FORBIDDEN', async () => {
     prisma.v1TeamMatch.findFirst.mockResolvedValue(
       teamMatchRow({ leagueId: 'league-1', status: 'matched', approvedApplicantTeamId: 'team-applicant' }),

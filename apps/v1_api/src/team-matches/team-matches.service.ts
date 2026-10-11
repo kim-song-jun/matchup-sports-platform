@@ -885,6 +885,8 @@ export class TeamMatchesService {
       throw stateConflict('Team match cannot be cancelled in current status');
     }
 
+    const hostReason = dto.reason?.trim() || null;
+
     const result = await this.prisma.$transaction(async (tx) => {
       // Share the Game -> TeamMatch lock order with result finalization.
       await tx.$queryRaw`SELECT id FROM v1_games WHERE team_match_id = ${teamMatch.id} FOR UPDATE`;
@@ -903,7 +905,7 @@ export class TeamMatchesService {
       });
       // 매치 ↔ 팀일정 연동(레인 schedule): teamMatchId로 연결된 SCHEDULED 스케줄(호스트/상대 최대
       // 2건)을 같은 트랜잭션 안에서 CANCELLED로 cascade한다 — row는 삭제하지 않는다.
-      await cascadeCancelTeamMatchSchedulesInTx(tx, teamMatch.id, dto.reason ?? 'host_cancelled');
+      await cascadeCancelTeamMatchSchedulesInTx(tx, teamMatch.id, hostReason ?? 'host_cancelled');
       await tx.v1Game.updateMany({ where: { teamMatchId: teamMatch.id, state: 'SCHEDULED' }, data: { state: 'CANCELLED', version: { increment: 1 } } });
       await tx.v1StatusChangeLog.create({
         data: {
@@ -913,7 +915,7 @@ export class TeamMatchesService {
           toStatus: 'cancelled',
           actorType: 'user',
           actorUserId: user.id,
-          reason: dto.reason ?? 'host_cancelled',
+          reason: hostReason ?? 'host_cancelled',
         },
       });
       return { applications, opponentTeamId: current.approvedApplicantTeamId };
@@ -932,7 +934,7 @@ export class TeamMatchesService {
           ).map((m) => m.userId),
         'team_match_cancelled',
         teamMatch.id,
-        `"${teamMatch.title}" 팀매치가 취소됐어요.`,
+        `"${teamMatch.title}" 팀매치가 취소됐어요.${hostReason ? ` 사유: ${hostReason}` : ''}`,
       );
     }
 

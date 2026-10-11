@@ -121,3 +121,68 @@ describe('개인 매치 목록 totalCount·facets HTTP/DB 계약', () => {
     await request(app.getHttpServer()).get('/api/v1/matches').query({ today: 'yes' }).expect(400);
   });
 });
+
+describe('개인 매치 모집 중 건수 — 정원 찬 글 제외(raw SQL 계약)', () => {
+  let app: INestApplication;
+  let cleanup: (() => Promise<void>) | undefined;
+  let db: PrismaService;
+  let sportId: string;
+  let regionId: string;
+  const hostId = randomUUID();
+  const userIds = Array.from({ length: 4 }, () => randomUUID());
+  let fullId: string;
+  let freeSlotId: string;
+  let cancelledSeatId: string;
+
+  const list = async (params: Record<string, string | number | boolean> = {}) => {
+    const response = await request(app.getHttpServer()).get('/api/v1/matches').query({ regionId, limit: 50, includeFacets: true, ...params }).expect(200);
+    return response.body.data as { items: Array<{ matchId: string }>; pageInfo: { totalCount?: number }; facets?: { recruiting: number } };
+  };
+  const ids = (body: { items: Array<{ matchId: string }> }) => body.items.map((item) => item.matchId);
+
+  beforeAll(async () => {
+    ({ app, cleanup } = await createV1IntegrationApp());
+    db = app.get(PrismaService);
+    for (const id of [hostId, ...userIds]) {
+      await db.v1User.create({ data: { id, email: `${id}@integration.test`, accountStatus: 'active', onboardingStatus: 'completed' } });
+    }
+    sportId = (await db.v1Sport.create({ data: { code: `full-${hostId}`, name: '풋살' } })).id;
+    regionId = (await db.v1Region.create({ data: { code: `full-${hostId}`, name: '정원 지역', level: 2 } })).id;
+    const startAt = new Date(Date.now() + 3 * DAY);
+    const make = async (title: string, seats: Array<{ userId: string; status: 'active' | 'completed' | 'cancelled' | 'removed' }>) => {
+      const match = await db.v1Match.create({ data: { hostUserId: hostId, sportId, regionId, title, placeName: '서울 운동장', maxParticipants: 2, startAt } });
+      await db.v1MatchParticipant.createMany({ data: seats.map((seat) => ({ matchId: match.id, ...seat })) });
+      return match.id;
+    };
+    // 같은 종목·같은 시각, 정원 2명. active + completed 두 명이면 가득 찬 글이다.
+    fullId = await make('정원 찬 글', [{ userId: userIds[0], status: 'active' }, { userId: userIds[1], status: 'completed' }]);
+    freeSlotId = await make('한 자리 남은 글', [{ userId: userIds[0], status: 'active' }]);
+    // 취소·제외된 참가자는 자리를 차지하지 않는다.
+    cancelledSeatId = await make('취소 좌석 글', [{ userId: userIds[0], status: 'active' }, { userId: userIds[1], status: 'cancelled' }, { userId: userIds[2], status: 'removed' }]);
+  });
+
+  afterAll(async () => {
+    await db.v1Match.deleteMany({ where: { hostUserId: hostId } });
+    await db.v1User.deleteMany({ where: { id: { in: [hostId, ...userIds] } } });
+    await db.v1Region.delete({ where: { id: regionId } });
+    await db.v1Sport.delete({ where: { id: sportId } });
+    await cleanup?.();
+  });
+
+  it('필터 없는 목록과 전체 건수에는 정원 찬 글도 그대로 있고, 모집 중 칩만 뺀다', async () => {
+    const body = await list();
+
+    expect(ids(body)).toEqual(expect.arrayContaining([fullId, freeSlotId, cancelledSeatId]));
+    expect(body.pageInfo.totalCount).toBe(3);
+    expect(body.facets?.recruiting).toBe(2);
+  });
+
+  it('recruitingOnly 는 정원 찬 글을 빼고 한 자리 남은 글·취소 좌석 글은 남긴다', async () => {
+    const body = await list({ recruitingOnly: true });
+
+    expect(ids(body)).not.toContain(fullId);
+    expect(ids(body).sort()).toEqual([freeSlotId, cancelledSeatId].sort());
+    expect(body.pageInfo.totalCount).toBe(2);
+    expect(body.facets?.recruiting).toBe(2);
+  });
+});

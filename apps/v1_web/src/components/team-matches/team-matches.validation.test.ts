@@ -291,3 +291,34 @@ describe('KST 기준 검증 — 브라우저 시간대(TZ=UTC 러너)와 무관'
     expect(build(base).payload).toMatchObject({ endsAt: null, deadlineAt: null });
   });
 });
+
+describe('상대팀 부담금은 총비용을 넘을 수 없다', () => {
+  const withCosts = (cost: number, opponentCost: number) => baseCtx({ draft: { ...baseCtx().draft, cost, opponentCost } });
+
+  it('총비용 50,000원에 상대팀 부담금 80,000원이면 조건 스텝 필드 오류로 막고 payload 를 만들지 않는다', () => {
+    const ctx = withCosts(50000, 80000);
+    expect(getTeamMatchMissingFields(ctx)).toEqual([
+      { field: 'opponentCost', label: '상대팀 부담금은 총비용보다 클 수 없어요', step: 'condition' },
+    ]);
+    expect(getTeamMatchStepErrors(ctx, 'condition').opponentCost).toBe('상대팀 부담금은 총비용보다 클 수 없어요');
+    expect(getTeamMatchStepErrors(ctx, 'place-time').opponentCost).toBeUndefined();
+    const result = buildTeamMatchPayloadResult(ctx.draft, ctx.hostTeamId, ctx.sportId, ctx.regionId);
+    expect(result.payload).toBeUndefined();
+    expect(result.missingFields?.map((item) => item.field)).toEqual(['opponentCost']);
+  });
+
+  it('총비용 0원에 상대팀 부담금이 있어도 막는다', () => {
+    expect(getTeamMatchMissingFields(withCosts(0, 10000)).map((item) => item.field)).toEqual(['opponentCost']);
+  });
+
+  it.each([[50000, 50000], [50000, 25000], [50000, 0], [0, 0]])('총비용 %i원·상대팀 부담금 %i원은 그대로 통과한다', (cost, opponentCost) => {
+    const ctx = withCosts(cost, opponentCost);
+    expect(getTeamMatchMissingFields(ctx)).toEqual([]);
+    expect(buildTeamMatchPayloadResult(ctx.draft, ctx.hostTeamId, ctx.sportId, ctx.regionId).payload).toBeDefined();
+  });
+
+  it('조건 스텝이 미완료로 표시된다', () => {
+    expect(getCompleteTeamMatchSteps(withCosts(50000, 80000), ['condition', 'place-time'])).toEqual(['place-time']);
+    expect(getCompleteTeamMatchSteps(withCosts(50000, 30000), ['condition', 'place-time'])).toEqual(['condition', 'place-time']);
+  });
+});

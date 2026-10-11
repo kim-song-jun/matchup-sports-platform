@@ -80,6 +80,7 @@ export default function AdminTeamMatchNewPage() {
   const dateErrors = teamMatchDateErrors({ startsAt, endsAt, deadlineAt });
   const levelRange = parseTeamMatchLevelRange(grade);
   const datesValid = startsAt !== '' && Object.keys(dateErrors).length === 0;
+  const costExceeded = (Number(opponentCost) || 0) > (Number(totalCost) || 0);
   const canSubmit =
     canWrite &&
     sportId !== '' &&
@@ -88,6 +89,7 @@ export default function AdminTeamMatchNewPage() {
     place !== null &&
     startsAt !== '' &&
     datesValid &&
+    !costExceeded &&
     !uploadingImage && levelRange !== null;
 
   const uploadImage = async (file: File) => {
@@ -227,6 +229,7 @@ export default function AdminTeamMatchNewPage() {
               </label>
             </div>
             <p className="text-[length:var(--font-size-caption)] text-[var(--text-muted)]">상대팀 부담금이 0원이면 무료 초청으로 안내돼요.</p>
+            {costExceeded && <p role="alert" className="text-[length:var(--font-size-body-sm)] text-red-500">상대팀 부담금은 총비용보다 클 수 없어요.</p>}
           </section>
 
           <section className="space-y-4 rounded-2xl border border-[var(--border)] bg-[var(--card-surface)] p-4 md:p-5">

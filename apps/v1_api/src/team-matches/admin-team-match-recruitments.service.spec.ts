@@ -165,6 +165,14 @@ describe('AdminTeamMatchRecruitmentsService', () => {
     service = new AdminTeamMatchRecruitmentsService(prisma, adminContext, games, notifications);
   });
 
+  it('rejects an opponent share above the total cost before writing', async () => {
+    await expect(service.create(adminUser, { ...createDto, costNote: '총 50,000원 · 상대팀 80,000원' })).rejects.toMatchObject({
+      status: 400,
+      response: { code: 'VALIDATION_FAILED', details: { field: 'costNote' } },
+    });
+    expect(prisma.v1TeamMatch.create).not.toHaveBeenCalled();
+  });
+
   it('opens a platform recruitment without assigning either team or creating a game', async () => {
     await expect(service.create(adminUser, createDto)).resolves.toEqual({
       teamMatchId: 'team-match-1',

@@ -2,6 +2,7 @@ import { excludeUnfilledSlotFixturesWhere } from '../common/competition/unfilled
 import { genderRuleColumnFilter, normalizeGenderRule } from '../common/gender-rule';
 import { teamMatchChatEntitlementWhere } from '../chat/chat-entitlement';
 import { canConfirmTeamMatch, validateTeamMatchDates } from './team-match-dates';
+import { assertOpponentCostWithinTotal } from './team-match-cost';
 import {
   BadRequestException,
   ConflictException,
@@ -639,6 +640,7 @@ export class TeamMatchesService {
     const place = this.resolvePlace(dto);
     await this.validateMasterRefs(dto.sportId, dto.regionId);
     const dates = validateTeamMatchDates(dto);
+    assertOpponentCostWithinTotal(dto.costNote);
     const payloadHash = canonicalGameCommandPayloadHash({
       actorUserId: user.id,
       dto,
@@ -802,6 +804,7 @@ export class TeamMatchesService {
     await this.validateMasterRefs(dto.sportId, dto.regionId);
     const levelRange = await resolveSportLevelRange(this.prisma, dto.sportId, dto.minLevelCode, dto.maxLevelCode);
     const dates = validateTeamMatchDates(dto, teamMatch.deadlineAt);
+    assertOpponentCostWithinTotal(dto.costNote);
 
     // 매치 ↔ 팀일정 연동(레인 schedule): 매치 제목/시간이 바뀌면 호스트 스케줄도 같은 트랜잭션 안에서
     // 동기화해야 캘린더가 실제와 어긋나지 않는다 — 이 메서드를 트랜잭션으로 승격한다(다른 4개

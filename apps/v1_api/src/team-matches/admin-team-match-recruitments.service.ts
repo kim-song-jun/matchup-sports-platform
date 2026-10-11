@@ -1,5 +1,6 @@
 import { ensurePlatformTeamMatchChat } from '../chat/platform-team-match-chat';
 import { canConfirmTeamMatch, validateTeamMatchDates } from './team-match-dates';
+import { assertOpponentCostWithinTotal } from './team-match-cost';
 import {
   BadRequestException,
   ConflictException,
@@ -64,6 +65,7 @@ export class AdminTeamMatchRecruitmentsService {
   async create(user: V1AuthUser, dto: CreateAdminTeamMatchRecruitmentDto) {
     const admin = await this.adminContext.getMutationAdmin(user.id);
     const dates = validateTeamMatchDates(dto);
+    assertOpponentCostWithinTotal(dto.costNote);
     if (!dto.title.trim() || !dto.manualPlaceName.trim()) {
       throw new BadRequestException({ code: 'VALIDATION_FAILED', message: '매치 제목과 경기 장소를 입력해 주세요.' });
     }
@@ -622,6 +624,7 @@ export class AdminTeamMatchRecruitmentsService {
       throw new ConflictException({ code: 'TEAM_MATCH_SPORT_IMMUTABLE', message: '모집을 만든 뒤에는 종목을 변경할 수 없어요.' });
     }
     const dates = validateTeamMatchDates(dto, existing.deadlineAt);
+    assertOpponentCostWithinTotal(dto.costNote);
     const [region, levelRange] = await Promise.all([
       this.prisma.v1Region.findFirst({ where: { id: dto.regionId, isActive: true, level: 2 }, select: { id: true } }),
       resolveSportLevelRange(this.prisma, dto.sportId, dto.minLevelCode, dto.maxLevelCode),

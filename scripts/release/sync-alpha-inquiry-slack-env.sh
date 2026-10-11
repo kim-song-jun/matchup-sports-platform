@@ -33,7 +33,6 @@ trap 'rm -f "\${tmp}"' EXIT
 grep -v '^SLACK_INQUIRY_WEBHOOK_URL=' "\${env_file}" > "\${tmp}" || true
 printf 'SLACK_INQUIRY_WEBHOOK_URL=%s\n' "\${value}" >> "\${tmp}"
 cat "\${tmp}" > "\${env_file}"
-trap - EXIT
 REMOTE
 )
 

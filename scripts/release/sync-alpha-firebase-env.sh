@@ -47,7 +47,6 @@ done
 cat "\${tmp}" > "\${env_file}"
 chmod 600 "\${env_file}"
 chown ec2-user:ec2-user "\${env_file}"
-trap - EXIT
 
 set -a
 # shellcheck disable=SC1090 -- validate the protected file without printing values.

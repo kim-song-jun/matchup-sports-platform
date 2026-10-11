@@ -64,6 +64,7 @@ if (runtimePolicies !== undefined) validateRuntimePolicies(runtimePolicies, erro
 validateSyncScriptParameterParity(errors);
 validateRuntimeSecretTransport(sources.get(runtimeSyncPath), errors);
 validateKakaoSyncBehaviour(errors);
+validateSyncScriptsRemoveEnvCopies(errors);
 
 requirePatterns(workflowPath, [
   [/amazon-ecr-login/, 'must authenticate to ECR'],
@@ -310,6 +311,18 @@ function validateKakaoSyncBehaviour(targetErrors) {
     }
   } finally {
     rmSync(stubDir, { recursive: true, force: true });
+  }
+}
+
+// The remote half copies the protected .env (every runtime secret) to a temp file; clearing the EXIT trap
+// on success skips its removal, so each deploy would leave another copy on the alpha host.
+function validateSyncScriptsRemoveEnvCopies(targetErrors) {
+  for (const file of readdirSync(resolve(sourceRoot, 'scripts/release'))) {
+    if (!/^sync-alpha-.+-env\.sh$/.test(file)) continue;
+    const source = readFileSync(resolve(sourceRoot, 'scripts/release', file), 'utf8');
+    if (/^trap - EXIT$/m.test(source)) {
+      targetErrors.push(`scripts/release/${file}: must not clear the EXIT trap; it removes the temp copy of deploy/.env`);
+    }
   }
 }
 

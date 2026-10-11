@@ -191,7 +191,7 @@ describe('채팅 재동기화와 안전 이벤트', () => {
     vi.restoreAllMocks();
   });
 
-  it('재연결이 몰려도 방 목록과 열린 방 메시지를 한 번만 다시 받는다(상세는 그대로)', async () => {
+  it('재연결이 몰려도 방 목록과 열린 방 상세·메시지를 한 번만 다시 받는다', async () => {
     const { useV1ChatRoomSocket } = await import('./use-v1-realtime-socket');
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     const reads: Record<string, number> = {};
@@ -209,7 +209,7 @@ describe('채팅 재동기화와 안전 이벤트', () => {
     listeners.connect(undefined);
     listeners.connect(undefined);
     await vi.advanceTimersByTimeAsync(2000);
-    expect(reads).toEqual({ list: 2, detail: 1, messages: 2 });
+    expect(reads).toEqual({ list: 2, detail: 2, messages: 2 });
 
     unmount();
     stops.forEach((stop) => stop());

@@ -64,6 +64,10 @@ function isChatMessagesQuery(query: Query): boolean {
   return query.queryKey.length > root.length + 1 && query.queryKey[root.length + 1] === 'messages';
 }
 
+function isChatRoomQuery(query: Query): boolean {
+  return query.queryKey.length === v1Keys.chatRooms().length + 1;
+}
+
 // Block changes must not leave the other side's messages readable, even while the refetch is slow or fails:
 // message caches are reset (an open room falls back to its skeleton), the rest is dropped when unmounted
 // and refetched in place otherwise.
@@ -100,14 +104,14 @@ function retainChatSync(queryClient: QueryClient, socket: Socket): () => void {
         includeLists = false;
         void queryClient.invalidateQueries({
           queryKey: v1Keys.chatRooms(),
-          predicate: (query) => isChatMessagesQuery(query) || (withLists && isChatListQuery(query)),
+          predicate: (query) => isChatMessagesQuery(query) || (withLists && (isChatListQuery(query) || isChatRoomQuery(query))),
         });
       }, RESYNC_DEBOUNCE_MS);
     };
     // Messages emitted while the socket was down are never replayed, so every connect resyncs — including a
     // first connect that arrives after the REST reads (a socket already connected here emits no first connect).
     const onConnect = () => scheduleResync(true);
-    // Lists refetch themselves on window focus (refetchOnWindowFocus: 'always'); only messages need this.
+    // Lists and room details refetch on window focus; only messages need this visibility listener.
     const onVisibility = () => {
       if (document.visibilityState === 'visible') scheduleResync(false);
     };

@@ -42,6 +42,10 @@ ordinary participant. A host with no confirmed participant receives `409
 MATCH_CHAT_PARTICIPANTS_REQUIRED`; no empty room is created. Once an ordinary participant is
 confirmed, the host retains room/list/notification entitlement even when `hostParticipates=false`
 and therefore has no host participant row.
+The owner keeps read/list/recipient entitlement for an existing room after the last guest leaves;
+the composer becomes `PARTICIPANTS_NOT_CONFIRMED`. Ownership does not bypass the resolve-time
+creation gate. A guest cancelled together with a cancelled match keeps history from the original
+approval time, including lazy repair of a null `visibleFromAt`; withdrawn/removed guests remain excluded.
 
 Personal-match rooms follow one read rule: a room that `GET /chat/rooms` lists always opens through
 `GET /chat/rooms/:roomId` and `.../messages` (the list and the read paths share

@@ -487,7 +487,7 @@ export function MatchDetailPageView({ model, lifecyclePanel }: { model: MatchDet
               {mode === 'mine' ? (
                 <>
                   <Link className={`tm-btn tm-btn-lg ${model.canComplete ? 'tm-btn-primary' : 'tm-btn-neutral'}`} href={match.applicationsHref ?? `/matches/${match.id}/applications`}>{model.canComplete ? '참여 여부 확인' : '신청자 관리'}</Link>
-                  {!model.completed && !model.canComplete && match.editHref ? <Link className="tm-btn tm-btn-lg tm-btn-primary" href={match.editHref ?? `/matches/${match.id}/edit`}>매치 수정</Link> : null}
+                  {!model.completed && !model.canComplete && match.editHref ? <Link className="tm-btn tm-btn-lg tm-btn-primary" href={match.editHref}>매치 수정</Link> : null}
                 </>
               ) : (
                 <Button
@@ -561,8 +561,8 @@ export function MatchDetailPageView({ model, lifecyclePanel }: { model: MatchDet
         {isDeadlinePassedClosed ? null : (
           <div className="tm-match-detail-fixed-cta-state">
             <span className="tm-text-caption">{mode === 'mine' ? '내가 만든 매치' : '신청 상태'}</span>
-            {mode === 'mine' && !model.completed && !model.canComplete ? (
-              <Link className="tm-match-detail-edit-link tm-text-label" href={match.editHref ?? `/matches/${match.id}/edit`}>매치 수정</Link>
+            {mode === 'mine' && !model.completed && !model.canComplete && match.editHref ? (
+              <Link className="tm-match-detail-edit-link tm-text-label" href={match.editHref}>매치 수정</Link>
             ) : (
               <span className="tm-text-label">{model.statusLabel ?? (model.completed ? '참여 완료' : match.actionLabel)}</span>
             )}

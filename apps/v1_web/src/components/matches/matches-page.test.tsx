@@ -950,6 +950,18 @@ describe('개인 매치 참여 기능', () => {
     }
   });
 
+  it('서버가 수정을 막은 진행 중 매치는 모바일·데스크톱 어디에도 매치 수정 입구를 내지 않는다', () => {
+    const model = getMatchDetailViewModel('mine');
+    model.match.id = 'match-live';
+    model.match.lifecycleStatus = 'in_progress';
+    model.match.editHref = undefined;
+    const { container } = render(<MatchDetailPageView model={model} />);
+    expect(screen.queryByRole('link', { name: '매치 수정' })).not.toBeInTheDocument();
+    expect(container.querySelector('.tm-match-detail-edit-link')).toBeNull();
+    expect(container.querySelector('a[href$="/edit"]')).toBeNull();
+    expect(screen.getAllByRole('link', { name: '신청자 관리' }).length).toBeGreaterThan(0);
+  });
+
   it('종료 확인이 가능한 호스트에게 더 이상 저장할 수 없는 수정 CTA를 보여주지 않는다', () => {
     const model = { ...getMatchDetailViewModel('mine'), canComplete: true };
     model.match.lifecycleStatus = 'completion_pending';

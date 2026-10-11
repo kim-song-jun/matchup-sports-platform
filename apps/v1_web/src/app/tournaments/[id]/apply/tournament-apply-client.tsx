@@ -8,6 +8,7 @@ import { buildPhoneVerifyHref } from '@/components/auth/phone-verification/phone
 import { useModalA11y } from '@/components/v1-ui/use-modal-a11y';
 import { useShellOverride } from '@/components/v1-ui/shell-override';
 import { AlertBanner, Card, EmptyState, ErrorState, InfoRow, SectionTitle } from '@/components/v1-ui/primitives';
+import { FormattedText } from '@/components/v1-ui/formatted-text';
 import { TeamAvatar } from '@/components/v1-ui/team-avatar';
 import { getTournamentRosterNextStep } from '@/components/tournaments/tournament-roster-next-step';
 import { SponsorLogoStrip } from '@/components/tournaments/tournament-sponsor-logo-strip';
@@ -981,7 +982,7 @@ function AgreementsStep({
           <ExpandableCheckRow
             id="agree-all"
             label="전체 동의"
-            summary={`${competitionNoun} 신청에 필요한 필수 동의와 선택 동의 항목을 모두 확인하고 동의합니다.\n선택 동의는 동의하지 않아도 ${competitionNoun} 신청이 가능합니다.`}
+            summary={`${competitionNoun} 신청에 필요한 필수 동의와 선택 동의 항목을 모두 확인하고 동의해요.\n선택 동의는 동의하지 않아도 ${competitionNoun} 신청이 가능해요.`}
             checked={allAgreed}
             onChange={toggleAllAgreements}
           />
@@ -1089,9 +1090,9 @@ function AgreementsStep({
             className="tm-text-micro"
             style={{ color: 'var(--text-muted)', marginTop: 4, lineHeight: 1.6 }}
           >
-            입금 확인에 사용됩니다. 실제 입금자명과 동일하게 입력해 주세요.
+            입금 확인에 사용돼요. 실제 입금자명과 동일하게 입력해 주세요.
             <br />
-            입금자명이 신청 정보와 다를 경우 참가 확정이 지연되거나 신청이 취소될 수 있습니다.
+            입금자명이 신청 정보와 다를 경우 참가 확정이 지연되거나 신청이 취소될 수 있어요.
           </p>
         </Card>
       </section>
@@ -1241,10 +1242,12 @@ function TournamentConsentDialog({
 
 function TournamentSubmitConfirmDialog({
   isSubmitting,
+  refundPolicyText,
   onCancel,
   onConfirm,
 }: {
   isSubmitting: boolean;
+  refundPolicyText: string | null;
   onCancel: () => void;
   onConfirm: () => void;
 }) {
@@ -1255,6 +1258,8 @@ function TournamentSubmitConfirmDialog({
     onClose: onCancel,
     pending: isSubmitting,
   });
+
+  const customRefundPolicy = refundPolicyText?.trim() || null;
 
   return (
     <div
@@ -1292,7 +1297,30 @@ function TournamentSubmitConfirmDialog({
           className="tm-text-caption"
           style={{ color: 'var(--text-muted)', lineHeight: 1.7, marginTop: 12 }}
         >
-          참가비 입금 후 단순 변심 또는 팀 사정으로 인한 신청 취소는 불가합니다.
+          {customRefundPolicy ? (
+            <>
+              <p style={{ margin: 0 }}>취소와 환불은 이 대회의 환불 정책을 따라요.</p>
+              <div
+                tabIndex={0}
+                className="tm-on-tint"
+                role="region"
+                aria-label="환불 정책"
+                style={{
+                  marginTop: 8,
+                  padding: 12,
+                  maxHeight: 160,
+                  overflowY: 'auto',
+                  borderRadius: 'var(--radius-field)',
+                  background: 'var(--grey50)',
+                  color: 'var(--text-body)',
+                }}
+              >
+                <FormattedText text={customRefundPolicy} />
+              </div>
+            </>
+          ) : (
+            '참가비 입금 후 단순 변심 또는 팀 사정으로 인한 신청 취소는 원칙적으로 불가해요.'
+          )}
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.6fr', gap: 8, marginTop: 20 }}>
           <button
@@ -2101,6 +2129,7 @@ export function TournamentApplyPageClient({ tournamentId }: { tournamentId: stri
         {submitConfirmOpen ? (
           <TournamentSubmitConfirmDialog
             isSubmitting={isSubmittingApplication}
+            refundPolicyText={tournament.refundPolicyText}
             onCancel={() => setSubmitConfirmOpen(false)}
             onConfirm={confirmAgreementsSubmit}
           />

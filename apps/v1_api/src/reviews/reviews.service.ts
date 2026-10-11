@@ -37,6 +37,7 @@ import { HidePostEventReviewDto } from './dto/moderate-review.dto';
 import { recalculateTournamentUserReputation } from './tournament-fixture-review-reputation';
 import { recalculateTournamentFixtureTeamTrust } from './tournament-fixture-review-trust';
 import { platformMatchOperator } from '../team-matches/platform-match-operator';
+import { isForfeitedGame, NOT_FORFEITED_GAME_WHERE } from '../league-matches/league-forfeit-result';
 
 const REVIEW_TAGS = {
   punctual: '시간 약속을 잘 지켜요',
@@ -605,6 +606,8 @@ export class ReviewsService {
           // Tournament-owned canonical matches are served by the dedicated
           // tournament review service. Equal-owner league rows remain here.
           { OR: [{ tournamentId: null }, { leagueId: { not: null } }] },
+          // 몰수 경기는 불참한 쪽이 뛰지 않았으므로 평가할 상대가 없다. take 전에 걸러야 최신 몰수가 limit 을 채우지 않는다.
+          { game: NOT_FORFEITED_GAME_WHERE },
         ],
       },
       orderBy: [{ completedAt: 'desc' }, { startAt: 'desc' }],
@@ -616,6 +619,7 @@ export class ReviewsService {
         approvedApplicantTeamId: true,
         completedAt: true,
         startAt: true,
+        leagueId: true,
         hostTeam: { select: { id: true, name: true } },
         approvedApplicantTeam: { select: { id: true, name: true } },
       },
@@ -655,6 +659,7 @@ export class ReviewsService {
           return [{
             sourceType: 'team_match' as const,
             sourceId: match.id,
+            isLeague: match.leagueId !== null,
             title: match.title,
             completedAt: toIso(completedAt),
             // 목록 배지가 작성 화면과 어긋나지 않도록 실제 대표 대상 종류를 따른다.
@@ -778,7 +783,7 @@ export class ReviewsService {
         approvedApplicantTeam: { select: teamSelect() },
         // 무효(VOID) 판정에 필요한 최소 필드. 결과 무효화는 V1TeamMatch 를 건드리지 않고
         // 게임의 공식 리비전만 VOID 로 바꾼다(tournament-result-review.service.ts voidResultRevision).
-        game: { select: { currentOfficialRevision: { select: { state: true } } } },
+        game: { select: { currentOfficialRevision: { select: { state: true, reason: true, outcomeReason: true } } } },
       },
     });
     if (!teamMatch) throw notFound('SOURCE_NOT_FOUND', 'Review source was not found');
@@ -789,6 +794,9 @@ export class ReviewsService {
     if (!isCompleted(teamMatch)) throw conflict('SOURCE_NOT_COMPLETED', 'Review source is not completed');
     if (isResultVoided(teamMatch.game)) {
       throw conflict('SOURCE_RESULT_VOIDED', '결과가 무효 처리된 경기예요. 평가를 남길 수 없어요.');
+    }
+    if (isForfeitedGame(teamMatch.game)) {
+      throw conflict('SOURCE_FORFEITED', '몰수로 끝난 경기예요. 평가를 남길 수 없어요.');
     }
     // team_match 앵커는 completedAt(games.service.ts 결과 확정 시 채워짐, 스펙 §6.1) — 정정 승인 시
     // 앵커가 갱신되면 이 판정도 매 요청마다 다시 계산되므로 마감이 함께 연장된다(D-6, 저장 안 함).
@@ -841,7 +849,7 @@ export class ReviewsService {
     );
 
     const payload = {
-      source: sourceSummary('team_match', teamMatch.id, teamMatch.title, reviewAt),
+      source: sourceSummary('team_match', teamMatch.id, teamMatch.title, reviewAt, teamMatch.leagueId !== null),
       sportId: teamMatch.sportId,
       // 겸직이면 단일 값으로 좁힐 수 없으므로 null — 소비자는 target.reviewerTeam 을 봐야 한다.
       reviewerTeam: reviewerTeams.length === 1 ? reviewerTeams[0] : null,
@@ -1183,7 +1191,7 @@ export class ReviewsService {
       teamMatchIds.length
         ? this.prisma.v1TeamMatch.findMany({
             where: { id: { in: teamMatchIds } },
-            select: { id: true, title: true, completedAt: true, startAt: true },
+            select: { id: true, title: true, completedAt: true, startAt: true, leagueId: true },
           })
         : [],
       // 빈 배열까지 위임하면 호출부가 대회 픽스처를 하나도 안 보는 경우에도 왕복이 생긴다.
@@ -1194,7 +1202,7 @@ export class ReviewsService {
 
     return new Map([
       ...matches.map((match) => [`match:${match.id}`, sourceSummary('match', match.id, match.title, match.completedAt ?? match.startAt)] as const),
-      ...teamMatches.map((match) => [`team_match:${match.id}`, sourceSummary('team_match', match.id, match.title, match.completedAt ?? match.startAt)] as const),
+      ...teamMatches.map((match) => [`team_match:${match.id}`, sourceSummary('team_match', match.id, match.title, match.completedAt ?? match.startAt, match.leagueId !== null)] as const),
       ...teamMatches.map((match) => [`platform_team_match:${match.id}`, sourceSummary('platform_team_match', match.id, match.title, match.completedAt ?? match.startAt)] as const),
       ...tournamentFixtures,
     ]);
@@ -1501,6 +1509,7 @@ export class ReviewsService {
     return {
       sourceType: review.sourceType,
       sourceId: review.sourceId,
+      isLeague: source?.isLeague,
       title: source?.title ?? `${targetName}에게 보낸 리뷰`,
       completedAt: source?.completedAt ?? toIso(review.submittedAt),
       targetType: review.targetType,
@@ -1562,8 +1571,12 @@ function teamSelect() {
   return { id: true, name: true, profile: { select: { logoUrl: true } } };
 }
 
-function sourceSummary(sourceType: SourceType, sourceId: string, title: string, completedAt: Date | null) {
-  return { sourceType, sourceId, title, completedAt: completedAt ? toIso(completedAt) : null };
+/** `isLeague` 는 팀 매치 요약에만 싣는다 — 목록이 "리그 경기"로 표기하는 근거. */
+function sourceSummary(sourceType: SourceType, sourceId: string, title: string, completedAt: Date | null, isLeague?: boolean) {
+  return {
+    sourceType, sourceId, title, completedAt: completedAt ? toIso(completedAt) : null,
+    ...(isLeague === undefined ? {} : { isLeague }),
+  };
 }
 
 /**

@@ -122,3 +122,23 @@ describe('describeResultReviewError — RESULT_ALREADY_OFFICIAL (contract 신설
     expect(message).toContain('정정');
   });
 });
+
+describe('describeResultReviewError — RESULT_GOAL_TIMELINE_INVALID', () => {
+  it('서버가 같은 코드로 보내는 영문 문구 5종이 모두 같은 한국어 안내로 바뀐다', () => {
+    const serverMessages = [
+      'Goal timeline totals must match the submitted score',
+      'Participant goal totals must match the official goal timeline',
+      'Goal participant must belong to the credited side',
+      'Own-goal participant must belong to the opposing side',
+      'Goal timeline ids must be unique and use a game side',
+    ];
+    const shown = new Set(
+      serverMessages.map((message) => describeResultReviewError(apiError('RESULT_GOAL_TIMELINE_INVALID', message))),
+    );
+
+    expect(shown.size).toBe(1);
+    const [message] = [...shown];
+    expect(message).not.toMatch(/[A-Za-z]{3,}/);
+    expect(message).toMatch(/득점 기록/);
+  });
+});

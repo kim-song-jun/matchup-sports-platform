@@ -384,6 +384,50 @@ describe('TournamentFixtureReviewsService', () => {
     });
   });
 
+  describe('몰수 경기', () => {
+    const withRevision = (id: string, n: number, revision: Record<string, unknown>) => {
+      const base = fixture({ id, fixtureNumber: n });
+      return { ...base, game: { ...base.game, currentOfficialRevision: { ...base.game.currentOfficialRevision, ...revision } } };
+    };
+    const forfeitRevisions = [
+      ['outcomeReason=FORFEIT', { outcomeReason: 'FORFEIT', reason: null }],
+      ['옛 몰수 마커 사유', { outcomeReason: 'NORMAL', reason: '[LEAGUE_FORFEIT] 상대 불참' }],
+    ] as const;
+
+    it.each(forfeitRevisions)('pending: 몰수 확정 경기(%s)는 빠지고 정상·중단 경기는 남는다', async (_label, revision) => {
+      const prisma = {
+        v1TeamMembership: { findMany: jest.fn().mockResolvedValue([{ teamId: reviewerTeamId, role: 'owner' }]) },
+        v1TeamMatch: {
+          findMany: jest.fn().mockResolvedValue([
+            withRevision(fixtureId, 1, revision),
+            withRevision(secondFixtureId, 2, { outcomeReason: 'ABANDONED', reason: null }),
+          ]),
+        },
+        v1TournamentPlayer: playerStore([]),
+        v1PostEventReview: { findMany: jest.fn().mockResolvedValue([]) },
+        ...appearanceStore(),
+      };
+      const service = new TournamentFixtureReviewsService(prisma as never, reviewPolicyStub());
+
+      const pending = await service.pending(user, 20);
+
+      expect(pending.map((item) => item.sourceId)).toEqual([secondFixtureId]);
+    });
+
+    it.each(forfeitRevisions)('source·submit: 몰수 확정 경기(%s)는 SOURCE_FORFEITED 로 막는다', async (_label, revision) => {
+      const prisma = {
+        v1TeamMatch: { findUnique: jest.fn().mockResolvedValue(withRevision(fixtureId, 1, revision)) },
+        v1TeamMembership: { findMany: jest.fn() },
+      };
+      const service = new TournamentFixtureReviewsService(prisma as never, reviewPolicyStub());
+
+      await expect(service.source(user, fixtureId)).rejects.toMatchObject({ response: { code: 'SOURCE_FORFEITED' } });
+      await expect(
+        service.submit(user, { sourceId: fixtureId, targetType: 'team', targetTeamId, rating: 4 }, ['manner']),
+      ).rejects.toMatchObject({ response: { code: 'SOURCE_FORFEITED' } });
+    });
+  });
+
   // 역할별 계약: owner/manager는 상대팀+상대 선수, member는 상대 선수만 평가한다.
   // 2026-08-18 정책 변경 후: 일반 멤버도 상대 팀 후기를 낼 수 있다. 이 테스트가 잡는 회귀는
   // "역할 필터가 되살아나 NOT_TEAM_MEMBER 로 떨어지는 것"이다.

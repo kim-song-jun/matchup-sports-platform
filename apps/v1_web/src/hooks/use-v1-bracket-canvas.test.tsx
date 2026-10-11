@@ -226,12 +226,14 @@ describe('useV1AddBracketFixture', () => {
     expect(next).not.toBe(first);
   });
 
-  it('실패 뒤 보내는 내용(조·라운드)이 바뀌면 새 키를 쓴다', async () => {
-    postMock.mockRejectedValueOnce(apiError(0)).mockResolvedValue({ id: 'new' });
+  it('처리 여부를 모르는 실패 뒤 다른 내용을 시도해도, 돌아오면 원래 내용은 같은 키로 재전송한다', async () => {
+    postMock.mockRejectedValueOnce(apiError(0)).mockRejectedValueOnce(apiError(0)).mockResolvedValue({ id: 'new' });
     await add('t1', { groupId: 'g1', round: 'league_r2' });
     await add('t1', { groupId: 'g1', round: 'league_r3' });
-    const [first, changed] = sentKeys();
-    expect(changed).not.toBe(first);
+    await add('t1', { groupId: 'g1', round: 'league_r2' });
+    const [first, other, retry] = sentKeys();
+    expect(other).not.toBe(first);
+    expect(retry).toBe(first);
   });
 
   it('다른 대회는 키를 공유하지 않는다', async () => {
@@ -245,27 +247,30 @@ describe('useV1AddBracketFixture', () => {
     expect(t1Retry).toBe(t1First);
   });
 
-  it('늦게 끝난 옛 요청의 실패는 그 사이 새로 만든 키를 지우지 않는다', async () => {
+  it('늦게 끝난 옛 요청의 거절은 그 사이 같은 내용으로 새로 만든 키를 지우지 못한다', async () => {
+    const input = { groupId: 'g1', round: 'league_r2' };
     let rejectOld: (error: unknown) => void = () => undefined;
     postMock.mockImplementationOnce(() => new Promise((_resolve, reject) => { rejectOld = reject; }));
     const { wrapper } = setup();
     const { result } = renderHook(() => useV1AddBracketFixture('t1'), { wrapper });
     let oldRequest: Promise<unknown> = Promise.resolve();
     act(() => {
-      oldRequest = result.current.mutateAsync({ groupId: 'g1', round: 'league_r2' }).catch(() => undefined);
+      oldRequest = result.current.mutateAsync(input).catch(() => undefined);
     });
     await waitFor(() => expect(postMock).toHaveBeenCalledTimes(1));
 
+    postMock.mockResolvedValueOnce({ id: 'new' });
+    await add('t1', input);
     postMock.mockRejectedValueOnce(apiError(0));
-    await add('t1', { groupId: 'g1', round: 'league_r3' });
+    await add('t1', input);
     await act(async () => {
       rejectOld(apiError(409));
       await oldRequest;
     });
     postMock.mockResolvedValue({ id: 'new' });
-    await add('t1', { groupId: 'g1', round: 'league_r3' });
+    await add('t1', input);
 
-    const [, newContent, newContentRetry] = sentKeys();
-    expect(newContentRetry).toBe(newContent);
+    const [, , lostResponse, retry] = sentKeys();
+    expect(retry).toBe(lostResponse);
   });
 });

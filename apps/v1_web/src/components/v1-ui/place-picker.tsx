@@ -21,6 +21,7 @@ const LIST_MAX_HEIGHT = 'min(320px, 45vh)';
 
 const SEARCH_DEBOUNCE_MS = 300;
 const SEARCH_FALLBACK_MESSAGE = '장소를 찾지 못했어요. 잠시 후 다시 시도해 주세요.';
+const MORE_FAILED_FALLBACK_MESSAGE = '결과를 더 불러오지 못했어요.';
 const SEARCH_UNAVAILABLE_MESSAGE = '지금은 장소 검색을 쓸 수 없어요. 장소 이름을 직접 입력해 주세요.';
 
 function escapeRegExp(text: string): string {
@@ -149,6 +150,7 @@ export function PlacePicker({
   const unavailable = search.error instanceof V1ApiError && search.error.code === 'PLACE_SEARCH_UNAVAILABLE';
   // 다음 쪽만 실패하면 받아 둔 결과는 그대로 두고 「더 보기」 줄에서 다시 시도한다.
   const moreFailed = searchActive && search.isFetchNextPageError;
+  const moreFailedMessage = moreFailed ? extractErrorMessage(search.error, MORE_FAILED_FALLBACK_MESSAGE) : null;
   const hasError = searchActive && search.isError && !moreFailed;
   const listVisible = open && searchActive && !hasError && items.length > 0;
   const listRef = useRef<HTMLUListElement>(null);
@@ -159,6 +161,12 @@ export function PlacePicker({
   }, [listVisible]);
   const moreOptionIndex = hasMore ? items.length : -1;
   const manualOptionIndex = items.length + (hasMore ? 1 : 0);
+  // 활성 줄은 인덱스라 새 쪽이 붙으면 직접 입력 줄의 인덱스가 밀린다 — 그 줄을 가리키고 있었다면 따라간다.
+  const [prevManualOptionIndex, setPrevManualOptionIndex] = useState(manualOptionIndex);
+  if (prevManualOptionIndex !== manualOptionIndex) {
+    setPrevManualOptionIndex(manualOptionIndex);
+    if (activeIndex === prevManualOptionIndex) setActiveIndex(manualOptionIndex);
+  }
   const recent = useMemo(() => (recentVenues ?? []).map(toRecentVenue), [recentVenues]);
 
   function switchToManual(initialName: string) {
@@ -428,7 +436,7 @@ export function PlacePicker({
                   <span className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>결과를 더 불러오고 있어요…</span>
                 ) : moreFailed ? (
                   <>
-                    <span className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>더 불러오지 못했어요.</span>
+                    <span className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>{moreFailedMessage}</span>
                     <b className="tm-text-caption" style={{ color: 'var(--blue700)' }}>다시 시도</b>
                   </>
                 ) : (
@@ -469,7 +477,8 @@ export function PlacePicker({
             ) : null}
             {/* 「더 보기」 줄의 진행·실패 문구는 목록 안에 있어 읽히지 않으므로 여기서 한 번 더 알린다. */}
             {loadingMore ? <span className="sr-only">결과를 더 불러오고 있어요</span> : null}
-            {moreFailed ? <span className="sr-only">결과를 더 불러오지 못했어요</span> : null}
+            {/* 다시 시도하는 동안에도 실패 상태가 남아 있으므로 불러오는 중이면 실패는 알리지 않는다. */}
+            {moreFailed && !loadingMore ? <span className="sr-only">{moreFailedMessage}</span> : null}
             {hasError ? (
               <div className="tm-text-caption" style={{ color: 'var(--text-muted)', marginTop: 8, lineHeight: 1.5 }}>
                 <p style={{ margin: 0 }}>

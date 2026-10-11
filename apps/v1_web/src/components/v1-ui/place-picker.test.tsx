@@ -194,15 +194,19 @@ describe('PlacePicker', () => {
       expect(onValue).toHaveBeenLastCalledWith(expect.objectContaining({ kind: 'picked', name: '망원 3구장', providerPlaceId: 'p3' }));
     });
 
-    it('다음 쪽만 실패하면 받아 둔 결과는 남기고 같은 줄에서 다시 시도한다', async () => {
+    it('다음 쪽만 실패하면 받아 둔 결과와 실패 이유를 남기고, 같은 줄에서 다시 시도하는 동안엔 실패를 알리지 않는다', async () => {
       let secondPageCalls = 0;
+      let releaseRetry: () => void = () => {};
+      const retryGate = new Promise<void>((resolve) => {
+        releaseRetry = resolve;
+      });
       server.use(
-        http.get('*/api/v1/places/search', ({ request }) => {
+        http.get('*/api/v1/places/search', async ({ request }) => {
           if (new URL(request.url).searchParams.get('page') !== '2') return page([place('p1', '망원 1구장')], true);
           secondPageCalls += 1;
-          return secondPageCalls === 1
-            ? errorBody(502, 'PLACE_SEARCH_FAILED', '카카오 응답이 늦어요')
-            : page([place('p2', '망원 2구장')], false);
+          if (secondPageCalls === 1) return errorBody(429, 'RATE_LIMITED', '요청이 많아요. 잠시 후 다시 시도해 주세요.');
+          await retryGate;
+          return page([place('p2', '망원 2구장')], false);
         }),
       );
       renderPicker();
@@ -210,14 +214,49 @@ describe('PlacePicker', () => {
       fireEvent.click(await findOption('결과 더 보기'));
 
       const retry = await findOption('다시 시도');
-      expect(screen.getByRole('status')).toHaveTextContent('결과를 더 불러오지 못했어요');
+      const status = screen.getByRole('status');
+      expect(retry).toHaveTextContent('요청이 많아요. 잠시 후 다시 시도해 주세요.');
+      expect(status).toHaveTextContent('요청이 많아요. 잠시 후 다시 시도해 주세요.');
+      // 첫 쪽 실패 안내(목록을 숨기고 버튼을 띄우는 쪽)로 바뀌지 않는다.
       expect(screen.getByRole('listbox')).toBeVisible();
       expect(await findOption('망원 1구장')).toBeInTheDocument();
-      expect(screen.queryByText('카카오 응답이 늦어요')).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: '이름만 직접 입력' })).not.toBeInTheDocument();
 
       fireEvent.click(retry);
+      await waitFor(() => expect(status).toHaveTextContent('결과를 더 불러오고 있어요'));
+      expect(status).not.toHaveTextContent('요청이 많아요');
+
+      releaseRetry();
       expect(await findOption('망원 2구장')).toBeInTheDocument();
       expect(secondPageCalls).toBe(2);
+    });
+
+    it('불러오는 동안 직접 입력 줄로 옮겨 가면 새 결과가 붙은 뒤에도 그 줄을 가리킨다', async () => {
+      let releaseNext: () => void = () => {};
+      const nextGate = new Promise<void>((resolve) => {
+        releaseNext = resolve;
+      });
+      server.use(
+        http.get('*/api/v1/places/search', async ({ request }) => {
+          if (new URL(request.url).searchParams.get('page') !== '2') return page([place('p1', '망원 1구장')], true);
+          await nextGate;
+          return page([place('p2', '망원 2구장'), place('p3', '망원 3구장')], false);
+        }),
+      );
+      renderPicker();
+      const combobox = screen.getByRole('combobox');
+      fireEvent.change(combobox, { target: { value: '망원' } });
+      fireEvent.click(await findOption('결과 더 보기'));
+      await findOption('결과를 더 불러오고 있어요');
+
+      fireEvent.keyDown(combobox, { key: 'ArrowDown' });
+      const manual = await findOption('이름만 직접 입력');
+      expect(combobox).toHaveAttribute('aria-activedescendant', manual.id);
+
+      releaseNext();
+      await findOption('망원 3구장');
+      const manualAfter = await findOption('이름만 직접 입력');
+      expect(combobox).toHaveAttribute('aria-activedescendant', manualAfter.id);
     });
   });
 

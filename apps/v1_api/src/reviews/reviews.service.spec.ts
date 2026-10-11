@@ -1462,8 +1462,6 @@ describe('ReviewsService', () => {
     });
   });
 
-  // 일반 팀원이 팀 매치에서 쓰는 후기는 "상대했던 선수"다. 근거는 그 경기 라인업에 실린
-  // 연동 팀원(V1GameParticipant.userId)뿐이며, 게스트·미제출 라인업은 대상이 되지 않는다.
   // MD-QA #107: 리그 경기가 "팀매치"로 보이고, 몰수패 경기의 (오지 않은) 선수들까지 리뷰 대상으로 떴다.
   describe('리그 경기 표기와 몰수 경기 제외', () => {
     const opponent = 'away-player-a';
@@ -1554,6 +1552,8 @@ describe('ReviewsService', () => {
     });
   });
 
+  // 일반 팀원이 팀 매치에서 쓰는 후기는 "상대했던 선수"다. 근거는 그 경기 라인업에 실린
+  // 연동 팀원(V1GameParticipant.userId)뿐이며, 게스트·미제출 라인업은 대상이 되지 않는다.
   describe('팀 매치 상대 선수 후기 — 역할 무관', () => {
     const opponentA = 'away-player-a';
     const opponentB = 'away-player-b';

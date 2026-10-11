@@ -951,6 +951,24 @@ describe('TournamentRegistrationsService', () => {
     );
   });
 
+  it.each([
+    ['regular_league', '리그'],
+    ['regular_tournament', '대회'],
+  ])('submit: 기록 공개 동의 안내 본문이 %s 신청에서는 "%s"로 표기된다', async (kind, noun) => {
+    prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow());
+    prisma.v1Tournament.findFirst.mockResolvedValue(
+      openTournament({ kind, registrationDeadlineAt: kind === 'regular_league' ? LEAGUE_OPEN_DEADLINE : undefined }),
+    );
+    prisma.v1TournamentRegistration.update.mockResolvedValue(registrationRow({ status: 'awaiting_payment' }));
+    prisma.v1TournamentPayment.upsert.mockResolvedValue(paymentRow());
+
+    await submitWithRecordDisclosure();
+
+    const body = notifications.emitToManyDeferred.mock.calls[0][3] as string;
+    expect(body).toContain(`${noun} 기록을 프로필에 공개할지`);
+    expect(body).not.toContain(noun === '리그' ? '대회 기록' : '리그 기록');
+  });
+
   it('submit: 기록 공개 동의를 체크하지 않으면 안내 알림도 보내지 않는다', async () => {
     prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow());
     prisma.v1Tournament.findFirst.mockResolvedValue(openTournament());

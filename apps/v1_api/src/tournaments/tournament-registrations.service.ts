@@ -502,7 +502,7 @@ export class TournamentRegistrationsService {
         },
         'tournament_record_consent_invite',
         tournamentId,
-        `"${result.tournament.title}" 대회 기록을 프로필에 공개할지 정해 주세요.`,
+        `"${result.tournament.title}" ${noun} 기록을 프로필에 공개할지 정해 주세요.`,
       );
     }
 

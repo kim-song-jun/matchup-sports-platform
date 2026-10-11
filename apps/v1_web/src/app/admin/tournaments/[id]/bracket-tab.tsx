@@ -24,7 +24,7 @@ import { AdminDataTable, AdminEmpty } from '@/components/admin';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
 import { useStartedTeamChangeReason } from '@/components/admin/bracket-canvas/use-started-team-change-reason';
 import { fixtureTeamChangeAccess } from '@/lib/bracket-canvas-layout';
-import { registrationIdsBlockedForGroup } from '@/lib/bracket-group-enrollment';
+import { registrationIdsBlockedForGroup, registrationIdsInOppositeFinalStage } from '@/lib/bracket-group-enrollment';
 import { BracketGroupQuickAdd } from './bracket-group-quick-add';
 import { BracketGroupCard } from './bracket-group-card';
 import { isGroupReady } from './bracket-group-helpers';
@@ -196,7 +196,10 @@ export function BracketTab({
     id: r.id,
     label: r.teamName ?? r.id,
   }));
-  const editBlockedIds = registrationIdsBlockedForGroup(bracket?.groups ?? [], editFixture?.groupId ?? null);
+  const editBlockedIds = new Set([
+    ...registrationIdsBlockedForGroup(bracket?.groups ?? [], editFixture?.groupId ?? null),
+    ...registrationIdsInOppositeFinalStage(bracket?.groups ?? [], bracket?.fixtures ?? [], editFixture?.groupId ?? null),
+  ]);
   const editPickerItems = (selectedId: string) => editFixtureTeamItems.filter((it) => !editBlockedIds.has(it.id) || it.id === selectedId);
 
   const editFixtureAccess = editFixture ? fixtureTeamChangeAccess(editFixture) : 'free';
@@ -332,7 +335,7 @@ export function BracketTab({
       // GROUP phase — 조별리그 대진은 서버가 만든다. 회전 수(1회전/2회전)를 모달에서 고른 뒤
       // POST /admin/tournaments/:id/league/fixtures/generate 를 호출한다.
       // 기존 fixture 존재 여부·최소 경기 수 검증도 서버가 판정하므로 여기서 미리 묻지 않는다.
-      if (group.groupTeams.length < 2) {
+      if (group.groupTeams.filter((team) => team.registrationId).length < 2) {
         showToast('조에 팀이 2개 이상 있어야 자동 생성할 수 있어요.', 'error');
         return;
       }

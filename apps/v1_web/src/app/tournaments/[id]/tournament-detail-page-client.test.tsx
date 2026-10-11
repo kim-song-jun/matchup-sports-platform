@@ -547,3 +547,34 @@ describe('TournamentDetailPageClient — 대회 종류별 진행 안내', () => 
     }
   });
 });
+
+describe('TournamentDetailPageClient — 신청 마감은 시각까지 보여요', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    tournamentApiMocks.useV1MyRegistrations.mockReturnValue({ data: [] });
+    tournamentApiMocks.useV1Reviews.mockReturnValue({
+      data: undefined, isError: false, isPending: false, isFetching: false, refetch: vi.fn(),
+    });
+  });
+
+  function renderWithDeadline(overrides: Partial<V1TournamentDetail>) {
+    tournamentApiMocks.useV1Tournament.mockReturnValue({
+      data: makeTournament({ registrationDeadlineAt: '2099-08-10T14:59:00.000Z', ...overrides }),
+      isLoading: false, isError: false, error: null, refetch: vi.fn(),
+    });
+    render(<TournamentDetailPageClient tournamentId="tournament-1" />);
+  }
+
+  it('대회 상세의 신청 마감 행이 KST 시각까지 적혀요', async () => {
+    renderWithDeadline({ kind: 'regular_tournament', status: 'open' });
+    await screen.findByRole('heading', { level: 1, name: '테스트 대회' });
+    expect(screen.getAllByText('2099년 8월 10일 (월) 오후 11:59').length).toBeGreaterThan(0);
+  });
+
+  it('리그 데스크톱 레일의 신청 마감도 시각까지 적혀요', async () => {
+    renderWithDeadline({ kind: 'regular_league', status: 'open' });
+    await screen.findByRole('heading', { level: 1, name: '테스트 대회' });
+    const rail = screen.getByRole('complementary', { name: '리그 참가 신청' });
+    expect(within(rail).getByText('신청 마감 2099년 8월 10일 (월) 오후 11:59')).toBeInTheDocument();
+  });
+});

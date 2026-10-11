@@ -59,6 +59,7 @@ function renderPanel(fixture = fixtureOf(), overrides: Partial<React.ComponentPr
     tournamentId: 't-1',
     fixture,
     groups: [knockout, groupStage],
+    fixtures: [fixture],
     slots,
     registrations,
     registrationsLoaded: true,
@@ -244,6 +245,38 @@ describe('BracketNodePanel — 자리 배정', () => {
       });
     });
 
+    describe('결승과 3·4위전의 같은 팀', () => {
+      const finalGroup = makeGroup({ id: 'g-final', name: '결승', phase: 'final', sortOrder: 3 });
+      const thirdGroup = makeGroup({ id: 'g-third', name: '3·4위전', phase: 'third_place', sortOrder: 4 });
+      const finalMatch = legacy({ id: 'f-final', groupId: 'g-final', homeRegistrationId: 'r1', homeTeamName: '서울FC', awayRegistrationId: 'r2', awayTeamName: '부산FC' });
+      const optionsOf = (label: string) => within(screen.getByLabelText(label)).getAllByRole('option').map((option) => option.textContent);
+
+      it('3·4위전 후보에서 결승에 있는 팀이 빠지고, "다른 조" 안내는 보이지 않는다', () => {
+        const third = legacy({ id: 'f-third', groupId: 'g-third', homeRegistrationId: null, homeTeamName: '홈 팀 미정' });
+        renderPanel(third, { groups: [finalGroup, thirdGroup], fixtures: [finalMatch, third] });
+        expect(optionsOf('홈 팀 선택')).toEqual(['비워 두기', '대구FC']);
+        expect(screen.queryByText('다른 조에 있는 팀은 목록에서 빠져 있어요.')).not.toBeInTheDocument();
+      });
+
+      it('이미 들어 있는 팀은 현재 값으로 남는다 — 기존 데이터를 지우라고 강요하지 않는다', () => {
+        const third = legacy({ id: 'f-third', groupId: 'g-third', homeRegistrationId: 'r1', homeTeamName: '서울FC' });
+        renderPanel(third, { groups: [finalGroup, thirdGroup], fixtures: [finalMatch, third] });
+        expect(optionsOf('홈 팀 선택')).toEqual(['비워 두기', '서울FC', '대구FC']);
+      });
+
+      it('반대 방향 - 결승 후보에서는 3·4위전에 있는 팀이 빠진다', () => {
+        const third = legacy({ id: 'f-third', groupId: 'g-third', homeRegistrationId: 'r3', homeTeamName: '대구FC', awayRegistrationId: null });
+        const final = legacy({ id: 'f-final', groupId: 'g-final', homeRegistrationId: null, homeTeamName: '홈 팀 미정' });
+        renderPanel(final, { groups: [finalGroup, thirdGroup], fixtures: [final, third] });
+        expect(optionsOf('홈 팀 선택')).toEqual(['비워 두기', '서울FC', '부산FC']);
+      });
+
+      it('대조군 - 8강 경기 후보는 결승에 있는 팀도 그대로 보인다', () => {
+        renderPanel(legacy({ homeRegistrationId: null, homeTeamName: '홈 팀 미정' }), { groups: [knockout, finalGroup, thirdGroup], fixtures: [finalMatch] });
+        expect(optionsOf('홈 팀 선택')).toEqual(['비워 두기', '서울FC', '부산FC', '대구FC']);
+      });
+    });
+
     describe('시작된 경기', () => {
       const started = (overrides: Partial<V1AdminBracketFixture> = {}) =>
         legacy({ awayRegistrationId: 'r2', awayTeamName: '부산FC', game: makeGame({ state: 'LIVE' }), ...overrides });
@@ -376,6 +409,8 @@ describe('BracketNodePanel — 결과 구역', () => {
     fireEvent.change(screen.getByLabelText('서울FC 점수'), { target: { value: '2' } });
     fireEvent.change(screen.getByLabelText('대구FC 점수'), { target: { value: '1' } });
     fireEvent.click(screen.getByRole('button', { name: '점수 확정' }));
+    expect(mocks.quick).not.toHaveBeenCalled();
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: '점수 확정' }));
     expect(mocks.quick).toHaveBeenCalledWith({ gameId: 'game-1', expectedVersion: 3, score: { home: 2, away: 1 } }, expect.any(Object));
   });
 
@@ -384,6 +419,7 @@ describe('BracketNodePanel — 결과 구역', () => {
     fireEvent.change(screen.getByLabelText('서울FC 점수'), { target: { value: '2' } });
     fireEvent.change(screen.getByLabelText('대구FC 점수'), { target: { value: '1' } });
     fireEvent.click(screen.getByRole('button', { name: '점수 확정' }));
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: '점수 확정' }));
     act(() => {
       mocks.quick.mock.calls[0][1].onError(
         new V1ApiError({ statusCode: 409, code: 'QUICK_RESULT_ROSTER_SYNCING', message: 'x', details: null, requestId: 'r', timestamp: 't' } as unknown as ConstructorParameters<typeof V1ApiError>[0]),

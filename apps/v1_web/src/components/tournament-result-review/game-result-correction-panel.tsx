@@ -14,7 +14,7 @@ import { AlertBanner, ErrorState } from '@/components/v1-ui/primitives';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
 import { Button } from '@/components/v1-ui/button';
 import { formatGameResultScoreWithPenalties } from '@/lib/game-result-score';
-import { deriveEditableGoalEvents } from '@/lib/result-goal-events';
+import { correctionGoalEventsPayload, deriveEditableGoalEvents } from '@/lib/result-goal-events';
 import { RevisionTimeline } from './revision-timeline';
 import { GameSummaryHeader } from './game-summary-header';
 import { ReasonModal } from './reason-modal';
@@ -262,6 +262,7 @@ export function GameResultCorrectionPanel({
 
   const renderCorrectionEditor = () => {
     if (!correctionFormOpen || !draftBase || !editPrefill) return null;
+    const baseGoalEvents = deriveEditableGoalEvents(editPrefill.goalEvents, eventsQuery.data?.events ?? []);
     return (
       <ResultEditModal
         open
@@ -271,7 +272,7 @@ export function GameResultCorrectionPanel({
         reasonLabel={entryCopy.reasonLabel}
         base={{
           score: editPrefill.score,
-          goalEvents: deriveEditableGoalEvents(editPrefill.goalEvents, eventsQuery.data?.events ?? []),
+          goalEvents: baseGoalEvents,
           participants: editPrefill.resultParticipants,
           mvpParticipantId: editPrefill.mvpParticipantId,
         }}
@@ -297,7 +298,8 @@ export function GameResultCorrectionPanel({
               reason: input.reason,
               changes: {
                 score: input.score,
-                goalEvents: input.goalEvents,
+                // 점수만 확정된 경기는 득점 행을 안 넣었으면 goalEvents 를 뺀다(MD-QA #94, 헬퍼 주석 참고).
+                goalEvents: correctionGoalEventsPayload(baseGoalEvents, input.goalEvents),
                 actualParticipants: input.actualParticipants,
                 eventsHash: correctionSnapshot.eventsHash,
                 mvpParticipantId: input.mvpParticipantId,

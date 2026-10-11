@@ -12,7 +12,7 @@ function revisionRow(overrides: Partial<OfficialRevisionRow> = {}): OfficialRevi
     revisionId: canonicalIds.revision, gameId: canonicalIds.game, revision: 1,
     score: { home: 2, away: 1 }, sourceHash: 'hash-1',
     playedAt: new Date('2026-06-14T00:00:00Z'), officialAt: new Date('2026-06-14T00:00:00Z'),
-    reason: null, sourceType: 'TEAM_MATCH', currentOfficialRevisionId: canonicalIds.revision,
+    reason: null, outcomeReason: 'NORMAL', sourceType: 'TEAM_MATCH', currentOfficialRevisionId: canonicalIds.revision,
     tournamentId: canonicalIds.tournament, teamMatchId: canonicalIds.match,
     tournamentTeamMatchId: canonicalIds.match, teamMatchTournamentId: canonicalIds.tournament,
     leagueId: null, homeTeamId: 'team-home', awayTeamId: 'team-away', visibility: 'LIVE' as const,

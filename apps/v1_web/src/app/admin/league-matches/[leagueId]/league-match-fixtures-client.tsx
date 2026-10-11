@@ -13,6 +13,7 @@ import {
   useV1AddLeagueTeam,
   useV1AdminLeagueMatch,
   useV1RevertLeagueCompletion,
+  useV1CompleteLeague,
   useV1AdminLeagueTeams,
   useV1CreateManualLeagueFixture,
   useV1AdminTeam,
@@ -37,11 +38,12 @@ import { describeLeaguePeriods, totalPeriodMinutes } from './league-period-defau
 import { pickLeagueNextAction } from '@/lib/league-next-action';
 import { leagueFixtureResultCell } from '@/lib/competition-status';
 import { extractErrorMessage } from '@/lib/error-message';
+import { josa } from '@/lib/korean';
 import { expandWeeklyFixtureDates, WEEKDAY_OPTIONS } from '@/lib/league-fixture-dates';
 import { toKstDateString } from '@/lib/kst-calendar';
 import { LeagueFixtureDatePicker } from './league-fixture-date-picker';
 import { LeagueWeeksPlanField } from './league-weeks-plan-field';
-import { resolveWeeksCount, type WeeksPlan } from '@/lib/league-round-robin-plan';
+import { plannedRounds, resolveWeeksCount, type WeeksPlan } from '@/lib/league-round-robin-plan';
 import { formatKstDateShort, formatKstTime } from '@/lib/date-utils';
 import { LeagueVisibilityControl } from './league-visibility-control';
 import { LeagueHoldControl } from './league-hold-control';
@@ -94,6 +96,13 @@ function isFixtureGameInProgress(fixture: V1LeagueFixture): boolean {
   return fixture.status !== 'cancelled' && (fixture.gameState === 'LIVE' || fixture.gameState === 'PAUSED');
 }
 
+function manualFixtureHint(canAdd: boolean, leagueEnded: boolean): string {
+  if (leagueEnded) return '끝난 리그에는 경기를 추가할 수 없어요. 먼저 ‘진행 중으로 되돌리기’를 해 주세요.';
+  return canAdd
+    ? '우천 순연 재편성이나 대체 경기처럼 한 경기만 필요할 때 써요.'
+    : '참가팀이 2팀 이상이어야 경기를 추가할 수 있어요.';
+}
+
 // 미리보기·생성(재생성) 버튼은 한 묶음 — 좁은 폭에선 한 줄을 나눠 쓰고, 넓은 폭에선 내용 폭으로 모인다.
 const ACTION_ROW_CLASS = 'col-span-full flex gap-2';
 
@@ -114,6 +123,8 @@ export default function LeagueMatchFixturesClient({
   const { data: series, isPending, isError, error, refetch } = useV1AdminLeagueMatch(leagueId);
   const revertCompletion = useV1RevertLeagueCompletion(leagueId);
   const [revertModalOpen, setRevertModalOpen] = useState(false);
+  const completeLeague = useV1CompleteLeague(leagueId);
+  const [completeModalOpen, setCompleteModalOpen] = useState(false);
   const generateFixtures = useV1GenerateLeagueFixtures(leagueId);
   const updateFixture = useV1UpdateLeagueFixture(leagueId);
   const cancelFixture = useV1CancelLeagueFixture(leagueId);
@@ -257,6 +268,9 @@ export default function LeagueMatchFixturesClient({
     );
   }
 
+  // 서버는 끝난 리그의 경기 추가·재생성을 409 LEAGUE_ENDED 로 막는다 — 폼을 다 채운 뒤가 아니라 버튼에서 먼저 알린다.
+  const leagueEnded = series.state === 'completed';
+
   // generate/regenerate/preview 세 호출이 전부 같은 폼 상태(weeksCount/dayOfWeek/time/
   // placeChoice)에서 같은 모양의 body를 만든다 — 세 곳에서 조립 규칙이 갈리면(예: 트림 여부)
   // "미리보기는 통과했는데 실제 생성은 다르게 실패"가 생긴다.
@@ -273,6 +287,10 @@ export default function LeagueMatchFixturesClient({
   const gamesPerDayValue = parseOptionalInt(gamesPerTeamPerDay);
   const teamCount = series.teamIds.length;
   const weeksCount = resolveWeeksCount(weeksPlan, teamCount, gamesPerDayValue ?? 1);
+  // 하루 경기 수 때문에 주차가 올림되면 `주차 × 하루 경기` 칸이 라운드로빈 한 바퀴보다 커진다 —
+  // 그때만 서버에 총 라운드를 알려 남는 칸에 앞 라운드를 다시 만들지 않게 한다.
+  const targetRounds = plannedRounds(weeksPlan, teamCount, weeksCount, gamesPerDayValue ?? 1);
+  const roundsCap = targetRounds >= 1 && targetRounds < weeksCount * (gamesPerDayValue ?? 1) ? targetRounds : null;
 
   // C안: 시간창(시작~종료)과 경기 시간이 다 있으면 팀당 하루 경기 수를 역산해 제안한다.
   // 정수가 아닌 입력이 하나라도 있으면 제안·계산 카드를 아예 숨긴다 — ?? 폴백(휴식 0·팀당 1)으로
@@ -408,6 +426,7 @@ export default function LeagueMatchFixturesClient({
             });
     return {
       weeksCount,
+      ...(roundsCap === null ? {} : { roundsCount: roundsCap }),
       // **시각이 비면 `schedule` 을 싣지 않는다.** 요일 경로는 위에서 `time` 이 비면
       // `dates` 를 빈 배열로 만들어 자연히 빠졌는데, 달력 경로는 `dates` 가 채워져 있어
       // **빈 `time` 이 그대로 나갔다** — 서버가 `time은 HH:mm 형식이어야 해요` 로 거부한다.
@@ -526,10 +545,10 @@ export default function LeagueMatchFixturesClient({
           setTeamSearch('');
           showToast(
             !result.hasExistingFixtures
-              ? `${item.label}을(를) 추가했어요.`
+              ? `${josa(item.label, ['을', '를'])} 추가했어요.`
               : leagueHasOfficialResult
-                ? `${item.label}을(를) 추가했어요. 다만 이 리그는 이미 확정된 결과가 있어 대진 재생성이 불가능해요 — 이 팀은 순위표에만 표시돼요.`
-                : `${item.label}을(를) 추가했어요. 대진에 반영하려면 표 아래 "대진 관리"에서 "대진 재생성"을 눌러 주세요.`,
+                ? `${josa(item.label, ['을', '를'])} 추가했어요. 다만 이 리그는 이미 확정된 결과가 있어 대진 재생성이 불가능해요 — 이 팀은 순위표에만 표시돼요.`
+                : `${josa(item.label, ['을', '를'])} 추가했어요. 대진에 반영하려면 표 아래 "대진 관리"에서 "대진 재생성"을 눌러 주세요.`,
             'success',
           );
         },
@@ -551,8 +570,8 @@ export default function LeagueMatchFixturesClient({
         setRemoveTarget(null);
         showToast(
           result.cancelledFixtureCount > 0
-            ? `${teamName}을(를) 제외했어요. 관련 대진 ${result.cancelledFixtureCount}경기도 함께 취소됐어요.`
-            : `${teamName}을(를) 제외했어요.`,
+            ? `${josa(teamName, ['을', '를'])} 제외했어요. 관련 대진 ${result.cancelledFixtureCount}경기도 함께 취소됐어요.`
+            : `${josa(teamName, ['을', '를'])} 제외했어요.`,
           'success',
         );
       },
@@ -618,6 +637,29 @@ export default function LeagueMatchFixturesClient({
           );
         },
         onError: (error) => showToast(extractErrorMessage(error, '리그를 되돌리지 못했어요.'), 'error'),
+      },
+    );
+  };
+
+  // 자동 종료는 결과 확정·대진 취소 때만 판정된다 — '진행 중으로 되돌리기' 뒤 대진을 바꾸지 않으면
+  // 남은 경기가 없어도 진행 중으로 남는다(MD-QA #93). 서버 판정(`shouldCompleteLeague`)과 같은 조건일
+  // 때만 버튼을 낸다: 취소·무효를 뺀 대진이 하나 이상이고 전부 공식 결과다.
+  const liveFixtures = series.fixtures.filter(
+    (fixture) => fixture.status !== 'cancelled' && fixture.resultStage !== 'voided',
+  );
+  const canCompleteLeague =
+    series.state === 'active' &&
+    liveFixtures.length > 0 &&
+    liveFixtures.every((fixture) => fixture.resultStage === 'official');
+  const onConfirmComplete = (reason: string) => {
+    completeLeague.mutate(
+      { reason: reason.trim() ? reason.trim() : undefined },
+      {
+        onSuccess: (result) => {
+          setCompleteModalOpen(false);
+          showToast(result.alreadyProcessed ? '이미 종료된 리그예요.' : '리그를 종료했어요.', 'success');
+        },
+        onError: (error) => showToast(extractErrorMessage(error, '리그를 종료하지 못했어요.'), 'error'),
       },
     );
   };
@@ -722,6 +764,16 @@ export default function LeagueMatchFixturesClient({
                 className="inline-flex min-h-[44px] items-center rounded-xl border border-[var(--border-strong)] px-4 text-sm font-semibold text-[var(--text-strong)] disabled:opacity-50"
               >
                 진행 중으로 되돌리기
+              </button>
+            )}
+            {canCompleteLeague && (
+              <button
+                type="button"
+                onClick={() => setCompleteModalOpen(true)}
+                disabled={completeLeague.isPending}
+                className="inline-flex min-h-[var(--size-touch-min)] items-center rounded-xl border border-[var(--border-strong)] px-4 text-[length:var(--font-size-label)] font-semibold text-[var(--text-strong)] disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+              >
+                리그 종료하기
               </button>
             )}
           </div>
@@ -849,15 +901,13 @@ export default function LeagueMatchFixturesClient({
           // **팀을 못 고르는 모달을 열지 않는다.** 홈·어웨이를 골라야 하는데 참가팀이
           // 아직 안 왔거나(로딩) 2팀 미만이면, 열어 봐야 빈 피커 두 개만 보이고 저장은
           // 항상 막힌다 — 빈 약속이다. 그 상태를 버튼 옆에서 먼저 말한다.
-          disabled={!canAddManualFixture}
+          disabled={!canAddManualFixture || leagueEnded}
           className="min-h-[44px] rounded-xl border border-[var(--border)] px-4 text-sm font-semibold text-[var(--text-strong)] disabled:opacity-50"
         >
           경기 하나 추가
         </button>
         <span className="text-xs text-[var(--text-muted)]">
-          {canAddManualFixture
-            ? '우천 순연 재편성이나 대체 경기처럼 한 경기만 필요할 때 써요.'
-            : '참가팀이 2팀 이상이어야 경기를 추가할 수 있어요.'}
+          {manualFixtureHint(canAddManualFixture, leagueEnded)}
         </span>
       </div>
 </>
@@ -1233,15 +1283,13 @@ export default function LeagueMatchFixturesClient({
               // **팀을 못 고르는 모달을 열지 않는다.** 홈·어웨이를 골라야 하는데 참가팀이
               // 아직 안 왔거나(로딩) 2팀 미만이면, 열어 봐야 빈 피커 두 개만 보이고 저장은
               // 항상 막힌다 — 빈 약속이다. 그 상태를 버튼 옆에서 먼저 말한다.
-              disabled={!canAddManualFixture}
+              disabled={!canAddManualFixture || leagueEnded}
               className="min-h-[44px] rounded-xl border border-[var(--border)] px-4 text-sm font-semibold text-[var(--text-strong)] disabled:opacity-50"
             >
               경기 하나 추가
             </button>
             <span className="text-xs text-[var(--text-muted)]">
-              {canAddManualFixture
-                ? '우천 순연 재편성이나 대체 경기처럼 한 경기만 필요할 때 써요.'
-                : '참가팀이 2팀 이상이어야 경기를 추가할 수 있어요.'}
+              {manualFixtureHint(canAddManualFixture, leagueEnded)}
             </span>
           </div>
 
@@ -1323,7 +1371,7 @@ export default function LeagueMatchFixturesClient({
                     <button
                       type="button"
                       onClick={onPreview}
-                      disabled={previewFixtures.isPending || !hasLeagueStartsOn}
+                      disabled={previewFixtures.isPending || !hasLeagueStartsOn || leagueEnded}
                       className="min-h-[44px] flex-1 rounded-xl border border-[var(--border-strong)] px-4 text-sm font-semibold text-[var(--text-strong)] disabled:opacity-50 md:flex-none"
                     >
                       미리보기
@@ -1331,7 +1379,7 @@ export default function LeagueMatchFixturesClient({
                     <button
                       type="button"
                       onClick={() => setRegenerateModalOpen(true)}
-                      disabled={!hasLeagueStartsOn || inProgressFixtures.length > 0 || hasSlotFixtures}
+                      disabled={!hasLeagueStartsOn || inProgressFixtures.length > 0 || hasSlotFixtures || leagueEnded}
                       className="min-h-[44px] flex-[1.6] rounded-xl bg-[var(--button-fill-warning)] px-4 text-sm font-semibold text-white hover:bg-[var(--button-fill-warning-hover)] transition-colors disabled:opacity-50 md:flex-none"
                     >
                       대진 재생성
@@ -1339,6 +1387,13 @@ export default function LeagueMatchFixturesClient({
                   </div>
                 </div>
                 {!hasLeagueStartsOn && <MissingStartsOnNotice />}
+                {leagueEnded ? (
+                  <p className="mt-2 text-[length:var(--font-size-body-sm)] text-[var(--orange700)]">
+                    {leagueHasOfficialResult
+                      ? '끝난 리그라 대진을 다시 만들 수 없어요. 확정된 결과가 있어 진행 중으로 되돌려도 다시 만들 수는 없어요.'
+                      : '끝난 리그라 대진을 다시 만들 수 없어요. 먼저 ‘진행 중으로 되돌리기’를 해 주세요.'}
+                  </p>
+                ) : null}
                 {inProgressFixtures.length > 0 ? (
                   <p className="mt-2 text-[length:var(--font-size-body-sm)] text-[var(--orange700)]">
                     진행 중인 경기가 있어 대진을 다시 만들 수 없어요. 콘솔의 ‘몰수·중단으로 종료’로 먼저 끝내 주세요.
@@ -1436,6 +1491,18 @@ export default function LeagueMatchFixturesClient({
         tone="amber"
         onConfirm={onConfirmRevert}
         onClose={() => setRevertModalOpen(false)}
+      />
+
+      <GateConfirmModal
+        open={completeModalOpen}
+        pending={completeLeague.isPending}
+        title="리그를 종료할까요?"
+        description="남은 경기가 모두 확정되거나 취소됐어요. 종료하면 지금 순위표가 최종 순위가 되고, 필요하면 다시 진행 중으로 되돌릴 수 있어요."
+        // 헤더 트리거("리그 종료하기")와 접근 이름이 겹치지 않게 짧게 쓴다(되돌리기 모달과 같은 관례).
+        confirmLabel="종료"
+        tone="blue"
+        onConfirm={onConfirmComplete}
+        onClose={() => setCompleteModalOpen(false)}
       />
 
       {/* 그룹 B 감사 결함 3: 참가팀 제외 확인 — 이전에는 칩의 X 버튼이 확인 없이 곧바로
@@ -1537,7 +1604,7 @@ function RemoveTeamConfirmModal({
             className="text-[length:var(--font-size-body-lg)] font-bold text-[var(--text-strong)] flex items-center gap-2"
           >
             <AlertTriangle size={17} className="text-[var(--orange700)]" aria-hidden="true" />
-            {teamName}을(를) 제외할까요?
+            {josa(teamName, ['을', '를'])} 제외할까요?
           </h2>
           <button
             type="button"

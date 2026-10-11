@@ -32,8 +32,8 @@ function mapEmailLoginError(err: unknown): string {
   return '지금은 로그인할 수 없어요. 잠시 후 다시 시도해 주세요.';
 }
 
-export function EmailLoginClient() {
-  const model = getEmailLoginViewModel();
+export function EmailLoginClient({ redirectPath }: { redirectPath?: string | null }) {
+  const model = getEmailLoginViewModel(redirectPath);
   const router = useRouter();
   const queryClient = useQueryClient();
   const login = useV1EmailLogin();
@@ -79,7 +79,7 @@ export function EmailLoginClient() {
   };
 
   return (
-    <AuthFrame topTitle="이메일 로그인" backHref={model.backHref} className="tm-auth-email-frame" stage={AUTH_WELCOME_STAGE}>
+    <AuthFrame topTitle="이메일 로그인" backHref={model.backHref} appBack className="tm-auth-email-frame" stage={AUTH_WELCOME_STAGE}>
       <form className="tm-auth-body" id="v1-email-login-form" onSubmit={submit}>
         <div className="tm-auth-logo" style={{ background: 'var(--surface)', boxShadow: 'inset 0 0 0 1px var(--grey200)' }}>
           <BrandMark size={42} alt="Teameet" />

@@ -28,8 +28,8 @@ vi.mock('@/hooks/use-v1-bracket-canvas', () => ({
 // 폼·액션 내부(검증·확인·정정)는 PR-3 의 테스트가 검증한다. 여기서는 시트가 알맞은 컴포넌트에 알맞은 props 를 넘기고
 // 폼의 onSubmit 을 빠른 입력 변이로 이어 주는지만 본다. 폼 mock 의 버튼은 실제 폼처럼 onSubmit 을 호출한다.
 vi.mock('./bracket-quick-result-form', () => ({
-  BracketQuickResultForm: (props: { homeLabel: string; awayLabel: string; isKnockout: boolean; errorMessage?: string | null; onSubmit: (score: { home: number; away: number }) => void }) => (
-    <div data-testid="quick-form" data-knockout={String(props.isKnockout)} data-home={props.homeLabel} data-away={props.awayLabel}>
+  BracketQuickResultForm: (props: { homeLabel: string; awayLabel: string; isKnockout: boolean; confirmBeforeSubmit?: boolean; errorMessage?: string | null; onSubmit: (score: { home: number; away: number }) => void }) => (
+    <div data-testid="quick-form" data-knockout={String(props.isKnockout)} data-confirm={String(props.confirmBeforeSubmit === true)} data-home={props.homeLabel} data-away={props.awayLabel}>
       {props.errorMessage ? <p role="alert">{props.errorMessage}</p> : null}
       <button type="button" onClick={() => props.onSubmit({ home: 2, away: 1 })}>폼 완료</button>
     </div>
@@ -205,6 +205,7 @@ describe('BracketCanvasMobile — 시트', () => {
     expect(card(/8강 · 2번 경기/)).toHaveAttribute('aria-expanded', 'true');
     const form = screen.getByTestId('quick-form');
     expect(form).toHaveAttribute('data-knockout', 'true');
+    expect(form).toHaveAttribute('data-confirm', 'true');
     expect(form).toHaveAttribute('data-home', '서초FC');
     expect(form).toHaveAttribute('data-away', '송파FC');
   });
@@ -531,6 +532,36 @@ describe('BracketCanvasMobile — 팀 넣기', () => {
       openSlotPicker('g-q2');
       expect(optionNames()).toEqual(['강남FC', '마포FC', '서초FC', '송파FC', '용산FC']);
       expect(screen.queryByText(hiddenNote)).not.toBeInTheDocument();
+    });
+  });
+
+  describe('결승과 3·4위전의 같은 팀 — 후보 제외', () => {
+    const finalGroup = buildGroup({ id: 'g-fin', name: '결승', phase: 'final', sortOrder: 3 });
+    const thirdGroup = buildGroup({ id: 'g-thr', name: '3·4위전', phase: 'third_place', sortOrder: 4 });
+    const stageGroups = [finalGroup, thirdGroup];
+    const finalMatch = makeFixture({ id: 'fx-fin', groupId: 'g-fin', fixtureNumber: 1, homeRegistrationId: 'r1', homeTeamName: '강남FC', awayRegistrationId: 'r2', awayTeamName: '마포FC', game: buildGame({ id: 'g-fin' }) });
+    const hiddenNote = '다른 조에 있는 팀은 목록에서 빠져 있어요.';
+
+    function openPicker(groupId: 'g-fin' | 'g-thr') {
+      const target = makeFixture({ id: 'fx-target', groupId, fixtureNumber: 2, round: groupId === 'g-thr' ? '3·4위전' : '결승', game: buildGame({ id: 'g-target' }) });
+      const stageFixtures = groupId === 'g-thr' ? [finalMatch, target] : [target, makeFixture({ id: 'fx-thr', groupId: 'g-thr', fixtureNumber: 3, homeRegistrationId: 'r3', homeTeamName: '서초FC', game: buildGame({ id: 'g-thr' }) })];
+      renderMobile({
+        rounds: buildBracketMobileRounds({ groups: stageGroups, fixtures: stageFixtures, slots: [] }),
+        slots: [], groups: stageGroups, fixtures: stageFixtures,
+      });
+      fireEvent.click(card(/2번 경기/));
+      fireEvent.click(screen.getByRole('button', { name: '홈 팀 고르기' }));
+    }
+
+    it('3·4위전 후보에서 결승 팀(강남FC·마포FC)이 빠지고 "다른 조" 안내는 없다', () => {
+      openPicker('g-thr');
+      expect(optionNames()).toEqual(['서초FC', '송파FC', '용산FC']);
+      expect(screen.queryByText(hiddenNote)).not.toBeInTheDocument();
+    });
+
+    it('반대 방향 - 결승 후보에서는 3·4위전 팀(서초FC)이 빠진다', () => {
+      openPicker('g-fin');
+      expect(optionNames()).toEqual(['강남FC', '마포FC', '송파FC', '용산FC']);
     });
   });
 

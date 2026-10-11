@@ -32,6 +32,18 @@ Production rollout requires the additive migration and API/web deployment before
 changing a league setting. A database-only change ahead of the serving API cannot
 enforce publication. Production promotion from dev to main is performed by the user.
 
+## Manual completion (리그 종료)
+
+`POST /api/v1/admin/league-matches/:leagueId/complete` (optional `reason`, max 200) closes an
+`active` league whose remaining fixtures are all settled — the same rule as the automatic
+transition (`shouldCompleteLeague`: at least one non-cancelled, non-voided fixture and every one of
+them has an official result). Automatic completion only runs on result confirmation and fixture
+cancellation, so a league reopened with `revert-completion` without any fixture change used to stay
+`active` (MD-QA #93). Fixtures still waiting for a result return `409 LEAGUE_FIXTURES_PENDING`; a
+draft or on-hold league returns `409 LEAGUE_NOT_ACTIVE`; an already completed league returns
+`alreadyProcessed: true`. Records `league_match.complete` in the admin audit and returns
+`{ leagueId, state: "completed", alreadyProcessed }`.
+
 ## Hold and resume (보류)
 
 A regular league is put on hold instead of being cancelled (2026-10-07).
@@ -52,11 +64,23 @@ restores visibility. Both actions record `league_match.hold` / `league_match.res
 in the admin audit and return `{ leagueId, state, isPublic, alreadyProcessed }`.
 A concurrent status or visibility change returns `409 LEAGUE_STATE_CHANGED`;
 hold compares both values so a newly private league is never restored as public.
+When resume restores `active` and every non-cancelled, non-voided fixture already has an
+official result, the league is completed in the same transaction (status-change reason
+`hold_released`) and the response returns `state: "completed"` (MD-QA #93).
 While on hold, fixture generation and regeneration return `409 LEAGUE_ON_HOLD`
 without creating or cancelling fixtures. Both actions recheck the status after
 locking the parent league row, including a hold committed during plan calculation.
 A completed or cancelled league rejects the same generation, template and slot-assignment
 actions with `409 LEAGUE_ENDED`; releasing slots on registration cancellation is not guarded.
+`POST .../fixtures/manual` and `PATCH .../fixtures/:teamMatchId` (update-fixture) also return
+`409 LEAGUE_ENDED` for a completed or cancelled league, but unlike generation they stay allowed
+while the league is on hold. Update-fixture writes the fixture first and then takes the league row
+with `FOR SHARE NOWAIT` and re-checks the status, so an edit that overlaps the final result completing
+the league is either rejected or committed before the completion. It never waits on the league row:
+when another transaction holds it (completion, regeneration, team removal, template replacement,
+manual add), the edit is rolled back with `409 COMMAND_CONCURRENCY_CONFLICT` ("잠시 후 다시 시도해
+주세요"), because the league-first and fixture-first lock orders both exist and waiting would deadlock
+with one of them.
 
 While a league is on hold, already-scheduled notifications for its fixtures are
 suppressed at fire time (the outbox rows are kept, so resuming re-enables the next
@@ -251,6 +275,7 @@ LEAGUE_REGION_INVALID` for an unknown or unsuitable region.
   Omitting `durationMinutes` fills `endAt` with `startsAt` + the fixture's
   regulation time (non-extra-time period total: both halves, or the single
   period of a one-period match).
+  A completed or cancelled league returns `409 LEAGUE_ENDED`; a league on hold is allowed.
 - `POST /api/v1/admin/league-matches/:leagueId/fixtures` (and `preview`,
   `regenerate`) accept `timing.gameDurationMinutes` as optional. When omitted,
   the regulation time of the league's own competition config (the version edited
@@ -260,6 +285,14 @@ LEAGUE_REGION_INVALID` for an unknown or unsuitable region.
   config without period lengths fails with
   `422 LEAGUE_FIXTURE_DURATION_REQUIRED`. Without any `timing`, fixtures of a
   matchday share one kickoff and `endAt` is kickoff + regulation time.
+- The same three endpoints accept optional `roundsCount` (integer 1–104). The
+  total number of rounds is `weeksCount × timing.gamesPerTeamPerDay` (default 1
+  per day), cut down to `roundsCount` when given; omitting it keeps that product.
+  Send it when `weeksCount` is rounded up for `gamesPerTeamPerDay` (for example
+  4 teams, 2 games per day: 2 weeks × 2 = 4 rounds, but a single round robin has
+  3) so the spare slot does not replay round 1 as a rematch. A total above 104
+  rounds still returns `422 LEAGUE_FIXTURE_LIMIT_EXCEEDED`; `roundsCount` itself
+  is capped at 104.
 - `POST /api/v1/admin/league-matches/:leagueId/fixtures/:teamMatchId/cancel`
   (`{ reason }`) cancels one fixture; an already-cancelled fixture returns
   `alreadyProcessed: true`. A fixture whose game is in progress (`LIVE` or

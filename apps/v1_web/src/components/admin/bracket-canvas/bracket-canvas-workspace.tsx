@@ -20,7 +20,7 @@ import {
   useMediaQuery,
 } from '@/hooks/use-media-query';
 import { describeBracketCanvasError } from '@/lib/bracket-canvas-errors';
-import { TEAM_IN_OTHER_GROUP_MESSAGE, registrationIdsBlockedForGroup } from '@/lib/bracket-group-enrollment';
+import { TEAM_IN_OTHER_GROUP_MESSAGE, finalStageConflictMessage, registrationIdsBlockedForGroup } from '@/lib/bracket-group-enrollment';
 import { buildSideLabelContext, directPlacedRegistrationIds, fixtureSideLabel, type SideKey } from '@/lib/bracket-canvas-layout';
 import { buildLeagueStandings } from '@/lib/bracket-league-standings-model';
 import { describeStandingsFill } from '@/lib/bracket-standings-fill-message';
@@ -164,9 +164,14 @@ export function BracketCanvasWorkspace({
   };
 
   const handleAssignDirect = (fixtureId: string, side: SideKey, registrationId: string) => {
-    const fixtureGroupId = bracket.fixtures.find((fixture) => fixture.id === fixtureId)?.groupId ?? null;
-    if (registrationIdsBlockedForGroup(bracket.groups, fixtureGroupId).has(registrationId)) {
+    const targetFixture = bracket.fixtures.find((fixture) => fixture.id === fixtureId);
+    if (registrationIdsBlockedForGroup(bracket.groups, targetFixture?.groupId ?? null).has(registrationId)) {
       showToast(TEAM_IN_OTHER_GROUP_MESSAGE, 'error');
+      return;
+    }
+    const finalStageConflict = finalStageConflictMessage(bracket.groups, bracket.fixtures, targetFixture, registrationId);
+    if (finalStageConflict !== null) {
+      showToast(finalStageConflict, 'error');
       return;
     }
     updateFixture.mutate(
@@ -235,6 +240,7 @@ export function BracketCanvasWorkspace({
         tournamentId={tournamentId}
         fixture={selectedFixture}
         groups={bracket.groups}
+        fixtures={bracket.fixtures}
         slots={bracket.slots}
         registrations={registrations}
         registrationsLoaded={registrationsState.status === 'success'}

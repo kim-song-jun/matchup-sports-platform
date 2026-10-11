@@ -11,7 +11,7 @@ import { Button } from '@/components/v1-ui/button';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
 import { useV1DeleteFixture, useV1UpdateFixture } from '@/hooks/use-v1-api';
 import { useV1AssignTournamentSlot, useV1QuickResult } from '@/hooks/use-v1-bracket-canvas';
-import { TEAM_IN_OTHER_GROUP_HIDDEN_NOTE, applyGroupRule, registrationIdsBlockedForGroup } from '@/lib/bracket-group-enrollment';
+import { TEAM_IN_OTHER_GROUP_HIDDEN_NOTE, applyGroupRule, registrationIdsBlockedForGroup, registrationIdsInOppositeFinalStage } from '@/lib/bracket-group-enrollment';
 import { describeBracketCanvasError } from '@/lib/bracket-canvas-errors';
 import { classifyFixtureSide, fixtureTeamChangeAccess, isFixtureLocked, isSlotAssignable, type SideKey } from '@/lib/bracket-canvas-layout';
 import { isoToKstDatetimeLocal, kstDatetimeLocalToIso } from '@/lib/kst-calendar';
@@ -30,6 +30,7 @@ export type BracketNodePanelProps = {
   tournamentId: string;
   fixture: V1AdminBracketFixture;
   groups: V1AdminBracketGroup[];
+  fixtures: V1AdminBracketFixture[];
   slots: V1AdminBracketSlot[];
   registrations: V1AdminTournamentRegistration[];
   /** 신청 목록이 아직 없거나 실패한 상태에서는 팀 선택창을 잠근다("팀 0개"처럼 보이지 않게). */
@@ -51,6 +52,7 @@ export function BracketNodePanel({
   tournamentId,
   fixture,
   groups,
+  fixtures,
   slots,
   registrations,
   registrationsLoaded,
@@ -123,6 +125,7 @@ export function BracketNodePanel({
       (registration) => registration.id,
       registrationIdsBlockedForGroup(groups, fixture.groupId),
       current,
+      registrationIdsInOppositeFinalStage(groups, fixtures, fixture.groupId),
     );
   };
 

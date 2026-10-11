@@ -4,6 +4,7 @@ import { delay, http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { buildLeagueGrid } from '@/lib/bracket-league-grid-model';
+import { clearFixtureRequestKey } from '@/lib/fixture-request-key-store';
 import { v1Keys } from '@/lib/query-keys';
 import { makeBracket, makeFixture, makeGroup } from '@/test/bracket-canvas-fixtures';
 import type { V1AdminTournamentBracket } from '@/types/api';
@@ -42,6 +43,7 @@ afterEach(() => {
   created = null;
   failNext = false;
   failOnce = null;
+  clearFixtureRequestKey('t-1');
 });
 afterAll(() => server.close());
 
@@ -62,7 +64,7 @@ const NO_GROUP_NOTICE = '조별 리그 조가 없어 경기를 추가할 수 없
 function renderLeagueDialog(bracket: V1AdminTournamentBracket = numbered) {
   serverBracket = bracket;
   const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
-  const props = { open: true, mode: 'add' as const, format: 'league' as const, tournamentId: 't-1', bracket, requestKeyRef: { current: null }, onClose: vi.fn(), showToast: vi.fn() };
+  const props = { open: true, mode: 'add' as const, format: 'league' as const, tournamentId: 't-1', bracket, onClose: vi.fn(), showToast: vi.fn() };
   render(
     <QueryClientProvider client={client}>
       <BracketFixtureToolsDialog {...props} />

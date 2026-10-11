@@ -1,5 +1,4 @@
 import { fireEvent, render, screen } from '@testing-library/react';
-import { V1ApiError } from '@/lib/api-client';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { makeBracket, makeFixture, makeGame, makeGroup } from '@/test/bracket-canvas-fixtures';
 import { BracketFixtureToolsDialog } from './bracket-fixture-tools-dialog';
@@ -22,13 +21,8 @@ const bracket = makeBracket({
   ],
 });
 
-const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const apiError = (statusCode: number) =>
-  new V1ApiError({ status: 'error', statusCode, code: statusCode === 0 ? 'NETWORK_ERROR' : 'SOME_CODE', message: 'x', timestamp: '2026-10-11T00:00:00.000Z' });
-const keyOf = (call: number) => (mocks.create.mock.calls[call][0] as { clientCommandId: string }).clientCommandId;
-
 function renderDialog(mode: 'add' | 'link') {
-  const props = { open: true, mode, format: 'knockout' as const, tournamentId: 't-1', bracket, requestKeyRef: { current: null }, onClose: vi.fn(), showToast: vi.fn() };
+  const props = { open: true, mode, format: 'knockout' as const, tournamentId: 't-1', bracket, onClose: vi.fn(), showToast: vi.fn() };
   render(<BracketFixtureToolsDialog {...props} />);
   return props;
 }
@@ -42,7 +36,7 @@ describe('BracketFixtureToolsDialog — 경기 추가', () => {
     const props = renderDialog('add');
     fireEvent.change(screen.getByLabelText('추가할 단계'), { target: { value: 'g-sf' } });
     fireEvent.click(screen.getByRole('button', { name: '경기 추가' }));
-    expect(mocks.create).toHaveBeenCalledWith({ groupId: 'g-sf', round: '4강', clientCommandId: expect.stringMatching(UUID_PATTERN) }, expect.any(Object));
+    expect(mocks.create).toHaveBeenCalledWith({ groupId: 'g-sf', round: '4강' }, expect.any(Object));
     mocks.create.mock.calls[0][1].onSuccess();
     expect(props.showToast).toHaveBeenCalledWith('4강 경기를 추가했어요. 칸을 눌러 팀을 넣어 주세요.', 'success');
     expect(props.onClose).toHaveBeenCalledTimes(1);
@@ -56,48 +50,9 @@ describe('BracketFixtureToolsDialog — 경기 추가', () => {
     expect(props.onClose).not.toHaveBeenCalled();
   });
 
-  it('처리 여부를 모르는 실패(네트워크·5xx) 뒤 다시 누르면 같은 키를, 4xx 거절·성공 뒤에는 새 키를 쓴다', () => {
-    renderDialog('add');
-    const click = () => fireEvent.click(screen.getByRole('button', { name: '경기 추가' }));
-    const settle = (call: number, outcome: 'success' | { error: unknown }) => {
-      const handlers = mocks.create.mock.calls[call][1];
-      if (outcome === 'success') handlers.onSuccess();
-      else handlers.onError(outcome.error);
-      handlers.onSettled();
-    };
-
-    click();
-    settle(0, { error: apiError(0) });
-    click();
-    settle(1, { error: apiError(503) });
-    click();
-    expect([keyOf(1), keyOf(2)]).toEqual([keyOf(0), keyOf(0)]);
-
-    settle(2, { error: apiError(409) });
-    click();
-    expect(keyOf(3)).not.toBe(keyOf(0));
-
-    settle(3, 'success');
-    click();
-    expect(keyOf(4)).not.toBe(keyOf(3));
-  });
-
-  it('실패 뒤 단계를 바꿔 다시 누르면 새 키로 보낸다', () => {
-    renderDialog('add');
-    fireEvent.click(screen.getByRole('button', { name: '경기 추가' }));
-    const handlers = mocks.create.mock.calls[0][1];
-    handlers.onError(apiError(0));
-    handlers.onSettled();
-    fireEvent.change(screen.getByLabelText('추가할 단계'), { target: { value: 'g-sf' } });
-    fireEvent.click(screen.getByRole('button', { name: '경기 추가' }));
-    expect(mocks.create.mock.calls[1][0]).toMatchObject({ groupId: 'g-sf', round: '4강' });
-    expect(keyOf(1)).not.toBe(keyOf(0));
-  });
-
   it('조별리그 단계만 있는 대진은 추가할 단계가 없다고 안내하고 버튼을 막는다', () => {
     render(
       <BracketFixtureToolsDialog
-        requestKeyRef={{ current: null }}
         open
         format="knockout"
         mode="add"
@@ -114,7 +69,6 @@ describe('BracketFixtureToolsDialog — 경기 추가', () => {
   it('group_knockout 은 리그 폼이 아니라 결선 단계 목록 그대로이고, 조별 단계는 나열하지 않는다', () => {
     render(
       <BracketFixtureToolsDialog
-        requestKeyRef={{ current: null }}
         open
         mode="add"
         format="group_knockout"
@@ -165,7 +119,6 @@ describe('BracketFixtureToolsDialog — 경기 연결', () => {
   it('현재 연결된 원천이 더는 후보가 아니어도(진행 중) 선택값과 표시가 어긋나지 않는다', () => {
     render(
       <BracketFixtureToolsDialog
-        requestKeyRef={{ current: null }}
         open
         format="knockout"
         mode="link"
@@ -190,7 +143,6 @@ describe('BracketFixtureToolsDialog — 경기 연결', () => {
   it('이미 시작한 경기는 연결 대상에서 뺀다', () => {
     render(
       <BracketFixtureToolsDialog
-        requestKeyRef={{ current: null }}
         open
         format="knockout"
         mode="link"
@@ -212,7 +164,6 @@ describe('BracketFixtureToolsDialog — 경기 연결', () => {
   it('연결할 수 있는 경기(앞 단계가 있는 경기)가 없으면 안내하고 저장을 막는다', () => {
     render(
       <BracketFixtureToolsDialog
-        requestKeyRef={{ current: null }}
         open
         format="knockout"
         mode="link"

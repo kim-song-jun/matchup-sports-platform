@@ -4751,7 +4751,7 @@ export type V1CreateFixturePayload = {
 };
 
 /** 번호를 서버가 정하는 「경기 추가」 요청. */
-export type V1AddBracketFixtureInput = { groupId: string; round: string; clientCommandId: string };
+export type V1AddBracketFixtureInput = { groupId: string; round: string };
 
 export type V1CreateAnnouncementPayload = {
   title: string;

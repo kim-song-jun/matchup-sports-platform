@@ -3,6 +3,7 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-li
 import { delay, http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { clearFixtureRequestKey } from '@/lib/fixture-request-key-store';
 import { makeBracket, makeFixture, makeGroup } from '@/test/bracket-canvas-fixtures';
 import { installViewport } from '@/test/viewport';
 import { BracketCanvasWorkspace } from './bracket-canvas-workspace';
@@ -49,17 +50,19 @@ afterEach(() => {
   server.resetHandlers();
   replies.length = 0;
   bodies.length = 0;
+  clearFixtureRequestKey('t-1');
+  clearFixtureRequestKey('t-2');
   restoreViewport?.();
 });
 afterAll(() => server.close());
 
-function renderWorkspace() {
+function renderWorkspace(tournamentId = 't-1') {
   const showToast = vi.fn();
   const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
-  render(
+  const view = render(
     <QueryClientProvider client={client}>
       <BracketCanvasWorkspace
-        tournamentId="t-1"
+        tournamentId={tournamentId}
         format="knockout"
         registrations={[]}
         registrationsState={{ status: 'success', truncated: false, refetchFailed: false, error: null, onRetry: vi.fn() }}
@@ -71,7 +74,7 @@ function renderWorkspace() {
       />
     </QueryClientProvider>,
   );
-  return showToast;
+  return Object.assign(showToast, { unmount: view.unmount });
 }
 
 // 본문 없는 오류 응답은 처음 한 번 에러 리포팅 경로를 타서 기본 1초를 넘길 수 있다.
@@ -128,5 +131,56 @@ describe('「경기 추가」 요청 키 — 실제 전송 경로', () => {
 
     if (keepsKey) expect(keys()[1]).toBe(keys()[0]);
     else expect(keys()[1]).not.toBe(keys()[0]);
+  });
+
+  // 그림↔목록 전환·반응형 폭 전환은 워크스페이스를 통째로 언마운트한다 — 키가 컴포넌트 상태에 있으면 여기서 사라진다.
+  it('응답을 잃은 뒤 워크스페이스가 언마운트됐다 다시 마운트돼도 같은 키로 재전송한다', async () => {
+    replies.push('network');
+    const first = renderWorkspace();
+    openDialog();
+    dialogAdd();
+    await settle(() => expect(first).toHaveBeenCalledWith(expect.any(String), 'error'));
+    first.unmount();
+
+    const second = renderWorkspace();
+    openDialog();
+    dialogAdd();
+    await settle(() => expect(second).toHaveBeenCalledWith(expect.stringContaining('경기를 추가했어요'), 'success'));
+
+    expect(bodies).toHaveLength(2);
+    expect(keys()[1]).toBe(keys()[0]);
+  });
+
+  it('성공하면 키가 비워져, 다시 마운트한 뒤의 추가는 새 키를 쓴다', async () => {
+    const first = renderWorkspace();
+    openDialog();
+    dialogAdd();
+    await settle(() => expect(first).toHaveBeenCalledWith(expect.stringContaining('경기를 추가했어요'), 'success'));
+    first.unmount();
+
+    const second = renderWorkspace();
+    openDialog();
+    dialogAdd();
+    await settle(() => expect(second).toHaveBeenCalledWith(expect.stringContaining('경기를 추가했어요'), 'success'));
+
+    expect(bodies).toHaveLength(2);
+    expect(keys()[1]).not.toBe(keys()[0]);
+  });
+
+  it('다른 대회는 실패한 대회의 키를 물려받지 않는다', async () => {
+    replies.push('network');
+    const first = renderWorkspace('t-1');
+    openDialog();
+    dialogAdd();
+    await settle(() => expect(first).toHaveBeenCalledWith(expect.any(String), 'error'));
+    first.unmount();
+
+    const other = renderWorkspace('t-2');
+    openDialog();
+    dialogAdd();
+    await settle(() => expect(other).toHaveBeenCalledWith(expect.stringContaining('경기를 추가했어요'), 'success'));
+
+    expect(bodies).toHaveLength(2);
+    expect(keys()[1]).not.toBe(keys()[0]);
   });
 });

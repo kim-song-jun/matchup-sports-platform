@@ -133,21 +133,46 @@ function assertReplayableFixture(aggregate: FixtureReplayAggregate, tournamentId
   }
 }
 
+/** 경기 생성 응답(serializeCanonicalFixture 결과). 키 기록에 그대로 저장돼 재전송 때 돌려준다. */
+export interface SerializedCanonicalFixture {
+  id: string;
+  tournamentId: string;
+  groupId: string | null;
+  round: string;
+  fixtureNumber: number;
+  legNumber: number;
+  parentFixtureId: string | null;
+  homeRegistrationId: string | null;
+  awayRegistrationId: string | null;
+  scheduledAt: string | null;
+  venue: string | null;
+  place: PlaceView | null;
+  status: 'completed' | 'cancelled' | 'scheduled';
+  createdAt: string;
+  updatedAt: string;
+}
+
+// upsert: 만료됐지만 지워지지 않은 같은 (경기, 키) 행이 있으면 유일 제약에 걸리므로 그 행을 새 기록으로 갱신한다.
 async function recordClientFixtureKey(
-  tx: Prisma.TransactionClient, userId: string, clientKey: string, payloadHash: string, teamMatchId: string,
+  tx: Prisma.TransactionClient, userId: string, clientKey: string, payloadHash: string, response: SerializedCanonicalFixture,
 ): Promise<void> {
-  await tx.v1IdempotencyRecord.create({
-    data: {
-      actorUserId: userId,
-      action: FIXTURE_CLIENT_CREATE_ACTION,
-      resourceType: V1GameSourceType.TEAM_MATCH,
-      resourceId: teamMatchId,
-      idempotencyKey: clientKey,
-      payloadHash,
-      responseStatus: 201,
-      responseBody: { teamMatchId },
-      expiresAt: new Date(Date.now() + FIXTURE_CLIENT_KEY_RETENTION_MS),
-    },
+  const identity = {
+    actorUserId: userId,
+    action: FIXTURE_CLIENT_CREATE_ACTION,
+    resourceType: V1GameSourceType.TEAM_MATCH,
+    resourceId: response.id,
+    idempotencyKey: clientKey,
+  };
+  const record = {
+    payloadHash,
+    responseStatus: 201,
+    responseBody: response as unknown as Prisma.InputJsonObject,
+    expiresAt: new Date(Date.now() + FIXTURE_CLIENT_KEY_RETENTION_MS),
+  };
+  await tx.v1IdempotencyRecord.upsert({
+    where: { actorUserId_action_resourceType_resourceId_idempotencyKey: identity },
+    create: { ...identity, ...record },
+    update: record,
   });
 }
 
@@ -522,16 +547,19 @@ export class TournamentBracketService {
     return this.serializeGroupTeam(saved);
   }
 
-  /** 같은 요청 고유 키로 처음 만든 경기를 돌려준다. 기록이 없거나 보관 기간(30일)이 지났으면 null(새 요청). */
+  /**
+   * 같은 요청 고유 키로 처음 돌려준 응답을 그대로 재생한다(전역 멱등 계약). 기록이 없거나 보관 기간(30일)이 지났으면 null(새 요청).
+   * 계약의 예외: 처음 만든 경기가 그 뒤 지워졌으면 지워진 경기의 옛 본문 대신 RESOURCE_GONE 이다.
+   */
   private async replayClientFixture(
     db: Prisma.TransactionClient, userId: string, tournamentId: string, clientKey: string, payloadHash: string,
-  ) {
+  ): Promise<SerializedCanonicalFixture | null> {
     const prior = await db.v1IdempotencyRecord.findFirst({
       where: {
         actorUserId: userId, action: FIXTURE_CLIENT_CREATE_ACTION, resourceType: V1GameSourceType.TEAM_MATCH,
         idempotencyKey: clientKey, expiresAt: { gt: new Date() },
       },
-      select: { resourceId: true, payloadHash: true },
+      select: { resourceId: true, payloadHash: true, responseBody: true },
     });
     if (!prior) return null;
     if (prior.payloadHash !== payloadHash) {
@@ -540,18 +568,17 @@ export class TournamentBracketService {
         message: '같은 경기 생성 키를 다른 내용으로 다시 사용할 수 없어요.',
       });
     }
-    const priorDetails = await db.v1TournamentMatchDetails.findFirst({
+    const alive = await db.v1TournamentMatchDetails.findFirst({
       where: { teamMatchId: prior.resourceId, tournamentId, teamMatch: { deletedAt: null } },
-      select: FIXTURE_REPLAY_SELECT,
+      select: { teamMatchId: true },
     });
-    if (!priorDetails?.teamMatch) {
+    if (!alive) {
       throw new ConflictException({
         code: 'COMMAND_IDEMPOTENCY_RESOURCE_GONE',
         message: '이 요청으로 만든 경기가 이미 지워졌어요. 다시 추가해 주세요.',
       });
     }
-    assertReplayableFixture(priorDetails.teamMatch, tournamentId);
-    return fixtureReplayResult({ ...priorDetails, teamMatch: priorDetails.teamMatch });
+    return prior.responseBody as unknown as SerializedCanonicalFixture;
   }
 
   async createFixture(user: V1AuthUser, tournamentId: string, dto: CreateFixtureDto) {
@@ -583,7 +610,7 @@ export class TournamentBracketService {
     // 잠금 없는 조회라 동시 첫 요청은 못 막는다 — 그 직렬화는 아래 트랜잭션 안의 같은 조회가 맡는다.
     if (clientKey) {
       const replay = await this.replayClientFixture(this.prisma, user.id, tournamentId, clientKey, clientPayloadHash);
-      if (replay) return this.serializeCanonicalFixture(replay, toPlaceView(replay));
+      if (replay) return replay;
     }
 
     // groupId가 주어지면 해당 대회 소속인지 확인
@@ -633,7 +660,7 @@ export class TournamentBracketService {
       });
     }
 
-    const created = await this.prisma.$transaction(async (tx) => {
+    return this.prisma.$transaction(async (tx) => {
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`league-fixture-generation:${tournamentId}`}, 0))`;
       // 요청 고유 키 재전송: 번호를 정하기 전에 처음 만든 경기를 찾는다(번호가 달라져 좌표 멱등이 안 걸리는 재시도를 막는다).
       if (clientKey) {
@@ -747,8 +774,10 @@ export class TournamentBracketService {
         }
         // 번호를 함께 보낸 키 요청이 좌표로 재생되면 키도 이 경기에 묶어 둔다 — 안 묶으면 그 뒤 경기가 옮겨지거나
         // 지워졌을 때 같은 키 재시도가 재생·RESOURCE_GONE 대신 새 경기를 만든다(위 키 조회에서 기록이 없었던 경우다).
-        if (clientKey) await recordClientFixtureKey(tx, user.id, clientKey, clientPayloadHash, existingDetails.teamMatchId);
-        return fixtureReplayResult(existingDetails);
+        const replayed = fixtureReplayResult(existingDetails);
+        const body = this.serializeCanonicalFixture(replayed, toPlaceView(replayed));
+        if (clientKey) await recordClientFixtureKey(tx, user.id, clientKey, clientPayloadHash, body);
+        return body;
       }
 
       const archived = await tx.v1TournamentMatchDetails.findMany({
@@ -884,10 +913,7 @@ export class TournamentBracketService {
         },
         tx,
       );
-      if (clientKey) {
-        await recordClientFixtureKey(tx, user.id, clientKey, clientPayloadHash, teamMatch.id);
-      }
-      return {
+      const createdRow = {
         ...teamMatch,
         tournamentId,
         groupId: dto.groupId ?? null,
@@ -898,9 +924,10 @@ export class TournamentBracketService {
         homeRegistrationId: dto.homeRegistrationId ?? null,
         awayRegistrationId: dto.awayRegistrationId ?? null,
       };
+      const body = this.serializeCanonicalFixture(createdRow, toPlaceView(createdRow));
+      if (clientKey) await recordClientFixtureKey(tx, user.id, clientKey, clientPayloadHash, body);
+      return body;
     });
-
-    return this.serializeCanonicalFixture(created, toPlaceView(created));
   }
 
   /** Persist the next match's HOME/AWAY source. Existing result projection owns promotion. */
@@ -1401,7 +1428,7 @@ export class TournamentBracketService {
     status: string;
     createdAt: Date;
     updatedAt: Date;
-  }, place: PlaceView | null) {
+  }, place: PlaceView | null): SerializedCanonicalFixture {
     const status =
       row.status === 'completed'
         ? 'completed'

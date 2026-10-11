@@ -1882,6 +1882,15 @@ export class LeagueMatchAdminService {
       }
       const completed = await this.leagueCompletion.settle(tx, leagueId, 'admin_completed');
       if (!completed) {
+        // 동시에 다른 관리자(또는 자동 종료)가 먼저 종료했으면 settle 은 0행 갱신으로 false 를 돌려준다 —
+        // 그 경우는 남은 경기 때문이 아니므로 다시 읽어 멱등 응답으로 돌려준다.
+        const latest = await findTournamentOnSurface(tx, ['regular_league'], {
+          where: { id: leagueId, deletedAt: null },
+          select: { status: true },
+        });
+        if (latest !== null && LEAGUE_STATE_BY_STATUS[latest.status] === 'completed') {
+          return { leagueId, state: 'completed' as const, alreadyProcessed: true };
+        }
         throw new ConflictException({
           code: 'LEAGUE_FIXTURES_PENDING',
           message: '아직 결과가 확정되지 않은 경기가 있어요. 모든 경기를 확정하거나 취소한 뒤 종료해 주세요.',

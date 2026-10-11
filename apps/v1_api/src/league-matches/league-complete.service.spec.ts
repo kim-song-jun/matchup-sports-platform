@@ -66,6 +66,31 @@ describe('LeagueMatchAdminService.completeLeague', () => {
     expect(logAdminAction).not.toHaveBeenCalled();
   });
 
+  it('조회 뒤 다른 관리자가 먼저 종료했으면 남은 경기 오류 대신 alreadyProcessed 를 돌려준다', async () => {
+    const { service, row, logAdminAction } = setup({ status: 'in_progress' }, [official()]);
+    // 첫 조회(서비스)·settle 조회는 진행 중으로 보이고, 그 사이 다른 트랜잭션이 종료를 커밋한다.
+    const reads = [{ ...row }, { ...row }];
+    const findFirst = jest.fn(async () => reads.shift() ?? { ...row });
+    (service as unknown as { prisma: { $transaction: (run: (tx: unknown) => Promise<unknown>) => Promise<unknown> } }).prisma = {
+      $transaction: async (run) =>
+        run({
+          v1Tournament: {
+            findFirst,
+            updateMany: jest.fn(async () => {
+              row.status = 'completed';
+              return { count: 0 };
+            }),
+          },
+          v1TeamMatch: { findMany: jest.fn(async () => [official()]) },
+          v1StatusChangeLog: { create: jest.fn() },
+          $queryRaw: jest.fn(async () => []),
+        }),
+    };
+    await expect(service.completeLeague(admin, 'league-1', {}))
+      .resolves.toEqual({ leagueId: 'league-1', state: 'completed', alreadyProcessed: true });
+    expect(logAdminAction).not.toHaveBeenCalled();
+  });
+
   it('이미 종료된 리그는 멱등하게 alreadyProcessed 를 돌려준다', async () => {
     const { service, logAdminAction } = setup({ status: 'completed' }, [official()]);
     await expect(service.completeLeague(admin, 'league-1', {}))

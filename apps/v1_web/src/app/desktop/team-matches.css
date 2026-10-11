@@ -1,19 +1,9 @@
 /* ============================================================
  * Desktop overrides — team-matches domain
  * Owner: team-matches wave agent
- * Rules are behind @media (min-width:1024px) / (min-width:1440px), except the
- * caption spacing block below, which is deliberately breakpoint-independent.
+ * ALL rules are behind @media (min-width:1024px) or @media (min-width:1440px).
+ * Mobile (<768) is NEVER modified here.
  * ============================================================ */
-
-/* 칩 줄 아래 캡션 → 요약 바 간격. 모든 폭에서 12px 로 같다(칩 줄 아래 패딩도 12px).
-   캡션이 없는 /matches 는 이 셀렉터에 걸리지 않는다. */
-.tm-sport-chip-row + .tm-text-caption {
-  margin: 0 0 var(--spacing-3);
-}
-
-.tm-text-caption + .tm-match-summary-row {
-  margin-top: 0;
-}
 
 /* ─── List page (/team-matches) ──────────────────────────────────────────── */
 
@@ -77,7 +67,7 @@
   .tm-sport-chip-row {
     flex-wrap: wrap;
     overflow-x: visible;
-    padding-bottom: var(--spacing-3);
+    padding-bottom: 0;
     gap: 8px;
   }
 

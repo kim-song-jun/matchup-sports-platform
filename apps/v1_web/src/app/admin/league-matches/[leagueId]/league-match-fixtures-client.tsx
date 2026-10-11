@@ -94,7 +94,6 @@ function isFixtureGameInProgress(fixture: V1LeagueFixture): boolean {
   return fixture.status !== 'cancelled' && (fixture.gameState === 'LIVE' || fixture.gameState === 'PAUSED');
 }
 
-// 미리보기·생성(재생성) 버튼은 한 묶음 — 좁은 폭에선 한 줄을 나눠 쓰고, 넓은 폭에선 내용 폭으로 모인다.
 function manualFixtureHint(canAdd: boolean, leagueEnded: boolean): string {
   if (leagueEnded) return '끝난 리그에는 경기를 추가할 수 없어요. 먼저 ‘진행 중으로 되돌리기’를 해 주세요.';
   return canAdd
@@ -102,6 +101,7 @@ function manualFixtureHint(canAdd: boolean, leagueEnded: boolean): string {
     : '참가팀이 2팀 이상이어야 경기를 추가할 수 있어요.';
 }
 
+// 미리보기·생성(재생성) 버튼은 한 묶음 — 좁은 폭에선 한 줄을 나눠 쓰고, 넓은 폭에선 내용 폭으로 모인다.
 const ACTION_ROW_CLASS = 'col-span-full flex gap-2';
 
 const inputClass =

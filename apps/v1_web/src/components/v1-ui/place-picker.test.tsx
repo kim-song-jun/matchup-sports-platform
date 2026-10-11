@@ -156,6 +156,110 @@ describe('PlacePicker', () => {
     expect(onValue).toHaveBeenLastCalledWith({ kind: 'manual', name: '가'.repeat(150) });
   });
 
+  describe('결과 더 보기', () => {
+    function place(id: string, name: string) {
+      return { provider: 'kakao', providerPlaceId: id, name, address: '서울 마포구', jibunAddress: null, category: null, latitude: 37.5, longitude: 126.9 };
+    }
+    function page(items: ReturnType<typeof place>[], hasMore: boolean) {
+      return HttpResponse.json({ status: 'success', data: { items, hasMore }, timestamp: '2026-10-11T00:00:00.000Z' });
+    }
+
+    it('결과가 더 있으면 다음 쪽을 목록 끝에 이어 붙이고, 마지막 쪽이면 「결과 더 보기」가 사라진다', async () => {
+      const pages: Array<string | null> = [];
+      server.use(
+        http.get('*/api/v1/places/search', ({ request }) => {
+          const requested = new URL(request.url).searchParams.get('page');
+          pages.push(requested);
+          return requested === '2'
+            ? page([place('p1', '망원 1구장'), place('p3', '망원 3구장')], false)
+            : page([place('p1', '망원 1구장'), place('p2', '망원 2구장')], true);
+        }),
+      );
+      const onValue = vi.fn();
+      renderPicker({ onValue });
+      fireEvent.change(screen.getByRole('combobox'), { target: { value: '망원' } });
+      await findOption('망원 2구장');
+
+      fireEvent.click(await findOption('결과 더 보기'));
+
+      const third = await findOption('망원 3구장');
+      // 활성 줄은 누른 「더 보기」 자리, 곧 첫 새 결과로 이어진다.
+      expect(screen.getByRole('combobox')).toHaveAttribute('aria-activedescendant', third.id);
+      // 쪽 경계에서 다시 온 1구장은 한 번만 보인다.
+      expect(screen.getAllByRole('option').filter((option) => option.textContent?.includes('망원 1구장'))).toHaveLength(1);
+      expect(screen.queryByText('결과 더 보기')).not.toBeInTheDocument();
+      expect(pages).toEqual([null, '2']);
+
+      fireEvent.click(third);
+      expect(onValue).toHaveBeenLastCalledWith(expect.objectContaining({ kind: 'picked', name: '망원 3구장', providerPlaceId: 'p3' }));
+    });
+
+    it('다음 쪽만 실패하면 받아 둔 결과와 실패 이유를 남기고, 같은 줄에서 다시 시도하는 동안엔 실패를 알리지 않는다', async () => {
+      let secondPageCalls = 0;
+      let releaseRetry: () => void = () => {};
+      const retryGate = new Promise<void>((resolve) => {
+        releaseRetry = resolve;
+      });
+      server.use(
+        http.get('*/api/v1/places/search', async ({ request }) => {
+          if (new URL(request.url).searchParams.get('page') !== '2') return page([place('p1', '망원 1구장')], true);
+          secondPageCalls += 1;
+          if (secondPageCalls === 1) return errorBody(429, 'RATE_LIMITED', '요청이 많아요. 잠시 후 다시 시도해 주세요.');
+          await retryGate;
+          return page([place('p2', '망원 2구장')], false);
+        }),
+      );
+      renderPicker();
+      fireEvent.change(screen.getByRole('combobox'), { target: { value: '망원' } });
+      fireEvent.click(await findOption('결과 더 보기'));
+
+      const retry = await findOption('다시 시도');
+      const status = screen.getByRole('status');
+      expect(retry).toHaveTextContent('요청이 많아요. 잠시 후 다시 시도해 주세요.');
+      expect(status).toHaveTextContent('요청이 많아요. 잠시 후 다시 시도해 주세요.');
+      // 첫 쪽 실패 안내(목록을 숨기고 버튼을 띄우는 쪽)로 바뀌지 않는다.
+      expect(screen.getByRole('listbox')).toBeVisible();
+      expect(await findOption('망원 1구장')).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: '이름만 직접 입력' })).not.toBeInTheDocument();
+
+      fireEvent.click(retry);
+      await waitFor(() => expect(status).toHaveTextContent('결과를 더 불러오고 있어요'));
+      expect(status).not.toHaveTextContent('요청이 많아요');
+
+      releaseRetry();
+      expect(await findOption('망원 2구장')).toBeInTheDocument();
+      expect(secondPageCalls).toBe(2);
+    });
+
+    it('불러오는 동안 직접 입력 줄로 옮겨 가면 새 결과가 붙은 뒤에도 그 줄을 가리킨다', async () => {
+      let releaseNext: () => void = () => {};
+      const nextGate = new Promise<void>((resolve) => {
+        releaseNext = resolve;
+      });
+      server.use(
+        http.get('*/api/v1/places/search', async ({ request }) => {
+          if (new URL(request.url).searchParams.get('page') !== '2') return page([place('p1', '망원 1구장')], true);
+          await nextGate;
+          return page([place('p2', '망원 2구장'), place('p3', '망원 3구장')], false);
+        }),
+      );
+      renderPicker();
+      const combobox = screen.getByRole('combobox');
+      fireEvent.change(combobox, { target: { value: '망원' } });
+      fireEvent.click(await findOption('결과 더 보기'));
+      await findOption('결과를 더 불러오고 있어요');
+
+      fireEvent.keyDown(combobox, { key: 'ArrowDown' });
+      const manual = await findOption('이름만 직접 입력');
+      expect(combobox).toHaveAttribute('aria-activedescendant', manual.id);
+
+      releaseNext();
+      await findOption('망원 3구장');
+      const manualAfter = await findOption('이름만 직접 입력');
+      expect(combobox).toHaveAttribute('aria-activedescendant', manualAfter.id);
+    });
+  });
+
   it('검색 결과가 없으면 안내와 직접 입력 버튼을 보여 준다', async () => {
     renderPicker();
     fireEvent.change(screen.getByRole('combobox'), { target: { value: '없는곳xyz' } });
@@ -319,20 +423,8 @@ describe('PlacePicker', () => {
       delete (Element.prototype as { scrollIntoView?: unknown }).scrollIntoView;
     });
 
-    it('데스크톱(1024px 이상)에서만 240px 로 키우고 모바일은 120px 그대로다', async () => {
-      restoreViewport = installViewport(1280);
-      const desktop = renderPicker({ initial: picked });
-      expect(await screen.findByRole('link', { name: '성산 풋살파크 지도 크게 보기' })).toHaveStyle({ height: '240px' });
-      desktop.unmount();
-      restoreViewport();
-
+    it('장소를 고른 직후에만 지도를 화면 안으로 스크롤한다 — 값이 채워진 채 열린 폼은 움직이지 않는다', async () => {
       restoreViewport = installViewport(390);
-      renderPicker({ initial: picked });
-      expect(await screen.findByRole('link', { name: '성산 풋살파크 지도 크게 보기' })).toHaveStyle({ height: '120px' });
-    });
-
-    it('데스크톱에서 장소를 고른 직후에만 지도를 화면 안으로 스크롤한다 — 값이 채워진 채 열린 폼은 움직이지 않는다', async () => {
-      restoreViewport = installViewport(1280);
       const prefilled = renderPicker({ initial: picked });
       await screen.findByRole('link', { name: '성산 풋살파크 지도 크게 보기' });
       expect(scrollIntoView).not.toHaveBeenCalled();
@@ -345,17 +437,6 @@ describe('PlacePicker', () => {
       const map = await screen.findByRole('link', { name: '망원한강공원 풋살장 지도 크게 보기' });
       // 검색 목록도 scrollIntoView 를 부르므로 호출 대상(this)이 지도 상자인지로 가린다.
       await waitFor(() => expect(scrollIntoView.mock.contexts).toContain(map));
-    });
-
-    it('모바일에서는 장소를 골라도 지도 때문에 스크롤하지 않는다', async () => {
-      restoreViewport = installViewport(390);
-      renderPicker();
-      fireEvent.change(screen.getByRole('combobox', { name: '장소' }), { target: { value: '망원 풋살' } });
-      fireEvent.click(await findOption('망원한강공원 풋살장'));
-
-      const map = await screen.findByRole('link', { name: '망원한강공원 풋살장 지도 크게 보기' });
-      expect(map).toHaveStyle({ height: '120px' });
-      expect(scrollIntoView.mock.contexts).not.toContain(map);
     });
   });
 });

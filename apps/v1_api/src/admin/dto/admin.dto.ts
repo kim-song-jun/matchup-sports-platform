@@ -14,6 +14,7 @@ import {
   MaxLength,
   Min,
 } from 'class-validator';
+import { MAX_PAGE_NUMBER } from '../../common/pagination/page-args';
 import { POPUP_TARGET_SCREENS, PopupTargetScreen } from '../../popups/popup-screen';
 
 // ─── List query DTOs ──────────────────────────────────────────────────────────
@@ -45,6 +46,7 @@ export class AdminUserListQueryDto {
   @Type(() => Number)
   @IsInt()
   @Min(1)
+  @Max(MAX_PAGE_NUMBER)
   page?: number;
 
   @IsOptional()
@@ -79,6 +81,7 @@ export class AdminMatchListQueryDto {
   @Type(() => Number)
   @IsInt()
   @Min(1)
+  @Max(MAX_PAGE_NUMBER)
   page?: number;
 
   @IsOptional()
@@ -109,6 +112,7 @@ export class AdminTeamListQueryDto {
   @Type(() => Number)
   @IsInt()
   @Min(1)
+  @Max(MAX_PAGE_NUMBER)
   page?: number;
 
   @IsOptional()
@@ -157,6 +161,7 @@ export class AdminTeamMatchListQueryDto {
   @Type(() => Number)
   @IsInt()
   @Min(1)
+  @Max(MAX_PAGE_NUMBER)
   page?: number;
 
   @IsOptional()
@@ -195,6 +200,7 @@ export class AdminNoticeListQueryDto {
   @Type(() => Number)
   @IsInt()
   @Min(1)
+  @Max(MAX_PAGE_NUMBER)
   page?: number;
 
   @IsOptional()
@@ -247,6 +253,7 @@ export class AdminInquiryListQueryDto {
   @Type(() => Number)
   @IsInt()
   @Min(1)
+  @Max(MAX_PAGE_NUMBER)
   page?: number;
 
   @IsOptional()
@@ -329,6 +336,7 @@ export class AdminPopupListQueryDto {
   @Type(() => Number)
   @IsInt()
   @Min(1)
+  @Max(MAX_PAGE_NUMBER)
   page?: number;
 
   @IsOptional()
@@ -477,6 +485,7 @@ export class AdminListQueryDto {
   @Type(() => Number)
   @IsInt()
   @Min(1)
+  @Max(MAX_PAGE_NUMBER)
   page?: number;
 
   @IsOptional()
@@ -552,6 +561,7 @@ export class AdminLogsQueryDto {
   @Type(() => Number)
   @IsInt()
   @Min(1)
+  @Max(MAX_PAGE_NUMBER)
   page?: number;
 
   @IsOptional()

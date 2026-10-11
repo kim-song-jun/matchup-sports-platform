@@ -233,6 +233,32 @@ describe('NotificationsService', () => {
     expect(prisma.v1Notification.create).not.toHaveBeenCalled();
   });
 
+  it.each([
+    ['tournament_registration_submitted', '리그 신청이 접수됐어요', '대회 신청이 접수됐어요'],
+    ['tournament_registration_confirmed', '리그 참가가 확정됐어요', '대회 참가가 확정됐어요'],
+    ['tournament_registration_cancelled', '리그 참가가 취소됐어요', '대회 참가가 취소됐어요'],
+  ] as const)('%s 제목은 정규 리그 신청에서만 리그로 나간다', async (type, leagueTitle, tournamentTitle) => {
+    prisma.v1NotificationPreference.findUnique.mockResolvedValue(null);
+    prisma.v1Notification.create.mockResolvedValue(makeNotification());
+
+    await service.emitNotification('user-1', type, 'c-1', '본문', { competitionKind: 'regular_league' });
+    await service.emitNotification('user-1', type, 'c-2', '본문', { competitionKind: 'regular_tournament' });
+    await service.emitNotification('user-1', type, 'c-3', '본문', { competitionKind: null });
+    await service.emitNotification('user-1', type, 'c-4', '본문');
+    await new Promise(setImmediate);
+
+    const titles = new Map(
+      prisma.v1Notification.create.mock.calls.map(([args]: [{ data: { targetId: string; title: string } }]) => [
+        args.data.targetId,
+        args.data.title,
+      ]),
+    );
+    expect(titles.get('c-1')).toBe(leagueTitle);
+    expect(titles.get('c-2')).toBe(tournamentTitle);
+    expect(titles.get('c-3')).toBe(tournamentTitle);
+    expect(titles.get('c-4')).toBe(tournamentTitle);
+  });
+
   it('body를 넘기지 않으면 이벤트 기본 body(EVENT_BODIES)로 채워진다', async () => {
     prisma.v1NotificationPreference.findUnique.mockResolvedValue(null);
     prisma.v1Notification.create.mockResolvedValue(makeNotification());
@@ -399,6 +425,38 @@ describe('NotificationsService', () => {
         data: expect.objectContaining({ deepLink: expectedDeepLink, targetType: 'team_match' }),
       }),
     );
+  });
+
+  // MD-QA #79 — 확정된 대회 경기 결과를 정정하면 보내는 알림. 매핑 함수 셋이 모두 파일 로컬이고 말미 폴백이 있어
+  // (targetType → 'team_match', 딥링크 → /team-matches/…, 선호도 → activityEnabled) 분기를 빠뜨리면 조용히 샌다.
+  describe('tournament_match_result_corrected 알림 매핑', () => {
+    it("targetType 이 'tournament' 이고 딥링크가 경기 상세로 가며 제목이 '정정'을 말한다", async () => {
+      prisma.v1NotificationPreference.findUnique.mockResolvedValue(null);
+      prisma.v1Notification.create.mockResolvedValue(makeNotification());
+
+      await service.emitNotification('user-1', 'tournament_match_result_corrected', 'tour-1:fixture-1');
+      await new Promise(setImmediate);
+
+      expect(prisma.v1Notification.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            targetType: 'tournament',
+            deepLink: '/tournaments/tour-1/matches/fixture-1',
+            title: '대회 경기 결과가 정정됐어요',
+            body: '정정된 경기 결과를 확인해 보세요.',
+          }),
+        }),
+      );
+    });
+
+    it('activityEnabled 를 끈 사용자에게는 발송되지 않는다', async () => {
+      prisma.v1NotificationPreference.findUnique.mockResolvedValue({ activityEnabled: false });
+
+      await service.emitNotification('user-1', 'tournament_match_result_corrected', 'tour-1:fixture-1');
+      await new Promise(setImmediate);
+
+      expect(prisma.v1Notification.create).not.toHaveBeenCalled();
+    });
   });
 
   // team_match_completed(일반 팀매치) 문구·링크는 이 태스크로 인해 한 글자도 바뀌면 안 된다

@@ -49,7 +49,7 @@ import {
   tournamentRosterClosedMessage,
   type RosterDeadlineState,
 } from '@/lib/roster-editability';
-import { teamRoleLabel } from '@/lib/v1-status-labels';
+import { PLAYER_ELIGIBILITY_LABEL, teamRoleLabel } from '@/lib/v1-status-labels';
 import { AvatarFallback } from '@/components/v1-ui/avatar-fallback';
 
 // 이 파일에서 가져다 쓰던 소비처(테스트 포함)가 그대로 돌아가게 이름만 다시 내보낸다.
@@ -59,12 +59,7 @@ export { parseJerseyInput };
 /* ── Helpers ── */
 
 function eligibilityLabel(status: V1PlayerEligibilityStatus): string {
-  switch (status) {
-    case 'non_pro': return '아마추어';
-    case 'pro': return '선출';
-    case 'needs_review': return '확인 중';
-    default: return '알 수 없음';
-  }
+  return PLAYER_ELIGIBILITY_LABEL[status] ?? '알 수 없음';
 }
 
 function eligibilityBadgeClass(status: V1PlayerEligibilityStatus): string {

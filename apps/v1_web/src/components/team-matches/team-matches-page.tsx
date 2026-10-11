@@ -279,13 +279,13 @@ function HeroTeamLink({ href, name, align, children }: { href?: string; name: st
   );
 }
 
-/** 팀 카드의 신뢰 배지와 같은 낱말·같은 배지 — 알 수 없는 값은 숨긴다. */
+/** 팀 카드의 신뢰 배지와 같은 낱말·같은 배지 — 알 수 없는 값은 숨긴다. 좁은 칸에서는 줄바꿈한다. */
 function HeroTrustBadge({ trustState, align }: { trustState?: string | null; align: 'left' | 'right' }) {
   const label = trustState ? trustStateLabel(trustState) : null;
   if (!label) return null;
   return (
     <div style={{ marginTop: 4, textAlign: align }}>
-      <span className="tm-badge tm-badge-sm tm-badge-blue">{label}</span>
+      <span className="tm-badge tm-badge-sm tm-badge-blue" style={{ maxWidth: '100%', whiteSpace: 'normal', lineHeight: 1.3, paddingBlock: 4 }}>{label}</span>
     </div>
   );
 }
@@ -1335,7 +1335,7 @@ function ConditionStep({ model }: { model: TeamMatchCreateViewModel }) {
 function ConditionFields({ model }: { model: TeamMatchCreateViewModel }) {
   const d = model.draft;
   const formatOptions = matchFormatOptionsForSport(model.selectedSport);
-  return <><TeamMatchLevelRangeField value={d.grade} error={model.form?.fieldErrors?.grade} onChange={(value) => model.form?.onFieldChange('grade', value)} /><PresetChipSelector label="경기방식" options={formatOptions} value={d.format} allowFreeText freeTextPlaceholder="예: 10:10, 3:3" onChange={(value) => model.form?.onFieldChange('format', value)} /><MultiPresetChipSelector label="경기 스타일" options={MATCH_STYLE_OPTIONS} values={d.style} allowFreeText freeTextPlaceholder="목록에 없으면 직접 입력해 주세요" maxItems={MATCH_STYLE_MAX_ITEMS} onChange={(value) => model.form?.onFieldChange('style', value)} /><PresetChipSelector label="유니폼 색상" options={UNIFORM_COLOR_OPTIONS} value={d.uniform} allowFreeText freeTextPlaceholder="예: 줄무늬 상의" onChange={(value) => model.form?.onFieldChange('uniform', value)} /><GenderRuleSelector value={d.gender} onChange={(value) => model.form?.onFieldChange('gender', value)} /><div className="tm-create-two-col"><CreateField label="총비용" value={`${d.cost}`} suffix="원" type="number" onChange={(value) => model.form?.onFieldChange('cost', Number(value))} /><CreateField label="상대팀 부담금" value={`${d.opponentCost}`} suffix="원" type="number" description={TEAM_MATCH_COST_EXPLANATION} onChange={(value) => model.form?.onFieldChange('opponentCost', Number(value))} /></div></>;
+  return <><TeamMatchLevelRangeField value={d.grade} error={model.form?.fieldErrors?.grade} onChange={(value) => model.form?.onFieldChange('grade', value)} /><PresetChipSelector label="경기방식" options={formatOptions} value={d.format} allowFreeText freeTextPlaceholder="예: 10:10, 3:3" onChange={(value) => model.form?.onFieldChange('format', value)} /><MultiPresetChipSelector label="경기 스타일" options={MATCH_STYLE_OPTIONS} values={d.style} allowFreeText freeTextPlaceholder="목록에 없으면 직접 입력해 주세요" maxItems={MATCH_STYLE_MAX_ITEMS} onChange={(value) => model.form?.onFieldChange('style', value)} /><PresetChipSelector label="유니폼 색상" options={UNIFORM_COLOR_OPTIONS} value={d.uniform} allowFreeText freeTextPlaceholder="예: 줄무늬 상의" onChange={(value) => model.form?.onFieldChange('uniform', value)} /><GenderRuleSelector value={d.gender} onChange={(value) => model.form?.onFieldChange('gender', value)} /><div className="tm-create-two-col"><CreateField label="총비용" value={`${d.cost}`} suffix="원" type="number" onChange={(value) => model.form?.onFieldChange('cost', Number(value))} /><CreateField id="field-opponentCost" error={model.form?.fieldErrors?.opponentCost} label="상대팀 부담금" value={`${d.opponentCost}`} suffix="원" type="number" description={TEAM_MATCH_COST_EXPLANATION} onChange={(value) => model.form?.onFieldChange('opponentCost', Number(value))} /></div></>;
 }
 
 // [P3] 위와 동일 원칙 — 캡션은 '장소와 시간'(단계 이름) 그대로, h1 만 질문형으로.
@@ -1605,12 +1605,12 @@ function prevHref(step: TeamMatchCreateViewModel['step']) {
  * API TrustState('verified' | 'estimated' | 'sample' | 'none', types/api.ts)의 배지 라벨.
  * 원래 gold/silver/bronze를 매핑하고 나머지를 원문 그대로 돌려줬는데, 그 등급은 API에
  * 존재한 적이 없는 값이라 실제 화면엔 "estimated" 영문 원문이 그대로 떴다(2026-08-25
- * 사용자 보고). 라벨은 공개 프로필(public-profile-client.tsx)·홈(home-client-model.ts)과
- * 같은 낱말을 쓰고, 모르는 값은 null 로 돌려 배지 자체를 숨긴다 — 원문 노출 재발 방지.
+ * 사용자 보고). 모르는 값은 null 로 돌려 배지 자체를 숨긴다 — 원문 노출 재발 방지.
+ * 팀 카드·히어로에서는 이 배지가 단독으로 뜨므로 "누적 중"만으로는 무엇이 쌓이는지 알 수 없다.
  */
 function trustStateLabel(trustState: string): string | null {
   if (trustState === 'verified') return '인증팀';
-  if (trustState === 'estimated') return '누적 중';
+  if (trustState === 'estimated') return '신뢰 점수 누적 중';
   if (trustState === 'sample') return null;
   return null;
 }

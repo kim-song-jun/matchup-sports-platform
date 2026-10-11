@@ -3,7 +3,8 @@
 import { useRef, useEffect, useId } from 'react';
 import { X } from 'lucide-react';
 import { formatEntryFee } from '@/lib/date-utils';
-import type { V1AdminTournamentRegistration } from '@/types/api';
+import type { V1AdminTournamentRegistration, V1PlayerEligibilityStatus } from '@/types/api';
+import { PLAYER_ELIGIBILITY_LABEL } from '@/lib/v1-status-labels';
 import { useOverlayHistory } from '@/components/v1-ui/use-overlay-history';
 import { useTopmostEscape } from '@/components/v1-ui/use-topmost-escape';
 import { FOCUSABLE_SELECTOR } from '@/components/v1-ui/use-modal-a11y';
@@ -11,9 +12,9 @@ import { lockBodyScroll } from '@/lib/body-scroll-lock';
 
 // ── Constants ─────────────────────────────────────────────────────────────
 
-export const ELIGIBILITY_LABEL: Record<string, string> = {
-  non_pro: '아마추어',
-  pro: '프로',
+export const ELIGIBILITY_LABEL: Record<V1PlayerEligibilityStatus, string> = {
+  non_pro: PLAYER_ELIGIBILITY_LABEL.non_pro,
+  pro: PLAYER_ELIGIBILITY_LABEL.pro,
   needs_review: '검토 필요',
 };
 

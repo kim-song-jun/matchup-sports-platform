@@ -47,7 +47,7 @@ export function tournamentFixtureSelect() {
       select: {
         id: true,
         sourceType: true,
-        currentOfficialRevision: { select: { id: true, state: true, officialAt: true } },
+        currentOfficialRevision: { select: { id: true, state: true, officialAt: true, reason: true, outcomeReason: true } },
       },
     },
     tournament: { select: { title: true, sportId: true } },

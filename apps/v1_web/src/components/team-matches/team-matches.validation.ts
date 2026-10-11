@@ -62,6 +62,7 @@ const RULES: Array<{
   { field: 'sportId', label: '종목을 선택해 주세요', step: 'sport', isSatisfied: (ctx) => Boolean(ctx.sportId) },
   { field: 'title', label: '매치 제목을 입력해 주세요', step: 'info', isSatisfied: (ctx) => Boolean(ctx.draft.title.trim()) },
   { field: 'grade', label: '실력등급을 다시 선택해 주세요', step: 'condition', isSatisfied: (ctx) => parseTeamMatchLevelRange(ctx.draft.grade) !== null },
+  { field: 'opponentCost', label: '상대팀 부담금은 총비용보다 클 수 없어요', step: 'condition', isSatisfied: (ctx) => ctx.draft.opponentCost <= ctx.draft.cost },
   { field: 'regionId', label: '지역을 선택해 주세요', step: 'place-time', isSatisfied: (ctx) => Boolean(ctx.regionId) },
   { field: 'place', label: '장소를 골라 주세요', step: 'place-time', isSatisfied: (ctx) => Boolean(ctx.draft.place?.name.trim()) },
   { field: 'date', label: '날짜를 입력해 주세요', step: 'place-time', isSatisfied: (ctx) => Boolean(ctx.draft.date) },

@@ -19,6 +19,7 @@ import { useTheme } from '@/components/providers/theme-provider';
 import { useV1PushRegistration } from '@/hooks/use-v1-push-registration';
 import { UserAvatar } from '@/components/v1-ui/user-avatar';
 import { extractErrorMessage } from '@/lib/error-message';
+import { TOURNAMENT_STAFF_ENTRY_LABEL } from '@/lib/tournament-staff-entry-label';
 import { reportClientError } from '@/lib/client-error-reporter';
 import { clearStoredV1Session, sanitizeRedirectPath, withFromPath } from '@/lib/session-storage';
 import { clearV1IdentityCache } from '@/lib/query-keys';
@@ -2553,7 +2554,7 @@ function toMyHomeModel(
       title: '대회 운영',
       items: [
         {
-          label: '담당 대회 운영',
+          label: TOURNAMENT_STAFF_ENTRY_LABEL,
           sub: `담당 중인 대회 ${staffTournamentCount}개`,
           href: '/my/tournament-staff',
           icon: 'ShieldCheck',

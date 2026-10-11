@@ -30,6 +30,7 @@ function registrationRow(overrides: Record<string, unknown> = {}) {
     tournamentId: 'tournament-1',
     tournament: { title: '테스트대회', kind: 'regular_tournament' },
     teamId: 'team-1',
+    team: { name: '성수FC' },
     appliedByUserId: 'manager-user',
     status: 'awaiting_payment',
     depositorName: '홍길동',
@@ -909,7 +910,32 @@ describe('AdminRegistrationsService', () => {
       'manager-user',
       'tournament_payment_confirmed',
       'tournament-1',
-      expect.any(String),
+      expect.stringContaining('테스트대회" 대회 운영진'),
+      { competitionKind: 'regular_tournament' },
+    );
+  });
+
+  it('정규 리그 신청의 입금 확인 알림은 본문과 종류 표시를 리그 기준으로 보낸다', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(opsAdminRecord);
+    prisma.v1TournamentRegistration.findUnique.mockResolvedValue(
+      registrationRow({
+        status: 'awaiting_payment',
+        appliedByUserId: 'manager-user',
+        tournament: { title: '테스트리그', kind: 'regular_league' },
+      }),
+    );
+    prisma.v1TournamentPayment.findUnique.mockResolvedValue(paymentRow({ status: 'ready' }));
+    prisma.v1TournamentPayment.update.mockResolvedValue(paymentRow({ status: 'paid', paidAt: new Date() }));
+    prisma.v1TournamentRegistration.update.mockResolvedValue(registrationRow({ status: 'payment_checking' }));
+
+    await service.confirmPayment(opsAuth, 'reg-1', { note: '입금 확인' });
+
+    expect(notifications.emitNotification).toHaveBeenCalledWith(
+      'manager-user',
+      'tournament_payment_confirmed',
+      'tournament-1',
+      '"테스트리그" 리그 운영진 확정을 기다려 주세요.',
+      { competitionKind: 'regular_league' },
     );
   });
 
@@ -929,7 +955,8 @@ describe('AdminRegistrationsService', () => {
       'manager-user',
       'tournament_registration_confirmed',
       'tournament-1',
-      expect.any(String),
+      expect.stringContaining('테스트대회" 대회 참가가'),
+      { competitionKind: 'regular_tournament' },
     );
   });
 
@@ -949,7 +976,8 @@ describe('AdminRegistrationsService', () => {
       'manager-user',
       'tournament_registration_waitlisted',
       'tournament-1',
-      expect.any(String),
+      expect.stringContaining('테스트대회" 대회 대기자'),
+      { competitionKind: 'regular_tournament' },
     );
   });
 
@@ -968,8 +996,49 @@ describe('AdminRegistrationsService', () => {
       'manager-user',
       'tournament_registration_cancelled',
       'tournament-1',
-      expect.any(String),
+      expect.stringContaining('테스트대회" 대회 참가 신청'),
+      { competitionKind: 'regular_tournament' },
     );
+  });
+
+  // MD-QA #79 — 팀을 여러 개 가진 팀장은 대회명만으로 어느 팀 신청인지, 왜 취소됐는지 알 수 없었다.
+  describe('cancel 알림 본문은 팀명과 사유를 싣는다', () => {
+    async function cancelWith(dto: { reason?: string }, row: Record<string, unknown> = {}) {
+      prisma.v1AdminUser.findUnique.mockResolvedValue(opsAdminRecord);
+      prisma.v1TournamentRegistration.findUnique.mockResolvedValue(
+        registrationRow({ status: 'confirmed', appliedByUserId: 'manager-user', tournamentId: 'tournament-1', ...row }),
+      );
+      prisma.v1TournamentRegistration.update.mockResolvedValue(registrationRow({ status: 'cancelled' }));
+      prisma.v1TournamentPayment.findUnique.mockResolvedValue(null);
+      await service.cancel(opsAuth, 'reg-1', dto);
+      return notifications.emitNotification.mock.calls[0][3] as string;
+    }
+
+    it('팀명·대회명과 어드민이 적은 사유를 함께 보낸다', async () => {
+      expect(await cancelWith({ reason: '입금 기한 초과' })).toBe(
+        '"성수FC" 팀의 "테스트대회" 대회 참가 신청이 거부돼 취소됐어요. 사유: 입금 기한 초과',
+      );
+    });
+
+    it('사유가 없으면 사유 문장을 붙이지 않는다', async () => {
+      expect(await cancelWith({})).toBe('"성수FC" 팀의 "테스트대회" 대회 참가 신청이 거부돼 취소됐어요.');
+    });
+
+    it('어드민 사유가 공백뿐이면 없는 것으로 본다', async () => {
+      expect(await cancelWith({ reason: '   ' })).toBe('"성수FC" 팀의 "테스트대회" 대회 참가 신청이 거부돼 취소됐어요.');
+    });
+
+    it('어드민이 사유를 안 적으면 팀이 취소 요청 때 남긴 사유를 쓴다', async () => {
+      expect(await cancelWith({}, { status: 'cancel_requested', cancelReason: '일정이 겹쳐요' })).toBe(
+        '"성수FC" 팀의 "테스트대회" 대회 참가 취소 요청이 승인됐어요. 사유: 일정이 겹쳐요',
+      );
+    });
+
+    it('어드민 사유가 있으면 팀의 취소 요청 사유보다 우선한다', async () => {
+      expect(await cancelWith({ reason: '운영 사정' }, { status: 'cancel_requested', cancelReason: '일정이 겹쳐요' })).toBe(
+        '"성수FC" 팀의 "테스트대회" 대회 참가 취소 요청이 승인됐어요. 사유: 운영 사정',
+      );
+    });
   });
 
   it('confirm: alreadyProcessed idempotent path does NOT emit notification', async () => {

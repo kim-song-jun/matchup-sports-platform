@@ -1,4 +1,5 @@
 import type { V1CompetitionKind, V1TournamentFormat } from '@/types/api';
+import { competitionKindLabel } from '@/lib/v1-status-labels';
 
 /**
  * **"이게 리그인가"를 `format` 으로 물으면 틀린다.** 그 질문의 정답은 두 필드를 다 봐야 나온다.
@@ -86,4 +87,14 @@ export function competitionFormatLabel(competition: {
 /** 현장 운영 셸 제목. `format` 이 아니라 `kind` 로 가른다(리그 방식 대회는 대회다). 모르는 동안·옛 행(null)은 대회. */
 export function competitionOpsTitle(kind: V1CompetitionKind | null | undefined): string {
   return kind === 'regular_league' ? '리그 운영' : '대회 운영';
+}
+
+/** 신청·안내 문구에 넣는 이름. `format` 이 아니라 `kind` 로 가른다 — 리그 방식 대회와 옛 행(null)은 대회다. */
+export function competitionNounOf(kind: V1CompetitionKind | null | undefined): string {
+  return competitionKindLabel(kind === 'regular_league' ? 'LEAGUE' : 'TOURNAMENT');
+}
+
+/** 서버가 대회 기준으로 내려주는 약관 제목·부제를 정규 리그 화면의 이름으로 바꿔 읽는다. 약관 본문은 동의한 원문이라 쓰지 않는다. */
+export function withCompetitionNoun(text: string, noun: string): string {
+  return text.replaceAll(competitionKindLabel('TOURNAMENT'), noun);
 }

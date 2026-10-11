@@ -24,7 +24,7 @@ import { AdminDataTable, AdminEmpty } from '@/components/admin';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
 import { useStartedTeamChangeReason } from '@/components/admin/bracket-canvas/use-started-team-change-reason';
 import { fixtureTeamChangeAccess } from '@/lib/bracket-canvas-layout';
-import { registrationIdsBlockedForGroup } from '@/lib/bracket-group-enrollment';
+import { registrationIdsBlockedForGroup, registrationIdsInOppositeFinalStage } from '@/lib/bracket-group-enrollment';
 import { BracketGroupQuickAdd } from './bracket-group-quick-add';
 import { BracketGroupCard } from './bracket-group-card';
 import { isGroupReady } from './bracket-group-helpers';
@@ -196,7 +196,10 @@ export function BracketTab({
     id: r.id,
     label: r.teamName ?? r.id,
   }));
-  const editBlockedIds = registrationIdsBlockedForGroup(bracket?.groups ?? [], editFixture?.groupId ?? null);
+  const editBlockedIds = new Set([
+    ...registrationIdsBlockedForGroup(bracket?.groups ?? [], editFixture?.groupId ?? null),
+    ...registrationIdsInOppositeFinalStage(bracket?.groups ?? [], bracket?.fixtures ?? [], editFixture?.groupId ?? null),
+  ]);
   const editPickerItems = (selectedId: string) => editFixtureTeamItems.filter((it) => !editBlockedIds.has(it.id) || it.id === selectedId);
 
   const editFixtureAccess = editFixture ? fixtureTeamChangeAccess(editFixture) : 'free';

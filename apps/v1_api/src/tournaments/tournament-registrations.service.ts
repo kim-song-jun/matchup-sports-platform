@@ -12,7 +12,7 @@ import {
   V1TournamentPayment,
   V1TournamentRegistration,
 } from '@prisma/client';
-import { NotificationsService } from '../notifications/notifications.service';
+import { competitionNounFor, NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { ManagedTermsRuntimeService } from '../terms/managed-terms-runtime.service';
 import { isPhoneVerificationEnforced } from '../verification/phone-verification-access';
@@ -204,30 +204,45 @@ export class TournamentRegistrationsService {
     let registration: V1TournamentRegistration;
     try {
       registration = existing
-        ? await this.prisma.v1TournamentRegistration.update({
-            where: { id: existing.id },
-            data: {
-              status: 'draft',
-              appliedByUserId: user.id,
-              depositorName: null,
-              agreedRules: false,
-              agreedPrivacy: false,
-              agreedRefund: false,
-              agreedMediaConsent: false,
-              cancelRequestedAt: null,
-              cancelPreviousStatus: null,
-              cancelReason: null,
-              adminCancelReason: null,
-              cancelOutcome: null,
-              // 감사 finding(reg-confirm-reapply-state-machine #2/#3): 이전 사이클(확정→잠금→취소)의
-              // 흔적을 되살아난 draft가 그대로 물려받아 (a) 새 신청인데 명단이 잠긴 채 시작하고
-              // (b) 임시저장 상태인데 확정일이 함께 표시됐다. 취소 후 재신청은 완전히 새로운
-              // 사이클이므로 이전 확정·잠금·마감예외 상태를 전부 초기화한다.
-              rosterLockedAt: null,
-              rosterDeadlineOverrideAt: null,
-              confirmedAt: null,
-              confirmedByAdminUserId: null,
-            },
+        ? await this.prisma.$transaction(async (tx) => {
+            // 자동 확정이 만든 명단은 팀이 검토한 적 없는 것이다. 출처 표시만 지우면 그 명단이
+            // '팀이 낸 명단'으로 둔갑하고 자동 채움도 이미 행이 있어 다시 돌지 않으므로 같이 비운다.
+            if (existing.rosterAutoConfirmedAt !== null) {
+              await tx.v1TournamentPlayer.updateMany({
+                where: { registrationId: existing.id, removedAt: null },
+                data: { removedAt: new Date() },
+              });
+            }
+            return tx.v1TournamentRegistration.update({
+              where: { id: existing.id },
+              data: {
+                status: 'draft',
+                appliedByUserId: user.id,
+                depositorName: null,
+                agreedRules: false,
+                agreedPrivacy: false,
+                agreedRefund: false,
+                agreedMediaConsent: false,
+                cancelRequestedAt: null,
+                cancelPreviousStatus: null,
+                cancelReason: null,
+                adminCancelReason: null,
+                cancelOutcome: null,
+                // 감사 finding(reg-confirm-reapply-state-machine #2/#3): 이전 사이클(확정→잠금→취소)의
+                // 흔적을 되살아난 draft가 그대로 물려받아 (a) 새 신청인데 명단이 잠긴 채 시작하고
+                // (b) 임시저장 상태인데 확정일이 함께 표시됐다. 취소 후 재신청은 완전히 새로운
+                // 사이클이므로 이전 확정·잠금·마감예외 상태를 전부 초기화한다.
+                rosterLockedAt: null,
+                rosterDeadlineOverrideAt: null,
+                confirmedAt: null,
+                confirmedByAdminUserId: null,
+                // 같은 행을 재사용하므로 이전 경로(운영자 추가·자동 확정)의 출처·시각이 남으면
+                // 어드민 신청 관리가 새 신청을 옛 시각의 "자동 확정"으로 보여 주고 직접 신청 수에서도 빠진다.
+                entrySource: 'applied',
+                rosterAutoConfirmedAt: null,
+                createdAt: new Date(),
+              },
+            });
           })
         : await this.prisma.v1TournamentRegistration.create({
             data: { tournamentId, teamId: dto.teamId, appliedByUserId: user.id, status: 'draft' },
@@ -463,13 +478,15 @@ export class TournamentRegistrationsService {
     });
 
     // 알림: 신청자에게 접수 안내 (fire-and-forget — 트랜잭션 실패와 무관)
+    const noun = competitionNounFor(result.tournament.kind);
     void this.notifications.emitNotification(
       result.updated.appliedByUserId,
       'tournament_registration_submitted',
       tournamentId,
       result.tournament.entryFee > 0
-        ? `"${result.tournament.title}" 대회 입금 안내를 확인해 주세요.`
-        : `"${result.tournament.title}" 대회 신청이 접수됐어요. 명단을 등록해 주세요.`,
+        ? `"${result.tournament.title}" ${noun} 입금 안내를 확인해 주세요.`
+        : `"${result.tournament.title}" ${noun} 신청이 접수됐어요. 명단을 등록해 주세요.`,
+      { competitionKind: result.tournament.kind },
     );
 
     // Task 154 P0-4 / 사용자 결정 ⑤ (2026-08-23): 기록 공개 동의를 **명단에 오른 선수
@@ -502,7 +519,7 @@ export class TournamentRegistrationsService {
         },
         'tournament_record_consent_invite',
         tournamentId,
-        `"${result.tournament.title}" 대회 기록을 프로필에 공개할지 정해 주세요.`,
+        `"${result.tournament.title}" ${noun} 기록을 프로필에 공개할지 정해 주세요.`,
       );
     }
 

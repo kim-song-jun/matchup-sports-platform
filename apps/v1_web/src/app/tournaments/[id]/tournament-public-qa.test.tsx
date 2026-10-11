@@ -120,6 +120,7 @@ describe('public tournament QA regressions', () => {
           sortOrder: 0,
           advanceCount: 2,
           groupTeams: [],
+          qualification: null,
           standings: [
             {
               registrationId: 'registration-1',
@@ -134,6 +135,7 @@ describe('public tournament QA regressions', () => {
               goalsFor: 2,
               goalsAgainst: 0,
               recalculatedAt: '2026-08-09T00:00:00.000Z',
+              sharedRank: null,
             },
           ],
         },

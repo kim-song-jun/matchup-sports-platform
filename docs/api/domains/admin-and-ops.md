@@ -76,7 +76,7 @@
 - 문의: `status=received|reviewing|answered|closed`, `category=account|match|team|tournament|payment_refund|report|other`, `q`, `cursor`, `limit`(1~50).
 - 운영자: `status=active|suspended|revoked`, `cursor`, `limit`(1~50).
 - 목록 응답은 `items`와 `pageInfo: { page, limit, total, totalPages, hasNext, hasPrev, nextCursor }`를 사용한다(`common/pagination/page-args.ts` 의 `buildPageInfo`).
-- 페이지 번호 표를 위해 `cursor` 와 함께 `page`(1 이상)도 받는 목록은, `page` 가 있으면 `page=1` 이어도 페이지 번호를 따르고 함께 온 `cursor` 는 무시한다(`paginationArgs`, 팀 매치 목록은 같은 규칙을 서비스에서 직접 적용).
+- 페이지 번호 표를 위해 `cursor` 와 함께 `page`(1~10,000, `MAX_PAGE_NUMBER` — 넘으면 400)도 받는 목록은, `page` 가 있으면 `page=1` 이어도 페이지 번호를 따르고 함께 온 `cursor` 는 무시한다(`paginationArgs`, 팀 매치 목록은 같은 규칙을 서비스에서 직접 적용).
 
 ## v1 관리자 목록 집계 계약
 
@@ -285,7 +285,7 @@ type AdminListSummary = {
 
 #### Task 149 — 팀매치 모집 조건 일치
 
-`POST /admin/team-matches`는 일반 생성과 같은 미래 시작/선택 종료/선택 마감 검증을 사용한다. 경기 스타일은 직접 입력을 포함해 최대 3개다. 신청 마감 뒤에도 접수된 두 팀은 경기 시작 전까지 확정할 수 있다(raw `recruiting`에 한함). 자세한 계약은 [팀매치](team-matches.md#일반관리자-날짜확정-공통-계약-task-149)를 따른다.
+`POST /admin/team-matches`는 일반 생성과 같은 미래 시작/선택 종료/선택 마감 검증을 사용한다. `costNote`의 상대팀 금액이 총비용보다 크면 생성·수정 모두 `400 VALIDATION_FAILED`(`details.field=costNote`)다. 경기 스타일은 직접 입력을 포함해 최대 3개다. 신청 마감 뒤에도 접수된 두 팀은 경기 시작 전까지 확정할 수 있다(raw `recruiting`에 한함). 자세한 계약은 [팀매치](team-matches.md#일반관리자-날짜확정-공통-계약-task-149)를 따른다.
 
 ## Competition fixtures in team-match administration (2026-10-03)
 

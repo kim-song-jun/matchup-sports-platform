@@ -9,6 +9,7 @@ import type { TournamentDetailRow } from './tournaments-read.query';
 import { resolveTournamentFixtureOfficialResult } from './tournament-fixture-official-result';
 import type { PublicRosterPlayer } from './public-roster';
 import { slotLabelFromRow } from './slots/tournament-slot-label';
+import type { GroupStandingSummary } from './slots/group-rank-preview';
 import { toPlaceView, type PlaceView } from '../places/place-snapshot';
 
 type PublicFixtureStatus = 'scheduled' | 'in_progress' | 'completed' | 'cancelled';
@@ -288,6 +289,11 @@ export function presentTournamentDetail(
    * 빈 배열이 된다.
    */
   rosterByRegistrationId: ReadonlyMap<string, PublicRosterPlayer[]> = new Map(),
+  /**
+   * 조별 공개 순위표 요약(키: 조 id) — 공동 순위·진출 팀. **호출부가 조회해 넘긴다**(`rosterByRegistrationId`
+   * 와 같은 규약). 기본값 빈 맵 = 요약 없음: 조별+결선이 아니거나 조가 덜 끝난 대회.
+   */
+  groupStandingSummaries: ReadonlyMap<string, GroupStandingSummary> = new Map(),
 ) {
   // Task 109 Track 6: bracketPublishedAt이 null이면 대진표(조/픽스처)를 관리자가 아직
   // 일괄 공개하지 않은 상태 — 공개 조회에서는 groups/fixtures를 빈 배열로 감춘다.
@@ -442,6 +448,7 @@ export function presentTournamentDetail(
       phase: group.phase,
       sortOrder: group.sortOrder,
       advanceCount: group.advanceCount,
+      qualification: groupStandingSummaries.get(group.id)?.qualification ?? null,
       groupTeams: [...group.groupTeams, ...(group.byeSlots ?? []).map((slot) => ({ ...slot, registrationId: null, registration: null, isBye: true }))].map((groupTeam) => ({
         id: groupTeam.id,
         registrationId: groupTeam.registrationId,
@@ -459,6 +466,7 @@ export function presentTournamentDetail(
         teamName: hideIdentity ? null : standing.registration.team.name,
         teamLogoUrl: hideIdentity ? null : (standing.registration.team.profile?.logoUrl ?? null),
         position: standing.position,
+        sharedRank: groupStandingSummaries.get(group.id)?.sharedRankByRegistrationId.get(standing.registrationId) ?? null,
         points: standing.points,
         wins: standing.wins,
         draws: standing.draws,

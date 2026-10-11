@@ -14,7 +14,7 @@ import { AlertBanner, ErrorState } from '@/components/v1-ui/primitives';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
 import { Button } from '@/components/v1-ui/button';
 import { formatGameResultScoreWithPenalties } from '@/lib/game-result-score';
-import { correctionGoalEventsPayload, deriveEditableGoalEvents } from '@/lib/result-goal-events';
+import { deriveEditableGoalEvents } from '@/lib/result-goal-events';
 import { RevisionTimeline } from './revision-timeline';
 import { GameSummaryHeader } from './game-summary-header';
 import { ReasonModal } from './reason-modal';
@@ -298,8 +298,8 @@ export function GameResultCorrectionPanel({
               reason: input.reason,
               changes: {
                 score: input.score,
-                // 점수만 확정된 경기는 득점 행을 안 넣었으면 goalEvents 를 뺀다(MD-QA #94, 헬퍼 주석 참고).
-                goalEvents: correctionGoalEventsPayload(baseGoalEvents, input.goalEvents),
+                // 점수만 있는 결과는 모달이 goalEvents 를 생략한다(서버가 기존 상태 유지, MD-QA #94·#95).
+                goalEvents: input.goalEvents,
                 actualParticipants: input.actualParticipants,
                 eventsHash: correctionSnapshot.eventsHash,
                 mvpParticipantId: input.mvpParticipantId,

@@ -515,6 +515,7 @@ export function toStandingsRows(rows: readonly PublicStandingRow[]): TournamentS
     teamName: row.teamName,
     teamLogoUrl: row.teamLogoUrl,
     position: row.position,
+    sharedRank: row.sharedRank,
     points: row.points,
     wins: row.wins,
     draws: row.draws,
@@ -529,9 +530,9 @@ export function toStandingsRows(rows: readonly PublicStandingRow[]): TournamentS
  * (bracket-page-client.tsx)의 표는 승점+득실 컬럼으로 따로 그려서 같은 대회의
  * 같은 팀 성적이 탭에 따라 다르게 보였다. 이제 표시 로직은
  * `TournamentStandingsTable` 한 벌뿐이고(컬럼 근거는 그 파일 주석 참고), 이
- * 함수는 그룹 나누기 + 어댑터 변환만 담당한다. 이 API 응답엔 진출(advance)
- * 정보가 없으므로 진출선 하이라이트는 항상 없음(advance=null) — 원래도 이
- * 탭엔 진출 배지가 없었으니 동작 변화 없음.
+ * 함수는 그룹 나누기 + 어댑터 변환만 담당한다. 이 API 응답엔 진출 정보가
+ * 없으므로 진출 표시는 항상 없음(advancingKeys=null) — 원래도 이 탭엔 진출
+ * 배지가 없었으니 동작 변화 없음.
  */
 /**
  * 순위표 접근성 라벨. **그룹명이 이미 "…순위" 로 끝나면 또 붙이지 않는다** — 티어가 없는
@@ -582,7 +583,7 @@ function StandingsTable({
           ) : null}
           <TournamentStandingsTable
             rows={toStandingsRows(group.rows)}
-            advance={null}
+            advancingKeys={null}
             ariaLabel={standingsAriaLabel(group.groupName, '표')}
           />
         </section>

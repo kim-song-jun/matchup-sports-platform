@@ -1,5 +1,6 @@
 import { Type } from 'class-transformer';
 import { IsIn, IsInt, IsISO8601, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
+import { MAX_PAGE_NUMBER } from '../../common/pagination/page-args';
 
 export const ERROR_LOG_SOURCES = ['server', 'client'] as const;
 export type ErrorLogSourceFilter = (typeof ERROR_LOG_SOURCES)[number];
@@ -54,6 +55,7 @@ export class AdminErrorLogListQueryDto {
   @Type(() => Number)
   @IsInt()
   @Min(1)
+  @Max(MAX_PAGE_NUMBER)
   page?: number;
 
   @IsOptional()

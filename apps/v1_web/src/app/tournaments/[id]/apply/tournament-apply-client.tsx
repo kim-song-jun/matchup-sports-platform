@@ -26,7 +26,7 @@ import { extractErrorMessage } from '@/lib/error-message';
 import { appRoute } from '@/lib/app-route';
 import { withFromPath } from '@/lib/session-storage';
 import { competitionDetailHref } from '@/lib/fixture-detail-route';
-import { competitionKindLabel } from '@/lib/v1-status-labels';
+import { competitionNounOf, withCompetitionNoun } from '@/lib/competition-kind';
 import { formatEntryFee } from '@/lib/date-utils';
 import { resolveRegistrationAmount } from '@/lib/tournament-registration-amount';
 import {
@@ -176,7 +176,7 @@ function OrderSummaryCard({
 
   const rows = (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
-      <InfoRow label="대회명" value={tournament.title} stacked={isRail} />
+      <InfoRow label={`${competitionNounOf(tournament.kind)}명`} value={tournament.title} stacked={isRail} />
       <InfoRow
         label="참가 팀"
         value={selectedTeam ? selectedTeam.name : '—'}
@@ -942,6 +942,7 @@ function AgreementsStep({
   terms: V1CurrentTermsItem[];
 }) {
   const [activeConsentDocument, setActiveConsentDocument] = useState<TournamentConsentDocument | null>(null);
+  const competitionNoun = competitionNounOf(tournament.kind);
   const stateKeyByCode = {
     tournament_rules: 'agreedRules',
     tournament_privacy: 'agreedPrivacy',
@@ -980,7 +981,7 @@ function AgreementsStep({
           <ExpandableCheckRow
             id="agree-all"
             label="전체 동의"
-            summary={'대회 신청에 필요한 필수 동의와 선택 동의 항목을 모두 확인하고 동의합니다.\n선택 동의는 동의하지 않아도 대회 신청이 가능합니다.'}
+            summary={`${competitionNoun} 신청에 필요한 필수 동의와 선택 동의 항목을 모두 확인하고 동의합니다.\n선택 동의는 동의하지 않아도 ${competitionNoun} 신청이 가능합니다.`}
             checked={allAgreed}
             onChange={toggleAllAgreements}
           />
@@ -990,9 +991,9 @@ function AgreementsStep({
               <ExpandableCheckRow
                 key={term.documentId}
                 id={`agree-${term.code}`}
-                label={term.title}
+                label={withCompetitionNoun(term.title, competitionNoun)}
                 consentType={term.requirement === 'required' ? 'required' : 'optional'}
-                summary={term.subtitle ?? undefined}
+                summary={term.subtitle ? withCompetitionNoun(term.subtitle, competitionNoun) : undefined}
                 checked={isChecked(term)}
                 onChange={(value) => {
                   const acceptedTermsDocumentIds = value
@@ -1003,7 +1004,7 @@ function AgreementsStep({
                     ...(stateKey ? { [stateKey]: value } : {}),
                   });
                 }}
-                document={{ title: term.title, body: term.content }}
+                document={{ title: withCompetitionNoun(term.title, competitionNoun), body: term.content }}
                 onOpenDocument={setActiveConsentDocument}
                 divider
               />
@@ -1101,7 +1102,7 @@ function AgreementsStep({
       {isFreeEntry ? (
         <Card pad={12} style={{ marginTop: 16, background: 'var(--grey50)' }}>
           <p className="tm-text-caption" style={{ color: 'var(--text-muted)', lineHeight: 1.6 }}>
-            이 대회는 무료로 참가할 수 있어요.
+            이 {competitionNoun}는 무료로 참가할 수 있어요.
           </p>
         </Card>
       ) : null}
@@ -1338,6 +1339,7 @@ function PaymentGuideStep({
   // 신청 이후 화면이라 현재 참가비가 아니라 이 신청의 금액으로 판정한다.
   const registeredAmount = resolveRegistrationAmount(registration, tournament);
   const isFreeEntry = registeredAmount === 0;
+  const competitionNoun = competitionNounOf(tournament.kind);
 
   // aria-live region ref for clipboard confirmation
   const copyLiveRef = useRef<HTMLSpanElement>(null);
@@ -1406,7 +1408,7 @@ function PaymentGuideStep({
             "계좌로 입금하라" + "입금 계좌가 준비되지 않았어요" 를 봤다(2026-09-04 alpha 실측).
             같은 신청이 `/tournaments/{id}/my` 와 어드민 목록에서는 "결제 완료" 로 뜨는 상태였다. */}
         <div className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>
-          {isFreeEntry ? '참가비가 없는 대회예요. 이제 명단을 등록해 주세요.' : '아래 계좌로 참가비를 입금해 주세요'}
+          {isFreeEntry ? `참가비가 없는 ${competitionNoun}예요. 이제 명단을 등록해 주세요.` : '아래 계좌로 참가비를 입금해 주세요'}
         </div>
       </div>
 
@@ -1827,7 +1829,9 @@ export function TournamentApplyPageClient({ tournamentId }: { tournamentId: stri
 
   // 여기부터는 대회·리그를 안다 — 돌아가기 CTA 도 종류에 맞는 이름과 상세 경로를 쓴다.
   const isRegularLeague = tournament.kind === 'regular_league';
-  const competitionNoun = competitionKindLabel(isRegularLeague ? 'LEAGUE' : 'TOURNAMENT');
+  const competitionNoun = competitionNounOf(tournament.kind);
+  const applyError = submitError ?? newRegistrationBlockMessage;
+  const displayedApplyError = applyError ? withCompetitionNoun(applyError, competitionNoun) : null;
   const loadedDetailHref = competitionDetailHref({ isRegularLeague, competitionId: tournamentId, fromHref: searchParams.get('from') });
 
   // 대회 신청은 본인확인이 전제다(서버도 submit에서 403 PHONE_NOT_VERIFIED로 막는다).
@@ -1993,9 +1997,9 @@ export function TournamentApplyPageClient({ tournamentId }: { tournamentId: stri
           <div className="tm-tournament-form-main">
             {step === 'team' ? (
               <>
-                {submitError ?? newRegistrationBlockMessage ? (
+                {displayedApplyError ? (
                   <div style={{ padding: '12px 20px 0' }}>
-                    <AlertBanner message={submitError ?? newRegistrationBlockMessage!} />
+                    <AlertBanner message={displayedApplyError} />
                   </div>
                 ) : null}
                 <TeamSelectStep
@@ -2021,12 +2025,12 @@ export function TournamentApplyPageClient({ tournamentId }: { tournamentId: stri
                 onBack={handleAgreementsBack}
                 onSubmit={requestAgreementsSubmit}
                 isSubmitting={isSubmittingApplication}
-                error={submitError ?? newRegistrationBlockMessage}
+                error={displayedApplyError}
                 termsError={
                   tournamentTerms.isError
-                    ? { message: '현재 대회 약관을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.', onRetry: () => void tournamentTerms.refetch() }
+                    ? { message: `현재 ${competitionNoun} 약관을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.`, onRetry: () => void tournamentTerms.refetch() }
                     : tournamentTerms.data && !tournamentTerms.data.ready
-                      ? { message: '현재 대회 필수 약관이 준비되지 않아 신청할 수 없어요.', onRetry: () => void tournamentTerms.refetch() }
+                      ? { message: `현재 ${competitionNoun} 필수 약관이 준비되지 않아 신청할 수 없어요.`, onRetry: () => void tournamentTerms.refetch() }
                       : null
                 }
                 terms={tournamentTerms.data?.items ?? []}

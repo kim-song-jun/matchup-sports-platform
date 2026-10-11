@@ -233,6 +233,32 @@ describe('NotificationsService', () => {
     expect(prisma.v1Notification.create).not.toHaveBeenCalled();
   });
 
+  it.each([
+    ['tournament_registration_submitted', '리그 신청이 접수됐어요', '대회 신청이 접수됐어요'],
+    ['tournament_registration_confirmed', '리그 참가가 확정됐어요', '대회 참가가 확정됐어요'],
+    ['tournament_registration_cancelled', '리그 참가가 취소됐어요', '대회 참가가 취소됐어요'],
+  ] as const)('%s 제목은 정규 리그 신청에서만 리그로 나간다', async (type, leagueTitle, tournamentTitle) => {
+    prisma.v1NotificationPreference.findUnique.mockResolvedValue(null);
+    prisma.v1Notification.create.mockResolvedValue(makeNotification());
+
+    await service.emitNotification('user-1', type, 'c-1', '본문', { competitionKind: 'regular_league' });
+    await service.emitNotification('user-1', type, 'c-2', '본문', { competitionKind: 'regular_tournament' });
+    await service.emitNotification('user-1', type, 'c-3', '본문', { competitionKind: null });
+    await service.emitNotification('user-1', type, 'c-4', '본문');
+    await new Promise(setImmediate);
+
+    const titles = new Map(
+      prisma.v1Notification.create.mock.calls.map(([args]: [{ data: { targetId: string; title: string } }]) => [
+        args.data.targetId,
+        args.data.title,
+      ]),
+    );
+    expect(titles.get('c-1')).toBe(leagueTitle);
+    expect(titles.get('c-2')).toBe(tournamentTitle);
+    expect(titles.get('c-3')).toBe(tournamentTitle);
+    expect(titles.get('c-4')).toBe(tournamentTitle);
+  });
+
   it('body를 넘기지 않으면 이벤트 기본 body(EVENT_BODIES)로 채워진다', async () => {
     prisma.v1NotificationPreference.findUnique.mockResolvedValue(null);
     prisma.v1Notification.create.mockResolvedValue(makeNotification());

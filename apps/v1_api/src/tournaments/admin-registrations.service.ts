@@ -7,7 +7,7 @@ import {
 } from '@nestjs/common';
 import { Prisma, V1CompetitionKind, V1TournamentPayment, V1TournamentRegistration } from '@prisma/client';
 import { AdminContextService } from '../common/admin-context.service';
-import { NotificationsService } from '../notifications/notifications.service';
+import { competitionNounFor, NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { V1AuthUser } from '../auth/v1-auth-user';
 import {
@@ -191,7 +191,8 @@ export class AdminRegistrationsService {
       registration.appliedByUserId,
       'tournament_payment_confirmed',
       registration.tournamentId,
-      `"${registration.tournament.title}" 대회 운영진 확정을 기다려 주세요.`,
+      `"${registration.tournament.title}" ${competitionNounFor(registration.tournament.kind)} 운영진 확정을 기다려 주세요.`,
+      { competitionKind: registration.tournament.kind },
     );
 
     const playerCount = await this.countPlayers(registrationId);
@@ -310,8 +311,9 @@ export class AdminRegistrationsService {
         : 'tournament_registration_waitlisted',
       registration.tournamentId,
       dto.decision === 'confirm'
-        ? `"${registration.tournament.title}" 대회 참가가 확정됐어요.`
-        : `"${registration.tournament.title}" 대회 대기자 명단에 등록됐어요.`,
+        ? `"${registration.tournament.title}" ${competitionNounFor(registration.tournament.kind)} 참가가 확정됐어요.`
+        : `"${registration.tournament.title}" ${competitionNounFor(registration.tournament.kind)} 대기자 명단에 등록됐어요.`,
+      { competitionKind: registration.tournament.kind },
     );
 
     const payment = await this.prisma.v1TournamentPayment.findUnique({ where: { registrationId } });
@@ -389,7 +391,8 @@ export class AdminRegistrationsService {
       registration.appliedByUserId,
       'tournament_registration_cancelled',
       registration.tournamentId,
-      `"${registration.tournament.title}" 대회 참가 신청이 취소됐어요.`,
+      `"${registration.tournament.title}" ${competitionNounFor(registration.tournament.kind)} 참가 신청이 취소됐어요.`,
+      { competitionKind: registration.tournament.kind },
     );
 
     const playerCount = await this.countPlayers(registrationId);

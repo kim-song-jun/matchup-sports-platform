@@ -1,5 +1,5 @@
 import { ForbiddenException, Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { Prisma, V1NotificationTargetType } from '@prisma/client';
+import { Prisma, V1CompetitionKind, V1NotificationTargetType } from '@prisma/client';
 import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 import { V1AuthUser } from '../auth/v1-auth-user';
 import { isQuietHour, nightPushAllowed } from '../common/quiet-hours';
@@ -196,6 +196,13 @@ export interface NotificationEmitOptions {
   readonly vars?: NotificationCopyVars;
   /** Per-recipient dedupe: stored as `${businessKey}:${userId}`; a repeat emit is skipped. */
   readonly businessKey?: string;
+  /** 정규 리그의 신청 알림이면 제목이 '대회' 대신 '리그'로 나간다(`LEAGUE_EVENT_TITLES`). */
+  readonly competitionKind?: V1CompetitionKind | null;
+}
+
+/** 대회·리그 신청 알림 본문에 넣는 이름. `kind` 가 null 인 옛 행은 대회다. */
+export function competitionNounFor(kind: V1CompetitionKind | null | undefined): '대회' | '리그' {
+  return kind === V1CompetitionKind.regular_league ? '리그' : '대회';
 }
 
 /** 알림 문구에 넣을 사람 이름 — 화면의 멤버 목록과 같은 우선순위(닉네임 → 표시 이름). */
@@ -625,6 +632,13 @@ const EVENT_TITLES: Record<NotificationEventType, string> = {
   tournament_identity_attest_rejected: '기록 연결이 거절됐어요',
 };
 
+/** 제목에 '대회'가 들어가는 신청 알림의 정규 리그판. */
+const LEAGUE_EVENT_TITLES: Partial<Record<NotificationEventType, string>> = {
+  tournament_registration_confirmed: '리그 참가가 확정됐어요',
+  tournament_registration_cancelled: '리그 참가가 취소됐어요',
+  tournament_registration_submitted: '리그 신청이 접수됐어요',
+};
+
 /**
  * 알림 본문(body) 기본값 — 호출부가 body를 넘기지 않아도 항상 title+body 구조를 보장하는 fallback.
  * 문체 규칙: 상태 통보성 이벤트(신청 승인/거절/취소 등 이미 벌어진 일을 알림)는 평서형("~됐어요.")을,
@@ -989,7 +1003,10 @@ export class NotificationsService {
       message = {
         targetType,
         targetId,
-        title: renderNotificationCopy(EVENT_TITLES[type], options?.vars),
+        title: renderNotificationCopy(
+          (options?.competitionKind === V1CompetitionKind.regular_league ? LEAGUE_EVENT_TITLES[type] : undefined) ?? EVENT_TITLES[type],
+          options?.vars,
+        ),
         body: body ?? renderNotificationCopy(EVENT_BODIES[type], options?.vars),
         deepLink: deepLinkForEvent(type, targetType, targetId),
       };

@@ -12,7 +12,7 @@ import {
   V1TournamentPayment,
   V1TournamentRegistration,
 } from '@prisma/client';
-import { NotificationsService } from '../notifications/notifications.service';
+import { competitionNounFor, NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { ManagedTermsRuntimeService } from '../terms/managed-terms-runtime.service';
 import { isPhoneVerificationEnforced } from '../verification/phone-verification-access';
@@ -461,13 +461,15 @@ export class TournamentRegistrationsService {
     });
 
     // 알림: 신청자에게 접수 안내 (fire-and-forget — 트랜잭션 실패와 무관)
+    const noun = competitionNounFor(result.tournament.kind);
     void this.notifications.emitNotification(
       result.updated.appliedByUserId,
       'tournament_registration_submitted',
       tournamentId,
       result.tournament.entryFee > 0
-        ? `"${result.tournament.title}" 대회 입금 안내를 확인해 주세요.`
-        : `"${result.tournament.title}" 대회 신청이 접수됐어요. 명단을 등록해 주세요.`,
+        ? `"${result.tournament.title}" ${noun} 입금 안내를 확인해 주세요.`
+        : `"${result.tournament.title}" ${noun} 신청이 접수됐어요. 명단을 등록해 주세요.`,
+      { competitionKind: result.tournament.kind },
     );
 
     // Task 154 P0-4 / 사용자 결정 ⑤ (2026-08-23): 기록 공개 동의를 **명단에 오른 선수

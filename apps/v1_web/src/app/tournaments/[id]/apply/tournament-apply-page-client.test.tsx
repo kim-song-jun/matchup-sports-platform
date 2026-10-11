@@ -1,6 +1,6 @@
 import type { ReactElement } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { fireEvent, render as rtlRender, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render as rtlRender, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { trackEvent } from '@/lib/analytics';
 import { useShellOverrideForRoute } from '@/components/v1-ui/shell-override';
@@ -972,6 +972,67 @@ describe('TournamentApplyPageClient GA events', () => {
 
       expect(await screen.findByText(/리그 신청은 휴대폰 본인인증을 마친 계정만/)).toBeInTheDocument();
       expect(screen.getByRole('link', { name: '리그 상세로 돌아가기' })).toHaveAttribute('href', '/league-matches/tournament-1');
+    });
+  });
+
+  describe('동의 단계 문구의 대회·리그 이름 (MD-QA #98)', () => {
+    // 리그는 마감이 없으면 신청을 받지 않는다 — 열려 있어야 동의 단계까지 간다.
+    const OPEN_DEADLINE = '2099-01-01T00:00:00.000Z';
+
+    const CONSENT_TERMS = {
+      data: {
+        context: 'tournament_application',
+        ready: true,
+        compliance: null,
+        items: [
+          { documentId: '11111111-1111-4111-8111-111111111111', code: 'tournament_rules', title: '대회 규정 및 안내사항 동의', subtitle: '대회 참가 기준', content: '대회 규정 본문', version: 'v1.1', requirement: 'required' },
+          { documentId: '33333333-3333-4333-8333-333333333333', code: 'tournament_refund', title: '참가비 입금·취소·환불 정책 동의', subtitle: '환불 기준', content: '환불 본문', version: 'v1.1', requirement: 'required' },
+          { documentId: '44444444-4444-4444-8444-444444444444', code: 'tournament_record_disclosure', title: '대회 경기 기록 공개 동의', subtitle: '선택 공개', content: '공개 본문', version: 'v1.1', requirement: 'optional' },
+        ],
+      },
+      isPending: false,
+      isError: false,
+    };
+
+    it.each([
+      ['regular_league', '리그', '대회'],
+      ['regular_tournament', '대회', '리그'],
+    ] as const)('%s 신청의 동의 항목은 "%s"라고 말한다', async (kind, noun, other) => {
+      tournamentApplyApiMocks.useV1Tournament.mockReturnValue({
+        data: makeTournament({ kind, registrationDeadlineAt: OPEN_DEADLINE }),
+        isLoading: false,
+        isError: false,
+        error: null,
+      });
+      tournamentApplyApiMocks.useV1CurrentTerms.mockReturnValue(CONSENT_TERMS);
+
+      await openAgreementsStep();
+
+      expect(screen.getByText(`${noun} 규정 및 안내사항 동의`)).toBeInTheDocument();
+      expect(screen.getByText(`${noun} 경기 기록 공개 동의`)).toBeInTheDocument();
+      expect(screen.getByText(`${noun} 참가 기준`)).toBeInTheDocument();
+      expect(screen.getByText(new RegExp(`^${noun} 신청에 필요한 필수 동의`))).toBeInTheDocument();
+      expect(screen.getByText(`이 ${noun}는 무료로 참가할 수 있어요.`)).toBeInTheDocument();
+      // 대회 이름이 없는 약관 제목은 그대로다.
+      expect(screen.getByText('참가비 입금·취소·환불 정책 동의')).toBeInTheDocument();
+      expect(screen.queryByText(new RegExp(`${other} (규정|경기 기록|참가 기준)`))).not.toBeInTheDocument();
+    });
+
+    it('리그 신청에서 약관 전문 창을 열어도 제목은 리그이고 본문은 동의한 원문 그대로다', async () => {
+      tournamentApplyApiMocks.useV1Tournament.mockReturnValue({
+        data: makeTournament({ kind: 'regular_league', registrationDeadlineAt: OPEN_DEADLINE }),
+        isLoading: false,
+        isError: false,
+        error: null,
+      });
+      tournamentApplyApiMocks.useV1CurrentTerms.mockReturnValue(CONSENT_TERMS);
+
+      await openAgreementsStep();
+      fireEvent.click(screen.getByRole('button', { name: '리그 규정 및 안내사항 동의 내용 보기' }));
+
+      const dialog = await screen.findByRole('dialog');
+      expect(within(dialog).getByText('리그 규정 및 안내사항 동의')).toBeInTheDocument();
+      expect(within(dialog).getByText('대회 규정 본문')).toBeInTheDocument();
     });
   });
 

@@ -191,7 +191,7 @@ describe('채팅 재동기화와 안전 이벤트', () => {
     vi.restoreAllMocks();
   });
 
-  it('재연결이 몰려도 방 목록과 열린 방 메시지를 한 번만 다시 받는다(상세는 그대로)', async () => {
+  async function setupRoom() {
     const { useV1ChatRoomSocket } = await import('./use-v1-realtime-socket');
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     const reads: Record<string, number> = {};
@@ -203,16 +203,67 @@ describe('채팅 재동기화와 안전 이벤트', () => {
     const { unmount } = renderHook(() => useV1ChatRoomSocket('room-1'), { wrapper: createWrapper(queryClient) });
     await waitFor(() => expect(reads).toEqual({ list: 1, detail: 1, messages: 1 }));
     vi.useFakeTimers();
+    return { reads, cleanup: () => { unmount(); stops.forEach((stop) => stop()); } };
+  }
 
-    // REST 읽기가 끝난 뒤에야 소켓이 처음 붙어도, 그 사이 이벤트는 재생되지 않으므로 다시 받는다.
+  it('REST 읽기 직후의 첫 연결은 방 목록·메시지를 다시 받지 않는다', async () => {
+    const { reads, cleanup } = await setupRoom();
+
+    listeners.connect(undefined);
+    await vi.advanceTimersByTimeAsync(2000);
+    expect(reads).toEqual({ list: 1, detail: 1, messages: 1 });
+
+    cleanup();
+  });
+
+  it('REST 읽기보다 한참 뒤에 처음 붙은 연결은 방 목록과 열린 방 메시지를 한 번만 다시 받는다(상세는 그대로)', async () => {
+    const { reads, cleanup } = await setupRoom();
+
+    await vi.advanceTimersByTimeAsync(5000);
     listeners.connect(undefined);
     listeners.connect(undefined);
     listeners.connect(undefined);
     await vi.advanceTimersByTimeAsync(2000);
     expect(reads).toEqual({ list: 2, detail: 1, messages: 2 });
 
+    cleanup();
+  });
+
+  it('연결이 끊겼다 다시 붙으면 방 목록과 열린 방 메시지를 다시 받는다', async () => {
+    const { reads, cleanup } = await setupRoom();
+
+    listeners.connect(undefined);
+    await vi.advanceTimersByTimeAsync(2000);
+    expect(reads).toEqual({ list: 1, detail: 1, messages: 1 });
+
+    await vi.advanceTimersByTimeAsync(30_000);
+    listeners.connect(undefined);
+    await vi.advanceTimersByTimeAsync(2000);
+    expect(reads).toEqual({ list: 2, detail: 1, messages: 2 });
+
+    cleanup();
+  });
+
+  it('오류로 끝난 메시지 조회는 연결이 붙어도 다시 받지 않는다', async () => {
+    const { useV1ChatRoomSocket } = await import('./use-v1-realtime-socket');
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    let reads = 0;
+    const observer = new QueryObserver(queryClient, {
+      queryKey: [...v1Keys.chatMessages('room-1'), { limit: 50 }],
+      queryFn: async () => { reads += 1; throw new Error('not found'); },
+    });
+    const stop = observer.subscribe(() => {});
+    const { unmount } = renderHook(() => useV1ChatRoomSocket('room-1'), { wrapper: createWrapper(queryClient) });
+    await waitFor(() => expect(observer.getCurrentResult().isError).toBe(true));
+    vi.useFakeTimers();
+
+    await vi.advanceTimersByTimeAsync(5000);
+    listeners.connect(undefined);
+    await vi.advanceTimersByTimeAsync(2000);
+    expect(reads).toBe(1);
+
     unmount();
-    stops.forEach((stop) => stop());
+    stop();
   });
 
   it('탭이 다시 보이면 열린 방 메시지만 다시 받고(목록은 포커스 갱신 몫), 숨겨질 때는 받지 않는다', async () => {

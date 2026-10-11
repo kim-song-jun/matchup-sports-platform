@@ -53,6 +53,8 @@ export function invalidateV1ChatMessageQueries(
 }
 
 const RESYNC_DEBOUNCE_MS = 1000;
+// Data fetched this close to a connect already includes everything the server had when the socket attached.
+const CONNECT_FRESH_MS = 2000;
 
 function isChatListQuery(query: Query): boolean {
   const root = v1Keys.chatRooms();
@@ -92,21 +94,33 @@ function retainChatSync(queryClient: QueryClient, socket: Socket): () => void {
     let timer: ReturnType<typeof setTimeout> | undefined;
     // A reconnect storm or quick tab switching collapses into one refetch.
     let includeLists = false;
+    let connectedAt: number | undefined;
     const scheduleResync = (lists: boolean) => {
       includeLists ||= lists;
       clearTimeout(timer);
       timer = setTimeout(() => {
         const withLists = includeLists;
+        const connectAt = connectedAt;
         includeLists = false;
+        connectedAt = undefined;
         void queryClient.invalidateQueries({
           queryKey: v1Keys.chatRooms(),
-          predicate: (query) => isChatMessagesQuery(query) || (withLists && isChatListQuery(query)),
+          predicate: (query) => {
+            if (!(isChatMessagesQuery(query) || (withLists && isChatListQuery(query)))) return false;
+            if (connectAt === undefined) return true;
+            // Errors stay as they are (React Query retries 5xx); fresh reads need no second GET.
+            return query.state.status !== 'error' && query.state.dataUpdatedAt < connectAt - CONNECT_FRESH_MS;
+          },
         });
       }, RESYNC_DEBOUNCE_MS);
     };
-    // Messages emitted while the socket was down are never replayed, so every connect resyncs — including a
-    // first connect that arrives after the REST reads (a socket already connected here emits no first connect).
-    const onConnect = () => scheduleResync(true);
+    // Messages emitted while the socket was down are never replayed, so a connect resyncs queries that predate
+    // it (a reconnect, or a first connect after slow REST reads). A message landing in the fresh window is
+    // recovered by the next chat:message refetch or the visibility resync.
+    const onConnect = () => {
+      connectedAt = Date.now();
+      scheduleResync(true);
+    };
     // Lists refetch themselves on window focus (refetchOnWindowFocus: 'always'); only messages need this.
     const onVisibility = () => {
       if (document.visibilityState === 'visible') scheduleResync(false);

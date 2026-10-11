@@ -206,7 +206,7 @@
     max-width: none;
     min-height: 64px;
     margin: 0;
-    padding: 0 20px;
+    padding: var(--spacing-2) 20px;
     display: flex;
     align-items: center;
     flex: 0 0 auto;
@@ -231,7 +231,6 @@
     display: flex;
     align-items: center;
     gap: var(--spacing-2);
-    margin-top: var(--spacing-1);
     font-size: var(--font-size-label);
     color: var(--grey700);
   }
@@ -245,13 +244,12 @@
     padding: 0 var(--spacing-2);
   }
 
-  /* 터치 영역 44px 은 음수 마진으로 헤더 높이를 늘리지 않고 확보한다. */
+  /* 44px 터치 영역은 헤더 높이가 흡수한다(음수 마진은 아래 요소가 클릭·포커스 링을 가린다). */
   .tm-chat-room-head-link {
     display: inline-flex;
     align-items: center;
     gap: var(--spacing-1);
     min-height: var(--spacing-11);
-    margin: calc(var(--spacing-3) * -1) 0;
     color: var(--grey700);
     text-decoration: none;
   }

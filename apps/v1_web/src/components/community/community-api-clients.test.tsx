@@ -400,13 +400,18 @@ describe('ChatRoomPageClient', () => {
 
     it('팀 컨택 방은 상태 카드를 그대로 두고 헤더엔 종류 칩만 둔다(링크 없음)', () => {
       mockRoom({
-        roomType: 'team_contact',
+        ...contactRoomDetail('requested', 'to'),
+        roomId: 'room-h',
         title: '컨택',
         linkedTarget: { type: 'team_contact', id: 'c-1', title: '컨택', route: null },
       });
 
       const { container } = renderWithClient(<ChatRoomPageClient roomId="room-h" />);
       const head = container.querySelector('.tm-chat-room-desktop-head') as HTMLElement;
+
+      const card = screen.getByRole('region', { name: '컨택 상태' });
+      expect(within(card).getByText('요청 대기')).toBeInTheDocument();
+      expect(within(card).getByRole('button', { name: '수락' })).toBeInTheDocument();
 
       expect(within(head).getByText('팀컨택')).toBeInTheDocument();
       expect(within(head).queryByRole('link', { name: /상세 보기/ })).toBeNull();

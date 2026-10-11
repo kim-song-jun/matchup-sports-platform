@@ -72,7 +72,11 @@ import { PLACE_SELECT } from '../places/place-select';
 import { rejectPartialPlaceUpdate, toPlaceColumns, toPlaceView, type PlaceSnapshot, type PlaceView } from '../places/place-snapshot';
 import { DEFAULT_FIXTURE_PLACE_NAME, resolveLeagueFixturePlace, type LeagueFixturePlaceInput } from './league-fixture-place';
 import { findTournamentOnSurface } from '../tournaments/tournament-surface-lookup';
-import { assertLeagueFixtureGenerationAllowedInTx, assertLeagueNotEndedInTx } from './league-fixture-generation-guard';
+import {
+  assertLeagueFixtureGenerationAllowedInTx,
+  assertLeagueNotEndedInTx,
+  assertLeagueNotEndedUnderShareLockInTx,
+} from './league-fixture-generation-guard';
 import { LEAGUE_STATE_BY_STATUS, isCompleteLeagueMirror } from '../tournaments/league-competition-mirror';
 import { randomUUID } from 'node:crypto';
 import { BRACKET_TEMPLATE_MAX_FIXTURES } from '../tournaments/templates/bracket-template-plan';
@@ -1503,8 +1507,7 @@ export class LeagueMatchAdminService {
       : null;
     const nextStartAt = dto.startsAt === undefined ? undefined : new Date(dto.startsAt);
     const updated = await this.prisma.$transaction(async (tx) => {
-      // 끝남·취소만 막고 보류 중 수정은 허용한다. 리그 행은 잠그지 않는다 — 시각·장소 수정은 완료 판정을
-      // 바꾸지 않고, 잠그면 취소·결과 확정(경기 → 리그 완료 갱신)과 역순으로 교착한다.
+      // 끝남·취소만 막고 보류 중 수정은 허용한다. 여기 읽기는 빠른 거절용이고, 최종 판정은 쓰기 뒤 공유 잠금 아래에서 한다.
       await assertLeagueNotEndedInTx(tx, leagueId);
       const nextEndAt = nextStartAt === undefined
         ? undefined
@@ -1521,6 +1524,8 @@ export class LeagueMatchAdminService {
           ...(nextPlace === undefined ? {} : toPlaceColumns(nextPlace)),
         },
       });
+      // 리그 행은 쓰기 뒤에 기다리지 않고 잡는다(FOR SHARE NOWAIT) — 순서·이유는 그 가드의 docblock.
+      await assertLeagueNotEndedUnderShareLockInTx(tx, leagueId);
       const persistedStartAt = requireLeagueStartAt(result.startAt, '리그 대진의 시작 시각이 없어 수정할 수 없어요.');
       // 사용자 확정: 시작 시각이 바뀌면 결과 미입력 리마인더도 새 시각을 따라간다 —
       // 새 세대(startAt)로 다시 스케줄할 뿐 옛 행은 건드리지 않는다(발화 시점에
@@ -1553,6 +1558,9 @@ export class LeagueMatchAdminService {
         tx,
       );
       return result;
+    }, {
+      timeout: 45_000, // 템플릿·재생성이 같은 경기 행을 45초까지 쥘 수 있다 — 그 대기 한도(리그 행은 기다리지 않는다)
+      maxWait: 5_000,
     });
     return {
       teamMatchId: updated.id,

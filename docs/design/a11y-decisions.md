@@ -30,6 +30,8 @@
 
 ## 자동으로 뜨는 시트의 패널 포커스 링 생략 — 2026-10-11
 
+**결정일** 2026-10-11 (KST) · **결정자** 사용자 · **상태** 유지
+
 **결정**: `BottomSheet initialFocus="sheet"` 의 패널(`tabIndex={-1}`)은 `:focus-visible` 링을 그리지 않는다
 (`globals.css` `.tm-filter-sheet[tabindex="-1"]:focus-visible`).
 

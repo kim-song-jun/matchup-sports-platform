@@ -4,6 +4,7 @@ import type { QueryClient, Query } from '@tanstack/react-query';
 import type { Socket } from 'socket.io-client';
 import { getV1Socket } from '@/lib/v1-socket';
 import { v1Keys } from '@/lib/query-keys';
+import { isTransientFailure } from '@/lib/api-client';
 
 type ChatMessageIdentity = { readonly roomId: string; readonly messageId: string };
 const MAX_RECENT_CHAT_MESSAGES = 100;
@@ -95,21 +96,25 @@ function retainChatSync(queryClient: QueryClient, socket: Socket): () => void {
     // A reconnect storm or quick tab switching collapses into one refetch.
     let includeLists = false;
     let connectedAt: number | undefined;
+    let disconnected = false;
+    let reconnected = false;
     const scheduleResync = (lists: boolean) => {
       includeLists ||= lists;
       clearTimeout(timer);
       timer = setTimeout(() => {
         const withLists = includeLists;
-        const connectAt = connectedAt;
+        const connectAt = reconnected ? undefined : connectedAt;
         includeLists = false;
         connectedAt = undefined;
+        reconnected = false;
         void queryClient.invalidateQueries({
           queryKey: v1Keys.chatRooms(),
           predicate: (query) => {
             if (!(isChatMessagesQuery(query) || (withLists && isChatListQuery(query)))) return false;
             if (connectAt === undefined) return true;
-            // Errors stay as they are (React Query retries 5xx); fresh reads need no second GET.
-            return query.state.status !== 'error' && query.state.dataUpdatedAt < connectAt - CONNECT_FRESH_MS;
+            // Permanent 4xx reads stay as they are; transient failures are retried on recovery.
+            if (query.state.status === 'error' && !isTransientFailure(query.state.error)) return false;
+            return query.state.dataUpdatedAt < connectAt - CONNECT_FRESH_MS;
           },
         });
       }, RESYNC_DEBOUNCE_MS);
@@ -118,8 +123,14 @@ function retainChatSync(queryClient: QueryClient, socket: Socket): () => void {
     // it (a reconnect, or a first connect after slow REST reads). A message landing in the fresh window is
     // recovered by the next chat:message refetch or the visibility resync.
     const onConnect = () => {
+      // A reconnect missed events regardless of how fresh the cache is; only the socket's first connect may skip.
       connectedAt = Date.now();
+      if (disconnected) reconnected = true;
+      disconnected = false;
       scheduleResync(true);
+    };
+    const onDisconnect = () => {
+      disconnected = true;
     };
     // Lists refetch themselves on window focus (refetchOnWindowFocus: 'always'); only messages need this.
     const onVisibility = () => {
@@ -127,6 +138,7 @@ function retainChatSync(queryClient: QueryClient, socket: Socket): () => void {
     };
     const onSafety = () => refreshChatAfterSafetyChange(queryClient);
     socket.on('connect', onConnect);
+    socket.on('disconnect', onDisconnect);
     socket.on('chat:safety-changed', onSafety);
     document.addEventListener('visibilitychange', onVisibility);
     entry = {
@@ -134,6 +146,7 @@ function retainChatSync(queryClient: QueryClient, socket: Socket): () => void {
       release: () => {
         clearTimeout(timer);
         socket.off('connect', onConnect);
+        socket.off('disconnect', onDisconnect);
         socket.off('chat:safety-changed', onSafety);
         document.removeEventListener('visibilitychange', onVisibility);
         sockets.delete(socket);

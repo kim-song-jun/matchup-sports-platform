@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider, QueryObserver } from '@tanstack/react
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { ReactNode } from 'react';
 import { v1Keys } from '@/lib/query-keys';
+import { V1ApiError } from '@/lib/api-client';
 
 const listeners: Record<string, (payload: unknown) => void> = {};
 const mockSocket = {
@@ -244,26 +245,55 @@ describe('채팅 재동기화와 안전 이벤트', () => {
     cleanup();
   });
 
-  it('오류로 끝난 메시지 조회는 연결이 붙어도 다시 받지 않는다', async () => {
+  async function setupErroredMessages(statusCode: number) {
     const { useV1ChatRoomSocket } = await import('./use-v1-realtime-socket');
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-    let reads = 0;
+    const counter = { reads: 0 };
     const observer = new QueryObserver(queryClient, {
       queryKey: [...v1Keys.chatMessages('room-1'), { limit: 50 }],
-      queryFn: async () => { reads += 1; throw new Error('not found'); },
+      queryFn: async () => {
+        counter.reads += 1;
+        throw new V1ApiError({ status: 'error', statusCode, code: 'X', message: 'fail', timestamp: '2026-10-12T00:00:00Z' });
+      },
     });
     const stop = observer.subscribe(() => {});
     const { unmount } = renderHook(() => useV1ChatRoomSocket('room-1'), { wrapper: createWrapper(queryClient) });
     await waitFor(() => expect(observer.getCurrentResult().isError).toBe(true));
     vi.useFakeTimers();
+    return { counter, cleanup: () => { unmount(); stop(); } };
+  }
 
+  it('4xx 로 끝난 메시지 조회는 연결이 붙어도 다시 받지 않는다', async () => {
+    const { counter, cleanup } = await setupErroredMessages(404);
     await vi.advanceTimersByTimeAsync(5000);
     listeners.connect(undefined);
     await vi.advanceTimersByTimeAsync(2000);
-    expect(reads).toBe(1);
+    expect(counter.reads).toBe(1);
+    cleanup();
+  });
 
-    unmount();
-    stop();
+  it('5xx 로 끝난 메시지 조회는 연결이 붙으면 다시 받는다', async () => {
+    const { counter, cleanup } = await setupErroredMessages(503);
+    await vi.advanceTimersByTimeAsync(5000);
+    listeners.connect(undefined);
+    await vi.advanceTimersByTimeAsync(2000);
+    expect(counter.reads).toBe(2);
+    cleanup();
+  });
+
+  it('끊긴 뒤 곧바로 다시 붙어도(방금 읽은 직후라도) 목록과 메시지를 다시 받는다', async () => {
+    const { reads, cleanup } = await setupRoom();
+
+    listeners.connect(undefined);
+    await vi.advanceTimersByTimeAsync(2000);
+    expect(reads).toEqual({ list: 1, detail: 1, messages: 1 });
+
+    listeners.disconnect(undefined);
+    listeners.connect(undefined);
+    await vi.advanceTimersByTimeAsync(2000);
+    expect(reads).toEqual({ list: 2, detail: 1, messages: 2 });
+
+    cleanup();
   });
 
   it('탭이 다시 보이면 열린 방 메시지만 다시 받고(목록은 포커스 갱신 몫), 숨겨질 때는 받지 않는다', async () => {

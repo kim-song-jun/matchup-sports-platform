@@ -88,6 +88,8 @@ export type ChatRoomViewModel = {
   teamContact?: V1ChatRoomTeamContact | null;
   /** 값이 있으면 입력창을 잠그고 이 문구를 placeholder 로 보여준다(수락 전·종료된 컨택). */
   inputLockedMessage?: string;
+  /** 값이 있으면 입력창 대신 이 안내를 보이는 읽기 전용 방이다(메시지는 그대로 읽힌다). */
+  readOnlyNotice?: string;
   messages: Array<{
     id: string;
     who: 'me' | 'other' | 'system';

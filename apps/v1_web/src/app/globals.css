@@ -5440,6 +5440,17 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
   gap: 8px;
 }
 
+.tm-chat-readonly-notice {
+  flex: 0 0 auto;
+  width: 100%;
+  min-height: 44px;
+  padding: 16px var(--v1-shell-page-x) calc(16px + var(--v1-shell-safe-bottom));
+  border-top: 1px solid var(--grey100);
+  background: var(--grey50);
+  color: var(--text-caption);
+  text-align: center;
+}
+
 .tm-chat-input-placeholder {
   flex: 1;
   min-height: 44px;

@@ -290,7 +290,6 @@ describe('ChatRoomPageClient', () => {
   });
 
   it.each([
-    ['MATCH_CHAT_PARTICIPANTS_REQUIRED', 409, 'Match chat requires a confirmed participant', '지금은 열 수 없는 채팅방이에요', '참가가 확정된 사람이 있어야 열 수 있는 채팅방이에요.'],
     ['NOT_FOUND', 404, 'Chat room was not found', '찾을 수 없는 채팅방이에요', '사라졌거나 볼 수 없는 채팅방이에요. 목록에서 다른 채팅방을 골라 주세요.'],
     ['CONFLICT', 422, 'Unprocessable', '채팅방을 열 수 없어요', '다시 불러와도 같은 결과예요. 목록으로 돌아가 주세요.'],
   ])('%s(%i) 오류는 코드별 안내를 보이고, 네트워크 탓이라 하지 않으며 다시 불러오기 대신 목록으로 안내한다', (code, statusCode, message, title, body) => {
@@ -309,7 +308,7 @@ describe('ChatRoomPageClient', () => {
   });
 
   it('방을 불러오지 못하면 목록 패널의 "채팅" 제목을 되풀이하지 않고, 비어 있는 연결 카드 칸도 만들지 않는다', () => {
-    const error = new V1ApiError({ status: 'error', statusCode: 409, code: 'MATCH_CHAT_PARTICIPANTS_REQUIRED', message: 'x', timestamp: '2026-10-12T00:00:00.000Z' });
+    const error = new V1ApiError({ status: 'error', statusCode: 404, code: 'NOT_FOUND', message: 'x', timestamp: '2026-10-12T00:00:00.000Z' });
     hooks.chatRoom.mockReturnValue({ data: undefined, isPending: false, isError: true, error, refetch: vi.fn() });
     hooks.chatMessages.mockReturnValue({ data: undefined, isPending: false, isError: true, error, refetch: vi.fn() });
 
@@ -327,6 +326,7 @@ describe('ChatRoomPageClient', () => {
         status: 'active',
         title: '(QA0929) 마포 주말 리그 1주차',
         linkedTarget: { type: 'team_match', id: 'tm-1', title: '(QA0929) 마포 주말 리그 1주차', route: '/team-matches/tm-1' },
+        composer: { canSend: true, blockedReason: null },
         me: { participantId: 'participant-me', status: 'active', pinned: false, mutedUntil: null, lastReadMessageId: null },
         participants: [],
       },
@@ -357,6 +357,7 @@ describe('ChatRoomPageClient', () => {
         status: 'active',
         title: 'Timestamp test',
         linkedTarget: { type: 'team', id: 'team-1', title: 'Test team', route: '/teams/team-1' },
+        composer: { canSend: true, blockedReason: null },
         me: {
           participantId: 'participant-me',
           status: 'active',
@@ -467,6 +468,7 @@ describe('ChatRoomPageClient — 입장 전 대화 안내 (H2)', () => {
     return {
       roomId: 'room-1', roomType, status: 'active', title: '성수 풋살 크루', teamContact: null,
       linkedTarget: { type: 'team', id: 'team-1', title: '성수 풋살 크루', route: '/teams/team-1' },
+      composer: { canSend: true, blockedReason: null },
       me: { participantId: 'p-me', status: 'active', pinned: false, mutedUntil: null, lastReadMessageId: null },
       participants: [],
     };
@@ -521,6 +523,7 @@ function contactRoomDetail(status: 'requested' | 'accepted' | 'declined', mySide
       toTeam: { id: 'team-b', name: '나팀' },
     },
     linkedTarget: { type: 'team_contact' as const, id: 'contact-1', title: '가팀', route: '/teams/team-a' },
+    composer: { canSend: true, blockedReason: null },
     me: { participantId: 'p-me', status: 'active', pinned: false, mutedUntil: null, lastReadMessageId: null },
     participants: [],
   };
@@ -980,5 +983,77 @@ describe('ChatListPageClient — 팀컨택 필터·배지', () => {
     // 첫 페이지를 클라이언트에서 거르지 않는다 — 서버에 roomType 필터와 최대 페이지를 요청해야 한다.
     expect(hooks.chatRooms).toHaveBeenCalledWith({ enabled: true, refetchOnWindowFocus: 'always', staleTime: 0 }, { roomType: 'team_contact', limit: 50 });
     expect(hooks.chatRooms).toHaveBeenCalledWith({ refetchOnWindowFocus: 'always' }, { limit: 50 });
+  });
+});
+
+describe('ChatRoomPageClient — 읽기 전용 매치 방', () => {
+  const matchRoomDetail = (composer: { canSend: boolean; blockedReason: string | null }) => ({
+    roomId: 'room-match',
+    roomType: 'match' as const,
+    status: 'active',
+    title: '수요일 풋살',
+    teamContact: null,
+    linkedTarget: { type: 'match' as const, id: 'm-1', title: '수요일 풋살', route: '/matches/m-1' },
+    composer,
+    me: { participantId: 'p-me', status: 'active', pinned: false, mutedUntil: null, lastReadMessageId: null },
+    participants: [],
+  });
+  const arrange = (composer: { canSend: boolean; blockedReason: string | null }, sendError?: unknown) => {
+    vi.clearAllMocks();
+    navigation.search = '';
+    hooks.chatRooms.mockReturnValue({ data: { items: [] }, isPending: false, isError: false, refetch: vi.fn() });
+    hooks.updateChatRoomMe.mockReturnValue({ isPending: false, variables: undefined, mutate: vi.fn() });
+    hooks.updateMyChatRoom.mockReturnValue({ isPending: false, mutate: vi.fn() });
+    hooks.sendChatMessage.mockReturnValue({ isPending: false, isError: Boolean(sendError), error: sendError, mutate: vi.fn(), reset: vi.fn() });
+    hooks.chatRoom.mockReturnValue({ data: matchRoomDetail(composer), dataUpdatedAt: 1, isPending: false, isError: false, refetch: vi.fn() });
+    hooks.chatMessages.mockReturnValue({ data: { items: [], pageInfo: { nextCursor: null } }, isPending: false, isError: false, refetch: vi.fn() });
+    return renderWithClient(<ChatRoomPageClient roomId="room-match" />);
+  };
+
+  it.each([
+    ['MATCH_CANCELLED', '취소된 매치라 대화를 보낼 수 없어요'],
+    ['PARTICIPANTS_NOT_CONFIRMED', '참가가 확정되면 대화할 수 있어요'],
+  ])('%s 이면 방은 열고 입력창과 보내기 메뉴 대신 안내를 보인다', (blockedReason, copy) => {
+    arrange({ canSend: false, blockedReason });
+
+    expect(screen.getByRole('note')).toHaveTextContent(copy);
+    expect(screen.queryByRole('textbox', { name: '메시지 입력' })).toBeNull();
+    expect(screen.queryByRole('button', { name: '보내기 메뉴 열기' })).toBeNull();
+    expect(screen.queryByRole('button', { name: '전송' })).toBeNull();
+  });
+
+  it('대조군 — 보낼 수 있는 방은 입력창이 있고 안내는 없다', () => {
+    arrange({ canSend: true, blockedReason: null });
+
+    expect(screen.getByRole('textbox', { name: '메시지 입력' })).toBeEnabled();
+    expect(screen.queryByRole('note')).toBeNull();
+  });
+
+  it('보내는 순간 409 MATCH_CHAT_CLOSED 로 막히면 상세를 다시 받기 전에도 같은 안내로 바뀐다', () => {
+    const error = new V1ApiError({ status: 'error', statusCode: 409, code: 'MATCH_CHAT_CLOSED', message: '서버 문구', timestamp: '2026-10-12T00:00:00.000Z' });
+    arrange({ canSend: true, blockedReason: null }, error);
+
+    expect(screen.getByRole('note')).toHaveTextContent('취소된 매치라 대화를 보낼 수 없어요');
+    expect(screen.queryByText('서버 문구')).toBeNull();
+  });
+
+  it('409 뒤 상세가 다시 와서 보낼 수 있다고 하면 안내가 걷히고 입력창이 돌아온다', () => {
+    const error = new V1ApiError({ status: 'error', statusCode: 409, code: 'MATCH_CHAT_CLOSED', message: '서버 문구', timestamp: '2026-10-12T00:00:00.000Z' });
+    // 실제 mutation 처럼 reset 이 불리면 에러 상태가 사라지는 가짜.
+    const sendState: { error: unknown } = { error };
+    const reset = vi.fn(() => { sendState.error = undefined; });
+    const sendMock = () => ({ isPending: false, isError: Boolean(sendState.error), error: sendState.error, mutate: vi.fn(), reset });
+    const view = arrange({ canSend: true, blockedReason: null }, error);
+    hooks.sendChatMessage.mockImplementation(sendMock);
+    view.rerender(<ChatRoomPageClient roomId="room-match" />);
+    expect(screen.getByRole('note')).toHaveTextContent('취소된 매치라 대화를 보낼 수 없어요');
+
+    // 상세가 다시 받아져(dataUpdatedAt 증가) 여전히 canSend=true.
+    hooks.chatRoom.mockReturnValue({ data: matchRoomDetail({ canSend: true, blockedReason: null }), dataUpdatedAt: 2, isPending: false, isError: false, refetch: vi.fn() });
+    view.rerender(<ChatRoomPageClient roomId="room-match" />);
+    view.rerender(<ChatRoomPageClient roomId="room-match" />);
+
+    expect(screen.queryByRole('note')).toBeNull();
+    expect(screen.getByRole('textbox', { name: '메시지 입력' })).toBeEnabled();
   });
 });

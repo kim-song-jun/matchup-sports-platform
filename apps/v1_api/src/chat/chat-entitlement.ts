@@ -45,23 +45,70 @@ export function teamMatchChatEntitlementWhere(userId: string): Prisma.V1TeamMatc
   };
 }
 
+const matchChatMemberStatuses = ['active', 'completed'] as const;
+
+const memberParticipantWhere = { status: { in: [...matchChatMemberStatuses] } };
+const confirmedGuestWhere = { role: 'participant' as const, status: { in: [...matchChatMemberStatuses] } };
+const readableMatchBase = { deletedAt: null };
+
+/**
+ * Guests that MatchesService.cancel flipped to `cancelled` keep an approved application, while a
+ * guest who withdrew (application `withdrawn`), was removed by the host (`cancelled_by_host`) or was
+ * dropped by a capacity reconfirmation (`withdrawn`) does not. Only meaningful together with a cancelled match.
+ */
+const cancelledWithMatchGuestWhere = {
+  role: 'participant' as const,
+  status: 'cancelled' as const,
+  application: { is: { status: 'approved' as const } },
+};
+
+/**
+ * Who may list, open and read a personal-match chat room. The chat list and every read path share
+ * this predicate; sending is gated separately by {@link matchChatSendBlock}. Recipients of pushes,
+ * unread counts and socket fan-out derive from the same pieces in {@link matchChatReaderUserWhere}.
+ */
+export function matchChatReadableWhere(userId: string): Prisma.V1MatchWhereInput {
+  return {
+    ...readableMatchBase,
+    OR: [
+      { participants: { some: { userId, ...memberParticipantWhere } } },
+      { hostUserId: userId, participants: { some: confirmedGuestWhere } },
+      { status: 'cancelled', participants: { some: { userId, ...cancelledWithMatchGuestWhere } } },
+      { status: 'cancelled', hostUserId: userId, participants: { some: cancelledWithMatchGuestWhere } },
+    ],
+  };
+}
+
+/** The same rule as {@link matchChatReadableWhere}, expressed on the user side for one match. */
+export function matchChatReaderUserWhere(matchId: string): Prisma.V1UserWhereInput {
+  return {
+    OR: [
+      { matchParticipants: { some: { matchId, ...memberParticipantWhere, match: readableMatchBase } } },
+      { hostedMatches: { some: { id: matchId, ...readableMatchBase, participants: { some: confirmedGuestWhere } } } },
+      { matchParticipants: { some: { matchId, ...cancelledWithMatchGuestWhere, match: { ...readableMatchBase, status: 'cancelled' } } } },
+      { hostedMatches: { some: { id: matchId, ...readableMatchBase, status: 'cancelled', participants: { some: cancelledWithMatchGuestWhere } } } },
+    ],
+  };
+}
+
+export type MatchChatSendBlock = 'MATCH_CANCELLED' | 'PARTICIPANTS_NOT_CONFIRMED';
+
+/** Why a viewer who can read a personal-match room still cannot write to it, or null when they can. */
+export function matchChatSendBlock(
+  match: { status: string; hostUserId: string; participants: { role: string; status: string }[] },
+  userId: string,
+): MatchChatSendBlock | null {
+  if (match.status === 'cancelled') return 'MATCH_CANCELLED';
+  const confirmed = match.participants.some(
+    (participant) => participant.role === 'participant' && (matchChatMemberStatuses as readonly string[]).includes(participant.status),
+  );
+  return match.hostUserId === userId && !confirmed ? 'PARTICIPANTS_NOT_CONFIRMED' : null;
+}
+
 export function currentChatEntitlementWhere(userId: string): Prisma.V1ChatRoomWhereInput {
   return {
     OR: [
-      {
-        match: {
-          is: {
-            deletedAt: null,
-            OR: [
-              { participants: { some: { userId, status: { in: ['active', 'completed'] } } } },
-              {
-                hostUserId: userId,
-                participants: { some: { role: 'participant', status: { in: ['active', 'completed'] } } },
-              },
-            ],
-          },
-        },
-      },
+      { match: { is: matchChatReadableWhere(userId) } },
       {
         team: {
           is: {
@@ -93,26 +140,7 @@ export function currentChatRecipientEntitlementWhere(
   room: ChatEntitlementRoom,
 ): Prisma.V1ChatRoomParticipantWhereInput {
   if (room.matchId) {
-    return {
-      user: {
-        OR: [
-          {
-            matchParticipants: {
-              some: { matchId: room.matchId, status: { in: ['active', 'completed'] }, match: { deletedAt: null } },
-            },
-          },
-          {
-            hostedMatches: {
-              some: {
-                id: room.matchId,
-                deletedAt: null,
-                participants: { some: { role: 'participant', status: { in: ['active', 'completed'] } } },
-              },
-            },
-          },
-        ],
-      },
-    };
+    return { user: matchChatReaderUserWhere(room.matchId) };
   }
   if (room.teamId) {
     return {

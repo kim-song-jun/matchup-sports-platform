@@ -1,4 +1,6 @@
-import { currentChatEntitlementWhere, currentChatRecipientEntitlementWhere } from './chat-entitlement';
+import {
+  currentChatEntitlementWhere, currentChatRecipientEntitlementWhere, matchChatReadableWhere, matchChatSendBlock,
+} from './chat-entitlement';
 
 // 감사 결함 회귀 방지(2026-08-27): 팀매치 채팅방이 rooms() 목록에 뜨려면 이 where 를
 // 통과해야 한다. 예전엔 status:'matched' 로 exact-match 해서 결과 제출로 completed 로
@@ -195,5 +197,107 @@ describe('currentChatRecipientEntitlementWhere', () => {
         teamContact: null,
       }),
     ).toThrow(/not linked/i);
+  });
+});
+
+describe('개인 매치 채팅 — 읽기 규칙 하나, 쓰기 규칙 따로', () => {
+  it('채팅 목록의 match 절이 읽기 규칙과 같은 객체다 (두 벌이 아니다)', () => {
+    const clause = currentChatEntitlementWhere('user-1').OR?.find((c) => c.match);
+    expect(clause).toEqual({ match: { is: matchChatReadableWhere('user-1') } });
+  });
+
+  const host = (participants: { role: string; status: string }[], status = 'recruiting') =>
+    matchChatSendBlock({ status, hostUserId: 'host', participants }, 'host');
+
+  it('확정 참가자가 없는 주최자는 쓰기만 막힌다', () => {
+    expect(host([{ role: 'host', status: 'active' }])).toBe('PARTICIPANTS_NOT_CONFIRMED');
+    expect(host([{ role: 'participant', status: 'cancelled' }])).toBe('PARTICIPANTS_NOT_CONFIRMED');
+  });
+
+  it('확정(active/completed) 참가자가 있으면 주최자도 쓸 수 있다', () => {
+    expect(host([{ role: 'participant', status: 'active' }])).toBeNull();
+    expect(host([{ role: 'participant', status: 'completed' }], 'completed')).toBeNull();
+  });
+
+  it('취소된 매치는 누구든 쓰기가 막힌다 (참가자 포함)', () => {
+    expect(host([{ role: 'participant', status: 'active' }], 'cancelled')).toBe('MATCH_CANCELLED');
+    expect(matchChatSendBlock({ status: 'cancelled', hostUserId: 'host', participants: [{ role: 'participant', status: 'active' }] }, 'guest'))
+      .toBe('MATCH_CANCELLED');
+  });
+
+  it('일반 참가자는 모집 중이면 쓸 수 있다', () => {
+    expect(matchChatSendBlock({ status: 'recruiting', hostUserId: 'host', participants: [{ role: 'participant', status: 'active' }] }, 'guest'))
+      .toBeNull();
+  });
+});
+
+// 읽기 규칙(목록·열람)과 수신자 규칙(푸시·안 읽음·소켓)은 같은 사람을 가리켜야 한다.
+// 두 where 를 같은 가짜 DB 행에 대해 평가해 결과가 일치하는지 본다.
+describe('개인 매치 채팅 — 읽기 가능 여부와 수신자 자격이 일치한다', () => {
+  type P = { userId: string; role: string; status: string; application?: { status: string } | null };
+  type M = { id: string; hostUserId: string; status: string; deletedAt: Date | null; participants: P[] };
+  const evalWhere = (where: any, row: any): boolean => {
+    if (where == null) return true;
+    return Object.entries(where).every(([key, cond]: [string, any]) => {
+      if (key === 'OR') return cond.some((c: any) => evalWhere(c, row));
+      const value = row[key];
+      if (cond !== null && typeof cond === 'object' && !(cond instanceof Date)) {
+        if ('some' in cond) return (value ?? []).some((v: any) => evalWhere(cond.some, v));
+        if ('in' in cond) return cond.in.includes(value);
+        if ('is' in cond) return value != null && evalWhere(cond.is, value);
+        return value != null && evalWhere(cond, value);
+      }
+      return value === cond;
+    });
+  };
+  // 사용자 쪽 행: 그 사용자의 참가 행(match 포함)과 주최 매치.
+  const userRow = (m: M, userId: string) => ({
+    matchParticipants: m.participants.filter((p) => p.userId === userId).map((p) => ({ ...p, matchId: m.id, match: m })),
+    hostedMatches: m.hostUserId === userId ? [m] : [],
+  });
+
+  const hostRow: P = { userId: 'host', role: 'host', status: 'active' };
+  const guest = (status: string, applicationStatus: string | null = null): P => ({
+    userId: 'guest', role: 'participant', status, application: applicationStatus ? { status: applicationStatus } : null,
+  });
+  const match = (over: Partial<M>): M => ({
+    id: 'm1', hostUserId: 'host', status: 'recruiting', deletedAt: null, participants: [hostRow], ...over,
+  });
+
+  const cases: { name: string; m: M; user: string; readable: boolean }[] = [
+    { name: '확정 참가자 없는 방의 주최자', m: match({}), user: 'host', readable: true },
+    { name: '확정 참가자가 있는 방의 주최자', m: match({ participants: [hostRow, guest('active')] }), user: 'host', readable: true },
+    { name: '확정 참가자', m: match({ participants: [hostRow, guest('active')] }), user: 'guest', readable: true },
+    { name: '취소된 매치의 주최자', m: match({ status: 'cancelled', participants: [hostRow, guest('active')] }), user: 'host', readable: true },
+    { name: '취소된 매치의 기존 확정 참가자', m: match({ status: 'cancelled', participants: [hostRow, guest('active')] }), user: 'guest', readable: true },
+    { name: '종료된 매치의 참가자', m: match({ status: 'completed', participants: [hostRow, guest('completed')] }), user: 'guest', readable: true },
+    { name: '내보내진 참가자', m: match({ participants: [hostRow, guest('removed')] }), user: 'guest', readable: false },
+    { name: '철회한 참가자', m: match({ participants: [hostRow, guest('cancelled')] }), user: 'guest', readable: false },
+    // MatchesService.cancel 은 승인 신청을 그대로 두고 참가 행만 cancelled 로 바꾼다.
+    { name: '매치 취소로 cancelled 가 된 참가자', m: match({ status: 'cancelled', participants: [hostRow, guest('cancelled', 'approved')] }), user: 'guest', readable: true },
+    { name: '매치 취소로 모두 cancelled 가 된 방의 주최자', m: match({ status: 'cancelled', participants: [hostRow, guest('cancelled', 'approved')] }), user: 'host', readable: true },
+    { name: '취소 전에 스스로 철회한 참가자(취소된 매치)', m: match({ status: 'cancelled', participants: [hostRow, guest('cancelled', 'withdrawn')] }), user: 'guest', readable: false },
+    { name: '취소 전에 정원 재확인으로 빠진 참가자(취소된 매치)', m: match({ status: 'cancelled', participants: [hostRow, guest('cancelled', null)] }), user: 'guest', readable: false },
+    { name: '취소 전에 내보내진 참가자(취소된 매치)', m: match({ status: 'cancelled', participants: [hostRow, guest('removed', 'cancelled_by_host')] }), user: 'guest', readable: false },
+    { name: '취소 전에 모두 철회한 방의 주최자(취소된 매치)', m: match({ status: 'cancelled', participants: [hostRow, guest('cancelled', 'withdrawn')] }), user: 'host', readable: true },
+    // 주최자가 참가하지 않는 매치는 주최자 행도 cancelled 라 참가 행으로는 열람할 근거가 없다.
+    { name: '불참 주최자: 취소로 빠진 참가자가 있으면 취소된 매치를 열람한다', m: match({ status: 'cancelled', participants: [{ ...hostRow, status: 'cancelled' }, guest('cancelled', 'approved')] }), user: 'host', readable: true },
+    { name: '불참 주최자: 취소 전에 모두 철회했으면 열람 불가', m: match({ status: 'cancelled', participants: [{ ...hostRow, status: 'cancelled' }, guest('cancelled', 'withdrawn')] }), user: 'host', readable: false },
+    { name: '취소되지 않은 매치의 철회 참가자는 신청이 approved 여도 불가', m: match({ participants: [hostRow, guest('cancelled', 'approved')] }), user: 'guest', readable: false },
+    { name: '무관한 사용자', m: match({ participants: [hostRow, guest('active')] }), user: 'stranger', readable: false },
+    { name: '삭제된 매치의 주최자', m: match({ deletedAt: new Date() }), user: 'host', readable: false },
+    { name: '삭제된 매치의 확정 참가자', m: match({ deletedAt: new Date(), participants: [hostRow, guest('active')] }), user: 'guest', readable: false },
+  ];
+
+  it.each(cases)('$name: 열람 가능 $readable, 수신자 자격도 같다', ({ m, user, readable }) => {
+    const canRead = evalWhere(matchChatReadableWhere(user), m);
+    const isRecipient = evalWhere(
+      (currentChatRecipientEntitlementWhere({
+        matchId: m.id, teamId: null, teamMatchId: null, teamMatch: null, teamContactId: null, teamContact: null,
+      }) as any).user,
+      userRow(m, user),
+    );
+    expect(canRead).toBe(readable);
+    expect(isRecipient).toBe(canRead);
   });
 });

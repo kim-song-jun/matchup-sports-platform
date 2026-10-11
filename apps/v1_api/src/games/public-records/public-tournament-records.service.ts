@@ -1585,7 +1585,7 @@ export class PublicTournamentRecordsService {
         participantId: eligible ? event.participantId : null,
         participantName: eligible
           ? event.participantId === null
-            ? (event.playerNameSnapshot ?? '선수 정보 없음')
+            ? event.playerNameSnapshot ?? null
             : resolveParticipantDisplayName(participant, nameProfileByUserId)
           : null,
         jerseyNumber: eligible ? (participant?.jerseyNumber ?? null) : null,
@@ -2395,7 +2395,7 @@ function presentScheduleEntry(
             side: raw.side,
             participantName: eligible
               ? raw.participantId === null
-                ? (raw.playerNameSnapshot ?? '선수 정보 없음')
+                ? raw.playerNameSnapshot ?? null
                 : resolveParticipantDisplayName(participant, nameProfileByUserId)
               : null,
             jerseyNumber: eligible ? (participant?.jerseyNumber ?? null) : null,

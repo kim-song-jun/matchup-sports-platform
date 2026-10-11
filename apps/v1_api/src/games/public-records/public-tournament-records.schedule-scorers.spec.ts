@@ -332,6 +332,61 @@ describe('PublicTournamentRecordsService.getSchedule -- 일정 카드 득점자 
     ]));
   });
 
+  it('공식 revision 일정 요약의 익명 골은 가짜 이름 없이 participantName 이 null 이다', async () => {
+    const registered = { ...ELIGIBLE, id: 'registered-schedule', userId: 'user-1', displayNameSnapshot: '등록 스냅샷', jerseyNumber: 8 };
+    const guest = { ...INELIGIBLE, id: 'guest-schedule', userId: null, displayNameSnapshot: '라인업 이름', jerseyNumber: 12 };
+    const fixture = makeFixture({
+      game: {
+        ...makeFixture({}).game!,
+        participants: [registered, guest],
+        currentOfficialRevision: {
+          state: 'OFFICIAL', supersedesId: null, officialAt: new Date(), score: { home: 1, away: 1 },
+          outcomeReason: 'NORMAL', outcomeNote: null,
+          goalEvents: [
+            { id: 'anonymous-schedule-goal', sideId: 'side-home', participantId: null, playerNameSnapshot: null, minute: 3, period: 1, ownGoal: false },
+          ],
+        },
+      },
+    });
+    const canonicalFixture: FakeCanonicalScheduleRow = {
+      teamMatchId: fixture.id,
+      tournamentId: TOURNAMENT_ID,
+      groupId: null,
+      round: fixture.round,
+      fixtureNumber: fixture.fixtureNumber,
+      legNumber: fixture.legNumber,
+      homeRegistrationId: fixture.homeRegistrationId,
+      awayRegistrationId: fixture.awayRegistrationId,
+      group: null,
+      homeRegistration: fixture.homeRegistration,
+      awayRegistration: fixture.awayRegistration,
+      teamMatch: {
+        startAt: fixture.scheduledAt,
+        placeName: null,
+        status: 'scheduled',
+        fieldId: null,
+        field: null,
+        videos: [],
+        game: fixture.game!,
+      },
+    };
+    const prisma = buildFakePrisma({
+      fixtures: [fixture],
+      canonicalRows: [canonicalFixture],
+      consentLinks: [{ participantId: registered.id, linkId: 'link-schedule', userId: 'user-1' }],
+      consentSnapshots: [{ linkId: 'link-schedule', state: 'GRANTED', effectiveAt: new Date('2026-01-01T00:00:00.000Z') }],
+      userConsents: [{ userId: 'user-1', state: 'GRANTED' }],
+      nameProfiles: [{ userId: 'user-1', realName: '실명', displayName: '레거시', nickname: '등록닉네임', tournamentRealNameVisible: false, deletedAt: null }],
+      goalEvents: [],
+    });
+
+    const result = await new PublicTournamentRecordsService(prisma, UNUSED_ACCESS_SERVICE).getSchedule(TOURNAMENT_ID, {});
+
+    expect(result.items[0].scorers).toEqual([
+      expect.objectContaining({ participantName: null, jerseyNumber: null }),
+    ]);
+  });
+
   it('정책 변경(2026-08-13): 동의 여부와 무관하게 대회 참가자는 모두 홈/원정과 이름/등번호가 실린다', async () => {
     const prisma = buildFakePrisma({
       fixtures: [makeFixture({})],

@@ -910,7 +910,32 @@ describe('AdminRegistrationsService', () => {
       'manager-user',
       'tournament_payment_confirmed',
       'tournament-1',
-      expect.any(String),
+      expect.stringContaining('테스트대회" 대회 운영진'),
+      { competitionKind: 'regular_tournament' },
+    );
+  });
+
+  it('정규 리그 신청의 입금 확인 알림은 본문과 종류 표시를 리그 기준으로 보낸다', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(opsAdminRecord);
+    prisma.v1TournamentRegistration.findUnique.mockResolvedValue(
+      registrationRow({
+        status: 'awaiting_payment',
+        appliedByUserId: 'manager-user',
+        tournament: { title: '테스트리그', kind: 'regular_league' },
+      }),
+    );
+    prisma.v1TournamentPayment.findUnique.mockResolvedValue(paymentRow({ status: 'ready' }));
+    prisma.v1TournamentPayment.update.mockResolvedValue(paymentRow({ status: 'paid', paidAt: new Date() }));
+    prisma.v1TournamentRegistration.update.mockResolvedValue(registrationRow({ status: 'payment_checking' }));
+
+    await service.confirmPayment(opsAuth, 'reg-1', { note: '입금 확인' });
+
+    expect(notifications.emitNotification).toHaveBeenCalledWith(
+      'manager-user',
+      'tournament_payment_confirmed',
+      'tournament-1',
+      '"테스트리그" 리그 운영진 확정을 기다려 주세요.',
+      { competitionKind: 'regular_league' },
     );
   });
 
@@ -930,7 +955,8 @@ describe('AdminRegistrationsService', () => {
       'manager-user',
       'tournament_registration_confirmed',
       'tournament-1',
-      expect.any(String),
+      expect.stringContaining('테스트대회" 대회 참가가'),
+      { competitionKind: 'regular_tournament' },
     );
   });
 
@@ -950,7 +976,8 @@ describe('AdminRegistrationsService', () => {
       'manager-user',
       'tournament_registration_waitlisted',
       'tournament-1',
-      expect.any(String),
+      expect.stringContaining('테스트대회" 대회 대기자'),
+      { competitionKind: 'regular_tournament' },
     );
   });
 
@@ -969,7 +996,8 @@ describe('AdminRegistrationsService', () => {
       'manager-user',
       'tournament_registration_cancelled',
       'tournament-1',
-      expect.any(String),
+      expect.stringContaining('테스트대회" 대회 참가 신청'),
+      { competitionKind: 'regular_tournament' },
     );
   });
 

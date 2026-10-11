@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { competitionFormatLabel, isLeagueCompetition } from './competition-kind';
+import { competitionFormatLabel, competitionNounOf, isLeagueCompetition, withCompetitionNoun } from './competition-kind';
 
 /**
  * **픽스처가 거울 행의 실제 모양이어야 한다.**
@@ -57,5 +57,27 @@ describe('competitionFormatLabel', () => {
   it('조별+토너먼트 / 토너먼트 라벨은 그대로다', () => {
     expect(competitionFormatLabel(GROUP_KNOCKOUT)).toBe('조별리그 + 토너먼트');
     expect(competitionFormatLabel(KNOCKOUT)).toBe('토너먼트');
+  });
+});
+
+describe('competitionNounOf', () => {
+  it('정규 리그만 리그다 — 리그 방식 대회와 옛 행(null)·미확인(undefined)은 대회', () => {
+    expect(competitionNounOf('regular_league')).toBe('리그');
+    expect(competitionNounOf('regular_tournament')).toBe('대회');
+    expect(competitionNounOf(null)).toBe('대회');
+    expect(competitionNounOf(undefined)).toBe('대회');
+  });
+});
+
+describe('withCompetitionNoun', () => {
+  it('약관 제목·부제의 대회를 이름에 맞게 바꾼다 — 한 문장에 여러 번 나와도 전부', () => {
+    expect(withCompetitionNoun('대회 규정 및 안내사항 동의', '리그')).toBe('리그 규정 및 안내사항 동의');
+    expect(withCompetitionNoun('대회 경기 기록 공개 동의', '리그')).toBe('리그 경기 기록 공개 동의');
+    expect(withCompetitionNoun('대회 신청과 대회 운영', '리그')).toBe('리그 신청과 리그 운영');
+  });
+
+  it('대회 화면에서는 그대로이고, 대회가 없는 제목(참가비 입금·취소·환불 정책 동의)도 그대로다', () => {
+    expect(withCompetitionNoun('대회 규정 및 안내사항 동의', '대회')).toBe('대회 규정 및 안내사항 동의');
+    expect(withCompetitionNoun('참가비 입금·취소·환불 정책 동의', '리그')).toBe('참가비 입금·취소·환불 정책 동의');
   });
 });

@@ -1,7 +1,7 @@
 'use client';
 
 import { Fragment, useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from 'react';
-import { MapPin, Pencil, Search } from 'lucide-react';
+import { ChevronDown, MapPin, Pencil, Search } from 'lucide-react';
 import { AlertTriangleIcon } from '@/components/v1-ui/icons';
 import { RecentVenueChips } from '@/components/v1-ui/create-form-fields';
 import { KakaoMapPreview } from '@/components/v1-ui/kakao-map-preview';
@@ -21,6 +21,7 @@ const LIST_MAX_HEIGHT = 'min(320px, 45vh)';
 
 const SEARCH_DEBOUNCE_MS = 300;
 const SEARCH_FALLBACK_MESSAGE = '장소를 찾지 못했어요. 잠시 후 다시 시도해 주세요.';
+const MORE_FAILED_FALLBACK_MESSAGE = '결과를 더 불러오지 못했어요.';
 const SEARCH_UNAVAILABLE_MESSAGE = '지금은 장소 검색을 쓸 수 없어요. 장소 이름을 직접 입력해 주세요.';
 
 function escapeRegExp(text: string): string {
@@ -130,11 +131,27 @@ export function PlacePicker({
 
   const searchActive = mode === 'search' && value === null && debouncedQuery.length >= 1;
   const search = useV1PlaceSearch(debouncedQuery, { enabled: searchActive });
-  const items: V1PlaceSearchItem[] = searchActive ? (search.data?.items ?? []) : [];
+  const items = useMemo(() => {
+    if (!searchActive) return [];
+    // 카카오가 쪽 경계에서 같은 장소를 다시 줄 수 있다 — 키가 겹치지 않게 처음 것만 남긴다.
+    const seen = new Set<string>();
+    const merged: V1PlaceSearchItem[] = [];
+    for (const item of (search.data?.pages ?? []).flatMap((page) => page.items)) {
+      if (seen.has(item.providerPlaceId)) continue;
+      seen.add(item.providerPlaceId);
+      merged.push(item);
+    }
+    return merged;
+  }, [searchActive, search.data]);
+  const hasMore = searchActive && Boolean(search.hasNextPage);
+  const loadingMore = search.isFetchingNextPage;
   // 입력과 디바운스 값이 어긋난 동안엔 직전 결과가 보이므로 "결과 없음" 판정은 최신 검색이 끝난 뒤에만 한다.
   const settled = searchActive && !search.isFetching && debouncedQuery === query.trim();
   const unavailable = search.error instanceof V1ApiError && search.error.code === 'PLACE_SEARCH_UNAVAILABLE';
-  const hasError = searchActive && search.isError;
+  // 다음 쪽만 실패하면 받아 둔 결과는 그대로 두고 「더 보기」 줄에서 다시 시도한다.
+  const moreFailed = searchActive && search.isFetchNextPageError;
+  const moreFailedMessage = moreFailed ? extractErrorMessage(search.error, MORE_FAILED_FALLBACK_MESSAGE) : null;
+  const hasError = searchActive && search.isError && !moreFailed;
   const listVisible = open && searchActive && !hasError && items.length > 0;
   const listRef = useRef<HTMLUListElement>(null);
   // 목록은 흐름 안에 그려져 하단 고정 버튼(만들기 CTA·모달 저장 줄)에 가릴 수 있다 — 열릴 때 한 번 보이게 한다.
@@ -142,7 +159,14 @@ export function PlacePicker({
   useEffect(() => {
     if (listVisible) listRef.current?.scrollIntoView?.({ block: 'nearest' });
   }, [listVisible]);
-  const manualOptionIndex = items.length;
+  const moreOptionIndex = hasMore ? items.length : -1;
+  const manualOptionIndex = items.length + (hasMore ? 1 : 0);
+  // 활성 줄은 인덱스라 새 쪽이 붙으면 직접 입력 줄의 인덱스가 밀린다 — 그 줄을 가리키고 있었다면 따라간다.
+  const [prevManualOptionIndex, setPrevManualOptionIndex] = useState(manualOptionIndex);
+  if (prevManualOptionIndex !== manualOptionIndex) {
+    setPrevManualOptionIndex(manualOptionIndex);
+    if (activeIndex === prevManualOptionIndex) setActiveIndex(manualOptionIndex);
+  }
   const recent = useMemo(() => (recentVenues ?? []).map(toRecentVenue), [recentVenues]);
 
   function switchToManual(initialName: string) {
@@ -163,6 +187,13 @@ export function PlacePicker({
     setQuery('');
     setJustPicked(false);
     setFocusInputNext(true);
+  }
+
+  function loadMore() {
+    if (!hasMore || loadingMore) return;
+    // 활성 줄을 「더 보기」에 두면 새 쪽이 붙은 뒤 같은 인덱스가 첫 새 결과가 된다 — 마우스로 눌러도 활성 줄이 엉뚱한 결과로 밀리지 않는다.
+    setActiveIndex(moreOptionIndex);
+    void search.fetchNextPage();
   }
 
   function selectItem(item: V1PlaceSearchItem) {
@@ -199,7 +230,9 @@ export function PlacePicker({
     } else if (event.key === 'Enter' && listVisible) {
       // 목록이 열려 있을 때의 Enter 는 폼 제출이 아니라 항목 선택이다.
       event.preventDefault();
+      // 「더 보기」에선 활성 위치를 그대로 둔다 — 새 결과가 오면 그 자리가 다음 쪽 첫 항목이 된다.
       if (activeIndex === manualOptionIndex) switchToManual(query);
+      else if (activeIndex === moreOptionIndex) loadMore();
       else if (activeIndex >= 0) selectItem(items[activeIndex]);
     }
   }
@@ -377,6 +410,43 @@ export function PlacePicker({
                 </li>
               );
             })}
+            {hasMore ? (
+              <li
+                id={optionId(moreOptionIndex)}
+                role="option"
+                className="tm-on-tint"
+                aria-selected={activeIndex === moreOptionIndex}
+                aria-disabled={loadingMore || undefined}
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={loadMore}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 6,
+                  minHeight: 48,
+                  padding: '12px 14px',
+                  scrollMarginBottom: 56,
+                  cursor: loadingMore ? 'default' : 'pointer',
+                  borderBottom: '1px solid var(--grey100)',
+                  background: activeIndex === moreOptionIndex ? 'var(--blue50)' : undefined,
+                }}
+              >
+                {loadingMore ? (
+                  <span className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>결과를 더 불러오고 있어요…</span>
+                ) : moreFailed ? (
+                  <>
+                    <span className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>{moreFailedMessage}</span>
+                    <b className="tm-text-caption" style={{ color: 'var(--blue700)' }}>다시 시도</b>
+                  </>
+                ) : (
+                  <>
+                    <b className="tm-text-caption" style={{ color: 'var(--blue700)' }}>결과 더 보기</b>
+                    <ChevronDown size={16} strokeWidth={2} aria-hidden="true" style={{ color: 'var(--blue700)' }} />
+                  </>
+                )}
+              </li>
+            ) : null}
             <li
               id={optionId(manualOptionIndex)}
               role="option"
@@ -405,6 +475,10 @@ export function PlacePicker({
             {searchActive && search.isFetching && items.length === 0 ? (
               <div className="tm-text-caption" style={{ color: 'var(--text-muted)', marginTop: 8 }}>장소를 찾고 있어요…</div>
             ) : null}
+            {/* 「더 보기」 줄의 진행·실패 문구는 목록 안에 있어 읽히지 않으므로 여기서 한 번 더 알린다. */}
+            {loadingMore ? <span className="sr-only">결과를 더 불러오고 있어요</span> : null}
+            {/* 다시 시도하는 동안에도 실패 상태가 남아 있으므로 불러오는 중이면 실패는 알리지 않는다. */}
+            {moreFailed && !loadingMore ? <span className="sr-only">{moreFailedMessage}</span> : null}
             {hasError ? (
               <div className="tm-text-caption" style={{ color: 'var(--text-muted)', marginTop: 8, lineHeight: 1.5 }}>
                 <p style={{ margin: 0 }}>

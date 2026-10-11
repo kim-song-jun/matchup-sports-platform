@@ -895,7 +895,7 @@ describe('TournamentRegistrationsService', () => {
     prisma.v1TournamentRegistration.findFirst.mockResolvedValue(
       registrationRow({ appliedByUserId: 'original-applicant' }),
     );
-    prisma.v1Tournament.findFirst.mockResolvedValue(openTournament());
+    prisma.v1Tournament.findFirst.mockResolvedValue(openTournament({ kind: 'regular_tournament' }));
     prisma.v1TournamentRegistration.update.mockResolvedValue(
       registrationRow({ status: 'awaiting_payment', appliedByUserId: 'original-applicant' }),
     );
@@ -907,7 +907,31 @@ describe('TournamentRegistrationsService', () => {
       'original-applicant',
       'tournament_registration_submitted',
       'tournament-1',
-      expect.any(String),
+      '"테스트대회" 대회 입금 안내를 확인해 주세요.',
+      { competitionKind: 'regular_tournament' },
+    );
+  });
+
+  it('submit: 정규 리그 신청 접수 알림은 본문과 종류 표시를 리그 기준으로 보낸다', async () => {
+    prisma.v1TournamentRegistration.findFirst.mockResolvedValue(
+      registrationRow({ appliedByUserId: 'original-applicant' }),
+    );
+    prisma.v1Tournament.findFirst.mockResolvedValue(
+      openTournament({ title: '테스트리그', kind: 'regular_league', registrationDeadlineAt: LEAGUE_OPEN_DEADLINE }),
+    );
+    prisma.v1TournamentRegistration.update.mockResolvedValue(
+      registrationRow({ status: 'awaiting_payment', appliedByUserId: 'original-applicant' }),
+    );
+    prisma.v1TournamentPayment.upsert.mockResolvedValue(paymentRow());
+
+    await service.submit(manager, 'tournament-1', 'reg-1', validSubmit);
+
+    expect(notifications.emitNotification).toHaveBeenCalledWith(
+      'original-applicant',
+      'tournament_registration_submitted',
+      'tournament-1',
+      '"테스트리그" 리그 입금 안내를 확인해 주세요.',
+      { competitionKind: 'regular_league' },
     );
   });
 
@@ -980,6 +1004,24 @@ describe('TournamentRegistrationsService', () => {
       'tournament-1',
       expect.any(String),
     );
+  });
+
+  it.each([
+    ['regular_league', '리그'],
+    ['regular_tournament', '대회'],
+  ])('submit: 기록 공개 동의 안내 본문이 %s 신청에서는 "%s"로 표기된다', async (kind, noun) => {
+    prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow());
+    prisma.v1Tournament.findFirst.mockResolvedValue(
+      openTournament({ kind, registrationDeadlineAt: kind === 'regular_league' ? LEAGUE_OPEN_DEADLINE : undefined }),
+    );
+    prisma.v1TournamentRegistration.update.mockResolvedValue(registrationRow({ status: 'awaiting_payment' }));
+    prisma.v1TournamentPayment.upsert.mockResolvedValue(paymentRow());
+
+    await submitWithRecordDisclosure();
+
+    const body = notifications.emitToManyDeferred.mock.calls[0][3] as string;
+    expect(body).toContain(`${noun} 기록을 프로필에 공개할지`);
+    expect(body).not.toContain(noun === '리그' ? '대회 기록' : '리그 기록');
   });
 
   it('submit: 기록 공개 동의를 체크하지 않으면 안내 알림도 보내지 않는다', async () => {

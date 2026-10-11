@@ -59,7 +59,10 @@ A completed or cancelled league rejects the same generation, template and slot-a
 actions with `409 LEAGUE_ENDED`; releasing slots on registration cancellation is not guarded.
 `POST .../fixtures/manual` and `PATCH .../fixtures/:teamMatchId` (update-fixture) also return
 `409 LEAGUE_ENDED` for a completed or cancelled league, but unlike generation they stay allowed
-while the league is on hold.
+while the league is on hold. Update-fixture locks the fixture's game row and then the league row
+before the check, so an edit that overlaps the final result completing the league is either
+rejected or committed before the completion — the same lock order as result officialization and
+cancellation (game → league).
 
 While a league is on hold, already-scheduled notifications for its fixtures are
 suppressed at fire time (the outbox rows are kept, so resuming re-enables the next

@@ -49,6 +49,8 @@ function teamRow(id: string, name: string, membershipIds: string[]) {
 }
 
 interface FakeState {
+  /** $queryRaw 로 보낸 SQL(값 자리는 ?) — 잠금 대상·순서 단언용. */
+  rawSql: string[];
   participants: Array<{
     id: string;
     sideId: string;
@@ -91,7 +93,7 @@ const KNOWN_TEAMS = new Map([
 
 function createFake() {
   const state: FakeState = {
-    participants: [], sides: [], links: [], linkEvents: [], scheduleCreates: [], calls: [], mirrorUpdates: [], rosterSyncTeamIds: [],
+    participants: [], sides: [], links: [], linkEvents: [], scheduleCreates: [], calls: [], rawSql: [], mirrorUpdates: [], rosterSyncTeamIds: [],
     // 기본: 서로 다른 두 경기일이 이미 있다(KST 9/5, 9/12).
     siblingStartAts: [new Date('2026-09-05T01:00:00.000Z'), new Date('2026-09-12T01:00:00.000Z')],
     teamMatchCreates: [],
@@ -389,7 +391,10 @@ function createFake() {
         },
       ),
     },
-    $queryRaw: track('$queryRaw', async () => [{ id: 'league-1' }]),
+    $queryRaw: track('$queryRaw', async (strings: TemplateStringsArray) => {
+      state.rawSql.push(strings.join('?'));
+      return [{ id: 'league-1' }];
+    }),
     // 명단 재계산 이벤트(값 순서: id, business_key, aggregate_type, aggregate_id, type, payload)는 따로 모은다.
     // 실제 재계산은 test/league-matches/league-roster-sync.integration-spec.ts.
     $executeRaw: async (_strings: TemplateStringsArray, ...values: unknown[]) => {
@@ -899,8 +904,14 @@ describe('LeagueMatchAdminService.generateFixtures — 자동 로스터와 신�
       await expect(svc.updateFixture(adminUser, 'league-1', 'tm-1', { placeName: '망원 운동장' }))
         .rejects.toMatchObject({ response: { code: 'LEAGUE_ENDED' } });
       expect(fake.state.calls).not.toContain('v1TeamMatch.update');
-      // 수정은 리그 행을 잠그지 않는다 — 잠그면 취소·결과 확정(경기 → 리그)과 역순 교착이 난다.
-      expect(fake.state.calls).not.toContain('$queryRaw');
+      // 게임 행 → 리그 행 순서로 잠근 뒤 검사한다 — 리그 행을 먼저 잡으면 취소·결과 확정(게임 → 리그)과 역순 교착.
+      expect(fake.state.rawSql).toHaveLength(2);
+      expect(fake.state.rawSql[0]).toContain('v1_games');
+      expect(fake.state.rawSql[0]).toContain('FOR UPDATE');
+      expect(fake.state.rawSql[1]).toContain('v1_tournaments');
+      const calls = fake.state.calls;
+      const leagueLockAt = calls.lastIndexOf('$queryRaw');
+      expect(calls.indexOf('v1Tournament.findFirst')).toBeGreaterThan(leagueLockAt);
     });
 
     // 대조군: 보류 중 수동 추가·수정은 허용이다 — 일괄 생성 가드(LEAGUE_ON_HOLD)를 쓰면 여기서 깨진다.

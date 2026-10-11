@@ -76,7 +76,7 @@ import { assertLeagueFixtureGenerationAllowedInTx, assertLeagueNotEndedInTx } fr
 import { LEAGUE_STATE_BY_STATUS, isCompleteLeagueMirror } from '../tournaments/league-competition-mirror';
 import { randomUUID } from 'node:crypto';
 import { BRACKET_TEMPLATE_MAX_FIXTURES } from '../tournaments/templates/bracket-template-plan';
-import { lockCompetitionForBracketMutationInTx } from '../tournaments/slots/competition-bracket-lock';
+import { lockCompetitionForBracketMutationInTx, lockCompetitionForSlotReleaseInTx } from '../tournaments/slots/competition-bracket-lock';
 import { planLeagueTemplate } from './league-template-plan';
 import { LeagueStateValue } from './league-state';
 import { isLeagueRegistrationOpen } from './league-registration-open';
@@ -1503,8 +1503,11 @@ export class LeagueMatchAdminService {
       : null;
     const nextStartAt = dto.startsAt === undefined ? undefined : new Date(dto.startsAt);
     const updated = await this.prisma.$transaction(async (tx) => {
-      // 끝남·취소만 막고 보류 중 수정은 허용한다. 리그 행은 잠그지 않는다 — 시각·장소 수정은 완료 판정을
-      // 바꾸지 않고, 잠그면 취소·결과 확정(경기 → 리그 완료 갱신)과 역순으로 교착한다.
+      // 끝남·취소만 막고 보류 중 수정은 허용한다. 검사와 쓰기를 한 덩어리로 묶되 잠금 순서는 취소·결과 확정과 같다
+      // (그 경기의 게임 행 → 리그 행): 같은 경기끼리는 게임 행에서, 리그 완료 처리와는 리그 행에서 직렬화된다.
+      // 리그 행을 먼저 잡으면 게임 행을 쥔 채 완료를 갱신하는 경로와 역순 교착이 난다.
+      await tx.$queryRaw`SELECT id FROM v1_games WHERE team_match_id = ${teamMatchId} FOR UPDATE`;
+      await lockCompetitionForSlotReleaseInTx(tx, { id: leagueId, kind: 'regular_league' });
       await assertLeagueNotEndedInTx(tx, leagueId);
       const nextEndAt = nextStartAt === undefined
         ? undefined
@@ -1553,6 +1556,9 @@ export class LeagueMatchAdminService {
         tx,
       );
       return result;
+    }, {
+      timeout: 45_000, // 템플릿·재생성이 리그 행을 45초까지 쥘 수 있다 — createManualFixture 와 같은 대기 한도
+      maxWait: 5_000,
     });
     return {
       teamMatchId: updated.id,

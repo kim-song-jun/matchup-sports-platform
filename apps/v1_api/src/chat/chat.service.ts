@@ -984,6 +984,8 @@ export class ChatService {
         });
         participant.visibleFromAt = sharedHistoryFrom;
       }
+      // 상대 팀이 먼저 열어 미리 등록된 운영진은 경계가 이미 있어 아래 첫 입장 경로를 타지 않는다.
+      if (room.teamMatchId && !room.teamMatch?.platformManaged) await this.recordTeamMatchFirstEntry(room.id, participant);
       return room;
     }
 
@@ -1015,6 +1017,20 @@ export class ChatService {
     });
     participant.visibleFromAt = current?.visibleFromAt ?? visibleFromAt;
     return room;
+  }
+
+  /** 사전 등록된 팀매치 참여자가 처음 방을 열 때 '들어왔어요' 한 줄을 남긴다. 동시에 연 요청은 참여자 행 잠금으로 줄세운다. */
+  private async recordTeamMatchFirstEntry(roomId: string, participant: { id: string; userId: string; user: { profile: { nickname: string | null; displayName: string | null } | null } }) {
+    const joinedWhere = { chatRoomId: roomId, senderUserId: participant.userId, systemEventType: 'joined' as const };
+    if (await this.prisma.v1ChatMessage.findFirst({ where: joinedWhere, select: { id: true } })) return;
+    const at = new Date();
+    const displayName = participant.user.profile?.nickname ?? participant.user.profile?.displayName ?? '참여자';
+    const line = await this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM v1_chat_room_participants WHERE id = ${participant.id} FOR UPDATE`;
+      if (await tx.v1ChatMessage.findFirst({ where: joinedWhere, select: { id: true } })) return null;
+      return this.recordSystemLine(tx, { chatRoomId: roomId, userId: participant.userId, event: 'joined', at, displayName, backdated: false });
+    });
+    if (line) void this.deliverSystemLine(line);
   }
 
   /**

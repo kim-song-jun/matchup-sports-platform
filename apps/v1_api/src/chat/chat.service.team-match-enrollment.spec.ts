@@ -34,6 +34,7 @@ function teamMatchWorld() {
   let room: Row | null = null;
   const participants: Row[] = [];
   const notifications: Row[] = [];
+  const messages: Row[] = [];
   let caller = hostCaptain.id;
 
   const isManager = (userId: string, teamId: string | null) => memberships.some(
@@ -54,9 +55,9 @@ function teamMatchWorld() {
       update: jest.fn(async () => room),
     },
     v1ChatRoomParticipant: {
-      findUnique: jest.fn(async ({ where }: { where: Row }) => participants.find(
-        (p) => p.chatRoomId === where.chatRoomId_userId.chatRoomId && p.userId === where.chatRoomId_userId.userId,
-      ) ?? null),
+      findUnique: jest.fn(async ({ where }: { where: Row }) => participants.find((p) => (where.id
+        ? p.id === where.id
+        : p.chatRoomId === where.chatRoomId_userId.chatRoomId && p.userId === where.chatRoomId_userId.userId)) ?? null),
       create: jest.fn(async ({ data }: { data: Row }) => { participants.push({ id: `p-${participants.length}`, ...data }); }),
       createMany: jest.fn(async ({ data, skipDuplicates }: { data: Row[]; skipDuplicates: boolean }) => {
         expect(skipDuplicates).toBe(true);
@@ -65,6 +66,11 @@ function teamMatchWorld() {
             participants.push({ id: `p-${participants.length}`, mutedUntil: null, ...row });
           }
         }
+      }),
+      updateMany: jest.fn(async ({ where, data }: { where: Row; data: Row }) => {
+        const target = participants.find((p) => p.id === where.id && (where.visibleFromAt !== null || p.visibleFromAt === null));
+        if (target) Object.assign(target, data);
+        return { count: target ? 1 : 0 };
       }),
       // 수신자 선정: 방·상태·발신자 제외만 평가하고, 자격(AND) 쪽은 아래 fake 멤버십으로 대신 판정한다.
       findMany: jest.fn(async ({ where }: { where: Row }) => participants.filter(
@@ -84,12 +90,22 @@ function teamMatchWorld() {
       )),
     },
     v1AdminUser: { findFirst: jest.fn(async () => null) },
-    v1ChatMessage: { create: jest.fn(async ({ data }: { data: Row }) => ({ id: 'message-1', sentAt: new Date(), messageType: 'text', ...data })) },
+    v1ChatMessage: {
+      create: jest.fn(async ({ data }: { data: Row }) => {
+        const message = { id: `message-${messages.length + 1}`, sentAt: new Date(), messageType: 'text', ...data };
+        messages.push(message);
+        return message;
+      }),
+      findFirst: jest.fn(async ({ where }: { where: Row }) => messages.find(
+        (m) => m.chatRoomId === where.chatRoomId && m.senderUserId === where.senderUserId && m.systemEventType === where.systemEventType,
+      ) ?? null),
+    },
+    $queryRaw: jest.fn(async () => []),
     v1NotificationPreference: { findMany: jest.fn(async () => []) },
     v1Notification: { createMany: jest.fn(async ({ data }: { data: Row[] }) => { notifications.push(...data); }) },
     $transaction: jest.fn(async (callback: (tx: unknown) => Promise<unknown>) => callback(prisma)),
   };
-  return { prisma, participants, notifications, memberships, as: (id: string) => { caller = id; } };
+  return { prisma, participants, notifications, messages, memberships, as: (id: string) => { caller = id; } };
 }
 
 describe('ChatService — 팀매치 방 참여자 등록 (MD-QA #111)', () => {
@@ -175,5 +191,31 @@ describe('ChatService — 팀매치 방 참여자 등록 (MD-QA #111)', () => {
     await service.sendMessage(hostCaptain, 'room-1', { content: '다시 보내요' });
     expect(world.participants.find((p) => p.userId === awayManager.id)!.status).toBe('left');
     expect(recipients()).toEqual([awayCaptain.id]);
+  });
+
+  describe('자동 등록된 상대 팀 운영진이 처음 방을 열 때', () => {
+    const joinedLines = (userId: string) => world.messages.filter((m) => m.systemEventType === 'joined' && m.senderUserId === userId);
+
+    it('직접 입장한 사람과 똑같이 들어왔어요 줄이 한 번 남는다', async () => {
+      world.as(hostCaptain.id);
+      await service.resolve(hostCaptain, { targetType: 'team_match', targetId: 'tm-1' });
+      await service.detail(hostCaptain, 'room-1');
+      expect(joinedLines(hostCaptain.id)).toHaveLength(1);
+      expect(joinedLines(awayCaptain.id)).toHaveLength(0);
+
+      world.as(awayCaptain.id);
+      await service.detail(awayCaptain, 'room-1');
+      expect(joinedLines(awayCaptain.id)).toHaveLength(1);
+    });
+
+    it('다시 열어도 줄은 하나다', async () => {
+      world.as(hostCaptain.id);
+      await service.resolve(hostCaptain, { targetType: 'team_match', targetId: 'tm-1' });
+
+      world.as(awayCaptain.id);
+      await service.detail(awayCaptain, 'room-1');
+      await service.detail(awayCaptain, 'room-1');
+      expect(joinedLines(awayCaptain.id)).toHaveLength(1);
+    });
   });
 });

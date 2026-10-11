@@ -107,6 +107,7 @@ function chatWorld(kind: RoomKind) {
         return row;
       }),
       count: jest.fn(async ({ where }: { where: Row }) => messages.filter((row) => matches(row, where)).length),
+      findFirst: jest.fn(async ({ where }: { where: Row }) => messages.find((row) => matches(row, where)) ?? null),
       findUnique: jest.fn(async ({ where }: { where: Row }) => messages.find((row) => row.id === where.id) ?? null),
     },
     // 참여 자격(assertCurrentRoomEntitlement)은 통과시킨다 — 이 스펙은 열람 경계만 본다.
@@ -124,6 +125,7 @@ function chatWorld(kind: RoomKind) {
     v1TeamMatch: { findFirst: jest.fn(async () => ({ hostTeamId: 'team-h', approvedApplicantTeamId: 'team-a' })) },
     v1TeamMembership: { findFirst: jest.fn(async () => ({ id: 'membership-1' })), findMany: jest.fn(async () => []) },
     v1TeamContact: { updateMany: jest.fn() },
+    $queryRaw: jest.fn(async () => []),
     $transaction: jest.fn(async (callback: (tx: unknown) => Promise<unknown>) => callback(prisma)),
   };
 

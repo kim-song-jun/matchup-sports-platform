@@ -158,6 +158,7 @@ describe('점수·팀 이름 뒤 조사는 받침을 따른다', () => {
     ['송파 유나이티드', '송파 유나이티드예요'],
     ['마포 레인저스', '마포 레인저스예요'],
     ['서울 강남', '서울 강남이에요'],
+    ['FC 서울(U18)', 'FC 서울(U18)이에요'],
   ])('승부차기 종료 확인 창: 선축 %s → %s', (name, expected) => {
     const firstKick: GameSide = { ...away, displayNameSnapshot: name };
     expect(penaltyShootoutFinishConfirmCopy(home, firstKick, 3, 3, firstKick).message).toContain(`선축은 ${expected}.`);

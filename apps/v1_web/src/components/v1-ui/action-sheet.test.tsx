@@ -98,6 +98,30 @@ describe('ActionSheet', () => {
     expect(onSelect).not.toHaveBeenCalled();
   });
 
+  it('조상이 스태킹 컨텍스트여도 시트가 갇히지 않게 body 직속으로 그린다', () => {
+    // 스크롤 영역 같은 조상이 스태킹 컨텍스트(iOS 웹뷰의 touch 스크롤 등)면 안쪽 z-index 는 밖의
+    // 하단 고정 CTA·상단바와 겨루지 못한다 — 시트가 조상 밖에 있어야 --z-modal 이 전역에서 이긴다.
+    const { container } = render(
+      <div data-testid="scroll-area" style={{ position: 'relative', zIndex: 0 }}>
+        <ActionSheet open title="길찾기" actions={[{ key: 'a', label: '카카오맵', onSelect: vi.fn() }]} onClose={vi.fn()} />
+      </div>,
+    );
+
+    const dialog = screen.getByRole('dialog', { name: '길찾기' });
+    expect(container.contains(dialog)).toBe(false);
+    expect(dialog.parentElement?.parentElement).toBe(document.body);
+  });
+
+  it('body 로 올려도 닫기·ESC·항목 선택은 그대로 동작한다', () => {
+    const onSelect = vi.fn();
+    const { onClose } = setup([{ key: 'a', label: '동작', onSelect }]);
+
+    fireEvent.click(screen.getByRole('button', { name: '동작' }));
+    expect(onSelect).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByRole('dialog').parentElement as HTMLElement);
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
   it('닫기 버튼이 onClose 를 부른다', () => {
     const { onClose } = setup([{ key: 'a', label: '동작', onSelect: vi.fn() }]);
 

@@ -2,7 +2,7 @@
 import type { Prisma } from '@prisma/client';
 import { FOOTBALL_V1_CONFIG } from '../competition-config/competition-config';
 import { calculateCompetitionStandings } from '../competition-config/competition-standings';
-import { loadGroupRankPreview } from './load-group-rank-preview';
+import { loadGroupRankPreview, loadGroupStandingSummaries } from './load-group-rank-preview';
 
 type Result = readonly [home: string, away: string, homeScore: number, awayScore: number];
 
@@ -10,24 +10,27 @@ const CLEAN_A: Result[] = [['r-a', 'r-b', 2, 0], ['r-a', 'r-c', 1, 0], ['r-b', '
 const TIED_A: Result[] = [['r-a', 'r-b', 0, 0], ['r-a', 'r-c', 1, 0], ['r-b', 'r-c', 1, 0]];
 const GROUP_B: Result[] = [['r-d', 'r-e', 1, 0], ['r-d', 'r-f', 1, 0], ['r-e', 'r-f', 1, 0]];
 
-function standingRows(groupId: string, ids: string[], results: Result[]) {
+const OFFICIAL_AT = new Date('2026-10-01T09:00:00Z');
+const RECALCULATED_AT = new Date('2026-10-01T10:00:00Z');
+
+function standingRows(groupId: string, ids: string[], results: Result[], recalculatedAt: Date | null = RECALCULATED_AT) {
   return calculateCompetitionStandings({
     tournamentId: 'tournament-1',
     configVersionId: 'config-1',
     registrationIds: ids,
     fixtures: results.map(([home, away, homeScore, awayScore]) => ({ homeRegistrationId: home, awayRegistrationId: away, homeScore, awayScore })),
     config: FOOTBALL_V1_CONFIG,
-  }).map((row) => ({ groupId, registrationId: row.registrationId, position: row.position, wins: row.wins, draws: row.draws, losses: row.losses }));
+  }).map((row) => ({ groupId, registrationId: row.registrationId, position: row.position, wins: row.wins, draws: row.draws, losses: row.losses, recalculatedAt }));
 }
 
-function detailRows(groupId: string, results: Result[], pendingIndex = -1) {
+function detailRows(groupId: string, results: Result[], pendingIndex = -1, officialAt = OFFICIAL_AT) {
   return results.map(([home, away, homeScore, awayScore], index) => ({
     groupId,
     homeRegistrationId: home,
     awayRegistrationId: away,
     teamMatch: {
       game: {
-        currentOfficialRevision: index === pendingIndex ? null : { state: 'OFFICIAL', score: { home: homeScore, away: awayScore } },
+        currentOfficialRevision: index === pendingIndex ? null : { state: 'OFFICIAL', score: { home: homeScore, away: awayScore }, officialAt },
       },
     },
   }));
@@ -131,6 +134,112 @@ describe('loadGroupRankPreview', () => {
     expect(preview.groupMembers.size).toBe(0);
     expect(findTeams).not.toHaveBeenCalled();
     expect(findStandings).not.toHaveBeenCalled();
+    expect(findDetails).not.toHaveBeenCalled();
+  });
+});
+
+describe('loadGroupStandingSummaries', () => {
+  // r-a→r-b→r-c→r-a 로 이긴 3팀 완전 동률 조 + 동률 없는 조(대조).
+  const TIE_THREE: Result[] = [['r-a', 'r-b', 1, 0], ['r-b', 'r-c', 1, 0], ['r-c', 'r-a', 1, 0]];
+
+  function summaryClient(options: { groups?: unknown[]; knockout?: unknown[]; pendingInTie?: boolean; tieOfficialAt?: Date } = {}) {
+    const findGroups = jest.fn().mockResolvedValue(
+      options.groups ?? [{ id: 'grp-a', advanceCount: 2 }, { id: 'grp-b', advanceCount: 2 }],
+    );
+    const findTeams = jest.fn().mockResolvedValue(TEAMS);
+    const findStandings = jest.fn().mockResolvedValue([
+      ...standingRows('grp-a', ['r-a', 'r-b', 'r-c'], TIE_THREE),
+      ...standingRows('grp-b', ['r-d', 'r-e', 'r-f'], GROUP_B),
+    ]);
+    const findDetails = jest.fn().mockImplementation(async (args: { where: { OR?: unknown } }) =>
+      args.where.OR === undefined
+        ? [...detailRows('grp-a', TIE_THREE, options.pendingInTie ? 2 : -1, options.tieOfficialAt), ...detailRows('grp-b', GROUP_B)]
+        : (options.knockout ?? []),
+    );
+    const client = {
+      v1TournamentGroup: { findMany: findGroups },
+      v1TournamentGroupTeam: { findMany: findTeams },
+      v1TournamentStanding: { findMany: findStandings },
+      v1TournamentMatchDetails: { findMany: findDetails },
+    } as unknown as Prisma.TransactionClient;
+    return { client, findGroups, findTeams, findDetails };
+  }
+  const placedMatch = (home: string | null, away: string | null) => ({ homeRegistrationId: home, awayRegistrationId: away });
+
+  it('결선 경기에 아무도 안 들어갔으면 — 동률 조는 공동 1위·미정, 동률 없는 조는 상위 N팀(대조)', async () => {
+    const { client } = summaryClient();
+
+    const summaries = await loadGroupStandingSummaries(client, 'tournament-1');
+
+    const tie = summaries.get('grp-a');
+    expect([...(tie?.sharedRankByRegistrationId ?? [])].sort()).toEqual([['r-a', 1], ['r-b', 1], ['r-c', 1]]);
+    expect(tie?.qualification).toEqual({ advancingRegistrationIds: [], undecided: true });
+    const clean = summaries.get('grp-b');
+    expect(clean?.sharedRankByRegistrationId.size).toBe(0);
+    expect(clean?.qualification).toEqual({ advancingRegistrationIds: ['r-d', 'r-e'], undecided: false });
+  });
+
+  it('어드민이 동률 조에서 고른 팀(결선 경기에 배정)이 진출 팀이 된다 — 다른 조 팀이 섞여 있어도 이 조 소속만 센다', async () => {
+    const { client } = summaryClient({ knockout: [placedMatch('r-b', 'r-c'), placedMatch('r-e', null)] });
+
+    const summaries = await loadGroupStandingSummaries(client, 'tournament-1');
+
+    expect(summaries.get('grp-a')?.qualification).toEqual({ advancingRegistrationIds: ['r-b', 'r-c'], undecided: false });
+    expect(summaries.get('grp-b')?.qualification).toEqual({ advancingRegistrationIds: ['r-e'], undecided: false });
+  });
+
+  it('덜 끝난 조는 맵에 없다 — 끝난 조는 그대로 남는다(대조)', async () => {
+    const { client } = summaryClient({ pendingInTie: true });
+
+    const summaries = await loadGroupStandingSummaries(client, 'tournament-1');
+
+    expect(summaries.has('grp-a')).toBe(false);
+    expect(summaries.has('grp-b')).toBe(true);
+  });
+
+  it('정정으로 공식 리비전이 순위 재계산보다 늦어졌으면 그 조는 낡은 표라 맵에 없다 — 다른 조는 그대로(대조)', async () => {
+    const { client } = summaryClient({ tieOfficialAt: new Date('2026-10-01T10:00:01Z') });
+
+    const summaries = await loadGroupStandingSummaries(client, 'tournament-1');
+
+    expect(summaries.has('grp-a')).toBe(false);
+    expect(summaries.has('grp-b')).toBe(true);
+  });
+
+  it('includeQualification:false 면 결선 경기 조회 없이 공동 순위만 싣고 qualification 은 null 이다', async () => {
+    const { client, findDetails } = summaryClient({ knockout: [placedMatch('r-b', 'r-c')] });
+
+    const summaries = await loadGroupStandingSummaries(client, 'tournament-1', { includeQualification: false });
+
+    expect(findDetails).toHaveBeenCalledTimes(1);
+    expect(findDetails.mock.calls[0][0].where.OR).toBeUndefined();
+    expect(summaries.get('grp-a')?.sharedRankByRegistrationId.size).toBe(3);
+    expect(summaries.get('grp-a')?.qualification).toBeNull();
+    expect(summaries.get('grp-b')?.qualification).toBeNull();
+  });
+
+  it('결선 경기는 조별 단계가 아닌 경기만, 취소·보관·삭제된 경기는 빼고 읽는다', async () => {
+    const { client, findGroups, findDetails } = summaryClient();
+
+    await loadGroupStandingSummaries(client, 'tournament-1');
+
+    expect(findGroups).toHaveBeenCalledWith(expect.objectContaining({ where: { tournamentId: 'tournament-1', phase: 'group' } }));
+    expect(findDetails).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          tournamentId: 'tournament-1',
+          OR: [{ groupId: null }, { group: { is: { phase: { not: 'group' } } } }],
+          teamMatch: { is: { deletedAt: null, status: { notIn: ['cancelled', 'archived'] } } },
+        },
+      }),
+    );
+  });
+
+  it('조별 단계 조가 없는 대회는 빈 맵이고 다른 표를 읽지 않는다', async () => {
+    const { client, findTeams, findDetails } = summaryClient({ groups: [] });
+
+    expect((await loadGroupStandingSummaries(client, 'tournament-1')).size).toBe(0);
+    expect(findTeams).not.toHaveBeenCalled();
     expect(findDetails).not.toHaveBeenCalled();
   });
 });

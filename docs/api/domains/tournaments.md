@@ -274,9 +274,10 @@ an occupied coordinate with the same payload returns its current canonical fixtu
 `clientCommandId`(UUID, 선택)를 보내면 이를 막는다. 웹은 제출마다 하나를 만들어 재시도에도 유지한다.
 
 - 같은 대회·같은 관리자·같은 키로 다시 오면 번호를 정하기 전에 처음 만든 경기를 같은 응답 모양으로 돌려준다. 새 경기·감사·알림은 없다.
-- 같은 키에 요청 내용(조·라운드·레그·상위 경기·홈/어웨이·일정·장소 이름·주소·좌표·출처·핀 id, 보낸 번호)이 다르면 `409 COMMAND_IDEMPOTENCY_PAYLOAD_REUSE`.
+- 재생은 조·홈/어웨이 등록 같은 바뀔 수 있는 상태의 검증보다 먼저 한다(잠금 없는 사전 조회). 처음 만든 뒤 등록이 취소돼도 같은 키 재전송은 검증 오류가 아니라 첫 경기를 돌려준다. 동시에 들어온 첫 요청은 트랜잭션 안의 같은 조회(대회 락 뒤)가 직렬화한다.
+- 같은 키에 요청 내용(조·라운드·레그·상위 경기·홈/어웨이·일정·장소 이름·주소·좌표·출처·핀 id, 보낸 번호)이 다르면 `409 COMMAND_IDEMPOTENCY_PAYLOAD_REUSE`. 내용 해시에는 요청이 보낸 값만 들어가며, 요청이 장소를 생략했을 때의 대회 기본 장소는 들어가지 않는다(그 사이 대회 장소가 바뀌어도 같은 요청은 재생된다).
 - 처음 만든 경기가 그 사이 삭제됐으면 `409 COMMAND_IDEMPOTENCY_RESOURCE_GONE`("이 요청으로 만든 경기가 이미 지워졌어요. 다시 추가해 주세요.").
-- 키는 경기 생성과 같은 트랜잭션에서 `v1IdempotencyRecord`(action `tournament_fixture_client_create`)에 24시간 기록된다. 키가 없으면 동작은 이전과 같다.
+- 키는 경기 생성과 같은 트랜잭션에서 `v1IdempotencyRecord`(action `tournament_fixture_client_create`)에 24시간 기록된다. 24시간이 지난 기록은 없는 것으로 보고, 같은 키라도 새 경기를 만든다. 키가 없으면 동작은 이전과 같다.
 - UUID 가 아니면 `400`.
 
 | Method | Path | DTO | Result |

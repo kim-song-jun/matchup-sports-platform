@@ -503,9 +503,69 @@ export class TournamentBracketService {
     return this.serializeGroupTeam(saved);
   }
 
+  /** 같은 요청 고유 키로 처음 만든 경기를 돌려준다. 기록이 없거나 24시간이 지났으면 null(새 요청). */
+  private async replayClientFixture(
+    db: Prisma.TransactionClient, userId: string, tournamentId: string, clientKey: string, payloadHash: string,
+  ) {
+    const prior = await db.v1IdempotencyRecord.findFirst({
+      where: {
+        actorUserId: userId, action: FIXTURE_CLIENT_CREATE_ACTION, resourceType: V1GameSourceType.TEAM_MATCH,
+        idempotencyKey: clientKey, expiresAt: { gt: new Date() },
+      },
+      select: { resourceId: true, payloadHash: true },
+    });
+    if (!prior) return null;
+    if (prior.payloadHash !== payloadHash) {
+      throw new ConflictException({
+        code: 'COMMAND_IDEMPOTENCY_PAYLOAD_REUSE',
+        message: '같은 경기 생성 키를 다른 내용으로 다시 사용할 수 없어요.',
+      });
+    }
+    const priorDetails = await db.v1TournamentMatchDetails.findFirst({
+      where: { teamMatchId: prior.resourceId, tournamentId, teamMatch: { deletedAt: null } },
+      select: FIXTURE_REPLAY_SELECT,
+    });
+    if (!priorDetails?.teamMatch) {
+      throw new ConflictException({
+        code: 'COMMAND_IDEMPOTENCY_RESOURCE_GONE',
+        message: '이 요청으로 만든 경기가 이미 지워졌어요. 다시 추가해 주세요.',
+      });
+    }
+    assertReplayableFixture(priorDetails.teamMatch, tournamentId);
+    return fixtureReplayResult({ ...priorDetails, teamMatch: priorDetails.teamMatch });
+  }
+
   async createFixture(user: V1AuthUser, tournamentId: string, dto: CreateFixtureDto) {
     const admin = await this.adminContext.getMutationAdmin(user.id);
     const tournament = await this.loadTournament(tournamentId);
+
+    const legNumber = dto.legNumber ?? 1;
+    // 저장과 같은 정규화(resolvePlaceSnapshot)를 거친 값으로 해시를 만든다 — 안 맞추면 같은 번호 재시도가 해시 불일치 409 가 난다.
+    const requestedPlace = this.fixturePlace(dto);
+    const requestedVenue = requestedPlace?.name ?? null;
+    const pinnedPlace = requestedPlace?.providerPlaceId ? requestedPlace : null;
+    // 번호를 서버가 정하는 요청의 내용 해시 — 번호는 빼고(재시도마다 달라진다) 보낸 번호가 있으면 넣는다.
+    // 요청에 실린 값만 넣는다: 대회 기본 장소·등록 상태처럼 재시도 사이에 바뀔 수 있는 서버 상태에 기대면 같은 요청이 409 가 된다.
+    const clientKey = dto.clientCommandId ? `tournament-fixture-client:${tournamentId}:${dto.clientCommandId}` : null;
+    const clientPayloadHash = canonicalGameCommandPayloadHash({
+      tournamentId,
+      groupId: dto.groupId ?? null,
+      round: dto.round,
+      legNumber,
+      parentFixtureId: dto.parentFixtureId ?? null,
+      homeRegistrationId: dto.homeRegistrationId ?? null,
+      awayRegistrationId: dto.awayRegistrationId ?? null,
+      scheduledAt: dto.scheduledAt ? new Date(dto.scheduledAt).toISOString() : null,
+      venue: requestedVenue,
+      place: requestedPlace,
+      ...(dto.fixtureNumber !== undefined ? { fixtureNumber: dto.fixtureNumber } : {}),
+    });
+    // 재생은 바뀔 수 있는 상태(조·등록 확정 여부)를 검증하기 전에 한다 — 이미 만든 경기가 그 사이 등록 취소 때문에 재생 불가가 되면 안 된다.
+    // 잠금 없는 조회라 동시 첫 요청은 못 막는다 — 그 직렬화는 아래 트랜잭션 안의 같은 조회가 맡는다.
+    if (clientKey) {
+      const replay = await this.replayClientFixture(this.prisma, user.id, tournamentId, clientKey, clientPayloadHash);
+      if (replay) return this.serializeCanonicalFixture(replay, toPlaceView(replay));
+    }
 
     // groupId가 주어지면 해당 대회 소속인지 확인
     if (dto.groupId) {
@@ -554,55 +614,12 @@ export class TournamentBracketService {
       });
     }
 
-    const legNumber = dto.legNumber ?? 1;
-    // 저장과 같은 정규화(resolvePlaceSnapshot)를 거친 값으로 해시를 만든다 — 안 맞추면 같은 번호 재시도가 해시 불일치 409 가 난다.
-    const requestedPlace = this.fixturePlace(dto);
-    const requestedVenue = requestedPlace?.name ?? null;
-    const pinnedPlace = requestedPlace?.providerPlaceId ? requestedPlace : null;
-    // 번호를 서버가 정하는 요청의 내용 해시 — 번호는 빼고(재시도마다 달라진다) 보낸 번호가 있으면 넣는다.
-    // 새 키라 옛 해시와 맞출 필요가 없어, 장소는 정규화한 스냅샷 전체(이름·주소·핀)를 넣는다.
-    const clientKey = dto.clientCommandId ? `tournament-fixture-client:${tournamentId}:${dto.clientCommandId}` : null;
-    const clientPayloadHash = canonicalGameCommandPayloadHash({
-      tournamentId,
-      groupId: dto.groupId ?? null,
-      round: dto.round,
-      legNumber,
-      parentFixtureId: dto.parentFixtureId ?? null,
-      homeRegistrationId: dto.homeRegistrationId ?? null,
-      awayRegistrationId: dto.awayRegistrationId ?? null,
-      scheduledAt: dto.scheduledAt ? new Date(dto.scheduledAt).toISOString() : null,
-      venue: requestedVenue ?? tournament.venue ?? null,
-      place: requestedPlace,
-      ...(dto.fixtureNumber !== undefined ? { fixtureNumber: dto.fixtureNumber } : {}),
-    });
     const created = await this.prisma.$transaction(async (tx) => {
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`league-fixture-generation:${tournamentId}`}, 0))`;
       // 요청 고유 키 재전송: 번호를 정하기 전에 처음 만든 경기를 찾는다(번호가 달라져 좌표 멱등이 안 걸리는 재시도를 막는다).
       if (clientKey) {
-        const prior = await tx.v1IdempotencyRecord.findFirst({
-          where: { actorUserId: user.id, action: FIXTURE_CLIENT_CREATE_ACTION, resourceType: V1GameSourceType.TEAM_MATCH, idempotencyKey: clientKey },
-          select: { resourceId: true, payloadHash: true },
-        });
-        if (prior) {
-          if (prior.payloadHash !== clientPayloadHash) {
-            throw new ConflictException({
-              code: 'COMMAND_IDEMPOTENCY_PAYLOAD_REUSE',
-              message: '같은 경기 생성 키를 다른 내용으로 다시 사용할 수 없어요.',
-            });
-          }
-          const priorDetails = await tx.v1TournamentMatchDetails.findFirst({
-            where: { teamMatchId: prior.resourceId, tournamentId, teamMatch: { deletedAt: null } },
-            select: FIXTURE_REPLAY_SELECT,
-          });
-          if (!priorDetails?.teamMatch) {
-            throw new ConflictException({
-              code: 'COMMAND_IDEMPOTENCY_RESOURCE_GONE',
-              message: '이 요청으로 만든 경기가 이미 지워졌어요. 다시 추가해 주세요.',
-            });
-          }
-          assertReplayableFixture(priorDetails.teamMatch, tournamentId);
-          return fixtureReplayResult({ ...priorDetails, teamMatch: priorDetails.teamMatch });
-        }
+        const replay = await this.replayClientFixture(tx, user.id, tournamentId, clientKey, clientPayloadHash);
+        if (replay) return replay;
       }
       // Numbers are tournament-wide and archived fixtures keep theirs, so the allocation reads every row.
       const fixtureNumber =

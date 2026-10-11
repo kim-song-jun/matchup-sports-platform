@@ -1329,7 +1329,7 @@ export default function LeagueMatchFixturesClient({
                     <button
                       type="button"
                       onClick={onPreview}
-                      disabled={previewFixtures.isPending || !hasLeagueStartsOn}
+                      disabled={previewFixtures.isPending || !hasLeagueStartsOn || leagueEnded}
                       className="min-h-[44px] flex-1 rounded-xl border border-[var(--border-strong)] px-4 text-sm font-semibold text-[var(--text-strong)] disabled:opacity-50 md:flex-none"
                     >
                       미리보기
@@ -1347,7 +1347,9 @@ export default function LeagueMatchFixturesClient({
                 {!hasLeagueStartsOn && <MissingStartsOnNotice />}
                 {leagueEnded ? (
                   <p className="mt-2 text-[length:var(--font-size-body-sm)] text-[var(--orange700)]">
-                    끝난 리그라 대진을 다시 만들 수 없어요. 먼저 ‘진행 중으로 되돌리기’를 해 주세요.
+                    {leagueHasOfficialResult
+                      ? '끝난 리그라 대진을 다시 만들 수 없어요. 확정된 결과가 있어 진행 중으로 되돌려도 다시 만들 수는 없어요.'
+                      : '끝난 리그라 대진을 다시 만들 수 없어요. 먼저 ‘진행 중으로 되돌리기’를 해 주세요.'}
                   </p>
                 ) : null}
                 {inProgressFixtures.length > 0 ? (

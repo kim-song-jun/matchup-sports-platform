@@ -1,4 +1,4 @@
-import { fireEvent, render as rtlRender, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render as rtlRender, screen, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -67,6 +67,7 @@ vi.mock('./matches-page', () => ({
       <div data-testid="address">{model.match.place?.address ?? ''}</div>
       <div data-testid="description">{model.match.description}</div>
       <div data-testid="title">{model.match.title}</div>
+      <div data-testid="deadline">{model.match.deadline}</div>
       <div data-testid="back-href">{model.backHref}</div>
       <div data-testid="edit-href">{model.match.editHref}</div>
       <div data-testid="applications-href">{model.match.applicationsHref}</div>
@@ -651,5 +652,48 @@ describe('MatchDetailPageClient — 목록 캐시 승계(placeholder) 중 행동
     render(<MatchDetailPageClient matchId="match-1" />);
 
     expect(screen.getByRole('button', { name: '참가 신청' })).toBeTruthy();
+  });
+});
+
+describe('MatchDetailPageClient — 마감 안내 시계', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-10-11T00:00:00.000Z'));
+    useV1MatchApplicationEligibilityMock.mockReturnValue({ data: { eligible: true, applicationId: null } });
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('페이지를 열어 둔 채 시간이 흐르면 마감 N분 전이 줄어들고, 마감이 지나면 지났어요로 바뀐다', () => {
+    useV1MatchMock.mockReturnValue({
+      data: { ...baseMatch, viewerState: 'none', deadlineAt: '2026-10-11T00:20:00.000Z' },
+      isError: false,
+    });
+
+    render(<MatchDetailPageClient matchId="match-1" />);
+    expect(screen.getByTestId('deadline').textContent).toBe('마감 20분 전');
+
+    act(() => {
+      vi.advanceTimersByTime(5 * 60_000);
+    });
+    expect(screen.getByTestId('deadline').textContent).toBe('마감 15분 전');
+
+    act(() => {
+      vi.advanceTimersByTime(16 * 60_000);
+    });
+    expect(screen.getByTestId('deadline').textContent).toBe('지났어요');
+  });
+
+  it('이미 지난 마감에는 타이머를 남기지 않는다', () => {
+    useV1MatchMock.mockReturnValue({
+      data: { ...baseMatch, viewerState: 'none', deadlineAt: '2026-10-10T23:00:00.000Z' },
+      isError: false,
+    });
+
+    render(<MatchDetailPageClient matchId="match-1" />);
+
+    expect(vi.getTimerCount()).toBe(0);
   });
 });

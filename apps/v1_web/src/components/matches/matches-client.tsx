@@ -270,6 +270,16 @@ export function MatchDetailPageClient({ matchId, seed }: { matchId: string; seed
     trackEvent('match_view', { matchId, sportType: matchSportType ?? '' });
   }, [matchId, query.data, matchSportType]);
 
+  // 마감 안내('마감 N분 전')는 렌더 시점의 Date.now() 로 계산되므로, 열어 둔 채로도 줄어들도록 1분마다 다시 그린다.
+  const [, refreshClock] = useState(0);
+  const deadlineMs = query.data?.deadlineAt ? new Date(query.data.deadlineAt).getTime() : null;
+  const hasUpcomingDeadline = deadlineMs !== null && Number.isFinite(deadlineMs) && deadlineMs > Date.now();
+  useEffect(() => {
+    if (!hasUpcomingDeadline) return;
+    const timer = window.setInterval(() => refreshClock((tick) => tick + 1), 60_000);
+    return () => window.clearInterval(timer);
+  }, [hasUpcomingDeadline, deadlineMs]);
+
   if (query.isError) {
     return <MatchStatePageView model={{ ...getMatchStateViewModel('error'), retry: () => void query.refetch(), backHref: fromPath ?? undefined }} />;
   }

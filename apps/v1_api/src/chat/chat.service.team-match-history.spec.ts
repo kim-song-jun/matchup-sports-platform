@@ -122,7 +122,7 @@ function chatWorld(kind: RoomKind) {
       })),
     },
     v1TeamMatch: { findFirst: jest.fn(async () => ({ hostTeamId: 'team-h', approvedApplicantTeamId: 'team-a' })) },
-    v1TeamMembership: { findFirst: jest.fn(async () => ({ id: 'membership-1' })) },
+    v1TeamMembership: { findFirst: jest.fn(async () => ({ id: 'membership-1' })), findMany: jest.fn(async () => []) },
     v1TeamContact: { updateMany: jest.fn() },
     $transaction: jest.fn(async (callback: (tx: unknown) => Promise<unknown>) => callback(prisma)),
   };

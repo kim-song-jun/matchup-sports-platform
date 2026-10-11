@@ -13,6 +13,7 @@ import { WebPushService } from '../notifications/web-push.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
 import { currentChatEntitlementWhere, currentChatRecipientEntitlementWhere, teamMatchChatEntitlementWhere } from './chat-entitlement';
+import { enrollTeamMatchChatMembers, TeamMatchChatSource } from './platform-team-match-chat';
 import { archiveEndedContactRooms } from '../team-contacts/contact-room-archive';
 import {
   CHAT_SHARE_KINDS,
@@ -232,8 +233,8 @@ export class ChatService {
       return this.resolveTeamRoom(user.id, dto.targetId);
     }
     if (dto.targetType === 'team_match') {
-      await this.assertCanUseTeamMatchChat(user.id, dto.targetId);
-      return this.resolveTeamMatchRoom(user.id, dto.targetId);
+      const match = await this.assertCanUseTeamMatchChat(user.id, dto.targetId);
+      return this.resolveTeamMatchRoom(user.id, dto.targetId, match);
     }
     if (dto.targetType === 'team_contact') {
       await this.assertCanUseTeamContactChat(user.id, dto.targetId);
@@ -489,6 +490,8 @@ export class ChatService {
         where: { id: room.id },
         data: { lastMessageAt: created.sentAt },
       });
+      // 방을 한쪽만 열어 둔 채 쌓인 기존 방도 첫 메시지부터 상대 팀 운영진에게 알림이 가도록 보낼 때 등록한다.
+      if (room.teamMatch) await enrollTeamMatchChatMembers(tx, room, room.teamMatch);
       return { message: created, recipientUserIds: await this.messageRecipientIds(tx, room, user.id) };
     });
 
@@ -773,10 +776,12 @@ export class ChatService {
     return { roomId: room.id, roomType: 'team', created: !existing, route: chatRoomRoute(room.id) };
   }
 
-  private async resolveTeamMatchRoom(userId: string, teamMatchId: string) {
+  private async resolveTeamMatchRoom(userId: string, teamMatchId: string, match: TeamMatchChatSource) {
     const existing = await this.prisma.v1ChatRoom.findUnique({ where: { teamMatchId } });
     const room = existing ?? (await this.prisma.v1ChatRoom.create({ data: { teamMatchId, status: 'active' } }));
     await this.ensureResolvedParticipant(room.id, userId);
+    // 상대 팀 운영진이 채팅을 직접 열기 전에도 첫 메시지부터 알림·안 읽음 수를 받도록 함께 등록한다.
+    await enrollTeamMatchChatMembers(this.prisma, room, match);
     return { roomId: room.id, roomType: 'team_match', created: !existing, route: chatRoomRoute(room.id) };
   }
 
@@ -851,12 +856,17 @@ export class ChatService {
     if (!membership) throw new ForbiddenException({ code: 'PERMISSION_DENIED', message: 'Team chat requires active team membership' });
   }
 
-  private async assertCanUseTeamMatchChat(userId: string, teamMatchId: string) {
-    const entitled = await this.prisma.v1TeamMatch.findFirst({
+  private findEntitledTeamMatch(userId: string, teamMatchId: string): Promise<TeamMatchChatSource | null> {
+    return this.prisma.v1TeamMatch.findFirst({
       where: { id: teamMatchId, ...teamMatchChatEntitlementWhere(userId) },
-      select: { id: true },
+      select: { hostTeamId: true, approvedApplicantTeamId: true, platformManaged: true, createdByUserId: true },
     });
+  }
+
+  private async assertCanUseTeamMatchChat(userId: string, teamMatchId: string): Promise<TeamMatchChatSource> {
+    const entitled = await this.findEntitledTeamMatch(userId, teamMatchId);
     if (!entitled) throw new ForbiddenException({ code: 'PERMISSION_DENIED', message: 'Team match chat requires assigned team management or the active platform organizer' });
+    return entitled;
   }
 
   private async assertCanUseTeamContactChat(userId: string, teamContactId: string) {
@@ -909,8 +919,8 @@ export class ChatService {
     throw new ForbiddenException({ code: 'PERMISSION_DENIED', message: 'Chat room is not linked to an active target' });
   }
 
-  private async getRoomParticipant(userId: string, roomId: string) {
-    const room = await this.prisma.v1ChatRoom.findFirst({
+  private findRoomWithParticipant(userId: string, roomId: string) {
+    return this.prisma.v1ChatRoom.findFirst({
       where: { id: roomId },
       include: {
         ...this.roomInclude(userId),
@@ -922,7 +932,17 @@ export class ChatService {
         },
       },
     });
+  }
+
+  private async getRoomParticipant(userId: string, roomId: string) {
+    let room = await this.findRoomWithParticipant(userId, roomId);
     if (!room) throw new NotFoundException({ code: 'NOT_FOUND', message: 'Chat room was not found' });
+    if (room.participants.length === 0 && room.teamMatchId && await this.findEntitledTeamMatch(userId, room.teamMatchId)) {
+      // 팀매치 방은 자격 있는 운영진이면 직접 주소로 들어와도 열린다(상대 팀이 먼저 열어 둔 방).
+      await enrollTeamMatchChatMembers(this.prisma, room, room.teamMatch!);
+      room = await this.findRoomWithParticipant(userId, roomId);
+      if (!room) throw new NotFoundException({ code: 'NOT_FOUND', message: 'Chat room was not found' });
+    }
     if (room.participants.length === 0) {
       throw new ForbiddenException({ code: 'PERMISSION_DENIED', message: 'Chat room access is denied' });
     }

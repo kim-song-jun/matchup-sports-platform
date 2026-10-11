@@ -60,7 +60,8 @@ export class MatchesService {
     const now = new Date();
     // 구간 경계는 첫 페이지에서 정해 커서로 이어받는다. `now` 는 가시성 조건 전용이다.
     const { cursor, referenceTime: splitAt } = decodeReferenceTimeCursor(query.cursor, now);
-    const where = this.listWhere(query, now);
+    const fullMatchIds = query.recruitingOnly ? await this.findFullRecruitingMatchIds(now) : [];
+    const where = this.listWhere(query, now, fullMatchIds);
     // 기본 정렬은 경기일 순이다 — 시작 전 경기를 가까운 날부터, 이미 시작한 경기(진행 중·종료
     // 확인 중·최근 완료)를 그 뒤에 최근 것부터. startAt asc 한 줄로 두면 기본 목록에 함께 실리는
     // 지난 경기가 가장 오래된 것부터 첫 페이지를 채운다. orderBy 로는 "시작 전/후"를 가를 수 없어
@@ -83,7 +84,7 @@ export class MatchesService {
             include,
           })
           .then((rows) => dropCursorRow(rows, page.cursorId, page.take).map((row) => ({ ...row, state: group }))),
-    }), query.includeFacets && !cursor ? this.countListFacets(query, now) : Promise.resolve(null)]);
+    }), query.includeFacets && !cursor ? this.countListFacets(query, now, fullMatchIds) : Promise.resolve(null)]);
 
     return {
       items: pageItems.map((match) => this.toListItem(match, user)),
@@ -103,31 +104,47 @@ export class MatchesService {
    * 해당 토글을 켠 건수라서, 토글이 꺼져 있어도 칩이 "켜면 몇 건인지"를 말한다.
    * 전체 건수는 종목 건수에서 얻어 쿼리는 세 번이다.
    */
-  private async countListFacets(query: MatchesQueryDto, now: Date) {
+  private async countListFacets(query: MatchesQueryDto, now: Date, listFullMatchIds: string[]) {
+    // 모집 중 칩은 토글이 꺼져 있어도 "켜면 몇 건인지"를 세므로 정원 찬 글 목록이 항상 필요하다.
+    const fullMatchIds = query.recruitingOnly ? listFullMatchIds : await this.findFullRecruitingMatchIds(now);
     const [sportRows, today, recruiting] = await Promise.all([
       this.prisma.v1Match.groupBy({
         by: ['sportId'],
-        where: this.listWhere({ ...query, sportId: undefined }, now),
+        where: this.listWhere({ ...query, sportId: undefined }, now, fullMatchIds),
         _count: { _all: true },
       }),
-      this.prisma.v1Match.count({ where: this.listWhere({ ...query, today: true }, now) }),
-      this.prisma.v1Match.count({ where: this.listWhere({ ...query, recruitingOnly: true }, now) }),
+      this.prisma.v1Match.count({ where: this.listWhere({ ...query, today: true }, now, fullMatchIds) }),
+      this.prisma.v1Match.count({ where: this.listWhere({ ...query, recruitingOnly: true }, now, fullMatchIds) }),
     ]);
     const sports = toSportFacets(sportRows);
     return { totalCount: totalFromSportFacets(sports, query.sportId), facets: { sports, today, recruiting } };
   }
 
   /**
+   * 정원이 찬 모집 중 글의 id. 참가자 수는 저장된 컬럼이 없고 Prisma where 가 관계 수와 컬럼을 비교하지
+   * 못해 SQL 로 센다. 대상은 시작 전 'recruiting' 글뿐이라 범위가 작고, 참가자 수 정의는
+   * getParticipantCount(active·completed, 호스트 포함)와 같다.
+   */
+  private async findFullRecruitingMatchIds(now: Date): Promise<string[]> {
+    const rows = await this.prisma.$queryRaw<Array<{ id: string }>>`
+      SELECT m.id FROM v1_matches m
+      WHERE m.deleted_at IS NULL AND m.status = 'recruiting' AND m.start_at >= ${now}
+        AND (SELECT COUNT(*) FROM v1_match_participants p
+             WHERE p.match_id = m.id AND p.status IN ('active', 'completed')) >= m.max_participants`;
+    return rows.map((row) => row.id);
+  }
+
+  /**
    * 목록·건수가 함께 쓰는 단일 where. 첫 페이지의 totalCount/facets 는 이 함수에 필터를 하나씩 뺀
    * query 를 넣어 세므로, 가시성·삭제·공개 규칙이 목록과 어긋날 수 없다.
    */
-  private listWhere(query: MatchesQueryDto, now: Date): Prisma.V1MatchWhereInput {
+  private listWhere(query: MatchesQueryDto, now: Date, fullMatchIds: string[] = []): Prisma.V1MatchWhereInput {
     const isDefaultDiscovery = query.status === undefined;
     const status = query.status ?? 'recruiting';
     const publicHistoryFrom = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
     const constraints: Prisma.V1MatchWhereInput[] = [
       ...(query.today ? [startsTodayWhere(now)] : []),
-      ...(query.recruitingOnly ? [recruitingNowWhere(now)] : []),
+      ...(query.recruitingOnly ? [recruitingNowWhere(now), { id: { notIn: fullMatchIds } } satisfies Prisma.V1MatchWhereInput] : []),
       // 일반 탐색은 마감 글도 경기 전까지 남기지만, 추천순은 즉시 신청할 수 있는
       // 모집 글만 보여줘야 하므로 추천에서만 신청 마감 조건을 적용한다.
       ...(status === 'recruiting' && query.sort === 'recommended'

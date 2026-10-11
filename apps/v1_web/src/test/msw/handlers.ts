@@ -670,10 +670,11 @@ export const v1MswHandlers = [
     const teamMatches = levelCodes.length
       ? teamMatchesBySport.filter((item) => rangeMatches(levelCodes, item.minLevel?.code, item.maxLevel?.code))
       : teamMatchesBySport;
+    // 종목 건수만 종목 필터를 빼고 센다. 모집 중 칩은 실제 서비스처럼 종목·레벨 필터를 그대로 유지한다.
     const teamMatchesIgnoringSport = levelCodes.length
       ? v1TeamMatchesFixture.filter((item) => rangeMatches(levelCodes, item.minLevel?.code, item.maxLevel?.code))
       : v1TeamMatchesFixture;
-    return ok(pageWithCounts(request, teamMatches, teamMatchesIgnoringSport, { today: 0, recruiting: teamMatchesIgnoringSport.length }));
+    return ok(pageWithCounts(request, teamMatches, teamMatchesIgnoringSport, { today: 0, recruiting: teamMatches.length }));
   }),
   http.get(`${api}/team-matches/:teamMatchId`, ({ params }) => ok(v1TeamMatchesFixture.find((item) => item.id === params.teamMatchId) ?? v1TeamMatchesFixture[0])),
   http.get(`${api}/chat/rooms`, () => ok(v1ChatRoomsFixture)),

@@ -1566,6 +1566,42 @@ describe('MatchesService', () => {
     const todayRange = /"startAt":\{"gte":"[^"]+","lt":"/;
     const wherePassed = (call: number, fn: 'groupBy' | 'count' | 'findMany') => JSON.stringify(prisma.v1Match[fn].mock.calls[call][0].where);
 
+    beforeEach(() => {
+      prisma.$queryRaw.mockResolvedValue([]);
+    });
+
+    it('모집 중 토글·칩은 정원이 찬 글(id)을 뺀다 — 같은 종목·시간이어도 가득 찬 글은 신청할 수 없다', async () => {
+      prisma.$queryRaw.mockResolvedValue([{ id: 'full-match' }]);
+      prisma.v1Match.groupBy.mockResolvedValue([]);
+      prisma.v1Match.count.mockResolvedValue(0);
+
+      await service.list(null, { recruitingOnly: true, includeFacets: true });
+
+      // 목록·종목 건수·오늘 칩·모집 중 칩 모두 같은 제외 목록을 건다.
+      for (const where of [wherePassed(0, 'findMany'), wherePassed(0, 'groupBy'), wherePassed(0, 'count'), wherePassed(1, 'count')]) {
+        expect(where).toContain('"id":{"notIn":["full-match"]}');
+      }
+    });
+
+    it('모집 중 칩은 토글이 꺼져 있어도 정원 찬 글을 빼고 세고, 목록·종목 건수는 빼지 않는다', async () => {
+      prisma.$queryRaw.mockResolvedValue([{ id: 'full-match' }]);
+      prisma.v1Match.groupBy.mockResolvedValue([]);
+      prisma.v1Match.count.mockResolvedValue(0);
+
+      await service.list(null, { includeFacets: true });
+
+      expect(wherePassed(1, 'count')).toContain('"id":{"notIn":["full-match"]}');
+      for (const where of [wherePassed(0, 'findMany'), wherePassed(0, 'groupBy'), wherePassed(0, 'count')]) {
+        expect(where).not.toContain('notIn');
+      }
+    });
+
+    it('모집 중 토글을 쓰지 않고 건수도 요청하지 않으면 정원 조회를 하지 않는다', async () => {
+      await service.list(null, {});
+
+      expect(prisma.$queryRaw).not.toHaveBeenCalled();
+    });
+
     it('종목 건수는 종목 필터만 뺀 where 로, 전체 건수는 그 합에서 필터된 종목만 골라 센다', async () => {
       prisma.v1Match.groupBy.mockResolvedValue([
         { sportId: SPORT_B, _count: { _all: 2 } },

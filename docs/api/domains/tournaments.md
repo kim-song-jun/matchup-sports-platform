@@ -217,6 +217,10 @@ Campaign admin routes inherit `V1AuthGuard`. Production accepts only the signed 
 - Reverting completion changes only `status`. Awards, standings and reviews are derived from `status === 'completed'`, so they are hidden again until the tournament is completed again. Review-request notifications are sent on the first completion only (a prior `completed` status log suppresses re-sending).
 - A restored draft is not publicly listed or readable (draft/cancelled return 404 to consumers) until it is opened again, which re-runs the paid-tournament payment-instruction check.
 
+## Admin registration counts (MD-QA #88)
+
+`GET /admin/tournaments` rows' `registrationCount` and `GET /admin/tournaments/:id` `operationCounts.registrations` count registrations whose status is **not** `draft` or `cancelled` (unsubmitted drafts and cancelled/rejected applications). They are not the total number of registration rows; use `GET /admin/tournaments/:id/registrations` for the full set. The `ACTIVE_REGISTRATION_COUNT` filter in `tournaments-admin.service.ts` is the single source for both.
+
 ## Admin Tournament Creation
 
 Admin-created tournaments require `teamCount` per tournament. The API does not treat an omitted team count as unlimited; missing `teamCount` is rejected with `400 TOURNAMENT_TEAM_COUNT_REQUIRED`. Public capacity, registration blocking, and progress bars must use the saved tournament `teamCount`, not a hard-coded default.

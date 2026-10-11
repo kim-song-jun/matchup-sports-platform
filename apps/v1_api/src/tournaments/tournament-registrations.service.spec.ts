@@ -517,6 +517,31 @@ describe('TournamentRegistrationsService', () => {
     expect(call.data.confirmedByAdminUserId).toBeNull();
   });
 
+  // 운영자가 넣었다 뺀 팀(seeded, 취소)이 직접 다시 신청하면 같은 행이 되살아난다. 이전 경로의
+  // 출처·생성 시각·자동 확정 표시가 남으면 어드민 목록이 새 신청을 "자동 확정 / 옛 시각"으로 보이고
+  // 마감 확인 창의 "팀이 직접 낸 신청"(entrySource applied) 집계에서도 빠진다.
+  it('create: 운영자가 넣었다 뺀 팀의 재신청은 출처·신청 시각·자동 확정 표시를 새 신청으로 되돌린다', async () => {
+    const before = Date.now();
+    prisma.v1Tournament.findFirst.mockResolvedValue(openTournament());
+    prisma.v1TournamentRegistration.findUnique.mockResolvedValue(
+      registrationRow({
+        status: 'cancelled',
+        entrySource: 'seeded',
+        rosterAutoConfirmedAt: new Date('2026-10-11T08:55:00Z'),
+        createdAt: new Date('2026-10-11T08:55:00Z'),
+      }),
+    );
+    prisma.v1TournamentRegistration.update.mockResolvedValue(registrationRow({ status: 'draft' }));
+
+    await service.create(manager, 'tournament-1', { teamId: 'team-1' });
+
+    const { data } = prisma.v1TournamentRegistration.update.mock.calls[0][0];
+    expect(data.entrySource).toBe('applied');
+    expect(data.rosterAutoConfirmedAt).toBeNull();
+    expect(data.createdAt).toBeInstanceOf(Date);
+    expect(data.createdAt.getTime()).toBeGreaterThanOrEqual(before);
+  });
+
   // ─── submit ───────────────────────────────────────────────────────────────────
 
   describe('참가비 0원이면 입금 단계를 건너뛴다 (Task 164 BE-4)', () => {

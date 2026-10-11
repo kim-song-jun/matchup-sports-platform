@@ -225,6 +225,11 @@ export class TournamentRegistrationsService {
               rosterDeadlineOverrideAt: null,
               confirmedAt: null,
               confirmedByAdminUserId: null,
+              // 같은 행을 재사용하므로 이전 경로(운영자 추가·자동 확정)의 출처·시각이 남으면
+              // 어드민 신청 관리가 새 신청을 옛 시각의 "자동 확정"으로 보여 주고 직접 신청 수에서도 빠진다.
+              entrySource: 'applied',
+              rosterAutoConfirmedAt: null,
+              createdAt: new Date(),
             },
           })
         : await this.prisma.v1TournamentRegistration.create({

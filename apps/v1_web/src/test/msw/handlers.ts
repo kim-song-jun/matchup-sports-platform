@@ -166,7 +166,9 @@ function pageWithCounts<T extends { sport?: { sportId: string } }>(
   ignoringSport: T[],
   toggles?: { today: number; recruiting: number },
 ) {
-  if (new URL(request.url).searchParams.get('cursor')) return page(items);
+  // 서버 계약: includeFacets=true 를 보낸 첫 페이지에만 건수를 싣는다.
+  const params = new URL(request.url).searchParams;
+  if (params.get('cursor') || params.get('includeFacets') !== 'true') return page(items);
   const counts = new Map<string, number>();
   for (const item of ignoringSport) {
     if (item.sport) counts.set(item.sport.sportId, (counts.get(item.sport.sportId) ?? 0) + 1);

@@ -89,7 +89,7 @@ Query:
 
 CAUTION:
 
-- 응답 `pageInfo`는 `nextCursor`, `hasNext`를 항상 포함하고, 커서 없는 **첫 페이지에만** `totalCount` 와 최상위 `facets.sports`(`{ sportId, count }[]`)를 싣는다. `totalCount` 는 cursor/limit을 제외하고 현재 검색·종목·지역·성별·레벨·가입정책 필터를 모두 적용한 전체 팀 수다. `facets.sports` 는 종목 필터만 뺀 나머지 필터로 센 종목별 건수라 종목을 골라도 다른 종목 칩 건수가 남는다(0건 종목 생략, 건수 내림차순). 예전 `pageInfo.total` 은 `totalCount` 로 이름을 바꿨다. 팀 목록에는 오늘·모집 중 개념이 없어 종목 건수만 준다.
+- 응답 `pageInfo`는 `nextCursor`, `hasNext`를 항상 포함하고, `includeFacets=true` 를 보낸 커서 없는 **첫 페이지에만** `totalCount` 와 최상위 `facets.sports`(`{ sportId, count }[]`)를 싣는다. `totalCount` 는 cursor/limit을 제외하고 현재 검색·종목·지역·성별·레벨·가입정책 필터를 모두 적용한 전체 팀 수다. `facets.sports` 는 종목 필터만 뺀 나머지 필터로 센 종목별 건수라 종목을 골라도 다른 종목 칩 건수가 남는다(0건 종목 생략, 건수 내림차순). 예전 `pageInfo.total`(매 페이지 항상 반환)은 `totalCount` 로 이름을 바꾸고 옵트인으로 바뀌었다 — 요청하지 않으면 집계 쿼리를 돌리지 않는다. 팀 목록에는 오늘·모집 중 개념이 없어 종목 건수만 준다.
 - Level response fields: `levelLabel`, `minLevel`, `maxLevel`
 - Team list/detail/my-teams region fields include `region.parentName` when the selected region has a parent; `regionName` is the display label (`parentName + name` for district regions, `{city} 전체` for city-level regions).
 - Team list, detail, `/me/teams` responses include `activityDays`, `activityFrequency`,

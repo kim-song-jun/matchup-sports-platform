@@ -2525,7 +2525,7 @@ describe('TeamMatchesService', () => {
       ]);
       prisma.v1TeamMatch.count.mockResolvedValueOnce(4).mockResolvedValueOnce(1);
 
-      const filtered = await service.list(null, { sportId: SPORT_A });
+      const filtered = await service.list(null, { sportId: SPORT_A, includeFacets: true });
 
       expect(filtered.pageInfo.totalCount).toBe(3);
       expect(filtered.facets).toEqual({ sports: [{ sportId: SPORT_A, count: 3 }, { sportId: SPORT_B, count: 2 }], today: 4, recruiting: 1 });
@@ -2533,7 +2533,7 @@ describe('TeamMatchesService', () => {
       expect(wherePassed(0, 'findMany')).toContain(SPORT_A);
       expect(wherePassed(0, 'groupBy')).not.toContain(SPORT_A);
 
-      const unfiltered = await service.list(null, {});
+      const unfiltered = await service.list(null, { includeFacets: true });
       expect(unfiltered.pageInfo.totalCount).toBe(5);
     });
 
@@ -2541,7 +2541,7 @@ describe('TeamMatchesService', () => {
       prisma.v1TeamMatch.groupBy.mockResolvedValue([]);
       prisma.v1TeamMatch.count.mockResolvedValue(0);
 
-      await service.list(null, { sportId: SPORT_A });
+      await service.list(null, { sportId: SPORT_A, includeFacets: true });
 
       // count 호출 순서: 0 = 오늘 칩, 1 = 모집 중 칩.
       const todayChip = wherePassed(0, 'count');
@@ -2563,7 +2563,7 @@ describe('TeamMatchesService', () => {
       prisma.v1TeamMatch.groupBy.mockResolvedValue([]);
       prisma.v1TeamMatch.count.mockResolvedValue(0);
 
-      await service.list(null, { today: true });
+      await service.list(null, { today: true, includeFacets: true });
 
       expect(wherePassed(0, 'findMany')).toMatch(todayRange);
       expect(wherePassed(0, 'groupBy')).toMatch(todayRange);
@@ -2571,12 +2571,34 @@ describe('TeamMatchesService', () => {
     });
 
     it('커서가 있는 다음 페이지는 건수를 다시 세지 않고 응답에도 싣지 않는다', async () => {
-      const next = await service.list(null, { cursor: 'upcoming:00000000-0000-4000-8000-000000000000@1700000000000' });
+      const next = await service.list(null, { includeFacets: true, cursor: 'upcoming:00000000-0000-4000-8000-000000000000@1700000000000' });
 
       expect(prisma.v1TeamMatch.groupBy).not.toHaveBeenCalled();
       expect(prisma.v1TeamMatch.count).not.toHaveBeenCalled();
       expect(next.pageInfo).not.toHaveProperty('totalCount');
       expect(next).not.toHaveProperty('facets');
+    });
+    it('includeFacets 를 요청하지 않으면 groupBy·count 를 부르지 않고 응답에도 싣지 않는다', async () => {
+      const first = await service.list(null, { sportId: SPORT_A });
+      const explicitOff = await service.list(null, { includeFacets: false });
+
+      expect(prisma.v1TeamMatch.groupBy).not.toHaveBeenCalled();
+      expect(prisma.v1TeamMatch.count).not.toHaveBeenCalled();
+      for (const res of [first, explicitOff]) {
+        expect(res.pageInfo).not.toHaveProperty('totalCount');
+        expect(res).not.toHaveProperty('facets');
+      }
+    });
+
+    it('깨진 커서는 첫 페이지로 읽으므로 요청 시 건수를 싣는다', async () => {
+      prisma.v1TeamMatch.groupBy.mockResolvedValue([{ sportId: SPORT_A, _count: { _all: 2 } }]);
+      prisma.v1TeamMatch.count.mockResolvedValue(0);
+
+      const res = await service.list(null, { includeFacets: true, cursor: 'upcoming:broken@not-a-time' });
+
+      expect(prisma.v1TeamMatch.groupBy).toHaveBeenCalledTimes(1);
+      expect(res.pageInfo.totalCount).toBe(2);
+      expect(res.facets).toBeDefined();
     });
   });
 });

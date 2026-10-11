@@ -145,7 +145,7 @@ export class TeamMatchesService {
             include,
           })
           .then((rows) => dropCursorRow(rows, page.cursorId, page.take).map((row) => ({ ...row, state: group }))),
-    }), query.cursor ? Promise.resolve(null) : this.countListFacets(query, now)]);
+    }), query.includeFacets && !cursor ? this.countListFacets(query, now) : Promise.resolve(null)]);
 
     const pageItems = teamMatches.map((teamMatch) => {
       assertTeamMatchPublicInvariant(teamMatch);
@@ -178,7 +178,7 @@ export class TeamMatchesService {
       pageInfo: {
         nextCursor: query.sort === 'latest' ? nextCursor : encodeReferenceTimeCursor(nextCursor, splitAt),
         hasNext,
-        // 건수는 첫 페이지(커서 없음)에만 싣는다 — 이후 페이지는 같은 숫자를 다시 세지 않는다.
+        // 건수는 요청(includeFacets)한 첫 페이지에만 싣는다. 깨진 커서는 첫 페이지로 읽으므로 해석된 cursor 로 판단한다.
         ...(counts ? { totalCount: counts.totalCount } : {}),
       },
       ...(counts ? { facets: counts.facets } : {}),

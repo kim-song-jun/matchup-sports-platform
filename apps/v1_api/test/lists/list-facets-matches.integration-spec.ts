@@ -2,9 +2,9 @@ import { randomUUID } from 'node:crypto';
 import type { INestApplication } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 import request = require('supertest');
-import { kstDayRange } from '../../src/common/pagination/list-facets';
 import { PrismaService } from '../../src/prisma/prisma.service';
 import { createV1IntegrationApp } from '../integration/integration-app';
+import { KST_TODAY_FIXTURE_TIMEOUT_MS, startAtLaterTodayKst } from './kst-today-fixture';
 
 const DAY = 24 * 60 * 60 * 1000;
 const host = randomUUID();
@@ -16,10 +16,9 @@ describe('개인 매치 목록 totalCount·facets HTTP/DB 계약', () => {
   let sportA: string;
   let sportB: string;
   let regionId: string;
-  let soonIsToday: boolean;
 
   const list = async (params: Record<string, string | number | boolean> = {}) => {
-    const response = await request(app.getHttpServer()).get('/api/v1/matches').query({ regionId, limit: 50, ...params }).expect(200);
+    const response = await request(app.getHttpServer()).get('/api/v1/matches').query({ regionId, limit: 50, includeFacets: true, ...params }).expect(200);
     return response.body.data as {
       items: Array<{ matchId: string }>;
       pageInfo: { totalCount?: number; nextCursor: string | null };
@@ -39,12 +38,10 @@ describe('개인 매치 목록 totalCount·facets HTTP/DB 계약', () => {
     sportB = (await db.v1Sport.create({ data: { code: `facet-b-${host}`, name: '러닝' } })).id;
     regionId = (await db.v1Region.create({ data: { code: `facet-${host}`, name: '건수 지역', level: 2 } })).id;
 
-    const soon = new Date(Date.now() + 60_000);
-    const { gte, lt } = kstDayRange(new Date());
-    soonIsToday = soon >= gte && soon < lt;
+    const laterToday = await startAtLaterTodayKst();
     await db.v1Match.createMany({
       data: [
-        row(sportA, { startAt: soon }), // A 모집 중, 곧 시작(오늘일 수 있음)
+        row(sportA, { startAt: laterToday }), // A 모집 중, KST 오늘 안에 아직 시작 전(유일한 오늘 경기)
         row(sportA), // A 모집 중
         row(sportA, { status: 'closed' }), // A 마감: 목록·종목 건수엔 포함, 모집 중 건수엔 제외
         row(sportA, { deletedAt: new Date() }), // 삭제: 어디에도 안 셈
@@ -53,7 +50,7 @@ describe('개인 매치 목록 totalCount·facets HTTP/DB 계약', () => {
         row(sportB, { deadlineAt: new Date(Date.now() - 1000) }), // B 마감 시각 지남: 목록엔 있고 모집 중 건수엔 제외
       ],
     });
-  });
+  }, KST_TODAY_FIXTURE_TIMEOUT_MS);
 
   afterAll(async () => {
     await db.v1Match.deleteMany({ where: { hostUserId: host } });
@@ -69,7 +66,7 @@ describe('개인 매치 목록 totalCount·facets HTTP/DB 계약', () => {
     expect(body.items).toHaveLength(5);
     expect(body.pageInfo.totalCount).toBe(5);
     expect(body.facets?.sports).toEqual([{ sportId: sportA, count: 3 }, { sportId: sportB, count: 2 }]);
-    expect(body.facets?.today).toBe(soonIsToday ? 1 : 0);
+    expect(body.facets?.today).toBe(1);
     expect(body.facets?.recruiting).toBe(3);
   });
 
@@ -90,16 +87,16 @@ describe('개인 매치 목록 totalCount·facets HTTP/DB 계약', () => {
     expect(body.pageInfo.totalCount).toBe(3);
     expect(body.facets?.sports).toEqual([{ sportId: sportA, count: 2 }, { sportId: sportB, count: 1 }]);
     expect(body.facets?.recruiting).toBe(3);
-    expect(body.facets?.today).toBe(soonIsToday ? 1 : 0);
+    expect(body.facets?.today).toBe(1);
   });
 
   it('오늘 토글: 오늘 시작하지 않는 경기는 빠지고 오늘 칩 건수는 토글 전(오늘 경기 수)이다', async () => {
     const body = await list({ today: true });
 
-    expect(body.pageInfo.totalCount).toBe(soonIsToday ? 1 : 0);
-    expect(body.items).toHaveLength(soonIsToday ? 1 : 0);
-    expect(body.facets?.today).toBe(soonIsToday ? 1 : 0);
-    expect(body.facets?.recruiting).toBe(soonIsToday ? 1 : 0);
+    expect(body.pageInfo.totalCount).toBe(1);
+    expect(body.items).toHaveLength(1);
+    expect(body.facets?.today).toBe(1);
+    expect(body.facets?.recruiting).toBe(1);
   });
 
   it('다음 페이지는 건수를 싣지 않고, 첫 페이지 건수는 limit 과 무관하게 전체 크기다', async () => {
@@ -110,6 +107,14 @@ describe('개인 매치 목록 totalCount·facets HTTP/DB 계약', () => {
     const second = await list({ limit: 2, cursor: first.pageInfo.nextCursor! });
     expect(second.pageInfo).not.toHaveProperty('totalCount');
     expect(second).not.toHaveProperty('facets');
+  });
+
+  it('includeFacets 를 요청하지 않으면 건수를 싣지 않는다(폴링·부가 조회 경로)', async () => {
+    const body = await list({ includeFacets: false });
+
+    expect(body.items).toHaveLength(5);
+    expect(body.pageInfo).not.toHaveProperty('totalCount');
+    expect(body).not.toHaveProperty('facets');
   });
 
   it('잘못된 토글 값은 400 이다', async () => {

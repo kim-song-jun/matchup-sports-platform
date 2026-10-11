@@ -59,6 +59,12 @@ export class MatchesQueryDto {
   @Transform(queryBoolean)
   @IsBoolean()
   recruitingOnly?: boolean;
+
+  /** `true` 이고 첫 페이지(커서 없음)일 때만 `pageInfo.totalCount` 와 `facets` 를 계산해 싣는다. 폴링·부가 조회는 생략한다. */
+  @IsOptional()
+  @Transform(queryBoolean)
+  @IsBoolean()
+  includeFacets?: boolean;
 }
 
 export class MyMatchesQueryDto {

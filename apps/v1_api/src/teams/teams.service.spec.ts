@@ -647,7 +647,7 @@ describe('TeamsService', () => {
         { sportId: sportA, _count: { _all: 3 } },
       ]);
 
-      const first = await service.list(null, { sportId: sportA, query: '팀' });
+      const first = await service.list(null, { sportId: sportA, query: '팀', includeFacets: true });
 
       expect(first.pageInfo.totalCount).toBe(3);
       expect(first.facets).toEqual({ sports: [{ sportId: sportA, count: 3 }, { sportId: sportB, count: 2 }] });
@@ -657,7 +657,11 @@ describe('TeamsService', () => {
       expect(sportWhere).toContain('팀'); // 다른 필터는 그대로 건다
 
       prisma.v1Team.groupBy.mockClear();
-      const next = await service.list(null, { cursor: 'team-1' });
+      const notRequested = await service.list(null, { sportId: sportA });
+      expect(prisma.v1Team.groupBy).not.toHaveBeenCalled();
+      expect(notRequested.pageInfo).not.toHaveProperty('totalCount');
+      expect(notRequested).not.toHaveProperty('facets');
+      const next = await service.list(null, { cursor: 'team-1', includeFacets: true });
       expect(prisma.v1Team.groupBy).not.toHaveBeenCalled();
       expect(next.pageInfo).not.toHaveProperty('totalCount');
       expect(next).not.toHaveProperty('facets');
@@ -690,7 +694,7 @@ describe('TeamsService', () => {
         },
       ]);
 
-      const result = await service.list(null, {});
+      const result = await service.list(null, { includeFacets: true });
 
       expect(result.items).toHaveLength(1);
       expect(result.items[0].owner).toEqual({

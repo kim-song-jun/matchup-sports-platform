@@ -981,7 +981,8 @@ export function useV1TeamPages(filters?: ListFilters, options?: QueryOptions & {
     queryFn: ({ pageParam }) =>
       v1Get<CursorPage<V1Team>>('/teams', {
         ...(filters ?? {}),
-        ...(pageParam ? { cursor: pageParam } : {}),
+        // 목록 머리의 전체 건수는 첫 페이지 응답에서만 읽는다. 다음 페이지 요청에는 붙이지 않는다.
+        ...(pageParam ? { cursor: pageParam } : { includeFacets: true }),
       }),
     getNextPageParam: (lastPage) =>
       lastPage.pageInfo?.hasNext ? lastPage.pageInfo.nextCursor ?? undefined : undefined,

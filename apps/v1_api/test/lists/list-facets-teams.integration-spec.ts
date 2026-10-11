@@ -14,8 +14,8 @@ describe('팀 목록 totalCount·facets HTTP/DB 계약', () => {
   let sportB: string;
   let regionId: string;
 
-  const list = async (params: Record<string, string | number> = {}) => {
-    const response = await request(app.getHttpServer()).get('/api/v1/teams').query({ regionId, limit: 50, ...params }).expect(200);
+  const list = async (params: Record<string, string | number | boolean> = {}) => {
+    const response = await request(app.getHttpServer()).get('/api/v1/teams').query({ regionId, limit: 50, includeFacets: true, ...params }).expect(200);
     return response.body.data as {
       items: Array<{ id: string }>;
       pageInfo: { totalCount?: number; nextCursor: string | null };
@@ -68,6 +68,14 @@ describe('팀 목록 totalCount·facets HTTP/DB 계약', () => {
 
     expect(body.pageInfo.totalCount).toBe(1);
     expect(body.facets?.sports).toEqual([{ sportId: sportA, count: 1 }]);
+  });
+
+  it('includeFacets 를 요청하지 않으면 건수를 싣지 않는다', async () => {
+    const body = await list({ includeFacets: false });
+
+    expect(body.items).toHaveLength(3);
+    expect(body.pageInfo).not.toHaveProperty('totalCount');
+    expect(body).not.toHaveProperty('facets');
   });
 
   it('다음 페이지는 건수를 싣지 않는다', async () => {

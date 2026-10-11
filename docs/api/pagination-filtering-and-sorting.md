@@ -51,6 +51,7 @@
   - 예: `isRead=true`, `isRead=false`
 - `limit`은 숫자 문자열로 보내되, UI에서 미리 `1..100` 범위 제한을 권장한다.
 - cursor는 서버가 준 값을 그대로 전달한다. 클라이언트에서 변환/파싱하지 않는다.
+- 팀·개인 매치·팀 매치 목록의 `totalCount`/`facets` 는 옵트인이다(`includeFacets=true`, 첫 페이지에서만 계산). 주 목록 쿼리의 첫 페이지 요청에만 붙이고 폴링·부가 조회·다음 페이지에는 붙이지 않는다.
 - `items` 기반과 `data` 기반을 혼용하지 않는다.
   - `useChatMessages`/`useChatRooms`는 응답 shape를 먼저 정규화한 뒤 컴포넌트로 넘긴다.
 

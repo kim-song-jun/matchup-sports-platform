@@ -124,7 +124,7 @@ export class TeamsService {
   async list(user: V1AuthUser | null, query: TeamsQueryDto) {
     const limit = Math.min(Math.max(query.limit ?? 20, 1), 50);
     const where = this.teamListWhere(query);
-    const isFirstPage = !query.cursor;
+    const withFacets = query.includeFacets === true && !query.cursor;
     const [teams, sportRows] = await Promise.all([
       this.prisma.v1Team.findMany({
         where,
@@ -133,8 +133,8 @@ export class TeamsService {
         take: limit + 1,
         ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
       }),
-      // 건수는 첫 페이지에만 싣는다. 종목 건수는 종목 필터만 뺀 where 로 세고, 전체 건수는 거기서 얻는다.
-      isFirstPage
+      // 건수는 includeFacets 를 요청한 첫 페이지에만 싣는다. 종목 건수는 종목 필터만 뺀 where 로 세고, 전체 건수는 거기서 얻는다.
+      withFacets
         ? this.prisma.v1Team.groupBy({
             by: ['sportId'],
             where: this.teamListWhere({ ...query, sportId: undefined }),

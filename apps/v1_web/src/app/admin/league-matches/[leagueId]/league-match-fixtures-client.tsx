@@ -95,6 +95,13 @@ function isFixtureGameInProgress(fixture: V1LeagueFixture): boolean {
 }
 
 // 미리보기·생성(재생성) 버튼은 한 묶음 — 좁은 폭에선 한 줄을 나눠 쓰고, 넓은 폭에선 내용 폭으로 모인다.
+function manualFixtureHint(canAdd: boolean, leagueEnded: boolean): string {
+  if (leagueEnded) return '끝난 리그에는 경기를 추가할 수 없어요. 먼저 ‘진행 중으로 되돌리기’를 해 주세요.';
+  return canAdd
+    ? '우천 순연 재편성이나 대체 경기처럼 한 경기만 필요할 때 써요.'
+    : '참가팀이 2팀 이상이어야 경기를 추가할 수 있어요.';
+}
+
 const ACTION_ROW_CLASS = 'col-span-full flex gap-2';
 
 const inputClass =
@@ -256,6 +263,9 @@ export default function LeagueMatchFixturesClient({
       </div>
     );
   }
+
+  // 서버는 끝난 리그의 경기 추가·재생성을 409 LEAGUE_ENDED 로 막는다 — 폼을 다 채운 뒤가 아니라 버튼에서 먼저 알린다.
+  const leagueEnded = series.state === 'completed';
 
   // generate/regenerate/preview 세 호출이 전부 같은 폼 상태(weeksCount/dayOfWeek/time/
   // placeChoice)에서 같은 모양의 body를 만든다 — 세 곳에서 조립 규칙이 갈리면(예: 트림 여부)
@@ -849,15 +859,13 @@ export default function LeagueMatchFixturesClient({
           // **팀을 못 고르는 모달을 열지 않는다.** 홈·어웨이를 골라야 하는데 참가팀이
           // 아직 안 왔거나(로딩) 2팀 미만이면, 열어 봐야 빈 피커 두 개만 보이고 저장은
           // 항상 막힌다 — 빈 약속이다. 그 상태를 버튼 옆에서 먼저 말한다.
-          disabled={!canAddManualFixture}
+          disabled={!canAddManualFixture || leagueEnded}
           className="min-h-[44px] rounded-xl border border-[var(--border)] px-4 text-sm font-semibold text-[var(--text-strong)] disabled:opacity-50"
         >
           경기 하나 추가
         </button>
         <span className="text-xs text-[var(--text-muted)]">
-          {canAddManualFixture
-            ? '우천 순연 재편성이나 대체 경기처럼 한 경기만 필요할 때 써요.'
-            : '참가팀이 2팀 이상이어야 경기를 추가할 수 있어요.'}
+          {manualFixtureHint(canAddManualFixture, leagueEnded)}
         </span>
       </div>
 </>
@@ -1233,15 +1241,13 @@ export default function LeagueMatchFixturesClient({
               // **팀을 못 고르는 모달을 열지 않는다.** 홈·어웨이를 골라야 하는데 참가팀이
               // 아직 안 왔거나(로딩) 2팀 미만이면, 열어 봐야 빈 피커 두 개만 보이고 저장은
               // 항상 막힌다 — 빈 약속이다. 그 상태를 버튼 옆에서 먼저 말한다.
-              disabled={!canAddManualFixture}
+              disabled={!canAddManualFixture || leagueEnded}
               className="min-h-[44px] rounded-xl border border-[var(--border)] px-4 text-sm font-semibold text-[var(--text-strong)] disabled:opacity-50"
             >
               경기 하나 추가
             </button>
             <span className="text-xs text-[var(--text-muted)]">
-              {canAddManualFixture
-                ? '우천 순연 재편성이나 대체 경기처럼 한 경기만 필요할 때 써요.'
-                : '참가팀이 2팀 이상이어야 경기를 추가할 수 있어요.'}
+              {manualFixtureHint(canAddManualFixture, leagueEnded)}
             </span>
           </div>
 
@@ -1331,7 +1337,7 @@ export default function LeagueMatchFixturesClient({
                     <button
                       type="button"
                       onClick={() => setRegenerateModalOpen(true)}
-                      disabled={!hasLeagueStartsOn || inProgressFixtures.length > 0 || hasSlotFixtures}
+                      disabled={!hasLeagueStartsOn || inProgressFixtures.length > 0 || hasSlotFixtures || leagueEnded}
                       className="min-h-[44px] flex-[1.6] rounded-xl bg-[var(--button-fill-warning)] px-4 text-sm font-semibold text-white hover:bg-[var(--button-fill-warning-hover)] transition-colors disabled:opacity-50 md:flex-none"
                     >
                       대진 재생성
@@ -1339,6 +1345,11 @@ export default function LeagueMatchFixturesClient({
                   </div>
                 </div>
                 {!hasLeagueStartsOn && <MissingStartsOnNotice />}
+                {leagueEnded ? (
+                  <p className="mt-2 text-[length:var(--font-size-body-sm)] text-[var(--orange700)]">
+                    끝난 리그라 대진을 다시 만들 수 없어요. 먼저 ‘진행 중으로 되돌리기’를 해 주세요.
+                  </p>
+                ) : null}
                 {inProgressFixtures.length > 0 ? (
                   <p className="mt-2 text-[length:var(--font-size-body-sm)] text-[var(--orange700)]">
                     진행 중인 경기가 있어 대진을 다시 만들 수 없어요. 콘솔의 ‘몰수·중단으로 종료’로 먼저 끝내 주세요.

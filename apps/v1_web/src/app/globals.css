@@ -945,6 +945,13 @@ button:disabled {
   flex-direction: column;
 }
 
+/* 상단바가 40px 여백을 대신 채우므로, 상단바 아래 로그인 본문은 위 여백을 줄여 총 높이를 비슷하게 둔다. */
+@media (max-width: 1023px) {
+  .tm-auth-scroll:not(.tm-auth-scroll-full) > .tm-auth-login {
+    padding-top: 8px;
+  }
+}
+
 .tm-auth-logo {
   width: 72px;
   height: 72px;

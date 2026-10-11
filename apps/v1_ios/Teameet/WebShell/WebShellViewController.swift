@@ -337,6 +337,7 @@ final class WebShellViewController: UIViewController {
     // MARK: - Session persistence
 
     func persistSession() {
+        guard WebShellSession.isRestorableLocation(webView.url) else { return }
         sessionStore.save(webView.interactionState as? Data)
     }
 

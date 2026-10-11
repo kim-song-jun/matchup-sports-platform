@@ -306,6 +306,13 @@ export function hasPreviousInAppEntry(): boolean {
   return !untracked && Boolean(mirror?.entries[mirror.index - 1]);
 }
 
+/** URL of the in-app entry right before this one, or null when a back would leave the app (or the tracker is unsure). */
+export function previousInAppEntryUrl(): string | null {
+  if (untracked || !mirror) return null;
+  const previous = mirror.entries[mirror.index - 1];
+  return previous && !previous.overlay ? previous.url : null;
+}
+
 /** Is there an earlier entry created by this document (a back to it is a same-document popstate)? */
 export function hasPreviousSameDocumentEntry(): boolean {
   if (untracked || !mirror) return false;

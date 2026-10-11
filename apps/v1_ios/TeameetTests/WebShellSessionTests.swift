@@ -79,4 +79,22 @@ final class WebShellSessionTests: XCTestCase {
             from: envelope(state: large), currentAppBuild: build, currentOSMajorVersion: osMajor)
         XCTAssertEqual(restored, large)
     }
+    /// A relaunch must not reopen the tab-bar-less login screen the reader was sent to; the
+    /// shell keeps the previous snapshot instead of overwriting it with the login page.
+    func testSkipsSnapshotsTakenOnLoginScreens() {
+        for path in ["/login", "/login?redirect=%2Ftournaments%2Ft1%2Fmy", "/login/email", "/login/email?redirect=%2Fmy"] {
+            XCTAssertFalse(
+                WebShellSession.isRestorableLocation(URL(string: "https://alpha.teameet.co.kr" + path)),
+                path)
+        }
+    }
+
+    func testKeepsSnapshotsTakenAnywhereElse() {
+        for path in ["/home", "/tournaments/t1", "/my", "/loginhelp", "/terms?mode=signup"] {
+            XCTAssertTrue(
+                WebShellSession.isRestorableLocation(URL(string: "https://alpha.teameet.co.kr" + path)),
+                path)
+        }
+        XCTAssertTrue(WebShellSession.isRestorableLocation(nil), "no URL yet: nothing to judge, the store decides")
+    }
 }

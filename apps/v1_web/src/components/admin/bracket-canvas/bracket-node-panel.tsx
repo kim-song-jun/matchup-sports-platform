@@ -1,6 +1,7 @@
 'use client';
 
 import { PlacePicker } from '@/components/v1-ui/place-picker';
+import { PLACE_NAME_MAX_LENGTH } from '@/lib/place';
 import type { PlaceValue } from '@/lib/place';
 import { fixtureVenuePatch, fixtureVenueValue } from './fixture-venue-patch';
 import Link from 'next/link';
@@ -360,6 +361,7 @@ export function BracketNodePanel({
               <input id={`${fixture.id}-scheduled`} type="datetime-local" value={scheduledAt} onChange={(event) => setScheduledAt(event.target.value)} className="tm-input" style={{ minHeight: 44 }} />
             </div>
             <PlacePicker
+              maxLength={PLACE_NAME_MAX_LENGTH.tournament}
               id={`${fixture.id}-venue`}
               label="장소"
               value={venue}

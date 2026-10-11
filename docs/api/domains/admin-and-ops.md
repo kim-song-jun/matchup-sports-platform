@@ -75,7 +75,8 @@
 - 공지: `status=draft|published|archived`, `audience=public|users|admins`, `category=업데이트|안내`, `q`, `cursor`, `limit`(1~50).
 - 문의: `status=received|reviewing|answered|closed`, `category=account|match|team|tournament|payment_refund|report|other`, `q`, `cursor`, `limit`(1~50).
 - 운영자: `status=active|suspended|revoked`, `cursor`, `limit`(1~50).
-- 목록 응답은 `items`와 `pageInfo: { nextCursor, hasNext }`를 사용한다.
+- 목록 응답은 `items`와 `pageInfo: { page, limit, total, totalPages, hasNext, hasPrev, nextCursor }`를 사용한다(`common/pagination/page-args.ts` 의 `buildPageInfo`).
+- 페이지 번호 표를 위해 `cursor` 와 함께 `page`(1 이상)도 받는 목록은, `page` 가 있으면 `page=1` 이어도 페이지 번호를 따르고 함께 온 `cursor` 는 무시한다(`paginationArgs`, 팀 매치 목록은 같은 규칙을 서비스에서 직접 적용).
 
 ## v1 관리자 목록 집계 계약
 

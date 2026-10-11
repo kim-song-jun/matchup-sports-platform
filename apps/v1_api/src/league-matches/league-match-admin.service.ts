@@ -69,14 +69,14 @@ import {
 } from './dto/league-match.dto';
 import { LEAGUE_TIE_BREAK_ORDER } from './league-tie-break';
 import { PLACE_SELECT } from '../places/place-select';
-import { toPlaceColumns, toPlaceView, type PlaceSnapshot, type PlaceView } from '../places/place-snapshot';
+import { rejectPartialPlaceUpdate, toPlaceColumns, toPlaceView, type PlaceSnapshot, type PlaceView } from '../places/place-snapshot';
 import { DEFAULT_FIXTURE_PLACE_NAME, resolveLeagueFixturePlace, type LeagueFixturePlaceInput } from './league-fixture-place';
 import { findTournamentOnSurface } from '../tournaments/tournament-surface-lookup';
 import { assertLeagueFixtureGenerationAllowedInTx, assertLeagueNotEndedInTx } from './league-fixture-generation-guard';
 import { LEAGUE_STATE_BY_STATUS, isCompleteLeagueMirror } from '../tournaments/league-competition-mirror';
 import { randomUUID } from 'node:crypto';
 import { BRACKET_TEMPLATE_MAX_FIXTURES } from '../tournaments/templates/bracket-template-plan';
-import { lockCompetitionForBracketMutationInTx, lockCompetitionForSlotReleaseInTx } from '../tournaments/slots/competition-bracket-lock';
+import { lockCompetitionForBracketMutationInTx } from '../tournaments/slots/competition-bracket-lock';
 import { planLeagueTemplate } from './league-template-plan';
 import { LeagueStateValue } from './league-state';
 import { isLeagueRegistrationOpen } from './league-registration-open';
@@ -1044,9 +1044,6 @@ export class LeagueMatchAdminService {
     }
 
     const { cancelledApplications, leagueCompleted } = await this.prisma.$transaction(async (tx) => {
-      // 리그 행 락이 먼저 — updateFixture·removeTeam·generateFixtures 와 같은 순서라야 40P01 이 나지 않는다.
-      // raw SQL 허용치가 꽉 찬 파일이라 같은 행 락을 하는 공용 헬퍼(보류 검사 없음)를 쓴다.
-      await lockCompetitionForSlotReleaseInTx(tx, { id: leagueId, kind: 'regular_league' });
       await this.assertFixtureGamesNotInProgress(
         tx,
         [teamMatchId],
@@ -1445,6 +1442,11 @@ export class LeagueMatchAdminService {
       // 끼어든 경기로 팀 경기 순서(출전정지)가 바뀐다 — 대회 대진 생성과 같이 양 팀을 다시 계산한다.
       await enqueueRosterResync(tx, competitionTeamTargets(league.id, [dto.homeTeamId, dto.awayTeamId]));
       return created;
+    }, {
+      // 리그 행 락을 기다린다 — 템플릿·재생성이 그 락을 45초까지 쥘 수 있어 Prisma 기본 5초면 정상 대기도 만료된다.
+      // 그 리그 레인과 같은 45초 + maxWait 5초(ALB idle_timeout 60초 안, 위 generateFixtures 주석).
+      timeout: 45_000,
+      maxWait: 5_000,
     });
 
     return { leagueId, teamMatchId };
@@ -1486,12 +1488,7 @@ export class LeagueMatchAdminService {
 
   async updateFixture(user: V1AuthUser, leagueId: string, teamMatchId: string, dto: UpdateLeagueFixtureDto) {
     const admin = await this.adminContext.getMutationAdmin(user.id);
-    // 이름 없이 주소·좌표만 오면 옛 핀과 새 주소가 섞인 장소가 된다 — 부분 수정은 받지 않는다.
-    const orphanPlaceField = [dto.placeAddress, dto.placeLatitude, dto.placeLongitude, dto.placeProvider, dto.placeProviderId]
-      .some((value) => value !== undefined);
-    if (dto.placeName === undefined && orphanPlaceField) {
-      throw new BadRequestException({ code: 'PLACE_NAME_REQUIRED', message: '장소를 바꾸려면 장소를 다시 골라 주세요.' });
-    }
+    rejectPartialPlaceUpdate(dto.placeName, [dto.placeAddress, dto.placeLatitude, dto.placeLongitude, dto.placeProvider, dto.placeProviderId]);
     const teamMatch = await this.prisma.v1TeamMatch.findFirst({ where: { id: teamMatchId, leagueId } });
     if (teamMatch === null) {
       throw new NotFoundException({ code: 'LEAGUE_NOT_FOUND', message: '이 리그의 대진이 아니에요.' });
@@ -1506,8 +1503,8 @@ export class LeagueMatchAdminService {
       : null;
     const nextStartAt = dto.startsAt === undefined ? undefined : new Date(dto.startsAt);
     const updated = await this.prisma.$transaction(async (tx) => {
-      // 리그 행 락이 먼저(removeTeam·generateFixtures 와 같은 순서). 끝남·취소만 막고 보류 중 수정은 허용한다.
-      await lockCompetitionForSlotReleaseInTx(tx, { id: leagueId, kind: 'regular_league' });
+      // 끝남·취소만 막고 보류 중 수정은 허용한다. 리그 행은 잠그지 않는다 — 시각·장소 수정은 완료 판정을
+      // 바꾸지 않고, 잠그면 취소·결과 확정(경기 → 리그 완료 갱신)과 역순으로 교착한다.
       await assertLeagueNotEndedInTx(tx, leagueId);
       const nextEndAt = nextStartAt === undefined
         ? undefined

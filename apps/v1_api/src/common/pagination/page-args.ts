@@ -17,8 +17,9 @@ export function paginationArgs(
   query: PageableQuery,
   limit: number,
 ): { skip?: number; cursor?: { id: string } } {
-  if (query.page && query.page > 1) {
-    return { skip: (query.page - 1) * limit };
+  // page=1 도 page 다 — 함께 온 cursor 가 창을 옮기면 응답의 page·total 표시와 어긋난다.
+  if (query.page !== undefined) {
+    return query.page > 1 ? { skip: (query.page - 1) * limit } : {};
   }
   if (query.cursor) {
     // cursor 가 가리키는 행 자체는 이전 페이지의 마지막이므로 건너뛴다.

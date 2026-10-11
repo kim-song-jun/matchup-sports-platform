@@ -61,7 +61,7 @@ import { tournamentTeamMatchBracketInclude, serializeTournamentTeamMatchBracket 
 import { competitionMatchLabel } from './tournament-round-label';
 import { acceptsBracketSource } from './tournament-bracket-phases';
 import { PLACE_SELECT } from '../places/place-select';
-import { resolvePlaceSnapshot, toPlaceView, type PlaceView } from '../places/place-snapshot';
+import { rejectPartialPlaceUpdate, resolvePlaceSnapshot, toPlaceView, type PlaceView } from '../places/place-snapshot';
 import { TOURNAMENT_VENUE_SELECT, tournamentVenueSnapshot } from '../places/tournament-venue';
 
 type AdminBracketResult = {
@@ -554,10 +554,12 @@ export class TournamentBracketService {
     }
 
     const legNumber = dto.legNumber ?? 1;
-    const requestedVenueProviderId = dto.venueProviderId?.trim();
-    // 저장 쪽 resolvePlaceSnapshot 과 같은 정규화(trim, 빈 값은 대회 기본 장소로) — 안 맞추면 같은 번호 재시도가 해시 불일치 409 가 난다.
-    const requestedVenue = dto.venue?.trim() || null;
+    // 저장과 같은 정규화(resolvePlaceSnapshot)를 거친 값으로 해시를 만든다 — 안 맞추면 같은 번호 재시도가 해시 불일치 409 가 난다.
+    const requestedPlace = this.fixturePlace(dto);
+    const requestedVenue = requestedPlace?.name ?? null;
+    const pinnedPlace = requestedPlace?.providerPlaceId ? requestedPlace : null;
     // 번호를 서버가 정하는 요청의 내용 해시 — 번호는 빼고(재시도마다 달라진다) 보낸 번호가 있으면 넣는다.
+    // 새 키라 옛 해시와 맞출 필요가 없어, 장소는 정규화한 스냅샷 전체(이름·주소·핀)를 넣는다.
     const clientKey = dto.clientCommandId ? `tournament-fixture-client:${tournamentId}:${dto.clientCommandId}` : null;
     const clientPayloadHash = canonicalGameCommandPayloadHash({
       tournamentId,
@@ -569,12 +571,7 @@ export class TournamentBracketService {
       awayRegistrationId: dto.awayRegistrationId ?? null,
       scheduledAt: dto.scheduledAt ? new Date(dto.scheduledAt).toISOString() : null,
       venue: requestedVenue ?? tournament.venue ?? null,
-      ...(requestedVenueProviderId ? { venueProviderId: requestedVenueProviderId } : {}),
-      // 주소·좌표·출처도 저장되는 장소의 일부다 — 빠지면 다른 핀으로 보낸 재시도가 첫 경기로 조용히 재생된다.
-      ...(dto.venueAddress?.trim() ? { venueAddress: dto.venueAddress.trim() } : {}),
-      ...(dto.venueLatitude != null ? { venueLatitude: dto.venueLatitude } : {}),
-      ...(dto.venueLongitude != null ? { venueLongitude: dto.venueLongitude } : {}),
-      ...(dto.venueProvider?.trim() ? { venueProvider: dto.venueProvider.trim() } : {}),
+      place: requestedPlace,
       ...(dto.fixtureNumber !== undefined ? { fixtureNumber: dto.fixtureNumber } : {}),
     });
     const created = await this.prisma.$transaction(async (tx) => {
@@ -622,7 +619,7 @@ export class TournamentBracketService {
         scheduledAt: dto.scheduledAt ? new Date(dto.scheduledAt).toISOString() : null,
         venue: requestedVenue ?? tournament.venue ?? null,
         // 핀 없는 요청의 해시는 예전과 같게 둔다(재시도 중인 명령이 불일치로 막히지 않게).
-        ...(requestedVenueProviderId ? { venueProviderId: requestedVenueProviderId } : {}),
+        ...(pinnedPlace ? pinnedPlaceFingerprint(pinnedPlace) : {}),
       };
       const durableCommandId = `tournament-fixture:${tournamentId}:${dto.round}:${fixtureNumber}:${legNumber}`;
       const payloadHash = canonicalGameCommandPayloadHash(commandPayload);
@@ -694,8 +691,16 @@ export class TournamentBracketService {
           awayRegistrationId: existingDetails.awayRegistrationId,
           scheduledAt: existingDetails.teamMatch.startAt?.toISOString() ?? null,
           venue: existingDetails.teamMatch.placeName,
-          // 요청이 핀을 명시했을 때만 비교한다 — 핀 없는 요청은 대회 기본 장소의 id 를 물려받아 저장될 수 있다.
-          ...(requestedVenueProviderId ? { venueProviderId: existingDetails.teamMatch.placeProviderId } : {}),
+          // 요청이 핀을 명시했을 때만 비교한다 — 핀 없는 요청은 대회 기본 장소의 핀을 물려받아 저장될 수 있다.
+          ...(pinnedPlace
+            ? pinnedPlaceFingerprint({
+                address: existingDetails.teamMatch.placeAddress,
+                latitude: existingDetails.teamMatch.placeLatitude,
+                longitude: existingDetails.teamMatch.placeLongitude,
+                provider: existingDetails.teamMatch.placeProvider,
+                providerPlaceId: existingDetails.teamMatch.placeProviderId,
+              })
+            : {}),
         };
         if (canonicalGameCommandPayloadHash(existingPayload) !== payloadHash) {
           throw new ConflictException({
@@ -767,7 +772,7 @@ export class TournamentBracketService {
         sportId: pinnedTournament.sportId,
         regionId: pinnedTournament.regionId ?? null,
         title: `${pinnedTournament.title} · ${competitionMatchLabel({ groupName: group?.name, round: dto.round, legNumber })} ${fixtureNumber}`,
-        place: this.fixturePlace(dto) ?? tournamentVenueSnapshot(pinnedTournament),
+        place: requestedPlace ?? tournamentVenueSnapshot(pinnedTournament),
         startAt: dto.scheduledAt ? new Date(dto.scheduledAt) : null,
         createdByUserId: user.id,
         competitionConfigVersionId: pinnedTournament.competitionConfigVersionId,
@@ -928,6 +933,7 @@ export class TournamentBracketService {
   /** 경기 일정·장소·대진(홈/어웨이) 수정. 시작된 경기도 결과가 없으면 사유와 함께 팀을 바꾼다(공식 결과가 있으면 409). */
   async updateFixture(user: V1AuthUser, fixtureId: string, dto: UpdateFixtureDto) {
     const admin = await this.adminContext.getMutationAdmin(user.id);
+    rejectPartialPlaceUpdate(dto.venue, [dto.venueAddress, dto.venueLatitude, dto.venueLongitude, dto.venueProvider, dto.venueProviderId]);
     const canonical = await this.prisma.v1TournamentMatchDetails.findUnique({
       where: { teamMatchId: fixtureId },
       select: {
@@ -1437,4 +1443,21 @@ export class TournamentBracketService {
       recalculatedAt: row.recalculatedAt?.toISOString() ?? null,
     };
   }
+}
+
+/** 핀 있는 경기 생성의 멱등 해시용 장소 지문 — 요청 스냅샷과 저장 행을 같은 모양으로 맞춘다. */
+function pinnedPlaceFingerprint(place: {
+  address: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  provider: string | null;
+  providerPlaceId: string | null;
+}) {
+  return {
+    venueProviderId: place.providerPlaceId,
+    venueProvider: place.provider,
+    venueAddress: place.address,
+    venueLatitude: place.latitude,
+    venueLongitude: place.longitude,
+  };
 }

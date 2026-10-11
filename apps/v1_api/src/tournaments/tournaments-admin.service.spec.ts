@@ -1131,6 +1131,22 @@ describe('TournamentsAdminService', () => {
     }
   });
 
+  it.each([
+    ['address only', { venueAddress: '서울 마포구' }],
+    ['pin only', { venueLatitude: 37.5, venueLongitude: 126.9, venueProvider: 'kakao', venueProviderId: 'p1' }],
+  ])('update: venue fields without venue (%s) → 400 PLACE_NAME_REQUIRED and nothing is written', async (_label, place) => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+    const existing = tournamentRow({ venue: '기존 장소' });
+    prisma.v1Tournament.findFirst
+      .mockResolvedValueOnce(existing)
+      .mockResolvedValueOnce({ ...existing, _count: { registrations: 0 } });
+
+    await expect(
+      service.update(ownerAuthUser, 'tournament-1', { expectedVersion: TOURNAMENT_ROW_UPDATED_AT, title: '제목', ...place }),
+    ).rejects.toMatchObject({ status: 400, response: { code: 'PLACE_NAME_REQUIRED' } });
+    expect(prisma.v1Tournament.updateMany).not.toHaveBeenCalled();
+  });
+
   it('update: rejects scheduledEndAt earlier than final scheduledAt', async () => {
     prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
     prisma.v1Tournament.findFirst.mockResolvedValue(

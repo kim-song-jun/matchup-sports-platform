@@ -18,6 +18,7 @@ import {
   leaguePlacePayload,
   type LeaguePlaceChoice,
 } from './league-fixture-place-field';
+import { PLACE_NAME_MAX_LENGTH } from '@/lib/place';
 
 const TEAM_COUNT_MIN = 3;
 const TEAM_COUNT_MAX = 20;
@@ -206,6 +207,7 @@ export function LeagueTemplateDialog({
 
         <div className="mb-4 grid md:max-w-xl">
           <LeagueFixturePlaceField
+            maxLength={PLACE_NAME_MAX_LENGTH.leagueFixture}
             legend="장소"
             customLabel="다른 장소 사용"
             defaultPlace={defaultPlace}

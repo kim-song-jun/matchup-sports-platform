@@ -55,6 +55,7 @@ import {
   leaguePlacePayload,
   type LeaguePlaceChoice,
 } from './league-fixture-place-field';
+import { PLACE_NAME_MAX_LENGTH } from '@/lib/place';
 import { BracketCanvasMobile } from '@/components/admin/bracket-canvas/bracket-canvas-mobile';
 import { BracketCanvasResponsive } from '@/components/admin/bracket-canvas/bracket-canvas-responsive';
 import type { RegistrationsLoadState } from '@/components/admin/bracket-canvas/bracket-team-tray';
@@ -984,6 +985,7 @@ export default function LeagueMatchFixturesClient({
               />
             </div>
             <LeagueFixturePlaceField
+              maxLength={PLACE_NAME_MAX_LENGTH.leagueFixture}
               legend="장소"
               customLabel="다른 장소 사용"
               defaultPlace={series.defaultPlace ?? null}
@@ -1306,6 +1308,7 @@ export default function LeagueMatchFixturesClient({
                     onGamesPerTeamPerDayChange={setGamesPerTeamPerDay}
                   />
                   <LeagueFixturePlaceField
+                    maxLength={PLACE_NAME_MAX_LENGTH.leagueFixture}
                     legend="장소"
                     customLabel="다른 장소 사용"
                     defaultPlace={series.defaultPlace ?? null}

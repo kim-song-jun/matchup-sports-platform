@@ -112,7 +112,7 @@ describe('ActionSheet', () => {
     expect(dialog.parentElement?.parentElement).toBe(document.body);
   });
 
-  it('body 로 올려도 닫기·ESC·항목 선택은 그대로 동작한다', () => {
+  it('body 로 올려도 항목 선택·배경 클릭·ESC 는 그대로 동작한다', () => {
     const onSelect = vi.fn();
     const { onClose } = setup([{ key: 'a', label: '동작', onSelect }]);
 
@@ -120,6 +120,8 @@ describe('ActionSheet', () => {
     expect(onSelect).toHaveBeenCalledTimes(1);
     fireEvent.click(screen.getByRole('dialog').parentElement as HTMLElement);
     expect(onClose).toHaveBeenCalledTimes(1);
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(onClose).toHaveBeenCalledTimes(2);
   });
 
   it('닫기 버튼이 onClose 를 부른다', () => {

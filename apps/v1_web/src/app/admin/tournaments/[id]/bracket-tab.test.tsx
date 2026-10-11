@@ -202,6 +202,8 @@ function confirmedRegistration(overrides: Partial<V1AdminTournamentRegistration>
     rosterDeadlineOverrideAt: null,
     cancelRequestedAt: null,
     cancelReason: null,
+    adminCancelReason: null,
+    cancelOutcome: null,
     playerCount: 5,
     payment: null,
     paymentInstructions: null,
@@ -774,5 +776,53 @@ describe('BracketTab — 12강·8강 토너먼트 자동 생성', () => {
     expect(bracketFixtures).toHaveLength(0);
     expect(createFixtureMutate).not.toHaveBeenCalled();
     expect(screen.getByRole('button', { name: '대진 자동 생성' })).toBeEnabled();
+  });
+});
+
+describe('BracketTab — 팀 배정 전 대진 자동 생성 안내', () => {
+  beforeEach(() => {
+    bracketFixtures = [];
+    v1Post.mockReset();
+    vi.clearAllMocks();
+  });
+  afterEach(() => {
+    bracketGroups = bracket.groups;
+  });
+
+  const HINT = '조에 팀을 2팀 이상 배정하면 대진을 자동으로 만들 수 있어요.';
+
+  function groupWithTeams(count: number) {
+    bracketGroups = [{
+      ...bracket.groups[0],
+      groupTeams: Array.from({ length: count }, (_, index) => ({
+        id: `gt-${index + 1}`,
+        groupId: 'group-a',
+        registrationId: `r${index + 1}`,
+        teamName: `팀 ${index + 1}`,
+        sortOrder: index,
+      })),
+    }] as typeof bracket.groups;
+  }
+
+  it.each([0, 1])('팀이 %i팀이면 눌러 보기 전에 이유가 화면에 남아 있고, 눌러도 모달 없이 알려준다', (count) => {
+    groupWithTeams(count);
+    const showToast = renderTab();
+
+    const button = screen.getByRole('button', { name: '대진 자동 생성' });
+    expect(screen.getByText(HINT)).toBeInTheDocument();
+    expect(button).toHaveAccessibleDescription(HINT);
+
+    fireEvent.click(button);
+    expect(showToast).toHaveBeenCalledWith('조에 팀이 2개 이상 있어야 자동 생성할 수 있어요.', 'error');
+    expect(screen.queryByRole('dialog', { name: '조별리그 대진 자동 생성' })).not.toBeInTheDocument();
+  });
+
+  it('대조군 — 팀이 2팀 이상이면 안내 없이 회전 수 모달이 열린다', () => {
+    groupWithTeams(2);
+    renderTab();
+
+    expect(screen.queryByText(HINT)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '대진 자동 생성' }));
+    expect(screen.getByRole('dialog', { name: '조별리그 대진 자동 생성' })).toBeInTheDocument();
   });
 });

@@ -160,6 +160,8 @@ function makeRegistration(overrides: Partial<V1TournamentRegistration> = {}): V1
     rosterDeadlineOverrideAt: null,
     cancelRequestedAt: null,
     cancelReason: null,
+    adminCancelReason: null,
+    cancelOutcome: null,
     playerCount: 0,
     payment: null,
     paymentInstructions: null,
@@ -487,6 +489,64 @@ describe('MyRegistrationPageClient — 명단 수정 가능 배지', () => {
     for (const link of screen.getAllByRole('link', { name: '선수 명단 수정하기' })) {
       expect(link).toHaveTextContent('선수 수정');
     }
+  });
+});
+
+describe('MyRegistrationPageClient — 어드민이 처리한 취소', () => {
+  beforeEach(() => {
+    searchParams = new URLSearchParams('reg=registration-1');
+  });
+
+  function arrange(registration: Partial<V1TournamentRegistration>) {
+    myRegistrationApiMocks.useV1Tournament.mockReturnValue({ data: makeTournament({}), isLoading: false });
+    myRegistrationApiMocks.useV1MyRegistrations.mockReturnValue({
+      data: [makeRegistration(registration)],
+      isLoading: false,
+      isError: false,
+      error: null,
+    });
+  }
+
+  it('팀이 남긴 취소 사유와 운영진 사유를 따로 보여 주고 승인된 취소임을 말한다', () => {
+    arrange({
+      status: 'cancelled',
+      cancelRequestedAt: '2026-10-10T00:00:00.000Z',
+      cancelReason: '선수 부족으로 불참',
+      adminCancelReason: '환불 안내함',
+      cancelOutcome: 'approved',
+    });
+    render(<MyRegistrationPageClient tournamentId="tournament-1" />);
+
+    expect(screen.getByText('선수 부족으로 불참')).toBeInTheDocument();
+    expect(screen.getByText('환불 안내함')).toBeInTheDocument();
+    expect(screen.getByText('운영진 사유')).toBeInTheDocument();
+    expect(screen.getAllByText('취소 승인됨').length).toBeGreaterThan(0);
+  });
+
+  it('`?reg=` 없는 목록 뷰의 배지도 처리 결과를 말한다', () => {
+    searchParams = new URLSearchParams('');
+    arrange({ status: 'cancelled', adminCancelReason: '자격 미달', cancelOutcome: 'rejected' });
+    render(<MyRegistrationPageClient tournamentId="tournament-1" />);
+
+    expect(screen.getByText('거부됨')).toBeInTheDocument();
+    expect(screen.queryByText('취소')).not.toBeInTheDocument();
+  });
+
+  it('대조군: 어드민이 처리하지 않은 취소는 목록에서도 그냥 "취소" 다', () => {
+    searchParams = new URLSearchParams('');
+    arrange({ status: 'cancelled', cancelOutcome: null });
+    render(<MyRegistrationPageClient tournamentId="tournament-1" />);
+
+    expect(screen.getByText('취소')).toBeInTheDocument();
+    expect(screen.queryByText('거부됨')).not.toBeInTheDocument();
+  });
+
+  it('운영자가 거부한 신청은 "거부됨" 이다', () => {
+    arrange({ status: 'cancelled', adminCancelReason: '자격 미달', cancelOutcome: 'rejected' });
+    render(<MyRegistrationPageClient tournamentId="tournament-1" />);
+
+    expect(screen.getAllByText('거부됨').length).toBeGreaterThan(0);
+    expect(screen.queryByText('취소 승인됨')).not.toBeInTheDocument();
   });
 });
 
@@ -918,6 +978,48 @@ describe('MyRegistrationPageClient — payment_checking 안내는 참가비 유�
     const text = container.textContent ?? '';
     expect(text).toContain('입금이 확인됐어요. 운영자가 선수 명단과 참가 조건을 확인하고 있어요.');
     expect(text).not.toContain('신청이 접수됐어요. 운영자가');
+  });
+});
+
+describe('MyRegistrationPageClient — 신청 상세 상단 카드는 어떤 상태에서도 대회명·팀명을 보인다 (MD-QA #80)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    searchParams = new URLSearchParams({ reg: 'registration-1' });
+    myRegistrationApiMocks.useV1MyTeams.mockReturnValue({ data: { items: [makeTeam()] }, isLoading: false });
+    myRegistrationApiMocks.useV1TournamentPlayers.mockReturnValue({ data: { players: [], belowMinimum: false } });
+    myRegistrationApiMocks.useV1CancelRegistrationRequest.mockReturnValue({ mutateAsync: vi.fn(), isPending: false });
+    myRegistrationApiMocks.useV1WithdrawCancelRegistrationRequest.mockReturnValue({ mutateAsync: vi.fn(), isPending: false });
+    myRegistrationApiMocks.useV1Team.mockReturnValue({ data: { name: '성수 풋살 크루' } });
+    myRegistrationApiMocks.useV1Tournament.mockReturnValue({ data: makeTournament({ title: '봄 풋살 대회' }), isLoading: false });
+  });
+
+  // 팀명은 이 화면에서 상단 카드에만 나온다(레일은 대회명만) — 팀명을 찾아 올라가면 그 카드다.
+  it.each([
+    'draft',
+    'submitted',
+    'awaiting_payment',
+    'payment_checking',
+    'paid',
+    'confirmed',
+    'waitlisted',
+    'cancel_requested',
+    'cancelled',
+  ] as const)('%s 상태의 신청 상세 상단에 대회명과 팀명이 있다', (status) => {
+    myRegistrationApiMocks.useV1MyRegistrations.mockReturnValue({
+      data: [makeRegistration({ status })],
+      isLoading: false,
+      isError: false,
+      error: null,
+    });
+    render(<MyRegistrationPageClient tournamentId="tournament-1" />);
+
+    const pass = screen.getByText('성수 풋살 크루').closest('[role="status"]');
+    expect(pass).not.toBeNull();
+    expect(pass).toHaveTextContent('봄 풋살 대회');
+    // 가드를 없애며 대기자 안내가 다른 상태에도 붙었다 — 취소된 신청에 "확정해 드려요" 를 약속하면 안 된다.
+    const waitlistNote = '앞 순위 팀이 취소하면 운영진이 확인 후 확정해 드려요.';
+    if (status === 'waitlisted') expect(pass).toHaveTextContent(waitlistNote);
+    else expect(pass).not.toHaveTextContent(waitlistNote);
   });
 });
 

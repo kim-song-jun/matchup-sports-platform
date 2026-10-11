@@ -7,7 +7,7 @@
  * 값도 안전한 한글 fallback으로 떨어지게 한다. 새 상태값 추가 시 여기만 갱신한다.
  */
 
-import type { V1InquiryReportReason, V1PlayerEligibilityStatus, V1TournamentRegistrationStatus } from '@/types/api';
+import type { V1InquiryReportReason, V1PlayerEligibilityStatus, V1RegistrationCancelOutcome, V1TournamentRegistrationStatus } from '@/types/api';
 
 /**
  * 팀 가입 신청 상태 — **관리자(검토자) 관점** 라벨.
@@ -384,6 +384,9 @@ export function leagueSeasonStageLabel(stage: LeagueSeasonStage): string {
 export const ARRIVAL_PENDING_LABEL = '도착 전';
 export const ARRIVAL_CONFIRMED_LABEL = '도착 확인';
 
+/** 운영 콘솔에서 레드카드가 기록된(되돌려지지 않은) 선수. */
+export const SENT_OFF_LABEL = '퇴장';
+
 /** 성별 조건 정본 값(서버 GENDER_RULES 와 같다). 매치 화면에서는 `matchGenderRuleLabel` 로 읽는다. */
 export const GENDER_RULE_OPTIONS = ['성별 무관', '남', '여'] as const;
 
@@ -441,16 +444,27 @@ const REGISTRATION_STATUS: Record<V1TournamentRegistrationStatus, { tone: Regist
   cancelled: { tone: 'grey', label: '취소' },
 };
 
+/** 어드민이 취소 처리한 신청의 상태 이름 — 일반 "취소" 와 달리 누가 끝냈는지가 드러난다. */
+export function registrationCancelOutcomeLabel(outcome: V1RegistrationCancelOutcome): string {
+  return outcome === 'approved' ? '취소 승인됨' : '거부됨';
+}
+
 /**
  * 대회·리그 참가 신청 상태 — 내 신청 화면·대회/리그 상세 "우리 팀 참가" 카드·팀 상세 "참가 중인 대회·리그"가
  * 같은 색·말을 쓴다. 배지는 `badgeClass`, 줄 안의 글자는 `textColor`. 모르는 값은 영문 코드 대신 한글로.
  */
-export function tournamentRegistrationStatusConfig(status: V1TournamentRegistrationStatus): {
+export function tournamentRegistrationStatusConfig(
+  status: V1TournamentRegistrationStatus,
+  cancelOutcome: V1RegistrationCancelOutcome | null,
+): {
   badgeClass: string;
   textColor: string;
   label: string;
 } {
   const entry: { tone: RegistrationTone; label: string } = REGISTRATION_STATUS[status] ?? { tone: 'grey', label: '상태 확인 중' };
+  if (status === 'cancelled' && cancelOutcome) {
+    return { ...REGISTRATION_TONE[entry.tone], label: registrationCancelOutcomeLabel(cancelOutcome) };
+  }
   return { ...REGISTRATION_TONE[entry.tone], label: entry.label };
 }
 

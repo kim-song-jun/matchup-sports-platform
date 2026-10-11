@@ -821,7 +821,11 @@ export function ResultEditModal({
                 </div>
               ))}
               {goalEvents.length === 0 ? (
-                <p className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>등록된 득점이 없어요.</p>
+                <p className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>
+                  {(base.goalEvents ?? []).length === 0
+                    ? '득점 기록 없이 점수만 확정된 경기예요. 점수만 고쳐도 되고, 득점자를 알면 득점을 추가해 주세요.'
+                    : '등록된 득점이 없어요.'}
+                </p>
               ) : null}
             </div>
           </section>

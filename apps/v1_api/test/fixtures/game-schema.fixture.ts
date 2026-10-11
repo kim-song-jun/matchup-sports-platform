@@ -576,7 +576,10 @@ export const gameSchemaSourceManifest = {
   // provider/provider_id, V1Tournament venue_address/provider/provider_id) backed by
   // 20261010090000_v1_place_snapshots. Game models and the bound historical game-operations
   // migration are unchanged; re-pin the schema bytes only.
-  schema: '8a2399efed6aeb515ac9c24a41c4a180255dae4e74c67a6682b681fbe6c74618',
+  // 2026-10-11: additive V1TournamentRegistration.adminCancelReason/cancelOutcome columns backed by
+  // the MD-QA #78 migration. Game models and the bound historical game-operations migration are
+  // unchanged; re-pin the schema bytes only.
+  schema: 'a21cf68599a1c8f34a4f18a0e69f0557d201affc59689b315deb9d8d0716c576',
   migration: '6bd7fae42e9ee7debff71d26f7252d220ad2c12ae6f14745d103fc7fa61e8f64',
 } as const;
 

@@ -3385,10 +3385,23 @@ export class GamesService {
       include: { resultParticipants: true },
       orderBy: { revision: 'desc' },
     });
+    // The creator (a team-match draft may be submitted by another manager) is an operator, not a player:
+    // the roster name policy below does not apply, so show the nickname (a withdrawn account keeps only its display label).
+    const creatorProfiles = await loadParticipantNameProfiles(
+      this.prisma,
+      revisions.map((revision) => revision.createdByUserId),
+    );
+    const withCreatorName = <T extends { createdByUserId: string | null }>(revision: T) => {
+      const profile = revision.createdByUserId === null ? undefined : creatorProfiles.get(revision.createdByUserId);
+      return {
+        ...revision,
+        createdByName: profile === undefined ? null : profile.deletedAt !== null ? (profile.displayName ?? profile.nickname) : profile.nickname,
+      };
+    };
     const participantIds = Array.from(
       new Set(revisions.flatMap((revision) => revision.resultParticipants.map((row) => row.participantId))),
     );
-    if (participantIds.length === 0) return revisions;
+    if (participantIds.length === 0) return revisions.map(withCreatorName);
 
     // Result rows intentionally expose no userId. Names are projected through the same
     // consent/name policy as public records, while the existing game actor read gate above
@@ -3418,7 +3431,7 @@ export class GamesService {
       }),
     );
 
-    return revisions.map((revision) => ({
+    return revisions.map(withCreatorName).map((revision) => ({
       ...revision,
       resultParticipants: revision.resultParticipants.map((row) => ({
         ...row,

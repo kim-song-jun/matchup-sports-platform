@@ -26,6 +26,11 @@ interface BottomSheetBaseProps {
    */
   open: boolean;
   children: ReactNode;
+  /**
+   * 열릴 때 포커스 위치. 기본 'control'(첫 컨트롤). 사용자 조작 없이 저절로 뜨는 시트는 'sheet' —
+   * 시트 패널 자체에 포커스를 둬 닫기 버튼에 키보드 포커스 링이 그려지지 않게 한다.
+   */
+  initialFocus?: 'control' | 'sheet';
 }
 
 type BottomSheetCloseProps =
@@ -84,7 +89,7 @@ const INTERACTIVE_SELECTOR = 'button, a, input, select, textarea, label, [role="
  * 없으므로 임계치 미만이면 무조건 원위치, 초과면 무조건 닫는다.
  */
 export function BottomSheet(props: BottomSheetProps) {
-  const { open, closeHref, onClose, children, title, ariaLabel } = props;
+  const { open, closeHref, onClose, children, title, ariaLabel, initialFocus = 'control' } = props;
   const router = useRouter();
 
   const navigate = useCallback(
@@ -136,6 +141,7 @@ export function BottomSheet(props: BottomSheetProps) {
     open: onClose ? open : true,
     onClose: onRequestClose,
     closeOnBack: Boolean(onClose), // URL 시트는 열림이 URL 항목이라 뒤로가기가 이미 닫는다.
+    initialFocus: initialFocus === 'sheet' ? 'dialog' : 'control',
   });
 
   const handlePointerDown = useCallback((event: ReactPointerEvent<HTMLElement>) => {
@@ -194,6 +200,7 @@ export function BottomSheet(props: BottomSheetProps) {
         aria-modal="true"
         aria-label={title ? undefined : ariaLabel}
         aria-labelledby={titleId}
+        tabIndex={initialFocus === 'sheet' ? -1 : undefined}
         style={dragOffset > 0 ? { transform: `translateY(${dragOffset}px)` } : undefined}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}

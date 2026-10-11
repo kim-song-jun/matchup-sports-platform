@@ -11,7 +11,7 @@ import type {
 } from '@/hooks/use-tournament-result-review';
 import type { GameLineup } from '@/types/game-operations';
 import { formatGameResultScoreWithPenalties, readGameResultScore } from '@/lib/game-result-score';
-import { describeGoalTimelineMismatch } from './goal-timeline-consistency';
+import { describeGoalTimelineMismatch, isScoreOnlyResult } from './goal-timeline-consistency';
 import { isSinglePeriod, periodLabel } from '@/components/tournament-live/operate/period-label';
 import { useOverlayHistory } from '@/components/v1-ui/use-overlay-history';
 import { useTopmostEscape } from '@/components/v1-ui/use-topmost-escape';
@@ -35,7 +35,8 @@ import { lockBodyScroll } from '@/lib/body-scroll-lock';
  */
 export type ResultEditSubmitInput = {
   score: GameResultScoreInput;
-  goalEvents: GameResultGoalEventInput[];
+  /** 득점 기록 없이 점수만 있는 결과는 생략한다 — 서버가 기존 상태를 유지한다. */
+  goalEvents?: GameResultGoalEventInput[];
   actualParticipants: GameResultParticipantInput[];
   mvpParticipantId?: string;
   reason: string;
@@ -506,7 +507,12 @@ export function ResultEditModal({
   );
   const homeSideId = sides.find((side) => side.sideKey === 'HOME')?.id;
   const awaySideId = sides.find((side) => side.sideKey === 'AWAY')?.id;
+  const baseRecorded = readGameResultScore(base.score);
+  const baseScoreOnly =
+    (base.goalEvents?.length ?? 0) === 0 && baseRecorded !== null && baseRecorded.home + baseRecorded.away > 0;
+  const scoreOnly = isScoreOnlyResult({ baseScoreOnly, goalEvents, participants });
   const timelineMismatch = describeGoalTimelineMismatch({
+    baseScoreOnly,
     score: { home, away },
     homeSideId,
     awaySideId,
@@ -991,7 +997,7 @@ export function ResultEditModal({
                 // 아니라 **허용 필드**다 -- 결선 무승부는 승부차기로만 승자가 갈리므로,
                 // 서버가 받아 주는 상태(`penaltiesAllowed`)에서는 반드시 실어 보낸다.
                 score: draftScore,
-                goalEvents,
+                ...(scoreOnly ? {} : { goalEvents }),
                 actualParticipants: participants,
                 ...(mvpParticipantId ? { mvpParticipantId } : {}),
                 reason: trimmedReason,

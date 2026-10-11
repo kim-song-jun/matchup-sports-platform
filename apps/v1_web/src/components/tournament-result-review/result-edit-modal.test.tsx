@@ -938,4 +938,59 @@ describe('ResultEditModal — 점수와 득점 기록이 어긋나면 제출 전
 
     expect(onConfirm).toHaveBeenCalledTimes(1);
   });
+  describe('득점 기록 없이 점수만 있는 결과(간편 결과)', () => {
+    it('점수만 고치면 막지 않고 goalEvents 를 보내지 않아 서버가 기존 상태를 유지하게 한다', () => {
+      const { onConfirm } = submitEdit({ score: { home: 2, away: 1 }, goalEvents: [] }, ({ confirmLabel }) => {
+        fireEvent.change(screen.getByLabelText('홈 점수'), { target: { value: '3' } });
+        fireEvent.change(screen.getByLabelText('사유'), { target: { value: '점수 정정' } });
+        expect(mismatchAlert()).toBeNull();
+        fireEvent.click(screen.getByRole('button', { name: confirmLabel }));
+      });
+
+      expect(onConfirm).toHaveBeenCalledTimes(1);
+      expect(onConfirm.mock.calls[0][0].score).toEqual({ home: 3, away: 1 });
+      expect(onConfirm.mock.calls[0][0]).not.toHaveProperty('goalEvents');
+    });
+
+    it('득점 기록을 더하면 점수가 기록 수를 따라가고, 그 기록과 함께 goalEvents 를 보낸다', () => {
+      const { onConfirm } = submitEdit({ score: { home: 2, away: 1 }, goalEvents: [] }, ({ confirmLabel }) => {
+        fireEvent.change(screen.getByLabelText('사유'), { target: { value: '기록 추가' } });
+        addGoal(HOME_SIDE_ID);
+        expect(mismatchAlert()).toBeNull();
+        fireEvent.click(screen.getByRole('button', { name: confirmLabel }));
+      });
+
+      expect(onConfirm.mock.calls[0][0].score).toEqual({ home: 1, away: 0 });
+      expect(onConfirm.mock.calls[0][0].goalEvents).toHaveLength(1);
+    });
+
+    it('선수 득점을 입력하면 기록이 없는 채로는 점수 전용으로 보지 않고 막는다', () => {
+      const { onConfirm } = submitEdit({ score: { home: 2, away: 1 }, goalEvents: [] }, ({ confirmLabel }) => {
+        fireEvent.change(screen.getByLabelText('사유'), { target: { value: '선수 득점' } });
+        fireEvent.change(screen.getAllByLabelText('득점')[0], { target: { value: '1' } });
+        expect(screen.getByRole('button', { name: confirmLabel })).toBeDisabled();
+        expect(mismatchAlert()).toHaveTextContent('점수(2:1)와 득점 기록(0:0)이 달라요');
+      });
+
+      expect(onConfirm).not.toHaveBeenCalled();
+    });
+
+    it('원본이 0:0 이고 기록도 없으면 점수만 올리는 것은 여전히 막는다', () => {
+      submitEdit({ score: { home: 0, away: 0 }, goalEvents: [] }, ({ confirmLabel }) => {
+        fireEvent.change(screen.getByLabelText('홈 점수'), { target: { value: '1' } });
+        fireEvent.change(screen.getByLabelText('사유'), { target: { value: '점수 정정' } });
+        expect(screen.getByRole('button', { name: confirmLabel })).toBeDisabled();
+        expect(mismatchAlert()).toHaveTextContent('점수(1:0)와 득점 기록(0:0)이 달라요');
+      });
+    });
+
+    it('기록이 있던 결과에서 기록을 모두 지우고 점수를 남기면 점수 전용으로 취급하지 않는다', () => {
+      submitEdit({}, ({ confirmLabel }) => {
+        fireEvent.click(screen.getByRole('button', { name: /삭제/ }));
+        fireEvent.change(screen.getByLabelText('홈 점수'), { target: { value: '1' } });
+        fireEvent.change(screen.getByLabelText('사유'), { target: { value: '기록 삭제' } });
+        expect(screen.getByRole('button', { name: confirmLabel })).toBeDisabled();
+      });
+    });
+  });
 });

@@ -1,5 +1,23 @@
 # v1_web
 
+## 1.6.9
+
+### Patch Changes
+
+- 56b2630: 데스크톱 채팅방 헤더가 방 이름·종류 칩·상세 링크를 함께 보여 주고, 헤더 아래 별도 연결 카드는 데스크톱에서 사라져 대화 영역이 넓어져요.
+- 030b034: Preserve existing match-room access and approval-time history at cancellation/withdrawal boundaries, retain unresolved send errors on refresh, and refresh composer state after reconnecting.
+
+## 1.6.8
+
+### Patch Changes
+
+- b9fbc93: 채팅방을 열 수 없을 때 이유에 맞는 안내와 「채팅 목록으로」 버튼을 보여 주고, 같은 요청을 반복하지 않아요. 채팅방을 열 때 같은 요청이 여러 번 가던 것을 줄이고, 연결이 끊겼다 돌아오거나 탭으로 돌아오면 놓친 메시지를 다시 받아 와요.
+- 7dcbe08: 개인 매치 채팅방이 목록에 보이는데 열면 409 로 막히던 문제를 고쳐요. 목록에 보이는 방은 항상 열리고, 취소된 매치이거나 확정 참가자가 없는 주최자는 메시지를 읽기만 하며 입력창 자리에 이유 안내가 나와요.
+- b0cfb9b: Prioritize the latest dev CI and skip superseded Alpha server activation while preserving in-progress deployments and pinned database transitions.
+- 5f89113: 채팅 목록의 선택·안읽음 강조가 고정 버튼 칸까지 이어져요. 채팅 화면 위쪽 여백과 입력창 좌우 여백도 다른 화면에 맞췄어요.
+- 85a6f6d: 팀 매치·매치·대회 목록의 더 보기가 15초 배경 재검증 때문에 잠기던 문제, 다음 페이지 실패 시 쌓은 목록이 사라지던 문제, 페이지가 붙을 때 카드가 위로 끼어들던 문제를 고치고 더 보기 후 스크롤이 카드 높이만큼 끌려 내려가던 현상을 막았어요.
+- 6503740: Allow crawlers to read home noindex, improve Korean landing metadata, suppress alpha sitemap feeds, and measure privacy-safe home navigation in GA4.
+
 ## 1.6.7
 
 ### Patch Changes

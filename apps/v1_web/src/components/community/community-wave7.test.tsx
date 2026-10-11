@@ -58,7 +58,7 @@ describe('채팅 목록 빈 상태', () => {
 
 const emptyRoom: ChatRoomViewModel = {
   title: '테스트 방',
-  context: { title: '연습 경기', sub: '7월 26일', href: '/matches/m-1' },
+  context: { title: '연습 경기', sub: '7월 26일', href: '/matches/m-1', typeLabel: '개인매치', linkLabel: '매치 상세 보기' },
   messages: [],
   status: 'ready',
 };

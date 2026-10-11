@@ -1,12 +1,28 @@
 #!/usr/bin/env node
 
-import { readFileSync } from 'node:fs';
+import { chmodSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
-import { resolve } from 'node:path';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
 
 const argumentsList = process.argv.slice(2);
 const sourceRoot = argumentsList.find((argument) => !argument.startsWith('--')) ?? '.';
 const runSelfTest = argumentsList.includes('--self-test');
+
+// Mirrors the live IAM policies. Apple sign-in and Firebase sync scripts write parameters that live IAM
+// does not allow yet (known gap, secrets unset), so they are excluded from the parity check below.
+const expectedRuntimeParameterNames = [
+  'APNS_BUNDLE_ID',
+  'APNS_KEY_ID',
+  'APNS_PRIVATE_KEY',
+  'APNS_TEAM_ID',
+  'KAKAO_APP_ID',
+  'KAKAO_CLIENT_ID',
+  'KAKAO_CLIENT_SECRET',
+  'KAKAO_REDIRECT_URI',
+  'SLACK_INQUIRY_WEBHOOK_URL',
+];
+const syncScriptsOutsideIam = new Set(['sync-alpha-apple-sign-in-env.sh', 'sync-alpha-firebase-env.sh']);
 
 const workflowPath = '.github/workflows/deploy-alpha.yml';
 const composePath = 'deploy/docker-compose.alpha.yml';
@@ -45,7 +61,10 @@ const sources = new Map([
 const errors = [];
 const runtimePolicies = renderRuntimePolicies();
 if (runtimePolicies !== undefined) validateRuntimePolicies(runtimePolicies, errors);
+validateSyncScriptParameterParity(errors);
 validateRuntimeSecretTransport(sources.get(runtimeSyncPath), errors);
+validateKakaoSyncBehaviour(errors);
+validateSyncScriptsRemoveEnvCopies(errors);
 
 requirePatterns(workflowPath, [
   [/amazon-ecr-login/, 'must authenticate to ECR'],
@@ -220,8 +239,98 @@ function renderRuntimePolicies() {
   }
 }
 
+function validateSyncScriptParameterParity(targetErrors) {
+  for (const file of readdirSync(resolve(sourceRoot, 'scripts/release'))) {
+    if (!/^sync-alpha-.+-env\.sh$/.test(file) || syncScriptsOutsideIam.has(file)) continue;
+    const source = readFileSync(resolve(sourceRoot, 'scripts/release', file), 'utf8');
+    const written = new Set();
+    const namesArray = source.match(/^names=\(([^)]*)\)/m);
+    if (namesArray) namesArray[1].trim().split(/\s+/).forEach((name) => written.add(name));
+    const literal = source.match(/parameter_name='\/teameet\/alpha\/env\/([A-Z0-9_]+)'/);
+    if (literal) written.add(literal[1]);
+    if (written.size === 0) {
+      targetErrors.push(`scripts/release/${file}: no SSM parameter names found; parity check cannot cover it`);
+    }
+    for (const name of written) {
+      if (!expectedRuntimeParameterNames.includes(name)) {
+        targetErrors.push(`scripts/release/${file}: writes ${name}, which the alpha IAM parameter list does not allow`);
+      }
+    }
+  }
+}
+
+// Runs the Kakao sync against a stubbed aws/jq: well-formed secrets must reach put-parameter, malformed
+// ones must leave AWS untouched. A guard that rejects everything still exits 0, so only this catches it.
+function validateKakaoSyncBehaviour(targetErrors) {
+  const script = resolve(sourceRoot, 'scripts/release/sync-alpha-kakao-env.sh');
+  const stubDir = mkdtempSync(join(tmpdir(), 'kakao-sync-stub-'));
+  const callLog = join(stubDir, 'aws-calls.log');
+  try {
+    writeFileSync(join(stubDir, 'aws'), [
+      '#!/usr/bin/env bash',
+      `printf '%s\\n' "$*" >> '${callLog}'`,
+      'case "$2" in send-command) echo cmd-0;; get-command-invocation) echo Success;; esac',
+      '',
+    ].join('\n'));
+    writeFileSync(join(stubDir, 'jq'), '#!/usr/bin/env bash\necho "{}"\n');
+    chmodSync(join(stubDir, 'aws'), 0o755);
+    chmodSync(join(stubDir, 'jq'), 0o755);
+    const valid = {
+      INSTANCE_ID: 'i-0123456789abcdef0',
+      AWS_REGION: 'ap-northeast-2',
+      SECRET_KAKAO_CLIENT_ID: '0123456789abcdef0123456789abcdef',
+      SECRET_KAKAO_CLIENT_SECRET: 'AbCdEf0123456789AbCdEf0123456789',
+      SECRET_ALPHA_KAKAO_REDIRECT_URI: 'https://alpha.teameet.co.kr/callback/kakao',
+      SECRET_KAKAO_APP_ID: '1234567',
+    };
+    const run = (overrides) => {
+      rmSync(callLog, { force: true });
+      const result = spawnSync('bash', [script], {
+        encoding: 'utf8',
+        env: { ...process.env, ...valid, ...overrides, PATH: `${stubDir}:${process.env.PATH}` },
+      });
+      let calls = '';
+      try { calls = readFileSync(callLog, 'utf8'); } catch { calls = ''; }
+      const written = [...calls.matchAll(/put-parameter .*--name \/teameet\/alpha\/env\/([A-Z_]+)/g)].map((match) => match[1]);
+      return { result, calls, written };
+    };
+
+    const happy = run({});
+    const expected = ['KAKAO_CLIENT_ID', 'KAKAO_CLIENT_SECRET', 'KAKAO_REDIRECT_URI', 'KAKAO_APP_ID'];
+    if (happy.result.status !== 0 || expected.some((name) => !happy.written.includes(name))) {
+      targetErrors.push(`scripts/release/sync-alpha-kakao-env.sh: well-formed secrets did not write ${expected.join(', ')} (exit ${happy.result.status}, wrote [${happy.written.join(', ')}])`);
+    }
+    for (const [label, overrides] of [
+      ['foreign redirect host', { SECRET_ALPHA_KAKAO_REDIRECT_URI: 'https://evil.example/callback/kakao' }],
+      ['short client id', { SECRET_KAKAO_CLIENT_ID: 'abc' }],
+    ]) {
+      const rejected = run(overrides);
+      if (rejected.result.status !== 0 || rejected.calls !== '') {
+        targetErrors.push(`scripts/release/sync-alpha-kakao-env.sh: ${label} must warn and leave AWS untouched (exit ${rejected.result.status})`);
+      }
+    }
+  } finally {
+    rmSync(stubDir, { recursive: true, force: true });
+  }
+}
+
+// The remote half copies the protected .env (every runtime secret) to a temp file; clearing the EXIT trap
+// on success skips its removal, so each deploy would leave another copy on the alpha host.
+function validateSyncScriptsRemoveEnvCopies(targetErrors) {
+  for (const file of readdirSync(resolve(sourceRoot, 'scripts/release'))) {
+    if (!/^sync-alpha-.+-env\.sh$/.test(file)) continue;
+    const source = readFileSync(resolve(sourceRoot, 'scripts/release', file), 'utf8');
+    if (/^trap - EXIT$/m.test(source)) {
+      targetErrors.push(`scripts/release/${file}: must not clear the EXIT trap; it removes the temp copy of deploy/.env`);
+    }
+  }
+}
+
 function validateRuntimePolicies(policies, targetErrors) {
-  const parameterArn = 'arn:aws:ssm:ap-northeast-2:123456789012:parameter/teameet/alpha/env/SLACK_INQUIRY_WEBHOOK_URL';
+  // Independent copy of the live allowlist; sorted like the renderer's output.
+  const parameterArn = expectedRuntimeParameterNames.map(
+    (name) => `arn:aws:ssm:ap-northeast-2:123456789012:parameter/teameet/alpha/env/${name}`,
+  );
   validateRuntimePolicy(
     policies?.github,
     {
@@ -259,10 +368,10 @@ function validateRuntimePolicy(policy, expected, targetErrors) {
     statement.Sid !== expected.sid ||
     statement.Effect !== 'Allow' ||
     statement.Action !== expected.action ||
-    statement.Resource !== expected.resource
+    JSON.stringify(statement.Resource) !== JSON.stringify(expected.resource)
   ) {
     targetErrors.push(
-      `${provisioningPath}: ${expected.label} runtime Parameter statement must be exactly ${expected.action} on ${expected.resource}`,
+      `${provisioningPath}: ${expected.label} runtime Parameter statement must be exactly ${expected.action} on the explicit parameter list`,
     );
   }
 }
@@ -371,6 +480,13 @@ function verifyNegativeControls(renderedPolicies) {
   });
   assertPolicyRejected('broad runtime Parameter resource', renderedPolicies, (policies) => {
     runtimeStatement(policies.github).Resource = 'arn:aws:ssm:ap-northeast-2:123456789012:parameter/teameet/alpha/env/*';
+  });
+
+  assertPolicyRejected('unexpected runtime Parameter name', renderedPolicies, (policies) => {
+    runtimeStatement(policies.github).Resource.push('arn:aws:ssm:ap-northeast-2:123456789012:parameter/teameet/alpha/env/OTHER');
+  });
+  assertPolicyRejected('missing runtime Parameter name', renderedPolicies, (policies) => {
+    runtimeStatement(policies.instance).Resource.pop();
   });
 
   errors.length = 0;

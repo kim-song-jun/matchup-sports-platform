@@ -94,10 +94,14 @@ function isExpectedGuestAuthProbe(path: string, init: RequestInit, error: V1ApiE
     && error.code === 'UNAUTHENTICATED';
 }
 
-export function retryTransientFailure(failureCount: number, error: unknown): boolean {
-  if (failureCount >= 2) return false;
+/** 같은 요청을 다시 보내면 결과가 달라질 수 있는 실패인가(서버 지연·요청 시간 초과 408·요청량 초과·네트워크 단절). 4xx 응답은 아니다. */
+export function isTransientFailure(error: unknown): boolean {
   if (!(error instanceof V1ApiError)) return true;
-  return isV1NetworkError(error) || error.statusCode >= 500 || error.statusCode === 429;
+  return isV1NetworkError(error) || error.statusCode >= 500 || error.statusCode === 408 || error.statusCode === 429;
+}
+
+export function retryTransientFailure(failureCount: number, error: unknown): boolean {
+  return failureCount < 2 && isTransientFailure(error);
 }
 
 function toErrorMessage(message: unknown): string | null {

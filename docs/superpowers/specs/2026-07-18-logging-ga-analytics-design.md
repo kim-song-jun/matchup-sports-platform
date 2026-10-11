@@ -47,7 +47,7 @@
 
 - `NEXT_PUBLIC_GA_MEASUREMENT_ID` env var. 미설정 시 스크립트 자체를 로드하지 않음(완전 no-op — 기존 `WebPushService` graceful-disable 패턴과 동일 철학).
 - `next/script`(`strategy="afterInteractive"`)로 gtag.js 로드. 별도 `@next/third-parties` 의존성 추가하지 않음(경량화).
-- `app/layout.tsx`(또는 `providers.tsx`)에 라우트 변경 감지 → `gtag('event', 'page_view', ...)` 자동 전송(Next App Router는 SPA 라우팅이므로 수동 트리거 필요).
+- `GoogleAnalytics`가 초기 `config`를 한 번 큐에 넣고, GA4 향상된 측정의 페이지 로드·브라우저 방문 기록 측정이 `page_view`를 보낸다. 별도 수동 `page_view`는 중복을 만들므로 보내지 않는다. 운영 스트림의 두 옵션이 켜져 있음을 2026-10-12 실제 UI에서 확인했다.
 - `lib/analytics.ts`: 단일 공개 API.
   ```ts
   export function trackEvent(name: string, params?: Record<string, string | number | boolean>): void
@@ -71,6 +71,9 @@ GA4 명명 규칙(snake_case) 준수. 카테고리별 이벤트 카탈로그:
 - `landing_cta_click { cta }`
 - `search { queryLength, resultCount, domain }` — 실제 전송 필드는 `query`가 아니라 `queryLength`(문자 길이, PII 방지)다. `domain`은 검색 결과가 있었던 도메인들을 콤마로 join한 문자열(`match`/`team_match`/`team`/`league` 중 0개 이상 조합, 전부 0건이면 빈 문자열 — `league`는 리그 발견성 감사, Task 153 Wave 3에서 추가). `tournament`는 통합검색 대상이 아니므로 포함되지 않는다(대회는 `/league-matches`와 달리 검색 API에 아직 편입되지 않았다) (구현: `apps/v1_web/src/components/search/search-experience.tsx`의 `trackEvent('search', { queryLength, resultCount, domain })`)
 - `home_view {}`
+- `home_navigation_click { destination, destination_type }` — 홈에서 내부 링크를 누른 이동 의도. `destination`은 정해진 경로 종류만, `destination_type`은 `list`/`detail`/`create`/`page`만 보낸다. ID·이름·링크 문구·쿼리·해시는 보내지 않는다. 가입·신청 완료 지표로 사용하지 않는다.
+
+2026-10-12 운영 GA4(속성 448147119)에 `cta`, `destination`, `destination_type`을 이벤트 범위 맞춤 측정기준으로 등록했다. `teameet-prod`만 포함하는 저장된 비교 **운영 사이트만 · teameet-prod**를 사용하면 같은 속성의 `alpha-teameet` 데이터가 섞이지 않는다. 이 설정은 기존 데이터를 삭제하거나 재수집하지 않는다. 새 홈 클릭 이벤트는 코드 배포 후부터 수집된다.
 
 **매칭(개인)**
 - `match_view { matchId, sportType }`

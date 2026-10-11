@@ -121,15 +121,19 @@ export function TeamListPageView({ model, fromHref }: { readonly model: TeamList
           <>
             <div className="tm-team-card-stack">{model.teams.map((team) => <TeamCard key={team.id} team={team} fromHref={fromHref} />)}</div>
             {model.hasNextPage ? (
-              <button
-                type="button"
-                className="tm-btn tm-btn-lg tm-btn-neutral tm-btn-block"
-                style={{ marginTop: 16 }}
-                onClick={model.onLoadMore}
-                disabled={model.isFetchingNextPage}
-              >
-                {model.isFetchingNextPage ? '팀을 더 불러오는 중...' : '팀 더 보기'}
-              </button>
+              <>
+                {model.loadMoreError ? (
+                  <p role="alert" className="tm-text-caption tm-load-more-error">다음 목록을 불러오지 못했어요. 다시 시도해 주세요.</p>
+                ) : null}
+                <button
+                  type="button"
+                  className="tm-btn tm-btn-md tm-btn-neutral tm-btn-block tm-load-more"
+                  onClick={model.onLoadMore}
+                  disabled={model.isFetchingNextPage || model.loadMoreLocked}
+                >
+                  {model.isFetchingNextPage ? '불러오는 중…' : model.loadMoreError ? '다시 불러오기' : '더 보기'}
+                </button>
+              </>
             ) : null}
           </>
         ) : (

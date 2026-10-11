@@ -186,7 +186,8 @@ export function ChatRoomPageView({ model, listModel, roomId }: { model: ChatRoom
       <MoreHorizontal size={21} strokeWidth={2} aria-hidden="true" />
     </button>
   ) : undefined;
-  useShellOverride({ title: model.title, topbarActions: roomMenuButton });
+  // 제목이 비면(방을 못 불러옴) 셸 표의 기본 제목을 그대로 쓴다.
+  useShellOverride({ title: model.title || undefined, topbarActions: roomMenuButton });
 
   return (
     <>
@@ -197,7 +198,7 @@ export function ChatRoomPageView({ model, listModel, roomId }: { model: ChatRoom
           </div>
           <ChatListContent model={listModel} selectedRoomId={roomId} />
         </aside>
-        <section className="tm-chat-desktop-thread-pane" aria-label={`${model.title} 채팅방`}>
+        <section className="tm-chat-desktop-thread-pane" aria-label={model.title ? `${model.title} 채팅방` : '채팅방'}>
       {/*
        * Desktop page head: back link + room title.
        * The mobile .tm-topbar (rendered inside AppChrome) is hidden on desktop,
@@ -208,11 +209,31 @@ export function ChatRoomPageView({ model, listModel, roomId }: { model: ChatRoom
         <AppBackLink className="tm-desktop-back" fallbackHref="/chat">
           <ChevronLeftIcon size={22} strokeWidth={2.2} />
         </AppBackLink>
-        <h1 className="tm-text-heading" style={{ margin: 0 }}>{model.title}</h1>
+        <div className="tm-chat-room-head-title">
+          {model.title ? (
+            <h2 className="tm-text-heading">{model.title}</h2>
+          ) : model.status === 'loading' ? (
+            <div className="tm-skeleton" aria-hidden="true" style={{ width: 160, height: 24, borderRadius: 'var(--radius-chip)' }} />
+          ) : (
+            <h2 className="tm-text-heading">채팅방</h2>
+          )}
+          {model.context.title ? (
+            <div className="tm-chat-room-head-sub">
+              <span className="tm-chat-room-head-chip">{model.context.typeLabel}</span>
+              {model.context.linkLabel ? (
+                <Link className="tm-chat-room-head-link" href={model.context.href}>
+                  {model.context.linkLabel}
+                  <ChevronRightIcon size={14} strokeWidth={2.2} />
+                </Link>
+              ) : null}
+            </div>
+          ) : null}
+        </div>
         {roomMenuButton ? <div className="ml-auto">{roomMenuButton}</div> : null}
       </div>
       <div className="tm-chat-room">
-        <div className="tm-chat-context">
+        {model.teamContact || model.context.title ? (
+        <div className={`tm-chat-context${model.teamContact ? '' : ' tm-hide-desktop'}`}>
           {model.teamContact ? (
             <TeamContactStatusCard contact={model.teamContact} />
           ) : model.context.title ? (
@@ -224,8 +245,9 @@ export function ChatRoomPageView({ model, listModel, roomId }: { model: ChatRoom
               </div>
               <ChevronRightIcon size={18} stroke="var(--text-caption)" />
             </Link>
-          ) : null /* 방을 불러오기 전엔 연결 카드를 그리지 않는다 */}
+          ) : null}
         </div>
+        ) : null /* 방을 불러오기 전엔 연결 카드 칸을 만들지 않는다 */}
         <div
           ref={threadRef}
           className={`tm-chat-thread${model.messages.length === 0 ? ' tm-list-empty' : ''}`}
@@ -330,6 +352,9 @@ export function ChatRoomPageView({ model, listModel, roomId }: { model: ChatRoom
         {model.sendingFile ? <div className="tm-text-caption" role="status" style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '4px 16px' }}>파일을 보내는 중이에요…</div> : null}
         {model.imageNotice ? <div className="tm-text-caption" role="status" style={{ textAlign: 'center', color: 'var(--orange700)', padding: '4px 16px' }}>{model.imageNotice}</div> : null}
         {/* [P2 마이크로인터랙션] justSent: Send → Check 아이콘 + tm-complete-check 애니메이션 (0.4s) */}
+        {model.readOnlyNotice ? (
+          <p className="tm-chat-readonly-notice tm-text-label" role="note">{model.readOnlyNotice}</p>
+        ) : (
         <div className={`tm-chat-inputbar${plusOpen ? ' is-panel-open' : ''}`}>
           {/* + ↔ × — 카카오톡처럼 입력창 아래 패널을 여닫는다. */}
           <button
@@ -380,7 +405,8 @@ export function ChatRoomPageView({ model, listModel, roomId }: { model: ChatRoom
             )}
           </button>
         </div>
-        {plusOpen && model.onPickImages ? (
+        )}
+        {plusOpen && !model.readOnlyNotice && model.onPickImages ? (
           <ChatPlusPanel
             id={plusPanelId}
             disabled={Boolean(model.sendingImages || model.sendingFile)}

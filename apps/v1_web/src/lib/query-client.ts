@@ -1,4 +1,5 @@
 import { QueryClient } from '@tanstack/react-query';
+import { isTransientFailure } from './api-client';
 
 export function createV1QueryClient(): QueryClient {
   return new QueryClient({
@@ -6,7 +7,8 @@ export function createV1QueryClient(): QueryClient {
       queries: {
         staleTime: 60_000,
         gcTime: 10 * 60_000,
-        retry: 1,
+        // 4xx 는 다시 보내도 같은 답이라 재시도하지 않는다. 서버 오류·네트워크 단절만 한 번 더.
+        retry: (failureCount, error) => failureCount < 1 && isTransientFailure(error),
         refetchOnWindowFocus: false,
       },
       mutations: {

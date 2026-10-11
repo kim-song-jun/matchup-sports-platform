@@ -125,7 +125,11 @@ export function TeamListPageClient({ seed }: { readonly seed?: CursorListSeed<V1
   // 얻지 못하는 요청 44회 자체다(서버 부하·모바일 데이터·배터리).
   const visibleTeams = visibleItems.map((item) => toTeam(item));
 
-  if (query.isError) return <TeamStatePageView model={getTeamStateViewModel('error')} />;
+  // 이미 받은 페이지가 있으면(다음 페이지·배경 재검증 실패) 목록을 지우지 않는다 — 첫 페이지 실패만 전체 에러 화면이다.
+  const hasPages = query.data !== undefined;
+  // 배경 재검증 실패와 다음 페이지 실패를 가른다 — 버튼은 fetchNextPage 만 다시 부르기 때문이다.
+  const loadMoreError = query.isFetchNextPageError;
+  if (query.isError && !hasPages) return <TeamStatePageView model={getTeamStateViewModel('error')} />;
   const firstPage = query.data?.pages[0];
   const total = firstPage?.pageInfo?.total ?? visibleItems.length;
   // isLoading 은 서버·하이드레이션 첫 렌더(persist 복원 중)에 false 라 데이터 없음(isPending)으로 판정한다.
@@ -158,6 +162,9 @@ export function TeamListPageClient({ seed }: { readonly seed?: CursorListSeed<V1
     listLoading: isListLoading,
     hasNextPage: query.hasNextPage,
     isFetchingNextPage: query.isFetchingNextPage,
+    // seed(placeholder)가 떠 있는 동안에는 첫 페이지 검증이 끝나기 전이라 낡은 커서를 따라가지 않게 잠근다.
+    loadMoreLocked: query.isPlaceholderData,
+    loadMoreError,
     onLoadMore: () => void query.fetchNextPage(),
     summary: {
       ...base.summary,

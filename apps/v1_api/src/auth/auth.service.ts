@@ -727,9 +727,6 @@ export class AuthService {
         onboardingStatus: true,
         createdAt: true,
         updatedAt: true,
-        onboardingProgress: {
-          select: { draftJson: true },
-        },
         authIdentities: {
           where: { provider: { in: SOCIAL_AUTH_PROVIDERS }, status: 'active' },
           select: { id: true },
@@ -787,8 +784,13 @@ export class AuthService {
         where: { isRequired: true, status: 'published' },
         select: { id: true },
       });
+      // Read inside the transaction: a concurrent login may have merged a provider seed since the outer read.
+      const progress = await transaction.v1UserOnboardingProgress.findUnique({
+        where: { userId },
+        select: { draftJson: true },
+      });
       const draft = {
-        ...draftObject(user.onboardingProgress?.draftJson),
+        ...draftObject(progress?.draftJson),
         ageConfirmedAt: new Date().toISOString(),
       };
       await transaction.v1UserOnboardingProgress.upsert({

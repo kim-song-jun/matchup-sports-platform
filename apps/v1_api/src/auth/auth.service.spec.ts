@@ -729,6 +729,30 @@ describe('AuthService', () => {
     });
   });
 
+  it('completeSocialTerms: merges the onboarding draft read inside the transaction, keeping a concurrently merged seed', async () => {
+    const activeTime = new Date();
+    prisma.v1User.findUnique
+      .mockResolvedValueOnce(pendingSocialUserRow({
+        createdAt: activeTime,
+        updatedAt: activeTime,
+        onboardingProgress: { draftJson: { kakaoName: '홍길동' } },
+      }))
+      .mockResolvedValueOnce(completedUserRow({ onboardingStatus: 'social_profile_required', onboardingProgress: { currentStep: 'signup' }, termsConsents: [], createdAt: activeTime, updatedAt: activeTime }));
+    prisma.v1TermsDocument.findMany.mockResolvedValue([]);
+    prisma.v1UserOnboardingProgress.findUnique.mockResolvedValue({
+      draftJson: { kakaoName: '홍길동', kakaoNickname: '새닉네임' },
+    });
+
+    await service.completeSocialTerms('user-1', { requiredTermsAccepted: true, ageConfirmed: true });
+
+    const draft = { kakaoName: '홍길동', kakaoNickname: '새닉네임', ageConfirmedAt: expect.any(String) };
+    expect(prisma.v1UserOnboardingProgress.upsert).toHaveBeenCalledWith({
+      where: { userId: 'user-1' },
+      update: { currentStep: 'signup', draftJson: draft },
+      create: { userId: 'user-1', currentStep: 'signup', draftJson: draft },
+    });
+  });
+
   describe('signup record consent', () => {
     function arrangeRegister() {
       prisma.v1User.findUnique
@@ -980,10 +1004,10 @@ describe('AuthService', () => {
       const now = new Date();
       prisma.v1User.findUnique.mockResolvedValueOnce(pendingSocialUserRow({
         onboardingStatus: 'social_terms_required',
-        onboardingProgress: { draftJson: { kakaoNickname: '카카오닉' } },
         createdAt: now,
         updatedAt: now,
       })).mockResolvedValue(completedUserRow({ onboardingStatus: 'social_profile_required' }));
+      prisma.v1UserOnboardingProgress.findUnique.mockResolvedValue({ draftJson: { kakaoNickname: '카카오닉' } });
       prisma.v1TermsDocument.findMany.mockResolvedValue([]);
 
       await service.completeSocialTerms('user-1', {

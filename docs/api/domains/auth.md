@@ -25,7 +25,7 @@
 | `POST` | `/api/v1/auth/social-link/preview` | user (pending social: `social_profile_required` without a profile, or `social_profile_deferred`) | `{ phone, proofToken }` | `{ maskedEmail, providers, hasPassword, linkingProvider }` — same checks and error codes as `social-link`, but consumes nothing and writes nothing |
 | `POST` | `/api/v1/auth/social-link` | user (pending social: `social_profile_required` without a profile, or `social_profile_deferred`) | `{ phone, proofToken }` | session of the phone's existing account (`session.userId` = holder) + `next?` |
 | `GET` | `/api/v1/auth/check-email` | none | `?email=` | `{ available: boolean }` |
-| `GET` | `/api/v1/auth/check-nickname` | none | `?nickname=` | `{ available: boolean }` |
+| `GET` | `/api/v1/auth/check-nickname` | optional | `?nickname=` | `{ available: boolean }` |
 | `GET` | `/api/v1/terms/current?context=signup\|tournament_application\|footer` | optional user | active context | effective current documents; signup adds per-user compliance |
 | `POST` | `/api/v1/terms/consents` | user | `{ documentIds: uuid[] }` | append-only acceptance result + compliance |
 | `GET` | `/api/v1/onboarding` | user | headers only | onboarding resume summary |
@@ -65,11 +65,12 @@ to obtain a session for them. In production, `V1AuthGuard` rejects header identi
 this route grants nothing beyond what any other guarded route already grants a caller with a valid
 session cookie.
 
-`GET /api/v1/auth/check-email` and `GET /api/v1/auth/check-nickname` are unauthenticated
-availability probes (`{ available: boolean }`) used by signup forms; both are rate-limited
+`GET /api/v1/auth/check-email` and `GET /api/v1/auth/check-nickname` are availability probes (check-nickname: optional auth, see below) (`{ available: boolean }`) used by signup forms; both are rate-limited
 (30/min). A missing or empty `email`/`nickname` query is rejected by the query DTO before the
 service runs. Nickname must be at least 2 trimmed characters; email must normalize to at least 3
 characters. Every rejection is `400 VALIDATION_ERROR`.
+
+`check-nickname` uses `OptionalV1AuthGuard`: an anonymous caller gets the strict answer, an authenticated caller's own current nickname is reported `available: true`, and profiles of deleted accounts are ignored (the same rule as register, defer and complete).
 
 ## Account Recovery (Pre-session)
 
@@ -196,7 +197,7 @@ Kakao signup starts with `POST /api/v1/auth/kakao` because the provider user key
 
 When `POST /api/v1/auth/social-terms` succeeds, the API does not create a profile. It sets `onboardingStatus = social_profile_required`, sets `currentStep = signup`, and returns `next.route = /signup/social`. The client must navigate to the returned route. The body must carry `ageConfirmed: true` (the "만 14세 이상이에요" checkbox); a missing or `false` value is `400`, and the confirmation time is stored as `draftJson.ageConfirmedAt`.
 
-`POST /api/v1/auth/social-profile/defer` (only from `social_profile_required`; `social_terms_required` is `400 TERMS_REQUIRED`, any other state `400 VALIDATION_ERROR`, an account older than 24h `401 SOCIAL_SIGNUP_EXPIRED`) creates a profile with an automatic nickname and sets `onboardingStatus = social_profile_deferred`. The nickname is the Kakao nickname (Apple: the first-authorization name), normalized to at most 20 characters; if taken it gets a 2-4 digit suffix, and if there is no seed or every attempt collides it becomes `팀밋사용자NNNN`. `real_name`, `gender` and `birth_date` stay null. The response has no `next.route`.
+`POST /api/v1/auth/social-profile/defer` (only from `social_profile_required`; `social_terms_required` is `400 TERMS_REQUIRED`, any other state `400 VALIDATION_ERROR`, an account older than 24h `401 SOCIAL_SIGNUP_EXPIRED`) creates a profile with an automatic nickname and sets `onboardingStatus = social_profile_deferred`. The nickname is the Kakao nickname (Apple: the first-authorization name), normalized to at most 20 characters; if taken it gets a 2-4 digit numeric suffix (the base is truncated by code points so the total stays within 20). With no usable seed, or when the suffixed attempts all collide, it falls back to `팀밋사용자` + 6 digits. Every returned nickname was checked against existing profiles (deleted accounts ignored) within a bounded number of attempts; when those are exhausted the call fails with `409 NICKNAME_GENERATION_FAILED` and no profile is created. `real_name`, `gender` and `birth_date` stay null. The response has no `next.route`.
 
 `social_profile_deferred` is not a pending-signup state: reads and the profile-form endpoints work, the 24h expiry does not apply, and `PATCH /onboarding/preferences`, `/onboarding/defer` and `/onboarding/complete` save their data but never change the status. Writes outside the phone-verification allow-list return `403 ACTIVITY_PROFILE_REQUIRED` with `details.next.route = /signup/social`. Finishing `POST /auth/social-profile` from this state keeps the existing nickname valid and sets `onboardingStatus = deferred` (sport onboarding was skipped), which opens the gate.
 

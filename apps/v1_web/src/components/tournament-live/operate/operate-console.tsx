@@ -426,7 +426,10 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
     () => deriveOnPitchParticipantIds(allParticipants, ops.liveEvents),
     [allParticipants, ops.liveEvents],
   );
-  const sentOffParticipantIds = useMemo(() => deriveSentOffParticipantIds(ops.liveEvents), [ops.liveEvents]);
+  const sentOffParticipantIds = useMemo(
+    () => deriveSentOffParticipantIds(ops.liveEvents, ops.queue.items),
+    [ops.liveEvents, ops.queue.items],
+  );
   const substitutionUsedBySideId = useMemo(() => {
     const bySide: Record<string, number> = {};
     for (const side of gameDetail.data?.sides ?? []) {

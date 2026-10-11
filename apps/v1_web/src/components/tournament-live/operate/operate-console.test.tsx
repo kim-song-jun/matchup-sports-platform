@@ -490,6 +490,34 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
     expect(within(screen.getByRole('dialog')).getByTestId('sent-off-ids')).toHaveTextContent(/^p-1$/);
   });
 
+  it('서버 확정 전(대기 중)인 레드카드 선수도 선수 목록에 퇴장으로 넘긴다', () => {
+    gameWithPeriods('LIVE', [
+      { number: 1, state: 'LIVE', startedAt: '2026-08-07T00:00:00.000Z', endedAt: null },
+      { number: 2, state: 'SCHEDULED', startedAt: null, endedAt: null },
+    ]);
+    const queuedRed = (clientEventId: string, participantId: string, status: 'queued' | 'failed') => ({
+      clientEventId,
+      gameId: 'game-1',
+      expectedVersion: 1,
+      event: { type: 'CARD', participantId, period: 1, clockMs: 0, occurredAt: '', payload: { card: 'RED' } },
+      payloadHash: 'h',
+      status,
+      queuedAt: '',
+      attempts: 0,
+      lastError: null,
+      ackedSequence: null,
+      ackedVersion: null,
+    });
+    mocks.useV1GameOperationsConsole.mockReturnValue(
+      consoleState({ queue: { items: [queuedRed('c-1', 'p-1', 'queued'), queuedRed('c-2', 'p-2', 'failed')] } }),
+    );
+    render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+
+    fireEvent.click(screen.getByRole('button', { name: /^골/ }));
+
+    expect(within(screen.getByRole('dialog')).getByTestId('sent-off-ids')).toHaveTextContent(/^p-1$/);
+  });
+
   it('골 확인 모달에서 취소하면 아무것도 기록되지 않는다', async () => {
     gameWithPeriods('LIVE', [
       { number: 1, state: 'LIVE', startedAt: '2026-08-07T00:00:00.000Z', endedAt: null },

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { countActiveSubstitutions, deriveOnPitchParticipantIds, deriveSentOffParticipantIds } from './on-pitch-state';
+import type { QueuedGameEvent } from '@/lib/game-operations-queue';
 import type { GameEventRecord, GameLineupParticipant } from '@/types/game-operations';
 
 function participant(id: string, sideId: string, started: boolean): GameLineupParticipant {
@@ -132,5 +133,35 @@ describe('deriveSentOffParticipantIds', () => {
       cardEvent('e3', 'p1', 'YELLOW', { type: 'CORRECTION', reversesEventId: 'e1', payload: {} }),
     ];
     expect(deriveSentOffParticipantIds(events)).toEqual(new Set(['p2']));
+  });
+
+  const queuedCard = (
+    clientEventId: string,
+    participantId: string,
+    card: 'RED' | 'YELLOW',
+    status: QueuedGameEvent['status'],
+  ): QueuedGameEvent => ({
+    clientEventId,
+    gameId: 'game-1',
+    expectedVersion: 1,
+    event: { type: 'CARD', participantId, period: 1, clockMs: 0, occurredAt: '', payload: { card } },
+    payloadHash: 'h',
+    status,
+    queuedAt: '',
+    attempts: 0,
+    lastError: null,
+    ackedSequence: null,
+    ackedVersion: null,
+  });
+
+  it('adds red cards still waiting for the server (queued/sending) but not failed, acked or yellow ones', () => {
+    const queued = [
+      queuedCard('c1', 'p1', 'RED', 'queued'),
+      queuedCard('c2', 'p2', 'RED', 'sending'),
+      queuedCard('c3', 'p3', 'RED', 'failed'),
+      queuedCard('c4', 'p4', 'RED', 'acked'),
+      queuedCard('c5', 'p5', 'YELLOW', 'queued'),
+    ];
+    expect(deriveSentOffParticipantIds([cardEvent('e1', 'p6', 'RED')], queued)).toEqual(new Set(['p1', 'p2', 'p6']));
   });
 });

@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { BracketQuickResultForm } from './bracket-quick-result-form';
 
@@ -105,5 +105,80 @@ describe('BracketQuickResultForm — 상태', () => {
     renderForm({ onCancel });
     fireEvent.click(screen.getByRole('button', { name: '취소' }));
     expect(onCancel).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('BracketQuickResultForm — 점수 입력칸', () => {
+  it('숫자가 아닌 글자와 음수 부호는 입력되지 않고, 점수는 세 자리까지만 받는다', () => {
+    renderForm();
+    type('서울FC 점수', 'a');
+    expect(screen.getByLabelText('서울FC 점수')).toHaveValue('');
+    type('서울FC 점수', '-1');
+    expect(screen.getByLabelText('서울FC 점수')).toHaveValue('1');
+    type('부산FC 점수', '1234');
+    expect(screen.getByLabelText('부산FC 점수')).toHaveValue('123');
+  });
+
+  it('승부차기 입력칸에도 같은 제한이 걸린다', () => {
+    renderForm();
+    type('서울FC 점수', '1');
+    type('부산FC 점수', '1');
+    type('서울FC 승부차기', '4x');
+    expect(screen.getByLabelText('서울FC 승부차기')).toHaveValue('4');
+  });
+});
+
+describe('BracketQuickResultForm — 확정 전 확인 창', () => {
+  const confirmDialog = () => within(screen.getByRole('dialog'));
+
+  it('확인 창을 켜면 누른 직후엔 보내지 않고, 창의 확정 버튼을 눌러야 보낸다', () => {
+    const props = renderForm({ confirmBeforeSubmit: true });
+    type('서울FC 점수', '3');
+    type('부산FC 점수', '1');
+    submit();
+    expect(props.onSubmit).not.toHaveBeenCalled();
+    expect(screen.getByRole('dialog')).toHaveTextContent('서울FC 3:1 부산FC');
+    fireEvent.click(confirmDialog().getByRole('button', { name: '점수 확정' }));
+    expect(props.onSubmit).toHaveBeenCalledWith({ home: 3, away: 1 });
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('확인 창에서 취소하면 보내지 않고 입력을 그대로 둔다', () => {
+    const props = renderForm({ confirmBeforeSubmit: true });
+    type('서울FC 점수', '3');
+    type('부산FC 점수', '1');
+    submit();
+    fireEvent.click(confirmDialog().getByRole('button', { name: '취소' }));
+    expect(props.onSubmit).not.toHaveBeenCalled();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('서울FC 점수')).toHaveValue('3');
+  });
+
+  it('검증에 걸리는 점수는 확인 창도 열지 않는다', () => {
+    const props = renderForm({ confirmBeforeSubmit: true });
+    type('서울FC 점수', '3');
+    submit();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(props.onSubmit).not.toHaveBeenCalled();
+  });
+
+  it('결선 무승부는 승부차기까지 확인 창에 보여 준다', () => {
+    renderForm({ confirmBeforeSubmit: true });
+    type('서울FC 점수', '2');
+    type('부산FC 점수', '2');
+    type('서울FC 승부차기', '5');
+    type('부산FC 승부차기', '4');
+    submit();
+    expect(screen.getByRole('dialog')).toHaveTextContent('2:2');
+    expect(screen.getByRole('dialog')).toHaveTextContent('5');
+  });
+
+  it('확인 창을 켜지 않은 폼(정정 입력 등)은 곧바로 보낸다', () => {
+    const props = renderForm();
+    type('서울FC 점수', '3');
+    type('부산FC 점수', '1');
+    submit();
+    expect(props.onSubmit).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 });

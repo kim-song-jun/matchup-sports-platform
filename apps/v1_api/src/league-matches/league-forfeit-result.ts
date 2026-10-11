@@ -13,7 +13,7 @@ export function isForfeitedGame(
   return revision ? resolveIsForfeit(revision) : false;
 }
 
-/** Prisma predicate equivalent to `isForfeitedGame` for a `game` relation filter (matches rows with no game). */
+/** Negation of `isForfeitedGame` as a `game` relation filter: keeps non-forfeited games and rows with no game. */
 export const NOT_FORFEITED_GAME_WHERE = {
   isNot: {
     currentOfficialRevision: {

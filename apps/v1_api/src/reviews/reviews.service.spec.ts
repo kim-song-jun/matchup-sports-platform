@@ -1462,6 +1462,75 @@ describe('ReviewsService', () => {
     });
   });
 
+  // MD-QA #107: 리그 경기가 "팀매치"로 보이고, 몰수패 경기의 (오지 않은) 선수들까지 리뷰 대상으로 떴다.
+  describe('리그 경기 표기와 몰수 경기 제외', () => {
+    const opponent = 'away-player-a';
+    const forfeitGame = (outcomeReason: string, reason: string | null = null) => ({
+      currentOfficialRevision: { state: 'OFFICIAL', reason, outcomeReason },
+    });
+
+    it('pending: 리그 소속 경기는 isLeague=true, 일반 팀매치는 false 로 낸다', async () => {
+      const leagueWorld = teamMatchWorld([{ userId: leaderId, teamId: hostTeamId, role: 'owner' }]);
+      Object.assign(leagueWorld.teamMatchRow, { leagueId: 'league-1', tournamentId: 'tournament-1' });
+      const plainWorld = teamMatchWorld([{ userId: leaderId, teamId: hostTeamId, role: 'owner' }]);
+      Object.assign(plainWorld.teamMatchRow, { leagueId: null, tournamentId: null });
+
+      const [league] = await makeService(leagueWorld.prisma)['pendingTeamReviews'](authUser(leaderId), 20);
+      const [plain] = await makeService(plainWorld.prisma)['pendingTeamReviews'](authUser(leaderId), 20);
+
+      expect(league).toMatchObject({ sourceType: 'team_match', isLeague: true });
+      expect(plain).toMatchObject({ sourceType: 'team_match', isLeague: false });
+    });
+
+    it('pending: 몰수 경기는 take 로 자르기 전에 DB 조건으로 거른다(최신 몰수가 limit 을 채우지 않도록)', async () => {
+      const { prisma } = teamMatchWorld([{ userId: leaderId, teamId: hostTeamId, role: 'owner' }], [], [opponent]);
+      const findMany = prisma.v1TeamMatch.findMany as jest.Mock;
+
+      await makeService(prisma)['pendingTeamReviews'](authUser(leaderId), 20);
+
+      const where = findMany.mock.calls[0][0].where as { AND: Array<Record<string, unknown>> };
+      expect(where.AND).toContainEqual({
+        game: { isNot: { currentOfficialRevision: { is: { OR: [{ outcomeReason: 'FORFEIT' }, { reason: { contains: '[LEAGUE_FORFEIT]' } }] } } } },
+      });
+      expect(findMany.mock.calls[0][0].take).toBe(20);
+    });
+
+    it.each([
+      ['outcomeReason=FORFEIT', forfeitGame('FORFEIT')],
+      ['옛 몰수 마커 사유', forfeitGame('NORMAL', '[LEAGUE_FORFEIT] 상대 불참')],
+    ])('source·submit: 몰수 경기(%s)는 SOURCE_FORFEITED 로 막고, 정상·중단 경기는 열린다', async (_label, game) => {
+      const forfeited = teamMatchWorld([{ userId: leaderId, teamId: hostTeamId, role: 'owner' }], [], [opponent]);
+      Object.assign(forfeited.teamMatchRow, { game });
+      const service = makeService(forfeited.prisma);
+
+      await expect(service.source(authUser(leaderId), { sourceType: 'team_match', sourceId: teamSourceId }))
+        .rejects.toMatchObject({ response: { code: 'SOURCE_FORFEITED' } });
+      await expect(service.submit(authUser(leaderId), teamReviewDto(4)))
+        .rejects.toMatchObject({ response: { code: 'SOURCE_FORFEITED' } });
+      expect(forfeited.createMock).not.toHaveBeenCalled();
+
+      for (const open of [forfeitGame('NORMAL'), forfeitGame('ABANDONED')]) {
+        const world = teamMatchWorld([{ userId: leaderId, teamId: hostTeamId, role: 'owner' }], [], [opponent]);
+        Object.assign(world.teamMatchRow, { game: open });
+        const source = await makeService(world.prisma).source(authUser(leaderId), { sourceType: 'team_match', sourceId: teamSourceId });
+        expect(source.targets.length).toBeGreaterThan(0);
+      }
+    });
+
+    it('source·written: 리그 경기 요약에 isLeague 가 실린다', async () => {
+      const { prisma, teamMatchRow } = teamMatchWorld([{ userId: leaderId, teamId: hostTeamId, role: 'owner' }]);
+      Object.assign(teamMatchRow, { leagueId: 'league-1' });
+
+      const source = await makeService(prisma).source(authUser(leaderId), { sourceType: 'team_match', sourceId: teamSourceId });
+      const summaries = await makeService(prisma)['reviewSourceSummaries']([
+        { sourceType: 'team_match', sourceId: teamSourceId },
+      ] as never);
+
+      expect(source.source).toMatchObject({ isLeague: true });
+      expect(summaries.get(`team_match:${teamSourceId}`)).toMatchObject({ isLeague: true });
+    });
+  });
+
   // 일반 팀원이 팀 매치에서 쓰는 후기는 "상대했던 선수"다. 근거는 그 경기 라인업에 실린
   // 연동 팀원(V1GameParticipant.userId)뿐이며, 게스트·미제출 라인업은 대상이 되지 않는다.
   describe('팀 매치 상대 선수 후기 — 역할 무관', () => {
@@ -2260,7 +2329,7 @@ function teamMatchWorld(
     })),
   };
 
-  return { prisma, createMock, reviewRows, teamTrustUpsert, userReputationUpsert };
+  return { prisma, createMock, reviewRows, teamTrustUpsert, userReputationUpsert, teamMatchRow: teamMatchRow as Record<string, unknown> };
 }
 
 async function runTeamTrust(candidates: FakeRow[], reverseReviews: FakeRow[]) {

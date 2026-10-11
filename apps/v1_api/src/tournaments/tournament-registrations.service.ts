@@ -204,33 +204,43 @@ export class TournamentRegistrationsService {
     let registration: V1TournamentRegistration;
     try {
       registration = existing
-        ? await this.prisma.v1TournamentRegistration.update({
-            where: { id: existing.id },
-            data: {
-              status: 'draft',
-              appliedByUserId: user.id,
-              depositorName: null,
-              agreedRules: false,
-              agreedPrivacy: false,
-              agreedRefund: false,
-              agreedMediaConsent: false,
-              cancelRequestedAt: null,
-              cancelPreviousStatus: null,
-              cancelReason: null,
-              // 감사 finding(reg-confirm-reapply-state-machine #2/#3): 이전 사이클(확정→잠금→취소)의
-              // 흔적을 되살아난 draft가 그대로 물려받아 (a) 새 신청인데 명단이 잠긴 채 시작하고
-              // (b) 임시저장 상태인데 확정일이 함께 표시됐다. 취소 후 재신청은 완전히 새로운
-              // 사이클이므로 이전 확정·잠금·마감예외 상태를 전부 초기화한다.
-              rosterLockedAt: null,
-              rosterDeadlineOverrideAt: null,
-              confirmedAt: null,
-              confirmedByAdminUserId: null,
-              // 같은 행을 재사용하므로 이전 경로(운영자 추가·자동 확정)의 출처·시각이 남으면
-              // 어드민 신청 관리가 새 신청을 옛 시각의 "자동 확정"으로 보여 주고 직접 신청 수에서도 빠진다.
-              entrySource: 'applied',
-              rosterAutoConfirmedAt: null,
-              createdAt: new Date(),
-            },
+        ? await this.prisma.$transaction(async (tx) => {
+            // 자동 확정이 만든 명단은 팀이 검토한 적 없는 것이다. 출처 표시만 지우면 그 명단이
+            // '팀이 낸 명단'으로 둔갑하고 자동 채움도 이미 행이 있어 다시 돌지 않으므로 같이 비운다.
+            if (existing.rosterAutoConfirmedAt !== null) {
+              await tx.v1TournamentPlayer.updateMany({
+                where: { registrationId: existing.id, removedAt: null },
+                data: { removedAt: new Date() },
+              });
+            }
+            return tx.v1TournamentRegistration.update({
+              where: { id: existing.id },
+              data: {
+                status: 'draft',
+                appliedByUserId: user.id,
+                depositorName: null,
+                agreedRules: false,
+                agreedPrivacy: false,
+                agreedRefund: false,
+                agreedMediaConsent: false,
+                cancelRequestedAt: null,
+                cancelPreviousStatus: null,
+                cancelReason: null,
+                // 감사 finding(reg-confirm-reapply-state-machine #2/#3): 이전 사이클(확정→잠금→취소)의
+                // 흔적을 되살아난 draft가 그대로 물려받아 (a) 새 신청인데 명단이 잠긴 채 시작하고
+                // (b) 임시저장 상태인데 확정일이 함께 표시됐다. 취소 후 재신청은 완전히 새로운
+                // 사이클이므로 이전 확정·잠금·마감예외 상태를 전부 초기화한다.
+                rosterLockedAt: null,
+                rosterDeadlineOverrideAt: null,
+                confirmedAt: null,
+                confirmedByAdminUserId: null,
+                // 같은 행을 재사용하므로 이전 경로(운영자 추가·자동 확정)의 출처·시각이 남으면
+                // 어드민 신청 관리가 새 신청을 옛 시각의 "자동 확정"으로 보여 주고 직접 신청 수에서도 빠진다.
+                entrySource: 'applied',
+                rosterAutoConfirmedAt: null,
+                createdAt: new Date(),
+              },
+            });
           })
         : await this.prisma.v1TournamentRegistration.create({
             data: { tournamentId, teamId: dto.teamId, appliedByUserId: user.id, status: 'draft' },

@@ -20,7 +20,7 @@ describe('GameRosterPlayerRow', () => {
 
   it('출전정지는 남은 경기 수와 자동 표기 — 서버의 설명 문장은 배지에 넣지 않는다', () => {
     render(
-      <GameRosterPlayerRow {...base} status="SUSPENDED" reason="퇴장 1회으로 2경기 출전정지예요." remainingMatches={2} />,
+      <GameRosterPlayerRow {...base} status="SUSPENDED" reason="퇴장 1회로 2경기 출전정지예요." remainingMatches={2} />,
     );
     expect(screen.getByText('출전정지 2경기')).toBeInTheDocument();
     expect(screen.getByText('자동 처리')).toBeInTheDocument();

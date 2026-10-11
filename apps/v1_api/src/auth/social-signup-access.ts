@@ -38,6 +38,8 @@ export function isPendingSocialSignupRequestAllowed(
     // (옥토모 카카오 hard-block) + 최종 제출. 이 셋을 막으면 소셜 가입이 원천 봉쇄된다.
     return (
       pathname.endsWith('/auth/social-profile') ||
+      pathname.endsWith('/auth/social-link') ||
+      pathname.endsWith('/auth/social-link/preview') ||
       pathname.endsWith('/auth/check-nickname') ||
       pathname.endsWith('/verification/phone/request') ||
       pathname.endsWith('/verification/phone/confirm')

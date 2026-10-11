@@ -69,6 +69,8 @@ export type NotificationEventType =
   | 'team_contact_accepted'
   | 'team_contact_declined'
   | 'inquiry_answered'
+  // 소셜 로그인이 휴대폰 주인의 기존 계정에 연결됐을 때 그 계정에게(MD-QA #126). 보안 알림이라 importantEnabled.
+  | 'social_identity_linked'
   // H3: 팀장·어드민이 팀을 보관(해체)하면 팀원 전원과 가입 신청자에게 한 번 알린다. 도착지는 해체된 팀 페이지.
   | 'team_dissolved'
   // Task 12, reminders lane: fired by the durable worker (jobs/schedule-reminders/schedule-reminder.service.ts)
@@ -226,7 +228,7 @@ export function renderNotificationCopy(template: string, vars: NotificationCopyV
 function preferenceFieldForEvent(type: NotificationEventType): NotificationPrefField {
   // 사용자가 직접 접수한 1:1 문의의 답변은 놓치면 안 되는 알림이므로
   // 활동 알림(activityEnabled)이 아니라 중요 알림(importantEnabled)으로 게이트한다.
-  if (type === 'inquiry_answered') {
+  if (type === 'inquiry_answered' || type === 'social_identity_linked') {
     return 'importantEnabled';
   }
   if (type === 'team_dissolved') {
@@ -321,6 +323,9 @@ function preferenceFieldForEvent(type: NotificationEventType): NotificationPrefF
 function targetTypeForEvent(type: NotificationEventType): V1NotificationTargetType {
   if (type === 'inquiry_answered') {
     return 'inquiry';
+  }
+  if (type === 'social_identity_linked') {
+    return 'system';
   }
   if (type === 'team_dissolved') {
     return 'team';
@@ -463,6 +468,9 @@ function deepLinkForEvent(
   }
   if (type === 'team_invitation_declined' && targetId) {
     return `/teams/${targetId}/members?tab=invitations`;
+  }
+  if (type === 'social_identity_linked') {
+    return '/my/settings';
   }
   // 새 팀장·나간 멤버 알림은 멤버 관리(멤버 탭)로 — 나머지 역할 알림은 기본 팀 상세로 간다.
   if ((type === 'team_owner_received' || type === 'team_member_left') && targetId) {
@@ -617,6 +625,7 @@ const EVENT_TITLES: Record<NotificationEventType, string> = {
   team_schedule_created: '새 일정이 올라왔어요',
   team_schedule_cancelled: '일정이 취소됐어요',
   inquiry_answered: '문의에 답변이 등록됐어요',
+  social_identity_linked: '로그인 수단이 연결됐어요',
   team_dissolved: '팀이 해체됐어요',
   schedule_rsvp_deadline_reminder: '참석 여부를 알려주세요',
   schedule_guest_recruitment_close_reminder: '용병 모집이 곧 마감돼요',
@@ -705,6 +714,7 @@ const EVENT_BODIES: Record<NotificationEventType, string> = {
   // 취소 사유는 팀장·매니저가 적은 문장 그대로다.
   team_schedule_cancelled: '"{team}" · {title}({when}) · {reason}',
   inquiry_answered: '답변 내용을 확인해 주세요.',
+  social_identity_linked: '{name} 로그인이 연결됐어요. 본인이 아니라면 고객센터로 문의해 주세요.',
   team_dissolved: '지난 기록은 그대로 남아요.',
   schedule_rsvp_deadline_reminder: 'RSVP 마감 전에 참석 여부를 남겨주세요.',
   schedule_guest_recruitment_close_reminder: '모집 마감 전에 신청 현황을 확인해 주세요.',

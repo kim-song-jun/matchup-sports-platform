@@ -8,6 +8,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Card, DatePickerTextInput } from '@/components/v1-ui/primitives';
 import { Button } from '@/components/v1-ui/button';
 import { PhoneConflictNotice } from '@/components/auth/otp/phone-conflict-notice';
+import { SocialLinkPrompt, SocialLinkVerify } from '@/components/auth/social-link-flow';
 import { PhoneVerificationCard } from '@/components/auth/phone-verification/phone-verification-card';
 import { useV1AuthMe, useV1CheckNickname, useV1CompleteSocialProfile } from '@/hooks/use-v1-api';
 import { useSocialSignupExit } from './use-social-signup-exit';
@@ -59,19 +60,38 @@ export function SocialSignupClient() {
   const [error, setError] = useState<string | null>(null);
   const exitFlow = useSocialSignupExit();
   const [phoneConflict, setPhoneConflict] = useState(false);
-  const phoneConflictNotice = (
+  // 충돌한 번호의 소유 증명을 시작한 상태 — 이때부터 가입 인증 카드 대신 연결용 인증 카드를 보여 준다.
+  const [linking, setLinking] = useState(false);
+  // 카카오가 동의항목 승인 하에 내려준 값(이름·번호·성별)을 자동으로 채운다.
+  // 동의항목이 없으면 socialSignupPrefill 이 null 이라 아무것도 하지 않고 직접 입력 흐름 그대로다.
+  const authMe = useV1AuthMe();
+  const prefill = authMe.data?.socialSignupPrefill ?? null;
+  const providerLabel = socialProviderLabel(authMe.data?.user?.authProvider);
+  const authProvider = authMe.data?.user?.authProvider;
+  // 서버가 연결을 허용하는 신원은 카카오·Apple 뿐이다 — 그 밖에는 기존의 로그인/계정 찾기 안내만 준다.
+  const canLink = authProvider === 'kakao' || authProvider === 'apple';
+  const chooseOtherNumber = () => {
+    setPhoneDigits('');
+    setPhoneVerified(false);
+    setPhoneConflict(false);
+    setLinking(false);
+  };
+  const phoneConflictNotice = canLink ? (
+    <SocialLinkPrompt
+      providerLabel={providerLabel ?? '소셜'}
+      onStart={() => {
+        setPhoneConflict(false);
+        setLinking(true);
+      }}
+      onChooseOtherNumber={chooseOtherNumber}
+    />
+  ) : (
     <PhoneConflictNotice
       pending={exitFlow.pending}
       onLogin={() => void exitFlow.leaveTo('/login')}
       onFindAccount={() => void exitFlow.leaveTo('/auth/find-account')}
     />
   );
-
-  // 카카오가 동의항목 승인 하에 내려준 값(이름·번호·성별)을 자동으로 채운다.
-  // 동의항목이 없으면 socialSignupPrefill 이 null 이라 아무것도 하지 않고 직접 입력 흐름 그대로다.
-  const authMe = useV1AuthMe();
-  const prefill = authMe.data?.socialSignupPrefill ?? null;
-  const providerLabel = socialProviderLabel(authMe.data?.user?.authProvider);
   // 카카오가 확인해 준 값은 사용자가 임의로 바꾸지 못하게 잠근다. 단 전화번호는 예외 —
   // 카카오 계정 번호와 실제 쓰는 번호가 다를 수 있고, 잠그면 OTP 본인인증을 통과할 방법이
   // 사라져 가입 자체가 막힌다. 그래서 채워 주기만 하고 수정은 허용한다.
@@ -317,6 +337,7 @@ export function SocialSignupClient() {
                 setPhoneDigits(normalizeSeparatedDigits(event.target.value));
                 setPhoneVerified(false);
                 setPhoneConflict(false);
+                setLinking(false);
               }}
               placeholder="010-0000-0000"
               required
@@ -324,7 +345,18 @@ export function SocialSignupClient() {
             />
           </label>
 
-          {phoneDigits.length === 11 && !phoneVerified ? (
+          {phoneDigits.length === 11 && !phoneVerified && linking ? (
+            <SocialLinkVerify
+              phone={phoneDigits}
+              providerLabel={providerLabel ?? '소셜'}
+              onChooseOtherNumber={chooseOtherNumber}
+              onLogin={() => void exitFlow.leaveTo('/login')}
+              onFindAccount={() => void exitFlow.leaveTo('/auth/find-account')}
+              exitPending={exitFlow.pending}
+            />
+          ) : null}
+
+          {phoneDigits.length === 11 && !phoneVerified && !linking ? (
             <PhoneVerificationCard mode="authed" phone={phoneDigits} onVerified={() => setPhoneVerified(true)} surface="inset" conflictNotice={phoneConflictNotice} />
           ) : null}
 

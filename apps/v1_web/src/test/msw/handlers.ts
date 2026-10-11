@@ -440,6 +440,10 @@ export const v1MswHandlers = [
   ...v1TeamInviteLinkMswHandlers,
   ...v1LeagueVisibilityMswHandlers,
   http.get(`${api}/auth/me`, () => ok(v1UserFixture)),
+  http.post(`${api}/auth/phone/issue`, () => ok({ expiresAt: new Date(Date.now() + 5 * 60 * 1000).toISOString(), devCode: '123456' })),
+  http.post(`${api}/auth/phone/verify`, () => ok({ verified: true, proofToken: 'proof-social-link' })),
+  http.post(`${api}/auth/social-link/preview`, () => ok({ maskedEmail: 'ru***@gmail.com', providers: ['email'], hasPassword: true, linkingProvider: 'kakao' })),
+  http.post(`${api}/auth/social-link`, () => ok({ session: { userId: v1UserFixture.id, userEmail: v1UserFixture.email }, ...v1UserFixture })),
   http.post(`${api}/auth/login`, () => ok({ session: { userId: v1UserFixture.id, userEmail: v1UserFixture.email }, ...v1UserFixture })),
   http.post(`${api}/auth/register`, async ({ request }) => {
     const body = await request.json();

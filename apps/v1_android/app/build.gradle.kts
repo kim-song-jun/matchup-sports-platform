@@ -21,6 +21,15 @@ val releaseSigningValues = mapOf(
 )
 val hasCompleteReleaseSigning = releaseSigningValues.values.all { !it.isNullOrBlank() }
 
+// Fixed alpha key so the Kakao console can register one key hash; local builds without it keep the debug key.
+val alphaSigningValues = mapOf(
+    "ANDROID_ALPHA_KEYSTORE_PATH" to providers.environmentVariable("ANDROID_ALPHA_KEYSTORE_PATH").orNull,
+    "ANDROID_ALPHA_KEYSTORE_PASSWORD" to providers.environmentVariable("ANDROID_ALPHA_KEYSTORE_PASSWORD").orNull,
+    "ANDROID_ALPHA_KEY_ALIAS" to providers.environmentVariable("ANDROID_ALPHA_KEY_ALIAS").orNull,
+    "ANDROID_ALPHA_KEY_PASSWORD" to providers.environmentVariable("ANDROID_ALPHA_KEY_PASSWORD").orNull,
+)
+val hasCompleteAlphaSigning = alphaSigningValues.values.all { !it.isNullOrBlank() }
+
 // Injected through ORG_GRADLE_PROJECT_* in CI; never committed. An empty key leaves Kakao login off.
 val kakaoNativeAppKeyAlpha = providers.gradleProperty("kakaoNativeAppKeyAlpha").orElse("").get().trim()
 val kakaoNativeAppKeyProduction = providers.gradleProperty("kakaoNativeAppKeyProduction").orElse("").get().trim()
@@ -72,6 +81,15 @@ android {
         }
     }
     signingConfigs {
+        if (hasCompleteAlphaSigning) {
+            create("alpha") {
+                storeType = "pkcs12"
+                storeFile = file(alphaSigningValues.getValue("ANDROID_ALPHA_KEYSTORE_PATH")!!)
+                storePassword = alphaSigningValues.getValue("ANDROID_ALPHA_KEYSTORE_PASSWORD")
+                keyAlias = alphaSigningValues.getValue("ANDROID_ALPHA_KEY_ALIAS")
+                keyPassword = alphaSigningValues.getValue("ANDROID_ALPHA_KEY_PASSWORD")
+            }
+        }
         create("release") {
             if (hasCompleteReleaseSigning) {
                 storeFile = file(releaseSigningValues.getValue("ANDROID_RELEASE_KEYSTORE_PATH")!!)
@@ -82,6 +100,11 @@ android {
         }
     }
     buildTypes {
+        // The debug buildType carries an implicit debug signingConfig that wins over a flavor's, so the alpha key is set here.
+        // Only CI supplies it, and only alpha APKs are distributed from debug builds.
+        if (hasCompleteAlphaSigning) {
+            debug { signingConfig = signingConfigs.getByName("alpha") }
+        }
         release {
             isMinifyEnabled = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")

@@ -384,6 +384,9 @@ export function leagueSeasonStageLabel(stage: LeagueSeasonStage): string {
 export const ARRIVAL_PENDING_LABEL = '도착 전';
 export const ARRIVAL_CONFIRMED_LABEL = '도착 확인';
 
+/** 운영 콘솔에서 레드카드가 기록된(되돌려지지 않은) 선수. */
+export const SENT_OFF_LABEL = '퇴장';
+
 /** 성별 조건 정본 값(서버 GENDER_RULES 와 같다). 매치 화면에서는 `matchGenderRuleLabel` 로 읽는다. */
 export const GENDER_RULE_OPTIONS = ['성별 무관', '남', '여'] as const;
 

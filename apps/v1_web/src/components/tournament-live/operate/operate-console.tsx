@@ -59,7 +59,7 @@ import { useTournamentOpsRole } from '@/components/tournament-ops/role-context';
 import { findRecentGoalEvent } from '@/lib/find-recent-goal-event';
 import { findRecentSubstitutionEvent } from '@/lib/find-recent-substitution-event';
 import { deriveFoulCounts } from '@/lib/team-foul-counter';
-import { deriveOnPitchParticipantIds, countActiveSubstitutions } from '@/lib/on-pitch-state';
+import { deriveOnPitchParticipantIds, deriveSentOffParticipantIds, countActiveSubstitutions } from '@/lib/on-pitch-state';
 import { TeamFoulCounterBar } from '@/components/game-operations/team-foul-counter-bar';
 import { formatMatchClock } from '@/lib/game-operations-clock';
 import { endPeriodLabel, periodLabel, periodPrefix, regularPeriodCountOf } from './period-label';
@@ -426,6 +426,7 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
     () => deriveOnPitchParticipantIds(allParticipants, ops.liveEvents),
     [allParticipants, ops.liveEvents],
   );
+  const sentOffParticipantIds = useMemo(() => deriveSentOffParticipantIds(ops.liveEvents), [ops.liveEvents]);
   const substitutionUsedBySideId = useMemo(() => {
     const bySide: Record<string, number> = {};
     for (const side of gameDetail.data?.sides ?? []) {
@@ -1782,6 +1783,7 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
           substitutionOutParticipantIds={substitutionOutParticipantIds}
           substitutionPolicy={gameDetail.data?.substitutionPolicy ?? null}
           substitutionUsedBySideId={substitutionUsedBySideId}
+          sentOffParticipantIds={sentOffParticipantIds}
           onCommit={handleCommit}
           onCancel={() => setPendingAction(null)}
         />

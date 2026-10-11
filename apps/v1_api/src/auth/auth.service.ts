@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException, ForbiddenException, Injectable, Logger, NotFoundException, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, Logger, NotFoundException, ServiceUnavailableException, UnauthorizedException } from '@nestjs/common';
 import { Prisma, V1AccountStatus, V1AuthProvider } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { buildOnboardingSummary, hasAcceptedRequiredTerms } from '../onboarding/onboarding-summary';
@@ -7,7 +7,7 @@ import { AppleLoginDto } from './dto/apple-login.dto';
 import { AppleIdentityService } from './apple-identity.service';
 import type { AppleIdentityClaims } from './apple-identity-token';
 import { AppleTokenService } from './apple-token.service';
-import { KakaoLoginDto } from './dto/kakao-login.dto';
+import { KakaoLoginDto, KakaoTokenLoginDto } from './dto/kakao-login.dto';
 import {
   buildKakaoSignupPrefill,
   normalizeKakaoNickname,
@@ -339,7 +339,42 @@ export class AuthService {
   }
 
   async kakaoLogin(dto: KakaoLoginDto) {
-    const profile = await this.fetchKakaoProfile(dto.code, dto.redirectUri);
+    const accessToken = await this.exchangeKakaoCode(dto.code, dto.redirectUri);
+    return this.kakaoSession(await this.fetchKakaoProfileByToken(accessToken));
+  }
+
+  /** Native SDK / token flow. The token must belong to our Kakao app, or any app's token would sign in. */
+  async kakaoTokenLogin(dto: KakaoTokenLoginDto) {
+    const expectedAppId = process.env.KAKAO_APP_ID;
+    if (!expectedAppId || !Number.isFinite(Number(expectedAppId))) {
+      throw new BadRequestException({
+        code: 'OAUTH_NOT_CONFIGURED',
+        message: 'Kakao login is not configured',
+      });
+    }
+
+    const info = (await this.kakaoApiGet(
+      'https://kapi.kakao.com/v1/user/access_token_info',
+      dto.accessToken,
+    )) as { id?: number | string; app_id?: number | string };
+    if (!info.id || info.app_id === undefined || Number(info.app_id) !== Number(expectedAppId)) {
+      throw new UnauthorizedException({
+        code: 'UNAUTHENTICATED',
+        message: 'Kakao token is not valid for this app',
+      });
+    }
+
+    const profile = await this.fetchKakaoProfileByToken(dto.accessToken);
+    if (profile.providerUserKey !== String(info.id)) {
+      throw new UnauthorizedException({
+        code: 'UNAUTHENTICATED',
+        message: 'Kakao token is not valid for this app',
+      });
+    }
+    return this.kakaoSession(profile);
+  }
+
+  private async kakaoSession(profile: KakaoProfile) {
     const now = new Date();
     const existingIdentity = await this.prisma.v1AuthIdentity.findUnique({
       where: {
@@ -1477,7 +1512,7 @@ export class AuthService {
     };
   }
 
-  private async fetchKakaoProfile(code: string, redirectUri?: string): Promise<KakaoProfile> {
+  private async exchangeKakaoCode(code: string, redirectUri?: string): Promise<string> {
     const clientId = process.env.KAKAO_CLIENT_ID;
     const clientSecret = process.env.KAKAO_CLIENT_SECRET;
     const redirect = redirectUri ?? process.env.KAKAO_REDIRECT_URI;
@@ -1489,17 +1524,24 @@ export class AuthService {
       });
     }
 
-    const tokenRes = await fetch('https://kauth.kakao.com/oauth/token', {
-      method: 'POST',
-      headers: { 'content-type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({
-        grant_type: 'authorization_code',
-        client_id: clientId,
-        client_secret: clientSecret,
-        redirect_uri: redirect,
-        code,
-      }),
-    });
+    let tokenRes: Response;
+    try {
+      tokenRes = await fetch('https://kauth.kakao.com/oauth/token', {
+        method: 'POST',
+        headers: { 'content-type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+          grant_type: 'authorization_code',
+          client_id: clientId,
+          client_secret: clientSecret,
+          redirect_uri: redirect,
+          code,
+        }),
+        signal: AbortSignal.timeout(KAKAO_FETCH_TIMEOUT_MS),
+      });
+    } catch (error) {
+      this.logger.warn(`Kakao token exchange unreachable: ${(error as Error).name}`);
+      throw kakaoUnavailable();
+    }
 
     if (!tokenRes.ok) {
       throw new UnauthorizedException({
@@ -1515,19 +1557,37 @@ export class AuthService {
         message: 'Kakao token response is invalid',
       });
     }
+    return tokenData.access_token;
+  }
 
-    const userRes = await fetch('https://kapi.kakao.com/v2/user/me', {
-      headers: { authorization: `Bearer ${tokenData.access_token}` },
-    });
+  /** GET against kapi with the user's token. Logs only Kakao's error code / HTTP status, never the token. */
+  private async kakaoApiGet(url: string, accessToken: string): Promise<unknown> {
+    let res: Response;
+    try {
+      res = await fetch(url, {
+        headers: { authorization: `Bearer ${accessToken}` },
+        signal: AbortSignal.timeout(KAKAO_FETCH_TIMEOUT_MS),
+      });
+    } catch (error) {
+      this.logger.warn(`Kakao API unreachable: ${(error as Error).name}`);
+      throw kakaoUnavailable();
+    }
 
-    if (!userRes.ok) {
+    if (!res.ok) {
+      const body = (await res.json().catch(() => null)) as { code?: number } | null;
+      const kakaoCode = body?.code;
+      this.logger.warn(`Kakao API rejected: http=${res.status} code=${kakaoCode ?? 'n/a'}`);
+      if (kakaoCode === -1 || res.status >= 500) throw kakaoUnavailable();
       throw new UnauthorizedException({
         code: 'UNAUTHENTICATED',
         message: 'Kakao profile fetch failed',
       });
     }
+    return res.json();
+  }
 
-    const userData = (await userRes.json()) as {
+  private async fetchKakaoProfileByToken(accessToken: string): Promise<KakaoProfile> {
+    const userData = (await this.kakaoApiGet('https://kapi.kakao.com/v2/user/me', accessToken)) as {
       id?: number | string;
       kakao_account?: {
         email?: string;
@@ -1577,6 +1637,15 @@ export class AuthService {
     };
   }
 
+}
+
+const KAKAO_FETCH_TIMEOUT_MS = 8_000;
+
+function kakaoUnavailable() {
+  return new ServiceUnavailableException({
+    code: 'KAKAO_UNAVAILABLE',
+    message: 'Kakao is temporarily unavailable',
+  });
 }
 
 function getAuthNextRoute(onboarding: { status: string; missing: string[]; currentStep: string }, options?: { social?: boolean }) {

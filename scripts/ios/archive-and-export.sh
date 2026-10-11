@@ -77,6 +77,8 @@ if [[ -f "$MARKER" ]]; then
 fi
 
 bash "$REPO_ROOT/scripts/release/generate-ios-version-xcconfig.sh"
+# Reads TEAMEET_KAKAO_NATIVE_APP_KEY from the environment; unset leaves Kakao sign-in off.
+bash "$REPO_ROOT/scripts/release/generate-ios-secrets-xcconfig.sh"
 ( cd "$IOS_DIR" && xcodegen generate >/dev/null )
 
 # --- archive -----------------------------------------------------------------------------

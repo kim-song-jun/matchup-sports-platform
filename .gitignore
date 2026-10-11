@@ -61,6 +61,7 @@ v1_before_team_chat_migration.sql
 apps/v1_ios/*.xcodeproj/
 apps/v1_ios/*.xcworkspace/
 apps/v1_ios/Config/Version.generated.xcconfig
+apps/v1_ios/Config/Secrets.generated.xcconfig
 apps/v1_ios/Generated-Info.plist
 apps/v1_ios/TeameetTests-Info.plist
 apps/v1_ios/DerivedData/

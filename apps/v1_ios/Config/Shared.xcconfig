@@ -13,6 +13,13 @@
 // shipping a stale or default version number.
 #include "Version.generated.xcconfig"
 
+// Kakao's native app key is empty unless CI (or a developer) generated
+// Secrets.generated.xcconfig with scripts/release/generate-ios-secrets-xcconfig.sh. The file is
+// gitignored and optional on purpose: a build without the key must still compile, with Kakao
+// sign-in off.
+TEAMEET_KAKAO_NATIVE_APP_KEY =
+#include? "Secrets.generated.xcconfig"
+
 IPHONEOS_DEPLOYMENT_TARGET = 16.0
 
 // iPhone only. iPad layout is out of scope for this task, and shipping an unreviewed

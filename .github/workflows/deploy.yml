@@ -1039,6 +1039,7 @@ jobs:
           SECRET_JWT_SECRET: ${{ secrets.JWT_SECRET }}
           SECRET_KAKAO_CLIENT_ID: ${{ secrets.KAKAO_CLIENT_ID }}
           SECRET_KAKAO_CLIENT_SECRET: ${{ secrets.KAKAO_CLIENT_SECRET }}
+          SECRET_KAKAO_APP_ID: ${{ secrets.KAKAO_APP_ID }}
           SECRET_KAKAO_REDIRECT_URI: ${{ secrets.KAKAO_REDIRECT_URI }}
           SECRET_KAKAO_SCOPE: ${{ vars.KAKAO_SCOPE }}
           SECRET_V1_HOST_ADMIN_PASSWORD: ${{ secrets.V1_HOST_ADMIN_PASSWORD }}

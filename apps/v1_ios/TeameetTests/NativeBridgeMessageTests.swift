@@ -21,8 +21,9 @@ final class NativeBridgeMessageTests: XCTestCase {
         XCTAssertEqual(NativeBridge.resultEventName, "teameet:native-push-result")
     }
 
-    /// Every string the web can send. Four come from `NativePushAction`; the fifth is Apple
-    /// sign-in, which is native because Apple blocks its web flow inside an embedded browser.
+    /// Every string the web can send. Four come from `NativePushAction`; the others are Apple
+    /// sign-in (Apple blocks its web flow inside an embedded browser) and Kakao sign-in (the
+    /// SDK hands off to the KakaoTalk app).
     func testSupportsExactlyTheDeclaredActions() {
         XCTAssertEqual(
             Set(NativeBridge.Action.allCases.map(\.rawValue)),
@@ -30,7 +31,12 @@ final class NativeBridgeMessageTests: XCTestCase {
              "request-notification-permission",
              "open-notification-settings",
              "revoke-push-device",
-             "sign-in-with-apple"])
+             "sign-in-with-apple",
+             "sign-in-with-kakao"])
+    }
+
+    func testUsesTheEventNameTheKakaoSignInWebCodeListensFor() {
+        XCTAssertEqual(NativeBridge.kakaoResultEventName, "teameet:native-kakao-result")
     }
 
     func testUsesTheEventNameTheAppleSignInWebCodeListensFor() {
@@ -95,6 +101,43 @@ final class NativeBridgeMessageTests: XCTestCase {
 
         XCTAssertTrue(script.contains("\"ok\":false"))
         XCTAssertFalse(script.contains("\"error\""))
+    }
+
+    // MARK: - Kakao reply
+
+    func testKakaoReplyCarriesTheAccessTokenAndTheRequestId() {
+        let script = NativeBridge.kakaoResultScript(requestId: "r1", accessToken: "tok-123")
+
+        XCTAssertTrue(script.contains("teameet:native-kakao-result"))
+        XCTAssertTrue(script.contains("\"requestId\":\"r1\""))
+        XCTAssertTrue(script.contains("\"accessToken\":\"tok-123\""))
+        XCTAssertFalse(script.contains("cancelled"))
+        XCTAssertFalse(script.contains("\"error\""))
+    }
+
+    /// Backing out is reported as `cancelled`, never as an error the page would show.
+    func testKakaoReplyReportsCancellationWithoutAnErrorOrToken() {
+        let script = NativeBridge.kakaoResultScript(requestId: "r1", cancelled: true)
+
+        XCTAssertTrue(script.contains("\"cancelled\":true"))
+        XCTAssertFalse(script.contains("\"error\""))
+        XCTAssertFalse(script.contains("accessToken"))
+    }
+
+    func testKakaoReplyReportsAFailureWithoutAToken() {
+        let script = NativeBridge.kakaoResultScript(requestId: "r1", error: "not configured")
+
+        XCTAssertTrue(script.contains("\"error\":\"not configured\""))
+        XCTAssertFalse(script.contains("accessToken"))
+        XCTAssertFalse(script.contains("cancelled"))
+    }
+
+    /// `requestId` comes from the page; a quote in it must stay inside the JSON string.
+    func testKakaoReplyEscapesAHostileRequestId() {
+        let script = NativeBridge.kakaoResultScript(requestId: "a'});alert(1);({", cancelled: true)
+
+        XCTAssertFalse(script.contains("alert(1);({'"))
+        XCTAssertTrue(script.contains("\"requestId\":\"a'});alert(1);({\""))
     }
 
     // MARK: - Parsing
@@ -191,7 +234,7 @@ final class NativeBridgeMessageTests: XCTestCase {
     /// `TeameetNative` through `addWebMessageListener`, and this reproduces the same global
     /// on top of `window.webkit.messageHandlers`.
     func testShimInstallsTheGlobalTheWebChecksFor() {
-        let shim = NativeBridge.shimScript
+        let shim = NativeBridge.shimScript(kakaoConfigured: false)
         XCTAssertTrue(shim.contains("window.webkit"))
         XCTAssertTrue(shim.contains("messageHandlers"))
         XCTAssertTrue(shim.contains("TeameetNative"))
@@ -206,7 +249,7 @@ final class NativeBridgeMessageTests: XCTestCase {
     /// Injected into every document, including ones where WebKit installed no handler. It
     /// must not throw there, or it would break the page it was meant to serve.
     func testShimBailsOutWhenNoHandlerIsPresent() {
-        XCTAssertTrue(NativeBridge.shimScript.contains("if (!handlers"))
+        XCTAssertTrue(NativeBridge.shimScript(kakaoConfigured: false).contains("if (!handlers"))
     }
 
     /// The web offers a shell-only feature by what `supports` lists, not by whether the
@@ -214,7 +257,7 @@ final class NativeBridgeMessageTests: XCTestCase {
     /// build that stopped advertising would silently hide Sign in with Apple, so the list is
     /// checked here rather than trusted.
     func testShimAdvertisesEveryActionTheShellAnswers() {
-        let shim = NativeBridge.shimScript
+        let shim = NativeBridge.shimScript(kakaoConfigured: true)
         XCTAssertTrue(shim.contains("supports:"))
         for action in NativeBridge.Action.allCases {
             XCTAssertTrue(shim.contains("'\(action.rawValue)'"),
@@ -223,11 +266,22 @@ final class NativeBridgeMessageTests: XCTestCase {
         XCTAssertTrue(shim.contains("'sign-in-with-apple'"))
     }
 
+    /// Without Kakao's key the SDK is never initialised, so offering the action would hang the
+    /// page. Every other action stays on the list.
+    func testShimOmitsKakaoWhenTheBuildHasNoNativeKey() {
+        let shim = NativeBridge.shimScript(kakaoConfigured: false)
+        XCTAssertFalse(shim.contains("sign-in-with-kakao"))
+        for action in NativeBridge.Action.allCases where action != .signInWithKakao {
+            XCTAssertTrue(shim.contains("'\(action.rawValue)'"),
+                          "the shim lost \(action.rawValue)")
+        }
+    }
+
     /// Derived from `Action.allCases`, so an action added to the enum cannot be left off the
     /// list the web reads.
     func testAdvertisedActionsAreDerivedFromTheEnum() {
         XCTAssertEqual(
-            NativeBridge.supportedActionsJSON,
+            NativeBridge.supportedActionsJSON(kakaoConfigured: true),
             "[" + NativeBridge.Action.allCases.map { "'\($0.rawValue)'" }.joined(separator: ",") + "]"
         )
     }

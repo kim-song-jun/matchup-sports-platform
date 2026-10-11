@@ -49,6 +49,12 @@ jobs:
       - name: Generate the version xcconfig
         run: bash scripts/release/generate-ios-version-xcconfig.sh
 
+      # Optional: without the secret the build compiles with Kakao native sign-in off.
+      - name: Generate the secrets xcconfig
+        env:
+          TEAMEET_KAKAO_NATIVE_APP_KEY: ${{ secrets.TEAMEET_KAKAO_NATIVE_APP_KEY }}
+        run: bash scripts/release/generate-ios-secrets-xcconfig.sh
+
       # Teameet.xcodeproj is generated and gitignored — project.yml is the definition. This
       # step is also what catches a project.yml that names a file nobody committed.
       - name: Generate the Xcode project

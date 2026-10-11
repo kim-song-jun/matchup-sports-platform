@@ -10,7 +10,8 @@
 export interface TeameetNativeBridge {
   postMessage(message: string): void;
   /**
-   * The actions this shell can answer. Only the iOS shell sets it.
+   * The actions this shell can answer (e.g. `sign-in-with-apple`, `sign-in-with-kakao`).
+   * The iOS shell always sets it; Android sets it only when it has a shell-only action to offer.
    *
    * Finding the global is not the same as finding a feature: Android installs one with this
    * same name through `addWebMessageListener`, and it answers push actions only. Anything

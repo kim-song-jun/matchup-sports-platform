@@ -33,12 +33,26 @@ configFiles:
   Production Debug: Config/Production.xcconfig
   Production Release: Config/Production.xcconfig
 
+# Pinned exactly: a floating range would let a new SDK release change what the store review
+# sees. KakaoSDKUser pulls in Common and Auth, which are listed for the imports that use them.
+packages:
+  KakaoOpenSDK:
+    url: https://github.com/kakao/kakao-ios-sdk
+    exactVersion: 2.29.0
+
 targets:
   Teameet:
     type: application
     platform: iOS
     sources:
       - path: Teameet
+    dependencies:
+      - package: KakaoOpenSDK
+        product: KakaoSDKCommon
+      - package: KakaoOpenSDK
+        product: KakaoSDKAuth
+      - package: KakaoOpenSDK
+        product: KakaoSDKUser
     settings:
       base:
         PRODUCT_NAME: Teameet
@@ -95,6 +109,19 @@ targets:
         # The environment contract the app reads at runtime through AppConfig.
         TeameetWebOrigin: $(TEAMEET_WEB_ORIGIN)
         TeameetWebViewInspectable: $(TEAMEET_WEBVIEW_INSPECTABLE)
+        # Kakao's native app key comes from the gitignored Config/Secrets.generated.xcconfig
+        # (scripts/release/generate-ios-secrets-xcconfig.sh). Empty means Kakao sign-in is off:
+        # AppConfig reads it as "not configured" and the shell neither advertises nor
+        # initialises the SDK.
+        TeameetKakaoNativeAppKey: $(TEAMEET_KAKAO_NATIVE_APP_KEY)
+        # The KakaoTalk handoff returns through kakao<native app key>://. LSApplicationQueriesSchemes
+        # lets canOpenURL detect whether KakaoTalk is installed.
+        CFBundleURLTypes:
+          - CFBundleURLSchemes:
+              - kakao$(TEAMEET_KAKAO_NATIVE_APP_KEY)
+        LSApplicationQueriesSchemes:
+          - kakaokompassauth
+          - kakaolink
 
   TeameetTests:
     type: bundle.unit-test

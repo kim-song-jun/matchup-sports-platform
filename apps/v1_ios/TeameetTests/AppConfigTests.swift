@@ -76,4 +76,20 @@ final class AppConfigTests: XCTestCase {
         XCTAssertEqual(AppConfig(infoDictionary: padded).webOrigin, "https://alpha.teameet.co.kr")
         XCTAssertEqual(AppConfig(infoDictionary: [:]).webOrigin, "")
     }
+
+    // MARK: - Kakao native app key
+
+    func testKakaoIsConfiguredOnlyWithAnAlphanumericKey() {
+        func configured(_ raw: String?) -> Bool {
+            var info: [String: Any] = [:]
+            if let raw { info[AppConfig.Key.kakaoNativeAppKey] = raw }
+            return AppConfig(infoDictionary: info).isKakaoSignInConfigured
+        }
+        XCTAssertTrue(configured("abc123DEF"))
+        XCTAssertTrue(configured("  abc123  "))
+        // Absent, blank, and an unexpanded placeholder all mean "not configured".
+        for raw in [nil, "", "   ", "$(TEAMEET_KAKAO_NATIVE_APP_KEY)", "ab c", "ab-c"] {
+            XCTAssertFalse(configured(raw), "\(raw ?? "nil") must not enable Kakao sign-in")
+        }
+    }
 }

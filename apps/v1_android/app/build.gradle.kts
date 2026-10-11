@@ -21,6 +21,10 @@ val releaseSigningValues = mapOf(
 )
 val hasCompleteReleaseSigning = releaseSigningValues.values.all { !it.isNullOrBlank() }
 
+// Injected through ORG_GRADLE_PROJECT_* in CI; never committed. An empty key leaves Kakao login off.
+val kakaoNativeAppKeyAlpha = providers.gradleProperty("kakaoNativeAppKeyAlpha").orElse("").get().trim()
+val kakaoNativeAppKeyProduction = providers.gradleProperty("kakaoNativeAppKeyProduction").orElse("").get().trim()
+
 android {
     namespace = "kr.co.teameet"
     compileSdk = 36
@@ -48,6 +52,8 @@ android {
             buildConfigField("String", "FIREBASE_APP_ID", javaStringQuote + providers.gradleProperty("firebaseAppIdAlpha").orElse("").get() + javaStringQuote)
             buildConfigField("String", "FIREBASE_API_KEY", javaStringQuote + providers.gradleProperty("firebaseApiKeyAlpha").orElse("").get() + javaStringQuote)
             buildConfigField("String", "FIREBASE_SENDER_ID", javaStringQuote + providers.gradleProperty("firebaseSenderIdAlpha").orElse("").get() + javaStringQuote)
+            buildConfigField("String", "KAKAO_NATIVE_APP_KEY", javaStringQuote + kakaoNativeAppKeyAlpha + javaStringQuote)
+            manifestPlaceholders["kakaoNativeAppKey"] = kakaoNativeAppKeyAlpha
         }
         create("production") {
             dimension = "environment"
@@ -61,6 +67,8 @@ android {
             buildConfigField("String", "FIREBASE_APP_ID", javaStringQuote + providers.gradleProperty("firebaseAppIdProduction").orElse("").get() + javaStringQuote)
             buildConfigField("String", "FIREBASE_API_KEY", javaStringQuote + providers.gradleProperty("firebaseApiKeyProduction").orElse("").get() + javaStringQuote)
             buildConfigField("String", "FIREBASE_SENDER_ID", javaStringQuote + providers.gradleProperty("firebaseSenderIdProduction").orElse("").get() + javaStringQuote)
+            buildConfigField("String", "KAKAO_NATIVE_APP_KEY", javaStringQuote + kakaoNativeAppKeyProduction + javaStringQuote)
+            manifestPlaceholders["kakaoNativeAppKey"] = kakaoNativeAppKeyProduction
         }
     }
     signingConfigs {
@@ -98,6 +106,7 @@ dependencies {
     // 1.19.0 requires compileSdk 37 / AGP 9.1; Play target 36 remains the stable release baseline.
     implementation("androidx.core:core:1.17.0")
     implementation("androidx.webkit:webkit:1.17.0")
+    implementation("com.kakao.sdk:v2-user:2.25.1")
     testImplementation("junit:junit:4.13.2")
 }
 
@@ -179,6 +188,16 @@ tasks.register("verifyProductionFirebaseConfiguration") {
     }
 }
 
+val verifyProductionKakaoConfiguration = tasks.register("verifyProductionKakaoConfiguration") {
+    group = "verification"
+    description = "Fails unless the production Kakao native app key is provided."
+    doLast {
+        require(kakaoNativeAppKeyProduction.matches(Regex("[0-9a-f]{32}"))) {
+            "kakaoNativeAppKeyProduction is missing or not a 32-char hex native app key"
+        }
+    }
+}
+
 val verifyProductionReleaseReadiness = tasks.register("verifyProductionReleaseReadiness") {
     group = "verification"
     description = "Fails unless a production release has complete external signing configuration."
@@ -196,5 +215,6 @@ tasks.configureEach {
     if (name == "bundleProductionRelease" || name == "assembleProductionRelease") {
         dependsOn(verifyProductionReleaseReadiness)
         dependsOn("verifyProductionFirebaseConfiguration")
+        dependsOn(verifyProductionKakaoConfiguration)
     }
 }

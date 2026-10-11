@@ -55,6 +55,7 @@ services:
       JWT_SECRET: v1-dev-secret
       KAKAO_CLIENT_ID: ${KAKAO_CLIENT_ID:-}
       KAKAO_CLIENT_SECRET: ${KAKAO_CLIENT_SECRET:-}
+      KAKAO_APP_ID: ${KAKAO_APP_ID:-}
       KAKAO_REDIRECT_URI: ${KAKAO_REDIRECT_URI:-}
       API_PORT: 8121
       NODE_ENV: development

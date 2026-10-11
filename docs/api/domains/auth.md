@@ -17,6 +17,7 @@
 | `POST` | `/api/v1/auth/dev-session` | user (header identity, non-production) | empty body | issues signed `teameet_v1_session` cookie for an already-header-authenticated caller |
 | `POST` | `/api/v1/auth/register` | none | `RegisterDto` + current required document IDs | session cookie + onboarding/terms route |
 | `POST` | `/api/v1/auth/kakao` | none | `{ code, redirectUri? }` | social session + onboarding route |
+| `POST` | `/api/v1/auth/kakao/token` | none | `{ accessToken }` (10-4096 chars) | same as `/auth/kakao` — both resolve the user through one shared path |
 | `POST` | `/api/v1/auth/apple/nonce` | none | empty body | `{ nonce }` (signed, 5 min TTL) |
 | `POST` | `/api/v1/auth/apple` | none | `{ identityToken, nonce, fullName? }` | social session + onboarding route |
 | `POST` | `/api/v1/auth/social-terms` | user | `{ requiredTermsAccepted: true, ageConfirmed: true, acceptedTermsDocumentIds: uuid[] }` | social session + onboarding route |
@@ -192,6 +193,8 @@ Email and social signup requests must submit every current required document ID 
 Email signup must accept required terms and submit `displayName`, an 11-digit `phone`, a real-calendar `birthDate` in `YYYYMMDD` format, and `gender = male | female` before `POST /api/v1/auth/register` creates the account. `displayName` is trimmed and cannot be blank. A successful email signup creates `v1_user_profiles`, sets `onboardingStatus = signup_done`, and sends the client through the signup complete screen before sport onboarding. `profileImageUrl` remains optional and nullable.
 
 `POST /api/v1/auth/register` and `POST /api/v1/auth/social-profile` (the last step of every signup path) also accept an optional `recordConsent: { granted: boolean, policyHash: string }`, the same shape as `PUT /me/record-consent`. When present it is upserted into `V1UserRecordConsent` (`GRANTED`/`REVOKED`) inside the signup transaction. When omitted (older clients) no consent row is written and the user stays undecided. Existing accounts are never backfilled.
+
+`POST /auth/kakao/token` (native SDK access token, 10/min throttle) fails closed in this order: `KAKAO_APP_ID` unset `400 OAUTH_NOT_CONFIGURED`; `GET /v1/user/access_token_info` whose `app_id` differs from `KAKAO_APP_ID` `401 UNAUTHENTICATED` (before `/v2/user/me` is called); `/v2/user/me` `id` differing from the token-info `id` `401`. Kakao `-401`/`-2` map to `401 UNAUTHENTICATED`; Kakao `-1`, 5xx, timeouts and network failures map to `503 KAKAO_UNAVAILABLE`. The token is never logged. `providerUserKey` is the same Kakao id as the code flow, so existing members sign in to the same account.
 
 Kakao signup starts with `POST /api/v1/auth/kakao` because the provider user key is needed first. The Kakao provider nickname is kept only as a server-side seed (`draftJson.kakaoNickname`) for `POST /auth/social-profile/defer`; it is never returned to the client, and Teameet never synthesizes a `k_{providerUserKey}` nickname. A new Kakao user is created as `onboardingStatus = social_terms_required` without a profile. If the user leaves here, admin surfaces should treat the row as `가입 진행 중 · 약관 미동의`.
 

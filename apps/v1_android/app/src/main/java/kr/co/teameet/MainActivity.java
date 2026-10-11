@@ -69,6 +69,7 @@ public final class MainActivity extends AppCompatActivity {
     private String pendingLocationOrigin;
     private String pendingPushRequestId;
     private String pendingPushSettingsRequestId;
+    private String pendingKakaoRequestId;
     private int bottomSystemInsetCssPixels;
     private int keyboardInsetCssPixels;
     private boolean keyboardVisible;
@@ -241,6 +242,7 @@ public final class MainActivity extends AppCompatActivity {
                     if (isMainFrame) handleNativeMessage(message);
                 });
         }
+        publishKakaoCapabilityAtDocumentStart();
         webView.setWebViewClient(new WebViewClient() {
             @Override public void onPageStarted(WebView view, String url, android.graphics.Bitmap favicon) {
                 super.onPageStarted(view, url, favicon);
@@ -262,6 +264,7 @@ public final class MainActivity extends AppCompatActivity {
                 if (homeRootReset.onPageFinished(url)) view.clearHistory();
                 if (AllowedNavigation.isInternal(Uri.parse(url))) {
                     lastRecoverableUrl = url;
+                    publishKakaoCapability();
                     publishSystemInsets();
                     if (canRegisterPush()) {
                         PushRegistrationClient.register(MainActivity.this);
@@ -546,6 +549,7 @@ public final class MainActivity extends AppCompatActivity {
                     requestId, canRegisterPush() && InstallationIdentity.isRegistered(this));
                 case "request-notification-permission" -> requestPushPermission(requestId);
                 case "open-notification-settings" -> openNotificationSettings(requestId);
+                case KakaoLoginPolicy.ACTION -> startKakaoLogin(requestId);
                 case "revoke-push-device" -> {
                     boolean keepOptIn = PushRevocationPolicy.keepsOptIn(
                         request.optString("reason", ""));
@@ -563,6 +567,53 @@ public final class MainActivity extends AppCompatActivity {
         } catch (Exception ignored) {
             // Ignore malformed messages from the page; no native action is performed.
         }
+    }
+
+    private void startKakaoLogin(String requestId) {
+        if (!KakaoLoginPolicy.isEnabled(BuildConfig.KAKAO_NATIVE_APP_KEY)) {
+            reportKakaoResult(KakaoLoginPolicy.errorScript(requestId, "kakao-unavailable"));
+            return;
+        }
+        if (pendingKakaoRequestId != null) {
+            reportKakaoResult(KakaoLoginPolicy.errorScript(requestId, "kakao-login-in-progress"));
+            return;
+        }
+        pendingKakaoRequestId = requestId;
+        KakaoNativeLogin.start(this, new KakaoNativeLogin.Callback() {
+            @Override public void onSuccess(String accessToken) {
+                finishKakao(KakaoLoginPolicy.successScript(requestId, accessToken));
+            }
+            @Override public void onCancelled() {
+                finishKakao(KakaoLoginPolicy.cancelledScript(requestId));
+            }
+            @Override public void onError(String code) {
+                finishKakao(KakaoLoginPolicy.errorScript(requestId, code));
+            }
+        });
+    }
+
+    private void finishKakao(String script) {
+        pendingKakaoRequestId = null;
+        reportKakaoResult(script);
+    }
+
+    private void reportKakaoResult(String script) {
+        if (webView != null) webView.evaluateJavascript(script, null);
+    }
+
+    /**
+     * The web reads `TeameetNative.supports` when the button is tapped, so the onPageFinished
+     * publish alone is enough; the document-start script just removes the timing question.
+     */
+    private void publishKakaoCapabilityAtDocumentStart() {
+        String script = KakaoLoginPolicy.capabilityScript(BuildConfig.KAKAO_NATIVE_APP_KEY);
+        if (script == null || !WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)) return;
+        WebViewCompat.addDocumentStartJavaScript(webView, script, Collections.singleton(BuildConfig.WEB_ORIGIN));
+    }
+
+    private void publishKakaoCapability() {
+        String script = KakaoLoginPolicy.capabilityScript(BuildConfig.KAKAO_NATIVE_APP_KEY);
+        if (script != null) webView.evaluateJavascript(script, null);
     }
 
     private void requestPushPermission(String requestId) {

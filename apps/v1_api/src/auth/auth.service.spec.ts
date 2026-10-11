@@ -14,6 +14,7 @@ import {
   ForbiddenException,
   NotFoundException,
   UnauthorizedException,
+  Logger,
 } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { V1AuthProvider } from '@prisma/client';
@@ -1213,6 +1214,176 @@ describe('AuthService', () => {
         where: { id: 'user-1', onboardingStatus: 'social_profile_required' },
         data: { onboardingStatus: 'signup_done', phone: '01087654321' },
       });
+    });
+  });
+
+  // ─── kakaoTokenLogin ─────────────────────────────────────────────────────
+
+  describe('kakaoTokenLogin', () => {
+    const originalFetch = global.fetch;
+    const originalEnv = { ...process.env };
+    const TOKEN = 'native-access-token-value';
+
+    const json = (body: unknown, ok = true, status = ok ? 200 : 401) =>
+      ({ ok, status, json: async () => body }) as unknown as Response;
+    const stubKakao = (responses: Response[]) => {
+      const fn = jest.fn();
+      responses.forEach((r) => fn.mockResolvedValueOnce(r));
+      global.fetch = fn as unknown as typeof fetch;
+      return fn;
+    };
+    const tokenInfo = (appId: number, id = 4994014420) => json({ id, app_id: appId, expires_in: 3000 });
+    const me = (body: Record<string, unknown> = { id: 4994014420, kakao_account: {} }) => json(body);
+
+    beforeEach(() => {
+      process.env.KAKAO_APP_ID = '123456';
+      prisma.v1User.findUnique.mockResolvedValue(pendingSocialUserRow());
+    });
+
+    afterEach(() => {
+      global.fetch = originalFetch;
+      process.env = { ...originalEnv };
+    });
+
+    it('app_id 가 우리 앱과 다르면 401 이고 프로필은 조회하지 않는다', async () => {
+      const fetchMock = stubKakao([tokenInfo(999999)]);
+
+      await expect(service.kakaoTokenLogin({ accessToken: TOKEN })).rejects.toMatchObject({
+        status: 401,
+        response: { code: 'UNAUTHENTICATED' },
+      });
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(fetchMock.mock.calls[0][0]).toBe('https://kapi.kakao.com/v1/user/access_token_info');
+      expect(prisma.v1User.create).not.toHaveBeenCalled();
+    });
+
+    it('app_id 가 같으면 같은 토큰으로 가입 흐름이 진행된다', async () => {
+      const fetchMock = stubKakao([tokenInfo(123456), me()]);
+      prisma.v1AuthIdentity.findUnique.mockResolvedValue(null);
+      prisma.v1User.create.mockResolvedValue({ id: 'new-social-user', email: null });
+
+      await service.kakaoTokenLogin({ accessToken: TOKEN });
+
+      expect(fetchMock.mock.calls[1][0]).toBe('https://kapi.kakao.com/v2/user/me');
+      expect(fetchMock.mock.calls[1][1].headers.authorization).toBe(`Bearer ${TOKEN}`);
+      expect(prisma.v1User.create).toHaveBeenCalledTimes(1);
+    });
+
+    it('KAKAO_APP_ID 가 없으면 카카오를 호출하기 전에 400 OAUTH_NOT_CONFIGURED', async () => {
+      delete process.env.KAKAO_APP_ID;
+      const fetchMock = stubKakao([]);
+
+      await expect(service.kakaoTokenLogin({ accessToken: TOKEN })).rejects.toMatchObject({
+        status: 400,
+        response: { code: 'OAUTH_NOT_CONFIGURED' },
+      });
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it('access_token_info 의 id 와 /v2/user/me 의 id 가 다르면 401', async () => {
+      stubKakao([tokenInfo(123456, 111), me({ id: 222, kakao_account: {} })]);
+
+      await expect(service.kakaoTokenLogin({ accessToken: TOKEN })).rejects.toMatchObject({
+        status: 401,
+        response: { code: 'UNAUTHENTICATED' },
+      });
+      expect(prisma.v1User.create).not.toHaveBeenCalled();
+    });
+
+    it('만료·무효 토큰(-401)은 401, 카카오 내부 오류(-1)와 네트워크 실패는 503 KAKAO_UNAVAILABLE', async () => {
+      stubKakao([json({ code: -401, msg: 'invalid token' }, false, 401)]);
+      await expect(service.kakaoTokenLogin({ accessToken: TOKEN })).rejects.toMatchObject({ status: 401 });
+
+      stubKakao([json({ code: -1, msg: 'internal' }, false, 400)]);
+      await expect(service.kakaoTokenLogin({ accessToken: TOKEN })).rejects.toMatchObject({
+        status: 503,
+        response: { code: 'KAKAO_UNAVAILABLE' },
+      });
+
+      global.fetch = jest.fn().mockRejectedValue(new Error('socket hang up')) as unknown as typeof fetch;
+      await expect(service.kakaoTokenLogin({ accessToken: TOKEN })).rejects.toMatchObject({
+        status: 503,
+        response: { code: 'KAKAO_UNAVAILABLE' },
+      });
+    });
+
+    it('토큰은 로그에 남지 않는다', async () => {
+      const warn = jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+      stubKakao([json({ code: -401, msg: `bad ${TOKEN}` }, false, 401)]);
+
+      await expect(service.kakaoTokenLogin({ accessToken: TOKEN })).rejects.toBeDefined();
+
+      expect(warn).toHaveBeenCalled();
+      expect(JSON.stringify(warn.mock.calls)).not.toContain(TOKEN);
+      warn.mockRestore();
+    });
+
+    it('미인증 이메일은 code 경로와 같이 409 SOCIAL_LINK_REQUIRES_VERIFIED_EMAIL', async () => {
+      stubKakao([
+        tokenInfo(123456, 779),
+        me({ id: 779, kakao_account: { email: 'victim@example.com', is_email_valid: true, is_email_verified: false } }),
+      ]);
+      prisma.v1AuthIdentity.findUnique.mockResolvedValue(null);
+      prisma.v1User.findUnique.mockResolvedValue({
+        id: 'victim-local', email: 'victim@example.com', accountStatus: 'active', emailVerifiedAt: NOW,
+      });
+
+      await expect(service.kakaoTokenLogin({ accessToken: TOKEN })).rejects.toMatchObject({
+        status: 409,
+        response: { code: 'SOCIAL_LINK_REQUIRES_VERIFIED_EMAIL' },
+      });
+      expect(prisma.v1AuthIdentity.create).not.toHaveBeenCalled();
+    });
+
+    it('신규 가입은 code 경로와 같은 user 생성 payload 를 만든다', async () => {
+      const profile = { id: 5150, kakao_account: { profile: { nickname: '카카오닉' } } };
+      prisma.v1AuthIdentity.findUnique.mockResolvedValue(null);
+      prisma.v1User.create.mockResolvedValue({ id: 'new-social-user', email: null });
+
+      process.env.KAKAO_CLIENT_ID = 'cid';
+      process.env.KAKAO_CLIENT_SECRET = 'secret';
+      process.env.KAKAO_REDIRECT_URI = 'https://teameet.co.kr/callback/kakao';
+      // lastLoginAt is stamped with new Date(); freeze it so the two payloads are comparable.
+      jest.useFakeTimers({ now: NOW, doNotFake: ['nextTick', 'setImmediate', 'setTimeout', 'queueMicrotask'] });
+      let viaCode;
+      let viaToken;
+      try {
+        stubKakao([json({ access_token: TOKEN }), me(profile)]);
+        await service.kakaoLogin({ code: 'auth-code' });
+        viaCode = prisma.v1User.create.mock.calls[0][0];
+
+        prisma.v1User.create.mockClear();
+        stubKakao([tokenInfo(123456, 5150), me(profile)]);
+        await service.kakaoTokenLogin({ accessToken: TOKEN });
+        viaToken = prisma.v1User.create.mock.calls[0][0];
+      } finally {
+        jest.useRealTimers();
+      }
+
+      expect(viaToken).toEqual(viaCode);
+      expect(viaToken.data.onboardingProgress.create.draftJson).toMatchObject({ kakaoNickname: '카카오닉' });
+    });
+
+    it('기존 identity 는 같은 providerUserKey 로 조회되어 재로그인된다', async () => {
+      stubKakao([tokenInfo(123456, 4994014420), me()]);
+      prisma.v1AuthIdentity.findUnique.mockResolvedValue({
+        id: 'existing-identity',
+        status: 'active',
+        user: {
+          id: 'existing-user', email: null, accountStatus: 'active',
+          onboardingStatus: 'completed', createdAt: new Date(), updatedAt: new Date(),
+        },
+      });
+
+      const result = await service.kakaoTokenLogin({ accessToken: TOKEN });
+
+      expect(prisma.v1AuthIdentity.findUnique).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { provider_providerUserKey: { provider: V1AuthProvider.kakao, providerUserKey: '4994014420' } },
+        }),
+      );
+      expect(result.session.userId).toBe('existing-user');
+      expect(prisma.v1User.create).not.toHaveBeenCalled();
     });
   });
 

@@ -25,6 +25,7 @@ jobs:
       ORG_GRADLE_PROJECT_firebaseAppIdProduction: ${{ vars.ANDROID_PRODUCTION_FIREBASE_APP_ID }}
       ORG_GRADLE_PROJECT_firebaseApiKeyProduction: ${{ vars.ANDROID_PRODUCTION_FIREBASE_API_KEY }}
       ORG_GRADLE_PROJECT_firebaseSenderIdProduction: ${{ vars.ANDROID_PRODUCTION_FIREBASE_SENDER_ID }}
+      ORG_GRADLE_PROJECT_kakaoNativeAppKeyProduction: ${{ vars.ANDROID_PRODUCTION_KAKAO_NATIVE_APP_KEY }}
       ANDROID_RELEASE_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_RELEASE_KEYSTORE_PASSWORD }}
       ANDROID_RELEASE_KEY_ALIAS: ${{ secrets.ANDROID_RELEASE_KEY_ALIAS }}
       ANDROID_RELEASE_KEY_PASSWORD: ${{ secrets.ANDROID_RELEASE_KEY_PASSWORD }}
@@ -62,6 +63,7 @@ jobs:
           [[ -n "${ORG_GRADLE_PROJECT_firebaseAppIdProduction}" ]] || missing+=(ANDROID_PRODUCTION_FIREBASE_APP_ID)
           [[ -n "${ORG_GRADLE_PROJECT_firebaseApiKeyProduction}" ]] || missing+=(ANDROID_PRODUCTION_FIREBASE_API_KEY)
           [[ -n "${ORG_GRADLE_PROJECT_firebaseSenderIdProduction}" ]] || missing+=(ANDROID_PRODUCTION_FIREBASE_SENDER_ID)
+          [[ -n "${ORG_GRADLE_PROJECT_kakaoNativeAppKeyProduction}" ]] || missing+=(ANDROID_PRODUCTION_KAKAO_NATIVE_APP_KEY)
           [[ -n "${ANDROID_RELEASE_KEYSTORE_BASE64}" ]] || missing+=(ANDROID_RELEASE_KEYSTORE_BASE64)
           [[ -n "${ANDROID_RELEASE_KEYSTORE_PASSWORD}" ]] || missing+=(ANDROID_RELEASE_KEYSTORE_PASSWORD)
           [[ -n "${ANDROID_RELEASE_KEY_ALIAS}" ]] || missing+=(ANDROID_RELEASE_KEY_ALIAS)

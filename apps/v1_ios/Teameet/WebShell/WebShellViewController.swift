@@ -16,6 +16,7 @@ final class WebShellViewController: UIViewController {
     /// Created on demand: most sessions never sign in with Apple, and the controller holds a
     /// pending continuation while a sheet is up.
     private lazy var appleSignIn = AppleSignInController()
+    private lazy var kakaoSignIn = KakaoSignInController()
     private var urlObservation: NSKeyValueObservation?
     private let reachability = NetworkReachability()
 
@@ -184,7 +185,7 @@ final class WebShellViewController: UIViewController {
         // Installed before any page script runs, because the web calls
         // isNativePushAvailable() during render.
         configuration.userContentController.addUserScript(WKUserScript(
-            source: NativeBridge.shimScript,
+            source: NativeBridge.shimScript(kakaoConfigured: config.isKakaoSignInConfigured),
             injectionTime: .atDocumentStart,
             forMainFrameOnly: true))
         // Pins the page at 1:1. Without it a 15px text field taking focus zooms the whole
@@ -554,6 +555,12 @@ extension WebShellViewController: WKScriptMessageHandler {
     }
 
     private func handle(_ request: NativeBridge.Message) async {
+        // Independent of push: Kakao sign-in must answer even in a build with no push lifecycle.
+        if request.action == .signInWithKakao {
+            await presentKakaoSignIn(request)
+            return
+        }
+
         guard let push else {
             // No push lifecycle in this build. Answering honestly beats leaving the page's
             // promise to time out: the settings screen renders an off switch instead of
@@ -578,7 +585,7 @@ extension WebShellViewController: WKScriptMessageHandler {
             openNotificationSettings()
         case .revokePushDevice:
             await push.revoke(reason: PushRevocation(bridgeReason: request.reason))
-        case .signInWithApple:
+        case .signInWithApple, .signInWithKakao:
             // Handled above, before this switch. Listed so a new action added to `Action`
             // cannot be forgotten here — the compiler refuses an inexhaustive switch.
             return
@@ -629,6 +636,39 @@ extension WebShellViewController: WKScriptMessageHandler {
             await replyToApple(
                 request, identityToken: nil, fullName: nil, error: "\(error)")
         }
+    }
+
+    /// Runs Kakao's native login for a page that asked for it. A build without the key never
+    /// advertises the action, so a request arriving anyway is answered with an error rather
+    /// than touching an SDK that was never initialised.
+    private func presentKakaoSignIn(_ request: NativeBridge.Message) async {
+        guard config.isKakaoSignInConfigured else {
+            await replyToKakao(request, error: "not configured")
+            return
+        }
+        do {
+            let accessToken = try await kakaoSignIn.signIn()
+            await replyToKakao(request, accessToken: accessToken)
+        } catch KakaoSignInController.Failure.cancelled {
+            await replyToKakao(request, cancelled: true)
+        } catch {
+            await replyToKakao(request, error: "\(error)")
+        }
+    }
+
+    private func replyToKakao(
+        _ request: NativeBridge.Message,
+        accessToken: String? = nil,
+        cancelled: Bool = false,
+        error: String? = nil
+    ) async {
+        let script = NativeBridge.kakaoResultScript(
+            requestId: request.requestId,
+            accessToken: accessToken,
+            cancelled: cancelled,
+            error: error)
+        guard !script.isEmpty else { return }
+        _ = try? await webView.evaluateJavaScript(script)
     }
 
     private func replyToApple(

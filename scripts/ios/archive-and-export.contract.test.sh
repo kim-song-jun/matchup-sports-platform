@@ -23,6 +23,8 @@ chmod +x "$WORK/repo/scripts/ios/archive-and-export.sh"
 printf 'versionName=0.0.0-contract\nversionCode=1\n' > "$WORK/repo/apps/v1_ios/version.properties"
 printf '#!/usr/bin/env bash\nset -euo pipefail\n' > "$WORK/repo/scripts/release/generate-ios-version-xcconfig.sh"
 chmod +x "$WORK/repo/scripts/release/generate-ios-version-xcconfig.sh"
+printf '#!/usr/bin/env bash\nset -euo pipefail\n' > "$WORK/repo/scripts/release/generate-ios-secrets-xcconfig.sh"
+chmod +x "$WORK/repo/scripts/release/generate-ios-secrets-xcconfig.sh"
 
 cat > "$WORK/bin/xcodegen" <<'EOF'
 #!/usr/bin/env bash

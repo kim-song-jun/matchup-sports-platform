@@ -35,16 +35,22 @@ describe('personal-match chat: listed rooms always open, sending is gated separa
   /** Host ids.a (own host row unless omitted). `others` are extra match participants who also sit in the chat room. */
   async function room(title: string, opts: {
     status: 'recruiting' | 'cancelled';
-    others?: { userId: string; role?: 'participant'; status: RowStatus }[];
+    others?: { userId: string; role?: 'participant'; status: RowStatus; application?: 'approved' | 'withdrawn' | 'cancelled_by_host' }[];
   }) {
     const match = await prisma.v1Match.create({ data: {
       hostUserId: ids.a, sportId, regionId, title, placeName: 'Read-only QA Court', startAt: new Date('2030-01-01T12:00:00Z'),
       maxParticipants: 10, status: opts.status,
-      participants: { create: [
-        { userId: ids.a, role: 'host', status: 'active' },
-        ...(opts.others ?? []).map((other) => ({ userId: other.userId, role: 'participant' as const, status: other.status })),
-      ] },
+      participants: { create: { userId: ids.a, role: 'host', status: 'active' } },
     } });
+    // MatchesService.cancel leaves the approved application untouched; withdraw/remove set their own status.
+    for (const other of opts.others ?? []) {
+      const application = other.application
+        ? await prisma.v1MatchApplication.create({ data: { matchId: match.id, applicantUserId: other.userId, status: other.application } })
+        : null;
+      await prisma.v1MatchParticipant.create({ data: {
+        matchId: match.id, userId: other.userId, role: 'participant', status: other.status, applicationId: application?.id,
+      } });
+    }
     const created = await prisma.v1ChatRoom.create({ data: {
       matchId: match.id,
       participants: { create: [ids.a, ...(opts.others ?? []).map((other) => other.userId)]
@@ -58,13 +64,30 @@ describe('personal-match chat: listed rooms always open, sending is gated separa
   let cancelledWithConfirmed: string;
   let cancelledNobodyLeft: string;
   let removedParticipant: string;
+  let cancelledByMatch: string;
+  let cancelledWithdrewBefore: string;
+  let cancelledNoRoom: string;
+  let recruitingNoRoom: string;
 
   beforeAll(async () => {
     hostAlone = await room('Host alone', { status: 'recruiting' });
     hostWithConfirmed = await room('Host with confirmed', { status: 'recruiting', others: [{ userId: ids.b, status: 'active' }] });
     cancelledWithConfirmed = await room('Cancelled, b still holds the row', { status: 'cancelled', others: [{ userId: ids.b, status: 'active' }] });
-    cancelledNobodyLeft = await room('Cancelled, b withdrew', { status: 'cancelled', others: [{ userId: ids.b, status: 'cancelled' }] });
-    removedParticipant = await room('c was removed', { status: 'recruiting', others: [{ userId: ids.b, status: 'active' }, { userId: ids.c, status: 'removed' }] });
+    cancelledNobodyLeft = await room('Cancelled, b withdrew', { status: 'cancelled', others: [{ userId: ids.b, status: 'cancelled', application: 'withdrawn' }] });
+    removedParticipant = await room('c was removed', { status: 'recruiting', others: [{ userId: ids.b, status: 'active' }, { userId: ids.c, status: 'removed', application: 'cancelled_by_host' }] });
+    cancelledByMatch = await room('Cancelled by host, b cancelled with it, c withdrew first', { status: 'cancelled', others: [
+      { userId: ids.b, status: 'cancelled', application: 'approved' },
+      { userId: ids.c, status: 'cancelled', application: 'withdrawn' },
+    ] });
+    cancelledWithdrewBefore = cancelledNobodyLeft;
+    cancelledNoRoom = (await prisma.v1Match.create({ data: {
+      hostUserId: ids.a, sportId, regionId, title: 'Cancelled without room', placeName: 'Court', startAt: new Date('2030-01-01T12:00:00Z'),
+      maxParticipants: 10, status: 'cancelled', participants: { create: { userId: ids.a, role: 'host', status: 'active' } },
+    } })).id;
+    recruitingNoRoom = (await prisma.v1Match.create({ data: {
+      hostUserId: ids.a, sportId, regionId, title: 'Recruiting without room', placeName: 'Court', startAt: new Date('2030-01-01T12:00:00Z'),
+      maxParticipants: 10, status: 'recruiting', participants: { create: { userId: ids.a, role: 'host', status: 'active' } },
+    } })).id;
   });
 
   it('every room the list returns opens through detail and messages (pair assertion, all users)', async () => {
@@ -121,5 +144,33 @@ describe('personal-match chat: listed rooms always open, sending is gated separa
     await as(ids.c).messages(removedParticipant).expect(403);
     await as(ids.c).send(removedParticipant).expect(403);
     await as(ids.outsider).detail(hostWithConfirmed).expect(403);
+  });
+
+  it('cancelled match: a guest cancelled together with the match reads read-only; one who withdrew first, and unrelated users, cannot', async () => {
+    const b = as(ids.b);
+    expect((await b.list()).map((item) => item.roomId)).toContain(cancelledByMatch);
+    expect((await b.detail(cancelledByMatch).expect(200)).body.data.composer).toEqual({ canSend: false, blockedReason: 'MATCH_CANCELLED' });
+    await b.messages(cancelledByMatch).expect(200);
+    expect((await b.send(cancelledByMatch).expect(409)).body.code).toBe('MATCH_CHAT_CLOSED');
+
+    const c = as(ids.c);
+    expect((await c.list()).map((item) => item.roomId)).not.toContain(cancelledByMatch);
+    await c.detail(cancelledByMatch).expect(403);
+    await c.messages(cancelledByMatch).expect(403);
+    expect((await as(ids.outsider).list()).map((item) => item.roomId)).not.toContain(cancelledByMatch);
+    await as(ids.outsider).detail(cancelledByMatch).expect(403);
+    await as(ids.b).detail(cancelledWithdrewBefore).expect(403);
+  });
+
+  it('resolve: no room is created for a cancelled match or a host without confirmed participants, but an existing room still opens', async () => {
+    const resolve = (targetId: string, userId = ids.a) =>
+      http().post('/api/v1/chat/rooms/resolve').set('x-v1-user-id', userId).send({ targetType: 'match', targetId });
+    expect((await resolve(cancelledNoRoom).expect(409)).body.code).toBe('MATCH_CHAT_CLOSED');
+    expect((await resolve(recruitingNoRoom).expect(409)).body.code).toBe('MATCH_CHAT_PARTICIPANTS_REQUIRED');
+    expect(await prisma.v1ChatRoom.count({ where: { matchId: { in: [cancelledNoRoom, recruitingNoRoom] } } })).toBe(0);
+
+    const existing = await prisma.v1ChatRoom.findFirstOrThrow({ where: { id: cancelledByMatch } });
+    const reopened = await resolve(existing.matchId!, ids.b).expect(201);
+    expect(reopened.body.data).toMatchObject({ roomId: cancelledByMatch, created: false });
   });
 });

@@ -52,6 +52,17 @@ const confirmedGuestWhere = { role: 'participant' as const, status: { in: [...ma
 const readableMatchBase = { deletedAt: null };
 
 /**
+ * Guests that MatchesService.cancel flipped to `cancelled` keep an approved application, while a
+ * guest who withdrew (application `withdrawn`), was removed by the host (`cancelled_by_host`) or was
+ * dropped by a capacity reconfirmation (`withdrawn`) does not. Only meaningful together with a cancelled match.
+ */
+const cancelledWithMatchGuestWhere = {
+  role: 'participant' as const,
+  status: 'cancelled' as const,
+  application: { is: { status: 'approved' as const } },
+};
+
+/**
  * Who may list, open and read a personal-match chat room. The chat list and every read path share
  * this predicate; sending is gated separately by {@link matchChatSendBlock}. Recipients of pushes,
  * unread counts and socket fan-out derive from the same pieces in {@link matchChatReaderUserWhere}.
@@ -62,6 +73,8 @@ export function matchChatReadableWhere(userId: string): Prisma.V1MatchWhereInput
     OR: [
       { participants: { some: { userId, ...memberParticipantWhere } } },
       { hostUserId: userId, participants: { some: confirmedGuestWhere } },
+      { status: 'cancelled', participants: { some: { userId, ...cancelledWithMatchGuestWhere } } },
+      { status: 'cancelled', hostUserId: userId, participants: { some: cancelledWithMatchGuestWhere } },
     ],
   };
 }
@@ -72,6 +85,8 @@ export function matchChatReaderUserWhere(matchId: string): Prisma.V1UserWhereInp
     OR: [
       { matchParticipants: { some: { matchId, ...memberParticipantWhere, match: readableMatchBase } } },
       { hostedMatches: { some: { id: matchId, ...readableMatchBase, participants: { some: confirmedGuestWhere } } } },
+      { matchParticipants: { some: { matchId, ...cancelledWithMatchGuestWhere, match: { ...readableMatchBase, status: 'cancelled' } } } },
+      { hostedMatches: { some: { id: matchId, ...readableMatchBase, status: 'cancelled', participants: { some: cancelledWithMatchGuestWhere } } } },
     ],
   };
 }

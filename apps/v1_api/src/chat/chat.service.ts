@@ -228,9 +228,12 @@ export class ChatService {
 
   async resolve(user: V1AuthUser, dto: ResolveChatRoomDto) {
     if (dto.targetType === 'match') {
-      // Creating a room is stricter than opening one: no empty room for a host who has no confirmed participant yet.
+      // Creating a room is stricter than opening one: a blocked match (cancelled, or no confirmed participant yet)
+      // never gets a new room. An existing room still opens read-only.
       const block = await this.assertCanUseMatchChat(user.id, dto.targetId);
-      if (block === 'PARTICIPANTS_NOT_CONFIRMED') this.assertMatchChatSendable(block);
+      if (block && !(await this.prisma.v1ChatRoom.findUnique({ where: { matchId: dto.targetId }, select: { id: true } }))) {
+        this.assertMatchChatSendable(block);
+      }
       return this.resolveMatchRoom(user.id, dto.targetId);
     }
     if (dto.targetType === 'team') {

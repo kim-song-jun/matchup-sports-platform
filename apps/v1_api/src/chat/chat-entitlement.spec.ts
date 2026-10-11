@@ -234,7 +234,7 @@ describe('개인 매치 채팅 — 읽기 규칙 하나, 쓰기 규칙 따로', 
 // 읽기 규칙(목록·열람)과 수신자 규칙(푸시·안 읽음·소켓)은 같은 사람을 가리켜야 한다.
 // 두 where 를 같은 가짜 DB 행에 대해 평가해 결과가 일치하는지 본다.
 describe('개인 매치 채팅 — 읽기 가능 여부와 수신자 자격이 일치한다', () => {
-  type P = { userId: string; role: string; status: string };
+  type P = { userId: string; role: string; status: string; application?: { status: string } | null };
   type M = { id: string; hostUserId: string; status: string; deletedAt: Date | null; participants: P[] };
   const evalWhere = (where: any, row: any): boolean => {
     if (where == null) return true;
@@ -257,7 +257,9 @@ describe('개인 매치 채팅 — 읽기 가능 여부와 수신자 자격이 �
   });
 
   const hostRow: P = { userId: 'host', role: 'host', status: 'active' };
-  const guest = (status: string): P => ({ userId: 'guest', role: 'participant', status });
+  const guest = (status: string, applicationStatus: string | null = null): P => ({
+    userId: 'guest', role: 'participant', status, application: applicationStatus ? { status: applicationStatus } : null,
+  });
   const match = (over: Partial<M>): M => ({
     id: 'm1', hostUserId: 'host', status: 'recruiting', deletedAt: null, participants: [hostRow], ...over,
   });
@@ -271,6 +273,17 @@ describe('개인 매치 채팅 — 읽기 가능 여부와 수신자 자격이 �
     { name: '종료된 매치의 참가자', m: match({ status: 'completed', participants: [hostRow, guest('completed')] }), user: 'guest', readable: true },
     { name: '내보내진 참가자', m: match({ participants: [hostRow, guest('removed')] }), user: 'guest', readable: false },
     { name: '철회한 참가자', m: match({ participants: [hostRow, guest('cancelled')] }), user: 'guest', readable: false },
+    // MatchesService.cancel 은 승인 신청을 그대로 두고 참가 행만 cancelled 로 바꾼다.
+    { name: '매치 취소로 cancelled 가 된 참가자', m: match({ status: 'cancelled', participants: [hostRow, guest('cancelled', 'approved')] }), user: 'guest', readable: true },
+    { name: '매치 취소로 모두 cancelled 가 된 방의 주최자', m: match({ status: 'cancelled', participants: [hostRow, guest('cancelled', 'approved')] }), user: 'host', readable: true },
+    { name: '취소 전에 스스로 철회한 참가자(취소된 매치)', m: match({ status: 'cancelled', participants: [hostRow, guest('cancelled', 'withdrawn')] }), user: 'guest', readable: false },
+    { name: '취소 전에 정원 재확인으로 빠진 참가자(취소된 매치)', m: match({ status: 'cancelled', participants: [hostRow, guest('cancelled', null)] }), user: 'guest', readable: false },
+    { name: '취소 전에 내보내진 참가자(취소된 매치)', m: match({ status: 'cancelled', participants: [hostRow, guest('removed', 'cancelled_by_host')] }), user: 'guest', readable: false },
+    { name: '취소 전에 모두 철회한 방의 주최자(취소된 매치)', m: match({ status: 'cancelled', participants: [hostRow, guest('cancelled', 'withdrawn')] }), user: 'host', readable: true },
+    // 주최자가 참가하지 않는 매치는 주최자 행도 cancelled 라 참가 행으로는 열람할 근거가 없다.
+    { name: '불참 주최자: 취소로 빠진 참가자가 있으면 취소된 매치를 열람한다', m: match({ status: 'cancelled', participants: [{ ...hostRow, status: 'cancelled' }, guest('cancelled', 'approved')] }), user: 'host', readable: true },
+    { name: '불참 주최자: 취소 전에 모두 철회했으면 열람 불가', m: match({ status: 'cancelled', participants: [{ ...hostRow, status: 'cancelled' }, guest('cancelled', 'withdrawn')] }), user: 'host', readable: false },
+    { name: '취소되지 않은 매치의 철회 참가자는 신청이 approved 여도 불가', m: match({ participants: [hostRow, guest('cancelled', 'approved')] }), user: 'guest', readable: false },
     { name: '무관한 사용자', m: match({ participants: [hostRow, guest('active')] }), user: 'stranger', readable: false },
     { name: '삭제된 매치의 주최자', m: match({ deletedAt: new Date() }), user: 'host', readable: false },
     { name: '삭제된 매치의 확정 참가자', m: match({ deletedAt: new Date(), participants: [hostRow, guest('active')] }), user: 'guest', readable: false },

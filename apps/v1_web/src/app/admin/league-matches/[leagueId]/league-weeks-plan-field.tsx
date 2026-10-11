@@ -33,7 +33,8 @@ export function LeagueWeeksPlanField({
   const doubleWeeks = suggestedWeeks(teamCount, 2, gamesPerTeamPerDay);
   const rounds = plannedRounds(plan, teamCount, weeksCount, gamesPerTeamPerDay);
   const games = plannedGameCount(teamCount, rounds);
-  const lastDayRounds = plan.kind === 'custom' ? 0 : rounds % Math.max(1, gamesPerTeamPerDay);
+  const lastDayRounds =
+    plan.kind === 'custom' || weeksCount <= 1 ? 0 : rounds % Math.max(1, gamesPerTeamPerDay);
   const chips = [
     { kind: 'single' as const, label: `단일 ${singleWeeks}주` },
     { kind: 'double' as const, label: `홈앤어웨이 ${doubleWeeks}주` },
@@ -54,7 +55,8 @@ export function LeagueWeeksPlanField({
           )}
           {lastDayRounds > 0 ? (
             <span className="mt-1 block text-[length:var(--font-size-caption)] text-[var(--text-muted)]">
-              라운드로빈은 한 번씩만 만나요 — 마지막 주에는 {lastDayRounds}라운드만 열려요
+              {plan.kind === 'single' ? '라운드로빈은 한 번씩만 만나요 — ' : null}
+              마지막 주에는 {lastDayRounds}라운드만 열려요
             </span>
           ) : null}
         </p>

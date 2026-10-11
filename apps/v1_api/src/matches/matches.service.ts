@@ -1307,11 +1307,8 @@ export class MatchesService {
     if (application.status !== 'requested') {
       throw stateConflict('대기 중인 신청만 승인할 수 있어요.');
     }
-    if (
-      application.match.status !== 'recruiting' ||
-      application.match.startAt < new Date() ||
-      (application.match.deadlineAt && application.match.deadlineAt < new Date())
-    ) {
+    // 신청 마감(deadlineAt)은 새 신청만 막는다 — 마감 전에 들어온 대기 신청은 경기 시작 전까지 승인할 수 있다.
+    if (application.match.status !== 'recruiting' || application.match.startAt < new Date()) {
       throw stateConflict(NOT_RECRUITING_APPROVAL_MESSAGE);
     }
 
@@ -1321,15 +1318,10 @@ export class MatchesService {
 
       const currentMatch = await tx.v1Match.findFirst({
         where: { id: application.matchId, deletedAt: null },
-        select: { status: true, startAt: true, deadlineAt: true, maxParticipants: true },
+        select: { status: true, startAt: true, maxParticipants: true },
       });
       const now = new Date();
-      if (
-        !currentMatch ||
-        currentMatch.status !== 'recruiting' ||
-        currentMatch.startAt < now ||
-        (currentMatch.deadlineAt && currentMatch.deadlineAt < now)
-      ) {
+      if (!currentMatch || currentMatch.status !== 'recruiting' || currentMatch.startAt < now) {
         throw stateConflict(NOT_RECRUITING_APPROVAL_MESSAGE);
       }
 
@@ -1857,7 +1849,7 @@ function resolveReopenDeadline(
   return parsed;
 }
 
-const NOT_RECRUITING_APPROVAL_MESSAGE = '모집 중인 매치만 승인할 수 있어요. 마감됐거나 시작 시간이 지났어요.';
+const NOT_RECRUITING_APPROVAL_MESSAGE = '모집 중인 매치만 승인할 수 있어요. 직접 마감했거나 시작 시간이 지났어요.';
 
 function stateConflict(message: string, code = 'STATE_CONFLICT') {
   return new ConflictException({

@@ -824,6 +824,7 @@ export class AuthService {
     const phone = dto.phone.trim();
     const birthDate = dto.birthDate.trim();
     const profileImageUrl = dto.profileImageUrl?.trim() || null;
+    const profileImageOmitted = dto.profileImageUrl === undefined;
 
     if (isValidBirthDateDigits(birthDate) && !isSignupAgeEligible(birthDate)) {
       throw new BadRequestException({
@@ -969,7 +970,8 @@ export class AuthService {
           realName,
           gender: dto.gender,
           birthDate,
-          profileImageUrl,
+          // A deferred caller may have uploaded an avatar from profile edit; omission must not clear it.
+          ...(wasDeferred && profileImageOmitted ? {} : { profileImageUrl }),
           visibility: 'public',
         },
         create: {

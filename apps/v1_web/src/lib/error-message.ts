@@ -1,3 +1,6 @@
+import { ACTIVITY_PROFILE_REQUIRED_CODE } from '@/lib/activity-profile-required';
+import { PHONE_VERIFICATION_REQUIRED_CODE } from '@/lib/phone-verification-required';
+
 /**
  * 에러 객체에서 사람이 읽을 수 있는 메시지를 추출해요.
  *
@@ -95,4 +98,13 @@ export function extractErrorDetails(err: unknown): unknown {
   }
 
   return undefined;
+}
+
+/**
+ * api-client 가 이미 전역 안내(휴대폰 인증 모달·활동 정보 시트)를 띄운 에러인지.
+ * 호출부는 이 에러에 "다시 시도해 주세요" 류 일반 실패 문구를 겹쳐 보여 주지 않는다.
+ */
+export function isGloballyHandledError(err: unknown): boolean {
+  const code = extractErrorCode(err);
+  return code === PHONE_VERIFICATION_REQUIRED_CODE || code === ACTIVITY_PROFILE_REQUIRED_CODE;
 }

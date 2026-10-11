@@ -764,11 +764,11 @@ describe('AuthService', () => {
       prisma.v1User.create.mockResolvedValue({ id: 'new-user', email: 'new@teameet.v1' });
     }
 
-    function arrangeSocialProfile() {
+    function arrangeSocialProfile(onboardingStatus = 'social_profile_required') {
       const activeTime = new Date();
       prisma.v1User.findUnique
         .mockResolvedValueOnce(pendingSocialUserRow({
-          onboardingStatus: 'social_profile_required',
+          onboardingStatus,
           onboardingProgress: { currentStep: 'signup' },
           termsConsents: [],
           createdAt: activeTime,
@@ -825,6 +825,25 @@ describe('AuthService', () => {
       arrangeSocialProfile();
       await service.completeSocialProfile('user-1', socialInput);
       expect(prisma.v1UserRecordConsent.upsert).not.toHaveBeenCalled();
+    });
+
+    it('completeSocialProfile: 미룬 계정이 프로필 사진을 생략하면 기존 사진을 지우지 않는다', async () => {
+      arrangeSocialProfile('social_profile_deferred');
+      await service.completeSocialProfile('user-1', socialInput);
+      const { update } = prisma.v1UserProfile.upsert.mock.calls[0][0];
+      expect(update).not.toHaveProperty('profileImageUrl');
+    });
+
+    it('completeSocialProfile: 미룬 계정이 새 프로필 사진을 보내면 교체한다', async () => {
+      arrangeSocialProfile('social_profile_deferred');
+      await service.completeSocialProfile('user-1', { ...socialInput, profileImageUrl: '/mock/new.jpg' });
+      expect(prisma.v1UserProfile.upsert.mock.calls[0][0].update.profileImageUrl).toBe('/mock/new.jpg');
+    });
+
+    it('completeSocialProfile: 가입 중 계정이 사진을 생략하면 기존처럼 null 로 저장한다', async () => {
+      arrangeSocialProfile();
+      await service.completeSocialProfile('user-1', socialInput);
+      expect(prisma.v1UserProfile.upsert.mock.calls[0][0].update.profileImageUrl).toBeNull();
     });
   });
 

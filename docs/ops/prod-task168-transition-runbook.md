@@ -354,6 +354,21 @@ Stage A 가 뜬 백업(`backup.dump`, `pg_restore -Fc` 형식)은 EC2 호스트�
 하나라도 거짓이면(예: 되돌릴 대상이 이미 M11 이후 코드라면) 허용된다 — M11 이후로 롤백하는
 것은 안전하기 때문이다.
 
+### 정보 입력 보류 상태가 생긴 뒤 그 이전 이미지로 되돌릴 때 (MD-QA #125)
+
+`20261011130000_v1_onboarding_social_profile_deferred` 가 추가한 가입 상태 `social_profile_deferred`
+는 그 이전 릴리스의 Prisma client 에 없다. 이 값을 가진 사용자가 한 명이라도 있는 상태에서 이전
+이미지로 되돌리면, 그 사용자의 인증 요청마다 상태 값을 읽지 못해 실패한다. 마이그레이션은 값
+추가만이라 DB 를 되돌릴 필요는 없고, **이미지를 되돌리기 직전에** 그 사용자들을 정보 입력 단계로
+돌려놓는다(멱등, Task168 원장·seal 과 무관한 사용자 상태 한 줄 — 롤백과 같은 사용자 승인 안에서 실행).
+
+```sql
+UPDATE v1_users SET onboarding_status = 'social_profile_required'
+WHERE onboarding_status = 'social_profile_deferred';
+```
+
+되돌린 뒤 그 사용자들은 다음 로그인 때 정보 입력 화면부터 다시 진행한다(자동 닉네임 프로필은 남는다).
+
 ## 금지 사항
 
 - **Stage A 완료 후 ~ Stage B 완료 전 구간에는 일반 배포(`task168_stage=none`)를 하지

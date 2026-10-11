@@ -79,7 +79,7 @@ Expected result: 실패 토스트가 아니라 전역 시트가 뜬다.
 - [ ] 24h 지난 `social_profile_required` 의 defer → 401 `SOCIAL_SIGNUP_EXPIRED` + 상태 리셋
 - [ ] 약관 재동의 필요한 deferred 사용자 → `TERMS_RECONSENT_REQUIRED` 가 먼저
 - [ ] 관리자 면제(`isPhoneVerificationExemptActor`)는 activity 검사에도 동일 적용
-- [ ] 소켓: deferred 사용자 연결 허용
+- [ ] 소켓: deferred 사용자 연결·알림·채팅 허용, `game.event.append`/`retry`·`game.takeover.request`/`renew` 는 비어드민에게 `ACTIVITY_PROFILE_REQUIRED` 로 거절
 - [ ] 대조군(전역 규칙 34): `completed`·휴대폰 미인증 일반·`social_profile_required` 사용자를 같은 가드 스펙에서 확인, 웹 게이트는 required 만 강제 이동
 
 ### Error paths
@@ -156,6 +156,6 @@ Expected result: 실패 토스트가 아니라 전역 시트가 뜬다.
 | 2026-10-11 | user | 건너뛰기 위치/범위/약관/종목/닉네임 | D1=B, D2=a, D3=a, D4=a, D5=a (되묻지 않음) |
 | 2026-10-11 | tech-planner | 초안은 라벨 소스를 `lib/admin-labels.ts` 로 가정 | 정정: 실제 단일 소스는 `lib/format-user.ts` `ONBOARDING_STATUS_LABEL` |
 | 2026-10-11 | tech-planner | 초안은 defer 상태 오류를 409/403 으로 가정 | 정정: 이 파일 관례대로 400 `VALIDATION_ERROR`/`TERMS_REQUIRED` |
-| 2026-10-11 | tech-planner | 초안은 소켓 쓰기 거부를 요구 | 정정: 휴대폰 게이트도 소켓에는 없고 쓰기 커맨드는 role 검사 — 게이트웨이 변경 없음(D2 범위 = 휴대폰 게이트와 동일) |
+| 2026-10-11 | tech-planner | 초안은 소켓 쓰기 거부를 요구 | 최종 정정(Codex P2 반영): 연결·알림·채팅은 열어 두되, `game.event.append`/`retry`·`game.takeover.request`/`renew` 는 command 시점에 `social_profile_deferred` 비어드민을 `ACTIVITY_PROFILE_REQUIRED` 로 거절한다(게이트웨이 변경 있음) |
 | 2026-10-11 | tech-planner | 선호 온보딩이 상태를 덮어써 게이트 해제 | deferred 에서는 상태 유지(계약 서버 9번에 추가) |
 | 2026-10-11 | tech-planner | 활동 시트를 `ConfirmModal` 로 할지 바텀시트로 할지 | 목업 `fG-gate-sheet` 기준으로 구현 시 확정(빌더가 불확실하면 `BLOCKED` 보고) |

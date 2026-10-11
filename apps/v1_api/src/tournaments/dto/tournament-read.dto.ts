@@ -10,6 +10,7 @@ import {
   MaxLength,
   Min,
 } from 'class-validator';
+import { MAX_PAGE_NUMBER } from '../../common/pagination/page-args';
 import {
   COMPETITION_LIST_KINDS,
   type CompetitionListKind,
@@ -87,6 +88,7 @@ export class TournamentListQueryDto {
   @Type(() => Number)
   @IsInt({ message: '페이지 번호는 정수여야 해요.' })
   @Min(1, { message: '페이지 번호는 1 이상이어야 해요.' })
+  @Max(MAX_PAGE_NUMBER, { message: '페이지 번호가 너무 커요.' })
   page?: number;
 
   @IsOptional()

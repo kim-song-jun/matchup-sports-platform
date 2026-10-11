@@ -529,6 +529,42 @@ describe('TournamentApplyPageClient GA events', () => {
     });
   });
 
+  describe('신청 확인 창의 취소 안내 (MD-QA #85)', () => {
+    async function openSubmitConfirm(refundPolicyText: string | null) {
+      tournamentApplyApiMocks.useV1Tournament.mockReturnValue({
+        data: makeTournament({ entryFee: 20000, refundPolicyText }),
+        isLoading: false,
+        isError: false,
+        error: null,
+      });
+      await openAgreementsStep();
+      fireEvent.click(screen.getByLabelText('전체 동의'));
+      fireEvent.change(screen.getByLabelText('입금자명 *'), { target: { value: '성수 풋살 크루' } });
+      fireEvent.click(screen.getAllByRole('button', { name: '신청 제출하기' })[0]);
+      return screen.findByRole('dialog', { name: '신청 전 확인해 주세요' });
+    }
+
+    it('대회가 환불 정책을 직접 정했으면 "취소 불가" 대신 그 정책을 보여 준다', async () => {
+      const dialog = await openSubmitConfirm('접수 마감 전까지는 전액 환불해 드려요.');
+
+      expect(within(dialog).getByText('접수 마감 전까지는 전액 환불해 드려요.')).toBeInTheDocument();
+      expect(dialog.textContent).not.toMatch(/취소는 .*불가/);
+    });
+
+    it('공백뿐인 환불 정책은 정책이 없는 것으로 보고 기본 안내를 보여 준다', async () => {
+      const dialog = await openSubmitConfirm('  \n  ');
+
+      expect(within(dialog).getByText('참가비 입금 후 단순 변심 또는 팀 사정으로 인한 신청 취소는 원칙적으로 불가해요.')).toBeInTheDocument();
+      expect(within(dialog).queryByRole('region', { name: '환불 정책' })).not.toBeInTheDocument();
+    });
+
+    it('환불 정책이 없는 대회는 기본 안내를 해요체로 보여 준다', async () => {
+      const dialog = await openSubmitConfirm(null);
+
+      expect(within(dialog).getByText('참가비 입금 후 단순 변심 또는 팀 사정으로 인한 신청 취소는 원칙적으로 불가해요.')).toBeInTheDocument();
+    });
+  });
+
   describe('신청 요약 rail (#1443)', () => {
     it('rail 은 요약 표면 하나만 그리고 안에 또 하나의 요약 카드를 넣지 않는다', async () => {
       await openAgreementsStep();

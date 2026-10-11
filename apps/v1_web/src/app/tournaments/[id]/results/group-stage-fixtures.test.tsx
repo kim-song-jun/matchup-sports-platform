@@ -30,6 +30,7 @@ function makeGroup(overrides: Partial<V1TournamentGroup> & Pick<V1TournamentGrou
     advanceCount: 2,
     groupTeams: [],
     standings: [],
+    qualification: null,
     ...overrides,
   };
 }

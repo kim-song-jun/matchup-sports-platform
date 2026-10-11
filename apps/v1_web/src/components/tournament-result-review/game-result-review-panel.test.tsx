@@ -328,6 +328,11 @@ describe('GameResultReviewPanel — 재제출 폼도 결선 승부차기 가드�
     id: 'revision-resubmittable',
     state: 'SUBMITTED',
     score: { home: 1, away: 1, penalties: { home: 4, away: 3 } },
+    // 서버는 점수 = 팀별 득점 기록 수가 아니면 재제출을 422 로 거부한다.
+    goalEvents: [
+      { id: 'goal-home', sideId: 'side-home', anonymous: true, ownGoal: false },
+      { id: 'goal-away', sideId: 'side-away', anonymous: true, ownGoal: false },
+    ],
   };
   let supersedeMutate: ReturnType<typeof vi.fn>;
 
@@ -386,7 +391,8 @@ describe('GameResultReviewPanel — 재제출 폼도 결선 승부차기 가드�
   it('결선 경기에서 정규시간 승패가 갈리면 승부차기를 싣지 않고, 그 사실을 저장 전에 알린다', () => {
     const dialog = openResubmitForm(true);
 
-    fireEvent.change(within(dialog).getByLabelText('홈 점수'), { target: { value: '2' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: '득점 추가' }));
+    expect(within(dialog).getByLabelText('홈 점수')).toHaveValue(2);
     expect(within(dialog).getByRole('status').textContent).toMatch(/승부차기 결과는 함께 지워져요/);
 
     fireEvent.change(within(dialog).getByLabelText('재제출 사유'), { target: { value: '정규시간 점수 정정' } });

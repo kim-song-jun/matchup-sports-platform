@@ -223,6 +223,17 @@ Query:
 | `view` | card/compact | No | — |
 | `cursor` | string | No | cursor pagination |
 | `limit` | int(1~50) | No | default 20 |
+| `today` | boolean(`true`/`false`) | No | `true` 이면 오늘(KST) 시작하는 경기만 |
+| `recruitingOnly` | boolean(`true`/`false`) | No | `true` 이면 지금 신청할 수 있는 글만(모집 중·시작 전·신청 마감 전) |
+
+응답: `{ items, pageInfo, facets? }`
+
+**첫 페이지 건수 (`totalCount` · `facets`)**: 커서 없는 첫 페이지 응답에만 `pageInfo.totalCount` 와 최상위 `facets` 가 실린다. 다음 페이지(`cursor` 있음)는 둘 다 싣지 않는다 — 화면은 첫 페이지 값을 보관한다.
+
+- `pageInfo.totalCount`: 목록과 **같은 where**(공개·삭제·호스트 팀 상태 규칙 포함)로 센 전체 건수. `limit` 과 무관하다.
+- `facets.sports`: `{ sportId, count }[]`(건수 내림차순, 0건 종목 생략). 종목 필터만 뺀 나머지 필터로 센다 — 종목을 하나 골라도 다른 종목 칩 건수가 그대로 남는다.
+- `facets.today` / `facets.recruiting`: 나머지 필터는 그대로 두고 해당 토글을 켠 건수. 토글이 꺼져 있어도 "켜면 몇 건"을 알려 준다.
+- 쿼리는 첫 페이지에 `groupBy` 1회와 `count` 2회(총 3회)이며 `status`·`startAt`·`sportId` 인덱스를 탄다.
 
 Rules:
 

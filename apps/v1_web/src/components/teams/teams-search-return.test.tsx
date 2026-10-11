@@ -60,7 +60,7 @@ const ok = (data: unknown) => HttpResponse.json({ status: 'success', data, times
 const server = setupServer(
   http.get('*/api/v1/teams', ({ request }) => {
     const items = new URL(request.url).searchParams.get('query') === teamName ? [team] : allTeams;
-    return ok({ items, pageInfo: { total: items.length, nextCursor: null, hasNext: false } });
+    return ok({ items, pageInfo: { totalCount: items.length, nextCursor: null, hasNext: false } });
   }),
   http.get(`*/api/v1/teams/${teamId}`, () => ok(detail)),
   http.get(`*/api/v1/teams/${teamId}/reviews`, () => ok({ bySport: [], highlight: null })),

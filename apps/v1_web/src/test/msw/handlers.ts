@@ -159,6 +159,26 @@ function page<T>(items: T[]) {
   return { items, nextCursor: null };
 }
 
+/** 서버 첫 페이지 응답처럼 totalCount·facets 를 싣는다. 종목 건수는 종목 필터를 뺀 목록(`ignoringSport`)으로 센다. */
+function pageWithCounts<T extends { sport?: { sportId: string } }>(
+  request: Request,
+  items: T[],
+  ignoringSport: T[],
+  toggles?: { today: number; recruiting: number },
+) {
+  if (new URL(request.url).searchParams.get('cursor')) return page(items);
+  const counts = new Map<string, number>();
+  for (const item of ignoringSport) {
+    if (item.sport) counts.set(item.sport.sportId, (counts.get(item.sport.sportId) ?? 0) + 1);
+  }
+  return {
+    items,
+    nextCursor: null,
+    pageInfo: { nextCursor: null, hasNext: false, totalCount: items.length },
+    facets: { sports: [...counts].map(([sportId, count]) => ({ sportId, count })).sort((a, b) => b.count - a.count), ...toggles },
+  };
+}
+
 function countFacet<T>(items: T[], values: readonly string[], read: (item: T) => string) {
   return Object.fromEntries(values.map((value) => [value, items.filter((item) => read(item) === value).length]));
 }
@@ -550,7 +570,7 @@ export const v1MswHandlers = [
     const matches = levelCodes.length
       ? v1MatchesFixture.filter((item) => rangeMatches(levelCodes, item.minLevel?.code, item.maxLevel?.code))
       : v1MatchesFixture;
-    return ok(page(matches));
+    return ok(pageWithCounts(request, matches, matches, { today: 0, recruiting: matches.length }));
   }),
   http.get(`${api}/matches/:matchId`, ({ params }) => ok(v1MatchesFixture.find((item) => item.id === params.matchId) ?? v1MatchesFixture[0])),
   http.get(`${api}/teams`, ({ request }) => {
@@ -563,7 +583,10 @@ export const v1MswHandlers = [
     const teams = levelCodes.length
       ? teamsBySport.filter((item) => rangeMatches(levelCodes, item.minLevel?.code, item.maxLevel?.code))
       : teamsBySport;
-    return ok(page(teams));
+    const teamsIgnoringSport = levelCodes.length
+      ? v1TeamsFixture.filter((item) => rangeMatches(levelCodes, item.minLevel?.code, item.maxLevel?.code))
+      : v1TeamsFixture;
+    return ok(pageWithCounts(request, teams, teamsIgnoringSport));
   }),
   http.get(`${api}/teams/name-availability`, () => ok({ available: true })),
   http.get(`${api}/teams/:teamId`, ({ params }) => ok(teamDetail(String(params.teamId)))),
@@ -645,7 +668,10 @@ export const v1MswHandlers = [
     const teamMatches = levelCodes.length
       ? teamMatchesBySport.filter((item) => rangeMatches(levelCodes, item.minLevel?.code, item.maxLevel?.code))
       : teamMatchesBySport;
-    return ok(page(teamMatches));
+    const teamMatchesIgnoringSport = levelCodes.length
+      ? v1TeamMatchesFixture.filter((item) => rangeMatches(levelCodes, item.minLevel?.code, item.maxLevel?.code))
+      : v1TeamMatchesFixture;
+    return ok(pageWithCounts(request, teamMatches, teamMatchesIgnoringSport, { today: 0, recruiting: teamMatchesIgnoringSport.length }));
   }),
   http.get(`${api}/team-matches/:teamMatchId`, ({ params }) => ok(v1TeamMatchesFixture.find((item) => item.id === params.teamMatchId) ?? v1TeamMatchesFixture[0])),
   http.get(`${api}/chat/rooms`, () => ok(v1ChatRoomsFixture)),

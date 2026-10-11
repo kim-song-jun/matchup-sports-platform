@@ -82,7 +82,7 @@ describe('팀 목록 N+1 방지', () => {
     apiClientMocks.v1Get.mockClear();
     const items = Array.from({ length: 12 }, (_, i) => teamWithoutActivity(i));
     hookMocks.useV1TeamPages.mockReturnValue({
-      data: { pages: [{ items, pageInfo: { nextCursor: null, hasNext: false, total: items.length } }] },
+      data: { pages: [{ items, pageInfo: { nextCursor: null, hasNext: false, totalCount: items.length } }] },
       isPending: false,
       isError: false,
       hasNextPage: false,
@@ -109,7 +109,7 @@ describe('팀 목록 N+1 방지', () => {
   it('팀 수가 늘어도 상세 호출은 여전히 0이다 (N 에 비례하지 않는다)', async () => {
     const items = Array.from({ length: 44 }, (_, i) => teamWithoutActivity(i));
     hookMocks.useV1TeamPages.mockReturnValue({
-      data: { pages: [{ items, pageInfo: { nextCursor: null, hasNext: false, total: items.length } }] },
+      data: { pages: [{ items, pageInfo: { nextCursor: null, hasNext: false, totalCount: items.length } }] },
       isPending: false,
       isError: false,
       hasNextPage: false,

@@ -113,6 +113,8 @@ describe('MatchesService', () => {
     v1Match: {
       findFirst: jest.Mock;
       findMany: jest.Mock;
+      count: jest.Mock;
+      groupBy: jest.Mock;
       create: jest.Mock;
       update: jest.Mock;
     };
@@ -147,6 +149,8 @@ describe('MatchesService', () => {
       v1Match: {
         findFirst: jest.fn(),
         findMany: jest.fn().mockResolvedValue([]),
+        count: jest.fn().mockResolvedValue(0),
+        groupBy: jest.fn().mockResolvedValue([]),
         create: jest.fn(),
         update: jest.fn(),
       },
@@ -772,7 +776,7 @@ describe('MatchesService', () => {
     const first = await service.list(null, { limit: 3 });
 
     expect(first.items.map((item: { matchId: string }) => item.matchId)).toEqual(['soon', 'later', 'yesterday']);
-    expect(first.pageInfo).toEqual({ nextCursor: expect.stringMatching(/^past:yesterday@\d+$/), hasNext: true });
+    expect(first.pageInfo).toEqual({ nextCursor: expect.stringMatching(/^past:yesterday@\d+$/), hasNext: true, totalCount: 0 });
 
     prisma.v1Match.findMany.mockClear();
     await service.list(null, { limit: 3, cursor: first.pageInfo.nextCursor! });
@@ -1554,6 +1558,74 @@ describe('MatchesService', () => {
       response: { code: 'VALIDATION_FAILED', details: { field: 'deadlineAt' } },
     });
     expect(prisma.v1Match.update).not.toHaveBeenCalled();
+  });
+
+  describe('list: 첫 페이지 건수(totalCount·facets)', () => {
+    const SPORT_A = '11111111-1111-4111-8111-111111111111';
+    const SPORT_B = '22222222-2222-4222-8222-222222222222';
+    const todayRange = /"startAt":\{"gte":"[^"]+","lt":"/;
+    const wherePassed = (call: number, fn: 'groupBy' | 'count' | 'findMany') => JSON.stringify(prisma.v1Match[fn].mock.calls[call][0].where);
+
+    it('종목 건수는 종목 필터만 뺀 where 로, 전체 건수는 그 합에서 필터된 종목만 골라 센다', async () => {
+      prisma.v1Match.groupBy.mockResolvedValue([
+        { sportId: SPORT_B, _count: { _all: 2 } },
+        { sportId: SPORT_A, _count: { _all: 3 } },
+      ]);
+      prisma.v1Match.count.mockResolvedValueOnce(4).mockResolvedValueOnce(1);
+
+      const filtered = await service.list(null, { sportId: SPORT_A });
+
+      expect(filtered.pageInfo.totalCount).toBe(3);
+      expect(filtered.facets).toEqual({ sports: [{ sportId: SPORT_A, count: 3 }, { sportId: SPORT_B, count: 2 }], today: 4, recruiting: 1 });
+      // 목록은 종목 필터를 걸고, 종목 건수는 걸지 않는다(다른 종목 칩이 0 이 되면 안 된다).
+      expect(wherePassed(0, 'findMany')).toContain(SPORT_A);
+      expect(wherePassed(0, 'groupBy')).not.toContain(SPORT_A);
+
+      const unfiltered = await service.list(null, {});
+      expect(unfiltered.pageInfo.totalCount).toBe(5);
+    });
+
+    it('오늘·모집 중 칩 건수는 나머지 필터는 그대로 두고 각자의 토글을 켠 where 로 센다', async () => {
+      prisma.v1Match.groupBy.mockResolvedValue([]);
+      prisma.v1Match.count.mockResolvedValue(0);
+
+      await service.list(null, { sportId: SPORT_A });
+
+      // count 호출 순서: 0 = 오늘 칩, 1 = 모집 중 칩.
+      const todayChip = wherePassed(0, 'count');
+      expect(todayChip).toMatch(todayRange);
+      expect(todayChip).not.toContain('"deadlineAt":null');
+      expect(todayChip).toContain(SPORT_A);
+      const recruitingChip = wherePassed(1, 'count');
+      expect(recruitingChip).toContain('"deadlineAt":null');
+      expect(recruitingChip).not.toMatch(todayRange);
+      expect(recruitingChip).toContain(SPORT_A);
+      // 토글이 꺼져 있으면 목록과 종목 건수에는 어느 토글도 걸리지 않는다.
+      for (const where of [wherePassed(0, 'findMany'), wherePassed(0, 'groupBy')]) {
+        expect(where).not.toMatch(todayRange);
+        expect(where).not.toContain('"deadlineAt":null');
+      }
+    });
+
+    it('켜 둔 토글은 목록·종목 건수·반대편 칩 건수에 모두 유지된다', async () => {
+      prisma.v1Match.groupBy.mockResolvedValue([]);
+      prisma.v1Match.count.mockResolvedValue(0);
+
+      await service.list(null, { today: true });
+
+      expect(wherePassed(0, 'findMany')).toMatch(todayRange);
+      expect(wherePassed(0, 'groupBy')).toMatch(todayRange);
+      expect(wherePassed(1, 'count')).toMatch(todayRange); // 모집 중 칩도 오늘만 센다
+    });
+
+    it('커서가 있는 다음 페이지는 건수를 다시 세지 않고 응답에도 싣지 않는다', async () => {
+      const next = await service.list(null, { cursor: 'upcoming:00000000-0000-4000-8000-000000000000@1700000000000' });
+
+      expect(prisma.v1Match.groupBy).not.toHaveBeenCalled();
+      expect(prisma.v1Match.count).not.toHaveBeenCalled();
+      expect(next.pageInfo).not.toHaveProperty('totalCount');
+      expect(next).not.toHaveProperty('facets');
+    });
   });
 });
 

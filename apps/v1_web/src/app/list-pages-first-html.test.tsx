@@ -73,7 +73,7 @@ function envelope(data: unknown): Response {
 }
 
 function pageOf(items: unknown[]) {
-  return { items, pageInfo: { nextCursor: null, hasNext: false, total: items.length } };
+  return { items, pageInfo: { nextCursor: null, hasNext: false, totalCount: items.length } };
 }
 
 /** 목록 경로마다 한 항목짜리 첫 페이지, 마스터 종목은 풋살 하나. */

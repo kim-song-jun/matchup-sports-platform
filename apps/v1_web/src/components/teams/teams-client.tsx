@@ -127,7 +127,7 @@ export function TeamListPageClient({ seed }: { readonly seed?: CursorListSeed<V1
 
   if (query.isError) return <TeamStatePageView model={getTeamStateViewModel('error')} />;
   const firstPage = query.data?.pages[0];
-  const total = firstPage?.pageInfo?.total ?? visibleItems.length;
+  const total = firstPage?.pageInfo?.totalCount ?? visibleItems.length;
   // isLoading 은 서버·하이드레이션 첫 렌더(persist 복원 중)에 false 라 데이터 없음(isPending)으로 판정한다.
   const isListLoading = query.isPending;
   const searchModel: NonNullable<TeamListViewModel['search']> = {

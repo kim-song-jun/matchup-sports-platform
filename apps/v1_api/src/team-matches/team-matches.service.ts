@@ -30,6 +30,7 @@ import { activeChatOperator } from '../chat/platform-team-match-chat';
 import { NotificationsService, type NotificationEventType } from '../notifications/notifications.service';
 import { formatKstMonthDayTime } from '../common/kst-datetime';
 import { decodeReferenceTimeCursor, encodeReferenceTimeCursor } from '../common/pagination/reference-time-cursor';
+import { recruitingNowWhere, startsTodayWhere, toSportFacets, totalFromSportFacets } from '../common/pagination/list-facets';
 import { dropCursorRow, resumeAfterCursorArgs } from '../common/pagination/resume-after-cursor';
 import { paginateByStatePriority } from '../league-matches/league-lifecycle-rules';
 import { PlaceProvider, PlaceView, resolvePlaceSnapshot, toPlaceColumns, toPlaceView } from '../places/place-snapshot';
@@ -116,13 +117,104 @@ export class TeamMatchesService {
 
   async list(user: V1AuthUser | null, query: TeamMatchesQueryDto) {
     const limit = Math.min(Math.max(query.limit ?? 20, 1), 50);
-    const isDefaultDiscovery = query.status === undefined;
-    const status = query.status ?? 'recruiting';
     const now = new Date();
     // 구간 경계는 첫 페이지에서 정해 커서로 이어받는다. `now` 는 가시성 조건 전용이다.
     const { cursor, referenceTime: splitAt } = decodeReferenceTimeCursor(query.cursor, now);
+    const where = this.listWhere(query, now);
+    // 기본 정렬은 경기일 순이다 — 시작 전 경기를 가까운 날부터, 이미 시작한 경기를 그 뒤에 최근
+    // 것부터, 일정 미정(startAt null — 리그 대진 등)은 맨 뒤. startAt asc 한 줄로 두면 기간 제한
+    // 없이 실리는 matched·최근 완료 경기가 가장 오래된 것부터 첫 페이지를 채운다. orderBy 로는
+    // "시작 전/후"를 가를 수 없어 구간별로 읽어 잇는다(커서는 "<구간>:<id>@<기준 시각>",
+    // matches.service.ts list() 와 같은 규칙). '최신순'을 고른 경우만 등록 최신순이다.
+    const groups: Record<string, Pick<Prisma.V1TeamMatchFindManyArgs, 'where' | 'orderBy'>> = {
+      latest: { where, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }] },
+      upcoming: { where: { AND: [where, { startAt: { gte: splitAt } }] }, orderBy: [{ startAt: 'asc' }, { createdAt: 'desc' }, { id: 'desc' }] },
+      past: { where: { AND: [where, { startAt: { lt: splitAt } }] }, orderBy: [{ startAt: 'desc' }, { createdAt: 'desc' }, { id: 'desc' }] },
+      unscheduled: { where: { AND: [where, { startAt: null }] }, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }] },
+    };
+    const include = this.teamMatchInclude(user);
+    const [{ items: teamMatches, hasNext, nextCursor }, counts] = await Promise.all([paginateByStatePriority({
+      stateGroups: query.sort === 'latest' ? ['latest'] : ['upcoming', 'past', 'unscheduled'],
+      limit,
+      cursor,
+      fetchGroup: (group, page) =>
+        this.prisma.v1TeamMatch
+          .findMany({
+            ...groups[group],
+            ...resumeAfterCursorArgs(page.cursorId, page.take),
+            include,
+          })
+          .then((rows) => dropCursorRow(rows, page.cursorId, page.take).map((row) => ({ ...row, state: group }))),
+    }), query.cursor ? Promise.resolve(null) : this.countListFacets(query, now)]);
+
+    const pageItems = teamMatches.map((teamMatch) => {
+      assertTeamMatchPublicInvariant(teamMatch);
+      return teamMatch;
+    });
+
+    // 캐시(V1TeamTrustScore)는 72시간 경과만으로는 안 갱신될 수 있으므로 이 페이지에 등장하는
+    // hostTeam들의 신뢰점수를 배치 1회 호출로 live 재계산해 덮어쓴다 (N+1 방지, computeRevealedTeamTrustBatch 참조).
+    const hostTeamIds = [...new Set(pageItems.map((teamMatch) => teamMatch.hostTeamId).filter((teamId): teamId is string => teamId !== null))];
+    const [trustByHostTeam, winsByHostTeam] = await Promise.all([
+      computeRevealedTeamTrustBatch(this.prisma, hostTeamIds),
+      this.loadOfficialWinCounts(hostTeamIds),
+    ]);
+    for (const teamMatch of pageItems) {
+      if (!teamMatch.hostTeam || !teamMatch.hostTeamId) continue;
+      const trust = trustByHostTeam.get(teamMatch.hostTeamId);
+      teamMatch.hostTeam.trustScore = trust
+        ? {
+            trustState: trust.trustState,
+            mannerScore: trust.mannerScore == null ? null : new Prisma.Decimal(trust.mannerScore),
+          }
+        : null;
+    }
+
+    return {
+      items: pageItems.map((teamMatch) =>
+        this.toListItem(teamMatch, user, teamMatch.hostTeamId ? winsByHostTeam.get(teamMatch.hostTeamId) ?? 0 : 0),
+      ),
+      // 최신순은 구간이 없어 기준 시각이 필요 없다.
+      pageInfo: {
+        nextCursor: query.sort === 'latest' ? nextCursor : encodeReferenceTimeCursor(nextCursor, splitAt),
+        hasNext,
+        // 건수는 첫 페이지(커서 없음)에만 싣는다 — 이후 페이지는 같은 숫자를 다시 세지 않는다.
+        ...(counts ? { totalCount: counts.totalCount } : {}),
+      },
+      ...(counts ? { facets: counts.facets } : {}),
+    };
+  }
+
+  /**
+   * 첫 페이지 칩 건수. 종목 건수는 종목 필터만 뺀 where 로 센다. today/recruiting 은 나머지 필터는 그대로 두고
+   * 해당 토글을 켠 건수라서, 토글이 꺼져 있어도 칩이 "켜면 몇 건인지"를 말한다.
+   * 전체 건수는 종목 건수에서 얻어 쿼리는 세 번이다.
+   */
+  private async countListFacets(query: TeamMatchesQueryDto, now: Date) {
+    const [sportRows, today, recruiting] = await Promise.all([
+      this.prisma.v1TeamMatch.groupBy({
+        by: ['sportId'],
+        where: this.listWhere({ ...query, sportId: undefined }, now),
+        _count: { _all: true },
+      }),
+      this.prisma.v1TeamMatch.count({ where: this.listWhere({ ...query, today: true }, now) }),
+      this.prisma.v1TeamMatch.count({ where: this.listWhere({ ...query, recruitingOnly: true }, now) }),
+    ]);
+    const sports = toSportFacets(sportRows);
+    return { totalCount: totalFromSportFacets(sports, query.sportId), facets: { sports, today, recruiting } };
+  }
+
+  /**
+   * 목록·건수가 함께 쓰는 단일 where. 첫 페이지의 totalCount/facets 는 이 함수에 필터를 하나씩 뺀
+   * query 를 넣어 세므로, 가시성·삭제·공개 규칙이 목록과 어긋날 수 없다.
+   */
+  private listWhere(query: TeamMatchesQueryDto, now: Date): Prisma.V1TeamMatchWhereInput {
+    const isDefaultDiscovery = query.status === undefined;
+    const status = query.status ?? 'recruiting';
     const publicHistoryFrom = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
     const constraints: Prisma.V1TeamMatchWhereInput[] = [
+      ...(query.today ? [startsTodayWhere(now)] : []),
+      ...(query.recruitingOnly ? [recruitingNowWhere(now)] : []),
       // 추천순의 모집 글에는 신청 마감을 적용한다. 확정 경기는 진행 중에도 찾을 수 있게 남긴다.
       ...(status === 'recruiting' && query.sort === 'recommended'
         ? [{ OR: [...(isDefaultDiscovery ? [{ status: 'matched' as const }] : []), { deadlineAt: null }, { deadlineAt: { gte: now } }] } satisfies Prisma.V1TeamMatchWhereInput]
@@ -139,7 +231,7 @@ export class TeamMatchesService {
           } satisfies Prisma.V1TeamMatchWhereInput]
         : []),
     ];
-    const where: Prisma.V1TeamMatchWhereInput = {
+    return {
       deletedAt: null,
       OR: [{ tournamentId: null }, { leagueId: { not: null } }],
       AND: [
@@ -200,62 +292,6 @@ export class TeamMatchesService {
       // 검색창 placeholder 가 "지역, 팀 이름, 경기조건"을 약속하므로 그 셋을 모두 훑는다.
       // hostTeam·region 이 빠져 있어서 팀 이름이나 지역명으로 검색하면 실제로 존재하는
       // 경기가 0건으로 나왔다.
-    };
-    // 기본 정렬은 경기일 순이다 — 시작 전 경기를 가까운 날부터, 이미 시작한 경기를 그 뒤에 최근
-    // 것부터, 일정 미정(startAt null — 리그 대진 등)은 맨 뒤. startAt asc 한 줄로 두면 기간 제한
-    // 없이 실리는 matched·최근 완료 경기가 가장 오래된 것부터 첫 페이지를 채운다. orderBy 로는
-    // "시작 전/후"를 가를 수 없어 구간별로 읽어 잇는다(커서는 "<구간>:<id>@<기준 시각>",
-    // matches.service.ts list() 와 같은 규칙). '최신순'을 고른 경우만 등록 최신순이다.
-    const groups: Record<string, Pick<Prisma.V1TeamMatchFindManyArgs, 'where' | 'orderBy'>> = {
-      latest: { where, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }] },
-      upcoming: { where: { AND: [where, { startAt: { gte: splitAt } }] }, orderBy: [{ startAt: 'asc' }, { createdAt: 'desc' }, { id: 'desc' }] },
-      past: { where: { AND: [where, { startAt: { lt: splitAt } }] }, orderBy: [{ startAt: 'desc' }, { createdAt: 'desc' }, { id: 'desc' }] },
-      unscheduled: { where: { AND: [where, { startAt: null }] }, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }] },
-    };
-    const include = this.teamMatchInclude(user);
-    const { items: teamMatches, hasNext, nextCursor } = await paginateByStatePriority({
-      stateGroups: query.sort === 'latest' ? ['latest'] : ['upcoming', 'past', 'unscheduled'],
-      limit,
-      cursor,
-      fetchGroup: (group, page) =>
-        this.prisma.v1TeamMatch
-          .findMany({
-            ...groups[group],
-            ...resumeAfterCursorArgs(page.cursorId, page.take),
-            include,
-          })
-          .then((rows) => dropCursorRow(rows, page.cursorId, page.take).map((row) => ({ ...row, state: group }))),
-    });
-
-    const pageItems = teamMatches.map((teamMatch) => {
-      assertTeamMatchPublicInvariant(teamMatch);
-      return teamMatch;
-    });
-
-    // 캐시(V1TeamTrustScore)는 72시간 경과만으로는 안 갱신될 수 있으므로 이 페이지에 등장하는
-    // hostTeam들의 신뢰점수를 배치 1회 호출로 live 재계산해 덮어쓴다 (N+1 방지, computeRevealedTeamTrustBatch 참조).
-    const hostTeamIds = [...new Set(pageItems.map((teamMatch) => teamMatch.hostTeamId).filter((teamId): teamId is string => teamId !== null))];
-    const [trustByHostTeam, winsByHostTeam] = await Promise.all([
-      computeRevealedTeamTrustBatch(this.prisma, hostTeamIds),
-      this.loadOfficialWinCounts(hostTeamIds),
-    ]);
-    for (const teamMatch of pageItems) {
-      if (!teamMatch.hostTeam || !teamMatch.hostTeamId) continue;
-      const trust = trustByHostTeam.get(teamMatch.hostTeamId);
-      teamMatch.hostTeam.trustScore = trust
-        ? {
-            trustState: trust.trustState,
-            mannerScore: trust.mannerScore == null ? null : new Prisma.Decimal(trust.mannerScore),
-          }
-        : null;
-    }
-
-    return {
-      items: pageItems.map((teamMatch) =>
-        this.toListItem(teamMatch, user, teamMatch.hostTeamId ? winsByHostTeam.get(teamMatch.hostTeamId) ?? 0 : 0),
-      ),
-      // 최신순은 구간이 없어 기준 시각이 필요 없다.
-      pageInfo: { nextCursor: query.sort === 'latest' ? nextCursor : encodeReferenceTimeCursor(nextCursor, splitAt), hasNext },
     };
   }
 

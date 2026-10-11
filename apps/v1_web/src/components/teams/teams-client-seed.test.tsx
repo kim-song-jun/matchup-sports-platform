@@ -59,7 +59,7 @@ describe('TeamListPageClient — 서버 seed 연결', () => {
     vi.clearAllMocks();
     searchParamsMock.value = new URLSearchParams('');
     hookMocks.useV1TeamPages.mockReturnValue({
-      data: { pages: [{ items: [], nextCursor: null, pageInfo: { nextCursor: null, hasNext: false, total: 0 } }] },
+      data: { pages: [{ items: [], nextCursor: null, pageInfo: { nextCursor: null, hasNext: false, totalCount: 0 } }] },
       isPending: false,
       isError: false,
       hasNextPage: false,
@@ -70,7 +70,7 @@ describe('TeamListPageClient — 서버 seed 연결', () => {
   });
 
   it('필터 없이 들어오면 seed를 useV1TeamPages/useV1MasterSports에 초기 페이지로 넘긴다', () => {
-    const page = { items: [seedTeam(0), seedTeam(1)], nextCursor: 'seed-1', pageInfo: { nextCursor: 'seed-1', hasNext: true, total: 52 } };
+    const page = { items: [seedTeam(0), seedTeam(1)], nextCursor: 'seed-1', pageInfo: { nextCursor: 'seed-1', hasNext: true, totalCount: 52 } };
     const seed = { page, sports: [seedSport] };
 
     render(<TeamListPageClient seed={seed} />);
@@ -83,7 +83,7 @@ describe('TeamListPageClient — 서버 seed 연결', () => {
 
   it('URL에 종목 필터가 걸려 있으면 무필터 목록 seed는 넘기지 않는다(종목 목록 seed는 그대로 넘긴다)', () => {
     searchParamsMock.value = new URLSearchParams('sportId=sport-futsal');
-    const seed = { page: { items: [seedTeam(0)], nextCursor: null, pageInfo: { nextCursor: null, hasNext: false, total: 1 } }, sports: [seedSport] };
+    const seed = { page: { items: [seedTeam(0)], nextCursor: null, pageInfo: { nextCursor: null, hasNext: false, totalCount: 1 } }, sports: [seedSport] };
 
     render(<TeamListPageClient seed={seed} />);
 
@@ -109,7 +109,7 @@ describe('TeamListPageClient — 서버 seed 연결', () => {
         pages: [{
           items: [seedTeam(0), seedTeam(1)],
           nextCursor: 'seed-1',
-          pageInfo: { nextCursor: 'seed-1', hasNext: true, total: 52 },
+          pageInfo: { nextCursor: 'seed-1', hasNext: true, totalCount: 52 },
         }],
       },
       isPending: false,

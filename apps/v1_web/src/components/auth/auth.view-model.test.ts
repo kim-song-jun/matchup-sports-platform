@@ -56,6 +56,11 @@ describe('auth view models', () => {
     expect(model.notice).toBeUndefined();
   });
 
+  it('carries the redirect on the email login back target and nothing else without one', () => {
+    expect(getEmailLoginViewModel('/tournaments/t1/my').backHref).toBe('/login?redirect=%2Ftournaments%2Ft1%2Fmy');
+    expect(getEmailLoginViewModel(null).backHref).toBe('/login');
+  });
+
   it('keeps signup on a submit-driven real API flow', () => {
     const model = getSignupFormViewModel();
 

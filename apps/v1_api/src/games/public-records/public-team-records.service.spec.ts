@@ -1,6 +1,75 @@
 import type { PrismaService } from '../../prisma/prisma.service';
 import { PublicTeamRecordsService } from './public-team-records.service';
 
+function buildBackfilledGoalPrisma(goalEvents: unknown[]): PrismaService {
+  const playedAt = new Date('2026-08-09T02:00:00.000Z');
+  const officialAt = new Date('2026-08-10T02:00:00.000Z');
+  const factFindMany = jest.fn().mockResolvedValue([
+    {
+      id: 'fact-1',
+      revisionId: 'revision-1',
+      gameId: 'game-1',
+      opponentTeamId: 'team-2',
+      tournamentId: 'tournament-1',
+      result: 'WON',
+      goalsFor: 1,
+      goalsAgainst: 0,
+      playedAt,
+      resultRevision: {
+        score: { home: 1, away: 0 },
+        // 이 골은 V1GameEvent 에 없다 — 리비전 JSON 에만 존재한다.
+        goalEvents,
+        game: {
+          currentOfficialRevisionId: 'revision-1',
+          visibilityPolicy: { mode: 'LIVE' },
+          teamMatchId: null,
+          sides: [
+            { id: 'side-home', sideKey: 'HOME', teamId: 'team-1' },
+            { id: 'side-away', sideKey: 'AWAY', teamId: 'team-2' },
+          ],
+          participants: [
+            { id: 'participant-1', sideId: 'side-home', userId: 'user-1', displayNameSnapshot: '김도윤', jerseyNumber: 7 },
+          ],
+        },
+      },
+      officialAt,
+    },
+  ]);
+  const prisma = {
+    v1GameOperationFlag: { findUnique: jest.fn().mockResolvedValue({ value: 'on' }) },
+    v1Team: {
+      findUnique: jest.fn().mockResolvedValue({ id: 'team-1', name: '서울 유나이티드', profile: null }),
+      findMany: jest.fn().mockResolvedValue([{ id: 'team-2', name: '부산 FC', profile: null }]),
+    },
+    v1TeamRecordFact: { findMany: factFindMany },
+    v1Tournament: {
+      // BE-5: 대회 제목과 리그 제목을 같은 테이블에서 읽는다 — `kind` 로 갈린다.
+      findMany: jest.fn(async ({ where }: { where: { kind?: string } }) =>
+        where.kind === 'regular_league' ? [] : [{ id: 'tournament-1', title: '주말 리그' }],
+      ),
+    },
+    v1TeamMatch: { findMany: jest.fn().mockResolvedValue([]) },
+    // 이벤트 테이블은 비어 있다 — 골은 리비전 JSON 에만 있다.
+    v1GameEvent: { findMany: jest.fn().mockResolvedValue([]) },
+    v1ParticipantIdentityLinkCurrent: {
+      findMany: jest.fn().mockResolvedValue([{ participantId: 'participant-1', linkId: 'link-1', userId: 'user-1' }]),
+    },
+    v1UserRecordConsent: {
+      findMany: jest.fn().mockResolvedValue([{ userId: 'user-1', state: 'GRANTED' }]),
+    },
+    v1ParticipantConsentSnapshot: { findMany: jest.fn().mockResolvedValue([]) },
+    v1UserProfile: { findMany: jest.fn().mockResolvedValue([]) },
+    $queryRaw: jest
+      .fn()
+      .mockResolvedValueOnce([{ id: 'fact-1', playedAt }])
+      .mockResolvedValueOnce([
+        { category: 'tournament', played: 1, won: 1, drawn: 0, lost: 0, goalsFor: 1, goalsAgainst: 0 },
+      ])
+      .mockResolvedValueOnce([{ season: '2026' }]),
+  } as unknown as PrismaService;
+  return prisma;
+}
+
 describe('PublicTeamRecordsService', () => {
   it('orders, filters, and presents team records by the match date instead of correction time', async () => {
     const playedAt = new Date('2026-08-09T02:00:00.000Z');
@@ -267,78 +336,28 @@ describe('PublicTeamRecordsService', () => {
    * 때문이다. 프로필 링크가 처음으로 이 경로를 실제로 사용한다.
    */
   it('백필된 골(goalEvents JSON)의 참가자도 동의 조회 대상에 포함해 프로필 링크가 붙는다', async () => {
-    const playedAt = new Date('2026-08-09T02:00:00.000Z');
-    const officialAt = new Date('2026-08-10T02:00:00.000Z');
-    const factFindMany = jest.fn().mockResolvedValue([
-      {
-        id: 'fact-1',
-        revisionId: 'revision-1',
-        gameId: 'game-1',
-        opponentTeamId: 'team-2',
-        tournamentId: 'tournament-1',
-        result: 'WON',
-        goalsFor: 1,
-        goalsAgainst: 0,
-        playedAt,
-        resultRevision: {
-          score: { home: 1, away: 0 },
-          // 이 골은 V1GameEvent 에 없다 — 리비전 JSON 에만 존재한다.
-          goalEvents: [
-            { id: 'goal-1', sideId: 'side-home', participantId: 'participant-1', minute: 12, period: 1, ownGoal: false },
-          ],
-          game: {
-            currentOfficialRevisionId: 'revision-1',
-            visibilityPolicy: { mode: 'LIVE' },
-            teamMatchId: null,
-            sides: [
-              { id: 'side-home', sideKey: 'HOME', teamId: 'team-1' },
-              { id: 'side-away', sideKey: 'AWAY', teamId: 'team-2' },
-            ],
-            participants: [
-              { id: 'participant-1', sideId: 'side-home', userId: 'user-1', displayNameSnapshot: '김도윤', jerseyNumber: 7 },
-            ],
-          },
-        },
-        officialAt,
-      },
+    const prisma = buildBackfilledGoalPrisma([
+      // 이 골은 V1GameEvent 에 없다 — 리비전 JSON 에만 존재한다.
+      { id: 'goal-1', sideId: 'side-home', participantId: 'participant-1', minute: 12, period: 1, ownGoal: false },
     ]);
-    const prisma = {
-      v1GameOperationFlag: { findUnique: jest.fn().mockResolvedValue({ value: 'on' }) },
-      v1Team: {
-        findUnique: jest.fn().mockResolvedValue({ id: 'team-1', name: '서울 유나이티드', profile: null }),
-        findMany: jest.fn().mockResolvedValue([{ id: 'team-2', name: '부산 FC', profile: null }]),
-      },
-      v1TeamRecordFact: { findMany: factFindMany },
-      v1Tournament: {
-        // BE-5: 대회 제목과 리그 제목을 같은 테이블에서 읽는다 — `kind` 로 갈린다.
-        findMany: jest.fn(async ({ where }: { where: { kind?: string } }) =>
-          where.kind === 'regular_league' ? [] : [{ id: 'tournament-1', title: '주말 리그' }],
-        ),
-      },
-      v1TeamMatch: { findMany: jest.fn().mockResolvedValue([]) },
-      // 이벤트 테이블은 비어 있다 — 골은 리비전 JSON 에만 있다.
-      v1GameEvent: { findMany: jest.fn().mockResolvedValue([]) },
-      v1ParticipantIdentityLinkCurrent: {
-        findMany: jest.fn().mockResolvedValue([{ participantId: 'participant-1', linkId: 'link-1', userId: 'user-1' }]),
-      },
-      v1UserRecordConsent: {
-        findMany: jest.fn().mockResolvedValue([{ userId: 'user-1', state: 'GRANTED' }]),
-      },
-      v1ParticipantConsentSnapshot: { findMany: jest.fn().mockResolvedValue([]) },
-      v1UserProfile: { findMany: jest.fn().mockResolvedValue([]) },
-      $queryRaw: jest
-        .fn()
-        .mockResolvedValueOnce([{ id: 'fact-1', playedAt }])
-        .mockResolvedValueOnce([
-          { category: 'tournament', played: 1, won: 1, drawn: 0, lost: 0, goalsFor: 1, goalsAgainst: 0 },
-        ])
-        .mockResolvedValueOnce([{ season: '2026' }]),
-    } as unknown as PrismaService;
 
     const result = await new PublicTeamRecordsService(prisma).getRecords('team-1', {});
 
     expect(result.items[0].events[0]).toEqual(
       expect.objectContaining({ participantName: '김도윤', profileHref: '/users/user-1' }),
     );
+  });
+
+  it('득점자를 기록하지 않은 익명 골은 가짜 이름 없이 participantName 이 null 이다', async () => {
+    const prisma = buildBackfilledGoalPrisma([
+      { id: 'goal-1', sideId: 'side-home', participantId: 'participant-1', minute: 12, period: 1, ownGoal: false },
+      { id: 'goal-2', sideId: 'side-home', participantId: null, playerNameSnapshot: null, minute: 30, period: 1, ownGoal: false },
+      { id: 'goal-3', sideId: 'side-home', participantId: null, playerNameSnapshot: '게스트 득점자', minute: 40, period: 2, ownGoal: false },
+    ]);
+
+    const result = await new PublicTeamRecordsService(prisma).getRecords('team-1', {});
+
+    const names = result.items[0].events.map((event) => event.participantName);
+    expect(names).toEqual(['김도윤', null, '게스트 득점자']);
   });
 });

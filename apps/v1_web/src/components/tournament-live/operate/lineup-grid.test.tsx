@@ -275,3 +275,48 @@ describe('LineupGrid — 도착 전 선수 (F71)', () => {
     expect(screen.getByRole('button', { name: '김철수 선수 이벤트 기록, 도착 전' })).toBeEnabled();
   });
 });
+
+describe('LineupGrid — 퇴장 선수 (MD-QA #97)', () => {
+  it('레드카드를 받은 선수에게만 "퇴장" 칩을 달고, 그래도 선택할 수 있다', () => {
+    const onSelectPlayer = vi.fn();
+    render(
+      <LineupGrid
+        sides={SIDES}
+        lineups={[lineup(SQUAD)]}
+        onSelectPlayer={onSelectPlayer}
+        sentOffParticipantIds={new Set(['p-2'])}
+      />,
+    );
+
+    const sentOff = screen.getByRole('button', { name: '김철수 선수 이벤트 기록, 퇴장' });
+    expect(sentOff).toHaveTextContent('퇴장');
+    expect(sentOff).toBeEnabled();
+    fireEvent.click(sentOff);
+    expect(onSelectPlayer).toHaveBeenCalledWith(
+      expect.objectContaining({ participant: expect.objectContaining({ id: 'p-2' }) }),
+    );
+
+    expect(screen.getByRole('button', { name: '홍길동 선수 이벤트 기록' })).not.toHaveTextContent('퇴장');
+  });
+
+  it('퇴장 선수가 도착 전이기도 하면 두 칩을 모두 단다', () => {
+    const arrived = { ...SQUAD[0], arrivedAt: '2026-08-23T09:50:00.000Z' };
+    render(
+      <LineupGrid
+        sides={SIDES}
+        lineups={[lineup([arrived, SQUAD[1]])]}
+        onSelectPlayer={vi.fn()}
+        sentOffParticipantIds={new Set(['p-2'])}
+      />,
+    );
+
+    const both = screen.getByRole('button', { name: '김철수 선수 이벤트 기록, 퇴장, 도착 전' });
+    expect(both).toHaveTextContent('퇴장');
+    expect(both).toHaveTextContent('도착 전');
+  });
+
+  it('퇴장 정보가 없으면 칩을 달지 않는다', () => {
+    render(<LineupGrid sides={SIDES} lineups={[lineup(SQUAD)]} onSelectPlayer={vi.fn()} />);
+    expect(screen.queryByText('퇴장')).toBeNull();
+  });
+});

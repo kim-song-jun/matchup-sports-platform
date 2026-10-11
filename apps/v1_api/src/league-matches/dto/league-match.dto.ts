@@ -128,6 +128,14 @@ export class GenerateLeagueFixturesDto extends LeaguePlaceSnapshotDto {
   @Max(52)
   weeksCount!: number;
 
+  // 지정하면 총 라운드를 `weeksCount × 팀당 하루 경기 수` 대신 이 수로 자른다 — 단일/홈앤어웨이가
+  // 라운드로빈 한 바퀴를 넘겨 앞 라운드를 다시 만들지 않게. 생략하면 기존 동작.
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(104)
+  roundsCount?: number;
+
   // 지정하지 않으면 기존 동작(시작일 그대로 매주 반복)을 유지한다 — 하위 호환.
   @IsOptional()
   @ValidateNested()
@@ -178,6 +186,14 @@ export class OpenLeagueRegistrationDto {
 }
 
 export class RevertLeagueCompletionDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  reason?: string;
+}
+
+// 되돌리기·보류 해제 뒤 남은 대진이 없으면 리그를 다시 종료할 길이 없었다(MD-QA #93) — 수동 종료. 사유는 선택.
+export class CompleteLeagueDto {
   @IsOptional()
   @IsString()
   @MaxLength(200)

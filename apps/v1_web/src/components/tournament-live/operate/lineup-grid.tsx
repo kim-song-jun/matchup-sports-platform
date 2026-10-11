@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import type { GameLineup, GameLineupParticipant, GameSide } from '@/types/game-operations';
 import { StatusChip } from '@/components/v1-ui/status-chip';
-import { ARRIVAL_PENDING_CHIP, arrivalCheckInUsed } from '@/lib/competition-status';
+import { ARRIVAL_PENDING_CHIP, SENT_OFF_CHIP, arrivalCheckInUsed } from '@/lib/competition-status';
 import { jerseyText } from './player-label';
 
 /**
@@ -35,6 +35,9 @@ export interface LineupGridProps {
    * renders. Used by the "들어올 선수" step, which is scoped to the outgoing
    * player's own side. */
   readonly restrictSideId?: string;
+  /** Participants with an active red card — shown with a "퇴장" chip but still selectable,
+   * since the server accepts later events and the operator may need to correct the record. */
+  readonly sentOffParticipantIds?: ReadonlySet<string>;
 }
 
 /** The latest lineup for a side is the highest `revision` row among
@@ -113,6 +116,7 @@ export function LineupGrid({
   disabled = false,
   filterParticipantIds,
   restrictSideId,
+  sentOffParticipantIds,
 }: LineupGridProps) {
   const visibleSides = restrictSideId === undefined ? sides : sides.filter((side) => side.id === restrictSideId);
   // 모바일(390px)에서는 두 사이드가 세로로 쌓여, 원정팀을 보려면 홈팀 전체를
@@ -229,13 +233,14 @@ export function LineupGrid({
                 <ul className="flex flex-col gap-2" role="list">
                   {participants.map((participant) => {
                     const arrivalPending = checkInUsed && participant.arrivedAt === null;
+                    const sentOff = sentOffParticipantIds?.has(participant.id) ?? false;
                     return (
                       <li key={participant.id}>
                         <button
                           type="button"
                           disabled={disabled}
                           onClick={() => onSelectPlayer({ sideId: side.id, participant })}
-                          aria-label={`${participant.displayNameSnapshot} 선수 이벤트 기록${arrivalPending ? `, ${ARRIVAL_PENDING_CHIP.label}` : ''}`}
+                          aria-label={`${participant.displayNameSnapshot} 선수 이벤트 기록${sentOff ? `, ${SENT_OFF_CHIP.label}` : ''}${arrivalPending ? `, ${ARRIVAL_PENDING_CHIP.label}` : ''}`}
                           className={[
                             'flex min-h-[44px] w-full items-center gap-3 rounded-lg px-3 py-2 text-left transition-colors',
                             'hover:bg-[var(--blue50)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500',
@@ -250,7 +255,7 @@ export function LineupGrid({
                           </span>
                           <span className="min-w-0 flex-1">
                             <span
-                              className={`block truncate text-sm font-medium ${arrivalPending ? 'text-[var(--text-muted)]' : 'text-[var(--text-strong)]'}`}
+                              className={`block truncate text-sm font-medium ${arrivalPending || sentOff ? 'text-[var(--text-muted)]' : 'text-[var(--text-strong)]'}`}
                             >
                               {participant.displayNameSnapshot}
                             </span>
@@ -260,9 +265,10 @@ export function LineupGrid({
                               </span>
                             ) : null}
                           </span>
-                          {arrivalPending ? (
-                            <span className="shrink-0">
-                              <StatusChip chip={ARRIVAL_PENDING_CHIP} />
+                          {sentOff || arrivalPending ? (
+                            <span className="flex shrink-0 items-center gap-1">
+                              {sentOff ? <StatusChip chip={SENT_OFF_CHIP} /> : null}
+                              {arrivalPending ? <StatusChip chip={ARRIVAL_PENDING_CHIP} /> : null}
                             </span>
                           ) : null}
                         </button>

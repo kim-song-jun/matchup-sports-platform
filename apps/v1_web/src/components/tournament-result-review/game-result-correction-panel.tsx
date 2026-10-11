@@ -262,6 +262,7 @@ export function GameResultCorrectionPanel({
 
   const renderCorrectionEditor = () => {
     if (!correctionFormOpen || !draftBase || !editPrefill) return null;
+    const baseGoalEvents = deriveEditableGoalEvents(editPrefill.goalEvents, eventsQuery.data?.events ?? []);
     return (
       <ResultEditModal
         open
@@ -271,7 +272,7 @@ export function GameResultCorrectionPanel({
         reasonLabel={entryCopy.reasonLabel}
         base={{
           score: editPrefill.score,
-          goalEvents: deriveEditableGoalEvents(editPrefill.goalEvents, eventsQuery.data?.events ?? []),
+          goalEvents: baseGoalEvents,
           participants: editPrefill.resultParticipants,
           mvpParticipantId: editPrefill.mvpParticipantId,
         }}
@@ -297,6 +298,7 @@ export function GameResultCorrectionPanel({
               reason: input.reason,
               changes: {
                 score: input.score,
+                // 점수만 있는 결과는 모달이 goalEvents 를 생략한다(서버가 기존 상태 유지, MD-QA #94·#95).
                 goalEvents: input.goalEvents,
                 actualParticipants: input.actualParticipants,
                 eventsHash: correctionSnapshot.eventsHash,

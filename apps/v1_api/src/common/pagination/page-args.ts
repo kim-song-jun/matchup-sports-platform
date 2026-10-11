@@ -1,4 +1,10 @@
 /**
+ * page 상한. 정수 검증은 1e308 같은 값도 통과시켜 offset 이 Infinity 가 되고 DB 가 500 을 낸다 —
+ * 실제 목록이 닿을 수 없는 크기라 이보다 큰 page 는 400 으로 거른다.
+ */
+export const MAX_PAGE_NUMBER = 10_000;
+
+/**
  * 어드민 목록의 페이지 번호 페이지네이션.
  *
  * 기존 목록은 전부 cursor 기반이었다. cursor 는 무한 스크롤에는 맞지만 어드민 표에서는
@@ -6,12 +12,6 @@
  * page 를 받되 cursor 도 계속 지원해 기존 호출자를 깨뜨리지 않는다 — 둘 다 오면 page 가
  * 이긴다(명시적으로 페이지를 고른 쪽이 의도가 분명하다).
  */
-/**
- * page 상한. 정수 검증은 1e308 같은 값도 통과시켜 offset 이 Infinity 가 되고 DB 가 500 을 낸다 —
- * 실제 목록이 닿을 수 없는 크기라 이보다 큰 page 는 400 으로 거른다.
- */
-export const MAX_PAGE_NUMBER = 10_000;
-
 export interface PageableQuery {
   readonly page?: number;
   readonly cursor?: string;

@@ -36,15 +36,16 @@ const CHAT_CONTEXT_DESTINATION: Record<'match' | 'team' | 'team_match' | 'team_c
   team_contact: null,
 };
 
+/** 데스크톱 방 헤더의 상세 링크 문구. 팀 컨택 방은 갈 상세가 없어 null. */
+export function chatRoomDestinationLabel(roomType: 'match' | 'team' | 'team_match' | 'team_contact'): string | null {
+  return CHAT_CONTEXT_DESTINATION[roomType];
+}
+
 /**
  * 채팅방 위 연결 카드의 부제 — 무슨 대화인지와 카드가 어디로 가는지(방 목록 한 줄처럼 읽히지 않게, F62).
  * `team_match` 방은 친선 팀매치와 리그 경기가 함께 쓰는데 서버가 경기 종류를 싣지 않아 "경기"로
  * 부른다(F63). 목록 필터 라벨(`chatRoomTypeLabel`)은 따로 둔다.
  */
-export function chatRoomDestinationLabel(roomType: 'match' | 'team' | 'team_match' | 'team_contact'): string | null {
-  return CHAT_CONTEXT_DESTINATION[roomType];
-}
-
 export function chatRoomContextSub(roomType: 'match' | 'team' | 'team_match' | 'team_contact'): string {
   const kind = roomType === 'team_match' ? '경기 채팅' : `${chatRoomTypeLabel(roomType)} 채팅`;
   const destination = CHAT_CONTEXT_DESTINATION[roomType];

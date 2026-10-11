@@ -165,7 +165,7 @@ Rules:
 
 - active `owner` 또는 `ops` admin만 생성할 수 있으며 `support`는 `403 PERMISSION_DENIED`다.
 - 생성된 행은 `hostTeamId=null`, `platformManaged=true`, `status=recruiting`인 독립 플랫폼 모집이다. `platformManaged`는 홈팀 유무로 계산하지 않고 `v1_team_matches.platform_managed`에 영구 저장한다.
-- 조건 필드는 일반 팀매치 모집과 같은 검증·저장 계약을 사용한다. web은 총 비용/상대팀 비용을 일반 생성 화면과 같은 `총 {금액}원 · 상대팀 {금액}원` 형식의 `costNote`로 보낸다.
+- 조건 필드는 일반 팀매치 모집과 같은 검증·저장 계약을 사용한다. web은 총 비용/상대팀 비용을 일반 생성 화면과 같은 `총 {금액}원 · 상대팀 {금액}원` 형식의 `costNote`로 보낸다. 상대팀 금액이 총비용보다 크면 `400 VALIDATION_FAILED`다(위 `POST /team-matches` Rules의 `costNote` 항목과 같은 규칙).
 - `deadlineAt`은 일반 모집처럼 선택 사항이며 입력한 경우 현재보다 이후이고 `startsAt`보다 빨라야 한다.
 - 생성 시 Game, team schedule, application을 만들지 않는다.
 - 첫 승인 전 공개 목록/상세 응답은 `platformManaged=true`, `hostTeam=null`을 반환하며 같은 종목의 관리 팀이 `POST /team-matches/:id/applications`로 신청할 수 있다. 첫 승인 뒤에는 모집 상태를 유지하면서 `hostTeam`에 예약된 HOME 팀을 반환한다.
@@ -276,6 +276,7 @@ Rules:
 - `imageUrl`(상세용 가로형)과 `listImageUrl`(목록용 정사각형)은 모두 선택 사항이다. 일반·관리자 생성/수정은 `/uploads`가 반환한 루트 상대 URL을 저장하고, 미선택 상태를 `null`로 보낸다. `V1TeamMatch.listImageUrl`은 nullable `v1_team_matches.list_image_url`에 저장된다.
 - 목록·상세·일반 수정 form·관리자 상세 응답은 두 이미지 값을 반환한다. 각 화면은 자기 이미지 → 다른 화면 이미지 → 종목 기본 이미지 순서로 표시한다. 기존 `imageUrl` 한 장만 있는 row는 양쪽 화면에서 계속 사용하므로 기존 사진의 일괄 복사/변경이 필요 없다.
 - 수정 요청의 `listImageUrl` 생략은 기존 목록 이미지를 유지하고, 명시적 `null`/빈 문자열은 목록 이미지를 제거한다. 기존 `imageUrl` 쓰기 계약은 유지한다. 기본 이미지는 화면에서만 선택하며 DB에 업로드 사진처럼 저장하지 않는다.
+- `costNote`가 `총 {금액}원 · 상대팀 {금액}원` 형식이고 상대팀 금액이 총비용보다 크면 `400 VALIDATION_FAILED`(`details.field=costNote`, "상대팀 부담금은 총비용보다 클 수 없어요.")다. 일반·관리자 생성과 수정 모두 같다. 이 형식이 아닌 자유 서술 `costNote`는 검사하지 않는다. 같은 `clientCommandId`로 이미 만들어진 모집을 다시 보내는 재시도는 이 검사 전에 저장된 결과를 돌려준다.
 - `deadlineAt`은 선택 사항이며 새로 설정할 때 현재보다 이후이고 `startsAt`보다 빨라야 한다. 수정 시에는 저장된 기존 마감 시각을 그대로 유지할 수 있다. `v1_team_matches.deadline_at`에 저장되고 목록·상세·수정 응답에 동일하게 반환된다.
 
 ## PATCH /team-matches/:teamMatchId (UpdateTeamMatchDto)

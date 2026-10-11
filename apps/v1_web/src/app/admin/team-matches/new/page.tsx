@@ -35,9 +35,15 @@ function formatOptions(sport?: { code?: string; name: string }) {
   return [];
 }
 
+function normalizedCosts(totalCost: string, opponentCost: string) {
+  return {
+    total: Math.max(0, Number(totalCost) || 0),
+    opponent: Math.max(0, Number(opponentCost) || 0),
+  };
+}
+
 function moneyNote(totalCost: string, opponentCost: string) {
-  const total = Math.max(0, Number(totalCost) || 0);
-  const opponent = Math.max(0, Number(opponentCost) || 0);
+  const { total, opponent } = normalizedCosts(totalCost, opponentCost);
   return total || opponent
     ? `총 ${total.toLocaleString('ko-KR')}원 · 상대팀 ${opponent.toLocaleString('ko-KR')}원`
     : null;
@@ -80,7 +86,8 @@ export default function AdminTeamMatchNewPage() {
   const dateErrors = teamMatchDateErrors({ startsAt, endsAt, deadlineAt });
   const levelRange = parseTeamMatchLevelRange(grade);
   const datesValid = startsAt !== '' && Object.keys(dateErrors).length === 0;
-  const costExceeded = (Number(opponentCost) || 0) > (Number(totalCost) || 0);
+  const normalized = normalizedCosts(totalCost, opponentCost);
+  const costExceeded = normalized.opponent > normalized.total;
   const canSubmit =
     canWrite &&
     sportId !== '' &&

@@ -1,5 +1,6 @@
 import { ForbiddenException } from '@nestjs/common';
 import { AdminTeamMatchRecruitmentsService } from './admin-team-match-recruitments.service';
+import { canonicalGameCommandPayloadHash } from '../games/games.service';
 
 const adminUser = {
   id: 'admin-user',
@@ -170,6 +171,18 @@ describe('AdminTeamMatchRecruitmentsService', () => {
       status: 400,
       response: { code: 'VALIDATION_FAILED', details: { field: 'costNote' } },
     });
+    expect(prisma.v1TeamMatch.create).not.toHaveBeenCalled();
+  });
+
+  it('replays a recruitment accepted before the cost rule existed instead of rejecting the retry', async () => {
+    const overLimitDto = { ...createDto, costNote: '총 50,000원 · 상대팀 80,000원' };
+    prisma.v1IdempotencyRecord.findFirst.mockResolvedValue({
+      resourceId: 'team-match-1',
+      payloadHash: canonicalGameCommandPayloadHash({ actorUserId: adminUser.id, dto: overLimitDto }),
+    });
+    prisma.v1TeamMatch.findUniqueOrThrow.mockResolvedValue({ id: 'team-match-1', status: 'recruiting' });
+
+    await expect(service.create(adminUser, overLimitDto)).resolves.toMatchObject({ teamMatchId: 'team-match-1', replayed: true });
     expect(prisma.v1TeamMatch.create).not.toHaveBeenCalled();
   });
 

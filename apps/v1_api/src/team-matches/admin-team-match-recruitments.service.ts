@@ -65,7 +65,6 @@ export class AdminTeamMatchRecruitmentsService {
   async create(user: V1AuthUser, dto: CreateAdminTeamMatchRecruitmentDto) {
     const admin = await this.adminContext.getMutationAdmin(user.id);
     const dates = validateTeamMatchDates(dto);
-    assertOpponentCostWithinTotal(dto.costNote);
     if (!dto.title.trim() || !dto.manualPlaceName.trim()) {
       throw new BadRequestException({ code: 'VALIDATION_FAILED', message: '매치 제목과 경기 장소를 입력해 주세요.' });
     }
@@ -103,6 +102,8 @@ export class AdminTeamMatchRecruitmentsService {
         return this.createResponse(teamMatch.id, teamMatch.status, true);
       }
 
+      // After the replay lookup: a request accepted before this rule existed must still replay.
+      assertOpponentCostWithinTotal(dto.costNote);
       const levelRange = await resolveSportLevelRange(
         tx,
         dto.sportId,

@@ -640,7 +640,6 @@ export class TeamMatchesService {
     const place = this.resolvePlace(dto);
     await this.validateMasterRefs(dto.sportId, dto.regionId);
     const dates = validateTeamMatchDates(dto);
-    assertOpponentCostWithinTotal(dto.costNote);
     const payloadHash = canonicalGameCommandPayloadHash({
       actorUserId: user.id,
       dto,
@@ -677,6 +676,8 @@ export class TeamMatchesService {
         return { teamMatch: existingTeamMatch, game };
       }
 
+      // After the replay lookup: a request accepted before this rule existed must still replay.
+      assertOpponentCostWithinTotal(dto.costNote);
       const source = await this.loadTeamMatchCreationSource(
         tx,
         dto.hostTeamId,

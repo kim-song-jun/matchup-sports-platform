@@ -120,8 +120,11 @@ export function MatchListPageClient({ seed }: { readonly seed?: CursorListSeed<V
   useCursorPaginationSnapshot(snapshotKey, { cursor, accumulated }, query);
 
   // 다음 페이지 실패는 이미 쌓은 목록을 지우지 않는다 — 첫 페이지 실패만 전체 에러 화면이다.
-  const loadMoreError = query.isError && Boolean(cursor);
-  if (query.isError && !loadMoreError) return <MatchStatePageView model={{ ...getMatchStateViewModel('error'), retry: () => void query.refetch() }} />;
+  // 커서 페이지에 성공한 데이터가 없는 상태 — 실패했거나 재시도 중이다. 데이터가 남은 채 난 배경 재검증
+  // 실패(폴링 등)는 다음 페이지 실패가 아니다.
+  const cursorPageUnavailable = Boolean(cursor) && query.data === undefined;
+  const loadMoreError = query.isError && cursorPageUnavailable;
+  if (query.isError && !loadMoreError && !(cursor && query.data !== undefined)) return <MatchStatePageView model={{ ...getMatchStateViewModel('error'), retry: () => void query.refetch() }} />;
 
   const base = getMatchListViewModel();
   const pageItems = query.data?.items;
@@ -130,7 +133,7 @@ export function MatchListPageClient({ seed }: { readonly seed?: CursorListSeed<V
   // 않게 하기 위함.
   // 가용성 정렬은 페이지 안에서만 한다 — 누적 전체를 다시 정렬하면 새 페이지의 신청 가능 카드가
   // 앞 페이지 마감 카드 위로 끼어들어 보던 카드가 밀린다.
-  const items: V1Match[] | undefined = loadMoreError
+  const items: V1Match[] | undefined = cursorPageUnavailable
     ? [...accumulated]
     : pageItems === undefined
       ? undefined
@@ -139,7 +142,7 @@ export function MatchListPageClient({ seed }: { readonly seed?: CursorListSeed<V
         : sortMatchesByAvailability(pageItems);
   const visibleItems = filterMatchesByLevels(items, selectedLevels);
   const countItems = filterMatchesByLevels((countFilters ? countMatches.data?.items ?? allMatches.data?.items : allMatches.data?.items) ?? items, selectedLevels);
-  const hasNext = loadMoreError || (query.data?.pageInfo?.hasNext ?? false);
+  const hasNext = cursorPageUnavailable || (query.data?.pageInfo?.hasNext ?? false);
   // 희소 결과(1~2건) 아래를 채우는 인접 매치 — 디자인 검수 W-3, B안.
   // 새 요청을 만들지 않는다: allMatches 는 필터가 걸려 있든 아니든 이미 돌고 있고
   // (countItems 가 같은 데이터를 쓴다) 그 무필터 목록에서 지금 보여준 것만 빼면 된다.
@@ -157,7 +160,7 @@ export function MatchListPageClient({ seed }: { readonly seed?: CursorListSeed<V
         ).slice(0, NEARBY_RAIL_MAX)
       : [];
   // 다음 페이지 요청만 "불러오는 중"이다 — 배경 재검증(isFetching)은 버튼과 무관하다.
-  const loadMorePending = Boolean(cursor) && (query.isPlaceholderData || (loadMoreError && query.isFetching));
+  const loadMorePending = Boolean(cursor) && (query.isPlaceholderData || (cursorPageUnavailable && query.isFetching));
   const handleLoadMore = () => {
     if (loadMorePending) return;
     if (loadMoreError) {

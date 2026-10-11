@@ -39,4 +39,17 @@ describe('/tournaments 더 보기 — 배경 재검증과 분리', () => {
 
     expect(useV1TournamentsMock).toHaveBeenLastCalledWith(expect.objectContaining({ cursor: 'cursor-2' }), expect.anything());
   });
+
+  it('서버 seed(placeholder)가 떠 있는 동안에는 cursor 가 없어도 더 보기를 잠근다', () => {
+    useV1TournamentsMock.mockReturnValue({
+      data: { items: [{ id: 't1', title: '2026 서울 풋살 오픈', status: 'open', sport: { code: 'futsal', name: '풋살' }, format: 'knockout', genderCategory: 'mixed', teamCount: 16, entryFee: 0, entryFeeConfigured: true, confirmedCount: 0, pendingPaymentCount: 0 }], pageInfo: { hasNext: true, nextCursor: 'seed-cursor', totalPages: 2, total: 2, page: 1 } },
+      isPending: false, isError: false, error: null, isFetching: true, isPlaceholderData: true, refetch: vi.fn(),
+    });
+    useV1TournamentsMock.mockClear();
+    render(<TournamentsPage />);
+
+    expect(screen.getByRole('button', { name: '불러오는 중…' })).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: '불러오는 중…' }));
+    expect(useV1TournamentsMock).not.toHaveBeenCalledWith(expect.objectContaining({ cursor: 'seed-cursor' }), expect.anything());
+  });
 });

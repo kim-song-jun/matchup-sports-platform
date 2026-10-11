@@ -254,7 +254,8 @@ export function TournamentsListPageClient({ seed }: { readonly seed?: Tournament
     && data?.pageInfo?.page !== page;
 
   // 다음 페이지 요청만 "불러오는 중"이다 — 배경 재검증(isFetching)은 버튼·자동 로딩과 무관하다.
-  const loadMorePending = !isDesktop && Boolean(cursor) && isPlaceholderData;
+  // 서버 seed 도 placeholder 라 첫 페이지 검증이 끝날 때까지 잠근다(seed 의 낡은 커서를 따라가지 않게).
+  const loadMorePending = !isDesktop && isPlaceholderData;
   const handleLoadMore = () => {
     if (!data?.pageInfo?.nextCursor || loadMorePending) return;
     setPagination({ accumulated: displayItems, cursor: data.pageInfo.nextCursor });

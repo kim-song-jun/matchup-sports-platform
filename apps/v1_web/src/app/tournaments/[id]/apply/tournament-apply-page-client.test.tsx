@@ -290,6 +290,44 @@ describe('TournamentApplyPageClient GA events', () => {
     });
   });
 
+  it('임시저장에 남은 옛 약관 문서 id 는 제출하지 않는다 — 새 약관 버전이 발행된 뒤 재진입', async () => {
+    window.sessionStorage.setItem(
+      'teameet.v1.applyDraft.registration-1',
+      JSON.stringify({ acceptedTermsDocumentIds: ['99999999-9999-4999-8999-999999999999'] }),
+    );
+    const createRegistrationMutateAsync = vi.fn().mockResolvedValue({ id: 'registration-1', status: 'draft' });
+    const submitRegistrationMutateAsync = vi.fn().mockResolvedValue({
+      id: 'registration-1', status: 'confirmed', payment: null, paymentInstructions: null, depositorName: null,
+    });
+    tournamentApplyApiMocks.useV1CreateRegistration.mockReturnValue({ mutateAsync: createRegistrationMutateAsync, isPending: false });
+    tournamentApplyApiMocks.useV1SubmitRegistration.mockReturnValue({ mutateAsync: submitRegistrationMutateAsync, isPending: false });
+
+    render(<TournamentApplyPageClient tournamentId="tournament-1" />);
+    const [nextButton] = await screen.findAllByRole('button', { name: /^다음 단계/ });
+    fireEvent.click(nextButton);
+    await waitFor(() => expect(createRegistrationMutateAsync).toHaveBeenCalled());
+
+    // '전체 동의'는 목록을 통째로 바꿔 옛 id 를 지운다 — 항목을 하나씩 체크해야 옛 id 와 합쳐지는 경로를 탄다.
+    fireEvent.click(await screen.findByLabelText('대회 규정 필수'));
+    fireEvent.click(screen.getByLabelText('개인정보 동의 필수'));
+    fireEvent.click(screen.getByLabelText('환불 정책 필수'));
+    const [submitButton] = screen.getAllByRole('button', { name: '신청 제출하기' });
+    fireEvent.click(submitButton);
+    fireEvent.click(await screen.findByRole('button', { name: '확인하고 신청하기' }));
+
+    await waitFor(() => {
+      expect(submitRegistrationMutateAsync).toHaveBeenCalledWith(
+        expect.objectContaining({
+          termsDocumentIds: [
+            '11111111-1111-4111-8111-111111111111',
+            '22222222-2222-4222-8222-222222222222',
+            '33333333-3333-4333-8333-333333333333',
+          ],
+        }),
+      );
+    });
+  });
+
   it('참가비가 없는 대회는 단계 라벨에서도 결제를 예고하지 않는다', async () => {
     // #1017 이 입력은 다 걷어냈는데 **라벨만 결제를 전제**하고 있었다 — 2026-09-04 alpha 실측:
     // 본문이 "이 대회는 무료로 참가할 수 있어요" 인 화면의 진행 표시가 `동의 · 결제 수단` /

@@ -1572,6 +1572,7 @@ export function TournamentApplyPageClient({ tournamentId }: { tournamentId: stri
   const { data: myTeamsData, isLoading: loadingTeams } = useV1MyTeams();
   const { data: myRegistrations = [], isLoading: loadingMyRegistrations } = useV1MyRegistrations(tournamentId);
   const tournamentTerms = useV1CurrentTerms('tournament_application');
+  const currentTermsDocumentIds = new Set((tournamentTerms.data?.items ?? []).map((term) => term.documentId));
   const authMe = useV1AuthMe();
   // undefined = 아직 모름(로딩 중이라 막지 않는다), false = 미인증으로 확인됨.
   const phoneVerified = authMe.data?.verification?.phoneVerified;
@@ -1947,7 +1948,8 @@ export function TournamentApplyPageClient({ tournamentId }: { tournamentId: stri
       setRegistrationId(targetRegistrationId);
       const submittedRegistration = await submitRegistration.mutateAsync({
         registrationIdOverride: targetRegistrationId,
-        termsDocumentIds: agreements.acceptedTermsDocumentIds ?? [],
+        // 임시저장에서 복원한 동의에는 그사이 새 버전으로 바뀐 약관의 옛 문서 id 가 남을 수 있다 — 지금 약관만 보낸다.
+        termsDocumentIds: (agreements.acceptedTermsDocumentIds ?? []).filter((id) => currentTermsDocumentIds.has(id)),
         paymentMethod: agreements.paymentMethod,
         depositorName: agreements.paymentMethod === 'bank_transfer' ? agreements.depositorName : undefined,
         agreedRules: agreements.agreedRules,

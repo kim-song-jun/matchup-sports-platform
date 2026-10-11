@@ -151,6 +151,7 @@ export function LeagueFixturePanel({
           awayLabel={node.away.label}
           isKnockout={false}
           submitLabel="점수 확정"
+          confirmBeforeSubmit
           pending={quickResult.isPending}
           errorMessage={quickError}
           onSubmit={(score) => {

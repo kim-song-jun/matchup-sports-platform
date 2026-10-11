@@ -33,7 +33,8 @@ describe('GameSummaryHeader 역할 라벨', () => {
   it('대회 스태프 역할은 그대로다 (회귀)', () => {
     render(<GameSummaryHeader game={gameWith('platform_ops')} currentRevision={null} />);
 
-    expect(screen.getByText(/플랫폼 운영자/)).toBeInTheDocument();
+    // 이 줄은 보는 사람의 권한이다 — 경기를 운영한 사람으로 읽히지 않도록 "내 권한" 이 붙는다.
+    expect(screen.getByText(/내 권한 플랫폼 운영자/)).toBeInTheDocument();
     expect(document.body.textContent).not.toContain('undefined');
   });
 

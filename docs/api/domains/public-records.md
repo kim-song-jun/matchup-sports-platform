@@ -439,6 +439,8 @@ identity/side itself:
   Unlinked participants aggregate by normalised name snapshot within the
   tournament; each row is `{ userId: string | null, name: string, teamName:
   string | null, goals: number, assists: number }`.
+  Each list is capped at 10 rows, extended with every player tied with the
+  10th row, so a tie group is never split (the award chips show rank 1-3 including ties).
 - **The schedule (`GET /tournaments/:id/schedule`) deliberately does not carry
   `profileHref`.** Its `consentMap` stays behind the name-gating flag because that endpoint
   *is* polled while any fixture is live (`LIVE_POLL_INTERVAL_MS`). Loading consent

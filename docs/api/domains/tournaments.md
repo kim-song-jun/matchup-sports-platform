@@ -217,6 +217,10 @@ Campaign admin routes inherit `V1AuthGuard`. Production accepts only the signed 
 - Reverting completion changes only `status`. Awards, standings and reviews are derived from `status === 'completed'`, so they are hidden again until the tournament is completed again. Review-request notifications are sent on the first completion only (a prior `completed` status log suppresses re-sending).
 - A restored draft is not publicly listed or readable (draft/cancelled return 404 to consumers) until it is opened again, which re-runs the paid-tournament payment-instruction check.
 
+## Admin registration counts (MD-QA #88)
+
+`GET /admin/tournaments` rows' `registrationCount` and `GET /admin/tournaments/:id` `operationCounts.registrations` count registrations whose status is **not** `draft` or `cancelled` (unsubmitted drafts and cancelled/rejected applications). They are not the total number of registration rows; use `GET /admin/tournaments/:id/registrations` for the full set. The `ACTIVE_REGISTRATION_COUNT` filter in `tournaments-admin.service.ts` is the single source for both.
+
 ## Admin Tournament Creation
 
 Admin-created tournaments require `teamCount` per tournament. The API does not treat an omitted team count as unlimited; missing `teamCount` is rejected with `400 TOURNAMENT_TEAM_COUNT_REQUIRED`. Public capacity, registration blocking, and progress bars must use the saved tournament `teamCount`, not a hard-coded default.
@@ -325,6 +329,8 @@ The list (`GET /api/v1/tournaments`) and detail (`GET /api/v1/tournaments/:tourn
 | `POST` | `/api/v1/tournaments/:tournamentId/registrations/:registrationId/cancel-request/withdraw` | user, team manager+ | empty body | `cancel_requested` returns to its saved previous status |
 
 `cancel-request` stores the status that existed before `cancel_requested`. It is rejected with `409 TOURNAMENT_ENDED` (registration unchanged) when the tournament or league is `completed` or `cancelled` — terminal states have nothing left to cancel; this applies to `draft` registrations too. Other non-cancellable registration statuses keep returning `409 REGISTRATION_NOT_CANCELLABLE`. `cancel-request/withdraw` is allowed only while the registration status is `cancel_requested`; it clears `cancelRequestedAt`, `cancelReason`, and the stored previous status after restoring the registration.
+
+Registration responses carry `cancelReason` (the team's reason from `cancel-request`), `adminCancelReason` (the reason an admin gave when processing the cancellation) and `cancelOutcome` (`approved` when an admin accepted a `cancel_requested` registration, `rejected` when an admin turned down a registration that had no cancel request, `null` for a draft the team cancelled itself and for rows older than the column). `PATCH /admin/registrations/:registrationId/cancel` writes the admin reason and outcome without touching `cancelReason`; the regular-league `400 LEAGUE_CANCEL_REASON_REQUIRED` applies only to a rejection, not to approving a team's own cancel request.
 
 `cancel-request/withdraw` re-reads the tournament under a row lock before restoring the registration, so it can reject after the outer checks passed. **Three** conflicts are possible there:
 
@@ -458,6 +464,7 @@ All team roster mutations lock the registration row and re-read `rosterLockedAt`
 - 번호는 JSON 숫자 정수 1..2147483647이다. 생략하면 유지하며 null/문자열/boolean/0/소수/범위 초과는 400이다.
 - 같은 대회·round·legNumber의 다른 경기와 번호가 겹치면 `409 FIXTURE_NUMBER_CONFLICT`다. 조가 달라도 같은 round/leg에서는 번호를 공유하지 않는다. 변경은 기존 생성 잠금 및 DB 유일성으로 보호하며 실패 시 전체 트랜잭션을 되돌린다.
 - 응답의 fixtureNumber, TeamMatch 제목, 연결된 팀 일정 제목에 새 번호가 반영된다. 번호가 출전정지 경기 순서에 영향을 주므로 관련 팀의 시작 전 명단 재계산 이벤트를 남긴다. 일정 상태는 번호 변경만으로 되살리지 않는다.
+- **경기 순서 = 단계 순서 (MD-QA #76)**: 출전정지가 "그 팀의 다음 경기"를 셀 때 대회 경기는 단계(조별리그 → 16강/12강 → 8강 → 4강 → 3·4위전·결승)를 먼저 보고, 같은 단계 안에서만 시각 → 라운드 → 대진 번호 → 레그 순으로 센다. 예정 시각이 단계와 어긋나도 결승이 조별 경기보다 먼저 "다음 경기"가 되지 않는다. `PATCH /admin/fixtures/:fixtureId` 가 `scheduledAt` 을 **바꾸면** 같은 대회의 다른 경기와 단계 순서가 뒤집히는지 검사해(앞 단계 경기보다 이르거나 뒤 단계 경기보다 늦으면) `409 FIXTURE_SCHEDULE_STAGE_ORDER` 로 거절한다. 시각을 비우거나 저장된 값을 그대로 보내는 요청, 단계를 알 수 없는 운영자 입력 라운드, 같은 단계끼리는 검사하지 않는다. `POST` 경기 추가도 새 경기의 단계와 시각으로 같은 검사를 한다(멱등 재생은 제외). 대진 템플릿·리그 대진 생성기가 일괄로 넣는 시각은 검사 대상이 아니다 — 운영자가 단계별 시각을 고르는 경로가 아니라 한 번에 짜인 일정을 그대로 만드는 경로이고, 이후 수정은 위 PATCH 검사를 받는다.
 - 경기 UUID, 팀 배정, 진출 edge, parent ID 및 Game 결과/리비전은 유지한다. 결과 확정 경기에서도 번호만 수정할 수 있으며 팀 변경의 기존 결과 잠금은 유지한다. 감사 `tournament.bracket.fixture.update`에 변경 전·후 번호를 기록한다.
 - 번호 이동 후 비워진 옛 좌표에서 새 경기 생성은 다음 creation generation을 사용한다. 이전 멱등 기록 및 경기 UUID를 덮어쓰거나 옛 경기를 replay하지 않는다. 기존 좌표의 동일 요청 재시도 계약은 유지한다.
 - 관리자 경기 수정 모달에서 현재 번호를 채우고 실제 API로 저장한다. 오류 시 입력/모달 유지, 성공 후 관리자 및 공개 상세 캐시를 갱신한다. 기존 프론트 MSW에는 이 PATCH 핸들러가 없으며 번호가 없는 기존 수정 payload는 계속 유효하다.
@@ -508,17 +515,17 @@ All team roster mutations lock the registration row and re-read `rosterLockedAt`
 
 ### Venue snapshot (Task 20261070)
 
-- Admin create/update accept `venue` + `venueAddress`, `venueLatitude`, `venueLongitude`, `venueProvider`, `venueProviderId`; responses add `venueAddress`, `venueProvider`, `venueProviderId` next to `venue`, `latitude`, `longitude`. The server no longer geocodes `venue`.
+- Admin create/update accept `venue` + `venueAddress`, `venueLatitude`, `venueLongitude`, `venueProvider`, `venueProviderId`; responses add `venueAddress`, `venueProvider`, `venueProviderId` next to `venue`, `latitude`, `longitude`. The server no longer geocodes `venue`. On update (tournament `PATCH` and fixture `PATCH /admin/fixtures/:id`), sending any address/pin field without `venue` is 400 `PLACE_NAME_REQUIRED` — the snapshot is replaced only as a whole.
 - PATCH: when the `venue` key is present the whole snapshot is replaced (a name-only PATCH clears coordinates and provider).
 - Bracket fixtures: `venue` + the same five `venue*` fields on create/update fixture DTOs map to the fixture's `place*` columns; fixtures created without a venue inherit the tournament's snapshot. Fixture responses keep `venue` and add `place: V1PlaceView | null`.
 
 ## Public list default order (2026-10-10)
 
-`GET /tournaments` orders by status group (recruiting, recruitment closed, in progress, finished), then date, then `id` ascending as the tie-breaker. "Recruitment closed" is the status the card shows: stored `closed`, plus a stored-`open` tournament whose `registrationDeadlineAt` has passed or whose capacity (confirmed + awaiting_payment/payment_checking/paid registrations vs `teamCount`) is full; regular leagues have no capacity and keep their stored status. The server is the only place this order is defined; clients render `items[]` as received. The order, the cursor comparison and the `page` offset are all computed in the database (one `ORDER BY` over the status group, the group's date key and `id`), so request cost depends on the page size, not on how many tournaments exist. A `cursor` is an opaque token (`pageInfo.nextCursor`) that carries the sort key its row had on the page that issued it, so a row that turns into 모집 마감 mid-scroll does not make the next page skip rows; a token the list did not issue returns an empty page. `page=1` together with a `cursor` follows the cursor; `total` is counted only for `page` requests.
+`GET /tournaments` orders by status group (recruiting, recruitment closed, in progress, finished), then date, then `id` ascending as the tie-breaker. "Recruitment closed" is the status the card shows: stored `closed`, plus a stored-`open` tournament whose `registrationDeadlineAt` has passed or whose capacity (confirmed + awaiting_payment/payment_checking/paid registrations vs `teamCount`) is full; regular leagues have no capacity and keep their stored status. The server is the only place this order is defined; clients render `items[]` as received. The order, the cursor comparison and the `page` offset are all computed in the database (one `ORDER BY` over the status group, the group's date key and `id`), so request cost depends on the page size, not on how many tournaments exist. A `cursor` is an opaque token (`pageInfo.nextCursor`) that carries the sort key its row had on the page that issued it, so a row that turns into 모집 마감 mid-scroll does not make the next page skip rows; a token the list did not issue returns an empty page. When `page` is present (including `page=1`) it wins and any `cursor` sent with it is ignored; `total` is counted only for `page` requests.
 
 1. `open` (a regular league's `draft` "upcoming" is grouped here) - `scheduledAt` ascending
 2. `closed` - `scheduledAt` ascending
 3. `in_progress` - `scheduledAt` ascending
 4. `completed` - most recently finished first (`scheduledEndAt` descending, falling back to `scheduledAt`)
 
-Rows without a date sort last inside their group. `cursor` is still the id of the last row of the previous page and `page` is an offset into the same order, so pages never skip or repeat a row. A `cursor` that no longer matches a visible row returns an empty page. Passing `status` narrows to one group; the group's ordering above still applies. The visible set is unchanged (`draft`/`cancelled` tournaments stay hidden).
+Rows without a date sort last inside their group. `page` is an offset into the same order, so page-number paging never skips or repeats a row. Passing `status` narrows to one group; the group's ordering above still applies. The visible set is unchanged (`draft`/`cancelled` tournaments stay hidden).

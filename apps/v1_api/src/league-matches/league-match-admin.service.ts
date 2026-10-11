@@ -61,6 +61,7 @@ import {
   RegenerateLeagueFixturesDto,
   OpenLeagueRegistrationDto,
   RevertLeagueCompletionDto,
+  CompleteLeagueDto,
   HoldLeagueDto,
   ResumeLeagueDto,
   UpdateLeagueDisciplineDto,
@@ -69,10 +70,14 @@ import {
 } from './dto/league-match.dto';
 import { LEAGUE_TIE_BREAK_ORDER } from './league-tie-break';
 import { PLACE_SELECT } from '../places/place-select';
-import { toPlaceColumns, toPlaceView, type PlaceSnapshot, type PlaceView } from '../places/place-snapshot';
+import { rejectPartialPlaceUpdate, toPlaceColumns, toPlaceView, type PlaceSnapshot, type PlaceView } from '../places/place-snapshot';
 import { DEFAULT_FIXTURE_PLACE_NAME, resolveLeagueFixturePlace, type LeagueFixturePlaceInput } from './league-fixture-place';
 import { findTournamentOnSurface } from '../tournaments/tournament-surface-lookup';
-import { assertLeagueFixtureGenerationAllowedInTx } from './league-fixture-generation-guard';
+import {
+  assertLeagueFixtureGenerationAllowedInTx,
+  assertLeagueNotEndedInTx,
+  assertLeagueNotEndedUnderShareLockInTx,
+} from './league-fixture-generation-guard';
 import { LEAGUE_STATE_BY_STATUS, isCompleteLeagueMirror } from '../tournaments/league-competition-mirror';
 import { randomUUID } from 'node:crypto';
 import { BRACKET_TEMPLATE_MAX_FIXTURES } from '../tournaments/templates/bracket-template-plan';
@@ -534,7 +539,7 @@ export class LeagueMatchAdminService {
           gamesPerTeamPerDay: dto.timing.gamesPerTeamPerDay ?? 1,
         }
       : undefined;
-    const totalRounds = dto.weeksCount * (timing?.gamesPerTeamPerDay ?? 1);
+    const totalRounds = Math.min(dto.weeksCount * (timing?.gamesPerTeamPerDay ?? 1), dto.roundsCount ?? Infinity);
     if (totalRounds > MAX_TOTAL_ROUNDS) {
       throw new UnprocessableEntityException({
         code: 'LEAGUE_FIXTURE_LIMIT_EXCEEDED',
@@ -1388,6 +1393,8 @@ export class LeagueMatchAdminService {
       // 일괄 생성과 같은 락. 같은 리그에 동시에 손대는 두 요청이 서로의 주차 계산을
       // 어긋나게 만들지 않는다 — 아래 형제 목록 조회가 이 락 안에서 일어나야 한다.
       await tx.$queryRaw`SELECT id FROM "v1_tournaments" WHERE id = ${leagueId} FOR UPDATE`;
+      // 끝남·취소만 막는다 — 보류 중 수동 추가는 허용이라 일괄 생성 가드(on_hold 도 막음)를 쓰지 않는다.
+      await assertLeagueNotEndedInTx(tx, leagueId);
       // **잠근 뒤에** 로스터를 다시 읽는다. 잠금 밖에서 읽은 `league.teams` 로 판정하면
       // TOCTOU 다 — 그 사이 `removeTeam` 이 커밋되면 **리그에서 이미 빠진 팀으로 대진이
       // 생기고**, 그 대진은 로스터에 없는 팀을 가리킨 채 남는다(제거 경로가 취소할 대상
@@ -1440,6 +1447,11 @@ export class LeagueMatchAdminService {
       // 끼어든 경기로 팀 경기 순서(출전정지)가 바뀐다 — 대회 대진 생성과 같이 양 팀을 다시 계산한다.
       await enqueueRosterResync(tx, competitionTeamTargets(league.id, [dto.homeTeamId, dto.awayTeamId]));
       return created;
+    }, {
+      // 리그 행 락을 기다린다 — 템플릿·재생성이 그 락을 45초까지 쥘 수 있어 Prisma 기본 5초면 정상 대기도 만료된다.
+      // 그 리그 레인과 같은 45초 + maxWait 5초(ALB idle_timeout 60초 안, 위 generateFixtures 주석).
+      timeout: 45_000,
+      maxWait: 5_000,
     });
 
     return { leagueId, teamMatchId };
@@ -1481,12 +1493,7 @@ export class LeagueMatchAdminService {
 
   async updateFixture(user: V1AuthUser, leagueId: string, teamMatchId: string, dto: UpdateLeagueFixtureDto) {
     const admin = await this.adminContext.getMutationAdmin(user.id);
-    // 이름 없이 주소·좌표만 오면 옛 핀과 새 주소가 섞인 장소가 된다 — 부분 수정은 받지 않는다.
-    const orphanPlaceField = [dto.placeAddress, dto.placeLatitude, dto.placeLongitude, dto.placeProvider, dto.placeProviderId]
-      .some((value) => value !== undefined);
-    if (dto.placeName === undefined && orphanPlaceField) {
-      throw new BadRequestException({ code: 'PLACE_NAME_REQUIRED', message: '장소를 바꾸려면 장소를 다시 골라 주세요.' });
-    }
+    rejectPartialPlaceUpdate(dto.placeName, [dto.placeAddress, dto.placeLatitude, dto.placeLongitude, dto.placeProvider, dto.placeProviderId]);
     const teamMatch = await this.prisma.v1TeamMatch.findFirst({ where: { id: teamMatchId, leagueId } });
     if (teamMatch === null) {
       throw new NotFoundException({ code: 'LEAGUE_NOT_FOUND', message: '이 리그의 대진이 아니에요.' });
@@ -1501,6 +1508,8 @@ export class LeagueMatchAdminService {
       : null;
     const nextStartAt = dto.startsAt === undefined ? undefined : new Date(dto.startsAt);
     const updated = await this.prisma.$transaction(async (tx) => {
+      // 끝남·취소만 막고 보류 중 수정은 허용한다. 여기 읽기는 빠른 거절용이고, 최종 판정은 쓰기 뒤 공유 잠금 아래에서 한다.
+      await assertLeagueNotEndedInTx(tx, leagueId);
       const nextEndAt = nextStartAt === undefined
         ? undefined
         : durationMs !== null
@@ -1516,6 +1525,8 @@ export class LeagueMatchAdminService {
           ...(nextPlace === undefined ? {} : toPlaceColumns(nextPlace)),
         },
       });
+      // 리그 행은 쓰기 뒤에 기다리지 않고 잡는다(FOR SHARE NOWAIT) — 순서·이유는 그 가드의 docblock.
+      await assertLeagueNotEndedUnderShareLockInTx(tx, leagueId);
       const persistedStartAt = requireLeagueStartAt(result.startAt, '리그 대진의 시작 시각이 없어 수정할 수 없어요.');
       // 사용자 확정: 시작 시각이 바뀌면 결과 미입력 리마인더도 새 시각을 따라간다 —
       // 새 세대(startAt)로 다시 스케줄할 뿐 옛 행은 건드리지 않는다(발화 시점에
@@ -1548,6 +1559,9 @@ export class LeagueMatchAdminService {
         tx,
       );
       return result;
+    }, {
+      timeout: 45_000, // 템플릿·재생성이 같은 경기 행을 45초까지 쥘 수 있다 — 그 대기 한도(리그 행은 기다리지 않는다)
+      maxWait: 5_000,
     });
     return {
       teamMatchId: updated.id,
@@ -1838,7 +1852,71 @@ export class LeagueMatchAdminService {
         },
         tx,
       );
-      return { leagueId, state: LEAGUE_STATE_BY_STATUS[restoreStatus], isPublic: restorePublic, alreadyProcessed: false };
+      // 보류 중에 남은 대진이 모두 확정·취소됐다면 진행 중으로 돌아가는 즉시 다시 판정한다 —
+      // 안 그러면 결과 확정 훅이 다시 불릴 일이 없어 리그가 영원히 진행 중으로 남는다(MD-QA #93).
+      const completed =
+        LEAGUE_STATE_BY_STATUS[restoreStatus] === 'active' &&
+        (await this.leagueCompletion.settle(tx, leagueId, 'hold_released'));
+      return {
+        leagueId,
+        state: completed ? ('completed' as const) : LEAGUE_STATE_BY_STATUS[restoreStatus],
+        isPublic: restorePublic,
+        alreadyProcessed: false,
+      };
+    });
+  }
+
+  /**
+   * 리그 종료(수동). 자동 종료는 결과 확정·대진 취소 때만 판정되므로, '진행 중으로 되돌리기' 뒤
+   * 대진을 바꾸지 않으면 남은 대진이 없어도 리그가 진행 중으로 남는다(MD-QA #93). 판정은 자동
+   * 종료와 같은 `settle`을 그대로 써서 "취소 제외 전 대진 확정" 조건을 우회하지 않는다.
+   */
+  async completeLeague(user: V1AuthUser, leagueId: string, dto: CompleteLeagueDto) {
+    const admin = await this.adminContext.getMutationAdmin(user.id);
+    return this.prisma.$transaction(async (tx) => {
+      const league = await findTournamentOnSurface(tx, ['regular_league'], {
+        where: { id: leagueId, deletedAt: null },
+        select: { id: true, status: true },
+      });
+      if (league === null) {
+        throw new NotFoundException({ code: 'LEAGUE_NOT_FOUND', message: '리그를 찾을 수 없어요.' });
+      }
+      const state = LEAGUE_STATE_BY_STATUS[league.status];
+      if (state === 'completed') {
+        return { leagueId, state: 'completed' as const, alreadyProcessed: true };
+      }
+      if (state !== 'active') {
+        throw new ConflictException({ code: 'LEAGUE_NOT_ACTIVE', message: '진행 중인 리그만 종료할 수 있어요.' });
+      }
+      const completed = await this.leagueCompletion.settle(tx, leagueId, 'admin_completed');
+      if (!completed) {
+        // 동시에 다른 관리자(또는 자동 종료)가 먼저 종료했으면 settle 은 0행 갱신으로 false 를 돌려준다 —
+        // 그 경우는 남은 경기 때문이 아니므로 다시 읽어 멱등 응답으로 돌려준다.
+        const latest = await findTournamentOnSurface(tx, ['regular_league'], {
+          where: { id: leagueId, deletedAt: null },
+          select: { status: true },
+        });
+        if (latest !== null && LEAGUE_STATE_BY_STATUS[latest.status] === 'completed') {
+          return { leagueId, state: 'completed' as const, alreadyProcessed: true };
+        }
+        throw new ConflictException({
+          code: 'LEAGUE_FIXTURES_PENDING',
+          message: '아직 결과가 확정되지 않은 경기가 있어요. 모든 경기를 확정하거나 취소한 뒤 종료해 주세요.',
+        });
+      }
+      await this.adminContext.logAdminAction(
+        admin,
+        {
+          action: 'league_match.complete',
+          targetType: 'league_match',
+          targetId: leagueId,
+          reason: dto.reason ?? null,
+          fromStatus: 'active',
+          toStatus: 'completed',
+        },
+        tx,
+      );
+      return { leagueId, state: 'completed' as const, alreadyProcessed: false };
     });
   }
 

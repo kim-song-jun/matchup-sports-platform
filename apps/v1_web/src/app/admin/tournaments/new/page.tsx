@@ -32,6 +32,7 @@ import { TournamentDatetimeField } from '@/components/admin/tournaments/tourname
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
 import type { PlaceValue } from '@/lib/place';
 import { PlacePicker } from '@/components/v1-ui/place-picker';
+import { PLACE_NAME_MAX_LENGTH } from '@/lib/place';
 import { revealWizardControl, revealWizardStage } from './wizard-stage-viewport';
 import { TournamentCard } from '@/app/tournaments/tournament-card';
 import {
@@ -852,6 +853,7 @@ function ScheduleStep({
         />
       </div>
       <PlacePicker
+        maxLength={PLACE_NAME_MAX_LENGTH.tournament}
         id="venue"
         label="장소"
         value={state.venue}

@@ -17,7 +17,7 @@ import { teamMatchDateErrors } from '@/lib/team-match-dates';
 import { V1_LEVELS } from '@/lib/v1-levels';
 import { GENDER_RULE_OPTIONS, genderRuleLabel, matchGenderRuleLabel } from '@/lib/v1-status-labels';
 import { toDistrictRegionOptions } from '@/lib/v1-regions';
-import { placeFromView, toMatchPlacePayload, type PlaceValue } from '@/lib/place';
+import { placeFromView, toMatchPlacePayload, type PlaceValue, PLACE_NAME_MAX_LENGTH } from '@/lib/place';
 import { PlacePicker } from '@/components/v1-ui/place-picker';
 import type { V1AdminTeamMatchDetail } from '@/types/api';
 import { isoToKstDatetimeLocal, kstDatetimeLocalToIso } from '@/lib/kst-calendar';
@@ -125,7 +125,7 @@ function EditForm({ teamMatch }: { teamMatch: V1AdminTeamMatchDetail }) {
 
           <section className="space-y-4 rounded-2xl border border-[var(--border)] bg-[var(--card-surface)] p-5">
             <h2 className="text-[length:var(--font-size-body-lg)] font-bold text-[var(--text-strong)]">장소와 시간</h2>
-            <PlacePicker label="경기 장소" value={place} onChange={setPlace} />
+            <PlacePicker label="경기 장소" value={place} onChange={setPlace} maxLength={PLACE_NAME_MAX_LENGTH.match} />
             <div className="grid gap-4 md:grid-cols-2">
               <label className="text-[length:var(--font-size-body-sm)] font-medium">경기 시작<input aria-label="경기 시작" type="datetime-local" value={startsAt} onChange={(event) => setStartsAt(event.target.value)} className={inputClass} /></label>
               <label className="text-[length:var(--font-size-body-sm)] font-medium">경기 종료<input aria-label="경기 종료" type="datetime-local" value={endsAt} onChange={(event) => setEndsAt(event.target.value)} className={inputClass} /></label>

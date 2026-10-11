@@ -322,6 +322,15 @@ describe('ScheduleContent — 득점 기록 전·후반 구분', () => {
     expect(screen.queryByText(hiddenLabel)).not.toBeInTheDocument();
   });
 
+  it('선수를 지정하지 않은 골(participantName null)은 "익명"으로 보여준다', () => {
+    render(<ScheduleContent tournamentId="tour-1" data={{ ...makeData(), items: [fixtureEntry({
+      scorers: [{ side: 'home', participantName: null, jerseyNumber: null, period: 1, clockMs: 60_000 }],
+    })] }} />);
+
+    expect(screen.getByRole('group', { name: '전반 기록' })).toHaveTextContent('익명');
+    expect(screen.queryByText(/선수 정보 없음/)).not.toBeInTheDocument();
+  });
+
   /**
    * 레거시 대회 결과에서 복원된 골(`goal-event-backfill.ts`)은 원본에 전/후반이 아예
    * 없었다 -- 서버가 `period: null`("모름")로 내려준다. 예전 `period !== 1` 분기는 그

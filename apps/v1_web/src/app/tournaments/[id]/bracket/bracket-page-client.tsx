@@ -33,7 +33,7 @@ import {
 } from '@/components/public-game-records/schedule-content';
 import { competitionFormatLabel, isLeagueCompetition } from '@/lib/competition-kind';
 import { useCurrentHref } from '@/components/v1-ui/use-current-href';
-import { withFromPath } from '@/lib/session-storage';
+import { hasStoredV1Session, withFromPath } from '@/lib/session-storage';
 import type {
   V1TournamentDetail,
   V1TournamentFixture,
@@ -384,7 +384,13 @@ export function BracketScheduleTab({
   // `/schedule`의 권한 기능도 통합 허브인 `/bracket`에서 동일하게 제공한다. 공개 일정
   // 조회와 분리된 인증 전용 요청이라 비로그인·비참가자는 빈 상태로 끝나고, 참가팀
   // owner/manager에게만 자기 팀 경기 강조가 열린다.
-  const myFixtures = useV1MyTournamentFixtures(tournamentId);
+  // 비로그인 관전자는 세션 힌트가 없으니 요청 자체를 보내지 않는다(보내면 매번 401).
+  // 힌트는 SSR 하이드레이션 불일치를 피하려고 effect 에서 읽는다.
+  const [hasSessionHint, setHasSessionHint] = useState(false);
+  useEffect(() => {
+    setHasSessionHint(hasStoredV1Session());
+  }, []);
+  const myFixtures = useV1MyTournamentFixtures(tournamentId, { enabled: hasSessionHint });
   // 리그는 조회조차 하지 않는다 — 위 섹션 주석 참조.
   const playerRecords = usePublicTournamentPlayerRecords(tournamentId, { enabled: !isRegularLeague });
 

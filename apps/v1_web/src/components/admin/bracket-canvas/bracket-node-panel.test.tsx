@@ -376,6 +376,8 @@ describe('BracketNodePanel — 결과 구역', () => {
     fireEvent.change(screen.getByLabelText('서울FC 점수'), { target: { value: '2' } });
     fireEvent.change(screen.getByLabelText('대구FC 점수'), { target: { value: '1' } });
     fireEvent.click(screen.getByRole('button', { name: '점수 확정' }));
+    expect(mocks.quick).not.toHaveBeenCalled();
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: '점수 확정' }));
     expect(mocks.quick).toHaveBeenCalledWith({ gameId: 'game-1', expectedVersion: 3, score: { home: 2, away: 1 } }, expect.any(Object));
   });
 
@@ -384,6 +386,7 @@ describe('BracketNodePanel — 결과 구역', () => {
     fireEvent.change(screen.getByLabelText('서울FC 점수'), { target: { value: '2' } });
     fireEvent.change(screen.getByLabelText('대구FC 점수'), { target: { value: '1' } });
     fireEvent.click(screen.getByRole('button', { name: '점수 확정' }));
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: '점수 확정' }));
     act(() => {
       mocks.quick.mock.calls[0][1].onError(
         new V1ApiError({ statusCode: 409, code: 'QUICK_RESULT_ROSTER_SYNCING', message: 'x', details: null, requestId: 'r', timestamp: 't' } as unknown as ConstructorParameters<typeof V1ApiError>[0]),

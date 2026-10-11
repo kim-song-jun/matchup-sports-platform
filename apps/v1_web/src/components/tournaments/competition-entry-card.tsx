@@ -108,7 +108,7 @@ function CompetitionEntryCard({
         .sort((a, b) => (a.scheduledAt ?? '').localeCompare(b.scheduledAt ?? ''))[0] ?? null
     : null;
   const teamName = registration.teamName ?? team?.name ?? '우리 팀';
-  const status = tournamentRegistrationStatusConfig(registration.status);
+  const status = tournamentRegistrationStatusConfig(registration.status, registration.cancelOutcome);
   const Heading = headingLevel === 2 ? 'h2' : 'h3';
   const rosterHref = withFromPath(registrationRosterPath(competition.id, registration.id), currentHref);
   const secondaryButton = 'tm-btn tm-btn-md tm-btn-neutral';

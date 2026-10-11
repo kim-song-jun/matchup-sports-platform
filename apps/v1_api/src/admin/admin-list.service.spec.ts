@@ -929,6 +929,19 @@ describe('AdminService — list/detail endpoints', () => {
       expect(result.pageInfo.nextCursor).toBe('tm-5');
       expect(result.items).toHaveLength(5);
     });
+
+    it('page 1 wins over a cursor sent with it; without a page the cursor keys the window', async () => {
+      prisma.v1TeamMatch.findMany.mockResolvedValue([]);
+      prisma.v1TeamMatch.findUnique.mockResolvedValue({ id: 'tm-3', createdAt: new Date('2026-10-01T00:00:00Z'), startAt: null });
+
+      await service.listTeamMatches(adminAuthUser, { page: 1, cursor: 'tm-3', limit: 5 });
+      expect(prisma.v1TeamMatch.findUnique).not.toHaveBeenCalled();
+      expect(prisma.v1TeamMatch.findMany.mock.calls[0][0].where).not.toHaveProperty('AND');
+
+      await service.listTeamMatches(adminAuthUser, { cursor: 'tm-3', limit: 5 });
+      expect(prisma.v1TeamMatch.findUnique).toHaveBeenCalledWith(expect.objectContaining({ where: { id: 'tm-3' } }));
+      expect(prisma.v1TeamMatch.findMany.mock.calls[1][0].where).toHaveProperty('AND');
+    });
   });
 
   describe('listInquiries', () => {

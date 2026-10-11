@@ -11,7 +11,7 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { buildPageInfo, paginationArgs } from '../common/pagination/page-args';
 import { V1AuthUser } from '../auth/v1-auth-user';
-import { resolvePlaceSnapshot } from '../places/place-snapshot';
+import { rejectPartialPlaceUpdate, resolvePlaceSnapshot } from '../places/place-snapshot';
 import { isBracketPublished } from './tournament-detail.presenter';
 import { TOURNAMENT_SURFACE_KIND } from './tournament-surface';
 import { findTournamentOnSurface, TOURNAMENT_KINDS } from './tournament-surface-lookup';
@@ -48,6 +48,11 @@ const REASON_REQUIRED_TRANSITIONS: ReadonlyArray<readonly [TournamentStatus, Tou
   ['completed', 'in_progress'],
   ['cancelled', 'draft'],
 ];
+
+/** 신청 팀 수에서 빼는 상태 — 미제출 초안과 취소(운영자 거부 포함)된 신청은 참가 후보가 아니다. */
+const ACTIVE_REGISTRATION_COUNT = {
+  where: { status: { notIn: ['draft', 'cancelled'] } },
+} satisfies Prisma.V1Tournament$registrationsArgs;
 
 const TOURNAMENT_LIST_STATUSES = ['draft', 'open', 'closed', 'in_progress', 'completed', 'cancelled'] as const;
 
@@ -141,7 +146,7 @@ export class TournamentsAdminService {
       orderBy: { createdAt: 'desc' },
       take: limit + 1,
       ...paginationArgs(query, limit),
-      include: { _count: { select: { registrations: true } } },
+      include: { _count: { select: { registrations: ACTIVE_REGISTRATION_COUNT } } },
     }), this.prisma.v1Tournament.groupBy({
       by: ['status'],
       where: statusFacetWhere,
@@ -187,7 +192,7 @@ export class TournamentsAdminService {
     const row = await findTournamentOnSurface(this.prisma, TOURNAMENT_KINDS, {
       where: { id: tournamentId, deletedAt: null },
       include: {
-        _count: { select: { registrations: true, announcements: true } },
+        _count: { select: { registrations: ACTIVE_REGISTRATION_COUNT, announcements: true } },
         sport: { select: { code: true } },
       },
     });
@@ -536,6 +541,7 @@ export class TournamentsAdminService {
     }
 
     // venue 키가 오면 스냅샷 전체를 교체한다 — 이름만 바뀌면 옛 핀(좌표·출처)을 남기지 않는다.
+    rejectPartialPlaceUpdate(dto.venue, [dto.venueAddress, dto.venueLatitude, dto.venueLongitude, dto.venueProvider, dto.venueProviderId]);
     const venueSnapshot = dto.venue !== undefined ? this.resolveVenueSnapshot(dto) : undefined;
 
     const data: Prisma.V1TournamentUncheckedUpdateManyInput = {};

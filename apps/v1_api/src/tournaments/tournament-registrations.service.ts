@@ -217,6 +217,8 @@ export class TournamentRegistrationsService {
               cancelRequestedAt: null,
               cancelPreviousStatus: null,
               cancelReason: null,
+              adminCancelReason: null,
+              cancelOutcome: null,
               // 감사 finding(reg-confirm-reapply-state-machine #2/#3): 이전 사이클(확정→잠금→취소)의
               // 흔적을 되살아난 draft가 그대로 물려받아 (a) 새 신청인데 명단이 잠긴 채 시작하고
               // (b) 임시저장 상태인데 확정일이 함께 표시됐다. 취소 후 재신청은 완전히 새로운
@@ -815,6 +817,8 @@ export class TournamentRegistrationsService {
       rosterDeadlineOverrideAt: row.rosterDeadlineOverrideAt?.toISOString() ?? null,
       cancelRequestedAt: row.cancelRequestedAt?.toISOString() ?? null,
       cancelReason: row.cancelReason,
+      adminCancelReason: row.adminCancelReason,
+      cancelOutcome: row.cancelOutcome,
       playerCount,
       payment: payment
         ? {

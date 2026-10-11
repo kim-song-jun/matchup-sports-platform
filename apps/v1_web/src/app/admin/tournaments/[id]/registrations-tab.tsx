@@ -5,6 +5,7 @@ import { ClipboardList, Download, Lock, Unlock, Check, X, Users, User, Clock, Al
 import { useV1AdminTournamentRegistrations, useV1ConfirmPayment, useV1ConfirmRegistration, useV1CancelRegistrationAdmin, useV1RejectCancelRequest, useV1RosterLock, useV1RosterUnlock, useV1RosterDeadlineOverrideGrant, useV1RosterDeadlineOverrideRevoke, useV1ExportRosterCsv, useV1ExportTournamentRosterCsv, useV1AdminTournamentPlayers, useV1UpdatePlayerEligibility, useV1AdminAddPlayer, useV1AdminRemovePlayer, useV1AdminRosterEligibleMembers } from '@/hooks/use-v1-api';
 import type { V1AdminTournamentRegistration } from '@/types/api';
 import { extractErrorMessage } from '@/lib/error-message';
+import { registrationCancelOutcomeLabel } from '@/lib/v1-status-labels';
 import { V1ApiError } from '@/lib/api-client';
 import { AdminCardList, AdminEmpty } from '@/components/admin';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
@@ -537,6 +538,9 @@ export function RegistrationsTab({
   // **사유를 받는 전용 모달을 연다**(FE-4 B안). 예전에는 예/아니오 확인만 받고 사유 없이
   // 보냈는데, 리그는 서버가 사유를 필수로 요구해서(`LEAGUE_CANCEL_REASON_REQUIRED`)
   // **어드민이 리그 신청을 거부할 방법이 아예 없었다.**
+  // 팀이 낸 취소 요청(cancel_requested)을 받아 주는 것은 거부가 아니라 승인이다 — 같은 API 를
+  // 쓰지만 문구와 사유 필수 여부(승인은 선택)가 갈린다.
+  const isCancelApproval = cancelTarget?.status === 'cancel_requested';
   const handleCancel = (reg: V1AdminTournamentRegistration) => {
     setCancelTarget(reg);
     setCancelReason('');
@@ -547,22 +551,21 @@ export function RegistrationsTab({
     const target = cancelTarget;
     if (target === null || cancelRegistration.isPending) return;
     const reason = cancelReason.trim();
-    if (requireCancelReason && reason === '') {
+    if (requireCancelReason && !isCancelApproval && reason === '') {
       // 서버도 막지만, 저장 순간에야 알면 운영자는 무엇이 빠졌는지 폼을 다시 훑어야 한다.
       setCancelError('리그 참가를 거부하려면 사유를 입력해 주세요.');
       return;
     }
     cancelRegistration.mutate(
-      // 빈 사유는 **보내지 않는다** — 대회에서 빈 문자열을 보내면 팀이 남긴 취소 사유를
-      // 덮어쓸 여지가 생긴다(서버는 `dto.reason ?? 기존값` 으로 보존한다).
+      // 빈 사유는 보내지 않는다 — 서버가 빈 문자열을 그대로 어드민 사유로 저장한다.
       { registrationId: target.id, ...(reason === '' ? {} : { reason }) },
       {
         onSuccess: () => {
           setCancelTarget(null);
-          showToast('거부했어요.', 'success');
+          showToast(isCancelApproval ? '취소를 승인했어요.' : '거부했어요.', 'success');
         },
         onError: (err) =>
-          setCancelError(extractErrorMessage(err, '거부하지 못했어요.')),
+          setCancelError(extractErrorMessage(err, isCancelApproval ? '취소를 승인하지 못했어요.' : '거부하지 못했어요.')),
       },
     );
   };
@@ -832,7 +835,13 @@ export function RegistrationsTab({
                 }]
               : []),
           ],
-          description: r.cancelReason ? `취소 사유: ${r.cancelReason}` : undefined,
+          statusLabel: r.status === 'cancelled' && r.cancelOutcome ? registrationCancelOutcomeLabel(r.cancelOutcome) : undefined,
+          description: r.cancelReason || r.adminCancelReason ? (
+            <>
+              {r.cancelReason ? <span className="block">{`팀 취소 사유: ${r.cancelReason}`}</span> : null}
+              {r.adminCancelReason ? <span className="block">{`운영진 사유: ${r.adminCancelReason}`}</span> : null}
+            </>
+          ) : undefined,
           tone:
             r.status === 'cancelled' || r.status === 'cancel_requested'
               ? 'danger'
@@ -985,12 +994,10 @@ export function RegistrationsTab({
                   onClick={() => void handleCancel(reg)}
                   disabled={cancelRegistration.isPending}
                   icon={<X size={13} />}
-                  // 모달·토스트와 같은 말을 쓴다. 이 액션은 팀의 취소 요청을 받아 주는
-                  // 것만이 아니라 **운영자가 신청을 물리는 것**도 겸하고(그래서 리그는
-                  // 사유가 필수다), 위쪽 상태 필터 칩의 "취소" 는 **신청 상태 이름**이라
-                  // 다른 뜻이다. BE 경로는 `.../cancel` 그대로 둔다 — 저장하는 상태가
-                  // `cancelled` 라서, 거기까지 바꾸면 상태 이름과 어긋난다.
-                  label="거부"
+                  // 모달·토스트와 같은 말을 쓴다. 팀의 취소 요청이면 승인, 그 밖에는 운영자가
+                  // 신청을 물리는 거부다(그래서 리그는 사유가 필수다). 위쪽 상태 필터 칩의
+                  // "취소" 는 **신청 상태 이름**이라 다른 뜻이다. BE 경로는 `.../cancel` 그대로.
+                  label={reg.status === 'cancel_requested' ? '취소 승인' : '거부'}
                   tone="red"
                 />
               )}
@@ -1002,21 +1009,23 @@ export function RegistrationsTab({
       {/* 신청 거부 모달 — 사유를 받는다(리그는 필수). */}
       <SimpleModal
         open={cancelTarget !== null}
-        title="신청 거부"
+        title={isCancelApproval ? '취소 승인' : '신청 거부'}
         onClose={() => setCancelTarget(null)}
         pending={cancelRegistration.isPending}
       >
         <div className="flex flex-col gap-3">
           <p className="text-sm text-[var(--text-muted)]">
-            {cancelTarget?.teamName ?? cancelTarget?.teamId}의 신청을 거부할까요? 되돌릴 수 없어요.
+            {isCancelApproval
+              ? `${cancelTarget?.teamName ?? cancelTarget?.teamId}의 참가 취소 요청을 승인할까요? 승인하면 신청이 취소되고 되돌릴 수 없어요.`
+              : `${cancelTarget?.teamName ?? cancelTarget?.teamId}의 신청을 거부할까요? 되돌릴 수 없어요.`}
           </p>
-          {cancelTarget?.status === 'cancel_requested' && cancelTarget.cancelReason ? (
+          {isCancelApproval && cancelTarget?.cancelReason ? (
             <p className="text-xs text-[var(--text-muted)]">
               팀이 남긴 취소 사유: “{cancelTarget.cancelReason}”
             </p>
           ) : null}
           <label className="text-sm font-medium text-[var(--text-strong)]" htmlFor="cancel-reason">
-            사유{requireCancelReason ? '' : ' (선택)'}
+            {isCancelApproval ? '운영진 사유' : '사유'}{requireCancelReason && !isCancelApproval ? '' : ' (선택)'}
           </label>
           <textarea
             id="cancel-reason"
@@ -1027,7 +1036,7 @@ export function RegistrationsTab({
             }}
             rows={3}
             placeholder={
-              requireCancelReason
+              requireCancelReason && !isCancelApproval
                 ? '왜 거부하는지 적어 주세요. 팀에게 남는 기록이에요.'
                 : '필요하면 적어 주세요.'
             }
@@ -1055,7 +1064,7 @@ export function RegistrationsTab({
               className="tm-btn tm-btn-sm tm-btn-danger"
               style={{ minHeight: 44 }}
             >
-              {cancelRegistration.isPending ? '처리 중…' : '거부'}
+              {cancelRegistration.isPending ? '처리 중…' : isCancelApproval ? '취소 승인' : '거부'}
             </button>
           </div>
         </div>

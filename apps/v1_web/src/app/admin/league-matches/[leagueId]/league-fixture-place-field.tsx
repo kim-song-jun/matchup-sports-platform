@@ -28,6 +28,7 @@ export function LeagueFixturePlaceField({
   choice,
   onChange,
   disabled = false,
+  maxLength,
 }: {
   legend?: string;
   customLabel?: string;
@@ -36,6 +37,8 @@ export function LeagueFixturePlaceField({
   choice: LeaguePlaceChoice;
   onChange: (choice: LeaguePlaceChoice) => void;
   disabled?: boolean;
+  /** 이 화면이 보내는 DTO 의 장소 이름 한도(`PLACE_NAME_MAX_LENGTH`). */
+  maxLength: number;
 }) {
   const name = useId();
   const options: Array<{ mode: LeaguePlaceChoice['mode']; label: string }> = [
@@ -67,6 +70,7 @@ export function LeagueFixturePlaceField({
           onChange={(place) => onChange({ ...choice, place })}
           recentVenues={recentVenues}
           disabled={disabled}
+          maxLength={maxLength}
         />
       ) : null}
     </fieldset>

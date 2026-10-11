@@ -14,6 +14,7 @@ import {
   leaguePlacePayload,
   type LeaguePlaceChoice,
 } from './league-fixture-place-field';
+import { PLACE_NAME_MAX_LENGTH } from '@/lib/place';
 
 
 /**
@@ -209,6 +210,7 @@ export function LeagueManualFixtureModal({
 
         <div className="mb-4 grid">
           <LeagueFixturePlaceField
+            maxLength={PLACE_NAME_MAX_LENGTH.leagueManualFixture}
             defaultPlace={defaultPlace}
             recentVenues={recentVenues}
             choice={placeChoice}

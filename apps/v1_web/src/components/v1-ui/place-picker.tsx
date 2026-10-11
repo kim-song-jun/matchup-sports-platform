@@ -68,6 +68,8 @@ export type PlacePickerProps = {
   placeholder?: string;
   /** 루트 요소에 덧붙이는 클래스(어드민 폼 간격 맞춤 등). 구조·동작은 같다. */
   className?: string;
+  /** 직접 입력 이름 길이. 화면이 보내는 DTO 의 한도(`PLACE_NAME_MAX_LENGTH`)를 넘긴다. */
+  maxLength: number;
 };
 
 export function PlacePicker({
@@ -80,6 +82,7 @@ export function PlacePicker({
   disabled = false,
   placeholder = '장소 이름이나 주소를 검색해요',
   className,
+  maxLength,
 }: PlacePickerProps) {
   const autoId = useId();
   const inputId = id ?? `${autoId}-input`;
@@ -268,7 +271,7 @@ export function PlacePicker({
               type="text"
               value={value?.name ?? ''}
               placeholder="장소 이름을 직접 입력해요"
-              maxLength={100}
+              maxLength={maxLength}
               disabled={disabled}
               aria-invalid={error ? true : undefined}
               aria-describedby={describedBy}

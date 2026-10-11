@@ -16,6 +16,7 @@
  * the real final state.
  */
 
+import type { QueuedGameEvent } from '@/lib/game-operations-queue';
 import type { GameEventRecord, GameLineupParticipant } from '@/types/game-operations';
 
 function outParticipantIdOf(event: GameEventRecord): string | null {
@@ -60,4 +61,29 @@ export function countActiveSubstitutions(sideId: string, events: readonly GameEv
   return events.filter(
     (event) => event.type === 'SUBSTITUTION' && event.sideId === sideId && !reversedIds.has(event.id),
   ).length;
+}
+
+/**
+ * Participants with an active (non-reversed) red card. A sent-off player stays in the
+ * on-pitch set — the red card is the only record that they can no longer take part.
+ * `queuedItems` adds red cards the operator just recorded that the server has not
+ * acknowledged yet (queued/sending); failed and acked items are left out.
+ */
+export function deriveSentOffParticipantIds(
+  events: readonly GameEventRecord[],
+  queuedItems: readonly QueuedGameEvent[] = [],
+): ReadonlySet<string> {
+  const reversedIds = new Set(
+    events.map((event) => event.reversesEventId).filter((id): id is string => id !== null && id !== undefined),
+  );
+  const sentOff = new Set<string>();
+  for (const event of events) {
+    if (event.type !== 'CARD' || event.payload.card !== 'RED' || reversedIds.has(event.id)) continue;
+    if (event.participantId !== null && event.participantId !== undefined) sentOff.add(event.participantId);
+  }
+  for (const { status, event } of queuedItems) {
+    if (status !== 'queued' && status !== 'sending') continue;
+    if (event.type === 'CARD' && event.payload.card === 'RED' && event.participantId) sentOff.add(event.participantId);
+  }
+  return sentOff;
 }

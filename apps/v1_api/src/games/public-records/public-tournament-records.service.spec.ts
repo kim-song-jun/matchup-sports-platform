@@ -482,6 +482,27 @@ describe('PublicTournamentRecordsService.getMatch -- event participant identity 
     ]));
   });
 
+  it('공식 revision의 익명 골(참가자·snapshot 없음)은 가짜 이름 없이 participantName 이 null 이다', async () => {
+    const prisma = buildFakePrisma({
+      scheduledAt: new Date(Date.now() - 60_000),
+      consentLinks: [],
+      consentSnapshots: [],
+      participants: [ELIGIBLE_PARTICIPANT],
+      events: [],
+      officialRevision: {
+        state: 'OFFICIAL', supersedesId: null, officialAt: new Date(), score: { home: 1, away: 0 },
+        goalEvents: [
+          { id: 'anonymous-goal', sideId: 'side-home', participantId: null, playerNameSnapshot: null, minute: 5, period: 1, ownGoal: false },
+        ],
+      },
+    });
+    const result = await new PublicTournamentRecordsService(prisma, NO_ASSIGNMENTS_ACCESS).getMatch(TOURNAMENT_ID, FIXTURE_ID, undefined);
+
+    expect(result.events).toEqual([
+      expect.objectContaining({ type: 'GOAL', participantId: null, participantName: null, jerseyNumber: null }),
+    ]);
+  });
+
   it('정책 변경(2026-08-13): 동의 없이 미연동/게스트 참가자라도 대회 참가자면 관전자에게 이름이 보인다', async () => {
     const now = new Date();
     const prisma = buildFakePrisma({

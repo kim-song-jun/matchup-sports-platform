@@ -111,3 +111,75 @@ describe('출전정지는 그 팀의 다음 경기에서 소진된다 (S1)', () 
     expect(verdicts.size).toBe(0);
   });
 });
+
+describe('대회 경기 순서는 단계가 먼저다 (MD-QA #76)', () => {
+  // DB 정렬(시각순)을 흉내 낸 결과: 결승을 조별 3경기보다 이른 시각으로 잘못 저장한 대회.
+  //   결승 23:15 (송파-한강) · 조별 3경기 23:20 (마포-송파) · 8강 23:30 (송파-마포)
+  const row = (id: string, host: string, away: string, phase: string | null, round: string) => ({
+    id,
+    hostTeamId: host,
+    approvedApplicantTeamId: away,
+    game: { id: `g-${id}` },
+    tournamentDetails: { round, group: phase === null ? null : { phase } },
+  });
+  const BY_TIME = [
+    row('final', 'SP', 'HG', 'final', '결승'),
+    row('g3', 'MP', 'SP', 'group', 'league_r3'),
+    row('qf', 'SP', 'MP', 'quarter', '8강'),
+  ];
+
+  function tx(rows: unknown[]) {
+    return { v1TeamMatch: { findMany: jest.fn(async () => rows) } } as unknown as Prisma.TransactionClient;
+  }
+
+  it('시각이 더 이른 결승보다 조별 경기가 앞선다', async () => {
+    const order = await loadTeamCompetitionGameOrder(tx(BY_TIME), { competitionId: 'cup', isLeague: false, teamId: 'SP' });
+    expect(order.map((game) => game.key)).toEqual(['g3', 'qf', 'final']);
+  });
+
+  it('조 없는 토너먼트 경기는 라운드 이름으로 단계를 읽는다', async () => {
+    const rows = [row('final', 'SP', 'HG', null, '결승'), row('qf', 'SP', 'MP', null, '8강'), row('g3', 'MP', 'SP', 'group', 'league_r3')];
+    const order = await loadTeamCompetitionGameOrder(tx(rows), { competitionId: 'cup', isLeague: false, teamId: 'SP' });
+    expect(order.map((game) => game.key)).toEqual(['g3', 'qf', 'final']);
+  });
+
+  it('같은 단계 안에서는 DB 가 준 시각 순서를 그대로 둔다', async () => {
+    const rows = [row('g2', 'SP', 'HG', 'group', 'league_r2'), row('g1', 'SP', 'MP', 'group', 'league_r1')];
+    const order = await loadTeamCompetitionGameOrder(tx(rows), { competitionId: 'cup', isLeague: false, teamId: 'SP' });
+    expect(order.map((game) => game.key)).toEqual(['g2', 'g1']);
+  });
+
+  it('조별 경기 정지가 결승에서 다시 걸리지 않는다', async () => {
+    // 송파 9번이 g2 에서 경고 2장 → 1경기 정지. 결승이 g2 와 g3 사이 시각이어도 정지는 다음 조별 경기(g3)에서 소진되고 결승에선 풀린다.
+    const results: Record<string, number> = { 'g-g2': 2 };
+    const rowsByTime = [
+      row('g2', 'SP', 'HG', 'group', 'league_r2'),
+      row('final', 'SP', 'HG', 'final', '결승'),
+      row('g3', 'MP', 'SP', 'group', 'league_r3'),
+    ];
+    const db = {
+      v1TeamMatch: { findMany: jest.fn(async () => rowsByTime) },
+      v1Tournament: { findFirst: jest.fn(async () => ({ yellowAccumulationLimit: 2, redCardSuspensionMatches: null })) },
+      v1Game: {
+        findMany: jest.fn(async ({ where }: { where: { id: { in: string[] } } }) =>
+          where.id.in.map((id) => ({ id, currentOfficialRevisionId: null, resultRevisions: results[id] === undefined ? [] : [{ id: `rev-${id}` }] })),
+        ),
+      },
+      v1GameResultParticipant: {
+        findMany: jest.fn(async ({ where }: { where: { resultRevisionId: { in: string[] } } }) =>
+          where.resultRevisionId.in.map((revisionId) => ({
+            resultRevisionId: revisionId,
+            participantId: 'p9',
+            cards: { yellow: results[revisionId.replace('rev-', '')], red: 0 },
+          })),
+        ),
+      },
+      v1GameParticipant: { findMany: jest.fn(async () => [{ id: 'p9', userId: 'kim' }]) },
+    } as unknown as Prisma.TransactionClient;
+    const orderedGames = await loadTeamCompetitionGameOrder(db, { competitionId: 'cup', isLeague: false, teamId: 'SP' });
+    const atG3 = await readSuspensionVerdicts(db, { competitionId: 'cup', orderedGames, upcomingKey: 'g3' });
+    const atFinal = await readSuspensionVerdicts(db, { competitionId: 'cup', orderedGames, upcomingKey: 'final' });
+    expect(atG3.get('kim')?.suspended).toBe(true);
+    expect(atFinal.get('kim')?.suspended).toBe(false);
+  });
+});

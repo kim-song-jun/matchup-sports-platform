@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { makeFixture, makeGroup } from '@/test/bracket-canvas-fixtures';
-import { registrationIdsBlockedForGroup, registrationIdsInOppositeFinalStage } from './bracket-group-enrollment';
+import { finalStageConflictMessage, registrationIdsBlockedForGroup, registrationIdsInOppositeFinalStage } from './bracket-group-enrollment';
 
 const member = (groupId: string, registrationId: string | null) => ({ id: `gt-${groupId}-${registrationId}`, groupId, registrationId, teamName: registrationId, sortOrder: 0, createdAt: '' });
 const gA = makeGroup({ id: 'gA', name: 'A조', phase: 'group', groupTeams: [member('gA', 'r1')] });
@@ -62,5 +62,29 @@ describe('registrationIdsInOppositeFinalStage', () => {
   it('반대쪽 경기에 팀이 비어 있으면 빈 자리는 무시한다', () => {
     const half = [makeFixture({ id: 'fx-final', groupId: 'gF', fixtureNumber: 1, homeRegistrationId: 'r1', awayRegistrationId: null })];
     expect(ids(registrationIdsInOppositeFinalStage([finalGroup, thirdGroup], half, 'gT'))).toEqual(['r1', 'r9']);
+  });
+});
+
+describe('finalStageConflictMessage', () => {
+  const finalGroup = makeGroup({ id: 'gF', name: '결승', phase: 'final', sortOrder: 5 });
+  const thirdGroup = makeGroup({ id: 'gT', name: '3·4위전', phase: 'third_place', sortOrder: 6 });
+  const finalFixture = makeFixture({ id: 'fx-final', groupId: 'gF', fixtureNumber: 1, homeRegistrationId: 'r1', awayRegistrationId: 'r2' });
+  const thirdFixture = makeFixture({ id: 'fx-third', groupId: 'gT', fixtureNumber: 1, homeRegistrationId: 'r3', awayRegistrationId: 'r4' });
+  const groups = [finalGroup, thirdGroup];
+  const fixtures = [finalFixture, thirdFixture];
+
+  it('결승 팀을 3·4위전 경기에 직접 넣으면 3·4위전 쪽 안내를, 반대 방향이면 결승 쪽 안내를 준다', () => {
+    expect(finalStageConflictMessage(groups, fixtures, thirdFixture, 'r1')).toContain('결승에 올라간 팀은 3·4위전에');
+    expect(finalStageConflictMessage(groups, fixtures, finalFixture, 'r3')).toContain('3·4위전에 들어간 팀은 결승에');
+  });
+
+  it('반대쪽에 없는 팀과 이 경기가 이미 갖고 있는 팀은 막지 않는다', () => {
+    expect(finalStageConflictMessage(groups, fixtures, thirdFixture, 'r9')).toBeNull();
+    const legacy = makeFixture({ id: 'fx-legacy', groupId: 'gT', fixtureNumber: 2, homeRegistrationId: 'r1', awayRegistrationId: null });
+    expect(finalStageConflictMessage(groups, [...fixtures, legacy], legacy, 'r1')).toBeNull();
+  });
+
+  it('찾을 수 없는 경기는 막지 않는다', () => {
+    expect(finalStageConflictMessage(groups, fixtures, undefined, 'r1')).toBeNull();
   });
 });

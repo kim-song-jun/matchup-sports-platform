@@ -682,10 +682,10 @@ export class TournamentBracketService {
         });
       }
 
+      await assertNotInOppositeFinalStageInTx(tx, {
+        tournamentId, fixtureId: null, groupPhase: group?.phase ?? null, round: dto.round, registrationIds: [dto.homeRegistrationId, dto.awayRegistrationId],
+      });
       if (dto.groupId && group) {
-        await assertNotInOppositeFinalStageInTx(tx, {
-          tournamentId, fixtureId: null, groupPhase: group.phase, registrationIds: [dto.homeRegistrationId, dto.awayRegistrationId],
-        });
         await ensureGroupPhaseTeamsInTx(tx, admin, tournamentId, dto.groupId, group.phase, [dto.homeRegistrationId, dto.awayRegistrationId]);
       }
 

@@ -65,3 +65,21 @@ export function registrationIdsInOppositeFinalStage(
   }
   return taken;
 }
+
+const FINAL_STAGE_CONFLICT_MESSAGE: Readonly<Record<string, string>> = {
+  third_place: '결승에 올라간 팀은 3·4위전에 넣을 수 없어요. 3·4위전에는 4강에서 진 팀을 넣어 주세요.',
+  final: '3·4위전에 들어간 팀은 결승에 넣을 수 없어요. 그 경기에서 먼저 빼 주세요.',
+};
+
+/** Direct-placement pre-check mirroring the server's 409; a team the fixture already holds is never a conflict. */
+export function finalStageConflictMessage(
+  groups: readonly V1AdminBracketGroup[],
+  fixtures: readonly V1AdminBracketFixture[],
+  target: V1AdminBracketFixture | undefined,
+  registrationId: string,
+): string | null {
+  if (target === undefined || target.homeRegistrationId === registrationId || target.awayRegistrationId === registrationId) return null;
+  if (!registrationIdsInOppositeFinalStage(groups, fixtures, target.groupId).has(registrationId)) return null;
+  const phase = groups.find((group) => group.id === target.groupId)?.phase;
+  return phase === undefined ? null : (FINAL_STAGE_CONFLICT_MESSAGE[phase] ?? null);
+}

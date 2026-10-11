@@ -21,7 +21,9 @@ async function assertStartKeepsStageOrder(
   if (selfRank === null) return;
   const others = await tx.v1TeamMatch.findMany({
     where: {
-      tournamentId: input.tournamentId, deletedAt: null, startAt: { not: null }, tournamentDetails: { isNot: null },
+      // 취소·보관된 경기는 치르지 않으니 남은 옛 시각이 다른 경기의 시각을 막으면 안 된다.
+      tournamentId: input.tournamentId, deletedAt: null, status: { notIn: ['cancelled', 'archived'] },
+      startAt: { not: null }, tournamentDetails: { isNot: null },
       ...(input.excludeTeamMatchId === null ? {} : { id: { not: input.excludeTeamMatchId } }),
     },
     select: { startAt: true, tournamentDetails: { select: STAGE_SELECT } },

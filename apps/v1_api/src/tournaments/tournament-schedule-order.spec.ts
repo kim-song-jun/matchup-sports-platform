@@ -3,7 +3,7 @@ import { assertFixtureScheduleKeepsStageOrder, assertNewFixtureScheduleKeepsStag
 
 const at = (hhmm: string) => new Date(`2026-10-10T${hhmm}:00.000Z`);
 
-type Match = { id: string; startAt: Date | null; phase: string | null; round: string };
+type Match = { id: string; startAt: Date | null; phase: string | null; round: string; status?: string };
 
 // 조별 1·2경기 23:00·23:10, 조별 3경기 23:20, 8강 23:30, 결승 23:40.
 const MATCHES: Match[] = [
@@ -26,8 +26,11 @@ function fakeTx(matches: Match[]) {
         const match = matches.find((candidate) => candidate.id === where.id);
         return match === undefined ? null : shape(match);
       }),
-      findMany: jest.fn(async ({ where }: { where: { id?: { not: string } } }) =>
-        matches.filter((candidate) => candidate.id !== where.id?.not && candidate.startAt !== null).map(shape),
+      findMany: jest.fn(async ({ where }: { where: { id?: { not: string }; status?: { notIn: string[] } } }) =>
+        matches
+          .filter((candidate) => candidate.id !== where.id?.not && candidate.startAt !== null)
+          .filter((candidate) => !where.status?.notIn.includes(candidate.status ?? 'matched'))
+          .map(shape),
       ),
     },
   } as unknown as Prisma.TransactionClient;
@@ -52,6 +55,19 @@ describe('assertFixtureScheduleKeepsStageOrder', () => {
   it('단계 순서를 지키는 시각은 통과시킨다', async () => {
     await expect(check('final', at('23:45'))).resolves.toBeUndefined();
     await expect(check('g2', at('23:05'))).resolves.toBeUndefined();
+  });
+
+  it('취소·보관된 경기의 옛 시각은 다른 단계의 시각을 막지 않는다', async () => {
+    const withLeftovers: Match[] = [
+      ...MATCHES,
+      { id: 'qf-cancelled', startAt: at('23:55'), phase: 'quarter', round: '8강', status: 'cancelled' },
+      { id: 'qf-archived', startAt: at('23:58'), phase: 'quarter', round: '8강', status: 'archived' },
+    ];
+    const run = (startAt: Date) =>
+      assertFixtureScheduleKeepsStageOrder(fakeTx(withLeftovers), { tournamentId: 't', teamMatchId: 'final', startAt });
+    await expect(run(at('23:45'))).resolves.toBeUndefined();
+    // 치르는 8강(23:30)보다 이른 결승은 여전히 막는다.
+    await expect(run(at('23:25'))).rejects.toMatchObject({ response: { code: 'FIXTURE_SCHEDULE_STAGE_ORDER' } });
   });
 
   it('같은 단계끼리는 시각 순서를 따지지 않는다', async () => {

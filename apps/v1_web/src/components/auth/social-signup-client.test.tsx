@@ -64,7 +64,7 @@ type AvailabilityCallbacks = {
 type CompleteProfileCallbacks = {
   readonly onSuccess: (result: {
     readonly session: { readonly userId: string; readonly userEmail: string | null };
-    readonly next: { readonly route: string | null };
+    readonly next?: { readonly route: string };
   }) => void;
   readonly onError?: (error: unknown) => void;
 };
@@ -274,6 +274,26 @@ describe('SocialSignupClient required profile contract', () => {
 
     // Then
     await waitFor(() => expect(router.replace).toHaveBeenCalledWith('/onboarding/region'));
+  });
+
+  it('가입 화면에서 제출했는데 다른 탭에서 이미 건너뛴 계정이면(next 없음) 하던 곳·홈으로 간다', async () => {
+    hooks.completeProfileMutate.mockImplementation(
+      (_body: unknown, callbacks: CompleteProfileCallbacks) => callbacks.onSuccess({
+        session: { userId: 'social-user', userEmail: null },
+      }),
+    );
+    render(<SocialSignupClient />);
+    await verifyNicknameAndSelectGender();
+    fireEvent.change(screen.getByLabelText(/^이름/), { target: { value: '김러너' } });
+    fireEvent.change(screen.getByLabelText(/^휴대폰 번호/), { target: { value: '01087654321' } });
+    fireEvent.change(screen.getByLabelText(/^생년월일/), { target: { value: '20000229' } });
+    await completePhoneVerification();
+
+    fireEvent.click(screen.getByRole('button', { name: '운동 설정으로 계속' }));
+
+    await waitFor(() => expect(router.replace).toHaveBeenCalledWith('/home'));
+    expect(analytics.trackEvent).toHaveBeenCalledWith('activity_profile_complete', { method: 'kakao' });
+    expect(analytics.trackEvent).not.toHaveBeenCalledWith('sign_up_complete', expect.anything());
   });
 
   it('blocks social signup submission until phone verification is completed', async () => {
@@ -505,7 +525,6 @@ describe('SocialSignupClient 나중에 입력할게요', () => {
 
   const deferResult = {
     session: { userId: 'u-1', userEmail: null },
-    next: { route: null },
   };
 
   it('입력 없이 건너뛰면 defer 를 호출하고 홈으로 가며 sign_up_complete(profile=deferred)를 남긴다', () => {
@@ -598,7 +617,7 @@ describe('SocialSignupClient 나중에 입력할게요', () => {
     hooks.authMe.profile.nickname = '카카오러너';
     setSearch('?redirect=%2Fteams%2Fnew');
     hooks.completeProfileMutate.mockImplementation((_b: unknown, cb: CompleteProfileCallbacks) =>
-      cb.onSuccess({ session: { userId: 'u-1', userEmail: null }, next: { route: null } }));
+      cb.onSuccess({ session: { userId: 'u-1', userEmail: null } }));
     render(<SocialSignupClient />);
 
     fireEvent.click(screen.getByRole('radio', { name: '여' }));

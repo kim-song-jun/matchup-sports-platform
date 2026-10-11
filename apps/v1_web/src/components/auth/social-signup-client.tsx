@@ -216,13 +216,16 @@ export function SocialSignupClient() {
           saveStoredV1Session(result.session);
           clearV1IdentityCache(queryClient);
           const method = authMe.data?.user?.authProvider ?? 'social';
-          if (activityMode) {
+          // No next route means the server finished a deferred profile — possibly deferred in another
+          // tab after this form rendered in signup mode.
+          const nextRoute = result.next?.route;
+          if (activityMode || !nextRoute) {
             trackEvent('activity_profile_complete', { method });
             router.replace(consumeRedirect() ?? '/home');
             return;
           }
           trackEvent('sign_up_complete', { method });
-          router.replace(result.next.route ?? '/home');
+          router.replace(nextRoute);
         },
         onError: (nextError) => {
           if (nextError instanceof V1ApiError && nextError.code === 'NICKNAME_CONFLICT') {

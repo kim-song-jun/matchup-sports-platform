@@ -366,7 +366,7 @@ export function useV1CompleteSocialProfile() {
       profileImageUrl?: string;
       recordConsent?: { granted: boolean; policyHash: string };
     }) =>
-      v1Post<V1AuthSessionResponse & { next: { route: string | null } }>('/auth/social-profile', body),
+      v1Post<V1AuthSessionResponse>('/auth/social-profile', body),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: v1Keys.authMe() }),
   });
 }
@@ -375,7 +375,7 @@ export function useV1DeferSocialProfile() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: () =>
-      v1Post<V1AuthSessionResponse & { next: { route: string | null } }>('/auth/social-profile/defer'),
+      v1Post<V1AuthSessionResponse>('/auth/social-profile/defer'),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: v1Keys.authMe() }),
   });
 }

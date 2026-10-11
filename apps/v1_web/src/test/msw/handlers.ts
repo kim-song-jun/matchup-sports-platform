@@ -458,7 +458,7 @@ export const v1MswHandlers = [
     return ok({ session: { userId: v1UserFixture.id, userEmail: v1UserFixture.email }, ...v1UserFixture, next: { route: '/signup/social' } });
   }),
   http.post(`${api}/auth/social-profile/defer`, () =>
-    ok({ session: { userId: v1UserFixture.id, userEmail: v1UserFixture.email }, ...v1UserFixture, next: { route: null } })),
+    ok({ session: { userId: v1UserFixture.id, userEmail: v1UserFixture.email }, ...v1UserFixture })),
   http.get(`${api}/onboarding`, () => ok({ status: 'signup_done', currentStep: 'sport', canResume: true, missing: ['sports'], sports: [], regions: [], regionOptional: true })),
   http.patch(`${api}/onboarding/preferences`, async ({ request }) => ok(await request.json())),
   http.post(`${api}/onboarding/complete`, () => ok({ completed: true })),

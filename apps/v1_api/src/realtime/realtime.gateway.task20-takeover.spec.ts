@@ -70,6 +70,7 @@ describe('Task 20 game-operations takeover realtime protocol', () => {
 
   beforeEach(async () => {
     jest.clearAllMocks();
+    prisma.v1User.findFirst.mockReset().mockResolvedValue({ onboardingStatus: 'completed', adminUser: null });
     gameTakeover.isSuperseded.mockReturnValue(false);
     const moduleRef = await Test.createTestingModule({
       providers: [

@@ -25,6 +25,7 @@ describe('AuthService.linkSocialToPhoneOwner', () => {
     return {
       v1User: { findUnique: jest.fn(), findFirst: jest.fn(), updateMany: jest.fn(), update: jest.fn(), delete: jest.fn() },
       v1AuthIdentity: { findFirst: jest.fn(), findMany: jest.fn(), update: jest.fn() },
+      v1Inquiry: { updateMany: jest.fn().mockResolvedValue({ count: 0 }) },
       v1AdminUser: { findUnique: jest.fn() },
       v1PhoneVerificationChallenge: { deleteMany: jest.fn(), count: jest.fn() },
       v1StatusChangeLog: { create: jest.fn() },
@@ -112,6 +113,7 @@ describe('AuthService.linkSocialToPhoneOwner', () => {
       where: { id: IDENTITY_ID, userId: CALLER_ID },
       data: { userId: HOLDER_ID, lastLoginAt: expect.any(Date) },
     });
+    expect(prisma.v1Inquiry.updateMany).toHaveBeenCalledWith({ where: { userId: CALLER_ID }, data: { userId: HOLDER_ID } });
     expect(prisma.v1User.delete).toHaveBeenCalledWith({ where: { id: CALLER_ID } });
     expect(prisma.v1StatusChangeLog.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
@@ -179,15 +181,38 @@ describe('AuthService.linkSocialToPhoneOwner', () => {
       await expectCode(service.linkSocialToPhoneOwner(CALLER_ID, dto()), 'SOCIAL_LINK_NOT_PENDING');
     });
 
+    it('accepts a deferred caller whose auto profile exists, for both link and preview', async () => {
+      prisma.v1User.findUnique.mockResolvedValue(
+        pendingCaller({ onboardingStatus: 'social_profile_deferred', profile: { id: 'auto-profile' } }),
+      );
+
+      await expect(service.previewSocialLink(CALLER_ID, dto())).resolves.toMatchObject({ linkingProvider: 'kakao' });
+      await service.linkSocialToPhoneOwner(CALLER_ID, dto());
+
+      expect(prisma.v1User.updateMany).toHaveBeenCalledWith({
+        where: { id: CALLER_ID, onboardingStatus: { in: ['social_profile_required', 'social_profile_deferred'] } },
+        data: { updatedAt: expect.any(Date) },
+      });
+      expect(prisma.v1User.delete).toHaveBeenCalledWith({ where: { id: CALLER_ID } });
+    });
+
+    it('still rejects a completed caller that has a profile', async () => {
+      prisma.v1User.findUnique.mockResolvedValue(
+        pendingCaller({ onboardingStatus: 'completed', profile: { id: 'p1' } }),
+      );
+
+      await expectCode(service.linkSocialToPhoneOwner(CALLER_ID, dto()), 'SOCIAL_LINK_NOT_PENDING');
+      await expectCode(service.previewSocialLink(CALLER_ID, dto()), 'SOCIAL_LINK_NOT_PENDING');
+    });
+
     it('resets an expired signup and answers 401', async () => {
       const old = new Date(Date.now() - 25 * 60 * 60 * 1000);
       prisma.v1User.findUnique.mockResolvedValue(pendingCaller({ createdAt: old, updatedAt: old }));
-      prisma.v1User.update.mockResolvedValue({});
       prisma.v1UserOnboardingProgress.upsert.mockResolvedValue({});
 
       await expectCode(service.linkSocialToPhoneOwner(CALLER_ID, dto()), 'SOCIAL_SIGNUP_EXPIRED');
-      expect(prisma.v1User.update).toHaveBeenCalledWith({
-        where: { id: CALLER_ID },
+      expect(prisma.v1User.updateMany).toHaveBeenCalledWith({
+        where: { id: CALLER_ID, onboardingStatus: { in: ['social_terms_required', 'social_profile_required'] } },
         data: { onboardingStatus: 'social_terms_required' },
       });
     });

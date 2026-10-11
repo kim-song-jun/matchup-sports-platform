@@ -31,6 +31,8 @@ beforeEach(() => {
 
 afterEach(() => {
   delete window.TeameetNative;
+  window.sessionStorage.clear();
+  window.history.pushState({}, '', '/');
 });
 
 describe('AppleLoginButton', () => {
@@ -56,6 +58,21 @@ describe('AppleLoginButton', () => {
   });
 
   /** A shell built before the code was forwarded still signs in; the field is simply absent. */
+  it('keeps the saved redirect while the server sends a new account to social terms', async () => {
+    reply = { ok: true, identityToken: 'identity.token' };
+    window.history.pushState({}, '', '/login?redirect=%2Fteams%2Fnew');
+    api.v1Post.mockImplementation((path: string) =>
+      path === '/auth/apple/nonce'
+        ? Promise.resolve({ nonce: 'server-nonce' })
+        : Promise.resolve({ next: { route: '/terms?mode=social' } }));
+    render(<AppleLoginButton />);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Apple로 계속하기' }));
+
+    await waitFor(() => expect(router.replace).toHaveBeenCalledWith('/terms?mode=social'));
+    expect(window.sessionStorage.getItem('teameet.v1.savedRedirect')).toBe('/teams/new');
+  });
+
   it('omits the authorization code when the shell did not send one', async () => {
     reply = { ok: true, identityToken: 'identity.token' };
     render(<AppleLoginButton />);

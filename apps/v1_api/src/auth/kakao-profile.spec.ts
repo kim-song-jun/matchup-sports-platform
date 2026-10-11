@@ -4,6 +4,7 @@ import {
   normalizeKakaoName,
   normalizeKakaoPhone,
   readKakaoSignupPrefill,
+  readSocialNicknameSeed,
 } from './kakao-profile';
 
 describe('normalizeKakaoPhone', () => {
@@ -75,5 +76,19 @@ describe('readKakaoSignupPrefill', () => {
     expect(readKakaoSignupPrefill([1, 2])).toBeNull();
     // 이미지 URL 만 있던 기존 가입 건(이 기능 이전 데이터)도 안전하게 null.
     expect(readKakaoSignupPrefill({ kakaoProfileImageUrl: 'https://img.example/a.png' })).toBeNull();
+  });
+});
+
+describe('readSocialNicknameSeed', () => {
+  it('prefers the Kakao nickname over the Apple name', () => {
+    expect(readSocialNicknameSeed({ kakaoNickname: ' 카카오닉 ', appleName: '애플' })).toBe('카카오닉');
+  });
+
+  it('falls back to the Apple name', () => {
+    expect(readSocialNicknameSeed({ appleName: '애플' })).toBe('애플');
+  });
+
+  it.each([null, [], 'x', {}, { kakaoNickname: '  ' }, { kakaoNickname: 3 }])('returns null for %p', (draft) => {
+    expect(readSocialNicknameSeed(draft)).toBeNull();
   });
 });

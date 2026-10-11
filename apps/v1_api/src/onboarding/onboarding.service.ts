@@ -33,7 +33,7 @@ export class OnboardingService {
     await this.validateSports(sports);
     await this.validateRegions(regions.map((region) => region.regionId));
 
-    const nextStatus = derivePreferenceStatus({
+    const derivedStatus = derivePreferenceStatus({
       sportsCount: sports.length,
       missingLevels: sports.some((sport) => !sport.levelId),
       currentStep: dto.currentStep,
@@ -73,22 +73,30 @@ export class OnboardingService {
         where: { id: userId },
         select: { onboardingStatus: true },
       });
-
-      await tx.v1User.update({
-        where: { id: userId },
-        data: { onboardingStatus: nextStatus },
+      // The deferred profile gate only opens through POST /auth/social-profile, so the status is
+      // not written at all (re-writing the read value could undo a concurrent transition).
+      const nextStatus =
+        user.onboardingStatus === 'social_profile_deferred' ? user.onboardingStatus : derivedStatus;
+      if (user.onboardingStatus !== 'social_profile_deferred') {
+        await tx.v1User.update({
+          where: { id: userId },
+          data: { onboardingStatus: nextStatus },
+        });
+      }
+      // The draft also carries signup-time keys (ageConfirmedAt, kakao prefill) that the DTO lacks.
+      const progress = await tx.v1UserOnboardingProgress.findUnique({
+        where: { userId },
+        select: { draftJson: true },
       });
+      const previousDraft =
+        progress?.draftJson && typeof progress.draftJson === 'object' && !Array.isArray(progress.draftJson)
+          ? (progress.draftJson as Prisma.InputJsonObject)
+          : {};
+      const draftJson = { ...previousDraft, ...dto } as unknown as Prisma.InputJsonValue;
       await tx.v1UserOnboardingProgress.upsert({
         where: { userId },
-        update: {
-          currentStep: dto.currentStep,
-          draftJson: dto as unknown as Prisma.InputJsonValue,
-        },
-        create: {
-          userId,
-          currentStep: dto.currentStep,
-          draftJson: dto as unknown as Prisma.InputJsonValue,
-        },
+        update: { currentStep: dto.currentStep, draftJson },
+        create: { userId, currentStep: dto.currentStep, draftJson },
       });
 
       if (user.onboardingStatus !== nextStatus) {
@@ -139,23 +147,28 @@ export class OnboardingService {
       });
     }
 
-    await this.changeStatus(userId, snapshot.onboardingStatus, 'completed', 'onboarding_complete');
+    const keepsProfileGate = snapshot.onboardingStatus === 'social_profile_deferred';
+    const nextStatus = keepsProfileGate ? snapshot.onboardingStatus : 'completed';
+    await this.changeStatus(userId, snapshot.onboardingStatus, nextStatus, 'onboarding_complete');
 
     return {
-      status: 'completed',
+      status: nextStatus,
       next: {
         route: '/home',
         reason: 'onboarding_completed',
       },
       missing: [],
-      limited: false,
+      limited: nextStatus !== 'completed',
     };
   }
 
   async defer(userId: string, reason: string) {
     await this.assertUserCanMutate(userId);
     const snapshot = await this.getUserSnapshot(userId);
-    const nextStatus = snapshot.onboardingStatus === 'completed' ? 'completed' : 'deferred';
+    const nextStatus =
+      snapshot.onboardingStatus === 'completed' || snapshot.onboardingStatus === 'social_profile_deferred'
+        ? snapshot.onboardingStatus
+        : 'deferred';
     const detail = getOnboardingDetail(snapshot);
 
     await this.changeStatus(userId, snapshot.onboardingStatus, nextStatus, `onboarding_defer:${reason}`);
@@ -258,6 +271,7 @@ export class OnboardingService {
       case 'region_done':
       case 'completed':
       case 'deferred':
+      case 'social_profile_deferred':
         return;
       default: {
         const exhaustiveStatus: never = user.onboardingStatus;

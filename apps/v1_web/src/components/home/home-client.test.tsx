@@ -1,11 +1,13 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Providers } from '@/app/providers';
 import { HomePageClient } from './home-client';
 
+const nav = vi.hoisted(() => ({ push: vi.fn() }));
+
 vi.mock('next/navigation', () => ({
   usePathname: () => '/home',
-  useRouter: () => ({ push: vi.fn(), replace: vi.fn(), back: vi.fn(), prefetch: vi.fn() }),
+  useRouter: () => ({ push: nav.push, replace: vi.fn(), back: vi.fn(), prefetch: vi.fn() }),
   useSearchParams: () => new URLSearchParams(),
 }));
 
@@ -18,10 +20,10 @@ const homeData = {
   viewer: { authenticated: true, onboardingStatus: 'completed', displayName: '테스터' },
 };
 
-function authMeResult(phoneVerified: boolean) {
+function authMeResult(phoneVerified: boolean, onboardingStatus = 'completed') {
   return {
     data: {
-      user: { id: 'user-1', email: 'user@example.com', onboardingStatus: 'completed' },
+      user: { id: 'user-1', email: 'user@example.com', onboardingStatus },
       profile: { displayName: '테스터' },
       termsCompliance: { compliant: true, pendingRequiredDocumentIds: [], nextRoute: null },
       verification: { emailVerified: true, phoneVerified },
@@ -90,5 +92,34 @@ describe('HomePageClient phone verify nudge banner', () => {
     expect(await screen.findByText('휴대폰 본인인증이 필요해요')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '휴대폰 본인인증 안내 닫기' })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: '인증하기' })).toBeInTheDocument();
+  });
+});
+
+describe('HomePageClient activity profile nudge banner', () => {
+  it('정보 입력을 미룬 계정에는 활동 정보 배너만 보이고 휴대폰 인증 배너는 겹치지 않는다', async () => {
+    authMeMock.mockReset().mockReturnValue(authMeResult(false, 'social_profile_deferred'));
+    render(
+      <Providers>
+        <HomePageClient />
+      </Providers>,
+    );
+
+    expect(await screen.findByText('활동 정보를 입력해 주세요')).toBeInTheDocument();
+    expect(screen.queryByText('휴대폰 본인인증이 필요해요')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: '입력하기' }));
+    expect(nav.push).toHaveBeenCalledWith('/signup/social?redirect=%2Fhome');
+  });
+
+  it('대조군 - 일반 가입자는 활동 정보 배너를 보지 않고 휴대폰 미인증이면 기존 배너만 본다', async () => {
+    authMeMock.mockReset().mockReturnValue(authMeResult(false, 'completed'));
+    render(
+      <Providers>
+        <HomePageClient />
+      </Providers>,
+    );
+
+    expect(await screen.findByText('휴대폰 본인인증이 필요해요')).toBeInTheDocument();
+    expect(screen.queryByText('활동 정보를 입력해 주세요')).not.toBeInTheDocument();
   });
 });

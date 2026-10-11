@@ -128,6 +128,32 @@ describe('MatchDetailPageClient — GA events', () => {
     expect(trackEvent).toHaveBeenCalledTimes(1);
   });
 
+  it('신청이 일반 오류로 실패하면 재시도 안내를 보여 준다', async () => {
+    applyMatchMutate.mockImplementation((_body, options) => options?.onError?.(new Error('boom')));
+    render(<MatchDetailPageClient matchId="match-1" />);
+
+    fireEvent.click(screen.getByRole('button', { name: '참가 신청' }));
+    fireEvent.click(screen.getByRole('button', { name: '신청 보내기' }));
+
+    expect(await screen.findByText('신청을 보내지 못했어요. 잠시 후 다시 시도해 주세요.')).toBeTruthy();
+  });
+
+  it.each(['ACTIVITY_PROFILE_REQUIRED', 'PHONE_VERIFICATION_REQUIRED'])(
+    '전역 안내가 처리한 %s 실패에는 일반 재시도 안내를 겹쳐 보여 주지 않는다',
+    async (code) => {
+      applyMatchMutate.mockImplementation((_body, options) =>
+        options?.onError?.(Object.assign(new Error('blocked'), { code, statusCode: 403 })),
+      );
+      render(<MatchDetailPageClient matchId="match-1" />);
+
+      fireEvent.click(screen.getByRole('button', { name: '참가 신청' }));
+      fireEvent.click(screen.getByRole('button', { name: '신청 보내기' }));
+
+      await waitFor(() => expect(applyMatchMutate).toHaveBeenCalled());
+      expect(screen.queryByText('신청을 보내지 못했어요. 잠시 후 다시 시도해 주세요.')).toBeNull();
+    },
+  );
+
   it('fires match_join_complete after a successful apply', async () => {
     render(<MatchDetailPageClient matchId="match-1" />);
 

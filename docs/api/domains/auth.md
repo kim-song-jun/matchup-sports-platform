@@ -19,12 +19,13 @@
 | `POST` | `/api/v1/auth/kakao` | none | `{ code, redirectUri? }` | social session + onboarding route |
 | `POST` | `/api/v1/auth/apple/nonce` | none | empty body | `{ nonce }` (signed, 5 min TTL) |
 | `POST` | `/api/v1/auth/apple` | none | `{ identityToken, nonce, fullName? }` | social session + onboarding route |
-| `POST` | `/api/v1/auth/social-terms` | user | `{ requiredTermsAccepted: true, acceptedTermsDocumentIds: uuid[] }` | social session + onboarding route |
-| `POST` | `/api/v1/auth/social-profile` | user | `SocialProfileDto` | compatibility profile completion |
-| `POST` | `/api/v1/auth/social-link/preview` | user (pending social, `social_profile_required` only) | `{ phone, proofToken }` | `{ maskedEmail, providers, hasPassword, linkingProvider }` — same checks and error codes as `social-link`, but consumes nothing and writes nothing |
-| `POST` | `/api/v1/auth/social-link` | user (pending social, `social_profile_required` only) | `{ phone, proofToken }` | session of the phone's existing account (`session.userId` = holder) + `next?` |
+| `POST` | `/api/v1/auth/social-terms` | user | `{ requiredTermsAccepted: true, ageConfirmed: true, acceptedTermsDocumentIds: uuid[] }` | social session + onboarding route |
+| `POST` | `/api/v1/auth/social-profile` | user | `SocialProfileDto` | compatibility profile completion (also finishes a deferred profile) |
+| `POST` | `/api/v1/auth/social-profile/defer` | user | empty body | skip the profile form; social session without `next` |
+| `POST` | `/api/v1/auth/social-link/preview` | user (pending social: `social_profile_required` without a profile, or `social_profile_deferred`) | `{ phone, proofToken }` | `{ maskedEmail, providers, hasPassword, linkingProvider }` — same checks and error codes as `social-link`, but consumes nothing and writes nothing |
+| `POST` | `/api/v1/auth/social-link` | user (pending social: `social_profile_required` without a profile, or `social_profile_deferred`) | `{ phone, proofToken }` | session of the phone's existing account (`session.userId` = holder) + `next?` |
 | `GET` | `/api/v1/auth/check-email` | none | `?email=` | `{ available: boolean }` |
-| `GET` | `/api/v1/auth/check-nickname` | none | `?nickname=` | `{ available: boolean }` |
+| `GET` | `/api/v1/auth/check-nickname` | optional | `?nickname=` | `{ available: boolean }` |
 | `GET` | `/api/v1/terms/current?context=signup\|tournament_application\|footer` | optional user | active context | effective current documents; signup adds per-user compliance |
 | `POST` | `/api/v1/terms/consents` | user | `{ documentIds: uuid[] }` | append-only acceptance result + compliance |
 | `GET` | `/api/v1/onboarding` | user | headers only | onboarding resume summary |
@@ -64,11 +65,12 @@ to obtain a session for them. In production, `V1AuthGuard` rejects header identi
 this route grants nothing beyond what any other guarded route already grants a caller with a valid
 session cookie.
 
-`GET /api/v1/auth/check-email` and `GET /api/v1/auth/check-nickname` are unauthenticated
-availability probes (`{ available: boolean }`) used by signup forms; both are rate-limited
+`GET /api/v1/auth/check-email` and `GET /api/v1/auth/check-nickname` are availability probes (check-nickname: optional auth, see below) (`{ available: boolean }`) used by signup forms; both are rate-limited
 (30/min). A missing or empty `email`/`nickname` query is rejected by the query DTO before the
 service runs. Nickname must be at least 2 trimmed characters; email must normalize to at least 3
 characters. Every rejection is `400 VALIDATION_ERROR`.
+
+`check-nickname` uses `OptionalV1AuthGuard`: an anonymous caller gets the strict answer, an authenticated caller's own current nickname is reported `available: true`, and profiles of deleted accounts are ignored (the same rule as register, defer and complete).
 
 ## Account Recovery (Pre-session)
 
@@ -191,11 +193,15 @@ Email signup must accept required terms and submit `displayName`, an 11-digit `p
 
 `POST /api/v1/auth/register` and `POST /api/v1/auth/social-profile` (the last step of every signup path) also accept an optional `recordConsent: { granted: boolean, policyHash: string }`, the same shape as `PUT /me/record-consent`. When present it is upserted into `V1UserRecordConsent` (`GRANTED`/`REVOKED`) inside the signup transaction. When omitted (older clients) no consent row is written and the user stays undecided. Existing accounts are never backfilled.
 
-Kakao signup starts with `POST /api/v1/auth/kakao` because the provider user key is needed first. Teameet does not derive, parse, or persist a service nickname from the Kakao provider nickname, and never synthesizes a `k_{providerUserKey}` nickname. A new Kakao user is created as `onboardingStatus = social_terms_required` without a profile. If the user leaves here, admin surfaces should treat the row as `가입 진행 중 · 약관 미동의`.
+Kakao signup starts with `POST /api/v1/auth/kakao` because the provider user key is needed first. The Kakao provider nickname is kept only as a server-side seed (`draftJson.kakaoNickname`) for `POST /auth/social-profile/defer`; it is never returned to the client, and Teameet never synthesizes a `k_{providerUserKey}` nickname. A new Kakao user is created as `onboardingStatus = social_terms_required` without a profile. If the user leaves here, admin surfaces should treat the row as `가입 진행 중 · 약관 미동의`.
 
-When `POST /api/v1/auth/social-terms` succeeds, the API does not create a profile. It sets `onboardingStatus = social_profile_required`, sets `currentStep = signup`, and returns `next.route = /signup/social`. The client must navigate to the returned route.
+When `POST /api/v1/auth/social-terms` succeeds, the API does not create a profile. It sets `onboardingStatus = social_profile_required`, sets `currentStep = signup`, and returns `next.route = /signup/social`. The client must navigate to the returned route. The body must carry `ageConfirmed: true` (the "만 14세 이상이에요" checkbox); a missing or `false` value is `400`, and the confirmation time is stored as `draftJson.ageConfirmedAt`.
 
-`POST /api/v1/auth/social-profile` then requires `nickname`, a trimmed non-blank name, an 11-digit `phone`, a real-calendar `birthDate` in `YYYYMMDD` format, and `gender = male | female`. New clients send the name as `realName`; deprecated `displayName` remains accepted during rolling deployment. The normalized value is written to both `real_name` and the legacy `display_name`, then the API sets `onboardingStatus = signup_done`, sets `currentStep = sport`, and returns the next route. `profileImageUrl` remains optional and nullable.
+`POST /api/v1/auth/social-profile/defer` (only from `social_profile_required`; `social_terms_required` is `400 TERMS_REQUIRED`, any other state `400 VALIDATION_ERROR`, an account older than 24h `401 SOCIAL_SIGNUP_EXPIRED`) creates a profile with an automatic nickname and sets `onboardingStatus = social_profile_deferred`. The nickname is the Kakao nickname (Apple: the first-authorization name), normalized to at most 20 characters; if taken it gets a 2-4 digit numeric suffix (the base is truncated by code points so the total stays within 20). With no usable seed, or when the suffixed attempts all collide, it falls back to `팀밋사용자` + 6 digits. Every returned nickname was checked against existing profiles (deleted accounts ignored) within a bounded number of attempts; when those are exhausted the call fails with `409 NICKNAME_GENERATION_FAILED` and no profile is created. `real_name`, `gender` and `birth_date` stay null. The response has no `next.route`.
+
+`social_profile_deferred` is not a pending-signup state: reads and the profile-form endpoints work, the 24h expiry does not apply, and `PATCH /onboarding/preferences`, `/onboarding/defer` and `/onboarding/complete` save their data but never change the status. Writes outside the phone-verification allow-list return `403 ACTIVITY_PROFILE_REQUIRED` with `details.next.route = /signup/social`. Finishing `POST /auth/social-profile` from this state keeps the existing nickname valid and sets `onboardingStatus = deferred` (sport onboarding was skipped), which opens the gate.
+
+`POST /api/v1/auth/social-profile` then requires `nickname`, a trimmed non-blank name, an 11-digit `phone`, a real-calendar `birthDate` in `YYYYMMDD` format, and `gender = male | female`. New clients send the name as `realName`; deprecated `displayName` remains accepted during rolling deployment. The normalized value is written to both `real_name` and the legacy `display_name`. From `social_profile_required` the API then sets `onboardingStatus = signup_done`, sets `currentStep = sport`, and returns the next route; from `social_profile_deferred` it sets `onboardingStatus = deferred` and the response has no `next` (the client returns to the screen that asked for the profile). `profileImageUrl` remains optional and nullable.
 
 `social_terms_required` and `social_profile_required` are authenticated-but-restricted states. They are not guest sessions. The web gate always resumes the exact required route, and API guards reject unrelated protected or optional-auth requests with `403 SIGNUP_INCOMPLETE` and `details.next.route`. The only common authenticated exceptions are `GET /auth/me` and `POST /auth/logout`; each pending state additionally allows only its own completion endpoint.
 

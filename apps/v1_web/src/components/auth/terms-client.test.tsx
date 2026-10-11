@@ -158,6 +158,48 @@ describe('TermsClient social navigation contract', () => {
   });
 });
 
+describe('TermsClient 소셜 만 14세 확인', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    searchParamsValue = new URLSearchParams('mode=social');
+    currentTermsValue = currentTerms();
+  });
+
+  it('필수 약관만 체크하면 제출할 수 없고, 만 14세 확인을 더하면 ageConfirmed 와 함께 전송한다', async () => {
+    render(<TermsClient />);
+    for (const item of currentTermsValue.items.filter((i) => i.requirement === 'required')) {
+      fireEvent.click(screen.getByRole('button', { name: `${item.title} 체크` }));
+    }
+    // 약관만 체크한 상태 — 제출 버튼은 아직 잠겨 있다.
+    expect(screen.getByRole('button', { name: '필수 약관에 동의해 주세요' })).toBeDisabled();
+
+    fireEvent.click(screen.getByRole('button', { name: '만 14세 이상이에요 체크' }));
+    const continueButton = await screen.findByRole('button', { name: '동의하고 회원가입하기' });
+    expect(continueButton).toBeEnabled();
+    fireEvent.click(continueButton);
+
+    expect(hooks.completeSocialTermsMutate).toHaveBeenCalledWith(
+      expect.objectContaining({ requiredTermsAccepted: true, ageConfirmed: true }),
+      expect.anything(),
+    );
+  });
+
+  it('전체 동의는 만 14세 확인까지 함께 켜고 끈다', () => {
+    render(<TermsClient />);
+    const age = screen.getByRole('button', { name: '만 14세 이상이에요 체크' });
+    fireEvent.click(screen.getByRole('button', { name: /전체 동의/ }));
+    expect(age).toHaveAttribute('aria-pressed', 'true');
+    fireEvent.click(screen.getByRole('button', { name: /전체 동의/ }));
+    expect(age).toHaveAttribute('aria-pressed', 'false');
+  });
+
+  it('이메일 가입에는 만 14세 확인 줄이 없다', () => {
+    searchParamsValue = new URLSearchParams('mode=signup');
+    render(<TermsClient />);
+    expect(screen.queryByRole('button', { name: '만 14세 이상이에요 체크' })).not.toBeInTheDocument();
+  });
+});
+
 // V7: 응답 없는 실패의 원문("Failed to fetch")은 화면 문구가 아니다.
 describe('TermsClient 응답 없는 실패', () => {
   beforeEach(() => {

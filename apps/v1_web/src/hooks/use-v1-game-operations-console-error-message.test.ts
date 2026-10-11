@@ -129,3 +129,14 @@ describe('SUBSTITUTION_NOT_TRACKED — 롤링 교체 종목의 교체 커맨드'
     expect(gameOperationsErrorMessage('SUBSTITUTION_NOT_TRACKED')).not.toContain('다시 시도');
   });
 });
+
+describe('ACTIVITY_PROFILE_REQUIRED — 활동 정보 입력을 미룬 계정의 소켓 쓰기 거절', () => {
+  it('자기 문구로 입력 필요를 안내하고', () => {
+    const message = gameOperationsErrorMessage('ACTIVITY_PROFILE_REQUIRED');
+    expect(message).toBe('활동 정보를 입력해야 경기를 운영할 수 있어요.');
+  });
+
+  it('정보를 입력하기 전엔 같은 요청이 항상 거부되므로 재시도 대상이 아니다', () => {
+    expect(isRetryableGameOperationsErrorCode('ACTIVITY_PROFILE_REQUIRED')).toBe(false);
+  });
+});

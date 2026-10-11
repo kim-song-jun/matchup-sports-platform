@@ -18,7 +18,7 @@ import { useCursorPagination, useCursorPaginationSnapshot } from '@/hooks/use-cu
 import { trackEvent } from '@/lib/analytics';
 import { v1Keys } from '@/lib/query-keys';
 import { chatRoomHref } from '@/lib/chat-route';
-import { extractErrorMessage } from '@/lib/error-message';
+import { extractErrorMessage, isGloballyHandledError } from '@/lib/error-message';
 import { sanitizeRedirectPath, withFromPath } from '@/lib/session-storage';
 import { V1_LEVELS, levelRangeMatches, toLevelCodes, toggleLevelCode } from '@/lib/v1-levels';
 import type { V1Match, V1MatchApiStatus, V1Sport, V1ViewerState } from '@/types/api';
@@ -402,7 +402,10 @@ export function MatchDetailPageClient({ matchId, seed }: { matchId: string; seed
                 setApplyDialogOpen(false);
                 setApplyMessage('');
               },
-              onError: () => setApplyError('신청을 보내지 못했어요. 잠시 후 다시 시도해 주세요.'),
+              onError: (err) => {
+                if (isGloballyHandledError(err)) return;
+                setApplyError('신청을 보내지 못했어요. 잠시 후 다시 시도해 주세요.');
+              },
             },
           );
         }}

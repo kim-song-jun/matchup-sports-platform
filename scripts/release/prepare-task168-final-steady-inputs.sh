@@ -28,7 +28,8 @@ m11=apps/v1_api/prisma/migrations/20260911090000_retire_tournament_fixture_table
 
 schema_sha="$(sha256sum "$schema" | awk '{print $1}')"
 m11_sha="$(sha256sum "$m11" | awk '{print $1}')"
-[[ "$schema_sha" == a21cf68599a1c8f34a4f18a0e69f0557d201affc59689b315deb9d8d0716c576 \
+# 2026-10-11: additive V1OnboardingStatus value social_profile_deferred (20261011130000_v1_onboarding_social_profile_deferred); M11 remains unchanged.
+[[ "$schema_sha" == b63d3222b1f3d0e1a3c8309f116cfd50eb28b624245685dbea2f7fff1f6ee2b9 \
   && "$m11_sha" == 08eac7347cbb10fcc4ef87d31d63bd9516d5bfda281dcf5730c4f0a1985d9323 ]] \
   || { echo 'Task168 final-policy schema/M11 digest mismatch' >&2; exit 1; }
 

@@ -77,6 +77,33 @@ describe('PendingSocialSignupGate required terms renewal', () => {
     expect(mocks.replace).not.toHaveBeenCalled();
   });
 
+  // 정보 입력을 미룬 계정은 쓸 수 있는 계정 — 강제 이동하면 건너뛰기가 무의미해진다.
+  // 대조군인 social_profile_required 는 같은 화면에서 여전히 가입 화면으로 보내진다.
+  it.each([
+    ['social_profile_deferred', false],
+    ['social_profile_required', true],
+  ] as const)('%s 계정이 /home 에 있을 때 강제 이동은 %s', async (onboardingStatus, redirected) => {
+    mocks.pathname = '/home';
+    mocks.useV1AuthMe.mockReturnValue({
+      isSuccess: true,
+      isError: false,
+      data: {
+        user: { onboardingStatus },
+        termsCompliance: { compliant: true, pendingRequiredDocumentIds: [], nextRoute: null },
+      },
+    });
+
+    render(<PendingSocialSignupGate><div>홈 화면</div></PendingSocialSignupGate>);
+
+    if (redirected) {
+      await waitFor(() => expect(mocks.replace).toHaveBeenCalledWith('/signup/social'));
+      expect(screen.queryByText('홈 화면')).not.toBeInTheDocument();
+    } else {
+      expect(await screen.findByText('홈 화면')).toBeInTheDocument();
+      expect(mocks.replace).not.toHaveBeenCalled();
+    }
+  });
+
   it('does not overwrite the redirect while already rendering the terms completion route', async () => {
     mocks.pathname = '/terms';
     mocks.useV1AuthMe.mockReturnValue({

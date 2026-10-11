@@ -19,7 +19,8 @@ import { PrismaService } from '../prisma/prisma.service';
 import type { V1AuthUser } from '../auth/v1-auth-user';
 import { currentRuntimeConfiguration, resolveV1RequestIdentity } from '../auth/v1-session';
 import { requireProductionFrontendOrigin } from '../common/security/v1-mutation-origin';
-import { getPendingSocialSignupRoute } from '../auth/social-signup-access';
+import { getPendingSocialSignupRoute, isActivityProfileRequired } from '../auth/social-signup-access';
+import { isPhoneVerificationExemptActor } from '../verification/phone-verification-access';
 import { AppendGameEventDto } from '../games/dto/game-event.dto';
 import { GameBroadcastRegistry } from '../games/game-broadcast.registry';
 import { GameTakeoverService } from '../games/game-takeover.service';
@@ -225,6 +226,7 @@ type GameTakeoverResult =
         // `TAKEOVER_TOKEN_EXPIRED`, and `GameTakeoverService.isSuperseded`
         // for why the two must not be conflated.
         | 'TAKEOVER_SUPERSEDED'
+        | 'ACTIVITY_PROFILE_REQUIRED'
         | 'VALIDATION_ERROR';
     };
 
@@ -727,6 +729,17 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
       );
     }
     try {
+      if (await this.isActivityProfileBlocked(authUser.id)) {
+        return this.emitProtocolError(
+          client,
+          {
+            code: 'ACTIVITY_PROFILE_REQUIRED',
+            clientEventId: input.clientEventId,
+            expectedVersion: input.expectedVersion,
+          },
+          { gameId: input.gameId, actorId: authUser.id },
+        );
+      }
       const dto = appendEventDto(input);
       const result = await this.gamesService.appendEvent(
         authUser,
@@ -770,6 +783,17 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
       );
     }
     try {
+      if (await this.isActivityProfileBlocked(authUser.id)) {
+        return this.emitProtocolError(
+          client,
+          {
+            code: 'ACTIVITY_PROFILE_REQUIRED',
+            clientEventId: input.clientEventId,
+            expectedVersion: input.rebasedExpectedVersion,
+          },
+          { gameId: input.gameId, actorId: authUser.id },
+        );
+      }
       const result = await this.gamesService.retryEvent(
         authUser,
         input.gameId,
@@ -814,6 +838,9 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
       return { status: 'denied', code: 'STAFF_SCOPE_DENIED', reason: 'AUTHORIZATION_SUBJECT_STALE' };
     }
     try {
+      if (await this.isActivityProfileBlocked(authUser.id)) {
+        return { status: 'denied', code: 'ACTIVITY_PROFILE_REQUIRED' };
+      }
       const grant = await this.gamesService.requestTakeover(authUser, input.gameId, {
         clientInstanceId: input.clientInstanceId,
         lastSequence: input.lastSequence,
@@ -842,6 +869,9 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
       return { status: 'denied', code: 'STAFF_SCOPE_DENIED', reason: 'SESSION_NOT_AUTHENTICATED' };
     }
     try {
+      if (await this.isActivityProfileBlocked(authUser.id)) {
+        return { status: 'denied', code: 'ACTIVITY_PROFILE_REQUIRED' };
+      }
       const grant = await this.gamesService.renewTakeover(authUser, input.gameId, {
         takeoverToken: input.takeoverToken,
         clientInstanceId: input.clientInstanceId,
@@ -1689,6 +1719,21 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
       sequence: result.sequence,
       version: result.version,
     };
+  }
+
+  // The socket also carries notifications/chat for deferred-profile users, so the
+  // V1AuthGuard ACTIVITY_PROFILE_REQUIRED rule is applied per write command against
+  // current state, not once at handshake.
+  private async isActivityProfileBlocked(userId: string): Promise<boolean> {
+    const user = await this.prisma.v1User.findFirst({
+      where: { id: userId },
+      select: { onboardingStatus: true, adminUser: { select: { status: true } } },
+    });
+    return (
+      user !== null &&
+      isActivityProfileRequired(user.onboardingStatus) &&
+      !isPhoneVerificationExemptActor(user)
+    );
   }
 
   /**

@@ -20,6 +20,7 @@ import { RegisterDto } from './dto/register.dto';
 import { SocialLinkDto } from './dto/social-link.dto';
 import { SocialProfileDto, SocialTermsDto } from './dto/social-profile.dto';
 import type { V1AuthUser } from './v1-auth-user';
+import { OptionalV1AuthGuard } from './optional-v1-auth.guard';
 import { V1AuthGuard } from './v1-auth.guard';
 import { V1SessionCookieInterceptor } from './v1-session.interceptor';
 
@@ -95,6 +96,12 @@ export class AuthController {
     return this.authService.completeSocialProfile(user.id, dto);
   }
 
+  @Post('social-profile/defer')
+  @UseGuards(V1AuthGuard)
+  deferSocialProfile(@CurrentUser() user: V1AuthUser) {
+    return this.authService.deferSocialProfile(user.id);
+  }
+
   /** Links the caller's pending social identity to the account that owns the OTP-proven phone. */
   @Post('social-link')
   @HttpCode(200)
@@ -127,7 +134,8 @@ export class AuthController {
 
   @Get('check-nickname')
   @Throttle({ default: { limit: 30, ttl: 60_000 } })
-  checkNickname(@Query() query: CheckNicknameQueryDto) {
-    return this.authService.checkNickname(query.nickname);
+  @UseGuards(OptionalV1AuthGuard)
+  checkNickname(@Query() query: CheckNicknameQueryDto, @CurrentUser() user?: V1AuthUser) {
+    return this.authService.checkNickname(query.nickname, user?.id);
   }
 }

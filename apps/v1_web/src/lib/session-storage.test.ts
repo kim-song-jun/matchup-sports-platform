@@ -7,6 +7,9 @@ import {
   getTournamentOpsOrigin,
   hasStoredV1Session,
   sanitizeRedirectPath,
+  saveRedirectPath,
+  getSavedRedirectPath,
+  clearSavedRedirectPath,
   withFromPath,
   saveStoredV1Session,
   saveTournamentOpsOrigin,
@@ -268,5 +271,25 @@ describe('sanitizeRedirectPath', () => {
     expect(sanitizeRedirectPath('tournament')).toBeNull();
     expect(sanitizeRedirectPath('//evil.example')).toBeNull();
     expect(sanitizeRedirectPath(null)).toBeNull();
+  });
+});
+
+describe('저장된 로그인 redirect', () => {
+  it('같은 origin 의 경로만 저장되고 clear 하면 사라진다', () => {
+    saveRedirectPath('/teams/new');
+    expect(getSavedRedirectPath()).toBe('/teams/new');
+    clearSavedRedirectPath();
+    expect(getSavedRedirectPath()).toBeNull();
+  });
+
+  it('외부 주소는 저장되지 않고 앞서 저장된 값도 지운다', () => {
+    saveRedirectPath('/teams/new');
+    saveRedirectPath('https://evil.example');
+    expect(getSavedRedirectPath()).toBeNull();
+  });
+
+  it('저장소에 직접 들어간 외부 주소는 읽을 때 걸러진다', () => {
+    window.sessionStorage.setItem('teameet.v1.savedRedirect', '//evil.example/x');
+    expect(getSavedRedirectPath()).toBeNull();
   });
 });

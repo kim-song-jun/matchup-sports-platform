@@ -70,6 +70,7 @@ async function createHarness(onboardingStatus: V1OnboardingStatus) {
       update: jest.fn().mockResolvedValue({ id: userId }),
     },
     v1UserOnboardingProgress: {
+      findUnique: jest.fn().mockResolvedValue(null),
       upsert: jest.fn().mockResolvedValue({ userId }),
     },
     v1StatusChangeLog: {
@@ -125,6 +126,7 @@ async function createHarness(onboardingStatus: V1OnboardingStatus) {
     moduleRef,
     service: moduleRef.get(OnboardingService),
     transaction,
+    progress: transactionClient.v1UserOnboardingProgress,
     writeMocks: [
       transactionClient.v1UserSportPreference.deleteMany,
       transactionClient.v1UserSportPreference.createMany,
@@ -182,4 +184,111 @@ describe('OnboardingService required social signup barrier', () => {
       }
     },
   );
+});
+
+describe('OnboardingService with the profile gate still closed (social_profile_deferred)', () => {
+  it('saves preferences without writing onboardingStatus or a status-change log', async () => {
+    const { moduleRef, service, writeMocks } = await createHarness('social_profile_deferred');
+    const [, , , , userUpdate, , statusLog] = writeMocks;
+
+    try {
+      await service.updatePreferences(userId, {
+        sports: [],
+        regions: [],
+        currentStep: 'sport',
+      });
+
+      expect(userUpdate).not.toHaveBeenCalled();
+      expect(statusLog).not.toHaveBeenCalled();
+    } finally {
+      await moduleRef.close();
+    }
+  });
+
+  it('keeps ageConfirmedAt and the kakao prefill in draftJson while overwriting DTO keys', async () => {
+    const { moduleRef, service, progress } = await createHarness('social_profile_deferred');
+    progress.findUnique.mockResolvedValue({
+      draftJson: {
+        ageConfirmedAt: '2026-10-11T00:00:00.000Z',
+        kakaoNickname: '카카오닉',
+        kakaoName: '홍길동',
+        currentStep: 'terms',
+      },
+    });
+
+    try {
+      await service.updatePreferences(userId, { sports: [], regions: [], currentStep: 'sport' });
+
+      const { update, create } = progress.upsert.mock.calls[0][0];
+      for (const draft of [update.draftJson, create.draftJson]) {
+        expect(draft).toMatchObject({
+          ageConfirmedAt: '2026-10-11T00:00:00.000Z',
+          kakaoNickname: '카카오닉',
+          kakaoName: '홍길동',
+          currentStep: 'sport',
+        });
+      }
+    } finally {
+      await moduleRef.close();
+    }
+  });
+
+  it('complete() reports limited:true while the profile gate is closed', async () => {
+    const { moduleRef, service } = await createHarness('social_profile_deferred');
+    try {
+      await expect(service.complete(userId)).resolves.toMatchObject({
+        status: 'social_profile_deferred',
+        limited: true,
+      });
+    } finally {
+      await moduleRef.close();
+    }
+  });
+
+  it('control: complete() reports limited:false once the gate is open', async () => {
+    const { moduleRef, service } = await createHarness('level_done');
+    try {
+      await expect(service.complete(userId)).resolves.toMatchObject({ status: 'completed', limited: false });
+    } finally {
+      await moduleRef.close();
+    }
+  });
+
+  it('control: a signed-up user still gets the derived status from the same payload', async () => {
+    const { moduleRef, service, writeMocks } = await createHarness('signup_done');
+    const [, , , , userUpdate] = writeMocks;
+
+    try {
+      await service.updatePreferences(userId, {
+        sports: [],
+        regions: [],
+        currentStep: 'sport',
+      });
+
+      expect(userUpdate).toHaveBeenCalledWith({
+        where: { id: userId },
+        data: { onboardingStatus: expect.not.stringMatching(/^social_profile_deferred$/) },
+      });
+    } finally {
+      await moduleRef.close();
+    }
+  });
+
+  it.each([
+    ['POST /onboarding/defer', (service: OnboardingService) => service.defer(userId, 'later')],
+    ['POST /onboarding/complete', (service: OnboardingService) => service.complete(userId)],
+  ])('%s does not open the gate', async (_name, invoke) => {
+    const { moduleRef, service, writeMocks } = await createHarness('social_profile_deferred');
+    const [, , , , userUpdate, , statusLog] = writeMocks;
+
+    try {
+      const result = (await invoke(service)) as { status: string };
+
+      expect(result.status).toBe('social_profile_deferred');
+      expect(userUpdate).not.toHaveBeenCalled();
+      expect(statusLog).not.toHaveBeenCalled();
+    } finally {
+      await moduleRef.close();
+    }
+  });
 });

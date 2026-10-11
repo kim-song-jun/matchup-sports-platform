@@ -16,7 +16,7 @@
 | POST | `/auth/kakao` | No | 카카오 로그인 |
 | POST | `/auth/naver` | No | 네이버 로그인 |
 | POST | `/auth/apple` | No | 애플 로그인 시도 |
-| POST | `/auth/social-link` | Yes (가입 대기 소셜 계정) | 휴대폰 OTP 증명 후 대기 소셜 로그인을 그 번호의 기존 계정에 연결 — 자세한 계약은 `domains/auth.md` |
+| POST | `/auth/social-link` | Yes (가입 대기·정보 입력 보류 소셜 계정) | 휴대폰 OTP 증명 후 대기 소셜 로그인을 그 번호의 기존 계정에 연결 — 자세한 계약은 `domains/auth.md` |
 | POST | `/auth/refresh` | No | refresh token으로 재발급 |
 | GET | `/auth/me` | Yes | 현재 사용자 조회 |
 | DELETE | `/auth/withdraw` | Yes | 소프트 삭제 탈퇴 |
@@ -75,6 +75,8 @@
 
 - `401`: 토큰 없음/만료/유효하지 않음
 - `403`: 인증은 되었지만 정책 위반(예: prod에서 dev-login)
+
+`V1AuthGuard` 의 403 판정 순서: 가입 진행 중(`SIGNUP_INCOMPLETE`) → 약관 재동의(`TERMS_RECONSENT_REQUIRED`) → 가입 정보 입력 보류(`ACTIVITY_PROFILE_REQUIRED`, `details.next.route = /signup/social`) → 휴대폰 인증(`PHONE_VERIFICATION_REQUIRED`). 뒤의 두 게이트는 같은 허용 목록(`isPhoneVerificationRequestAllowed`)과 관리자 면제를 공유하고, 조회(GET/HEAD/OPTIONS)는 항상 통과한다.
 
 ## Edge Cases
 

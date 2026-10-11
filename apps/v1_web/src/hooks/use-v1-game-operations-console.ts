@@ -246,7 +246,8 @@ export interface UseV1GameOperationsConsoleResult {
   readonly liveEvents: readonly GameEventRecord[];
   readonly gameSnapshot: { readonly version: number; readonly state: GameState } | null;
   readonly bannerMessage: string | null;
-  submitEvent(input: SubmitEventInput): Promise<void>;
+  /** Resolves to the queued item's `clientEventId`, or `null` when nothing was queued (no takeover / snapshot). */
+  submitEvent(input: SubmitEventInput): Promise<string | null>;
   retryFailedEvent(clientEventId: string): void;
   requestTakeover(): void;
   /** T3 추가 — 큐를 거치지 않는 온라인 전용 되돌리기(D-10과 같은 이유로 절대
@@ -991,8 +992,8 @@ export function useV1GameOperationsConsole(
   }, [connectionStatus, takeoverEnabled, takeover, sync, queue, sendQueuedItem]);
 
   const submitEvent = useCallback(
-    async (input: SubmitEventInput) => {
-      if (!takeoverEnabledRef.current || !gameSnapshot) return;
+    async (input: SubmitEventInput): Promise<string | null> => {
+      if (!takeoverEnabledRef.current || !gameSnapshot) return null;
       // D-10 (frozen decision table): this is the ONLY thing that may ever
       // enter the durable offline queue. Asserting it here — even though
       // every current caller already only constructs an append_event —
@@ -1011,7 +1012,7 @@ export function useV1GameOperationsConsole(
         occurredAt: input.occurredAt,
         payload: input.payload,
       });
-      if (!takeoverEnabledRef.current) return;
+      if (!takeoverEnabledRef.current) return null;
       const item: QueuedGameEvent = {
         clientEventId,
         gameId: gameId ?? '',
@@ -1035,6 +1036,7 @@ export function useV1GameOperationsConsole(
         ackedVersion: null,
       };
       dispatchQueue({ type: 'ENQUEUE', item });
+      return clientEventId;
     },
     [gameId, gameSnapshot],
   );

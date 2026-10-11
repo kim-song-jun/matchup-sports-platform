@@ -759,6 +759,82 @@ describe('MatchEditPageClient — cancel confirmation', () => {
   });
 });
 
+// MD-QA #120: 일정·장소를 바꾸면 서버가 확정 참가자 전원을 취소하는데 저장 전에 아무 확인이 없었다.
+describe('MatchEditPageClient — 일정·장소 변경 확인', () => {
+  const original = {
+    participantCount: matchEditData.participantCount,
+    hostParticipates: matchEditData.form.hostParticipates,
+    startsAt: matchEditData.form.startsAt,
+  };
+
+  afterEach(() => {
+    cleanup();
+    matchEditData.participantCount = original.participantCount;
+    matchEditData.form.hostParticipates = original.hostParticipates;
+    matchEditData.form.startsAt = original.startsAt;
+  });
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    matchEditData.participantCount = 4;
+    matchEditData.form.hostParticipates = true;
+    // 화면은 분 단위로만 다룬다 — 실제 매치처럼 초·밀리초가 0인 시각으로 맞춘다(fixture 기본값은 Date.now() 기반).
+    const start = new Date(original.startsAt);
+    start.setSeconds(0, 0);
+    matchEditData.form.startsAt = start.toISOString();
+  });
+
+  // 이 파일의 모킹된 화면은 제출 버튼을 submitLabel 과 무관하게 '매치 만들기'로 그린다.
+  async function goToPlaceTime() {
+    render(<MatchEditPageClient matchId="match-edit-1" />);
+    await waitFor(() => expect(screen.getByLabelText('제목')).toHaveValue('수정 중인 매치'));
+    fireEvent.click(screen.getByRole('button', { name: '다음' }));
+    fireEvent.click(screen.getByRole('button', { name: '다음' }));
+    expect(screen.getByTestId('match-step')).toHaveTextContent('place-time');
+  }
+
+  it('시작 시간을 바꾸면 영향받는 확정 참가자 수를 알리고, 거절하면 저장하지 않는다', async () => {
+    confirmMock.mockResolvedValue(false);
+    await goToPlaceTime();
+    fireEvent.change(screen.getByLabelText('시작 시간'), { target: { value: '06:05' } });
+    fireEvent.click(screen.getByRole('button', { name: '다음' }));
+    fireEvent.click(screen.getByRole('button', { name: '매치 만들기' }));
+
+    await waitFor(() => expect(confirmMock).toHaveBeenCalledWith(expect.objectContaining({
+      title: '일정·장소를 바꿀까요?',
+      message: expect.stringContaining('확정 참가자 3명'),
+    })));
+    expect(updateMatchMutate).not.toHaveBeenCalled();
+  });
+
+  it('확인하면 저장한다', async () => {
+    confirmMock.mockResolvedValue(true);
+    await goToPlaceTime();
+    fireEvent.change(screen.getByLabelText('시작 시간'), { target: { value: '06:05' } });
+    fireEvent.click(screen.getByRole('button', { name: '다음' }));
+    fireEvent.click(screen.getByRole('button', { name: '매치 만들기' }));
+    await waitFor(() => expect(updateMatchMutate).toHaveBeenCalled());
+  });
+
+  it('일정·장소를 그대로 두면 확인 없이 저장한다', async () => {
+    await goToPlaceTime();
+    fireEvent.click(screen.getByRole('button', { name: '다음' }));
+    fireEvent.click(screen.getByRole('button', { name: '매치 만들기' }));
+    await waitFor(() => expect(updateMatchMutate).toHaveBeenCalled());
+    expect(confirmMock).not.toHaveBeenCalled();
+  });
+
+  it('호스트 말고 확정 참가자가 없으면 일정을 바꿔도 확인하지 않는다', async () => {
+    matchEditData.participantCount = 1;
+    await goToPlaceTime();
+    fireEvent.change(screen.getByLabelText('시작 시간'), { target: { value: '06:05' } });
+    fireEvent.click(screen.getByRole('button', { name: '다음' }));
+    fireEvent.click(screen.getByRole('button', { name: '매치 만들기' }));
+    await waitFor(() => expect(updateMatchMutate).toHaveBeenCalled());
+    expect(confirmMock).not.toHaveBeenCalled();
+  });
+});
+
 /**
  * 모집 마감 / 다시 열기 (2026-09-07 제보 대응).
  *

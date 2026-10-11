@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  requiresParticipantReconfirmation,
   buildMatchPayloadResult,
   getCompleteMatchSteps,
   getMatchMissingFields,
@@ -257,5 +258,38 @@ describe('신청 마감일/마감시간 부분 입력 — 한쪽만 채우면 �
     const ctx = baseCtx({ draft: { ...baseCtx().draft, deadlineDate, deadlineTime } });
 
     expect(getMatchMissingFields(ctx).some((item) => item.field === 'deadlineDate' || item.field === 'deadlineTime')).toBe(false);
+  });
+});
+
+describe('requiresParticipantReconfirmation (MD-QA #120 — 서버 requiresReconfirmation 과 같은 조건)', () => {
+  const form = {
+    sportId: 's', title: 't', capacity: 4,
+    startsAt: '2026-10-11T06:20:00.000Z', endsAt: '2026-10-11T06:50:00.000Z',
+    manualPlaceName: '망원유수지체육공원', addressText: '서울 마포구', placeProviderId: 'p1', placeLatitude: 37.5, placeLongitude: 126.9,
+  };
+  const payload = {
+    sportId: 's', regionId: 'r', title: 't', capacity: 4, hostParticipates: true,
+    startsAt: '2026-10-11T06:20:00.000Z', endsAt: '2026-10-11T06:50:00.000Z',
+    manualPlaceName: '망원유수지체육공원', addressText: '서울 마포구', placeProviderId: 'p1', placeLatitude: 37.5, placeLongitude: 126.9,
+  } as Parameters<typeof requiresParticipantReconfirmation>[1];
+
+  it('일정·장소가 같으면 false (제목·정원 등 다른 값은 무관)', () => {
+    expect(requiresParticipantReconfirmation(form, { ...payload, title: '새 제목', capacity: 6 })).toBe(false);
+  });
+
+  it('같은 시각을 다른 표기로 보내도 false', () => {
+    expect(requiresParticipantReconfirmation(form, { ...payload, startsAt: '2026-10-11T15:20:00+09:00' })).toBe(false);
+  });
+
+  it.each([
+    ['시작', { startsAt: '2026-10-11T06:10:00.000Z' }],
+    ['종료', { endsAt: '2026-10-11T07:00:00.000Z' }],
+    ['종료 삭제', { endsAt: null }],
+    ['장소 이름', { manualPlaceName: '다른 구장' }],
+    ['주소', { addressText: null }],
+    ['장소 id', { placeProviderId: 'p2' }],
+    ['좌표', { placeLatitude: 37.6 }],
+  ])('%s이 바뀌면 true', (_label, change) => {
+    expect(requiresParticipantReconfirmation(form, { ...payload, ...change })).toBe(true);
   });
 });

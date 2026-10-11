@@ -46,6 +46,8 @@ export function isPendingSocialSignupRequestAllowed(
     return (
       pathname.endsWith('/auth/social-profile') ||
       pathname.endsWith('/auth/social-profile/defer') ||
+      pathname.endsWith('/auth/social-link') ||
+      pathname.endsWith('/auth/social-link/preview') ||
       pathname.endsWith('/auth/check-nickname') ||
       pathname.endsWith('/verification/phone/request') ||
       pathname.endsWith('/verification/phone/confirm')

@@ -22,6 +22,8 @@
 | `POST` | `/api/v1/auth/social-terms` | user | `{ requiredTermsAccepted: true, ageConfirmed: true, acceptedTermsDocumentIds: uuid[] }` | social session + onboarding route |
 | `POST` | `/api/v1/auth/social-profile` | user | `SocialProfileDto` | compatibility profile completion (also finishes a deferred profile) |
 | `POST` | `/api/v1/auth/social-profile/defer` | user | empty body | skip the profile form; social session without `next` |
+| `POST` | `/api/v1/auth/social-link/preview` | user (pending social, `social_profile_required` only) | `{ phone, proofToken }` | `{ maskedEmail, providers, hasPassword, linkingProvider }` — same checks and error codes as `social-link`, but consumes nothing and writes nothing |
+| `POST` | `/api/v1/auth/social-link` | user (pending social, `social_profile_required` only) | `{ phone, proofToken }` | session of the phone's existing account (`session.userId` = holder) + `next?` |
 | `GET` | `/api/v1/auth/check-email` | none | `?email=` | `{ available: boolean }` |
 | `GET` | `/api/v1/auth/check-nickname` | none | `?nickname=` | `{ available: boolean }` |
 | `GET` | `/api/v1/terms/current?context=signup\|tournament_application\|footer` | optional user | active context | effective current documents; signup adds per-user compliance |
@@ -31,7 +33,7 @@
 | `POST` | `/api/v1/onboarding/complete` | user | empty body | completed onboarding summary |
 | `POST` | `/api/v1/onboarding/defer` | user | `{ reason?: "skip_now" \| "later" \| "unknown" }` | deferred onboarding summary |
 | `POST` | `/api/v1/auth/phone/issue` | none | `{ phone }` | `{ expiresAt, devCode? }` |
-| `POST` | `/api/v1/auth/phone/verify` | none | `{ phone, code, purpose? }` | `{ verified, proofToken }` |
+| `POST` | `/api/v1/auth/phone/verify` | none | `{ phone, code, purpose?: "signup" \| "password_reset" \| "social_link" }` | `{ verified, proofToken }` |
 | `POST` | `/api/v1/auth/recovery/find-account` | none | `{ phone, proofToken }` | `{ maskedEmail, providers, hasPassword }` |
 | `POST` | `/api/v1/auth/recovery/reset-password` | none | `{ phone, proofToken, newPassword }` | `{ ok: true }` |
 | `POST` | `/api/v1/auth/recovery/email/request` | none | `{ email }` | `{ sent: true, expiresAt, devCode? }` |
@@ -93,6 +95,7 @@ the payload is what separates them. Signing, expiry, and constant-time compariso
 ```
 phone  signup          {phone}:{exp}                      ← legacy shape, must not change
 phone  password_reset  password_reset:{phone}:{exp}
+phone  social_link     social_link:{phone}:{exp}
 email  password_reset  email:password_reset:{email}:{exp}  ← channel label
 ```
 
@@ -200,6 +203,12 @@ When `POST /api/v1/auth/social-terms` succeeds, the API does not create a profil
 `POST /api/v1/auth/social-profile` then requires `nickname`, a trimmed non-blank name, an 11-digit `phone`, a real-calendar `birthDate` in `YYYYMMDD` format, and `gender = male | female`. New clients send the name as `realName`; deprecated `displayName` remains accepted during rolling deployment. The normalized value is written to both `real_name` and the legacy `display_name`. From `social_profile_required` the API then sets `onboardingStatus = signup_done`, sets `currentStep = sport`, and returns the next route; from `social_profile_deferred` it sets `onboardingStatus = deferred` and the response has no `next` (the client returns to the screen that asked for the profile). `profileImageUrl` remains optional and nullable.
 
 `social_terms_required` and `social_profile_required` are authenticated-but-restricted states. They are not guest sessions. The web gate always resumes the exact required route, and API guards reject unrelated protected or optional-auth requests with `403 SIGNUP_INCOMPLETE` and `details.next.route`. The only common authenticated exceptions are `GET /auth/me` and `POST /auth/logout`; each pending state additionally allows only its own completion endpoint.
+
+### Linking a pending social login to the phone owner (`POST /auth/social-link`)
+
+When a social login returns no usable email, a new pending account is created even though the person already has one, and requesting that person's phone OTP on `/signup/social` (`POST /verification/phone/request`) is a `409 PHONE_CONFLICT`. The client then runs `phone/issue` → `phone/verify` with `purpose: "social_link"` → `social-link`. Only the caller's pending account (`social_profile_required`, exactly one active kakao/apple identity, no profile) may call it. The social identity row moves to the existing account (Apple refresh token preserved), the empty pending account is deleted, and the response is the holder's login session; the cookie is replaced with the holder's. The holder receives a `social_identity_linked` notification. The client first calls `POST /auth/social-link/preview` to show which account the number belongs to (masked email, login methods); the preview does not consume the proof. The proof is single-use: the server consumes the verified phone challenge inside the transaction.
+
+Errors: `400 PHONE_NOT_VERIFIED` (bad, expired, wrong-purpose or already-used proof), `404 ACCOUNT_NOT_FOUND` (no account owns the phone), `403 ACCOUNT_WITHDRAWAL_PENDING` / `403 PERMISSION_DENIED` (holder not active), `401 SOCIAL_SIGNUP_EXPIRED`, `409 SOCIAL_LINK_NOT_PENDING`, `409 SOCIAL_LINK_SAME_ACCOUNT`, `409 SOCIAL_LINK_PHONE_UNVERIFIED` (the holder never verified that phone — a number someone else typed must not hand over the account), `409 SOCIAL_LINK_ADMIN_FORBIDDEN` (holder has an active or suspended admin role), `409 SOCIAL_LINK_PROVIDER_EXISTS` (holder already has an active identity of that provider), `409 SOCIAL_LINK_CONFLICT` (concurrent change), `409 SOCIAL_LINK_ACCOUNT_NOT_EMPTY` (pending account unexpectedly owns data). Rate limit 5/min.
 
 `GET /api/v1/auth/me` includes account login metadata under `user`: `authProvider`, `authProviders`, and `hasPassword`. Clients must use `hasPassword` to decide whether email/password account controls are applicable.
 

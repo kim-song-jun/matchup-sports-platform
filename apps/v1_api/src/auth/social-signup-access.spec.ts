@@ -44,4 +44,13 @@ describe('social signup access contract', () => {
     expect(isActivityProfileRequired('social_profile_required')).toBe(false);
     expect(isActivityProfileRequired('completed')).toBe(false);
   });
+
+  it('allows social-link only while the profile step is pending', () => {
+    expect(isPendingSocialSignupRequestAllowed('social_profile_required', '/api/v1/auth/social-link')).toBe(true);
+    expect(isPendingSocialSignupRequestAllowed('social_terms_required', '/api/v1/auth/social-link')).toBe(false);
+    expect(isPendingSocialSignupRequestAllowed('social_profile_required', '/api/v1/auth/social-link/')).toBe(true);
+    expect(isPendingSocialSignupRequestAllowed('social_profile_required', '/api/v1/auth/social-linkx')).toBe(false);
+    expect(isPendingSocialSignupRequestAllowed('social_profile_required', '/api/v1/auth/social-link/preview')).toBe(true);
+    expect(isPendingSocialSignupRequestAllowed('social_terms_required', '/api/v1/auth/social-link/preview')).toBe(false);
+  });
 });

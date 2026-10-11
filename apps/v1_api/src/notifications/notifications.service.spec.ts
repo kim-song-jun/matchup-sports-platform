@@ -194,6 +194,33 @@ describe('NotificationsService', () => {
     });
   });
 
+  it('소셜 연결 알림은 system 타입·설정 화면 딥링크이고 중요 알림 설정만 따른다', async () => {
+    prisma.v1NotificationPreference.findUnique.mockResolvedValue({ importantEnabled: false, activityEnabled: true });
+    await service.emitNotification('user-1', 'social_identity_linked', null, undefined, {
+      vars: { name: '카카오' },
+      businessKey: 'social-link:identity-1',
+    });
+    await new Promise(setImmediate);
+    expect(prisma.v1Notification.create).not.toHaveBeenCalled();
+
+    prisma.v1NotificationPreference.findUnique.mockResolvedValue({ importantEnabled: true, activityEnabled: false });
+    prisma.v1Notification.create.mockImplementation(async ({ data }) => makeNotification(data));
+    await service.emitNotification('user-1', 'social_identity_linked', null, undefined, {
+      vars: { name: '카카오' },
+      businessKey: 'social-link:identity-2',
+    });
+    await new Promise(setImmediate);
+    expect(prisma.v1Notification.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        recipientUserId: 'user-1',
+        targetType: 'system',
+        title: '로그인 수단이 연결됐어요',
+        body: '카카오 로그인이 연결됐어요. 본인이 아니라면 고객센터로 문의해 주세요.',
+        deepLink: '/my/settings',
+      }),
+    });
+  });
+
   it('사용자가 해당 카테고리를 비활성화했을 때 알림 DB row를 생성하지 않는다', async () => {
     // matchEnabled = false → match_application_received must be suppressed
     prisma.v1NotificationPreference.findUnique.mockResolvedValue({ matchEnabled: false });

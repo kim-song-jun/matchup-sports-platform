@@ -91,6 +91,7 @@ vi.mock('./lineup-grid', async (importOriginal) => ({
     onSelectPlayer,
     restrictSideId,
     filterParticipantIds,
+    sentOffParticipantIds,
   }: {
     onSelectPlayer: (input: {
       sideId: string;
@@ -102,6 +103,7 @@ vi.mock('./lineup-grid', async (importOriginal) => ({
     }) => void;
     restrictSideId?: string;
     filterParticipantIds?: ReadonlySet<string>;
+    sentOffParticipantIds?: ReadonlySet<string>;
   }) => {
     const participantId = restrictSideId
       ? filterParticipantIds?.has('p-1')
@@ -125,6 +127,7 @@ vi.mock('./lineup-grid', async (importOriginal) => ({
         <button type="button" onClick={() => onSelectPlayer({ sideId: 'side-home', participant })}>
           select-player
         </button>
+        <span data-testid="sent-off-ids">{[...(sentOffParticipantIds ?? [])].sort().join(',')}</span>
       </div>
     );
   },
@@ -460,6 +463,59 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
     );
     expect(mocks.useV1GameOperationsConsole().submitEvent).toHaveBeenCalledTimes(1);
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+  });
+
+  it('레드카드가 기록된(되돌리지 않은) 선수만 선수 목록에 퇴장으로 넘긴다', () => {
+    gameWithPeriods('LIVE', [
+      { number: 1, state: 'LIVE', startedAt: '2026-08-07T00:00:00.000Z', endedAt: null },
+      { number: 2, state: 'SCHEDULED', startedAt: null, endedAt: null },
+    ]);
+    const card = (sequence: number, participantId: string, color: 'RED' | 'YELLOW'): GameEventRecord =>
+      ({ ...goal(sequence), type: 'CARD', participantId, payload: { card: color } }) as GameEventRecord;
+    const undoneRed = card(2, 'p-2', 'RED');
+    mocks.useV1GameOperationsConsole.mockReturnValue(
+      consoleState({
+        liveEvents: [
+          card(1, 'p-1', 'RED'),
+          undoneRed,
+          { ...goal(3), type: 'CORRECTION', participantId: 'p-2', reversesEventId: undoneRed.id, payload: {} } as GameEventRecord,
+          card(4, 'p-3', 'YELLOW'),
+        ],
+      }),
+    );
+    render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+
+    fireEvent.click(screen.getByRole('button', { name: /^골/ }));
+
+    expect(within(screen.getByRole('dialog')).getByTestId('sent-off-ids')).toHaveTextContent(/^p-1$/);
+  });
+
+  it('서버 확정 전(대기 중)인 레드카드 선수도 선수 목록에 퇴장으로 넘긴다', () => {
+    gameWithPeriods('LIVE', [
+      { number: 1, state: 'LIVE', startedAt: '2026-08-07T00:00:00.000Z', endedAt: null },
+      { number: 2, state: 'SCHEDULED', startedAt: null, endedAt: null },
+    ]);
+    const queuedRed = (clientEventId: string, participantId: string, status: 'queued' | 'failed') => ({
+      clientEventId,
+      gameId: 'game-1',
+      expectedVersion: 1,
+      event: { type: 'CARD', participantId, period: 1, clockMs: 0, occurredAt: '', payload: { card: 'RED' } },
+      payloadHash: 'h',
+      status,
+      queuedAt: '',
+      attempts: 0,
+      lastError: null,
+      ackedSequence: null,
+      ackedVersion: null,
+    });
+    mocks.useV1GameOperationsConsole.mockReturnValue(
+      consoleState({ queue: { items: [queuedRed('c-1', 'p-1', 'queued'), queuedRed('c-2', 'p-2', 'failed')] } }),
+    );
+    render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+
+    fireEvent.click(screen.getByRole('button', { name: /^골/ }));
+
+    expect(within(screen.getByRole('dialog')).getByTestId('sent-off-ids')).toHaveTextContent(/^p-1$/);
   });
 
   it('골 확인 모달에서 취소하면 아무것도 기록되지 않는다', async () => {

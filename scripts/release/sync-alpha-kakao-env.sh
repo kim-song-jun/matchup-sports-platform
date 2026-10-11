@@ -19,15 +19,17 @@ set -Eeuo pipefail
 [[ "${AWS_REGION}" =~ ^[a-z]{2}-[a-z]+-[0-9]$ ]]
 
 # A malformed value leaves the host unchanged with a warning rather than failing the deploy.
-for guard in "KAKAO_CLIENT_ID:${SECRET_KAKAO_CLIENT_ID}:^[0-9a-f]{32}$" \
-             "KAKAO_CLIENT_SECRET:${SECRET_KAKAO_CLIENT_SECRET}:^[A-Za-z0-9]{16,64}$" \
-             "KAKAO_REDIRECT_URI:${SECRET_ALPHA_KAKAO_REDIRECT_URI}:^https://alpha\\.teameet\\.co\\.kr/[A-Za-z0-9._~/-]*$"; do
-  name="${guard%%:*}"; rest="${guard#*:}"; pattern="${rest##*:}"; value="${rest%:*}"
-  [[ "${value}" =~ ${pattern} ]] || {
-    echo "::warning::${name} does not look right (${#value} chars); the host's Kakao env was left unchanged"
-    exit 0
-  }
-done
+# Checked one by one: the redirect URI contains ':', so a ':'-delimited guard list cannot carry it.
+leave_unchanged() {
+  echo "::warning::$1 does not look right ($2 chars); the host's Kakao env was left unchanged"
+  exit 0
+}
+client_id_pattern='^[0-9a-f]{32}$'
+client_secret_pattern='^[A-Za-z0-9]{16,64}$'
+redirect_pattern='^https://alpha\.teameet\.co\.kr/[A-Za-z0-9._~/-]*$'
+[[ "${SECRET_KAKAO_CLIENT_ID}" =~ ${client_id_pattern} ]] || leave_unchanged KAKAO_CLIENT_ID "${#SECRET_KAKAO_CLIENT_ID}"
+[[ "${SECRET_KAKAO_CLIENT_SECRET}" =~ ${client_secret_pattern} ]] || leave_unchanged KAKAO_CLIENT_SECRET "${#SECRET_KAKAO_CLIENT_SECRET}"
+[[ "${SECRET_ALPHA_KAKAO_REDIRECT_URI}" =~ ${redirect_pattern} ]] || leave_unchanged KAKAO_REDIRECT_URI "${#SECRET_ALPHA_KAKAO_REDIRECT_URI}"
 
 names=(KAKAO_CLIENT_ID KAKAO_CLIENT_SECRET KAKAO_REDIRECT_URI)
 values=("${SECRET_KAKAO_CLIENT_ID}" "${SECRET_KAKAO_CLIENT_SECRET}" "${SECRET_ALPHA_KAKAO_REDIRECT_URI}")

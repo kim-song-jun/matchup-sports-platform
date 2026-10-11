@@ -141,6 +141,15 @@ describe('KakaoMapPreview', () => {
       delete (Element.prototype as { scrollIntoView?: unknown }).scrollIntoView;
     });
 
+    it('높이는 고정값 없이 폭의 절반이고 160~240 사이로 묶인다', async () => {
+      await renderPreview();
+      const link = await screen.findByRole('link', LINK);
+
+      expect(link.style.aspectRatio).toBe('2 / 1');
+      expect(link).toHaveStyle({ minHeight: '160px', maxHeight: '240px' });
+      expect(link.style.height).toBe('');
+    });
+
     it('revealOnShow 를 켜면 상자가 나타날 때 한 번 화면 안으로 스크롤한다', async () => {
       await renderPreview({ revealOnShow: true });
       const link = await screen.findByRole('link', LINK);

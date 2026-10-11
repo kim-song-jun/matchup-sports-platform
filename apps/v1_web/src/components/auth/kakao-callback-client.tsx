@@ -7,21 +7,14 @@ import { useQueryClient } from '@tanstack/react-query';
 import { V1ApiError, v1Post } from '@/lib/api-client';
 import { trackEvent } from '@/lib/analytics';
 import { clearV1IdentityCache } from '@/lib/query-keys';
-import { sanitizeRedirectPath, saveStoredV1Session } from '@/lib/session-storage';
+import { clearSavedRedirectPath, getSavedRedirectPath, saveStoredV1Session } from '@/lib/session-storage';
 import type { V1AuthSessionResponse } from '@/types/api';
 import { AUTH_NOTICE_STAGE, AUTH_WELCOME_STAGE, AuthFrame } from './auth-page';
-import { KAKAO_OAUTH_STATE_STORAGE_KEY } from './auth.view-model';
+import { isSocialOnboardingRoute, KAKAO_OAUTH_STATE_STORAGE_KEY } from './auth.view-model';
 import { extractErrorMessage } from '@/lib/error-message';
 
 function getKakaoRedirectUri() {
   return process.env.NEXT_PUBLIC_KAKAO_REDIRECT_URI;
-}
-
-function getSavedRedirectPath() {
-  if (typeof window === 'undefined') return null;
-  const value = window.sessionStorage.getItem('teameet.v1.kakao.redirect');
-  window.sessionStorage.removeItem('teameet.v1.kakao.redirect');
-  return sanitizeRedirectPath(value);
 }
 
 // 로그인 CSRF(세션 고정) 방지: authorize 이동 시 저장해 둔 state 값을 읽고 즉시 제거한다.
@@ -74,9 +67,11 @@ export function KakaoCallbackClient() {
         clearV1IdentityCache(queryClient);
         const nextRoute = result.next?.route ?? getSavedRedirectPath() ?? '/home';
         // next.route가 사회 가입 미완료 상태로 안내하면 신규 가입 진행 중, 그 외에는 기존 계정 로그인.
-        if (nextRoute === '/terms?mode=social' || nextRoute === '/signup/social') {
+        // 가입 중에는 저장된 redirect 를 가입 마지막 화면이 쓰도록 남긴다.
+        if (isSocialOnboardingRoute(nextRoute)) {
           trackEvent('sign_up_start', { method: 'kakao' });
         } else {
+          clearSavedRedirectPath();
           trackEvent('login', { method: 'kakao' });
         }
         router.replace(nextRoute);

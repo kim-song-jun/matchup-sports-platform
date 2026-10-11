@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation';
 import { isNativeAppleSignInAvailable, requestNativeAppleSignIn } from '@/lib/native-apple';
 import { extractErrorMessage } from '@/lib/error-message';
 import { v1Post } from '@/lib/api-client';
+import { clearSavedRedirectPath, getSavedRedirectPath, saveRedirectPath } from '@/lib/session-storage';
+import { isSocialOnboardingRoute } from './auth.view-model';
 import type { V1AuthSessionResponse } from '@/types/api';
 
 /**
@@ -33,6 +35,7 @@ export function AppleLoginButton({ className, style }: { className?: string; sty
     setBusy(true);
     setError(null);
     try {
+      saveRedirectPath(new URLSearchParams(window.location.search).get('redirect'));
       const { nonce } = await v1Post<{ nonce: string }>('/auth/apple/nonce');
       const result = await requestNativeAppleSignIn(nonce);
       if (!result.ok || !result.identityToken) {
@@ -52,7 +55,9 @@ export function AppleLoginButton({ className, style }: { className?: string; sty
         ...(result.fullName ? { fullName: result.fullName } : {}),
       });
       // 신규 가입이면 약관 단계로, 기존 회원이면 홈으로. 경로는 서버가 정한다.
-      router.replace(session.next?.route ?? '/home');
+      const route = session.next?.route ?? getSavedRedirectPath() ?? '/home';
+      if (!isSocialOnboardingRoute(route)) clearSavedRedirectPath();
+      router.replace(route);
       router.refresh();
     } catch (err) {
       setError(extractErrorMessage(err, 'Apple 로그인에 실패했어요. 잠시 후 다시 시도해 주세요.'));

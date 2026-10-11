@@ -1055,6 +1055,16 @@ export class AuthService {
       });
     }
 
+    // Accounts parked in social_profile_required before the 14+ confirmation moved to the
+    // terms step have no ageConfirmedAt; they must pass the terms step again.
+    if (!draftObject(user.onboardingProgress?.draftJson).ageConfirmedAt) {
+      await this.resetExpiredSocialSignup(userId);
+      throw new BadRequestException({
+        code: 'TERMS_REQUIRED',
+        message: 'Required terms must be accepted before social profile registration',
+      });
+    }
+
     const nickname = await generateSocialNickname(
       readSocialNicknameSeed(user.onboardingProgress?.draftJson),
       async (candidate) =>
@@ -1190,17 +1200,19 @@ export class AuthService {
   }
 
   private async resetExpiredSocialSignup(userId: string) {
-    await this.prisma.$transaction([
-      this.prisma.v1User.update({
-        where: { id: userId },
+    // Only a still-pending social signup goes back to terms — a completion that won a race stays.
+    await this.prisma.$transaction(async (tx) => {
+      const reset = await tx.v1User.updateMany({
+        where: { id: userId, onboardingStatus: { in: ['social_terms_required', 'social_profile_required'] } },
         data: { onboardingStatus: 'social_terms_required' },
-      }),
-      this.prisma.v1UserOnboardingProgress.upsert({
+      });
+      if (reset.count === 0) return;
+      await tx.v1UserOnboardingProgress.upsert({
         where: { userId },
         update: { currentStep: 'terms' },
         create: { userId, currentStep: 'terms' },
-      }),
-    ]);
+      });
+    });
   }
 
   /**

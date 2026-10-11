@@ -2,6 +2,7 @@ import { generateSocialNickname, normalizeSocialNicknameSeed } from './social-ni
 
 const never = async () => false;
 const always = async () => true;
+const LONE_SURROGATE = /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/;
 
 describe('normalizeSocialNicknameSeed', () => {
   it('collapses whitespace, strips control characters and trims', () => {
@@ -10,6 +11,15 @@ describe('normalizeSocialNicknameSeed', () => {
 
   it('cuts to 20 characters', () => {
     expect(normalizeSocialNicknameSeed('가'.repeat(30))).toBe('가'.repeat(20));
+  });
+
+  it('cuts by code points so an emoji at the boundary is never split', () => {
+    const seed = `${'가'.repeat(19)}😀뒤`;
+    const result = normalizeSocialNicknameSeed(seed);
+
+    expect(result).toBe(`${'가'.repeat(19)}😀`);
+    expect(Array.from(result ?? '')).toHaveLength(20);
+    expect(result).not.toMatch(LONE_SURROGATE);
   });
 
   it.each([null, undefined, '', '  ', '가'])('returns null for %p (under 2 characters)', (seed) => {
@@ -35,6 +45,15 @@ describe('generateSocialNickname', () => {
 
     expect(nickname).toHaveLength(20);
     expect(nickname.endsWith('50')).toBe(true);
+  });
+
+  it('keeps suffixed names within 20 code points without a lone surrogate', async () => {
+    const seed = `${'가'.repeat(17)}😀😀😀`;
+    const nickname = await generateSocialNickname(seed, async (n) => n === seed, () => 0.5);
+
+    expect(Array.from(nickname)).toHaveLength(20);
+    expect(nickname).toBe(`${'가'.repeat(17)}😀50`);
+    expect(nickname).not.toMatch(LONE_SURROGATE);
   });
 
   it('falls back to a generic name when there is no seed', async () => {

@@ -632,8 +632,8 @@ describe('AuthService', () => {
     // any FK-restricted row, e.g. chat participation, would fail to delete
     // and 500-loop on every subsequent login attempt)
     expect(prisma.v1User.delete).not.toHaveBeenCalled();
-    expect(prisma.v1User.update).toHaveBeenCalledWith({
-      where: { id: 'user-1' },
+    expect(prisma.v1User.updateMany).toHaveBeenCalledWith({
+      where: { id: 'user-1', onboardingStatus: { in: ['social_terms_required', 'social_profile_required'] } },
       data: { onboardingStatus: 'social_terms_required' },
     });
     expect(prisma.v1UserOnboardingProgress.upsert).toHaveBeenCalledWith({
@@ -934,8 +934,8 @@ describe('AuthService', () => {
     });
 
     expect(prisma.v1User.delete).not.toHaveBeenCalled();
-    expect(prisma.v1User.update).toHaveBeenCalledWith({
-      where: { id: 'user-1' },
+    expect(prisma.v1User.updateMany).toHaveBeenCalledWith({
+      where: { id: 'user-1', onboardingStatus: { in: ['social_terms_required', 'social_profile_required'] } },
       data: { onboardingStatus: 'social_terms_required' },
     });
     expect(prisma.v1UserOnboardingProgress.upsert).toHaveBeenCalledWith({
@@ -952,7 +952,7 @@ describe('AuthService', () => {
       const now = new Date();
       return pendingSocialUserRow({
         onboardingStatus: 'social_profile_required',
-        onboardingProgress: { currentStep: 'signup', draftJson: { kakaoNickname: '카카오닉' } },
+        onboardingProgress: { currentStep: 'signup', draftJson: { kakaoNickname: '카카오닉', ageConfirmedAt: '2026-10-11T00:00:00.000Z' } },
         createdAt: now,
         updatedAt: now,
         ...overrides,
@@ -1034,7 +1034,7 @@ describe('AuthService', () => {
 
     it('deferSocialProfile: 시드가 없으면 팀밋사용자 계열 닉네임을 쓴다', async () => {
       prisma.v1User.findUnique
-        .mockResolvedValueOnce(freshProfileRequired({ onboardingProgress: { currentStep: 'signup', draftJson: {} } }))
+        .mockResolvedValueOnce(freshProfileRequired({ onboardingProgress: { currentStep: 'signup', draftJson: { ageConfirmedAt: '2026-10-11T00:00:00.000Z' } } }))
         .mockResolvedValue(completedUserRow({ onboardingStatus: 'social_profile_deferred' }));
       prisma.v1UserProfile.findFirst.mockResolvedValue(null);
 
@@ -1077,6 +1077,38 @@ describe('AuthService', () => {
         response: { code: 'SOCIAL_SIGNUP_EXPIRED' },
       });
       expect(prisma.v1UserProfile.upsert).not.toHaveBeenCalled();
+    });
+
+    it('deferSocialProfile: ageConfirmedAt 이 없으면 약관 단계로 되돌리고 TERMS_REQUIRED, 프로필은 만들지 않는다', async () => {
+      prisma.v1User.findUnique.mockResolvedValue(freshProfileRequired({
+        onboardingProgress: { currentStep: 'signup', draftJson: { kakaoNickname: '카카오닉' } },
+      }));
+      prisma.v1User.update.mockResolvedValue({});
+
+      await expect(service.deferSocialProfile('user-1')).rejects.toMatchObject({
+        status: 400,
+        response: { code: 'TERMS_REQUIRED' },
+      });
+      expect(prisma.v1User.updateMany).toHaveBeenCalledWith({
+        where: { id: 'user-1', onboardingStatus: { in: ['social_terms_required', 'social_profile_required'] } },
+        data: { onboardingStatus: 'social_terms_required' },
+      });
+      expect(prisma.v1UserProfile.upsert).not.toHaveBeenCalled();
+      expect(prisma.v1User.updateMany).not.toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ onboardingStatus: 'social_profile_deferred' }) }),
+      );
+    });
+
+    it('deferSocialProfile: 약관 단계 되돌리기는 그 사이 가입을 마친 계정을 건드리지 않는다', async () => {
+      prisma.v1User.findUnique.mockResolvedValue(freshProfileRequired({
+        onboardingProgress: { currentStep: 'signup', draftJson: { kakaoNickname: '카카오닉' } },
+      }));
+      prisma.v1User.updateMany.mockResolvedValue({ count: 0 });
+
+      await expect(service.deferSocialProfile('user-1')).rejects.toMatchObject({
+        response: { code: 'TERMS_REQUIRED' },
+      });
+      expect(prisma.v1UserOnboardingProgress.upsert).not.toHaveBeenCalled();
     });
 
     it('deferSocialProfile: 상태 CAS 실패 시 프로필을 만들지 않는다', async () => {

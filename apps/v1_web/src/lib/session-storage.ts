@@ -145,6 +145,27 @@ export function withFromPath(path: string, from: string | null | undefined) {
   return appendFrom(path, rebuilt);
 }
 
+// 소셜 로그인은 외부 화면을 거쳐 돌아오므로 `?redirect=` 가 주소에서 사라진다. 로그인 버튼이 눌린 시점에
+// 저장해 두고, 가입 단계(약관·활동 정보)를 마친 화면이 꺼내 쓴다. 탭을 닫으면 사라져야 해서 sessionStorage.
+const SAVED_REDIRECT_KEY = 'teameet.v1.savedRedirect';
+
+/** 허용되지 않는 값이면 이전에 저장된 값도 지워, 다른 로그인 시도의 목적지가 남지 않게 한다. */
+export function saveRedirectPath(value: string | null | undefined) {
+  const redirect = sanitizeRedirectPath(value);
+  if (redirect) window.sessionStorage.setItem(SAVED_REDIRECT_KEY, redirect);
+  else window.sessionStorage.removeItem(SAVED_REDIRECT_KEY);
+}
+
+export function getSavedRedirectPath() {
+  if (typeof window === 'undefined') return null;
+  return sanitizeRedirectPath(window.sessionStorage.getItem(SAVED_REDIRECT_KEY));
+}
+
+export function clearSavedRedirectPath() {
+  if (typeof window === 'undefined') return;
+  window.sessionStorage.removeItem(SAVED_REDIRECT_KEY);
+}
+
 export function getCurrentRedirectPath() {
   if (typeof window === 'undefined') return '/home';
   return `${window.location.pathname}${window.location.search}${window.location.hash}`;

@@ -500,6 +500,7 @@ describe('SocialSignupClient 나중에 입력할게요', () => {
     hooks.authMe.verification.phoneVerified = false;
     hooks.authMeFailed = false;
     setSearch('');
+    window.sessionStorage.clear();
   });
 
   const deferResult = {
@@ -541,6 +542,28 @@ describe('SocialSignupClient 나중에 입력할게요', () => {
     unmount();
 
     setSearch('?redirect=https%3A%2F%2Fevil.example');
+    render(<SocialSignupClient />);
+    fireEvent.click(screen.getByRole('button', { name: '나중에 입력할게요' }));
+    expect(router.replace).toHaveBeenLastCalledWith('/home');
+  });
+
+  it('주소에 redirect 가 없으면 로그인 때 저장한 값으로 가고 쓴 뒤에는 비운다, 저장값이 없으면 홈', () => {
+    hooks.deferMutate.mockImplementation((_v: undefined, cb: CompleteProfileCallbacks) => cb.onSuccess(deferResult));
+    window.sessionStorage.setItem('teameet.v1.savedRedirect', '/teams/new');
+    const { unmount } = render(<SocialSignupClient />);
+    fireEvent.click(screen.getByRole('button', { name: '나중에 입력할게요' }));
+    expect(router.replace).toHaveBeenLastCalledWith('/teams/new');
+    expect(window.sessionStorage.getItem('teameet.v1.savedRedirect')).toBeNull();
+    unmount();
+
+    render(<SocialSignupClient />);
+    fireEvent.click(screen.getByRole('button', { name: '나중에 입력할게요' }));
+    expect(router.replace).toHaveBeenLastCalledWith('/home');
+  });
+
+  it('저장소의 외부 주소 redirect 는 건너뛰기에서도 무시한다', () => {
+    hooks.deferMutate.mockImplementation((_v: undefined, cb: CompleteProfileCallbacks) => cb.onSuccess(deferResult));
+    window.sessionStorage.setItem('teameet.v1.savedRedirect', 'https://evil.example');
     render(<SocialSignupClient />);
     fireEvent.click(screen.getByRole('button', { name: '나중에 입력할게요' }));
     expect(router.replace).toHaveBeenLastCalledWith('/home');

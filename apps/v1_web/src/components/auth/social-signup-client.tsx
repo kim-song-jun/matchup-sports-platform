@@ -14,7 +14,7 @@ import { useSocialSignupExit } from './use-social-signup-exit';
 import { V1ApiError } from '@/lib/api-client';
 import { trackEvent } from '@/lib/analytics';
 import { clearV1IdentityCache } from '@/lib/query-keys';
-import { sanitizeRedirectPath, saveStoredV1Session } from '@/lib/session-storage';
+import { clearSavedRedirectPath, getSavedRedirectPath, sanitizeRedirectPath, saveStoredV1Session } from '@/lib/session-storage';
 import { AUTH_WELCOME_STAGE, AuthFrame } from './auth-page';
 import {
   formatBirthDate,
@@ -139,8 +139,13 @@ export function SocialSignupClient() {
     });
   };
 
-  const readRedirect = () =>
-    sanitizeRedirectPath(new URLSearchParams(window.location.search).get('redirect'));
+  // 주소의 redirect 가 먼저, 소셜 로그인을 거쳐 주소에서 사라졌다면 로그인 때 저장해 둔 값. 쓰는 즉시 비운다.
+  const consumeRedirect = () => {
+    const redirect = sanitizeRedirectPath(new URLSearchParams(window.location.search).get('redirect'))
+      ?? getSavedRedirectPath();
+    clearSavedRedirectPath();
+    return redirect;
+  };
 
   const deferSignup = () => {
     if (deferProfile.isPending || completeProfile.isPending) return;
@@ -153,7 +158,7 @@ export function SocialSignupClient() {
           method: authMe.data?.user?.authProvider ?? 'social',
           profile: 'deferred',
         });
-        router.replace(readRedirect() ?? '/home');
+        router.replace(consumeRedirect() ?? '/home');
       },
       onError: (nextError) => {
         if (nextError instanceof V1ApiError && nextError.code === 'TERMS_REQUIRED') {
@@ -213,7 +218,7 @@ export function SocialSignupClient() {
           const method = authMe.data?.user?.authProvider ?? 'social';
           if (activityMode) {
             trackEvent('activity_profile_complete', { method });
-            router.replace(readRedirect() ?? '/home');
+            router.replace(consumeRedirect() ?? '/home');
             return;
           }
           trackEvent('sign_up_complete', { method });

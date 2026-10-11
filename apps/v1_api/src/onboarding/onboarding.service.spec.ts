@@ -187,7 +187,7 @@ describe('OnboardingService required social signup barrier', () => {
 });
 
 describe('OnboardingService with the profile gate still closed (social_profile_deferred)', () => {
-  it('saves preferences but keeps the status and writes no status-change log', async () => {
+  it('saves preferences without writing onboardingStatus or a status-change log', async () => {
     const { moduleRef, service, writeMocks } = await createHarness('social_profile_deferred');
     const [, , , , userUpdate, , statusLog] = writeMocks;
 
@@ -198,10 +198,7 @@ describe('OnboardingService with the profile gate still closed (social_profile_d
         currentStep: 'sport',
       });
 
-      expect(userUpdate).toHaveBeenCalledWith({
-        where: { id: userId },
-        data: { onboardingStatus: 'social_profile_deferred' },
-      });
+      expect(userUpdate).not.toHaveBeenCalled();
       expect(statusLog).not.toHaveBeenCalled();
     } finally {
       await moduleRef.close();

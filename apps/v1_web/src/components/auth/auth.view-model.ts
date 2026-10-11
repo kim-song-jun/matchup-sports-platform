@@ -174,3 +174,8 @@ export function getSignupCompleteViewModel(): SignupCompleteViewModel {
     secondary: { label: '나중에 설정하기', href: '/home', tone: 'neutral' },
   };
 }
+
+/** 서버가 신규 소셜 계정을 가입 단계로 보낼 때 쓰는 경로. 이 단계에서는 로그인 후 목적지를 아직 쓰지 않는다. */
+export function isSocialOnboardingRoute(route: string | null | undefined) {
+  return route === '/terms?mode=social' || route === '/signup/social';
+}

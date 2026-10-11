@@ -5,14 +5,17 @@ const FALLBACK_ATTEMPTS = 5;
 const FALLBACK_PREFIX = '팀밋사용자';
 
 export function normalizeSocialNicknameSeed(seed: string | null | undefined): string | null {
-  const cleaned = (seed ?? '')
+  const collapsed = (seed ?? '')
     // eslint-disable-next-line no-control-regex
     .replace(/[\u0000-\u001f\u007f]/g, '')
     .replace(/\s+/g, ' ')
-    .trim()
-    .slice(0, MAX_NICKNAME_LENGTH)
     .trim();
-  return cleaned.length >= MIN_NICKNAME_LENGTH ? cleaned : null;
+  const cleaned = takeCodePoints(collapsed, MAX_NICKNAME_LENGTH).trim();
+  return Array.from(cleaned).length >= MIN_NICKNAME_LENGTH ? cleaned : null;
+}
+
+function takeCodePoints(value: string, limit: number): string {
+  return Array.from(value).slice(0, limit).join('');
 }
 
 function randomDigits(length: number, random: () => number): string {
@@ -38,7 +41,7 @@ export async function generateSocialNickname(
     for (let attempt = 0; attempt < SUFFIXED_ATTEMPTS; attempt += 1) {
       // 2 digits for the first tries, widening to 4 as collisions pile up.
       const digits = randomDigits(Math.min(2 + Math.floor(attempt / 3), 4), random);
-      const candidate = `${base.slice(0, MAX_NICKNAME_LENGTH - digits.length).trim()}${digits}`;
+      const candidate = `${takeCodePoints(base, MAX_NICKNAME_LENGTH - digits.length).trim()}${digits}`;
       if (!(await isTaken(candidate))) return candidate;
     }
   }

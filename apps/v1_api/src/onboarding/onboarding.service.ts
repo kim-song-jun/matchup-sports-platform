@@ -73,15 +73,16 @@ export class OnboardingService {
         where: { id: userId },
         select: { onboardingStatus: true },
       });
-      // Preferences are saved, but the status stays: the deferred profile gate only opens
-      // through POST /auth/social-profile.
+      // The deferred profile gate only opens through POST /auth/social-profile, so the status is
+      // not written at all (re-writing the read value could undo a concurrent transition).
       const nextStatus =
         user.onboardingStatus === 'social_profile_deferred' ? user.onboardingStatus : derivedStatus;
-
-      await tx.v1User.update({
-        where: { id: userId },
-        data: { onboardingStatus: nextStatus },
-      });
+      if (user.onboardingStatus !== 'social_profile_deferred') {
+        await tx.v1User.update({
+          where: { id: userId },
+          data: { onboardingStatus: nextStatus },
+        });
+      }
       // The draft also carries signup-time keys (ageConfirmedAt, kakao prefill) that the DTO lacks.
       const progress = await tx.v1UserOnboardingProgress.findUnique({
         where: { userId },

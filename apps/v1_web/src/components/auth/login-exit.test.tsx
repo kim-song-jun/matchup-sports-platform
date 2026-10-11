@@ -56,7 +56,7 @@ describe.each(exits)('로그인 화면 출구 — %s', (_label, exit) => {
 
   it('앞 항목이 다른 로그인 단계(/login/email)면 그리로 되돌아가지 않고 홈으로 간다', () => {
     window.history.pushState({}, '', '/login/email');
-    window.history.pushState({}, '', '/login');
+    window.history.pushState({}, '', '/login?redirect=%2Ftournaments%2Ft1%2Fmy');
     renderLogin();
 
     fireEvent.click(exit());
@@ -67,7 +67,7 @@ describe.each(exits)('로그인 화면 출구 — %s', (_label, exit) => {
 
   it('탭의 유일한 항목이 로그인으로 교체된 경우엔 거울에 앞 항목이 남아 있어도 홈으로 간다', () => {
     window.history.pushState({}, '', '/tournaments/t1');
-    window.history.pushState({}, '', '/login');
+    window.history.pushState({}, '', '/login?redirect=%2Ftournaments%2Ft1%2Fmy');
     Object.defineProperty(window.history, 'length', { value: 1, configurable: true });
     try {
       renderLogin();
@@ -75,6 +75,28 @@ describe.each(exits)('로그인 화면 출구 — %s', (_label, exit) => {
     } finally {
       delete (window.history as { length?: number }).length;
     }
+
+    expect(router.replace).toHaveBeenCalledWith('/home');
+    expect(router.back).not.toHaveBeenCalled();
+  });
+
+  it('redirect 없이 열린 로그인(로그아웃·탈퇴)은 앞 항목이 보호 화면이어도 홈으로 간다', () => {
+    window.history.pushState({}, '', '/my/settings');
+    window.history.pushState({}, '', '/login');
+    renderLogin();
+
+    fireEvent.click(exit());
+
+    expect(router.replace).toHaveBeenCalledWith('/home');
+    expect(router.back).not.toHaveBeenCalled();
+  });
+
+  it('앞 항목이 redirect 대상 자신이면 되돌아가지 않고 홈으로 간다', () => {
+    window.history.pushState({}, '', '/tournaments/t1/my');
+    window.history.pushState({}, '', '/login?redirect=%2Ftournaments%2Ft1%2Fmy');
+    renderLogin();
+
+    fireEvent.click(exit());
 
     expect(router.replace).toHaveBeenCalledWith('/home');
     expect(router.back).not.toHaveBeenCalled();

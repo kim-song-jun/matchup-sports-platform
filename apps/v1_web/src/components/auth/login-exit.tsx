@@ -7,18 +7,23 @@ import { isAppBackPending, markAppInitiatedBack, previousInAppEntryUrl } from '@
 import { AuthBackButton } from './auth-back-button';
 
 /**
- * Leaves the login screen the way the user came in. A login screen is reached by replacing the
- * screen that needed a session, so the entry before it is the screen the user was looking at —
- * back returns there. With nothing in-app before it (first launch, relaunch) or only another
- * login step (/login/email), it goes to `fallbackHref` instead of bouncing between login screens.
+ * Leaves the login screen the way the user came in. A login opened with `?redirect=` replaced a screen
+ * that needed a session, so the entry before it is what the user was looking at — back returns there.
+ * Without `redirect` (logout, withdrawal, direct entry) the entry before it may itself be a protected
+ * screen that would bounce straight back to login, so it goes to `fallbackHref`, as it does with nothing
+ * in-app before it (first launch, relaunch) or only another login step (/login/email).
  */
 function useLeaveLogin(fallbackHref: string): () => void {
   const router = useRouter();
   return () => {
     if (isAppBackPending()) return;
+    const redirect = new URLSearchParams(window.location.search).get('redirect');
     const previous = previousInAppEntryUrl();
     // history.length === 1: the only entry was replaced by this login screen, so the mirror's "previous" is a ghost.
-    if (previous !== null && !previous.startsWith('/login') && window.history.length > 1) {
+    if (
+      redirect !== null && previous !== null && !previous.startsWith('/login')
+      && previous.split(/[?#]/)[0] !== redirect.split(/[?#]/)[0] && window.history.length > 1
+    ) {
       markAppInitiatedBack();
       router.back();
       return;

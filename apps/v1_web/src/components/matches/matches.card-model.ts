@@ -189,7 +189,7 @@ export function formatDeadline(value: string | null | undefined): string {
   if (Number.isNaN(deadline.getTime())) return '';
   const diffMs = deadline.getTime() - Date.now();
   if (diffMs <= 0) return '지났어요';
-  // 올림하면 20분 남아도 '1시간', 25시간 남아도 '2일'로 부풀려진다 — 단위를 넘기 전까지는 내림한다.
+  // 올림하면 20분 남아도 '1시간', 25시간 남아도 '2일'로 부풀려진다 — 분은 올림해 0분 표기를 피하고, 시간·일은 내림한다.
   const diffMinutes = Math.ceil(diffMs / 60_000);
   if (diffMinutes < 60) return `마감 ${diffMinutes}분 전`;
   const diffHours = Math.floor(diffMinutes / 60);

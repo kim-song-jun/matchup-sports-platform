@@ -134,7 +134,7 @@ describe('TeamListPageClient — 서버 seed 연결', () => {
   it('다음 페이지 요청이 실패해도 쌓은 팀 목록을 지우지 않고 다시 불러오기를 보여 준다', () => {
     const fetchNextPage = vi.fn();
     hookMocks.useV1TeamPages.mockReturnValue({
-      data: twoTeams, isPending: false, isError: true, hasNextPage: true, isFetchingNextPage: false, isPlaceholderData: false, fetchNextPage,
+      data: twoTeams, isPending: false, isError: true, isFetchNextPageError: true, hasNextPage: true, isFetchingNextPage: false, isPlaceholderData: false, fetchNextPage,
     });
 
     render(<TeamListPageClient />);
@@ -143,6 +143,18 @@ describe('TeamListPageClient — 서버 seed 연결', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('다음 목록을 불러오지 못했어요');
     fireEvent.click(screen.getByRole('button', { name: '다시 불러오기' }));
     expect(fetchNextPage).toHaveBeenCalledTimes(1);
+  });
+
+  it('배경 재검증만 실패했으면(isFetchNextPageError=false) 목록을 유지하고 다음 목록 오류를 띄우지 않는다', () => {
+    hookMocks.useV1TeamPages.mockReturnValue({
+      data: twoTeams, isPending: false, isError: true, isFetchNextPageError: false, hasNextPage: true, isFetchingNextPage: false, isPlaceholderData: false, fetchNextPage: vi.fn(),
+    });
+
+    render(<TeamListPageClient />);
+
+    expect(screen.getByText('서버시드팀 0')).toBeInTheDocument();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '더 보기' })).toBeEnabled();
   });
 
   it('대조군 — 첫 페이지 자체가 실패하면 전체 에러 화면이다', () => {
@@ -164,7 +176,7 @@ describe('TeamListPageClient — 서버 seed 연결', () => {
 
     render(<TeamListPageClient />);
 
-    const button = screen.getByRole('button', { name: '불러오는 중…' });
+    const button = screen.getByRole('button', { name: '더 보기' });
     expect(button).toBeDisabled();
     expect(button).toHaveClass('tm-load-more', 'tm-btn-md');
     fireEvent.click(button);

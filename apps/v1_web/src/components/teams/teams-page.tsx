@@ -129,7 +129,7 @@ export function TeamListPageView({ model, fromHref }: { readonly model: TeamList
                   type="button"
                   className="tm-btn tm-btn-md tm-btn-neutral tm-btn-block tm-load-more"
                   onClick={model.onLoadMore}
-                  disabled={model.isFetchingNextPage}
+                  disabled={model.isFetchingNextPage || model.loadMoreLocked}
                 >
                   {model.isFetchingNextPage ? '불러오는 중…' : model.loadMoreError ? '다시 불러오기' : '더 보기'}
                 </button>

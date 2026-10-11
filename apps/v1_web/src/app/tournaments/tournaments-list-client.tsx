@@ -256,6 +256,8 @@ export function TournamentsListPageClient({ seed }: { readonly seed?: Tournament
   // 다음 페이지 요청만 "불러오는 중"이다 — 배경 재검증(isFetching)은 버튼·자동 로딩과 무관하다.
   // 서버 seed 도 placeholder 라 첫 페이지 검증이 끝날 때까지 잠근다(seed 의 낡은 커서를 따라가지 않게).
   const loadMorePending = !isDesktop && isPlaceholderData;
+  // 사용자가 요청하기 전(seed 검증 중)에는 잠그기만 하고 문구는 그대로 둔다.
+  const loadMoreRequested = loadMorePending && Boolean(cursor);
   const handleLoadMore = () => {
     if (!data?.pageInfo?.nextCursor || loadMorePending) return;
     setPagination({ accumulated: displayItems, cursor: data.pageInfo.nextCursor });
@@ -384,11 +386,11 @@ export function TournamentsListPageClient({ seed }: { readonly seed?: Tournament
                     disabled={loadMorePending}
                     onClick={handleLoadMore}
                   >
-                    {loadMorePending ? '불러오는 중…' : '더 보기'}
+                    {loadMoreRequested ? '불러오는 중…' : '더 보기'}
                   </button>
                 ) : null}
                 <p aria-live="polite" className="sr-only">
-                  {loadMorePending
+                  {loadMoreRequested
                     ? '대회를 더 불러오는 중이에요.'
                     : `대회 ${displayItems.length}개를 보고 있어요.${hasNext ? '' : ' 마지막 목록이에요.'}`}
                 </p>

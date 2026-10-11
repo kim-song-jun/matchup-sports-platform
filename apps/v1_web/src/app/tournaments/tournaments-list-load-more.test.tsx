@@ -48,8 +48,8 @@ describe('/tournaments 더 보기 — 배경 재검증과 분리', () => {
     useV1TournamentsMock.mockClear();
     render(<TournamentsPage />);
 
-    expect(screen.getByRole('button', { name: '불러오는 중…' })).toBeDisabled();
-    fireEvent.click(screen.getByRole('button', { name: '불러오는 중…' }));
+    expect(screen.getByRole('button', { name: '더 보기' })).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: '더 보기' }));
     expect(useV1TournamentsMock).not.toHaveBeenCalledWith(expect.objectContaining({ cursor: 'seed-cursor' }), expect.anything());
   });
 });

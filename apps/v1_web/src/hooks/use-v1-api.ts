@@ -2744,6 +2744,12 @@ export function useV1SendChatMessage(roomId: string) {
       invalidateV1ChatMessageQueries(queryClient, message);
       invalidateV1NotificationQueries(queryClient);
     },
+    // 보내는 순간 막힌 방(취소·참가 미확정)은 상세의 composer 도 옛 값이라 다시 받는다.
+    onError: (error) => {
+      if (error instanceof V1ApiError && error.statusCode === 409) {
+        void queryClient.invalidateQueries({ queryKey: v1Keys.chatRoom(roomId) });
+      }
+    },
   });
 }
 

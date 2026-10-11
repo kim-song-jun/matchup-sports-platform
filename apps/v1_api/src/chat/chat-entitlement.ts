@@ -45,23 +45,43 @@ export function teamMatchChatEntitlementWhere(userId: string): Prisma.V1TeamMatc
   };
 }
 
+const matchChatMemberStatuses = ['active', 'completed'] as const;
+
+/**
+ * Who may list, open and read a personal-match chat room. The chat list and every read path share
+ * this predicate; sending is gated separately by {@link matchChatSendBlock}.
+ */
+export function matchChatReadableWhere(userId: string): Prisma.V1MatchWhereInput {
+  return {
+    deletedAt: null,
+    OR: [
+      { participants: { some: { userId, status: { in: [...matchChatMemberStatuses] } } } },
+      {
+        hostUserId: userId,
+        participants: { some: { role: 'participant', status: { in: [...matchChatMemberStatuses] } } },
+      },
+    ],
+  };
+}
+
+export type MatchChatSendBlock = 'MATCH_CANCELLED' | 'PARTICIPANTS_NOT_CONFIRMED';
+
+/** Why a viewer who can read a personal-match room still cannot write to it, or null when they can. */
+export function matchChatSendBlock(
+  match: { status: string; hostUserId: string; participants: { role: string; status: string }[] },
+  userId: string,
+): MatchChatSendBlock | null {
+  if (match.status === 'cancelled') return 'MATCH_CANCELLED';
+  const confirmed = match.participants.some(
+    (participant) => participant.role === 'participant' && (matchChatMemberStatuses as readonly string[]).includes(participant.status),
+  );
+  return match.hostUserId === userId && !confirmed ? 'PARTICIPANTS_NOT_CONFIRMED' : null;
+}
+
 export function currentChatEntitlementWhere(userId: string): Prisma.V1ChatRoomWhereInput {
   return {
     OR: [
-      {
-        match: {
-          is: {
-            deletedAt: null,
-            OR: [
-              { participants: { some: { userId, status: { in: ['active', 'completed'] } } } },
-              {
-                hostUserId: userId,
-                participants: { some: { role: 'participant', status: { in: ['active', 'completed'] } } },
-              },
-            ],
-          },
-        },
-      },
+      { match: { is: matchChatReadableWhere(userId) } },
       {
         team: {
           is: {

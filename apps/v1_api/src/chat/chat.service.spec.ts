@@ -20,6 +20,7 @@ import { getLoggerToken } from 'nestjs-pino';
 import { WebPushService } from '../notifications/web-push.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
+import { matchChatReadableWhere } from './chat-entitlement';
 import { ChatService, parseShareCard } from './chat.service';
 
 // ─── shared test fixtures ──────────────────────────────────────────────────────
@@ -169,8 +170,9 @@ describe('ChatService', () => {
         // 열람 시작(matchChatHistory) — 승인 시각이 없는 참가자: 예전처럼 입장 시각부터 보인다.
         findUnique: jest.fn().mockResolvedValue({ hostUserId: 'host-user', participants: [] }),
         findFirst: jest.fn().mockResolvedValue({
+          status: 'recruiting',
           hostUserId: 'host-user',
-          participants: [{ userId: userA.id, role: 'participant' }],
+          participants: [{ userId: userA.id, role: 'participant', status: 'active' }],
         }),
       },
       v1MatchParticipant: { findFirst: jest.fn() },
@@ -200,6 +202,9 @@ describe('ChatService', () => {
 
   afterEach(() => jest.clearAllMocks());
 
+  const denyMatchChat = () => prisma.v1Match.findFirst.mockImplementation(async (args?: { select?: { hostUserId?: boolean } }) =>
+      args?.select?.hostUserId ? null : { id: 'match-1' });
+
   // ─── 1. 비-참가자는 메시지 전송 불가 ─────────────────────────────────────────
 
   it('sendMessage: 채팅방에 참가하지 않은 사용자 → 403 PERMISSION_DENIED', async () => {
@@ -228,7 +233,7 @@ describe('ChatService', () => {
 
   it('sendMessage: 채팅 참가 행이 active여도 현재 매치 참가 자격이 없으면 403', async () => {
     prisma.v1ChatRoom.findFirst.mockResolvedValue(makeRoomForParticipant(userA.id));
-    prisma.v1Match.findFirst.mockResolvedValue({ hostUserId: 'host-user', participants: [] });
+    denyMatchChat();
 
     await expect(service.sendMessage(userA, 'room-1', { content: '권한이 끝난 뒤 메시지' })).rejects.toMatchObject({
       response: { code: 'PERMISSION_DENIED' },
@@ -803,12 +808,13 @@ describe('ChatService', () => {
     const first = await service.resolve(userA, { targetType: 'match', targetId: 'match-1' });
     expect(first).toMatchObject({ roomId: 'room-new', roomType: 'match', created: true, route: '/chat/room-new' });
     expect(prisma.v1Match.findFirst).toHaveBeenCalledWith({
-      where: { id: 'match-1', deletedAt: null },
+      where: { id: 'match-1', ...matchChatReadableWhere(userA.id) },
       select: {
+        status: true,
         hostUserId: true,
         participants: {
           where: { status: { in: ['active', 'completed'] } },
-          select: { userId: true, role: true },
+          select: { userId: true, role: true, status: true },
         },
       },
     });
@@ -894,7 +900,7 @@ describe('ChatService', () => {
   // ─── 8. resolve(match): 비-참가자 → 403 PERMISSION_DENIED ──────────────────
 
   it('resolve(match): 매치 비-참가자 사용자 → 403 PERMISSION_DENIED', async () => {
-    prisma.v1Match.findFirst.mockResolvedValue({ hostUserId: 'host-user', participants: [] });
+    denyMatchChat();
 
     await expect(service.resolve(userB, { targetType: 'match', targetId: 'match-1' })).rejects.toMatchObject({
       response: { code: 'PERMISSION_DENIED' },
@@ -907,7 +913,7 @@ describe('ChatService', () => {
   });
 
   it('resolve(match): 참가자가 없는 주최자에게 안내 가능한 409를 반환하고 방을 만들지 않는다', async () => {
-    prisma.v1Match.findFirst.mockResolvedValue({ hostUserId: userA.id, participants: [] });
+    prisma.v1Match.findFirst.mockResolvedValue({ status: 'recruiting', hostUserId: userA.id, participants: [] });
 
     await expect(service.resolve(userA, { targetType: 'match', targetId: 'match-1' })).rejects.toMatchObject({
       response: {
@@ -921,8 +927,9 @@ describe('ChatService', () => {
 
   it('resolve(match): 본인이 참가하지 않는 주최자도 승인 참가자가 있으면 채팅방에 입장한다', async () => {
     prisma.v1Match.findFirst.mockResolvedValue({
+      status: 'recruiting',
       hostUserId: userA.id,
-      participants: [{ userId: userB.id, role: 'participant' }],
+      participants: [{ userId: userB.id, role: 'participant', status: 'active' }],
     });
     prisma.v1ChatRoom.findUnique.mockResolvedValue({ id: 'room-1', matchId: 'match-1', status: 'active' });
     prisma.v1ChatRoomParticipant.findUnique.mockResolvedValue(null);
@@ -947,5 +954,66 @@ describe('ChatService', () => {
       response: { code: 'NOT_FOUND' },
     });
     await expect(service.detail(userA, 'ghost-room')).rejects.toThrow(NotFoundException);
+  });
+  // ─── 10. 읽기는 목록 규칙을 따르고, 쓰기만 따로 막는다 ───────────────────────────
+
+  describe('개인 매치 방 읽기 전용', () => {
+    const hostRoom = () => makeRoomForParticipant(userA.id);
+    const arrangeMatch = (match: { status: string; participants: { userId: string; role: string; status: string }[] }) =>
+      prisma.v1Match.findFirst.mockResolvedValue({ hostUserId: userA.id, ...match });
+
+    it('detail: 확정 참가자가 없는 주최자도 방이 열리고 composer 가 PARTICIPANTS_NOT_CONFIRMED 로 막힌다', async () => {
+      prisma.v1ChatRoom.findFirst.mockResolvedValue(hostRoom());
+      arrangeMatch({ status: 'recruiting', participants: [{ userId: userA.id, role: 'host', status: 'active' }] });
+
+      await expect(service.detail(userA, 'room-1')).resolves.toMatchObject({
+        composer: { canSend: false, blockedReason: 'PARTICIPANTS_NOT_CONFIRMED' },
+      });
+    });
+
+    it('detail: 참가자가 확정된 주최자는 composer 가 열린다', async () => {
+      prisma.v1ChatRoom.findFirst.mockResolvedValue(hostRoom());
+      arrangeMatch({ status: 'recruiting', participants: [{ userId: userB.id, role: 'participant', status: 'active' }] });
+
+      await expect(service.detail(userA, 'room-1')).resolves.toMatchObject({ composer: { canSend: true, blockedReason: null } });
+    });
+
+    it('detail: 취소된 매치는 참가자가 확정돼 있어도 MATCH_CANCELLED', async () => {
+      prisma.v1ChatRoom.findFirst.mockResolvedValue(hostRoom());
+      arrangeMatch({ status: 'cancelled', participants: [{ userId: userB.id, role: 'participant', status: 'active' }] });
+
+      await expect(service.detail(userA, 'room-1')).resolves.toMatchObject({
+        composer: { canSend: false, blockedReason: 'MATCH_CANCELLED' },
+      });
+    });
+
+    it('messages: 읽기 전용 방도 메시지 목록은 열린다', async () => {
+      prisma.v1ChatRoom.findFirst.mockResolvedValue(hostRoom());
+      arrangeMatch({ status: 'cancelled', participants: [] });
+      prisma.v1ChatMessage.findMany.mockResolvedValue([]);
+      prisma.v1ChatRoomParticipant.findMany.mockResolvedValue([]);
+
+      await expect(service.messages(userA, 'room-1', {})).resolves.toMatchObject({ items: [] });
+    });
+
+    it('sendMessage: 취소된 매치 → 409 MATCH_CHAT_CLOSED', async () => {
+      prisma.v1ChatRoom.findFirst.mockResolvedValue(hostRoom());
+      arrangeMatch({ status: 'cancelled', participants: [{ userId: userB.id, role: 'participant', status: 'active' }] });
+
+      await expect(service.sendMessage(userA, 'room-1', { content: '안녕' })).rejects.toMatchObject({
+        response: { code: 'MATCH_CHAT_CLOSED' },
+      });
+      expect(prisma.v1ChatMessage.create).not.toHaveBeenCalled();
+    });
+
+    it('sendMessage: 확정 참가자가 없는 주최자 → 409 MATCH_CHAT_PARTICIPANTS_REQUIRED', async () => {
+      prisma.v1ChatRoom.findFirst.mockResolvedValue(hostRoom());
+      arrangeMatch({ status: 'recruiting', participants: [{ userId: userA.id, role: 'host', status: 'active' }] });
+
+      await expect(service.sendMessage(userA, 'room-1', { content: '안녕' })).rejects.toMatchObject({
+        response: { code: 'MATCH_CHAT_PARTICIPANTS_REQUIRED' },
+      });
+      expect(prisma.v1ChatMessage.create).not.toHaveBeenCalled();
+    });
   });
 });

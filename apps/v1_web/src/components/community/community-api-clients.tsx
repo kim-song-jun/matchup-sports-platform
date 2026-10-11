@@ -36,7 +36,7 @@ import type { ChatListViewModel, ChatRoomModel, ChatRoomViewModel, ChatShareCand
 import { chatRoomContextSub, chatRoomTypeLabel } from '@/lib/chat-route';
 import { displayInitials } from '@/lib/display-initials';
 import { MAX_CHAT_IMAGES, formatFileSize } from './chat-plus-panel';
-import { describeChatRoomLoadError, pickChatRoomLoadError } from './chat-room-load-error';
+import { composerBlockFromSendError, describeChatComposerBlock, describeChatRoomLoadError, pickChatRoomLoadError } from './chat-room-load-error';
 
 type ChatCategory = ChatRoomModel['type'] | '전체';
 
@@ -202,6 +202,9 @@ export function ChatRoomPageClient({ roomId }: { roomId: string }) {
         ? '종료된 컨택이에요'
         : undefined
     : undefined;
+  // 서버가 알려 준 막힘, 또는 방금 보내다 409 로 확인된 막힘 — 방은 열어 둔 채 입력창만 안내로 바꾼다.
+  const composerBlock = room.data?.composer.blockedReason ?? composerBlockFromSendError(send.error);
+  const readOnlyNotice = composerBlock ? describeChatComposerBlock(composerBlock) : undefined;
   const isError = room.isError || messages.isError;
   // 4xx 는 다시 불러와도 같은 답이라 재시도 대신 나갈 길을 준다.
   const loadErrorCause = isError ? pickChatRoomLoadError(room.error, messages.error) : null;
@@ -235,6 +238,7 @@ export function ChatRoomPageClient({ roomId }: { roomId: string }) {
     // 더 오래된 메시지가 남아 있으면 여기가 대화의 맨 위가 아니다.
     historyNotice: room.data?.roomType === 'team' && messages.data?.pageInfo?.hasNext !== true ? '들어오기 전 대화는 보이지 않아요' : undefined,
     inputLockedMessage,
+    readOnlyNotice,
     messages: messageItems,
     status: isLoading ? 'loading' : isError ? 'error' : 'ready',
     emptyTitle: loadError
@@ -245,11 +249,11 @@ export function ChatRoomPageClient({ roomId }: { roomId: string }) {
     emptyBody: loadError
       ? loadError.body
       : messages.data && items.length === 0
-        ? inputLockedMessage ?? '먼저 말을 걸어 대화를 시작해 보세요'
+        ? inputLockedMessage ?? readOnlyNotice ?? '먼저 말을 걸어 대화를 시작해 보세요'
         : undefined,
     draft,
     sending: send.isPending,
-    sendError: send.isError ? extractErrorMessage(send.error, '메시지를 전송하지 못했어요. 다시 시도해 주세요.') : undefined,
+    sendError: send.isError && !composerBlockFromSendError(send.error) ? extractErrorMessage(send.error, '메시지를 전송하지 못했어요. 다시 시도해 주세요.') : undefined,
     onDraftChange: setDraft,
     onSend: () => {
       const content = draft.trim();

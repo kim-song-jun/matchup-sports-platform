@@ -339,6 +339,9 @@ export function ChatRoomPageView({ model, listModel, roomId }: { model: ChatRoom
         {model.sendingFile ? <div className="tm-text-caption" role="status" style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '4px 16px' }}>파일을 보내는 중이에요…</div> : null}
         {model.imageNotice ? <div className="tm-text-caption" role="status" style={{ textAlign: 'center', color: 'var(--orange700)', padding: '4px 16px' }}>{model.imageNotice}</div> : null}
         {/* [P2 마이크로인터랙션] justSent: Send → Check 아이콘 + tm-complete-check 애니메이션 (0.4s) */}
+        {model.readOnlyNotice ? (
+          <p className="tm-chat-readonly-notice tm-text-label" role="note">{model.readOnlyNotice}</p>
+        ) : (
         <div className={`tm-chat-inputbar${plusOpen ? ' is-panel-open' : ''}`}>
           {/* + ↔ × — 카카오톡처럼 입력창 아래 패널을 여닫는다. */}
           <button
@@ -389,7 +392,8 @@ export function ChatRoomPageView({ model, listModel, roomId }: { model: ChatRoom
             )}
           </button>
         </div>
-        {plusOpen && model.onPickImages ? (
+        )}
+        {plusOpen && !model.readOnlyNotice && model.onPickImages ? (
           <ChatPlusPanel
             id={plusPanelId}
             disabled={Boolean(model.sendingImages || model.sendingFile)}

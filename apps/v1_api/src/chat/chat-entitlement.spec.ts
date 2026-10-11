@@ -1,4 +1,6 @@
-import { currentChatEntitlementWhere, currentChatRecipientEntitlementWhere } from './chat-entitlement';
+import {
+  currentChatEntitlementWhere, currentChatRecipientEntitlementWhere, matchChatReadableWhere, matchChatSendBlock,
+} from './chat-entitlement';
 
 // 감사 결함 회귀 방지(2026-08-27): 팀매치 채팅방이 rooms() 목록에 뜨려면 이 where 를
 // 통과해야 한다. 예전엔 status:'matched' 로 exact-match 해서 결과 제출로 completed 로
@@ -195,5 +197,36 @@ describe('currentChatRecipientEntitlementWhere', () => {
         teamContact: null,
       }),
     ).toThrow(/not linked/i);
+  });
+});
+
+describe('개인 매치 채팅 — 읽기 규칙 하나, 쓰기 규칙 따로', () => {
+  it('채팅 목록의 match 절이 읽기 규칙과 같은 객체다 (두 벌이 아니다)', () => {
+    const clause = currentChatEntitlementWhere('user-1').OR?.find((c) => c.match);
+    expect(clause).toEqual({ match: { is: matchChatReadableWhere('user-1') } });
+  });
+
+  const host = (participants: { role: string; status: string }[], status = 'recruiting') =>
+    matchChatSendBlock({ status, hostUserId: 'host', participants }, 'host');
+
+  it('확정 참가자가 없는 주최자는 쓰기만 막힌다', () => {
+    expect(host([{ role: 'host', status: 'active' }])).toBe('PARTICIPANTS_NOT_CONFIRMED');
+    expect(host([{ role: 'participant', status: 'cancelled' }])).toBe('PARTICIPANTS_NOT_CONFIRMED');
+  });
+
+  it('확정(active/completed) 참가자가 있으면 주최자도 쓸 수 있다', () => {
+    expect(host([{ role: 'participant', status: 'active' }])).toBeNull();
+    expect(host([{ role: 'participant', status: 'completed' }], 'completed')).toBeNull();
+  });
+
+  it('취소된 매치는 누구든 쓰기가 막힌다 (참가자 포함)', () => {
+    expect(host([{ role: 'participant', status: 'active' }], 'cancelled')).toBe('MATCH_CANCELLED');
+    expect(matchChatSendBlock({ status: 'cancelled', hostUserId: 'host', participants: [{ role: 'participant', status: 'active' }] }, 'guest'))
+      .toBe('MATCH_CANCELLED');
+  });
+
+  it('일반 참가자는 모집 중이면 쓸 수 있다', () => {
+    expect(matchChatSendBlock({ status: 'recruiting', hostUserId: 'host', participants: [{ role: 'participant', status: 'active' }] }, 'guest'))
+      .toBeNull();
   });
 });

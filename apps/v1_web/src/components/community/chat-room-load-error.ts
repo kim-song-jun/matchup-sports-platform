@@ -1,5 +1,6 @@
 import { V1ApiError, isTransientFailure, isUnauthenticatedError } from '@/lib/api-client';
 import { isAccessDeniedError } from '@/lib/access-denied-error';
+import type { V1ChatComposerBlockedReason } from '@/types/api';
 
 export type ChatRoomLoadError = {
   title: string;
@@ -8,7 +9,23 @@ export type ChatRoomLoadError = {
   retryable: boolean;
 };
 
-const CODE_MATCH_CHAT_PARTICIPANTS_REQUIRED = 'MATCH_CHAT_PARTICIPANTS_REQUIRED';
+const COMPOSER_BLOCKED_COPY: Record<V1ChatComposerBlockedReason, string> = {
+  MATCH_CANCELLED: '취소된 매치라 대화를 보낼 수 없어요',
+  PARTICIPANTS_NOT_CONFIRMED: '참가가 확정되면 대화할 수 있어요',
+};
+
+/** 방은 열리지만 보내기가 막힌 이유의 안내 문구. */
+export function describeChatComposerBlock(reason: V1ChatComposerBlockedReason): string {
+  return COMPOSER_BLOCKED_COPY[reason];
+}
+
+/** 보내는 순간 막힌 것으로 확인된 오류의 막힘 이유 — 상세를 다시 받기 전에 같은 안내를 보인다. */
+export function composerBlockFromSendError(error: unknown): V1ChatComposerBlockedReason | null {
+  if (!(error instanceof V1ApiError)) return null;
+  if (error.code === 'MATCH_CHAT_CLOSED') return 'MATCH_CANCELLED';
+  if (error.code === 'MATCH_CHAT_PARTICIPANTS_REQUIRED') return 'PARTICIPANTS_NOT_CONFIRMED';
+  return null;
+}
 
 /** 상세와 메시지가 함께 실패하면 다시 불러와도 소용없는 쪽(403·404 등)을 안내한다 — 일시 오류 문구가 앞서면 막힌 방에서 재시도만 반복하게 된다. */
 export function pickChatRoomLoadError(...errors: unknown[]): unknown {
@@ -27,13 +44,6 @@ export function describeChatRoomLoadError(error: unknown): ChatRoomLoadError {
     return {
       title: '참여 중인 멤버만 볼 수 있어요',
       body: '팀에서 빠졌거나 채팅방에서 나가면 이 대화를 볼 수 없어요. 다시 함께하려면 팀에 새로 신청해 주세요.',
-      retryable: false,
-    };
-  }
-  if (error instanceof V1ApiError && error.code === CODE_MATCH_CHAT_PARTICIPANTS_REQUIRED) {
-    return {
-      title: '지금은 열 수 없는 채팅방이에요',
-      body: '참가가 확정된 사람이 있어야 열 수 있는 채팅방이에요.',
       retryable: false,
     };
   }

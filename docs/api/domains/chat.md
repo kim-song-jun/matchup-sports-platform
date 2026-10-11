@@ -43,6 +43,16 @@ MATCH_CHAT_PARTICIPANTS_REQUIRED`; no empty room is created. Once an ordinary pa
 confirmed, the host retains room/list/notification entitlement even when `hostParticipates=false`
 and therefore has no host participant row.
 
+Personal-match rooms follow one read rule: a room that `GET /chat/rooms` lists always opens through
+`GET /chat/rooms/:roomId` and `.../messages` (the list and the read paths share
+`matchChatReadableWhere`). Sending is gated separately. Room detail carries
+`composer: { canSend, blockedReason }` where `blockedReason` is `MATCH_CANCELLED` (the match is
+cancelled, for the host and any participant still holding a row) or `PARTICIPANTS_NOT_CONFIRMED`
+(host with no confirmed participant yet); otherwise `canSend=true, blockedReason=null`. Other room
+types always return `canSend=true`. `POST /chat/rooms/:roomId/messages` on a blocked room returns
+`409 MATCH_CHAT_CLOSED` (cancelled) or `409 MATCH_CHAT_PARTICIPANTS_REQUIRED` (no confirmed
+participant). Withdrawn, removed and unrelated users are neither listed nor openable (`403`).
+
 ## Room entry and read state
 
 - `GET /chat/rooms` checks the same current entitlement, active chat participant, requested room

@@ -1,5 +1,12 @@
 # v1_web
 
+## 1.6.9
+
+### Patch Changes
+
+- 56b2630: 데스크톱 채팅방 헤더가 방 이름·종류 칩·상세 링크를 함께 보여 주고, 헤더 아래 별도 연결 카드는 데스크톱에서 사라져 대화 영역이 넓어져요.
+- 030b034: Preserve existing match-room access and approval-time history at cancellation/withdrawal boundaries, retain unresolved send errors on refresh, and refresh composer state after reconnecting.
+
 ## 1.6.8
 
 ### Patch Changes

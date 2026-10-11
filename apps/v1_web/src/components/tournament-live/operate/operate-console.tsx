@@ -722,6 +722,26 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
         : Promise.resolve(),
     [],
   );
+  // 방금 적재한 이벤트가 서버에 확정(acked)됐는지, 실패(failed)했는지. 큐에서 사라지면(재수화 등) 확정을 알 수 없어 실패로 본다.
+  const eventSettledWaitersRef = useRef<Array<() => void>>([]);
+  useEffect(() => {
+    const waiters = eventSettledWaitersRef.current;
+    eventSettledWaitersRef.current = [];
+    waiters.forEach((check) => check());
+  }, [ops]);
+  const waitForEventSettled = useCallback(
+    (clientEventId: string) =>
+      new Promise<'acked' | 'failed'>((resolve) => {
+        const check = () => {
+          const item = opsRef.current.queue.items.find((candidate) => candidate.clientEventId === clientEventId);
+          if (!item || item.status === 'failed') resolve('failed');
+          else if (item.status === 'acked') resolve('acked');
+          else eventSettledWaitersRef.current.push(check);
+        };
+        check();
+      }),
+    [],
+  );
 
   const handleCommit = useCallback(
     async (input: EventCaptureCommitInput) => {
@@ -743,10 +763,17 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
       const askRed = isSecondYellowWithoutRed(liveEventsRef.current, opsRef.current.queue.items, input);
       const submitted = opsRef.current.submitEvent(input);
       if (askRed) {
-        await submitted;
+        const yellowEventId = await submitted;
+        if (yellowEventId === null) return;
         const redInput: EventCaptureCommitInput = { ...input, payload: { card: 'RED' } };
         const redCopy = secondYellowConfirmCopy(input, gameDetail.data?.sides ?? [], fixtureLineup.data?.lineups ?? [], periodCount);
         if (await confirm(redCopy)) {
+          // 서버는 레드 앞에 옐로가 있는지 보지 않는다 — 옐로가 확정되기 전에 레드를 적재하면 옐로가 실패해도
+          // 레드만 남고, 옐로를 다시 보내면 기록 순서가 뒤집힌다.
+          if ((await waitForEventSettled(yellowEventId)) !== 'acked') {
+            showToast('옐로 기록이 실패했어요. 옐로를 다시 보낸 뒤 레드를 기록해 주세요.');
+            return;
+          }
           await waitForQueueIdle();
           void opsRef.current.submitEvent(redInput);
         }
@@ -769,7 +796,7 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
         });
       }
     },
-    [commandBlocked, showToast, confirm, waitForQueueIdle, gameDetail.data?.sides, fixtureLineup.data?.lineups, clockWarningMinutes, periodCount],
+    [commandBlocked, showToast, confirm, waitForQueueIdle, waitForEventSettled, gameDetail.data?.sides, fixtureLineup.data?.lineups, clockWarningMinutes, periodCount],
   );
 
   // 이슈 #376 — 예전엔 ops.reverseEvent(되돌리기) + ops.submitEvent(재제출) 두 번

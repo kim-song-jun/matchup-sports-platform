@@ -51,6 +51,18 @@ describe('RequireActivityProfile', () => {
     expect(mocks.replace).not.toHaveBeenCalled();
   });
 
+  it('돌아올 경로에 해시도 담는다', () => {
+    mocks.onboardingStatus = 'social_profile_deferred';
+    window.history.replaceState(null, '', '/teams/abc#member-list');
+    render(
+      <RequireActivityProfile title="신청하려면 정보가 필요해요">
+        <div>폼</div>
+      </RequireActivityProfile>,
+    );
+    fireEvent.click(screen.getByRole('button', { name: '정보 입력하기' }));
+    expect(mocks.push).toHaveBeenCalledWith('/signup/social?redirect=%2Fteams%2Fabc%23member-list');
+  });
+
   it('앱 안에 이전 화면이 없으면(딥링크·새 탭) 다음에 할게요가 홈으로 보낸다', () => {
     mocks.onboardingStatus = 'social_profile_deferred';
     mocks.hasPrevious = false;

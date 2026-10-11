@@ -4,7 +4,7 @@ import type { ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import { EmptyState } from '@/components/v1-ui/primitives';
 import { useV1AuthMe } from '@/hooks/use-v1-api';
-import { buildActivityProfileHref } from '@/lib/activity-profile-required';
+import { buildActivityProfileHref, currentReturnPath } from '@/lib/activity-profile-required';
 import { hasPreviousInAppEntry, markAppInitiatedBack } from '@/lib/navigation-history';
 import { ShieldAlert } from 'lucide-react';
 
@@ -19,7 +19,7 @@ export function RequireActivityProfile({ title, children }: { title: string; chi
   if (authMe.data?.user.onboardingStatus !== 'social_profile_deferred') return <>{children}</>;
 
   const enter = () => {
-    router.push(buildActivityProfileHref(`${window.location.pathname}${window.location.search}`));
+    router.push(buildActivityProfileHref(currentReturnPath()));
   };
 
   const dismiss = () => {

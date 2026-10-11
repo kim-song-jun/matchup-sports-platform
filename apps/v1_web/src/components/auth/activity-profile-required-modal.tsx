@@ -6,6 +6,7 @@ import { browserAppRoute } from '@/lib/app-route';
 import {
   ACTIVITY_PROFILE_PATH,
   buildActivityProfileHref,
+  currentReturnPath,
   subscribeActivityProfileRequired,
 } from '@/lib/activity-profile-required';
 
@@ -28,8 +29,7 @@ export function ActivityProfileRequiredModal() {
 
   const handleConfirm = () => {
     setOpen(false);
-    const returnTo = `${window.location.pathname}${window.location.search}`;
-    window.location.assign(browserAppRoute(buildActivityProfileHref(returnTo)));
+    window.location.assign(browserAppRoute(buildActivityProfileHref(currentReturnPath())));
   };
 
   return (

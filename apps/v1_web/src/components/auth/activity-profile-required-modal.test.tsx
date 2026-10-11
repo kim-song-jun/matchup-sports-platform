@@ -10,8 +10,8 @@ vi.mock('@/lib/client-error-reporter', () => ({
 
 const assign = vi.fn();
 
-function setLocation(pathname: string, search = '') {
-  vi.stubGlobal('location', { pathname, search, assign } as unknown as Location);
+function setLocation(pathname: string, search = '', hash = '') {
+  vi.stubGlobal('location', { pathname, search, hash, assign } as unknown as Location);
 }
 
 function stubApiError(code: string) {
@@ -42,7 +42,7 @@ describe('ActivityProfileRequiredModal', () => {
   });
 
   it('403 ACTIVITY_PROFILE_REQUIRED 를 받으면 시트를 띄우고 정보 입력으로 안내하며 클라이언트 오류로 올리지 않는다', async () => {
-    setLocation('/matches/m-1', '?tab=info');
+    setLocation('/matches/m-1', '?tab=info', '#roster');
     stubApiError('ACTIVITY_PROFILE_REQUIRED');
     render(<ActivityProfileRequiredModal />);
 
@@ -54,7 +54,7 @@ describe('ActivityProfileRequiredModal', () => {
     expect(reportClientError).not.toHaveBeenCalled();
 
     fireEvent.click(screen.getByRole('button', { name: '정보 입력하기' }));
-    expect(assign).toHaveBeenCalledWith('/signup/social?redirect=%2Fmatches%2Fm-1%3Ftab%3Dinfo');
+    expect(assign).toHaveBeenCalledWith('/signup/social?redirect=%2Fmatches%2Fm-1%3Ftab%3Dinfo%23roster');
   });
 
   it('다음에 할게요로 닫으면 이동하지 않는다', async () => {

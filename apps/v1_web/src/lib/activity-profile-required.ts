@@ -12,6 +12,12 @@ export function buildActivityProfileHref(returnTo: string): string {
   return `${ACTIVITY_PROFILE_PATH}?redirect=${encodeURIComponent(returnTo)}`;
 }
 
+/** 입력을 마친 뒤 돌아올 현재 위치. 해시(#section)까지 포함해야 같은 자리로 복귀한다. */
+export function currentReturnPath(): string {
+  const { pathname, search, hash } = window.location;
+  return `${pathname}${search}${hash}`;
+}
+
 type Listener = () => void;
 
 const listeners = new Set<Listener>();

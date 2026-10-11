@@ -9,6 +9,8 @@ const finishedUserId = 'integration-social-defer-finished';
 const emailUserId = 'integration-social-defer-email';
 const takenNicknameUserId = 'integration-social-defer-taken';
 const noAgeUserId = 'integration-social-defer-no-age';
+const sportId = '5a1f0c3e-7b52-4d0a-9c11-0000000d3f01';
+const regionId = 'integration-social-defer-region';
 const ids = [deferringUserId, finishedUserId, emailUserId, takenNicknameUserId, noAgeUserId];
 
 /**
@@ -66,9 +68,15 @@ describe('V1 social profile deferral integration', () => {
     await prisma.v1UserProfile.create({
       data: { userId: takenNicknameUserId, nickname: '디퍼카카오', visibility: 'public' },
     });
+    const creatorProfile = { realName: '디퍼실명', gender: 'male', birthDate: '1990-01-01' };
     await prisma.v1UserProfile.create({
-      data: { userId: finishedUserId, nickname: '디퍼완료', visibility: 'public' },
+      data: { userId: finishedUserId, nickname: '디퍼완료', visibility: 'public', ...creatorProfile },
     });
+    await prisma.v1UserProfile.create({
+      data: { userId: emailUserId, nickname: '디퍼이메일', visibility: 'public', ...creatorProfile },
+    });
+    await prisma.v1Sport.create({ data: { id: sportId, code: 'integration-social-defer-football', name: '디퍼 축구' } });
+    await prisma.v1Region.create({ data: { id: regionId, code: 'INTEGRATION_SOCIAL_DEFER', name: '디퍼 지역', level: 2 } });
 
     // Reconsent runs before the activity gate; keep every fixture compliant so only the
     // onboarding status differs between users.
@@ -87,8 +95,20 @@ describe('V1 social profile deferral integration', () => {
     await cleanupApp?.();
   });
 
+  function teamPayload(name: string) {
+    return { name, sportId, regionId, joinPolicy: 'approval_required' };
+  }
+
   async function cleanupFixtures() {
     if (!prisma) return;
+    const teams = await prisma.v1Team.findMany({ where: { ownerUserId: { in: ids } }, select: { id: true } });
+    const teamIds = teams.map((team) => team.id);
+    // Team creation writes a chat room, owner membership and profile (cascade from the team) plus status logs and a system chat line.
+    await prisma.v1ChatMessage.deleteMany({ where: { senderUserId: { in: ids } } });
+    await prisma.v1StatusChangeLog.deleteMany({ where: { OR: [{ actorUserId: { in: ids } }, { targetId: { in: teamIds } }] } });
+    await prisma.v1Team.deleteMany({ where: { id: { in: teamIds } } });
+    await prisma.v1Sport.deleteMany({ where: { id: sportId } });
+    await prisma.v1Region.deleteMany({ where: { id: regionId } });
     await prisma.v1ManagedTermsConsentEvent.deleteMany({ where: { userId: { in: ids } } });
     await prisma.v1UserTermsConsent.deleteMany({ where: { userId: { in: ids } } });
     await prisma.v1UserOnboardingProgress.deleteMany({ where: { userId: { in: ids } } });
@@ -147,11 +167,12 @@ describe('V1 social profile deferral integration', () => {
     const response = await request(app.getHttpServer())
       .post('/api/v1/teams')
       .set('x-v1-user-id', deferringUserId)
-      .send({ name: '디퍼팀', sportId: 'football' })
+      .send(teamPayload('디퍼팀'))
       .expect(403);
 
     expect(response.body.code).toBe('ACTIVITY_PROFILE_REQUIRED');
     expect(response.body.details?.next?.route).toBe('/signup/social');
+    expect(await prisma.v1Team.count({ where: { ownerUserId: deferringUserId } })).toBe(0);
   });
 
   it('keeps the profile form endpoints reachable while deferred', async () => {
@@ -188,22 +209,23 @@ describe('V1 social profile deferral integration', () => {
     expect(user.onboardingStatus).toBe('social_profile_deferred');
   });
 
-  it('control: once the profile is finished the same write is no longer stopped by this gate', async () => {
-    const response = await request(app.getHttpServer())
+  it('control: once the profile is finished the same write goes through', async () => {
+    await request(app.getHttpServer())
       .post('/api/v1/teams')
       .set('x-v1-user-id', finishedUserId)
-      .send({ name: '디퍼완료팀', sportId: 'football' });
+      .send(teamPayload('디퍼완료팀'))
+      .expect(201);
 
-    expect(response.body.code).not.toBe('ACTIVITY_PROFILE_REQUIRED');
-    expect(response.body.code).not.toBe('PHONE_VERIFICATION_REQUIRED');
+    expect(await prisma.v1Team.count({ where: { ownerUserId: finishedUserId } })).toBe(1);
   });
 
   it('control: an email-signup user is unaffected', async () => {
-    const response = await request(app.getHttpServer())
+    await request(app.getHttpServer())
       .post('/api/v1/teams')
       .set('x-v1-user-id', emailUserId)
-      .send({ name: '디퍼이메일팀', sportId: 'football' });
+      .send(teamPayload('디퍼이메일팀'))
+      .expect(201);
 
-    expect(response.body.code).not.toBe('ACTIVITY_PROFILE_REQUIRED');
+    expect(await prisma.v1Team.count({ where: { ownerUserId: emailUserId } })).toBe(1);
   });
 });

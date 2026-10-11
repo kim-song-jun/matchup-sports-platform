@@ -37,7 +37,8 @@ function registrationRow(overrides: Record<string, unknown> = {}) {
     id: 'reg-1', tournamentId: 'tournament-1', teamId: 'team-1', appliedByUserId: 'manager-user',
     status: 'draft', depositorName: null, agreedRules: false, agreedPrivacy: false, agreedRefund: false,
     agreedMediaConsent: false, confirmedAt: null, rosterLockedAt: null, cancelRequestedAt: null,
-    cancelPreviousStatus: null, cancelReason: null, rosterAutoConfirmedAt: null, entrySource: 'applied',
+    cancelPreviousStatus: null, cancelReason: null, adminCancelReason: null, cancelOutcome: null,
+    rosterAutoConfirmedAt: null, entrySource: 'applied',
     createdAt: new Date('2026-06-14T00:00:00Z'), updatedAt: new Date('2026-06-14T00:00:00Z'), ...overrides,
   };
 }
@@ -503,6 +504,9 @@ describe('TournamentRegistrationsService', () => {
         confirmedByAdminUserId: 'admin-1',
         rosterLockedAt: new Date('2026-06-05T00:00:00Z'),
         rosterDeadlineOverrideAt: new Date('2026-06-10T00:00:00Z'),
+        // 어드민이 거부하며 남긴 사유·결과도 이전 사이클의 흔적이다.
+        adminCancelReason: '자격 미달',
+        cancelOutcome: 'rejected',
       }),
     );
     prisma.v1TournamentRegistration.update.mockResolvedValue(registrationRow({ status: 'draft' }));
@@ -515,6 +519,8 @@ describe('TournamentRegistrationsService', () => {
     expect(call.data.rosterDeadlineOverrideAt).toBeNull();
     expect(call.data.confirmedAt).toBeNull();
     expect(call.data.confirmedByAdminUserId).toBeNull();
+    expect(call.data.adminCancelReason).toBeNull();
+    expect(call.data.cancelOutcome).toBeNull();
   });
 
   // 운영자가 넣었다 뺀 팀(seeded, 취소)이 직접 다시 신청하면 같은 행이 되살아난다. 이전 경로의

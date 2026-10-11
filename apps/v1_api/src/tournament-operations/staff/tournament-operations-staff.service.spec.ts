@@ -192,7 +192,7 @@ type FakeTeamMatchRow = {
   fieldId: string | null;
   field: { name: string | null } | null;
   deletedAt: Date | null;
-  game: { id: string; state: string; sourceType: string } | null;
+  game: { id: string; state: string; sourceType: string; sides: Array<{ sideKey: 'HOME' | 'AWAY'; displayNameSnapshot: string }> } | null;
   tournamentDetails: {
     tournamentId: string;
     round: string;
@@ -348,7 +348,7 @@ describe('TournamentOperationsStaffService.myAssignments', () => {
       fieldId: fieldScopedId,
       field: { name: 'A구장' },
       deletedAt: null,
-      game: { id: 'game-1', state: 'SCHEDULED', sourceType: 'TEAM_MATCH' },
+      game: { id: 'game-1', state: 'SCHEDULED', sourceType: 'TEAM_MATCH', sides: [] },
       tournamentDetails: { tournamentId, round: 'group', fixtureNumber: 1, legNumber: 1 },
     };
     const { service } = buildMyAssignmentsHarness(
@@ -382,7 +382,7 @@ describe('TournamentOperationsStaffService.myAssignments', () => {
       fieldId: null,
       field: null,
       deletedAt: null,
-      game: { id: `game-${id}`, state: 'SCHEDULED', sourceType: 'TEAM_MATCH' },
+      game: { id: `game-${id}`, state: 'SCHEDULED', sourceType: 'TEAM_MATCH', sides: [] },
       tournamentDetails: details,
     });
     const { service } = buildMyAssignmentsHarness(
@@ -399,6 +399,41 @@ describe('TournamentOperationsStaffService.myAssignments', () => {
     expect(result.items[0]?.fixtures.map(({ fixtureId, groupName }) => ({ fixtureId, groupName }))).toEqual([
       { fixtureId: 'fx-group', groupName: 'A조' },
       { fixtureId: 'fx-final', groupName: null },
+    ]);
+  });
+
+  it('담당 경기에 홈·원정 팀 이름을 싣는다 — 팀 이름은 경기 콘솔과 같은 게임 사이드에서 읽고, 사이드가 없으면 null', async () => {
+    const fixture = (id: string, sides: NonNullable<FakeTeamMatchRow['game']>['sides']): FakeTeamMatchRow => ({
+      id,
+      tournamentId,
+      title: '(테스트)1010 · A조 · 조별리그 3라운드 3',
+      startAt: new Date('2026-10-03T10:00:00.000Z'),
+      status: 'matched',
+      fieldId: null,
+      field: null,
+      deletedAt: null,
+      game: { id: `game-${id}`, state: 'SCHEDULED', sourceType: 'TEAM_MATCH', sides },
+      tournamentDetails: { tournamentId, round: 'league_r3', fixtureNumber: 3, legNumber: 1 },
+    });
+    const { service } = buildMyAssignmentsHarness(
+      [assignmentRow({ fixtureScopes: [{ teamMatchId: 'fx-named' }, { teamMatchId: 'fx-empty' }] })],
+      null,
+      [
+        fixture('fx-named', [
+          { sideKey: 'AWAY', displayNameSnapshot: '망원 FC' },
+          { sideKey: 'HOME', displayNameSnapshot: '성수 FC' },
+        ]),
+        fixture('fx-empty', []),
+      ],
+    );
+
+    const result = await service.myAssignments(targetUserId);
+
+    expect(
+      result.items[0]?.fixtures.map(({ fixtureId, homeTeamName, awayTeamName }) => ({ fixtureId, homeTeamName, awayTeamName })),
+    ).toEqual([
+      { fixtureId: 'fx-empty', homeTeamName: null, awayTeamName: null },
+      { fixtureId: 'fx-named', homeTeamName: '성수 FC', awayTeamName: '망원 FC' },
     ]);
   });
 

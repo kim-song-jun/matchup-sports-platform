@@ -841,3 +841,11 @@ describe('ResultEditModal — 공식 득점 타임라인 편집', () => {
     expect(onConfirm.mock.calls[0][0].goalEvents[0]).not.toHaveProperty('participantId');
   });
 });
+
+describe('ResultEditModal 점수만 확정된 경기 안내 (MD-QA #94)', () => {
+  it('원래 득점 기록이 없으면 점수만 고쳐도 된다고 안내한다', () => {
+    const props = baseProps();
+    render(<ResultEditModal {...props} lineups={[]} />);
+    expect(screen.getByText(/득점 기록 없이 점수만 확정된 경기예요/)).toBeInTheDocument();
+  });
+});

@@ -4,6 +4,7 @@ import type { WebPushService } from '../notifications/web-push.service';
 import type { GameOperationClaim } from '../jobs/v1-game-operations-worker.service';
 import type { OfficialRevisionRow } from './game-result-official-projection.types';
 import { loadOfficialResultRecipients, loadResultTeamNames, officialResultNoticeBody } from './official-result-notice';
+import { resolveIsForfeit } from '../league-matches/league-forfeit-result';
 import { parseOfficialScore } from './parse-official-score';
 import { notificationCopyFor } from '../notifications/notifications.service';
 import { competitionMatchLabel } from '../tournaments/tournament-round-label';
@@ -89,7 +90,7 @@ export class TournamentFixtureCompletionNotificationService {
       `tournament-fixture-completed:${fixtureId}:${userId}`;
     const rows = enabledRecipients.map((recipient) => ({
       userId: recipient.userId,
-      body: officialResultNoticeBody({ label, ...names, score, side: recipient.side, record: recipient.record }),
+      body: officialResultNoticeBody({ label, ...names, score, side: recipient.side, record: recipient.record, isForfeit: resolveIsForfeit(revision) }),
     }));
 
     const alreadyDelivered = await tx.v1Notification.findMany({

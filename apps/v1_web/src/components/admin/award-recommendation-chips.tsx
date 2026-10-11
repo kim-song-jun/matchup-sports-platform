@@ -1,5 +1,6 @@
 'use client';
 
+import { competitionRanks } from '@/lib/competition-ranks';
 import type { V1AdminTournamentPlayerRecordRow } from '@/types/api';
 
 /**
@@ -17,7 +18,17 @@ export type AwardRecommendation = {
   row: V1AdminTournamentPlayerRecordRow;
 };
 
-const TOP_N = 3;
+/** 이 순위 이내만 보여준다. 개수가 아니라 순위 기준이라 같은 순위 선수는 전원 보인다. */
+const TOP_RANK = 3;
+
+type RankedRow = { row: V1AdminTournamentPlayerRecordRow; rank: number; shared: boolean };
+
+function rankRows(rows: V1AdminTournamentPlayerRecordRow[], valueOf: (row: V1AdminTournamentPlayerRecordRow) => number): RankedRow[] {
+  const ranks = competitionRanks(rows.map(valueOf));
+  return rows
+    .map((row, index) => ({ row, rank: ranks[index], shared: ranks.filter((rank) => rank === ranks[index]).length > 1 }))
+    .filter(({ rank }) => rank <= TOP_RANK);
+}
 
 export function AwardRecommendationChips({
   goals,
@@ -33,9 +44,9 @@ export function AwardRecommendationChips({
   onRetry?: () => void;
   onPick: (recommendation: AwardRecommendation) => void;
 }) {
-  const groups: Array<{ kind: 'goals' | 'assists'; label: string; unit: string; rows: V1AdminTournamentPlayerRecordRow[] }> = [
-    { kind: 'goals' as const, label: '득점 상위', unit: '골', rows: (goals ?? []).slice(0, TOP_N) },
-    { kind: 'assists' as const, label: '도움 상위', unit: '도움', rows: (assists ?? []).slice(0, TOP_N) },
+  const groups: Array<{ kind: 'goals' | 'assists'; label: string; unit: string; rows: RankedRow[] }> = [
+    { kind: 'goals' as const, label: '득점 상위', unit: '골', rows: rankRows(goals ?? [], (row) => row.goals) },
+    { kind: 'assists' as const, label: '도움 상위', unit: '도움', rows: rankRows(assists ?? [], (row) => row.assists) },
   ].filter((group) => group.rows.length > 0);
   if (isError) {
     return (
@@ -66,22 +77,25 @@ export function AwardRecommendationChips({
         {groups.map((group) => (
           <div key={group.kind} className="flex flex-wrap items-center gap-2">
             <span className="text-xs font-bold text-[var(--text-strong)] mr-1">{group.label}</span>
-            {group.rows.map((row, index) => (
-              <button
-                key={`${row.userId ?? row.name}-${index}`}
-                type="button"
-                onClick={() => onPick({ kind: group.kind, row })}
-                className="inline-flex items-center gap-1 min-h-[44px] px-3 rounded-lg border border-[var(--tint-blue-border)] bg-[var(--card-surface)] text-xs text-[var(--text-strong)] hover:bg-[var(--blue50)]"
-                aria-label={`${group.label} ${index + 1}위 ${row.name} ${group.kind === 'goals' ? row.goals : row.assists}${group.unit}${row.teamName ? ` (${row.teamName})` : ''} — 수상 항목으로 추가`}
-              >
-                <span className="font-bold text-[var(--blue700)]">{index + 1}위</span>
-                <span>{row.name}</span>
-                <span className="text-[var(--text-muted)]">
-                  {group.kind === 'goals' ? row.goals : row.assists}{group.unit}
-                  {row.teamName ? ` · ${row.teamName}` : ''}
-                </span>
-              </button>
-            ))}
+            {group.rows.map(({ row, rank, shared }, index) => {
+              const rankLabel = `${shared ? '공동 ' : ''}${rank}위`;
+              return (
+                <button
+                  key={`${row.userId ?? row.name}-${index}`}
+                  type="button"
+                  onClick={() => onPick({ kind: group.kind, row })}
+                  className="inline-flex items-center gap-1 min-h-[44px] px-3 rounded-lg border border-[var(--tint-blue-border)] bg-[var(--card-surface)] text-xs text-[var(--text-strong)] hover:bg-[var(--blue50)]"
+                  aria-label={`${group.label} ${rankLabel} ${row.name} ${group.kind === 'goals' ? row.goals : row.assists}${group.unit}${row.teamName ? ` (${row.teamName})` : ''} — 수상 항목으로 추가`}
+                >
+                  <span className="font-bold text-[var(--blue700)]">{rankLabel}</span>
+                  <span>{row.name}</span>
+                  <span className="text-[var(--text-muted)]">
+                    {group.kind === 'goals' ? row.goals : row.assists}{group.unit}
+                    {row.teamName ? ` · ${row.teamName}` : ''}
+                  </span>
+                </button>
+              );
+            })}
           </div>
         ))}
       </div>

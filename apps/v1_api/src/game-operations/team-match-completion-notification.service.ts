@@ -1,6 +1,7 @@
 import { Logger } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { canReviewFromLineup, readTeamMatchLineupUserIds } from '../games/roster/team-match-lineup-accounts';
+import { resolveIsForfeit } from '../league-matches/league-forfeit-result';
 import { resolveLeagueWeekNumbers } from '../league-matches/league-week-number';
 import { notificationCopyFor } from '../notifications/notifications.service';
 import type { WebPushService } from '../notifications/web-push.service';
@@ -162,6 +163,7 @@ export class TeamMatchCompletionNotificationService {
         score,
         side: recipient.side,
         record: recipient.record,
+        isForfeit: resolveIsForfeit(revision),
       }),
       deepLink: copy.deepLink,
     }));

@@ -2,9 +2,11 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { EmailLoginClient } from './email-login-client';
 import { V1ApiError } from '@/lib/api-client';
+import { __resetNavigationHistoryForTests, installNavigationHistory } from '@/lib/navigation-history';
 
 const router = vi.hoisted(() => ({
   replace: vi.fn(),
+  back: vi.fn(),
 }));
 
 const hooks = vi.hoisted(() => ({
@@ -23,6 +25,7 @@ vi.mock('@/lib/native-apple', () => ({
 
 vi.mock('next/navigation', () => ({
   useRouter: () => router,
+  useSearchParams: () => new URLSearchParams(),
 }));
 
 vi.mock('@tanstack/react-query', () => ({
@@ -155,5 +158,37 @@ describe('EmailLoginClient GA events', () => {
 
     await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('지금은 로그인할 수 없어요. 잠시 후 다시 시도해 주세요.'));
     expect(screen.getByRole('alert')).not.toHaveTextContent('카카오');
+  });
+});
+
+describe('EmailLoginClient back to the login start screen', () => {
+  const loginUrl = '/login?redirect=%2Ftournaments%2Ft1%2Fmy';
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    __resetNavigationHistoryForTests();
+    window.sessionStorage.clear();
+    window.history.replaceState(null, '', '/home');
+    installNavigationHistory();
+  });
+
+  it('keeps redirect on the back target so the restored login still knows where it came from', () => {
+    render(<EmailLoginClient redirectPath="/tournaments/t1/my" />);
+
+    for (const back of screen.getAllByRole('link', { name: '뒤로가기' })) {
+      expect(back).toHaveAttribute('href', loginUrl);
+    }
+  });
+
+  it('pops the email step instead of stacking a second login entry on top of it', () => {
+    window.history.pushState({}, '', '/tournaments/t1');
+    window.history.pushState({}, '', loginUrl);
+    window.history.pushState({}, '', '/login/email?redirect=%2Ftournaments%2Ft1%2Fmy');
+    render(<EmailLoginClient redirectPath="/tournaments/t1/my" />);
+
+    fireEvent.click(screen.getAllByRole('link', { name: '뒤로가기' })[0]);
+
+    expect(router.back).toHaveBeenCalledTimes(1);
+    expect(router.replace).not.toHaveBeenCalled();
   });
 });

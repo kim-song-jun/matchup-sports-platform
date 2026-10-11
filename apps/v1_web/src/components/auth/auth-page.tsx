@@ -4,6 +4,7 @@ import type { ReactNode } from 'react';
 import { Card } from '@/components/v1-ui/primitives';
 import { AppBackLink } from '@/components/v1-ui/app-back-link';
 import { AuthBackButton } from './auth-back-button';
+import { LoginExitBackButton, LoginGuestLink } from './login-exit';
 import { AuthFixedCta } from './auth-fixed-cta';
 import { ChevronLeftIcon, MatchIcon, TeamMatchIcon, TrophyIcon } from '@/components/v1-ui/icons';
 import { BrandMark } from '@/components/v1-ui/brand-logo';
@@ -13,7 +14,7 @@ import type { AuthAction, AuthExceptionViewModel, LoginProvider, LoginViewModel,
 
 export function LoginPageView({ model }: { model: LoginViewModel }) {
   const card = (
-    <AuthFrame stage={AUTH_WELCOME_STAGE}>
+    <AuthFrame stage={AUTH_WELCOME_STAGE} exitFallbackHref={model.guestHref}>
       <div className="tm-auth-login">
         <div>
           {/* 데스크톱(≥1024)에서는 같은 그래픽이 왼쪽 스테이지에 크게 놓이므로 카드 안의 것은 숨긴다. */}
@@ -55,7 +56,7 @@ export function LoginPageView({ model }: { model: LoginViewModel }) {
           </div>
           <AuthDivider />
           <Link className="tm-btn tm-btn-lg tm-btn-outline tm-btn-block tm-auth-email-link" href={model.emailHref}>이메일로 로그인</Link>
-          <Link className="tm-btn tm-btn-lg tm-btn-outline tm-btn-block tm-auth-guest-link" href={model.guestHref}>로그인 없이 시작하기</Link>
+          <LoginGuestLink className="tm-btn tm-btn-lg tm-btn-outline tm-btn-block tm-auth-guest-link" href={model.guestHref}>로그인 없이 시작하기</LoginGuestLink>
           <p className="tm-text-body tm-auth-center">
             아직 계정이 없나요? <Link href={model.signupHref}>회원가입</Link>
           </p>
@@ -165,7 +166,7 @@ export function AuthIllustration({ name, className }: { name: string; className?
   );
 }
 
-export function AuthFrame({ children, topTitle, backHref, appBack = false, onBack, backLabel, skipHref, fixedAction, className, stage }: {
+export function AuthFrame({ children, topTitle, backHref, appBack = false, onBack, exitFallbackHref, backLabel, skipHref, fixedAction, className, stage }: {
   children: ReactNode;
   topTitle?: string;
   backHref?: string;
@@ -176,6 +177,11 @@ export function AuthFrame({ children, topTitle, backHref, appBack = false, onBac
    * 둘 다 없으면 상단 좌측이 비어 화면을 빠져나갈 방법이 사라진다.
    */
   onBack?: () => void;
+  /**
+   * 들어온 화면으로 돌아가는 뒤로가기(로그인 화면용). 앞에 앱 안 화면이 있으면 history back,
+   * 없거나 다른 로그인 단계뿐이면 이 경로로 간다. backHref·onBack 이 있으면 그쪽이 우선이다.
+   */
+  exitFallbackHref?: string;
   /** 스크린리더용 라벨. 동작이 단순 뒤로가기가 아닐 때 무엇을 하는지 알린다. */
   backLabel?: string;
   skipHref?: string;
@@ -188,7 +194,7 @@ export function AuthFrame({ children, topTitle, backHref, appBack = false, onBac
    */
   stage?: AuthStage;
 }) {
-  const hasBack = Boolean(backHref || onBack);
+  const hasBack = Boolean(backHref || onBack || exitFallbackHref);
   return (
     <div className={`tm-auth-frame${className ? ` ${className}` : ''}${stage ? ' tm-auth-frame-staged' : ''}`}>
       {stage ? (
@@ -215,8 +221,10 @@ export function AuthFrame({ children, topTitle, backHref, appBack = false, onBac
               </AppBackLink> : <Link className="tm-onboarding-desktop-back" href={backHref} aria-label={backLabel ?? '뒤로가기'}>
               <ChevronLeftIcon size={22} strokeWidth={2.2} />
             </Link>
+          ) : onBack ? (
+            <AuthBackButton className="tm-onboarding-desktop-back" label={backLabel ?? '뒤로가기'} onClick={onBack} />
           ) : (
-            <AuthBackButton className="tm-onboarding-desktop-back" label={backLabel ?? '뒤로가기'} onClick={onBack!} />
+            <LoginExitBackButton className="tm-onboarding-desktop-back" fallbackHref={exitFallbackHref!} />
           )}
           {topTitle ? <span className="tm-onboarding-desktop-nav-title">{topTitle}</span> : null}
         </div>
@@ -233,6 +241,8 @@ export function AuthFrame({ children, topTitle, backHref, appBack = false, onBac
               </Link>
             ) : onBack ? (
               <AuthBackButton className="tm-btn tm-btn-icon tm-btn-ghost" label={backLabel ?? '뒤로가기'} onClick={onBack} />
+            ) : exitFallbackHref ? (
+              <LoginExitBackButton className="tm-btn tm-btn-icon tm-btn-ghost" fallbackHref={exitFallbackHref} />
             ) : null}
             {topTitle ? <div className="tm-text-body-lg">{topTitle}</div> : null}
           </div>

@@ -16,6 +16,11 @@ import Foundation
 /// screen without a bottom nav. Skip the injection and all of them sit under the home
 /// indicator.
 ///
+/// The same script also publishes `data-teameet-native-keyboard`. The shell resizes the web
+/// view above the keyboard, so `visualViewport` never shrinks and the page's own keyboard
+/// detection (`KeyboardViewportBridge`) never fires; this attribute is what hides the
+/// bottom navigation behind the keyboard, as it does on Android.
+///
 /// Both variables are written, matching Android. Setting `--v1-shell-safe-bottom` directly
 /// as well keeps the shell correct against a deployed web build whose CSS predates the
 /// `max()` definition.
@@ -23,16 +28,19 @@ enum SafeAreaBridge {
 
     static let nativeVariable = "--teameet-native-safe-bottom"
     static let shellVariable = "--v1-shell-safe-bottom"
+    /// `data-teameet-native-keyboard` in the page's CSS, which hides the bottom navigation.
+    static let keyboardDatasetKey = "teameetNativeKeyboard"
 
     /// A `WKWebView` renders at `initial-scale=1` with `width=device-width`, so one CSS
     /// pixel is one point and the inset needs no density division — unlike Android, which
     /// divides by `displayMetrics.density`.
-    static func script(bottomInsetPoints: Double) -> String {
+    static func script(bottomInsetPoints: Double, keyboardOpen: Bool) -> String {
         let pixels = Int(bottomInsetPoints.rounded())
         let value = "\(max(0, pixels))px"
         return """
         document.documentElement.style.setProperty('\(nativeVariable)','\(value)');\
-        document.documentElement.style.setProperty('\(shellVariable)','\(value)')
+        document.documentElement.style.setProperty('\(shellVariable)','\(value)');\
+        document.documentElement.dataset.\(keyboardDatasetKey)='\(keyboardOpen ? "open" : "closed")'
         """
     }
 

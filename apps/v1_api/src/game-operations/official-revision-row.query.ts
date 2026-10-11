@@ -27,6 +27,7 @@ export function officialRevisionRowSelect(): Prisma.Sql {
       COALESCE(team_match.start_at, revision.official_at) AS "playedAt",
       revision.official_at AS "officialAt",
       revision.reason,
+      revision.outcome_reason::text AS "outcomeReason",
       game.source_type::text AS "sourceType",
       game.current_official_revision_id AS "currentOfficialRevisionId",
       team_match.id AS "teamMatchId",

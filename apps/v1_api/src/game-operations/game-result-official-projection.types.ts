@@ -19,6 +19,8 @@ export type OfficialRevisionRow = {
   playedAt: Date;
   officialAt: Date;
   reason: string | null;
+  /** `NORMAL | FORFEIT | ABANDONED` — the column, not the legacy reason marker. */
+  outcomeReason: string;
   sourceType: string;
   currentOfficialRevisionId: string | null;
   /** The canonical TeamMatch source id, when the game has one. */

@@ -75,6 +75,27 @@ describe('reviews view model — 대회 경기 리뷰 계약', () => {
     expect(sourceTypeLabel('tournament_fixture')).toBe('대회 경기');
   });
 
+  it('목록 요약은 상대 팀 평가가 섞인 대상 수를 "명"이 아니라 "건"으로 센다', () => {
+    const item = (sourceId: string, targetCount: number, reviewedCount: number) => ({
+      sourceType: 'team_match' as const,
+      sourceId,
+      title: sourceId,
+      completedAt: null,
+      targetType: 'user' as const,
+      targetCount,
+      reviewedCount,
+      remainingCount: targetCount - reviewedCount,
+      state: targetCount === reviewedCount ? ('done' as const) : ('ready' as const),
+    });
+    const data = { items: [item('a', 7, 2), item('b', 3, 3)], pageInfo: { nextCursor: null, hasNext: false } };
+
+    const pending = toReviewsPageModel(data, 'pending');
+    expect(pending.stats.map((stat) => stat.value)).toEqual(['2건', '10건', '5건']);
+    const written = toReviewsPageModel(data, 'written');
+    expect(written.stats.map((stat) => stat.value)).toEqual(['5건', '2건', '5건']);
+    expect(written.cards.find((card) => card.sourceId === 'b')?.meta).toBe('3건 전송 완료');
+  });
+
   it('대회 fixture 상대팀 리뷰는 리뷰 목록에서 상대팀 CTA로 보인다', () => {
     const model = toReviewsPageModel({
       items: [
@@ -239,8 +260,8 @@ describe('reviews view model — 작성 현황과 제출 대상', () => {
   });
 
   it('현황 문구는 보낸 인원이 있을 때만 앞에 붙인다', () => {
-    expect(formatReviewProgress({ submitted: 0, inProgress: 2, remaining: 5, ready: [], incomplete: [] })).toBe('작성 중 2명 · 남은 대상 5명');
-    expect(formatReviewProgress({ submitted: 1, inProgress: 0, remaining: 3, ready: [], incomplete: [] })).toBe('작성 완료 1명 · 작성 중 0명 · 남은 대상 3명');
+    expect(formatReviewProgress({ submitted: 0, inProgress: 2, remaining: 5, ready: [], incomplete: [] })).toBe('작성 중 2건 · 남은 대상 5건');
+    expect(formatReviewProgress({ submitted: 1, inProgress: 0, remaining: 3, ready: [], incomplete: [] })).toBe('작성 완료 1건 · 작성 중 0건 · 남은 대상 3건');
   });
 
   it('덜 끝난 대상이 하나면 그 이름과 빠진 것을, 여럿이면 첫 이름과 건수를 말한다', () => {

@@ -237,6 +237,36 @@ describe('ChatRoomPageClient', () => {
     expect(screen.queryByRole('link', { name: '채팅 목록으로' })).not.toBeInTheDocument();
   });
 
+  it.each([
+    ['MATCH_CHAT_PARTICIPANTS_REQUIRED', 409, 'Match chat requires a confirmed participant', '지금은 열 수 없는 채팅방이에요', '참가가 확정된 사람이 있어야 열 수 있는 채팅방이에요.'],
+    ['NOT_FOUND', 404, 'Chat room was not found', '찾을 수 없는 채팅방이에요', '사라졌거나 볼 수 없는 채팅방이에요. 목록에서 다른 채팅방을 골라 주세요.'],
+    ['CONFLICT', 422, 'Unprocessable', '채팅방을 열 수 없어요', '다시 불러와도 같은 결과예요. 목록으로 돌아가 주세요.'],
+  ])('%s(%i) 오류는 코드별 안내를 보이고, 네트워크 탓이라 하지 않으며 다시 불러오기 대신 목록으로 안내한다', (code, statusCode, message, title, body) => {
+    const error = new V1ApiError({ status: 'error', statusCode, code, message, timestamp: '2026-10-12T00:00:00.000Z' });
+    hooks.chatRoom.mockReturnValue({ data: undefined, isPending: false, isError: true, error, refetch: vi.fn() });
+    hooks.chatMessages.mockReturnValue({ data: undefined, isPending: false, isError: true, error, refetch: vi.fn() });
+
+    renderWithClient(<ChatRoomPageClient roomId="room-4xx" />);
+
+    expect(screen.getByText(title)).toBeInTheDocument();
+    expect(screen.getByText(body)).toBeInTheDocument();
+    expect(screen.queryByText(/네트워크/)).not.toBeInTheDocument();
+    expect(screen.queryByText(message)).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '다시 불러오기' })).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: '채팅 목록으로' })).toHaveAttribute('href', '/chat');
+  });
+
+  it('방을 불러오지 못하면 목록 패널의 "채팅" 제목을 되풀이하지 않고, 비어 있는 연결 카드 칸도 만들지 않는다', () => {
+    const error = new V1ApiError({ status: 'error', statusCode: 409, code: 'MATCH_CHAT_PARTICIPANTS_REQUIRED', message: 'x', timestamp: '2026-10-12T00:00:00.000Z' });
+    hooks.chatRoom.mockReturnValue({ data: undefined, isPending: false, isError: true, error, refetch: vi.fn() });
+    hooks.chatMessages.mockReturnValue({ data: undefined, isPending: false, isError: true, error, refetch: vi.fn() });
+
+    const { container } = renderWithClient(<ChatRoomPageClient roomId="room-4xx" />);
+
+    expect(screen.getAllByRole('heading', { level: 1, name: '채팅' })).toHaveLength(1);
+    expect(container.querySelector('.tm-chat-context')).toBeNull();
+  });
+
   it('F62·F63: 경기 채팅방 카드는 "경기 채팅 · 경기 상세 보기"이고, 차단 관리는 방 맨 위가 아니라 ⋯ 채팅방 메뉴 안에 있다', () => {
     hooks.chatRoom.mockReturnValue({
       data: {

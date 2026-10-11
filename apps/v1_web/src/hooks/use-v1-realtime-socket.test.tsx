@@ -173,3 +173,120 @@ describe('useV1ChatListSocket', () => {
     expect(mockSocket.off).toHaveBeenCalledWith('chat:message', expect.any(Function));
   });
 });
+
+describe('채팅 재동기화와 안전 이벤트', () => {
+  function observe(queryClient: QueryClient, queryKey: readonly unknown[], reads: Record<string, number>, name: string) {
+    const observer = new QueryObserver(queryClient, {
+      queryKey,
+      queryFn: async () => ({ revision: (reads[name] = (reads[name] ?? 0) + 1) }),
+      staleTime: Infinity,
+    });
+    return observer.subscribe(() => {});
+  }
+  const setVisibility = (state: DocumentVisibilityState) =>
+    vi.spyOn(document, 'visibilityState', 'get').mockReturnValue(state);
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+
+  it('첫 연결은 무시하고, 이후 재연결이 몰려도 방 목록과 열린 방 메시지를 한 번만 다시 받는다(상세는 그대로)', async () => {
+    const { useV1ChatRoomSocket } = await import('./use-v1-realtime-socket');
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const reads: Record<string, number> = {};
+    const stops = [
+      observe(queryClient, [...v1Keys.chatRooms(), 'list', { limit: 50 }], reads, 'list'),
+      observe(queryClient, v1Keys.chatRoom('room-1'), reads, 'detail'),
+      observe(queryClient, [...v1Keys.chatMessages('room-1'), { limit: 50 }], reads, 'messages'),
+    ];
+    const { unmount } = renderHook(() => useV1ChatRoomSocket('room-1'), { wrapper: createWrapper(queryClient) });
+    await waitFor(() => expect(reads).toEqual({ list: 1, detail: 1, messages: 1 }));
+    vi.useFakeTimers();
+
+    listeners.connect(undefined); // 첫 연결
+    await vi.advanceTimersByTimeAsync(2000);
+    expect(reads).toEqual({ list: 1, detail: 1, messages: 1 });
+
+    listeners.connect(undefined); // 끊겼다 다시 붙기를 반복
+    listeners.connect(undefined);
+    listeners.connect(undefined);
+    await vi.advanceTimersByTimeAsync(2000);
+    expect(reads).toEqual({ list: 2, detail: 1, messages: 2 });
+
+    unmount();
+    stops.forEach((stop) => stop());
+  });
+
+  it('탭이 다시 보이면 방 목록과 열린 방 메시지를 다시 받고, 숨겨질 때는 받지 않는다', async () => {
+    const { useV1ChatRoomSocket } = await import('./use-v1-realtime-socket');
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const reads: Record<string, number> = {};
+    const stops = [
+      observe(queryClient, [...v1Keys.chatRooms(), 'list', { limit: 50 }], reads, 'list'),
+      observe(queryClient, [...v1Keys.chatMessages('room-1'), { limit: 50 }], reads, 'messages'),
+    ];
+    const { unmount } = renderHook(() => useV1ChatRoomSocket('room-1'), { wrapper: createWrapper(queryClient) });
+    await waitFor(() => expect(reads).toEqual({ list: 1, messages: 1 }));
+    vi.useFakeTimers();
+
+    setVisibility('hidden');
+    document.dispatchEvent(new Event('visibilitychange'));
+    await vi.advanceTimersByTimeAsync(2000);
+    expect(reads).toEqual({ list: 1, messages: 1 });
+
+    setVisibility('visible');
+    document.dispatchEvent(new Event('visibilitychange'));
+    await vi.advanceTimersByTimeAsync(2000);
+    expect(reads).toEqual({ list: 2, messages: 2 });
+
+    unmount();
+    stops.forEach((stop) => stop());
+  });
+
+  it('전역 브리지·방·목록 훅이 함께 떠 있어도 안전 이벤트 핸들러는 한 번만 등록한다', async () => {
+    const { useV1ChatListSocket, useV1ChatRoomSocket, useV1NotificationSocket } = await import('./use-v1-realtime-socket');
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const { unmount } = renderHook(() => {
+      useV1NotificationSocket();
+      useV1ChatRoomSocket('room-1');
+      useV1ChatListSocket();
+    }, { wrapper: createWrapper(queryClient) });
+
+    const registered = (event: string) => mockSocket.on.mock.calls.filter(([name]) => name === event).length;
+    expect(registered('chat:safety-changed')).toBe(1);
+    expect(registered('connect')).toBe(1);
+
+    unmount();
+    expect(mockSocket.off.mock.calls.filter(([name]) => name === 'chat:safety-changed')).toHaveLength(1);
+  });
+
+  it('차단이 바뀌어도 열려 있는 방은 로딩으로 되돌아가지 않고 보이던 내용 위에서 다시 받는다', async () => {
+    const { useV1ChatRoomSocket } = await import('./use-v1-realtime-socket');
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    let reads = 0;
+    let release: () => void = () => {};
+    const gate = new Promise<void>((resolve) => { release = resolve; });
+    const key = [...v1Keys.chatMessages('room-1'), { limit: 50 }];
+    const observer = new QueryObserver(queryClient, {
+      queryKey: key,
+      queryFn: async () => {
+        reads += 1;
+        if (reads > 1) await gate;
+        return { revision: reads };
+      },
+    });
+    const stop = observer.subscribe(() => {});
+    const { unmount } = renderHook(() => useV1ChatRoomSocket('room-1'), { wrapper: createWrapper(queryClient) });
+    await waitFor(() => expect(observer.getCurrentResult().data).toEqual({ revision: 1 }));
+
+    listeners['chat:safety-changed']({});
+    await waitFor(() => expect(observer.getCurrentResult().isFetching).toBe(true));
+
+    expect(observer.getCurrentResult().data).toEqual({ revision: 1 });
+    release();
+    await waitFor(() => expect(observer.getCurrentResult().data).toEqual({ revision: 2 }));
+    unmount();
+    stop();
+  });
+});

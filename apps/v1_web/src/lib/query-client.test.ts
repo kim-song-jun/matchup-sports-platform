@@ -88,4 +88,34 @@ describe('createV1QueryClient — 조회', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
     unsubscribe();
   });
+
+  it('4xx 응답은 다시 보내지 않아 한 번만 요청하고 바로 오류가 된다', async () => {
+    serverResponse = {
+      ok: false,
+      status: 409,
+      json: async () => ({ status: 'error', statusCode: 409, code: 'MATCH_CHAT_PARTICIPANTS_REQUIRED', message: '참가자가 있어야 해요.', timestamp: '' }),
+    };
+    const observer = new QueryObserver(client, { queryKey: ['v1', 'test', 'conflict'], queryFn: () => v1Get('/chat/rooms/room-1'), retryDelay: 0 });
+    const unsubscribe = observer.subscribe(() => {});
+
+    await vi.waitFor(() => expect(observer.getCurrentResult().status).toBe('error'));
+    await flush();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    unsubscribe();
+  });
+
+  it('대조군 — 서버 오류(5xx)는 한 번만 더 시도하고 그래도 실패하면 오류가 된다', async () => {
+    serverResponse = {
+      ok: false,
+      status: 503,
+      json: async () => ({ status: 'error', statusCode: 503, code: 'SERVICE_UNAVAILABLE', message: '잠시 후 다시 시도해 주세요.', timestamp: '' }),
+    };
+    const observer = new QueryObserver(client, { queryKey: ['v1', 'test', 'unavailable'], queryFn: () => v1Get('/chat/rooms/room-1'), retryDelay: 0 });
+    const unsubscribe = observer.subscribe(() => {});
+
+    await vi.waitFor(() => expect(observer.getCurrentResult().status).toBe('error'));
+    await flush();
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    unsubscribe();
+  });
 });

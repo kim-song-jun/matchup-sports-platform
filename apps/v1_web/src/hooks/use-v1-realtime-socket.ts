@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import type { QueryClient } from '@tanstack/react-query';
+import type { QueryClient, Query } from '@tanstack/react-query';
+import type { Socket } from 'socket.io-client';
 import { getV1Socket } from '@/lib/v1-socket';
 import { v1Keys } from '@/lib/query-keys';
 
@@ -51,6 +52,85 @@ export function invalidateV1ChatMessageQueries(
   void queryClient.invalidateQueries({ queryKey: root, predicate: (query) => refresh.has(query) });
 }
 
+const RESYNC_DEBOUNCE_MS = 1000;
+
+function isChatListQuery(query: Query): boolean {
+  const root = v1Keys.chatRooms();
+  return query.queryKey.length === root.length || query.queryKey[root.length] === 'list';
+}
+
+function isChatMessagesQuery(query: Query): boolean {
+  const root = v1Keys.chatRooms();
+  return query.queryKey.length > root.length + 1 && query.queryKey[root.length + 1] === 'messages';
+}
+
+// Block changes must not leave the other side's messages readable. A mounted room is refetched in place
+// (resetting it would flash the open room back to its skeleton); unmounted cache entries are dropped.
+function refreshChatAfterSafetyChange(queryClient: QueryClient): void {
+  const root = v1Keys.chatRooms();
+  void queryClient.cancelQueries({ queryKey: root }).then(() => {
+    queryClient.removeQueries({ queryKey: root, type: 'inactive' });
+    void queryClient.invalidateQueries({ queryKey: root });
+  });
+  void queryClient.invalidateQueries({ queryKey: [...v1Keys.all, 'chat', 'blocked-users'] });
+}
+
+type RetainedChatSync = { count: number; release: () => void };
+const retainedChatSync = new WeakMap<QueryClient, WeakMap<Socket, RetainedChatSync>>();
+
+/**
+ * Registers the socket-level chat listeners (block changes, resync after reconnect / tab return) once per
+ * socket and query client, however many hooks ask for them. The returned function releases one hold.
+ */
+function retainChatSync(queryClient: QueryClient, socket: Socket): () => void {
+  const sockets = retainedChatSync.get(queryClient) ?? new WeakMap<Socket, RetainedChatSync>();
+  retainedChatSync.set(queryClient, sockets);
+  let entry = sockets.get(socket);
+  if (!entry) {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    // A reconnect storm or quick tab switching collapses into one refetch.
+    const scheduleResync = () => {
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        void queryClient.invalidateQueries({
+          queryKey: v1Keys.chatRooms(),
+          predicate: (query) => isChatListQuery(query) || isChatMessagesQuery(query),
+        });
+      }, RESYNC_DEBOUNCE_MS);
+    };
+    // Messages emitted while the socket was down are never replayed, so every connect after the first resyncs.
+    let connectedBefore = socket.connected === true;
+    const onConnect = () => {
+      if (connectedBefore) scheduleResync();
+      connectedBefore = true;
+    };
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') scheduleResync();
+    };
+    const onSafety = () => refreshChatAfterSafetyChange(queryClient);
+    socket.on('connect', onConnect);
+    socket.on('chat:safety-changed', onSafety);
+    document.addEventListener('visibilitychange', onVisibility);
+    entry = {
+      count: 0,
+      release: () => {
+        clearTimeout(timer);
+        socket.off('connect', onConnect);
+        socket.off('chat:safety-changed', onSafety);
+        document.removeEventListener('visibilitychange', onVisibility);
+        sockets.delete(socket);
+      },
+    };
+    sockets.set(socket, entry);
+  }
+  entry.count += 1;
+  const held = entry;
+  return () => {
+    held.count -= 1;
+    if (held.count === 0) held.release();
+  };
+}
+
 export function useV1NotificationSocket(): void {
   const queryClient = useQueryClient();
 
@@ -60,15 +140,11 @@ export function useV1NotificationSocket(): void {
       queryClient.invalidateQueries({ queryKey: v1Keys.notificationsRoot() });
       queryClient.invalidateQueries({ queryKey: v1Keys.notificationUnreadSummary() });
     };
-    const safetyHandler = () => {
-      void queryClient.cancelQueries({ queryKey: v1Keys.chatRooms() }).then(() => queryClient.resetQueries({ queryKey: v1Keys.chatRooms() }));
-      void queryClient.invalidateQueries({ queryKey: [...v1Keys.all, 'chat', 'blocked-users'] });
-    };
-    socket.on('chat:safety-changed', safetyHandler);
     socket.on('notification:new', handler);
+    const releaseChatSync = retainChatSync(queryClient, socket);
     return () => {
-      socket.off('chat:safety-changed', safetyHandler);
       socket.off('notification:new', handler);
+      releaseChatSync();
     };
   }, [queryClient]);
 }
@@ -82,16 +158,12 @@ export function useV1ChatRoomSocket(roomId: string): void {
       const message = chatMessageIdentity(payload);
       if (message?.roomId === roomId) invalidateV1ChatMessageQueries(queryClient, message, 'room');
     };
-    // The global bridge may have mounted before login; the active room must
-    // also clear cached content when either participant changes a block.
-    const safetyHandler = () => {
-      void queryClient.cancelQueries({ queryKey: v1Keys.chatRooms() }).then(() => queryClient.resetQueries({ queryKey: v1Keys.chatRooms() }));
-    };
-    socket.on('chat:safety-changed', safetyHandler);
     socket.on('chat:message', handler);
+    // The global bridge is absent when the session began after page load; the room must still react itself.
+    const releaseChatSync = retainChatSync(queryClient, socket);
     return () => {
-      socket.off('chat:safety-changed', safetyHandler);
       socket.off('chat:message', handler);
+      releaseChatSync();
     };
   }, [queryClient, roomId]);
 }
@@ -107,6 +179,10 @@ export function useV1ChatListSocket(enabled = true): void {
       if (message) invalidateV1ChatMessageQueries(queryClient, message, 'list');
     };
     socket.on('chat:message', handler);
-    return () => { socket.off('chat:message', handler); };
+    const releaseChatSync = retainChatSync(queryClient, socket);
+    return () => {
+      socket.off('chat:message', handler);
+      releaseChatSync();
+    };
   }, [queryClient, enabled]);
 }

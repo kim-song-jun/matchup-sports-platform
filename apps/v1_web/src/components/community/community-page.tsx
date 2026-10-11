@@ -186,7 +186,8 @@ export function ChatRoomPageView({ model, listModel, roomId }: { model: ChatRoom
       <MoreHorizontal size={21} strokeWidth={2} aria-hidden="true" />
     </button>
   ) : undefined;
-  useShellOverride({ title: model.title, topbarActions: roomMenuButton });
+  // 제목이 비면(방을 못 불러옴) 셸 표의 기본 제목을 그대로 쓴다.
+  useShellOverride({ title: model.title || undefined, topbarActions: roomMenuButton });
 
   return (
     <>
@@ -197,7 +198,7 @@ export function ChatRoomPageView({ model, listModel, roomId }: { model: ChatRoom
           </div>
           <ChatListContent model={listModel} selectedRoomId={roomId} />
         </aside>
-        <section className="tm-chat-desktop-thread-pane" aria-label={`${model.title} 채팅방`}>
+        <section className="tm-chat-desktop-thread-pane" aria-label={model.title ? `${model.title} 채팅방` : '채팅방'}>
       {/*
        * Desktop page head: back link + room title.
        * The mobile .tm-topbar (rendered inside AppChrome) is hidden on desktop,
@@ -208,10 +209,15 @@ export function ChatRoomPageView({ model, listModel, roomId }: { model: ChatRoom
         <AppBackLink className="tm-desktop-back" fallbackHref="/chat">
           <ChevronLeftIcon size={22} strokeWidth={2.2} />
         </AppBackLink>
-        <h1 className="tm-text-heading" style={{ margin: 0 }}>{model.title}</h1>
+        {model.title ? (
+          <h1 className="tm-text-heading" style={{ margin: 0 }}>{model.title}</h1>
+        ) : (
+          <div className="tm-skeleton" aria-hidden="true" style={{ width: 160, height: 24, borderRadius: 'var(--radius-chip)' }} />
+        )}
         {roomMenuButton ? <div className="ml-auto">{roomMenuButton}</div> : null}
       </div>
       <div className="tm-chat-room">
+        {model.teamContact || model.context.title ? (
         <div className="tm-chat-context">
           {model.teamContact ? (
             <TeamContactStatusCard contact={model.teamContact} />
@@ -224,8 +230,9 @@ export function ChatRoomPageView({ model, listModel, roomId }: { model: ChatRoom
               </div>
               <ChevronRightIcon size={18} stroke="var(--text-caption)" />
             </Link>
-          ) : null /* 방을 불러오기 전엔 연결 카드를 그리지 않는다 */}
+          ) : null}
         </div>
+        ) : null /* 방을 불러오기 전엔 연결 카드 칸을 만들지 않는다 */}
         <div
           ref={threadRef}
           className={`tm-chat-thread${model.messages.length === 0 ? ' tm-list-empty' : ''}`}

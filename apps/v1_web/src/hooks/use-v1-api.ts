@@ -2752,9 +2752,17 @@ export function useV1UpdateMyChatRoom(roomId: string) {
   return useMutation({
     mutationFn: (body: { pinned?: boolean; lastReadMessageId?: string | null; mutedUntil?: string | null }) =>
       v1Patch<V1ChatRoomMeUpdate>(`/chat/rooms/${roomId}/me`, body),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: v1Keys.chatRooms() });
-      queryClient.invalidateQueries({ queryKey: v1Keys.chatRoom(roomId) });
+    onSuccess: (updated) => {
+      // 열린 방의 상세·메시지는 이 변경과 무관해 다시 받지 않는다. 상세의 me 는 응답으로 맞추고, 안읽음 수가 걸린 목록만 갱신한다.
+      queryClient.setQueryData<V1ChatRoomDetail>(v1Keys.chatRoom(roomId), (detail) => detail && {
+        ...detail,
+        me: { ...detail.me, pinned: updated.pinned, mutedUntil: updated.mutedUntil, lastReadMessageId: updated.lastReadMessageId },
+      });
+      const root = v1Keys.chatRooms();
+      void queryClient.invalidateQueries({
+        queryKey: root,
+        predicate: (query) => query.queryKey.length === root.length || query.queryKey[root.length] === 'list',
+      });
     },
   });
 }

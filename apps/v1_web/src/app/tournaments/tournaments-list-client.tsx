@@ -253,14 +253,19 @@ export function TournamentsListPageClient({ seed }: { readonly seed?: Tournament
   const emptyPreviousPage = isDesktop && isPlaceholderData && displayItems.length === 0
     && data?.pageInfo?.page !== page;
 
+  // 다음 페이지 요청만 "불러오는 중"이다 — 배경 재검증(isFetching)은 버튼·자동 로딩과 무관하다.
+  // 서버 seed 도 placeholder 라 첫 페이지 검증이 끝날 때까지 잠근다(seed 의 낡은 커서를 따라가지 않게).
+  const loadMorePending = !isDesktop && isPlaceholderData;
+  // 사용자가 요청하기 전(seed 검증 중)에는 잠그기만 하고 문구는 그대로 둔다.
+  const loadMoreRequested = loadMorePending && Boolean(cursor);
   const handleLoadMore = () => {
-    if (!data?.pageInfo?.nextCursor || isFetching) return;
+    if (!data?.pageInfo?.nextCursor || loadMorePending) return;
     setPagination({ accumulated: displayItems, cursor: data.pageInfo.nextCursor });
   };
 
   // 목록 끝 감시자 — 화면에 들어오면 다음 페이지를 이어 붙인다(모바일 전용).
   const sentinelRef = useInfiniteScroll({
-    enabled: !isDesktop && hasNext && !isFetching,
+    enabled: !isDesktop && hasNext && !loadMorePending,
     onReachEnd: handleLoadMore,
   });
 
@@ -376,17 +381,16 @@ export function TournamentsListPageClient({ seed }: { readonly seed?: Tournament
                   // 환경, 그리고 스크롤 대신 직접 누르고 싶은 사용자를 위한 길이다.
                   // 로딩 중에는 같은 자리에서 상태만 바꿔 목록이 밀리지 않게 한다.
                   <button
-                    className="tm-btn tm-btn-md tm-btn-neutral tm-btn-block"
+                    className="tm-btn tm-btn-md tm-btn-neutral tm-btn-block tm-load-more"
                     type="button"
-                    disabled={isFetching}
+                    disabled={loadMorePending}
                     onClick={handleLoadMore}
-                    style={{ marginTop: 16 }}
                   >
-                    {isFetching ? '불러오는 중…' : '더 보기'}
+                    {loadMoreRequested ? '불러오는 중…' : '더 보기'}
                   </button>
                 ) : null}
                 <p aria-live="polite" className="sr-only">
-                  {isFetching
+                  {loadMoreRequested
                     ? '대회를 더 불러오는 중이에요.'
                     : `대회 ${displayItems.length}개를 보고 있어요.${hasNext ? '' : ' 마지막 목록이에요.'}`}
                 </p>

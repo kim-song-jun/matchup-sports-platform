@@ -1894,6 +1894,21 @@ button:disabled {
   width: 100%;
 }
 
+/* 더 보기 버튼 — 카드가 위에 붙어도 버튼이 스크롤 앵커가 되지 않게 한다(앵커가 되면 브라우저가
+   버튼 위치를 고정하려 스크롤을 카드 높이만큼 끌어내린다). */
+.tm-load-more {
+  margin-top: var(--spacing-4);
+  overflow-anchor: none;
+}
+
+.tm-load-more-error {
+  margin-top: var(--spacing-4);
+}
+
+.tm-load-more-error + .tm-load-more {
+  margin-top: var(--spacing-2);
+}
+
 .tm-btn-ghost {
   background: transparent;
   color: var(--text);

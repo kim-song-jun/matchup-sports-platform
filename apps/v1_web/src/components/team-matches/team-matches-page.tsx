@@ -279,13 +279,13 @@ function HeroTeamLink({ href, name, align, children }: { href?: string; name: st
   );
 }
 
-/** 팀 카드의 신뢰 배지와 같은 낱말·같은 배지 — 알 수 없는 값은 숨긴다. */
+/** 팀 카드의 신뢰 배지와 같은 낱말·같은 배지 — 알 수 없는 값은 숨긴다. 좁은 칸에서는 줄바꿈한다. */
 function HeroTrustBadge({ trustState, align }: { trustState?: string | null; align: 'left' | 'right' }) {
   const label = trustState ? trustStateLabel(trustState) : null;
   if (!label) return null;
   return (
     <div style={{ marginTop: 4, textAlign: align }}>
-      <span className="tm-badge tm-badge-sm tm-badge-blue">{label}</span>
+      <span className="tm-badge tm-badge-sm tm-badge-blue" style={{ maxWidth: '100%', whiteSpace: 'normal', lineHeight: 1.3, paddingBlock: 4 }}>{label}</span>
     </div>
   );
 }
@@ -1605,12 +1605,12 @@ function prevHref(step: TeamMatchCreateViewModel['step']) {
  * API TrustState('verified' | 'estimated' | 'sample' | 'none', types/api.ts)의 배지 라벨.
  * 원래 gold/silver/bronze를 매핑하고 나머지를 원문 그대로 돌려줬는데, 그 등급은 API에
  * 존재한 적이 없는 값이라 실제 화면엔 "estimated" 영문 원문이 그대로 떴다(2026-08-25
- * 사용자 보고). 라벨은 공개 프로필(public-profile-client.tsx)·홈(home-client-model.ts)과
- * 같은 낱말을 쓰고, 모르는 값은 null 로 돌려 배지 자체를 숨긴다 — 원문 노출 재발 방지.
+ * 사용자 보고). 모르는 값은 null 로 돌려 배지 자체를 숨긴다 — 원문 노출 재발 방지.
+ * 팀 카드·히어로에서는 이 배지가 단독으로 뜨므로 "누적 중"만으로는 무엇이 쌓이는지 알 수 없다.
  */
 function trustStateLabel(trustState: string): string | null {
   if (trustState === 'verified') return '인증팀';
-  if (trustState === 'estimated') return '누적 중';
+  if (trustState === 'estimated') return '신뢰 점수 누적 중';
   if (trustState === 'sample') return null;
   return null;
 }

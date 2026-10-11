@@ -69,7 +69,6 @@ public final class MainActivity extends AppCompatActivity {
     private String pendingLocationOrigin;
     private String pendingPushRequestId;
     private String pendingPushSettingsRequestId;
-    private String pendingKakaoRequestId;
     private int bottomSystemInsetCssPixels;
     private int keyboardInsetCssPixels;
     private boolean keyboardVisible;
@@ -574,27 +573,20 @@ public final class MainActivity extends AppCompatActivity {
             reportKakaoResult(KakaoLoginPolicy.errorScript(requestId, "kakao-unavailable"));
             return;
         }
-        if (pendingKakaoRequestId != null) {
-            reportKakaoResult(KakaoLoginPolicy.errorScript(requestId, "kakao-login-in-progress"));
-            return;
-        }
-        pendingKakaoRequestId = requestId;
+        // No in-flight guard: the web sends another request only after its own timeout or a reload, and
+        // the SDK callback may never arrive (abandoned KakaoTalk hand-off). Stale results carry an old
+        // requestId, which the web ignores.
         KakaoNativeLogin.start(this, new KakaoNativeLogin.Callback() {
             @Override public void onSuccess(String accessToken) {
-                finishKakao(KakaoLoginPolicy.successScript(requestId, accessToken));
+                reportKakaoResult(KakaoLoginPolicy.successScript(requestId, accessToken));
             }
             @Override public void onCancelled() {
-                finishKakao(KakaoLoginPolicy.cancelledScript(requestId));
+                reportKakaoResult(KakaoLoginPolicy.cancelledScript(requestId));
             }
             @Override public void onError(String code) {
-                finishKakao(KakaoLoginPolicy.errorScript(requestId, code));
+                reportKakaoResult(KakaoLoginPolicy.errorScript(requestId, code));
             }
         });
-    }
-
-    private void finishKakao(String script) {
-        pendingKakaoRequestId = null;
-        reportKakaoResult(script);
     }
 
     private void reportKakaoResult(String script) {

@@ -1,5 +1,6 @@
 import { http, HttpResponse } from 'msw';
 import isISO8601 from 'validator/lib/isISO8601';
+import { toKstDateString } from '@/lib/kst-calendar';
 import type { SharedRecord } from '@/hooks/use-team-match-record';
 import {
   getSignupProfileIssue,
@@ -180,6 +181,41 @@ function pageWithCounts<T extends { sport?: { sportId: string }; sportName?: str
     nextCursor: null,
     pageInfo: { nextCursor: null, hasNext: false, totalCount: items.length },
     facets: { sports: [...counts].map(([sportId, count]) => ({ sportId, count })).sort((a, b) => b.count - a.count), ...toggles },
+  };
+}
+
+type ToggleRow = { startsAt: string; status: string; deadlineAt?: string | null; capacityText?: string };
+type ToggleFlags = { today: boolean; recruitingOnly: boolean };
+
+function readToggles(request: Request): ToggleFlags {
+  const params = new URL(request.url).searchParams;
+  return { today: params.get('today') === 'true', recruitingOnly: params.get('recruitingOnly') === 'true' };
+}
+
+/**
+ * 서버 토글 규칙(`list-facets.ts`)을 따른다. today = KST 오늘 시작, recruitingOnly = 지금 신청 가능
+ * (모집 중 · 시작 전 · 마감 전). `excludeFull` 은 매치만 — 정원이 찬 글(`n/m` 에서 n>=m)을 뺀다.
+ */
+function applyToggles<T extends ToggleRow>(items: T[], flags: ToggleFlags, excludeFull: boolean, now = new Date()): T[] {
+  return items.filter((item) => {
+    if (flags.today && toKstDateString(new Date(item.startsAt)) !== toKstDateString(now)) return false;
+    if (!flags.recruitingOnly) return true;
+    if (item.status !== 'open' && item.status !== 'recruiting') return false;
+    if (new Date(item.startsAt) < now) return false;
+    if (item.deadlineAt && new Date(item.deadlineAt) < now) return false;
+    if (excludeFull) {
+      const fill = /(\d+)\s*\/\s*(\d+)/.exec(item.capacityText ?? '');
+      if (fill && Number(fill[1]) >= Number(fill[2])) return false;
+    }
+    return true;
+  });
+}
+
+/** 각 칩 건수는 자기 토글만 빼고(다른 토글은 유지) 센다. */
+function toggleFacets<T extends ToggleRow>(base: T[], flags: ToggleFlags, excludeFull: boolean) {
+  return {
+    today: applyToggles(base, { ...flags, today: true }, excludeFull).length,
+    recruiting: applyToggles(base, { ...flags, recruitingOnly: true }, excludeFull).length,
   };
 }
 
@@ -571,10 +607,12 @@ export const v1MswHandlers = [
   }),
   http.get(`${api}/matches`, ({ request }) => {
     const levelCodes = new URL(request.url).searchParams.get('levelCodes')?.split(',').filter(Boolean) ?? [];
-    const matches = levelCodes.length
+    const flags = readToggles(request);
+    const byLevel = levelCodes.length
       ? v1MatchesFixture.filter((item) => rangeMatches(levelCodes, item.minLevel?.code, item.maxLevel?.code))
       : v1MatchesFixture;
-    return ok(pageWithCounts(request, matches, matches, { today: 0, recruiting: matches.length }));
+    const matches = applyToggles(byLevel, flags, true);
+    return ok(pageWithCounts(request, matches, matches, toggleFacets(byLevel, flags, true)));
   }),
   http.get(`${api}/matches/:matchId`, ({ params }) => ok(v1MatchesFixture.find((item) => item.id === params.matchId) ?? v1MatchesFixture[0])),
   http.get(`${api}/teams`, ({ request }) => {
@@ -669,14 +707,16 @@ export const v1MswHandlers = [
     const teamMatchesBySport = sport
       ? v1TeamMatchesFixture.filter((item) => item.sport?.sportId === sport.id || item.sportName === sport.name)
       : v1TeamMatchesFixture;
-    const teamMatches = levelCodes.length
+    const flags = readToggles(request);
+    const byLevel = levelCodes.length
       ? teamMatchesBySport.filter((item) => rangeMatches(levelCodes, item.minLevel?.code, item.maxLevel?.code))
       : teamMatchesBySport;
-    // 종목 건수만 종목 필터를 빼고 센다. 모집 중 칩은 실제 서비스처럼 종목·레벨 필터를 그대로 유지한다.
-    const teamMatchesIgnoringSport = levelCodes.length
+    const teamMatches = applyToggles(byLevel, flags, false);
+    // 종목 건수만 종목 필터를 빼고 센다(토글은 유지). 토글 칩은 종목·레벨 필터를 유지하고 자기 토글만 뺀다.
+    const ignoringSportByLevel = levelCodes.length
       ? v1TeamMatchesFixture.filter((item) => rangeMatches(levelCodes, item.minLevel?.code, item.maxLevel?.code))
       : v1TeamMatchesFixture;
-    return ok(pageWithCounts(request, teamMatches, teamMatchesIgnoringSport, { today: 0, recruiting: teamMatches.length }));
+    return ok(pageWithCounts(request, teamMatches, applyToggles(ignoringSportByLevel, flags, false), toggleFacets(byLevel, flags, false)));
   }),
   http.get(`${api}/team-matches/:teamMatchId`, ({ params }) => ok(v1TeamMatchesFixture.find((item) => item.id === params.teamMatchId) ?? v1TeamMatchesFixture[0])),
   http.get(`${api}/chat/rooms`, () => ok(v1ChatRoomsFixture)),

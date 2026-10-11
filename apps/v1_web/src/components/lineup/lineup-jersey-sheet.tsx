@@ -29,7 +29,7 @@ interface Props {
   error: string | null;
   /** "이 경기만"이면 명단 초안만, "팀 번호도 함께"면 팀 번호 저장 뒤 초안까지 — 부모가 처리한다. */
   onSave: (jerseyNumber: number | null, scope: LineupJerseyScope) => void;
-  /** 번호나 저장 범위를 고칠 때 — 부모가 `error` 를 비운다(거절 사유는 이전 입력에 대한 것이다). */
+  /** 번호나 저장 범위를 고칠 때 — 부모가 `error` 를 비운다(거절 사유는 이전 입력에 대한 것이다). 저장 중에는 입력이 잠겨 호출되지 않는다. */
   onEdit: () => void;
 }
 
@@ -131,6 +131,7 @@ function JerseyForm({ target, holderOf, pending, error, onSave, onEdit }: Omit<P
           maxLength={2}
           autoComplete="off"
           autoFocus
+          readOnly={pending}
           value={text}
           error={fieldError}
           style={{ fontWeight: 700 }}
@@ -148,8 +149,8 @@ function JerseyForm({ target, holderOf, pending, error, onSave, onEdit }: Omit<P
       {target.canChangeTeamNumber ? (
         <fieldset style={{ border: 0, margin: 0, padding: 0, display: 'grid', gap: 4 }}>
           <legend className="sr-only">번호를 어디에 저장할까요</legend>
-          <ScopeOption name={scopeName} checked={scope === 'match'} onChange={() => chooseScope('match')} label="이 경기만 바꿔요" />
-          <ScopeOption name={scopeName} checked={scope === 'team'} onChange={() => chooseScope('team')} label="팀 번호도 함께 바꿔요" />
+          <ScopeOption name={scopeName} disabled={pending} checked={scope === 'match'} onChange={() => chooseScope('match')} label="이 경기만 바꿔요" />
+          <ScopeOption name={scopeName} disabled={pending} checked={scope === 'team'} onChange={() => chooseScope('team')} label="팀 번호도 함께 바꿔요" />
           {matchOnlyNotice !== null ? (
             <p className="tm-text-caption" style={{ color: 'var(--orange700)', margin: '4px 0 0', lineHeight: 1.5, fontWeight: 600 }}>
               {matchOnlyNotice}
@@ -176,10 +177,10 @@ function JerseyForm({ target, holderOf, pending, error, onSave, onEdit }: Omit<P
   );
 }
 
-function ScopeOption({ name, checked, onChange, label }: { name: string; checked: boolean; onChange: () => void; label: string }) {
+function ScopeOption({ name, checked, disabled, onChange, label }: { name: string; checked: boolean; disabled: boolean; onChange: () => void; label: string }) {
   return (
     <label style={{ display: 'flex', alignItems: 'center', gap: 8, minHeight: 44, cursor: 'pointer' }}>
-      <input type="radio" name={name} checked={checked} onChange={onChange} style={{ width: 20, height: 20, margin: 0, accentColor: 'var(--blue500)' }} />
+      <input type="radio" name={name} checked={checked} disabled={disabled} onChange={onChange} style={{ width: 20, height: 20, margin: 0, accentColor: 'var(--blue500)' }} />
       <span className="tm-text-label">{label}</span>
     </label>
   );

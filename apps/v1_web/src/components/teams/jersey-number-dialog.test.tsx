@@ -1,6 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { useState } from 'react';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { JerseyNumberDialog } from './jersey-number-dialog';
 
 const TAKEN = '이미 같은 등번호를 쓰는 팀원이 있어요.';
@@ -35,5 +36,16 @@ describe('JerseyNumberDialog', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '저장' }));
     expect(screen.getByRole('alert')).toHaveTextContent(TAKEN);
+  });
+
+  it('저장 중에는 입력이 잠겨 번호를 고칠 수 없다 — 응답이 다른 번호의 거절로 오해되지 않게', async () => {
+    const onEdit = vi.fn();
+    render(
+      <JerseyNumberDialog open memberName="홍길동" current={7} saving error={null} onClose={() => undefined} onEdit={onEdit} onSave={() => undefined} />,
+    );
+    const input = screen.getByLabelText('등번호 (비우면 해제)');
+    await userEvent.type(input, '9');
+    expect(input).toHaveValue(7);
+    expect(onEdit).not.toHaveBeenCalled();
   });
 });

@@ -3776,8 +3776,8 @@ label.tm-btn:focus-within {
   transition: none;
 }
 
-/* initialFocus="sheet" 인 시트는 패널이 포커스를 받는다 — 컨테이너라 링을 그리지 않는다. */
-.tm-filter-sheet[tabindex="-1"]:focus {
+/* initialFocus="sheet" 시트의 패널은 tabIndex -1 컨테이너라 링을 그리지 않는다(docs/design/a11y-decisions.md). */
+.tm-filter-sheet[tabindex="-1"]:focus-visible {
   outline: none;
 }
 

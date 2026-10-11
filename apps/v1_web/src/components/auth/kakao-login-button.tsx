@@ -77,6 +77,11 @@ export function KakaoLoginButton({
       router.replace(route);
       router.refresh();
     } catch (err) {
+      if (err instanceof V1ApiError && err.code === 'PERMISSION_DENIED') {
+        trackEvent('login_failed', { method: 'kakao', reason: err.code });
+        router.replace('/auth/blocked');
+        return;
+      }
       failNative(err instanceof V1ApiError ? err.code : 'unknown', extractErrorMessage(err, NATIVE_FAILURE_MESSAGE));
     } finally {
       busyRef.current = false;

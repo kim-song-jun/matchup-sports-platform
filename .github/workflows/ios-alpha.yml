@@ -8,6 +8,7 @@ on:
       - apps/v1_ios/**
       - scripts/ios/**
       - scripts/release/require-ios-production-ref.sh
+      - scripts/release/generate-ios-secrets-xcconfig.sh
       - .github/workflows/ios-alpha.yml
   push:
     branches: [dev]
@@ -15,6 +16,7 @@ on:
       - apps/v1_ios/**
       - scripts/ios/**
       - scripts/release/require-ios-production-ref.sh
+      - scripts/release/generate-ios-secrets-xcconfig.sh
       - .github/workflows/ios-alpha.yml
 
 permissions:

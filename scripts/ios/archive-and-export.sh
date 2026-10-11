@@ -63,8 +63,8 @@ fi
 
 # An empty key still builds and signs; the app just never advertises Kakao sign-in. Uploading
 # that to the production record cannot be undone, so refuse it here (archive-only runs are fine).
-if [[ "$UPLOAD" == true && "$SCHEME" == TeameetProduction && -z "${TEAMEET_KAKAO_NATIVE_APP_KEY:-}" ]]; then
-  echo "[archive] TEAMEET_KAKAO_NATIVE_APP_KEY is required to upload a production build." >&2
+if [[ "$UPLOAD" == true && "$SCHEME" == TeameetProduction && ! "${TEAMEET_KAKAO_NATIVE_APP_KEY:-}" =~ ^[0-9a-f]{32}$ ]]; then
+  echo "[archive] TEAMEET_KAKAO_NATIVE_APP_KEY (32 hex chars) is required to upload a production build." >&2
   exit 1
 fi
 

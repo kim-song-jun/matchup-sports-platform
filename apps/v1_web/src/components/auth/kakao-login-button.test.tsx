@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { KakaoLoginButton } from './kakao-login-button';
+import { V1ApiError } from '@/lib/api-client';
 import { KAKAO_OAUTH_STATE_STORAGE_KEY } from './auth.view-model';
 import { v1Keys } from '@/lib/query-keys';
 import { V1_SESSION_HINT_KEY } from '@/lib/session-storage';
@@ -122,6 +123,16 @@ describe('KakaoLoginButton', () => {
       renderButton();
       await click();
       expect(await screen.findByRole('alert')).toHaveTextContent('로그인 정보를 확인할 수 없어요.');
+    });
+
+    it('routes a blocked account to /auth/blocked like the callback path', async () => {
+      reply = { accessToken: 'blocked' };
+      api.v1Post.mockRejectedValue(new V1ApiError({ status: 'error', statusCode: 403, code: 'PERMISSION_DENIED', message: '차단된 계정이에요.', timestamp: '2026-10-12T00:00:00.000Z' }));
+      renderButton();
+      await click();
+      await waitFor(() => expect(router.replace).toHaveBeenCalledWith('/auth/blocked'));
+      expect(screen.queryByRole('alert')).toBeNull();
+      expect(analytics.trackEvent).toHaveBeenCalledWith('login_failed', { method: 'kakao', reason: 'PERMISSION_DENIED' });
     });
 
     it('shows a Korean message when the shell never answers (timeout)', async () => {

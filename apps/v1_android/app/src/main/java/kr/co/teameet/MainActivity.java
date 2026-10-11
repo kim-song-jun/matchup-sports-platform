@@ -590,7 +590,8 @@ public final class MainActivity extends AppCompatActivity {
     }
 
     private void reportKakaoResult(String script) {
-        if (webView != null) webView.evaluateJavascript(script, null);
+        // After recreation the old activity's WebView is destroyed and the reloaded page has no waiter.
+        if (!isDestroyed() && webView != null) webView.evaluateJavascript(script, null);
     }
 
     /**

@@ -32,6 +32,7 @@ import { MatchCreatePageView } from './matches-page';
 import type { MatchCreateStep, MatchCreateViewModel } from './matches.types';
 import {
   buildMatchPayloadResult,
+  requiresParticipantReconfirmation,
   getCompleteMatchSteps,
   getMatchMissingFields,
   getMatchStepErrors,
@@ -401,7 +402,7 @@ export function MatchEditPageClient({ matchId }: { matchId: string }) {
       if (!url) throw new Error('이미지 URL을 받지 못했어요. 다시 시도해 주세요.');
       return url;
     },
-    onSubmit: () => {
+    onSubmit: async () => {
       // 로딩 중 재클릭 시 중복 제출 방지 — isPending 은 disabled 속성과 동일하게 리렌더
       // 이후에나 반영되는 값이라 동시 클릭까지 막지는 못하지만, 스피너가 보이는 동안의
       // 재클릭은 막는다(동시 클릭 방지가 필요하면 ref 락을 따로 둔다).
@@ -422,6 +423,20 @@ export function MatchEditPageClient({ matchId }: { matchId: string }) {
             : '수정에 필요한 정보가 빠져 있어요. 다시 확인해 주세요.',
         );
         return;
+      }
+      // 일정·장소가 바뀌면 서버가 확정 참가자 전원을 취소하고 대기 신청을 마감한다 — 되돌릴 수 없으니
+      // 저장 전에 영향받는 인원을 알리고 확인받는다(MD-QA #120). 호스트 본인은 인원에서 뺀다.
+      const affectedParticipants = editQuery.data
+        ? Math.max(0, editQuery.data.participantCount - (editQuery.data.form.hostParticipates === false ? 0 : 1))
+        : 0;
+      if (editQuery.data && affectedParticipants > 0 && requiresParticipantReconfirmation(editQuery.data.form, payloadResult.payload)) {
+        const ok = await confirm({
+          title: '일정·장소를 바꿀까요?',
+          message: `확정 참가자 ${affectedParticipants}명의 참가가 취소되고 대기 중인 신청도 마감돼요. 참가자는 변경 알림을 받고 다시 신청해야 해요.`,
+          confirmLabel: '변경하고 저장',
+          tone: 'danger',
+        });
+        if (!ok) return;
       }
       updateMatch.mutate(
         { ...payloadResult.payload, version },

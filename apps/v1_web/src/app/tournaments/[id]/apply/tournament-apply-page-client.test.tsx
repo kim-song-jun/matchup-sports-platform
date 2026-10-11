@@ -511,6 +511,13 @@ describe('TournamentApplyPageClient GA events', () => {
       expect(dialog.textContent).not.toMatch(/취소는 .*불가/);
     });
 
+    it('공백뿐인 환불 정책은 정책이 없는 것으로 보고 기본 안내를 보여 준다', async () => {
+      const dialog = await openSubmitConfirm('  \n  ');
+
+      expect(within(dialog).getByText('참가비 입금 후 단순 변심 또는 팀 사정으로 인한 신청 취소는 원칙적으로 불가해요.')).toBeInTheDocument();
+      expect(within(dialog).queryByRole('region', { name: '환불 정책' })).not.toBeInTheDocument();
+    });
+
     it('환불 정책이 없는 대회는 기본 안내를 해요체로 보여 준다', async () => {
       const dialog = await openSubmitConfirm(null);
 

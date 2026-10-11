@@ -1258,6 +1258,8 @@ function TournamentSubmitConfirmDialog({
     pending: isSubmitting,
   });
 
+  const customRefundPolicy = refundPolicyText?.trim() || null;
+
   return (
     <div
       role="presentation"
@@ -1294,7 +1296,7 @@ function TournamentSubmitConfirmDialog({
           className="tm-text-caption"
           style={{ color: 'var(--text-muted)', lineHeight: 1.7, marginTop: 12 }}
         >
-          {refundPolicyText ? (
+          {customRefundPolicy ? (
             <>
               <p style={{ margin: 0 }}>취소와 환불은 이 대회의 환불 정책을 따라요.</p>
               <div
@@ -1312,7 +1314,7 @@ function TournamentSubmitConfirmDialog({
                   color: 'var(--text-body)',
                 }}
               >
-                <FormattedText text={refundPolicyText} />
+                <FormattedText text={customRefundPolicy} />
               </div>
             </>
           ) : (

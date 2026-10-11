@@ -73,7 +73,7 @@ const REGISTRATION_STATUS_LABEL: Record<string, string> = {
   waitlisted: '대기',
   cancel_requested: '취소 요청',
 };
-const ELIGIBILITY_LABEL: Record<string, string> = { non_pro: '아마추어', pro: '프로', needs_review: '검토 필요' };
+const ELIGIBILITY_LABEL: Record<string, string> = { non_pro: '아마추어', pro: '선출', needs_review: '검토 필요' };
 const GENDER_LABEL: Record<string, string> = { male: '남성', female: '여성' };
 
 /** KST 기준 `YYYY-MM-DD HH:mm` — sv-SE 로캘이 ISO 모양 날짜를 준다. */

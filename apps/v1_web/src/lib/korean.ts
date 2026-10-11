@@ -16,6 +16,7 @@ const DIGIT_HAS_BATCHIM: Readonly<Record<string, boolean>> = {
   '9': false,
 };
 
+const READABLE_CHARACTER = /[가-힣A-Za-z0-9]/u;
 const RIEUL_FINAL = 8;
 const RIEUL_DIGITS: ReadonlySet<string> = new Set(['1', '7', '8']);
 
@@ -24,10 +25,11 @@ const RIEUL_DIGITS: ReadonlySet<string> = new Set(['1', '7', '8']);
  * 예: josa('김민준', ['을', '를']) → '김민준을' / josa('활성커버', ['은', '는']) → '활성커버는'
  * 숫자로 끝나면 그 숫자의 한국어 발음 받침으로 판정한다(예: josa('레드2', ['을','를']) → '레드2를',
  * josa('레드1', ['을','를']) → '레드1을'). 그 외 한글이 아닌 글자(영문 등)로 끝나면 받침 없음 쪽을 사용한다.
+ * 끝의 괄호·기호는 읽히지 않으므로 건너뛴다(josa('FC 서울(U18)', ['이에요','예요']) → 'FC 서울(U18)이에요').
  */
 export function josa(word: string, [withBatchim, withoutBatchim]: [string, string]): string {
-  const lastChar = word[word.length - 1] ?? '';
-  const last = word.charCodeAt(word.length - 1);
+  const lastChar = Array.from(word).findLast((character) => READABLE_CHARACTER.test(character)) ?? '';
+  const last = lastChar.charCodeAt(0);
   const isHangul = last >= 0xac00 && last <= 0xd7a3;
   const hasBatchim = isHangul
     ? (last - 0xac00) % 28 !== 0

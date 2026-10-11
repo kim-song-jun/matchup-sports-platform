@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { Check, ChevronRight, Pencil, Plus, RefreshCw, Trash2, X } from 'lucide-react';
 import { EntityPicker, type EntityPickerItem } from '@/components/admin/entity-picker';
 import { AdminDataTable, AdminEmpty, type AdminTableColumn } from '@/components/admin';
@@ -205,6 +205,7 @@ export function BracketGroupCard({
 
   const teamCount = group.groupTeams.filter((team) => team.registrationId).length;
   const fixtureCount = groupFixtures.length;
+  const autoGenerateHintId = useId();
   const ready = teamCount > 0 && fixtureCount > 0;
   const teamLabel = teamCount === 0 ? '배정 대기' : `${teamCount}팀 배정됨`;
   const fixtureLabel = fixtureCount === 0 ? '대진 미생성' : `대진 ${fixtureCount}경기`;
@@ -241,6 +242,7 @@ export function BracketGroupCard({
   }
 
   const isKnockout = group.phase !== 'group';
+  const needsMoreTeams = !isKnockout && teamCount < 2;
   const roundOptions: string[] = isKnockout
     ? ['16강', '12강', '8강', '4강', '결승', '3·4위전']
     : ['조별 1라운드', '조별 2라운드', '조별 3라운드', '조별 4라운드', '조별 5라운드'];
@@ -439,6 +441,7 @@ export function BracketGroupCard({
                 type="button"
                 onClick={() => onAutoGenerate(group.id)}
                 disabled={isAutoGenerating || createFixture.isPending}
+                aria-describedby={needsMoreTeams ? autoGenerateHintId : undefined}
                 className={submitBtnCls}
               >
                 <RefreshCw size={14} aria-hidden="true" />
@@ -453,6 +456,12 @@ export function BracketGroupCard({
                 직접 입력 {manualFixtureOpen ? '닫기' : '›'}
               </button>
             </div>
+
+            {needsMoreTeams && (
+              <p id={autoGenerateHintId} className="text-[length:var(--font-size-caption)] text-[var(--text-muted)]">
+                조에 팀을 2팀 이상 배정하면 대진을 자동으로 만들 수 있어요.
+              </p>
+            )}
 
             {manualFixtureOpen && (
               <form onSubmit={handleCreateFixture} noValidate className="grid grid-cols-1 sm:grid-cols-2 gap-3">

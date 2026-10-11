@@ -51,7 +51,7 @@ import {
   formatTournamentDateShort,
   formatTournamentDateTimeShort,
   formatTournamentDateRangeWithTime,
-  formatTournamentDateLong,
+  formatTournamentDateTimeLong,
   formatEntryFee,
 } from '@/lib/date-utils';
 import {
@@ -894,7 +894,7 @@ export function TournamentDetailView({
           </div>
           {/* 항상 표시 */}
           {tournament.registrationDeadlineAt ? (
-            <InfoRow label="신청 마감" value={formatTournamentDateLong(tournament.registrationDeadlineAt)} />
+            <InfoRow label="신청 마감" value={formatTournamentDateTimeLong(tournament.registrationDeadlineAt)} />
           ) : null}
           {tournament.venue ? (
             <InfoRow label="장소" value={tournament.venue} />
@@ -1171,7 +1171,7 @@ export function TournamentDetailView({
         </div>
         {tournament.registrationDeadlineAt ? (
           <div className="tm-text-caption" style={{ color: 'var(--text-caption)', marginBottom: 12 }}>
-            신청 마감 {formatTournamentDateLong(tournament.registrationDeadlineAt)}
+            신청 마감 {formatTournamentDateTimeLong(tournament.registrationDeadlineAt)}
           </div>
         ) : null}
         <ApplyCTAButtons tournament={tournament} blockReason={registrationBlock} myRegistration={myRegistration} />

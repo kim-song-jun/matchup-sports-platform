@@ -4,7 +4,7 @@ export type Loaded<T> = { ok: true; data: T | null } | { ok: false };
 
 /**
  * 리그 화면은 원래 클라이언트만 API 를 불렀다 — 서버 조회가 실패했다고 페이지를 500 으로 만들지
- * 않는다. 실패는 로그로 남기고 메타·LD 만 포기한다(없는 리그의 404 는 proxy.ts 가 HTTP 상태로 처리한다).
+ * 않는다. 실패는 로그로 남기고 메타·LD 만 포기한다. 404(data=null)는 실패가 아니라 "공개되지 않은 리그"다.
  */
 export async function loadPublic<T>(path: string): Promise<Loaded<T>> {
   try {

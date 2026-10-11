@@ -58,6 +58,15 @@ describe('OpenInAppSheet', () => {
     expect(document.querySelector('img')?.getAttribute('src')).toBe('/brand/icon-192.png');
   });
 
+  it('저절로 열린 시트는 닫기 버튼이 아니라 시트 패널이 포커스를 받는다 — WebKit 이 닫기에 포커스 링을 그리지 않게', async () => {
+    await mount();
+    advance(1500);
+    advance(60); // 훅의 초기 포커스는 열린 다음 렌더의 effect 에서 60ms 뒤에 잡힌다.
+
+    expect(document.activeElement).toBe(screen.getByRole('dialog'));
+    expect(document.activeElement).not.toBe(screen.getByRole('button', { name: '닫기' }));
+  });
+
   it('네이티브 셸 안에서는 열리지 않는다', async () => {
     (window as W).webkit = { messageHandlers: { TeameetNative: { postMessage() {} } } };
     await mount();

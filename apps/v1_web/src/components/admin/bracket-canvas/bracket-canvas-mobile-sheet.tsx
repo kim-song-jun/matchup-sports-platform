@@ -101,6 +101,7 @@ function ResultSection({ node, competitionId, scope, canWrite, showToast, onDone
         awayLabel={awayName}
         isKnockout={node.knockout}
         submitLabel="점수 확정"
+        confirmBeforeSubmit
         pending={quickResult.isPending}
         errorMessage={quickError}
         onSubmit={(score) => {

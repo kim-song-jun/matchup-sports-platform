@@ -527,8 +527,8 @@ function parseTeamSelectionOptions(error: unknown): { teamId: string; teamName: 
  * 폼이 복제되면 팀 선택 재제출·사진 업로드 같은 예외 처리가 곧장 두 벌로 갈라진다.
  */
 export function ReviewFormModal({
-  tournamentId, onClose,
-}: { tournamentId: string; onClose: () => void }) {
+  tournamentId, onClose, noun = '대회',
+}: { tournamentId: string; onClose: () => void; noun?: '대회' | '리그' }) {
   const commentId = useId();
   const [rating, setRating] = useState(5);
   const [comment, setComment] = useState('');
@@ -624,12 +624,12 @@ export function ReviewFormModal({
         }}
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-          <h3 className="tm-text-body-lg" style={{ margin: 0 }}>대회 후기 작성</h3>
+          <h3 className="tm-text-body-lg" style={{ margin: 0 }}>{noun} 후기 작성</h3>
           <button type="button" onClick={onClose} disabled={isPending} style={{ display: 'inline-flex', width: 44, height: 44, alignItems: 'center', justifyContent: 'center', flexShrink: 0, background: 'none', border: 'none', padding: 0, cursor: isPending ? 'default' : 'pointer', color: 'var(--text-muted)', opacity: isPending ? 0.55 : 1 }} aria-label="닫기"><X size={20} /></button>
         </div>
 
         <div style={{ marginBottom: 16, textAlign: 'center' }}>
-          <p style={{ margin: '0 0 12px', fontSize: 13, color: 'var(--text-caption)' }}>대회는 어떠셨나요?</p>
+          <p style={{ margin: '0 0 12px', fontSize: 13, color: 'var(--text-caption)' }}>{noun}는 어떠셨나요?</p>
           <StarRating value={rating} onChange={setRating} />
         </div>
 
@@ -687,7 +687,7 @@ export function ReviewFormModal({
         <textarea
           id={commentId}
           value={comment} onChange={(e) => setComment(e.target.value)}
-          placeholder="대회 운영, 경기장, 대진표 등 솔직한 후기를 남겨주세요. (선택)"
+          placeholder={`${noun} 운영, 경기장, ${noun === '리그' ? '일정' : '대진표'} 등 솔직한 후기를 남겨주세요. (선택)`}
           maxLength={500}
           rows={4}
           style={{
@@ -808,7 +808,11 @@ export function ReviewCard({ review }: { review: V1TournamentReview }) {
  * `isParticipant`/`alreadyReviewed`는 버튼뿐 아니라 **빈 상태 안내 문구**를 고르는 데도
  * 쓰이므로(왜 못 쓰는지를 상태별로 안내한다) 판정 결과를 통째로 돌려준다.
  */
-export function useTournamentReviewWriteGate(tournamentId: string, status: V1TournamentDetail['status']) {
+export function useTournamentReviewWriteGate(
+  tournamentId: string,
+  status: V1TournamentDetail['status'],
+  noun: '대회' | '리그' = '대회',
+) {
   // localStorage는 로그인 힌트일 뿐이에요. 쿠키만 남은 사용자도 서버 인증을 확인해야 해요.
   const shouldProbe = shouldProbeV1Session();
   const auth = useV1AuthMe({ enabled: shouldProbe, retry: retryTransientFailure });
@@ -859,7 +863,7 @@ export function useTournamentReviewWriteGate(tournamentId: string, status: V1Tou
       ? '후기 작성 자격을 확인하고 있어요.'
       : !hasSession
         ? '로그인하면 참가팀의 팀장·매니저는 후기를 작성할 수 있어요.'
-        : '대회 후기는 참가팀의 팀장·매니저가 작성해요. 팀원은 맞붙은 상대 선수에 대한 후기를 남길 수 있어요.';
+        : `${noun} 후기는 참가팀의 팀장·매니저가 작성해요. 팀원은 맞붙은 상대 선수에 대한 후기를 남길 수 있어요.`;
   return {
     hasSession,
     isCompleted,

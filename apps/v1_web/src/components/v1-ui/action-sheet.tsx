@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useId, type MouseEvent as ReactMouseEvent, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 import { closeOverlayThenNavigate, overlayLinkClick } from '@/lib/overlay-history';
 import { useModalA11y } from './use-modal-a11y';
@@ -73,9 +74,11 @@ export function ActionSheet({ open, title, subtitle, actions, onClose }: ActionS
   const pathname = usePathname();
   const { dialogRef, onBackdropClick } = useModalA11y<HTMLElement, HTMLDivElement>({ open, onClose });
 
-  if (!open) return null;
+  if (!open || typeof document === 'undefined') return null;
 
-  return (
+  // body 로 올린다 — 스크롤 영역 같은 조상이 스태킹 컨텍스트이면(iOS 웹뷰 등) 안쪽 z-index 가 밖의
+  // 하단 고정 CTA·상단바와 겨루지 못해 시트가 그 아래에 깔린다(ConfirmModal 과 같은 이유).
+  return createPortal(
     <div
       className="fixed inset-0 flex items-end justify-center bg-gray-900/50 sm:items-center sm:p-4"
       style={{ zIndex: 'var(--z-modal)' }}
@@ -140,7 +143,8 @@ export function ActionSheet({ open, title, subtitle, actions, onClose }: ActionS
           ))}
         </ul>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 

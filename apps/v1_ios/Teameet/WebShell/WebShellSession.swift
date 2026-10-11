@@ -27,6 +27,16 @@ struct WebShellSession: Equatable {
         self.interactionState = interactionState
     }
 
+    /// Whether a snapshot taken while `url` is showing is worth restoring at the next launch.
+    ///
+    /// The login screens are a detour — they have no tab bar and nothing to go back to once
+    /// the app has been relaunched — so a snapshot taken there is skipped and the previous one
+    /// (the screen the reader was on before being sent to log in) stays in place.
+    static func isRestorableLocation(_ url: URL?) -> Bool {
+        guard let path = url?.path else { return true }
+        return path != "/login" && !path.hasPrefix("/login/")
+    }
+
     func encoded() -> Data? {
         let envelope: [String: Any] = [
             "marker": Self.formatMarker,

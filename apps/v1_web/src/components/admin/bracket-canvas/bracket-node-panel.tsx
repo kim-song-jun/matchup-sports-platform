@@ -303,6 +303,7 @@ export function BracketNodePanel({
           awayLabel={sideLabels.AWAY}
           isKnockout={isKnockout}
           submitLabel="점수 확정"
+          confirmBeforeSubmit
           pending={quickResult.isPending}
           errorMessage={quickError}
           onSubmit={(score) => {

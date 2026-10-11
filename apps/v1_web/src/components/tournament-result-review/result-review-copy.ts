@@ -27,6 +27,8 @@ export const KNOWN_ERROR_MESSAGES: Record<string, string> = {
   PARTICIPANT_INVALID: '선수 정보가 올바르지 않아요. 각 선수는 한 번씩만, 소속 진영에 맞게 입력해 주세요.',
   MVP_INVALID: 'MVP는 입력한 선수 중 한 명이어야 해요.',
   SCORER_REQUIRED: '득점자를 입력해야 확정할 수 있어요.',
+  // 서버 문구 5종(점수 합계·선수별 합계·진영·익명 표시·중복 id)이 모두 영문이라 매핑이 없으면 그대로 뜬다.
+  RESULT_GOAL_TIMELINE_INVALID: '득점 기록이 점수·선수 기록과 맞지 않아요. 팀별 득점 수와 득점자를 다시 확인해 주세요.',
   COMMAND_IDEMPOTENCY_KEY_MISMATCH: '요청을 다시 시도하지 못했어요. 화면을 새로고침한 뒤 다시 시도해 주세요.',
   IDEMPOTENCY_PAYLOAD_CONFLICT: '요청 내용이 바뀌어 다시 시도하지 못했어요. 화면을 새로고침해 주세요.',
   // 승부차기 가드 3종. 서버 문구는 바이트 동일 제약이 있어 서버에서 못 바꾸는데

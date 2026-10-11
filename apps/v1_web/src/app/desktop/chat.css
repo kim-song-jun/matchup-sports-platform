@@ -239,7 +239,7 @@
   .tm-chat-room-head-chip {
     flex: none;
     font-weight: 700;
-    color: var(--blue600);
+    color: var(--blue700);
     background: var(--blue50);
     border-radius: var(--radius-chip);
     padding: 0 var(--spacing-2);

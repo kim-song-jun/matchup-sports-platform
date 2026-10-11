@@ -86,7 +86,9 @@ export function RevisionTimeline({ revisions }: { revisions: readonly GameResult
             <p className="tm-text-caption" style={{ color: 'var(--text-caption)', marginTop: 8 }}>
               {revision.createdByActorType === 'SYSTEM'
                 ? `자동 처리(${revision.createdBySystemActor ?? '시스템'})`
-                : '담당자 처리'}
+                : revision.createdByName
+                  ? `${revision.createdByName} 처리`
+                  : '담당자 처리'}
               {' · '}리비전 #{revision.revision}
             </p>
           </li>

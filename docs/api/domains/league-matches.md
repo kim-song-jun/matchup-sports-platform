@@ -32,6 +32,18 @@ Production rollout requires the additive migration and API/web deployment before
 changing a league setting. A database-only change ahead of the serving API cannot
 enforce publication. Production promotion from dev to main is performed by the user.
 
+## Manual completion (리그 종료)
+
+`POST /api/v1/admin/league-matches/:leagueId/complete` (optional `reason`, max 200) closes an
+`active` league whose remaining fixtures are all settled — the same rule as the automatic
+transition (`shouldCompleteLeague`: at least one non-cancelled, non-voided fixture and every one of
+them has an official result). Automatic completion only runs on result confirmation and fixture
+cancellation, so a league reopened with `revert-completion` without any fixture change used to stay
+`active` (MD-QA #93). Fixtures still waiting for a result return `409 LEAGUE_FIXTURES_PENDING`; a
+draft or on-hold league returns `409 LEAGUE_NOT_ACTIVE`; an already completed league returns
+`alreadyProcessed: true`. Records `league_match.complete` in the admin audit and returns
+`{ leagueId, state: "completed", alreadyProcessed }`.
+
 ## Hold and resume (보류)
 
 A regular league is put on hold instead of being cancelled (2026-10-07).
@@ -52,6 +64,9 @@ restores visibility. Both actions record `league_match.hold` / `league_match.res
 in the admin audit and return `{ leagueId, state, isPublic, alreadyProcessed }`.
 A concurrent status or visibility change returns `409 LEAGUE_STATE_CHANGED`;
 hold compares both values so a newly private league is never restored as public.
+When resume restores `active` and every non-cancelled, non-voided fixture already has an
+official result, the league is completed in the same transaction (status-change reason
+`hold_released`) and the response returns `state: "completed"` (MD-QA #93).
 While on hold, fixture generation and regeneration return `409 LEAGUE_ON_HOLD`
 without creating or cancelling fixtures. Both actions recheck the status after
 locking the parent league row, including a hold committed during plan calculation.

@@ -13,6 +13,7 @@ import {
   useV1AddLeagueTeam,
   useV1AdminLeagueMatch,
   useV1RevertLeagueCompletion,
+  useV1CompleteLeague,
   useV1AdminLeagueTeams,
   useV1CreateManualLeagueFixture,
   useV1AdminTeam,
@@ -114,6 +115,8 @@ export default function LeagueMatchFixturesClient({
   const { data: series, isPending, isError, error, refetch } = useV1AdminLeagueMatch(leagueId);
   const revertCompletion = useV1RevertLeagueCompletion(leagueId);
   const [revertModalOpen, setRevertModalOpen] = useState(false);
+  const completeLeague = useV1CompleteLeague(leagueId);
+  const [completeModalOpen, setCompleteModalOpen] = useState(false);
   const generateFixtures = useV1GenerateLeagueFixtures(leagueId);
   const updateFixture = useV1UpdateLeagueFixture(leagueId);
   const cancelFixture = useV1CancelLeagueFixture(leagueId);
@@ -622,6 +625,29 @@ export default function LeagueMatchFixturesClient({
     );
   };
 
+  // 자동 종료는 결과 확정·대진 취소 때만 판정된다 — '진행 중으로 되돌리기' 뒤 대진을 바꾸지 않으면
+  // 남은 경기가 없어도 진행 중으로 남는다(MD-QA #93). 서버 판정(`shouldCompleteLeague`)과 같은 조건일
+  // 때만 버튼을 낸다: 취소·무효를 뺀 대진이 하나 이상이고 전부 공식 결과다.
+  const liveFixtures = series.fixtures.filter(
+    (fixture) => fixture.status !== 'cancelled' && fixture.resultStage !== 'voided',
+  );
+  const canCompleteLeague =
+    series.state === 'active' &&
+    liveFixtures.length > 0 &&
+    liveFixtures.every((fixture) => fixture.resultStage === 'official');
+  const onConfirmComplete = (reason: string) => {
+    completeLeague.mutate(
+      { reason: reason.trim() ? reason.trim() : undefined },
+      {
+        onSuccess: (result) => {
+          setCompleteModalOpen(false);
+          showToast(result.alreadyProcessed ? '이미 종료된 리그예요.' : '리그를 종료했어요.', 'success');
+        },
+        onError: (error) => showToast(extractErrorMessage(error, '리그를 종료하지 못했어요.'), 'error'),
+      },
+    );
+  };
+
   // R12: 취소는 되돌릴 수 없는 조작이라 GateConfirmModal로 사유를 받은 뒤에만 실행한다.
   const onConfirmCancel = (reason: string) => {
     if (!cancelTarget) return;
@@ -722,6 +748,16 @@ export default function LeagueMatchFixturesClient({
                 className="inline-flex min-h-[44px] items-center rounded-xl border border-[var(--border-strong)] px-4 text-sm font-semibold text-[var(--text-strong)] disabled:opacity-50"
               >
                 진행 중으로 되돌리기
+              </button>
+            )}
+            {canCompleteLeague && (
+              <button
+                type="button"
+                onClick={() => setCompleteModalOpen(true)}
+                disabled={completeLeague.isPending}
+                className="inline-flex min-h-[var(--size-touch-min)] items-center rounded-xl border border-[var(--border-strong)] px-4 text-[length:var(--font-size-label)] font-semibold text-[var(--text-strong)] disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+              >
+                리그 종료하기
               </button>
             )}
           </div>
@@ -1436,6 +1472,18 @@ export default function LeagueMatchFixturesClient({
         tone="amber"
         onConfirm={onConfirmRevert}
         onClose={() => setRevertModalOpen(false)}
+      />
+
+      <GateConfirmModal
+        open={completeModalOpen}
+        pending={completeLeague.isPending}
+        title="리그를 종료할까요?"
+        description="남은 경기가 모두 확정되거나 취소됐어요. 종료하면 지금 순위표가 최종 순위가 되고, 필요하면 다시 진행 중으로 되돌릴 수 있어요."
+        // 헤더 트리거("리그 종료하기")와 접근 이름이 겹치지 않게 짧게 쓴다(되돌리기 모달과 같은 관례).
+        confirmLabel="종료"
+        tone="blue"
+        onConfirm={onConfirmComplete}
+        onClose={() => setCompleteModalOpen(false)}
       />
 
       {/* 그룹 B 감사 결함 3: 참가팀 제외 확인 — 이전에는 칩의 X 버튼이 확인 없이 곧바로

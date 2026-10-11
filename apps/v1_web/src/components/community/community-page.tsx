@@ -209,18 +209,31 @@ export function ChatRoomPageView({ model, listModel, roomId }: { model: ChatRoom
         <AppBackLink className="tm-desktop-back" fallbackHref="/chat">
           <ChevronLeftIcon size={22} strokeWidth={2.2} />
         </AppBackLink>
-        {model.title ? (
-          <h1 className="tm-text-heading" style={{ margin: 0 }}>{model.title}</h1>
-        ) : model.status === 'loading' ? (
-          <div className="tm-skeleton" aria-hidden="true" style={{ width: 160, height: 24, borderRadius: 'var(--radius-chip)' }} />
-        ) : (
-          <h1 className="tm-text-heading" style={{ margin: 0 }}>채팅방</h1>
-        )}
+        <div className="tm-chat-room-head-title">
+          {model.title ? (
+            <h2 className="tm-text-heading">{model.title}</h2>
+          ) : model.status === 'loading' ? (
+            <div className="tm-skeleton" aria-hidden="true" style={{ width: 160, height: 24, borderRadius: 'var(--radius-chip)' }} />
+          ) : (
+            <h2 className="tm-text-heading">채팅방</h2>
+          )}
+          {model.context.title ? (
+            <div className="tm-chat-room-head-sub">
+              <span className="tm-chat-room-head-chip">{model.context.typeLabel}</span>
+              {model.context.linkLabel ? (
+                <Link className="tm-chat-room-head-link" href={model.context.href}>
+                  {model.context.linkLabel}
+                  <ChevronRightIcon size={14} strokeWidth={2.2} />
+                </Link>
+              ) : null}
+            </div>
+          ) : null}
+        </div>
         {roomMenuButton ? <div className="ml-auto">{roomMenuButton}</div> : null}
       </div>
       <div className="tm-chat-room">
         {model.teamContact || model.context.title ? (
-        <div className="tm-chat-context">
+        <div className={`tm-chat-context${model.teamContact ? '' : ' tm-hide-desktop'}`}>
           {model.teamContact ? (
             <TeamContactStatusCard contact={model.teamContact} />
           ) : model.context.title ? (

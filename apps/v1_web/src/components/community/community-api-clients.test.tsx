@@ -268,7 +268,7 @@ describe('ChatRoomPageClient', () => {
     const { container } = renderWithClient(<ChatRoomPageClient roomId="room-403" />);
 
     expect(container.querySelector('.tm-chat-room-desktop-head .tm-skeleton')).toBeNull();
-    expect(container.querySelector('.tm-chat-room-desktop-head h1')?.textContent).toBe('채팅방');
+    expect(container.querySelector('.tm-chat-room-desktop-head h2')?.textContent).toBe('채팅방');
   });
 
   it('서버 오류(5xx)는 여전히 다시 불러오기를 준다', () => {
@@ -347,6 +347,85 @@ describe('ChatRoomPageClient', () => {
 
     expect(screen.queryByRole('dialog', { name: '채팅방 메뉴' })).toBeNull();
     expect(screen.getByRole('dialog', { name: '채팅 차단 관리' })).toBeInTheDocument();
+  });
+
+  describe('데스크톱 방 헤더에 방 정보를 흡수한다 (D4=B)', () => {
+    function mockRoom(overrides: Record<string, unknown>) {
+      hooks.chatRoom.mockReturnValue({
+        data: {
+          roomId: 'room-h',
+          status: 'active',
+          composer: { canSend: true, blockedReason: null },
+          me: { participantId: 'participant-me', status: 'active', pinned: false, mutedUntil: null, lastReadMessageId: null },
+          participants: [],
+          ...overrides,
+        },
+        isPending: false,
+        isError: false,
+        refetch: vi.fn(),
+      });
+      hooks.chatMessages.mockReturnValue({ data: { items: [], pageInfo: { nextCursor: null } }, isPending: false, isError: false, refetch: vi.fn() });
+    }
+
+    it('경기 방 헤더는 방 이름(h2)·종류 칩·상세 링크를 한 곳에 보여 주고, 별도 연결 카드는 데스크톱에서 숨긴다', () => {
+      mockRoom({
+        roomType: 'match',
+        title: '주말 풋살',
+        linkedTarget: { type: 'match', id: 'm-1', title: '주말 풋살', route: '/matches/m-1' },
+      });
+
+      const { container } = renderWithClient(<ChatRoomPageClient roomId="room-h" />);
+      const head = container.querySelector('.tm-chat-room-desktop-head') as HTMLElement;
+
+      expect(within(head).getByRole('heading', { level: 2, name: '주말 풋살' })).toBeInTheDocument();
+      expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
+      expect(within(head).getByText('개인매치')).toBeInTheDocument();
+      expect(within(head).getByRole('link', { name: '매치 상세 보기' })).toHaveAttribute('href', '/matches/m-1?from=%2Fchat%2Froom-1');
+      expect(container.querySelector('.tm-chat-context')?.className).toContain('tm-hide-desktop');
+    });
+
+    it('팀 방 헤더는 "팀" 칩과 팀 상세 링크를 보여 주고, 일정 줄은 만들지 않는다', () => {
+      mockRoom({
+        roomType: 'team',
+        title: '우리 팀',
+        linkedTarget: { type: 'team', id: 't-1', title: '우리 팀', route: '/teams/t-1' },
+      });
+
+      const { container } = renderWithClient(<ChatRoomPageClient roomId="room-h" />);
+      const head = container.querySelector('.tm-chat-room-desktop-head') as HTMLElement;
+
+      expect(within(head).getByText('팀')).toBeInTheDocument();
+      expect(within(head).getByRole('link', { name: '팀 상세 보기' })).toHaveAttribute('href', '/teams/t-1?from=%2Fchat%2Froom-1');
+    });
+
+    it('팀 컨택 방은 상태 카드를 그대로 두고 헤더엔 종류 칩만 둔다(링크 없음)', () => {
+      mockRoom({
+        roomType: 'team_contact',
+        title: '컨택',
+        linkedTarget: { type: 'team_contact', id: 'c-1', title: '컨택', route: null },
+      });
+
+      const { container } = renderWithClient(<ChatRoomPageClient roomId="room-h" />);
+      const head = container.querySelector('.tm-chat-room-desktop-head') as HTMLElement;
+
+      expect(within(head).getByText('팀컨택')).toBeInTheDocument();
+      expect(within(head).queryByRole('link', { name: /상세 보기/ })).toBeNull();
+    });
+
+    it('보내기가 막힌 읽기 전용 방도 헤더 정보와 안내 문구를 함께 보여 준다', () => {
+      mockRoom({
+        roomType: 'match',
+        title: '취소된 매치',
+        linkedTarget: { type: 'match', id: 'm-2', title: '취소된 매치', route: '/matches/m-2' },
+        composer: { canSend: false, blockedReason: 'MATCH_CANCELLED' },
+      });
+
+      const { container } = renderWithClient(<ChatRoomPageClient roomId="room-h" />);
+      const head = container.querySelector('.tm-chat-room-desktop-head') as HTMLElement;
+
+      expect(within(head).getByRole('link', { name: '매치 상세 보기' })).toBeInTheDocument();
+      expect(screen.getAllByText('취소된 매치라 대화를 보낼 수 없어요').length).toBeGreaterThan(0);
+    });
   });
 
   it('shows one timestamp at the bottom of each same-sender, same-minute run', () => {

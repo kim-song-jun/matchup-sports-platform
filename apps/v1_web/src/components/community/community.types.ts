@@ -83,7 +83,8 @@ export type ChatRoomViewModel = {
   onMessageSafety?: (message: { id: string; label: string }) => void;
   onManageBlocked?: () => void;
   title: string;
-  context: { title: string; sub: string; href: string };
+  /** typeLabel·linkLabel 은 데스크톱 방 헤더(종류 칩 + 상세 링크)용, sub 는 모바일 연결 카드용이다. linkLabel 이 null 이면 링크가 없다. */
+  context: { title: string; sub: string; href: string; typeLabel: string; linkLabel: string | null };
   /** 팀컨택 방이면 상단 컨텍스트 카드 대신 상태 카드를 그린다. */
   teamContact?: V1ChatRoomTeamContact | null;
   /** 값이 있으면 입력창을 잠그고 이 문구를 placeholder 로 보여준다(수락 전·종료된 컨택). */

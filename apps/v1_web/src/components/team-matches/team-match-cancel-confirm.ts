@@ -12,3 +12,12 @@ export const TEAM_MATCH_CANCEL_CONFIRM = {
   // 기본값 '취소'는 확정 버튼("팀매치 취소")과 헷갈린다.
   cancelLabel: '닫기',
 } as const satisfies ConfirmOptions;
+
+/** 신청한 팀이 승인 전에 신청을 거둘 때의 확인창. */
+export const TEAM_MATCH_WITHDRAW_CONFIRM = {
+  title: '신청을 취소할까요?',
+  message: '호스트 팀에 취소 알림이 가요. 다시 신청할 수 있어요.',
+  confirmLabel: '신청 취소',
+  cancelLabel: '아니요',
+  tone: 'danger',
+} as const satisfies ConfirmOptions;

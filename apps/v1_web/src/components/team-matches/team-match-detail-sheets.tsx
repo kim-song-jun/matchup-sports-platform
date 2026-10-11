@@ -6,6 +6,7 @@ import { useId, useState } from 'react';
 import { Check, ChevronDown, ChevronRight, Lock } from 'lucide-react';
 import { BottomSheet } from '@/components/v1-ui/bottom-sheet';
 import { TeamAvatar } from '@/components/v1-ui/team-avatar';
+import { formatAmountNumber } from '@/lib/date-utils';
 import { extractErrorMessage } from '@/lib/error-message';
 import { josa } from '@/lib/korean';
 import { overlayLinkClick } from '@/lib/overlay-history';
@@ -101,12 +102,14 @@ function MenuText({ label, description, muted, danger }: { label: string; descri
 const APPLY_MESSAGE_MAX = 100;
 
 /**
- * 신청 가능한 팀이 2개 이상인 팀장의 신청 시트(N-1). 한 사람이 한 팀매치에 두 팀으로 동시에
+ * 신청 가능한 팀이 있는 팀장의 신청 시트(N-1). 한 사람이 한 팀매치에 두 팀으로 동시에
  * 신청할 수는 없어서(ALREADY_REQUESTED_WITH_ANOTHER_TEAM) 신청 전에 팀을 고르는 순간을 만든다.
- * 신청할 수 없는 팀은 이유와 함께 잠가 보여 준다.
+ * 신청할 수 없는 팀은 이유와 함께 잠가 보여 준다. 팀이 하나뿐이어도 부담금을 확인하는 단계로 쓴다.
  */
-export function TeamMatchApplyTeamSheet({ picker, onClose, onApplied }: {
+export function TeamMatchApplyTeamSheet({ picker, opponentCost, onClose, onApplied }: {
   picker: NonNullable<TeamMatchDetailViewModel['applyTeamPicker']>;
+  /** 상대팀 부담금 — 모르면 null 이라 금액 줄을 그리지 않는다. */
+  opponentCost: number | null;
   onClose: () => void;
   onApplied: (result: unknown) => void;
 }) {
@@ -117,6 +120,7 @@ export function TeamMatchApplyTeamSheet({ picker, onClose, onApplied }: {
   const groupName = useId();
   const messageId = useId();
   const selected = picker.teams.find((team) => team.teamId === teamId && team.eligible) ?? null;
+  const pickable = picker.teams.filter((team) => team.eligible).length > 1;
 
   const submit = async () => {
     if (!selected || pending) return;
@@ -133,7 +137,7 @@ export function TeamMatchApplyTeamSheet({ picker, onClose, onApplied }: {
   };
 
   return (
-    <BottomSheet open onClose={onClose} title="어느 팀으로 신청할까요?">
+    <BottomSheet open onClose={onClose} title={pickable ? '어느 팀으로 신청할까요?' : '이 팀으로 신청할까요?'}>
       <fieldset style={{ border: 0, padding: 0, margin: '16px 0 0', minWidth: 0 }}>
         <legend className="sr-only">신청할 팀</legend>
         <div style={{ display: 'grid', gap: 8 }}>
@@ -180,6 +184,14 @@ export function TeamMatchApplyTeamSheet({ picker, onClose, onApplied }: {
           })}
         </div>
       </fieldset>
+      {opponentCost !== null ? (
+        <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 12, marginTop: 16, paddingTop: 12, borderTop: '1px solid var(--border)' }}>
+          <span className="tm-text-label" style={{ color: 'var(--text-strong)' }}>상대팀 부담금</span>
+          <span className="tm-text-label tab-num" style={{ color: 'var(--text-strong)', fontVariantNumeric: 'tabular-nums' }}>
+            {opponentCost === 0 ? '무료' : `${formatAmountNumber(opponentCost)}원`}
+          </span>
+        </div>
+      ) : null}
       <label htmlFor={messageId} className="tm-text-label" style={{ display: 'block', marginTop: 16, color: 'var(--text-strong)' }}>
         홈팀에 한마디 <span style={{ fontWeight: 400, color: 'var(--text-muted)' }}>(선택)</span>
       </label>

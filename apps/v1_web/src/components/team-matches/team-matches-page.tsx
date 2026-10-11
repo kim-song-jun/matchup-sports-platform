@@ -385,6 +385,12 @@ export function TeamMatchDetailPageView({ model, recordEntry, lifecyclePanel }: 
       });
   };
 
+  // 신청 철회처럼 확인이 붙은 CTA 는 확정했을 때만 실행한다.
+  const runApplyCta = async () => {
+    if (model.applyConfirm && !(await confirm(model.applyConfirm))) return;
+    runHeroAction(model.onApply, applyResultMessage);
+  };
+
   // ⋯ 메뉴 항목 — 확인 창은 시트 위에 겹쳐 뜨고, 확정했을 때만 시트를 닫고 실행한다.
   const runHostAction = async (action: NonNullable<TeamMatchDetailViewModel['hostActions']>[number]) => {
     if (action.confirm) {
@@ -589,7 +595,7 @@ export function TeamMatchDetailPageView({ model, recordEntry, lifecyclePanel }: 
       ) : mode === 'mine' ? (
         <button className="tm-btn tm-btn-lg tm-btn-neutral tm-btn-disabled" type="button" disabled>{cta}</button>
       ) : model.applyTeamPicker ? (
-        // 신청할 수 있는 팀이 2개 이상이면 곧바로 신청하지 않고 팀을 고르게 한다(N-1).
+        // 신청할 수 있는 팀이 있으면 곧바로 신청하지 않고 시트에서 팀·부담금을 확인하게 한다(N-1).
         <button className="tm-btn tm-btn-lg tm-btn-primary" type="button" disabled={model.applyPending} onClick={() => setApplyTeamOpen(true)}>
           {model.applyPending ? '처리 중' : cta}
         </button>
@@ -599,7 +605,7 @@ export function TeamMatchDetailPageView({ model, recordEntry, lifecyclePanel }: 
          * 안내 문구와 실제 동작은 **같은 근거**에서 나와야 한다 — 둘이 갈리면 화면이 거짓말을
          * 한다(C2 실사고: 라벨은 '신청 취소'인데 액션은 다른 팀 신규 신청이었다). 그래서 문구는
          * mode가 아니라 액션이 돌려준 결과 status에서 뽑는다(applyResultMessage 주석 참고). */
-        <button className={`tm-btn tm-btn-lg ${ctaTone}`} disabled={!canRunAction || model.applyPending} type="button" onClick={() => runHeroAction(model.onApply, applyResultMessage)}>
+        <button className={`tm-btn tm-btn-lg ${ctaTone}`} disabled={!canRunAction || model.applyPending} type="button" onClick={() => { void runApplyCta(); }}>
           {model.applyPending ? '처리 중' : cta}
         </button>
       )}
@@ -836,6 +842,7 @@ export function TeamMatchDetailPageView({ model, recordEntry, lifecyclePanel }: 
       {applyTeamOpen && model.applyTeamPicker ? (
         <TeamMatchApplyTeamSheet
           picker={model.applyTeamPicker}
+          opponentCost={match.opponentCost}
           onClose={() => setApplyTeamOpen(false)}
           onApplied={(result) => {
             if (!heroMountedRef.current) return;

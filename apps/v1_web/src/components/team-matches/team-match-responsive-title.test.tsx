@@ -110,7 +110,7 @@ describe('QA #46 실제 모델 → 상세 화면 responsive 제목', () => {
     renderAtWidth(model, 502);
 
     fireEvent.click(screen.getByRole('button', { name: '신청하기' }));
-    const sheet = await screen.findByRole('dialog', { name: '어느 팀으로 신청할까요?' });
+    const sheet = await screen.findByRole('dialog', { name: '이 팀으로 신청할까요?' });
     expect(within(sheet).getByRole('radio', { name: /합성 신청팀/ })).toBeChecked();
     fireEvent.click(within(sheet).getByRole('button', { name: '닫기' }));
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());

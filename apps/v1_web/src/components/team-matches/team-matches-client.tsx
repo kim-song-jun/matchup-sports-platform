@@ -32,7 +32,6 @@ import { V1_LEVELS, levelRangeMatches, toLevelCodes, toggleLevelCode } from '@/l
 import type { V1TeamMatch, V1TeamMatchApiStatus, V1TeamMatchViewerState } from '@/types/api';
 import type { CursorListSeed } from '@/lib/public-list-seed';
 import { extractErrorMessage } from '@/lib/error-message';
-import { josa } from '@/lib/korean';
 import { TEAM_MATCH_CANCELLED_LABEL, teamMatchApplicationStatusLabel } from '@/lib/v1-status-labels';
 import { gameRosterScreenPath } from '@/lib/game-roster-routes';
 import { getCurrentRedirectPath, getLoginPathForRedirect, sanitizeRedirectPath, withFromPath } from '@/lib/session-storage';
@@ -40,7 +39,7 @@ import { getCurrentRedirectPath, getLoginPathForRedirect, sanitizeRedirectPath, 
 // team-match-lineup.service.ts의 loadContext()와 완전히 동일한 규칙이라 그 규칙을 그대로
 // 재현해둔 순수 함수를 라인업 모듈에서 재사용한다(새로 만들지 않음).
 import { resolveOwnTeamId } from '@/app/team-matches/[id]/lineup/lineup.view-model';
-import { TEAM_MATCH_CANCEL_CONFIRM } from './team-match-cancel-confirm';
+import { TEAM_MATCH_CANCEL_CONFIRM, TEAM_MATCH_WITHDRAW_CONFIRM } from './team-match-cancel-confirm';
 import { MatchLifecyclePanel } from '../matches/match-lifecycle-panel';
 import { buildAttendanceSummary } from './team-match-attendance-summary';
 import {
@@ -407,13 +406,13 @@ export function TeamMatchDetailPageClient({ teamMatchId, seed }: { teamMatchId: 
       rememberApplyTeamId(teamId);
       return result;
     });
-  // N-1: 신청 가능한 팀이 2개 이상일 때만 팀을 고른다. 살아 있는 신청이 있으면 CTA 는 철회라 시트가 없다.
+  // N-1: 신청 가능한 팀이 있으면 신청 시트를 연다(팀이 하나여도 부담금을 다시 보여 준다). 살아 있는 신청이 있으면 CTA 는 철회라 시트가 없다.
   const eligibleTeamCount = eligibility.data?.teams.filter((team) => team.eligible).length ?? 0;
   const defaultApplyTeamId = eligibility.data ? pickDefaultApplyTeamId(eligibility.data.teams, readLastApplyTeamId()) : null;
   const applyTeamPicker: TeamMatchDetailViewModel['applyTeamPicker'] = !seeding
     && eligibility.data
     && defaultApplyTeamId
-    && eligibleTeamCount >= 2
+    && eligibleTeamCount >= 1
     && displayStatus === 'recruiting'
     && viewerState !== 'requested'
     && selectedEligibility?.reasonCode !== 'ALREADY_REQUESTED'
@@ -432,6 +431,19 @@ export function TeamMatchDetailPageClient({ teamMatchId, seed }: { teamMatchId: 
       }
     : undefined;
   const editLockReason = teamMatchEditLockReason(apiStatus);
+  const withdrawApplication = () => withdrawTeamMatch.mutateAsync({ reason: 'applicant_team_withdrawn_from_v1_web' });
+  const applyAction = seeding ? undefined : getApplyAction({
+    viewerState,
+    status: displayStatus,
+    applicationId: selectedEligibility?.applicationId,
+    isGuest,
+    hasNoTeam,
+    isParticipantMember,
+    withdraw: withdrawApplication,
+    reasonCode: selectedEligibility?.reasonCode,
+    sportId: query.data.sport?.sportId,
+    redirectTo: (href) => router.push(href),
+  });
 
   const model: TeamMatchDetailViewModel = {
     ...fallback,
@@ -566,21 +578,8 @@ export function TeamMatchDetailPageClient({ teamMatchId, seed }: { teamMatchId: 
       : undefined,
     onShare: () => shareTeamMatch(query.data),
     lineupAction,
-    onApply: seeding ? undefined : getApplyAction({
-      viewerState,
-      status: displayStatus,
-      selectedTeamId: selectedEligibility?.teamId,
-      applicationId: selectedEligibility?.applicationId,
-      eligible: selectedEligibility?.eligible,
-      isGuest,
-      hasNoTeam,
-      isParticipantMember,
-      apply: (teamId) => submitApplication(teamId, null),
-      withdraw: () => withdrawTeamMatch.mutateAsync({ reason: 'applicant_team_withdrawn_from_v1_web' }),
-      reasonCode: selectedEligibility?.reasonCode,
-      sportId: query.data.sport?.sportId,
-      redirectTo: (href) => router.push(href),
-    }),
+    onApply: applyAction,
+    applyConfirm: applyAction && applyAction === withdrawApplication ? TEAM_MATCH_WITHDRAW_CONFIRM : undefined,
   };
 
   return <TeamMatchDetailPageView model={model} lifecyclePanel={!seeding && query.data.lifecycle && !query.data.league && apiStatus === 'on_hold' ? <MatchLifecyclePanel id={teamMatchId} domain="team-matches" status={getStatus(query.data)} lifecycle={query.data.lifecycle} canManage={Boolean(query.data.viewer?.manageableHostTeam && query.data.viewer?.manageRoute)} /> : undefined} recordEntry={query.data.gameId ? <TeamMatchRecordEntry teamMatchId={teamMatchId} detailOnly={recordParams.get('view') === 'detail'} fromHref={fromPath} /> : undefined} />;
@@ -771,7 +770,6 @@ function applyLabel(
   if (isGuest) return '로그인하고 신청하기';
   // 팀 없음: 팀 만들기 유도 (#13)
   if (hasNoTeam) return '팀 만들고 신청하기';
-  if (team?.eligible) return `${josa(team.name, ['으로', '로'])} 신청`;
   return reasonLabel(team?.reasonCode);
 }
 
@@ -1046,13 +1044,10 @@ async function shareTeamMatch(match: V1TeamMatch) {
 function getApplyAction({
   viewerState,
   status,
-  selectedTeamId,
   applicationId,
-  eligible,
   isGuest,
   hasNoTeam,
   isParticipantMember,
-  apply,
   withdraw,
   reasonCode,
   sportId,
@@ -1060,13 +1055,10 @@ function getApplyAction({
 }: {
   viewerState: V1TeamMatchViewerState;
   status: V1TeamMatchApiStatus;
-  selectedTeamId?: string;
   applicationId?: string | null;
-  eligible?: boolean;
   isGuest?: boolean;
   hasNoTeam?: boolean;
   isParticipantMember?: boolean;
-  apply: (teamId: string) => Promise<unknown>;
   withdraw: () => Promise<unknown>;
   reasonCode?: string;
   sportId?: string;
@@ -1088,7 +1080,6 @@ function getApplyAction({
   // 파란 primary 버튼이 "신청 불가"라고 적힌 채 클릭되면 로그인 페이지로 튀는 상태였다
   // (alpha 실측 C-1: 완료된 리그 경기를 guest로 열면 그런 버튼이 보였다).
   if (status !== 'recruiting') return undefined;
-  if (eligible && selectedTeamId) return () => apply(selectedTeamId);
   // 비인증: 로그인 페이지로 이동하되, 보던 팀매치 상세로 복귀하도록 redirect 전파 (Copilot)
   if (isGuest) return async () => { redirectTo(getLoginPathForRedirect(getCurrentRedirectPath())); };
   // 팀 없음: 팀 만들기로 보내되 이 팀매치 주소를 넘긴다(#13) — 만든 뒤 돌아와 새 팀으로 바로 신청한다.

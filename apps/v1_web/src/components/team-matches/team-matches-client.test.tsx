@@ -93,6 +93,7 @@ vi.mock('./team-matches-page', () => ({
       <span data-testid="team-match-detail-back-href">{model.detailBackHref}</span>
       <span data-testid="team-match-status-label">{model.statusLabel}</span>
       <span data-testid="team-match-apply-label">{model.applyLabel}</span>
+      <span data-testid="team-match-apply-confirm">{model.applyConfirm?.title ?? ''}</span>
       <span data-testid="team-match-description">{model.match.description}</span>
       <span data-testid="team-match-address">{model.match.place?.address ?? ''}</span>
       <span data-testid="team-match-cost">{model.match.cost}</span>
@@ -183,10 +184,10 @@ describe('TeamMatchDetailPageClient — GA events', () => {
   it('fires team_match_apply_complete after a successful opponent-team application', async () => {
     render(<TeamMatchDetailPageClient teamMatchId="team-match-1" />);
 
-    fireEvent.click(screen.getByRole('button', { name: '상대팀 신청' }));
+    fireEvent.click(screen.getByRole('button', { name: '시트로 신청' }));
 
     await waitFor(() => {
-      expect(applyTeamMatchMutateAsync).toHaveBeenCalledWith({ applicantTeamId: 'team-mine', message: null });
+      expect(applyTeamMatchMutateAsync).toHaveBeenCalledWith({ applicantTeamId: 'team-b', message: '한마디' });
     });
     expect(trackEvent).toHaveBeenCalledWith('team_match_apply_complete', { teamMatchId: 'team-match-1' });
   });
@@ -320,29 +321,6 @@ describe('TeamMatchDetailPageClient — GA events', () => {
     expect(screen.queryByText('내가 만든 팀매치')).not.toBeInTheDocument();
   });
 
-  // L1 — "합정 유나이티드으로 신청": 받침 없는 이름에도 '으로' 가 붙었다.
-  it.each([
-    ['합정 유나이티드', '합정 유나이티드로 신청'],
-    ['마포 FC', '마포 FC로 신청'],
-    ['한강 러너스', '한강 러너스로 신청'],
-    ['서울 팀', '서울 팀으로 신청'],
-    ['라이벌', '라이벌로 신청'],
-  ])('신청 버튼의 조사는 팀 이름 받침을 따른다: %s', (name, expected) => {
-    useV1TeamMatchEligibilityMock.mockReturnValue({
-      data: {
-        teamMatchId: 'team-match-1',
-        requiresApproval: true,
-        requiresPayment: false,
-        teams: [{ teamId: 'team-mine', name, role: 'owner', eligible: true, reasonCode: '', applicationId: null }],
-      },
-      isSuccess: true,
-    });
-
-    render(<TeamMatchDetailPageClient teamMatchId="team-match-1" />);
-
-    expect(screen.getByTestId('team-match-apply-label')).toHaveTextContent(expected);
-  });
-
   it('종목이 다른 팀만 있으면 "팀 만들기" 유도 대신 종목이 다르다는 사유를 보여준다', () => {
     // status는 beforeEach 기준 'recruiting'이라 신청 마감 분기(status !== 'recruiting')를
     // 타지 않고 reasonLabel(reasonCode)까지 도달한다. eligible:false + SPORT_MISMATCH인
@@ -426,8 +404,8 @@ describe('TeamMatchDetailPageClient — 참가팀 멤버가 자기 팀 경기를
 
     mockMatch('recruiting', false);
     render(<TeamMatchDetailPageClient teamMatchId="team-match-1" />);
-    expect(screen.getByTestId('team-match-apply-label')).toHaveTextContent('내 팀으로 신청');
-    expect(screen.getByRole('button', { name: '상대팀 신청' })).toBeInTheDocument();
+    expect(screen.getByTestId('team-match-apply-label')).toHaveTextContent('신청하기');
+    expect(screen.getByTestId('team-match-apply-picker')).toBeInTheDocument();
   });
 });
 
@@ -1414,6 +1392,8 @@ describe('TeamMatchDetailPageClient — 신청 중인 뷰어의 히어로 CTA는
     expect(useV1WithdrawTeamMatchApplicationMock).toHaveBeenCalledWith('team-match-1', 'app-alpha');
     // 라벨과 액션이 같은 팀을 가리켜야 한다 — 취소 CTA는 철회할 팀(알파FC)을 이름으로 밝힌다.
     expect(screen.getByTestId('team-match-apply-label')).toHaveTextContent('알파FC');
+    // 철회는 확인을 거친다 — 신청 CTA 는 확인이 붙지 않는다.
+    expect(screen.getByTestId('team-match-apply-confirm')).toHaveTextContent('신청을 취소할까요?');
   });
 
   it('철회할 신청서를 찾을 수 없으면 CTA를 비활성화하고, 다른 팀으로 신청하지 않는다', () => {
@@ -1797,15 +1777,27 @@ describe('TeamMatchDetailPageClient — 여러 팀 팀장의 신청 팀 선택 (
     expect(screen.getByTestId('team-match-apply-label')).toHaveTextContent('신청하기');
   });
 
-  it('경계 — 신청 가능한 팀이 1개면 시트 없이 지금처럼 그 팀으로 바로 신청한다', () => {
+  // MD-QA #112 — 팀이 하나뿐인 팀장도 부담금·한마디를 확인하는 시트를 거친다.
+  it('신청 가능한 팀이 1개여도 시트를 쓰고, 못 하는 팀은 이유와 함께 잠긴다', () => {
     mockViewer([
       { teamId: 'team-a', name: 'A팀', role: 'owner', eligible: true, reasonCode: 'OK' },
       { teamId: 'team-c', name: 'C팀', role: 'owner', eligible: false, reasonCode: 'SPORT_MISMATCH' },
     ]);
     render(<TeamMatchDetailPageClient teamMatchId="tm-n1" />);
 
+    const picker = screen.getByTestId('team-match-apply-picker');
+    expect(picker).toHaveAttribute('data-default-team', 'team-a');
+    expect(picker).toHaveTextContent('C팀:팀장:이 팀매치와 종목이 다른 팀이에요');
+    expect(screen.getByTestId('team-match-apply-label')).toHaveTextContent('신청하기');
+  });
+
+  it('경계 — 신청 가능한 팀이 하나도 없으면 시트를 열지 않는다', () => {
+    mockViewer([
+      { teamId: 'team-c', name: 'C팀', role: 'owner', eligible: false, reasonCode: 'SPORT_MISMATCH' },
+    ]);
+    render(<TeamMatchDetailPageClient teamMatchId="tm-n1" />);
+
     expect(screen.queryByTestId('team-match-apply-picker')).not.toBeInTheDocument();
-    expect(screen.getByTestId('team-match-apply-label')).toHaveTextContent('A팀으로 신청');
   });
 
   it('시트로 신청하면 고른 팀과 한마디를 보내고, 그 팀을 다음 기본값으로 기억한다', async () => {

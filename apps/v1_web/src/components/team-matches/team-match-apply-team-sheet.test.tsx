@@ -23,6 +23,7 @@ function renderSheet(teams: Picker['teams']) {
   render(
     <TeamMatchApplyTeamSheet
       picker={{ teams, defaultTeamId: teams[0].teamId, submit }}
+      opponentCost={null}
       onClose={vi.fn()}
       onApplied={vi.fn()}
     />,
@@ -63,6 +64,18 @@ describe('TeamMatchApplyTeamSheet 팀 선택', () => {
     expect((screen.getByRole('radio', { name: /가나다FC/ }) as HTMLInputElement).checked).toBe(false);
     fireEvent.click(screen.getByRole('button', { name: '라마바FC로 신청하기' }));
     expect(submit).toHaveBeenCalledWith('t2', null);
+  });
+
+  // L1 — "합정 유나이티드으로 신청": 받침 없는 이름에도 '으로' 가 붙었다.
+  it.each([
+    ['합정 유나이티드', '합정 유나이티드로 신청하기'],
+    ['마포 FC', '마포 FC로 신청하기'],
+    ['한강 러너스', '한강 러너스로 신청하기'],
+    ['서울 팀', '서울 팀으로 신청하기'],
+    ['라이벌', '라이벌로 신청하기'],
+  ])('신청 버튼의 조사는 팀 이름 받침을 따른다: %s', (name, expected) => {
+    renderSheet([makeTeam('t1', name)]);
+    expect(screen.getByRole('button', { name: expected })).toBeTruthy();
   });
 
   it('잠긴 팀은 선택되지 않는다', () => {

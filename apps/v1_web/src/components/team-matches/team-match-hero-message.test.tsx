@@ -85,7 +85,7 @@ async function submitFromActualPicker() {
   await act(async () => {
     fireEvent.click(screen.getAllByRole('button', { name: '신청하기' })[0]!);
   });
-  const sheet = screen.getByRole('dialog', { name: '어느 팀으로 신청할까요?' });
+  const sheet = screen.getByRole('dialog', { name: '이 팀으로 신청할까요?' });
   expect(within(sheet).getByRole('radio', { name: /합성 신청팀/ })).toBeChecked();
   await act(async () => {
     fireEvent.click(within(sheet).getByRole('button', { name: '합성 신청팀으로 신청하기' }));
@@ -212,7 +212,7 @@ describe('TeamMatchDetailPageView — hero 안내 TTL과 unmount', () => {
     const view = renderDetail(undefined, { applyLabel: '신청하기', applyTeamPicker: picker(submit) });
     await submitFromActualPicker();
     expect(submit).toHaveBeenCalledWith('timer-applicant', null);
-    expect(screen.queryByRole('dialog', { name: '어느 팀으로 신청할까요?' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('dialog', { name: '이 팀으로 신청할까요?' })).not.toBeInTheDocument();
     expect(screen.getByRole('status')).toHaveTextContent(APPLIED);
     expect(heroTimeoutIds.size).toBe(1);
     view.unmount();

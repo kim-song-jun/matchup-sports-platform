@@ -206,6 +206,27 @@ describe('NotificationsService', () => {
     expect(prisma.v1Notification.create).not.toHaveBeenCalled();
   });
 
+  it('match_no_show 알림은 매치 알림 설정을 따르고 매치 상세로 연결된다', async () => {
+    prisma.v1NotificationPreference.findUnique.mockResolvedValue({ matchEnabled: false });
+    await service.emitNotification('user-1', 'match_no_show', 'match-1');
+    await new Promise(setImmediate);
+    expect(prisma.v1Notification.create).not.toHaveBeenCalled();
+
+    prisma.v1NotificationPreference.findUnique.mockResolvedValue(null);
+    prisma.v1Notification.create.mockResolvedValue(makeNotification());
+    await service.emitNotification('user-1', 'match_no_show', 'match-1');
+    await new Promise(setImmediate);
+    expect(prisma.v1Notification.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          targetType: 'match',
+          title: '매치 불참으로 기록됐어요',
+          deepLink: '/matches/match-1',
+        }),
+      }),
+    );
+  });
+
   it('알림 DB 쓰기 실패가 호출자에게 에러를 전파하지 않는다 (fire-and-forget)', async () => {
     // Even when create throws, emitNotification itself must resolve cleanly
     prisma.v1NotificationPreference.findUnique.mockResolvedValue(null);

@@ -292,6 +292,44 @@ describe('MatchesService', () => {
     );
   });
 
+  it('complete: 불참으로 지정된 참가자에게만 match_no_show를, 참여한 참가자에게는 match_completed만 보낸다', async () => {
+    prisma.v1Match.findFirst.mockResolvedValue(matchRow({
+      startAt: PAST,
+      proceedConfirmedAt: new Date(),
+      participants: [
+        { id: 'host-participant', userId: host.id, role: 'host', status: 'active' },
+        { id: 'attended-participant', userId: otherUser.id, role: 'participant', status: 'active' },
+        { id: 'absent-participant', userId: 'absent-user', role: 'participant', status: 'active' },
+        { id: 'absent-participant-2', userId: 'absent-user-2', role: 'participant', status: 'active' },
+      ],
+    }));
+    prisma.v1Match.update.mockResolvedValue(matchRow({ status: 'completed', completedAt: new Date() }));
+    prisma.v1MatchParticipant.update.mockResolvedValue({});
+    prisma.v1MatchApplication.findMany.mockResolvedValue([]);
+    prisma.v1MatchApplication.updateMany.mockResolvedValue({ count: 0 });
+
+    await service.complete(host, 'match-1', {
+      participants: [
+        { participantId: 'attended-participant', status: 'completed' },
+        { participantId: 'absent-participant', status: 'no_show' },
+        { participantId: 'absent-participant-2', status: 'no_show' },
+      ],
+    });
+
+    expect(notifications.emitNotificationToMany).toHaveBeenCalledWith(
+      ['absent-user', 'absent-user-2'],
+      'match_no_show',
+      'match-1',
+      expect.any(String),
+    );
+    expect(notifications.emitNotificationToMany).toHaveBeenCalledWith(
+      [otherUser.id],
+      'match_completed',
+      'match-1',
+      expect.any(String),
+    );
+  });
+
   it('complete: 참가하지 않는 호스트를 참가자로 다시 만들거나 완료 인원에 포함하지 않는다', async () => {
     prisma.v1Match.findFirst.mockResolvedValue(matchRow({
       startAt: PAST,

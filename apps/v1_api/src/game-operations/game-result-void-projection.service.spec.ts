@@ -13,7 +13,7 @@ function canonicalRow(overrides: Record<string, unknown> = {}) {
     revisionId: REVISION_ID, gameId: GAME_ID, revision: 2, state: 'VOID',
     score: { home: 1, away: 0 }, sourceHash: 'hash-void-1',
     playedAt: new Date('2026-07-31T09:00:00Z'), officialAt: new Date('2026-08-01T00:00:00Z'),
-    reason: 'ADMIN_VOID', sourceType: 'TEAM_MATCH', currentOfficialRevisionId: REVISION_ID,
+    reason: 'ADMIN_VOID', outcomeReason: 'NORMAL', sourceType: 'TEAM_MATCH', currentOfficialRevisionId: REVISION_ID,
     teamMatchId: MATCH_ID, tournamentTeamMatchId: MATCH_ID,
     leagueId: null, teamMatchTournamentId: TOURNAMENT_ID, detailsTournamentId: TOURNAMENT_ID,
     homeTeamId: 'team-home', awayTeamId: 'team-away', visibility: 'LIVE', ...overrides,

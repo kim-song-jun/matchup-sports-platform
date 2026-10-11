@@ -160,7 +160,7 @@ function page<T>(items: T[]) {
 }
 
 /** 서버 첫 페이지 응답처럼 totalCount·facets 를 싣는다. 종목 건수는 종목 필터를 뺀 목록(`ignoringSport`)으로 센다. */
-function pageWithCounts<T extends { sport?: { sportId: string } }>(
+function pageWithCounts<T extends { sport?: { sportId: string }; sportName?: string }>(
   request: Request,
   items: T[],
   ignoringSport: T[],
@@ -171,7 +171,9 @@ function pageWithCounts<T extends { sport?: { sportId: string } }>(
   if (params.get('cursor') || params.get('includeFacets') !== 'true') return page(items);
   const counts = new Map<string, number>();
   for (const item of ignoringSport) {
-    if (item.sport) counts.set(item.sport.sportId, (counts.get(item.sport.sportId) ?? 0) + 1);
+    // 목록 필터와 같은 방식으로 종목을 푼다 — sport 객체가 없는 픽스처 행은 sportName 으로 마스터 종목을 찾는다.
+    const sportId = item.sport?.sportId ?? v1SportsFixture.find((sport) => sport.name === item.sportName)?.id;
+    if (sportId) counts.set(sportId, (counts.get(sportId) ?? 0) + 1);
   }
   return {
     items,

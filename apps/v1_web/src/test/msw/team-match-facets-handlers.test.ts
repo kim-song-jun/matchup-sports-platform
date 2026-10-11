@@ -3,7 +3,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { v1Get } from '@/lib/api-client';
 import { v1MswHandlers } from './handlers';
 
-type FacetPage = { items: unknown[]; facets: { recruiting: number } };
+type FacetPage = { items: unknown[]; facets: { recruiting: number; sports: { sportId: string; count: number }[] } };
 
 const server = setupServer(...v1MswHandlers);
 
@@ -25,5 +25,12 @@ describe('MSW /team-matches 모집 중 칩', () => {
     const soccer = await v1Get<FacetPage>('/team-matches', { sportId: 'sport-soccer', includeFacets: true });
     expect(soccer.facets.recruiting).toBe(soccer.items.length);
     expect(soccer.items.length).toBeGreaterThan(0);
+  });
+
+  it.each(['/matches', '/teams', '/team-matches'])('%s 종목 칩 건수는 sport 객체 없는 픽스처 행도 sportName 으로 센다', async (path) => {
+    const page = await v1Get<FacetPage>(path, { includeFacets: true });
+    expect(page.items.length).toBeGreaterThan(0);
+    expect(page.facets.sports.length).toBeGreaterThan(0);
+    expect(page.facets.sports.reduce((sum, item) => sum + item.count, 0)).toBe(page.items.length);
   });
 });

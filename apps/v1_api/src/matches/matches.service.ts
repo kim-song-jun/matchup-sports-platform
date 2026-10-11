@@ -102,7 +102,7 @@ export class MatchesService {
   /**
    * 첫 페이지 칩 건수. 종목 건수는 종목 필터만 뺀 where 로 센다. today/recruiting 은 나머지 필터는 그대로 두고
    * 해당 토글을 켠 건수라서, 토글이 꺼져 있어도 칩이 "켜면 몇 건인지"를 말한다.
-   * 전체 건수는 종목 건수에서 얻어 쿼리는 세 번이다.
+   * 전체 건수는 종목 건수에서 얻는다. 쿼리는 groupBy 1 + count 2 + 정원 찬 글 id raw SQL 1(recruitingOnly 면 생략)이다.
    */
   private async countListFacets(query: MatchesQueryDto, now: Date, listFullMatchIds: string[]) {
     // 모집 중 칩은 토글이 꺼져 있어도 "켜면 몇 건인지"를 세므로 정원 찬 글 목록이 항상 필요하다.

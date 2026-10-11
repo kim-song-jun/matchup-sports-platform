@@ -1112,7 +1112,7 @@ export class AuthService {
 
         const stillPending = await tx.v1User.updateMany({
           where: { id: callerId, onboardingStatus: 'social_profile_required' },
-          data: {},
+          data: { updatedAt: now },
         });
         if (stillPending.count !== 1) throw this.socialLinkConflict();
 

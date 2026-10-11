@@ -127,7 +127,8 @@ describe('V1 social link to phone owner integration', () => {
     const consentEventsBefore = await prisma.v1ManagedTermsConsentEvent.count({ where: { userId: callerId } });
     expect(consentEventsBefore).toBeGreaterThan(0);
 
-    const response = await link(callerId, await proveHolderPhone()).expect(200);
+    const response = await link(callerId, await proveHolderPhone());
+    expect({ status: response.status, code: response.body.code }).toEqual({ status: 200, code: undefined });
 
     expect(response.body.data.session.userId).toBe(HOLDER_ID);
     const cookie = (response.headers['set-cookie'] as unknown as string[]).map((c) => c.split(';')[0]).join('; ');
@@ -154,7 +155,8 @@ describe('V1 social link to phone owner integration', () => {
       .expect(200);
 
     expect(preview.body.data.linkingProvider).toBe('kakao');
-    expect(JSON.stringify(preview.body.data)).not.toContain('integration.test');
+    expect(preview.body.data.maskedEmail).toBe('so***@integration.test');
+    expect(JSON.stringify(preview.body.data)).not.toContain('social-link-holder');
     await expectUntouched(callerId);
 
     await link(callerId, proof).expect(200);

@@ -18,6 +18,7 @@ import type { TournamentOpsOrigin } from '@/lib/session-storage';
 import { resolveTournamentLiveBase } from '@/lib/tournament-live-routes';
 import { competitionOpsTitle } from '@/lib/competition-kind';
 import { staffRoleLabel } from './badges';
+import { canManageTournamentResults } from './role-context';
 import { useOverlayHistory } from '@/components/v1-ui/use-overlay-history';
 import { useTopmostEscape } from '@/components/v1-ui/use-topmost-escape';
 import { overlayLinkClick } from '@/lib/overlay-history';
@@ -121,8 +122,7 @@ const RESULT_MANAGEMENT_DISABLED_REASON = '결과 검토·정정은 대회 운�
  */
 function buildNavItems(basePath: string, role: V1TournamentStaffRole): NavItem[] {
   const base = basePath;
-  const canManageResults = role === 'TOURNAMENT_DIRECTOR' || role === 'PLATFORM_OPS';
-  const resultGate = canManageResults ? {} : { disabled: true, disabledReason: RESULT_MANAGEMENT_DISABLED_REASON };
+  const resultGate = canManageTournamentResults(role) ? {} : { disabled: true, disabledReason: RESULT_MANAGEMENT_DISABLED_REASON };
   return [
     {
       label: '운영 보드',

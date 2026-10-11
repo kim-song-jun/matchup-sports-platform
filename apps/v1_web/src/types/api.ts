@@ -1669,6 +1669,8 @@ export type V1GameResultRevision = {
   outcomeNote: string | null;
   createdByActorType: 'USER' | 'SYSTEM';
   createdByUserId: string | null;
+  /** 만든 사람의 닉네임. 시스템이 만든 리비전은 `null`. */
+  createdByName: string | null;
   createdBySystemActor: string | null;
   supersedesId: string | null;
   submittedAt: string | null;
@@ -3518,6 +3520,9 @@ export type V1TournamentRegistrationStatus =
   | 'cancel_requested'
   | 'cancelled';
 
+/** 어드민이 취소 처리한 결과 — 팀의 취소 요청을 받아 줬는지(approved), 운영자가 신청을 물렸는지(rejected). */
+export type V1RegistrationCancelOutcome = 'approved' | 'rejected';
+
 export type V1TournamentParticipantStatus = Extract<
   V1TournamentRegistrationStatus,
   'confirmed' | 'waitlisted'
@@ -4100,7 +4105,12 @@ export type V1TournamentRegistration = {
   /** 어드민이 부여한 명단 제출 마감 예외 — 부여된 이후에는 마감이 지나도 명단을 계속 수정할 수 있다 */
   rosterDeadlineOverrideAt: string | null;
   cancelRequestedAt: string | null;
+  /** 팀이 취소 요청에 남긴 사유 */
   cancelReason: string | null;
+  /** 어드민이 취소 승인·거부를 처리하며 남긴 사유 */
+  adminCancelReason: string | null;
+  /** 어드민이 처리하지 않은 취소(팀이 직접 취소한 임시저장, 이전 데이터)는 null */
+  cancelOutcome: V1RegistrationCancelOutcome | null;
   playerCount: number;
   payment: V1TournamentPaymentSummary | null;
   paymentInstructions: V1TournamentPaymentInstructions | null;
@@ -5119,6 +5129,9 @@ export type V1MyTournamentStaffFixture = {
   gameId: string;
   tournamentId: string;
   title: string;
+  /** 경기 콘솔과 같은 홈·원정 이름. 사이드가 아직 없으면 `null`. */
+  homeTeamName: string | null;
+  awayTeamName: string | null;
   scheduledAt: string | null;
   status: string;
   gameState: V1GameState | null;

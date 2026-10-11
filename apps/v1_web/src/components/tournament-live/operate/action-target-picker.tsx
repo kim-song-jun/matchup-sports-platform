@@ -64,6 +64,8 @@ export interface ActionTargetPickerProps {
   readonly substitutionPolicy?: GameSubstitutionPolicy | null;
   /** sideId → 지금까지 확정된(되돌리지 않은) 교체 횟수. */
   readonly substitutionUsedBySideId?: Readonly<Record<string, number>>;
+  /** 레드카드가 기록된 선수 id — 선수 목록에서 "퇴장" 칩으로 가른다. */
+  readonly sentOffParticipantIds?: ReadonlySet<string>;
   readonly onCommit: (input: EventCaptureCommitInput) => void;
   readonly onCancel: () => void;
 }
@@ -97,6 +99,7 @@ export function ActionTargetPicker({
   substitutionOutParticipantIds,
   substitutionPolicy,
   substitutionUsedBySideId,
+  sentOffParticipantIds,
   onCommit,
   onCancel,
 }: ActionTargetPickerProps) {
@@ -253,6 +256,7 @@ export function ActionTargetPicker({
                 sides={sides}
                 lineups={lineups}
                 onSelectPlayer={setSubstitutionOut}
+                sentOffParticipantIds={sentOffParticipantIds}
                 filterParticipantIds={onPitchParticipantIds}
               />
             ) : (
@@ -266,6 +270,7 @@ export function ActionTargetPicker({
                   sides={sides}
                   lineups={lineups}
                   onSelectPlayer={commitSubstitution}
+                  sentOffParticipantIds={sentOffParticipantIds}
                   restrictSideId={substitutionOut.sideId}
                   filterParticipantIds={
                     onPitchParticipantIds &&
@@ -283,7 +288,12 @@ export function ActionTargetPicker({
               </div>
             )
           ) : (
-            <LineupGrid sides={sides} lineups={lineups} onSelectPlayer={commitPlayer} />
+            <LineupGrid
+              sides={sides}
+              lineups={lineups}
+              onSelectPlayer={commitPlayer}
+              sentOffParticipantIds={sentOffParticipantIds}
+            />
           )}
 
           {allowTeamOnly ? (

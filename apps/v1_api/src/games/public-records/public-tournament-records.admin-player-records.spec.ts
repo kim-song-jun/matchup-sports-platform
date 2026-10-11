@@ -152,4 +152,38 @@ describe('PublicTournamentRecordsService.getPlayerRecordsForAdmin', () => {
       [null, 1],
     ]);
   });
+
+  it('keeps every player tied at the 10-row cutoff but still drops lower scorers past it', async () => {
+    // 1골 12명이 10번째 자리를 걸쳐 있다 — 잘라 내면 "공동 1위"가 일부만 남는다.
+    // 선두(2골)가 앞에 있어도 동점 묶음 전체가 남아야 한다.
+    const tied = Array.from({ length: 12 }, (_, i) => `p-tied-${i}`);
+    const { prisma } = buildPrisma({
+      games: [{ currentOfficialRevisionId: 'rev-1' }],
+      participantRows: [
+        { participantId: 'p-top', goals: 2, assists: 0, resultRevision: OFFICIAL },
+        ...tied.map((participantId) => ({ participantId, goals: 1, assists: 0, resultRevision: OFFICIAL })),
+      ],
+      participants: [
+        { id: 'p-top', userId: 'user-top', displayNameSnapshot: '선두', sideId: 'side-1' },
+        ...tied.map((id, i) => ({ id, userId: `user-${i}`, displayNameSnapshot: `동점${i}`, sideId: 'side-1' })),
+      ],
+      sides: [{ id: 'side-1', teamId: null }],
+    });
+    const result = await new PublicTournamentRecordsService(prisma, access).getPlayerRecordsForAdmin('tour-1');
+    expect(result.goals).toHaveLength(13);
+    expect(result.goals[0].goals).toBe(2);
+    expect(result.goals.slice(1).every((row) => row.goals === 1)).toBe(true);
+  });
+
+  it('still caps at the limit when no tie crosses the cutoff', async () => {
+    const ids = Array.from({ length: 12 }, (_, i) => `p-${i}`);
+    const { prisma } = buildPrisma({
+      games: [{ currentOfficialRevisionId: 'rev-1' }],
+      participantRows: ids.map((participantId, i) => ({ participantId, goals: 20 - i, assists: 0, resultRevision: OFFICIAL })),
+      participants: ids.map((id, i) => ({ id, userId: `user-${i}`, displayNameSnapshot: `선수${i}`, sideId: 'side-1' })),
+      sides: [{ id: 'side-1', teamId: null }],
+    });
+    const result = await new PublicTournamentRecordsService(prisma, access).getPlayerRecordsForAdmin('tour-1');
+    expect(result.goals.map((row) => row.goals)).toEqual([20, 19, 18, 17, 16, 15, 14, 13, 12, 11]);
+  });
 });

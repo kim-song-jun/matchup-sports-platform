@@ -30,13 +30,13 @@ export function toReviewsPageModel(data: V1ReviewListResponse | undefined, tab: 
     stats: tab === 'pending'
       ? [
           { label: '경기', value: `${items.length}건` },
-          { label: '대상', value: `${targetCount}명` },
-          { label: '남은 리뷰', value: `${remainingCount}명` },
+          { label: '대상', value: `${targetCount}건` },
+          { label: '남은 리뷰', value: `${remainingCount}건` },
         ]
       : [
-          { label: '작성 완료', value: `${reviewedCount || items.length}명` },
+          { label: '작성 완료', value: `${reviewedCount || items.length}건` },
           { label: '기록', value: `${items.length}건` },
-          { label: '진행', value: remainingCount > 0 ? `${remainingCount}명` : '완료' },
+          { label: '진행', value: remainingCount > 0 ? `${remainingCount}건` : '완료' },
         ],
     cards: items.map((item) => ({
       ...item,
@@ -147,7 +147,7 @@ export function getReviewProgress(targets: V1ReviewTarget[], drafts: Record<stri
 }
 
 export function formatReviewProgress({ submitted, inProgress, remaining }: ReviewProgress) {
-  return [submitted > 0 ? `작성 완료 ${submitted}명` : null, `작성 중 ${inProgress}명`, `남은 대상 ${remaining}명`]
+  return [submitted > 0 ? `작성 완료 ${submitted}건` : null, `작성 중 ${inProgress}건`, `남은 대상 ${remaining}건`]
     .filter(Boolean)
     .join(' · ');
 }
@@ -255,7 +255,7 @@ export function formatDateTime(value: string | null) {
 }
 
 function buildListMeta(completedAt: string | null, reviewedCount: number, targetCount: number, remainingCount: number) {
-  if (remainingCount <= 0) return `${reviewedCount}명에게 전송 완료`;
+  if (remainingCount <= 0) return `${reviewedCount}건 전송 완료`;
   return `${formatDateTime(completedAt)} · ${reviewedCount}/${targetCount} 완료`;
 }
 

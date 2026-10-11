@@ -28,6 +28,12 @@ export interface ModalA11yOptions {
   exitMs?: number;
   /** 뒤로가기로 닫기. 기본 true — URL 이 열림을 소유하는 시트(BottomSheet)만 끈다. */
   closeOnBack?: boolean;
+  /**
+   * 열릴 때 포커스를 어디에 둘지. 기본 'control'(첫 컨트롤).
+   * 사용자 입력 없이 저절로 열리는 오버레이는 'dialog' — 스크립트 포커스가 처음 컨트롤에 닿으면
+   * WebKit 이 키보드 포커스로 보고 :focus-visible 링을 그린다. 패널에 tabIndex={-1} 이 있어야 한다.
+   */
+  initialFocus?: 'control' | 'dialog';
 }
 
 export interface ModalA11yHandles<
@@ -110,6 +116,7 @@ export function useModalA11y<
   pending = false,
   exitMs = MODAL_EXIT_MS,
   closeOnBack = true,
+  initialFocus = 'control',
 }: ModalA11yOptions): ModalA11yHandles<TInitial, TDialog> {
   useOverlayHistory({ open, onClose, locked: pending, enabled: closeOnBack });
   const dialogRef = useRef<TDialog | null>(null);
@@ -213,9 +220,9 @@ export function useModalA11y<
 
   const focusFirstControl = () => {
     const target =
-      initialFocusRef.current ??
-      dialogRef.current?.querySelector<HTMLElement>(FOCUSABLE_SELECTOR) ??
-      null;
+      initialFocus === 'dialog'
+        ? dialogRef.current
+        : (initialFocusRef.current ?? dialogRef.current?.querySelector<HTMLElement>(FOCUSABLE_SELECTOR) ?? null);
     target?.focus();
   };
 
@@ -261,7 +268,8 @@ export function useModalA11y<
       const first = focusable[0];
       const last = focusable[focusable.length - 1];
       if (e.shiftKey) {
-        if (document.activeElement === first) {
+        // 패널 자체에 포커스가 있을 때(initialFocus 'dialog')의 Shift+Tab 도 패널 밖으로 새지 않게 한다.
+        if (document.activeElement === first || document.activeElement === dialog) {
           e.preventDefault();
           last.focus();
         }

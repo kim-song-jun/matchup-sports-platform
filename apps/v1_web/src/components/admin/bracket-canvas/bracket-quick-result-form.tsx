@@ -2,6 +2,8 @@
 
 import { useId, useState, type ChangeEvent, type FormEvent } from 'react';
 import { Button } from '@/components/v1-ui/button';
+import { ConfirmModal } from '@/components/v1-ui/confirm-modal';
+import { formatGameResultScoreWithPenalties } from '@/lib/game-result-score';
 import { needsPenalties, parseQuickScore, type QuickScoreInputs } from '@/lib/bracket-quick-score';
 import type { V1QuickResultScore } from '@/types/api';
 
@@ -11,11 +13,15 @@ export type BracketQuickResultFormProps = {
   isKnockout: boolean;
   initial?: V1QuickResultScore;
   submitLabel: string;
+  /** true 면 확인 창을 거친 뒤에야 `onSubmit` 을 부른다 — 곧바로 공식 결과가 되는 입력에 쓴다. */
+  confirmBeforeSubmit?: boolean;
   pending: boolean;
   errorMessage?: string | null;
   onSubmit: (score: V1QuickResultScore) => void;
   onCancel?: () => void;
 };
+
+const SCORE_MAX_DIGITS = 3;
 
 function toInputs(initial: V1QuickResultScore | undefined): QuickScoreInputs {
   return {
@@ -32,6 +38,7 @@ export function BracketQuickResultForm({
   isKnockout,
   initial,
   submitLabel,
+  confirmBeforeSubmit = false,
   pending,
   errorMessage,
   onSubmit,
@@ -40,12 +47,13 @@ export function BracketQuickResultForm({
   const idPrefix = useId();
   const [inputs, setInputs] = useState<QuickScoreInputs>(() => toInputs(initial));
   const [validationError, setValidationError] = useState<string | null>(null);
+  const [awaitingConfirm, setAwaitingConfirm] = useState<V1QuickResultScore | null>(null);
   const showPenalties = needsPenalties(inputs, isKnockout);
   const shownError = validationError ?? errorMessage ?? null;
 
   const change = (key: keyof QuickScoreInputs) => (event: ChangeEvent<HTMLInputElement>) => {
     setValidationError(null);
-    setInputs((current) => ({ ...current, [key]: event.target.value }));
+    setInputs((current) => ({ ...current, [key]: event.target.value.replace(/\D/g, '').slice(0, SCORE_MAX_DIGITS) }));
   };
 
   const handleSubmit = (event: FormEvent) => {
@@ -55,7 +63,14 @@ export function BracketQuickResultForm({
       setValidationError(parsed.error);
       return;
     }
-    onSubmit(parsed.score);
+    if (confirmBeforeSubmit) setAwaitingConfirm(parsed.score);
+    else onSubmit(parsed.score);
+  };
+
+  const confirmScore = () => {
+    if (awaitingConfirm === null) return;
+    onSubmit(awaitingConfirm);
+    setAwaitingConfirm(null);
   };
 
   const field = (key: keyof QuickScoreInputs, label: string) => (
@@ -109,6 +124,14 @@ export function BracketQuickResultForm({
           {submitLabel}
         </Button>
       </div>
+      <ConfirmModal
+        open={awaitingConfirm !== null}
+        title="이 점수로 확정할까요?"
+        message={`${homeLabel} ${awaitingConfirm === null ? '' : formatGameResultScoreWithPenalties(awaitingConfirm)} ${awayLabel}. 확정하면 공식 결과로 공개돼요. 나중에 고치려면 사유를 남기는 정정이 필요해요.`}
+        confirmLabel={submitLabel}
+        onConfirm={confirmScore}
+        onCancel={() => setAwaitingConfirm(null)}
+      />
     </form>
   );
 }

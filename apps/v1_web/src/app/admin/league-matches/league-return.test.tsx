@@ -80,6 +80,7 @@ vi.mock('@/hooks/use-v1-api', () => ({
   useV1AddLeagueTeam: () => ({ isPending: false }),
   useV1RemoveLeagueTeam: () => ({ isPending: false }),
   useV1RevertLeagueCompletion: () => ({ isPending: false }),
+  useV1CompleteLeague: () => ({ isPending: false }),
   useV1HoldLeague: () => ({ mutate: vi.fn(), isPending: false }),
   useV1ResumeLeague: () => ({ mutate: vi.fn(), isPending: false }),
   useV1CloseLeagueRegistration: () => ({ mutate: vi.fn(), isPending: false }),

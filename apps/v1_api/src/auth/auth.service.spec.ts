@@ -223,6 +223,35 @@ describe('AuthService', () => {
     expect(prisma.v1UserProfile.findFirst).not.toHaveBeenCalled();
   });
 
+  describe('checkNickname', () => {
+    const profiles = [
+      { userId: 'me', nickname: '내닉네임', deletedAt: null },
+      { userId: 'other', nickname: '남닉네임', deletedAt: null },
+      { userId: 'gone', nickname: '탈퇴닉네임', deletedAt: new Date() },
+    ];
+    beforeEach(() => {
+      prisma.v1UserProfile.findFirst.mockImplementation(
+        async ({ where }: { where: { nickname: string; deletedAt?: null; userId?: { not: string } } }) =>
+          profiles.find(
+            (p) =>
+              p.nickname === where.nickname &&
+              (where.deletedAt === undefined || p.deletedAt === null) &&
+              (!where.userId || p.userId !== where.userId.not),
+          ) ?? null,
+      );
+    });
+
+    it('treats the caller\'s own nickname as available but another user\'s as taken', async () => {
+      await expect(service.checkNickname('내닉네임', 'me')).resolves.toEqual({ available: true });
+      await expect(service.checkNickname('남닉네임', 'me')).resolves.toEqual({ available: false });
+    });
+
+    it('stays strict for anonymous callers and ignores deleted profiles', async () => {
+      await expect(service.checkNickname('내닉네임')).resolves.toEqual({ available: false });
+      await expect(service.checkNickname('탈퇴닉네임')).resolves.toEqual({ available: true });
+    });
+  });
+
   it('register: 이미 사용 중인 닉네임 → 409 NICKNAME_CONFLICT', async () => {
     prisma.v1User.findUnique.mockResolvedValue(null);            // email available
     prisma.v1UserProfile.findFirst.mockResolvedValue({ id: 'p-1' }); // nickname taken
@@ -235,6 +264,10 @@ describe('AuthService', () => {
       status: 409,
       response: { code: 'NICKNAME_CONFLICT' },
     });
+    // check-nickname 과 같은 기준이어야 한다 — 탈퇴한 프로필의 닉네임은 다시 쓸 수 있다.
+    expect(prisma.v1UserProfile.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { nickname: '중복닉네임', deletedAt: null } }),
+    );
   });
 
   it('register: 유효하지 않은 생년월일(잘못된 날짜) → 400 VALIDATION_ERROR', async () => {

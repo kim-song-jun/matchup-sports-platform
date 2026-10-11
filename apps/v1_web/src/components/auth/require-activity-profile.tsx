@@ -2,9 +2,10 @@
 
 import type { ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
-import { Button } from '@/components/v1-ui/button';
+import { EmptyState } from '@/components/v1-ui/primitives';
 import { useV1AuthMe } from '@/hooks/use-v1-api';
 import { buildActivityProfileHref } from '@/lib/activity-profile-required';
+import { hasPreviousInAppEntry, markAppInitiatedBack } from '@/lib/navigation-history';
 import { ShieldAlert } from 'lucide-react';
 
 /**
@@ -21,19 +22,27 @@ export function RequireActivityProfile({ title, children }: { title: string; chi
     router.push(buildActivityProfileHref(`${window.location.pathname}${window.location.search}`));
   };
 
+  const dismiss = () => {
+    if (hasPreviousInAppEntry()) {
+      markAppInitiatedBack();
+      router.back();
+      return;
+    }
+    router.replace('/home');
+  };
+
   return (
-    <div className="tm-empty-state tm-empty-state-fill" role="region" aria-labelledby="activity-profile-gate-title">
-      <div className="tm-empty-icon" aria-hidden="true">
-        <ShieldAlert size={36} strokeWidth={1.5} />
-      </div>
-      <div id="activity-profile-gate-title" className="tm-text-body-lg">{title}</div>
-      <div className="tm-text-label" style={{ color: 'var(--text-muted)', marginTop: 8, lineHeight: 1.5 }}>
-        이름·생년월일·성별과 휴대폰 인증을 한 번만 입력하면 바로 이어서 할 수 있어요.
-      </div>
-      <div style={{ display: 'flex', gap: 8, marginTop: 24 }}>
-        <Button onClick={() => router.back()} size="md" type="button" variant="neutral">다음에 할게요</Button>
-        <Button onClick={enter} size="md" type="button" variant="primary">정보 입력하기</Button>
-      </div>
+    <div role="region" aria-label={title} style={{ display: 'flex', flexDirection: 'column' }}>
+      <EmptyState
+        fill
+        icon={<ShieldAlert size={36} strokeWidth={1.5} />}
+        title={title}
+        sub="이름·생년월일·성별과 휴대폰 인증을 한 번만 입력하면 바로 이어서 할 수 있어요."
+        cta="정보 입력하기"
+        onCta={enter}
+        secondaryCta="다음에 할게요"
+        onSecondaryCta={dismiss}
+      />
     </div>
   );
 }

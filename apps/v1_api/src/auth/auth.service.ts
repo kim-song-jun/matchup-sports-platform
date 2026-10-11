@@ -136,7 +136,7 @@ export class AuthService {
     }
 
     const existingNickname = await this.prisma.v1UserProfile.findFirst({
-      where: { nickname },
+      where: { nickname, deletedAt: null },
       select: { id: true },
     });
 
@@ -250,7 +250,7 @@ export class AuthService {
     return { available: !existing };
   }
 
-  async checkNickname(nicknameValue: string) {
+  async checkNickname(nicknameValue: string, callerUserId?: string) {
     const nickname = nicknameValue?.trim() ?? '';
     if (nickname.length < 2) {
       throw new BadRequestException({
@@ -260,7 +260,11 @@ export class AuthService {
     }
 
     const existing = await this.prisma.v1UserProfile.findFirst({
-      where: { nickname },
+      where: {
+        nickname,
+        deletedAt: null,
+        ...(callerUserId ? { userId: { not: callerUserId } } : {}),
+      },
       select: { id: true },
     });
 

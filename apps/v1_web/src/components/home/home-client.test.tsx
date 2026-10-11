@@ -1,11 +1,13 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Providers } from '@/app/providers';
 import { HomePageClient } from './home-client';
 
+const nav = vi.hoisted(() => ({ push: vi.fn() }));
+
 vi.mock('next/navigation', () => ({
   usePathname: () => '/home',
-  useRouter: () => ({ push: vi.fn(), replace: vi.fn(), back: vi.fn(), prefetch: vi.fn() }),
+  useRouter: () => ({ push: nav.push, replace: vi.fn(), back: vi.fn(), prefetch: vi.fn() }),
   useSearchParams: () => new URLSearchParams(),
 }));
 
@@ -103,8 +105,10 @@ describe('HomePageClient activity profile nudge banner', () => {
     );
 
     expect(await screen.findByText('활동 정보를 입력해 주세요')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '입력하기' })).toBeInTheDocument();
     expect(screen.queryByText('휴대폰 본인인증이 필요해요')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: '입력하기' }));
+    expect(nav.push).toHaveBeenCalledWith('/signup/social?redirect=%2Fhome');
   });
 
   it('대조군 - 일반 가입자는 활동 정보 배너를 보지 않고 휴대폰 미인증이면 기존 배너만 본다', async () => {

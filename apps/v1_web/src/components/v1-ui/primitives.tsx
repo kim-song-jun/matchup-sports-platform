@@ -414,6 +414,9 @@ type EmptyStateProps = {
    * 카드·탭 안에 다른 내용과 섞여 나오는 빈 상태에는 쓰지 않는다.
    */
   fill?: boolean;
+  /** 보조 행동(예: 「다음에 할게요」). 버튼형 CTA(onCta)와 함께 주면 그 왼쪽에 중립 버튼으로 나란히 놓인다. */
+  secondaryCta?: string;
+  onSecondaryCta?: () => void;
   /**
    * `agy-3d-graphic` 스킬로 만든 그래픽(`public/illustrations/<name>-640.webp`)을 아이콘 원
    * 대신 보여준다. 그래픽은 장식이라 alt 없이 aria-hidden — 의미는 title/sub 가 전달한다.
@@ -422,7 +425,7 @@ type EmptyStateProps = {
   illustration?: { name: string };
 };
 
-export function EmptyState({ title, sub, cta, onCta, ctaHref, icon, fill, illustration }: EmptyStateProps) {
+export function EmptyState({ title, sub, cta, onCta, ctaHref, icon, fill, illustration, secondaryCta, onSecondaryCta }: EmptyStateProps) {
   return (
     <div className={`tm-empty-state${fill ? ' tm-empty-state-fill' : ''}`}>
       {illustration ? (
@@ -448,6 +451,15 @@ export function EmptyState({ title, sub, cta, onCta, ctaHref, icon, fill, illust
         <Link className="tm-btn tm-btn-sm tm-btn-primary" href={ctaHref} style={{ marginTop: 24 }}>
           {cta}
         </Link>
+      ) : cta && secondaryCta ? (
+        <div style={{ display: 'flex', gap: 8, marginTop: 24 }}>
+          <button className="tm-btn tm-btn-sm tm-btn-neutral" type="button" onClick={onSecondaryCta}>
+            {secondaryCta}
+          </button>
+          <button className="tm-btn tm-btn-sm tm-btn-primary" type="button" onClick={onCta}>
+            {cta}
+          </button>
+        </div>
       ) : cta ? (
         <button className="tm-btn tm-btn-sm tm-btn-primary" type="button" style={{ marginTop: 24 }} onClick={onCta}>
           {cta}

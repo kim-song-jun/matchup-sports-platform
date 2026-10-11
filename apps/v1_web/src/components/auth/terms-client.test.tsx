@@ -158,7 +158,6 @@ describe('TermsClient social navigation contract', () => {
   });
 });
 
-// V7: 응답 없는 실패의 원문("Failed to fetch")은 화면 문구가 아니다.
 describe('TermsClient 소셜 만 14세 확인', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -201,6 +200,7 @@ describe('TermsClient 소셜 만 14세 확인', () => {
   });
 });
 
+// V7: 응답 없는 실패의 원문("Failed to fetch")은 화면 문구가 아니다.
 describe('TermsClient 응답 없는 실패', () => {
   beforeEach(() => {
     vi.clearAllMocks();

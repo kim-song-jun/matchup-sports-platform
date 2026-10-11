@@ -82,17 +82,20 @@ export class OnboardingService {
         where: { id: userId },
         data: { onboardingStatus: nextStatus },
       });
+      // The draft also carries signup-time keys (ageConfirmedAt, kakao prefill) that the DTO lacks.
+      const progress = await tx.v1UserOnboardingProgress.findUnique({
+        where: { userId },
+        select: { draftJson: true },
+      });
+      const previousDraft =
+        progress?.draftJson && typeof progress.draftJson === 'object' && !Array.isArray(progress.draftJson)
+          ? (progress.draftJson as Prisma.InputJsonObject)
+          : {};
+      const draftJson = { ...previousDraft, ...dto } as unknown as Prisma.InputJsonValue;
       await tx.v1UserOnboardingProgress.upsert({
         where: { userId },
-        update: {
-          currentStep: dto.currentStep,
-          draftJson: dto as unknown as Prisma.InputJsonValue,
-        },
-        create: {
-          userId,
-          currentStep: dto.currentStep,
-          draftJson: dto as unknown as Prisma.InputJsonValue,
-        },
+        update: { currentStep: dto.currentStep, draftJson },
+        create: { userId, currentStep: dto.currentStep, draftJson },
       });
 
       if (user.onboardingStatus !== nextStatus) {

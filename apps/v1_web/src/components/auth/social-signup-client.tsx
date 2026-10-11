@@ -82,6 +82,8 @@ export function SocialSignupClient() {
   // 정보 입력을 미룬 계정이 활동 시도 중 돌아온 화면 — 가입 모드와 달리 건너뛰기가 없고 입력 뒤 원래 화면으로 간다.
   const activityMode = authMe.data?.user?.onboardingStatus === 'social_profile_deferred';
   const statusPending = authMe.isPending === true;
+  // 건너뛰기는 가입 직후 상태가 확인된 때만 — 조회 실패나 이미 미룬 계정에는 보이지 않는다.
+  const signupMode = authMe.data?.user?.onboardingStatus === 'social_profile_required';
   const [activitySeeded, setActivitySeeded] = useState(false);
   useEffect(() => {
     if (!activityMode || activitySeeded || !authMe.data) return;
@@ -277,7 +279,7 @@ export function SocialSignupClient() {
             {isBlocked ? '입력 확인 후 계속' : activityMode ? '입력 완료하고 계속하기' : '운동 설정으로 계속'}
           </Button>
           {actionReason ? <div className="tm-text-micro tm-auth-fixed-reason">{actionReason}</div> : null}
-          {!activityMode && !statusPending ? (
+          {signupMode ? (
             <>
               <div className="tm-auth-fixed-skip-row" style={{ justifyContent: 'center' }}>
                 <Button disabled={deferProfile.isPending} onClick={deferSignup} size="sm" type="button" variant="ghost">
@@ -296,14 +298,14 @@ export function SocialSignupClient() {
             <h1 className="tm-text-heading tm-auth-heading">활동 정보 입력</h1>
             <p className="tm-text-body tm-auth-sub">입력을 마치면 하던 화면으로 돌아가요.</p>
           </>
-        ) : (
+        ) : signupMode ? (
           <>
             <h1 className="tm-text-heading tm-auth-heading">프로필을 완성해 주세요</h1>
             <p className="tm-text-body tm-auth-sub">
               {providerLabel ? `${providerLabel} 계정 확인이 됐어요.` : '계정 확인이 됐어요.'} 가입에 필요한 프로필 정보를 입력해 주세요.
             </p>
           </>
-        )}
+        ) : null}
         <div className="tm-auth-form tm-auth-signup-form">
           <label className="tm-auth-field">
             <span className="tm-text-label">닉네임</span>

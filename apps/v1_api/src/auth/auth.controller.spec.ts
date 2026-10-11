@@ -328,7 +328,7 @@ describe('AuthController', () => {
         .get('/auth/check-nickname?nickname=%EA%B0%80%EB%82%98')
         .expect(200, { available: true });
       expect(authService.checkEmail).toHaveBeenCalledWith('A@Example.com');
-      expect(authService.checkNickname).toHaveBeenCalledWith('가나');
+      expect(authService.checkNickname).toHaveBeenCalledWith('가나', undefined);
       await app.close();
     });
   });

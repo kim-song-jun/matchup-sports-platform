@@ -17,6 +17,7 @@ const hooks = vi.hoisted(() => ({
   authedPhoneRequestMutateAsync: vi.fn(),
   authedPhoneConfirmMutateAsync: vi.fn(),
   logoutMutateAsync: vi.fn(),
+  authMeFailed: false,
   // 카카오 동의항목 미승인이 기본값 — 프리필 없이 직접 입력하는 기존 흐름.
   authMe: {
     socialSignupPrefill: null as null | { name: string | null; phone: string | null; gender: 'male' | 'female' | null },
@@ -39,7 +40,9 @@ vi.mock('@tanstack/react-query', () => ({
 }));
 
 vi.mock('@/hooks/use-v1-api', () => ({
-  useV1AuthMe: () => ({ data: hooks.authMe }),
+  useV1AuthMe: () => (hooks.authMeFailed
+    ? { data: undefined, isPending: false, isError: true }
+    : { data: hooks.authMe }),
   useV1Logout: () => ({ mutateAsync: hooks.logoutMutateAsync, isPending: false }),
   useV1CheckNickname: () => ({ mutate: hooks.checkNicknameMutate, isPending: false }),
   useV1CompleteSocialProfile: () => ({ mutate: hooks.completeProfileMutate, isPending: false }),
@@ -495,6 +498,7 @@ describe('SocialSignupClient 나중에 입력할게요', () => {
     hooks.authMe.user.phone = null;
     hooks.authMe.profile.nickname = null;
     hooks.authMe.verification.phoneVerified = false;
+    hooks.authMeFailed = false;
     setSearch('');
   });
 
@@ -513,6 +517,19 @@ describe('SocialSignupClient 나중에 입력할게요', () => {
     expect(hooks.deferMutate).toHaveBeenCalledTimes(1);
     expect(router.replace).toHaveBeenCalledWith('/home');
     expect(analytics.trackEvent).toHaveBeenCalledWith('sign_up_complete', { method: 'kakao', profile: 'deferred' });
+  });
+
+  it('가입 상태를 읽지 못했거나 이미 미룬 계정에는 건너뛰기를 보이지 않는다', () => {
+    hooks.authMeFailed = true;
+    const { unmount } = render(<SocialSignupClient />);
+    expect(screen.queryByRole('button', { name: '나중에 입력할게요' })).not.toBeInTheDocument();
+    expect(screen.queryByText('프로필을 완성해 주세요')).not.toBeInTheDocument();
+    unmount();
+
+    hooks.authMeFailed = false;
+    hooks.authMe.user.onboardingStatus = 'social_profile_deferred';
+    render(<SocialSignupClient />);
+    expect(screen.queryByRole('button', { name: '나중에 입력할게요' })).not.toBeInTheDocument();
   });
 
   it('저장된 redirect 가 같은 origin 의 경로면 홈 대신 거기로 간다, 외부 주소는 무시한다', () => {

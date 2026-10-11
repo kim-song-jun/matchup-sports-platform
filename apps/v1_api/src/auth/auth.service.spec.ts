@@ -20,6 +20,7 @@ import { V1AuthProvider } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AppleIdentityService } from './apple-identity.service';
 import { AppleTokenService } from './apple-token.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { AuthService } from './auth.service';
 import type { RegisterDto } from './dto/register.dto';
 import { hashPassword } from './password-hash';
@@ -176,6 +177,7 @@ describe('AuthService', () => {
         { provide: PhoneVerificationService, useValue: phoneVerification },
         { provide: AppleIdentityService, useValue: appleIdentity },
         { provide: AppleTokenService, useValue: { storeFromAuthorizationCode: jest.fn() } },
+        { provide: NotificationsService, useValue: { emitNotification: jest.fn() } },
       ],
     }).compile();
 

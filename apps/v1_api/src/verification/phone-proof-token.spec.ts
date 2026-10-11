@@ -29,6 +29,16 @@ describe('phone-proof-token', () => {
     expect(verifyPhoneProofToken(token, '01012345678')).toBe(false);
   });
 
+  it('social_link 증명은 signup·password_reset 과 서로 통하지 않는다', () => {
+    const phone = '01012345678';
+    const link = issuePhoneProofToken(phone, 'social_link');
+    expect(verifyPhoneProofToken(link, phone, 'social_link')).toBe(true);
+    expect(verifyPhoneProofToken(link, phone, 'signup')).toBe(false);
+    expect(verifyPhoneProofToken(link, phone, 'password_reset')).toBe(false);
+    expect(verifyPhoneProofToken(issuePhoneProofToken(phone, 'signup'), phone, 'social_link')).toBe(false);
+    expect(verifyPhoneProofToken(issuePhoneProofToken(phone, 'password_reset'), phone, 'social_link')).toBe(false);
+  });
+
   // 용도가 페이로드에 없으면 "가입하려고 받은 증명"으로 남의 비밀번호를 재설정할 수 있다.
   it('용도가 다른 토큰은 서로 통하지 않는다', () => {
     const signupToken = issuePhoneProofToken('01012345678');

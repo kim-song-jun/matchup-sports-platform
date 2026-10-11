@@ -29,4 +29,13 @@ describe('social signup access contract', () => {
     expect(isPendingSocialSignupRequestAllowed('social_terms_required', '/api/v1/verification/phone/request')).toBe(false);
     expect(isPendingSocialSignupRequestAllowed('social_terms_required', '/api/v1/auth/check-nickname')).toBe(false);
   });
+
+  it('allows social-link only while the profile step is pending', () => {
+    expect(isPendingSocialSignupRequestAllowed('social_profile_required', '/api/v1/auth/social-link')).toBe(true);
+    expect(isPendingSocialSignupRequestAllowed('social_terms_required', '/api/v1/auth/social-link')).toBe(false);
+    expect(isPendingSocialSignupRequestAllowed('social_profile_required', '/api/v1/auth/social-link/')).toBe(true);
+    expect(isPendingSocialSignupRequestAllowed('social_profile_required', '/api/v1/auth/social-linkx')).toBe(false);
+    expect(isPendingSocialSignupRequestAllowed('social_profile_required', '/api/v1/auth/social-link/preview')).toBe(true);
+    expect(isPendingSocialSignupRequestAllowed('social_terms_required', '/api/v1/auth/social-link/preview')).toBe(false);
+  });
 });

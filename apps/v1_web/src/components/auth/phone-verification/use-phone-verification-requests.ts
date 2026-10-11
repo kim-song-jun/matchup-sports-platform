@@ -11,7 +11,7 @@ type Options = {
   /** public: 비로그인 회원가입 전 pre-account 인증(proofToken 발급). authed: 로그인 후 카카오/레거시 구제. */
   mode: 'public' | 'authed';
   /** public 모드에서 발급받을 증명 토큰의 용도. 생략하면 가입용. */
-  purpose?: 'signup' | 'password_reset';
+  purpose?: 'signup' | 'password_reset' | 'social_link';
   phone: string;
   /** public 모드는 proofToken을 전달하고, authed 모드는 서버가 이미 phoneVerifiedAt을 세팅하므로 인자 없이 호출된다. */
   onVerified: (proofToken?: string) => void;

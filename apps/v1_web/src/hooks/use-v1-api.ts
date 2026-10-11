@@ -54,6 +54,7 @@ import type {
   V1AdminRow,
   V1PushFailureSummary,
   V1FoundAccount,
+  V1SocialLinkPreview,
   V1SmsFailureSummary,
   V1AdminMonitoringSummary,
   V1AdminOpsSummary,
@@ -391,8 +392,23 @@ export function useV1PhoneVerify() {
   return useMutation({
     // purpose 를 생략하면 가입용 토큰이 발급된다. 계정 찾기·비밀번호 재설정은
     // 'password_reset' 을 넘겨 가입용 증명과 섞이지 않게 한다.
-    mutationFn: (body: { phone: string; code: string; purpose?: 'signup' | 'password_reset' }) =>
+    mutationFn: (body: { phone: string; code: string; purpose?: 'signup' | 'password_reset' | 'social_link' }) =>
       v1Post<{ verified: boolean; proofToken?: string }>('/auth/phone/verify', body),
+  });
+}
+
+export function useV1SocialLinkPreview() {
+  return useMutation({
+    mutationFn: (body: { phone: string; proofToken: string }) =>
+      v1Post<V1SocialLinkPreview>('/auth/social-link/preview', body),
+  });
+}
+
+/** 성공하면 서버가 세션 쿠키를 기존 계정으로 바꾼다 — 호출자가 세션 저장·캐시 비우기를 맡는다. */
+export function useV1SocialLink() {
+  return useMutation({
+    mutationFn: (body: { phone: string; proofToken: string }) =>
+      v1Post<V1AuthSessionResponse>('/auth/social-link', body),
   });
 }
 

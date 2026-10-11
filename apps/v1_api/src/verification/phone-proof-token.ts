@@ -14,7 +14,7 @@ import { issueProofToken, verifyProofToken, type ProofPayloadBuilder } from './p
  *
  * 서명·만료·상수시간 비교는 proof-token 에 모여 있다.
  */
-export type PhoneProofPurpose = 'signup' | 'password_reset';
+export type PhoneProofPurpose = 'signup' | 'password_reset' | 'social_link';
 
 function payloadFor(phone: string, purpose: PhoneProofPurpose): ProofPayloadBuilder {
   return (expMs) => (purpose === 'signup' ? `${phone}:${expMs}` : `${purpose}:${phone}:${expMs}`);

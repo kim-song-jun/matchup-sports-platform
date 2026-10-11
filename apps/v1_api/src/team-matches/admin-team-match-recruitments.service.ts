@@ -485,7 +485,7 @@ export class AdminTeamMatchRecruitmentsService {
       );
       this.emitTeamNotifications(
         result.rejectedTeamIds,
-        'team_match_application_rejected',
+        'team_match_closed',
         teamMatchId,
         '신청한 팀매치의 참가팀이 확정되어 모집이 종료됐어요.',
       );
@@ -757,7 +757,7 @@ export class AdminTeamMatchRecruitmentsService {
     return game;
   }
 
-  private emitTeamNotifications(teamIds: string[], type: 'team_match_application_approved' | 'team_match_application_rejected', teamMatchId: string, body: string) {
+  private emitTeamNotifications(teamIds: string[], type: 'team_match_application_approved' | 'team_match_application_rejected' | 'team_match_closed', teamMatchId: string, body: string) {
     if (teamIds.length === 0) return;
     this.notifications.emitToManyDeferred(
       async () => (

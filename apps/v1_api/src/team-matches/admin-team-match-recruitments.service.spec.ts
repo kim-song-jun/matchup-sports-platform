@@ -265,6 +265,38 @@ describe('AdminTeamMatchRecruitmentsService', () => {
     );
   });
 
+  it('titles the auto-closed applications as closed, not rejected, when the second team is confirmed', async () => {
+    prisma.v1TeamMatch.findFirst.mockResolvedValueOnce({
+      ...await prisma.v1TeamMatch.findFirst(),
+      hostTeamId: 'team-home',
+      game: { id: 'game-1' },
+      applications: [
+        application(homeApplicationId, 'team-home', '홈 FC', 'approved'),
+        application(awayApplicationId, 'team-away', '원정 FC'),
+        application('00000000-0000-4000-8000-000000000403', 'team-late', '늦은 FC'),
+      ],
+    });
+
+    prisma.v1TeamMatchApplication.findMany.mockResolvedValueOnce([
+      { id: '00000000-0000-4000-8000-000000000403', applicantTeamId: 'team-late' },
+    ]);
+
+    await service.approveApplication(adminUser, 'team-match-1', awayApplicationId, approveDto);
+
+    expect(notifications.emitToManyDeferred).toHaveBeenCalledWith(
+      expect.any(Function),
+      'team_match_closed',
+      'team-match-1',
+      '신청한 팀매치의 참가팀이 확정되어 모집이 종료됐어요.',
+    );
+    expect(notifications.emitToManyDeferred).not.toHaveBeenCalledWith(
+      expect.any(Function),
+      'team_match_application_rejected',
+      expect.anything(),
+      expect.anything(),
+    );
+  });
+
   it('repairs a legacy first approval that did not persist the HOME team or game', async () => {
     prisma.v1TeamMatch.findFirst.mockResolvedValueOnce({
       ...await prisma.v1TeamMatch.findFirst(),

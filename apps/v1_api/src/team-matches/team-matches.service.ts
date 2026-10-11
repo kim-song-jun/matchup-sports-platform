@@ -1516,9 +1516,10 @@ export class TeamMatchesService {
       application.teamMatchId,
       `"${application.teamMatch.title}" 팀매치 신청이 승인됐어요.`,
     );
+    // 자동 종료는 거절이 아니라 마감이다 — 거절 제목으로 보내면 호스트가 거절한 것처럼 읽힌다.
     this.emitNotificationToTeamManagers(
       result.autoRejectedApplicantTeamIds,
-      'team_match_application_rejected',
+      'team_match_closed',
       application.teamMatchId,
       `"${application.teamMatch.title}" 팀매치는 다른 팀으로 정해졌어요. 다른 팀매치를 둘러봐요.`,
     );

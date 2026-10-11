@@ -1291,9 +1291,15 @@ describe('TeamMatchesService', () => {
     });
     expect(notifications.emitToManyDeferred).toHaveBeenCalledWith(
       expect.any(Function),
-      'team_match_application_rejected',
+      'team_match_closed',
       'tm-1',
       expect.stringContaining('다른 팀으로 정해졌어요. 다른 팀매치를 둘러봐요.'),
+    );
+    expect(notifications.emitToManyDeferred).not.toHaveBeenCalledWith(
+      expect.any(Function),
+      'team_match_application_rejected',
+      expect.anything(),
+      expect.anything(),
     );
   });
 

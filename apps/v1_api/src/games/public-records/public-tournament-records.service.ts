@@ -87,8 +87,15 @@ const LEAGUE_FIXTURE_NOT_FOUND = { code: 'LEAGUE_FIXTURE_NOT_FOUND', message: '�
 const LEAGUE_FORFEIT_REASON_MARKER = '[LEAGUE_FORFEIT]';
 // 리그 도메인(league-match-public.service.ts)과 같은 상한 — 회고 STATS-1은 그 패턴의 복제다.
 const PLAYER_RECORDS_LIMIT = 30;
-// 어드민 추천 근거는 상위 후보만 필요하다 — chip 3개 + 여유분.
+// 어드민 추천 근거는 상위 후보만 필요하다 — 단 컷오프 지점의 동점자는 끊지 않는다(`takeTopWithTies`).
 const ADMIN_PLAYER_RECORDS_LIMIT = 10;
+
+/** 값 내림차순 배열의 앞 `limit`개 + 마지막 자리와 같은 값인 동점자 전원. */
+function takeTopWithTies<T>(rows: T[], limit: number, valueOf: (row: T) => number): T[] {
+  if (rows.length <= limit) return rows;
+  const cutoffValue = valueOf(rows[limit - 1]);
+  return rows.filter((row, index) => index < limit || valueOf(row) === cutoffValue);
+}
 type TournamentFixtureStatus = 'scheduled' | 'in_progress' | 'completed' | 'cancelled';
 
 /**
@@ -605,8 +612,16 @@ export class PublicTournamentRecordsService {
     const rows = [...totalsByKey.values()];
     return {
       tournamentId,
-      goals: rows.filter((row) => row.goals > 0).sort((a, b) => b.goals - a.goals).slice(0, ADMIN_PLAYER_RECORDS_LIMIT),
-      assists: rows.filter((row) => row.assists > 0).sort((a, b) => b.assists - a.assists).slice(0, ADMIN_PLAYER_RECORDS_LIMIT),
+      goals: takeTopWithTies(
+        rows.filter((row) => row.goals > 0).sort((a, b) => b.goals - a.goals),
+        ADMIN_PLAYER_RECORDS_LIMIT,
+        (row) => row.goals,
+      ),
+      assists: takeTopWithTies(
+        rows.filter((row) => row.assists > 0).sort((a, b) => b.assists - a.assists),
+        ADMIN_PLAYER_RECORDS_LIMIT,
+        (row) => row.assists,
+      ),
     };
   }
 

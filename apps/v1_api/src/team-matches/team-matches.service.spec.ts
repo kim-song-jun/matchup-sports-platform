@@ -413,6 +413,58 @@ describe('TeamMatchesService', () => {
     expect(prisma.v1TeamMatch.update).not.toHaveBeenCalled();
   });
 
+  it('create / update: 상대팀 부담금이 총비용보다 크면 400 VALIDATION_FAILED 이고 저장하지 않는다', async () => {
+    prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'mem-1', team: { sportId: 'sport-1' } });
+    prisma.v1TeamMatch.findFirst.mockResolvedValue(teamMatchRow({ hostTeam: { sportId: 'sport-1' } }));
+    prisma.v1Sport.findFirst.mockResolvedValue({ id: 'sport-1', code: 'futsal' });
+    prisma.v1Region.findFirst.mockResolvedValue({ id: 'region-1' });
+    const dto = {
+      hostTeamId: 'team-host',
+      sportId: 'sport-1',
+      regionId: 'region-1',
+      title: '비용 초과',
+      startsAt: FUTURE.toISOString(),
+      manualPlaceName: '망원 풋살장',
+      costNote: '총 50,000원 · 상대팀 80,000원',
+    };
+
+    await expect(service.create(manager, dto)).rejects.toMatchObject({
+      status: 400,
+      response: { code: 'VALIDATION_FAILED', details: { field: 'costNote' } },
+    });
+    await expect(service.update(manager, 'tm-1', { ...dto, version: '2026-06-01T00:00:00.000Z' })).rejects.toMatchObject({
+      status: 400,
+      response: { code: 'VALIDATION_FAILED', details: { field: 'costNote' } },
+    });
+    expect(prisma.v1TeamMatch.create).not.toHaveBeenCalled();
+    expect(prisma.v1TeamMatch.update).not.toHaveBeenCalled();
+  });
+
+  it('create: 비용 규칙 도입 전에 만들어진 모집의 재시도는 400 이 아니라 저장된 결과를 다시 돌려준다', async () => {
+    prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'mem-1', team: { sportId: 'sport-1' } });
+    prisma.v1Sport.findFirst.mockResolvedValue({ id: 'sport-1', code: 'futsal' });
+    prisma.v1Region.findFirst.mockResolvedValue({ id: 'region-1' });
+    prisma.v1IdempotencyRecord.findFirst.mockResolvedValue({ resourceId: 'tm-1' });
+    const existing = teamMatchRow({ hostTeamId: 'team-host', startAt: FUTURE });
+    (prisma.v1TeamMatch as any).findUniqueOrThrow = jest.fn().mockResolvedValue(existing);
+    jest.spyOn(service as any, 'resolveTeamGameActorRole').mockResolvedValue('owner');
+    jest.spyOn(service as any, 'loadPersistedGameSourceInput').mockResolvedValue({});
+    games.createFromSourceInTransaction.mockResolvedValue({
+      gameId: 'game-1', sourceType: 'TEAM_MATCH', sourceId: 'tm-1', competitionConfigVersionId: 'config-1', state: 'SCHEDULED', version: 0,
+    });
+
+    await expect(service.create(manager, {
+      hostTeamId: 'team-host',
+      sportId: 'sport-1',
+      regionId: 'region-1',
+      title: '비용 초과',
+      startsAt: FUTURE.toISOString(),
+      manualPlaceName: '망원 풋살장',
+      costNote: '총 50,000원 · 상대팀 80,000원',
+    }, 'cmd-1')).resolves.toBeDefined();
+    expect(prisma.v1TeamMatch.create).not.toHaveBeenCalled();
+  });
+
   it('create: 신청 마감시간을 v1_team_matches에 저장한다', async () => {
     const deadlineAt = new Date(FUTURE.getTime() - 24 * 60 * 60 * 1000);
     prisma.v1TeamMembership.findFirst.mockResolvedValue({
@@ -590,6 +642,28 @@ describe('TeamMatchesService', () => {
     prisma.v1TeamMatchApplication.updateMany.mockResolvedValue({ count: 0 });
     const result = await service.cancel(manager, 'tm-1', {});
     expect(result).toMatchObject({ teamMatchId: 'tm-1', status: 'cancelled', cancelledApplications: 0 });
+  });
+
+  describe('cancel: 상대팀 알림의 취소 사유', () => {
+    const cancelMatched = async (dto: { reason?: string | null }) => {
+      prisma.v1TeamMatch.findFirst.mockResolvedValue(
+        teamMatchRow({ status: 'matched', approvedApplicantTeamId: 'team-applicant' }),
+      );
+      prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'mem-1' });
+      prisma.v1TeamMatchApplication.updateMany.mockResolvedValue({ count: 0 });
+      await service.cancel(manager, 'tm-1', dto);
+      return notifications.emitToManyDeferred.mock.calls.find(([, type]) => type === 'team_match_cancelled');
+    };
+
+    it('호스트가 적은 사유를 상대팀 알림 본문에 담는다', async () => {
+      const call = await cancelMatched({ reason: '  구장 사정으로 어려워졌어요  ' });
+      expect(call?.[3]).toBe(`"${teamMatchRow().title}" 팀매치가 취소됐어요. 사유: 구장 사정으로 어려워졌어요`);
+    });
+
+    it.each([undefined, null, '', '   '])('사유가 %j 이면 알림에 사유 문구를 붙이지 않는다', async (reason) => {
+      const call = await cancelMatched({ reason });
+      expect(call?.[3]).toBe(`"${teamMatchRow().title}" 팀매치가 취소됐어요.`);
+    });
   });
 
   it('cancel: 리그 대진(leagueId 有)은 호스트 팀이 직접 취소할 수 없다 → 409 LEAGUE_FIXTURE_HOST_CANCEL_FORBIDDEN', async () => {
@@ -1239,9 +1313,15 @@ describe('TeamMatchesService', () => {
     });
     expect(notifications.emitToManyDeferred).toHaveBeenCalledWith(
       expect.any(Function),
-      'team_match_application_rejected',
+      'team_match_closed',
       'tm-1',
       expect.stringContaining('다른 팀으로 정해졌어요. 다른 팀매치를 둘러봐요.'),
+    );
+    expect(notifications.emitToManyDeferred).not.toHaveBeenCalledWith(
+      expect.any(Function),
+      'team_match_application_rejected',
+      expect.anything(),
+      expect.anything(),
     );
   });
 

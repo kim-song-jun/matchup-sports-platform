@@ -2,6 +2,7 @@ import { excludeUnfilledSlotFixturesWhere } from '../common/competition/unfilled
 import { genderRuleColumnFilter, normalizeGenderRule } from '../common/gender-rule';
 import { teamMatchChatEntitlementWhere } from '../chat/chat-entitlement';
 import { canConfirmTeamMatch, validateTeamMatchDates } from './team-match-dates';
+import { assertOpponentCostWithinTotal } from './team-match-cost';
 import {
   BadRequestException,
   ConflictException,
@@ -675,6 +676,8 @@ export class TeamMatchesService {
         return { teamMatch: existingTeamMatch, game };
       }
 
+      // After the replay lookup: a request accepted before this rule existed must still replay.
+      assertOpponentCostWithinTotal(dto.costNote);
       const source = await this.loadTeamMatchCreationSource(
         tx,
         dto.hostTeamId,
@@ -802,6 +805,7 @@ export class TeamMatchesService {
     await this.validateMasterRefs(dto.sportId, dto.regionId);
     const levelRange = await resolveSportLevelRange(this.prisma, dto.sportId, dto.minLevelCode, dto.maxLevelCode);
     const dates = validateTeamMatchDates(dto, teamMatch.deadlineAt);
+    assertOpponentCostWithinTotal(dto.costNote);
 
     // 매치 ↔ 팀일정 연동(레인 schedule): 매치 제목/시간이 바뀌면 호스트 스케줄도 같은 트랜잭션 안에서
     // 동기화해야 캘린더가 실제와 어긋나지 않는다 — 이 메서드를 트랜잭션으로 승격한다(다른 4개
@@ -885,6 +889,8 @@ export class TeamMatchesService {
       throw stateConflict('Team match cannot be cancelled in current status');
     }
 
+    const hostReason = dto.reason?.trim() || null;
+
     const result = await this.prisma.$transaction(async (tx) => {
       // Share the Game -> TeamMatch lock order with result finalization.
       await tx.$queryRaw`SELECT id FROM v1_games WHERE team_match_id = ${teamMatch.id} FOR UPDATE`;
@@ -903,7 +909,7 @@ export class TeamMatchesService {
       });
       // 매치 ↔ 팀일정 연동(레인 schedule): teamMatchId로 연결된 SCHEDULED 스케줄(호스트/상대 최대
       // 2건)을 같은 트랜잭션 안에서 CANCELLED로 cascade한다 — row는 삭제하지 않는다.
-      await cascadeCancelTeamMatchSchedulesInTx(tx, teamMatch.id, dto.reason ?? 'host_cancelled');
+      await cascadeCancelTeamMatchSchedulesInTx(tx, teamMatch.id, hostReason ?? 'host_cancelled');
       await tx.v1Game.updateMany({ where: { teamMatchId: teamMatch.id, state: 'SCHEDULED' }, data: { state: 'CANCELLED', version: { increment: 1 } } });
       await tx.v1StatusChangeLog.create({
         data: {
@@ -913,7 +919,7 @@ export class TeamMatchesService {
           toStatus: 'cancelled',
           actorType: 'user',
           actorUserId: user.id,
-          reason: dto.reason ?? 'host_cancelled',
+          reason: hostReason ?? 'host_cancelled',
         },
       });
       return { applications, opponentTeamId: current.approvedApplicantTeamId };
@@ -932,7 +938,7 @@ export class TeamMatchesService {
           ).map((m) => m.userId),
         'team_match_cancelled',
         teamMatch.id,
-        `"${teamMatch.title}" 팀매치가 취소됐어요.`,
+        `"${teamMatch.title}" 팀매치가 취소됐어요.${hostReason ? ` 사유: ${hostReason}` : ''}`,
       );
     }
 
@@ -1512,9 +1518,10 @@ export class TeamMatchesService {
       application.teamMatchId,
       `"${application.teamMatch.title}" 팀매치 신청이 승인됐어요.`,
     );
+    // 자동 종료는 거절이 아니라 마감이다 — 거절 제목으로 보내면 호스트가 거절한 것처럼 읽힌다.
     this.emitNotificationToTeamManagers(
       result.autoRejectedApplicantTeamIds,
-      'team_match_application_rejected',
+      'team_match_closed',
       application.teamMatchId,
       `"${application.teamMatch.title}" 팀매치는 다른 팀으로 정해졌어요. 다른 팀매치를 둘러봐요.`,
     );

@@ -106,6 +106,47 @@ describe('AdminTeamMatchNewPage', () => {
     expect(push).toHaveBeenCalledWith('/admin/team-matches/tm-1');
   });
 
+  it('상대팀 부담금이 총비용보다 크면 안내하고 모집 시작을 막는다', async () => {
+    const mutateAsync = vi.fn();
+    useCreate.mockReturnValue({ mutateAsync, isPending: false } as never);
+    render(<AdminTeamMatchNewPage />);
+
+    fireEvent.change(screen.getByLabelText('종목'), { target: { value: 'sport-futsal' } });
+    fireEvent.change(screen.getByLabelText('지역'), { target: { value: 'region-gangnam' } });
+    fireEvent.change(screen.getByLabelText('매치 제목'), { target: { value: '모집전' } });
+    await enterManualPlace('잠실 풋살장');
+    fireEvent.change(screen.getByLabelText('경기 시작'), { target: { value: '2026-10-20T19:00' } });
+    fireEvent.change(screen.getByLabelText('총비용'), { target: { value: '50000' } });
+    fireEvent.change(screen.getByLabelText('상대팀 부담금'), { target: { value: '80000' } });
+
+    expect(screen.getByText('상대팀 부담금은 총비용보다 클 수 없어요.')).toHaveTextContent('상대팀 부담금은 총비용보다 클 수 없어요.');
+    expect(screen.getByRole('button', { name: '팀 신청 모집 시작하기' })).toBeDisabled();
+
+    fireEvent.change(screen.getByLabelText('상대팀 부담금'), { target: { value: '50000' } });
+    expect(screen.queryByText('상대팀 부담금은 총비용보다 클 수 없어요.')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '팀 신청 모집 시작하기' })).toBeEnabled();
+  });
+
+  it('음수 비용은 0원으로 보고 저장되는 값과 같은 기준으로 부담금을 비교한다', async () => {
+    const mutateAsync = vi.fn().mockResolvedValue({ teamMatchId: 'tm-1', status: 'recruiting', detailRoute: '/admin/team-matches/tm-1', replayed: false });
+    useCreate.mockReturnValue({ mutateAsync, isPending: false } as never);
+    render(<AdminTeamMatchNewPage />);
+
+    fireEvent.change(screen.getByLabelText('종목'), { target: { value: 'sport-futsal' } });
+    fireEvent.change(screen.getByLabelText('지역'), { target: { value: 'region-gangnam' } });
+    fireEvent.change(screen.getByLabelText('매치 제목'), { target: { value: '모집전' } });
+    await enterManualPlace('잠실 풋살장');
+    fireEvent.change(screen.getByLabelText('경기 시작'), { target: { value: '2026-10-20T19:00' } });
+    fireEvent.change(screen.getByLabelText('총비용'), { target: { value: '-100' } });
+
+    expect(screen.queryByText('상대팀 부담금은 총비용보다 클 수 없어요.')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '팀 신청 모집 시작하기' })).toBeEnabled();
+
+    fireEvent.change(screen.getByLabelText('상대팀 부담금'), { target: { value: '5000' } });
+    expect(screen.getByText('상대팀 부담금은 총비용보다 클 수 없어요.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '팀 신청 모집 시작하기' })).toBeDisabled();
+  });
+
   it('직접 입력 칸에 이어서 친 장소 이름도 앞뒤 공백을 지우고 보낸다', async () => {
     const mutateAsync = vi.fn().mockResolvedValue({ teamMatchId: 'tm-1', status: 'recruiting', detailRoute: '/admin/team-matches/tm-1', replayed: false });
     useCreate.mockReturnValue({ mutateAsync, isPending: false } as never);

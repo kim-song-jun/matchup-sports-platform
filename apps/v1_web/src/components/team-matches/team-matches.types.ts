@@ -1,4 +1,4 @@
-import type { ConfirmOptions } from '@/components/v1-ui/confirm-modal';
+import type { ConfirmOptions, ConfirmReasonConfig } from '@/components/v1-ui/confirm-modal';
 import type { PlaceValue } from '@/lib/place';
 import type { V1PlaceView, V1RecentVenue, V1TeamMatchApiStatus } from '@/types/api';
 
@@ -188,8 +188,11 @@ export type TeamMatchDetailViewModel = {
       cancelLabel?: string;
       /** 기본 'danger'(취소). 되돌릴 길이 있는 모집 마감은 'default'. */
       tone?: 'default' | 'danger';
+      /** 있으면 확인 창에 사유 입력칸을 두고, 적은 사유를 `onClick` 으로 넘긴다. */
+      reason?: ConfirmReasonConfig;
     };
-    onClick: () => void | Promise<unknown>;
+    /** `confirm.reason` 이 있으면 호스트가 적은 사유(선택이면 빈 문자열)를 받는다. */
+    onClick: (reason?: string) => void | Promise<unknown>;
   }>;
   /** 호스트의 신청 목록을 아직 받는 중 — 알림으로 들어온 호스트에게 "신청 없음"을 먼저 보이지 않는다. */
   applicationsPending?: boolean;

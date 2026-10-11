@@ -1,4 +1,5 @@
 import { ForbiddenException, GoneException } from '@nestjs/common';
+import { isForfeitedGame, NOT_FORFEITED_GAME_WHERE } from '../league-matches/league-forfeit-result';
 import { TournamentFixtureReviewsService } from './tournament-fixture-reviews.service';
 
 const user = {
@@ -393,12 +394,38 @@ describe('TournamentFixtureReviewsService', () => {
       ['outcomeReason=FORFEIT', { outcomeReason: 'FORFEIT', reason: null }],
       ['옛 몰수 마커 사유', { outcomeReason: 'NORMAL', reason: '[LEAGUE_FORFEIT] 상대 불참' }],
     ] as const;
+    // Applies the query's forfeit filter and `take` the way the database does, so the test fails if the
+    // forfeit filter moves back after `take`.
+    const forfeitAwareFindMany = (rows: Array<ReturnType<typeof fixture>>) =>
+      jest.fn(async ({ where, take }: { where: { game?: unknown }; take?: number }) =>
+        rows.filter((row) => where.game !== NOT_FORFEITED_GAME_WHERE || !isForfeitedGame(row.game as never)).slice(0, take));
+
+    it('pending: 최근 후보가 전부 몰수여도 그 뒤의 정상 경기를 돌려준다 — 몰수는 take 전에 거른다', async () => {
+      const forfeit = { outcomeReason: 'FORFEIT', reason: null };
+      const prisma = {
+        v1TeamMembership: { findMany: jest.fn().mockResolvedValue([{ teamId: reviewerTeamId, role: 'owner' }]) },
+        v1TeamMatch: {
+          findMany: forfeitAwareFindMany([
+            ...[1, 2, 3, 4, 5].map((n) => withRevision(`forfeit-${n}`, n, forfeit)),
+            withRevision(secondFixtureId, 9, { outcomeReason: 'NORMAL', reason: null }),
+          ]),
+        },
+        v1TournamentPlayer: playerStore([]),
+        v1PostEventReview: { findMany: jest.fn().mockResolvedValue([]) },
+        ...appearanceStore(),
+      };
+      const service = new TournamentFixtureReviewsService(prisma as never, reviewPolicyStub());
+
+      const pending = await service.pending(user, 1);
+
+      expect(pending.map((item) => item.sourceId)).toEqual([secondFixtureId]);
+    });
 
     it.each(forfeitRevisions)('pending: 몰수 확정 경기(%s)는 빠지고 정상·중단 경기는 남는다', async (_label, revision) => {
       const prisma = {
         v1TeamMembership: { findMany: jest.fn().mockResolvedValue([{ teamId: reviewerTeamId, role: 'owner' }]) },
         v1TeamMatch: {
-          findMany: jest.fn().mockResolvedValue([
+          findMany: forfeitAwareFindMany([
             withRevision(fixtureId, 1, revision),
             withRevision(secondFixtureId, 2, { outcomeReason: 'ABANDONED', reason: null }),
           ]),

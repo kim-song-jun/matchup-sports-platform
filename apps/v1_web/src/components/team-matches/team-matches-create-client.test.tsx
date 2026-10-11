@@ -51,7 +51,7 @@ vi.mock('next/navigation', () => ({
 }));
 
 vi.mock('@/components/v1-ui/confirm-modal', () => ({
-  useConfirm: () => ({ confirm: confirmMock, ConfirmModal: null }),
+  useConfirm: () => ({ confirm: confirmMock, confirmWithReason: confirmMock, ConfirmModal: null }),
 }));
 
 vi.mock('@/hooks/use-v1-api', () => ({
@@ -504,7 +504,7 @@ describe('TeamMatchEditPageClient — cancel confirmation', () => {
   });
 
   it('팀매치 취소 버튼을 눌러도 확인 전에는 취소 API를 호출하지 않는다', async () => {
-    confirmMock.mockResolvedValue(false); // 사용자가 확인 모달에서 '취소'를 누른 경우
+    confirmMock.mockResolvedValue(null); // 사용자가 확인 모달에서 '닫기'를 누른 경우
     render(<TeamMatchEditPageClient teamMatchId="team-match-edit-1" />);
 
     fireEvent.click(await screen.findByRole('button', { name: '팀매치 취소' }));
@@ -515,7 +515,7 @@ describe('TeamMatchEditPageClient — cancel confirmation', () => {
 
   // L29 — 닫기 버튼이 확정 버튼과 같은 '취소'였고, 제출한 참석명단이 잠긴다는 말이 없었다.
   it('확인창은 닫기 버튼을 "닫기"로 부르고 참석명단이 잠긴다고 알린다', async () => {
-    confirmMock.mockResolvedValue(false);
+    confirmMock.mockResolvedValue(null);
     render(<TeamMatchEditPageClient teamMatchId="team-match-edit-1" />);
 
     fireEvent.click(await screen.findByRole('button', { name: '팀매치 취소' }));
@@ -525,20 +525,47 @@ describe('TeamMatchEditPageClient — cancel confirmation', () => {
       cancelLabel: '닫기',
       tone: 'danger',
       message: expect.stringContaining('제출한 참석명단은 잠겨서 더는 수정할 수 없어요'),
+      reason: expect.objectContaining({ label: '취소 사유 (선택)', required: false, maxLength: 500 }),
     })));
   });
 
-  it('확인 모달에서 승인하면 그제서야 취소 API를 호출한다', async () => {
-    confirmMock.mockResolvedValue(true);
+  it('상대팀이 확정돼 수정이 잠긴 경기는 사유를 필수로 받는다', async () => {
+    confirmMock.mockResolvedValue(null);
+    teamMatchEditData.editable = false;
+    try {
+      render(<TeamMatchEditPageClient teamMatchId="team-match-edit-1" />);
+      fireEvent.click(await screen.findByRole('button', { name: '팀매치 취소' }));
+
+      await waitFor(() => expect(confirmMock).toHaveBeenCalledWith(expect.objectContaining({
+        reason: expect.objectContaining({ label: '취소 사유', required: true }),
+      })));
+    } finally {
+      teamMatchEditData.editable = true;
+    }
+  });
+
+  it('확인 모달에서 적은 사유를 취소 API 로 보낸다', async () => {
+    confirmMock.mockResolvedValue('개인 사정으로 어려워졌어요');
     render(<TeamMatchEditPageClient teamMatchId="team-match-edit-1" />);
 
     fireEvent.click(await screen.findByRole('button', { name: '팀매치 취소' }));
 
     await waitFor(() => {
       expect(cancelTeamMatchMutate).toHaveBeenCalledWith(
-        { reason: 'host_cancelled_from_v1_web' },
+        { reason: '개인 사정으로 어려워졌어요' },
         expect.any(Object),
       );
+    });
+  });
+
+  it('사유를 비워 두고 승인해도 취소는 진행되고 사유는 보내지 않는다', async () => {
+    confirmMock.mockResolvedValue('');
+    render(<TeamMatchEditPageClient teamMatchId="team-match-edit-1" />);
+
+    fireEvent.click(await screen.findByRole('button', { name: '팀매치 취소' }));
+
+    await waitFor(() => {
+      expect(cancelTeamMatchMutate).toHaveBeenCalledWith({ reason: null }, expect.any(Object));
     });
   });
 });

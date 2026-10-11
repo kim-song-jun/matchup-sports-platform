@@ -185,7 +185,8 @@ describe('loadGroupStandingSummaries', () => {
     const summaries = await loadGroupStandingSummaries(client, 'tournament-1');
 
     expect(summaries.get('grp-a')?.qualification).toEqual({ advancingRegistrationIds: ['r-b', 'r-c'], undecided: false });
-    expect(summaries.get('grp-b')?.qualification).toEqual({ advancingRegistrationIds: ['r-e'], undecided: false });
+    // 동률 없는 B조는 r-e 만 배치됐어도 순위로 확정된 나머지 진출 팀(r-d)까지 진출이다.
+    expect(summaries.get('grp-b')?.qualification).toEqual({ advancingRegistrationIds: ['r-d', 'r-e'], undecided: false });
   });
 
   it('덜 끝난 조는 맵에 없다 — 끝난 조는 그대로 남는다(대조)', async () => {

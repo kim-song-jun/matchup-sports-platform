@@ -1,4 +1,4 @@
-import type { ConfirmOptions } from '@/components/v1-ui/confirm-modal';
+import type { ConfirmOptions, ConfirmReasonConfig } from '@/components/v1-ui/confirm-modal';
 
 /**
  * 호스트가 팀매치를 취소할 때의 확인창 — 상세와 수정 화면이 같은 문구를 쓴다.
@@ -21,3 +21,16 @@ export const TEAM_MATCH_WITHDRAW_CONFIRM = {
   cancelLabel: '아니요',
   tone: 'danger',
 } as const satisfies ConfirmOptions;
+
+/** 서버 CancelTeamMatchDto.reason 의 @MaxLength(500) 과 같다. */
+const CANCEL_REASON_MAX_LENGTH = 500;
+
+/** 확정된 상대팀이 있으면 사유가 그 팀 알림에 담기므로 꼭 받는다. */
+export function teamMatchCancelReasonField(opponentConfirmed: boolean): ConfirmReasonConfig {
+  return {
+    label: opponentConfirmed ? '취소 사유' : '취소 사유 (선택)',
+    required: opponentConfirmed,
+    maxLength: CANCEL_REASON_MAX_LENGTH,
+    hint: opponentConfirmed ? '상대팀에 가는 취소 알림에 그대로 담겨요.' : '팀 일정과 변경 기록에 남아요.',
+  };
+}

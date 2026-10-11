@@ -50,6 +50,8 @@ const FOUR_TIE_TOP: Result[] = [['A', 'B', 0, 0], ['A', 'C', 1, 0], ['A', 'D', 1
 // 4팀 조: A 1위, B·C 가 2·3위 완전 동률, D 4위.
 const FOUR_TIE_MIDDLE: Result[] = [['A', 'B', 1, 0], ['A', 'C', 1, 0], ['A', 'D', 1, 0], ['B', 'C', 0, 0], ['B', 'D', 1, 0], ['C', 'D', 1, 0]];
 const TIE_SECOND_THIRD: Result[] = [['A', 'B', 1, 0], ['A', 'C', 1, 0], ['B', 'C', 0, 0]];
+// 4팀 조: A>B>C>D 동률 없음.
+const FOUR_CLEAN: Result[] = [['A', 'B', 1, 0], ['A', 'C', 1, 0], ['A', 'D', 1, 0], ['B', 'C', 1, 0], ['B', 'D', 1, 0], ['C', 'D', 1, 0]];
 // 저장 순위(설정: 승점 → 맞대결)는 B>A, §5(승점 → 득실)는 A>B 로 갈리는 4팀 조.
 const RULES_DISAGREE: Result[] = [
   ['B', 'A', 1, 0], ['A', 'C', 4, 0], ['A', 'D', 0, 0], ['B', 'C', 0, 0], ['D', 'B', 1, 0], ['C', 'D', 0, 1],
@@ -223,14 +225,19 @@ describe('summarizeGroupStanding', () => {
       expect(summary?.qualification).toEqual({ advancingRegistrationIds: [], undecided: true });
     });
 
-    it('안쪽 동률이면 일부만 배정돼도 안쪽 동률은 미정이 아니다 — 배정된 팀만 진출이고 undecided 는 false', () => {
+    it('안쪽 동률이면 일부만 배정돼도 안쪽 동률은 미정이 아니다 — 배정된 팀에 나머지 확정 팀을 더해 진출, undecided 는 false', () => {
       const summary = summarizeGroupStanding(sourceOf(['A', 'B', 'C', 'D'], FOUR_TIE_TOP), 2, new Set(['A']));
-      expect(summary?.qualification).toEqual({ advancingRegistrationIds: ['A'], undecided: false });
+      expect(summary?.qualification).toEqual({ advancingRegistrationIds: ['A', 'B'], undecided: false });
     });
 
     it('걸친 동률이면 일부만 배정됐을 때 undecided 가 남는다(대조)', () => {
       const summary = summarizeGroupStanding(sourceOf(['A', 'B', 'C', 'D'], FOUR_TIE_MIDDLE), 2, new Set(['A']));
       expect(summary?.qualification).toEqual({ advancingRegistrationIds: ['A'], undecided: true });
+    });
+
+    it('걸친 동률에서 어드민이 동률 팀 하나를 골라 배치했으면 나머지 자리는 확정 팀이 채워 미정이 아니다', () => {
+      const summary = summarizeGroupStanding(sourceOf(['A', 'B', 'C', 'D'], FOUR_TIE_MIDDLE), 2, new Set(['B']));
+      expect(summary?.qualification).toEqual({ advancingRegistrationIds: ['A', 'B'], undecided: false });
     });
 
     it('저장 순위와 §5 가 갈린 두 팀이 모두 진출선 안쪽이면(상위 3팀) 둘 다 진출이고 undecided 가 아니다', () => {
@@ -263,9 +270,24 @@ describe('summarizeGroupStanding', () => {
       expect(summary?.sharedRankByRegistrationId.size).toBe(3);
     });
 
-    it('동률 없는 조에서 자리가 일부만 채워졌으면 채운 팀만 진출이고 undecided 가 아니다', () => {
+    it('동률 없는 조에서 자리가 일부만 채워졌어도 순위로 확정된 나머지 팀까지 진출이고 undecided 가 아니다', () => {
       const summary = summarizeGroupStanding(sourceOf(['A', 'B', 'C'], CLEAN), 2, new Set(['A']));
-      expect(summary?.qualification).toEqual({ advancingRegistrationIds: ['A'], undecided: false });
+      expect(summary?.qualification).toEqual({ advancingRegistrationIds: ['A', 'B'], undecided: false });
+    });
+
+    it('동률 없는 4팀 조·상위 2팀 진출에서 결선에 1팀만 배치돼도 확정 2팀이 진출이다', () => {
+      const summary = summarizeGroupStanding(sourceOf(['A', 'B', 'C', 'D'], FOUR_CLEAN), 2, new Set(['B']));
+      expect(summary?.qualification).toEqual({ advancingRegistrationIds: ['A', 'B'], undecided: false });
+    });
+
+    it('다른 조 팀만 배치됐으면 이 조는 아무도 안 들어간 것과 같다 — 상위 N팀 진출(대조)', () => {
+      const summary = summarizeGroupStanding(sourceOf(['A', 'B', 'C'], CLEAN), 2, new Set(['OTHER-GROUP']));
+      expect(summary?.qualification).toEqual({ advancingRegistrationIds: ['A', 'B'], undecided: false });
+    });
+
+    it('어드민이 자리에 순위와 다른 팀을 넣었으면 그 팀이 먼저 들어가고 남은 자리만 순위 순으로 채운다 — 진출 수를 넘지 않는다', () => {
+      const summary = summarizeGroupStanding(sourceOf(['A', 'B', 'C'], CLEAN), 2, new Set(['C']));
+      expect(summary?.qualification).toEqual({ advancingRegistrationIds: ['A', 'C'], undecided: false });
     });
 
     it('advanceCount 가 조 팀 수 이상이면 완전 동률이어도 조 전체가 진출이고 undecided 가 아니다', () => {

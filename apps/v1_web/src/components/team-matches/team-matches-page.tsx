@@ -295,7 +295,7 @@ function HeroTeamChevron() {
 }
 
 export function TeamMatchDetailPageView({ model, recordEntry, lifecyclePanel }: { model: TeamMatchDetailViewModel; recordEntry?: React.ReactNode; lifecyclePanel?: React.ReactNode }) {
-  const { confirm, ConfirmModal } = useConfirm();
+  const { confirm, confirmWithReason, ConfirmModal } = useConfirm();
   const { match, mode } = model;
   const detailImage = teamMatchImage(match, 'detail');
   const hasAssignedHostTeam = Boolean(match.hostTeamId);
@@ -393,12 +393,20 @@ export function TeamMatchDetailPageView({ model, recordEntry, lifecyclePanel }: 
 
   // ⋯ 메뉴 항목 — 확인 창은 시트 위에 겹쳐 뜨고, 확정했을 때만 시트를 닫고 실행한다.
   const runHostAction = async (action: NonNullable<TeamMatchDetailViewModel['hostActions']>[number]) => {
+    let reason: string | undefined;
     if (action.confirm) {
-      const accepted = await confirm({ ...action.confirm, tone: action.confirm.tone ?? 'danger' });
-      if (!accepted) return;
+      const { reason: reasonField, ...options } = action.confirm;
+      const confirmOptions = { ...options, tone: options.tone ?? 'danger' };
+      if (reasonField) {
+        const answer = await confirmWithReason({ ...confirmOptions, reason: reasonField });
+        if (answer === null) return;
+        reason = answer;
+      } else if (!(await confirm(confirmOptions))) {
+        return;
+      }
     }
     setMenuOpen(false);
-    runHeroAction(action.onClick, `${action.label} 처리를 완료했어요.`);
+    runHeroAction(() => action.onClick(reason), `${action.label} 처리를 완료했어요.`);
   };
 
   type ApplicantTeam = TeamMatchDetailViewModel['match']['applicantTeams'][number];
@@ -1342,7 +1350,7 @@ function ConditionStep({ model }: { model: TeamMatchCreateViewModel }) {
 function ConditionFields({ model }: { model: TeamMatchCreateViewModel }) {
   const d = model.draft;
   const formatOptions = matchFormatOptionsForSport(model.selectedSport);
-  return <><TeamMatchLevelRangeField value={d.grade} error={model.form?.fieldErrors?.grade} onChange={(value) => model.form?.onFieldChange('grade', value)} /><PresetChipSelector label="경기방식" options={formatOptions} value={d.format} allowFreeText freeTextPlaceholder="예: 10:10, 3:3" onChange={(value) => model.form?.onFieldChange('format', value)} /><MultiPresetChipSelector label="경기 스타일" options={MATCH_STYLE_OPTIONS} values={d.style} allowFreeText freeTextPlaceholder="목록에 없으면 직접 입력해 주세요" maxItems={MATCH_STYLE_MAX_ITEMS} onChange={(value) => model.form?.onFieldChange('style', value)} /><PresetChipSelector label="유니폼 색상" options={UNIFORM_COLOR_OPTIONS} value={d.uniform} allowFreeText freeTextPlaceholder="예: 줄무늬 상의" onChange={(value) => model.form?.onFieldChange('uniform', value)} /><GenderRuleSelector value={d.gender} onChange={(value) => model.form?.onFieldChange('gender', value)} /><div className="tm-create-two-col"><CreateField label="총비용" value={`${d.cost}`} suffix="원" type="number" onChange={(value) => model.form?.onFieldChange('cost', Number(value))} /><CreateField label="상대팀 부담금" value={`${d.opponentCost}`} suffix="원" type="number" description={TEAM_MATCH_COST_EXPLANATION} onChange={(value) => model.form?.onFieldChange('opponentCost', Number(value))} /></div></>;
+  return <><TeamMatchLevelRangeField value={d.grade} error={model.form?.fieldErrors?.grade} onChange={(value) => model.form?.onFieldChange('grade', value)} /><PresetChipSelector label="경기방식" options={formatOptions} value={d.format} allowFreeText freeTextPlaceholder="예: 10:10, 3:3" onChange={(value) => model.form?.onFieldChange('format', value)} /><MultiPresetChipSelector label="경기 스타일" options={MATCH_STYLE_OPTIONS} values={d.style} allowFreeText freeTextPlaceholder="목록에 없으면 직접 입력해 주세요" maxItems={MATCH_STYLE_MAX_ITEMS} onChange={(value) => model.form?.onFieldChange('style', value)} /><PresetChipSelector label="유니폼 색상" options={UNIFORM_COLOR_OPTIONS} value={d.uniform} allowFreeText freeTextPlaceholder="예: 줄무늬 상의" onChange={(value) => model.form?.onFieldChange('uniform', value)} /><GenderRuleSelector value={d.gender} onChange={(value) => model.form?.onFieldChange('gender', value)} /><div className="tm-create-two-col"><CreateField label="총비용" value={`${d.cost}`} suffix="원" type="number" onChange={(value) => model.form?.onFieldChange('cost', Number(value))} /><CreateField id="field-opponentCost" error={model.form?.fieldErrors?.opponentCost} label="상대팀 부담금" value={`${d.opponentCost}`} suffix="원" type="number" description={TEAM_MATCH_COST_EXPLANATION} onChange={(value) => model.form?.onFieldChange('opponentCost', Number(value))} /></div></>;
 }
 
 // [P3] 위와 동일 원칙 — 캡션은 '장소와 시간'(단계 이름) 그대로, h1 만 질문형으로.

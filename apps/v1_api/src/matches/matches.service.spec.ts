@@ -292,6 +292,44 @@ describe('MatchesService', () => {
     );
   });
 
+  it('complete: 불참으로 지정된 참가자에게만 match_no_show를, 참여한 참가자에게는 match_completed만 보낸다', async () => {
+    prisma.v1Match.findFirst.mockResolvedValue(matchRow({
+      startAt: PAST,
+      proceedConfirmedAt: new Date(),
+      participants: [
+        { id: 'host-participant', userId: host.id, role: 'host', status: 'active' },
+        { id: 'attended-participant', userId: otherUser.id, role: 'participant', status: 'active' },
+        { id: 'absent-participant', userId: 'absent-user', role: 'participant', status: 'active' },
+        { id: 'absent-participant-2', userId: 'absent-user-2', role: 'participant', status: 'active' },
+      ],
+    }));
+    prisma.v1Match.update.mockResolvedValue(matchRow({ status: 'completed', completedAt: new Date() }));
+    prisma.v1MatchParticipant.update.mockResolvedValue({});
+    prisma.v1MatchApplication.findMany.mockResolvedValue([]);
+    prisma.v1MatchApplication.updateMany.mockResolvedValue({ count: 0 });
+
+    await service.complete(host, 'match-1', {
+      participants: [
+        { participantId: 'attended-participant', status: 'completed' },
+        { participantId: 'absent-participant', status: 'no_show' },
+        { participantId: 'absent-participant-2', status: 'no_show' },
+      ],
+    });
+
+    expect(notifications.emitNotificationToMany).toHaveBeenCalledWith(
+      ['absent-user', 'absent-user-2'],
+      'match_no_show',
+      'match-1',
+      expect.any(String),
+    );
+    expect(notifications.emitNotificationToMany).toHaveBeenCalledWith(
+      [otherUser.id],
+      'match_completed',
+      'match-1',
+      expect.any(String),
+    );
+  });
+
   it('complete: 참가하지 않는 호스트를 참가자로 다시 만들거나 완료 인원에 포함하지 않는다', async () => {
     prisma.v1Match.findFirst.mockResolvedValue(matchRow({
       startAt: PAST,
@@ -477,6 +515,49 @@ describe('MatchesService', () => {
       matchId: 'match-1', hostUserId: host.id, userId: applicationRow().applicantUserId, approvedAt,
     });
     expect(chat.deliverSystemLine).toHaveBeenCalledWith({ messageId: 'joined-line' });
+  });
+
+  describe('approveApplication: 신청 마감 시각 이후', () => {
+    it('마감 전에 들어온 대기 신청은 마감 시각이 지나도 경기 시작 전이면 승인된다', async () => {
+      const match = matchRow({ status: 'recruiting', startAt: FUTURE, deadlineAt: PAST });
+      prisma.v1MatchApplication.findFirst.mockResolvedValue(applicationRow({ match }));
+      prisma.v1Match.findFirst.mockResolvedValue(match);
+      prisma.v1MatchApplication.updateMany.mockResolvedValue({ count: 1 });
+      prisma.v1MatchParticipant.upsert.mockResolvedValue({ id: 'participant-1' });
+
+      await expect(service.approveApplication(host, 'app-1', {})).resolves.toMatchObject({
+        applicationId: 'app-1',
+        status: 'approved',
+      });
+      expect(prisma.v1MatchParticipant.upsert).toHaveBeenCalledTimes(1);
+    });
+
+    it('마감 시각이 지나도 정원이 찼으면 여전히 FULL 로 막힌다', async () => {
+      const match = matchRow({ status: 'recruiting', startAt: FUTURE, deadlineAt: PAST, maxParticipants: 6 });
+      prisma.v1MatchApplication.findFirst.mockResolvedValue(applicationRow({ match }));
+      prisma.v1Match.findFirst.mockResolvedValue(match);
+      prisma.v1MatchParticipant.count.mockResolvedValue(6);
+
+      await expect(service.approveApplication(host, 'app-1', {})).rejects.toMatchObject({
+        response: { code: 'FULL' },
+      });
+      expect(prisma.v1MatchParticipant.upsert).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      ['경기 시작 시각이 지났으면', { status: 'recruiting', startAt: PAST, deadlineAt: PAST }],
+      ['호스트가 직접 마감한 매치면', { status: 'closed', startAt: FUTURE, deadlineAt: PAST }],
+      ['취소된 매치면', { status: 'cancelled', startAt: FUTURE, deadlineAt: null }],
+    ])('%s 승인할 수 없다', async (_label, overrides) => {
+      const match = matchRow(overrides);
+      prisma.v1MatchApplication.findFirst.mockResolvedValue(applicationRow({ match }));
+      prisma.v1Match.findFirst.mockResolvedValue(match);
+
+      await expect(service.approveApplication(host, 'app-1', {})).rejects.toMatchObject({
+        response: { code: 'STATE_CONFLICT' },
+      });
+      expect(prisma.v1MatchParticipant.upsert).not.toHaveBeenCalled();
+    });
   });
 
   // ─── 5. 비-호스트 신청 승인 → 403 PERMISSION_DENIED ─────────────────────

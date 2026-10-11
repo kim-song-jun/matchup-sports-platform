@@ -416,6 +416,8 @@ export interface PublicTeamRecordItem {
   readonly playedAt: string;
   /** 승부차기가 있었던 경기(결선 무승부 후 승부차기)만 채워진다. */
   readonly penalties: PublicTeamRecordPenalties | null;
+  /** 몰수로 확정된 경기. 점수는 관례 스코어(1:0)이고, `status_only` 경기에서는 항상 false 다. */
+  readonly isForfeit: boolean;
   /** 시간순(period asc, clockMs asc) 정렬. 골·카드 이벤트만 담긴다. */
   readonly events: readonly PublicTeamRecordEvent[];
 }

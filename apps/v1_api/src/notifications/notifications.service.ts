@@ -20,6 +20,7 @@ export type NotificationEventType =
   | 'match_cancelled'
   | 'match_closed'
   | 'match_completed'
+  | 'match_no_show'
   | 'match_updated'
   | 'match_proceed_confirmed'
   | 'team_join_application_received'
@@ -239,7 +240,8 @@ function preferenceFieldForEvent(type: NotificationEventType): NotificationPrefF
     type === 'match_closed' ||
     type === 'match_updated' ||
     type === 'match_proceed_confirmed' ||
-    type === 'match_completed'
+    type === 'match_completed' ||
+    type === 'match_no_show'
   ) {
     return 'matchEnabled';
   }
@@ -331,7 +333,8 @@ function targetTypeForEvent(type: NotificationEventType): V1NotificationTargetTy
     type === 'match_closed' ||
     type === 'match_updated' ||
     type === 'match_proceed_confirmed' ||
-    type === 'match_completed'
+    type === 'match_completed' ||
+    type === 'match_no_show'
   ) {
     return 'match';
   }
@@ -577,6 +580,7 @@ const EVENT_TITLES: Record<NotificationEventType, string> = {
   match_updated: '매치 일정·장소가 변경됐어요',
   match_proceed_confirmed: '매치 진행이 확정됐어요',
   match_completed: '매치가 완료됐어요. 리뷰를 남겨보세요!',
+  match_no_show: '매치 불참으로 기록됐어요',
   team_join_application_received: '{name}님이 가입을 신청했어요',
   team_join_application_accepted: '팀 가입 신청이 수락됐어요',
   team_join_application_rejected: '팀 가입 신청이 거절됐어요',
@@ -662,6 +666,7 @@ const EVENT_BODIES: Record<NotificationEventType, string> = {
   match_updated: '변경 내용을 확인하고 다시 신청해 주세요.',
   match_proceed_confirmed: '현재 확정 인원으로 진행해요.',
   match_completed: '함께한 매치의 리뷰를 남겨보세요.',
+  match_no_show: '호스트가 이번 매치를 불참으로 기록했어요.',
   team_join_application_received: '"{team}" · 승인하거나 거절해 주세요.',
   team_join_application_accepted: '팀 가입이 승인됐어요.',
   team_join_application_rejected: '팀 가입 신청이 거절됐어요.',

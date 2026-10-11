@@ -546,13 +546,23 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
         { number: 1, state: 'LIVE', startedAt: '2026-08-07T00:00:00.000Z', endedAt: null },
         { number: 2, state: 'SCHEDULED', startedAt: null, endedAt: null },
       ]);
-      const state = consoleState({ liveEvents });
+      // 방금 적재한 옐로(q-1)는 이미 서버에 확정된 상태 — 레드는 옐로가 확정된 뒤에만 적재된다.
+      const state = consoleState({ liveEvents, queue: { items: [queuedYellow('acked')] } });
+      state.submitEvent.mockResolvedValue('q-1');
       mocks.useV1GameOperationsConsole.mockReturnValue(state);
       render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
       fireEvent.click(screen.getByRole('button', { name: /^옐로카드/ }));
       fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'select-player' }));
       fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: '옐로카드 기록' }));
       return state.submitEvent;
+    }
+
+    function queuedYellow(status: 'queued' | 'sending' | 'acked' | 'failed') {
+      return {
+        clientEventId: 'q-1', gameId: 'game-1', expectedVersion: 2, status,
+        event: { type: 'CARD', sideId: SIDE_ID, participantId: 'p-1', period: 1, clockMs: 1, occurredAt: '', payload: { card: 'YELLOW' } },
+        payloadHash: 'h', queuedAt: '', attempts: 0, lastError: null, ackedSequence: null, ackedVersion: null,
+      };
     }
 
     it('같은 선수의 두 번째 옐로를 기록하면 레드도 기록할지 묻고, 확인하면 레드를 한 번 더 기록한다', async () => {
@@ -584,6 +594,7 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
         { number: 2, state: 'SCHEDULED', startedAt: null, endedAt: null },
       ]);
       const state = consoleState({ liveEvents: [yellow(1, 'p-1')] });
+      state.submitEvent.mockResolvedValue('q-1');
       mocks.useV1GameOperationsConsole.mockReturnValue(state);
       const { rerender } = render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
       fireEvent.click(screen.getByRole('button', { name: /^옐로카드/ }));
@@ -613,6 +624,36 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
 
       await waitFor(() => expect(state.submitEvent).toHaveBeenCalledTimes(2));
       expect(state.submitEvent).toHaveBeenLastCalledWith(expect.objectContaining({ payload: { card: 'RED' } }));
+    });
+
+    it('옐로 기록이 실패하면 레드를 적재하지 않고 다시 보내라고 안내한다 — 레드만 남거나 순서가 뒤집히지 않게', async () => {
+      gameWithPeriods('LIVE', [
+        { number: 1, state: 'LIVE', startedAt: '2026-08-07T00:00:00.000Z', endedAt: null },
+        { number: 2, state: 'SCHEDULED', startedAt: null, endedAt: null },
+      ]);
+      const state = consoleState({ liveEvents: [yellow(1, 'p-1')] });
+      state.submitEvent.mockResolvedValue('q-1');
+      mocks.useV1GameOperationsConsole.mockReturnValue(state);
+      const { rerender } = render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+      fireEvent.click(screen.getByRole('button', { name: /^옐로카드/ }));
+      fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'select-player' }));
+      fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: '옐로카드 기록' }));
+      const redButton = await screen.findByRole('button', { name: '레드도 기록' });
+      mocks.useV1GameOperationsConsole.mockReturnValue(
+        consoleState({ liveEvents: [yellow(1, 'p-1')], queue: { items: [queuedYellow('sending')] }, submitEvent: state.submitEvent }),
+      );
+      rerender(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+      fireEvent.click(redButton);
+      await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+
+      mocks.useV1GameOperationsConsole.mockReturnValue(
+        consoleState({ liveEvents: [yellow(1, 'p-1')], queue: { items: [queuedYellow('failed')] }, submitEvent: state.submitEvent }),
+      );
+      rerender(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+
+      expect(await screen.findByText('옐로 기록이 실패했어요. 옐로를 다시 보낸 뒤 레드를 기록해 주세요.')).toBeInTheDocument();
+      expect(state.submitEvent).toHaveBeenCalledTimes(1);
+      expect(state.submitEvent).not.toHaveBeenCalledWith(expect.objectContaining({ payload: { card: 'RED' } }));
     });
 
     it('"옐로만 둘게요"를 고르면 레드를 기록하지 않는다', async () => {

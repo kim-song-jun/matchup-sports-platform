@@ -360,4 +360,102 @@ describe('PublicTeamRecordsService', () => {
     const names = result.items[0].events.map((event) => event.participantName);
     expect(names).toEqual(['김도윤', null, '게스트 득점자']);
   });
+
+  describe('몰수 표시(isForfeit)', () => {
+    type RevisionOutcome = { outcomeReason: string; reason: string | null };
+
+    function forfeitFact(
+      n: number,
+      outcome: RevisionOutcome,
+      result: 'WON' | 'LOST',
+      policyMode: 'LIVE' | 'STATUS_ONLY' = 'LIVE',
+    ) {
+      return {
+        id: `fact-${n}`,
+        revisionId: `revision-${n}`,
+        gameId: `game-${n}`,
+        opponentTeamId: 'team-2',
+        tournamentId: 'tournament-1',
+        result,
+        goalsFor: result === 'WON' ? 1 : 0,
+        goalsAgainst: result === 'WON' ? 0 : 1,
+        playedAt: new Date(`2026-08-0${n}T02:00:00.000Z`),
+        resultRevision: {
+          score: { home: 1, away: 0 },
+          goalEvents: null,
+          ...outcome,
+          game: {
+            currentOfficialRevisionId: `revision-${n}`,
+            visibilityPolicy: { mode: policyMode },
+            teamMatchId: null,
+            sides: [
+              { id: 'side-home', sideKey: 'HOME', teamId: 'team-1' },
+              { id: 'side-away', sideKey: 'AWAY', teamId: 'team-2' },
+            ],
+            participants: [],
+          },
+        },
+      };
+    }
+
+    function buildPrisma(facts: ReturnType<typeof forfeitFact>[]) {
+      // 실제 Prisma 처럼 select 에 없는 필드는 돌려주지 않는다 — select 누락이 실패로 드러나게 한다.
+      const findMany = jest.fn(async (args: { select: { resultRevision: { select: Record<string, unknown> } } }) =>
+        facts.map((fact) => {
+          const selected = args.select.resultRevision.select;
+          const { outcomeReason, reason, ...rest } = fact.resultRevision;
+          return {
+            ...fact,
+            resultRevision: {
+              ...rest,
+              ...(selected.outcomeReason === true ? { outcomeReason } : {}),
+              ...(selected.reason === true ? { reason } : {}),
+            },
+          };
+        }),
+      );
+      return {
+        v1GameOperationFlag: { findUnique: jest.fn().mockResolvedValue({ value: 'on' }) },
+        v1Team: {
+          findUnique: jest.fn().mockResolvedValue({ id: 'team-1', name: '서울 유나이티드', profile: null }),
+          findMany: jest.fn().mockResolvedValue([{ id: 'team-2', name: '부산 FC', profile: null }]),
+        },
+        v1TeamRecordFact: { findMany: findMany },
+        v1Tournament: { findMany: jest.fn().mockResolvedValue([{ id: 'tournament-1', title: '주말 리그' }]) },
+        v1TeamMatch: { findMany: jest.fn().mockResolvedValue([]) },
+        v1GameEvent: { findMany: jest.fn().mockResolvedValue([]) },
+        $queryRaw: jest
+          .fn()
+          .mockResolvedValueOnce(facts.map((fact) => ({ id: fact.id, playedAt: fact.playedAt })))
+          .mockResolvedValueOnce([])
+          .mockResolvedValueOnce([{ season: '2026' }]),
+      } as unknown as PrismaService;
+    }
+
+    it('몰수승·몰수패 행만 isForfeit 이고 정상 종료·중단 행은 아니다', async () => {
+      const prisma = buildPrisma([
+        forfeitFact(1, { outcomeReason: 'FORFEIT', reason: null }, 'WON'),
+        forfeitFact(2, { outcomeReason: 'NORMAL', reason: '[LEAGUE_RESULT_CORRECTION] [LEAGUE_FORFEIT] 불참' }, 'LOST'),
+        forfeitFact(3, { outcomeReason: 'NORMAL', reason: null }, 'WON'),
+        forfeitFact(4, { outcomeReason: 'ABANDONED', reason: null }, 'WON'),
+      ]);
+
+      const result = await new PublicTeamRecordsService(prisma).getRecords('team-1', {});
+
+      expect(result.items.map((item) => [item.gameId, item.isForfeit])).toEqual([
+        ['game-1', true],
+        ['game-2', true],
+        ['game-3', false],
+        ['game-4', false],
+      ]);
+    });
+
+    it('결과를 가린 status_only 경기는 몰수 여부도 드러내지 않는다', async () => {
+      const prisma = buildPrisma([forfeitFact(1, { outcomeReason: 'FORFEIT', reason: null }, 'WON', 'STATUS_ONLY')]);
+
+      const result = await new PublicTeamRecordsService(prisma).getRecords('team-1', {});
+
+      expect(result.items[0]).toEqual(expect.objectContaining({ result: null, isForfeit: false }));
+    });
+  });
 });

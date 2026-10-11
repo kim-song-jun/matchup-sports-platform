@@ -129,7 +129,7 @@ describe('ChatService', () => {
     v1StatusChangeLog: { create: jest.Mock };
     v1Match: { findFirst: jest.Mock; findUnique: jest.Mock };
     v1MatchParticipant: { findFirst: jest.Mock };
-    v1TeamMembership: { findFirst: jest.Mock };
+    v1TeamMembership: { findFirst: jest.Mock; findMany: jest.Mock };
     v1TeamMatch: { findFirst: jest.Mock; findMany: jest.Mock };
     v1UploadAsset: { findFirst: jest.Mock };
     v1TeamSchedule: { findFirst: jest.Mock };
@@ -174,7 +174,7 @@ describe('ChatService', () => {
         }),
       },
       v1MatchParticipant: { findFirst: jest.fn() },
-      v1TeamMembership: { findFirst: jest.fn() },
+      v1TeamMembership: { findFirst: jest.fn(), findMany: jest.fn().mockResolvedValue([]) },
       v1TeamMatch: { findFirst: jest.fn(), findMany: jest.fn() },
       v1UploadAsset: { findFirst: jest.fn() },
       v1TeamSchedule: { findFirst: jest.fn() },

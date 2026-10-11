@@ -1,5 +1,6 @@
 import { ensurePlatformTeamMatchChat } from '../chat/platform-team-match-chat';
 import { canConfirmTeamMatch, validateTeamMatchDates } from './team-match-dates';
+import { assertOpponentCostWithinTotal } from './team-match-cost';
 import {
   BadRequestException,
   ConflictException,
@@ -101,6 +102,8 @@ export class AdminTeamMatchRecruitmentsService {
         return this.createResponse(teamMatch.id, teamMatch.status, true);
       }
 
+      // After the replay lookup: a request accepted before this rule existed must still replay.
+      assertOpponentCostWithinTotal(dto.costNote);
       const levelRange = await resolveSportLevelRange(
         tx,
         dto.sportId,
@@ -482,7 +485,7 @@ export class AdminTeamMatchRecruitmentsService {
       );
       this.emitTeamNotifications(
         result.rejectedTeamIds,
-        'team_match_application_rejected',
+        'team_match_closed',
         teamMatchId,
         '신청한 팀매치의 참가팀이 확정되어 모집이 종료됐어요.',
       );
@@ -622,6 +625,7 @@ export class AdminTeamMatchRecruitmentsService {
       throw new ConflictException({ code: 'TEAM_MATCH_SPORT_IMMUTABLE', message: '모집을 만든 뒤에는 종목을 변경할 수 없어요.' });
     }
     const dates = validateTeamMatchDates(dto, existing.deadlineAt);
+    assertOpponentCostWithinTotal(dto.costNote);
     const [region, levelRange] = await Promise.all([
       this.prisma.v1Region.findFirst({ where: { id: dto.regionId, isActive: true, level: 2 }, select: { id: true } }),
       resolveSportLevelRange(this.prisma, dto.sportId, dto.minLevelCode, dto.maxLevelCode),
@@ -753,7 +757,7 @@ export class AdminTeamMatchRecruitmentsService {
     return game;
   }
 
-  private emitTeamNotifications(teamIds: string[], type: 'team_match_application_approved' | 'team_match_application_rejected', teamMatchId: string, body: string) {
+  private emitTeamNotifications(teamIds: string[], type: 'team_match_application_approved' | 'team_match_application_rejected' | 'team_match_closed', teamMatchId: string, body: string) {
     if (teamIds.length === 0) return;
     this.notifications.emitToManyDeferred(
       async () => (

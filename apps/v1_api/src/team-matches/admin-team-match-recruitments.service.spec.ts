@@ -1,5 +1,6 @@
 import { ForbiddenException } from '@nestjs/common';
 import { AdminTeamMatchRecruitmentsService } from './admin-team-match-recruitments.service';
+import { canonicalGameCommandPayloadHash } from '../games/games.service';
 
 const adminUser = {
   id: 'admin-user',
@@ -165,6 +166,26 @@ describe('AdminTeamMatchRecruitmentsService', () => {
     service = new AdminTeamMatchRecruitmentsService(prisma, adminContext, games, notifications);
   });
 
+  it('rejects an opponent share above the total cost before writing', async () => {
+    await expect(service.create(adminUser, { ...createDto, costNote: '총 50,000원 · 상대팀 80,000원' })).rejects.toMatchObject({
+      status: 400,
+      response: { code: 'VALIDATION_FAILED', details: { field: 'costNote' } },
+    });
+    expect(prisma.v1TeamMatch.create).not.toHaveBeenCalled();
+  });
+
+  it('replays a recruitment accepted before the cost rule existed instead of rejecting the retry', async () => {
+    const overLimitDto = { ...createDto, costNote: '총 50,000원 · 상대팀 80,000원' };
+    prisma.v1IdempotencyRecord.findFirst.mockResolvedValue({
+      resourceId: 'team-match-1',
+      payloadHash: canonicalGameCommandPayloadHash({ actorUserId: adminUser.id, dto: overLimitDto }),
+    });
+    prisma.v1TeamMatch.findUniqueOrThrow.mockResolvedValue({ id: 'team-match-1', status: 'recruiting' });
+
+    await expect(service.create(adminUser, overLimitDto)).resolves.toMatchObject({ teamMatchId: 'team-match-1', replayed: true });
+    expect(prisma.v1TeamMatch.create).not.toHaveBeenCalled();
+  });
+
   it('opens a platform recruitment without assigning either team or creating a game', async () => {
     await expect(service.create(adminUser, createDto)).resolves.toEqual({
       teamMatchId: 'team-match-1',
@@ -241,6 +262,38 @@ describe('AdminTeamMatchRecruitmentsService', () => {
       expect.anything(),
       expect.objectContaining({ action: 'team_match.application.approve', targetId: homeApplicationId }),
       prisma,
+    );
+  });
+
+  it('titles the auto-closed applications as closed, not rejected, when the second team is confirmed', async () => {
+    prisma.v1TeamMatch.findFirst.mockResolvedValueOnce({
+      ...await prisma.v1TeamMatch.findFirst(),
+      hostTeamId: 'team-home',
+      game: { id: 'game-1' },
+      applications: [
+        application(homeApplicationId, 'team-home', '홈 FC', 'approved'),
+        application(awayApplicationId, 'team-away', '원정 FC'),
+        application('00000000-0000-4000-8000-000000000403', 'team-late', '늦은 FC'),
+      ],
+    });
+
+    prisma.v1TeamMatchApplication.findMany.mockResolvedValueOnce([
+      { id: '00000000-0000-4000-8000-000000000403', applicantTeamId: 'team-late' },
+    ]);
+
+    await service.approveApplication(adminUser, 'team-match-1', awayApplicationId, approveDto);
+
+    expect(notifications.emitToManyDeferred).toHaveBeenCalledWith(
+      expect.any(Function),
+      'team_match_closed',
+      'team-match-1',
+      '신청한 팀매치의 참가팀이 확정되어 모집이 종료됐어요.',
+    );
+    expect(notifications.emitToManyDeferred).not.toHaveBeenCalledWith(
+      expect.any(Function),
+      'team_match_application_rejected',
+      expect.anything(),
+      expect.anything(),
     );
   });
 

@@ -38,6 +38,7 @@ import { describeLeaguePeriods, totalPeriodMinutes } from './league-period-defau
 import { pickLeagueNextAction } from '@/lib/league-next-action';
 import { leagueFixtureResultCell } from '@/lib/competition-status';
 import { extractErrorMessage } from '@/lib/error-message';
+import { josa } from '@/lib/korean';
 import { expandWeeklyFixtureDates, WEEKDAY_OPTIONS } from '@/lib/league-fixture-dates';
 import { toKstDateString } from '@/lib/kst-calendar';
 import { LeagueFixtureDatePicker } from './league-fixture-date-picker';
@@ -539,10 +540,10 @@ export default function LeagueMatchFixturesClient({
           setTeamSearch('');
           showToast(
             !result.hasExistingFixtures
-              ? `${item.label}을(를) 추가했어요.`
+              ? `${josa(item.label, ['을', '를'])} 추가했어요.`
               : leagueHasOfficialResult
-                ? `${item.label}을(를) 추가했어요. 다만 이 리그는 이미 확정된 결과가 있어 대진 재생성이 불가능해요 — 이 팀은 순위표에만 표시돼요.`
-                : `${item.label}을(를) 추가했어요. 대진에 반영하려면 표 아래 "대진 관리"에서 "대진 재생성"을 눌러 주세요.`,
+                ? `${josa(item.label, ['을', '를'])} 추가했어요. 다만 이 리그는 이미 확정된 결과가 있어 대진 재생성이 불가능해요 — 이 팀은 순위표에만 표시돼요.`
+                : `${josa(item.label, ['을', '를'])} 추가했어요. 대진에 반영하려면 표 아래 "대진 관리"에서 "대진 재생성"을 눌러 주세요.`,
             'success',
           );
         },
@@ -564,8 +565,8 @@ export default function LeagueMatchFixturesClient({
         setRemoveTarget(null);
         showToast(
           result.cancelledFixtureCount > 0
-            ? `${teamName}을(를) 제외했어요. 관련 대진 ${result.cancelledFixtureCount}경기도 함께 취소됐어요.`
-            : `${teamName}을(를) 제외했어요.`,
+            ? `${josa(teamName, ['을', '를'])} 제외했어요. 관련 대진 ${result.cancelledFixtureCount}경기도 함께 취소됐어요.`
+            : `${josa(teamName, ['을', '를'])} 제외했어요.`,
           'success',
         );
       },
@@ -1598,7 +1599,7 @@ function RemoveTeamConfirmModal({
             className="text-[length:var(--font-size-body-lg)] font-bold text-[var(--text-strong)] flex items-center gap-2"
           >
             <AlertTriangle size={17} className="text-[var(--orange700)]" aria-hidden="true" />
-            {teamName}을(를) 제외할까요?
+            {josa(teamName, ['을', '를'])} 제외할까요?
           </h2>
           <button
             type="button"

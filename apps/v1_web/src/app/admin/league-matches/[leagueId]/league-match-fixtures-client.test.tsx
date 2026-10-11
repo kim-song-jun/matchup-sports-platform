@@ -2464,6 +2464,38 @@ describe('LeagueMatchFixturesClient — 지금 할 일 카드와 콘솔 열기',
     expect(screen.queryByText(/경기가 진행 중인 팀은/)).toBeNull();
     expect(screen.queryByText(/진행 중인 경기가 있어 대진을 다시 만들 수 없어요/)).toBeNull();
   });
+
+  // 팀 이름 받침에 따라 확인 창·완료 토스트의 조사가 갈린다. 받침 있음·없음·숫자 끝을 양쪽에 둔다.
+  it.each([
+    ['송파 유나이티드', '송파 유나이티드를'],
+    ['서울 철강', '서울 철강을'],
+    ['레드2', '레드2를'],
+    ['(테스트)1010', '(테스트)1010을'],
+  ])('%s 를 제외할 때 확인 창과 완료 안내가 받침에 맞는 조사를 쓴다', async (teamName, withJosa) => {
+    const removeMutate = vi.fn((_teamId: string, options: { onSuccess: (r: { cancelledFixtureCount: number }) => void }) =>
+      options.onSuccess({ cancelledFixtureCount: 0 }));
+    periodSettingsMock.mockReturnValue(periodSettingsOf([25, 25]));
+    useV1CancelLeagueFixtureMock.mockReturnValue({ mutate: vi.fn(), isPending: false } as never);
+    useV1RegenerateLeagueFixturesMock.mockReturnValue({ mutate: vi.fn(), isPending: false } as never);
+    useV1RevertLeagueCompletionMock.mockReturnValue({ mutate: vi.fn(), isPending: false } as never);
+    useV1RemoveLeagueTeamMock.mockReturnValue({ mutate: removeMutate, isPending: false } as never);
+    const teams = [
+      { teamId: 't1', name: teamName, status: 'active', memberCount: 5, logoUrl: null, registrationId: 'r-t1' },
+      { teamId: 't2', name: '합정 유나이티드', status: 'active', memberCount: 5, logoUrl: null, registrationId: 'r-t2' },
+      { teamId: 't3', name: '성수 FC', status: 'active', memberCount: 5, logoUrl: null, registrationId: 'r-t3' },
+    ];
+    renderLeague([{ ...base, teamMatchId: 'tm-1', title: '1주차', startAt: W1 }], teams);
+    openFixtureManage();
+
+    fireEvent.click(screen.getByRole('button', { name: `${teamName} 제외` }));
+    const dialog = await screen.findByRole('alertdialog');
+    expect(within(dialog).getByRole('heading', { name: `${withJosa} 제외할까요?` })).toBeInTheDocument();
+    expect(dialog.textContent).not.toContain('(를)');
+
+    fireEvent.click(within(dialog).getByRole('button', { name: '제외' }));
+    expect(removeMutate).toHaveBeenCalledWith('t1', expect.anything());
+    expect(screen.getByText(`${withJosa} 제외했어요.`)).toBeInTheDocument();
+  });
 });
 
 describe('LeagueMatchFixturesClient — 일정 보드와 보기 전환', () => {

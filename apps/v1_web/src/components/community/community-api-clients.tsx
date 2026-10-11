@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { extractErrorMessage } from '@/lib/error-message';
 import { formatTournamentDateTimeShort } from '@/lib/date-utils';
@@ -202,6 +202,13 @@ export function ChatRoomPageClient({ roomId }: { roomId: string }) {
         ? '종료된 컨택이에요'
         : undefined
     : undefined;
+  // 보내다 막힌 뒤 상세가 새로 오면 서버의 현재 판정이 우선이다 — 옛 409 가 풀린 방의 입력창을 계속 가리지 않게 비운다.
+  const sendFailedRef = useRef(false);
+  sendFailedRef.current = send.isError;
+  const resetSend = send.reset;
+  useEffect(() => {
+    if (sendFailedRef.current) resetSend();
+  }, [room.dataUpdatedAt, resetSend]);
   // 서버가 알려 준 막힘, 또는 방금 보내다 409 로 확인된 막힘 — 방은 열어 둔 채 입력창만 안내로 바꾼다.
   const composerBlock = room.data?.composer.blockedReason ?? composerBlockFromSendError(send.error);
   const readOnlyNotice = composerBlock ? describeChatComposerBlock(composerBlock) : undefined;

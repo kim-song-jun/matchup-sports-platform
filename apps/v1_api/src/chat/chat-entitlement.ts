@@ -47,19 +47,31 @@ export function teamMatchChatEntitlementWhere(userId: string): Prisma.V1TeamMatc
 
 const matchChatMemberStatuses = ['active', 'completed'] as const;
 
+const memberParticipantWhere = { status: { in: [...matchChatMemberStatuses] } };
+const confirmedGuestWhere = { role: 'participant' as const, status: { in: [...matchChatMemberStatuses] } };
+const readableMatchBase = { deletedAt: null };
+
 /**
  * Who may list, open and read a personal-match chat room. The chat list and every read path share
- * this predicate; sending is gated separately by {@link matchChatSendBlock}.
+ * this predicate; sending is gated separately by {@link matchChatSendBlock}. Recipients of pushes,
+ * unread counts and socket fan-out derive from the same pieces in {@link matchChatReaderUserWhere}.
  */
 export function matchChatReadableWhere(userId: string): Prisma.V1MatchWhereInput {
   return {
-    deletedAt: null,
+    ...readableMatchBase,
     OR: [
-      { participants: { some: { userId, status: { in: [...matchChatMemberStatuses] } } } },
-      {
-        hostUserId: userId,
-        participants: { some: { role: 'participant', status: { in: [...matchChatMemberStatuses] } } },
-      },
+      { participants: { some: { userId, ...memberParticipantWhere } } },
+      { hostUserId: userId, participants: { some: confirmedGuestWhere } },
+    ],
+  };
+}
+
+/** The same rule as {@link matchChatReadableWhere}, expressed on the user side for one match. */
+export function matchChatReaderUserWhere(matchId: string): Prisma.V1UserWhereInput {
+  return {
+    OR: [
+      { matchParticipants: { some: { matchId, ...memberParticipantWhere, match: readableMatchBase } } },
+      { hostedMatches: { some: { id: matchId, ...readableMatchBase, participants: { some: confirmedGuestWhere } } } },
     ],
   };
 }
@@ -113,26 +125,7 @@ export function currentChatRecipientEntitlementWhere(
   room: ChatEntitlementRoom,
 ): Prisma.V1ChatRoomParticipantWhereInput {
   if (room.matchId) {
-    return {
-      user: {
-        OR: [
-          {
-            matchParticipants: {
-              some: { matchId: room.matchId, status: { in: ['active', 'completed'] }, match: { deletedAt: null } },
-            },
-          },
-          {
-            hostedMatches: {
-              some: {
-                id: room.matchId,
-                deletedAt: null,
-                participants: { some: { role: 'participant', status: { in: ['active', 'completed'] } } },
-              },
-            },
-          },
-        ],
-      },
-    };
+    return { user: matchChatReaderUserWhere(room.matchId) };
   }
   if (room.teamId) {
     return {

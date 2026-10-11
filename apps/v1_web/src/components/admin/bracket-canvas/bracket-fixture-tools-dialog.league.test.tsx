@@ -4,6 +4,7 @@ import { delay, http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { buildLeagueGrid } from '@/lib/bracket-league-grid-model';
+import { clearFixtureRequestKey } from '@/lib/fixture-request-key-store';
 import { v1Keys } from '@/lib/query-keys';
 import { makeBracket, makeFixture, makeGroup } from '@/test/bracket-canvas-fixtures';
 import type { V1AdminTournamentBracket } from '@/types/api';
@@ -11,6 +12,8 @@ import { BracketFixtureToolsDialog } from './bracket-fixture-tools-dialog';
 
 const bodies: unknown[] = [];
 let failNext = false;
+// 한 번만 쓰이는 실패. 'network' 는 응답을 못 받은 경우(처리 여부 모름), 'server' 는 5xx.
+let failOnce: 'network' | 'server' | null = null;
 let serverBracket: V1AdminTournamentBracket;
 let created: { id: string; fixtureNumber: number } | null = null;
 const server = setupServer(
@@ -18,6 +21,12 @@ const server = setupServer(
   http.post('*/api/v1/admin/tournaments/:id/fixtures', async ({ request }) => {
     bodies.push(await request.json());
     await delay(30);
+    if (failOnce !== null) {
+      const mode = failOnce;
+      failOnce = null;
+      if (mode === 'network') return HttpResponse.error();
+      return HttpResponse.json({ status: 'error', statusCode: 503, code: 'UNAVAILABLE', message: 'down' }, { status: 503 });
+    }
     if (failNext) {
       return HttpResponse.json({ status: 'error', statusCode: 409, code: 'LEAGUE_ON_HOLD', message: 'on hold' }, { status: 409 });
     }
@@ -33,6 +42,8 @@ afterEach(() => {
   bodies.length = 0;
   created = null;
   failNext = false;
+  failOnce = null;
+  clearFixtureRequestKey('t-1');
 });
 afterAll(() => server.close());
 
@@ -47,6 +58,7 @@ const numbered = makeBracket({
     makeFixture({ id: 'a10', groupId: 'gA', fixtureNumber: 9, round: 'league_r10' }),
   ],
 });
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const NO_GROUP_NOTICE = '조별 리그 조가 없어 경기를 추가할 수 없어요. 조 설정을 확인하거나 대진을 템플릿으로 다시 만들어 주세요.';
 
 function renderLeagueDialog(bracket: V1AdminTournamentBracket = numbered) {
@@ -60,6 +72,9 @@ function renderLeagueDialog(bracket: V1AdminTournamentBracket = numbered) {
   );
   return { props, client };
 }
+
+const sentBody = (groupId: string, round: string) => ({ groupId, round, clientCommandId: expect.stringMatching(UUID_PATTERN) });
+const sentKeys = () => bodies.map((body) => (body as { clientCommandId: string }).clientCommandId);
 
 const optionTexts = (select: HTMLElement) => within(select).getAllByRole('option').map((option) => option.textContent);
 
@@ -80,7 +95,7 @@ describe('BracketFixtureToolsDialog — 리그 경기 추가', () => {
     fireEvent.change(screen.getByLabelText('라운드'), { target: { value: 'new' } });
     fireEvent.click(screen.getByRole('button', { name: '경기 추가' }));
     await waitFor(() => expect(props.onClose).toHaveBeenCalledTimes(1));
-    expect(bodies).toEqual([{ groupId: 'gA', round: 'league_r11' }]);
+    expect(bodies).toEqual([sentBody('gA', 'league_r11')]);
     expect(props.showToast).toHaveBeenCalledWith('11라운드 A조 경기를 추가했어요. 칸을 눌러 팀을 넣어 주세요.', 'success');
     expect(client.getQueryState(key)?.isInvalidated).toBe(true);
   });
@@ -91,7 +106,7 @@ describe('BracketFixtureToolsDialog — 리그 경기 추가', () => {
     fireEvent.change(screen.getByLabelText('라운드'), { target: { value: 'r2' } });
     fireEvent.click(screen.getByRole('button', { name: '경기 추가' }));
     await waitFor(() => expect(props.onClose).toHaveBeenCalled());
-    expect(bodies).toEqual([{ groupId: 'gB', round: 'league_r2' }]);
+    expect(bodies).toEqual([sentBody('gB', 'league_r2')]);
     expect(props.showToast).toHaveBeenCalledWith('2라운드 B조 경기를 추가했어요. 칸을 눌러 팀을 넣어 주세요.', 'success');
   });
 
@@ -108,7 +123,7 @@ describe('BracketFixtureToolsDialog — 리그 경기 추가', () => {
     fireEvent.change(screen.getByLabelText('라운드'), { target: { value: 'r1' } });
     fireEvent.click(screen.getByRole('button', { name: '경기 추가' }));
     await waitFor(() => expect(props.onClose).toHaveBeenCalledTimes(1));
-    expect(bodies).toEqual([{ groupId: 'gL', round: 'league_r1' }]);
+    expect(bodies).toEqual([sentBody('gL', 'league_r1')]);
     expect(props.showToast).toHaveBeenCalledWith('1라운드 리그 경기를 추가했어요. 칸을 눌러 팀을 넣어 주세요.', 'success');
   });
 
@@ -153,6 +168,42 @@ describe('BracketFixtureToolsDialog — 리그 경기 추가', () => {
     fireEvent.click(screen.getByRole('button', { name: '경기 추가' }));
     await waitFor(() => expect(props.onClose).toHaveBeenCalledTimes(1));
     expect(bodies).toHaveLength(2); // 실패 뒤 잠금이 풀려 재시도 요청이 나간다
+    expect(new Set(sentKeys()).size).toBe(2); // 서버가 4xx 로 거절한 요청의 키는 재사용하지 않는다
+  });
+
+  it.each([
+    ['응답을 받지 못한', 'network'],
+    ['서버가 5xx 로 답한', 'server'],
+  ] as const)('%s 실패 뒤 같은 내용으로 다시 누르면 같은 키로 보내고, 성공한 다음 추가는 새 키를 쓴다', async (_name, mode) => {
+    failOnce = mode;
+    const { props } = renderLeagueDialog();
+    const clickAdd = () => fireEvent.click(screen.getByRole('button', { name: '경기 추가' }));
+    clickAdd();
+    await waitFor(() => expect(props.showToast).toHaveBeenCalledWith(expect.any(String), 'error'));
+    await waitFor(() => expect(screen.getByRole('button', { name: '경기 추가' })).toBeEnabled());
+    clickAdd();
+    await waitFor(() => expect(props.onClose).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(screen.getByRole('button', { name: '경기 추가' })).toBeEnabled());
+    clickAdd();
+    await waitFor(() => expect(props.onClose).toHaveBeenCalledTimes(2));
+
+    const [first, retry, next] = sentKeys();
+    expect(retry).toBe(first);
+    expect(next).not.toBe(first);
+  });
+
+  it('실패 뒤 보내는 내용(조·라운드)을 바꾸면 새 키로 보낸다', async () => {
+    failOnce = 'network';
+    const { props } = renderLeagueDialog();
+    fireEvent.click(screen.getByRole('button', { name: '경기 추가' }));
+    await waitFor(() => expect(props.showToast).toHaveBeenCalledWith(expect.any(String), 'error'));
+    await waitFor(() => expect(screen.getByRole('button', { name: '경기 추가' })).toBeEnabled());
+    fireEvent.change(screen.getByLabelText('조'), { target: { value: 'gB' } });
+    fireEvent.click(screen.getByRole('button', { name: '경기 추가' }));
+    await waitFor(() => expect(props.onClose).toHaveBeenCalledTimes(1));
+
+    expect(bodies.map((body) => (body as { groupId: string }).groupId)).toEqual(['gA', 'gB']);
+    expect(new Set(sentKeys()).size).toBe(2);
   });
 
   it('번호가 없는 옛 대진도 격자 줄과 같은 라운드를 고르고, 고른 라운드는 league_r{k} 로 저장되어 그 줄에 합쳐진다', async () => {
@@ -168,7 +219,7 @@ describe('BracketFixtureToolsDialog — 리그 경기 추가', () => {
     fireEvent.change(round, { target: { value: 'r1' } });
     fireEvent.click(screen.getByRole('button', { name: '경기 추가' }));
     await waitFor(() => expect(props.onClose).toHaveBeenCalled());
-    expect(bodies).toEqual([{ groupId: 'gB', round: 'league_r1' }]);
+    expect(bodies).toEqual([sentBody('gB', 'league_r1')]);
     expect(props.showToast).toHaveBeenCalledWith('1라운드 B조 경기를 추가했어요. 칸을 눌러 팀을 넣어 주세요.', 'success');
 
     const grid = buildLeagueGrid({ groups: legacy.groups, fixtures: [...legacyFixtures, makeFixture({ id: 'new-1', groupId: 'gB', fixtureNumber: created!.fixtureNumber, round: 'league_r1' })] });

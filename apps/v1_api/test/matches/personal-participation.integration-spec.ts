@@ -419,7 +419,8 @@ describe('개인 매치 참여 이력 HTTP/DB 계약', () => {
 
     const page1 = (await get(outsider, `/matches?sportId=${ownSportId}&limit=2`).expect(200)).body.data;
     expect(page1.items.map((m: { matchId: string }) => m.matchId)).toEqual([near, far]);
-    expect(page1.pageInfo).toEqual({ nextCursor: expect.stringMatching(new RegExp(`^upcoming:${far}@\\d+$`)), hasNext: true });
+    // 첫 페이지라 목록 전체 건수(가까운·먼·지난 경기)가 같이 온다.
+    expect(page1.pageInfo).toEqual({ nextCursor: expect.stringMatching(new RegExp(`^upcoming:${far}@\\d+$`)), hasNext: true, totalCount: 3 });
 
     const page2 = (await get(outsider, `/matches?sportId=${ownSportId}&limit=2&cursor=${page1.pageInfo.nextCursor}`).expect(200)).body.data;
     expect(page2.items.map((m: { matchId: string }) => m.matchId)).toEqual([ended]);

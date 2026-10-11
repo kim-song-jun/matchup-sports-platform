@@ -373,6 +373,8 @@ export interface V1LeagueFixtureTimingPayload {
 
 export interface V1GenerateLeagueFixturesPayload extends V1PlaceSnapshotPayload {
   weeksCount: number;
+  /** 총 라운드 수, 1~104. 주면 서버가 `weeksCount × 팀당 하루 경기 수` 대신 이 수까지만 만든다(라운드로빈 재대결 방지). */
+  roundsCount?: number;
   /** 지정하지 않으면 시작일 그대로(자정) 매주 반복하는 기존 동작을 유지한다. */
   schedule?: V1LeagueFixtureScheduleTemplate;
   /** 지정하지 않으면 서버 기본값('장소 미정')을 사용한다. */

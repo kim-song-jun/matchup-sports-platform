@@ -534,7 +534,7 @@ export class LeagueMatchAdminService {
           gamesPerTeamPerDay: dto.timing.gamesPerTeamPerDay ?? 1,
         }
       : undefined;
-    const totalRounds = dto.weeksCount * (timing?.gamesPerTeamPerDay ?? 1);
+    const totalRounds = Math.min(dto.weeksCount * (timing?.gamesPerTeamPerDay ?? 1), dto.roundsCount ?? Infinity);
     if (totalRounds > MAX_TOTAL_ROUNDS) {
       throw new UnprocessableEntityException({
         code: 'LEAGUE_FIXTURE_LIMIT_EXCEEDED',

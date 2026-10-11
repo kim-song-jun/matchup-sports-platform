@@ -57,6 +57,9 @@ without creating or cancelling fixtures. Both actions recheck the status after
 locking the parent league row, including a hold committed during plan calculation.
 A completed or cancelled league rejects the same generation, template and slot-assignment
 actions with `409 LEAGUE_ENDED`; releasing slots on registration cancellation is not guarded.
+`POST .../fixtures/manual` and `PATCH .../fixtures/:teamMatchId` (update-fixture) also return
+`409 LEAGUE_ENDED` for a completed or cancelled league, but unlike generation they stay allowed
+while the league is on hold.
 
 While a league is on hold, already-scheduled notifications for its fixtures are
 suppressed at fire time (the outbox rows are kept, so resuming re-enables the next
@@ -251,6 +254,7 @@ LEAGUE_REGION_INVALID` for an unknown or unsuitable region.
   Omitting `durationMinutes` fills `endAt` with `startsAt` + the fixture's
   regulation time (non-extra-time period total: both halves, or the single
   period of a one-period match).
+  A completed or cancelled league returns `409 LEAGUE_ENDED`; a league on hold is allowed.
 - `POST /api/v1/admin/league-matches/:leagueId/fixtures` (and `preview`,
   `regenerate`) accept `timing.gameDurationMinutes` as optional. When omitted,
   the regulation time of the league's own competition config (the version edited

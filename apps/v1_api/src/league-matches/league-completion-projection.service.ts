@@ -4,6 +4,7 @@ import { shouldCompleteLeague } from './league-lifecycle-rules';
 import { STATUS_BY_LEAGUE_STATE } from '../tournaments/league-competition-mirror';
 import { LEAGUE_STATE_BY_STATUS } from '../tournaments/league-competition-mirror';
 import { findTournamentOnSurface } from '../tournaments/tournament-surface-lookup';
+import { lockCompetitionForSlotReleaseInTx } from '../tournaments/slots/competition-bracket-lock';
 
 /**
  * `GameResultOfficialProjectionService.handler`가 여는 같은 트랜잭션(tx) 위에서
@@ -64,41 +65,48 @@ export class LeagueCompletionProjectionService {
     // status까지 읽어 판정은 shouldCompleteLeague에 맡긴다 -- 취소 제외/빈 리그 배제
     // 규칙이 서비스 안에 인라인으로 있으면 그 규칙만 검증하는 테스트를 로컬에서 돌릴 수
     // 없다(이 파일은 @prisma/client를 import 한다). league-lifecycle-rules.ts 참고.
-    const fixtures = await tx.v1TeamMatch.findMany({
-      where: { leagueId },
-      select: {
-        status: true,
-        game: {
-          select: {
-            // 감사 L-E finding 5 수정: 예전 계산은 "currentOfficialRevisionId == null"을
-            // "무효"의 신호로 삼았는데, voidResultRevision(tournament-result-review.service.ts)은 포인터를
-            // null로 풀지 않고 VOID 리비전 자신으로 옮긴다 -- 그래서 hasOfficialResult와
-            // isVoided가 서로 배타적인 이 계산식에서 isVoided는 프로덕션에서 절대 true가
-            // 될 수 없었다(항상 hasOfficialResult=true로 잘못 잡혀 "이 대진은 결과가
-            // 확정됐다"로 세어짐). 포인터가 실제로 가리키는 리비전의 state를 직접 읽으면
-            // 두 값이 항상 정확히 하나만 참이 된다 -- 재입력으로 새 OFFICIAL 리비전이
-            // 생기면 포인터가 그쪽으로 옮겨가므로 isVoided는 자연히 다시 false가 된다.
-            currentOfficialRevision: { select: { state: true } },
+    const isReady = async () => {
+      const fixtures = await tx.v1TeamMatch.findMany({
+        where: { leagueId },
+        select: {
+          status: true,
+          game: {
+            select: {
+              // 감사 L-E finding 5 수정: 예전 계산은 "currentOfficialRevisionId == null"을
+              // "무효"의 신호로 삼았는데, voidResultRevision(tournament-result-review.service.ts)은 포인터를
+              // null로 풀지 않고 VOID 리비전 자신으로 옮긴다 -- 그래서 hasOfficialResult와
+              // isVoided가 서로 배타적인 이 계산식에서 isVoided는 프로덕션에서 절대 true가
+              // 될 수 없었다(항상 hasOfficialResult=true로 잘못 잡혀 "이 대진은 결과가
+              // 확정됐다"로 세어짐). 포인터가 실제로 가리키는 리비전의 state를 직접 읽으면
+              // 두 값이 항상 정확히 하나만 참이 된다 -- 재입력으로 새 OFFICIAL 리비전이
+              // 생기면 포인터가 그쪽으로 옮겨가므로 isVoided는 자연히 다시 false가 된다.
+              currentOfficialRevision: { select: { state: true } },
+            },
           },
         },
-      },
-    });
-    const ready = shouldCompleteLeague({
-      state: LEAGUE_STATE_BY_STATUS[league.status],
-      fixtures: fixtures.map((fixture) => ({
-        status: fixture.status,
-        hasOfficialResult: fixture.game?.currentOfficialRevision?.state === 'OFFICIAL',
-        isVoided: fixture.game?.currentOfficialRevision?.state === 'VOID',
-      })),
-    });
-    if (!ready) return false;
+      });
+      return shouldCompleteLeague({
+        state: LEAGUE_STATE_BY_STATUS[league.status],
+        fixtures: fixtures.map((fixture) => ({
+          status: fixture.status,
+          hasOfficialResult: fixture.game?.currentOfficialRevision?.state === 'OFFICIAL',
+          isVoided: fixture.game?.currentOfficialRevision?.state === 'VOID',
+        })),
+      });
+    };
+    if (!(await isReady())) return false;
+
+    // 완료 직전에만 리그 행을 잠그고 다시 센다 — 그 사이 같은 락을 쥔 수동 경기 추가가 커밋됐으면 새 경기를 보고 멈추고,
+    // 이 락을 먼저 잡으면 추가 쪽 끝남 가드가 완료를 본다. 결과 확정마다 잠그지 않도록 판정이 참일 때만 잠근다.
+    await lockCompetitionForSlotReleaseInTx(tx, { id: leagueId, kind: 'regular_league' });
+    if (!(await isReady())) return false;
 
     // 동시성: 두 대진의 결과가 거의 동시에 OFFICIAL이 되면 두 트랜잭션 모두 이 지점까지
     // 도달할 수 있다. WHERE state = 'active' 조건부 UPDATE가 행 잠금을 통해 오직 먼저
     // 커밋하는 쪽만 실제로 completed로 전이시키고, 늦게 도착한 트랜잭션은 이미 state가
     // completed로 바뀐 걸 보고 0행 매치라 조용히 no-op한다 -- teams.service.ts
-    // acceptInvitation()의 "조건부 update" 선례(R15-002)와 동일한 패턴이라 별도
-    // SELECT ... FOR UPDATE가 필요 없다.
+    // acceptInvitation()의 "조건부 update" 선례(R15-002)와 동일한 패턴이다(완료끼리의 경합엔
+    // 위 리그 행 락이 필요 없다 — 그 락은 수동 경기 추가와의 경합용이다).
     // BE-5 drop: 조건부 update 를 통합 축에 직접 건다. 위 동시성 설계는 그대로다 —
     // `where` 에 현재 상태를 걸어 **먼저 커밋하는 쪽만** 1행을 잡고, 늦게 온 트랜잭션은
     // 0행이라 조용히 no-op 한다. (`kind` 가드로 같은 id 의 진짜 대회를 제외한다.)

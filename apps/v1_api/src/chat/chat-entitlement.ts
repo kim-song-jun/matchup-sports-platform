@@ -48,7 +48,6 @@ export function teamMatchChatEntitlementWhere(userId: string): Prisma.V1TeamMatc
 const matchChatMemberStatuses = ['active', 'completed'] as const;
 
 const memberParticipantWhere = { status: { in: [...matchChatMemberStatuses] } };
-const confirmedGuestWhere = { role: 'participant' as const, status: { in: [...matchChatMemberStatuses] } };
 const readableMatchBase = { deletedAt: null };
 
 /**
@@ -62,6 +61,17 @@ const cancelledWithMatchGuestWhere = {
   application: { is: { status: 'approved' as const } },
 };
 
+/** History repair must recognize the same approved guests that retain cancelled-room access. */
+export function matchChatHistoryParticipantWhere(userId: string): Prisma.V1MatchParticipantWhereInput {
+  return {
+    userId,
+    OR: [
+      memberParticipantWhere,
+      { ...cancelledWithMatchGuestWhere, match: { status: 'cancelled' } },
+    ],
+  };
+}
+
 /**
  * Who may list, open and read a personal-match chat room. The chat list and every read path share
  * this predicate; sending is gated separately by {@link matchChatSendBlock}. Recipients of pushes,
@@ -72,9 +82,8 @@ export function matchChatReadableWhere(userId: string): Prisma.V1MatchWhereInput
     ...readableMatchBase,
     OR: [
       { participants: { some: { userId, ...memberParticipantWhere } } },
-      { hostUserId: userId, participants: { some: confirmedGuestWhere } },
+      { hostUserId: userId },
       { status: 'cancelled', participants: { some: { userId, ...cancelledWithMatchGuestWhere } } },
-      { status: 'cancelled', hostUserId: userId, participants: { some: cancelledWithMatchGuestWhere } },
     ],
   };
 }
@@ -84,9 +93,8 @@ export function matchChatReaderUserWhere(matchId: string): Prisma.V1UserWhereInp
   return {
     OR: [
       { matchParticipants: { some: { matchId, ...memberParticipantWhere, match: readableMatchBase } } },
-      { hostedMatches: { some: { id: matchId, ...readableMatchBase, participants: { some: confirmedGuestWhere } } } },
+      { hostedMatches: { some: { id: matchId, ...readableMatchBase } } },
       { matchParticipants: { some: { matchId, ...cancelledWithMatchGuestWhere, match: { ...readableMatchBase, status: 'cancelled' } } } },
-      { hostedMatches: { some: { id: matchId, ...readableMatchBase, status: 'cancelled', participants: { some: cancelledWithMatchGuestWhere } } } },
     ],
   };
 }

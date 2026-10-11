@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import type { ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { V1ApiError, V1_OFFLINE_WRITE_MESSAGE } from '@/lib/api-client';
@@ -825,16 +825,16 @@ describe('ChatRoomPageClient — 팀컨택 방', () => {
       hooks.chatRoom.mockReturnValue({ data: contactRoomDetail('accepted', 'from'), isPending: false, isError: false, refetch: vi.fn() });
       vi.spyOn(clientErrorReporter, 'reportClientError').mockImplementation(() => {});
       vi.stubGlobal('fetch', vi.fn(fetchResult));
-      renderWithClient(<ChatRoomPageClient roomId="room-contact" />);
+      const view = renderWithClient(<ChatRoomPageClient roomId="room-contact" />);
       const input = screen.getByLabelText('메시지 입력');
       fireEvent.change(input, { target: { value: '안녕' } });
       fireEvent.keyDown(input, { key: 'Enter' });
-      return input;
+      return { input, view };
     }
 
     it('오프라인이면 연결 문구를 보여 주고, 쓴 글은 그대로 남긴다', async () => {
       vi.spyOn(window.navigator, 'onLine', 'get').mockReturnValue(false);
-      const input = await sendAndFail(() => Promise.reject(new TypeError('Failed to fetch')));
+      const { input } = await sendAndFail(() => Promise.reject(new TypeError('Failed to fetch')));
 
       expect(await screen.findByText(V1_OFFLINE_WRITE_MESSAGE)).toBeInTheDocument();
       expect(screen.queryByText(FALLBACK)).not.toBeInTheDocument();
@@ -845,6 +845,21 @@ describe('ChatRoomPageClient — 팀컨택 방', () => {
       await sendAndFail(() => Promise.resolve({ ok: false, status: 502, statusText: 'Bad Gateway', json: async () => { throw new SyntaxError('Unexpected token <'); } }));
 
       expect(await screen.findByText(FALLBACK)).toBeInTheDocument();
+    });
+
+    it('방 상세가 갱신돼도 해결되지 않은 502 전송 오류와 초안을 유지한다', async () => {
+      const { input, view } = await sendAndFail(() => Promise.resolve({ ok: false, status: 502, statusText: 'Bad Gateway', json: async () => { throw new SyntaxError('Unexpected token <'); } }));
+      expect(await screen.findByText(FALLBACK)).toBeInTheDocument();
+      hooks.chatRoom.mockReturnValue({ data: contactRoomDetail('accepted', 'from'), dataUpdatedAt: 2, isPending: false, isError: false, refetch: vi.fn() });
+
+      view.rerender(<ChatRoomPageClient roomId="room-contact" />);
+      await act(async () => {
+        // Flush TanStack's scheduled mutation notification after the room effect.
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      });
+
+      expect(screen.queryByText(FALLBACK)).toBeInTheDocument();
+      expect(input).toHaveValue('안녕');
     });
   });
 });

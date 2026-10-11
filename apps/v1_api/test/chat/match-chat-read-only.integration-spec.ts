@@ -35,12 +35,13 @@ describe('personal-match chat: listed rooms always open, sending is gated separa
   /** Host ids.a (own host row unless omitted). `others` are extra match participants who also sit in the chat room. */
   async function room(title: string, opts: {
     status: 'recruiting' | 'cancelled';
+    hostParticipates?: boolean;
     others?: { userId: string; role?: 'participant'; status: RowStatus; application?: 'approved' | 'withdrawn' | 'cancelled_by_host' }[];
   }) {
     const match = await prisma.v1Match.create({ data: {
       hostUserId: ids.a, sportId, regionId, title, placeName: 'Read-only QA Court', startAt: new Date('2030-01-01T12:00:00Z'),
       maxParticipants: 10, status: opts.status,
-      participants: { create: { userId: ids.a, role: 'host', status: 'active' } },
+      ...(opts.hostParticipates === false ? {} : { participants: { create: { userId: ids.a, role: 'host' as const, status: 'active' as const } } }),
     } });
     // MatchesService.cancel leaves the approved application untouched; withdraw/remove set their own status.
     for (const other of opts.others ?? []) {
@@ -126,6 +127,44 @@ describe('personal-match chat: listed rooms always open, sending is gated separa
     }
     await as(ids.b).send(hostWithConfirmed).expect(201);
     await as(ids.a).send(hostWithConfirmed).expect(201);
+  });
+
+  it.each(['recruiting', 'cancelled'] as const)('a non-participating host retains an existing %s room after the last guest withdraws', async (status) => {
+    const roomId = await room('Host without own participant row', {
+      status, hostParticipates: false,
+      others: [{ userId: ids.b, status: 'cancelled', application: 'withdrawn' }],
+    });
+    expect((await as(ids.a).list()).map((item) => item.roomId)).toContain(roomId);
+    expect((await as(ids.a).detail(roomId).expect(200)).body.data.composer)
+      .toEqual({ canSend: false, blockedReason: status === 'cancelled' ? 'MATCH_CANCELLED' : 'PARTICIPANTS_NOT_CONFIRMED' });
+    await as(ids.a).messages(roomId).expect(200);
+    expect((await as(ids.a).send(roomId).expect(409)).body.code).toBe(status === 'cancelled' ? 'MATCH_CHAT_CLOSED' : 'MATCH_CHAT_PARTICIPANTS_REQUIRED');
+    await as(ids.b).detail(roomId).expect(403);
+  });
+
+  it('repairs a cancelled approved guest history from approval, never from before approval', async () => {
+    const roomId = await room('Cancelled legacy history', {
+      status: 'cancelled', others: [{ userId: ids.b, status: 'cancelled', application: 'approved' }],
+    });
+    const linked = await prisma.v1ChatRoom.findUniqueOrThrow({ where: { id: roomId } });
+    const createdAt = new Date('2020-01-01T00:00:00.000Z');
+    const approvedAt = new Date('2021-01-01T00:00:00.000Z');
+    await prisma.v1Match.update({ where: { id: linked.matchId! }, data: { createdAt } });
+    await prisma.v1ChatRoom.update({ where: { id: roomId }, data: { createdAt } });
+    await prisma.v1MatchParticipant.updateMany({ where: { matchId: linked.matchId!, userId: ids.b }, data: { approvedAt } });
+    await prisma.v1ChatRoomParticipant.updateMany({ where: { chatRoomId: roomId, userId: ids.b }, data: { visibleFromAt: null } });
+    const before = await prisma.v1ChatMessage.create({ data: {
+      chatRoomId: roomId, senderUserId: ids.a, body: 'Before approval', sentAt: new Date('2020-06-01T00:00:00.000Z'),
+    } });
+    const after = await prisma.v1ChatMessage.create({ data: {
+      chatRoomId: roomId, senderUserId: ids.a, body: 'After approval', sentAt: new Date('2022-01-01T00:00:00.000Z'),
+    } });
+
+    const items = (await as(ids.b).messages(roomId).expect(200)).body.data.items as { messageId: string }[];
+    expect(items.map((item) => item.messageId)).toContain(after.id);
+    expect(items.map((item) => item.messageId)).not.toContain(before.id);
+    const participant = await prisma.v1ChatRoomParticipant.findFirstOrThrow({ where: { chatRoomId: roomId, userId: ids.b } });
+    expect(participant.visibleFromAt).toEqual(approvedAt);
   });
 
   it('cancelled match: read-only for the host and for a participant who still holds the row, send is 409 MATCH_CHAT_CLOSED', async () => {

@@ -82,6 +82,17 @@ manual add), the edit is rolled back with `409 COMMAND_CONCURRENCY_CONFLICT` ("�
 주세요"), because the league-first and fixture-first lock orders both exist and waiting would deadlock
 with one of them.
 
+Automatic completion follows the same rule from the fixture side. When the last result is officialized
+(or the last remaining fixture is cancelled or voided) the completion step locks the league row with
+`FOR UPDATE NOWAIT` while its caller still holds the game row. If regeneration, template replacement
+or another league-first operation holds the league row, completion gives up with the same retryable
+`409 COMMAND_CONCURRENCY_CONFLICT`: the result projection worker retries it later (its retry backoff
+outlasts the 45-second league-lane transactions), an operator cancellation can be retried, and the
+league-first operation proceeds (for example to its own `BRACKET_LOCKED` check) instead of being killed
+as a deadlock victim. Team removal and hold release already hold the league row in the same
+transaction, so they are unaffected; manual completion (`complete`) gets the same retryable 409 when
+the league row is busy.
+
 While a league is on hold, already-scheduled notifications for its fixtures are
 suppressed at fire time (the outbox rows are kept, so resuming re-enables the next
 firing): game day-before/kickoff reminders and lineup reminders/todos

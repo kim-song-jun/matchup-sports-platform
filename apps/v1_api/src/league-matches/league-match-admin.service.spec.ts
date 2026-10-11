@@ -12,7 +12,7 @@
  * 생겼다" 는 증명되지 않는다. 가짜 tx 는 호출된 statement 를 전부 기록해 참가자당 statement
  * 수도 같은 하네스에서 센다.
  */
-import { V1GameSideKey, V1GameSourceType } from '@prisma/client';
+import { Prisma, V1GameSideKey, V1GameSourceType } from '@prisma/client';
 import { leagueFixtureTitle } from './league-fixture-creation';
 import { Test, TestingModule } from '@nestjs/testing';
 import { AdminContextService } from '../common/admin-context.service';
@@ -904,14 +904,31 @@ describe('LeagueMatchAdminService.generateFixtures — 자동 로스터와 신�
       await expect(svc.updateFixture(adminUser, 'league-1', 'tm-1', { placeName: '망원 운동장' }))
         .rejects.toMatchObject({ response: { code: 'LEAGUE_ENDED' } });
       expect(fake.state.calls).not.toContain('v1TeamMatch.update');
-      // 게임 행 → 리그 행 순서로 잠근 뒤 검사한다 — 리그 행을 먼저 잡으면 취소·결과 확정(게임 → 리그)과 역순 교착.
-      expect(fake.state.rawSql).toHaveLength(2);
-      expect(fake.state.rawSql[0]).toContain('v1_games');
-      expect(fake.state.rawSql[0]).toContain('FOR UPDATE');
-      expect(fake.state.rawSql[1]).toContain('v1_tournaments');
+      // 이미 끝난 리그는 쓰기 전 읽기에서 거절된다 — 리그 행을 잠그지 않는다.
+      expect(fake.state.rawSql).toEqual([]);
+    });
+
+    // 쓰기 직후 리그 행을 기다리지 않고(FOR SHARE NOWAIT) 잡아 다시 본다 — 그 사이 완료가 커밋됐으면 트랜잭션째 거절.
+    it.each(['completed', 'cancelled'])('updateFixture: 쓰기 뒤 공유 잠금 아래에서 %s 를 보면 409 LEAGUE_ENDED', async (status) => {
+      const { fake, svc } = await setup(status, 1);
+      await expect(svc.updateFixture(adminUser, 'league-1', 'tm-1', { placeName: '망원 운동장' }))
+        .rejects.toMatchObject({ response: { code: 'LEAGUE_ENDED' } });
       const calls = fake.state.calls;
-      const leagueLockAt = calls.lastIndexOf('$queryRaw');
-      expect(calls.indexOf('v1Tournament.findFirst')).toBeGreaterThan(leagueLockAt);
+      expect(calls.indexOf('v1TeamMatch.update')).toBeLessThan(calls.indexOf('$queryRaw'));
+      expect(calls.lastIndexOf('v1Tournament.findFirst')).toBeGreaterThan(calls.indexOf('$queryRaw'));
+      expect(fake.state.rawSql).toHaveLength(1);
+      expect(fake.state.rawSql[0]).toMatch(/v1_tournaments.*FOR SHARE NOWAIT/s);
+    });
+
+    it('updateFixture: 다른 작업이 리그 행을 쥐고 있으면 기다리지 않고 409 COMMAND_CONCURRENCY_CONFLICT', async () => {
+      const { fake, svc } = await setup('in_progress', 0);
+      fake.tx.$queryRaw = (async () => {
+        throw new Prisma.PrismaClientKnownRequestError('could not obtain lock on row', {
+          code: 'P2010', clientVersion: Prisma.prismaVersion.client, meta: { code: '55P03' },
+        });
+      }) as typeof fake.tx.$queryRaw;
+      await expect(svc.updateFixture(adminUser, 'league-1', 'tm-1', { placeName: '망원 운동장' }))
+        .rejects.toMatchObject({ response: { code: 'COMMAND_CONCURRENCY_CONFLICT' } });
     });
 
     // 대조군: 보류 중 수동 추가·수정은 허용이다 — 일괄 생성 가드(LEAGUE_ON_HOLD)를 쓰면 여기서 깨진다.
@@ -925,6 +942,9 @@ describe('LeagueMatchAdminService.generateFixtures — 자동 로스터와 신�
       const { fake, svc } = await setup(status, 0);
       await svc.updateFixture(adminUser, 'league-1', 'tm-1', { placeName: '망원 운동장' });
       expect(fake.state.calls.filter((call) => call === 'v1TeamMatch.update')).toHaveLength(1);
+      // 리그 행은 기다리는 잠금(FOR UPDATE)도, 게임 행 잠금도 잡지 않는다 — 두 잠금 순서 어느 쪽과도 교착하지 않게.
+      expect(fake.state.rawSql).toHaveLength(1);
+      expect(fake.state.rawSql[0]).toContain('FOR SHARE NOWAIT');
     });
   });
 

@@ -1,14 +1,15 @@
 import { randomUUID } from 'node:crypto';
 import type { INestApplication } from '@nestjs/common';
 import request = require('supertest');
+import type { Prisma } from '@prisma/client';
 import type { V1AuthUser } from '../../src/auth/v1-auth-user';
 import { LeagueMatchAdminService } from '../../src/league-matches/league-match-admin.service';
 import { PrismaService } from '../../src/prisma/prisma.service';
 import { ManagedTermsRuntimeService } from '../../src/terms/managed-terms-runtime.service';
 import { createV1IntegrationApp } from '../integration/integration-app';
 
-// updateFixture 의 "끝남 검사 + 쓰기" 원자성. 잠금 순서는 결과 확정 경로와 같다(게임 행 → 리그 행).
-// 두 커넥션을 실제로 겹쳐 (1) 검사 시점 이후에 완료가 끼어들지 못하고 (2) 역순 교착(40P01)이 없음을 본다.
+// updateFixture 는 게임 행을 잠그지 않고 리그 행을 FOR SHARE NOWAIT 로만 확인한다(기다리면 리그→경기 /
+// 경기→리그 두 잠금 순서 중 어느 쪽과든 교착). 두 커넥션을 실제로 겹쳐 대기 없음·409·교착 없음을 본다.
 const suiteId = randomUUID().slice(0, 8);
 const ownerUserId = `ufer-owner-${suiteId}`;
 const NEW_START = '2031-03-01T10:00:00.000Z';
@@ -68,22 +69,6 @@ describe('리그 경기 수정 vs 리그 완료 경합 (updateFixture 원자성)
 
   const startAtOf = async (id: string) => (await prisma.v1TeamMatch.findUniqueOrThrow({ where: { id }, select: { startAt: true } })).startAt;
 
-  /** 제3 커넥션(풀의 다른 연결)에서 `table` 의 FOR UPDATE 를 기다리는 세션이 생길 때까지 폴링한다. */
-  async function waitUntilBlockedOn(table: string) {
-    const deadline = Date.now() + 10_000;
-    while (Date.now() < deadline) {
-      const rows = await prisma.$queryRawUnsafe<Array<{ pid: number }>>(
-        `SELECT pid FROM pg_stat_activity
-          WHERE datname = current_database() AND pid <> pg_backend_pid()
-            AND wait_event_type = 'Lock' AND query ILIKE '%FOR UPDATE%' AND query ILIKE $1`,
-        `%${table}%`,
-      );
-      if (rows.length > 0) return;
-      await new Promise((resolve) => setTimeout(resolve, 100));
-    }
-    throw new Error(`updateFixture 가 ${table} 잠금에서 막히지 않았어요(10초).`);
-  }
-
   async function failureOf(promise: Promise<unknown>): Promise<{ code?: string; name: string; message: string }> {
     try {
       await promise;
@@ -91,81 +76,109 @@ describe('리그 경기 수정 vs 리그 완료 경합 (updateFixture 원자성)
       const e = err as { name: string; message: string; getResponse?: () => { code?: string } };
       return { code: e.getResponse?.().code, name: e.name, message: e.message };
     }
-    throw new Error('updateFixture 가 성공했어요 — 409 LEAGUE_ENDED 를 기대했어요.');
+    throw new Error('updateFixture 가 성공했어요 — 409 를 기대했어요.');
   }
 
-  /**
-   * 완료 쪽 트랜잭션 A. `lockOrder` 에 따라 게임 행부터 / 리그 행부터 잡고, 잡은 뒤 `held` 로 알리고
-   * `gate` 가 열릴 때까지 쥔 채 기다린다. 열리면 리그를 completed 로 바꾸고 커밋한다.
-   */
-  function startCompleter(ctx: { leagueId: string; teamMatchId: string }, lockOrder: 'game-first' | 'league-first') {
+  const NO_DEADLOCK = /deadlock|40P01|Transaction/i;
+  const lockGame = (tx: Prisma.TransactionClient, teamMatchId: string) =>
+    tx.$queryRaw`SELECT id FROM v1_games WHERE team_match_id = ${teamMatchId} FOR UPDATE`;
+  const lockLeague = (tx: Prisma.TransactionClient, leagueId: string) =>
+    tx.$queryRaw`SELECT id FROM "v1_tournaments" WHERE id = ${leagueId} FOR UPDATE`;
+
+  /** `before` 를 마친 트랜잭션을 `release()` 전까지 열어 두고, 풀리면 `after` 를 실행해 커밋한다. */
+  function startHolder(before: (tx: Prisma.TransactionClient) => Promise<unknown>, after: (tx: Prisma.TransactionClient) => Promise<unknown>) {
     let release!: () => void;
     const gate = new Promise<void>((resolve) => { release = resolve; });
     let markHeld!: () => void;
     const held = new Promise<void>((resolve) => { markHeld = resolve; });
-    const lockGame = (tx: Pick<PrismaService, '$queryRaw'>) => tx.$queryRaw`SELECT id FROM v1_games WHERE team_match_id = ${ctx.teamMatchId} FOR UPDATE`;
-    const lockLeague = (tx: Pick<PrismaService, '$queryRaw'>) => tx.$queryRaw`SELECT id FROM "v1_tournaments" WHERE id = ${ctx.leagueId} FOR UPDATE`;
     const done = prisma.$transaction(async (tx) => {
-      if (lockOrder === 'game-first') {
-        await lockGame(tx);
-        markHeld();
-        await gate;
-        await lockLeague(tx);
-      } else {
-        await lockLeague(tx);
-      }
-      await tx.v1Tournament.update({ where: { id: ctx.leagueId }, data: { status: 'completed' } });
-      if (lockOrder === 'league-first') {
-        markHeld();
-        await gate;
-      }
+      await before(tx);
+      markHeld();
+      await gate;
+      await after(tx);
     }, { timeout: 20_000, maxWait: 10_000 });
-    // held 전에 A 가 실패하면 테스트가 영원히 기다리지 않게 한다.
-    const heldOrFailed = Promise.race([held, done.then(() => undefined)]);
-    return { release, done, held: heldOrFailed };
+    return { release, done, held: Promise.race([held, done.then(() => undefined)]) };
   }
 
-  it('결과 확정 쪽이 게임 행을 먼저 쥔 경우 — updateFixture 는 게임 행에서 막혔다가 409 LEAGUE_ENDED 로 실패하고 시각은 그대로다', async () => {
+  const complete = (tx: Prisma.TransactionClient, leagueId: string) =>
+    tx.v1Tournament.update({ where: { id: leagueId }, data: { status: 'completed' } });
+  const statusOf = async (id: string) => (await prisma.v1Tournament.findUniqueOrThrow({ where: { id } })).status;
+
+  it('A) 결과 확정 쪽이 게임 행을 쥐고 있어도 updateFixture 는 막히지 않고 성공하며, 이어서 완료도 교착 없이 끝난다', async () => {
     const ctx = await newLeagueWithFixture();
-    const completer = startCompleter(ctx, 'game-first');
+    const holder = startHolder(
+      (tx) => lockGame(tx, ctx.teamMatchId),
+      async (tx) => { await lockLeague(tx, ctx.leagueId); await complete(tx, ctx.leagueId); },
+    );
     try {
-      await completer.held;
-      const attempt = failureOf(service.updateFixture(actor, ctx.leagueId, ctx.teamMatchId, { startsAt: NEW_START }));
-      await waitUntilBlockedOn('v1_games');
-      completer.release();
-      await completer.done;
-      const failure = await attempt;
-      expect(failure).toMatchObject({ code: 'LEAGUE_ENDED' });
-      expect(failure.message).not.toMatch(/deadlock|40P01|Transaction/i);
+      await holder.held;
+      await service.updateFixture(actor, ctx.leagueId, ctx.teamMatchId, { startsAt: NEW_START });
+      expect((await startAtOf(ctx.teamMatchId))?.toISOString()).toBe(NEW_START);
+      holder.release();
+      await holder.done;
     } finally {
-      completer.release();
-      await completer.done.catch(() => undefined);
+      holder.release();
+      await holder.done.catch(() => undefined);
     }
+    expect(await statusOf(ctx.leagueId)).toBe('completed');
+  }, 40_000);
+
+  it('B) 완료 쪽이 리그 행을 먼저 쥐면(미커밋 completed) updateFixture 는 기다리지 않고 409 COMMAND_CONCURRENCY_CONFLICT 다', async () => {
+    const ctx = await newLeagueWithFixture();
+    const holder = startHolder(
+      async (tx) => { await lockLeague(tx, ctx.leagueId); await complete(tx, ctx.leagueId); },
+      async () => undefined,
+    );
+    try {
+      await holder.held;
+      const started = Date.now();
+      const failure = await failureOf(service.updateFixture(actor, ctx.leagueId, ctx.teamMatchId, { startsAt: NEW_START }));
+      expect(Date.now() - started).toBeLessThan(5_000);
+      expect(failure).toMatchObject({ code: 'COMMAND_CONCURRENCY_CONFLICT' });
+      expect(failure.message).not.toMatch(NO_DEADLOCK);
+      expect(await startAtOf(ctx.teamMatchId)).toEqual(ctx.startAtBefore);
+      holder.release();
+      await holder.done;
+    } finally {
+      holder.release();
+      await holder.done.catch(() => undefined);
+    }
+    expect(await statusOf(ctx.leagueId)).toBe('completed');
+  }, 40_000);
+
+  it('C) 리그 행 → 게임 행 순서로 잡는 일괄 경로가 리그 행을 쥔 동안 updateFixture 는 즉시 409 이고, 일괄 경로는 막힘 없이 커밋된다', async () => {
+    const ctx = await newLeagueWithFixture();
+    const holder = startHolder(
+      (tx) => lockLeague(tx, ctx.leagueId),
+      (tx) => lockGame(tx, ctx.teamMatchId),
+    );
+    try {
+      await holder.held;
+      const started = Date.now();
+      const failure = await failureOf(service.updateFixture(actor, ctx.leagueId, ctx.teamMatchId, { startsAt: NEW_START }));
+      expect(Date.now() - started).toBeLessThan(5_000);
+      expect(failure).toMatchObject({ code: 'COMMAND_CONCURRENCY_CONFLICT' });
+      expect(failure.message).not.toMatch(NO_DEADLOCK);
+      expect(await startAtOf(ctx.teamMatchId)).toEqual(ctx.startAtBefore);
+      holder.release();
+      await holder.done;
+    } finally {
+      holder.release();
+      await holder.done.catch(() => undefined);
+    }
+  }, 40_000);
+
+  it('D) 이미 완료가 커밋된 리그는 409 LEAGUE_ENDED 이고 시각은 그대로다', async () => {
+    const ctx = await newLeagueWithFixture();
+    await prisma.v1Tournament.update({ where: { id: ctx.leagueId }, data: { status: 'completed' } });
+    const failure = await failureOf(service.updateFixture(actor, ctx.leagueId, ctx.teamMatchId, { startsAt: NEW_START }));
+    expect(failure).toMatchObject({ code: 'LEAGUE_ENDED' });
     expect(await startAtOf(ctx.teamMatchId)).toEqual(ctx.startAtBefore);
   }, 40_000);
 
-  it('완료 쪽이 리그 행을 먼저 쥔 경우 — updateFixture 는 리그 행에서 막혔다가 409 LEAGUE_ENDED 로 실패하고 시각은 그대로다', async () => {
-    const ctx = await newLeagueWithFixture();
-    const completer = startCompleter(ctx, 'league-first');
-    try {
-      await completer.held;
-      const attempt = failureOf(service.updateFixture(actor, ctx.leagueId, ctx.teamMatchId, { startsAt: NEW_START }));
-      await waitUntilBlockedOn('v1_tournaments');
-      completer.release();
-      await completer.done;
-      const failure = await attempt;
-      expect(failure).toMatchObject({ code: 'LEAGUE_ENDED' });
-      expect(failure.message).not.toMatch(/deadlock|40P01|Transaction/i);
-    } finally {
-      completer.release();
-      await completer.done.catch(() => undefined);
-    }
-    expect(await startAtOf(ctx.teamMatchId)).toEqual(ctx.startAtBefore);
-  }, 40_000);
-
-  it('대조군 — 겹침 없는 진행 중 리그와 보류 리그는 수정에 성공한다', async () => {
+  it('E) 대조군 — 겹침 없는 진행 중 리그와 보류 리그는 수정에 성공한다', async () => {
     const running = await newLeagueWithFixture();
-    expect((await prisma.v1Tournament.findUniqueOrThrow({ where: { id: running.leagueId } })).status).toBe('in_progress');
+    expect(await statusOf(running.leagueId)).toBe('in_progress');
     await service.updateFixture(actor, running.leagueId, running.teamMatchId, { startsAt: NEW_START });
     expect((await startAtOf(running.teamMatchId))?.toISOString()).toBe(NEW_START);
 

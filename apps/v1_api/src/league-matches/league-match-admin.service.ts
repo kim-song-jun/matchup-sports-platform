@@ -61,6 +61,7 @@ import {
   RegenerateLeagueFixturesDto,
   OpenLeagueRegistrationDto,
   RevertLeagueCompletionDto,
+  CompleteLeagueDto,
   HoldLeagueDto,
   ResumeLeagueDto,
   UpdateLeagueDisciplineDto,
@@ -1851,7 +1852,71 @@ export class LeagueMatchAdminService {
         },
         tx,
       );
-      return { leagueId, state: LEAGUE_STATE_BY_STATUS[restoreStatus], isPublic: restorePublic, alreadyProcessed: false };
+      // 보류 중에 남은 대진이 모두 확정·취소됐다면 진행 중으로 돌아가는 즉시 다시 판정한다 —
+      // 안 그러면 결과 확정 훅이 다시 불릴 일이 없어 리그가 영원히 진행 중으로 남는다(MD-QA #93).
+      const completed =
+        LEAGUE_STATE_BY_STATUS[restoreStatus] === 'active' &&
+        (await this.leagueCompletion.settle(tx, leagueId, 'hold_released'));
+      return {
+        leagueId,
+        state: completed ? ('completed' as const) : LEAGUE_STATE_BY_STATUS[restoreStatus],
+        isPublic: restorePublic,
+        alreadyProcessed: false,
+      };
+    });
+  }
+
+  /**
+   * 리그 종료(수동). 자동 종료는 결과 확정·대진 취소 때만 판정되므로, '진행 중으로 되돌리기' 뒤
+   * 대진을 바꾸지 않으면 남은 대진이 없어도 리그가 진행 중으로 남는다(MD-QA #93). 판정은 자동
+   * 종료와 같은 `settle`을 그대로 써서 "취소 제외 전 대진 확정" 조건을 우회하지 않는다.
+   */
+  async completeLeague(user: V1AuthUser, leagueId: string, dto: CompleteLeagueDto) {
+    const admin = await this.adminContext.getMutationAdmin(user.id);
+    return this.prisma.$transaction(async (tx) => {
+      const league = await findTournamentOnSurface(tx, ['regular_league'], {
+        where: { id: leagueId, deletedAt: null },
+        select: { id: true, status: true },
+      });
+      if (league === null) {
+        throw new NotFoundException({ code: 'LEAGUE_NOT_FOUND', message: '리그를 찾을 수 없어요.' });
+      }
+      const state = LEAGUE_STATE_BY_STATUS[league.status];
+      if (state === 'completed') {
+        return { leagueId, state: 'completed' as const, alreadyProcessed: true };
+      }
+      if (state !== 'active') {
+        throw new ConflictException({ code: 'LEAGUE_NOT_ACTIVE', message: '진행 중인 리그만 종료할 수 있어요.' });
+      }
+      const completed = await this.leagueCompletion.settle(tx, leagueId, 'admin_completed');
+      if (!completed) {
+        // 동시에 다른 관리자(또는 자동 종료)가 먼저 종료했으면 settle 은 0행 갱신으로 false 를 돌려준다 —
+        // 그 경우는 남은 경기 때문이 아니므로 다시 읽어 멱등 응답으로 돌려준다.
+        const latest = await findTournamentOnSurface(tx, ['regular_league'], {
+          where: { id: leagueId, deletedAt: null },
+          select: { status: true },
+        });
+        if (latest !== null && LEAGUE_STATE_BY_STATUS[latest.status] === 'completed') {
+          return { leagueId, state: 'completed' as const, alreadyProcessed: true };
+        }
+        throw new ConflictException({
+          code: 'LEAGUE_FIXTURES_PENDING',
+          message: '아직 결과가 확정되지 않은 경기가 있어요. 모든 경기를 확정하거나 취소한 뒤 종료해 주세요.',
+        });
+      }
+      await this.adminContext.logAdminAction(
+        admin,
+        {
+          action: 'league_match.complete',
+          targetType: 'league_match',
+          targetId: leagueId,
+          reason: dto.reason ?? null,
+          fromStatus: 'active',
+          toStatus: 'completed',
+        },
+        tx,
+      );
+      return { leagueId, state: 'completed' as const, alreadyProcessed: false };
     });
   }
 

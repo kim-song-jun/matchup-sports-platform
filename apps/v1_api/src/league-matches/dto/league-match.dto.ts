@@ -184,6 +184,14 @@ export class RevertLeagueCompletionDto {
   reason?: string;
 }
 
+// 되돌리기·보류 해제 뒤 남은 대진이 없으면 리그를 다시 종료할 길이 없었다(MD-QA #93) — 수동 종료. 사유는 선택.
+export class CompleteLeagueDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  reason?: string;
+}
+
 // R12: 리그 대진 취소는 되돌릴 수 없는 운영 조작이라 사유를 필수로 받는다
 // (프론트 GateConfirmModal의 REASON_MAX=500과 동일 상한).
 // 리그 보류는 공개 화면에서 리그와 경기를 숨기는 운영 조작이라 사유를 필수로 받는다(대진 취소와 같은 상한).

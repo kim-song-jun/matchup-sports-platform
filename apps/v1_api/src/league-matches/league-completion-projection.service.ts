@@ -48,7 +48,12 @@ export class LeagueCompletionProjectionService {
   async settle(
     tx: Prisma.TransactionClient,
     leagueId: string,
-    reason: 'all_fixtures_confirmed' | 'remaining_fixture_cancelled' | 'remaining_fixture_voided',
+    reason:
+      | 'all_fixtures_confirmed'
+      | 'remaining_fixture_cancelled'
+      | 'remaining_fixture_voided'
+      | 'hold_released'
+      | 'admin_completed',
   ): Promise<boolean> {
     // BE-5: 조기 반환 판정을 통합 축에서 읽는다(쓰기는 아래 dual-write 그대로).
     const league = await findTournamentOnSurface(tx, ['regular_league'], {

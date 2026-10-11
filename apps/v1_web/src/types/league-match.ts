@@ -503,6 +503,13 @@ export interface V1RevertLeagueCompletionResult {
   alreadyProcessed: boolean;
 }
 
+/** 리그 종료(수동) 응답 — POST /admin/league-matches/:leagueId/complete. */
+export interface V1CompleteLeagueResult {
+  leagueId: string;
+  state: 'completed';
+  alreadyProcessed: boolean;
+}
+
 // R13: 대진 재생성 — POST /admin/league-matches/:leagueId/fixtures/regenerate
 export interface V1RegenerateLeagueFixturesPayload extends V1GenerateLeagueFixturesPayload {
   reason: string;

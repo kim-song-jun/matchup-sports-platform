@@ -264,12 +264,21 @@ function SeasonSummaryCard({
           )}
         </div>
       )}
-      <Link
-        href={withFromPath(`/league-matches/${leagueId}/awards`, currentHref)}
-        className="tm-btn tm-btn-sm tm-btn-outline mt-3"
-      >
-        시즌 결산 자세히 보기 →
-      </Link>
+      <div className="mt-3 flex flex-wrap gap-2">
+        <Link
+          href={withFromPath(`/league-matches/${leagueId}/awards`, currentHref)}
+          className="tm-btn tm-btn-sm tm-btn-outline"
+        >
+          시즌 결산 자세히 보기 →
+        </Link>
+        {/* 참가팀 후기는 대회와 같은 화면을 쓴다 — 화면이 `kind`로 리그 문구를 고른다. */}
+        <Link
+          href={withFromPath(`/tournaments/${leagueId}/reviews`, currentHref)}
+          className="tm-btn tm-btn-sm tm-btn-outline"
+        >
+          참가팀 후기 보기·쓰기 →
+        </Link>
+      </div>
     </Card>
   );
 }

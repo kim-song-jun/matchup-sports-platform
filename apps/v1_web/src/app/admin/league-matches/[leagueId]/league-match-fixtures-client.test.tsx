@@ -14,6 +14,7 @@ import {
   useV1RegenerateLeagueFixtures,
   useV1RemoveLeagueTeam,
   useV1RevertLeagueCompletion,
+  useV1CompleteLeague,
   useV1Teams,
   useV1UpdateLeagueFixture,
 } from '@/hooks/use-v1-api';
@@ -126,6 +127,7 @@ vi.mock('@/hooks/use-v1-api', () => ({
   // R6/D-3: 종료 역전이. 대부분의 테스트는 state !== 'completed' 라 버튼 자체가 안 뜨므로
   // 기본값으로 충분하고, 역전이 테스트만 mutate 를 들여다본다.
   useV1RevertLeagueCompletion: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
+  useV1CompleteLeague: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
   useV1HoldLeague: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
   useV1ResumeLeague: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
   useV1CloseLeagueRegistration: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
@@ -165,6 +167,7 @@ const useV1RegenerateLeagueFixturesMock = vi.mocked(useV1RegenerateLeagueFixture
 const useV1RemoveLeagueTeamMock = vi.mocked(useV1RemoveLeagueTeam, { partial: true });
 const useV1UpdateLeagueFixtureMock = vi.mocked(useV1UpdateLeagueFixture, { partial: true });
 const useV1RevertLeagueCompletionMock = vi.mocked(useV1RevertLeagueCompletion, { partial: true });
+const useV1CompleteLeagueMock = vi.mocked(useV1CompleteLeague, { partial: true });
 const useV1TeamsMock = vi.mocked(useV1Teams, { partial: true });
 
 /** 만든 대진은 지울 수 없어 생성은 확인 창을 거친다(F42) — 누르고 확인까지 한 번에. */
@@ -207,6 +210,7 @@ describe('LeagueMatchFixturesClient', () => {
     useV1CancelLeagueFixtureMock.mockReturnValue({ mutate: vi.fn(), isPending: false } as never);
     useV1RegenerateLeagueFixturesMock.mockReturnValue({ mutate: vi.fn(), isPending: false } as never);
     useV1RevertLeagueCompletionMock.mockReturnValue({ mutate: vi.fn(), isPending: false } as never);
+    useV1CompleteLeagueMock.mockReturnValue({ mutate: vi.fn(), isPending: false } as never);
   });
 
   // D6(2026-08-24 확정): '상태' 열과 별개로 '결과' 열을 둔다. 이 열이 없던 동안 운영자는
@@ -1490,6 +1494,57 @@ describe('LeagueMatchFixturesClient', () => {
     fireEvent.click(screen.getByRole('button', { name: '되돌리기' }));
 
     await waitFor(() => expect(revertMutate).toHaveBeenCalledWith({ reason: '오심 정정' }, expect.anything()));
+  });
+
+  it('남은 대진이 모두 확정·취소된 진행 중 리그에만 "리그 종료하기"가 뜨고, 확인하면 complete mutation을 호출한다', async () => {
+    // MD-QA #93: 되돌리기·보류 해제 뒤 대진을 바꾸지 않으면 자동 종료가 다시 판정되지 않아 리그가
+    // 진행 중으로 남았다. 버튼 노출 조건은 서버 shouldCompleteLeague 와 같아야 한다.
+    const fixture = (id: string, status: string, resultStage: string) => ({
+      teamMatchId: id, title: id, homeTeamId: 't1', awayTeamId: 't2', startAt: '2026-09-01T20:00:00.000Z',
+      placeName: '장소 미정', status, resultStage, homeScore: null, awayScore: null,
+    });
+    const detail = (state: string, fixtures: ReturnType<typeof fixture>[]) => ({
+      data: {
+        leagueId: 'league-1', isPublic: true, title: '가을 풋살 리그', state,
+        teamIds: ['t1', 't2'], startsOn: '2026-09-01T00:00:00.000Z', fixtures,
+      },
+      isPending: false,
+    });
+    useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false } as never);
+    useV1GenerateLeagueFixturesMock.mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as never);
+    useV1UpdateLeagueFixtureMock.mockReturnValue({ mutate: vi.fn() } as never);
+    const renderClient = () =>
+      render(
+        <Providers>
+          <LeagueMatchFixturesClient leagueId="league-1" initialView="list" />
+        </Providers>,
+      );
+
+    // 결과를 기다리는 대진이 남아 있으면 버튼이 없다.
+    useV1AdminLeagueMatchMock.mockReturnValue(detail('active', [
+      fixture('tm-1', 'completed', 'official'), fixture('tm-2', 'matched', 'not_entered'),
+    ]) as never);
+    const pendingView = renderClient();
+    expect(screen.queryByRole('button', { name: '리그 종료하기' })).not.toBeInTheDocument();
+    pendingView.unmount();
+
+    // 대진이 전부 취소된 리그도 종료 대상이 아니다(서버도 같은 판정).
+    useV1AdminLeagueMatchMock.mockReturnValue(detail('active', [fixture('tm-1', 'cancelled', 'not_entered')]) as never);
+    const cancelledView = renderClient();
+    expect(screen.queryByRole('button', { name: '리그 종료하기' })).not.toBeInTheDocument();
+    cancelledView.unmount();
+
+    const completeMutate = vi.fn();
+    useV1CompleteLeagueMock.mockReturnValue({ mutate: completeMutate, isPending: false } as never);
+    useV1AdminLeagueMatchMock.mockReturnValue(detail('active', [
+      fixture('tm-1', 'completed', 'official'), fixture('tm-2', 'cancelled', 'not_entered'),
+    ]) as never);
+    renderClient();
+    fireEvent.click(screen.getByRole('button', { name: '리그 종료하기' }));
+    const reasonBox = await screen.findByLabelText(/^사유/);
+    fireEvent.change(reasonBox, { target: { value: '추가 경기 없음' } });
+    fireEvent.click(screen.getByRole('button', { name: '종료' }));
+    await waitFor(() => expect(completeMutate).toHaveBeenCalledWith({ reason: '추가 경기 없음' }, expect.anything()));
   });
 
   // U1(A안 "확정 다이얼로그") — 행 ⋯ 시트의 결과 항목은 결과 진행 단계에 따라 갈린다.

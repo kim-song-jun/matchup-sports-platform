@@ -37,7 +37,7 @@ function item(type: TeamRecordCategory, year: string, index: number): PublicTeam
     leagueId: type === 'league' ? 'league-1' : null,
     leagueTitle: type === 'league' ? '합성 리그' : null,
     type, opponentTeamId: `opponent-${index}`, opponentTeamName: `합성 상대 ${index}`, opponentTeamLogoUrl: null,
-    result: 'WON', goalsFor: 2, goalsAgainst: 1, playedAt: `${year}-09-20T09:00:00Z`, penalties: null, events: [],
+    result: 'WON', goalsFor: 2, goalsAgainst: 1, playedAt: `${year}-09-20T09:00:00Z`, penalties: null, isForfeit: false, events: [],
   };
 }
 const items = [item('league', '2026', 1), item('league', '2025', 2), item('tournament', '2026', 3),

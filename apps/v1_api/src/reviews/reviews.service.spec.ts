@@ -1464,6 +1464,96 @@ describe('ReviewsService', () => {
 
   // 일반 팀원이 팀 매치에서 쓰는 후기는 "상대했던 선수"다. 근거는 그 경기 라인업에 실린
   // 연동 팀원(V1GameParticipant.userId)뿐이며, 게스트·미제출 라인업은 대상이 되지 않는다.
+  // MD-QA #107: 리그 경기가 "팀매치"로 보이고, 몰수패 경기의 (오지 않은) 선수들까지 리뷰 대상으로 떴다.
+  describe('리그 경기 표기와 몰수 경기 제외', () => {
+    const opponent = 'away-player-a';
+    const forfeitGame = (outcomeReason: string, reason: string | null = null) => ({
+      currentOfficialRevision: { state: 'OFFICIAL', reason, outcomeReason },
+    });
+
+    it('pending: 리그 소속 경기는 isLeague=true, 일반 팀매치는 false 로 낸다', async () => {
+      const leagueWorld = teamMatchWorld([{ userId: leaderId, teamId: hostTeamId, role: 'owner' }]);
+      Object.assign(leagueWorld.teamMatchRow, { leagueId: 'league-1', tournamentId: 'tournament-1' });
+      const plainWorld = teamMatchWorld([{ userId: leaderId, teamId: hostTeamId, role: 'owner' }]);
+      Object.assign(plainWorld.teamMatchRow, { leagueId: null, tournamentId: null });
+
+      const [league] = await makeService(leagueWorld.prisma)['pendingTeamReviews'](authUser(leaderId), 20);
+      const [plain] = await makeService(plainWorld.prisma)['pendingTeamReviews'](authUser(leaderId), 20);
+
+      expect(league).toMatchObject({ sourceType: 'team_match', isLeague: true });
+      expect(plain).toMatchObject({ sourceType: 'team_match', isLeague: false });
+    });
+
+    it.each([
+      ['outcomeReason=FORFEIT', forfeitGame('FORFEIT')],
+      ['옛 몰수 마커 사유', forfeitGame('NORMAL', '[LEAGUE_FORFEIT] 상대 불참')],
+    ])('pending: 몰수 확정 경기(%s)는 목록에서 빠지고, 정상·중단 경기는 그대로 남는다', async (_label, game) => {
+      const forfeited = teamMatchWorld([{ userId: leaderId, teamId: hostTeamId, role: 'owner' }], [], [opponent]);
+      Object.assign(forfeited.teamMatchRow, { game });
+      const normal = teamMatchWorld([{ userId: leaderId, teamId: hostTeamId, role: 'owner' }], [], [opponent]);
+      Object.assign(normal.teamMatchRow, { game: forfeitGame('NORMAL') });
+      const abandoned = teamMatchWorld([{ userId: leaderId, teamId: hostTeamId, role: 'owner' }], [], [opponent]);
+      Object.assign(abandoned.teamMatchRow, { game: forfeitGame('ABANDONED') });
+
+      expect(await makeService(forfeited.prisma)['pendingTeamReviews'](authUser(leaderId), 20)).toEqual([]);
+      expect(await makeService(normal.prisma)['pendingTeamReviews'](authUser(leaderId), 20)).toHaveLength(1);
+      expect(await makeService(abandoned.prisma)['pendingTeamReviews'](authUser(leaderId), 20)).toHaveLength(1);
+    });
+
+    it('source: 몰수 경기는 새로 쓸 대상이 없고 이미 쓴 후기는 그대로 보인다', async () => {
+      const { prisma, teamMatchRow } = teamMatchWorld(
+        [{ userId: leaderId, teamId: hostTeamId, role: 'owner' }],
+        [{
+          id: 'review-old', reviewerUserId: leaderId, reviewerTeamId: hostTeamId, sourceType: 'team_match', sourceId: teamSourceId,
+          targetType: 'team', targetTeamId: awayTeamId, targetUserId: null, rating: 4, status: 'submitted', submittedAt, tags: [],
+          targetUser: null, targetTeam: { id: awayTeamId, name: '원정팀', profile: { logoUrl: null } },
+          reviewerUser: { id: leaderId, profile: { nickname: '작성자', profileImageUrl: null } },
+          reviewerTeam: { id: hostTeamId, name: '홈팀', profile: { logoUrl: null } },
+        }],
+        [opponent],
+      );
+      Object.assign(teamMatchRow, { game: forfeitGame('FORFEIT') });
+
+      const source = await makeService(prisma).source(authUser(leaderId), { sourceType: 'team_match', sourceId: teamSourceId });
+
+      expect(source.targets.map((target) => [target.targetType, target.alreadySubmitted])).toEqual([['team', true]]);
+    });
+
+    it('submit: 몰수 경기의 선수·팀 후기는 TARGET_NOT_REVIEWABLE 로 거부한다', async () => {
+      const { prisma, createMock, teamMatchRow } = teamMatchWorld(
+        [{ userId: leaderId, teamId: hostTeamId, role: 'owner' }],
+        [],
+        [opponent],
+      );
+      Object.assign(teamMatchRow, { game: forfeitGame('FORFEIT') });
+      const service = makeService(prisma);
+
+      const playerError = await service.submit(authUser(leaderId), {
+        sourceType: 'team_match', sourceId: teamSourceId, targetType: 'user', targetUserId: opponent, rating: 4, tagCodes: ['manner'],
+      }).catch((err: unknown) => err);
+      const teamError = await service.submit(authUser(leaderId), teamReviewDto(4)).catch((err: unknown) => err);
+
+      for (const error of [playerError, teamError]) {
+        expect(error).toBeInstanceOf(ForbiddenException);
+        expect((error as ForbiddenException).getResponse()).toMatchObject({ code: 'TARGET_NOT_REVIEWABLE' });
+      }
+      expect(createMock).not.toHaveBeenCalled();
+    });
+
+    it('source·written: 리그 경기 요약에 isLeague 가 실린다', async () => {
+      const { prisma, teamMatchRow } = teamMatchWorld([{ userId: leaderId, teamId: hostTeamId, role: 'owner' }]);
+      Object.assign(teamMatchRow, { leagueId: 'league-1' });
+
+      const source = await makeService(prisma).source(authUser(leaderId), { sourceType: 'team_match', sourceId: teamSourceId });
+      const summaries = await makeService(prisma)['reviewSourceSummaries']([
+        { sourceType: 'team_match', sourceId: teamSourceId },
+      ] as never);
+
+      expect(source.source).toMatchObject({ isLeague: true });
+      expect(summaries.get(`team_match:${teamSourceId}`)).toMatchObject({ isLeague: true });
+    });
+  });
+
   describe('팀 매치 상대 선수 후기 — 역할 무관', () => {
     const opponentA = 'away-player-a';
     const opponentB = 'away-player-b';
@@ -2260,7 +2350,7 @@ function teamMatchWorld(
     })),
   };
 
-  return { prisma, createMock, reviewRows, teamTrustUpsert, userReputationUpsert };
+  return { prisma, createMock, reviewRows, teamTrustUpsert, userReputationUpsert, teamMatchRow: teamMatchRow as Record<string, unknown> };
 }
 
 async function runTeamTrust(candidates: FakeRow[], reverseReviews: FakeRow[]) {

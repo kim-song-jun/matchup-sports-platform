@@ -2031,6 +2031,8 @@ export type V1ReviewListItem = {
   reviewedCount: number;
   remainingCount: number;
   state: 'ready' | 'done';
+  /** 팀 매치 후기에서만 온다. 리그 경기면 true. */
+  isLeague?: boolean;
   reviewerTeam?: { teamId: string; name: string } | null;
   targetTeam?: { teamId: string; name: string } | null;
 };
@@ -2058,7 +2060,7 @@ export type V1ReceivedReviewDetail = Omit<V1ReviewDetail, 'reviewerUser' | 'revi
   reviewerTeam: V1ReviewActorTeam | null;
   submittedAt: string | null;
   /** 어느 경기에서 받은 후기인지. 소스를 못 찾으면 null. */
-  source: { sourceType: V1ReviewSourceType; sourceId: string; title: string; completedAt: string | null } | null;
+  source: { sourceType: V1ReviewSourceType; sourceId: string; title: string; completedAt: string | null; isLeague?: boolean } | null;
 };
 
 export type V1ReviewerTeam = {

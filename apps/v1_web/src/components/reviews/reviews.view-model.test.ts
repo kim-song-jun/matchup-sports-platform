@@ -75,6 +75,44 @@ describe('reviews view model — 대회 경기 리뷰 계약', () => {
     expect(sourceTypeLabel('tournament_fixture')).toBe('대회 경기');
   });
 
+  it('리그 팀 매치는 "리그 경기", 일반 팀 매치는 "팀매치"로 표시한다', () => {
+    const item = {
+      sourceType: 'team_match' as const, title: '라운드 1', completedAt: '2026-10-10T12:00:00.000Z',
+      targetType: 'team' as const, targetCount: 1, reviewedCount: 0, remainingCount: 1, state: 'ready' as const,
+    };
+    const model = toReviewsPageModel({
+      items: [
+        { ...item, sourceId: 'league-match', isLeague: true },
+        { ...item, sourceId: 'friendly-match', isLeague: false },
+        { ...item, sourceId: 'old-response' },
+      ],
+      pageInfo: { nextCursor: null, hasNext: false },
+    }, 'pending');
+
+    expect(model.cards.map((card) => card.kindLabel)).toEqual(['리그 경기', '팀매치', '팀매치']);
+  });
+
+  it('받은 리뷰 그룹도 리그 경기를 "리그 경기"로 표시한다', () => {
+    const common = {
+      targetType: 'user' as const, targetUser: { userId: 'me', name: '나', imageUrl: null },
+      targetTeam: null, reviewerTeam: null, status: 'submitted' as const, submittedAt: null, anonymous: false, tags: [],
+      reviewerUser: { userId: 'p', name: '참가자', imageUrl: null }, rating: 5, sourceType: 'team_match' as const,
+    };
+    const source = { sourceType: 'team_match' as const, title: '라운드 1', completedAt: null };
+    const model = toReviewsReceivedPageModel({
+      items: [
+        { ...common, reviewId: 'a', sourceId: 'league-match', source: { ...source, sourceId: 'league-match', isLeague: true } },
+        { ...common, reviewId: 'b', sourceId: 'friendly-match', source: { ...source, sourceId: 'friendly-match', isLeague: false } },
+      ],
+      pageInfo: { nextCursor: null, hasNext: false },
+    });
+
+    const metas = model.userGroups.map((group) => group.meta);
+    expect(metas[0]).toContain('리그 경기');
+    expect(metas[1]).toContain('팀매치');
+    expect(metas[1]).not.toContain('리그 경기');
+  });
+
   it('대회 fixture 상대팀 리뷰는 리뷰 목록에서 상대팀 CTA로 보인다', () => {
     const model = toReviewsPageModel({
       items: [

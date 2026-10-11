@@ -1,7 +1,7 @@
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { TeamMatchSharedRecord, TeamMatchRecordEntry } from './team-match-shared-record';
-import type { SharedRecord } from '@/hooks/use-team-match-record';
+import type { RecordChange, SharedGoal, SharedRecord } from '@/hooks/use-team-match-record';
 import { V1_NETWORK_ERROR_CODE, V1ApiError } from '@/lib/api-client';
 
 const state = vi.hoisted(() => ({ data: {} as SharedRecord, mutate: vi.fn(), refetch: vi.fn(), replace: vi.fn(), search: '', mutationError: undefined as unknown }));
@@ -589,6 +589,68 @@ describe('shared record participant flow', () => {
       render(<TeamMatchSharedRecord teamMatchId="match" admin />);
       fireEvent.click(deleteButton(/박지훈.*삭제$/));
       expect(await screen.findByRole('dialog', { name: '득점을 삭제할까요?' })).toHaveTextContent('지우면 양 팀의 종료 확인도 취소돼요.');
+      expect(state.mutate).not.toHaveBeenCalled();
+    });
+  });
+
+  // 이력의 [이 변경 되돌리기]도 같은 서버 규칙을 탄다 — 추가를 되돌리면 그 득점이 사라지고, 어떤 되돌리기든 양 팀 종료 확인이 비워진다.
+  describe('진행 중 변경 되돌리기 — 상대 팀 몫이 걸릴 때만 확인한다', () => {
+    const ownGoal = { id: 'g1', sideId: 'home', participantId: 'h1', ownGoal: false, minute: 10, subMatchId: null };
+    const theirGoal = { id: 'g2', sideId: 'away', participantId: 'a1', ownGoal: false, minute: 20, subMatchId: null };
+    const awayConfirmed = [{ sideId: 'away', name: '상대 팀장', at: '2026-09-21T01:00:00Z' }];
+    const change = (goalId: string, action: string, before: SharedGoal | null, after: SharedGoal | null): RecordChange => ({ id: 'c1', version: 3, action, actorName: '기록자', goalId, subMatchId: null, before, after, at: '2026-09-21T01:00:00Z' });
+    const undoButton = () => screen.getByRole('button', { name: '이 변경 되돌리기' });
+    const expectUndone = () => waitFor(() => expect(state.mutate).toHaveBeenCalledWith(expect.objectContaining({ action: 'undo', changeId: 'c1', expectedVersion: 3 })));
+
+    it('내 팀 득점 추가를 되돌리고 상대 종료 확인도 없으면 확인 없이 바로 되돌린다', async () => {
+      state.data.goals = [ownGoal];
+      state.data.history = [change('g1', 'add', null, ownGoal)];
+      render(<TeamMatchSharedRecord teamMatchId="match" />);
+      fireEvent.click(undoButton());
+      await expectUndone();
+      expect(screen.queryByRole('dialog')).toBeNull();
+    });
+
+    it('상대 팀 득점 추가를 되돌리면 그 득점이 사라지니 확인 뒤에만 되돌린다', async () => {
+      state.data.goals = [theirGoal];
+      state.data.history = [change('g2', 'add', null, theirGoal)];
+      render(<TeamMatchSharedRecord teamMatchId="match" />);
+      fireEvent.click(undoButton());
+
+      const dialog = await screen.findByRole('dialog', { name: '이 변경을 되돌릴까요?' });
+      expect(dialog).toHaveTextContent('상대 팀이 기록한 득점이에요.');
+      expect(dialog).not.toHaveTextContent('종료 확인');
+      expect(state.mutate).not.toHaveBeenCalled();
+      fireEvent.click(within(dialog).getByRole('button', { name: '변경 되돌리기' }));
+      await expectUndone();
+    });
+
+    it('상대 팀이 종료 확인한 상태에서는 내 득점 되돌리기도 확인 뒤에만 보내고 종료 확인이 풀린다고 알린다', async () => {
+      state.data.goals = [ownGoal];
+      state.data.confirmations = awayConfirmed;
+      state.data.history = [change('g1', 'add', null, ownGoal)];
+      render(<TeamMatchSharedRecord teamMatchId="match" />);
+      fireEvent.click(undoButton());
+
+      const dialog = await screen.findByRole('dialog', { name: '이 변경을 되돌릴까요?' });
+      expect(dialog).toHaveTextContent('되돌리면 상대 팀의 종료 확인도 취소돼요.');
+      expect(state.mutate).not.toHaveBeenCalled();
+    });
+
+    it('지운 득점을 되살리는 되돌리기는 득점을 잃지 않아 상대 확인이 없으면 바로 보낸다 — 상대 확인이 있으면 묻는다(대조군)', async () => {
+      state.data.goals = [];
+      state.data.history = [change('g2', 'delete', theirGoal, null)];
+      const view = render(<TeamMatchSharedRecord teamMatchId="match" />);
+      fireEvent.click(undoButton());
+      await expectUndone();
+      expect(screen.queryByRole('dialog')).toBeNull();
+      view.unmount();
+
+      state.mutate.mockClear();
+      state.data.confirmations = awayConfirmed;
+      render(<TeamMatchSharedRecord teamMatchId="match" />);
+      fireEvent.click(undoButton());
+      expect(await screen.findByRole('dialog', { name: '이 변경을 되돌릴까요?' })).toHaveTextContent('상대 팀의 종료 확인도 취소돼요.');
       expect(state.mutate).not.toHaveBeenCalled();
     });
   });

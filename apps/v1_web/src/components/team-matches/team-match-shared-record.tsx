@@ -19,6 +19,7 @@ import {
   type SharedPublicGoalEvent,
   type SharedRecord,
   type SharedSubMatch,
+  type RecordChange,
   type RecordCommand,
 } from '@/hooks/use-team-match-record';
 import { extractErrorMessage } from '@/lib/error-message';
@@ -41,6 +42,15 @@ function isOpponentGoal(data: SharedRecord, goal: SharedGoal) {
   if (!data.ownSideId) return false;
   const player = data.participants.find((p) => p.id === goal.participantId);
   return (player?.sideId ?? (goal.ownGoal ? null : goal.sideId)) !== data.ownSideId;
+}
+
+// 진행 중 기록에서 득점을 지우거나 바꾸는 동작이 상대 팀 몫을 건드리는 경우의 안내 문구. 서버는 득점이 바뀔 때마다 양 팀 종료 확인을 모두 비운다.
+// 내 득점이고 상대 확인도 없으면 흔한 수정이라 빈 배열이고, 호출부는 묻지 않는다.
+function liveRiskNotes(data: SharedRecord, goal: SharedGoal | null, verb = '지우면') {
+  return [
+    goal && isOpponentGoal(data, goal) ? '상대 팀이 기록한 득점이에요.' : null,
+    data.confirmations.some((c) => c.sideId !== data.ownSideId) ? `${verb} ${data.ownSideId ? '상대' : '양'} 팀의 종료 확인도 취소돼요.` : null,
+  ].filter((note): note is string => note !== null);
 }
 
 function goalLabel(data: SharedRecord, goal: SharedGoal | null) {
@@ -270,12 +280,20 @@ export function TeamMatchSharedRecord({ teamMatchId, admin = false }: { teamMatc
       void commandAfterConfirm({ action: 'delete', goalId: goal.id }, { ...prompt, message: `${label} 득점을 지우면 ${OFFICIAL_CHANGE_NOTE}` });
       return;
     }
-    // 진행 중 삭제는 서버가 양 팀 종료 확인을 모두 비운다. 내 득점이고 상대 확인도 없으면 흔한 수정이라 묻지 않는다.
-    const notes = [
-      isOpponentGoal(data, goal) ? '상대 팀이 기록한 득점이에요.' : null,
-      data.confirmations.some((c) => c.sideId !== data.ownSideId) ? `지우면 ${data.ownSideId ? '상대' : '양'} 팀의 종료 확인도 취소돼요.` : null,
-    ].filter((note): note is string => note !== null);
+    const notes = liveRiskNotes(data, goal);
     void commandAfterConfirm({ action: 'delete', goalId: goal.id }, { ...prompt, message: `${label} ${notes.join(' ')} 지울까요?` }, notes.length > 0);
+  };
+  const undoChange = (change: RecordChange) => {
+    if (!data) return;
+    const prompt = { title: '이 변경을 되돌릴까요?', confirmLabel: '변경 되돌리기' };
+    if (data.phase === 'official') {
+      void commandAfterConfirm({ action: 'undo', changeId: change.id }, { ...prompt, message: `이 변경을 되돌리면 ${OFFICIAL_CHANGE_NOTE}` });
+      return;
+    }
+    // 되돌리면 지금 있는 득점이 사라지거나 바뀐다. 이미 지워진 득점을 되살리는 되돌리기는 득점을 잃지 않는다.
+    const current = change.goalId ? data.goals.find((g) => g.id === change.goalId) : undefined;
+    const notes = liveRiskNotes(data, current ?? null, '되돌리면');
+    void commandAfterConfirm({ action: 'undo', changeId: change.id }, { ...prompt, message: `${current ? `${goalLabel(data, current)} ` : ''}${notes.join(' ')} 되돌릴까요?` }, notes.length > 0);
   };
 
   if (!data) {
@@ -484,7 +502,7 @@ export function TeamMatchSharedRecord({ teamMatchId, admin = false }: { teamMatc
               <time>{new Date(change.at).toLocaleString('ko-KR')}</time>
               {change.goalId && <p className={styles.muted}>{goalLabel(data, change.before as SharedGoal | null)} → {goalLabel(data, change.after as SharedGoal | null)}</p>}
               {change.subMatchId && !change.goalId && <p className={styles.muted}>{(change.before as SharedSubMatch | null)?.title ?? '없음'} → {(change.after as SharedSubMatch | null)?.title ?? '삭제'}</p>}
-              {data.canEdit && change.goalId && <Button variant="ghost" size="sm" disabled={disabled || controlsOpen} onClick={() => void commandAfterConfirm({ action: 'undo', changeId: change.id }, { title: '이 변경을 되돌릴까요?', message: `이 변경을 되돌리면 ${OFFICIAL_CHANGE_NOTE}`, confirmLabel: '변경 되돌리기' })}>이 변경 되돌리기</Button>}
+              {data.canEdit && change.goalId && <Button variant="ghost" size="sm" disabled={disabled || controlsOpen} onClick={() => undoChange(change)}>이 변경 되돌리기</Button>}
             </li>)}
           </ul>
           {!data.history.length && <p className={styles.muted}>첫 기록을 기다리고 있어요.</p>}

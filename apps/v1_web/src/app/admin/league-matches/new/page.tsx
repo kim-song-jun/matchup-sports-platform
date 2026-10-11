@@ -96,8 +96,19 @@ export default function AdminLeagueMatchNewPage() {
   const periodNames = periodLabels(periodMinutes.length);
   const periodsInvalid = periodMinutes.some((value) => !/^\d+$/.test(value.trim()) || Number(value) < 1 || Number(value) > 240);
 
+  // Same-day leagues are allowed; the server rejects only endsOn < startsOn. YYYY-MM-DD compares lexicographically.
+  const endsBeforeStart = startsOn !== '' && endsOn !== '' && endsOn < startsOn;
+  const periodRangeError = endsBeforeStart ? '종료일은 시작일보다 빠를 수 없어요.' : null;
+
   const canSubmit =
-    title.trim().length > 0 && sportId !== '' && regionId !== '' && startsOn !== '' && endsOn !== '' && selectedTeams.length >= 2 && !periodsInvalid;
+    title.trim().length > 0 &&
+    sportId !== '' &&
+    regionId !== '' &&
+    startsOn !== '' &&
+    endsOn !== '' &&
+    !endsBeforeStart &&
+    selectedTeams.length >= 2 &&
+    !periodsInvalid;
 
   // 그룹 B 감사 결함 4: canSubmit이 false일 때 "왜"를 알려준다 — 지금까지는 버튼이 그냥
   // 비활성으로만 보여서 뭐가 덜 채워졌는지 화면에서 알 방법이 없었다. 위에서 아래로 채우는
@@ -108,6 +119,7 @@ export default function AdminLeagueMatchNewPage() {
     if (sportId === '') return '종목을 선택해 주세요.';
     if (regionId === '') return '지역을 선택해 주세요.';
     if (startsOn === '' || endsOn === '') return '시작일·종료일을 입력해 주세요.';
+    if (periodRangeError) return periodRangeError;
     if (selectedTeams.length < 2) return `참가 팀을 2팀 이상 추가해 주세요. (현재 ${selectedTeams.length}팀)`;
     if (periodsInvalid) return '경기 시간은 피리어드마다 1~240분 사이의 정수로 입력해 주세요.';
     return null;
@@ -229,9 +241,25 @@ export default function AdminLeagueMatchNewPage() {
           </div>
           <div>
             <label htmlFor="series-ends-on" className="mb-1 block text-sm font-medium text-[var(--text-strong)]">종료일</label>
-            <input id="series-ends-on" type="date" max={DATE_INPUT_MAX} value={endsOn} onChange={(e) => setEndsOn(e.target.value)} className={inputClass} />
+            <input
+              id="series-ends-on"
+              type="date"
+              min={startsOn || undefined}
+              max={DATE_INPUT_MAX}
+              value={endsOn}
+              onChange={(e) => setEndsOn(e.target.value)}
+              aria-invalid={periodRangeError ? true : undefined}
+              aria-describedby={periodRangeError ? 'series-ends-on-error' : undefined}
+              className={inputClass}
+            />
           </div>
         </div>
+
+        {periodRangeError && (
+          <p id="series-ends-on-error" role="alert" className="-mt-3 tm-text-caption font-medium text-[var(--red700)]">
+            {periodRangeError}
+          </p>
+        )}
 
         <div>
           <label htmlFor="series-team-picker" className="mb-1 block text-sm font-medium text-[var(--text-strong)]">참가 팀 추가 (최소 2팀)</label>

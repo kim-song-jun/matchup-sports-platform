@@ -259,6 +259,41 @@ describe('AdminLeagueMatchNewPage', () => {
     }
   }
 
+  it('종료일이 시작일보다 빠르면 종료일 아래에 안내를 보이고 만들기 버튼을 잠근다', async () => {
+    const mutateAsync = vi.fn();
+    useV1CreateLeagueMatchMock.mockReturnValue({ mutateAsync, isPending: false } as never);
+    await fillLeagueForm();
+
+    fireEvent.change(screen.getByLabelText('시작일'), { target: { value: '2026-10-20' } });
+    fireEvent.change(screen.getByLabelText('종료일'), { target: { value: '2026-10-12' } });
+
+    const endsOn = screen.getByLabelText('종료일');
+    expect(endsOn).toHaveAttribute('aria-invalid', 'true');
+    expect(screen.getByRole('alert')).toHaveTextContent('종료일은 시작일보다 빠를 수 없어요.');
+    expect(endsOn).toHaveAccessibleDescription(/종료일은 시작일보다 빠를 수 없어요/);
+    const submit = screen.getByRole('button', { name: '리그 만들기' });
+    expect(submit).toBeDisabled();
+    fireEvent.click(submit);
+    expect(mutateAsync).not.toHaveBeenCalled();
+
+    // 종료일을 바로잡으면 안내가 사라지고 다시 만들 수 있다.
+    fireEvent.change(screen.getByLabelText('종료일'), { target: { value: '2026-10-25' } });
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '리그 만들기' })).toBeEnabled();
+  });
+
+  it('시작일과 종료일이 같은 날이면 오류 없이 만들 수 있다', async () => {
+    useV1CreateLeagueMatchMock.mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as never);
+    await fillLeagueForm();
+
+    fireEvent.change(screen.getByLabelText('시작일'), { target: { value: '2026-10-20' } });
+    fireEvent.change(screen.getByLabelText('종료일'), { target: { value: '2026-10-20' } });
+
+    expect(screen.getByLabelText('종료일')).not.toHaveAttribute('aria-invalid', 'true');
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '리그 만들기' })).toBeEnabled();
+  });
+
   it('경기 시간을 종목 기본값(20·20)으로 미리 채우고, 고치지 않으면 피리어드를 따로 저장하지 않는다', async () => {
     pushMock.mockClear();
     savePeriodsMock.mockReset();

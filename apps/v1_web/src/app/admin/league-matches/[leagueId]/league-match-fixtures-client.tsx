@@ -43,7 +43,7 @@ import { expandWeeklyFixtureDates, WEEKDAY_OPTIONS } from '@/lib/league-fixture-
 import { toKstDateString } from '@/lib/kst-calendar';
 import { LeagueFixtureDatePicker } from './league-fixture-date-picker';
 import { LeagueWeeksPlanField } from './league-weeks-plan-field';
-import { resolveWeeksCount, type WeeksPlan } from '@/lib/league-round-robin-plan';
+import { plannedRounds, resolveWeeksCount, type WeeksPlan } from '@/lib/league-round-robin-plan';
 import { formatKstDateShort, formatKstTime } from '@/lib/date-utils';
 import { LeagueVisibilityControl } from './league-visibility-control';
 import { LeagueHoldControl } from './league-hold-control';
@@ -287,6 +287,10 @@ export default function LeagueMatchFixturesClient({
   const gamesPerDayValue = parseOptionalInt(gamesPerTeamPerDay);
   const teamCount = series.teamIds.length;
   const weeksCount = resolveWeeksCount(weeksPlan, teamCount, gamesPerDayValue ?? 1);
+  // 하루 경기 수 때문에 주차가 올림되면 `주차 × 하루 경기` 칸이 라운드로빈 한 바퀴보다 커진다 —
+  // 그때만 서버에 총 라운드를 알려 남는 칸에 앞 라운드를 다시 만들지 않게 한다.
+  const targetRounds = plannedRounds(weeksPlan, teamCount, weeksCount, gamesPerDayValue ?? 1);
+  const roundsCap = targetRounds >= 1 && targetRounds < weeksCount * (gamesPerDayValue ?? 1) ? targetRounds : null;
 
   // C안: 시간창(시작~종료)과 경기 시간이 다 있으면 팀당 하루 경기 수를 역산해 제안한다.
   // 정수가 아닌 입력이 하나라도 있으면 제안·계산 카드를 아예 숨긴다 — ?? 폴백(휴식 0·팀당 1)으로
@@ -422,6 +426,7 @@ export default function LeagueMatchFixturesClient({
             });
     return {
       weeksCount,
+      ...(roundsCap === null ? {} : { roundsCount: roundsCap }),
       // **시각이 비면 `schedule` 을 싣지 않는다.** 요일 경로는 위에서 `time` 이 비면
       // `dates` 를 빈 배열로 만들어 자연히 빠졌는데, 달력 경로는 `dates` 가 채워져 있어
       // **빈 `time` 이 그대로 나갔다** — 서버가 `time은 HH:mm 형식이어야 해요` 로 거부한다.

@@ -1679,9 +1679,9 @@ describe('LeagueMatchFixturesClient — 대진 timing 설정', () => {
     );
   });
 
-  it('F40: 라운드가 주차에 안 나눠지면 요약이 마지막 주에 다시 열리는 라운드를 알린다', () => {
-    useV1GenerateLeagueFixturesMock.mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as never);
-    const REPEAT = /첫 라운드 대진이 한 번 더 열려요/;
+  it('F40: 라운드가 주차에 안 나눠져도 라운드로빈 한 바퀴만 만들고 마지막 주에 남는 라운드만 연다', async () => {
+    const mutateAsync = vi.fn().mockResolvedValue({ teamMatchIds: [], warnings: [] });
+    useV1GenerateLeagueFixturesMock.mockReturnValue({ mutateAsync, isPending: false } as never);
 
     render(
       <Providers>
@@ -1689,15 +1689,42 @@ describe('LeagueMatchFixturesClient — 대진 timing 설정', () => {
       </Providers>,
     );
 
-    // 4팀 단일 3라운드 · 하루 2경기 → 2주 4라운드: 서버는 1라운드 대진을 한 번 더 만든다.
+    // 4팀 단일 3라운드 · 하루 2경기 → 2주, 3라운드 = 6경기. 첫 라운드 재대결(8경기)은 없다.
+    fireEvent.change(screen.getByLabelText('요일'), { target: { value: '3' } });
+    fireEvent.change(screen.getByLabelText('시작 시각'), { target: { value: '22:00' } });
     fireEvent.change(screen.getByLabelText('팀당 하루 경기'), { target: { value: '2' } });
-    expect(screen.getByText(/2주차 · 8경기가 만들어져요/)).toBeInTheDocument();
-    expect(screen.getByText(REPEAT)).toBeInTheDocument();
+    expect(screen.getByText(/2주차 · 6경기가 만들어져요/)).toBeInTheDocument();
+    expect(screen.getByText(/마지막 주에는 1라운드만 열려요/)).toBeInTheDocument();
+    expect(screen.queryByText(/한 번 더 열려요/)).not.toBeInTheDocument();
+    await generateAndConfirm();
+    await waitFor(() =>
+      expect(mutateAsync).toHaveBeenCalledWith(
+        expect.objectContaining({ weeksCount: 2, roundsCount: 3, timing: { gamesPerTeamPerDay: 2 } }),
+      ),
+    );
 
-    // 대조군: 하루 3경기면 1주에 3라운드가 딱 들어가 다시 여는 라운드가 없다.
+    // 대조군: 하루 3경기면 1주에 3라운드가 딱 들어가 안내도 상한도 없다.
     fireEvent.change(screen.getByLabelText('팀당 하루 경기'), { target: { value: '3' } });
     expect(screen.getByText(/1주차 · 6경기가 만들어져요/)).toBeInTheDocument();
-    expect(screen.queryByText(/한 번 더 열려요/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/마지막 주에는/)).not.toBeInTheDocument();
+  });
+
+  it('F40: 홈앤어웨이는 두 번씩 만나므로 "한 번씩만" 문구 없이 마지막 주 라운드 수만 안내한다', () => {
+    useV1GenerateLeagueFixturesMock.mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as never);
+
+    render(
+      <Providers>
+        <LeagueMatchFixturesClient leagueId="league-1" initialView="list" />
+      </Providers>,
+    );
+
+    fireEvent.change(screen.getByLabelText('팀당 하루 경기'), { target: { value: '4' } });
+    // 단일: 3라운드 · 하루 4경기 → 1주뿐이라 안내가 없다.
+    expect(screen.queryByText(/마지막 주에는/)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /홈앤어웨이/ }));
+    // 4팀 홈앤어웨이 6라운드 · 하루 4경기 → 2주, 마지막 주 2라운드.
+    expect(screen.getByText(/마지막 주에는 2라운드만 열려요/)).toBeInTheDocument();
+    expect(screen.queryByText(/한 번씩만 만나요/)).not.toBeInTheDocument();
   });
 
   it('이용 종료 시각까지 넣으면 팀당 경기 수를 역산 제안하고 "이대로 적용"이 값을 채운다', () => {

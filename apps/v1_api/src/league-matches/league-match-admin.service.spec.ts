@@ -613,6 +613,17 @@ describe('LeagueMatchAdminService.generateFixtures — 자동 로스터와 신�
     ]);
   });
 
+  it('roundsCount 가 주차 수 × 팀당 하루 경기 수보다 작으면 그 라운드 수까지만 만든다', async () => {
+    // 2팀은 한 라운드 = 한 경기. 3주 × 하루 1경기면 3경기지만 roundsCount 1 이면 한 경기뿐이다.
+    await service.generateFixtures(adminUser, 'league-1', { weeksCount: 3, roundsCount: 1 });
+    expect(state.calls.filter((call) => call === 'v1TeamMatch.create')).toHaveLength(1);
+  });
+
+  it('roundsCount 가 더 커도 주차 수 × 팀당 하루 경기 수를 넘기지 않는다', async () => {
+    await service.generateFixtures(adminUser, 'league-1', { weeksCount: 2, roundsCount: 5 });
+    expect(state.calls.filter((call) => call === 'v1TeamMatch.create')).toHaveLength(2);
+  });
+
   it('리그를 active 로 옮길 때 통합 축 거울의 status 도 같이 옮긴다 (dual-write)', async () => {
     await service.generateFixtures(adminUser, 'league-1', { weeksCount: 1 });
 

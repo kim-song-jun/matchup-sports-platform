@@ -128,6 +128,14 @@ export class GenerateLeagueFixturesDto extends LeaguePlaceSnapshotDto {
   @Max(52)
   weeksCount!: number;
 
+  // 지정하면 총 라운드를 `weeksCount × 팀당 하루 경기 수` 대신 이 수로 자른다 — 단일/홈앤어웨이가
+  // 라운드로빈 한 바퀴를 넘겨 앞 라운드를 다시 만들지 않게. 생략하면 기존 동작.
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(104)
+  roundsCount?: number;
+
   // 지정하지 않으면 기존 동작(시작일 그대로 매주 반복)을 유지한다 — 하위 호환.
   @IsOptional()
   @ValidateNested()

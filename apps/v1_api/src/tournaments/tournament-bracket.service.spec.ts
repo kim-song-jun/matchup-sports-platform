@@ -1197,10 +1197,10 @@ describe('TournamentBracketService', () => {
       expect(rows).toHaveLength(1);
     });
 
-    it('만료된 기록은 없는 것으로 본다 — 24시간이 지난 키는 새 경기를 만들고 새 기록을 남긴다', async () => {
+    it('만료된 기록은 없는 것으로 본다 — 보관 기간(30일, 전역 멱등 계약)이 지난 키는 새 경기를 만들고 새 기록을 남긴다', async () => {
       const rows = arrange();
       await service.createFixture(ownerUser, 'tournament-1', { ...request, clientCommandId: KEY_A });
-      expect(rows[0].expiresAt.getTime()).toBeGreaterThan(Date.now() + 23 * 60 * 60 * 1000);
+      expect(rows[0].expiresAt.getTime()).toBeGreaterThan(Date.now() + 29 * 24 * 60 * 60 * 1000);
       rows[0].expiresAt = new Date(Date.now() - 1000);
       prisma.v1TeamMatch.create.mockResolvedValue({ id: 'fixture-2' });
       prisma.v1TeamMatch.findUniqueOrThrow.mockResolvedValue({ ...canonicalDetailsRow().teamMatch, id: 'fixture-2', hostTeamId: null, approvedApplicantTeamId: null });
@@ -1210,6 +1210,26 @@ describe('TournamentBracketService', () => {
       expect(prisma.v1IdempotencyRecord.findFirst).toHaveBeenCalledWith(expect.objectContaining({
         where: expect.objectContaining({ expiresAt: { gt: expect.any(Date) } }),
       }));
+    });
+
+    // 번호를 함께 보낸 키 요청이 좌표 멱등으로 재생돼도 키를 그 경기에 묶는다 — 그 뒤 경기가 지워지면 같은 키는 새 경기가 아니라 RESOURCE_GONE.
+    it('번호와 키를 함께 보낸 요청이 좌표로 재생되면 키 기록을 남기고, 그 경기가 지워진 뒤 같은 키는 RESOURCE_GONE', async () => {
+      const rows = arrange();
+      prisma.v1TournamentRegistration.findFirst.mockResolvedValue({ id: 'reg-x' });
+      // 좌표 재생은 저장된 경기 내용이 요청과 같아야 한다 — 저장 행(canonicalDetailsRow)의 등록·장소에 맞춘다.
+      const numbered = { ...request, fixtureNumber: 1, homeRegistrationId: 'reg-1', awayRegistrationId: 'reg-2', venue: '망원 구장', clientCommandId: KEY_B };
+      const stored = canonicalDetailsRow();
+      prisma.v1TournamentMatchDetails.findFirst.mockResolvedValueOnce({ ...stored, teamMatch: { ...stored.teamMatch, placeName: '망원 구장' } });
+      const replayed = await service.createFixture(ownerUser, 'tournament-1', numbered);
+      expect(replayed).toMatchObject({ id: 'fixture-1' });
+      expect(prisma.v1TeamMatch.create).not.toHaveBeenCalled();
+      expect(rows).toHaveLength(1);
+      expect(rows[0]).toMatchObject({ resourceId: stored.teamMatchId, idempotencyKey: `tournament-fixture-client:tournament-1:${KEY_B}` });
+
+      prisma.v1TournamentMatchDetails.findFirst.mockResolvedValueOnce(null);
+      await expect(service.createFixture(ownerUser, 'tournament-1', numbered))
+        .rejects.toMatchObject({ response: { code: 'COMMAND_IDEMPOTENCY_RESOURCE_GONE' } });
+      expect(prisma.v1TeamMatch.create).not.toHaveBeenCalled();
     });
 
     describe('첫 요청 뒤 홈 팀 등록이 취소된 경우', () => {

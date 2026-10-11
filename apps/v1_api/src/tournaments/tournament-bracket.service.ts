@@ -87,7 +87,8 @@ type AdminBracketFixture = ReturnType<typeof serializeTournamentTeamMatchBracket
 };
 
 const FIXTURE_CLIENT_CREATE_ACTION = 'tournament_fixture_client_create';
-const FIXTURE_CLIENT_KEY_RETENTION_MS = 24 * 60 * 60 * 1000;
+// 전역 멱등 계약(docs/api/global-contract.md)의 보관 기간과 같다.
+const FIXTURE_CLIENT_KEY_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
 
 const FIXTURE_REPLAY_SELECT = {
   teamMatchId: true,
@@ -130,6 +131,24 @@ function assertReplayableFixture(aggregate: FixtureReplayAggregate, tournamentId
     !aggregate.game.sides.some((side) => side.sideKey === V1GameSideKey.AWAY && side.teamId === aggregate.approvedApplicantTeamId)) {
     throw new ConflictException({ code: 'TEAM_MATCH_IDEMPOTENCY_INCOMPLETE', message: '기존 대진 생성 기록이 완전하지 않아요.' });
   }
+}
+
+async function recordClientFixtureKey(
+  tx: Prisma.TransactionClient, userId: string, clientKey: string, payloadHash: string, teamMatchId: string,
+): Promise<void> {
+  await tx.v1IdempotencyRecord.create({
+    data: {
+      actorUserId: userId,
+      action: FIXTURE_CLIENT_CREATE_ACTION,
+      resourceType: V1GameSourceType.TEAM_MATCH,
+      resourceId: teamMatchId,
+      idempotencyKey: clientKey,
+      payloadHash,
+      responseStatus: 201,
+      responseBody: { teamMatchId },
+      expiresAt: new Date(Date.now() + FIXTURE_CLIENT_KEY_RETENTION_MS),
+    },
+  });
 }
 
 function fixtureReplayResult(details: FixtureReplayDetails & { teamMatch: FixtureReplayAggregate }) {
@@ -503,7 +522,7 @@ export class TournamentBracketService {
     return this.serializeGroupTeam(saved);
   }
 
-  /** 같은 요청 고유 키로 처음 만든 경기를 돌려준다. 기록이 없거나 24시간이 지났으면 null(새 요청). */
+  /** 같은 요청 고유 키로 처음 만든 경기를 돌려준다. 기록이 없거나 보관 기간(30일)이 지났으면 null(새 요청). */
   private async replayClientFixture(
     db: Prisma.TransactionClient, userId: string, tournamentId: string, clientKey: string, payloadHash: string,
   ) {
@@ -726,6 +745,9 @@ export class TournamentBracketService {
             message: '같은 경기 생성 키를 다른 내용으로 다시 사용할 수 없어요.',
           });
         }
+        // 번호를 함께 보낸 키 요청이 좌표로 재생되면 키도 이 경기에 묶어 둔다 — 안 묶으면 그 뒤 경기가 옮겨지거나
+        // 지워졌을 때 같은 키 재시도가 재생·RESOURCE_GONE 대신 새 경기를 만든다(위 키 조회에서 기록이 없었던 경우다).
+        if (clientKey) await recordClientFixtureKey(tx, user.id, clientKey, clientPayloadHash, existingDetails.teamMatchId);
         return fixtureReplayResult(existingDetails);
       }
 
@@ -863,19 +885,7 @@ export class TournamentBracketService {
         tx,
       );
       if (clientKey) {
-        await tx.v1IdempotencyRecord.create({
-          data: {
-            actorUserId: user.id,
-            action: FIXTURE_CLIENT_CREATE_ACTION,
-            resourceType: V1GameSourceType.TEAM_MATCH,
-            resourceId: teamMatch.id,
-            idempotencyKey: clientKey,
-            payloadHash: clientPayloadHash,
-            responseStatus: 201,
-            responseBody: { teamMatchId: teamMatch.id },
-            expiresAt: new Date(Date.now() + FIXTURE_CLIENT_KEY_RETENTION_MS),
-          },
-        });
+        await recordClientFixtureKey(tx, user.id, clientKey, clientPayloadHash, teamMatch.id);
       }
       return {
         ...teamMatch,

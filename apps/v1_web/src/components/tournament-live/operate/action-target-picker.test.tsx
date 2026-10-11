@@ -107,6 +107,30 @@ describe('ActionTargetPicker — 액션 우선(액션 먼저, 대상은 나중)'
     );
   });
 
+  it('레드카드가 기록된 선수는 골·카드 대상 목록에서 "퇴장"으로 가르되 다른 팀 선수는 그대로 둔다', () => {
+    for (const [actionLabel, actionType] of [['골', 'GOAL'], ['옐로카드', 'CARD']] as const) {
+      const { unmount } = render(
+        <ActionTargetPicker
+          open
+          actionLabel={actionLabel}
+          actionType={actionType}
+          cardColor={actionType === 'CARD' ? 'YELLOW' : undefined}
+          frozen={FROZEN}
+          sides={SIDES}
+          lineups={LINEUPS}
+          allowTeamOnly={false}
+          sentOffParticipantIds={new Set(['p-jung'])}
+          onCommit={vi.fn()}
+          onCancel={vi.fn()}
+        />,
+      );
+
+      expect(screen.getByRole('button', { name: '정우진 선수 이벤트 기록, 퇴장' })).toHaveTextContent('퇴장');
+      expect(screen.getByRole('button', { name: '조현우 선수 이벤트 기록' })).not.toHaveTextContent('퇴장');
+      unmount();
+    }
+  });
+
   it('카드 액션은 payload.card로 색을 실어 보낸다', async () => {
     const onCommit = vi.fn();
     render(

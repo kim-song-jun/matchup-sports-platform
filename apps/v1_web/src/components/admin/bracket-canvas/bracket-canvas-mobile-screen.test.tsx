@@ -11,7 +11,7 @@ const { bracketState, refetch } = vi.hoisted(() => ({
 
 vi.mock('@/hooks/use-v1-api', () => ({ useV1AdminBracket: () => bracketState.value }));
 vi.mock('./bracket-canvas-mobile', () => ({
-  BracketCanvasMobile: (props: { competitionId: string; scope: string; canWrite: boolean; rounds: Array<{ label: string }>; candidates: unknown[]; slots: unknown[]; registrationsState: RegistrationsLoadState }) => (
+  BracketCanvasMobile: (props: { competitionId: string; scope: string; canWrite: boolean; rounds: Array<{ label: string }>; candidates: unknown[]; slots: unknown[]; groups?: unknown[]; registrationsState: RegistrationsLoadState }) => (
     <div
       data-testid="mobile-canvas"
       data-competition-id={props.competitionId}
@@ -20,6 +20,7 @@ vi.mock('./bracket-canvas-mobile', () => ({
       data-rounds={props.rounds.map((round) => round.label).join(',')}
       data-candidates={props.candidates.length}
       data-slots={props.slots.length}
+      data-groups={props.groups?.length ?? -1}
       data-registrations-status={props.registrationsState.status}
     />
   ),
@@ -55,6 +56,7 @@ describe('BracketCanvasMobileScreen', () => {
     expect(mobile).toHaveAttribute('data-scope', 'tournament');
     expect(mobile).toHaveAttribute('data-rounds', '8강');
     expect(mobile).toHaveAttribute('data-slots', '1');
+    expect(mobile).toHaveAttribute('data-groups', '1');
     expect(mobile).toHaveAttribute('data-candidates', '1');
     expect(mobile).toHaveAttribute('data-can-write', 'true');
     expect(mobile).toHaveAttribute('data-registrations-status', 'success');

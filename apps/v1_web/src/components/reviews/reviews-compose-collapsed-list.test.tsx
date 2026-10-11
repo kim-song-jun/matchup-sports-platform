@@ -209,16 +209,16 @@ describe('경기 후기 작성 — 별과 태그 중 하나만 채우면 보낼 
 describe('경기 후기 작성 — 작성 현황은 입력 즉시 바뀐다', () => {
   it('상단 배지·선수 목록 배지·현황 카드가 보내기 전에 갱신된다', async () => {
     const user = await renderPage();
-    expect(screen.getByText('작성 중 0명')).toBeInTheDocument();
-    expect(screen.getByText('작성 중 0명 · 남은 대상 4명')).toBeInTheDocument();
+    expect(screen.getByText('작성 중 0건')).toBeInTheDocument();
+    expect(screen.getByText('작성 중 0건 · 남은 대상 4건')).toBeInTheDocument();
     expect(screen.getByText('0명 작성 중')).toBeInTheDocument();
 
     await fillTeam(user);
     await user.click(playerRow('김선수'));
     await user.click(stars('김선수 총점').getByRole('radio', { name: '3점' }));
 
-    expect(screen.getByText('작성 중 2명')).toBeInTheDocument();
-    expect(screen.getByText('작성 중 2명 · 남은 대상 2명')).toBeInTheDocument();
+    expect(screen.getByText('작성 중 2건')).toBeInTheDocument();
+    expect(screen.getByText('작성 중 2건 · 남은 대상 2건')).toBeInTheDocument();
     expect(screen.getByText('1명 작성 중')).toBeInTheDocument();
     expect(screen.getByText('태그가 빠진 1건은 아직 보낼 수 없어요')).toBeInTheDocument();
   });

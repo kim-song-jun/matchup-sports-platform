@@ -118,3 +118,19 @@ describe('경기별 진출 연결 실제 저장 계약', () => {
     expect(await prisma.v1TournamentMatchAdvancementEdge.count({ where: { tournamentId } })).toBe(4);
   });
 });
+
+describe('경기 번호 서버 할당 실제 저장 계약', () => {
+  beforeAll(async () => { await prisma.$connect(); });
+  afterAll(async () => { await prisma.$disconnect(); });
+  it('번호 없이 같은 조·라운드에 두 번 만들면 둘 다 새 경기로 남고 번호는 대회 최대값 뒤로 이어진다', async () => {
+    const tournamentId = competitionConfigFixture.tournamentId;
+    const group = (await prisma.v1TournamentGroup.findMany({ where: { tournamentId } })).find((candidate) => candidate.phase === 'round12')!;
+    const max = (await prisma.v1TournamentMatchDetails.aggregate({ where: { tournamentId }, _max: { fixtureNumber: true } }))._max.fixtureNumber!;
+    const first = await service.createFixture(user, tournamentId, { groupId: group.id, round: '12강' });
+    const second = await service.createFixture(user, tournamentId, { groupId: group.id, round: '12강' });
+    expect(first.id).not.toBe(second.id);
+    expect([first.fixtureNumber, second.fixtureNumber]).toEqual([max + 1, max + 2]);
+    const stored = await prisma.v1TournamentMatchDetails.findMany({ where: { teamMatchId: { in: [first.id, second.id] } }, select: { fixtureNumber: true, round: true, groupId: true } });
+    expect(stored.map((row) => [row.fixtureNumber, row.round, row.groupId]).sort()).toEqual([[max + 1, '12강', group.id], [max + 2, '12강', group.id]]);
+  });
+});

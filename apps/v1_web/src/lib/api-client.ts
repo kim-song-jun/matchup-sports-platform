@@ -6,6 +6,10 @@ import {
   PHONE_VERIFICATION_REQUIRED_CODE,
   notifyPhoneVerificationRequired,
 } from './phone-verification-required';
+import {
+  ACTIVITY_PROFILE_REQUIRED_CODE,
+  notifyActivityProfileRequired,
+} from './activity-profile-required';
 
 type QueryValue = string | number | boolean | null | undefined;
 type QueryParams = Record<string, QueryValue>;
@@ -159,7 +163,8 @@ export async function v1Api<T>(path: string, init: RequestInit = {}): Promise<T>
     // 10초 창이라 미인증 사용자 수만큼 에러 로그가 실제로 쌓이고, 그러면 어드민 에러 뷰어에서
     // 진짜 장애가 이 잡음에 묻힌다 — 로그는 건너뛰고 안내 신호만 보낸다.
     const phoneVerificationRequired = error.code === PHONE_VERIFICATION_REQUIRED_CODE;
-    if (!phoneVerificationRequired && !isExpectedGuestAuthProbe(path, init, error)) {
+    const activityProfileRequired = error.code === ACTIVITY_PROFILE_REQUIRED_CODE;
+    if (!phoneVerificationRequired && !activityProfileRequired && !isExpectedGuestAuthProbe(path, init, error)) {
       reportClientError({
         message: error.message,
         level: error.statusCode >= 500 ? 'error' : 'warn',
@@ -174,6 +179,7 @@ export async function v1Api<T>(path: string, init: RequestInit = {}): Promise<T>
     // 미인증 계정이 쓰기를 시도한 경우 — 실패 토스트만 남기면 사용자는 이유를 알 수 없다.
     // 전역 모달이 인증 화면으로 안내하도록 여기서 한 번만 신호를 쏜다.
     if (phoneVerificationRequired) notifyPhoneVerificationRequired();
+    if (activityProfileRequired) notifyActivityProfileRequired();
     throw error;
   }
 

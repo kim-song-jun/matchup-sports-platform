@@ -7,6 +7,7 @@ import { useV1ChatListSocket } from '@/hooks/use-v1-realtime-socket';
 import { v1Post } from '@/lib/api-client';
 import { trackEvent } from '@/lib/analytics';
 import { buildPhoneVerifyHref } from '@/components/auth/phone-verification/phone-verify-route';
+import { buildActivityProfileHref } from '@/lib/activity-profile-required';
 import type { V1ResolveLocationResponse } from '@/types/api';
 import { HomePageView } from './home-page';
 import { EMPTY_WEATHER, toHomeChatRooms, toHomeModel, withoutHomeContent } from './home-client-model';
@@ -42,8 +43,14 @@ export function HomePageClient() {
 
   // 인증을 마칠 때까지 계속 보이는 상시 배너 — 닫을 수 있게 두면 한 번 닫은 사용자는
   // 왜 신청·등록이 막히는지 알 방법이 없어진다(조회는 열려 있어 화면상 정상으로 보인다).
+  const activityProfileDeferred =
+    isAuthenticated && authMe.data?.user.onboardingStatus === 'social_profile_deferred';
+  const activityProfileNudge = activityProfileDeferred
+    ? { onEnter: () => router.push(buildActivityProfileHref('/home')) }
+    : undefined;
+  // 정보 입력을 미룬 계정은 입력 화면에서 휴대폰 인증까지 함께 받으므로 인증 배너를 겹쳐 띄우지 않는다.
   const phoneVerifyNudge =
-    isAuthenticated && authMe.data?.verification?.phoneVerified === false
+    isAuthenticated && !activityProfileDeferred && authMe.data?.verification?.phoneVerified === false
       ? { onVerify: () => router.push(buildPhoneVerifyHref('/home')) }
       : undefined;
   const fallback = getHomeViewModel();
@@ -60,7 +67,7 @@ export function HomePageClient() {
   const pendingReviews = usePendingReviewsSummary();
   const teamActivity = query.data?.teamActivity ?? null;
   const bannerDecision = decideHomeBanners({
-    phoneVerify: phoneVerifyNudge !== undefined,
+    phoneVerify: phoneVerifyNudge !== undefined || activityProfileNudge !== undefined,
     teamInvitation: Boolean(teamActivity?.pendingInvitations),
     joinRequests: Boolean(teamActivity?.pendingJoinRequests),
     recordConsent: recordConsentNudge !== undefined,
@@ -89,6 +96,7 @@ export function HomePageClient() {
             retry: () => void query.refetch(),
             chatRetry: () => void chatRooms.refetch(),
             phoneVerifyNudge,
+            activityProfileNudge,
           }}
         />
       </>
@@ -110,9 +118,10 @@ export function HomePageClient() {
                 recordConsentNudge,
                 bannerDecision,
                 phoneVerifyNudge,
+                activityProfileNudge,
                 chatRetry: () => void chatRooms.refetch(),
               }
-            : { ...nonDataFallback, statsLoading: true, chatUnreadCount, chatStatus, chatRooms: chatRoomSummaries, weather: weather ?? EMPTY_WEATHER, weatherPermission, weatherRefreshing, refreshWeather, phoneVerifyNudge, chatRetry: () => void chatRooms.refetch() }
+            : { ...nonDataFallback, statsLoading: true, chatUnreadCount, chatStatus, chatRooms: chatRoomSummaries, weather: weather ?? EMPTY_WEATHER, weatherPermission, weatherRefreshing, refreshWeather, phoneVerifyNudge, activityProfileNudge, chatRetry: () => void chatRooms.refetch() }
         }
       />
     </>

@@ -1,5 +1,6 @@
 import type { Prisma } from '@prisma/client';
 import { leagueFixtureListOrder, leagueFixtureListWhere } from '../../league-matches/league-fixture-list-source';
+import { competitionStageRank } from '../tournament-stage-rank';
 import type { OrderedCompetitionGame } from './suspension-verdicts';
 
 type Tx = Prisma.TransactionClient;
@@ -9,6 +10,24 @@ export interface CompetitionMatchOrderRow {
   readonly hostTeamId: string | null;
   readonly approvedApplicantTeamId: string | null;
   readonly game: { readonly id: string } | null;
+  readonly tournamentDetails?: {
+    readonly round: string;
+    readonly group: { readonly phase: string } | null;
+  } | null;
+}
+
+/**
+ * 대회 경기를 단계 순서(조별리그 → 결선)로 안정 정렬한다. 같은 단계 안에서는 받은 순서(시각 순)를 유지한다.
+ * 정지는 실제 진행 순서에서 소진돼야 하는데 예정 시각은 단계와 어긋나게 저장될 수 있다 —
+ * 단계를 먼저 보지 않으면 일찍 잡힌 결승이 조별 경기보다 "다음 경기"가 된다.
+ * 단계를 알 수 없는 라운드는 조별 단계와 같은 칸에 둔다.
+ */
+export function sortByCompetitionStage<T extends CompetitionMatchOrderRow>(rows: readonly T[]): T[] {
+  const rank = (row: T) => competitionStageRank({
+    phase: row.tournamentDetails?.group?.phase,
+    round: row.tournamentDetails?.round ?? '',
+  }) ?? 0;
+  return rows.map((row) => ({ row, rank: rank(row) })).sort((a, b) => a.rank - b.rank).map(({ row }) => row);
 }
 
 /**
@@ -33,11 +52,12 @@ const ORDER_SELECT = {
   hostTeamId: true,
   approvedApplicantTeamId: true,
   game: { select: { id: true } },
+  tournamentDetails: { select: { round: true, group: { select: { phase: true } } } },
 } as const;
 
 /**
  * 출전정지 판정에 넘길 `orderedGames`(key = teamMatchId). 정렬은 각 축의 목록 화면 순서다 —
- * 리그는 `leagueFixtureListOrder`, 대회는 시각 → 라운드 → 대진 번호 → 레그 → id.
+ * 리그는 `leagueFixtureListOrder`, 대회는 단계(조별리그 → 결선) → 시각 → 라운드 → 대진 번호 → 레그 → id.
  */
 export async function loadTeamCompetitionGameOrder(
   tx: Tx,
@@ -61,5 +81,5 @@ export async function loadTeamCompetitionGameOrder(
         ],
         select: ORDER_SELECT,
       });
-  return narrowToTeamGames(rows, input.teamId);
+  return narrowToTeamGames(input.isLeague ? rows : sortByCompetitionStage(rows), input.teamId);
 }

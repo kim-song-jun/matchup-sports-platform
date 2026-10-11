@@ -910,6 +910,7 @@ export function TeamMembersPageClient({ teamId }: { teamId: string }) {
           setJerseyTarget(null);
           setJerseyError(null);
         }}
+        onEdit={() => setJerseyError(null)}
         onSave={(jerseyNumber) => {
           if (jerseyTarget === null) return;
           setJerseyError(null);

@@ -1,5 +1,6 @@
 import { labelToLevelCode } from '@/lib/v1-levels';
-import type { V1MatchMutationPayload } from '@/types/api';
+import { toMatchPlacePayload } from '@/lib/place';
+import type { V1MatchEdit, V1MatchMutationPayload } from '@/types/api';
 import type { MatchCreateStep, MatchCreateViewModel } from './matches.types';
 
 /**
@@ -64,7 +65,7 @@ const RULES: Array<{
   { field: 'sportId', label: '종목을 선택해 주세요', step: 'sport', isSatisfied: (ctx) => Boolean(ctx.sportId) },
   { field: 'title', label: '매치 제목을 입력해 주세요', step: 'info', isSatisfied: (ctx) => Boolean(ctx.draft.title.trim()) },
   { field: 'regionId', label: '지역을 선택해 주세요', step: 'place-time', isSatisfied: (ctx) => Boolean(ctx.regionId) },
-  { field: 'venue', label: '장소를 입력해 주세요', step: 'place-time', isSatisfied: (ctx) => Boolean(ctx.draft.venue.trim()) },
+  { field: 'place', label: '장소를 골라 주세요', step: 'place-time', isSatisfied: (ctx) => Boolean(ctx.draft.place?.name.trim()) },
   { field: 'date', label: '날짜를 입력해 주세요', step: 'place-time', isSatisfied: (ctx) => Boolean(ctx.draft.date) },
   { field: 'startTime', label: '시작 시간을 입력해 주세요', step: 'place-time', isSatisfied: (ctx) => Boolean(ctx.draft.startTime) },
   {
@@ -200,8 +201,7 @@ export function buildMatchPayloadResult(draft: MatchDraft, sportId: string, regi
       // 주최자가 참가하면 최소 정원은 2명(나 + 1명) — UI 스테퍼와 같은 하한을 여기서도 강제한다.
       capacity: Math.max(Number(draft.capacity) || 1, draft.hostParticipates ? 2 : 1),
       hostParticipates: draft.hostParticipates,
-      manualPlaceName: draft.venue.trim(),
-      addressText: draft.address.trim() || null,
+      ...toMatchPlacePayload(draft.place),
       rulesText: draft.rules.trim() || null,
       minLevelCode: labelToLevelCode(draft.minLevel),
       maxLevelCode: labelToLevelCode(draft.maxLevel),
@@ -209,6 +209,28 @@ export function buildMatchPayloadResult(draft: MatchDraft, sportId: string, regi
       costNote: draft.costNote.trim() || null,
     },
   };
+}
+
+/**
+ * 수정 저장이 확정 참가자를 다시 신청받게 만드는가 — 서버 `MatchesService.update`의
+ * `requiresReconfirmation`(시작·종료 시각, 장소 이름·주소·제공자 id·좌표 중 하나라도 바뀜)과
+ * 같은 조건이어야 한다. 화면이 더 넓게 잡으면 취소되지 않는데 경고하고, 좁게 잡으면 경고 없이
+ * 전원이 취소된다(MD-QA #120).
+ */
+export function requiresParticipantReconfirmation(
+  form: V1MatchEdit['form'],
+  payload: V1MatchMutationPayload,
+): boolean {
+  const time = (value: string | null | undefined) => (value ? new Date(value).getTime() : null);
+  return (
+    time(form.startsAt) !== time(payload.startsAt)
+    || time(form.endsAt) !== time(payload.endsAt)
+    || form.manualPlaceName !== payload.manualPlaceName
+    || (form.addressText ?? null) !== (payload.addressText ?? null)
+    || (form.placeProviderId ?? null) !== (payload.placeProviderId ?? null)
+    || (form.placeLatitude ?? null) !== (payload.placeLatitude ?? null)
+    || (form.placeLongitude ?? null) !== (payload.placeLongitude ?? null)
+  );
 }
 
 /** CreateProgress 배지: 각 스텝이 자기 필수 필드를 전부 채웠는지(필수 필드가 없는 스텝은 항상 완료). */

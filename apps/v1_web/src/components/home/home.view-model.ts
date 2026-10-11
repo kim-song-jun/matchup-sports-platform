@@ -12,7 +12,7 @@ const matches: HomeMatchCard[] = [
     time: '14:00',
     currentParticipants: 18,
     maxParticipants: 22,
-    actionLabel: '승인제 신청',
+    actionLabel: '경기 신청하기',
     imageUrl: '/mock/generated/team-huddle.webp',
   },
   {
@@ -25,7 +25,7 @@ const matches: HomeMatchCard[] = [
     time: '20:30',
     currentParticipants: 9,
     maxParticipants: 10,
-    actionLabel: '승인제 신청',
+    actionLabel: '경기 신청하기',
     imageUrl: '/mock/generated/futsal-rooftop.webp',
   },
   {
@@ -38,7 +38,7 @@ const matches: HomeMatchCard[] = [
     time: '07:00',
     currentParticipants: 11,
     maxParticipants: 15,
-    actionLabel: '승인제 신청',
+    actionLabel: '경기 신청하기',
     imageUrl: '/mock/generated/team-huddle.webp',
   },
   {
@@ -51,7 +51,7 @@ const matches: HomeMatchCard[] = [
     time: '19:00',
     currentParticipants: 14,
     maxParticipants: 20,
-    actionLabel: '승인제 신청',
+    actionLabel: '경기 신청하기',
     imageUrl: '/mock/generated/team-huddle.webp',
   },
 ];

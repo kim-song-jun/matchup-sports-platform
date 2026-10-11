@@ -69,6 +69,8 @@ export function BracketCanvasMobileScreen({ tournamentId, registrations, registr
         scope="tournament"
         rounds={rounds}
         slots={bracket.slots}
+        groups={bracket.groups}
+        fixtures={bracket.fixtures}
         candidates={candidates}
         canWrite={canWrite}
         registrationsState={registrationsState}

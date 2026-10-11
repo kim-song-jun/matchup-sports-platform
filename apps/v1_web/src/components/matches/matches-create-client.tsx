@@ -24,6 +24,7 @@ import {
 import { trackEvent } from '@/lib/analytics';
 import { clearExpiringDraft, draftStorageAvailable, readExpiringDraft, writeExpiringDraft } from '@/lib/expiring-draft';
 import { getCreatorProfilePrompt, profileEditHref } from '@/lib/creator-profile';
+import { placeFromEditForm, type PlaceValue } from '@/lib/place';
 import { toDistrictRegionOptions } from '@/lib/v1-regions';
 import { lockedReasonLabel } from '@/lib/v1-status-labels';
 import type { V1MatchEdit } from '@/types/api';
@@ -31,6 +32,7 @@ import { MatchCreatePageView } from './matches-page';
 import type { MatchCreateStep, MatchCreateViewModel } from './matches.types';
 import {
   buildMatchPayloadResult,
+  requiresParticipantReconfirmation,
   getCompleteMatchSteps,
   getMatchMissingFields,
   getMatchStepErrors,
@@ -400,7 +402,7 @@ export function MatchEditPageClient({ matchId }: { matchId: string }) {
       if (!url) throw new Error('이미지 URL을 받지 못했어요. 다시 시도해 주세요.');
       return url;
     },
-    onSubmit: () => {
+    onSubmit: async () => {
       // 로딩 중 재클릭 시 중복 제출 방지 — isPending 은 disabled 속성과 동일하게 리렌더
       // 이후에나 반영되는 값이라 동시 클릭까지 막지는 못하지만, 스피너가 보이는 동안의
       // 재클릭은 막는다(동시 클릭 방지가 필요하면 ref 락을 따로 둔다).
@@ -421,6 +423,20 @@ export function MatchEditPageClient({ matchId }: { matchId: string }) {
             : '수정에 필요한 정보가 빠져 있어요. 다시 확인해 주세요.',
         );
         return;
+      }
+      // 일정·장소가 바뀌면 서버가 확정 참가자 전원을 취소하고 대기 신청을 마감한다 — 되돌릴 수 없으니
+      // 저장 전에 영향받는 인원을 알리고 확인받는다(MD-QA #120). 호스트 본인은 인원에서 뺀다.
+      const affectedParticipants = editQuery.data
+        ? Math.max(0, editQuery.data.participantCount - (editQuery.data.form.hostParticipates === false ? 0 : 1))
+        : 0;
+      if (editQuery.data && affectedParticipants > 0 && requiresParticipantReconfirmation(editQuery.data.form, payloadResult.payload)) {
+        const ok = await confirm({
+          title: '일정·장소를 바꿀까요?',
+          message: `확정 참가자 ${affectedParticipants}명의 참가가 취소되고 대기 중인 신청도 마감돼요. 참가자는 변경 알림을 받고 다시 신청해야 해요.`,
+          confirmLabel: '변경하고 저장',
+          tone: 'danger',
+        });
+        if (!ok) return;
       }
       updateMatch.mutate(
         { ...payloadResult.payload, version },
@@ -529,7 +545,7 @@ function buildCreateModel({
   lockedReason?: string | null;
   submitting?: boolean;
   onSelectSport: (sportName: string) => void;
-  onFieldChange: (field: keyof MatchDraft, value: string | number | boolean) => void;
+  onFieldChange: (field: keyof MatchDraft, value: string | number | boolean | PlaceValue | null) => void;
   onRegionChange: (regionId: string) => void;
   onBack: () => void;
   onNext: () => void;
@@ -590,7 +606,7 @@ function usePersistedDraft() {
   useEffect(() => {
     // 하루가 지난 드래프트는 readExpiringDraft가 알아서 버린다 — 예전에는 만료가 없어
     // 며칠 전 작성하다 만 내용이 새 매치 작성 화면에 그대로 되살아났다.
-    const stored = readExpiringDraft<Partial<MatchDraft>>(storageKey);
+    const stored = readExpiringDraft<StoredMatchDraft>(storageKey);
     if (stored === null) return;
     const hydrated = { ...buildDefaultDraft(), ...normalizeStoredDraft(stored) };
     draftRef.current = hydrated;
@@ -621,7 +637,11 @@ function buildDefaultDraft(): MatchDraft {
   };
 }
 
-function normalizeStoredDraft(stored: Partial<MatchDraft>): Partial<MatchDraft> {
+/** 장소 필드가 `venue`/`address` 문자열이던 시절의 저장 초안. */
+type StoredMatchDraft = Partial<MatchDraft> & { venue?: string; address?: string };
+
+function normalizeStoredDraft(storedWithLegacy: StoredMatchDraft): Partial<MatchDraft> {
+  const { venue: legacyVenue, address: legacyAddress, ...stored } = storedWithLegacy;
   const oldDefaults = {
     title: '주말 풋살 초보 환영 매치',
     description: '초보도 편하게 참여할 수 있는 주말 풋살 매치예요.',
@@ -635,25 +655,30 @@ function normalizeStoredDraft(stored: Partial<MatchDraft>): Partial<MatchDraft> 
     maxLevel: '중수',
   };
 
+  const legacyName = legacyVenue?.trim() ?? '';
+  const legacySample = legacyName === oldDefaults.venue && legacyAddress === oldDefaults.address;
+  const legacyPlace: PlaceValue | null =
+    legacyName && !legacySample
+      ? { kind: 'manual', name: legacyName, address: legacyAddress?.trim() || null }
+      : null;
+  const withPlace: Partial<MatchDraft> = legacyPlace && !stored.place ? { ...stored, place: legacyPlace } : stored;
+
   const isLegacySample =
     stored.title === oldDefaults.title &&
     stored.description === oldDefaults.description &&
     stored.rules === oldDefaults.rules &&
-    stored.venue === oldDefaults.venue &&
-    stored.address === oldDefaults.address &&
+    legacySample &&
     stored.date === oldDefaults.date &&
     stored.startTime === oldDefaults.startTime &&
     stored.endTime === oldDefaults.endTime;
 
-  if (!isLegacySample) return stored;
+  if (!isLegacySample) return withPlace;
 
   return {
     ...stored,
     title: stored.title === oldDefaults.title ? '' : stored.title,
     description: stored.description === oldDefaults.description ? '' : stored.description,
     rules: stored.rules === oldDefaults.rules ? '' : stored.rules,
-    venue: stored.venue === oldDefaults.venue ? '' : stored.venue,
-    address: stored.address === oldDefaults.address ? '' : stored.address,
     date: stored.date === oldDefaults.date ? '' : stored.date,
     startTime: stored.startTime === oldDefaults.startTime ? '' : stored.startTime,
     endTime: stored.endTime === oldDefaults.endTime ? '' : stored.endTime,
@@ -679,8 +704,7 @@ export function draftFromMatchEdit(edit: V1MatchEdit): MatchDraft {
     gender: normalizeGenderRule(edit.form.genderRule),
     minLevel: levelCodeToDraftLabel(edit.form.minLevelCode) ?? buildDefaultDraft().minLevel,
     maxLevel: levelCodeToDraftLabel(edit.form.maxLevelCode) ?? buildDefaultDraft().maxLevel,
-    venue: edit.form.manualPlaceName,
-    address: edit.form.addressText ?? '',
+    place: placeFromEditForm(edit.form),
     date: toDateInput(start),
     startTime: toTimeInput(start),
     endTime: end ? toTimeInput(end) : '',

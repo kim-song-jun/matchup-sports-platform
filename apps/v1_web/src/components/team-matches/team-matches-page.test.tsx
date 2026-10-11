@@ -5,7 +5,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { queryImageBySrc } from '@/test/next-image';
 import { TeamMatchCreatePageView, TeamMatchDetailPageView, TeamMatchListPageView } from './team-matches-page';
 import { getTeamMatchCreateViewModel, getTeamMatchDetailViewModel, getTeamMatchListViewModel } from './team-matches.view-model';
-import type { TeamMatchModel } from './team-matches.types';
+import { TEAM_MATCH_WITHDRAW_CONFIRM } from './team-match-cancel-confirm';
+import type { TeamMatchDetailViewModel, TeamMatchModel } from './team-matches.types';
 
 // routerPush를 vi.hoisted로 모듈 스코프에 고정 — useRouter()가 매 렌더 새 vi.fn()을
 // 반환하면 클릭 핸들러가 실제로 호출한 push를 테스트에서 단언할 방법이 없다.
@@ -602,7 +603,7 @@ describe('team match full edit', () => {
     for (const label of [
       '매치 제목', '설명', '최소 등급', '최대 등급', '경기방식',
       '경기 스타일', '유니폼 색상', '장소',
-      '상세 주소', '날짜', '시작 시간', '종료 시간', '신청 마감일', '신청 마감시간',
+      '날짜', '시작 시간', '종료 시간', '신청 마감일', '신청 마감시간',
     ]) {
       expect(screen.getByLabelText(label)).toBeInTheDocument();
     }
@@ -636,7 +637,7 @@ describe('team match full edit', () => {
 
     renderPage(<TeamMatchCreatePageView model={model} />);
 
-    for (const label of ['매치 제목', '설명', '상세 주소', '날짜']) {
+    for (const label of ['매치 제목', '설명', '장소', '날짜']) {
       if (locked) expect(screen.getByLabelText(label)).toBeDisabled();
       else expect(screen.getByLabelText(label)).not.toBeDisabled();
     }
@@ -775,7 +776,7 @@ describe('경기 조건 — 값이 없는 항목', () => {
 describe('팀매치 만들기 confirm 단계 — 마지막 행 표기 결함', () => {
   it('상세 주소가 아니라 장소를 라벨로 값을 보여주고, 상세 주소는 sub로 노출한다', () => {
     const model = getTeamMatchCreateViewModel('confirm');
-    model.draft = { ...model.draft, venue: '잠실 풋살파크 A구장', address: '서울 송파구 올림픽로 25, 3층 2번 코트' };
+    model.draft = { ...model.draft, place: { kind: 'manual', name: '잠실 풋살파크 A구장', address: '서울 송파구 올림픽로 25, 3층 2번 코트' } };
 
     renderPage(<TeamMatchCreatePageView model={model} />);
 
@@ -1195,14 +1196,15 @@ describe('상세 CTA 상태줄 — 신청한 적 없는 뷰어의 닫힌 매치�
  * ③ 승인된 뷰어의 히어로 상대팀 자리에 팀 이름 대신 신청 상태("승인 완료")가 떴다.
  */
 describe('상세 홈팀 카드·히어로 — 표기 결함 회귀(2026-08-25)', () => {
-  it('trustState=estimated 는 영문 원문이 아니라 "누적 중"으로 표기한다', () => {
+  it('trustState=estimated 는 영문 원문이 아니라 무엇이 쌓이는 중인지 밝힌 "신뢰 점수 누적 중"으로 표기한다', () => {
     const model = getTeamMatchDetailViewModel('default');
     model.match.hostTeamTrustState = 'estimated';
 
     renderPage(<TeamMatchDetailPageView model={model} />);
 
     // hostTeamCard 는 모바일용·데스크톱용 두 위치에 렌더된다 — 개수는 세지 않는다.
-    expect(screen.getAllByText('누적 중').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('신뢰 점수 누적 중').length).toBeGreaterThan(0);
+    expect(screen.queryByText('누적 중')).not.toBeInTheDocument();
     expect(screen.queryByText('estimated')).not.toBeInTheDocument();
   });
 
@@ -1360,7 +1362,8 @@ describe('TeamMatchDetailPageView — 히어로가 두 팀을 요약한다 (#142
     expect(hero.getByText('팀 평점 4.0 · 9승 · 상급')).toBeInTheDocument();
     expect(hero.getByText('중급')).toBeInTheDocument();
     expect(hero.getByText('인증팀')).toBeInTheDocument();
-    expect(hero.getByText('누적 중')).toBeInTheDocument();
+    expect(hero.getByText('신뢰 점수 누적 중')).toBeInTheDocument();
+    expect(hero.queryByText('누적 중')).not.toBeInTheDocument();
   });
 
   it('대조군 — 표시하지 않는 신뢰 상태(sample)는 배지가 없다', () => {
@@ -1525,6 +1528,61 @@ describe('TeamMatchDetailPageView — 신청팀 후속 행동', () => {
     await waitFor(() => expect(onCancel).toHaveBeenCalledTimes(1));
     // 확정하면 메뉴 시트도 닫힌다.
     expect(screen.queryByRole('dialog', { name: '매치 관리' })).not.toBeInTheDocument();
+  });
+
+  function modelWithCancelReason(required: boolean) {
+    const onCancel = vi.fn();
+    const model = getTeamMatchDetailViewModel('mine');
+    model.manageMenu = { edit: { href: '/team-matches/team-match-1/edit' }, history: [] };
+    model.hostActions = [{
+      label: '팀매치 취소',
+      tone: 'danger',
+      confirm: {
+        title: '팀매치를 취소할까요?',
+        message: '취소하면 되돌릴 수 없어요.',
+        confirmLabel: '팀매치 취소',
+        reason: { label: required ? '취소 사유' : '취소 사유 (선택)', required, maxLength: 500 },
+      },
+      onClick: onCancel,
+    }];
+    return { model, onCancel };
+  }
+
+  async function openCancelDialog() {
+    fireEvent.click(screen.getAllByRole('button', { name: '매치 관리 메뉴' })[0]);
+    fireEvent.click(await screen.findByRole('button', { name: /팀매치 취소/ }));
+    return screen.findByRole('dialog', { name: '팀매치를 취소할까요?' });
+  }
+
+  it('⋯ 메뉴의 취소 확인창에서 적은 사유가 취소 동작으로 넘어간다', async () => {
+    const { model, onCancel } = modelWithCancelReason(true);
+    renderPage(<TeamMatchDetailPageView model={model} />);
+
+    const dialog = await openCancelDialog();
+    const confirmButton = within(dialog).getByRole('button', { name: '팀매치 취소' });
+    // 필수 사유라 비어 있으면 확정할 수 없다.
+    expect(confirmButton).toBeDisabled();
+    fireEvent.change(within(dialog).getByLabelText('취소 사유'), { target: { value: '  구장 사정이 생겼어요  ' } });
+    fireEvent.click(confirmButton);
+
+    await waitFor(() => expect(onCancel).toHaveBeenCalledWith('구장 사정이 생겼어요'));
+  });
+
+  it('선택 사유는 비워도 확정되고, 닫으면 아무것도 실행하지 않는다', async () => {
+    const { model, onCancel } = modelWithCancelReason(false);
+    renderPage(<TeamMatchDetailPageView model={model} />);
+
+    let dialog = await openCancelDialog();
+    fireEvent.change(within(dialog).getByLabelText('취소 사유 (선택)'), { target: { value: '쓰다 만 사유' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: '취소' }));
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: '팀매치를 취소할까요?' })).not.toBeInTheDocument());
+    expect(onCancel).not.toHaveBeenCalled();
+
+    // 다시 열면 이전에 쓰던 사유가 남아 있지 않다.
+    dialog = await openCancelDialog();
+    expect(within(dialog).getByLabelText('취소 사유 (선택)')).toHaveValue('');
+    fireEvent.click(within(dialog).getByRole('button', { name: '팀매치 취소' }));
+    await waitFor(() => expect(onCancel).toHaveBeenCalledWith(''));
   });
 });
 
@@ -2074,6 +2132,77 @@ describe('TeamMatchDetailPageView — 여러 팀 팀장의 신청 팀 선택 시
   });
 });
 
+describe('TeamMatchDetailPageView — 팀이 하나인 팀장의 신청 시트·취소 확인 (MD-QA #112)', () => {
+  const singleTeamPicker = (submit = vi.fn(async () => ({ status: 'requested' }))): NonNullable<TeamMatchDetailViewModel['applyTeamPicker']> => ({
+    teams: [
+      { teamId: 'a', name: '한강 로버스', roleLabel: '팀장', eligible: true, reason: null },
+      { teamId: 'c', name: '망원 축구단', roleLabel: '팀장', eligible: false, reason: '이 팀매치와 종목이 다른 팀이에요' },
+    ],
+    defaultTeamId: 'a',
+    submit,
+  });
+
+  it('신청할 수 있는 팀이 하나여도 시트에서 상대팀 부담금을 보여 주고, 확정해야 신청한다', async () => {
+    const submit = vi.fn(async () => ({ status: 'requested' }));
+    const model = getTeamMatchDetailViewModel('default');
+    model.applyLabel = '신청하기';
+    model.match.opponentCost = 80000;
+    model.applyTeamPicker = singleTeamPicker(submit);
+    renderPage(<TeamMatchDetailPageView model={model} />);
+
+    fireEvent.click(screen.getAllByRole('button', { name: '신청하기' })[0]);
+    const sheet = await screen.findByRole('dialog', { name: '이 팀으로 신청할까요?' });
+    expect(sheet).toHaveTextContent('상대팀 부담금');
+    expect(sheet).toHaveTextContent('80,000원');
+    expect(submit).not.toHaveBeenCalled();
+
+    fireEvent.change(within(sheet).getByLabelText(/홈팀에 한마디/), { target: { value: '잘 부탁드려요' } });
+    fireEvent.click(within(sheet).getByRole('button', { name: '한강 로버스로 신청하기' }));
+    await waitFor(() => expect(submit).toHaveBeenCalledWith('a', '잘 부탁드려요'));
+  });
+
+  it('부담금이 0원이면 "무료", 모르면 금액 줄을 그리지 않는다', async () => {
+    const model = getTeamMatchDetailViewModel('default');
+    model.applyLabel = '신청하기';
+    model.applyTeamPicker = singleTeamPicker();
+
+    model.match.opponentCost = 0;
+    const free = renderPage(<TeamMatchDetailPageView model={model} />);
+    fireEvent.click(screen.getAllByRole('button', { name: '신청하기' })[0]);
+    expect(await screen.findByRole('dialog', { name: '이 팀으로 신청할까요?' })).toHaveTextContent(/상대팀 부담금\s*무료/);
+    free.unmount();
+
+    model.match.opponentCost = null;
+    renderPage(<TeamMatchDetailPageView model={model} />);
+    fireEvent.click(screen.getAllByRole('button', { name: '신청하기' })[0]);
+    expect(await screen.findByRole('dialog', { name: '이 팀으로 신청할까요?' })).not.toHaveTextContent('상대팀 부담금');
+  });
+
+  it('신청 취소는 확인을 거치고, 아니요를 누르면 철회하지 않는다', async () => {
+    const onApply = vi.fn().mockResolvedValue({ applicationId: 'app-a', status: 'withdrawn' });
+    const model = getTeamMatchDetailViewModel('pending');
+    model.applyLabel = '한강 로버스 신청 취소';
+    model.onApply = onApply;
+    model.applyConfirm = TEAM_MATCH_WITHDRAW_CONFIRM;
+    renderPage(<TeamMatchDetailPageView model={model} />);
+
+    fireEvent.click(screen.getAllByRole('button', { name: '한강 로버스 신청 취소' })[0]);
+    const dialog = await screen.findByRole('dialog', { name: '신청을 취소할까요?' });
+    expect(dialog).toHaveTextContent('호스트 팀에 취소 알림이 가요');
+    expect(onApply).not.toHaveBeenCalled();
+
+    fireEvent.click(within(dialog).getByRole('button', { name: '아니요' }));
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: '신청을 취소할까요?' })).not.toBeInTheDocument());
+    expect(onApply).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getAllByRole('button', { name: '한강 로버스 신청 취소' })[0]);
+    const again = await screen.findByRole('dialog', { name: '신청을 취소할까요?' });
+    fireEvent.click(within(again).getByRole('button', { name: '신청 취소' }));
+    expect(await screen.findByText('신청을 취소했어요.')).toBeInTheDocument();
+    expect(onApply).toHaveBeenCalledTimes(1);
+  });
+});
+
 // W2-V8(alpha 확인) — 취소된 팀매치의 "취소됨"이 상대팀 이름 아래 캡션 자리에 있어 매치가 아니라
 // 상대 팀의 상태처럼 읽혔다. 매치 상태는 히어로 맨 위 배지, 상대팀 캡션은 팀 상태만.
 describe('TeamMatchDetailPageView — 히어로의 매치 상태 자리 (W2-V8)', () => {
@@ -2137,5 +2266,36 @@ describe('TeamMatchListPageView — 상세로 가는 카드는 지금 목록(검
     const hrefs = Array.from(container.querySelectorAll<HTMLAnchorElement>('a.tm-match-row')).map((a) => a.getAttribute('href'));
 
     expect(hrefs).toEqual(['/team-matches/tm-a', '/team-matches/tm-b']);
+  });
+});
+
+describe('TeamMatchDetailPageView — 일정·장소의 장소 카드', () => {
+  function withPlace(place: ReturnType<typeof getTeamMatchDetailViewModel>['match']['place']) {
+    const base = getTeamMatchDetailViewModel('default');
+    return { ...base, match: { ...base.match, place } };
+  }
+
+  it('좌표가 있으면 이름·주소를 한 번만 보여 주고 길찾기 링크가 좌표 경로를 연다', () => {
+    renderPage(
+      <TeamMatchDetailPageView
+        model={withPlace({ name: '망원한강공원 풋살장', address: '서울 마포구 마포나루길 467', latitude: 37.5558, longitude: 126.8985, provider: 'kakao', providerPlaceId: 'k-1' })}
+      />,
+    );
+    expect(screen.getAllByText('망원한강공원 풋살장').length).toBeGreaterThan(0);
+    fireEvent.click(screen.getAllByRole('button', { name: '길찾기' })[0]);
+    const sheet = within(screen.getByRole('dialog', { name: '길찾기' }));
+    expect(sheet.getByRole('link', { name: /^카카오맵/ }).getAttribute('href')).toContain('37.5558,126.8985');
+    expect(sheet.getByRole('link', { name: /^네이버 지도/ })).toBeInTheDocument();
+    expect(screen.queryByText(/정확한 위치가 등록되지 않았어요/)).not.toBeInTheDocument();
+  });
+
+  it('좌표가 없으면 위치 미등록 안내와 이름 검색 링크만 보여 준다', () => {
+    renderPage(
+      <TeamMatchDetailPageView model={withPlace({ name: '동네 운동장', address: null, latitude: null, longitude: null, provider: null, providerPlaceId: null })} />,
+    );
+    expect(screen.getAllByText(/정확한 위치가 등록되지 않았어요/).length).toBeGreaterThan(0);
+    expect(screen.queryByRole('button', { name: '길찾기' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getAllByRole('button', { name: '지도 앱에서 찾기' })[0]);
+    expect(within(screen.getByRole('dialog', { name: '지도 앱에서 찾기' })).getByRole('link', { name: /^카카오맵/ })).toBeInTheDocument();
   });
 });

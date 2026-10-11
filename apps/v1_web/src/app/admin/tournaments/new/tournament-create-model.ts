@@ -1,3 +1,4 @@
+import { placeFromVenueFields, toVenuePayload, type PlaceValue } from '@/lib/place';
 import type {
   V1CreateTournamentPayload,
   V1Tournament,
@@ -53,7 +54,7 @@ export type TournamentCreateState = {
   registrationDeadlineAt: string;
   rosterDeadlineAt: string;
   registrationDeadlineDirty: boolean;
-  venue: string;
+  venue: PlaceValue | null;
   teamCount: string;
   minPlayers: string;
   maxPlayers: string;
@@ -126,7 +127,7 @@ export const INITIAL_TOURNAMENT_CREATE_STATE: TournamentCreateState = {
   registrationDeadlineAt: '',
   rosterDeadlineAt: '',
   registrationDeadlineDirty: false,
-  venue: '',
+  venue: null,
   teamCount: '8',
   minPlayers: '6',
   maxPlayers: '10',
@@ -250,7 +251,7 @@ export function tournamentCreateReducer(
         // 없는 칸이 그냥 남아 버튼이 아무 일도 안 한 것처럼 보인다(실제 제보).
         [action.slot]: {
           ...state[action.slot],
-          ...buildTournamentPromoFactDefaults(state),
+          ...buildTournamentPromoFactDefaults({ ...state, venue: state.venue?.name }),
         },
         promoFactsDirty: {
           ...state.promoFactsDirty,
@@ -323,7 +324,7 @@ function syncPromoFacts(
   if (changedField && !(PROMO_FACT_SOURCE_FIELDS as readonly string[]).includes(changedField)) {
     return state;
   }
-  const defaults = buildTournamentPromoFactDefaults(state);
+  const defaults = buildTournamentPromoFactDefaults({ ...state, venue: state.venue?.name });
   const promoHome = applyPromoFactDefaults(state.promoHome, defaults, state.promoFactsDirty.promoHome);
   const promoList = applyPromoFactDefaults(state.promoList, defaults, state.promoFactsDirty.promoList);
   if (promoHome === state.promoHome && promoList === state.promoList) return state;
@@ -392,7 +393,7 @@ export function mapTournamentToWizardFields(tournament: V1Tournament): Tournamen
     rosterDeadlineAt: isoToKstDatetimeLocal(tournament.rosterDeadlineAt),
     // 이미 서버에 저장된 값이니 자동 제안 로직(D-3)이 다시 덮어쓰면 안 된다.
     registrationDeadlineDirty: true,
-    venue: tournament.venue ?? '',
+    venue: placeFromVenueFields(tournament),
     teamCount: String(tournament.teamCount),
     minPlayers: String(tournament.minPlayers),
     maxPlayers: String(tournament.maxPlayers),
@@ -452,7 +453,7 @@ export function mapTournamentToWizardFields(tournament: V1Tournament): Tournamen
     },
   };
 
-  const defaults = buildTournamentPromoFactDefaults(restored);
+  const defaults = buildTournamentPromoFactDefaults({ ...restored, venue: restored.venue?.name });
   return syncPromoFacts({
     ...restored,
     promoFactsDirty: {
@@ -501,7 +502,7 @@ export function buildTournamentPreviewItem(
     registrationDeadlineAt: kstDatetimeLocalToIso(state.registrationDeadlineAt),
     scheduledAt: kstDatetimeLocalToIso(state.scheduledAt),
     scheduledEndAt: kstDatetimeLocalToIso(state.scheduledEndAt),
-    venue: state.venue.trim() || null,
+    venue: state.venue?.name ?? null,
     coverImageUrl: state.coverImageUrl,
     teamCount: Number(state.teamCount) || 0,
     genderCategory: state.genderCategory,
@@ -717,7 +718,7 @@ export function buildTournamentCreatePayload(
     registrationDeadlineAt: kstDatetimeLocalToIso(state.registrationDeadlineAt) ?? undefined,
     // 비우면 null 을 보낸다 — 초안을 이어 고칠 때(PATCH) 지운 마감이 서버에 남지 않게.
     rosterDeadlineAt: kstDatetimeLocalToIso(state.rosterDeadlineAt),
-    venue: state.venue.trim() || undefined,
+    ...toVenuePayload(state.venue),
     coverImageUrl: state.coverImageUrl,
     teamCount: Number(state.teamCount),
     minPlayers: Number(state.minPlayers),

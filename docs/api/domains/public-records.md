@@ -67,8 +67,10 @@ existing file changed.
 | `GET /tournaments/:id/schedule` | `cursor?`, `limit? (1-100, default 20)`, `round?`, `groupId?` | `{ tournamentId, tournamentTitle, bracketPublished, items[], unscheduled[], standings[], nextCursor }` |
 | `GET /tournaments/:id/matches/:fixtureId` | -- | one match projection (see below) |
 | `GET /tournaments/:id/player-records` | -- | `{ tournamentId, goals[], assists[], hiddenByEligibility }` -- per-user `{ userId, nickname, profileHref, goals, assists }`, desc-sorted, top 30 each; `hiddenByEligibility` is true when a row with goals/assists was left out for lack of public eligibility (same rule as the league endpoint, `isRankedRecordHiddenByEligibility`) |
-| `GET /teams/:id/records` | `cursor?`, `limit?`, `season? (YYYY)` | `{ teamId, teamName, teamLogoUrl, summary, availableSeasons[], items[] (including opponentTeamLogoUrl), nextCursor }` |
+| `GET /teams/:id/records` | `cursor?`, `limit?`, `season? (YYYY)` | `{ teamId, teamName, teamLogoUrl, summary, availableSeasons[], items[] (including opponentTeamLogoUrl and isForfeit: true for a forfeit-decided game, always false on status_only rows), nextCursor }` |
 | `GET /users/:id/records` | `cursor?`, `limit?`, `season? (YYYY)` | `{ userId, nickname, summary, tournamentAwards[], items[], nextCursor }` |
+
+`standings[].sharedRank: number | null` 은 조별+결선 대회에서 정본 §5 동점 처리로도 갈리지 않은 팀의 공동 순위(동률 묶음의 최소 `position`)이고, 그 밖(편성 기준선 행·리그 방식·토너먼트·정규 리그 거울)은 `null` 이다. 대회 상세 `groups[].standings[].sharedRank` 와 같은 값이다(`tournaments.md` 조 순위 항목).
 
 `cursor` is opaque (base64url JSON `{key,id}`); never construct it
 client-side.
@@ -437,6 +439,8 @@ identity/side itself:
   Unlinked participants aggregate by normalised name snapshot within the
   tournament; each row is `{ userId: string | null, name: string, teamName:
   string | null, goals: number, assists: number }`.
+  Each list is capped at 10 rows, extended with every player tied with the
+  10th row, so a tie group is never split (the award chips show rank 1-3 including ties).
 - **The schedule (`GET /tournaments/:id/schedule`) deliberately does not carry
   `profileHref`.** Its `consentMap` stays behind the name-gating flag because that endpoint
   *is* polled while any fixture is live (`LIVE_POLL_INTERVAL_MS`). Loading consent

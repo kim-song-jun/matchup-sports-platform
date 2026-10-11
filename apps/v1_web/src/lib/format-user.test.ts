@@ -36,6 +36,7 @@ describe('formatOnboardingStatus', () => {
   it('알려진 상태는 한글 라벨로', () => {
     expect(formatOnboardingStatus('not_started')).toBe('시작 전');
     expect(formatOnboardingStatus('completed')).toBe('완료');
+    expect(formatOnboardingStatus('social_profile_deferred')).toBe('정보 입력 보류');
   });
 
   it('모르는 값은 원문 그대로, 빈 값은 대시', () => {

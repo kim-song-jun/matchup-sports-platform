@@ -1,3 +1,4 @@
+import type { V1PlaceView } from '@/types/api';
 /**
  * Task 24 -- frontend-local mirror of the public-records response shapes
  * shipped in `apps/v1_api/src/games/public-records/**` (see
@@ -173,6 +174,8 @@ interface PublicStandingRowBase {
   readonly teamName: string | null;
   readonly teamLogoUrl: string | null;
   readonly position: number;
+  /** 끝까지 안 갈린 동률 묶음의 최고 순위(공동 n위). 동률이 아니면 null. */
+  readonly sharedRank: number | null;
   readonly points: number;
   readonly wins: number;
   readonly draws: number;
@@ -314,6 +317,8 @@ export interface PublicMatchDetail {
   readonly groupName: string | null;
   readonly scheduledAt: string | null;
   readonly venue: string | null;
+  /** 장소 스냅샷(지도·길찾기용). 옛 응답에는 없을 수 있다. */
+  readonly place?: V1PlaceView | null;
   readonly fieldName: string | null;
   readonly home: PublicSideSummary | null;
   readonly away: PublicSideSummary | null;
@@ -411,6 +416,8 @@ export interface PublicTeamRecordItem {
   readonly playedAt: string;
   /** 승부차기가 있었던 경기(결선 무승부 후 승부차기)만 채워진다. */
   readonly penalties: PublicTeamRecordPenalties | null;
+  /** 몰수로 확정된 경기. 점수는 관례 스코어(1:0)이고, `status_only` 경기에서는 항상 false 다. */
+  readonly isForfeit: boolean;
   /** 시간순(period asc, clockMs asc) 정렬. 골·카드 이벤트만 담긴다. */
   readonly events: readonly PublicTeamRecordEvent[];
 }

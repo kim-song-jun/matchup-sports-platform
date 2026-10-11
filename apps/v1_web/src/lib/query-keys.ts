@@ -1,4 +1,5 @@
 import type { QueryClient } from '@tanstack/react-query';
+import { publicGameRecordsKeys } from '@/components/public-game-records/use-public-game-records';
 import { PERSIST_STORAGE_KEY } from './query-persist';
 
 export const v1Keys = {
@@ -190,6 +191,7 @@ export const v1Keys = {
   leagueMatch: (leagueId: string) => [...v1Keys.all, 'league-matches', leagueId] as const,
   // R4: 내 리그. leagueMatch(leagueId) 와 같은 네임스페이스지만 'me' 는 UUID 가 아니라
   // 실제 리그 id 와 절대 충돌하지 않는다.
+  leagueClaimableFixtures: (leagueId: string) => [...v1Keys.all, 'league-claimable-fixtures', leagueId] as const,
   myLeagues: () => [...v1Keys.all, 'league-matches', 'me'] as const,
   leagueMatchStandings: (leagueId: string) => [...v1Keys.leagueMatch(leagueId), 'standings'] as const,
   leagueMatchPlayerRecords: (leagueId: string) => [...v1Keys.leagueMatch(leagueId), 'player-records'] as const,
@@ -202,6 +204,7 @@ export const v1Keys = {
   adminReviewPolicySettings: () => [...v1Keys.all, 'admin', 'review-policy-settings'] as const,
   adminSiteInfo: () => [...v1Keys.all, 'admin', 'site-info'] as const,
   publicKakaoMapsKey: () => [...v1Keys.all, 'public', 'kakao-maps-key'] as const,
+  placeSearch: (query: string) => [...v1Keys.all, 'places', 'search', query] as const,
   // Task 21: live tournament operations console (fixture lineup + event backfill).
   // `game`은 위쪽에 이미 선언돼 있어 여기서 다시 정의하지 않는다 — 양쪽 브랜치가
   // 동일한 정의를 각각 추가해 머지 시 중복 키가 될 뻔했다.
@@ -235,6 +238,24 @@ export const v1Keys = {
   /** 내 스태프 배정(GET /tournament-ops/me/assignments) — identity 스코프라 `all` 접두사를 유지한다. */
   myTournamentOpsAssignments: () => [...v1Keys.all, 'tournament-ops', 'me', 'assignments'] as const,
 };
+
+/**
+ * 리그 대진이 바뀔 때 함께 무효화할 키. 공개 `leagueMatch` 는 순위·선수 기록 하위 키를 prefix 로 포함하고,
+ * `leagueMatches()` 는 칸 채우기로 바뀔 수 있는 리그 상태가 실린 공개 목록이다.
+ * 경기 상세 페이지는 팀매치 상세(`teamMatchesAll`)와 리그 경기 기록(`leagueFixtureRecords`)을 읽는다 — 팀매치 id 를 모르므로 prefix 로 덮는다.
+ */
+export function leagueViewKeys(leagueId: string) {
+  return [
+    v1Keys.adminLeagueMatch(leagueId),
+    v1Keys.adminLeagueMatchList(),
+    v1Keys.leagueMatches(),
+    v1Keys.leagueMatch(leagueId),
+    v1Keys.leagueClaimableFixtures(leagueId),
+    v1Keys.tournament(leagueId),
+    v1Keys.teamMatchesAll(),
+    publicGameRecordsKeys.leagueFixtureRecords(leagueId),
+  ];
+}
 
 // 로그인/회원가입 등 identity 전환 시 반드시 호출 — 캐시가 identity로 스코프되지 않아
 // 이전 사용자 데이터(채팅방/알림 등)가 새 사용자에게 그대로 노출되는 것을 막는다.

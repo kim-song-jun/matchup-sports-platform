@@ -4,9 +4,11 @@ import Link from 'next/link';
 import { useCurrentHref } from '@/components/v1-ui/use-current-href';
 import type { ReactNode } from 'react';
 import { Trophy, LayoutGrid, Star, ChevronRight, ClipboardList, Video, Gift, Search } from 'lucide-react';
+import { PlaceCard } from '@/components/v1-ui/place-card';
 import { Card, ErrorState } from '@/components/v1-ui/primitives';
 import { withFromPath } from '@/lib/session-storage';
 import type {
+  V1PlaceView,
   V1ReviewListItem,
   V1TournamentFixture,
   V1TournamentGroup,
@@ -20,8 +22,6 @@ import {
   type TournamentPostEventCard,
   type TournamentVenuePrepItem,
 } from './tournament-venue-retention-model';
-import { TournamentVenueMap } from './tournament-venue-map';
-import { TournamentVenueNavigationButton } from './tournament-venue-navigation-button';
 import { competitionMatchLabel } from '@/lib/tournament-round-label';
 
 export {
@@ -30,21 +30,16 @@ export {
 } from './tournament-venue-retention-model';
 
 export function TournamentVenuePrepSection({
-  venue,
+  place,
   announcements,
   parkingInfo = null,
-  latitude = null,
-  longitude = null,
 }: {
-  venue: string | null;
+  /** 장소 스냅샷. 좌표가 없으면 PlaceCard 가 지도 앱 이름 검색 버튼으로 폴백한다. */
+  place: V1PlaceView | null;
   parkingInfo?: string | null;
   announcements: TournamentAnnouncementSummary[];
-  /** 카카오 지오코딩 좌표. 둘 다 있을 때만 지도 임베드 + 내비게이션 버튼을 보여준다. */
-  latitude?: number | null;
-  longitude?: number | null;
 }) {
-  const items = getTournamentVenuePrepItems({ venue, parkingInfo, announcements, latitude, longitude });
-  const hasCoordinates = venue !== null && latitude !== null && longitude !== null;
+  const items = getTournamentVenuePrepItems({ venue: place?.name ?? null, parkingInfo, announcements });
 
   return (
     <section aria-labelledby="venue-prep-heading" style={{ marginTop: 24 }}>
@@ -52,16 +47,19 @@ export function TournamentVenuePrepSection({
         현장 안내
       </div>
       <Card pad={16} style={{ marginTop: 4 }}>
-        <div style={{ display: 'grid', gap: 12 }}>
-          {items.map((item) => (
-            <HubFactRow key={item.key} item={item} />
-          ))}
-        </div>
-        {hasCoordinates ? (
-          <>
-            <TournamentVenueMap venue={venue} latitude={latitude} longitude={longitude} />
-            <TournamentVenueNavigationButton venue={venue} latitude={latitude} longitude={longitude} />
-          </>
+        {place ? <PlaceCard place={place} /> : null}
+        {items.length > 0 ? (
+          <div
+            style={{
+              display: 'grid',
+              gap: 12,
+              ...(place ? { marginTop: 16, paddingTop: 16, borderTop: '1px solid var(--border)' } : {}),
+            }}
+          >
+            {items.map((item) => (
+              <HubFactRow key={item.key} item={item} />
+            ))}
+          </div>
         ) : null}
       </Card>
     </section>
@@ -503,35 +501,9 @@ function HubFactRow({ item }: { item: TournamentVenuePrepItem }) {
           </div>
         ) : null}
         {item.actionLabel && item.href ? (
-          item.hrefExternal ? (
-            <a
-              href={item.href}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="tm-btn tm-btn-sm tm-btn-neutral"
-              style={{ marginTop: 8 }}
-            >
-              {item.actionLabel}
-            </a>
-          ) : (
-            <Link href={item.href} className="tm-btn tm-btn-sm tm-btn-neutral" style={{ marginTop: 8 }}>
-              {item.actionLabel}
-            </Link>
-          )
-        ) : null}
-        {item.notice ? (
-          <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--border)' }}>
-            <div className="tm-text-caption" style={{ color: 'var(--text-muted)', lineHeight: 1.5 }}>
-              {item.notice.summary}
-            </div>
-            <Link
-              href={item.notice.href}
-              className="tm-text-caption"
-              style={{ color: 'var(--blue700)', fontWeight: 600, marginTop: 2, display: 'inline-block' }}
-            >
-              {item.notice.actionLabel}
-            </Link>
-          </div>
+          <Link href={item.href} className="tm-btn tm-btn-sm tm-btn-neutral" style={{ marginTop: 8 }}>
+            {item.actionLabel}
+          </Link>
         ) : null}
       </div>
       {item.status !== null ? <StatusBadge status={item.status} /> : null}

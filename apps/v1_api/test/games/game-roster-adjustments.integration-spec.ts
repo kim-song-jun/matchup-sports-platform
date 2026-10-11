@@ -611,7 +611,7 @@ describe('경기 명단 조정 API (Task 179)', () => {
         regionId,
         competitionConfigId: config!.id,
         title: '명단 조정 L1',
-        placeName: '테스트 구장',
+        place: { name: '테스트 구장', address: null, latitude: null, longitude: null, provider: null, providerPlaceId: null },
         startAt: new Date(Date.now() + 7 * DAY),
         endAt: null,
         home: teams.get(teamA.id)!,

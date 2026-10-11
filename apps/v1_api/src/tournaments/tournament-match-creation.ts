@@ -12,6 +12,7 @@ import { ConflictException, UnprocessableEntityException } from '@nestjs/common'
 import type { GameActorScope, GameCreationResult, GameParticipantCreationInput } from '../games/games.types';
 import { GamesService } from '../games/games.service';
 import { createTeamMatchScheduleInTx } from '../team-schedules/team-match-schedule';
+import { toPlaceColumns, type PlaceSnapshot } from '../places/place-snapshot';
 import { defaultFixtureEndAt } from './competition-config/fixture-end-at';
 
 export type TournamentMatchCreationTeam = {
@@ -33,7 +34,8 @@ export type TournamentMatchCreationInput = {
   sportId: string;
   regionId: string | null;
   title: string;
-  placeName: string | null;
+  /** 장소 스냅샷. null 이면 장소 칸 여섯 개가 모두 비어요. */
+  place: PlaceSnapshot | null;
   startAt: Date | null;
   endAt?: Date | null;
   fieldId?: string | null;
@@ -227,7 +229,7 @@ export async function createTournamentMatchInTx(
       sportId: input.sportId,
       regionId: input.regionId,
       title: input.title,
-      placeName: input.placeName,
+      ...toPlaceColumns(input.place),
       startAt: input.startAt,
       endAt,
       status: input.status ?? V1TeamMatchStatus.matched,

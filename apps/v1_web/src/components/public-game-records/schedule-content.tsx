@@ -387,10 +387,10 @@ function ScheduleRow({
           좌상단으로 올려도 될것같아 카드에서"). 빈 자리를 채우면서 스코어 아래 줄도
           한 줄 짧아진다. 긴 구장명은 말줄임으로 접고 날짜 쪽은 줄이지 않는다 —
           경기 시각은 목록에서 가장 자주 찾는 값이라 잘리면 안 된다. */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-        <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-caption)', display: 'flex', gap: 8, alignItems: 'center', minWidth: 0 }}>
-          {/* 경기 이름은 한 줄로 둔다 — 390 에서 "조별리그 2라 / 운드"처럼 단어 가운데서 끊겼다. 모자라면 장소(flexShrink 2)가
-              먼저 줄고, 조 이름이 아주 길 때만 이름도 말줄임으로 줄어 날짜 쪽으로 넘치지 않는다. */}
+      <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: '2px 8px', marginBottom: 8 }}>
+        <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-caption)', display: 'flex', flexWrap: 'wrap', gap: '2px 8px', alignItems: 'center', minWidth: 0, maxWidth: '100%' }}>
+          {/* 경기 이름은 한 줄로 둔다 — 390 에서 "조별리그 2라 / 운드"처럼 단어 가운데서 끊겼다. 장소가 날짜와 한 줄에 안 들어가면
+              바깥 머리줄이 줄을 바꿔 장소가 폭 전체를 쓴다(한 줄에 욱여넣으면 "월.." 만 남았다). 조 이름이 아주 길 때만 이름도 말줄임으로 줄어 날짜 쪽으로 넘치지 않는다. */}
           {matchLabel === groupHeading ? null : (
             <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0, flexShrink: 1 }}>{matchLabel}</span>
           )}
@@ -405,7 +405,7 @@ function ScheduleRow({
           ) : null}
         </span>
         {/* [R-T2] 고정폭 없는 flex 텍스트 — 12로 상향. */}
-        <span style={{ fontSize: 12, color: 'var(--text-caption)', display: 'flex', gap: 8, alignItems: 'center', flexShrink: 0 }}>
+        <span style={{ fontSize: 12, color: 'var(--text-caption)', display: 'flex', gap: 8, alignItems: 'center', flexShrink: 0, marginLeft: 'auto' }}>
           {dateLabel ?? '일정 미정'}
           {entry.status === 'live' ? (
             <LiveBadge clock={entry.clock} periodBreak={entry.periodBreak} periodCount={entry.periodCount} />
@@ -515,6 +515,7 @@ export function toStandingsRows(rows: readonly PublicStandingRow[]): TournamentS
     teamName: row.teamName,
     teamLogoUrl: row.teamLogoUrl,
     position: row.position,
+    sharedRank: row.sharedRank,
     points: row.points,
     wins: row.wins,
     draws: row.draws,
@@ -529,9 +530,9 @@ export function toStandingsRows(rows: readonly PublicStandingRow[]): TournamentS
  * (bracket-page-client.tsx)의 표는 승점+득실 컬럼으로 따로 그려서 같은 대회의
  * 같은 팀 성적이 탭에 따라 다르게 보였다. 이제 표시 로직은
  * `TournamentStandingsTable` 한 벌뿐이고(컬럼 근거는 그 파일 주석 참고), 이
- * 함수는 그룹 나누기 + 어댑터 변환만 담당한다. 이 API 응답엔 진출(advance)
- * 정보가 없으므로 진출선 하이라이트는 항상 없음(advance=null) — 원래도 이
- * 탭엔 진출 배지가 없었으니 동작 변화 없음.
+ * 함수는 그룹 나누기 + 어댑터 변환만 담당한다. 이 API 응답엔 진출 정보가
+ * 없으므로 진출 표시는 항상 없음(advancingKeys=null) — 원래도 이 탭엔 진출
+ * 배지가 없었으니 동작 변화 없음.
  */
 /**
  * 순위표 접근성 라벨. **그룹명이 이미 "…순위" 로 끝나면 또 붙이지 않는다** — 티어가 없는
@@ -582,7 +583,7 @@ function StandingsTable({
           ) : null}
           <TournamentStandingsTable
             rows={toStandingsRows(group.rows)}
-            advance={null}
+            advancingKeys={null}
             ariaLabel={standingsAriaLabel(group.groupName, '표')}
           />
         </section>

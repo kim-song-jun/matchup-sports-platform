@@ -81,8 +81,14 @@ and therefore has no host participant row.
   /chat/rooms/:roomId/messages` returns only messages at or after it, and `PATCH
   /chat/rooms/:roomId/me` rejects `lastReadMessageId` values outside that visible window.
 - Newly created or reactivated team-chat participants set `visible_from_at` at confirmed membership
-  activation; ordinary on-demand team-match participants start with `visible_from_at = null` and the first room
-  detail/message entry sets it and creates the joined system message.
+  activation. Team-match rooms (MD-QA #111): resolving the room, sending a message, or opening it by direct
+  address as an entitled owner/manager registers **every** active owner/manager of both teams (plus the active
+  platform operator) with `visible_from_at = room.created_at`, so the other team gets unread counts and
+  notifications from the first message without opening the room first. Existing rows are never touched (a member
+  who left stays out); non-entitled callers still get `403 PERMISSION_DENIED`. A pre-registered member's first
+  room detail/message read still creates the joined system message (once, serialized by a participant row lock);
+  platform-managed rooms keep creating none. The room opener (null boundary) gets `visible_from_at` and the joined
+  line from that first read, as before.
 - Personal match: approving an application (`POST /match-applications/:id/approve`) creates or finds the
   match room in the same transaction, registers the approved participant with `visible_from_at` = the
   approval time (`v1_match_participants.approved_at`) plus the joined system message — every approval resets it

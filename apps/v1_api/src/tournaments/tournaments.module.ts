@@ -1,7 +1,6 @@
 import { Module } from '@nestjs/common';
 import { AdminContextModule } from '../common/admin-context.module';
 import { OperationAuditModule } from '../common/audit/operation-audit.module';
-import { IntegrationsModule } from '../integrations/integrations.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { OptionalV1AuthGuard } from '../auth/optional-v1-auth.guard';
 import { V1AuthGuard } from '../auth/v1-auth.guard';
@@ -31,7 +30,6 @@ import { TournamentSponsorsController } from './tournament-sponsors.controller';
 import { TournamentSponsorsService } from './tournament-sponsors.service';
 import { TournamentReviewsController } from './tournament-reviews.controller';
 import { TournamentReviewsService } from './tournament-reviews.service';
-import { KakaoGeocodingService } from './kakao-geocoding.service';
 import {
   TournamentCampaignsAdminController,
   TournamentCampaignsPublicController,
@@ -76,7 +74,6 @@ import { TeamCompetitionEntriesService } from './team-competition-entries.servic
   imports: [
     AdminContextModule,
     NotificationsModule,
-    IntegrationsModule,
     GamesModule,
     OperationAuditModule,
     RealtimeModule,
@@ -118,7 +115,6 @@ import { TeamCompetitionEntriesService } from './team-competition-entries.servic
     TournamentAnnouncementsService,
     TournamentSponsorsService,
     TournamentReviewsService,
-    KakaoGeocodingService,
     TournamentCampaignReadService,
     TournamentCampaignAdminService,
     TournamentCampaignStatusService,

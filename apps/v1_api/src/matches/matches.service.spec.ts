@@ -61,6 +61,10 @@ function matchRow(overrides: Record<string, unknown> = {}) {
     imageUrl: null,
     placeName: '강남역',
     placeAddress: null,
+    placeLatitude: null,
+    placeLongitude: null,
+    placeProvider: null,
+    placeProviderId: null,
     startAt: FUTURE,
     endAt: null,
     deadlineAt: null,
@@ -207,15 +211,15 @@ describe('MatchesService', () => {
     // orderBy가 distinct 필드로 시작하지 않으면 의도한 순서를 보장 못 해 서비스가
     // 직접 dedup한다(회귀 방지).
     prisma.v1Match.findMany.mockResolvedValue([
-      { placeName: '한강공원 축구장', placeAddress: '서울 영등포구 여의동로 330' },
-      { placeName: '한강공원 축구장', placeAddress: '서울 영등포구 여의동로 330(구주소)' },
-      { placeName: '강남역', placeAddress: null },
+      { placeName: '한강공원 축구장', placeAddress: '서울 영등포구 여의동로 330', placeLatitude: 37.5282, placeLongitude: 126.9326, placeProvider: 'kakao', placeProviderId: '12345' },
+      { placeName: '한강공원 축구장', placeAddress: '서울 영등포구 여의동로 330(구주소)', placeLatitude: null, placeLongitude: null, placeProvider: null, placeProviderId: null },
+      { placeName: '강남역', placeAddress: null, placeLatitude: null, placeLongitude: null, placeProvider: null, placeProviderId: null },
     ]);
 
     await expect(service.recentVenues(host)).resolves.toEqual({
       items: [
-        { placeName: '한강공원 축구장', addressText: '서울 영등포구 여의동로 330' },
-        { placeName: '강남역', addressText: null },
+        { placeName: '한강공원 축구장', addressText: '서울 영등포구 여의동로 330', latitude: 37.5282, longitude: 126.9326, provider: 'kakao', providerPlaceId: '12345' },
+        { placeName: '강남역', addressText: null, latitude: null, longitude: null, provider: null, providerPlaceId: null },
       ],
     });
     expect(prisma.v1Match.findMany).toHaveBeenCalledWith(
@@ -280,6 +284,44 @@ describe('MatchesService', () => {
       where: { id: 'guest-participant' },
       data: expect.objectContaining({ status: 'completed', completedAt: expect.any(Date) }),
     }));
+    expect(notifications.emitNotificationToMany).toHaveBeenCalledWith(
+      [otherUser.id],
+      'match_completed',
+      'match-1',
+      expect.any(String),
+    );
+  });
+
+  it('complete: 불참으로 지정된 참가자에게만 match_no_show를, 참여한 참가자에게는 match_completed만 보낸다', async () => {
+    prisma.v1Match.findFirst.mockResolvedValue(matchRow({
+      startAt: PAST,
+      proceedConfirmedAt: new Date(),
+      participants: [
+        { id: 'host-participant', userId: host.id, role: 'host', status: 'active' },
+        { id: 'attended-participant', userId: otherUser.id, role: 'participant', status: 'active' },
+        { id: 'absent-participant', userId: 'absent-user', role: 'participant', status: 'active' },
+        { id: 'absent-participant-2', userId: 'absent-user-2', role: 'participant', status: 'active' },
+      ],
+    }));
+    prisma.v1Match.update.mockResolvedValue(matchRow({ status: 'completed', completedAt: new Date() }));
+    prisma.v1MatchParticipant.update.mockResolvedValue({});
+    prisma.v1MatchApplication.findMany.mockResolvedValue([]);
+    prisma.v1MatchApplication.updateMany.mockResolvedValue({ count: 0 });
+
+    await service.complete(host, 'match-1', {
+      participants: [
+        { participantId: 'attended-participant', status: 'completed' },
+        { participantId: 'absent-participant', status: 'no_show' },
+        { participantId: 'absent-participant-2', status: 'no_show' },
+      ],
+    });
+
+    expect(notifications.emitNotificationToMany).toHaveBeenCalledWith(
+      ['absent-user', 'absent-user-2'],
+      'match_no_show',
+      'match-1',
+      expect.any(String),
+    );
     expect(notifications.emitNotificationToMany).toHaveBeenCalledWith(
       [otherUser.id],
       'match_completed',
@@ -473,6 +515,49 @@ describe('MatchesService', () => {
       matchId: 'match-1', hostUserId: host.id, userId: applicationRow().applicantUserId, approvedAt,
     });
     expect(chat.deliverSystemLine).toHaveBeenCalledWith({ messageId: 'joined-line' });
+  });
+
+  describe('approveApplication: 신청 마감 시각 이후', () => {
+    it('마감 전에 들어온 대기 신청은 마감 시각이 지나도 경기 시작 전이면 승인된다', async () => {
+      const match = matchRow({ status: 'recruiting', startAt: FUTURE, deadlineAt: PAST });
+      prisma.v1MatchApplication.findFirst.mockResolvedValue(applicationRow({ match }));
+      prisma.v1Match.findFirst.mockResolvedValue(match);
+      prisma.v1MatchApplication.updateMany.mockResolvedValue({ count: 1 });
+      prisma.v1MatchParticipant.upsert.mockResolvedValue({ id: 'participant-1' });
+
+      await expect(service.approveApplication(host, 'app-1', {})).resolves.toMatchObject({
+        applicationId: 'app-1',
+        status: 'approved',
+      });
+      expect(prisma.v1MatchParticipant.upsert).toHaveBeenCalledTimes(1);
+    });
+
+    it('마감 시각이 지나도 정원이 찼으면 여전히 FULL 로 막힌다', async () => {
+      const match = matchRow({ status: 'recruiting', startAt: FUTURE, deadlineAt: PAST, maxParticipants: 6 });
+      prisma.v1MatchApplication.findFirst.mockResolvedValue(applicationRow({ match }));
+      prisma.v1Match.findFirst.mockResolvedValue(match);
+      prisma.v1MatchParticipant.count.mockResolvedValue(6);
+
+      await expect(service.approveApplication(host, 'app-1', {})).rejects.toMatchObject({
+        response: { code: 'FULL' },
+      });
+      expect(prisma.v1MatchParticipant.upsert).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      ['경기 시작 시각이 지났으면', { status: 'recruiting', startAt: PAST, deadlineAt: PAST }],
+      ['호스트가 직접 마감한 매치면', { status: 'closed', startAt: FUTURE, deadlineAt: PAST }],
+      ['취소된 매치면', { status: 'cancelled', startAt: FUTURE, deadlineAt: null }],
+    ])('%s 승인할 수 없다', async (_label, overrides) => {
+      const match = matchRow(overrides);
+      prisma.v1MatchApplication.findFirst.mockResolvedValue(applicationRow({ match }));
+      prisma.v1Match.findFirst.mockResolvedValue(match);
+
+      await expect(service.approveApplication(host, 'app-1', {})).rejects.toMatchObject({
+        response: { code: 'STATE_CONFLICT' },
+      });
+      expect(prisma.v1MatchParticipant.upsert).not.toHaveBeenCalled();
+    });
   });
 
   // ─── 5. 비-호스트 신청 승인 → 403 PERMISSION_DENIED ─────────────────────
@@ -962,6 +1047,99 @@ describe('MatchesService', () => {
 
     expect(prisma.v1Match.create).toHaveBeenCalledWith(
       expect.objectContaining({ data: expect.objectContaining({ costNote: '10,000원/1인' }) }),
+    );
+  });
+
+  it('create: 고른 장소 스냅샷(좌표·provider·id)을 그대로 저장한다', async () => {
+    prisma.v1Sport.findFirst.mockResolvedValue({ id: 'sport-1' });
+    prisma.v1Region.findFirst.mockResolvedValue({ id: 'region-1' });
+    prisma.v1Match.create.mockResolvedValue(matchRow());
+    prisma.v1MatchParticipant.create.mockResolvedValue({ id: 'participant-1' });
+
+    await service.create(host, {
+      sportId: 'sport-1',
+      regionId: 'region-1',
+      title: '테스트 매치',
+      startsAt: FUTURE.toISOString(),
+      capacity: 10,
+      manualPlaceName: '망원 풋살장',
+      addressText: '서울 마포구 월드컵로 1',
+      placeLatitude: 37.55,
+      placeLongitude: 126.9,
+      placeProvider: 'kakao',
+      placeProviderId: '777',
+    });
+
+    expect(prisma.v1Match.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          placeName: '망원 풋살장',
+          placeAddress: '서울 마포구 월드컵로 1',
+          placeLatitude: 37.55,
+          placeLongitude: 126.9,
+          placeProvider: 'kakao',
+          placeProviderId: '777',
+        }),
+      }),
+    );
+  });
+
+  it('create: 핀 정보가 일부만 오면 400 PLACE_SNAPSHOT_INCOMPLETE 이고 저장하지 않는다', async () => {
+    prisma.v1Sport.findFirst.mockResolvedValue({ id: 'sport-1' });
+    prisma.v1Region.findFirst.mockResolvedValue({ id: 'region-1' });
+
+    await expect(
+      service.create(host, {
+        sportId: 'sport-1',
+        regionId: 'region-1',
+        title: '테스트 매치',
+        startsAt: FUTURE.toISOString(),
+        capacity: 10,
+        manualPlaceName: '망원 풋살장',
+        placeLatitude: 37.55,
+        placeLongitude: 126.9,
+      }),
+    ).rejects.toMatchObject({ response: { code: 'PLACE_SNAPSHOT_INCOMPLETE' } });
+    expect(prisma.v1Match.create).not.toHaveBeenCalled();
+  });
+
+  it('update: 이름만 보내면 옛 핀(좌표·provider·id)을 null 로 지운다', async () => {
+    prisma.v1Sport.findFirst.mockResolvedValue({ id: 'sport-1' });
+    prisma.v1Region.findFirst.mockResolvedValue({ id: 'region-1' });
+    const current = matchRow({
+      status: 'recruiting',
+      startAt: FUTURE,
+      placeName: '망원 풋살장',
+      placeLatitude: 37.55,
+      placeLongitude: 126.9,
+      placeProvider: 'kakao',
+      placeProviderId: '777',
+    });
+    prisma.v1Match.findFirst.mockResolvedValue(current);
+    prisma.v1Match.update.mockResolvedValue(current);
+    prisma.v1MatchParticipant.findMany.mockResolvedValue([]);
+    prisma.v1MatchApplication.findMany.mockResolvedValue([]);
+
+    await service.update(host, 'match-1', {
+      sportId: 'sport-1',
+      regionId: 'region-1',
+      title: '테스트 매치',
+      startsAt: FUTURE.toISOString(),
+      capacity: 10,
+      manualPlaceName: '동네 운동장',
+      version: current.updatedAt.toISOString(),
+    });
+
+    expect(prisma.v1Match.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          placeName: '동네 운동장',
+          placeLatitude: null,
+          placeLongitude: null,
+          placeProvider: null,
+          placeProviderId: null,
+        }),
+      }),
     );
   });
 

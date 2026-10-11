@@ -53,6 +53,10 @@ function teamMatchRow(overrides: Record<string, unknown> = {}) {
     listImageUrl: null,
     placeName: '잠실 풋살장',
     placeAddress: null,
+    placeLatitude: null,
+    placeLongitude: null,
+    placeProvider: null,
+    placeProviderId: null,
     startAt: FUTURE,
     endAt: null,
     deadlineAt: null,
@@ -231,15 +235,15 @@ describe('TeamMatchesService', () => {
     // orderBy가 distinct 필드로 시작하지 않으면 의도한 순서를 보장 못 해 서비스가
     // 직접 dedup한다(회귀 방지).
     prisma.v1TeamMatch.findMany.mockResolvedValue([
-      { placeName: '풋살파크 강서', placeAddress: '서울 강서구' },
-      { placeName: '풋살파크 강서', placeAddress: '서울 강서구(구주소)' },
-      { placeName: '잠실 풋살장', placeAddress: null },
+      { placeName: '풋살파크 강서', placeAddress: '서울 강서구', placeLatitude: 37.55, placeLongitude: 126.84, placeProvider: 'kakao', placeProviderId: '9001' },
+      { placeName: '풋살파크 강서', placeAddress: '서울 강서구(구주소)', placeLatitude: null, placeLongitude: null, placeProvider: null, placeProviderId: null },
+      { placeName: '잠실 풋살장', placeAddress: null, placeLatitude: null, placeLongitude: null, placeProvider: null, placeProviderId: null },
     ]);
 
     await expect(service.recentVenues(manager, 'team-host')).resolves.toEqual({
       items: [
-        { placeName: '풋살파크 강서', addressText: '서울 강서구' },
-        { placeName: '잠실 풋살장', addressText: null },
+        { placeName: '풋살파크 강서', addressText: '서울 강서구', latitude: 37.55, longitude: 126.84, provider: 'kakao', providerPlaceId: '9001' },
+        { placeName: '잠실 풋살장', addressText: null, latitude: null, longitude: null, provider: null, providerPlaceId: null },
       ],
     });
     expect(prisma.v1TeamMatch.findMany).toHaveBeenCalledWith(
@@ -324,6 +328,140 @@ describe('TeamMatchesService', () => {
         details: { field: 'sportId' },
       },
     });
+    expect(prisma.v1TeamMatch.create).not.toHaveBeenCalled();
+  });
+
+  it('create: 고른 장소 스냅샷(좌표·provider·id)을 그대로 저장한다', async () => {
+    prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'mem-1', team: { sportId: 'sport-1' } });
+    prisma.v1Sport.findFirst.mockResolvedValue({ id: 'sport-1', code: 'futsal' });
+    prisma.v1Region.findFirst.mockResolvedValue({ id: 'region-1' });
+    prisma.v1Team.findFirst.mockResolvedValue({
+      id: 'team-host',
+      name: 'Host Team',
+      memberships: [{ id: 'mem-1', userId: manager.id, role: 'owner', user: { profile: { nickname: '매니저', displayName: null } } }],
+    });
+    prisma.v1TeamMatch.create.mockResolvedValue(teamMatchRow());
+    prisma.v1StatusChangeLog.create.mockResolvedValue({});
+    games.createFromSourceInTransaction.mockResolvedValue({
+      gameId: 'game-1',
+      sourceType: 'TEAM_MATCH',
+      sourceId: 'tm-1',
+      competitionConfigVersionId: 'config-1',
+      state: 'SCHEDULED',
+      version: 0,
+    });
+
+    await service.create(manager, {
+      hostTeamId: 'team-host',
+      sportId: 'sport-1',
+      regionId: 'region-1',
+      title: '장소 스냅샷 팀매치',
+      startsAt: FUTURE.toISOString(),
+      manualPlaceName: '망원 풋살장',
+      addressText: '서울 마포구 월드컵로 1',
+      placeLatitude: 37.55,
+      placeLongitude: 126.9,
+      placeProvider: 'kakao',
+      placeProviderId: '777',
+    });
+
+    expect(prisma.v1TeamMatch.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        placeName: '망원 풋살장',
+        placeAddress: '서울 마포구 월드컵로 1',
+        placeLatitude: 37.55,
+        placeLongitude: 126.9,
+        placeProvider: 'kakao',
+        placeProviderId: '777',
+      }),
+    });
+  });
+
+  it('create: 핀 정보가 일부만 오면 400 PLACE_SNAPSHOT_INCOMPLETE 이고 저장하지 않는다', async () => {
+    prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'mem-1', team: { sportId: 'sport-1' } });
+
+    await expect(
+      service.create(manager, {
+        hostTeamId: 'team-host',
+        sportId: 'sport-1',
+        regionId: 'region-1',
+        title: '부분 핀',
+        startsAt: FUTURE.toISOString(),
+        manualPlaceName: '망원 풋살장',
+        placeProvider: 'kakao',
+      }),
+    ).rejects.toMatchObject({ status: 400, response: { code: 'PLACE_SNAPSHOT_INCOMPLETE' } });
+    expect(prisma.v1TeamMatch.create).not.toHaveBeenCalled();
+  });
+
+  it('update: 핀 정보가 일부만 오면 400 PLACE_SNAPSHOT_INCOMPLETE 이고 저장하지 않는다', async () => {
+    prisma.v1TeamMatch.findFirst.mockResolvedValue(teamMatchRow({ hostTeam: { sportId: 'sport-1' } }));
+    prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'mem-1', team: { sportId: 'sport-1' } });
+
+    await expect(
+      service.update(manager, 'tm-1', {
+        hostTeamId: 'team-host',
+        sportId: 'sport-1',
+        regionId: 'region-1',
+        title: '부분 핀',
+        startsAt: FUTURE.toISOString(),
+        manualPlaceName: '망원 풋살장',
+        placeLatitude: 37.55,
+        version: '2026-06-01T00:00:00.000Z',
+      }),
+    ).rejects.toMatchObject({ status: 400, response: { code: 'PLACE_SNAPSHOT_INCOMPLETE' } });
+    expect(prisma.v1TeamMatch.update).not.toHaveBeenCalled();
+  });
+
+  it('create / update: 상대팀 부담금이 총비용보다 크면 400 VALIDATION_FAILED 이고 저장하지 않는다', async () => {
+    prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'mem-1', team: { sportId: 'sport-1' } });
+    prisma.v1TeamMatch.findFirst.mockResolvedValue(teamMatchRow({ hostTeam: { sportId: 'sport-1' } }));
+    prisma.v1Sport.findFirst.mockResolvedValue({ id: 'sport-1', code: 'futsal' });
+    prisma.v1Region.findFirst.mockResolvedValue({ id: 'region-1' });
+    const dto = {
+      hostTeamId: 'team-host',
+      sportId: 'sport-1',
+      regionId: 'region-1',
+      title: '비용 초과',
+      startsAt: FUTURE.toISOString(),
+      manualPlaceName: '망원 풋살장',
+      costNote: '총 50,000원 · 상대팀 80,000원',
+    };
+
+    await expect(service.create(manager, dto)).rejects.toMatchObject({
+      status: 400,
+      response: { code: 'VALIDATION_FAILED', details: { field: 'costNote' } },
+    });
+    await expect(service.update(manager, 'tm-1', { ...dto, version: '2026-06-01T00:00:00.000Z' })).rejects.toMatchObject({
+      status: 400,
+      response: { code: 'VALIDATION_FAILED', details: { field: 'costNote' } },
+    });
+    expect(prisma.v1TeamMatch.create).not.toHaveBeenCalled();
+    expect(prisma.v1TeamMatch.update).not.toHaveBeenCalled();
+  });
+
+  it('create: 비용 규칙 도입 전에 만들어진 모집의 재시도는 400 이 아니라 저장된 결과를 다시 돌려준다', async () => {
+    prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'mem-1', team: { sportId: 'sport-1' } });
+    prisma.v1Sport.findFirst.mockResolvedValue({ id: 'sport-1', code: 'futsal' });
+    prisma.v1Region.findFirst.mockResolvedValue({ id: 'region-1' });
+    prisma.v1IdempotencyRecord.findFirst.mockResolvedValue({ resourceId: 'tm-1' });
+    const existing = teamMatchRow({ hostTeamId: 'team-host', startAt: FUTURE });
+    (prisma.v1TeamMatch as any).findUniqueOrThrow = jest.fn().mockResolvedValue(existing);
+    jest.spyOn(service as any, 'resolveTeamGameActorRole').mockResolvedValue('owner');
+    jest.spyOn(service as any, 'loadPersistedGameSourceInput').mockResolvedValue({});
+    games.createFromSourceInTransaction.mockResolvedValue({
+      gameId: 'game-1', sourceType: 'TEAM_MATCH', sourceId: 'tm-1', competitionConfigVersionId: 'config-1', state: 'SCHEDULED', version: 0,
+    });
+
+    await expect(service.create(manager, {
+      hostTeamId: 'team-host',
+      sportId: 'sport-1',
+      regionId: 'region-1',
+      title: '비용 초과',
+      startsAt: FUTURE.toISOString(),
+      manualPlaceName: '망원 풋살장',
+      costNote: '총 50,000원 · 상대팀 80,000원',
+    }, 'cmd-1')).resolves.toBeDefined();
     expect(prisma.v1TeamMatch.create).not.toHaveBeenCalled();
   });
 
@@ -504,6 +642,28 @@ describe('TeamMatchesService', () => {
     prisma.v1TeamMatchApplication.updateMany.mockResolvedValue({ count: 0 });
     const result = await service.cancel(manager, 'tm-1', {});
     expect(result).toMatchObject({ teamMatchId: 'tm-1', status: 'cancelled', cancelledApplications: 0 });
+  });
+
+  describe('cancel: 상대팀 알림의 취소 사유', () => {
+    const cancelMatched = async (dto: { reason?: string | null }) => {
+      prisma.v1TeamMatch.findFirst.mockResolvedValue(
+        teamMatchRow({ status: 'matched', approvedApplicantTeamId: 'team-applicant' }),
+      );
+      prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'mem-1' });
+      prisma.v1TeamMatchApplication.updateMany.mockResolvedValue({ count: 0 });
+      await service.cancel(manager, 'tm-1', dto);
+      return notifications.emitToManyDeferred.mock.calls.find(([, type]) => type === 'team_match_cancelled');
+    };
+
+    it('호스트가 적은 사유를 상대팀 알림 본문에 담는다', async () => {
+      const call = await cancelMatched({ reason: '  구장 사정으로 어려워졌어요  ' });
+      expect(call?.[3]).toBe(`"${teamMatchRow().title}" 팀매치가 취소됐어요. 사유: 구장 사정으로 어려워졌어요`);
+    });
+
+    it.each([undefined, null, '', '   '])('사유가 %j 이면 알림에 사유 문구를 붙이지 않는다', async (reason) => {
+      const call = await cancelMatched({ reason });
+      expect(call?.[3]).toBe(`"${teamMatchRow().title}" 팀매치가 취소됐어요.`);
+    });
   });
 
   it('cancel: 리그 대진(leagueId 有)은 호스트 팀이 직접 취소할 수 없다 → 409 LEAGUE_FIXTURE_HOST_CANCEL_FORBIDDEN', async () => {
@@ -1153,9 +1313,15 @@ describe('TeamMatchesService', () => {
     });
     expect(notifications.emitToManyDeferred).toHaveBeenCalledWith(
       expect.any(Function),
-      'team_match_application_rejected',
+      'team_match_closed',
       'tm-1',
       expect.stringContaining('다른 팀으로 정해졌어요. 다른 팀매치를 둘러봐요.'),
+    );
+    expect(notifications.emitToManyDeferred).not.toHaveBeenCalledWith(
+      expect.any(Function),
+      'team_match_application_rejected',
+      expect.anything(),
+      expect.anything(),
     );
   });
 

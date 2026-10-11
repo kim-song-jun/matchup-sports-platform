@@ -22,8 +22,12 @@ export interface ConfirmOptions {
   acknowledgement?: string;
 }
 
+/** `confirmWithReason` 의 사유 입력칸 — 값은 훅이 들고 있으므로 라벨·제한만 넘긴다. */
+export type ConfirmReasonConfig = Omit<ConfirmReasonField, 'value' | 'onChange'>;
+
 interface ConfirmState extends ConfirmOptions {
-  resolve: (value: boolean) => void;
+  reason?: ConfirmReasonConfig;
+  resolve: (value: boolean, reason: string) => void;
 }
 
 // ── Hook ──────────────────────────────────────────────────────────────────────
@@ -41,12 +45,21 @@ interface ConfirmState extends ConfirmOptions {
 export function useConfirm() {
   const [state, setState] = useState<ConfirmState | null>(null);
   const settledRef = useRef<(() => void) | null>(null);
+  const [reasonValue, setReasonValue] = useState('');
   const stateRef = useRef(state);
   stateRef.current = state;
 
   const confirm = useCallback((opts: ConfirmOptions): Promise<boolean> => {
     return new Promise<boolean>((resolve) => {
-      setState({ ...opts, resolve });
+      setState({ ...opts, resolve: (value) => resolve(value) });
+    });
+  }, []);
+
+  /** 사유 입력칸이 있는 확인창 — 닫으면 null, 확인하면 앞뒤 공백을 뗀 사유(선택이면 빈 문자열일 수 있다). */
+  const confirmWithReason = useCallback((opts: ConfirmOptions & { reason: ConfirmReasonConfig }): Promise<string | null> => {
+    return new Promise<string | null>((resolve) => {
+      setReasonValue('');
+      setState({ ...opts, resolve: (value, reason) => resolve(value ? reason.trim() : null) });
     });
   }, []);
 
@@ -54,10 +67,11 @@ export function useConfirm() {
     (value: boolean) => {
       if (!state) return;
       const { resolve } = state;
-      settledRef.current = () => resolve(value);
+      const reason = reasonValue;
+      settledRef.current = () => resolve(value, reason);
       setState(null);
     },
-    [state],
+    [state, reasonValue],
   );
 
   // 모달의 히스토리 항목이 걷힌 뒤에 알린다 — 곧바로 router.push·back 하는 호출자와 엇갈리지 않게.
@@ -74,7 +88,7 @@ export function useConfirm() {
       const settled = settledRef.current;
       settledRef.current = null;
       if (settled) settled();
-      else stateRef.current?.resolve(false);
+      else stateRef.current?.resolve(false, '');
     },
     [],
   );
@@ -88,12 +102,13 @@ export function useConfirm() {
       cancelLabel={state?.cancelLabel}
       tone={state?.tone}
       acknowledgement={state?.acknowledgement}
+      reasonField={state?.reason ? { ...state.reason, value: reasonValue, onChange: setReasonValue } : undefined}
       onConfirm={() => handleResolve(true)}
       onCancel={() => handleResolve(false)}
     />
   );
 
-  return { confirm, ConfirmModal: modal } as const;
+  return { confirm, confirmWithReason, ConfirmModal: modal } as const;
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────

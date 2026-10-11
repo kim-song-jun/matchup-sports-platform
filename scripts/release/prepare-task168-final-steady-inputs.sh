@@ -20,13 +20,16 @@ set -Eeuo pipefail
 # 2026-10-01 Task 180 G12 adds v1_team_invite_links.
 # 2026-10-01 Task 180 W4-V8: v1_team_invitations unique (team, user) -> pending-only partial unique + plain index.
 # 2026-10-07: additive v1_tournaments.is_public with its own migration; M11 remains unchanged.
+# 2026-10-10: additive place snapshot columns on v1_matches/v1_team_matches/v1_tournaments (20261010090000_v1_place_snapshots); M11 remains unchanged.
+# 2026-10-11: additive v1_tournament_registrations.admin_cancel_reason/cancel_outcome (20261011090000_v1_registration_cancel_outcome); M11 remains unchanged.
 schema=apps/v1_api/prisma/schema.prisma
 m11=apps/v1_api/prisma/migrations/20260911090000_retire_tournament_fixture_tables/migration.sql
 [[ -f "$schema" && -f "$m11" ]] || { echo 'Task168 final-policy source inputs missing' >&2; exit 1; }
 
 schema_sha="$(sha256sum "$schema" | awk '{print $1}')"
 m11_sha="$(sha256sum "$m11" | awk '{print $1}')"
-[[ "$schema_sha" == 6643bf1329ddb0303c952c349d99965a200d79573660c39af027007da822834d \
+# 2026-10-11: additive V1OnboardingStatus value social_profile_deferred (20261011130000_v1_onboarding_social_profile_deferred); M11 remains unchanged.
+[[ "$schema_sha" == b63d3222b1f3d0e1a3c8309f116cfd50eb28b624245685dbea2f7fff1f6ee2b9 \
   && "$m11_sha" == 08eac7347cbb10fcc4ef87d31d63bd9516d5bfda281dcf5730c4f0a1985d9323 ]] \
   || { echo 'Task168 final-policy schema/M11 digest mismatch' >&2; exit 1; }
 

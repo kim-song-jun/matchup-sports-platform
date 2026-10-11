@@ -1,4 +1,6 @@
-import type { V1TeamMatchApiStatus } from '@/types/api';
+import type { ConfirmOptions, ConfirmReasonConfig } from '@/components/v1-ui/confirm-modal';
+import type { PlaceValue } from '@/lib/place';
+import type { V1PlaceView, V1RecentVenue, V1TeamMatchApiStatus } from '@/types/api';
 
 export type TeamMatchModel = {
   lifecycleLabel?: '보류';
@@ -120,7 +122,8 @@ export type TeamMatchDetailMode = 'default' | 'pending' | 'approved' | 'mine' | 
 export type TeamMatchDetailViewModel = {
   match: TeamMatchModel & {
     description: string;
-    address: string;
+    /** 서버가 내려준 장소 스냅샷(좌표 없으면 이름·주소만). */
+    place: V1PlaceView | null;
     hostTeamHref?: string;
     hostTeamId?: string | null;
     hostTeamLogoUrl?: string | null;
@@ -169,6 +172,8 @@ export type TeamMatchDetailViewModel = {
   applyLabel?: string;
   applyPending?: boolean;
   onApply?: () => void;
+  /** 있으면 onApply 를 실행하기 전에 이 확인창을 먼저 띄운다(신청 철회). */
+  applyConfirm?: ConfirmOptions;
   /** 히어로 ⋯ 메뉴의 실행 항목(모집 마감·재개·취소). */
   hostActions?: Array<{
     label: string;
@@ -183,8 +188,11 @@ export type TeamMatchDetailViewModel = {
       cancelLabel?: string;
       /** 기본 'danger'(취소). 되돌릴 길이 있는 모집 마감은 'default'. */
       tone?: 'default' | 'danger';
+      /** 있으면 확인 창에 사유 입력칸을 두고, 적은 사유를 `onClick` 으로 넘긴다. */
+      reason?: ConfirmReasonConfig;
     };
-    onClick: () => void | Promise<unknown>;
+    /** `confirm.reason` 이 있으면 호스트가 적은 사유(선택이면 빈 문자열)를 받는다. */
+    onClick: (reason?: string) => void | Promise<unknown>;
   }>;
   /** 호스트의 신청 목록을 아직 받는 중 — 알림으로 들어온 호스트에게 "신청 없음"을 먼저 보이지 않는다. */
   applicationsPending?: boolean;
@@ -229,7 +237,7 @@ export type TeamMatchDetailViewModel = {
   myApplicationTeam?: { teamId: string; name: string; logoUrl?: string | null } | null;
   /** 보는 사람이 확정된 상대팀(신청 팀) 쪽 — 히어로 오른쪽 자리를 매칭 뒤에도 "우리 팀"으로 부른다. */
   viewerOnApplicantSide?: boolean;
-  /** 신청 가능한 팀이 2개 이상인 팀장의 팀 선택 시트(N-1). */
+  /** 신청 가능한 팀이 있는 팀장의 신청 시트(N-1) — 팀이 하나여도 부담금·한마디를 확인하고 신청한다. */
   applyTeamPicker?: {
     teams: Array<{ teamId: string; name: string; logoUrl?: string | null; roleLabel: string; eligible: boolean; reason: string | null }>;
     defaultTeamId: string;
@@ -290,8 +298,7 @@ export type TeamMatchCreateViewModel = {
     listImageUrl?: string;
     cost: number;
     opponentCost: number;
-    venue: string;
-    address: string;
+    place: PlaceValue | null;
     date: string;
     startTime: string;
     endDate?: string;
@@ -306,7 +313,7 @@ export type TeamMatchCreateViewModel = {
     regions: Array<{ id: string; name: string; shortName?: string; parentName?: string }>;
     onSelectTeam: (teamName: string) => void;
     onSelectSport: (sportName: string) => void;
-    onFieldChange: (field: keyof TeamMatchCreateViewModel['draft'], value: string | number | string[]) => void;
+    onFieldChange: (field: keyof TeamMatchCreateViewModel['draft'], value: string | number | string[] | PlaceValue | null) => void;
     onRegionChange: (regionId: string) => void;
     uploadImage?: (file: File) => Promise<string>;
     onBack: () => void;
@@ -331,6 +338,6 @@ export type TeamMatchCreateViewModel = {
     /** CreateProgress 배지: 지나온 스텝 중 필수 필드를 전부 채운 스텝(체크 표시용). */
     completeSteps?: TeamMatchCreateStep[];
     /** #3 1단계: 이 팀이 호스트로 과거에 실제로 입력했던 장소 — 장소 입력창 포커스 시 칩으로 노출. */
-    recentVenues?: Array<{ placeName: string; addressText: string | null }>;
+    recentVenues?: V1RecentVenue[];
   };
 };

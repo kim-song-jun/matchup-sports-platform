@@ -1,12 +1,18 @@
 import { Logger } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { canReviewFromLineup, readTeamMatchLineupUserIds } from '../games/roster/team-match-lineup-accounts';
+import { resolveIsForfeit } from '../league-matches/league-forfeit-result';
 import { resolveLeagueWeekNumbers } from '../league-matches/league-week-number';
 import { notificationCopyFor } from '../notifications/notifications.service';
 import type { WebPushService } from '../notifications/web-push.service';
 import type { GameOperationClaim } from '../jobs/v1-game-operations-worker.service';
 import type { OfficialRevisionRow } from './game-result-official-projection.types';
-import { loadOfficialResultRecipients, loadResultTeamNames, officialResultNoticeBody } from './official-result-notice';
+import {
+  loadOfficialResultRecipients,
+  loadResultTeamNames,
+  officialResultNoticeBody,
+  type ResultSide,
+} from './official-result-notice';
 import { parseOfficialScore } from './parse-official-score';
 
 /**
@@ -92,7 +98,7 @@ export class TeamMatchCompletionNotificationService {
 
     const rows =
       teamMatch.leagueId === null
-        ? await this.friendlyRows(tx, teamMatchId, teamMatch)
+        ? await this.friendlyRows(tx, revision, teamMatchId, teamMatch)
         : await this.leagueRows(tx, revision, teamMatchId, { ...teamMatch, leagueId: teamMatch.leagueId });
     await this.deliver(tx, teamMatchId, rows, claim);
   }
@@ -100,9 +106,11 @@ export class TeamMatchCompletionNotificationService {
   /**
    * 일반 팀매치 알림의 목적지는 후기 작성 화면이다 — 후기 작성 자격과 같은 판정(canReviewFromLineup)으로
    * 거르지 않으면 명단 밖 팀장·매니저가 눌렀을 때 403 막다른 길이다.
+   * 본문은 리그·대회와 같은 결과 문장(스코어·승패, 받는 사람 팀 기준) 뒤에 후기 안내를 붙인다.
    */
   private async friendlyRows(
     tx: Prisma.TransactionClient,
+    revision: OfficialRevisionRow,
     teamMatchId: string,
     teamMatch: { title: string; hostTeamId: string | null; approvedApplicantTeamId: string | null },
   ): Promise<CompletionRow[]> {
@@ -121,8 +129,17 @@ export class TeamMatchCompletionNotificationService {
       ),
     ];
     const copy = notificationCopyFor('team_match_completed', 'team_match', teamMatchId);
-    const body = `"${teamMatch.title}" ${copy.defaultBody}`;
-    return recipients.map((userId) => ({ userId, title: copy.title, body, deepLink: copy.deepLink }));
+    const names = await loadResultTeamNames(tx, revision.homeTeamId, revision.awayTeamId);
+    const score = parseOfficialScore(revision.score);
+    const isForfeit = resolveIsForfeit(revision);
+    const sideOf = (userId: string): ResultSide =>
+      memberships.some((m) => m.userId === userId && m.teamId === revision.awayTeamId) ? 'AWAY' : 'HOME';
+    return recipients.map((userId) => ({
+      userId,
+      title: copy.title,
+      body: `${officialResultNoticeBody({ label: `"${teamMatch.title}"`, ...names, score, side: sideOf(userId), record: null, isForfeit })} ${copy.defaultBody}`,
+      deepLink: copy.deepLink,
+    }));
   }
 
   /** 리그: 팀장·매니저 + 그 공식 결과의 출전자. 본문은 받는 사람 팀 기준 스코어·승패와 출전자의 개인 기록. */
@@ -162,6 +179,7 @@ export class TeamMatchCompletionNotificationService {
         score,
         side: recipient.side,
         record: recipient.record,
+        isForfeit: resolveIsForfeit(revision),
       }),
       deepLink: copy.deepLink,
     }));

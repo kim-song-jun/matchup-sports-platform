@@ -24,11 +24,16 @@ import { AdminDataTable, AdminEmpty } from '@/components/admin';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
 import { useStartedTeamChangeReason } from '@/components/admin/bracket-canvas/use-started-team-change-reason';
 import { fixtureTeamChangeAccess } from '@/lib/bracket-canvas-layout';
+import { registrationIdsBlockedForGroup, registrationIdsInOppositeFinalStage } from '@/lib/bracket-group-enrollment';
 import { BracketGroupQuickAdd } from './bracket-group-quick-add';
 import { BracketGroupCard } from './bracket-group-card';
 import { isGroupReady } from './bracket-group-helpers';
 import { EntityPicker, type EntityPickerItem } from '@/components/admin/entity-picker';
 import { formatDate } from './tournament-admin-shared';
+import { PlacePicker } from '@/components/v1-ui/place-picker';
+import { PLACE_NAME_MAX_LENGTH } from '@/lib/place';
+import type { PlaceValue } from '@/lib/place';
+import { fixtureVenuePatch, fixtureVenueValue } from '@/components/admin/bracket-canvas/fixture-venue-patch';
 import {
   SimpleModal,
   inputCls,
@@ -157,7 +162,7 @@ export function BracketTab({
   const editNumberId = useId();
   const [editFxNumber, setEditFxNumber] = useState('');
   const [editFxScheduledAt, setEditFxScheduledAt] = useState('');
-  const [editFxVenue, setEditFxVenue] = useState('');
+  const [editFxVenue, setEditFxVenue] = useState<PlaceValue | null>(null);
   const [editFxHomeRegId, setEditFxHomeRegId] = useState('');
   const [editFxAwayRegId, setEditFxAwayRegId] = useState('');
 
@@ -191,6 +196,11 @@ export function BracketTab({
     id: r.id,
     label: r.teamName ?? r.id,
   }));
+  const editBlockedIds = new Set([
+    ...registrationIdsBlockedForGroup(bracket?.groups ?? [], editFixture?.groupId ?? null),
+    ...registrationIdsInOppositeFinalStage(bracket?.groups ?? [], bracket?.fixtures ?? [], editFixture?.groupId ?? null),
+  ]);
+  const editPickerItems = (selectedId: string) => editFixtureTeamItems.filter((it) => !editBlockedIds.has(it.id) || it.id === selectedId);
 
   const editFixtureAccess = editFixture ? fixtureTeamChangeAccess(editFixture) : 'free';
   const editFixtureTeamsLocked = editFixtureAccess === 'official' || editFixtureAccess === 'cancelled';
@@ -224,7 +234,7 @@ export function BracketTab({
         ...(teamChangeReason === undefined ? {} : { teamChangeReason }),
         ...(fixtureNumber !== editFixture.fixtureNumber ? { fixtureNumber } : {}),
         ...(scheduledAtIso ? { scheduledAt: scheduledAtIso } : {}),
-        venue: editFxVenue,
+        ...fixtureVenuePatch(editFxVenue, editFixture),
         ...(homeChanged ? { homeRegistrationId: editFxHomeRegId || null } : {}),
         ...(awayChanged ? { awayRegistrationId: editFxAwayRegId || null } : {}),
       },
@@ -325,7 +335,7 @@ export function BracketTab({
       // GROUP phase — 조별리그 대진은 서버가 만든다. 회전 수(1회전/2회전)를 모달에서 고른 뒤
       // POST /admin/tournaments/:id/league/fixtures/generate 를 호출한다.
       // 기존 fixture 존재 여부·최소 경기 수 검증도 서버가 판정하므로 여기서 미리 묻지 않는다.
-      if (group.groupTeams.length < 2) {
+      if (group.groupTeams.filter((team) => team.registrationId).length < 2) {
         showToast('조에 팀이 2개 이상 있어야 자동 생성할 수 있어요.', 'error');
         return;
       }
@@ -781,7 +791,7 @@ export function BracketTab({
                       setEditFixture(f);
                       setEditFxNumber(String(f.fixtureNumber));
                       setEditFxScheduledAt(isoToKstDatetimeLocal(f.scheduledAt));
-                      setEditFxVenue(f.venue ?? '');
+                      setEditFxVenue(fixtureVenueValue(f));
                       setEditFxHomeRegId(f.homeRegistrationId ?? '');
                       setEditFxAwayRegId(f.awayRegistrationId ?? '');
                     }}
@@ -895,19 +905,15 @@ export function BracketTab({
               className={inputCls}
             />
           </div>
-          <div className="flex flex-col gap-1">
-            <label htmlFor="edit-fx-venue" className="text-[length:var(--font-size-label)] text-[var(--text-strong)]">장소</label>
-            <input
-              id="edit-fx-venue"
-              type="text"
-              value={editFxVenue}
-              onChange={(e) => setEditFxVenue(e.target.value)}
-              disabled={updateFixture.isPending}
-              maxLength={200}
-              placeholder="예: 성산 풋살파크 A구장"
-              className={inputCls}
-            />
-          </div>
+          <PlacePicker
+            maxLength={PLACE_NAME_MAX_LENGTH.tournament}
+            id="edit-fx-venue"
+            label="장소"
+            value={editFxVenue}
+            onChange={setEditFxVenue}
+            disabled={updateFixture.isPending}
+            placeholder="예: 성산 풋살파크 A구장"
+          />
           <div className="flex flex-col gap-3 sm:flex-row">
             <div className="flex min-w-0 flex-col gap-1 flex-1">
               <label htmlFor="edit-fx-home" className="text-[length:var(--font-size-label)] text-[var(--text-strong)]">홈 팀</label>
@@ -915,7 +921,7 @@ export function BracketTab({
                 id="edit-fx-home"
                 value={editFixtureTeamItems.find((it) => it.id === editFxHomeRegId) ?? null}
                 onChange={(item) => setEditFxHomeRegId(item?.id ?? '')}
-                items={editFixtureTeamItems}
+                items={editPickerItems(editFxHomeRegId)}
                 disabled={updateFixture.isPending || editFixtureTeamsLocked}
                 clearLabel="미정"
                 placeholder="홈 팀 검색"
@@ -927,7 +933,7 @@ export function BracketTab({
                 id="edit-fx-away"
                 value={editFixtureTeamItems.find((it) => it.id === editFxAwayRegId) ?? null}
                 onChange={(item) => setEditFxAwayRegId(item?.id ?? '')}
-                items={editFixtureTeamItems}
+                items={editPickerItems(editFxAwayRegId)}
                 disabled={updateFixture.isPending || editFixtureTeamsLocked}
                 clearLabel="미정"
                 placeholder="어웨이 팀 검색"

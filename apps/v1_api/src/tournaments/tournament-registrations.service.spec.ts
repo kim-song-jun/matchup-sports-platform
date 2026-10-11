@@ -37,7 +37,8 @@ function registrationRow(overrides: Record<string, unknown> = {}) {
     id: 'reg-1', tournamentId: 'tournament-1', teamId: 'team-1', appliedByUserId: 'manager-user',
     status: 'draft', depositorName: null, agreedRules: false, agreedPrivacy: false, agreedRefund: false,
     agreedMediaConsent: false, confirmedAt: null, rosterLockedAt: null, cancelRequestedAt: null,
-    cancelPreviousStatus: null, cancelReason: null,
+    cancelPreviousStatus: null, cancelReason: null, adminCancelReason: null, cancelOutcome: null,
+    rosterAutoConfirmedAt: null, entrySource: 'applied',
     createdAt: new Date('2026-06-14T00:00:00Z'), updatedAt: new Date('2026-06-14T00:00:00Z'), ...overrides,
   };
 }
@@ -71,7 +72,7 @@ describe('TournamentRegistrationsService', () => {
     v1Tournament: { findFirst: jest.Mock };
     v1TournamentRegistration: { findUnique: jest.Mock; findFirst: jest.Mock; findMany: jest.Mock; create: jest.Mock; update: jest.Mock; count: jest.Mock };
     v1TournamentPayment: { upsert: jest.Mock; findUnique: jest.Mock; update: jest.Mock };
-    v1TournamentPlayer: { count: jest.Mock; groupBy: jest.Mock; findMany: jest.Mock };
+    v1TournamentPlayer: { count: jest.Mock; groupBy: jest.Mock; findMany: jest.Mock; updateMany: jest.Mock };
     // 쓰기 메서드를 일부러 두지 않는다 -- 구현이 기록 공개 상태를 쓰려 하면 즉시 깨져야 한다.
     v1UserRecordConsent: { findMany: jest.Mock };
     v1UserProfile: { updateMany: jest.Mock };
@@ -95,7 +96,7 @@ describe('TournamentRegistrationsService', () => {
       v1Tournament: { findFirst: jest.fn() },
       v1TournamentRegistration: { findUnique: jest.fn(), findFirst: jest.fn(), findMany: jest.fn(), create: jest.fn(), update: jest.fn(), count: jest.fn().mockResolvedValue(0) },
       v1TournamentPayment: { upsert: jest.fn(), findUnique: jest.fn(), update: jest.fn() },
-      v1TournamentPlayer: { count: jest.fn().mockResolvedValue(0), groupBy: jest.fn().mockResolvedValue([]), findMany: jest.fn().mockResolvedValue([]) },
+      v1TournamentPlayer: { count: jest.fn().mockResolvedValue(0), groupBy: jest.fn().mockResolvedValue([]), findMany: jest.fn().mockResolvedValue([]), updateMany: jest.fn().mockResolvedValue({ count: 0 }) },
       v1UserRecordConsent: { findMany: jest.fn().mockResolvedValue([]) },
       v1UserProfile: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
       $transaction: jest.fn(),
@@ -503,6 +504,9 @@ describe('TournamentRegistrationsService', () => {
         confirmedByAdminUserId: 'admin-1',
         rosterLockedAt: new Date('2026-06-05T00:00:00Z'),
         rosterDeadlineOverrideAt: new Date('2026-06-10T00:00:00Z'),
+        // 어드민이 거부하며 남긴 사유·결과도 이전 사이클의 흔적이다.
+        adminCancelReason: '자격 미달',
+        cancelOutcome: 'rejected',
       }),
     );
     prisma.v1TournamentRegistration.update.mockResolvedValue(registrationRow({ status: 'draft' }));
@@ -515,6 +519,57 @@ describe('TournamentRegistrationsService', () => {
     expect(call.data.rosterDeadlineOverrideAt).toBeNull();
     expect(call.data.confirmedAt).toBeNull();
     expect(call.data.confirmedByAdminUserId).toBeNull();
+    expect(call.data.adminCancelReason).toBeNull();
+    expect(call.data.cancelOutcome).toBeNull();
+  });
+
+  // 운영자가 넣었다 뺀 팀(seeded, 취소)이 직접 다시 신청하면 같은 행이 되살아난다. 이전 경로의
+  // 출처·생성 시각·자동 확정 표시가 남으면 어드민 목록이 새 신청을 "자동 확정 / 옛 시각"으로 보이고
+  // 마감 확인 창의 "팀이 직접 낸 신청"(entrySource applied) 집계에서도 빠진다.
+  it('create: 운영자가 넣었다 뺀 팀의 재신청은 출처·신청 시각·자동 확정 표시를 새 신청으로 되돌린다', async () => {
+    const before = Date.now();
+    prisma.v1Tournament.findFirst.mockResolvedValue(openTournament());
+    prisma.v1TournamentRegistration.findUnique.mockResolvedValue(
+      registrationRow({
+        status: 'cancelled',
+        entrySource: 'seeded',
+        rosterAutoConfirmedAt: new Date('2026-10-11T08:55:00Z'),
+        createdAt: new Date('2026-10-11T08:55:00Z'),
+      }),
+    );
+    prisma.v1TournamentRegistration.update.mockResolvedValue(registrationRow({ status: 'draft' }));
+
+    await service.create(manager, 'tournament-1', { teamId: 'team-1' });
+
+    const { data } = prisma.v1TournamentRegistration.update.mock.calls[0][0];
+    expect(data.entrySource).toBe('applied');
+    expect(data.rosterAutoConfirmedAt).toBeNull();
+    expect(data.createdAt).toBeInstanceOf(Date);
+    expect(data.createdAt.getTime()).toBeGreaterThanOrEqual(before);
+  });
+
+  // 자동 확정 명단은 취소 뒤에도 활성 행으로 남는다. 출처 표시만 지우면 그 명단이 팀이 낸 것으로 보이고,
+  // 자동 채움은 행이 이미 있어 다시 돌지 않는다. 팀이 직접 낸 명단은 건드리지 않는다.
+  it.each([
+    ['자동 확정으로 만든 명단은 비운다', new Date('2026-10-11T08:55:00Z'), 'reg-1'],
+    ['팀이 직접 낸 명단은 그대로 둔다', null, null],
+  ])('create: 취소 신청을 되살릴 때 %s', async (_name, autoConfirmedAt, clearedRegistrationId) => {
+    prisma.v1Tournament.findFirst.mockResolvedValue(openTournament());
+    prisma.v1TournamentRegistration.findUnique.mockResolvedValue(
+      registrationRow({ status: 'cancelled', rosterAutoConfirmedAt: autoConfirmedAt }),
+    );
+    prisma.v1TournamentRegistration.update.mockResolvedValue(registrationRow({ status: 'draft' }));
+
+    await service.create(manager, 'tournament-1', { teamId: 'team-1' });
+
+    if (clearedRegistrationId === null) {
+      expect(prisma.v1TournamentPlayer.updateMany).not.toHaveBeenCalled();
+      return;
+    }
+    expect(prisma.v1TournamentPlayer.updateMany).toHaveBeenCalledWith({
+      where: { registrationId: clearedRegistrationId, removedAt: null },
+      data: { removedAt: expect.any(Date) },
+    });
   });
 
   // ─── submit ───────────────────────────────────────────────────────────────────
@@ -840,7 +895,7 @@ describe('TournamentRegistrationsService', () => {
     prisma.v1TournamentRegistration.findFirst.mockResolvedValue(
       registrationRow({ appliedByUserId: 'original-applicant' }),
     );
-    prisma.v1Tournament.findFirst.mockResolvedValue(openTournament());
+    prisma.v1Tournament.findFirst.mockResolvedValue(openTournament({ kind: 'regular_tournament' }));
     prisma.v1TournamentRegistration.update.mockResolvedValue(
       registrationRow({ status: 'awaiting_payment', appliedByUserId: 'original-applicant' }),
     );
@@ -852,7 +907,31 @@ describe('TournamentRegistrationsService', () => {
       'original-applicant',
       'tournament_registration_submitted',
       'tournament-1',
-      expect.any(String),
+      '"테스트대회" 대회 입금 안내를 확인해 주세요.',
+      { competitionKind: 'regular_tournament' },
+    );
+  });
+
+  it('submit: 정규 리그 신청 접수 알림은 본문과 종류 표시를 리그 기준으로 보낸다', async () => {
+    prisma.v1TournamentRegistration.findFirst.mockResolvedValue(
+      registrationRow({ appliedByUserId: 'original-applicant' }),
+    );
+    prisma.v1Tournament.findFirst.mockResolvedValue(
+      openTournament({ title: '테스트리그', kind: 'regular_league', registrationDeadlineAt: LEAGUE_OPEN_DEADLINE }),
+    );
+    prisma.v1TournamentRegistration.update.mockResolvedValue(
+      registrationRow({ status: 'awaiting_payment', appliedByUserId: 'original-applicant' }),
+    );
+    prisma.v1TournamentPayment.upsert.mockResolvedValue(paymentRow());
+
+    await service.submit(manager, 'tournament-1', 'reg-1', validSubmit);
+
+    expect(notifications.emitNotification).toHaveBeenCalledWith(
+      'original-applicant',
+      'tournament_registration_submitted',
+      'tournament-1',
+      '"테스트리그" 리그 입금 안내를 확인해 주세요.',
+      { competitionKind: 'regular_league' },
     );
   });
 
@@ -925,6 +1004,24 @@ describe('TournamentRegistrationsService', () => {
       'tournament-1',
       expect.any(String),
     );
+  });
+
+  it.each([
+    ['regular_league', '리그'],
+    ['regular_tournament', '대회'],
+  ])('submit: 기록 공개 동의 안내 본문이 %s 신청에서는 "%s"로 표기된다', async (kind, noun) => {
+    prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow());
+    prisma.v1Tournament.findFirst.mockResolvedValue(
+      openTournament({ kind, registrationDeadlineAt: kind === 'regular_league' ? LEAGUE_OPEN_DEADLINE : undefined }),
+    );
+    prisma.v1TournamentRegistration.update.mockResolvedValue(registrationRow({ status: 'awaiting_payment' }));
+    prisma.v1TournamentPayment.upsert.mockResolvedValue(paymentRow());
+
+    await submitWithRecordDisclosure();
+
+    const body = notifications.emitToManyDeferred.mock.calls[0][3] as string;
+    expect(body).toContain(`${noun} 기록을 프로필에 공개할지`);
+    expect(body).not.toContain(noun === '리그' ? '대회 기록' : '리그 기록');
   });
 
   it('submit: 기록 공개 동의를 체크하지 않으면 안내 알림도 보내지 않는다', async () => {

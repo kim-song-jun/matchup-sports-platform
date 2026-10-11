@@ -9,6 +9,7 @@ import { V1AuthGuard } from '../auth/v1-auth.guard';
 import { LeagueFixtureVideosController } from './league-fixture-videos.controller';
 import { LeagueFixtureVideosService } from './league-fixture-videos.service';
 import { LeagueCoverImageService } from './league-cover-image.service';
+import { LeagueVenueService } from './league-venue.service';
 import { LeagueEntryFeeController } from './league-entry-fee.controller';
 import { LeagueEntryFeeService } from './league-entry-fee.service';
 import { LeagueMatchAdminController } from './league-match-admin.controller';
@@ -53,6 +54,7 @@ import { LeagueSeriesAdminService } from './league-series-admin.service';
     LeagueMatchPublicService,
     LeagueRegistrationCloseService,
     LeagueSeriesAdminService,
+    LeagueVenueService,
     OptionalV1AuthGuard,
     V1AuthGuard,
   ],

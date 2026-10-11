@@ -54,9 +54,10 @@ function buildKakaoAuthUrl() {
   return `https://kauth.kakao.com/oauth/authorize?${params.toString()}`;
 }
 
-export function getEmailLoginViewModel(): EmailLoginViewModel {
+export function getEmailLoginViewModel(redirectPath?: string | null): EmailLoginViewModel {
   return {
-    backHref: '/login',
+    // 로그인 첫 화면으로 돌아가도 redirect 가 끊기지 않게 같이 싣는다.
+    backHref: redirectPath ? `/login?redirect=${encodeURIComponent(redirectPath)}` : '/login',
     title: '이메일로\n로그인해요',
     sub: '',
     fields: [
@@ -172,4 +173,9 @@ export function getSignupCompleteViewModel(): SignupCompleteViewModel {
     primary: { label: '운동 설정 시작하기', href: '/onboarding/sport' },
     secondary: { label: '나중에 설정하기', href: '/home', tone: 'neutral' },
   };
+}
+
+/** 서버가 신규 소셜 계정을 가입 단계로 보낼 때 쓰는 경로. 이 단계에서는 로그인 후 목적지를 아직 쓰지 않는다. */
+export function isSocialOnboardingRoute(route: string | null | undefined) {
+  return route === '/terms?mode=social' || route === '/signup/social';
 }

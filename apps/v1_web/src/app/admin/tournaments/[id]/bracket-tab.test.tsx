@@ -135,6 +135,8 @@ function noopMutation() {
 }
 
 vi.mock('@/hooks/use-v1-api', () => ({
+  useV1PlaceSearch: () => ({ data: undefined, isFetching: false, isError: false, error: null }),
+  useV1PublicKakaoMapsKey: () => ({ data: { kakaoMapsJsKey: null }, isLoading: false }),
   useV1AdminBracket: () => ({
     data: { ...bracket, groups: bracketGroups, fixtures: bracketFixtures },
     isPending: false,
@@ -200,6 +202,8 @@ function confirmedRegistration(overrides: Partial<V1AdminTournamentRegistration>
     rosterDeadlineOverrideAt: null,
     cancelRequestedAt: null,
     cancelReason: null,
+    adminCancelReason: null,
+    cancelOutcome: null,
     playerCount: 5,
     payment: null,
     paymentInstructions: null,
@@ -506,6 +510,61 @@ describe('BracketTab — 경기 수정: 팀 해제(TBD) 전송', () => {
   });
 });
 
+describe('BracketTab — 경기 수정: 한 팀 한 조', () => {
+  const groupWith = (id: string, name: string, phase: 'group' | 'semi', sortOrder: number, teams: string[]) => ({
+    ...bracket.groups[0], id, name, phase, sortOrder,
+    groupTeams: teams.map((registrationId, index) => ({ id: `gt-${registrationId}`, groupId: id, registrationId, teamName: registrationId, sortOrder: index })),
+  }) as unknown as typeof bracket.groups[number];
+  const registrations = () => ['r1', 'r2', 'r3'].map((id, index) => confirmedRegistration({ id, teamName: ['강남FC', '마포FC', '송파FC'][index] }));
+  const openEdit = async () => {
+    fireEvent.click(screen.getAllByRole('button', { name: 'A조 · 조별리그 1라운드 1번 경기 수정' })[0]);
+    return screen.findByRole('dialog', { name: '경기 수정' });
+  };
+  const homeOptions = (dialog: HTMLElement) => {
+    fireEvent.click(within(dialog).getAllByRole('button', { name: '선택 해제' })[0]);
+    fireEvent.change(within(dialog).getByPlaceholderText('홈 팀 검색'), { target: { value: 'FC' } });
+    return screen.getAllByRole('option').map((option) => option.textContent ?? '').join();
+  };
+
+  beforeEach(() => {
+    bracketFixtures = [fixtureRow({ id: 'fx-1', round: 'league_r1', fixtureNumber: 1, homeRegistrationId: 'r1', awayRegistrationId: null })];
+  });
+  afterEach(() => { bracketGroups = bracket.groups; });
+
+  it('조별 단계 경기의 수정 후보에서 다른 조 팀(마포FC)은 빠지고 이 조 팀·미편성 팀은 남는다', async () => {
+    bracketGroups = [groupWith('group-a', 'A조', 'group', 0, ['r1']), groupWith('group-b', 'B조', 'group', 1, ['r2'])];
+    renderTab(vi.fn(), registrations());
+    const labels = homeOptions(await openEdit());
+    expect(labels).toContain('강남FC');
+    expect(labels).toContain('송파FC');
+    expect(labels).not.toContain('마포FC');
+  });
+
+  it('어웨이 후보도 같은 기준으로 다른 조 팀(마포FC)을 거른다', async () => {
+    bracketGroups = [groupWith('group-a', 'A조', 'group', 0, ['r1']), groupWith('group-b', 'B조', 'group', 1, ['r2'])];
+    renderTab(vi.fn(), registrations());
+    const dialog = await openEdit();
+    fireEvent.change(within(dialog).getByPlaceholderText('어웨이 팀 검색'), { target: { value: 'FC' } });
+    const labels = screen.getAllByRole('option').map((option) => option.textContent ?? '').join();
+    expect(labels).toContain('송파FC');
+    expect(labels).not.toContain('마포FC');
+  });
+
+  it('이미 고른 팀이 다른 조 편성이어도 선택값으로 그대로 보인다', async () => {
+    bracketGroups = [groupWith('group-a', 'A조', 'group', 0, ['r1']), groupWith('group-b', 'B조', 'group', 1, ['r2'])];
+    bracketFixtures = [fixtureRow({ id: 'fx-1', round: 'league_r1', fixtureNumber: 1, homeRegistrationId: 'r2', awayRegistrationId: null })];
+    renderTab(vi.fn(), registrations());
+    const dialog = await openEdit();
+    expect(within(dialog).getByText('마포FC')).toBeInTheDocument();
+  });
+
+  it('대조군 — 마포FC 가 결선 단계 조에만 있으면 보인다', async () => {
+    bracketGroups = [groupWith('group-a', 'A조', 'group', 0, ['r1']), groupWith('semi-1', '4강', 'semi', 1, ['r2'])];
+    renderTab(vi.fn(), registrations());
+    expect(homeOptions(await openEdit())).toContain('마포FC');
+  });
+});
+
 describe('BracketTab — 경기 수정: 시작된 경기의 팀 교체', () => {
   const registrations = () => [
     confirmedRegistration({ id: 'r1', teamName: '강남FC' }),
@@ -717,5 +776,53 @@ describe('BracketTab — 12강·8강 토너먼트 자동 생성', () => {
     expect(bracketFixtures).toHaveLength(0);
     expect(createFixtureMutate).not.toHaveBeenCalled();
     expect(screen.getByRole('button', { name: '대진 자동 생성' })).toBeEnabled();
+  });
+});
+
+describe('BracketTab — 팀 배정 전 대진 자동 생성 안내', () => {
+  beforeEach(() => {
+    bracketFixtures = [];
+    v1Post.mockReset();
+    vi.clearAllMocks();
+  });
+  afterEach(() => {
+    bracketGroups = bracket.groups;
+  });
+
+  const HINT = '조에 팀을 2팀 이상 배정하면 대진을 자동으로 만들 수 있어요.';
+
+  function groupWithTeams(count: number) {
+    bracketGroups = [{
+      ...bracket.groups[0],
+      groupTeams: Array.from({ length: count }, (_, index) => ({
+        id: `gt-${index + 1}`,
+        groupId: 'group-a',
+        registrationId: `r${index + 1}`,
+        teamName: `팀 ${index + 1}`,
+        sortOrder: index,
+      })),
+    }] as typeof bracket.groups;
+  }
+
+  it.each([0, 1])('팀이 %i팀이면 눌러 보기 전에 이유가 화면에 남아 있고, 눌러도 모달 없이 알려준다', (count) => {
+    groupWithTeams(count);
+    const showToast = renderTab();
+
+    const button = screen.getByRole('button', { name: '대진 자동 생성' });
+    expect(screen.getByText(HINT)).toBeInTheDocument();
+    expect(button).toHaveAccessibleDescription(HINT);
+
+    fireEvent.click(button);
+    expect(showToast).toHaveBeenCalledWith('조에 팀이 2개 이상 있어야 자동 생성할 수 있어요.', 'error');
+    expect(screen.queryByRole('dialog', { name: '조별리그 대진 자동 생성' })).not.toBeInTheDocument();
+  });
+
+  it('대조군 — 팀이 2팀 이상이면 안내 없이 회전 수 모달이 열린다', () => {
+    groupWithTeams(2);
+    renderTab();
+
+    expect(screen.queryByText(HINT)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '대진 자동 생성' }));
+    expect(screen.getByRole('dialog', { name: '조별리그 대진 자동 생성' })).toBeInTheDocument();
   });
 });

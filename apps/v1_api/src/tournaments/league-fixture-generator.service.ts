@@ -9,6 +9,7 @@ import { V1AuthUser } from '../auth/v1-auth-user';
 import { GenerateLeagueFixturesDto } from './dto/admin-league.dto';
 import { participantDisplayName } from './participant-display-name';
 import { findTournamentOnSurface, TOURNAMENT_KINDS } from './tournament-surface-lookup';
+import { TOURNAMENT_VENUE_SELECT, tournamentVenueSnapshot } from '../places/tournament-venue';
 import { createTournamentMatchInTx } from './tournament-match-creation';
 import { competitionMatchLabel } from './tournament-round-label';
 import { lockGameRows } from '../games/roster/game-roster-sync';
@@ -532,6 +533,7 @@ export class LeagueFixtureGeneratorService {
             title: true,
             sportId: true,
             regionId: true,
+            ...TOURNAMENT_VENUE_SELECT,
           },
         });
         const competitionConfigVersionId = pinnedTournament?.competitionConfigVersionId;
@@ -757,6 +759,7 @@ export class LeagueFixtureGeneratorService {
             homeRegistrationId: row.homeRegistrationId,
             awayRegistrationId: row.awayRegistrationId,
             scheduledAt: row.startAt?.toISOString() ?? null,
+            // 해시는 요청이 보낸 값(없음)만 본다 — 기본 장소를 섞으면 이미 만든 대진의 재시도가 payload 불일치로 막힌다.
             venue: null,
           });
 
@@ -773,7 +776,7 @@ export class LeagueFixtureGeneratorService {
             regionId: pinnedTournament.regionId ?? null,
             // round 는 `league_r{n}` 좌표 키다 — 제목은 팀 일정·알림에 그대로 복사되므로 화면 이름으로 저장한다.
             title: `${pinnedTournament.title} · ${competitionMatchLabel({ groupName: currentGroup.name, round: row.round, legNumber: row.legNumber })} ${row.fixtureNumber}`,
-            placeName: null,
+            place: tournamentVenueSnapshot(pinnedTournament),
             startAt: row.startAt,
             createdByUserId: user.id,
             competitionConfigVersionId,

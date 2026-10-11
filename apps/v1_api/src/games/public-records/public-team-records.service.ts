@@ -9,6 +9,7 @@ import {
   parseTournamentFixtureOfficialScore,
   resolveGoalDisplaySideId,
 } from '../../tournaments/tournament-fixture-official-result';
+import { resolveIsForfeit } from '../../league-matches/league-forfeit-result';
 import { TeamRecordsQueryDto } from './dto/public-records-query.dto';
 import { decodeRecordCursor, encodeRecordCursor, type RecordCursor } from './public-cursor';
 import { loadParticipantConsentEligibility, type ParticipantConsentEligibility } from './public-consent';
@@ -47,6 +48,8 @@ interface TeamRecordFactRow {
   readonly resultRevision: {
     readonly score: Prisma.JsonValue;
     readonly goalEvents: Prisma.JsonValue | null;
+    readonly outcomeReason: string;
+    readonly reason: string | null;
     readonly game: {
       readonly currentOfficialRevisionId: string | null;
       readonly teamMatchId: string | null;
@@ -229,6 +232,8 @@ export class PublicTeamRecordsService {
         penalties: isStatusOnly
           ? null
           : resolveTeamPenalties(row.resultRevision.score, row.resultRevision.game.sides, teamId),
+        // 몰수는 1:0 관례 스코어라 표시 없이는 실제 1:0 승패와 구분되지 않는다.
+        isForfeit: isStatusOnly ? false : resolveIsForfeit(row.resultRevision),
         events: isStatusOnly ? [] : (eventsByGameId.get(row.gameId) ?? []),
         playedAt: row.playedAt.toISOString(),
       };
@@ -345,6 +350,9 @@ export class PublicTeamRecordsService {
           select: {
             score: true,
             goalEvents: true,
+            // 몰수 여부(`resolveIsForfeit`)만 읽는다 — 사유 원문은 공개하지 않는다.
+            outcomeReason: true,
+            reason: true,
             game: {
               select: {
                 currentOfficialRevisionId: true,
@@ -532,7 +540,7 @@ export class PublicTeamRecordsService {
                 : 'opponent') as 'own' | 'opponent',
             participantName: eligible
                 ? event.participantId === null
-                  ? (event.playerNameSnapshot ?? '선수 정보 없음')
+                  ? event.playerNameSnapshot ?? null
                   : resolveParticipantDisplayName(participant, nameProfileByUserId)
                 : null,
               jerseyNumber: eligible ? (participant?.jerseyNumber ?? null) : null,

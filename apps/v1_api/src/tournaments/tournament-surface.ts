@@ -66,11 +66,11 @@ export type CompetitionListKind = (typeof COMPETITION_LIST_KINDS)[number];
  * 배열에 값을 더하면 여기서 컴파일이 깨진다(그 반대도 마찬가지). 두 곳을 손으로 맞추는
  * 구조였다면 언젠가 하나만 늘어난다.
  */
-export const COMPETITION_LIST_SURFACE: Record<CompetitionListKind, Prisma.V1TournamentWhereInput> = {
+export const COMPETITION_LIST_SURFACE: Record<CompetitionListKind, Prisma.Sql> = {
   /** 두 종류를 함께 — 통합 목록. R1 이전 행도 포함한다(조건을 안 건다). */
-  all: {},
-  /** 지금까지의 기본 동작. 정규 대회 + R1 이전 행. */
-  tournament: TOURNAMENT_SURFACE_KIND,
+  all: Prisma.sql`TRUE`,
+  /** 지금까지의 기본 동작. 정규 대회 + R1 이전 행. `TOURNAMENT_SURFACE_KIND` 의 SQL 표현이다. */
+  tournament: Prisma.sql`(t.kind::text = 'regular_tournament' OR t.kind IS NULL)`,
   /** 정규 리그 시즌만. */
-  league: { kind: 'regular_league' },
+  league: Prisma.sql`t.kind::text = 'regular_league'`,
 };

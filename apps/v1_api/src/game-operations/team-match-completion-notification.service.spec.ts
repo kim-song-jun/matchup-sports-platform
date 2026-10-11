@@ -11,6 +11,7 @@ function revisionFixture(overrides: Partial<OfficialRevisionRow> = {}): Official
     playedAt: new Date('2026-08-01T00:00:00Z'),
     officialAt: new Date('2026-08-01T00:00:00Z'),
     reason: null,
+    outcomeReason: 'NORMAL',
     sourceType: 'TEAM_MATCH',
     currentOfficialRevisionId: 'revision-1',
     tournamentId: null,
@@ -81,6 +82,9 @@ function fakeTx(options: {
     v1TeamMembership: {
       findMany: jest.fn().mockResolvedValue(options.memberships),
     },
+    v1Team: {
+      findMany: jest.fn().mockResolvedValue([{ id: 'team-home', name: '송파 FC' }, { id: 'team-away', name: '마포 FC' }]),
+    },
     v1NotificationPreference: {
       findMany: jest.fn().mockResolvedValue(options.preferences),
     },
@@ -134,7 +138,11 @@ describe('TeamMatchCompletionNotificationService', () => {
       expect(row.targetType).toBe('team_match');
       expect(row.targetId).toBe('tm-1');
       expect(row.deepLink).toBe('/my/reviews/team_match/tm-1');
-      expect(row.body).toBe('"테스트 팀매치" 팀매치 리뷰를 남겨보세요.');
+      expect(row.body).toBe(
+        row.recipientUserId === 'user-host-owner'
+          ? '"테스트 팀매치" · 송파 FC 3 : 1 마포 FC · 승리. 팀매치 리뷰를 남겨보세요.'
+          : '"테스트 팀매치" · 송파 FC 3 : 1 마포 FC · 패배. 팀매치 리뷰를 남겨보세요.',
+      );
       expect(row.businessKey).toBe(`team-match-completed:tm-1:${row.recipientUserId}`);
     }
 
@@ -166,6 +174,27 @@ describe('TeamMatchCompletionNotificationService', () => {
 
     const data = createMany.mock.calls[0][0].data as Array<Record<string, unknown>>;
     expect(data.map((row) => row.recipientUserId).sort()).toEqual(['user-away-leader', 'user-host-in']);
+  });
+
+  // 승패는 받는 사람 팀 기준이다 — 홈/원정, 승/무/패, 몰수 대조군을 한 번에 둔다.
+  it.each([
+    { name: '무승부', revision: { score: { home: 2, away: 2 } }, home: '무승부', away: '무승부' },
+    { name: '몰수', revision: { score: { home: 1, away: 0 }, outcomeReason: 'FORFEIT' }, home: '몰수승', away: '몰수패' },
+    { name: '승부차기', revision: { score: { home: 1, away: 1, penalties: { home: 3, away: 4 } } }, home: '패배', away: '승리' },
+  ])('일반 팀매치 알림 본문에 $name 결과를 받는 사람 팀 기준으로 담는다', async ({ revision, home, away }) => {
+    const { tx, createMany } = fakeTx({
+      teamMatch: { id: 'tm-1', title: '테스트 팀매치', hostTeamId: 'team-home', approvedApplicantTeamId: 'team-away', leagueId: null },
+      memberships: [{ userId: 'user-home', teamId: 'team-home' }, { userId: 'user-away', teamId: 'team-away' }],
+      preferences: [],
+      alreadyDelivered: [],
+    });
+
+    await new TeamMatchCompletionNotificationService().project(tx, revisionFixture(revision));
+
+    const data = createMany.mock.calls[0][0].data as Array<{ recipientUserId: string; body: string }>;
+    const bodyOf = (userId: string) => data.find((row) => row.recipientUserId === userId)?.body ?? '';
+    expect(bodyOf('user-home')).toMatch(new RegExp(`· ${home}\\. 팀매치 리뷰를 남겨보세요\\.$`));
+    expect(bodyOf('user-away')).toMatch(new RegExp(`· ${away}\\. 팀매치 리뷰를 남겨보세요\\.$`));
   });
 
   describe('리그 결과 확정 (Task 180 G7)', () => {
@@ -242,6 +271,25 @@ describe('TeamMatchCompletionNotificationService', () => {
       });
       expect(data.some((row) => String(row.body).includes('문의'))).toBe(false);
       expect(webPush.sendToUser).toHaveBeenCalledWith('away-manager', expect.objectContaining({ title: '경기 결과가 확정됐어요' }));
+    });
+
+    it('몰수로 확정된 리그 경기는 양 팀에 몰수패·몰수승으로 알린다 — 컬럼과 레거시 표식 모두', async () => {
+      const forfeitRevisions = [
+        { outcomeReason: 'FORFEIT', reason: '불참' },
+        { outcomeReason: 'NORMAL', reason: '[LEAGUE_FORFEIT] 불참' },
+      ];
+      for (const forfeit of forfeitRevisions) {
+        const { tx, createMany } = fakeLeagueTx({ members, resultRows: [] });
+        await new TeamMatchCompletionNotificationService().project(
+          tx,
+          { ...leagueRevision(), score: { home: 0, away: 1 }, ...forfeit },
+        );
+        const data = createMany.mock.calls[0][0].data as Array<Record<string, unknown>>;
+        expect(data.map((row) => [row.recipientUserId, row.body])).toEqual([
+          ['home-owner', '가을 리그 2주차 · 성수 FC 0 : 1 망원 FC · 몰수패.'],
+          ['away-manager', '가을 리그 2주차 · 성수 FC 0 : 1 망원 FC · 몰수승.'],
+        ]);
+      }
     });
 
     it('경기·대회 알림(teamMatchEnabled)을 끈 출전자는 받지 않는다', async () => {

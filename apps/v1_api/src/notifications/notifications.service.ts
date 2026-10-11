@@ -1,5 +1,5 @@
 import { ForbiddenException, Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { Prisma, V1NotificationTargetType } from '@prisma/client';
+import { Prisma, V1CompetitionKind, V1NotificationTargetType } from '@prisma/client';
 import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 import { V1AuthUser } from '../auth/v1-auth-user';
 import { isQuietHour, nightPushAllowed } from '../common/quiet-hours';
@@ -20,6 +20,7 @@ export type NotificationEventType =
   | 'match_cancelled'
   | 'match_closed'
   | 'match_completed'
+  | 'match_no_show'
   | 'match_updated'
   | 'match_proceed_confirmed'
   | 'team_join_application_received'
@@ -68,6 +69,8 @@ export type NotificationEventType =
   | 'team_contact_accepted'
   | 'team_contact_declined'
   | 'inquiry_answered'
+  // 소셜 로그인이 휴대폰 주인의 기존 계정에 연결됐을 때 그 계정에게(MD-QA #126). 보안 알림이라 importantEnabled.
+  | 'social_identity_linked'
   // H3: 팀장·어드민이 팀을 보관(해체)하면 팀원 전원과 가입 신청자에게 한 번 알린다. 도착지는 해체된 팀 페이지.
   | 'team_dissolved'
   // Task 12, reminders lane: fired by the durable worker (jobs/schedule-reminders/schedule-reminder.service.ts)
@@ -110,6 +113,9 @@ export type NotificationEventType =
   // 대회 경기 결과 확정(tournament-fixture-completion-notification.service.ts). targetId 는
   // "${tournamentId}:${teamMatchId}" 복합 — 경기 상세가 2계층 경로라서다.
   | 'tournament_match_completed'
+  // 확정된 대회 경기 결과를 어드민이 정정해 다시 확정했을 때(MD-QA #79). 같은 복합 targetId 를 쓰고,
+  // 발송은 completed 와 같은 tournament-fixture-completion-notification.service.ts 가 한다.
+  | 'tournament_match_result_corrected'
   // 경기 전 알림(Task 180 G7): 출전자에게 전날 한 번(대회·리그 팀장·매니저는 기존 "명단 확인"을 받는다),
   // 킥오프 2시간 전에 출전자와 팀장·매니저에게 한 번. 발송은 jobs/lineup-reminders 워커가 tx 로 직접 쓴다.
   // 대회 경기는 targetType 'tournament' + "${tournamentId}:${teamMatchId}", 나머지는 'team_match' + teamMatchId.
@@ -196,6 +202,13 @@ export interface NotificationEmitOptions {
   readonly vars?: NotificationCopyVars;
   /** Per-recipient dedupe: stored as `${businessKey}:${userId}`; a repeat emit is skipped. */
   readonly businessKey?: string;
+  /** 정규 리그의 신청 알림이면 제목이 '대회' 대신 '리그'로 나간다(`LEAGUE_EVENT_TITLES`). */
+  readonly competitionKind?: V1CompetitionKind | null;
+}
+
+/** 대회·리그 신청 알림 본문에 넣는 이름. `kind` 가 null 인 옛 행은 대회다. */
+export function competitionNounFor(kind: V1CompetitionKind | null | undefined): '대회' | '리그' {
+  return kind === V1CompetitionKind.regular_league ? '리그' : '대회';
 }
 
 /** 알림 문구에 넣을 사람 이름 — 화면의 멤버 목록과 같은 우선순위(닉네임 → 표시 이름). */
@@ -215,7 +228,7 @@ export function renderNotificationCopy(template: string, vars: NotificationCopyV
 function preferenceFieldForEvent(type: NotificationEventType): NotificationPrefField {
   // 사용자가 직접 접수한 1:1 문의의 답변은 놓치면 안 되는 알림이므로
   // 활동 알림(activityEnabled)이 아니라 중요 알림(importantEnabled)으로 게이트한다.
-  if (type === 'inquiry_answered') {
+  if (type === 'inquiry_answered' || type === 'social_identity_linked') {
     return 'importantEnabled';
   }
   if (type === 'team_dissolved') {
@@ -229,7 +242,8 @@ function preferenceFieldForEvent(type: NotificationEventType): NotificationPrefF
     type === 'match_closed' ||
     type === 'match_updated' ||
     type === 'match_proceed_confirmed' ||
-    type === 'match_completed'
+    type === 'match_completed' ||
+    type === 'match_no_show'
   ) {
     return 'matchEnabled';
   }
@@ -284,6 +298,7 @@ function preferenceFieldForEvent(type: NotificationEventType): NotificationPrefF
     // 새 preference 컬럼을 만들면 마이그레이션이 붙는데 그럴 이유가 없다.
     type === 'tournament_award_received' ||
     type === 'tournament_match_completed' ||
+    type === 'tournament_match_result_corrected' ||
     // 신원 연결 승인 요청·만료·승인·거절(대회 판)도 대회 활동 축이다.
     type === 'tournament_identity_attest_requested' ||
     type === 'tournament_identity_attest_expired' ||
@@ -309,6 +324,9 @@ function targetTypeForEvent(type: NotificationEventType): V1NotificationTargetTy
   if (type === 'inquiry_answered') {
     return 'inquiry';
   }
+  if (type === 'social_identity_linked') {
+    return 'system';
+  }
   if (type === 'team_dissolved') {
     return 'team';
   }
@@ -320,7 +338,8 @@ function targetTypeForEvent(type: NotificationEventType): V1NotificationTargetTy
     type === 'match_closed' ||
     type === 'match_updated' ||
     type === 'match_proceed_confirmed' ||
-    type === 'match_completed'
+    type === 'match_completed' ||
+    type === 'match_no_show'
   ) {
     return 'match';
   }
@@ -356,6 +375,7 @@ function targetTypeForEvent(type: NotificationEventType): V1NotificationTargetTy
     type === 'tournament_completed_review_request' ||
     type === 'tournament_award_received' ||
     type === 'tournament_match_completed' ||
+    type === 'tournament_match_result_corrected' ||
     // targetId 는 "${tournamentId}:${fixtureId}" 복합 문자열 — 경기 상세가 2계층 경로라서다.
     // schedule_rsvp_deadline_reminder 의 기존 복합 targetId 선례를 따르고, 딥링크는
     // deepLinkForEvent 에서 명시적으로 파싱한다.
@@ -449,6 +469,9 @@ function deepLinkForEvent(
   if (type === 'team_invitation_declined' && targetId) {
     return `/teams/${targetId}/members?tab=invitations`;
   }
+  if (type === 'social_identity_linked') {
+    return '/my/settings';
+  }
   // 새 팀장·나간 멤버 알림은 멤버 관리(멤버 탭)로 — 나머지 역할 알림은 기본 팀 상세로 간다.
   if ((type === 'team_owner_received' || type === 'team_member_left') && targetId) {
     return `/teams/${targetId}/members`;
@@ -514,7 +537,8 @@ function deepLinkForEvent(
       type === 'tournament_identity_attest_expired' ||
       type === 'tournament_identity_attest_approved' ||
       type === 'tournament_identity_attest_rejected' ||
-      type === 'tournament_match_completed') &&
+      type === 'tournament_match_completed' ||
+      type === 'tournament_match_result_corrected') &&
     targetId
   ) {
     const [tournamentId, fixtureId] = targetId.split(':');
@@ -564,6 +588,7 @@ const EVENT_TITLES: Record<NotificationEventType, string> = {
   match_updated: '매치 일정·장소가 변경됐어요',
   match_proceed_confirmed: '매치 진행이 확정됐어요',
   match_completed: '매치가 완료됐어요. 리뷰를 남겨보세요!',
+  match_no_show: '매치 불참으로 기록됐어요',
   team_join_application_received: '{name}님이 가입을 신청했어요',
   team_join_application_accepted: '팀 가입 신청이 수락됐어요',
   team_join_application_rejected: '팀 가입 신청이 거절됐어요',
@@ -600,6 +625,7 @@ const EVENT_TITLES: Record<NotificationEventType, string> = {
   team_schedule_created: '새 일정이 올라왔어요',
   team_schedule_cancelled: '일정이 취소됐어요',
   inquiry_answered: '문의에 답변이 등록됐어요',
+  social_identity_linked: '로그인 수단이 연결됐어요',
   team_dissolved: '팀이 해체됐어요',
   schedule_rsvp_deadline_reminder: '참석 여부를 알려주세요',
   schedule_guest_recruitment_close_reminder: '용병 모집이 곧 마감돼요',
@@ -611,6 +637,7 @@ const EVENT_TITLES: Record<NotificationEventType, string> = {
   league_promotion_withdrawn: '리그 참가가 종료됐어요',
   league_team_match_completed: '경기 결과가 확정됐어요',
   tournament_match_completed: '대회 경기 결과가 확정됐어요',
+  tournament_match_result_corrected: '대회 경기 결과가 정정됐어요',
   // 발송 경로가 앞에 "9/30 (수) 01:10 " 을 붙인다 — 자정을 넘긴 경기가 "내일"로 읽히지 않게 날짜를 쓴다.
   game_day_before_reminder: '경기가 있어요',
   game_kickoff_reminder: '2시간 뒤 경기가 시작돼요',
@@ -623,6 +650,13 @@ const EVENT_TITLES: Record<NotificationEventType, string> = {
   tournament_identity_attest_approved: '기록 연결이 승인됐어요',
   team_match_identity_attest_rejected: '기록 연결이 거절됐어요',
   tournament_identity_attest_rejected: '기록 연결이 거절됐어요',
+};
+
+/** 제목에 '대회'가 들어가는 신청 알림의 정규 리그판. */
+const LEAGUE_EVENT_TITLES: Partial<Record<NotificationEventType, string>> = {
+  tournament_registration_confirmed: '리그 참가가 확정됐어요',
+  tournament_registration_cancelled: '리그 참가가 취소됐어요',
+  tournament_registration_submitted: '리그 신청이 접수됐어요',
 };
 
 /**
@@ -641,6 +675,7 @@ const EVENT_BODIES: Record<NotificationEventType, string> = {
   match_updated: '변경 내용을 확인하고 다시 신청해 주세요.',
   match_proceed_confirmed: '현재 확정 인원으로 진행해요.',
   match_completed: '함께한 매치의 리뷰를 남겨보세요.',
+  match_no_show: '호스트가 이번 매치를 불참으로 기록했어요.',
   team_join_application_received: '"{team}" · 승인하거나 거절해 주세요.',
   team_join_application_accepted: '팀 가입이 승인됐어요.',
   team_join_application_rejected: '팀 가입 신청이 거절됐어요.',
@@ -679,6 +714,7 @@ const EVENT_BODIES: Record<NotificationEventType, string> = {
   // 취소 사유는 팀장·매니저가 적은 문장 그대로다.
   team_schedule_cancelled: '"{team}" · {title}({when}) · {reason}',
   inquiry_answered: '답변 내용을 확인해 주세요.',
+  social_identity_linked: '{name} 로그인이 연결됐어요. 본인이 아니라면 고객센터로 문의해 주세요.',
   team_dissolved: '지난 기록은 그대로 남아요.',
   schedule_rsvp_deadline_reminder: 'RSVP 마감 전에 참석 여부를 남겨주세요.',
   schedule_guest_recruitment_close_reminder: '모집 마감 전에 신청 현황을 확인해 주세요.',
@@ -690,6 +726,7 @@ const EVENT_BODIES: Record<NotificationEventType, string> = {
   league_promotion_withdrawn: '이번 시즌을 끝으로 리그 참가가 종료됐어요.',
   league_team_match_completed: '확정된 경기 결과를 확인해 보세요.',
   tournament_match_completed: '확정된 경기 결과를 확인해 보세요.',
+  tournament_match_result_corrected: '정정된 경기 결과를 확인해 보세요.',
   // 두 경기 전 알림의 본문 끝 문장이다 — 발송 경로가 "vs 상대 · 장소." 뒤에 붙인다.
   game_day_before_reminder: '출전 명단은 경기 전까지 바뀔 수 있어요.',
   game_kickoff_reminder: '지금 출전 명단에 있어요.',
@@ -989,7 +1026,10 @@ export class NotificationsService {
       message = {
         targetType,
         targetId,
-        title: renderNotificationCopy(EVENT_TITLES[type], options?.vars),
+        title: renderNotificationCopy(
+          (options?.competitionKind === V1CompetitionKind.regular_league ? LEAGUE_EVENT_TITLES[type] : undefined) ?? EVENT_TITLES[type],
+          options?.vars,
+        ),
         body: body ?? renderNotificationCopy(EVENT_BODIES[type], options?.vars),
         deepLink: deepLinkForEvent(type, targetType, targetId),
       };

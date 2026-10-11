@@ -22,6 +22,8 @@ vi.mock('@/hooks/use-v1-api', () => ({
   useV1UpdateTournament: () => ({ mutate: hooks.mutate, isPending: hooks.isPending }),
   useV1UploadImages: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useV1MasterSports: () => ({ data: [] }),
+  useV1PlaceSearch: () => ({ data: undefined, isFetching: false, isError: false, error: null }),
+  useV1PublicKakaoMapsKey: () => ({ data: { kakaoMapsJsKey: null }, isLoading: false }),
   useV1LineupSizeOptions: () => ({ data: [], isPending: false, isError: false }),
 }));
 
@@ -304,5 +306,34 @@ describe('TournamentInfoSection — 명단 제출 마감은 신청 마감과 같
     submitEdit(() => fireEvent.change(screen.getByLabelText(/대회명/), { target: { value: '새 대회명' } }));
 
     expect(hooks.mutate).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('TournamentInfoSection — 장소 스냅샷', () => {
+  beforeEach(() => {
+    hooks.mutate.mockReset();
+    hooks.showToast.mockReset();
+  });
+
+  function save(edit: () => void) {
+    fireEvent.click(screen.getByRole('button', { name: '대회 정보 수정' }));
+    edit();
+    fireEvent.click(screen.getByRole('button', { name: '저장' }));
+    return hooks.mutate.mock.calls[0][0] as Record<string, unknown>;
+  }
+
+  it('장소를 건드리지 않은 수정은 장소 필드를 하나도 보내지 않는다 — 서버가 스냅샷을 교체하지 않게', () => {
+    renderSection(true, { venueProvider: 'kakao', venueProviderId: 'kakao-1', latitude: 37.5, longitude: 127 } as Partial<V1Tournament>);
+    const body = save(() => fireEvent.change(screen.getByLabelText(/대회명/), { target: { value: '새 대회명' } }));
+
+    expect(Object.keys(body).filter((key) => key.startsWith('venue') || key === 'latitude')).toEqual([]);
+  });
+
+  it('장소 이름을 바꾸면 venue 를 보낸다 — 이름만 직접 입력한 값이라 좌표 키는 없다', () => {
+    renderSection(true);
+    const body = save(() => fireEvent.change(screen.getByLabelText('장소'), { target: { value: '뚝섬 풋살장' } }));
+
+    expect(body).toMatchObject({ venue: '뚝섬 풋살장' });
+    expect(Object.keys(body)).not.toContain('venueLatitude');
   });
 });

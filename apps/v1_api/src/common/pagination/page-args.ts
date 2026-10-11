@@ -1,4 +1,10 @@
 /**
+ * page 상한. 정수 검증은 1e308 같은 값도 통과시켜 offset 이 Infinity 가 되고 DB 가 500 을 낸다 —
+ * 실제 목록이 닿을 수 없는 크기라 이보다 큰 page 는 400 으로 거른다.
+ */
+export const MAX_PAGE_NUMBER = 10_000;
+
+/**
  * 어드민 목록의 페이지 번호 페이지네이션.
  *
  * 기존 목록은 전부 cursor 기반이었다. cursor 는 무한 스크롤에는 맞지만 어드민 표에서는
@@ -17,8 +23,9 @@ export function paginationArgs(
   query: PageableQuery,
   limit: number,
 ): { skip?: number; cursor?: { id: string } } {
-  if (query.page && query.page > 1) {
-    return { skip: (query.page - 1) * limit };
+  // page=1 도 page 다 — 함께 온 cursor 가 창을 옮기면 응답의 page·total 표시와 어긋난다.
+  if (query.page !== undefined) {
+    return query.page > 1 ? { skip: (query.page - 1) * limit } : {};
   }
   if (query.cursor) {
     // cursor 가 가리키는 행 자체는 이전 페이지의 마지막이므로 건너뛴다.

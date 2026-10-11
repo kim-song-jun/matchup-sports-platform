@@ -23,6 +23,7 @@ import {
   resultStateLabel,
 } from './format';
 import { PenaltyScoreline } from './penalty-scoreline';
+import { PlaceCard } from '@/components/v1-ui/place-card';
 import type { PublicLineupSlot, PublicMatchDetail, PublicMatchEvent } from './types';
 import { competitionMatchLabel } from '@/lib/tournament-round-label';
 
@@ -332,6 +333,7 @@ export function MatchDetailContent({
   from,
   afterHeader,
   showInlineStatus = true,
+  placeBadge,
 }: {
   data: PublicMatchDetail;
   from?: string;
@@ -339,6 +341,8 @@ export function MatchDetailContent({
   afterHeader?: ReactNode;
   /** false 면 일시 줄의 " · 예정" 을 뺀다 — 화면 위에 경기 상태 칩이 이미 있을 때(리그 경기 상세). */
   showInlineStatus?: boolean;
+  /** 장소 카드 안에 붙는 보조 표식(예: 리그 "이 경기만 장소가 달라요"). */
+  placeBadge?: ReactNode;
 }) {
   const isStatusOnly = data.visibilityMode === 'status_only';
   return (
@@ -437,6 +441,15 @@ export function MatchDetailContent({
         </Card>
       </header>
       {afterHeader ?? null}
+
+      {data.place ? (
+        <section>
+          <h3 className="tm-hub-section-title" style={{ marginBottom: 12 }}>장소</h3>
+          <Card pad={16}>
+            <PlaceCard place={data.place} badge={placeBadge} />
+          </Card>
+        </section>
+      ) : null}
 
       {data.mvp ? (
         <Card pad={16}>

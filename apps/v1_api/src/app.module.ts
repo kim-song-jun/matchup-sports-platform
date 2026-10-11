@@ -33,6 +33,7 @@ import { UploadsModule } from './uploads/uploads.module';
 import { TournamentsModule } from './tournaments/tournaments.module';
 import { VerificationModule } from './verification/verification.module';
 import { IntegrationsModule } from './integrations/integrations.module';
+import { PlacesModule } from './places/places.module';
 import { SiteInfoModule } from './site-info/site-info.module';
 import { LogsModule } from './logs/logs.module';
 import { ErrorLogsModule } from './error-logs/error-logs.module';
@@ -84,6 +85,7 @@ import { LeagueMatchModule } from './league-matches/league-match.module';
     LeagueMatchModule,
     VerificationModule,
     IntegrationsModule,
+    PlacesModule,
     SiteInfoModule,
     LogsModule,
     TournamentFixtureLineupModule,

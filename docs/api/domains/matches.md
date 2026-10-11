@@ -72,6 +72,8 @@
 | `hostParticipates` | boolean | No | `true` |
 | `manualPlaceName` | string | Yes | - |
 | `addressText` | string | No | - |
+| `placeLatitude`, `placeLongitude` | number | No | 장소 검색에서 고른 좌표. 4개(`placeProvider`·`placeProviderId` 포함)가 모두 있거나 모두 없어야 해요(일부만 오면 400 `PLACE_SNAPSHOT_INCOMPLETE`) |
+| `placeProvider`, `placeProviderId` | string | No | 현재 `kakao` 만 지원. 수정 시 `manualPlaceName` 을 보내면 장소 전체를 교체해요(좌표를 안 보내면 지워져요) |
 | `rulesText` | string | No | 안내/규칙 표시용 |
 | `minLevelCode` | level code | No | - |
 | `maxLevelCode` | level code | No | - |
@@ -143,6 +145,8 @@
 - 오래된 데이터에 호스트 참가자 행이 없으면 같은 트랜잭션 안에서 복구한다.
 - `completed` 참가자는 참여 기록과 후기 자격을 유지하고, `no_show` 참가자는 불참 기록으로 표시되며
   후기 CTA가 제공되지 않는다.
+- 이번 완료로 새로 `no_show`가 된 참가자에게는 `match_no_show` 알림(매치 알림 설정을 따르고 `/matches/:id`로 연결)을
+  보낸다. 같은 payload 재시도는 알림을 다시 보내지 않는다.
 - 이 완료는 참여 이력만 확정한다. 득점·도움·승패 같은 공식 경기 기록은 별도 Game/결과 리비전이
   없는 개인 모집 매치에서 생성하지 않는다.
 
@@ -152,7 +156,7 @@
   필터와 cursor pagination을 지원한다. 프론트의 승인 대기·확정 명단·전체 이력 탭은 각각 이 실제
   필터를 사용하며 확정 명단에는 호스트도 별도로 표시한다.
 - 승인은 정원이 차 있으면 `409 FULL`("정원이 모두 찼어요. 기존 참가자의 승인을 취소하면 승인할 수 있어요."),
-  모집 중이 아니면(마감·시작 시각 경과·닫힘) `409 STATE_CONFLICT`를 한국어 메시지로 돌려준다. 신청자 관리
+  모집 중이 아니면(호스트가 직접 마감·시작 시각 경과·취소) `409 STATE_CONFLICT`를 한국어 메시지로 돌려준다. 신청 마감 시각(`deadlineAt`)은 새 신청만 막으므로, 마감 전에 들어온 대기 신청은 마감 시각 이후에도 경기 시작 전까지 승인·거절할 수 있다. 신청자 관리
   화면은 `participantCount >= capacity`면 남은 신청의 승인 버튼을 막고 같은 안내를 보여 준다. 승인은 같은
   트랜잭션에서 참가자를 매치 채팅방에 승인 시각부터 등록한다(chat 계약 참고).
 - 신청자는 `requested` 신청을 철회할 수 있다. `approved` 신청도 매치 시작 전에는 철회할 수 있으며,
@@ -217,3 +221,5 @@ revision flow has produced the applicable persisted result state.
 - PATCH 수정: 보류를 미래 일정으로 변경해 recruiting 재모집. 진행 결정 초기화. 일정/장소 변경 시 requested 신청 expired, approved 신청 withdrawn, 기존 참가자 cancelled로 전환하고 match_updated 알림으로 재신청 안내. row lock 및 stale version 검증.
 - 인증 + 주최자 권한의 `DELETE /matches/:id`: recruiting/closed/cancelled이며 모든 신청 이력 및 주최자 외 참가 이력이 없을 때 archived/deletedAt soft delete + 감사 로그. 이력이 있으면 409 STATE_CONFLICT, 취소를 안내한다.
 - 보류에서도 POST cancel 가능. 타인·비활성 계정 mutation은 기존 권한 검증으로 거절. 진행 중·완료·취소 상태를 보류로 역전하지 않는다. 새 상태는 read-derived 표시 상태이고 목록 query enum은 기존 계약 유지.
+
+응답의 `place` 는 `{ name, address, latitude, longitude, provider, providerPlaceId } | null` 이에요(`address` 는 예전 `addressText`). 수정 폼 `form` 과 `recent-venues` 항목에도 좌표·provider·providerPlaceId 가 실려요.

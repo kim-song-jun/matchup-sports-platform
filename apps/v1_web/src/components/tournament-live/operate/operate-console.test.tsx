@@ -1,4 +1,4 @@
-import { act, render, screen, within, fireEvent, waitFor } from '@testing-library/react';
+import { act, cleanup, render, screen, within, fireEvent, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { COMMAND_RESPONSE_TIMEOUT_MS, OperateConsole } from './operate-console';
 import type { GameEventRecord } from '@/types/game-operations';
@@ -91,6 +91,7 @@ vi.mock('./lineup-grid', async (importOriginal) => ({
     onSelectPlayer,
     restrictSideId,
     filterParticipantIds,
+    sentOffParticipantIds,
   }: {
     onSelectPlayer: (input: {
       sideId: string;
@@ -102,6 +103,7 @@ vi.mock('./lineup-grid', async (importOriginal) => ({
     }) => void;
     restrictSideId?: string;
     filterParticipantIds?: ReadonlySet<string>;
+    sentOffParticipantIds?: ReadonlySet<string>;
   }) => {
     const participantId = restrictSideId
       ? filterParticipantIds?.has('p-1')
@@ -125,6 +127,7 @@ vi.mock('./lineup-grid', async (importOriginal) => ({
         <button type="button" onClick={() => onSelectPlayer({ sideId: 'side-home', participant })}>
           select-player
         </button>
+        <span data-testid="sent-off-ids">{[...(sentOffParticipantIds ?? [])].sort().join(',')}</span>
       </div>
     );
   },
@@ -462,6 +465,59 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
   });
 
+  it('레드카드가 기록된(되돌리지 않은) 선수만 선수 목록에 퇴장으로 넘긴다', () => {
+    gameWithPeriods('LIVE', [
+      { number: 1, state: 'LIVE', startedAt: '2026-08-07T00:00:00.000Z', endedAt: null },
+      { number: 2, state: 'SCHEDULED', startedAt: null, endedAt: null },
+    ]);
+    const card = (sequence: number, participantId: string, color: 'RED' | 'YELLOW'): GameEventRecord =>
+      ({ ...goal(sequence), type: 'CARD', participantId, payload: { card: color } }) as GameEventRecord;
+    const undoneRed = card(2, 'p-2', 'RED');
+    mocks.useV1GameOperationsConsole.mockReturnValue(
+      consoleState({
+        liveEvents: [
+          card(1, 'p-1', 'RED'),
+          undoneRed,
+          { ...goal(3), type: 'CORRECTION', participantId: 'p-2', reversesEventId: undoneRed.id, payload: {} } as GameEventRecord,
+          card(4, 'p-3', 'YELLOW'),
+        ],
+      }),
+    );
+    render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+
+    fireEvent.click(screen.getByRole('button', { name: /^골/ }));
+
+    expect(within(screen.getByRole('dialog')).getByTestId('sent-off-ids')).toHaveTextContent(/^p-1$/);
+  });
+
+  it('서버 확정 전(대기 중)인 레드카드 선수도 선수 목록에 퇴장으로 넘긴다', () => {
+    gameWithPeriods('LIVE', [
+      { number: 1, state: 'LIVE', startedAt: '2026-08-07T00:00:00.000Z', endedAt: null },
+      { number: 2, state: 'SCHEDULED', startedAt: null, endedAt: null },
+    ]);
+    const queuedRed = (clientEventId: string, participantId: string, status: 'queued' | 'failed') => ({
+      clientEventId,
+      gameId: 'game-1',
+      expectedVersion: 1,
+      event: { type: 'CARD', participantId, period: 1, clockMs: 0, occurredAt: '', payload: { card: 'RED' } },
+      payloadHash: 'h',
+      status,
+      queuedAt: '',
+      attempts: 0,
+      lastError: null,
+      ackedSequence: null,
+      ackedVersion: null,
+    });
+    mocks.useV1GameOperationsConsole.mockReturnValue(
+      consoleState({ queue: { items: [queuedRed('c-1', 'p-1', 'queued'), queuedRed('c-2', 'p-2', 'failed')] } }),
+    );
+    render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+
+    fireEvent.click(screen.getByRole('button', { name: /^골/ }));
+
+    expect(within(screen.getByRole('dialog')).getByTestId('sent-off-ids')).toHaveTextContent(/^p-1$/);
+  });
+
   it('골 확인 모달에서 취소하면 아무것도 기록되지 않는다', async () => {
     gameWithPeriods('LIVE', [
       { number: 1, state: 'LIVE', startedAt: '2026-08-07T00:00:00.000Z', endedAt: null },
@@ -478,6 +534,149 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
 
     expect(screen.queryByRole('dialog')).toBeNull();
     expect(mocks.useV1GameOperationsConsole().submitEvent).not.toHaveBeenCalled();
+  });
+
+  describe('두 번째 옐로 — 레드 기록 확인 시트 (MD-QA #81)', () => {
+    function yellow(sequence: number, participantId: string | null, overrides: Partial<GameEventRecord> = {}): GameEventRecord {
+      return { ...goal(sequence), type: 'CARD', participantId, payload: { card: 'YELLOW' }, ...overrides } as GameEventRecord;
+    }
+
+    async function recordYellow(liveEvents: GameEventRecord[]) {
+      gameWithPeriods('LIVE', [
+        { number: 1, state: 'LIVE', startedAt: '2026-08-07T00:00:00.000Z', endedAt: null },
+        { number: 2, state: 'SCHEDULED', startedAt: null, endedAt: null },
+      ]);
+      // 방금 적재한 옐로(q-1)는 이미 서버에 확정된 상태 — 레드는 옐로가 확정된 뒤에만 적재된다.
+      const state = consoleState({ liveEvents, queue: { items: [queuedYellow('acked')] } });
+      state.submitEvent.mockResolvedValue('q-1');
+      mocks.useV1GameOperationsConsole.mockReturnValue(state);
+      render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+      fireEvent.click(screen.getByRole('button', { name: /^옐로카드/ }));
+      fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'select-player' }));
+      fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: '옐로카드 기록' }));
+      return state.submitEvent;
+    }
+
+    function queuedYellow(status: 'queued' | 'sending' | 'acked' | 'failed') {
+      return {
+        clientEventId: 'q-1', gameId: 'game-1', expectedVersion: 2, status,
+        event: { type: 'CARD', sideId: SIDE_ID, participantId: 'p-1', period: 1, clockMs: 1, occurredAt: '', payload: { card: 'YELLOW' } },
+        payloadHash: 'h', queuedAt: '', attempts: 0, lastError: null, ackedSequence: null, ackedVersion: null,
+      };
+    }
+
+    it('같은 선수의 두 번째 옐로를 기록하면 레드도 기록할지 묻고, 확인하면 레드를 한 번 더 기록한다', async () => {
+      const submitEvent = await recordYellow([yellow(1, 'p-1')]);
+
+      const sheet = await screen.findByRole('dialog');
+      expect(sheet).toHaveTextContent('정우진이 이 경기에서 옐로 2장이에요');
+      expect(sheet).toHaveTextContent('경고 누적 퇴장으로 레드카드도 기록할까요?');
+      // 옐로 자체는 시트가 뜨기 전에 이미 기록 요청이 나갔다.
+      expect(submitEvent).toHaveBeenCalledTimes(1);
+      expect(submitEvent).toHaveBeenLastCalledWith(expect.objectContaining({ type: 'CARD', participantId: 'p-1', payload: { card: 'YELLOW' } }));
+
+      fireEvent.click(within(sheet).getByRole('button', { name: '레드도 기록' }));
+
+      await waitFor(() => expect(submitEvent).toHaveBeenCalledTimes(2));
+      expect(submitEvent).toHaveBeenLastCalledWith(
+        expect.objectContaining({ type: 'CARD', participantId: 'p-1', sideId: 'side-home', payload: { card: 'RED' } }),
+      );
+    });
+
+    it('앞선 옐로가 아직 전송 중이면 확정될 때까지 기다렸다가 레드를 기록한다(같은 버전으로 둘을 적재하면 서버가 거절한다)', async () => {
+      const pendingYellowItem = {
+        clientEventId: 'q-1', gameId: 'game-1', expectedVersion: 2, status: 'sending',
+        event: { type: 'CARD', sideId: SIDE_ID, participantId: 'p-1', period: 1, clockMs: 1, occurredAt: '', payload: { card: 'YELLOW' } },
+        payloadHash: 'h', queuedAt: '', attempts: 0, lastError: null, ackedSequence: null, ackedVersion: null,
+      };
+      gameWithPeriods('LIVE', [
+        { number: 1, state: 'LIVE', startedAt: '2026-08-07T00:00:00.000Z', endedAt: null },
+        { number: 2, state: 'SCHEDULED', startedAt: null, endedAt: null },
+      ]);
+      const state = consoleState({ liveEvents: [yellow(1, 'p-1')] });
+      state.submitEvent.mockResolvedValue('q-1');
+      mocks.useV1GameOperationsConsole.mockReturnValue(state);
+      const { rerender } = render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+      fireEvent.click(screen.getByRole('button', { name: /^옐로카드/ }));
+      fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'select-player' }));
+      fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: '옐로카드 기록' }));
+      const redButton = await screen.findByRole('button', { name: '레드도 기록' });
+      // 시트가 떠 있는 동안 방금 기록한 옐로가 큐에서 전송 중이다.
+      const sending = consoleState({ liveEvents: [yellow(1, 'p-1')], queue: { items: [pendingYellowItem] }, submitEvent: state.submitEvent });
+      mocks.useV1GameOperationsConsole.mockReturnValue(sending);
+      rerender(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+      fireEvent.click(redButton);
+
+      await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 20));
+      });
+      expect(state.submitEvent).toHaveBeenCalledTimes(1);
+
+      const acked = consoleState({
+        liveEvents: [yellow(1, 'p-1'), yellow(2, 'p-1')],
+        queue: { items: [{ ...pendingYellowItem, status: 'acked' }] },
+        gameSnapshot: { version: 3, state: 'LIVE' },
+        submitEvent: state.submitEvent,
+      });
+      mocks.useV1GameOperationsConsole.mockReturnValue(acked);
+      rerender(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+
+      await waitFor(() => expect(state.submitEvent).toHaveBeenCalledTimes(2));
+      expect(state.submitEvent).toHaveBeenLastCalledWith(expect.objectContaining({ payload: { card: 'RED' } }));
+    });
+
+    it('옐로 기록이 실패하면 레드를 적재하지 않고 다시 보내라고 안내한다 — 레드만 남거나 순서가 뒤집히지 않게', async () => {
+      gameWithPeriods('LIVE', [
+        { number: 1, state: 'LIVE', startedAt: '2026-08-07T00:00:00.000Z', endedAt: null },
+        { number: 2, state: 'SCHEDULED', startedAt: null, endedAt: null },
+      ]);
+      const state = consoleState({ liveEvents: [yellow(1, 'p-1')] });
+      state.submitEvent.mockResolvedValue('q-1');
+      mocks.useV1GameOperationsConsole.mockReturnValue(state);
+      const { rerender } = render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+      fireEvent.click(screen.getByRole('button', { name: /^옐로카드/ }));
+      fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'select-player' }));
+      fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: '옐로카드 기록' }));
+      const redButton = await screen.findByRole('button', { name: '레드도 기록' });
+      mocks.useV1GameOperationsConsole.mockReturnValue(
+        consoleState({ liveEvents: [yellow(1, 'p-1')], queue: { items: [queuedYellow('sending')] }, submitEvent: state.submitEvent }),
+      );
+      rerender(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+      fireEvent.click(redButton);
+      await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+
+      mocks.useV1GameOperationsConsole.mockReturnValue(
+        consoleState({ liveEvents: [yellow(1, 'p-1')], queue: { items: [queuedYellow('failed')] }, submitEvent: state.submitEvent }),
+      );
+      rerender(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+
+      expect(await screen.findByText('옐로 기록이 실패했어요. 옐로를 다시 보낸 뒤 레드를 기록해 주세요.')).toBeInTheDocument();
+      expect(state.submitEvent).toHaveBeenCalledTimes(1);
+      expect(state.submitEvent).not.toHaveBeenCalledWith(expect.objectContaining({ payload: { card: 'RED' } }));
+    });
+
+    it('"옐로만 둘게요"를 고르면 레드를 기록하지 않는다', async () => {
+      const submitEvent = await recordYellow([yellow(1, 'p-1')]);
+
+      fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: '옐로만 둘게요' }));
+
+      await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+      expect(submitEvent).toHaveBeenCalledTimes(1);
+    });
+
+    it('첫 옐로·다른 선수의 옐로·이미 레드가 있는 선수에게는 시트를 띄우지 않는다', async () => {
+      for (const liveEvents of [
+        [],
+        [yellow(1, 'p-2')],
+        [yellow(1, 'p-1'), yellow(2, 'p-1', { payload: { card: 'RED' } })],
+      ]) {
+        const submitEvent = await recordYellow(liveEvents);
+        await waitFor(() => expect(submitEvent).toHaveBeenCalledTimes(1));
+        await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+        cleanup();
+      }
+    });
   });
 
   // 종료 흐름 개편(사용자 결정 2) — 예전엔 마지막 피리어드가 LIVE인 동안
@@ -2083,11 +2282,11 @@ describe('OperateConsole — 승부차기 (과제 2)', () => {
    * **그 값을 어디서 얻는가**는 거기서 검증되지 않는다 — 콘솔이 서버 값을 무시하고
    * `true`로 굳혀도 술어 테스트는 전부 초록이다.
    *
-   * 그래서 두 정책의 답이 갈리는 국면을 UI로 직접 만든다: 홈(선축) 3킥 3점 / 원정 2킥
-   * 0점. 원정의 마지막 킥으로도 따라잡을 수 없어 A2는 종료를 허용하지만, 조기 종료를
-   * 끈 A1은 원정의 세 번째 킥까지 기다린다.
+   * 그래서 두 정책의 답이 갈리는 국면을 UI로 직접 만든다: 홈(선축)·원정 각 2킥, 2점 대
+   * 0점. 남은 1킥씩으로도 따라잡을 수 없어 A2는 종료를 허용하지만, 조기 종료를 끈 A1은
+   * 세 번째 킥까지 기다린다.
    */
-  async function openPanelAndKickThreeToTwo(policy?: { earlyStop: boolean }): Promise<HTMLElement> {
+  async function openPanelAndKickTwoRounds(policy?: { earlyStop: boolean }): Promise<HTMLElement> {
     setup(policy === undefined ? {} : { penaltyShootoutPolicy: policy });
     render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
 
@@ -2099,28 +2298,29 @@ describe('OperateConsole — 승부차기 (과제 2)', () => {
     chooseFirstKicker(panel, '강남 풋살 클럽');
     const successButton = within(panel).getByRole('button', { name: /성공/ });
     const missButton = within(panel).getByRole('button', { name: /실패/ });
-    // 홈 성공 / 원정 실패를 두 번 반복한 뒤 홈이 한 번 더 성공 → 홈 3킥 3점 / 원정 2킥 0점.
+    // 홈 성공 / 원정 실패를 두 번 반복 → 각 2킥, 홈 2점 / 원정 0점.
     for (let round = 0; round < 2; round += 1) {
       fireEvent.click(successButton);
       fireEvent.click(missButton);
     }
-    fireEvent.click(successButton);
     return panel;
   }
 
-  it('earlyStop 정책이면(기본) 홈 3킥 3점 / 원정 2킥 0점에서 승부차기를 종료할 수 있다', async () => {
-    const panel = await openPanelAndKickThreeToTwo({ earlyStop: true });
+  it('earlyStop 정책이면(기본) 각 2킥 2점 대 0점에서 승부차기를 종료할 수 있다', async () => {
+    const panel = await openPanelAndKickTwoRounds({ earlyStop: true });
     expect(within(panel).getByRole('button', { name: '승부차기 종료' })).not.toBeDisabled();
   });
 
   it('서버가 earlyStop=false를 내려주면 같은 국면에서 종료가 잠긴다 — 정책이 UI까지 배선돼 있다', async () => {
-    const panel = await openPanelAndKickThreeToTwo({ earlyStop: false });
+    const panel = await openPanelAndKickTwoRounds({ earlyStop: false });
     expect(within(panel).getByRole('button', { name: '승부차기 종료' })).toBeDisabled();
-    expect(panel).toHaveTextContent('성수 풋살 클럽의 응답 킥이 남아 있어요.');
+    expect(panel).toHaveTextContent('아직 남은 킥으로 뒤집힐 수 있어요.');
+    // 미결이므로 킥 입력은 계속 열려 있다.
+    expect(within(panel).getByRole('button', { name: /성공/ })).toBeEnabled();
   });
 
   it('서버가 정책을 안 내려주면(레거시 응답) FIFA 정규로 폴백한다', async () => {
-    const panel = await openPanelAndKickThreeToTwo(undefined);
+    const panel = await openPanelAndKickTwoRounds(undefined);
     expect(within(panel).getByRole('button', { name: '승부차기 종료' })).not.toBeDisabled();
   });
 
@@ -2131,10 +2331,10 @@ describe('OperateConsole — 승부차기 (과제 2)', () => {
    * `home !== away` 하나만 봤으므로 홈이 1킥 넣은 1:0조차 결판이었다.
    *
    * 이 테스트가 지키는 계약 자체(최종 점수를 **배열 순서가 아니라 `sideKey` 기준으로**
-   * 매핑해 `end` payload 에 싣는다)는 그대로다. 3:0은 원정이 남은 2킥을 다 넣어도 2점이라
-   * 수학적으로 끝난 국면이다.
+   * 매핑해 `end` payload 에 싣는다)는 그대로다. 각 2킥 뒤 2:0 은 원정이 남은 1킥을
+   * 넣어도 1점이라 수학적으로 끝난 국면이다.
    */
-  it('승부차기 시작 확인 → 킥 입력(3:0) → 종료 확인을 거치면, end 커맨드가 sideKey 기준 최종 점수로 호출된다', async () => {
+  it('승부차기 시작 확인 → 킥 입력(2:0) → 종료 확인을 거치면, end 커맨드가 sideKey 기준 최종 점수로 호출된다', async () => {
     setup();
     mocks.postV1GameCommand.mockResolvedValue({
       gameId: 'game-1', state: 'ENDED', version: 3, revisionId: 'rev-1', revision: 1, revisionState: 'SUBMITTED',
@@ -2152,20 +2352,21 @@ describe('OperateConsole — 승부차기 (과제 2)', () => {
     const successButton = within(panel).getByRole('button', { name: /성공/ });
     const missButton = within(panel).getByRole('button', { name: /실패/ });
 
-    // 순서는 항상 번갈아 찬다(선축인 홈 먼저). 홈의 세 번째 성공 시점에는 원정이
-    // 한 번 덜 찼어도 마지막 킥으로 따라잡을 수 없으므로 규칙상 결판이다.
+    // 순서는 항상 번갈아 찬다(선축인 홈 먼저). 각 2킥 뒤 2:0 은 남은 1킥씩으로 따라잡을 수
+    // 없어 규칙상 결판이고, 그 순간부터 킥 입력이 잠긴다.
     fireEvent.click(successButton); // 홈 1:0
     fireEvent.click(missButton); // 원정 1:0
     fireEvent.click(successButton); // 홈 2:0
     fireEvent.click(missButton); // 원정 2:0
-    fireEvent.click(successButton); // 홈 3:0
+    expect(successButton).toBeDisabled();
+    expect(missButton).toBeDisabled();
 
     const finishButton = within(panel).getByRole('button', { name: '승부차기 종료' });
     expect(finishButton).not.toBeDisabled();
     fireEvent.click(finishButton);
 
     const finishDialog = await screen.findByRole('dialog', { name: '승부차기를 종료할까요?' });
-    expect(finishDialog).toHaveTextContent('강남 풋살 클럽 3 : 0 성수 풋살 클럽');
+    expect(finishDialog).toHaveTextContent('강남 풋살 클럽 2 : 0 성수 풋살 클럽');
     fireEvent.click(within(finishDialog).getByRole('button', { name: '승부차기 종료' }));
 
     await waitFor(() =>
@@ -2177,7 +2378,7 @@ describe('OperateConsole — 승부차기 (과제 2)', () => {
           // 끝난 종료이므로 `operatorOverride`는 **실리지 않는다** — 키 부재가 곧
           // "우회 아님"이라, 여기에 키가 생기면 감사 기록이 우회를 구분하지 못한다.
           payload: {
-            penalties: { home: 3, away: 0, firstKickSideKey: 'HOME', takenHome: 3, takenAway: 2 },
+            penalties: { home: 2, away: 0, firstKickSideKey: 'HOME', takenHome: 2, takenAway: 2 },
           },
         }),
         COMMAND_OPTIONS,

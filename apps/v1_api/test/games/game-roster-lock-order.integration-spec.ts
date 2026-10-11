@@ -197,7 +197,7 @@ describe('경기 명단 쓰기 잠금 순서 (Task 179)', () => {
         regionId,
         competitionConfigId: config!.id,
         title: '잠금 순서 리그 대진',
-        placeName: '테스트 구장',
+        place: { name: '테스트 구장', address: null, latitude: null, longitude: null, provider: null, providerPlaceId: null },
         startAt: new Date(Date.now() + 7 * DAY),
         endAt: null,
         home: teams.get(teamA.id)!,

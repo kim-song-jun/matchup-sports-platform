@@ -56,7 +56,7 @@ Public review lookup requires `isPublic = true` and `deletedAt = null`; private,
 deleted, unknown and unsupported competitions return `404 TOURNAMENT_NOT_FOUND`
 before review rows are queried. A valid competition with no visible reviews returns
 `{ items: [], total: 0, page, pageSize }`. Defaults are `page = 1`, `pageSize = 10`,
-with page size limited to 50. Reviews are newest first. Search is case-insensitive
+with page size limited to 50 and `page` limited to 1–10,000 (`MAX_PAGE_NUMBER`; larger is 400). Reviews are newest first. Search is case-insensitive
 over team name, comment and author nickname; hidden reviews are excluded from both
 items and total. Public items contain only `id`, `authorId`, `authorNickname`,
 `authorProfileImageUrl`, `teamName`, `rating`, `comment`, `photoUrls` and `createdAt`.
@@ -217,6 +217,10 @@ Campaign admin routes inherit `V1AuthGuard`. Production accepts only the signed 
 - Reverting completion changes only `status`. Awards, standings and reviews are derived from `status === 'completed'`, so they are hidden again until the tournament is completed again. Review-request notifications are sent on the first completion only (a prior `completed` status log suppresses re-sending).
 - A restored draft is not publicly listed or readable (draft/cancelled return 404 to consumers) until it is opened again, which re-runs the paid-tournament payment-instruction check.
 
+## Admin registration counts (MD-QA #88)
+
+`GET /admin/tournaments` rows' `registrationCount` and `GET /admin/tournaments/:id` `operationCounts.registrations` count registrations whose status is **not** `draft` or `cancelled` (unsubmitted drafts and cancelled/rejected applications). They are not the total number of registration rows; use `GET /admin/tournaments/:id/registrations` for the full set. The `ACTIVE_REGISTRATION_COUNT` filter in `tournaments-admin.service.ts` is the single source for both.
+
 ## Admin Tournament Creation
 
 Admin-created tournaments require `teamCount` per tournament. The API does not treat an omitted team count as unlimited; missing `teamCount` is rejected with `400 TOURNAMENT_TEAM_COUNT_REQUIRED`. Public capacity, registration blocking, and progress bars must use the saved tournament `teamCount`, not a hard-coded default.
@@ -264,9 +268,21 @@ The deterministic fixture command is derived from tournament, round, fixture num
 an occupied coordinate with the same payload returns its current canonical fixture, while a changed payload at that coordinate returns
 `409 COMMAND_IDEMPOTENCY_PAYLOAD_REUSE`.
 
+### 경기 추가 요청 고유 키 (`clientCommandId`)
+
+번호를 서버가 정하는 요청은 응답이 끊겨 다시 보내면 새 번호로 빈 경기가 하나 더 생긴다(좌표 멱등이 번호에 묶여 있다).
+`clientCommandId`(UUID, 선택)를 보내면 이를 막는다. 웹은 제출마다 하나를 만들어 재시도에도 유지한다.
+
+- 같은 대회·같은 관리자·같은 키로 다시 오면 번호를 정하기 전에 **처음 돌려준 응답 본문을 그대로** 재생한다(전역 계약: 같은 키·같은 내용이면 원래 응답). 그 사이 경기 번호·일정이 바뀌어도 본문은 처음과 같다. 새 경기·감사·알림은 없다.
+- 재생은 조·홈/어웨이 등록 같은 바뀔 수 있는 상태의 검증보다 먼저 한다(잠금 없는 사전 조회). 처음 만든 뒤 등록이 취소돼도 같은 키 재전송은 검증 오류가 아니라 첫 경기를 돌려준다. 동시에 들어온 첫 요청은 트랜잭션 안의 같은 조회(대회 락 뒤)가 직렬화한다.
+- 같은 키에 요청 내용(조·라운드·레그·상위 경기·홈/어웨이·일정·장소 이름·주소·좌표·출처·핀 id, 보낸 번호)이 다르면 `409 COMMAND_IDEMPOTENCY_PAYLOAD_REUSE`. 내용 해시에는 요청이 보낸 값만 들어가며, 요청이 장소를 생략했을 때의 대회 기본 장소는 들어가지 않는다(그 사이 대회 장소가 바뀌어도 같은 요청은 재생된다).
+- 원래 응답 재생의 의도된 예외: 처음 만든 경기가 그 사이 삭제됐으면 옛 본문 대신 `409 COMMAND_IDEMPOTENCY_RESOURCE_GONE`("이 요청으로 만든 경기가 이미 지워졌어요. 다시 추가해 주세요.").
+- 키는 경기 생성과 같은 트랜잭션에서 `v1IdempotencyRecord`(action `tournament_fixture_client_create`)에 전역 계약과 같은 30일 동안 기록된다. 번호를 함께 보내 기존 경기가 좌표로 재생된 경우에도 키를 그 경기에 묶어 기록한다(그때 돌려준 본문을 저장). 같은 (경기, 키) 기록이 이미 있으면(만료 포함) 새 기록으로 갱신한다. 30일이 지난 기록은 없는 것으로 보고, 같은 키라도 새 경기를 만든다. 키가 없으면 동작은 이전과 같다.
+- UUID 가 아니면 `400`.
+
 | Method | Path | DTO | Result |
 |---|---|---|---|
-| `POST` | `/api/v1/admin/tournaments/:tournamentId/fixtures` | `CreateFixtureDto` | active admin fixture/Game source creation or the explicit pin/idempotency conflict above. |
+| `POST` | `/api/v1/admin/tournaments/:tournamentId/fixtures` | `CreateFixtureDto` | active admin fixture/Game source creation or the explicit pin/idempotency conflict above. `fixtureNumber` is optional: when omitted the server assigns the tournament-wide max (archived fixtures included) + 1 inside the creation transaction, under the same `league-fixture-generation` lock, and the durable command id uses the assigned number. A sent number keeps the existing idempotency behaviour. Optional `clientCommandId` (UUID, one per submission; see [요청 고유 키](#경기-추가-요청-고유-키-clientcommandid)). |
 | `PATCH` | `/api/v1/admin/fixtures/:fixtureId` | `UpdateFixtureDto` | fixture metadata including optional positive integer `fixtureNumber`; duplicate round/leg number returns `409 FIXTURE_NUMBER_CONFLICT`. See [대진 번호 수정](#대진-번호-수정-2026-10-05). |
 
 The legacy generic result paths remain registered only to reject unsafe writes:
@@ -325,6 +341,8 @@ The list (`GET /api/v1/tournaments`) and detail (`GET /api/v1/tournaments/:tourn
 | `POST` | `/api/v1/tournaments/:tournamentId/registrations/:registrationId/cancel-request/withdraw` | user, team manager+ | empty body | `cancel_requested` returns to its saved previous status |
 
 `cancel-request` stores the status that existed before `cancel_requested`. It is rejected with `409 TOURNAMENT_ENDED` (registration unchanged) when the tournament or league is `completed` or `cancelled` — terminal states have nothing left to cancel; this applies to `draft` registrations too. Other non-cancellable registration statuses keep returning `409 REGISTRATION_NOT_CANCELLABLE`. `cancel-request/withdraw` is allowed only while the registration status is `cancel_requested`; it clears `cancelRequestedAt`, `cancelReason`, and the stored previous status after restoring the registration.
+
+Registration responses carry `cancelReason` (the team's reason from `cancel-request`), `adminCancelReason` (the reason an admin gave when processing the cancellation) and `cancelOutcome` (`approved` when an admin accepted a `cancel_requested` registration, `rejected` when an admin turned down a registration that had no cancel request, `null` for a draft the team cancelled itself and for rows older than the column). `PATCH /admin/registrations/:registrationId/cancel` writes the admin reason and outcome without touching `cancelReason`; the regular-league `400 LEAGUE_CANCEL_REASON_REQUIRED` applies only to a rejection, not to approving a team's own cancel request.
 
 `cancel-request/withdraw` re-reads the tournament under a row lock before restoring the registration, so it can reject after the outer checks passed. **Three** conflicts are possible there:
 
@@ -458,6 +476,7 @@ All team roster mutations lock the registration row and re-read `rosterLockedAt`
 - 번호는 JSON 숫자 정수 1..2147483647이다. 생략하면 유지하며 null/문자열/boolean/0/소수/범위 초과는 400이다.
 - 같은 대회·round·legNumber의 다른 경기와 번호가 겹치면 `409 FIXTURE_NUMBER_CONFLICT`다. 조가 달라도 같은 round/leg에서는 번호를 공유하지 않는다. 변경은 기존 생성 잠금 및 DB 유일성으로 보호하며 실패 시 전체 트랜잭션을 되돌린다.
 - 응답의 fixtureNumber, TeamMatch 제목, 연결된 팀 일정 제목에 새 번호가 반영된다. 번호가 출전정지 경기 순서에 영향을 주므로 관련 팀의 시작 전 명단 재계산 이벤트를 남긴다. 일정 상태는 번호 변경만으로 되살리지 않는다.
+- **경기 순서 = 단계 순서 (MD-QA #76)**: 출전정지가 "그 팀의 다음 경기"를 셀 때 대회 경기는 단계(조별리그 → 16강/12강 → 8강 → 4강 → 3·4위전·결승)를 먼저 보고, 같은 단계 안에서만 시각 → 라운드 → 대진 번호 → 레그 순으로 센다. 예정 시각이 단계와 어긋나도 결승이 조별 경기보다 먼저 "다음 경기"가 되지 않는다. `PATCH /admin/fixtures/:fixtureId` 가 `scheduledAt` 을 **바꾸면** 같은 대회의 다른 경기와 단계 순서가 뒤집히는지 검사해(앞 단계 경기보다 이르거나 뒤 단계 경기보다 늦으면) `409 FIXTURE_SCHEDULE_STAGE_ORDER` 로 거절한다. 시각을 비우거나 저장된 값을 그대로 보내는 요청, 단계를 알 수 없는 운영자 입력 라운드, 같은 단계끼리는 검사하지 않는다. `POST` 경기 추가도 새 경기의 단계와 시각으로 같은 검사를 한다(멱등 재생은 제외). 대진 템플릿·리그 대진 생성기가 일괄로 넣는 시각은 검사 대상이 아니다 — 운영자가 단계별 시각을 고르는 경로가 아니라 한 번에 짜인 일정을 그대로 만드는 경로이고, 이후 수정은 위 PATCH 검사를 받는다.
 - 경기 UUID, 팀 배정, 진출 edge, parent ID 및 Game 결과/리비전은 유지한다. 결과 확정 경기에서도 번호만 수정할 수 있으며 팀 변경의 기존 결과 잠금은 유지한다. 감사 `tournament.bracket.fixture.update`에 변경 전·후 번호를 기록한다.
 - 번호 이동 후 비워진 옛 좌표에서 새 경기 생성은 다음 creation generation을 사용한다. 이전 멱등 기록 및 경기 UUID를 덮어쓰거나 옛 경기를 replay하지 않는다. 기존 좌표의 동일 요청 재시도 계약은 유지한다.
 - 관리자 경기 수정 모달에서 현재 번호를 채우고 실제 API로 저장한다. 오류 시 입력/모달 유지, 성공 후 관리자 및 공개 상세 캐시를 갱신한다. 기존 프론트 MSW에는 이 PATCH 핸들러가 없으며 번호가 없는 기존 수정 payload는 계속 유효하다.
@@ -465,7 +484,10 @@ All team roster mutations lock the registration row and re-read `rosterLockedAt`
 ### 조별리그 경기와 조 편성 정합 (2026-10-08)
 
 - 조 순위는 조 편성(`groups[].groupTeams`)을 기준으로 계산·표시한다. 순위 행(`V1TournamentStanding`)은 결과 확정 뒤 재계산 때 만들어진다. 순위 행이 하나도 없는 조는 공개 일정·기록 API(`public-tournament-records.service.ts`)가 편성 팀으로 0값 `baselineStandings`를 서버에서 내리고, 웹 대진 페이지도 `groupTeams`로 같은 0값 기준선을 만든다. 순위 행이 있는 조는 행만 내려서, 새로 편성된 팀은 재계산 전까지 표에서 빠진다.
+- 조별+결선(`format = group_knockout`, `kind ≠ regular_league`) 대회의 공개 상세는 대진표가 공개된 뒤 조별 공개 순위표 요약을 싣는다. `groups[].standings[].sharedRank: number | null` 은 정본 §5 동점 처리를 다 쓰고도 갈리지 않은 팀에만 값이 있다(그 동률 묶음 팀들의 저장 `position` 중 최솟값 — 묶음 전원이 같은 값, "공동 n위"). `groups[].qualification: { advancingRegistrationIds: string[]; undecided: boolean } | null` 은 진출 팀이다: 결선 경기(조별 단계가 아닌 비취소·비보관·비삭제 경기)에 이미 배정된 이 조 팀은 대진이 정답이라 그대로 싣고(진출 수보다 많아도), 남은 자리는 순위로 확정된 팀(동률 없는 자리의 팀, 진출선 안쪽 동률 묶음 전원)으로 순위 순서대로 진출 수까지 채운다 — 일부만 배정됐거나 결선 자리가 진출 수보다 적어도 확정 팀이 빠지지 않는다. 진출선에 걸친 동률 팀은 운영자가 고를 때까지 넣지 않고, 그래서 진출 수를 다 못 채우면 `undecided = true`. 어드민이 자리에 순위와 다른 팀을 넣었으면 그 팀이 먼저 들어가 확정 팀 하나가 밀려날 수 있다(자리를 다 채우면 대진과 같아진다). `advanceCount` 가 조 팀 수 이상이면 조 전체가 진출이고 `undecided = false`. 조 경기가 덜 끝났거나 순위표가 낡았거나(확정 경기 수가 어긋나거나, 결과 정정으로 공식 리비전 시각이 조 순위 행의 재계산 시각보다 뒤인 경우 — 재계산 시각이 없는 옛 행이 있으면 경기 수만 본다) `advanceCount` 가 null 이면 `qualification = null`, `sharedRank` 는 null. 어드민 미리보기와 같은 판정(`group-rank-preview.ts`)에서 나오며, 팀 식별 정보가 아니라 구조 정보라 모집 중 마스킹 대상이 아니다.
 - `POST /admin/tournaments/:id/fixtures`(그리고 팀을 바꾸는 `PATCH /admin/fixtures/:id`)는 `phase = group` 조 안의 경기에 들어가는 팀이 그 조에 편성돼 있지 않으면 같은 트랜잭션에서 편성한다. `sortOrder`는 조의 현재 최댓값 + 1이고 이미 편성된 팀은 건드리지 않는다. 결선 단계(`round12`~`third_place`) 조와 조 없는 경기는 편성을 바꾸지 않는다. 감사 `tournament.bracket.group_team.create`(`afterJson.auto = "fixture"`). 자동 편성으로 새 편성이 생겼고 그 조에 순위 행이 이미 있으면 같은 트랜잭션에서 `recalculateStandings`와 같은 계산(조별 + 통합)을 돌리고 감사 `tournament.bracket.standings.recalculate_auto`를 남긴다. 순위 행이 없는 조는 재계산하지 않는다.
+- **한 팀 한 조 (2026-10-10, 결정 4)**: 위 자동 편성은 그 팀이 **같은 대회의 다른 `phase = group` 조에 이미 편성돼 있지 않을 때만** 일어난다. 이 조에 없는 신청이 다른 조별 조에 있으면 `POST /admin/tournaments/:id/fixtures`·`PATCH /admin/fixtures/:id`·`POST /admin/tournaments/:id/group-teams` 는 `409 TEAM_IN_OTHER_GROUP`("다른 조에 있는 팀은 이 조에 넣을 수 없어요. 그 조에서 먼저 빼 주세요.")로 거절하고 아무것도 쓰지 않는다(상대 팀 자동 편성 포함). 응답 `details` 에 겹친 `registrationId` 와 들어가려던 `groupId` 가 담긴다. 자리 배정(`PUT /admin/tournament-slots/:slotId/assignment`·배치 변경·무작위 채우기)도 같은 코드로 거절하되, 맞바꾸기 도중의 일시적 겹침을 허용하려고 **트랜잭션 끝에서 이전 팀의 편성을 푼 뒤 이번 요청이 새로 만든 편성만** 검사한다(거절되면 자리 변경 전체가 롤백). 이미 이 조에도 편성된 팀은 다른 조와 겹쳐 있어도 허용하고(이미 겹친 데이터는 그대로), 결선 단계 조·조 없는 경기는 이 검사를 하지 않는다. 다른 조로 옮기려면 먼저 `DELETE /admin/group-teams/:id` 로 옛 조 편성을 뺀다(그 조에 경기가 남아 있으면 `GROUP_TEAM_HAS_FIXTURES`).
+- **결승 · 3·4위전 같은 팀 금지 (MD-QA #77)**: 같은 대회의 `phase = third_place` 조에 속한 경기·편성(조 없는 경기는 `round` 가 `3·4위전`/`third_place`·`결승`/`final` 인 것)에 `phase = final` 조의 경기 사이드나 편성에 이미 있는 팀을 넣으면 `409 FINALIST_IN_THIRD_PLACE`, 반대로 결승 조에 3·4위전의 팀을 넣으면 `409 THIRD_PLACE_TEAM_IN_FINAL` 로 거절한다(`POST /admin/tournaments/:id/fixtures`·`PATCH /admin/fixtures/:id`·`POST /admin/tournaments/:id/group-teams`). 응답 `details.registrationId` 에 겹친 신청이 담긴다. 이 경기가 이미 갖고 있는 팀을 그대로 다시 보내는 요청과 삭제된 경기는 검사하지 않는다. 4강 패자가 3·4위전으로 올라가는 자동 진출은 이 검사를 거치지 않는다. 자리(slot)는 1회전 경기에만 연결되므로 자리 배정은 결승·3·4위전 사이드에 닿지 않고, 두 단계 사이를 오가는 팀 교체는 한 경기씩 비운 뒤 넣는 두 단계로 한다.
 - `DELETE /admin/group-teams/:id`는 `phase = group` 조에서 삭제되지 않은 경기가 남아 있는 팀이면 `409 GROUP_TEAM_HAS_FIXTURES`로 거부한다. 경기가 없는 팀, 결선 단계 조와 미정 부전승 자리는 기존대로 해제된다.
 - 공개 상세 `leagueFixtures[]`는 여전히 `kind = regular_league`에서만 채워진다. 리그 방식 일반 대회(`format = league`)의 일정은 `fixtures[]`로 그린다.
 
@@ -490,7 +512,7 @@ All team roster mutations lock the registration row and re-read `rosterLockedAt`
   - 오류: 422 `BRACKET_TEMPLATE_UNSUPPORTED`(범위 밖·필수 필드 누락·`group_knockout` 은 아직 미지원)·`BRACKET_TEMPLATE_FORMAT_MISMATCH`·`BRACKET_TEMPLATE_TOO_LARGE`(경기 240 초과), 409 `COMPETITION_CONFIG_REQUIRED`·`BRACKET_NOT_EMPTY`(비삭제 경기·조·자리가 있음)·`BRACKET_LOCKED`(`replaceExisting` 인데 시작·결과가 있는 경기가 있음).
   - `replaceExisting`: 모든 경기가 시작 전·결과 없음일 때만. 하류 경기부터 소프트 삭제 → 자리 → GroupTeam·Standing·ByeSlot → 조 순으로 지우고 새로 만든다(경기 번호는 1부터 다시, 생성 키는 소프트 삭제 이력 수를 반영).
 - `PUT /admin/tournament-slots/:slotId/assignment` — 본문 `{ registrationId: uuid | null }`(null = 비우기). 응답 `{ slot: { id, kind, groupId, sourceGroupId, position, label, registrationId, teamName }, affectedTeamMatchIds }`.
-  - 그 자리를 쓰는 경기(`deletedAt IS NULL AND status <> 'cancelled'`) 전부에 사이드를 반영한다. `phase = group` 조에서는 조 편성(`V1TournamentGroupTeam`)을 만들고, 교체·비우기 때 그 조의 다른 경기에 더 이상 없는 이전 팀의 편성·순위 행을 지운 뒤 순위를 다시 계산한다. BYE 자리는 `ByeSlot` ↔ `GroupTeam(isBye)` 를 전환한다(`createBye` 와 같은 의미).
+  - 그 자리를 쓰는 경기(`deletedAt IS NULL AND status <> 'cancelled'`) 전부에 사이드를 반영한다. `phase = group` 조에서는 조 편성(`V1TournamentGroupTeam`)을 만들고, 교체·비우기 때 그 조의 다른 경기에 더 이상 없는 이전 팀의 편성·순위 행을 지운 뒤 순위를 다시 계산한다. 새로 만든 편성이 같은 대회의 다른 `phase = group` 조 편성과 겹치면 `409 TEAM_IN_OTHER_GROUP` — 위 한 팀 한 조 문단. BYE 자리는 `ByeSlot` ↔ `GroupTeam(isBye)` 를 전환한다(`createBye` 와 같은 의미).
   - 오류: 404 `SLOT_NOT_FOUND`, 422 `SLOT_REGISTRATION_INVALID`(다른 대회·미확정 등록), 409 `SLOT_TEAM_ALREADY_PLACED`(ENTRY·BYE 교차 포함)·`SLOT_LOCKED`(자리를 쓰는 경기 중 시작·결과 있음).
 - `POST /admin/tournaments/:tournamentId/slots/random-fill` — 본문 없음. 잠금 안에서 다시 읽은 빈 ENTRY·BYE 자리에, 아직 어느 자리에도 없는 확정 등록을 서버가 무작위로 배정한다(남는 쪽은 그대로). 응답 `{ assignments: [{ slotId, registrationId }] }`.
 - `PATCH /admin/fixtures/:id` 로 자리에 연결된 사이드의 팀을 바꾸면 409 `SLOT_LINKED`(일정·장소·번호 수정은 그대로).
@@ -504,13 +526,19 @@ All team roster mutations lock the registration row and re-read `rosterLockedAt`
 - `GET /admin/tournaments/:tournamentId/slots/standings-preview`: 어드민(support 포함). 응답 `{ slots: [{ slotId, label, state: 'ready'|'tied'|'group_incomplete', candidateRegistrationId, candidateTeamName, tiedRegistrationIds, currentRegistrationId }] }`, 올라올 조 순서 → 순위 순. 조의 비삭제·비취소 경기가 전부 OFFICIAL 이고 조 순위표가 그 결과를 반영했을 때만 `ready`/`tied`. 정본 §5 동점 처리(승점 → 득실 → 다득점 → 맞대결 → 적은 실점)를 다 쓰고도 갈리지 않은 완전 동률 구간에 그 순위가 걸리면 `tied`(`tiedRegistrationIds` = 동률 팀 전체, 후보 없음). 대회 설정 규칙의 저장 순위와 §5 가 어긋나는 자리도 `tied`. 정규 리그 id 는 404 `TOURNAMENT_NOT_FOUND`.
 - `POST /admin/tournaments/:tournamentId/slots/fill-from-standings` `{ overrides?: [{ slotId, registrationId }] }`(최대 16개, uuid): mutation admin. 응답 `{ assignments: [{ slotId, registrationId }], skipped: [{ slotId, reason: 'tied'|'group_incomplete' }] }`. `ready` 자리 + override 를 한 트랜잭션에서 배정한다 — 바뀔 자리를 먼저 모두 비운 뒤 넣어 A1↔A2 맞바꾸기가 유일 제약에 걸리지 않는다. override 허용 범위: `tied` 자리는 `tiedRegistrationIds` 안의 팀, `ready` 자리는 그 조 소속 팀, `group_incomplete` 자리는 불가(422 `SLOT_REGISTRATION_INVALID`). 같은 팀이 두 자리에 배정되면 409 `SLOT_TEAM_ALREADY_PLACED`, 결선 경기가 시작된 자리가 바뀌어야 하면 409 `SLOT_LOCKED`(이미 맞게 들어 있는 자리는 건드리지 않는다). 시작 전이면 다시 채울 수 있다. 감사 `tournament.slots.fill_from_standings`.
 
+### Venue snapshot (Task 20261070)
+
+- Admin create/update accept `venue` + `venueAddress`, `venueLatitude`, `venueLongitude`, `venueProvider`, `venueProviderId`; responses add `venueAddress`, `venueProvider`, `venueProviderId` next to `venue`, `latitude`, `longitude`. The server no longer geocodes `venue`. On update (tournament `PATCH` and fixture `PATCH /admin/fixtures/:id`), sending any address/pin field without `venue` is 400 `PLACE_NAME_REQUIRED` — the snapshot is replaced only as a whole.
+- PATCH: when the `venue` key is present the whole snapshot is replaced (a name-only PATCH clears coordinates and provider).
+- Bracket fixtures: `venue` + the same five `venue*` fields on create/update fixture DTOs map to the fixture's `place*` columns; fixtures created without a venue inherit the tournament's snapshot. Fixture responses keep `venue` and add `place: V1PlaceView | null`.
+
 ## Public list default order (2026-10-10)
 
-`GET /tournaments` orders by status group, then date, then `id` ascending as the tie-breaker. The server is the only place this order is defined; clients render `items[]` as received.
+`GET /tournaments` orders by status group (recruiting, recruitment closed, in progress, finished), then date, then `id` ascending as the tie-breaker. "Recruitment closed" is the status the card shows: stored `closed`, plus a stored-`open` tournament whose `registrationDeadlineAt` has passed or whose capacity (confirmed + awaiting_payment/payment_checking/paid registrations vs `teamCount`) is full; regular leagues have no capacity and keep their stored status. The server is the only place this order is defined; clients render `items[]` as received. The order, the cursor comparison and the `page` offset are all computed in the database (one `ORDER BY` over the status group, the group's date key and `id`), so request cost depends on the page size, not on how many tournaments exist. A `cursor` is an opaque token (`pageInfo.nextCursor`) that carries the sort key its row had on the page that issued it, so a row that turns into 모집 마감 mid-scroll does not make the next page skip rows; a token the list did not issue returns an empty page. When `page` is present (including `page=1`) it wins and any `cursor` sent with it is ignored; `total` is counted only for `page` requests. `page` is capped at 10,000 (`MAX_PAGE_NUMBER`); a larger value is a 400 instead of an overflowing offset.
 
 1. `open` (a regular league's `draft` "upcoming" is grouped here) - `scheduledAt` ascending
 2. `closed` - `scheduledAt` ascending
 3. `in_progress` - `scheduledAt` ascending
 4. `completed` - most recently finished first (`scheduledEndAt` descending, falling back to `scheduledAt`)
 
-Rows without a date sort last inside their group. `cursor` is still the id of the last row of the previous page and `page` is an offset into the same order, so pages never skip or repeat a row. A `cursor` that no longer matches a visible row returns an empty page. Passing `status` narrows to one group; the group's ordering above still applies. The visible set is unchanged (`draft`/`cancelled` tournaments stay hidden).
+Rows without a date sort last inside their group. `page` is an offset into the same order, so page-number paging never skips or repeats a row. Passing `status` narrows to one group; the group's ordering above still applies. The visible set is unchanged (`draft`/`cancelled` tournaments stay hidden).

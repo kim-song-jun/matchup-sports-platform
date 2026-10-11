@@ -4,10 +4,8 @@ import { makeBracket, makeFixture, makeGame, makeGroup } from '@/test/bracket-ca
 import { BracketFixtureToolsDialog } from './bracket-fixture-tools-dialog';
 
 const mocks = vi.hoisted(() => ({ create: vi.fn(), setSources: vi.fn() }));
-vi.mock('@/hooks/use-v1-api', () => ({
-  useV1CreateFixture: () => ({ mutate: mocks.create, isPending: false }),
-}));
 vi.mock('@/hooks/use-v1-bracket-canvas', () => ({
+  useV1AddBracketFixture: () => ({ mutate: mocks.create, isPending: false }),
   useV1SetBracketSources: () => ({ mutate: mocks.setSources, isPending: false }),
 }));
 
@@ -24,7 +22,7 @@ const bracket = makeBracket({
 });
 
 function renderDialog(mode: 'add' | 'link') {
-  const props = { open: true, mode, tournamentId: 't-1', bracket, onClose: vi.fn(), showToast: vi.fn() };
+  const props = { open: true, mode, format: 'knockout' as const, tournamentId: 't-1', bracket, onClose: vi.fn(), showToast: vi.fn() };
   render(<BracketFixtureToolsDialog {...props} />);
   return props;
 }
@@ -34,11 +32,11 @@ beforeEach(() => {
 });
 
 describe('BracketFixtureToolsDialog — 경기 추가', () => {
-  it('고른 단계에 대진 미정 경기를 다음 번호로 만들고, 성공하면 알리고 닫는다', () => {
+  it('고른 단계의 round 로 경기 추가를 요청하고(번호는 서버가 정한다), 성공하면 알리고 닫는다', () => {
     const props = renderDialog('add');
     fireEvent.change(screen.getByLabelText('추가할 단계'), { target: { value: 'g-sf' } });
     fireEvent.click(screen.getByRole('button', { name: '경기 추가' }));
-    expect(mocks.create).toHaveBeenCalledWith({ groupId: 'g-sf', round: '4강', fixtureNumber: 4 }, expect.any(Object));
+    expect(mocks.create).toHaveBeenCalledWith({ groupId: 'g-sf', round: '4강' }, expect.any(Object));
     mocks.create.mock.calls[0][1].onSuccess();
     expect(props.showToast).toHaveBeenCalledWith('4강 경기를 추가했어요. 칸을 눌러 팀을 넣어 주세요.', 'success');
     expect(props.onClose).toHaveBeenCalledTimes(1);
@@ -56,6 +54,7 @@ describe('BracketFixtureToolsDialog — 경기 추가', () => {
     render(
       <BracketFixtureToolsDialog
         open
+        format="knockout"
         mode="add"
         tournamentId="t-1"
         bracket={makeBracket({ groups: [makeGroup({ id: 'g', name: 'A조', phase: 'group' })], fixtures: [] })}
@@ -65,6 +64,26 @@ describe('BracketFixtureToolsDialog — 경기 추가', () => {
     );
     expect(screen.getByText('경기를 추가할 수 있는 단계가 없어요. 템플릿으로 대진을 먼저 만들어 주세요.')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '경기 추가' })).toBeDisabled();
+  });
+
+  it('group_knockout 은 리그 폼이 아니라 결선 단계 목록 그대로이고, 조별 단계는 나열하지 않는다', () => {
+    render(
+      <BracketFixtureToolsDialog
+        open
+        mode="add"
+        format="group_knockout"
+        tournamentId="t-1"
+        bracket={makeBracket({
+          groups: [makeGroup({ id: 'g-a', name: 'A조', phase: 'group', sortOrder: 0 }), makeGroup({ id: 'g-sf', name: '4강', phase: 'semi', sortOrder: 1 })],
+          fixtures: [makeFixture({ id: 'a1', groupId: 'g-a', fixtureNumber: 1, round: 'league_r1' })],
+        })}
+        onClose={vi.fn()}
+        showToast={vi.fn()}
+      />,
+    );
+    const select = screen.getByLabelText('추가할 단계') as HTMLSelectElement;
+    expect(Array.from(select.options).map((option) => option.textContent)).toEqual(['4강']);
+    expect(screen.queryByLabelText('라운드')).not.toBeInTheDocument();
   });
 });
 
@@ -101,6 +120,7 @@ describe('BracketFixtureToolsDialog — 경기 연결', () => {
     render(
       <BracketFixtureToolsDialog
         open
+        format="knockout"
         mode="link"
         tournamentId="t-1"
         bracket={makeBracket({
@@ -124,6 +144,7 @@ describe('BracketFixtureToolsDialog — 경기 연결', () => {
     render(
       <BracketFixtureToolsDialog
         open
+        format="knockout"
         mode="link"
         tournamentId="t-1"
         bracket={makeBracket({
@@ -144,6 +165,7 @@ describe('BracketFixtureToolsDialog — 경기 연결', () => {
     render(
       <BracketFixtureToolsDialog
         open
+        format="knockout"
         mode="link"
         tournamentId="t-1"
         bracket={makeBracket({

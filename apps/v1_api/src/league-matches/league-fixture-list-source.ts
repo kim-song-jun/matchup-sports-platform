@@ -2,6 +2,8 @@ import type { Prisma, V1GameState, V1VisibilityMode } from '@prisma/client';
 import { excludeUnfilledSlotFixturesWhere } from '../common/competition/unfilled-slot-gate';
 import { effectivePublicVisibilityMode } from '../games/public-records/public-visibility';
 import { resolveIsForfeit } from './league-forfeit-result';
+import { PLACE_SELECT } from '../places/place-select';
+import { toPlaceView, type PlaceView } from '../places/place-snapshot';
 
 /**
  * 리그 **일정 목록**을 만드는 한 곳.
@@ -33,6 +35,11 @@ export type LeagueFixtureListRow = {
   approvedApplicantTeamId: string | null;
   startAt: Date;
   placeName: string;
+  placeAddress: string | null;
+  placeLatitude: number | null;
+  placeLongitude: number | null;
+  placeProvider: string | null;
+  placeProviderId: string | null;
   status: string;
   game: {
     id: string;
@@ -66,6 +73,7 @@ export type LeagueFixtureListItem = {
   awayAssigned: boolean;
   startAt: Date;
   placeName: string;
+  place: PlaceView | null;
   status: string;
   homeScore: number | null;
   awayScore: number | null;
@@ -115,6 +123,7 @@ export function toLeagueFixtureList(
       awayAssigned: fixture.approvedApplicantTeamId !== null,
       startAt: fixture.startAt,
       placeName: fixture.placeName,
+      place: toPlaceView(fixture),
       status: fixture.status,
       homeScore: scoreHidden ? null : fact?.homeScore ?? null,
       awayScore: scoreHidden ? null : fact?.awayScore ?? null,
@@ -195,7 +204,7 @@ export const LEAGUE_FIXTURE_LIST_SELECT = {
   hostTeamId: true,
   approvedApplicantTeamId: true,
   startAt: true,
-  placeName: true,
+  ...PLACE_SELECT,
   status: true,
   // `visibilityPolicy` 를 빼면 매퍼가 모드를 **볼 수 없어** 가려야 할 점수를 그대로 싣는다.
   game: { select: { id: true, state: true, currentOfficialRevisionId: true, visibilityPolicy: { select: { mode: true } } } },

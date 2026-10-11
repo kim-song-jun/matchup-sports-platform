@@ -1,6 +1,7 @@
 'use client';
 
 import type { CSSProperties, MouseEvent } from 'react';
+import { saveRedirectPath } from '@/lib/session-storage';
 import { generateKakaoOAuthState, KAKAO_OAUTH_STATE_STORAGE_KEY } from './auth.view-model';
 
 // 카카오 로그인 버튼(클라이언트). authorize 이동 직전 클릭 시점에 CSRF 방지 state를 생성·저장한 뒤
@@ -22,6 +23,7 @@ export function KakaoLoginButton({
     const state = generateKakaoOAuthState();
     try {
       window.sessionStorage.setItem(KAKAO_OAUTH_STATE_STORAGE_KEY, state);
+      saveRedirectPath(new URLSearchParams(window.location.search).get('redirect'));
     } catch {
       // sessionStorage 사용 불가(프라이빗 모드/quota 초과) 시 CSRF 방지 state를 저장할 수 없어
       // 안전한 로그인이 불가능하다. 조용히 실패하지 않고 사용자에게 알린 뒤 중단한다(fail-closed).

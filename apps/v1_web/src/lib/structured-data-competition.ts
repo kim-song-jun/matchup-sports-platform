@@ -78,11 +78,21 @@ export function buildFixtureEventLd(match: PublicMatchDetail): JsonLdNode | null
 
   const venue = [match.venue, match.fieldName].filter(Boolean).join(' ');
   if (venue) {
-    node.location = {
+    const place = match.place;
+    const location: JsonLdNode = {
       '@type': 'Place',
       name: venue,
-      address: { '@type': 'PostalAddress', addressCountry: 'KR', name: venue },
+      address: {
+        '@type': 'PostalAddress',
+        addressCountry: 'KR',
+        name: venue,
+        ...(place?.address ? { streetAddress: place.address } : {}),
+      },
     };
+    if (typeof place?.latitude === 'number' && typeof place.longitude === 'number') {
+      location.geo = { '@type': 'GeoCoordinates', latitude: place.latitude, longitude: place.longitude };
+    }
+    node.location = location;
   }
 
   const score = officialScoreText(match, homeName, awayName);

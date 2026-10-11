@@ -572,7 +572,16 @@ export const gameSchemaSourceManifest = {
   // 2026-10-09: additive V1TournamentSlot + V1TeamMatch.homeSlotId/awaySlotId + the round16
   // group phase value, all backed by 20261009090000_v1_tournament_slots. Game models and the bound historical
   // game-operations migration are unchanged; re-pin the schema bytes only.
-  schema: '6643bf1329ddb0303c952c349d99965a200d79573660c39af027007da822834d',
+  // 2026-10-10: additive place snapshot columns (V1Match/V1TeamMatch place_latitude/longitude/
+  // provider/provider_id, V1Tournament venue_address/provider/provider_id) backed by
+  // 20261010090000_v1_place_snapshots. Game models and the bound historical game-operations
+  // migration are unchanged; re-pin the schema bytes only.
+  // 2026-10-11: additive V1TournamentRegistration.adminCancelReason/cancelOutcome columns backed by
+  // the MD-QA #78 migration. Game models and the bound historical game-operations migration are
+  // unchanged; re-pin the schema bytes only.
+  // 2026-10-11: additive V1OnboardingStatus value social_profile_deferred (MD-QA #125 migration). Game
+  // models and the bound historical game-operations migration are unchanged; re-pin the schema bytes only.
+  schema: 'b63d3222b1f3d0e1a3c8309f116cfd50eb28b624245685dbea2f7fff1f6ee2b9',
   migration: '6bd7fae42e9ee7debff71d26f7252d220ad2c12ae6f14745d103fc7fa61e8f64',
 } as const;
 

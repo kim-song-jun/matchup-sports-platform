@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
+import { readGameResultScore } from '@/lib/game-result-score';
 import { ResultEditModal } from './result-edit-modal';
 import type {
   GameResultGoalEventInput,
@@ -83,6 +84,25 @@ function resultParticipant(
 
 const SCORE: GameResultScore = { home: 1, away: 0 };
 
+/** 서버는 점수 = 팀별 득점 기록 수가 아니면 정정을 422 로 거부하므로, 픽스처는 점수와 같은 수의 익명 득점을 가진다. */
+function goalsMatching(score: GameResultScore): GameResultGoalEventInput[] {
+  const read = readGameResultScore(score);
+  const make = (sideId: string, count: number, prefix: string): GameResultGoalEventInput[] =>
+    Array.from({ length: count }, (_, index) => ({ id: `${prefix}-${index}`, sideId, anonymous: true, ownGoal: false }));
+  return [...make(HOME_SIDE_ID, read?.home ?? 0, 'home'), ...make(AWAY_SIDE_ID, read?.away ?? 0, 'away')];
+}
+
+let addedGoalSeq = 0;
+/** 화면의 「득점 추가」로 득점 기록을 하나 더한다(점수 칸은 기록 수를 따라간다). */
+function addGoal(sideId: string) {
+  vi.spyOn(Date, 'now').mockReturnValueOnce(++addedGoalSeq);
+  fireEvent.click(screen.getByRole('button', { name: '득점 추가' }));
+  const count = screen.getAllByLabelText(/번째 득점 팀$/).length;
+  if (sideId !== HOME_SIDE_ID) {
+    fireEvent.change(screen.getByLabelText(`${count}번째 득점 팀`), { target: { value: sideId } });
+  }
+}
+
 // `.slice(-6)`(폴백 라벨이 쓰는 규칙)은 문자열의 "마지막" 6자를 잘라내므로,
 // 알파에서 관측된 라벨("참가자 dc52c8")을 재현하려면 그 6자를 id의 접두어가
 // 아니라 접미어에 둬야 한다.
@@ -97,7 +117,7 @@ function baseProps() {
     confirmLabel: '정정 제출',
     base: {
       score: SCORE,
-      goalEvents: [] as GameResultGoalEventInput[],
+      goalEvents: goalsMatching(SCORE),
       participants: [
         resultParticipant(HOME_PARTICIPANT_ID, HOME_SIDE_ID),
         resultParticipant(AWAY_PARTICIPANT_ID, AWAY_SIDE_ID),
@@ -111,6 +131,12 @@ function baseProps() {
     onConfirm: vi.fn(),
     onCancel: vi.fn(),
   };
+}
+
+/** 득점 기록 행이 없는 화면 -- 득점 선택칸의 선수 옵션이 선수 이름 개수 검증에 섞이지 않게 한다. */
+function propsWithoutGoalRecords() {
+  const props = baseProps();
+  return { ...props, base: { ...props.base, goalEvents: [] } };
 }
 
 type BaseOverrides = Partial<ReturnType<typeof baseProps>['base']>;
@@ -127,7 +153,11 @@ function submitEdit(
     <ResultEditModal
       {...props}
       {...extraProps}
-      base={{ ...props.base, ...baseOverrides }}
+      base={{
+        ...props.base,
+        goalEvents: goalsMatching(baseOverrides.score ?? props.base.score),
+        ...baseOverrides,
+      }}
       lineups={[]}
       onConfirm={onConfirm}
     />,
@@ -167,7 +197,7 @@ describe('ResultEditModal participant naming', () => {
       lineup(AWAY_SIDE_ID, [{ id: AWAY_PARTICIPANT_ID, name: '강아라', jersey: 7 }]),
     ];
 
-    render(<ResultEditModal {...baseProps()} lineups={lineups} />);
+    render(<ResultEditModal {...propsWithoutGoalRecords()} lineups={lineups} />);
 
     // 참가자 카드 헤딩과 MVP 드롭다운 옵션 양쪽 모두 같은 라벨을 쓰므로(둘 다
     // `participantLabel`을 호출) 두 곳 모두에서 실명이 나와야 한다.
@@ -182,7 +212,7 @@ describe('ResultEditModal participant naming', () => {
       lineup(HOME_SIDE_ID, [{ id: HOME_PARTICIPANT_ID, name: '김골키', jersey: 1 }]),
       lineup(AWAY_SIDE_ID, [{ id: AWAY_PARTICIPANT_ID, name: '강아라', jersey: 7 }]),
     ];
-    render(<ResultEditModal {...baseProps()} lineups={lineups} />);
+    render(<ResultEditModal {...propsWithoutGoalRecords()} lineups={lineups} />);
 
     // 칸 이름이 "득점" 뿐이라 선수 12명이면 어느 선수 칸인지 알 수 없었다 — 그룹 이름이 선수다.
     const group = screen.getByRole('group', { name: '홈 · #1 김골키' });
@@ -196,7 +226,7 @@ describe('ResultEditModal participant naming', () => {
   });
 
   it('falls back to an explicit "라인업에 없음" label (not a blank) when no lineup data is available', () => {
-    render(<ResultEditModal {...baseProps()} lineups={[]} />);
+    render(<ResultEditModal {...propsWithoutGoalRecords()} lineups={[]} />);
 
     expect(screen.getAllByText('홈 · 참가자 dc52c8 (라인업에 없음)')).toHaveLength(2);
     expect(screen.getAllByText('원정 · 참가자 701eb3 (라인업에 없음)')).toHaveLength(2);
@@ -234,14 +264,14 @@ describe('ResultEditModal — result-revisions 의 중첩(regulation) 스코어 
 
   it('onConfirm 이 넘기는 score 에는 goals/penalty/incomplete/provenance/regulation 이 섞이지 않는다 -- 섞이면 서버가 400을 낸다', () => {
     const { onConfirm } = submitEdit({ score: REGULATION_SCORE }, ({ confirmLabel }) => {
-      fireEvent.change(screen.getByLabelText('원정 점수'), { target: { value: '3' } });
+      addGoal(AWAY_SIDE_ID);
       fireEvent.change(screen.getByLabelText('사유'), { target: { value: '득점 누락 정정' } });
       fireEvent.click(screen.getByRole('button', { name: confirmLabel }));
     });
 
     expect(onConfirm).toHaveBeenCalledTimes(1);
     const submittedScore = onConfirm.mock.calls[0][0].score;
-    expect(submittedScore).toMatchObject({ home: 2, away: 3 });
+    expect(submittedScore).toMatchObject({ home: 2, away: 2 });
     expectNoForbiddenScoreKeys(submittedScore);
   });
 });
@@ -301,8 +331,8 @@ describe('ResultEditModal — 승부차기(penalties) 점수 보존', () => {
       { score: { home: 1, away: 1, penalties: { home: 4, away: 3 } } },
       ({ confirmLabel }) => {
         // 1:1 -> 2:2 (여전히 무승부) -- 승부차기가 계속 승자를 가리는 상태다.
-        fireEvent.change(screen.getByLabelText('홈 점수'), { target: { value: '2' } });
-        fireEvent.change(screen.getByLabelText('원정 점수'), { target: { value: '2' } });
+        addGoal(HOME_SIDE_ID);
+        addGoal(AWAY_SIDE_ID);
         fireEvent.change(screen.getByLabelText('사유'), { target: { value: '정규시간 득점 정정' } });
         fireEvent.click(screen.getByRole('button', { name: confirmLabel }));
       },
@@ -319,7 +349,7 @@ describe('ResultEditModal — 승부차기(penalties) 점수 보존', () => {
       { score: { home: 1, away: 1, penalties: { home: 4, away: 3 } } },
       ({ confirmLabel }) => {
         // 1:1(승부차기 4:3) -> 2:1 -- 정규시간에서 이미 승자가 갈렸다.
-        fireEvent.change(screen.getByLabelText('홈 점수'), { target: { value: '2' } });
+        addGoal(HOME_SIDE_ID);
         fireEvent.change(screen.getByLabelText('사유'), { target: { value: '정규시간 득점 정정' } });
         fireEvent.click(screen.getByRole('button', { name: confirmLabel }));
       },
@@ -418,6 +448,11 @@ describe('ResultEditModal — 참가자 어시스트·파울 보존/입력 (2-A)
   it('base 의 assists/fouls 를 건드리지 않고 제출하면 원래 값이 그대로 실려 나간다', () => {
     const { onConfirm } = submitEdit(
       {
+        score: { home: 2, away: 0 },
+        goalEvents: [
+          { id: 'goal-1', sideId: HOME_SIDE_ID, participantId: HOME_PARTICIPANT_ID, ownGoal: false },
+          { id: 'goal-2', sideId: HOME_SIDE_ID, participantId: HOME_PARTICIPANT_ID, ownGoal: false },
+        ],
         participants: [
           resultParticipant(HOME_PARTICIPANT_ID, HOME_SIDE_ID, { goals: 2, assists: 1, fouls: 3 }),
           resultParticipant(AWAY_PARTICIPANT_ID, AWAY_SIDE_ID, { goals: 0, assists: 2, fouls: 1 }),
@@ -482,20 +517,23 @@ describe('ResultEditModal — 참가자 어시스트·파울 보존/입력 (2-A)
     expect(submitted[1].minutesPlayed).toBeUndefined();
   });
 
-  // 하네스 정상 동작 증명(통과하는 짝): 위 두 테스트와 완전히 같은 경로·같은 단언
-  // 방식인데 `goals`(이미 폼에 있는 필드)만 다루므로 지금도 초록이다 -- 위 실패가
-  // 하네스(렌더/제출 시퀀스) 탓이 아니라 assists/fouls 누락 탓임을 가른다.
-  it('득점 입력값은 지금도 제출 payload 로 왕복한다 (하네스 정상 동작 증명)', () => {
+  it('득점 기록을 지우면 점수와 선수 득점이 함께 줄어 제출된다', () => {
     const { onConfirm } = submitEdit(
-      { participants: [resultParticipant(HOME_PARTICIPANT_ID, HOME_SIDE_ID, { goals: 1 })] },
+      {
+        goalEvents: [{ id: 'goal-1', sideId: HOME_SIDE_ID, participantId: HOME_PARTICIPANT_ID, ownGoal: false }],
+        participants: [resultParticipant(HOME_PARTICIPANT_ID, HOME_SIDE_ID, { goals: 1 })],
+      },
       ({ confirmLabel }) => {
-        fireEvent.change(screen.getAllByLabelText('득점')[0], { target: { value: '4' } });
-        fireEvent.change(screen.getByLabelText('사유'), { target: { value: '득점 정정' } });
+        fireEvent.click(screen.getByRole('button', { name: '삭제' }));
+        fireEvent.change(screen.getByLabelText('사유'), { target: { value: '오기록 삭제' } });
         fireEvent.click(screen.getByRole('button', { name: confirmLabel }));
       },
     );
 
-    expect(onConfirm.mock.calls[0][0].actualParticipants[0]).toMatchObject({ goals: 4 });
+    const submitted = onConfirm.mock.calls[0][0];
+    expect(submitted.goalEvents).toEqual([]);
+    expect(submitted.score).toEqual({ home: 0, away: 0 });
+    expect(submitted.actualParticipants[0]).toMatchObject({ goals: 0 });
   });
 });
 
@@ -588,7 +626,7 @@ describe('ResultEditModal — 결선 무승부 사전 경고', () => {
     render(
       <ResultEditModal
         {...props}
-        base={{ ...props.base, score: { home: 2, away: 1 } }}
+        base={{ ...props.base, score: { home: 2, away: 1 }, goalEvents: goalsMatching({ home: 2, away: 1 }) }}
         lineups={[]}
         isKnockoutFixture
         onConfirm={onConfirm}
@@ -598,7 +636,7 @@ describe('ResultEditModal — 결선 무승부 사전 경고', () => {
     // 라이브 영역은 문구가 생기기 **전에도** DOM 에 있어야 한다(아래 별도 describe 참고).
     expect(liveRegionText()).toBe('');
 
-    fireEvent.change(screen.getByLabelText('원정 점수'), { target: { value: '2' } });
+    addGoal(AWAY_SIDE_ID);
 
     const warning = screen.getByRole('status');
     expect(warning).toHaveTextContent(/승부차기/);
@@ -731,14 +769,12 @@ describe('ResultEditModal — 숫자 입력은 정수로 정규화된다', () =>
     expect(onConfirm.mock.calls[0][0].actualParticipants[0]).toMatchObject({ assists: 1 });
   });
 
-  it('점수 칸에 소수를 넣어도 정수로 잘려서 제출된다', () => {
-    const { onConfirm } = submitEdit({}, ({ confirmLabel }) => {
+  it('점수 칸에 소수를 넣어도 정수로 잘려서 반영된다', () => {
+    submitEdit({}, () => {
       fireEvent.change(screen.getByLabelText('홈 점수'), { target: { value: '2.7' } });
-      fireEvent.change(screen.getByLabelText('사유'), { target: { value: '점수 정정' } });
-      fireEvent.click(screen.getByRole('button', { name: confirmLabel }));
     });
 
-    expect(onConfirm.mock.calls[0][0].score).toEqual({ home: 2, away: 0 });
+    expect(screen.getByLabelText('홈 점수')).toHaveValue(2);
   });
 });
 
@@ -825,7 +861,7 @@ describe('ResultEditModal — 공식 득점 타임라인 편집', () => {
   });
 
   it('선수를 지정하지 않은 새 골은 명시적인 익명 플래그로 제출한다', () => {
-    const { onConfirm } = submitEdit({}, ({ confirmLabel }) => {
+    const { onConfirm } = submitEdit({ score: { home: 0, away: 0 } }, ({ confirmLabel }) => {
       fireEvent.click(screen.getByRole('button', { name: '득점 추가' }));
       fireEvent.change(screen.getByLabelText('사유'), { target: { value: '익명 득점 추가' } });
       fireEvent.click(screen.getByRole('button', { name: confirmLabel }));
@@ -839,5 +875,130 @@ describe('ResultEditModal — 공식 득점 타임라인 편집', () => {
       }),
     ]);
     expect(onConfirm.mock.calls[0][0].goalEvents[0]).not.toHaveProperty('participantId');
+  });
+});
+
+/**
+ * 서버(`assertGoalTimelineConsistent`)는 점수·득점 기록·선수 득점이 어긋난 정정을 422 로
+ * 거부하고, 그 문구는 영문이다. 운영자가 영문 오류를 보기 전에 화면이 먼저 막고 알려야 한다.
+ */
+describe('ResultEditModal — 점수와 득점 기록이 어긋나면 제출 전에 막는다', () => {
+  const mismatchAlert = () => screen.queryByRole('alert');
+
+  it('홈 점수만 올리고 득점 기록은 그대로면 한국어 안내와 함께 제출이 막힌다', () => {
+    const { onConfirm } = submitEdit({}, ({ confirmLabel }) => {
+      fireEvent.change(screen.getByLabelText('홈 점수'), { target: { value: '2' } });
+      fireEvent.change(screen.getByLabelText('사유'), { target: { value: '점수 정정' } });
+
+      const confirm = screen.getByRole('button', { name: confirmLabel });
+      expect(confirm).toBeDisabled();
+      expect(mismatchAlert()).toHaveTextContent('점수(2:0)와 득점 기록(1:0)이 달라요');
+      expect(confirm).toHaveAttribute('aria-describedby', mismatchAlert()?.id);
+      fireEvent.click(confirm);
+    });
+
+    expect(onConfirm).not.toHaveBeenCalled();
+  });
+
+  it('원정 쪽만 어긋나도 막고, 득점 기록을 맞추면 안내가 사라지고 제출된다', () => {
+    const { onConfirm } = submitEdit({}, ({ confirmLabel }) => {
+      fireEvent.change(screen.getByLabelText('원정 점수'), { target: { value: '1' } });
+      fireEvent.change(screen.getByLabelText('사유'), { target: { value: '원정 득점 누락' } });
+      expect(screen.getByRole('button', { name: confirmLabel })).toBeDisabled();
+      expect(mismatchAlert()).toHaveTextContent('점수(1:1)와 득점 기록(1:0)이 달라요');
+
+      addGoal(AWAY_SIDE_ID);
+      expect(mismatchAlert()).toBeNull();
+      fireEvent.click(screen.getByRole('button', { name: confirmLabel }));
+    });
+
+    expect(onConfirm.mock.calls[0][0].score).toEqual({ home: 1, away: 1 });
+  });
+
+  it('선수별 득점 수가 득점 기록과 다르면 막고, 자책골은 선수 득점으로 세지 않는다', () => {
+    const { onConfirm } = submitEdit(
+      {
+        // 홈 팀 선수의 자책골이 아니라 원정 선수가 넣은 자책골이 홈 득점이 된다.
+        goalEvents: [
+          { id: 'goal-1', sideId: HOME_SIDE_ID, participantId: AWAY_PARTICIPANT_ID, ownGoal: true },
+        ],
+      },
+      ({ confirmLabel }) => {
+        fireEvent.change(screen.getByLabelText('사유'), { target: { value: '자책골 확인' } });
+        expect(screen.getByRole('button', { name: confirmLabel })).toBeEnabled();
+
+        fireEvent.change(screen.getAllByLabelText('득점')[1], { target: { value: '1' } });
+        expect(screen.getByRole('button', { name: confirmLabel })).toBeDisabled();
+        expect(mismatchAlert()).toHaveTextContent('선수별 득점 수가 득점 기록과 달라요');
+
+        fireEvent.change(screen.getAllByLabelText('득점')[1], { target: { value: '0' } });
+        fireEvent.click(screen.getByRole('button', { name: confirmLabel }));
+      },
+    );
+
+    expect(onConfirm).toHaveBeenCalledTimes(1);
+  });
+  describe('득점 기록 없이 점수만 있는 결과(간편 결과)', () => {
+    it('점수만 고치면 막지 않고 goalEvents 를 보내지 않아 서버가 기존 상태를 유지하게 한다', () => {
+      const { onConfirm } = submitEdit({ score: { home: 2, away: 1 }, goalEvents: [] }, ({ confirmLabel }) => {
+        fireEvent.change(screen.getByLabelText('홈 점수'), { target: { value: '3' } });
+        fireEvent.change(screen.getByLabelText('사유'), { target: { value: '점수 정정' } });
+        expect(mismatchAlert()).toBeNull();
+        fireEvent.click(screen.getByRole('button', { name: confirmLabel }));
+      });
+
+      expect(onConfirm).toHaveBeenCalledTimes(1);
+      expect(onConfirm.mock.calls[0][0].score).toEqual({ home: 3, away: 1 });
+      expect(onConfirm.mock.calls[0][0]).not.toHaveProperty('goalEvents');
+    });
+
+    it('득점 기록을 더하면 점수가 기록 수를 따라가고, 그 기록과 함께 goalEvents 를 보낸다', () => {
+      const { onConfirm } = submitEdit({ score: { home: 2, away: 1 }, goalEvents: [] }, ({ confirmLabel }) => {
+        fireEvent.change(screen.getByLabelText('사유'), { target: { value: '기록 추가' } });
+        addGoal(HOME_SIDE_ID);
+        expect(mismatchAlert()).toBeNull();
+        fireEvent.click(screen.getByRole('button', { name: confirmLabel }));
+      });
+
+      expect(onConfirm.mock.calls[0][0].score).toEqual({ home: 1, away: 0 });
+      expect(onConfirm.mock.calls[0][0].goalEvents).toHaveLength(1);
+    });
+
+    it('선수 득점을 입력하면 기록이 없는 채로는 점수 전용으로 보지 않고 막는다', () => {
+      const { onConfirm } = submitEdit({ score: { home: 2, away: 1 }, goalEvents: [] }, ({ confirmLabel }) => {
+        fireEvent.change(screen.getByLabelText('사유'), { target: { value: '선수 득점' } });
+        fireEvent.change(screen.getAllByLabelText('득점')[0], { target: { value: '1' } });
+        expect(screen.getByRole('button', { name: confirmLabel })).toBeDisabled();
+        expect(mismatchAlert()).toHaveTextContent('점수(2:1)와 득점 기록(0:0)이 달라요');
+      });
+
+      expect(onConfirm).not.toHaveBeenCalled();
+    });
+
+    it('원본이 0:0 이고 기록도 없으면 점수만 올리는 것은 여전히 막는다', () => {
+      submitEdit({ score: { home: 0, away: 0 }, goalEvents: [] }, ({ confirmLabel }) => {
+        fireEvent.change(screen.getByLabelText('홈 점수'), { target: { value: '1' } });
+        fireEvent.change(screen.getByLabelText('사유'), { target: { value: '점수 정정' } });
+        expect(screen.getByRole('button', { name: confirmLabel })).toBeDisabled();
+        expect(mismatchAlert()).toHaveTextContent('점수(1:0)와 득점 기록(0:0)이 달라요');
+      });
+    });
+
+    it('기록이 있던 결과에서 기록을 모두 지우고 점수를 남기면 점수 전용으로 취급하지 않는다', () => {
+      submitEdit({}, ({ confirmLabel }) => {
+        fireEvent.click(screen.getByRole('button', { name: /삭제/ }));
+        fireEvent.change(screen.getByLabelText('홈 점수'), { target: { value: '1' } });
+        fireEvent.change(screen.getByLabelText('사유'), { target: { value: '기록 삭제' } });
+        expect(screen.getByRole('button', { name: confirmLabel })).toBeDisabled();
+      });
+    });
+  });
+});
+
+describe('ResultEditModal 점수만 확정된 경기 안내 (MD-QA #94)', () => {
+  it('원래 득점 기록이 없으면 점수만 고쳐도 된다고 안내한다', () => {
+    const props = baseProps();
+    render(<ResultEditModal {...props} base={{ ...props.base, goalEvents: [] }} lineups={[]} />);
+    expect(screen.getByText(/득점 기록 없이 점수만 확정된 경기예요/)).toBeInTheDocument();
   });
 });

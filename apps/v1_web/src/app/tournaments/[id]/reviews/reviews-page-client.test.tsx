@@ -5,6 +5,7 @@ import { useShellOverrideForRoute } from '@/components/v1-ui/shell-override';
 import { TournamentReviewsPageClient } from './reviews-page-client';
 
 const navState = vi.hoisted(() => ({ search: '' }));
+const tournamentState = vi.hoisted(() => ({ data: undefined as unknown }));
 vi.mock('next/navigation', () => ({
   usePathname: () => '/tournaments/t1/reviews',
   useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
@@ -14,7 +15,7 @@ vi.mock('next/navigation', () => ({
 const idle = { isLoading: false, isFetching: false, isError: false, error: null, refetch: vi.fn() };
 vi.mock('@/hooks/use-v1-api', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/hooks/use-v1-api')>()),
-  useV1Tournament: () => ({ ...idle, data: undefined }),
+  useV1Tournament: () => ({ ...idle, data: tournamentState.data }),
   useV1Reviews: () => ({ ...idle, data: undefined }),
   useV1TournamentReviews: () => ({ ...idle, data: { items: [], total: 0, page: 1, pageSize: 10 } }),
 }));
@@ -37,6 +38,7 @@ function renderReviews() {
 describe('TournamentReviewsPageClient — 상단 뒤로가기 출처(MD-QA #34)', () => {
   beforeEach(() => {
     navState.search = '';
+    tournamentState.data = undefined;
   });
 
   it('유효한 from 이 있으면 셸 뒤로가기가 그 주소로 바뀐다', () => {
@@ -60,5 +62,24 @@ describe('TournamentReviewsPageClient — 상단 뒤로가기 출처(MD-QA #34)'
     navState.search = `from=${encodeURIComponent(evil)}`;
     renderReviews();
     expect(screen.getByTestId('shell-back')).toBeEmptyDOMElement();
+  });
+});
+
+describe('TournamentReviewsPageClient — 리그 문구(MD-QA #92)', () => {
+  beforeEach(() => {
+    navState.search = '';
+  });
+
+  it('리그(kind=regular_league)면 안내·빈 상태 문구가 리그 기준이다', () => {
+    tournamentState.data = { id: 't1', title: '가을 리그', status: 'in_progress', kind: 'regular_league', fixtures: [], groups: [] };
+    renderReviews();
+    expect(screen.getByText('이 리그에 참가한 팀의 팀장·매니저가 남긴 후기예요.')).toBeInTheDocument();
+    expect(screen.getByText('리그 참가팀의 후기가 등록되면 여기에서 볼 수 있어요.')).toBeInTheDocument();
+  });
+
+  it('대회는 기존처럼 대회 문구를 쓴다', () => {
+    tournamentState.data = { id: 't1', title: '가을 대회', status: 'in_progress', kind: 'regular_tournament', fixtures: [], groups: [] };
+    renderReviews();
+    expect(screen.getByText('이 대회에 참가한 팀의 팀장·매니저가 남긴 후기예요.')).toBeInTheDocument();
   });
 });

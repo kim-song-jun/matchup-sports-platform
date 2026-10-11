@@ -41,6 +41,49 @@ describe('ActionSheet', () => {
     expect(screen.queryByRole('button', { name: /레드팀 경기 명단/ })).toBeNull();
   });
 
+  it('icon 은 라벨 왼쪽에 그려지고 접근 이름을 바꾸지 않는다', () => {
+    setup([{ key: 'a', label: '카카오맵', icon: <img src="/x.webp" alt="" data-testid="ic" />, onSelect: vi.fn() }]);
+    const button = screen.getByRole('button', { name: '카카오맵' });
+    expect(within(button).getByTestId('ic')).toBeInTheDocument();
+  });
+
+  it('externalHref 항목은 순수 링크이고 newTab 일 때만 새 탭 속성을 가지며 누르면 시트를 닫는다', () => {
+    const { onClose } = setup([
+      { key: 'a', label: '앱으로', externalHref: 'kakaomap://route?ep=1,2' },
+      { key: 'b', label: '새 창으로', externalHref: 'https://map.kakao.com/', newTab: true },
+    ]);
+    const app = screen.getByRole('link', { name: '앱으로' });
+    expect(app).toHaveAttribute('href', 'kakaomap://route?ep=1,2');
+    expect(app).not.toHaveAttribute('target');
+    expect(app).not.toHaveAttribute('rel');
+    const web = screen.getByRole('link', { name: '새 창으로' });
+    expect(web).toHaveAttribute('target', '_blank');
+    expect(web).toHaveAttribute('rel', 'noopener noreferrer');
+    fireEvent.click(app);
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('같은 탭 외부 링크는 기본 이동을 막고 시트를 닫은 뒤 이동한다 — 새 탭 링크는 막지 않는다', async () => {
+    const originalLocation = window.location;
+    const assign = vi.fn();
+    Object.defineProperty(window, 'location', { configurable: true, value: { ...originalLocation, assign } });
+    try {
+      const { onClose } = setup([
+        { key: 'a', label: '앱으로', externalHref: 'kakaomap://route?ep=1,2' },
+        { key: 'b', label: '새 창으로', externalHref: 'https://map.kakao.com/', newTab: true },
+      ]);
+      const notPrevented = fireEvent.click(screen.getByRole('link', { name: '앱으로' }));
+      expect(notPrevented).toBe(false);
+      expect(onClose).toHaveBeenCalledTimes(1);
+      await vi.waitFor(() => expect(assign).toHaveBeenCalledWith('kakaomap://route?ep=1,2'));
+
+      expect(fireEvent.click(screen.getByRole('link', { name: '새 창으로' }))).toBe(true);
+      expect(assign).toHaveBeenCalledTimes(1);
+    } finally {
+      Object.defineProperty(window, 'location', { configurable: true, value: originalLocation });
+    }
+  });
+
   it('비활성 항목은 누를 수 없고 왜 못 누르는지를 설명 자리에 말한다', () => {
     const onSelect = vi.fn();
     setup([
@@ -53,6 +96,32 @@ describe('ActionSheet', () => {
     expect(button).not.toHaveTextContent('경기를 마쳐요');
     fireEvent.click(button);
     expect(onSelect).not.toHaveBeenCalled();
+  });
+
+  it('조상이 스태킹 컨텍스트여도 시트가 갇히지 않게 body 직속으로 그린다', () => {
+    // 스크롤 영역 같은 조상이 스태킹 컨텍스트(iOS 웹뷰의 touch 스크롤 등)면 안쪽 z-index 는 밖의
+    // 하단 고정 CTA·상단바와 겨루지 못한다 — 시트가 조상 밖에 있어야 --z-modal 이 전역에서 이긴다.
+    const { container } = render(
+      <div data-testid="scroll-area" style={{ position: 'relative', zIndex: 0 }}>
+        <ActionSheet open title="길찾기" actions={[{ key: 'a', label: '카카오맵', onSelect: vi.fn() }]} onClose={vi.fn()} />
+      </div>,
+    );
+
+    const dialog = screen.getByRole('dialog', { name: '길찾기' });
+    expect(container.contains(dialog)).toBe(false);
+    expect(dialog.parentElement?.parentElement).toBe(document.body);
+  });
+
+  it('body 로 올려도 항목 선택·배경 클릭·ESC 는 그대로 동작한다', () => {
+    const onSelect = vi.fn();
+    const { onClose } = setup([{ key: 'a', label: '동작', onSelect }]);
+
+    fireEvent.click(screen.getByRole('button', { name: '동작' }));
+    expect(onSelect).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByRole('dialog').parentElement as HTMLElement);
+    expect(onClose).toHaveBeenCalledTimes(1);
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(onClose).toHaveBeenCalledTimes(2);
   });
 
   it('닫기 버튼이 onClose 를 부른다', () => {

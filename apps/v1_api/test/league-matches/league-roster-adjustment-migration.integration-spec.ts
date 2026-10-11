@@ -160,7 +160,7 @@ describe('리그 팀장 저장본 → 경기 명단 조정 이관', () => {
           regionId,
           competitionConfigId: config!.id,
           title,
-          placeName: '테스트 구장',
+          place: { name: '테스트 구장', address: null, latitude: null, longitude: null, provider: null, providerPlaceId: null },
           startAt: new Date(Date.now() + days * DAY),
           endAt: null,
           home: teams.get(teamA.id)!,

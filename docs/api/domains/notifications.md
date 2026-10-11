@@ -137,6 +137,8 @@ fan-out되며, 한 채널의 개별 발송 실패는 알림 row 자체나 다른
 1:1 문의에 어드민이 답변하면 문의한 회원에게 `inquiry_answered`(targetType `inquiry`, 딥링크
 `/my/inquiries/:inquiryId`)를 emit한다 — 게스트 문의는 계정이 없으므로 연락처로 대신 응답한다. 이
 이벤트는 `activityEnabled`가 아니라 `importantEnabled`로 게이팅된다.
+소셜 로그인이 휴대폰 주인의 기존 계정에 연결되면 그 계정에 `social_identity_linked`(targetType `system`, 딥링크
+`/my/settings`)를 emit한다 — 보안 알림이라 같은 `importantEnabled`로 게이팅된다.
 
 팀 초대를 받으면 `team_invitation_received`(targetType `team`, targetId는 팀 id)를 emit하고 딥링크는 팀 상세가
 아니라 수락·거절을 하는 `/my/invitations`다. 딥링크는 알림 생성 시 `V1Notification.deepLink`에 저장되므로
@@ -171,8 +173,10 @@ fan-out되며, 한 채널의 개별 발송 실패는 알림 row 자체나 다른
 | 킥오프 2시간 전 `game_kickoff_reminder` | 출전자 + 팀장·매니저 | 2시간 뒤 경기가 시작돼요 / `01:10 vs (상대) · (장소). 지금 출전 명단에 있어요.` — 출전자가 아닌 팀장·매니저는 마지막 문장 없음 | 공개 경기 상세 |
 | 리그 결과 확정 `league_team_match_completed` | 팀장·매니저 + 그 공식 결과의 출전자 | 경기 결과가 확정됐어요 / `(리그명) N주차 · 마포 FC 2 : 1 합정 유나이티드 · 승리. 내 기록 1골이에요.` | `/team-matches/:id/result` |
 | 대회 결과 확정 `tournament_match_completed` | 〃 | 대회 경기 결과가 확정됐어요 / `(대회명) · (경기 이름) · 홈 2 : 1 원정 · 승리.` (+ 개인 기록) | `/tournaments/:id/matches/:teamMatchId` |
+| 대회 결과 정정 `tournament_match_result_corrected` | 〃 (정정된 공식 결과의 출전자 기준) | 대회 경기 결과가 정정됐어요 / `(대회명) · (경기 이름) · 홈 2 : 1 원정 · 승리.` — 정정된 스코어 (+ 개인 기록) | `/tournaments/:id/matches/:teamMatchId` |
 
 - 한 사람에게 한 건 — 참가 명단에 든 팀장·매니저는 팀장 문구만 받는다.
+- 확정된 대회 경기 결과를 정정해 다시 확정하면 `tournament_match_result_corrected` 가 정정 리비전마다 수신자당 한 번 간다(완료 알림과 별개 — 이미 완료 알림을 받은 사람도 받는다). 리그 대진·친선은 정정해도 다시 알리지 않는다.
 - 시각은 KST 날짜·요일·시각으로 쓰고 "내일" 같은 상대 표현을 쓰지 않는다. 와/과는 상대팀 이름의 받침으로 고른다.
 - **출전자**: 대회·리그는 계산된 경기 명단(참가 명단 − 조정 − 결장 − 출전정지), 친선 팀매치는 최신 참석명단이
   제출(SUBMITTED·LOCKED)된 경우 그 명단. 참석명단을 아직 안 낸 친선 사이드는 킥오프 알림을 보내지 않는다(팀장·매니저는

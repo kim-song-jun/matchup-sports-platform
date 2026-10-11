@@ -15,6 +15,8 @@ vi.mock('next/navigation', () => ({
 }));
 vi.mock('@/lib/uuid', () => ({ randomUuid: () => '00000000-0000-4000-8000-000000000099' }));
 vi.mock('@/hooks/use-v1-api', () => ({
+  useV1PlaceSearch: () => ({ data: undefined, error: null, isFetching: false, isError: false, refetch: vi.fn() }),
+  useV1PublicKakaoMapsKey: () => ({ data: undefined }),
   useV1AdminMe: () => ({ data: { capabilities: ['status:write'] } }),
   useV1AdminTeamMatch: () => hooks.detail,
   useV1MasterRegions: () => ({ data: [
@@ -86,7 +88,8 @@ describe('AdminTeamMatchEditPage', () => {
     expect(screen.getByLabelText('최소 등급')).toHaveValue('beginner');
     expect(screen.getByLabelText('최대 등급')).toHaveValue('intermediate');
     fireEvent.change(screen.getByLabelText('제목'), { target: { value: '  수정 모집전  ' } });
-    fireEvent.change(screen.getByLabelText('경기 장소'), { target: { value: '  새 풋살장  ' } });
+    expect(screen.getByRole('textbox', { name: '경기 장소' })).toHaveValue('기존 풋살장');
+    fireEvent.change(screen.getByRole('textbox', { name: '경기 장소' }), { target: { value: '새 풋살장' } });
     fireEvent.click(screen.getByRole('button', { name: '수정 내용 저장' }));
 
     await waitFor(() => expect(update.mutateAsync).toHaveBeenCalledWith(expect.objectContaining({

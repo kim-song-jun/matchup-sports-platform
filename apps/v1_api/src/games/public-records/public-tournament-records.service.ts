@@ -5,6 +5,8 @@ import { PrismaService } from '../../prisma/prisma.service';
 import type { V1AuthUser } from '../../auth/v1-auth-user';
 import { compareRosterOrder } from '../../common/roster-order';
 import { isBracketPublished, shouldHideParticipantIdentity } from '../../tournaments/tournament-detail.presenter';
+import type { GroupStandingSummary } from '../../tournaments/slots/group-rank-preview';
+import { loadGroupStandingSummaries } from '../../tournaments/slots/load-group-rank-preview';
 import {
   ALL_COMPETITION_KINDS,
   findPublicTournamentOnSurface,
@@ -59,6 +61,8 @@ import { LEAGUE_TIE_BREAK_ORDER } from '../../league-matches/league-tie-break';
 import { SLOT_LABEL_SELECT, slotLabelFromRow } from '../../tournaments/slots/tournament-slot-label';
 import { PUBLIC_COMPETITION_STATUS_WHERE } from '../../tournaments/tournaments-read.query';
 import { regularPeriodCount } from '../../tournaments/competition-config/competition-config.parse';
+import { PLACE_SELECT } from '../../places/place-select';
+import { toPlaceView, type PlaceView } from '../../places/place-snapshot';
 
 /**
  * A fixture/match this route never returns individually and never lists in
@@ -85,8 +89,15 @@ const LEAGUE_FIXTURE_NOT_FOUND = { code: 'LEAGUE_FIXTURE_NOT_FOUND', message: '�
 const LEAGUE_FORFEIT_REASON_MARKER = '[LEAGUE_FORFEIT]';
 // 리그 도메인(league-match-public.service.ts)과 같은 상한 — 회고 STATS-1은 그 패턴의 복제다.
 const PLAYER_RECORDS_LIMIT = 30;
-// 어드민 추천 근거는 상위 후보만 필요하다 — chip 3개 + 여유분.
+// 어드민 추천 근거는 상위 후보만 필요하다 — 단 컷오프 지점의 동점자는 끊지 않는다(`takeTopWithTies`).
 const ADMIN_PLAYER_RECORDS_LIMIT = 10;
+
+/** 값 내림차순 배열의 앞 `limit`개 + 마지막 자리와 같은 값인 동점자 전원. */
+function takeTopWithTies<T>(rows: T[], limit: number, valueOf: (row: T) => number): T[] {
+  if (rows.length <= limit) return rows;
+  const cutoffValue = valueOf(rows[limit - 1]);
+  return rows.filter((row, index) => index < limit || valueOf(row) === cutoffValue);
+}
 type TournamentFixtureStatus = 'scheduled' | 'in_progress' | 'completed' | 'cancelled';
 
 /**
@@ -169,7 +180,7 @@ const CANONICAL_SCHEDULE_SELECT = {
   teamMatch: {
     select: {
       startAt: true,
-      placeName: true,
+      ...PLACE_SELECT,
       status: true,
       fieldId: true,
       homeSlot: { select: SLOT_LABEL_SELECT },
@@ -196,6 +207,7 @@ type FixtureScheduleRow = {
   groupId: string | null;
   scheduledAt: Date | null;
   venue: string | null;
+  place: PlaceView | null;
   status: TournamentFixtureStatus;
   homeRegistrationId: string | null;
   awayRegistrationId: string | null;
@@ -218,6 +230,7 @@ function presentCanonicalSchedule(row: CanonicalScheduleRow): FixtureScheduleRow
     groupId: row.groupId,
     scheduledAt: row.teamMatch.startAt,
     venue: row.teamMatch.placeName,
+    place: toPlaceView(row.teamMatch),
     status: canonicalFixtureStatus(row.teamMatch.status),
     homeRegistrationId: row.homeRegistrationId,
     awayRegistrationId: row.awayRegistrationId,
@@ -241,6 +254,7 @@ type PublicFixtureMatchRow = {
   groupId: string | null;
   scheduledAt: Date | null;
   venue: string | null;
+  place: PlaceView | null;
   status: TournamentFixtureStatus;
   homeRegistrationId: string | null;
   awayRegistrationId: string | null;
@@ -270,7 +284,7 @@ const CANONICAL_MATCH_SELECT = {
   teamMatch: {
     select: {
       startAt: true,
-      placeName: true,
+      ...PLACE_SELECT,
       status: true,
       fieldId: true,
       field: { select: { name: true } },
@@ -304,6 +318,7 @@ function presentCanonicalMatch(row: CanonicalMatchRow): FixtureMatchRow {
     groupId: row.groupId,
     scheduledAt: row.teamMatch.startAt,
     venue: row.teamMatch.placeName,
+    place: toPlaceView(row.teamMatch),
     status: canonicalFixtureStatus(row.teamMatch.status),
     homeRegistrationId: row.homeRegistrationId,
     awayRegistrationId: row.awayRegistrationId,
@@ -599,8 +614,16 @@ export class PublicTournamentRecordsService {
     const rows = [...totalsByKey.values()];
     return {
       tournamentId,
-      goals: rows.filter((row) => row.goals > 0).sort((a, b) => b.goals - a.goals).slice(0, ADMIN_PLAYER_RECORDS_LIMIT),
-      assists: rows.filter((row) => row.assists > 0).sort((a, b) => b.assists - a.assists).slice(0, ADMIN_PLAYER_RECORDS_LIMIT),
+      goals: takeTopWithTies(
+        rows.filter((row) => row.goals > 0).sort((a, b) => b.goals - a.goals),
+        ADMIN_PLAYER_RECORDS_LIMIT,
+        (row) => row.goals,
+      ),
+      assists: takeTopWithTies(
+        rows.filter((row) => row.assists > 0).sort((a, b) => b.assists - a.assists),
+        ADMIN_PLAYER_RECORDS_LIMIT,
+        (row) => row.assists,
+      ),
     };
   }
 
@@ -640,6 +663,7 @@ export class PublicTournamentRecordsService {
         id: true,
         title: true,
         kind: true,
+        format: true,
         status: true,
         bracketPublishedAt: true,
         bracketPublishScheduledAt: true,
@@ -856,6 +880,7 @@ export class PublicTournamentRecordsService {
         // 편성 순서일 뿐 성적 순위가 아니다. 표가 전부 0이면 프론트(TournamentStandingsTable)가
         // 메달 색·진출 강조를 스스로 끄고 "아직 경기 기록이 없어요" 안내를 붙인다.
         position: index + 1,
+        sharedRank: null,
         points: 0,
         wins: 0,
         draws: 0,
@@ -864,6 +889,13 @@ export class PublicTournamentRecordsService {
         goalsAgainst: 0,
       })),
     );
+
+    // 공동 순위는 조별+결선 대회에만 있다 — 「순위·대진표」 탭(대회 상세)과 같은 로더라 두 탭이 어긋나지 않는다.
+    // 진출 팀은 이 탭이 안 쓰므로 결선 대진 조회를 건너뛰고, 순위 행이 하나도 없으면 로더를 아예 부르지 않는다.
+    const groupStandingSummaries =
+      tournament.format === 'group_knockout' && standings.length > 0
+        ? await loadGroupStandingSummaries(this.prisma, tournamentId, { includeQualification: false })
+        : new Map<string, GroupStandingSummary>();
 
     const lastFixture = pageFixtures[pageFixtures.length - 1];
     const nextCursor: string | null =
@@ -886,6 +918,7 @@ export class PublicTournamentRecordsService {
           teamName: hideIdentity ? null : standing.registration.team.name,
           teamLogoUrl: hideIdentity ? null : (standing.registration.team.profile?.logoUrl ?? null),
           position: standing.position,
+          sharedRank: groupStandingSummaries.get(standing.groupId)?.sharedRankByRegistrationId.get(standing.registrationId) ?? null,
           points: standing.points,
           wins: standing.wins,
           draws: standing.draws,
@@ -1064,6 +1097,7 @@ export class PublicTournamentRecordsService {
         teamName: hideIdentity ? null : teamNameById.get(standing.teamId) ?? null,
         teamLogoUrl: hideIdentity ? null : teamLogoById.get(standing.teamId) ?? null,
         position: standing.position,
+        sharedRank: null,
         points: standing.points,
         wins: standing.wins,
         draws: standing.draws,
@@ -1248,6 +1282,7 @@ export class PublicTournamentRecordsService {
       groupName: fixture.group?.name ?? null,
       scheduledAt: fixture.scheduledAt?.toISOString() ?? null,
       venue: fixture.venue,
+      place: fixture.place,
       fieldName: fixture.field?.name ?? null,
       home: presentSide(fixture.homeRegistrationId, fixture.homeRegistration, hideIdentity),
       away: presentSide(fixture.awayRegistrationId, fixture.awayRegistration, hideIdentity),
@@ -1578,7 +1613,7 @@ export class PublicTournamentRecordsService {
         participantId: eligible ? event.participantId : null,
         participantName: eligible
           ? event.participantId === null
-            ? (event.playerNameSnapshot ?? '선수 정보 없음')
+            ? event.playerNameSnapshot ?? null
             : resolveParticipantDisplayName(participant, nameProfileByUserId)
           : null,
         jerseyNumber: eligible ? (participant?.jerseyNumber ?? null) : null,
@@ -1835,7 +1870,7 @@ export class PublicTournamentRecordsService {
         hostTeamId: true,
         approvedApplicantTeamId: true,
         startAt: true,
-        placeName: true,
+        ...PLACE_SELECT,
         status: true,
         hostTeam: { select: { id: true, name: true } },
         approvedApplicantTeam: { select: { id: true, name: true } },
@@ -1951,6 +1986,7 @@ export class PublicTournamentRecordsService {
       groupName: null,
       scheduledAt: teamMatch.startAt.toISOString(),
       venue: teamMatch.placeName,
+      place: toPlaceView(teamMatch),
       fieldName: null,
       // 리그 대진은 등록(registration) 개념이 없다 — teamId 를 그대로 안정적 id 로 쓴다.
       home: { registrationId: teamMatch.hostTeam.id, teamId: teamMatch.hostTeam.id, teamName: teamMatch.hostTeam.name },
@@ -2180,7 +2216,7 @@ const LEAGUE_SCHEDULE_SELECT = {
   id: true,
   leagueId: true,
   startAt: true,
-  placeName: true,
+  ...PLACE_SELECT,
   status: true,
   hostTeamId: true,
   approvedApplicantTeamId: true,
@@ -2248,6 +2284,7 @@ function toLeagueScheduleRow(
     groupId: null,
     scheduledAt: fixture.startAt,
     venue: fixture.placeName,
+    place: toPlaceView(fixture),
     status: LEAGUE_STATUS_TO_FIXTURE_STATUS[fixture.status],
     homeRegistrationId: fixture.hostTeamId,
     awayRegistrationId: fixture.approvedApplicantTeamId,
@@ -2386,7 +2423,7 @@ function presentScheduleEntry(
             side: raw.side,
             participantName: eligible
               ? raw.participantId === null
-                ? (raw.playerNameSnapshot ?? '선수 정보 없음')
+                ? raw.playerNameSnapshot ?? null
                 : resolveParticipantDisplayName(participant, nameProfileByUserId)
               : null,
             jerseyNumber: eligible ? (participant?.jerseyNumber ?? null) : null,
@@ -2414,6 +2451,7 @@ function presentScheduleEntry(
     groupName: fixture.group?.name ?? null,
     scheduledAt: fixture.scheduledAt?.toISOString() ?? null,
     venue: fixture.venue,
+    place: fixture.place,
     // finding #76: fieldId도 함께 내려준다 -- 위 canonical schedule select의 field.id 참고.
     // 소비처(my-staff-fixtures-client.tsx)가 이제 이 값으로 담당 경기를 매칭한다
     // (이름은 유일하지 않아 동명 필드가 생기면 오배정된다).

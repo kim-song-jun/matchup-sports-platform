@@ -10,7 +10,9 @@ import {
 import type { Request } from 'express';
 import { PrismaService } from '../prisma/prisma.service';
 import {
+  ACTIVITY_PROFILE_ROUTE,
   getPendingSocialSignupRoute,
+  isActivityProfileRequired,
   isPendingSocialSignupRequestAllowed,
 } from './social-signup-access';
 import type { V1AuthUser } from './v1-auth-user';
@@ -118,6 +120,19 @@ export class V1AuthGuard implements CanActivate {
           },
         });
       }
+    }
+
+    // 가입 정보 입력을 건너뛴 계정은 휴대폰 게이트와 같은 허용 목록 밖의 쓰기를 막는다.
+    if (
+      isActivityProfileRequired(user.onboardingStatus) &&
+      !isPhoneVerificationExemptActor(user) &&
+      !isPhoneVerificationRequestAllowed(request.method, requestUrl)
+    ) {
+      throw new ForbiddenException({
+        code: 'ACTIVITY_PROFILE_REQUIRED',
+        message: '활동하려면 정보를 먼저 입력해 주세요.',
+        details: { next: { route: ACTIVITY_PROFILE_ROUTE } },
+      });
     }
 
     // 휴대폰 본인인증 전역 게이트 — 조회는 열어 두고 쓰기만 막는다.

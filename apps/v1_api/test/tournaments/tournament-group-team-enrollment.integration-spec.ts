@@ -21,6 +21,18 @@ const teamsOf = async (groupId: string) =>
   (await prisma.v1TournamentGroupTeam.findMany({ where: { groupId }, orderBy: { sortOrder: 'asc' } }))
     .map(({ registrationId, sortOrder }) => ({ registrationId, sortOrder }));
 
+/** 조별 단계 편성에서 이 팀을 뗀다 — 시드 A조의 팀을 다른 조에 넣는 테스트의 명시적 준비. */
+const detach = (...registrationIds: string[]) =>
+  prisma.v1TournamentGroupTeam.deleteMany({ where: { registrationId: { in: registrationIds }, group: { tournamentId: ids.tournamentId, phase: 'group' } } });
+
+/** 시드 상태 복원 — A조에 4팀, 다른 조별 조의 편성은 없음. 앞 테스트가 만든 편성에 기대는 테스트 앞에서 부른다. */
+const restoreSeedStage = async () => {
+  await prisma.v1TournamentGroupTeam.deleteMany({ where: { groupId: { not: ids.groupId }, group: { tournamentId: ids.tournamentId, phase: 'group' } } });
+  const have = new Set((await teamsOf(ids.groupId)).map((team) => team.registrationId));
+  const missing = ids.registrationIds.map((registrationId, sortOrder) => ({ groupId: ids.groupId, registrationId, sortOrder })).filter((row) => !have.has(row.registrationId));
+  if (missing.length > 0) await prisma.v1TournamentGroupTeam.createMany({ data: missing });
+};
+
 describe('조별리그 경기와 조 편성 정합 (PostgreSQL)', () => {
   beforeAll(async () => {
     await prisma.$connect();
@@ -31,6 +43,7 @@ describe('조별리그 경기와 조 편성 정합 (PostgreSQL)', () => {
   afterAll(async () => { await prisma.$disconnect(); });
 
   it('편성 안 된 팀으로 조 경기를 만들면 편성되고, 이미 편성된 팀은 중복 행 없이 그대로다', async () => {
+    await detach(reg0, reg1, reg2);
     await bracket.createFixture(user, ids.tournamentId, {
       groupId: groupB, round: 'B조 1라운드', fixtureNumber: 101, homeRegistrationId: reg0, awayRegistrationId: reg1,
     });
@@ -56,6 +69,7 @@ describe('조별리그 경기와 조 편성 정합 (PostgreSQL)', () => {
   });
 
   it('경기가 남은 팀의 편성 해제는 409, 경기 없는 팀은 해제된다', async () => {
+    await detach(reg3);
     const busy = await prisma.v1TournamentGroupTeam.findFirstOrThrow({ where: { groupId: groupB, registrationId: reg1 } });
     await expect(bracket.removeGroupTeam(user, busy.id)).rejects.toMatchObject({ response: { code: 'GROUP_TEAM_HAS_FIXTURES' } });
     expect(await prisma.v1TournamentGroupTeam.count({ where: { id: busy.id } })).toBe(1);
@@ -84,6 +98,7 @@ describe('조별리그 경기와 조 편성 정합 (PostgreSQL)', () => {
       await prisma.v1TournamentGroupTeam.deleteMany({ where: { groupId: groupB } });
       await prisma.v1TeamMatch.update({ where: { id: lone.id }, data: { deletedAt: new Date() } });
       // reg3 는 이제 삭제된 경기에만 남는다. reg0 은 살아 있는 B조 경기(101,102)에도 있어 채워진다.
+      await restoreSeedStage();
       const groupABefore = await prisma.v1TournamentGroupTeam.findMany({ where: { groupId: ids.groupId }, orderBy: { sortOrder: 'asc' } });
 
       await runBackfill();
@@ -92,6 +107,7 @@ describe('조별리그 경기와 조 편성 정합 (PostgreSQL)', () => {
       expect(afterFirst.map((team) => team.sortOrder)).toEqual([0, 1, 2]);
 
       // 이미 편성된 A조는 행 id·순서까지 그대로, 결선 조는 비어 있다.
+      expect(groupABefore).toHaveLength(4);
       expect(await prisma.v1TournamentGroupTeam.findMany({ where: { groupId: ids.groupId }, orderBy: { sortOrder: 'asc' } })).toEqual(groupABefore);
       expect(await teamsOf(groupFinal)).toEqual([]);
 
@@ -112,6 +128,8 @@ describe('조별리그 경기와 조 편성 정합 (PostgreSQL)', () => {
     });
 
     it('확정이 아닌 신청의 팀은 편성하지 않는다', async () => {
+      await restoreSeedStage();
+      await detach(reg1, reg2);
       const groupD = (await bracket.createGroup(user, ids.tournamentId, { name: 'D조', phase: 'group' })).id;
       await bracket.createFixture(user, ids.tournamentId, {
         groupId: groupD, round: 'D조 1라운드', fixtureNumber: 111, homeRegistrationId: reg1, awayRegistrationId: reg2,
@@ -127,6 +145,8 @@ describe('조별리그 경기와 조 편성 정합 (PostgreSQL)', () => {
     });
 
     it('정규 리그(kind=regular_league) 대회의 조 경기는 편성하지 않는다', async () => {
+      await restoreSeedStage();
+      await detach(reg0, reg2);
       const groupE = (await bracket.createGroup(user, ids.tournamentId, { name: 'E조', phase: 'group' })).id;
       await bracket.createFixture(user, ids.tournamentId, {
         groupId: groupE, round: 'E조 1라운드', fixtureNumber: 112, homeRegistrationId: reg0, awayRegistrationId: reg2,
@@ -148,6 +168,8 @@ describe('조별리그 경기와 조 편성 정합 (PostgreSQL)', () => {
           { registrationId, points, wins, draws, losses, goalsFor, goalsAgainst, fairPlayPoints, position }));
 
     it('순위 행이 없는 조는 자동 편성해도 순위 행을 만들지 않는다 (공개 화면이 0값 기준선을 내린다)', async () => {
+      await restoreSeedStage();
+      await detach(reg0, reg1);
       const groupC = (await bracket.createGroup(user, ids.tournamentId, { name: 'C조', phase: 'group' })).id;
       await bracket.createFixture(user, ids.tournamentId, {
         groupId: groupC, round: 'C조 1라운드', fixtureNumber: 121, homeRegistrationId: reg0, awayRegistrationId: reg1,
@@ -157,6 +179,7 @@ describe('조별리그 경기와 조 편성 정합 (PostgreSQL)', () => {
     });
 
     it('순위 행이 있는 조에 팀이 자동 편성되면 그 팀의 순위 행이 같은 요청에서 생기고 기존 팀 값은 그대로다', async () => {
+      await restoreSeedStage();
       await bracket.recalculateStandings(user, ids.tournamentId);
       const before = await standingsOf(ids.groupId);
       expect(before).toHaveLength(4);
@@ -174,6 +197,67 @@ describe('조별리그 경기와 조 편성 정합 (PostgreSQL)', () => {
       expect(after.map((row) => row.registrationId)).toEqual(before.map((row) => row.registrationId));
       expect(after.find((row) => row.registrationId === reg3)).toEqual(before.find((row) => row.registrationId === reg3));
       expect(after.filter((row) => row.registrationId !== reg3)).toEqual(before.filter((row) => row.registrationId !== reg3));
+    });
+  });
+
+  describe('한 팀 한 조 (결정 4) — 서버가 지킨다', () => {
+    let groupC: string;
+    let groupD: string;
+    const createIn = (groupId: string, home: string | undefined, away: string | undefined, fixtureNumber: number) =>
+      bracket.createFixture(user, ids.tournamentId, { groupId, round: `한팀한조 ${fixtureNumber}`, fixtureNumber, homeRegistrationId: home, awayRegistrationId: away });
+
+    beforeAll(async () => {
+      groupC = (await bracket.createGroup(user, ids.tournamentId, { name: '한팀한조 C조', phase: 'group' })).id;
+      groupD = (await bracket.createGroup(user, ids.tournamentId, { name: '한팀한조 D조', phase: 'group' })).id;
+    });
+    beforeEach(() => detach(reg0, reg1, reg2, reg3)); // 모든 조별 조에서 뗀다 — 앞 블록이 남긴 B·C·D·E 편성 포함
+
+    it('다른 조별 조에 편성된 팀으로 만들면 409 TEAM_IN_OTHER_GROUP 이고 경기도 편성도 생기지 않는다', async () => {
+      await bracket.createGroupTeam(user, ids.tournamentId, { groupId: groupC, registrationId: reg0 });
+
+      await expect(createIn(groupD, reg0, reg1, 301)).rejects.toMatchObject({ response: { code: 'TEAM_IN_OTHER_GROUP' } });
+
+      expect(await teamsOf(groupD)).toEqual([]); // 상대 팀 reg1 도 편성되지 않았다
+      expect(await prisma.v1TournamentMatchDetails.count({ where: { groupId: groupD } })).toBe(0);
+    });
+
+    it('같은 조에 편성된 팀은 허용되고, 어느 조에도 없는 상대 팀은 자동 편성된다 (대조군)', async () => {
+      await bracket.createGroupTeam(user, ids.tournamentId, { groupId: groupC, registrationId: reg0 });
+
+      await createIn(groupC, reg0, reg1, 302);
+
+      expect((await teamsOf(groupC)).map((team) => team.registrationId)).toEqual([reg0, reg1]);
+    });
+
+    it('이미 두 조에 겹친 옛 데이터의 팀도 편성된 그 조 경기에는 계속 넣을 수 있다', async () => {
+      // 게이트 이전에 생긴 겹침을 SQL 로 재현한다(서비스는 이제 만들지 못한다).
+      await prisma.v1TournamentGroupTeam.createMany({ data: [
+        { groupId: groupC, registrationId: reg2, sortOrder: 0 },
+        { groupId: groupD, registrationId: reg2, sortOrder: 0 },
+      ] });
+
+      await expect(createIn(groupC, reg2, reg3, 303)).resolves.toBeDefined();
+
+      expect(await prisma.v1TournamentGroupTeam.count({ where: { registrationId: reg2, group: { phase: 'group', tournamentId: ids.tournamentId } } })).toBe(2);
+    });
+
+    it('PATCH 로 다른 조 팀을 넣으면 409 이고 경기는 비어 있는 채다, 편성 안 된 팀은 들어가 자동 편성된다', async () => {
+      await bracket.createGroupTeam(user, ids.tournamentId, { groupId: groupC, registrationId: reg0 });
+      const fixture = await createIn(groupD, undefined, undefined, 304);
+
+      await expect(bracket.updateFixture(user, fixture.id, { homeRegistrationId: reg0 })).rejects.toMatchObject({ response: { code: 'TEAM_IN_OTHER_GROUP' } });
+      expect((await prisma.v1TournamentMatchDetails.findUniqueOrThrow({ where: { teamMatchId: fixture.id } })).homeRegistrationId).toBeNull();
+
+      await bracket.updateFixture(user, fixture.id, { homeRegistrationId: reg1 });
+      expect((await teamsOf(groupD)).map((team) => team.registrationId)).toEqual([reg1]);
+    });
+
+    it('목록 화면의 조 팀 배정도 다른 조 팀은 409, 결선 단계 조는 그대로 받는다', async () => {
+      await bracket.createGroupTeam(user, ids.tournamentId, { groupId: groupC, registrationId: reg0 });
+
+      await expect(bracket.createGroupTeam(user, ids.tournamentId, { groupId: groupD, registrationId: reg0 }))
+        .rejects.toMatchObject({ response: { code: 'TEAM_IN_OTHER_GROUP' } });
+      await expect(bracket.createGroupTeam(user, ids.tournamentId, { groupId: groupFinal, registrationId: reg0 })).resolves.toBeDefined();
     });
   });
 });

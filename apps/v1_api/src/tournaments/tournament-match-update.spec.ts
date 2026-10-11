@@ -202,7 +202,7 @@ function fakeTx(startAt: Date | null = null, gameOptions: FakeGame = {}) {
 beforeEach(() => jest.clearAllMocks());
 
 describe('updateTournamentMatchInTx — 자기 경기만 잠그고 명단은 후속 이벤트로', () => {
-  it.each([{ venue: '새 구장' }, { fixtureNumber: 7 }])('종료 없는 경기의 부분 수정은 경기와 양 팀 캘린더 종료를 함께 보충한다: %j', async (patch) => {
+  it.each([{ place: { name: '새 구장', address: null, latitude: null, longitude: null, provider: null, providerPlaceId: null } }, { fixtureNumber: 7 }])('종료 없는 경기의 부분 수정은 경기와 양 팀 캘린더 종료를 함께 보충한다: %j', async (patch) => {
     const startAt = new Date('2026-11-15T09:00:00Z');
     const endAt = new Date('2026-11-15T09:40:00Z');
     const { tx, mocks } = fakeTx(startAt);
@@ -259,9 +259,37 @@ describe('updateTournamentMatchInTx — 자기 경기만 잠그고 명단은 후
 
   it('장소만 고치면 이벤트를 남기지 않는다', async () => {
     const { tx, calls, events } = fakeTx();
-    await updateTournamentMatchInTx(tx, { teamMatchId: 'tm-x', venue: '새 구장' });
+    await updateTournamentMatchInTx(tx, { teamMatchId: 'tm-x', place: { name: '새 구장', address: null, latitude: null, longitude: null, provider: null, providerPlaceId: null } });
     expect(events).toEqual([]);
     expect(calls).not.toContain('enqueue');
+  });
+
+  it('장소 스냅샷이 오면 장소 여섯 칸 전체를 교체하고, 이름만 오면 좌표를 비운다', async () => {
+    const { tx } = fakeTx();
+    await updateTournamentMatchInTx(tx, {
+      teamMatchId: 'tm-x',
+      place: { name: '상암', address: '서울 마포구', latitude: 37.5, longitude: 126.9, provider: 'kakao', providerPlaceId: '9' },
+    });
+    expect(tx.v1TeamMatch.update).toHaveBeenLastCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ placeName: '상암', placeAddress: '서울 마포구', placeLatitude: 37.5, placeLongitude: 126.9, placeProvider: 'kakao', placeProviderId: '9' }),
+    }));
+
+    await updateTournamentMatchInTx(tx, {
+      teamMatchId: 'tm-x',
+      place: { name: '동네 운동장', address: null, latitude: null, longitude: null, provider: null, providerPlaceId: null },
+    });
+    expect(tx.v1TeamMatch.update).toHaveBeenLastCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ placeName: '동네 운동장', placeAddress: null, placeLatitude: null, placeLongitude: null, placeProvider: null, placeProviderId: null }),
+    }));
+  });
+
+  it('장소를 보내지 않으면 장소 칸을 건드리지 않는다', async () => {
+    const { tx } = fakeTx();
+    await updateTournamentMatchInTx(tx, { teamMatchId: 'tm-x', scheduledAt: new Date('2026-09-02T10:00:00Z') });
+    const data = (tx.v1TeamMatch.update as jest.Mock).mock.calls[0][0].data;
+    for (const key of ['placeName', 'placeAddress', 'placeLatitude', 'placeLongitude', 'placeProvider', 'placeProviderId']) {
+      expect(data).not.toHaveProperty(key);
+    }
   });
 
   it('번호만 고치면 새 번호를 저장·응답하고 제목과 일정은 동기화하며 경기·결과·사이드는 유지한다', async () => {
@@ -418,7 +446,7 @@ describe('updateTournamentMatchInTx — 시작된 경기의 팀 교체', () => {
 
   it('팀은 그대로 두고 장소만 고치면 진행 중 경기도 사유·삭제 없이 수정된다', async () => {
     const { tx, calls } = fakeTx(null, { state: 'LIVE' });
-    await expect(updateTournamentMatchInTx(tx, { teamMatchId: 'tm-x', venue: '새 구장', allowStartedTeamChange: true })).resolves.toMatchObject({ startedTeamChange: null });
+    await expect(updateTournamentMatchInTx(tx, { teamMatchId: 'tm-x', place: { name: '새 구장', address: null, latitude: null, longitude: null, provider: null, providerPlaceId: null }, allowStartedTeamChange: true })).resolves.toMatchObject({ startedTeamChange: null });
     expect(calls).not.toContain('delete-events');
   });
 
@@ -442,6 +470,6 @@ it('연결된 슬롯을 null로 덮으려는 요청은 잠금 뒤 최신 승자 
 it('연결된 슬롯의 최신 팀을 그대로 보내는 수정은 허용한다', async () => {
   const { tx } = fakeTx();
   (tx.v1TournamentMatchAdvancementEdge.findMany as jest.Mock).mockResolvedValue([{ targetSide: 'HOME' }]);
-  await expect(updateTournamentMatchInTx(tx, { teamMatchId: 'tm-x', homeRegistrationId: 'reg-a', venue: '새 장소' }))
+  await expect(updateTournamentMatchInTx(tx, { teamMatchId: 'tm-x', homeRegistrationId: 'reg-a', place: { name: '새 장소', address: null, latitude: null, longitude: null, provider: null, providerPlaceId: null } }))
     .resolves.toMatchObject({ homeRegistrationId: 'reg-a' });
 });

@@ -114,6 +114,19 @@ describe('formatDeadline / formatDeadlineDetail — 실제 시각(사실) 계약
     expect(formatDeadline(in3Hours)).toBe('마감 3시간 전');
   });
 
+  it('마감까지 1시간 미만이면 남은 분을, 1시간 이상이면 내림한 시간·일을 캡션으로 준다', () => {
+    const at = (ms: number) => new Date(NOW.getTime() + ms).toISOString();
+    const MIN = 60_000;
+    expect(formatDeadline(at(20 * MIN))).toBe('마감 20분 전');
+    expect(formatDeadline(at(40 * MIN))).toBe('마감 40분 전');
+    expect(formatDeadline(at(59 * MIN))).toBe('마감 59분 전');
+    expect(formatDeadline(at(60 * MIN))).toBe('마감 1시간 전');
+    expect(formatDeadline(at(119 * MIN))).toBe('마감 1시간 전');
+    expect(formatDeadline(at(23 * 60 * MIN + 59 * MIN))).toBe('마감 23시간 전');
+    expect(formatDeadline(at(24 * 60 * MIN))).toBe('마감 1일 전');
+    expect(formatDeadline(at(49 * 60 * MIN))).toBe('마감 2일 전');
+  });
+
   it('마감 시각이 없으면 값은 "경기 시작 전까지", 캡션은 빈 문자열(중복 표시 방지)', () => {
     expect(formatDeadlineDetail(null)).toBe('경기 시작 전까지');
     expect(formatDeadline(null)).toBe('');

@@ -17,6 +17,8 @@ import { teamMatchDateErrors } from '@/lib/team-match-dates';
 import { V1_LEVELS } from '@/lib/v1-levels';
 import { GENDER_RULE_OPTIONS, genderRuleLabel, matchGenderRuleLabel } from '@/lib/v1-status-labels';
 import { toDistrictRegionOptions } from '@/lib/v1-regions';
+import { placeFromView, toMatchPlacePayload, type PlaceValue, PLACE_NAME_MAX_LENGTH } from '@/lib/place';
+import { PlacePicker } from '@/components/v1-ui/place-picker';
 import type { V1AdminTeamMatchDetail } from '@/types/api';
 import { isoToKstDatetimeLocal, kstDatetimeLocalToIso } from '@/lib/kst-calendar';
 import { TeamMatchImagesField } from '@/components/team-matches/team-match-images';
@@ -36,8 +38,9 @@ function EditForm({ teamMatch }: { teamMatch: V1AdminTeamMatchDetail }) {
   const [imageUrl, setImageUrl] = useState(teamMatch.imageUrl ?? '');
   const [listImageUrl, setListImageUrl] = useState(teamMatch.listImageUrl ?? '');
   const [regionId, setRegionId] = useState(teamMatch.regionId);
-  const [placeName, setPlaceName] = useState(teamMatch.placeName);
-  const [addressText, setAddressText] = useState(teamMatch.placeAddress ?? '');
+  const [place, setPlace] = useState<PlaceValue | null>(
+    () => placeFromView(teamMatch.place) ?? (teamMatch.placeName ? { kind: 'manual', name: teamMatch.placeName, address: teamMatch.placeAddress } : null),
+  );
   const [startsAt, setStartsAt] = useState(isoToKstDatetimeLocal(teamMatch.startAt));
   const [endsAt, setEndsAt] = useState(isoToKstDatetimeLocal(teamMatch.endAt));
   const [deadlineAt, setDeadlineAt] = useState(isoToKstDatetimeLocal(teamMatch.deadlineAt));
@@ -57,7 +60,7 @@ function EditForm({ teamMatch }: { teamMatch: V1AdminTeamMatchDetail }) {
     deadlineAt,
     existingDeadlineAt: teamMatch.deadlineAt,
   });
-  const canSubmit = canWrite && title.trim() !== '' && regionId !== '' && placeName.trim() !== '' && startsAt !== '' && Object.keys(dateErrors).length === 0 && !uploading;
+  const canSubmit = canWrite && title.trim() !== '' && regionId !== '' && place !== null && startsAt !== '' && Object.keys(dateErrors).length === 0 && !uploading;
 
   const uploadImage = async (file: File) => {
     const result = await uploadImages.mutateAsync([file]);
@@ -81,8 +84,7 @@ function EditForm({ teamMatch }: { teamMatch: V1AdminTeamMatchDetail }) {
         startsAt: startsAtIso,
         endsAt: kstDatetimeLocalToIso(endsAt),
         deadlineAt: kstDatetimeLocalToIso(deadlineAt),
-        manualPlaceName: placeName.trim(),
-        addressText: addressText.trim() || null,
+        ...toMatchPlacePayload(place),
         costNote: costNote.trim() || null,
         rulesText: rulesText.trim() || null,
         minLevelCode: minLevelCode || null,
@@ -123,8 +125,7 @@ function EditForm({ teamMatch }: { teamMatch: V1AdminTeamMatchDetail }) {
 
           <section className="space-y-4 rounded-2xl border border-[var(--border)] bg-[var(--card-surface)] p-5">
             <h2 className="text-[length:var(--font-size-body-lg)] font-bold text-[var(--text-strong)]">장소와 시간</h2>
-            <label className="block text-[length:var(--font-size-body-sm)] font-medium">경기 장소<input aria-label="경기 장소" value={placeName} onChange={(event) => setPlaceName(event.target.value)} maxLength={120} className={inputClass} /></label>
-            <label className="block text-[length:var(--font-size-body-sm)] font-medium">상세 주소<input aria-label="상세 주소" value={addressText} onChange={(event) => setAddressText(event.target.value)} maxLength={200} className={inputClass} /></label>
+            <PlacePicker label="경기 장소" value={place} onChange={setPlace} maxLength={PLACE_NAME_MAX_LENGTH.match} />
             <div className="grid gap-4 md:grid-cols-2">
               <label className="text-[length:var(--font-size-body-sm)] font-medium">경기 시작<input aria-label="경기 시작" type="datetime-local" value={startsAt} onChange={(event) => setStartsAt(event.target.value)} className={inputClass} /></label>
               <label className="text-[length:var(--font-size-body-sm)] font-medium">경기 종료<input aria-label="경기 종료" type="datetime-local" value={endsAt} onChange={(event) => setEndsAt(event.target.value)} className={inputClass} /></label>

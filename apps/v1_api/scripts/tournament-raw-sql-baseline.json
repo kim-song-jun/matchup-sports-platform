@@ -59,5 +59,13 @@
   "src/tournaments/slots/competition-bracket-lock.ts": {
     "allowed": 1,
     "why": "Regular-league lane: competition-row FOR UPDATE, the same lock the league service takes. It returns no data; the on-hold check runs after the lock through findTournamentOnSurface(['regular_league'])."
+  },
+  "src/tournaments/tournament-list-query.ts": {
+    "allowed": 1,
+    "why": "공개 목록 정렬·페이지를 DB 에서 한다(상태 그룹 순서는 Prisma orderBy 로 못 쓴다). 종류 조건은 COMPETITION_LIST_SURFACE 표를 거치고, 공개·상태·삭제 조건은 통합 스펙이 Prisma where 와 같은 결과인지 고정한다."
+  },
+  "src/league-matches/league-fixture-generation-guard.ts": {
+    "allowed": 2,
+    "why": "리그 행을 기다리지 않고 잠그는 NOWAIT 두 갈래(경기 수정의 끝남 검사용 FOR SHARE NOWAIT, 완료 처리용 FOR UPDATE NOWAIT) — 데이터를 돌려주지 않고, 상태 판정은 그 뒤 kind 를 거는 findTournamentOnSurface 가 한다. 리그 → 경기·경기 → 리그 두 잠금 순서가 공존해 리그 행을 기다리면 교착하므로, Prisma 로 표현할 수 없는 NOWAIT 잠금이 필요하다."
   }
 }

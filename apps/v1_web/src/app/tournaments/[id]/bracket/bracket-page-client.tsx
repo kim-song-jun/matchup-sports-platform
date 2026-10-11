@@ -33,7 +33,7 @@ import {
 } from '@/components/public-game-records/schedule-content';
 import { competitionFormatLabel, isLeagueCompetition } from '@/lib/competition-kind';
 import { useCurrentHref } from '@/components/v1-ui/use-current-href';
-import { withFromPath } from '@/lib/session-storage';
+import { hasStoredV1Session, withFromPath } from '@/lib/session-storage';
 import type {
   V1TournamentDetail,
   V1TournamentFixture,
@@ -51,6 +51,7 @@ function toStandingsRows(standings: readonly V1TournamentStanding[]): Tournament
     teamName: s.teamName,
     teamLogoUrl: s.teamLogoUrl,
     position: s.position,
+    sharedRank: s.sharedRank,
     points: s.points,
     wins: s.wins,
     draws: s.draws,
@@ -90,6 +91,7 @@ function toGroupStandingsRows(group: V1TournamentGroup): TournamentStandingsRow[
       teamName: team.teamName,
       teamLogoUrl: team.teamLogoUrl,
       position: nextPosition++,
+      sharedRank: null,
       points: 0,
       wins: 0,
       draws: 0,
@@ -180,9 +182,8 @@ function TeamFixturesDetail({ teamId, fixtures }: { teamId: string | null; fixtu
  * 또는 cancelled) 뒤에만 보여준다. 예전엔 group.advanceCount만 있으면 1경기만 끝나도
  * "상위 N팀 진출" 배지·순위표 강조가 확정처럼 떴다 — 오너 지적: "바로 진출 그게
  * 아니라 실제 조별리그가 다 끝나야 나오게끔". 미완료면 배지 대신 정직한 안내
- * ("조별리그가 끝나면 진출 팀이 정해져요")를 보여주고, advance 자체를 null로 낮춰
- * 아래 순위표 하이라이트(tm-standings-row-highlight)·StandingRankBadge의 승격 강조도
- * 같은 기준으로 자동 꺼지게 한다(별도 분기 없이 하나의 변수로 gate).
+ * ("조별리그가 끝나면 진출 팀이 정해져요")를 보여주고, 순위표에 넘기는 advancingKeys 도
+ * 같은 `stageComplete` 로 gate 해 하이라이트·진출 배지가 함께 꺼지게 한다.
  */
 function GroupStandingsSection({
   group,
@@ -194,6 +195,10 @@ function GroupStandingsSection({
   fromHref?: string;
 }) {
   const stageComplete = isGroupStageComplete(group.id, fixtures);
+  // 진출 팀은 서버가 결선 대진 기준으로 알려 준다(group.qualification) — 완전 동률이면 position 이
+  // 임의 순서라 `position <= advanceCount` 로 칠하면 실제 결선 팀과 갈린다. 없으면 칠하지 않는다.
+  const advancingKeys =
+    stageComplete && group.qualification ? new Set(group.qualification.advancingRegistrationIds) : null;
   const advance = stageComplete ? group.advanceCount : null;
   /* #381 — 펼침 상세는 "이 조에서 치른 경기"만 보여준다. 예전엔 대회 전체 픽스처를
      팀 id 로만 걸러서, 조별 순위 영역인데도 그 팀의 결선(4강·결승·3·4위전) 경기와
@@ -224,10 +229,15 @@ function GroupStandingsSection({
           </span>
         ) : null}
       </div>
+      {stageComplete && group.qualification?.undecided ? (
+        <div className="tm-text-caption" style={{ marginBottom: 8 }}>
+          동률 — 운영자가 진출 팀을 정해요
+        </div>
+      ) : null}
 
       <TournamentStandingsTable
         rows={toGroupStandingsRows(group)}
-        advance={advance}
+        advancingKeys={advancingKeys}
         ariaLabel={`${group.name} 순위표`}
         renderDetail={(row) => <TeamFixturesDetail teamId={row.teamId} fixtures={groupFixtures} />}
         fromHref={fromHref}
@@ -249,7 +259,7 @@ function LeagueStandingsSection({
 }) {
   return (
     <section aria-label={standingsAriaLabel(label)} style={{ marginBottom: 16 }}>
-      <TournamentStandingsTable rows={rows} advance={null} ariaLabel={standingsAriaLabel(label, '표')} fromHref={fromHref} />
+      <TournamentStandingsTable rows={rows} advancingKeys={null} ariaLabel={standingsAriaLabel(label, '표')} fromHref={fromHref} />
     </section>
   );
 }
@@ -374,7 +384,13 @@ export function BracketScheduleTab({
   // `/schedule`의 권한 기능도 통합 허브인 `/bracket`에서 동일하게 제공한다. 공개 일정
   // 조회와 분리된 인증 전용 요청이라 비로그인·비참가자는 빈 상태로 끝나고, 참가팀
   // owner/manager에게만 자기 팀 경기 강조가 열린다.
-  const myFixtures = useV1MyTournamentFixtures(tournamentId);
+  // 비로그인 관전자는 세션 힌트가 없으니 요청 자체를 보내지 않는다(보내면 매번 401).
+  // 힌트는 SSR 하이드레이션 불일치를 피하려고 effect 에서 읽는다.
+  const [hasSessionHint, setHasSessionHint] = useState(false);
+  useEffect(() => {
+    setHasSessionHint(hasStoredV1Session());
+  }, []);
+  const myFixtures = useV1MyTournamentFixtures(tournamentId, { enabled: hasSessionHint });
   // 리그는 조회조차 하지 않는다 — 위 섹션 주석 참조.
   const playerRecords = usePublicTournamentPlayerRecords(tournamentId, { enabled: !isRegularLeague });
 

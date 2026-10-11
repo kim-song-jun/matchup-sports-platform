@@ -20,6 +20,7 @@ enum V1OnboardingStatus {
   terms_done
   social_terms_required
   social_profile_required
+  social_profile_deferred
   signup_done
   sport_done
   level_done
@@ -1211,6 +1212,11 @@ model V1Match {
   imageUrl        String?       @map("image_url")
   placeName       String        @map("place_name")
   placeAddress    String?       @map("place_address")
+  // 장소 검색으로 고른 장소의 스냅샷(src/places/place-snapshot.ts). 직접 입력한 장소는 넷 다 null 이다.
+  placeLatitude   Float?        @map("place_latitude")
+  placeLongitude  Float?        @map("place_longitude")
+  placeProvider   String?       @map("place_provider")
+  placeProviderId String?       @map("place_provider_id")
   startAt         DateTime      @map("start_at")
   endAt           DateTime?     @map("end_at")
   deadlineAt      DateTime?     @map("deadline_at")
@@ -1803,6 +1809,11 @@ model V1TeamMatch {
   listImageUrl               String?           @map("list_image_url")
   placeName                  String?           @map("place_name")
   placeAddress               String?           @map("place_address")
+  // 장소 검색으로 고른 장소의 스냅샷(src/places/place-snapshot.ts). 직접 입력한 장소는 넷 다 null 이다.
+  placeLatitude              Float?            @map("place_latitude")
+  placeLongitude             Float?            @map("place_longitude")
+  placeProvider              String?           @map("place_provider")
+  placeProviderId            String?           @map("place_provider_id")
   startAt                    DateTime?         @map("start_at")
   endAt                      DateTime?         @map("end_at")
   deadlineAt                 DateTime?         @map("deadline_at")
@@ -2531,6 +2542,13 @@ enum V1TournamentRegistrationStatus {
   cancelled
 }
 
+/// 어드민이 신청을 취소 상태로 보낸 이유 — 팀의 취소 요청을 받아 준 것인지(approved), 운영자가 신청을 물린 것인지(rejected).
+/// 팀이 직접 취소한 draft 와 이 컬럼이 생기기 전의 행은 null 이다.
+enum V1RegistrationCancelOutcome {
+  approved
+  rejected
+}
+
 enum V1TournamentPaymentMethod {
   pg
   bank_transfer
@@ -2599,10 +2617,13 @@ model V1Tournament {
   scheduledEndAt             DateTime?                   @map("scheduled_end_at")
   venue                      String?
   parkingInfo                String?                     @default("주차와 입장 동선은 지도에서 확인해요.") @map("parking_info")
-  // 카카오 로컬 API 키워드 검색으로 venue를 지오코딩한 좌표(KakaoGeocodingService). 키 미설정/검색
-  // 실패 시 null로 남고, 그 경우 프론트는 네이버 지도 검색 링크 폴백을 그대로 사용한다.
+  // venue 의 장소 스냅샷(src/places/place-snapshot.ts). 직접 입력한 장소는 좌표·provider 가 null 이다.
+  // 대회·리그 경기를 만들 때 기본 장소로 상속된다.
+  venueAddress               String?                     @map("venue_address")
   latitude                   Float?
   longitude                  Float?
+  venueProvider              String?                     @map("venue_provider")
+  venueProviderId            String?                     @map("venue_provider_id")
   coverImageUrl              String?                     @map("cover_image_url")
   teamCount                  Int                         @default(8) @map("team_count")
   minPlayers                 Int                         @default(6) @map("min_players")
@@ -2827,6 +2848,9 @@ model V1TournamentRegistration {
   cancelRequestedAt        DateTime?                       @map("cancel_requested_at")
   cancelPreviousStatus     V1TournamentRegistrationStatus? @map("cancel_previous_status")
   cancelReason             String?                         @map("cancel_reason")
+  /// 어드민이 취소 승인·거부를 처리하며 남긴 사유. `cancelReason` 은 팀이 취소 요청에 남긴 사유만 담는다.
+  adminCancelReason        String?                         @map("admin_cancel_reason")
+  cancelOutcome            V1RegistrationCancelOutcome?    @map("cancel_outcome")
   createdAt                DateTime                        @default(now()) @map("created_at")
   updatedAt                DateTime                        @updatedAt @map("updated_at")
   // ── 통합 축 (R1 expand, 아직 읽는 코드 없음) ─────────────────────────────────

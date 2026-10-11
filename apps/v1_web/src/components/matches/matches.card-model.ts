@@ -189,10 +189,12 @@ export function formatDeadline(value: string | null | undefined): string {
   if (Number.isNaN(deadline.getTime())) return '';
   const diffMs = deadline.getTime() - Date.now();
   if (diffMs <= 0) return '지났어요';
-  const diffHours = Math.ceil(diffMs / 3_600_000);
+  // 올림하면 20분 남아도 '1시간', 25시간 남아도 '2일'로 부풀려진다 — 분은 올림해 0분 표기를 피하고, 시간·일은 내림한다.
+  const diffMinutes = Math.ceil(diffMs / 60_000);
+  if (diffMinutes < 60) return `마감 ${diffMinutes}분 전`;
+  const diffHours = Math.floor(diffMinutes / 60);
   if (diffHours < 24) return `마감 ${diffHours}시간 전`;
-  const diffDays = Math.ceil(diffHours / 24);
-  return `마감 ${diffDays}일 전`;
+  return `마감 ${Math.floor(diffHours / 24)}일 전`;
 }
 
 /** [P2] 신청 마감 실제 시각(값 슬롯) — 지났든 남았든 항상 실제 날짜·시각을 보여준다. */

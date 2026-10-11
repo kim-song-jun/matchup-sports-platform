@@ -2,6 +2,20 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { LeagueTemplateDialog, type LeagueTemplateDialogProps } from './league-template-dialog';
 
+vi.mock('@/hooks/use-v1-api', () => ({
+  useV1PlaceSearch: () => ({ data: undefined, isFetching: false, isError: false, error: null }),
+  useV1PublicKakaoMapsKey: () => ({ data: { kakaoMapsJsKey: null }, isLoading: false }),
+}));
+
+const SANGAM = {
+  name: '상암 풋살파크',
+  address: '서울 마포구 월드컵로 240',
+  latitude: 37.5683,
+  longitude: 126.8972,
+  provider: 'kakao' as const,
+  providerPlaceId: 'kakao-sangam',
+};
+
 // 2030-01-07 은 월요일이다. 시작일을 먼 미래로 두면 "지금" 과 무관하게 요일 전개 결과가 고정된다.
 const STARTS_ON = '2030-01-07T00:00:00.000Z';
 
@@ -12,6 +26,7 @@ function setup(overrides: Partial<LeagueTemplateDialogProps> = {}) {
     <LeagueTemplateDialog
       leagueStartsOn={STARTS_ON}
       initialTeamCount={4}
+      defaultPlace={null}
       recentVenues={[]}
       replaceExisting={false}
       isSubmitting={false}
@@ -108,27 +123,31 @@ describe('LeagueTemplateDialog', () => {
     expect(screen.getByLabelText('요일')).toHaveValue('1');
   });
 
-  it('장소를 적으면 placeName 으로 보내고, 추천 칩을 누르면 채워지며, 비우면 키가 없다', async () => {
-    const { onSubmit } = setup({ recentVenues: ['망원 유수지', '성수 풋살장'] });
+  it('다른 장소 사용에서 추천 칩을 고르면 장소 스냅샷을 보낸다', async () => {
+    const { onSubmit } = setup({ recentVenues: [SANGAM] });
     fillByWeekday();
 
-    fireEvent.click(screen.getByRole('button', { name: /성수 풋살장/ }));
-    expect(screen.getByLabelText('기본 장소')).toHaveValue('성수 풋살장');
+    fireEvent.click(screen.getByRole('radio', { name: '다른 장소 사용' }));
+    fireEvent.click(screen.getByRole('button', { name: /상암 풋살파크/ }));
     fireEvent.click(screen.getByRole('button', { name: '빈 경기 만들기' }));
 
     await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
-    expect(onSubmit.mock.calls[0][0]).toMatchObject({ placeName: '성수 풋살장' });
+    expect(onSubmit.mock.calls[0][0]).toMatchObject({
+      placeName: '상암 풋살파크',
+      placeLatitude: 37.5683,
+      placeProviderId: 'kakao-sangam',
+    });
   });
 
-  it('장소를 비워 두면 placeName 키 자체를 보내지 않는다 — 서버 기본값("장소 미정")을 쓴다', async () => {
-    const { onSubmit } = setup();
+  it('기본 장소 사용(기본값)이면 장소 키를 하나도 보내지 않는다 — 서버가 기본 장소를 상속한다', async () => {
+    const { onSubmit } = setup({ defaultPlace: SANGAM });
     fillByWeekday();
-    fireEvent.change(screen.getByLabelText('기본 장소'), { target: { value: '   ' } });
+    expect(screen.getByRole('radio', { name: '기본 장소 사용 (상암 풋살파크)' })).toBeChecked();
 
     fireEvent.click(screen.getByRole('button', { name: '빈 경기 만들기' }));
 
     await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
-    expect(Object.keys(onSubmit.mock.calls[0][0])).not.toContain('placeName');
+    expect(Object.keys(onSubmit.mock.calls[0][0]).filter((key) => key.startsWith('place'))).toEqual([]);
   });
 
   it('리그 시작일을 읽을 수 없으면 요일 채우기를 막고 이유를 적는다', () => {

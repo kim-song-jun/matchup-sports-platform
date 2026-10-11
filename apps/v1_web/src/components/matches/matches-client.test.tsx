@@ -1,4 +1,4 @@
-import { fireEvent, render as rtlRender, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render as rtlRender, screen, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -64,9 +64,10 @@ vi.mock('./matches-page', () => ({
       {model.onChat && <button onClick={model.onChat}>채팅</button>}
       {model.chatError && <div role="alert">{model.chatError}</div>}
       {model.reviewAction && <a href={model.reviewAction.href}>{model.reviewAction.label}</a>}
-      <div data-testid="address">{model.match.address}</div>
+      <div data-testid="address">{model.match.place?.address ?? ''}</div>
       <div data-testid="description">{model.match.description}</div>
       <div data-testid="title">{model.match.title}</div>
+      <div data-testid="deadline">{model.match.deadline}</div>
       <div data-testid="back-href">{model.backHref}</div>
       <div data-testid="edit-href">{model.match.editHref}</div>
       <div data-testid="applications-href">{model.match.applicationsHref}</div>
@@ -90,7 +91,7 @@ vi.mock('./matches-page', () => ({
   MatchStatePageView: () => null,
 }));
 
-// place는 실제 detail API 응답 모양(`{ name, addressText }`) 그대로 둔다 — 예전 fixture는
+// place는 실제 detail API 응답 모양(`V1PlaceView`: name·address·좌표) 그대로 둔다 — 예전 fixture는
 // 실API가 절대 주지 않는 top-level `placeName`을 심어 뒀고, matches-client.tsx의
 // `?? query.data.placeName` 폴백 가지가 이 fixture 때문에만 값을 갖게 되어 실제로는 목업
 // fallback까지 내려가는 결함(2026-08-27 감사 M-A-personal-match-state)을 가리고 있었다.
@@ -100,7 +101,7 @@ const baseMatch = {
   title: '풋살 매치',
   sportName: '풋살',
   sport: { sportId: 'sport-futsal', name: '풋살' },
-  place: { name: '서울 풋살장', addressText: '서울 마포구 월드컵로 1' },
+  place: { name: '서울 풋살장', address: '서울 마포구 월드컵로 1', latitude: null, longitude: null, provider: null, providerPlaceId: null },
   startsAt: '2026-08-01T10:00:00.000Z',
   capacityText: '3/10',
   status: 'open' as const,
@@ -126,6 +127,32 @@ describe('MatchDetailPageClient — GA events', () => {
     expect(trackEvent).toHaveBeenCalledWith('match_view', { matchId: 'match-1', sportType: '풋살' });
     expect(trackEvent).toHaveBeenCalledTimes(1);
   });
+
+  it('신청이 일반 오류로 실패하면 재시도 안내를 보여 준다', async () => {
+    applyMatchMutate.mockImplementation((_body, options) => options?.onError?.(new Error('boom')));
+    render(<MatchDetailPageClient matchId="match-1" />);
+
+    fireEvent.click(screen.getByRole('button', { name: '참가 신청' }));
+    fireEvent.click(screen.getByRole('button', { name: '신청 보내기' }));
+
+    expect(await screen.findByText('신청을 보내지 못했어요. 잠시 후 다시 시도해 주세요.')).toBeTruthy();
+  });
+
+  it.each(['ACTIVITY_PROFILE_REQUIRED', 'PHONE_VERIFICATION_REQUIRED'])(
+    '전역 안내가 처리한 %s 실패에는 일반 재시도 안내를 겹쳐 보여 주지 않는다',
+    async (code) => {
+      applyMatchMutate.mockImplementation((_body, options) =>
+        options?.onError?.(Object.assign(new Error('blocked'), { code, statusCode: 403 })),
+      );
+      render(<MatchDetailPageClient matchId="match-1" />);
+
+      fireEvent.click(screen.getByRole('button', { name: '참가 신청' }));
+      fireEvent.click(screen.getByRole('button', { name: '신청 보내기' }));
+
+      await waitFor(() => expect(applyMatchMutate).toHaveBeenCalled());
+      expect(screen.queryByText('신청을 보내지 못했어요. 잠시 후 다시 시도해 주세요.')).toBeNull();
+    },
+  );
 
   it('fires match_join_complete after a successful apply', async () => {
     render(<MatchDetailPageClient matchId="match-1" />);
@@ -284,7 +311,7 @@ describe('MatchDetailPageClient — 주소·설명 목업 폴백 (2026-08-27 감
     useV1MatchMock.mockReturnValue({
       data: {
         ...baseMatch,
-        place: { name: '성수 실내체육관', addressText: null },
+        place: { name: '성수 실내체육관', address: null, latitude: null, longitude: null, provider: null, providerPlaceId: null },
         description: null,
         descriptionPreview: null,
         viewerState: 'none',
@@ -302,7 +329,7 @@ describe('MatchDetailPageClient — 주소·설명 목업 폴백 (2026-08-27 감
     useV1MatchMock.mockReturnValue({
       data: {
         ...baseMatch,
-        place: { name: '성수 실내체육관', addressText: '서울 성동구 아차산로 17' },
+        place: { name: '성수 실내체육관', address: '서울 성동구 아차산로 17', latitude: null, longitude: null, provider: null, providerPlaceId: null },
         description: '초보 환영 농구 매치예요.',
         viewerState: 'none',
       },
@@ -651,5 +678,48 @@ describe('MatchDetailPageClient — 목록 캐시 승계(placeholder) 중 행동
     render(<MatchDetailPageClient matchId="match-1" />);
 
     expect(screen.getByRole('button', { name: '참가 신청' })).toBeTruthy();
+  });
+});
+
+describe('MatchDetailPageClient — 마감 안내 시계', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-10-11T00:00:00.000Z'));
+    useV1MatchApplicationEligibilityMock.mockReturnValue({ data: { eligible: true, applicationId: null } });
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('페이지를 열어 둔 채 시간이 흐르면 마감 N분 전이 줄어들고, 마감이 지나면 지났어요로 바뀐다', () => {
+    useV1MatchMock.mockReturnValue({
+      data: { ...baseMatch, viewerState: 'none', deadlineAt: '2026-10-11T00:20:00.000Z' },
+      isError: false,
+    });
+
+    render(<MatchDetailPageClient matchId="match-1" />);
+    expect(screen.getByTestId('deadline').textContent).toBe('마감 20분 전');
+
+    act(() => {
+      vi.advanceTimersByTime(5 * 60_000);
+    });
+    expect(screen.getByTestId('deadline').textContent).toBe('마감 15분 전');
+
+    act(() => {
+      vi.advanceTimersByTime(16 * 60_000);
+    });
+    expect(screen.getByTestId('deadline').textContent).toBe('지났어요');
+  });
+
+  it('이미 지난 마감에는 타이머를 남기지 않는다', () => {
+    useV1MatchMock.mockReturnValue({
+      data: { ...baseMatch, viewerState: 'none', deadlineAt: '2026-10-10T23:00:00.000Z' },
+      isError: false,
+    });
+
+    render(<MatchDetailPageClient matchId="match-1" />);
+
+    expect(vi.getTimerCount()).toBe(0);
   });
 });

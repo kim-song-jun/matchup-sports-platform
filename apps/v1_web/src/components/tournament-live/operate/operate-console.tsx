@@ -29,7 +29,7 @@ import {
 } from '@/hooks/use-v1-game-operations';
 import { readGameResultScore } from '@/lib/game-result-score';
 import { gameOperationsErrorMessage, useV1GameOperationsConsole } from '@/hooks/use-v1-game-operations-console';
-import { isTakeoverHeld } from '@/lib/game-operations-queue';
+import { hasPendingWork, isTakeoverHeld } from '@/lib/game-operations-queue';
 import {
   freezeCapture,
   isClockSuspicious,
@@ -39,6 +39,7 @@ import { extractErrorMessage } from '@/lib/error-message';
 import { randomUuid } from '@/lib/uuid';
 import { isV1NetworkError, V1ApiError } from '@/lib/api-client';
 import { ActionTargetPicker, type EventCaptureCommitInput } from './action-target-picker';
+import { isSecondYellowWithoutRed } from './second-yellow';
 import { latestLineupForDisplay, latestOperableLineup } from './lineup-grid';
 import { MatchupTitle } from './matchup-title';
 import { ElapsedMatchClock } from './elapsed-match-clock';
@@ -59,13 +60,14 @@ import { useTournamentOpsRole } from '@/components/tournament-ops/role-context';
 import { findRecentGoalEvent } from '@/lib/find-recent-goal-event';
 import { findRecentSubstitutionEvent } from '@/lib/find-recent-substitution-event';
 import { deriveFoulCounts } from '@/lib/team-foul-counter';
-import { deriveOnPitchParticipantIds, countActiveSubstitutions } from '@/lib/on-pitch-state';
+import { deriveOnPitchParticipantIds, deriveSentOffParticipantIds, countActiveSubstitutions } from '@/lib/on-pitch-state';
 import { TeamFoulCounterBar } from '@/components/game-operations/team-foul-counter-bar';
 import { formatMatchClock } from '@/lib/game-operations-clock';
 import { endPeriodLabel, periodLabel, periodPrefix, regularPeriodCountOf } from './period-label';
 import {
   commandConfirmCopy,
   commitActionConfirmCopy,
+  secondYellowConfirmCopy,
   penaltyShootoutFinishConfirmCopy,
   penaltyShootoutOverrideFinishConfirmCopy,
   penaltyShootoutStartConfirmCopy,
@@ -426,6 +428,10 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
     () => deriveOnPitchParticipantIds(allParticipants, ops.liveEvents),
     [allParticipants, ops.liveEvents],
   );
+  const sentOffParticipantIds = useMemo(
+    () => deriveSentOffParticipantIds(ops.liveEvents, ops.queue.items),
+    [ops.liveEvents, ops.queue.items],
+  );
   const substitutionUsedBySideId = useMemo(() => {
     const bySide: Record<string, number> = {};
     for (const side of gameDetail.data?.sides ?? []) {
@@ -697,6 +703,45 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
   useEffect(() => {
     liveEventsRef.current = ops.liveEvents;
   }, [ops.liveEvents]);
+  // 확인 시트를 기다리는 사이 버전이 올라가므로, 그 뒤의 큐 적재는 최신 `ops`로 한다.
+  // 큐 항목마다 적재 시점의 gameSnapshot.version 이 expectedVersion 으로 박히므로,
+  // 앞 이벤트가 확정되기 전에 뒤 이벤트를 적재하면 서버가 VERSION_CONFLICT 로 거절한다.
+  const opsRef = useRef(ops);
+  const queueIdleWaitersRef = useRef<Array<() => void>>([]);
+  useEffect(() => {
+    opsRef.current = ops;
+    if (hasPendingWork(ops.queue)) return;
+    const waiters = queueIdleWaitersRef.current;
+    queueIdleWaitersRef.current = [];
+    waiters.forEach((release) => release());
+  }, [ops]);
+  const waitForQueueIdle = useCallback(
+    () =>
+      hasPendingWork(opsRef.current.queue)
+        ? new Promise<void>((resolve) => queueIdleWaitersRef.current.push(resolve))
+        : Promise.resolve(),
+    [],
+  );
+  // 방금 적재한 이벤트가 서버에 확정(acked)됐는지, 실패(failed)했는지. 큐에서 사라지면(재수화 등) 확정을 알 수 없어 실패로 본다.
+  const eventSettledWaitersRef = useRef<Array<() => void>>([]);
+  useEffect(() => {
+    const waiters = eventSettledWaitersRef.current;
+    eventSettledWaitersRef.current = [];
+    waiters.forEach((check) => check());
+  }, [ops]);
+  const waitForEventSettled = useCallback(
+    (clientEventId: string) =>
+      new Promise<'acked' | 'failed'>((resolve) => {
+        const check = () => {
+          const item = opsRef.current.queue.items.find((candidate) => candidate.clientEventId === clientEventId);
+          if (!item || item.status === 'failed') resolve('failed');
+          else if (item.status === 'acked') resolve('acked');
+          else eventSettledWaitersRef.current.push(check);
+        };
+        check();
+      }),
+    [],
+  );
 
   const handleCommit = useCallback(
     async (input: EventCaptureCommitInput) => {
@@ -715,7 +760,26 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
         periodCount,
       );
       if (!(await confirm(copy))) return;
-      void ops.submitEvent(input);
+      const askRed = isSecondYellowWithoutRed(liveEventsRef.current, opsRef.current.queue.items, input);
+      const submitted = opsRef.current.submitEvent(input);
+      if (askRed) {
+        const yellowEventId = await submitted;
+        if (yellowEventId === null) return;
+        const redInput: EventCaptureCommitInput = { ...input, payload: { card: 'RED' } };
+        const redCopy = secondYellowConfirmCopy(input, gameDetail.data?.sides ?? [], fixtureLineup.data?.lineups ?? [], periodCount);
+        if (await confirm(redCopy)) {
+          // 서버는 레드 앞에 옐로가 있는지 보지 않는다 — 옐로가 확정되기 전에 레드를 적재하면 옐로가 실패해도
+          // 레드만 남고, 옐로를 다시 보내면 기록 순서가 뒤집힌다.
+          if ((await waitForEventSettled(yellowEventId)) !== 'acked') {
+            showToast('옐로 기록이 실패했어요. 옐로를 다시 보낸 뒤 레드를 기록해 주세요.');
+            return;
+          }
+          await waitForQueueIdle();
+          void opsRef.current.submitEvent(redInput);
+        }
+      } else {
+        void submitted;
+      }
       // 익명 GOAL에는 participantId가 없어 findRecentGoalEvent가 매칭할 수 없으므로
       // 어시스트 추가 액션을 달지 않는다(고아 토스트 액션을 만들지 않기 위한 가드).
       if (input.type === 'GOAL' && input.participantId !== undefined) {
@@ -732,7 +796,7 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
         });
       }
     },
-    [commandBlocked, ops, showToast, confirm, gameDetail.data?.sides, fixtureLineup.data?.lineups, clockWarningMinutes],
+    [commandBlocked, showToast, confirm, waitForQueueIdle, waitForEventSettled, gameDetail.data?.sides, fixtureLineup.data?.lineups, clockWarningMinutes, periodCount],
   );
 
   // 이슈 #376 — 예전엔 ops.reverseEvent(되돌리기) + ops.submitEvent(재제출) 두 번
@@ -1782,6 +1846,7 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
           substitutionOutParticipantIds={substitutionOutParticipantIds}
           substitutionPolicy={gameDetail.data?.substitutionPolicy ?? null}
           substitutionUsedBySideId={substitutionUsedBySideId}
+          sentOffParticipantIds={sentOffParticipantIds}
           onCommit={handleCommit}
           onCancel={() => setPendingAction(null)}
         />

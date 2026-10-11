@@ -30,19 +30,19 @@ export function toReviewsPageModel(data: V1ReviewListResponse | undefined, tab: 
     stats: tab === 'pending'
       ? [
           { label: '경기', value: `${items.length}건` },
-          { label: '대상', value: `${targetCount}명` },
-          { label: '남은 리뷰', value: `${remainingCount}명` },
+          { label: '대상', value: `${targetCount}건` },
+          { label: '남은 리뷰', value: `${remainingCount}건` },
         ]
       : [
-          { label: '작성 완료', value: `${reviewedCount || items.length}명` },
+          { label: '작성 완료', value: `${reviewedCount || items.length}건` },
           { label: '기록', value: `${items.length}건` },
-          { label: '진행', value: remainingCount > 0 ? `${remainingCount}명` : '완료' },
+          { label: '진행', value: remainingCount > 0 ? `${remainingCount}건` : '완료' },
         ],
     cards: items.map((item) => ({
       ...item,
       href: `/my/reviews/${item.sourceType}/${item.sourceId}`,
       badgeLabel: item.state === 'done' ? '완료' : isTeamReviewSource(item.sourceType) ? '상대팀' : '작성 전',
-      kindLabel: sourceTypeLabel(item.sourceType),
+      kindLabel: sourceTypeLabel(item.sourceType, item.isLeague),
       meta: buildListMeta(item.completedAt, item.reviewedCount, item.targetCount, item.remainingCount),
       ctaLabel: item.state === 'done' ? '보기' : item.reviewedCount > 0 ? '이어서 작성' : '리뷰',
     })),
@@ -147,7 +147,7 @@ export function getReviewProgress(targets: V1ReviewTarget[], drafts: Record<stri
 }
 
 export function formatReviewProgress({ submitted, inProgress, remaining }: ReviewProgress) {
-  return [submitted > 0 ? `작성 완료 ${submitted}명` : null, `작성 중 ${inProgress}명`, `남은 대상 ${remaining}명`]
+  return [submitted > 0 ? `작성 완료 ${submitted}건` : null, `작성 중 ${inProgress}건`, `남은 대상 ${remaining}건`]
     .filter(Boolean)
     .join(' · ');
 }
@@ -227,12 +227,12 @@ export function toReviewsReceivedPageModel(data: V1ReviewReceivedResponse | unde
   };
 }
 
-export function sourceTypeLabel(sourceType: V1ReviewSourceType) {
+export function sourceTypeLabel(sourceType: V1ReviewSourceType, isLeague?: boolean) {
   switch (sourceType) {
     case 'match':
       return '개인 매치';
     case 'team_match':
-      return '팀매치';
+      return isLeague ? '리그 경기' : '팀매치';
     case 'platform_team_match':
       return '운영 평가 · 참가자 평점과 별도';
     case 'tournament_fixture':
@@ -255,7 +255,7 @@ export function formatDateTime(value: string | null) {
 }
 
 function buildListMeta(completedAt: string | null, reviewedCount: number, targetCount: number, remainingCount: number) {
-  if (remainingCount <= 0) return `${reviewedCount}명에게 전송 완료`;
+  if (remainingCount <= 0) return `${reviewedCount}건 전송 완료`;
   return `${formatDateTime(completedAt)} · ${reviewedCount}/${targetCount} 완료`;
 }
 
@@ -275,7 +275,7 @@ function groupReceivedReviews(items: V1ReceivedReviewDetail[]) {
       // 어느 경기였는지를 제목으로 — 예전엔 "팀매치"처럼 종류만 나와서 맥락을 알 수 없었다.
       title: first?.source?.title ?? sourceTypeLabel(sourceType),
       meta: [
-        sourceTypeLabel(sourceType),
+        sourceTypeLabel(sourceType, first?.source?.isLeague),
         first?.submittedAt ? formatDateTime(first.submittedAt) : null,
         `받은 리뷰 ${reviews.length}건`,
       ].filter(Boolean).join(' · '),

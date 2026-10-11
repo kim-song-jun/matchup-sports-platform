@@ -43,6 +43,8 @@ function renderDetail(action: HeroAction = () => undefined, extra: Partial<TeamM
     match: {
       ...base.match,
       id: 'hero-message-fixture',
+      // 장소 카드의 주소 복사 라이브 영역(role=status)이 hero 안내 단언과 섞이지 않게 한다.
+      place: null,
       title: '합성 안내 수명 팀매치',
       hostTeam: '합성 홈팀',
       imageUrl: null,
@@ -83,7 +85,7 @@ async function submitFromActualPicker() {
   await act(async () => {
     fireEvent.click(screen.getAllByRole('button', { name: '신청하기' })[0]!);
   });
-  const sheet = screen.getByRole('dialog', { name: '어느 팀으로 신청할까요?' });
+  const sheet = screen.getByRole('dialog', { name: '이 팀으로 신청할까요?' });
   expect(within(sheet).getByRole('radio', { name: /합성 신청팀/ })).toBeChecked();
   await act(async () => {
     fireEvent.click(within(sheet).getByRole('button', { name: '합성 신청팀으로 신청하기' }));
@@ -210,7 +212,7 @@ describe('TeamMatchDetailPageView — hero 안내 TTL과 unmount', () => {
     const view = renderDetail(undefined, { applyLabel: '신청하기', applyTeamPicker: picker(submit) });
     await submitFromActualPicker();
     expect(submit).toHaveBeenCalledWith('timer-applicant', null);
-    expect(screen.queryByRole('dialog', { name: '어느 팀으로 신청할까요?' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('dialog', { name: '이 팀으로 신청할까요?' })).not.toBeInTheDocument();
     expect(screen.getByRole('status')).toHaveTextContent(APPLIED);
     expect(heroTimeoutIds.size).toBe(1);
     view.unmount();

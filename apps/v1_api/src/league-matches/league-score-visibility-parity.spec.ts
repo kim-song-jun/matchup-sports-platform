@@ -31,6 +31,11 @@ function rowWithPolicy(mode: V1VisibilityMode): LeagueFixtureListRow {
     approvedApplicantTeamId: 'team-b',
     startAt: START,
     placeName: '풋살장 A',
+    placeAddress: null,
+    placeLatitude: null,
+    placeLongitude: null,
+    placeProvider: null,
+    placeProviderId: null,
     status: 'completed',
     game: { id: 'game-1', state: 'ENDED', currentOfficialRevisionId: 'rev-1', visibilityPolicy: { mode } },
   };

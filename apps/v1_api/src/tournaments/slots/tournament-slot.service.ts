@@ -8,7 +8,7 @@ import { lockGameRows } from '../../games/roster/game-row-lock';
 import { assignLeagueFixtureSideInTx } from '../../league-matches/league-fixture-side-assignment';
 import { promoteLeagueWhenSlotsFilledInTx } from '../../league-matches/league-slot-status';
 import { PrismaService } from '../../prisma/prisma.service';
-import { assignTournamentFixtureSideInTx, releaseUnusedGroupTeamsInTx } from '../tournament-bracket-tx';
+import { assertNotInOtherGroupInTx, assignTournamentFixtureSideInTx, releaseUnusedGroupTeamsInTx, type GroupEnrollment } from '../tournament-bracket-tx';
 import { adminBracketSlotInclude, serializeAdminBracketSlot } from './admin-bracket-view';
 import { ALL_COMPETITION_KINDS, findTournamentOnSurface } from '../tournament-surface-lookup';
 import { syncByeSlotInTx } from './bye-slot-sync';
@@ -33,6 +33,16 @@ async function releaseGroupTeams(tx: Tx, ctx: SlotMutationContext, tournamentId:
   for (const { groupId, registrationId } of releases) byGroup.set(groupId, [...(byGroup.get(groupId) ?? []), registrationId]);
   for (const [groupId, registrationIds] of byGroup) {
     await releaseUnusedGroupTeamsInTx(tx, ctx.admin, tournamentId, groupId, registrationIds);
+  }
+}
+
+type GroupTeamLedger = { releases: GroupTeamRelease[]; enrollments: GroupEnrollment[] };
+
+/** 모든 자리 변경이 끝난 뒤에만 부른다: 이전 팀 편성을 풀고, 이번 요청이 새로 만든 편성이 다른 조별 조와 겹치면 409 (전체 롤백). */
+async function settleGroupTeams(tx: Tx, ctx: SlotMutationContext, tournamentId: string, ledger: GroupTeamLedger): Promise<void> {
+  await releaseGroupTeams(tx, ctx, tournamentId, ledger.releases);
+  for (const { groupId, registrationId } of ledger.enrollments) {
+    await assertNotInOtherGroupInTx(tx, { tournamentId, groupId, registrationIds: [registrationId] });
   }
 }
 
@@ -72,7 +82,7 @@ async function assignSlotCore(
   ctx: SlotMutationContext,
   slotId: string,
   registrationId: string | null,
-  releases: GroupTeamRelease[],
+  ledger: GroupTeamLedger,
 ): Promise<{ tournamentId: string; fixtureIds: string[] }> {
   const slot = await tx.v1TournamentSlot.findUnique({
     where: { id: slotId },
@@ -103,13 +113,13 @@ async function assignSlotCore(
   if (slot.kind === 'BYE') await syncByeSlotInTx(tx, slot, registrationId);
   for (const fixture of fixtures) {
     if (fixture.groupPhase === 'group' && fixture.groupId !== null && slot.registrationId !== null) {
-      releases.push({ groupId: fixture.groupId, registrationId: slot.registrationId });
+      ledger.releases.push({ groupId: fixture.groupId, registrationId: slot.registrationId });
     }
     for (const side of sidesUsingSlot(fixture, slot.id)) {
       if (competition.kind === 'regular_league') {
         await assignLeagueFixtureSideInTx(tx, ctx, ctx.admin, { teamMatchId: fixture.id, side, registrationId });
       } else {
-        await assignTournamentFixtureSideInTx(tx, ctx, ctx.admin, { fixtureId: fixture.id, side, registrationId });
+        await assignTournamentFixtureSideInTx(tx, ctx, ctx.admin, { fixtureId: fixture.id, side, registrationId, enrollmentSink: ledger.enrollments });
       }
     }
   }
@@ -140,9 +150,9 @@ export async function assignSlotInTx(
   slotId: string,
   registrationId: string | null,
 ): Promise<string[]> {
-  const releases: GroupTeamRelease[] = [];
-  const { tournamentId, fixtureIds } = await assignSlotCore(tx, ctx, slotId, registrationId, releases);
-  await releaseGroupTeams(tx, ctx, tournamentId, releases);
+  const ledger: GroupTeamLedger = { releases: [], enrollments: [] };
+  const { tournamentId, fixtureIds } = await assignSlotCore(tx, ctx, slotId, registrationId, ledger);
+  await settleGroupTeams(tx, ctx, tournamentId, ledger);
   return fixtureIds;
 }
 
@@ -180,19 +190,19 @@ export async function assignSlotsBatchInTx(
   const fixtures = await loadSlotUsingFixtures(tx, slotIds);
   await lockGameRows(tx, fixtures.flatMap((fixture) => (fixture.game === null ? [] : [fixture.game.id])));
 
-  const releases: GroupTeamRelease[] = [];
+  const ledger: GroupTeamLedger = { releases: [], enrollments: [] };
   const affected = new Set<string>();
   for (const change of ordered) {
     const before = current.get(change.slotId) ?? null;
     if (before !== null && before !== change.registrationId) {
-      (await assignSlotCore(tx, ctx, change.slotId, null, releases)).fixtureIds.forEach((id) => affected.add(id));
+      (await assignSlotCore(tx, ctx, change.slotId, null, ledger)).fixtureIds.forEach((id) => affected.add(id));
     }
   }
   for (const change of ordered) {
     if (change.registrationId === null) continue;
-    (await assignSlotCore(tx, ctx, change.slotId, change.registrationId, releases)).fixtureIds.forEach((id) => affected.add(id));
+    (await assignSlotCore(tx, ctx, change.slotId, change.registrationId, ledger)).fixtureIds.forEach((id) => affected.add(id));
   }
-  await releaseGroupTeams(tx, ctx, tournamentId, releases);
+  await settleGroupTeams(tx, ctx, tournamentId, ledger);
   return [...affected].sort();
 }
 
@@ -221,13 +231,13 @@ export async function releaseSlotsForRegistrationInTx(
   });
   if (held.length === 0) return;
   const fixtures = await loadSlotUsingFixtures(tx, held.map((slot) => slot.id));
-  const releases: GroupTeamRelease[] = [];
+  const ledger: GroupTeamLedger = { releases: [], enrollments: [] };
   for (const slot of held) {
     const using = fixtures.filter((fixture) => fixture.homeSlotId === slot.id || fixture.awaySlotId === slot.id);
     if (using.some(isSlotFixtureStarted)) continue;
-    await assignSlotCore(tx, ctx, slot.id, null, releases);
+    await assignSlotCore(tx, ctx, slot.id, null, ledger);
   }
-  await releaseGroupTeams(tx, ctx, competition.id, releases);
+  await settleGroupTeams(tx, ctx, competition.id, ledger);
 }
 
 @Injectable()

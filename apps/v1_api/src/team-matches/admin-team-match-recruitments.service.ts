@@ -1,5 +1,6 @@
 import { ensurePlatformTeamMatchChat } from '../chat/platform-team-match-chat';
 import { canConfirmTeamMatch, validateTeamMatchDates } from './team-match-dates';
+import { assertOpponentCostWithinTotal } from './team-match-cost';
 import {
   BadRequestException,
   ConflictException,
@@ -12,6 +13,7 @@ import { V1AuthUser } from '../auth/v1-auth-user';
 import { AdminContextService } from '../common/admin-context.service';
 import { canonicalGameCommandPayloadHash, GamesService } from '../games/games.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { resolvePlaceSnapshot, toPlaceColumns } from '../places/place-snapshot';
 import { PrismaService } from '../prisma/prisma.service';
 import { resolveSportLevelRange } from '../sports/level-range';
 import { createTeamMatchScheduleInTx } from '../team-schedules/team-schedules.service';
@@ -48,12 +50,25 @@ export class AdminTeamMatchRecruitmentsService {
     private readonly notifications: NotificationsService,
   ) {}
 
+  /** 이름이 요청에 있으면 스냅샷 전체를 교체한다 — 좌표가 안 오면 null 이라 새 이름에 옛 핀이 남지 않는다. */
+  private resolvePlace(dto: CreateAdminTeamMatchRecruitmentDto) {
+    return resolvePlaceSnapshot({
+      name: dto.manualPlaceName,
+      address: dto.addressText,
+      latitude: dto.placeLatitude,
+      longitude: dto.placeLongitude,
+      provider: dto.placeProvider,
+      providerPlaceId: dto.placeProviderId,
+    });
+  }
+
   async create(user: V1AuthUser, dto: CreateAdminTeamMatchRecruitmentDto) {
     const admin = await this.adminContext.getMutationAdmin(user.id);
     const dates = validateTeamMatchDates(dto);
     if (!dto.title.trim() || !dto.manualPlaceName.trim()) {
       throw new BadRequestException({ code: 'VALIDATION_FAILED', message: '매치 제목과 경기 장소를 입력해 주세요.' });
     }
+    const place = this.resolvePlace(dto);
 
     const [sport, region, competitionConfig] = await Promise.all([
       this.prisma.v1Sport.findFirst({ where: { id: dto.sportId, isActive: true }, select: { id: true } }),
@@ -87,6 +102,8 @@ export class AdminTeamMatchRecruitmentsService {
         return this.createResponse(teamMatch.id, teamMatch.status, true);
       }
 
+      // After the replay lookup: a request accepted before this rule existed must still replay.
+      assertOpponentCostWithinTotal(dto.costNote);
       const levelRange = await resolveSportLevelRange(
         tx,
         dto.sportId,
@@ -108,8 +125,7 @@ export class AdminTeamMatchRecruitmentsService {
           description: dto.description?.trim() || null,
           imageUrl: dto.imageUrl?.trim() || null,
           listImageUrl: dto.listImageUrl?.trim() || null,
-          placeName: dto.manualPlaceName.trim(),
-          placeAddress: dto.addressText?.trim() || null,
+          ...toPlaceColumns(place),
           startAt: dates.startsAt,
           endAt: dates.endsAt,
           deadlineAt: dates.deadlineAt,
@@ -469,7 +485,7 @@ export class AdminTeamMatchRecruitmentsService {
       );
       this.emitTeamNotifications(
         result.rejectedTeamIds,
-        'team_match_application_rejected',
+        'team_match_closed',
         teamMatchId,
         '신청한 팀매치의 참가팀이 확정되어 모집이 종료됐어요.',
       );
@@ -583,6 +599,7 @@ export class AdminTeamMatchRecruitmentsService {
     if (!dto.title.trim() || !dto.manualPlaceName.trim()) {
       throw new BadRequestException({ code: 'VALIDATION_FAILED', message: '매치 제목과 경기 장소를 입력해 주세요.' });
     }
+    const place = this.resolvePlace(dto);
     const existing = await this.prisma.v1TeamMatch.findFirst({
       where: { id: teamMatchId, deletedAt: null },
       select: {
@@ -608,6 +625,7 @@ export class AdminTeamMatchRecruitmentsService {
       throw new ConflictException({ code: 'TEAM_MATCH_SPORT_IMMUTABLE', message: '모집을 만든 뒤에는 종목을 변경할 수 없어요.' });
     }
     const dates = validateTeamMatchDates(dto, existing.deadlineAt);
+    assertOpponentCostWithinTotal(dto.costNote);
     const [region, levelRange] = await Promise.all([
       this.prisma.v1Region.findFirst({ where: { id: dto.regionId, isActive: true, level: 2 }, select: { id: true } }),
       resolveSportLevelRange(this.prisma, dto.sportId, dto.minLevelCode, dto.maxLevelCode),
@@ -623,8 +641,7 @@ export class AdminTeamMatchRecruitmentsService {
           description: dto.description?.trim() || null,
           imageUrl: dto.imageUrl?.trim() || null,
           listImageUrl: dto.listImageUrl === undefined ? undefined : dto.listImageUrl?.trim() || null,
-          placeName: dto.manualPlaceName.trim(),
-          placeAddress: dto.addressText?.trim() || null,
+          ...toPlaceColumns(place),
           startAt: dates.startsAt,
           endAt: dates.endsAt,
           deadlineAt: dates.deadlineAt,
@@ -740,7 +757,7 @@ export class AdminTeamMatchRecruitmentsService {
     return game;
   }
 
-  private emitTeamNotifications(teamIds: string[], type: 'team_match_application_approved' | 'team_match_application_rejected', teamMatchId: string, body: string) {
+  private emitTeamNotifications(teamIds: string[], type: 'team_match_application_approved' | 'team_match_application_rejected' | 'team_match_closed', teamMatchId: string, body: string) {
     if (teamIds.length === 0) return;
     this.notifications.emitToManyDeferred(
       async () => (

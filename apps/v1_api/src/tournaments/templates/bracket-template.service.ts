@@ -19,10 +19,12 @@ import { ApplyBracketTemplateDto, toBracketTemplateInput } from './dto/bracket-t
 // (league-fixture-generator.service.ts 의 TRANSACTION_TIMEOUT_MS 주석과 같은 이유).
 const TRANSACTION_OPTIONS = { timeout: 45_000, maxWait: 5_000 } as const;
 
+import { TOURNAMENT_VENUE_SELECT, type TournamentVenueRow } from '../../places/tournament-venue';
+
 type Tx = Prisma.TransactionClient;
 type PinnedTournament = {
-  id: string; sportId: string; regionId: string | null; venue: string | null; title: string; competitionConfigVersionId: string;
-};
+  id: string; sportId: string; regionId: string | null; title: string; competitionConfigVersionId: string;
+} & TournamentVenueRow;
 
 function lookup(map: ReadonlyMap<string, string>, key: string, what: string): string {
   const id = map.get(key);
@@ -105,7 +107,7 @@ export class BracketTemplateService {
   private async loadPinnedTournament(tx: Tx, tournamentId: string): Promise<PinnedTournament> {
     const pinned = await findTournamentOnSurface(tx, TOURNAMENT_KINDS, {
       where: { id: tournamentId, deletedAt: null },
-      select: { id: true, sportId: true, regionId: true, venue: true, title: true, competitionConfigVersionId: true },
+      select: { id: true, sportId: true, regionId: true, ...TOURNAMENT_VENUE_SELECT, title: true, competitionConfigVersionId: true },
     });
     if (pinned === null) {
       throw new NotFoundException({ code: 'TOURNAMENT_NOT_FOUND', message: '대회를 찾을 수 없어요.' });

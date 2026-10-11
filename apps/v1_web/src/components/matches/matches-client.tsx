@@ -18,7 +18,7 @@ import { useCursorPagination, useCursorPaginationSnapshot } from '@/hooks/use-cu
 import { trackEvent } from '@/lib/analytics';
 import { v1Keys } from '@/lib/query-keys';
 import { chatRoomHref } from '@/lib/chat-route';
-import { extractErrorMessage } from '@/lib/error-message';
+import { extractErrorMessage, isGloballyHandledError } from '@/lib/error-message';
 import { sanitizeRedirectPath, withFromPath } from '@/lib/session-storage';
 import { V1_LEVELS, levelRangeMatches, toLevelCodes, toggleLevelCode } from '@/lib/v1-levels';
 import type { V1Match, V1MatchApiStatus, V1Sport, V1ViewerState } from '@/types/api';
@@ -270,6 +270,16 @@ export function MatchDetailPageClient({ matchId, seed }: { matchId: string; seed
     trackEvent('match_view', { matchId, sportType: matchSportType ?? '' });
   }, [matchId, query.data, matchSportType]);
 
+  // 마감 안내('마감 N분 전')는 렌더 시점의 Date.now() 로 계산되므로, 열어 둔 채로도 줄어들도록 1분마다 다시 그린다.
+  const [, refreshClock] = useState(0);
+  const deadlineMs = query.data?.deadlineAt ? new Date(query.data.deadlineAt).getTime() : null;
+  const hasUpcomingDeadline = deadlineMs !== null && Number.isFinite(deadlineMs) && deadlineMs > Date.now();
+  useEffect(() => {
+    if (!hasUpcomingDeadline) return;
+    const timer = window.setInterval(() => refreshClock((tick) => tick + 1), 60_000);
+    return () => window.clearInterval(timer);
+  }, [hasUpcomingDeadline, deadlineMs]);
+
   if (query.isError) {
     return <MatchStatePageView model={{ ...getMatchStateViewModel('error'), retry: () => void query.refetch(), backHref: fromPath ?? undefined }} />;
   }
@@ -306,7 +316,7 @@ export function MatchDetailPageClient({ matchId, seed }: { matchId: string; seed
       // '서울 양천구 안양천로 939'가 실제 주소처럼 뜨던 결함(2026-08-27 감사
       // M-A-personal-match-state)을 막는다.
       description: query.data.description ?? query.data.descriptionPreview ?? '',
-      address: query.data.place?.addressText ?? query.data.placeName ?? '',
+      place: query.data.place ?? (query.data.placeName ? { name: query.data.placeName, address: null, latitude: null, longitude: null, provider: null, providerPlaceId: null } : null),
       // API가 규칙을 안 주면 빈 배열 — 목업 규칙('풋살화 착용' 등)을 남의 매치에
       // 붙이지 않는다. 렌더 쪽(matches-page.tsx)이 `.length` 로 섹션을 숨긴다.
       rules: query.data.rulesText ? [query.data.rulesText] : [],
@@ -392,7 +402,10 @@ export function MatchDetailPageClient({ matchId, seed }: { matchId: string; seed
                 setApplyDialogOpen(false);
                 setApplyMessage('');
               },
-              onError: () => setApplyError('신청을 보내지 못했어요. 잠시 후 다시 시도해 주세요.'),
+              onError: (err) => {
+                if (isGloballyHandledError(err)) return;
+                setApplyError('신청을 보내지 못했어요. 잠시 후 다시 시도해 주세요.');
+              },
             },
           );
         }}

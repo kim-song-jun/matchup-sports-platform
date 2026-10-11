@@ -553,7 +553,7 @@ export class MockTournamentSeedService {
         sportId,
         regionId: null,
         title: `${home.teamName} vs ${away.teamName}`,
-        placeName: '목업 테스트 경기장',
+        place: { name: '목업 테스트 경기장', address: null, latitude: null, longitude: null, provider: null, providerPlaceId: null },
         startAt: now,
         endAt: now,
         fieldId: null,

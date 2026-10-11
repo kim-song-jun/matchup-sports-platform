@@ -54,6 +54,7 @@ import type {
   V1AdminRow,
   V1PushFailureSummary,
   V1FoundAccount,
+  V1SocialLinkPreview,
   V1SmsFailureSummary,
   V1AdminMonitoringSummary,
   V1AdminOpsSummary,
@@ -281,6 +282,7 @@ import type {
   V1PurgeGuestInquiriesPayload,
   V1PurgeGuestInquiriesResult,
   V1PublicKakaoMapsKeyResponse,
+  V1PlaceSearchResponse,
   V1TournamentOperationsBoardFilters,
   V1TournamentOperationsBoardPage,
   V1TournamentStaffListResponse,
@@ -365,7 +367,16 @@ export function useV1CompleteSocialProfile() {
       profileImageUrl?: string;
       recordConsent?: { granted: boolean; policyHash: string };
     }) =>
-      v1Post<V1AuthSessionResponse & { next: { route: string } }>('/auth/social-profile', body),
+      v1Post<V1AuthSessionResponse>('/auth/social-profile', body),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: v1Keys.authMe() }),
+  });
+}
+
+export function useV1DeferSocialProfile() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () =>
+      v1Post<V1AuthSessionResponse>('/auth/social-profile/defer'),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: v1Keys.authMe() }),
   });
 }
@@ -373,7 +384,7 @@ export function useV1CompleteSocialProfile() {
 export function useV1CompleteSocialTerms() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (body: { requiredTermsAccepted: boolean; acceptedTermsDocumentIds: string[] }) =>
+    mutationFn: (body: { requiredTermsAccepted: boolean; acceptedTermsDocumentIds: string[]; ageConfirmed: boolean }) =>
       v1Post<V1AuthSessionResponse & { next: { route: string } }>('/auth/social-terms', body),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: v1Keys.authMe() }),
   });
@@ -390,8 +401,23 @@ export function useV1PhoneVerify() {
   return useMutation({
     // purpose 를 생략하면 가입용 토큰이 발급된다. 계정 찾기·비밀번호 재설정은
     // 'password_reset' 을 넘겨 가입용 증명과 섞이지 않게 한다.
-    mutationFn: (body: { phone: string; code: string; purpose?: 'signup' | 'password_reset' }) =>
+    mutationFn: (body: { phone: string; code: string; purpose?: 'signup' | 'password_reset' | 'social_link' }) =>
       v1Post<{ verified: boolean; proofToken?: string }>('/auth/phone/verify', body),
+  });
+}
+
+export function useV1SocialLinkPreview() {
+  return useMutation({
+    mutationFn: (body: { phone: string; proofToken: string }) =>
+      v1Post<V1SocialLinkPreview>('/auth/social-link/preview', body),
+  });
+}
+
+/** 성공하면 서버가 세션 쿠키를 기존 계정으로 바꾼다 — 호출자가 세션 저장·캐시 비우기를 맡는다. */
+export function useV1SocialLink() {
+  return useMutation({
+    mutationFn: (body: { phone: string; proofToken: string }) =>
+      v1Post<V1AuthSessionResponse>('/auth/social-link', body),
   });
 }
 
@@ -2089,7 +2115,7 @@ export type V1LeagueClaimableFixtures = {
 
 export function useV1LeagueClaimableFixtures(leagueId: string, options?: { enabled?: boolean }) {
   return useQuery({
-    queryKey: ['v1', 'league-claimable-fixtures', leagueId] as const,
+    queryKey: v1Keys.leagueClaimableFixtures(leagueId),
     queryFn: () =>
       v1Get<V1LeagueClaimableFixtures>(`/league-matches/${leagueId}/claimable-fixtures`),
     enabled: Boolean(leagueId) && (options?.enabled ?? true),
@@ -5019,6 +5045,7 @@ export function useV1CreateFixture(tournamentId: string) {
       queryClient.invalidateQueries({
         queryKey: v1Keys.adminTournamentBracket(tournamentId),
       });
+      queryClient.invalidateQueries({ queryKey: v1Keys.tournament(tournamentId) });
     },
   });
 }
@@ -5056,6 +5083,7 @@ export function useV1DeleteFixture(tournamentId: string) {
     mutationFn: (fixtureId: string) => v1Delete<{ deleted: boolean }>(`/admin/fixtures/${fixtureId}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: v1Keys.adminTournamentBracket(tournamentId) });
+      queryClient.invalidateQueries({ queryKey: v1Keys.tournament(tournamentId) });
     },
   });
 }
@@ -5110,11 +5138,14 @@ export function useV1RecalculateStandings(tournamentId: string) {
   });
 }
 
+export function fetchV1AdminBracket(tournamentId: string) {
+  return v1Get<V1AdminTournamentBracket>(`/admin/tournaments/${tournamentId}/bracket`);
+}
+
 export function useV1AdminBracket(tournamentId: string) {
   return useQuery({
     queryKey: v1Keys.adminTournamentBracket(tournamentId),
-    queryFn: () =>
-      v1Get<V1AdminTournamentBracket>(`/admin/tournaments/${tournamentId}/bracket`),
+    queryFn: () => fetchV1AdminBracket(tournamentId),
     enabled: !!tournamentId,
   });
 }
@@ -5474,6 +5505,29 @@ export function useV1PublicKakaoMapsKey(options?: QueryOptions) {
   });
 }
 
+/** 카카오 키워드 검색이 넘겨주는 마지막 쪽(10건씩 45쪽). 서버 DTO 의 `page` 상한과 같다. */
+const PLACE_SEARCH_MAX_PAGE = 45;
+
+/**
+ * 카카오 장소 검색(서버 프록시). 입력이 비면 호출하지 않고, 입력이 바뀌는 동안은 직전 결과를
+ * 유지해 목록이 깜빡이지 않게 한다. 503 PLACE_SEARCH_UNAVAILABLE(키 없음)은 재시도해도 같으므로
+ * 재시도하지 않는다. 결과는 10건씩 쪽으로 받고 `fetchNextPage` 로 다음 쪽을 이어 붙인다.
+ */
+export function useV1PlaceSearch(query: string, options?: QueryOptions) {
+  const trimmed = query.trim();
+  return useInfiniteQuery({
+    queryKey: v1Keys.placeSearch(trimmed),
+    initialPageParam: 1,
+    queryFn: ({ pageParam }) =>
+      v1Get<V1PlaceSearchResponse>('/places/search', { query: trimmed, ...(pageParam > 1 ? { page: pageParam } : {}) }),
+    getNextPageParam: (last, pages) => (last.hasMore && pages.length < PLACE_SEARCH_MAX_PAGE ? pages.length + 1 : undefined),
+    enabled: (options?.enabled ?? true) && trimmed.length >= 1,
+    staleTime: 60 * 1000,
+    placeholderData: keepPreviousData,
+    retry: false,
+  });
+}
+
 // ─── 어드민: 콘텐츠(공지/팝업) 본문 이미지 업로드 ────────────────────────────
 
 export function useV1UploadAdminContentAsset() {
@@ -5733,6 +5787,7 @@ import type {
   V1RemoveLeagueTeamResult,
   V1RevertLeagueCompletionPayload,
   V1RevertLeagueCompletionResult,
+  V1CompleteLeagueResult,
   V1UpdateLeagueFixturePayload,
   V1UpdateLeagueFixtureResult,
   V1OpenLeagueRegistrationPayload,
@@ -5743,6 +5798,8 @@ import type {
   V1UpdateLeagueEntryFeeResult,
   V1UpdateLeagueCoverImagePayload,
   V1UpdateLeagueCoverImageResult,
+  V1UpdateLeagueVenuePayload,
+  V1UpdateLeagueVenueResult,
 
   V1CreateManualLeagueFixturePayload,
 
@@ -5825,7 +5882,7 @@ export function useV1UpdateLeagueVisibility(leagueId: string) {
       queryClient.invalidateQueries({ queryKey: v1Keys.adminLeagueMatchList() });
       queryClient.invalidateQueries({ queryKey: v1Keys.leagueMatches() });
       queryClient.invalidateQueries({ queryKey: v1Keys.leagueMatch(leagueId) });
-      queryClient.invalidateQueries({ queryKey: ['v1', 'league-claimable-fixtures', leagueId] });
+      queryClient.invalidateQueries({ queryKey: v1Keys.leagueClaimableFixtures(leagueId) });
       for (const fixtureId of fixtureIds) {
         queryClient.invalidateQueries({ queryKey: v1Keys.teamMatch(fixtureId) });
       }
@@ -5944,6 +6001,15 @@ export function useV1UpdateLeagueCoverImage(leagueId: string) {
   });
 }
 
+export function useV1UpdateLeagueVenue(leagueId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: V1UpdateLeagueVenuePayload) =>
+      v1Patch<V1UpdateLeagueVenueResult>(`/admin/league-matches/${encodeURIComponent(leagueId)}/venue`, body),
+    onSuccess: () => invalidateLeagueSurfaces(queryClient, leagueId),
+  });
+}
+
 /**
  * 리그에 **한 경기만** 만든다(수동 대진).
  *
@@ -6055,11 +6121,11 @@ export function useV1CancelLeagueFixture(leagueId: string) {
  * 리그 보류(취소 대신)·보류 해제. 보류는 리그와 경기를 공개 화면에서 숨기므로 공개 읽기 캐시도 다시
  * 확인한다(공개 설정 변경과 같은 범위).
  */
-function useLeagueHoldMutation(leagueId: string, action: 'hold' | 'resume') {
+function useLeagueStatusMutation<TResult>(leagueId: string, action: 'hold' | 'resume' | 'complete') {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (body: { reason?: string }) =>
-      v1Post<V1LeagueHoldResult>(`/admin/league-matches/${encodeURIComponent(leagueId)}/${action}`, body),
+      v1Post<TResult>(`/admin/league-matches/${encodeURIComponent(leagueId)}/${action}`, body),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: v1Keys.adminLeagueMatch(leagueId) });
       queryClient.invalidateQueries({ queryKey: v1Keys.adminLeagueMatchList() });
@@ -6073,11 +6139,17 @@ function useLeagueHoldMutation(leagueId: string, action: 'hold' | 'resume') {
 }
 
 export function useV1HoldLeague(leagueId: string) {
-  return useLeagueHoldMutation(leagueId, 'hold');
+  return useLeagueStatusMutation<V1LeagueHoldResult>(leagueId, 'hold');
 }
 
 export function useV1ResumeLeague(leagueId: string) {
-  return useLeagueHoldMutation(leagueId, 'resume');
+  return useLeagueStatusMutation<V1LeagueHoldResult>(leagueId, 'resume');
+}
+
+// 되돌리기·보류 해제 뒤 남은 대진이 없으면 자동 종료 판정이 다시 불리지 않는다(MD-QA #93) — 수동 종료.
+// 종료되면 공개 상세·목록·홈의 상태 표시도 바뀌므로 보류와 같은 범위를 무효화한다.
+export function useV1CompleteLeague(leagueId: string) {
+  return useLeagueStatusMutation<V1CompleteLeagueResult>(leagueId, 'complete');
 }
 
 export function useV1RevertLeagueCompletion(leagueId: string) {

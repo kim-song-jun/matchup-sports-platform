@@ -32,6 +32,7 @@ import {
 } from '@/lib/game-operations-clock';
 import { getV1GameOperationsSocket, setGameOperationsAuthorizationSubjectVersion } from '@/lib/v1-game-operations-socket';
 import { randomUuid } from '@/lib/uuid';
+import { ACTIVITY_PROFILE_REQUIRED_CODE, notifyActivityProfileRequired } from '@/lib/activity-profile-required';
 import { reportClientError } from '@/lib/client-error-reporter';
 import { v1Keys } from '@/lib/query-keys';
 import type { V1MyTournamentStaffResponse } from '@/types/api';
@@ -246,7 +247,8 @@ export interface UseV1GameOperationsConsoleResult {
   readonly liveEvents: readonly GameEventRecord[];
   readonly gameSnapshot: { readonly version: number; readonly state: GameState } | null;
   readonly bannerMessage: string | null;
-  submitEvent(input: SubmitEventInput): Promise<void>;
+  /** Resolves to the queued item's `clientEventId`, or `null` when nothing was queued (no takeover / snapshot). */
+  submitEvent(input: SubmitEventInput): Promise<string | null>;
   retryFailedEvent(clientEventId: string): void;
   requestTakeover(): void;
   /** T3 추가 — 큐를 거치지 않는 온라인 전용 되돌리기(D-10과 같은 이유로 절대
@@ -652,6 +654,7 @@ export function useV1GameOperationsConsole(
     // 안 되는 상태가 된다 — 구독·takeover 에만 싣는 것은 **배선이 반쪽**이다.
     const onGameError = (error: { code: string; clientEventId?: string; reason?: string }) => {
       if (cancelled) return;
+      if (error.code === ACTIVITY_PROFILE_REQUIRED_CODE) notifyActivityProfileRequired();
       if (error.clientEventId) {
         dispatchQueue({
           type: 'FAIL',
@@ -743,6 +746,7 @@ export function useV1GameOperationsConsole(
         // 운영자가 실제 원인이 아니라 권한 요청이라는 엉뚱한 경로로 가기 때문이다.
         // 서버가 명시한 거부만 그 코드로 남기고, 나머지는 원인 미상으로 구분한다.
         if (result.status !== 'granted') {
+          if (result.code === ACTIVITY_PROFILE_REQUIRED_CODE) notifyActivityProfileRequired();
           dispatchTakeover({ type: 'DENIED', code: result.code ?? 'TAKEOVER_UNAVAILABLE' });
           return;
         }
@@ -930,6 +934,7 @@ export function useV1GameOperationsConsole(
           setGameSnapshot((current) => (current ? { ...current, version: result.version! } : current));
           void queryClient.invalidateQueries({ queryKey: v1Keys.game(gameId) });
         } else {
+          if (result.code === ACTIVITY_PROFILE_REQUIRED_CODE) notifyActivityProfileRequired();
           dispatchQueue({
             type: 'FAIL',
             clientEventId: item.clientEventId,
@@ -991,8 +996,8 @@ export function useV1GameOperationsConsole(
   }, [connectionStatus, takeoverEnabled, takeover, sync, queue, sendQueuedItem]);
 
   const submitEvent = useCallback(
-    async (input: SubmitEventInput) => {
-      if (!takeoverEnabledRef.current || !gameSnapshot) return;
+    async (input: SubmitEventInput): Promise<string | null> => {
+      if (!takeoverEnabledRef.current || !gameSnapshot) return null;
       // D-10 (frozen decision table): this is the ONLY thing that may ever
       // enter the durable offline queue. Asserting it here — even though
       // every current caller already only constructs an append_event —
@@ -1011,7 +1016,7 @@ export function useV1GameOperationsConsole(
         occurredAt: input.occurredAt,
         payload: input.payload,
       });
-      if (!takeoverEnabledRef.current) return;
+      if (!takeoverEnabledRef.current) return null;
       const item: QueuedGameEvent = {
         clientEventId,
         gameId: gameId ?? '',
@@ -1035,6 +1040,7 @@ export function useV1GameOperationsConsole(
         ackedVersion: null,
       };
       dispatchQueue({ type: 'ENQUEUE', item });
+      return clientEventId;
     },
     [gameId, gameSnapshot],
   );
@@ -1189,6 +1195,8 @@ export function gameOperationsErrorMessage(code: string): string {
       return '다른 화면에서 이 경기 운영 권한을 가져갔어요. 새로고침 후 다시 시도해주세요.';
     case 'STAFF_SCOPE_DENIED':
       return '이 경기를 운영할 권한이 없어요.';
+    case ACTIVITY_PROFILE_REQUIRED_CODE:
+      return '활동 정보를 입력해야 경기를 운영할 수 있어요.';
     case 'TAKEOVER_UNAVAILABLE':
       // 서버가 거부 사유 코드를 주지 않은 경우만 여기로 온다. 연결 자체는 살아 있을 수
       // 있으므로(실제로 "실시간 연결됨" 상태에서 이 코드가 뜬 사례가 있었다) 원인을
@@ -1300,6 +1308,7 @@ export function gameOperationsErrorMessage(code: string): string {
  */
 const NON_RETRYABLE_GAME_OPERATIONS_ERROR_CODES = new Set<string>([
   'STAFF_SCOPE_DENIED',
+  ACTIVITY_PROFILE_REQUIRED_CODE,
   'INVALID_ACTOR_SCOPE',
   'TERMINAL_GAME_IMMUTABLE',
   'PERIOD_ALREADY_ENDED',

@@ -18,9 +18,10 @@ export class PhoneVerifyDto {
 
   /**
    * 발급받을 증명 토큰의 용도. 생략하면 기존 동작 그대로 가입용이다 —
-   * 계정 찾기·비밀번호 재설정은 'password_reset' 을 명시해 가입용 토큰과 섞이지 않게 한다.
+   * 계정 찾기·비밀번호 재설정은 'password_reset' 을, 소셜 계정을 휴대폰 주인의 기존 계정에 연결할 때는 'social_link' 를
+   * 명시해 가입용 토큰과 섞이지 않게 한다.
    */
   @IsOptional()
-  @IsIn(['signup', 'password_reset'])
+  @IsIn(['signup', 'password_reset', 'social_link'])
   purpose?: PhoneProofPurpose;
 }

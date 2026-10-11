@@ -32,7 +32,7 @@ const teamMatchDetailByMode: Record<SkeletonMode, (typeof teamMatches)[number]> 
   mine: teamMatches[3],
 };
 
-const detailCopy: Record<SkeletonMode, Pick<TeamMatchDetailViewModel['match'], 'description' | 'address' | 'applicantTeams'>> = {
+const detailCopy: Record<SkeletonMode, Pick<TeamMatchDetailViewModel['match'], 'description' | 'applicantTeams'> & { address: string }> = {
   default: {
     description: '우리 팀 홈구장에서 친선 팀매치를 진행해요. 상대팀은 신청 후 팀 정보와 등급을 확인해 승인해요.',
     address: '서울 마포구 월드컵로 240',
@@ -81,8 +81,7 @@ const draft = {
   listImageUrl: '',
   cost: 0,
   opponentCost: 0,
-  venue: '',
-  address: '',
+  place: null,
   date: '',
   startTime: '',
   endTime: '',
@@ -136,11 +135,13 @@ export function getTeamMatchStateViewModel(state: 'empty' | 'error'): TeamMatchS
 
 export function getTeamMatchDetailViewModel(mode: SkeletonMode = 'default'): TeamMatchDetailViewModel {
   const match = teamMatchDetailByMode[mode];
+  const { address, ...description } = detailCopy[mode];
   return {
     mode,
     match: {
       ...match,
-      ...detailCopy[mode],
+      ...description,
+      place: { name: match.venue, address, latitude: null, longitude: null, provider: null, providerPlaceId: null },
     },
   };
 }

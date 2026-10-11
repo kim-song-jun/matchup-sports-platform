@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { notFound } from 'next/navigation';
 import LeagueMatchStandingsClient from './league-match-standings-client';
 import { JsonLd } from '@/components/seo/json-ld';
 import { formatTournamentDateLong } from '@/lib/date-utils';
@@ -39,6 +40,9 @@ export default async function LeagueMatchPage({ params }: Props) {
     loadPublic<V1PublicLeagueDetail>(leaguePath(leagueId)),
     loadPublic<V1LeagueStandingsResponse>(`${leaguePath(leagueId)}/standings`),
   ]);
+  // 보류·비공개·삭제·없는 리그는 API 가 똑같이 404 다 — 경기 상세와 같은 일반 not-found 로 보낸다.
+  // 조회 실패(ok=false)는 404 가 아니므로 클라이언트가 재시도할 수 있게 그대로 렌더한다.
+  if (league.ok && !league.data) notFound();
   const detail = league.ok ? league.data : null;
 
   return (

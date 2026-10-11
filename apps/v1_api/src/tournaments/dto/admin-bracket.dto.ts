@@ -16,6 +16,7 @@ import {
   ValidateIf,
   ValidateNested,
 } from 'class-validator';
+import { IsPlaceLatitude, IsPlaceLongitude, IsPlaceProvider, IsPlaceProviderId } from '../../places/place-snapshot';
 
 // ─── Group phase constants ─────────────────────────────────────────────────────
 
@@ -115,10 +116,20 @@ export class CreateFixtureDto {
   @MaxLength(60)
   round!: string;
 
+  /** 생략하면 서버가 대회 안의 최대 번호 + 1 을 트랜잭션 안에서 정한다. */
+  @IsOptional()
   @Type(() => Number)
   @IsInt()
   @Min(1)
-  fixtureNumber!: number;
+  fixtureNumber?: number;
+
+  /**
+   * 요청(제출) 한 번에 하나씩 만드는 고유 키. 같은 키로 다시 보내면 처음 만든 경기를 돌려주고 새로 만들지 않는다
+   * (번호를 서버가 정하는 요청이 응답 유실로 재시도돼도 빈 경기가 늘어나지 않게). 같은 키에 다른 내용이면 409.
+   */
+  @IsOptional()
+  @IsUUID()
+  clientCommandId?: string;
 
   @IsOptional()
   @Type(() => Number)
@@ -152,6 +163,23 @@ export class CreateFixtureDto {
   @IsString()
   @MaxLength(200)
   venue?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  venueAddress?: string;
+
+  @IsPlaceLatitude()
+  venueLatitude?: number | null;
+
+  @IsPlaceLongitude()
+  venueLongitude?: number | null;
+
+  @IsPlaceProvider()
+  venueProvider?: string | null;
+
+  @IsPlaceProviderId()
+  venueProviderId?: string | null;
 }
 
 export class UpdateFixtureDto {
@@ -164,12 +192,30 @@ export class UpdateFixtureDto {
 
   @IsOptional()
   @IsDateString()
-  scheduledAt?: string;
+  /** null 은 일정을 미정으로 비운다. */
+  scheduledAt?: string | null;
 
   @IsOptional()
   @IsString()
   @MaxLength(200)
   venue?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  venueAddress?: string;
+
+  @IsPlaceLatitude()
+  venueLatitude?: number | null;
+
+  @IsPlaceLongitude()
+  venueLongitude?: number | null;
+
+  @IsPlaceProvider()
+  venueProvider?: string | null;
+
+  @IsPlaceProviderId()
+  venueProviderId?: string | null;
 
   /** 공식 결과가 있는 경기는 팀 변경 불가(409) — 결과를 먼저 무효로 돌려야 한다 */
   @IsOptional()

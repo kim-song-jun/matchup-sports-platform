@@ -1,11 +1,12 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { Check, ChevronRight, Pencil, Plus, RefreshCw, Trash2, X } from 'lucide-react';
 import { EntityPicker, type EntityPickerItem } from '@/components/admin/entity-picker';
 import { AdminDataTable, AdminEmpty, type AdminTableColumn } from '@/components/admin';
 import { byeRound } from '@/lib/tournament-bracket-rounds';
 import { extractErrorMessage } from '@/lib/error-message';
+import { registrationIdsBlockedForGroup, registrationIdsInOppositeFinalStage } from '@/lib/bracket-group-enrollment';
 import type { useV1AssignGroupTeam, useV1CreateFixture, useV1CreateBracketBye } from '@/hooks/use-v1-api';
 import type { V1AdminBracketFixture, V1AdminBracketGroup, V1AdminBracketStanding } from '@/types/api';
 import { computeQualifyingShortlist, isGroupReady } from './bracket-group-helpers';
@@ -204,15 +205,19 @@ export function BracketGroupCard({
 
   const teamCount = group.groupTeams.filter((team) => team.registrationId).length;
   const fixtureCount = groupFixtures.length;
+  const autoGenerateHintId = useId();
   const ready = teamCount > 0 && fixtureCount > 0;
   const teamLabel = teamCount === 0 ? '배정 대기' : `${teamCount}팀 배정됨`;
   const fixtureLabel = fixtureCount === 0 ? '대진 미생성' : `대진 ${fixtureCount}경기`;
 
   const assignedIds = new Set(group.groupTeams.map((gt) => gt.registrationId));
+  const finalStageIds = registrationIdsInOppositeFinalStage(allGroups, fixtures, group.id);
   const suggestedTeams = computeQualifyingShortlist(group, allGroups, allStandings).filter(
-    (c) => !assignedIds.has(c.id),
+    (c) => !assignedIds.has(c.id) && !finalStageIds.has(c.id),
   );
-  const searchPoolItems = confirmedTeamItems.filter((it) => !assignedIds.has(it.id));
+  const blockedIds = new Set([...registrationIdsBlockedForGroup(allGroups, group.id), ...finalStageIds]);
+  const searchPoolItems = confirmedTeamItems.filter((it) => !assignedIds.has(it.id) && !blockedIds.has(it.id));
+  const fixtureTeamItems = confirmedTeamItems.filter((it) => !blockedIds.has(it.id));
 
   function handleBatchAssign(registrationIds: string[]) {
     if (registrationIds.length === 0) return;
@@ -237,6 +242,7 @@ export function BracketGroupCard({
   }
 
   const isKnockout = group.phase !== 'group';
+  const needsMoreTeams = !isKnockout && teamCount < 2;
   const roundOptions: string[] = isKnockout
     ? ['16강', '12강', '8강', '4강', '결승', '3·4위전']
     : ['조별 1라운드', '조별 2라운드', '조별 3라운드', '조별 4라운드', '조별 5라운드'];
@@ -435,6 +441,7 @@ export function BracketGroupCard({
                 type="button"
                 onClick={() => onAutoGenerate(group.id)}
                 disabled={isAutoGenerating || createFixture.isPending}
+                aria-describedby={needsMoreTeams ? autoGenerateHintId : undefined}
                 className={submitBtnCls}
               >
                 <RefreshCw size={14} aria-hidden="true" />
@@ -449,6 +456,12 @@ export function BracketGroupCard({
                 직접 입력 {manualFixtureOpen ? '닫기' : '›'}
               </button>
             </div>
+
+            {needsMoreTeams && (
+              <p id={autoGenerateHintId} className="text-[length:var(--font-size-caption)] text-[var(--text-muted)]">
+                조에 팀을 2팀 이상 배정하면 대진을 자동으로 만들 수 있어요.
+              </p>
+            )}
 
             {manualFixtureOpen && (
               <form onSubmit={handleCreateFixture} noValidate className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -507,7 +520,7 @@ export function BracketGroupCard({
                     id={`fixture-home-${group.id}`}
                     value={confirmedTeamItems.find((it) => it.id === fixtureHomeRegId) ?? null}
                     onChange={(item) => setFixtureHomeRegId(item?.id ?? '')}
-                    items={confirmedTeamItems.filter((it) => it.id !== fixtureAwayRegId)}
+                    items={fixtureTeamItems.filter((it) => it.id !== fixtureAwayRegId)}
                     disabled={createFixture.isPending || byePending}
                     clearLabel="미정"
                     placeholder={entryType === 'bye' ? '부전승 팀 검색' : '홈 팀 검색'}
@@ -523,7 +536,7 @@ export function BracketGroupCard({
                     id={`fixture-away-${group.id}`}
                     value={confirmedTeamItems.find((it) => it.id === fixtureAwayRegId) ?? null}
                     onChange={(item) => setFixtureAwayRegId(item?.id ?? '')}
-                    items={confirmedTeamItems.filter((it) => it.id !== fixtureHomeRegId)}
+                    items={fixtureTeamItems.filter((it) => it.id !== fixtureHomeRegId)}
                     disabled={createFixture.isPending || byePending}
                     clearLabel="미정"
                     placeholder="어웨이 팀 검색"

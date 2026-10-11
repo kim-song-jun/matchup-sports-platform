@@ -61,6 +61,17 @@ describe('buildFixtureEventLd', () => {
     expect(ld?.location).toMatchObject({ name: '송파 풋살파크 A코트' });
   });
 
+  it('장소 스냅샷에 좌표가 있으면 geo 와 도로명 주소를 싣고, 없으면 geo 를 지어내지 않는다', () => {
+    const place = { name: '송파 풋살파크', address: '서울 송파구 올림픽로 1', latitude: 37.51, longitude: 127.1, provider: 'kakao' as const, providerPlaceId: 'k1' };
+    const withGeo = buildFixtureEventLd(fixture({ place }))?.location as Record<string, unknown>;
+    expect(withGeo.geo).toEqual({ '@type': 'GeoCoordinates', latitude: 37.51, longitude: 127.1 });
+    expect(withGeo.address).toMatchObject({ streetAddress: '서울 송파구 올림픽로 1' });
+
+    const nameOnly = buildFixtureEventLd(fixture({ place: { ...place, latitude: null, longitude: null, provider: null, providerPlaceId: null } }))?.location as Record<string, unknown>;
+    expect(nameOnly).not.toHaveProperty('geo');
+    expect(buildFixtureEventLd(fixture())?.location).not.toHaveProperty('geo');
+  });
+
   it('확정된 점수만 싣고, 진행 중·확정 전 점수는 싣지 않는다', () => {
     expect(buildFixtureEventLd(fixture())?.description).toBe('최종 스코어 송파 유나이티드 2 : 1 한강 로버스');
     expect(buildFixtureEventLd(fixture({ scoreStatus: 'pending' }))).not.toHaveProperty('description');

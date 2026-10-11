@@ -5,13 +5,15 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('@/lib/api-client', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/lib/api-client')>();
-  return { ...actual, v1Post: vi.fn(), v1Put: vi.fn(), v1Patch: vi.fn() };
+  return { ...actual, v1Get: vi.fn(), v1Post: vi.fn(), v1Put: vi.fn(), v1Patch: vi.fn() };
 });
 
-import { v1Patch, v1Post, v1Put } from '@/lib/api-client';
+import { V1ApiError, v1Get, v1Patch, v1Post, v1Put } from '@/lib/api-client';
+import { clearFixtureRequestKey } from '@/lib/fixture-request-key-store';
 import { v1Keys } from '@/lib/query-keys';
 import { resultReviewKeys } from '@/hooks/use-tournament-result-review';
 import {
+  useV1AddBracketFixture,
   useV1ApplyBracketTemplate,
   useV1AssignTournamentSlot,
   useV1QuickResult,
@@ -19,6 +21,7 @@ import {
   useV1SetBracketSources,
 } from './use-v1-bracket-canvas';
 
+const getMock = vi.mocked(v1Get);
 const postMock = vi.mocked(v1Post);
 const putMock = vi.mocked(v1Put);
 const patchMock = vi.mocked(v1Patch);
@@ -27,15 +30,18 @@ function setup() {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
   const invalidate = vi.spyOn(client, 'invalidateQueries');
   const wrapper = ({ children }: { children: ReactNode }) => createElement(QueryClientProvider, { client }, children);
-  return { wrapper, invalidate };
+  return { wrapper, invalidate, client };
 }
 
 const invalidatedKeys = (spy: ReturnType<typeof setup>['invalidate']) => spy.mock.calls.map(([filters]) => filters?.queryKey);
 
 beforeEach(() => {
+  getMock.mockReset();
   postMock.mockReset();
   putMock.mockReset();
   patchMock.mockReset();
+  clearFixtureRequestKey('t1');
+  clearFixtureRequestKey('t2');
 });
 
 describe('useV1QuickResult', () => {
@@ -151,5 +157,120 @@ describe('useV1SetBracketSources', () => {
       awaySourceFixtureId: null,
     });
     expect(invalidatedKeys(invalidate)).toContainEqual(v1Keys.adminTournamentBracket('t1'));
+  });
+});
+
+describe('useV1AddBracketFixture', () => {
+  const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  const apiError = (statusCode: number) =>
+    new V1ApiError({ status: 'error', statusCode, code: statusCode === 0 ? 'NETWORK_ERROR' : 'SOME_CODE', message: 'x', timestamp: '2026-10-11T00:00:00.000Z' });
+  const sentKeys = () => postMock.mock.calls.map(([, body]) => (body as { clientCommandId: string }).clientCommandId);
+  const add = async (tournamentId: string, input: { groupId: string; round: string }) => {
+    const { wrapper } = setup();
+    const { result } = renderHook(() => useV1AddBracketFixture(tournamentId), { wrapper });
+    await act(async () => {
+      await result.current.mutateAsync(input).catch(() => undefined);
+    });
+  };
+
+  it('경기 번호는 보내지 않고 조·라운드와 요청 키(UUID)만 보낸다 — 번호는 서버가 정한다', async () => {
+    postMock.mockResolvedValue({ id: 'new' });
+    await add('t1', { groupId: 'g1', round: 'league_r2' });
+
+    expect(postMock).toHaveBeenCalledWith('/admin/tournaments/t1/fixtures', { groupId: 'g1', round: 'league_r2', clientCommandId: expect.stringMatching(UUID) });
+    expect(getMock).not.toHaveBeenCalled();
+  });
+
+  it('만든 뒤 어드민 대진과 대회 상세·공개 일정 캐시를 같이 무효화한다', async () => {
+    postMock.mockResolvedValue({ id: 'new' });
+    const { wrapper, invalidate } = setup();
+    const { result } = renderHook(() => useV1AddBracketFixture('t1'), { wrapper });
+
+    await act(async () => {
+      await result.current.mutateAsync({ groupId: 'g1', round: 'league_r1' });
+    });
+
+    const keys = invalidatedKeys(invalidate);
+    expect(keys).toContainEqual(v1Keys.adminTournamentBracket('t1'));
+    expect(keys).toContainEqual(v1Keys.tournament('t1'));
+  });
+
+  // 키 수명은 훅 인스턴스가 아니라 대회 단위다 — 화면이 다시 마운트돼도(새 훅 인스턴스) 이어진다.
+  it.each([
+    ['연결 끊김', apiError(0)],
+    ['5xx', apiError(503)],
+  ])('%s 실패 뒤 다른 훅 인스턴스로 같은 내용을 다시 보내도 같은 키다', async (_name, failure) => {
+    postMock.mockRejectedValueOnce(failure).mockResolvedValue({ id: 'new' });
+    const input = { groupId: 'g1', round: 'league_r2' };
+    await add('t1', input);
+    await add('t1', input);
+    const [first, retry] = sentKeys();
+    expect(retry).toBe(first);
+  });
+
+  it('성공하면 키를 버려 다음 추가는 새 키를 쓴다', async () => {
+    postMock.mockResolvedValue({ id: 'new' });
+    const input = { groupId: 'g1', round: 'league_r2' };
+    await add('t1', input);
+    await add('t1', input);
+    const [first, next] = sentKeys();
+    expect(next).not.toBe(first);
+  });
+
+  it('서버가 4xx 로 거절하면 키를 버린다 — 같은 키로 다시 보내도 같은 답이다', async () => {
+    postMock.mockRejectedValueOnce(apiError(409)).mockResolvedValue({ id: 'new' });
+    const input = { groupId: 'g1', round: 'league_r2' };
+    await add('t1', input);
+    await add('t1', input);
+    const [first, next] = sentKeys();
+    expect(next).not.toBe(first);
+  });
+
+  it('처리 여부를 모르는 실패 뒤 다른 내용을 시도해도, 돌아오면 원래 내용은 같은 키로 재전송한다', async () => {
+    postMock.mockRejectedValueOnce(apiError(0)).mockRejectedValueOnce(apiError(0)).mockResolvedValue({ id: 'new' });
+    await add('t1', { groupId: 'g1', round: 'league_r2' });
+    await add('t1', { groupId: 'g1', round: 'league_r3' });
+    await add('t1', { groupId: 'g1', round: 'league_r2' });
+    const [first, other, retry] = sentKeys();
+    expect(other).not.toBe(first);
+    expect(retry).toBe(first);
+  });
+
+  it('다른 대회는 키를 공유하지 않는다', async () => {
+    postMock.mockRejectedValue(apiError(0));
+    const input = { groupId: 'g1', round: 'league_r2' };
+    await add('t1', input);
+    await add('t2', input);
+    await add('t1', input);
+    const [t1First, t2, t1Retry] = sentKeys();
+    expect(t2).not.toBe(t1First);
+    expect(t1Retry).toBe(t1First);
+  });
+
+  it('늦게 끝난 옛 요청의 거절은 그 사이 같은 내용으로 새로 만든 키를 지우지 못한다', async () => {
+    const input = { groupId: 'g1', round: 'league_r2' };
+    let rejectOld: (error: unknown) => void = () => undefined;
+    postMock.mockImplementationOnce(() => new Promise((_resolve, reject) => { rejectOld = reject; }));
+    const { wrapper } = setup();
+    const { result } = renderHook(() => useV1AddBracketFixture('t1'), { wrapper });
+    let oldRequest: Promise<unknown> = Promise.resolve();
+    act(() => {
+      oldRequest = result.current.mutateAsync(input).catch(() => undefined);
+    });
+    await waitFor(() => expect(postMock).toHaveBeenCalledTimes(1));
+
+    postMock.mockResolvedValueOnce({ id: 'new' });
+    await add('t1', input);
+    postMock.mockRejectedValueOnce(apiError(0));
+    await add('t1', input);
+    await act(async () => {
+      rejectOld(apiError(409));
+      await oldRequest;
+    });
+    postMock.mockResolvedValue({ id: 'new' });
+    await add('t1', input);
+
+    const [, , lostResponse, retry] = sentKeys();
+    expect(retry).toBe(lostResponse);
   });
 });

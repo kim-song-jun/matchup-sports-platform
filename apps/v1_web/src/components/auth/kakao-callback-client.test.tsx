@@ -87,6 +87,28 @@ describe('KakaoCallbackClient GA events', () => {
     expect(router.replace).toHaveBeenCalledWith('/terms?mode=social');
   });
 
+  it('keeps the saved redirect through the social onboarding route, and drops it once the user is logged in', async () => {
+    window.sessionStorage.setItem('teameet.v1.savedRedirect', '/teams/new');
+    primeValidOAuthState();
+    api.v1Post.mockResolvedValue({
+      session: { userId: 'new-user', userEmail: null },
+      next: { route: '/terms?mode=social', reason: 'social_terms_required' },
+    });
+    const { unmount } = render(<KakaoCallbackClient />);
+    await waitFor(() => expect(router.replace).toHaveBeenCalledWith('/terms?mode=social'));
+    expect(window.sessionStorage.getItem('teameet.v1.savedRedirect')).toBe('/teams/new');
+    unmount();
+
+    primeValidOAuthState();
+    api.v1Post.mockResolvedValue({
+      session: { userId: 'existing-user', userEmail: null },
+      next: { route: '/home', reason: 'ready' },
+    });
+    render(<KakaoCallbackClient />);
+    await waitFor(() => expect(router.replace).toHaveBeenLastCalledWith('/home'));
+    expect(window.sessionStorage.getItem('teameet.v1.savedRedirect')).toBeNull();
+  });
+
   it('tracks login when the API routes a returning kakao user straight into the app', async () => {
     // Given
     primeValidOAuthState();

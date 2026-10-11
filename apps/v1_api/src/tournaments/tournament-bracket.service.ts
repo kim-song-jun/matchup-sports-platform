@@ -48,7 +48,8 @@ import {
   type TournamentFixtureGameForResult,
 } from './tournament-fixture-official-result';
 import { findTournamentOnSurface, TOURNAMENT_KINDS } from './tournament-surface-lookup';
-import { assertSidesNotSlotLinked, createGroupInTx, deleteTournamentGroupInTx, ensureGroupPhaseTeamsInTx, recalculateStandingsInTx, softDeleteTournamentFixtureInTx, updateTournamentFixtureInTx } from './tournament-bracket-tx';
+import { assertNewFixtureScheduleKeepsStageOrder } from './tournament-schedule-order';
+import { assertNotInOppositeFinalStageInTx, assertNotInOtherGroupInTx, assertSidesNotSlotLinked, createGroupInTx, deleteTournamentGroupInTx, ensureGroupPhaseTeamsInTx, recalculateStandingsInTx, softDeleteTournamentFixtureInTx, updateTournamentFixtureInTx } from './tournament-bracket-tx';
 import { participantDisplayName } from './participant-display-name';
 import { readJerseyNumbers } from './tournament-player-jersey';
 import { createTournamentMatchInTx } from './tournament-match-creation';
@@ -60,6 +61,9 @@ import { adminBracketSlotInclude, serializeAdminBracketSlot } from './slots/admi
 import { tournamentTeamMatchBracketInclude, serializeTournamentTeamMatchBracket } from './tournament-team-match-bracket.query';
 import { competitionMatchLabel } from './tournament-round-label';
 import { acceptsBracketSource } from './tournament-bracket-phases';
+import { PLACE_SELECT } from '../places/place-select';
+import { rejectPartialPlaceUpdate, resolvePlaceSnapshot, toPlaceView, type PlaceView } from '../places/place-snapshot';
+import { TOURNAMENT_VENUE_SELECT, tournamentVenueSnapshot } from '../places/tournament-venue';
 
 type AdminBracketResult = {
   id: string;
@@ -81,6 +85,110 @@ type AdminBracketFixture = ReturnType<typeof serializeTournamentTeamMatchBracket
   result: AdminBracketResult;
   videos: Array<{ id: string; title: string | null; url: string; sortOrder: number }>;
 };
+
+const FIXTURE_CLIENT_CREATE_ACTION = 'tournament_fixture_client_create';
+// 전역 멱등 계약(docs/api/global-contract.md)의 보관 기간과 같다.
+const FIXTURE_CLIENT_KEY_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
+
+const FIXTURE_REPLAY_SELECT = {
+  teamMatchId: true,
+  tournamentId: true,
+  groupId: true,
+  round: true,
+  fixtureNumber: true,
+  legNumber: true,
+  parentTeamMatchId: true,
+  homeRegistrationId: true,
+  awayRegistrationId: true,
+  teamMatch: {
+    select: {
+      id: true,
+      tournamentId: true,
+      hostTeamId: true,
+      approvedApplicantTeamId: true,
+      competitionConfigVersionId: true,
+      game: { select: { sourceType: true, teamMatchId: true, competitionConfigVersionId: true, sides: { select: { sideKey: true, teamId: true } } } },
+      startAt: true,
+      ...PLACE_SELECT,
+      status: true,
+      createdAt: true,
+      updatedAt: true,
+    },
+  },
+} satisfies Prisma.V1TournamentMatchDetailsSelect;
+
+type FixtureReplayDetails = Prisma.V1TournamentMatchDetailsGetPayload<{ select: typeof FIXTURE_REPLAY_SELECT }>;
+type FixtureReplayAggregate = NonNullable<FixtureReplayDetails['teamMatch']>;
+
+/** 이미 만든 경기를 응답으로 돌려주기 전에, 경기·게임·양 팀 면이 온전히 이어져 있는지 확인한다. */
+function assertReplayableFixture(aggregate: FixtureReplayAggregate, tournamentId: string): void {
+  if (aggregate.tournamentId !== tournamentId || aggregate.game === null ||
+    aggregate.game.sourceType !== V1GameSourceType.TEAM_MATCH ||
+    aggregate.game.teamMatchId !== aggregate.id ||
+    aggregate.game.competitionConfigVersionId !== aggregate.competitionConfigVersionId ||
+    aggregate.game.sides.length !== 2 ||
+    !aggregate.game.sides.some((side) => side.sideKey === V1GameSideKey.HOME && side.teamId === aggregate.hostTeamId) ||
+    !aggregate.game.sides.some((side) => side.sideKey === V1GameSideKey.AWAY && side.teamId === aggregate.approvedApplicantTeamId)) {
+    throw new ConflictException({ code: 'TEAM_MATCH_IDEMPOTENCY_INCOMPLETE', message: '기존 대진 생성 기록이 완전하지 않아요.' });
+  }
+}
+
+/** 경기 생성 응답(serializeCanonicalFixture 결과). 키 기록에 그대로 저장돼 재전송 때 돌려준다. */
+export interface SerializedCanonicalFixture {
+  id: string;
+  tournamentId: string;
+  groupId: string | null;
+  round: string;
+  fixtureNumber: number;
+  legNumber: number;
+  parentFixtureId: string | null;
+  homeRegistrationId: string | null;
+  awayRegistrationId: string | null;
+  scheduledAt: string | null;
+  venue: string | null;
+  place: PlaceView | null;
+  status: 'completed' | 'cancelled' | 'scheduled';
+  createdAt: string;
+  updatedAt: string;
+}
+
+// upsert: 만료됐지만 지워지지 않은 같은 (경기, 키) 행이 있으면 유일 제약에 걸리므로 그 행을 새 기록으로 갱신한다.
+async function recordClientFixtureKey(
+  tx: Prisma.TransactionClient, userId: string, clientKey: string, payloadHash: string, response: SerializedCanonicalFixture,
+): Promise<void> {
+  const identity = {
+    actorUserId: userId,
+    action: FIXTURE_CLIENT_CREATE_ACTION,
+    resourceType: V1GameSourceType.TEAM_MATCH,
+    resourceId: response.id,
+    idempotencyKey: clientKey,
+  };
+  const record = {
+    payloadHash,
+    responseStatus: 201,
+    responseBody: response as unknown as Prisma.InputJsonObject,
+    expiresAt: new Date(Date.now() + FIXTURE_CLIENT_KEY_RETENTION_MS),
+  };
+  await tx.v1IdempotencyRecord.upsert({
+    where: { actorUserId_action_resourceType_resourceId_idempotencyKey: identity },
+    create: { ...identity, ...record },
+    update: record,
+  });
+}
+
+function fixtureReplayResult(details: FixtureReplayDetails & { teamMatch: FixtureReplayAggregate }) {
+  return {
+    ...details.teamMatch,
+    tournamentId: details.tournamentId,
+    groupId: details.groupId,
+    round: details.round,
+    fixtureNumber: details.fixtureNumber,
+    legNumber: details.legNumber,
+    parentTeamMatchId: details.parentTeamMatchId,
+    homeRegistrationId: details.homeRegistrationId,
+    awayRegistrationId: details.awayRegistrationId,
+  };
+}
 
 @Injectable()
 export class TournamentBracketService {
@@ -307,6 +415,15 @@ export class TournamentBracketService {
         });
       }
 
+      if (group.phase === 'group') {
+        await assertNotInOtherGroupInTx(tx, {
+          tournamentId, groupId: group.id, registrationIds: [dto.registrationId],
+        });
+      }
+      await assertNotInOppositeFinalStageInTx(tx, {
+        tournamentId, fixtureId: null, groupPhase: group.phase, registrationIds: [dto.registrationId],
+      });
+
       if (dto.isBye) {
         const booked = await tx.v1TournamentMatchDetails.findFirst({ where: {
           groupId: group.id,
@@ -433,9 +550,71 @@ export class TournamentBracketService {
     return this.serializeGroupTeam(saved);
   }
 
+  /**
+   * 같은 요청 고유 키로 처음 돌려준 응답을 그대로 재생한다(전역 멱등 계약). 기록이 없거나 보관 기간(30일)이 지났으면 null(새 요청).
+   * 계약의 예외: 처음 만든 경기가 그 뒤 지워졌으면 지워진 경기의 옛 본문 대신 RESOURCE_GONE 이다.
+   */
+  private async replayClientFixture(
+    db: Prisma.TransactionClient, userId: string, tournamentId: string, clientKey: string, payloadHash: string,
+  ): Promise<SerializedCanonicalFixture | null> {
+    const prior = await db.v1IdempotencyRecord.findFirst({
+      where: {
+        actorUserId: userId, action: FIXTURE_CLIENT_CREATE_ACTION, resourceType: V1GameSourceType.TEAM_MATCH,
+        idempotencyKey: clientKey, expiresAt: { gt: new Date() },
+      },
+      select: { resourceId: true, payloadHash: true, responseBody: true },
+    });
+    if (!prior) return null;
+    if (prior.payloadHash !== payloadHash) {
+      throw new ConflictException({
+        code: 'COMMAND_IDEMPOTENCY_PAYLOAD_REUSE',
+        message: '같은 경기 생성 키를 다른 내용으로 다시 사용할 수 없어요.',
+      });
+    }
+    const alive = await db.v1TournamentMatchDetails.findFirst({
+      where: { teamMatchId: prior.resourceId, tournamentId, teamMatch: { deletedAt: null } },
+      select: { teamMatchId: true },
+    });
+    if (!alive) {
+      throw new ConflictException({
+        code: 'COMMAND_IDEMPOTENCY_RESOURCE_GONE',
+        message: '이 요청으로 만든 경기가 이미 지워졌어요. 다시 추가해 주세요.',
+      });
+    }
+    return prior.responseBody as unknown as SerializedCanonicalFixture;
+  }
+
   async createFixture(user: V1AuthUser, tournamentId: string, dto: CreateFixtureDto) {
     const admin = await this.adminContext.getMutationAdmin(user.id);
     const tournament = await this.loadTournament(tournamentId);
+
+    const legNumber = dto.legNumber ?? 1;
+    // 저장과 같은 정규화(resolvePlaceSnapshot)를 거친 값으로 해시를 만든다 — 안 맞추면 같은 번호 재시도가 해시 불일치 409 가 난다.
+    const requestedPlace = this.fixturePlace(dto);
+    const requestedVenue = requestedPlace?.name ?? null;
+    const pinnedPlace = requestedPlace?.providerPlaceId ? requestedPlace : null;
+    // 번호를 서버가 정하는 요청의 내용 해시 — 번호는 빼고(재시도마다 달라진다) 보낸 번호가 있으면 넣는다.
+    // 요청에 실린 값만 넣는다: 대회 기본 장소·등록 상태처럼 재시도 사이에 바뀔 수 있는 서버 상태에 기대면 같은 요청이 409 가 된다.
+    const clientKey = dto.clientCommandId ? `tournament-fixture-client:${tournamentId}:${dto.clientCommandId}` : null;
+    const clientPayloadHash = canonicalGameCommandPayloadHash({
+      tournamentId,
+      groupId: dto.groupId ?? null,
+      round: dto.round,
+      legNumber,
+      parentFixtureId: dto.parentFixtureId ?? null,
+      homeRegistrationId: dto.homeRegistrationId ?? null,
+      awayRegistrationId: dto.awayRegistrationId ?? null,
+      scheduledAt: dto.scheduledAt ? new Date(dto.scheduledAt).toISOString() : null,
+      venue: requestedVenue,
+      place: requestedPlace,
+      ...(dto.fixtureNumber !== undefined ? { fixtureNumber: dto.fixtureNumber } : {}),
+    });
+    // 재생은 바뀔 수 있는 상태(조·등록 확정 여부)를 검증하기 전에 한다 — 이미 만든 경기가 그 사이 등록 취소 때문에 재생 불가가 되면 안 된다.
+    // 잠금 없는 조회라 동시 첫 요청은 못 막는다 — 그 직렬화는 아래 트랜잭션 안의 같은 조회가 맡는다.
+    if (clientKey) {
+      const replay = await this.replayClientFixture(this.prisma, user.id, tournamentId, clientKey, clientPayloadHash);
+      if (replay) return replay;
+    }
 
     // groupId가 주어지면 해당 대회 소속인지 확인
     if (dto.groupId) {
@@ -484,24 +663,33 @@ export class TournamentBracketService {
       });
     }
 
-    const legNumber = dto.legNumber ?? 1;
-    const commandPayload = {
-      tournamentId,
-      groupId: dto.groupId ?? null,
-      round: dto.round,
-      fixtureNumber: dto.fixtureNumber,
-      legNumber,
-      parentFixtureId: dto.parentFixtureId ?? null,
-      homeRegistrationId: dto.homeRegistrationId ?? null,
-      awayRegistrationId: dto.awayRegistrationId ?? null,
-      scheduledAt: dto.scheduledAt ? new Date(dto.scheduledAt).toISOString() : null,
-      venue: dto.venue ?? tournament.venue ?? null,
-    };
-    const durableCommandId = `tournament-fixture:${tournamentId}:${dto.round}:${dto.fixtureNumber}:${legNumber}`;
-    const payloadHash = canonicalGameCommandPayloadHash(commandPayload);
-
-    const created = await this.prisma.$transaction(async (tx) => {
+    return this.prisma.$transaction(async (tx) => {
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`league-fixture-generation:${tournamentId}`}, 0))`;
+      // 요청 고유 키 재전송: 번호를 정하기 전에 처음 만든 경기를 찾는다(번호가 달라져 좌표 멱등이 안 걸리는 재시도를 막는다).
+      if (clientKey) {
+        const replay = await this.replayClientFixture(tx, user.id, tournamentId, clientKey, clientPayloadHash);
+        if (replay) return replay;
+      }
+      // Numbers are tournament-wide and archived fixtures keep theirs, so the allocation reads every row.
+      const fixtureNumber =
+        dto.fixtureNumber ??
+        ((await tx.v1TournamentMatchDetails.aggregate({ where: { tournamentId }, _max: { fixtureNumber: true } }))._max.fixtureNumber ?? 0) + 1;
+      const commandPayload = {
+        tournamentId,
+        groupId: dto.groupId ?? null,
+        round: dto.round,
+        fixtureNumber,
+        legNumber,
+        parentFixtureId: dto.parentFixtureId ?? null,
+        homeRegistrationId: dto.homeRegistrationId ?? null,
+        awayRegistrationId: dto.awayRegistrationId ?? null,
+        scheduledAt: dto.scheduledAt ? new Date(dto.scheduledAt).toISOString() : null,
+        venue: requestedVenue ?? tournament.venue ?? null,
+        // 핀 없는 요청의 해시는 예전과 같게 둔다(재시도 중인 명령이 불일치로 막히지 않게).
+        ...(pinnedPlace ? pinnedPlaceFingerprint(pinnedPlace) : {}),
+      };
+      const durableCommandId = `tournament-fixture:${tournamentId}:${dto.round}:${fixtureNumber}:${legNumber}`;
+      const payloadHash = canonicalGameCommandPayloadHash(commandPayload);
       await tx.$executeRawUnsafe('SELECT pg_advisory_xact_lock(hashtextextended($1, 0))', durableCommandId);
       const group = dto.groupId
         ? await tx.v1TournamentGroup.findFirst({ where: { id: dto.groupId, tournamentId }, select: { name: true, phase: true } })
@@ -523,7 +711,7 @@ export class TournamentBracketService {
           sportId: true,
           regionId: true,
           title: true,
-          venue: true,
+          ...TOURNAMENT_VENUE_SELECT,
           competitionConfigVersionId: true,
         },
       });
@@ -554,45 +742,11 @@ export class TournamentBracketService {
       }
 
       const existingDetails = await tx.v1TournamentMatchDetails.findFirst({
-        where: { tournamentId, round: dto.round, fixtureNumber: dto.fixtureNumber, legNumber },
-        select: {
-          teamMatchId: true,
-          tournamentId: true,
-          groupId: true,
-          round: true,
-          fixtureNumber: true,
-          legNumber: true,
-          parentTeamMatchId: true,
-          homeRegistrationId: true,
-          awayRegistrationId: true,
-          teamMatch: {
-            select: {
-              id: true,
-              tournamentId: true,
-              hostTeamId: true,
-              approvedApplicantTeamId: true,
-              competitionConfigVersionId: true,
-              game: { select: { sourceType: true, teamMatchId: true, competitionConfigVersionId: true, sides: { select: { sideKey: true, teamId: true } } } },
-              startAt: true,
-              placeName: true,
-              status: true,
-              createdAt: true,
-              updatedAt: true,
-            },
-          },
-        },
+        where: { tournamentId, round: dto.round, fixtureNumber, legNumber },
+        select: FIXTURE_REPLAY_SELECT,
       });
       if (existingDetails?.teamMatch) {
-        const aggregate = existingDetails.teamMatch;
-        if (aggregate.tournamentId !== tournamentId || aggregate.game === null ||
-          aggregate.game.sourceType !== V1GameSourceType.TEAM_MATCH ||
-          aggregate.game.teamMatchId !== aggregate.id ||
-          aggregate.game.competitionConfigVersionId !== aggregate.competitionConfigVersionId ||
-          aggregate.game.sides.length !== 2 ||
-          !aggregate.game.sides.some((side) => side.sideKey === V1GameSideKey.HOME && side.teamId === aggregate.hostTeamId) ||
-          !aggregate.game.sides.some((side) => side.sideKey === V1GameSideKey.AWAY && side.teamId === aggregate.approvedApplicantTeamId)) {
-          throw new ConflictException({ code: 'TEAM_MATCH_IDEMPOTENCY_INCOMPLETE', message: '기존 대진 생성 기록이 완전하지 않아요.' });
-        }
+        assertReplayableFixture(existingDetails.teamMatch, tournamentId);
         const existingPayload = {
           tournamentId: existingDetails.tournamentId,
           groupId: existingDetails.groupId,
@@ -604,6 +758,16 @@ export class TournamentBracketService {
           awayRegistrationId: existingDetails.awayRegistrationId,
           scheduledAt: existingDetails.teamMatch.startAt?.toISOString() ?? null,
           venue: existingDetails.teamMatch.placeName,
+          // 요청이 핀을 명시했을 때만 비교한다 — 핀 없는 요청은 대회 기본 장소의 핀을 물려받아 저장될 수 있다.
+          ...(pinnedPlace
+            ? pinnedPlaceFingerprint({
+                address: existingDetails.teamMatch.placeAddress,
+                latitude: existingDetails.teamMatch.placeLatitude,
+                longitude: existingDetails.teamMatch.placeLongitude,
+                provider: existingDetails.teamMatch.placeProvider,
+                providerPlaceId: existingDetails.teamMatch.placeProviderId,
+              })
+            : {}),
         };
         if (canonicalGameCommandPayloadHash(existingPayload) !== payloadHash) {
           throw new ConflictException({
@@ -611,21 +775,16 @@ export class TournamentBracketService {
             message: '같은 경기 생성 키를 다른 내용으로 다시 사용할 수 없어요.',
           });
         }
-        return {
-          ...existingDetails.teamMatch,
-          tournamentId: existingDetails.tournamentId,
-          groupId: existingDetails.groupId,
-          round: existingDetails.round,
-          fixtureNumber: existingDetails.fixtureNumber,
-          legNumber: existingDetails.legNumber,
-          parentTeamMatchId: existingDetails.parentTeamMatchId,
-          homeRegistrationId: existingDetails.homeRegistrationId,
-          awayRegistrationId: existingDetails.awayRegistrationId,
-        };
+        // 번호를 함께 보낸 키 요청이 좌표로 재생되면 키도 이 경기에 묶어 둔다 — 안 묶으면 그 뒤 경기가 옮겨지거나
+        // 지워졌을 때 같은 키 재시도가 재생·RESOURCE_GONE 대신 새 경기를 만든다(위 키 조회에서 기록이 없었던 경우다).
+        const replayed = fixtureReplayResult(existingDetails);
+        const body = this.serializeCanonicalFixture(replayed, toPlaceView(replayed));
+        if (clientKey) await recordClientFixtureKey(tx, user.id, clientKey, clientPayloadHash, body);
+        return body;
       }
 
       const archived = await tx.v1TournamentMatchDetails.findMany({
-        where: { tournamentId, round: { startsWith: dto.round + ':deleted:' }, fixtureNumber: dto.fixtureNumber, legNumber, teamMatch: { deletedAt: { not: null } } },
+        where: { tournamentId, round: { startsWith: dto.round + ':deleted:' }, fixtureNumber, legNumber, teamMatch: { deletedAt: { not: null } } },
         select: { teamMatchId: true },
       });
       const creationCommandId = await nextFixtureCreationCommandId(tx, durableCommandId, tournamentId, archived.length, user.id);
@@ -665,9 +824,16 @@ export class TournamentBracketService {
         });
       }
 
+      await assertNotInOppositeFinalStageInTx(tx, {
+        tournamentId, fixtureId: null, groupPhase: group?.phase ?? null, round: dto.round, registrationIds: [dto.homeRegistrationId, dto.awayRegistrationId],
+      });
       if (dto.groupId && group) {
         await ensureGroupPhaseTeamsInTx(tx, admin, tournamentId, dto.groupId, group.phase, [dto.homeRegistrationId, dto.awayRegistrationId]);
       }
+
+      await assertNewFixtureScheduleKeepsStageOrder(tx, {
+        tournamentId, phase: group?.phase, round: dto.round, startAt: dto.scheduledAt ? new Date(dto.scheduledAt) : null,
+      });
 
       const [homeJerseys, awayJerseys] = await Promise.all([
         home ? readJerseyNumbers(tx, home.id) : Promise.resolve(new Map<string, number>()),
@@ -677,15 +843,15 @@ export class TournamentBracketService {
         tournamentId,
         groupId: dto.groupId ?? null,
         round: dto.round,
-        fixtureNumber: dto.fixtureNumber,
+        fixtureNumber,
         legNumber,
         parentTeamMatchId,
         homeRegistrationId: dto.homeRegistrationId ?? null,
         awayRegistrationId: dto.awayRegistrationId ?? null,
         sportId: pinnedTournament.sportId,
         regionId: pinnedTournament.regionId ?? null,
-        title: `${pinnedTournament.title} · ${competitionMatchLabel({ groupName: group?.name, round: dto.round, legNumber })} ${dto.fixtureNumber}`,
-        placeName: commandPayload.venue,
+        title: `${pinnedTournament.title} · ${competitionMatchLabel({ groupName: group?.name, round: dto.round, legNumber })} ${fixtureNumber}`,
+        place: requestedPlace ?? tournamentVenueSnapshot(pinnedTournament),
         startAt: dto.scheduledAt ? new Date(dto.scheduledAt) : null,
         createdByUserId: user.id,
         competitionConfigVersionId: pinnedTournament.competitionConfigVersionId,
@@ -732,7 +898,7 @@ export class TournamentBracketService {
           hostTeamId: true,
           approvedApplicantTeamId: true,
           startAt: true,
-          placeName: true,
+          ...PLACE_SELECT,
           status: true,
           createdAt: true,
           updatedAt: true,
@@ -747,26 +913,27 @@ export class TournamentBracketService {
           afterJson: {
             tournamentId,
             round: dto.round,
-            fixtureNumber: dto.fixtureNumber,
+            fixtureNumber,
             status: teamMatch.status,
           },
         },
         tx,
       );
-      return {
+      const createdRow = {
         ...teamMatch,
         tournamentId,
         groupId: dto.groupId ?? null,
         round: dto.round,
-        fixtureNumber: dto.fixtureNumber,
+        fixtureNumber,
         legNumber,
         parentTeamMatchId,
         homeRegistrationId: dto.homeRegistrationId ?? null,
         awayRegistrationId: dto.awayRegistrationId ?? null,
       };
+      const body = this.serializeCanonicalFixture(createdRow, toPlaceView(createdRow));
+      if (clientKey) await recordClientFixtureKey(tx, user.id, clientKey, clientPayloadHash, body);
+      return body;
     });
-
-    return this.serializeCanonicalFixture(created);
   }
 
   /** Persist the next match's HOME/AWAY source. Existing result projection owns promotion. */
@@ -831,6 +998,7 @@ export class TournamentBracketService {
   /** 경기 일정·장소·대진(홈/어웨이) 수정. 시작된 경기도 결과가 없으면 사유와 함께 팀을 바꾼다(공식 결과가 있으면 409). */
   async updateFixture(user: V1AuthUser, fixtureId: string, dto: UpdateFixtureDto) {
     const admin = await this.adminContext.getMutationAdmin(user.id);
+    rejectPartialPlaceUpdate(dto.venue, [dto.venueAddress, dto.venueLatitude, dto.venueLongitude, dto.venueProvider, dto.venueProviderId]);
     const canonical = await this.prisma.v1TournamentMatchDetails.findUnique({
       where: { teamMatchId: fixtureId },
       select: {
@@ -913,8 +1081,8 @@ export class TournamentBracketService {
           tournamentId: canonical.tournamentId,
           groupId: canonical.groupId,
           fixtureNumber: dto.fixtureNumber,
-          scheduledAt: dto.scheduledAt !== undefined ? new Date(dto.scheduledAt) : undefined,
-          venue: dto.venue,
+          scheduledAt: dto.scheduledAt == null ? dto.scheduledAt : new Date(dto.scheduledAt),
+          place: dto.venue === undefined ? undefined : this.fixturePlace(dto),
           homeRegistrationId: dto.homeRegistrationId,
           awayRegistrationId: dto.awayRegistrationId,
           allowStartedTeamChange: true,
@@ -924,7 +1092,7 @@ export class TournamentBracketService {
       const startedTeamChange = updated.startedTeamChange === null
         ? null
         : { removedEventCount: updated.startedTeamChange.removedEventCount, score: updated.startedTeamChange.scoreAfter };
-      return { ...this.serializeCanonicalFixture(updated), startedTeamChange };
+      return { ...this.serializeCanonicalFixture(updated, updated.place), startedTeamChange };
     }
     throw new NotFoundException({ code: 'FIXTURE_NOT_FOUND', message: '경기를 찾을 수 없어요.' });
   }
@@ -1236,6 +1404,17 @@ export class TournamentBracketService {
     };
   }
 
+  private fixturePlace(dto: Pick<CreateFixtureDto, 'venue' | 'venueAddress' | 'venueLatitude' | 'venueLongitude' | 'venueProvider' | 'venueProviderId'>) {
+    return resolvePlaceSnapshot({
+      name: dto.venue,
+      address: dto.venueAddress,
+      latitude: dto.venueLatitude,
+      longitude: dto.venueLongitude,
+      provider: dto.venueProvider,
+      providerPlaceId: dto.venueProviderId,
+    });
+  }
+
   /**
    * Canonical bracket creation stores a TeamMatch + TournamentMatchDetails pair.
    * Keep the admin DTO stable while the canonical read path is authoritative.
@@ -1255,7 +1434,7 @@ export class TournamentBracketService {
     status: string;
     createdAt: Date;
     updatedAt: Date;
-  }) {
+  }, place: PlaceView | null): SerializedCanonicalFixture {
     const status =
       row.status === 'completed'
         ? 'completed'
@@ -1274,6 +1453,7 @@ export class TournamentBracketService {
       awayRegistrationId: row.awayRegistrationId,
       scheduledAt: row.startAt?.toISOString() ?? null,
       venue: row.placeName,
+      place,
       status,
       createdAt: row.createdAt.toISOString(),
       updatedAt: row.updatedAt.toISOString(),
@@ -1328,4 +1508,21 @@ export class TournamentBracketService {
       recalculatedAt: row.recalculatedAt?.toISOString() ?? null,
     };
   }
+}
+
+/** 핀 있는 경기 생성의 멱등 해시용 장소 지문 — 요청 스냅샷과 저장 행을 같은 모양으로 맞춘다. */
+function pinnedPlaceFingerprint(place: {
+  address: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  provider: string | null;
+  providerPlaceId: string | null;
+}) {
+  return {
+    venueProviderId: place.providerPlaceId,
+    venueProvider: place.provider,
+    venueAddress: place.address,
+    venueLatitude: place.latitude,
+    venueLongitude: place.longitude,
+  };
 }

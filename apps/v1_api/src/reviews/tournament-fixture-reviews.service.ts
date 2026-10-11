@@ -1,5 +1,6 @@
 import { BadRequestException, ConflictException, ForbiddenException, GoneException, Injectable, NotFoundException } from '@nestjs/common';
 import { V1TeamMembershipRole } from '@prisma/client';
+import { isForfeitedGame, NOT_FORFEITED_GAME_WHERE } from '../league-matches/league-forfeit-result';
 import { V1AuthUser } from '../auth/v1-auth-user';
 import { PrismaService } from '../prisma/prisma.service';
 import { formatReviewWindow, reviewWindowClosed } from './review-deadline';
@@ -52,6 +53,8 @@ export class TournamentFixtureReviewsService {
         leagueId: null,
         status: 'completed',
         tournamentDetails: { isNot: null },
+        // 몰수 경기는 불참한 쪽이 뛰지 않았으므로 평가할 상대가 없다. take 전에 걸러야 최신 몰수가 후보를 채우지 않는다.
+        game: NOT_FORFEITED_GAME_WHERE,
         OR: [
           { tournamentDetails: { is: { homeRegistration: { is: { teamId: { in: teamIds } } } } } },
           { tournamentDetails: { is: { awayRegistration: { is: { teamId: { in: teamIds } } } } } },
@@ -60,7 +63,8 @@ export class TournamentFixtureReviewsService {
       orderBy: [{ updatedAt: 'desc' }],
       take: limit * 4,
       select: tournamentFixtureSelect(),
-    })).filter(isCanonicalTournamentFixture).filter((fixture) => officialResultTimestamp(fixture) !== null);
+    })).filter(isCanonicalTournamentFixture)
+      .filter((fixture) => officialResultTimestamp(fixture) !== null);
     const reviewed = await this.existingReviews(fixtures.map((fixture) => fixture.tournamentId), user.id);
     const seenKeys = new Set<string>();
 
@@ -308,6 +312,9 @@ export class TournamentFixtureReviewsService {
     }
     if (fixture.status !== 'completed' || !officialResultTimestamp(fixture)) {
       throw conflict('SOURCE_NOT_COMPLETED', 'Review source is not completed');
+    }
+    if (isForfeitedGame(fixture.game)) {
+      throw conflict('SOURCE_FORFEITED', '몰수로 끝난 경기예요. 평가를 남길 수 없어요.');
     }
     // 평가창(스펙 §6). 기간은 어드민 설정(V1ReviewPolicySettings)에서 읽고, 저장하지 않고 매
     // 조회 시점에 계산한다 -- 정정으로 officialAt이 갱신되면 마감도 그 시각 기준으로 자동

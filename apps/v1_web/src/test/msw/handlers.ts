@@ -48,6 +48,7 @@ import {
   v1HomeFixture,
   v1InquiriesFixture,
   v1MatchesFixture,
+  v1PlaceSearchFixture,
   v1NoticesFixture,
   v1NotificationsFixture,
   v1ProfileFixture,
@@ -439,6 +440,10 @@ export const v1MswHandlers = [
   ...v1TeamInviteLinkMswHandlers,
   ...v1LeagueVisibilityMswHandlers,
   http.get(`${api}/auth/me`, () => ok(v1UserFixture)),
+  http.post(`${api}/auth/phone/issue`, () => ok({ expiresAt: new Date(Date.now() + 5 * 60 * 1000).toISOString(), devCode: '123456' })),
+  http.post(`${api}/auth/phone/verify`, () => ok({ verified: true, proofToken: 'proof-social-link' })),
+  http.post(`${api}/auth/social-link/preview`, () => ok({ maskedEmail: 'ru***@gmail.com', providers: ['email'], hasPassword: true, linkingProvider: 'kakao' })),
+  http.post(`${api}/auth/social-link`, () => ok({ session: { userId: v1UserFixture.id, userEmail: v1UserFixture.email }, ...v1UserFixture })),
   http.post(`${api}/auth/login`, () => ok({ session: { userId: v1UserFixture.id, userEmail: v1UserFixture.email }, ...v1UserFixture })),
   http.post(`${api}/auth/register`, async ({ request }) => {
     const body = await request.json();
@@ -446,12 +451,32 @@ export const v1MswHandlers = [
     if (issue) return validationError(issue);
     return ok({ session: { userId: v1UserFixture.id, userEmail: v1UserFixture.email }, ...v1UserFixture });
   }),
+  http.post(`${api}/auth/social-terms`, async ({ request }) => {
+    const body = (await request.json()) as { ageConfirmed?: unknown };
+    if (body.ageConfirmed !== true) {
+      return HttpResponse.json(
+        { status: 'error', statusCode: 400, code: 'VALIDATION_ERROR', message: '만 14세 이상 확인이 필요해요.', timestamp: '2026-05-18T00:00:00.000Z' },
+        { status: 400 },
+      );
+    }
+    return ok({ session: { userId: v1UserFixture.id, userEmail: v1UserFixture.email }, ...v1UserFixture, next: { route: '/signup/social' } });
+  }),
+  http.post(`${api}/auth/social-profile/defer`, () =>
+    ok({ session: { userId: v1UserFixture.id, userEmail: v1UserFixture.email }, ...v1UserFixture })),
   http.get(`${api}/onboarding`, () => ok({ status: 'signup_done', currentStep: 'sport', canResume: true, missing: ['sports'], sports: [], regions: [], regionOptional: true })),
   http.patch(`${api}/onboarding/preferences`, async ({ request }) => ok(await request.json())),
   http.post(`${api}/onboarding/complete`, () => ok({ completed: true })),
   http.post(`${api}/onboarding/defer`, () => ok({ status: 'deferred', next: { route: '/home', reason: 'onboarding_deferred' }, missing: ['sports'], limited: true })),
   http.get(`${api}/master/sports`, () => ok(v1SportsFixture)),
   http.get(`${api}/master/regions`, () => ok(v1RegionsFixture)),
+  http.get(`${api}/public/integrations/kakao-maps-key`, () => ok({ kakaoMapsJsKey: null })),
+  http.get(`${api}/places/search`, ({ request }) => {
+    const tokens = (new URL(request.url).searchParams.get('query') ?? '').trim().split(/\s+/).filter(Boolean);
+    const items = tokens.length === 0
+      ? []
+      : v1PlaceSearchFixture.items.filter((item) => tokens.some((token) => item.name.includes(token)));
+    return ok({ items, hasMore: false });
+  }),
   http.get(`${api}/search/recent`, () => ok({ items: v1RecentSearchesFixture })),
   http.post(`${api}/search/recent`, async ({ request }) => {
     const body = await request.json() as { query: string; filters?: unknown };
@@ -1304,6 +1329,7 @@ export const v1MswHandlers = [
       outcomeNote: null,
       createdByActorType: 'USER',
       createdByUserId: 'user-1',
+      createdByName: '스태프 닉네임',
       createdBySystemActor: null,
       supersedesId: null,
       submittedAt: null,

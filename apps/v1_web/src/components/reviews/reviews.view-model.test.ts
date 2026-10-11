@@ -75,6 +75,65 @@ describe('reviews view model — 대회 경기 리뷰 계약', () => {
     expect(sourceTypeLabel('tournament_fixture')).toBe('대회 경기');
   });
 
+  it('리그 팀 매치는 "리그 경기", 일반 팀 매치는 "팀매치"로 표시한다', () => {
+    const item = {
+      sourceType: 'team_match' as const, title: '라운드 1', completedAt: '2026-10-10T12:00:00.000Z',
+      targetType: 'team' as const, targetCount: 1, reviewedCount: 0, remainingCount: 1, state: 'ready' as const,
+    };
+    const model = toReviewsPageModel({
+      items: [
+        { ...item, sourceId: 'league-match', isLeague: true },
+        { ...item, sourceId: 'friendly-match', isLeague: false },
+        { ...item, sourceId: 'old-response' },
+      ],
+      pageInfo: { nextCursor: null, hasNext: false },
+    }, 'pending');
+
+    expect(model.cards.map((card) => card.kindLabel)).toEqual(['리그 경기', '팀매치', '팀매치']);
+  });
+
+  it('받은 리뷰 그룹도 리그 경기를 "리그 경기"로 표시한다', () => {
+    const common = {
+      targetType: 'user' as const, targetUser: { userId: 'me', name: '나', imageUrl: null },
+      targetTeam: null, reviewerTeam: null, status: 'submitted' as const, submittedAt: null, anonymous: false, tags: [],
+      reviewerUser: { userId: 'p', name: '참가자', imageUrl: null }, rating: 5, sourceType: 'team_match' as const,
+    };
+    const source = { sourceType: 'team_match' as const, title: '라운드 1', completedAt: null };
+    const model = toReviewsReceivedPageModel({
+      items: [
+        { ...common, reviewId: 'a', sourceId: 'league-match', source: { ...source, sourceId: 'league-match', isLeague: true } },
+        { ...common, reviewId: 'b', sourceId: 'friendly-match', source: { ...source, sourceId: 'friendly-match', isLeague: false } },
+      ],
+      pageInfo: { nextCursor: null, hasNext: false },
+    });
+
+    const metas = model.userGroups.map((group) => group.meta);
+    expect(metas[0]).toContain('리그 경기');
+    expect(metas[1]).toContain('팀매치');
+    expect(metas[1]).not.toContain('리그 경기');
+  });
+
+  it('목록 요약은 상대 팀 평가가 섞인 대상 수를 "명"이 아니라 "건"으로 센다', () => {
+    const item = (sourceId: string, targetCount: number, reviewedCount: number) => ({
+      sourceType: 'team_match' as const,
+      sourceId,
+      title: sourceId,
+      completedAt: null,
+      targetType: 'user' as const,
+      targetCount,
+      reviewedCount,
+      remainingCount: targetCount - reviewedCount,
+      state: targetCount === reviewedCount ? ('done' as const) : ('ready' as const),
+    });
+    const data = { items: [item('a', 7, 2), item('b', 3, 3)], pageInfo: { nextCursor: null, hasNext: false } };
+
+    const pending = toReviewsPageModel(data, 'pending');
+    expect(pending.stats.map((stat) => stat.value)).toEqual(['2건', '10건', '5건']);
+    const written = toReviewsPageModel(data, 'written');
+    expect(written.stats.map((stat) => stat.value)).toEqual(['5건', '2건', '5건']);
+    expect(written.cards.find((card) => card.sourceId === 'b')?.meta).toBe('3건 전송 완료');
+  });
+
   it('대회 fixture 상대팀 리뷰는 리뷰 목록에서 상대팀 CTA로 보인다', () => {
     const model = toReviewsPageModel({
       items: [
@@ -239,8 +298,8 @@ describe('reviews view model — 작성 현황과 제출 대상', () => {
   });
 
   it('현황 문구는 보낸 인원이 있을 때만 앞에 붙인다', () => {
-    expect(formatReviewProgress({ submitted: 0, inProgress: 2, remaining: 5, ready: [], incomplete: [] })).toBe('작성 중 2명 · 남은 대상 5명');
-    expect(formatReviewProgress({ submitted: 1, inProgress: 0, remaining: 3, ready: [], incomplete: [] })).toBe('작성 완료 1명 · 작성 중 0명 · 남은 대상 3명');
+    expect(formatReviewProgress({ submitted: 0, inProgress: 2, remaining: 5, ready: [], incomplete: [] })).toBe('작성 중 2건 · 남은 대상 5건');
+    expect(formatReviewProgress({ submitted: 1, inProgress: 0, remaining: 3, ready: [], incomplete: [] })).toBe('작성 완료 1건 · 작성 중 0건 · 남은 대상 3건');
   });
 
   it('덜 끝난 대상이 하나면 그 이름과 빠진 것을, 여럿이면 첫 이름과 건수를 말한다', () => {

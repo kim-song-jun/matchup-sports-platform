@@ -14,6 +14,7 @@ import {
   useV1RegenerateLeagueFixtures,
   useV1RemoveLeagueTeam,
   useV1RevertLeagueCompletion,
+  useV1CompleteLeague,
   useV1Teams,
   useV1UpdateLeagueFixture,
 } from '@/hooks/use-v1-api';
@@ -126,10 +127,14 @@ vi.mock('@/hooks/use-v1-api', () => ({
   // R6/D-3: 종료 역전이. 대부분의 테스트는 state !== 'completed' 라 버튼 자체가 안 뜨므로
   // 기본값으로 충분하고, 역전이 테스트만 mutate 를 들여다본다.
   useV1RevertLeagueCompletion: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
+  useV1CompleteLeague: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
   useV1HoldLeague: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
   useV1ResumeLeague: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
   useV1CloseLeagueRegistration: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
   useV1UpdateLeagueCoverImage: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
+  useV1UpdateLeagueVenue: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
+  useV1PublicKakaoMapsKey: vi.fn(() => ({ data: { kakaoMapsJsKey: null }, isLoading: false })),
+  useV1PlaceSearch: vi.fn(() => ({ data: undefined, isFetching: false, isError: false, error: null })),
   useV1UploadImages: vi.fn(() => ({ mutateAsync: vi.fn(), isPending: false })),
   // 팀 추가 EntityPicker의 검색 후보 — 빈 목록이면 아무것도 렌더하지 않아 무해하다.
   useV1Teams: vi.fn(() => ({ data: undefined, isFetching: false })),
@@ -139,6 +144,15 @@ vi.mock('@/hooks/use-v1-api', () => ({
   useV1Settings: vi.fn(() => ({ data: undefined, isError: false, refetch: vi.fn() })),
   useV1UpdateSettings: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
 }));
+
+const PICKED_VENUE = {
+  name: '상암 풋살파크',
+  address: '서울 마포구 월드컵로 240',
+  latitude: 37.5683,
+  longitude: 126.8972,
+  provider: 'kakao',
+  providerPlaceId: 'kakao-sangam',
+};
 
 const useV1ActivePopupMock = vi.mocked(useV1ActivePopup, { partial: true });
 const useV1AddLeagueTeamMock = vi.mocked(useV1AddLeagueTeam, { partial: true });
@@ -153,6 +167,7 @@ const useV1RegenerateLeagueFixturesMock = vi.mocked(useV1RegenerateLeagueFixture
 const useV1RemoveLeagueTeamMock = vi.mocked(useV1RemoveLeagueTeam, { partial: true });
 const useV1UpdateLeagueFixtureMock = vi.mocked(useV1UpdateLeagueFixture, { partial: true });
 const useV1RevertLeagueCompletionMock = vi.mocked(useV1RevertLeagueCompletion, { partial: true });
+const useV1CompleteLeagueMock = vi.mocked(useV1CompleteLeague, { partial: true });
 const useV1TeamsMock = vi.mocked(useV1Teams, { partial: true });
 
 /** 만든 대진은 지울 수 없어 생성은 확인 창을 거친다(F42) — 누르고 확인까지 한 번에. */
@@ -195,6 +210,7 @@ describe('LeagueMatchFixturesClient', () => {
     useV1CancelLeagueFixtureMock.mockReturnValue({ mutate: vi.fn(), isPending: false } as never);
     useV1RegenerateLeagueFixturesMock.mockReturnValue({ mutate: vi.fn(), isPending: false } as never);
     useV1RevertLeagueCompletionMock.mockReturnValue({ mutate: vi.fn(), isPending: false } as never);
+    useV1CompleteLeagueMock.mockReturnValue({ mutate: vi.fn(), isPending: false } as never);
   });
 
   // D6(2026-08-24 확정): '상태' 열과 별개로 '결과' 열을 둔다. 이 열이 없던 동안 운영자는
@@ -614,9 +630,7 @@ describe('LeagueMatchFixturesClient', () => {
       expect(input.className).toContain('w-full');
       expect(input.parentElement!.parentElement).toBe(grid);
     }
-    const place = screen.getByLabelText('기본 장소');
-    expect(place.className).toContain('w-full');
-    expect(place.parentElement!.className).toContain('col-span-full');
+    expect(screen.getByRole('group', { name: '장소' }).className).toContain('col-span-full');
     expect(screen.getByRole('button', { name: '미리보기' }).parentElement).toBe(
       screen.getByRole('button', { name: '라운드로빈 대진 생성' }).parentElement,
     );
@@ -662,7 +676,7 @@ describe('LeagueMatchFixturesClient', () => {
   it('요일·시각·장소를 채우고 생성하면 schedule과 placeName을 함께 전달한다', async () => {
     useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false } as never);
     useV1AdminLeagueMatchMock.mockReturnValue({
-      data: { leagueId: 'league-1', isPublic: true, title: '가을 풋살 리그', startsOn: '2026-09-01T00:00:00.000Z', state: 'draft', teamIds: ['t1', 't2'], fixtures: [] },
+      data: { leagueId: 'league-1', isPublic: true, title: '가을 풋살 리그', startsOn: '2026-09-01T00:00:00.000Z', state: 'draft', teamIds: ['t1', 't2'], fixtures: [], recentVenues: [PICKED_VENUE] },
       isPending: false,
     } as never);
     const mutateAsync = vi.fn().mockResolvedValue({ leagueId: 'league-1', createdCount: 7, teamMatchIds: [] });
@@ -679,7 +693,8 @@ describe('LeagueMatchFixturesClient', () => {
     fireEvent.change(screen.getByLabelText('주차 수'), { target: { value: '7' } });
     fireEvent.change(screen.getByLabelText('요일'), { target: { value: '6' } });
     fireEvent.change(screen.getByLabelText('시작 시각'), { target: { value: '19:30' } });
-    fireEvent.change(screen.getByLabelText('기본 장소'), { target: { value: '상암 풋살파크' } });
+    fireEvent.click(screen.getByRole('radio', { name: '다른 장소 사용' }));
+    fireEvent.click(screen.getByRole('button', { name: PICKED_VENUE.name }));
     await generateAndConfirm();
 
     // **서버는 요일을 모른다** — 화면이 날짜 목록으로 전개해 보내야 한다(Task 164 BE-2).
@@ -689,10 +704,17 @@ describe('LeagueMatchFixturesClient', () => {
     const payload = mutateAsync.mock.calls[0][0] as {
       weeksCount: number;
       schedule: { dates: string[]; time: string };
-      placeName: string;
     };
     expect(payload.weeksCount).toBe(7);
-    expect(payload.placeName).toBe('상암 풋살파크');
+    // 검색으로 고른 장소는 이름과 함께 좌표·provider 스냅샷 전체가 간다.
+    expect(payload).toMatchObject({
+      placeName: '상암 풋살파크',
+      placeAddress: '서울 마포구 월드컵로 240',
+      placeLatitude: 37.5683,
+      placeLongitude: 126.8972,
+      placeProvider: 'kakao',
+      placeProviderId: 'kakao-sangam',
+    });
     expect(payload.schedule.time).toBe('19:30');
     expect(payload.schedule).not.toHaveProperty('dayOfWeek');
     // 주차 수만큼, 전부 토요일(KST), 전부 미래 — 서버가 거부하지 않는 값이어야 한다.
@@ -787,7 +809,7 @@ describe('LeagueMatchFixturesClient', () => {
         teamIds: ['t1', 't2'],
         startsOn: '2026-09-01T00:00:00.000Z',
         fixtures: [],
-        recentVenues: ['상암 풋살파크', '잠실 종합운동장'],
+        recentVenues: [{ name: '상암 풋살파크', address: null, latitude: null, longitude: null, provider: null, providerPlaceId: null }, { name: '잠실 종합운동장', address: null, latitude: null, longitude: null, provider: null, providerPlaceId: null }],
       },
       isPending: false,
     } as never);
@@ -801,6 +823,7 @@ describe('LeagueMatchFixturesClient', () => {
       </Providers>,
     );
 
+    fireEvent.click(screen.getByRole('radio', { name: '다른 장소 사용' }));
     fireEvent.click(screen.getByRole('button', { name: '잠실 종합운동장' }));
     await generateAndConfirm();
 
@@ -808,6 +831,54 @@ describe('LeagueMatchFixturesClient', () => {
       weeksCount: 1,
       placeName: '잠실 종합운동장',
     }));
+  });
+
+  it('기본 장소 사용을 고르면(기본값) 장소 필드를 하나도 보내지 않아 서버가 리그 기본 장소를 상속한다', async () => {
+    useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false } as never);
+    useV1AdminLeagueMatchMock.mockReturnValue({
+      data: {
+        leagueId: 'league-1', isPublic: true, title: '가을 풋살 리그', state: 'draft', teamIds: ['t1', 't2'],
+        startsOn: '2026-09-01T00:00:00.000Z', fixtures: [], recentVenues: [PICKED_VENUE], defaultPlace: PICKED_VENUE,
+      },
+      isPending: false,
+    } as never);
+    const mutateAsync = vi.fn().mockResolvedValue({ leagueId: 'league-1', createdCount: 1, teamMatchIds: [] });
+    useV1GenerateLeagueFixturesMock.mockReturnValue({ mutateAsync, isPending: false } as never);
+    useV1UpdateLeagueFixtureMock.mockReturnValue({ mutate: vi.fn() } as never);
+
+    render(
+      <Providers>
+        <LeagueMatchFixturesClient leagueId="league-1" initialView="list" />
+      </Providers>,
+    );
+
+    expect(screen.getByRole('radio', { name: '기본 장소 사용 (상암 풋살파크)' })).toBeChecked();
+    await generateAndConfirm();
+
+    await waitFor(() => expect(mutateAsync).toHaveBeenCalledWith({ weeksCount: 1 }));
+  });
+
+  it('다른 장소를 골랐는데 장소를 고르지 않으면 생성하지 않고 안내한다', async () => {
+    useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false } as never);
+    useV1AdminLeagueMatchMock.mockReturnValue({
+      data: { leagueId: 'league-1', isPublic: true, title: '가을 풋살 리그', state: 'draft', teamIds: ['t1', 't2'], startsOn: '2026-09-01T00:00:00.000Z', fixtures: [] },
+      isPending: false,
+    } as never);
+    const mutateAsync = vi.fn();
+    useV1GenerateLeagueFixturesMock.mockReturnValue({ mutateAsync, isPending: false } as never);
+    useV1UpdateLeagueFixtureMock.mockReturnValue({ mutate: vi.fn() } as never);
+
+    render(
+      <Providers>
+        <LeagueMatchFixturesClient leagueId="league-1" initialView="list" />
+      </Providers>,
+    );
+
+    fireEvent.click(screen.getByRole('radio', { name: '다른 장소 사용' }));
+    fireEvent.click(screen.getByRole('button', { name: '라운드로빈 대진 생성' }));
+
+    expect(await screen.findByText(/다른 장소를 골라 주세요/)).toBeInTheDocument();
+    expect(mutateAsync).not.toHaveBeenCalled();
   });
 
   it('조회가 실패하면 에러 메시지와 재시도 버튼을 보여주고, 버튼을 누르면 refetch를 호출한다', () => {
@@ -886,12 +957,13 @@ describe('LeagueMatchFixturesClient', () => {
   });
 
   describe('일정 수정 모달', () => {
-    function renderOneFixture(mutate: ReturnType<typeof vi.fn>) {
+    function renderOneFixture(mutate: ReturnType<typeof vi.fn>, extra: Record<string, unknown> = {}) {
       useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false } as never);
       useV1AdminLeagueMatchMock.mockReturnValue({
         data: {
           leagueId: 'league-1', isPublic: true, title: '가을 풋살 리그', state: 'active', teamIds: ['t1', 't2'],
           startsOn: '2026-09-01T00:00:00.000Z',
+          ...extra,
           fixtures: [
             { teamMatchId: 'tm-1', title: '가을 풋살 리그 1주차', homeTeamId: 't1', awayTeamId: 't2', startAt: '2026-09-01T20:00:00.000Z', placeName: '탄천 보조구장', placeAddress: '성남시 탄천로 1', status: 'matched' },
           ],
@@ -909,17 +981,45 @@ describe('LeagueMatchFixturesClient', () => {
       return screen.getByRole('dialog', { name: '일정 수정' });
     }
 
-    it('현재 구장·주소를 채워 열고, 구장만 바꾸면 그 필드만 보낸다', async () => {
+    it('기본 장소가 없는 리그의 경기는 현재 장소로 열리고, 이름만 바꾸면 장소 필드만 보낸다', async () => {
       const mutate = vi.fn();
       const modal = renderOneFixture(mutate);
 
-      expect(within(modal).getByLabelText('구장')).toHaveValue('탄천 보조구장');
-      expect(within(modal).getByLabelText(/^주소/)).toHaveValue('성남시 탄천로 1');
-      fireEvent.change(within(modal).getByLabelText('구장'), { target: { value: '잠실 보조구장' } });
+      expect(within(modal).getByRole('radio', { name: '이 경기만 다른 장소' })).toBeChecked();
+      expect(within(modal).getByLabelText('다른 장소')).toHaveValue('탄천 보조구장');
+      fireEvent.change(within(modal).getByLabelText('다른 장소'), { target: { value: '잠실 보조구장' } });
       fireEvent.click(within(modal).getByRole('button', { name: '저장' }));
 
       await waitFor(() =>
-        expect(mutate).toHaveBeenCalledWith({ teamMatchId: 'tm-1', body: { placeName: '잠실 보조구장' } }, expect.anything()),
+        expect(mutate).toHaveBeenCalledWith(
+          { teamMatchId: 'tm-1', body: { placeName: '잠실 보조구장' } },
+          expect.anything(),
+        ),
+      );
+    });
+
+    it('시각만 바꾸면 장소 필드를 하나도 보내지 않는다', async () => {
+      const mutate = vi.fn();
+      const modal = renderOneFixture(mutate);
+
+      fireEvent.change(within(modal).getByLabelText('일시'), { target: { value: '2026-09-03T20:00' } });
+      fireEvent.click(within(modal).getByRole('button', { name: '저장' }));
+
+      await waitFor(() => expect(mutate).toHaveBeenCalledTimes(1));
+      const body = mutate.mock.calls[0][0].body as Record<string, unknown>;
+      expect(Object.keys(body)).toEqual(['startsAt']);
+    });
+
+    it('기본 장소와 다른 경기를 기본 장소 사용으로 바꾸면 placeName 을 빈 문자열로 보낸다', async () => {
+      const mutate = vi.fn();
+      const modal = renderOneFixture(mutate, { defaultPlace: PICKED_VENUE });
+
+      expect(within(modal).getByRole('radio', { name: '이 경기만 다른 장소' })).toBeChecked();
+      fireEvent.click(within(modal).getByRole('radio', { name: '기본 장소 사용 (상암 풋살파크)' }));
+      fireEvent.click(within(modal).getByRole('button', { name: '저장' }));
+
+      await waitFor(() =>
+        expect(mutate).toHaveBeenCalledWith({ teamMatchId: 'tm-1', body: { placeName: '' } }, expect.anything()),
       );
     });
 
@@ -927,7 +1027,7 @@ describe('LeagueMatchFixturesClient', () => {
       const mutate = vi.fn((_vars, opts) => opts.onSuccess({}));
       const modal = renderOneFixture(mutate);
 
-      fireEvent.change(within(modal).getByLabelText('구장'), { target: { value: '잠실 보조구장' } });
+      fireEvent.change(within(modal).getByLabelText('다른 장소'), { target: { value: '잠실 보조구장' } });
       fireEvent.click(within(modal).getByRole('button', { name: '저장' }));
 
       expect(await screen.findByText('일정을 저장했어요.')).toBeInTheDocument();
@@ -938,12 +1038,12 @@ describe('LeagueMatchFixturesClient', () => {
       const mutate = vi.fn((_vars, opts) => opts.onError(new Error('서버가 거부했어요')));
       const modal = renderOneFixture(mutate);
 
-      fireEvent.change(within(modal).getByLabelText('구장'), { target: { value: '잠실 보조구장' } });
+      fireEvent.change(within(modal).getByLabelText('다른 장소'), { target: { value: '잠실 보조구장' } });
       fireEvent.click(within(modal).getByRole('button', { name: '저장' }));
 
       expect(await within(modal).findByRole('alert')).toBeInTheDocument();
       expect(screen.getByRole('dialog', { name: '일정 수정' })).toBeInTheDocument();
-      expect(within(modal).getByLabelText('구장')).toHaveValue('잠실 보조구장');
+      expect(within(modal).getByLabelText('다른 장소')).toHaveValue('잠실 보조구장');
     });
   });
 
@@ -1396,6 +1496,57 @@ describe('LeagueMatchFixturesClient', () => {
     await waitFor(() => expect(revertMutate).toHaveBeenCalledWith({ reason: '오심 정정' }, expect.anything()));
   });
 
+  it('남은 대진이 모두 확정·취소된 진행 중 리그에만 "리그 종료하기"가 뜨고, 확인하면 complete mutation을 호출한다', async () => {
+    // MD-QA #93: 되돌리기·보류 해제 뒤 대진을 바꾸지 않으면 자동 종료가 다시 판정되지 않아 리그가
+    // 진행 중으로 남았다. 버튼 노출 조건은 서버 shouldCompleteLeague 와 같아야 한다.
+    const fixture = (id: string, status: string, resultStage: string) => ({
+      teamMatchId: id, title: id, homeTeamId: 't1', awayTeamId: 't2', startAt: '2026-09-01T20:00:00.000Z',
+      placeName: '장소 미정', status, resultStage, homeScore: null, awayScore: null,
+    });
+    const detail = (state: string, fixtures: ReturnType<typeof fixture>[]) => ({
+      data: {
+        leagueId: 'league-1', isPublic: true, title: '가을 풋살 리그', state,
+        teamIds: ['t1', 't2'], startsOn: '2026-09-01T00:00:00.000Z', fixtures,
+      },
+      isPending: false,
+    });
+    useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false } as never);
+    useV1GenerateLeagueFixturesMock.mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as never);
+    useV1UpdateLeagueFixtureMock.mockReturnValue({ mutate: vi.fn() } as never);
+    const renderClient = () =>
+      render(
+        <Providers>
+          <LeagueMatchFixturesClient leagueId="league-1" initialView="list" />
+        </Providers>,
+      );
+
+    // 결과를 기다리는 대진이 남아 있으면 버튼이 없다.
+    useV1AdminLeagueMatchMock.mockReturnValue(detail('active', [
+      fixture('tm-1', 'completed', 'official'), fixture('tm-2', 'matched', 'not_entered'),
+    ]) as never);
+    const pendingView = renderClient();
+    expect(screen.queryByRole('button', { name: '리그 종료하기' })).not.toBeInTheDocument();
+    pendingView.unmount();
+
+    // 대진이 전부 취소된 리그도 종료 대상이 아니다(서버도 같은 판정).
+    useV1AdminLeagueMatchMock.mockReturnValue(detail('active', [fixture('tm-1', 'cancelled', 'not_entered')]) as never);
+    const cancelledView = renderClient();
+    expect(screen.queryByRole('button', { name: '리그 종료하기' })).not.toBeInTheDocument();
+    cancelledView.unmount();
+
+    const completeMutate = vi.fn();
+    useV1CompleteLeagueMock.mockReturnValue({ mutate: completeMutate, isPending: false } as never);
+    useV1AdminLeagueMatchMock.mockReturnValue(detail('active', [
+      fixture('tm-1', 'completed', 'official'), fixture('tm-2', 'cancelled', 'not_entered'),
+    ]) as never);
+    renderClient();
+    fireEvent.click(screen.getByRole('button', { name: '리그 종료하기' }));
+    const reasonBox = await screen.findByLabelText(/^사유/);
+    fireEvent.change(reasonBox, { target: { value: '추가 경기 없음' } });
+    fireEvent.click(screen.getByRole('button', { name: '종료' }));
+    await waitFor(() => expect(completeMutate).toHaveBeenCalledWith({ reason: '추가 경기 없음' }, expect.anything()));
+  });
+
   // U1(A안 "확정 다이얼로그") — 행 ⋯ 시트의 결과 항목은 결과 진행 단계에 따라 갈린다.
   // 감사 확인(A-league-void-stage): voided(무효화된 결과)도 백엔드가 신규 입력을 이미
   // 허용하므로 '결과 입력' 버튼이 떠야 한다 — 여기서 빠지면 무효 대진은 재입력 버튼
@@ -1528,9 +1679,9 @@ describe('LeagueMatchFixturesClient — 대진 timing 설정', () => {
     );
   });
 
-  it('F40: 라운드가 주차에 안 나눠지면 요약이 마지막 주에 다시 열리는 라운드를 알린다', () => {
-    useV1GenerateLeagueFixturesMock.mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as never);
-    const REPEAT = /첫 라운드 대진이 한 번 더 열려요/;
+  it('F40: 라운드가 주차에 안 나눠져도 라운드로빈 한 바퀴만 만들고 마지막 주에 남는 라운드만 연다', async () => {
+    const mutateAsync = vi.fn().mockResolvedValue({ teamMatchIds: [], warnings: [] });
+    useV1GenerateLeagueFixturesMock.mockReturnValue({ mutateAsync, isPending: false } as never);
 
     render(
       <Providers>
@@ -1538,15 +1689,42 @@ describe('LeagueMatchFixturesClient — 대진 timing 설정', () => {
       </Providers>,
     );
 
-    // 4팀 단일 3라운드 · 하루 2경기 → 2주 4라운드: 서버는 1라운드 대진을 한 번 더 만든다.
+    // 4팀 단일 3라운드 · 하루 2경기 → 2주, 3라운드 = 6경기. 첫 라운드 재대결(8경기)은 없다.
+    fireEvent.change(screen.getByLabelText('요일'), { target: { value: '3' } });
+    fireEvent.change(screen.getByLabelText('시작 시각'), { target: { value: '22:00' } });
     fireEvent.change(screen.getByLabelText('팀당 하루 경기'), { target: { value: '2' } });
-    expect(screen.getByText(/2주차 · 8경기가 만들어져요/)).toBeInTheDocument();
-    expect(screen.getByText(REPEAT)).toBeInTheDocument();
+    expect(screen.getByText(/2주차 · 6경기가 만들어져요/)).toBeInTheDocument();
+    expect(screen.getByText(/마지막 주에는 1라운드만 열려요/)).toBeInTheDocument();
+    expect(screen.queryByText(/한 번 더 열려요/)).not.toBeInTheDocument();
+    await generateAndConfirm();
+    await waitFor(() =>
+      expect(mutateAsync).toHaveBeenCalledWith(
+        expect.objectContaining({ weeksCount: 2, roundsCount: 3, timing: { gamesPerTeamPerDay: 2 } }),
+      ),
+    );
 
-    // 대조군: 하루 3경기면 1주에 3라운드가 딱 들어가 다시 여는 라운드가 없다.
+    // 대조군: 하루 3경기면 1주에 3라운드가 딱 들어가 안내도 상한도 없다.
     fireEvent.change(screen.getByLabelText('팀당 하루 경기'), { target: { value: '3' } });
     expect(screen.getByText(/1주차 · 6경기가 만들어져요/)).toBeInTheDocument();
-    expect(screen.queryByText(/한 번 더 열려요/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/마지막 주에는/)).not.toBeInTheDocument();
+  });
+
+  it('F40: 홈앤어웨이는 두 번씩 만나므로 "한 번씩만" 문구 없이 마지막 주 라운드 수만 안내한다', () => {
+    useV1GenerateLeagueFixturesMock.mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as never);
+
+    render(
+      <Providers>
+        <LeagueMatchFixturesClient leagueId="league-1" initialView="list" />
+      </Providers>,
+    );
+
+    fireEvent.change(screen.getByLabelText('팀당 하루 경기'), { target: { value: '4' } });
+    // 단일: 3라운드 · 하루 4경기 → 1주뿐이라 안내가 없다.
+    expect(screen.queryByText(/마지막 주에는/)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /홈앤어웨이/ }));
+    // 4팀 홈앤어웨이 6라운드 · 하루 4경기 → 2주, 마지막 주 2라운드.
+    expect(screen.getByText(/마지막 주에는 2라운드만 열려요/)).toBeInTheDocument();
+    expect(screen.queryByText(/한 번씩만 만나요/)).not.toBeInTheDocument();
   });
 
   it('이용 종료 시각까지 넣으면 팀당 경기 수를 역산 제안하고 "이대로 적용"이 값을 채운다', () => {
@@ -1986,13 +2164,13 @@ describe('참가 신청 요약 카드', () => {
  * 분기에 있는지**는 아무도 안 봤다. alpha 실화면에서 발견됐다(2026-09-04).
  */
 describe('수동 대진 추가 입구 — 대진 유무와 무관하게 보인다', () => {
-  function renderWithFixtures(fixtures: unknown[]) {
+  function renderWithFixtures(fixtures: unknown[], state: 'active' | 'completed' = 'active') {
     useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false } as never);
     useV1AdminLeagueMatchMock.mockReturnValue({
       data: {
         leagueId: 'league-1',
         isPublic: true, title: '가을 풋살 리그', startsOn: '2026-09-01T00:00:00.000Z',
-        state: 'active', teamIds: ['t1', 't2'], recentVenues: [], fixtures,
+        state, teamIds: ['t1', 't2'], recentVenues: [], fixtures,
       },
       isPending: false,
     } as never);
@@ -2040,6 +2218,53 @@ describe('수동 대진 추가 입구 — 대진 유무와 무관하게 보인�
     } as never);
     renderWithFixtures([]);
     expect(await screen.findByRole('button', { name: '경기 하나 추가' })).not.toBeDisabled();
+  });
+
+  describe('끝난 리그', () => {
+    const OFFICIAL_FIXTURE = {
+      teamMatchId: 'tm-1', title: '3주차', homeTeamId: 't1', awayTeamId: 't2',
+      startAt: '2026-09-01T20:00:00.000Z', placeName: '장소 미정', status: 'matched',
+      resultStage: 'official', homeScore: 3, awayScore: 1,
+    };
+
+    beforeEach(() => {
+      useV1AdminLeagueTeamsMock.mockReturnValue({
+        data: { teams: [{ teamId: 't1', name: 'A팀' }, { teamId: 't2', name: 'B팀' }] },
+      } as never);
+    });
+
+    it('경기 추가를 누를 수 없고, 폼을 열기 전에 이유와 풀 방법을 말해 준다', async () => {
+      renderWithFixtures([OFFICIAL_FIXTURE], 'completed');
+      openFixtureManage();
+      expect(await screen.findByRole('button', { name: '경기 하나 추가' })).toBeDisabled();
+      expect(screen.getByText(/끝난 리그에는 경기를 추가할 수 없어요/)).toBeInTheDocument();
+      expect(screen.queryByText(/우천 순연 재편성이나 대체 경기/)).toBeNull();
+    });
+
+    it('대진 재생성·미리보기를 누를 수 없고, 확정 결과가 있으면 되돌려도 안 된다고 적는다', async () => {
+      renderWithFixtures([OFFICIAL_FIXTURE], 'completed');
+      openFixtureManage();
+      expect(await screen.findByRole('button', { name: '대진 재생성' })).toBeDisabled();
+      expect(screen.getByRole('button', { name: '미리보기' })).toBeDisabled();
+      expect(screen.getByText(/확정된 결과가 있어 진행 중으로 되돌려도 다시 만들 수는 없어요/)).toBeInTheDocument();
+      expect(screen.queryByText(/끝난 리그라 대진을 다시 만들 수 없어요. 먼저/)).toBeNull();
+    });
+
+    it('확정 결과가 없는 끝난 리그는 되돌리면 풀린다고 안내한다', async () => {
+      renderWithFixtures([{ ...OFFICIAL_FIXTURE, resultStage: null, homeScore: null, awayScore: null }], 'completed');
+      openFixtureManage();
+      expect(await screen.findByRole('button', { name: '대진 재생성' })).toBeDisabled();
+      expect(screen.getByText(/끝난 리그라 대진을 다시 만들 수 없어요. 먼저 ‘진행 중으로 되돌리기’를 해 주세요/)).toBeInTheDocument();
+    });
+
+    it('진행 중인 리그는 둘 다 열려 있다 (회귀 방지 — 상태 조건이 항상 참이면 아무것도 못 한다)', async () => {
+      renderWithFixtures([OFFICIAL_FIXTURE], 'active');
+      openFixtureManage();
+      expect(await screen.findByRole('button', { name: '경기 하나 추가' })).not.toBeDisabled();
+      expect(screen.getByRole('button', { name: '대진 재생성' })).not.toBeDisabled();
+      expect(screen.getByRole('button', { name: '미리보기' })).not.toBeDisabled();
+      expect(screen.queryByText(/끝난 리그/)).toBeNull();
+    });
   });
 
   it('참가팀이 아직 안 왔으면(로딩) 누를 수 없다 — 빈 피커를 "팀 없음" 으로 오해한다', async () => {
@@ -2265,6 +2490,38 @@ describe('LeagueMatchFixturesClient — 지금 할 일 카드와 콘솔 열기',
     expect(regenerateButton()).not.toBeDisabled();
     expect(screen.queryByText(/경기가 진행 중인 팀은/)).toBeNull();
     expect(screen.queryByText(/진행 중인 경기가 있어 대진을 다시 만들 수 없어요/)).toBeNull();
+  });
+
+  // 팀 이름 받침에 따라 확인 창·완료 토스트의 조사가 갈린다. 받침 있음·없음·숫자 끝을 양쪽에 둔다.
+  it.each([
+    ['송파 유나이티드', '송파 유나이티드를'],
+    ['서울 철강', '서울 철강을'],
+    ['레드2', '레드2를'],
+    ['(테스트)1010', '(테스트)1010을'],
+  ])('%s 를 제외할 때 확인 창과 완료 안내가 받침에 맞는 조사를 쓴다', async (teamName, withJosa) => {
+    const removeMutate = vi.fn((_teamId: string, options: { onSuccess: (r: { cancelledFixtureCount: number }) => void }) =>
+      options.onSuccess({ cancelledFixtureCount: 0 }));
+    periodSettingsMock.mockReturnValue(periodSettingsOf([25, 25]));
+    useV1CancelLeagueFixtureMock.mockReturnValue({ mutate: vi.fn(), isPending: false } as never);
+    useV1RegenerateLeagueFixturesMock.mockReturnValue({ mutate: vi.fn(), isPending: false } as never);
+    useV1RevertLeagueCompletionMock.mockReturnValue({ mutate: vi.fn(), isPending: false } as never);
+    useV1RemoveLeagueTeamMock.mockReturnValue({ mutate: removeMutate, isPending: false } as never);
+    const teams = [
+      { teamId: 't1', name: teamName, status: 'active', memberCount: 5, logoUrl: null, registrationId: 'r-t1' },
+      { teamId: 't2', name: '합정 유나이티드', status: 'active', memberCount: 5, logoUrl: null, registrationId: 'r-t2' },
+      { teamId: 't3', name: '성수 FC', status: 'active', memberCount: 5, logoUrl: null, registrationId: 'r-t3' },
+    ];
+    renderLeague([{ ...base, teamMatchId: 'tm-1', title: '1주차', startAt: W1 }], teams);
+    openFixtureManage();
+
+    fireEvent.click(screen.getByRole('button', { name: `${teamName} 제외` }));
+    const dialog = await screen.findByRole('alertdialog');
+    expect(within(dialog).getByRole('heading', { name: `${withJosa} 제외할까요?` })).toBeInTheDocument();
+    expect(dialog.textContent).not.toContain('(를)');
+
+    fireEvent.click(within(dialog).getByRole('button', { name: '제외' }));
+    expect(removeMutate).toHaveBeenCalledWith('t1', expect.anything());
+    expect(screen.getByText(`${withJosa} 제외했어요.`)).toBeInTheDocument();
   });
 });
 

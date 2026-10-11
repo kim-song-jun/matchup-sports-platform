@@ -221,8 +221,7 @@ describe('대회 표면은 정규 리그 시즌을 보여주지 않는다 (real 
     admin = new TournamentsAdminService(
       prisma,
       new AdminContextService(prisma),
-      // list() 는 지오코딩·알림을 쓰지 않는다 — 생성자 시그니처만 채운다.
-      undefined as never,
+      // list() 는 알림을 쓰지 않는다 — 생성자 시그니처만 채운다.
       undefined as never,
     );
     adminSvc = new AdminService(prisma);

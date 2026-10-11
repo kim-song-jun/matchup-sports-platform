@@ -12,6 +12,7 @@ import { TeamAvatar } from '@/components/v1-ui/team-avatar';
 import { Trophy, Goal, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useV1Tournament, useV1MyRegistrations } from '@/hooks/use-v1-api';
 import { v1Get } from '@/lib/api-client';
+import { placeFromVenueFields, placeToView } from '@/lib/place';
 import { publicFixtureSideLabel } from '@/lib/public-fixture-side-label';
 import {
   LeagueStandingsTable,
@@ -50,7 +51,7 @@ import {
   formatTournamentDateShort,
   formatTournamentDateTimeShort,
   formatTournamentDateRangeWithTime,
-  formatTournamentDateLong,
+  formatTournamentDateTimeLong,
   formatEntryFee,
 } from '@/lib/date-utils';
 import {
@@ -62,6 +63,7 @@ import {
   pendingCapacityLabel,
 } from '@/lib/tournament-registration-availability';
 import type {
+  V1PlaceView,
   V1TournamentDetail,
   V1TournamentFormat,
   V1TournamentGroup,
@@ -892,7 +894,7 @@ export function TournamentDetailView({
           </div>
           {/* 항상 표시 */}
           {tournament.registrationDeadlineAt ? (
-            <InfoRow label="신청 마감" value={formatTournamentDateLong(tournament.registrationDeadlineAt)} />
+            <InfoRow label="신청 마감" value={formatTournamentDateTimeLong(tournament.registrationDeadlineAt)} />
           ) : null}
           {tournament.venue ? (
             <InfoRow label="장소" value={tournament.venue} />
@@ -925,11 +927,9 @@ export function TournamentDetailView({
       />
 
       <TournamentVenuePrepSection
-        venue={tournament.venue}
+        place={tournamentPlaceView(tournament)}
         parkingInfo={tournament.parkingInfo}
         announcements={allAnnouncements}
-        latitude={tournament.latitude}
-        longitude={tournament.longitude}
       />
 
       {/* ── 대회 진행 방식 — format-aware step-by-step flow explanation ── */}
@@ -1124,14 +1124,14 @@ export function TournamentDetailView({
           <div className="tm-text-body-lg" style={{ marginBottom: 8 }}>참가 전 꼭 확인해 주세요</div>
           <Card pad={0} className="tm-on-tint" style={{ background: 'var(--grey50)', overflow: 'hidden' }}>
             {([
-              { label: '신청 확정', text: '운영진 확인 + 참가비 입금 완료 후 확정됩니다.' },
-              { label: '환불 불가', text: '단순 변심·일정 착오·팀 사정으로 인한 취소는 원칙적으로 불가합니다.' },
-              { label: '주최 취소', text: '주최 측 사정 취소 시 참가비 100% 환불됩니다.' },
-              { label: '노쇼 실격', text: '노쇼 시 실격 처리되며 참가비는 환불되지 않습니다.' },
-              { label: '허위 정보', text: '경력·소속 이력 허위 제출 시 팀 탈락됩니다.' },
-              { label: '본인 확인', text: '당일 신분증 또는 확인 자료 제출을 요청할 수 있습니다.' },
-              { label: '부상 책임', text: '경기 전 본인 건강 상태를 확인 후 참가하세요.' },
-              { label: '현장 촬영', text: '대회 현장에서 사진·영상이 촬영될 수 있습니다.' },
+              { label: '신청 확정', text: '운영진 확인 + 참가비 입금 완료 후 확정돼요.' },
+              { label: '환불 불가', text: '단순 변심·일정 착오·팀 사정으로 인한 취소는 원칙적으로 불가해요.' },
+              { label: '주최 취소', text: '주최 측 사정 취소 시 참가비 100% 환불돼요.' },
+              { label: '노쇼 실격', text: '노쇼 시 실격 처리되며 참가비는 환불되지 않아요.' },
+              { label: '허위 정보', text: '경력·소속 이력 허위 제출 시 팀 탈락돼요.' },
+              { label: '본인 확인', text: '당일 신분증 또는 확인 자료 제출을 요청할 수 있어요.' },
+              { label: '부상 책임', text: '경기 전 본인 건강 상태를 확인하고 참가해 주세요.' },
+              { label: '현장 촬영', text: '대회 현장에서 사진·영상이 촬영될 수 있어요.' },
             ] as { label: string; text: string }[])
               // 벤치마크 감사(P0 ①): 이 데스크톱 aside 목록도 모바일 카드와 같은 라벨을 쓰는
               // 별도 사본이라 같은 모순이 생긴다 — 같은 기준(REFUND_RELATED_LABELS)으로 거른다.
@@ -1171,7 +1171,7 @@ export function TournamentDetailView({
         </div>
         {tournament.registrationDeadlineAt ? (
           <div className="tm-text-caption" style={{ color: 'var(--text-caption)', marginBottom: 12 }}>
-            신청 마감 {formatTournamentDateLong(tournament.registrationDeadlineAt)}
+            신청 마감 {formatTournamentDateTimeLong(tournament.registrationDeadlineAt)}
           </div>
         ) : null}
         <ApplyCTAButtons tournament={tournament} blockReason={registrationBlock} myRegistration={myRegistration} />
@@ -1573,15 +1573,15 @@ function AccordionSection({
  * 데이터는 이 상수 하나로 통일한다.
  */
 const PRE_PARTICIPATION_CHECK_ITEMS: { label: string; text: string }[] = [
-  { label: '신청 확정', text: '운영진 확인 + 참가비 입금 완료 후 참가가 확정됩니다.' },
-  { label: '환불 불가', text: '참가비 입금 후 단순 변심·일정 착오·팀 사정으로 인한 취소는 원칙적으로 불가합니다.' },
-  { label: '주최 취소', text: '주최 측 사정으로 대회가 취소되는 경우 참가비 100% 환불됩니다.' },
-  { label: '대회 연기', text: '대회 연기 시 기존 대회일 2주 전까지 취소·환불 요청이 가능합니다.' },
-  { label: '노쇼 실격', text: '노쇼 시 실격 처리되며 참가비는 환불되지 않습니다.' },
-  { label: '허위 정보', text: '선수 경력·소속 이력 등 허위 제출 시 팀 탈락 사유가 됩니다.' },
-  { label: '본인 확인', text: '대회 당일 신분증 또는 본인 확인 자료 제출을 요청할 수 있습니다.' },
-  { label: '부상 책임', text: '경기 중 부상 위험에 대비해 참가 전 본인 건강 상태를 확인하세요.' },
-  { label: '현장 촬영', text: '대회 현장에서 사진 및 영상이 촬영될 수 있습니다.' },
+  { label: '신청 확정', text: '운영진 확인 + 참가비 입금 완료 후 참가가 확정돼요.' },
+  { label: '환불 불가', text: '참가비 입금 후 단순 변심·일정 착오·팀 사정으로 인한 취소는 원칙적으로 불가해요.' },
+  { label: '주최 취소', text: '주최 측 사정으로 대회가 취소되는 경우 참가비 100% 환불돼요.' },
+  { label: '대회 연기', text: '대회 연기 시 기존 대회일 2주 전까지 취소·환불 요청이 가능해요.' },
+  { label: '노쇼 실격', text: '노쇼 시 실격 처리되며 참가비는 환불되지 않아요.' },
+  { label: '허위 정보', text: '선수 경력·소속 이력 등 허위 제출 시 팀 탈락 사유가 돼요.' },
+  { label: '본인 확인', text: '대회 당일 신분증 또는 본인 확인 자료 제출을 요청할 수 있어요.' },
+  { label: '부상 책임', text: '경기 중 부상 위험에 대비해 참가 전 본인 건강 상태를 확인해 주세요.' },
+  { label: '현장 촬영', text: '대회 현장에서 사진 및 영상이 촬영될 수 있어요.' },
 ];
 
 /** 환불·취소 조건만 다루는 항목(다른 항목 — 노쇼 실격·허위 정보 등 — 은 환불이 아니라 자격 문제라 유지). */
@@ -2121,7 +2121,7 @@ function ScheduleNoticeCaption({ style }: { style?: React.CSSProperties }) {
       className="tm-text-caption"
       style={{ color: 'var(--text-muted)', lineHeight: 1.5, marginTop: 8, ...style }}
     >
-      대회 일정 및 경기 방식은 현장 상황에 따라 일부 변경될 수 있습니다. 참가 전 꼭 확인해 주세요.
+      대회 일정 및 경기 방식은 현장 상황에 따라 일부 변경될 수 있어요. 참가 전 꼭 확인해 주세요.
     </div>
   );
 }
@@ -2280,4 +2280,9 @@ function TournamentDetailSkeleton() {
       </Card>
     </div>
   );
+}
+
+function tournamentPlaceView(tournament: V1TournamentDetail): V1PlaceView | null {
+  const value = placeFromVenueFields(tournament);
+  return value ? placeToView(value) : null;
 }

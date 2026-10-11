@@ -51,7 +51,7 @@ vi.mock('next/navigation', () => ({
 }));
 
 vi.mock('@/components/v1-ui/confirm-modal', () => ({
-  useConfirm: () => ({ confirm: confirmMock, ConfirmModal: null }),
+  useConfirm: () => ({ confirm: confirmMock, confirmWithReason: confirmMock, ConfirmModal: null }),
 }));
 
 vi.mock('@/hooks/use-v1-api', () => ({
@@ -94,6 +94,8 @@ vi.mock('@/hooks/use-v1-api', () => ({
   useV1CreateTeamMatch: () => ({ mutate: createTeamMatchMutate, isPending: false }),
   useV1UploadImages: () => ({ mutateAsync: uploadImagesMutateAsync, isPending: false }),
   useV1TeamRecentVenues: () => ({ data: undefined }),
+  useV1PlaceSearch: () => ({ data: undefined, error: null, isFetching: false, isError: false, refetch: vi.fn() }),
+  useV1PublicKakaoMapsKey: () => ({ data: undefined }),
   useV1TeamMatchEdit: () => ({ data: teamMatchEditData, isError: false, isLoading: false }),
   useV1UpdateTeamMatch: () => ({ mutate: updateTeamMatchMutate, isPending: false }),
   useV1CancelTeamMatch: () => ({ mutate: cancelTeamMatchMutate, isPending: false }),
@@ -108,7 +110,7 @@ vi.mock('./team-matches-page', () => ({
         <label htmlFor="title">제목</label>
         <input id="title" value={model.draft.title} onChange={(event) => form.onFieldChange('title', event.target.value)} />
         <label htmlFor="venue">장소</label>
-        <input id="venue" value={model.draft.venue} onChange={(event) => form.onFieldChange('venue', event.target.value)} />
+        <input id="venue" value={model.draft.place?.name ?? ''} onChange={(event) => form.onFieldChange('place', event.target.value ? { kind: 'manual', name: event.target.value } : null)} />
         <label htmlFor="date">날짜</label>
         <input id="date" value={model.draft.date} onChange={(event) => form.onFieldChange('date', event.target.value)} />
         <label htmlFor="startTime">시작 시간</label>
@@ -305,8 +307,7 @@ describe('team match edit hydration', () => {
     expect(draft).toMatchObject({
       imageUrl: '/uploads/team-match-cover.webp',
       listImageUrl: '/uploads/team-match-list.webp',
-      venue: '잠실 풋살파크',
-      address: '서울 송파구 올림픽로 25',
+      place: { kind: 'manual', name: '잠실 풋살파크', address: '서울 송파구 올림픽로 25' },
     });
     expect(payload).toMatchObject({
       imageUrl: '/uploads/team-match-cover.webp',
@@ -355,9 +356,48 @@ describe('team match edit hydration', () => {
 
   it('maps a removed edit image to null instead of a fallback image', () => {
     const startsAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-    const draft = { ...getTeamMatchCreateViewModel('edit').draft, title: '이미지 제거', imageUrl: '', venue: '잠실', date: startsAt.toISOString().slice(0, 10), startTime: '19:00' };
+    const draft = { ...getTeamMatchCreateViewModel('edit').draft, title: '이미지 제거', imageUrl: '', place: { kind: 'manual' as const, name: '잠실' }, date: startsAt.toISOString().slice(0, 10), startTime: '19:00' };
 
     expect(buildTeamMatchPayloadResult(draft, 'team-1', 'sport-futsal', 'region-gangnam').payload?.imageUrl).toBeNull();
+  });
+});
+
+describe('team-match place payload', () => {
+  const future = () => {
+    const start = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+    return { date: toKstDateString(start), startTime: '18:00' };
+  };
+  const baseDraft = () => ({ ...getTeamMatchCreateViewModel('place-time').draft, title: '장소 팀매치', ...future() });
+  const build = (place: ReturnType<typeof baseDraft>['place']) =>
+    buildTeamMatchPayloadResult({ ...baseDraft(), place }, 'team-1', 'sport-futsal', 'region-gangnam').payload;
+
+  it('검색으로 고른 장소는 이름·주소와 좌표·provider 를 함께 보낸다', () => {
+    expect(build({ kind: 'picked', name: '망원한강공원 풋살장', address: '서울 마포구 마포나루길 467', latitude: 37.5558, longitude: 126.8985, provider: 'kakao', providerPlaceId: 'k-1' })).toMatchObject({
+      manualPlaceName: '망원한강공원 풋살장',
+      addressText: '서울 마포구 마포나루길 467',
+      placeLatitude: 37.5558,
+      placeLongitude: 126.8985,
+      placeProvider: 'kakao',
+      placeProviderId: 'k-1',
+    });
+  });
+
+  it('직접 입력한 장소는 이름만 보내고 좌표 필드를 싣지 않는다', () => {
+    const payload = build({ kind: 'manual', name: '동네 운동장' });
+    expect(payload).toMatchObject({ manualPlaceName: '동네 운동장' });
+    for (const key of ['placeLatitude', 'placeLongitude', 'placeProvider', 'placeProviderId']) expect(payload).not.toHaveProperty(key);
+  });
+
+  it('장소가 비어 있으면 payload 를 만들지 않는다', () => {
+    expect(build(null)).toBeUndefined();
+  });
+
+  it('좌표가 있는 수정 응답은 핀이 있는 장소로, 없는 옛 응답은 직접 입력 장소로 복원한다', () => {
+    const form = { ...teamMatchEditData.form, manualPlaceName: '망원한강공원 풋살장', addressText: '서울 마포구 마포나루길 467' };
+    expect(draftFromTeamMatchEdit({ ...teamMatchEditData, status: 'recruiting' as const, form: { ...form, placeLatitude: 37.5558, placeLongitude: 126.8985, placeProvider: 'kakao', placeProviderId: 'k-1' } }).place)
+      .toMatchObject({ kind: 'picked', providerPlaceId: 'k-1' });
+    expect(draftFromTeamMatchEdit({ ...teamMatchEditData, status: 'recruiting' as const, form }).place)
+      .toEqual({ kind: 'manual', name: '망원한강공원 풋살장', address: '서울 마포구 마포나루길 467' });
   });
 });
 
@@ -371,7 +411,7 @@ describe('team-match deadline payload', () => {
       {
         ...draft,
         title: '마감 시간이 있는 팀매치',
-        venue: '한강 풋살장',
+        place: { kind: 'manual' as const, name: '한강 풋살장' },
         date: startDate,
         startTime: '18:00',
         endTime: '20:00',
@@ -464,7 +504,7 @@ describe('TeamMatchEditPageClient — cancel confirmation', () => {
   });
 
   it('팀매치 취소 버튼을 눌러도 확인 전에는 취소 API를 호출하지 않는다', async () => {
-    confirmMock.mockResolvedValue(false); // 사용자가 확인 모달에서 '취소'를 누른 경우
+    confirmMock.mockResolvedValue(null); // 사용자가 확인 모달에서 '닫기'를 누른 경우
     render(<TeamMatchEditPageClient teamMatchId="team-match-edit-1" />);
 
     fireEvent.click(await screen.findByRole('button', { name: '팀매치 취소' }));
@@ -475,7 +515,7 @@ describe('TeamMatchEditPageClient — cancel confirmation', () => {
 
   // L29 — 닫기 버튼이 확정 버튼과 같은 '취소'였고, 제출한 참석명단이 잠긴다는 말이 없었다.
   it('확인창은 닫기 버튼을 "닫기"로 부르고 참석명단이 잠긴다고 알린다', async () => {
-    confirmMock.mockResolvedValue(false);
+    confirmMock.mockResolvedValue(null);
     render(<TeamMatchEditPageClient teamMatchId="team-match-edit-1" />);
 
     fireEvent.click(await screen.findByRole('button', { name: '팀매치 취소' }));
@@ -485,20 +525,47 @@ describe('TeamMatchEditPageClient — cancel confirmation', () => {
       cancelLabel: '닫기',
       tone: 'danger',
       message: expect.stringContaining('제출한 참석명단은 잠겨서 더는 수정할 수 없어요'),
+      reason: expect.objectContaining({ label: '취소 사유 (선택)', required: false, maxLength: 500 }),
     })));
   });
 
-  it('확인 모달에서 승인하면 그제서야 취소 API를 호출한다', async () => {
-    confirmMock.mockResolvedValue(true);
+  it('상대팀이 확정돼 수정이 잠긴 경기는 사유를 필수로 받는다', async () => {
+    confirmMock.mockResolvedValue(null);
+    teamMatchEditData.editable = false;
+    try {
+      render(<TeamMatchEditPageClient teamMatchId="team-match-edit-1" />);
+      fireEvent.click(await screen.findByRole('button', { name: '팀매치 취소' }));
+
+      await waitFor(() => expect(confirmMock).toHaveBeenCalledWith(expect.objectContaining({
+        reason: expect.objectContaining({ label: '취소 사유', required: true }),
+      })));
+    } finally {
+      teamMatchEditData.editable = true;
+    }
+  });
+
+  it('확인 모달에서 적은 사유를 취소 API 로 보낸다', async () => {
+    confirmMock.mockResolvedValue('개인 사정으로 어려워졌어요');
     render(<TeamMatchEditPageClient teamMatchId="team-match-edit-1" />);
 
     fireEvent.click(await screen.findByRole('button', { name: '팀매치 취소' }));
 
     await waitFor(() => {
       expect(cancelTeamMatchMutate).toHaveBeenCalledWith(
-        { reason: 'host_cancelled_from_v1_web' },
+        { reason: '개인 사정으로 어려워졌어요' },
         expect.any(Object),
       );
+    });
+  });
+
+  it('사유를 비워 두고 승인해도 취소는 진행되고 사유는 보내지 않는다', async () => {
+    confirmMock.mockResolvedValue('');
+    render(<TeamMatchEditPageClient teamMatchId="team-match-edit-1" />);
+
+    fireEvent.click(await screen.findByRole('button', { name: '팀매치 취소' }));
+
+    await waitFor(() => {
+      expect(cancelTeamMatchMutate).toHaveBeenCalledWith({ reason: null }, expect.any(Object));
     });
   });
 });

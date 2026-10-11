@@ -59,7 +59,13 @@ A completed or cancelled league rejects the same generation, template and slot-a
 actions with `409 LEAGUE_ENDED`; releasing slots on registration cancellation is not guarded.
 `POST .../fixtures/manual` and `PATCH .../fixtures/:teamMatchId` (update-fixture) also return
 `409 LEAGUE_ENDED` for a completed or cancelled league, but unlike generation they stay allowed
-while the league is on hold.
+while the league is on hold. Update-fixture writes the fixture first and then takes the league row
+with `FOR SHARE NOWAIT` and re-checks the status, so an edit that overlaps the final result completing
+the league is either rejected or committed before the completion. It never waits on the league row:
+when another transaction holds it (completion, regeneration, team removal, template replacement,
+manual add), the edit is rolled back with `409 COMMAND_CONCURRENCY_CONFLICT` ("잠시 후 다시 시도해
+주세요"), because the league-first and fixture-first lock orders both exist and waiting would deadlock
+with one of them.
 
 While a league is on hold, already-scheduled notifications for its fixtures are
 suppressed at fire time (the outbox rows are kept, so resuming re-enables the next

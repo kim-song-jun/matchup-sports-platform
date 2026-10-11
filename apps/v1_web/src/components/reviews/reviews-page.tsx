@@ -300,7 +300,7 @@ export function ReviewSubmitCompleteView({ model, onConfirm }: { model: ReviewSo
         <Card pad={16} style={{ marginTop: 24, textAlign: 'left' }}>
           <div className="tm-text-label">{model.source.title}</div>
           {/* "별점 선택됨"·"태그 선택됨"은 무엇을 보냈든 항상 같은 문구라 아무것도 알려주지
-              않았다. 실제로 달라지는 값(보낸 인원 / 남은 인원)만 남긴다. */}
+              않았다. 실제로 달라지는 값(보낸 건수 / 남은 건수)만 남긴다. */}
           <div className="tm-review-chip-row">
             <span className="tm-badge tm-badge-blue">{reviewed}건 전송</span>
             {remaining > 0 ? <span className="tm-badge tm-badge-grey">{remaining}건 남음</span> : null}

@@ -1,4 +1,4 @@
-import type { ConfirmReasonConfig } from '@/components/v1-ui/confirm-modal';
+import type { ConfirmOptions, ConfirmReasonConfig } from '@/components/v1-ui/confirm-modal';
 import type { PlaceValue } from '@/lib/place';
 import type { V1PlaceView, V1RecentVenue, V1TeamMatchApiStatus } from '@/types/api';
 
@@ -172,6 +172,8 @@ export type TeamMatchDetailViewModel = {
   applyLabel?: string;
   applyPending?: boolean;
   onApply?: () => void;
+  /** 있으면 onApply 를 실행하기 전에 이 확인창을 먼저 띄운다(신청 철회). */
+  applyConfirm?: ConfirmOptions;
   /** 히어로 ⋯ 메뉴의 실행 항목(모집 마감·재개·취소). */
   hostActions?: Array<{
     label: string;
@@ -235,7 +237,7 @@ export type TeamMatchDetailViewModel = {
   myApplicationTeam?: { teamId: string; name: string; logoUrl?: string | null } | null;
   /** 보는 사람이 확정된 상대팀(신청 팀) 쪽 — 히어로 오른쪽 자리를 매칭 뒤에도 "우리 팀"으로 부른다. */
   viewerOnApplicantSide?: boolean;
-  /** 신청 가능한 팀이 2개 이상인 팀장의 팀 선택 시트(N-1). */
+  /** 신청 가능한 팀이 있는 팀장의 신청 시트(N-1) — 팀이 하나여도 부담금·한마디를 확인하고 신청한다. */
   applyTeamPicker?: {
     teams: Array<{ teamId: string; name: string; logoUrl?: string | null; roleLabel: string; eligible: boolean; reason: string | null }>;
     defaultTeamId: string;

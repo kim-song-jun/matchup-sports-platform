@@ -13,6 +13,15 @@ export const TEAM_MATCH_CANCEL_CONFIRM = {
   cancelLabel: '닫기',
 } as const satisfies ConfirmOptions;
 
+/** 신청한 팀이 승인 전에 신청을 거둘 때의 확인창. */
+export const TEAM_MATCH_WITHDRAW_CONFIRM = {
+  title: '신청을 취소할까요?',
+  message: '호스트 팀에 취소 알림이 가요. 다시 신청할 수 있어요.',
+  confirmLabel: '신청 취소',
+  cancelLabel: '아니요',
+  tone: 'danger',
+} as const satisfies ConfirmOptions;
+
 /** 서버 CancelTeamMatchDto.reason 의 @MaxLength(500) 과 같다. */
 const CANCEL_REASON_MAX_LENGTH = 500;
 

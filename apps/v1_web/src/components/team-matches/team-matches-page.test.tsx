@@ -5,7 +5,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { queryImageBySrc } from '@/test/next-image';
 import { TeamMatchCreatePageView, TeamMatchDetailPageView, TeamMatchListPageView } from './team-matches-page';
 import { getTeamMatchCreateViewModel, getTeamMatchDetailViewModel, getTeamMatchListViewModel } from './team-matches.view-model';
-import type { TeamMatchModel } from './team-matches.types';
+import { TEAM_MATCH_WITHDRAW_CONFIRM } from './team-match-cancel-confirm';
+import type { TeamMatchDetailViewModel, TeamMatchModel } from './team-matches.types';
 
 // routerPush를 vi.hoisted로 모듈 스코프에 고정 — useRouter()가 매 렌더 새 vi.fn()을
 // 반환하면 클릭 핸들러가 실제로 호출한 push를 테스트에서 단언할 방법이 없다.
@@ -2128,6 +2129,77 @@ describe('TeamMatchDetailPageView — 여러 팀 팀장의 신청 팀 선택 시
 
     expect(await within(sheet).findByRole('alert')).toBeInTheDocument();
     expect(screen.getByRole('dialog', { name: '어느 팀으로 신청할까요?' })).toBeInTheDocument();
+  });
+});
+
+describe('TeamMatchDetailPageView — 팀이 하나인 팀장의 신청 시트·취소 확인 (MD-QA #112)', () => {
+  const singleTeamPicker = (submit = vi.fn(async () => ({ status: 'requested' }))): NonNullable<TeamMatchDetailViewModel['applyTeamPicker']> => ({
+    teams: [
+      { teamId: 'a', name: '한강 로버스', roleLabel: '팀장', eligible: true, reason: null },
+      { teamId: 'c', name: '망원 축구단', roleLabel: '팀장', eligible: false, reason: '이 팀매치와 종목이 다른 팀이에요' },
+    ],
+    defaultTeamId: 'a',
+    submit,
+  });
+
+  it('신청할 수 있는 팀이 하나여도 시트에서 상대팀 부담금을 보여 주고, 확정해야 신청한다', async () => {
+    const submit = vi.fn(async () => ({ status: 'requested' }));
+    const model = getTeamMatchDetailViewModel('default');
+    model.applyLabel = '신청하기';
+    model.match.opponentCost = 80000;
+    model.applyTeamPicker = singleTeamPicker(submit);
+    renderPage(<TeamMatchDetailPageView model={model} />);
+
+    fireEvent.click(screen.getAllByRole('button', { name: '신청하기' })[0]);
+    const sheet = await screen.findByRole('dialog', { name: '이 팀으로 신청할까요?' });
+    expect(sheet).toHaveTextContent('상대팀 부담금');
+    expect(sheet).toHaveTextContent('80,000원');
+    expect(submit).not.toHaveBeenCalled();
+
+    fireEvent.change(within(sheet).getByLabelText(/홈팀에 한마디/), { target: { value: '잘 부탁드려요' } });
+    fireEvent.click(within(sheet).getByRole('button', { name: '한강 로버스로 신청하기' }));
+    await waitFor(() => expect(submit).toHaveBeenCalledWith('a', '잘 부탁드려요'));
+  });
+
+  it('부담금이 0원이면 "무료", 모르면 금액 줄을 그리지 않는다', async () => {
+    const model = getTeamMatchDetailViewModel('default');
+    model.applyLabel = '신청하기';
+    model.applyTeamPicker = singleTeamPicker();
+
+    model.match.opponentCost = 0;
+    const free = renderPage(<TeamMatchDetailPageView model={model} />);
+    fireEvent.click(screen.getAllByRole('button', { name: '신청하기' })[0]);
+    expect(await screen.findByRole('dialog', { name: '이 팀으로 신청할까요?' })).toHaveTextContent(/상대팀 부담금\s*무료/);
+    free.unmount();
+
+    model.match.opponentCost = null;
+    renderPage(<TeamMatchDetailPageView model={model} />);
+    fireEvent.click(screen.getAllByRole('button', { name: '신청하기' })[0]);
+    expect(await screen.findByRole('dialog', { name: '이 팀으로 신청할까요?' })).not.toHaveTextContent('상대팀 부담금');
+  });
+
+  it('신청 취소는 확인을 거치고, 아니요를 누르면 철회하지 않는다', async () => {
+    const onApply = vi.fn().mockResolvedValue({ applicationId: 'app-a', status: 'withdrawn' });
+    const model = getTeamMatchDetailViewModel('pending');
+    model.applyLabel = '한강 로버스 신청 취소';
+    model.onApply = onApply;
+    model.applyConfirm = TEAM_MATCH_WITHDRAW_CONFIRM;
+    renderPage(<TeamMatchDetailPageView model={model} />);
+
+    fireEvent.click(screen.getAllByRole('button', { name: '한강 로버스 신청 취소' })[0]);
+    const dialog = await screen.findByRole('dialog', { name: '신청을 취소할까요?' });
+    expect(dialog).toHaveTextContent('호스트 팀에 취소 알림이 가요');
+    expect(onApply).not.toHaveBeenCalled();
+
+    fireEvent.click(within(dialog).getByRole('button', { name: '아니요' }));
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: '신청을 취소할까요?' })).not.toBeInTheDocument());
+    expect(onApply).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getAllByRole('button', { name: '한강 로버스 신청 취소' })[0]);
+    const again = await screen.findByRole('dialog', { name: '신청을 취소할까요?' });
+    fireEvent.click(within(again).getByRole('button', { name: '신청 취소' }));
+    expect(await screen.findByText('신청을 취소했어요.')).toBeInTheDocument();
+    expect(onApply).toHaveBeenCalledTimes(1);
   });
 });
 

@@ -124,6 +124,7 @@ function revision(overrides: Partial<V1GameResultRevision> = {}): V1GameResultRe
     outcomeNote: null,
     createdByActorType: 'USER',
     createdByUserId: 'user-host',
+    createdByName: null,
     createdBySystemActor: null,
     supersedesId: null,
     submittedAt: null,

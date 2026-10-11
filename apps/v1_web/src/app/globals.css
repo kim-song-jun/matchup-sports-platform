@@ -945,6 +945,13 @@ button:disabled {
   flex-direction: column;
 }
 
+/* 상단바가 40px 여백을 대신 채우므로, 상단바 아래 로그인 본문은 위 여백을 줄여 총 높이를 비슷하게 둔다. */
+@media (max-width: 1023px) {
+  .tm-auth-scroll:not(.tm-auth-scroll-full) > .tm-auth-login {
+    padding-top: 8px;
+  }
+}
+
 .tm-auth-logo {
   width: 72px;
   height: 72px;
@@ -3774,6 +3781,11 @@ label.tm-btn:focus-within {
  * 마다 transform 을 바꾸면 각 프레임이 짧게 트랜지션되며 손가락보다 한 박자 늦게 쫓아온다. */
 .tm-filter-sheet.is-dragging {
   transition: none;
+}
+
+/* initialFocus="sheet" 시트의 패널은 tabIndex -1 컨테이너라 링을 그리지 않는다(docs/design/a11y-decisions.md). */
+.tm-filter-sheet[tabindex="-1"]:focus-visible {
+  outline: none;
 }
 
 @keyframes tm-filter-scrim-fade {

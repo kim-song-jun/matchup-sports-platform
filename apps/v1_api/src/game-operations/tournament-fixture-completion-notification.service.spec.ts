@@ -11,6 +11,7 @@ function revisionFixture(overrides: Partial<OfficialRevisionRow> = {}): Official
     playedAt: new Date('2026-08-01T00:00:00Z'),
     officialAt: new Date('2026-08-01T00:00:00Z'),
     reason: null,
+    outcomeReason: 'NORMAL',
     sourceType: 'TEAM_MATCH',
     currentOfficialRevisionId: 'revision-1',
     tournamentId: 'tour-1',
@@ -127,6 +128,22 @@ describe('TournamentFixtureCompletionNotificationService', () => {
     expect(rows.find((row: { recipientUserId: string }) => row.recipientUserId === 'captain-away').body).toBe(
       '테스트 대회 · 결승 · 홈팀FC 2 : 1 원정팀FC · 패배.',
     );
+  });
+
+  it('labels a forfeited fixture as 몰수패/몰수승 for each side', async () => {
+    const { tx, createMany } = fakeTx({
+      memberships: [{ userId: 'captain-home' }, { userId: 'captain-away', teamId: 'team-away' }],
+      preferences: [],
+      alreadyDelivered: [],
+    });
+    await new TournamentFixtureCompletionNotificationService().project(
+      tx,
+      revisionFixture({ score: { home: 0, away: 1 }, outcomeReason: 'FORFEIT' }),
+    );
+    const rows = createMany.mock.calls[0][0].data as Array<{ recipientUserId: string; body: string }>;
+    const bodyOf = (userId: string) => rows.find((row) => row.recipientUserId === userId)?.body;
+    expect(bodyOf('captain-home')).toBe('테스트 대회 · 결승 · 홈팀FC 0 : 1 원정팀FC · 몰수패.');
+    expect(bodyOf('captain-away')).toBe('테스트 대회 · 결승 · 홈팀FC 0 : 1 원정팀FC · 몰수승.');
   });
 
   // W9-V2 — 알림도 화면과 같은 경기 이름("A조 · 조별리그 2라운드")을 쓴다. 예전엔 조 이름이 빠졌다.

@@ -13,6 +13,7 @@ import {
   OpenLeagueRegistrationDto,
   RegenerateLeagueFixturesDto,
   RevertLeagueCompletionDto,
+  CompleteLeagueDto,
   HoldLeagueDto,
   ResumeLeagueDto,
   UpdateLeagueDisciplineDto,
@@ -245,6 +246,17 @@ export class LeagueMatchAdminController {
     @Body() dto: ResumeLeagueDto,
   ) {
     return this.service.resumeLeague(user, leagueId, dto);
+  }
+
+  /** 리그 종료 — 진행 중이면서 남은 대진이 모두 확정·취소된 리그를 completed 로 닫는다. */
+  @Post(':leagueId/complete')
+  @HttpCode(200)
+  completeLeague(
+    @CurrentUser() user: V1AuthUser,
+    @Param('leagueId', leagueIdPipe) leagueId: string,
+    @Body() dto: CompleteLeagueDto,
+  ) {
+    return this.service.completeLeague(user, leagueId, dto);
   }
 
   @Post(':leagueId/revert-completion')

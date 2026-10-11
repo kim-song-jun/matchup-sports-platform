@@ -1004,6 +1004,7 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
           pending={changeTeamJersey.isPending}
           error={jerseyError}
           onSave={handleSaveJersey}
+          onEdit={() => setJerseyError(null)}
         />
       ) : null}
 

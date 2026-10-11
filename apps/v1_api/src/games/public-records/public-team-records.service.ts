@@ -532,7 +532,7 @@ export class PublicTeamRecordsService {
                 : 'opponent') as 'own' | 'opponent',
             participantName: eligible
                 ? event.participantId === null
-                  ? (event.playerNameSnapshot ?? '선수 정보 없음')
+                  ? event.playerNameSnapshot ?? null
                   : resolveParticipantDisplayName(participant, nameProfileByUserId)
                 : null,
               jerseyNumber: eligible ? (participant?.jerseyNumber ?? null) : null,

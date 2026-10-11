@@ -1795,6 +1795,34 @@ describe('TeamMatchLineupPageClient — H5 참석명단', () => {
     expect(screen.queryByRole('button', { name: '홍길동 등번호 9번 바꾸기' })).not.toBeInTheDocument();
   });
 
+  describe('D-5 번호 시트: 팀 번호 저장 실패 문구는 입력을 고치면 사라진다', () => {
+    function openSheetWithTakenError() {
+      hoisted.changeJerseyMutate.mockImplementation((_vars: unknown, options: { onError: (error: Error) => void }) =>
+        options.onError(new V1ApiError({ status: 'error', statusCode: 409, code: 'TEAM_JERSEY_NUMBER_TAKEN', message: '이미 같은 등번호를 쓰는 팀원이 있어요.', timestamp: '2026-09-30T00:00:00.000Z' })),
+      );
+      renderLineup({ starters: [starter('user-1', '홍길동', 7)] });
+      fireEvent.click(screen.getByRole('button', { name: '홍길동 등번호 7번 바꾸기' }));
+      const sheet = screen.getByRole('dialog', { name: '홍길동 등번호' });
+      fireEvent.click(within(sheet).getByLabelText('팀 번호도 함께 바꿔요'));
+      fireEvent.change(within(sheet).getByLabelText('등번호'), { target: { value: '9' } });
+      fireEvent.click(within(sheet).getByRole('button', { name: '9번으로 저장' }));
+      expect(within(sheet).getByText('이미 같은 등번호를 쓰는 팀원이 있어요.')).toBeInTheDocument();
+      return sheet;
+    }
+
+    it('번호를 다시 입력하면 지운다', () => {
+      const sheet = openSheetWithTakenError();
+      fireEvent.change(within(sheet).getByLabelText('등번호'), { target: { value: '10' } });
+      expect(within(sheet).queryByText('이미 같은 등번호를 쓰는 팀원이 있어요.')).not.toBeInTheDocument();
+    });
+
+    it('저장 범위를 "이 경기만"으로 바꿔도 지운다 — 팀 번호 저장이 실패 원인이었다', () => {
+      const sheet = openSheetWithTakenError();
+      fireEvent.click(within(sheet).getByLabelText('이 경기만 바꿔요'));
+      expect(within(sheet).queryByText('이미 같은 등번호를 쓰는 팀원이 있어요.')).not.toBeInTheDocument();
+    });
+  });
+
   it('D-5 번호 시트: 게스트는 팀 번호 선택지가 없고, 명단의 다른 번호와 겹치면 저장을 막는다', () => {
     renderLineup({ starters: [starter(null, '용병', 5), starter('user-1', '홍길동', 7)] });
 

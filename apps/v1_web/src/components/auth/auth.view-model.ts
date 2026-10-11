@@ -54,9 +54,10 @@ function buildKakaoAuthUrl() {
   return `https://kauth.kakao.com/oauth/authorize?${params.toString()}`;
 }
 
-export function getEmailLoginViewModel(): EmailLoginViewModel {
+export function getEmailLoginViewModel(redirectPath?: string | null): EmailLoginViewModel {
   return {
-    backHref: '/login',
+    // 로그인 첫 화면으로 돌아가도 redirect 가 끊기지 않게 같이 싣는다.
+    backHref: redirectPath ? `/login?redirect=${encodeURIComponent(redirectPath)}` : '/login',
     title: '이메일로\n로그인해요',
     sub: '',
     fields: [

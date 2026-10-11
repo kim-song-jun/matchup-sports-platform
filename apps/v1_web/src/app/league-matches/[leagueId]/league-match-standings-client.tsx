@@ -264,12 +264,21 @@ function SeasonSummaryCard({
           )}
         </div>
       )}
-      <Link
-        href={withFromPath(`/league-matches/${leagueId}/awards`, currentHref)}
-        className="tm-btn tm-btn-sm tm-btn-outline mt-3"
-      >
-        시즌 결산 자세히 보기 →
-      </Link>
+      <div className="mt-3 flex flex-wrap gap-2">
+        <Link
+          href={withFromPath(`/league-matches/${leagueId}/awards`, currentHref)}
+          className="tm-btn tm-btn-sm tm-btn-outline"
+        >
+          시즌 결산 자세히 보기 →
+        </Link>
+        {/* 참가팀 후기는 대회와 같은 화면을 쓴다 — 화면이 `kind`로 리그 문구를 고른다. */}
+        <Link
+          href={withFromPath(`/tournaments/${leagueId}/reviews`, currentHref)}
+          className="tm-btn tm-btn-sm tm-btn-outline"
+        >
+          참가팀 후기 보기·쓰기 →
+        </Link>
+      </div>
     </Card>
   );
 }
@@ -619,7 +628,7 @@ export default function LeagueMatchStandingsClient({
   const nextUpcomingFixtureId = nextUpcomingFixture?.teamMatchId ?? null;
   const phaseCounts = countLeagueFixturePhases(fixtures);
 
-  // 잘못된 leagueId 딥링크(404 등)는 빈 화면이 아니라 에러 안내 + 재시도로 처리한다.
+  // 서버 404 는 page.tsx 의 notFound() 가 처리한다. 여기는 클라이언트 조회 실패(네트워크 오류 등)만 맡는다.
   if (seriesQuery.isError) {
     return (
       <div className="mx-auto max-w-4xl px-4 py-6">

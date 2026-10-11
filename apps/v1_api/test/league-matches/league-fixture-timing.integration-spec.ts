@@ -207,6 +207,28 @@ describe('리그 대진 timing(경기 시간·휴식·팀당 하루 경기 수)'
     }
   });
 
+  it('roundsCount 로 자르면 라운드로빈 한 바퀴만 만들고 마지막 날은 남는 라운드만 연다(재대결 없음)', async () => {
+    // 4팀 단일 = 3라운드. 하루 2라운드면 2일 = 4라운드 칸이지만 3라운드까지만 만든다.
+    const leagueId = await createLeague('라운드 상한 리그');
+    const res = await request(app.getHttpServer())
+      .post(`/api/v1/admin/league-matches/${leagueId}/fixtures`)
+      .set('x-v1-user-id', ownerUserId)
+      .send({ weeksCount: 2, roundsCount: 3, schedule: wednesday22, timing: { gameDurationMinutes: 15, gamesPerTeamPerDay: 2 } });
+    expect(res.status).toBe(201);
+    expect(res.body.data.teamMatchIds).toHaveLength(6);
+
+    const fixtures = await prisma.v1TeamMatch.findMany({ where: { leagueId }, orderBy: { startAt: 'asc' } });
+    const games = await prisma.v1Game.findMany({
+      where: { teamMatchId: { in: fixtures.map((f) => f.id) } },
+      include: { sides: true },
+    });
+    const pairs = games.map((game) => game.sides.map((side) => side.teamId).sort().join('|'));
+    expect(new Set(pairs).size).toBe(6);
+    const dayOf = (f: { startAt: Date | null }) => f.startAt!.toISOString().slice(0, 10);
+    expect(fixtures.filter((f) => dayOf(f) === futureDates[0])).toHaveLength(4);
+    expect(fixtures.filter((f) => dayOf(f) === futureDates[1])).toHaveLength(2);
+  });
+
   it('주차 수 × 팀당 하루 경기 수가 총 라운드 상한을 넘으면 422로 거부한다', async () => {
     const leagueId = await createLeague('상한 초과 리그');
     const res = await request(app.getHttpServer())

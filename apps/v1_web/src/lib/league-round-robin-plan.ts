@@ -4,7 +4,7 @@
  * 서버 라운드로빈(`apps/v1_api/src/common/scheduling/round-robin.ts`)과 같은 셈이어야 한다 —
  * 홀수 팀은 부전 한 자리를 더해 라운드 = (짝수로 맞춘 팀 수 − 1), 주차 수만큼 라운드를 돌리고
  * (넘치면 처음부터 다시 돈다) 한 라운드는 floor(팀 수 / 2)경기다. 서버는 총 라운드를
- * `weeksCount × gamesPerTeamPerDay` 로 만든다.
+ * `weeksCount × gamesPerTeamPerDay` 로 만들되, `roundsCount` 를 주면 거기서 자른다.
  */
 
 export type RoundRobinLegs = 1 | 2;
@@ -22,13 +22,13 @@ export function suggestedWeeks(teamCount: number, legs: RoundRobinLegs, gamesPer
 }
 
 /**
- * 제안 주차가 라운드를 딱 담지 못해 서버가 처음 라운드부터 다시 돌리는 라운드 수. 남는 칸은
- * 팀당 하루 경기 수보다 적어 전부 마지막 주에 들어간다 — 예: 4팀 단일·하루 2경기 → 2주 4라운드 중 1개.
+ * 이 계획이 서버에 요청할 총 라운드 수. 단일/홈앤어웨이는 라운드로빈 한 바퀴(들)로 못 박는다 —
+ * 팀당 하루 경기 수로 주차가 올림되어도 남는 칸에 앞 라운드를 다시 만들지 않는다.
+ * 직접 입력은 `주차 × 하루 경기`를 그대로 쓴다(넘치면 서버가 처음부터 다시 돈다).
  */
-export function repeatedRounds(teamCount: number, legs: RoundRobinLegs, gamesPerTeamPerDay = 1): number {
-  const rounds = roundRobinRounds(teamCount, legs);
-  if (rounds === 0) return 0;
-  return suggestedWeeks(teamCount, legs, gamesPerTeamPerDay) * Math.max(1, gamesPerTeamPerDay) - rounds;
+export function plannedRounds(plan: WeeksPlan, teamCount: number, weeksCount: number, gamesPerTeamPerDay = 1): number {
+  if (plan.kind === 'custom') return weeksCount * Math.max(1, gamesPerTeamPerDay);
+  return roundRobinRounds(teamCount, plan.kind === 'double' ? 2 : 1);
 }
 
 export function resolveWeeksCount(plan: WeeksPlan, teamCount: number, gamesPerTeamPerDay = 1): number {
@@ -36,10 +36,10 @@ export function resolveWeeksCount(plan: WeeksPlan, teamCount: number, gamesPerTe
   return suggestedWeeks(teamCount, plan.kind === 'double' ? 2 : 1, gamesPerTeamPerDay);
 }
 
-/** 이 주차 수로 만들어질 경기 수 — 서버와 같은 셈. */
-export function plannedGameCount(teamCount: number, weeksCount: number, gamesPerTeamPerDay = 1): number {
-  if (teamCount < 2 || weeksCount < 1) return 0;
-  return weeksCount * Math.max(1, gamesPerTeamPerDay) * Math.floor(teamCount / 2);
+/** 이 라운드 수로 만들어질 경기 수 — 서버와 같은 셈(한 라운드 = floor(팀 수 / 2)경기). */
+export function plannedGameCount(teamCount: number, rounds: number): number {
+  if (teamCount < 2 || rounds < 1) return 0;
+  return rounds * Math.floor(teamCount / 2);
 }
 
 const PLAN_LABEL: Record<WeeksPlan['kind'], string> = {

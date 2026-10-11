@@ -210,6 +210,7 @@ describe('소셜 가입 번호 충돌 → 기존 계정 연결', () => {
 
   it.each([
     ['SOCIAL_LINK_ADMIN_FORBIDDEN', '이 계정은 이 방법으로 연결할 수 없어요. 고객센터로 문의해 주세요.'],
+    ['SOCIAL_LINK_ACCOUNT_NOT_EMPTY', '이미 활동 기록이 있는 계정이라 연결할 수 없어요. 고객센터로 문의해 주세요.'],
     ['ACCOUNT_WITHDRAWAL_PENDING', '탈퇴를 진행 중인 계정이라 연결할 수 없어요.'],
     ['ACCOUNT_NOT_FOUND', '이 번호로 가입된 계정을 찾지 못했어요.'],
     ['SOCIAL_SIGNUP_EXPIRED', '가입 가능 시간이 지났어요. 카카오 로그인부터 다시 시작해 주세요.'],
@@ -224,6 +225,16 @@ describe('소셜 가입 번호 충돌 → 기존 계정 연결', () => {
     expect(await screen.findByText(message)).toBeInTheDocument();
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     expect(calls.link).toHaveLength(0);
+  });
+
+  it('연결 단계의 ACCOUNT_NOT_EMPTY 는 다시 시도해도 같아서 재시도 버튼을 남기지 않는다', async () => {
+    server.use(http.post('*/api/v1/auth/social-link', () => failure('SOCIAL_LINK_ACCOUNT_NOT_EMPTY', 'x', 409)));
+    await openConflict();
+    const user = await verifyOwnership();
+    await user.click(within(await screen.findByRole('dialog')).getByRole('button', { name: '연결하고 로그인' }));
+
+    expect(await screen.findByText('이미 활동 기록이 있는 계정이라 연결할 수 없어요. 고객센터로 문의해 주세요.')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '기존 계정에 연결' })).not.toBeInTheDocument();
   });
 
   it('연결 단계에서 PHONE_NOT_VERIFIED 면 인증을 처음부터 다시 시작하게 한다', async () => {

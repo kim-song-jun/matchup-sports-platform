@@ -24,6 +24,7 @@ const TERMINAL_CODES = new Set([
   PROVIDER_EXISTS,
   HOLDER_PHONE_UNVERIFIED,
   'SOCIAL_LINK_ADMIN_FORBIDDEN',
+  'SOCIAL_LINK_ACCOUNT_NOT_EMPTY',
   'ACCOUNT_WITHDRAWAL_PENDING',
   'ACCOUNT_NOT_FOUND',
   'SOCIAL_SIGNUP_EXPIRED',
@@ -229,6 +230,8 @@ function linkErrorMessage(err: unknown, code: string | null, providerLabel: stri
       return '기존 계정에서 인증되지 않은 번호라 연결할 수 없어요. 처음 가입한 방법으로 로그인해 주세요.';
     case 'SOCIAL_LINK_ADMIN_FORBIDDEN':
       return '이 계정은 이 방법으로 연결할 수 없어요. 고객센터로 문의해 주세요.';
+    case 'SOCIAL_LINK_ACCOUNT_NOT_EMPTY':
+      return '이미 활동 기록이 있는 계정이라 연결할 수 없어요. 고객센터로 문의해 주세요.';
     case 'ACCOUNT_WITHDRAWAL_PENDING':
       return '탈퇴를 진행 중인 계정이라 연결할 수 없어요.';
     case 'ACCOUNT_NOT_FOUND':

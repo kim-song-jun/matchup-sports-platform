@@ -388,9 +388,9 @@ function ScheduleRow({
           한 줄 짧아진다. 긴 구장명은 말줄임으로 접고 날짜 쪽은 줄이지 않는다 —
           경기 시각은 목록에서 가장 자주 찾는 값이라 잘리면 안 된다. */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-        <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-caption)', display: 'flex', gap: 8, alignItems: 'center', minWidth: 0 }}>
-          {/* 경기 이름은 한 줄로 둔다 — 390 에서 "조별리그 2라 / 운드"처럼 단어 가운데서 끊겼다. 모자라면 장소(flexShrink 2)가
-              먼저 줄고, 조 이름이 아주 길 때만 이름도 말줄임으로 줄어 날짜 쪽으로 넘치지 않는다. */}
+        <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-caption)', display: 'flex', flexWrap: 'wrap', gap: '2px 8px', alignItems: 'center', minWidth: 0 }}>
+          {/* 경기 이름은 한 줄로 둔다 — 390 에서 "조별리그 2라 / 운드"처럼 단어 가운데서 끊겼다. 장소가 남는 자리에 안 들어가면
+              다음 줄로 내려 폭 전체를 쓴다(한 줄에 욱여넣으면 "월.." 만 남았다). 조 이름이 아주 길 때만 이름도 말줄임으로 줄어 날짜 쪽으로 넘치지 않는다. */}
           {matchLabel === groupHeading ? null : (
             <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0, flexShrink: 1 }}>{matchLabel}</span>
           )}

@@ -229,7 +229,7 @@ function TeamRecordRow({
         {item.result === null ? (
           <span style={resultChipStyle('PENDING')}>결과 비공개</span>
         ) : (
-          <span style={resultChipStyle(item.result)}>{teamRecordResultLabel(item.result)}</span>
+          <span style={resultChipStyle(item.result)}>{teamRecordResultLabel(item.result, item.isForfeit)}</span>
         )}
         <span
           style={{
@@ -257,7 +257,7 @@ function TeamRecordRow({
           </span>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flexShrink: 0, gap: 2 }}>
-          <span className="tab-num" style={{ fontSize: 18, fontWeight: 800, color: 'var(--text-strong)' }}>
+          <span className="tab-num" style={{ fontSize: 18, fontWeight: item.isForfeit ? 400 : 800, color: 'var(--text-strong)' }}>
             {/* 공개 가시성이 `status_only` 인 경기는 점수를 감춘다 — 빈칸으로 두면 "0:0 인가?"
                 로 읽히므로 감춰졌다는 사실 자체를 글자로 말한다(색만으로 전달하지 않는다). */}
             {item.goalsFor === null || item.goalsAgainst === null
@@ -266,6 +266,12 @@ function TeamRecordRow({
           </span>
           {/* 정규시간 스코어 그대로 두고, 승부차기는 아래 보조 표기로만 덧붙인다 --
               대회 화면(PenaltyScoreline)과 동일한 "승부차기 N-M" 문구. */}
+          {/* 몰수 스코어는 관례로 붙은 값이라 굵게 강조하지 않고, 공개 리그 일정과 같은 말로 밝힌다. */}
+          {item.isForfeit ? (
+            <span style={{ fontSize: 'var(--font-size-micro)', fontWeight: 600, color: 'var(--text-caption)' }}>
+              관례 스코어
+            </span>
+          ) : null}
           {penaltyLabel ? (
             <span className="tab-num" style={{ fontSize: 'var(--font-size-micro)', fontWeight: 600, color: 'var(--text-caption)' }}>
               {penaltyLabel}

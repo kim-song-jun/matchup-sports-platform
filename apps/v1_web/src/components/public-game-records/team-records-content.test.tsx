@@ -27,6 +27,7 @@ function makeItem(overrides: Partial<PublicTeamRecordItem> = {}): PublicTeamReco
     goalsFor: 2,
     goalsAgainst: 1,
     penalties: null,
+    isForfeit: false,
     events: [],
     playedAt: '2026-08-10T02:00:00.000Z',
     ...overrides,
@@ -165,5 +166,39 @@ describe('TeamRecordsContent — 행 캡션의 대회·리그 이름', () => {
     );
 
     expect(screen.getByRole('link')).toHaveAttribute('href', selfHref);
+  });
+
+  // MD-QA #118: 몰수는 관례 스코어(1:0)라 표시가 없으면 실제 1:0 승패와 같아 보인다.
+  describe('몰수 경기 표시', () => {
+    it('몰수승·몰수패 행은 결과 칩에 몰수를 붙이고 관례 스코어임을 밝히며, 정상 경기·무승부는 그대로 둔다', () => {
+      render(
+        <TeamRecordsContent
+          data={makeTeamRecords([
+            makeItem({ gameId: 'g-win', opponentTeamName: '마포 FC', result: 'WON', isForfeit: true, goalsFor: 1, goalsAgainst: 0 }),
+            makeItem({ gameId: 'g-loss', opponentTeamName: '송파 FC', result: 'LOST', isForfeit: true, goalsFor: 0, goalsAgainst: 1 }),
+            makeItem({ gameId: 'g-normal', opponentTeamName: '강남 FC', result: 'WON', isForfeit: false }),
+            makeItem({ gameId: 'g-draw', opponentTeamName: '용산 FC', result: 'DRAWN', isForfeit: false, goalsFor: 1, goalsAgainst: 1 }),
+          ])}
+        />,
+      );
+
+      expect(screen.getByText('몰수승')).toBeInTheDocument();
+      expect(screen.getByText('몰수패')).toBeInTheDocument();
+      // 정상 경기의 칩은 여전히 '승'/'무' 이고 몰수 표기가 번지지 않는다.
+      expect(screen.getByText('승')).toBeInTheDocument();
+      expect(screen.getByText('무')).toBeInTheDocument();
+      expect(screen.getAllByText('관례 스코어')).toHaveLength(2);
+    });
+
+    it('결과를 가린 행은 몰수 표시 없이 결과 비공개로 남는다', () => {
+      render(
+        <TeamRecordsContent
+          data={makeTeamRecords([makeItem({ result: null, goalsFor: null, goalsAgainst: null, isForfeit: false })])}
+        />,
+      );
+
+      expect(screen.getByText('결과 비공개')).toBeInTheDocument();
+      expect(screen.queryByText('관례 스코어')).not.toBeInTheDocument();
+    });
   });
 });

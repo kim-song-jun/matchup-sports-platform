@@ -103,9 +103,13 @@ export function formatTeamRecordPenaltyScoreline(
 
 const TEAM_RECORD_RESULT_LABEL: Record<string, string> = { WON: '승', DRAWN: '무', LOST: '패' };
 
-/** Team-record row result ('WON'|'DRAWN'|'LOST' as a plain string, see `PublicTeamRecordItem.result`). */
-export function teamRecordResultLabel(result: string): string {
-  return TEAM_RECORD_RESULT_LABEL[result] ?? result;
+/**
+ * Team-record row result ('WON'|'DRAWN'|'LOST' as a plain string, see `PublicTeamRecordItem.result`).
+ * A forfeit is never a draw, so only a win or loss gets the 몰수 prefix.
+ */
+export function teamRecordResultLabel(result: string, isForfeit = false): string {
+  const label = TEAM_RECORD_RESULT_LABEL[result] ?? result;
+  return isForfeit && (result === 'WON' || result === 'LOST') ? `몰수${label}` : label;
 }
 
 /** User-record row result -- `null` means the score could not be resolved (no fixture side match). */

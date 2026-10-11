@@ -45,7 +45,7 @@ export function toCompetitionEntryRows(
 ): TeamCompetitionEntryRow[] {
   return entries.items.map((entry) => {
     const isLeague = entry.competitionKind === 'regular_league';
-    const status = tournamentRegistrationStatusConfig(entry.registrationStatus);
+    const status = tournamentRegistrationStatusConfig(entry.registrationStatus, null);
     const deadline = entry.rosterDeadlineAt;
     const rosterNote =
       entry.rosterBlockedBy === 'closed' && ENDED.has(entry.status)

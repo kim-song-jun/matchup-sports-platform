@@ -4,7 +4,7 @@
  * jsdom 은 `PointerEvent`·`setPointerCapture` 계열을 구현하지 않는다(불가피한 브라우저 API
  * mock, CLAUDE.md 품질 규칙 3의 예외) — 이 파일에서만 최소 폴리필을 둔다.
  */
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import type { MouseEvent, ReactNode } from 'react';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { __resetNavigationHistoryForTests, decideBackAction, installNavigationHistory } from '@/lib/navigation-history';
@@ -201,5 +201,46 @@ describe('BottomSheet onClose 모드', () => {
     expect(dialog.querySelector('.tm-filter-sheet-handle')).not.toBeNull();
     // scrim 은 링크가 아니다 — 닫힐 URL 이 없다.
     expect(screen.queryByRole('link', { name: '필터 닫기' })).not.toBeInTheDocument();
+  });
+
+  describe('초기 포커스', () => {
+    const FOCUS_DELAY_MS = 60;
+
+    beforeEach(() => {
+      vi.useFakeTimers();
+    });
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    function renderFocus(initialFocus?: 'control' | 'sheet') {
+      render(
+        <BottomSheet open onClose={vi.fn()} title="매치 관리" initialFocus={initialFocus}>
+          <button type="button">확인</button>
+        </BottomSheet>,
+      );
+      act(() => {
+        vi.advanceTimersByTime(FOCUS_DELAY_MS);
+      });
+      return screen.getByRole('dialog', { name: '매치 관리' });
+    }
+
+    it('기본은 첫 컨트롤(닫기 버튼)이 포커스를 받는다', () => {
+      renderFocus();
+      expect(document.activeElement).toBe(screen.getByRole('button', { name: '닫기' }));
+    });
+
+    it('initialFocus="sheet" 면 패널이 포커스를 받고, 그 상태의 Shift+Tab 도 패널 안에 머문다', () => {
+      const dialog = renderFocus('sheet');
+      expect(document.activeElement).toBe(dialog);
+
+      const notPrevented = fireEvent.keyDown(document, { key: 'Tab', shiftKey: true });
+      expect(notPrevented).toBe(false);
+      expect(document.activeElement).toBe(screen.getByRole('button', { name: '확인' }));
+    });
+
+    it('initialFocus="sheet" 가 아니면 패널은 포커스 대상이 아니다', () => {
+      expect(renderFocus().hasAttribute('tabindex')).toBe(false);
+    });
   });
 });

@@ -2,7 +2,7 @@
 
 import {
   plannedGameCount,
-  repeatedRounds,
+  plannedRounds,
   suggestedWeeks,
   weeksPlanLabel,
   type WeeksPlan,
@@ -31,9 +31,10 @@ export function LeagueWeeksPlanField({
 }) {
   const singleWeeks = suggestedWeeks(teamCount, 1, gamesPerTeamPerDay);
   const doubleWeeks = suggestedWeeks(teamCount, 2, gamesPerTeamPerDay);
-  const games = plannedGameCount(teamCount, weeksCount, gamesPerTeamPerDay);
-  const extraRounds =
-    plan.kind === 'custom' ? 0 : repeatedRounds(teamCount, plan.kind === 'double' ? 2 : 1, gamesPerTeamPerDay);
+  const rounds = plannedRounds(plan, teamCount, weeksCount, gamesPerTeamPerDay);
+  const games = plannedGameCount(teamCount, rounds);
+  const lastDayRounds =
+    plan.kind === 'custom' || weeksCount <= 1 ? 0 : rounds % Math.max(1, gamesPerTeamPerDay);
   const chips = [
     { kind: 'single' as const, label: `단일 ${singleWeeks}주` },
     { kind: 'double' as const, label: `홈앤어웨이 ${doubleWeeks}주` },
@@ -52,10 +53,10 @@ export function LeagueWeeksPlanField({
               팀 수로 자동 계산
             </span>
           )}
-          {extraRounds > 0 ? (
+          {lastDayRounds > 0 ? (
             <span className="mt-1 block text-[length:var(--font-size-caption)] text-[var(--text-muted)]">
-              마지막 주에는 {extraRounds === 1 ? '첫 라운드' : `첫 ${extraRounds}개 라운드`} 대진이 한 번 더
-              열려요 — 이미 만난 팀끼리 다시 만나요
+              {plan.kind === 'single' ? '라운드로빈은 한 번씩만 만나요 — ' : null}
+              마지막 주에는 {lastDayRounds}라운드만 열려요
             </span>
           ) : null}
         </p>

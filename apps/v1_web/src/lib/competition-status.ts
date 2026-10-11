@@ -2,6 +2,7 @@ import type { FixtureNodeState } from '@/lib/bracket-canvas-layout';
 import type { V1LeagueFixture } from '@/types/league-match';
 import {
   ARRIVAL_PENDING_LABEL,
+  SENT_OFF_LABEL,
   GAME_STATE_MATCH_PHASE,
   LEAGUE_SUBJECT_LABEL,
   MATCH_SUBJECT_LABEL,
@@ -264,6 +265,7 @@ export function shouldOfferRecordClaim(input: {
 // ── 도착 확인(검인) ──────────────────────────────────────────────────────────
 
 export const ARRIVAL_PENDING_CHIP: StatusChipModel = { label: ARRIVAL_PENDING_LABEL, tone: 'orange', icon: null };
+export const SENT_OFF_CHIP: StatusChipModel = { label: SENT_OFF_LABEL, tone: 'red', icon: 'cancel' };
 
 /**
  * 도착 확인을 한 명이라도 한 경기에서만 "도착 전"을 가른다 — 아무도 확인하지 않았다면

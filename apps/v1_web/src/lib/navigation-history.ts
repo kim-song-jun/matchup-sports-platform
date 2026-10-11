@@ -30,11 +30,13 @@ const FROM_COMPARISON_MAX_DEPTH = 4;
 
 // buffer: a same-URL entry the unsaved-changes guard pushes so a cold-entry back stays in this document.
 // stale: the form entry under a buffer that was reloaded — a dead same-URL copy that traversal skips.
-type Entry = { url: string; overlay?: boolean; parent?: boolean; buffer?: boolean; stale?: boolean };
+// gated: a screen rendered behind RequireAuth — going back to it with an ended session bounces to login again.
+type Entry = { url: string; overlay?: boolean; parent?: boolean; buffer?: boolean; stale?: boolean; gated?: boolean };
 // tabStart: mirror index of the tab's very first history entry (nothing, not even another site, is before it).
 // leaveTarget: where a leave traversal was headed. A leave out of the app never pops here, so a later forward
 // back into this tab must compare against it, not the index the leave started from.
-type Mirror = { index: number; entries: Record<number, Entry>; tabStart?: number; leaveTarget?: number };
+// replacing: the current entry is about to be replaced by a new document (location.replace), not followed by one.
+type Mirror = { index: number; entries: Record<number, Entry>; tabStart?: number; leaveTarget?: number; replacing?: boolean };
 export type AppPop = { direction: 'back' | 'forward' | 'unknown'; appInitiated: boolean };
 type HistoryMethod = History['pushState'];
 
@@ -77,6 +79,7 @@ function clearPendingAppBack() {
   pendingAppBackTimer = null;
 }
 
+const pathOf = (url: string) => url.split(/[?#]/)[0];
 const currentUrl = () => `${window.location.pathname}${window.location.search}${window.location.hash}`;
 
 function normalizeComparisonUrl(url: string, fromDepth: number): string | null {
@@ -145,10 +148,12 @@ function recordPush(state: unknown) {
   if (!mirror) return;
   const next = mirror.index + 1;
   for (const key of Object.keys(mirror.entries)) if (Number(key) >= next) delete mirror.entries[Number(key)];
+  delete mirror.replacing; // a push means the announced document replace did not happen
   mirror.index = next;
+  const gated = mirror.entries[next - 1]?.gated && pathOf(mirror.entries[next - 1].url) === window.location.pathname;
   mirror.entries[next] = pushingBuffer
     ? { url: currentUrl(), buffer: true }
-    : { url: currentUrl(), overlay: Boolean(asRecord(state)?.[OVERLAY_STATE_KEY]) };
+    : { url: currentUrl(), overlay: Boolean(asRecord(state)?.[OVERLAY_STATE_KEY]), ...(gated ? { gated: true } : {}) };
   persist();
 }
 
@@ -247,7 +252,8 @@ export function installNavigationHistory(): void {
     // 같은 탭의 전체 문서 이동(외부 복귀·네이티브 loadUrl) — 새 항목이 쌓인 것이다.
     mirror = stored;
     for (const key of Object.keys(mirror.entries)) if (Number(key) > stored.index) delete mirror.entries[Number(key)];
-    mirror.index = stored.index + 1;
+    mirror.index = stored.replacing ? stored.index : stored.index + 1;
+    delete mirror.replacing;
   } else {
     mirror = { index: 0, entries: {}, ...(window.history.length === 1 ? { tabStart: 0 } : {}) };
     coldStart = true;
@@ -281,7 +287,13 @@ export function installNavigationHistory(): void {
     if (!mirror) return;
     const previous = mirror.entries[mirror.index];
     const keepBuffer = Boolean(previous?.buffer) && sameUrl(previous.url, currentUrl());
-    mirror.entries[mirror.index] = { url: currentUrl(), overlay: Boolean(stampedState[OVERLAY_STATE_KEY]), ...(keepBuffer ? { buffer: true } : {}) };
+    const keepGated = Boolean(previous?.gated) && pathOf(previous.url) === window.location.pathname;
+    mirror.entries[mirror.index] = {
+      url: currentUrl(),
+      overlay: Boolean(stampedState[OVERLAY_STATE_KEY]),
+      ...(keepBuffer ? { buffer: true } : {}),
+      ...(keepGated ? { gated: true } : {}),
+    };
     persist();
   };
   replace.call(window.history, withIdx(leftoverMarker ? withoutOverlay(window.history.state) : window.history.state, mirror.index), '');
@@ -304,6 +316,24 @@ export function decideBackAction(target: string): 'back' | 'replace' {
 /** 이 탭에서 앱 안의 이전 항목으로 돌아갈 수 있는가(router.back() 이 앱 밖으로 나가지 않는가). */
 export function hasPreviousInAppEntry(): boolean {
   return !untracked && Boolean(mirror?.entries[mirror.index - 1]);
+}
+
+/**
+ * URL of the in-app entry right before this one, or null when a back would leave the app, the tracker is unsure,
+ * or that entry is a RequireAuth screen (an ended session would bounce straight back to login).
+ */
+export function previousPublicEntryUrl(): string | null {
+  if (untracked || !mirror) return null;
+  const previous = mirror.entries[mirror.index - 1];
+  return previous && !previous.overlay && !previous.gated ? previous.url : null;
+}
+
+/** Called by RequireAuth once it renders a screen: the current entry is behind a session. */
+export function markEntryAuthGated(): void {
+  const entry = mirror?.entries[mirror.index];
+  if (!mirror || !entry || entry.gated) return;
+  mirror.entries[mirror.index] = { ...entry, gated: true };
+  persist();
 }
 
 /** Is there an earlier entry created by this document (a back to it is a same-document popstate)? */
@@ -366,6 +396,19 @@ export function goBackLeaving(steps: number): void {
 
 export function currentEntryIsBuffer(): boolean {
   return Boolean(mirror?.entries[mirror.index]?.buffer);
+}
+
+/** `window.location.replace` that keeps the mirror honest: the new document takes this entry's slot instead of stacking on it. */
+export function replaceDocument(url: string): void {
+  markEntryReplacedByDocument();
+  window.location.replace(url);
+}
+
+/** Call right before a `location.replace`: the next document's entry replaces the current one in the mirror. */
+export function markEntryReplacedByDocument(): void {
+  if (!mirror) return;
+  mirror.replacing = true;
+  persist();
 }
 
 /** Replace the current entry with an in-app URL — soft (router.replace) when bound, otherwise a full load. */

@@ -2541,6 +2541,13 @@ enum V1TournamentRegistrationStatus {
   cancelled
 }
 
+/// 어드민이 신청을 취소 상태로 보낸 이유 — 팀의 취소 요청을 받아 준 것인지(approved), 운영자가 신청을 물린 것인지(rejected).
+/// 팀이 직접 취소한 draft 와 이 컬럼이 생기기 전의 행은 null 이다.
+enum V1RegistrationCancelOutcome {
+  approved
+  rejected
+}
+
 enum V1TournamentPaymentMethod {
   pg
   bank_transfer
@@ -2840,6 +2847,9 @@ model V1TournamentRegistration {
   cancelRequestedAt        DateTime?                       @map("cancel_requested_at")
   cancelPreviousStatus     V1TournamentRegistrationStatus? @map("cancel_previous_status")
   cancelReason             String?                         @map("cancel_reason")
+  /// 어드민이 취소 승인·거부를 처리하며 남긴 사유. `cancelReason` 은 팀이 취소 요청에 남긴 사유만 담는다.
+  adminCancelReason        String?                         @map("admin_cancel_reason")
+  cancelOutcome            V1RegistrationCancelOutcome?    @map("cancel_outcome")
   createdAt                DateTime                        @default(now()) @map("created_at")
   updatedAt                DateTime                        @updatedAt @map("updated_at")
   // ── 통합 축 (R1 expand, 아직 읽는 코드 없음) ─────────────────────────────────

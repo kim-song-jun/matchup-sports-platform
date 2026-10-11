@@ -192,7 +192,8 @@ export class UpdateFixtureDto {
 
   @IsOptional()
   @IsDateString()
-  scheduledAt?: string;
+  /** null 은 일정을 미정으로 비운다. */
+  scheduledAt?: string | null;
 
   @IsOptional()
   @IsString()

@@ -5756,6 +5756,7 @@ import type {
   V1RemoveLeagueTeamResult,
   V1RevertLeagueCompletionPayload,
   V1RevertLeagueCompletionResult,
+  V1CompleteLeagueResult,
   V1UpdateLeagueFixturePayload,
   V1UpdateLeagueFixtureResult,
   V1OpenLeagueRegistrationPayload,
@@ -6089,11 +6090,11 @@ export function useV1CancelLeagueFixture(leagueId: string) {
  * 리그 보류(취소 대신)·보류 해제. 보류는 리그와 경기를 공개 화면에서 숨기므로 공개 읽기 캐시도 다시
  * 확인한다(공개 설정 변경과 같은 범위).
  */
-function useLeagueHoldMutation(leagueId: string, action: 'hold' | 'resume') {
+function useLeagueStatusMutation<TResult>(leagueId: string, action: 'hold' | 'resume' | 'complete') {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (body: { reason?: string }) =>
-      v1Post<V1LeagueHoldResult>(`/admin/league-matches/${encodeURIComponent(leagueId)}/${action}`, body),
+      v1Post<TResult>(`/admin/league-matches/${encodeURIComponent(leagueId)}/${action}`, body),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: v1Keys.adminLeagueMatch(leagueId) });
       queryClient.invalidateQueries({ queryKey: v1Keys.adminLeagueMatchList() });
@@ -6107,11 +6108,17 @@ function useLeagueHoldMutation(leagueId: string, action: 'hold' | 'resume') {
 }
 
 export function useV1HoldLeague(leagueId: string) {
-  return useLeagueHoldMutation(leagueId, 'hold');
+  return useLeagueStatusMutation<V1LeagueHoldResult>(leagueId, 'hold');
 }
 
 export function useV1ResumeLeague(leagueId: string) {
-  return useLeagueHoldMutation(leagueId, 'resume');
+  return useLeagueStatusMutation<V1LeagueHoldResult>(leagueId, 'resume');
+}
+
+// 되돌리기·보류 해제 뒤 남은 대진이 없으면 자동 종료 판정이 다시 불리지 않는다(MD-QA #93) — 수동 종료.
+// 종료되면 공개 상세·목록·홈의 상태 표시도 바뀌므로 보류와 같은 범위를 무효화한다.
+export function useV1CompleteLeague(leagueId: string) {
+  return useLeagueStatusMutation<V1CompleteLeagueResult>(leagueId, 'complete');
 }
 
 export function useV1RevertLeagueCompletion(leagueId: string) {

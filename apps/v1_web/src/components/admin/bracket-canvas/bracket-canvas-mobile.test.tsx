@@ -28,8 +28,8 @@ vi.mock('@/hooks/use-v1-bracket-canvas', () => ({
 // 폼·액션 내부(검증·확인·정정)는 PR-3 의 테스트가 검증한다. 여기서는 시트가 알맞은 컴포넌트에 알맞은 props 를 넘기고
 // 폼의 onSubmit 을 빠른 입력 변이로 이어 주는지만 본다. 폼 mock 의 버튼은 실제 폼처럼 onSubmit 을 호출한다.
 vi.mock('./bracket-quick-result-form', () => ({
-  BracketQuickResultForm: (props: { homeLabel: string; awayLabel: string; isKnockout: boolean; errorMessage?: string | null; onSubmit: (score: { home: number; away: number }) => void }) => (
-    <div data-testid="quick-form" data-knockout={String(props.isKnockout)} data-home={props.homeLabel} data-away={props.awayLabel}>
+  BracketQuickResultForm: (props: { homeLabel: string; awayLabel: string; isKnockout: boolean; confirmBeforeSubmit?: boolean; errorMessage?: string | null; onSubmit: (score: { home: number; away: number }) => void }) => (
+    <div data-testid="quick-form" data-knockout={String(props.isKnockout)} data-confirm={String(props.confirmBeforeSubmit === true)} data-home={props.homeLabel} data-away={props.awayLabel}>
       {props.errorMessage ? <p role="alert">{props.errorMessage}</p> : null}
       <button type="button" onClick={() => props.onSubmit({ home: 2, away: 1 })}>폼 완료</button>
     </div>
@@ -205,6 +205,7 @@ describe('BracketCanvasMobile — 시트', () => {
     expect(card(/8강 · 2번 경기/)).toHaveAttribute('aria-expanded', 'true');
     const form = screen.getByTestId('quick-form');
     expect(form).toHaveAttribute('data-knockout', 'true');
+    expect(form).toHaveAttribute('data-confirm', 'true');
     expect(form).toHaveAttribute('data-home', '서초FC');
     expect(form).toHaveAttribute('data-away', '송파FC');
   });

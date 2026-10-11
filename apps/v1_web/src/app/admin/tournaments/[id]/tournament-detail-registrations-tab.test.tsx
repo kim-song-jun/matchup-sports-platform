@@ -97,6 +97,8 @@ function baseRegistration(
     rosterDeadlineOverrideAt: null,
     cancelRequestedAt: null,
     cancelReason: null,
+    adminCancelReason: null,
+    cancelOutcome: null,
     playerCount: 5,
     payment: null,
     createdAt: '2026-01-01T00:00:00.000Z',
@@ -561,9 +563,81 @@ describe('RegistrationsTab — 거부 사유와 자동 확정 배지 (FE-4)', ()
     if (submit === undefined) throw new Error('모달의 거부 버튼을 찾지 못했다');
     fireEvent.click(submit);
 
-    // 빈 사유는 **키 자체를 빼고** 보낸다 — 빈 문자열을 보내면 팀이 남긴 취소 사유를
-    // 덮어쓸 여지가 생긴다(서버는 `dto.reason ?? 기존값` 으로 보존한다).
+    // 빈 사유는 **키 자체를 빼고** 보낸다 — 서버가 빈 문자열을 어드민 사유로 그대로 저장한다.
     expect(cancelMutate).toHaveBeenCalledWith({ registrationId: 'reg-1' }, expect.anything());
+  });
+
+  describe('팀의 취소 요청 처리', () => {
+    const requested = {
+      status: 'cancel_requested' as const,
+      cancelPreviousStatus: 'confirmed',
+      cancelRequestedAt: '2026-10-10T00:00:00.000Z',
+      cancelReason: '선수 부족으로 불참',
+    };
+
+    it('취소 요청에는 "거부" 대신 "취소 승인" 액션과 승인 문구가 나온다', () => {
+      arrange(requested);
+      render(<RegistrationsTab tournamentId="tournament-1" showToast={showToast} canWrite />);
+
+      expect(screen.queryByRole('button', { name: '거부' })).not.toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: '취소 승인' }));
+
+      expect(screen.getByRole('dialog')).toHaveTextContent('참가 취소 요청을 승인할까요?');
+      expect(screen.getByRole('dialog')).not.toHaveTextContent('신청을 거부할까요?');
+      expect(screen.getByRole('dialog')).toHaveTextContent('선수 부족으로 불참');
+    });
+
+    it('승인은 팀 사유를 건드리지 않고 운영진 사유만 실어 보내며, 결과 문구도 승인이다', () => {
+      const { cancelMutate } = arrange(requested);
+      render(<RegistrationsTab tournamentId="tournament-1" showToast={showToast} canWrite />);
+      fireEvent.click(screen.getByRole('button', { name: '취소 승인' }));
+      fireEvent.change(screen.getByLabelText(/운영진 사유/), { target: { value: '환불 안내함' } });
+      fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: '취소 승인' }));
+
+      expect(cancelMutate).toHaveBeenCalledWith({ registrationId: 'reg-1', reason: '환불 안내함' }, expect.anything());
+      const onSuccess = (cancelMutate.mock.calls[0][1] as { onSuccess: () => void }).onSuccess;
+      act(() => onSuccess());
+      expect(showToast).toHaveBeenCalledWith('취소를 승인했어요.', 'success');
+    });
+
+    it('리그라도 취소 요청의 승인은 사유 없이 보낼 수 있다 (거부는 여전히 필수)', () => {
+      const { cancelMutate } = arrange(requested);
+      render(<RegistrationsTab tournamentId="league-1" showToast={showToast} canWrite requireCancelReason />);
+      fireEvent.click(screen.getByRole('button', { name: '취소 승인' }));
+      fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: '취소 승인' }));
+
+      expect(cancelMutate).toHaveBeenCalledWith({ registrationId: 'reg-1' }, expect.anything());
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    });
+  });
+
+  describe('처리된 신청의 표시', () => {
+    it('팀 사유와 운영진 사유를 따로 보여 주고, 승인과 거부를 다른 상태 이름으로 구분한다', () => {
+      arrange({
+        status: 'cancelled',
+        cancelRequestedAt: '2026-10-10T00:00:00.000Z',
+        cancelReason: '선수 부족으로 불참',
+        adminCancelReason: '환불 안내함',
+        cancelOutcome: 'approved',
+      });
+      const { unmount } = render(<RegistrationsTab tournamentId="tournament-1" showToast={showToast} canWrite />);
+      expect(screen.getByText('팀 취소 사유: 선수 부족으로 불참')).toBeInTheDocument();
+      expect(screen.getByText('운영진 사유: 환불 안내함')).toBeInTheDocument();
+      expect(screen.getByText('취소 승인됨')).toBeInTheDocument();
+      unmount();
+
+      arrange({ status: 'cancelled', adminCancelReason: '자격 미달', cancelOutcome: 'rejected' });
+      render(<RegistrationsTab tournamentId="tournament-1" showToast={showToast} canWrite />);
+      expect(screen.getByText('거부됨')).toBeInTheDocument();
+      expect(screen.queryByText('취소 승인됨')).not.toBeInTheDocument();
+    });
+
+    it('어드민이 처리하지 않은 취소(결과 없음)는 기존처럼 "취소" 로 남는다', () => {
+      arrange({ status: 'cancelled', cancelOutcome: null });
+      render(<RegistrationsTab tournamentId="tournament-1" showToast={showToast} canWrite />);
+      expect(screen.queryByText('취소 승인됨')).not.toBeInTheDocument();
+      expect(screen.queryByText('거부됨')).not.toBeInTheDocument();
+    });
   });
 
   it('자동 확정된 명단이면 그렇게 표시한다', () => {

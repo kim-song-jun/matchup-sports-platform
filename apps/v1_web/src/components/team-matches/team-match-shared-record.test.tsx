@@ -502,14 +502,94 @@ describe('shared record participant flow', () => {
       fireEvent.click(within(dialog).getByRole('button', { name: '변경 되돌리기' }));
       await waitFor(() => expect(state.mutate).toHaveBeenCalledWith(expect.objectContaining({ action: 'undo', changeId: 'c1', expectedVersion: 3 })));
     });
+  });
+  // MD-QA #115 (C안) — 진행 중 삭제는 상대 팀 몫이 걸릴 때만 묻는다. 서버는 삭제마다 양 팀 종료 확인을 모두 비운다.
+  describe('진행 중 득점 삭제 — 상대 팀 몫이 걸릴 때만 확인한다', () => {
+    const ownGoal = { id: 'g1', sideId: 'home', participantId: 'h1', ownGoal: false, minute: 10, subMatchId: null };
+    const theirGoal = { id: 'g2', sideId: 'away', participantId: 'a1', ownGoal: false, minute: 20, subMatchId: null };
+    const awayConfirmed = [{ sideId: 'away', name: '상대 팀장', at: '2026-09-21T01:00:00Z' }];
+    const homeConfirmed = [{ sideId: 'home', name: '우리 팀장', at: '2026-09-21T01:00:00Z' }];
+    const deleteButton = (name: RegExp) => screen.getByRole('button', { name });
+    const expectDeleted = (goalId: string) => waitFor(() => expect(state.mutate).toHaveBeenCalledWith(expect.objectContaining({ action: 'delete', goalId, expectedVersion: 3 })));
 
-    it('대조군 — 진행 중인 공동 기록의 삭제는 확인 없이 바로 보낸다', async () => {
-      state.data.goals = [{ id: 'g1', sideId: 'home', participantId: 'h1', ownGoal: false, minute: 10, subMatchId: null }];
+    it('내 팀 득점이고 상대 종료 확인도 없으면 확인 없이 바로 지운다', async () => {
+      state.data.goals = [ownGoal, theirGoal];
       render(<TeamMatchSharedRecord teamMatchId="match" />);
-      fireEvent.click(screen.getByRole('button', { name: /김민수.*삭제$/ }));
-
-      await waitFor(() => expect(state.mutate).toHaveBeenCalledWith(expect.objectContaining({ action: 'delete', goalId: 'g1' })));
+      fireEvent.click(deleteButton(/김민수.*삭제$/));
+      await expectDeleted('g1');
       expect(screen.queryByRole('dialog')).toBeNull();
+    });
+
+    it('우리 팀만 종료 확인한 상태에서 내 득점을 지워도 상대 몫이 없어 바로 지운다', async () => {
+      state.data.goals = [ownGoal];
+      state.data.confirmations = homeConfirmed;
+      render(<TeamMatchSharedRecord teamMatchId="match" />);
+      fireEvent.click(deleteButton(/김민수.*삭제$/));
+      await expectDeleted('g1');
+      expect(screen.queryByRole('dialog')).toBeNull();
+    });
+
+    it('상대 팀 득점은 누가 기록했는지 알린 뒤 [득점 삭제]를 눌러야 지운다', async () => {
+      state.data.goals = [ownGoal, theirGoal];
+      render(<TeamMatchSharedRecord teamMatchId="match" />);
+      fireEvent.click(deleteButton(/박지훈.*삭제$/));
+
+      const dialog = await screen.findByRole('dialog', { name: '득점을 삭제할까요?' });
+      expect(dialog).toHaveTextContent('상대 팀이 기록한 득점이에요.');
+      expect(dialog).not.toHaveTextContent('종료 확인');
+      expect(state.mutate).not.toHaveBeenCalled();
+      fireEvent.click(within(dialog).getByRole('button', { name: '득점 삭제' }));
+      await expectDeleted('g2');
+    });
+
+    it('상대 팀이 종료 확인한 상태에서는 내 득점도 확인 뒤에만 지우고 종료 확인이 풀린다고 알린다', async () => {
+      state.data.goals = [ownGoal];
+      state.data.confirmations = awayConfirmed;
+      render(<TeamMatchSharedRecord teamMatchId="match" />);
+      fireEvent.click(deleteButton(/김민수.*삭제$/));
+
+      const dialog = await screen.findByRole('dialog', { name: '득점을 삭제할까요?' });
+      expect(dialog).toHaveTextContent('지우면 상대 팀의 종료 확인도 취소돼요.');
+      expect(dialog).not.toHaveTextContent('상대 팀이 기록한 득점');
+      expect(state.mutate).not.toHaveBeenCalled();
+      fireEvent.click(within(dialog).getByRole('button', { name: '득점 삭제' }));
+      await expectDeleted('g1');
+    });
+
+    it('상대 득점이면서 상대 종료 확인이 걸리면 두 이유를 한 창에서 알린다', async () => {
+      state.data.goals = [theirGoal];
+      state.data.confirmations = awayConfirmed;
+      render(<TeamMatchSharedRecord teamMatchId="match" />);
+      fireEvent.click(deleteButton(/박지훈.*삭제$/));
+
+      const dialog = await screen.findByRole('dialog', { name: '득점을 삭제할까요?' });
+      expect(dialog).toHaveTextContent('상대 팀이 기록한 득점이에요. 지우면 상대 팀의 종료 확인도 취소돼요.');
+    });
+
+    it('[취소]하면 아무것도 보내지 않는다', async () => {
+      state.data.goals = [theirGoal];
+      render(<TeamMatchSharedRecord teamMatchId="match" />);
+      fireEvent.click(deleteButton(/박지훈.*삭제$/));
+      fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: '취소' }));
+
+      await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+      expect(state.mutate).not.toHaveBeenCalled();
+    });
+
+    it('운영자는 내 팀이 없어 득점 소속으로는 묻지 않고, 종료 확인이 걸릴 때만 양 팀 확인이 취소된다고 알린다', async () => {
+      state.data = { ...state.data, ownSideId: null, operator: true, participant: false, goals: [ownGoal, theirGoal] };
+      const view = render(<TeamMatchSharedRecord teamMatchId="match" admin />);
+      fireEvent.click(deleteButton(/박지훈.*삭제$/));
+      await expectDeleted('g2');
+      expect(screen.queryByRole('dialog')).toBeNull();
+      view.unmount();
+
+      state.mutate.mockClear();
+      state.data = { ...state.data, confirmations: awayConfirmed };
+      render(<TeamMatchSharedRecord teamMatchId="match" admin />);
+      fireEvent.click(deleteButton(/박지훈.*삭제$/));
+      expect(await screen.findByRole('dialog', { name: '득점을 삭제할까요?' })).toHaveTextContent('지우면 양 팀의 종료 확인도 취소돼요.');
+      expect(state.mutate).not.toHaveBeenCalled();
     });
   });
   it('flags a potentially duplicate goal instead of blindly adding it', () => {

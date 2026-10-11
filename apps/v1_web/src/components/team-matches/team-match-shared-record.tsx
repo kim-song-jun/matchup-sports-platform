@@ -35,6 +35,14 @@ import {
 } from '@/components/public-game-records/format';
 import styles from './team-match-shared-record.module.css';
 
+// 득점자의 소속팀이 내 팀이 아니면 상대 팀 득점이다. 소속을 알 수 없으면 내 것임을 보장할 수 없으니 상대로 본다.
+// 운영자는 내 팀이 없어 "상대 팀"이라는 표현이 성립하지 않는다.
+function isOpponentGoal(data: SharedRecord, goal: SharedGoal) {
+  if (!data.ownSideId) return false;
+  const player = data.participants.find((p) => p.id === goal.participantId);
+  return (player?.sideId ?? (goal.ownGoal ? null : goal.sideId)) !== data.ownSideId;
+}
+
 function goalLabel(data: SharedRecord, goal: SharedGoal | null) {
   if (!goal) return '기록 없음';
   const player = data.participants.find((p) => p.id === goal.participantId);
@@ -245,19 +253,30 @@ export function TeamMatchSharedRecord({ teamMatchId, admin = false }: { teamMatc
       // useMutation exposes the actual error while local form state stays intact.
     }
   }
-  // 확정된 결과의 득점 삭제·변경 되돌리기는 누르는 즉시 공식 결과를 바꾼다 — 그 앞에만 확인 창을 둔다(H9 A).
-  // 진행 중 기록은 이력으로 되돌릴 수 있어 그대로 즉시 반영한다. 확인하는 동안 바뀐 기록은 열었던 버전으로 막는다.
-  async function commandAfterConfirm(input: Omit<RecordCommand, 'commandId' | 'expectedVersion'>, prompt: { title: string; message: string; confirmLabel: string }) {
+  // 확정된 결과의 득점 삭제·변경 되돌리기는 누르는 즉시 공식 결과를 바꾼다 — 그 앞에는 확인 창을 둔다(H9 A).
+  // 진행 중 기록은 이력으로 되돌릴 수 있어 즉시 반영하되, 삭제만은 상대 팀 몫이 걸릴 때 묻는다(deleteGoal).
+  // 확인하는 동안 바뀐 기록은 열었던 버전으로 막는다.
+  async function commandAfterConfirm(input: Omit<RecordCommand, 'commandId' | 'expectedVersion'>, prompt: { title: string; message: string; confirmLabel: string }, needsConfirm = data?.phase === 'official') {
     if (!data) return;
     const version = data.version;
-    if (data.phase === 'official' && !(await confirm({ ...prompt, tone: 'danger' }))) return;
+    if (needsConfirm && !(await confirm({ ...prompt, tone: 'danger' }))) return;
     await command(input, version);
   }
-  const deleteGoal = (goal: SharedGoal) => void commandAfterConfirm({ action: 'delete', goalId: goal.id }, {
-    title: '득점을 삭제할까요?',
-    message: `${data ? goalLabel(data, goal) : ''} 득점을 지우면 ${OFFICIAL_CHANGE_NOTE}`,
-    confirmLabel: '득점 삭제',
-  });
+  const deleteGoal = (goal: SharedGoal) => {
+    if (!data) return;
+    const label = goalLabel(data, goal);
+    const prompt = { title: '득점을 삭제할까요?', confirmLabel: '득점 삭제' };
+    if (data.phase === 'official') {
+      void commandAfterConfirm({ action: 'delete', goalId: goal.id }, { ...prompt, message: `${label} 득점을 지우면 ${OFFICIAL_CHANGE_NOTE}` });
+      return;
+    }
+    // 진행 중 삭제는 서버가 양 팀 종료 확인을 모두 비운다. 내 득점이고 상대 확인도 없으면 흔한 수정이라 묻지 않는다.
+    const notes = [
+      isOpponentGoal(data, goal) ? '상대 팀이 기록한 득점이에요.' : null,
+      data.confirmations.some((c) => c.sideId !== data.ownSideId) ? `지우면 ${data.ownSideId ? '상대' : '양'} 팀의 종료 확인도 취소돼요.` : null,
+    ].filter((note): note is string => note !== null);
+    void commandAfterConfirm({ action: 'delete', goalId: goal.id }, { ...prompt, message: `${label} ${notes.join(' ')} 지울까요?` }, notes.length > 0);
+  };
 
   if (!data) {
     return query.isError

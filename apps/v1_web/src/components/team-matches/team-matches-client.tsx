@@ -755,8 +755,7 @@ function applyLabel(
   if (viewerState === 'host_team') return status === 'expired' ? '경기 시간이 지났어요' : status === 'completed' ? '경기 종료' : '매치 수정';
   if (viewerState === 'requested' || team?.reasonCode === 'ALREADY_REQUESTED') {
     // 라벨과 액션은 같은 `team`에서 나와야 한다(getApplyAction도 이 팀의 applicationId를 쓴다).
-    // 여러 팀을 관리하는 사용자에게 "어느 팀 신청을 취소하는지"를 밝혀야 신청 CTA
-    // (`${팀명}으로 신청`)와 대칭이 맞고, 라벨·액션이 갈렸는지도 화면에서 바로 드러난다.
+    // 여러 팀을 관리하는 사용자에게 "어느 팀 신청을 취소하는지"를 밝힌다.
     if (team?.applicationId) return `${team.name} 신청 취소`;
     // 철회 대상을 못 찾은 경우(예: 신청 당시 팀에서 운영진 자격을 잃어 eligibility 목록에서
     // 빠짐) 이 CTA는 아무것도 못 한다 — 비활성 버튼에 '신청 취소'라고 적어두면 "여기서

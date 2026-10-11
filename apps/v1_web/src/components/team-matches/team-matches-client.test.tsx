@@ -405,6 +405,8 @@ describe('TeamMatchDetailPageClient — 참가팀 멤버가 자기 팀 경기를
     mockMatch('recruiting', false);
     render(<TeamMatchDetailPageClient teamMatchId="team-match-1" />);
     expect(screen.getByTestId('team-match-apply-label')).toHaveTextContent('신청하기');
+    // 신청(비철회) CTA 에는 확인이 붙지 않는다 — 확인은 철회 CTA 에만 있다.
+    expect(screen.getByTestId('team-match-apply-confirm').textContent).toBe('');
     expect(screen.getByTestId('team-match-apply-picker')).toBeInTheDocument();
   });
 });
@@ -1392,7 +1394,7 @@ describe('TeamMatchDetailPageClient — 신청 중인 뷰어의 히어로 CTA는
     expect(useV1WithdrawTeamMatchApplicationMock).toHaveBeenCalledWith('team-match-1', 'app-alpha');
     // 라벨과 액션이 같은 팀을 가리켜야 한다 — 취소 CTA는 철회할 팀(알파FC)을 이름으로 밝힌다.
     expect(screen.getByTestId('team-match-apply-label')).toHaveTextContent('알파FC');
-    // 철회는 확인을 거친다 — 신청 CTA 는 확인이 붙지 않는다.
+    // 철회는 확인을 거친다.
     expect(screen.getByTestId('team-match-apply-confirm')).toHaveTextContent('신청을 취소할까요?');
   });
 

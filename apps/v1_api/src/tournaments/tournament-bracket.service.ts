@@ -49,7 +49,7 @@ import {
 } from './tournament-fixture-official-result';
 import { findTournamentOnSurface, TOURNAMENT_KINDS } from './tournament-surface-lookup';
 import { assertNewFixtureScheduleKeepsStageOrder } from './tournament-schedule-order';
-import { assertNotInOtherGroupInTx, assertSidesNotSlotLinked, createGroupInTx, deleteTournamentGroupInTx, ensureGroupPhaseTeamsInTx, recalculateStandingsInTx, softDeleteTournamentFixtureInTx, updateTournamentFixtureInTx } from './tournament-bracket-tx';
+import { assertNotInOppositeFinalStageInTx, assertNotInOtherGroupInTx, assertSidesNotSlotLinked, createGroupInTx, deleteTournamentGroupInTx, ensureGroupPhaseTeamsInTx, recalculateStandingsInTx, softDeleteTournamentFixtureInTx, updateTournamentFixtureInTx } from './tournament-bracket-tx';
 import { participantDisplayName } from './participant-display-name';
 import { readJerseyNumbers } from './tournament-player-jersey';
 import { createTournamentMatchInTx } from './tournament-match-creation';
@@ -316,6 +316,9 @@ export class TournamentBracketService {
           tournamentId, groupId: group.id, registrationIds: [dto.registrationId],
         });
       }
+      await assertNotInOppositeFinalStageInTx(tx, {
+        tournamentId, fixtureId: null, groupPhase: group.phase, registrationIds: [dto.registrationId],
+      });
 
       if (dto.isBye) {
         const booked = await tx.v1TournamentMatchDetails.findFirst({ where: {
@@ -694,6 +697,9 @@ export class TournamentBracketService {
         });
       }
 
+      await assertNotInOppositeFinalStageInTx(tx, {
+        tournamentId, fixtureId: null, groupPhase: group?.phase ?? null, round: dto.round, registrationIds: [dto.homeRegistrationId, dto.awayRegistrationId],
+      });
       if (dto.groupId && group) {
         await ensureGroupPhaseTeamsInTx(tx, admin, tournamentId, dto.groupId, group.phase, [dto.homeRegistrationId, dto.awayRegistrationId]);
       }

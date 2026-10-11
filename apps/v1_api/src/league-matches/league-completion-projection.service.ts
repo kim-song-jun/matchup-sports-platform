@@ -4,7 +4,7 @@ import { shouldCompleteLeague } from './league-lifecycle-rules';
 import { STATUS_BY_LEAGUE_STATE } from '../tournaments/league-competition-mirror';
 import { LEAGUE_STATE_BY_STATUS } from '../tournaments/league-competition-mirror';
 import { findTournamentOnSurface } from '../tournaments/tournament-surface-lookup';
-import { lockCompetitionForSlotReleaseInTx } from '../tournaments/slots/competition-bracket-lock';
+import { lockLeagueRowForCompletionInTx } from './league-fixture-generation-guard';
 
 /**
  * `GameResultOfficialProjectionService.handler`가 여는 같은 트랜잭션(tx) 위에서
@@ -103,7 +103,9 @@ export class LeagueCompletionProjectionService {
 
     // 완료 직전에만 리그 행을 잠그고 다시 센다 — 그 사이 같은 락을 쥔 수동 경기 추가가 커밋됐으면 새 경기를 보고 멈추고,
     // 이 락을 먼저 잡으면 추가 쪽 끝남 가드가 완료를 본다. 결과 확정마다 잠그지 않도록 판정이 참일 때만 잠근다.
-    await lockCompetitionForSlotReleaseInTx(tx, { id: leagueId, kind: 'regular_league' });
+    // 호출부(결과 투영·취소)가 게임 행을 쥔 채 오므로 기다리지 않는다 — 템플릿 교체·재생성(리그 → 게임)이 쥐고 있으면
+    // 재시도 가능한 409 로 물러난다(worker 는 다시 시도, 운영자 취소는 다시 누르기).
+    await lockLeagueRowForCompletionInTx(tx, leagueId);
     if (!(await isReady())) return false;
 
     // 동시성: 두 대진의 결과가 거의 동시에 OFFICIAL이 되면 두 트랜잭션 모두 이 지점까지

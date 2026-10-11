@@ -40,22 +40,43 @@ export async function assertLeagueFixtureGenerationAllowedInTx(
 }
 
 /**
- * 리그 행을 FOR SHARE NOWAIT 로 잡은 뒤 끝남·취소를 다시 본다. 잡은 공유 잠금은 커밋까지 리그 완료 갱신을 막아
- * 검사와 앞선 쓰기가 한 덩어리가 된다. 기다리지 않는 이유: 이 시스템엔 리그 → 경기(일괄 생성·재생성·팀 제외)와
- * 경기 → 리그(결과 확정·취소) 두 잠금 순서가 함께 있어, 경기 행을 쥔 채 리그 행을 기다리면 어느 쪽과든 교착한다.
- * 다른 작업이 리그 행을 쥐고 있으면 기다리지 않고 재시도 가능한 409 로 끝낸다.
+ * 리그 행을 기다리지 않고 잠근다. 이 시스템엔 리그 → 경기(일괄 생성·재생성·팀 제외·템플릿 교체)와 경기 → 리그
+ * (결과 확정·취소의 완료 처리) 두 잠금 순서가 함께 있어, 경기 쪽을 쥔 채 리그 행을 기다리면 어느 쪽과든 교착한다.
+ * 잡지 못하면 재시도 가능한 409 로 끝낸다(결과 투영 worker 는 이 오류를 다시 시도한다). 같은 트랜잭션이 이미 쥔
+ * 잠금과는 충돌하지 않는다.
  */
-export async function assertLeagueNotEndedUnderShareLockInTx(tx: Prisma.TransactionClient, leagueId: string): Promise<void> {
+async function lockLeagueRowWithoutWaitingInTx(
+  tx: Prisma.TransactionClient,
+  leagueId: string,
+  mode: 'share' | 'update',
+): Promise<void> {
   try {
-    await tx.$queryRaw`SELECT id FROM "v1_tournaments" WHERE id = ${leagueId} FOR SHARE NOWAIT`;
+    if (mode === 'share') {
+      await tx.$queryRaw`SELECT id FROM "v1_tournaments" WHERE id = ${leagueId} FOR SHARE NOWAIT`;
+    } else {
+      await tx.$queryRaw`SELECT id FROM "v1_tournaments" WHERE id = ${leagueId} FOR UPDATE NOWAIT`;
+    }
   } catch (error: unknown) {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2010' && error.meta?.code === '55P03') {
       throw new ConflictException({
         code: 'COMMAND_CONCURRENCY_CONFLICT',
-        message: '리그에서 다른 작업이 진행 중이라 경기를 바꾸지 못했어요. 잠시 후 다시 시도해 주세요.',
+        message: '리그에서 다른 작업이 진행 중이에요. 잠시 후 다시 시도해 주세요.',
       });
     }
     throw error;
   }
+}
+
+/** 리그 완료 처리용 — 리그 행을 기다리지 않고 FOR UPDATE 로 잡는다(이유는 lockLeagueRowWithoutWaitingInTx). */
+export async function lockLeagueRowForCompletionInTx(tx: Prisma.TransactionClient, leagueId: string): Promise<void> {
+  await lockLeagueRowWithoutWaitingInTx(tx, leagueId, 'update');
+}
+
+/**
+ * 리그 행을 기다리지 않는 공유 잠금으로 잡은 뒤 끝남·취소를 다시 본다(리그 경기 수정용). 공유 잠금은 커밋까지
+ * 리그 완료 갱신을 막아 검사와 앞선 쓰기가 한 덩어리가 된다.
+ */
+export async function assertLeagueNotEndedUnderShareLockInTx(tx: Prisma.TransactionClient, leagueId: string): Promise<void> {
+  await lockLeagueRowWithoutWaitingInTx(tx, leagueId, 'share');
   throwIfLeagueEnded(await loadLeagueStatusInTx(tx, leagueId));
 }

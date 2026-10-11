@@ -22,8 +22,8 @@
 | `POST` | `/api/v1/auth/social-terms` | user | `{ requiredTermsAccepted: true, ageConfirmed: true, acceptedTermsDocumentIds: uuid[] }` | social session + onboarding route |
 | `POST` | `/api/v1/auth/social-profile` | user | `SocialProfileDto` | compatibility profile completion (also finishes a deferred profile) |
 | `POST` | `/api/v1/auth/social-profile/defer` | user | empty body | skip the profile form; social session without `next` |
-| `POST` | `/api/v1/auth/social-link/preview` | user (pending social, `social_profile_required` only) | `{ phone, proofToken }` | `{ maskedEmail, providers, hasPassword, linkingProvider }` — same checks and error codes as `social-link`, but consumes nothing and writes nothing |
-| `POST` | `/api/v1/auth/social-link` | user (pending social, `social_profile_required` only) | `{ phone, proofToken }` | session of the phone's existing account (`session.userId` = holder) + `next?` |
+| `POST` | `/api/v1/auth/social-link/preview` | user (pending social: `social_profile_required` without a profile, or `social_profile_deferred`) | `{ phone, proofToken }` | `{ maskedEmail, providers, hasPassword, linkingProvider }` — same checks and error codes as `social-link`, but consumes nothing and writes nothing |
+| `POST` | `/api/v1/auth/social-link` | user (pending social: `social_profile_required` without a profile, or `social_profile_deferred`) | `{ phone, proofToken }` | session of the phone's existing account (`session.userId` = holder) + `next?` |
 | `GET` | `/api/v1/auth/check-email` | none | `?email=` | `{ available: boolean }` |
 | `GET` | `/api/v1/auth/check-nickname` | none | `?nickname=` | `{ available: boolean }` |
 | `GET` | `/api/v1/terms/current?context=signup\|tournament_application\|footer` | optional user | active context | effective current documents; signup adds per-user compliance |

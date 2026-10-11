@@ -272,4 +272,49 @@ describe('소셜 가입 번호 충돌 → 기존 계정 연결', () => {
     await screen.findByText('이 번호로 가입된 계정을 찾지 못했어요.');
     expect(screen.queryByRole('button', { name: '계정 다시 확인' })).not.toBeInTheDocument();
   });
+
+  describe('활동 정보 입력(건너뛴 계정) 모드', () => {
+    const useDeferredAccount = () =>
+      server.use(
+        http.get('*/api/v1/auth/me', () =>
+          success({
+            user: { onboardingStatus: 'social_profile_deferred', authProvider },
+            profile: { nickname: '카카오러너' },
+            socialSignupPrefill: null,
+          }),
+        ),
+      );
+    const setSearch = (search: string) =>
+      Object.defineProperty(window, 'location', { configurable: true, value: { ...window.location, search } });
+
+    afterEach(() => setSearch(''));
+
+    it('번호 충돌에서 같은 연결 안내가 나오고, 연결하면 저장된 redirect 로 돌아간다', async () => {
+      useDeferredAccount();
+      setSearch('?redirect=%2Fteams%2Fnew');
+      await openConflict();
+      expect(screen.getByRole('heading', { name: '활동 정보 입력' })).toBeInTheDocument();
+      const user = await verifyOwnership();
+
+      await user.click(within(await screen.findByRole('dialog')).getByRole('button', { name: '연결하고 로그인' }));
+
+      await waitFor(() => expect(replace).toHaveBeenCalledWith('/teams/new'));
+      expect(calls.link).toEqual([{ phone: '01012345678', proofToken: 'proof-1' }]);
+    });
+
+    it('redirect 가 없으면 홈으로, 서버 next 는 따르지 않는다', async () => {
+      useDeferredAccount();
+      server.use(
+        http.post('*/api/v1/auth/social-link', () =>
+          success({ session: { userId: 'holder-1', userEmail: null }, user: { id: 'holder-1' }, next: { route: '/onboarding' } }),
+        ),
+      );
+      await openConflict();
+      const user = await verifyOwnership();
+      await user.click(within(await screen.findByRole('dialog')).getByRole('button', { name: '연결하고 로그인' }));
+
+      await waitFor(() => expect(replace).toHaveBeenCalledWith('/home'));
+      expect(replace).not.toHaveBeenCalledWith('/onboarding');
+    });
+  });
 });

@@ -179,15 +179,38 @@ describe('AuthService.linkSocialToPhoneOwner', () => {
       await expectCode(service.linkSocialToPhoneOwner(CALLER_ID, dto()), 'SOCIAL_LINK_NOT_PENDING');
     });
 
+    it('accepts a deferred caller whose auto profile exists, for both link and preview', async () => {
+      prisma.v1User.findUnique.mockResolvedValue(
+        pendingCaller({ onboardingStatus: 'social_profile_deferred', profile: { id: 'auto-profile' } }),
+      );
+
+      await expect(service.previewSocialLink(CALLER_ID, dto())).resolves.toMatchObject({ linkingProvider: 'kakao' });
+      await service.linkSocialToPhoneOwner(CALLER_ID, dto());
+
+      expect(prisma.v1User.updateMany).toHaveBeenCalledWith({
+        where: { id: CALLER_ID, onboardingStatus: { in: ['social_profile_required', 'social_profile_deferred'] } },
+        data: { updatedAt: expect.any(Date) },
+      });
+      expect(prisma.v1User.delete).toHaveBeenCalledWith({ where: { id: CALLER_ID } });
+    });
+
+    it('still rejects a completed caller that has a profile', async () => {
+      prisma.v1User.findUnique.mockResolvedValue(
+        pendingCaller({ onboardingStatus: 'completed', profile: { id: 'p1' } }),
+      );
+
+      await expectCode(service.linkSocialToPhoneOwner(CALLER_ID, dto()), 'SOCIAL_LINK_NOT_PENDING');
+      await expectCode(service.previewSocialLink(CALLER_ID, dto()), 'SOCIAL_LINK_NOT_PENDING');
+    });
+
     it('resets an expired signup and answers 401', async () => {
       const old = new Date(Date.now() - 25 * 60 * 60 * 1000);
       prisma.v1User.findUnique.mockResolvedValue(pendingCaller({ createdAt: old, updatedAt: old }));
-      prisma.v1User.update.mockResolvedValue({});
       prisma.v1UserOnboardingProgress.upsert.mockResolvedValue({});
 
       await expectCode(service.linkSocialToPhoneOwner(CALLER_ID, dto()), 'SOCIAL_SIGNUP_EXPIRED');
-      expect(prisma.v1User.update).toHaveBeenCalledWith({
-        where: { id: CALLER_ID },
+      expect(prisma.v1User.updateMany).toHaveBeenCalledWith({
+        where: { id: CALLER_ID, onboardingStatus: { in: ['social_terms_required', 'social_profile_required'] } },
         data: { onboardingStatus: 'social_terms_required' },
       });
     });

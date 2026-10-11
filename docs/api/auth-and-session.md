@@ -16,7 +16,7 @@
 | POST | `/auth/kakao` | No | 카카오 로그인 |
 | POST | `/auth/naver` | No | 네이버 로그인 |
 | POST | `/auth/apple` | No | 애플 로그인 시도 |
-| POST | `/auth/social-link` | Yes (가입 대기 소셜 계정) | 휴대폰 OTP 증명 후 대기 소셜 로그인을 그 번호의 기존 계정에 연결 — 자세한 계약은 `domains/auth.md` |
+| POST | `/auth/social-link` | Yes (가입 대기·정보 입력 보류 소셜 계정) | 휴대폰 OTP 증명 후 대기 소셜 로그인을 그 번호의 기존 계정에 연결 — 자세한 계약은 `domains/auth.md` |
 | POST | `/auth/refresh` | No | refresh token으로 재발급 |
 | GET | `/auth/me` | Yes | 현재 사용자 조회 |
 | DELETE | `/auth/withdraw` | Yes | 소프트 삭제 탈퇴 |

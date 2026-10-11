@@ -37,6 +37,9 @@ describe('V1AuthGuard activity profile gate', () => {
       ['GET', '/api/v1/auth/me'],
       ['POST', '/api/v1/auth/social-profile'],
       ['POST', '/api/v1/auth/check-nickname'],
+      ['POST', '/api/v1/auth/social-link'],
+      ['POST', '/api/v1/auth/social-link/preview'],
+      ['POST', '/api/v1/verification/phone/confirm'],
       ['POST', '/api/v1/verification/phone/request'],
       ['PATCH', '/api/v1/onboarding/preferences'],
     ])('lets %s %s through', async (method, url) => {

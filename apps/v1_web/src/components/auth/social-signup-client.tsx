@@ -437,6 +437,7 @@ export function SocialSignupClient() {
               onLogin={() => void exitFlow.leaveTo('/login')}
               onFindAccount={() => void exitFlow.leaveTo('/auth/find-account')}
               exitPending={exitFlow.pending}
+              onLinked={activityMode ? () => router.replace(consumeRedirect() ?? '/home') : undefined}
             />
           ) : null}
 

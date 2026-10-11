@@ -54,6 +54,8 @@ type Props = {
   onLogin: () => void;
   onFindAccount: () => void;
   exitPending: boolean;
+  /** Where to go after linking when the server's `next` route is not the right target (activity mode returns to the saved page). */
+  onLinked?: () => void;
 };
 
 type LinkError = { code: string | null; message: string };
@@ -95,7 +97,7 @@ export function SocialLinkPrompt({
 }
 
 /** 번호 소유 증명(OTP) → 연결 대상 확인 → 연결·로그인까지의 흐름. */
-export function SocialLinkVerify({ phone, providerLabel, onChooseOtherNumber, onLogin, onFindAccount, exitPending }: Props) {
+export function SocialLinkVerify({ phone, providerLabel, onChooseOtherNumber, onLogin, onFindAccount, exitPending, onLinked }: Props) {
   const router = useRouter();
   const queryClient = useQueryClient();
   const previewMutation = useV1SocialLinkPreview();
@@ -149,7 +151,8 @@ export function SocialLinkVerify({ phone, providerLabel, onChooseOtherNumber, on
           saveStoredV1Session(result.session);
           clearV1IdentityCache(queryClient);
           trackEvent('social_account_linked', { provider: preview.linkingProvider });
-          router.replace(result.next?.route ?? '/home');
+          if (onLinked) onLinked();
+          else router.replace(result.next?.route ?? '/home');
         },
         onError: fail,
       },

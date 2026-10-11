@@ -1217,7 +1217,7 @@ export class AuthService {
         if (consumed.count !== 1) throw this.phoneNotVerified();
 
         const stillPending = await tx.v1User.updateMany({
-          where: { id: callerId, onboardingStatus: 'social_profile_required' },
+          where: { id: callerId, onboardingStatus: { in: ['social_profile_required', 'social_profile_deferred'] } },
           data: { updatedAt: now },
         });
         if (stillPending.count !== 1) throw this.socialLinkConflict();
@@ -1318,9 +1318,12 @@ export class AuthService {
       throw new ForbiddenException({ code: 'PERMISSION_DENIED', message: '이 계정으로는 연결할 수 없어요.' });
     }
     const [identity] = caller.authIdentities;
+    // A deferred caller owns an auto-generated profile; a required one has none yet.
+    const isLinkableSignupState =
+      caller.onboardingStatus === 'social_profile_deferred' ||
+      (caller.onboardingStatus === 'social_profile_required' && !caller.profile);
     if (
-      caller.onboardingStatus !== 'social_profile_required' ||
-      caller.profile ||
+      !isLinkableSignupState ||
       caller.authIdentities.length !== 1 ||
       !identity ||
       !SOCIAL_AUTH_PROVIDERS.includes(identity.provider)

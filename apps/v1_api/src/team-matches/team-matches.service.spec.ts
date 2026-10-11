@@ -2590,6 +2590,20 @@ describe('TeamMatchesService', () => {
       }
     });
 
+    it.each([
+      ['구형 id 단독 커서', 'legacy-id'],
+      ['모르는 구간 접두사', 'bogus:00000000-0000-4000-8000-000000000000@1700000000000'],
+    ])('%s 는 첫 그룹부터 다시 읽으므로 요청 시 건수를 싣는다', async (_name, cursor) => {
+      prisma.v1TeamMatch.groupBy.mockResolvedValue([{ sportId: SPORT_A, _count: { _all: 2 } }]);
+      prisma.v1TeamMatch.count.mockResolvedValue(0);
+
+      const res = await service.list(null, { includeFacets: true, cursor });
+
+      expect(prisma.v1TeamMatch.groupBy).toHaveBeenCalledTimes(1);
+      expect(res.pageInfo.totalCount).toBe(2);
+      expect(res.facets).toBeDefined();
+    });
+
     it('깨진 커서는 첫 페이지로 읽으므로 요청 시 건수를 싣는다', async () => {
       prisma.v1TeamMatch.groupBy.mockResolvedValue([{ sportId: SPORT_A, _count: { _all: 2 } }]);
       prisma.v1TeamMatch.count.mockResolvedValue(0);

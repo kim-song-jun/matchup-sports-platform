@@ -208,6 +208,12 @@ export function parseStatePriorityCursor(cursor: string | undefined): { state: s
   return { state: cursor.slice(0, sep), id: cursor.slice(sep + 1) };
 }
 
+/** 커서가 `stateGroups` 안의 그룹을 가리키는지. 아니면 `paginateByStatePriority` 가 첫 그룹부터 다시 읽는다. */
+export function isResumableStatePriorityCursor(cursor: string | undefined, stateGroups: readonly string[]): boolean {
+  const parsed = parseStatePriorityCursor(cursor);
+  return parsed !== null && stateGroups.includes(parsed.state);
+}
+
 /**
  * 상태 우선순위 그룹 순서(`LEAGUE_STATE_PRIORITY_ORDER`)대로 필요한 만큼만 채우는
  * 순수 페이지네이션 플래너.

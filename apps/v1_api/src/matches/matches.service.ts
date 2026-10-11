@@ -11,7 +11,7 @@ import { ChatService } from '../chat/chat.service';
 import { decodeReferenceTimeCursor, encodeReferenceTimeCursor } from '../common/pagination/reference-time-cursor';
 import { recruitingNowWhere, startsTodayWhere, toSportFacets, totalFromSportFacets } from '../common/pagination/list-facets';
 import { dropCursorRow, resumeAfterCursorArgs } from '../common/pagination/resume-after-cursor';
-import { paginateByStatePriority } from '../league-matches/league-lifecycle-rules';
+import { isResumableStatePriorityCursor, paginateByStatePriority } from '../league-matches/league-lifecycle-rules';
 import { NotificationsService } from '../notifications/notifications.service';
 import { PlaceProvider, PlaceView, resolvePlaceSnapshot, toPlaceColumns, toPlaceView } from '../places/place-snapshot';
 import { PrismaService } from '../prisma/prisma.service';
@@ -72,8 +72,11 @@ export class MatchesService {
       past: { where: { AND: [where, { startAt: { lt: splitAt } }] }, orderBy: [{ startAt: 'desc' }, { createdAt: 'desc' }, { id: 'desc' }] },
     };
     const include = this.matchInclude(user);
+    const stateGroups = query.sort === 'latest' ? ['latest'] : ['upcoming', 'past'];
+    // 해석되지 않는 커서는 페이지네이터가 첫 그룹부터 다시 읽으므로 첫 페이지로 본다.
+    const isFirstPage = !isResumableStatePriorityCursor(cursor, stateGroups);
     const [{ items: pageItems, hasNext, nextCursor }, counts] = await Promise.all([paginateByStatePriority({
-      stateGroups: query.sort === 'latest' ? ['latest'] : ['upcoming', 'past'],
+      stateGroups,
       limit,
       cursor,
       fetchGroup: (group, page) =>
@@ -84,7 +87,7 @@ export class MatchesService {
             include,
           })
           .then((rows) => dropCursorRow(rows, page.cursorId, page.take).map((row) => ({ ...row, state: group }))),
-    }), query.includeFacets && !cursor ? this.countListFacets(query, now, fullMatchIds) : Promise.resolve(null)]);
+    }), query.includeFacets && isFirstPage ? this.countListFacets(query, now, fullMatchIds) : Promise.resolve(null)]);
 
     return {
       items: pageItems.map((match) => this.toListItem(match, user)),
@@ -92,7 +95,7 @@ export class MatchesService {
       pageInfo: {
         nextCursor: query.sort === 'latest' ? nextCursor : encodeReferenceTimeCursor(nextCursor, splitAt),
         hasNext,
-        // 건수는 요청(includeFacets)한 첫 페이지에만 싣는다. 깨진 커서는 첫 페이지로 읽으므로 해석된 cursor 로 판단한다.
+        // 건수는 요청(includeFacets)한 첫 페이지에만 싣는다. 해석되지 않는 커서는 첫 페이지로 읽는다.
         ...(counts ? { totalCount: counts.totalCount } : {}),
       },
       ...(counts ? { facets: counts.facets } : {}),

@@ -32,7 +32,7 @@ import { formatKstMonthDayTime } from '../common/kst-datetime';
 import { decodeReferenceTimeCursor, encodeReferenceTimeCursor } from '../common/pagination/reference-time-cursor';
 import { recruitingNowWhere, startsTodayWhere, toSportFacets, totalFromSportFacets } from '../common/pagination/list-facets';
 import { dropCursorRow, resumeAfterCursorArgs } from '../common/pagination/resume-after-cursor';
-import { paginateByStatePriority } from '../league-matches/league-lifecycle-rules';
+import { isResumableStatePriorityCursor, paginateByStatePriority } from '../league-matches/league-lifecycle-rules';
 import { PlaceProvider, PlaceView, resolvePlaceSnapshot, toPlaceColumns, toPlaceView } from '../places/place-snapshot';
 import { PrismaService } from '../prisma/prisma.service';
 import {
@@ -133,8 +133,11 @@ export class TeamMatchesService {
       unscheduled: { where: { AND: [where, { startAt: null }] }, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }] },
     };
     const include = this.teamMatchInclude(user);
+    const stateGroups = query.sort === 'latest' ? ['latest'] : ['upcoming', 'past', 'unscheduled'];
+    // 해석되지 않는 커서는 페이지네이터가 첫 그룹부터 다시 읽으므로 첫 페이지로 본다.
+    const isFirstPage = !isResumableStatePriorityCursor(cursor, stateGroups);
     const [{ items: teamMatches, hasNext, nextCursor }, counts] = await Promise.all([paginateByStatePriority({
-      stateGroups: query.sort === 'latest' ? ['latest'] : ['upcoming', 'past', 'unscheduled'],
+      stateGroups,
       limit,
       cursor,
       fetchGroup: (group, page) =>
@@ -145,7 +148,7 @@ export class TeamMatchesService {
             include,
           })
           .then((rows) => dropCursorRow(rows, page.cursorId, page.take).map((row) => ({ ...row, state: group }))),
-    }), query.includeFacets && !cursor ? this.countListFacets(query, now) : Promise.resolve(null)]);
+    }), query.includeFacets && isFirstPage ? this.countListFacets(query, now) : Promise.resolve(null)]);
 
     const pageItems = teamMatches.map((teamMatch) => {
       assertTeamMatchPublicInvariant(teamMatch);
@@ -178,7 +181,7 @@ export class TeamMatchesService {
       pageInfo: {
         nextCursor: query.sort === 'latest' ? nextCursor : encodeReferenceTimeCursor(nextCursor, splitAt),
         hasNext,
-        // 건수는 요청(includeFacets)한 첫 페이지에만 싣는다. 깨진 커서는 첫 페이지로 읽으므로 해석된 cursor 로 판단한다.
+        // 건수는 요청(includeFacets)한 첫 페이지에만 싣는다. 해석되지 않는 커서는 첫 페이지로 읽는다.
         ...(counts ? { totalCount: counts.totalCount } : {}),
       },
       ...(counts ? { facets: counts.facets } : {}),

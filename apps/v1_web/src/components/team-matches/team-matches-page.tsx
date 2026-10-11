@@ -279,13 +279,13 @@ function HeroTeamLink({ href, name, align, children }: { href?: string; name: st
   );
 }
 
-/** 팀 카드의 신뢰 배지와 같은 낱말·같은 배지 — 알 수 없는 값은 숨긴다. */
+/** 팀 카드의 신뢰 배지와 같은 낱말·같은 배지 — 알 수 없는 값은 숨긴다. 좁은 칸에서는 줄바꿈한다. */
 function HeroTrustBadge({ trustState, align }: { trustState?: string | null; align: 'left' | 'right' }) {
   const label = trustState ? trustStateLabel(trustState) : null;
   if (!label) return null;
   return (
     <div style={{ marginTop: 4, textAlign: align }}>
-      <span className="tm-badge tm-badge-sm tm-badge-blue">{label}</span>
+      <span className="tm-badge tm-badge-sm tm-badge-blue" style={{ maxWidth: '100%', whiteSpace: 'normal', lineHeight: 1.3, paddingBlock: 4 }}>{label}</span>
     </div>
   );
 }

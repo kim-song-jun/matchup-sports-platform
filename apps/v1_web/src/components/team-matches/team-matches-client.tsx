@@ -40,7 +40,7 @@ import { getCurrentRedirectPath, getLoginPathForRedirect, sanitizeRedirectPath, 
 // team-match-lineup.service.ts의 loadContext()와 완전히 동일한 규칙이라 그 규칙을 그대로
 // 재현해둔 순수 함수를 라인업 모듈에서 재사용한다(새로 만들지 않음).
 import { resolveOwnTeamId } from '@/app/team-matches/[id]/lineup/lineup.view-model';
-import { TEAM_MATCH_CANCEL_CONFIRM } from './team-match-cancel-confirm';
+import { TEAM_MATCH_CANCEL_CONFIRM, teamMatchCancelReasonField } from './team-match-cancel-confirm';
 import { MatchLifecyclePanel } from '../matches/match-lifecycle-panel';
 import { buildAttendanceSummary } from './team-match-attendance-summary';
 import {
@@ -496,7 +496,7 @@ export function TeamMatchDetailPageClient({ teamMatchId, seed }: { teamMatchId: 
           isLeagueFixture,
           closeTeamMatch: () => closeTeamMatch.mutateAsync({ reason: 'host_closed_from_v1_web' }),
           reopenTeamMatch: () => reopenTeamMatch.mutateAsync({ reason: 'host_reopened_from_v1_web' }),
-          cancelTeamMatch: () => cancelTeamMatch.mutateAsync({ reason: 'host_cancelled_from_v1_web' }),
+          cancelTeamMatch: (reason) => cancelTeamMatch.mutateAsync({ reason: reason || null }),
           // 보류 매치의 취소·삭제는 상세의 보류 결정 패널이 맡는다 — 메뉴에 같은 동작을 두 번 두지 않는다.
           deleteTeamMatch: query.data.lifecycle?.canDelete && apiStatus !== 'on_hold'
             ? () => deleteTeamMatch.mutateAsync()
@@ -872,7 +872,7 @@ function buildHostActions({
   isLeagueFixture: boolean;
   closeTeamMatch: () => Promise<unknown>;
   reopenTeamMatch: () => Promise<unknown>;
-  cancelTeamMatch: () => Promise<unknown>;
+  cancelTeamMatch: (reason?: string) => Promise<unknown>;
   /** 지원 이력이 없어 삭제할 수 있을 때만 넘긴다. */
   deleteTeamMatch?: () => Promise<unknown>;
   pending: boolean;
@@ -884,7 +884,7 @@ function buildHostActions({
     description: opponentName ? `취소하면 ${opponentName}에 알림이 가요.` : '취소하면 되돌릴 수 없어요.',
     tone: 'danger',
     pending,
-    confirm: TEAM_MATCH_CANCEL_CONFIRM,
+    confirm: { ...TEAM_MATCH_CANCEL_CONFIRM, reason: teamMatchCancelReasonField(opponentName !== null) },
     onClick: cancelTeamMatch,
   };
   const deleteAction: NonNullable<TeamMatchDetailViewModel['hostActions']>[number] | null = deleteTeamMatch

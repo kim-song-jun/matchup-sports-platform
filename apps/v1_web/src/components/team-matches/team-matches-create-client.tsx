@@ -27,7 +27,7 @@ import { formatTeamMatchLevelRange } from '@/lib/team-match-level-range';
 import { toDistrictRegionOptions } from '@/lib/v1-regions';
 import { lockedReasonLabel, teamRoleLabel } from '@/lib/v1-status-labels';
 import type { V1MyTeam, V1TeamMatchEdit } from '@/types/api';
-import { TEAM_MATCH_CANCEL_CONFIRM } from './team-match-cancel-confirm';
+import { TEAM_MATCH_CANCEL_CONFIRM, teamMatchCancelReasonField } from './team-match-cancel-confirm';
 import { TeamMatchCreatePageView } from './team-matches-page';
 import type { TeamMatchCreateStep, TeamMatchCreateViewModel } from './team-matches.types';
 import { teamMatchStepHref } from './team-matches.routes';
@@ -317,7 +317,7 @@ export function TeamMatchEditPageClient({ teamMatchId }: { teamMatchId: string }
   // 상세가 넘긴 출처(자기 ?from= 포함)가 있으면 취소·저장 뒤 그 상세로 돌아가 체인을 잇는다.
   const fromDetail = sanitizeRedirectPath(useSearchParams().get('from'));
   const detailHref = fromDetail ?? `/team-matches/${teamMatchId}`;
-  const { confirm, ConfirmModal } = useConfirm();
+  const { confirmWithReason, ConfirmModal } = useConfirm();
   const editQuery = useV1TeamMatchEdit(teamMatchId);
   const teams = useV1MyTeams();
   const sports = useV1MasterSports();
@@ -447,11 +447,11 @@ export function TeamMatchEditPageClient({ teamMatchId }: { teamMatchId: string }
       // 되돌리는 API가 없는 파괴적 동작 — 신청자 전원이 cancelled_by_host로 넘어가고
       // 알림도 나간다. '변경사항 저장' 바로 아래 붙은 버튼이라 오탭 가능성이 높으므로
       // 확인 없이 즉시 실행하지 않는다.
-      const ok = await confirm({ ...TEAM_MATCH_CANCEL_CONFIRM, tone: 'danger' });
-      if (!ok) return;
+      const reason = await confirmWithReason({ ...TEAM_MATCH_CANCEL_CONFIRM, tone: 'danger', reason: teamMatchCancelReasonField(editQuery.data?.editable === false) });
+      if (reason === null) return;
       setError(null);
       cancelTeamMatch.mutate(
-        { reason: 'host_cancelled_from_v1_web' },
+        { reason: reason || null },
         {
           onSuccess: () => router.push(detailHref),
           onError: (err) => setError(extractErrorMessage(err, '팀매치를 취소할 수 없어요. 다시 시도해 주세요.')),

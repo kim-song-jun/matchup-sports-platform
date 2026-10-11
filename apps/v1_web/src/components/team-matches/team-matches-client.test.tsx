@@ -22,6 +22,7 @@ vi.mock('@/lib/analytics', () => ({ trackEvent: vi.fn() }));
 const {
   applyTeamMatchMutateAsync,
   withdrawTeamMatchMutateAsync,
+  cancelTeamMatchMutateAsync,
   useV1WithdrawTeamMatchApplicationMock,
   routerPush,
   useV1TeamMatchMock,
@@ -33,6 +34,7 @@ const {
   return {
     applyTeamMatchMutateAsync: vi.fn(),
     withdrawTeamMatchMutateAsync,
+    cancelTeamMatchMutateAsync: vi.fn(),
     // 철회 훅은 applicationId를 **훅 생성 시점 인자**로 받는다(use-v1-api.ts) — 그래서 "어떤
     // 신청서를 철회하는지"는 mutateAsync 인자가 아니라 이 호출 인자로만 확인할 수 있다.
     useV1WithdrawTeamMatchApplicationMock: vi.fn(() => ({
@@ -73,7 +75,7 @@ vi.mock('@/hooks/use-v1-api', () => ({
   useV1RejectTeamMatchApplication: () => ({ mutate: vi.fn(), isPending: false }),
   useV1CloseTeamMatch: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useV1ReopenTeamMatch: () => ({ mutateAsync: vi.fn(), isPending: false }),
-  useV1CancelTeamMatch: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useV1CancelTeamMatch: () => ({ mutateAsync: cancelTeamMatchMutateAsync, isPending: false }),
   useV1DeleteTeamMatch: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useV1ResolveChatRoom: () => ({ mutate: resolveChatRoomMutateMock, isPending: false }),
   useV1WithdrawTeamMatchApplication: useV1WithdrawTeamMatchApplicationMock,
@@ -120,6 +122,11 @@ vi.mock('./team-matches-page', () => ({
         </div>
       ) : null}
       <span data-testid="team-match-cancel-confirm">{JSON.stringify(model.hostActions?.find((action) => action.label === '팀매치 취소')?.confirm ?? null)}</span>
+      {(['일정이 바뀌었어요', ''] as const).map((reason) => (
+        <button key={reason} onClick={() => { void model.hostActions?.find((action) => action.label === '팀매치 취소')?.onClick(reason); }}>
+          {`취소 실행(${reason || '사유 없음'})`}
+        </button>
+      ))}
       {model.onApply && <button onClick={model.onApply}>상대팀 신청</button>}
       {model.resultAction && <a href={model.resultAction.href}>{model.resultAction.label}</a>}
       {model.reviewAction && <a href={model.reviewAction.href}>{model.reviewAction.label}</a>}
@@ -1289,7 +1296,7 @@ describe('TeamMatchDetailPageClient — 리그 대진은 "팀매치 취소"를 �
     useV1TeamMatchEligibilityMock.mockReturnValue({ data: undefined, isSuccess: false });
   });
 
-  function mockHostView(status: string, league: { leagueId: string; title: string } | null) {
+  function mockHostView(status: string, league: { leagueId: string; title: string } | null, opponent: { teamId: string; name: string } | null = null) {
     useV1TeamMatchMock.mockReturnValue({
       data: {
         id: 'team-match-host-1',
@@ -1302,6 +1309,7 @@ describe('TeamMatchDetailPageClient — 리그 대진은 "팀매치 취소"를 �
         displayState: status,
         viewer: { state: 'host_team', manageableHostTeam: true },
         hostTeam: { teamId: 'team-host', name: '알파팀' },
+        approvedOpponentTeam: opponent,
         league,
       },
       isError: false,
@@ -1336,6 +1344,31 @@ describe('TeamMatchDetailPageClient — 리그 대진은 "팀매치 취소"를 �
     expect(confirm).toMatchObject({ confirmLabel: '팀매치 취소', cancelLabel: '닫기' });
     expect(confirm.message).toContain('제출한 참석명단은 잠겨서 더는 수정할 수 없어요');
     expect(confirm.message).not.toContain('사라져요');
+  });
+
+  it('상대팀이 확정된 매치는 취소 사유를 꼭 받고, 확정 상대가 없으면 선택으로 받는다', () => {
+    mockHostView('matched', null, { teamId: 'team-away', name: '합정 유나이티드' });
+    const { unmount } = render(<TeamMatchDetailPageClient teamMatchId="team-match-host-1" />);
+    const withOpponent = JSON.parse(screen.getByTestId('team-match-cancel-confirm').textContent ?? 'null');
+    unmount();
+
+    mockHostView('recruiting', null);
+    render(<TeamMatchDetailPageClient teamMatchId="team-match-host-1" />);
+    const withoutOpponent = JSON.parse(screen.getByTestId('team-match-cancel-confirm').textContent ?? 'null');
+
+    expect(withOpponent.reason).toMatchObject({ label: '취소 사유', required: true, maxLength: 500 });
+    expect(withoutOpponent.reason).toMatchObject({ label: '취소 사유 (선택)', required: false, maxLength: 500 });
+  });
+
+  it('호스트가 적은 취소 사유를 취소 API 로 보내고, 비워 두면 사유를 보내지 않는다', () => {
+    mockHostView('recruiting', null);
+    render(<TeamMatchDetailPageClient teamMatchId="team-match-host-1" />);
+
+    fireEvent.click(screen.getByRole('button', { name: '취소 실행(일정이 바뀌었어요)' }));
+    fireEvent.click(screen.getByRole('button', { name: '취소 실행(사유 없음)' }));
+
+    expect(cancelTeamMatchMutateAsync).toHaveBeenNthCalledWith(1, { reason: '일정이 바뀌었어요' });
+    expect(cancelTeamMatchMutateAsync).toHaveBeenNthCalledWith(2, { reason: null });
   });
 
   it('일반 팀매치(리그 아님, 같은 상태)는 여전히 "팀매치 취소"가 보인다(회귀 방지)', () => {

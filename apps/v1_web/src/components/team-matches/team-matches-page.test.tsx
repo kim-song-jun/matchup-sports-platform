@@ -1528,6 +1528,61 @@ describe('TeamMatchDetailPageView — 신청팀 후속 행동', () => {
     // 확정하면 메뉴 시트도 닫힌다.
     expect(screen.queryByRole('dialog', { name: '매치 관리' })).not.toBeInTheDocument();
   });
+
+  function modelWithCancelReason(required: boolean) {
+    const onCancel = vi.fn();
+    const model = getTeamMatchDetailViewModel('mine');
+    model.manageMenu = { edit: { href: '/team-matches/team-match-1/edit' }, history: [] };
+    model.hostActions = [{
+      label: '팀매치 취소',
+      tone: 'danger',
+      confirm: {
+        title: '팀매치를 취소할까요?',
+        message: '취소하면 되돌릴 수 없어요.',
+        confirmLabel: '팀매치 취소',
+        reason: { label: required ? '취소 사유' : '취소 사유 (선택)', required, maxLength: 500 },
+      },
+      onClick: onCancel,
+    }];
+    return { model, onCancel };
+  }
+
+  async function openCancelDialog() {
+    fireEvent.click(screen.getAllByRole('button', { name: '매치 관리 메뉴' })[0]);
+    fireEvent.click(await screen.findByRole('button', { name: /팀매치 취소/ }));
+    return screen.findByRole('dialog', { name: '팀매치를 취소할까요?' });
+  }
+
+  it('⋯ 메뉴의 취소 확인창에서 적은 사유가 취소 동작으로 넘어간다', async () => {
+    const { model, onCancel } = modelWithCancelReason(true);
+    renderPage(<TeamMatchDetailPageView model={model} />);
+
+    const dialog = await openCancelDialog();
+    const confirmButton = within(dialog).getByRole('button', { name: '팀매치 취소' });
+    // 필수 사유라 비어 있으면 확정할 수 없다.
+    expect(confirmButton).toBeDisabled();
+    fireEvent.change(within(dialog).getByLabelText('취소 사유'), { target: { value: '  구장 사정이 생겼어요  ' } });
+    fireEvent.click(confirmButton);
+
+    await waitFor(() => expect(onCancel).toHaveBeenCalledWith('구장 사정이 생겼어요'));
+  });
+
+  it('선택 사유는 비워도 확정되고, 닫으면 아무것도 실행하지 않는다', async () => {
+    const { model, onCancel } = modelWithCancelReason(false);
+    renderPage(<TeamMatchDetailPageView model={model} />);
+
+    let dialog = await openCancelDialog();
+    fireEvent.change(within(dialog).getByLabelText('취소 사유 (선택)'), { target: { value: '쓰다 만 사유' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: '취소' }));
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: '팀매치를 취소할까요?' })).not.toBeInTheDocument());
+    expect(onCancel).not.toHaveBeenCalled();
+
+    // 다시 열면 이전에 쓰던 사유가 남아 있지 않다.
+    dialog = await openCancelDialog();
+    expect(within(dialog).getByLabelText('취소 사유 (선택)')).toHaveValue('');
+    fireEvent.click(within(dialog).getByRole('button', { name: '팀매치 취소' }));
+    await waitFor(() => expect(onCancel).toHaveBeenCalledWith(''));
+  });
 });
 
 // C2 — 상세 히어로 CTA가 '신청 취소'라고 적어두고 실제로는 다른 팀으로 **새 신청**을 보내던

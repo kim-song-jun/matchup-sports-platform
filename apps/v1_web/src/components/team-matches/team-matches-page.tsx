@@ -295,7 +295,7 @@ function HeroTeamChevron() {
 }
 
 export function TeamMatchDetailPageView({ model, recordEntry, lifecyclePanel }: { model: TeamMatchDetailViewModel; recordEntry?: React.ReactNode; lifecyclePanel?: React.ReactNode }) {
-  const { confirm, ConfirmModal } = useConfirm();
+  const { confirm, confirmWithReason, ConfirmModal } = useConfirm();
   const { match, mode } = model;
   const detailImage = teamMatchImage(match, 'detail');
   const hasAssignedHostTeam = Boolean(match.hostTeamId);
@@ -387,12 +387,20 @@ export function TeamMatchDetailPageView({ model, recordEntry, lifecyclePanel }: 
 
   // ⋯ 메뉴 항목 — 확인 창은 시트 위에 겹쳐 뜨고, 확정했을 때만 시트를 닫고 실행한다.
   const runHostAction = async (action: NonNullable<TeamMatchDetailViewModel['hostActions']>[number]) => {
+    let reason: string | undefined;
     if (action.confirm) {
-      const accepted = await confirm({ ...action.confirm, tone: action.confirm.tone ?? 'danger' });
-      if (!accepted) return;
+      const { reason: reasonField, ...options } = action.confirm;
+      const confirmOptions = { ...options, tone: options.tone ?? 'danger' };
+      if (reasonField) {
+        const answer = await confirmWithReason({ ...confirmOptions, reason: reasonField });
+        if (answer === null) return;
+        reason = answer;
+      } else if (!(await confirm(confirmOptions))) {
+        return;
+      }
     }
     setMenuOpen(false);
-    runHeroAction(action.onClick, `${action.label} 처리를 완료했어요.`);
+    runHeroAction(() => action.onClick(reason), `${action.label} 처리를 완료했어요.`);
   };
 
   type ApplicantTeam = TeamMatchDetailViewModel['match']['applicantTeams'][number];

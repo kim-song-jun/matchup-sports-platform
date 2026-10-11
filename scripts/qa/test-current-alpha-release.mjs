@@ -68,7 +68,25 @@ try {
   assert.ok(workflow.indexOf(second) > workflow.indexOf(named('Sync Kakao OAuth runtime env')));
   assert.ok(workflow.indexOf(second) < workflow.indexOf(named('Deploy through AWS Systems Manager')));
   const ci = readFileSync(join(root, '.github/workflows/deploy.yml'), 'utf8');
-  assert.match(ci, /cancel-in-progress: \$\{\{ github\.event_name == 'pull_request' \|\| github\.ref == 'refs\/heads\/dev' \}\}/);
+  const concurrency = ci.match(/\nconcurrency:\n  group: ci-\$\{\{ (.+) \}\}\n  cancel-in-progress: \$\{\{ (.+) \}\}/);
+  assert.ok(concurrency, 'top-level CI concurrency contract');
+  // These workflow expressions use only comparison/boolean operators and format;
+  // evaluate the actual expressions against event contexts, including stale reruns.
+  const format = (template, value) => template.replace('{0}', String(value));
+  const group = new Function('github', 'format', `return (${concurrency[1]});`);
+  const cancels = new Function('github', `return (${concurrency[2]});`);
+  function checkConcurrency(event, ref, attempt, id, expectedGroup, expectedCancel) {
+    const github = { event_name: event, ref, run_attempt: attempt, run_id: id,
+      event: { pull_request: { number: 15 } } };
+    assert.equal(group(github, format), expectedGroup);
+    assert.equal(cancels(github), expectedCancel);
+  }
+  checkConcurrency('push', 'refs/heads/dev', 1, 10, 'refs/heads/dev', true);
+  checkConcurrency('push', 'refs/heads/dev', 2, 9, 'dev-isolated-9', false);
+  checkConcurrency('workflow_dispatch', 'refs/heads/dev', 1, 11, 'dev-isolated-11', false);
+  checkConcurrency('push', 'refs/heads/main', 1, 12, 'refs/heads/main', false);
+  checkConcurrency('workflow_dispatch', 'refs/heads/main', 2, 13, 'refs/heads/main', false);
+  checkConcurrency('pull_request', 'refs/pull/15/merge', 1, 14, 'pr-15', true);
   assert.match(ci, /run: node scripts\/qa\/test-current-alpha-release\.mjs/);
   console.log('PASS protected workflow activation and latest-dev CI wiring');
 } finally {

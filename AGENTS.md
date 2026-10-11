@@ -317,7 +317,8 @@ Global rules inherited from `~/.codex/AGENTS.md`:
 - **머지·push 전에 항상 `baseRefName`을 확인한다**(2026-08-09 base=main 오머지 사고). 직전에
   `gh pr view <N> --json baseRefName`으로 `dev`임을 확인하고 아니면 `gh pr edit <N> --base dev`로 재타깃한다.
 - **dev push = alpha 자동 실배포** → dev 머지 전 검증(테스트·tsc·lint)을 실배포 게이트로 취급한다.
-- **dev CI는 최신 실행 우선, 서버 배포는 중간 취소 금지.** 같은 dev ref의 오래된 CI는 취소한다.
+- **dev CI는 최신 push 우선, 서버 배포는 중간 취소 금지.** 새 dev push가 이전 push CI를 취소한다.
+  dev 재실행·수동 dispatch는 run별로 격리해 과거 SHA가 최신 CI를 취소하지 못하게 한다.
   Alpha는 런타임 설정 변경 전과 SSM 시작 직전에 현재 dev SHA를 확인해 오래된 일반 배포를 건너뛴다.
   이미 시작한 SSM, 운영 배포, 명시적으로 고정한 Task168 Stage B 전환은 취소하지 않는다.
 - **worktree는 항상 `git fetch origin dev` 직후 `origin/dev`에서 만든다.** 로컬 `dev` 브랜치를 체크아웃해

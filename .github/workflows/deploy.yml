@@ -33,12 +33,13 @@ permissions:
 
 # PR 간 상호 취소 방지: 그룹을 PR/ref 단위로 분리
 # - pull_request: 같은 PR의 이전 attempt만 취소 (ci-pr-N)
-# - dev: 최신 커밋의 CI를 우선하고 이전 실행 취소 (서버 배포 job은 main 전용)
+# - dev push: 새 push가 이전 push CI를 취소 (서버 배포 job은 main 전용)
+# - dev 재실행/dispatch: 과거 SHA가 최신 CI를 취소하지 않도록 run별 격리
 # - main ref (push · workflow_dispatch): 취소 없이 직렬 큐
 # 프로덕션 배포 직렬화는 build-images/deploy job의 job-level concurrency가 담당
 concurrency:
-  group: ci-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' || github.ref == 'refs/heads/dev' }}
+  group: ci-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || (github.ref == 'refs/heads/dev' && (github.run_attempt > 1 || github.event_name == 'workflow_dispatch')) && format('dev-isolated-{0}', github.run_id) || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' || (github.ref == 'refs/heads/dev' && github.event_name == 'push' && github.run_attempt == 1) }}
 
 jobs:
   # ── Gates: 릴리스 계약 검사 ─────────────────────────────────────────────────

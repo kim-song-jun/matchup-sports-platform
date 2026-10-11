@@ -3,5 +3,14 @@
 # 프로덕션(teameet.co.kr)의 robots.txt 는 앱이 생성하며(apps/v1_web/src/app/robots.ts)
 # 공개 경로를 허용합니다. 이 파일은 alpha 에서만 nginx 가 그 응답을 대신합니다 —
 # deploy/nginx.alpha.conf 의 `location = /robots.txt` 참고.
+# 검색 봇은 HTTP noindex를 읽어 기존 URL을 색인에서 제거해야 한다.
+# Disallow만으로는 외부 링크에서 발견한 URL의 검색 노출을 막지 못한다.
+User-agent: Googlebot
+User-agent: Yeti
+User-agent: Bingbot
+User-agent: Daum
+Disallow:
+
+# 검색 이외 크롤러(AI 학습/답변 포함)는 계속 수집을 차단한다.
 User-agent: *
 Disallow: /

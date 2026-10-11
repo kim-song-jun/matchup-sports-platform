@@ -16,6 +16,17 @@ const rules = () => {
 const PRIVATE_PATHS = ['/admin/', '/my/', '/chat/', '/api/', '/auth/', '/users/'];
 
 describe('robots', () => {
+  it('앱 홈의 noindex를 읽도록 수집은 허용하고 검색 제외 헤더는 유지한다', async () => {
+    for (const rule of rules()) {
+      expect(rule.allow).toContain('/home');
+      expect(rule.disallow).not.toContain('/home');
+    }
+    const headers = await nextConfig.headers!();
+    expect(headers.find((entry) => entry.source === '/home')?.headers).toContainEqual({
+      key: 'X-Robots-Tag', value: 'noindex, nofollow, noarchive',
+    });
+  });
+
   it('AI 크롤러와 네이버 Yeti 를 명시적으로 다룬다', () => {
     const agents = rules().map((rule) => rule.userAgent);
 

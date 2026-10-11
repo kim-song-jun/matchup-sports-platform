@@ -155,12 +155,24 @@ describe('V1 social profile deferral integration', () => {
   });
 
   it('keeps the profile form endpoints reachable while deferred', async () => {
-    const response = await request(app.getHttpServer())
-      .post('/api/v1/auth/check-nickname')
-      .set('x-v1-user-id', deferringUserId)
-      .send({ nickname: '디퍼새닉' });
+    const own = await prisma.v1UserProfile.findUniqueOrThrow({
+      where: { userId: deferringUserId },
+      select: { nickname: true },
+    });
 
-    expect(response.status).not.toBe(403);
+    const ownName = await request(app.getHttpServer())
+      .get('/api/v1/auth/check-nickname')
+      .query({ nickname: own.nickname })
+      .set('x-v1-user-id', deferringUserId)
+      .expect(200);
+    expect(ownName.body.data.available).toBe(true);
+
+    const takenName = await request(app.getHttpServer())
+      .get('/api/v1/auth/check-nickname')
+      .query({ nickname: '디퍼완료' })
+      .set('x-v1-user-id', deferringUserId)
+      .expect(200);
+    expect(takenName.body.data.available).toBe(false);
   });
 
   it('does not open the gate through the preference onboarding endpoints', async () => {

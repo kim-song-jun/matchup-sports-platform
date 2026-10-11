@@ -119,9 +119,17 @@ describe('RealtimeGateway', () => {
     v1User: { findFirst: jest.fn() },
     v1Game: { findUnique: jest.fn(), findMany: jest.fn().mockResolvedValue([]) },
   };
-  const gamesService = { assertReadAccess: jest.fn(), listEvents: jest.fn() };
+  const gamesService = {
+    assertReadAccess: jest.fn(),
+    listEvents: jest.fn(),
+    appendEvent: jest.fn(),
+    requestTakeover: jest.fn(),
+    retryEvent: jest.fn(),
+    renewTakeover: jest.fn(),
+  };
   const server = {
     to: jest.fn().mockReturnThis(),
+    except: jest.fn().mockReturnThis(),
     emit: jest.fn(),
     in: jest.fn().mockReturnThis(),
     socketsLeave: jest.fn(),
@@ -281,6 +289,128 @@ describe('RealtimeGateway', () => {
 
     expect(socket.join).not.toHaveBeenCalled();
     expect(socket.disconnect).toHaveBeenCalledWith(true);
+  });
+
+  describe('social_profile_deferred write gate', () => {
+    const base = { id: 'user-1', email: 'user-1@example.test', accountStatus: 'active' };
+    const appendPayload = {
+      gameId: 'game-1',
+      expectedVersion: 1,
+      clientEventId: 'evt-1',
+      takeoverToken: 'token-1',
+      payloadHash: 'hash-1',
+      event: { type: 'goal', period: 1, clockMs: 0, occurredAt: '2026-10-11T00:00:00.000Z', payload: {} },
+    };
+    const takeoverPayload = {
+      gameId: 'game-1',
+      authorizationSubjectVersion: 0,
+      clientInstanceId: 'gateway-spec-client',
+      lastSequence: 0,
+    };
+
+    function stubUser(onboardingStatus: string, adminUser: { status: string } | null = null) {
+      prisma.v1User.findFirst.mockResolvedValue({ ...base, onboardingStatus, adminUser });
+    }
+
+    async function connect() {
+      const socket = buildSocket({}, { 'x-v1-user-id': 'user-1' });
+      await handleConnection(gateway, socket);
+      return socket;
+    }
+
+    function append(socket: ReturnType<typeof buildSocket>) {
+      return Reflect.apply(gateway.appendGameEvent, gateway, [socket, appendPayload]);
+    }
+
+    function requestTakeover(socket: ReturnType<typeof buildSocket>) {
+      return Reflect.apply(gateway.requestGameTakeover, gateway, [socket, takeoverPayload]);
+    }
+
+    const retryPayload = {
+      gameId: 'game-1',
+      rebasedExpectedVersion: 2,
+      clientEventId: 'evt-1',
+      takeoverToken: 'token-1',
+      payloadHash: 'hash-1',
+      event: appendPayload.event,
+    };
+    const renewPayload = { gameId: 'game-1', takeoverToken: 'token-1', clientInstanceId: 'gateway-spec-client' };
+
+    beforeEach(() => {
+      gamesService.appendEvent.mockReset().mockResolvedValue({ clientEventId: 'evt-1', sequence: 1, version: 2, event: {} });
+      gamesService.requestTakeover.mockReset().mockResolvedValue({ takeoverToken: 't' });
+    });
+
+    it('keeps a deferred non-admin connected but refuses its write commands', async () => {
+      stubUser('social_profile_deferred');
+      const socket = await connect();
+
+      expect(socket.join).toHaveBeenCalledWith('user:user-1');
+      expect(socket.disconnect).not.toHaveBeenCalled();
+      await expect(append(socket)).resolves.toMatchObject({
+        status: 'error',
+        code: 'ACTIVITY_PROFILE_REQUIRED',
+        clientEventId: 'evt-1',
+      });
+      await expect(requestTakeover(socket)).resolves.toEqual({
+        status: 'denied',
+        code: 'ACTIVITY_PROFILE_REQUIRED',
+      });
+      expect(gamesService.appendEvent).not.toHaveBeenCalled();
+      expect(gamesService.requestTakeover).not.toHaveBeenCalled();
+    });
+
+    it('refuses game.event.retry and game.takeover.renew for a deferred non-admin', async () => {
+      stubUser('social_profile_deferred');
+      const socket = await connect();
+
+      await expect(Reflect.apply(gateway.retryGameEvent, gateway, [socket, retryPayload])).resolves.toEqual({
+        status: 'error',
+        code: 'ACTIVITY_PROFILE_REQUIRED',
+        clientEventId: 'evt-1',
+        expectedVersion: 2,
+      });
+      await expect(Reflect.apply(gateway.renewGameTakeover, gateway, [socket, renewPayload])).resolves.toEqual({
+        status: 'denied',
+        code: 'ACTIVITY_PROFILE_REQUIRED',
+      });
+      expect(gamesService.retryEvent).not.toHaveBeenCalled();
+      expect(gamesService.renewTakeover).not.toHaveBeenCalled();
+    });
+
+    it('answers a failed profile lookup with the append INTERNAL_ERROR ack instead of rejecting', async () => {
+      stubUser('completed');
+      const socket = await connect();
+      prisma.v1User.findFirst.mockRejectedValue(new Error('connection terminated unexpectedly'));
+
+      await expect(append(socket)).resolves.toMatchObject({ status: 'error', code: 'INTERNAL_ERROR', clientEventId: 'evt-1' });
+      expect(gamesService.appendEvent).not.toHaveBeenCalled();
+    });
+
+    it('lets an active admin past the gate but not a revoked one', async () => {
+      stubUser('social_profile_deferred', { status: 'active' });
+      const socket = await connect();
+      await expect(append(socket)).resolves.toMatchObject({ status: 'ack' });
+
+      stubUser('social_profile_deferred', { status: 'revoked' });
+      await expect(append(socket)).resolves.toMatchObject({ code: 'ACTIVITY_PROFILE_REQUIRED' });
+    });
+
+    it('does not affect a normal user', async () => {
+      stubUser('completed');
+      const socket = await connect();
+      await expect(append(socket)).resolves.toMatchObject({ status: 'ack' });
+      await expect(requestTakeover(socket)).resolves.toMatchObject({ status: 'granted' });
+    });
+
+    it('reads the status at command time, so finishing the profile after connect unblocks writes', async () => {
+      stubUser('social_profile_deferred');
+      const socket = await connect();
+      await expect(append(socket)).resolves.toMatchObject({ code: 'ACTIVITY_PROFILE_REQUIRED' });
+
+      stubUser('completed');
+      await expect(append(socket)).resolves.toMatchObject({ status: 'ack' });
+    });
   });
 
   it('disconnects the socket and logs instead of crashing when the DB lookup rejects', async () => {

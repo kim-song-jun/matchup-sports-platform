@@ -235,6 +235,11 @@ describe('summarizeGroupStanding', () => {
       expect(summary?.qualification).toEqual({ advancingRegistrationIds: ['A'], undecided: true });
     });
 
+    it('걸친 동률에서 어드민이 동률 팀 하나를 골라 배치했으면 나머지 자리는 확정 팀이 채워 미정이 아니다', () => {
+      const summary = summarizeGroupStanding(sourceOf(['A', 'B', 'C', 'D'], FOUR_TIE_MIDDLE), 2, new Set(['B']));
+      expect(summary?.qualification).toEqual({ advancingRegistrationIds: ['A', 'B'], undecided: false });
+    });
+
     it('저장 순위와 §5 가 갈린 두 팀이 모두 진출선 안쪽이면(상위 3팀) 둘 다 진출이고 undecided 가 아니다', () => {
       const summary = summarizeGroupStanding(sourceOf(['A', 'B', 'C', 'D'], RULES_DISAGREE), 3, none);
       expect([...(summary?.qualification?.advancingRegistrationIds ?? [])].sort()).toEqual(['A', 'B', 'D']);

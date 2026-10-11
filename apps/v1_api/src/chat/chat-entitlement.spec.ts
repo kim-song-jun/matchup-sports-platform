@@ -230,3 +230,61 @@ describe('개인 매치 채팅 — 읽기 규칙 하나, 쓰기 규칙 따로', 
       .toBeNull();
   });
 });
+
+// 읽기 규칙(목록·열람)과 수신자 규칙(푸시·안 읽음·소켓)은 같은 사람을 가리켜야 한다.
+// 두 where 를 같은 가짜 DB 행에 대해 평가해 결과가 일치하는지 본다.
+describe('개인 매치 채팅 — 읽기 가능 여부와 수신자 자격이 일치한다', () => {
+  type P = { userId: string; role: string; status: string };
+  type M = { id: string; hostUserId: string; status: string; deletedAt: Date | null; participants: P[] };
+  const evalWhere = (where: any, row: any): boolean => {
+    if (where == null) return true;
+    return Object.entries(where).every(([key, cond]: [string, any]) => {
+      if (key === 'OR') return cond.some((c: any) => evalWhere(c, row));
+      const value = row[key];
+      if (cond !== null && typeof cond === 'object' && !(cond instanceof Date)) {
+        if ('some' in cond) return (value ?? []).some((v: any) => evalWhere(cond.some, v));
+        if ('in' in cond) return cond.in.includes(value);
+        if ('is' in cond) return value != null && evalWhere(cond.is, value);
+        return value != null && evalWhere(cond, value);
+      }
+      return value === cond;
+    });
+  };
+  // 사용자 쪽 행: 그 사용자의 참가 행(match 포함)과 주최 매치.
+  const userRow = (m: M, userId: string) => ({
+    matchParticipants: m.participants.filter((p) => p.userId === userId).map((p) => ({ ...p, matchId: m.id, match: m })),
+    hostedMatches: m.hostUserId === userId ? [m] : [],
+  });
+
+  const hostRow: P = { userId: 'host', role: 'host', status: 'active' };
+  const guest = (status: string): P => ({ userId: 'guest', role: 'participant', status });
+  const match = (over: Partial<M>): M => ({
+    id: 'm1', hostUserId: 'host', status: 'recruiting', deletedAt: null, participants: [hostRow], ...over,
+  });
+
+  const cases: { name: string; m: M; user: string; readable: boolean }[] = [
+    { name: '확정 참가자 없는 방의 주최자', m: match({}), user: 'host', readable: true },
+    { name: '확정 참가자가 있는 방의 주최자', m: match({ participants: [hostRow, guest('active')] }), user: 'host', readable: true },
+    { name: '확정 참가자', m: match({ participants: [hostRow, guest('active')] }), user: 'guest', readable: true },
+    { name: '취소된 매치의 주최자', m: match({ status: 'cancelled', participants: [hostRow, guest('active')] }), user: 'host', readable: true },
+    { name: '취소된 매치의 기존 확정 참가자', m: match({ status: 'cancelled', participants: [hostRow, guest('active')] }), user: 'guest', readable: true },
+    { name: '종료된 매치의 참가자', m: match({ status: 'completed', participants: [hostRow, guest('completed')] }), user: 'guest', readable: true },
+    { name: '내보내진 참가자', m: match({ participants: [hostRow, guest('removed')] }), user: 'guest', readable: false },
+    { name: '철회한 참가자', m: match({ participants: [hostRow, guest('cancelled')] }), user: 'guest', readable: false },
+    { name: '무관한 사용자', m: match({ participants: [hostRow, guest('active')] }), user: 'stranger', readable: false },
+    { name: '삭제된 매치의 주최자', m: match({ deletedAt: new Date() }), user: 'host', readable: false },
+    { name: '삭제된 매치의 확정 참가자', m: match({ deletedAt: new Date(), participants: [hostRow, guest('active')] }), user: 'guest', readable: false },
+  ];
+
+  it.each(cases)('$name: 열람 가능 $readable, 수신자 자격도 같다', ({ m, user, readable }) => {
+    const canRead = evalWhere(matchChatReadableWhere(user), m);
+    const isRecipient = evalWhere(
+      (currentChatRecipientEntitlementWhere({
+        matchId: m.id, teamId: null, teamMatchId: null, teamMatch: null, teamContactId: null, teamContact: null,
+      }) as any).user,
+      userRow(m, user),
+    );
+    expect(canRead).toBe(readable);
+    expect(isRecipient).toBe(canRead);
+  });
+});

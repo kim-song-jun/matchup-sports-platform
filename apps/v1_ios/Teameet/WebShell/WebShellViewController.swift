@@ -291,7 +291,8 @@ final class WebShellViewController: UIViewController {
         guard force || inset != publishedBottomInset else { return }
         publishedBottomInset = inset
         webView.evaluateJavaScript(
-            SafeAreaBridge.script(bottomInsetPoints: Double(inset)), completionHandler: nil)
+            SafeAreaBridge.script(bottomInsetPoints: Double(inset), keyboardOpen: keyboardOverlap > 0),
+            completionHandler: nil)
     }
 
     // MARK: - Loading

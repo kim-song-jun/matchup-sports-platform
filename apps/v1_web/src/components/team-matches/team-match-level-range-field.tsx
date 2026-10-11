@@ -15,15 +15,15 @@ export function TeamMatchLevelRangeField({ value, onChange, error }: {
   const min = range?.minLevelCode ?? '';
   const max = range?.maxLevelCode ?? '';
   const invalid = range === null;
+  const levelIndex = (code: string) => V1_LEVELS.findIndex((level) => level.code === code);
+  const minIndex = min ? levelIndex(min) : 0;
+  const maxIndex = max ? levelIndex(max) : V1_LEVELS.length - 1;
+  // 선택지를 상대 끝점으로 제한해 입력한 등급이 조용히 바뀌는 일 없이 최소 <= 최대를 지킨다.
+  const optionsFor = (endpoint: 'min' | 'max') => V1_LEVELS.filter((_, index) => (endpoint === 'min' ? index <= maxIndex : index >= minIndex));
   const change = (endpoint: 'min' | 'max', code: string) => {
     if (!code) { onChange?.(''); return; }
-    let nextMin = endpoint === 'min' ? code : min || code;
-    let nextMax = endpoint === 'max' ? code : max || code;
-    if (V1_LEVELS.findIndex((level) => level.code === nextMin) > V1_LEVELS.findIndex((level) => level.code === nextMax)) {
-      if (endpoint === 'min') nextMax = nextMin; else nextMin = nextMax;
-    }
     // 한 번의 갱신으로 두 끝점을 기록해 즉시 다음 단계로 가거나 연속 입력해도 값이 갈리지 않는다.
-    onChange?.(formatTeamMatchLevelRange(nextMin, nextMax));
+    onChange?.(formatTeamMatchLevelRange(endpoint === 'min' ? code : min || code, endpoint === 'max' ? code : max || code));
   };
   return (
     <div className="tm-create-field">
@@ -37,7 +37,7 @@ export function TeamMatchLevelRangeField({ value, onChange, error }: {
               aria-describedby={error || invalid ? errorId : undefined} onChange={(event) => change(endpoint, event.target.value)}>
               {invalid ? <option value="invalid" disabled>등급을 다시 선택해 주세요</option> : null}
               <option value="">미설정</option>
-              {V1_LEVELS.map((level) => <option key={level.code} value={level.code}>{level.label}</option>)}
+              {optionsFor(endpoint).map((level) => <option key={level.code} value={level.code}>{level.label}</option>)}
             </select>
           </label>
         ))}

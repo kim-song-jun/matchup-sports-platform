@@ -1195,14 +1195,15 @@ describe('상세 CTA 상태줄 — 신청한 적 없는 뷰어의 닫힌 매치�
  * ③ 승인된 뷰어의 히어로 상대팀 자리에 팀 이름 대신 신청 상태("승인 완료")가 떴다.
  */
 describe('상세 홈팀 카드·히어로 — 표기 결함 회귀(2026-08-25)', () => {
-  it('trustState=estimated 는 영문 원문이 아니라 "누적 중"으로 표기한다', () => {
+  it('trustState=estimated 는 영문 원문이 아니라 무엇이 쌓이는 중인지 밝힌 "신뢰 점수 누적 중"으로 표기한다', () => {
     const model = getTeamMatchDetailViewModel('default');
     model.match.hostTeamTrustState = 'estimated';
 
     renderPage(<TeamMatchDetailPageView model={model} />);
 
     // hostTeamCard 는 모바일용·데스크톱용 두 위치에 렌더된다 — 개수는 세지 않는다.
-    expect(screen.getAllByText('누적 중').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('신뢰 점수 누적 중').length).toBeGreaterThan(0);
+    expect(screen.queryByText('누적 중')).not.toBeInTheDocument();
     expect(screen.queryByText('estimated')).not.toBeInTheDocument();
   });
 
@@ -1360,7 +1361,8 @@ describe('TeamMatchDetailPageView — 히어로가 두 팀을 요약한다 (#142
     expect(hero.getByText('팀 평점 4.0 · 9승 · 상급')).toBeInTheDocument();
     expect(hero.getByText('중급')).toBeInTheDocument();
     expect(hero.getByText('인증팀')).toBeInTheDocument();
-    expect(hero.getByText('누적 중')).toBeInTheDocument();
+    expect(hero.getByText('신뢰 점수 누적 중')).toBeInTheDocument();
+    expect(hero.queryByText('누적 중')).not.toBeInTheDocument();
   });
 
   it('대조군 — 표시하지 않는 신뢰 상태(sample)는 배지가 없다', () => {

@@ -37,7 +37,7 @@ import { HidePostEventReviewDto } from './dto/moderate-review.dto';
 import { recalculateTournamentUserReputation } from './tournament-fixture-review-reputation';
 import { recalculateTournamentFixtureTeamTrust } from './tournament-fixture-review-trust';
 import { platformMatchOperator } from '../team-matches/platform-match-operator';
-import { resolveIsForfeit } from '../league-matches/league-forfeit-result';
+import { isForfeitedGame, NOT_FORFEITED_GAME_WHERE } from '../league-matches/league-forfeit-result';
 
 const REVIEW_TAGS = {
   punctual: '시간 약속을 잘 지켜요',
@@ -606,6 +606,8 @@ export class ReviewsService {
           // Tournament-owned canonical matches are served by the dedicated
           // tournament review service. Equal-owner league rows remain here.
           { OR: [{ tournamentId: null }, { leagueId: { not: null } }] },
+          // 몰수 경기는 불참한 쪽이 뛰지 않았으므로 평가할 상대가 없다. take 전에 걸러야 최신 몰수가 limit 을 채우지 않는다.
+          { game: NOT_FORFEITED_GAME_WHERE },
         ],
       },
       orderBy: [{ completedAt: 'desc' }, { startAt: 'desc' }],
@@ -618,7 +620,6 @@ export class ReviewsService {
         completedAt: true,
         startAt: true,
         leagueId: true,
-        game: { select: { currentOfficialRevision: { select: { state: true, reason: true, outcomeReason: true } } } },
         hostTeam: { select: { id: true, name: true } },
         approvedApplicantTeam: { select: { id: true, name: true } },
       },
@@ -633,8 +634,6 @@ export class ReviewsService {
     return teamMatches
       .flatMap((match) => {
         if (!match.approvedApplicantTeamId) return [];
-        // 몰수 경기는 불참한 쪽이 뛰지 않았으므로 평가할 상대가 없다.
-        if (isForfeitedResult(match.game)) return [];
         assertTeamReviewTeams(match);
         const completedAt = match.completedAt ?? match.startAt;
         if (completedAt === null) throw conflict('TEAM_MATCH_NOT_READY', 'Completed team match has no review date');
@@ -796,6 +795,9 @@ export class ReviewsService {
     if (isResultVoided(teamMatch.game)) {
       throw conflict('SOURCE_RESULT_VOIDED', '결과가 무효 처리된 경기예요. 평가를 남길 수 없어요.');
     }
+    if (isForfeitedGame(teamMatch.game)) {
+      throw conflict('SOURCE_FORFEITED', '몰수로 끝난 경기예요. 평가를 남길 수 없어요.');
+    }
     // team_match 앵커는 completedAt(games.service.ts 결과 확정 시 채워짐, 스펙 §6.1) — 정정 승인 시
     // 앵커가 갱신되면 이 판정도 매 요청마다 다시 계산되므로 마감이 함께 연장된다(D-6, 저장 안 함).
     const reviewAt = teamMatch.completedAt ?? teamMatch.startAt;
@@ -846,8 +848,6 @@ export class ReviewsService {
       existingReviews.filter((review) => review.targetType === 'user').map((review) => [review.targetUserId, review]),
     );
 
-    // 몰수 경기는 새 후기를 받지 않는다. 이미 쓴 후기는 그대로 보여 준다.
-    const forfeited = isForfeitedResult(teamMatch.game);
     const payload = {
       source: sourceSummary('team_match', teamMatch.id, teamMatch.title, reviewAt, teamMatch.leagueId !== null),
       sportId: teamMatch.sportId,
@@ -890,7 +890,7 @@ export class ReviewsService {
           };
         });
         return [...teamTargets, ...playerTargets];
-      }).filter((target) => !forfeited || target.alreadySubmitted),
+      }),
     };
     // 닫힌 방향의 상대 선수 — 제출 시 "없는 대상"이 아니라 "명단 밖 작성자"로 구분해 응답하기 위한 것이다.
     const benchedTargetUserIds = new Set(
@@ -1577,11 +1577,6 @@ function sourceSummary(sourceType: SourceType, sourceId: string, title: string, 
     sourceType, sourceId, title, completedAt: completedAt ? toIso(completedAt) : null,
     ...(isLeague === undefined ? {} : { isLeague }),
   };
-}
-
-function isForfeitedResult(game: { currentOfficialRevision: { reason: string | null; outcomeReason: string } | null } | null | undefined) {
-  const revision = game?.currentOfficialRevision;
-  return revision ? resolveIsForfeit(revision) : false;
 }
 
 /**

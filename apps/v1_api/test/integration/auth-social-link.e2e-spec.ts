@@ -83,7 +83,7 @@ describe('V1 social link to phone owner integration', () => {
     await prisma.v1AuthIdentity.create({
       data: { id: `${id}-identity`, userId: id, provider, providerUserKey: `${KEY_PREFIX}-${provider}-${pendingSeq}`, status: 'active' },
     });
-    if (onboardingStatus === 'completed') return id;
+    // Completed callers need the consents too, or V1AuthGuard stops them (reconsent 403) before the service check.
     const termsService = app.get(ManagedTermsRuntimeService);
     const required = (await termsService.currentSignupTerms()).items
       .filter((item) => item.requirement === 'required')

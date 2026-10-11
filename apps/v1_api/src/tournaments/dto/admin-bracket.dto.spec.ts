@@ -1,7 +1,7 @@
 import 'reflect-metadata';
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
-import { FixtureGoalDto, CreateGroupDto, CreateGroupTeamDto, UpdateFixtureDto, TOURNAMENT_GROUP_PHASES } from './admin-bracket.dto';
+import { CreateFixtureDto, FixtureGoalDto, CreateGroupDto, CreateGroupTeamDto, UpdateFixtureDto, TOURNAMENT_GROUP_PHASES } from './admin-bracket.dto';
 
 describe('UpdateFixtureDto 번호 계약', () => {
   it('실제 whitelist 설정에서 새 번호를 받는다', async () => {
@@ -13,6 +13,19 @@ describe('UpdateFixtureDto 번호 계약', () => {
   });
   it('생략은 허용한다', async () => {
     expect(await validate(plainToInstance(UpdateFixtureDto, {}))).toHaveLength(0);
+  });
+});
+
+describe('CreateFixtureDto 요청 고유 키', () => {
+  const options = { whitelist: true, forbidNonWhitelisted: true };
+  it('UUID 키는 받고, 생략도 허용한다', async () => {
+    const withKey = { round: 'group_a', clientCommandId: '0b0c6d0e-1111-4a11-8a11-111111111111' };
+    expect(await validate(plainToInstance(CreateFixtureDto, withKey), options)).toHaveLength(0);
+    expect(await validate(plainToInstance(CreateFixtureDto, { round: 'group_a' }), options)).toHaveLength(0);
+  });
+  it.each(['not-a-uuid', '', 123])('UUID 가 아닌 키 %s 는 거절한다', async (clientCommandId) => {
+    const errors = await validate(plainToInstance(CreateFixtureDto, { round: 'group_a', clientCommandId }), options);
+    expect(errors.some((error) => error.property === 'clientCommandId')).toBe(true);
   });
 });
 

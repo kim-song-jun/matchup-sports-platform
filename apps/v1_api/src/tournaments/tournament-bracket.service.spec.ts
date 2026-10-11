@@ -303,7 +303,7 @@ describe('TournamentBracketService', () => {
     v1TeamSchedule: { findMany: jest.Mock; findUnique: jest.Mock; update: jest.Mock; create: jest.Mock; updateMany: jest.Mock };
     v1TournamentRegistration: { findFirst: jest.Mock; findMany: jest.Mock; findUnique: jest.Mock };
     v1GameResultRevision: { findUnique: jest.Mock; findFirst: jest.Mock };
-    v1IdempotencyRecord: { findFirst: jest.Mock; findMany: jest.Mock };
+    v1IdempotencyRecord: { findFirst: jest.Mock; findMany: jest.Mock; create: jest.Mock };
     v1Game: { update: jest.Mock; findMany: jest.Mock };
     v1GameVisibilityPolicy: { update: jest.Mock };
     v1GameLineup: { findFirst: jest.Mock; updateMany: jest.Mock; create: jest.Mock };
@@ -365,7 +365,7 @@ describe('TournamentBracketService', () => {
         findUnique: jest.fn(),
       },
       v1GameResultRevision: { findUnique: jest.fn().mockResolvedValue({ state: 'VOID' }), findFirst: jest.fn().mockResolvedValue(null) },
-      v1IdempotencyRecord: { findFirst: jest.fn().mockResolvedValue(null), findMany: jest.fn().mockResolvedValue([]) },
+      v1IdempotencyRecord: { findFirst: jest.fn().mockResolvedValue(null), findMany: jest.fn().mockResolvedValue([]), create: jest.fn().mockResolvedValue({}) },
       v1GameVisibilityPolicy: { update: jest.fn().mockResolvedValue({}) },
       v1Game: { update: jest.fn().mockResolvedValue({}), findMany: jest.fn().mockResolvedValue([]) },
       v1GameLineup: {
@@ -1052,6 +1052,135 @@ describe('TournamentBracketService', () => {
       const result = await service.createFixture(ownerUser, 'tournament-1', unpinned);
       expect(result).toMatchObject({ id: 'fixture-1' });
       expect(prisma.v1TeamMatch.create).not.toHaveBeenCalled();
+    });
+  });
+
+  // 요청 고유 키: 번호를 서버가 정하는 요청이 응답 유실로 재전송돼도 같은 경기를 돌려준다.
+  describe('createFixture: 요청 고유 키(clientCommandId)', () => {
+    const KEY_A = '0b0c6d0e-1111-4a11-8a11-111111111111';
+    const KEY_B = '0b0c6d0e-2222-4a22-8a22-222222222222';
+    type IdempotencyWhere = { actorUserId: string; action: string; idempotencyKey: string };
+    type IdempotencyRow = { actorUserId: string; action: string; resourceType: string; resourceId: string; idempotencyKey: string; payloadHash: string };
+
+    /** 기록 테이블을 흉내 낸다 — create 로 쌓인 행을 findFirst 가 where 로 찾는다(좌표 멱등의 revision 조회는 못 찾는다). */
+    function arrange() {
+      const rows: IdempotencyRow[] = [];
+      prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdmin);
+      prisma.v1Tournament.findFirst.mockResolvedValue(tournamentRow());
+      prisma.v1TournamentGroup.findFirst.mockResolvedValue(groupRow());
+      prisma.v1TeamMatch.create.mockResolvedValue({ id: 'fixture-1' });
+      prisma.v1TeamMatch.findUniqueOrThrow.mockResolvedValue({ ...canonicalDetailsRow().teamMatch, hostTeamId: null, approvedApplicantTeamId: null });
+      prisma.v1IdempotencyRecord.create.mockImplementation(async ({ data }: { data: IdempotencyRow }) => { rows.push(data); return data; });
+      prisma.v1IdempotencyRecord.findFirst.mockImplementation(async ({ where }: { where: IdempotencyWhere }) =>
+        rows.find((row) => row.actorUserId === where.actorUserId && row.action === where.action && row.idempotencyKey === where.idempotencyKey) ?? null);
+      return rows;
+    }
+    const clientRecords = () => prisma.v1IdempotencyRecord.create.mock.calls.map((call: [{ data: IdempotencyRow }]) => call[0].data);
+    const request = { groupId: 'group-1', round: 'group_a' } as const;
+    // 처음 만든 경기가 번호 1 로 저장된 상태에서, 재전송 때 서버가 그 경기를 상세에서 다시 읽는다.
+    const storedFixture = () => ({ ...canonicalDetailsRow(), teamMatch: { ...canonicalDetailsRow().teamMatch, hostTeamId: null, approvedApplicantTeamId: null,
+      game: { ...canonicalDetailsRow().teamMatch.game, sides: [{ sideKey: 'HOME', teamId: null }, { sideKey: 'AWAY', teamId: null }], competitionConfigVersionId: null }, competitionConfigVersionId: null } });
+
+    it('번호를 생략한 요청을 같은 키로 다시 보내면 첫 경기를 돌려주고 새 경기·새 번호를 만들지 않는다', async () => {
+      const rows = arrange();
+      prisma.v1TournamentMatchDetails.aggregate.mockResolvedValue({ _max: { fixtureNumber: 4 } });
+      const first = await service.createFixture(ownerUser, 'tournament-1', { ...request, clientCommandId: KEY_A });
+      expect(prisma.v1TeamMatch.create).toHaveBeenCalledTimes(1);
+      expect(rows).toHaveLength(1);
+      expect(rows[0]).toMatchObject({ actorUserId: 'owner-user-id', action: 'tournament_fixture_client_create', resourceType: 'TEAM_MATCH', resourceId: 'fixture-1', idempotencyKey: `tournament-fixture-client:tournament-1:${KEY_A}` });
+
+      // 응답이 끊겨 다시 누르면 그 사이 다른 경기가 생겨 최대 번호가 6 이 된 상태 — 키 없이 보냈다면 7번 빈 경기가 또 생겼을 것이다.
+      prisma.v1TournamentMatchDetails.aggregate.mockResolvedValue({ _max: { fixtureNumber: 6 } });
+      prisma.v1TournamentMatchDetails.findFirst.mockResolvedValueOnce(storedFixture());
+      const second = await service.createFixture(ownerUser, 'tournament-1', { ...request, clientCommandId: KEY_A });
+
+      expect(prisma.v1TeamMatch.create).toHaveBeenCalledTimes(1);
+      expect(rows).toHaveLength(1);
+      expect(prisma.v1TournamentMatchDetails.aggregate).toHaveBeenCalledTimes(1);
+      expect(prisma.v1TournamentMatchDetails.findFirst).toHaveBeenLastCalledWith(expect.objectContaining({
+        where: { teamMatchId: 'fixture-1', tournamentId: 'tournament-1', teamMatch: { deletedAt: null } },
+      }));
+      expect(second).toMatchObject({ id: first.id, fixtureNumber: 1 });
+      expect(prisma.v1AdminActionLog.create).toHaveBeenCalledTimes(1);
+    });
+
+    // 해시 입력에서 필드 하나만 빠져도 그 필드를 바꾼 재전송이 첫 경기로 조용히 재생된다 — 필드마다 한 케이스씩 걸어 빠진 필드 이름이 실패에 드러나게 한다.
+    const pinned = { venue: '망원 구장', venueAddress: '서울 마포구', venueLatitude: 37.55, venueLongitude: 126.9, venueProvider: 'kakao', venueProviderId: '555' };
+    it.each<[string, Record<string, unknown>, Record<string, unknown>]>([
+      ['groupId', {}, { groupId: 'group-2' }],
+      ['round', {}, { round: 'group_b' }],
+      ['fixtureNumber', {}, { fixtureNumber: 3 }],
+      ['legNumber', {}, { legNumber: 2 }],
+      ['parentFixtureId', {}, { parentFixtureId: '0b0c6d0e-3333-4a33-8a33-333333333333' }],
+      ['homeRegistrationId', {}, { homeRegistrationId: 'reg-1' }],
+      ['awayRegistrationId', {}, { awayRegistrationId: 'reg-2' }],
+      ['scheduledAt', {}, { scheduledAt: '2026-10-20T10:00:00.000Z' }],
+      ['venue', {}, { venue: '망원 구장' }],
+      ['venueProviderId', pinned, { ...pinned, venueProviderId: '999' }],
+      ['venueAddress', pinned, { ...pinned, venueAddress: '서울 강남구' }],
+      ['venueLatitude', pinned, { ...pinned, venueLatitude: 37.56 }],
+      ['venueLongitude', pinned, { ...pinned, venueLongitude: 126.91 }],
+    ])('같은 키에 %s 만 바뀐 내용이면 409 PAYLOAD_REUSE 이고 새로 만들지 않는다', async (_field, first, changed) => {
+      const rows = arrange();
+      prisma.v1TournamentRegistration.findFirst.mockResolvedValue({ id: 'reg-x' });
+      await service.createFixture(ownerUser, 'tournament-1', { ...request, ...first, clientCommandId: KEY_A });
+      await expect(service.createFixture(ownerUser, 'tournament-1', { ...request, ...changed, clientCommandId: KEY_A }))
+        .rejects.toMatchObject({ response: { code: 'COMMAND_IDEMPOTENCY_PAYLOAD_REUSE' } });
+      expect(prisma.v1TeamMatch.create).toHaveBeenCalledTimes(1);
+      expect(rows).toHaveLength(1);
+    });
+
+    it('대조군: 장소 필드를 공백만 다르게 보낸 재전송은 같은 요청이라 첫 경기를 돌려준다', async () => {
+      const rows = arrange();
+      await service.createFixture(ownerUser, 'tournament-1', { ...request, ...pinned, clientCommandId: KEY_A });
+      prisma.v1TournamentMatchDetails.findFirst.mockResolvedValueOnce(storedFixture());
+      const again = await service.createFixture(ownerUser, 'tournament-1', {
+        ...request, ...pinned, venueAddress: ' 서울 마포구 ', venueProvider: ' kakao ', clientCommandId: KEY_A,
+      });
+      expect(again).toMatchObject({ id: 'fixture-1' });
+      expect(prisma.v1TeamMatch.create).toHaveBeenCalledTimes(1);
+      expect(rows).toHaveLength(1);
+    });
+
+    it('같은 키인데 첫 경기가 지워졌으면 409 RESOURCE_GONE 이고 새 경기를 몰래 만들지 않는다', async () => {
+      arrange();
+      await service.createFixture(ownerUser, 'tournament-1', { ...request, clientCommandId: KEY_A });
+      prisma.v1TournamentMatchDetails.findFirst.mockResolvedValueOnce(null);
+      await expect(service.createFixture(ownerUser, 'tournament-1', { ...request, clientCommandId: KEY_A }))
+        .rejects.toMatchObject({ response: { code: 'COMMAND_IDEMPOTENCY_RESOURCE_GONE' } });
+      expect(prisma.v1TeamMatch.create).toHaveBeenCalledTimes(1);
+    });
+
+    it('대조군: 키 없이 두 번 보내면 매번 새 경기를 만들고 기록을 남기지 않는다', async () => {
+      arrange();
+      prisma.v1TournamentMatchDetails.aggregate.mockResolvedValueOnce({ _max: { fixtureNumber: 4 } }).mockResolvedValueOnce({ _max: { fixtureNumber: 5 } });
+      await service.createFixture(ownerUser, 'tournament-1', { ...request });
+      await service.createFixture(ownerUser, 'tournament-1', { ...request });
+      expect(prisma.v1TeamMatch.create).toHaveBeenCalledTimes(2);
+      expect(clientRecords()).toEqual([]);
+    });
+
+    it('대조군: 다른 키는 새 경기를 만들고 각자 자기 키로 기록한다', async () => {
+      arrange();
+      await service.createFixture(ownerUser, 'tournament-1', { ...request, clientCommandId: KEY_A });
+      await service.createFixture(ownerUser, 'tournament-1', { ...request, clientCommandId: KEY_B });
+      expect(prisma.v1TeamMatch.create).toHaveBeenCalledTimes(2);
+      expect(clientRecords().map((row: IdempotencyRow) => row.idempotencyKey)).toEqual([
+        `tournament-fixture-client:tournament-1:${KEY_A}`,
+        `tournament-fixture-client:tournament-1:${KEY_B}`,
+      ]);
+    });
+
+    it('대조군: 다른 대회에서 같은 키를 써도 서로 독립이다', async () => {
+      arrange();
+      prisma.v1Tournament.findFirst.mockImplementation(async ({ where }: { where: { id: string } }) => tournamentRow({ id: where.id }));
+      await service.createFixture(ownerUser, 'tournament-1', { ...request, clientCommandId: KEY_A });
+      await service.createFixture(ownerUser, 'tournament-2', { ...request, clientCommandId: KEY_A });
+      expect(prisma.v1TeamMatch.create).toHaveBeenCalledTimes(2);
+      expect(clientRecords().map((row: IdempotencyRow) => row.idempotencyKey)).toEqual([
+        `tournament-fixture-client:tournament-1:${KEY_A}`,
+        `tournament-fixture-client:tournament-2:${KEY_A}`,
+      ]);
     });
   });
 

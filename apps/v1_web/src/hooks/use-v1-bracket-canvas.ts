@@ -6,6 +6,7 @@ import { v1Get, v1Patch, v1Post, v1Put } from '@/lib/api-client';
 import { leagueViewKeys, v1Keys } from '@/lib/query-keys';
 import { randomUuid } from '@/lib/uuid';
 import type {
+  V1AddBracketFixtureInput,
   V1ApplyBracketTemplatePayload,
   V1ApplyBracketTemplateResult,
   V1AdminBracketFixture,
@@ -108,12 +109,12 @@ export function useV1SetBracketSources(tournamentId: string) {
   });
 }
 
-/** `POST /admin/tournaments/:id/fixtures` — 번호는 서버가 대회 안의 최대 번호 다음으로 정한다. */
+/** `POST /admin/tournaments/:id/fixtures` — 번호는 서버가 대회 안의 최대 번호 다음으로 정한다. `clientCommandId` 는 호출부가 정해 재시도에도 유지한다. */
 export function useV1AddBracketFixture(tournamentId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ groupId, round }: { groupId: string; round: string }) =>
-      v1Post<V1AdminBracketFixture>(`/admin/tournaments/${tournamentId}/fixtures`, { groupId, round }),
+    mutationFn: (input: V1AddBracketFixtureInput) =>
+      v1Post<V1AdminBracketFixture>(`/admin/tournaments/${tournamentId}/fixtures`, input),
     onSuccess: () => invalidateCompetitionViews(queryClient, tournamentId, 'tournament'),
   });
 }

@@ -123,6 +123,14 @@ export class CreateFixtureDto {
   @Min(1)
   fixtureNumber?: number;
 
+  /**
+   * 요청(제출) 한 번에 하나씩 만드는 고유 키. 같은 키로 다시 보내면 처음 만든 경기를 돌려주고 새로 만들지 않는다
+   * (번호를 서버가 정하는 요청이 응답 유실로 재시도돼도 빈 경기가 늘어나지 않게). 같은 키에 다른 내용이면 409.
+   */
+  @IsOptional()
+  @IsUUID()
+  clientCommandId?: string;
+
   @IsOptional()
   @Type(() => Number)
   @IsInt()

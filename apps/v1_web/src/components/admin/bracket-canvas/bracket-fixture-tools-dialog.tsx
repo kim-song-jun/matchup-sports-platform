@@ -1,14 +1,19 @@
 'use client';
 
 import { X } from 'lucide-react';
-import { useId, useMemo, useRef, useState } from 'react';
+import { useId, useMemo, useRef, useState, type RefObject } from 'react';
 import { Button } from '@/components/v1-ui/button';
 import { useModalA11y } from '@/components/v1-ui/use-modal-a11y';
 import { useV1AddBracketFixture, useV1SetBracketSources } from '@/hooks/use-v1-bracket-canvas';
+import { V1ApiError } from '@/lib/api-client';
 import { describeBracketCanvasError } from '@/lib/bracket-canvas-errors';
 import { bracketSourceCandidates, isFixtureLinkable, knockoutRoundLabel } from '@/lib/bracket-fixture-tools';
+import { randomUuid } from '@/lib/uuid';
 import type { V1AdminBracketFixture, V1AdminTournamentBracket, V1TournamentFormat } from '@/types/api';
 import { BracketLeagueAddFixtureForm, type LeagueAddSubmit } from './bracket-league-add-fixture-form';
+
+/** 처리 여부를 모르는 실패 뒤 재시도가 같은 요청으로 읽히게 하는 키. 같은 내용(content)일 때만 재사용한다. */
+export type FixtureRequestKey = { content: string; clientCommandId: string };
 
 export type BracketFixtureToolsDialogProps = {
   open: boolean;
@@ -16,13 +21,15 @@ export type BracketFixtureToolsDialogProps = {
   format: V1TournamentFormat;
   tournamentId: string;
   bracket: V1AdminTournamentBracket;
+  /** 대화상자는 열 때마다 새로 마운트되므로 키는 부모가 들고 있어야 닫았다 다시 연 재시도에도 살아남는다. */
+  requestKeyRef: RefObject<FixtureRequestKey | null>;
   onClose: () => void;
   showToast: (message: string, variant?: 'success' | 'error') => void;
 };
 
 const SELECT_CLASS = 'tm-input';
 
-export function BracketFixtureToolsDialog({ open, mode, format, tournamentId, bracket, onClose, showToast }: BracketFixtureToolsDialogProps) {
+export function BracketFixtureToolsDialog({ open, mode, format, tournamentId, bracket, requestKeyRef, onClose, showToast }: BracketFixtureToolsDialogProps) {
   const idPrefix = useId();
   const createFixture = useV1AddBracketFixture(tournamentId);
   const setSources = useV1SetBracketSources(tournamentId);
@@ -76,14 +83,21 @@ export function BracketFixtureToolsDialog({ open, mode, format, tournamentId, br
   const createFixtureAt = (target: { groupId: string; round: string; toastLabel: string }) => {
     if (submitting.current) return;
     submitting.current = true;
+    const content = `${tournamentId}|${target.groupId}|${target.round}`;
+    if (requestKeyRef.current?.content !== content) requestKeyRef.current = { content, clientCommandId: randomUuid() };
     createFixture.mutate(
-      { groupId: target.groupId, round: target.round },
+      { groupId: target.groupId, round: target.round, clientCommandId: requestKeyRef.current.clientCommandId },
       {
         onSuccess: () => {
+          requestKeyRef.current = null;
           showToast(`${target.toastLabel} 경기를 추가했어요. 칸을 눌러 팀을 넣어 주세요.`, 'success');
           onClose();
         },
-        onError: (error) => showToast(describeBracketCanvasError(error, '경기를 추가하지 못했어요.'), 'error'),
+        onError: (error) => {
+          // 서버가 4xx 로 거절한 요청은 같은 키로 다시 보내도 같은 답이므로 키를 버린다.
+          if (error instanceof V1ApiError && error.statusCode >= 400 && error.statusCode < 500) requestKeyRef.current = null;
+          showToast(describeBracketCanvasError(error, '경기를 추가하지 못했어요.'), 'error');
+        },
         onSettled: () => {
           submitting.current = false;
         },

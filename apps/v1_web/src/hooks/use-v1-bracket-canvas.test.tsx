@@ -157,17 +157,19 @@ describe('useV1SetBracketSources', () => {
   });
 });
 
+const KEY = '5d1c0e9a-2b7f-4c3d-9a6e-1f2a3b4c5d6e';
+
 describe('useV1AddBracketFixture', () => {
-  it('경기 번호는 보내지 않고 조와 라운드만 보낸다 — 번호는 서버가 정한다', async () => {
+  it('경기 번호는 보내지 않고 조·라운드와 호출부가 정한 요청 키만 보낸다 — 번호는 서버가 정한다', async () => {
     postMock.mockResolvedValue({ id: 'new' });
     const { wrapper } = setup();
     const { result } = renderHook(() => useV1AddBracketFixture('t1'), { wrapper });
 
     await act(async () => {
-      await result.current.mutateAsync({ groupId: 'g1', round: 'league_r2' });
+      await result.current.mutateAsync({ groupId: 'g1', round: 'league_r2', clientCommandId: KEY });
     });
 
-    expect(postMock).toHaveBeenCalledWith('/admin/tournaments/t1/fixtures', { groupId: 'g1', round: 'league_r2' });
+    expect(postMock).toHaveBeenCalledWith('/admin/tournaments/t1/fixtures', { groupId: 'g1', round: 'league_r2', clientCommandId: KEY });
     expect(getMock).not.toHaveBeenCalled();
   });
 
@@ -177,7 +179,7 @@ describe('useV1AddBracketFixture', () => {
     const { result } = renderHook(() => useV1AddBracketFixture('t1'), { wrapper });
 
     await act(async () => {
-      await result.current.mutateAsync({ groupId: 'g1', round: 'league_r1' });
+      await result.current.mutateAsync({ groupId: 'g1', round: 'league_r1', clientCommandId: KEY });
     });
 
     const keys = invalidatedKeys(invalidate);

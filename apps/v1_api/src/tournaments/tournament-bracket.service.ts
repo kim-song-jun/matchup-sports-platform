@@ -85,6 +85,66 @@ type AdminBracketFixture = ReturnType<typeof serializeTournamentTeamMatchBracket
   videos: Array<{ id: string; title: string | null; url: string; sortOrder: number }>;
 };
 
+const FIXTURE_CLIENT_CREATE_ACTION = 'tournament_fixture_client_create';
+const FIXTURE_CLIENT_KEY_RETENTION_MS = 24 * 60 * 60 * 1000;
+
+const FIXTURE_REPLAY_SELECT = {
+  teamMatchId: true,
+  tournamentId: true,
+  groupId: true,
+  round: true,
+  fixtureNumber: true,
+  legNumber: true,
+  parentTeamMatchId: true,
+  homeRegistrationId: true,
+  awayRegistrationId: true,
+  teamMatch: {
+    select: {
+      id: true,
+      tournamentId: true,
+      hostTeamId: true,
+      approvedApplicantTeamId: true,
+      competitionConfigVersionId: true,
+      game: { select: { sourceType: true, teamMatchId: true, competitionConfigVersionId: true, sides: { select: { sideKey: true, teamId: true } } } },
+      startAt: true,
+      ...PLACE_SELECT,
+      status: true,
+      createdAt: true,
+      updatedAt: true,
+    },
+  },
+} satisfies Prisma.V1TournamentMatchDetailsSelect;
+
+type FixtureReplayDetails = Prisma.V1TournamentMatchDetailsGetPayload<{ select: typeof FIXTURE_REPLAY_SELECT }>;
+type FixtureReplayAggregate = NonNullable<FixtureReplayDetails['teamMatch']>;
+
+/** 이미 만든 경기를 응답으로 돌려주기 전에, 경기·게임·양 팀 면이 온전히 이어져 있는지 확인한다. */
+function assertReplayableFixture(aggregate: FixtureReplayAggregate, tournamentId: string): void {
+  if (aggregate.tournamentId !== tournamentId || aggregate.game === null ||
+    aggregate.game.sourceType !== V1GameSourceType.TEAM_MATCH ||
+    aggregate.game.teamMatchId !== aggregate.id ||
+    aggregate.game.competitionConfigVersionId !== aggregate.competitionConfigVersionId ||
+    aggregate.game.sides.length !== 2 ||
+    !aggregate.game.sides.some((side) => side.sideKey === V1GameSideKey.HOME && side.teamId === aggregate.hostTeamId) ||
+    !aggregate.game.sides.some((side) => side.sideKey === V1GameSideKey.AWAY && side.teamId === aggregate.approvedApplicantTeamId)) {
+    throw new ConflictException({ code: 'TEAM_MATCH_IDEMPOTENCY_INCOMPLETE', message: '기존 대진 생성 기록이 완전하지 않아요.' });
+  }
+}
+
+function fixtureReplayResult(details: FixtureReplayDetails & { teamMatch: FixtureReplayAggregate }) {
+  return {
+    ...details.teamMatch,
+    tournamentId: details.tournamentId,
+    groupId: details.groupId,
+    round: details.round,
+    fixtureNumber: details.fixtureNumber,
+    legNumber: details.legNumber,
+    parentTeamMatchId: details.parentTeamMatchId,
+    homeRegistrationId: details.homeRegistrationId,
+    awayRegistrationId: details.awayRegistrationId,
+  };
+}
+
 @Injectable()
 export class TournamentBracketService {
   private readonly competitionConfigs: CompetitionConfigRegistry;
@@ -497,8 +557,55 @@ export class TournamentBracketService {
     const requestedVenueProviderId = dto.venueProviderId?.trim();
     // 저장 쪽 resolvePlaceSnapshot 과 같은 정규화(trim, 빈 값은 대회 기본 장소로) — 안 맞추면 같은 번호 재시도가 해시 불일치 409 가 난다.
     const requestedVenue = dto.venue?.trim() || null;
+    // 번호를 서버가 정하는 요청의 내용 해시 — 번호는 빼고(재시도마다 달라진다) 보낸 번호가 있으면 넣는다.
+    const clientKey = dto.clientCommandId ? `tournament-fixture-client:${tournamentId}:${dto.clientCommandId}` : null;
+    const clientPayloadHash = canonicalGameCommandPayloadHash({
+      tournamentId,
+      groupId: dto.groupId ?? null,
+      round: dto.round,
+      legNumber,
+      parentFixtureId: dto.parentFixtureId ?? null,
+      homeRegistrationId: dto.homeRegistrationId ?? null,
+      awayRegistrationId: dto.awayRegistrationId ?? null,
+      scheduledAt: dto.scheduledAt ? new Date(dto.scheduledAt).toISOString() : null,
+      venue: requestedVenue ?? tournament.venue ?? null,
+      ...(requestedVenueProviderId ? { venueProviderId: requestedVenueProviderId } : {}),
+      // 주소·좌표·출처도 저장되는 장소의 일부다 — 빠지면 다른 핀으로 보낸 재시도가 첫 경기로 조용히 재생된다.
+      ...(dto.venueAddress?.trim() ? { venueAddress: dto.venueAddress.trim() } : {}),
+      ...(dto.venueLatitude != null ? { venueLatitude: dto.venueLatitude } : {}),
+      ...(dto.venueLongitude != null ? { venueLongitude: dto.venueLongitude } : {}),
+      ...(dto.venueProvider?.trim() ? { venueProvider: dto.venueProvider.trim() } : {}),
+      ...(dto.fixtureNumber !== undefined ? { fixtureNumber: dto.fixtureNumber } : {}),
+    });
     const created = await this.prisma.$transaction(async (tx) => {
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`league-fixture-generation:${tournamentId}`}, 0))`;
+      // 요청 고유 키 재전송: 번호를 정하기 전에 처음 만든 경기를 찾는다(번호가 달라져 좌표 멱등이 안 걸리는 재시도를 막는다).
+      if (clientKey) {
+        const prior = await tx.v1IdempotencyRecord.findFirst({
+          where: { actorUserId: user.id, action: FIXTURE_CLIENT_CREATE_ACTION, resourceType: V1GameSourceType.TEAM_MATCH, idempotencyKey: clientKey },
+          select: { resourceId: true, payloadHash: true },
+        });
+        if (prior) {
+          if (prior.payloadHash !== clientPayloadHash) {
+            throw new ConflictException({
+              code: 'COMMAND_IDEMPOTENCY_PAYLOAD_REUSE',
+              message: '같은 경기 생성 키를 다른 내용으로 다시 사용할 수 없어요.',
+            });
+          }
+          const priorDetails = await tx.v1TournamentMatchDetails.findFirst({
+            where: { teamMatchId: prior.resourceId, tournamentId, teamMatch: { deletedAt: null } },
+            select: FIXTURE_REPLAY_SELECT,
+          });
+          if (!priorDetails?.teamMatch) {
+            throw new ConflictException({
+              code: 'COMMAND_IDEMPOTENCY_RESOURCE_GONE',
+              message: '이 요청으로 만든 경기가 이미 지워졌어요. 다시 추가해 주세요.',
+            });
+          }
+          assertReplayableFixture(priorDetails.teamMatch, tournamentId);
+          return fixtureReplayResult({ ...priorDetails, teamMatch: priorDetails.teamMatch });
+        }
+      }
       // Numbers are tournament-wide and archived fixtures keep theirs, so the allocation reads every row.
       const fixtureNumber =
         dto.fixtureNumber ??
@@ -572,44 +679,10 @@ export class TournamentBracketService {
 
       const existingDetails = await tx.v1TournamentMatchDetails.findFirst({
         where: { tournamentId, round: dto.round, fixtureNumber, legNumber },
-        select: {
-          teamMatchId: true,
-          tournamentId: true,
-          groupId: true,
-          round: true,
-          fixtureNumber: true,
-          legNumber: true,
-          parentTeamMatchId: true,
-          homeRegistrationId: true,
-          awayRegistrationId: true,
-          teamMatch: {
-            select: {
-              id: true,
-              tournamentId: true,
-              hostTeamId: true,
-              approvedApplicantTeamId: true,
-              competitionConfigVersionId: true,
-              game: { select: { sourceType: true, teamMatchId: true, competitionConfigVersionId: true, sides: { select: { sideKey: true, teamId: true } } } },
-              startAt: true,
-              ...PLACE_SELECT,
-              status: true,
-              createdAt: true,
-              updatedAt: true,
-            },
-          },
-        },
+        select: FIXTURE_REPLAY_SELECT,
       });
       if (existingDetails?.teamMatch) {
-        const aggregate = existingDetails.teamMatch;
-        if (aggregate.tournamentId !== tournamentId || aggregate.game === null ||
-          aggregate.game.sourceType !== V1GameSourceType.TEAM_MATCH ||
-          aggregate.game.teamMatchId !== aggregate.id ||
-          aggregate.game.competitionConfigVersionId !== aggregate.competitionConfigVersionId ||
-          aggregate.game.sides.length !== 2 ||
-          !aggregate.game.sides.some((side) => side.sideKey === V1GameSideKey.HOME && side.teamId === aggregate.hostTeamId) ||
-          !aggregate.game.sides.some((side) => side.sideKey === V1GameSideKey.AWAY && side.teamId === aggregate.approvedApplicantTeamId)) {
-          throw new ConflictException({ code: 'TEAM_MATCH_IDEMPOTENCY_INCOMPLETE', message: '기존 대진 생성 기록이 완전하지 않아요.' });
-        }
+        assertReplayableFixture(existingDetails.teamMatch, tournamentId);
         const existingPayload = {
           tournamentId: existingDetails.tournamentId,
           groupId: existingDetails.groupId,
@@ -630,17 +703,7 @@ export class TournamentBracketService {
             message: '같은 경기 생성 키를 다른 내용으로 다시 사용할 수 없어요.',
           });
         }
-        return {
-          ...existingDetails.teamMatch,
-          tournamentId: existingDetails.tournamentId,
-          groupId: existingDetails.groupId,
-          round: existingDetails.round,
-          fixtureNumber: existingDetails.fixtureNumber,
-          legNumber: existingDetails.legNumber,
-          parentTeamMatchId: existingDetails.parentTeamMatchId,
-          homeRegistrationId: existingDetails.homeRegistrationId,
-          awayRegistrationId: existingDetails.awayRegistrationId,
-        };
+        return fixtureReplayResult(existingDetails);
       }
 
       const archived = await tx.v1TournamentMatchDetails.findMany({
@@ -772,6 +835,21 @@ export class TournamentBracketService {
         },
         tx,
       );
+      if (clientKey) {
+        await tx.v1IdempotencyRecord.create({
+          data: {
+            actorUserId: user.id,
+            action: FIXTURE_CLIENT_CREATE_ACTION,
+            resourceType: V1GameSourceType.TEAM_MATCH,
+            resourceId: teamMatch.id,
+            idempotencyKey: clientKey,
+            payloadHash: clientPayloadHash,
+            responseStatus: 201,
+            responseBody: { teamMatchId: teamMatch.id },
+            expiresAt: new Date(Date.now() + FIXTURE_CLIENT_KEY_RETENTION_MS),
+          },
+        });
+      }
       return {
         ...teamMatch,
         tournamentId,

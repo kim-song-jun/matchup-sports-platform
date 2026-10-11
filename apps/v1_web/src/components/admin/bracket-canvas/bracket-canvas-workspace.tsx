@@ -1,7 +1,7 @@
 'use client';
 
 import { Globe, LayoutTemplate, Link2, Plus, Shuffle } from 'lucide-react';
-import { useEffect, useId, useMemo, useState } from 'react';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { AdminListSkeleton } from '@/components/admin/admin-skeleton';
 import { BottomSheet } from '@/components/v1-ui/bottom-sheet';
 import { Button } from '@/components/v1-ui/button';
@@ -33,7 +33,7 @@ import { BracketLeagueStandings } from './bracket-league-standings';
 import { BracketNodePanel } from './bracket-node-panel';
 import { BracketStandingsFillButton } from './bracket-standings-fill-button';
 import { BracketTeamTray, type RegistrationsLoadState } from './bracket-team-tray';
-import { BracketFixtureToolsDialog } from './bracket-fixture-tools-dialog';
+import { BracketFixtureToolsDialog, type FixtureRequestKey } from './bracket-fixture-tools-dialog';
 import { BracketTemplateDialog } from './bracket-template-dialog';
 import { focusFixtureOpener } from './fixture-opener-focus';
 
@@ -71,6 +71,7 @@ export function BracketCanvasWorkspace({
   const [pendingRegistrationId, setPendingRegistrationId] = useState<string | null>(null);
   const [templateOpen, setTemplateOpen] = useState(false);
   const [toolsMode, setToolsMode] = useState<'add' | 'link' | null>(null);
+  const fixtureRequestKey = useRef<FixtureRequestKey | null>(null);
   const [standingsSheetOpen, setStandingsSheetOpen] = useState(false);
   const toolbarHintId = useId();
   // 서버 기본값 true: 하이드레이션 전에는 지금 레이아웃(옆 패널)을 유지하고, 좁은 태블릿만 클라이언트에서 시트로 바뀐다.
@@ -442,6 +443,7 @@ export function BracketCanvasWorkspace({
           format={format}
           tournamentId={tournamentId}
           bracket={bracket}
+          requestKeyRef={fixtureRequestKey}
           onClose={() => setToolsMode(null)}
           showToast={showToast}
         />

@@ -4736,7 +4736,12 @@ export type V1CreateFixturePayload = {
   venueLongitude?: number | null;
   venueProvider?: 'kakao' | null;
   venueProviderId?: string | null;
+  /** 요청 고유 키(UUID). 번호를 생략하는 「경기 추가」가 응답 유실 뒤 재시도해도 서버가 첫 경기를 돌려준다. */
+  clientCommandId?: string;
 };
+
+/** 번호를 서버가 정하는 「경기 추가」 요청. */
+export type V1AddBracketFixtureInput = { groupId: string; round: string; clientCommandId: string };
 
 export type V1CreateAnnouncementPayload = {
   title: string;

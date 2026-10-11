@@ -484,6 +484,7 @@ export class MatchesService {
           completedAt: match.completedAt,
           expiredApplications: 0,
           completedUserIds: [] as string[],
+          noShowUserIds: [] as string[],
           expiredUserIds: [] as string[],
           completedParticipants: match.participants.filter((participant) => participant.status === 'completed').length,
           noShowParticipants: finalizedGuests.filter((participant) => participant.status === 'no_show').length,
@@ -579,6 +580,9 @@ export class MatchesService {
         completedUserIds: guests
           .filter((participant) => requestedStatuses.get(participant.id) === 'completed')
           .map((participant) => participant.userId),
+        noShowUserIds: guests
+          .filter((participant) => requestedStatuses.get(participant.id) === 'no_show')
+          .map((participant) => participant.userId),
         expiredUserIds: pending.map((application) => application.applicantUserId),
         completedParticipants:
           (host ? 1 : 0) +
@@ -596,6 +600,12 @@ export class MatchesService {
         'match_completed',
         matchId,
         '참여한 개인 매치가 완료됐어요. 함께한 참가자에게 후기를 남겨보세요.',
+      );
+      void this.notifications.emitNotificationToMany(
+        result.noShowUserIds,
+        'match_no_show',
+        matchId,
+        '호스트가 이번 매치를 불참으로 기록했어요. 사정이 있었다면 호스트에게 문의해 보세요.',
       );
       void this.notifications.emitNotificationToMany(
         result.expiredUserIds,

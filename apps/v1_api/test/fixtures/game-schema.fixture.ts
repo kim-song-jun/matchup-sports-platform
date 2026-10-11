@@ -579,7 +579,9 @@ export const gameSchemaSourceManifest = {
   // 2026-10-11: additive V1TournamentRegistration.adminCancelReason/cancelOutcome columns backed by
   // the MD-QA #78 migration. Game models and the bound historical game-operations migration are
   // unchanged; re-pin the schema bytes only.
-  schema: 'a21cf68599a1c8f34a4f18a0e69f0557d201affc59689b315deb9d8d0716c576',
+  // 2026-10-11: additive V1OnboardingStatus value social_profile_deferred (MD-QA #125 migration). Game
+  // models and the bound historical game-operations migration are unchanged; re-pin the schema bytes only.
+  schema: 'b63d3222b1f3d0e1a3c8309f116cfd50eb28b624245685dbea2f7fff1f6ee2b9',
   migration: '6bd7fae42e9ee7debff71d26f7252d220ad2c12ae6f14745d103fc7fa61e8f64',
 } as const;
 

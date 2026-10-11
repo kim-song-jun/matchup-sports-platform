@@ -1227,6 +1227,8 @@ export class AuthService {
           where: { id: identity.id, userId: callerId },
           data: { userId: holder.id, lastLoginAt: now },
         });
+        // A deferred account may already have filed support inquiries (cascade on user delete); they are the same person's.
+        await tx.v1Inquiry.updateMany({ where: { userId: callerId }, data: { userId: holder.id } });
         await tx.v1User.delete({ where: { id: callerId } });
         await tx.v1StatusChangeLog.create({
           data: {

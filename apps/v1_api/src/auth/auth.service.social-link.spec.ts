@@ -25,6 +25,7 @@ describe('AuthService.linkSocialToPhoneOwner', () => {
     return {
       v1User: { findUnique: jest.fn(), findFirst: jest.fn(), updateMany: jest.fn(), update: jest.fn(), delete: jest.fn() },
       v1AuthIdentity: { findFirst: jest.fn(), findMany: jest.fn(), update: jest.fn() },
+      v1Inquiry: { updateMany: jest.fn().mockResolvedValue({ count: 0 }) },
       v1AdminUser: { findUnique: jest.fn() },
       v1PhoneVerificationChallenge: { deleteMany: jest.fn(), count: jest.fn() },
       v1StatusChangeLog: { create: jest.fn() },
@@ -112,6 +113,7 @@ describe('AuthService.linkSocialToPhoneOwner', () => {
       where: { id: IDENTITY_ID, userId: CALLER_ID },
       data: { userId: HOLDER_ID, lastLoginAt: expect.any(Date) },
     });
+    expect(prisma.v1Inquiry.updateMany).toHaveBeenCalledWith({ where: { userId: CALLER_ID }, data: { userId: HOLDER_ID } });
     expect(prisma.v1User.delete).toHaveBeenCalledWith({ where: { id: CALLER_ID } });
     expect(prisma.v1StatusChangeLog.create).toHaveBeenCalledWith({
       data: expect.objectContaining({

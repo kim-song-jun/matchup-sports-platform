@@ -1,6 +1,6 @@
 # Task 20261072: 운영 검색 노출 및 홈 GA4 계측 정정
 
-Status: Code validated; external setup done; authorized dev/main release in progress
+Status: SEO deployed and verified on alpha; latest-dev pipeline improvement and authorized main release in progress
 **Owner**: Codex main (단일 에이전트)
 **Created**: 2026-10-12
 
@@ -68,6 +68,9 @@ Forbidden: DB/인증 동작/제품 시각 디자인/다른 세션 파일. 2026-1
 - 공유 checkout의 HEAD가 작업 중 다른 세션에 의해 `32325e990`으로 이동했다. 이 작업의 소스·nginx·robots·analytics 의존 경로에는 시작 HEAD 대비 변경이 없고 내 변경 12개만 dirty 상태로 유지된다. HEAD 이동이나 원격 동기화는 이 세션이 실행하지 않았다.
 
 ## Resume Cursor
+0. SEO PR #1842 merged to dev at `8deac7bc16382b85615f70d98c1a91cd5ae858a7`; exact CI `38174051752` and Alpha `38174051733` succeeded. Live alpha verified: home/landing noindex, new robots, sitemap/RSS 404, health DB true. Actual home → teams click emitted one `home_navigation_click` and one SPA `page_view`, both GA HTTP 204, no runtime exception. Production remains `461d03081d4186abdb42436e936383ffb36493e4` pending promotion.
+0.1. User requested latest-dev deployment optimization while parallel PRs #1839/#1840 advanced dev to `381749db22135d39800c4b0b124d7e033ca32a01`. Promote run `38175387865` safely refused mismatched alpha/dev and changed nothing. Added scope: CI/workflow freshness helper/tests, deployment policy docs, Changeset. Dev CI cancels superseded runs; Alpha checks SHA before runtime env sync and again immediately before SSM. Already-started SSM remains serialized and completes; manual Stage B keeps its pinned contract. Image preparation remains serialized in the existing workflow. No new subagents, local servers or DB changes.
+0.2. GA4 Internal Traffic filter is Testing. Saved non-destructive comparison `운영 · 내부 트래픽 제외` (ID `16108290729`): production stream plus exclusion of `testDataFilterName=Internal Traffic`; applied to realtime and events. Did not activate permanent data deletion. Current browser task space 250 must be finished after release verification.
 1. 사용자 후속 승인: “dev 반영하고 검증한 다음 main 배포까지 진행해줘. 구글 사이트맵 오류도 확인해서 해결해주고.” 내 경로만 로컬 커밋 → dev PR/CI → alpha 실측 → 버전 승격/CI → main 배포 → 운영 실측 순서로 진행한다. 별도 승인 재요청은 필요하지 않다.
 2. 배포 후 운영 robots/메타 및 alpha robots/noindex/sitemap 404, 새 홈 이동 이벤트의 live 수집을 확인한다.
 3. Google 사이트맵 보고서는 10/12 05:41 재확인에서 성공, 읽은 날짜 10/12, 발견 URL 271로 처리 완료됐다. 일시적인 읽기 실패 상태는 해소됐고 재제출은 하지 않았다. `google-sitemap-success.png`로 실제 보고서 증거를 저장했다.

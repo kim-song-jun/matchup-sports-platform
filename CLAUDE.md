@@ -52,6 +52,9 @@
   Actions의 PR 생성을 허용하지 않는다) — 그 PR을 실제로 열고 머지하는 것은 여전히 사용자만 한다.
 - **dev 머지 = 즉시 alpha 실배포.** 승인 게이트가 없으므로 dev 머지 전 검증(테스트·tsc·lint)을
   실배포 게이트로 취급한다.
+- **dev CI는 최신 실행 우선, 서버 배포는 중간 취소 금지.** 같은 dev ref의 오래된 CI는 취소한다.
+  Alpha는 런타임 설정 변경 전과 SSM 시작 직전에 현재 dev SHA를 확인해 오래된 일반 배포를 건너뛴다.
+  이미 시작한 SSM, 운영 배포, 명시적으로 고정한 Task168 Stage B 전환은 취소하지 않는다.
 - **`main`에 dev에 없는 커밋이 생겼다면 `origin/main → dev` 방향으로 흡수한다.** 반대 방향으로
   dev 내용을 main 기준에 맞춰 되돌리지 않는다.
 - **`main`에는 classic branch protection은 없지만 ruleset이 걸려 있다**(2026-08-09 실측 정정).

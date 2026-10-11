@@ -113,15 +113,19 @@ export function TeamMatchListPageView({ model }: { model: TeamMatchListViewModel
         {/* 서버는 20건씩 커서로 자르는데(team-matches.service.ts) 예전엔 여기서 더 볼 방법이
             없었다(감사 결함) — tournaments/tournaments-list-client.tsx 와 같은 "더 보기" 누적 패턴. */}
         {!model.isLoading && model.hasNext ? (
-          <button
-            type="button"
-            className="tm-btn tm-btn-md tm-btn-neutral tm-btn-block"
-            style={{ marginTop: 16 }}
-            disabled={model.loadMorePending}
-            onClick={model.onLoadMore}
-          >
-            {model.loadMorePending ? '불러오는 중…' : '더 보기'}
-          </button>
+          <>
+            {model.loadMoreError ? (
+              <p role="alert" className="tm-text-caption tm-load-more-error">다음 목록을 불러오지 못했어요. 다시 시도해 주세요.</p>
+            ) : null}
+            <button
+              type="button"
+              className="tm-btn tm-btn-md tm-btn-neutral tm-btn-block tm-load-more"
+              disabled={model.loadMorePending}
+              onClick={model.onLoadMore}
+            >
+              {model.loadMorePending ? '불러오는 중…' : model.loadMoreError ? '다시 불러오기' : '더 보기'}
+            </button>
+          </>
         ) : null}
       </div>
       {model.filterSheet?.open ? <TeamMatchFilterSheet model={model} /> : null}

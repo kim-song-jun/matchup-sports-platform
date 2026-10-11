@@ -205,6 +205,39 @@ describe('#1568 실제 팀매치 목록 누적 상태와 상세 복귀', () => {
     await openDetail(); await browserBack(); await expectCards(60);
   });
 
+  it('다음 페이지 실패는 이미 쌓은 20건을 지우지 않고 인라인 재시도를 보인다', async () => {
+    mount(); await expectCards(20);
+    response = (filters) => filters?.cursor ? Promise.reject(new Error('합성 조회 실패')) : defaultResponse(filters);
+    fireEvent.click(screen.getByRole('button', { name: '더 보기' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('다음 목록을 불러오지 못했어요');
+    expect(cards()).toHaveLength(20);
+    expect(screen.getByRole('button', { name: '다시 불러오기' })).toBeEnabled();
+  });
+
+  it('다음 페이지가 도착해도 앞 페이지 카드 순서는 그대로다(신청 가능 카드가 위로 끼어들지 않는다)', async () => {
+    response = (filters) => {
+      const first = page(0, 20, 'page-20');
+      first.items[0] = { ...first.items[0], status: 'closed' };
+      return filters?.cursor ? page(20, 20, null) : first;
+    };
+    mount(); await expectCards(20);
+    const before = cards().map((item) => item.href);
+    fireEvent.click(screen.getByRole('button', { name: '더 보기' }));
+    await expectCards(40);
+    expect(cards().slice(0, 20).map((item) => item.href)).toEqual(before);
+  });
+
+  it('배경 재검증이 도는 중에도 더 보기 클릭이 다음 cursor를 요청한다', async () => {
+    mount(); await expectCards(20);
+    response = (filters) => filters?.cursor ? defaultResponse(filters) : new Promise(() => {});
+    act(() => { void client.refetchQueries({ queryKey: v1Keys.teamMatchesAll() }); });
+    await waitFor(() => expect(client.isFetching()).toBeGreaterThan(0));
+    const button = screen.getByRole('button', { name: '더 보기' });
+    expect(button).toBeEnabled();
+    fireEvent.click(button);
+    await waitFor(() => expect(apiGet).toHaveBeenCalledWith('/team-matches', expect.objectContaining({ cursor: 'page-20' })));
+  });
+
   it('서버 페이지에 중복 ID가 있어도 카드와 복귀 후 누적 수를 중복하지 않는다', async () => {
     response = (filters) => filters?.cursor ? { ...page(20, 20, null), items: [match(0), ...page(20, 20, null).items] } : page(0, 20, 'page-20');
     mount(); await loadTo(40); await openDetail(); await browserBack(); await expectCards(40);

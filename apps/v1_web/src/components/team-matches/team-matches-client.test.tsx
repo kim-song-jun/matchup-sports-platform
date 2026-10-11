@@ -1497,7 +1497,7 @@ describe('TeamMatchListPageClient — 커서 페이지네이션 누적', () => {
 
     expect(screen.getByTestId('team-match-count')).toHaveTextContent('2');
     expect(screen.getByTestId('team-match-sport-counts')).toHaveTextContent('전체:2|풋살:2');
-    expect(screen.getByTestId('team-match-order')).toHaveTextContent('팀매치 2|팀매치 1');
+    expect(screen.getByTestId('team-match-order')).toHaveTextContent('팀매치 1|팀매치 2');
     expect(screen.queryByRole('button', { name: '더 보기' })).not.toBeInTheDocument();
   });
 

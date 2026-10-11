@@ -166,17 +166,22 @@ export function TeamMatchListPageClient({ seed }: { readonly seed?: CursorListSe
 
   useCursorPaginationSnapshot(snapshotKey, { cursor, accumulated }, query);
 
-  if (query.isError) return <TeamMatchStatePageView model={{ ...getTeamMatchStateViewModel('error'), retry: () => void query.refetch() }} />;
+  // 다음 페이지 실패는 이미 쌓은 목록을 지우지 않는다 — 첫 페이지 실패만 전체 에러 화면이다.
+  const loadMoreError = query.isError && Boolean(cursor);
+  if (query.isError && !loadMoreError) return <TeamMatchStatePageView model={{ ...getTeamMatchStateViewModel('error'), retry: () => void query.refetch() }} />;
 
   const base = getTeamMatchListViewModel();
   const pageItems = query.data?.items;
-  const items: V1TeamMatch[] | undefined = pageItems === undefined
-    ? undefined
-    : cursor
-      ? [...accumulated, ...pageItems.filter((item) => !accumulated.some((prev) => (prev.teamMatchId ?? prev.id) === (item.teamMatchId ?? item.id)))]
-      : pageItems;
-  const orderedItems = items ? sortTeamMatchesByAvailability(items) : undefined;
-  const visibleItems = filterTeamMatchesByLevels(orderedItems, selectedLevels);
+  // 가용성 정렬은 페이지 안에서만 한다 — 누적 전체를 다시 정렬하면 새 페이지의 신청 가능 카드가
+  // 앞 페이지 마감 카드 위로 끼어들어 보던 카드가 밀린다.
+  const items: V1TeamMatch[] | undefined = loadMoreError
+    ? [...accumulated]
+    : pageItems === undefined
+      ? undefined
+      : cursor
+        ? [...accumulated, ...sortTeamMatchesByAvailability(pageItems.filter((item) => !accumulated.some((prev) => (prev.teamMatchId ?? prev.id) === (item.teamMatchId ?? item.id))))]
+        : sortTeamMatchesByAvailability(pageItems);
+  const visibleItems = filterTeamMatchesByLevels(items, selectedLevels);
   const countPageItems = (countFilters ? countQuery.data?.items ?? allQuery.data?.items : allQuery.data?.items) ?? [];
   const countPageIds = new Set(countPageItems.map((item) => item.teamMatchId ?? item.id));
   const loadedMoreItems = selectedSportId ? [] : (items ?? []).filter((item) => !countPageIds.has(item.teamMatchId ?? item.id));
@@ -184,10 +189,17 @@ export function TeamMatchListPageClient({ seed }: { readonly seed?: CursorListSe
     [...countPageItems, ...loadedMoreItems],
     selectedLevels,
   );
-  const hasNext = query.data?.pageInfo?.hasNext ?? false;
+  const hasNext = loadMoreError || (query.data?.pageInfo?.hasNext ?? false);
+  // 다음 페이지 요청만 "불러오는 중"이다 — 15초 배경 폴링(isFetching)은 버튼과 무관하다.
+  const loadMorePending = Boolean(cursor) && (query.isPlaceholderData || (loadMoreError && query.isFetching));
   const handleLoadMore = () => {
-    if (!query.data?.pageInfo?.nextCursor || query.isFetching) return;
-    setPagination({ accumulated: orderedItems ?? [], cursor: query.data.pageInfo.nextCursor });
+    if (loadMorePending) return;
+    if (loadMoreError) {
+      void query.refetch();
+      return;
+    }
+    if (!query.data?.pageInfo?.nextCursor) return;
+    setPagination({ accumulated: items ?? [], cursor: query.data.pageInfo.nextCursor });
   };
   const searchModel: NonNullable<TeamMatchListViewModel['search']> = {
     value: searchValue,
@@ -227,7 +239,8 @@ export function TeamMatchListPageClient({ seed }: { readonly seed?: CursorListSe
         summary: summarizeTeamMatches(visibleItems),
         hasNext,
         onLoadMore: handleLoadMore,
-        loadMorePending: query.isFetching,
+        loadMorePending,
+        loadMoreError,
       }
     : {
         ...base,

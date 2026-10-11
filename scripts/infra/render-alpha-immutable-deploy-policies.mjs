@@ -1,5 +1,19 @@
 #!/usr/bin/env node
 
+// Explicit names only (no wildcard). Each sync-alpha-*-env.sh that writes a parameter must be listed here;
+// scripts/qa/check-alpha-immutable-deploy.mjs fails when one is missing.
+export const ALPHA_RUNTIME_PARAMETER_NAMES = [
+  'APNS_BUNDLE_ID',
+  'APNS_KEY_ID',
+  'APNS_PRIVATE_KEY',
+  'APNS_TEAM_ID',
+  'KAKAO_APP_ID',
+  'KAKAO_CLIENT_ID',
+  'KAKAO_CLIENT_SECRET',
+  'KAKAO_REDIRECT_URI',
+  'SLACK_INQUIRY_WEBHOOK_URL',
+];
+
 export function renderAlphaImmutableDeployPolicies({ region, accountId, bucket, instanceId }) {
   requireValue(region, 'region');
   requireValue(accountId, 'accountId');
@@ -8,7 +22,9 @@ export function renderAlphaImmutableDeployPolicies({ region, accountId, bucket, 
 
   const apiRepository = 'teameet-alpha-v1-api';
   const webRepository = 'teameet-alpha-v1-web';
-  const parameterArn = `arn:aws:ssm:${region}:${accountId}:parameter/teameet/alpha/env/SLACK_INQUIRY_WEBHOOK_URL`;
+  const parameterArns = ALPHA_RUNTIME_PARAMETER_NAMES.map(
+    (name) => `arn:aws:ssm:${region}:${accountId}:parameter/teameet/alpha/env/${name}`,
+  );
   return {
     github: {
       Version: '2012-10-17',
@@ -64,7 +80,7 @@ export function renderAlphaImmutableDeployPolicies({ region, accountId, bucket, 
           Sid: 'WriteAlphaRuntimeParameter',
           Effect: 'Allow',
           Action: 'ssm:PutParameter',
-          Resource: parameterArn,
+          Resource: parameterArns,
         },
       ],
     },
@@ -94,7 +110,7 @@ export function renderAlphaImmutableDeployPolicies({ region, accountId, bucket, 
           Sid: 'ReadAlphaRuntimeParameter',
           Effect: 'Allow',
           Action: 'ssm:GetParameter',
-          Resource: parameterArn,
+          Resource: parameterArns,
         },
       ],
     },

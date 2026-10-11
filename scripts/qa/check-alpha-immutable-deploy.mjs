@@ -1,12 +1,27 @@
 #!/usr/bin/env node
 
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { resolve } from 'node:path';
 
 const argumentsList = process.argv.slice(2);
 const sourceRoot = argumentsList.find((argument) => !argument.startsWith('--')) ?? '.';
 const runSelfTest = argumentsList.includes('--self-test');
+
+// Mirrors the live IAM policies. Apple sign-in and Firebase sync scripts write parameters that live IAM
+// does not allow yet (known gap, secrets unset), so they are excluded from the parity check below.
+const expectedRuntimeParameterNames = [
+  'APNS_BUNDLE_ID',
+  'APNS_KEY_ID',
+  'APNS_PRIVATE_KEY',
+  'APNS_TEAM_ID',
+  'KAKAO_APP_ID',
+  'KAKAO_CLIENT_ID',
+  'KAKAO_CLIENT_SECRET',
+  'KAKAO_REDIRECT_URI',
+  'SLACK_INQUIRY_WEBHOOK_URL',
+];
+const syncScriptsOutsideIam = new Set(['sync-alpha-apple-sign-in-env.sh', 'sync-alpha-firebase-env.sh']);
 
 const workflowPath = '.github/workflows/deploy-alpha.yml';
 const composePath = 'deploy/docker-compose.alpha.yml';
@@ -45,6 +60,7 @@ const sources = new Map([
 const errors = [];
 const runtimePolicies = renderRuntimePolicies();
 if (runtimePolicies !== undefined) validateRuntimePolicies(runtimePolicies, errors);
+validateSyncScriptParameterParity(errors);
 validateRuntimeSecretTransport(sources.get(runtimeSyncPath), errors);
 
 requirePatterns(workflowPath, [
@@ -220,8 +236,31 @@ function renderRuntimePolicies() {
   }
 }
 
+function validateSyncScriptParameterParity(targetErrors) {
+  for (const file of readdirSync(resolve(sourceRoot, 'scripts/release'))) {
+    if (!/^sync-alpha-.+-env\.sh$/.test(file) || syncScriptsOutsideIam.has(file)) continue;
+    const source = readFileSync(resolve(sourceRoot, 'scripts/release', file), 'utf8');
+    const written = new Set();
+    const namesArray = source.match(/^names=\(([^)]*)\)/m);
+    if (namesArray) namesArray[1].trim().split(/\s+/).forEach((name) => written.add(name));
+    const literal = source.match(/parameter_name='\/teameet\/alpha\/env\/([A-Z0-9_]+)'/);
+    if (literal) written.add(literal[1]);
+    if (written.size === 0) {
+      targetErrors.push(`scripts/release/${file}: no SSM parameter names found; parity check cannot cover it`);
+    }
+    for (const name of written) {
+      if (!expectedRuntimeParameterNames.includes(name)) {
+        targetErrors.push(`scripts/release/${file}: writes ${name}, which the alpha IAM parameter list does not allow`);
+      }
+    }
+  }
+}
+
 function validateRuntimePolicies(policies, targetErrors) {
-  const parameterArn = 'arn:aws:ssm:ap-northeast-2:123456789012:parameter/teameet/alpha/env/SLACK_INQUIRY_WEBHOOK_URL';
+  // Independent copy of the live allowlist; sorted like the renderer's output.
+  const parameterArn = expectedRuntimeParameterNames.map(
+    (name) => `arn:aws:ssm:ap-northeast-2:123456789012:parameter/teameet/alpha/env/${name}`,
+  );
   validateRuntimePolicy(
     policies?.github,
     {
@@ -259,10 +298,10 @@ function validateRuntimePolicy(policy, expected, targetErrors) {
     statement.Sid !== expected.sid ||
     statement.Effect !== 'Allow' ||
     statement.Action !== expected.action ||
-    statement.Resource !== expected.resource
+    JSON.stringify(statement.Resource) !== JSON.stringify(expected.resource)
   ) {
     targetErrors.push(
-      `${provisioningPath}: ${expected.label} runtime Parameter statement must be exactly ${expected.action} on ${expected.resource}`,
+      `${provisioningPath}: ${expected.label} runtime Parameter statement must be exactly ${expected.action} on the explicit parameter list`,
     );
   }
 }
@@ -371,6 +410,13 @@ function verifyNegativeControls(renderedPolicies) {
   });
   assertPolicyRejected('broad runtime Parameter resource', renderedPolicies, (policies) => {
     runtimeStatement(policies.github).Resource = 'arn:aws:ssm:ap-northeast-2:123456789012:parameter/teameet/alpha/env/*';
+  });
+
+  assertPolicyRejected('unexpected runtime Parameter name', renderedPolicies, (policies) => {
+    runtimeStatement(policies.github).Resource.push('arn:aws:ssm:ap-northeast-2:123456789012:parameter/teameet/alpha/env/OTHER');
+  });
+  assertPolicyRejected('missing runtime Parameter name', renderedPolicies, (policies) => {
+    runtimeStatement(policies.instance).Resource.pop();
   });
 
   errors.length = 0;

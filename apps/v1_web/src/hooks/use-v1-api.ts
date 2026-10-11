@@ -5480,16 +5480,22 @@ export function useV1PublicKakaoMapsKey(options?: QueryOptions) {
   });
 }
 
+/** 카카오 키워드 검색이 넘겨주는 마지막 쪽(10건씩 45쪽). 서버 DTO 의 `page` 상한과 같다. */
+const PLACE_SEARCH_MAX_PAGE = 45;
+
 /**
  * 카카오 장소 검색(서버 프록시). 입력이 비면 호출하지 않고, 입력이 바뀌는 동안은 직전 결과를
  * 유지해 목록이 깜빡이지 않게 한다. 503 PLACE_SEARCH_UNAVAILABLE(키 없음)은 재시도해도 같으므로
- * 재시도하지 않는다.
+ * 재시도하지 않는다. 결과는 10건씩 쪽으로 받고 `fetchNextPage` 로 다음 쪽을 이어 붙인다.
  */
 export function useV1PlaceSearch(query: string, options?: QueryOptions) {
   const trimmed = query.trim();
-  return useQuery({
+  return useInfiniteQuery({
     queryKey: v1Keys.placeSearch(trimmed),
-    queryFn: () => v1Get<V1PlaceSearchResponse>('/places/search', { query: trimmed }),
+    initialPageParam: 1,
+    queryFn: ({ pageParam }) =>
+      v1Get<V1PlaceSearchResponse>('/places/search', { query: trimmed, ...(pageParam > 1 ? { page: pageParam } : {}) }),
+    getNextPageParam: (last, pages) => (last.hasMore && pages.length < PLACE_SEARCH_MAX_PAGE ? pages.length + 1 : undefined),
     enabled: (options?.enabled ?? true) && trimmed.length >= 1,
     staleTime: 60 * 1000,
     placeholderData: keepPreviousData,

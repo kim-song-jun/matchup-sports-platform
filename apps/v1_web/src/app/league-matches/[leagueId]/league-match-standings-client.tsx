@@ -628,7 +628,7 @@ export default function LeagueMatchStandingsClient({
   const nextUpcomingFixtureId = nextUpcomingFixture?.teamMatchId ?? null;
   const phaseCounts = countLeagueFixturePhases(fixtures);
 
-  // 잘못된 leagueId 딥링크(404 등)는 빈 화면이 아니라 에러 안내 + 재시도로 처리한다.
+  // 서버 404 는 page.tsx 의 notFound() 가 처리한다. 여기는 클라이언트 조회 실패(네트워크 오류 등)만 맡는다.
   if (seriesQuery.isError) {
     return (
       <div className="mx-auto max-w-4xl px-4 py-6">

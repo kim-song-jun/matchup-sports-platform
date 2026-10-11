@@ -231,7 +231,7 @@ export function ReviewSourcePageView({
                   <div className="tm-text-caption">{model.sourceMeta}</div>
                   <div className="tm-text-body-lg" style={{ marginTop: 4 }}>{model.source.title}</div>
                 </div>
-                <span className="tm-badge tm-badge-blue">작성 중 {progress.inProgress}명</span>
+                <span className="tm-badge tm-badge-blue">작성 중 {progress.inProgress}건</span>
               </div>
             </Card>
             <ReviewTargetSections
@@ -302,8 +302,8 @@ export function ReviewSubmitCompleteView({ model, onConfirm }: { model: ReviewSo
           {/* "별점 선택됨"·"태그 선택됨"은 무엇을 보냈든 항상 같은 문구라 아무것도 알려주지
               않았다. 실제로 달라지는 값(보낸 인원 / 남은 인원)만 남긴다. */}
           <div className="tm-review-chip-row">
-            <span className="tm-badge tm-badge-blue">{reviewed}명 전송</span>
-            {remaining > 0 ? <span className="tm-badge tm-badge-grey">{remaining}명 남음</span> : null}
+            <span className="tm-badge tm-badge-blue">{reviewed}건 전송</span>
+            {remaining > 0 ? <span className="tm-badge tm-badge-grey">{remaining}건 남음</span> : null}
           </div>
         </Card>
       </div>

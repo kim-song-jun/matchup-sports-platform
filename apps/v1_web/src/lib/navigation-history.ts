@@ -30,7 +30,8 @@ const FROM_COMPARISON_MAX_DEPTH = 4;
 
 // buffer: a same-URL entry the unsaved-changes guard pushes so a cold-entry back stays in this document.
 // stale: the form entry under a buffer that was reloaded — a dead same-URL copy that traversal skips.
-type Entry = { url: string; overlay?: boolean; parent?: boolean; buffer?: boolean; stale?: boolean };
+// gated: a screen rendered behind RequireAuth — going back to it with an ended session bounces to login again.
+type Entry = { url: string; overlay?: boolean; parent?: boolean; buffer?: boolean; stale?: boolean; gated?: boolean };
 // tabStart: mirror index of the tab's very first history entry (nothing, not even another site, is before it).
 // leaveTarget: where a leave traversal was headed. A leave out of the app never pops here, so a later forward
 // back into this tab must compare against it, not the index the leave started from.
@@ -78,6 +79,7 @@ function clearPendingAppBack() {
   pendingAppBackTimer = null;
 }
 
+const pathOf = (url: string) => url.split(/[?#]/)[0];
 const currentUrl = () => `${window.location.pathname}${window.location.search}${window.location.hash}`;
 
 function normalizeComparisonUrl(url: string, fromDepth: number): string | null {
@@ -148,9 +150,10 @@ function recordPush(state: unknown) {
   for (const key of Object.keys(mirror.entries)) if (Number(key) >= next) delete mirror.entries[Number(key)];
   delete mirror.replacing; // a push means the announced document replace did not happen
   mirror.index = next;
+  const gated = mirror.entries[next - 1]?.gated && pathOf(mirror.entries[next - 1].url) === window.location.pathname;
   mirror.entries[next] = pushingBuffer
     ? { url: currentUrl(), buffer: true }
-    : { url: currentUrl(), overlay: Boolean(asRecord(state)?.[OVERLAY_STATE_KEY]) };
+    : { url: currentUrl(), overlay: Boolean(asRecord(state)?.[OVERLAY_STATE_KEY]), ...(gated ? { gated: true } : {}) };
   persist();
 }
 
@@ -284,7 +287,13 @@ export function installNavigationHistory(): void {
     if (!mirror) return;
     const previous = mirror.entries[mirror.index];
     const keepBuffer = Boolean(previous?.buffer) && sameUrl(previous.url, currentUrl());
-    mirror.entries[mirror.index] = { url: currentUrl(), overlay: Boolean(stampedState[OVERLAY_STATE_KEY]), ...(keepBuffer ? { buffer: true } : {}) };
+    const keepGated = Boolean(previous?.gated) && pathOf(previous.url) === window.location.pathname;
+    mirror.entries[mirror.index] = {
+      url: currentUrl(),
+      overlay: Boolean(stampedState[OVERLAY_STATE_KEY]),
+      ...(keepBuffer ? { buffer: true } : {}),
+      ...(keepGated ? { gated: true } : {}),
+    };
     persist();
   };
   replace.call(window.history, withIdx(leftoverMarker ? withoutOverlay(window.history.state) : window.history.state, mirror.index), '');
@@ -309,11 +318,22 @@ export function hasPreviousInAppEntry(): boolean {
   return !untracked && Boolean(mirror?.entries[mirror.index - 1]);
 }
 
-/** URL of the in-app entry right before this one, or null when a back would leave the app (or the tracker is unsure). */
-export function previousInAppEntryUrl(): string | null {
+/**
+ * URL of the in-app entry right before this one, or null when a back would leave the app, the tracker is unsure,
+ * or that entry is a RequireAuth screen (an ended session would bounce straight back to login).
+ */
+export function previousPublicEntryUrl(): string | null {
   if (untracked || !mirror) return null;
   const previous = mirror.entries[mirror.index - 1];
-  return previous && !previous.overlay ? previous.url : null;
+  return previous && !previous.overlay && !previous.gated ? previous.url : null;
+}
+
+/** Called by RequireAuth once it renders a screen: the current entry is behind a session. */
+export function markEntryAuthGated(): void {
+  const entry = mirror?.entries[mirror.index];
+  if (!mirror || !entry || entry.gated) return;
+  mirror.entries[mirror.index] = { ...entry, gated: true };
+  persist();
 }
 
 /** Is there an earlier entry created by this document (a back to it is a same-document popstate)? */

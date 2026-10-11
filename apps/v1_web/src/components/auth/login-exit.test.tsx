@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { __resetNavigationHistoryForTests, installNavigationHistory, markEntryReplacedByDocument } from '@/lib/navigation-history';
+import { __resetNavigationHistoryForTests, installNavigationHistory, markEntryAuthGated, markEntryReplacedByDocument } from '@/lib/navigation-history';
 import { LoginPageView } from './auth-page';
 import { getLoginViewModel } from './auth.view-model';
 
@@ -84,6 +84,18 @@ describe.each(exits)('로그인 화면 출구 — %s', (_label, exit) => {
     window.history.pushState({}, '', '/my/settings');
     window.history.pushState({}, '', '/login');
     renderLogin();
+
+    fireEvent.click(exit());
+
+    expect(router.replace).toHaveBeenCalledWith('/home');
+    expect(router.back).not.toHaveBeenCalled();
+  });
+
+  it('세션 만료로 보호 화면(/my)에서 다른 보호 화면으로 옮겨 열린 로그인은 앞 항목으로 돌아가지 않고 홈으로 간다', () => {
+    window.history.pushState({}, '', '/my');
+    markEntryAuthGated();
+    window.history.pushState({}, '', '/login?redirect=%2Fnotifications');
+    render(<LoginPageView model={getLoginViewModel('/notifications')} />);
 
     fireEvent.click(exit());
 

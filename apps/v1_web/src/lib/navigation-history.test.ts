@@ -18,7 +18,8 @@ import {
   isAppBackPending,
   isAppNavigationPop,
   markAppInitiatedBack,
-  previousInAppEntryUrl,
+  markEntryAuthGated,
+  previousPublicEntryUrl,
   pushBufferEntry,
   replaceDocument,
   subscribeAppPop,
@@ -301,7 +302,7 @@ describe('replaceDocument', () => {
     window.history.replaceState(null, '', '/login?redirect=%2Ftournaments%2F1%2Fapply');
     installNavigationHistory();
 
-    expect(previousInAppEntryUrl()).toBe('/tournaments/1');
+    expect(previousPublicEntryUrl()).toBe('/tournaments/1');
   });
 
   it('교체 없이 일어난 전체 문서 이동(링크·assign)은 새 항목으로 쌓인다', () => {
@@ -312,7 +313,42 @@ describe('replaceDocument', () => {
     window.history.pushState(null, '', '/matches/3');
     installNavigationHistory();
 
-    expect(previousInAppEntryUrl()).toBe('/tournaments/1');
+    expect(previousPublicEntryUrl()).toBe('/tournaments/1');
+  });
+});
+
+describe('previousPublicEntryUrl — RequireAuth 화면은 앞 항목으로 치지 않는다', () => {
+  it('앞 항목이 RequireAuth 뒤 화면이면 null, 공개 화면이면 그 URL', () => {
+    installNavigationHistory();
+    window.history.pushState({}, '', '/tournaments/1');
+    window.history.pushState({}, '', '/my');
+    markEntryAuthGated();
+    window.history.pushState({}, '', '/notifications');
+    expect(previousPublicEntryUrl()).toBeNull();
+
+    window.history.pushState({}, '', '/tournaments/2');
+    window.history.pushState({}, '', '/login');
+    expect(previousPublicEntryUrl()).toBe('/tournaments/2');
+  });
+
+  it('같은 경로의 쿼리 변경(push·replace)은 보호 표식을 이어받고 다른 경로로 가면 이어받지 않는다', () => {
+    installNavigationHistory();
+    window.history.pushState({}, '', '/my');
+    markEntryAuthGated();
+    window.history.pushState({}, '', '/my?tab=teams');
+    window.history.pushState({}, '', '/login');
+    expect(previousPublicEntryUrl()).toBeNull(); // push 로 쌓은 /my?tab=teams
+
+    window.history.back();
+    window.history.pushState({}, '', '/my');
+    markEntryAuthGated();
+    window.history.replaceState({}, '', '/my?tab=schedule');
+    window.history.pushState({}, '', '/login');
+    expect(previousPublicEntryUrl()).toBeNull(); // replace 로 바꾼 /my?tab=schedule
+
+    window.history.pushState({}, '', '/landing');
+    window.history.pushState({}, '', '/login');
+    expect(previousPublicEntryUrl()).toBe('/landing');
   });
 });
 

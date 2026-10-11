@@ -105,6 +105,20 @@ describe('RequireAuth', () => {
     expect(mirror.replacing).toBe(true);
   });
 
+  it('marks the history entry it renders as behind a session, so a later login does not back into it', async () => {
+    __resetNavigationHistoryForTests();
+    window.sessionStorage.clear();
+    installNavigationHistory();
+    mocks.useV1AuthMe.mockReturnValue({ isError: false, isFetching: false, isSuccess: true, error: null, refetch: mocks.refetch });
+
+    render(<RequireAuth><div>마이페이지</div></RequireAuth>);
+
+    await waitFor(() => {
+      const mirror = JSON.parse(window.sessionStorage.getItem('teameet.v1.navHistory') ?? '{}');
+      expect(mirror.entries[mirror.index].gated).toBe(true);
+    });
+  });
+
   it('keeps the session and exposes retry for a temporary auth failure', async () => {
     mocks.useV1AuthMe.mockReturnValue({
       isError: true,

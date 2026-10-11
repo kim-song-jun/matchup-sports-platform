@@ -3,22 +3,22 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import type { MouseEvent, ReactNode } from 'react';
-import { isAppBackPending, markAppInitiatedBack, previousInAppEntryUrl } from '@/lib/navigation-history';
+import { isAppBackPending, markAppInitiatedBack, previousPublicEntryUrl } from '@/lib/navigation-history';
 import { AuthBackButton } from './auth-back-button';
 
 /**
  * Leaves the login screen the way the user came in. A login opened with `?redirect=` replaced a screen
  * that needed a session, so the entry before it is what the user was looking at — back returns there.
- * Without `redirect` (logout, withdrawal, direct entry) the entry before it may itself be a protected
- * screen that would bounce straight back to login, so it goes to `fallbackHref`, as it does with nothing
- * in-app before it (first launch, relaunch) or only another login step (/login/email).
+ * Without `redirect` (logout, withdrawal, direct entry), or when the entry before it is itself behind
+ * RequireAuth (an expired session moving between protected screens), back would bounce straight to login
+ * again, so it goes to `fallbackHref` — as it does with nothing in-app before it (first launch, relaunch).
  */
 function useLeaveLogin(fallbackHref: string): () => void {
   const router = useRouter();
   return () => {
     if (isAppBackPending()) return;
     const redirect = new URLSearchParams(window.location.search).get('redirect');
-    const previous = previousInAppEntryUrl();
+    const previous = previousPublicEntryUrl();
     // history.length === 1: the only entry was replaced by this login screen, so the mirror's "previous" is a ghost.
     if (
       redirect !== null && previous !== null && !previous.startsWith('/login')

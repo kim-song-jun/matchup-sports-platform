@@ -207,37 +207,20 @@ describe('채팅 재동기화와 안전 이벤트', () => {
     return { reads, cleanup: () => { unmount(); stops.forEach((stop) => stop()); } };
   }
 
-  it('REST 읽기 직후의 첫 연결은 방 목록·메시지를 다시 받지 않는다', async () => {
-    const { reads, cleanup } = await setupRoom();
-
-    listeners.connect(undefined);
-    await vi.advanceTimersByTimeAsync(2000);
-    expect(reads).toEqual({ list: 1, detail: 1, messages: 1 });
-
-    cleanup();
-  });
-
-  it('REST 읽기보다 한참 뒤에 처음 붙은 연결은 방 목록과 열린 방 메시지를 한 번만 다시 받는다(상세는 그대로)', async () => {
+  it('소켓이 이미 붙어 있을 때 방을 열면(앱 안 이동) 방 목록·메시지를 한 번씩만 요청한다', async () => {
     const { reads, cleanup } = await setupRoom();
 
     await vi.advanceTimersByTimeAsync(5000);
-    listeners.connect(undefined);
-    listeners.connect(undefined);
-    listeners.connect(undefined);
-    await vi.advanceTimersByTimeAsync(2000);
-    expect(reads).toEqual({ list: 2, detail: 1, messages: 2 });
+    expect(reads).toEqual({ list: 1, detail: 1, messages: 1 });
 
     cleanup();
   });
 
-  it('연결이 끊겼다 다시 붙으면 방 목록과 열린 방 메시지를 다시 받는다', async () => {
+  it('REST 읽기 뒤에 처음 붙은 연결(하드 로드)은 아무리 직후여도 방 목록과 열린 방 메시지를 한 번만 다시 받는다(상세는 그대로)', async () => {
     const { reads, cleanup } = await setupRoom();
 
     listeners.connect(undefined);
-    await vi.advanceTimersByTimeAsync(2000);
-    expect(reads).toEqual({ list: 1, detail: 1, messages: 1 });
-
-    await vi.advanceTimersByTimeAsync(30_000);
+    listeners.connect(undefined);
     listeners.connect(undefined);
     await vi.advanceTimersByTimeAsync(2000);
     expect(reads).toEqual({ list: 2, detail: 1, messages: 2 });
@@ -263,35 +246,37 @@ describe('채팅 재동기화와 안전 이벤트', () => {
     return { counter, cleanup: () => { unmount(); stop(); } };
   }
 
-  it('4xx 로 끝난 메시지 조회는 연결이 붙어도 다시 받지 않는다', async () => {
+  it('4xx 로 끝난 메시지 조회는 연결·재연결·탭 복귀에도 다시 받지 않는다', async () => {
     const { counter, cleanup } = await setupErroredMessages(404);
-    await vi.advanceTimersByTimeAsync(5000);
     listeners.connect(undefined);
+    await vi.advanceTimersByTimeAsync(2000);
+    listeners.connect(undefined);
+    await vi.advanceTimersByTimeAsync(2000);
+    setVisibility('visible');
+    document.dispatchEvent(new Event('visibilitychange'));
     await vi.advanceTimersByTimeAsync(2000);
     expect(counter.reads).toBe(1);
     cleanup();
   });
 
-  it('5xx 로 끝난 메시지 조회는 연결이 붙으면 다시 받는다', async () => {
+  it('5xx 로 끝난 메시지 조회는 재연결 때 다시 받는다', async () => {
     const { counter, cleanup } = await setupErroredMessages(503);
-    await vi.advanceTimersByTimeAsync(5000);
     listeners.connect(undefined);
     await vi.advanceTimersByTimeAsync(2000);
     expect(counter.reads).toBe(2);
     cleanup();
   });
 
-  it('끊긴 뒤 곧바로 다시 붙어도(방금 읽은 직후라도) 목록과 메시지를 다시 받는다', async () => {
+  it('방금 다시 받은 직후 재연결해도 목록과 메시지를 또 다시 받는다', async () => {
     const { reads, cleanup } = await setupRoom();
 
     listeners.connect(undefined);
     await vi.advanceTimersByTimeAsync(2000);
-    expect(reads).toEqual({ list: 1, detail: 1, messages: 1 });
+    expect(reads).toEqual({ list: 2, detail: 1, messages: 2 });
 
-    listeners.disconnect(undefined);
     listeners.connect(undefined);
     await vi.advanceTimersByTimeAsync(2000);
-    expect(reads).toEqual({ list: 2, detail: 1, messages: 2 });
+    expect(reads).toEqual({ list: 3, detail: 1, messages: 3 });
 
     cleanup();
   });

@@ -54,8 +54,6 @@ export function invalidateV1ChatMessageQueries(
 }
 
 const RESYNC_DEBOUNCE_MS = 1000;
-// Data fetched this close to a connect already includes everything the server had when the socket attached.
-const CONNECT_FRESH_MS = 2000;
 
 function isChatListQuery(query: Query): boolean {
   const root = v1Keys.chatRooms();
@@ -95,50 +93,32 @@ function retainChatSync(queryClient: QueryClient, socket: Socket): () => void {
     let timer: ReturnType<typeof setTimeout> | undefined;
     // A reconnect storm or quick tab switching collapses into one refetch.
     let includeLists = false;
-    let connectedAt: number | undefined;
-    let disconnected = false;
-    let reconnected = false;
     const scheduleResync = (lists: boolean) => {
       includeLists ||= lists;
       clearTimeout(timer);
       timer = setTimeout(() => {
         const withLists = includeLists;
-        const connectAt = reconnected ? undefined : connectedAt;
         includeLists = false;
-        connectedAt = undefined;
-        reconnected = false;
         void queryClient.invalidateQueries({
           queryKey: v1Keys.chatRooms(),
           predicate: (query) => {
             if (!(isChatMessagesQuery(query) || (withLists && isChatListQuery(query)))) return false;
-            if (connectAt === undefined) return true;
-            // Permanent 4xx reads stay as they are; transient failures are retried on recovery.
-            if (query.state.status === 'error' && !isTransientFailure(query.state.error)) return false;
-            return query.state.dataUpdatedAt < connectAt - CONNECT_FRESH_MS;
+            // Permanent 4xx reads (e.g. a 404 room) stay as they are; transient failures are retried on recovery.
+            return !(query.state.status === 'error' && !isTransientFailure(query.state.error));
           },
         });
       }, RESYNC_DEBOUNCE_MS);
     };
-    // Messages emitted while the socket was down are never replayed, so a connect resyncs queries that predate
-    // it (a reconnect, or a first connect after slow REST reads). A message landing in the fresh window is
-    // recovered by the next chat:message refetch or the visibility resync.
-    const onConnect = () => {
-      // A reconnect missed events regardless of how fresh the cache is; only the socket's first connect may skip.
-      connectedAt = Date.now();
-      if (disconnected) reconnected = true;
-      disconnected = false;
-      scheduleResync(true);
-    };
-    const onDisconnect = () => {
-      disconnected = true;
-    };
+    // Events emitted before the socket joined are never replayed, and elapsed time cannot prove a message did
+    // not commit between a REST snapshot and the join, so every connect resyncs. In-app navigation finds the
+    // socket already connected (one request per query); only a hard load into a room costs one extra resync.
+    const onConnect = () => scheduleResync(true);
     // Lists refetch themselves on window focus (refetchOnWindowFocus: 'always'); only messages need this.
     const onVisibility = () => {
       if (document.visibilityState === 'visible') scheduleResync(false);
     };
     const onSafety = () => refreshChatAfterSafetyChange(queryClient);
     socket.on('connect', onConnect);
-    socket.on('disconnect', onDisconnect);
     socket.on('chat:safety-changed', onSafety);
     document.addEventListener('visibilitychange', onVisibility);
     entry = {
@@ -146,7 +126,6 @@ function retainChatSync(queryClient: QueryClient, socket: Socket): () => void {
       release: () => {
         clearTimeout(timer);
         socket.off('connect', onConnect);
-        socket.off('disconnect', onDisconnect);
         socket.off('chat:safety-changed', onSafety);
         document.removeEventListener('visibilitychange', onVisibility);
         sockets.delete(socket);

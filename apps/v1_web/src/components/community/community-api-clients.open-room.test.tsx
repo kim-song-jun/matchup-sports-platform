@@ -65,7 +65,7 @@ describe('채팅방 열기 — 요청 중복', () => {
     expect(count('GET /chat/rooms')).toBe(2);
   });
 
-  it('열자마자 소켓이 붙어도 메시지·목록을 다시 받지 않는다', async () => {
+  it('하드 로드로 REST 읽기 뒤에 소켓이 붙으면 메시지·목록을 한 번만 더 받는다', async () => {
     const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
     clients.push(client);
     render(<QueryClientProvider client={client}><ChatRoomPageClient roomId="room-1" /></QueryClientProvider>);
@@ -75,8 +75,8 @@ describe('채팅방 열기 — 요청 중복', () => {
     await waitFor(() => expect(client.isFetching()).toBe(0));
     await new Promise((resolve) => setTimeout(resolve, 1500));
 
-    expect(count('GET /chat/rooms/room-1/messages')).toBe(1);
-    expect(count('GET /chat/rooms')).toBe(2);
+    expect(count('GET /chat/rooms/room-1/messages')).toBe(2);
+    expect(count('GET /chat/rooms')).toBe(3);
   });
 
   it('없는 방(404)은 소켓이 붙어도 메시지를 한 번만 요청한다', async () => {

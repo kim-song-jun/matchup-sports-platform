@@ -93,8 +93,9 @@ describe('isSecondYellowWithoutRed', () => {
     expect(isSecondYellowWithoutRed([], [queued('p-1', 'YELLOW', 'sending')], committing('p-1'))).toBe(true);
   });
 
-  it('실패한 전송은 기록되지 않았으니 세지 않고, 이미 확정된 항목은 이벤트 목록에서만 센다', () => {
-    expect(isSecondYellowWithoutRed([], [queued('p-1', 'YELLOW', 'failed')], committing('p-1'))).toBe(false);
+  it('실패해 재시도를 기다리는 옐로는 센다(재시도가 성공하면 기록되므로), 이미 확정된 항목은 이벤트 목록에서만 센다', () => {
+    expect(isSecondYellowWithoutRed([], [queued('p-1', 'YELLOW', 'failed')], committing('p-1'))).toBe(true);
+    expect(isSecondYellowWithoutRed([], [queued('p-1', 'YELLOW', 'failed'), queued('p-1', 'RED', 'failed')], committing('p-1'))).toBe(false);
     expect(isSecondYellowWithoutRed([card('p-1', 'YELLOW')], [queued('p-1', 'YELLOW', 'acked')], committing('p-1'))).toBe(true);
   });
 

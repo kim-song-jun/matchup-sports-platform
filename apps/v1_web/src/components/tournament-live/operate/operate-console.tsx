@@ -29,7 +29,7 @@ import {
 } from '@/hooks/use-v1-game-operations';
 import { readGameResultScore } from '@/lib/game-result-score';
 import { gameOperationsErrorMessage, useV1GameOperationsConsole } from '@/hooks/use-v1-game-operations-console';
-import { isTakeoverHeld } from '@/lib/game-operations-queue';
+import { hasPendingWork, isTakeoverHeld } from '@/lib/game-operations-queue';
 import {
   freezeCapture,
   isClockSuspicious,
@@ -700,10 +700,24 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
     liveEventsRef.current = ops.liveEvents;
   }, [ops.liveEvents]);
   // 확인 시트를 기다리는 사이 버전이 올라가므로, 그 뒤의 큐 적재는 최신 `ops`로 한다.
+  // 큐 항목마다 적재 시점의 gameSnapshot.version 이 expectedVersion 으로 박히므로,
+  // 앞 이벤트가 확정되기 전에 뒤 이벤트를 적재하면 서버가 VERSION_CONFLICT 로 거절한다.
   const opsRef = useRef(ops);
+  const queueIdleWaitersRef = useRef<Array<() => void>>([]);
   useEffect(() => {
     opsRef.current = ops;
+    if (hasPendingWork(ops.queue)) return;
+    const waiters = queueIdleWaitersRef.current;
+    queueIdleWaitersRef.current = [];
+    waiters.forEach((release) => release());
   }, [ops]);
+  const waitForQueueIdle = useCallback(
+    () =>
+      hasPendingWork(opsRef.current.queue)
+        ? new Promise<void>((resolve) => queueIdleWaitersRef.current.push(resolve))
+        : Promise.resolve(),
+    [],
+  );
 
   const handleCommit = useCallback(
     async (input: EventCaptureCommitInput) => {
@@ -723,11 +737,17 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
       );
       if (!(await confirm(copy))) return;
       const askRed = isSecondYellowWithoutRed(liveEventsRef.current, opsRef.current.queue.items, input);
-      void opsRef.current.submitEvent(input);
+      const submitted = opsRef.current.submitEvent(input);
       if (askRed) {
+        await submitted;
         const redInput: EventCaptureCommitInput = { ...input, payload: { card: 'RED' } };
         const redCopy = secondYellowConfirmCopy(input, gameDetail.data?.sides ?? [], fixtureLineup.data?.lineups ?? [], periodCount);
-        if (await confirm(redCopy)) void opsRef.current.submitEvent(redInput);
+        if (await confirm(redCopy)) {
+          await waitForQueueIdle();
+          void opsRef.current.submitEvent(redInput);
+        }
+      } else {
+        void submitted;
       }
       // 익명 GOAL에는 participantId가 없어 findRecentGoalEvent가 매칭할 수 없으므로
       // 어시스트 추가 액션을 달지 않는다(고아 토스트 액션을 만들지 않기 위한 가드).
@@ -745,7 +765,7 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
         });
       }
     },
-    [commandBlocked, showToast, confirm, gameDetail.data?.sides, fixtureLineup.data?.lineups, clockWarningMinutes, periodCount],
+    [commandBlocked, showToast, confirm, waitForQueueIdle, gameDetail.data?.sides, fixtureLineup.data?.lineups, clockWarningMinutes, periodCount],
   );
 
   // 이슈 #376 — 예전엔 ops.reverseEvent(되돌리기) + ops.submitEvent(재제출) 두 번

@@ -4,9 +4,10 @@ import type { EventCaptureCommitInput } from './action-target-picker';
 
 /**
  * 지금 기록하려는 옐로가 이 경기에서 그 선수의 두 번째 옐로이고 레드는 아직 없는가.
- * 서버 확정 이벤트(취소된 것 제외)와 아직 서버에 닿지 않은 대기·전송 중 항목을 함께 센다 —
- * 연달아 눌러 두 번째가 아직 큐에 있을 때도 놓치지 않기 위해서다. `acked` 항목은 이미
- * 이벤트 목록에 있으므로 다시 세지 않는다.
+ * 서버 확정 이벤트(취소된 것 제외)와 아직 서버에 닿지 않은 큐 항목을 함께 센다 —
+ * 연달아 눌러 두 번째가 아직 큐에 있을 때도 놓치지 않기 위해서다. `failed` 도 센다:
+ * "다시 시도"가 성공하면 그대로 기록되는 항목이라 세지 않으면 재시도 뒤 옐로 2장·레드 0이 된다.
+ * `acked` 항목은 이미 이벤트 목록에 있으므로 다시 세지 않는다.
  */
 export function isSecondYellowWithoutRed(
   events: readonly GameEventRecord[],
@@ -26,7 +27,7 @@ export function isSecondYellowWithoutRed(
     ...queueItems
       .filter(
         (item) =>
-          (item.status === 'queued' || item.status === 'sending') &&
+          item.status !== 'acked' &&
           item.event.type === 'CARD' &&
           item.event.participantId === participantId,
       )

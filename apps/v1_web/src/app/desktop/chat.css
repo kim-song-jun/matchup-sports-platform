@@ -206,7 +206,7 @@
     max-width: none;
     min-height: 64px;
     margin: 0;
-    padding: 0 20px;
+    padding: var(--spacing-2) 20px;
     display: flex;
     align-items: center;
     flex: 0 0 auto;
@@ -215,8 +215,53 @@
   }
 
   .tm-chat-desktop-pane-head h1,
-  .tm-chat-room-desktop-head h1 {
+  .tm-chat-room-head-title {
+    min-width: 0;
+    flex: 1 1 0%;
+  }
+
+  .tm-chat-room-head-title h2 {
     margin: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .tm-chat-room-head-sub {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-2);
+    font-size: var(--font-size-label);
+    color: var(--grey700);
+  }
+
+  .tm-chat-room-head-chip {
+    flex: none;
+    font-weight: 700;
+    color: var(--blue700);
+    background: var(--blue50);
+    border-radius: var(--radius-chip);
+    padding: 0 var(--spacing-2);
+  }
+
+  /* 44px 터치 영역은 헤더 높이가 흡수한다(음수 마진은 아래 요소가 클릭·포커스 링을 가린다). */
+  .tm-chat-room-head-link {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--spacing-1);
+    min-height: var(--spacing-11);
+    color: var(--grey700);
+    text-decoration: none;
+  }
+
+  .tm-chat-room-head-link:hover {
+    color: var(--blue600);
+  }
+
+  .tm-chat-room-head-link:focus-visible {
+    outline: 2px solid var(--blue500);
+    outline-offset: 2px;
+    border-radius: var(--radius-field);
   }
 
   .tm-chat-room-desktop-head {

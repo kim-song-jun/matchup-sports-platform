@@ -33,7 +33,7 @@ import type { V1ChatMessage, V1ChatRoom, V1Notification } from '@/types/api';
 import { ChatListPageView, ChatRoomPageView, NotificationsPageView } from './community-page';
 import { formatChatListTimestamp } from './chat-message-time';
 import type { ChatListViewModel, ChatRoomModel, ChatRoomViewModel, ChatShareCandidate, NotificationModel, NotificationsViewModel } from './community.types';
-import { chatRoomContextSub, chatRoomTypeLabel } from '@/lib/chat-route';
+import { chatRoomContextSub, chatRoomDestinationLabel, chatRoomTypeLabel } from '@/lib/chat-route';
 import { displayInitials } from '@/lib/display-initials';
 import { MAX_CHAT_IMAGES, formatFileSize } from './chat-plus-panel';
 import { composerBlockFromSendError, describeChatComposerBlock, describeChatRoomLoadError, pickChatRoomLoadError } from './chat-room-load-error';
@@ -237,10 +237,12 @@ export function ChatRoomPageClient({ roomId }: { roomId: string }) {
       ? {
           title: room.data.linkedTarget.title,
           sub: chatRoomContextSub(room.data.roomType),
+          typeLabel: chatRoomTypeLabel(room.data.roomType),
+          linkLabel: room.data.linkedTarget.route ? chatRoomDestinationLabel(room.data.roomType) : null,
           // 연결된 화면에서 뒤로가면 이 채팅방으로 돌아온다.
           href: room.data.linkedTarget.route ? withFromPath(room.data.linkedTarget.route, currentHref) : '/chat',
         }
-      : { title: '', sub: '', href: '/chat' },
+      : { title: '', sub: '', href: '/chat', typeLabel: '', linkLabel: null },
     teamContact: contact,
     // 더 오래된 메시지가 남아 있으면 여기가 대화의 맨 위가 아니다.
     historyNotice: room.data?.roomType === 'team' && messages.data?.pageInfo?.hasNext !== true ? '들어오기 전 대화는 보이지 않아요' : undefined,

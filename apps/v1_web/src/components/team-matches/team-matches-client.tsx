@@ -195,8 +195,10 @@ export function TeamMatchListPageClient({ seed }: { readonly seed?: CursorListSe
   const hasNext = cursorPageUnavailable || (query.data?.pageInfo?.hasNext ?? false);
   // 다음 페이지 요청만 "불러오는 중"이다 — 15초 배경 폴링(isFetching)은 버튼과 무관하다.
   const loadMorePending = Boolean(cursor) && (query.isPlaceholderData || (cursorPageUnavailable && query.isFetching));
+  // seed(placeholder)가 떠 있는 동안에는 첫 페이지 검증 전이라 seed 의 낡은 커서를 따라가지 않게 잠근다.
+  const loadMoreLocked = query.isPlaceholderData;
   const handleLoadMore = () => {
-    if (loadMorePending) return;
+    if (loadMorePending || loadMoreLocked) return;
     if (loadMoreError) {
       void query.refetch();
       return;
@@ -243,6 +245,7 @@ export function TeamMatchListPageClient({ seed }: { readonly seed?: CursorListSe
         hasNext,
         onLoadMore: handleLoadMore,
         loadMorePending,
+        loadMoreLocked,
         loadMoreError,
       }
     : {

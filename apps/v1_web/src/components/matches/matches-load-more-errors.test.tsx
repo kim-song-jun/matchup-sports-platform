@@ -18,6 +18,7 @@ type Filters = { cursor?: string };
 let client: QueryClient;
 let failCursorPage: boolean;
 let holdCursorPage: Promise<never> | null;
+let holdFirstPage: Promise<never> | null;
 
 function item(index: number): V1Match {
   const startsAt = new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString();
@@ -38,10 +39,11 @@ describe('매치 목록 더 보기 — 실패와 폴링 구분', () => {
   beforeEach(() => {
     failCursorPage = false;
     holdCursorPage = null;
+    holdFirstPage = null;
     client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     apiGet.mockImplementation(async (path: string, filters?: Filters) => {
       if (path !== '/matches') return [];
-      if (!filters?.cursor) return page([item(0), item(1)], 'c2');
+      if (!filters?.cursor) return holdFirstPage ?? page([item(0), item(1)], 'c2');
       if (holdCursorPage) return holdCursorPage;
       if (failCursorPage) throw new Error('boom');
       return page([item(2)], null);
@@ -82,5 +84,17 @@ describe('매치 목록 더 보기 — 실패와 폴링 구분', () => {
     const pending = await screen.findByRole('button', { name: '불러오는 중…' });
     expect(pending).toBeDisabled();
     expect(cards()).toHaveLength(2);
+  });
+
+  it('서버 seed 로 그리는 동안(첫 페이지 검증 전)에는 더 보기가 잠겨 seed 의 커서를 따라가지 않는다', async () => {
+    holdFirstPage = new Promise<never>(() => undefined);
+    const seed = { page: page([item(7), item(8)], 'stale-seed-cursor'), sports: [] };
+    render(<QueryClientProvider client={client}><MatchListPageClient seed={seed} /></QueryClientProvider>);
+
+    const button = await screen.findByRole('button', { name: '더 보기' });
+    expect(cards()).toHaveLength(2);
+    expect(button).toBeDisabled();
+    fireEvent.click(button);
+    expect(apiGet.mock.calls.some(([, filters]) => (filters as Filters | undefined)?.cursor === 'stale-seed-cursor')).toBe(false);
   });
 });

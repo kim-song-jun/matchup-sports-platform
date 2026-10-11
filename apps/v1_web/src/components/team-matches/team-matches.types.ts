@@ -105,6 +105,7 @@ export type TeamMatchListViewModel = {
   hasNext?: boolean;
   onLoadMore?: () => void;
   loadMorePending?: boolean;
+  loadMoreLocked?: boolean;
   /** 다음 페이지 요청이 실패했다 — 목록은 유지하고 버튼 옆에서 다시 시도하게 한다. */
   loadMoreError?: boolean;
 };

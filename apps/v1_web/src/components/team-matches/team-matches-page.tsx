@@ -120,7 +120,7 @@ export function TeamMatchListPageView({ model }: { model: TeamMatchListViewModel
             <button
               type="button"
               className="tm-btn tm-btn-md tm-btn-neutral tm-btn-block tm-load-more"
-              disabled={model.loadMorePending}
+              disabled={model.loadMorePending || model.loadMoreLocked}
               onClick={model.onLoadMore}
             >
               {model.loadMorePending ? '불러오는 중…' : model.loadMoreError ? '다시 불러오기' : '더 보기'}

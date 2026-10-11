@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { __resetNavigationHistoryForTests, installNavigationHistory } from '@/lib/navigation-history';
+import { __resetNavigationHistoryForTests, installNavigationHistory, markEntryReplacedByDocument } from '@/lib/navigation-history';
 import { LoginPageView } from './auth-page';
 import { getLoginViewModel } from './auth.view-model';
 
@@ -95,6 +95,39 @@ describe.each(exits)('로그인 화면 출구 — %s', (_label, exit) => {
     window.history.pushState({}, '', '/tournaments/t1/my');
     window.history.pushState({}, '', '/login?redirect=%2Ftournaments%2Ft1%2Fmy');
     renderLogin();
+
+    fireEvent.click(exit());
+
+    expect(router.replace).toHaveBeenCalledWith('/home');
+    expect(router.back).not.toHaveBeenCalled();
+  });
+});
+
+// RequireAuth 는 push 한 보호 화면을 window.location.replace 로 로그인에 하드 교체한다 — 새 문서·state null.
+describe.each(exits)('로그인 화면 출구(하드 교체로 열림) — %s', (_label, exit) => {
+  function openLoginByHardReplace(redirect: string) {
+    window.history.pushState({}, '', '/tournaments/t1');
+    window.history.pushState({}, '', redirect);
+    markEntryReplacedByDocument();
+    __resetNavigationHistoryForTests(); // 새 문서: 메모리는 사라지고 sessionStorage 거울만 남는다
+    window.history.replaceState(null, '', `/login?redirect=${encodeURIComponent(redirect)}`);
+    installNavigationHistory();
+  }
+
+  it('참가 신청 화면이 로그인으로 교체돼도 대회 상세로 돌아간다(홈이 아니다)', () => {
+    openLoginByHardReplace('/tournaments/t1/apply');
+    render(<LoginPageView model={getLoginViewModel('/tournaments/t1/apply')} />);
+
+    fireEvent.click(exit());
+
+    expect(router.back).toHaveBeenCalledTimes(1);
+    expect(router.replace).not.toHaveBeenCalled();
+  });
+
+  it('하드 교체가 아니라 앱 안에서 push 한 로그인이 redirect 대상 자신 위에 쌓였으면 홈으로 간다', () => {
+    window.history.pushState({}, '', '/tournaments/t1/apply');
+    window.history.pushState({}, '', '/login?redirect=%2Ftournaments%2Ft1%2Fapply');
+    render(<LoginPageView model={getLoginViewModel('/tournaments/t1/apply')} />);
 
     fireEvent.click(exit());
 

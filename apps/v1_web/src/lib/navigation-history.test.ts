@@ -18,7 +18,9 @@ import {
   isAppBackPending,
   isAppNavigationPop,
   markAppInitiatedBack,
+  previousInAppEntryUrl,
   pushBufferEntry,
+  replaceDocument,
   subscribeAppPop,
   suppressNextPop,
   type AppPop,
@@ -278,6 +280,39 @@ describe('콜드스타트 부모 항목', () => {
     expect(ensureColdStartParent('/matches')).toBe(false);
     expect(window.history.length).toBe(lengthBefore);
     expect(idx()).toBe(2);
+  });
+});
+
+describe('replaceDocument', () => {
+  it('location.replace 로 바뀐 문서는 교체된 항목의 자리를 차지한다 — 쌓이면 유령 항목이 앞 항목으로 읽힌다', () => {
+    installNavigationHistory();
+    window.history.pushState({}, '', '/tournaments/1');
+    window.history.pushState({}, '', '/tournaments/1/apply');
+    const replace = vi.fn();
+    vi.stubGlobal('location', { ...window.location, replace });
+    try {
+      replaceDocument('/login?redirect=%2Ftournaments%2F1%2Fapply');
+    } finally {
+      vi.unstubAllGlobals();
+    }
+    expect(replace).toHaveBeenCalledWith('/login?redirect=%2Ftournaments%2F1%2Fapply');
+
+    __resetNavigationHistoryForTests();
+    window.history.replaceState(null, '', '/login?redirect=%2Ftournaments%2F1%2Fapply');
+    installNavigationHistory();
+
+    expect(previousInAppEntryUrl()).toBe('/tournaments/1');
+  });
+
+  it('교체 없이 일어난 전체 문서 이동(링크·assign)은 새 항목으로 쌓인다', () => {
+    installNavigationHistory();
+    window.history.pushState({}, '', '/tournaments/1');
+
+    __resetNavigationHistoryForTests();
+    window.history.pushState(null, '', '/matches/3');
+    installNavigationHistory();
+
+    expect(previousInAppEntryUrl()).toBe('/tournaments/1');
   });
 });
 

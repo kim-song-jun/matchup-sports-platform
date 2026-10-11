@@ -10,6 +10,7 @@ import {
   getLoginPathForRedirect,
   shouldProbeV1Session,
 } from '@/lib/session-storage';
+import { replaceDocument } from '@/lib/navigation-history';
 import { disconnectV1Socket } from '@/lib/v1-socket';
 import { SessionFallback } from './session-entry-gate';
 import { ErrorState } from '@/components/v1-ui/primitives';
@@ -27,7 +28,7 @@ export function RequireAuth({ children }: { children: ReactNode }) {
     if (!nextHasSessionHint) {
       // router.replace()는 로그인 상태에서 prefetch된 /login 인스턴스를 재사용해
       // 세션 무효화 이전 스냅샷에 멈출 수 있다(하드 네비게이션으로 우회).
-      window.location.replace(getLoginPathForRedirect(getCurrentRedirectPath()));
+      replaceDocument(getLoginPathForRedirect(getCurrentRedirectPath()));
     }
   }, []);
 
@@ -37,7 +38,7 @@ export function RequireAuth({ children }: { children: ReactNode }) {
 
     clearStoredV1Session();
     disconnectV1Socket();
-    window.location.replace(getLoginPathForRedirect(getCurrentRedirectPath()));
+    replaceDocument(getLoginPathForRedirect(getCurrentRedirectPath()));
   }, [authMe.error, authMe.isError, authMe.isFetching, hasSessionHint]);
 
   if (hasSessionHint && authMe.isSuccess) return <>{children}</>;

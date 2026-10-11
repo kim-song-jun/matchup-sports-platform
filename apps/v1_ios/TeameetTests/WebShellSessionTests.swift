@@ -79,6 +79,7 @@ final class WebShellSessionTests: XCTestCase {
             from: envelope(state: large), currentAppBuild: build, currentOSMajorVersion: osMajor)
         XCTAssertEqual(restored, large)
     }
+
     /// A relaunch must not reopen the tab-bar-less login screen the reader was sent to; the
     /// shell keeps the previous snapshot instead of overwriting it with the login page.
     func testSkipsSnapshotsTakenOnLoginScreens() {

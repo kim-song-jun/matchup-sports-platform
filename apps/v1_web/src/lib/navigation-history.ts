@@ -34,7 +34,8 @@ type Entry = { url: string; overlay?: boolean; parent?: boolean; buffer?: boolea
 // tabStart: mirror index of the tab's very first history entry (nothing, not even another site, is before it).
 // leaveTarget: where a leave traversal was headed. A leave out of the app never pops here, so a later forward
 // back into this tab must compare against it, not the index the leave started from.
-type Mirror = { index: number; entries: Record<number, Entry>; tabStart?: number; leaveTarget?: number };
+// replacing: the current entry is about to be replaced by a new document (location.replace), not followed by one.
+type Mirror = { index: number; entries: Record<number, Entry>; tabStart?: number; leaveTarget?: number; replacing?: boolean };
 export type AppPop = { direction: 'back' | 'forward' | 'unknown'; appInitiated: boolean };
 type HistoryMethod = History['pushState'];
 
@@ -145,6 +146,7 @@ function recordPush(state: unknown) {
   if (!mirror) return;
   const next = mirror.index + 1;
   for (const key of Object.keys(mirror.entries)) if (Number(key) >= next) delete mirror.entries[Number(key)];
+  delete mirror.replacing; // a push means the announced document replace did not happen
   mirror.index = next;
   mirror.entries[next] = pushingBuffer
     ? { url: currentUrl(), buffer: true }
@@ -247,7 +249,8 @@ export function installNavigationHistory(): void {
     // 같은 탭의 전체 문서 이동(외부 복귀·네이티브 loadUrl) — 새 항목이 쌓인 것이다.
     mirror = stored;
     for (const key of Object.keys(mirror.entries)) if (Number(key) > stored.index) delete mirror.entries[Number(key)];
-    mirror.index = stored.index + 1;
+    mirror.index = stored.replacing ? stored.index : stored.index + 1;
+    delete mirror.replacing;
   } else {
     mirror = { index: 0, entries: {}, ...(window.history.length === 1 ? { tabStart: 0 } : {}) };
     coldStart = true;
@@ -373,6 +376,19 @@ export function goBackLeaving(steps: number): void {
 
 export function currentEntryIsBuffer(): boolean {
   return Boolean(mirror?.entries[mirror.index]?.buffer);
+}
+
+/** `window.location.replace` that keeps the mirror honest: the new document takes this entry's slot instead of stacking on it. */
+export function replaceDocument(url: string): void {
+  markEntryReplacedByDocument();
+  window.location.replace(url);
+}
+
+/** Call right before a `location.replace`: the next document's entry replaces the current one in the mirror. */
+export function markEntryReplacedByDocument(): void {
+  if (!mirror) return;
+  mirror.replacing = true;
+  persist();
 }
 
 /** Replace the current entry with an in-app URL — soft (router.replace) when bound, otherwise a full load. */

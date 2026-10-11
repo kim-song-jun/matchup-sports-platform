@@ -57,6 +57,7 @@ function makeGroup(
     advanceCount: null,
     groupTeams: [],
     standings: [],
+    qualification: null,
     ...overrides,
   };
 }
@@ -694,11 +695,11 @@ describe('getCompletedChampionName', () => {
       standings: [
         {
           registrationId: 'r2', teamId: 'team-2', teamName: '2위팀', teamLogoUrl: null, position: 2,
-          points: 10, wins: 3, draws: 1, losses: 1, goalsFor: 8, goalsAgainst: 5, recalculatedAt: null,
+          points: 10, wins: 3, draws: 1, losses: 1, goalsFor: 8, goalsAgainst: 5, recalculatedAt: null, sharedRank: null,
         },
         {
           registrationId: 'r1', teamId: 'team-1', teamName: '1위팀', teamLogoUrl: null, position: 1,
-          points: 13, wins: 4, draws: 1, losses: 0, goalsFor: 12, goalsAgainst: 3, recalculatedAt: null,
+          points: 13, wins: 4, draws: 1, losses: 0, goalsFor: 12, goalsAgainst: 3, recalculatedAt: null, sharedRank: null,
         },
       ],
     });
@@ -1050,6 +1051,7 @@ describe('TournamentDetailView — 정규 리그 거울 행', () => {
     progress: { total: 2, played: 1, remaining: 1, percent: 50 },
     magicNumber: null,
     recalculatedAt: null,
+    sharedRank: null,
   };
 
   function makeMirror(overrides: Partial<V1TournamentDetail> = {}): V1TournamentDetail {

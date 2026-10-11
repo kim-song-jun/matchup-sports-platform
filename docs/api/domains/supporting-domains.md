@@ -64,8 +64,11 @@
     상대 선수는 상대 사이드 최신 라인업에서 계정으로 해석된 참가자이고, 등번호 오름차순(번호 없음은 뒤, 같으면 이름순)으로 나온다.
     - 작성 자격: 작성자 사이드 최신 라인업에 계정으로 해석된 참가자가 1명 이상이면 그 명단에 있는 팀원만 작성자다. 경기별 명단 조정으로 빠진 팀원은 pending 목록(홈·마이 개수 포함)에 나오지 않고, 상세 조회와 제출(팀·선수 후기 모두)은 `403 NOT_ACTUAL_PARTICIPANT`다. 계정으로 해석된 참가자가 없으면(빈 라인업·계정 미연결 자동 명단 포함) 활성 팀원 전원이 작성자다.
     - 양 팀 겸직자가 한쪽 사이드 명단에서만 빠지면 그 방향의 대상만 닫힌다.
+    - 리그 소속 경기(`leagueId` 있음)는 pending·written·received 항목과 `source` 요약에 `isLeague: true`가 실린다. 클라이언트는 이 값으로 "팀매치" 대신 "리그 경기"로 표기한다(일반 팀매치는 `false`).
+    - 몰수로 확정된 경기(현재 공식 결과의 `outcomeReason=FORFEIT` 또는 옛 `[LEAGUE_FORFEIT]` 사유 마커)는 pending 목록에서 제외하고, 대상 조회와 제출은 `409 SOURCE_FORFEITED`다. 이미 쓴 리뷰는 written·received 목록에 그대로 남는다.
   - `tournament_fixture`: 완료되고 공식 결과가 기록된 대회 경기에서 참가팀 active `owner | manager`는 상대 팀(`targetType=team`)과 상대 등록 선수(`targetType=user`)를, active `member`는 상대 등록 선수만 평가한다.
     - `sourceId`는 작성 화면으로 진입한 fixture ID다.
+    - 몰수로 확정된 대회 경기는 `team_match`와 같은 기준으로 pending 목록에서 제외하고, 대상 조회와 제출은 `409 SOURCE_FORFEITED`다.
     - 중복 방지는 내부 `sourceGroupId=tournamentId` 기준이다. 같은 대회에서 같은 두 팀이 리그전/토너먼트로 두 번 만나도, 같은 작성자는 같은 상대 팀·선수를 한 번만 평가한다.
     - `GET /reviews?tab=pending&tournamentId=:uuid`는 해당 대회의 사용자별 남은 fixture 리뷰만 반환한다. 비참가자, 이미 전부 작성한 경기, 같은 상대 재대결 중복은 목록에서 제외한다.
 - `POST /reviews` body:

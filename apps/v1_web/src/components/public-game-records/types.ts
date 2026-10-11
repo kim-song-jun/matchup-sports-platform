@@ -174,6 +174,8 @@ interface PublicStandingRowBase {
   readonly teamName: string | null;
   readonly teamLogoUrl: string | null;
   readonly position: number;
+  /** 끝까지 안 갈린 동률 묶음의 최고 순위(공동 n위). 동률이 아니면 null. */
+  readonly sharedRank: number | null;
   readonly points: number;
   readonly wins: number;
   readonly draws: number;

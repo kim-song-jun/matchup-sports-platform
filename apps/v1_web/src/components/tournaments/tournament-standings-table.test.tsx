@@ -18,6 +18,7 @@ const ROW: TournamentStandingsRow = {
   teamName: '성수 FC',
   teamLogoUrl: null,
   position: 1,
+  sharedRank: null,
   points: 9,
   wins: 3,
   draws: 0,
@@ -38,7 +39,7 @@ describe('TournamentStandingsTable', () => {
         points: 0, wins: 0, draws: 0, losses: 0, goalsFor: 0, goalsAgainst: 0 },
     ];
 
-    render(<TournamentStandingsTable rows={zeroRows} advance={2} ariaLabel="테스트 순위표" />);
+    render(<TournamentStandingsTable rows={zeroRows} advancingKeys={new Set(['r1', 'r2'])} ariaLabel="테스트 순위표" />);
 
     // 편성된 팀이 빠짐없이 나온다
     expect(screen.getByText('한강 유나이티드')).toBeInTheDocument();
@@ -48,20 +49,20 @@ describe('TournamentStandingsTable', () => {
   });
 
   it('#/팀/전적/승점/득실 5개 컬럼을 렌더한다', () => {
-    render(<TournamentStandingsTable rows={[ROW]} advance={null} ariaLabel="테스트 순위표" />);
+    render(<TournamentStandingsTable rows={[ROW]} advancingKeys={null} ariaLabel="테스트 순위표" />);
     const table = screen.getByRole('table', { name: '테스트 순위표' });
     const headers = within(table).getAllByRole('columnheader').map((h) => h.textContent);
     expect(headers).toEqual(['#', '팀', '전적', '승점', '득실']);
   });
 
   it('승점은 "N점", 득실은 부호 있는 숫자로 보여준다', () => {
-    render(<TournamentStandingsTable rows={[ROW]} advance={null} ariaLabel="테스트 순위표" />);
+    render(<TournamentStandingsTable rows={[ROW]} advancingKeys={null} ariaLabel="테스트 순위표" />);
     expect(screen.getByText('9점')).toBeInTheDocument();
     expect(screen.getByText('+6')).toBeInTheDocument();
   });
 
   it('팀명을 누르면 /teams/:teamId/records 로 이동한다', () => {
-    render(<TournamentStandingsTable rows={[ROW]} advance={null} ariaLabel="테스트 순위표" />);
+    render(<TournamentStandingsTable rows={[ROW]} advancingKeys={null} ariaLabel="테스트 순위표" />);
     expect(screen.getByRole('link', { name: /성수 FC/ })).toHaveAttribute('href', '/teams/team-1/records');
   });
 
@@ -69,7 +70,7 @@ describe('TournamentStandingsTable', () => {
     render(
       <TournamentStandingsTable
         rows={[ROW]}
-        advance={null}
+        advancingKeys={null}
         ariaLabel="테스트 순위표"
         fromHref="/tournaments/tour-1/bracket"
       />,
@@ -80,22 +81,86 @@ describe('TournamentStandingsTable', () => {
     );
   });
 
-  it('advance가 null이 아니고 순위<=advance면 하이라이트 행을 렌더한다', () => {
+  const TIED_ROWS: TournamentStandingsRow[] = [
+    { ...ROW, key: 'reg-a', teamId: 'team-a', teamName: '가 FC', position: 1, sharedRank: 1 },
+    { ...ROW, key: 'reg-b', teamId: 'team-b', teamName: '나 FC', position: 2, sharedRank: 1 },
+    { ...ROW, key: 'reg-c', teamId: 'team-c', teamName: '다 FC', position: 3, sharedRank: 1 },
+  ];
+
+  it('advancingKeys 에 든 행만 하이라이트하고 진출 배지를 붙인다 — position 순서와 무관하다', () => {
     const { container } = render(
-      <TournamentStandingsTable rows={[ROW]} advance={2} ariaLabel="테스트 순위표" />,
+      <TournamentStandingsTable rows={TIED_ROWS} advancingKeys={new Set(['reg-b', 'reg-c'])} ariaLabel="테스트 순위표" />,
     );
-    expect(container.querySelector('.tm-standings-row-highlight')).not.toBeNull();
+    const highlighted = Array.from(container.querySelectorAll('.tm-standings-row-highlight')).map((tr) => tr.textContent);
+    expect(highlighted).toHaveLength(2);
+    expect(highlighted[0]).toContain('나 FC');
+    expect(highlighted[1]).toContain('다 FC');
+    const rowOf = (name: string) => screen.getByText(name).closest('tr') as HTMLElement;
+    expect(within(rowOf('나 FC')).getByText('진출')).toBeInTheDocument();
+    expect(within(rowOf('다 FC')).getByText('진출')).toBeInTheDocument();
+    expect(within(rowOf('가 FC')).queryByText('진출')).toBeNull();
   });
 
-  it('advance가 null이면 순위가 낮아도 하이라이트하지 않는다', () => {
+  it('advancingKeys 가 null 이면 position 이 높아도 하이라이트·진출 배지가 없다', () => {
     const { container } = render(
-      <TournamentStandingsTable rows={[ROW]} advance={null} ariaLabel="테스트 순위표" />,
+      <TournamentStandingsTable rows={TIED_ROWS} advancingKeys={null} ariaLabel="테스트 순위표" />,
     );
     expect(container.querySelector('.tm-standings-row-highlight')).toBeNull();
+    expect(screen.queryByText('진출')).toBeNull();
+  });
+
+  it('sharedRank 가 있는 행은 메달 대신 "공동 n" 배지와 "공동 n위" 레이블을 보여준다', () => {
+    render(<TournamentStandingsTable rows={TIED_ROWS} advancingKeys={null} ariaLabel="테스트 순위표" />);
+    const badges = screen.getAllByText('공동 1', { selector: '.tm-badge-orange' });
+    expect(badges).toHaveLength(3);
+    // 화면엔 "공동 1", 스크린리더엔 숨긴 "위"까지 이어서 "공동 1위"로 읽힌다
+    expect(badges[0]).toHaveTextContent('공동 1위');
+    expect(badges[0].querySelector('.sr-only')).toHaveTextContent('위');
+    // 저장 position(2·3)이 번호로 새어 나오거나 메달 색이 칠해지면 한 팀만 앞선 것처럼 읽힌다
+    expect(document.querySelector('.tm-standings-rank-gold')).toBeNull();
+    expect(document.querySelector('.tm-standings-rank-silver')).toBeNull();
+  });
+
+  it('공동 순위 행이 하나라도 있으면 # 열을 넓히고, 없으면 36px 그대로다', () => {
+    const { rerender } = render(
+      <TournamentStandingsTable rows={TIED_ROWS} advancingKeys={null} ariaLabel="테스트 순위표" />,
+    );
+    const hashHeader = () => within(screen.getByRole('table', { name: '테스트 순위표' })).getByRole('columnheader', { name: '#' });
+    expect(hashHeader()).toHaveStyle({ width: '64px' });
+    rerender(
+      <TournamentStandingsTable
+        rows={[ROW, { ...ROW, key: 'reg-2', teamId: 'team-2', teamName: '마포 FC', position: 2 }]}
+        advancingKeys={null}
+        ariaLabel="테스트 순위표"
+      />,
+    );
+    expect(hashHeader()).toHaveStyle({ width: '36px' });
+  });
+
+  it('동률이 없는 행은 순위 번호와 메달 색을 그대로 쓴다', () => {
+    render(<TournamentStandingsTable rows={[ROW]} advancingKeys={null} ariaLabel="테스트 순위표" />);
+    expect(screen.queryByText(/공동/)).toBeNull();
+    expect(document.querySelector('.tm-standings-rank-gold')).toHaveTextContent('1');
+  });
+
+  it('전 지표가 0인 표에서는 sharedRank 가 있어도 공동 배지를 달지 않는다', () => {
+    const zero = { points: 0, wins: 0, draws: 0, losses: 0, goalsFor: 0, goalsAgainst: 0 };
+    render(
+      <TournamentStandingsTable
+        rows={[
+          { ...ROW, ...zero, key: 'z1', teamId: 'z1', teamName: '영 FC', position: 1, sharedRank: 1 },
+          { ...ROW, ...zero, key: 'z2', teamId: 'z2', teamName: '공 FC', position: 2, sharedRank: 1 },
+        ]}
+        advancingKeys={null}
+        ariaLabel="테스트 순위표"
+      />,
+    );
+    expect(screen.queryByText(/공동/)).toBeNull();
+    expect(screen.getByText(/아직 경기 기록이 없어요/)).toBeInTheDocument();
   });
 
   it('행이 없으면 빈 안내 문구를 보여준다', () => {
-    render(<TournamentStandingsTable rows={[]} advance={null} ariaLabel="테스트 순위표" />);
+    render(<TournamentStandingsTable rows={[]} advancingKeys={null} ariaLabel="테스트 순위표" />);
     expect(screen.getByText('순위 집계 전이에요')).toBeInTheDocument();
   });
 
@@ -109,7 +174,7 @@ describe('TournamentStandingsTable', () => {
           { ...ROW, key: 'plus', teamId: 't-plus', teamName: '득실 플러스팀', goalsFor: 10, goalsAgainst: 4 },
           { ...ROW, key: 'minus', teamId: 't-minus', teamName: '득실 마이너스팀', goalsFor: 2, goalsAgainst: 5 },
         ]}
-        advance={null}
+        advancingKeys={null}
         ariaLabel="테스트 순위표"
       />,
     );
@@ -132,6 +197,7 @@ describe('순위표 컬럼 통일 — 두 소비처(bracket 탭 vs schedule 탭)
       sortOrder: 0,
       advanceCount: 2,
       groupTeams: [],
+      qualification: null,
       standings: [
         {
           registrationId: 'reg-1',
@@ -146,6 +212,7 @@ describe('순위표 컬럼 통일 — 두 소비처(bracket 탭 vs schedule 탭)
           goalsFor: 10,
           goalsAgainst: 4,
           recalculatedAt: null,
+          sharedRank: null,
         },
       ],
     };
@@ -239,6 +306,7 @@ describe('순위표 컬럼 통일 — 두 소비처(bracket 탭 vs schedule 탭)
           teamName: '성수 FC',
           teamLogoUrl: null,
           position: 1,
+          sharedRank: null,
           points: 9,
           wins: 3,
           draws: 0,

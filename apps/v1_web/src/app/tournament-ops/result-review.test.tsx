@@ -11,6 +11,7 @@ import {
   type TournamentGameDetail,
   type TournamentGameSide,
 } from '@/hooks/use-tournament-result-review';
+import { readGameResultScore } from '@/lib/game-result-score';
 import { GameResultReviewPanel } from '@/components/tournament-result-review/game-result-review-panel';
 import { GameResultCorrectionPanel } from '@/components/tournament-result-review/game-result-correction-panel';
 
@@ -126,9 +127,27 @@ function buildGame(actorRole: GameActorRole, overrides?: Partial<TournamentGameD
 function buildRevision(
   overrides: Partial<GameResultRevision> & { id: string; revision: number; state: GameResultRevisionState },
 ): GameResultRevision {
+  // 서버는 점수 = 팀별 득점 기록 수, 선수 득점 = 그 선수의 득점 기록 수가 아니면 정정을 422 로 거부한다.
+  const recorded = readGameResultScore(overrides.score ?? { home: 2, away: 1 });
+  const homeGoals = recorded?.home ?? 0;
+  const awayGoals = recorded?.away ?? 0;
   return {
     gameId: 'game-1',
     score: { home: 2, away: 1 },
+    goalEvents: [
+      ...Array.from({ length: homeGoals }, (_, index) => ({
+        id: `goal-home-${index}`,
+        sideId: 'side-home',
+        participantId: 'participant-aaaaaa111111',
+        ownGoal: false,
+      })),
+      ...Array.from({ length: awayGoals }, (_, index) => ({
+        id: `goal-away-${index}`,
+        sideId: 'side-away',
+        anonymous: true,
+        ownGoal: false,
+      })),
+    ],
     eventsHash: 'hash-1',
     missingScorer: false,
     mvpParticipantId: null,
@@ -152,7 +171,7 @@ function buildRevision(
         sideId: 'side-home',
         started: true,
         minutesPlayed: 90,
-        goals: 2,
+        goals: homeGoals,
         assists: 1,
         fouls: 0,
         cards: { yellow: 0, red: 0 },
@@ -328,6 +347,7 @@ describe('officialize (approve) always available to platform_ops', () => {
         expectedVersion: 5,
         score: { home: 2, away: 1 },
         eventsHash: 'hash-1',
+        goalEvents: expect.any(Array),
         mvpParticipantId: 'participant-aaaaaa111111',
       },
       expect.any(Object),
@@ -464,7 +484,8 @@ describe('correction -- create against the current official revision, always cap
     await user.click(screen.getByRole('button', { name: '정정 시작' }));
     const dialog = screen.getByRole('dialog');
     const homeInput = within(dialog).getByLabelText('홈 점수');
-    fireEvent.change(homeInput, { target: { value: '2' } });
+    expect(homeInput).toHaveValue(1);
+    await user.click(within(dialog).getByRole('button', { name: '득점 추가' }));
     expect(within(dialog).getByText('점수 변경: 1:1 → 2:1')).toBeInTheDocument();
 
     await user.type(within(dialog).getByLabelText('정정 사유'), '득점 누락 정정');
@@ -490,7 +511,7 @@ describe('correction -- create against the current official revision, always cap
               sideId: 'side-home',
               started: true,
               minutesPlayed: 90,
-              goals: 2,
+              goals: 1,
               assists: 1,
               fouls: 0,
               cards: { yellow: 0, red: 0 },
@@ -746,7 +767,9 @@ describe('결선 무승부는 저장 전에 폼이 알려준다', () => {
 
     await user.click(screen.getByRole('button', { name: '결과 다시 입력' }));
     const dialog = screen.getByRole('dialog');
-    fireEvent.change(within(dialog).getByLabelText('원정 점수'), { target: { value: '2' } });
+    // 2:1 -> 2:2 -- 득점 기록 하나를 원정 팀으로 더한다.
+    await user.click(within(dialog).getByRole('button', { name: '득점 추가' }));
+    fireEvent.change(within(dialog).getByLabelText('4번째 득점 팀'), { target: { value: 'side-away' } });
 
     expect(within(dialog).getByRole('status')).toHaveTextContent(/승부차기/);
 

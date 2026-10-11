@@ -447,7 +447,7 @@ export function TeamMatchEditPageClient({ teamMatchId }: { teamMatchId: string }
       // 되돌리는 API가 없는 파괴적 동작 — 신청자 전원이 cancelled_by_host로 넘어가고
       // 알림도 나간다. '변경사항 저장' 바로 아래 붙은 버튼이라 오탭 가능성이 높으므로
       // 확인 없이 즉시 실행하지 않는다.
-      const reason = await confirmWithReason({ ...TEAM_MATCH_CANCEL_CONFIRM, tone: 'danger', reason: teamMatchCancelReasonField(false) });
+      const reason = await confirmWithReason({ ...TEAM_MATCH_CANCEL_CONFIRM, tone: 'danger', reason: teamMatchCancelReasonField(editQuery.data?.editable === false) });
       if (reason === null) return;
       setError(null);
       cancelTeamMatch.mutate(

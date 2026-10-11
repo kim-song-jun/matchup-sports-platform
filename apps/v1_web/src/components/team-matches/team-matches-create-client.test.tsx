@@ -529,6 +529,21 @@ describe('TeamMatchEditPageClient — cancel confirmation', () => {
     })));
   });
 
+  it('상대팀이 확정돼 수정이 잠긴 경기는 사유를 필수로 받는다', async () => {
+    confirmMock.mockResolvedValue(null);
+    teamMatchEditData.editable = false;
+    try {
+      render(<TeamMatchEditPageClient teamMatchId="team-match-edit-1" />);
+      fireEvent.click(await screen.findByRole('button', { name: '팀매치 취소' }));
+
+      await waitFor(() => expect(confirmMock).toHaveBeenCalledWith(expect.objectContaining({
+        reason: expect.objectContaining({ label: '취소 사유', required: true }),
+      })));
+    } finally {
+      teamMatchEditData.editable = true;
+    }
+  });
+
   it('확인 모달에서 적은 사유를 취소 API 로 보낸다', async () => {
     confirmMock.mockResolvedValue('개인 사정으로 어려워졌어요');
     render(<TeamMatchEditPageClient teamMatchId="team-match-edit-1" />);

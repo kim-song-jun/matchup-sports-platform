@@ -146,14 +146,13 @@ function qualificationOf(
   const isInsideLine = (id: string) =>
     (orderIndexById.get(id) ?? Infinity) < effectiveCount && (positionById.get(id) ?? Infinity) <= effectiveCount;
   // 진출 자리 순서대로 모은 확정 팀. 진출선 안쪽 동률은 누가 올라가는지는 정해졌고 시드만 미정이라 여기 넣는다.
+  // 진출선에 걸친 동률 팀은 넣지 않는다 — 운영자가 고를 때까지 진출로 칠하지 않는다.
   const decided = new Set<string>();
-  let straddlesLine = false;
   for (let rank = 1; rank <= effectiveCount; rank += 1) {
     const resolution = resolveRankIn(source, league, rank);
     if (resolution.state === 'group_incomplete') return null;
     if (resolution.state === 'ready') decided.add(resolution.registrationId);
     else if (resolution.tiedRegistrationIds.every(isInsideLine)) resolution.tiedRegistrationIds.forEach((id) => decided.add(id));
-    else straddlesLine = true;
   }
   // 조 전체가 올라가면 동률이 어디에 걸려도 진출 팀은 이미 정해졌다.
   if (effectiveCount >= source.registrationIds.length) {
@@ -161,8 +160,13 @@ function qualificationOf(
   }
   const members = new Set(source.registrationIds);
   const placed = [...placedRegistrationIds].filter((id) => members.has(id)).sort();
-  if (placed.length > 0) {
-    return { advancingRegistrationIds: placed, undecided: placed.length < effectiveCount && straddlesLine };
+  // 결선에 들어간 팀은 대진이 정답이라 그대로 두고(진출 수보다 많아도 — 와일드카드 등), 남은 자리만 순위로 확정된 팀으로
+  // 순위 순서대로 채운다. 배치가 일부만 됐거나 결선 자리가 진출 수보다 적어도 확정 팀이 빠지지 않는다. 어드민이 자리에
+  // 순위와 다른 팀을 넣었으면 그 팀이 먼저 들어가 확정 팀 하나가 밀려날 수 있다(자리를 다 채우면 대진과 같아진다).
+  const advancing = [...placed];
+  for (const id of decided) {
+    if (advancing.length >= effectiveCount) break;
+    if (!advancing.includes(id)) advancing.push(id);
   }
-  return { advancingRegistrationIds: [...decided], undecided: straddlesLine };
+  return { advancingRegistrationIds: advancing.sort(), undecided: advancing.length < effectiveCount };
 }

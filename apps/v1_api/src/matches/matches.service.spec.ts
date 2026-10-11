@@ -479,6 +479,49 @@ describe('MatchesService', () => {
     expect(chat.deliverSystemLine).toHaveBeenCalledWith({ messageId: 'joined-line' });
   });
 
+  describe('approveApplication: 신청 마감 시각 이후', () => {
+    it('마감 전에 들어온 대기 신청은 마감 시각이 지나도 경기 시작 전이면 승인된다', async () => {
+      const match = matchRow({ status: 'recruiting', startAt: FUTURE, deadlineAt: PAST });
+      prisma.v1MatchApplication.findFirst.mockResolvedValue(applicationRow({ match }));
+      prisma.v1Match.findFirst.mockResolvedValue(match);
+      prisma.v1MatchApplication.updateMany.mockResolvedValue({ count: 1 });
+      prisma.v1MatchParticipant.upsert.mockResolvedValue({ id: 'participant-1' });
+
+      await expect(service.approveApplication(host, 'app-1', {})).resolves.toMatchObject({
+        applicationId: 'app-1',
+        status: 'approved',
+      });
+      expect(prisma.v1MatchParticipant.upsert).toHaveBeenCalledTimes(1);
+    });
+
+    it('마감 시각이 지나도 정원이 찼으면 여전히 FULL 로 막힌다', async () => {
+      const match = matchRow({ status: 'recruiting', startAt: FUTURE, deadlineAt: PAST, maxParticipants: 6 });
+      prisma.v1MatchApplication.findFirst.mockResolvedValue(applicationRow({ match }));
+      prisma.v1Match.findFirst.mockResolvedValue(match);
+      prisma.v1MatchParticipant.count.mockResolvedValue(6);
+
+      await expect(service.approveApplication(host, 'app-1', {})).rejects.toMatchObject({
+        response: { code: 'FULL' },
+      });
+      expect(prisma.v1MatchParticipant.upsert).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      ['경기 시작 시각이 지났으면', { status: 'recruiting', startAt: PAST, deadlineAt: PAST }],
+      ['호스트가 직접 마감한 매치면', { status: 'closed', startAt: FUTURE, deadlineAt: PAST }],
+      ['취소된 매치면', { status: 'cancelled', startAt: FUTURE, deadlineAt: null }],
+    ])('%s 승인할 수 없다', async (_label, overrides) => {
+      const match = matchRow(overrides);
+      prisma.v1MatchApplication.findFirst.mockResolvedValue(applicationRow({ match }));
+      prisma.v1Match.findFirst.mockResolvedValue(match);
+
+      await expect(service.approveApplication(host, 'app-1', {})).rejects.toMatchObject({
+        response: { code: 'STATE_CONFLICT' },
+      });
+      expect(prisma.v1MatchParticipant.upsert).not.toHaveBeenCalled();
+    });
+  });
+
   // ─── 5. 비-호스트 신청 승인 → 403 PERMISSION_DENIED ─────────────────────
 
   it('approveApplication: 호스트가 아닌 사용자가 승인하면 403 PERMISSION_DENIED를 던진다', async () => {

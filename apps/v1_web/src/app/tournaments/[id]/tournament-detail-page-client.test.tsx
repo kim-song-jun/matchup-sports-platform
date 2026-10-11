@@ -440,7 +440,7 @@ describe('TournamentDetailPageClient — 리그 방식 일정', () => {
   it('리그 방식 일반 대회는 대회 축 경기를 일정으로 그린다 (leagueFixtures 는 비어 있다)', async () => {
     renderLeagueFormat({
       kind: 'regular_tournament',
-      groups: [{ id: 'group-1', name: 'BUFF 리그', phase: 'group', sortOrder: 0, advanceCount: null, groupTeams: [], standings: [] }],
+      groups: [{ id: 'group-1', name: 'BUFF 리그', phase: 'group', sortOrder: 0, advanceCount: null, groupTeams: [], standings: [], qualification: null }],
       fixtures: [tournamentFixture],
       leagueFixtures: [],
     });

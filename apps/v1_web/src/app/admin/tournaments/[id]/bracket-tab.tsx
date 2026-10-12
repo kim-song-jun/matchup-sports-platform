@@ -40,6 +40,9 @@ import {
   submitBtnCls,
 } from './tournament-detail-shared';
 import { isoToKstDatetimeLocal, kstDatetimeLocalToIso } from '@/lib/kst-calendar';
+import { Button } from '@/components/v1-ui/button';
+import { BracketListTemplateTools } from '@/components/admin/bracket-canvas/bracket-list-template-tools';
+import { CrossGroupRound12Dialog } from '@/components/admin/bracket-canvas/cross-group-round12-dialog';
 
 
 /**
@@ -126,6 +129,7 @@ export function BracketTab({
   bracketPublishedAt,
   bracketPublishScheduledAt,
   canWrite,
+  tournamentFormat,
 }: {
   tournamentId: string;
   showToast: (msg: string, v?: 'success' | 'error') => void;
@@ -136,8 +140,10 @@ export function BracketTab({
   bracketPublishedAt: string | null | undefined;
   bracketPublishScheduledAt: string | null | undefined;
   canWrite: boolean;
+  tournamentFormat?: 'knockout' | 'league' | 'group_knockout';
 }) {
   const { data: bracket, isPending, isError, error, refetch } = useV1AdminBracket(tournamentId);
+  const [round12AutoOpen, setRound12AutoOpen] = useState(false);
   const createGroup = useV1CreateGroup(tournamentId);
   const assignGroupTeam = useV1AssignGroupTeam(tournamentId);
   const createFixture = useV1CreateFixture(tournamentId);
@@ -646,6 +652,11 @@ export function BracketTab({
 
     <div className="flex flex-col gap-6">
 
+      {canWrite && tournamentFormat ? <BracketListTemplateTools tournamentId={tournamentId} format={tournamentFormat}
+        hasExistingBracket={groups.length > 0 || fixtures.length > 0 || (bracket?.slots?.length ?? 0) > 0}
+        groups={groups} slots={bracket?.slots ?? []} registrations={registrations} showToast={showToast} /> : null}
+      {round12AutoOpen ? <CrossGroupRound12Dialog tournamentId={tournamentId} onClose={() => setRound12AutoOpen(false)} showToast={showToast} /> : null}
+
       {/* ── 조 롤업 헤더 + 원클릭 조 추가 ─────────────────────────────── */}
       <div className="flex items-center justify-between gap-3 flex-wrap px-1">
         <p className="text-[length:var(--font-size-label)] font-semibold text-[var(--text-body)]">
@@ -677,28 +688,32 @@ export function BracketTab({
       ) : (
         <div className="flex flex-col gap-4">
           {groups.map((group) => (
-            <BracketGroupCard
-              key={group.id}
-              group={group}
-              allGroups={groups}
-              allStandings={allStandings}
-              fixtures={fixtures}
-              confirmedTeamItems={confirmedTeamItems}
-              assignGroupTeam={assignGroupTeam}
-              createFixture={createFixture}
-              createBye={createBye}
-              isAutoGenerating={isAutoGenerating}
-              onAutoGenerate={(groupId) => void handleAutoGenerate(groupId)}
-              onEditGroup={(g) => {
-                setEditGroup(g);
-                setEditGroupName(g.name);
-                setEditGroupAdvance(g.advanceCount != null ? String(g.advanceCount) : '');
-              }}
-              onDeleteGroup={(g) => void handleDeleteGroup(g)}
-              onRemoveGroupTeam={(groupTeamId, teamName) => void handleRemoveGroupTeam(groupTeamId, teamName)}
-              autoFocus={focusGroupId === group.id}
-              showToast={showToast}
-            />
+            <div key={group.id} className="flex flex-col gap-2">
+              {canWrite && tournamentFormat === 'group_knockout' && group.phase === 'round12' && groups.filter((item) => item.phase === 'group').length === 5
+                ? <div className="flex justify-end"><Button variant="outline" size="md" onClick={() => setRound12AutoOpen(true)}>12강 진출팀 자동 배정</Button></div> : null}
+              <BracketGroupCard
+                group={group}
+                managedEntrySlots={(bracket?.slots ?? []).some((slot) => slot.kind === 'ENTRY' && slot.groupId === group.id)}
+                allGroups={groups}
+                allStandings={allStandings}
+                fixtures={fixtures}
+                confirmedTeamItems={confirmedTeamItems}
+                assignGroupTeam={assignGroupTeam}
+                createFixture={createFixture}
+                createBye={createBye}
+                isAutoGenerating={isAutoGenerating}
+                onAutoGenerate={(groupId) => void handleAutoGenerate(groupId)}
+                onEditGroup={(g) => {
+                  setEditGroup(g);
+                  setEditGroupName(g.name);
+                  setEditGroupAdvance(g.advanceCount != null ? String(g.advanceCount) : '');
+                }}
+                onDeleteGroup={(g) => void handleDeleteGroup(g)}
+                onRemoveGroupTeam={(groupTeamId, teamName) => void handleRemoveGroupTeam(groupTeamId, teamName)}
+                autoFocus={focusGroupId === group.id}
+                showToast={showToast}
+              />
+            </div>
           ))}
         </div>
       )}

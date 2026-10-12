@@ -17,7 +17,8 @@ export function tournamentSlotLabel(input: TournamentSlotLabelInput): string {
     case 'BYE':
       return `부전승 ${input.position}`;
     case 'GROUP_RANK':
-      return input.sourceGroupName === null ? `${input.position}위` : `${input.sourceGroupName} ${input.position}위`;
+      return input.sourceGroupName === null && input.groupPhase === 'round12' ? `결선 ${input.position}번 자리`
+        : input.sourceGroupName === null ? `${input.position}위` : `${input.sourceGroupName} ${input.position}위`;
     case 'ENTRY':
       return input.groupPhase === 'group' && input.groupName !== null
         ? `${input.groupName} ${input.position}번`

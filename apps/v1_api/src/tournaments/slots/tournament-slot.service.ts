@@ -15,6 +15,8 @@ import { syncByeSlotInTx } from './bye-slot-sync';
 import { lockCompetitionForBracketMutationInTx, lockCompetitionForSlotReleaseInTx } from './competition-bracket-lock';
 import { fillSlotsFromStandings, previewGroupRankStandings, type FillOverride } from './group-rank-fill';
 import { pickRandomAssignments } from './random-assignment';
+import { applyCrossGroupRound12, previewCrossGroupRound12 } from './cross-group-round12';
+import type { CrossGroupRound12Dto } from './dto/cross-group-round12.dto';
 import { assertSlotFixturesNotStarted, isSlotFixtureStarted, loadSlotUsingFixtures, sidesUsingSlot } from './slot-fixtures';
 
 type Tx = Prisma.TransactionClient;
@@ -55,7 +57,7 @@ const alreadyPlaced = () =>
 
 async function assertPlaceable(
   tx: Tx,
-  slot: { id: string; tournamentId: string; kind: V1TournamentSlotKind },
+  slot: { id: string; tournamentId: string; kind: V1TournamentSlotKind; groupId: string | null },
   registrationId: string,
 ): Promise<void> {
   const registration = await tx.v1TournamentRegistration.findFirst({
@@ -68,10 +70,19 @@ async function assertPlaceable(
       message: '이 대회에서 확정된 팀만 자리에 넣을 수 있어요.',
     });
   }
-  // ENTRY 와 BYE 는 한 팀이 동시에 차지할 수 없다 — 유일 제약은 같은 kind 끼리만 막으므로 서비스가 교차로 막는다.
-  const exclusiveKinds: V1TournamentSlotKind[] = slot.kind === 'GROUP_RANK' ? ['GROUP_RANK'] : ['ENTRY', 'BYE'];
+  // 유일 제약은 같은 kind 끼리만 막는다. 서비스는 결선 진출 자리의 kind 간 중복도 막는다.
+  const exclusiveKinds: V1TournamentSlotKind[] = slot.kind === 'GROUP_RANK' ? ['GROUP_RANK', 'BYE']
+    : slot.kind === 'BYE' ? ['ENTRY', 'BYE', 'GROUP_RANK'] : ['ENTRY', 'BYE'];
+  const group = slot.groupId === null ? null : await tx.v1TournamentGroup.findUnique({
+    where: { id: slot.groupId }, select: { phase: true },
+  });
+  // 조별 ENTRY를 가진 팀도 결선 BYE로 진출할 수 있다. 결선 안의 중복은 계속 막는다.
+  const stageEntry = slot.kind === 'ENTRY' && group?.phase === 'group';
   const placed = await tx.v1TournamentSlot.findFirst({
-    where: { tournamentId: slot.tournamentId, registrationId, kind: { in: exclusiveKinds }, id: { not: slot.id } },
+    where: { tournamentId: slot.tournamentId, registrationId, kind: { in: exclusiveKinds }, id: { not: slot.id },
+      ...(slot.kind === 'BYE' ? { NOT: { kind: 'ENTRY', group: { is: { phase: 'group' } } } }
+        : stageEntry ? { kind: 'ENTRY' as const } : {}),
+    },
     select: { id: true },
   });
   if (placed !== null) throw alreadyPlaced();
@@ -255,7 +266,7 @@ export class TournamentSlotService {
   private async loadCompetition(db: PrismaService | Tx, competitionId: string) {
     const competition = await findTournamentOnSurface(db, ALL_COMPETITION_KINDS, {
       where: { id: competitionId, deletedAt: null },
-      select: { id: true, kind: true },
+      select: { id: true, kind: true, format: true },
     });
     if (competition === null) {
       throw new NotFoundException({ code: 'TOURNAMENT_NOT_FOUND', message: '대회를 찾을 수 없어요.' });
@@ -288,7 +299,9 @@ export class TournamentSlotService {
       await lockCompetitionForBracketMutationInTx(tx, competition);
       // 잠금 안에서 다시 읽는다 — 화면이 본 빈 자리가 아니라 지금의 빈 자리·미배치 팀이 기준이다.
       const slotRows = await tx.v1TournamentSlot.findMany({
-        where: { tournamentId: competition.id, kind: { in: ['ENTRY', 'BYE'] } },
+        where: { tournamentId: competition.id, kind: { in: ['ENTRY', 'BYE'] },
+          ...(competition.format === 'group_knockout' ? { kind: 'ENTRY' as const, group: { is: { phase: 'group' as const } } } : {}),
+        },
         select: { id: true, registrationId: true },
         orderBy: { id: 'asc' },
       });
@@ -311,6 +324,15 @@ export class TournamentSlotService {
       );
       return { assignments };
     }, SLOT_TRANSACTION_OPTIONS);
+  }
+
+  /** 조 간 성적 비교 12강 미리보기/배정. */
+  round12Preview(user: V1AuthUser, tournamentId: string) {
+    return previewCrossGroupRound12({ prisma: this.prisma, adminContext: this.adminContext, games: this.games }, user, tournamentId);
+  }
+
+  round12Apply(user: V1AuthUser, tournamentId: string, input: CrossGroupRound12Dto) {
+    return applyCrossGroupRound12({ prisma: this.prisma, adminContext: this.adminContext, games: this.games }, user, tournamentId, input);
   }
 
   /** GET /admin/tournaments/:tournamentId/slots/standings-preview */

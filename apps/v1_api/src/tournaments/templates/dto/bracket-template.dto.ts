@@ -10,6 +10,9 @@ export class ApplyBracketTemplateDto {
   @IsIn(BRACKET_TEMPLATE_KINDS)
   kind!: BracketTemplateKind;
 
+  @IsOptional() @IsIn(['cross_group_round12'])
+  qualificationMode?: 'cross_group_round12';
+
   @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(1000)
   size?: number;
 
@@ -57,6 +60,7 @@ export function toBracketTemplateInput(dto: ApplyBracketTemplateDto): BracketTem
         advancePerGroup: required(dto.advancePerGroup, 'advancePerGroup') as 1 | 2,
         legs: required(dto.legs, 'legs') as 1 | 2,
         thirdPlace: dto.thirdPlace ?? false,
+        ...(dto.qualificationMode ? { qualificationMode: dto.qualificationMode } : {}),
       };
   }
 }

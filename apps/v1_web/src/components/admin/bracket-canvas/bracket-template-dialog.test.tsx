@@ -29,6 +29,17 @@ beforeEach(() => {
 });
 
 describe('BracketTemplateDialog — 토너먼트', () => {
+  it('조별+결선에서 20팀·5조→12강을 고르면 41경기를 만들고 특수 진출 규칙을 보낸다', () => {
+    renderDialog({ format: 'group_knockout' });
+    fireEvent.click(screen.getByLabelText('20팀 · 5개 조 → 12강 (3위 상위 2팀 추가)'));
+    expect(screen.getByText('경기 41개 · 자리 32개 · 연결 10개')).toBeInTheDocument();
+    expect(screen.getByLabelText('조 수')).toBeDisabled();
+    create();
+    expect(mocks.apply).toHaveBeenCalledWith({
+      kind: 'group_knockout', groupCount: 5, teamsPerGroup: 4, advancePerGroup: 2, legs: 1,
+      thirdPlace: false, qualificationMode: 'cross_group_round12',
+    }, expect.any(Object));
+  });
   it('8팀 + 3·4위전이 기본이고 만들어질 개수를 미리 보여 준다', () => {
     renderDialog();
     expect(screen.getByLabelText('8팀')).toBeChecked();

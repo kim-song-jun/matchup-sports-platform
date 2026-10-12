@@ -33,6 +33,11 @@ export function planBracketTemplateCounts(input: BracketTemplateInput): Template
     return { groups: 1, slots: input.teamCount, fixtures: ((input.teamCount * (input.teamCount - 1)) / 2) * input.legs, edges: 0 };
   }
   // 결선 크기(조 수 x 진출 팀 수)가 2·4·8·16 이 아니거나 결승만인데 3·4위전이면 서버가 거절하는 조합 — 미리보기도 없다.
+  if (input.qualificationMode === 'cross_group_round12') {
+    if (input.groupCount !== 5 || input.teamsPerGroup !== 4 || input.advancePerGroup !== 2 || input.legs !== 1) return null;
+    const knockout = planBracketTemplateCounts({ kind: 'knockout', size: 12, thirdPlace: input.thirdPlace })!;
+    return { groups: knockout.groups + 5, slots: knockout.slots + 20, fixtures: knockout.fixtures + 30, edges: knockout.edges };
+  }
   const size = input.groupCount * input.advancePerGroup;
   if (![2, 4, 8, 16].includes(size) || (size === 2 && input.thirdPlace)) return null;
   const third = input.thirdPlace ? 1 : 0;

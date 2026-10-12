@@ -1,0 +1,21 @@
+{
+  "route": "https://alpha.teameet.co.kr/admin/tournaments/ad200600-0000-4000-8000-000000000003/overview",
+  "viewport": {
+    "width": 1440,
+    "height": 1000
+  },
+  "mode": "read-only unauthenticated alpha",
+  "errors": [],
+  "failures": [
+    {
+      "url": "https://alpha.teameet.co.kr/api/v1/auth/me",
+      "status": 401
+    },
+    {
+      "url": "https://alpha.teameet.co.kr/api/v1/auth/me",
+      "status": 401
+    }
+  ],
+  "finalUrl": "https://alpha.teameet.co.kr/login?redirect=%2Fadmin%2Ftournaments%2Fad200600-0000-4000-8000-000000000003%2Foverview",
+  "text": "teameet\n같이 뛸 사람이\n기다리고 있어요\n\n종목·실력·지역만 알려주면 딱 맞는 매치와 팀을 찾아드려요.\n\n같이 뛸 사람을 한 번에 찾아요\n\nTeameet에 오신 걸 환영해요\n\n내 종목·실력·지역에 맞는 매치를 추천받아요\n팀을 만들고 다른 팀과 경기를 잡아요\n대회에 참가하고 기록을 쌓아요\n카카오\n네이버\n\n네이버 로그인은 준비 중이에요\n\n또는\n이메일로 로그인로그인 없이 시작하기\n\n아직 계정이 없나요? 회원가입\n\n로그인 또는 가입을 진행하면 서비스 이용약관과 개인정보 처리방침에 동의하는 것으로 간주돼요."
+}

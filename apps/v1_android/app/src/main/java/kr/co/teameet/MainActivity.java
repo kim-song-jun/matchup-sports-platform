@@ -50,11 +50,13 @@ import androidx.webkit.WebViewCompat;
 import androidx.webkit.WebViewFeature;
 import com.google.firebase.messaging.FirebaseMessaging;
 import java.util.Collections;
+import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.function.Consumer;
 import org.json.JSONObject;
+import org.json.JSONArray;
 
 public final class MainActivity extends AppCompatActivity {
     private FrameLayout rootView;
@@ -548,7 +550,16 @@ public final class MainActivity extends AppCompatActivity {
                     requestId, canRegisterPush() && InstallationIdentity.isRegistered(this));
                 case "request-notification-permission" -> requestPushPermission(requestId);
                 case "open-notification-settings" -> openNotificationSettings(requestId);
-                case KakaoLoginPolicy.ACTION -> startKakaoLogin(requestId);
+                case KakaoLoginPolicy.ACTION -> {
+                    List<String> scopes = new ArrayList<>();
+                    JSONArray requestedScopes = request.optJSONArray("scopes");
+                    if (requestedScopes != null) {
+                        for (int i = 0; i < requestedScopes.length(); i++) {
+                            scopes.add(requestedScopes.optString(i, ""));
+                        }
+                    }
+                    startKakaoLogin(requestId, scopes);
+                }
                 case "revoke-push-device" -> {
                     boolean keepOptIn = PushRevocationPolicy.keepsOptIn(
                         request.optString("reason", ""));
@@ -568,7 +579,7 @@ public final class MainActivity extends AppCompatActivity {
         }
     }
 
-    private void startKakaoLogin(String requestId) {
+    private void startKakaoLogin(String requestId, List<String> scopes) {
         if (!KakaoLoginPolicy.isEnabled(BuildConfig.KAKAO_NATIVE_APP_KEY)) {
             reportKakaoResult(KakaoLoginPolicy.errorScript(requestId, "kakao-unavailable"));
             return;
@@ -576,7 +587,7 @@ public final class MainActivity extends AppCompatActivity {
         // No in-flight guard: the web sends another request only after its own timeout or a reload, and
         // the SDK callback may never arrive (abandoned KakaoTalk hand-off). Stale results carry an old
         // requestId, which the web ignores.
-        KakaoNativeLogin.start(this, new KakaoNativeLogin.Callback() {
+        KakaoNativeLogin.start(this, scopes, new KakaoNativeLogin.Callback() {
             @Override public void onSuccess(String accessToken) {
                 reportKakaoResult(KakaoLoginPolicy.successScript(requestId, accessToken));
             }

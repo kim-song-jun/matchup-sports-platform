@@ -647,7 +647,7 @@ extension WebShellViewController: WKScriptMessageHandler {
             return
         }
         do {
-            let accessToken = try await kakaoSignIn.signIn()
+            let accessToken = try await kakaoSignIn.signIn(scopes: request.scopes)
             await replyToKakao(request, accessToken: accessToken)
         } catch KakaoSignInController.Failure.cancelled {
             await replyToKakao(request, cancelled: true)

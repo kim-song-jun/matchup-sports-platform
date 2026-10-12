@@ -7,6 +7,16 @@ import UserNotifications
 /// existing code rather than chosen: the global, the four action strings, the event name,
 /// and the three `detail` fields. A change on this side is a break on that side.
 final class NativeBridgeMessageTests: XCTestCase {
+    func testCarriesKakaoConsentScopesAndOnlyRequestsMissingValidItems() {
+        let parsed = message(#"{"type":"sign-in-with-kakao","requestId":"r1","scopes":["name","phone_number","gender"]}"#)
+        XCTAssertEqual(parsed?.scopes, ["name", "phone_number", "gender"])
+        XCTAssertEqual(message(#"{"type":"sign-in-with-kakao","requestId":"old"}"#)?.scopes, [])
+        XCTAssertEqual(KakaoSignInPolicy.additionalScopes(
+            requested: ["name", "phone_number", "gender", "gender", "", "bad scope"],
+            granted: ["name"]), ["phone_number", "gender"])
+        XCTAssertEqual(KakaoSignInPolicy.additionalScopes(requested: ["name"], granted: ["name"]), [])
+    }
+
 
     private func message(_ json: String) -> NativeBridge.Message? {
         NativeBridge.parse(json)

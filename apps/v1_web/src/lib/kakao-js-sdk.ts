@@ -34,13 +34,23 @@ export function loadKakaoJsSdk(): Promise<KakaoJsSdk> {
     script.integrity = KAKAO_JS_SDK_INTEGRITY;
     script.crossOrigin = 'anonymous';
     script.async = true;
+    const timeoutId = setTimeout(() => fail(new Error('Kakao JS SDK script timed out')), 8_000);
+    const cleanup = () => {
+      clearTimeout(timeoutId);
+      script.onload = null;
+      script.onerror = null;
+    };
     const fail = (error: Error) => {
+      cleanup();
       sdkLoadPromise = null;
       script.remove();
       reject(error);
     };
     script.onload = () => {
-      if (window.Kakao) resolve(window.Kakao);
+      if (window.Kakao) {
+        cleanup();
+        resolve(window.Kakao);
+      }
       else fail(new Error('Kakao JS SDK loaded but window.Kakao is missing'));
     };
     script.onerror = () => fail(new Error('Failed to load Kakao JS SDK script'));

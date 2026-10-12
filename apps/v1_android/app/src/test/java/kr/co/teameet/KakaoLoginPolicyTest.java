@@ -5,8 +5,18 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import org.junit.Test;
+import java.util.Arrays;
+import java.util.List;
 
 public final class KakaoLoginPolicyTest {
+    @Test public void asksOnlyForConfiguredScopesThatAreNotAlreadyGranted() {
+        assertEquals(List.of("phone_number", "gender"), KakaoLoginPolicy.additionalScopes(
+            Arrays.asList("name", "phone_number", "gender", "gender", "", null, "bad scope"),
+            List.of("name")));
+        assertEquals(List.of("name"), KakaoLoginPolicy.additionalScopes(List.of("name"), null));
+        assertTrue(KakaoLoginPolicy.additionalScopes(List.of("name"), List.of("name")).isEmpty());
+    }
+
     @Test public void buildsWithoutAKeyDoNotAdvertiseTheCapability() {
         assertFalse(KakaoLoginPolicy.isEnabled(""));
         assertFalse(KakaoLoginPolicy.isEnabled("   "));

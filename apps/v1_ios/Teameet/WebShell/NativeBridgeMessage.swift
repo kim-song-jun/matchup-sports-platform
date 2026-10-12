@@ -56,6 +56,8 @@ enum NativeBridge {
         /// revocation, which keeps the reader's opt-in — see `PushRevocation`. Absent on
         /// every older web build, which is read as an opt-out, the behaviour it had.
         var reason: String?
+        /// Optional consent IDs from the same configured authorize URL used by web login.
+        var scopes: [String] = []
     }
 
     /// Parses a message from the page.
@@ -78,7 +80,8 @@ enum NativeBridge {
             action: action,
             requestId: requestId,
             nonce: payload["nonce"] as? String,
-            reason: payload["reason"] as? String)
+            reason: payload["reason"] as? String,
+            scopes: payload["scopes"] as? [String] ?? [])
     }
 
     /// Builds the JavaScript that hands a result back to the page.

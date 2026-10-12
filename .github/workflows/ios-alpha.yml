@@ -104,6 +104,18 @@ jobs:
             -destination "platform=iOS Simulator,id=${{ steps.simulator.outputs.udid }}" \
             CODE_SIGNING_ALLOWED=NO
 
+      - name: Audit built production crypto dependencies
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          settings=$(xcodebuild -showBuildSettings -json \
+            -project apps/v1_ios/Teameet.xcodeproj -scheme TeameetProduction \
+            -configuration 'Production Release' \
+            -destination "platform=iOS Simulator,id=${{ steps.simulator.outputs.udid }}" \
+            CODE_SIGNING_ALLOWED=NO)
+          app=$(printf '%s' "${settings}" | python3 -c 'import json,sys; s=next(x["buildSettings"] for x in json.load(sys.stdin) if x["target"] == "Teameet"); print(s["TARGET_BUILD_DIR"] + "/" + s["WRAPPER_NAME"])')
+          bash scripts/ios/audit-built-crypto.sh "${app}"
+
       # The live harness must be inert here, and inert in a way that is visible. A bundle
       # that silently ran nothing would report the same green as one that passed, which is
       # exactly the reading error this step exists to prevent: every test must be *skipped*,

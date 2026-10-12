@@ -39,7 +39,7 @@ export function isNativeKakaoSignInAvailable(): boolean {
   return Array.isArray(bridge.supports) && bridge.supports.includes(KAKAO_ACTION);
 }
 
-export function requestNativeKakaoSignIn(): Promise<NativeKakaoSignInResult> {
+export function requestNativeKakaoSignIn(scopes: readonly string[] = []): Promise<NativeKakaoSignInResult> {
   return new Promise((resolve, reject) => {
     const bridge = typeof window === 'undefined' ? undefined : window.TeameetNative;
     if (!bridge) {
@@ -68,7 +68,7 @@ export function requestNativeKakaoSignIn(): Promise<NativeKakaoSignInResult> {
     }, RESPONSE_TIMEOUT_MS);
 
     try {
-      bridge.postMessage(JSON.stringify({ type: KAKAO_ACTION, requestId }));
+      bridge.postMessage(JSON.stringify({ type: KAKAO_ACTION, requestId, ...(scopes.length ? { scopes } : {}) }));
     } catch (error) {
       cleanup();
       reject(error);

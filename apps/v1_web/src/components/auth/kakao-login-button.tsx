@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { CSSProperties, MouseEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
-import { V1ApiError, v1Get, v1Post } from '@/lib/api-client';
+import { V1ApiError, v1Api, v1Post } from '@/lib/api-client';
 import { trackEvent } from '@/lib/analytics';
 import { extractErrorMessage } from '@/lib/error-message';
 import { reportClientError } from '@/lib/client-error-reporter';
@@ -17,6 +17,7 @@ import type { V1AuthSessionResponse, V1PublicKakaoMapsKeyResponse } from '@/type
 import { generateKakaoOAuthState, isSocialOnboardingRoute, KAKAO_OAUTH_STATE_STORAGE_KEY } from './auth.view-model';
 
 const NATIVE_FAILURE_MESSAGE = '카카오 로그인에 실패했어요. 잠시 후 다시 시도해 주세요.';
+const SDK_PREFLIGHT_TIMEOUT_MS = 8_000;
 
 // 카카오 로그인 버튼(클라이언트). 클릭 시점에 CSRF 방지 state를 생성·저장한 뒤 경로를 고른다.
 // state 저장이 SSR 시점이 아닌 실제 브라우저에서 일어나야 kakao-callback-client.tsx의
@@ -57,7 +58,8 @@ export function KakaoLoginButton({
   const signInNative = async () => {
     try {
       saveRedirectPath(new URLSearchParams(window.location.search).get('redirect'));
-      const result = await requestNativeKakaoSignIn();
+      const scopes = new URL(href).searchParams.get('scope')?.split(',').filter(Boolean) ?? [];
+      const result = await requestNativeKakaoSignIn(scopes);
       if (result.cancelled) return;
       if (result.error || !result.accessToken) {
         reportClientError({ message: 'Native Kakao sign-in failed', level: 'warn', context: { reason: result.error ?? 'missing-token' } });
@@ -97,11 +99,25 @@ export function KakaoLoginButton({
     const authorizeUrl = new URL(href);
     const redirectUri = authorizeUrl.searchParams.get('redirect_uri');
     const scope = authorizeUrl.searchParams.get('scope') ?? undefined;
+    const controller = new AbortController();
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
+    const deadline = new Promise<never>((_, reject) => {
+      timeoutId = setTimeout(() => {
+        controller.abort();
+        reject(new Error('Kakao login SDK preparation timed out'));
+      }, SDK_PREFLIGHT_TIMEOUT_MS);
+    });
     try {
       if (!redirectUri) throw new Error('Kakao redirect_uri is missing from the authorize URL');
-      const { kakaoMapsJsKey } = await v1Get<V1PublicKakaoMapsKeyResponse>('/public/integrations/kakao-maps-key');
-      if (!kakaoMapsJsKey) throw new Error('Kakao JS key is not configured');
-      const sdk = await getInitializedKakaoJsSdk(kakaoMapsJsKey);
+      const prepare = async () => {
+        const { kakaoMapsJsKey } = await v1Api<V1PublicKakaoMapsKeyResponse>(
+          '/public/integrations/kakao-maps-key', { method: 'GET', signal: controller.signal },
+        );
+        controller.signal.throwIfAborted();
+        if (!kakaoMapsJsKey) throw new Error('Kakao JS key is not configured');
+        return getInitializedKakaoJsSdk(kakaoMapsJsKey);
+      };
+      const sdk = await Promise.race([prepare(), deadline]);
       sdk.Auth.authorize({ redirectUri, state, ...(scope ? { scope } : {}), throughTalk: true });
     } catch (err) {
       reportClientError({
@@ -111,6 +127,8 @@ export function KakaoLoginButton({
         context: { reason: err instanceof Error ? err.message : String(err) },
       });
       navigateToAuthorizeUrl(state);
+    } finally {
+      clearTimeout(timeoutId);
     }
   };
 

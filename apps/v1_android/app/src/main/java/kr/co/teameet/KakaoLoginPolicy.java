@@ -1,5 +1,8 @@
 package kr.co.teameet;
 
+import java.util.ArrayList;
+import java.util.List;
+
 /** Pure decisions and bridge payloads for native Kakao login; no Android or Kakao SDK types. */
 final class KakaoLoginPolicy {
     static final String ACTION = "sign-in-with-kakao";
@@ -22,6 +25,15 @@ final class KakaoLoginPolicy {
     /** A cancelled KakaoTalk attempt ends the flow; any other talk failure may retry with the account page. */
     static boolean shouldFallBackToAccountLogin(boolean cancelled) {
         return !cancelled;
+    }
+
+    static List<String> additionalScopes(List<String> requested, List<String> granted) {
+        List<String> missing = new ArrayList<>();
+        for (String scope : requested) {
+            if (scope != null && scope.matches("[a-z_]+") && !missing.contains(scope)
+                && (granted == null || !granted.contains(scope))) missing.add(scope);
+        }
+        return missing;
     }
 
     static String successScript(String requestId, String accessToken) {

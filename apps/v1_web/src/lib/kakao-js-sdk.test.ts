@@ -16,6 +16,26 @@ function scripts() {
 }
 
 describe('Kakao JS SDK loader', () => {
+  it('removes a stalled script and allows a fresh attempt after the deadline', async () => {
+    vi.useFakeTimers();
+    try {
+      const { loadKakaoJsSdk } = await freshLoader();
+      const first = loadKakaoJsSdk();
+      const rejection = expect(first).rejects.toThrow('Kakao JS SDK script timed out');
+      const oldScript = scripts()[0] as HTMLScriptElement;
+      await vi.advanceTimersByTimeAsync(8_000);
+      await rejection;
+      expect(scripts()).toHaveLength(0);
+      expect(oldScript.onload).toBeNull();
+      const next = loadKakaoJsSdk();
+      window.Kakao = { init: vi.fn(), isInitialized: () => true, Auth: { authorize: vi.fn() } };
+      (scripts()[0] as HTMLScriptElement).onload?.(new Event('load'));
+      await expect(next).resolves.toBe(window.Kakao);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('injects one pinned script with SRI and shares it between callers', async () => {
     const { KAKAO_JS_SDK_INTEGRITY, loadKakaoJsSdk } = await freshLoader();
     const first = loadKakaoJsSdk();

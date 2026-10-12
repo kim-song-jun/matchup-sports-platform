@@ -39,6 +39,11 @@ packages:
   KakaoOpenSDK:
     url: https://github.com/kakao/kakao-ios-sdk
     exactVersion: 2.29.0
+  # Kakao allows 5.9..<6.0. Pin its networking dependency as well so regenerating
+  # this project cannot silently select a different dependency graph.
+  Alamofire:
+    url: https://github.com/Alamofire/Alamofire.git
+    exactVersion: 5.12.2
 
 targets:
   Teameet:
@@ -53,6 +58,8 @@ targets:
         product: KakaoSDKAuth
       - package: KakaoOpenSDK
         product: KakaoSDKUser
+      - package: Alamofire
+        product: Alamofire
     settings:
       base:
         PRODUCT_NAME: Teameet
@@ -101,10 +108,10 @@ targets:
         # "Build is not in an internally testable state", which does not mention encryption
         # and sends you looking at signing instead. Measured on builds 1 and 3.
         #
-        # False is the accurate answer for this app, not a convenient one: it is a WKWebView
-        # shell whose only cryptography is the HTTPS the operating system provides. Nothing
-        # is implemented here and no crypto library is bundled — every screen is drawn by the
-        # web app. Confirmed by the user 2026-08-31, since this is a legal declaration.
+        # Retains the user-confirmed declaration (2026-08-31). The dependency audit in
+        # docs/ops/ios-release.md now includes Kakao's CryptoKit/CommonCrypto calls and
+        # Alamofire. Both use Apple-provided crypto; "no dependencies/HTTPS only" is obsolete.
+        # CI records linked libraries and crypto symbols for the built production app.
         ITSAppUsesNonExemptEncryption: false
         # The environment contract the app reads at runtime through AppConfig.
         TeameetWebOrigin: $(TEAMEET_WEB_ORIGIN)
@@ -162,6 +169,7 @@ targets:
       - path: Teameet/Push/PushRevocation.swift
       - path: Teameet/Push/PushRegistrationLedger.swift
       - path: Teameet/Auth/AppleNonceHash.swift
+      - path: Teameet/Auth/KakaoSignInPolicy.swift
     settings:
       base:
         GENERATE_INFOPLIST_FILE: NO

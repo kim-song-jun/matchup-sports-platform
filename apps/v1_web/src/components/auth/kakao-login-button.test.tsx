@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -9,7 +9,7 @@ import { v1Keys } from '@/lib/query-keys';
 import { V1_SESSION_HINT_KEY } from '@/lib/session-storage';
 
 const router = vi.hoisted(() => ({ replace: vi.fn(), refresh: vi.fn() }));
-const api = vi.hoisted(() => ({ v1Post: vi.fn(), v1Get: vi.fn() }));
+const api = vi.hoisted(() => ({ v1Post: vi.fn(), v1Api: vi.fn() }));
 const sdk = vi.hoisted(() => ({ getInitializedKakaoJsSdk: vi.fn() }));
 const reporter = vi.hoisted(() => ({ reportClientError: vi.fn() }));
 const analytics = vi.hoisted(() => ({ trackEvent: vi.fn() }));
@@ -18,7 +18,7 @@ vi.mock('next/navigation', () => ({ useRouter: () => router }));
 vi.mock('@/lib/api-client', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/lib/api-client')>()),
   v1Post: api.v1Post,
-  v1Get: api.v1Get,
+  v1Api: api.v1Api,
 }));
 vi.mock('@/lib/kakao-js-sdk', () => ({ getInitializedKakaoJsSdk: sdk.getInitializedKakaoJsSdk }));
 vi.mock('@/lib/analytics', () => ({ trackEvent: analytics.trackEvent }));
@@ -47,7 +47,7 @@ beforeEach(() => {
     configurable: true,
     value: { search: '', pathname: '/login', set href(value: string) { assigned = value; } },
   });
-  api.v1Get.mockResolvedValue({ kakaoMapsJsKey: 'js-key' });
+  api.v1Api.mockResolvedValue({ kakaoMapsJsKey: 'js-key' });
   api.v1Post.mockResolvedValue({ session: { userId: 'u1', userEmail: null }, next: { route: '/home' } });
   sdk.getInitializedKakaoJsSdk.mockResolvedValue({ Auth: { authorize } });
 });
@@ -75,6 +75,9 @@ describe('KakaoLoginButton', () => {
       await click();
       await waitFor(() => expect(router.replace).toHaveBeenCalledWith('/home'));
       expect(api.v1Post).toHaveBeenCalledWith('/auth/kakao/token', { accessToken: 'kakao-token' });
+      expect(JSON.parse(vi.mocked(window.TeameetNative!.postMessage).mock.calls[0][0])).toMatchObject({
+        type: 'sign-in-with-kakao', scopes: ['name', 'phone_number'],
+      });
       expect(sdk.getInitializedKakaoJsSdk).not.toHaveBeenCalled();
     });
 
@@ -142,7 +145,7 @@ describe('KakaoLoginButton', () => {
         (window.TeameetNative as { postMessage: unknown }).postMessage = vi.fn();
         renderButton();
         await click();
-        await vi.advanceTimersByTimeAsync(120_000);
+        await act(() => vi.advanceTimersByTimeAsync(120_000));
         expect(await screen.findByRole('alert')).toHaveTextContent('카카오 로그인에 실패했어요');
       } finally {
         vi.useRealTimers();
@@ -151,6 +154,27 @@ describe('KakaoLoginButton', () => {
   });
 
   describe('browser', () => {
+    it.each(['key', 'sdk'] as const)('uses the URL after a stalled %s request and ignores its late completion', async (stage) => {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+      let complete: (value: unknown) => void = () => {};
+      const pending = new Promise((resolve) => { complete = resolve; });
+      if (stage === 'key') api.v1Api.mockReturnValue(pending);
+      else sdk.getInitializedKakaoJsSdk.mockReturnValue(pending);
+      try {
+        renderButton();
+        await click();
+        await vi.advanceTimersByTimeAsync(8_000);
+        expect(assigned).toBe(`${HREF}&state=${window.sessionStorage.getItem(KAKAO_OAUTH_STATE_STORAGE_KEY)}`);
+        expect(reporter.reportClientError).toHaveBeenCalledTimes(1);
+        complete(stage === 'key' ? { kakaoMapsJsKey: 'late-key' } : { Auth: { authorize } });
+        await vi.advanceTimersByTimeAsync(1);
+        expect(authorize).not.toHaveBeenCalled();
+        if (stage === 'key') expect(sdk.getInitializedKakaoJsSdk).not.toHaveBeenCalled();
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
     it('uses the JS SDK with the same redirectUri, scope and the stored state', async () => {
       renderButton();
       await click();
@@ -175,7 +199,7 @@ describe('KakaoLoginButton', () => {
       const stored = window.sessionStorage.getItem(KAKAO_OAUTH_STATE_STORAGE_KEY);
       expect(assigned).toBe(`${HREF}&state=${stored}`);
       expect(window.TeameetNative.postMessage).not.toHaveBeenCalled();
-      expect(api.v1Get).not.toHaveBeenCalled();
+      expect(api.v1Api).not.toHaveBeenCalled();
       expect(authorize).not.toHaveBeenCalled();
     });
 
@@ -193,7 +217,7 @@ describe('KakaoLoginButton', () => {
     });
 
     it('falls back to the authorize URL with state and logs when the JS key is missing', async () => {
-      api.v1Get.mockResolvedValue({ kakaoMapsJsKey: null });
+      api.v1Api.mockResolvedValue({ kakaoMapsJsKey: null });
       renderButton();
       await click();
       await waitFor(() => expect(assigned).not.toBeNull());

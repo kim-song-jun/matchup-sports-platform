@@ -2,7 +2,7 @@
 
 ## Request and scope
 
-The user authorized reviewing, repairing, and merging the currently open PRs #1837, #1843, and #1848 into dev, testing alpha, creating the dev-to-main promotion PR, and deploying main only after release blockers are cleared. On 2026-10-12 the user explicitly requested a new Kakao app in the logged-in account, migration of existing users, and consent/privacy settings matching actual collection. New-app console setup is authorized; production credential cutover requires demonstrated existing-account continuity. Do not expose credentials, rewrite existing consents, or submit store releases as a side effect.
+The user authorized reviewing, repairing, and merging PRs #1837, #1843, and #1848 into dev, testing alpha, creating the dev-to-main promotion PR, and deploying main only after release blockers are cleared. On 2026-10-12 the user recovered the original Kakao account and superseded the new-app migration plan: configure API, web login, Maps, Android and iOS under the original app `1467783`. Preserve its production REST identity and existing account associations. Consent/privacy settings must match actual collection. Do not expose credentials, rewrite existing consents, or submit store releases as a side effect.
 
 ## Ownership
 
@@ -20,7 +20,7 @@ The user authorized reviewing, repairing, and merging the currently open PRs #18
 - [x] Each exact PR revision passes the applicable CI checks before dev merge.
 - [x] The combined dev revision passes API/Web/Gates and applicable Android/iOS CI; alpha serves that revision.
 - [ ] Within each environment, login REST, login JavaScript and native credentials identify its intended app. Maps REST/JS are independently configured and cannot select the login app.
-- [ ] New-app transition preserves existing user IDs, memberships and history, uses verified ownership to link identities, and never infers identity from names or unverified contact data.
+- [ ] Original-app configuration preserves existing user IDs, memberships and history; email-to-Kakao linking uses verified ownership and never infers identity from names or unverified contact data.
 - [ ] Console consent items, actual collected fields and public privacy disclosures agree; any review/business-verification blockers are explicit.
 - [ ] Console domains, callback URLs, package/bundle identifiers and available signing key hashes match the actual builds.
 - [ ] Alpha maps, browser login/session, lists/facets and chat recovery are exercised against deployed code. Native-build proof is distinguished from physical-device KakaoTalk proof.
@@ -28,6 +28,20 @@ The user authorized reviewing, repairing, and merging the currently open PRs #18
 - [ ] If gates pass, promote the verified revision, approve the authorized production deployment, verify served SHA/release and affected production flows, and close owned browser/process resources.
 
 ## Progress snapshot
+
+### 2026-10-12 original account recovered — supersedes new-app cutover
+
+- The user explicitly redirected API/app/Maps work to the recovered original account. Console access confirms Owner of business app `1467783`, 팀밋(Teameet), operated by 아이위(IWI). The live production login bundles match this app's `teameet-v1` REST key, compared in memory without exposing values. Production still serves `eda4a05de8543f95f0c88376baac7212086c1037` / `1.6.10`.
+- Retaining that original app removes the cross-app identity migration requirement for the 598 production Kakao identities. The earlier 100-user contact gap is historical evidence for rejecting the abandoned new-app cutover, not a reason to migrate those identities now.
+- Original app nickname, avatar and email scopes were disabled; all three are now saved as optional with actual service purposes. Name, gender, birthday, birthyear and phone still require review. Business-app registration is present, but the separate business-information review and personal-information permission application are not yet submitted for this original app.
+- Existing original REST callbacks already include production and alpha current paths. Its login client secret is ON; no REST key or client secret was rotated. JavaScript/native platform configuration and new-app Maps/CI settings still need reconciliation to the original app.
+- Alpha admin login passed (`auth/me` and `admin/users`: 200). The exact newly created test target matched the prior ID hash, email and nickname, with no admin role, team membership or hosted match. User-authorized admin deletion completed: account status deleted and email/phone released. Additional reset/signup work stopped when the user redirected the task to the original account. Browser email-to-Kakao linking remains unverified.
+- Two browser waits were invalid assumptions: the member detail heading differs from the expected text, and the admin shell retains a dialog element after the delete modal closes. Read-only API inspection confirmed successful deletion. Console radio/row targeting was corrected after unsupported selector syntax and a floating-button interception; optional-scope saves were verified from the resulting table.
+- Draft main PR #1851 also has a confirmed release gate failure (`38196988164`): unreleased Changesets must be consumed before promotion. API/Web checks passed; main remains unmerged.
+- Original app business-information and five optional personal-scope reviews are now submitted and show pending. Requested scopes: name, gender, birthday, birthyear and phone; no CI, shipping, friends or redundant age range. Business document and actual empty production signup/service screenshots were inspected before submission. Until approval, production `KAKAO_SCOPE` contains only optional nickname/avatar/email.
+- Original web JS key now permits production/alpha origins and their current callbacks. The original native key registers `kr.co.teameet` for Android/iOS and four previously verified Play signing/upload hashes. The representative domain now points at the current root URL. Original login REST and client secret remain unchanged. GitHub production JS/native keys and original app ID are configured without logging values.
+- Maps now uses original app `1467783` in both environments. Alpha admin save and both public key endpoints confirm the original JS key. Original REST place search returned 200 with a result. Production map-only transaction `c881c167-fcea-4709-9dd9-7cc77375bdb5` succeeded with audit `91a06f99-44ef-45f0-8513-ca19e7d1ec3f`, verified both keys and unchanged login configuration. The encrypted one-use handoff parameter was deleted; no member identities were migrated.
+- New official test child `1604879` belongs to original app `1467783`. Login is ON; all eight intended scopes are optional; the designated tester is an active Viewer. REST/JS callback and domain are alpha-only, Android/iOS identifiers are `kr.co.teameet.alpha`, and the fixed alpha signing hash is registered. All alpha GitHub REST/secret/app-ID/JS/native settings now target this child. A fresh image/deployment and actual browser verification are still required; current alpha runtime remains on the earlier child until that deployment.
 
 ### 2026-10-12 configured test app and production Maps proof
 

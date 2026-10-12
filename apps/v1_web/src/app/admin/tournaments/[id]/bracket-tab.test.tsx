@@ -209,6 +209,12 @@ function renderTab(showToast = vi.fn(), registrations: V1AdminTournamentRegistra
 }
 
 describe('BracketTab — 진출 연결 출처 선택', () => {
+  afterEach(() => {
+    bracketGroups = bracket.groups;
+    bracketFixtures = [];
+    bracketSlots = [];
+  });
+
   it('반대편에서 선택한 경기 출처를 목록에서 제외한다', async () => {
     const quarter = { ...bracket.groups[0], id: 'quarter', name: '8강', phase: 'quarter', sortOrder: 0 } as unknown as typeof bracket.groups[number];
     const semi = { ...bracket.groups[0], id: 'semi', name: '4강', phase: 'semi', sortOrder: 1 } as unknown as typeof bracket.groups[number];

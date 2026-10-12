@@ -44,6 +44,7 @@ Status (추가 요청): In Progress — dev PR #1853 정확한 head CI 통과, �
 12. head `932ee6992` CI `38213260004` API/Web/Gates 모두 PASS. 최신 Copilot 1건은 양쪽에 동일한 진출 출처를 선택할 수 있는 문제이며 v1 서버 거절 계약과 교차 확인해 패널·목록·수기 선택을 보완한다. 수정 뒤 새 head의 CI·Copilot을 다시 확인한다.
 13. 사용자 UI 표시 요청에 A/C 설계 미리보기를 메시지에 직접 표시했다. 실제 alpha after 증거로 취급하지 않는다. 다른 dev 변경 `7570bd809`의 계정 약관 배포로 space 326이 필수 약관 화면으로 이동하고 관리자 조회 403이 확인되어 계정 소유자에게 직접 동의 후 재개를 요청했다. 약관을 대신 수락하지 않는다.
 14. 마지막 Copilot 선택 오류를 공유 side-options helper로 패널·수기 연결·목록 모두 수정하고 중복 저장도 막았다. 서버의 `BRACKET_SOURCE_INVALID` 계약과 Sol 독립 정적 검토 PASS. 선택된 소비 테스트 2개 PASS; helper/panel 3개 PASS(잘못 구성한 테스트 입력 1개를 실제 계약에 맞게 정정한 뒤 좁게 재검증). root 최종 lint PASS. 소유 테스트 PID `20434`, `22329` 종료 확인; 로컬 전체 suite를 반복하지 않는다.
+15. head `2e6283559` 최신 Copilot inline 미해결 0건. CI `38216609886` Web은 8,677 PASS/7 FAIL: 새 목록 출처 테스트가 공유 조·경기 배열을 복구하지 않아 후속 테스트에 영향을 줬다. 해당 describe의 afterEach로 상태를 복구하고 단언은 유지했다. 좁은 bracket-tab 파일 40/40 PASS; 기존 started-team-change 테스트에서 React act 경고 1개가 있으므로 무경고 검증으로 보고하지 않는다. 테스트 PID `78004` 종료 확인. 제품 코드 변경은 없다.
 
 ### Alpha 실행 계획 (아직 결과 아님)
 

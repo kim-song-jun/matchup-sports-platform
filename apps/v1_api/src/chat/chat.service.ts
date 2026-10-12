@@ -14,7 +14,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
 import {
   currentChatEntitlementWhere, currentChatRecipientEntitlementWhere, MatchChatSendBlock, matchChatReadableWhere,
-  matchChatSendBlock, teamMatchChatEntitlementWhere,
+  matchChatSendBlock, matchChatHistoryParticipantWhere, teamMatchChatEntitlementWhere,
 } from './chat-entitlement';
 import { enrollTeamMatchChatMembers, TeamMatchChatSource } from './platform-team-match-chat';
 import { archiveEndedContactRooms } from '../team-contacts/contact-room-archive';
@@ -1059,7 +1059,7 @@ export class ChatService {
       where: { id: matchId },
       select: {
         hostUserId: true,
-        participants: { where: { userId, status: { in: ['active', 'completed'] } }, select: { approvedAt: true } },
+        participants: { where: matchChatHistoryParticipantWhere(userId), select: { approvedAt: true } },
       },
     });
     if (!match) return { from: null, joinedAt: null };

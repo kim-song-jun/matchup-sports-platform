@@ -65,15 +65,12 @@ describe('currentChatEntitlementWhere — 일반/플랫폼 팀매치 채팅 엔�
 });
 
 describe('currentChatEntitlementWhere — 개인매치 주최자 채팅', () => {
-  it('활성 일반 참가자가 있을 때 주최자도 현재 채팅 권한을 유지한다', () => {
+  it('주최자는 일반 참가자의 상태와 무관하게 기존 방의 읽기 권한을 유지한다', () => {
     const where = currentChatEntitlementWhere('host-1');
     const matchBranch = where.OR?.find((clause: any) => 'match' in clause) as any;
     const hostBranch = matchBranch.match.is.OR.find((clause: any) => clause.hostUserId === 'host-1');
 
-    expect(hostBranch.participants.some).toEqual({
-      role: 'participant',
-      status: { in: ['active', 'completed'] },
-    });
+    expect(hostBranch).toEqual({ hostUserId: 'host-1' });
   });
 });
 
@@ -102,12 +99,7 @@ describe('currentChatRecipientEntitlementWhere', () => {
     const participantBranch = (where.user as any)?.OR?.find((clause: any) => clause.matchParticipants);
     const hostBranch = (where.user as any)?.OR?.find((clause: any) => clause.hostedMatches);
     expect(participantBranch.matchParticipants.some.matchId).toBe('m1');
-    expect(hostBranch.hostedMatches.some).toMatchObject({
-      id: 'm1',
-      participants: {
-        some: { role: 'participant', status: { in: ['active', 'completed'] } },
-      },
-    });
+    expect(hostBranch.hostedMatches.some).toEqual({ id: 'm1', deletedAt: null });
   });
 
   it('team 방이면 팀 멤버십으로 좁힌다', () => {
@@ -265,6 +257,8 @@ describe('개인 매치 채팅 — 읽기 가능 여부와 수신자 자격이 �
   });
 
   const cases: { name: string; m: M; user: string; readable: boolean }[] = [
+    { name: '참가행 없이 마지막 참가자가 철회한 방의 주최자', m: match({ participants: [guest('cancelled', 'withdrawn')] }), user: 'host', readable: true },
+    { name: '참가행 없이 취소된 방의 주최자', m: match({ status: 'cancelled', participants: [] }), user: 'host', readable: true },
     { name: '확정 참가자 없는 방의 주최자', m: match({}), user: 'host', readable: true },
     { name: '확정 참가자가 있는 방의 주최자', m: match({ participants: [hostRow, guest('active')] }), user: 'host', readable: true },
     { name: '확정 참가자', m: match({ participants: [hostRow, guest('active')] }), user: 'guest', readable: true },
@@ -282,7 +276,7 @@ describe('개인 매치 채팅 — 읽기 가능 여부와 수신자 자격이 �
     { name: '취소 전에 모두 철회한 방의 주최자(취소된 매치)', m: match({ status: 'cancelled', participants: [hostRow, guest('cancelled', 'withdrawn')] }), user: 'host', readable: true },
     // 주최자가 참가하지 않는 매치는 주최자 행도 cancelled 라 참가 행으로는 열람할 근거가 없다.
     { name: '불참 주최자: 취소로 빠진 참가자가 있으면 취소된 매치를 열람한다', m: match({ status: 'cancelled', participants: [{ ...hostRow, status: 'cancelled' }, guest('cancelled', 'approved')] }), user: 'host', readable: true },
-    { name: '불참 주최자: 취소 전에 모두 철회했으면 열람 불가', m: match({ status: 'cancelled', participants: [{ ...hostRow, status: 'cancelled' }, guest('cancelled', 'withdrawn')] }), user: 'host', readable: false },
+    { name: '불참 주최자: 취소 전에 모두 철회해도 기존 방은 읽기 전용으로 유지', m: match({ status: 'cancelled', participants: [{ ...hostRow, status: 'cancelled' }, guest('cancelled', 'withdrawn')] }), user: 'host', readable: true },
     { name: '취소되지 않은 매치의 철회 참가자는 신청이 approved 여도 불가', m: match({ participants: [hostRow, guest('cancelled', 'approved')] }), user: 'guest', readable: false },
     { name: '무관한 사용자', m: match({ participants: [hostRow, guest('active')] }), user: 'stranger', readable: false },
     { name: '삭제된 매치의 주최자', m: match({ deletedAt: new Date() }), user: 'host', readable: false },

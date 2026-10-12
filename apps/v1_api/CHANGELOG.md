@@ -1,5 +1,11 @@
 # v1_api
 
+## 1.6.9
+
+### Patch Changes
+
+- 030b034: Preserve existing match-room access and approval-time history at cancellation/withdrawal boundaries, retain unresolved send errors on refresh, and refresh composer state after reconnecting.
+
 ## 1.6.8
 
 ### Patch Changes

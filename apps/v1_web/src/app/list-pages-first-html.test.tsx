@@ -8,6 +8,7 @@ import type { ReactNode } from 'react';
 import { renderToString } from 'react-dom/server';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { V1Match, V1Sport, V1Team, V1TeamMatch } from '@/types/api';
+import { TEAM_LIST_SEED_PATH } from '@/lib/public-list-seed';
 import { parseJsonLd, stripScriptTags } from '@/test/html-sanitize';
 
 const searchParamsState = vi.hoisted(() => ({ value: new URLSearchParams() }));
@@ -73,7 +74,7 @@ function envelope(data: unknown): Response {
 }
 
 function pageOf(items: unknown[]) {
-  return { items, pageInfo: { nextCursor: null, hasNext: false, total: items.length } };
+  return { items, pageInfo: { nextCursor: null, hasNext: false, totalCount: items.length } };
 }
 
 /** 목록 경로마다 한 항목짜리 첫 페이지, 마스터 종목은 풋살 하나. */
@@ -81,7 +82,7 @@ function healthyApi(path: string): Response {
   if (path === '/master/sports') return envelope([FUTSAL]);
   if (path === '/matches') return envelope(pageOf([CLOSED_MATCH, MATCH]));
   if (path === '/team-matches') return envelope(pageOf([TEAM_MATCH]));
-  if (path === '/teams?limit=20') return envelope(pageOf([TEAM]));
+  if (path === TEAM_LIST_SEED_PATH) return envelope(pageOf([TEAM]));
   if (path.startsWith('/tournaments/campaigns?')) return envelope(pageOf([]));
   if (path.startsWith('/tournaments?')) return envelope(pageOf([]));
   if (path === '/notices') return envelope({ notices: [] });
@@ -218,7 +219,7 @@ describe('공개 목록 첫 HTML — seed 성공', () => {
   // 팀 목록은 필터가 걸리면 클라이언트가 seed 를 버린다 — 매치·팀매치는 무필터 전체 목록 쿼리가 seed 를 계속 쓴다.
   it('/teams 는 필터가 걸린 주소에서 버려질 목록 seed 를 요청하지 않는다', async () => {
     await serverHtml(TeamsPage, 'sportId=sport-futsal-uuid');
-    expect(requested).not.toContain('/teams?limit=20');
+    expect(requested).not.toContain(TEAM_LIST_SEED_PATH);
   });
 
   it('/matches 는 필터가 걸려도 전체 목록 쿼리용 seed 를 받는다', async () => {

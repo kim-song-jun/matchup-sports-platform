@@ -1,5 +1,6 @@
-import { Type } from 'class-transformer';
-import { IsIn, IsInt, IsNotEmpty, IsOptional, IsString, IsUUID, Max, MaxLength, Min } from 'class-validator';
+import { Transform, Type } from 'class-transformer';
+import { queryBoolean } from '../../common/query-boolean';
+import { IsBoolean, IsIn, IsInt, IsNotEmpty, IsOptional, IsString, IsUUID, Max, MaxLength, Min } from 'class-validator';
 
 export class TeamsQueryDto {
   @IsOptional()
@@ -47,6 +48,12 @@ export class TeamsQueryDto {
   @IsOptional()
   @IsIn(['card', 'compact'])
   view?: 'card' | 'compact';
+
+  /** `true` 이고 첫 페이지(커서 없음)일 때만 `pageInfo.totalCount` 와 `facets` 를 계산해 싣는다. 폴링·부가 조회는 생략한다. */
+  @IsOptional()
+  @Transform(queryBoolean)
+  @IsBoolean()
+  includeFacets?: boolean;
 }
 
 export class MyTeamsQueryDto {

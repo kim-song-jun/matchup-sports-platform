@@ -14,11 +14,11 @@ The user authorized reviewing, repairing, and merging the currently open PRs #18
 ## Acceptance criteria / exit proof
 
 - [ ] Email signup keeps direct verification; Kakao-supplied contacts bypass duplicate OTP. Existing verified contact matches attach Kakao to the original user ID; conflicting members never merge.
-- [ ] A real HTTP/DB integration test proves account/profile preservation and social profile completion with phone verification enforced and no SMS challenge.
+- [x] A real HTTP/DB integration test proves account/profile preservation and social profile completion with phone verification enforced and no SMS challenge.
 
-- [ ] Open review findings are fixed or disproved with concrete evidence; conflicts are resolved without losing existing behavior.
-- [ ] Each exact PR revision passes the applicable CI checks before dev merge.
-- [ ] The combined dev revision passes API/Web/Gates and applicable Android/iOS CI; alpha serves that revision.
+- [x] Open review findings are fixed or disproved with concrete evidence; conflicts are resolved without losing existing behavior.
+- [x] Each exact PR revision passes the applicable CI checks before dev merge.
+- [x] The combined dev revision passes API/Web/Gates and applicable Android/iOS CI; alpha serves that revision.
 - [ ] Within each environment, login REST, login JavaScript and native credentials identify its intended app. Maps REST/JS are independently configured and cannot select the login app.
 - [ ] New-app transition preserves existing user IDs, memberships and history, uses verified ownership to link identities, and never infers identity from names or unverified contact data.
 - [ ] Console consent items, actual collected fields and public privacy disclosures agree; any review/business-verification blockers are explicit.
@@ -29,12 +29,28 @@ The user authorized reviewing, repairing, and merging the currently open PRs #18
 
 ## Progress snapshot
 
+### 2026-10-12 configured test app and production Maps proof
+
+- Combined dev `a4b7c2d78` passed CI (`38196854771`) and alpha deployment (`38196854769`). Live alpha returned the exact SHA and release `1.7.0-alpha.20261012.ga4b7c2d78a58`. The served login HTML/19 script chunks contained the test app's REST and dedicated login JS keys, compared in memory without recording their values.
+- Real designated-member browser flow passed: Kakao displayed the official test app and all eight optional scopes; after the user authenticated, the API reported the expected account with email and phone verified. Name/gender/phone/birth date were prefilled. Required service terms and profile submission completed without an email/SMS challenge, then optional sport setup was deferred and the home screen loaded. Logout -> Kakao account confirmation -> login returned the same hashed user ID and preserved nickname/verification state.
+- Relogin first waited at Kakao's normal account-confirmation screen; the automated home-path wait timed out. Inspection identified that screen, and pressing its visible Continue button completed login. This was a test navigation assumption, not an authentication error.
+- Profile screenshots at desktop/tablet/mobile widths showed the provider phone explanation with no horizontal overflow. Initial mobile/tablet CTAs were in the viewport; the desktop form required scrolling. Full end-of-form viewport review remains open, so these captures do not certify every responsive state.
+- Admin reset/rejoin and actual browser email -> Kakao linking remain open. The freshly created test member is an ordinary user; `/admin/users` correctly returned 403. An existing alpha administrator login was requested in the browser. No real or test user has been deleted/reset.
+- #1850 head `325951fcd` passed API/Web/Gates and merged into dev as `a4b7c2d78`. Both review findings were fixed: validate REST/JS/callback configuration before immutable image resolution, and pass the login JS build argument to documented manual builds. The real CLI contract tests passed 2/2; alpha immutable deployment checks passed.
+- The official test app `1604717` now has login enabled, its designated test member active, and optional nickname/avatar/email/name/gender/birthday/birthyear/phone scopes saved. Alpha REST/JS/native credentials and scope settings identify this test app. Its Android/iOS IDs are `kr.co.teameet.alpha`, with the fixed alpha signing hash registered. Secret values and the test member's personal address are intentionally omitted.
+- Alpha Maps remains on parent app `1604606`, independently of login. The real admin place picker returned results, selected a venue and rendered loaded Kakao tiles and a pin. The unsaved tournament form was only a QA fixture; no tournament was created.
+- Production Maps was initially unconfigured. A scoped transaction registered only the parent app's REST/JS map fields and created an audit record. SSM invocation `6340c36e-2a76-4532-930e-efab86231004` succeeded, confirmed both values match and the login configuration digest is unchanged. The public Maps key endpoint matched the console key. A read-only provider request from the production API container returned HTTP 200 with a place result. The browser's pending-signup account correctly receives `SIGNUP_INCOMPLETE` on protected place search; that is not a full authenticated production UI pass.
+- The temporary encrypted handoff parameter was deleted after registration. No IAM policy, login credential, user identity, membership or history was changed by the Maps operation.
+- Read-only production eligibility audit: 598 active Kakao identities for 598 non-tombstoned users; 498 users have a verified phone, no user has a verified email. The 100 users without a verified contact include 38 with completed onboarding, and 99 have active account status. These are eligibility counts, not proof of actual new-app contact matches. Do not switch production login keys until an ownership-preserving path also covers the unmatched cohort.
+- Both production business-information and personal-information reviews still show pending. Android App Links runtime proof and physical-device login/return flows remain open.
+- Draft promotion PR #1851 (`dev` -> `main`) documents these blockers and must not be merged yet. Fresh test-app Android (`38196925566`) and iOS (`38196928378`) builds passed for `a4b7c2d78`. No physical Android/iOS device is currently connected, so installed-KakaoTalk and return/cancel flows are not certified by these builds. An ancillary GitHub AI security scan failed because its configured model was unavailable; it is not counted as a successful scan.
+
 ### 2026-10-12 independent Maps and official test app
 
 - #1837 head `ffa74d870` passed API/Web/Gates, Android and iOS; all review threads were resolved. It merged into dev as `38aeada3b`, and both root and the existing feature worktree were fast-forwarded.
-- Alpha Maps REST/JS settings were saved for app `1604606`; the public key endpoint matched the console key and real place search returned HTTP 200 with 10 results. Map rendering is still pending.
+- Alpha Maps REST/JS settings were saved for app `1604606`; the public key endpoint matched the console key and real place search returned HTTP 200 with 10 results. Rendering was subsequently verified as recorded above.
 - The user requested independent Maps migration. Inspection found that the new browser login reused the Maps JS endpoint. It now reads a dedicated `NEXT_PUBLIC_KAKAO_LOGIN_JS_KEY`, built from environment-specific secrets, so Maps may use a different app. Focused browser/native-button tests passed: 14/14.
-- The user requested reusable alpha signup/linking tests. Official Kakao test app `1604717` (팀밋 Alpha 테스트) was created under `1604606`. Console keys, test consent grants, test-member access and alpha deployment are not yet complete. Production login keys remain unchanged.
+- The user requested reusable alpha signup/linking tests. Official Kakao test app `1604717` (팀밋 Alpha 테스트) was created under `1604606`; configuration was subsequently completed as recorded above. Actual deployed login scenarios remain open. Production login keys remain unchanged.
 - Existing admin deletion anonymizes the member, releases email/phone/provider identities and rejects active admins/team authorities; it is not a reusable onboarding reset. No user was reset or deleted. Alpha-only test account lifecycle needs explicit target isolation and audit evidence before use.
 - Play current/previous/upload certificate hashes are registered on the production native key. The public App Links fingerprint is configured in the production GitHub environment for the next deployment; current runtime verification is pending.
 - AWS CLI login was renewed. Owned temporary SecureString `/teameet/alpha/setup-kakao-1604606` was removed; no IAM permissions were changed.

@@ -199,6 +199,8 @@ function renderTab(showToast = vi.fn(), registrations: V1AdminTournamentRegistra
       tournamentId="t-1"
       showToast={showToast}
       registrations={registrations}
+      confirmedTeamCount={registrations.filter((registration) => registration.status === 'confirmed').length}
+      confirmedTeamCountStatus="success"
       registrationDeadlineAt={null}
       bracketPublishedAt={null}
       bracketPublishScheduledAt={null}
@@ -677,9 +679,12 @@ describe('BracketTab — 경기 수정: 시작된 경기의 팀 교체', () => {
     expect(confirmDialog).toHaveTextContent('강남FC 쪽 명단과 기록');
     expect(updateFixtureMutate).not.toHaveBeenCalled();
     fireEvent.change(within(confirmDialog).getByLabelText('바꾸는 이유'), { target: { value: '참가 팀 사정' } });
-    fireEvent.click(within(confirmDialog).getByRole('button', { name: '팀 바꾸기' }));
+    await act(async () => {
+      fireEvent.click(within(confirmDialog).getByRole('button', { name: '팀 바꾸기' }));
+      await Promise.resolve();
+    });
 
-    await vi.waitFor(() => expect(updateFixtureMutate).toHaveBeenCalledTimes(1));
+    expect(updateFixtureMutate).toHaveBeenCalledTimes(1);
     expect(updateFixtureMutate.mock.calls[0][0]).toMatchObject({ fixtureId: 'fx-1', homeRegistrationId: null, teamChangeReason: '참가 팀 사정' });
   });
 

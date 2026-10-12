@@ -7,9 +7,10 @@ import { useV1AssignTournamentSlot, useV1RandomFillSlots } from '@/hooks/use-v1-
 import { extractErrorMessage } from '@/lib/error-message';
 import type { V1AdminBracketGroup, V1AdminBracketSlot, V1AdminTournamentRegistration } from '@/types/api';
 
-export function BracketListTemplateTools({ tournamentId, format, hasExistingBracket, groups, slots, registrations, showToast }: {
+export function BracketListTemplateTools({ tournamentId, format, hasExistingBracket, groups, slots, registrations, confirmedTeamCount, confirmedTeamCountStatus, showToast }: {
   tournamentId: string; format: 'knockout' | 'league' | 'group_knockout'; hasExistingBracket: boolean;
   groups: V1AdminBracketGroup[]; slots: V1AdminBracketSlot[]; registrations: V1AdminTournamentRegistration[];
+  confirmedTeamCount: number; confirmedTeamCountStatus: 'pending' | 'success' | 'error';
   showToast: (message: string, variant?: 'success' | 'error') => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -52,7 +53,9 @@ export function BracketListTemplateTools({ tournamentId, format, hasExistingBrac
         </fieldset>)}
       </div>
     </details> : null}
-    {open ? <BracketTemplateDialog open tournamentId={tournamentId} format={format} hasExistingBracket={hasExistingBracket} onClose={() => setOpen(false)} showToast={showToast} /> : null}
+    {open ? <BracketTemplateDialog open tournamentId={tournamentId} format={format}
+      confirmedTeamCount={confirmedTeamCount} confirmedTeamCountStatus={confirmedTeamCountStatus}
+      hasExistingBracket={hasExistingBracket} onClose={() => setOpen(false)} showToast={showToast} /> : null}
     {ConfirmModal}
   </section>;
 }

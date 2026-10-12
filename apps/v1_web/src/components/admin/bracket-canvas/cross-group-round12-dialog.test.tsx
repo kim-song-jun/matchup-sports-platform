@@ -32,7 +32,8 @@ describe('목록 12강 자동 배정 팝업 HTTP 계약', () => {
     const showToast = vi.fn();
     const client = new QueryClient({ defaultOptions: { mutations: { retry: false } } });
     render(<QueryClientProvider client={client}><BracketListTemplateTools tournamentId="test" format="group_knockout"
-      hasExistingBracket={false} groups={[]} slots={[]} registrations={[]} showToast={showToast} /></QueryClientProvider>);
+      hasExistingBracket={false} groups={[]} slots={[]} registrations={[]} confirmedTeamCount={0}
+      confirmedTeamCountStatus="success" showToast={showToast} /></QueryClientProvider>);
     fireEvent.click(screen.getByRole('button', { name: '전체 대진 만들기' }));
     fireEvent.change(await screen.findByLabelText('참가 팀 수'), { target: { value: '20' } });
     const preset = await screen.findByRole('radio', { name: '5개 조 × 4팀 → 12강' });
@@ -42,6 +43,18 @@ describe('목록 12강 자동 배정 팝업 HTTP 계약', () => {
     await waitFor(() => expect(showToast).toHaveBeenCalledWith('경기 41개와 자리 32개를 만들었어요.', 'success'));
     expect(saved).toEqual({ kind: 'group_knockout', groupCount: 5, teamsPerGroup: 4, advancePerGroup: 2,
       legs: 1, thirdPlace: false, qualificationMode: 'cross_group_round12' });
+  });
+
+  it('목록의 템플릿 다이얼로그가 12명의 확정 참가자에 맞춰 12팀 녹아웃을 기본 선택한다', async () => {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
+    render(<QueryClientProvider client={client}><BracketListTemplateTools tournamentId="test" format="knockout"
+      hasExistingBracket={false} groups={[]} slots={[]} registrations={[]} confirmedTeamCount={12}
+      confirmedTeamCountStatus="success" showToast={vi.fn()} /></QueryClientProvider>);
+
+    fireEvent.click(screen.getByRole('button', { name: '전체 대진 만들기' }));
+
+    expect(await screen.findByLabelText('참가 팀 수')).toHaveValue('12');
+    expect(screen.getByRole('radio', { name: '12팀 대진 틀' })).toBeChecked();
   });
   it('12팀 전체와 부전승을 추천하고 팀 교환을 중복 없이 저장한다', async () => {
     const preview = createCrossGroupRound12Fixture();

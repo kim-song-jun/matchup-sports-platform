@@ -1,5 +1,5 @@
 import { Test, type TestingModule } from '@nestjs/testing';
-import { V1GameState } from '@prisma/client';
+import { V1GameState, type Prisma } from '@prisma/client';
 import { OperationAuditWriterService } from '../../src/common/audit/operation-audit-writer.service';
 import { GameTakeoverService } from '../../src/games/game-takeover.service';
 import { GamesService } from '../../src/games/games.service';
@@ -20,19 +20,41 @@ import { TeamMatchesService } from '../../src/team-matches/team-matches.service'
 const ids = {
   hostUser: '65000000-0000-4000-8000-000000000001',
   opponentUser: '65000000-0000-4000-8000-000000000002',
+  secondOpponentUser: '65000000-0000-4000-8000-000000000003',
   sport: '65000000-0000-4000-8000-000000000010',
   region: '65000000-0000-4000-8000-000000000011',
   hostTeam: '65000000-0000-4000-8000-000000000020',
   opponentTeam: '65000000-0000-4000-8000-000000000021',
+  secondOpponentTeam: '65000000-0000-4000-8000-000000000022',
 } as const;
 
 const prisma = new PrismaService();
 const games = new GamesService(prisma, new OperationAuditWriterService(), new GameTakeoverService());
 const teamSchedules = new TeamSchedulesService(prisma);
 const notifications = {
-  emitNotification: async () => undefined,
-  emitToManyDeferred: () => undefined,
+  emitNotification: jest.fn(async () => undefined),
+  emitToManyDeferred: jest.fn(),
 };
+// Prisma Client 6.19.2 defaults (PrismaService passes no transactionOptions): maxWait 2s, timeout 5s.
+const PRISMA_INTERACTIVE_TRANSACTION_MAX_WAIT_MS = 2_000;
+const PRISMA_INTERACTIVE_TRANSACTION_TIMEOUT_MS = 5_000;
+const CLOSE_BARRIER_TIMEOUT_MS = 8_000;
+const TRANSACTION_DRAIN_TIMEOUT_MS = PRISMA_INTERACTIVE_TRANSACTION_MAX_WAIT_MS + PRISMA_INTERACTIVE_TRANSACTION_TIMEOUT_MS + 1_000;
+
+async function settleWithin<T>(promise: Promise<T>, timeoutMs: number, label: string): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(new Error(`${label} did not settle within ${timeoutMs}ms`)), timeoutMs);
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
 const authUser = (id: string) => ({
   id,
   email: `${id}@example.test`,
@@ -74,12 +96,14 @@ describe('레인 schedule — 매치 ↔ 팀일정 연동 (TeamMatch 생명주�
       data: [
         { id: ids.hostUser, email: 'schedule-link-host@example.test', phone: '01065000001', accountStatus: 'active', onboardingStatus: 'completed' },
         { id: ids.opponentUser, email: 'schedule-link-opponent@example.test', phone: '01065000002', accountStatus: 'active', onboardingStatus: 'completed' },
+        { id: ids.secondOpponentUser, email: 'schedule-link-second-opponent@example.test', phone: '01065000003', accountStatus: 'active', onboardingStatus: 'completed' },
       ],
     });
     await prisma.v1UserProfile.createMany({
       data: [
         { userId: ids.hostUser, nickname: 'Link Host', displayName: 'Link Host', realName: 'Link Host Real', gender: 'male' },
         { userId: ids.opponentUser, nickname: 'Link Opponent', displayName: 'Link Opponent', realName: 'Link Opponent Real', gender: 'female' },
+        { userId: ids.secondOpponentUser, nickname: 'Link Second Opponent', displayName: 'Link Second Opponent', realName: 'Link Second Opponent Real', gender: 'female' },
       ],
     });
     const football = await prisma.v1Sport.upsert({
@@ -96,12 +120,14 @@ describe('레인 schedule — 매치 ↔ 팀일정 연동 (TeamMatch 생명주�
       data: [
         { id: ids.hostTeam, ownerUserId: ids.hostUser, sportId, regionId: ids.region, name: 'Schedule-link Host' },
         { id: ids.opponentTeam, ownerUserId: ids.opponentUser, sportId, regionId: ids.region, name: 'Schedule-link Opponent' },
+        { id: ids.secondOpponentTeam, ownerUserId: ids.secondOpponentUser, sportId, regionId: ids.region, name: 'Schedule-link Second Opponent' },
       ],
     });
     await prisma.v1TeamMembership.createMany({
       data: [
         { teamId: ids.hostTeam, userId: ids.hostUser, role: 'owner', status: 'active' },
         { teamId: ids.opponentTeam, userId: ids.opponentUser, role: 'owner', status: 'active' },
+        { teamId: ids.secondOpponentTeam, userId: ids.secondOpponentUser, role: 'owner', status: 'active' },
       ],
     });
 
@@ -170,6 +196,125 @@ describe('레인 schedule — 매치 ↔ 팀일정 연동 (TeamMatch 생명주�
     expect(hostDetail.matchConfirmed).toBe(true);
     expect(opponentDetail.matchConfirmed).toBe(true);
   });
+
+  it('마감 사전 조회 뒤 신청 승인이 끝나면 잠금 후 matched를 보존하고 마감 부작용을 만들지 않는다', async () => {
+    const created = await teamMatches.create(
+      authUser(ids.hostUser),
+      baseDto({ title: 'Close-approve race fixture' }),
+      'schedule-link-close-approve-race-create',
+    );
+    const approvedApplication = await prisma.v1TeamMatchApplication.create({
+      data: {
+        teamMatchId: created.teamMatchId,
+        applicantTeamId: ids.opponentTeam,
+        appliedByUserId: ids.opponentUser,
+        status: 'requested',
+      },
+    });
+    const otherApplication = await prisma.v1TeamMatchApplication.create({
+      data: {
+        teamMatchId: created.teamMatchId,
+        applicantTeamId: ids.secondOpponentTeam,
+        appliedByUserId: ids.secondOpponentUser,
+        status: 'requested',
+      },
+    });
+
+    let reachCloseTransaction!: () => void;
+    const closeReachedTransaction = new Promise<void>((resolve) => {
+      reachCloseTransaction = resolve;
+    });
+    let releaseCloseTransaction!: () => void;
+    const closeTransactionRelease = new Promise<void>((resolve) => {
+      releaseCloseTransaction = resolve;
+    });
+    let interceptNextTransaction = true;
+    const originalTransaction = prisma.$transaction.bind(prisma) as unknown as (
+      callback: (tx: Prisma.TransactionClient) => Promise<unknown>,
+    ) => Promise<unknown>;
+    const transactionSpy = jest.spyOn(prisma, '$transaction');
+    transactionSpy.mockImplementation(((operation: unknown) => {
+      if (typeof operation !== 'function') {
+        throw new Error('Expected an interactive transaction callback');
+      }
+      const callback = operation as (tx: Prisma.TransactionClient) => Promise<unknown>;
+      if (interceptNextTransaction) {
+        interceptNextTransaction = false;
+        reachCloseTransaction();
+        return closeTransactionRelease.then(() => originalTransaction(callback));
+      }
+      return originalTransaction(callback);
+    }) as typeof prisma.$transaction);
+
+    const closing = teamMatches.close(authUser(ids.hostUser), created.teamMatchId, { reason: 'race fixture close' })
+      .then((value) => ({ ok: true as const, value }), (error: unknown) => ({ ok: false as const, error }));
+    let approvalSettlement: Promise<
+      | { ok: true; value: Awaited<ReturnType<TeamMatchesService['approveApplication']>> }
+      | { ok: false; error: unknown }
+    > | undefined;
+    let approvalSettlementObserved = false;
+    let approval: Awaited<ReturnType<TeamMatchesService['approveApplication']>> | undefined;
+    try {
+      const reachedExpectedBarrier = await settleWithin(Promise.race([
+        closeReachedTransaction.then(() => true),
+        closing.then(() => false),
+      ]), CLOSE_BARRIER_TIMEOUT_MS, 'close precheck barrier');
+      expect(reachedExpectedBarrier).toBe(true);
+      approvalSettlement = teamMatches.approveApplication(authUser(ids.hostUser), approvedApplication.id, {})
+        .then((value) => ({ ok: true as const, value }), (error: unknown) => ({ ok: false as const, error }));
+      const approvalOutcome = await settleWithin(
+        approvalSettlement,
+        TRANSACTION_DRAIN_TIMEOUT_MS,
+        'approveApplication transaction',
+      );
+      approvalSettlementObserved = true;
+      if (!approvalOutcome.ok) throw approvalOutcome.error;
+      approval = approvalOutcome.value;
+    } finally {
+      releaseCloseTransaction();
+      try {
+        if (approvalSettlement && !approvalSettlementObserved) {
+          await settleWithin(approvalSettlement, TRANSACTION_DRAIN_TIMEOUT_MS, 'approveApplication cleanup');
+          approvalSettlementObserved = true;
+        }
+      } finally {
+        try {
+          await settleWithin(closing, TRANSACTION_DRAIN_TIMEOUT_MS, 'close transaction cleanup');
+        } finally {
+          transactionSpy.mockRestore();
+        }
+      }
+    }
+
+    const closeOutcome = await closing;
+    expect(approval?.status).toBe('approved');
+    expect(closeOutcome.ok).toBe(false);
+    if (closeOutcome.ok) throw new Error('close unexpectedly succeeded after approval committed');
+    expect(closeOutcome.error).toMatchObject({ status: 409 });
+
+    const [teamMatch, applications, logs] = await Promise.all([
+      prisma.v1TeamMatch.findUniqueOrThrow({ where: { id: created.teamMatchId } }),
+      prisma.v1TeamMatchApplication.findMany({ where: { teamMatchId: created.teamMatchId }, orderBy: { id: 'asc' } }),
+      prisma.v1StatusChangeLog.findMany({ where: { targetId: { in: [created.teamMatchId, approvedApplication.id, otherApplication.id] } } }),
+    ]);
+    expect(teamMatch.status).toBe('matched');
+    expect(teamMatch.approvedApplicantTeamId).toBe(ids.opponentTeam);
+    expect(applications).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: approvedApplication.id, status: 'approved' }),
+      expect.objectContaining({ id: otherApplication.id, status: 'rejected' }),
+    ]));
+    expect(applications.some((application) => application.status === 'expired')).toBe(false);
+    expect(logs).toEqual(expect.arrayContaining([
+      expect.objectContaining({ targetType: 'team_match', toStatus: 'matched' }),
+      expect.objectContaining({ targetType: 'team_match_application', targetId: approvedApplication.id, toStatus: 'approved' }),
+      expect.objectContaining({ targetType: 'team_match_application', targetId: otherApplication.id, toStatus: 'rejected' }),
+    ]));
+    expect(logs.some((log) => log.targetType === 'team_match' && log.toStatus === 'closed')).toBe(false);
+    expect(logs.some((log) => log.toStatus === 'expired')).toBe(false);
+    expect(notifications.emitToManyDeferred.mock.calls.some(([, , targetId, body]) =>
+      targetId === created.teamMatchId && String(body).includes('모집이 마감되어 대기 중인 신청이 종료'),
+    )).toBe(false);
+  }, 30_000);
 
   it('TeamMatch 취소 시 연결된 SCHEDULED 스케줄(호스트+상대)이 모두 CANCELLED로 cascade되고 row는 삭제되지 않는다', async () => {
     const created = await teamMatches.create(authUser(ids.hostUser), baseDto({ title: 'Cancel-flow match' }), 'schedule-link-cancel-create');

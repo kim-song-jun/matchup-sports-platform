@@ -411,6 +411,13 @@ export type V1MatchLifecycle = {
   onHoldReason: 'NO_PARTICIPANTS' | 'UNDER_CAPACITY' | 'NO_OPPONENT' | null;
 };
 
+export type V1TeamMatchLifecycle = V1MatchLifecycle & {
+  /** Whether the host can end pending applications through the close action. */
+  canCloseRecruitment?: boolean;
+  /** Whether the host can reopen a manually closed recruitment. */
+  canReopenRecruitment?: boolean;
+};
+
 /** 서버가 내려주는 장소 스냅샷. 좌표·provider 가 없으면(이름만 직접 입력) 지도 없이 이름 검색 폴백으로 보여 준다. */
 export type V1PlaceView = {
   name: string;
@@ -1313,7 +1320,7 @@ export type V1TeamMatch = V1Match & {
   region?: { regionId: string; name: string; parentName?: string | null } | null;
   place?: V1PlaceView | null;
   displayState?: V1TeamMatchApiStatus;
-  lifecycle?: V1MatchLifecycle;
+  lifecycle?: V1TeamMatchLifecycle;
   costNote?: string | null;
   /**
    * 리그전 경기면 소속 리그, 일반 팀 매치면 null. 백엔드

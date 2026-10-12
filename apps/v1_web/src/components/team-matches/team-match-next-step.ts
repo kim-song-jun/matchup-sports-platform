@@ -51,15 +51,14 @@ export function summarizeApplicationHistory(history: readonly ApplicationHistory
 }
 
 /**
- * 서버 edit() 과 같은 판정 — 수정은 모집 중(DB recruiting)이고 시작 전일 때만 열린다.
- * 인자는 `displayState` 가 아니라 `status`(api status) 다: 신청 마감 시각이 지나 화면에 '마감'으로
- * 보이는 매치도 서버는 수정을 받는다.
+ * 수정 가능 여부는 서버 lifecycle capability가 결정한다. 상태값은 잠금 사유 문구에만 쓴다.
  */
-export function teamMatchEditLockReason(apiStatus: string): string | null {
-  if (apiStatus === 'recruiting') return null;
-  if (apiStatus === 'closed') return '모집을 마감해서 바꿀 수 없어요. 모집을 다시 열면 바꿀 수 있어요.';
+export function teamMatchEditLockReason(canEdit: boolean, apiStatus: string): string | null {
+  if (canEdit) return null;
+  if (apiStatus === 'closed') return '모집을 마감해서 수정할 수 없어요.';
   if (apiStatus === 'matched') return '상대팀이 정해져서 바꿀 수 없어요. 바꿔야 하면 채팅으로 상의해요.';
   if (apiStatus === 'expired') return '경기 시간이 지나서 바꿀 수 없어요.';
+  if (apiStatus === 'recruiting') return '현재 상태에서는 수정할 수 없어요.';
   return '끝난 팀매치는 바꿀 수 없어요.';
 }
 

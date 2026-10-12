@@ -4,6 +4,7 @@ import { TeamMatchRecordEntry } from './team-match-shared-record';
 
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useCursorPagination, useCursorPaginationSnapshot } from '@/hooks/use-cursor-pagination';
 import {
   useV1ApplyTeamMatch,
@@ -77,6 +78,7 @@ import {
 
 export function TeamMatchListPageClient({ seed }: { readonly seed?: CursorListSeed<V1TeamMatch> } = {}) {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const searchParams = useSearchParams();
   const selectedSportId = searchParams.get('sportId') ?? undefined;
   const selectedSort = toTeamMatchSort(searchParams.get('sort'));
@@ -137,13 +139,22 @@ export function TeamMatchListPageClient({ seed }: { readonly seed?: CursorListSe
     teamMatchFiltersKey,
     (savedCursor) => v1Keys.teamMatches(savedCursor ? { ...teamMatchFilters, cursor: savedCursor } : teamMatchFilters),
   );
+  const loadedPageCursorsKey = useMemo(() => [...snapshotKey, 'loaded-page-cursors'] as const, [snapshotKey]);
+  useEffect(() => {
+    if (!cursor && accumulated.length === 0 && queryClient.getQueryData<string[]>(loadedPageCursorsKey)?.length) {
+      queryClient.setQueryData(loadedPageCursorsKey, []);
+    }
+  }, [accumulated.length, cursor, loadedPageCursorsKey, queryClient]);
   const allQueryFilters = useMemo(() => (!teamMatchFilters && cursor ? { cursor } : undefined), [teamMatchFilters, cursor]);
   const filteredQueryFilters = useMemo(
     () => (teamMatchFilters ? (cursor ? { ...teamMatchFilters, cursor } : teamMatchFilters) : undefined),
     [teamMatchFilters, cursor],
   );
   // matches-client.tsx 와 같다 — seed 는 cursor 없는 무필터 키에만 맞는다.
-  const allQuery = useV1TeamMatches(allQueryFilters, { seed: allQueryFilters ? undefined : seed?.page });
+  const allQuery = useV1TeamMatches(allQueryFilters, {
+    seed: allQueryFilters ? undefined : seed?.page,
+    refetchOnWindowFocus: 'always',
+  });
   const countFilters = useMemo(() => {
     const filters: { query?: string; genderRule?: string; levelCodes?: string; kind?: 'friendly' | 'competition' } = {};
     if (selectedGenderRule) filters.genderRule = selectedGenderRule;
@@ -154,17 +165,115 @@ export function TeamMatchListPageClient({ seed }: { readonly seed?: CursorListSe
   }, [selectedGenderRule, selectedLevels, selectedKind, submittedQuery]);
   const filteredQuery = useV1TeamMatches(
     filteredQueryFilters,
-    { enabled: Boolean(teamMatchFilters) },
+    { enabled: Boolean(teamMatchFilters), refetchOnWindowFocus: 'always' },
   );
   const countQuery = useV1TeamMatches(
     countFilters,
-    { enabled: Boolean(countFilters) },
+    { enabled: Boolean(countFilters), refetchOnWindowFocus: 'always' },
   );
   const recentSearches = useV1RecentSearches();
   const recordSearch = useV1RecordSearch();
   const query = teamMatchFilters ? filteredQuery : allQuery;
 
   useCursorPaginationSnapshot(snapshotKey, { cursor, accumulated }, query);
+
+  const accumulatedIdentity = useMemo(
+    () => JSON.stringify(accumulated.map((item) => item.teamMatchId ?? item.id)),
+    [accumulated],
+  );
+  useEffect(() => {
+    if (!cursor || accumulatedIdentity === '[]' || query.dataUpdatedAt === 0 || query.isPlaceholderData || !isTeamMatchPageData(query.data)) return;
+    const currentPageData = query.data;
+    let active = true;
+    const ids = new Set<string>(JSON.parse(accumulatedIdentity) as string[]);
+    const matchesFilters = (queryKey: readonly unknown[]) => {
+      if (queryKey[1] !== 'team-matches' || !isTeamMatchFilterRecord(queryKey[2])) return false;
+      const pageFilters = { ...queryKey[2] };
+      delete pageFilters.cursor;
+      return sameTeamMatchFilters(pageFilters, teamMatchFilters ?? {});
+    };
+    const matchingQueries = queryClient.getQueryCache().findAll({ queryKey: v1Keys.teamMatchesAll() }).filter((cachedQuery) => matchesFilters(cachedQuery.queryKey));
+    const pageByCursor = new Map<string | undefined, (typeof matchingQueries)[number]>();
+    for (const cachedQuery of matchingQueries) {
+      if (!isTeamMatchPageData(cachedQuery.state.data)) continue;
+      const filters = cachedQuery.queryKey[2] as Record<string, unknown>;
+      pageByCursor.set(typeof filters.cursor === 'string' ? filters.cursor : undefined, cachedQuery);
+    }
+    const loadedPageCursors = queryClient.getQueryData<string[]>(loadedPageCursorsKey) ?? [];
+    const previousPages = [...new Set<string | undefined>([undefined, ...loadedPageCursors])]
+      .map((pageCursor) => pageByCursor.get(pageCursor))
+      .filter((cachedQuery): cachedQuery is (typeof matchingQueries)[number] => Boolean(cachedQuery && isTeamMatchPageData(cachedQuery.state.data)));
+    const snapshots = previousPages.map((cachedQuery) => ({
+      queryHash: cachedQuery.queryHash,
+      queryKey: cachedQuery.queryKey,
+      data: cachedQuery.state.data as TeamMatchPageData,
+    }));
+
+    void Promise.allSettled(snapshots.map((snapshot) =>
+      queryClient.refetchQueries(
+        { type: 'all', queryKey: snapshot.queryKey, exact: true },
+        { throwOnError: true },
+      ),
+    )).then((refetchResults) => {
+      if (!active) return;
+      const queriesByHash = new Map(
+        queryClient.getQueryCache().findAll({ queryKey: v1Keys.teamMatchesAll() }).map((cachedQuery) => [cachedQuery.queryHash, cachedQuery]),
+      );
+      const refreshedPageByItemId = new Map<string, boolean>();
+      const failedPageItemsById = new Map<string, V1TeamMatch>();
+      const successfulPages: TeamMatchPageData[] = [];
+      const currentPageIds = new Set(currentPageData.items.map((item) => item.teamMatchId ?? item.id));
+      const refreshedAccumulated: V1TeamMatch[] = [];
+      const accumulatedIds = new Set<string>();
+      for (const [index, snapshot] of snapshots.entries()) {
+        const cachedQuery = queriesByHash.get(snapshot.queryHash);
+        const refreshedData = cachedQuery?.state.data;
+        const refreshedSuccessfully = refetchResults[index]?.status === 'fulfilled' && isTeamMatchPageData(refreshedData);
+        const pageData = refreshedSuccessfully && isTeamMatchPageData(refreshedData) ? refreshedData : snapshot.data;
+        for (const item of snapshot.data.items) {
+          const id = item.teamMatchId ?? item.id;
+          if (!refreshedPageByItemId.has(id)) refreshedPageByItemId.set(id, refreshedSuccessfully);
+          if (!refreshedSuccessfully && !failedPageItemsById.has(id)) failedPageItemsById.set(id, item);
+        }
+        if (refreshedSuccessfully) successfulPages.push(pageData);
+      }
+      const successfulItemsById = new Map<string, V1TeamMatch>();
+      for (const pageData of successfulPages) {
+        for (const item of pageData.items) {
+          const id = item.teamMatchId ?? item.id;
+          if (!successfulItemsById.has(id)) successfulItemsById.set(id, item);
+        }
+      }
+      for (const item of accumulated) {
+        const id = item.teamMatchId ?? item.id;
+        if (currentPageIds.has(id) || accumulatedIds.has(id)) continue;
+        const refreshedItem = successfulItemsById.get(id);
+        if (refreshedItem) {
+          refreshedAccumulated.push(refreshedItem);
+        } else if (failedPageItemsById.has(id)) {
+          refreshedAccumulated.push(failedPageItemsById.get(id)!);
+        } else {
+          if (refreshedPageByItemId.get(id)) continue;
+          refreshedAccumulated.push(item);
+        }
+        accumulatedIds.add(id);
+      }
+      for (const pageData of successfulPages) {
+        for (const item of pageData.items) {
+          const id = item.teamMatchId ?? item.id;
+          if (ids.has(id) || currentPageIds.has(id) || accumulatedIds.has(id)) continue;
+          refreshedAccumulated.push(item);
+          accumulatedIds.add(id);
+        }
+      }
+      if (refreshedAccumulated.length !== accumulated.length || refreshedAccumulated.some((item, index) => item !== accumulated[index])) {
+        setPagination({ cursor, accumulated: refreshedAccumulated });
+      }
+    });
+    return () => {
+      active = false;
+    };
+  }, [accumulatedIdentity, cursor, loadedPageCursorsKey, query.data, query.dataUpdatedAt, query.isPlaceholderData, queryClient, setPagination, teamMatchFiltersKey]);
 
   // 다음 페이지 실패는 이미 쌓은 목록을 지우지 않는다 — 첫 페이지 실패만 전체 에러 화면이다.
   // 커서 페이지에 성공한 데이터가 없는 상태 — 실패했거나 재시도 중이다. 데이터가 남은 채 난 배경 재검증
@@ -204,6 +313,10 @@ export function TeamMatchListPageClient({ seed }: { readonly seed?: CursorListSe
       return;
     }
     if (!query.data?.pageInfo?.nextCursor) return;
+    if (cursor) {
+      const loadedPageCursors = queryClient.getQueryData<string[]>(loadedPageCursorsKey) ?? [];
+      if (!loadedPageCursors.includes(cursor)) queryClient.setQueryData(loadedPageCursorsKey, [...loadedPageCursors, cursor]);
+    }
     setPagination({ accumulated: items ?? [], cursor: query.data.pageInfo.nextCursor });
   };
   const searchModel: NonNullable<TeamMatchListViewModel['search']> = {
@@ -295,7 +408,11 @@ export function TeamMatchListPageClient({ seed }: { readonly seed?: CursorListSe
 /** matches-client.tsx 의 `seed` 와 같은 목적·같은 안전장치 — 자세한 근거는 그쪽 주석. */
 export function TeamMatchDetailPageClient({ teamMatchId, seed }: { teamMatchId: string; seed?: V1TeamMatch | null }) {
   const router = useRouter();
-  const query = useV1TeamMatch(teamMatchId, { seed });
+  const query = useV1TeamMatch(teamMatchId, {
+    seed,
+    refetchInterval: 15_000,
+    refetchOnWindowFocus: 'always',
+  });
   const recordParams = useSearchParams();
   // topBar:false라 셸 뒤로가기가 없다 — 페이지가 직접 그리는 모바일·데스크톱 링크
   // (team-matches-page.tsx)가 이 값을 쓴다. public-profile-client.tsx와 같은 `?from=` 패턴.
@@ -398,8 +515,7 @@ export function TeamMatchDetailPageClient({ teamMatchId, seed }: { teamMatchId: 
   const seeding = query.isPlaceholderData;
   const isLeagueFixture = Boolean(query.data.league);
   const displayStatus = getStatus(query.data);
-  // 수정·마감·재개는 서버 api status 로 판정한다 — displayState 는 신청 마감 시각이 지나면
-  // 'closed' 로 보이지만 서버는 여전히 recruiting 으로 보고 재개를 409 로 거부한다.
+  // 자동/수동 마감의 차이는 서버 lifecycle capability가 판정한다. 상태값만으로 재개 여부를 추측하지 않는다.
   // V1TeamMatch 는 V1Match 의 status 타입을 물려받아 좁다 — getStatus() 와 같은 캐스트다.
   const apiStatus = query.data.status as V1TeamMatchApiStatus;
   const requestedCount = applications.data?.items.filter((item) => item.status === 'requested').length ?? 0;
@@ -453,7 +569,7 @@ export function TeamMatchDetailPageClient({ teamMatchId, seed }: { teamMatchId: 
         submit: submitApplication,
       }
     : undefined;
-  const editLockReason = teamMatchEditLockReason(apiStatus);
+  const editLockReason = teamMatchEditLockReason(query.data.lifecycle?.canEdit === true, apiStatus);
   const withdrawApplication = () => withdrawTeamMatch.mutateAsync({ reason: 'applicant_team_withdrawn_from_v1_web' });
   const applyAction = seeding ? undefined : getApplyAction({
     viewerState,
@@ -523,6 +639,8 @@ export function TeamMatchDetailPageClient({ teamMatchId, seed }: { teamMatchId: 
     hostActions: !seeding && canManageMatchListing
       ? buildHostActions({
           status: apiStatus,
+          canCloseRecruitment: query.data.lifecycle?.canCloseRecruitment === true,
+          canReopenRecruitment: query.data.lifecycle?.canReopenRecruitment === true,
           requestedCount,
           opponentName: approvedOpponent?.name ?? null,
           // 리그 대진은 서버가 팀 단독 취소를 409 LEAGUE_FIXTURE_HOST_CANCEL_FORBIDDEN 으로
@@ -556,7 +674,9 @@ export function TeamMatchDetailPageClient({ teamMatchId, seed }: { teamMatchId: 
           matchPhase: scheduleLabel !== null,
           completed: displayStatus === 'completed',
           manageHref,
-          reopen: () => reopenTeamMatch.mutateAsync({ reason: 'host_reopened_from_v1_web' }),
+          reopen: query.data.lifecycle?.canReopenRecruitment === true
+            ? () => reopenTeamMatch.mutateAsync({ reason: 'host_reopened_from_v1_web' })
+            : undefined,
           lineupAction,
           resultAction,
           reviewAction,
@@ -775,7 +895,12 @@ function applyLabel(
 ) {
   if (status === 'cancelled') return '취소된 팀매치예요';
   // 호스트의 하단 버튼은 보통 nextAction(매치 수정·모집 재개·참석명단 관리)이 그린다 — 이 라벨은 할 일이 없을 때의 상태다.
-  if (viewerState === 'host_team') return status === 'expired' ? '경기 시간이 지났어요' : status === 'completed' ? '경기 종료' : '매치 수정';
+  if (viewerState === 'host_team') {
+    if (status === 'expired') return '경기 시간이 지났어요';
+    if (status === 'completed') return '경기 종료';
+    if (status === 'closed') return '신청 마감';
+    return '매치 수정';
+  }
   if (viewerState === 'requested' || team?.reasonCode === 'ALREADY_REQUESTED') {
     // 라벨과 액션은 같은 `team`에서 나와야 한다(getApplyAction도 이 팀의 applicationId를 쓴다).
     // 여러 팀을 관리하는 사용자에게 "어느 팀 신청을 취소하는지"를 밝힌다.
@@ -876,6 +1001,8 @@ function canOpenTeamMatchChat(
 
 function buildHostActions({
   status,
+  canCloseRecruitment,
+  canReopenRecruitment,
   requestedCount,
   opponentName,
   isLeagueFixture,
@@ -887,6 +1014,8 @@ function buildHostActions({
 }: {
   /** 서버 api status — close()/reopen() 이 보는 값과 같아야 눌러서 409 를 보지 않는다. */
   status: V1TeamMatchApiStatus;
+  canCloseRecruitment: boolean;
+  canReopenRecruitment: boolean;
   requestedCount: number;
   opponentName: string | null;
   isLeagueFixture: boolean;
@@ -918,21 +1047,23 @@ function buildHostActions({
       }
     : null;
   const withDelete = (actions: NonNullable<TeamMatchDetailViewModel['hostActions']>) => (deleteAction ? [...actions, deleteAction] : actions);
-  if (status === 'recruiting') {
+  if (status === 'on_hold') return [];
+  if (canCloseRecruitment) {
+    const closeLabel = status === 'closed' ? '대기 신청 종료' : '모집 마감';
     // 마감하면 서버가 대기 신청을 전부 expired 로 끝낸다(close()) — 끝나는 팀이 있을 때만 확인한다.
     const closeConfirm = requestedCount > 0
       ? {
-          title: '모집을 마감할까요?',
-          message: `대기 중인 신청 ${requestedCount}팀이 종료되고 알림이 가요. 마감한 뒤에도 모집을 다시 열 수 있어요.`,
-          confirmLabel: '모집 마감',
+          title: status === 'closed' ? '대기 신청을 종료할까요?' : '모집을 마감할까요?',
+          message: `대기 중인 신청 ${requestedCount}팀이 종료되고 알림이 가요.${status === 'closed' ? '' : ' 마감한 뒤에도 모집을 다시 열 수 있어요.'}`,
+          confirmLabel: closeLabel,
           cancelLabel: '닫기',
           tone: 'default' as const,
         }
       : undefined;
     return withDelete([
       {
-        label: '모집 마감',
-        description: requestedCount > 0 ? `대기 중인 신청 ${requestedCount}팀이 종료돼요.` : '더 이상 신청을 받지 않아요.',
+        label: closeLabel,
+        description: requestedCount > 0 ? `대기 중인 신청 ${requestedCount}팀이 종료돼요.` : status === 'closed' ? '남아 있는 대기 신청을 종료해요.' : '더 이상 신청을 받지 않아요.',
         tone: 'neutral',
         pending,
         confirm: closeConfirm,
@@ -941,12 +1072,14 @@ function buildHostActions({
       ...(isLeagueFixture ? [] : [cancelAction]),
     ]);
   }
-  if (status === 'on_hold') return [];
-  if (status === 'closed') {
+  if (canReopenRecruitment) {
     return withDelete([
       { label: '모집 재개', description: '다시 신청을 받아요.', tone: 'primary', pending, onClick: reopenTeamMatch },
       ...(isLeagueFixture ? [] : [cancelAction]),
     ]);
+  }
+  if (status === 'closed') {
+    return withDelete(isLeagueFixture ? [] : [cancelAction]);
   }
   if (status === 'matched') {
     // Task 16 removed the standalone "complete" mutation — completion is now an
@@ -1133,4 +1266,20 @@ function modelScheduleLabel(match: V1TeamMatch) {
   if (phase === 'completion_pending') return '종료 확인 중';
   if (phase === 'live') return '진행 중';
   return null;
+}
+
+function isTeamMatchFilterRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+type TeamMatchPageData = { items: V1TeamMatch[]; nextCursor: string | null };
+
+function isTeamMatchPageData(value: unknown): value is TeamMatchPageData {
+  return isTeamMatchFilterRecord(value) && Array.isArray(value.items) && (typeof value.nextCursor === 'string' || value.nextCursor === null);
+}
+
+function sameTeamMatchFilters(left: Record<string, unknown>, right: Record<string, unknown>) {
+  const normalized = (filters: Record<string, unknown>) =>
+    Object.entries(filters).sort(([leftKey], [rightKey]) => leftKey.localeCompare(rightKey));
+  return JSON.stringify(normalized(left)) === JSON.stringify(normalized(right));
 }

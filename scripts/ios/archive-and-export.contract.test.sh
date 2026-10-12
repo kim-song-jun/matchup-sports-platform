@@ -108,7 +108,7 @@ run_correct_mapping TeameetProduction 'Production Release' 'Teameet Production A
 : > "$WORK/fake-key.p8"
 if env PATH="$WORK/bin:$PATH" CONTRACT_XCODEBUILD_LOG="$WORK/xcodebuild.log" \
   CONTRACT_ALTOOL_SENTINEL="$WORK/alttool.sentinel" CONTRACT_BUNDLE_ID=kr.co.wrong \
-  TEAMEET_ARCHIVE_SCHEME=TeameetProduction TEAMEET_ARCHIVE_OUTPUT="$WORK/wrong-export" TEAMEET_KAKAO_NATIVE_APP_KEY=0123456789abcdef0123456789abcdef APP_STORE_CONNECT_KEY_ID=fake \
+  TEAMEET_ARCHIVE_SCHEME=TeameetProduction TEAMEET_ARCHIVE_OUTPUT="$WORK/wrong-export" TEAMEET_KAKAO_PRODUCTION_NATIVE_APP_KEY=0123456789abcdef0123456789abcdef APP_STORE_CONNECT_KEY_ID=fake \
   APP_STORE_CONNECT_ISSUER_ID=fake APP_STORE_CONNECT_KEY_FILE="$WORK/fake-key.p8" \
   "$WORK/repo/scripts/ios/archive-and-export.sh" --upload >"$WORK/wrong-export.out" 2>&1; then
   echo 'wrong exported bundle unexpectedly succeeded' >&2
@@ -128,27 +128,27 @@ if env PATH="$WORK/bin:$PATH" CONTRACT_XCODEBUILD_LOG="$WORK/xcodebuild.log" \
   echo 'production upload without the Kakao key unexpectedly succeeded' >&2
   exit 1
 fi
-grep -q 'TEAMEET_KAKAO_NATIVE_APP_KEY (32 hex chars) is required' "$WORK/no-kakao-key.out"
+grep -q 'TEAMEET_KAKAO_PRODUCTION_NATIVE_APP_KEY (32 hex chars) is required' "$WORK/no-kakao-key.out"
 [[ ! -s "$WORK/alttool.sentinel" ]]
 
 # A malformed key (wrong length / non-hex) is refused like a missing one.
 if env PATH="$WORK/bin:$PATH" CONTRACT_XCODEBUILD_LOG="$WORK/xcodebuild.log" \
   CONTRACT_ALTOOL_SENTINEL="$WORK/alttool.sentinel" CONTRACT_BUNDLE_ID=kr.co.teameet \
-  TEAMEET_ARCHIVE_SCHEME=TeameetProduction TEAMEET_ARCHIVE_OUTPUT="$WORK/bad-kakao-key" TEAMEET_KAKAO_NATIVE_APP_KEY=abc123 \
+  TEAMEET_ARCHIVE_SCHEME=TeameetProduction TEAMEET_ARCHIVE_OUTPUT="$WORK/bad-kakao-key" TEAMEET_KAKAO_PRODUCTION_NATIVE_APP_KEY=abc123 \
   APP_STORE_CONNECT_KEY_ID=fake APP_STORE_CONNECT_ISSUER_ID=fake \
   APP_STORE_CONNECT_KEY_FILE="$WORK/fake-key.p8" \
   "$WORK/repo/scripts/ios/archive-and-export.sh" --upload >"$WORK/bad-kakao-key.out" 2>&1; then
   echo 'production upload with a malformed Kakao key unexpectedly succeeded' >&2
   exit 1
 fi
-grep -q 'TEAMEET_KAKAO_NATIVE_APP_KEY (32 hex chars) is required' "$WORK/bad-kakao-key.out"
+grep -q 'TEAMEET_KAKAO_PRODUCTION_NATIVE_APP_KEY (32 hex chars) is required' "$WORK/bad-kakao-key.out"
 [[ ! -s "$WORK/alttool.sentinel" ]]
 
 # Positive upload control: all gates pass and only the stubbed altool is reached.
 set +e
 env PATH="$WORK/bin:$PATH" CONTRACT_XCODEBUILD_LOG="$WORK/xcodebuild.log" \
   CONTRACT_ALTOOL_SENTINEL="$WORK/alttool.sentinel" CONTRACT_BUNDLE_ID=kr.co.teameet \
-  TEAMEET_ARCHIVE_SCHEME=TeameetProduction TEAMEET_ARCHIVE_OUTPUT="$WORK/correct-upload" TEAMEET_KAKAO_NATIVE_APP_KEY=0123456789abcdef0123456789abcdef \
+  TEAMEET_ARCHIVE_SCHEME=TeameetProduction TEAMEET_ARCHIVE_OUTPUT="$WORK/correct-upload" TEAMEET_KAKAO_PRODUCTION_NATIVE_APP_KEY=0123456789abcdef0123456789abcdef \
   APP_STORE_CONNECT_KEY_ID=fake APP_STORE_CONNECT_ISSUER_ID=fake \
   APP_STORE_CONNECT_KEY_FILE="$WORK/fake-key.p8" \
   "$WORK/repo/scripts/ios/archive-and-export.sh" --upload >"$WORK/correct-upload.out" 2>&1

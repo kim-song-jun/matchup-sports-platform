@@ -31,6 +31,11 @@ The user authorized reviewing, repairing, and merging the currently open PRs #18
 
 ### 2026-10-12 follow-up
 
+- Contact implementation at `e314d0625` passed API and Web CI, including the real `auth-kakao-contact-link.integration-spec.ts` DB suite (overall integration: 160 suites, 1161 passed, 3 skipped). Android and iOS also passed. The conservative SQL gate rejected new immutable terms INSERT/guard statements; their exact statements and compatibility rationale are now registered for the next CI revision.
+- Kakao Maps is enabled with the app's free quota. Email, nickname and profile-image scopes are optional; name/phone/gender/birthday/birthyear remain awaiting review. Native platform keys are separate for production and alpha; alpha signing hash is registered and production package/bundle IDs are registered. Native keys and alpha REST/app-ID secrets were transferred to GitHub without logging values.
+- iOS now resolves a distinct native key per flavor. Real xcconfig-generation and upload-rejection contracts passed locally. Alpha deployment now uses dedicated credentials and fails closed before activation if required values are invalid. Maps DB/JS alignment and actual new-app login remain required before release.
+- AWS CLI session expired during read-only verification. No production credentials changed. User directed switching Ego to For Apps; old TaskSpace 283 closed and TaskSpace 304 has the existing Play app (`kr.co.teameet`, currently under review).
+
 - #1843 merged into dev as `8b9fff12b9c6b066fa6c09b6cfa68a769a13ebb8` after API/Web/Gates success. #1848 merged as `3d7180ea2d44f251648d24eb12a1abf5fb0392cd` after the same checks; root checkout fast-forwarded after each merge.
 - #1837 `67dd77add` passed API/Web/Gates, Android and iOS. iOS alpha/production tests, production Release build and built crypto audit passed. Additional user-requested contact/consent changes below need a fresh exact-head CI run.
 - Business registration and business-information review submitted for Kakao app `1604606`. Personal information review submitted for optional name, gender, phone, birthday and birthyear using the actual production signup screenshot. Both console statuses are `심사 중`; personal review proceeds after business approval. No age_range, CI or shipping request.

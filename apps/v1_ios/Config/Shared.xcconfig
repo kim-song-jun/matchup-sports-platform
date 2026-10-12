@@ -17,7 +17,8 @@
 // Secrets.generated.xcconfig with scripts/release/generate-ios-secrets-xcconfig.sh. The file is
 // gitignored and optional on purpose: a build without the key must still compile, with Kakao
 // sign-in off.
-TEAMEET_KAKAO_NATIVE_APP_KEY =
+TEAMEET_KAKAO_ALPHA_NATIVE_APP_KEY =
+TEAMEET_KAKAO_PRODUCTION_NATIVE_APP_KEY =
 #include? "Secrets.generated.xcconfig"
 
 IPHONEOS_DEPLOYMENT_TARGET = 16.0

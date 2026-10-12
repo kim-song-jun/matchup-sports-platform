@@ -145,7 +145,7 @@ A안은 데스크톱 큰 팝업, 모바일 전체 높이 다이얼로그로 한�
 
 ## 2026-10-12 추가 요청 — A + C 선택
 
-Status (추가 요청): In Progress — PR #1853 dev 머지·alpha 배포 완료; S1 그래픽 카드 후속 구현과 최종 alpha 흐름 검증 중.
+Status (추가 요청): In Progress — PR #1853·#1863 dev 머지·alpha 배포 완료. 변경 후 운영자 실화면·저장 검증은 동일 ego326 재인증 대기.
 
 - 사용자 요청: 첨부 운영자 피드백의 대회·리그 템플릿을 다듬어 dev 대상 PR과 alpha 테스트까지 진행.
 - 원문 피드백: 12강 지원이 불명확하고, 템플릿과 수기 입력이 잘 이어지지 않으며 수정·삭제가 번거롭다. 기능 제거 의견은 첨부 대화의 제안이며 사용자 확정 요구로 취급하지 않는다.
@@ -168,6 +168,9 @@ Status (추가 요청): In Progress — PR #1853 dev 머지·alpha 배포 완료
 - 운영자 확인 후 alpha9795 admin/me 200·ops 재확인. 수기13번 경기 추가201→편집 자동 열림→이미 다른 경기에 배정된 두 팀 PATCH200×2/GET 저장 확인→삭제 확인/DELETE200→GET에서 신규ID 부재·원래12경기 유지. 신규 QA 경기만 변경·삭제했고 결과·공개 상태는 유지했다.
 - PR head56ef의 CI38228980712 Web은 8,710 PASS / 4 FAIL: 비선택 카드까지 포함한 부전승 문구·중복 조 구성 radio·옛 특수 checkbox 선택자 때문에 실패했다. 실제 선택 카드/미리보기로 범위를 좁히고 HTTP 소비 테스트는 20팀 입력→실제 특수 카드 선택으로 수정했으며 POST payload 단언은 유지했다. 영향을 받은 6개 계약 최종 PASS. 로컬 timeout 두 건은 해당 CI에서 재현되지 않았다.
 - 자동 리뷰에서 20팀 특수 선택 후11팀 변경 시 해제 불가와 visible title/접근성 이름 불일치 두 건을 수정했다. 특수 모드 해제/복구 회귀1개 PASS, radioLabel prop·override를 완전히 삭제하고 titleId를 접근성 이름으로 사용한다. Sol 최종 정적 PASS, root 최종 lint(tsc+패턴) PASS. 새 head CI·alpha after가 최종 게이트다. Advanced Security는 기존과 동일한 미지원 모델 claude-opus-5의 session.create 실패이며 보안 검사 PASS로 취급하지 않는다.
+- 최종 PR head `9f82f2efc60f302efc7e6fdf4b7dd4a71df3213e` CI `38233610168` API/Web/Gates PASS(Web 740파일/8,723테스트·lint/typecheck·production build). base dev와 expected head를 확인해 #1863을 merge `eb38409219dc23d2ec347c211f64d5d9251e0b96`로 머지했다. 두 커밋의 Git tree `3d2775e43499a1035826fe018744796699f2a720`는 동일하다. 머지 커밋 CI `38235211195`도 모두 PASS, alpha Deploy `38235211193` SUCCESS.
+- 19:34 KST alpha Web/API commit `eb38409219dc23d2ec347c211f64d5d9251e0b96`, Web release `1.8.0-alpha.20261012.geb38409219dc`를 실제 확인했다. 브라우저 인증 쿠키 0·admin/me 401이므로 같은 ego326을 로그인 화면에서 계정 소유자에게 넘기고 재인증을 요청했다. 변경 후 실제 UI·저장 PASS는 아직 미완이다. 공유 primary HEAD는 dev와 diverged하여 FF 동기화가 거절됐고 외부 WIP는 보존했으며 격리 작업트리만 정상 FF했다.
+- 같은 새 배포의 cookie 없는 guest HTTP에서 admin/me 401 `UNAUTHENTICATED`, 비공개 QA 공개대진 404·data 없음 확인. 관리자 UI/생성/저장 검증을 대체하지 않는다. 다음 cursor: 사용자 로그인 확인 → 동일326 takeOver → 생성 2×2/3폭 after 캡처 → 4형식 실제 생성·편집·저장 → 증거·cleanup. 로그인 대기에는 task.finish를 호출하지 않는다.
 
 ### Owned / Forbidden scope
 

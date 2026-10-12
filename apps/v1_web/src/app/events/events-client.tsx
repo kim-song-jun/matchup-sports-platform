@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { Sparkles } from 'lucide-react';
 import { EmptyState, ErrorState } from '@/components/v1-ui/primitives';
 import { extractErrorMessage } from '@/lib/error-message';
+import { withFromPath } from '@/lib/session-storage';
 import { useV1TournamentCampaignsInfinite } from '@/hooks/use-v1-tournament-campaign';
 import { useV1MasterSports } from '@/hooks/use-v1-api';
 import { EventCampaignCard } from '@/components/tournaments/event-campaign-card';
@@ -86,7 +87,7 @@ export function EventsPageClient({ seed }: { readonly seed?: EventCampaignSeed }
     if (!validSyntax || !validMasterSport) {
       setActiveSportCode(undefined);
       pendingLocalSportCode.current = NO_LOCAL_SPORT_DRAFT;
-      router.replace('/events', { scroll: false });
+      router.replace(withFromPath('/events', searchParams.get('from')), { scroll: false });
       return;
     }
     setActiveSportCode(requestedSport ?? undefined);
@@ -99,7 +100,9 @@ export function EventsPageClient({ seed }: { readonly seed?: EventCampaignSeed }
       : undefined;
     setActiveSportCode(nextCode);
     pendingLocalSportCode.current = nextCode;
-    router.replace(nextCode ? `/events?sport=${encodeURIComponent(nextCode)}` : '/events', { scroll: false });
+    // 종목을 바꿔도 들어온 곳(`?from=`)은 지키지 않으면 뒤로가기가 바로 전 화면 대신 고정 목적지로 간다.
+    const eventsPath = nextCode ? `/events?sport=${encodeURIComponent(nextCode)}` : '/events';
+    router.replace(withFromPath(eventsPath, searchParams.get('from')), { scroll: false });
   };
 
   return (

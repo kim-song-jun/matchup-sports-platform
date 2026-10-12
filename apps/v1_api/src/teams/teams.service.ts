@@ -17,6 +17,7 @@ import { normalizeEmail } from '../auth/normalize-email';
 import { V1AuthUser } from '../auth/v1-auth-user';
 import { ChatService, type ChatSystemLine } from '../chat/chat.service';
 import { NotificationsService, notificationPersonName } from '../notifications/notifications.service';
+import { toSportFacets, totalFromSportFacets } from '../common/pagination/list-facets';
 import { PrismaService } from '../prisma/prisma.service';
 import { contactRecruitingWhere } from '../team-matches/contact-recruiting';
 import { assertCreatorProfileComplete } from '../profile/creator-profile.guard';
@@ -123,7 +124,8 @@ export class TeamsService {
   async list(user: V1AuthUser | null, query: TeamsQueryDto) {
     const limit = Math.min(Math.max(query.limit ?? 20, 1), 50);
     const where = this.teamListWhere(query);
-    const [teams, total] = await Promise.all([
+    const withFacets = query.includeFacets === true && !query.cursor;
+    const [teams, sportRows] = await Promise.all([
       this.prisma.v1Team.findMany({
         where,
         include: this.teamInclude(user),
@@ -131,8 +133,16 @@ export class TeamsService {
         take: limit + 1,
         ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
       }),
-      this.prisma.v1Team.count({ where }),
+      // 건수는 includeFacets 를 요청한 첫 페이지에만 싣는다. 종목 건수는 종목 필터만 뺀 where 로 세고, 전체 건수는 거기서 얻는다.
+      withFacets
+        ? this.prisma.v1Team.groupBy({
+            by: ['sportId'],
+            where: this.teamListWhere({ ...query, sportId: undefined }),
+            _count: { _all: true },
+          })
+        : Promise.resolve(null),
     ]);
+    const sports = sportRows ? toSportFacets(sportRows) : null;
 
     const pageItems = teams.slice(0, limit);
     const hasNext = teams.length > limit;
@@ -150,8 +160,9 @@ export class TeamsService {
       pageInfo: {
         nextCursor: hasNext ? pageItems.at(-1)?.id ?? null : null,
         hasNext,
-        total,
+        ...(sports ? { totalCount: totalFromSportFacets(sports, query.sportId) } : {}),
       },
+      ...(sports ? { facets: { sports } } : {}),
     };
   }
 

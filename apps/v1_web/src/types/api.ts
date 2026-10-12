@@ -31,12 +31,24 @@ export type PageInfo = {
   total?: number;
   totalPages?: number;
   hasPrev?: boolean;
+  // 팀·개인 매치·팀 매치 목록의 첫 페이지(커서 없음)에만 실린다. 필터가 적용된 전체 건수.
+  totalCount?: number;
+};
+
+/** 목록 칩 건수. 첫 페이지에만 실리며 종목 건수는 종목 필터만 뺀 나머지 필터로 센 값이다. */
+export type ListFacets = {
+  sports: Array<{ sportId: string; count: number }>;
+  /** 팀 목록에는 없다. 나머지 필터는 그대로 두고 `today` 토글을 켠 건수. */
+  today?: number;
+  /** 팀 목록에는 없다. 나머지 필터는 그대로 두고 `recruitingOnly` 토글을 켠 건수. */
+  recruiting?: number;
 };
 
 export type CursorPage<T> = {
   items: T[];
   nextCursor: string | null;
   pageInfo?: PageInfo;
+  facets?: ListFacets;
 };
 
 export type AdminListSummary = {

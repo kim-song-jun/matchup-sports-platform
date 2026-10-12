@@ -121,7 +121,7 @@ function invitationRow(overrides: Record<string, unknown> = {}) {
 describe('TeamsService', () => {
   let service: TeamsService;
   let prisma: {
-    v1Team: { findFirst: jest.Mock; findMany: jest.Mock; count: jest.Mock; update: jest.Mock; create: jest.Mock; updateMany: jest.Mock; findUniqueOrThrow: jest.Mock };
+    v1Team: { findFirst: jest.Mock; findMany: jest.Mock; count: jest.Mock; groupBy: jest.Mock; update: jest.Mock; create: jest.Mock; updateMany: jest.Mock; findUniqueOrThrow: jest.Mock };
     v1TeamProfile: { upsert: jest.Mock };
     v1TeamContactBlock: { findMany: jest.Mock };
     v1TeamMatch: { findFirst: jest.Mock };
@@ -156,7 +156,7 @@ describe('TeamsService', () => {
 
   beforeEach(async () => {
     prisma = {
-      v1Team: { findFirst: jest.fn(), findMany: jest.fn().mockResolvedValue([]), count: jest.fn().mockResolvedValue(1), update: jest.fn(), create: jest.fn(), updateMany: jest.fn(), findUniqueOrThrow: jest.fn() },
+      v1Team: { findFirst: jest.fn(), findMany: jest.fn().mockResolvedValue([]), count: jest.fn().mockResolvedValue(1), groupBy: jest.fn().mockResolvedValue([{ sportId: 'sport-1', _count: { _all: 1 } }]), update: jest.fn(), create: jest.fn(), updateMany: jest.fn(), findUniqueOrThrow: jest.fn() },
       v1TeamProfile: { upsert: jest.fn() },
       v1TeamContactBlock: { findMany: jest.fn().mockResolvedValue([]) },
       v1TeamMatch: { findFirst: jest.fn().mockResolvedValue(null) },
@@ -639,6 +639,34 @@ describe('TeamsService', () => {
   });
 
   describe('list', () => {
+    it('종목 건수는 종목 필터만 뺀 where 로 세고, 전체 건수는 필터된 종목의 건수다. 다음 페이지는 건수를 싣지 않는다', async () => {
+      const sportA = '11111111-1111-4111-8111-111111111111';
+      const sportB = '22222222-2222-4222-8222-222222222222';
+      prisma.v1Team.groupBy.mockResolvedValue([
+        { sportId: sportB, _count: { _all: 2 } },
+        { sportId: sportA, _count: { _all: 3 } },
+      ]);
+
+      const first = await service.list(null, { sportId: sportA, query: '팀', includeFacets: true });
+
+      expect(first.pageInfo.totalCount).toBe(3);
+      expect(first.facets).toEqual({ sports: [{ sportId: sportA, count: 3 }, { sportId: sportB, count: 2 }] });
+      expect(JSON.stringify(prisma.v1Team.findMany.mock.calls[0][0].where)).toContain(sportA);
+      const sportWhere = JSON.stringify(prisma.v1Team.groupBy.mock.calls[0][0].where);
+      expect(sportWhere).not.toContain(sportA);
+      expect(sportWhere).toContain('팀'); // 다른 필터는 그대로 건다
+
+      prisma.v1Team.groupBy.mockClear();
+      const notRequested = await service.list(null, { sportId: sportA });
+      expect(prisma.v1Team.groupBy).not.toHaveBeenCalled();
+      expect(notRequested.pageInfo).not.toHaveProperty('totalCount');
+      expect(notRequested).not.toHaveProperty('facets');
+      const next = await service.list(null, { cursor: 'team-1', includeFacets: true });
+      expect(prisma.v1Team.groupBy).not.toHaveBeenCalled();
+      expect(next.pageInfo).not.toHaveProperty('totalCount');
+      expect(next).not.toHaveProperty('facets');
+    });
+
     it('includes the owner in each list item', async () => {
       prisma.v1Team.findMany.mockResolvedValueOnce([
         {
@@ -666,7 +694,7 @@ describe('TeamsService', () => {
         },
       ]);
 
-      const result = await service.list(null, {});
+      const result = await service.list(null, { includeFacets: true });
 
       expect(result.items).toHaveLength(1);
       expect(result.items[0].owner).toEqual({
@@ -676,9 +704,12 @@ describe('TeamsService', () => {
       });
       // 목록 카드가 매니저 이름을 쓰지 않는다(G12 팀장 줄 제거) — 더는 내려 보내지 않는다.
       expect(result.items[0]).not.toHaveProperty('manager');
-      expect(result.pageInfo.total).toBe(1);
-      expect(prisma.v1Team.count).toHaveBeenCalledWith({
+      expect(result.pageInfo.totalCount).toBe(1);
+      expect(result.facets).toEqual({ sports: [{ sportId: 'sport-1', count: 1 }] });
+      expect(prisma.v1Team.groupBy).toHaveBeenCalledWith({
+        by: ['sportId'],
         where: expect.objectContaining({ status: 'active', deletedAt: null }),
+        _count: { _all: true },
       });
     });
 

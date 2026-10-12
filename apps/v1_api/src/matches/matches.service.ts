@@ -9,8 +9,9 @@ import { Prisma, V1Match, V1MatchApplication, V1MatchParticipant } from '@prisma
 import { V1AuthUser } from '../auth/v1-auth-user';
 import { ChatService } from '../chat/chat.service';
 import { decodeReferenceTimeCursor, encodeReferenceTimeCursor } from '../common/pagination/reference-time-cursor';
+import { recruitingNowWhere, startsTodayWhere, toSportFacets, totalFromSportFacets } from '../common/pagination/list-facets';
 import { dropCursorRow, resumeAfterCursorArgs } from '../common/pagination/resume-after-cursor';
-import { paginateByStatePriority } from '../league-matches/league-lifecycle-rules';
+import { isResumableStatePriorityCursor, paginateByStatePriority } from '../league-matches/league-lifecycle-rules';
 import { NotificationsService } from '../notifications/notifications.service';
 import { PlaceProvider, PlaceView, resolvePlaceSnapshot, toPlaceColumns, toPlaceView } from '../places/place-snapshot';
 import { PrismaService } from '../prisma/prisma.service';
@@ -56,13 +57,97 @@ export class MatchesService {
 
   async list(user: V1AuthUser | null, query: MatchesQueryDto) {
     const limit = Math.min(Math.max(query.limit ?? 20, 1), 50);
-    const isDefaultDiscovery = query.status === undefined;
-    const status = query.status ?? 'recruiting';
     const now = new Date();
     // 구간 경계는 첫 페이지에서 정해 커서로 이어받는다. `now` 는 가시성 조건 전용이다.
     const { cursor, referenceTime: splitAt } = decodeReferenceTimeCursor(query.cursor, now);
+    const fullMatchIds = query.recruitingOnly ? await this.findFullRecruitingMatchIds(now) : [];
+    const where = this.listWhere(query, now, fullMatchIds);
+    // 기본 정렬은 경기일 순이다 — 시작 전 경기를 가까운 날부터, 이미 시작한 경기(진행 중·종료
+    // 확인 중·최근 완료)를 그 뒤에 최근 것부터. startAt asc 한 줄로 두면 기본 목록에 함께 실리는
+    // 지난 경기가 가장 오래된 것부터 첫 페이지를 채운다. orderBy 로는 "시작 전/후"를 가를 수 없어
+    // 구간별로 읽어 잇는다(커서는 "<구간>:<id>@<기준 시각>"). '최신순'을 고른 경우만 등록 최신순이다.
+    const groups: Record<string, Pick<Prisma.V1MatchFindManyArgs, 'where' | 'orderBy'>> = {
+      latest: { where, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }] },
+      upcoming: { where: { AND: [where, { startAt: { gte: splitAt } }] }, orderBy: [{ startAt: 'asc' }, { createdAt: 'desc' }, { id: 'desc' }] },
+      past: { where: { AND: [where, { startAt: { lt: splitAt } }] }, orderBy: [{ startAt: 'desc' }, { createdAt: 'desc' }, { id: 'desc' }] },
+    };
+    const include = this.matchInclude(user);
+    const stateGroups = query.sort === 'latest' ? ['latest'] : ['upcoming', 'past'];
+    // 해석되지 않는 커서는 페이지네이터가 첫 그룹부터 다시 읽으므로 첫 페이지로 본다.
+    const isFirstPage = !isResumableStatePriorityCursor(cursor, stateGroups);
+    const [{ items: pageItems, hasNext, nextCursor }, counts] = await Promise.all([paginateByStatePriority({
+      stateGroups,
+      limit,
+      cursor,
+      fetchGroup: (group, page) =>
+        this.prisma.v1Match
+          .findMany({
+            ...groups[group],
+            ...resumeAfterCursorArgs(page.cursorId, page.take),
+            include,
+          })
+          .then((rows) => dropCursorRow(rows, page.cursorId, page.take).map((row) => ({ ...row, state: group }))),
+    }), query.includeFacets && isFirstPage ? this.countListFacets(query, now, fullMatchIds) : Promise.resolve(null)]);
+
+    return {
+      items: pageItems.map((match) => this.toListItem(match, user)),
+      // 최신순은 구간이 없어 기준 시각이 필요 없다.
+      pageInfo: {
+        nextCursor: query.sort === 'latest' ? nextCursor : encodeReferenceTimeCursor(nextCursor, splitAt),
+        hasNext,
+        // 건수는 요청(includeFacets)한 첫 페이지에만 싣는다. 해석되지 않는 커서는 첫 페이지로 읽는다.
+        ...(counts ? { totalCount: counts.totalCount } : {}),
+      },
+      ...(counts ? { facets: counts.facets } : {}),
+    };
+  }
+
+  /**
+   * 첫 페이지 칩 건수. 종목 건수는 종목 필터만 뺀 where 로 센다. today/recruiting 은 나머지 필터는 그대로 두고
+   * 해당 토글을 켠 건수라서, 토글이 꺼져 있어도 칩이 "켜면 몇 건인지"를 말한다.
+   * 전체 건수는 종목 건수에서 얻는다. 쿼리는 groupBy 1 + count 2 + 정원 찬 글 id raw SQL 1(recruitingOnly 면 생략)이다.
+   */
+  private async countListFacets(query: MatchesQueryDto, now: Date, listFullMatchIds: string[]) {
+    // 모집 중 칩은 토글이 꺼져 있어도 "켜면 몇 건인지"를 세므로 정원 찬 글 목록이 항상 필요하다.
+    const fullMatchIds = query.recruitingOnly ? listFullMatchIds : await this.findFullRecruitingMatchIds(now);
+    const [sportRows, today, recruiting] = await Promise.all([
+      this.prisma.v1Match.groupBy({
+        by: ['sportId'],
+        where: this.listWhere({ ...query, sportId: undefined }, now, fullMatchIds),
+        _count: { _all: true },
+      }),
+      this.prisma.v1Match.count({ where: this.listWhere({ ...query, today: true }, now, fullMatchIds) }),
+      this.prisma.v1Match.count({ where: this.listWhere({ ...query, recruitingOnly: true }, now, fullMatchIds) }),
+    ]);
+    const sports = toSportFacets(sportRows);
+    return { totalCount: totalFromSportFacets(sports, query.sportId), facets: { sports, today, recruiting } };
+  }
+
+  /**
+   * 정원이 찬 모집 중 글의 id. 참가자 수는 저장된 컬럼이 없고 Prisma where 가 관계 수와 컬럼을 비교하지
+   * 못해 SQL 로 센다. 대상은 시작 전 'recruiting' 글뿐이라 범위가 작고, 참가자 수 정의는
+   * getParticipantCount(active·completed, 호스트 포함)와 같다.
+   */
+  private async findFullRecruitingMatchIds(now: Date): Promise<string[]> {
+    const rows = await this.prisma.$queryRaw<Array<{ id: string }>>`
+      SELECT m.id FROM v1_matches m
+      WHERE m.deleted_at IS NULL AND m.status = 'recruiting' AND m.start_at >= ${now}
+        AND (SELECT COUNT(*) FROM v1_match_participants p
+             WHERE p.match_id = m.id AND p.status IN ('active', 'completed')) >= m.max_participants`;
+    return rows.map((row) => row.id);
+  }
+
+  /**
+   * 목록·건수가 함께 쓰는 단일 where. 첫 페이지의 totalCount/facets 는 이 함수에 필터를 하나씩 뺀
+   * query 를 넣어 세므로, 가시성·삭제·공개 규칙이 목록과 어긋날 수 없다.
+   */
+  private listWhere(query: MatchesQueryDto, now: Date, fullMatchIds: string[] = []): Prisma.V1MatchWhereInput {
+    const isDefaultDiscovery = query.status === undefined;
+    const status = query.status ?? 'recruiting';
     const publicHistoryFrom = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
     const constraints: Prisma.V1MatchWhereInput[] = [
+      ...(query.today ? [startsTodayWhere(now)] : []),
+      ...(query.recruitingOnly ? [recruitingNowWhere(now), { id: { notIn: fullMatchIds } } satisfies Prisma.V1MatchWhereInput] : []),
       // 일반 탐색은 마감 글도 경기 전까지 남기지만, 추천순은 즉시 신청할 수 있는
       // 모집 글만 보여줘야 하므로 추천에서만 신청 마감 조건을 적용한다.
       ...(status === 'recruiting' && query.sort === 'recommended'
@@ -78,7 +163,7 @@ export class MatchesService {
           } satisfies Prisma.V1MatchWhereInput]
         : []),
     ];
-    const where: Prisma.V1MatchWhereInput = {
+    return {
       deletedAt: null,
       // status='recruiting'인 raw DB 행에는 시작 시각이 이미 지난("만료") 매치도 섞여 있다 —
       // v1에는 만료를 자동으로 다른 status로 넘기는 cron이 없기 때문이다. 'recruiting' 조회는
@@ -130,36 +215,6 @@ export class MatchesService {
       ...(query.genderRule ? { genderRule: getGenderRuleWhere(query.genderRule) } : {}),
       ...levelCodeWhere(parseLevelCodes(query.levelCodes)),
       ...(constraints.length ? { AND: constraints } : {}),
-    };
-
-    // 기본 정렬은 경기일 순이다 — 시작 전 경기를 가까운 날부터, 이미 시작한 경기(진행 중·종료
-    // 확인 중·최근 완료)를 그 뒤에 최근 것부터. startAt asc 한 줄로 두면 기본 목록에 함께 실리는
-    // 지난 경기가 가장 오래된 것부터 첫 페이지를 채운다. orderBy 로는 "시작 전/후"를 가를 수 없어
-    // 구간별로 읽어 잇는다(커서는 "<구간>:<id>@<기준 시각>"). '최신순'을 고른 경우만 등록 최신순이다.
-    const groups: Record<string, Pick<Prisma.V1MatchFindManyArgs, 'where' | 'orderBy'>> = {
-      latest: { where, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }] },
-      upcoming: { where: { AND: [where, { startAt: { gte: splitAt } }] }, orderBy: [{ startAt: 'asc' }, { createdAt: 'desc' }, { id: 'desc' }] },
-      past: { where: { AND: [where, { startAt: { lt: splitAt } }] }, orderBy: [{ startAt: 'desc' }, { createdAt: 'desc' }, { id: 'desc' }] },
-    };
-    const include = this.matchInclude(user);
-    const { items: pageItems, hasNext, nextCursor } = await paginateByStatePriority({
-      stateGroups: query.sort === 'latest' ? ['latest'] : ['upcoming', 'past'],
-      limit,
-      cursor,
-      fetchGroup: (group, page) =>
-        this.prisma.v1Match
-          .findMany({
-            ...groups[group],
-            ...resumeAfterCursorArgs(page.cursorId, page.take),
-            include,
-          })
-          .then((rows) => dropCursorRow(rows, page.cursorId, page.take).map((row) => ({ ...row, state: group }))),
-    });
-
-    return {
-      items: pageItems.map((match) => this.toListItem(match, user)),
-      // 최신순은 구간이 없어 기준 시각이 필요 없다.
-      pageInfo: { nextCursor: query.sort === 'latest' ? nextCursor : encodeReferenceTimeCursor(nextCursor, splitAt), hasNext },
     };
   }
 

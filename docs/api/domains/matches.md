@@ -41,8 +41,19 @@
 | `sort` | recommended/latest/starts_at/deadline | No | 생략 시 경기일 순 |
 | `cursor` | string | No | cursor pagination |
 | `limit` | 1~50 | No | 기본 20 |
+| `today` | boolean(`true`/`false`) | No | `true` 이면 오늘(KST) 시작하는 경기만 |
+| `recruitingOnly` | boolean(`true`/`false`) | No | `true` 이면 지금 신청할 수 있는 글만(모집 중·시작 전·신청 마감 전) |
+| `includeFacets` | boolean(`true`/`false`) | No | `true` 이고 커서가 없을 때만 `pageInfo.totalCount`·`facets` 를 계산해 싣는다. 생략·`false` 면 집계 쿼리를 돌리지 않는다 |
 
-- Response: `{ items, pageInfo }`
+- Response: `{ items, pageInfo, facets? }`
+
+**첫 페이지 건수 (`totalCount` · `facets`)**: **`includeFacets=true` 를 보낸 첫 페이지(커서 없음, 깨진 커서를 첫 페이지로 읽은 경우 포함)** 응답에만 `pageInfo.totalCount` 와 최상위 `facets` 가 실린다. 요청하지 않았거나 다음 페이지(`cursor` 있음)면 둘 다 싣지 않고 집계 쿼리도 돌리지 않는다. 클라이언트는 화면의 주 목록 쿼리에서 첫 페이지에 한 번만 보내 값을 보관하고, 폴링·`allQuery`/`filteredQuery`/`countQuery` 같은 부가 조회에는 보내지 않는다.
+
+- `pageInfo.totalCount`: 목록과 **같은 where**(공개·삭제·호스트 팀 상태 규칙 포함)로 센 전체 건수. `limit` 과 무관하다.
+- `facets.sports`: `{ sportId, count }[]`(건수 내림차순, 0건 종목 생략). 종목 필터만 뺀 나머지 필터로 센다 — 종목을 하나 골라도 다른 종목 칩 건수가 그대로 남는다.
+- `facets.today` / `facets.recruiting`: 나머지 필터는 그대로 두고 해당 토글을 켠 건수. 토글이 꺼져 있어도 "켜면 몇 건"을 알려 준다.
+- 쿼리는 요청한 첫 페이지에 `groupBy` 1회와 `count` 2회에, 정원 찬 글 id 를 구하는 raw SQL 1회(총 4회)를 더한다. `recruitingOnly` 요청은 목록 조회가 이미 그 id 를 구했으므로 raw SQL 이 없어 3회다. `status`·`startAt`·`sportId` 인덱스를 탄다.
+
 - 기본 목록(그리고 `recommended`/`deadline`/`starts_at`)은 경기일 순이다: 시작 전 경기(`startAt >= now`)를 `startAt ASC` 로 먼저, 이미 시작한 경기를 `startAt DESC` 로 그 뒤에 잇는다(동률은 `createdAt DESC, id DESC`). `latest` 만 `createdAt DESC, id DESC` 등록 최신순이다.
 - 경기일 순은 구간별로 따로 읽어 잇기 때문에 `pageInfo.nextCursor` 가 `"<구간>:<id>@<기준 시각 epoch ms>"`(`upcoming:`/`past:`) 형태다. 기준 시각은 첫 페이지를 읽은 시각이며, 이후 페이지는 요청 시각이 아니라 이 값으로 시작 전/후 구간을 가른다 — 넘기는 도중 1페이지 마지막 경기가 시작해도 다음 경기가 건너뛰어지지 않는다. 기준 시각은 구간 분할에만 쓰고 공개 범위(모집 중 여부·최근 7일 등)는 항상 요청 시각으로 판정한다. 요청 시각보다 미래인 기준 시각은 요청 시각으로 내려 읽고, 시각이 깨진 커서는 첫 페이지부터 다시 읽는다. 최신순(`latest:<id>`)은 구간이 없어 시각을 싣지 않는다. 커서 행이 그사이 목록 조건(모집 중 여부 등)을 벗어나도 다음 경기는 건너뛰지 않고 이어서 돌려준다. 클라이언트는 받은 값을 그대로 돌려주면 된다 — 시각 없는 `"<구간>:<id>"` 커서는 요청 시각을 기준으로 이어 읽고, 접두사 없는 예전 커서는 첫 페이지부터 다시 읽는다.
 - `status`를 생략한 일반 목록은 시작 전 raw `recruiting`/`closed`와 최근 7일 안에 시작·완료된 매치를 포함한다. raw 상태는 mutation guard를 위해 그대로 두고, 화면 상태는 `displayState`로 구분한다: 시작 전 `recruiting|closed|full`, 진행 조건 충족 시 `startAt <= now < endAt`은 `in_progress`, `endAt <= now`(종료 시각이 없으면 시작 시각부터)는 `completion_pending`, 완료 확정 뒤에는 `completed`다.

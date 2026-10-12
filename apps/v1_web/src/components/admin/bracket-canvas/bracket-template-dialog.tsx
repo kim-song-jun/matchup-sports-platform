@@ -33,7 +33,7 @@ const TEAM_COUNT_PATTERN = /^\d{1,2}$/;
 const KNOCKOUT_SIZES = [4, 8, 12, 16] as const;
 
 function applyGroupShape(current: GroupKnockoutTemplateValue, shape: GroupKnockoutTemplateValue): GroupKnockoutTemplateValue {
-  return { ...current, ...shape, thirdPlace: shape.groupCount * shape.advancePerGroup === 2 ? false : current.thirdPlace };
+  return { ...current, ...shape, qualificationMode: undefined, thirdPlace: shape.groupCount * shape.advancePerGroup === 2 ? false : current.thirdPlace };
 }
 
 function templateStagePreview(input: BracketTemplateInput): string {
@@ -49,6 +49,9 @@ function templateStagePreview(input: BracketTemplateInput): string {
   if (input.kind === 'league') {
     const rounds = (input.teamCount % 2 === 0 ? input.teamCount - 1 : input.teamCount) * input.legs;
     return `단일 리그 · ${rounds}라운드 · 라운드마다 ${Math.floor(input.teamCount / 2)}경기`;
+  }
+  if (input.qualificationMode === 'cross_group_round12') {
+    return ['5개 조 · 조별 3라운드', '12강 4경기', '부전승 4자리', '8강 4경기', '4강 2경기', '결승 1경기', ...(input.thirdPlace ? ['3·4위전 1경기'] : [])].join(' → ');
   }
   const finalists = input.groupCount * input.advancePerGroup;
   const finals: Record<number, string[]> = {
@@ -128,9 +131,11 @@ export function BracketTemplateDialog({ open, tournamentId, format, confirmedTea
         ? { kind: 'knockout', size, thirdPlace }
         : null
       : format === 'group_knockout'
-        ? groupTeamCountValid && groupShape !== null
-          ? { kind: 'group_knockout', ...groupKnockout, ...groupShape }
-          : null
+        ? groupKnockout.qualificationMode === 'cross_group_round12'
+          ? teamCount === 20 ? { kind: 'group_knockout', ...groupKnockout } : null
+          : groupTeamCountValid && groupShape !== null
+            ? { kind: 'group_knockout', ...groupKnockout, ...groupShape }
+            : null
         : teamCountValid
           ? { kind: 'league', teamCount, legs }
           : null;
@@ -257,7 +262,9 @@ export function BracketTemplateDialog({ open, tournamentId, format, confirmedTea
                     <p className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>확정 참가팀은 {confirmedTeamCount}팀이에요. 참가 인원과 구성을 확인해 주세요.</p>
                   ) : null}
                 </div>
-                {groupShapes.length > 0 ? (
+                {groupKnockout.qualificationMode === 'cross_group_round12' ? (
+                  <p className="tm-text-caption text-[var(--text-muted)]">5개 조 × 조당 4팀 · 조 간 성적 비교로 12팀 진출</p>
+                ) : groupShapes.length > 0 ? (
                   <div className="flex flex-col gap-1">
                     <label htmlFor={`${idPrefix}-group-shape`} className="tm-text-label font-semibold" style={{ color: 'var(--text-strong)' }}>가능한 조 편성</label>
                     <select id={`${idPrefix}-group-shape`} className="tm-input" style={{ minHeight: 44 }} value={groupShape ? `${groupShape.groupCount}:${groupShape.teamsPerGroup}:${groupShape.advancePerGroup}` : ''} onChange={(event) => {
@@ -273,7 +280,7 @@ export function BracketTemplateDialog({ open, tournamentId, format, confirmedTea
                 ) : (
                   <p role="alert" className="tm-text-caption" style={{ color: 'var(--red700)' }}>현재 지원 범위(2~8개 조, 조당 3~6팀, 결선 2·4·8·16팀)에 맞는 조 편성이 없어요. 팀 수를 바꾸거나 녹아웃 템플릿을 선택해 주세요.</p>
                 )}
-                <GroupKnockoutFields value={groupKnockout} onChange={(value) => { draftTouchedRef.current = true; setGroupKnockout(value); }} disabled={apply.isPending} lockShape />
+                <GroupKnockoutFields value={groupKnockout} onChange={(value) => { draftTouchedRef.current = true; setGroupKnockout(value); setTeamCountText(String(value.groupCount * value.teamsPerGroup)); }} disabled={apply.isPending} lockShape />
               </>
             ) : (
               <>

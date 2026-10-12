@@ -191,6 +191,14 @@ jobs:
           INSTANCE_ID: ${{ vars.ALPHA_EC2_INSTANCE_ID }}
         run: bash scripts/release/resolve-alpha-rollback-base.sh
 
+      - name: Validate Kakao web configuration before immutable image resolution
+        env:
+          KAKAO_CLIENT_ID: ${{ secrets.ALPHA_KAKAO_CLIENT_ID }}
+          KAKAO_LOGIN_JS_KEY: ${{ secrets.ALPHA_KAKAO_LOGIN_JS_KEY }}
+          KAKAO_REDIRECT_URI: ${{ secrets.ALPHA_KAKAO_REDIRECT_URI }}
+          KAKAO_WEB_ORIGIN: https://alpha.teameet.co.kr
+        run: node scripts/release/validate-kakao-web-config.mjs
+
       - name: Resolve immutable image tags
         id: images
         env:

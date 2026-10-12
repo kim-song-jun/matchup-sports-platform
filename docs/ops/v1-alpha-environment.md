@@ -19,6 +19,10 @@ test-app members can sign in, and test-only consent grants do not approve produc
 Native builds use the alpha test-app key for `kr.co.teameet.alpha` and the production app key
 for `kr.co.teameet`. See the Android and iOS release runbooks.
 
+Both deployment workflows validate required login build keys and the environment callback
+before resolving immutable image tags. After changing any build-time Kakao configuration,
+deploy a new source revision; rerunning an existing SHA deliberately reuses its existing image.
+
 `https://alpha.teameet.co.kr`은 `dev` 브랜치의 v1 Web/API를 실제 HTTPS 환경에서 검증하는 비운영 환경이다. 프로덕션과 인프라·데이터베이스·업로드 볼륨을 공유하지 않는다.
 
 프로덕션 배포의 공통 v1 경로·컨테이너 계약은 [`deploy/DEPLOY_GUIDE.md`](../../deploy/DEPLOY_GUIDE.md)를 함께 참고한다.

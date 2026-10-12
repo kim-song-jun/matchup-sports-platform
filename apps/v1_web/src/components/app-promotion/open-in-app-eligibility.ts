@@ -13,11 +13,6 @@ const EXCLUDED_PATH_PREFIXES = [
   '/onboarding',
 ] as const;
 
-// iPadOS 는 데스크톱 UA 를 보내므로 iPad 는 자연스레 제외된다.
-export function isIosMobileUserAgent(userAgent: string): boolean {
-  return /iPhone|iPod/.test(userAgent);
-}
-
 export function isExcludedOpenInAppPath(pathname: string | null): boolean {
   if (!pathname) return false;
   return EXCLUDED_PATH_PREFIXES.some(

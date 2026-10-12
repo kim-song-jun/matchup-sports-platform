@@ -12,7 +12,10 @@ import { V1AuthUser } from '../auth/v1-auth-user';
 import { WebPushService } from '../notifications/web-push.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
-import { currentChatEntitlementWhere, currentChatRecipientEntitlementWhere, teamMatchChatEntitlementWhere } from './chat-entitlement';
+import {
+  currentChatEntitlementWhere, currentChatRecipientEntitlementWhere, MatchChatSendBlock, matchChatReadableWhere,
+  matchChatSendBlock, matchChatHistoryParticipantWhere, teamMatchChatEntitlementWhere,
+} from './chat-entitlement';
 import { enrollTeamMatchChatMembers, TeamMatchChatSource } from './platform-team-match-chat';
 import { archiveEndedContactRooms } from '../team-contacts/contact-room-archive';
 import {
@@ -225,7 +228,12 @@ export class ChatService {
 
   async resolve(user: V1AuthUser, dto: ResolveChatRoomDto) {
     if (dto.targetType === 'match') {
-      await this.assertCanUseMatchChat(user.id, dto.targetId);
+      // Creating a room is stricter than opening one: a blocked match (cancelled, or no confirmed participant yet)
+      // never gets a new room. An existing room still opens read-only.
+      const block = await this.assertCanUseMatchChat(user.id, dto.targetId);
+      if (block && !(await this.prisma.v1ChatRoom.findUnique({ where: { matchId: dto.targetId }, select: { id: true } }))) {
+        this.assertMatchChatSendable(block);
+      }
       return this.resolveMatchRoom(user.id, dto.targetId);
     }
     if (dto.targetType === 'team') {
@@ -257,6 +265,7 @@ export class ChatService {
       linkedTarget: getLinkedTarget(room, counterpartTeamId(teamContact)),
       teamContact,
       me: this.toMe(room, user.id),
+      composer: { canSend: room.sendBlock === null, blockedReason: room.sendBlock },
       participants: room.participants.slice(0, 20).map((participant) => ({
         userId: participant.userId,
         displayName: participant.user.profile?.nickname ?? participant.user.profile?.displayName ?? '참여자',
@@ -440,6 +449,7 @@ export class ChatService {
     }
     if (sentKinds === 0) throw validationError('content is required', 'content');
     const room = await this.getActiveParticipantRoom(user.id, roomId);
+    this.assertMatchChatSendable(room.sendBlock);
     if (room.teamContact) {
       const status = contactDisplayStatus(room.teamContact.status, room.teamContact.expiresAt);
       if (status !== 'accepted') throw stateConflict('수락한 뒤에 대화할 수 있어요.', 'TEAM_CONTACT_NOT_ACCEPTED');
@@ -815,32 +825,33 @@ export class ChatService {
     return { roomId: room.id, roomType: 'team_contact', created: !existing, route: chatRoomRoute(room.id) };
   }
 
-  private async assertCanUseMatchChat(userId: string, matchId: string) {
+  /** Read access to a personal-match room; resolves to why the viewer cannot write, or null. */
+  private async assertCanUseMatchChat(userId: string, matchId: string): Promise<MatchChatSendBlock | null> {
     const match = await this.prisma.v1Match.findFirst({
-      where: { id: matchId, deletedAt: null },
+      where: { id: matchId, ...matchChatReadableWhere(userId) },
       select: {
+        status: true,
         hostUserId: true,
         participants: {
           where: { status: { in: ['active', 'completed'] } },
-          select: { userId: true, role: true },
+          select: { userId: true, role: true, status: true },
         },
       },
     });
-    if (!match) {
-      throw new NotFoundException({ code: 'NOT_FOUND', message: 'Match was not found' });
-    }
+    if (match) return matchChatSendBlock(match, userId);
 
-    const isHost = match.hostUserId === userId;
-    const hasConfirmedParticipant = match.participants.some((participant) => participant.role === 'participant');
-    if (isHost && !hasConfirmedParticipant) {
-      throw new ConflictException({
-        code: 'MATCH_CHAT_PARTICIPANTS_REQUIRED',
-        message: '아직 참여자가 없어 채팅을 시작할 수 없어요. 신청자를 승인한 뒤 이용해 주세요.',
-      });
-    }
-    if (isHost || match.participants.some((participant) => participant.userId === userId)) return;
-
+    const exists = await this.prisma.v1Match.findFirst({ where: { id: matchId, deletedAt: null }, select: { id: true } });
+    if (!exists) throw new NotFoundException({ code: 'NOT_FOUND', message: 'Match was not found' });
     throw new ForbiddenException({ code: 'PERMISSION_DENIED', message: 'Match chat requires confirmed participation' });
+  }
+
+  private assertMatchChatSendable(block: MatchChatSendBlock | null) {
+    if (block === 'MATCH_CANCELLED') {
+      throw stateConflict('취소된 매치라 대화를 보낼 수 없어요.', 'MATCH_CHAT_CLOSED');
+    }
+    if (block === 'PARTICIPANTS_NOT_CONFIRMED') {
+      throw stateConflict('아직 참여자가 없어 채팅을 시작할 수 없어요. 신청자를 승인한 뒤 이용해 주세요.', 'MATCH_CHAT_PARTICIPANTS_REQUIRED');
+    }
   }
 
   private async assertCanUseTeamChat(userId: string, teamId: string) {
@@ -899,8 +910,8 @@ export class ChatService {
     if (room.participants[0].status !== 'active') {
       throw new ForbiddenException({ code: 'PERMISSION_DENIED', message: 'Chat room participant is not active' });
     }
-    await this.assertCurrentRoomEntitlement(userId, room);
-    return room;
+    const sendBlock = await this.assertCurrentRoomEntitlement(userId, room);
+    return { ...room, sendBlock };
   }
 
   private async assertCurrentRoomEntitlement(
@@ -911,12 +922,13 @@ export class ChatService {
       teamMatchId: string | null;
       teamContactId: string | null;
     },
-  ) {
+  ): Promise<MatchChatSendBlock | null> {
     if (room.matchId) return this.assertCanUseMatchChat(userId, room.matchId);
-    if (room.teamId) return this.assertCanUseTeamChat(userId, room.teamId);
-    if (room.teamMatchId) return this.assertCanUseTeamMatchChat(userId, room.teamMatchId);
-    if (room.teamContactId) return this.assertCanUseTeamContactChat(userId, room.teamContactId);
-    throw new ForbiddenException({ code: 'PERMISSION_DENIED', message: 'Chat room is not linked to an active target' });
+    if (room.teamId) await this.assertCanUseTeamChat(userId, room.teamId);
+    else if (room.teamMatchId) await this.assertCanUseTeamMatchChat(userId, room.teamMatchId);
+    else if (room.teamContactId) await this.assertCanUseTeamContactChat(userId, room.teamContactId);
+    else throw new ForbiddenException({ code: 'PERMISSION_DENIED', message: 'Chat room is not linked to an active target' });
+    return null;
   }
 
   private findRoomWithParticipant(userId: string, roomId: string) {
@@ -1047,7 +1059,7 @@ export class ChatService {
       where: { id: matchId },
       select: {
         hostUserId: true,
-        participants: { where: { userId, status: { in: ['active', 'completed'] } }, select: { approvedAt: true } },
+        participants: { where: matchChatHistoryParticipantWhere(userId), select: { approvedAt: true } },
       },
     });
     if (!match) return { from: null, joinedAt: null };

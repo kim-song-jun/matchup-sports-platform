@@ -107,6 +107,8 @@ describe('LandingPage', () => {
     expect(metadata.alternates?.canonical).toBe('/landing');
     expect(metadata.openGraph?.url).toBe('/landing');
     expect(metadata.description).toContain('팀밋');
+    expect(metadata.title).toContain('팀밋');
+    expect(metadata.title).toContain('축구·풋살');
     expect(metadata.description).not.toContain('Teameet');
   });
 

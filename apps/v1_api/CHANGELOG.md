@@ -1,5 +1,18 @@
 # v1_api
 
+## 1.6.9
+
+### Patch Changes
+
+- 030b034: Preserve existing match-room access and approval-time history at cancellation/withdrawal boundaries, retain unresolved send errors on refresh, and refresh composer state after reconnecting.
+
+## 1.6.8
+
+### Patch Changes
+
+- 5cb7be1: alpha 배포가 카카오 로그인 서버 설정(클라이언트 키·시크릿·리다이렉트 주소)을 기존 GitHub 시크릿에서 호스트로 동기화해, alpha 에서 카카오 코드 로그인이 OAUTH_NOT_CONFIGURED 로 막히지 않아요.
+- 7dcbe08: 개인 매치 채팅방이 목록에 보이는데 열면 409 로 막히던 문제를 고쳐요. 목록에 보이는 방은 항상 열리고, 취소된 매치이거나 확정 참가자가 없는 주최자는 메시지를 읽기만 하며 입력창 자리에 이유 안내가 나와요.
+
 ## 1.6.7
 
 ### Patch Changes

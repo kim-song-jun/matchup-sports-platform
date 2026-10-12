@@ -6,6 +6,7 @@ import { useV1AuthMe, useV1ChatRooms, useV1Home } from '@/hooks/use-v1-api';
 import { useV1ChatListSocket } from '@/hooks/use-v1-realtime-socket';
 import { v1Post } from '@/lib/api-client';
 import { trackEvent } from '@/lib/analytics';
+import { observeHomeNavigation } from '@/lib/home-analytics';
 import { buildPhoneVerifyHref } from '@/components/auth/phone-verification/phone-verify-route';
 import { buildActivityProfileHref } from '@/lib/activity-profile-required';
 import type { V1ResolveLocationResponse } from '@/types/api';
@@ -22,6 +23,7 @@ export function HomePageClient() {
 
   useEffect(() => {
     trackEvent('home_view', {});
+    return observeHomeNavigation();
   }, []);
 
   const query = useV1Home();

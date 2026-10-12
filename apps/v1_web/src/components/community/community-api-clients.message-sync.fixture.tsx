@@ -11,6 +11,7 @@ const linkedTarget = { type: 'team', id: 'team-1', title: '동기화 테스트 �
 const roomDetail: V1ChatRoomDetail = {
   roomId: 'room-1', roomType: 'team', title: '동기화 테스트 팀', status: 'active', teamContact: null,
   linkedTarget,
+  composer: { canSend: true, blockedReason: null },
   me: { participantId: 'participant-a', status: 'active', pinned: false, mutedUntil: null, lastReadMessageId: null },
   participants: [{ userId: 'user-a', displayName: '나', role: 'owner' }],
 };

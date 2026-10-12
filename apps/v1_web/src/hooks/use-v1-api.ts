@@ -2745,6 +2745,12 @@ export function useV1SendChatMessage(roomId: string) {
       invalidateV1ChatMessageQueries(queryClient, message);
       invalidateV1NotificationQueries(queryClient);
     },
+    // 보내는 순간 막힌 방(취소·참가 미확정)은 상세의 composer 도 옛 값이라 다시 받는다.
+    onError: (error) => {
+      if (error instanceof V1ApiError && error.statusCode === 409) {
+        void queryClient.invalidateQueries({ queryKey: v1Keys.chatRoom(roomId) });
+      }
+    },
   });
 }
 
@@ -2753,9 +2759,17 @@ export function useV1UpdateMyChatRoom(roomId: string) {
   return useMutation({
     mutationFn: (body: { pinned?: boolean; lastReadMessageId?: string | null; mutedUntil?: string | null }) =>
       v1Patch<V1ChatRoomMeUpdate>(`/chat/rooms/${roomId}/me`, body),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: v1Keys.chatRooms() });
-      queryClient.invalidateQueries({ queryKey: v1Keys.chatRoom(roomId) });
+    onSuccess: (updated) => {
+      // 열린 방의 상세·메시지는 이 변경과 무관해 다시 받지 않는다. 상세의 me 는 응답으로 맞추고, 안읽음 수가 걸린 목록만 갱신한다.
+      queryClient.setQueryData<V1ChatRoomDetail>(v1Keys.chatRoom(roomId), (detail) => detail && {
+        ...detail,
+        me: { ...detail.me, pinned: updated.pinned, mutedUntil: updated.mutedUntil, lastReadMessageId: updated.lastReadMessageId },
+      });
+      const root = v1Keys.chatRooms();
+      void queryClient.invalidateQueries({
+        queryKey: root,
+        predicate: (query) => query.queryKey.length === root.length || query.queryKey[root.length] === 'list',
+      });
     },
   });
 }

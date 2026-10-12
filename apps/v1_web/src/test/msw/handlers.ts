@@ -734,6 +734,9 @@ export const v1MswHandlers = [
       title: room.title,
       teamContact: room.teamContact,
       linkedTarget: room.linkedTarget,
+      composer: room.linkedTargetCancelled
+        ? { canSend: false, blockedReason: 'MATCH_CANCELLED' as const }
+        : { canSend: true, blockedReason: null },
       me: {
         participantId: 'chat-participant-1',
         status: 'active',

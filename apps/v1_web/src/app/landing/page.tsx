@@ -13,9 +13,9 @@ import { LandingV4Faq } from '@/components/landing/v4/landing-v4-faq';
 import { LandingV4Cta } from '@/components/landing/v4/landing-v4-cta';
 
 export const metadata = buildPublicMetadata({
-  title: '매치부터 대회까지, 한 앱에서 끝까지',
+  title: '팀밋 — 축구·풋살 매치, 팀 찾기와 대회',
   description:
-    '매치와 팀을 찾고, 대회 신청부터 라이브 스코어와 기록까지 한 흐름으로 이어지는 생활체육 플랫폼 팀밋이에요.',
+    '팀밋에서 함께 뛸 매치와 팀을 찾아보세요. 축구·풋살 대회와 리그의 일정, 참가 신청, 라이브 스코어, 경기 기록을 한곳에서 확인할 수 있어요.',
   path: '/landing',
 });
 

@@ -498,7 +498,18 @@ jobs:
           MIGRATION_BASE_SHA: ${{ steps.rollback-base.outputs.migrationBaseSha }}
         run: bash scripts/release/create-alpha-release-manifest.sh
 
+      # The protected deployment queue must not activate a commit superseded during CI/build.
+      - name: Check latest dev before runtime changes
+        id: deployment-current
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          RELEASE_SHA: ${{ steps.release.outputs.sha }}
+          TASK168_STAGE: ${{ steps.task168.outputs.stage }}
+        run: bash scripts/release/check-current-alpha-release.sh
+
       - name: Sync inquiry Slack runtime env
+        if: steps.deployment-current.outputs.current == 'true'
         env:
           INSTANCE_ID: ${{ vars.ALPHA_EC2_INSTANCE_ID }}
           AWS_REGION: ${{ vars.ALPHA_AWS_REGION }}
@@ -506,6 +517,7 @@ jobs:
         run: bash scripts/release/sync-alpha-inquiry-slack-env.sh
 
       - name: Sync FCM service-account runtime env
+        if: steps.deployment-current.outputs.current == 'true'
         env:
           INSTANCE_ID: ${{ vars.ALPHA_EC2_INSTANCE_ID }}
           AWS_REGION: ${{ vars.ALPHA_AWS_REGION }}
@@ -516,6 +528,7 @@ jobs:
       # names are missing so the gap is visible in the run rather than only in a silent
       # "iOS push disabled" line in the API's startup log.
       - name: Sync APNs runtime env
+        if: steps.deployment-current.outputs.current == 'true'
         env:
           INSTANCE_ID: ${{ vars.ALPHA_EC2_INSTANCE_ID }}
           AWS_REGION: ${{ vars.ALPHA_AWS_REGION }}
@@ -542,6 +555,7 @@ jobs:
       # Same policy as APNs: skipped with a warning until the secrets exist, never blocks a deploy.
       # The team id is the APNs one (same Apple team); the key is a separate Sign in with Apple key.
       - name: Sync Sign in with Apple runtime env
+        if: steps.deployment-current.outputs.current == 'true'
         env:
           INSTANCE_ID: ${{ vars.ALPHA_EC2_INSTANCE_ID }}
           AWS_REGION: ${{ vars.ALPHA_AWS_REGION }}
@@ -563,6 +577,7 @@ jobs:
 
       # Alpha shares prod's Kakao app. Skipped with a warning until the secrets exist, never blocks a deploy.
       - name: Sync Kakao OAuth runtime env
+        if: steps.deployment-current.outputs.current == 'true'
         env:
           INSTANCE_ID: ${{ vars.ALPHA_EC2_INSTANCE_ID }}
           AWS_REGION: ${{ vars.ALPHA_AWS_REGION }}
@@ -582,7 +597,18 @@ jobs:
           bash scripts/release/sync-alpha-kakao-env.sh \
             || echo "::warning::Kakao env sync did not complete; the host's env may be unchanged from before"
 
+      - name: Recheck latest dev before server activation
+        id: activation-current
+        if: steps.deployment-current.outputs.current == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          RELEASE_SHA: ${{ steps.release.outputs.sha }}
+          TASK168_STAGE: ${{ steps.task168.outputs.stage }}
+        run: bash scripts/release/check-current-alpha-release.sh
+
       - name: Deploy through AWS Systems Manager
+        if: steps.activation-current.outputs.current == 'true'
         timeout-minutes: ${{ fromJSON(steps.task168.outputs.stepTimeoutMinutes) }}
         env:
           TASK168_STAGE: ${{ steps.task168.outputs.stage }}
@@ -607,6 +633,7 @@ jobs:
         run: bash scripts/release/deploy-alpha-via-ssm.sh
 
       - name: Verify public alpha release identity
+        if: steps.activation-current.outputs.current == 'true'
         env:
           RELEASE_SHA: ${{ steps.release.outputs.sha }}
           RELEASE_VERSION: ${{ steps.version.outputs.prerelease }}

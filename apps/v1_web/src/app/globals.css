@@ -1167,6 +1167,33 @@ button:disabled {
   line-height: 1.6;
 }
 
+.tm-auth-business-info {
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.tm-auth-business-info .tm-ps-business {
+  gap: 4px 12px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.tm-auth-business-info .tm-ps-business-row {
+  align-items: flex-start;
+  gap: 4px;
+}
+
+.tm-auth-business-info .tm-ps-business dt {
+  color: var(--text-muted);
+}
+
+.tm-auth-business-info .tm-ps-business dd,
+.tm-auth-business-info .tm-ps-footer-inline-link {
+  color: var(--text-body);
+}
+
 .tm-auth-body {
   padding: 24px 20px;
 }

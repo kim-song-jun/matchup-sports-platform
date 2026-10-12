@@ -3,6 +3,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { __resetNavigationHistoryForTests, installNavigationHistory, markEntryAuthGated, markEntryReplacedByDocument } from '@/lib/navigation-history';
 import { LoginPageView } from './auth-page';
 import { getLoginViewModel } from './auth.view-model';
+import { normalizeSiteInfo } from '@/lib/public-site/site-info';
+
+const siteInfo = normalizeSiteInfo(null);
 
 const router = vi.hoisted(() => ({ back: vi.fn(), replace: vi.fn(), push: vi.fn(), refresh: vi.fn(), prefetch: vi.fn() }));
 vi.mock('next/navigation', () => ({ useRouter: () => router }));
@@ -20,7 +23,7 @@ beforeEach(() => {
 afterEach(() => __resetNavigationHistoryForTests());
 
 function renderLogin() {
-  render(<LoginPageView model={getLoginViewModel('/tournaments/t1/my')} />);
+  render(<LoginPageView model={getLoginViewModel('/tournaments/t1/my')} siteInfo={siteInfo} />);
 }
 
 // 두 출구(상단 뒤로가기·"로그인 없이 시작하기")는 같은 규칙을 따라야 한다.
@@ -95,7 +98,7 @@ describe.each(exits)('로그인 화면 출구 — %s', (_label, exit) => {
     window.history.pushState({}, '', '/my');
     markEntryAuthGated();
     window.history.pushState({}, '', '/login?redirect=%2Fnotifications');
-    render(<LoginPageView model={getLoginViewModel('/notifications')} />);
+    render(<LoginPageView model={getLoginViewModel('/notifications')} siteInfo={siteInfo} />);
 
     fireEvent.click(exit());
 
@@ -128,7 +131,7 @@ describe.each(exits)('로그인 화면 출구(하드 교체로 열림) — %s', 
 
   it('참가 신청 화면이 로그인으로 교체돼도 대회 상세로 돌아간다(홈이 아니다)', () => {
     openLoginByHardReplace('/tournaments/t1/apply');
-    render(<LoginPageView model={getLoginViewModel('/tournaments/t1/apply')} />);
+    render(<LoginPageView model={getLoginViewModel('/tournaments/t1/apply')} siteInfo={siteInfo} />);
 
     fireEvent.click(exit());
 
@@ -139,7 +142,7 @@ describe.each(exits)('로그인 화면 출구(하드 교체로 열림) — %s', 
   it('하드 교체가 아니라 앱 안에서 push 한 로그인이 redirect 대상 자신 위에 쌓였으면 홈으로 간다', () => {
     window.history.pushState({}, '', '/tournaments/t1/apply');
     window.history.pushState({}, '', '/login?redirect=%2Ftournaments%2Ft1%2Fapply');
-    render(<LoginPageView model={getLoginViewModel('/tournaments/t1/apply')} />);
+    render(<LoginPageView model={getLoginViewModel('/tournaments/t1/apply')} siteInfo={siteInfo} />);
 
     fireEvent.click(exit());
 

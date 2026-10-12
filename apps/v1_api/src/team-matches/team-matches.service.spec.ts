@@ -1085,6 +1085,27 @@ describe('TeamMatchesService', () => {
     );
   });
 
+  it('close: 사전 조회 뒤 승인된 팀매치는 잠금 후 matched를 보존하고 마감하지 않는다', async () => {
+    prisma.v1TeamMatch.findFirst
+      .mockResolvedValueOnce(teamMatchRow({ status: 'recruiting', startAt: FUTURE }))
+      .mockResolvedValueOnce(teamMatchRow({
+        status: 'matched',
+        startAt: FUTURE,
+        approvedApplicantTeamId: 'team-applicant',
+      }));
+    prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'mem-1' });
+    prisma.v1TeamMatch.update.mockResolvedValue(teamMatchRow({ status: 'closed' }));
+    prisma.v1TeamMatchApplication.updateMany.mockResolvedValue({ count: 0 });
+    prisma.v1StatusChangeLog.create.mockResolvedValue({});
+
+    await expect(service.close(manager, 'tm-1', { reason: '모집 완료' })).rejects.toMatchObject({ status: 409 });
+
+    expect(prisma.$queryRaw).toHaveBeenCalled();
+    expect(prisma.v1TeamMatch.update).not.toHaveBeenCalled();
+    expect(prisma.v1TeamMatchApplication.updateMany).not.toHaveBeenCalled();
+    expect(notifications.emitToManyDeferred).not.toHaveBeenCalled();
+  });
+
   it('close: 마감 자동 closed여도 경기 시작 후에는 기존 수동 마감 제한을 유지한다', async () => {
     const now = new Date('2026-10-12T03:00:00.000Z');
     jest.useFakeTimers({ doNotFake: ['nextTick', 'setImmediate', 'clearImmediate', 'setTimeout', 'clearTimeout', 'setInterval', 'clearInterval', 'queueMicrotask', 'hrtime', 'performance', 'requestAnimationFrame', 'cancelAnimationFrame', 'requestIdleCallback', 'cancelIdleCallback'] });

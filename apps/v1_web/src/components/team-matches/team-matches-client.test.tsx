@@ -1770,6 +1770,7 @@ describe('TeamMatchDetailPageClient — 호스트의 신청 승인·관리 메�
     mockHost({
       status: 'matched',
       gameId: 'game-1',
+      lifecycle: { canEdit: false, canDelete: false, onHoldReason: null, canCloseRecruitment: false, canReopenRecruitment: false },
       approvedOpponentTeam: { teamId: 'team-a', name: 'a팀', applicationId: 'a' },
     });
     myTeamsRef.current = { items: [{ teamId: 'team-host', role: 'owner' }] };

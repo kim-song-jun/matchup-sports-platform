@@ -1068,6 +1068,24 @@ export class TeamMatchesService {
     }
 
     const result = await this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM "v1_team_matches" WHERE id = ${teamMatch.id} FOR UPDATE`;
+      const currentTeamMatch = await tx.v1TeamMatch.findFirst({
+        where: { id: teamMatch.id, deletedAt: null },
+        select: {
+          status: true,
+          startAt: true,
+          approvedApplicantTeamId: true,
+        },
+      });
+      if (
+        !currentTeamMatch ||
+        currentTeamMatch.status !== 'recruiting' ||
+        currentTeamMatch.approvedApplicantTeamId ||
+        (currentTeamMatch.startAt !== null && currentTeamMatch.startAt <= new Date())
+      ) {
+        throw stateConflict('Only active recruiting team matches can be closed');
+      }
+
       const updated = await tx.v1TeamMatch.update({
         where: { id: teamMatch.id },
         data: { status: 'closed' },

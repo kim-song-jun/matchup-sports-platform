@@ -46,11 +46,11 @@
 
 ### API 통합 테스트(CI)
 
-- [ ] 실제 DB·HTTP 요청으로 마감 경계에 도달한 모집과 이미 시작된 만료 모집을 `closed` 목록·상세에서 확인해야 해요. 테스트를 작성했고 CI 실행을 기다려요.
-- [ ] 두 모집이 `recruiting`, 모집 가능, 추천순 결과에서 제외되는지 CI에서 확인해야 해요.
+- [x] 실제 DB·HTTP 요청으로 마감 경계에 도달한 모집과 이미 시작된 만료 모집이 `closed` 목록·상세에서 확인돼요. 코드 변경 커밋 `d358a626`의 CI run 38241243585에서 통과했어요.
+- [x] 두 모집이 `recruiting`, 모집 가능, 추천순 결과에서 제외돼요. 코드 변경 커밋 `d358a626`의 CI run 38241243585에서 통과했어요.
 - [x] 내 팀매치 `recruiting` 필터가 raw 상태도 recruiting인 항목만 반환하고, 저장된 closed·cancelled 항목을 제외하는 DB 대조군을 추가했어요.
-- [ ] CI run 38236166629에서 위 HTTP 요청이 403을 반환했어요. 로그에는 응답 body/code가 없어요. `/me/team-matches`의 유일한 route guard는 `V1AuthGuard`이고 fixture 계정은 active/completed이며 GET은 휴대폰 인증 게이트 허용 경로예요. 필수 약관 동의 기록이 빠진 host fixture가 `signupCompliance`를 막았다고 guard 소스에서 좁혀, 공식 `ManagedTermsRuntimeService`로 필수 문서에 동의시키고 cleanup에서 consent event를 삭제하게 했어요. 서비스 gate는 우회하지 않았고 CI 재실행에서 200 확인이 남아 있어요.
-- [ ] 통합 테스트는 CI에서 실행해요. 로컬에서는 실행하지 않았어요.
+- 이전 CI run 38236166629에서는 위 HTTP 요청이 403을 반환했어요. 로그에 응답 body/code가 없어 원인을 단정하지 않았고, 필수 약관 동의가 누락된 host fixture를 공식 `ManagedTermsRuntimeService`로 보완해 cleanup에서 consent event를 삭제하도록 했어요. 서비스 gate는 우회하지 않았어요.
+- [x] 코드 변경 커밋 `d358a626125b8102223a27eda37e1a7201f9af8b`의 CI run 38241243585에서 Gates, API, Web이 모두 SUCCESS였어요. 통합 테스트는 CI에서 확인했고 로컬에서는 실행하지 않았어요.
 
 ### 화면 조회 갱신 테스트
 
@@ -77,7 +77,7 @@ API Luna는 팀매치 서비스·단위 테스트·목록 통합 테스트, 팀�
 - 공용 MSW 상세 응답은 기존에도 lifecycle을 제공하지 않는 축약 fixture예요. 이번 관리 동작 검증은 실제 컴포넌트에 명시적인 API 계약 응답을 전달했으며, 해당 공용 fixture 전체 정정은 포함하지 않았어요.
 - `git diff --check` 통과, 수정 경로의 `TODO`·`FIXME`·`HACK`·`XXX` 표식 없음.
 - root는 최종 API/Web 소스의 `tsc --noEmit`, API surface 검사, Web pattern 검사를 직렬 실행해 모두 exit 0을 확인했어요. 감독 PID 78776, API tsc 78910·surface 80468, Web tsc 80515·pattern 82604는 종료됐어요. 독립 gpt-6-sol 최종 소스 리뷰에서 잔여 P1/P2 없이 코드 PASS를 확인했어요.
-- API 통합 테스트·전체 빌드·현재 커밋 CI와 alpha 브라우저 검증은 남아 있어요. UI 3폭 갤러리는 dev 머지 및 alpha 포함을 확인한 뒤 실제 화면으로 게시해요.
+- 코드 변경 커밋 `d358a626`의 CI run 38241243585에서 Gates, API, Web이 모두 SUCCESS였어요. alpha 브라우저 검증과 dev 머지, UI 3폭 갤러리 게시가 남아 있고, 이번 문서 정정 커밋의 CI도 별도 확인이 필요해요. 갤러리는 dev 머지 및 alpha 배포에 변경이 포함된 것을 확인한 뒤 실제 화면으로 게시해요.
 - 마지막 UI 반례는 자동 마감 하단 안내의 기대값 `신청 마감` 대신 `매치 수정`이 나오는 RED를 확인했어요. client와 실제 page를 대상으로 수정 뒤 2 passed, 232 skipped, exit 0을 확인했어요. page의 데스크톱·모바일 CTA가 함께 렌더되는 fixture 특성으로 첫 검사에서 cardinality 오류가 나서 모든 버튼의 disabled 상태를 검사하도록 고쳤어요. supervisor 74909·runner 74911·Vitest 74955는 종료됐어요.
 - 후속 Sol 리뷰의 시작 후 수동 마감 반례를 반영했어요. 자동 마감으로 파생 `closed`인 raw `recruiting`도 `startAt`이 지난 뒤에는 `close()`가 409로 거절하고, `canCloseRecruitment`도 false로 응답해 대기 신청을 종료하거나 알림을 보내지 않아요. 기존 null `startAt` 예외는 유지해요. 두 targeted unit test는 GREEN 2 passed, 136 skipped, exit 0 (supervisor PID 65801, Jest child PID 65808)예요. lifecycle 테스트는 RED에서 true 반환을 확인했어요. close 테스트는 fixture/transaction 경로의 `undefined.id` 오류가 2회 발생해 behavioral RED로 세지 않았고, 안전 guard를 구현한 뒤 통과했어요.
 - CI Web 실패 `team-matches-client.test.tsx:1797`은 `matched` fixture가 공통 `mockHost` 기본 lifecycle(`canEdit=true`)을 물려받아 실제 API capability와 달랐어요. `team-matches.service.ts`의 상세 계약은 `matched`에서 `canEdit=false`예요. matched 시나리오 fixture에 실제 lifecycle 값을 명시한 뒤 같은 단일 테스트가 1 passed, 89 skipped, exit 0으로 통과했어요. Vitest supervisor PID 49140은 종료됐고, parent PID 50452는 실행 중인 Codex 호스트라 정리 대상에서 제외했어요.
@@ -86,6 +86,6 @@ API Luna는 팀매치 서비스·단위 테스트·목록 통합 테스트, 팀�
 - PR #1862 2차 독립 리뷰에서 `myTeamMatches(recruiting)`의 terminal 상태 혼입, 성공적으로 다시 받은 이전 페이지에서 사라진 항목이 누적 카드에 남는 문제, `startAt === now` 재개 경계 불일치를 발견했어요. raw recruiting 조건과 closed/cancelled DB 대조군, 성공한 페이지 응답의 실제 membership으로 누적 목록을 재구성하는 회귀, `startAt <= now` 재개 거절 및 상세 capability 경계를 반영했어요. API/Web 회귀와 통합 테스트 파일 타입 검증은 worker 1로 최소 실행하고, DB 통합 자체는 CI에서 확인해요.
 - 추가 Sol P2는 페이지 갱신이 반환한 새 `nextCursor`를 따라 이전 페이지를 찾으면서, 첫 페이지의 커서가 사라지면 이미 누적된 두 번째 페이지를 더는 조회하지 못하고 만료 카드가 남는 경우예요. 팀매치 화면은 실제 로드한 cursor 키를 별도 pagination metadata로 보존해 이전 페이지별 성공·실패를 처리하도록 수정했고, 첫 페이지 커서 제거·두 번째 페이지 실패 보존·다음 성공 제거 및 요청 cursor/outcome을 검사하는 UI 테스트를 추가했어요. `loadedPageCursorsKey`와 효과의 filter dependency를 각각 snapshot key와 직렬화한 `teamMatchFiltersKey`에 고정해 불필요한 렌더별 재요청을 막아요. 회귀 테스트는 임의 rerender에서 추가 fetch 없음, page2 rejected 요청 뒤 카드 보존, `dataUpdatedAt` 증가 후 page2 resolved 요청과 카드 제거를 확인했어요(단일 파일 1 passed, 91 skipped, worker 1). 독립 Sol 최종 리뷰는 PASS예요.
 - 새 CI 결과에서 pagination-history 순서 계약이 깨지는 회귀를 확인했어요. 이전 페이지 최신 응답의 배열 순서로 누적 목록을 재구성해 기존 첫 페이지의 정렬 위치가 바뀌었어요. 기존 누적 순서를 유지하면서 성공 응답의 같은 ID 항목만 최신 객체로 교체하고, membership에서 사라진 ID를 제거하며, 실패 페이지는 보존하고 새 항목은 기존 누적 뒤에 추가하도록 수정했어요. CI 실패를 좁은 단일 테스트에서 재현한 뒤 history 순서 + 마감 상태 최신화 + 페이지 cursor retry 성공·실패 회귀가 3 passed, 116 skipped로 통과했어요(두 파일, worker 1). 독립 Sol 최종 코드는 PASS예요.
-- 이번 서비스 수정 후 API `tsc --noEmit`, `v1-surface-check`를 직렬 실행해 둘 다 exit 0을 확인했어요(감독 PID 86896, tsc PID 87248, surface PID 90891). API tsconfig는 통합 테스트 경로를 포함하지 않으므로 이 결과를 통합 파일의 타입 검증으로 세지 않았어요. 최종 통합 파일 하나를 TypeScript rootNames로 지정한 noEmit 검증에서 diagnostics 0·exit 0을 확인했어요(감독 PID 10466, Node PID 10490). 해당 프로세스는 종료됐어요. 실제 DB 실행과 현재 head CI는 남아 있어요.
-- Copilot 4247011104의 공용 focus 재조회 영향도 수정했어요. `useV1TeamMatches`는 기본 focus 재조회를 끄고 팀매치 목록의 all/filtered/count 호출만 명시적으로 켜요. 홈·검색·팀 목록의 기존 정책과 상세 훅의 재조회는 유지해요. 실제 React Query/MSW에서 수정 전 네 소비자 모두 재조회하는 RED와 수정 후 목록만 재조회하는 GREEN을 확인했어요(1 passed, 3 skipped, worker 1). 감독 PID 91444는 종료됐어요. 최종 커밋의 CI와 alpha QA는 별도로 확인해요.
+- 이번 서비스 수정 후 API `tsc --noEmit`, `v1-surface-check`를 직렬 실행해 둘 다 exit 0을 확인했어요(감독 PID 86896, tsc PID 87248, surface PID 90891). API tsconfig는 통합 테스트 경로를 포함하지 않으므로 이 결과를 통합 파일의 타입 검증으로 세지 않았어요. 최종 통합 파일 하나를 TypeScript rootNames로 지정한 noEmit 검증에서 diagnostics 0·exit 0을 확인했어요(감독 PID 10466, Node PID 10490). 해당 프로세스는 종료됐어요. 이후 코드 변경 커밋 `d358a626`의 실제 DB 통합 테스트는 CI run 38241243585에서 통과했어요.
+- Copilot 4247011104의 공용 focus 재조회 영향도 수정했어요. `useV1TeamMatches`는 기본 focus 재조회를 끄고 팀매치 목록의 all/filtered/count 호출만 명시적으로 켜요. 홈·검색·팀 목록의 기존 정책과 상세 훅의 재조회는 유지해요. 실제 React Query/MSW에서 수정 전 네 소비자 모두 재조회하는 RED와 수정 후 목록만 재조회하는 GREEN을 확인했어요(1 passed, 3 skipped, worker 1). 감독 PID 91444는 종료됐어요. 코드 변경 커밋 `d358a626`의 run 38241243585에서 Gates/API/Web 모두 SUCCESS였고 alpha QA는 남아 있어요.
 - 최종 리뷰 본문의 상세 공유 훅 지적도 반영했어요. `useV1TeamMatch`의 polling·focus 재조회 기본값은 false로 돌리고 실제 `TeamMatchDetailPageClient`만 15초 polling·focus always를 명시해요. 결과·일정·공유 기록·라인업의 조회에는 추가 자동 요청이 생기지 않아요. 실제 Query/MSW에서 비옵트인 상세가 focus 뒤 재조회되는 RED를 확인하고, 수정 후 비옵트인은 focus·15초 경과 뒤에도 1회 요청을 유지하며 옵트인은 focus·polling 때 갱신되는 GREEN을 확인했어요(1 passed, 4 skipped, worker 1). 테스트 PID 52452는 종료됐어요.

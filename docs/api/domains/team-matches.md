@@ -241,7 +241,7 @@ Rules:
 - `status`를 생략한 일반 탐색은 경기 시작 전인 `recruiting`, `closed`, `matched`를 포함한다.
 - 기본 목록(그리고 `recommended`/`deadline`/`starts_at`)은 경기일 순이다: 시작 전 경기를 `startAt ASC` 로 먼저, 이미 시작한 경기를 `startAt DESC` 로 그 뒤에, 일정 미정(`startAt` null)을 `createdAt DESC` 로 맨 뒤에 잇는다(동률은 `createdAt DESC, id DESC`). `latest` 만 `createdAt DESC, id DESC` 등록 최신순이다.
 - `pageInfo.nextCursor` 는 `"<구간>:<id>@<기준 시각 epoch ms>"`(`upcoming:`/`past:`/`unscheduled:`, 최신순은 시각 없는 `latest:<id>`) 형태다 — 기준 시각 규칙(구간 분할에만 사용, 공개 범위는 요청 시각 판정, 미래 값은 요청 시각으로 내림, 깨진 값은 첫 페이지부터, 시각 없는 구형 커서는 요청 시각 기준)은 개인매치 목록과 같다. 커서 행이 그사이 목록 조건을 벗어나도 다음 경기를 건너뛰지 않는 것도 같다.
-- 일반 목록은 신청 마감 시각에 도달한 일반 미매칭 모집도 `closed` 상태로 경기 시작 전까지 노출해요. 이 모집은 시작 시각 이후에도 `closed`를 유지하지만 기본 탐색에서는 기존 시작 후 제외 규칙을 따라요. 신청 마감이 없는 모집의 시작 시각 경과는 기존 `on_hold` 표시를 유지해요.
+- 일반 목록은 신청 마감 시각에 도달한 일반 미매칭 모집도 `closed` 상태로 경기 시작 전까지 노출한다. 이 모집은 시작 시각 이후에도 `closed`를 유지하지만 기본 탐색에서는 기존 시작 후 제외 규칙을 따른다. 신청 마감이 없는 모집은 시작 시각이 지난 뒤에도 기존 `on_hold` 표시를 유지한다.
 - `status=closed`는 저장된 `closed`와 마감 시각이 지난 일반 미매칭 `recruiting`을 포함하며, `status=recruiting`은 마감이 남았거나 마감 시각이 없는 모집만 포함한다. 검색 결과도 같은 필터를 적용한다.
 - `sort=recommended`는 경기 시작 전인 raw `recruiting` 중 신청 마감이 없거나 아직 지나지 않은 항목만 포함한다. 신청 가능 목록과 `facets.recruiting`도 마감 시각과 같아지는 순간부터 제외한다.
 - `teamId`는 `hostTeamId = teamId` 또는 `applications.some(applicantTeamId = teamId)` 둘 중 하나를 만족하면 포함

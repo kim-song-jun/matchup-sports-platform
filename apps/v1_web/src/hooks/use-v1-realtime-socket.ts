@@ -4,6 +4,7 @@ import type { QueryClient, Query } from '@tanstack/react-query';
 import type { Socket } from 'socket.io-client';
 import { getV1Socket } from '@/lib/v1-socket';
 import { v1Keys } from '@/lib/query-keys';
+import { isTransientFailure } from '@/lib/api-client';
 
 type ChatMessageIdentity = { readonly roomId: string; readonly messageId: string };
 const MAX_RECENT_CHAT_MESSAGES = 100;
@@ -104,12 +105,17 @@ function retainChatSync(queryClient: QueryClient, socket: Socket): () => void {
         includeLists = false;
         void queryClient.invalidateQueries({
           queryKey: v1Keys.chatRooms(),
-          predicate: (query) => isChatMessagesQuery(query) || (withLists && (isChatListQuery(query) || isChatRoomQuery(query))),
+          predicate: (query) => {
+            if (!(isChatMessagesQuery(query) || (withLists && (isChatListQuery(query) || isChatRoomQuery(query))))) return false;
+            // Permanent 4xx reads (e.g. a 404 room) stay as they are; transient failures are retried on recovery.
+            return !(query.state.status === 'error' && !isTransientFailure(query.state.error));
+          },
         });
       }, RESYNC_DEBOUNCE_MS);
     };
-    // Messages emitted while the socket was down are never replayed, so every connect resyncs — including a
-    // first connect that arrives after the REST reads (a socket already connected here emits no first connect).
+    // Events emitted before the socket joined are never replayed, and elapsed time cannot prove a message did
+    // not commit between a REST snapshot and the join, so every connect resyncs. In-app navigation finds the
+    // socket already connected (one request per query); only a hard load into a room costs one extra resync.
     const onConnect = () => scheduleResync(true);
     // Lists and room details refetch on window focus; only messages need this visibility listener.
     const onVisibility = () => {

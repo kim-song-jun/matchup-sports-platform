@@ -10,7 +10,8 @@ import { useState, type FormEvent } from 'react';
 import { Button } from '@/components/v1-ui/button';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
 import { useV1DeleteFixture, useV1UpdateFixture } from '@/hooks/use-v1-api';
-import { useV1AssignTournamentSlot, useV1QuickResult } from '@/hooks/use-v1-bracket-canvas';
+import { useV1AssignTournamentSlot, useV1QuickResult, useV1SetBracketSources } from '@/hooks/use-v1-bracket-canvas';
+import { bracketSourceCandidates, bracketSourceSideOptions, isFixtureLinkable } from '@/lib/bracket-fixture-tools';
 import { TEAM_IN_OTHER_GROUP_HIDDEN_NOTE, applyGroupRule, registrationIdsBlockedForGroup, registrationIdsInOppositeFinalStage } from '@/lib/bracket-group-enrollment';
 import { describeBracketCanvasError } from '@/lib/bracket-canvas-errors';
 import { classifyFixtureSide, fixtureTeamChangeAccess, isFixtureLocked, isSlotAssignable, type SideKey } from '@/lib/bracket-canvas-layout';
@@ -63,6 +64,7 @@ export function BracketNodePanel({
 }: BracketNodePanelProps) {
   const assignSlot = useV1AssignTournamentSlot(tournamentId, 'tournament');
   const quickResult = useV1QuickResult(tournamentId, 'tournament');
+  const setBracketSources = useV1SetBracketSources(tournamentId);
   const updateFixture = useV1UpdateFixture(tournamentId);
   const deleteFixture = useV1DeleteFixture(tournamentId);
   const { confirm, ConfirmModal } = useConfirm();
@@ -70,6 +72,8 @@ export function BracketNodePanel({
   const [scheduledAt, setScheduledAt] = useState(() => isoToKstDatetimeLocal(fixture.scheduledAt));
   const [venue, setVenue] = useState<PlaceValue | null>(fixtureVenueValue(fixture));
   const [quickError, setQuickError] = useState<string | null>(null);
+  const [homeSourceId, setHomeSourceId] = useState(() => fixture.bracketSources?.find((source) => source.side === 'HOME')?.fixtureId ?? '');
+  const [awaySourceId, setAwaySourceId] = useState(() => fixture.bracketSources?.find((source) => source.side === 'AWAY')?.fixtureId ?? '');
 
   const title = fixtureTitle(fixture, groups);
   const locked = isFixtureLocked(fixture);
@@ -80,6 +84,27 @@ export function BracketNodePanel({
   const confirmed = registrations.filter((registration) => registration.status === 'confirmed');
   const placedIds = new Set(slots.filter((slot) => slot.kind !== 'GROUP_RANK' && slot.registrationId !== null).map((slot) => slot.registrationId));
   const game = fixture.game;
+  const sourceCandidates = bracketSourceCandidates({ target: fixture, groups, fixtures });
+  const sourceOptions = (side: SideKey) => {
+    const currentFixtureId = side === 'HOME' ? homeSourceId : awaySourceId;
+    const oppositeFixtureId = side === 'HOME' ? awaySourceId : homeSourceId;
+    return bracketSourceSideOptions({ candidates: sourceCandidates, fixtures, currentFixtureId, oppositeFixtureId });
+  };
+  const duplicateSourceSelected = homeSourceId !== '' && homeSourceId === awaySourceId;
+
+  const handleSaveSources = () => {
+    setBracketSources.mutate(
+      {
+        fixtureId: fixture.id,
+        homeSourceFixtureId: homeSourceId || null,
+        awaySourceFixtureId: awaySourceId || null,
+      },
+      {
+        onSuccess: () => showToast('진출 연결을 저장했어요.', 'success'),
+        onError: (error) => showToast(describeBracketCanvasError(error, '진출 연결을 저장하지 못했어요.'), 'error'),
+      },
+    );
+  };
 
   const handleAssign = (slot: V1AdminBracketSlot, registrationId: string) => {
     assignSlot.mutate(
@@ -242,9 +267,16 @@ export function BracketNodePanel({
   };
 
   const handleDelete = async () => {
+    const downstreamCount = fixtures.filter((candidate) => candidate.bracketSources?.some((source) => source.fixtureId === fixture.id)).length;
+    const linkedImpact = downstreamCount > 0 ? ` 이 경기를 출처로 쓰는 후속 경기 ${downstreamCount}개도 영향을 받아요.` : '';
+    const protection = fixture.result !== null || game?.hasOfficialResult
+      ? ' 결과가 있는 경기는 삭제할 수 없어요.'
+      : game?.state === 'LIVE' || game?.state === 'PAUSED'
+        ? ' 진행 중인 경기는 삭제할 수 없어요.'
+        : '';
     const ok = await confirm({
       title: '경기 삭제',
-      message: `${title}를 삭제할까요? 되돌릴 수 없어요.`,
+      message: `${title}를 삭제할까요? 되돌릴 수 없어요.${linkedImpact}${protection}`,
       confirmLabel: '삭제',
       tone: 'danger',
     });
@@ -350,6 +382,36 @@ export function BracketNodePanel({
           <p className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>{TEAM_IN_OTHER_GROUP_HIDDEN_NOTE}</p>
         ) : null}
       </section>
+
+      {isFixtureLinkable(fixture) && sourceCandidates.length > 0 ? (
+        <section aria-label="진출 연결" className="flex flex-col gap-3">
+          <h3 className={sectionTitle} style={{ color: 'var(--text-strong)' }}>진출 연결</h3>
+          <p className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>이전 경기의 승자나 패자를 이 칸으로 연결해요. 연결된 팀은 자리에서 직접 바꾸지 않고 여기서 출처를 수정해요.</p>
+          {(['HOME', 'AWAY'] as const).map((side) => {
+            const value = side === 'HOME' ? homeSourceId : awaySourceId;
+            const options = sourceOptions(side);
+            return (
+              <label key={side} className="flex flex-col gap-1 tm-text-caption" style={{ color: 'var(--text-muted)' }}>
+                {side === 'HOME' ? '홈 출처 경기' : '어웨이 출처 경기'}
+                <select
+                  aria-label={`${side === 'HOME' ? '홈' : '어웨이'} 출처 경기`}
+                  className="tm-input"
+                  style={{ minHeight: 44 }}
+                  value={options.some((candidate) => candidate.id === value) ? value : ''}
+                  disabled={!canWrite || setBracketSources.isPending}
+                  onChange={(event) => side === 'HOME' ? setHomeSourceId(event.target.value) : setAwaySourceId(event.target.value)}
+                >
+                  <option value="">연결 없음 · 직접 배정</option>
+                  {options.map((candidate) => (
+                    <option key={candidate.id} value={candidate.id}>{`${fixtureTitle(candidate, groups)} ${groups.find((group) => group.id === fixture.groupId)?.phase === 'third_place' ? '패자' : '승자'}`}</option>
+                  ))}
+                </select>
+              </label>
+            );
+          })}
+          {canWrite ? <Button type="button" variant="outline" size="md" disabled={duplicateSourceSelected} loading={setBracketSources.isPending} onClick={handleSaveSources}>진출 연결 저장</Button> : null}
+        </section>
+      ) : null}
 
       <section aria-label="결과" className="flex flex-col gap-3">
         <h3 className={sectionTitle} style={{ color: 'var(--text-strong)' }}>결과</h3>

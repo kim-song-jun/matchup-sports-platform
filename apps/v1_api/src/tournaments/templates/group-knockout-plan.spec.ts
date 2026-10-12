@@ -24,6 +24,27 @@ const rankLabel = (p: BracketTemplatePlan, key: string | null) => {
 };
 
 describe('planGroupKnockoutTemplate — 개수 계약', () => {
+  it('5조×4팀의 12강은 41경기·32자리·부전승4개와 완결된 승자 연결을 만든다', () => {
+    const p = plan({ groupCount: 5, qualificationMode: 'cross_group_round12' });
+    expect(stageFixtures(p)).toHaveLength(30);
+    expect(p.fixtures).toHaveLength(41);
+    expect(p.slots).toHaveLength(32);
+    expect(p.slots.filter((slot) => slot.kind === 'ENTRY')).toHaveLength(20);
+    expect(p.slots.filter((slot) => slot.kind === 'GROUP_RANK')).toHaveLength(8);
+    expect(p.byeSlots).toHaveLength(4);
+    expect(p.edges).toHaveLength(10);
+    for (const slot of p.slots.filter((slot) => slot.kind === 'BYE')) {
+      expect(p.fixtures.filter((fixture) => fixture.groupKey === 'quarter' && fixture.homeSlotKey === slot.key)).toHaveLength(1);
+    }
+    for (const fixture of p.fixtures.filter((row) => row.groupKey === 'round12')) {
+      expect(p.edges.filter((edge) => edge.sourceFixtureKey === fixture.key && edge.targetFixtureKey.startsWith('quarter-'))).toHaveLength(1);
+    }
+    expect(p.fixtures.map((fixture) => fixture.fixtureNumber)).toEqual(Array.from({ length: 41 }, (_, i) => i + 1));
+  });
+  it('특수 12강 설정에서 5조·4팀·1회전이 아닌 조합은 거절한다', () => {
+    expect(() => plan({ groupCount: 4, qualificationMode: 'cross_group_round12' })).toThrow();
+    expect(() => plan({ groupCount: 5, legs: 2, qualificationMode: 'cross_group_round12' })).toThrow();
+  });
   it('2조 x 4팀, 2팀 진출, 1회전: 조별 12 + 4강 2 + 결승 1 = 15경기, 연결 2, 자리 12(ENTRY 8 + GROUP_RANK 4)', () => {
     const p = plan();
     expect(stageFixtures(p)).toHaveLength(12);

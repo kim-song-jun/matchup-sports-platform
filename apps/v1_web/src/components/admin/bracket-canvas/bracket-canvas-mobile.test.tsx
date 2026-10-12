@@ -101,7 +101,7 @@ function renderMobile(overrides: Partial<BracketCanvasMobileProps> = {}, queryCl
       <BracketCanvasMobile competitionId="t-1" scope="tournament" rounds={rounds} slots={slots} candidates={candidates} canWrite registrationsState={loaded} showToast={showToast} {...overrides} />
     </QueryClientProvider>,
   );
-  return { showToast, ...utils };
+  return { showToast, rounds, queryClient, ...utils };
 }
 
 const card = (name: RegExp) => screen.getByRole('button', { name });
@@ -208,6 +208,23 @@ describe('BracketCanvasMobile — 시트', () => {
     expect(form).toHaveAttribute('data-confirm', 'true');
     expect(form).toHaveAttribute('data-home', '서초FC');
     expect(form).toHaveAttribute('data-away', '송파FC');
+  });
+
+  it('생성 후 전달된 경기가 다른 라운드에 있으면 그 라운드를 열고 닫은 뒤 같은 focus로 다시 열지 않는다', () => {
+    const { rerender, rounds, queryClient } = renderMobile({ focusFixtureId: 'fx-5' });
+    expect(sheet()).toHaveAccessibleName('4강 · 5번 경기');
+    expect(screen.getByRole('tab', { name: '4강' })).toHaveAttribute('aria-selected', 'true');
+
+    fireEvent.click(within(sheet()).getByRole('button', { name: '닫기' }));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+
+    rerender(
+      <QueryClientProvider client={queryClient}>
+        <BracketCanvasMobile competitionId="t-1" scope="tournament" rounds={[...rounds]} slots={slots} candidates={candidates} canWrite registrationsState={loaded} showToast={vi.fn()} focusFixtureId="fx-5" />
+      </QueryClientProvider>,
+    );
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: '4강' })).toHaveAttribute('aria-selected', 'true');
   });
 
   it('폼을 제출하면 그 경기의 게임 id·버전으로 빠른 입력 변이를 부르고, 성공하면 토스트와 함께 시트가 닫힌다', () => {

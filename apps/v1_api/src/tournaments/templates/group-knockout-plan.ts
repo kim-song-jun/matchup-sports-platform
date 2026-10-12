@@ -10,6 +10,7 @@ import type {
 } from './bracket-template-plan';
 import { FIXTURES_IN_PHASE, GROUP_NAME, ROUND_LABEL, type KnockoutPhase } from './knockout-phase-labels';
 import { groupRankPairings } from './group-rank-pairings';
+import { planKnockout } from './bracket-template-plan';
 
 export type GroupKnockoutTemplateInput = Extract<BracketTemplateInput, { kind: 'group_knockout' }>;
 
@@ -39,7 +40,13 @@ function assertSupported(input: GroupKnockoutTemplateInput): void {
   ) {
     unsupported('조는 2~8개, 조당 팀은 3~6팀, 진출은 1~2팀, 회전은 1~2회로 입력해 주세요.');
   }
-  groupRankPairings(groupCount, advancePerGroup); // 결선 크기가 2·4·8·16 이 아니면 여기서 422
+  if (input.qualificationMode === 'cross_group_round12') {
+    if (groupCount !== 5 || teamsPerGroup !== 4 || advancePerGroup !== 2 || legs !== 1) {
+      unsupported('조 간 성적 비교 12강은 5개 조·조당 4팀·1회전·조 1·2위 진출로 만들어 주세요.');
+    }
+  } else {
+    groupRankPairings(groupCount, advancePerGroup);
+  }
   if (groupCount * advancePerGroup === 2 && thirdPlace) {
     unsupported('결선이 결승 한 경기뿐이면 3·4위전을 만들 수 없어요.');
   }
@@ -52,7 +59,8 @@ export function planGroupKnockoutTemplate(
   assertSupported(input);
   const { groupCount, teamsPerGroup, advancePerGroup, legs, thirdPlace } = input;
   const size = groupCount * advancePerGroup;
-  const mainPhases = MAIN_CHAIN.slice(MAIN_CHAIN.indexOf(FIRST_PHASE_BY_SIZE[size]));
+  const mainPhases = input.qualificationMode === 'cross_group_round12' ? []
+    : MAIN_CHAIN.slice(MAIN_CHAIN.indexOf(FIRST_PHASE_BY_SIZE[size]));
   // 결승 다음이 3·4위전 — PR-1b/1c knockout 템플릿과 같은 번호·그룹 순서
   const phases: KnockoutPhase[] = thirdPlace ? [...mainPhases, 'third_place'] : [...mainPhases];
   const firstPhase = phases[0];
@@ -74,7 +82,7 @@ export function planGroupKnockoutTemplate(
   phases.forEach((phase, index) => {
     groups.push({ key: knockoutGroupKey(phase), name: GROUP_NAME[phase], phase, sortOrder: index, advanceCount: null });
   });
-  for (let g = 0; g < groupCount; g += 1) {
+  for (let g = 0; g < groupCount && input.qualificationMode !== 'cross_group_round12'; g += 1) {
     for (let rank = 1; rank <= advancePerGroup; rank += 1) {
       slots.push({ key: rankKey(g, rank), kind: 'GROUP_RANK', groupKey: knockoutGroupKey(firstPhase), position: rank, sourceGroupKey: stageGroupKey(g) });
     }
@@ -105,6 +113,15 @@ export function planGroupKnockoutTemplate(
     lastNumber += rows.length;
   }
 
+  if (input.qualificationMode === 'cross_group_round12') {
+    const knockout = planKnockout({ kind: 'knockout', size: 12, thirdPlace }, lastNumber);
+    // 결선 ENTRY는 조별 ENTRY와 다른 진출 자리다. 기존 kind별 유일 제약을 유지한다.
+    knockout.slots = knockout.slots.map((slot) => slot.kind === 'ENTRY'
+      ? { ...slot, kind: 'GROUP_RANK', position: slot.position + 4 } : slot);
+    return { groups: [...groups.filter((group) => group.phase === 'group'), ...knockout.groups],
+      slots: [...slots, ...knockout.slots], fixtures: [...fixtures, ...knockout.fixtures],
+      edges: knockout.edges, byeSlots: knockout.byeSlots };
+  }
   const pairings = groupRankPairings(groupCount, advancePerGroup);
   for (const phase of phases) {
     for (let index = 1; index <= FIXTURES_IN_PHASE[phase]; index += 1) {

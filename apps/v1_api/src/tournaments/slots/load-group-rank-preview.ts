@@ -82,7 +82,7 @@ export async function loadGroupRankPreview(
 type LoadedGroupRankSource = GroupRankSource & { teamNameById: ReadonlyMap<string, string> };
 
 /** 조별 순위 판정 입력. 어드민 미리보기와 공개 순위표가 같은 조회 조건을 쓰도록 한 곳에 둔다. */
-async function loadGroupRankSources(
+export async function loadGroupRankSources(
   client: Prisma.TransactionClient,
   tournamentId: string,
   groupIds: readonly string[],

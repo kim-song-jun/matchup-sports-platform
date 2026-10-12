@@ -13,6 +13,9 @@ The user authorized reviewing, repairing, and merging the currently open PRs #18
 
 ## Acceptance criteria / exit proof
 
+- [ ] Email signup keeps direct verification; Kakao-supplied contacts bypass duplicate OTP. Existing verified contact matches attach Kakao to the original user ID; conflicting members never merge.
+- [ ] A real HTTP/DB integration test proves account/profile preservation and social profile completion with phone verification enforced and no SMS challenge.
+
 - [ ] Open review findings are fixed or disproved with concrete evidence; conflicts are resolved without losing existing behavior.
 - [ ] Each exact PR revision passes the applicable CI checks before dev merge.
 - [ ] The combined dev revision passes API/Web/Gates and applicable Android/iOS CI; alpha serves that revision.
@@ -25,6 +28,17 @@ The user authorized reviewing, repairing, and merging the currently open PRs #18
 - [ ] If gates pass, promote the verified revision, approve the authorized production deployment, verify served SHA/release and affected production flows, and close owned browser/process resources.
 
 ## Progress snapshot
+
+### 2026-10-12 follow-up
+
+- #1843 merged into dev as `8b9fff12b9c6b066fa6c09b6cfa68a769a13ebb8` after API/Web/Gates success. #1848 merged as `3d7180ea2d44f251648d24eb12a1abf5fb0392cd` after the same checks; root checkout fast-forwarded after each merge.
+- #1837 `67dd77add` passed API/Web/Gates, Android and iOS. iOS alpha/production tests, production Release build and built crypto audit passed. Additional user-requested contact/consent changes below need a fresh exact-head CI run.
+- Business registration and business-information review submitted for Kakao app `1604606`. Personal information review submitted for optional name, gender, phone, birthday and birthyear using the actual production signup screenshot. Both console statuses are `심사 중`; personal review proceeds after business approval. No age_range, CI or shipping request.
+- New-app REST callbacks saved for production and alpha. Both unused new client secrets were regenerated before integration, and secret logging is suppressed. Production credentials remain unchanged pending the release gate.
+- User clarified ordinary flows: direct verification for email signup; no duplicate email/SMS verification for Kakao; automatic linking via consistent previously verified service contacts. Code and profile UI now implement this. New provider email/phone are confirmed from server-fetched Kakao data, and Gregorian birth date is prefilled. Contact collision/race/unverified legacy boundaries are tested.
+- Focused auth/date tests: 124 passed. Social signup UI tests: 42 passed. Immutable privacy disclosure test: 1 passed. Web TypeScript passed. Stale local Prisma generated types were refreshed; the preceding compile failure is resolved. Local Docker is off, so real DB integration execution is delegated to CI, not claimed passed.
+- Added append-only privacy policy v1.5 and signup privacy v1.2 with Kakao collection, optional scopes, contact matching and 30-day deletion grace disclosures. Existing consent/document rows are preserved.
+- Current production old-app Kakao authorization/callback reached the actual social profile screen through required terms; the current account is a pending signup, not an admin login. This does not prove the new app or native device login.
 
 - Baseline dev: `7225b1514f8daa885a05fef2f7c0859d0bc9cf14`; main/runtime: `eda4a05de8543f95f0c88376baac7212086c1037` / `1.6.10`.
 - #1837 has five unresolved review findings; #1843 has one MSW parity finding; #1848 has no unresolved review thread but conflicts with current dev.

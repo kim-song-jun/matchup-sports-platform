@@ -43,6 +43,8 @@ kept for historical reference under `docs/archive/v0-api/domains/`, not indexed 
 
 ## Canonical sources for the frozen SM New reference (auth/onboarding, terms, games/tournament-ops)
 
+Current Kakao signup and existing-account linking use the [provider contact confirmation contract](./domains/auth.md#kakao-contact-confirmation-and-automatic-account-linking): no duplicate OTP for Kakao-provided contacts, preservation of the member ID, and explicit rejection of conflicting contacts.
+
 - Frozen reference checklist: `docs/reference/sm-new-api-v1-contract-checklist.md`
 - State machines: `docs/reference/sm-new-state-machines.md`
 - Permissions: `docs/reference/sm-new-permission-matrix.md`

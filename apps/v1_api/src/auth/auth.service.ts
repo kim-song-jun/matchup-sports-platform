@@ -10,6 +10,7 @@ import { AppleTokenService } from './apple-token.service';
 import { KakaoLoginDto, KakaoTokenLoginDto } from './dto/kakao-login.dto';
 import {
   buildKakaoSignupPrefill,
+  normalizeKakaoBirthDate,
   normalizeKakaoNickname,
   readKakaoSignupPrefill,
   readSocialNicknameSeed,
@@ -408,10 +409,17 @@ export class AuthService {
         });
       }
 
+      await this.acceptExistingKakaoContacts(existingIdentity.user.id, profile, now);
       await this.touchExistingSocialIdentity(
         existingIdentity,
         now,
-        profile.nickname ? { kakaoNickname: profile.nickname } : null,
+        {
+          ...(profile.nickname ? { kakaoNickname: profile.nickname } : {}),
+          kakaoName: profile.signupPrefill?.name ?? null,
+          kakaoPhone: profile.signupPrefill?.phone ?? null,
+          kakaoGender: profile.signupPrefill?.gender ?? null,
+          kakaoBirthDate: profile.signupPrefill?.birthDate ?? null,
+        },
       );
 
       return this.sessionResponse(existingIdentity.user.id, existingIdentity.user.email, { social: true });
@@ -432,30 +440,38 @@ export class AuthService {
             email: true,
             accountStatus: true,
             emailVerifiedAt: true,
+            phone: true,
+            phoneVerifiedAt: true,
           },
         })
       : null;
 
-    if (existingUser) {
-      if (!providerEmailVerified || providerEmail === null) {
+    const phone = profile.signupPrefill?.phone ?? null;
+    const phoneOwner = phone ? await this.prisma.v1User.findFirst({
+      where: { phone },
+      select: { id: true, email: true, phone: true, accountStatus: true, emailVerifiedAt: true, phoneVerifiedAt: true },
+    }) : null;
+    if (existingUser && phoneOwner && existingUser.id !== phoneOwner.id) {
+      throw this.kakaoContactConflict();
+    }
+    const candidate = existingUser ?? phoneOwner;
+    if (candidate) {
+      if (existingUser && !providerEmailVerified && !phoneOwner?.phoneVerifiedAt) {
         throw new ConflictException({
           code: 'SOCIAL_LINK_REQUIRES_VERIFIED_EMAIL',
           message: '카카오에서 이메일 소유 확인이 되지 않아 기존 계정과 연결할 수 없어요. 카카오 이메일 인증 후 다시 시도해 주세요.',
         });
       }
-      const linked = await this.linkExistingSocialIdentity({
-        provider: V1AuthProvider.kakao,
-        providerUserKey: profile.providerUserKey,
-        email: providerEmail,
-        existingUserId: existingUser.id,
-        now,
-      });
+      const linked = await this.linkExistingKakaoIdentity(candidate.id, profile, now);
       return this.sessionResponse(linked.id, linked.email, { social: true });
     }
 
     const user = await this.prisma.v1User.create({
       data: {
         email,
+        emailVerifiedAt: email ? now : null,
+        phone,
+        phoneVerifiedAt: phone ? now : null,
         accountStatus: 'active',
         onboardingStatus: 'social_terms_required',
         lastLoginAt: now,
@@ -481,6 +497,7 @@ export class AuthService {
                     kakaoName: profile.signupPrefill.name,
                     kakaoPhone: profile.signupPrefill.phone,
                     kakaoGender: profile.signupPrefill.gender,
+                    kakaoBirthDate: profile.signupPrefill.birthDate,
                   }
                 : {}),
             },
@@ -498,6 +515,86 @@ export class AuthService {
     });
 
     return this.sessionResponse(user.id, user.email, { social: true });
+  }
+
+  private kakaoContactConflict() {
+    return new ConflictException({
+      code: 'SOCIAL_LINK_CONTACT_CONFLICT',
+      message: '카카오 정보와 기존 계정 정보가 일치하지 않아요. 기존 가입 방법으로 로그인해 계정 정보를 확인해 주세요.',
+    });
+  }
+
+  /** Established Kakao identities also benefit from provider contact confirmation on their next login. */
+  private async acceptExistingKakaoContacts(userId: string, profile: KakaoProfile, now: Date) {
+    const email = profile.email && profile.emailValid && profile.emailVerified ? normalizeEmail(profile.email) : null;
+    const phone = profile.signupPrefill?.phone ?? null;
+    if (!email && !phone) return;
+    await this.prisma.$transaction(async (tx) => {
+      const user = await tx.v1User.findUnique({
+        where: { id: userId },
+        select: { email: true, phone: true, emailVerifiedAt: true, phoneVerifiedAt: true },
+      });
+      if (!user) throw this.kakaoContactConflict();
+      // Do not overwrite a separate service contact or claim a number belonging to another member.
+      const acceptEmail = Boolean(email && user.email === email && !user.emailVerifiedAt);
+      const acceptPhone = Boolean(phone && user.phone === phone && !user.phoneVerifiedAt);
+      if (!acceptEmail && !acceptPhone) return;
+      const updated = await tx.v1User.updateMany({
+        where: { id: userId, accountStatus: 'active', email: user.email, phone: user.phone },
+        data: { ...(acceptEmail ? { emailVerifiedAt: now } : {}), ...(acceptPhone ? { phoneVerifiedAt: now } : {}) },
+      });
+      if (updated.count !== 1) throw this.kakaoContactConflict();
+      await tx.v1StatusChangeLog.create({
+        data: { targetType: 'user_contact', targetId: userId, fromStatus: 'unverified', toStatus: 'confirmed', actorType: 'user', actorUserId: userId, reason: 'kakao_provided_contact' },
+      });
+    });
+  }
+
+  /** Provider assertions are fetched by the server, never accepted from the login request body. */
+  private async linkExistingKakaoIdentity(userId: string, profile: KakaoProfile, now: Date) {
+    const email = profile.email && profile.emailValid && profile.emailVerified ? normalizeEmail(profile.email) : null;
+    const phone = profile.signupPrefill?.phone ?? null;
+    return this.prisma.$transaction(async (tx) => {
+      const candidate = await tx.v1User.findUnique({
+        where: { id: userId },
+        select: { id: true, email: true, phone: true, emailVerifiedAt: true, phoneVerifiedAt: true, accountStatus: true },
+      });
+      if (!candidate) throw this.kakaoContactConflict();
+      this.assertNotWithdrawalPending(candidate.accountStatus);
+      if (candidate.accountStatus !== 'active') {
+        throw new ForbiddenException({ code: 'PERMISSION_DENIED', message: 'This account cannot sign in' });
+      }
+      if ((email && candidate.email && email !== candidate.email) || (phone && candidate.phone && phone !== candidate.phone)) {
+        throw this.kakaoContactConflict();
+      }
+      const emailMatches = Boolean(email && candidate.email === email && candidate.emailVerifiedAt);
+      const phoneMatches = Boolean(phone && candidate.phone === phone && candidate.phoneVerifiedAt);
+      if (!emailMatches && !phoneMatches) {
+        if (email && candidate.email === email) assertLinkableByEmail(candidate);
+        throw this.kakaoContactConflict();
+      }
+      // Lock and recheck the verified contact. A concurrent profile edit must invalidate this claim.
+      const claimed = await tx.v1User.updateMany({
+        where: {
+          id: candidate.id, accountStatus: 'active',
+          email: candidate.email, phone: candidate.phone,
+          ...(emailMatches ? { emailVerifiedAt: { not: null } } : { phoneVerifiedAt: { not: null } }),
+        },
+        data: {
+          lastLoginAt: now,
+          ...(email ? { email, emailVerifiedAt: now } : {}),
+          ...(phone ? { phone, phoneVerifiedAt: now } : {}),
+        },
+      });
+      if (claimed.count !== 1) throw this.kakaoContactConflict();
+      const identity = await tx.v1AuthIdentity.create({
+        data: { userId, provider: V1AuthProvider.kakao, providerUserKey: profile.providerUserKey, email, status: 'active', lastLoginAt: now },
+      });
+      await tx.v1StatusChangeLog.create({
+        data: { targetType: 'auth_identity', targetId: identity.id, fromStatus: 'unlinked', toStatus: 'linked', actorType: 'user', actorUserId: userId, reason: `kakao_verified_contact:${emailMatches ? 'email' : 'phone'}` },
+      });
+      return { id: userId, email: email ?? candidate.email };
+    });
   }
 
   /**
@@ -640,12 +737,12 @@ export class AuthService {
       user: { id: string; onboardingStatus: string; createdAt: Date; updatedAt: Date };
     },
     now: Date,
-    seed: Record<string, string> | null,
+    seed: Record<string, string | null> | null,
   ): Promise<void> {
     const { user } = identity;
     const expired = isExpiredSocialSignup(user);
     const pending =
-      user.onboardingStatus === 'social_terms_required' || user.onboardingStatus === 'social_profile_required';
+      user.onboardingStatus === 'social_terms_required' || user.onboardingStatus === 'social_profile_required' || user.onboardingStatus === 'social_profile_deferred';
 
     await this.prisma.$transaction(async (tx) => {
       await tx.v1AuthIdentity.update({
@@ -884,9 +981,10 @@ export class AuthService {
         onboardingStatus: true,
         createdAt: true,
         updatedAt: true,
+        onboardingProgress: { select: { draftJson: true } },
         authIdentities: {
           where: { provider: { in: SOCIAL_AUTH_PROVIDERS }, status: 'active' },
-          select: { id: true },
+          select: { id: true, provider: true },
         },
         termsConsents: {
           where: {
@@ -972,7 +1070,11 @@ export class AuthService {
       }
     }
 
-    if (this.phoneVerification.enabled) {
+    const kakaoPhone = user.authIdentities.some((identity) => identity.provider === V1AuthProvider.kakao)
+      ? readKakaoSignupPrefill(user.onboardingProgress?.draftJson)?.phone
+      : null;
+    const acceptedKakaoPhone = Boolean(phone && kakaoPhone === phone);
+    if (this.phoneVerification.enabled && !acceptedKakaoPhone) {
       const verified = await this.prisma.v1User.findUnique({
         where: { id: userId },
         select: { phone: true, phoneVerifiedAt: true },
@@ -988,12 +1090,21 @@ export class AuthService {
     await this.prisma.$transaction(async (transaction) => {
       const transition = await transaction.v1User.updateMany({
         where: { id: userId, onboardingStatus: previousStatus },
-        data: { onboardingStatus: wasDeferred ? 'deferred' : 'signup_done', phone },
+        data: {
+          onboardingStatus: wasDeferred ? 'deferred' : 'signup_done', phone,
+          ...(acceptedKakaoPhone ? { phoneVerifiedAt: new Date() } : {}),
+        },
       });
       if (transition.count !== 1) {
         throw new BadRequestException({
           code: 'VALIDATION_ERROR',
           message: 'Social signup state changed before profile completion',
+        });
+      }
+
+      if (acceptedKakaoPhone) {
+        await transaction.v1StatusChangeLog.create({
+          data: { targetType: 'user_phone', targetId: userId, fromStatus: 'signup', toStatus: 'confirmed', actorType: 'user', actorUserId: userId, reason: 'kakao_provided_phone' },
         });
       }
 
@@ -1189,7 +1300,7 @@ export class AuthService {
     const termsCompliance = await this.managedTerms.signupCompliance(user.id);
     // 소셜 가입이 진행 중일 때만 내려준다 — 가입이 끝나면 같은 값이 프로필/유저에 저장되므로
     // 이 필드를 계속 실어 보낼 이유가 없고, 노출 범위도 필요한 순간으로 좁힌다.
-    const socialSignupPrefill = isPendingSocialSignup(user.onboardingStatus)
+    const socialSignupPrefill = (isPendingSocialSignup(user.onboardingStatus) || user.onboardingStatus === 'social_profile_deferred')
       ? readKakaoSignupPrefill(user.onboardingProgress?.draftJson)
       : null;
 
@@ -1598,6 +1709,9 @@ export class AuthService {
         name?: string;
         phone_number?: string;
         gender?: string;
+        birthday?: string;
+        birthyear?: string;
+        birthday_type?: string;
         profile?: {
           nickname?: string;
           profile_image_url?: string;
@@ -1633,6 +1747,7 @@ export class AuthService {
         name: userData.kakao_account?.name,
         phone: userData.kakao_account?.phone_number,
         gender: userData.kakao_account?.gender,
+        birthDate: normalizeKakaoBirthDate(userData.kakao_account?.birthyear, userData.kakao_account?.birthday, userData.kakao_account?.birthday_type),
       }),
     };
   }

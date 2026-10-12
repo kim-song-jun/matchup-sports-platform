@@ -10,9 +10,11 @@ import { ChevronLeftIcon, MatchIcon, TeamMatchIcon, TrophyIcon } from '@/compone
 import { BrandMark } from '@/components/v1-ui/brand-logo';
 import { AppleLoginButton } from './apple-login-button';
 import { KakaoLoginButton } from './kakao-login-button';
+import { PublicBusinessInfo } from '@/components/public-site';
 import type { AuthAction, AuthExceptionViewModel, LoginProvider, LoginViewModel, SignupCompleteViewModel } from './auth.types';
+import type { PublicSiteInfo } from '@/lib/public-site/site-info';
 
-export function LoginPageView({ model }: { model: LoginViewModel }) {
+export function LoginPageView({ model, siteInfo }: { model: LoginViewModel; siteInfo: PublicSiteInfo }) {
   const card = (
     <AuthFrame stage={AUTH_WELCOME_STAGE} exitFallbackHref={model.guestHref}>
       <div className="tm-auth-login">
@@ -62,9 +64,12 @@ export function LoginPageView({ model }: { model: LoginViewModel }) {
           </p>
           <p className="tm-text-caption tm-auth-policy">
             {/* P0 R-X2: 링크 텍스트 blue500(3.71:1 불통과) → blue700(#1b64da, 5.41:1 AA 통과). blue600은 4.49:1로 0.01 미달. */}
-            로그인 또는 가입을 진행하면 <Link href="/terms?document=terms" style={{ color: 'var(--blue700)' }}>서비스 이용약관</Link>과{' '}
-            <Link href="/terms?document=privacy" style={{ color: 'var(--blue700)' }}>개인정보 처리방침</Link>에 동의하는 것으로 간주돼요.
+            <Link href="/terms?document=terms" style={{ color: 'var(--blue700)' }}>서비스 이용약관</Link>과{' '}
+            <Link href="/terms?document=privacy" style={{ color: 'var(--blue700)' }}>개인정보 처리방침</Link>을 확인할 수 있어요.
           </p>
+          <div className="tm-auth-business-info">
+            <PublicBusinessInfo siteInfo={siteInfo} />
+          </div>
         </div>
       </div>
     </AuthFrame>

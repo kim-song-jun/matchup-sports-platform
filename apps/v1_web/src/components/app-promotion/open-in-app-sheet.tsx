@@ -5,11 +5,10 @@ import { usePathname } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { BottomSheet } from '@/components/v1-ui/bottom-sheet';
 import { BrandMark } from '@/components/v1-ui/brand-logo';
-import { IOS_APP_STORE_URL } from '@/lib/app-store-links';
+import { getMobileAppStoreUrl } from '@/lib/app-store-links';
 import { detectNativeShell } from '@/lib/native-bridge';
 import {
   isExcludedOpenInAppPath,
-  isIosMobileUserAgent,
   OPEN_IN_APP_DELAY_MS,
   OPEN_IN_APP_DISMISSED_KEY,
 } from './open-in-app-eligibility';
@@ -45,17 +44,20 @@ export function OpenInAppSheet() {
   const pathname = usePathname();
   const excluded = isExcludedOpenInAppPath(pathname);
   const [open, setOpen] = useState(false);
-  // 처음 열 때까지 BottomSheet 를 마운트하지 않는다 — 데스크톱·Android·셸에서는 시트(와 그 라우터 훅)가
+  const [storeUrl, setStoreUrl] = useState<string | null>(null);
+  // 처음 열 때까지 BottomSheet 를 마운트하지 않는다 — 데스크톱·셸에서는 시트(와 그 라우터 훅)가
   // 아예 렌더되지 않고, 한 번 열린 뒤에는 남겨 닫힘 애니메이션을 지킨다.
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     if (excluded) return;
     if (detectNativeShell() !== null) return;
-    if (!isIosMobileUserAgent(window.navigator.userAgent)) return;
+    const mobileStoreUrl = getMobileAppStoreUrl(window.navigator.userAgent);
+    if (!mobileStoreUrl) return;
     if (wasDismissed()) return;
     const timer = window.setTimeout(() => {
       if (wasDismissed()) return;
+      setStoreUrl(mobileStoreUrl);
       setMounted(true);
       setOpen(true);
     }, OPEN_IN_APP_DELAY_MS);
@@ -67,13 +69,13 @@ export function OpenInAppSheet() {
     setOpen(false);
   }, []);
 
-  // App Store 에서 돌아왔을 때 시트가 남아 있지 않게 닫되, 링크 이동이 시작된 다음 태스크에서 닫는다.
+  // 스토어에서 돌아왔을 때 시트가 남아 있지 않게 닫되, 링크 이동이 시작된 다음 태스크에서 닫는다.
   const openAppStore = useCallback(() => {
     recordDismissed();
     window.setTimeout(() => setOpen(false), 0);
   }, []);
 
-  if (!mounted) return null;
+  if (!mounted || !storeUrl) return null;
 
   return (
     <BottomSheet open={open} onClose={dismiss} ariaLabel="팀밋 앱으로 열기" initialFocus="sheet">
@@ -98,7 +100,7 @@ export function OpenInAppSheet() {
         ))}
       </ul>
       <a
-        href={IOS_APP_STORE_URL}
+        href={storeUrl}
         onClick={openAppStore}
         className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block"
       >

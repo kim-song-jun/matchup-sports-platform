@@ -1,0 +1,53 @@
+[
+  {
+    "width": 390,
+    "height": 844,
+    "metrics": {
+      "overflow": 0,
+      "dialog": {
+        "x": 0,
+        "y": 0,
+        "width": 390,
+        "height": 844
+      },
+      "selectors": 27
+    },
+    "errors": [],
+    "failures": [],
+    "mode": "headed synthetic component fixture; alpha not deployed or verified"
+  },
+  {
+    "width": 768,
+    "height": 1024,
+    "metrics": {
+      "overflow": 0,
+      "dialog": {
+        "x": 16,
+        "y": 51.203125,
+        "width": 736,
+        "height": 921.59375
+      },
+      "selectors": 27
+    },
+    "errors": [],
+    "failures": [],
+    "mode": "headed synthetic component fixture; alpha not deployed or verified"
+  },
+  {
+    "width": 1440,
+    "height": 1000,
+    "metrics": {
+      "overflow": 0,
+      "dialog": {
+        "x": 272,
+        "y": 50,
+        "width": 896,
+        "height": 900
+      },
+      "selectors": 27
+    },
+    "errors": [],
+    "failures": [],
+    "mode": "headed synthetic component fixture; alpha not deployed or verified"
+  }
+]

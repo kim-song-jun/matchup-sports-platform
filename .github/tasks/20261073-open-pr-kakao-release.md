@@ -13,6 +13,8 @@ The user authorized reviewing, repairing, and merging PRs #1837, #1843, and #184
 
 ## Acceptance criteria / exit proof
 
+- [x] Compact business disclosure: the user approved the recommended link treatment before implementation (2026-10-12).
+- [ ] Login exposes a compact, keyboard-accessible business-information link; its public destination shows the configured full details without authentication. Verify navigation/back behavior and layout at 390/768/1440px on deployed alpha.
 - [ ] Email signup keeps direct verification; Kakao-supplied contacts bypass duplicate OTP. Existing verified contact matches attach Kakao to the original user ID; conflicting members never merge.
 - [x] A real HTTP/DB integration test proves account/profile preservation and social profile completion with phone verification enforced and no SMS challenge.
 
@@ -28,6 +30,14 @@ The user authorized reviewing, repairing, and merging PRs #1837, #1843, and #184
 - [ ] If gates pass, promote the verified revision, approve the authorized production deployment, verify served SHA/release and affected production flows, and close owned browser/process resources.
 
 ## Progress snapshot
+
+### 2026-10-12 compact business-information follow-up
+
+- The user requested less prominent business information and explicitly approved the recommended treatment: replace the login details block with a `사업자 정보` link to `/landing#business-info`. Keep the full existing public footer and policy links available. This approval supersedes presenting further layout alternatives for this bounded change.
+- Luna owns the narrow web component/consumer/CSS/test changes; root owns integration, deployed QA and this status document. Existing bracket work in the shared root checkout is out of scope and remains untouched.
+- Read-only native inspection confirms Android and iOS permit navigation within the configured HTTPS origin, including paths and fragments. Their content comes from the deployed web application, so this link change needs no native binary release. Physical-device Kakao return/cancel verification is a separate outstanding release gate.
+- The prior final receipt records #1860 merged as `769ca9d81`, exact CI and alpha success, business review approved, and the five additional required personal scopes resubmitted with status pending. Main #1851 remains draft until its existing authentication/configuration and release-preparation gates pass. This small UI change does not waive those gates.
+- Focused auth-exit/view/site-info tests passed 45/45, and web lint/typecheck passed. Independent Sol review found one ineffective absence assertion that referenced a deleted fixture; it now asserts that the full business-information region is absent while the navigation link remains. The revised five auth-view tests passed. Deployed alpha navigation and three-width screenshots remain pending.
 
 ### 2026-10-12 required-consent alpha release and real account flows
 

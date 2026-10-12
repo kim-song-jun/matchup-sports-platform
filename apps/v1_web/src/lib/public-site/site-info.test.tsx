@@ -33,10 +33,20 @@ describe('사업자 정보 블록', () => {
     });
     render(<PublicBusinessInfo siteInfo={info} />);
     const block = screen.getByRole('region', { name: '사업자 정보' });
+    expect(block).toHaveAttribute('id', 'business-info');
     const labels = within(block).getAllByRole('term').map((node) => node.textContent);
     expect(labels).toEqual(['상호', '통신판매업 신고번호', '이메일']);
     expect(block.textContent).not.toMatch(/대표자|사업자등록번호|사업장 주소/);
     expect(within(block).getByRole('link', { name: 'help@example.com' })).toHaveAttribute('href', 'mailto:help@example.com');
+  });
+
+  it('공개 footer의 앵커에 사업자 정보를 그대로 제공한다', () => {
+    const info = normalizeSiteInfo({ companyName: '가상 회사', representativeName: '홍길동' });
+    render(<PublicBusinessInfo siteInfo={info} />);
+    const block = screen.getByRole('region', { name: '사업자 정보' });
+    expect(block).toHaveAttribute('id', 'business-info');
+    expect(block).toHaveTextContent('가상 회사');
+    expect(block).toHaveTextContent('홍길동');
   });
 
   it('어드민 값이 비면 저장소에 공개된 상호·이메일만 남는다', () => {

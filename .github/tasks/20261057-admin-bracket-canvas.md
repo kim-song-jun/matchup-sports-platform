@@ -125,7 +125,8 @@ A안은 데스크톱 큰 팝업, 모바일 전체 높이 다이얼로그로 한�
 - API: 범위 단위 최초 105개 통과, narrowing 수정 후 서비스/선정 7개 재검증 통과(선정 4개는 중복). API 타입 검사 및 surface 검사 통과.
 - Web 타입 검사: 변경 파일 오류 없음, 선재 `use-v1-api.leave-team.test.tsx:42,65`의 mutate 무인자 호출 오류 2개로 전체 타입 검사는 실패. 이번 범위에서 관련 없는 테스트는 변경하지 않았다. Web 패턴 검사 통과.
 - 2026-10-12 Alpha 배포 요청: 최신 dev 37a06cea0과 동일 base 확인. 로컬 TanStack 5.91→lockfile 5.102.8 일치 후 기존 leave-team 타입 오류 2개가 사라졌다. 신규 테스트 role query의 지원하지 않는 exact 옵션을 앵커 정규식으로 수정했다. 수정 후 Web 전체 타입 검사 0, 배포 전 신규 HTTP/선정 회귀 재확인 및 dev PR 진행.
-- 미실행: Alpha 로그인 후 실제 관리자/공개 화면 QA **0/3 폭**, 실제 대회 데이터 편성, commit/push/deploy. 현재 테스트 증거는 dirty tree 기준이며 PR-ready 판정이 아니다.
+- 배포 진행: 구현 커밋 `332fa2efb`를 push하고 dev 대상 [PR #1855](https://github.com/kim-song-jun/matchup-sports-platform/pull/1855)를 생성했다. 웹/Gates CI 통과, API 전체 통합 1,167개 중 정규 리그 무작위 배정 2개 실패를 확인했다. `regular_league`에도 group_knockout format이 저장될 수 있으므로 조별 ENTRY 제한은 대회 kind에만 적용하도록 수정했다. 최신 dev `7570bd809`를 기능 브랜치에 merge했다. 새 임시 DB에 전체 migration + CI competition-config backfill을 적용하고 기존 리그 11 + 신규 12강 3 = **14/14 통과**(108.906초). 첫 로컬 재검증은 기존 임시 DB 데이터·미완료 초기화 때문에 실패해 새 DB로 교정했으며 통과 증거로 계산하지 않는다. CI 재확인 중이고 Copilot 요청 2회에도 리뷰는 아직 0건이다.
+- 미실행: Alpha 로그인 후 실제 관리자/공개 화면 QA **0/3 폭**, 실제 대회 데이터 편성, dev 병합 및 해당 기능 Alpha 배포. 기존 Alpha 배포 성공은 이 기능 반영의 근거가 아니다.
 - 브라우저: 초기 libnspr4/libnss3/libasound2 누락을 /tmp 추출 라이브러리로 해결했다(시스템 설치 없음). headed 합성 컴포넌트 **390/768/1440 3/3 PASS**, 각 폭 템플릿·팝업 상단·배정 하단 3장, 가로 overflow0·JS/console/network 오류0. 본문 스크롤과 저장 버튼 영역 분리, desktop 비교표 3열 확인. 실제 Alpha에서는 로그인 이동/auth/me401 확인, 기능 검증은 0/3이다. 변경 전 기능 화면은 인증 없어서 확보하지 못했다. 브라우저 트리는 모두 종료했고 임시 PostgreSQL도 `pg_ctl stop -m fast`로 종료했다.
 - 결정은 `docs/design/competition-canonical-flow.md` §6에 반영했다. API README/global/domain 및 변경 기록을 함께 갱신했다.
 

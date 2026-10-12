@@ -300,7 +300,9 @@ export class TournamentSlotService {
       // 잠금 안에서 다시 읽는다 — 화면이 본 빈 자리가 아니라 지금의 빈 자리·미배치 팀이 기준이다.
       const slotRows = await tx.v1TournamentSlot.findMany({
         where: { tournamentId: competition.id, kind: { in: ['ENTRY', 'BYE'] },
-          ...(competition.format === 'group_knockout' ? { kind: 'ENTRY' as const, group: { is: { phase: 'group' as const } } } : {}),
+          ...(competition.kind !== 'regular_league' && competition.format === 'group_knockout'
+            ? { kind: 'ENTRY' as const, group: { is: { phase: 'group' as const } } }
+            : {}),
         },
         select: { id: true, registrationId: true },
         orderBy: { id: 'asc' },

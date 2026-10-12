@@ -65,7 +65,8 @@ export function LoginPageView({ model }: { model: LoginViewModel }) {
             <Link href="/terms?document=terms" style={{ color: 'var(--blue700)' }}>서비스 이용약관</Link>과{' '}
             <Link href="/terms?document=privacy" style={{ color: 'var(--blue700)' }}>개인정보 처리방침</Link>을 확인할 수 있어요.
           </p>
-          <Link className="tm-auth-business-link" href="/landing#business-info">사업자 정보</Link>
+          {/* 새로고침·뒤로가기 뒤에도 fragment를 정확히 유지하도록 문서 이동을 사용한다. */}
+          <a className="tm-auth-business-link" href="/landing#business-info">사업자 정보</a>
         </div>
       </div>
     </AuthFrame>

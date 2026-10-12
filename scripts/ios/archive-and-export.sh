@@ -47,8 +47,6 @@ esac
 CONFIGURATION="${TEAMEET_ARCHIVE_CONFIGURATION:-$SCHEME_CONFIGURATION}"
 OUTPUT="${TEAMEET_ARCHIVE_OUTPUT:-${TMPDIR:-/tmp}/teameet-ios-archive}"
 UPLOAD=false
-TEAM_ID="${TEAMEET_TEAM_ID:-U9J95Q6XD3}"
-SIGNING_IDENTITY="${TEAMEET_SIGNING_IDENTITY:-Apple Distribution}"
 PROFILE_NAME="${TEAMEET_PROFILE_NAME:-$SCHEME_PROFILE}"
 
 # Configuration and profile identify the signed app just as strongly as the scheme. They are
@@ -89,7 +87,10 @@ bash "$REPO_ROOT/scripts/release/generate-ios-secrets-xcconfig.sh"
 ( cd "$IOS_DIR" && xcodegen generate >/dev/null )
 
 # --- archive -----------------------------------------------------------------------------
-# Manual signing, deliberately. Automatic signing (`-allowProvisioningUpdates`) does not work
+# Manual signing is configured on the app target in `project.yml`, deliberately. Passing the
+# provisioning profile as an xcodebuild command-line override makes it global to the build graph,
+# including Swift Package targets that reject provisioning profiles. Automatic signing
+# (`-allowProvisioningUpdates`) does not work
 # for this project and the reason is not obvious: Xcode's archive action always asks for a
 # *development* profile, and Apple refuses to issue one to a team with no registered devices —
 # "Your team has no devices from which to generate a provisioning profile". Nobody here has an
@@ -110,11 +111,7 @@ xcodebuild archive \
   -scheme "$SCHEME" \
   -configuration "$CONFIGURATION" \
   -destination 'generic/platform=iOS' \
-  -archivePath "$ARCHIVE" \
-  CODE_SIGN_STYLE=Manual \
-  DEVELOPMENT_TEAM="$TEAM_ID" \
-  CODE_SIGN_IDENTITY="$SIGNING_IDENTITY" \
-  PROVISIONING_PROFILE_SPECIFIER="$PROFILE_NAME"
+  -archivePath "$ARCHIVE"
 
 # --- export ------------------------------------------------------------------------------
 echo "[archive] exporting with $(basename "$IOS_DIR")/ExportOptions.plist"

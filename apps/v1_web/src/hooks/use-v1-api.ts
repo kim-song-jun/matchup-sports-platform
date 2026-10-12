@@ -1725,7 +1725,7 @@ export function useV1MySchedule(filters?: ListFilters, options?: { enabled?: boo
 
 export function useV1TeamMatches(
   filters?: ListFilters,
-  options?: QueryOptions & { seed?: CursorPage<V1TeamMatch>; refetchInterval?: number | false },
+  options?: QueryOptions & { seed?: CursorPage<V1TeamMatch>; refetchInterval?: number | false; refetchOnWindowFocus?: boolean | 'always' },
 ) {
   const seed = options?.seed;
   return useQuery({
@@ -1733,6 +1733,7 @@ export function useV1TeamMatches(
     queryFn: () => v1Get<CursorPage<V1TeamMatch>>('/team-matches', filters),
     // 홈 추천처럼 한 장만 보여 주는 곳은 끈다 — 모든 방문자가 15초마다 목록을 다시 받을 이유가 없다.
     refetchInterval: options?.refetchInterval ?? 15000,
+    refetchOnWindowFocus: options?.refetchOnWindowFocus ?? false,
     enabled: options?.enabled,
     // useV1Matches와 동일한 이유 — cursor로 쿼리키가 바뀌는 "더 보기" 중 목록이 비지 않게 하고,
     // 첫 진입에만 서버 seed 를 쓴다.
@@ -1740,13 +1741,18 @@ export function useV1TeamMatches(
   });
 }
 
-export function useV1TeamMatch(teamMatchId: string, options?: { seed?: V1TeamMatch | null }) {
+export function useV1TeamMatch(
+  teamMatchId: string,
+  options?: { seed?: V1TeamMatch | null; refetchInterval?: number | false; refetchOnWindowFocus?: boolean | 'always' },
+) {
   const queryClient = useQueryClient();
   const seed = options?.seed;
   return useQuery({
     queryKey: v1Keys.teamMatch(teamMatchId),
     queryFn: () => v1Get<V1TeamMatch>(`/team-matches/${teamMatchId}`),
     enabled: Boolean(teamMatchId),
+    refetchInterval: options?.refetchInterval ?? false,
+    refetchOnWindowFocus: options?.refetchOnWindowFocus ?? false,
     // useV1Match 와 같은 이유·같은 안전장치(뷰어 상태·신청 목록 제거) — 자세한 근거는 그쪽 주석.
     placeholderData: () => {
       const source =

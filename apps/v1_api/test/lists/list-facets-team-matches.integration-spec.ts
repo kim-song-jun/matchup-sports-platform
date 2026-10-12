@@ -3,6 +3,7 @@ import type { INestApplication } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 import request = require('supertest');
 import { PrismaService } from '../../src/prisma/prisma.service';
+import { ManagedTermsRuntimeService } from '../../src/terms/managed-terms-runtime.service';
 import { createV1IntegrationApp } from '../integration/integration-app';
 import { KST_TODAY_FIXTURE_TIMEOUT_MS, startAtLaterTodayKst } from './kst-today-fixture';
 
@@ -21,7 +22,7 @@ describe('팀 매치 목록 totalCount·facets HTTP/DB 계약', () => {
   const list = async (params: Record<string, string | number | boolean> = {}) => {
     const response = await request(app.getHttpServer()).get('/api/v1/team-matches').query({ regionId, limit: 50, includeFacets: true, ...params }).expect(200);
     return response.body.data as {
-      items: Array<{ teamMatchId: string }>;
+      items: Array<{ teamMatchId: string; status: string; displayState: string }>;
       pageInfo: { totalCount?: number; nextCursor: string | null };
       facets?: { sports: Array<{ sportId: string; count: number }>; today: number; recruiting: number };
     };
@@ -35,6 +36,12 @@ describe('팀 매치 목록 totalCount·facets HTTP/DB 계약', () => {
     ({ app, cleanup } = await createV1IntegrationApp());
     db = app.get(PrismaService);
     await db.v1User.create({ data: { id: host, email: `${host}@integration.test`, accountStatus: 'active', onboardingStatus: 'completed' } });
+    const termsService = app.get(ManagedTermsRuntimeService);
+    const currentSignupTerms = await termsService.currentSignupTerms();
+    const requiredDocumentIds = currentSignupTerms.items
+      .filter((item) => item.requirement === 'required')
+      .map((item) => item.documentId);
+    await termsService.acceptSignupTerms(host, requiredDocumentIds);
     sportA = (await db.v1Sport.create({ data: { code: `facet-a-${host}`, name: '풋살' } })).id;
     sportB = (await db.v1Sport.create({ data: { code: `facet-b-${host}`, name: '러닝' } })).id;
     regionId = (await db.v1Region.create({ data: { code: `facet-${host}`, name: '건수 지역', level: 2 } })).id;
@@ -58,6 +65,7 @@ describe('팀 매치 목록 totalCount·facets HTTP/DB 계약', () => {
   afterAll(async () => {
     await db.v1TeamMatch.deleteMany({ where: { createdByUserId: host } });
     await db.v1Team.delete({ where: { id: teamId } });
+    await db.v1ManagedTermsConsentEvent.deleteMany({ where: { userId: host } });
     await db.v1User.delete({ where: { id: host } });
     await db.v1Region.delete({ where: { id: regionId } });
     await db.v1Sport.deleteMany({ where: { id: { in: [sportA, sportB] } } });
@@ -133,5 +141,95 @@ describe('팀 매치 목록 totalCount·facets HTTP/DB 계약', () => {
 
   it('잘못된 토글 값은 400 이다', async () => {
     await request(app.getHttpServer()).get('/api/v1/team-matches').query({ today: 'yes' }).expect(400);
+  });
+
+  it('deadlineAt 만료는 검색·closed 필터에 포함되고 recruiting 필터에서는 제외된다', async () => {
+    const futureMatchId = randomUUID();
+    const startedMatchId = randomUUID();
+    const title = `마감 자동 처리 ${futureMatchId}`;
+    const exactCutoff = new Date();
+    await db.v1TeamMatch.createMany({
+      data: [
+        row(sportA, {
+          id: futureMatchId,
+          title,
+          status: 'recruiting',
+          deadlineAt: exactCutoff,
+          startAt: new Date(Date.now() + DAY),
+        }),
+        row(sportA, {
+          id: startedMatchId,
+          title,
+          status: 'recruiting',
+          deadlineAt: new Date(exactCutoff.getTime() - DAY),
+          startAt: new Date(exactCutoff.getTime() - 1000),
+        }),
+      ],
+    });
+
+    try {
+      const closed = await list({ status: 'closed', query: title, includeFacets: false });
+      expect(closed.items).toEqual(expect.arrayContaining([
+        expect.objectContaining({ teamMatchId: futureMatchId, status: 'closed', displayState: 'closed' }),
+        expect.objectContaining({ teamMatchId: startedMatchId, status: 'closed', displayState: 'closed' }),
+      ]));
+
+      const recruiting = await list({ status: 'recruiting', query: title, includeFacets: false });
+      expect(recruiting.items).toEqual([]);
+      const available = await list({ recruitingOnly: true, query: title, includeFacets: false });
+      expect(available.items).toEqual([]);
+      const recommended = await list({ sort: 'recommended', query: title, includeFacets: false });
+      expect(recommended.items).toEqual([]);
+
+      for (const id of [futureMatchId, startedMatchId]) {
+        const detail = await request(app.getHttpServer()).get(`/api/v1/team-matches/${id}`).expect(200);
+        expect(detail.body.data).toEqual(expect.objectContaining({ status: 'closed', displayState: 'closed' }));
+      }
+    } finally {
+      await db.v1TeamMatch.deleteMany({ where: { id: { in: [futureMatchId, startedMatchId] } } });
+    }
+  });
+
+  it('GET /me/team-matches의 closed/recruiting 필터는 만료 deadline의 파생 상태와 일치한다', async () => {
+    const expiredTitle = `내 팀매치 만료 ${host}`;
+    const activeTitle = `내 팀매치 모집 ${host}`;
+    const manuallyClosedTitle = `내 팀매치 수동 마감 ${host}`;
+    const cancelledTitle = `내 팀매치 취소 ${host}`;
+    const matchedTitle = `내 팀매치 상대 확정 ${host}`;
+    await db.v1TeamMatch.createMany({
+      data: [
+        row(sportA, { title: expiredTitle, deadlineAt: new Date(Date.now() - 60_000) }),
+        row(sportA, { title: activeTitle, deadlineAt: new Date(Date.now() + DAY) }),
+        row(sportA, { title: manuallyClosedTitle, status: 'closed', deadlineAt: new Date(Date.now() + DAY) }),
+        row(sportA, { title: cancelledTitle, status: 'cancelled', deadlineAt: new Date(Date.now() + DAY) }),
+        row(sportA, { title: matchedTitle, status: 'matched', approvedApplicantTeamId: teamId, deadlineAt: new Date(Date.now() + DAY) }),
+      ],
+    });
+
+    try {
+      const readMine = async (status: 'closed' | 'recruiting') => request(app.getHttpServer())
+        .get('/api/v1/me/team-matches')
+        .set('x-v1-user-id', host)
+        .query({ scope: 'created', status, limit: 50 })
+        .expect(200);
+      const [closed, recruiting] = await Promise.all([readMine('closed'), readMine('recruiting')]);
+      const ourItems = (response: request.Response) => response.body.data.items.filter(
+        (item: { title: string }) => [expiredTitle, activeTitle, manuallyClosedTitle, cancelledTitle, matchedTitle].includes(item.title),
+      );
+      expect(ourItems(closed)).toEqual(expect.arrayContaining([
+        expect.objectContaining({ title: expiredTitle, status: 'closed', displayState: 'closed' }),
+        expect.objectContaining({ title: manuallyClosedTitle, status: 'closed' }),
+      ]));
+      expect(ourItems(closed)).toHaveLength(2);
+      expect(ourItems(recruiting)).toEqual([expect.objectContaining({ title: activeTitle, status: 'recruiting' })]);
+      expect(ourItems(recruiting)).not.toEqual(expect.arrayContaining([
+        expect.objectContaining({ title: manuallyClosedTitle }),
+        expect.objectContaining({ title: cancelledTitle }),
+        expect.objectContaining({ title: matchedTitle }),
+      ]));
+      expect(ourItems(closed)).not.toEqual(expect.arrayContaining([expect.objectContaining({ title: matchedTitle })]));
+    } finally {
+      await db.v1TeamMatch.deleteMany({ where: { createdByUserId: host, title: { in: [expiredTitle, activeTitle, manuallyClosedTitle, cancelledTitle, matchedTitle] } } });
+    }
   });
 });

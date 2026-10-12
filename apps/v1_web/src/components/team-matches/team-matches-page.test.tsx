@@ -2028,6 +2028,25 @@ describe('TeamMatchDetailPageView — 매칭 뒤 진행 카드와 ⋯ 메뉴 (H6
     expect(within(menu).getByRole('button', { name: /팀매치 취소/ })).toHaveTextContent('취소하면 합정 유나이티드에 알림이 가요.');
   });
 
+  it('자동 마감 상태는 하단에 신청 마감을 알리고, 관리 메뉴의 수정 링크는 유지한다', async () => {
+    const model = getTeamMatchDetailViewModel('mine');
+    model.applyLabel = '신청 마감';
+    model.nextAction = undefined;
+    model.manageMenu = { edit: { href: '/team-matches/team-match-1/edit' }, history: [] };
+    model.hostActions = [];
+
+    renderPage(<TeamMatchDetailPageView model={model} />);
+
+    const closedCtas = screen.getAllByRole('button', { name: '신청 마감' });
+    expect(closedCtas.length).toBeGreaterThan(0);
+    for (const cta of closedCtas) expect(cta).toBeDisabled();
+    expect(screen.queryByRole('button', { name: '매치 수정' })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getAllByRole('button', { name: '매치 관리 메뉴' })[0]);
+    const menu = await screen.findByRole('dialog', { name: '매치 관리' });
+    expect(within(menu).getByRole('link', { name: /정보 수정/ })).toHaveAttribute('href', '/team-matches/team-match-1/edit');
+  });
+
   it('⋯ 메뉴 — 모집 중이면 정보 수정이 링크이고, 신청 기록이 없으면 그 행이 없다', async () => {
     const model = getTeamMatchDetailViewModel('mine');
     model.match.apiStatus = 'recruiting';
@@ -2040,6 +2059,40 @@ describe('TeamMatchDetailPageView — 매칭 뒤 진행 카드와 ⋯ 메뉴 (H6
     expect(within(menu).getByRole('link', { name: /정보 수정/ })).toHaveAttribute('href', '/team-matches/team-match-1/edit');
     expect(within(menu).queryByRole('button', { name: /신청 기록/ })).not.toBeInTheDocument();
     expect(within(menu).getByRole('button', { name: /모집 마감/ })).toHaveTextContent('대기 중인 신청 2팀이 종료돼요.');
+  });
+
+  it('자동 마감된 매치의 대기 신청 종료는 정확한 확인 뒤에만 실행되고 모집 재개 CTA는 없다', async () => {
+    const closePendingApplications = vi.fn();
+    const model = getTeamMatchDetailViewModel('mine');
+    model.manageMenu = { edit: { href: '/team-matches/team-match-1/edit' }, history: [] };
+    model.hostActions = [{
+      label: '대기 신청 종료',
+      description: '대기 중인 신청 2팀이 종료돼요.',
+      tone: 'neutral',
+      confirm: {
+        title: '대기 신청을 종료할까요?',
+        message: '대기 중인 신청 2팀이 종료되고 알림이 가요.',
+        confirmLabel: '대기 신청 종료',
+        cancelLabel: '닫기',
+        tone: 'default',
+      },
+      onClick: closePendingApplications,
+    }];
+
+    renderPage(<TeamMatchDetailPageView model={model} />);
+
+    expect(screen.queryByRole('button', { name: '모집 재개' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getAllByRole('button', { name: '매치 관리 메뉴' })[0]);
+    const menu = await screen.findByRole('dialog', { name: '매치 관리' });
+    expect(within(menu).getByRole('link', { name: /정보 수정/ })).toHaveAttribute('href', '/team-matches/team-match-1/edit');
+    fireEvent.click(within(menu).getByRole('button', { name: /대기 신청 종료/ }));
+
+    const confirm = await screen.findByRole('dialog', { name: '대기 신청을 종료할까요?' });
+    expect(confirm).toHaveTextContent('대기 중인 신청 2팀이 종료되고 알림이 가요.');
+    expect(closePendingApplications).not.toHaveBeenCalled();
+    fireEvent.click(within(confirm).getByRole('button', { name: '대기 신청 종료' }));
+
+    await waitFor(() => expect(closePendingApplications).toHaveBeenCalledTimes(1));
   });
 
   it('상대가 확정된 참가팀(신청 팀 쪽)도 같은 자리에서 진행 상황을 본다 — 호스트용 잠금 안내는 없다', () => {

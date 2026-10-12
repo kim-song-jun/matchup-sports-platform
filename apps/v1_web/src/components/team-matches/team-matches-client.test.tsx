@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { trackEvent } from '@/lib/analytics';
+import { v1Keys } from '@/lib/query-keys';
 import type { V1TeamMatch, V1TeamMatchViewerState } from '@/types/api';
 import type { TeamMatchDetailViewModel, TeamMatchListViewModel, TeamMatchModel } from './team-matches.types';
 import { TeamMatchDetailPageClient, TeamMatchListPageClient } from './team-matches-client';
@@ -143,6 +144,7 @@ vi.mock('./team-matches-page', () => ({
   TeamMatchListPageView: ({ model }: { model: TeamMatchListViewModel }) => (
     <div>
       <span data-testid={'team-match-order'}>{model.matches.map((match) => match.title).join('|')}</span>
+      <span data-testid="team-match-states">{model.matches.map((match) => match.status).join('|')}</span>
       <span data-testid="team-match-count">{model.matches.length}</span>
       <span data-testid="team-match-sport-counts">{model.sports.map((sport) => `${sport.label}:${sport.count}`).join('|')}</span>
       {model.hasNext && model.onLoadMore ? <button onClick={model.onLoadMore}>더 보기</button> : null}
@@ -1287,6 +1289,13 @@ describe('TeamMatchDetailPageClient — 리그 대진은 "팀매치 취소"를 �
         startsAt: '2026-08-01T10:00:00.000Z',
         status,
         displayState: status,
+        lifecycle: {
+          canEdit: false,
+          canDelete: false,
+          onHoldReason: null,
+          canCloseRecruitment: status === 'recruiting',
+          canReopenRecruitment: status === 'closed',
+        },
         viewer: { state: 'host_team', manageableHostTeam: true },
         hostTeam: { teamId: 'team-host', name: '알파팀' },
         approvedOpponentTeam: opponent,
@@ -1501,6 +1510,183 @@ describe('TeamMatchListPageClient — 커서 페이지네이션 누적', () => {
     expect(screen.queryByRole('button', { name: '더 보기' })).not.toBeInTheDocument();
   });
 
+  it('이미 불러온 페이지도 마감 상태로 새로고침되어 누적 카드가 오래된 모집 중 상태로 남지 않는다', async () => {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const expiredItem = {
+      id: 'tm-expired-page-1',
+      teamMatchId: 'tm-expired-page-1',
+      title: '이전 페이지 만료 경기',
+      sportName: '풋살',
+      startsAt: '2026-09-01T10:00:00.000Z',
+      status: 'recruiting' as const,
+    };
+    const refreshedPage = {
+      items: [{ ...expiredItem, status: 'closed' as const, displayState: 'closed' as const }],
+      nextCursor: null,
+      pageInfo: { nextCursor: null, hasNext: false },
+    };
+    client.setQueryDefaults(v1Keys.teamMatchesAll(), {
+      queryFn: async ({ queryKey }) => {
+        const filters = queryKey[2] as { cursor?: string };
+        return filters.cursor ? { items: [], nextCursor: null, pageInfo: { nextCursor: null, hasNext: false } } : refreshedPage;
+      },
+    });
+    client.setQueryData(v1Keys.teamMatches({}), {
+      items: [expiredItem],
+      nextCursor: 'cursor-page-2',
+      pageInfo: { nextCursor: 'cursor-page-2', hasNext: true },
+    });
+    client.setQueryData(v1Keys.teamMatches({ cursor: 'cursor-page-2' }), {
+      items: [{ id: 'tm-page-2', teamMatchId: 'tm-page-2', title: '두 번째 페이지', sportName: '풋살', startsAt: '2026-09-01T10:00:00.000Z', status: 'recruiting' }],
+      nextCursor: null,
+      pageInfo: { nextCursor: null, hasNext: false },
+    });
+    client.setQueryData([...v1Keys.teamMatchesAll(), 'pagination', ''], {
+      cursor: 'cursor-page-2',
+      accumulated: [expiredItem],
+    });
+    useV1TeamMatchesMock.mockImplementation((filters?: { cursor?: string }) => ({
+      ...page([{ id: 'tm-page-2', title: '두 번째 페이지' }], null),
+      dataUpdatedAt: 1,
+      isSuccess: true,
+      isPlaceholderData: false,
+    }));
+
+    renderTestingLibrary(<TeamMatchListPageClient />, {
+      wrapper: ({ children }) => <QueryClientProvider client={client}>{children}</QueryClientProvider>,
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId('team-match-states').textContent?.startsWith('closed')).toBe(true);
+    });
+  });
+
+  it('추천순에서 첫 페이지의 다음 커서가 사라져도 로드했던 페이지를 재조회해 실패는 보존하고 다음 성공에서 제거한다', async () => {
+    searchParamsRef.current = new URLSearchParams('sort=recommended');
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const expiredItem = {
+      id: 'tm-expired-recommended',
+      teamMatchId: 'tm-expired-recommended',
+      title: '추천순 만료 경기',
+      sportName: '풋살',
+      startsAt: '2026-09-01T10:00:00.000Z',
+      status: 'recruiting' as const,
+    };
+    const failedRefreshItem = {
+      id: 'tm-failed-refresh-page',
+      teamMatchId: 'tm-failed-refresh-page',
+      title: '새로고침 실패 페이지 경기',
+      sportName: '풋살',
+      startsAt: '2026-09-01T10:00:00.000Z',
+      status: 'recruiting' as const,
+    };
+    let failPageTwo = true;
+    const pageTwoRequests: Array<{ cursor?: string; outcome: 'rejected' | 'resolved' }> = [];
+    client.setQueryDefaults(v1Keys.teamMatchesAll(), {
+      queryFn: async ({ queryKey }) => {
+        const filters = queryKey[2] as { cursor?: string };
+        if (filters.cursor === 'cursor-page-2') {
+          const outcome = failPageTwo ? 'rejected' : 'resolved';
+          pageTwoRequests.push({ cursor: filters.cursor, outcome });
+          if (failPageTwo) throw new Error('temporary previous-page refresh failure');
+        }
+        return { items: [], nextCursor: null, pageInfo: { nextCursor: null, hasNext: false } };
+      },
+    });
+    client.setQueryData(v1Keys.teamMatches({ sort: 'recommended' }), {
+      items: [expiredItem],
+      nextCursor: 'cursor-page-2',
+      pageInfo: { nextCursor: 'cursor-page-2', hasNext: true },
+    });
+    client.setQueryData(v1Keys.teamMatches({ sort: 'recommended', cursor: 'cursor-page-2' }), {
+      items: [failedRefreshItem],
+      nextCursor: 'cursor-page-3',
+      pageInfo: { nextCursor: 'cursor-page-3', hasNext: true },
+    });
+    client.setQueryData(v1Keys.teamMatches({ sort: 'recommended', cursor: 'cursor-page-3' }), {
+      items: [{ id: 'tm-current-recommended', teamMatchId: 'tm-current-recommended', title: '현재 추천 경기', sportName: '풋살', startsAt: '2026-09-01T10:00:00.000Z', status: 'recruiting' }],
+      nextCursor: null,
+      pageInfo: { nextCursor: null, hasNext: false },
+    });
+    client.setQueryData([...v1Keys.teamMatchesAll(), 'pagination', '{"sort":"recommended"}'], {
+      cursor: 'cursor-page-3',
+      accumulated: [expiredItem, failedRefreshItem],
+    });
+    client.setQueryData([...v1Keys.teamMatchesAll(), 'pagination', '{"sort":"recommended"}', 'loaded-page-cursors'], ['cursor-page-2']);
+    const currentPageResponse = page([{ id: 'tm-current-recommended', title: '현재 추천 경기' }], null);
+    let currentPageDataUpdatedAt = 1;
+    useV1TeamMatchesMock.mockImplementation((filters?: { cursor?: string }) => ({
+      ...currentPageResponse,
+      dataUpdatedAt: currentPageDataUpdatedAt,
+      isSuccess: true,
+      isPlaceholderData: false,
+    }));
+
+    const { rerender } = renderTestingLibrary(<TeamMatchListPageClient />, {
+      wrapper: ({ children }) => <QueryClientProvider client={client}>{children}</QueryClientProvider>,
+    });
+
+    await waitFor(() => expect(screen.getByTestId('team-match-order')).toHaveTextContent('현재 추천 경기'));
+    await waitFor(() => expect(pageTwoRequests).toContainEqual({ cursor: 'cursor-page-2', outcome: 'rejected' }));
+    expect(screen.getByTestId('team-match-order')).not.toHaveTextContent('추천순 만료 경기');
+    expect(screen.getByTestId('team-match-order')).toHaveTextContent('새로고침 실패 페이지 경기');
+    expect(screen.getByTestId('team-match-count')).toHaveTextContent('2');
+
+    const failedPageTwoRequestCount = pageTwoRequests.length;
+    rerender(<TeamMatchListPageClient />);
+    expect(pageTwoRequests).toHaveLength(failedPageTwoRequestCount);
+    failPageTwo = false;
+    currentPageDataUpdatedAt += 1;
+    rerender(<TeamMatchListPageClient />);
+    await waitFor(() => expect(pageTwoRequests.slice(failedPageTwoRequestCount)).toContainEqual({ cursor: 'cursor-page-2', outcome: 'resolved' }));
+    await waitFor(() => expect(screen.getByTestId('team-match-order')).not.toHaveTextContent('새로고침 실패 페이지 경기'));
+    expect(screen.getByTestId('team-match-order')).toHaveTextContent('현재 추천 경기');
+  });
+
+  it('성공 갱신에서 다른 이전 페이지로 이동한 카드도 기존 누적 순서로 유지한다', async () => {
+    searchParamsRef.current = new URLSearchParams('sort=recommended');
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const removedItem = { id: 'tm-removed-from-loaded-pages', teamMatchId: 'tm-removed-from-loaded-pages', title: '사라진 카드', sportName: '풋살', startsAt: '2026-09-01T10:00:00.000Z', status: 'recruiting' as const };
+    const movedItem = { id: 'tm-moved-between-pages', teamMatchId: 'tm-moved-between-pages', title: '이동 카드 이전 응답', sportName: '풋살', startsAt: '2026-09-01T10:00:00.000Z', status: 'recruiting' as const };
+    const pageTwoB = { id: 'tm-page-two-b', teamMatchId: 'tm-page-two-b', title: '페이지2 B', sportName: '풋살', startsAt: '2026-09-01T10:00:00.000Z', status: 'recruiting' as const };
+    const pageTwoD = { id: 'tm-page-two-d', teamMatchId: 'tm-page-two-d', title: '페이지2 D', sportName: '풋살', startsAt: '2026-09-01T10:00:00.000Z', status: 'recruiting' as const };
+    const movedItemRefreshed = { ...movedItem, title: '이동 카드 최신 응답', status: 'closed' as const, displayState: 'closed' as const };
+    client.setQueryDefaults(v1Keys.teamMatchesAll(), {
+      queryFn: async ({ queryKey }) => {
+        const filters = queryKey[2] as { cursor?: string };
+        if (filters.cursor === 'cursor-page-2') {
+          return { items: [pageTwoD, movedItemRefreshed, pageTwoB], nextCursor: null, pageInfo: { nextCursor: null, hasNext: false } };
+        }
+        return { items: [], nextCursor: null, pageInfo: { nextCursor: null, hasNext: false } };
+      },
+    });
+    client.setQueryData(v1Keys.teamMatches({ sort: 'recommended' }), {
+      items: [movedItem, removedItem], nextCursor: 'cursor-page-2', pageInfo: { nextCursor: 'cursor-page-2', hasNext: true },
+    });
+    client.setQueryData(v1Keys.teamMatches({ sort: 'recommended', cursor: 'cursor-page-2' }), {
+      items: [pageTwoB, pageTwoD], nextCursor: 'cursor-page-3', pageInfo: { nextCursor: 'cursor-page-3', hasNext: true },
+    });
+    client.setQueryData(v1Keys.teamMatches({ sort: 'recommended', cursor: 'cursor-page-3' }), {
+      items: [{ id: 'tm-current-moved', teamMatchId: 'tm-current-moved', title: '현재 추천 경기', sportName: '풋살', startsAt: '2026-09-01T10:00:00.000Z', status: 'recruiting' }],
+      nextCursor: null, pageInfo: { nextCursor: null, hasNext: false },
+    });
+    client.setQueryData([...v1Keys.teamMatchesAll(), 'pagination', '{"sort":"recommended"}'], {
+      cursor: 'cursor-page-3', accumulated: [removedItem, movedItem, pageTwoB, pageTwoD],
+    });
+    client.setQueryData([...v1Keys.teamMatchesAll(), 'pagination', '{"sort":"recommended"}', 'loaded-page-cursors'], ['cursor-page-2']);
+    useV1TeamMatchesMock.mockImplementation(() => ({
+      ...page([{ id: 'tm-current-moved', title: '현재 추천 경기' }], null), dataUpdatedAt: 1, isSuccess: true, isPlaceholderData: false,
+    }));
+
+    renderTestingLibrary(<TeamMatchListPageClient />, {
+      wrapper: ({ children }) => <QueryClientProvider client={client}>{children}</QueryClientProvider>,
+    });
+
+    await waitFor(() => expect(screen.getByTestId('team-match-order')).toHaveTextContent('이동 카드 최신 응답|페이지2 B|페이지2 D|현재 추천 경기'));
+    expect(screen.getByTestId('team-match-order')).not.toHaveTextContent('사라진 카드');
+    expect(screen.getByTestId('team-match-states')).toHaveTextContent('closed|open|open|open');
+  });
+
   it('종목을 선택해도 종목별 숫자에 선택된 종목의 별도 페이지를 섞지 않는다', () => {
     searchParamsRef.current = new URLSearchParams('sportId=futsal-id');
     useV1TeamMatchesMock.mockImplementation((filters?: { sportId?: string }, options?: { enabled?: boolean }) => {
@@ -1610,7 +1796,9 @@ describe('TeamMatchDetailPageClient — 호스트의 신청 승인·관리 메�
         sportName: '풋살',
         placeName: '경기장',
         startsAt: FUTURE,
+        deadlineAt: FUTURE,
         status: 'recruiting',
+        lifecycle: { canEdit: true, canDelete: false, onHoldReason: null, canCloseRecruitment: true, canReopenRecruitment: false },
         viewer: { state: 'host_team', manageableHostTeam: true },
         hostTeam: { teamId: 'team-host', name: '마포 FC' },
         ...data,
@@ -1680,26 +1868,61 @@ describe('TeamMatchDetailPageClient — 호스트의 신청 승인·관리 메�
     expect(json('team-match-host-action-details')[0]).toEqual({ label: '모집 마감', description: '더 이상 신청을 받지 않아요.', confirm: null });
   });
 
-  it('신청 마감 시각만 지난 매치(api recruiting · 화면 closed)는 재개가 아니라 마감·수정이 열린다 — 서버 판정과 같다', () => {
-    mockHost({ status: 'recruiting', displayState: 'closed' });
+  it('자동 마감된 매치는 남은 대기 신청 종료 액션과 파괴 동작 확인을 표시한다', () => {
+    mockHost({
+      status: 'closed',
+      displayState: 'closed',
+      deadlineAt: '2026-08-01T10:00:00.000Z',
+      lifecycle: { canEdit: true, canDelete: false, onHoldReason: null, canCloseRecruitment: true, canReopenRecruitment: false },
+    });
+    applicationsRef.current = { items: [application('a', 'requested'), application('b', 'requested')] };
     render(<TeamMatchDetailPageClient teamMatchId="tm-h6" />);
 
-    expect(screen.getByTestId('team-match-host-actions')).toHaveTextContent('모집 마감,팀매치 취소');
-    expect(screen.getByTestId('team-match-next-action')).toHaveTextContent('매치 수정');
+    expect(screen.getByTestId('team-match-host-actions')).toHaveTextContent('대기 신청 종료,팀매치 취소');
+    expect(json('team-match-host-action-details')[0]).toMatchObject({
+      label: '대기 신청 종료',
+      description: '대기 중인 신청 2팀이 종료돼요.',
+      confirm: {
+        title: '대기 신청을 종료할까요?',
+        message: '대기 중인 신청 2팀이 종료되고 알림이 가요.',
+        confirmLabel: '대기 신청 종료',
+      },
+    });
+    expect(screen.getByTestId('team-match-next-action')).toBeEmptyDOMElement();
+    expect(screen.getByTestId('team-match-apply-label')).toHaveTextContent('신청 마감');
+    expect(json('team-match-manage-menu').edit).toEqual({ href: '/team-matches/tm-h6/edit' });
   });
 
   it('직접 마감한 매치는 재개가 다음 할 일이고 수정은 이유와 함께 잠긴다', () => {
-    mockHost({ status: 'closed', displayState: 'closed' });
+    mockHost({
+      status: 'closed',
+      displayState: 'closed',
+      lifecycle: { canEdit: false, canDelete: false, onHoldReason: null, canCloseRecruitment: false, canReopenRecruitment: true },
+    });
     render(<TeamMatchDetailPageClient teamMatchId="tm-h6" />);
 
     expect(screen.getByTestId('team-match-host-actions')).toHaveTextContent('모집 재개,팀매치 취소');
     expect(screen.getByTestId('team-match-next-action')).toHaveTextContent('모집 재개');
-    expect(json('team-match-manage-menu').edit.lockedReason).toContain('모집을 다시 열면');
+    expect(json('team-match-manage-menu').edit.lockedReason).toBe('모집을 마감해서 수정할 수 없어요.');
+  });
+
+  it('마감·재개 capability가 없으면 상태값만으로 액션을 추측하지 않는다', () => {
+    mockHost({
+      status: 'closed',
+      displayState: 'closed',
+      deadlineAt: '2026-08-01T10:00:00.000Z',
+      lifecycle: { canEdit: false, canDelete: false, onHoldReason: null, canCloseRecruitment: false, canReopenRecruitment: false },
+    });
+
+    render(<TeamMatchDetailPageClient teamMatchId="tm-h6" />);
+
+    expect(screen.getByTestId('team-match-host-actions')).toHaveTextContent('팀매치 취소');
+    expect(screen.getByTestId('team-match-host-actions')).not.toHaveTextContent(/모집 마감|모집 재개|대기 신청 종료/);
   });
 
   // 취소·수정은 ⋯ 메뉴가 맡고, 보류 결정 패널(MatchLifecyclePanel)은 보류 매치에만 남는다 — 메뉴에 없던 "삭제"는 메뉴로 옮겼다.
   it('지원 이력이 없는 모집 중 매치는 ⋯ 메뉴에 삭제가 있고, 상세에는 관리 패널이 없다', () => {
-    mockHost({ lifecycle: { canEdit: true, canDelete: true, onHoldReason: null } });
+    mockHost({ lifecycle: { canEdit: true, canDelete: true, onHoldReason: null, canCloseRecruitment: true, canReopenRecruitment: false } });
     render(<TeamMatchDetailPageClient teamMatchId="tm-h6" />);
 
     expect(screen.getByTestId('team-match-host-actions')).toHaveTextContent('모집 마감,팀매치 취소,팀매치 삭제');
@@ -1708,14 +1931,14 @@ describe('TeamMatchDetailPageClient — 호스트의 신청 승인·관리 메�
   });
 
   it('대조군 — 삭제할 수 없는 매치(canDelete=false)의 메뉴에는 삭제가 없다', () => {
-    mockHost({ lifecycle: { canEdit: true, canDelete: false, onHoldReason: null } });
+    mockHost({ lifecycle: { canEdit: true, canDelete: false, onHoldReason: null, canCloseRecruitment: true, canReopenRecruitment: false } });
     render(<TeamMatchDetailPageClient teamMatchId="tm-h6" />);
 
     expect(screen.getByTestId('team-match-host-actions')).toHaveTextContent(/^모집 마감,팀매치 취소$/);
   });
 
   it('보류 매치는 취소·삭제를 보류 결정 패널이 맡고 ⋯ 메뉴에는 두지 않는다', () => {
-    mockHost({ status: 'on_hold', lifecycle: { canEdit: true, canDelete: true, onHoldReason: 'NO_OPPONENT' } });
+    mockHost({ status: 'on_hold', lifecycle: { canEdit: true, canDelete: true, onHoldReason: 'NO_OPPONENT', canCloseRecruitment: false, canReopenRecruitment: false } });
     render(<TeamMatchDetailPageClient teamMatchId="tm-h6" />);
 
     expect(screen.getByTestId('team-match-lifecycle-panel')).toHaveTextContent('true');
@@ -1726,6 +1949,7 @@ describe('TeamMatchDetailPageClient — 호스트의 신청 승인·관리 메�
     mockHost({
       status: 'matched',
       gameId: 'game-1',
+      lifecycle: { canEdit: false, canDelete: false, onHoldReason: null, canCloseRecruitment: false, canReopenRecruitment: false },
       approvedOpponentTeam: { teamId: 'team-a', name: 'a팀', applicationId: 'a' },
     });
     myTeamsRef.current = { items: [{ teamId: 'team-host', role: 'owner' }] };

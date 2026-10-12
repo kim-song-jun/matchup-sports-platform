@@ -71,11 +71,12 @@ describe('toApplicationHistory — ⋯ 메뉴의 신청 기록', () => {
 });
 
 describe('teamMatchEditLockReason — 서버 edit() 과 같은 판정', () => {
-  it('모집 중일 때만 수정이 열리고, 잠긴 이유는 상태마다 다르다', () => {
-    expect(teamMatchEditLockReason('recruiting')).toBeNull();
-    expect(teamMatchEditLockReason('closed')).toContain('모집을 다시 열면');
-    expect(teamMatchEditLockReason('matched')).toContain('상대팀이 정해져서');
-    expect(teamMatchEditLockReason('expired')).toContain('경기 시간이 지나서');
+  it('수정 권한은 lifecycle capability를 따르고, 잠긴 이유는 상태마다 다르다', () => {
+    expect(teamMatchEditLockReason(true, 'recruiting')).toBeNull();
+    expect(teamMatchEditLockReason(true, 'closed')).toBeNull();
+    expect(teamMatchEditLockReason(false, 'closed')).not.toContain('다시 열면');
+    expect(teamMatchEditLockReason(false, 'matched')).toContain('상대팀이 정해져서');
+    expect(teamMatchEditLockReason(false, 'expired')).toContain('경기 시간이 지나서');
   });
 });
 

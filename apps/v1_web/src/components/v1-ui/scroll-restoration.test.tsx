@@ -10,13 +10,15 @@
  * 그리고 그 반대 방향도 함께 고정한다 — **일반 링크는 여전히 맨 위에서 시작해야 한다**
  * (탭과 링크를 뭉뚱그려 전부 복원하면 새 화면이 중간부터 보이는 다른 버그가 된다).
  */
-import { render } from '@testing-library/react';
+import { act, render, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { saveScrollPosition } from '@/lib/scroll-positions';
 
 const nav = vi.hoisted(() => ({ pathname: '/tournaments' }));
 vi.mock('next/navigation', () => ({ usePathname: () => nav.pathname }));
-vi.mock('@/lib/session-storage', () => ({ getCurrentRedirectPath: () => nav.pathname }));
+vi.mock('@/lib/session-storage', () => ({
+  getCurrentRedirectPath: () => `${nav.pathname}${window.location.search}${window.location.hash}`,
+}));
 
 import { ScrollRestoration } from './scroll-restoration';
 
@@ -40,8 +42,19 @@ function anchor(className: string, href: string) {
   return a;
 }
 
+function targetAt(area: HTMLElement, id: string, offsetTop: number) {
+  const target = document.createElement('section');
+  target.id = id;
+  Object.defineProperty(target, 'offsetTop', { value: offsetTop });
+  target.scrollIntoView = vi.fn(() => { area.scrollTop = target.offsetTop; });
+  return target;
+}
+
 function clickThen(el: HTMLElement, nextPath: string, rerender: () => void) {
-  el.dispatchEvent(new MouseEvent('click', { bubbles: true, button: 0 }));
+  document.addEventListener('click', (event) => {
+    if (event.target instanceof Element && event.target.closest('a')) event.preventDefault();
+  }, { once: true });
+  el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, button: 0 }));
   nav.pathname = nextPath;
   rerender();
 }
@@ -49,6 +62,7 @@ function clickThen(el: HTMLElement, nextPath: string, rerender: () => void) {
 describe('ScrollRestoration — 탭으로 돌아오면 보던 자리로', () => {
   beforeEach(() => {
     nav.pathname = '/tournaments';
+    window.history.replaceState(null, '', '/tournaments');
     window.sessionStorage.clear();
     document.body.innerHTML = '';
     // jsdom 에는 ResizeObserver 가 없다. 높이가 이미 충분한 케이스만 쓰므로
@@ -102,6 +116,125 @@ describe('ScrollRestoration — 탭으로 돌아오면 보던 자리로', () => 
     expect(area.scrollTop).toBe(0);
   });
 
+  it('초기 URL fragment가 있으면 실제 target으로 이동한다', () => {
+    nav.pathname = '/landing';
+    window.history.replaceState(null, '', '/landing#business-info');
+    const area = mountScrollArea(5000);
+    const target = targetAt(area, 'business-info', 1200);
+    area.appendChild(target);
+
+    render(<ScrollRestoration />);
+
+    expect(target.scrollIntoView).toHaveBeenCalledTimes(1);
+    expect(area.scrollTop).toBe(1200);
+  });
+
+  it('fragment target이 뒤늦게 렌더되면 해당 요소가 생긴 뒤 이동한다', async () => {
+    nav.pathname = '/landing';
+    window.history.replaceState(null, '', '/landing#business-info');
+    const area = mountScrollArea(5000);
+    const view = render(<ScrollRestoration />);
+    const target = targetAt(area, 'business-info', 1350);
+
+    area.appendChild(target);
+
+    await waitFor(() => expect(target.scrollIntoView).toHaveBeenCalledTimes(1));
+    expect(area.scrollTop).toBe(1350);
+    view.unmount();
+  });
+
+  it('기다림 상한이 지나면 없는 target 감시를 끝내고 나중에 생겨도 스크롤하지 않는다', async () => {
+    vi.useFakeTimers();
+    let unmount = () => {};
+    try {
+      nav.pathname = '/landing';
+      window.history.replaceState(null, '', '/landing#business-info');
+      const area = mountScrollArea(5000);
+      const view = render(<ScrollRestoration />);
+      unmount = view.unmount;
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(10_000);
+      });
+
+      const target = targetAt(area, 'business-info', 1350);
+      await act(async () => {
+        area.appendChild(target);
+        await Promise.resolve();
+      });
+
+      expect(target.scrollIntoView).not.toHaveBeenCalled();
+      expect(area.scrollTop).toBe(0);
+    } finally {
+      unmount();
+      vi.useRealTimers();
+    }
+  });
+
+  it('same-path pushState로 hash가 바뀌면 대기 중인 이전 target을 스크롤하지 않는다', async () => {
+    nav.pathname = '/landing';
+    window.history.replaceState(null, '', '/landing#business-info');
+    const area = mountScrollArea(5000);
+    render(<ScrollRestoration />);
+    const staleTarget = targetAt(area, 'business-info', 1400);
+
+    window.history.pushState(null, '', '/landing#other');
+    await act(async () => {
+      area.appendChild(staleTarget);
+      await Promise.resolve();
+    });
+
+    expect(staleTarget.scrollIntoView).not.toHaveBeenCalled();
+    expect(area.scrollTop).toBe(0);
+  });
+
+  it.each(['route departure', 'unmount'])('missing fragment observer stops after %s', async (exit) => {
+    nav.pathname = '/landing';
+    window.history.replaceState(null, '', '/landing#business-info');
+    mountScrollArea(5000);
+    const view = render(<ScrollRestoration />);
+    const target = document.createElement('section');
+    target.id = 'business-info';
+    target.scrollIntoView = vi.fn();
+
+    if (exit === 'route departure') {
+      window.history.replaceState(null, '', '/login');
+      nav.pathname = '/login';
+      view.rerender(<ScrollRestoration />);
+    } else {
+      view.unmount();
+    }
+
+    await act(async () => {
+      document.body.appendChild(target);
+      await Promise.resolve();
+    });
+
+    expect(target.scrollIntoView).not.toHaveBeenCalled();
+  });
+
+  it('fragment 링크의 pathname 전환은 target 이동을 보존한다', () => {
+    const area = mountScrollArea(5000);
+    area.scrollTop = 460;
+    nav.pathname = '/login';
+    window.history.replaceState(null, '', '/login');
+    const view = render(<ScrollRestoration />);
+    const target = targetAt(area, 'business-info', 950);
+    area.appendChild(target);
+
+    const link = anchor('tm-card-link', '/landing#business-info');
+    document.addEventListener('click', (event) => {
+      if (event.target instanceof Element && event.target.closest('a')) event.preventDefault();
+    }, { once: true });
+    link.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, button: 0 }));
+    window.history.replaceState(null, '', '/landing#business-info');
+    nav.pathname = '/landing';
+    view.rerender(<ScrollRestoration />);
+
+    expect(target.scrollIntoView).toHaveBeenCalledTimes(1);
+    expect(area.scrollTop).toBe(950);
+  });
+
   it('그 탭에 처음 들어가면(저장된 값 없음) 맨 위 그대로 둔다', () => {
     const area = mountScrollArea(5000);
     nav.pathname = '/teams';
@@ -118,6 +251,7 @@ describe('ScrollRestoration — 탭으로 돌아오면 보던 자리로', () => 
 // 전에는 이 클릭이 'push' 로 잡혀 목록이 매번 맨 위에서 시작했다.
 describe('ScrollRestoration — 예전 방문의 위치가 남지 않는다', () => {
   beforeEach(() => {
+    window.history.replaceState(null, '', '/tournaments');
     window.sessionStorage.clear();
     document.body.innerHTML = '';
     vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} });
@@ -165,6 +299,7 @@ describe('ScrollRestoration — 예전 방문의 위치가 남지 않는다', ()
 describe('ScrollRestoration — 뒤로가기는 보던 자리로', () => {
   beforeEach(() => {
     nav.pathname = '/tournaments';
+    window.history.replaceState(null, '', '/tournaments');
     window.sessionStorage.clear();
     document.body.innerHTML = '';
     vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} });
@@ -199,5 +334,23 @@ describe('ScrollRestoration — 뒤로가기는 보던 자리로', () => {
     view.rerender(<ScrollRestoration />);
 
     expect(area.scrollTop).toBe(410);
+  });
+
+  it('hash가 있어도 popstate에서는 저장된 위치를 먼저 복원한다', () => {
+    const area = mountScrollArea(5000);
+    const target = targetAt(area, 'business-info', 1200);
+    area.appendChild(target);
+    nav.pathname = '/landing/details';
+    window.history.replaceState(null, '', '/landing/details');
+    const view = render(<ScrollRestoration />);
+    saveScrollPosition('/landing#business-info', 410);
+
+    window.dispatchEvent(new PopStateEvent('popstate'));
+    window.history.replaceState(null, '', '/landing#business-info');
+    nav.pathname = '/landing';
+    view.rerender(<ScrollRestoration />);
+
+    expect(area.scrollTop).toBe(410);
+    expect(target.scrollIntoView).not.toHaveBeenCalled();
   });
 });

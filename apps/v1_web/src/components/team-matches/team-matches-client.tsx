@@ -151,7 +151,10 @@ export function TeamMatchListPageClient({ seed }: { readonly seed?: CursorListSe
     [teamMatchFilters, cursor],
   );
   // matches-client.tsx 와 같다 — seed 는 cursor 없는 무필터 키에만 맞는다.
-  const allQuery = useV1TeamMatches(allQueryFilters, { seed: allQueryFilters ? undefined : seed?.page });
+  const allQuery = useV1TeamMatches(allQueryFilters, {
+    seed: allQueryFilters ? undefined : seed?.page,
+    refetchOnWindowFocus: 'always',
+  });
   const countFilters = useMemo(() => {
     const filters: { query?: string; genderRule?: string; levelCodes?: string; kind?: 'friendly' | 'competition' } = {};
     if (selectedGenderRule) filters.genderRule = selectedGenderRule;
@@ -162,11 +165,11 @@ export function TeamMatchListPageClient({ seed }: { readonly seed?: CursorListSe
   }, [selectedGenderRule, selectedLevels, selectedKind, submittedQuery]);
   const filteredQuery = useV1TeamMatches(
     filteredQueryFilters,
-    { enabled: Boolean(teamMatchFilters) },
+    { enabled: Boolean(teamMatchFilters), refetchOnWindowFocus: 'always' },
   );
   const countQuery = useV1TeamMatches(
     countFilters,
-    { enabled: Boolean(countFilters) },
+    { enabled: Boolean(countFilters), refetchOnWindowFocus: 'always' },
   );
   const recentSearches = useV1RecentSearches();
   const recordSearch = useV1RecordSearch();

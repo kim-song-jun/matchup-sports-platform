@@ -13,10 +13,12 @@ const matchId = 'team-match-expiry-1';
 let status: 'recruiting' | 'closed' = 'recruiting';
 let listReads = 0;
 let detailReads = 0;
+const listReadQueries: string[] = [];
 const match = { id: matchId, teamMatchId: matchId, status, displayState: status } as V1TeamMatch;
 const server = setupServer(
   http.get(`${api}/team-matches`, ({ request }) => {
     listReads += 1;
+    listReadQueries.push(new URL(request.url).searchParams.get('query') ?? '');
     const item = { ...match, status, displayState: status };
     const items = status === 'closed' && new URL(request.url).searchParams.get('sort') === 'recommended' ? [] : [item];
     const data: CursorPage<V1TeamMatch> = { items, nextCursor: null, pageInfo: { hasNext: false, nextCursor: null } };
@@ -42,6 +44,7 @@ beforeEach(() => {
   status = 'recruiting';
   listReads = 0;
   detailReads = 0;
+  listReadQueries.length = 0;
   vi.stubEnv('NEXT_PUBLIC_API_URL', api);
   focusManager.setFocused(undefined);
 });
@@ -59,7 +62,7 @@ describe('team-match deadline refresh', () => {
   it('refreshes active list and detail queries on tab return with a fresh cache', async () => {
     const tab = createTab();
     const { result } = renderHook(() => ({
-      list: useV1TeamMatches(),
+      list: useV1TeamMatches(undefined, { refetchOnWindowFocus: 'always' }),
       detail: useV1TeamMatch(matchId),
     }), { wrapper: tab.wrapper });
     await waitFor(() => {
@@ -85,7 +88,7 @@ describe('team-match deadline refresh', () => {
 
   it('polls an open detail after the same 15-second interval as the list', async () => {
     const tab = createTab();
-    const { result } = renderHook(() => ({ list: useV1TeamMatches(), detail: useV1TeamMatch(matchId) }), { wrapper: tab.wrapper });
+    const { result } = renderHook(() => ({ list: useV1TeamMatches(undefined, { refetchOnWindowFocus: 'always' }), detail: useV1TeamMatch(matchId) }), { wrapper: tab.wrapper });
     await waitFor(() => {
       expect(result.current.list.data?.items[0]?.status).toBe('recruiting');
       expect(result.current.detail.data?.status).toBe('recruiting');
@@ -102,7 +105,7 @@ describe('team-match deadline refresh', () => {
 
   it('recommended list drops a deadline-closed item when the refreshed API response no longer includes it', async () => {
     const tab = createTab();
-    const { result } = renderHook(() => useV1TeamMatches({ sort: 'recommended' }), { wrapper: tab.wrapper });
+    const { result } = renderHook(() => useV1TeamMatches({ sort: 'recommended' }, { refetchOnWindowFocus: 'always' }), { wrapper: tab.wrapper });
     await waitFor(() => expect(result.current.data?.items[0]?.status).toBe('recruiting'));
     expect(listReads).toBe(1);
 
@@ -112,5 +115,27 @@ describe('team-match deadline refresh', () => {
 
     await waitFor(() => expect(result.current.data?.items).toEqual([]));
     expect(listReads).toBe(2);
+  });
+
+  it('keeps shared home, search and team-list queries focus-idle while the team-match list opts in', async () => {
+    const tab = createTab();
+    const { result } = renderHook(() => ({
+      home: useV1TeamMatches({ query: 'home' }, { refetchInterval: false }),
+      search: useV1TeamMatches({ query: 'search' }),
+      teamMatches: useV1TeamMatches({ query: 'team-matches' }),
+      list: useV1TeamMatches({ query: 'list' }, { refetchOnWindowFocus: 'always' }),
+    }), { wrapper: tab.wrapper });
+    await waitFor(() => expect(listReads).toBe(4));
+    expect(listReadQueries).toEqual(['home', 'search', 'team-matches', 'list']);
+
+    status = 'closed';
+    await act(async () => { focusManager.setFocused(false); });
+    await act(async () => { focusManager.setFocused(true); });
+
+    await waitFor(() => expect(result.current.list.data?.items[0]?.status).toBe('closed'));
+    expect(listReadQueries).toEqual(['home', 'search', 'team-matches', 'list', 'list']);
+    expect(result.current.home.data?.items[0]?.status).toBe('recruiting');
+    expect(result.current.search.data?.items[0]?.status).toBe('recruiting');
+    expect(result.current.teamMatches.data?.items[0]?.status).toBe('recruiting');
   });
 });

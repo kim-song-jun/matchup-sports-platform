@@ -112,6 +112,8 @@ the API — unknown body/query fields can produce `400`.
 
 ## Authentication
 
+Kakao signup confirms server-fetched provider contacts without duplicate OTP. Existing verified contacts may link Kakao to the same member; conflicting contacts return `409 SOCIAL_LINK_CONTACT_CONFLICT`. Email signup retains its direct verification gates. See [Auth](./domains/auth.md#kakao-contact-confirmation-and-automatic-account-linking) for the ownership and profile-completion rules.
+
 Production authentication uses the signed `teameet_v1_session` HttpOnly cookie issued by successful
 email registration/login and Kakao/Apple authentication responses (see [Auth](./domains/auth.md)).
 The cookie is `Secure` in production, `SameSite=Lax`, scoped to path `/` (the Socket.IO handshake at `/socket.io` needs it too), and expires after seven

@@ -6,6 +6,8 @@
  * 화면은 값이 있을 때만 자동 채움한다 — 승인 여부에 따라 코드 변경 없이 동작이 갈린다.
  */
 
+import { isValidBirthDateDigits } from './birth-date';
+
 /** 카카오가 내려주는 성별 값. 그 외 값은 우리 스키마에 없으므로 버린다. */
 const KAKAO_GENDERS = ['male', 'female'] as const;
 
@@ -40,6 +42,14 @@ export interface KakaoSignupPrefill {
   name: string | null;
   phone: string | null;
   gender: KakaoGender | null;
+  birthDate: string | null;
+}
+
+/** Kakao birthdays can be lunar. Never reinterpret a lunar birthday as a Gregorian date. */
+export function normalizeKakaoBirthDate(birthyear?: string, birthday?: string, birthdayType?: string): string | null {
+  if (birthdayType !== 'SOLAR' || !/^\d{4}$/.test(birthyear ?? '') || !/^\d{4}$/.test(birthday ?? '')) return null;
+  const value = `${birthyear}${birthday}`;
+  return isValidBirthDateDigits(value) ? value : null;
 }
 
 /** 프리필 값이 하나도 없으면 null — draftJson 에 빈 객체를 남기지 않는다. */
@@ -47,14 +57,16 @@ export function buildKakaoSignupPrefill(input: {
   name?: string | null;
   phone?: string | null;
   gender?: string | null;
+  birthDate?: string | null;
 }): KakaoSignupPrefill | null {
   const prefill: KakaoSignupPrefill = {
     name: normalizeKakaoName(input.name),
     phone: normalizeKakaoPhone(input.phone),
     gender: normalizeKakaoGender(input.gender),
+    birthDate: input.birthDate && isValidBirthDateDigits(input.birthDate) ? input.birthDate : null,
   };
 
-  return prefill.name || prefill.phone || prefill.gender ? prefill : null;
+  return prefill.name || prefill.phone || prefill.gender || prefill.birthDate ? prefill : null;
 }
 
 /**
@@ -73,6 +85,7 @@ export function readKakaoSignupPrefill(draftJson: unknown): KakaoSignupPrefill |
       : typeof draft.appleName === 'string' ? draft.appleName : null,
     phone: typeof draft.kakaoPhone === 'string' ? draft.kakaoPhone : null,
     gender: typeof draft.kakaoGender === 'string' ? draft.kakaoGender : null,
+    birthDate: typeof draft.kakaoBirthDate === 'string' ? draft.kakaoBirthDate : null,
   });
 }
 

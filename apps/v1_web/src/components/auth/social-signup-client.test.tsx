@@ -20,7 +20,7 @@ const hooks = vi.hoisted(() => ({
   authMeFailed: false,
   // 카카오 동의항목 미승인이 기본값 — 프리필 없이 직접 입력하는 기존 흐름.
   authMe: {
-    socialSignupPrefill: null as null | { name: string | null; phone: string | null; gender: 'male' | 'female' | null },
+    socialSignupPrefill: null as null | { name: string | null; phone: string | null; gender: 'male' | 'female' | null; birthDate?: string | null },
     user: { authProvider: 'kakao' as string | null, onboardingStatus: 'social_profile_required', phone: null as string | null },
     profile: { nickname: null as string | null },
     verification: { phoneVerified: false },
@@ -426,6 +426,9 @@ describe('SocialSignupClient 카카오 자동 채움', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     hooks.authMe.socialSignupPrefill = null;
+    hooks.authMe.user.authProvider = 'kakao';
+    hooks.authMe.user.onboardingStatus = 'social_profile_required';
+    hooks.authMeFailed = false;
   });
 
   it('카카오 값이 없으면 기존처럼 직접 입력한다', () => {
@@ -465,6 +468,30 @@ describe('SocialSignupClient 카카오 자동 채움', () => {
     const phone = screen.getByLabelText(/^휴대폰 번호/);
     await waitFor(() => expect(phone).toHaveValue('010-1234-5678'));
     expect(phone).not.toHaveAttribute('readonly');
+  });
+
+  it('카카오 번호와 생년월일은 자동 입력하고 인증 요청 없이 가입을 제출한다', async () => {
+    hooks.authMe.socialSignupPrefill = { name: '회원', phone: '01012345678', gender: 'female', birthDate: '20000229' };
+    hooks.checkNicknameMutate.mockImplementation((_v: string, cb: AvailabilityCallbacks) => cb.onSuccess({ available: true }));
+    render(<SocialSignupClient />);
+    await waitFor(() => expect(screen.getByLabelText(/^휴대폰 번호/)).toHaveValue('010-1234-5678'));
+    expect(screen.getByLabelText(/^생년월일/)).toHaveValue('2000-02-29');
+    expect(screen.queryByRole('button', { name: '__stub_verify__' })).not.toBeInTheDocument();
+    expect(screen.getByText('카카오에서 받은 전화번호예요. 추가 인증 없이 사용할 수 있어요.')).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('닉네임'), { target: { value: '카카오회원' } });
+    fireEvent.click(screen.getByRole('button', { name: '중복 확인' }));
+    fireEvent.submit(document.getElementById('v1-social-signup-form')!);
+    expect(hooks.completeProfileMutate).toHaveBeenCalledWith(expect.objectContaining({ phone: '01012345678', birthDate: '20000229' }), expect.any(Object));
+    expect(hooks.authedPhoneRequestMutateAsync).not.toHaveBeenCalled();
+  });
+
+  it('사용자가 다른 번호를 입력하면 카카오 제공 번호의 인증 상태를 재사용하지 않는다', async () => {
+    hooks.authMe.socialSignupPrefill = { name: null, phone: '01012345678', gender: null };
+    render(<SocialSignupClient />);
+    await waitFor(() => expect(screen.getByLabelText(/^휴대폰 번호/)).toHaveValue('010-1234-5678'));
+    fireEvent.change(screen.getByLabelText(/^휴대폰 번호/), { target: { value: '01087654321' } });
+    expect(screen.getByRole('button', { name: '__stub_verify__' })).toBeInTheDocument();
+    expect(screen.queryByText('카카오에서 받은 전화번호예요. 추가 인증 없이 사용할 수 있어요.')).not.toBeInTheDocument();
   });
 });
 

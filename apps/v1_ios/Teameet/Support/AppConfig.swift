@@ -13,6 +13,7 @@ struct AppConfig: Equatable {
     enum Key {
         static let webOrigin = "TeameetWebOrigin"
         static let webViewInspectable = "TeameetWebViewInspectable"
+        static let kakaoNativeAppKey = "TeameetKakaoNativeAppKey"
         static let appVersion = "CFBundleShortVersionString"
         static let buildNumber = "CFBundleVersion"
     }
@@ -23,6 +24,10 @@ struct AppConfig: Equatable {
     /// Alpha exposes the embedded page to Safari's Web Inspector; production never does,
     /// whatever the build type. Android pins the same guarantee in `BuildConfig`.
     let webViewInspectable: Bool
+
+    /// Kakao's native app key, injected from CI through `Secrets.generated.xcconfig`. Empty in
+    /// a build without it; the shell then neither advertises Kakao sign-in nor touches the SDK.
+    let kakaoNativeAppKey: String
 
     /// Reported with a push registration so a delivery failure can be traced to a release.
     /// Comes from `version.properties` by way of `MARKETING_VERSION`.
@@ -46,9 +51,15 @@ struct AppConfig: Equatable {
         // xcconfig delivers this as the literal string YES or NO, not a plist boolean,
         // because the value reaches Info.plist through $(VAR) substitution.
         webViewInspectable = string(Key.webViewInspectable).caseInsensitiveCompare("YES") == .orderedSame
+        // Only an alphanumeric value is a key. An unexpanded `$(...)` placeholder must read as
+        // "not configured" rather than reach the SDK.
+        let kakaoKey = string(Key.kakaoNativeAppKey)
+        kakaoNativeAppKey = kakaoKey.allSatisfy { $0.isASCII && ($0.isLetter || $0.isNumber) } ? kakaoKey : ""
         appVersion = string(Key.appVersion)
         buildNumber = string(Key.buildNumber)
     }
+
+    var isKakaoSignInConfigured: Bool { !kakaoNativeAppKey.isEmpty }
 
     /// The URL the shell opens for a sanitised route.
     func url(forRoute route: String) -> URL? {

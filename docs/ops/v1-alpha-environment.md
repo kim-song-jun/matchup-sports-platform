@@ -1,5 +1,20 @@
 # Teameet v1 alpha 환경 운영
 
+## Kakao app configuration
+
+Alpha web and API use the same dedicated repository secrets: `ALPHA_KAKAO_CLIENT_ID`,
+`ALPHA_KAKAO_CLIENT_SECRET`, `ALPHA_KAKAO_APP_ID`, and `ALPHA_KAKAO_REDIRECT_URI`.
+Production keeps the existing unprefixed credentials until the verified cutover.
+Missing or malformed alpha credentials stop activation; the deployment must not silently
+keep credentials from a different app. `ALPHA_KAKAO_SCOPE` is an optional repository variable:
+set only scopes approved and enabled in that app's Kakao console.
+
+The admin-managed Maps REST/JavaScript integration must belong to the same app as OAuth,
+because browser KakaoTalk login uses the Maps JavaScript key. Verify `/public/integrations/kakao-maps-key`
+and actual authorization/callback before declaring the transition ready. Native builds use
+separate alpha/production platform keys for `kr.co.teameet.alpha` and `kr.co.teameet`; both
+keys still belong to the intended OAuth app. See the Android and iOS release runbooks.
+
 `https://alpha.teameet.co.kr`은 `dev` 브랜치의 v1 Web/API를 실제 HTTPS 환경에서 검증하는 비운영 환경이다. 프로덕션과 인프라·데이터베이스·업로드 볼륨을 공유하지 않는다.
 
 프로덕션 배포의 공통 v1 경로·컨테이너 계약은 [`deploy/DEPLOY_GUIDE.md`](../../deploy/DEPLOY_GUIDE.md)를 함께 참고한다.

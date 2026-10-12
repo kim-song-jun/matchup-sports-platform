@@ -108,6 +108,7 @@ export type V1AuthMe = {
     name: string | null;
     phone: string | null;
     gender: 'male' | 'female' | null;
+    birthDate?: string | null;
   } | null;
   user: {
     id: string;

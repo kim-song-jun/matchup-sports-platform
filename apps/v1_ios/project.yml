@@ -33,12 +33,33 @@ configFiles:
   Production Debug: Config/Production.xcconfig
   Production Release: Config/Production.xcconfig
 
+# Pinned exactly: a floating range would let a new SDK release change what the store review
+# sees. KakaoSDKUser pulls in Common and Auth, which are listed for the imports that use them.
+packages:
+  KakaoOpenSDK:
+    url: https://github.com/kakao/kakao-ios-sdk
+    exactVersion: 2.29.0
+  # Kakao allows 5.9..<6.0. Pin its networking dependency as well so regenerating
+  # this project cannot silently select a different dependency graph.
+  Alamofire:
+    url: https://github.com/Alamofire/Alamofire.git
+    exactVersion: 5.12.2
+
 targets:
   Teameet:
     type: application
     platform: iOS
     sources:
       - path: Teameet
+    dependencies:
+      - package: KakaoOpenSDK
+        product: KakaoSDKCommon
+      - package: KakaoOpenSDK
+        product: KakaoSDKAuth
+      - package: KakaoOpenSDK
+        product: KakaoSDKUser
+      - package: Alamofire
+        product: Alamofire
     settings:
       base:
         PRODUCT_NAME: Teameet
@@ -87,14 +108,27 @@ targets:
         # "Build is not in an internally testable state", which does not mention encryption
         # and sends you looking at signing instead. Measured on builds 1 and 3.
         #
-        # False is the accurate answer for this app, not a convenient one: it is a WKWebView
-        # shell whose only cryptography is the HTTPS the operating system provides. Nothing
-        # is implemented here and no crypto library is bundled — every screen is drawn by the
-        # web app. Confirmed by the user 2026-08-31, since this is a legal declaration.
+        # Retains the user-confirmed declaration (2026-08-31). The dependency audit in
+        # docs/ops/ios-release.md now includes Kakao's CryptoKit/CommonCrypto calls and
+        # Alamofire. Both use Apple-provided crypto; "no dependencies/HTTPS only" is obsolete.
+        # CI records linked libraries and crypto symbols for the built production app.
         ITSAppUsesNonExemptEncryption: false
         # The environment contract the app reads at runtime through AppConfig.
         TeameetWebOrigin: $(TEAMEET_WEB_ORIGIN)
         TeameetWebViewInspectable: $(TEAMEET_WEBVIEW_INSPECTABLE)
+        # Kakao's native app key comes from the gitignored Config/Secrets.generated.xcconfig
+        # (scripts/release/generate-ios-secrets-xcconfig.sh). Empty means Kakao sign-in is off:
+        # AppConfig reads it as "not configured" and the shell neither advertises nor
+        # initialises the SDK.
+        TeameetKakaoNativeAppKey: $(TEAMEET_KAKAO_NATIVE_APP_KEY)
+        # The KakaoTalk handoff returns through kakao<native app key>://. LSApplicationQueriesSchemes
+        # lets canOpenURL detect whether KakaoTalk is installed.
+        CFBundleURLTypes:
+          - CFBundleURLSchemes:
+              - kakao$(TEAMEET_KAKAO_NATIVE_APP_KEY)
+        LSApplicationQueriesSchemes:
+          - kakaokompassauth
+          - kakaolink
 
   TeameetTests:
     type: bundle.unit-test
@@ -135,6 +169,7 @@ targets:
       - path: Teameet/Push/PushRevocation.swift
       - path: Teameet/Push/PushRegistrationLedger.swift
       - path: Teameet/Auth/AppleNonceHash.swift
+      - path: Teameet/Auth/KakaoSignInPolicy.swift
     settings:
       base:
         GENERATE_INFOPLIST_FILE: NO

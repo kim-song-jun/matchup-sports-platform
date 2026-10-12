@@ -61,6 +61,13 @@ if [[ "$CONFIGURATION" != "$SCHEME_CONFIGURATION" || "$PROFILE_NAME" != "$SCHEME
 fi
 [[ "${1:-}" == "--upload" ]] && UPLOAD=true
 
+# An empty key still builds and signs; the app just never advertises Kakao sign-in. Uploading
+# that to the production record cannot be undone, so refuse it here (archive-only runs are fine).
+if [[ "$UPLOAD" == true && "$SCHEME" == TeameetProduction && ! "${TEAMEET_KAKAO_PRODUCTION_NATIVE_APP_KEY:-}" =~ ^[0-9a-f]{32}$ ]]; then
+  echo "[archive] TEAMEET_KAKAO_PRODUCTION_NATIVE_APP_KEY (32 hex chars) is required to upload a production build." >&2
+  exit 1
+fi
+
 # --- build number ------------------------------------------------------------------------
 # App Store Connect refuses a second upload with a build number it has already seen for the
 # same marketing version. The number lives in version.properties, which is also what the
@@ -77,6 +84,8 @@ if [[ -f "$MARKER" ]]; then
 fi
 
 bash "$REPO_ROOT/scripts/release/generate-ios-version-xcconfig.sh"
+# Reads separate alpha/production native keys; each bundle uses only its own key.
+bash "$REPO_ROOT/scripts/release/generate-ios-secrets-xcconfig.sh"
 ( cd "$IOS_DIR" && xcodegen generate >/dev/null )
 
 # --- archive -----------------------------------------------------------------------------

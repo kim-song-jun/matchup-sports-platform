@@ -14,7 +14,7 @@ import { AuthService } from './auth.service';
 import { AppleLoginDto } from './dto/apple-login.dto';
 import { AppleIdentityService } from './apple-identity.service';
 import { CheckEmailQueryDto, CheckNicknameQueryDto } from './dto/check-availability.dto';
-import { KakaoLoginDto } from './dto/kakao-login.dto';
+import { KakaoLoginDto, KakaoTokenLoginDto } from './dto/kakao-login.dto';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 import { SocialLinkDto } from './dto/social-link.dto';
@@ -66,6 +66,12 @@ export class AuthController {
   @Throttle({ default: { limit: 10, ttl: 60_000 } })
   kakaoLogin(@Body() dto: KakaoLoginDto) {
     return this.authService.kakaoLogin(dto);
+  }
+
+  @Post('kakao/token')
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  kakaoTokenLogin(@Body() dto: KakaoTokenLoginDto) {
+    return this.authService.kakaoTokenLogin(dto);
   }
 
   /**

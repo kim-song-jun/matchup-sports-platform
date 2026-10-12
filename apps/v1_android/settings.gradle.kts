@@ -3,7 +3,14 @@ pluginManagement {
 }
 dependencyResolutionManagement {
     repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
-    repositories { google(); mavenCentral() }
+    repositories {
+        google()
+        mavenCentral()
+        maven {
+            url = uri("https://devrepo.kakao.com/nexus/content/groups/public/")
+            content { includeGroup("com.kakao.sdk") }
+        }
+    }
 }
 rootProject.name = "TeameetAndroid"
 include(":app")

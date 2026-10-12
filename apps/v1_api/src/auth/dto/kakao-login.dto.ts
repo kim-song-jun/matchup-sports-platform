@@ -1,4 +1,4 @@
-import { IsOptional, IsString, MinLength } from 'class-validator';
+import { IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
 
 export class KakaoLoginDto {
   @IsString()
@@ -8,4 +8,11 @@ export class KakaoLoginDto {
   @IsOptional()
   @IsString()
   redirectUri?: string;
+}
+
+export class KakaoTokenLoginDto {
+  @IsString()
+  @MinLength(10)
+  @MaxLength(4096)
+  accessToken!: string;
 }

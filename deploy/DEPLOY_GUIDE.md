@@ -69,6 +69,7 @@ test "$(curl -sS -o /dev/null -w '%{http_code}' http://localhost:3013/v1/home)" 
 | `TOSS_WEBHOOK_SECRET` | 결제 webhook 검증 key, 선택 |
 | `KAKAO_CLIENT_ID` | Kakao OAuth client id, 선택 |
 | `KAKAO_CLIENT_SECRET` | Kakao OAuth client secret, 선택 |
+| `KAKAO_APP_ID` | 카카오 콘솔 "앱 ID"(숫자), 선택. 네이티브 앱 토큰 로그인(`POST /auth/kakao/token`)이 `access_token_info.app_id`와 대조한다. 비면 그 엔드포인트는 400 `OAUTH_NOT_CONFIGURED` |
 | `KAKAO_REDIRECT_URI` | Kakao OAuth callback, 선택 |
 | `V1_HOST_ADMIN_PASSWORD` | v1 host admin password |
 | `GA_PROD` | production GA4 Measurement ID, 선택 |
@@ -145,7 +146,7 @@ gh workflow run rollback-prod.yml -f expected_active_sha=<되돌리기 직전 ac
 | `FRONTEND_URL` | production CORS 및 브라우저 mutation origin 검증에 쓰는 canonical HTTPS origin; 기본값 `https://teameet.co.kr` |
 | `V1_INTERNAL_API_ORIGIN` | Next.js server-side API origin; 기본값 `http://v1_api:8121` |
 | `DEPLOY_SYNC_V1_SEED_DATA` | 검토된 v1 seed sync opt-in; 기본 비활성 |
-| `KAKAO_CLIENT_ID`, `KAKAO_CLIENT_SECRET`, `KAKAO_REDIRECT_URI` | Kakao OAuth |
+| `KAKAO_CLIENT_ID`, `KAKAO_CLIENT_SECRET`, `KAKAO_REDIRECT_URI`, `KAKAO_APP_ID` | Kakao OAuth |
 | `TOSS_CLIENT_KEY`, `TOSS_SECRET_KEY`, `TOSS_WEBHOOK_SECRET` | 결제 연동 |
 | `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` | Web Push (`WebPushService`); 셋 중 하나라도 비어 있으면 graceful disable. 생성·회전 절차는 `docs/ops/vapid-setup.md` 참조 |
 

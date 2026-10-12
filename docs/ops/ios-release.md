@@ -186,28 +186,40 @@ Apple 의 분류표는 세 갈래다
 | OS 밖의 산업 표준 알고리즘 | 프랑스 배포 시 French encryption declaration |
 | 국제 표준 기구가 인정하지 않은 독자 알고리즘 | CCATS + French declaration |
 
-이 앱이 첫 번째 칸에 해당하는지 저장소에서 직접 확인했다:
+2026-10-12 카카오 네이티브 로그인 도입으로 의존성 근거를 다시 확인했다. 이전의
+"SPM 0개 / HTTPS만 사용" 기록은 더 이상 적용되지 않는다.
 
 | 확인 항목 | 결과 |
 |---|---|
-| SPM 패키지 | **0개** (`project.yml` 에 `packages:` 자체가 없다) |
-| 빌드된 `.app` 의 내장 프레임워크 | **없음** |
-| CryptoKit / CommonCrypto / 직접 구현한 AES·RSA | **없음** |
-| 암호화 관련 import | `import Security` 하나 — Keychain, OS 제공 |
-| 네트워크 암호화 | `WKWebView` 와 `URLSession` 의 HTTPS/TLS, 즉 OS 제공 |
+| SPM 패키지 | KakaoOpenSDK **2.29.0**, Alamofire **5.12.2**를 `project.yml`에서 모두 exact pin. Kakao의 `5.9..<6.0` 범위에만 의존하지 않는다 |
+| 앱에 연결하는 SDK 제품 | KakaoSDKCommon, KakaoSDKAuth, KakaoSDKUser, Alamofire. Cert/Friend 바이너리 제품은 연결하지 않는다 |
+| CryptoKit / CommonCrypto | Kakao `SdkCrypto+Version.swift`가 Apple CryptoKit의 AES.GCM을 호출. `SdkCrypto.swift`의 이전 토큰 복호화·이전·키 유도·해시는 Apple CommonCrypto를 호출 |
+| Security | Keychain 및 OS 제공 보안 API 사용 |
+| 네트워크 암호화 | WKWebView, URLSession 및 Alamofire의 URLSession 전송 경로 |
+| 빌드된 `.app` 확인 | iOS Alpha CI의 `Audit built production crypto dependencies` 단계가 실제 바이너리의 `otool -L`, undefined crypto symbol, 내장 framework 목록 및 Info.plist 선언을 로그로 보존. 배포 기록에는 해당 revision의 성공 run을 연결한다 |
 
 APNs 프로바이더 토큰의 ES256 서명은 **서버(Node)** 에서 한다 — iOS 앱 바이너리에는 없다.
 
-**따라서 사실관계는 "OS 안의 암호화로 한정" 에 해당한다.** 다만 이 답변은 사용자가 하는 **법적
-선언**이므로 저장소가 값을 대신 넣지 않는다. 사용자가 위 사실관계를 확인하면 `project.yml` 의
-`info.properties` 에 한 줄을 넣어 매 업로드마다 묻지 않게 할 수 있다:
+확인한 SDK 암호화 구현은 OS 제공 CryptoKit/CommonCrypto를 사용한다. 근거는
+[Kakao 2.29.0 SdkCrypto](https://github.com/kakao/kakao-ios-sdk/blob/2.29.0/Sources/KakaoSDKCommon/common/common/SdkCrypto.swift),
+[AES.GCM 호출](https://github.com/kakao/kakao-ios-sdk/blob/2.29.0/Sources/KakaoSDKCommon/common/common/SdkCrypto%2BVersion.swift),
+[Apple의 OS 암호화 분류](https://developer.apple.com/help/app-store-connect/reference/export-compliance-documentation-for-encryption/)다.
+이미 사용자가 확인한 `project.yml`의 다음 선언을 유지한다. SDK 제품·버전이 바뀌면 소스와
+새 archive의 바이너리 근거를 다시 확인해야 하며, 단순히 CI가 green이라는 이유로 법적 선언을 바꾸지 않는다:
 
 ```yaml
         ITSAppUsesNonExemptEncryption: false
 ```
 
-넣지 않으면 업로드할 때마다 App Store Connect 에서 같은 질문에 답하게 된다 — 틀린 것은 아니고
-번거로울 뿐이다.
+이 감사는 카카오톡 실기기 복귀 테스트나 App Store 심사를 대신하지 않는다.
+
+### Kakao build inputs
+
+`TEAMEET_KAKAO_ALPHA_NATIVE_APP_KEY`와 `TEAMEET_KAKAO_PRODUCTION_NATIVE_APP_KEY`는 GitHub secret 또는 archive 프로세스 환경으로 전달한다.
+`generate-ios-secrets-xcconfig.sh`가 gitignore된 파일에 두 값을 기록하고 각 xcconfig는 자기 환경의 키만 선택한다. 같은 카카오 앱에서 네이티브 키를 각각 발급해
+운영 키에 `kr.co.teameet`, alpha 키에 `kr.co.teameet.alpha` 번들 ID를 등록하고, 웹 REST 키·지도 JS 키·서버
+`KAKAO_APP_ID`가 동일 앱에 속하는지 확인한다. 키가 없는 CI는 컴파일만 검증하며 네이티브
+로그인 기능은 광고하지 않는다. 키가 있는 빌드의 카카오톡 설치/미설치·취소·복귀 검증 후에만 배포한다.
 
 ### 준비된 것 — 지금 저장소에 있다
 

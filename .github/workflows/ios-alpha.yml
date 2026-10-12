@@ -8,6 +8,7 @@ on:
       - apps/v1_ios/**
       - scripts/ios/**
       - scripts/release/require-ios-production-ref.sh
+      - scripts/release/generate-ios-secrets-xcconfig.sh
       - .github/workflows/ios-alpha.yml
   push:
     branches: [dev]
@@ -15,6 +16,7 @@ on:
       - apps/v1_ios/**
       - scripts/ios/**
       - scripts/release/require-ios-production-ref.sh
+      - scripts/release/generate-ios-secrets-xcconfig.sh
       - .github/workflows/ios-alpha.yml
 
 permissions:
@@ -39,6 +41,11 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
+      - name: Verify native key and upload configuration contracts
+        run: |
+          bash scripts/ios/kakao-key-config.contract.test.sh
+          bash scripts/ios/archive-and-export.contract.test.sh
+
       - name: Install XcodeGen
         run: brew install xcodegen
 
@@ -48,6 +55,13 @@ jobs:
       # "could not find included file 'Version.generated.xcconfig'".
       - name: Generate the version xcconfig
         run: bash scripts/release/generate-ios-version-xcconfig.sh
+
+      # Optional: without the secret the build compiles with Kakao native sign-in off.
+      - name: Generate the secrets xcconfig
+        env:
+          TEAMEET_KAKAO_ALPHA_NATIVE_APP_KEY: ${{ secrets.TEAMEET_KAKAO_ALPHA_NATIVE_APP_KEY }}
+          TEAMEET_KAKAO_PRODUCTION_NATIVE_APP_KEY: ${{ secrets.TEAMEET_KAKAO_PRODUCTION_NATIVE_APP_KEY }}
+        run: bash scripts/release/generate-ios-secrets-xcconfig.sh
 
       # Teameet.xcodeproj is generated and gitignored — project.yml is the definition. This
       # step is also what catches a project.yml that names a file nobody committed.
@@ -95,6 +109,18 @@ jobs:
             -project Teameet.xcodeproj -scheme TeameetProduction -configuration 'Production Release' \
             -destination "platform=iOS Simulator,id=${{ steps.simulator.outputs.udid }}" \
             CODE_SIGNING_ALLOWED=NO
+
+      - name: Audit built production crypto dependencies
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          settings=$(xcodebuild -showBuildSettings -json \
+            -project apps/v1_ios/Teameet.xcodeproj -scheme TeameetProduction \
+            -configuration 'Production Release' \
+            -destination "platform=iOS Simulator,id=${{ steps.simulator.outputs.udid }}" \
+            CODE_SIGNING_ALLOWED=NO)
+          app=$(printf '%s' "${settings}" | python3 -c 'import json,sys; s=next(x["buildSettings"] for x in json.load(sys.stdin) if x["target"] == "Teameet"); print(s["TARGET_BUILD_DIR"] + "/" + s["WRAPPER_NAME"])')
+          bash scripts/ios/audit-built-crypto.sh "${app}"
 
       # The live harness must be inert here, and inert in a way that is visible. A bundle
       # that silently ran nothing would report the same green as one that passed, which is

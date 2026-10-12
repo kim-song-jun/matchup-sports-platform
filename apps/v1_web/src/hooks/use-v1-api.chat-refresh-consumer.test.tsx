@@ -55,6 +55,7 @@ const server = setupServer(
     const data: V1ChatRoomDetail = {
       roomId: room.roomId, roomType: room.roomType, title: serverTitle, status: room.status,
       teamContact: room.teamContact, linkedTarget: room.linkedTarget,
+      composer: { canSend: true, blockedReason: null },
       me: { participantId: 'participant-1', status: 'active', pinned: serverPinned,
         mutedUntil: null, lastReadMessageId: message.messageId }, participants: [],
     };

@@ -8,6 +8,8 @@ import { PUBLIC_SITE_ALLOW_PATHS } from '@/lib/public-site/routes';
  */
 const ALLOWED_PATHS = [
   '/landing',
+  // 수집을 막으면 검색엔진이 /home의 noindex를 읽지 못해 URL만 검색 결과에 남는다.
+  '/home',
   '/matches',
   '/teams',
   '/team-matches',
@@ -24,7 +26,6 @@ const DISALLOWED_PATHS = [
   '/auth/',
   '/callback/',
   '/chat/',
-  '/home',
   '/login',
   '/my/',
   '/notifications',

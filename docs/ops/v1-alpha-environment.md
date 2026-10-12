@@ -134,7 +134,7 @@ GitHub repository variables:
 
 IAM 신뢰 정책은 `kim-song-jun/matchup-sports-platform` 저장소의 정확한 `refs/heads/dev` subject와 수동 rollback용 정확한 `environment:alpha` subject, `sts.amazonaws.com` audience만 허용한다. GitHub의 `alpha` environment 배포 branch policy도 반드시 `dev`만 허용해야 하며, required reviewer 승인 없이 rollback job을 시작하지 않는다. GitHub role은 alpha artifact/manifest prefix와 두 alpha ECR repository push, 해당 인스턴스의 SSM 명령만 허용한다. EC2 instance role은 SSM core, alpha artifact version 읽기, 두 alpha ECR repository pull만 가진다. provisioning은 account ID, 정확한 bucket 이름/owner, EC2 `Name`·`Environment=alpha`·`Branch=dev`, SSM online 상태를 mutation 전에 확인한다. 전용 role의 과거 inline policy는 canonical policy로 교체하며 예상 밖 attached policy가 있으면 자동 삭제하지 않고 중지한다. 초기 또는 drift 복구 시 AWS CLI 로그인 후 아래 멱등 스크립트를 실행한다.
 
-문의 Slack Webhook은 `/teameet/alpha/env/SLACK_INQUIRY_WEBHOOK_URL` SecureString으로만 전달한다. GitHub role은 이 Parameter 한 개에 대한 `ssm:PutParameter`, EC2 role은 같은 Parameter의 `ssm:GetParameter`만 허용하며, SSM 명령 이력에는 비밀값 대신 Parameter 경로만 남긴다.
+런타임 비밀값(문의 Slack Webhook, APNs, 카카오 로그인)은 `/teameet/alpha/env/<이름>` SecureString으로만 전달한다. 허용 이름은 `scripts/infra/render-alpha-immutable-deploy-policies.mjs`의 목록이 정본이다: `SLACK_INQUIRY_WEBHOOK_URL`, `APNS_BUNDLE_ID`·`APNS_KEY_ID`·`APNS_PRIVATE_KEY`·`APNS_TEAM_ID`, `KAKAO_CLIENT_ID`·`KAKAO_CLIENT_SECRET`·`KAKAO_REDIRECT_URI`·`KAKAO_APP_ID`. GitHub role은 이 이름들에 대한 `ssm:PutParameter`, EC2 role은 같은 이름의 `ssm:GetParameter`만 허용하며(와일드카드 금지 — `scripts/qa/check-alpha-immutable-deploy.mjs`가 막는다), SSM 명령 이력에는 비밀값 대신 Parameter 경로만 남긴다. 값을 쓰는 쪽은 `scripts/release/sync-alpha-*-env.sh`이고, 새 sync 스크립트가 쓰는 이름은 이 목록과 검사기 목록에 함께 추가해야 한다.
 
 ```bash
 ALPHA_AWS_REGION=ap-northeast-2 \

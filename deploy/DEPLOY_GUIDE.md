@@ -152,7 +152,7 @@ gh workflow run rollback-prod.yml -f expected_active_sha=<되돌리기 직전 ac
 
 `v1_web`의 브라우저 API URL은 이미지 빌드 시 `/api/v1`로 고정한다. 배포 환경에 별도 Web base path를 설정하지 않는다.
 
-`VAPID_PUBLIC_KEY`/`VAPID_PRIVATE_KEY`/`VAPID_SUBJECT`는 **production(`deploy.yml`)에서만** GitHub Actions secret → `deploy/.env` 동기화 대상이다(4절 표, `sync_env_from_github_secret` 패턴). **Alpha(`deploy-alpha.yml` / `deploy/deploy-alpha.sh`)에는 의도적으로 배선하지 않는다** — alpha의 `deploy/.env`는 CI가 건드리지 않는 operator-managed 파일이며(`KAKAO_CLIENT_ID`/`KAKAO_CLIENT_SECRET`와 동일 선례), `GA_ALPHA`만 예외인 이유는 Web 빌드 시점에 `NEXT_PUBLIC_GA_MEASUREMENT_ID` build-arg로 번들에 굽기 위해 SSM 파라미터로 직접 전달되는 것일 뿐 `deploy/.env`에 쓰이지 않기 때문이다. VAPID는 build-arg가 아니라 `v1_api` 컨테이너 런타임 secret이므로 이 경로를 재사용할 수 없다. Alpha에서 Web Push를 켜려면 운영자가 alpha EC2의 `~/teameet/deploy/.env`에 `VAPID_PUBLIC_KEY`/`VAPID_PRIVATE_KEY`/`VAPID_SUBJECT`를 직접 추가한다(미설정 시 `WebPushService`가 graceful disable되므로 배포 자체는 안전).
+`VAPID_PUBLIC_KEY`/`VAPID_PRIVATE_KEY`/`VAPID_SUBJECT`는 **production(`deploy.yml`)에서만** GitHub Actions secret → `deploy/.env` 동기화 대상이다(4절 표, `sync_env_from_github_secret` 패턴). **Alpha(`deploy-alpha.yml` / `deploy/deploy-alpha.sh`)에는 의도적으로 배선하지 않는다** — alpha의 `deploy/.env`는 operator-managed 파일이고, CI는 `scripts/release/sync-alpha-*-env.sh`가 맡은 키(문의 Slack·APNs·카카오 로그인 `KAKAO_CLIENT_ID`/`KAKAO_CLIENT_SECRET`/`KAKAO_REDIRECT_URI`/`KAKAO_APP_ID`)만 SSM을 거쳐 고쳐 쓴다. `GA_ALPHA`가 따로인 이유는 Web 빌드 시점에 `NEXT_PUBLIC_GA_MEASUREMENT_ID` build-arg로 번들에 굽기 위해 SSM 파라미터로 직접 전달되는 것일 뿐 `deploy/.env`에 쓰이지 않기 때문이다. VAPID는 build-arg가 아니라 `v1_api` 컨테이너 런타임 secret이므로 이 경로를 재사용할 수 없다. Alpha에서 Web Push를 켜려면 운영자가 alpha EC2의 `~/teameet/deploy/.env`에 `VAPID_PUBLIC_KEY`/`VAPID_PRIVATE_KEY`/`VAPID_SUBJECT`를 직접 추가한다(미설정 시 `WebPushService`가 graceful disable되므로 배포 자체는 안전).
 
 ## 6. 컨테이너 구성
 

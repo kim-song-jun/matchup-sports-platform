@@ -119,22 +119,30 @@ export function MatchListPageClient({ seed }: { readonly seed?: CursorListSeed<V
   const query = matchFilters ? filteredMatches : allMatches;
   useCursorPaginationSnapshot(snapshotKey, { cursor, accumulated }, query);
 
-  if (query.isError) return <MatchStatePageView model={{ ...getMatchStateViewModel('error'), retry: () => void query.refetch() }} />;
+  // 다음 페이지 실패는 이미 쌓은 목록을 지우지 않는다 — 첫 페이지 실패만 전체 에러 화면이다.
+  // 커서 페이지에 성공한 데이터가 없는 상태 — 실패했거나 재시도 중이다. 데이터가 남은 채 난 배경 재검증
+  // 실패(폴링 등)는 다음 페이지 실패가 아니다.
+  const cursorPageUnavailable = Boolean(cursor) && query.data === undefined;
+  const loadMoreError = query.isError && cursorPageUnavailable;
+  if (query.isError && !loadMoreError && !(cursor && query.data !== undefined)) return <MatchStatePageView model={{ ...getMatchStateViewModel('error'), retry: () => void query.refetch() }} />;
 
   const base = getMatchListViewModel();
   const pageItems = query.data?.items;
   // 누적: cursor가 있으면(2페이지 이상) 직전까지 쌓아둔 목록 뒤에 새 페이지를 이어 붙인다 —
   // id 기준 중복 제거는 in-flight 재요청(포커스 재검증 등)이 겹쳐 와도 카드가 두 번 그려지지
   // 않게 하기 위함.
-  const items: V1Match[] | undefined = pageItems === undefined
-    ? undefined
-    : cursor
-      ? [...accumulated, ...pageItems.filter((item) => !accumulated.some((prev) => (prev.matchId ?? prev.id) === (item.matchId ?? item.id)))]
-      : pageItems;
-  const orderedItems = items ? sortMatchesByAvailability(items) : undefined;
-  const visibleItems = filterMatchesByLevels(orderedItems, selectedLevels);
+  // 가용성 정렬은 페이지 안에서만 한다 — 누적 전체를 다시 정렬하면 새 페이지의 신청 가능 카드가
+  // 앞 페이지 마감 카드 위로 끼어들어 보던 카드가 밀린다.
+  const items: V1Match[] | undefined = cursorPageUnavailable
+    ? [...accumulated]
+    : pageItems === undefined
+      ? undefined
+      : cursor
+        ? [...accumulated, ...sortMatchesByAvailability(pageItems.filter((item) => !accumulated.some((prev) => (prev.matchId ?? prev.id) === (item.matchId ?? item.id))))]
+        : sortMatchesByAvailability(pageItems);
+  const visibleItems = filterMatchesByLevels(items, selectedLevels);
   const countItems = filterMatchesByLevels((countFilters ? countMatches.data?.items ?? allMatches.data?.items : allMatches.data?.items) ?? items, selectedLevels);
-  const hasNext = query.data?.pageInfo?.hasNext ?? false;
+  const hasNext = cursorPageUnavailable || (query.data?.pageInfo?.hasNext ?? false);
   // 희소 결과(1~2건) 아래를 채우는 인접 매치 — 디자인 검수 W-3, B안.
   // 새 요청을 만들지 않는다: allMatches 는 필터가 걸려 있든 아니든 이미 돌고 있고
   // (countItems 가 같은 데이터를 쓴다) 그 무필터 목록에서 지금 보여준 것만 빼면 된다.
@@ -151,9 +159,18 @@ export function MatchListPageClient({ seed }: { readonly seed?: CursorListSeed<V
           ),
         ).slice(0, NEARBY_RAIL_MAX)
       : [];
+  // 다음 페이지 요청만 "불러오는 중"이다 — 배경 재검증(isFetching)은 버튼과 무관하다.
+  const loadMorePending = Boolean(cursor) && (query.isPlaceholderData || (cursorPageUnavailable && query.isFetching));
+  // seed(placeholder)가 떠 있는 동안에는 첫 페이지 검증 전이라 seed 의 낡은 커서를 따라가지 않게 잠근다.
+  const loadMoreLocked = query.isPlaceholderData;
   const handleLoadMore = () => {
-    if (!query.data?.pageInfo?.nextCursor || query.isFetching) return;
-    setPagination({ accumulated: orderedItems ?? [], cursor: query.data.pageInfo.nextCursor });
+    if (loadMorePending || loadMoreLocked) return;
+    if (loadMoreError) {
+      void query.refetch();
+      return;
+    }
+    if (!query.data?.pageInfo?.nextCursor) return;
+    setPagination({ accumulated: items ?? [], cursor: query.data.pageInfo.nextCursor });
   };
   const searchModel: NonNullable<MatchListViewModel['search']> = {
     value: searchValue,
@@ -190,7 +207,9 @@ export function MatchListPageClient({ seed }: { readonly seed?: CursorListSeed<V
         },
         hasNext,
         onLoadMore: handleLoadMore,
-        loadMorePending: query.isFetching,
+        loadMorePending,
+        loadMoreLocked,
+        loadMoreError,
       }
     : {
         ...base,

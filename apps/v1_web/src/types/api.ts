@@ -2222,6 +2222,8 @@ export type V1ChatMessage = {
   unreadCount?: number;
 };
 
+export type V1ChatComposerBlockedReason = 'MATCH_CANCELLED' | 'PARTICIPANTS_NOT_CONFIRMED';
+
 export type V1ChatRoomDetail = {
   roomId: string;
   roomType: 'match' | 'team' | 'team_match' | 'team_contact';
@@ -2229,6 +2231,8 @@ export type V1ChatRoomDetail = {
   title: string;
   teamContact: V1ChatRoomTeamContact | null;
   linkedTarget: V1ChatRoom['linkedTarget'];
+  /** 방은 열려 있어도 보내기가 막힌 이유. 개인 매치 방에만 값이 생긴다. */
+  composer: { canSend: boolean; blockedReason: V1ChatComposerBlockedReason | null };
   me: {
     participantId: string | null;
     status: string;

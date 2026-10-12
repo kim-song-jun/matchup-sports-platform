@@ -85,6 +85,7 @@ vi.mock('./matches-page', () => ({
       <span data-testid="match-count">{model.matches.length}</span>
       <span data-testid="nearby-order">{(model.nearbyMatches ?? []).map((match) => match.title).join('|')}</span>
       <span data-testid="nearby-count">{(model.nearbyMatches ?? []).length}</span>
+      <span data-testid="load-more-error">{String(Boolean(model.loadMoreError))}</span>
       {model.hasNext && model.onLoadMore ? <button onClick={model.onLoadMore}>더 보기</button> : null}
     </div>
   ),
@@ -462,9 +463,39 @@ describe('MatchListPageClient — 커서 페이지네이션 누적', () => {
     // cursor state 갱신 → 재렌더 → useV1Matches가 cursor-page-2로 다시 호출되어 2페이지를
     // 받고, 누적 로직이 1페이지 위에 이어 붙인다.
     expect(screen.getByTestId('match-count')).toHaveTextContent('2');
-    expect(screen.getByTestId('match-order')).toHaveTextContent('매치 2|매치 1');
+    expect(screen.getByTestId('match-order')).toHaveTextContent('매치 1|매치 2');
     // 마지막 페이지(nextCursor: null)라 "더 보기"가 사라진다.
     expect(screen.queryByRole('button', { name: '더 보기' })).not.toBeInTheDocument();
+  });
+
+  it('배경 재검증(isFetching) 중에도 더 보기 클릭이 다음 cursor를 요청한다', () => {
+    const base = useV1MatchesMock.getMockImplementation()!;
+    useV1MatchesMock.mockImplementation((filters?: { cursor?: string }, options?: { enabled?: boolean }) => ({
+      ...base(filters, options),
+      ...(filters?.cursor ? {} : { isFetching: true }),
+    }));
+    render(<MatchListPageClient />);
+
+    fireEvent.click(screen.getByRole('button', { name: '더 보기' }));
+
+    expect(useV1MatchesMock).toHaveBeenCalledWith({ cursor: 'cursor-page-2' }, expect.anything());
+    expect(screen.getByTestId('match-count')).toHaveTextContent('2');
+  });
+
+  it('다음 페이지 요청이 실패해도 쌓은 목록을 유지하고 loadMoreError 로 알린다', () => {
+    const base = useV1MatchesMock.getMockImplementation()!;
+    useV1MatchesMock.mockImplementation((filters?: { cursor?: string }, options?: { enabled?: boolean }) => (
+      filters?.cursor
+        ? { data: undefined, isError: true, isFetching: false, isPending: false, isPlaceholderData: false, refetch: vi.fn() }
+        : base(filters, options)
+    ));
+    render(<MatchListPageClient />);
+
+    fireEvent.click(screen.getByRole('button', { name: '더 보기' }));
+
+    expect(screen.getByTestId('match-count')).toHaveTextContent('1');
+    expect(screen.getByTestId('load-more-error')).toHaveTextContent('true');
+    expect(screen.getByRole('button', { name: '더 보기' })).toBeInTheDocument();
   });
 });
 

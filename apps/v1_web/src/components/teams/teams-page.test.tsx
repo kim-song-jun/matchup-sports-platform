@@ -615,6 +615,50 @@ describe('TeamFormPageView — 만들기 첫 화면', () => {
     expect(screen.getByRole('combobox', { name: '정원' })).toBeVisible();
   });
 
+  it.each([
+    ...['create', 'edit'].flatMap((mode) => [
+      { mode, team: { name: '' }, form: { sportId: 'sport-1', regionId: 'region-1' }, expected: 'textbox' },
+      { mode, team: { name: '성수 크루' }, form: { sportId: '', regionId: 'region-1' }, expected: 'sport' },
+      { mode, team: { name: '성수 크루' }, form: { sportId: 'sport-1', regionId: '' }, expected: 'region' },
+    ]),
+  ])('필수값 오류에서 첫 누락 항목으로 포커스하고 안내를 유지한다 (%j)', ({ mode, team, form, expected }) => {
+    const model = createModel({ ...form, error: '팀 이름, 종목, 지역을 모두 입력해 주세요.' });
+    model.mode = mode as 'create' | 'edit';
+    model.team = { ...model.team, ...team };
+
+    render(<TeamFormPageView model={model} />);
+
+    expect(screen.getAllByRole('alert').some((alert) => alert.textContent?.includes('팀 이름, 종목, 지역을 모두 입력해 주세요.'))).toBe(true);
+    const target = expected === 'textbox'
+      ? screen.getByRole('textbox', { name: '팀 이름' })
+      : expected === 'sport'
+        ? within(screen.getByRole('group', { name: '종목 선택' })).getByRole('button', { name: '풋살' })
+        : screen.getByRole('combobox', { name: '시군구' });
+    expect(target).toHaveFocus();
+    const descriptionTarget = expected === 'sport' ? screen.getByRole('group', { name: '종목 선택' }) : target;
+    const descriptionId = descriptionTarget.getAttribute('aria-describedby');
+    expect(descriptionId).toBeTruthy();
+    expect(document.getElementById(descriptionId!)).toBeVisible();
+  }, 15000);
+
+  it('입력 중에는 오류 효과가 포커스를 빼앗지 않고 재제출하면 다음 누락 항목으로 옮긴다', async () => {
+    const model = createModel({ sportId: '', error: '팀 이름, 종목, 지역을 모두 입력해 주세요.' });
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
+    const renderForm = (currentModel: TeamFormViewModel) => <QueryClientProvider client={queryClient}><TeamFormPageView model={currentModel} /></QueryClientProvider>;
+    const view = rtlRender(renderForm(model));
+    const nameInput = screen.getByRole('textbox', { name: '팀 이름' });
+    expect(nameInput).toHaveFocus();
+
+    view.rerender(renderForm({ ...model, team: { ...model.team, name: '성수 크루' } }));
+    expect(nameInput.isConnected).toBe(true);
+    expect(nameInput).toHaveFocus();
+
+    fireEvent.click(view.container.querySelector('.tm-team-form-cta button.tm-btn-primary')!);
+    const sportButton = within(screen.getByRole('group', { name: '종목 선택' })).getByRole('button', { name: '풋살' });
+    await waitFor(() => expect(sportButton).toHaveFocus());
+    expect(screen.getAllByRole('alert').some((alert) => alert.textContent?.includes('팀 이름, 종목, 지역을 모두 입력해 주세요.'))).toBe(true);
+  });
+
   describe('#1534 fixed CTA의 키보드 포커스 가림', () => {
     let frames: Map<number, FrameRequestCallback>;
     beforeEach(() => {
@@ -679,6 +723,41 @@ describe('TeamFormPageView — 만들기 첫 화면', () => {
       flushFocusFrames();
       expect(level).toHaveFocus();
       expect(scrollBy).not.toHaveBeenCalled();
+    });
+
+    it('inline CTA 상태에서는 scroll-area 가시 경계 밖의 포커스 필드를 올린다', () => {
+      const { level, scrollBy } = setupFocus({ position: 'static' });
+      const scroller = level.closest<HTMLElement>('.tm-scroll-area')!;
+      vi.spyOn(scroller, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 56, 787, 344));
+
+      level.focus();
+      flushFocusFrames();
+
+      expect(scrollBy).toHaveBeenCalledTimes(1);
+      expect(scrollBy.mock.calls[0][0].top).toBeGreaterThan(0);
+    });
+
+    it('입력은 보이지만 연결된 오류 설명이 scrollport 밖이면 두 요소가 함께 보이도록 스크롤한다', () => {
+      const model = createModel({ error: '팀 이름, 종목, 지역을 모두 입력해 주세요.' });
+      const view = render(<div className="tm-scroll-area"><TeamFormPageView model={model} /></div>);
+      const nameInput = screen.getByRole('textbox', { name: '팀 이름' });
+      const errorHelp = document.getElementById(nameInput.getAttribute('aria-describedby')!)!;
+      const scroller = view.container.querySelector<HTMLElement>('.tm-scroll-area')!;
+      const footer = view.container.querySelector<HTMLElement>('.tm-team-form-cta')!;
+      const scrollBy = vi.fn();
+      footer.style.position = 'static';
+      Object.defineProperty(scroller, 'scrollBy', { value: scrollBy, configurable: true });
+      vi.spyOn(scroller, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 56, 390, 334));
+      vi.spyOn(nameInput, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 340, 350, 30));
+      vi.spyOn(errorHelp, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 372, 350, 50));
+
+      nameInput.blur();
+      nameInput.focus();
+      flushFocusFrames();
+
+      expect(nameInput.getBoundingClientRect().bottom).toBeLessThan(390);
+      expect(errorHelp.getBoundingClientRect().bottom).toBeGreaterThan(390);
+      expect(scrollBy).toHaveBeenCalledWith({ top: 40, behavior: 'instant' });
     });
 
     it('Shift+Tab→Tab 반복에서도 포커스와 선택을 유지한다', async () => {

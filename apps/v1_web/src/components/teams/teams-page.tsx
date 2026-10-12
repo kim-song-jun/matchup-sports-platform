@@ -989,10 +989,13 @@ export function TeamFormPageView({
   const previewRegion = form?.regions.find((region) => region.id === form.regionId)?.name ?? team.region ?? '';
   // 저장 버튼은 화면 맨 아래, 오류 안내는 맨 위라 저장이 거절돼도 아무 일 없어 보인다 — 안내가 생기면 끌어온다.
   const errorRef = useRef<HTMLDivElement>(null);
+  const formFieldsRef = useRef<HTMLDivElement>(null);
   const fixedCtaRef = useRef<HTMLDivElement>(null);
   const focusFrameRef = useRef<number | null>(null);
+  const submitFrameRef = useRef<number | null>(null);
   useEffect(() => () => {
     if (focusFrameRef.current !== null) cancelAnimationFrame(focusFrameRef.current);
+    if (submitFrameRef.current !== null) cancelAnimationFrame(submitFrameRef.current);
   }, []);
 
   function revealFocusedField(event: FocusEvent<HTMLDivElement>) {
@@ -1005,18 +1008,62 @@ export function TeamFormPageView({
       if (document.activeElement !== target || !target.isConnected) return;
       const cta = fixedCtaRef.current;
       const scroller = target.closest<HTMLElement>('.tm-scroll-area');
-      // desktop 숨김 및 소프트 키보드의 absolute CTA는 기존 흐름을 사용한다.
-      if (!cta || !scroller || getComputedStyle(cta).position !== 'fixed') return;
-      const bar = cta.getBoundingClientRect();
+      if (!cta || !scroller) return;
+      const ctaPosition = getComputedStyle(cta).position;
       const field = target.getBoundingClientRect();
-      if (bar.height > 0 && field.bottom > bar.top && field.top < bar.bottom) {
-        scroller.scrollBy({ top: field.bottom - bar.top + 4, behavior: 'instant' });
+      if (ctaPosition === 'fixed') {
+        const bar = cta.getBoundingClientRect();
+        if (bar.height > 0 && field.bottom > bar.top && field.top < bar.bottom) {
+          scroller.scrollBy({ top: field.bottom - bar.top + 4, behavior: 'instant' });
+        }
+        return;
+      }
+      if (ctaPosition !== 'static') return;
+      const scrollport = scroller.getBoundingClientRect();
+      if (scrollport.height === 0) return;
+      const descriptionIds = (target.getAttribute('aria-describedby')
+        ?? target.closest<HTMLElement>('[aria-describedby]')?.getAttribute('aria-describedby')
+        ?? '').split(/\s+/).filter(Boolean);
+      const descriptionRects = descriptionIds
+        .map((id) => document.getElementById(id)?.getBoundingClientRect())
+        .filter((rect): rect is DOMRect => Boolean(rect && rect.height > 0));
+      const contentTop = Math.min(field.top, ...descriptionRects.map((rect) => rect.top));
+      const contentBottom = Math.max(field.bottom, ...descriptionRects.map((rect) => rect.bottom));
+      const viewport = window.visualViewport;
+      const visibleTop = Math.max(scrollport.top, viewport?.offsetTop ?? 0);
+      const visibleBottom = Math.min(scrollport.bottom, viewport ? viewport.offsetTop + viewport.height : window.innerHeight);
+      if (contentBottom > visibleBottom) {
+        scroller.scrollBy({ top: contentBottom - visibleBottom + 8, behavior: 'instant' });
+      } else if (contentTop < visibleTop) {
+        scroller.scrollBy({ top: contentTop - visibleTop - 8, behavior: 'instant' });
       }
     });
   }
   const formError = form?.error;
+  const missingRequired = !team.name.trim() ? 'name' : !form?.sportId ? 'sport' : !form?.regionId ? 'region' : null;
+  const requiredErrorId = useId();
+  function firstMissingRequiredField() {
+    if (missingRequired === 'name') return formFieldsRef.current?.querySelector<HTMLElement>('.tm-create-native-input') ?? null;
+    if (missingRequired === 'sport') return formFieldsRef.current?.querySelector<HTMLElement>('[role="group"][aria-label="종목 선택"] button') ?? null;
+    if (missingRequired === 'region') return formFieldsRef.current?.querySelector<HTMLElement>('select[aria-label="시군구"]') ?? null;
+    return null;
+  }
+
+  function submitForm() {
+    form?.onSubmit();
+    if (submitFrameRef.current !== null) cancelAnimationFrame(submitFrameRef.current);
+    submitFrameRef.current = requestAnimationFrame(() => {
+      submitFrameRef.current = null;
+      const missingField = firstMissingRequiredField();
+      if (missingField?.isConnected) missingField.focus({ preventScroll: true });
+    });
+  }
+
   useEffect(() => {
-    if (formError) revealAndFocus(errorRef.current);
+    if (!formError) return;
+    revealAndFocus(errorRef.current);
+    const missingField = firstMissingRequiredField();
+    missingField?.focus({ preventScroll: true });
   }, [formError]);
   const [logoPickerOpen, setLogoPickerOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
@@ -1046,7 +1093,7 @@ export function TeamFormPageView({
         <h1 className="tm-text-heading">{edit ? '팀 수정' : '팀 만들기'}</h1>
       </div>
       <div className="tm-team-form-grid tm-content-enter">
-        <div className="tm-create-shell tm-team-form-main" onFocusCapture={revealFocusedField}>
+        <div ref={formFieldsRef} className="tm-create-shell tm-team-form-main" onFocusCapture={revealFocusedField}>
           {edit ? (
             <Card pad={16}>
               <div className="tm-my-toggle-row">
@@ -1074,7 +1121,7 @@ export function TeamFormPageView({
             </>
           ) : null}
           {form?.error ? <div ref={errorRef} tabIndex={-1} role="alert"><Card pad={16} style={{ marginTop: 16, background: 'var(--red50)' }}><div className="tm-text-label">저장할 수 없어요</div><div className="tm-text-caption" style={{ marginTop: 4 }}>{form.error}</div></Card></div> : null}
-          <CreateField label="팀 이름" value={team.name} placeholder="예: 성수 풋살 크루" error={form?.nameError} onChange={(value) => form?.onFieldChange('name', value)} />
+          <CreateField label="팀 이름" value={team.name} placeholder="예: 성수 풋살 크루" error={form?.nameError ?? (missingRequired === 'name' ? formError ?? undefined : undefined)} onChange={(value) => form?.onFieldChange('name', value)} />
           {edit || logoPickerOpen ? (
             <TeamLogoField logoUrl={team.logoUrl} teamName={team.name} uploadImage={form?.uploadImage} onChange={(url) => form?.onFieldChange('logoUrl', url)} />
           ) : (
@@ -1101,7 +1148,7 @@ export function TeamFormPageView({
             ) : form.sports.length === 0 ? (
               <ErrorState title="종목을 불러오지 못했어요" message="잠시 후 다시 시도해 주세요." onRetry={() => window.location.reload()} />
             ) : (
-              <div className="tm-team-form-chip-row" role="group" aria-label="종목 선택">
+              <div className="tm-team-form-chip-row" role="group" aria-label="종목 선택" aria-invalid={missingRequired === 'sport' && Boolean(formError) || undefined} aria-describedby={missingRequired === 'sport' && formError ? `${requiredErrorId}-sport` : undefined}>
                 {form.sports.map((sport) => (
                   <button
                     key={sport.id}
@@ -1115,6 +1162,7 @@ export function TeamFormPageView({
                 ))}
               </div>
             )}
+            <FieldErrorText id={`${requiredErrorId}-sport`} message={missingRequired === 'sport' ? formError ?? undefined : undefined} />
           </div>
           <RegionSelect
             value={form?.regionId ?? ''}
@@ -1127,6 +1175,8 @@ export function TeamFormPageView({
                   ? '내 활동 지역으로 채웠어요. 바꿀 수 있어요.'
                   : '팀 추천과 지역 검색에 쓰여요.'
             }
+            error={missingRequired === 'region' ? formError ?? undefined : undefined}
+            errorId={`${requiredErrorId}-region`}
           />
           {edit ? (
             <>
@@ -1164,11 +1214,11 @@ export function TeamFormPageView({
         {/* Desktop-only sticky rail: live team-card preview + CTA (mobile uses the fixed CTA below). */}
         <aside className="tm-team-form-rail tm-show-desktop" aria-label="팀 미리보기">
           <TeamFormPreview team={team} sportName={previewSport} regionName={previewRegion} editing={edit} />
-          <button className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block" type="button" disabled={form?.submitting} onClick={form?.onSubmit}>{form?.submitting ? '저장 중' : edit ? '저장' : '팀 만들기'}</button>
+          <button className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block" type="button" disabled={form?.submitting} onClick={submitForm}>{form?.submitting ? '저장 중' : edit ? '저장' : '팀 만들기'}</button>
           <Link className="tm-btn tm-btn-md tm-btn-neutral tm-btn-block" href={cancelHref}>{edit ? '취소' : '이전'}</Link>
         </aside>
       </div>
-      <div ref={fixedCtaRef} className="tm-fixed-cta tm-team-form-cta tm-hide-desktop"><div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 8 }}><Link className="tm-btn tm-btn-lg tm-btn-neutral" href={cancelHref}>{edit ? '취소' : '이전'}</Link><button className="tm-btn tm-btn-lg tm-btn-primary" type="button" disabled={form?.submitting} onClick={form?.onSubmit}>{form?.submitting ? '저장 중' : edit ? '저장' : '팀 만들기'}</button></div></div>
+      <div ref={fixedCtaRef} className="tm-fixed-cta tm-team-form-cta tm-hide-desktop"><div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 8 }}><Link className="tm-btn tm-btn-lg tm-btn-neutral" href={cancelHref}>{edit ? '취소' : '이전'}</Link><button className="tm-btn tm-btn-lg tm-btn-primary" type="button" disabled={form?.submitting} onClick={submitForm}>{form?.submitting ? '저장 중' : edit ? '저장' : '팀 만들기'}</button></div></div>
     </>
   );
 }
@@ -2211,11 +2261,15 @@ function RegionSelect({
   regions,
   onChange,
   caption,
+  error,
+  errorId,
 }: {
   value: string;
   regions: Array<{ id: string; name: string; shortName?: string; parentName?: string }>;
   onChange?: (regionId: string) => void;
   caption: string;
+  error?: string;
+  errorId?: string;
 }) {
   const normalizedRegions = regions.map((region) => {
     if (region.parentName || region.shortName) return region;
@@ -2260,6 +2314,8 @@ function RegionSelect({
           value={value}
           onChange={(event) => onChange?.(event.target.value)}
           aria-label="시군구"
+          aria-invalid={Boolean(error) || undefined}
+          aria-describedby={error ? errorId : undefined}
         >
           {districtOptions.length === 0 ? <option value="">구/시 선택</option> : null}
           {districtOptions.map((region) => (
@@ -2269,6 +2325,7 @@ function RegionSelect({
           ))}
         </select>
       </div>
+      <FieldErrorText id={errorId} message={error} />
       <div className="tm-text-caption" style={{ marginTop: 8 }}>{caption}</div>
     </label>
   );

@@ -3889,6 +3889,21 @@ html[data-teameet-native-keyboard="open"] .tm-fixed-cta {
   position: absolute;
 }
 
+html.tm-keyboard-open .tm-scroll-area:has(.tm-create-shell) .tm-fixed-cta,
+html[data-teameet-native-keyboard="open"] .tm-scroll-area:has(.tm-create-shell) .tm-fixed-cta {
+  position: static;
+  left: auto;
+  bottom: auto;
+  width: auto;
+  transform: none;
+  z-index: auto;
+}
+
+html.tm-keyboard-open .tm-scroll-area:has(.tm-create-shell) .tm-create-shell,
+html[data-teameet-native-keyboard="open"] .tm-scroll-area:has(.tm-create-shell) .tm-create-shell {
+  padding-bottom: 16px;
+}
+
 html.tm-keyboard-open .tm-modal-panel,
 html[data-teameet-native-keyboard="open"] .tm-modal-panel {
   max-height: calc(var(--teameet-visual-viewport-height, 100dvh) - 24px) !important;

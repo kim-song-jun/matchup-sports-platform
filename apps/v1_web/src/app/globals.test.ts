@@ -70,6 +70,17 @@ describe('keyboard viewport layout', () => {
   });
 });
 
+describe('keyboard viewport layout', () => {
+  it('keeps form actions in document flow and removes fixed-footer reserve while the keyboard is open', () => {
+    expect(globalsCss).toMatch(
+      /html\.tm-keyboard-open \.tm-scroll-area:has\(\.tm-create-shell\) \.tm-fixed-cta,\s*html\[data-teameet-native-keyboard="open"\] \.tm-scroll-area:has\(\.tm-create-shell\) \.tm-fixed-cta\s*\{[^}]*position:\s*static;[^}]*left:\s*auto;[^}]*bottom:\s*auto;[^}]*transform:\s*none;/,
+    );
+    expect(globalsCss).toMatch(
+      /html\.tm-keyboard-open \.tm-scroll-area:has\(\.tm-create-shell\) \.tm-create-shell,\s*html\[data-teameet-native-keyboard="open"\] \.tm-scroll-area:has\(\.tm-create-shell\) \.tm-create-shell\s*\{[^}]*padding-bottom:\s*16px;/,
+    );
+  });
+});
+
 describe('data-nav-kind 선택자 형태 — 형태가 틀리면 조용히 발화하지 않는다', () => {
   // **주석을 걷어내고 본다.** 이 규칙들의 주석은 금지된 형태를 그대로 인용해 설명하므로,
   // 원문 그대로 스캔하면 설명문이 위반으로 잡힌다(실제로 한 번 걸렸다).

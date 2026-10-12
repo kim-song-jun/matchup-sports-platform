@@ -145,7 +145,7 @@ A안은 데스크톱 큰 팝업, 모바일 전체 높이 다이얼로그로 한�
 
 ## 2026-10-12 추가 요청 — A + C 선택
 
-Status (추가 요청): In Progress — PR #1853·#1863 dev 머지·alpha 배포 완료. 변경 후 생성 화면3폭·12팀 초안 저장 확인; 나머지4형식 대진 생성/편집/저장은 동일 ego326 재인증 대기.
+Status (추가 요청): In Progress — PR #1853·#1863 dev 머지·alpha 배포 완료. 생성 화면3폭·초안 보존·4형식 실제 생성/편집/저장 확인. 후속 #1873 CI·alpha의 목록 기본 팀 수/카드 대비 재검증 진행 중.
 
 - 사용자 요청: 첨부 운영자 피드백의 대회·리그 템플릿을 다듬어 dev 대상 PR과 alpha 테스트까지 진행.
 - 원문 피드백: 12강 지원이 불명확하고, 템플릿과 수기 입력이 잘 이어지지 않으며 수정·삭제가 번거롭다. 기능 제거 의견은 첨부 대화의 제안이며 사용자 확정 요구로 취급하지 않는다.
@@ -173,6 +173,9 @@ Status (추가 요청): In Progress — PR #1853·#1863 dev 머지·alpha 배포
 - 같은 새 배포의 cookie 없는 guest HTTP에서 admin/me 401 `UNAUTHENTICATED`, 비공개 QA 공개대진 404·data 없음 확인. 관리자 UI/생성/저장 검증을 대체하지 않는다. 다음 cursor: 사용자 로그인 확인 → 동일326 takeOver → 생성 2×2/3폭 after 캡처 → 4형식 실제 생성·편집·저장 → 증거·cleanup. 로그인 대기에는 task.finish를 호출하지 않는다.
 - 사용자의 ㄱㄱ 후 관리자200으로 재개. alpha eb384 실제 생성 화면에서 desktop1440/tablet768은2×2, mobile390은1열·가로 넘침0·44px 다음 CTA를 캡처했고 스크롤 끝의 성별 선택 가림 없음. Sol 실제5장 독립 캡처 PASS(BLOCK0/WARN0, 작은 SVG 보조 라벨 FYI). 새 입력 정규 리그 이동 경고→계속 작성 입력 보존→이동하기 실제 별도 route 확인. 토너먼트만 선택→12팀 초안 POST201/GET200(format knockout/status draft/scheduledAt2026-11-02T09:00Z), Runtime exception0.
 - 신규 초안 `f24be679-642b-439b-81a3-ee631eb74502`의 기본 isPublic=true다. 일반 update에 visibility를 보낸 요청400은 전용 `/visibility` 계약으로 바로잡았으나, 새로고침 뒤 auth cookie가 사라져401이 되어 private flag 저장은 미완이다. 저장된 초안의 미저장 입력 경고 문구는 실제 확인했으나 그 취소/이동 확인은 미완. 접수/공개를 시작하지 않았다. 이후 alpha f9d38(eb384의 직접 descendant, 다른 사업자 fragment PR #1866)에서 새 초안의 guest detail/bracket404·data 없음 확인. Luna 읽기 전용 auth 분석상 TTL7일·401 자체 cookie삭제 없음, 소실 직접 원인은 미확정. 같은326 이메일로그인 handOff·재인증 요청; 다음 첫 작업은 신규 초안 visibility false만 저장한 뒤 나머지4형식 대진 테스트다.
+
+- 2026-10-13 로그인 후 alpha b446537 admin200. 신규 초안 visibility false PATCH/GET200·나머지 핵심 필드 보존; 저장 초안 경고 취소 시 미저장 입력 보존·확인 시 정규 리그 route 이동·서버 초안 그대로 확인. 단독12팀12경기(3·4위 포함), 조별12팀33경기, 대회 리그4팀6경기, 정규 리그4팀6경기의 생성→첫 경기 편집→양팀·일정·장소 서버 저장 확인. 20→11→20 특수 선택 해제/잠금 해제/유효 편성 복구 확인. 정규 리그 모바일 수기 추가201→7경기·기존6ID 보존→4주차/신규 sheet/양팀 확인→닫기/reload 후 sheet0 확인. 결과·공개/진행 변경 없음. 상세 증거는 `docs/visual-qa/template-graphic-cards-20261012/README.md`.
+- 목록의 전체 대진 만들기가 실제 확정팀 수를 누락해12팀에도8로 열리는 결함과 비활성 카드 가독성 WARN을 발견·수정. Luna4소스/5테스트 변경, Sol 독립 정적 PASS. 집중70테스트·lint/typecheck/패턴 PASS. 사유 입력의 async act 경고 수정 후 해당1계약 PASS·경고 없음. 후속 dev PR #1873; exact-head CI와 배포 후 실제 기본 선택·3폭 대비가 남았다.
 
 ### Owned / Forbidden scope
 

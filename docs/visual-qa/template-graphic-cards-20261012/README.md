@@ -1,6 +1,6 @@
 # S1 그래픽 템플릿 — alpha 실측
 
-Status: 검증 진행 중. 변경 후 생성 화면·12팀 초안 저장은 확인했고, 4형식 대진 생성·편집/저장은 재인증 대기다.
+Status: 4형식 실제 생성·편집·저장 확인. 후속 PR #1873의 정확한 SHA CI와 수정 배포 후 목록 기본 팀 수·카드 대비 재검증 진행 중.
 
 사용자 선택: 대회 생성에서 진행 방식을 고르고, 대진 관리에서는 현재 방식의 템플릿을 선택한다. 기존 대회의 format 전환은 하지 않는다. 생성의 네 번째 카드는 별도 정규 리그 생성 화면으로 이동한다.
 
@@ -57,6 +57,26 @@ alpha `89e7dcba577afdeaaf190393e4fe43f0d586a3aa`, release `1.8.0-alpha.20261012.
 - Luna의 읽기 전용 auth 진단: session cookie TTL7일, RequireAuth401은 localStorage 힌트만 삭제하고 cookie 삭제는 하지 않으며, 명시적 session 삭제는 logout/withdraw 경로다. 실제 cookie 소실의 직접 원인은 확인되지 않았다. 모니터 구간 auth events가 없었던 것은 전체 이탈 구간의 부재 증거가 아니다. 사용자에게 같은326의 이메일 로그인 화면을 다시 handOff했다.
 - 이후 guest HTTP의 alpha commit은 `f9d38b30686a3b4f316eee6423da7dfcd344c951`로 바뀌었다. 다른 PR #1866의 merge이며 첫 parent가 eb384이고 템플릿 파일 변경은 없다. 이 버전에서 신규 초안 detail404 `TOURNAMENT_NOT_FOUND`, 공개bracket404·data 없음으로 비공개 초안 게이트를 확인했다. 쿠키 이탈과 배포 사이의 인과관계는 확인되지 않았다.
 
-동일 공간326의 계정 소유자 로그인 확인 후 takeOver한다. 먼저 새 초안의 visibility false만 저장하고 나머지 값을 보존한다. 저장 초안 이동의 취소/확인, 단독12팀·조별12팀·대회 리그4팀·정규 리그4팀의 선택→생성→첫 경기 편집/저장, 20→11→20 특수 프리셋 복구, 템플릿 dialog390/768/1440 실제 화면·스크롤·고정 CTA를 확인한다. 대진 생성 후 after 이미지와 저장 결과는 아직 없다.
+위 재인증 대기는 아래 2026-10-13 실제 결과로 대체한다.
 
-현재 테스트·lint 소유 PID는 모두 종료했고 임시 node_modules 링크 2개를 정확한 target 확인 후 제거했다. Node exact-command 기준 시작198/현재225이며, 동일 signature의54벌 증가는 없고 다른 세션 프로세스는 종료하지 않았다. 테스트/dev server/Docker를 추가로 띄우지 않았다. ego326은 사용자 로그인 제어 중이므로 유지하며 최종 실제 QA 종료 후 `finish({ keep: [] })`한다.
+### 2026-10-13 실제 생성·저장 (alpha b446537)
+
+- 동일 ego326 운영자 조회200, Web/API commit `b4465375611d109c3b9045a57a2b3015824f1913`. eb384 이후 커밋이며 템플릿 화면 소스는 변하지 않았다.
+- 신규 초안 `/visibility` PATCH200/GET200: isPublic=false, 제목·status·format·teamCount·scheduledAt 보존. 저장된 초안의 미저장 제목을 입력하고 정규 리그 링크의 취소에서 입력 보존, 확인에서 실제 `/admin/league-matches/new`로 이동. 서버 제목 `(QA) 그래픽 템플릿 생성1012`·draft·knockout·12팀·비공개 유지.
+
+| 형식 | 생성·편집·서버 저장 증거 |
+|---|---|
+| 토너먼트12팀 | 교체 확인→template POST201→GET200, 12경기·12자리(3·4위 포함). 첫 칸 자동 열림. 유니콘FS/제이지fs 배정과 11/2 18:00·그래픽 템플릿 QA 코트 PATCH200/GET200. fixture `6247e2f3-77bb-58e5-a42f-a12b7c545b3d`. 7팀 안내·submit disabled 확인. |
+| 조별12팀 | 2×6·2위 진출→POST201→GET200, 33경기·16자리. 4×3·1위 진출 미리보기15경기 확인 후 기본 구성 복구. 첫 칸 자동 열림, 양팀·11/2 19:00·그래픽 조별리그 QA 코트 저장200. home slot이 조별5경기에 공통 사용됨. fixture `2493225b-849b-5c70-9b6c-5198fcef9cfc`. |
+| 대회 리그4팀 | 단일3라운드/6경기↔홈어웨이6라운드/12경기 미리보기. 단일 교체 생성 후 GET200 6경기·4자리, 첫 칸 자동 열림. 잡초fs/곰빵은 가면가·11/2 20:00·그래픽 대회 리그 QA 코트 저장200. fixture `455c15a3-8f5d-5da6-bb66-80f74332268a`. |
+| 정규 리그4팀 | 단일6↔홈어웨이12 미리보기, 월요일 채우기11/2·11/9·11/16의3개 날짜→모바일 생성·첫 경기 열림→GET200 6경기·4자리. 모바일 팀 고르기로 유니콘FS/제이지fs 배정, desktop 일정 수정→PATCH200/GET200 11/2 19:30·그래픽 정규 리그 QA 코트. teamMatch `d8854db3-a8d8-44a1-919f-a8e7f8e29603`. |
+
+- 조별20팀 특수 카드 선택 시 미리보기41경기·32자리, 12강4경기+부전승4자리. 20→11에서 특수 카드·설명·미리보기 제거, submit disabled, 일반 select 잠금 해제. 11→20에서 일반4×5·2위 구성 복구와 submit enabled. 특수20팀 자체 생성·결과·진출 확정은 이번 실행에서 하지 않았다.
+- 정규 리그 모바일 목록→경기 하나 추가→팀 스피릿/알파 레드 FC·11/23 20:00→manual POST201/GET200. 신규 `05b5fa6b-ce5a-4be1-b802-83b17d9a80cf`만 추가, 원래6개ID 유지. 4주차 선택·신규 경기 sheet 자동 열림·양팀/점수 입력 UI 확인. 닫기→reload 후 열린 dialog0·1주차 초기화: 닫은 sheet 재오픈 없음. 현재 QA 정규 리그는 템플릿6+수기1 총7경기이며 비공개·결과 없음.
+- 실제 생성·일정 저장의 관측 구간 Runtime exception0. 녹아웃·정규 리그 템플릿1440/768/390 가로 넘침0·고정 CTA44px 확인. 모바일 녹아웃은 그림의 구조 편집이 큰 화면 전용이며 목록의 ‘전체 대진 만들기’ 경로로 접근한다. 모바일 전환에서 canvas 모달 unmount는 이 기존 분기다.
+- 새 이미지: 각 `after-*-template.png`, `after-*-edit.png`, 모바일 `after-knockout-template-bottom.png`·`after-regular-league-template-bottom.png`·`after-regular-league-team-edit.png`·`after-regular-league-manual-add.png`. Sol 녹아웃4장 시각 BLOCK0, 비활성 카드 전체 opacity 가독성 WARN1은 아래 수정으로 처리 중이다.
+- 실제 목록 경로가 확정팀 수를 누락해12팀에도8로 열리는 결함 발견. page→BracketTab→tools→dialog에 실제 count/status를 전달하고, disabled 카드 wrapper opacity를 제거해 읽기 쉬운 의미 색상으로 수정. Luna 구현, Sol 독립 정적 PASS, 집중5파일70테스트 PASS·lint/typecheck/패턴 PASS. 기존 사유 입력 테스트의 비동기 act 경고도 실제 continuation을 기다리도록 수정했고 해당1계약 재실행 PASS·경고 없음.
+- 후속 dev PR [#1873](https://github.com/kim-song-jun/matchup-sports-platform/pull/1873). 수정 배포 뒤 기본 팀 수와 3폭 카드 대비·나머지 조별/대회리그 dialog 캡처를 이어서 확인한다. 현재 소스 검증을 배포 후 확인으로 대신 주장하지 않는다.
+- QA 스크립트 오류는 제품 성공으로 숨기지 않았다: hidden sidebar와 일반 modal selector 혼동→실제 `.tm-modal-panel` 및 제목으로 분리, 교체 확인을 건너뛴 대기→실제 ‘교체’ 후 생성 확인, sr-only radio pointer→실제 키보드 Space 선택, regular fixtures GET의 잘못된 경로404→실제 detail GET, 저장 초안 초기 hydration 이전 click→공개 확인 hydrate 후 step1 진입. 각 오류 뒤 실제 UI/API로 결과를 확인했다.
+
+이전 10/12 단계 종료에는 테스트·lint 소유 PID가 모두 종료됐고 임시 node_modules 링크2개를 정확한 target 확인 후 제거했다. 그 단계의 Node exact-command 기준 시작198/종료225이며 동일 signature의54벌 증가는 없었다. 다른 세션 프로세스는 종료하지 않았다. 다음 단계에서는 같은 ego326을 이어 사용하며 최종 실제 QA 종료 후 `finish({ keep: [] })`한다.

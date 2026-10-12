@@ -164,6 +164,7 @@ Status (추가 요청): In Progress — PR #1853 dev 머지·alpha 배포 완료
 - 2026-10-12 재로그인 후 alpha는 `89e7dcba577afdeaaf190393e4fe43f0d586a3aa` / `1.8.0-alpha.20261012.g89e7dcba577a`, 운영자 조회 200. 최신 cross_group_round12 지원을 보존하며 origin/dev를 격리 checkout에 병합했다. 기존 12팀 QA 경기 시각 PATCH/GET `2026-11-02T09:00:00.000Z` 저장 확인. 앞선 자동화 fill은 React 변경 이벤트를 발생시키지 않아 키보드 이벤트로 바로잡았다.
 - Sol의 독립 계약 검토에서 생성 API가 저장하지 않는 단일/홈·어웨이 그림과 저장된 초안의 미저장 입력 경고 누락을 발견했다. 생성에는 중립 리그 그림을 적용하고, 저장 초안도 이동 전에 입력 유실 경고를 제공하도록 수정했다. 실제 단일/홈·어웨이 카드는 템플릿 단계에서만 사용한다.
 - S1 구현: Luna 구현, Sol 최종 정적 PASS. 12팀 그림 연결선·결승, 홈·어웨이 단계 제목, 링크 focus outline을 보완했다. 생성 카드·초안 이동 경고·12팀·리그 라운드의 집중 계약은 PASS. 기존 presentation Tab7과 240경기 제한 테스트는 로컬 5초 timeout이었고 baseline으로 단정하지 않는다. 마지막 20팀 카드 단언 수정은 재실행하지 않았으므로 정확한 PR SHA의 CI가 최종 확인한다. root tsc PASS 후 폰트 토큰·baseline을 수정하여 패턴 검사 PASS. 전체 로컬 suite/build는 반복하지 않았다.
+- 후속 dev PR [#1863](https://github.com/kim-song-jun/matchup-sports-platform/pull/1863) 생성. alpha `979500ea3`에서 재로그인 직후 admin/me 200을 확인했으나 이후 일반 auth/me 200·account active·약관 compliant 상태에서 admin/me/bracket/수기 생성이 모두 403 `Active admin access is required`로 변경됐다. 수기 생성은 성공하지 않았고 기존 QA 데이터는 그대로다. 활성 관리자 접근 문제를 계정 소유자에게 전달했으며 우회하지 않는다. PR 정확한 SHA CI·후속 배포·실제 그래픽 after 검증은 아직 미완이다.
 
 ### Owned / Forbidden scope
 

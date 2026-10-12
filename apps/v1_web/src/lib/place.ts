@@ -249,7 +249,7 @@ export function hasCoordinates(
 export type PlaceNavPlatform = 'ios' | 'android' | 'ios-web' | 'android-web' | 'web';
 
 export type PlaceNavLink = {
-  key: 'kakao' | 'naver' | 'tmap';
+  key: 'applemaps' | 'kakao' | 'naver' | 'tmap';
   label: string;
   iconSrc: string;
   description: string;
@@ -293,6 +293,9 @@ export function placeNavigationLinks(
   const { latitude, longitude } = place;
   const routable = typeof latitude === 'number' && typeof longitude === 'number';
   const mode: PlaceNavLink['mode'] = routable ? 'route' : 'search';
+  const appleMapsHref = routable
+    ? `https://maps.apple.com/?daddr=${latitude},${longitude}&dirflg=d`
+    : `https://maps.apple.com/?q=${name}`;
 
   const kakaoHref = routable
     ? inShell
@@ -320,7 +323,7 @@ export function placeNavigationLinks(
       : routable ? '웹에서 길찾기' : '이름으로 검색';
   const appDescription = routable ? '앱으로 길찾기' : '이름으로 검색';
 
-  // /map-apps/*.webp 는 각사가 앱스토어에 올린 공식 앱 아이콘(2026-10-10 받음)이다 — 상표라 변형하지 말고, 바뀌면 파일을 교체한다.
+  // /map-apps 의 앱 아이콘은 각사의 공식 앱스토어 artwork다 — 상표라 변형하지 말고, 출처는 같은 폴더 문서에 기록한다.
   const links: PlaceNavLink[] = [
     {
       key: 'kakao', label: '카카오맵', iconSrc: '/map-apps/kakaomap.webp', mode, href: kakaoHref, newTab: desktop,
@@ -331,6 +334,13 @@ export function placeNavigationLinks(
       description: inShell ? appDescription : webDescription('네이버 지도'),
     },
   ];
+  if (platform === 'ios' || platform === 'ios-web') {
+    links.unshift({
+      key: 'applemaps', label: 'Apple 지도', iconSrc: '/map-apps/applemaps.jpg', mode,
+      href: appleMapsHref, newTab: false,
+      description: routable ? 'Apple 지도에서 길찾기' : 'Apple 지도에서 이름으로 검색',
+    });
+  }
   const tmapBase = { key: 'tmap', label: '티맵', iconSrc: '/map-apps/tmap.webp', mode } as const;
   if (inShell) {
     links.push({ ...tmapBase, href: `tmap://${tmapPath}`, newTab: false, description: appDescription });
@@ -361,7 +371,8 @@ export function detectPlaceNavPlatform(): PlaceNavPlatform {
   const shell = detectNativeShell();
   if (shell) return shell;
   if (typeof navigator === 'undefined') return 'web';
-  if (/iPhone|iPad|iPod/i.test(navigator.userAgent)) return 'ios-web';
+  const isIPadDesktopSafari = navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1;
+  if (/iPhone|iPad|iPod/i.test(navigator.userAgent) || isIPadDesktopSafari) return 'ios-web';
   if (/Android/i.test(navigator.userAgent)) return 'android-web';
   return 'web';
 }

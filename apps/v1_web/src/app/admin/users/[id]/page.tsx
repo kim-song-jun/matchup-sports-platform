@@ -281,7 +281,7 @@ export default function AdminUserDetailPage() {
           >
             <h2 id="delete-user-title" className="text-[length:var(--font-size-body-lg)] font-bold text-[var(--text-strong)]">회원 삭제</h2>
             <p className="mt-2 text-sm leading-relaxed text-[var(--text-muted)]">
-              {userTitle(user)} 회원을 삭제 처리합니다. 되돌리려면 별도 상태 변경과 계정 확인이 필요해요.
+              {userTitle(user)} 회원을 삭제 처리해요. 삭제한 계정은 되돌릴 수 없지만, 이메일·전화번호·로그인 식별자를 사용해 새로 가입할 수 있어요.
             </p>
             <label className="mt-4 block text-sm font-semibold text-[var(--text-body)]" htmlFor="delete-user-reason">
               삭제 사유

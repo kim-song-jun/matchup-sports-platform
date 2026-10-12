@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { ArrowLeft, ArrowRight, Check, ChevronLeft, Copy, Lock } from 'lucide-react';
-import { useEffect, useReducer, useRef, useState, type FocusEvent } from 'react';
+import { useEffect, useReducer, useRef, useState, type FocusEvent, type MouseEvent } from 'react';
 import {
   useV1AdminTournament,
   useV1AdminTournaments,
@@ -53,6 +53,7 @@ import {
   type TournamentCreateState,
 } from './tournament-create-model';
 import { useSaveTournamentPeriodSettings, useTournamentPeriodSettings } from '@/hooks/use-tournament-period-settings';
+import { CompetitionTemplateCard } from '@/shared/ui/competition-template-card';
 
 function scrollBehavior(): ScrollBehavior {
   return window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth';
@@ -90,6 +91,20 @@ export default function AdminTournamentsNewPage() {
     (tournament) => tournament.bankName || tournament.bankAccount || tournament.bankHolder,
   );
   const { confirm, ConfirmModal: startRegistrationConfirmModal } = useConfirm();
+
+  const handleRegularLeagueNavigation = async (event: MouseEvent<HTMLAnchorElement>) => {
+    if (!state.draftId && JSON.stringify(state) === JSON.stringify(INITIAL_TOURNAMENT_CREATE_STATE)) return;
+    event.preventDefault();
+    const ok = await confirm({
+      title: '정규 리그 생성 화면으로 이동할까요?',
+      message: state.draftId
+        ? '대회 초안은 저장되어 있어요. 마지막 저장 이후 바꾼 내용은 저장되지 않았을 수 있어요. 이동하면 저장되지 않은 입력을 잃을 수 있어요.'
+        : '작성 중인 대회 정보는 아직 저장되지 않았어요. 정규 리그 화면으로 이동하면 입력 내용을 잃어요.',
+      confirmLabel: '이동하기',
+      cancelLabel: '계속 작성',
+    });
+    if (ok) router.push('/admin/league-matches/new');
+  };
 
   // 새로고침·직접 URL 진입(?draftId=…)으로 돌아온 경우 — 메모리 상태는 비어 있지만 이미
   // 서버에 초안이 있으므로, 그 값을 폼에 채우고 확인 단계로 보낸다. state.draftId가 이미
@@ -413,6 +428,7 @@ export default function AdminTournamentsNewPage() {
                 errors={errors}
                 dispatch={dispatch}
                 setField={setField}
+                onRegularLeagueNavigation={handleRegularLeagueNavigation}
               />
             ) : null}
             {state.step === 1 ? (
@@ -650,6 +666,7 @@ function BasicStep({
   errors,
   dispatch,
   setField,
+  onRegularLeagueNavigation,
 }: {
   state: TournamentCreateState;
   sports: SportOption[];
@@ -658,6 +675,7 @@ function BasicStep({
   errors: Record<string, string>;
   dispatch: React.Dispatch<TournamentCreateAction>;
   setField: SetField;
+  onRegularLeagueNavigation: (event: MouseEvent<HTMLAnchorElement>) => void;
 }) {
   return (
     <div className="grid gap-5">
@@ -692,38 +710,21 @@ function BasicStep({
       </div>
 
       <fieldset className="min-w-0">
-        <legend className="text-sm font-semibold text-[var(--text-body)]">대회 형식</legend>
-        <div className="mt-2 grid gap-2 sm:grid-cols-3">
-          {([
-            ['group_knockout', '조별리그 + 토너먼트', '예선 순위 후 결선'],
-            ['knockout', '토너먼트', '패하면 탈락'],
-            ['league', '리그 방식', '모든 팀이 순위 경쟁'],
-          ] as const).map(([value, label, description]) => (
-            <label
-              key={value}
-              className={[
-                'cursor-pointer rounded-xl border p-3 transition-colors',
-                state.format === value
-                  ? 'tm-on-tint border-blue-500 bg-[var(--blue50)]'
-                  : 'border-[var(--border)] hover:border-[var(--border-strong)]',
-              ].join(' ')}
-            >
-              <input
-                type="radio"
-                name="format"
-                value={value}
-                checked={state.format === value}
-                onChange={() => setField('format', value as V1TournamentFormat)}
-                // 접근성 이름을 라디오 자체에 명시적으로 고정한다 — enum 원시값(value=
-                // "group_knockout" 등)이 아니라 화면에 보이는 한국어 라벨이 스크린 리더에
-                // 그대로 읽혀야 한다.
-                aria-label={label}
-                className="sr-only"
-              />
-              <span className="block text-sm font-bold text-[var(--text-strong)]">{label}</span>
-              <span className="mt-1 block text-xs text-[var(--text-caption)]">{description}</span>
-            </label>
-          ))}
+        <legend className="text-sm font-semibold text-[var(--text-body)]">대회 진행 방식</legend>
+        <p className="mt-1 text-xs text-[var(--text-caption)]">대회 안에서 사용할 경기 형식을 골라요. 정규 리그는 별도 화면에서 만들어요.</p>
+        <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <CompetitionTemplateCard mode="radio" name="format" value="group_knockout" checked={state.format === 'group_knockout'}
+            onChange={(value) => setField('format', value as V1TournamentFormat)} graphic="groups"
+            title="조별리그 + 토너먼트" description="조별 경기 순위에 따라 결선에 진출해요." meta="조별 예선 → 결선 대진" />
+          <CompetitionTemplateCard mode="radio" name="format" value="knockout" checked={state.format === 'knockout'}
+            onChange={(value) => setField('format', value as V1TournamentFormat)} graphic="knockout"
+            title="토너먼트만" description="정해진 대진으로 경기하고, 패하면 탈락해요." meta="4·8·12·16팀 템플릿 지원" />
+          <CompetitionTemplateCard mode="radio" name="format" value="league" checked={state.format === 'league'}
+            onChange={(value) => setField('format', value as V1TournamentFormat)} graphic="league"
+            title="대회 리그전" description="이 대회 참가팀이 리그 방식으로 순위를 겨뤄요." meta="대회 형식 · 정규 리그와 별도" />
+          <CompetitionTemplateCard mode="link" href="/admin/league-matches/new" onClick={onRegularLeagueNavigation}
+            graphic="league" title="정규 리그 만들기" description="대회와 별도인 시즌 리그를 만들어요. 팀·기간·장소를 설정하는 화면으로 이동해요."
+            meta="별도 관리 화면" linkLabel="정규 리그 생성 화면으로 이동" />
         </div>
       </fieldset>
 

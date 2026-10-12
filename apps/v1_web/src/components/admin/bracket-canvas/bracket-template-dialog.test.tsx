@@ -87,7 +87,8 @@ describe('BracketTemplateDialog — 참가 수 동기화', () => {
 describe('BracketTemplateDialog — 토너먼트', () => {
   it('조별+결선에서 20팀·5조→12강을 고르면 41경기를 만들고 특수 진출 규칙을 보낸다', () => {
     renderDialog({ format: 'group_knockout' });
-    fireEvent.click(screen.getByLabelText('20팀 · 5개 조 → 12강 (3위 상위 2팀 추가)'));
+    fireEvent.change(screen.getByLabelText('참가 팀 수'), { target: { value: '20' } });
+    fireEvent.click(screen.getByRole('radio', { name: '5개 조 × 4팀 → 12강' }));
     expect(screen.getByText('경기 41개 · 자리 32개 · 연결 10개')).toBeInTheDocument();
     expect(screen.getByLabelText('조 수')).toBeDisabled();
     create();
@@ -108,7 +109,7 @@ describe('BracketTemplateDialog — 토너먼트', () => {
     fireEvent.change(screen.getByLabelText('참가 팀 수'), { target: { value: '12' } });
     expect(screen.getByText('경기 12개 · 자리 12개 · 연결 12개')).toBeInTheDocument();
     expect(screen.getByText(/진행 순서:/)).toHaveTextContent('12강 4경기 → 부전승 4자리 → 8강 4경기');
-    expect(screen.getByText(/4팀은 부전승으로 8강에 올라가요/)).toBeInTheDocument();
+    expect(screen.getByRole('radio', { name: '12팀 대진 틀' })).toHaveAccessibleDescription(/4팀은 부전승으로 8강에 올라가요/);
     fireEvent.click(screen.getByLabelText('3·4위전도 만들기'));
     expect(screen.getByText('경기 11개 · 자리 12개 · 연결 10개')).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText('참가 팀 수'), { target: { value: '4' } });
@@ -192,6 +193,7 @@ describe('BracketTemplateDialog — 리그 방식 대회', () => {
     typeTeams('6');
     fireEvent.click(screen.getByLabelText('2회전'));
     expect(screen.getByText('경기 30개 · 자리 6개')).toBeInTheDocument();
+    expect(screen.getByText('진행 순서: 홈·어웨이 리그 · 10라운드 · 라운드마다 3경기')).toBeInTheDocument();
     create();
     expect(mocks.apply).toHaveBeenCalledWith({ kind: 'league', teamCount: 6, legs: 2 }, expect.any(Object));
   });
@@ -223,10 +225,15 @@ describe('BracketTemplateDialog — 열림', () => {
 
 describe('BracketTemplateDialog — 조별+결선', () => {
   const change = (label: string, value: string) => fireEvent.change(screen.getByLabelText(label), { target: { value } });
+  const chooseShape = (groups: number, teams: number, advancePerGroup = 2) => fireEvent.click(screen.getByRole('radio', {
+    name: `${groups}개 조 × ${teams}팀`,
+    description: `조별 ${advancePerGroup}위까지 진출해요. 결선은 ${groups * advancePerGroup}팀이에요.`,
+  }));
 
   it('2조 x 4팀 2팀 진출이 기본이고 만들어질 개수를 미리 보여 준다', () => {
     renderDialog({ format: 'group_knockout' });
     expect(screen.getByLabelText('조 수')).toHaveValue('2');
+    expect(screen.getByRole('radio', { name: /2개 조 × 4팀/ })).toBeChecked();
     expect(screen.getByText('경기 15개 · 자리 12개 · 연결 2개')).toBeInTheDocument();
     fireEvent.click(screen.getByLabelText('3·4위전도 만들기'));
     expect(screen.getByText('경기 16개 · 자리 12개 · 연결 4개')).toBeInTheDocument();
@@ -235,7 +242,7 @@ describe('BracketTemplateDialog — 조별+결선', () => {
   it('만들기는 계약 본문(group_knockout 평탄화)으로 보낸다', () => {
     renderDialog({ format: 'group_knockout' });
     change('참가 팀 수', '12');
-    change('가능한 조 편성', '2:6:2');
+    chooseShape(2, 6);
     change('조별 회전', '2');
     create();
     expect(mocks.apply).toHaveBeenCalledWith(
@@ -257,11 +264,11 @@ describe('BracketTemplateDialog — 조별+결선', () => {
   it('경기가 240개를 넘으면 만들 수 없다 (8조 x 6팀 x 2회전 = 247개, 5팀이면 167개로 가능)', () => {
     renderDialog({ format: 'group_knockout' });
     change('참가 팀 수', '40');
-    change('가능한 조 편성', '8:5:1');
+    chooseShape(8, 5, 1);
     change('조별 회전', '2');
     expect(screen.getByRole('button', { name: '대진 만들기' })).toBeEnabled();
     change('참가 팀 수', '48');
-    change('가능한 조 편성', '8:6:1');
+    chooseShape(8, 6, 1);
     expect(screen.getByRole('button', { name: '대진 만들기' })).toBeDisabled();
     expect(screen.getByText('경기가 240개를 넘어서 만들 수 없어요. 팀 수나 회전 수를 줄여 주세요.')).toBeInTheDocument();
   });
@@ -269,7 +276,7 @@ describe('BracketTemplateDialog — 조별+결선', () => {
   it('8조 x 4팀 2팀 진출은 16강을 만든다 — 개수 미리보기 63개(3·4위전 64개), 본문은 groupCount 8 · advancePerGroup 2', () => {
     renderDialog({ format: 'group_knockout' });
     change('참가 팀 수', '32');
-    change('가능한 조 편성', '8:4:2');
+    chooseShape(8, 4);
     expect(screen.getByRole('button', { name: '대진 만들기' })).toBeEnabled();
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
     expect(screen.getByText('경기 63개 · 자리 48개 · 연결 14개')).toBeInTheDocument();
@@ -285,11 +292,11 @@ describe('BracketTemplateDialog — 조별+결선', () => {
   it('16강 조합도 경기가 240개를 넘으면 막는다 (8조 x 6팀 x 2회전 + 16강 = 256개, 5팀이면 176개로 가능)', () => {
     renderDialog({ format: 'group_knockout' });
     change('참가 팀 수', '40');
-    change('가능한 조 편성', '8:5:2');
+    chooseShape(8, 5, 2);
     change('조별 회전', '2');
     expect(screen.getByRole('button', { name: '대진 만들기' })).toBeEnabled();
     change('참가 팀 수', '48');
-    change('가능한 조 편성', '8:6:2');
+    chooseShape(8, 6, 2);
     expect(screen.getByRole('button', { name: '대진 만들기' })).toBeDisabled();
     expect(screen.getByText('경기가 240개를 넘어서 만들 수 없어요. 팀 수나 회전 수를 줄여 주세요.')).toBeInTheDocument();
     change('조별 회전', '1');
@@ -311,5 +318,24 @@ describe('BracketTemplateDialog — 조별+결선', () => {
   it('토너먼트·리그 대회의 화면은 그대로다 — 조별 입력 칸이 없다 (대조군)', () => {
     renderDialog({ format: 'knockout' });
     expect(screen.queryByLabelText('조 수')).not.toBeInTheDocument();
+  });
+
+  it('20팀은 기존 4×5 조 구성을 유지하면서 지원하지 않는 5팀 결선 대신 특수 12강 카드를 제공한다', () => {
+    renderDialog({ format: 'group_knockout', confirmedTeamCount: 20 });
+    const fourByFiveOptions = screen.getAllByRole('radio', { name: '4개 조 × 5팀' });
+    expect(fourByFiveOptions).toHaveLength(2);
+    const finalistDescriptions = fourByFiveOptions.map((option) =>
+      document.getElementById(option.getAttribute('aria-describedby') ?? '')?.textContent,
+    );
+    expect(finalistDescriptions).toEqual(expect.arrayContaining([
+      '조별 2위까지 진출해요. 결선은 8팀이에요.',
+      '조별 1위까지 진출해요. 결선은 4팀이에요.',
+    ]));
+    const special = screen.getByRole('radio', { name: '5개 조 × 4팀 → 12강' });
+    expect(special).toBeInTheDocument();
+    expect(special).toHaveAccessibleDescription(/3위 상위 2팀.*조 1위 상위 4팀은 8강으로 직행/);
+    fireEvent.click(special);
+    expect(screen.getByText('경기 41개 · 자리 32개 · 연결 10개')).toBeInTheDocument();
+    expect(screen.getByText(/부전승 4자리/)).toBeInTheDocument();
   });
 });

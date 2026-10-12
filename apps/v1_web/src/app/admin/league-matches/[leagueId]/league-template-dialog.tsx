@@ -2,7 +2,6 @@
 
 import { useId, useState } from 'react';
 import type { V1PlaceView } from '@/types/api';
-import { SegmentedTabs } from '@/components/v1-ui/segmented-tabs';
 import { useModalA11y } from '@/components/v1-ui/use-modal-a11y';
 import { extractErrorMessage } from '@/lib/error-message';
 import { toKstDateString } from '@/lib/kst-calendar';
@@ -19,6 +18,7 @@ import {
   type LeaguePlaceChoice,
 } from './league-fixture-place-field';
 import { PLACE_NAME_MAX_LENGTH } from '@/lib/place';
+import { CompetitionTemplateCard } from '@/shared/ui/competition-template-card';
 
 const TEAM_COUNT_MIN = 3;
 const TEAM_COUNT_MAX = 20;
@@ -67,6 +67,8 @@ export function LeagueTemplateDialog({
   const teamCountInRange = teamCount !== null && teamCount >= TEAM_COUNT_MIN && teamCount <= TEAM_COUNT_MAX;
   // 템플릿은 하루에 한 라운드를 치른다 — 필요한 경기 날짜 수가 곧 라운드 수다.
   const rounds = teamCountInRange ? roundRobinRounds(teamCount, legs) : 0;
+  const singleRounds = teamCountInRange ? roundRobinRounds(teamCount, 1) : 0;
+  const doubleRounds = teamCountInRange ? roundRobinRounds(teamCount, 2) : 0;
   const hasStartsOn = !Number.isNaN(new Date(leagueStartsOn).getTime());
 
   const fillByWeekday =
@@ -145,7 +147,7 @@ export function LeagueTemplateDialog({
           </p>
         ) : null}
 
-        <div className="mb-4 grid grid-cols-2 items-start gap-3 md:max-w-xl">
+        <div className="mb-4 grid grid-cols-1 items-start gap-3 md:max-w-xl">
           <div>
             <label htmlFor="league-template-team-count" className="mb-1 block text-[length:var(--font-size-body-sm)] font-medium text-[var(--text-strong)]">팀 수</label>
             <input
@@ -158,20 +160,18 @@ export function LeagueTemplateDialog({
               className={`${inputClass} w-full`}
             />
           </div>
-          <div>
-            <p className="mb-1 block text-[length:var(--font-size-body-sm)] font-medium text-[var(--text-strong)]">방식</p>
-            <SegmentedTabs
-              ariaLabel="리그 방식"
-              role="radiogroup"
-              activeId={legs === 2 ? 'double' : 'single'}
-              onSelect={(id) => setLegs(id === 'double' ? 2 : 1)}
-              items={[
-                { id: 'single', label: '단일 리그' },
-                { id: 'double', label: '홈앤어웨이' },
-              ]}
-            />
-          </div>
         </div>
+        <fieldset className="mb-4 min-w-0 md:max-w-2xl">
+          <legend className="mb-2 text-[length:var(--font-size-body-sm)] font-semibold text-[var(--text-strong)]">경기 방식</legend>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <CompetitionTemplateCard mode="radio" name="league-template-legs" value="1" checked={legs === 1}
+              radioLabel="단일 리그" onChange={() => setLegs(1)} graphic="league-single" title="단일 리그"
+              description="모든 팀이 서로 한 번씩 경기해요." meta={teamCountInRange ? `${singleRounds}라운드 · ${plannedGameCount(teamCount, singleRounds)}경기` : '팀 수 3~20팀'} />
+            <CompetitionTemplateCard mode="radio" name="league-template-legs" value="2" checked={legs === 2}
+              radioLabel="홈앤어웨이" onChange={() => setLegs(2)} graphic="league-double" title="홈·어웨이 리그"
+              description="모든 팀이 서로 홈과 어웨이로 두 번 경기해요." meta={teamCountInRange ? `${doubleRounds}라운드 · ${plannedGameCount(teamCount, doubleRounds)}경기` : '팀 수 3~20팀'} />
+          </div>
+        </fieldset>
         {teamCountInRange ? (
           <p className="mb-4 text-[length:var(--font-size-body-sm)] font-semibold text-[var(--text-strong)]">
             {`${rounds}라운드 · ${plannedGameCount(teamCount, rounds)}경기를 만들어요`}

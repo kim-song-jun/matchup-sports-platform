@@ -448,6 +448,7 @@ export function BracketCanvasWorkspace({
           format={format}
           tournamentId={tournamentId}
           bracket={bracket}
+          onFixtureCreated={setSelectedFixtureId}
           onClose={() => setToolsMode(null)}
           showToast={showToast}
         />
@@ -458,7 +459,15 @@ export function BracketCanvasWorkspace({
           open={templateOpen}
           tournamentId={tournamentId}
           format={templateFormat}
+          confirmedTeamCount={registrations.filter((registration) => registration.status === 'confirmed').length}
+          confirmedTeamCountStatus={registrationsState.status}
           hasExistingBracket={!isEmpty}
+          onApplied={() => {
+            void refetch().then(({ data }) => {
+              const firstFixture = [...(data?.fixtures ?? [])].sort((a, b) => a.fixtureNumber - b.fixtureNumber)[0];
+              if (firstFixture) setSelectedFixtureId(firstFixture.id);
+            });
+          }}
           onClose={() => setTemplateOpen(false)}
           showToast={showToast}
         />

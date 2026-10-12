@@ -64,10 +64,13 @@ struct RootView: View {
                         .transition(model.shellTransition)
                 }
             }
-            // A universal link. This is what brings the Kakao sign-in redirect back into the
-            // app: `AllowedNavigation` sends the authorization pages out to Safari, so
-            // without this the redirect to /callback/kakao completes there and the session
-            // is created in the wrong browser.
+            // The KakaoTalk handoff returns through the `kakao<key>://` custom scheme.
+            .onOpenURL { url in
+                if config.isKakaoSignInConfigured { _ = KakaoSignInController.handle(openURL: url) }
+            }
+            // A universal link, such as the Kakao web sign-in redirect to /callback/kakao
+            // when it completes in Safari after an external handoff: it brings that last
+            // hop back into the app, where the shell's cookie store is.
             //
             // A link for another host produces no route and is ignored here, which leaves
             // the system to open it in Safari — the right outcome for a page this shell has

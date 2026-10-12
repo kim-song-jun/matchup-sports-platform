@@ -15,7 +15,7 @@ const { v1GetMock } = vi.hoisted(() => {
   const realPage: CursorPage<V1Team> = {
     items: [{ id: 'real-1', teamId: 'real-1', name: '실제 팀' } as unknown as V1Team],
     nextCursor: null,
-    pageInfo: { nextCursor: null, hasNext: false, total: 1 },
+    pageInfo: { nextCursor: null, hasNext: false, totalCount: 1 },
   };
   return { v1GetMock: vi.fn().mockResolvedValue(realPage) };
 });

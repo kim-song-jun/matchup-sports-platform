@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { BRACKET_TEMPLATE_MAX_FIXTURES, exceedsFixtureLimit, planBracketTemplateCounts } from './bracket-template-counts';
+import { BRACKET_TEMPLATE_MAX_FIXTURES, exceedsFixtureLimit, groupKnockoutShapes, planBracketTemplateCounts, recommendedKnockoutSize } from './bracket-template-counts';
 
 describe('planBracketTemplateCounts', () => {
   it.each([
@@ -36,6 +36,23 @@ describe('planBracketTemplateCounts', () => {
     ['결승만인데 3·4위전', { groupCount: 2, teamsPerGroup: 4, advancePerGroup: 1, legs: 1, thirdPlace: true }],
   ] as const)('서버가 거절하는 조별+결선 조합은 미리보기가 없다(null) — %s', (_name, rest) => {
     expect(planBracketTemplateCounts({ kind: 'group_knockout', ...rest })).toBeNull();
+  });
+});
+
+describe('participant-count template recommendations', () => {
+  it('allows knockout recommendations only for exact participant counts supported by existing templates', () => {
+    expect([4, 8, 12, 16].map(recommendedKnockoutSize)).toEqual([4, 8, 12, 16]);
+    expect([3, 5, 6, 7, 9, 10, 11, 13, 14, 15, 17].map(recommendedKnockoutSize)).toEqual(Array(11).fill(null));
+  });
+
+  it('offers exact supported group layouts, including the two existing 12-team patterns', () => {
+    expect(groupKnockoutShapes(12)).toEqual([
+      { groupCount: 2, teamsPerGroup: 6, advancePerGroup: 2 },
+      { groupCount: 2, teamsPerGroup: 6, advancePerGroup: 1 },
+      { groupCount: 4, teamsPerGroup: 3, advancePerGroup: 2 },
+      { groupCount: 4, teamsPerGroup: 3, advancePerGroup: 1 },
+    ]);
+    expect(groupKnockoutShapes(11)).toEqual([]);
   });
 });
 

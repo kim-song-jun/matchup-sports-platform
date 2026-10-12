@@ -62,9 +62,11 @@ export function LoginPageView({ model }: { model: LoginViewModel }) {
           </p>
           <p className="tm-text-caption tm-auth-policy">
             {/* P0 R-X2: 링크 텍스트 blue500(3.71:1 불통과) → blue700(#1b64da, 5.41:1 AA 통과). blue600은 4.49:1로 0.01 미달. */}
-            로그인 또는 가입을 진행하면 <Link href="/terms?document=terms" style={{ color: 'var(--blue700)' }}>서비스 이용약관</Link>과{' '}
-            <Link href="/terms?document=privacy" style={{ color: 'var(--blue700)' }}>개인정보 처리방침</Link>에 동의하는 것으로 간주돼요.
+            <Link href="/terms?document=terms" style={{ color: 'var(--blue700)' }}>서비스 이용약관</Link>과{' '}
+            <Link href="/terms?document=privacy" style={{ color: 'var(--blue700)' }}>개인정보 처리방침</Link>을 확인할 수 있어요.
           </p>
+          {/* 새로고침·뒤로가기 뒤에도 fragment를 정확히 유지하도록 문서 이동을 사용한다. */}
+          <a className="tm-auth-business-link" href="/landing#business-info">사업자 정보</a>
         </div>
       </div>
     </AuthFrame>

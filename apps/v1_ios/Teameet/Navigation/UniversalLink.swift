@@ -2,12 +2,11 @@ import Foundation
 
 /// Turns an incoming universal link into a route this shell may open.
 ///
-/// The reason this exists is the Kakao sign-in redirect. `AllowedNavigation` sends
-/// `kauth.kakao.com` — and the `accounts.kakao.com` page it redirects to — out to Safari,
-/// which is correct for a third-party authorization page but means the redirect back to
-/// `https://<origin>/callback/kakao` also lands in Safari. The reader signs in and ends up
-/// with a session in the wrong browser. A universal link brings that last hop back into the
-/// app, where the shell's cookie store is.
+/// The reason this exists is the Kakao sign-in redirect. The authorization pages
+/// (`kauth.kakao.com`, `accounts.kakao.com`) stay inside the WebView, but a login that hands
+/// off to Safari or the KakaoTalk app finishes at `https://<origin>/callback/kakao` outside
+/// the shell and would leave the reader with a session in the wrong browser. A universal link
+/// brings that last hop back into the app, where the shell's cookie store is.
 ///
 /// Kept free of UIKit so the matching rule can be tested. That matters more than it looks:
 /// iOS hands the app whatever URL the association file claimed, so a build whose

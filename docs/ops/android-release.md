@@ -31,6 +31,8 @@ Configure these public identifiers in the protected `production` environment:
 - `ANDROID_PRODUCTION_FIREBASE_APP_ID`
 - `ANDROID_PRODUCTION_FIREBASE_API_KEY`
 - `ANDROID_PRODUCTION_FIREBASE_SENDER_ID`
+- `ANDROID_PRODUCTION_KAKAO_NATIVE_APP_KEY` (the native key of the same Kakao app as
+  the server REST key and `KAKAO_APP_ID`; required by the production bundle gate)
 - `ANDROID_APP_LINKS_SHA256_CERT_FINGERPRINTS` (Play app-signing SHA-256; comma-separated
   when Play provides more than one active certificate)
 
@@ -40,6 +42,15 @@ Configure these secrets in the same environment:
 - `ANDROID_RELEASE_KEYSTORE_PASSWORD`
 - `ANDROID_RELEASE_KEY_ALIAS`
 - `ANDROID_RELEASE_KEY_PASSWORD`
+
+Before enabling native Kakao login, register package `kr.co.teameet` in that Kakao
+app with both the upload certificate and Play app-signing certificate key hashes
+(base64 of the SHA-1 certificate digest, not the App Links SHA-256 fingerprint).
+For alpha use repository variable `ANDROID_ALPHA_KAKAO_NATIVE_APP_KEY`, package
+`kr.co.teameet.alpha`, and the alpha signing certificate hash. The server needs
+`KAKAO_APP_ID` in both environments; the web and REST keys must belong to that same
+app. Verify installed/uninstalled KakaoTalk, cancellation and return-to-app on a
+device before store rollout. A passing build alone does not prove those flows.
 
 Keep the original keystore in two access-controlled backups outside GitHub. Record its alias and
 certificate fingerprints separately from its passwords. Prefer Play App Signing: the locally held key

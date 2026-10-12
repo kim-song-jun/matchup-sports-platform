@@ -192,6 +192,28 @@ describe('AuthController', () => {
     expect(authService.kakaoLogin).toHaveBeenCalledWith(dto);
   });
 
+  it('forwards a native Kakao access token to the service', async () => {
+    const authService = {
+      kakaoTokenLogin: jest.fn().mockResolvedValue({ session: { userId: 'user-1', userEmail: null } }),
+    };
+    const moduleRef = await Test.createTestingModule({
+      controllers: [AuthController],
+      providers: [
+        { provide: AuthService, useValue: authService },
+        { provide: PrismaService, useValue: {} },
+        { provide: AppleIdentityService, useValue: appleIdentityDouble() },
+      ],
+    }).compile();
+
+    const controller = moduleRef.get(AuthController);
+    const dto = { accessToken: 'native-access-token-value' };
+
+    await expect(controller.kakaoTokenLogin(dto)).resolves.toEqual({
+      session: { userId: 'user-1', userEmail: null },
+    });
+    expect(authService.kakaoTokenLogin).toHaveBeenCalledWith(dto);
+  });
+
   it('completes v1 social terms', async () => {
     const authService = {
       me: jest.fn(),

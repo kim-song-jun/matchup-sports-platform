@@ -1059,6 +1059,7 @@ button:disabled {
 
 .tm-auth-provider-row {
   display: flex;
+  flex-wrap: wrap;
   gap: 12px;
 }
 
@@ -1144,6 +1145,12 @@ button:disabled {
   color: var(--text-caption);
 }
 
+/* 버튼 행 안에 렌더되는 오류 문구: 버튼 폭을 나누지 않고 행 아래 한 줄을 쓴다. */
+.tm-auth-provider-error {
+  flex: 1 1 100%;
+  order: 1;
+}
+
 .tm-auth-provider-disabled,
 .tm-auth-provider-disabled:disabled {
   border: 1px solid var(--grey100);
@@ -1158,6 +1165,17 @@ button:disabled {
   margin-top: 16px;
   text-align: center;
   line-height: 1.6;
+}
+
+.tm-auth-business-link {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  margin-top: 8px;
+  color: var(--text-muted);
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 
 .tm-auth-body {
@@ -3880,6 +3898,21 @@ html[data-teameet-native-keyboard="open"] .tm-auth-scroll {
 html.tm-keyboard-open .tm-fixed-cta,
 html[data-teameet-native-keyboard="open"] .tm-fixed-cta {
   position: absolute;
+}
+
+html.tm-keyboard-open .tm-scroll-area:has(.tm-create-shell) .tm-fixed-cta,
+html[data-teameet-native-keyboard="open"] .tm-scroll-area:has(.tm-create-shell) .tm-fixed-cta {
+  position: static;
+  left: auto;
+  bottom: auto;
+  width: auto;
+  transform: none;
+  z-index: auto;
+}
+
+html.tm-keyboard-open .tm-scroll-area:has(.tm-create-shell) .tm-create-shell,
+html[data-teameet-native-keyboard="open"] .tm-scroll-area:has(.tm-create-shell) .tm-create-shell {
+  padding-bottom: 16px;
 }
 
 html.tm-keyboard-open .tm-modal-panel,

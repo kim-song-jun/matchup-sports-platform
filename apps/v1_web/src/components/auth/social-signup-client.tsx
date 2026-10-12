@@ -93,11 +93,11 @@ export function SocialSignupClient() {
       onFindAccount={() => void exitFlow.leaveTo('/auth/find-account')}
     />
   );
-  // 카카오가 확인해 준 값은 사용자가 임의로 바꾸지 못하게 잠근다. 단 전화번호는 예외 —
-  // 카카오 계정 번호와 실제 쓰는 번호가 다를 수 있고, 잠그면 OTP 본인인증을 통과할 방법이
-  // 사라져 가입 자체가 막힌다. 그래서 채워 주기만 하고 수정은 허용한다.
+  // 카카오가 제공한 번호는 추가 인증 없이 사용한다. 다른 번호로 바꾼 경우에만 직접 인증한다.
   const lockedName = Boolean(prefill?.name);
   const lockedGender = Boolean(prefill?.gender);
+  const kakaoPhoneAccepted = authProvider === 'kakao' && Boolean(prefill?.phone) && prefill?.phone === phoneDigits;
+  const contactReady = phoneVerified || kakaoPhoneAccepted;
 
   // 정보 입력을 미룬 계정이 활동 시도 중 돌아온 화면 — 가입 모드와 달리 건너뛰기가 없고 입력 뒤 원래 화면으로 간다.
   const activityMode = authMe.data?.user?.onboardingStatus === 'social_profile_deferred';
@@ -128,6 +128,7 @@ export function SocialSignupClient() {
     if (prefill.name) setDisplayName(prefill.name);
     if (prefill.gender) setGender(prefill.gender);
     if (prefill.phone) setPhoneDigits((current) => (current.length > 0 ? current : prefill.phone!));
+    if (prefill.birthDate) setBirthDateDigits((current) => current || prefill.birthDate!);
     setPrefillApplied(true);
   }, [prefill, prefillApplied]);
 
@@ -217,7 +218,7 @@ export function SocialSignupClient() {
       return;
     }
 
-    if (!phoneVerified) {
+    if (!contactReady) {
       setError('휴대폰 본인인증을 완료해 주세요.');
       return;
     }
@@ -429,7 +430,7 @@ export function SocialSignupClient() {
             />
           </label>
 
-          {phoneDigits.length === 11 && !phoneVerified && linking ? (
+          {phoneDigits.length === 11 && linking ? (
             <SocialLinkVerify
               phone={phoneDigits}
               providerLabel={providerLabel ?? '소셜'}
@@ -441,11 +442,11 @@ export function SocialSignupClient() {
             />
           ) : null}
 
-          {phoneDigits.length === 11 && !phoneVerified && !linking ? (
+          {phoneDigits.length === 11 && !contactReady && !linking ? (
             <PhoneVerificationCard mode="authed" phone={phoneDigits} onVerified={() => setPhoneVerified(true)} surface="inset" conflictNotice={phoneConflictNotice} />
           ) : null}
 
-          {phoneVerified ? (
+          {contactReady ? (
             <div
               className="tm-text-caption"
               role="status"
@@ -455,7 +456,7 @@ export function SocialSignupClient() {
                 aria-hidden="true"
                 style={{ width: 6, height: 6, borderRadius: 'var(--radius-circle)', background: 'var(--blue500)', display: 'inline-block' }}
               />
-              휴대폰 본인인증이 완료됐어요
+              {kakaoPhoneAccepted ? '카카오에서 받은 전화번호예요. 추가 인증 없이 사용할 수 있어요.' : '휴대폰 본인인증이 완료됐어요'}
             </div>
           ) : null}
 

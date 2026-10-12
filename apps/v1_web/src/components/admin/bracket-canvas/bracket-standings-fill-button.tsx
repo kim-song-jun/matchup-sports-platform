@@ -15,14 +15,14 @@ export function BracketStandingsFillButton({
   onError,
 }: {
   tournamentId: string;
-  slots: ReadonlyArray<{ kind: string }>;
+  slots: ReadonlyArray<{ kind: string; sourceGroupId?: string | null }>;
   teamNames: ReadonlyMap<string, string>;
   canWrite: boolean;
   onFilled?: (result: V1FillSlotsFromStandingsResult) => void;
   onError?: (message: string) => void;
 }) {
   const [open, setOpen] = useState(false);
-  if (!canWrite || !slots.some((slot) => slot.kind === 'GROUP_RANK')) return null;
+  if (!canWrite || !slots.some((slot) => slot.kind === 'GROUP_RANK' && slot.sourceGroupId !== null)) return null;
   return (
     <>
       <Button variant="outline" size="md" onClick={() => setOpen(true)}>

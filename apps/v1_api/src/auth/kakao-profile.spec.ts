@@ -3,6 +3,7 @@ import {
   normalizeKakaoGender,
   normalizeKakaoName,
   normalizeKakaoPhone,
+  normalizeKakaoBirthDate,
   readKakaoSignupPrefill,
   readSocialNicknameSeed,
 } from './kakao-profile';
@@ -54,6 +55,7 @@ describe('buildKakaoSignupPrefill', () => {
       name: null,
       phone: null,
       gender: 'female',
+      birthDate: null,
     });
   });
 });
@@ -67,7 +69,7 @@ describe('readKakaoSignupPrefill', () => {
         kakaoPhone: '01012345678',
         kakaoGender: 'male',
       }),
-    ).toEqual({ name: '홍길동', phone: '01012345678', gender: 'male' });
+    ).toEqual({ name: '홍길동', phone: '01012345678', gender: 'male', birthDate: null });
   });
 
   it('draftJson 이 없거나 형태가 다르면 null 이다', () => {
@@ -76,6 +78,19 @@ describe('readKakaoSignupPrefill', () => {
     expect(readKakaoSignupPrefill([1, 2])).toBeNull();
     // 이미지 URL 만 있던 기존 가입 건(이 기능 이전 데이터)도 안전하게 null.
     expect(readKakaoSignupPrefill({ kakaoProfileImageUrl: 'https://img.example/a.png' })).toBeNull();
+  });
+});
+
+describe('Kakao birth date', () => {
+  it('combines a complete Gregorian birthday and year without collecting age_range', () => {
+    expect(normalizeKakaoBirthDate('2000', '0229', 'SOLAR')).toBe('20000229');
+    expect(readKakaoSignupPrefill({ kakaoBirthDate: '20000229' })?.birthDate).toBe('20000229');
+  });
+  it.each([
+    ['2001', '0229', 'SOLAR'], ['2000', '0229', 'LUNAR'],
+    [undefined, '0101', 'SOLAR'], ['2000', undefined, 'SOLAR'], ['2000', '0101', undefined],
+  ])('does not invent a date from %s/%s/%s', (year, birthday, type) => {
+    expect(normalizeKakaoBirthDate(year, birthday, type)).toBeNull();
   });
 });
 

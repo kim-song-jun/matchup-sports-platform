@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { useId } from 'react';
 import { BrandMark } from '@/components/v1-ui/brand-logo';
 import { businessInfoRows, type PublicSiteInfo } from '@/lib/public-site/site-info';
 import { PUBLIC_FOOTER_GROUPS } from './public-site-nav';
@@ -6,9 +7,10 @@ import { PUBLIC_FOOTER_GROUPS } from './public-site-nav';
 /** 사업자 정보 블록. 어드민이 입력하지 않은 항목은 줄째 빠진다. */
 export function PublicBusinessInfo({ siteInfo }: { siteInfo: PublicSiteInfo }) {
   const rows = businessInfoRows(siteInfo);
+  const headingId = useId();
   return (
-    <section aria-labelledby="tm-ps-business-heading">
-      <h2 id="tm-ps-business-heading" className="sr-only">사업자 정보</h2>
+    <section id="business-info" aria-labelledby={headingId}>
+      <h2 id={headingId} className="sr-only">사업자 정보</h2>
       <dl className="tm-ps-business">
         {rows.map((row) => (
           <div key={row.key} className="tm-ps-business-row">

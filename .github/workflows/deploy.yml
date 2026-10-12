@@ -297,7 +297,9 @@ jobs:
 
       # A gate that is not wired into any workflow is the same as no gate.
       - name: Alpha immutable-deploy contract checks
-        run: node scripts/qa/check-alpha-immutable-deploy.mjs
+        run: |
+          node --test scripts/release/validate-kakao-web-config.test.mjs
+          node scripts/qa/check-alpha-immutable-deploy.mjs
 
       # Task168 StageB. All four run the real target scripts against fake
       # aws/docker, never a hand-copied excerpt — see each script's own
@@ -751,6 +753,14 @@ jobs:
           INSTANCE_ID: ${{ vars.PROD_EC2_INSTANCE_ID }}
         run: bash scripts/release/resolve-prod-rollback-base.sh
 
+      - name: Validate Kakao web configuration before immutable image resolution
+        env:
+          KAKAO_CLIENT_ID: ${{ secrets.KAKAO_CLIENT_ID }}
+          KAKAO_LOGIN_JS_KEY: ${{ secrets.KAKAO_LOGIN_JS_KEY }}
+          KAKAO_REDIRECT_URI: ${{ secrets.KAKAO_REDIRECT_URI }}
+          KAKAO_WEB_ORIGIN: https://teameet.co.kr
+        run: node scripts/release/validate-kakao-web-config.mjs
+
       - name: Resolve immutable image tags
         id: images
         env:
@@ -887,6 +897,7 @@ jobs:
             NEXT_PUBLIC_API_URL=/api/v1
             INTERNAL_API_ORIGIN=${{ steps.origin.outputs.internalApiOrigin }}
             NEXT_PUBLIC_KAKAO_CLIENT_ID=${{ secrets.KAKAO_CLIENT_ID }}
+            NEXT_PUBLIC_KAKAO_LOGIN_JS_KEY=${{ secrets.KAKAO_LOGIN_JS_KEY }}
             NEXT_PUBLIC_KAKAO_REDIRECT_URI=${{ secrets.KAKAO_REDIRECT_URI }}
             NEXT_PUBLIC_KAKAO_SCOPE=${{ vars.KAKAO_SCOPE }}
             NEXT_PUBLIC_GA_MEASUREMENT_ID=${{ secrets.GA_PROD }}
@@ -1044,6 +1055,7 @@ jobs:
           SECRET_JWT_SECRET: ${{ secrets.JWT_SECRET }}
           SECRET_KAKAO_CLIENT_ID: ${{ secrets.KAKAO_CLIENT_ID }}
           SECRET_KAKAO_CLIENT_SECRET: ${{ secrets.KAKAO_CLIENT_SECRET }}
+          SECRET_KAKAO_APP_ID: ${{ secrets.KAKAO_APP_ID }}
           SECRET_KAKAO_REDIRECT_URI: ${{ secrets.KAKAO_REDIRECT_URI }}
           SECRET_KAKAO_SCOPE: ${{ vars.KAKAO_SCOPE }}
           SECRET_V1_HOST_ADMIN_PASSWORD: ${{ secrets.V1_HOST_ADMIN_PASSWORD }}

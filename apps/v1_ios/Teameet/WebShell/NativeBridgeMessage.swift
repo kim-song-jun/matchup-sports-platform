@@ -23,6 +23,9 @@ enum NativeBridge {
     /// sign-in reply can never be mistaken for a push-state reply by a page listening to both.
     static let appleResultEventName = "teameet:native-apple-result"
 
+    /// The event `requestNativeKakaoSignIn` listens for.
+    static let kakaoResultEventName = "teameet:native-kakao-result"
+
     /// The actions the web can ask for. Anything else is ignored rather than answered,
     /// because answering an action we do not implement would resolve the page's promise with
     /// a state we did not actually check.
@@ -34,6 +37,9 @@ enum NativeBridge {
         /// Sign in with Apple. Native because Apple blocks its web flow inside an embedded
         /// browser — see `apps/v1_web/src/lib/native-apple.ts`.
         case signInWithApple = "sign-in-with-apple"
+        /// Kakao Talk login through the native SDK. Advertised only by a build that carries
+        /// Kakao's native app key — see `supportedActionsJSON(kakaoConfigured:)`.
+        case signInWithKakao = "sign-in-with-kakao"
     }
 
     struct Message: Equatable {
@@ -50,6 +56,8 @@ enum NativeBridge {
         /// revocation, which keeps the reader's opt-in — see `PushRevocation`. Absent on
         /// every older web build, which is read as an opt-out, the behaviour it had.
         var reason: String?
+        /// Optional consent IDs from the same configured authorize URL used by web login.
+        var scopes: [String] = []
     }
 
     /// Parses a message from the page.
@@ -72,7 +80,8 @@ enum NativeBridge {
             action: action,
             requestId: requestId,
             nonce: payload["nonce"] as? String,
-            reason: payload["reason"] as? String)
+            reason: payload["reason"] as? String,
+            scopes: payload["scopes"] as? [String] ?? [])
     }
 
     /// Builds the JavaScript that hands a result back to the page.
@@ -116,6 +125,25 @@ enum NativeBridge {
             return ""
         }
         return "window.dispatchEvent(new CustomEvent('\(appleResultEventName)',{detail:\(json)}))"
+    }
+
+    /// The reply to `sign-in-with-kakao`: the access token the server verifies, a bare
+    /// `cancelled` when the reader backed out, or `error`. The web matches on `requestId`.
+    static func kakaoResultScript(
+        requestId: String,
+        accessToken: String? = nil,
+        cancelled: Bool = false,
+        error: String? = nil
+    ) -> String {
+        var detail: [String: Any] = ["requestId": requestId]
+        if let accessToken { detail["accessToken"] = accessToken }
+        if cancelled { detail["cancelled"] = true }
+        if let error { detail["error"] = error }
+        guard let data = try? JSONSerialization.data(withJSONObject: detail),
+              let json = String(data: data, encoding: .utf8) else {
+            return ""
+        }
+        return "window.dispatchEvent(new CustomEvent('\(kakaoResultEventName)',{detail:\(json)}))"
     }
 
     /// Whether a frame that sent a message is allowed to drive the bridge.
@@ -163,12 +191,16 @@ enum NativeBridge {
     ///
     /// Android cannot grow this field — the object there is built by WebView itself — which
     /// is exactly right: no list means no shell-only action.
-    static let supportedActionsJSON: String = {
-        let quoted = Action.allCases.map { "'\($0.rawValue)'" }.joined(separator: ",")
-        return "[\(quoted)]"
-    }()
+    ///
+    /// Kakao sign-in is listed only when the build carries Kakao's native app key; without
+    /// it the SDK is never initialised, so offering the action would hang the page.
+    static func supportedActionsJSON(kakaoConfigured: Bool) -> String {
+        let actions = Action.allCases.filter { $0 != .signInWithKakao || kakaoConfigured }
+        return "[" + actions.map { "'\($0.rawValue)'" }.joined(separator: ",") + "]"
+    }
 
-    static let shimScript = """
+    static func shimScript(kakaoConfigured: Bool) -> String {
+        """
     (function () {
       var handlers = window.webkit && window.webkit.messageHandlers;
       if (!handlers || !handlers.\(handlerName)) { return; }
@@ -178,7 +210,7 @@ enum NativeBridge {
           postMessage: function (message) {
             handlers.\(handlerName).postMessage(String(message));
           },
-          supports: Object.freeze(\(supportedActionsJSON))
+          supports: Object.freeze(\(supportedActionsJSON(kakaoConfigured: kakaoConfigured)))
         }),
         writable: false,
         configurable: false,
@@ -186,4 +218,5 @@ enum NativeBridge {
       });
     })();
     """
+    }
 }

@@ -1,5 +1,33 @@
 # v1_web
 
+## 1.8.0
+
+### Minor Changes
+
+- 332fa2e: 대진 목록에서 5조·20팀의 조별리그와 12강을 생성하고, 공식 성적에 따른 진출팀을 추천·수정·일괄 저장할 수 있습니다.
+
+### Patch Changes
+
+- 222bb76: Android 웹에서도 앱 안내가 표시되고 Google Play로 연결돼요. iPhone은 기존 App Store로 연결돼요.
+- 96a5417: 로그인 화면의 사업자 정보 링크가 공개 랜딩의 상세 정보로 이동해요.
+- f24f2ce: 대회 생성의 진행 방식과 대회·정규 리그 대진 템플릿을 작은 대진 그림이 있는 카드로 비교하고, 선택한 구성의 경기 수와 진행 순서를 확인할 수 있게 개선해요.
+- e7cfe39: 해시 주소로 공개 정보를 열면 페이지가 해당 내용까지 이동해요.
+- 041b714: 로그인 사업자 정보의 항목명이 좁은 화면에서 분리되지 않게 하고 이메일의 줄 정렬을 맞춥니다. 관리자 회원 삭제 안내에 계정 복원이 불가능하며 새로 가입할 수 있음을 명확히 표시합니다.
+- b6cf128: 카카오 가입에 필요한 필수 개인정보와 선택 프로필 항목을 구분한 새 개인정보 안내를 발행하고 기존 동의 이력을 보존합니다. 로그인 화면에 관리자가 등록한 사업자 정보를 표시하고, 로그인 자체를 약관 동의로 간주하던 문구를 수정합니다.
+- 4963f39: 모바일 키보드가 열려도 팀 만들기·수정 화면의 저장 버튼이 입력 내용을 가리지 않고, 필수 항목을 비워 제출하면 첫 입력 위치와 안내를 보여줘요.
+- 9764942: 로그인 화면에는 사업자 정보 링크만 간결하게 두고, 공개 랜딩 footer에서 전체 사업자 정보를 확인할 수 있어요.
+- 095ed4e: 대회·리그 대진을 참가 팀 수와 가능한 구성부터 확인해 만들고, 템플릿 경기와 직접 추가한 경기의 팀·일정·진출 연결을 같은 편집 흐름에서 다듬을 수 있게 개선해요.
+
+## 1.7.0
+
+### Patch Changes
+
+- 7d8260f: Resync the chat room list and the open room's messages on every socket connect, first connect included, because events sent before the join are never replayed. Queries that ended in a permanent 4xx error are not refetched on connect, reconnect or tab return; transient failures (network, 408, 429, 5xx) are retried on recovery.
+- 1034e35: 카카오가 제공한 연락처의 중복 인증을 생략하고, 확인된 기존 회원 정보와 일치하면 같은 계정에 카카오 로그인을 연결합니다. 생년월일 자동 입력과 개인정보 수집 안내를 함께 반영합니다.
+- 83a196a: Separate the Kakao login JavaScript key from Maps settings so map migration and alpha test-app configuration cannot change the login application.
+- 8402952: 팀·개인 매치·팀 매치 목록 첫 페이지가 필터가 적용된 전체 건수(pageInfo.totalCount)와 종목별 건수(facets.sports)를 내려줘요. 매치 목록은 오늘(today)·모집 중(recruitingOnly) 필터와 각 건수(facets.today·recruiting)도 지원해요. 팀 목록의 pageInfo.total 은 totalCount 로 이름이 바뀌었어요.
+- c63172f: 카카오 로그인이 카카오톡 앱으로 바로 이어져요. 앱에서는 카카오 네이티브 로그인을, 웹에서는 카카오톡 로그인을 먼저 쓰고, 쓸 수 없으면 기존 카카오 로그인 화면으로 넘어가요.
+
 ## 1.6.9
 
 ### Patch Changes

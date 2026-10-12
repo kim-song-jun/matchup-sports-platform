@@ -13,7 +13,6 @@ export default async function LoginPage({
   const params = await searchParams;
   const raw = typeof params.redirect === 'string' ? params.redirect : null;
   const redirectPath = sanitizeRedirectPath(raw);
-
   return (
     <SessionEntryGate mode="login">
       <LoginPageView model={getLoginViewModel(redirectPath)} />

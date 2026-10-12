@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Puts the Kakao OAuth server credentials into the alpha host's runtime env.
 #
-# Without them `/auth/kakao` code login answers 400 OAUTH_NOT_CONFIGURED on alpha. Alpha and
-# prod share one Kakao app, so the values come from the same GitHub secrets the web build uses.
+# Without them `/auth/kakao` code login answers 400 OAUTH_NOT_CONFIGURED on alpha.
+# Alpha-specific GitHub secrets feed both this script and the matching web build.
 #
 # Same transport and quoting as sync-alpha-apple-sign-in-env.sh: values go to SSM as
 # SecureString and are written into the host's protected `deploy/.env` over SSM.
@@ -15,14 +15,15 @@ set -Eeuo pipefail
 : "${SECRET_KAKAO_CLIENT_ID:?SECRET_KAKAO_CLIENT_ID is required}"
 : "${SECRET_KAKAO_CLIENT_SECRET:?SECRET_KAKAO_CLIENT_SECRET is required}"
 : "${SECRET_ALPHA_KAKAO_REDIRECT_URI:?SECRET_ALPHA_KAKAO_REDIRECT_URI is required}"
+: "${SECRET_KAKAO_APP_ID:?SECRET_KAKAO_APP_ID is required}"
 [[ "${INSTANCE_ID}" =~ ^i-[0-9a-f]{17}$ ]]
 [[ "${AWS_REGION}" =~ ^[a-z]{2}-[a-z]+-[0-9]$ ]]
 
-# A malformed value leaves the host unchanged with a warning rather than failing the deploy.
+# Validate the complete configuration before changing AWS or the host.
 # Checked one by one: the redirect URI contains ':', so a ':'-delimited guard list cannot carry it.
 leave_unchanged() {
-  echo "::warning::$1 does not look right ($2 chars); the host's Kakao env was left unchanged"
-  exit 0
+  echo "::error::$1 does not look right ($2 chars); the host's Kakao env was left unchanged"
+  exit 1
 }
 client_id_pattern='^[0-9a-f]{32}$'
 client_secret_pattern='^[A-Za-z0-9]{16,64}$'
@@ -31,18 +32,9 @@ redirect_pattern='^https://alpha\.teameet\.co\.kr/[A-Za-z0-9._~/-]*$'
 [[ "${SECRET_KAKAO_CLIENT_SECRET}" =~ ${client_secret_pattern} ]] || leave_unchanged KAKAO_CLIENT_SECRET "${#SECRET_KAKAO_CLIENT_SECRET}"
 [[ "${SECRET_ALPHA_KAKAO_REDIRECT_URI}" =~ ${redirect_pattern} ]] || leave_unchanged KAKAO_REDIRECT_URI "${#SECRET_ALPHA_KAKAO_REDIRECT_URI}"
 
-names=(KAKAO_CLIENT_ID KAKAO_CLIENT_SECRET KAKAO_REDIRECT_URI)
-values=("${SECRET_KAKAO_CLIENT_ID}" "${SECRET_KAKAO_CLIENT_SECRET}" "${SECRET_ALPHA_KAKAO_REDIRECT_URI}")
-
-# The app id is optional (it only gates the native app flow); written only when it is all digits.
-if [[ -n "${SECRET_KAKAO_APP_ID:-}" ]]; then
-  if [[ "${SECRET_KAKAO_APP_ID}" =~ ^[0-9]+$ ]]; then
-    names+=(KAKAO_APP_ID)
-    values+=("${SECRET_KAKAO_APP_ID}")
-  else
-    echo "::warning::KAKAO_APP_ID is not all digits (${#SECRET_KAKAO_APP_ID} chars); it was not written"
-  fi
-fi
+[[ "${SECRET_KAKAO_APP_ID}" =~ ^[0-9]+$ ]] || leave_unchanged KAKAO_APP_ID "${#SECRET_KAKAO_APP_ID}"
+names=(KAKAO_CLIENT_ID KAKAO_CLIENT_SECRET KAKAO_REDIRECT_URI KAKAO_APP_ID)
+values=("${SECRET_KAKAO_CLIENT_ID}" "${SECRET_KAKAO_CLIENT_SECRET}" "${SECRET_ALPHA_KAKAO_REDIRECT_URI}" "${SECRET_KAKAO_APP_ID}")
 
 for index in "${!names[@]}"; do
   aws ssm put-parameter --region "${AWS_REGION}" \

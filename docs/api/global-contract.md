@@ -1,12 +1,14 @@
 # Global v1 API contract
 
+조별 성적 기반 12강 배정은 [tournaments](./domains/tournaments.md)의 `round12-preview` / `round12-assignments` 계약을 따른다. 읽기는 support 포함, 쓰기는 mutation admin만 허용한다. 미리보기의 버전은 저장 시 다시 검증하며 성적·대진 변경은 409로 차단한다. 12자리 및 부전승·8강 직행 반영은 단일 트랜잭션이며 부분 성공 응답은 없다.
+
 This contract is frozen against the approved Task 127 plan. Domain documents provide navigation and domain-specific policy; this registry is the exact cross-domain REST, field, actor, idempotency, error, transition, and compensation contract.
 
 <!-- API_CONTRACT_PLAN_SHA256:06e363a416b9f031c14ec854e1842f5412f4d72e971745edcd792c9365249edc -->
 
 <!-- API_CONTRACT_SECTION_BEGIN:Frozen REST and idempotency contract -->
 ### Frozen REST and idempotency contract
-All responses use `{status,data,timestamp}`. Collection reads use `limit` (default 20, max 100), opaque `cursor`, and `{items,nextCursor}`. All authenticated mutations carry `Idempotency-Key`; all versioned mutations carry `expectedVersion`. Canonical scope is `(actorUserId, action, resourceType, resourceId, idempotencyKey)`, retained 30 days. Same key + same SHA-256 payload replays the original status/body; same key + different payload returns `409 IDEMPOTENCY_PAYLOAD_CONFLICT`. For game commands, `clientCommandId` is required to equal the normalized `Idempotency-Key`; the same value is persisted atomically in `V1IdempotencyRecord`, so changing only the header or only the body returns `422 COMMAND_IDEMPOTENCY_KEY_MISMATCH`, and reusing the value with a different payload returns the canonical 409. Stale version returns `409 VERSION_CONFLICT`; validation `422`; missing resource `404`; unauthenticated `401`; authorization `403`.
+All responses use `{status,data,timestamp}`. Collection reads use `limit` (default 20, max 100), opaque `cursor`, and `{items,nextCursor}`. 팀·개인 매치·팀 매치 목록은 추가로 `includeFacets=true` 를 보낸 첫 페이지(커서 없음)에만 `pageInfo.totalCount`(필터가 적용된 전체 건수)와 최상위 `facets`(종목별 건수, 매치 목록은 `today`·`recruiting` 포함)를 싣는다 — 요청하지 않았거나 `cursor` 가 있으면 둘 다 없고 집계 쿼리도 돌리지 않는다(폴링·부가 조회는 보내지 않는다). 상세는 각 도메인 문서를 따른다. All authenticated mutations carry `Idempotency-Key`; all versioned mutations carry `expectedVersion`. Canonical scope is `(actorUserId, action, resourceType, resourceId, idempotencyKey)`, retained 30 days. Same key + same SHA-256 payload replays the original status/body; same key + different payload returns `409 IDEMPOTENCY_PAYLOAD_CONFLICT`. For game commands, `clientCommandId` is required to equal the normalized `Idempotency-Key`; the same value is persisted atomically in `V1IdempotencyRecord`, so changing only the header or only the body returns `422 COMMAND_IDEMPOTENCY_KEY_MISMATCH`, and reusing the value with a different payload returns the canonical 409. Stale version returns `409 VERSION_CONFLICT`; validation `422`; missing resource `404`; unauthenticated `401`; authorization `403`.
 
 | Method/path | Request → response fields | Authorized actor/action |
 |---|---|---|
@@ -111,6 +113,8 @@ Global `ValidationPipe` settings: `whitelist: true`, `forbidNonWhitelisted: true
 the API — unknown body/query fields can produce `400`.
 
 ## Authentication
+
+Kakao signup confirms server-fetched provider contacts without duplicate OTP. Existing verified contacts may link Kakao to the same member; conflicting contacts return `409 SOCIAL_LINK_CONTACT_CONFLICT`. Email signup retains its direct verification gates. See [Auth](./domains/auth.md#kakao-contact-confirmation-and-automatic-account-linking) for the ownership and profile-completion rules.
 
 Production authentication uses the signed `teameet_v1_session` HttpOnly cookie issued by successful
 email registration/login and Kakao/Apple authentication responses (see [Auth](./domains/auth.md)).

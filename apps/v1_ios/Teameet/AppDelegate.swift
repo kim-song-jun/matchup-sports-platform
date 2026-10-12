@@ -1,3 +1,4 @@
+import KakaoSDKCommon
 import UIKit
 import UserNotifications
 
@@ -21,6 +22,10 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
         _ application: UIApplication,
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
     ) -> Bool {
+        // Without Kakao's key the SDK stays untouched and the bridge never advertises Kakao.
+        if AppConfig.main.isKakaoSignInConfigured {
+            KakaoSDK.initSDK(appKey: AppConfig.main.kakaoNativeAppKey)
+        }
         let coordinator = PushCoordinator(config: AppConfig.main)
         push = coordinator
         UNUserNotificationCenter.current().delegate = self

@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import type { CSSProperties, FocusEvent, ReactNode } from 'react';
-import { useEffect, useId, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { Check, ChevronDown, Info, Lock } from 'lucide-react';
 import { useShellOverride } from '@/components/v1-ui/shell-override';
 import { AppBackLink } from '@/components/v1-ui/app-back-link';
@@ -989,35 +989,129 @@ export function TeamFormPageView({
   const previewRegion = form?.regions.find((region) => region.id === form.regionId)?.name ?? team.region ?? '';
   // 저장 버튼은 화면 맨 아래, 오류 안내는 맨 위라 저장이 거절돼도 아무 일 없어 보인다 — 안내가 생기면 끌어온다.
   const errorRef = useRef<HTMLDivElement>(null);
+  const formFieldsRef = useRef<HTMLDivElement>(null);
   const fixedCtaRef = useRef<HTMLDivElement>(null);
   const focusFrameRef = useRef<number | null>(null);
+  const submitFrameRef = useRef<number | null>(null);
+  const viewportFrameRef = useRef<number | null>(null);
   useEffect(() => () => {
     if (focusFrameRef.current !== null) cancelAnimationFrame(focusFrameRef.current);
+    if (submitFrameRef.current !== null) cancelAnimationFrame(submitFrameRef.current);
   }, []);
+
+  const revealFieldAndDescription = useCallback((target: HTMLElement) => {
+    const cta = fixedCtaRef.current;
+    const scroller = target.closest<HTMLElement>('.tm-scroll-area');
+    if (!cta || !scroller) return;
+    const ctaPosition = getComputedStyle(cta).position;
+    if (ctaPosition !== 'fixed' && ctaPosition !== 'static') return;
+    const field = target.getBoundingClientRect();
+    const descriptionIds = (target.getAttribute('aria-describedby')
+      ?? target.closest<HTMLElement>('[aria-describedby]')?.getAttribute('aria-describedby')
+      ?? '').split(/\s+/).filter(Boolean);
+    const descriptionRects = descriptionIds
+      .map((id) => document.getElementById(id)?.getBoundingClientRect())
+      .filter((rect): rect is DOMRect => Boolean(rect && rect.height > 0));
+    const contentTop = Math.min(field.top, ...descriptionRects.map((rect) => rect.top));
+    const contentBottom = Math.max(field.bottom, ...descriptionRects.map((rect) => rect.bottom));
+    const scrollport = scroller.getBoundingClientRect();
+    if (scrollport.height === 0) return;
+    const viewport = window.visualViewport;
+    let visibleTop = Math.max(scrollport.top, viewport?.offsetTop ?? 0);
+    let visibleBottom = Math.min(scrollport.bottom, viewport ? viewport.offsetTop + viewport.height : window.innerHeight);
+    if (ctaPosition === 'fixed') {
+      const bar = cta.getBoundingClientRect();
+      if (bar.height > 0) visibleBottom = Math.min(visibleBottom, bar.top);
+    }
+    if (contentBottom > visibleBottom) {
+      scroller.scrollBy({ top: contentBottom - visibleBottom + (ctaPosition === 'fixed' ? 4 : 8), behavior: 'instant' });
+    } else if (contentTop < visibleTop) {
+      scroller.scrollBy({ top: contentTop - visibleTop - 8, behavior: 'instant' });
+    }
+  }, []);
+
+  useEffect(() => {
+    const viewport = window.visualViewport;
+    const revealAfterViewportSettles = () => {
+      if (viewportFrameRef.current !== null) cancelAnimationFrame(viewportFrameRef.current);
+      viewportFrameRef.current = requestAnimationFrame(() => {
+        viewportFrameRef.current = null;
+        const active = document.activeElement;
+        if (active instanceof HTMLElement && formFieldsRef.current?.contains(active) && active.isConnected) {
+          revealFieldAndDescription(active);
+        }
+      });
+    };
+
+    window.addEventListener('resize', revealAfterViewportSettles);
+    viewport?.addEventListener('resize', revealAfterViewportSettles);
+    viewport?.addEventListener('scroll', revealAfterViewportSettles);
+
+    return () => {
+      window.removeEventListener('resize', revealAfterViewportSettles);
+      viewport?.removeEventListener('resize', revealAfterViewportSettles);
+      viewport?.removeEventListener('scroll', revealAfterViewportSettles);
+      if (viewportFrameRef.current !== null) {
+        cancelAnimationFrame(viewportFrameRef.current);
+        viewportFrameRef.current = null;
+      }
+    };
+  }, [revealFieldAndDescription]);
+
+  function scheduleFieldReveal(target: HTMLElement) {
+    if (focusFrameRef.current !== null) cancelAnimationFrame(focusFrameRef.current);
+    // native focus scroll 뒤의 실제 가림만 회복한다. 빠른 다음 포커스는 이전 예약을 버린다.
+    focusFrameRef.current = requestAnimationFrame(() => {
+      focusFrameRef.current = null;
+      if (document.activeElement === target && target.isConnected) revealFieldAndDescription(target);
+    });
+  }
 
   function revealFocusedField(event: FocusEvent<HTMLDivElement>) {
     const target = event.target;
-    if (!(target instanceof HTMLElement)) return;
-    if (focusFrameRef.current !== null) cancelAnimationFrame(focusFrameRef.current);
-    // native focus 스크롤 뒤의 실제 가림만 회복한다. 빠른 다음 포커스는 이전 예약을 버린다.
-    focusFrameRef.current = requestAnimationFrame(() => {
-      focusFrameRef.current = null;
-      if (document.activeElement !== target || !target.isConnected) return;
-      const cta = fixedCtaRef.current;
-      const scroller = target.closest<HTMLElement>('.tm-scroll-area');
-      // desktop 숨김 및 소프트 키보드의 absolute CTA는 기존 흐름을 사용한다.
-      if (!cta || !scroller || getComputedStyle(cta).position !== 'fixed') return;
-      const bar = cta.getBoundingClientRect();
-      const field = target.getBoundingClientRect();
-      if (bar.height > 0 && field.bottom > bar.top && field.top < bar.bottom) {
-        scroller.scrollBy({ top: field.bottom - bar.top + 4, behavior: 'instant' });
+    if (target instanceof HTMLElement) scheduleFieldReveal(target);
+  }
+  const formError = form?.error;
+  const missingRequired = !team.name.trim() ? 'name' : !form?.sportId ? 'sport' : !form?.regionId ? 'region' : null;
+  type RequiredField = NonNullable<typeof missingRequired>;
+  const [submittedMissingRequired, setSubmittedMissingRequired] = useState<RequiredField | null>(() => formError ? missingRequired : null);
+  const displayedMissingRequired = formError ? submittedMissingRequired : null;
+  const requiredErrorId = useId();
+  function requiredFieldElement(field: RequiredField | null) {
+    if (field === 'name') return formFieldsRef.current?.querySelector<HTMLElement>('.tm-create-native-input') ?? null;
+    if (field === 'sport') return formFieldsRef.current?.querySelector<HTMLElement>('[role="group"][aria-label="종목 선택"] button') ?? null;
+    if (field === 'region') return formFieldsRef.current?.querySelector<HTMLElement>('select[aria-label="시군구"]') ?? null;
+    return null;
+  }
+
+  function submitForm() {
+    setSubmittedMissingRequired(missingRequired);
+    form?.onSubmit();
+    if (submitFrameRef.current !== null) cancelAnimationFrame(submitFrameRef.current);
+    submitFrameRef.current = requestAnimationFrame(() => {
+      submitFrameRef.current = null;
+      const missingField = requiredFieldElement(missingRequired);
+      if (missingField?.isConnected) {
+        missingField.focus({ preventScroll: true });
+        if (focusFrameRef.current !== null) cancelAnimationFrame(focusFrameRef.current);
+        focusFrameRef.current = null;
+        revealFieldAndDescription(missingField);
       }
     });
   }
-  const formError = form?.error;
+
   useEffect(() => {
-    if (formError) revealAndFocus(errorRef.current);
-  }, [formError]);
+    if (!formError) return;
+    if (submittedMissingRequired) {
+      const missingField = requiredFieldElement(submittedMissingRequired);
+      if (missingField?.isConnected) {
+        missingField.focus({ preventScroll: true });
+        scheduleFieldReveal(missingField);
+      }
+      return;
+    }
+    revealAndFocus(errorRef.current);
+  }, [formError, submittedMissingRequired]);
   const [logoPickerOpen, setLogoPickerOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
   const moreId = useId();
@@ -1046,7 +1140,7 @@ export function TeamFormPageView({
         <h1 className="tm-text-heading">{edit ? '팀 수정' : '팀 만들기'}</h1>
       </div>
       <div className="tm-team-form-grid tm-content-enter">
-        <div className="tm-create-shell tm-team-form-main" onFocusCapture={revealFocusedField}>
+        <div ref={formFieldsRef} className="tm-create-shell tm-team-form-main" onFocusCapture={revealFocusedField}>
           {edit ? (
             <Card pad={16}>
               <div className="tm-my-toggle-row">
@@ -1073,8 +1167,8 @@ export function TeamFormPageView({
               <div className="tm-text-caption" style={{ marginTop: 4 }}>이름·종목·활동 지역만 정하면 바로 시작해요.</div>
             </>
           ) : null}
-          {form?.error ? <div ref={errorRef} tabIndex={-1} role="alert"><Card pad={16} style={{ marginTop: 16, background: 'var(--red50)' }}><div className="tm-text-label">저장할 수 없어요</div><div className="tm-text-caption" style={{ marginTop: 4 }}>{form.error}</div></Card></div> : null}
-          <CreateField label="팀 이름" value={team.name} placeholder="예: 성수 풋살 크루" error={form?.nameError} onChange={(value) => form?.onFieldChange('name', value)} />
+          {form?.error ? <div ref={errorRef} tabIndex={-1} role={displayedMissingRequired ? undefined : 'alert'}><Card pad={16} style={{ marginTop: 16, background: 'var(--red50)' }}><div className="tm-text-label">저장할 수 없어요</div><div className="tm-text-caption" style={{ marginTop: 4 }}>{form.error}</div></Card></div> : null}
+          <CreateField label="팀 이름" value={team.name} placeholder="예: 성수 풋살 크루" error={form?.nameError ?? (displayedMissingRequired === 'name' ? formError ?? undefined : undefined)} onChange={(value) => form?.onFieldChange('name', value)} />
           {edit || logoPickerOpen ? (
             <TeamLogoField logoUrl={team.logoUrl} teamName={team.name} uploadImage={form?.uploadImage} onChange={(url) => form?.onFieldChange('logoUrl', url)} />
           ) : (
@@ -1101,7 +1195,7 @@ export function TeamFormPageView({
             ) : form.sports.length === 0 ? (
               <ErrorState title="종목을 불러오지 못했어요" message="잠시 후 다시 시도해 주세요." onRetry={() => window.location.reload()} />
             ) : (
-              <div className="tm-team-form-chip-row" role="group" aria-label="종목 선택">
+              <div className="tm-team-form-chip-row" role="group" aria-label="종목 선택" aria-invalid={displayedMissingRequired === 'sport' && Boolean(formError) || undefined} aria-describedby={displayedMissingRequired === 'sport' && formError ? `${requiredErrorId}-sport` : undefined}>
                 {form.sports.map((sport) => (
                   <button
                     key={sport.id}
@@ -1115,6 +1209,7 @@ export function TeamFormPageView({
                 ))}
               </div>
             )}
+            <FieldErrorText id={`${requiredErrorId}-sport`} message={displayedMissingRequired === 'sport' ? formError ?? undefined : undefined} />
           </div>
           <RegionSelect
             value={form?.regionId ?? ''}
@@ -1127,6 +1222,8 @@ export function TeamFormPageView({
                   ? '내 활동 지역으로 채웠어요. 바꿀 수 있어요.'
                   : '팀 추천과 지역 검색에 쓰여요.'
             }
+            error={displayedMissingRequired === 'region' ? formError ?? undefined : undefined}
+            errorId={`${requiredErrorId}-region`}
           />
           {edit ? (
             <>
@@ -1164,11 +1261,11 @@ export function TeamFormPageView({
         {/* Desktop-only sticky rail: live team-card preview + CTA (mobile uses the fixed CTA below). */}
         <aside className="tm-team-form-rail tm-show-desktop" aria-label="팀 미리보기">
           <TeamFormPreview team={team} sportName={previewSport} regionName={previewRegion} editing={edit} />
-          <button className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block" type="button" disabled={form?.submitting} onClick={form?.onSubmit}>{form?.submitting ? '저장 중' : edit ? '저장' : '팀 만들기'}</button>
+          <button className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block" type="button" disabled={form?.submitting} onClick={submitForm}>{form?.submitting ? '저장 중' : edit ? '저장' : '팀 만들기'}</button>
           <Link className="tm-btn tm-btn-md tm-btn-neutral tm-btn-block" href={cancelHref}>{edit ? '취소' : '이전'}</Link>
         </aside>
       </div>
-      <div ref={fixedCtaRef} className="tm-fixed-cta tm-team-form-cta tm-hide-desktop"><div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 8 }}><Link className="tm-btn tm-btn-lg tm-btn-neutral" href={cancelHref}>{edit ? '취소' : '이전'}</Link><button className="tm-btn tm-btn-lg tm-btn-primary" type="button" disabled={form?.submitting} onClick={form?.onSubmit}>{form?.submitting ? '저장 중' : edit ? '저장' : '팀 만들기'}</button></div></div>
+      <div ref={fixedCtaRef} className="tm-fixed-cta tm-team-form-cta tm-hide-desktop"><div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 8 }}><Link className="tm-btn tm-btn-lg tm-btn-neutral" href={cancelHref}>{edit ? '취소' : '이전'}</Link><button className="tm-btn tm-btn-lg tm-btn-primary" type="button" disabled={form?.submitting} onClick={submitForm}>{form?.submitting ? '저장 중' : edit ? '저장' : '팀 만들기'}</button></div></div>
     </>
   );
 }
@@ -2211,11 +2308,15 @@ function RegionSelect({
   regions,
   onChange,
   caption,
+  error,
+  errorId,
 }: {
   value: string;
   regions: Array<{ id: string; name: string; shortName?: string; parentName?: string }>;
   onChange?: (regionId: string) => void;
   caption: string;
+  error?: string;
+  errorId?: string;
 }) {
   const normalizedRegions = regions.map((region) => {
     if (region.parentName || region.shortName) return region;
@@ -2260,6 +2361,8 @@ function RegionSelect({
           value={value}
           onChange={(event) => onChange?.(event.target.value)}
           aria-label="시군구"
+          aria-invalid={Boolean(error) || undefined}
+          aria-describedby={error ? errorId : undefined}
         >
           {districtOptions.length === 0 ? <option value="">구/시 선택</option> : null}
           {districtOptions.map((region) => (
@@ -2269,6 +2372,7 @@ function RegionSelect({
           ))}
         </select>
       </div>
+      <FieldErrorText id={errorId} message={error} />
       <div className="tm-text-caption" style={{ marginTop: 8 }}>{caption}</div>
     </label>
   );

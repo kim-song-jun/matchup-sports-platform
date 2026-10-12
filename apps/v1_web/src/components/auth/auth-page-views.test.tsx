@@ -42,6 +42,11 @@ describe('로그인 화면', () => {
     expect([...container.querySelectorAll('img.tm-auth-illustration')].some((img) => srcOf(img).includes('auth-welcome-640.webp'))).toBe(true);
     expect(screen.getByRole('link', { name: '이메일로 로그인' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: '로그인 없이 시작하기' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: '사업자 정보' })).toHaveAttribute('href', '/landing#business-info');
+    expect(screen.queryByRole('region', { name: '사업자 정보' })).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: '개인정보 처리방침' }).closest('p'))
+      .toHaveTextContent('서비스 이용약관과 개인정보 처리방침을 확인할 수 있어요.');
+    expect(screen.queryByText(/동의하는 것으로 간주돼요/)).not.toBeInTheDocument();
   });
 
   /**

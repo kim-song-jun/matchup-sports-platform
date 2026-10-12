@@ -18,7 +18,7 @@ in the same change that discovers the drift.
 - [Matches](./domains/matches.md)
 - [Teams](./domains/teams.md)
 - [Team matches](./domains/team-matches.md)
-- [Tournaments](./domains/tournaments.md) — 대진 생성·번호 수정·진출 연결 및 결과 계약
+- [Tournaments](./domains/tournaments.md) — 대진 생성·번호 수정·진출 연결 및 결과 계약, 5조·20팀→12강 추천·일괄 배정
 - [League matches](./domains/league-matches.md)
 - [Regular league public visibility](./domains/league-matches.md#public-visibility) — publication control, admin access and public read gates.
 - [Games](./domains/games.md)
@@ -42,6 +42,8 @@ implemented them):** Venues, Lessons, Marketplace, Payments, Mercenary. Their v0
 kept for historical reference under `docs/archive/v0-api/domains/`, not indexed here.
 
 ## Canonical sources for the frozen SM New reference (auth/onboarding, terms, games/tournament-ops)
+
+Current Kakao signup and existing-account linking use the [provider contact confirmation contract](./domains/auth.md#kakao-contact-confirmation-and-automatic-account-linking): no duplicate OTP for Kakao-provided contacts, preservation of the member ID, and explicit rejection of conflicting contacts.
 
 - Frozen reference checklist: `docs/reference/sm-new-api-v1-contract-checklist.md`
 - State machines: `docs/reference/sm-new-state-machines.md`

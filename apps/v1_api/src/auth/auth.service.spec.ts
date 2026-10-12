@@ -14,6 +14,7 @@ import {
   ForbiddenException,
   NotFoundException,
   UnauthorizedException,
+  Logger,
 } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { V1AuthProvider } from '@prisma/client';
@@ -112,7 +113,7 @@ function buildPrismaMock() {
     v1AuthIdentity: {
       findUnique: jest.fn(),
       update: jest.fn(),
-      create: jest.fn(),
+      create: jest.fn().mockResolvedValue({ id: 'created-identity' }),
     },
     v1TermsDocument: {
       findMany: jest.fn(),
@@ -124,6 +125,7 @@ function buildPrismaMock() {
     v1UserRecordConsent: {
       upsert: jest.fn(),
     },
+    v1StatusChangeLog: { create: jest.fn() },
     v1UserTermsConsent: {
       createMany: jest.fn(),
     },
@@ -847,6 +849,50 @@ describe('AuthService', () => {
     });
   });
 
+  describe('Kakao signup without duplicate phone verification', () => {
+    const input = { nickname: '카카오회원', displayName: '회원', phone: '01012345678', gender: 'female' as const, birthDate: '20000229' };
+    function arrange(draft: Record<string, unknown>, provider: V1AuthProvider = V1AuthProvider.kakao) {
+      phoneVerification.enabled = true;
+      prisma.v1User.findUnique
+        .mockResolvedValueOnce(pendingSocialUserRow({
+          onboardingStatus: 'social_profile_required', createdAt: new Date(), updatedAt: new Date(),
+          onboardingProgress: { draftJson: draft }, authIdentities: [{ id: 'i', provider }],
+        }))
+        .mockResolvedValueOnce(completedUserRow({ onboardingStatus: 'signup_done' }));
+    }
+    it('still returns provider prefill when a member resumes a deferred profile', async () => {
+      prisma.v1User.findUnique.mockResolvedValue(completedUserRow({
+        onboardingStatus: 'social_profile_deferred', onboardingProgress: { draftJson: { kakaoPhone: input.phone, kakaoBirthDate: input.birthDate } },
+      }));
+      expect((await service.me('user-1')).socialSignupPrefill).toMatchObject({ phone: input.phone, birthDate: input.birthDate });
+    });
+    it('accepts the server-fetched Kakao phone with no OTP and records its source', async () => {
+      arrange({ kakaoPhone: input.phone });
+      await service.completeSocialProfile('user-1', input);
+      expect(prisma.v1User.updateMany).toHaveBeenCalledWith(expect.objectContaining({
+        data: expect.objectContaining({ phone: input.phone, phoneVerifiedAt: expect.any(Date) }),
+      }));
+      expect(prisma.v1StatusChangeLog.create).toHaveBeenCalledWith(expect.objectContaining({
+        data: expect.objectContaining({ reason: 'kakao_provided_phone' }),
+      }));
+    });
+    it.each([
+      [{}, V1AuthProvider.kakao],
+      [{ kakaoPhone: '01099998888' }, V1AuthProvider.kakao],
+      [{ kakaoPhone: input.phone }, V1AuthProvider.apple],
+    ])('does not accept a missing, changed or unrelated provider phone', async (draft, provider) => {
+      arrange(draft, provider);
+      await expect(service.completeSocialProfile('user-1', input)).rejects.toMatchObject({ response: { code: 'PHONE_NOT_VERIFIED' } });
+      expect(prisma.v1User.updateMany).not.toHaveBeenCalled();
+    });
+    it('does not transfer a phone already owned by another user through profile submission', async () => {
+      arrange({ kakaoPhone: input.phone });
+      prisma.v1User.findFirst.mockResolvedValue({ id: 'other-user' });
+      await expect(service.completeSocialProfile('user-1', input)).rejects.toMatchObject({ response: { code: 'PHONE_CONFLICT' } });
+      expect(prisma.v1User.updateMany).not.toHaveBeenCalled();
+    });
+  });
+
   it('completeSocialProfile: consent row가 없어도 약관 단계 완료 상태면 프로필을 저장한다', async () => {
     const activeTime = new Date();
     prisma.v1User.findUnique
@@ -1216,6 +1262,229 @@ describe('AuthService', () => {
     });
   });
 
+  // ─── kakaoTokenLogin ─────────────────────────────────────────────────────
+
+  describe('kakaoTokenLogin', () => {
+    const originalFetch = global.fetch;
+    const originalEnv = { ...process.env };
+    const TOKEN = 'native-access-token-value';
+
+    const json = (body: unknown, ok = true, status = ok ? 200 : 401) =>
+      ({ ok, status, json: async () => body }) as unknown as Response;
+    const stubKakao = (responses: Response[]) => {
+      const fn = jest.fn();
+      responses.forEach((r) => fn.mockResolvedValueOnce(r));
+      global.fetch = fn as unknown as typeof fetch;
+      return fn;
+    };
+    const tokenInfo = (appId: number, id = 4994014420) => json({ id, app_id: appId, expires_in: 3000 });
+    const me = (body: Record<string, unknown> = { id: 4994014420, kakao_account: {} }) => json(body);
+
+    beforeEach(() => {
+      process.env.KAKAO_APP_ID = '123456';
+      prisma.v1User.findUnique.mockResolvedValue(pendingSocialUserRow());
+    });
+
+    afterEach(() => {
+      global.fetch = originalFetch;
+      process.env = { ...originalEnv };
+    });
+
+    it('app_id 가 우리 앱과 다르면 401 이고 프로필은 조회하지 않는다', async () => {
+      const fetchMock = stubKakao([tokenInfo(999999)]);
+
+      await expect(service.kakaoTokenLogin({ accessToken: TOKEN })).rejects.toMatchObject({
+        status: 401,
+        response: { code: 'UNAUTHENTICATED' },
+      });
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(fetchMock.mock.calls[0][0]).toBe('https://kapi.kakao.com/v1/user/access_token_info');
+      expect(prisma.v1User.create).not.toHaveBeenCalled();
+    });
+
+    it('app_id 가 같으면 같은 토큰으로 가입 흐름이 진행된다', async () => {
+      const fetchMock = stubKakao([tokenInfo(123456), me()]);
+      prisma.v1AuthIdentity.findUnique.mockResolvedValue(null);
+      prisma.v1User.create.mockResolvedValue({ id: 'new-social-user', email: null });
+
+      await service.kakaoTokenLogin({ accessToken: TOKEN });
+
+      expect(fetchMock.mock.calls[1][0]).toBe('https://kapi.kakao.com/v2/user/me');
+      expect(fetchMock.mock.calls[1][1].headers.authorization).toBe(`Bearer ${TOKEN}`);
+      expect(prisma.v1User.create).toHaveBeenCalledTimes(1);
+    });
+
+    it('KAKAO_APP_ID 가 없으면 카카오를 호출하기 전에 400 OAUTH_NOT_CONFIGURED', async () => {
+      delete process.env.KAKAO_APP_ID;
+      const fetchMock = stubKakao([]);
+
+      await expect(service.kakaoTokenLogin({ accessToken: TOKEN })).rejects.toMatchObject({
+        status: 400,
+        response: { code: 'OAUTH_NOT_CONFIGURED' },
+      });
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it('access_token_info 의 id 와 /v2/user/me 의 id 가 다르면 401', async () => {
+      stubKakao([tokenInfo(123456, 111), me({ id: 222, kakao_account: {} })]);
+
+      await expect(service.kakaoTokenLogin({ accessToken: TOKEN })).rejects.toMatchObject({
+        status: 401,
+        response: { code: 'UNAUTHENTICATED' },
+      });
+      expect(prisma.v1User.create).not.toHaveBeenCalled();
+    });
+
+    it('만료·무효 토큰(-401)은 401, 카카오 내부 오류(-1)와 네트워크 실패는 503 KAKAO_UNAVAILABLE', async () => {
+      stubKakao([json({ code: -401, msg: 'invalid token' }, false, 401)]);
+      await expect(service.kakaoTokenLogin({ accessToken: TOKEN })).rejects.toMatchObject({ status: 401 });
+
+      stubKakao([json({ code: -1, msg: 'internal' }, false, 400)]);
+      await expect(service.kakaoTokenLogin({ accessToken: TOKEN })).rejects.toMatchObject({
+        status: 503,
+        response: { code: 'KAKAO_UNAVAILABLE' },
+      });
+
+      global.fetch = jest.fn().mockRejectedValue(new Error('socket hang up')) as unknown as typeof fetch;
+      await expect(service.kakaoTokenLogin({ accessToken: TOKEN })).rejects.toMatchObject({
+        status: 503,
+        response: { code: 'KAKAO_UNAVAILABLE' },
+      });
+    });
+
+    it('토큰은 로그에 남지 않는다', async () => {
+      const warn = jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+      stubKakao([json({ code: -401, msg: `bad ${TOKEN}` }, false, 401)]);
+
+      await expect(service.kakaoTokenLogin({ accessToken: TOKEN })).rejects.toBeDefined();
+
+      expect(warn).toHaveBeenCalled();
+      expect(JSON.stringify(warn.mock.calls)).not.toContain(TOKEN);
+      warn.mockRestore();
+    });
+
+    it('미인증 이메일은 code 경로와 같이 409 SOCIAL_LINK_REQUIRES_VERIFIED_EMAIL', async () => {
+      stubKakao([
+        tokenInfo(123456, 779),
+        me({ id: 779, kakao_account: { email: 'victim@example.com', is_email_valid: true, is_email_verified: false } }),
+      ]);
+      prisma.v1AuthIdentity.findUnique.mockResolvedValue(null);
+      prisma.v1User.findUnique.mockResolvedValue({
+        id: 'victim-local', email: 'victim@example.com', accountStatus: 'active', emailVerifiedAt: NOW,
+      });
+
+      await expect(service.kakaoTokenLogin({ accessToken: TOKEN })).rejects.toMatchObject({
+        status: 409,
+        response: { code: 'SOCIAL_LINK_REQUIRES_VERIFIED_EMAIL' },
+      });
+      expect(prisma.v1AuthIdentity.create).not.toHaveBeenCalled();
+    });
+
+    it('신규 가입은 code 경로와 같은 user 생성 payload 를 만든다', async () => {
+      const profile = { id: 5150, kakao_account: { profile: { nickname: '카카오닉' } } };
+      prisma.v1AuthIdentity.findUnique.mockResolvedValue(null);
+      prisma.v1User.create.mockResolvedValue({ id: 'new-social-user', email: null });
+
+      process.env.KAKAO_CLIENT_ID = 'cid';
+      process.env.KAKAO_CLIENT_SECRET = 'secret';
+      process.env.KAKAO_REDIRECT_URI = 'https://teameet.co.kr/callback/kakao';
+      // lastLoginAt is stamped with new Date(); freeze it so the two payloads are comparable.
+      jest.useFakeTimers({ now: NOW, doNotFake: ['nextTick', 'setImmediate', 'setTimeout', 'queueMicrotask'] });
+      let viaCode;
+      let viaToken;
+      try {
+        stubKakao([json({ access_token: TOKEN }), me(profile)]);
+        await service.kakaoLogin({ code: 'auth-code' });
+        viaCode = prisma.v1User.create.mock.calls[0][0];
+
+        prisma.v1User.create.mockClear();
+        stubKakao([tokenInfo(123456, 5150), me(profile)]);
+        await service.kakaoTokenLogin({ accessToken: TOKEN });
+        viaToken = prisma.v1User.create.mock.calls[0][0];
+      } finally {
+        jest.useRealTimers();
+      }
+
+      expect(viaToken).toEqual(viaCode);
+      expect(viaToken.data.onboardingProgress.create.draftJson).toMatchObject({ kakaoNickname: '카카오닉' });
+    });
+
+    const verifiedKakaoAccount = {
+      email: 'member@example.com', is_email_valid: true, is_email_verified: true,
+      phone_number: '+82 10-1234-5678', name: '회원', gender: 'female',
+      birthyear: '2000', birthday: '0229', birthday_type: 'SOLAR',
+    };
+    const contactOwner = {
+      id: 'email-member', email: 'member@example.com', phone: '01012345678',
+      accountStatus: 'active', emailVerifiedAt: NOW, phoneVerifiedAt: NOW,
+    };
+    it('new Kakao members store provider-verified contacts and Gregorian DOB without OTP', async () => {
+      stubKakao([tokenInfo(123456), me({ id: 4994014420, kakao_account: verifiedKakaoAccount })]);
+      prisma.v1User.findUnique.mockResolvedValueOnce(null).mockResolvedValueOnce(pendingSocialUserRow());
+      prisma.v1User.create.mockResolvedValue({ id: 'user-1', email: verifiedKakaoAccount.email });
+      await service.kakaoTokenLogin({ accessToken: TOKEN });
+      expect(prisma.v1User.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({
+        phone: '01012345678', phoneVerifiedAt: expect.any(Date), emailVerifiedAt: expect.any(Date),
+        onboardingProgress: { create: expect.objectContaining({ draftJson: expect.objectContaining({ kakaoBirthDate: '20000229' }) }) },
+      }) }));
+    });
+    it.each(['email', 'phone', 'both'])('links an existing verified %s contact to the same user ID without OTP', async (match) => {
+      const account = match === 'phone' ? { phone_number: verifiedKakaoAccount.phone_number } :
+        match === 'email' ? { email: verifiedKakaoAccount.email, is_email_valid: true, is_email_verified: true } : verifiedKakaoAccount;
+      stubKakao([tokenInfo(123456), me({ id: 4994014420, kakao_account: account })]);
+      if (match !== 'phone') prisma.v1User.findUnique.mockResolvedValueOnce(contactOwner);
+      prisma.v1User.findUnique.mockResolvedValueOnce(contactOwner).mockResolvedValueOnce(completedUserRow({ id: contactOwner.id }));
+      if (match !== 'email') prisma.v1User.findFirst.mockResolvedValue(contactOwner);
+      prisma.v1AuthIdentity.create.mockResolvedValue({ id: 'new-kakao-identity' });
+      await service.kakaoTokenLogin({ accessToken: TOKEN });
+      expect(prisma.v1AuthIdentity.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ userId: contactOwner.id, provider: 'kakao' }) }));
+      expect(prisma.v1User.create).not.toHaveBeenCalled();
+      expect(prisma.v1User.delete).not.toHaveBeenCalled();
+    });
+    it('refuses contacts pointing to two different existing users without modifying either', async () => {
+      stubKakao([tokenInfo(123456), me({ id: 4994014420, kakao_account: verifiedKakaoAccount })]);
+      prisma.v1User.findUnique.mockResolvedValue(contactOwner);
+      prisma.v1User.findFirst.mockResolvedValue({ ...contactOwner, id: 'different-phone-owner' });
+      await expect(service.kakaoTokenLogin({ accessToken: TOKEN })).rejects.toMatchObject({ response: { code: 'SOCIAL_LINK_CONTACT_CONFLICT' } });
+      expect(prisma.v1AuthIdentity.create).not.toHaveBeenCalled();
+      expect(prisma.v1User.updateMany).not.toHaveBeenCalled();
+    });
+    it('refuses a legacy unverified phone and a contact changed during the link transaction', async () => {
+      const profile = { id: 4994014420, kakao_account: { phone_number: verifiedKakaoAccount.phone_number } };
+      prisma.v1User.findFirst.mockResolvedValue(contactOwner);
+      prisma.v1User.findUnique.mockResolvedValue({ ...contactOwner, phoneVerifiedAt: null });
+      stubKakao([tokenInfo(123456), me(profile)]);
+      await expect(service.kakaoTokenLogin({ accessToken: TOKEN })).rejects.toMatchObject({ response: { code: 'SOCIAL_LINK_CONTACT_CONFLICT' } });
+      prisma.v1User.findUnique.mockResolvedValue(contactOwner);
+      prisma.v1User.updateMany.mockResolvedValue({ count: 0 });
+      stubKakao([tokenInfo(123456), me(profile)]);
+      await expect(service.kakaoTokenLogin({ accessToken: TOKEN })).rejects.toMatchObject({ response: { code: 'SOCIAL_LINK_CONTACT_CONFLICT' } });
+      expect(prisma.v1AuthIdentity.create).not.toHaveBeenCalled();
+    });
+
+    it('기존 identity 는 같은 providerUserKey 로 조회되어 재로그인된다', async () => {
+      stubKakao([tokenInfo(123456, 4994014420), me()]);
+      prisma.v1AuthIdentity.findUnique.mockResolvedValue({
+        id: 'existing-identity',
+        status: 'active',
+        user: {
+          id: 'existing-user', email: null, accountStatus: 'active',
+          onboardingStatus: 'completed', createdAt: new Date(), updatedAt: new Date(),
+        },
+      });
+
+      const result = await service.kakaoTokenLogin({ accessToken: TOKEN });
+
+      expect(prisma.v1AuthIdentity.findUnique).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { provider_providerUserKey: { provider: V1AuthProvider.kakao, providerUserKey: '4994014420' } },
+        }),
+      );
+      expect(result.session.userId).toBe('existing-user');
+      expect(prisma.v1User.create).not.toHaveBeenCalled();
+    });
+  });
+
   // ─── kakaoLogin ──────────────────────────────────────────────────────────
 
   describe('kakaoLogin', () => {
@@ -1385,7 +1654,7 @@ describe('AuthService', () => {
 
       await expect(service.kakaoLogin({ code: 'auth-code' })).rejects.toMatchObject({
         status: 409,
-        response: { code: 'SOCIAL_LINK_REQUIRES_VERIFIED_EMAIL' },
+        response: { code: 'SOCIAL_LINK_CONTACT_CONFLICT' },
       });
       expect(prisma.v1AuthIdentity.create).not.toHaveBeenCalled();
     });
@@ -1476,7 +1745,10 @@ describe('AuthService', () => {
             update: {
               draftJson: {
                 ageConfirmedAt: '2026-10-11T00:00:00.000Z',
-                kakaoName: '홍길동',
+                  kakaoName: null,
+                  kakaoPhone: null,
+                  kakaoGender: null,
+                  kakaoBirthDate: null,
                 kakaoNickname: '새닉네임',
               },
             },
@@ -1505,7 +1777,7 @@ describe('AuthService', () => {
         expect(prisma.v1UserOnboardingProgress.upsert).toHaveBeenCalledWith(expect.objectContaining({
           update: {
             currentStep: 'terms',
-            draftJson: { ageConfirmedAt: '2026-10-11T00:00:00.000Z', kakaoNickname: '새닉네임' },
+            draftJson: { ageConfirmedAt: '2026-10-11T00:00:00.000Z', kakaoNickname: '새닉네임', kakaoName: null, kakaoPhone: null, kakaoGender: null, kakaoBirthDate: null },
           },
         }));
       });
@@ -1568,8 +1840,8 @@ describe('AuthService', () => {
       });
       expect(prisma.v1UserOnboardingProgress.upsert).toHaveBeenCalledWith({
         where: { userId: 'user-1' },
-        update: { currentStep: 'terms' },
-        create: { userId: 'user-1', currentStep: 'terms' },
+        update: { currentStep: 'terms', draftJson: { kakaoName: null, kakaoPhone: null, kakaoGender: null, kakaoBirthDate: null } },
+        create: { userId: 'user-1', currentStep: 'terms', draftJson: { kakaoName: null, kakaoPhone: null, kakaoGender: null, kakaoBirthDate: null } },
       });
       expect(prisma.v1AuthIdentity.update).toHaveBeenCalledWith({
         where: { id: 'identity-1' },

@@ -59,6 +59,11 @@ const sources = new Map([
 ]);
 
 const errors = [];
+const alphaWorkflow = sources.get(workflowPath);
+const kakaoBuildGate = alphaWorkflow.indexOf('run: node scripts/release/validate-kakao-web-config.mjs');
+if (kakaoBuildGate < 0 || kakaoBuildGate > alphaWorkflow.indexOf('- name: Resolve immutable image tags')) {
+  errors.push('Kakao web configuration must be validated before resolving immutable images');
+}
 const runtimePolicies = renderRuntimePolicies();
 if (runtimePolicies !== undefined) validateRuntimePolicies(runtimePolicies, errors);
 validateSyncScriptParameterParity(errors);
@@ -73,6 +78,11 @@ requirePatterns(workflowPath, [
   [/create-alpha-release-manifest\.sh/, 'must create or reuse the immutable manifest'],
   [/deploy-alpha-via-ssm\.sh/, 'must delegate the pinned release to SSM'],
   [/sync-alpha-firebase-env\.sh/, 'must restore Firebase Admin credentials before deployment'],
+  [/NEXT_PUBLIC_KAKAO_CLIENT_ID=\$\{\{ secrets\.ALPHA_KAKAO_CLIENT_ID \}\}/, 'web build must use the alpha Kakao app'],
+  [/NEXT_PUBLIC_KAKAO_LOGIN_JS_KEY=\$\{\{ secrets\.ALPHA_KAKAO_LOGIN_JS_KEY \}\}/, 'web login JS key must be independent of Maps'],
+  [/SECRET_KAKAO_CLIENT_ID: \$\{\{ secrets\.ALPHA_KAKAO_CLIENT_ID \}\}/, 'API must use the same alpha Kakao app as the web'],
+  [/SECRET_KAKAO_CLIENT_SECRET: \$\{\{ secrets\.ALPHA_KAKAO_CLIENT_SECRET \}\}/, 'API secret must be isolated from production'],
+  [/SECRET_KAKAO_APP_ID: \$\{\{ secrets\.ALPHA_KAKAO_APP_ID \}\}/, 'native token audience must use the alpha app ID'],
   [/runs\?branch=dev&head_sha=\$\{RELEASE_SHA\}/, 'must query CI runs for the exact release SHA'],
   [/select-matching-ci-run\.sh "\$\{RELEASE_SHA\}"/, 'must judge CI via select-matching-ci-run.sh (accepts the Promote bot dispatch of version commits)'],
 ]);
@@ -303,10 +313,12 @@ function validateKakaoSyncBehaviour(targetErrors) {
     for (const [label, overrides] of [
       ['foreign redirect host', { SECRET_ALPHA_KAKAO_REDIRECT_URI: 'https://evil.example/callback/kakao' }],
       ['short client id', { SECRET_KAKAO_CLIENT_ID: 'abc' }],
+      ['invalid native app id', { SECRET_KAKAO_APP_ID: 'not-an-app-id' }],
+      ['missing native app id', { SECRET_KAKAO_APP_ID: '' }],
     ]) {
       const rejected = run(overrides);
-      if (rejected.result.status !== 0 || rejected.calls !== '') {
-        targetErrors.push(`scripts/release/sync-alpha-kakao-env.sh: ${label} must warn and leave AWS untouched (exit ${rejected.result.status})`);
+      if (rejected.result.status === 0 || rejected.calls !== '') {
+        targetErrors.push(`scripts/release/sync-alpha-kakao-env.sh: ${label} must fail and leave AWS untouched (exit ${rejected.result.status})`);
       }
     }
   } finally {

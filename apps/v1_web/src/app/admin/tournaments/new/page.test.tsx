@@ -981,6 +981,39 @@ describe('AdminTournamentsNewPage — 4단계(공개 확인)', () => {
 
     expect(screen.getByRole('radio', { name: '조별리그 + 토너먼트' })).toBeInTheDocument();
     expect(screen.queryByRole('radio', { name: 'group_knockout' })).not.toBeInTheDocument();
+    expect(screen.getByRole('radio', { name: '토너먼트만' })).toBeInTheDocument();
+    expect(screen.getByRole('radio', { name: '대회 리그전' })).toBeInTheDocument();
+    expect(screen.queryByText('서로 1회')).not.toBeInTheDocument();
+    expect(screen.queryByText('홈·어웨이')).not.toBeInTheDocument();
+    expect(screen.getByRole('radio', { name: '대회 리그전' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /정규 리그 만들기/ })).toHaveAttribute('href', '/admin/league-matches/new');
+  });
+
+  it('대회 입력이 있으면 별도 정규 리그 화면으로 이동하기 전에 변경 손실을 확인한다', async () => {
+    renderPage();
+    fillBasicStep();
+    fireEvent.click(screen.getByRole('link', { name: /정규 리그 만들기/ }));
+
+    const confirmDialog = await screen.findByRole('dialog', { name: '정규 리그 생성 화면으로 이동할까요?' });
+    expect(within(confirmDialog).getByText(/작성 중인 대회 정보는 아직 저장되지 않았어요/)).toBeInTheDocument();
+    fireEvent.click(within(confirmDialog).getByRole('button', { name: '계속 작성' }));
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: '정규 리그 생성 화면으로 이동할까요?' })).not.toBeInTheDocument());
+    expect(routerPush).not.toHaveBeenCalledWith('/admin/league-matches/new');
+  });
+
+  it('저장된 대회 초안을 고친 뒤 별도 정규 리그 화면으로 이동할 때 저장되지 않은 변경을 알린다', async () => {
+    searchParamsValue = new URLSearchParams('draftId=draft-1');
+    useV1AdminTournamentMock.mockReturnValue({ data: fakeDraftTournament(), isPending: false });
+    renderPage();
+
+    fireEvent.click(screen.getByRole('button', { name: /1단계 기본 정보/ }));
+    fireEvent.change(screen.getByLabelText(/대회명/), { target: { value: '수정 중인 대회 이름' } });
+    fireEvent.click(screen.getByRole('link', { name: '정규 리그 만들기' }));
+
+    const confirmDialog = await screen.findByRole('dialog', { name: '정규 리그 생성 화면으로 이동할까요?' });
+    expect(within(confirmDialog).getByText(/대회 초안은 저장되어 있어요.*저장되지 않은 입력/)).toBeInTheDocument();
+    fireEvent.click(within(confirmDialog).getByRole('button', { name: '이동하기' }));
+    await waitFor(() => expect(routerPush).toHaveBeenCalledWith('/admin/league-matches/new'));
   });
 
   it('새로고침 후 draftId만 남아 있어도 새로 만들지 않고 확인 단계를 그대로 이어서 보여준다', () => {

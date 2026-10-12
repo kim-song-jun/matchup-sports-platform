@@ -1,6 +1,6 @@
 # S1 그래픽 템플릿 — alpha 실측
 
-Status: 4형식 실제 생성·편집·저장 확인. 후속 PR #1873의 정확한 SHA CI와 수정 배포 후 목록 기본 팀 수·카드 대비 재검증 진행 중.
+Status: Done — 4형식 실제 생성·편집·저장, #1873 exact-head/merge CI·dev 머지·alpha 배포와 수정 후 3폭/끝 스크롤·기본 팀 수·카드 대비 확인 완료.
 
 사용자 선택: 대회 생성에서 진행 방식을 고르고, 대진 관리에서는 현재 방식의 템플릿을 선택한다. 기존 대회의 format 전환은 하지 않는다. 생성의 네 번째 카드는 별도 정규 리그 생성 화면으로 이동한다.
 
@@ -77,6 +77,36 @@ alpha `89e7dcba577afdeaaf190393e4fe43f0d586a3aa`, release `1.8.0-alpha.20261012.
 - 새 이미지: 각 `after-*-template.png`, `after-*-edit.png`, 모바일 `after-knockout-template-bottom.png`·`after-regular-league-template-bottom.png`·`after-regular-league-team-edit.png`·`after-regular-league-manual-add.png`. Sol 녹아웃4장 시각 BLOCK0, 비활성 카드 전체 opacity 가독성 WARN1은 아래 수정으로 처리 중이다.
 - 실제 목록 경로가 확정팀 수를 누락해12팀에도8로 열리는 결함 발견. page→BracketTab→tools→dialog에 실제 count/status를 전달하고, disabled 카드 wrapper opacity를 제거해 읽기 쉬운 의미 색상으로 수정. Luna 구현, Sol 독립 정적 PASS, 집중5파일70테스트 PASS·lint/typecheck/패턴 PASS. 기존 사유 입력 테스트의 비동기 act 경고도 실제 continuation을 기다리도록 수정했고 해당1계약 재실행 PASS·경고 없음.
 - 후속 dev PR [#1873](https://github.com/kim-song-jun/matchup-sports-platform/pull/1873). 수정 배포 뒤 기본 팀 수와 3폭 카드 대비·나머지 조별/대회리그 dialog 캡처를 이어서 확인한다. 현재 소스 검증을 배포 후 확인으로 대신 주장하지 않는다.
+- 목록의 8강5번 경기 편집에서 연결된 쪽의 직접 배정 제한·진출 연결 안내를 확인했다. 진출 연결 모달의 기존 출처를 그대로 저장하여 `/bracket-sources` 200·GET200, 12경기와 원래 home slot·away WINNER 출처 보존을 확인했다. 관측 Runtime exception0. 중복 후보의 모든 조합을 라이브에서 검증했다고 주장하지 않는다.
+- 정규 리그 수기 추가 후 완전히 hydrate된 모바일 sheet를 `mobile/after-regular-league-manual-add-hydrated.png`로 다시 캡처했다. 팀 스피릿/알파 레드 FC·점수 입력이 표시되며 390×844에서 sheet bottom844, CTA 높이44/bottom820이다. 앞선 `after-regular-league-manual-add.png`의 초기 hydration 증거를 이 캡처로 보완한다.
+- 후속 head `ea0475f6c04da5935ac9f87bf607164496202c95` CI `38277803343` API/Web/Gates PASS. 해당 head의 Copilot inline 지적0건. 별도 Advanced Security `38277804270`은 미지원 `claude-opus-5` session.create 실패로 실행되지 않았으며 PASS로 보고하지 않는다. base dev/expected head 확인 후 merge `9e9a01925384cdc77d427e04b3655b54c54cb2e0` 완료. 다른 dev PR의 지도 선택 변경이 함께 포함되어 merge와 feature head의 tree는 다르지만 템플릿 source diff는 없다. merge CI `38279349212`도 API/Web/Gates PASS(Web741파일/8,742테스트·lint/typecheck·production build). alpha Deploy `38279349210`과 수정 실화면은 대기 중이다.
+- 정확한 feature head의 Web741파일/8,737테스트·lint/typecheck·production build PASS, API unit408suite/6,067테스트 PASS, migration/integration161suite/1,167PASS·3skip. 앞선 dev `d039a1e85` alpha Deploy `38278407019`은 새 push로 matching CI가 cancelled되어 대기 단계에서 종료됐다. 서버 배포 실패나 수정 SHA 배포 성공으로 취급하지 않는다.
+- Sol은 완전히 hydrate된 수기 추가 모바일 캡처도 BLOCK0/WARN0으로 독립 확인했다. 이 이미지 자체는 저장의 증거가 아니며 저장은 위 POST201/GET200으로 별도 확인했다.
 - QA 스크립트 오류는 제품 성공으로 숨기지 않았다: hidden sidebar와 일반 modal selector 혼동→실제 `.tm-modal-panel` 및 제목으로 분리, 교체 확인을 건너뛴 대기→실제 ‘교체’ 후 생성 확인, sr-only radio pointer→실제 키보드 Space 선택, regular fixtures GET의 잘못된 경로404→실제 detail GET, 저장 초안 초기 hydration 이전 click→공개 확인 hydrate 후 step1 진입. 각 오류 뒤 실제 UI/API로 결과를 확인했다.
 
 이전 10/12 단계 종료에는 테스트·lint 소유 PID가 모두 종료됐고 임시 node_modules 링크2개를 정확한 target 확인 후 제거했다. 그 단계의 Node exact-command 기준 시작198/종료225이며 동일 signature의54벌 증가는 없었다. 다른 세션 프로세스는 종료하지 않았다. 다음 단계에서는 같은 ego326을 이어 사용하며 최종 실제 QA 종료 후 `finish({ keep: [] })`한다.
+
+### 최종 수정 배포 검증 (2026-10-13)
+
+- alpha Deploy `38279349210` SUCCESS. 실제 Web/API commit `9e9a01925384cdc77d427e04b3655b54c54cb2e0`, release `1.8.1-alpha.20261013.g9e9a01925384`, 운영자200. 입력을 바꾸지 않고 목록 템플릿을 열어 KO12팀·Group12팀·대회리그4팀 기본값을 확인했다. regular4팀도 자동 반영된다. KO4/8/16카드는 native disabled를 유지하며 wrapper opacity1이다.
+- 재생성은 클릭하지 않고 preview만 검증했다. 배포 전후 전체 fixture 응답 SHA256은 아래와 같이 모두 동일하다. 실제 생성·편집·저장은 앞선 b446 실행 증거이며, 최신 배포에서 데이터 보존·변경된 진입 경로·가독성을 재확인했다.
+
+| 형식 | 기본 선택 | 경기/자리 | fixture SHA256 (배포 전후 동일) |
+|---|---|---|---|
+| 토너먼트 | 12팀·3/4위 포함 | 12/12 | `3ccd33b70ba28c9b38b67fa936e8251eb738273d2b9537d59029665b18d9ba3a` |
+| 조별+결선 | 2×6·2위 진출 | 33/16 | `85c93ce98cf14a3a3b4e1ffa8b6d8c6ea51abf66050887da31aeba056ef6fd5b` |
+| 대회 리그 | 4팀·단일 | 6/4 | `cf2d6e24db4f121e46b7e96622954148d46475a5430916d89c5ea7ffbb2282d1` |
+| 정규 리그 | 4팀·단일 | 7/4 (수기1 포함) | `f0b5c1577c9157d741fad28a5ebf7436e2a8fe86d8dc2c9ac2ecedbb535ed980` |
+
+| viewport | 4형식 가로 넘침 | CTA 높이 | 본문 끝 확인 |
+|---|---|---|---|
+| 1440×1000 | 0 | 44px | 조별·정규 리그 실제 끝 스크롤, KO·대회리그는 한 화면에 들어옴 |
+| 768×960 | 0 | 44px | 조별·정규 리그 실제 끝 스크롤, KO·대회리그는 한 화면에 들어옴 |
+| 390×844 | 0 | 44px | KO·조별·정규리그 실제 끝 스크롤, 대회리그는 한 화면에 들어옴 |
+
+- 캡처24장: `{desktop,tablet,mobile}/after-list-{knockout,group,tournament-league}-template{,-bottom}.png` 18장, `{desktop,tablet,mobile}/after-redeployed-regular-league-template{,-bottom}.png` 6장. 세 폭에서 초기 상태와 본문 끝 상태를 각각 확인했다. regular 날짜11/02·11/09·11/16은 preview에서만 선택했다.
+- Sol 독립 시각 검토24장 BLOCK0/WARN0. 비활성 카드 가독성의 앞선 WARN은 수정 후 해소됐다. 별도 수화 완료 모바일 수기 추가 이미지1장도 BLOCK0/WARN0. 시각 판정과 API 저장 판정을 구분했다.
+- 3개 대회 비공개·bracketPublishedAt null, regular 비공개 유지. 최신 배포의 guest admin401 `UNAUTHENTICATED`, 비공개 공개bracket404·data없음(API 확인). 404의 기존 generic `INTERNAL_ERROR`는 이번 frontend 범위에서 바꾸지 않았다. 결과 확정·전적·알림, 기록 있는 경기 삭제, 특수20팀 생성·진출은 이번 라이브 QA에서 실행하지 않았다.
+- 관측 Runtime/console 오류0, 끝 스크롤 보완 구간 admin4xx0. 잘못된 shell glob 조회1건은 `rg` 경로로 바로잡았으며 제품 동작 실패가 아니다. 공간326 종료 후 desktop/tablet 끝 캡처 누락을 발견해 보완 공간366에서 같은 운영자 세션으로 확인했다. 인증 우회·재로그인은 하지 않았다. 모달 전환 중 찍힌 KO/대회리그 하단4장의 품질 WARN은 opacity1·running animation0을 기다린 재캡처와 Sol 독립 재판정으로 해소했다.
+- 공유 primary FF 동기화는 기존 detached/diverged HEAD 때문에 exit128로 거절됐다. 외부 WIP는 보존했고 격리 checkout은 merge9e9a까지 FF했다. source PR에는 새로운 분기/환경/배포 정책 변경이 없다.
+- 최종 cleanup: ego326/366 각각 한 번 `finish({ keep: [] })` 완료, 이후 task-space inventory에서 두 ID 부재 확인. 소유 테스트 PID29482/30613/63128 모두 부재, 임시 dependency 링크2개 제거, 로컬 dev 서버/새 Docker 서비스 없음. Node 시작157/종료127, 종료 signature20개·최대중복15개, browser helper0; 54벌 증식 없음. 다른 세션 프로세스는 종료하지 않았다. Luna 구현·Sol 검증 에이전트는 terminal completed 상태다.

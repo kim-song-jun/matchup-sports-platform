@@ -216,24 +216,26 @@ describe('채팅 재동기화와 안전 이벤트', () => {
     cleanup();
   });
 
-  it('REST 읽기 뒤에 처음 붙은 연결(하드 로드)은 아무리 직후여도 방 목록과 열린 방 메시지를 한 번만 다시 받는다(상세는 그대로)', async () => {
+  it('REST 읽기 뒤 첫 연결은 방 목록·상세·메시지를 한 번만 다시 받는다', async () => {
     const { reads, cleanup } = await setupRoom();
 
     listeners.connect(undefined);
     listeners.connect(undefined);
     listeners.connect(undefined);
     await vi.advanceTimersByTimeAsync(2000);
-    expect(reads).toEqual({ list: 2, detail: 1, messages: 2 });
+    expect(reads).toEqual({ list: 2, detail: 2, messages: 2 });
 
     cleanup();
   });
 
-  async function setupErroredMessages(statusCode: number) {
+  async function setupErroredQuery(statusCode: number, kind: 'messages' | 'detail' | 'list' = 'messages') {
     const { useV1ChatRoomSocket } = await import('./use-v1-realtime-socket');
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     const counter = { reads: 0 };
     const observer = new QueryObserver(queryClient, {
-      queryKey: [...v1Keys.chatMessages('room-1'), { limit: 50 }],
+      queryKey: kind === 'detail' ? v1Keys.chatRoom('room-1')
+        : kind === 'list' ? v1Keys.chatRooms()
+          : [...v1Keys.chatMessages('room-1'), { limit: 50 }],
       queryFn: async () => {
         counter.reads += 1;
         throw new V1ApiError({ status: 'error', statusCode, code: 'X', message: 'fail', timestamp: '2026-10-12T00:00:00Z' });
@@ -246,8 +248,8 @@ describe('채팅 재동기화와 안전 이벤트', () => {
     return { counter, cleanup: () => { unmount(); stop(); } };
   }
 
-  it('4xx 로 끝난 메시지 조회는 연결·재연결·탭 복귀에도 다시 받지 않는다', async () => {
-    const { counter, cleanup } = await setupErroredMessages(404);
+  it.each(['messages', 'detail', 'list'] as const)('4xx 로 끝난 %s 조회는 연결·재연결·탭 복귀에도 다시 받지 않는다', async (kind) => {
+    const { counter, cleanup } = await setupErroredQuery(404, kind);
     listeners.connect(undefined);
     await vi.advanceTimersByTimeAsync(2000);
     listeners.connect(undefined);
@@ -259,8 +261,8 @@ describe('채팅 재동기화와 안전 이벤트', () => {
     cleanup();
   });
 
-  it('5xx 로 끝난 메시지 조회는 재연결 때 다시 받는다', async () => {
-    const { counter, cleanup } = await setupErroredMessages(503);
+  it.each(['messages', 'detail', 'list'] as const)('5xx 로 끝난 %s 조회는 재연결 때 다시 받는다', async (kind) => {
+    const { counter, cleanup } = await setupErroredQuery(503, kind);
     listeners.connect(undefined);
     await vi.advanceTimersByTimeAsync(2000);
     expect(counter.reads).toBe(2);
@@ -272,11 +274,11 @@ describe('채팅 재동기화와 안전 이벤트', () => {
 
     listeners.connect(undefined);
     await vi.advanceTimersByTimeAsync(2000);
-    expect(reads).toEqual({ list: 2, detail: 1, messages: 2 });
+    expect(reads).toEqual({ list: 2, detail: 2, messages: 2 });
 
     listeners.connect(undefined);
     await vi.advanceTimersByTimeAsync(2000);
-    expect(reads).toEqual({ list: 3, detail: 1, messages: 3 });
+    expect(reads).toEqual({ list: 3, detail: 3, messages: 3 });
 
     cleanup();
   });

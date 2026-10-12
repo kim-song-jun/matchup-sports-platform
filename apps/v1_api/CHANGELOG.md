@@ -1,5 +1,16 @@
 # v1_api
 
+## 1.7.0
+
+### Minor Changes
+
+- c63172f: 앱에서 카카오톡으로 로그인할 수 있도록 카카오 액세스 토큰 로그인(`POST /auth/kakao/token`)을 추가해요. 우리 카카오 앱이 발급한 토큰만 받고, 기존 카카오 로그인과 같은 계정 연결·가입 흐름을 써요.
+
+### Patch Changes
+
+- 1034e35: 카카오가 제공한 연락처의 중복 인증을 생략하고, 확인된 기존 회원 정보와 일치하면 같은 계정에 카카오 로그인을 연결합니다. 생년월일 자동 입력과 개인정보 수집 안내를 함께 반영합니다.
+- 8402952: 팀·개인 매치·팀 매치 목록 첫 페이지가 필터가 적용된 전체 건수(pageInfo.totalCount)와 종목별 건수(facets.sports)를 내려줘요. 매치 목록은 오늘(today)·모집 중(recruitingOnly) 필터와 각 건수(facets.today·recruiting)도 지원해요. 팀 목록의 pageInfo.total 은 totalCount 로 이름이 바뀌었어요.
+
 ## 1.6.9
 
 ### Patch Changes

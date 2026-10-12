@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { makeFixture, makeGame, makeGroup } from '@/test/bracket-canvas-fixtures';
 import type { V1AdminBracketResult } from '@/types/api';
-import { bracketSourceCandidates, knockoutRoundLabel } from './bracket-fixture-tools';
+import { bracketSourceCandidates, bracketSourceSideOptions, knockoutRoundLabel } from './bracket-fixture-tools';
 
 describe('knockoutRoundLabel', () => {
   it.each([
@@ -44,7 +44,7 @@ describe('bracketSourceCandidates', () => {
       id: 'q9',
       groupId: 'g-qf',
       fixtureNumber: 9,
-      game: makeGame({ latestRevision: { id: 'rev' } as never }),
+      game: makeGame({ hasOfficialResult: true, latestRevision: { id: 'rev', state: 'OFFICIAL' } as never }),
     });
     const noGame = makeFixture({ id: 'q10', groupId: 'g-qf', fixtureNumber: 10, game: null });
     const withResult = makeFixture({
@@ -83,5 +83,51 @@ describe('bracketSourceCandidates', () => {
     const fixtures = [upperGame, lowerGame, target];
 
     expect(bracketSourceCandidates({ target, groups, fixtures }).map((fixture) => fixture.id)).toEqual(['upper-game']);
+  });
+
+  it('승자와 패자 출처는 각각 한 번만 연결하고, 현재 대상 링크는 다시 편집할 수 있다', () => {
+    const third = makeGroup({ id: 'g-third', name: '3·4위전', phase: 'third_place' });
+    const semi = makeFixture({ id: 'semi-source', groupId: 'g-sf', fixtureNumber: 5, game: makeGame() });
+    const finalWithWinner = makeFixture({
+      id: 'final-winner', groupId: 'g-fin', fixtureNumber: 7, game: makeGame(),
+      bracketSources: [{ fixtureId: 'semi-source', side: 'HOME', outcome: 'WINNER' }],
+    });
+    const finalTarget = makeFixture({ id: 'final-target', groupId: 'g-fin', fixtureNumber: 8, game: makeGame() });
+    const thirdTarget = makeFixture({ id: 'third-target', groupId: 'g-third', fixtureNumber: 9, game: makeGame() });
+    const fixtures = [semi, finalWithWinner, finalTarget, thirdTarget];
+
+    expect(bracketSourceCandidates({ target: finalTarget, groups: [...groups, third], fixtures })).toEqual([]);
+    expect(bracketSourceCandidates({ target: finalWithWinner, groups: [...groups, third], fixtures })).toContain(semi);
+    expect(bracketSourceCandidates({ target: thirdTarget, groups: [...groups, third], fixtures })).toContain(semi);
+  });
+});
+
+describe('bracketSourceSideOptions', () => {
+  const sourceGroup = makeGroup({ id: 'options-qf', name: '8강', phase: 'quarter' });
+  const targetGroup = makeGroup({ id: 'options-sf', name: '4강', phase: 'semi' });
+  const q1 = makeFixture({ id: 'options-q1', groupId: sourceGroup.id, fixtureNumber: 1, game: makeGame() });
+  const q2 = makeFixture({ id: 'options-q2', groupId: sourceGroup.id, fixtureNumber: 2, game: makeGame() });
+  const target = makeFixture({ id: 'options-s1', groupId: targetGroup.id, fixtureNumber: 3, game: makeGame() });
+
+  it('반대편이 선택한 경기만 제외하고 현재 연결 및 다른 후보는 유지한다', () => {
+    const fixtures = [q1, q2, target];
+    const options = bracketSourceSideOptions({
+      candidates: [q1, q2],
+      fixtures,
+      currentFixtureId: q2.id,
+      oppositeFixtureId: q1.id,
+    });
+    expect(options.map((fixture) => fixture.id)).toEqual([q2.id]);
+  });
+
+  it('후보에서 사라진 현재 연결은 반대편 선택과 중복되지 않으면 유지한다', () => {
+    const lockedSource = makeFixture({ id: 'locked-source', groupId: sourceGroup.id, fixtureNumber: 3, game: makeGame({ state: 'LIVE' }) });
+    const options = bracketSourceSideOptions({
+      candidates: [],
+      fixtures: [q1, q2, lockedSource, target],
+      currentFixtureId: 'locked-source',
+      oppositeFixtureId: q2.id,
+    });
+    expect(options.map((fixture) => fixture.id)).toEqual(['locked-source']);
   });
 });

@@ -13,6 +13,7 @@ function build(admin: ReturnType<typeof adminRow> | null) {
     v1AdminUser: { findUnique: jest.fn(async () => admin) },
     v1TournamentSlot: { findUnique: jest.fn(async (): Promise<Record<string, unknown> | null> => null), findUniqueOrThrow: jest.fn(), findMany: jest.fn(), findFirst: jest.fn(), update: jest.fn() },
     v1Tournament: { findFirst: jest.fn(async (): Promise<Record<string, unknown> | null> => null) },
+    v1TournamentGroup: { findUnique: jest.fn(async () => ({ phase: 'final' })) },
     v1TournamentRegistration: { findFirst: jest.fn() },
     v1TournamentGroupTeam: { findMany: jest.fn() },
     v1TournamentStanding: { findMany: jest.fn() },

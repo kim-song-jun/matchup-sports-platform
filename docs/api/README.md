@@ -18,7 +18,7 @@ in the same change that discovers the drift.
 - [Matches](./domains/matches.md)
 - [Teams](./domains/teams.md)
 - [Team matches](./domains/team-matches.md)
-- [Tournaments](./domains/tournaments.md) — 대진 생성·상위/하위 결선·범위별 시상·번호 수정·진출 연결 및 결과 계약
+- [Tournaments](./domains/tournaments.md) — 대진 생성·상위/하위 결선·범위별 시상·번호 수정·진출 연결 및 결과 계약, 5조·20팀→12강 추천·일괄 배정
 - [League matches](./domains/league-matches.md)
 - [Regular league public visibility](./domains/league-matches.md#public-visibility) — publication control, admin access and public read gates.
 - [Games](./domains/games.md)

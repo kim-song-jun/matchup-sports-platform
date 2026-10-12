@@ -2,6 +2,10 @@
 
 [작업 문서](../../.github/tasks/20261057-admin-bracket-canvas.md#2026-10-12-extension-정규대회-하나--상위하위-결선--시상-두-세트) · [실행 시나리오](./18-regular-tournament-split-finals.md). 하나의 대회에서 조 1·2위는 상위, 3·4위는 하위 결선으로 배정한다. 팀 시상 안내와 개인상 범위는 어드민이 설정한다. Backend521·Web226·스키마 바인딩7개 계약은 좁은 재실행을 포함해 통과했다. 독립 Sol static review의 모바일 단계 순서·읽기 권한 두 결함은 수정·재검토 PASS. PR#1858 커밋본 CI와 변경 후 alpha/3폭 QA는 대기 중이며 전체 완료를 의미하지 않는다.
 
+## 2026-10-12 — 대진 목록 5조·20팀→12강 자동 배정
+
+[Task 20261057 후속](../../.github/tasks/20261057-admin-bracket-canvas.md): 빈 목록의 전체 대진 생성(조별30+결선11), 조별 자리 편집/무작위 배정, 12강 성적 비교·동률 확인·팀 교환·일괄 저장 구현. 실제 임시 PostgreSQL 신규3+기존슬롯44=47/47, Web114/114, API 타입/surface·Web 패턴 통과. 최초 로컬 의존성 불일치로 보였던 leave-team 타입 오류2개는 lockfile TanStack 5.102.8 일치 후 해소, 신규 테스트 role 옵션 수정 후 Web 전체 타입 검사 0. Headed 합성 컴포넌트 390/768/1440 3/3, overflow·JS/console/network 오류0, [증거](../screenshots/round12-list/evidence.json). Alpha 대상 URL은 로그인 이동(auth/me401); **실제 Alpha 기능 QA 0/3, 배포/실제 대회 데이터 변경 없음**. 합성 화면은 실제 Alpha 검증으로 계산하지 않는다.
+
 ## 2026-10-05 — Android Alpha QA 후속 수정
 
 [Task 156](../../.github/tasks/156-android-app-fcm-foundation.md#android-alpha-physical-qa-and-fixes--2026-10-05) · [Android 실행 기록](./android-device-ui-audit.md#2026-10-05--latest-alpha-continuation-and-android-fixes): 최신 Alpha 실기기 16화면·실제 FCM 3상태·권한/로그아웃·PDF 업로드 확인. TXT 선택 제한, 한글 다운로드 표시명, 회전 inset 초기화 오류 수정안과 회귀 11+2 통과. 수정 APK 빌드·실기기 after QA 및 dev 반영 대기. 전체 기능/모든 라우트 통과를 의미하지 않는다.

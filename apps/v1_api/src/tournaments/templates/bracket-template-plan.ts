@@ -6,7 +6,7 @@ import { planGroupKnockoutTemplate } from './group-knockout-plan';
 
 export type BracketTemplateInput =
   | { kind: 'knockout'; size: 4 | 8 | 12 | 16; thirdPlace: boolean }
-  | { kind: 'group_knockout'; groupCount: number; teamsPerGroup: number; advancePerGroup: 1 | 2; legs: 1 | 2; thirdPlace: boolean; lowerBracket?: boolean }
+  | { kind: 'group_knockout'; groupCount: number; teamsPerGroup: number; advancePerGroup: 1 | 2; legs: 1 | 2; thirdPlace: boolean; lowerBracket?: boolean; qualificationMode?: 'cross_group_round12' }
   | { kind: 'league'; teamCount: number; legs: 1 | 2 };
 export type PlanGroup = { key: string; name: string; phase: V1TournamentGroupPhase; sortOrder: number; advanceCount: number | null; bracketTrack?: 'overall' | 'upper' | 'lower' };
 export type PlanSlot = { key: string; kind: V1TournamentSlotKind; groupKey: string | null; position: number; sourceGroupKey: string | null };
@@ -30,7 +30,7 @@ function entrySlot(groupKey: string, position: number): PlanSlot {
   return { key: `entry-${position}`, kind: 'ENTRY', groupKey, position, sourceGroupKey: null };
 }
 
-function planKnockout(input: Extract<BracketTemplateInput, { kind: 'knockout' }>, offset: number): BracketTemplatePlan {
+export function planKnockout(input: Extract<BracketTemplateInput, { kind: 'knockout' }>, offset: number): BracketTemplatePlan {
   const phases: KnockoutPhase[] = [];
   if (input.size === 16) phases.push('round16');
   if (input.size === 12) phases.push('round12');

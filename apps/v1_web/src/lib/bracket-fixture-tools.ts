@@ -26,6 +26,7 @@ export function bracketSourceCandidates(input: {
   const targetTrack = trackByGroup.get(target.groupId ?? '') ?? 'overall';
   const previousPhases = BRACKET_SOURCE_PHASES[targetPhase];
   if (previousPhases === undefined) return [];
+  const sourceOutcome = targetPhase === 'third_place' ? 'LOSER' : 'WINNER';
   return fixtures.filter(
     (fixture) =>
       previousPhases.includes(phaseByGroup.get(fixture.groupId ?? '') ?? '') &&
@@ -34,7 +35,11 @@ export function bracketSourceCandidates(input: {
       !fixture.parentFixtureId &&
       fixture.status === 'scheduled' &&
       fixture.result === null &&
-      isFixtureLinkable(fixture),
+      isFixtureLinkable(fixture) &&
+      !fixtures.some((otherTarget) =>
+        otherTarget.id !== target.id &&
+        otherTarget.bracketSources?.some((source) => source.fixtureId === fixture.id && source.outcome === sourceOutcome),
+      ),
   );
 }
 
@@ -59,4 +64,19 @@ export function bracketExistingSource(input: {
   if ((trackByGroup.get(source.groupId ?? '') ?? 'overall') !== targetTrack) return null;
   if (source.legNumber !== 1 || source.parentFixtureId) return null;
   return source;
+}
+
+/** Keep each source picker distinct while retaining an existing link that is no longer otherwise eligible. */
+export function bracketSourceSideOptions(input: {
+  candidates: readonly V1AdminBracketFixture[];
+  fixtures: readonly V1AdminBracketFixture[];
+  currentFixtureId: string;
+  oppositeFixtureId: string;
+}): V1AdminBracketFixture[] {
+  const options = input.candidates.filter((fixture) => fixture.id !== input.oppositeFixtureId);
+  if (input.currentFixtureId === '' || input.currentFixtureId === input.oppositeFixtureId || options.some((fixture) => fixture.id === input.currentFixtureId)) {
+    return options;
+  }
+  const current = input.fixtures.find((fixture) => fixture.id === input.currentFixtureId);
+  return current === undefined ? options : [current, ...options];
 }

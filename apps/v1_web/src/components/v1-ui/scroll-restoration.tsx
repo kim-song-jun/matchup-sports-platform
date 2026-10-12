@@ -5,12 +5,14 @@ import { usePathname } from 'next/navigation';
 import { getCurrentRedirectPath } from '@/lib/session-storage';
 import { readScrollPosition, saveScrollPosition } from '@/lib/scroll-positions';
 import { installNavigationHistory, subscribeAppPop } from '@/lib/navigation-history';
+import { locationHashId } from '@/lib/public-site/location-hash';
 import { TAB_LINK_SELECTOR } from './navigation-tab-selectors';
 
 const DESKTOP_QUERY = '(min-width: 1024px)'; // desktop/_shell.css 의 breakpoint 와 동일해야
   // 한다 — 이 값이 어긋나면 두 스크롤 모델(문서 vs .tm-scroll-area)이 서로 다른 지점에서
   // 전환돼 스크롤 대상이 어긋난다.
 const SAVE_DEBOUNCE_MS = 150;
+const HASH_TARGET_WAIT_MS = 10_000;
 
 /**
  * 이동의 종류. 'tab' 이 'push' 와 갈리는 것이 핵심이다.
@@ -149,11 +151,55 @@ export function ScrollRestoration() {
     };
   }, []);
 
-  // ③ 적용 — pathname 이 실제로 바뀌면 방향에 따라 top=0 또는 복원.
+  // ③ 적용 — pathname 이 실제로 바뀌면 방향에 따라 top=0, hash target, 또는 복원.
   useEffect(() => {
     const el = getScrollElement();
+    const scrollToHashTarget = () => {
+      const hash = window.location.hash;
+      if (!hash) return { requested: false, dispose: () => {} };
+
+      const id = locationHashId(hash);
+      let observer: MutationObserver | null = null;
+      let timeoutId: ReturnType<typeof setTimeout> | null = null;
+      const dispose = () => {
+        observer?.disconnect();
+        if (timeoutId !== null) clearTimeout(timeoutId);
+        window.removeEventListener('hashchange', dispose);
+      };
+      const scroll = () => {
+        if (window.location.hash !== hash) {
+          dispose();
+          return false;
+        }
+        const target = document.getElementById(id);
+        if (!target) return false;
+        dispose();
+        target.scrollIntoView();
+        const currentEl = getScrollElement();
+        if (currentEl) saveScrollPosition(getCurrentRedirectPath(), getScrollTop(currentEl));
+        return true;
+      };
+
+      if (scroll()) return { requested: true, dispose: () => {} };
+
+      // Streamed route content may add the fragment after this pathname commit. Observe DOM
+      // growth instead of guessing a delay, and release the observer when the route changes.
+      observer = new MutationObserver(scroll);
+      observer.observe(document.body, { childList: true, subtree: true });
+      window.addEventListener('hashchange', dispose);
+      // A fragment can point to an optional section. Bound observation work if it never appears.
+      timeoutId = setTimeout(dispose, HASH_TARGET_WAIT_MS);
+      return { requested: true, dispose };
+    };
+
     if (firstRenderRef.current) {
-      firstRenderRef.current = false; // 최초 마운트(새로고침/콜드스타트)는 브라우저 기본에 맡긴다.
+      firstRenderRef.current = false;
+      // App Router의 초기 렌더가 fragment 이동을 보장하지 않아, hydration 후 이 효과가 hash target 이동을 보완한다.
+      const hashScroll = scrollToHashTarget();
+      if (hashScroll.requested) {
+        return hashScroll.dispose;
+      }
+      // 일반 최초 마운트(새로고침/콜드스타트)는 브라우저의 현재 위치를 보존한다.
       // 스크롤해야만 저장되므로, 지금 위치를 적어 두지 않으면 예전 방문의 값이 남아 나중에 그리로 복원된다.
       if (el) saveScrollPosition(getCurrentRedirectPath(), getScrollTop(el));
       return;
@@ -166,6 +212,12 @@ export function ScrollRestoration() {
       // 저장된 값이 없으면(예: 딥링크로 직접 진입, 또는 그 탭에 처음 들어감) 아무 것도
       // 하지 않는다 — 이미 0이다.
     } else {
+      const hashScroll = scrollToHashTarget();
+      if (hashScroll.requested) {
+        // Next.js scrolls fragments during its layout effect; preserve that position in this later effect.
+        if (!document.getElementById(locationHashId(window.location.hash))) setScrollTop(el, 0);
+        return hashScroll.dispose;
+      }
       setScrollTop(el, 0);
       saveScrollPosition(getCurrentRedirectPath(), 0); // 새로 들어온 화면이 예전 위치를 덮어쓴다.
     }

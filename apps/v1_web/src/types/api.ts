@@ -4396,6 +4396,7 @@ export type BracketTemplateInput =
   | { kind: 'knockout'; size: 4 | 8 | 12 | 16; thirdPlace: boolean }
   | {
       kind: 'group_knockout';
+      qualificationMode?: 'cross_group_round12';
       groupCount: number;
       teamsPerGroup: number;
       advancePerGroup: 1 | 2;

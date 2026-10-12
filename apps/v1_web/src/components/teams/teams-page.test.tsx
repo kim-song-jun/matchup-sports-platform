@@ -615,9 +615,64 @@ describe('TeamFormPageView — 만들기 첫 화면', () => {
     expect(screen.getByRole('combobox', { name: '정원' })).toBeVisible();
   });
 
+  it.each([
+    ...['create', 'edit'].flatMap((mode) => [
+      { mode, team: { name: '' }, form: { sportId: 'sport-1', regionId: 'region-1' }, expected: 'textbox' },
+      { mode, team: { name: '성수 크루' }, form: { sportId: '', regionId: 'region-1' }, expected: 'sport' },
+      { mode, team: { name: '성수 크루' }, form: { sportId: 'sport-1', regionId: '' }, expected: 'region' },
+    ]),
+  ])('필수값 오류에서 첫 누락 항목으로 포커스하고 안내를 유지한다 (%j)', ({ mode, team, form, expected }) => {
+    const model = createModel({ ...form, error: '팀 이름, 종목, 지역을 모두 입력해 주세요.' });
+    model.mode = mode as 'create' | 'edit';
+    model.team = { ...model.team, ...team };
+
+    render(<TeamFormPageView model={model} />);
+
+    expect(screen.getAllByRole('alert').some((alert) => alert.textContent?.includes('팀 이름, 종목, 지역을 모두 입력해 주세요.'))).toBe(true);
+    const target = expected === 'textbox'
+      ? screen.getByRole('textbox', { name: '팀 이름' })
+      : expected === 'sport'
+        ? within(screen.getByRole('group', { name: '종목 선택' })).getByRole('button', { name: '풋살' })
+        : screen.getByRole('combobox', { name: '시군구' });
+    expect(target).toHaveFocus();
+    const descriptionTarget = expected === 'sport' ? screen.getByRole('group', { name: '종목 선택' }) : target;
+    const descriptionId = descriptionTarget.getAttribute('aria-describedby');
+    expect(descriptionId).toBeTruthy();
+    expect(document.getElementById(descriptionId!)).toBeVisible();
+  }, 15000);
+
+  it('필수값 오류는 폼 요약과 인라인 설명 중 하나만 live alert로 알린다', () => {
+    render(<TeamFormPageView model={createModel({ error: '팀 이름, 종목, 지역을 모두 입력해 주세요.' })} />);
+
+    expect(screen.getAllByRole('alert')).toHaveLength(1);
+    expect(screen.getByRole('textbox', { name: '팀 이름' })).toHaveAccessibleDescription('팀 이름, 종목, 지역을 모두 입력해 주세요.');
+  });
+
+  it('입력 중에는 오류 효과가 포커스를 빼앗지 않고 재제출하면 다음 누락 항목으로 옮긴다', async () => {
+    const model = createModel({ sportId: '', error: '팀 이름, 종목, 지역을 모두 입력해 주세요.' });
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
+    const renderForm = (currentModel: TeamFormViewModel) => <QueryClientProvider client={queryClient}><TeamFormPageView model={currentModel} /></QueryClientProvider>;
+    const view = rtlRender(renderForm(model));
+    const nameInput = screen.getByRole('textbox', { name: '팀 이름' });
+    expect(nameInput).toHaveFocus();
+
+    view.rerender(renderForm({ ...model, team: { ...model.team, name: '성수 크루' } }));
+    expect(nameInput.isConnected).toBe(true);
+    expect(nameInput).toHaveFocus();
+    expect(nameInput).toHaveAccessibleDescription('팀 이름, 종목, 지역을 모두 입력해 주세요.');
+    expect(screen.getByRole('group', { name: '종목 선택' })).not.toHaveAttribute('aria-describedby');
+
+    fireEvent.click(view.container.querySelector('.tm-team-form-cta button.tm-btn-primary')!);
+    const sportButton = within(screen.getByRole('group', { name: '종목 선택' })).getByRole('button', { name: '풋살' });
+    await waitFor(() => expect(sportButton).toHaveFocus());
+    expect(screen.getAllByRole('alert').some((alert) => alert.textContent?.includes('팀 이름, 종목, 지역을 모두 입력해 주세요.'))).toBe(true);
+  });
+
   describe('#1534 fixed CTA의 키보드 포커스 가림', () => {
     let frames: Map<number, FrameRequestCallback>;
+    let originalVisualViewport: PropertyDescriptor | undefined;
     beforeEach(() => {
+      originalVisualViewport = Object.getOwnPropertyDescriptor(window, 'visualViewport');
       frames = new Map();
       let id = 0;
       vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
@@ -626,7 +681,11 @@ describe('TeamFormPageView — 만들기 첫 화면', () => {
       });
       vi.spyOn(window, 'cancelAnimationFrame').mockImplementation((key) => { frames.delete(key); });
     });
-    afterEach(() => { vi.restoreAllMocks(); });
+    afterEach(() => {
+      if (originalVisualViewport) Object.defineProperty(window, 'visualViewport', originalVisualViewport);
+      else Reflect.deleteProperty(window, 'visualViewport');
+      vi.restoreAllMocks();
+    });
     function flushFocusFrames() {
       act(() => {
         const pending = [...frames.values()];
@@ -646,6 +705,7 @@ describe('TeamFormPageView — 만들기 첫 화면', () => {
       // observed tablet coordinates, not a claim that actual alpha pixels are fixed.
       footer.style.position = position;
       vi.spyOn(footer, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, footerTop, 787, footerHeight));
+      vi.spyOn(scroller, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 56, 787, 788));
       vi.spyOn(level, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, bottom - 48, 300, 48));
       const scrollBy = vi.fn();
       Object.defineProperty(scroller, 'scrollBy', { value: scrollBy, configurable: true });
@@ -681,6 +741,165 @@ describe('TeamFormPageView — 만들기 첫 화면', () => {
       expect(scrollBy).not.toHaveBeenCalled();
     });
 
+    it('inline CTA 상태에서는 scroll-area 가시 경계 밖의 포커스 필드를 올린다', () => {
+      const { level, scrollBy } = setupFocus({ position: 'static' });
+      const scroller = level.closest<HTMLElement>('.tm-scroll-area')!;
+      vi.spyOn(scroller, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 56, 787, 344));
+
+      level.focus();
+      flushFocusFrames();
+
+      expect(scrollBy).toHaveBeenCalledTimes(1);
+      expect(scrollBy.mock.calls[0][0].top).toBeGreaterThan(0);
+    });
+
+    it('입력은 보이지만 연결된 오류 설명이 scrollport 밖이면 두 요소가 함께 보이도록 스크롤한다', () => {
+      const model = createModel({ error: '팀 이름, 종목, 지역을 모두 입력해 주세요.' });
+      const view = render(<div className="tm-scroll-area"><TeamFormPageView model={model} /></div>);
+      const nameInput = screen.getByRole('textbox', { name: '팀 이름' });
+      const errorHelp = document.getElementById(nameInput.getAttribute('aria-describedby')!)!;
+      const scroller = view.container.querySelector<HTMLElement>('.tm-scroll-area')!;
+      const footer = view.container.querySelector<HTMLElement>('.tm-team-form-cta')!;
+      const scrollBy = vi.fn();
+      footer.style.position = 'static';
+      Object.defineProperty(scroller, 'scrollBy', { value: scrollBy, configurable: true });
+      vi.spyOn(scroller, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 56, 390, 334));
+      vi.spyOn(nameInput, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 340, 350, 30));
+      vi.spyOn(errorHelp, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 372, 350, 50));
+
+      nameInput.blur();
+      nameInput.focus();
+      flushFocusFrames();
+
+      expect(nameInput.getBoundingClientRect().bottom).toBeLessThan(390);
+      expect(errorHelp.getBoundingClientRect().bottom).toBeGreaterThan(390);
+      expect(scrollBy).toHaveBeenCalledWith({ top: 40, behavior: 'instant' });
+    });
+
+    it.each([
+      { positionAfterKeyboard: 'fixed', expectedScroll: 24 },
+      { positionAfterKeyboard: 'static', expectedScroll: 28 },
+    ])('invalid submit 뒤 visual viewport가 줄면 포커스 필드와 연결된 오류 설명을 다시 드러낸다 (%j)', ({ positionAfterKeyboard, expectedScroll }) => {
+      const model = createModel({ error: '팀 이름, 종목, 지역을 모두 입력해 주세요.' });
+      const viewport = Object.assign(new EventTarget(), { offsetTop: 0, height: 500 });
+      Object.defineProperty(window, 'visualViewport', { configurable: true, value: viewport });
+      const view = render(<div className="tm-scroll-area"><TeamFormPageView model={model} /></div>);
+      const nameInput = screen.getByRole('textbox', { name: '팀 이름' });
+      const errorHelp = document.getElementById(nameInput.getAttribute('aria-describedby')!)!;
+      const scroller = view.container.querySelector<HTMLElement>('.tm-scroll-area')!;
+      const footer = view.container.querySelector<HTMLElement>('.tm-team-form-cta')!;
+      const scrollBy = vi.fn();
+      footer.style.position = 'fixed';
+      Object.defineProperty(scroller, 'scrollBy', { value: scrollBy, configurable: true });
+      vi.spyOn(footer, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 416, 390, 89));
+      vi.spyOn(scroller, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 56, 390, 788));
+      vi.spyOn(nameInput, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 220, 350, 20));
+      vi.spyOn(errorHelp, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 245, 350, 35));
+      nameInput.focus();
+      flushFocusFrames();
+      scrollBy.mockClear();
+      expect(nameInput).toHaveFocus();
+      expect(errorHelp.getBoundingClientRect().bottom).toBeLessThan(viewport.height);
+      fireEvent.click(within(footer).getByRole('button', { name: '팀 만들기' }));
+      flushFocusFrames();
+      expect(model.form?.onSubmit).toHaveBeenCalledTimes(1);
+      expect(nameInput).toHaveFocus();
+      scrollBy.mockClear();
+
+      footer.style.position = positionAfterKeyboard;
+      viewport.height = 260;
+      act(() => viewport.dispatchEvent(new Event('resize')));
+      flushFocusFrames();
+
+      expect(nameInput.getBoundingClientRect().bottom).toBeLessThan(viewport.height);
+      expect(errorHelp.getBoundingClientRect().bottom).toBeGreaterThan(viewport.height);
+      expect(scrollBy).toHaveBeenCalledWith({ top: expectedScroll, behavior: 'instant' });
+      scrollBy.mockClear();
+
+      act(() => viewport.dispatchEvent(new Event('resize')));
+      act(() => viewport.dispatchEvent(new Event('scroll')));
+      expect(frames.size).toBe(1);
+      view.unmount();
+      expect(frames.size).toBe(0);
+      flushFocusFrames();
+      expect(scrollBy).not.toHaveBeenCalled();
+    });
+
+    it('fixed CTA가 있을 때도 필드와 연결 오류 설명 전체를 가시 영역에 둔다', () => {
+      const model = createModel({ error: '팀 이름, 종목, 지역을 모두 입력해 주세요.' });
+      const view = render(<div className="tm-scroll-area"><TeamFormPageView model={model} /></div>);
+      const nameInput = screen.getByRole('textbox', { name: '팀 이름' });
+      const errorHelp = document.getElementById(nameInput.getAttribute('aria-describedby')!)!;
+      const scroller = view.container.querySelector<HTMLElement>('.tm-scroll-area')!;
+      const footer = view.container.querySelector<HTMLElement>('.tm-team-form-cta')!;
+      const scrollBy = vi.fn();
+      footer.style.position = 'fixed';
+      Object.defineProperty(scroller, 'scrollBy', { value: scrollBy, configurable: true });
+      vi.spyOn(footer, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 416, 390, 89));
+      vi.spyOn(scroller, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 56, 390, 788));
+      vi.spyOn(nameInput, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 370, 350, 20));
+      vi.spyOn(errorHelp, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 395, 350, 35));
+
+      nameInput.blur();
+      nameInput.focus();
+      flushFocusFrames();
+
+      expect(nameInput.getBoundingClientRect().bottom).toBeLessThan(416);
+      expect(errorHelp.getBoundingClientRect().bottom).toBeGreaterThan(416);
+      expect(scrollBy).toHaveBeenCalledWith({ top: 18, behavior: 'instant' });
+    });
+
+    it('같은 오류 항목에 재제출하면 포커스가 이미 있어도 fixed CTA 가림을 다시 보정한다', () => {
+      const model = createModel({ error: '팀 이름, 종목, 지역을 모두 입력해 주세요.' });
+      const view = render(<div className="tm-scroll-area"><TeamFormPageView model={model} /></div>);
+      const nameInput = screen.getByRole('textbox', { name: '팀 이름' });
+      const errorHelp = document.getElementById(nameInput.getAttribute('aria-describedby')!)!;
+      const scroller = view.container.querySelector<HTMLElement>('.tm-scroll-area')!;
+      const footer = view.container.querySelector<HTMLElement>('.tm-team-form-cta')!;
+      const submitButton = within(footer).getByRole('button', { name: '팀 만들기' });
+      const scrollBy = vi.fn();
+      footer.style.position = 'fixed';
+      Object.defineProperty(scroller, 'scrollBy', { value: scrollBy, configurable: true });
+      vi.spyOn(footer, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 416, 390, 89));
+      vi.spyOn(scroller, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 56, 390, 788));
+      vi.spyOn(nameInput, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 370, 350, 20));
+      vi.spyOn(errorHelp, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 395, 350, 35));
+      nameInput.focus();
+      flushFocusFrames();
+      scrollBy.mockClear();
+      expect(document.activeElement).toBe(nameInput);
+
+      fireEvent.click(submitButton);
+      flushFocusFrames();
+
+      expect(document.activeElement).toBe(nameInput);
+      expect(scrollBy).toHaveBeenCalledWith({ top: 18, behavior: 'instant' });
+    });
+
+    it('fixed CTA 상태에서도 scroll-area 상단 밖의 필드와 오류 안내를 다시 드러낸다', () => {
+      const model = createModel({ error: '팀 이름, 종목, 지역을 모두 입력해 주세요.' });
+      const view = render(<div className="tm-scroll-area"><TeamFormPageView model={model} /></div>);
+      const nameInput = screen.getByRole('textbox', { name: '팀 이름' });
+      const errorHelp = document.getElementById(nameInput.getAttribute('aria-describedby')!)!;
+      const scroller = view.container.querySelector<HTMLElement>('.tm-scroll-area')!;
+      const footer = view.container.querySelector<HTMLElement>('.tm-team-form-cta')!;
+      const scrollBy = vi.fn();
+      footer.style.position = 'fixed';
+      Object.defineProperty(scroller, 'scrollBy', { value: scrollBy, configurable: true });
+      vi.spyOn(footer, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 760, 390, 84));
+      vi.spyOn(scroller, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 56, 390, 788));
+      vi.spyOn(nameInput, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 30, 350, 20));
+      vi.spyOn(errorHelp, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 42, 350, 8));
+
+      nameInput.blur();
+      nameInput.focus();
+      flushFocusFrames();
+
+      expect(nameInput.getBoundingClientRect().top).toBeLessThan(56);
+      expect(errorHelp.getBoundingClientRect().bottom).toBeLessThan(56);
+      expect(scrollBy).toHaveBeenCalledWith({ top: -34, behavior: 'instant' });
+    });
+
     it('Shift+Tab→Tab 반복에서도 포커스와 선택을 유지한다', async () => {
       const { level, scrollBy } = setupFocus();
       const user = userEvent.setup();
@@ -696,8 +915,10 @@ describe('TeamFormPageView — 만들기 첫 화면', () => {
 
     it('빠른 다음 포커스나 폼 unmount 후 이전 예약이 스크롤하지 않는다', () => {
       const { view, level, scrollBy } = setupFocus();
+      const capacity = screen.getByRole('combobox', { name: '정원' });
+      vi.spyOn(capacity, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 200, 240, 40));
       level.focus();
-      screen.getByRole('combobox', { name: '정원' }).focus();
+      capacity.focus();
       flushFocusFrames();
       expect(scrollBy).not.toHaveBeenCalled();
       level.focus();

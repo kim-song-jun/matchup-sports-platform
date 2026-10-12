@@ -161,6 +161,8 @@ interface BracketGroupCardProps {
   /** 방금 이 조를 만들었으면 true — 마운트 직후 한 번 스크롤+포커스한다. */
   autoFocus: boolean;
   showToast: (msg: string, v?: 'success' | 'error') => void;
+  managedEntrySlots?: boolean;
+  onFixtureCreated?: (fixture: V1AdminBracketFixture) => void;
 }
 
 export function BracketGroupCard({
@@ -179,6 +181,8 @@ export function BracketGroupCard({
   onRemoveGroupTeam,
   autoFocus,
   showToast,
+  managedEntrySlots = false,
+  onFixtureCreated,
 }: BracketGroupCardProps) {
   const rootRef = useRef<HTMLDivElement>(null);
   const groupFixtures = fixtures.filter((f) => f.groupId === group.id);
@@ -296,11 +300,12 @@ export function BracketGroupCard({
         ...(fixtureAwayRegId ? { awayRegistrationId: fixtureAwayRegId } : {}),
       },
       {
-        onSuccess: () => {
+        onSuccess: (fixture) => {
           setFixtureRound('');
           setFixtureNumber('1');
           setFixtureHomeRegId('');
           setFixtureAwayRegId('');
+          onFixtureCreated?.(fixture);
           showToast('경기 일정을 추가했어요.', 'success');
         },
         onError: (err) => showToast(extractErrorMessage(err, '경기 일정 추가에 실패했어요.'), 'error'),
@@ -392,14 +397,14 @@ export function BracketGroupCard({
                     {gt.isBye && createBye && <button type="button" aria-label={`부전승 ${gt.sortOrder + 1}번 자리 수정`}
                       onClick={() => { setEditingByeId(gt.id); setFixtureRound(byeRound(group.phase)?.label ?? ''); setEntryType('bye'); setByePosition(String(gt.sortOrder + 1)); setFixtureHomeRegId(gt.registrationId ?? ''); setFixtureAwayRegId(''); setManualFixtureOpen(true); }}
                       className="inline-flex items-center justify-center w-[44px] h-[44px] rounded-lg text-[var(--text-muted)] hover:text-[var(--blue700)]"><Pencil size={14} aria-hidden="true" /></button>}
-                    <button
+                    {!managedEntrySlots && <button
                       type="button"
                       onClick={() => onRemoveGroupTeam(gt.id, gt.teamName ?? (gt.isBye ? '팀 미정 부전승 자리' : '이 팀'))}
                       aria-label={gt.isBye ? `부전승 ${gt.sortOrder + 1}번 자리 삭제` : `${gt.teamName ?? '팀'} 배정 해제`}
                       className="inline-flex items-center justify-center w-[20px] h-[20px] rounded-full text-[var(--text-muted)] hover:text-red-500 hover:bg-[var(--red50)] transition-colors"
                     >
                       <X size={11} aria-hidden="true" />
-                    </button>
+                    </button>}
                   </span>
                 ))}
               </div>
@@ -426,13 +431,13 @@ export function BracketGroupCard({
           </div>
 
           {/* ── 팀 배정 ── */}
-          <TeamStagingPicker
+          {managedEntrySlots ? <p className="tm-text-caption text-[var(--text-muted)]">위의 ‘조별 팀 자리 편집’에서 팀을 선택해 주세요. 연결된 조별 경기들에 함께 반영돼요.</p> : <TeamStagingPicker
             pickerId={`bracket-group-${group.id}-team-search`}
             suggestedTeams={suggestedTeams}
             searchPoolItems={searchPoolItems}
             isSubmitting={isBatchAssigning || assignGroupTeam.isPending}
             onBatchAssign={handleBatchAssign}
-          />
+          />}
 
           {/* ── 경기 일정 ── */}
           <div className="flex flex-col gap-3 pt-1 border-t border-[var(--border)]">
@@ -440,7 +445,7 @@ export function BracketGroupCard({
               <button
                 type="button"
                 onClick={() => onAutoGenerate(group.id)}
-                disabled={isAutoGenerating || createFixture.isPending}
+                disabled={managedEntrySlots || isAutoGenerating || createFixture.isPending}
                 aria-describedby={needsMoreTeams ? autoGenerateHintId : undefined}
                 className={submitBtnCls}
               >

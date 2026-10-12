@@ -4,7 +4,9 @@
  * 확인 모달에 경고 문구가 포함, (3) 확인 시 publishBracket mutate 호출, (4) 이미 공개된
  * 경우 버튼이 사라지고 공개 시각 안내로 대체된다.
  */
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, render as rtlRender, screen, waitFor, within } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import type { ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { V1AdminTournamentBracket } from '@/types/api';
 import {
@@ -47,6 +49,11 @@ function noopMutationHook<T>(): T {
 }
 
 const emptyBracket: V1AdminTournamentBracket = { groups: [], fixtures: [], standings: [], slots: [] };
+
+function render(ui: ReactElement) {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
+  return rtlRender(<QueryClientProvider client={client}>{ui}</QueryClientProvider>);
+}
 
 // 공개·예약은 조가 하나라도 있어야 열린다(빈 대진표 공개 사고 방지). 공개 흐름을 검증하는
 // 케이스는 조가 있는 대진표를 기본으로 쓴다.

@@ -166,8 +166,13 @@ export function CompetitionTemplateCard(props: CompetitionTemplateCardProps) {
       </Link>
     );
   }
+  const radioStateClass = props.disabled
+    ? 'cursor-not-allowed border-[var(--border-strong)] bg-[var(--card-surface-muted)]'
+    : props.checked
+      ? 'cursor-pointer border-[var(--blue500)] bg-[var(--blue50)]'
+      : 'cursor-pointer border-[var(--border)] hover:border-[var(--border-strong)]';
   return (
-    <label className={`${cardClass} cursor-pointer ${props.checked ? 'border-[var(--blue500)] bg-[var(--blue50)]' : 'border-[var(--border)] hover:border-[var(--border-strong)]'} ${props.disabled ? 'cursor-not-allowed opacity-50' : ''}`}>
+    <label className={`${cardClass} ${radioStateClass}`}>
       <input type="radio" name={props.name} value={props.value} checked={props.checked} disabled={props.disabled}
         aria-labelledby={titleId} aria-describedby={descriptionId} onChange={() => props.onChange(props.value)}
         className="sr-only" />

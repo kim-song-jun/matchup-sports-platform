@@ -126,6 +126,8 @@ export function BracketTab({
   tournamentId,
   showToast,
   registrations,
+  confirmedTeamCount,
+  confirmedTeamCountStatus,
   registrationDeadlineAt,
   tournamentStatus,
   bracketPublishedAt,
@@ -136,6 +138,8 @@ export function BracketTab({
   tournamentId: string;
   showToast: (msg: string, v?: 'success' | 'error') => void;
   registrations: V1AdminTournamentRegistration[];
+  confirmedTeamCount: number;
+  confirmedTeamCountStatus: 'pending' | 'success' | 'error';
   registrationDeadlineAt: string | null | undefined;
   /** 접수를 마감 시각 전에 수동으로 닫으면(closed 이후) 마감 시각이 미래여도 접수는 끝난 것이다. */
   tournamentStatus?: V1TournamentStatus;
@@ -717,7 +721,8 @@ export function BracketTab({
 
       {canWrite && tournamentFormat ? <BracketListTemplateTools tournamentId={tournamentId} format={tournamentFormat}
         hasExistingBracket={groups.length > 0 || fixtures.length > 0 || (bracket?.slots?.length ?? 0) > 0}
-        groups={groups} slots={bracket?.slots ?? []} registrations={registrations} showToast={showToast} /> : null}
+        groups={groups} slots={bracket?.slots ?? []} registrations={registrations}
+        confirmedTeamCount={confirmedTeamCount} confirmedTeamCountStatus={confirmedTeamCountStatus} showToast={showToast} /> : null}
       {round12AutoOpen ? <CrossGroupRound12Dialog tournamentId={tournamentId} onClose={() => setRound12AutoOpen(false)} showToast={showToast} /> : null}
 
       {/* ── 조 롤업 헤더 + 원클릭 조 추가 ─────────────────────────────── */}

@@ -199,6 +199,8 @@ function renderTab(showToast = vi.fn(), registrations: V1AdminTournamentRegistra
       tournamentId="t-1"
       showToast={showToast}
       registrations={registrations}
+      confirmedTeamCount={registrations.filter((registration) => registration.status === 'confirmed').length}
+      confirmedTeamCountStatus="success"
       registrationDeadlineAt={null}
       bracketPublishedAt={null}
       bracketPublishScheduledAt={null}

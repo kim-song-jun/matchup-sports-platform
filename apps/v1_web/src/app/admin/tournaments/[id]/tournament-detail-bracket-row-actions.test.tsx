@@ -88,7 +88,7 @@ describe('BracketTab 행 액션 (T6-1/T6-4)', () => {
       isPending: false, isError: false, error: null, refetch: vi.fn(),
     } as unknown as ReturnType<typeof useV1AdminBracket>);
 
-    render(<BracketTab tournamentId="tournament-1" showToast={vi.fn()} registrations={[]} registrationDeadlineAt={null} bracketPublishedAt={null} bracketPublishScheduledAt={null} canWrite />);
+    render(<BracketTab tournamentId="tournament-1" showToast={vi.fn()} registrations={[]} confirmedTeamCount={0} confirmedTeamCountStatus="success" registrationDeadlineAt={null} bracketPublishedAt={null} bracketPublishScheduledAt={null} canWrite />);
 
     // AdminDataTable(scrollOnMobile)은 데스크톱 테이블 + 모바일 컴팩트 테이블을 동시에
     // DOM에 렌더한다(CSS hidden/lg:hidden으로만 전환 — jsdom은 레이아웃을 계산하지
@@ -118,7 +118,7 @@ describe('BracketTab 행 액션 (T6-1/T6-4)', () => {
       isPending: false, isError: false, error: null, refetch: vi.fn(),
     } as unknown as ReturnType<typeof useV1AdminBracket>);
 
-    render(<BracketTab tournamentId="tournament-1" showToast={vi.fn()} registrations={[]} registrationDeadlineAt={null} bracketPublishedAt={null} bracketPublishScheduledAt={null} canWrite />);
+    render(<BracketTab tournamentId="tournament-1" showToast={vi.fn()} registrations={[]} confirmedTeamCount={0} confirmedTeamCountStatus="success" registrationDeadlineAt={null} bracketPublishedAt={null} bracketPublishScheduledAt={null} canWrite />);
 
     const correctionLinks = screen.getAllByRole('link', { name: /결과 정정하러 가기/ });
     expect(correctionLinks.length).toBeGreaterThan(0);
@@ -133,7 +133,7 @@ describe('BracketTab 행 액션 (T6-1/T6-4)', () => {
       data: { groups: [], fixtures: [fixture({ status: 'in_progress', result: null })], standings: [] },
       isPending: false, isError: false, error: null, refetch: vi.fn(),
     } as unknown as ReturnType<typeof useV1AdminBracket>);
-    render(<BracketTab tournamentId="tournament-1" showToast={vi.fn()} registrations={[]} registrationDeadlineAt={null} bracketPublishedAt={null} bracketPublishScheduledAt={null} canWrite />);
+    render(<BracketTab tournamentId="tournament-1" showToast={vi.fn()} registrations={[]} confirmedTeamCount={0} confirmedTeamCountStatus="success" registrationDeadlineAt={null} bracketPublishedAt={null} bracketPublishScheduledAt={null} canWrite />);
     expect(screen.getAllByRole('link', { name: /운영 콘솔 열기/ }).length).toBeGreaterThan(0);
   });
 });

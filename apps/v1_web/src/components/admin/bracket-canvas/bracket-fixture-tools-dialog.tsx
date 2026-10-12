@@ -17,12 +17,13 @@ export type BracketFixtureToolsDialogProps = {
   tournamentId: string;
   bracket: V1AdminTournamentBracket;
   onClose: () => void;
+  onFixtureCreated?: (fixtureId: string) => void;
   showToast: (message: string, variant?: 'success' | 'error') => void;
 };
 
 const SELECT_CLASS = 'tm-input';
 
-export function BracketFixtureToolsDialog({ open, mode, format, tournamentId, bracket, onClose, showToast }: BracketFixtureToolsDialogProps) {
+export function BracketFixtureToolsDialog({ open, mode, format, tournamentId, bracket, onClose, onFixtureCreated, showToast }: BracketFixtureToolsDialogProps) {
   const idPrefix = useId();
   const createFixture = useV1AddBracketFixture(tournamentId);
   const setSources = useV1SetBracketSources(tournamentId);
@@ -79,7 +80,8 @@ export function BracketFixtureToolsDialog({ open, mode, format, tournamentId, br
     createFixture.mutate(
       { groupId: target.groupId, round: target.round },
       {
-        onSuccess: () => {
+        onSuccess: (fixture) => {
+          onFixtureCreated?.(fixture.id);
           showToast(`${target.toastLabel} 경기를 추가했어요. 칸을 눌러 팀을 넣어 주세요.`, 'success');
           onClose();
         },

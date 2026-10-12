@@ -1,5 +1,43 @@
 # Task 20261057: 어드민 대진 그림 편집기 — 그림 먼저, 팀은 자리에, 결과는 칸에서
 
+## 2026-10-12 추가 요청 — A + C 선택
+
+Status (추가 요청): In Progress — A+C 구현·계약 테스트·독립 리뷰·lint 완료, PR·alpha 대기.
+
+- 사용자 요청: 첨부 운영자 피드백의 대회·리그 템플릿을 다듬어 dev 대상 PR과 alpha 테스트까지 진행.
+- 원문 피드백: 12강 지원이 불명확하고, 템플릿과 수기 입력이 잘 이어지지 않으며 수정·삭제가 번거롭다. 기능 제거 의견은 첨부 대화의 제안이며 사용자 확정 요구로 취급하지 않는다.
+- 사용자 결정: "A + C 로 가는게 좋겠네." 기존 그림 편집 유지 + 참가 팀 수부터 가능한 구성 안내 + 생성 뒤 수기 경기와 동일한 편집 흐름.
+- 현재 근거: HEAD/origin/dev/alpha `a4b7c2d78` 일치. 단독 토너먼트 4·8·12·16팀, 12팀 선택 시 4팀 부전승 안내·경기 수 표시를 실제 alpha에서 확인. 이번 조사에서 생성·저장하지 않음. 조별 이후 결선은 2·4·8·16팀 지원.
+- 설계 비교: 로컬 의사결정 목업 A(그림 편집 통합), B(수기 목록 우선), C(팀 수부터 안내)를 작성한 뒤 사용자 A+C 선택. 제품 코드에 목업 파일을 포함하지 않는다.
+
+### Owned / Forbidden scope
+
+- 구현: `apps/v1_web/src/components/admin/bracket-canvas/`, 관련 `apps/v1_web/src/lib/bracket-template-*`, 대회 `bracket-tab.tsx`, 정규 리그 대진 편집·템플릿 화면 및 관련 좁은 테스트.
+- root: 이 task 추가 요청 절, changeset, PR·CI·alpha 증거.
+- Forbidden: Prisma·DB migration, production, 새로운 임의 팀 수 지원·조별 뒤 12팀 결선 확대, 템플릿 제거, 다른 도메인·다른 세션 WIP.
+- 구현/검증은 각각 Luna/Sol 순차 위임. 서브에이전트 self-commit·push·merge·테스트 병렬 fan-out 금지.
+
+### Acceptance Criteria
+
+- [x] A·B·C 3안 및 추천안 → 사용자 A+C 선택.
+- [x] 참가 팀 수를 먼저 입력하고 해당 대회 진행 방식에 맞는 실제 지원 구성과 경기·단계 미리보기를 제공한다. 등록 팀 수를 유효하게 활용하고 지원하지 않는 조합은 이유를 명시한다.
+- [x] 템플릿 생성 경기와 수기로 만든 경기의 팀·일정·진출 연결 편집 동선이 이어진다. 목록 편집도 slot/source 계약을 우회하지 않는다.
+- [x] 생성/수기 추가 성공 뒤 해당 경기 편집으로 이어지고, 삭제 영향·기록 보호 이유를 확인할 수 있다. 실패를 성공으로 표시하지 않는다.
+- [x] 정규 리그도 참가 팀 수·라운드·경기 수 안내와 생성 후 편집 흐름을 유지한다.
+- [ ] 기존 권한·공개 대진·결과·전적·알림 API 계약을 유지한다.
+- [ ] 최소 계약 테스트·범위 lint/typecheck, dev 대상 PR의 정확한 SHA CI·독립 리뷰.
+- [ ] alpha 배포 SHA 확인 후 대회/정규 리그와 390·768·1440px 실제 흐름·스크린샷 검증. 테스트 데이터 변경 범위를 증거로 남긴다.
+
+### Progress Snapshot
+
+1. 컨텍스트·최신 dev·alpha 기준 확인 완료. alpha space 326 재사용, 사용자의 운영자 직접 로그인 후 `/admin/me` 200 확인.
+2. A+C 구현 완료. Luna 구현 → Sol 독립 검토에서 임의 팀 수 올림 추천·양쪽 동일 팀 선택·모달 높이 문제를 수정 → Sol 정적 재검토 PASS. 템플릿/helper/목록 94개 중 93 PASS 후 마지막 오류 표시 테스트의 refetch mock을 실제 Promise 계약에 맞추고 관련 3개 PASS. 경기 패널 45개 PASS. `pnpm --filter v1_web lint`(tsc·v1 패턴 검사) PASS; PR·배포·변경 후 alpha PASS는 아직 없음.
+3. alpha 전용 QA 데이터: 비공개 대회 `1c7cb376-70cf-4532-a95d-3bf088bae1bb`(확정 12팀, 결과 없음), 정규 리그 `48603613-3382-4993-9106-34661ae74fa6`(4팀, 준비 상태). 기존 다른 QA 대회/리그는 조회만 했으며 변경하지 않음.
+4. 변경 전 1440px 템플릿 화면 캡처. 저장된 테스트 계정은 401이었으나 사용자 직접 로그인으로 해소. 준비 도중 다시 로그인 화면으로 전환되었으므로 배포 후 로그인 재개 필요. 자동화 selector 오기와 파일 경로 오기는 실제 snapshot/파일 목록으로 바로잡음. context-mode DTO 조회 타임아웃은 native 파일 조회로 대체.
+5. 종료 시 ego `finish({ keep: [] })`, 위임 에이전트 상태 확인/종료, 소유 프로세스 회수.
+6. 작업 중 alpha/dev가 `37a06cea0`으로 갱신됨. 이전 base 대비 릴리스 버전·changeset 소비·별도 task 문서만 변경되었고 이번 기능 소스와 충돌 없음. 공유 메인 작업트리에는 다른 세션 WIP가 있으므로 손대지 않음.
+
+
 Status: Review — 2026-10-10 구현 PR 18개 dev 머지(마지막 #1766 `da879b17a`), #1771 로 C3 정정 테스트 고정, alpha E2E 6회 모두 통과. 남은 것: 동률 조의 공개 순위표 진출 표시(결정 A 구현 `fix/bracket-tie-standings` — 머지·alpha 재확인 대기), PR별 갤러리 일부 미게시, Copilot clean 미확인(장애) — 끝나거나 면제되면 Done
 **Owner**: Planning(main) → backend-data-dev · backend-api-dev · frontend-data-dev · frontend-ui-dev
 **Created**: 2026-10-08

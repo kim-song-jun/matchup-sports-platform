@@ -161,6 +161,7 @@ interface BracketGroupCardProps {
   /** 방금 이 조를 만들었으면 true — 마운트 직후 한 번 스크롤+포커스한다. */
   autoFocus: boolean;
   showToast: (msg: string, v?: 'success' | 'error') => void;
+  onFixtureCreated?: (fixture: V1AdminBracketFixture) => void;
 }
 
 export function BracketGroupCard({
@@ -179,6 +180,7 @@ export function BracketGroupCard({
   onRemoveGroupTeam,
   autoFocus,
   showToast,
+  onFixtureCreated,
 }: BracketGroupCardProps) {
   const rootRef = useRef<HTMLDivElement>(null);
   const groupFixtures = fixtures.filter((f) => f.groupId === group.id);
@@ -296,11 +298,12 @@ export function BracketGroupCard({
         ...(fixtureAwayRegId ? { awayRegistrationId: fixtureAwayRegId } : {}),
       },
       {
-        onSuccess: () => {
+        onSuccess: (fixture) => {
           setFixtureRound('');
           setFixtureNumber('1');
           setFixtureHomeRegId('');
           setFixtureAwayRegId('');
+          onFixtureCreated?.(fixture);
           showToast('경기 일정을 추가했어요.', 'success');
         },
         onError: (err) => showToast(extractErrorMessage(err, '경기 일정 추가에 실패했어요.'), 'error'),

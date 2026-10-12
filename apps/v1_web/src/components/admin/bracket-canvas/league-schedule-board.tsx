@@ -1,6 +1,6 @@
 'use client';
 
-import { useId, useMemo, useState, type DragEvent } from 'react';
+import { useEffect, useId, useMemo, useState, type DragEvent } from 'react';
 import { EyeOff } from 'lucide-react';
 import { BottomSheet } from '@/components/v1-ui/bottom-sheet';
 import { EmptyState } from '@/components/v1-ui/primitives';
@@ -33,6 +33,7 @@ export interface LeagueScheduleBoardProps {
   canWrite: boolean;
   showToast: (message: string, variant?: 'success' | 'error') => void;
   onOpenTemplate: () => void;
+  focusFixtureId?: string | null;
   onEditSchedule: (teamMatchId: string) => void;
   onCancelFixture: (teamMatchId: string) => void;
   onShowList: () => void;
@@ -47,7 +48,7 @@ function scoreText(node: LeagueBoardNode): string | null {
   return `${score.home} : ${score.away}${penalties}`;
 }
 
-export function LeagueScheduleBoard({ leagueId, fixtures, slots, teams, canWrite, showToast, onOpenTemplate, onEditSchedule, onCancelFixture, onShowList }: LeagueScheduleBoardProps) {
+export function LeagueScheduleBoard({ leagueId, fixtures, slots, teams, canWrite, showToast, onOpenTemplate, focusFixtureId = null, onEditSchedule, onCancelFixture, onShowList }: LeagueScheduleBoardProps) {
   const headingId = useId();
   // 서버 기본값 true — 하이드레이션 전엔 지금 배치를 유지하고 좁은 태블릿만 클라이언트에서 바뀐다.
   const sidePanel = useMediaQuery(BRACKET_CANVAS_SIDE_PANEL_MEDIA_QUERY, true);
@@ -67,6 +68,13 @@ export function LeagueScheduleBoard({ leagueId, fixtures, slots, teams, canWrite
   } = useV1AdminTournamentRegistrations(leagueId);
   const [selectedRegistrationId, setSelectedRegistrationId] = useState<string | null>(null);
   const [openFixtureId, setOpenFixtureId] = useState<string | null>(null);
+  const focusedFixtureExists = focusFixtureId !== null && fixtures.some((fixture) => fixture.teamMatchId === focusFixtureId);
+
+  useEffect(() => {
+    if (focusedFixtureExists && focusFixtureId !== null) {
+      setOpenFixtureId(focusFixtureId);
+    }
+  }, [focusFixtureId, focusedFixtureExists]);
 
   const registrations = registrationsData?.items;
   // 대회 대진 화면과 같은 규칙 — 캐시된 목록은 재조회가 실패해도 쓰되 실패는 refetchFailed 로 드러낸다.

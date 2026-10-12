@@ -10,7 +10,9 @@ import { describeBracketCanvasError } from '@/lib/bracket-canvas-errors';
 import {
   BRACKET_TEMPLATE_MAX_FIXTURES,
   exceedsFixtureLimit,
+  groupKnockoutShapes,
   planBracketTemplateCounts,
+  recommendedKnockoutSize,
 } from '@/lib/bracket-template-counts';
 import type { BracketTemplateInput } from '@/types/api';
 import { DEFAULT_GROUP_KNOCKOUT_VALUE, GroupKnockoutFields, type GroupKnockoutTemplateValue } from './bracket-group-knockout-fields';
@@ -19,41 +21,85 @@ export type BracketTemplateDialogProps = {
   open: boolean;
   tournamentId: string;
   format: 'knockout' | 'league' | 'group_knockout';
+  confirmedTeamCount?: number;
   hasExistingBracket: boolean;
   onClose: () => void;
+  onApplied?: () => void;
   showToast: (message: string, variant?: 'success' | 'error') => void;
 };
 
 const TEAM_COUNT_PATTERN = /^\d{1,2}$/;
 const KNOCKOUT_SIZES = [4, 8, 12, 16] as const;
 
-function radioRow(id: string, name: string, label: string, checked: boolean, onChange: () => void) {
+function applyGroupShape(current: GroupKnockoutTemplateValue, shape: GroupKnockoutTemplateValue): GroupKnockoutTemplateValue {
+  return { ...current, ...shape, thirdPlace: shape.groupCount * shape.advancePerGroup === 2 ? false : current.thirdPlace };
+}
+
+function templateStagePreview(input: BracketTemplateInput): string {
+  if (input.kind === 'knockout') {
+    const rounds: Record<4 | 8 | 12 | 16, string[]> = {
+      4: ['4강 2경기', '결승 1경기'],
+      8: ['8강 4경기', '4강 2경기', '결승 1경기'],
+      12: ['12강 4경기', '8강 4경기', '4강 2경기', '결승 1경기'],
+      16: ['16강 8경기', '8강 4경기', '4강 2경기', '결승 1경기'],
+    };
+    return [...rounds[input.size], ...(input.thirdPlace ? ['3·4위전 1경기'] : []), ...(input.size === 12 ? ['부전승 4자리'] : [])].join(' → ');
+  }
+  if (input.kind === 'league') {
+    const rounds = (input.teamCount % 2 === 0 ? input.teamCount - 1 : input.teamCount) * input.legs;
+    return `단일 리그 · ${rounds}라운드 · 라운드마다 ${Math.floor(input.teamCount / 2)}경기`;
+  }
+  const finalists = input.groupCount * input.advancePerGroup;
+  const finals: Record<number, string[]> = {
+    2: ['결승 1경기'],
+    4: ['4강 2경기', '결승 1경기'],
+    8: ['8강 4경기', '4강 2경기', '결승 1경기'],
+    16: ['16강 8경기', '8강 4경기', '4강 2경기', '결승 1경기'],
+  };
+  const groupRounds = (input.teamsPerGroup % 2 === 0 ? input.teamsPerGroup - 1 : input.teamsPerGroup) * input.legs;
+  return [`${input.groupCount}개 조 · 조별 ${groupRounds}라운드`, ...finals[finalists], ...(input.thirdPlace ? ['3·4위전 1경기'] : [])].join(' → ');
+}
+
+function radioRow(id: string, name: string, label: string, checked: boolean, onChange: () => void, disabled = false) {
   return (
-    <label key={id} htmlFor={id} className="tm-text-label flex min-h-[44px] items-center gap-2" style={{ color: 'var(--text-strong)' }}>
-      <input id={id} type="radio" name={name} checked={checked} onChange={onChange} className="size-5" />
+    <label key={id} htmlFor={id} className="tm-text-label flex min-h-[44px] items-center gap-2" style={{ color: disabled ? 'var(--text-muted)' : 'var(--text-strong)' }}>
+      <input id={id} type="radio" name={name} checked={checked} disabled={disabled} onChange={onChange} className="size-5" />
       {label}
     </label>
   );
 }
 
-export function BracketTemplateDialog({ open, tournamentId, format, hasExistingBracket, onClose, showToast }: BracketTemplateDialogProps) {
+export function BracketTemplateDialog({ open, tournamentId, format, confirmedTeamCount = 0, hasExistingBracket, onClose, onApplied, showToast }: BracketTemplateDialogProps) {
   const idPrefix = useId();
   const apply = useV1ApplyBracketTemplate(tournamentId);
   const { confirm, ConfirmModal } = useConfirm();
   const { dialogRef, onBackdropClick, mounted, closing } = useModalA11y({ open, onClose, pending: apply.isPending });
-  const [size, setSize] = useState<4 | 8 | 12 | 16>(8);
+  const [size, setSize] = useState<4 | 8 | 12 | 16>(() => recommendedKnockoutSize(confirmedTeamCount) ?? 8);
   const [thirdPlace, setThirdPlace] = useState(true);
-  const [teamCountText, setTeamCountText] = useState('6');
+  const teamCountMaximum = format === 'group_knockout' ? 48 : 20;
+  const [teamCountText, setTeamCountText] = useState(String(Math.max(3, Math.min(teamCountMaximum, confirmedTeamCount || (format === 'league' ? 6 : 8)))));
   const [legs, setLegs] = useState<1 | 2>(1);
-  const [groupKnockout, setGroupKnockout] = useState<GroupKnockoutTemplateValue>(DEFAULT_GROUP_KNOCKOUT_VALUE);
+  const [groupKnockout, setGroupKnockout] = useState<GroupKnockoutTemplateValue>(() => {
+    const initialCount = confirmedTeamCount || 8;
+    return { ...DEFAULT_GROUP_KNOCKOUT_VALUE, ...(groupKnockoutShapes(initialCount)[0] ?? {}) };
+  });
 
   const teamCount = TEAM_COUNT_PATTERN.test(teamCountText) ? Number(teamCountText) : null;
   const teamCountValid = teamCount !== null && teamCount >= 3 && teamCount <= 20;
+  const groupTeamCountValid = teamCount !== null && teamCount >= 6 && teamCount <= 48;
+  const knockoutRecommendation = teamCount === null ? null : recommendedKnockoutSize(teamCount);
+  const knockoutTeamCountSupported = knockoutRecommendation !== null;
+  const groupShapes = teamCount === null ? [] : groupKnockoutShapes(teamCount);
+  const groupShape = groupShapes.find((shape) => shape.groupCount === groupKnockout.groupCount && shape.teamsPerGroup === groupKnockout.teamsPerGroup && shape.advancePerGroup === groupKnockout.advancePerGroup) ?? null;
   const input: BracketTemplateInput | null =
     format === 'knockout'
-      ? { kind: 'knockout', size, thirdPlace }
+      ? knockoutTeamCountSupported && size === teamCount
+        ? { kind: 'knockout', size, thirdPlace }
+        : null
       : format === 'group_knockout'
-        ? { kind: 'group_knockout', ...groupKnockout }
+        ? groupTeamCountValid && groupShape !== null
+          ? { kind: 'group_knockout', ...groupKnockout, ...groupShape }
+          : null
         : teamCountValid
           ? { kind: 'league', teamCount, legs }
           : null;
@@ -75,6 +121,7 @@ export function BracketTemplateDialog({ open, tournamentId, format, hasExistingB
     apply.mutate(hasExistingBracket ? { ...input, replaceExisting: true } : input, {
       onSuccess: (result) => {
         showToast(`경기 ${result.fixtures}개와 자리 ${result.slots}개를 만들었어요.`, 'success');
+        onApplied?.();
         onClose();
       },
       onError: (error) => showToast(describeBracketCanvasError(error, '대진을 만들지 못했어요.'), 'error'),
@@ -95,10 +142,10 @@ export function BracketTemplateDialog({ open, tournamentId, format, hasExistingB
           role="dialog"
           aria-modal="true"
           aria-labelledby={titleId}
-          className={`tm-modal-panel w-full max-w-[440px] overflow-hidden bg-[var(--card-surface)] shadow-[var(--shadow-dropdown)]${closing ? ' is-closing' : ''}`}
+          className={`tm-modal-panel flex max-h-[calc(100dvh-32px)] w-full max-w-[440px] flex-col overflow-hidden bg-[var(--card-surface)] shadow-[var(--shadow-dropdown)]${closing ? ' is-closing' : ''}`}
           style={{ borderRadius: 'var(--radius-hero)' }}
         >
-          <div className="flex items-center justify-between border-b border-[var(--border)] px-5 py-4">
+          <div className="flex shrink-0 items-center justify-between border-b border-[var(--border)] px-5 py-4">
             <h2 id={titleId} className="tm-text-body-lg font-bold" style={{ color: 'var(--text-strong)' }}>
               템플릿으로 대진 만들기
             </h2>
@@ -114,7 +161,8 @@ export function BracketTemplateDialog({ open, tournamentId, format, hasExistingB
             </button>
           </div>
 
-          <div className="flex flex-col gap-4 px-5 py-5">
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-5">
+            <div className="flex flex-col gap-4">
             {hasExistingBracket ? (
               <p className="tm-text-caption" style={{ color: 'var(--orange700)' }}>
                 이미 대진이 있어요. 만들면 기존 대진이 모두 지워지고 새로 만들어져요.
@@ -123,9 +171,28 @@ export function BracketTemplateDialog({ open, tournamentId, format, hasExistingB
 
             {format === 'knockout' ? (
               <>
+                <div className="flex flex-col gap-1">
+                  <label htmlFor={`${idPrefix}-teams`} className="tm-text-label font-semibold" style={{ color: 'var(--text-strong)' }}>참가 팀 수</label>
+                  <input id={`${idPrefix}-teams`} type="text" inputMode="numeric" maxLength={2} value={teamCountText} onChange={(event) => {
+                    setTeamCountText(event.target.value);
+                    const nextCount = /^\d{1,2}$/.test(event.target.value) ? Number(event.target.value) : null;
+                    const recommendation = nextCount === null ? null : recommendedKnockoutSize(nextCount);
+                    if (recommendation !== null) setSize(recommendation);
+                  }} className="tm-input" style={{ minHeight: 44 }} />
+                  {knockoutRecommendation === null ? (
+                    <p role="alert" className="tm-text-caption" style={{ color: 'var(--red700)' }}>녹아웃 템플릿은 참가팀 수가 정확히 4·8·12·16팀일 때만 만들 수 있어요. 다른 인원은 대진을 직접 편성해 주세요.</p>
+                  ) : confirmedTeamCount > 0 && teamCount !== confirmedTeamCount ? (
+                    <p className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>확정 참가팀은 {confirmedTeamCount}팀이에요. 템플릿 팀 수를 실제 참가 인원에 맞춰 확인해 주세요.</p>
+                  ) : null}
+                </div>
                 <fieldset className="flex flex-col">
                   <legend className="tm-text-label mb-1 font-semibold" style={{ color: 'var(--text-strong)' }}>팀 수</legend>
-                  {KNOCKOUT_SIZES.map((value) => radioRow(`${idPrefix}-size-${value}`, `${idPrefix}-size`, `${value}팀`, size === value, () => setSize(value)))}
+                  {KNOCKOUT_SIZES.map((value) => radioRow(`${idPrefix}-size-${value}`, `${idPrefix}-size`, `${value}팀 대진 틀${value !== teamCount ? ' · 참가팀 수와 다름' : ''}`, size === value && value === teamCount, () => setSize(value), value !== teamCount))}
+                  {knockoutRecommendation !== null ? (
+                    <p className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>
+                      참가팀 수와 같은 {knockoutRecommendation}팀 대진 틀을 사용해요.
+                    </p>
+                  ) : null}
                   {size === 12 ? (
                     <p className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>
                       12강은 8팀이 12강을 치르고, 4팀은 부전승으로 8강에 올라가요.
@@ -138,7 +205,34 @@ export function BracketTemplateDialog({ open, tournamentId, format, hasExistingB
                 </label>
               </>
             ) : format === 'group_knockout' ? (
-              <GroupKnockoutFields value={groupKnockout} onChange={setGroupKnockout} disabled={apply.isPending} />
+              <>
+                <div className="flex flex-col gap-1">
+                  <label htmlFor={`${idPrefix}-teams`} className="tm-text-label font-semibold" style={{ color: 'var(--text-strong)' }}>참가 팀 수</label>
+                  <input id={`${idPrefix}-teams`} type="text" inputMode="numeric" maxLength={2} value={teamCountText} onChange={(event) => {
+                    setTeamCountText(event.target.value);
+                    const nextCount = /^\d{1,2}$/.test(event.target.value) ? Number(event.target.value) : null;
+                    const shapes = nextCount === null ? [] : groupKnockoutShapes(nextCount);
+                    if (shapes[0]) setGroupKnockout((current) => applyGroupShape(current, { ...current, ...shapes[0] }));
+                  }} className="tm-input" style={{ minHeight: 44 }} />
+                  {confirmedTeamCount > 0 && teamCount !== confirmedTeamCount ? (
+                    <p className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>확정 참가팀은 {confirmedTeamCount}팀이에요. 참가 인원과 구성을 확인해 주세요.</p>
+                  ) : null}
+                </div>
+                {groupShapes.length > 0 ? (
+                  <div className="flex flex-col gap-1">
+                    <label htmlFor={`${idPrefix}-group-shape`} className="tm-text-label font-semibold" style={{ color: 'var(--text-strong)' }}>가능한 조 편성</label>
+                    <select id={`${idPrefix}-group-shape`} className="tm-input" style={{ minHeight: 44 }} value={groupShape ? `${groupShape.groupCount}:${groupShape.teamsPerGroup}:${groupShape.advancePerGroup}` : ''} onChange={(event) => {
+                      const shape = groupShapes.find((item) => `${item.groupCount}:${item.teamsPerGroup}:${item.advancePerGroup}` === event.target.value);
+                      if (shape) setGroupKnockout((current) => applyGroupShape(current, { ...current, ...shape }));
+                    }}>
+                      {groupShapes.map((shape) => <option key={`${shape.groupCount}:${shape.teamsPerGroup}:${shape.advancePerGroup}`} value={`${shape.groupCount}:${shape.teamsPerGroup}:${shape.advancePerGroup}`}>{`${shape.groupCount}개 조 × 조당 ${shape.teamsPerGroup}팀 · 조 ${shape.advancePerGroup}위까지 · 결선 ${shape.groupCount * shape.advancePerGroup}팀`}</option>)}
+                    </select>
+                  </div>
+                ) : (
+                  <p role="alert" className="tm-text-caption" style={{ color: 'var(--red700)' }}>현재 지원 범위(2~8개 조, 조당 3~6팀, 결선 2·4·8·16팀)에 맞는 조 편성이 없어요. 팀 수를 바꾸거나 녹아웃 템플릿을 선택해 주세요.</p>
+                )}
+                <GroupKnockoutFields value={groupKnockout} onChange={setGroupKnockout} disabled={apply.isPending} lockShape />
+              </>
             ) : (
               <>
                 <div className="flex flex-col gap-1">
@@ -165,19 +259,23 @@ export function BracketTemplateDialog({ open, tournamentId, format, hasExistingB
               </>
             )}
 
-            {counts !== null ? (
-              <p className="tm-text-label font-semibold" style={{ color: 'var(--text-strong)' }}>
-                {counts.edges > 0 ? `경기 ${counts.fixtures}개 · 자리 ${counts.slots}개 · 연결 ${counts.edges}개` : `경기 ${counts.fixtures}개 · 자리 ${counts.slots}개`}
-              </p>
+            {counts !== null && input !== null ? (
+              <div className="flex flex-col gap-1">
+                <p className="tm-text-label font-semibold" style={{ color: 'var(--text-strong)' }}>
+                  {counts.edges > 0 ? `경기 ${counts.fixtures}개 · 자리 ${counts.slots}개 · 연결 ${counts.edges}개` : `경기 ${counts.fixtures}개 · 자리 ${counts.slots}개`}
+                </p>
+                <p className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>진행 순서: {templateStagePreview(input)}</p>
+              </div>
             ) : null}
             {tooLarge ? (
               <p role="alert" className="tm-text-caption" style={{ color: 'var(--red700)' }}>
                 {`경기가 ${BRACKET_TEMPLATE_MAX_FIXTURES}개를 넘어서 만들 수 없어요. 팀 수나 회전 수를 줄여 주세요.`}
               </p>
             ) : null}
+            </div>
           </div>
 
-          <div className="flex gap-2 px-5 pb-5">
+          <div className="flex shrink-0 gap-2 px-5 pb-5">
             <Button type="button" variant="neutral" size="md" className="flex-1" onClick={onClose} disabled={apply.isPending}>
               취소
             </Button>

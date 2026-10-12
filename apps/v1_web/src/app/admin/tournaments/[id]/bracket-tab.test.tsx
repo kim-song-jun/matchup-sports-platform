@@ -20,6 +20,7 @@ import { V1ApiError } from '@/lib/api-client';
 import { BracketTab, describeLeagueReplace } from './bracket-tab';
 
 const v1Post = vi.fn();
+const assignSlotAsync = vi.fn();
 
 vi.mock('@/lib/api-client', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/lib/api-client')>();
@@ -40,6 +41,9 @@ function fixtureRow(overrides: Partial<V1AdminBracketFixture>): V1AdminBracketFi
     parentFixtureId: null,
     homeRegistrationId: 'r1',
     awayRegistrationId: 'r2',
+    homeSlotId: null,
+    awaySlotId: null,
+    bracketSources: [],
     homeTeamName: '강남FC',
     awayTeamName: '서초유나이티드',
     scheduledAt: null,
@@ -124,9 +128,24 @@ describe('BracketTab — 대진 번호 수정', () => {
     const dialog = await openNumberEdit();
     fireEvent.change(within(dialog).getByLabelText('대진 번호'), { target: { value: '2' } });
     fireEvent.click(within(dialog).getByRole('button', { name: '저장' }));
-    expect(toast).toHaveBeenCalledWith(message, 'error');
+    await waitFor(() => expect(toast).toHaveBeenCalledWith(message, 'error'));
     expect(within(dialog).getByLabelText('대진 번호')).toHaveValue(2);
     expect(dialog).toBeInTheDocument();
+  });
+
+  it('slot에 연결된 팀은 assignment API로 저장하고 일반 fixture PATCH에는 보내지 않는다', async () => {
+    bracketFixtures = [fixtureRow({ homeSlotId: 'slot-home', awaySlotId: null })];
+    assignSlotAsync.mockReset().mockResolvedValue(undefined);
+    const registrations = [
+      confirmedRegistration({ id: 'r1', teamName: '강남FC' }),
+      confirmedRegistration({ id: 'r3', teamName: '마포FC' }),
+    ];
+    renderTab(vi.fn(), registrations);
+    const dialog = await openNumberEdit();
+    fireEvent.click(within(dialog).getAllByRole('button', { name: '선택 해제' })[0]);
+    fireEvent.click(within(dialog).getByRole('button', { name: '저장' }));
+    await waitFor(() => expect(assignSlotAsync).toHaveBeenCalledWith({ slotId: 'slot-home', registrationId: null }));
+    expect(updateFixtureMutate).not.toHaveBeenCalled();
   });
 });
 
@@ -142,7 +161,7 @@ vi.mock('@/hooks/use-v1-api', () => ({
     isPending: false,
     isError: false,
     error: null,
-    refetch: vi.fn(),
+    refetch: vi.fn(() => Promise.resolve({ data: { ...bracket, groups: bracketGroups, fixtures: bracketFixtures } })),
   }),
   useV1PublishTournamentBracket: noopMutation,
   useV1UnpublishTournamentBracket: noopMutation,
@@ -156,6 +175,10 @@ vi.mock('@/hooks/use-v1-api', () => ({
   useV1UpdateGroup: noopMutation,
   useV1DeleteGroup: noopMutation,
   useV1RemoveGroupTeam: noopMutation,
+}));
+
+vi.mock('@/hooks/use-v1-bracket-canvas', () => ({
+  useV1AssignTournamentSlot: () => ({ mutateAsync: assignSlotAsync, isPending: false }),
 }));
 
 function alreadyExists(details: Record<string, unknown>) {
@@ -548,6 +571,16 @@ describe('BracketTab — 경기 수정: 한 팀 한 조', () => {
     const labels = screen.getAllByRole('option').map((option) => option.textContent ?? '').join();
     expect(labels).toContain('송파FC');
     expect(labels).not.toContain('마포FC');
+  });
+
+  it('반대편에 선택한 팀은 후보에서 빠져 홈·어웨이에 같은 팀을 고를 수 없다', async () => {
+    bracketFixtures = [fixtureRow({ id: 'fx-1', round: 'league_r1', fixtureNumber: 1, homeRegistrationId: 'r1', awayRegistrationId: null })];
+    renderTab(vi.fn(), registrations());
+    const dialog = await openEdit();
+    const awayPicker = within(dialog).getByPlaceholderText('어웨이 팀 검색');
+    fireEvent.click(awayPicker);
+    fireEvent.change(awayPicker, { target: { value: '강남FC' } });
+    await waitFor(() => expect(screen.queryByRole('option', { name: '강남FC' })).not.toBeInTheDocument());
   });
 
   it('이미 고른 팀이 다른 조 편성이어도 선택값으로 그대로 보인다', async () => {

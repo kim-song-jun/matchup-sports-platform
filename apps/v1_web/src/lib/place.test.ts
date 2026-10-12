@@ -69,10 +69,33 @@ describe('placeNavigationLinks', () => {
 
   it('iOS 웹: 티맵은 href 가 아니라 핸들러를 가진다', () => {
     const links = placeNavigationLinks(nameOnly, 'ios-web');
-    expect(links.map((l) => l.key)).toEqual(['kakao', 'naver', 'tmap']);
-    expect(links[2].href).toBeUndefined();
-    expect(typeof links[2].onSelect).toBe('function');
-    expect(links[0].description).toBe('이름으로 검색');
+    expect(links.map((l) => l.key)).toEqual(['applemaps', 'kakao', 'naver', 'tmap']);
+    expect(links[0]).toMatchObject({
+      label: 'Apple 지도',
+      iconSrc: '/map-apps/applemaps.jpg',
+      mode: 'search',
+      href: `https://maps.apple.com/?q=${enc}`,
+      newTab: false,
+      description: 'Apple 지도에서 이름으로 검색',
+    });
+    expect(links[3].href).toBeUndefined();
+    expect(typeof links[3].onSelect).toBe('function');
+    expect(links[1].description).toBe('이름으로 검색');
+  });
+
+  it('Apple 지도는 iOS 좌표 검색에서 첫 번째 HTTPS 길찾기 링크로만 제공한다', () => {
+    for (const platform of ['ios', 'ios-web'] as const) {
+      const links = placeNavigationLinks(route, platform);
+      expect(links.map((link) => link.key)).toEqual(['applemaps', 'kakao', 'naver', 'tmap']);
+      expect(links[0]).toMatchObject({
+        href: 'https://maps.apple.com/?daddr=37.5,127.1&dirflg=d',
+        mode: 'route',
+        newTab: false,
+      });
+    }
+    for (const platform of ['android', 'android-web', 'web'] as const) {
+      expect(placeNavigationLinks(route, platform).some((link) => link.key === 'applemaps')).toBe(false);
+    }
   });
 
   it.each([
@@ -93,11 +116,13 @@ describe('placeNavigationLinks', () => {
   it('좌표 없음: 앱 셸은 앱 이름 검색, 데스크톱은 웹 검색 URL', () => {
     const mobile = placeNavigationLinks(nameOnly, 'ios');
     expect(mobile.map((l) => l.href)).toEqual([
+      `https://maps.apple.com/?q=${enc}`,
       `kakaomap://search?q=${enc}`,
       `nmap://search?query=${enc}&appname=teameet.kr`,
       `tmap://search?name=${enc}`,
     ]);
-    expect(mobile.every((l) => l.mode === 'search' && l.description === '이름으로 검색')).toBe(true);
+    expect(mobile[0].description).toBe('Apple 지도에서 이름으로 검색');
+    expect(mobile.slice(1).every((l) => l.mode === 'search' && l.description === '이름으로 검색')).toBe(true);
     const desktop = placeNavigationLinks(nameOnly, 'web');
     expect(desktop.map((l) => l.href)).toEqual([`https://map.kakao.com/?q=${enc}`, `https://map.naver.com/p/search/${enc}`]);
     expect(desktop[0].description).toBe('새 창에서 이름으로 검색');
@@ -195,6 +220,16 @@ describe('detectPlaceNavPlatform', () => {
 
   it('앱 밖 아이폰 브라우저는 ios-web', () => {
     vi.stubGlobal('navigator', { ...navigator, userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X)' });
+    expect(detectPlaceNavPlatform()).toBe('ios-web');
+  });
+
+  it('데스크톱 UA 를 쓰는 iPadOS Safari 는 터치 지원 Mac 플랫폼으로 ios-web 을 감지한다', () => {
+    vi.stubGlobal('navigator', {
+      ...navigator,
+      userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 Version/18.0 Safari/605.1.15',
+      platform: 'MacIntel',
+      maxTouchPoints: 5,
+    });
     expect(detectPlaceNavPlatform()).toBe('ios-web');
   });
 

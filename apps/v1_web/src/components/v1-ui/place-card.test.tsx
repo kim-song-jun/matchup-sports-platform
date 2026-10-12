@@ -112,7 +112,20 @@ describe('PlaceCard', () => {
     fireEvent.click(screen.getByRole('button', { name: '지도 앱에서 찾기' }));
     const dialog = screen.getByRole('dialog', { name: '지도 앱에서 찾기' });
     expect(within(dialog).getByText('동네 운동장')).toBeInTheDocument();
+    const appleMaps = within(dialog).getByRole('link', { name: /^Apple 지도/ });
+    expect(appleMaps).toHaveAttribute('href', `https://maps.apple.com/?q=${encodeURIComponent('동네 운동장')}`);
+    expect(appleMaps).not.toHaveAttribute('target');
     expect(within(dialog).getByRole('link', { name: /^카카오맵/ })).toHaveAttribute('href', `kakaomap://search?q=${encodeURIComponent('동네 운동장')}`);
+  });
+
+  it('iOS 웹 좌표 길찾기에 Apple 지도를 첫 번째 HTTPS 링크로 같은 탭에서 보여 준다', () => {
+    renderCard(<PlaceCard place={withCoords} platform="ios-web" />);
+    fireEvent.click(screen.getByRole('button', { name: '길찾기' }));
+    const dialog = screen.getByRole('dialog', { name: '길찾기' });
+    const appleMaps = within(dialog).getByRole('link', { name: /^Apple 지도/ });
+    expect(appleMaps).toHaveAttribute('href', 'https://maps.apple.com/?daddr=37.5558,126.8985&dirflg=d');
+    expect(appleMaps).not.toHaveAttribute('target');
+    expect(appleMaps.compareDocumentPosition(within(dialog).getByRole('link', { name: /^카카오맵/ })) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
   it('지도 키가 없으면 지도 칸만 접히고 길찾기 버튼은 그대로 동작한다', async () => {

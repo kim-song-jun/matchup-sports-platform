@@ -1167,33 +1167,15 @@ button:disabled {
   line-height: 1.6;
 }
 
-.tm-auth-business-info {
-  margin-top: 20px;
-  padding-top: 16px;
-  border-top: 1px solid var(--border);
-}
-
-.tm-auth-business-info .tm-ps-business {
-  gap: 4px 12px;
-  margin: 0;
-  padding: 0;
-  border: 0;
-}
-
-.tm-auth-business-info .tm-ps-business-row {
-  align-items: baseline;
-  gap: 4px;
-}
-
-.tm-auth-business-info .tm-ps-business dt {
-  flex: 0 0 auto;
-  white-space: nowrap;
+.tm-auth-business-link {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  margin-top: 8px;
   color: var(--text-muted);
-}
-
-.tm-auth-business-info .tm-ps-business dd,
-.tm-auth-business-info .tm-ps-footer-inline-link {
-  color: var(--text-body);
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 
 .tm-auth-body {
@@ -3916,6 +3898,21 @@ html[data-teameet-native-keyboard="open"] .tm-auth-scroll {
 html.tm-keyboard-open .tm-fixed-cta,
 html[data-teameet-native-keyboard="open"] .tm-fixed-cta {
   position: absolute;
+}
+
+html.tm-keyboard-open .tm-scroll-area:has(.tm-create-shell) .tm-fixed-cta,
+html[data-teameet-native-keyboard="open"] .tm-scroll-area:has(.tm-create-shell) .tm-fixed-cta {
+  position: static;
+  left: auto;
+  bottom: auto;
+  width: auto;
+  transform: none;
+  z-index: auto;
+}
+
+html.tm-keyboard-open .tm-scroll-area:has(.tm-create-shell) .tm-create-shell,
+html[data-teameet-native-keyboard="open"] .tm-scroll-area:has(.tm-create-shell) .tm-create-shell {
+  padding-bottom: 16px;
 }
 
 html.tm-keyboard-open .tm-modal-panel,

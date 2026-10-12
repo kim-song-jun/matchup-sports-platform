@@ -7,7 +7,6 @@ import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { AuthExceptionPageView, LoginPageView, SignupCompletePageView } from './auth-page';
 import { getAuthExceptionViewModel, getLoginViewModel, getSignupCompleteViewModel } from './auth.view-model';
-import { normalizeSiteInfo } from '@/lib/public-site/site-info';
 
 vi.mock('next/link', () => ({
   default: ({ children, href, ...rest }: { children: React.ReactNode; href: string }) => (
@@ -16,11 +15,6 @@ vi.mock('next/link', () => ({
 }));
 
 const srcOf = (img: Element) => decodeURIComponent(img.getAttribute('src') ?? '');
-const siteInfo = normalizeSiteInfo({
-  representativeName: '대표자 이름',
-  businessRegistrationNumber: '123-45-67890',
-  address: '사업장 주소',
-});
 
 describe('인증 안내 화면', () => {
   it('"안내" 카드 대신 auth-notice 그래픽을 타이틀 위에 그린다', () => {
@@ -43,14 +37,13 @@ vi.mock('next/navigation', () => ({
 
 describe('로그인 화면', () => {
   it('로고 원 대신 auth-welcome 그래픽을 쓰고 두 진입 CTA를 유지한다', () => {
-    const { container } = render(<LoginPageView model={getLoginViewModel(null)} siteInfo={siteInfo} />);
+    const { container } = render(<LoginPageView model={getLoginViewModel(null)} />);
     expect(container.querySelector('.tm-auth-logo')).toBeNull();
     expect([...container.querySelectorAll('img.tm-auth-illustration')].some((img) => srcOf(img).includes('auth-welcome-640.webp'))).toBe(true);
     expect(screen.getByRole('link', { name: '이메일로 로그인' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: '로그인 없이 시작하기' })).toBeInTheDocument();
-    expect(screen.getByRole('region', { name: '사업자 정보' })).toHaveTextContent('아이위(IWI');
-    expect(screen.getByRole('region', { name: '사업자 정보' })).toHaveTextContent('123-45-67890');
-    expect(screen.getByRole('region', { name: '사업자 정보' })).toHaveTextContent('사업장 주소');
+    expect(screen.getByRole('link', { name: '사업자 정보' })).toHaveAttribute('href', '/landing#business-info');
+    expect(screen.queryByRole('region', { name: '사업자 정보' })).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: '개인정보 처리방침' }).closest('p'))
       .toHaveTextContent('서비스 이용약관과 개인정보 처리방침을 확인할 수 있어요.');
     expect(screen.queryByText(/동의하는 것으로 간주돼요/)).not.toBeInTheDocument();
@@ -61,7 +54,7 @@ describe('로그인 화면', () => {
    * 소셜 로그인이 위, 이메일이 아래. 순서가 뒤집히면 Apple 이 권장하는 배치가 아니게 된다.
    */
   it('소셜 로그인을 이메일 진입보다 위에 둔다', () => {
-    const { container } = render(<LoginPageView model={getLoginViewModel(null)} siteInfo={siteInfo} />);
+    const { container } = render(<LoginPageView model={getLoginViewModel(null)} />);
     const providerGroup = container.querySelector('.tm-auth-provider-group');
     const emailLink = screen.getByRole('link', { name: '이메일로 로그인' });
 
@@ -72,7 +65,7 @@ describe('로그인 화면', () => {
 
   /** 브라우저에는 브리지가 없으므로 Apple 버튼이 그려지지 않는다. */
   it('브리지가 없는 브라우저에서는 Apple 버튼을 그리지 않는다', () => {
-    render(<LoginPageView model={getLoginViewModel(null)} siteInfo={siteInfo} />);
+    render(<LoginPageView model={getLoginViewModel(null)} />);
     expect(screen.queryByRole('button', { name: 'Apple로 계속하기' })).toBeNull();
   });
 });

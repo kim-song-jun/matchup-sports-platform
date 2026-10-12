@@ -10,11 +10,9 @@ import { ChevronLeftIcon, MatchIcon, TeamMatchIcon, TrophyIcon } from '@/compone
 import { BrandMark } from '@/components/v1-ui/brand-logo';
 import { AppleLoginButton } from './apple-login-button';
 import { KakaoLoginButton } from './kakao-login-button';
-import { PublicBusinessInfo } from '@/components/public-site';
 import type { AuthAction, AuthExceptionViewModel, LoginProvider, LoginViewModel, SignupCompleteViewModel } from './auth.types';
-import type { PublicSiteInfo } from '@/lib/public-site/site-info';
 
-export function LoginPageView({ model, siteInfo }: { model: LoginViewModel; siteInfo: PublicSiteInfo }) {
+export function LoginPageView({ model }: { model: LoginViewModel }) {
   const card = (
     <AuthFrame stage={AUTH_WELCOME_STAGE} exitFallbackHref={model.guestHref}>
       <div className="tm-auth-login">
@@ -67,9 +65,7 @@ export function LoginPageView({ model, siteInfo }: { model: LoginViewModel; site
             <Link href="/terms?document=terms" style={{ color: 'var(--blue700)' }}>서비스 이용약관</Link>과{' '}
             <Link href="/terms?document=privacy" style={{ color: 'var(--blue700)' }}>개인정보 처리방침</Link>을 확인할 수 있어요.
           </p>
-          <div className="tm-auth-business-info">
-            <PublicBusinessInfo siteInfo={siteInfo} />
-          </div>
+          <Link className="tm-auth-business-link" href="/landing#business-info">사업자 정보</Link>
         </div>
       </div>
     </AuthFrame>

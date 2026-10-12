@@ -308,6 +308,77 @@ describe('TeamDetailPageView', () => {
     expect(onCta).toHaveBeenCalledTimes(2);
   });
 
+  it('clears a pending hero error message timeout when the detail page unmounts', async () => {
+    vi.useFakeTimers();
+    try {
+      const model: TeamDetailViewModel = {
+        ...getTeamDetailViewModel('default'),
+        onCta: () => Promise.reject(new Error('신청을 처리하지 못했어요.')),
+      };
+      const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: Infinity }, mutations: { retry: false } } });
+      const { unmount } = rtlRender(
+        <QueryClientProvider client={queryClient}>
+          <TeamDetailPageView model={model} />
+        </QueryClientProvider>,
+      );
+      const timersBeforeAction = vi.getTimerCount();
+
+      fireEvent.click(screen.getAllByRole('button', { name: '가입 신청' })[0]);
+      await act(async () => {
+        for (let i = 0; i < 5; i += 1) await Promise.resolve();
+      });
+
+      expect(screen.getAllByText('신청을 처리하지 못했어요.')).toHaveLength(2);
+      expect(vi.getTimerCount()).toBe(timersBeforeAction + 1);
+
+      unmount();
+      expect(vi.getTimerCount()).toBe(0);
+
+      await vi.advanceTimersByTimeAsync(4000);
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('does not schedule a hero message after its action settles following unmount', async () => {
+    vi.useFakeTimers();
+    try {
+      let rejectAction: ((reason?: unknown) => void) | undefined;
+      const pendingAction = new Promise<void>((_, reject) => {
+        rejectAction = reject;
+      });
+      const onCta = vi.fn(() => pendingAction);
+      const model: TeamDetailViewModel = {
+        ...getTeamDetailViewModel('default'),
+        onCta,
+      };
+      const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: Infinity }, mutations: { retry: false } } });
+      const { unmount } = rtlRender(
+        <QueryClientProvider client={queryClient}>
+          <TeamDetailPageView model={model} />
+        </QueryClientProvider>,
+      );
+
+      fireEvent.click(screen.getAllByRole('button', { name: '가입 신청' })[0]);
+      await act(async () => {
+        for (let i = 0; i < 3; i += 1) await Promise.resolve();
+      });
+      expect(onCta).toHaveBeenCalledOnce();
+
+      unmount();
+      const timersAfterUnmount = vi.getTimerCount();
+      await act(async () => {
+        rejectAction?.(new Error('신청을 처리하지 못했어요.'));
+        for (let i = 0; i < 5; i += 1) await Promise.resolve();
+      });
+
+      expect(vi.getTimerCount()).toBe(timersAfterUnmount);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('승인 대기 상태에서는 무엇을 기다리는지 알려주는 안내가 화면에 남는다', () => {
     const model: TeamDetailViewModel = {
       ...getTeamDetailViewModel('pending'),

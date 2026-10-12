@@ -549,8 +549,21 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
   const memberCapacity = formatMemberCapacity(team);
   const capacity = formatCapacity(team);
   const [heroMessage, setHeroMessage] = useState('');
+  const heroMessageTimeoutRef = useRef<number | null>(null);
+  const heroActionMountedRef = useRef(false);
   const mobileBodyRef = useRef<HTMLElement>(null);
   const mobileCtaRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    heroActionMountedRef.current = true;
+    return () => {
+      heroActionMountedRef.current = false;
+      if (heroMessageTimeoutRef.current !== null) {
+        window.clearTimeout(heroMessageTimeoutRef.current);
+        heroMessageTimeoutRef.current = null;
+      }
+    };
+  }, []);
 
   useEffect(() => {
     const body = mobileBodyRef.current;
@@ -596,6 +609,17 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
           : '이 팀과 뛴 팀들이 남긴 평가예요.';
 
   const heroActionBusyRef = useRef(false);
+  const showHeroMessage = (message: string, duration: number) => {
+    if (!heroActionMountedRef.current) return;
+    if (heroMessageTimeoutRef.current !== null) {
+      window.clearTimeout(heroMessageTimeoutRef.current);
+    }
+    setHeroMessage(message);
+    heroMessageTimeoutRef.current = window.setTimeout(() => {
+      heroMessageTimeoutRef.current = null;
+      if (heroActionMountedRef.current) setHeroMessage('');
+    }, duration);
+  };
   const runHeroAction = (action: (() => void | Promise<unknown>) | undefined, successMessage: string, failureMessage = '잠시 후 다시 시도해 주세요.') => {
     // 로딩 중 재클릭 시 중복 제출 방지 — disabled/loading prop은 리렌더 이후에나 반영되므로
     // 동기적인 ref 락으로 한 번 더 막는다.
@@ -607,14 +631,12 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
     void Promise.resolve()
       .then(() => action())
       .then(() => {
-        setHeroMessage(successMessage);
-        window.setTimeout(() => setHeroMessage(''), 2600);
+        showHeroMessage(successMessage, 2600);
       })
       .catch((err: unknown) => {
         // 서버는 '이미 가입 신청해서 승인을 기다리고 있어요.'처럼 구체적인 사유를 준다.
         // 이를 버리고 일반 문구로 덮으면 사용자는 무엇이 잘못됐는지 알 수 없다.
-        setHeroMessage(extractErrorMessage(err, failureMessage));
-        window.setTimeout(() => setHeroMessage(''), 4000);
+        showHeroMessage(extractErrorMessage(err, failureMessage), 4000);
       })
       .finally(() => {
         heroActionBusyRef.current = false;

@@ -76,6 +76,7 @@ All 25 runtime instances classified:
 
 - [x] Browser and native keyboard selectors share the form-only flow rule.
 - [x] Fixed CTA behavior outside form scroll areas remains unchanged by selector scope.
+- [x] Invalid submit 뒤 visual viewport resize/scroll settle에서도 활성 필드와 연결 설명을 함께 드러내요.
 - [ ] Desktop fixed-action focus behavior remains unchanged.
 
 ### Error paths
@@ -104,6 +105,7 @@ All 25 runtime instances classified:
 
 - [ ] Original conditions met.
 - [x] Focused regression tests green.
+- [ ] Viewport-settle regression has captured RED and GREEN evidence (수정 전 RED는 미실행).
 - [x] CSS preserves non-form fixed CTA consumers.
 - [x] Source diff contains no unrelated changes or new TODO/FIXME/HACK/XXX markers.
 - [ ] Alpha visual QA and physical-device QA status reported separately.
@@ -151,3 +153,15 @@ No authentication, API, persistence, or user-data contract changes.
 - RED: 검토 대상 회귀 4개가 안내 이동, 중복 알림, 고정 CTA 가림, 재제출 시 가림 문제로 실패했어요(실패 4 / 건너뜀 71). 상단 inset 변경 후 첫 통합 실행에서는 빠른 포커스 전환 fixture도 실패했어요. 다음 대상인 `정원`의 jsdom 기본 rect가 `(0,0)`이라 scrollport 위쪽에 잘린 것으로 판정됐어요. fixture에 가시 rect를 지정하고 기존 취소 단언은 유지했어요.
 - GREEN: `pnpm --filter v1_web exec vitest run src/components/teams/teams-page.test.tsx src/app/globals.test.ts -t '필수값 오류|입력 중에는 오류 효과|fixed CTA가 있을 때도|같은 오류 항목에 재제출|inline CTA 상태에서는|입력은 보이지만 연결된 오류 설명|실제 create 폼의 팀 소개|실제 edit 폼의 팀 소개|이미 보이는 필드|빠른 다음 포커스|저장 오류가 생기면 화면 밖 안내|fixed CTA 상태에서도 scroll-area 상단 밖|keeps form actions in document flow|changes fixed chrome and scroll bounds' --maxWorkers=1 --minWorkers=1` 명령은 exit 0으로 끝났고, 두 파일에서 22개가 통과하고 144개가 건너뛰었어요. 상단 56px 가림 케이스도 통과했어요. 이 케이스는 코드 수정과 함께 추가해 통합 묶음에서 처음 실행했기 때문에 수정 전 별도 RED 결과는 없어요. 앞서 검토한 회귀 4개는 별도 RED 증거가 있어요.
 - 이번 리뷰 후속에서는 CSS와 keyboard viewport bridge 코드를 수정하지 않았어요. 실제 Android/iOS 키보드 QA와 alpha 경로 QA는 이 작업에서 검증하지 않았어요.
+
+## PR #1859 리뷰 후속 2
+
+- 리뷰 지적은 재현 가능한 경로예요. invalid submit의 최초 포커스 직후 필드와 설명을 한 번 드러내도, 모바일 키보드가 visual viewport 높이를 줄인 뒤에는 `TeamFormPageView`가 active control만으로 오류 설명의 가림을 회복하지 않았어요.
+- `TeamFormPageView`는 `window.resize`와 `visualViewport`의 `resize`·`scroll`을 한 animation frame으로 합친 뒤, 포커스가 폼 안에 남아 있고 요소가 연결돼 있는지 확인해 기존 `revealFieldAndDescription`을 다시 호출해요. 일반 문서 `window.scroll`은 감시하지 않아 키보드와 무관한 스크롤에서 폼 필드를 되감지 않아요. 기존 계산이 필드와 `aria-describedby` bounds, 상단 56px inset, fixed CTA 경계를 계속 함께 적용해요. effect cleanup은 등록한 listener와 대기 frame을 정리해요.
+- 새 회귀 테스트는 invalid submit으로 첫 누락 이름 필드에 포커스한 뒤 viewport 높이가 줄어드는 상황에서, 입력은 보이고 연결된 오류 설명은 가려진 상태를 만들어요. keyboard open에 해당하는 fixed→static CTA 전환과 fixed 유지 두 경우 모두 viewport `resize` 뒤 설명을 드러내는 scroll 요청이 발생해야 해요. 연속 resize/scroll 이벤트는 한 frame으로 합쳐지고 unmount 뒤 대기 frame은 취소돼요.
+- 회귀 테스트는 구현과 함께 작성해서 수정 전 RED는 실행하지 않았어요. 실패를 만들기 위한 임시 롤백도 하지 않았어요.
+- GREEN 명령 `pnpm --filter v1_web exec vitest run src/components/teams/teams-page.test.tsx -t 'invalid submit 뒤 visual viewport가 줄면|필수값 오류|입력 중에는 오류 효과|fixed CTA가 있을 때도|같은 오류 항목에 재제출|inline CTA 상태에서는|입력은 보이지만 연결된 오류 설명|이미 보이는 필드|빠른 다음 포커스|fixed CTA 상태에서도 scroll-area 상단 밖' --maxWorkers=1 --minWorkers=1`은 exit 0으로 끝났어요. `teams-page.test.tsx`에서 19개 통과, 59개 건너뜀, 총 78개였고 Vitest duration은 4.45초예요. 새 파라미터 회귀 2개(fixed 유지/static 전환), 관련 필수값·가시성·반복제출·취소 테스트가 함께 통과했어요.
+- 테스트 전 preflight는 12 CPU core, load average `16.76 / 14.84 / 15.90`, system-wide memory free 52%였어요. 정확한 실행파일 기준 Node 프로세스는 전후 137개, Safari platform helper 9개였어요. Docker daemon은 실행 중이 아니었고 3013/8121 listener는 없었어요. 명시된 진행 지시에 따라 이 상태만 기록하고 최소 worker 1로 진행했어요.
+- 실행 세션 ID는 `61104`예요. 테스트가 첫 PID 표본 전에 종료돼 OS PID/PPID를 캡처하지 못했어요. 사후 focused test 프로세스는 0개, Node executable 수는 기준 137개로 돌아와 별도 종료 신호는 필요하지 않았어요. 이 PID 캡처 한계는 남겨요.
+- root는 최종 소스에서 `tsc --noEmit`과 `node scripts/v1-pattern-check.mjs`를 직렬 실행해 모두 exit 0을 확인했어요. typecheck PID 82714, 패턴 검사 PID 83062는 종료됐어요. 별도 gpt-6-sol이 최종 소스의 뷰포트 처리·가시성·cleanup을 검토해 코드 PASS를 판정했어요.
+- Alpha 시각 QA와 물리 Android/iOS 키보드 QA는 계속 미확인 상태예요. 로컬 빌드·브라우저는 실행하지 않았어요.

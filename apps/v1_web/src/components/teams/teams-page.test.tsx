@@ -670,7 +670,9 @@ describe('TeamFormPageView — 만들기 첫 화면', () => {
 
   describe('#1534 fixed CTA의 키보드 포커스 가림', () => {
     let frames: Map<number, FrameRequestCallback>;
+    let originalVisualViewport: PropertyDescriptor | undefined;
     beforeEach(() => {
+      originalVisualViewport = Object.getOwnPropertyDescriptor(window, 'visualViewport');
       frames = new Map();
       let id = 0;
       vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
@@ -679,7 +681,11 @@ describe('TeamFormPageView — 만들기 첫 화면', () => {
       });
       vi.spyOn(window, 'cancelAnimationFrame').mockImplementation((key) => { frames.delete(key); });
     });
-    afterEach(() => { vi.restoreAllMocks(); });
+    afterEach(() => {
+      if (originalVisualViewport) Object.defineProperty(window, 'visualViewport', originalVisualViewport);
+      else Reflect.deleteProperty(window, 'visualViewport');
+      vi.restoreAllMocks();
+    });
     function flushFocusFrames() {
       act(() => {
         const pending = [...frames.values()];
@@ -768,6 +774,55 @@ describe('TeamFormPageView — 만들기 첫 화면', () => {
       expect(nameInput.getBoundingClientRect().bottom).toBeLessThan(390);
       expect(errorHelp.getBoundingClientRect().bottom).toBeGreaterThan(390);
       expect(scrollBy).toHaveBeenCalledWith({ top: 40, behavior: 'instant' });
+    });
+
+    it.each([
+      { positionAfterKeyboard: 'fixed', expectedScroll: 24 },
+      { positionAfterKeyboard: 'static', expectedScroll: 28 },
+    ])('invalid submit 뒤 visual viewport가 줄면 포커스 필드와 연결된 오류 설명을 다시 드러낸다 (%j)', ({ positionAfterKeyboard, expectedScroll }) => {
+      const model = createModel({ error: '팀 이름, 종목, 지역을 모두 입력해 주세요.' });
+      const viewport = Object.assign(new EventTarget(), { offsetTop: 0, height: 500 });
+      Object.defineProperty(window, 'visualViewport', { configurable: true, value: viewport });
+      const view = render(<div className="tm-scroll-area"><TeamFormPageView model={model} /></div>);
+      const nameInput = screen.getByRole('textbox', { name: '팀 이름' });
+      const errorHelp = document.getElementById(nameInput.getAttribute('aria-describedby')!)!;
+      const scroller = view.container.querySelector<HTMLElement>('.tm-scroll-area')!;
+      const footer = view.container.querySelector<HTMLElement>('.tm-team-form-cta')!;
+      const scrollBy = vi.fn();
+      footer.style.position = 'fixed';
+      Object.defineProperty(scroller, 'scrollBy', { value: scrollBy, configurable: true });
+      vi.spyOn(footer, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 416, 390, 89));
+      vi.spyOn(scroller, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 56, 390, 788));
+      vi.spyOn(nameInput, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 220, 350, 20));
+      vi.spyOn(errorHelp, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 245, 350, 35));
+      nameInput.focus();
+      flushFocusFrames();
+      scrollBy.mockClear();
+      expect(nameInput).toHaveFocus();
+      expect(errorHelp.getBoundingClientRect().bottom).toBeLessThan(viewport.height);
+      fireEvent.click(within(footer).getByRole('button', { name: '팀 만들기' }));
+      flushFocusFrames();
+      expect(model.form?.onSubmit).toHaveBeenCalledTimes(1);
+      expect(nameInput).toHaveFocus();
+      scrollBy.mockClear();
+
+      footer.style.position = positionAfterKeyboard;
+      viewport.height = 260;
+      act(() => viewport.dispatchEvent(new Event('resize')));
+      flushFocusFrames();
+
+      expect(nameInput.getBoundingClientRect().bottom).toBeLessThan(viewport.height);
+      expect(errorHelp.getBoundingClientRect().bottom).toBeGreaterThan(viewport.height);
+      expect(scrollBy).toHaveBeenCalledWith({ top: expectedScroll, behavior: 'instant' });
+      scrollBy.mockClear();
+
+      act(() => viewport.dispatchEvent(new Event('resize')));
+      act(() => viewport.dispatchEvent(new Event('scroll')));
+      expect(frames.size).toBe(1);
+      view.unmount();
+      expect(frames.size).toBe(0);
+      flushFocusFrames();
+      expect(scrollBy).not.toHaveBeenCalled();
     });
 
     it('fixed CTA가 있을 때도 필드와 연결 오류 설명 전체를 가시 영역에 둔다', () => {

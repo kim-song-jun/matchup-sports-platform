@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import type { CSSProperties, FocusEvent, ReactNode } from 'react';
-import { useEffect, useId, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { Check, ChevronDown, Info, Lock } from 'lucide-react';
 import { useShellOverride } from '@/components/v1-ui/shell-override';
 import { AppBackLink } from '@/components/v1-ui/app-back-link';
@@ -993,12 +993,13 @@ export function TeamFormPageView({
   const fixedCtaRef = useRef<HTMLDivElement>(null);
   const focusFrameRef = useRef<number | null>(null);
   const submitFrameRef = useRef<number | null>(null);
+  const viewportFrameRef = useRef<number | null>(null);
   useEffect(() => () => {
     if (focusFrameRef.current !== null) cancelAnimationFrame(focusFrameRef.current);
     if (submitFrameRef.current !== null) cancelAnimationFrame(submitFrameRef.current);
   }, []);
 
-  function revealFieldAndDescription(target: HTMLElement) {
+  const revealFieldAndDescription = useCallback((target: HTMLElement) => {
     const cta = fixedCtaRef.current;
     const scroller = target.closest<HTMLElement>('.tm-scroll-area');
     if (!cta || !scroller) return;
@@ -1027,7 +1028,35 @@ export function TeamFormPageView({
     } else if (contentTop < visibleTop) {
       scroller.scrollBy({ top: contentTop - visibleTop - 8, behavior: 'instant' });
     }
-  }
+  }, []);
+
+  useEffect(() => {
+    const viewport = window.visualViewport;
+    const revealAfterViewportSettles = () => {
+      if (viewportFrameRef.current !== null) cancelAnimationFrame(viewportFrameRef.current);
+      viewportFrameRef.current = requestAnimationFrame(() => {
+        viewportFrameRef.current = null;
+        const active = document.activeElement;
+        if (active instanceof HTMLElement && formFieldsRef.current?.contains(active) && active.isConnected) {
+          revealFieldAndDescription(active);
+        }
+      });
+    };
+
+    window.addEventListener('resize', revealAfterViewportSettles);
+    viewport?.addEventListener('resize', revealAfterViewportSettles);
+    viewport?.addEventListener('scroll', revealAfterViewportSettles);
+
+    return () => {
+      window.removeEventListener('resize', revealAfterViewportSettles);
+      viewport?.removeEventListener('resize', revealAfterViewportSettles);
+      viewport?.removeEventListener('scroll', revealAfterViewportSettles);
+      if (viewportFrameRef.current !== null) {
+        cancelAnimationFrame(viewportFrameRef.current);
+        viewportFrameRef.current = null;
+      }
+    };
+  }, [revealFieldAndDescription]);
 
   function scheduleFieldReveal(target: HTMLElement) {
     if (focusFrameRef.current !== null) cancelAnimationFrame(focusFrameRef.current);

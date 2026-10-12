@@ -34,7 +34,10 @@ describe('목록 12강 자동 배정 팝업 HTTP 계약', () => {
     render(<QueryClientProvider client={client}><BracketListTemplateTools tournamentId="test" format="group_knockout"
       hasExistingBracket={false} groups={[]} slots={[]} registrations={[]} showToast={showToast} /></QueryClientProvider>);
     fireEvent.click(screen.getByRole('button', { name: '전체 대진 만들기' }));
-    fireEvent.click(await screen.findByLabelText('20팀 · 5개 조 → 12강 (3위 상위 2팀 추가)'));
+    fireEvent.change(await screen.findByLabelText('참가 팀 수'), { target: { value: '20' } });
+    const preset = await screen.findByRole('radio', { name: '5개 조 × 4팀 → 12강' });
+    expect(preset).toHaveAccessibleDescription(/조 1·2위 10팀과 3위 상위 2팀이 진출/);
+    fireEvent.click(preset);
     fireEvent.click(screen.getByRole('button', { name: /^대진 만들기$/ }));
     await waitFor(() => expect(showToast).toHaveBeenCalledWith('경기 41개와 자리 32개를 만들었어요.', 'success'));
     expect(saved).toEqual({ kind: 'group_knockout', groupCount: 5, teamsPerGroup: 4, advancePerGroup: 2,

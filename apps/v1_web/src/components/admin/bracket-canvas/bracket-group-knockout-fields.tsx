@@ -62,11 +62,13 @@ export function GroupKnockoutFields({
   onChange,
   disabled = false,
   lockShape = false,
+  showCrossGroupRound12Preset = true,
 }: {
   value: GroupKnockoutTemplateValue;
   onChange: (next: GroupKnockoutTemplateValue) => void;
   disabled?: boolean;
   lockShape?: boolean;
+  showCrossGroupRound12Preset?: boolean;
 }) {
   const id = useId();
   const issue = groupKnockoutShapeIssue(value);
@@ -76,13 +78,15 @@ export function GroupKnockoutFields({
 
   return (
     <div className="flex flex-col gap-4">
-      <label className="tm-text-label flex min-h-[44px] items-center gap-2">
-        <input type="checkbox" checked={value.qualificationMode === 'cross_group_round12'} disabled={disabled}
-          onChange={(event) => onChange(event.target.checked
-            ? { ...value, groupCount: 5, teamsPerGroup: 4, advancePerGroup: 2, legs: 1, qualificationMode: 'cross_group_round12' }
-            : { ...DEFAULT_GROUP_KNOCKOUT_VALUE, thirdPlace: value.thirdPlace })} />
-        20팀 · 5개 조 → 12강 (3위 상위 2팀 추가)
-      </label>
+      {showCrossGroupRound12Preset ? (
+        <label className="tm-text-label flex min-h-[44px] items-center gap-2">
+          <input type="checkbox" checked={value.qualificationMode === 'cross_group_round12'} disabled={disabled}
+            onChange={(event) => onChange(event.target.checked
+              ? { ...value, groupCount: 5, teamsPerGroup: 4, advancePerGroup: 2, legs: 1, qualificationMode: 'cross_group_round12' }
+              : { ...DEFAULT_GROUP_KNOCKOUT_VALUE, thirdPlace: value.thirdPlace })} />
+          20팀 · 5개 조 → 12강 (3위 상위 2팀 추가)
+        </label>
+      ) : null}
       {value.qualificationMode === 'cross_group_round12' ? (
         <p className="tm-text-caption text-[var(--text-muted)]">조 1·2위 10팀과 3위 상위 2팀이 진출해요. 조 1위 상위 4팀은 8강으로 직행해요. 팀 미정으로 전체 대진을 만들어요.</p>
       ) : null}

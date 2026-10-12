@@ -183,6 +183,7 @@ sudo docker build \
   --build-arg NEXT_PUBLIC_API_URL=/api/v1 \
   --build-arg INTERNAL_API_ORIGIN="${V1_INTERNAL_API_ORIGIN:-http://v1_api:8121}" \
   --build-arg NEXT_PUBLIC_KAKAO_CLIENT_ID="${KAKAO_CLIENT_ID:-}" \
+  --build-arg NEXT_PUBLIC_KAKAO_LOGIN_JS_KEY="${KAKAO_LOGIN_JS_KEY:-}" \
   --build-arg NEXT_PUBLIC_KAKAO_REDIRECT_URI="${KAKAO_REDIRECT_URI:-}" \
   -t teameet-v1-web .
 

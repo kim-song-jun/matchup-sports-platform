@@ -9,7 +9,7 @@ import { v1Keys } from '@/lib/query-keys';
 import { V1_SESSION_HINT_KEY } from '@/lib/session-storage';
 
 const router = vi.hoisted(() => ({ replace: vi.fn(), refresh: vi.fn() }));
-const api = vi.hoisted(() => ({ v1Post: vi.fn(), v1Api: vi.fn() }));
+const api = vi.hoisted(() => ({ v1Post: vi.fn() }));
 const sdk = vi.hoisted(() => ({ getInitializedKakaoJsSdk: vi.fn() }));
 const reporter = vi.hoisted(() => ({ reportClientError: vi.fn() }));
 const analytics = vi.hoisted(() => ({ trackEvent: vi.fn() }));
@@ -18,7 +18,6 @@ vi.mock('next/navigation', () => ({ useRouter: () => router }));
 vi.mock('@/lib/api-client', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/lib/api-client')>()),
   v1Post: api.v1Post,
-  v1Api: api.v1Api,
 }));
 vi.mock('@/lib/kakao-js-sdk', () => ({ getInitializedKakaoJsSdk: sdk.getInitializedKakaoJsSdk }));
 vi.mock('@/lib/analytics', () => ({ trackEvent: analytics.trackEvent }));
@@ -47,12 +46,14 @@ beforeEach(() => {
     configurable: true,
     value: { search: '', pathname: '/login', set href(value: string) { assigned = value; } },
   });
-  api.v1Api.mockResolvedValue({ kakaoMapsJsKey: 'js-key' });
+  vi.stubEnv('NEXT_PUBLIC_KAKAO_LOGIN_JS_KEY', 'login-js-key');
+  vi.stubEnv('NEXT_PUBLIC_KAKAO_MAPS_JS_KEY', 'different-maps-app-key');
   api.v1Post.mockResolvedValue({ session: { userId: 'u1', userEmail: null }, next: { route: '/home' } });
   sdk.getInitializedKakaoJsSdk.mockResolvedValue({ Auth: { authorize } });
 });
 
 afterEach(() => {
+  vi.unstubAllEnvs();
   delete window.TeameetNative;
   window.sessionStorage.clear();
 });
@@ -154,28 +155,26 @@ describe('KakaoLoginButton', () => {
   });
 
   describe('browser', () => {
-    it.each(['key', 'sdk'] as const)('uses the URL after a stalled %s request and ignores its late completion', async (stage) => {
+    it('uses the URL after a stalled SDK request and ignores its late completion', async () => {
       vi.useFakeTimers({ shouldAdvanceTime: true });
       let complete: (value: unknown) => void = () => {};
       const pending = new Promise((resolve) => { complete = resolve; });
-      if (stage === 'key') api.v1Api.mockReturnValue(pending);
-      else sdk.getInitializedKakaoJsSdk.mockReturnValue(pending);
+      sdk.getInitializedKakaoJsSdk.mockReturnValue(pending);
       try {
         renderButton();
         await click();
         await vi.advanceTimersByTimeAsync(8_000);
         expect(assigned).toBe(`${HREF}&state=${window.sessionStorage.getItem(KAKAO_OAUTH_STATE_STORAGE_KEY)}`);
         expect(reporter.reportClientError).toHaveBeenCalledTimes(1);
-        complete(stage === 'key' ? { kakaoMapsJsKey: 'late-key' } : { Auth: { authorize } });
+        complete({ Auth: { authorize } });
         await vi.advanceTimersByTimeAsync(1);
         expect(authorize).not.toHaveBeenCalled();
-        if (stage === 'key') expect(sdk.getInitializedKakaoJsSdk).not.toHaveBeenCalled();
       } finally {
         vi.useRealTimers();
       }
     });
 
-    it('uses the JS SDK with the same redirectUri, scope and the stored state', async () => {
+    it('uses the login key independently of Maps with the same redirectUri, scope and stored state', async () => {
       renderButton();
       await click();
       await waitFor(() => expect(authorize).toHaveBeenCalledTimes(1));
@@ -187,7 +186,7 @@ describe('KakaoLoginButton', () => {
         state: stored,
         throughTalk: true,
       });
-      expect(sdk.getInitializedKakaoJsSdk).toHaveBeenCalledWith('js-key');
+      expect(sdk.getInitializedKakaoJsSdk).toHaveBeenCalledWith('login-js-key');
       expect(assigned).toBeNull();
     });
 
@@ -199,7 +198,6 @@ describe('KakaoLoginButton', () => {
       const stored = window.sessionStorage.getItem(KAKAO_OAUTH_STATE_STORAGE_KEY);
       expect(assigned).toBe(`${HREF}&state=${stored}`);
       expect(window.TeameetNative.postMessage).not.toHaveBeenCalled();
-      expect(api.v1Api).not.toHaveBeenCalled();
       expect(authorize).not.toHaveBeenCalled();
     });
 
@@ -217,7 +215,7 @@ describe('KakaoLoginButton', () => {
     });
 
     it('falls back to the authorize URL with state and logs when the JS key is missing', async () => {
-      api.v1Api.mockResolvedValue({ kakaoMapsJsKey: null });
+      vi.stubEnv('NEXT_PUBLIC_KAKAO_LOGIN_JS_KEY', '');
       renderButton();
       await click();
       await waitFor(() => expect(assigned).not.toBeNull());
@@ -225,6 +223,7 @@ describe('KakaoLoginButton', () => {
       expect(assigned).toBe(`${HREF}&state=${stored}`);
       expect(reporter.reportClientError).toHaveBeenCalledWith(expect.objectContaining({ level: 'warn' }));
       expect(authorize).not.toHaveBeenCalled();
+      expect(sdk.getInitializedKakaoJsSdk).not.toHaveBeenCalled();
     });
 
     it('falls back and logs when the SDK fails to load', async () => {

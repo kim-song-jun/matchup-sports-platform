@@ -12,6 +12,7 @@ const DESKTOP_QUERY = '(min-width: 1024px)'; // desktop/_shell.css 의 breakpoin
   // 한다 — 이 값이 어긋나면 두 스크롤 모델(문서 vs .tm-scroll-area)이 서로 다른 지점에서
   // 전환돼 스크롤 대상이 어긋난다.
 const SAVE_DEBOUNCE_MS = 150;
+const HASH_TARGET_WAIT_MS = 10_000;
 
 /**
  * 이동의 종류. 'tab' 이 'push' 와 갈리는 것이 핵심이다.
@@ -159,8 +160,10 @@ export function ScrollRestoration() {
 
       const id = locationHashId(hash);
       let observer: MutationObserver | null = null;
+      let timeoutId: ReturnType<typeof setTimeout> | null = null;
       const dispose = () => {
         observer?.disconnect();
+        if (timeoutId !== null) clearTimeout(timeoutId);
         window.removeEventListener('hashchange', dispose);
       };
       const scroll = () => {
@@ -184,12 +187,14 @@ export function ScrollRestoration() {
       observer = new MutationObserver(scroll);
       observer.observe(document.body, { childList: true, subtree: true });
       window.addEventListener('hashchange', dispose);
+      // A fragment can point to an optional section. Bound observation work if it never appears.
+      timeoutId = setTimeout(dispose, HASH_TARGET_WAIT_MS);
       return { requested: true, dispose };
     };
 
     if (firstRenderRef.current) {
       firstRenderRef.current = false;
-      // App Router의 초기 상태에는 fragment target이 없어 수동 복원 환경에서 첫 로드의 hash를 처리하지 않는다.
+      // App Router의 초기 렌더가 fragment 이동을 보장하지 않아, hydration 후 이 효과가 hash target 이동을 보완한다.
       const hashScroll = scrollToHashTarget();
       if (hashScroll.requested) {
         return hashScroll.dispose;

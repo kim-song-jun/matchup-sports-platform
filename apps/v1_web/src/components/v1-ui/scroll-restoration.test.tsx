@@ -143,6 +143,34 @@ describe('ScrollRestoration — 탭으로 돌아오면 보던 자리로', () => 
     view.unmount();
   });
 
+  it('기다림 상한이 지나면 없는 target 감시를 끝내고 나중에 생겨도 스크롤하지 않는다', async () => {
+    vi.useFakeTimers();
+    let unmount = () => {};
+    try {
+      nav.pathname = '/landing';
+      window.history.replaceState(null, '', '/landing#business-info');
+      const area = mountScrollArea(5000);
+      const view = render(<ScrollRestoration />);
+      unmount = view.unmount;
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(10_000);
+      });
+
+      const target = targetAt(area, 'business-info', 1350);
+      await act(async () => {
+        area.appendChild(target);
+        await Promise.resolve();
+      });
+
+      expect(target.scrollIntoView).not.toHaveBeenCalled();
+      expect(area.scrollTop).toBe(0);
+    } finally {
+      unmount();
+      vi.useRealTimers();
+    }
+  });
+
   it('same-path pushState로 hash가 바뀌면 대기 중인 이전 target을 스크롤하지 않는다', async () => {
     nav.pathname = '/landing';
     window.history.replaceState(null, '', '/landing#business-info');

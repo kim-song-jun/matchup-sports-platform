@@ -29,6 +29,16 @@ The user authorized reviewing, repairing, and merging PRs #1837, #1843, and #184
 
 ## Progress snapshot
 
+### 2026-10-12 required consent and business review correction
+
+- The user explicitly authorized correcting original app 1467783 consent requirements, public privacy disclosures, and certificate-based business information; resubmit review, verify alpha signup and email-to-Kakao linking, then promote only if gates pass.
+- Append-only privacy_policy v1.6 and signup_privacy v1.3 replace optional-contact wording with required email/name/phone/gender/birthday/birthyear and optional nickname/avatar. Prior published documents and acceptance events are preserved; no new global reconsent gate is introduced.
+- Login now displays configured public business information and links to the actual policies without implying that a login itself records consent. Business settings use the existing singleton; certificate birthdate/QR are not published.
+- Luna implemented the separate terms and login slices. Independent Sol review found missing reconsent/effective-date guard predicates in the new migration; those are corrected, with exact migration compatibility entries updated. Focused tests and deployed browser validation are in progress.
+- Original app email is now required with collection when absent. Child 1604879 has all six required scopes; nickname/avatar remain optional. Original additional five fields still require Kakao review; the previous optional application is pending and its application button is disabled.
+- Certificate-based business settings are published in production (audit `3cc2713e-9a11-45fd-93c0-ceecda08d4fc`) and alpha (audit `e726993f-d273-4b83-874e-dadaecbcbe37`). The production landing footer visibly contains company, representative, registration number, address and support email at widths 1440/768/390 without horizontal overflow. Unrelated retention and mail-order settings were preserved. The first transaction attempt stopped before writes due to a void-result lock query; the corrected integer-result query succeeded in both environments.
+- Focused terms tests passed 2/2. The migration-checker self-test passed after matching its exact allowlist entry format. Web validation initially found a fragmented-text assertion error and one 5-second host-load timeout; the assertion is fixed and the same 25 tests are rerunning serially with a local 30-second timeout. No product timeout or assertion has been weakened. Main PR #1851 remains draft until external permission and live-authentication gates pass.
+
 ### 2026-10-12 original account recovered — supersedes new-app cutover
 
 - The user explicitly redirected API/app/Maps work to the recovered original account. Console access confirms Owner of business app `1467783`, 팀밋(Teameet), operated by 아이위(IWI). The live production login bundles match this app's `teameet-v1` REST key, compared in memory without exposing values. Production still serves `eda4a05de8543f95f0c88376baac7212086c1037` / `1.6.10`.
@@ -97,4 +107,4 @@ The user authorized reviewing, repairing, and merging PRs #1837, #1843, and #184
 
 ## Validation and cleanup
 
-Use exact pathspec commits. Run the smallest contract tests serially after host preflight; CI owns full rebuilds. Browser QA uses ego against alpha/production, with one reusable task space. Credentials are transferred only to the authorized repository's secret/variable destinations and never logged. No subagents or local web servers are needed.
+Use exact pathspec commits. Run the smallest contract tests serially after host preflight; CI owns full rebuilds. Browser QA uses ego against alpha/production, with one reusable task space. Credentials are transferred only to the authorized repository's secret/variable destinations and never logged. The required-consent follow-up used Luna for two independent implementation slices and Sol for independent review; completed agents were stopped. No local web server was started.

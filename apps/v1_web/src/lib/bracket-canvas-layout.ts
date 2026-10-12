@@ -1,4 +1,5 @@
 import { tournamentRoundLabel } from '@/lib/tournament-round-label';
+import { bracketTrackLabel } from '@/lib/bracket-track';
 import type {
   V1AdminBracketFixture,
   V1AdminBracketFixtureGame,
@@ -79,7 +80,7 @@ function bracketColumns(groups: readonly V1AdminBracketGroup[], fixtures: readon
     .map((group) => ({
       key: group.id,
       groupId: group.id,
-      label: group.name,
+      label: bracketTrackLabel(group.bracketTrack) ? `${bracketTrackLabel(group.bracketTrack)} · ${group.name}` : group.name,
       fixtures: fixtures.filter((fixture) => fixture.groupId === group.id).sort(compareFixtures),
     }));
   const known = new Set(groups.map((group) => group.id));

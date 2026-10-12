@@ -102,11 +102,13 @@ export function resolveGroupRank(source: GroupRankSource, rank: number): GroupRa
 }
 
 export type GroupQualification = { advancingRegistrationIds: string[]; undecided: boolean };
+export type QualificationTrack = 'overall' | 'upper' | 'lower';
 export type GroupStandingSummary = {
   /** §5 로 끝까지 안 갈린 팀만 들어간다. 값 = 그 동률 묶음 팀들의 저장 position 중 최솟값. */
   sharedRankByRegistrationId: Map<string, number>;
   /** advanceCount 가 null 이면 null. */
   qualification: GroupQualification | null;
+  qualificationByTrack?: { upper: GroupQualification | null; lower: GroupQualification | null };
 };
 
 /**
@@ -117,6 +119,7 @@ export function summarizeGroupStanding(
   source: GroupRankSource,
   advanceCount: number | null,
   placedRegistrationIds: ReadonlySet<string>,
+  options: { splitBracket?: boolean; placedByTrack?: ReadonlyMap<QualificationTrack, ReadonlySet<string>> } = {},
 ): GroupStandingSummary | null {
   const results = settledResults(source);
   if (results === null) return null;
@@ -130,7 +133,12 @@ export function summarizeGroupStanding(
     const shared = Math.min(...positions);
     for (const id of tie.teamIds) sharedRankByRegistrationId.set(id, shared);
   }
-  return { sharedRankByRegistrationId, qualification: qualificationOf(source, league, advanceCount, placedRegistrationIds) };
+  if (options.splitBracket) {
+    const upper = qualificationOf(source, league, 2, options.placedByTrack?.get('upper') ?? new Set(), 1);
+    const lower = qualificationOf(source, league, 2, options.placedByTrack?.get('lower') ?? new Set(), 3);
+    return { sharedRankByRegistrationId, qualification: upper, qualificationByTrack: { upper, lower } };
+  }
+  return { sharedRankByRegistrationId, qualification: qualificationOf(source, league, advanceCount, placedRegistrationIds, 1) };
 }
 
 function qualificationOf(
@@ -138,17 +146,19 @@ function qualificationOf(
   league: GroupLeague,
   advanceCount: number | null,
   placedRegistrationIds: ReadonlySet<string>,
+  firstRank: number,
 ): GroupQualification | null {
   if (advanceCount === null) return null;
-  const effectiveCount = Math.min(advanceCount, source.registrationIds.length);
+  const effectiveCount = Math.min(advanceCount, Math.max(0, source.registrationIds.length - firstRank + 1));
   const orderIndexById = new Map(league.standings.map((row, index) => [row.teamId, index]));
   const positionById = new Map(source.standings.map((row) => [row.registrationId, row.position]));
   const isInsideLine = (id: string) =>
-    (orderIndexById.get(id) ?? Infinity) < effectiveCount && (positionById.get(id) ?? Infinity) <= effectiveCount;
+    (orderIndexById.get(id) ?? Infinity) >= firstRank - 1 && (orderIndexById.get(id) ?? Infinity) < firstRank - 1 + effectiveCount &&
+    (positionById.get(id) ?? Infinity) >= firstRank && (positionById.get(id) ?? Infinity) < firstRank + effectiveCount;
   // 진출 자리 순서대로 모은 확정 팀. 진출선 안쪽 동률은 누가 올라가는지는 정해졌고 시드만 미정이라 여기 넣는다.
   // 진출선에 걸친 동률 팀은 넣지 않는다 — 운영자가 고를 때까지 진출로 칠하지 않는다.
   const decided = new Set<string>();
-  for (let rank = 1; rank <= effectiveCount; rank += 1) {
+  for (let rank = firstRank; rank < firstRank + effectiveCount; rank += 1) {
     const resolution = resolveRankIn(source, league, rank);
     if (resolution.state === 'group_incomplete') return null;
     if (resolution.state === 'ready') decided.add(resolution.registrationId);

@@ -55,7 +55,7 @@ export const TOURNAMENT_LIST_INCLUDE = {
 export const TOURNAMENT_DETAIL_INCLUDE = {
   sport: { select: { code: true, name: true } },
   groups: {
-    orderBy: [{ phase: 'asc' }, { sortOrder: 'asc' }],
+    orderBy: [{ phase: 'asc' }, { sortOrder: 'asc' }, { bracketTrack: 'asc' }],
     include: {
       byeSlots: true,
       groupTeams: {
@@ -200,7 +200,7 @@ export const TOURNAMENT_DETAIL_INCLUDE = {
   // 아바타로 내보낸다(M-A 감사: 개인 기록 섹션은 이미 같은 화면에서 프로필 링크를
   // 공개하는데 어워드 섹션만 빠져 있었다).
   awards: {
-    orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
+    orderBy: [{ sortOrder: 'asc' }, { bracketTrack: 'asc' }, { createdAt: 'asc' }],
     include: {
       recipient: {
         select: {
@@ -217,6 +217,11 @@ export const TOURNAMENT_DETAIL_INCLUDE = {
         },
       },
     },
+  },
+  awardSets: {
+    where: { bracketTrack: { in: ['upper', 'lower'] } },
+    orderBy: { bracketTrack: 'asc' },
+    select: { bracketTrack: true, prizePool: true, prizeSummary: true, prizeBreakdown: true },
   },
   campaign: { select: { slug: true, status: true } },
 } as const satisfies Prisma.V1TournamentInclude;

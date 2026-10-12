@@ -446,9 +446,13 @@ export function presentTournamentDetail(
       id: group.id,
       name: group.name,
       phase: group.phase,
+      bracketTrack: group.bracketTrack,
       sortOrder: group.sortOrder,
       advanceCount: group.advanceCount,
       qualification: groupStandingSummaries.get(group.id)?.qualification ?? null,
+      ...(groupStandingSummaries.get(group.id)?.qualificationByTrack
+        ? { qualificationByTrack: groupStandingSummaries.get(group.id)!.qualificationByTrack }
+        : {}),
       groupTeams: [...group.groupTeams, ...(group.byeSlots ?? []).map((slot) => ({ ...slot, registrationId: null, registration: null, isBye: true }))].map((groupTeam) => ({
         id: groupTeam.id,
         registrationId: groupTeam.registrationId,
@@ -580,6 +584,7 @@ export function presentTournamentDetail(
       return {
         id: award.id,
         awardType: award.awardType,
+        bracketTrack: award.bracketTrack,
         awardLabel: award.awardLabel,
         iconKey: award.iconKey ?? null,
         recipientName: presentAwardRecipientName(award),
@@ -589,6 +594,12 @@ export function presentTournamentDetail(
         note: award.note ?? null,
       };
     }),
+    awardSets: (row.awardSets ?? []).map((awardSet) => ({
+      bracketTrack: awardSet.bracketTrack,
+      prizePool: awardSet.prizePool,
+      prizeSummary: awardSet.prizeSummary,
+      prizeBreakdown: awardSet.prizeBreakdown,
+    })),
     // 정규 리그 시즌에만 채워진다. 대회는 항상 빈 배열 — 화면이 길이 0이면 이 섹션을
     // 아예 그리지 않는다(`fixtures` 와 같은 규약).
     leagueFixtures: leagueFixtures.map((fixture) => ({

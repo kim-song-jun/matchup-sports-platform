@@ -19,6 +19,7 @@ export type BracketTemplateDialogProps = {
   open: boolean;
   tournamentId: string;
   format: 'knockout' | 'league' | 'group_knockout';
+  allowSplitBracket?: boolean;
   hasExistingBracket: boolean;
   onClose: () => void;
   showToast: (message: string, variant?: 'success' | 'error') => void;
@@ -36,7 +37,7 @@ function radioRow(id: string, name: string, label: string, checked: boolean, onC
   );
 }
 
-export function BracketTemplateDialog({ open, tournamentId, format, hasExistingBracket, onClose, showToast }: BracketTemplateDialogProps) {
+export function BracketTemplateDialog({ open, tournamentId, format, allowSplitBracket = false, hasExistingBracket, onClose, showToast }: BracketTemplateDialogProps) {
   const idPrefix = useId();
   const apply = useV1ApplyBracketTemplate(tournamentId);
   const { confirm, ConfirmModal } = useConfirm();
@@ -53,7 +54,15 @@ export function BracketTemplateDialog({ open, tournamentId, format, hasExistingB
     format === 'knockout'
       ? { kind: 'knockout', size, thirdPlace }
       : format === 'group_knockout'
-        ? { kind: 'group_knockout', ...groupKnockout }
+        ? {
+            kind: 'group_knockout',
+            groupCount: groupKnockout.groupCount,
+            teamsPerGroup: groupKnockout.teamsPerGroup,
+            advancePerGroup: groupKnockout.advancePerGroup,
+            legs: groupKnockout.legs,
+            thirdPlace: groupKnockout.thirdPlace,
+            ...(allowSplitBracket && groupKnockout.lowerBracket ? { lowerBracket: true } : {}),
+          }
         : teamCountValid
           ? { kind: 'league', teamCount, legs }
           : null;
@@ -138,7 +147,7 @@ export function BracketTemplateDialog({ open, tournamentId, format, hasExistingB
                 </label>
               </>
             ) : format === 'group_knockout' ? (
-              <GroupKnockoutFields value={groupKnockout} onChange={setGroupKnockout} disabled={apply.isPending} />
+              <GroupKnockoutFields value={groupKnockout} onChange={setGroupKnockout} disabled={apply.isPending} allowLowerBracket={allowSplitBracket} />
             ) : (
               <>
                 <div className="flex flex-col gap-1">

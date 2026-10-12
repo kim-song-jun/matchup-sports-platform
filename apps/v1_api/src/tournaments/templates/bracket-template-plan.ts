@@ -6,9 +6,9 @@ import { planGroupKnockoutTemplate } from './group-knockout-plan';
 
 export type BracketTemplateInput =
   | { kind: 'knockout'; size: 4 | 8 | 12 | 16; thirdPlace: boolean }
-  | { kind: 'group_knockout'; groupCount: number; teamsPerGroup: number; advancePerGroup: 1 | 2; legs: 1 | 2; thirdPlace: boolean }
+  | { kind: 'group_knockout'; groupCount: number; teamsPerGroup: number; advancePerGroup: 1 | 2; legs: 1 | 2; thirdPlace: boolean; lowerBracket?: boolean }
   | { kind: 'league'; teamCount: number; legs: 1 | 2 };
-export type PlanGroup = { key: string; name: string; phase: V1TournamentGroupPhase; sortOrder: number; advanceCount: number | null };
+export type PlanGroup = { key: string; name: string; phase: V1TournamentGroupPhase; sortOrder: number; advanceCount: number | null; bracketTrack?: 'overall' | 'upper' | 'lower' };
 export type PlanSlot = { key: string; kind: V1TournamentSlotKind; groupKey: string | null; position: number; sourceGroupKey: string | null };
 export type PlanFixture = { key: string; groupKey: string; round: string; fixtureNumber: number; legNumber: number; homeSlotKey: string | null; awaySlotKey: string | null };
 export type PlanEdge = { sourceFixtureKey: string; outcome: 'WINNER' | 'LOSER'; targetFixtureKey: string; targetSide: 'HOME' | 'AWAY' };
@@ -104,7 +104,7 @@ function planLeague(input: Extract<BracketTemplateInput, { kind: 'league' }>, of
     balanceHome: true, schedule: null, fixtureNumberOffset: offset,
   });
   return {
-    groups: [{ key: groupKey, name: '리그', phase: 'group', sortOrder: 0, advanceCount: null }],
+    groups: [{ key: groupKey, name: '리그', phase: 'group', sortOrder: 0, advanceCount: null, bracketTrack: 'overall' }],
     slots,
     fixtures: rows.map((row) => ({
       key: `league-${row.fixtureNumber - offset}`, groupKey, round: row.round,

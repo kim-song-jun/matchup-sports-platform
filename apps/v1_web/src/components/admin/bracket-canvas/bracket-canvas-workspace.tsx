@@ -27,6 +27,7 @@ import { describeStandingsFill } from '@/lib/bracket-standings-fill-message';
 import { isBracketPublished } from '@/lib/bracket-visibility';
 import { extractErrorMessage } from '@/lib/error-message';
 import type { V1AdminTournamentRegistration, V1TournamentFormat } from '@/types/api';
+import type { V1CompetitionKind } from '@/types/api';
 import { BracketCanvas, fixtureTitle } from './bracket-canvas';
 import { BracketLeagueGrid } from './bracket-league-grid';
 import { BracketLeagueStandings } from './bracket-league-standings';
@@ -40,6 +41,7 @@ import { focusFixtureOpener } from './fixture-opener-focus';
 export type BracketCanvasWorkspaceProps = {
   tournamentId: string;
   format: V1TournamentFormat | undefined;
+  kind?: V1CompetitionKind | null;
   registrations: V1AdminTournamentRegistration[];
   registrationsState: RegistrationsLoadState;
   bracketPublishedAt: string | null | undefined;
@@ -52,6 +54,7 @@ export type BracketCanvasWorkspaceProps = {
 export function BracketCanvasWorkspace({
   tournamentId,
   format,
+  kind,
   registrations,
   registrationsState,
   bracketPublishedAt,
@@ -458,6 +461,7 @@ export function BracketCanvasWorkspace({
           open={templateOpen}
           tournamentId={tournamentId}
           format={templateFormat}
+          allowSplitBracket={kind === 'regular_tournament'}
           hasExistingBracket={!isEmpty}
           onClose={() => setTemplateOpen(false)}
           showToast={showToast}

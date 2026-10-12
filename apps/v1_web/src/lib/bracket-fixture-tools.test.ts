@@ -70,4 +70,18 @@ describe('bracketSourceCandidates', () => {
   it('앞 단계가 없는 8강 경기(12강·16강 없는 대진)나 조별리그 경기는 후보가 없다', () => {
     expect(bracketSourceCandidates({ target: q1, groups, fixtures: [q1, q2] })).toEqual([]);
   });
+
+  it('상·하위 결선의 연결 후보를 같은 트랙으로 한정한다', () => {
+    const upperSemi = makeGroup({ id: 'upper-semi', name: '4강', phase: 'semi', bracketTrack: 'upper' });
+    const lowerSemi = makeGroup({ id: 'lower-semi', name: '4강', phase: 'semi', bracketTrack: 'lower' });
+    const upperFinal = makeGroup({ id: 'upper-final', name: '결승', phase: 'final', bracketTrack: 'upper' });
+    const lowerFinal = makeGroup({ id: 'lower-final', name: '결승', phase: 'final', bracketTrack: 'lower' });
+    const upperGame = makeFixture({ id: 'upper-game', groupId: upperSemi.id, fixtureNumber: 1, game: makeGame() });
+    const lowerGame = makeFixture({ id: 'lower-game', groupId: lowerSemi.id, fixtureNumber: 2, game: makeGame() });
+    const target = makeFixture({ id: 'upper-target', groupId: upperFinal.id, fixtureNumber: 3, game: makeGame() });
+    const groups = [upperSemi, lowerSemi, upperFinal, lowerFinal];
+    const fixtures = [upperGame, lowerGame, target];
+
+    expect(bracketSourceCandidates({ target, groups, fixtures }).map((fixture) => fixture.id)).toEqual(['upper-game']);
+  });
 });

@@ -1,7 +1,7 @@
 import { render, screen, within } from '@testing-library/react';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { TournamentBracket } from './tournament-bracket';
-import type { V1TournamentFixture } from '@/types/api';
+import type { V1TournamentFixture, V1TournamentGroup } from '@/types/api';
 import { queryImageBySrc } from '@/test/next-image';
 
 it('팀 없는 부전승 네 자리는 비공개 팀과 구분해 미정으로 표시한다', () => {
@@ -184,6 +184,24 @@ it('3·4위전의 미정 두 자리에 저장된 4강 패자 출처를 표시한
   const card = screen.getByRole('group', { name: '4강 1경기 패자 대 4강 2경기 패자' });
   expect(within(card).getByText('4강 1경기 패자')).toBeVisible();
   expect(within(card).getByText('4강 2경기 패자')).toBeVisible();
+});
+
+it('상위·하위 결선은 같은 라운드여도 공개 대진 그림에서 독립된 그래프로 보여준다', () => {
+  const trackedGroup = (id: string, name: string, bracketTrack: 'upper' | 'lower') => ({
+    id, name, phase: 'final', sortOrder: 0, advanceCount: null, standings: [], qualification: null, groupTeams: [], bracketTrack,
+  }) as unknown as V1TournamentGroup;
+  render(<TournamentBracket groups={[
+    trackedGroup('upper-final', '상위 결선', 'upper'),
+    trackedGroup('lower-final', '하위 결선', 'lower'),
+  ]} fixtures={[
+    makeFixture({ id: 'upper-final-match', fixtureNumber: 1, groupId: 'upper-final', round: 'final', homeTeamName: '상위 A', awayTeamName: '상위 B' }),
+    makeFixture({ id: 'lower-final-match', fixtureNumber: 1, groupId: 'lower-final', round: 'final', homeTeamName: '하위 A', awayTeamName: '하위 B' }),
+  ]} />);
+
+  const upper = screen.getByRole('region', { name: '상위 결선' });
+  const lower = screen.getByRole('region', { name: '하위 결선' });
+  expect(within(upper).getByRole('group', { name: '상위 A 대 상위 B' })).toBeInTheDocument();
+  expect(within(lower).getByRole('group', { name: '하위 A 대 하위 B' })).toBeInTheDocument();
 });
 describe('공개 대진표 — 자리 라벨', () => {
   it('TBD 사이드에 자리 라벨이 있으면 라벨을 보여 주고 대기 모양으로 그린다', () => {

@@ -29,7 +29,7 @@ function unsupported(message: string): never {
 }
 
 function assertSupported(input: GroupKnockoutTemplateInput): void {
-  const { groupCount, teamsPerGroup, advancePerGroup, legs, thirdPlace } = input;
+  const { groupCount, teamsPerGroup, advancePerGroup, legs, thirdPlace, lowerBracket = false } = input;
   const inRange = (value: number, min: number, max: number) => Number.isInteger(value) && value >= min && value <= max;
   if (
     !inRange(groupCount, 2, 8) ||
@@ -38,6 +38,9 @@ function assertSupported(input: GroupKnockoutTemplateInput): void {
     (legs !== 1 && legs !== 2)
   ) {
     unsupported('조는 2~8개, 조당 팀은 3~6팀, 진출은 1~2팀, 회전은 1~2회로 입력해 주세요.');
+  }
+  if (lowerBracket && (advancePerGroup !== 2 || ![2, 4, 8].includes(groupCount) || teamsPerGroup < 4)) {
+    unsupported('상·하위 결선은 조 2·4·8개, 조당 4팀 이상, 조별 2팀 진출에서만 만들 수 있어요.');
   }
   groupRankPairings(groupCount, advancePerGroup); // 결선 크기가 2·4·8·16 이 아니면 여기서 422
   if (groupCount * advancePerGroup === 2 && thirdPlace) {
@@ -50,12 +53,11 @@ export function planGroupKnockoutTemplate(
   ctx: { fixtureNumberOffset: number },
 ): BracketTemplatePlan {
   assertSupported(input);
-  const { groupCount, teamsPerGroup, advancePerGroup, legs, thirdPlace } = input;
+  const { groupCount, teamsPerGroup, advancePerGroup, legs, thirdPlace, lowerBracket = false } = input;
   const size = groupCount * advancePerGroup;
   const mainPhases = MAIN_CHAIN.slice(MAIN_CHAIN.indexOf(FIRST_PHASE_BY_SIZE[size]));
-  // 결승 다음이 3·4위전 — PR-1b/1c knockout 템플릿과 같은 번호·그룹 순서
+  const tracks = lowerBracket ? (['upper', 'lower'] as const) : (['overall'] as const);
   const phases: KnockoutPhase[] = thirdPlace ? [...mainPhases, 'third_place'] : [...mainPhases];
-  const firstPhase = phases[0];
 
   const groups: PlanGroup[] = [];
   const slots: PlanSlot[] = [];
@@ -66,17 +68,37 @@ export function planGroupKnockoutTemplate(
       phase: 'group',
       sortOrder: g,
       advanceCount: advancePerGroup,
+      bracketTrack: 'overall',
     });
     for (let position = 1; position <= teamsPerGroup; position += 1) {
       slots.push({ key: entryKey(g, position), kind: 'ENTRY', groupKey: stageGroupKey(g), position, sourceGroupKey: null });
     }
   }
-  phases.forEach((phase, index) => {
-    groups.push({ key: knockoutGroupKey(phase), name: GROUP_NAME[phase], phase, sortOrder: index, advanceCount: null });
-  });
-  for (let g = 0; g < groupCount; g += 1) {
-    for (let rank = 1; rank <= advancePerGroup; rank += 1) {
-      slots.push({ key: rankKey(g, rank), kind: 'GROUP_RANK', groupKey: knockoutGroupKey(firstPhase), position: rank, sourceGroupKey: stageGroupKey(g) });
+  for (const track of tracks) {
+    for (const [index, phase] of phases.entries()) {
+      const groupKey = track === 'overall' ? knockoutGroupKey(phase) : `${track}:${knockoutGroupKey(phase)}`;
+      groups.push({
+        key: groupKey,
+        name: track === 'overall' ? GROUP_NAME[phase] : `${track === 'upper' ? '상위' : '하위'} ${GROUP_NAME[phase]}`,
+        phase,
+        sortOrder: index,
+        advanceCount: null,
+        bracketTrack: track,
+      });
+    }
+    const firstPhase = phases[0];
+    const firstGroupKey = track === 'overall' ? knockoutGroupKey(firstPhase) : `${track}:${knockoutGroupKey(firstPhase)}`;
+    for (let g = 0; g < groupCount; g += 1) {
+      for (let rank = 1; rank <= advancePerGroup; rank += 1) {
+        const sourceRank = track === 'lower' ? rank + 2 : rank;
+        slots.push({
+          key: track === 'overall' ? rankKey(g, sourceRank) : `${track}:${rankKey(g, sourceRank)}`,
+          kind: 'GROUP_RANK',
+          groupKey: firstGroupKey,
+          position: sourceRank,
+          sourceGroupKey: stageGroupKey(g),
+        });
+      }
     }
   }
 
@@ -106,34 +128,37 @@ export function planGroupKnockoutTemplate(
   }
 
   const pairings = groupRankPairings(groupCount, advancePerGroup);
-  for (const phase of phases) {
-    for (let index = 1; index <= FIXTURES_IN_PHASE[phase]; index += 1) {
-      lastNumber += 1;
-      const pair = phase === firstPhase ? pairings[index - 1] : null;
-      fixtures.push({
-        key: knockoutFixtureKey(phase, index),
-        groupKey: knockoutGroupKey(phase),
-        round: ROUND_LABEL[phase],
-        fixtureNumber: lastNumber,
-        legNumber: 1,
-        homeSlotKey: pair ? rankKey(pair[0].group, pair[0].rank) : null,
-        awaySlotKey: pair ? rankKey(pair[1].group, pair[1].rank) : null,
-      });
-    }
-  }
-
   const edges: PlanEdge[] = [];
-  for (let i = 0; i < mainPhases.length - 1; i += 1) {
-    const from = mainPhases[i];
-    const to = mainPhases[i + 1];
-    for (let j = 1; j <= FIXTURES_IN_PHASE[to]; j += 1) {
-      edges.push({ sourceFixtureKey: knockoutFixtureKey(from, 2 * j - 1), outcome: 'WINNER', targetFixtureKey: knockoutFixtureKey(to, j), targetSide: 'HOME' });
-      edges.push({ sourceFixtureKey: knockoutFixtureKey(from, 2 * j), outcome: 'WINNER', targetFixtureKey: knockoutFixtureKey(to, j), targetSide: 'AWAY' });
+  for (const track of tracks) {
+    const trackPrefix = track === 'overall' ? '' : `${track}:`;
+    const firstPhase = phases[0];
+    for (const phase of phases) {
+      for (let index = 1; index <= FIXTURES_IN_PHASE[phase]; index += 1) {
+        lastNumber += 1;
+        const pair = phase === firstPhase ? pairings[index - 1] : null;
+        fixtures.push({
+          key: `${trackPrefix}${knockoutFixtureKey(phase, index)}`,
+          groupKey: track === 'overall' ? knockoutGroupKey(phase) : `${track}:${knockoutGroupKey(phase)}`,
+          round: ROUND_LABEL[phase],
+          fixtureNumber: lastNumber,
+          legNumber: 1,
+          homeSlotKey: pair ? (track === 'overall' ? rankKey(pair[0].group, pair[0].rank) : `${track}:${rankKey(pair[0].group, track === 'lower' ? pair[0].rank + 2 : pair[0].rank)}`) : null,
+          awaySlotKey: pair ? (track === 'overall' ? rankKey(pair[1].group, pair[1].rank) : `${track}:${rankKey(pair[1].group, track === 'lower' ? pair[1].rank + 2 : pair[1].rank)}`) : null,
+        });
+      }
     }
-  }
-  if (thirdPlace) {
-    edges.push({ sourceFixtureKey: knockoutFixtureKey('semi', 1), outcome: 'LOSER', targetFixtureKey: knockoutFixtureKey('third_place', 1), targetSide: 'HOME' });
-    edges.push({ sourceFixtureKey: knockoutFixtureKey('semi', 2), outcome: 'LOSER', targetFixtureKey: knockoutFixtureKey('third_place', 1), targetSide: 'AWAY' });
+    for (let i = 0; i < mainPhases.length - 1; i += 1) {
+      const from = mainPhases[i];
+      const to = mainPhases[i + 1];
+      for (let j = 1; j <= FIXTURES_IN_PHASE[to]; j += 1) {
+        edges.push({ sourceFixtureKey: `${trackPrefix}${knockoutFixtureKey(from, 2 * j - 1)}`, outcome: 'WINNER', targetFixtureKey: `${trackPrefix}${knockoutFixtureKey(to, j)}`, targetSide: 'HOME' });
+        edges.push({ sourceFixtureKey: `${trackPrefix}${knockoutFixtureKey(from, 2 * j)}`, outcome: 'WINNER', targetFixtureKey: `${trackPrefix}${knockoutFixtureKey(to, j)}`, targetSide: 'AWAY' });
+      }
+    }
+    if (thirdPlace) {
+      edges.push({ sourceFixtureKey: `${trackPrefix}${knockoutFixtureKey('semi', 1)}`, outcome: 'LOSER', targetFixtureKey: `${trackPrefix}${knockoutFixtureKey('third_place', 1)}`, targetSide: 'HOME' });
+      edges.push({ sourceFixtureKey: `${trackPrefix}${knockoutFixtureKey('semi', 2)}`, outcome: 'LOSER', targetFixtureKey: `${trackPrefix}${knockoutFixtureKey('third_place', 1)}`, targetSide: 'AWAY' });
+    }
   }
 
   return { groups, slots, fixtures, edges, byeSlots: [] };

@@ -7,6 +7,7 @@ import { useModalA11y } from '@/components/v1-ui/use-modal-a11y';
 import { useV1AddBracketFixture, useV1SetBracketSources } from '@/hooks/use-v1-bracket-canvas';
 import { describeBracketCanvasError } from '@/lib/bracket-canvas-errors';
 import { bracketSourceCandidates, isFixtureLinkable, knockoutRoundLabel } from '@/lib/bracket-fixture-tools';
+import { bracketTrackLabel } from '@/lib/bracket-track';
 import type { V1AdminBracketFixture, V1AdminTournamentBracket, V1TournamentFormat } from '@/types/api';
 import { BracketLeagueAddFixtureForm, type LeagueAddSubmit } from './bracket-league-add-fixture-form';
 
@@ -40,23 +41,27 @@ export function BracketFixtureToolsDialog({ open, mode, format, tournamentId, br
         .sort((a, b) => a.fixtureNumber - b.fixtureNumber),
     [bracket.fixtures, bracket.groups],
   );
-  const groupName = (fixture: V1AdminBracketFixture) => bracket.groups.find((group) => group.id === fixture.groupId)?.name ?? fixture.round;
+  const groupName = (fixture: V1AdminBracketFixture) => {
+    const group = bracket.groups.find((candidate) => candidate.id === fixture.groupId);
+    const trackLabel = bracketTrackLabel(group?.bracketTrack);
+    return `${trackLabel ? `${trackLabel} · ` : ''}${group?.name ?? fixture.round}`;
+  };
   const fixtureTitle = (fixture: V1AdminBracketFixture) => `${groupName(fixture)} ${fixture.fixtureNumber}번 경기`;
 
   const [groupId, setGroupId] = useState(addableGroups[0]?.id ?? '');
   const [targetId, setTargetId] = useState(linkable[0]?.id ?? '');
-  const sourceOf = (fixture: V1AdminBracketFixture | undefined, side: 'HOME' | 'AWAY') =>
-    fixture?.bracketSources?.find((source) => source.side === side)?.fixtureId ?? '';
+  const sourceOf = (fixture: V1AdminBracketFixture | undefined, side: 'HOME' | 'AWAY') => {
+    const sourceId = fixture?.bracketSources?.find((source) => source.side === side)?.fixtureId ?? '';
+    if (fixture === undefined || sourceId === '') return '';
+    return bracketSourceCandidates({ target: fixture, groups: bracket.groups, fixtures: bracket.fixtures }).some((candidate) => candidate.id === sourceId)
+      ? sourceId
+      : '';
+  };
   const [homeSource, setHomeSource] = useState(() => sourceOf(linkable[0], 'HOME'));
   const [awaySource, setAwaySource] = useState(() => sourceOf(linkable[0], 'AWAY'));
 
   const target = linkable.find((fixture) => fixture.id === targetId) ?? null;
   const candidates = target === null ? [] : bracketSourceCandidates({ target, groups: bracket.groups, fixtures: bracket.fixtures });
-  const sourceOptions = (current: string) => {
-    if (current === '' || candidates.some((fixture) => fixture.id === current)) return candidates;
-    const linked = bracket.fixtures.find((fixture) => fixture.id === current);
-    return linked === undefined ? candidates : [linked, ...candidates];
-  };
   const targetPhase = target === null ? '' : (bracket.groups.find((group) => group.id === target.groupId)?.phase ?? '');
   const outcomeLabel = targetPhase === 'third_place' ? '패자' : '승자';
 
@@ -210,7 +215,7 @@ export function BracketFixtureToolsDialog({ open, mode, format, tournamentId, br
                       onChange={(event) => (side === 'HOME' ? setHomeSource(event.target.value) : setAwaySource(event.target.value))}
                     >
                       <option value="">연결 없음 · 직접 배정</option>
-                      {sourceOptions(side === 'HOME' ? homeSource : awaySource).map((fixture) => (
+                      {candidates.map((fixture) => (
                         <option key={fixture.id} value={fixture.id}>{`${fixtureTitle(fixture)} ${outcomeLabel}`}</option>
                       ))}
                     </select>

@@ -29,7 +29,7 @@ export async function createGroupInTx(
   tx: Tx,
   admin: V1ActiveAdmin,
   tournamentId: string,
-  input: { name: string; phase: V1TournamentGroupPhase; sortOrder: number; advanceCount: number | null },
+  input: { name: string; phase: V1TournamentGroupPhase; sortOrder: number; advanceCount: number | null; bracketTrack?: 'overall' | 'upper' | 'lower' },
 ): Promise<V1TournamentGroup> {
   const group = await tx.v1TournamentGroup.create({
     data: {
@@ -38,13 +38,14 @@ export async function createGroupInTx(
       phase: input.phase,
       sortOrder: input.sortOrder,
       advanceCount: input.advanceCount,
+      bracketTrack: input.bracketTrack ?? 'overall',
     },
   });
   await writeAdminActionLog(tx, admin, {
     action: 'tournament.bracket.group.create',
     targetType: 'tournament_group',
     targetId: group.id,
-    afterJson: { tournamentId, name: group.name, phase: group.phase },
+    afterJson: { tournamentId, name: group.name, phase: group.phase, bracketTrack: group.bracketTrack },
   });
   return group;
 }

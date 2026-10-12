@@ -615,7 +615,7 @@ describe('BracketPageContent — 진출 배지는 조별리그 완료 후에만'
   ];
   const highlightedTeams = (container: HTMLElement) =>
     Array.from(container.querySelectorAll('.tm-standings-row-highlight')).map(
-      (tr) => tr.querySelector('td:nth-child(2)')?.textContent?.replace('진출', '').trim(),
+      (tr) => tr.querySelector('td:nth-child(2) span[style*="font-weight"]')?.textContent?.trim(),
     );
   const tiedGroup = (qualification: V1TournamentGroup['qualification']) =>
     makeGroup({
@@ -667,6 +667,77 @@ describe('BracketPageContent — 진출 배지는 조별리그 완료 후에만'
     const controlTable = screen.getByRole('table', { name: 'B조 순위표' });
     expect(highlightedTeams(controlTable)).toEqual(['대조1팀', '대조2팀']);
     expect(within(controlTable).queryByText(/공동/)).toBeNull();
+  });
+
+  it('분리 결선은 상·하위 qualification 을 합쳐 각 팀에 올바른 범위 배지를 표시한다', () => {
+    const tournament = makeTournament({
+      id: 'tour-split-qualification',
+      status: 'in_progress',
+      format: 'group_knockout',
+      fixtures: COMPLETE_FIXTURES,
+      groups: [
+        {
+          ...tiedGroup(null),
+          qualificationByTrack: {
+            upper: { advancingRegistrationIds: ['reg-3'], undecided: false },
+            lower: { advancingRegistrationIds: ['reg-6'], undecided: false },
+          },
+        },
+      ],
+    });
+
+    renderBracketStandingsTab(tournament);
+
+    const table = screen.getByRole('table', { name: 'A조 순위표' });
+    expect(highlightedTeams(table)).toEqual(['03팀', '06팀']);
+    expect(within(table).getByText('상위 진출')).toBeInTheDocument();
+    expect(within(table).getByText('하위 진출')).toBeInTheDocument();
+  });
+
+  it('split qualification 값이 null이어도 완료된 조에서 일반 상위 진출 규칙을 잘못 보여주지 않는다', () => {
+    const tournament = makeTournament({
+      id: 'tour-null-track-qualification',
+      status: 'in_progress',
+      format: 'group_knockout',
+      fixtures: COMPLETE_FIXTURES,
+      groups: [{ ...tiedGroup(null), qualificationByTrack: { upper: null, lower: null } }],
+    });
+
+    renderBracketStandingsTab(tournament);
+
+    const table = screen.getByRole('table', { name: 'A조 순위표' });
+    expect(highlightedTeams(table)).toEqual([]);
+    expect(within(table).queryByText(/상위 진출|하위 진출/)).not.toBeInTheDocument();
+    expect(screen.getByText('각 조 1·2위는 상위 결선, 3·4위는 하위 결선에 참가해요.')).toBeInTheDocument();
+    expect(screen.queryByText('상위 2팀 진출')).not.toBeInTheDocument();
+    expect(screen.getByRole('status')).toHaveTextContent('결선 진출 팀을 확인 중이에요.');
+  });
+
+  it('조별 경기가 끝나기 전에는 track qualification 이 와도 실제 진출 라벨을 보여주지 않는다', () => {
+    const tournament = makeTournament({
+      id: 'tour-incomplete-track-qualification',
+      status: 'in_progress',
+      format: 'group_knockout',
+      fixtures: [
+        makeFixture({ id: 'fx-1', groupId: 'group-a', round: 'group', status: 'completed' }),
+        makeFixture({ id: 'fx-2', groupId: 'group-a', round: 'group', status: 'scheduled' }),
+      ],
+      groups: [{
+        ...tiedGroup(null),
+        qualificationByTrack: {
+          upper: { advancingRegistrationIds: ['reg-3'], undecided: false },
+          lower: { advancingRegistrationIds: ['reg-6'], undecided: false },
+        },
+      }],
+    });
+
+    renderBracketStandingsTab(tournament);
+
+    const table = screen.getByRole('table', { name: 'A조 순위표' });
+    expect(highlightedTeams(table)).toEqual([]);
+    expect(within(table).queryByText(/상위 진출|하위 진출/)).not.toBeInTheDocument();
+    expect(screen.getByText('각 조 1·2위는 상위 결선, 3·4위는 하위 결선에 참가해요.')).toBeInTheDocument();
+    expect(screen.queryByText('상위 2팀 진출')).not.toBeInTheDocument();
   });
 
   it('동률 때문에 진출 팀이 덜 정해졌으면 정해진 팀만 칠하고 안내 캡션을 보여 준다', () => {

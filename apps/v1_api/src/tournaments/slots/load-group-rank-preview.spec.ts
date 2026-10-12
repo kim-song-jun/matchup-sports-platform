@@ -38,10 +38,11 @@ function detailRows(groupId: string, results: Result[], pendingIndex = -1, offic
 
 const slot = (id: string, position: number, sourceGroupId: string, sortOrder: number, groupName: string, registrationId: string | null = null) => ({
   id,
+  groupId: 'final-1',
   position,
   registrationId,
   sourceGroupId,
-  group: { name: '4강', phase: 'semi' },
+  group: { id: 'final-1', name: '4강', phase: 'semi', bracketTrack: 'overall' },
   sourceGroup: { name: groupName, sortOrder },
 });
 
@@ -78,9 +79,9 @@ describe('loadGroupRankPreview', () => {
     const preview = await loadGroupRankPreview(client, 'tournament-1');
 
     expect(preview.rows).toEqual([
-      { slotId: 's-a1', label: 'A조 1위', state: 'ready', candidateRegistrationId: 'r-a', candidateTeamName: '가FC', tiedRegistrationIds: [], currentRegistrationId: null },
-      { slotId: 's-a2', label: 'A조 2위', state: 'ready', candidateRegistrationId: 'r-b', candidateTeamName: '나FC', tiedRegistrationIds: [], currentRegistrationId: 'r-b' },
-      { slotId: 's-b1', label: 'B조 1위', state: 'group_incomplete', candidateRegistrationId: null, candidateTeamName: null, tiedRegistrationIds: [], currentRegistrationId: null },
+      { slotId: 's-a1', groupId: 'final-1', bracketTrack: 'overall', position: 1, sourceGroupId: 'grp-a', label: 'A조 1위', state: 'ready', candidateRegistrationId: 'r-a', candidateTeamName: '가FC', tiedRegistrationIds: [], currentRegistrationId: null },
+      { slotId: 's-a2', groupId: 'final-1', bracketTrack: 'overall', position: 2, sourceGroupId: 'grp-a', label: 'A조 2위', state: 'ready', candidateRegistrationId: 'r-b', candidateTeamName: '나FC', tiedRegistrationIds: [], currentRegistrationId: 'r-b' },
+      { slotId: 's-b1', groupId: 'final-1', bracketTrack: 'overall', position: 1, sourceGroupId: 'grp-b', label: 'B조 1위', state: 'group_incomplete', candidateRegistrationId: null, candidateTeamName: null, tiedRegistrationIds: [], currentRegistrationId: null },
     ]);
     expect([...(preview.groupMembers.get('s-a1') ?? [])].sort()).toEqual(['r-a', 'r-b', 'r-c']);
     expect([...(preview.groupMembers.get('s-b1') ?? [])].sort()).toEqual(['r-d', 'r-e', 'r-f']);

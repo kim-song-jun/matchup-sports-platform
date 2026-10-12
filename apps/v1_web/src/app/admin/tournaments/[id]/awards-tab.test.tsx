@@ -5,6 +5,7 @@ import { AwardsTab } from './awards-tab';
 import type { V1TournamentAward } from '@/types/api';
 
 const setAwardsMutate = vi.fn();
+const setAwardSetsMutate = vi.fn();
 
 const award: V1TournamentAward = {
   id: 'award-1',
@@ -17,13 +18,15 @@ const award: V1TournamentAward = {
   note: '3골 1어시스트',
 };
 
-const { playerRecordsHolder, awardsHolder } = vi.hoisted(() => ({
+const { playerRecordsHolder, awardsHolder, awardSetsHolder } = vi.hoisted(() => ({
   awardsHolder: { current: null as V1TournamentAward[] | null },
+  awardSetsHolder: { current: [] as { id: string; bracketTrack: 'upper' | 'lower'; prizePool: number | null; prizeSummary: string | null; prizeBreakdown: string | null }[] },
   playerRecordsHolder: {
     current: undefined as undefined | { tournamentId: string; goals: unknown[]; assists: unknown[] },
     error: false,
   },
 }));
+const awardSetsQueryEnabled = vi.hoisted(() => vi.fn());
 vi.mock('@/hooks/use-v1-api', () => ({
   useV1AdminTournamentRegistrations: () => ({
     data: { items: [{ id: 'reg-1', status: 'confirmed', teamId: 'team-1', teamName: 'A팀' }] },
@@ -33,21 +36,24 @@ vi.mock('@/hooks/use-v1-api', () => ({
     isFetching: false,
   }),
   useV1AdminTournamentAwards: () => ({ data: awardsHolder.current ?? [award] }),
+  useV1AdminTournamentAwardSets: (_tournamentId: string, enabled = true) => { awardSetsQueryEnabled(enabled); return { data: awardSetsHolder.current, isPending: false, isError: false, refetch: vi.fn() }; },
   // STATS-3 추천 chip — 기본은 빈 랭킹(기존 테스트 화면 불변). chip 시나리오는
   // holder를 채워 사용한다.
   useV1AdminTournamentPlayerRecords: () => ({ data: playerRecordsHolder.current, isError: playerRecordsHolder.error === true, refetch: vi.fn() }),
   useV1SetTournamentAwards: () => ({ mutate: setAwardsMutate, isPending: false }),
+  useV1SetTournamentAwardSets: () => ({ mutate: setAwardSetsMutate, isPending: false }),
 }));
 
 describe('AwardsTab permissions', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    awardSetsHolder.current = [];
   });
 
   it('shows award data without mutation affordances when the admin has read-only access', () => {
     render(<AwardsTab tournamentId="tournament-1" canWrite={false} showToast={vi.fn()} />);
 
-    expect(screen.getByText('MVP')).toBeInTheDocument();
+    expect(screen.getByText(/^MVP · 전체$/)).toBeInTheDocument();
     expect(screen.getByText(/김선수/)).toBeInTheDocument();
     expect(screen.getByRole('status')).toHaveTextContent('조회 전용 권한');
     expect(screen.queryByRole('button', { name: '+ 항목 추가' })).not.toBeInTheDocument();
@@ -67,6 +73,96 @@ describe('AwardsTab permissions', () => {
 
     await user.click(saveButton);
     expect(setAwardsMutate).toHaveBeenCalled();
+  });
+
+  it('persists the selected scope for personal awards', async () => {
+    const user = userEvent.setup();
+    render(<AwardsTab tournamentId="tournament-1" canWrite allowSplitAwards showToast={vi.fn()} />);
+
+    await user.selectOptions(screen.getByLabelText('수상 범위'), 'upper');
+    await user.click(screen.getByRole('button', { name: '어워드 저장' }));
+
+    expect(setAwardsMutate).toHaveBeenCalledWith(
+      [expect.objectContaining({ awardType: 'mvp', bracketTrack: 'upper' })],
+      expect.objectContaining({ onSuccess: expect.any(Function), onError: expect.any(Function) }),
+    );
+  });
+
+  it('saves split team prize fields through the award-set endpoint payload', async () => {
+    const user = userEvent.setup();
+    render(<AwardsTab tournamentId="tournament-1" canWrite allowSplitAwards showToast={vi.fn()} />);
+
+    await user.selectOptions(screen.getByLabelText('편집할 결선'), 'lower');
+    await user.type(screen.getByLabelText('총상금'), '250000');
+    await user.type(screen.getByLabelText('시상 안내'), '하위 결선 우승팀');
+    await user.click(screen.getByRole('button', { name: '상·하위 시상 저장' }));
+
+    expect(setAwardSetsMutate).toHaveBeenCalledWith(
+      [
+        { bracketTrack: 'lower', prizePool: 250000, prizeSummary: '하위 결선 우승팀', prizeBreakdown: null },
+      ],
+      expect.objectContaining({ onSuccess: expect.any(Function), onError: expect.any(Function) }),
+    );
+  });
+
+  it('clears both saved split scopes by persisting an empty award-set list', async () => {
+    awardSetsHolder.current = [
+      { id: 'set-upper', bracketTrack: 'upper', prizePool: 300000, prizeSummary: '상위 시상', prizeBreakdown: null },
+      { id: 'set-lower', bracketTrack: 'lower', prizePool: 100000, prizeSummary: '하위 시상', prizeBreakdown: null },
+    ];
+    const user = userEvent.setup();
+    render(<AwardsTab tournamentId="tournament-1" canWrite allowSplitAwards showToast={vi.fn()} />);
+
+    const pool = screen.getByLabelText('총상금');
+    const summary = screen.getByLabelText('시상 안내');
+    await user.clear(pool);
+    await user.clear(summary);
+    await user.selectOptions(screen.getByLabelText('편집할 결선'), 'lower');
+    await user.clear(screen.getByLabelText('총상금'));
+    await user.clear(screen.getByLabelText('시상 안내'));
+    await user.click(screen.getByRole('button', { name: '상·하위 시상 저장' }));
+
+    expect(setAwardSetsMutate).toHaveBeenCalledWith(
+      [],
+      expect.objectContaining({ onSuccess: expect.any(Function), onError: expect.any(Function) }),
+    );
+    awardSetsHolder.current = [];
+  });
+
+  it('preserves a deliberately entered zero prize pool while omitting the other empty scope', async () => {
+    const user = userEvent.setup();
+    render(<AwardsTab tournamentId="tournament-1" canWrite allowSplitAwards showToast={vi.fn()} />);
+
+    await user.type(screen.getByLabelText('총상금'), '0');
+    await user.click(screen.getByRole('button', { name: '상·하위 시상 저장' }));
+
+    expect(setAwardSetsMutate).toHaveBeenCalledWith(
+      [{ bracketTrack: 'upper', prizePool: 0, prizeSummary: null, prizeBreakdown: null }],
+      expect.objectContaining({ onSuccess: expect.any(Function), onError: expect.any(Function) }),
+    );
+  });
+
+  it('does not query or expose split controls before an exact regular tournament kind is hydrated', () => {
+    render(<AwardsTab tournamentId="tournament-1" canWrite showToast={vi.fn()} />);
+    expect(awardSetsQueryEnabled).toHaveBeenCalledWith(false);
+    expect(screen.queryByRole('region', { name: '팀 시상 안내' })).not.toBeInTheDocument();
+    expect(screen.getByLabelText('수상 범위')).toHaveValue('overall');
+    expect(screen.queryByRole('option', { name: '상위 결선' })).not.toBeInTheDocument();
+  });
+
+  it('preserves a loaded personal award scope when the editor has no split-scope permission', async () => {
+    awardsHolder.current = [{ ...award, bracketTrack: 'upper' }];
+    const user = userEvent.setup();
+    render(<AwardsTab tournamentId="tournament-1" canWrite showToast={vi.fn()} />);
+    const scope = screen.getByLabelText('수상 범위');
+    expect(scope).toHaveValue('upper');
+    expect(scope).toBeDisabled();
+
+    await user.click(screen.getByRole('button', { name: '어워드 저장' }));
+    expect(setAwardsMutate).toHaveBeenCalledWith(
+      [expect.objectContaining({ awardType: 'mvp', bracketTrack: 'upper' })],
+      expect.objectContaining({ onSuccess: expect.any(Function), onError: expect.any(Function) }),
+    );
   });
 });
 

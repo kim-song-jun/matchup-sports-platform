@@ -180,6 +180,7 @@ export class PublicUserRecordsService {
       select: {
         id: true,
         tournamentId: true,
+        bracketTrack: true,
         awardType: true,
         awardLabel: true,
         iconKey: true,
@@ -199,6 +200,7 @@ export class PublicUserRecordsService {
           id: award.id,
           tournamentId: award.tournamentId,
           tournamentTitle: award.tournament.title,
+          bracketTrack: award.bracketTrack,
           awardType: award.awardType,
           awardLabel: award.awardLabel,
           iconKey: award.iconKey,

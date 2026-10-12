@@ -4,12 +4,12 @@ describe('serializeAdminBracketSlot', () => {
   const row = (overrides: Record<string, unknown>) => ({
     id: 'slot-1', tournamentId: 't-1', kind: 'ENTRY', groupId: 'g-a', position: 2, sourceGroupId: null, registrationId: null,
     createdAt: new Date(), updatedAt: new Date(),
-    group: { name: 'A조', phase: 'group' }, sourceGroup: null, registration: null, ...overrides,
+    group: { name: 'A조', phase: 'group', bracketTrack: 'overall' }, sourceGroup: null, registration: null, ...overrides,
   }) as never;
 
   it('배정된 자리는 팀 이름과 등록 id 를, 빈 자리는 둘 다 null 을 낸다', () => {
     expect(serializeAdminBracketSlot(row({ registrationId: 'reg-1', registration: { team: { name: '서울 FC' } } }))).toEqual({
-      id: 'slot-1', kind: 'ENTRY', groupId: 'g-a', sourceGroupId: null, position: 2, label: 'A조 2번', registrationId: 'reg-1', teamName: '서울 FC',
+      id: 'slot-1', kind: 'ENTRY', groupId: 'g-a', bracketTrack: 'overall', sourceGroupId: null, position: 2, label: 'A조 2번', registrationId: 'reg-1', teamName: '서울 FC',
     });
     expect(serializeAdminBracketSlot(row({}))).toMatchObject({ registrationId: null, teamName: null });
   });
@@ -18,6 +18,11 @@ describe('serializeAdminBracketSlot', () => {
     expect(
       serializeAdminBracketSlot(row({ kind: 'GROUP_RANK', groupId: 'g-f', sourceGroupId: 'g-a', position: 1, group: { name: '4강', phase: 'semi' }, sourceGroup: { name: 'A조' } })),
     ).toMatchObject({ kind: 'GROUP_RANK', sourceGroupId: 'g-a', label: 'A조 1위' });
+  });
+
+  it('결선 자리는 소속 결선 범위를 보낸다', () => {
+    expect(serializeAdminBracketSlot(row({ group: { name: '하위 4강', phase: 'semi', bracketTrack: 'lower' } })))
+      .toMatchObject({ bracketTrack: 'lower' });
   });
 });
 

@@ -11,6 +11,10 @@ import { tournamentSlotLabel } from './tournament-slot-label';
 
 export type GroupRankPreviewRow = {
   slotId: string;
+  groupId: string | null;
+  bracketTrack: 'overall' | 'upper' | 'lower';
+  position: number;
+  sourceGroupId: string;
   label: string;
   state: 'ready' | 'tied' | 'group_incomplete';
   candidateRegistrationId: string | null;
@@ -36,7 +40,8 @@ export async function loadGroupRankPreview(
       position: true,
       registrationId: true,
       sourceGroupId: true,
-      group: { select: { name: true, phase: true } },
+      groupId: true,
+      group: { select: { id: true, name: true, phase: true, bracketTrack: true } },
       sourceGroup: { select: { name: true, sortOrder: true } },
     },
   });
@@ -62,6 +67,10 @@ export async function loadGroupRankPreview(
     const candidate = resolution.state === 'ready' ? resolution.registrationId : null;
     return {
       slotId: slot.id,
+      groupId: slot.groupId,
+      bracketTrack: slot.group?.bracketTrack ?? 'overall',
+      position: slot.position,
+      sourceGroupId: slot.sourceGroupId,
       label: tournamentSlotLabel({
         kind: 'GROUP_RANK',
         position: slot.position,
@@ -158,6 +167,8 @@ export async function loadGroupStandingSummaries(
     groups.map((group) => group.id),
   );
   const placed = new Set<string>();
+  const placedByTrack = new Map<'overall' | 'upper' | 'lower', Set<string>>();
+  let splitBracket = false;
   if (includeQualification) {
     // groupId null 은 조 없는 결선 경기. NOT 은 groupId null 행을 걸러 내므로 OR 로 둘 다 잡는다.
     const knockoutDetails = await client.v1TournamentMatchDetails.findMany({
@@ -166,11 +177,15 @@ export async function loadGroupStandingSummaries(
         OR: [{ groupId: null }, { group: { is: { phase: { not: 'group' } } } }],
         teamMatch: { is: { deletedAt: null, status: { notIn: ['cancelled', 'archived'] } } },
       },
-      select: { homeRegistrationId: true, awayRegistrationId: true },
+      select: { homeRegistrationId: true, awayRegistrationId: true, group: { select: { bracketTrack: true } } },
     });
+    splitBracket = knockoutDetails.some((row) => row.group?.bracketTrack === 'upper' || row.group?.bracketTrack === 'lower');
     for (const row of knockoutDetails) {
-      if (row.homeRegistrationId !== null) placed.add(row.homeRegistrationId);
-      if (row.awayRegistrationId !== null) placed.add(row.awayRegistrationId);
+      const track = row.group?.bracketTrack ?? 'overall';
+      const trackPlaced = placedByTrack.get(track) ?? new Set<string>();
+      placedByTrack.set(track, trackPlaced);
+      if (row.homeRegistrationId !== null) { placed.add(row.homeRegistrationId); trackPlaced.add(row.homeRegistrationId); }
+      if (row.awayRegistrationId !== null) { placed.add(row.awayRegistrationId); trackPlaced.add(row.awayRegistrationId); }
     }
   }
 
@@ -178,8 +193,15 @@ export async function loadGroupStandingSummaries(
   for (const group of groups) {
     const source = sourceByGroup.get(group.id);
     const advanceCount = includeQualification ? group.advanceCount : null;
-    const summary = source === undefined ? null : summarizeGroupStanding(source, advanceCount, placed);
+    const summary = source === undefined ? null : summarizeGroupStanding(source, advanceCount, placed, { splitBracket, placedByTrack });
     if (summary !== null) summaries.set(group.id, summary);
+    else if (splitBracket) {
+      summaries.set(group.id, {
+        sharedRankByRegistrationId: new Map(),
+        qualification: null,
+        qualificationByTrack: { upper: null, lower: null },
+      });
+    }
   }
   return summaries;
 }

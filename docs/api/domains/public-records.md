@@ -549,7 +549,7 @@ only from the current official result revision's `mvpParticipantId`.
 `tournamentAwards[]` is a separate list backed by
 `V1TournamentAward.recipientUserId`. Each item contains `id`,
 `tournamentId`, `tournamentTitle`, `awardType`, the tournament-defined
-`awardLabel`, nullable `iconKey`, `teamName`, `note`, and `awardedAt`.
+`awardLabel`, `bracketTrack` (`overall | upper | lower`), nullable `iconKey`, `teamName`, `note`, and `awardedAt`.
 Clients display `awardLabel` verbatim because award categories vary by
 tournament; they must not collapse tournament awards into match MVP.
 

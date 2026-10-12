@@ -1,6 +1,7 @@
 import { isFixtureLocked } from '@/lib/bracket-canvas-layout';
 import { BRACKET_SOURCE_PHASES } from '@/lib/tournament-bracket-rounds';
 import { isKnockoutPhase, tournamentRoundLabel } from '@/lib/tournament-round-label';
+import { effectiveBracketTrack } from '@/lib/bracket-track';
 import type { V1AdminBracketFixture, V1AdminBracketGroup } from '@/types/api';
 
 export function knockoutRoundLabel(phase: string): string | null {
@@ -20,11 +21,14 @@ export function bracketSourceCandidates(input: {
   const { target, groups, fixtures } = input;
   const phaseByGroup = new Map(groups.map((group) => [group.id, group.phase]));
   const targetPhase = phaseByGroup.get(target.groupId ?? '') ?? '';
+  const trackByGroup = new Map(groups.map((group) => [group.id, effectiveBracketTrack(group.bracketTrack)]));
+  const targetTrack = trackByGroup.get(target.groupId ?? '') ?? 'overall';
   const previousPhases = BRACKET_SOURCE_PHASES[targetPhase];
   if (previousPhases === undefined) return [];
   return fixtures.filter(
     (fixture) =>
       previousPhases.includes(phaseByGroup.get(fixture.groupId ?? '') ?? '') &&
+      (trackByGroup.get(fixture.groupId ?? '') ?? 'overall') === targetTrack &&
       fixture.legNumber === 1 &&
       !fixture.parentFixtureId &&
       fixture.status === 'scheduled' &&

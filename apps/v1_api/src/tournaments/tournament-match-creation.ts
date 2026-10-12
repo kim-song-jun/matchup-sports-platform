@@ -14,6 +14,7 @@ import { GamesService } from '../games/games.service';
 import { createTeamMatchScheduleInTx } from '../team-schedules/team-match-schedule';
 import { toPlaceColumns, type PlaceSnapshot } from '../places/place-snapshot';
 import { defaultFixtureEndAt } from './competition-config/fixture-end-at';
+import { assertSameBracketTrack } from './bracket-track';
 
 export type TournamentMatchCreationTeam = {
   id: string | null;
@@ -291,6 +292,17 @@ export async function createTournamentMatchAdvancementEdgeInTx(
   tx: Prisma.TransactionClient,
   input: TournamentMatchAdvancementInput,
 ): Promise<string> {
+  const tracks = await tx.v1TournamentMatchDetails.findMany({
+    where: { tournamentId: input.tournamentId, teamMatchId: { in: [input.sourceTeamMatchId, input.targetTeamMatchId] } },
+    select: { teamMatchId: true, group: { select: { bracketTrack: true } } },
+  });
+  if (tracks.length !== 2) {
+    throw new UnprocessableEntityException({
+      code: 'BRACKET_FIXTURE_INVALID',
+      message: '같은 대회의 결선 경기만 연결할 수 있어요.',
+    });
+  }
+  assertSameBracketTrack(tracks[0].group?.bracketTrack ?? 'overall', tracks[1].group?.bracketTrack ?? 'overall');
   const edge = await tx.v1TournamentMatchAdvancementEdge.create({
     data: {
       tournamentId: input.tournamentId,

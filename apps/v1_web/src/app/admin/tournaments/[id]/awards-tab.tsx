@@ -2,30 +2,37 @@
 
 import { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
-import { useV1AdminTournamentRegistrations, useV1AdminTournamentPlayers, useV1AdminTournamentAwards, useV1SetTournamentAwards, useV1AdminTournamentPlayerRecords } from '@/hooks/use-v1-api';
+import { useV1AdminTournamentRegistrations, useV1AdminTournamentPlayers, useV1AdminTournamentAwards, useV1SetTournamentAwards, useV1AdminTournamentPlayerRecords, useV1AdminTournamentAwardSets, useV1SetTournamentAwardSets } from '@/hooks/use-v1-api';
 import { AdminEmpty, AdminTableSkeleton } from '@/components/admin';
 import { AwardRecommendationChips, type AwardRecommendation } from '@/components/admin/award-recommendation-chips';
-import type { V1TournamentAwardIconKey } from '@/types/api';
+import type { V1TournamentAwardIconKey, V1TournamentAwardSetInput } from '@/types/api';
 import { extractErrorMessage } from '@/lib/error-message';
 import { legacyAwardIconKey, TOURNAMENT_AWARD_ICON_OPTIONS, TournamentAwardIcon } from '@/components/tournaments/tournament-award-icon';
 import { EntityPicker, type EntityPickerItem } from '@/components/admin/entity-picker';
 import { randomUuid } from '@/lib/uuid';
+import { PrizeBreakdownEditor, createPrizeRowId, serializeTournamentPrizeRows, type TournamentPrizeRow } from '@/components/admin/tournaments/prize-breakdown-editor';
+import { parsePrizeRows } from '@/lib/prize-breakdown';
 
 
 // ── Tab: Individual Awards ────────────────────────────────────────────────
 
-type AwardForm = { awardType: string; awardLabel: string; iconKey: V1TournamentAwardIconKey; recipientName: string; recipientUserId: string; teamName: string; note: string };
+type AwardForm = { awardType: string; awardLabel: string; iconKey: V1TournamentAwardIconKey; recipientName: string; recipientUserId: string; teamName: string; note: string; bracketTrack: 'overall' | 'upper' | 'lower' };
+type AwardSetDraft = { prizePool: string; prizeSummary: string; prizeRows: TournamentPrizeRow[] };
 
 export function AwardsTab({
   tournamentId,
   canWrite,
+  allowSplitAwards = false,
   showToast,
 }: {
   readonly tournamentId: string;
   readonly canWrite: boolean;
+  readonly allowSplitAwards?: boolean;
   readonly showToast: (msg: string, v?: 'success' | 'error') => void;
 }) {
   const setAwards = useV1SetTournamentAwards(tournamentId);
+  const setAwardSets = useV1SetTournamentAwardSets(tournamentId);
+  const { data: savedAwardSets, isPending: awardSetsPending, isError: awardSetsError, refetch: refetchAwardSets } = useV1AdminTournamentAwardSets(tournamentId, allowSplitAwards);
   const {
     data: savedAwards,
     isPending: awardsPending,
@@ -54,9 +61,28 @@ export function AwardsTab({
       recipientUserId: award.recipientUserId ?? '',
       teamName: award.teamName ?? '',
       note: award.note ?? '',
+      bracketTrack: award.bracketTrack ?? 'overall',
     })));
     setLoaded(true);
   }, [loaded, savedAwards]);
+
+  const emptyAwardSetDraft = (): AwardSetDraft => ({ prizePool: '', prizeSummary: '', prizeRows: [] });
+  const [awardSetDrafts, setAwardSetDrafts] = useState<Record<'upper' | 'lower', AwardSetDraft>>({ upper: emptyAwardSetDraft(), lower: emptyAwardSetDraft() });
+  const [awardSetsLoaded, setAwardSetsLoaded] = useState(false);
+  const [activeAwardSet, setActiveAwardSet] = useState<'upper' | 'lower'>('upper');
+  useEffect(() => {
+    if (!savedAwardSets || awardSetsLoaded) return;
+    const drafts = { upper: emptyAwardSetDraft(), lower: emptyAwardSetDraft() };
+    for (const awardSet of savedAwardSets) {
+      drafts[awardSet.bracketTrack] = {
+        prizePool: awardSet.prizePool === null ? '' : String(awardSet.prizePool),
+        prizeSummary: awardSet.prizeSummary ?? '',
+        prizeRows: parsePrizeRows(awardSet.prizeBreakdown ?? '').map((row) => ({ id: createPrizeRowId(), label: row.label, value: row.amount })),
+      };
+    }
+    setAwardSetDrafts(drafts);
+    setAwardSetsLoaded(true);
+  }, [awardSetsLoaded, savedAwardSets]);
 
   const update = (idx: number, field: keyof AwardForm, value: string) => {
     setRows((prev) => prev.map((r, i) => i === idx ? { ...r, [field]: value } : r));
@@ -66,7 +92,7 @@ export function AwardsTab({
     // Date.now()만으로는 같은 ms의 연속 추가가 같은 awardType이 돼 DB unique
     // (@@unique([tournamentId, awardType])) 위반으로 저장이 실패한다(리뷰 지적).
     // randomUuid()는 crypto.randomUUID 부재 WebView(Capacitor 구형)까지 흡수하는 헬퍼다.
-    setRows((prev) => [...prev, { awardType: `custom_${randomUuid()}`, awardLabel: '', iconKey: 'trophy', recipientName: '', recipientUserId: '', teamName: '', note: '' }]);
+    setRows((prev) => [...prev, { awardType: `custom_${randomUuid()}`, awardLabel: '', iconKey: 'trophy', recipientName: '', recipientUserId: '', teamName: '', note: '', bracketTrack: 'overall' }]);
   };
 
   // 회고 STATS-3 — 추천 근거 chip. 비게이팅 어드민 랭킹이라 미동의 1위도 그대로
@@ -86,6 +112,7 @@ export function AwardsTab({
         recipientUserId: row.userId ?? '',
         teamName: row.teamName ?? '',
         note: '',
+        bracketTrack: 'overall',
       },
     ]);
   };
@@ -105,6 +132,31 @@ export function AwardsTab({
     setAwards.mutate(awards, {
       onSuccess: () => showToast('개인 어워드가 저장됐어요.', 'success'),
       onError: (err) => showToast(extractErrorMessage(err, '개인 어워드를 저장하지 못했어요.'), 'error'),
+    });
+  };
+
+  const saveAwardSets = () => {
+    const awardSets: V1TournamentAwardSetInput[] = (['upper', 'lower'] as const).flatMap((bracketTrack) => {
+      const draft = awardSetDrafts[bracketTrack];
+      const pool = draft.prizePool.trim();
+      const summary = draft.prizeSummary.trim();
+      const breakdown = serializeTournamentPrizeRows(draft.prizeRows);
+      if (pool === '' && summary === '' && breakdown === '') return [];
+      return {
+        bracketTrack,
+        prizePool: pool === '' ? null : Math.floor(Number(pool)),
+        prizeSummary: summary || null,
+        prizeBreakdown: breakdown || null,
+      };
+    });
+    const invalid = awardSets.find((awardSet) => typeof awardSet.prizePool === 'number' && (!Number.isFinite(awardSet.prizePool) || awardSet.prizePool < 0));
+    if (invalid) {
+      showToast('총상금은 0 이상의 숫자로 입력해 주세요.', 'error');
+      return;
+    }
+    setAwardSets.mutate(awardSets, {
+      onSuccess: () => showToast('상·하위 결선 시상을 저장했어요.', 'success'),
+      onError: (error) => showToast(extractErrorMessage(error, '결선 시상을 저장하지 못했어요.'), 'error'),
     });
   };
 
@@ -138,6 +190,33 @@ export function AwardsTab({
 
   return (
     <div className="tm-content-enter p-4">
+      {allowSplitAwards ? <section aria-label="팀 시상 안내" className="mb-8 rounded-2xl border border-[var(--border)] bg-[var(--card-surface)] p-4">
+        <div className="mb-4">
+          <h3 className="text-[length:var(--font-size-body)] font-bold text-[var(--text-strong)]">팀 시상 안내</h3>
+          <p className="mt-1 text-[length:var(--font-size-caption)] text-[var(--text-muted)]">대회 전체 시상은 대회 정보에서 관리하고, 상·하위 결선별 시상은 여기에서 저장해요.</p>
+        </div>
+        {awardSetsPending ? <AdminTableSkeleton rows={3} cols={2} /> : awardSetsError ? (
+          <AdminEmpty title="결선 시상 안내를 불러오지 못했어요." action={<button type="button" onClick={() => void refetchAwardSets()} className="min-h-[44px] px-4 rounded-lg border border-[var(--border)] font-semibold">다시 시도</button>} />
+        ) : (
+          <>
+            <label htmlFor="award-set-track" className="mb-2 block text-[length:var(--font-size-caption)] text-[var(--text-muted)]">편집할 결선</label>
+            <select id="award-set-track" value={activeAwardSet} onChange={(event) => setActiveAwardSet(event.target.value as 'upper' | 'lower')} disabled={!canWrite || setAwardSets.isPending} className="mb-4 h-[44px] w-full rounded-xl border border-[var(--border)] bg-[var(--card-surface)] px-3 text-[length:var(--font-size-label)] text-[var(--text-strong)]">
+              <option value="upper">상위 결선</option>
+              <option value="lower">하위 결선</option>
+            </select>
+            <PrizeBreakdownEditor
+              rows={awardSetDrafts[activeAwardSet].prizeRows}
+              onChange={(prizeRows) => setAwardSetDrafts((current) => ({ ...current, [activeAwardSet]: { ...current[activeAwardSet], prizeRows } }))}
+              prizePool={awardSetDrafts[activeAwardSet].prizePool}
+              onPrizePoolChange={(prizePool) => setAwardSetDrafts((current) => ({ ...current, [activeAwardSet]: { ...current[activeAwardSet], prizePool } }))}
+              disabled={!canWrite || setAwardSets.isPending}
+            />
+            <label htmlFor="award-set-summary" className="mt-4 mb-1 block text-[length:var(--font-size-caption)] text-[var(--text-body)]">시상 안내</label>
+            <textarea id="award-set-summary" rows={2} maxLength={500} value={awardSetDrafts[activeAwardSet].prizeSummary} onChange={(event) => setAwardSetDrafts((current) => ({ ...current, [activeAwardSet]: { ...current[activeAwardSet], prizeSummary: event.target.value } }))} disabled={!canWrite || setAwardSets.isPending} className="w-full rounded-xl border border-[var(--border)] bg-[var(--card-surface)] p-3 text-[length:var(--font-size-label)] text-[var(--text-strong)]" />
+            {canWrite ? <button type="button" onClick={saveAwardSets} disabled={setAwardSets.isPending || !awardSetsLoaded} className="mt-4 min-h-[44px] w-full rounded-xl bg-blue-600 px-4 font-semibold text-white disabled:opacity-50">{setAwardSets.isPending ? '저장 중…' : '상·하위 시상 저장'}</button> : null}
+          </>
+        )}
+      </section> : null}
       <div className="flex items-center justify-between mb-4">
         <div>
           <h3 className="text-[length:var(--font-size-body)] font-bold text-[var(--text-strong)]">개인 어워드</h3>
@@ -177,6 +256,7 @@ export function AwardsTab({
                 removeRow={removeRow}
                 tournamentId={tournamentId}
                 teamItems={awardTeamItems}
+                allowSplitAwards={allowSplitAwards}
               />
             ))
           : rows.map((row, idx) => <AwardRowReadOnly key={idx} row={row} />)}
@@ -214,7 +294,7 @@ function AwardRowReadOnly({ row }: { readonly row: AwardForm }) {
           <TournamentAwardIcon iconKey={row.iconKey} />
         </span>
         <div className="min-w-0">
-          <p className="text-[length:var(--font-size-label)] font-bold text-[var(--text-strong)] truncate">{row.awardLabel}</p>
+          <p className="text-[length:var(--font-size-label)] font-bold text-[var(--text-strong)] truncate">{row.awardLabel} · {row.bracketTrack === 'upper' ? '상위 결선' : row.bracketTrack === 'lower' ? '하위 결선' : '전체'}</p>
           <p className="mt-0.5 text-xs text-[var(--text-muted)] truncate">
             {row.recipientName}
             {row.teamName ? ` · ${row.teamName}` : ''}
@@ -238,6 +318,7 @@ function AwardRow({
   removeRow,
   tournamentId,
   teamItems,
+  allowSplitAwards,
 }: {
   idx: number;
   row: AwardForm;
@@ -245,6 +326,7 @@ function AwardRow({
   removeRow: (idx: number) => void;
   tournamentId: string;
   teamItems: EntityPickerItem[];
+  allowSplitAwards: boolean;
 }) {
   const teamNameTrimmed = row.teamName.trim();
   const selectedTeamItem: EntityPickerItem | null = teamNameTrimmed
@@ -295,6 +377,14 @@ function AwardRow({
             ))}
           </select>
         </div>
+      </div>
+      <div className="mb-2">
+        <label htmlFor={`award-track-${idx}`} className="text-[length:var(--font-size-caption)] text-[var(--text-muted)] mb-1 block">수상 범위</label>
+        <select id={`award-track-${idx}`} value={row.bracketTrack} disabled={!allowSplitAwards} onChange={(event) => update(idx, 'bracketTrack', event.target.value)} className="h-11 w-full rounded-xl border border-[var(--border)] bg-[var(--card-surface)] px-3 text-[length:var(--font-size-label)] text-[var(--text-strong)] disabled:opacity-70">
+          {allowSplitAwards || row.bracketTrack === 'overall' ? <option value="overall">대회 전체</option> : null}
+          {allowSplitAwards || row.bracketTrack === 'upper' ? <option value="upper">상위 결선</option> : null}
+          {allowSplitAwards || row.bracketTrack === 'lower' ? <option value="lower">하위 결선</option> : null}
+        </select>
       </div>
       <div className="grid grid-cols-2 gap-2">
         <div>

@@ -125,6 +125,7 @@ function GoalDiff({ gf, ga }: { gf: number; ga: number }) {
 export function TournamentStandingsTable({
   rows,
   advancingKeys,
+  advancingLabels,
   ariaLabel,
   emptyMessage = '순위 집계 전이에요',
   renderDetail,
@@ -132,6 +133,7 @@ export function TournamentStandingsTable({
 }: {
   rows: readonly TournamentStandingsRow[];
   advancingKeys: ReadonlySet<string> | null;
+  advancingLabels?: ReadonlyMap<string, readonly string[]>;
   ariaLabel: string;
   emptyMessage?: string;
   renderDetail?: (row: TournamentStandingsRow) => ReactNode;
@@ -207,7 +209,13 @@ export function TournamentStandingsTable({
                       >
                         {isHidden ? '참가팀 비공개' : row.teamName}
                       </span>
-                      {promoted ? <span className="tm-badge tm-badge-blue tm-badge-sm" style={{ flexShrink: 0 }}>진출</span> : null}
+                      {promoted ? (
+                        advancingLabels?.get(row.key)?.length ? (
+                          <span className="flex flex-wrap gap-1">
+                            {advancingLabels.get(row.key)!.map((label) => <span key={label} className="tm-badge tm-badge-blue tm-badge-sm" style={{ flexShrink: 0 }}>{label}</span>)}
+                          </span>
+                        ) : <span className="tm-badge tm-badge-blue tm-badge-sm" style={{ flexShrink: 0 }}>진출</span>
+                      ) : null}
                     </span>
                   </>
                 );

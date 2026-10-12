@@ -24,6 +24,8 @@ describe('ApplyBracketTemplateDto', () => {
     expect(
       toBracketTemplateInput(await run({ kind: 'group_knockout', groupCount: 2, teamsPerGroup: 4, advancePerGroup: 2, legs: 1, thirdPlace: true })),
     ).toEqual({ kind: 'group_knockout', groupCount: 2, teamsPerGroup: 4, advancePerGroup: 2, legs: 1, thirdPlace: true });
+    expect(toBracketTemplateInput(await run({ kind: 'group_knockout', groupCount: 2, teamsPerGroup: 4, advancePerGroup: 2, legs: 1, lowerBracket: true })))
+      .toEqual({ kind: 'group_knockout', groupCount: 2, teamsPerGroup: 4, advancePerGroup: 2, legs: 1, thirdPlace: false, lowerBracket: true });
   });
 
   it('replaceExisting 은 입력(계획)이 아니라 DTO 에만 남는다', async () => {

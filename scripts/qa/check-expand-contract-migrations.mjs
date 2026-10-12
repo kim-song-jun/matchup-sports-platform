@@ -83,6 +83,18 @@ const REVIEWED_NON_ADDITIVE = [
     reason: "Task 149 mandatory creator operator participation, reviewed 2026-10-04. Restores only a left participant whose identity is the platform match creator and remains an active unrevoked owner/ops with an active account, in an active room and supported match lifecycle. Team-manager voluntary exits are untouched unless the same identity is also the mandatory creator operator. Only status,left_at,updated_at change; messages, visibility, pins and read cursors remain intact. The previous API dynamically checks team entitlement, so rollback retains its own access rules; this user-requested operational rejoin needs no schema rollback.",
   },
   {
+    file: "apps/v1_api/prisma/migrations/20261012050000_v1_tournament_split_knockout_awards/migration.sql",
+    statement: 'CREATE UNIQUE INDEX "v1_tournament_awards_tournament_id_bracket_track_award_type_key" ON "v1_tournament_awards"("tournament_id", "bracket_track", "award_type")',
+    reason:
+      "Regular tournament split finals and awards, reviewed 2026-10-12. The old (tournament_id, award_type) unique index remains active while this scoped index is built in the same transaction. Every existing award receives bracket_track='overall' from the preceding NOT NULL DEFAULT column addition, and the old index already guarantees at most one row per (tournament_id, award_type), so the narrower scoped key cannot find existing duplicates. PostgreSQL's transactional DDL/locks prevent a writer from observing a partial swap; any index-build failure rolls back the column additions and this index. After commit the schema intentionally permits the same award_type on different tracks, so rollback to the old global-unique schema is safe only before such rows are written; later rollback requires explicit data reconciliation and cannot preserve both track awards unchanged.",
+  },
+  {
+    file: "apps/v1_api/prisma/migrations/20261012050000_v1_tournament_split_knockout_awards/migration.sql",
+    statement: 'DROP INDEX "v1_tournament_awards_tournament_id_award_type_key"',
+    reason:
+      "Regular tournament split finals and awards, reviewed 2026-10-12. This drops the old one-award-type-per-tournament rule only after the replacement unique index is created, in the same transaction. Existing award rows remain unchanged and all are scoped to overall by the preceding default; the old rule remains effective until commit. After commit, writes may create multiple rows with one award_type across tracks, so restoring the old index or rolling back to code that assumes a globally unique award requires reconciliation if those rows exist; this migration does not merge or discard track-specific awards.",
+  },
+  {
     file: 'apps/v1_api/prisma/migrations/20261001220000_v1_team_invitation_history/migration.sql',
     statement:
       'CREATE UNIQUE INDEX IF NOT EXISTS "v1_team_invitations_pending_key" ON "v1_team_invitations"("team_id", "invited_user_id") ' +

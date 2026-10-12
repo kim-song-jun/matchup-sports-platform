@@ -16,6 +16,9 @@ export class ApplyBracketTemplateDto {
   @IsOptional() @IsBoolean()
   thirdPlace?: boolean;
 
+  @IsOptional() @IsBoolean()
+  lowerBracket?: boolean;
+
   @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(1000)
   groupCount?: number;
 
@@ -57,6 +60,7 @@ export function toBracketTemplateInput(dto: ApplyBracketTemplateDto): BracketTem
         advancePerGroup: required(dto.advancePerGroup, 'advancePerGroup') as 1 | 2,
         legs: required(dto.legs, 'legs') as 1 | 2,
         thirdPlace: dto.thirdPlace ?? false,
+        ...(dto.lowerBracket === undefined ? {} : { lowerBracket: dto.lowerBracket }),
       };
   }
 }

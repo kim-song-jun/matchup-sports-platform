@@ -14,9 +14,11 @@
  */
 import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
+import { plainToInstance } from 'class-transformer';
+import { validateSync } from 'class-validator';
 import { PrismaService } from '../prisma/prisma.service';
 import { AdminContextService } from '../common/admin-context.service';
-import { TournamentReviewsService } from './tournament-reviews.service';
+import { TournamentAwardItemDto, TournamentReviewsService } from './tournament-reviews.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { kindAwareFindFirst } from '../../test/helpers/kind-aware-find-first';
 
@@ -64,6 +66,7 @@ function awardRow(overrides: Record<string, unknown> = {}) {
   return {
     id: 'award-1',
     tournamentId: 'tournament-1',
+    bracketTrack: 'overall',
     awardType: 'mvp',
     awardLabel: 'MVP',
     iconKey: 'crown',
@@ -269,6 +272,22 @@ const confirmedRegistrationRows = [
 ];
 
 describe('TournamentReviewsService — awards admin gate', () => {
+  it('TournamentAwardItemDto: 상위/하위 범위는 받고 알 수 없는 bracketTrack은 거절한다', () => {
+    const validAward = {
+      awardType: 'mvp',
+      awardLabel: 'MVP',
+      recipientName: '김철수',
+      recipientUserId: '01900000-0000-7000-8000-000000000001',
+    };
+    for (const bracketTrack of ['upper', 'lower']) {
+      const dto = plainToInstance(TournamentAwardItemDto, { ...validAward, bracketTrack });
+      expect(validateSync(dto, { whitelist: true, forbidNonWhitelisted: true })).toHaveLength(0);
+    }
+
+    const invalid = plainToInstance(TournamentAwardItemDto, { ...validAward, bracketTrack: 'final' });
+    expect(validateSync(invalid, { whitelist: true, forbidNonWhitelisted: true })).not.toHaveLength(0);
+  });
+
   let service: TournamentReviewsService;
   let prisma: {
     v1AdminUser: { findUnique: jest.Mock };
@@ -287,6 +306,8 @@ describe('TournamentReviewsService — awards admin gate', () => {
     };
     v1AdminActionLog: { create: jest.Mock };
     $transaction: jest.Mock;
+    $executeRaw: jest.Mock;
+    $queryRaw: jest.Mock;
   };
 
   beforeEach(async () => {
@@ -309,6 +330,8 @@ describe('TournamentReviewsService — awards admin gate', () => {
       },
       v1AdminActionLog: { create: jest.fn().mockResolvedValue({ id: 'action-log-1' }) },
       $transaction: jest.fn(),
+      $executeRaw: jest.fn().mockResolvedValue(0),
+      $queryRaw: jest.fn().mockResolvedValue([]),
     };
     (prisma.$transaction as jest.Mock).mockImplementation(async (arg: unknown) =>
       Array.isArray(arg)
@@ -462,6 +485,19 @@ describe('TournamentReviewsService — awards admin gate', () => {
     expect(prisma.v1TournamentAward.create).not.toHaveBeenCalled();
   });
 
+  it('setAwards: 상위·하위 시상 범위는 정규리그에서 거절한다', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+    prisma.v1Tournament.findFirst.mockResolvedValue({ id: 'league-1', deletedAt: null, kind: 'regular_league' });
+
+    await expect(service.setAwards(ownerAuthUser, 'league-1', {
+      awards: [{
+        awardType: 'mvp', awardLabel: 'MVP', bracketTrack: 'upper',
+        recipientName: '김철수', recipientUserId: 'user-kim',
+      }],
+    } as never)).rejects.toMatchObject({ response: { code: 'AWARD_TRACK_UNSUPPORTED' } });
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
   it('setAwards: owner admin replaces awards and returns the updated list', async () => {
     prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
     prisma.v1Tournament.findFirst.mockResolvedValue({ id: 'tournament-1', deletedAt: null });
@@ -592,6 +628,68 @@ describe('TournamentReviewsService — awards admin gate', () => {
     expect(notifications.emitNotification).toHaveBeenCalledTimes(1);
     expect(notifications.emitNotification).toHaveBeenCalledWith(
       'user-kim', 'tournament_award_received', 'tournament-1', expect.stringContaining('득점왕'),
+    );
+  });
+
+  it('setAwards: 같은 awardType은 서로 다른 bracketTrack에서 허용하고 같은 track 안에서는 거절한다', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+    prisma.v1Tournament.findFirst.mockResolvedValue({ id: 'tournament-1', title: '테스트 대회', deletedAt: null, kind: 'regular_tournament' });
+    prisma.v1TournamentRegistration.findMany.mockResolvedValue(confirmedRegistrationRows);
+    prisma.v1TournamentAward.deleteMany.mockResolvedValue({ count: 0 });
+    prisma.v1TournamentAward.create.mockImplementation(async ({ data }: { data: Record<string, unknown> }) => ({
+      ...awardRow(),
+      ...data,
+    }));
+    prisma.v1TournamentAward.findMany.mockResolvedValue([]);
+
+    await expect(service.setAwards(ownerAuthUser, 'tournament-1', {
+      awards: [
+        { awardType: 'mvp', awardLabel: '상위 MVP', bracketTrack: 'upper', recipientName: '김철수', recipientUserId: 'user-kim' },
+        { awardType: 'mvp', awardLabel: '하위 MVP', bracketTrack: 'lower', recipientName: '김철수', recipientUserId: 'user-kim' },
+      ],
+    } as never)).resolves.toHaveLength(0);
+
+    expect(prisma.v1TournamentAward.create).toHaveBeenCalledTimes(2);
+    expect(prisma.v1TournamentAward.create).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({ data: expect.objectContaining({ awardType: 'mvp', bracketTrack: 'upper' }) }),
+    );
+    expect(prisma.v1TournamentAward.create).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ data: expect.objectContaining({ awardType: 'mvp', bracketTrack: 'lower' }) }),
+    );
+
+    prisma.v1TournamentAward.create.mockClear();
+    await expect(service.setAwards(ownerAuthUser, 'tournament-1', {
+      awards: [
+        { awardType: 'mvp', awardLabel: '상위 MVP', bracketTrack: 'upper', recipientName: '김철수', recipientUserId: 'user-kim' },
+        { awardType: 'mvp', awardLabel: '또 다른 상위 MVP', bracketTrack: 'upper', recipientName: '이영희', recipientUserId: 'user-lee' },
+      ],
+    } as never)).rejects.toMatchObject({ response: { code: 'DUPLICATE_AWARD_TYPE' } });
+    expect(prisma.v1TournamentAward.create).not.toHaveBeenCalled();
+  });
+
+  it('setAwards: 같은 수상자의 같은 awardType도 bracketTrack이 바뀌면 새 수상 알림을 보낸다', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+    prisma.v1Tournament.findFirst.mockResolvedValue({ id: 'tournament-1', title: '테스트 대회', deletedAt: null, kind: 'regular_tournament' });
+    prisma.v1TournamentRegistration.findMany.mockResolvedValue(confirmedRegistrationRows);
+    prisma.v1TournamentAward.findMany.mockResolvedValueOnce([
+      { ...awardRow(), awardType: 'mvp', bracketTrack: 'upper', recipientUserId: 'user-kim' },
+    ]);
+    prisma.v1TournamentAward.deleteMany.mockResolvedValue({ count: 1 });
+    prisma.v1TournamentAward.create.mockResolvedValue(awardRow({ bracketTrack: 'lower' }));
+    prisma.v1TournamentAward.findMany.mockResolvedValue([awardRow({ bracketTrack: 'lower' })]);
+
+    await service.setAwards(ownerAuthUser, 'tournament-1', {
+      awards: [{
+        awardType: 'mvp', awardLabel: '하위 MVP', bracketTrack: 'lower',
+        recipientName: '김철수', recipientUserId: 'user-kim', teamName: '레알마드리드',
+      }],
+    } as never);
+
+    expect(notifications.emitNotification).toHaveBeenCalledTimes(1);
+    expect(notifications.emitNotification).toHaveBeenCalledWith(
+      'user-kim', 'tournament_award_received', 'tournament-1', expect.stringContaining('하위 MVP'),
     );
   });
 

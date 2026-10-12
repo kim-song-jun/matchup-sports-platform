@@ -23,6 +23,54 @@ const rankLabel = (p: BracketTemplatePlan, key: string | null) => {
   return `${source.name.replace('조', '')}${slot.position}`;
 };
 
+describe('planGroupKnockoutTemplate — 한 대회의 상위·하위 결선', () => {
+  it('2조 4팀의 1·2위와 3·4위를 독립 결선에 보내고 두 결승까지 연결한다', () => {
+    const input = { ...base, lowerBracket: true };
+    const p = planGroupKnockoutTemplate(input, { fixtureNumberOffset: 0 });
+    expect(p.fixtures).toHaveLength(18);
+    const upperGroups = p.groups.filter((group) => 'bracketTrack' in group && group.bracketTrack === 'upper');
+    const lowerGroups = p.groups.filter((group) => 'bracketTrack' in group && group.bracketTrack === 'lower');
+    expect(upperGroups.map((group) => group.phase)).toEqual(['semi', 'final']);
+    expect(lowerGroups.map((group) => group.phase)).toEqual(['semi', 'final']);
+    const rankSlots = p.slots.filter((slot) => slot.kind === 'GROUP_RANK');
+    expect(rankSlots).toHaveLength(8);
+    expect(rankSlots.filter((slot) => upperGroups.some((group) => group.key === slot.groupKey)).map((slot) => slot.position).sort()).toEqual([1, 1, 2, 2]);
+    expect(rankSlots.filter((slot) => lowerGroups.some((group) => group.key === slot.groupKey)).map((slot) => slot.position).sort()).toEqual([3, 3, 4, 4]);
+    for (const groups of [upperGroups, lowerGroups]) {
+      const firstRound = p.fixtures.filter((fixture) => fixture.groupKey === groups[0].key);
+      for (const fixture of firstRound) {
+        const home = p.slots.find((slot) => slot.key === fixture.homeSlotKey)!;
+        const away = p.slots.find((slot) => slot.key === fixture.awaySlotKey)!;
+        expect(home.sourceGroupKey).not.toBe(away.sourceGroupKey);
+      }
+      const final = p.fixtures.find((fixture) => fixture.groupKey === groups[1].key)!;
+      expect(p.edges.filter((edge) => edge.targetFixtureKey === final.key).map((edge) => edge.sourceFixtureKey).sort()).toEqual(firstRound.map((fixture) => fixture.key).sort());
+    }
+    expect(p.edges).toHaveLength(4);
+  });
+
+  it.each([2, 4, 8] as const)('%i조 분리 결선은 양쪽의 경기 번호·자리·연결 키를 독립시킨다', (groupCount) => {
+    const p = planGroupKnockoutTemplate({ ...base, groupCount, lowerBracket: true, thirdPlace: true }, { fixtureNumberOffset: 20 });
+    const upper = p.groups.filter((group) => group.bracketTrack === 'upper');
+    const lower = p.groups.filter((group) => group.bracketTrack === 'lower');
+    const upperKeys = new Set(p.fixtures.filter((fixture) => upper.some((group) => group.key === fixture.groupKey)).map((fixture) => fixture.key));
+    const lowerKeys = new Set(p.fixtures.filter((fixture) => lower.some((group) => group.key === fixture.groupKey)).map((fixture) => fixture.key));
+    expect([...upperKeys].some((key) => lowerKeys.has(key))).toBe(false);
+    expect(new Set(p.fixtures.map((fixture) => fixture.fixtureNumber)).size).toBe(p.fixtures.length);
+    expect(p.edges.filter((edge) => upperKeys.has(edge.targetFixtureKey) && !upperKeys.has(edge.sourceFixtureKey))).toHaveLength(0);
+    expect(p.edges.filter((edge) => lowerKeys.has(edge.targetFixtureKey) && !lowerKeys.has(edge.sourceFixtureKey))).toHaveLength(0);
+    expect(p.groups.filter((group) => group.phase === 'third_place').map((group) => group.bracketTrack).sort()).toEqual(['lower', 'upper']);
+  });
+
+  it.each([
+    [{ lowerBracket: true, groupCount: 3 }, '지원 그룹 수'],
+    [{ lowerBracket: true, advancePerGroup: 1 }, '조별 2팀 진출'],
+    [{ lowerBracket: true, teamsPerGroup: 3 }, '조당 4팀 이상'],
+  ] as const)('rejects unsupported split input %o (%s)', (input, _reason) => {
+    expect(() => plan(input)).toThrow(UnprocessableEntityException);
+  });
+});
+
 describe('planGroupKnockoutTemplate — 개수 계약', () => {
   it('2조 x 4팀, 2팀 진출, 1회전: 조별 12 + 4강 2 + 결승 1 = 15경기, 연결 2, 자리 12(ENTRY 8 + GROUP_RANK 4)', () => {
     const p = plan();

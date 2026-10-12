@@ -479,7 +479,7 @@ describe('AwardsPageClient — 완료 전 상금 정보 노출 (hasPrizeData 판
 
     render(<AwardsPageClient tournamentId="tournament-1" />);
 
-    expect(screen.getByText('총 상금')).toBeInTheDocument();
+    expect(screen.getAllByText('총 상금')).toHaveLength(1);
   });
 
   it('진행 중이고 prizePool·prizeSummary·prizeBreakdown 전부 없으면 상금 섹션을 그리지 않는다', () => {
@@ -499,6 +499,79 @@ describe('AwardsPageClient — 완료 전 상금 정보 노출 (hasPrizeData 판
     render(<AwardsPageClient tournamentId="tournament-1" />);
 
     expect(screen.queryByText('총 상금')).not.toBeInTheDocument();
+  });
+
+  it('분리 시상을 모두 비우면 공개 페이지가 기존 대회 전체 시상으로 돌아간다', () => {
+    awardsApiMocks.useV1Tournament.mockReturnValue({
+      data: makeCompletedTournament({
+        prizePool: 400000,
+        prizeSummary: '대회 전체 시상 안내',
+        prizeBreakdown: null,
+        awardSets: [],
+      }),
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+
+    render(<AwardsPageClient tournamentId="tournament-1" />);
+
+    expect(screen.getByRole('heading', { name: '상금 · 시상' })).toBeInTheDocument();
+    expect(screen.getAllByText('총 상금')).toHaveLength(1);
+    expect(screen.getByText('대회 전체 시상 안내', { selector: 'p' })).toBeInTheDocument();
+  });
+
+  it('완료된 분리 결선은 저장된 범위별 팀 시상과 개인 어워드를 각각 묶어 보여준다', () => {
+    awardsApiMocks.useV1Tournament.mockReturnValue({
+      data: makeCompletedTournament({
+        prizePool: 500000,
+        prizeSummary: '대회 전체 시상 안내',
+        groups: [
+          { id: 'upper-final', phase: 'final', bracketTrack: 'upper', standings: [] },
+          { id: 'lower-final', phase: 'final', bracketTrack: 'lower', standings: [] },
+        ] as never,
+        fixtures: [
+          {
+            id: 'upper-final-match', groupId: 'upper-final', round: 'final', fixtureNumber: 1,
+            homeTeamName: '상위 우승팀', awayTeamName: '상위 준우승팀',
+            result: { homeScore: 2, awayScore: 0, hasPenalty: false, homePenaltyScore: null, awayPenaltyScore: null, note: null, recordedAt: '', goals: [] },
+          },
+          {
+            id: 'lower-final-match', groupId: 'lower-final', round: 'final', fixtureNumber: 2,
+            homeTeamName: '하위 우승팀', awayTeamName: '하위 준우승팀',
+            result: { homeScore: 1, awayScore: 0, hasPenalty: false, homePenaltyScore: null, awayPenaltyScore: null, note: null, recordedAt: '', goals: [] },
+          },
+        ] as never,
+        awardSets: [
+          { bracketTrack: 'upper', prizePool: 300000, prizeSummary: '상위 우승 시상', prizeBreakdown: '1위,300000' },
+          { bracketTrack: 'lower', prizePool: 100000, prizeSummary: '하위 우승 시상', prizeBreakdown: '1위,100000' },
+        ],
+        awards: [
+          { id: 'award-upper', awardType: 'mvp', awardLabel: '상위 MVP', recipientName: '상위 선수', recipientUserId: null, recipientProfileImageUrl: null, teamName: '상위팀', note: null, bracketTrack: 'upper' },
+          { id: 'award-lower', awardType: 'mvp', awardLabel: '하위 MVP', recipientName: '하위 선수', recipientUserId: null, recipientProfileImageUrl: null, teamName: '하위팀', note: null, bracketTrack: 'lower' },
+        ],
+      }),
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+
+    render(<AwardsPageClient tournamentId="tournament-1" />);
+
+    expect(screen.getByRole('heading', { name: '상위 결선 시상' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: '하위 결선 시상' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: '대회 전체 시상 안내' })).toBeInTheDocument();
+    expect(screen.getByText('상위 우승 시상')).toBeInTheDocument();
+    expect(screen.getByText('하위 우승 시상')).toBeInTheDocument();
+    expect(screen.getByText('대회 전체 시상 안내', { selector: 'p' })).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: '상위 결선 개인 어워드' })).toHaveTextContent('상위 MVP');
+    expect(screen.getByRole('region', { name: '하위 결선 개인 어워드' })).toHaveTextContent('하위 MVP');
+    expect(screen.getByRole('region', { name: '상위 결선 시상 결과' })).toHaveTextContent('상위 우승팀');
+    expect(screen.getByRole('region', { name: '하위 결선 시상 결과' })).toHaveTextContent('하위 우승팀');
+    expect(screen.queryByText('상위 우승팀', { selector: '.tm-awards-podium-name' })).toBeInTheDocument();
+    expect(screen.queryByText('하위 우승팀', { selector: '.tm-awards-podium-name' })).toBeInTheDocument();
   });
 });
 

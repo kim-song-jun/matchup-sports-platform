@@ -2,7 +2,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { renderHook, waitFor } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { v1Api, v1Get, v1Patch, v1Post } from '@/lib/api-client';
+import { v1Api, v1Get, v1Patch, v1Post, v1Put } from '@/lib/api-client';
 import { trackEvent } from '@/lib/analytics';
 import { v1Keys } from '@/lib/query-keys';
 import type { V1Profile } from '@/types/api';
@@ -23,6 +23,7 @@ import {
   useV1OpenLeagueRegistration,
   useV1UpdateLeagueCoverImage,
   useV1UpdateLeagueEntryFee,
+  useV1SetTournamentAwardSets,
 } from './use-v1-api';
 
 vi.mock('@/lib/api-client', async () => {
@@ -32,6 +33,7 @@ vi.mock('@/lib/api-client', async () => {
     v1Get: vi.fn(),
     v1Patch: vi.fn(),
     v1Post: vi.fn(),
+    v1Put: vi.fn(),
     v1Api: vi.fn(),
   };
 });
@@ -43,6 +45,7 @@ vi.mock('@/lib/analytics', () => ({
 const v1GetMock = vi.mocked(v1Get);
 const v1PatchMock = vi.mocked(v1Patch);
 const v1PostMock = vi.mocked(v1Post);
+const v1PutMock = vi.mocked(v1Put);
 const v1ApiMock = vi.mocked(v1Api);
 const trackEventMock = vi.mocked(trackEvent);
 
@@ -248,6 +251,30 @@ describe('useV1UnhideReview', () => {
     expect(invalidateSpy).toHaveBeenCalledWith({
       queryKey: ['admin-tournament-reviews', 'tournament-1'],
     });
+  });
+});
+
+describe('useV1SetTournamentAwardSets', () => {
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('persists an empty split award list and invalidates public tournament detail', async () => {
+    v1PutMock.mockResolvedValue([]);
+    const { wrapper, queryClient } = createWrapperWithClient();
+    const detailKey = v1Keys.tournament('tournament-1');
+    queryClient.setQueryData(detailKey, {
+      id: 'tournament-1',
+      awardSets: [{ id: 'upper-set', bracketTrack: 'upper' }],
+    });
+    const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
+    const { result } = renderHook(() => useV1SetTournamentAwardSets('tournament-1'), { wrapper });
+
+    await result.current.mutateAsync([]);
+
+    expect(v1PutMock).toHaveBeenCalledWith('/admin/tournaments/tournament-1/award-sets', { awardSets: [] });
+    await waitFor(() => expect(queryClient.getQueryState(detailKey)?.isInvalidated).toBe(true));
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: detailKey });
   });
 });
 

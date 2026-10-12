@@ -9,6 +9,7 @@ export type GroupKnockoutTemplateValue = {
   advancePerGroup: 1 | 2;
   legs: 1 | 2;
   thirdPlace: boolean;
+  lowerBracket: boolean;
 };
 
 export const DEFAULT_GROUP_KNOCKOUT_VALUE: GroupKnockoutTemplateValue = {
@@ -17,6 +18,7 @@ export const DEFAULT_GROUP_KNOCKOUT_VALUE: GroupKnockoutTemplateValue = {
   advancePerGroup: 2,
   legs: 1,
   thirdPlace: false,
+  lowerBracket: false,
 };
 
 const SUPPORTED_KNOCKOUT_SIZES = [2, 4, 8, 16];
@@ -33,6 +35,9 @@ export function groupKnockoutShapeIssue(value: GroupKnockoutTemplateValue): stri
     return `결선에 올라가는 팀은 2·4·8·16팀이어야 해요. 지금은 ${size}팀이에요.`;
   }
   if (size === 2 && value.thirdPlace) return '결선이 결승 한 경기뿐이면 3·4위전을 만들 수 없어요.';
+  if (value.lowerBracket && value.advancePerGroup !== 2) return '상위·하위 결선은 조별 2팀 진출을 선택해 주세요.';
+  if (value.lowerBracket && ![2, 4, 8].includes(value.groupCount)) return '상위·하위 결선은 2·4·8개 조에서 만들 수 있어요.';
+  if (value.lowerBracket && value.teamsPerGroup < 4) return '상위·하위 결선은 조당 4팀 이상이 필요해요.';
   return null;
 }
 
@@ -56,10 +61,12 @@ export function GroupKnockoutFields({
   value,
   onChange,
   disabled = false,
+  allowLowerBracket = false,
 }: {
   value: GroupKnockoutTemplateValue;
   onChange: (next: GroupKnockoutTemplateValue) => void;
   disabled?: boolean;
+  allowLowerBracket?: boolean;
 }) {
   const id = useId();
   const issue = groupKnockoutShapeIssue(value);
@@ -126,6 +133,25 @@ export function GroupKnockoutFields({
           <p className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>결선이 결승 한 경기뿐이면 3·4위전을 만들 수 없어요.</p>
         ) : null}
       </div>
+
+      {allowLowerBracket ? (
+        <label htmlFor={`${id}-lower-bracket`} className="tm-text-label flex min-h-[44px] items-center gap-2" style={{ color: 'var(--text-strong)' }}>
+          <input
+            id={`${id}-lower-bracket`}
+            type="checkbox"
+            className="size-5"
+            checked={value.lowerBracket}
+            disabled={disabled}
+            onChange={(e) => onChange({ ...value, lowerBracket: e.target.checked })}
+          />
+          상위·하위 결선도 만들기
+        </label>
+      ) : null}
+      {allowLowerBracket ? (
+        <p className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>
+          각 조 1·2위는 상위 결선, 3·4위는 하위 결선에 참가해요.
+        </p>
+      ) : null}
 
       {issue !== null ? (
         <p role="alert" className="tm-text-caption" style={{ color: 'var(--red700)' }}>{issue}</p>

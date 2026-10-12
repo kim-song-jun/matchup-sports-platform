@@ -1,3 +1,7 @@
+## 2026-10-12 — 정규대회 상·하위 결선과 시상
+
+[작업 문서](../../.github/tasks/20261057-admin-bracket-canvas.md#2026-10-12-extension-정규대회-하나--상위하위-결선--시상-두-세트) · [실행 시나리오](./18-regular-tournament-split-finals.md). 하나의 대회에서 조 1·2위는 상위, 3·4위는 하위 결선으로 배정한다. 팀 시상 안내와 개인상 범위는 어드민이 설정한다. Backend521·Web224·스키마 바인딩7개 계약은 좁은 재실행을 포함해 통과했다. 독립 Sol static review critical0. 변경 후 alpha/3폭 QA와 실제 DB 적용은 아직 미실행이며 전체 완료를 의미하지 않는다.
+
 ## 2026-10-05 — Android Alpha QA 후속 수정
 
 [Task 156](../../.github/tasks/156-android-app-fcm-foundation.md#android-alpha-physical-qa-and-fixes--2026-10-05) · [Android 실행 기록](./android-device-ui-audit.md#2026-10-05--latest-alpha-continuation-and-android-fixes): 최신 Alpha 실기기 16화면·실제 FCM 3상태·권한/로그아웃·PDF 업로드 확인. TXT 선택 제한, 한글 다운로드 표시명, 회전 inset 초기화 오류 수정안과 회귀 11+2 통과. 수정 APK 빌드·실기기 after QA 및 dev 반영 대기. 전체 기능/모든 라우트 통과를 의미하지 않는다.

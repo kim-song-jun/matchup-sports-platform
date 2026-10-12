@@ -168,6 +168,35 @@ describe('ResultsPageContent — 우승팀 없는 완료 대회의 경기 영상
   });
 });
 
+it('분리 결선이 끝나면 상위·하위 결승 우승자를 각각 공개한다', () => {
+  const trackedGroup = (id: string, bracketTrack: 'upper' | 'lower') => ({
+    id, name: `${bracketTrack} 결선`, phase: 'final', sortOrder: 0, advanceCount: null, groupTeams: [], standings: [], qualification: null, bracketTrack,
+  }) as unknown as V1TournamentGroup;
+  const trackedFinal = (id: string, groupId: string, home: string, away: string, homeScore: number, awayScore: number) => ({
+    ...leagueFixtureWithVideo(),
+    id,
+    groupId,
+    round: 'final',
+    homeTeamName: home,
+    awayTeamName: away,
+    result: { ...leagueFixtureWithVideo().result!, homeScore, awayScore, goals: [] },
+    videos: [],
+  });
+  const tournament = baseTournament({
+    format: 'group_knockout',
+    groups: [trackedGroup('upper-final', 'upper'), trackedGroup('lower-final', 'lower')],
+    fixtures: [
+      trackedFinal('upper-final-fixture', 'upper-final', '상위 우승팀', '상위 준우승팀', 2, 0),
+      trackedFinal('lower-final-fixture', 'lower-final', '하위 우승팀', '하위 준우승팀', 1, 0),
+    ],
+  });
+
+  render(<ResultsPageContent tournament={tournament} />);
+
+  expect(screen.getByRole('region', { name: '상위 결선 결과' })).toHaveTextContent('상위 우승팀');
+  expect(screen.getByRole('region', { name: '하위 결선 결과' })).toHaveTextContent('하위 우승팀');
+});
+
 /**
  * 완료된 리그 방식(format='league') 대회의 최종결과 회귀 테스트. 이 화면은 원래
  * knockout 전용 'final'/'결승' 라운드 픽스처만 보고 우승팀·최종 순위를 계산해

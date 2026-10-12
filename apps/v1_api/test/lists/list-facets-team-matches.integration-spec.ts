@@ -3,6 +3,7 @@ import type { INestApplication } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 import request = require('supertest');
 import { PrismaService } from '../../src/prisma/prisma.service';
+import { ManagedTermsRuntimeService } from '../../src/terms/managed-terms-runtime.service';
 import { createV1IntegrationApp } from '../integration/integration-app';
 import { KST_TODAY_FIXTURE_TIMEOUT_MS, startAtLaterTodayKst } from './kst-today-fixture';
 
@@ -35,6 +36,12 @@ describe('팀 매치 목록 totalCount·facets HTTP/DB 계약', () => {
     ({ app, cleanup } = await createV1IntegrationApp());
     db = app.get(PrismaService);
     await db.v1User.create({ data: { id: host, email: `${host}@integration.test`, accountStatus: 'active', onboardingStatus: 'completed' } });
+    const termsService = app.get(ManagedTermsRuntimeService);
+    const currentSignupTerms = await termsService.currentSignupTerms();
+    const requiredDocumentIds = currentSignupTerms.items
+      .filter((item) => item.requirement === 'required')
+      .map((item) => item.documentId);
+    await termsService.acceptSignupTerms(host, requiredDocumentIds);
     sportA = (await db.v1Sport.create({ data: { code: `facet-a-${host}`, name: '풋살' } })).id;
     sportB = (await db.v1Sport.create({ data: { code: `facet-b-${host}`, name: '러닝' } })).id;
     regionId = (await db.v1Region.create({ data: { code: `facet-${host}`, name: '건수 지역', level: 2 } })).id;
@@ -58,6 +65,7 @@ describe('팀 매치 목록 totalCount·facets HTTP/DB 계약', () => {
   afterAll(async () => {
     await db.v1TeamMatch.deleteMany({ where: { createdByUserId: host } });
     await db.v1Team.delete({ where: { id: teamId } });
+    await db.v1ManagedTermsConsentEvent.deleteMany({ where: { userId: host } });
     await db.v1User.delete({ where: { id: host } });
     await db.v1Region.delete({ where: { id: regionId } });
     await db.v1Sport.deleteMany({ where: { id: { in: [sportA, sportB] } } });

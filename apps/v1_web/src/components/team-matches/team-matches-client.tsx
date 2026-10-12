@@ -216,7 +216,9 @@ export function TeamMatchListPageClient({ seed }: { readonly seed?: CursorListSe
       const queriesByHash = new Map(
         queryClient.getQueryCache().findAll({ queryKey: v1Keys.teamMatchesAll() }).map((cachedQuery) => [cachedQuery.queryHash, cachedQuery]),
       );
-      const trackedPreviousIds = new Set<string>();
+      const refreshedPageByItemId = new Map<string, boolean>();
+      const failedPageItemsById = new Map<string, V1TeamMatch>();
+      const successfulPages: TeamMatchPageData[] = [];
       const currentPageIds = new Set(currentPageData.items.map((item) => item.teamMatchId ?? item.id));
       const refreshedAccumulated: V1TeamMatch[] = [];
       const accumulatedIds = new Set<string>();
@@ -225,19 +227,38 @@ export function TeamMatchListPageClient({ seed }: { readonly seed?: CursorListSe
         const refreshedData = cachedQuery?.state.data;
         const refreshedSuccessfully = refetchResults[index]?.status === 'fulfilled' && isTeamMatchPageData(refreshedData);
         const pageData = refreshedSuccessfully && isTeamMatchPageData(refreshedData) ? refreshedData : snapshot.data;
-        for (const item of snapshot.data.items) trackedPreviousIds.add(item.teamMatchId ?? item.id);
+        for (const item of snapshot.data.items) {
+          const id = item.teamMatchId ?? item.id;
+          if (!refreshedPageByItemId.has(id)) refreshedPageByItemId.set(id, refreshedSuccessfully);
+          if (!refreshedSuccessfully && !failedPageItemsById.has(id)) failedPageItemsById.set(id, item);
+        }
+        if (refreshedSuccessfully) successfulPages.push(pageData);
+      }
+      const successfulItemsById = new Map<string, V1TeamMatch>();
+      for (const pageData of successfulPages) {
         for (const item of pageData.items) {
           const id = item.teamMatchId ?? item.id;
-          if (!ids.has(id) && !refreshedSuccessfully) continue;
-          if (!currentPageIds.has(id) && !accumulatedIds.has(id)) {
-            refreshedAccumulated.push(item);
-            accumulatedIds.add(id);
-          }
+          if (!successfulItemsById.has(id)) successfulItemsById.set(id, item);
         }
       }
       for (const item of accumulated) {
         const id = item.teamMatchId ?? item.id;
-        if (!trackedPreviousIds.has(id) && !currentPageIds.has(id) && !accumulatedIds.has(id)) {
+        if (currentPageIds.has(id) || accumulatedIds.has(id)) continue;
+        const refreshedItem = successfulItemsById.get(id);
+        if (refreshedItem) {
+          refreshedAccumulated.push(refreshedItem);
+        } else if (failedPageItemsById.has(id)) {
+          refreshedAccumulated.push(failedPageItemsById.get(id)!);
+        } else {
+          if (refreshedPageByItemId.get(id)) continue;
+          refreshedAccumulated.push(item);
+        }
+        accumulatedIds.add(id);
+      }
+      for (const pageData of successfulPages) {
+        for (const item of pageData.items) {
+          const id = item.teamMatchId ?? item.id;
+          if (ids.has(id) || currentPageIds.has(id) || accumulatedIds.has(id)) continue;
           refreshedAccumulated.push(item);
           accumulatedIds.add(id);
         }

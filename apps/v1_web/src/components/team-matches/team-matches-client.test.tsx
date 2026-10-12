@@ -1643,6 +1643,50 @@ describe('TeamMatchListPageClient — 커서 페이지네이션 누적', () => {
     expect(screen.getByTestId('team-match-order')).toHaveTextContent('현재 추천 경기');
   });
 
+  it('성공 갱신에서 다른 이전 페이지로 이동한 카드도 기존 누적 순서로 유지한다', async () => {
+    searchParamsRef.current = new URLSearchParams('sort=recommended');
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const removedItem = { id: 'tm-removed-from-loaded-pages', teamMatchId: 'tm-removed-from-loaded-pages', title: '사라진 카드', sportName: '풋살', startsAt: '2026-09-01T10:00:00.000Z', status: 'recruiting' as const };
+    const movedItem = { id: 'tm-moved-between-pages', teamMatchId: 'tm-moved-between-pages', title: '이동 카드 이전 응답', sportName: '풋살', startsAt: '2026-09-01T10:00:00.000Z', status: 'recruiting' as const };
+    const pageTwoB = { id: 'tm-page-two-b', teamMatchId: 'tm-page-two-b', title: '페이지2 B', sportName: '풋살', startsAt: '2026-09-01T10:00:00.000Z', status: 'recruiting' as const };
+    const pageTwoD = { id: 'tm-page-two-d', teamMatchId: 'tm-page-two-d', title: '페이지2 D', sportName: '풋살', startsAt: '2026-09-01T10:00:00.000Z', status: 'recruiting' as const };
+    const movedItemRefreshed = { ...movedItem, title: '이동 카드 최신 응답', status: 'closed' as const, displayState: 'closed' as const };
+    client.setQueryDefaults(v1Keys.teamMatchesAll(), {
+      queryFn: async ({ queryKey }) => {
+        const filters = queryKey[2] as { cursor?: string };
+        if (filters.cursor === 'cursor-page-2') {
+          return { items: [pageTwoD, movedItemRefreshed, pageTwoB], nextCursor: null, pageInfo: { nextCursor: null, hasNext: false } };
+        }
+        return { items: [], nextCursor: null, pageInfo: { nextCursor: null, hasNext: false } };
+      },
+    });
+    client.setQueryData(v1Keys.teamMatches({ sort: 'recommended' }), {
+      items: [movedItem, removedItem], nextCursor: 'cursor-page-2', pageInfo: { nextCursor: 'cursor-page-2', hasNext: true },
+    });
+    client.setQueryData(v1Keys.teamMatches({ sort: 'recommended', cursor: 'cursor-page-2' }), {
+      items: [pageTwoB, pageTwoD], nextCursor: 'cursor-page-3', pageInfo: { nextCursor: 'cursor-page-3', hasNext: true },
+    });
+    client.setQueryData(v1Keys.teamMatches({ sort: 'recommended', cursor: 'cursor-page-3' }), {
+      items: [{ id: 'tm-current-moved', teamMatchId: 'tm-current-moved', title: '현재 추천 경기', sportName: '풋살', startsAt: '2026-09-01T10:00:00.000Z', status: 'recruiting' }],
+      nextCursor: null, pageInfo: { nextCursor: null, hasNext: false },
+    });
+    client.setQueryData([...v1Keys.teamMatchesAll(), 'pagination', '{"sort":"recommended"}'], {
+      cursor: 'cursor-page-3', accumulated: [removedItem, movedItem, pageTwoB, pageTwoD],
+    });
+    client.setQueryData([...v1Keys.teamMatchesAll(), 'pagination', '{"sort":"recommended"}', 'loaded-page-cursors'], ['cursor-page-2']);
+    useV1TeamMatchesMock.mockImplementation(() => ({
+      ...page([{ id: 'tm-current-moved', title: '현재 추천 경기' }], null), dataUpdatedAt: 1, isSuccess: true, isPlaceholderData: false,
+    }));
+
+    renderTestingLibrary(<TeamMatchListPageClient />, {
+      wrapper: ({ children }) => <QueryClientProvider client={client}>{children}</QueryClientProvider>,
+    });
+
+    await waitFor(() => expect(screen.getByTestId('team-match-order')).toHaveTextContent('이동 카드 최신 응답|페이지2 B|페이지2 D|현재 추천 경기'));
+    expect(screen.getByTestId('team-match-order')).not.toHaveTextContent('사라진 카드');
+    expect(screen.getByTestId('team-match-states')).toHaveTextContent('closed|open|open|open');
+  });
+
   it('종목을 선택해도 종목별 숫자에 선택된 종목의 별도 페이지를 섞지 않는다', () => {
     searchParamsRef.current = new URLSearchParams('sportId=futsal-id');
     useV1TeamMatchesMock.mockImplementation((filters?: { sportId?: string }, options?: { enabled?: boolean }) => {

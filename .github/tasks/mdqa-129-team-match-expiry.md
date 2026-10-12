@@ -49,6 +49,7 @@
 - [ ] 실제 DB·HTTP 요청으로 마감 경계에 도달한 모집과 이미 시작된 만료 모집을 `closed` 목록·상세에서 확인해야 해요. 테스트를 작성했고 CI 실행을 기다려요.
 - [ ] 두 모집이 `recruiting`, 모집 가능, 추천순 결과에서 제외되는지 CI에서 확인해야 해요.
 - [x] 내 팀매치 `recruiting` 필터가 raw 상태도 recruiting인 항목만 반환하고, 저장된 closed·cancelled 항목을 제외하는 DB 대조군을 추가했어요.
+- [ ] CI run 38236166629에서 위 HTTP 요청이 403을 반환했어요. 로그에는 응답 body/code가 없어요. `/me/team-matches`의 유일한 route guard는 `V1AuthGuard`이고 fixture 계정은 active/completed이며 GET은 휴대폰 인증 게이트 허용 경로예요. 필수 약관 동의 기록이 빠진 host fixture가 `signupCompliance`를 막았다고 guard 소스에서 좁혀, 공식 `ManagedTermsRuntimeService`로 필수 문서에 동의시키고 cleanup에서 consent event를 삭제하게 했어요. 서비스 gate는 우회하지 않았고 CI 재실행에서 200 확인이 남아 있어요.
 - [ ] 통합 테스트는 CI에서 실행해요. 로컬에서는 실행하지 않았어요.
 
 ### 화면 조회 갱신 테스트
@@ -84,4 +85,5 @@ API Luna는 팀매치 서비스·단위 테스트·목록 통합 테스트, 팀�
 - 실제 Prisma·서비스를 사용하는 승인/마감 경합 통합 테스트를 `team-match-schedule-link.integration-spec.ts`에 추가했어요. 확정 상대팀과 신청·로그를 보존하고 마감 알림을 보내지 않는지 검증하며, 실행은 CI에 맡겨요. 독립 gpt-6-sol 리뷰의 테스트 실패 시 정리 누락을 수정해 제한 시간과 barrier·트랜잭션·spy 정리를 보완했고, 재리뷰는 잔여 P1/P2 없이 PASS예요.
 - PR #1862 2차 독립 리뷰에서 `myTeamMatches(recruiting)`의 terminal 상태 혼입, 성공적으로 다시 받은 이전 페이지에서 사라진 항목이 누적 카드에 남는 문제, `startAt === now` 재개 경계 불일치를 발견했어요. raw recruiting 조건과 closed/cancelled DB 대조군, 성공한 페이지 응답의 실제 membership으로 누적 목록을 재구성하는 회귀, `startAt <= now` 재개 거절 및 상세 capability 경계를 반영했어요. API/Web 회귀와 통합 테스트 파일 타입 검증은 worker 1로 최소 실행하고, DB 통합 자체는 CI에서 확인해요.
 - 추가 Sol P2는 페이지 갱신이 반환한 새 `nextCursor`를 따라 이전 페이지를 찾으면서, 첫 페이지의 커서가 사라지면 이미 누적된 두 번째 페이지를 더는 조회하지 못하고 만료 카드가 남는 경우예요. 팀매치 화면은 실제 로드한 cursor 키를 별도 pagination metadata로 보존해 이전 페이지별 성공·실패를 처리하도록 수정했고, 첫 페이지 커서 제거·두 번째 페이지 실패 보존·다음 성공 제거 및 요청 cursor/outcome을 검사하는 UI 테스트를 추가했어요. `loadedPageCursorsKey`와 효과의 filter dependency를 각각 snapshot key와 직렬화한 `teamMatchFiltersKey`에 고정해 불필요한 렌더별 재요청을 막아요. 회귀 테스트는 임의 rerender에서 추가 fetch 없음, page2 rejected 요청 뒤 카드 보존, `dataUpdatedAt` 증가 후 page2 resolved 요청과 카드 제거를 확인했어요(단일 파일 1 passed, 91 skipped, worker 1). 독립 Sol 최종 리뷰는 PASS예요.
+- 새 CI 결과에서 pagination-history 순서 계약이 깨지는 회귀를 확인했어요. 이전 페이지 최신 응답의 배열 순서로 누적 목록을 재구성해 기존 첫 페이지의 정렬 위치가 바뀌었어요. 기존 누적 순서를 유지하면서 성공 응답의 같은 ID 항목만 최신 객체로 교체하고, membership에서 사라진 ID를 제거하며, 실패 페이지는 보존하고 새 항목은 기존 누적 뒤에 추가하도록 수정했어요. CI 실패를 좁은 단일 테스트에서 재현한 뒤 history 순서 + 마감 상태 최신화 + 페이지 cursor retry 성공·실패 회귀가 3 passed, 116 skipped로 통과했어요(두 파일, worker 1). 독립 Sol 최종 코드는 PASS예요.
 - 이번 서비스 수정 후 API `tsc --noEmit`, `v1-surface-check`를 직렬 실행해 둘 다 exit 0을 확인했어요(감독 PID 86896, tsc PID 87248, surface PID 90891). API tsconfig는 통합 테스트 경로를 포함하지 않으므로 이 결과를 통합 파일의 타입 검증으로 세지 않았어요. 최종 통합 파일 하나를 TypeScript rootNames로 지정한 noEmit 검증에서 diagnostics 0·exit 0을 확인했어요(감독 PID 10466, Node PID 10490). 해당 프로세스는 종료됐어요. 실제 DB 실행과 현재 head CI는 남아 있어요.

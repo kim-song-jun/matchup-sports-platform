@@ -1,5 +1,15 @@
 # v1_web
 
+## 1.7.0
+
+### Patch Changes
+
+- 7d8260f: Resync the chat room list and the open room's messages on every socket connect, first connect included, because events sent before the join are never replayed. Queries that ended in a permanent 4xx error are not refetched on connect, reconnect or tab return; transient failures (network, 408, 429, 5xx) are retried on recovery.
+- 1034e35: 카카오가 제공한 연락처의 중복 인증을 생략하고, 확인된 기존 회원 정보와 일치하면 같은 계정에 카카오 로그인을 연결합니다. 생년월일 자동 입력과 개인정보 수집 안내를 함께 반영합니다.
+- 83a196a: Separate the Kakao login JavaScript key from Maps settings so map migration and alpha test-app configuration cannot change the login application.
+- 8402952: 팀·개인 매치·팀 매치 목록 첫 페이지가 필터가 적용된 전체 건수(pageInfo.totalCount)와 종목별 건수(facets.sports)를 내려줘요. 매치 목록은 오늘(today)·모집 중(recruitingOnly) 필터와 각 건수(facets.today·recruiting)도 지원해요. 팀 목록의 pageInfo.total 은 totalCount 로 이름이 바뀌었어요.
+- c63172f: 카카오 로그인이 카카오톡 앱으로 바로 이어져요. 앱에서는 카카오 네이티브 로그인을, 웹에서는 카카오톡 로그인을 먼저 쓰고, 쓸 수 없으면 기존 카카오 로그인 화면으로 넘어가요.
+
 ## 1.6.9
 
 ### Patch Changes

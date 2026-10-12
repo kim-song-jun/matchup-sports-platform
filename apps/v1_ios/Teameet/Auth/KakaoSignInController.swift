@@ -19,6 +19,13 @@ final class KakaoSignInController {
 
     private var inFlight = false
 
+    // The SDK's mutable OAuthToken is not Sendable. Copy only the immutable values
+    // needed by this flow before resuming across the callback/actor boundary.
+    private struct Credentials: Sendable {
+        let accessToken: String
+        let scopes: [String]
+    }
+
     /// Only call when `AppConfig.isKakaoSignInConfigured`; the SDK throws on a missing key.
     func signIn(scopes: [String] = []) async throws -> String {
         // A second login while one is up would strand the first callback.
@@ -27,11 +34,11 @@ final class KakaoSignInController {
         defer { inFlight = false }
 
         let token = try await authenticate()
-        let missing = KakaoSignInPolicy.additionalScopes(requested: scopes, granted: token.scopes ?? [])
+        let missing = KakaoSignInPolicy.additionalScopes(requested: scopes, granted: token.scopes)
         guard !missing.isEmpty else { return token.accessToken }
         // One additional-consent request. A successful response may omit optional items
         // the reader declined; it still completes sign-in without prompting again.
-        let consented = try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<OAuthToken, Error>) in
+        let consented = try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Credentials, Error>) in
             UserApi.shared.loginWithKakaoAccount(scopes: missing) { token, error in
                 continuation.resume(with: Self.result(token: token, error: error))
             }
@@ -39,7 +46,7 @@ final class KakaoSignInController {
         return consented.accessToken
     }
 
-    private func authenticate() async throws -> OAuthToken {
+    private func authenticate() async throws -> Credentials {
         if UserApi.isKakaoTalkLoginAvailable() {
             do {
                 return try await loginWithKakaoTalk()
@@ -55,7 +62,7 @@ final class KakaoSignInController {
         return try await loginWithKakaoAccount()
     }
 
-    private func loginWithKakaoTalk() async throws -> OAuthToken {
+    private func loginWithKakaoTalk() async throws -> Credentials {
         try await withCheckedThrowingContinuation { continuation in
             // Custom scheme rather than the default universal link, which would need an
             // association file for the Kakao domain.
@@ -65,7 +72,7 @@ final class KakaoSignInController {
         }
     }
 
-    private func loginWithKakaoAccount() async throws -> OAuthToken {
+    private func loginWithKakaoAccount() async throws -> Credentials {
         try await withCheckedThrowingContinuation { continuation in
             UserApi.shared.loginWithKakaoAccount { token, error in
                 continuation.resume(with: Self.result(token: token, error: error))
@@ -73,7 +80,7 @@ final class KakaoSignInController {
         }
     }
 
-    private nonisolated static func result(token: OAuthToken?, error: Error?) -> Result<OAuthToken, Error> {
+    private nonisolated static func result(token: OAuthToken?, error: Error?) -> Result<Credentials, Error> {
         if let error {
             if let sdkError = error as? SdkError, sdkError.isClientFailed,
                sdkError.getClientError().reason == .Cancelled {
@@ -82,7 +89,7 @@ final class KakaoSignInController {
             return .failure(Failure.failed(error.localizedDescription))
         }
         guard let token, !token.accessToken.isEmpty else { return .failure(Failure.missingAccessToken) }
-        return .success(token)
+        return .success(Credentials(accessToken: token.accessToken, scopes: token.scopes ?? []))
     }
 
     /// Whether a URL is the KakaoTalk handoff coming back, and if so lets the SDK finish it.

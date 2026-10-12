@@ -61,10 +61,12 @@ export function GroupKnockoutFields({
   value,
   onChange,
   disabled = false,
+  lockShape = false,
 }: {
   value: GroupKnockoutTemplateValue;
   onChange: (next: GroupKnockoutTemplateValue) => void;
   disabled?: boolean;
+  lockShape?: boolean;
 }) {
   const id = useId();
   const issue = groupKnockoutShapeIssue(value);
@@ -87,13 +89,13 @@ export function GroupKnockoutFields({
       <div className="grid grid-cols-2 gap-3">
         <div className="flex flex-col gap-1">
           <label htmlFor={`${id}-groups`} className={LABEL_CLASS} style={{ color: 'var(--text-strong)' }}>조 수</label>
-          <select id={`${id}-groups`} className={SELECT_CLASS} value={value.groupCount} disabled={disabled || value.qualificationMode === 'cross_group_round12'} onChange={(e) => numberField('groupCount', e)}>
+          <select id={`${id}-groups`} className={SELECT_CLASS} value={value.groupCount} disabled={disabled || lockShape || value.qualificationMode === 'cross_group_round12'} onChange={(e) => numberField('groupCount', e)}>
             {range(2, 8).map((n) => <option key={n} value={n}>{n}개 조</option>)}
           </select>
         </div>
         <div className="flex flex-col gap-1">
           <label htmlFor={`${id}-teams`} className={LABEL_CLASS} style={{ color: 'var(--text-strong)' }}>조당 팀 수</label>
-          <select id={`${id}-teams`} className={SELECT_CLASS} value={value.teamsPerGroup} disabled={disabled || value.qualificationMode === 'cross_group_round12'} onChange={(e) => numberField('teamsPerGroup', e)}>
+          <select id={`${id}-teams`} className={SELECT_CLASS} value={value.teamsPerGroup} disabled={disabled || lockShape || value.qualificationMode === 'cross_group_round12'} onChange={(e) => numberField('teamsPerGroup', e)}>
             {range(3, 6).map((n) => <option key={n} value={n}>{n}팀</option>)}
           </select>
         </div>

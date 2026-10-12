@@ -126,6 +126,7 @@ A안은 데스크톱 큰 팝업, 모바일 전체 높이 다이얼로그로 한�
 - Web 타입 검사: 변경 파일 오류 없음, 선재 `use-v1-api.leave-team.test.tsx:42,65`의 mutate 무인자 호출 오류 2개로 전체 타입 검사는 실패. 이번 범위에서 관련 없는 테스트는 변경하지 않았다. Web 패턴 검사 통과.
 - 2026-10-12 Alpha 배포 요청: 최신 dev 37a06cea0과 동일 base 확인. 로컬 TanStack 5.91→lockfile 5.102.8 일치 후 기존 leave-team 타입 오류 2개가 사라졌다. 신규 테스트 role query의 지원하지 않는 exact 옵션을 앵커 정규식으로 수정했다. 수정 후 Web 전체 타입 검사 0, 배포 전 신규 HTTP/선정 회귀 재확인 및 dev PR 진행.
 - 배포 진행: 구현 커밋 `332fa2efb`를 push하고 dev 대상 [PR #1855](https://github.com/kim-song-jun/matchup-sports-platform/pull/1855)를 생성했다. 웹/Gates CI 통과, API 전체 통합 1,167개 중 정규 리그 무작위 배정 2개 실패를 확인했다. `regular_league`에도 group_knockout format이 저장될 수 있으므로 조별 ENTRY 제한은 대회 kind에만 적용하도록 수정했다. 최신 dev `7570bd809`를 기능 브랜치에 merge했다. 새 임시 DB에 전체 migration + CI competition-config backfill을 적용하고 기존 리그 11 + 신규 12강 3 = **14/14 통과**(108.906초). 첫 로컬 재검증은 기존 임시 DB 데이터·미완료 초기화 때문에 실패해 새 DB로 교정했으며 통과 증거로 계산하지 않는다. CI 재확인 중이고 Copilot 요청 2회에도 리뷰는 아직 0건이다.
+- 2026-10-12 배포 승인: 사용자에게 Copilot 리뷰 미도착 상태와 정본 게이트를 설명했고 이번 PR의 예외 진행 승인을 받았다(“진행해줘”, 이후 대회 범위 재확인 후 “오케이 배포 해줘”). API/Web/Gates CI `38215920209` 모두 PASS. 이후 dev의 템플릿 편집 PR #1853 병합으로 충돌이 생겨 최신 dev `c97fe65a5`를 반영했다. 두 작업의 task 기록·경기 생성 후 편집·조별 슬롯 제한을 모두 유지하고 팀 수 기반 생성 UI에 20팀·5조·12강 프리셋을 연결했다. 수정 후 영향 웹 5개 파일 **113/113 PASS**, 웹 전체 타입 검사 PASS. 새 CI 확인 후 dev 병합·Alpha 배포 진행.
 - 미실행: Alpha 로그인 후 실제 관리자/공개 화면 QA **0/3 폭**, 실제 대회 데이터 편성, dev 병합 및 해당 기능 Alpha 배포. 기존 Alpha 배포 성공은 이 기능 반영의 근거가 아니다.
 - 브라우저: 초기 libnspr4/libnss3/libasound2 누락을 /tmp 추출 라이브러리로 해결했다(시스템 설치 없음). headed 합성 컴포넌트 **390/768/1440 3/3 PASS**, 각 폭 템플릿·팝업 상단·배정 하단 3장, 가로 overflow0·JS/console/network 오류0. 본문 스크롤과 저장 버튼 영역 분리, desktop 비교표 3열 확인. 실제 Alpha에서는 로그인 이동/auth/me401 확인, 기능 검증은 0/3이다. 변경 전 기능 화면은 인증 없어서 확보하지 못했다. 브라우저 트리는 모두 종료했고 임시 PostgreSQL도 `pg_ctl stop -m fast`로 종료했다.
 - 결정은 `docs/design/competition-canonical-flow.md` §6에 반영했다. API README/global/domain 및 변경 기록을 함께 갱신했다.
@@ -141,6 +142,62 @@ A안은 데스크톱 큰 팝업, 모바일 전체 높이 다이얼로그로 한�
 - [합성 화면 측정](../../docs/screenshots/round12-list/evidence.json), [Alpha 읽기 전용 접근 기록](../../docs/screenshots/round12-list/alpha-readonly.json), [로그인 이동 화면](../../docs/screenshots/round12-list/alpha-before-access.png).
 - 명령: 현재 컴포넌트 esbuild 번들 + Tailwind compile + 임시 정적 서버(Next 서버 아님), Playwright `chromium.launch({ headless: false })`. 합성 20팀은 `src/test/msw/cross-group-round12-fixture.ts` 사용. PID/PPID 기록: 최종 정적 QA Node13088→Chrome13216, Alpha Node12871→Chrome12893. 모두 finally browser.close/server.close 후 종료.
 - 남은 배포 후 시나리오: 관리자 목록에서 실제 전체 생성→20팀 편성→공식 결과→추천/동률/교환/저장→공개 대진·진출 표시를 3폭에서 확인. 이번 범위의 완료 상태는 코드·로컬 계약 검증까지다.
+
+## 2026-10-12 추가 요청 — A + C 선택
+
+Status (추가 요청): In Progress — dev PR #1853 정확한 head CI 통과, 마지막 진출 연결 선택 검토 보완·alpha 대기.
+
+- 사용자 요청: 첨부 운영자 피드백의 대회·리그 템플릿을 다듬어 dev 대상 PR과 alpha 테스트까지 진행.
+- 원문 피드백: 12강 지원이 불명확하고, 템플릿과 수기 입력이 잘 이어지지 않으며 수정·삭제가 번거롭다. 기능 제거 의견은 첨부 대화의 제안이며 사용자 확정 요구로 취급하지 않는다.
+- 사용자 결정: "A + C 로 가는게 좋겠네." 기존 그림 편집 유지 + 참가 팀 수부터 가능한 구성 안내 + 생성 뒤 수기 경기와 동일한 편집 흐름.
+- 현재 근거: HEAD/origin/dev/alpha `a4b7c2d78` 일치. 단독 토너먼트 4·8·12·16팀, 12팀 선택 시 4팀 부전승 안내·경기 수 표시를 실제 alpha에서 확인. 이번 조사에서 생성·저장하지 않음. 조별 이후 결선은 2·4·8·16팀 지원.
+- 설계 비교: 로컬 의사결정 목업 A(그림 편집 통합), B(수기 목록 우선), C(팀 수부터 안내)를 작성한 뒤 사용자 A+C 선택. 제품 코드에 목업 파일을 포함하지 않는다.
+
+### Owned / Forbidden scope
+
+- 구현: `apps/v1_web/src/components/admin/bracket-canvas/`, 관련 `apps/v1_web/src/lib/bracket-template-*`, 대회 `bracket-tab.tsx`, 정규 리그 대진 편집·템플릿 화면 및 관련 좁은 테스트.
+- root: 이 task 추가 요청 절, changeset, PR·CI·alpha 증거.
+- Forbidden: Prisma·DB migration, production, 새로운 임의 팀 수 지원·조별 뒤 12팀 결선 확대, 템플릿 제거, 다른 도메인·다른 세션 WIP.
+- 구현/검증은 각각 Luna/Sol 순차 위임. 서브에이전트 self-commit·push·merge·테스트 병렬 fan-out 금지.
+
+### Acceptance Criteria
+
+- [x] A·B·C 3안 및 추천안 → 사용자 A+C 선택.
+- [ ] 참가 팀 수를 먼저 입력하고 해당 대회 진행 방식에 맞는 실제 지원 구성과 경기·단계 미리보기를 제공한다. 등록 팀 수를 유효하게 활용하고 지원하지 않는 조합은 이유를 명시한다.
+- [ ] 템플릿 생성 경기와 수기로 만든 경기의 팀·일정·진출 연결 편집 동선이 이어진다. 목록 편집도 slot/source 계약을 우회하지 않는다.
+- [ ] 생성/수기 추가 성공 뒤 해당 경기 편집으로 이어지고, 삭제 영향·기록 보호 이유를 확인할 수 있다. 실패를 성공으로 표시하지 않는다.
+- [x] 정규 리그도 참가 팀 수·라운드·경기 수 안내와 생성 후 편집 흐름을 유지한다.
+- [ ] 기존 권한·공개 대진·결과·전적·알림 API 계약을 유지한다.
+- [ ] 최소 계약 테스트·범위 lint/typecheck, dev 대상 PR의 정확한 SHA CI·독립 리뷰.
+- [ ] alpha 배포 SHA 확인 후 대회/정규 리그와 390·768·1440px 실제 흐름·스크린샷 검증. 테스트 데이터 변경 범위를 증거로 남긴다.
+
+### Progress Snapshot
+
+1. 컨텍스트·최신 dev·alpha 기준 확인 완료. alpha space 326 재사용, 사용자의 운영자 직접 로그인 후 `/admin/me` 200 확인.
+2. A+C 구현 완료. Luna 구현 → Sol 독립 검토에서 임의 팀 수 올림 추천·양쪽 동일 팀 선택·모달 높이 문제를 수정 → Sol 정적 재검토 PASS. 템플릿/helper/목록 94개 중 93 PASS 후 마지막 오류 표시 테스트의 refetch mock을 실제 Promise 계약에 맞추고 관련 3개 PASS. 경기 패널 45개 PASS. `pnpm --filter v1_web lint`(tsc·v1 패턴 검사) PASS; PR·배포·변경 후 alpha PASS는 아직 없음.
+3. alpha 전용 QA 데이터: 비공개 대회 `1c7cb376-70cf-4532-a95d-3bf088bae1bb`(확정 12팀, 결과 없음), 정규 리그 `48603613-3382-4993-9106-34661ae74fa6`(4팀, 준비 상태). 기존 다른 QA 대회/리그는 조회만 했으며 변경하지 않음.
+4. 변경 전 1440px 템플릿 화면 캡처. 저장된 테스트 계정은 401이었으나 사용자 직접 로그인으로 해소. 준비 도중 다시 로그인 화면으로 전환되었으므로 배포 후 로그인 재개 필요. 자동화 selector 오기와 파일 경로 오기는 실제 snapshot/파일 목록으로 바로잡음. context-mode DTO 조회 타임아웃은 native 파일 조회로 대체.
+5. 종료 시 ego `finish({ keep: [] })`, 위임 에이전트 상태 확인/종료, 소유 프로세스 회수.
+6. 작업 중 alpha/dev가 `37a06cea0`으로 갱신됨. 이전 base 대비 릴리스 버전·changeset 소비·별도 task 문서만 변경되었고 이번 기능 소스와 충돌 없음. 공유 메인 작업트리에는 다른 세션 WIP가 있으므로 손대지 않음.
+7. dev PR [#1853](https://github.com/kim-song-jun/matchup-sports-platform/pull/1853), head `01f35f11e`. CI `38208150429` API/Gates PASS, Web FAIL: 전체 8,663개 중 14개가 기존 공개·행 액션 테스트 2개 파일의 새 slot 훅 QueryClient 계약 누락으로 실패. Copilot은 해당 head에서 open findings 0건이나 Codex inline 6건은 미해결.
+8. 보완 범위: 직접 입력 쪽의 참가팀 선택·hybrid 경기 쪽별 잠금, 이미 다른 경기에 쓰인 진출 연결 후보 제외, 모바일 리그 생성 후 편집 연결, 늦게 도착한 등록 팀 수·로딩/오류 처리, 12팀 부전승 진행 순서. Sol이 등록 팀 수 초기화 문제를 독립 재현해 이전 PASS를 supersede했고 Luna가 수정 중. 기능 완료·변경 후 alpha PASS로 보고하지 않는다.
+9. 6건 수정 후 Sol 정적 검토 PASS. 모바일은 해당 라운드도 선택하고, 같은 focus ID의 refetch에서는 닫힌 시트를 다시 열지 않음. Luna의 집중 실행 35개 중 33 PASS 후 모호한 alert·선택 chip 단언 2건을 실제 UI에 맞게 수정하고 해당 계약 PASS; CI 소비 테스트 14개 포함. 모바일 refetch 회귀는 새 rounds 배열로 강화한 단일 테스트 PASS. 소유 테스트 PID `86281`, `92241` 종료 확인. 신규 커밋 CI·배포·변경 후 실제 화면 검증은 아직 없음.
+10. 사용자 재로그인 뒤 `/admin/me` 200 확인. alpha는 아직 `37a06cea0` / `1.7.1-alpha.20261012.g37a06cea0f77`이며 변경 전 390·768px 증거를 추가 기록한다. 캐시 데이터가 있는 등록 목록의 refetch 실패 처리는 기존 stale-data 정책을 유지하고, 데이터 없는 pending/error만 템플릿 적용을 막는다.
+11. root 최종 lint 1회에서 group shape의 `legs`·`thirdPlace` 타입 누락 검출 → 기존 완전한 값에 shape를 병합하여 수정 → root `pnpm --filter v1_web lint` 재실행 PASS(tsc·패턴 검사). lint shell PID `17370` 실행 종료. 로컬 전체 suite는 반복하지 않고 새 PR head CI로 확인한다.
+12. head `932ee6992` CI `38213260004` API/Web/Gates 모두 PASS. 최신 Copilot 1건은 양쪽에 동일한 진출 출처를 선택할 수 있는 문제이며 v1 서버 거절 계약과 교차 확인해 패널·목록·수기 선택을 보완한다. 수정 뒤 새 head의 CI·Copilot을 다시 확인한다.
+13. 사용자 UI 표시 요청에 A/C 설계 미리보기를 메시지에 직접 표시했다. 실제 alpha after 증거로 취급하지 않는다. 다른 dev 변경 `7570bd809`의 계정 약관 배포로 space 326이 필수 약관 화면으로 이동하고 관리자 조회 403이 확인되어 계정 소유자에게 직접 동의 후 재개를 요청했다. 약관을 대신 수락하지 않는다.
+14. 마지막 Copilot 선택 오류를 공유 side-options helper로 패널·수기 연결·목록 모두 수정하고 중복 저장도 막았다. 서버의 `BRACKET_SOURCE_INVALID` 계약과 Sol 독립 정적 검토 PASS. 선택된 소비 테스트 2개 PASS; helper/panel 3개 PASS(잘못 구성한 테스트 입력 1개를 실제 계약에 맞게 정정한 뒤 좁게 재검증). root 최종 lint PASS. 소유 테스트 PID `20434`, `22329` 종료 확인; 로컬 전체 suite를 반복하지 않는다.
+15. head `2e6283559` 최신 Copilot inline 미해결 0건. CI `38216609886` Web은 8,677 PASS/7 FAIL: 새 목록 출처 테스트가 공유 조·경기 배열을 복구하지 않아 후속 테스트에 영향을 줬다. 해당 describe의 afterEach로 상태를 복구하고 단언은 유지했다. 좁은 bracket-tab 파일 40/40 PASS; 기존 started-team-change 테스트에서 React act 경고 1개가 있으므로 무경고 검증으로 보고하지 않는다. 테스트 PID `78004` 종료 확인. 제품 코드 변경은 없다.
+
+### Alpha 실행 계획 (아직 결과 아님)
+
+- 배포 SHA 확인 → 운영자 로그인 200 → 이번 작업 QA 리그 비공개 확인 후 진행한다.
+- 단독 12팀: 등록 팀 수 초기값·부전승 순서·경기 수 확인, 템플릿 교체 → 첫 경기 편집, 팀/일정 저장, 수기 경기 추가 → 해당 경기 편집, 수기 경기에서 슬롯에 배치된 팀 선택, 삭제 영향 확인.
+- 조별 후 결선·대회 리그: 이번 작업 전용 데이터로 12팀 조별 구성(2×6, 4×3)·진출 수와 리그 경기 수를 확인하고 생성·편집을 밟는다. 지원하지 않는 팀 수는 저장이 잠기는지 확인한다.
+- 정규 리그 4팀: 단/복수 라운드 경기 수, 생성 뒤 편집, 수기 추가 뒤 모바일 편집 시트 연결을 확인한다. 기존 모바일 화면에는 템플릿 생성 진입이 없어 그 동선을 실행했다고 보고하지 않는다.
+- 390·768·1440px: 데이터 로딩 후 동일 모달/편집 상태의 캡처, 본문 끝 스크롤, 마지막 입력·CTA 가림, console/network, 운영자·로그인 필요 상태를 기록한다.
+- 기존 대회·리그는 변경하지 않고, 생성한 QA 데이터는 비공개·결과 없는 상태로 남긴다. 종료 시 ego space 326과 소유 프로세스를 회수한다.
+
 
 Status: Review — 2026-10-10 구현 PR 18개 dev 머지(마지막 #1766 `da879b17a`), #1771 로 C3 정정 테스트 고정, alpha E2E 6회 모두 통과. 남은 것: 동률 조의 공개 순위표 진출 표시(결정 A 구현 `fix/bracket-tie-standings` — 머지·alpha 재확인 대기), PR별 갤러리 일부 미게시, Copilot clean 미확인(장애) — 끝나거나 면제되면 Done
 **Owner**: Planning(main) → backend-data-dev · backend-api-dev · frontend-data-dev · frontend-ui-dev

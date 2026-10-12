@@ -5,6 +5,34 @@ export const BRACKET_TEMPLATE_MAX_FIXTURES = 240;
 
 export type TemplatePlanCounts = { groups: number; slots: number; fixtures: number; edges: number };
 
+export type GroupKnockoutShape = {
+  groupCount: number;
+  teamsPerGroup: number;
+  advancePerGroup: 1 | 2;
+};
+
+/** Exact group layouts the server can build for a given registered participant count. */
+export function groupKnockoutShapes(teamCount: number): GroupKnockoutShape[] {
+  const shapes: GroupKnockoutShape[] = [];
+  for (let groupCount = 2; groupCount <= 8; groupCount += 1) {
+    for (let teamsPerGroup = 3; teamsPerGroup <= 6; teamsPerGroup += 1) {
+      if (groupCount * teamsPerGroup !== teamCount) continue;
+      for (const advancePerGroup of [2, 1] as const) {
+        const finalists = groupCount * advancePerGroup;
+        if ([2, 4, 8, 16].includes(finalists)) {
+          shapes.push({ groupCount, teamsPerGroup, advancePerGroup });
+        }
+      }
+    }
+  }
+  return shapes;
+}
+
+/** Return a knockout preset only when the participant count exactly matches an existing format. */
+export function recommendedKnockoutSize(teamCount: number): 4 | 8 | 12 | 16 | null {
+  return ([4, 8, 12, 16] as const).find((size) => size === teamCount) ?? null;
+}
+
 // 첫 라운드부터 결승까지 경기 수.
 const KNOCKOUT_ROUNDS: Readonly<Record<4 | 8 | 12 | 16, readonly number[]>> = {
   4: [2, 1],

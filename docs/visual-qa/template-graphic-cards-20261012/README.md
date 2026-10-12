@@ -1,6 +1,6 @@
 # S1 그래픽 템플릿 — alpha 실측
 
-Status: 검증 진행 중. 변경 후 alpha UI·저장 PASS로 취급하지 않는다.
+Status: 검증 진행 중. 변경 후 생성 화면·12팀 초안 저장은 확인했고, 4형식 대진 생성·편집/저장은 재인증 대기다.
 
 사용자 선택: 대회 생성에서 진행 방식을 고르고, 대진 관리에서는 현재 방식의 템플릿을 선택한다. 기존 대회의 format 전환은 하지 않는다. 생성의 네 번째 카드는 별도 정규 리그 생성 화면으로 이동한다.
 
@@ -48,6 +48,15 @@ alpha `89e7dcba577afdeaaf190393e4fe43f0d586a3aa`, release `1.8.0-alpha.20261012.
 
 ## 남은 검증과 재개 조건
 
-동일 공간326의 계정 소유자 로그인 확인 후 takeOver한다. 생성 2×2 카드·초안 이동 경고, 단독12팀·조별12팀·대회 리그4팀·정규 리그4팀의 선택→생성→첫 경기 편집/저장, 20→11→20 특수 프리셋 복구, 390/768/1440 실제 화면·스크롤·고정 CTA를 확인한다. 변경 후 after 이미지와 저장 결과는 아직 없다.
+### 변경 후 실제 확인 (alpha eb384)
+
+- 관리자 조회200 후 실제 생성 화면을 열어 desktop1440×1000 / tablet768×960 / mobile390×844에서 캡처했다. Desktop·tablet2×2, mobile1열이며 가로 넘침 없음. 고정 '다음' 버튼 높이44px. 스크롤 끝 캡처에서 마지막 성별 선택과 고정 CTA 사이 여백이 유지된다.
+- `desktop/after-create.png`, `tablet/after-create.png`, `tablet/after-create-bottom.png`, `mobile/after-create.png`, `mobile/after-create-bottom.png`. Sol이 실제5장과 대응 코드를 읽어 캡처 범위 PASS(BLOCK0/WARN0), 작은 SVG 보조 라벨은 FYI로 판단했다. 판정은 생성1단계 정지 화면에만 한정된다.
+- 새 입력의 정규 리그 링크 경고→계속 작성에서 대회명 보존→이동하기→실제 `/admin/league-matches/new` 도착 확인. 그 뒤 새 생성 화면에서 토너먼트만을 선택해 필수 값 입력→대회 만들기 POST201. 초안 `f24be679-642b-439b-81a3-ee631eb74502`는 format knockout/teamCount12/status draft, GET200의 scheduledAt `2026-11-02T09:00:00.000Z`; 생성 구간 Runtime exception0.
+- 신규 초안의 isPublic 기본값은 true다. 일반 update에 isPublic을 보낸 첫 요청은 DTO whitelist400이었다(저장 실패). source로 전용 `/visibility` 경로를 확인했다. 새로고침 후 저장된 초안의 미저장 입력 경고 문구도 실제 표시됐으나, 이어진 조회/visibility 요청 구간에 쿠키가 사라져401이 됐다. private flag 정리와 저장 초안 경고의 취소/이동 후 보존 확인은 재인증 뒤 진행한다. status draft는 유지했으며 접수/공개를 시작하지 않았다.
+- Luna의 읽기 전용 auth 진단: session cookie TTL7일, RequireAuth401은 localStorage 힌트만 삭제하고 cookie 삭제는 하지 않으며, 명시적 session 삭제는 logout/withdraw 경로다. 실제 cookie 소실의 직접 원인은 확인되지 않았다. 모니터 구간 auth events가 없었던 것은 전체 이탈 구간의 부재 증거가 아니다. 사용자에게 같은326의 이메일 로그인 화면을 다시 handOff했다.
+- 이후 guest HTTP의 alpha commit은 `f9d38b30686a3b4f316eee6423da7dfcd344c951`로 바뀌었다. 다른 PR #1866의 merge이며 첫 parent가 eb384이고 템플릿 파일 변경은 없다. 이 버전에서 신규 초안 detail404 `TOURNAMENT_NOT_FOUND`, 공개bracket404·data 없음으로 비공개 초안 게이트를 확인했다. 쿠키 이탈과 배포 사이의 인과관계는 확인되지 않았다.
+
+동일 공간326의 계정 소유자 로그인 확인 후 takeOver한다. 먼저 새 초안의 visibility false만 저장하고 나머지 값을 보존한다. 저장 초안 이동의 취소/확인, 단독12팀·조별12팀·대회 리그4팀·정규 리그4팀의 선택→생성→첫 경기 편집/저장, 20→11→20 특수 프리셋 복구, 템플릿 dialog390/768/1440 실제 화면·스크롤·고정 CTA를 확인한다. 대진 생성 후 after 이미지와 저장 결과는 아직 없다.
 
 현재 테스트·lint 소유 PID는 모두 종료했고 임시 node_modules 링크 2개를 정확한 target 확인 후 제거했다. Node exact-command 기준 시작198/현재225이며, 동일 signature의54벌 증가는 없고 다른 세션 프로세스는 종료하지 않았다. 테스트/dev server/Docker를 추가로 띄우지 않았다. ego326은 사용자 로그인 제어 중이므로 유지하며 최종 실제 QA 종료 후 `finish({ keep: [] })`한다.

@@ -23,6 +23,20 @@ describe('MSW /team-matches 모집 중 칩', () => {
 
   afterEach(() => vi.useRealTimers());
 
+  it.each(['sport-without-matches', 'sport-futsal'])('/matches applies %s to rows and toggle counts but keeps other sport facets', async (sportId) => {
+    vi.useFakeTimers({ toFake: ['Date'], now: new Date('2026-05-18T16:00:00.000Z') });
+    const all = await v1Get<FacetPage>('/matches', { includeFacets: true });
+    const filtered = await v1Get<FacetPage>('/matches', { sportId, includeFacets: true });
+    const sportCount = all.facets.sports.find((item) => item.sportId === sportId)?.count ?? 0;
+    expect(filtered.items).toHaveLength(sportCount);
+    expect(filtered.pageInfo?.totalCount).toBe(sportCount);
+    expect(filtered.facets.sports).toEqual(all.facets.sports);
+    if (sportCount === 0) {
+      expect(filtered.facets.today).toBe(0);
+      expect(filtered.facets.recruiting).toBe(0);
+    }
+  });
+
   it('종목 필터를 유지한 채 센다 — 팀 매치가 없는 종목이면 0건', async () => {
     const other = await v1Get<FacetPage>('/team-matches', { sportId: 'sport-futsal', includeFacets: true });
     expect(other.items).toHaveLength(0);

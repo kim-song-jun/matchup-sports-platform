@@ -606,13 +606,18 @@ export const v1MswHandlers = [
     return ok(inquiry);
   }),
   http.get(`${api}/matches`, ({ request }) => {
+    const sportId = new URL(request.url).searchParams.get('sportId');
+    const sport = v1SportsFixture.find((item) => item.id === sportId);
     const levelCodes = new URL(request.url).searchParams.get('levelCodes')?.split(',').filter(Boolean) ?? [];
     const flags = readToggles(request);
     const byLevel = levelCodes.length
       ? v1MatchesFixture.filter((item) => rangeMatches(levelCodes, item.minLevel?.code, item.maxLevel?.code))
       : v1MatchesFixture;
-    const matches = applyToggles(byLevel, flags, true);
-    return ok(pageWithCounts(request, matches, matches, toggleFacets(byLevel, flags, true)));
+    const bySport = sportId
+      ? byLevel.filter((item) => item.sport?.sportId === sportId || (sport && item.sportName === sport.name))
+      : byLevel;
+    const matches = applyToggles(bySport, flags, true);
+    return ok(pageWithCounts(request, matches, applyToggles(byLevel, flags, true), toggleFacets(bySport, flags, true)));
   }),
   http.get(`${api}/matches/:matchId`, ({ params }) => ok(v1MatchesFixture.find((item) => item.id === params.matchId) ?? v1MatchesFixture[0])),
   http.get(`${api}/teams`, ({ request }) => {

@@ -10,9 +10,12 @@ import { useV1TeamMatch, useV1TeamMatches } from './use-v1-api';
 
 const api = 'http://localhost/api/v1';
 const matchId = 'team-match-expiry-1';
+const passiveMatchId = 'team-match-expiry-passive';
 let status: 'recruiting' | 'closed' = 'recruiting';
+let passiveStatus: 'recruiting' | 'closed' = 'recruiting';
 let listReads = 0;
 let detailReads = 0;
+let passiveDetailReads = 0;
 const listReadQueries: string[] = [];
 const match = { id: matchId, teamMatchId: matchId, status, displayState: status } as V1TeamMatch;
 const server = setupServer(
@@ -28,6 +31,10 @@ const server = setupServer(
     detailReads += 1;
     return HttpResponse.json({ status: 'success', data: { ...match, status, displayState: status } });
   }),
+  http.get(`${api}/team-matches/${passiveMatchId}`, () => {
+    passiveDetailReads += 1;
+    return HttpResponse.json({ status: 'success', data: { ...match, id: passiveMatchId, teamMatchId: passiveMatchId, status: passiveStatus, displayState: passiveStatus } });
+  }),
   http.post('*/api/v1/logs/client-error', () => new HttpResponse(null, { status: 204 })),
 );
 
@@ -42,8 +49,10 @@ function createTab() {
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
 beforeEach(() => {
   status = 'recruiting';
+  passiveStatus = 'recruiting';
   listReads = 0;
   detailReads = 0;
+  passiveDetailReads = 0;
   listReadQueries.length = 0;
   vi.stubEnv('NEXT_PUBLIC_API_URL', api);
   focusManager.setFocused(undefined);
@@ -63,7 +72,7 @@ describe('team-match deadline refresh', () => {
     const tab = createTab();
     const { result } = renderHook(() => ({
       list: useV1TeamMatches(undefined, { refetchOnWindowFocus: 'always' }),
-      detail: useV1TeamMatch(matchId),
+      detail: useV1TeamMatch(matchId, { refetchInterval: 15_000, refetchOnWindowFocus: 'always' }),
     }), { wrapper: tab.wrapper });
     await waitFor(() => {
       expect(result.current.list.data?.items[0]?.status).toBe('recruiting');
@@ -88,7 +97,7 @@ describe('team-match deadline refresh', () => {
 
   it('polls an open detail after the same 15-second interval as the list', async () => {
     const tab = createTab();
-    const { result } = renderHook(() => ({ list: useV1TeamMatches(undefined, { refetchOnWindowFocus: 'always' }), detail: useV1TeamMatch(matchId) }), { wrapper: tab.wrapper });
+    const { result } = renderHook(() => ({ list: useV1TeamMatches(undefined, { refetchOnWindowFocus: 'always' }), detail: useV1TeamMatch(matchId, { refetchInterval: 15_000, refetchOnWindowFocus: 'always' }) }), { wrapper: tab.wrapper });
     await waitFor(() => {
       expect(result.current.list.data?.items[0]?.status).toBe('recruiting');
       expect(result.current.detail.data?.status).toBe('recruiting');
@@ -138,4 +147,32 @@ describe('team-match deadline refresh', () => {
     expect(result.current.search.data?.items[0]?.status).toBe('recruiting');
     expect(result.current.teamMatches.data?.items[0]?.status).toBe('recruiting');
   });
+
+  it('keeps passive shared detail consumers idle while the team-match detail opts into focus and interval refresh', async () => {
+    const tab = createTab();
+    const { result } = renderHook(() => ({
+      passive: useV1TeamMatch(passiveMatchId),
+      detail: useV1TeamMatch(matchId, { refetchInterval: 15_000, refetchOnWindowFocus: 'always' }),
+    }), { wrapper: tab.wrapper });
+    await waitFor(() => {
+      expect(result.current.passive.data?.status).toBe('recruiting');
+      expect(result.current.detail.data?.status).toBe('recruiting');
+    });
+    expect(passiveDetailReads).toBe(1);
+    expect(detailReads).toBe(1);
+
+    passiveStatus = 'closed';
+    status = 'closed';
+    await act(async () => { focusManager.setFocused(false); });
+    await act(async () => { focusManager.setFocused(true); });
+    await waitFor(() => expect(result.current.detail.data?.status).toBe('closed'));
+    expect(detailReads).toBe(2);
+    expect(passiveDetailReads).toBe(1);
+    expect(result.current.passive.data?.status).toBe('recruiting');
+
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 15_100)); });
+    await waitFor(() => expect(detailReads).toBeGreaterThanOrEqual(3));
+    expect(passiveDetailReads).toBe(1);
+    expect(result.current.passive.data?.status).toBe('recruiting');
+  }, 25_000);
 });

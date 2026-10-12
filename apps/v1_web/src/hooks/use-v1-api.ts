@@ -1741,17 +1741,18 @@ export function useV1TeamMatches(
   });
 }
 
-export function useV1TeamMatch(teamMatchId: string, options?: { seed?: V1TeamMatch | null }) {
+export function useV1TeamMatch(
+  teamMatchId: string,
+  options?: { seed?: V1TeamMatch | null; refetchInterval?: number | false; refetchOnWindowFocus?: boolean | 'always' },
+) {
   const queryClient = useQueryClient();
   const seed = options?.seed;
   return useQuery({
     queryKey: v1Keys.teamMatch(teamMatchId),
     queryFn: () => v1Get<V1TeamMatch>(`/team-matches/${teamMatchId}`),
     enabled: Boolean(teamMatchId),
-    // Deadline status is derived by the API, so an open detail must refresh like the list and
-    // must re-read on tab return even when another consumer left a fresh cache entry.
-    refetchInterval: 15000,
-    refetchOnWindowFocus: 'always',
+    refetchInterval: options?.refetchInterval ?? false,
+    refetchOnWindowFocus: options?.refetchOnWindowFocus ?? false,
     // useV1Match 와 같은 이유·같은 안전장치(뷰어 상태·신청 목록 제거) — 자세한 근거는 그쪽 주석.
     placeholderData: () => {
       const source =

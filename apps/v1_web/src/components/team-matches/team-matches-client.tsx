@@ -408,7 +408,11 @@ export function TeamMatchListPageClient({ seed }: { readonly seed?: CursorListSe
 /** matches-client.tsx 의 `seed` 와 같은 목적·같은 안전장치 — 자세한 근거는 그쪽 주석. */
 export function TeamMatchDetailPageClient({ teamMatchId, seed }: { teamMatchId: string; seed?: V1TeamMatch | null }) {
   const router = useRouter();
-  const query = useV1TeamMatch(teamMatchId, { seed });
+  const query = useV1TeamMatch(teamMatchId, {
+    seed,
+    refetchInterval: 15_000,
+    refetchOnWindowFocus: 'always',
+  });
   const recordParams = useSearchParams();
   // topBar:false라 셸 뒤로가기가 없다 — 페이지가 직접 그리는 모바일·데스크톱 링크
   // (team-matches-page.tsx)가 이 값을 쓴다. public-profile-client.tsx와 같은 `?from=` 패턴.

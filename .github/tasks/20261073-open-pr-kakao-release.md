@@ -19,7 +19,7 @@ The user authorized reviewing, repairing, and merging the currently open PRs #18
 - [ ] Open review findings are fixed or disproved with concrete evidence; conflicts are resolved without losing existing behavior.
 - [ ] Each exact PR revision passes the applicable CI checks before dev merge.
 - [ ] The combined dev revision passes API/Web/Gates and applicable Android/iOS CI; alpha serves that revision.
-- [ ] All REST, JavaScript and native credentials identify the same intended app; required native key and app-ID inputs are configured without leaking values.
+- [ ] Within each environment, login REST, login JavaScript and native credentials identify its intended app. Maps REST/JS are independently configured and cannot select the login app.
 - [ ] New-app transition preserves existing user IDs, memberships and history, uses verified ownership to link identities, and never infers identity from names or unverified contact data.
 - [ ] Console consent items, actual collected fields and public privacy disclosures agree; any review/business-verification blockers are explicit.
 - [ ] Console domains, callback URLs, package/bundle identifiers and available signing key hashes match the actual builds.
@@ -28,6 +28,16 @@ The user authorized reviewing, repairing, and merging the currently open PRs #18
 - [ ] If gates pass, promote the verified revision, approve the authorized production deployment, verify served SHA/release and affected production flows, and close owned browser/process resources.
 
 ## Progress snapshot
+
+### 2026-10-12 independent Maps and official test app
+
+- #1837 head `ffa74d870` passed API/Web/Gates, Android and iOS; all review threads were resolved. It merged into dev as `38aeada3b`, and both root and the existing feature worktree were fast-forwarded.
+- Alpha Maps REST/JS settings were saved for app `1604606`; the public key endpoint matched the console key and real place search returned HTTP 200 with 10 results. Map rendering is still pending.
+- The user requested independent Maps migration. Inspection found that the new browser login reused the Maps JS endpoint. It now reads a dedicated `NEXT_PUBLIC_KAKAO_LOGIN_JS_KEY`, built from environment-specific secrets, so Maps may use a different app. Focused browser/native-button tests passed: 14/14.
+- The user requested reusable alpha signup/linking tests. Official Kakao test app `1604717` (팀밋 Alpha 테스트) was created under `1604606`. Console keys, test consent grants, test-member access and alpha deployment are not yet complete. Production login keys remain unchanged.
+- Existing admin deletion anonymizes the member, releases email/phone/provider identities and rejects active admins/team authorities; it is not a reusable onboarding reset. No user was reset or deleted. Alpha-only test account lifecycle needs explicit target isolation and audit evidence before use.
+- Play current/previous/upload certificate hashes are registered on the production native key. The public App Links fingerprint is configured in the production GitHub environment for the next deployment; current runtime verification is pending.
+- AWS CLI login was renewed. Owned temporary SecureString `/teameet/alpha/setup-kakao-1604606` was removed; no IAM permissions were changed.
 
 ### 2026-10-12 follow-up
 

@@ -216,9 +216,10 @@ APNs 프로바이더 토큰의 ES256 서명은 **서버(Node)** 에서 한다 �
 ### Kakao build inputs
 
 `TEAMEET_KAKAO_ALPHA_NATIVE_APP_KEY`와 `TEAMEET_KAKAO_PRODUCTION_NATIVE_APP_KEY`는 GitHub secret 또는 archive 프로세스 환경으로 전달한다.
-`generate-ios-secrets-xcconfig.sh`가 gitignore된 파일에 두 값을 기록하고 각 xcconfig는 자기 환경의 키만 선택한다. 같은 카카오 앱에서 네이티브 키를 각각 발급해
-운영 키에 `kr.co.teameet`, alpha 키에 `kr.co.teameet.alpha` 번들 ID를 등록하고, 웹 REST 키·지도 JS 키·서버
-`KAKAO_APP_ID`가 동일 앱에 속하는지 확인한다. 키가 없는 CI는 컴파일만 검증하며 네이티브
+`generate-ios-secrets-xcconfig.sh`가 gitignore된 파일에 두 값을 기록하고 각 xcconfig는 자기 환경의 키만 선택한다.
+운영 앱 키에 `kr.co.teameet`, alpha 테스트 앱 키에 `kr.co.teameet.alpha` 번들 ID를 등록하고, 각 환경의
+로그인 REST 키·로그인 JS 키·네이티브 키·서버 `KAKAO_APP_ID`가 동일 앱에 속하는지 확인한다.
+지도 REST/JS 설정은 로그인과 독립적이다. 키가 없는 CI는 컴파일만 검증하며 네이티브
 로그인 기능은 광고하지 않는다. 키가 있는 빌드의 카카오톡 설치/미설치·취소·복귀 검증 후에만 배포한다.
 
 ### 준비된 것 — 지금 저장소에 있다

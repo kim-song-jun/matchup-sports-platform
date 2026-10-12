@@ -9,11 +9,15 @@ Missing or malformed alpha credentials stop activation; the deployment must not 
 keep credentials from a different app. `ALPHA_KAKAO_SCOPE` is an optional repository variable:
 set only scopes approved and enabled in that app's Kakao console.
 
-The admin-managed Maps REST/JavaScript integration must belong to the same app as OAuth,
-because browser KakaoTalk login uses the Maps JavaScript key. Verify `/public/integrations/kakao-maps-key`
-and actual authorization/callback before declaring the transition ready. Native builds use
-separate alpha/production platform keys for `kr.co.teameet.alpha` and `kr.co.teameet`; both
-keys still belong to the intended OAuth app. See the Android and iOS release runbooks.
+Browser KakaoTalk login uses `ALPHA_KAKAO_LOGIN_JS_KEY` (production:
+`KAKAO_LOGIN_JS_KEY`), embedded as `NEXT_PUBLIC_KAKAO_LOGIN_JS_KEY` in the web build.
+This key must belong to the same app as that environment's OAuth REST/native keys.
+The admin-managed Maps REST/JavaScript keys are independent: changing Maps must never
+change the app used to sign in. Verify actual map search/render and login/callback separately.
+Alpha can use the official Kakao test app under the production business app; only registered
+test-app members can sign in, and test-only consent grants do not approve production scopes.
+Native builds use the alpha test-app key for `kr.co.teameet.alpha` and the production app key
+for `kr.co.teameet`. See the Android and iOS release runbooks.
 
 `https://alpha.teameet.co.kr`은 `dev` 브랜치의 v1 Web/API를 실제 HTTPS 환경에서 검증하는 비운영 환경이다. 프로덕션과 인프라·데이터베이스·업로드 볼륨을 공유하지 않는다.
 

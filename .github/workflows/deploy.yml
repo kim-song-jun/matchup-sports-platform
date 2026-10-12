@@ -887,6 +887,7 @@ jobs:
             NEXT_PUBLIC_API_URL=/api/v1
             INTERNAL_API_ORIGIN=${{ steps.origin.outputs.internalApiOrigin }}
             NEXT_PUBLIC_KAKAO_CLIENT_ID=${{ secrets.KAKAO_CLIENT_ID }}
+            NEXT_PUBLIC_KAKAO_LOGIN_JS_KEY=${{ secrets.KAKAO_LOGIN_JS_KEY }}
             NEXT_PUBLIC_KAKAO_REDIRECT_URI=${{ secrets.KAKAO_REDIRECT_URI }}
             NEXT_PUBLIC_KAKAO_SCOPE=${{ vars.KAKAO_SCOPE }}
             NEXT_PUBLIC_GA_MEASUREMENT_ID=${{ secrets.GA_PROD }}

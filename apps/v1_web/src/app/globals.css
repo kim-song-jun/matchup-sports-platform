@@ -1181,11 +1181,13 @@ button:disabled {
 }
 
 .tm-auth-business-info .tm-ps-business-row {
-  align-items: flex-start;
+  align-items: baseline;
   gap: 4px;
 }
 
 .tm-auth-business-info .tm-ps-business dt {
+  flex: 0 0 auto;
+  white-space: nowrap;
   color: var(--text-muted);
 }
 

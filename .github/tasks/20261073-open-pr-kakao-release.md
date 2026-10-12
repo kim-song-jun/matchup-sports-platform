@@ -31,6 +31,14 @@ The user authorized reviewing, repairing, and merging PRs #1837, #1843, and #184
 
 ## Progress snapshot
 
+### 2026-10-12 user-promoted main and parallel store submission
+
+- The user merged #1868 as `02849dd0eb39b3e4d913f03ba248392f783a16b6` and explicitly requested Android/iOS review submission while Kakao personal-field review remains pending. That pending review is no longer a store-submission gate; physical-device testing remains explicitly waived. Preserve the original Kakao identity and report provider/store approval separately.
+- Main CI/deployment run `38247478682` is in progress. Android production build `38247855926` reached Gradle but failed because `testProductionReleaseUnitTest` is not registered. The workflow now uses the existing production-flavor debug unit-test task, already exercised by Android Alpha CI, followed by the unchanged signed `bundleProductionRelease` task. Signing, Firebase/Kakao gates, alignment verification, artifact checksum and cleanup remain unchanged. Luna implemented the two-file fix and Sol independently reviewed it; source checks passed, and actual rebuild remains pending.
+- Production Android and iOS store versions are being prepared in the existing app records. Creating a version draft is not a binary upload or review submission. Existing App Store privacy declarations and reviewer access must be reconciled with the actual account fields and web analytics before submitting.
+- The real iOS archive exposed a second release-tool defect: global `PROVISIONING_PROFILE_SPECIFIER` reached Swift Package dependencies, which reject provisioning profiles. The canonical XcodeGen app-target Release configurations now hold their Alpha/Production signing settings; the archive command no longer applies global signing overrides. The narrow archive contract test passed and independent Sol source review passed. A signed archive is still running and remains the runtime proof.
+- App Store Connect now has a 0.1.5 review draft. Its existing private reviewer credentials successfully logged into production, reached `/home`, and received `/api/v1/auth/me` HTTP 200; credentials were neither printed nor committed. Play has an empty production release draft awaiting the new signed AAB.
+
 ### 2026-10-12 final compact-link proof and Apple account selection
 
 - Official release preparation consumed all 10 outstanding Changesets and advanced the fixed API/Web pair to 1.8.0, with no dependency changes. Independent Sol review confirmed one-to-one changelog coverage. PR #1867 targets dev; its initial revision passed the promotion metadata gate and received Copilot review with zero findings. Native versions are now prepared as Android 0.1.1/code 2 and iOS 0.1.5/build 9, above the observed public builds; the amended exact revision requires fresh CI including native jobs. These metadata edits are not store publication.

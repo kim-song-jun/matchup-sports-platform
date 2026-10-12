@@ -5,6 +5,11 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 SOURCE_SCRIPT="$ROOT_DIR/scripts/ios/archive-and-export.sh"
 [[ -f "$SOURCE_SCRIPT" ]] || { echo "missing source script: $SOURCE_SCRIPT" >&2; exit 1; }
+PROJECT_SPEC="$ROOT_DIR/apps/v1_ios/project.yml"
+grep -q 'Alpha Release:' "$PROJECT_SPEC"
+grep -q 'PROVISIONING_PROFILE_SPECIFIER: Teameet Alpha App Store' "$PROJECT_SPEC"
+grep -q 'Production Release:' "$PROJECT_SPEC"
+grep -q 'PROVISIONING_PROFILE_SPECIFIER: Teameet Production App Store' "$PROJECT_SPEC"
 
 WORK="$(mktemp -d)"
 cleanup() {
@@ -87,7 +92,7 @@ run_rejected_override wrong_configuration TEAMEET_ARCHIVE_CONFIGURATION 'Alpha R
 run_rejected_override wrong_profile TEAMEET_PROFILE_NAME 'Teameet Alpha App Store'
 
 run_correct_mapping() {
-  local scheme="$1" configuration="$2" profile="$3" expected_bundle_id="$4"
+  local scheme="$1" configuration="$2" expected_bundle_id="$3"
   : > "$WORK/xcodebuild.log"
   set +e
   env PATH="$WORK/bin:$PATH" CONTRACT_XCODEBUILD_LOG="$WORK/xcodebuild.log" \
@@ -98,11 +103,11 @@ run_correct_mapping() {
   [[ "$status" -eq 0 ]]
   grep -q -- "-scheme $scheme" "$WORK/xcodebuild.log"
   grep -q -- "-configuration $configuration" "$WORK/xcodebuild.log"
-  grep -q -- "PROVISIONING_PROFILE_SPECIFIER=$profile" "$WORK/xcodebuild.log"
+  ! grep -q -- 'PROVISIONING_PROFILE_SPECIFIER=' "$WORK/xcodebuild.log"
 }
 
-run_correct_mapping TeameetAlpha 'Alpha Release' 'Teameet Alpha App Store' 'kr.co.teameet.alpha'
-run_correct_mapping TeameetProduction 'Production Release' 'Teameet Production App Store' 'kr.co.teameet'
+run_correct_mapping TeameetAlpha 'Alpha Release' 'kr.co.teameet.alpha'
+run_correct_mapping TeameetProduction 'Production Release' 'kr.co.teameet'
 
 : > "$WORK/alttool.sentinel"
 : > "$WORK/fake-key.p8"

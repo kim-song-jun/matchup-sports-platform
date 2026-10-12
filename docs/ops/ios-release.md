@@ -230,7 +230,7 @@ APNs 프로바이더 토큰의 ES256 서명은 **서버(Node)** 에서 한다 �
 | `scripts/ios/asc-profile.mjs` | App Store 프로파일을 ASC API 로 생성·설치 (기기 등록 불필요) |
 | `scripts/ios/archive-and-export.sh` | archive → export → (`--upload` 일 때만) 업로드 |
 | 빌드 번호 강제 | `version.properties` 가 원천. 같은 버전·빌드 번호로 두 번 업로드하면 스크립트가 먼저 막는다 |
-| `DEVELOPMENT_TEAM` | `project.yml` 기본값 `U9J95Q6XD3`; archive 시 `TEAMEET_TEAM_ID` 환경변수로 override 가능 |
+| `DEVELOPMENT_TEAM` | `apps/v1_ios/project.yml`의 `Teameet` 앱 타깃에 `U9J95Q6XD3`로 고정. `Alpha Release`와 `Production Release`가 각각 해당 앱의 수동 서명 프로파일을 지정하며, archive 스크립트는 scheme에 맞는 구성과 프로파일을 선택한다. Team ID 변경 시 앱 타깃 설정을 갱신한다. |
 
 ### 자동 서명은 이 프로젝트에서 동작하지 않는다 (2026-08-31 실측)
 
@@ -362,7 +362,7 @@ GitHub Actions secrets 는 public 저장소에서도 값이 노출되지 않고 
 
 | 항목 | 위치 | 현재 상태 |
 |---|---|---|
-| iOS 서명 Team ID | `apps/v1_ios/project.yml`, `scripts/ios/archive-and-export.sh` | `project.yml` 기본값은 `U9J95Q6XD3`; archive 스크립트의 `TEAMEET_TEAM_ID` 환경변수로 override 가능 |
+| iOS 서명 Team ID와 프로파일 | `apps/v1_ios/project.yml`, `scripts/ios/archive-and-export.sh` | `Teameet` 앱 타깃의 `DEVELOPMENT_TEAM`은 `U9J95Q6XD3`이며, `Alpha Release`/`Production Release`가 각 환경의 수동 서명 프로파일을 지정한다. archive 스크립트는 선택된 scheme에 맞춰 구성과 프로파일을 고른다. Team ID 변경 시 `project.yml`의 앱 타깃 값을 갱신한다. |
 | APNs 서버 인증 | `scripts/ios/apns-send.mjs`, `.github/workflows/deploy.yml`, `.github/workflows/deploy-alpha.yml` | 두 workflow가 `APNS_KEY_ID`, `APNS_TEAM_ID`, `APNS_PRIVATE_KEY`라는 같은 secret 이름을 사용한다. production job은 `environment: production`이므로 새 조직 값을 production 환경 secrets에 넣고, alpha의 기존 값은 현재 저장소/조직 secret 범위에서 유지한다. 실제 적용값은 GitHub secret precedence와 workflow job scope를 확인한 뒤 기록한다. |
 | Sign in with Apple / associated domains | `apps/v1_ios/Teameet/Teameet.entitlements` | Team ID 하드코딩 없음(xcconfig 변수) — 새 App ID 에 capability 만 다시 켜면 됨 |
 | production AASA | `deploy/aasa/apple-app-site-association` | alpha와 production App ID가 모두 등록돼 있다. 조직 이전 후 production App ID만 새 Team ID 값으로 갱신하고 alpha 항목은 보존한다. |

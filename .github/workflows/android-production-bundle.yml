@@ -84,8 +84,8 @@ jobs:
           chmod 600 "${keystore_path}"
           echo "ANDROID_RELEASE_KEYSTORE_PATH=${keystore_path}" >> "${GITHUB_ENV}"
 
-      - name: Test and build signed production AAB
-        run: gradle -p apps/v1_android --no-daemon testProductionReleaseUnitTest bundleProductionRelease
+      - name: Test production flavor and build signed production AAB
+        run: gradle -p apps/v1_android --no-daemon testProductionDebugUnitTest bundleProductionRelease
 
       - name: Verify production AAB 16 KB page alignment
         shell: bash

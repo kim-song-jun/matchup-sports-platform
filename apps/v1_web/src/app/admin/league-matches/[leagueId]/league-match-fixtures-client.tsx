@@ -134,6 +134,7 @@ export default function LeagueMatchFixturesClient({
   const applyTemplate = useV1ApplyLeagueTemplate(leagueId);
   const [view, setView] = useState<LeagueFixturesView>(initialView);
   const [templateOpen, setTemplateOpen] = useState(false);
+  const [focusFixtureId, setFocusFixtureId] = useState<string | null>(null);
   // 모바일 팀 고르기의 후보는 참가팀 목록(teamsData)에서 오므로 로드 상태도 같은 조회를 따른다.
   const registrationsState: RegistrationsLoadState = {
     status: teamsData !== undefined ? 'success' : teamsIsError ? 'error' : 'pending',
@@ -810,6 +811,7 @@ export default function LeagueMatchFixturesClient({
               canWrite={canWrite}
               showToast={showToast}
               onOpenTemplate={() => setTemplateOpen(true)}
+              focusFixtureId={focusFixtureId}
               onEditSchedule={(teamMatchId) =>
                 setScheduleFixture(series.fixtures.find((fixture) => fixture.teamMatchId === teamMatchId) ?? null)
               }
@@ -824,6 +826,7 @@ export default function LeagueMatchFixturesClient({
               competitionId={leagueId}
               scope="league"
               rounds={mobileRounds}
+              focusFixtureId={focusFixtureId}
               slots={series.slots ?? []}
               candidates={mobileCandidates}
               canWrite={canWrite}
@@ -930,7 +933,9 @@ export default function LeagueMatchFixturesClient({
           isSubmitting={createManualFixture.isPending}
           onSubmit={async (payload) => {
             try {
-              await createManualFixture.mutateAsync(payload);
+              const created = await createManualFixture.mutateAsync(payload);
+              setFocusFixtureId(created.teamMatchId);
+              setView('board');
               showToast('경기를 만들었어요.', 'success');
             } catch (error) {
               showToast(extractErrorMessage(error, '경기를 만들지 못했어요.'), 'error');
@@ -1469,6 +1474,12 @@ export default function LeagueMatchFixturesClient({
           onSubmit={async (payload) => {
             const result = await applyTemplate.mutateAsync(payload);
             showToast(`빈 경기 ${result.fixtures}개를 만들었어요. 자리에 팀을 넣어 보세요.`, 'success');
+            const refreshed = await refetch();
+            const firstFixture = refreshed.data?.fixtures[0];
+            if (firstFixture) {
+              setFocusFixtureId(firstFixture.teamMatchId);
+              setView('board');
+            }
           }}
           onClose={() => setTemplateOpen(false)}
         />

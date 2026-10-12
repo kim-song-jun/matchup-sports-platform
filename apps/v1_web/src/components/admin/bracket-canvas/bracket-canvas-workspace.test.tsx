@@ -42,8 +42,8 @@ vi.mock('./bracket-fixture-tools-dialog', () => ({
     props.open ? <div data-testid="tools-dialog" data-mode={props.mode} data-format={props.format ?? ''} /> : null,
 }));
 vi.mock('./bracket-template-dialog', () => ({
-  BracketTemplateDialog: (props: { open: boolean; hasExistingBracket: boolean; format: string }) =>
-    props.open ? <div data-testid="template-dialog" data-existing={String(props.hasExistingBracket)} data-format={props.format} /> : null,
+  BracketTemplateDialog: (props: { open: boolean; hasExistingBracket: boolean; format: string; confirmedTeamCountStatus: string }) =>
+    props.open ? <div data-testid="template-dialog" data-existing={String(props.hasExistingBracket)} data-format={props.format} data-registrations-status={props.confirmedTeamCountStatus} /> : null,
 }));
 
 vi.mock('./bracket-standings-fill-button', () => ({
@@ -309,6 +309,12 @@ describe('BracketCanvasWorkspace — 칸 패널', () => {
 });
 
 describe('BracketCanvasWorkspace — 도구 모음', () => {
+  it.each(['pending', 'error'] as const)('참가팀 조회가 %s이면 실제 상태를 템플릿 대화상자에 넘긴다', (status) => {
+    renderWorkspace({ registrationsState: { ...loaded, status, error: status === 'error' ? new Error('unavailable') : null } });
+    fireEvent.click(screen.getByRole('button', { name: '템플릿으로 다시 만들기' }));
+    expect(screen.getByTestId('template-dialog')).toHaveAttribute('data-registrations-status', status);
+  });
+
   it('대진이 있으면 "템플릿으로 다시 만들기"가 교체 모드로 대화상자를 연다', () => {
     renderWorkspace();
     fireEvent.click(screen.getByRole('button', { name: '템플릿으로 다시 만들기' }));

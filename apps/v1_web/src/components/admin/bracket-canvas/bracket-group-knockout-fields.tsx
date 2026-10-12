@@ -9,6 +9,7 @@ export type GroupKnockoutTemplateValue = {
   advancePerGroup: 1 | 2;
   legs: 1 | 2;
   thirdPlace: boolean;
+  qualificationMode?: 'cross_group_round12';
 };
 
 export const DEFAULT_GROUP_KNOCKOUT_VALUE: GroupKnockoutTemplateValue = {
@@ -28,6 +29,10 @@ const knockoutSize = (value: GroupKnockoutTemplateValue) => value.groupCount * v
  * 경기 수 상한(240)은 대화상자가 `planBracketTemplateCounts` 로 따로 막는다.
  */
 export function groupKnockoutShapeIssue(value: GroupKnockoutTemplateValue): string | null {
+  if (value.qualificationMode === 'cross_group_round12') {
+    return value.groupCount === 5 && value.teamsPerGroup === 4 && value.advancePerGroup === 2 && value.legs === 1
+      ? null : '조 간 비교 12강은 5개 조·4팀·1회전으로 만들어 주세요.';
+  }
   const size = knockoutSize(value);
   if (!SUPPORTED_KNOCKOUT_SIZES.includes(size)) {
     return `결선에 올라가는 팀은 2·4·8·16팀이어야 해요. 지금은 ${size}팀이에요.`;
@@ -56,10 +61,12 @@ export function GroupKnockoutFields({
   value,
   onChange,
   disabled = false,
+  lockShape = false,
 }: {
   value: GroupKnockoutTemplateValue;
   onChange: (next: GroupKnockoutTemplateValue) => void;
   disabled?: boolean;
+  lockShape?: boolean;
 }) {
   const id = useId();
   const issue = groupKnockoutShapeIssue(value);
@@ -69,16 +76,26 @@ export function GroupKnockoutFields({
 
   return (
     <div className="flex flex-col gap-4">
+      <label className="tm-text-label flex min-h-[44px] items-center gap-2">
+        <input type="checkbox" checked={value.qualificationMode === 'cross_group_round12'} disabled={disabled}
+          onChange={(event) => onChange(event.target.checked
+            ? { ...value, groupCount: 5, teamsPerGroup: 4, advancePerGroup: 2, legs: 1, qualificationMode: 'cross_group_round12' }
+            : { ...DEFAULT_GROUP_KNOCKOUT_VALUE, thirdPlace: value.thirdPlace })} />
+        20팀 · 5개 조 → 12강 (3위 상위 2팀 추가)
+      </label>
+      {value.qualificationMode === 'cross_group_round12' ? (
+        <p className="tm-text-caption text-[var(--text-muted)]">조 1·2위 10팀과 3위 상위 2팀이 진출해요. 조 1위 상위 4팀은 8강으로 직행해요. 팀 미정으로 전체 대진을 만들어요.</p>
+      ) : null}
       <div className="grid grid-cols-2 gap-3">
         <div className="flex flex-col gap-1">
           <label htmlFor={`${id}-groups`} className={LABEL_CLASS} style={{ color: 'var(--text-strong)' }}>조 수</label>
-          <select id={`${id}-groups`} className={SELECT_CLASS} value={value.groupCount} disabled={disabled} onChange={(e) => numberField('groupCount', e)}>
+          <select id={`${id}-groups`} className={SELECT_CLASS} value={value.groupCount} disabled={disabled || lockShape || value.qualificationMode === 'cross_group_round12'} onChange={(e) => numberField('groupCount', e)}>
             {range(2, 8).map((n) => <option key={n} value={n}>{n}개 조</option>)}
           </select>
         </div>
         <div className="flex flex-col gap-1">
           <label htmlFor={`${id}-teams`} className={LABEL_CLASS} style={{ color: 'var(--text-strong)' }}>조당 팀 수</label>
-          <select id={`${id}-teams`} className={SELECT_CLASS} value={value.teamsPerGroup} disabled={disabled} onChange={(e) => numberField('teamsPerGroup', e)}>
+          <select id={`${id}-teams`} className={SELECT_CLASS} value={value.teamsPerGroup} disabled={disabled || lockShape || value.qualificationMode === 'cross_group_round12'} onChange={(e) => numberField('teamsPerGroup', e)}>
             {range(3, 6).map((n) => <option key={n} value={n}>{n}팀</option>)}
           </select>
         </div>
@@ -88,7 +105,7 @@ export function GroupKnockoutFields({
             id={`${id}-advance`}
             className={SELECT_CLASS}
             value={value.advancePerGroup}
-            disabled={disabled}
+            disabled={disabled || value.qualificationMode === 'cross_group_round12'}
             onChange={(e) => onChange(applyGroupKnockoutChange(value, { advancePerGroup: Number(e.target.value) as 1 | 2 }))}
           >
             <option value={1}>조 1위만</option>
@@ -101,7 +118,7 @@ export function GroupKnockoutFields({
             id={`${id}-legs`}
             className={SELECT_CLASS}
             value={value.legs}
-            disabled={disabled}
+            disabled={disabled || value.qualificationMode === 'cross_group_round12'}
             onChange={(e) => onChange(applyGroupKnockoutChange(value, { legs: Number(e.target.value) as 1 | 2 }))}
           >
             <option value={1}>한 번씩</option>

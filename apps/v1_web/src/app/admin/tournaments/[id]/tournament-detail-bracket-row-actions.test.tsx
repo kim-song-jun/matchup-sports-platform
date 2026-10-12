@@ -3,7 +3,9 @@
  * 실어 보내고, 예정/진행중 경기에는 "운영 콘솔 열기" CTA를 함께 노출하는지 검증한다.
  * mock 세팅은 tournament-detail-bracket-publish.test.tsx의 beforeEach를 그대로 재사용한다.
  */
-import { render, screen } from '@testing-library/react';
+import { render as rtlRender, screen } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import type { ReactElement } from 'react';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import {
   useV1AdminBracket,
@@ -21,6 +23,11 @@ import {
   useV1UpdateGroup,
 } from '@/hooks/use-v1-api';
 import { BracketTab } from './bracket-tab';
+
+function render(ui: ReactElement) {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
+  return rtlRender(<QueryClientProvider client={client}>{ui}</QueryClientProvider>);
+}
 
 vi.mock('@/hooks/use-v1-api', () => ({
   useV1AdminBracket: vi.fn(),

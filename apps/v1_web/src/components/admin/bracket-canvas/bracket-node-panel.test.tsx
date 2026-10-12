@@ -10,11 +10,13 @@ const mocks = vi.hoisted(() => ({
   quick: vi.fn(),
   updateFixture: vi.fn(),
   deleteFixture: vi.fn(),
+  setSources: vi.fn(),
 }));
 
 vi.mock('@/hooks/use-v1-bracket-canvas', () => ({
   useV1AssignTournamentSlot: () => ({ mutate: mocks.assign, isPending: false }),
   useV1QuickResult: () => ({ mutate: mocks.quick, isPending: false }),
+  useV1SetBracketSources: () => ({ mutate: mocks.setSources, isPending: false }),
 }));
 vi.mock('@/hooks/use-v1-api', () => ({
   useV1PlaceSearch: () => ({ data: undefined, isFetching: false, isError: false, error: null }),
@@ -361,6 +363,42 @@ describe('BracketNodePanel — 자리 배정', () => {
     expect(screen.queryByRole('button', { name: '일정 저장' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '경기 삭제' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '점수 확정' })).not.toBeInTheDocument();
+  });
+});
+
+describe('BracketNodePanel — 진출 연결', () => {
+  it('반대편 출처를 후보에서 빼되 다른 출처와 저장은 유지한다', () => {
+    const sourceGroup = makeGroup({ id: 'g-q', name: '8강', phase: 'quarter', sortOrder: 0 });
+    const targetGroup = makeGroup({ id: 'g-s', name: '4강', phase: 'semi', sortOrder: 1 });
+    const q1 = makeFixture({ id: 'q1', groupId: 'g-q', fixtureNumber: 1, game: makeGame({ id: 'q-game-1' }) });
+    const q2 = makeFixture({ id: 'q2', groupId: 'g-q', fixtureNumber: 2, game: makeGame({ id: 'q-game-2' }) });
+    const target = makeFixture({ id: 's1', groupId: 'g-s', fixtureNumber: 3, game: makeGame({ id: 's-game' }) });
+    renderPanel(target, { groups: [sourceGroup, targetGroup], fixtures: [q1, q2, target] });
+
+    fireEvent.change(screen.getByLabelText('홈 출처 경기'), { target: { value: 'q1' } });
+    const away = screen.getByLabelText('어웨이 출처 경기') as HTMLSelectElement;
+    expect(Array.from(away.options).map((option) => option.value)).toEqual(['', 'q2']);
+    fireEvent.change(away, { target: { value: 'q2' } });
+    fireEvent.click(screen.getByRole('button', { name: '진출 연결 저장' }));
+
+    expect(mocks.setSources).toHaveBeenCalledWith(
+      { fixtureId: 's1', homeSourceFixtureId: 'q1', awaySourceFixtureId: 'q2' },
+      expect.any(Object),
+    );
+  });
+
+  it('선택한 패널에서 이전 단계 출처를 저장한다', () => {
+    const sourceGroup = makeGroup({ id: 'g-q', name: '8강', phase: 'quarter', sortOrder: 0 });
+    const targetGroup = makeGroup({ id: 'g-s', name: '4강', phase: 'semi', sortOrder: 1 });
+    const sourceFixture = makeFixture({ id: 'q1', groupId: 'g-q', fixtureNumber: 1, game: makeGame({ id: 'q-game' }) });
+    const targetFixture = makeFixture({ id: 's1', groupId: 'g-s', fixtureNumber: 2, game: makeGame({ id: 's-game' }) });
+    renderPanel(targetFixture, { groups: [sourceGroup, targetGroup], fixtures: [sourceFixture, targetFixture] });
+    fireEvent.change(screen.getByLabelText('홈 출처 경기'), { target: { value: 'q1' } });
+    fireEvent.click(screen.getByRole('button', { name: '진출 연결 저장' }));
+    expect(mocks.setSources).toHaveBeenCalledWith(
+      { fixtureId: 's1', homeSourceFixtureId: 'q1', awaySourceFixtureId: null },
+      expect.any(Object),
+    );
   });
 });
 

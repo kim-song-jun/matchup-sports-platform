@@ -18,8 +18,12 @@ function renderDialog(overrides: Partial<React.ComponentProps<typeof BracketTemp
     showToast: vi.fn(),
     ...overrides,
   };
-  render(<BracketTemplateDialog {...props} />);
-  return props;
+  const view = render(<BracketTemplateDialog {...props} />);
+  return {
+    ...props,
+    rerender: (nextOverrides: Partial<React.ComponentProps<typeof BracketTemplateDialog>>) =>
+      view.rerender(<BracketTemplateDialog {...props} {...nextOverrides} />),
+  };
 }
 
 const create = () => fireEvent.click(screen.getByRole('button', { name: '대진 만들기' }));
@@ -28,28 +32,93 @@ beforeEach(() => {
   vi.clearAllMocks();
 });
 
+describe('BracketTemplateDialog — 참가 수 동기화', () => {
+  it('닫혀 있는 동안 확정 참가팀이 로드되면 열 때 최신 수를 사용한다', async () => {
+    const dialog = renderDialog({ open: false, confirmedTeamCount: 0 });
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+
+    dialog.rerender({ open: true, confirmedTeamCount: 12 });
+
+    await waitFor(() => expect(screen.getByLabelText('참가 팀 수')).toHaveValue('12'));
+    expect(screen.getByLabelText('12팀 대진 틀')).toBeChecked();
+  });
+
+  it('열린 뒤 아직 건드리지 않은 입력은 확정 참가팀 수가 도착하면 갱신한다', async () => {
+    const dialog = renderDialog({ open: true, confirmedTeamCount: 0 });
+    expect(screen.getByLabelText('참가 팀 수')).toHaveValue('8');
+
+    dialog.rerender({ confirmedTeamCount: 12 });
+
+    await waitFor(() => expect(screen.getByLabelText('참가 팀 수')).toHaveValue('12'));
+  });
+
+  it('운영자가 참가 수를 편집하면 늦게 도착한 확정 수로 덮어쓰지 않는다', async () => {
+    const dialog = renderDialog({ open: true, confirmedTeamCount: 0 });
+    fireEvent.change(screen.getByLabelText('참가 팀 수'), { target: { value: '4' } });
+
+    dialog.rerender({ confirmedTeamCount: 12 });
+
+    await waitFor(() => expect(screen.getByLabelText('참가 팀 수')).toHaveValue('4'));
+  });
+
+  it('다시 열 때는 마지막 확정 참가 수를 이전 입력보다 우선한다', async () => {
+    const dialog = renderDialog({ open: true, confirmedTeamCount: 4 });
+    fireEvent.change(screen.getByLabelText('참가 팀 수'), { target: { value: '8' } });
+
+    dialog.rerender({ open: false, confirmedTeamCount: 12 });
+    dialog.rerender({ open: true, confirmedTeamCount: 12 });
+
+    await waitFor(() => expect(screen.getByLabelText('참가 팀 수')).toHaveValue('12'));
+    expect(screen.getByLabelText('12팀 대진 틀')).toBeChecked();
+  });
+
+  it.each(['pending', 'error'] as const)('참가팀 목록이 %s이면 인원 수를 추측하지 않고 적용을 막는다', (status) => {
+    renderDialog({ confirmedTeamCountStatus: status });
+    expect(screen.getByLabelText('참가 팀 수')).toHaveValue('');
+    if (status === 'pending') {
+      expect(screen.getByRole('status')).toHaveTextContent('불러오는 중');
+    } else {
+      expect(screen.getByText('확정 참가팀 수를 불러오지 못했어요. 참가팀 목록을 다시 불러온 뒤 대진을 만들어 주세요.')).toBeInTheDocument();
+    }
+    expect(screen.getByRole('button', { name: '대진 만들기' })).toBeDisabled();
+  });
+});
+
 describe('BracketTemplateDialog — 토너먼트', () => {
+  it('조별+결선에서 20팀·5조→12강을 고르면 41경기를 만들고 특수 진출 규칙을 보낸다', () => {
+    renderDialog({ format: 'group_knockout' });
+    fireEvent.click(screen.getByLabelText('20팀 · 5개 조 → 12강 (3위 상위 2팀 추가)'));
+    expect(screen.getByText('경기 41개 · 자리 32개 · 연결 10개')).toBeInTheDocument();
+    expect(screen.getByLabelText('조 수')).toBeDisabled();
+    create();
+    expect(mocks.apply).toHaveBeenCalledWith({
+      kind: 'group_knockout', groupCount: 5, teamsPerGroup: 4, advancePerGroup: 2, legs: 1,
+      thirdPlace: false, qualificationMode: 'cross_group_round12',
+    }, expect.any(Object));
+  });
   it('8팀 + 3·4위전이 기본이고 만들어질 개수를 미리 보여 준다', () => {
     renderDialog();
-    expect(screen.getByLabelText('8팀')).toBeChecked();
+    expect(screen.getByLabelText('8팀 대진 틀')).toBeChecked();
     expect(screen.getByLabelText('3·4위전도 만들기')).toBeChecked();
     expect(screen.getByText('경기 8개 · 자리 8개 · 연결 8개')).toBeInTheDocument();
   });
 
   it('팀 수와 3·4위전 선택에 따라 미리보기가 바뀐다', () => {
     renderDialog();
-    fireEvent.click(screen.getByLabelText('12팀'));
+    fireEvent.change(screen.getByLabelText('참가 팀 수'), { target: { value: '12' } });
     expect(screen.getByText('경기 12개 · 자리 12개 · 연결 12개')).toBeInTheDocument();
+    expect(screen.getByText(/진행 순서:/)).toHaveTextContent('12강 4경기 → 부전승 4자리 → 8강 4경기');
     expect(screen.getByText(/4팀은 부전승으로 8강에 올라가요/)).toBeInTheDocument();
     fireEvent.click(screen.getByLabelText('3·4위전도 만들기'));
     expect(screen.getByText('경기 11개 · 자리 12개 · 연결 10개')).toBeInTheDocument();
-    fireEvent.click(screen.getByLabelText('4팀'));
+    fireEvent.change(screen.getByLabelText('참가 팀 수'), { target: { value: '4' } });
     expect(screen.getByText('경기 3개 · 자리 4개 · 연결 2개')).toBeInTheDocument();
   });
 
   it('16팀은 부전승 안내 없이 경기 16개(3·4위전 없으면 15개)를 미리 보여 준다', () => {
     renderDialog();
-    fireEvent.click(screen.getByLabelText('16팀'));
+    fireEvent.change(screen.getByLabelText('참가 팀 수'), { target: { value: '16' } });
+    expect(screen.getByLabelText('16팀 대진 틀')).toBeChecked();
     expect(screen.getByText('경기 16개 · 자리 16개 · 연결 16개')).toBeInTheDocument();
     expect(screen.queryByText(/부전승/)).not.toBeInTheDocument();
     fireEvent.click(screen.getByLabelText('3·4위전도 만들기'));
@@ -59,12 +128,26 @@ describe('BracketTemplateDialog — 토너먼트', () => {
     expect(mocks.apply).toHaveBeenCalledWith({ kind: 'knockout', size: 16, thirdPlace: true }, expect.any(Object));
   });
 
+
+  it.each(['3', '5', '6', '7', '9', '10', '11', '13', '14', '15', '17', '20'])(
+    '기존 템플릿이 없는 %s팀은 추천 대진을 만들지 않고 지원 수를 설명한다',
+    (teamCount) => {
+      renderDialog();
+      fireEvent.change(screen.getByLabelText('참가 팀 수'), { target: { value: teamCount } });
+      expect(screen.getByRole('alert')).toHaveTextContent('정확히 4·8·12·16팀');
+      expect(screen.getByRole('button', { name: '대진 만들기' })).toBeDisabled();
+      expect(screen.queryByText(/빈 자리/)).not.toBeInTheDocument();
+    },
+  );
+
   it('대진이 비어 있으면 replaceExisting 없이 만들고, 성공하면 개수를 알리고 닫는다', () => {
-    const props = renderDialog();
+    const applied = vi.fn();
+    const props = renderDialog({ onApplied: applied });
     create();
     expect(mocks.apply).toHaveBeenCalledWith({ kind: 'knockout', size: 8, thirdPlace: true }, expect.any(Object));
     mocks.apply.mock.calls[0][1].onSuccess({ groups: 4, slots: 8, fixtures: 8, edges: 8 });
     expect(props.showToast).toHaveBeenCalledWith('경기 8개와 자리 8개를 만들었어요.', 'success');
+    expect(applied).toHaveBeenCalledTimes(1);
     expect(props.onClose).toHaveBeenCalledTimes(1);
   });
 
@@ -151,41 +234,42 @@ describe('BracketTemplateDialog — 조별+결선', () => {
 
   it('만들기는 계약 본문(group_knockout 평탄화)으로 보낸다', () => {
     renderDialog({ format: 'group_knockout' });
-    change('조당 팀 수', '5');
+    change('참가 팀 수', '12');
+    change('가능한 조 편성', '2:6:2');
     change('조별 회전', '2');
     create();
     expect(mocks.apply).toHaveBeenCalledWith(
-      { kind: 'group_knockout', groupCount: 2, teamsPerGroup: 5, advancePerGroup: 2, legs: 2, thirdPlace: false },
+      { kind: 'group_knockout', groupCount: 2, teamsPerGroup: 6, advancePerGroup: 2, legs: 2, thirdPlace: false },
       expect.any(Object),
     );
   });
 
-  it('지원하지 않는 조합(3조 x 2팀 진출 = 6팀)은 만들 수 없고 이유를 보여 준다 — 개수 미리보기도 숨긴다', () => {
+  it('현재 참가 수와 맞는 지원 구성이 없으면 만들 수 없고 이유를 보여 준다', () => {
     renderDialog({ format: 'group_knockout' });
-    change('조 수', '3');
+    change('참가 팀 수', '11');
     expect(screen.getByRole('button', { name: '대진 만들기' })).toBeDisabled();
-    expect(screen.getByRole('alert')).toHaveTextContent('2·4·8·16팀');
+    expect(screen.getByRole('alert')).toHaveTextContent('지원 범위');
     expect(screen.queryByText(/^경기 \d+개/)).not.toBeInTheDocument();
-    change('조별 진출 팀 수', '1');
-    change('조 수', '4');
+    change('참가 팀 수', '12');
     expect(screen.getByRole('button', { name: '대진 만들기' })).toBeEnabled();
   });
 
   it('경기가 240개를 넘으면 만들 수 없다 (8조 x 6팀 x 2회전 = 247개, 5팀이면 167개로 가능)', () => {
     renderDialog({ format: 'group_knockout' });
-    change('조 수', '8');
-    change('조별 진출 팀 수', '1');
+    change('참가 팀 수', '40');
+    change('가능한 조 편성', '8:5:1');
     change('조별 회전', '2');
-    change('조당 팀 수', '5');
     expect(screen.getByRole('button', { name: '대진 만들기' })).toBeEnabled();
-    change('조당 팀 수', '6');
+    change('참가 팀 수', '48');
+    change('가능한 조 편성', '8:6:1');
     expect(screen.getByRole('button', { name: '대진 만들기' })).toBeDisabled();
     expect(screen.getByText('경기가 240개를 넘어서 만들 수 없어요. 팀 수나 회전 수를 줄여 주세요.')).toBeInTheDocument();
   });
 
   it('8조 x 4팀 2팀 진출은 16강을 만든다 — 개수 미리보기 63개(3·4위전 64개), 본문은 groupCount 8 · advancePerGroup 2', () => {
     renderDialog({ format: 'group_knockout' });
-    change('조 수', '8');
+    change('참가 팀 수', '32');
+    change('가능한 조 편성', '8:4:2');
     expect(screen.getByRole('button', { name: '대진 만들기' })).toBeEnabled();
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
     expect(screen.getByText('경기 63개 · 자리 48개 · 연결 14개')).toBeInTheDocument();
@@ -200,11 +284,12 @@ describe('BracketTemplateDialog — 조별+결선', () => {
 
   it('16강 조합도 경기가 240개를 넘으면 막는다 (8조 x 6팀 x 2회전 + 16강 = 256개, 5팀이면 176개로 가능)', () => {
     renderDialog({ format: 'group_knockout' });
-    change('조 수', '8');
+    change('참가 팀 수', '40');
+    change('가능한 조 편성', '8:5:2');
     change('조별 회전', '2');
-    change('조당 팀 수', '5');
     expect(screen.getByRole('button', { name: '대진 만들기' })).toBeEnabled();
-    change('조당 팀 수', '6');
+    change('참가 팀 수', '48');
+    change('가능한 조 편성', '8:6:2');
     expect(screen.getByRole('button', { name: '대진 만들기' })).toBeDisabled();
     expect(screen.getByText('경기가 240개를 넘어서 만들 수 없어요. 팀 수나 회전 수를 줄여 주세요.')).toBeInTheDocument();
     change('조별 회전', '1');

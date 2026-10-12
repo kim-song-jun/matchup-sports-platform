@@ -91,6 +91,7 @@ function BracketPageBody() {
         />
       ) : (
         <BracketTab
+          tournamentFormat={tournament?.format}
           tournamentId={tournamentId}
           showToast={showToast}
           registrations={registrations}

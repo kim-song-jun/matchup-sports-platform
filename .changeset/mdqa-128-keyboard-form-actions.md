@@ -2,4 +2,4 @@
 "v1_web": patch
 ---
 
-Keep form actions in scroll flow while the mobile keyboard is open and focus the first missing team field on submit.
+모바일 키보드가 열려도 팀 만들기·수정 화면의 저장 버튼이 입력 내용을 가리지 않고, 필수 항목을 비워 제출하면 첫 입력 위치와 안내를 보여줘요.

@@ -47,7 +47,7 @@ describe('Android bottom inset layout', () => {
   });
 });
 
-describe('keyboard viewport layout', () => {
+describe('keyboard viewport behavior', () => {
   it('keeps app and auth frames on the visual viewport with a normal 100dvh fallback', () => {
     expect(globalsCss).toMatch(
       /\.tm-app-frame\s*\{[^}]*height:\s*var\(--teameet-visual-viewport-height,\s*100dvh\)/,
@@ -70,7 +70,7 @@ describe('keyboard viewport layout', () => {
   });
 });
 
-describe('keyboard viewport layout', () => {
+describe('keyboard viewport form actions', () => {
   it('keeps form actions in document flow and removes fixed-footer reserve while the keyboard is open', () => {
     expect(globalsCss).toMatch(
       /html\.tm-keyboard-open \.tm-scroll-area:has\(\.tm-create-shell\) \.tm-fixed-cta,\s*html\[data-teameet-native-keyboard="open"\] \.tm-scroll-area:has\(\.tm-create-shell\) \.tm-fixed-cta\s*\{[^}]*position:\s*static;[^}]*left:\s*auto;[^}]*bottom:\s*auto;[^}]*transform:\s*none;/,

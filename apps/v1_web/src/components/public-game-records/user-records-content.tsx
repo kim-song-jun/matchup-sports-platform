@@ -12,6 +12,7 @@ import { RECORD_TYPE_TABS, recordEmptyCopy, type RecordTypeFilter } from './reco
 import { PersonalMatchRecordsSection } from './personal-match-records-section';
 import { competitionLabel, matchupLabel } from './record-consent-preview';
 import { withFromPath } from '@/lib/session-storage';
+import { bracketTrackLabel } from '@/lib/bracket-track';
 import type { PublicUserRecordItem, PublicUserRecordsResponse } from './types';
 
 /**
@@ -251,52 +252,55 @@ export function UserRecordsContent({
             <section aria-labelledby="tournament-awards-title">
               <h3 id="tournament-awards-title" className="tm-hub-section-title" style={{ marginBottom: 12 }}>대회 수상</h3>
               <Card pad={0}>
-                {data.tournamentAwards.map((award) => (
-                  <Link
-                    key={award.id}
-                    href={withFromPath(`/tournaments/${award.tournamentId}`, fromHref)}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 12,
-                      padding: '16px 16px',
-                      borderTop: '1px solid var(--grey100)',
-                      color: 'inherit',
-                      textDecoration: 'none',
-                    }}
-                  >
-                    <span
-                      aria-hidden="true"
+                {data.tournamentAwards.map((award) => {
+                  const trackLabel = bracketTrackLabel(award.bracketTrack);
+                  return (
+                    <Link
+                      key={award.id}
+                      href={withFromPath(`/tournaments/${award.tournamentId}`, fromHref)}
                       style={{
-                        display: 'inline-flex',
-                        width: 40,
-                        height: 40,
-                        flexShrink: 0,
+                        display: 'flex',
                         alignItems: 'center',
-                        justifyContent: 'center',
-                        borderRadius: 'var(--radius-control)',
-                        background: 'var(--surface-soft)',
+                        gap: 12,
+                        padding: '16px 16px',
+                        borderTop: '1px solid var(--grey100)',
+                        color: 'inherit',
+                        textDecoration: 'none',
                       }}
                     >
-                      <TournamentAwardIcon iconKey={award.iconKey} awardType={award.awardType} size={20} />
-                    </span>
-                    <span style={{ minWidth: 0, flex: 1 }}>
-                      <span style={{ display: 'block', fontSize: 14, fontWeight: 700, color: 'var(--text-strong)' }}>
-                        {award.awardLabel}
+                      <span
+                        aria-hidden="true"
+                        style={{
+                          display: 'inline-flex',
+                          width: 40,
+                          height: 40,
+                          flexShrink: 0,
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          borderRadius: 'var(--radius-control)',
+                          background: 'var(--surface-soft)',
+                        }}
+                      >
+                        <TournamentAwardIcon iconKey={award.iconKey} awardType={award.awardType} size={20} />
                       </span>
-                      <span style={{ display: 'block', marginTop: 2, fontSize: 12, color: 'var(--text-caption)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {award.tournamentTitle}
-                        {award.teamName ? ` · ${award.teamName}` : ''}
-                        {formatTournamentDateShort(award.awardedAt) ? ` · ${formatTournamentDateShort(award.awardedAt)}` : ''}
-                      </span>
-                      {award.note ? (
-                        <span style={{ display: 'block', marginTop: 4, fontSize: 12, color: 'var(--text-muted)' }}>
-                          {award.note}
+                      <span style={{ minWidth: 0, flex: 1 }}>
+                        <span style={{ display: 'block', fontSize: 14, fontWeight: 700, color: 'var(--text-strong)' }}>
+                          {trackLabel ? `${trackLabel} · ` : ''}{award.awardLabel}
                         </span>
-                      ) : null}
-                    </span>
-                  </Link>
-                ))}
+                        <span style={{ display: 'block', marginTop: 2, fontSize: 12, color: 'var(--text-caption)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {award.tournamentTitle}
+                          {award.teamName ? ` · ${award.teamName}` : ''}
+                          {formatTournamentDateShort(award.awardedAt) ? ` · ${formatTournamentDateShort(award.awardedAt)}` : ''}
+                        </span>
+                        {award.note ? (
+                          <span style={{ display: 'block', marginTop: 4, fontSize: 12, color: 'var(--text-muted)' }}>
+                            {award.note}
+                          </span>
+                        ) : null}
+                      </span>
+                    </Link>
+                  );
+                })}
               </Card>
             </section>
           ) : null}

@@ -125,6 +125,25 @@ describe('UserRecordsContent match links', () => {
     );
   });
 
+  it('상·하위 결선에서 같은 어워드명은 범위 라벨로 구분하고 legacy 어워드는 전체 표기를 유지한다', () => {
+    render(
+      <UserRecordsContent
+        data={{
+          ...data([]),
+          tournamentAwards: [
+            { id: 'award-upper', tournamentId: 'tournament-9', tournamentTitle: '겨울 리그컵', awardType: 'mvp', awardLabel: 'MVP', bracketTrack: 'upper', iconKey: 'trophy', teamName: null, note: null, awardedAt: '2026-08-10T00:00:00.000Z' },
+            { id: 'award-lower', tournamentId: 'tournament-9', tournamentTitle: '겨울 리그컵', awardType: 'mvp', awardLabel: 'MVP', bracketTrack: 'lower', iconKey: 'trophy', teamName: null, note: null, awardedAt: '2026-08-10T00:00:00.000Z' },
+            { id: 'award-legacy', tournamentId: 'tournament-9', tournamentTitle: '겨울 리그컵', awardType: 'mvp', awardLabel: 'MVP', iconKey: 'trophy', teamName: null, note: null, awardedAt: '2026-08-10T00:00:00.000Z' },
+          ],
+        }}
+      />,
+    );
+
+    expect(screen.getByText('상위 결선 · MVP')).toBeInTheDocument();
+    expect(screen.getByText('하위 결선 · MVP')).toBeInTheDocument();
+    expect(screen.getByText('MVP', { exact: true })).toBeInTheDocument();
+  });
+
   // D2: withFromPath 로 바꾼 뒤에만 드러나는 차이 — 받은 출처가 지금 누르는 행과 같은
   // 화면을 가리키면 다시 감싸지 않고 그 값을 그대로 재사용한다.
   it('받은 출처가 지금 누르는 경기 화면 자신이면 다시 감싸지 않고 그대로 재사용한다', () => {

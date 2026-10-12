@@ -581,7 +581,9 @@ export const gameSchemaSourceManifest = {
   // unchanged; re-pin the schema bytes only.
   // 2026-10-11: additive V1OnboardingStatus value social_profile_deferred (MD-QA #125 migration). Game
   // models and the bound historical game-operations migration are unchanged; re-pin the schema bytes only.
-  schema: 'b63d3222b1f3d0e1a3c8309f116cfd50eb28b624245685dbea2f7fff1f6ee2b9',
+  // 2026-10-12: additive tournament bracket tracks and award sets (20261012050000_v1_tournament_split_knockout_awards).
+  // Game models and the bound historical game-operations migration are unchanged; re-pin the schema bytes only.
+  schema: '29b199fd1b1bf7c0b0497d186daf62fa69c7d16b2cb14d940dce40527e8687a5',
   migration: '6bd7fae42e9ee7debff71d26f7252d220ad2c12ae6f14745d103fc7fa61e8f64',
 } as const;
 

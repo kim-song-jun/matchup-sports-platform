@@ -28,6 +28,9 @@ export type BracketCanvasProps = {
   onAssignDirect: (fixtureId: string, side: SideKey, registrationId: string) => void;
 };
 
+// The shared API type is being updated separately; read the server's track field locally here.
+type BracketSlotWithTrack = V1AdminBracketSlot & { bracketTrack?: 'overall' | 'upper' | 'lower' };
+
 export function fixtureTitle(fixture: V1AdminBracketFixture, groups: readonly V1AdminBracketGroup[]): string {
   const group = groups.find((candidate) => candidate.id === fixture.groupId);
   const groupName = group?.name ?? null;
@@ -132,6 +135,12 @@ export function BracketCanvas({
           <BracketGroupBlock
             key={block.groupId}
             block={block}
+            hasSplitQualification={slots.some((slot) => {
+              const trackedSlot = slot as BracketSlotWithTrack;
+              return trackedSlot.kind === 'GROUP_RANK'
+                && trackedSlot.sourceGroupId === block.groupId
+                && trackedSlot.bracketTrack === 'lower';
+            })}
             canWrite={canWrite}
             lockedSlotIds={lockedSlotIds}
             pendingRegistrationId={pendingRegistrationId}

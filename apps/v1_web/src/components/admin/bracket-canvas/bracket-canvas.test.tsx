@@ -113,6 +113,10 @@ describe('BracketCanvas — 조별+결선 조 편성 블록', () => {
     });
   const rank = (letter: string, sourceGroupId: string, position: number) =>
     makeSlot({ id: `r${letter}${position}`, kind: 'GROUP_RANK', groupId: 'g-semi', sourceGroupId, position, label: `${letter}조 ${position}위` });
+  const splitRank = (letter: string, sourceGroupId: string, targetGroupId: string, position: number, bracketTrack: 'upper' | 'lower') => ({
+    ...makeSlot({ id: `split-${letter}${position}`, kind: 'GROUP_RANK', groupId: targetGroupId, sourceGroupId, position, label: `${letter}조 ${position}위` }),
+    bracketTrack,
+  });
   const rankSlots = [rank('A', 'gA', 1), rank('A', 'gA', 2), rank('B', 'gB', 1), rank('B', 'gB', 2)];
   const groupSlots = [
     entry('gA', 'A', 1, '서울FC'), entry('gA', 'A', 2), entry('gA', 'A', 3), entry('gA', 'A', 4),
@@ -143,6 +147,27 @@ describe('BracketCanvas — 조별+결선 조 편성 블록', () => {
     expect(screen.getAllByRole('heading', { level: 3 }).map((h) => h.textContent)).toEqual(['A조', 'B조', '조 편성', '4강', '결승']);
     expect(within(screen.getByRole('group', { name: 'A조 조 편성' })).getByRole('button', { name: 'A조 1번, 서울FC' })).toBeInTheDocument();
     expect(within(screen.getByRole('group', { name: 'A조 조 편성' })).getByRole('button', { name: 'A조 2번, 빈 자리' })).toBeInTheDocument();
+  });
+
+  it('하위 트랙 GROUP_RANK 슬롯이 있을 때 이름과 무관하게 분리 진출 규칙을 표시한다', () => {
+    const lower = makeGroup({ id: 'g-lower', name: '패자부활', phase: 'quarter', sortOrder: 2 });
+    renderCanvas({
+      ...stageProps(),
+      groups: [gFinal, gSemi, lower, gB, gA],
+      slots: [
+        ...groupSlots,
+        splitRank('A', 'gA', 'g-semi', 1, 'upper'),
+        splitRank('A', 'gA', 'g-semi', 2, 'upper'),
+        splitRank('B', 'gB', 'g-semi', 1, 'upper'),
+        splitRank('B', 'gB', 'g-semi', 2, 'upper'),
+        splitRank('A', 'gA', 'g-lower', 3, 'lower'),
+        splitRank('A', 'gA', 'g-lower', 4, 'lower'),
+        splitRank('B', 'gB', 'g-lower', 3, 'lower'),
+        splitRank('B', 'gB', 'g-lower', 4, 'lower'),
+      ],
+    });
+    expect(screen.getAllByText('1·2위 상위 · 3·4위 하위')).toHaveLength(2);
+    expect(screen.queryByText('상위 2팀 진출')).not.toBeInTheDocument();
   });
 
   it('조 순위 연결선 4개는 선·점 점선이고 설명 문구가 따로 붙는다 (승자선 설명과 구분)', () => {

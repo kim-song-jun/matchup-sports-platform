@@ -1,4 +1,4 @@
-import type { V1PlaceView } from '@/types/api';
+import type { V1PlaceView, V1TournamentBracketTrack } from '@/types/api';
 /**
  * Task 24 -- frontend-local mirror of the public-records response shapes
  * shipped in `apps/v1_api/src/games/public-records/**` (see
@@ -531,6 +531,8 @@ export interface PublicUserTournamentAward {
   readonly tournamentTitle: string;
   readonly awardType: string;
   readonly awardLabel: string;
+  /** Missing on legacy payloads, which semantically belong to the overall tournament scope. */
+  readonly bracketTrack?: V1TournamentBracketTrack;
   readonly iconKey:
     | 'trophy'
     | 'crown'

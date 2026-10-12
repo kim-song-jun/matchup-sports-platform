@@ -1733,6 +1733,7 @@ export function useV1TeamMatches(
     queryFn: () => v1Get<CursorPage<V1TeamMatch>>('/team-matches', filters),
     // 홈 추천처럼 한 장만 보여 주는 곳은 끈다 — 모든 방문자가 15초마다 목록을 다시 받을 이유가 없다.
     refetchInterval: options?.refetchInterval ?? 15000,
+    refetchOnWindowFocus: 'always',
     enabled: options?.enabled,
     // useV1Matches와 동일한 이유 — cursor로 쿼리키가 바뀌는 "더 보기" 중 목록이 비지 않게 하고,
     // 첫 진입에만 서버 seed 를 쓴다.
@@ -1747,6 +1748,10 @@ export function useV1TeamMatch(teamMatchId: string, options?: { seed?: V1TeamMat
     queryKey: v1Keys.teamMatch(teamMatchId),
     queryFn: () => v1Get<V1TeamMatch>(`/team-matches/${teamMatchId}`),
     enabled: Boolean(teamMatchId),
+    // Deadline status is derived by the API, so an open detail must refresh like the list and
+    // must re-read on tab return even when another consumer left a fresh cache entry.
+    refetchInterval: 15000,
+    refetchOnWindowFocus: 'always',
     // useV1Match 와 같은 이유·같은 안전장치(뷰어 상태·신청 목록 제거) — 자세한 근거는 그쪽 주석.
     placeholderData: () => {
       const source =

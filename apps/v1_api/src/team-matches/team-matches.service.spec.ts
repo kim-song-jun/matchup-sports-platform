@@ -81,6 +81,27 @@ function teamMatchRow(overrides: Record<string, unknown> = {}) {
   };
 }
 
+function publicTeamMatchDetailRow(overrides: Record<string, unknown> = {}) {
+  return {
+    ...teamMatchRow(overrides),
+    sport: { id: 'sport-1', name: '풋살' },
+    region: { id: 'region-1', name: '서울' },
+    minSportLevel: null,
+    maxSportLevel: null,
+    hostTeam: {
+      id: 'team-host',
+      name: '호스트팀',
+      ownerUserId: manager.id,
+      status: 'active',
+      profile: null,
+      trustScore: null,
+      memberships: [],
+    },
+    approvedApplicantTeam: null,
+    applications: [],
+  };
+}
+
 function applicationRow(overrides: Record<string, unknown> = {}) {
   return {
     id: 'app-1',
@@ -1033,7 +1054,7 @@ describe('TeamMatchesService', () => {
     const where = prisma.v1TeamMatch.findMany.mock.calls[0][0].where.AND[0];
     expect(where.status).toEqual({ in: ['recruiting', 'matched'] });
     expect(where.AND).toEqual(expect.arrayContaining([
-      { OR: [{ status: 'matched' }, { deadlineAt: null }, { deadlineAt: { gte: expect.any(Date) } }] },
+      { OR: [{ status: 'matched' }, { deadlineAt: null }, { deadlineAt: { gt: expect.any(Date) } }] },
     ]));
   });
 
@@ -1064,6 +1085,25 @@ describe('TeamMatchesService', () => {
     );
   });
 
+  it('close: 마감 자동 closed여도 경기 시작 후에는 기존 수동 마감 제한을 유지한다', async () => {
+    const now = new Date('2026-10-12T03:00:00.000Z');
+    jest.useFakeTimers({ doNotFake: ['nextTick', 'setImmediate', 'clearImmediate', 'setTimeout', 'clearTimeout', 'setInterval', 'clearInterval', 'queueMicrotask', 'hrtime', 'performance', 'requestAnimationFrame', 'cancelAnimationFrame', 'requestIdleCallback', 'cancelIdleCallback'] });
+    jest.setSystemTime(now);
+    prisma.v1TeamMatch.findFirst.mockResolvedValue(
+      teamMatchRow({ status: 'recruiting', startAt: new Date(now.getTime() - 60_000), deadlineAt: new Date(now.getTime() - 120_000), hostTeam: { id: 'team-host', sportId: 'sport-1' } }),
+    );
+    prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'mem-1', team: { sportId: 'sport-1', name: '호스트팀' } });
+
+    try {
+      await expect(service.close(manager, 'tm-1', { reason: '모집 완료' })).rejects.toMatchObject({ status: 409 });
+      expect(prisma.v1TeamMatch.update).not.toHaveBeenCalled();
+      expect(prisma.v1TeamMatchApplication.updateMany).not.toHaveBeenCalled();
+      expect(notifications.emitToManyDeferred).not.toHaveBeenCalled();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
   it('reopen: closed 팀매치를 recruiting으로 되돌린다', async () => {
     prisma.v1TeamMatch.findFirst.mockResolvedValue(
       teamMatchRow({ status: 'closed', startAt: FUTURE }),
@@ -1078,6 +1118,21 @@ describe('TeamMatchesService', () => {
     expect(prisma.v1TeamMatch.update).toHaveBeenCalledWith(
       expect.objectContaining({ data: expect.objectContaining({ status: 'recruiting' }) }),
     );
+  });
+
+  it('reopen: deadlineAt 경계부터는 재개 성공이 즉시 마감 상태로 뒤집히지 않도록 거부한다', async () => {
+    const now = new Date('2026-10-12T03:00:00.000Z');
+    jest.useFakeTimers({ doNotFake: ['nextTick', 'setImmediate', 'clearImmediate', 'setTimeout', 'clearTimeout', 'setInterval', 'clearInterval', 'queueMicrotask', 'hrtime', 'performance', 'requestAnimationFrame', 'cancelAnimationFrame', 'requestIdleCallback', 'cancelIdleCallback'] });
+    jest.setSystemTime(now);
+    prisma.v1TeamMatch.findFirst.mockResolvedValue(teamMatchRow({ status: 'closed', startAt: FUTURE, deadlineAt: now }));
+    prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'mem-1' });
+
+    try {
+      await expect(service.reopen(manager, 'tm-1', { reason: '추가 모집' })).rejects.toMatchObject({ status: 409 });
+      expect(prisma.v1TeamMatch.update).not.toHaveBeenCalled();
+    } finally {
+      jest.useRealTimers();
+    }
   });
 
   it('remove: 신청 이력 없는 보류 팀매치는 삭제할 수 있다', async () => {
@@ -1360,24 +1415,7 @@ describe('TeamMatchesService', () => {
 
   it('detail: 상대팀 없이 startAt이 과거면 on_hold를 반환 (NOT_FOUND_OR_ARCHIVED 전이 없음)', async () => {
     // The recruiting + past startAt match should be visible as "expired", not 404.
-    const teamMatch = {
-      ...teamMatchRow({ status: 'recruiting', startAt: PAST }),
-      sport: { id: 'sport-1', name: '풋살' },
-      region: { id: 'region-1', name: '서울' },
-      minSportLevel: null,
-      maxSportLevel: null,
-      hostTeam: {
-        id: 'team-host',
-        name: '호스트팀',
-        ownerUserId: manager.id,
-        status: 'active',
-        profile: null,
-        trustScore: null,
-        memberships: [],
-      },
-      approvedApplicantTeam: null,
-      applications: [],
-    };
+    const teamMatch = publicTeamMatchDetailRow({ status: 'recruiting', startAt: PAST });
     prisma.v1TeamMatch.findFirst.mockResolvedValue(teamMatch);
     prisma.v1Team.findMany.mockResolvedValue([]);
 
@@ -1385,32 +1423,148 @@ describe('TeamMatchesService', () => {
     expect(result.status).toBe('on_hold');
   });
 
-  it('detail: raw status가 recruiting이어도 신청 마감이 지났으면 displayState는 closed다', async () => {
-    const teamMatch = {
-      ...teamMatchRow({ status: 'recruiting', startAt: FUTURE, deadlineAt: PAST }),
-      sport: { id: 'sport-1', name: '풋살' },
-      region: { id: 'region-1', name: '서울' },
-      minSportLevel: null,
-      maxSportLevel: null,
-      hostTeam: {
-        id: 'team-host',
-        name: '호스트팀',
-        ownerUserId: manager.id,
-        status: 'active',
-        profile: null,
-        trustScore: null,
-        memberships: [],
-      },
-      approvedApplicantTeam: null,
-      applications: [],
-    };
+  it('detail: 미매칭 모집 팀매치는 신청 마감 시각부터 closed로 노출한다', async () => {
+    const now = new Date('2026-10-12T03:00:00.000Z');
+    jest.useFakeTimers({ doNotFake: ['nextTick', 'setImmediate', 'clearImmediate', 'setTimeout', 'clearTimeout', 'setInterval', 'clearInterval', 'queueMicrotask', 'hrtime', 'performance', 'requestAnimationFrame', 'cancelAnimationFrame', 'requestIdleCallback', 'cancelIdleCallback'] });
+    jest.setSystemTime(now);
+    const teamMatch = publicTeamMatchDetailRow({ status: 'recruiting', startAt: new Date(now.getTime() + 60_000), deadlineAt: now });
     prisma.v1TeamMatch.findFirst.mockResolvedValue(teamMatch);
+    prisma.v1Team.findMany.mockResolvedValue([]);
+
+    try {
+      const result = await service.detail(null, 'tm-1');
+
+      expect(result.status).toBe('closed');
+      expect(result.displayState).toBe('closed');
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it.each([
+    ['미래 마감', { status: 'recruiting', deadlineAt: FUTURE }, 'recruiting', 'recruiting'],
+    ['마감 시각 없음', { status: 'recruiting', deadlineAt: null }, 'recruiting', 'recruiting'],
+    ['이미 마감된 글', { status: 'closed', deadlineAt: PAST }, 'closed', 'closed'],
+    ['마감 뒤 경기 시작', { status: 'recruiting', startAt: PAST, deadlineAt: PAST }, 'closed', 'closed'],
+    ['시작 뒤 수동 마감', { status: 'closed', startAt: PAST, deadlineAt: null }, 'on_hold', 'on_hold'],
+    ['리그 모집의 기존 표시', { status: 'recruiting', leagueId: 'league-1', deadlineAt: PAST }, 'recruiting', 'closed'],
+    ['대회 모집의 기존 표시', { status: 'recruiting', tournamentId: 'tournament-1', deadlineAt: PAST }, 'recruiting', 'closed'],
+    ['상대팀 확정 모집의 기존 표시', { status: 'recruiting', approvedApplicantTeamId: 'team-away', deadlineAt: PAST }, 'recruiting', 'closed'],
+    ['상대팀이 이미 매칭된 글', { status: 'matched', approvedApplicantTeamId: 'team-away', deadlineAt: PAST }, 'matched', 'matched'],
+    ['취소된 글', { status: 'cancelled', deadlineAt: PAST }, 'cancelled', 'cancelled'],
+    ['종료된 글', { status: 'completed', deadlineAt: PAST }, 'completed', 'completed'],
+  ])('detail: 신청 마감 전후에도 %s 상태는 기존 범위를 유지한다', async (_label, overrides, expectedStatus, expectedDisplayState) => {
+    prisma.v1TeamMatch.findFirst.mockResolvedValue(publicTeamMatchDetailRow(overrides));
     prisma.v1Team.findMany.mockResolvedValue([]);
 
     const result = await service.detail(null, 'tm-1');
 
-    expect(result.status).toBe('on_hold');
-    expect(result.displayState).toBe('on_hold');
+    expect(result.status).toBe(expectedStatus);
+    expect(result.displayState).toBe(expectedDisplayState);
+  });
+
+  it('detail: 마감 시각과 같은 순간에도 새 신청을 닫고 이미 접수된 신청은 승인할 수 있다', async () => {
+    const now = new Date('2026-10-12T03:00:00.000Z');
+    jest.useFakeTimers({ doNotFake: ['nextTick', 'setImmediate', 'clearImmediate', 'setTimeout', 'clearTimeout', 'setInterval', 'clearInterval', 'queueMicrotask', 'hrtime', 'performance', 'requestAnimationFrame', 'cancelAnimationFrame', 'requestIdleCallback', 'cancelIdleCallback'] });
+    jest.setSystemTime(now);
+    try {
+      const app = applicationWithTeamMatch(
+        { status: 'requested' },
+        { status: 'recruiting', startAt: new Date(now.getTime() + 60_000), deadlineAt: now },
+      );
+      prisma.v1TeamMatchApplication.findFirst.mockResolvedValue(app);
+      prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'mem-1' });
+      prisma.v1TeamMatch.findFirst.mockResolvedValue(teamMatchRow({ deadlineAt: now }));
+      prisma.v1TeamMatchApplication.updateMany.mockResolvedValue({ count: 1 });
+      prisma.v1TeamMatch.update.mockResolvedValue(teamMatchRow({ status: 'matched', approvedApplicantTeamId: 'team-applicant' }));
+
+      const result = await service.approveApplication(manager, 'app-1', {});
+
+      expect(result.status).toBe('approved');
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('detail: 관리 액션 플래그는 원본 상태와 관리 권한에 맞춰 제공한다', async () => {
+    prisma.v1TeamMatch.findFirst.mockResolvedValue({
+      ...publicTeamMatchDetailRow({ status: 'recruiting', startAt: FUTURE, deadlineAt: PAST }),
+      hostTeam: {
+        ...publicTeamMatchDetailRow().hostTeam,
+        memberships: [{ userId: manager.id, role: 'manager', status: 'active' }],
+      },
+    });
+    prisma.v1Team.findMany.mockResolvedValue([]);
+    prisma.v1TeamMatchApplication.count.mockResolvedValue(0);
+
+    const result = await service.detail(manager, 'tm-1');
+
+    expect(result.lifecycle).toEqual(expect.objectContaining({
+      canCloseRecruitment: true,
+      canReopenRecruitment: false,
+    }));
+  });
+
+  it('detail: 마감 자동 closed 이후 경기 시작 시에는 수동 마감 액션을 숨긴다', async () => {
+    const now = new Date('2026-10-12T03:00:00.000Z');
+    jest.useFakeTimers({ doNotFake: ['nextTick', 'setImmediate', 'clearImmediate', 'setTimeout', 'clearTimeout', 'setInterval', 'clearInterval', 'queueMicrotask', 'hrtime', 'performance', 'requestAnimationFrame', 'cancelAnimationFrame', 'requestIdleCallback', 'cancelIdleCallback'] });
+    jest.setSystemTime(now);
+    const detail = publicTeamMatchDetailRow({
+      status: 'recruiting',
+      startAt: new Date(now.getTime() - 60_000),
+      deadlineAt: new Date(now.getTime() - 120_000),
+    });
+    prisma.v1TeamMatch.findFirst.mockResolvedValue({
+      ...detail,
+      hostTeam: { ...detail.hostTeam, memberships: [{ userId: manager.id, role: 'manager', status: 'active' }] },
+    });
+    prisma.v1Team.findMany.mockResolvedValue([]);
+    prisma.v1TeamMatchApplication.count.mockResolvedValue(0);
+
+    try {
+      const result = await service.detail(manager, 'tm-1');
+      expect(result.status).toBe('closed');
+      expect(result.lifecycle.canCloseRecruitment).toBe(false);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it.each([
+    ['재개 가능한 수동 마감', { status: 'closed', startAt: FUTURE, deadlineAt: null }, true],
+    ['기한이 지난 자동 마감', { status: 'closed', startAt: FUTURE, deadlineAt: PAST }, false],
+  ])('detail: %s에는 재개 가능 여부를 정확히 표시한다', async (_label, overrides, canReopenRecruitment) => {
+    const detail = publicTeamMatchDetailRow({ ...overrides, hostTeamId: 'team-host' });
+    prisma.v1TeamMatch.findFirst.mockResolvedValue({
+      ...detail,
+      hostTeam: { ...detail.hostTeam, memberships: [{ userId: manager.id, role: 'manager', status: 'active' }] },
+    });
+    prisma.v1Team.findMany.mockResolvedValue([]);
+    prisma.v1TeamMatchApplication.count.mockResolvedValue(0);
+
+    const result = await service.detail(manager, 'tm-1');
+
+    expect(result.lifecycle.canReopenRecruitment).toBe(canReopenRecruitment);
+  });
+
+  it('detail: 마감 시각과 같은 순간부터 재개 버튼을 제공하지 않는다', async () => {
+    const now = new Date('2026-10-12T03:00:00.000Z');
+    jest.useFakeTimers({ doNotFake: ['nextTick', 'setImmediate', 'clearImmediate', 'setTimeout', 'clearTimeout', 'setInterval', 'clearInterval', 'queueMicrotask', 'hrtime', 'performance', 'requestAnimationFrame', 'cancelAnimationFrame', 'requestIdleCallback', 'cancelIdleCallback'] });
+    jest.setSystemTime(now);
+    const detail = publicTeamMatchDetailRow({ status: 'closed', startAt: new Date(now.getTime() + 60_000), deadlineAt: now });
+    prisma.v1TeamMatch.findFirst.mockResolvedValue({
+      ...detail,
+      hostTeam: { ...detail.hostTeam, memberships: [{ userId: manager.id, role: 'manager', status: 'active' }] },
+    });
+    prisma.v1Team.findMany.mockResolvedValue([]);
+    prisma.v1TeamMatchApplication.count.mockResolvedValue(0);
+
+    try {
+      const result = await service.detail(manager, 'tm-1');
+      expect(result.lifecycle.canReopenRecruitment).toBe(false);
+    } finally {
+      jest.useRealTimers();
+    }
   });
 
   // Task 17: the result-entry/approval screens call `/games/:gameId/...` and
@@ -2395,6 +2549,32 @@ describe('TeamMatchesService', () => {
 
       const created = await service.createApplication(manager, 'tm-1', { applicantTeamId: 'team-applicant' });
       expect(created.status).toBe('requested');
+    });
+
+    it('createApplication: deadlineAt 경계와 같은 시각부터 새 신청을 거부한다', async () => {
+      const now = new Date('2026-10-12T03:00:00.000Z');
+      jest.useFakeTimers({ doNotFake: ['nextTick', 'setImmediate', 'clearImmediate', 'setTimeout', 'clearTimeout', 'setInterval', 'clearInterval', 'queueMicrotask', 'hrtime', 'performance', 'requestAnimationFrame', 'cancelAnimationFrame', 'requestIdleCallback', 'cancelIdleCallback'] });
+      jest.setSystemTime(now);
+      prisma.v1TeamMatch.findFirst.mockResolvedValue({
+        ...teamMatchRow({ status: 'recruiting', startAt: new Date(now.getTime() + 60_000), deadlineAt: now, hostTeamId: 'team-host' }),
+        sport: { id: 'sport-1', name: '풋살' }, region: { id: 'region-1', name: '서울' },
+        minSportLevel: null, maxSportLevel: null,
+        hostTeam: { id: 'team-host', memberships: [], trustScore: null }, approvedApplicantTeam: null, applications: [],
+      });
+      prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'mem-applicant', team: { sportId: 'sport-1' } });
+      prisma.v1Team.findMany.mockResolvedValue([
+        { id: 'team-applicant', name: '신청팀', sportId: 'sport-1', memberships: [{ role: 'manager' }] },
+      ]);
+
+      try {
+        const eligibility = await service.applicationEligibility(manager, 'tm-1', {});
+        expect(eligibility.teams[0]).toMatchObject({ eligible: false, reasonCode: 'NOT_RECRUITING' });
+        await expect(service.createApplication(manager, 'tm-1', { applicantTeamId: 'team-applicant' }))
+          .rejects.toMatchObject({ response: { code: 'NOT_RECRUITING' } });
+        expect(prisma.v1TeamMatchApplication.create).not.toHaveBeenCalled();
+      } finally {
+        jest.useRealTimers();
+      }
     });
   });
 

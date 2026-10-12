@@ -1287,6 +1287,13 @@ describe('TeamMatchDetailPageClient — 리그 대진은 "팀매치 취소"를 �
         startsAt: '2026-08-01T10:00:00.000Z',
         status,
         displayState: status,
+        lifecycle: {
+          canEdit: false,
+          canDelete: false,
+          onHoldReason: null,
+          canCloseRecruitment: status === 'recruiting',
+          canReopenRecruitment: status === 'closed',
+        },
         viewer: { state: 'host_team', manageableHostTeam: true },
         hostTeam: { teamId: 'team-host', name: '알파팀' },
         approvedOpponentTeam: opponent,
@@ -1610,7 +1617,9 @@ describe('TeamMatchDetailPageClient — 호스트의 신청 승인·관리 메�
         sportName: '풋살',
         placeName: '경기장',
         startsAt: FUTURE,
+        deadlineAt: FUTURE,
         status: 'recruiting',
+        lifecycle: { canEdit: true, canDelete: false, onHoldReason: null, canCloseRecruitment: true, canReopenRecruitment: false },
         viewer: { state: 'host_team', manageableHostTeam: true },
         hostTeam: { teamId: 'team-host', name: '마포 FC' },
         ...data,
@@ -1680,26 +1689,61 @@ describe('TeamMatchDetailPageClient — 호스트의 신청 승인·관리 메�
     expect(json('team-match-host-action-details')[0]).toEqual({ label: '모집 마감', description: '더 이상 신청을 받지 않아요.', confirm: null });
   });
 
-  it('신청 마감 시각만 지난 매치(api recruiting · 화면 closed)는 재개가 아니라 마감·수정이 열린다 — 서버 판정과 같다', () => {
-    mockHost({ status: 'recruiting', displayState: 'closed' });
+  it('자동 마감된 매치는 남은 대기 신청 종료 액션과 파괴 동작 확인을 표시한다', () => {
+    mockHost({
+      status: 'closed',
+      displayState: 'closed',
+      deadlineAt: '2026-08-01T10:00:00.000Z',
+      lifecycle: { canEdit: true, canDelete: false, onHoldReason: null, canCloseRecruitment: true, canReopenRecruitment: false },
+    });
+    applicationsRef.current = { items: [application('a', 'requested'), application('b', 'requested')] };
     render(<TeamMatchDetailPageClient teamMatchId="tm-h6" />);
 
-    expect(screen.getByTestId('team-match-host-actions')).toHaveTextContent('모집 마감,팀매치 취소');
-    expect(screen.getByTestId('team-match-next-action')).toHaveTextContent('매치 수정');
+    expect(screen.getByTestId('team-match-host-actions')).toHaveTextContent('대기 신청 종료,팀매치 취소');
+    expect(json('team-match-host-action-details')[0]).toMatchObject({
+      label: '대기 신청 종료',
+      description: '대기 중인 신청 2팀이 종료돼요.',
+      confirm: {
+        title: '대기 신청을 종료할까요?',
+        message: '대기 중인 신청 2팀이 종료되고 알림이 가요.',
+        confirmLabel: '대기 신청 종료',
+      },
+    });
+    expect(screen.getByTestId('team-match-next-action')).toBeEmptyDOMElement();
+    expect(screen.getByTestId('team-match-apply-label')).toHaveTextContent('신청 마감');
+    expect(json('team-match-manage-menu').edit).toEqual({ href: '/team-matches/tm-h6/edit' });
   });
 
   it('직접 마감한 매치는 재개가 다음 할 일이고 수정은 이유와 함께 잠긴다', () => {
-    mockHost({ status: 'closed', displayState: 'closed' });
+    mockHost({
+      status: 'closed',
+      displayState: 'closed',
+      lifecycle: { canEdit: false, canDelete: false, onHoldReason: null, canCloseRecruitment: false, canReopenRecruitment: true },
+    });
     render(<TeamMatchDetailPageClient teamMatchId="tm-h6" />);
 
     expect(screen.getByTestId('team-match-host-actions')).toHaveTextContent('모집 재개,팀매치 취소');
     expect(screen.getByTestId('team-match-next-action')).toHaveTextContent('모집 재개');
-    expect(json('team-match-manage-menu').edit.lockedReason).toContain('모집을 다시 열면');
+    expect(json('team-match-manage-menu').edit.lockedReason).toBe('모집을 마감해서 수정할 수 없어요.');
+  });
+
+  it('마감·재개 capability가 없으면 상태값만으로 액션을 추측하지 않는다', () => {
+    mockHost({
+      status: 'closed',
+      displayState: 'closed',
+      deadlineAt: '2026-08-01T10:00:00.000Z',
+      lifecycle: { canEdit: false, canDelete: false, onHoldReason: null, canCloseRecruitment: false, canReopenRecruitment: false },
+    });
+
+    render(<TeamMatchDetailPageClient teamMatchId="tm-h6" />);
+
+    expect(screen.getByTestId('team-match-host-actions')).toHaveTextContent('팀매치 취소');
+    expect(screen.getByTestId('team-match-host-actions')).not.toHaveTextContent(/모집 마감|모집 재개|대기 신청 종료/);
   });
 
   // 취소·수정은 ⋯ 메뉴가 맡고, 보류 결정 패널(MatchLifecyclePanel)은 보류 매치에만 남는다 — 메뉴에 없던 "삭제"는 메뉴로 옮겼다.
   it('지원 이력이 없는 모집 중 매치는 ⋯ 메뉴에 삭제가 있고, 상세에는 관리 패널이 없다', () => {
-    mockHost({ lifecycle: { canEdit: true, canDelete: true, onHoldReason: null } });
+    mockHost({ lifecycle: { canEdit: true, canDelete: true, onHoldReason: null, canCloseRecruitment: true, canReopenRecruitment: false } });
     render(<TeamMatchDetailPageClient teamMatchId="tm-h6" />);
 
     expect(screen.getByTestId('team-match-host-actions')).toHaveTextContent('모집 마감,팀매치 취소,팀매치 삭제');
@@ -1708,14 +1752,14 @@ describe('TeamMatchDetailPageClient — 호스트의 신청 승인·관리 메�
   });
 
   it('대조군 — 삭제할 수 없는 매치(canDelete=false)의 메뉴에는 삭제가 없다', () => {
-    mockHost({ lifecycle: { canEdit: true, canDelete: false, onHoldReason: null } });
+    mockHost({ lifecycle: { canEdit: true, canDelete: false, onHoldReason: null, canCloseRecruitment: true, canReopenRecruitment: false } });
     render(<TeamMatchDetailPageClient teamMatchId="tm-h6" />);
 
     expect(screen.getByTestId('team-match-host-actions')).toHaveTextContent(/^모집 마감,팀매치 취소$/);
   });
 
   it('보류 매치는 취소·삭제를 보류 결정 패널이 맡고 ⋯ 메뉴에는 두지 않는다', () => {
-    mockHost({ status: 'on_hold', lifecycle: { canEdit: true, canDelete: true, onHoldReason: 'NO_OPPONENT' } });
+    mockHost({ status: 'on_hold', lifecycle: { canEdit: true, canDelete: true, onHoldReason: 'NO_OPPONENT', canCloseRecruitment: false, canReopenRecruitment: false } });
     render(<TeamMatchDetailPageClient teamMatchId="tm-h6" />);
 
     expect(screen.getByTestId('team-match-lifecycle-panel')).toHaveTextContent('true');

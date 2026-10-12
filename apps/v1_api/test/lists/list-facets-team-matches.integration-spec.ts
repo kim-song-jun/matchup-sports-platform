@@ -21,7 +21,7 @@ describe('팀 매치 목록 totalCount·facets HTTP/DB 계약', () => {
   const list = async (params: Record<string, string | number | boolean> = {}) => {
     const response = await request(app.getHttpServer()).get('/api/v1/team-matches').query({ regionId, limit: 50, includeFacets: true, ...params }).expect(200);
     return response.body.data as {
-      items: Array<{ teamMatchId: string }>;
+      items: Array<{ teamMatchId: string; status: string; displayState: string }>;
       pageInfo: { totalCount?: number; nextCursor: string | null };
       facets?: { sports: Array<{ sportId: string; count: number }>; today: number; recruiting: number };
     };
@@ -133,5 +133,52 @@ describe('팀 매치 목록 totalCount·facets HTTP/DB 계약', () => {
 
   it('잘못된 토글 값은 400 이다', async () => {
     await request(app.getHttpServer()).get('/api/v1/team-matches').query({ today: 'yes' }).expect(400);
+  });
+
+  it('deadlineAt 만료는 검색·closed 필터에 포함되고 recruiting 필터에서는 제외된다', async () => {
+    const futureMatchId = randomUUID();
+    const startedMatchId = randomUUID();
+    const title = `마감 자동 처리 ${futureMatchId}`;
+    const exactCutoff = new Date();
+    await db.v1TeamMatch.createMany({
+      data: [
+        row(sportA, {
+          id: futureMatchId,
+          title,
+          status: 'recruiting',
+          deadlineAt: exactCutoff,
+          startAt: new Date(Date.now() + DAY),
+        }),
+        row(sportA, {
+          id: startedMatchId,
+          title,
+          status: 'recruiting',
+          deadlineAt: new Date(exactCutoff.getTime() - DAY),
+          startAt: new Date(exactCutoff.getTime() - 1000),
+        }),
+      ],
+    });
+
+    try {
+      const closed = await list({ status: 'closed', query: title, includeFacets: false });
+      expect(closed.items).toEqual(expect.arrayContaining([
+        expect.objectContaining({ teamMatchId: futureMatchId, status: 'closed', displayState: 'closed' }),
+        expect.objectContaining({ teamMatchId: startedMatchId, status: 'closed', displayState: 'closed' }),
+      ]));
+
+      const recruiting = await list({ status: 'recruiting', query: title, includeFacets: false });
+      expect(recruiting.items).toEqual([]);
+      const available = await list({ recruitingOnly: true, query: title, includeFacets: false });
+      expect(available.items).toEqual([]);
+      const recommended = await list({ sort: 'recommended', query: title, includeFacets: false });
+      expect(recommended.items).toEqual([]);
+
+      for (const id of [futureMatchId, startedMatchId]) {
+        const detail = await request(app.getHttpServer()).get(`/api/v1/team-matches/${id}`).expect(200);
+        expect(detail.body.data).toEqual(expect.objectContaining({ status: 'closed', displayState: 'closed' }));
+      }
+    } finally {
+      await db.v1TeamMatch.deleteMany({ where: { id: { in: [futureMatchId, startedMatchId] } } });
+    }
   });
 });

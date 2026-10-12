@@ -15,6 +15,7 @@ const DESKTOP_UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/
 type W = Window & { webkit?: unknown };
 const KEY = 'teameet:v1:open-in-app:dismissed';
 const STORE_URL = 'https://apps.apple.com/kr/app/id6809736050';
+const PLAY_STORE_URL = 'https://play.google.com/store/apps/details?id=kr.co.teameet';
 
 function setUa(ua: string) {
   Object.defineProperty(window.navigator, 'userAgent', { value: ua, configurable: true });
@@ -44,17 +45,22 @@ afterEach(() => {
   vi.useRealTimers();
   vi.restoreAllMocks();
   delete (window as W).webkit;
+  delete window.TeameetNative;
 });
 
 describe('OpenInAppSheet', () => {
-  it('iPhone Safari 에서 1.5초 뒤 열리고 App Store 링크와 앱 아이콘을 보여 준다', async () => {
+  it.each([
+    ['iPhone Safari', IPHONE_UA, STORE_URL],
+    ['Android Chrome', ANDROID_UA, PLAY_STORE_URL],
+  ])('%s 에서 1.5초 뒤 열리고 해당 스토어 링크와 앱 아이콘을 보여 준다', async (_label, ua, storeUrl) => {
+    setUa(ua);
     await mount();
     advance(1499);
     expect(screen.queryByRole('dialog')).toBeNull();
     advance(1);
 
     expect(screen.getByRole('dialog')).toBeTruthy();
-    expect(screen.getByRole('link', { name: '앱으로 열기' }).getAttribute('href')).toBe(STORE_URL);
+    expect(screen.getByRole('link', { name: '앱으로 열기' }).getAttribute('href')).toBe(storeUrl);
     expect(document.querySelector('img')?.getAttribute('src')).toBe('/brand/icon-192.png');
   });
 
@@ -74,8 +80,15 @@ describe('OpenInAppSheet', () => {
     expect(screen.queryByRole('dialog')).toBeNull();
   });
 
+  it('Android 네이티브 셸 안에서는 열리지 않는다', async () => {
+    setUa(ANDROID_UA);
+    window.TeameetNative = { postMessage() {} };
+    await mount();
+    advance(5000);
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
   it.each([
-    ['Android', ANDROID_UA],
     ['데스크톱', DESKTOP_UA],
   ])('%s UA 에서는 열리지 않는다', async (_label, ua) => {
     setUa(ua);
@@ -94,7 +107,8 @@ describe('OpenInAppSheet', () => {
     },
   );
 
-  it('"모바일 웹으로 계속 볼게요" 로 닫으면 기록되고 다시 마운트해도 열리지 않는다', async () => {
+  it.each([['iPhone', IPHONE_UA], ['Android', ANDROID_UA]])('%s: 웹으로 계속 보기로 닫으면 다시 마운트해도 열리지 않는다', async (_label, ua) => {
+    setUa(ua);
     const first = await mount();
     advance(1500);
     fireEvent.click(screen.getByRole('button', { name: '모바일 웹으로 계속 볼게요' }));
@@ -108,7 +122,8 @@ describe('OpenInAppSheet', () => {
     expect(screen.queryByRole('dialog')).toBeNull();
   });
 
-  it('"앱으로 열기" 클릭도 닫힘으로 기록하고, App Store 에서 돌아와도 시트가 남지 않게 닫는다', async () => {
+  it.each([['iPhone', IPHONE_UA], ['Android', ANDROID_UA]])('%s: 앱으로 열기를 누르면 스토어 이동 후 시트가 남지 않게 닫는다', async (_label, ua) => {
+    setUa(ua);
     await mount();
     advance(1500);
     const link = screen.getByRole('link', { name: '앱으로 열기' });

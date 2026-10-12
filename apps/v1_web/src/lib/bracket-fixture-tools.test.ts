@@ -70,4 +70,20 @@ describe('bracketSourceCandidates', () => {
   it('앞 단계가 없는 8강 경기(12강·16강 없는 대진)나 조별리그 경기는 후보가 없다', () => {
     expect(bracketSourceCandidates({ target: q1, groups, fixtures: [q1, q2] })).toEqual([]);
   });
+
+  it('승자와 패자 출처는 각각 한 번만 연결하고, 현재 대상 링크는 다시 편집할 수 있다', () => {
+    const third = makeGroup({ id: 'g-third', name: '3·4위전', phase: 'third_place' });
+    const semi = makeFixture({ id: 'semi-source', groupId: 'g-sf', fixtureNumber: 5, game: makeGame() });
+    const finalWithWinner = makeFixture({
+      id: 'final-winner', groupId: 'g-fin', fixtureNumber: 7, game: makeGame(),
+      bracketSources: [{ fixtureId: 'semi-source', side: 'HOME', outcome: 'WINNER' }],
+    });
+    const finalTarget = makeFixture({ id: 'final-target', groupId: 'g-fin', fixtureNumber: 8, game: makeGame() });
+    const thirdTarget = makeFixture({ id: 'third-target', groupId: 'g-third', fixtureNumber: 9, game: makeGame() });
+    const fixtures = [semi, finalWithWinner, finalTarget, thirdTarget];
+
+    expect(bracketSourceCandidates({ target: finalTarget, groups: [...groups, third], fixtures })).toEqual([]);
+    expect(bracketSourceCandidates({ target: finalWithWinner, groups: [...groups, third], fixtures })).toContain(semi);
+    expect(bracketSourceCandidates({ target: thirdTarget, groups: [...groups, third], fixtures })).toContain(semi);
+  });
 });

@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useId, useState } from 'react';
+import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { Zap } from 'lucide-react';
 import type { AdminToastVariant } from '@/components/admin';
 import { AlertBanner, EmptyState } from '@/components/v1-ui/primitives';
@@ -26,6 +26,7 @@ export interface BracketCanvasMobileProps {
   competitionId: string;
   scope: 'tournament' | 'league';
   rounds: MobileRound[];
+  focusFixtureId?: string | null;
   slots: V1AdminBracketSlot[];
   /** 한 팀 한 조 후보 제외용 — tournament scope 에서만 넘긴다. */
   groups?: readonly V1AdminBracketGroup[];
@@ -106,17 +107,27 @@ function MobileNodeCard({ node, expanded, onOpen }: { node: MobileNode; expanded
   );
 }
 
-export function BracketCanvasMobile({ competitionId, scope, rounds, slots, groups, fixtures, candidates, canWrite, registrationsState, showToast }: BracketCanvasMobileProps) {
+export function BracketCanvasMobile({ competitionId, scope, rounds, focusFixtureId = null, slots, groups, fixtures, candidates, canWrite, registrationsState, showToast }: BracketCanvasMobileProps) {
   const roundSelectId = useId();
   const [pickedRoundKey, setPickedRoundKey] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [view, setView] = useState<MobileSheetView>({ kind: 'detail' });
+  const lastFocusedFixtureIdRef = useRef<string | null>(null);
   const closeSheet = useCallback(() => setSelectedId(null), []);
   // 다른 칸을 열 때 이전 칸의 팀 고르기 화면이 남지 않게 한다.
   const openNode = useCallback((fixtureId: string) => {
     setView({ kind: 'detail' });
     setSelectedId(fixtureId);
   }, []);
+
+  useEffect(() => {
+    if (focusFixtureId === null || focusFixtureId === lastFocusedFixtureIdRef.current) return;
+    const containingRound = rounds.find((round) => findNode([round], focusFixtureId) !== null);
+    if (containingRound === undefined) return;
+    lastFocusedFixtureIdRef.current = focusFixtureId;
+    setPickedRoundKey(containingRound.key);
+    openNode(focusFixtureId);
+  }, [focusFixtureId, openNode, rounds]);
 
   const activeKey = rounds.some((round) => round.key === pickedRoundKey) ? pickedRoundKey : pickInitialRoundKey(rounds);
   const activeRound = rounds.find((round) => round.key === activeKey) ?? null;

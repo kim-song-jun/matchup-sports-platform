@@ -460,6 +460,7 @@ export function BracketCanvasWorkspace({
           tournamentId={tournamentId}
           format={templateFormat}
           confirmedTeamCount={registrations.filter((registration) => registration.status === 'confirmed').length}
+          confirmedTeamCountStatus={registrationsState.status}
           hasExistingBracket={!isEmpty}
           onApplied={() => {
             void refetch().then(({ data }) => {

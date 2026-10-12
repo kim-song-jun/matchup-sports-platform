@@ -826,6 +826,7 @@ export default function LeagueMatchFixturesClient({
               competitionId={leagueId}
               scope="league"
               rounds={mobileRounds}
+              focusFixtureId={focusFixtureId}
               slots={series.slots ?? []}
               candidates={mobileCandidates}
               canWrite={canWrite}

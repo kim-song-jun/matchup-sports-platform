@@ -18,14 +18,70 @@ function renderDialog(overrides: Partial<React.ComponentProps<typeof BracketTemp
     showToast: vi.fn(),
     ...overrides,
   };
-  render(<BracketTemplateDialog {...props} />);
-  return props;
+  const view = render(<BracketTemplateDialog {...props} />);
+  return {
+    ...props,
+    rerender: (nextOverrides: Partial<React.ComponentProps<typeof BracketTemplateDialog>>) =>
+      view.rerender(<BracketTemplateDialog {...props} {...nextOverrides} />),
+  };
 }
 
 const create = () => fireEvent.click(screen.getByRole('button', { name: '대진 만들기' }));
 
 beforeEach(() => {
   vi.clearAllMocks();
+});
+
+describe('BracketTemplateDialog — 참가 수 동기화', () => {
+  it('닫혀 있는 동안 확정 참가팀이 로드되면 열 때 최신 수를 사용한다', async () => {
+    const dialog = renderDialog({ open: false, confirmedTeamCount: 0 });
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+
+    dialog.rerender({ open: true, confirmedTeamCount: 12 });
+
+    await waitFor(() => expect(screen.getByLabelText('참가 팀 수')).toHaveValue('12'));
+    expect(screen.getByLabelText('12팀 대진 틀')).toBeChecked();
+  });
+
+  it('열린 뒤 아직 건드리지 않은 입력은 확정 참가팀 수가 도착하면 갱신한다', async () => {
+    const dialog = renderDialog({ open: true, confirmedTeamCount: 0 });
+    expect(screen.getByLabelText('참가 팀 수')).toHaveValue('8');
+
+    dialog.rerender({ confirmedTeamCount: 12 });
+
+    await waitFor(() => expect(screen.getByLabelText('참가 팀 수')).toHaveValue('12'));
+  });
+
+  it('운영자가 참가 수를 편집하면 늦게 도착한 확정 수로 덮어쓰지 않는다', async () => {
+    const dialog = renderDialog({ open: true, confirmedTeamCount: 0 });
+    fireEvent.change(screen.getByLabelText('참가 팀 수'), { target: { value: '4' } });
+
+    dialog.rerender({ confirmedTeamCount: 12 });
+
+    await waitFor(() => expect(screen.getByLabelText('참가 팀 수')).toHaveValue('4'));
+  });
+
+  it('다시 열 때는 마지막 확정 참가 수를 이전 입력보다 우선한다', async () => {
+    const dialog = renderDialog({ open: true, confirmedTeamCount: 4 });
+    fireEvent.change(screen.getByLabelText('참가 팀 수'), { target: { value: '8' } });
+
+    dialog.rerender({ open: false, confirmedTeamCount: 12 });
+    dialog.rerender({ open: true, confirmedTeamCount: 12 });
+
+    await waitFor(() => expect(screen.getByLabelText('참가 팀 수')).toHaveValue('12'));
+    expect(screen.getByLabelText('12팀 대진 틀')).toBeChecked();
+  });
+
+  it.each(['pending', 'error'] as const)('참가팀 목록이 %s이면 인원 수를 추측하지 않고 적용을 막는다', (status) => {
+    renderDialog({ confirmedTeamCountStatus: status });
+    expect(screen.getByLabelText('참가 팀 수')).toHaveValue('');
+    if (status === 'pending') {
+      expect(screen.getByRole('status')).toHaveTextContent('불러오는 중');
+    } else {
+      expect(screen.getByText('확정 참가팀 수를 불러오지 못했어요. 참가팀 목록을 다시 불러온 뒤 대진을 만들어 주세요.')).toBeInTheDocument();
+    }
+    expect(screen.getByRole('button', { name: '대진 만들기' })).toBeDisabled();
+  });
 });
 
 describe('BracketTemplateDialog — 토너먼트', () => {
@@ -40,6 +96,7 @@ describe('BracketTemplateDialog — 토너먼트', () => {
     renderDialog();
     fireEvent.change(screen.getByLabelText('참가 팀 수'), { target: { value: '12' } });
     expect(screen.getByText('경기 12개 · 자리 12개 · 연결 12개')).toBeInTheDocument();
+    expect(screen.getByText(/진행 순서:/)).toHaveTextContent('12강 4경기 → 부전승 4자리 → 8강 4경기');
     expect(screen.getByText(/4팀은 부전승으로 8강에 올라가요/)).toBeInTheDocument();
     fireEvent.click(screen.getByLabelText('3·4위전도 만들기'));
     expect(screen.getByText('경기 11개 · 자리 12개 · 연결 10개')).toBeInTheDocument();

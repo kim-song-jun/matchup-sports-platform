@@ -22,6 +22,7 @@ export function bracketSourceCandidates(input: {
   const targetPhase = phaseByGroup.get(target.groupId ?? '') ?? '';
   const previousPhases = BRACKET_SOURCE_PHASES[targetPhase];
   if (previousPhases === undefined) return [];
+  const sourceOutcome = targetPhase === 'third_place' ? 'LOSER' : 'WINNER';
   return fixtures.filter(
     (fixture) =>
       previousPhases.includes(phaseByGroup.get(fixture.groupId ?? '') ?? '') &&
@@ -29,6 +30,10 @@ export function bracketSourceCandidates(input: {
       !fixture.parentFixtureId &&
       fixture.status === 'scheduled' &&
       fixture.result === null &&
-      isFixtureLinkable(fixture),
+      isFixtureLinkable(fixture) &&
+      !fixtures.some((otherTarget) =>
+        otherTarget.id !== target.id &&
+        otherTarget.bracketSources?.some((source) => source.fixtureId === fixture.id && source.outcome === sourceOutcome),
+      ),
   );
 }

@@ -41,18 +41,22 @@
 - [x] 수동 마감의 시작 후 `on_hold`와 리그·대회·상대팀 확정 모집의 기존 `displayState=closed`를 대조군으로 확인해요.
 - [x] 마감 경계에서 새 신청을 거부하고, 이미 접수된 신청은 승인할 수 있는지 확인해요.
 - [x] 마감 경계의 재개 거부와 상세 액션 가능 여부를 확인해요.
+- [x] 경기 시작 시각과 같은 순간부터 재개와 상세 `canReopenRecruitment`를 거부해요.
 - [x] 추천순 필터의 마감 경계가 엄격한지 확인해요.
 
 ### API 통합 테스트(CI)
 
 - [ ] 실제 DB·HTTP 요청으로 마감 경계에 도달한 모집과 이미 시작된 만료 모집을 `closed` 목록·상세에서 확인해야 해요. 테스트를 작성했고 CI 실행을 기다려요.
 - [ ] 두 모집이 `recruiting`, 모집 가능, 추천순 결과에서 제외되는지 CI에서 확인해야 해요.
+- [x] 내 팀매치 `recruiting` 필터가 raw 상태도 recruiting인 항목만 반환하고, 저장된 closed·cancelled 항목을 제외하는 DB 대조군을 추가했어요.
 - [ ] 통합 테스트는 CI에서 실행해요. 로컬에서는 실행하지 않았어요.
 
 ### 화면 조회 갱신 테스트
 
 - [x] 실제 React Query hook·QueryClient·MSW로 캐시가 신선한 탭의 복귀 재조회를 확인해요.
 - [x] 실제 15초 타이머로 목록과 상세가 새 `closed` 응답을 소비하는지 확인해요.
+- [x] 추천순 목록의 실제 MSW 응답에서 만료 항목이 사라지고, 커서 누적 화면은 성공 페이지의 사라진 항목을 제거하며 실패 페이지의 카드는 보존하는지 확인해요.
+- [x] 첫 페이지 갱신으로 `nextCursor`가 사라져도 실제 로드한 페이지 키를 따라 이전 페이지를 재조회해요. page2 실패 요청과 카드 보존, 다음 poll 성공 요청과 카드 제거, 임의 rerender에서 추가 요청이 없음을 확인해요.
 - [x] 자동 마감의 대기 신청 종료·수정 링크, 수동 마감의 재개, capability 없는 상태의 취소·삭제 보존을 컴포넌트 테스트로 확인했어요.
 - [ ] alpha에서 실제 화면·역할·폭별 검증이 남아 있어요.
 
@@ -78,4 +82,6 @@ API Luna는 팀매치 서비스·단위 테스트·목록 통합 테스트, 팀�
 - CI Web 실패 `team-matches-client.test.tsx:1797`은 `matched` fixture가 공통 `mockHost` 기본 lifecycle(`canEdit=true`)을 물려받아 실제 API capability와 달랐어요. `team-matches.service.ts`의 상세 계약은 `matched`에서 `canEdit=false`예요. matched 시나리오 fixture에 실제 lifecycle 값을 명시한 뒤 같은 단일 테스트가 1 passed, 89 skipped, exit 0으로 통과했어요. Vitest supervisor PID 49140은 종료됐고, parent PID 50452는 실행 중인 Codex 호스트라 정리 대상에서 제외했어요.
 - Codex P1 리뷰에서 승인과 수동 마감이 겹치면 이미 확정된 상대팀을 `closed`로 덮는 경쟁 조건을 찾았어요. `close()`도 승인과 같은 팀매치 행 잠금을 얻고 트랜잭션 안에서 상태·상대팀·시작 시각을 다시 검사해, 승인이 먼저 끝났다면 409로 거절해요. 정상 마감과 경합 반례의 단위 검증은 2 passed, 137 skipped, exit 0이며 Jest PID 65923은 종료됐어요. 수정 전 성공 응답으로 확정 상태를 덮는 behavioral RED를 확인했고, 그 이전 fixture 설정 오류는 RED로 세지 않았어요.
 - 실제 Prisma·서비스를 사용하는 승인/마감 경합 통합 테스트를 `team-match-schedule-link.integration-spec.ts`에 추가했어요. 확정 상대팀과 신청·로그를 보존하고 마감 알림을 보내지 않는지 검증하며, 실행은 CI에 맡겨요. 독립 gpt-6-sol 리뷰의 테스트 실패 시 정리 누락을 수정해 제한 시간과 barrier·트랜잭션·spy 정리를 보완했고, 재리뷰는 잔여 P1/P2 없이 PASS예요.
+- PR #1862 2차 독립 리뷰에서 `myTeamMatches(recruiting)`의 terminal 상태 혼입, 성공적으로 다시 받은 이전 페이지에서 사라진 항목이 누적 카드에 남는 문제, `startAt === now` 재개 경계 불일치를 발견했어요. raw recruiting 조건과 closed/cancelled DB 대조군, 성공한 페이지 응답의 실제 membership으로 누적 목록을 재구성하는 회귀, `startAt <= now` 재개 거절 및 상세 capability 경계를 반영했어요. API/Web 회귀와 통합 테스트 파일 타입 검증은 worker 1로 최소 실행하고, DB 통합 자체는 CI에서 확인해요.
+- 추가 Sol P2는 페이지 갱신이 반환한 새 `nextCursor`를 따라 이전 페이지를 찾으면서, 첫 페이지의 커서가 사라지면 이미 누적된 두 번째 페이지를 더는 조회하지 못하고 만료 카드가 남는 경우예요. 팀매치 화면은 실제 로드한 cursor 키를 별도 pagination metadata로 보존해 이전 페이지별 성공·실패를 처리하도록 수정했고, 첫 페이지 커서 제거·두 번째 페이지 실패 보존·다음 성공 제거 및 요청 cursor/outcome을 검사하는 UI 테스트를 추가했어요. `loadedPageCursorsKey`와 효과의 filter dependency를 각각 snapshot key와 직렬화한 `teamMatchFiltersKey`에 고정해 불필요한 렌더별 재요청을 막아요. 회귀 테스트는 임의 rerender에서 추가 fetch 없음, page2 rejected 요청 뒤 카드 보존, `dataUpdatedAt` 증가 후 page2 resolved 요청과 카드 제거를 확인했어요(단일 파일 1 passed, 91 skipped, worker 1). 독립 Sol 최종 리뷰는 PASS예요.
 - 이번 서비스 수정 후 API `tsc --noEmit`, `v1-surface-check`를 직렬 실행해 둘 다 exit 0을 확인했어요(감독 PID 86896, tsc PID 87248, surface PID 90891). API tsconfig는 통합 테스트 경로를 포함하지 않으므로 이 결과를 통합 파일의 타입 검증으로 세지 않았어요. 최종 통합 파일 하나를 TypeScript rootNames로 지정한 noEmit 검증에서 diagnostics 0·exit 0을 확인했어요(감독 PID 10466, Node PID 10490). 해당 프로세스는 종료됐어요. 실제 DB 실행과 현재 head CI는 남아 있어요.

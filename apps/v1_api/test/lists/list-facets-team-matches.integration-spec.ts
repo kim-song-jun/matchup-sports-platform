@@ -181,4 +181,47 @@ describe('팀 매치 목록 totalCount·facets HTTP/DB 계약', () => {
       await db.v1TeamMatch.deleteMany({ where: { id: { in: [futureMatchId, startedMatchId] } } });
     }
   });
+
+  it('GET /me/team-matches의 closed/recruiting 필터는 만료 deadline의 파생 상태와 일치한다', async () => {
+    const expiredTitle = `내 팀매치 만료 ${host}`;
+    const activeTitle = `내 팀매치 모집 ${host}`;
+    const manuallyClosedTitle = `내 팀매치 수동 마감 ${host}`;
+    const cancelledTitle = `내 팀매치 취소 ${host}`;
+    const matchedTitle = `내 팀매치 상대 확정 ${host}`;
+    await db.v1TeamMatch.createMany({
+      data: [
+        row(sportA, { title: expiredTitle, deadlineAt: new Date(Date.now() - 60_000) }),
+        row(sportA, { title: activeTitle, deadlineAt: new Date(Date.now() + DAY) }),
+        row(sportA, { title: manuallyClosedTitle, status: 'closed', deadlineAt: new Date(Date.now() + DAY) }),
+        row(sportA, { title: cancelledTitle, status: 'cancelled', deadlineAt: new Date(Date.now() + DAY) }),
+        row(sportA, { title: matchedTitle, status: 'matched', approvedApplicantTeamId: teamId, deadlineAt: new Date(Date.now() + DAY) }),
+      ],
+    });
+
+    try {
+      const readMine = async (status: 'closed' | 'recruiting') => request(app.getHttpServer())
+        .get('/api/v1/me/team-matches')
+        .set('x-v1-user-id', host)
+        .query({ scope: 'created', status, limit: 50 })
+        .expect(200);
+      const [closed, recruiting] = await Promise.all([readMine('closed'), readMine('recruiting')]);
+      const ourItems = (response: request.Response) => response.body.data.items.filter(
+        (item: { title: string }) => [expiredTitle, activeTitle, manuallyClosedTitle, cancelledTitle, matchedTitle].includes(item.title),
+      );
+      expect(ourItems(closed)).toEqual(expect.arrayContaining([
+        expect.objectContaining({ title: expiredTitle, status: 'closed', displayState: 'closed' }),
+        expect.objectContaining({ title: manuallyClosedTitle, status: 'closed' }),
+      ]));
+      expect(ourItems(closed)).toHaveLength(2);
+      expect(ourItems(recruiting)).toEqual([expect.objectContaining({ title: activeTitle, status: 'recruiting' })]);
+      expect(ourItems(recruiting)).not.toEqual(expect.arrayContaining([
+        expect.objectContaining({ title: manuallyClosedTitle }),
+        expect.objectContaining({ title: cancelledTitle }),
+        expect.objectContaining({ title: matchedTitle }),
+      ]));
+      expect(ourItems(closed)).not.toEqual(expect.arrayContaining([expect.objectContaining({ title: matchedTitle })]));
+    } finally {
+      await db.v1TeamMatch.deleteMany({ where: { createdByUserId: host, title: { in: [expiredTitle, activeTitle, manuallyClosedTitle, cancelledTitle, matchedTitle] } } });
+    }
+  });
 });

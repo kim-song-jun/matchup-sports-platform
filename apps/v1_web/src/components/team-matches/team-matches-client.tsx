@@ -4,6 +4,7 @@ import { TeamMatchRecordEntry } from './team-match-shared-record';
 
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useCursorPagination, useCursorPaginationSnapshot } from '@/hooks/use-cursor-pagination';
 import {
   useV1ApplyTeamMatch,
@@ -77,6 +78,7 @@ import {
 
 export function TeamMatchListPageClient({ seed }: { readonly seed?: CursorListSeed<V1TeamMatch> } = {}) {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const searchParams = useSearchParams();
   const selectedSportId = searchParams.get('sportId') ?? undefined;
   const selectedSort = toTeamMatchSort(searchParams.get('sort'));
@@ -137,6 +139,12 @@ export function TeamMatchListPageClient({ seed }: { readonly seed?: CursorListSe
     teamMatchFiltersKey,
     (savedCursor) => v1Keys.teamMatches(savedCursor ? { ...teamMatchFilters, cursor: savedCursor } : teamMatchFilters),
   );
+  const loadedPageCursorsKey = useMemo(() => [...snapshotKey, 'loaded-page-cursors'] as const, [snapshotKey]);
+  useEffect(() => {
+    if (!cursor && accumulated.length === 0 && queryClient.getQueryData<string[]>(loadedPageCursorsKey)?.length) {
+      queryClient.setQueryData(loadedPageCursorsKey, []);
+    }
+  }, [accumulated.length, cursor, loadedPageCursorsKey, queryClient]);
   const allQueryFilters = useMemo(() => (!teamMatchFilters && cursor ? { cursor } : undefined), [teamMatchFilters, cursor]);
   const filteredQueryFilters = useMemo(
     () => (teamMatchFilters ? (cursor ? { ...teamMatchFilters, cursor } : teamMatchFilters) : undefined),
@@ -165,6 +173,83 @@ export function TeamMatchListPageClient({ seed }: { readonly seed?: CursorListSe
   const query = teamMatchFilters ? filteredQuery : allQuery;
 
   useCursorPaginationSnapshot(snapshotKey, { cursor, accumulated }, query);
+
+  const accumulatedIdentity = useMemo(
+    () => JSON.stringify(accumulated.map((item) => item.teamMatchId ?? item.id)),
+    [accumulated],
+  );
+  useEffect(() => {
+    if (!cursor || accumulatedIdentity === '[]' || query.dataUpdatedAt === 0 || query.isPlaceholderData || !isTeamMatchPageData(query.data)) return;
+    const currentPageData = query.data;
+    let active = true;
+    const ids = new Set<string>(JSON.parse(accumulatedIdentity) as string[]);
+    const matchesFilters = (queryKey: readonly unknown[]) => {
+      if (queryKey[1] !== 'team-matches' || !isTeamMatchFilterRecord(queryKey[2])) return false;
+      const pageFilters = { ...queryKey[2] };
+      delete pageFilters.cursor;
+      return sameTeamMatchFilters(pageFilters, teamMatchFilters ?? {});
+    };
+    const matchingQueries = queryClient.getQueryCache().findAll({ queryKey: v1Keys.teamMatchesAll() }).filter((cachedQuery) => matchesFilters(cachedQuery.queryKey));
+    const pageByCursor = new Map<string | undefined, (typeof matchingQueries)[number]>();
+    for (const cachedQuery of matchingQueries) {
+      if (!isTeamMatchPageData(cachedQuery.state.data)) continue;
+      const filters = cachedQuery.queryKey[2] as Record<string, unknown>;
+      pageByCursor.set(typeof filters.cursor === 'string' ? filters.cursor : undefined, cachedQuery);
+    }
+    const loadedPageCursors = queryClient.getQueryData<string[]>(loadedPageCursorsKey) ?? [];
+    const previousPages = [...new Set<string | undefined>([undefined, ...loadedPageCursors])]
+      .map((pageCursor) => pageByCursor.get(pageCursor))
+      .filter((cachedQuery): cachedQuery is (typeof matchingQueries)[number] => Boolean(cachedQuery && isTeamMatchPageData(cachedQuery.state.data)));
+    const snapshots = previousPages.map((cachedQuery) => ({
+      queryHash: cachedQuery.queryHash,
+      queryKey: cachedQuery.queryKey,
+      data: cachedQuery.state.data as TeamMatchPageData,
+    }));
+
+    void Promise.allSettled(snapshots.map((snapshot) =>
+      queryClient.refetchQueries(
+        { type: 'all', queryKey: snapshot.queryKey, exact: true },
+        { throwOnError: true },
+      ),
+    )).then((refetchResults) => {
+      if (!active) return;
+      const queriesByHash = new Map(
+        queryClient.getQueryCache().findAll({ queryKey: v1Keys.teamMatchesAll() }).map((cachedQuery) => [cachedQuery.queryHash, cachedQuery]),
+      );
+      const trackedPreviousIds = new Set<string>();
+      const currentPageIds = new Set(currentPageData.items.map((item) => item.teamMatchId ?? item.id));
+      const refreshedAccumulated: V1TeamMatch[] = [];
+      const accumulatedIds = new Set<string>();
+      for (const [index, snapshot] of snapshots.entries()) {
+        const cachedQuery = queriesByHash.get(snapshot.queryHash);
+        const refreshedData = cachedQuery?.state.data;
+        const refreshedSuccessfully = refetchResults[index]?.status === 'fulfilled' && isTeamMatchPageData(refreshedData);
+        const pageData = refreshedSuccessfully && isTeamMatchPageData(refreshedData) ? refreshedData : snapshot.data;
+        for (const item of snapshot.data.items) trackedPreviousIds.add(item.teamMatchId ?? item.id);
+        for (const item of pageData.items) {
+          const id = item.teamMatchId ?? item.id;
+          if (!ids.has(id) && !refreshedSuccessfully) continue;
+          if (!currentPageIds.has(id) && !accumulatedIds.has(id)) {
+            refreshedAccumulated.push(item);
+            accumulatedIds.add(id);
+          }
+        }
+      }
+      for (const item of accumulated) {
+        const id = item.teamMatchId ?? item.id;
+        if (!trackedPreviousIds.has(id) && !currentPageIds.has(id) && !accumulatedIds.has(id)) {
+          refreshedAccumulated.push(item);
+          accumulatedIds.add(id);
+        }
+      }
+      if (refreshedAccumulated.length !== accumulated.length || refreshedAccumulated.some((item, index) => item !== accumulated[index])) {
+        setPagination({ cursor, accumulated: refreshedAccumulated });
+      }
+    });
+    return () => {
+      active = false;
+    };
+  }, [accumulatedIdentity, cursor, loadedPageCursorsKey, query.data, query.dataUpdatedAt, query.isPlaceholderData, queryClient, setPagination, teamMatchFiltersKey]);
 
   // 다음 페이지 실패는 이미 쌓은 목록을 지우지 않는다 — 첫 페이지 실패만 전체 에러 화면이다.
   // 커서 페이지에 성공한 데이터가 없는 상태 — 실패했거나 재시도 중이다. 데이터가 남은 채 난 배경 재검증
@@ -204,6 +289,10 @@ export function TeamMatchListPageClient({ seed }: { readonly seed?: CursorListSe
       return;
     }
     if (!query.data?.pageInfo?.nextCursor) return;
+    if (cursor) {
+      const loadedPageCursors = queryClient.getQueryData<string[]>(loadedPageCursorsKey) ?? [];
+      if (!loadedPageCursors.includes(cursor)) queryClient.setQueryData(loadedPageCursorsKey, [...loadedPageCursors, cursor]);
+    }
     setPagination({ accumulated: items ?? [], cursor: query.data.pageInfo.nextCursor });
   };
   const searchModel: NonNullable<TeamMatchListViewModel['search']> = {
@@ -1149,4 +1238,20 @@ function modelScheduleLabel(match: V1TeamMatch) {
   if (phase === 'completion_pending') return '종료 확인 중';
   if (phase === 'live') return '진행 중';
   return null;
+}
+
+function isTeamMatchFilterRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+type TeamMatchPageData = { items: V1TeamMatch[]; nextCursor: string | null };
+
+function isTeamMatchPageData(value: unknown): value is TeamMatchPageData {
+  return isTeamMatchFilterRecord(value) && Array.isArray(value.items) && (typeof value.nextCursor === 'string' || value.nextCursor === null);
+}
+
+function sameTeamMatchFilters(left: Record<string, unknown>, right: Record<string, unknown>) {
+  const normalized = (filters: Record<string, unknown>) =>
+    Object.entries(filters).sort(([leftKey], [rightKey]) => leftKey.localeCompare(rightKey));
+  return JSON.stringify(normalized(left)) === JSON.stringify(normalized(right));
 }

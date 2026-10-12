@@ -15,10 +15,11 @@ let listReads = 0;
 let detailReads = 0;
 const match = { id: matchId, teamMatchId: matchId, status, displayState: status } as V1TeamMatch;
 const server = setupServer(
-  http.get(`${api}/team-matches`, () => {
+  http.get(`${api}/team-matches`, ({ request }) => {
     listReads += 1;
     const item = { ...match, status, displayState: status };
-    const data: CursorPage<V1TeamMatch> = { items: [item], nextCursor: null, pageInfo: { hasNext: false, nextCursor: null } };
+    const items = status === 'closed' && new URL(request.url).searchParams.get('sort') === 'recommended' ? [] : [item];
+    const data: CursorPage<V1TeamMatch> = { items, nextCursor: null, pageInfo: { hasNext: false, nextCursor: null } };
     return HttpResponse.json({ status: 'success', data });
   }),
   http.get(`${api}/team-matches/${matchId}`, () => {
@@ -98,4 +99,18 @@ describe('team-match deadline refresh', () => {
     expect(listReads).toBeGreaterThanOrEqual(2);
     expect(detailReads).toBeGreaterThanOrEqual(2);
   }, 20_000);
+
+  it('recommended list drops a deadline-closed item when the refreshed API response no longer includes it', async () => {
+    const tab = createTab();
+    const { result } = renderHook(() => useV1TeamMatches({ sort: 'recommended' }), { wrapper: tab.wrapper });
+    await waitFor(() => expect(result.current.data?.items[0]?.status).toBe('recruiting'));
+    expect(listReads).toBe(1);
+
+    status = 'closed';
+    await act(async () => { focusManager.setFocused(false); });
+    await act(async () => { focusManager.setFocused(true); });
+
+    await waitFor(() => expect(result.current.data?.items).toEqual([]));
+    expect(listReads).toBe(2);
+  });
 });

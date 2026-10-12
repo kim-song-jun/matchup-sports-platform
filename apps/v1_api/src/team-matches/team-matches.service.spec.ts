@@ -704,6 +704,45 @@ describe('TeamMatchesService', () => {
 
   // ─── myTeamMatches: status 필터 + 정렬 결정성 ──────────────────────────────
 
+  it('myTeamMatches: closed/recruiting 필터가 마감 기한 파생 상태를 공개 목록과 같은 기준으로 적용한다', async () => {
+    prisma.v1TeamMembership.findMany.mockResolvedValue([{ teamId: 'team-host', role: 'owner' }]);
+    prisma.v1TeamMatch.findMany.mockResolvedValue([]);
+
+    await service.myTeamMatches(manager, { status: 'closed', scope: 'hosted' });
+    const closedWhere = prisma.v1TeamMatch.findMany.mock.calls[0][0].where;
+    expect(closedWhere.status).toBeUndefined();
+    expect(closedWhere.AND).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        OR: expect.arrayContaining([
+          expect.objectContaining({
+            status: 'recruiting',
+            leagueId: null,
+            tournamentId: null,
+            approvedApplicantTeamId: null,
+            deadlineAt: { lte: expect.any(Date) },
+          }),
+        ]),
+      }),
+    ]));
+
+    prisma.v1TeamMatch.findMany.mockClear();
+    await service.myTeamMatches(manager, { status: 'recruiting', scope: 'hosted' });
+    const recruitingWhere = prisma.v1TeamMatch.findMany.mock.calls[0][0].where;
+    expect(recruitingWhere.status).toBeUndefined();
+    expect(recruitingWhere.AND).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        status: 'recruiting',
+        OR: expect.arrayContaining([
+          expect.objectContaining({
+            AND: expect.arrayContaining([
+              expect.objectContaining({ OR: expect.arrayContaining([{ deadlineAt: null }, { deadlineAt: { gt: expect.any(Date) } }]) }),
+            ]),
+          }),
+        ]),
+      }),
+    ]));
+  });
+
   it('myTeamMatches: 매치 상태 필터(cancelled)가 DB 쿼리에 실제로 적용된다', async () => {
     prisma.v1TeamMembership.findMany.mockResolvedValue([{ teamId: 'team-host', role: 'owner' }]);
     prisma.v1TeamMatch.findMany.mockResolvedValue([]);
@@ -1141,6 +1180,49 @@ describe('TeamMatchesService', () => {
     );
   });
 
+  it('reopen: precheck 뒤 트랜잭션 대기 중 deadlineAt이 지나면 잠금 후 재조회에서 거부한다', async () => {
+    const initialNow = new Date('2026-10-12T03:00:00.000Z');
+    const deadlineAt = new Date(initialNow.getTime() + 500);
+    jest.useFakeTimers({ doNotFake: ['nextTick', 'setImmediate', 'clearImmediate', 'setTimeout', 'clearTimeout', 'setInterval', 'clearInterval', 'queueMicrotask', 'hrtime', 'performance', 'requestAnimationFrame', 'cancelAnimationFrame', 'requestIdleCallback', 'cancelIdleCallback'] });
+    jest.setSystemTime(initialNow);
+    prisma.v1TeamMatch.findFirst
+      .mockResolvedValueOnce(teamMatchRow({ status: 'closed', startAt: FUTURE, deadlineAt }))
+      .mockResolvedValueOnce(teamMatchRow({ status: 'closed', startAt: FUTURE, deadlineAt }));
+    prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'mem-1' });
+    prisma.v1TeamMatch.update.mockResolvedValue(teamMatchRow({ status: 'recruiting' }));
+    prisma.$transaction.mockImplementation(async (callback: (tx: typeof prisma) => Promise<unknown>) => {
+      jest.advanceTimersByTime(1_000);
+      return callback(prisma);
+    });
+
+    try {
+      await expect(service.reopen(manager, 'tm-1', { reason: '추가 모집' })).rejects.toMatchObject({ status: 409 });
+      expect(prisma.v1TeamMatch.findFirst).toHaveBeenCalledTimes(2);
+      expect(prisma.v1TeamMatch.update).not.toHaveBeenCalled();
+      expect(prisma.v1StatusChangeLog.create).not.toHaveBeenCalled();
+      expect(String(prisma.$queryRaw.mock.calls.at(-1)?.[0])).toContain('FOR UPDATE');
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('reopen: startAt과 같은 순간에는 재개를 거부한다', async () => {
+    const boundary = new Date('2026-10-12T03:00:00.000Z');
+    jest.useFakeTimers({ doNotFake: ['nextTick', 'setImmediate', 'clearImmediate', 'setTimeout', 'clearTimeout', 'setInterval', 'clearInterval', 'queueMicrotask', 'hrtime', 'performance', 'requestAnimationFrame', 'cancelAnimationFrame', 'requestIdleCallback', 'cancelIdleCallback'] });
+    jest.setSystemTime(boundary);
+    prisma.v1TeamMatch.findFirst.mockResolvedValue(teamMatchRow({ status: 'closed', startAt: boundary, deadlineAt: FUTURE }));
+    prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'mem-1' });
+    prisma.v1TeamMatch.update.mockResolvedValue(teamMatchRow({ status: 'recruiting' }));
+
+    try {
+      await expect(service.reopen(manager, 'tm-1', { reason: '추가 모집' })).rejects.toMatchObject({ status: 409 });
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+      expect(prisma.v1TeamMatch.update).not.toHaveBeenCalled();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
   it('reopen: deadlineAt 경계부터는 재개 성공이 즉시 마감 상태로 뒤집히지 않도록 거부한다', async () => {
     const now = new Date('2026-10-12T03:00:00.000Z');
     jest.useFakeTimers({ doNotFake: ['nextTick', 'setImmediate', 'clearImmediate', 'setTimeout', 'clearTimeout', 'setInterval', 'clearInterval', 'queueMicrotask', 'hrtime', 'performance', 'requestAnimationFrame', 'cancelAnimationFrame', 'requestIdleCallback', 'cancelIdleCallback'] });
@@ -1573,6 +1655,26 @@ describe('TeamMatchesService', () => {
     jest.useFakeTimers({ doNotFake: ['nextTick', 'setImmediate', 'clearImmediate', 'setTimeout', 'clearTimeout', 'setInterval', 'clearInterval', 'queueMicrotask', 'hrtime', 'performance', 'requestAnimationFrame', 'cancelAnimationFrame', 'requestIdleCallback', 'cancelIdleCallback'] });
     jest.setSystemTime(now);
     const detail = publicTeamMatchDetailRow({ status: 'closed', startAt: new Date(now.getTime() + 60_000), deadlineAt: now });
+    prisma.v1TeamMatch.findFirst.mockResolvedValue({
+      ...detail,
+      hostTeam: { ...detail.hostTeam, memberships: [{ userId: manager.id, role: 'manager', status: 'active' }] },
+    });
+    prisma.v1Team.findMany.mockResolvedValue([]);
+    prisma.v1TeamMatchApplication.count.mockResolvedValue(0);
+
+    try {
+      const result = await service.detail(manager, 'tm-1');
+      expect(result.lifecycle.canReopenRecruitment).toBe(false);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('detail: 경기 시작 시각과 같은 순간부터 재개 버튼을 제공하지 않는다', async () => {
+    const now = new Date('2026-10-12T03:00:00.000Z');
+    jest.useFakeTimers({ doNotFake: ['nextTick', 'setImmediate', 'clearImmediate', 'setTimeout', 'clearTimeout', 'setInterval', 'clearInterval', 'queueMicrotask', 'hrtime', 'performance', 'requestAnimationFrame', 'cancelAnimationFrame', 'requestIdleCallback', 'cancelIdleCallback'] });
+    jest.setSystemTime(now);
+    const detail = publicTeamMatchDetailRow({ status: 'closed', startAt: now, deadlineAt: FUTURE });
     prisma.v1TeamMatch.findFirst.mockResolvedValue({
       ...detail,
       hostTeam: { ...detail.hostTeam, memberships: [{ userId: manager.id, role: 'manager', status: 'active' }] },

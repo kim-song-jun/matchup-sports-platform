@@ -304,7 +304,7 @@ Rules:
 
 - host team owner/manager 전용, body `{ reason?: string | null }`
 - `close`는 팀매치를 `closed`로 바꾸고 새 신청을 거절하며 대기 중이던 신청을 `expired`로 정리한다.
-- `reopen`은 `startAt` 이전의 `closed` 팀매치만 되돌린다. 만료된 신청은 자동 복구되지 않는다.
+- `reopen`은 현재 시각이 `startAt`보다 이른 `closed` 팀매치만 되돌린다. `startAt`과 같은 순간부터는 재개할 수 없고, 상세 `canReopenRecruitment`도 같은 경계를 사용한다. 만료된 신청은 자동 복구되지 않는다.
 
 ## POST /team-matches/:teamMatchId/applications
 
@@ -425,7 +425,7 @@ MSW 기본 픽스처의 라인업은 DRAFT이므로 공동 기록 조회는 편�
 - `POST /team-matches/:id/cancel`은 보류에서도 허용. 신청 이력, 감사 로그, 확정 상대팀 알림 및 연결 팀 일정 취소를 유지한다.
 - 신규 `DELETE /team-matches/:id`: 인증 + 주최팀 기존 관리 권한. recruiting/closed/cancelled이고 확정 상대팀과 **모든 신청 이력**이 없을 때만 archived/deletedAt soft delete 및 감사 로그. 연결 팀 일정은 취소한다. 신청 이력이 있으면 409 STATE_CONFLICT로 취소를 안내한다.
 - 신청/승인/수정/취소/삭제는 team-match row lock 아래 상태를 재검사한다. 수정 stale version은 409 VERSION_CONFLICT.
-- `on_hold`는 표시 상태이며 별도 DB enum/backfill 불필요. 목록의 `closed` query는 저장된 closed와 마감 시각이 지난 일반 미매칭 모집을 함께 반환하고, `recruiting` query는 마감 전 모집만 반환한다. 경기 시작 시각이 지난 마감 모집도 `closed` 필터에 남는다. 기존 expired query 호환 계약은 유지.
+- `on_hold`는 표시 상태이며 별도 DB enum/backfill 불필요. 공개 목록과 내 팀매치 목록의 `closed` query는 저장된 closed와 마감 시각이 지난 일반 미매칭 recruiting을 함께 반환하고, `recruiting` query는 raw 상태가 recruiting인 항목 중 마감 전 모집만 반환한다. 경기 시작 시각이 지난 마감 모집도 `closed` 필터에 남는다. terminal 상태는 `recruiting` 결과에 섞이지 않는다. 기존 expired query 호환 계약은 유지.
 
 - 일정·장소 변경 시 기존 requested 신청은 expired로 전환하고 `team_match_updated` 알림으로 재신청을 안내한다. 과거 신청 이력은 보존한다.
 - 취소·삭제 시 연결된 SCHEDULED Game도 CANCELLED로 전환하여 팀 일정/경기 상태가 어긋나지 않게 한다.

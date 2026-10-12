@@ -140,4 +140,14 @@ No authentication, API, persistence, or user-data contract changes.
 - CSS selector GREEN: `pnpm --filter v1_web exec vitest run src/components/teams/teams-page.test.tsx src/app/globals.test.ts -t '필수값 오류에서 첫 누락 항목|keeps form actions in document flow' --maxWorkers=1 --minWorkers=1` passed 4 / skipped 152 (exit 0).
 - Type check: `pnpm --filter v1_web exec tsc --noEmit` first reported three nullable-error prop mismatches at `teams-page.tsx:1124,1165,1178`; each was fixed with `?? undefined`. Final captured run exited 0 (`TSC_EXIT=0`).
 - Pattern gate: from `apps/v1_web`, `node scripts/v1-pattern-check.mjs` exited 0; undefined CSS tokens, invalid font-size classes, spacing-grid deviations, radius literals, and baseline drift were all 0.
-- This lane did not execute browser route QA (0/8), server-error focused regression, or physical-device soft-keyboard QA. These remain separate verification items; the parent's alpha before/after evidence is separately owned.
+- This lane did not execute browser route QA (0/8) or physical-device soft-keyboard QA. The review follow-up ran the focused server-error regression noted below; alpha before/after evidence remains parent-owned.
+
+## PR #1859 리뷰 후속
+
+- 사용자가 입력을 수정해도 마지막 제출에서 누락된 항목을 유지해요. 다음 제출 전까지 `aria-describedby`가 다른 필드로 이동하지 않아요.
+- 누락된 항목이 이미 포커스된 상태에서 다시 제출해도 같은 대상을 측정하고 화면에 드러내요. 새 포커스 이벤트가 없어도 동작해요.
+- 필수 입력 오류는 라이브 알림을 하나만 제공해요. 필드에 연결된 인라인 설명이 알림을 맡고, 화면에 보이는 폼 요약은 별도 라이브 영역이 아니에요. 일반 서버·권한 오류는 폼 수준 알림과 포커스 경로를 유지해요.
+- 고정·인라인 CTA의 가시성 보정은 각 입력과 연결된 `aria-describedby` 요소의 사각형을 함께 사용해요. 두 모드 모두 실제 `.tm-scroll-area`와 visual viewport의 교집합을 가시 영역으로 계산해요. 고정 모드는 CTA 상단을 하단 경계에 추가로 적용해요. 상단 경계에는 scroll area의 56px inset이 반영돼요.
+- RED: 검토 대상 회귀 4개가 안내 이동, 중복 알림, 고정 CTA 가림, 재제출 시 가림 문제로 실패했어요(실패 4 / 건너뜀 71). 상단 inset 변경 후 첫 통합 실행에서는 빠른 포커스 전환 fixture도 실패했어요. 다음 대상인 `정원`의 jsdom 기본 rect가 `(0,0)`이라 scrollport 위쪽에 잘린 것으로 판정됐어요. fixture에 가시 rect를 지정하고 기존 취소 단언은 유지했어요.
+- GREEN: `pnpm --filter v1_web exec vitest run src/components/teams/teams-page.test.tsx src/app/globals.test.ts -t '필수값 오류|입력 중에는 오류 효과|fixed CTA가 있을 때도|같은 오류 항목에 재제출|inline CTA 상태에서는|입력은 보이지만 연결된 오류 설명|실제 create 폼의 팀 소개|실제 edit 폼의 팀 소개|이미 보이는 필드|빠른 다음 포커스|저장 오류가 생기면 화면 밖 안내|fixed CTA 상태에서도 scroll-area 상단 밖|keeps form actions in document flow|changes fixed chrome and scroll bounds' --maxWorkers=1 --minWorkers=1` 명령은 exit 0으로 끝났고, 두 파일에서 22개가 통과하고 144개가 건너뛰었어요. 상단 56px 가림 케이스도 통과했어요. 이 케이스는 코드 수정과 함께 추가해 통합 묶음에서 처음 실행했기 때문에 수정 전 별도 RED 결과는 없어요. 앞서 검토한 회귀 4개는 별도 RED 증거가 있어요.
+- 이번 리뷰 후속에서는 CSS와 keyboard viewport bridge 코드를 수정하지 않았어요. 실제 Android/iOS 키보드 QA와 alpha 경로 QA는 이 작업에서 검증하지 않았어요.

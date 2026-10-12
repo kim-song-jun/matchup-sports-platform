@@ -1,6 +1,6 @@
 ## 2026-10-12 — 정규대회 상·하위 결선과 시상
 
-[작업 문서](../../.github/tasks/20261057-admin-bracket-canvas.md#2026-10-12-extension-정규대회-하나--상위하위-결선--시상-두-세트) · [실행 시나리오](./18-regular-tournament-split-finals.md). 하나의 대회에서 조 1·2위는 상위, 3·4위는 하위 결선으로 배정한다. 팀 시상 안내와 개인상 범위는 어드민이 설정한다. Backend521·Web224·스키마 바인딩7개 계약은 좁은 재실행을 포함해 통과했다. 독립 Sol static review critical0. 변경 후 alpha/3폭 QA와 실제 DB 적용은 아직 미실행이며 전체 완료를 의미하지 않는다.
+[작업 문서](../../.github/tasks/20261057-admin-bracket-canvas.md#2026-10-12-extension-정규대회-하나--상위하위-결선--시상-두-세트) · [실행 시나리오](./18-regular-tournament-split-finals.md). 하나의 대회에서 조 1·2위는 상위, 3·4위는 하위 결선으로 배정한다. 팀 시상 안내와 개인상 범위는 어드민이 설정한다. Backend521·Web226·스키마 바인딩7개 계약은 좁은 재실행을 포함해 통과했다. 독립 Sol static review의 모바일 단계 순서·읽기 권한 두 결함은 수정·재검토 PASS. PR#1858 커밋본 CI와 변경 후 alpha/3폭 QA는 대기 중이며 전체 완료를 의미하지 않는다.
 
 ## 2026-10-05 — Android Alpha QA 후속 수정
 

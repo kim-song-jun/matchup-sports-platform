@@ -195,6 +195,14 @@ const PHASE_BUCKET: Record<V1TournamentGroupPhase, { key: string; label: string 
   final: { key: 'final', label: '결승' },
   third_place: { key: 'final', label: '결승' },
 };
+const PHASE_ORDER: Record<string, number> = {
+  group: 0,
+  round16: 1,
+  round12: 2,
+  quarter: 3,
+  semi: 4,
+  final: 5,
+};
 
 type FixtureOrder = { fixtureNumber: number; legNumber: number };
 const byFixtureOrder = (a: FixtureOrder, b: FixtureOrder) => a.fixtureNumber - b.fixtureNumber || a.legNumber - b.legNumber;
@@ -234,6 +242,7 @@ export function buildBracketMobileRounds(input: {
     if (round.key === 'group' && round.sections.length === 1) round.label = round.sections[0].heading ?? round.label;
     round.sections.sort((a, b) => Number(thirdPlaceSectionKeys.has(a.key)) - Number(thirdPlaceSectionKeys.has(b.key)));
   }
+  rounds.sort((a, b) => PHASE_ORDER[a.key] - PHASE_ORDER[b.key]);
 
   const orphans = input.fixtures
     .filter((f) => f.groupId === null || !groupIds.has(f.groupId))

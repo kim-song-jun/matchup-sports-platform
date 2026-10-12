@@ -200,7 +200,7 @@ export function AwardsTab({
         ) : (
           <>
             <label htmlFor="award-set-track" className="mb-2 block text-[length:var(--font-size-caption)] text-[var(--text-muted)]">편집할 결선</label>
-            <select id="award-set-track" value={activeAwardSet} onChange={(event) => setActiveAwardSet(event.target.value as 'upper' | 'lower')} disabled={!canWrite || setAwardSets.isPending} className="mb-4 h-[44px] w-full rounded-xl border border-[var(--border)] bg-[var(--card-surface)] px-3 text-[length:var(--font-size-label)] text-[var(--text-strong)]">
+            <select id="award-set-track" value={activeAwardSet} onChange={(event) => setActiveAwardSet(event.target.value as 'upper' | 'lower')} disabled={setAwardSets.isPending} className="mb-4 h-[44px] w-full rounded-xl border border-[var(--border)] bg-[var(--card-surface)] px-3 text-[length:var(--font-size-label)] text-[var(--text-strong)]">
               <option value="upper">상위 결선</option>
               <option value="lower">하위 결선</option>
             </select>

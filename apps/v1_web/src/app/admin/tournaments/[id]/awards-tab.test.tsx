@@ -61,6 +61,29 @@ describe('AwardsTab permissions', () => {
     expect(screen.queryByRole('button', { name: /어워드 저장/ })).not.toBeInTheDocument();
   });
 
+  it('read-only support can inspect lower-final awards while all mutation controls remain locked', async () => {
+    awardSetsHolder.current = [
+      { id: 'set-upper', bracketTrack: 'upper', prizePool: 300000, prizeSummary: '상위 시상', prizeBreakdown: null },
+      { id: 'set-lower', bracketTrack: 'lower', prizePool: 100000, prizeSummary: '하위 시상', prizeBreakdown: null },
+    ];
+    const user = userEvent.setup();
+    render(<AwardsTab tournamentId="tournament-1" canWrite={false} allowSplitAwards showToast={vi.fn()} />);
+
+    const track = screen.getByLabelText('편집할 결선');
+    expect(track).toBeEnabled();
+    expect(screen.getByLabelText('총상금')).toHaveValue('300,000');
+    expect(screen.getByLabelText('총상금')).toBeDisabled();
+    expect(screen.getByLabelText('시상 안내')).toBeDisabled();
+    expect(screen.queryByRole('button', { name: '상·하위 시상 저장' })).not.toBeInTheDocument();
+
+    await user.selectOptions(track, 'lower');
+    expect(screen.getByLabelText('총상금')).toHaveValue('100,000');
+    expect(screen.getByLabelText('시상 안내')).toHaveValue('하위 시상');
+    expect(screen.getByLabelText('총상금')).toBeDisabled();
+    expect(screen.getByLabelText('시상 안내')).toBeDisabled();
+    expect(setAwardSetsMutate).not.toHaveBeenCalled();
+  });
+
   it('keeps add, remove, and save affordances for mutation-capable admins', async () => {
     const user = userEvent.setup();
     render(<AwardsTab tournamentId="tournament-1" canWrite showToast={vi.fn()} />);

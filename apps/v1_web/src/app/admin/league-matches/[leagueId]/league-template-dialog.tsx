@@ -165,10 +165,10 @@ export function LeagueTemplateDialog({
           <legend className="mb-2 text-[length:var(--font-size-body-sm)] font-semibold text-[var(--text-strong)]">경기 방식</legend>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <CompetitionTemplateCard mode="radio" name="league-template-legs" value="1" checked={legs === 1}
-              radioLabel="단일 리그" onChange={() => setLegs(1)} graphic="league-single" title="단일 리그"
+              onChange={() => setLegs(1)} graphic="league-single" title="단일 리그"
               description="모든 팀이 서로 한 번씩 경기해요." meta={teamCountInRange ? `${singleRounds}라운드 · ${plannedGameCount(teamCount, singleRounds)}경기` : '팀 수 3~20팀'} />
             <CompetitionTemplateCard mode="radio" name="league-template-legs" value="2" checked={legs === 2}
-              radioLabel="홈앤어웨이" onChange={() => setLegs(2)} graphic="league-double" title="홈·어웨이 리그"
+              onChange={() => setLegs(2)} graphic="league-double" title="홈·어웨이 리그"
               description="모든 팀이 서로 홈과 어웨이로 두 번 경기해요." meta={teamCountInRange ? `${doubleRounds}라운드 · ${plannedGameCount(teamCount, doubleRounds)}경기` : '팀 수 3~20팀'} />
           </div>
         </fieldset>

@@ -268,6 +268,11 @@ export function BracketTemplateDialog({ open, tournamentId, format, confirmedTea
                     const nextCount = /^\d{1,2}$/.test(event.target.value) ? Number(event.target.value) : null;
                     const shapes = nextCount === null ? [] : groupKnockoutShapes(nextCount);
                     if (shapes[0]) setGroupKnockout((current) => applyGroupShape(current, { ...current, ...shapes[0] }));
+                    else if (nextCount !== 20) {
+                      setGroupKnockout((current) => current.qualificationMode === 'cross_group_round12'
+                        ? { ...DEFAULT_GROUP_KNOCKOUT_VALUE }
+                        : current);
+                    }
                   }} className="tm-input" style={{ minHeight: 44 }} />
                   {confirmedTeamCount > 0 && teamCount !== confirmedTeamCount ? (
                     <p className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>확정 참가팀은 {confirmedTeamCount}팀이에요. 참가 인원과 구성을 확인해 주세요.</p>
@@ -323,7 +328,7 @@ export function BracketTemplateDialog({ open, tournamentId, format, confirmedTea
                     <p className="tm-text-caption mt-2 font-semibold" style={{ color: 'var(--text-strong)' }}>선택 미리보기: {templateStagePreview(input ?? { kind: 'group_knockout', ...groupKnockout })}</p>
                   </div>
                 ) : null}
-                <GroupKnockoutFields value={groupKnockout} onChange={(value) => { draftTouchedRef.current = true; setGroupKnockout(value); setTeamCountText(String(value.groupCount * value.teamsPerGroup)); }} disabled={apply.isPending} lockShape showCrossGroupRound12Preset={false} />
+                <GroupKnockoutFields value={groupKnockout} onChange={(value) => { draftTouchedRef.current = true; setGroupKnockout(value); setTeamCountText(String(value.groupCount * value.teamsPerGroup)); }} disabled={apply.isPending} lockShape={groupShape !== null || groupKnockout.qualificationMode === 'cross_group_round12'} showCrossGroupRound12Preset={false} />
               </>
             ) : (
               <>
@@ -351,7 +356,7 @@ export function BracketTemplateDialog({ open, tournamentId, format, confirmedTea
                       const rounds = teamCountValid ? (teamCount! % 2 === 0 ? teamCount! - 1 : teamCount!) * value : null;
                       return (
                         <CompetitionTemplateCard key={value} mode="radio" name={`${idPrefix}-legs`} value={String(value)} checked={legs === value}
-                          radioLabel={value === 1 ? '1회전' : '2회전'} onChange={() => { draftTouchedRef.current = true; setLegs(value); }}
+                          onChange={() => { draftTouchedRef.current = true; setLegs(value); }}
                           graphic={value === 1 ? 'league-single' : 'league-double'} title={value === 1 ? '단일 리그' : '홈·어웨이 리그'}
                           description={value === 1 ? '모든 팀과 한 번씩 경기해요.' : '모든 팀과 홈·어웨이로 두 번 경기해요.'}
                           meta={plan && rounds !== null ? `${rounds}라운드 · 경기 ${plan.fixtures}개` : '팀 수를 입력하면 일정을 계산해요'} />

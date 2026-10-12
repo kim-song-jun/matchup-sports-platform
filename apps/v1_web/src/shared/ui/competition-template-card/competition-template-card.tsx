@@ -20,7 +20,6 @@ type RadioCardProps = CardContentProps & {
   value: string;
   checked: boolean;
   disabled?: boolean;
-  radioLabel?: string;
   onChange: (value: string) => void;
 };
 
@@ -170,7 +169,7 @@ export function CompetitionTemplateCard(props: CompetitionTemplateCardProps) {
   return (
     <label className={`${cardClass} cursor-pointer ${props.checked ? 'border-[var(--blue500)] bg-[var(--blue50)]' : 'border-[var(--border)] hover:border-[var(--border-strong)]'} ${props.disabled ? 'cursor-not-allowed opacity-50' : ''}`}>
       <input type="radio" name={props.name} value={props.value} checked={props.checked} disabled={props.disabled}
-        aria-label={props.radioLabel} aria-labelledby={props.radioLabel ? undefined : titleId} aria-describedby={descriptionId} onChange={() => props.onChange(props.value)}
+        aria-labelledby={titleId} aria-describedby={descriptionId} onChange={() => props.onChange(props.value)}
         className="sr-only" />
       <CardBody {...props} titleId={titleId} descriptionId={descriptionId} />
     </label>

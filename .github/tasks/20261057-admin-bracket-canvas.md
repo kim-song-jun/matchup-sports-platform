@@ -165,6 +165,9 @@ Status (추가 요청): In Progress — PR #1853 dev 머지·alpha 배포 완료
 - Sol의 독립 계약 검토에서 생성 API가 저장하지 않는 단일/홈·어웨이 그림과 저장된 초안의 미저장 입력 경고 누락을 발견했다. 생성에는 중립 리그 그림을 적용하고, 저장 초안도 이동 전에 입력 유실 경고를 제공하도록 수정했다. 실제 단일/홈·어웨이 카드는 템플릿 단계에서만 사용한다.
 - S1 구현: Luna 구현, Sol 최종 정적 PASS. 12팀 그림 연결선·결승, 홈·어웨이 단계 제목, 링크 focus outline을 보완했다. 생성 카드·초안 이동 경고·12팀·리그 라운드의 집중 계약은 PASS. 기존 presentation Tab7과 240경기 제한 테스트는 로컬 5초 timeout이었고 baseline으로 단정하지 않는다. 마지막 20팀 카드 단언 수정은 재실행하지 않았으므로 정확한 PR SHA의 CI가 최종 확인한다. root tsc PASS 후 폰트 토큰·baseline을 수정하여 패턴 검사 PASS. 전체 로컬 suite/build는 반복하지 않았다.
 - 후속 dev PR [#1863](https://github.com/kim-song-jun/matchup-sports-platform/pull/1863) 생성. alpha `979500ea3`에서 재로그인 직후 admin/me 200을 확인했으나 이후 일반 auth/me 200·account active·약관 compliant 상태에서 admin/me/bracket/수기 생성이 모두 403 `Active admin access is required`로 변경됐다. 수기 생성은 성공하지 않았고 기존 QA 데이터는 그대로다. 활성 관리자 접근 문제를 계정 소유자에게 전달했으며 우회하지 않는다. PR 정확한 SHA CI·후속 배포·실제 그래픽 after 검증은 아직 미완이다.
+- 운영자 확인 후 alpha9795 admin/me 200·ops 재확인. 수기13번 경기 추가201→편집 자동 열림→이미 다른 경기에 배정된 두 팀 PATCH200×2/GET 저장 확인→삭제 확인/DELETE200→GET에서 신규ID 부재·원래12경기 유지. 신규 QA 경기만 변경·삭제했고 결과·공개 상태는 유지했다.
+- PR head56ef의 CI38228980712 Web은 8,710 PASS / 4 FAIL: 비선택 카드까지 포함한 부전승 문구·중복 조 구성 radio·옛 특수 checkbox 선택자 때문에 실패했다. 실제 선택 카드/미리보기로 범위를 좁히고 HTTP 소비 테스트는 20팀 입력→실제 특수 카드 선택으로 수정했으며 POST payload 단언은 유지했다. 영향을 받은 6개 계약 최종 PASS. 로컬 timeout 두 건은 해당 CI에서 재현되지 않았다.
+- 자동 리뷰에서 20팀 특수 선택 후11팀 변경 시 해제 불가와 visible title/접근성 이름 불일치 두 건을 수정했다. 특수 모드 해제/복구 회귀1개 PASS, radioLabel prop·override를 완전히 삭제하고 titleId를 접근성 이름으로 사용한다. Sol 최종 정적 PASS, root 최종 lint(tsc+패턴) PASS. 새 head CI·alpha after가 최종 게이트다. Advanced Security는 기존과 동일한 미지원 모델 claude-opus-5의 session.create 실패이며 보안 검사 PASS로 취급하지 않는다.
 
 ### Owned / Forbidden scope
 

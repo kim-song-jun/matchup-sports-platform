@@ -47,7 +47,9 @@ describe('LeagueTemplateDialog', () => {
   it('팀 수·회전·요일 전개 날짜·시각을 그대로 보내고 성공하면 닫는다 — replaceExisting 키는 없다', async () => {
     const { onSubmit, onClose } = setup();
 
-    fireEvent.click(screen.getByRole('radio', { name: '홈앤어웨이' }));
+    expect(screen.getByRole('radio', { name: '단일 리그' })).toBeInTheDocument();
+    expect(screen.getByRole('radio', { name: '홈·어웨이 리그' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('radio', { name: '홈·어웨이 리그' }));
     fillByWeekday();
     fireEvent.click(screen.getByRole('button', { name: '빈 경기 만들기' }));
 
@@ -82,7 +84,7 @@ describe('LeagueTemplateDialog', () => {
     setup();
     expect(screen.getByText('3라운드 · 6경기를 만들어요')).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('radio', { name: '홈앤어웨이' }));
+    fireEvent.click(screen.getByRole('radio', { name: '홈·어웨이 리그' }));
     expect(screen.getByText('6라운드 · 12경기를 만들어요')).toBeInTheDocument();
 
     fireEvent.change(screen.getByLabelText('팀 수'), { target: { value: '5' } });

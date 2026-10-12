@@ -2,7 +2,7 @@
 
 ## 2026-10-12 추가 요청 — A + C 선택
 
-Status (추가 요청): In Progress — dev PR #1853 리뷰 보완 완료, 새 커밋 CI·변경 후 alpha 대기.
+Status (추가 요청): In Progress — dev PR #1853 정확한 head CI 통과, 마지막 진출 연결 선택 검토 보완·alpha 대기.
 
 - 사용자 요청: 첨부 운영자 피드백의 대회·리그 템플릿을 다듬어 dev 대상 PR과 alpha 테스트까지 진행.
 - 원문 피드백: 12강 지원이 불명확하고, 템플릿과 수기 입력이 잘 이어지지 않으며 수정·삭제가 번거롭다. 기능 제거 의견은 첨부 대화의 제안이며 사용자 확정 요구로 취급하지 않는다.
@@ -41,6 +41,9 @@ Status (추가 요청): In Progress — dev PR #1853 리뷰 보완 완료, 새 �
 9. 6건 수정 후 Sol 정적 검토 PASS. 모바일은 해당 라운드도 선택하고, 같은 focus ID의 refetch에서는 닫힌 시트를 다시 열지 않음. Luna의 집중 실행 35개 중 33 PASS 후 모호한 alert·선택 chip 단언 2건을 실제 UI에 맞게 수정하고 해당 계약 PASS; CI 소비 테스트 14개 포함. 모바일 refetch 회귀는 새 rounds 배열로 강화한 단일 테스트 PASS. 소유 테스트 PID `86281`, `92241` 종료 확인. 신규 커밋 CI·배포·변경 후 실제 화면 검증은 아직 없음.
 10. 사용자 재로그인 뒤 `/admin/me` 200 확인. alpha는 아직 `37a06cea0` / `1.7.1-alpha.20261012.g37a06cea0f77`이며 변경 전 390·768px 증거를 추가 기록한다. 캐시 데이터가 있는 등록 목록의 refetch 실패 처리는 기존 stale-data 정책을 유지하고, 데이터 없는 pending/error만 템플릿 적용을 막는다.
 11. root 최종 lint 1회에서 group shape의 `legs`·`thirdPlace` 타입 누락 검출 → 기존 완전한 값에 shape를 병합하여 수정 → root `pnpm --filter v1_web lint` 재실행 PASS(tsc·패턴 검사). lint shell PID `17370` 실행 종료. 로컬 전체 suite는 반복하지 않고 새 PR head CI로 확인한다.
+12. head `932ee6992` CI `38213260004` API/Web/Gates 모두 PASS. 최신 Copilot 1건은 양쪽에 동일한 진출 출처를 선택할 수 있는 문제이며 v1 서버 거절 계약과 교차 확인해 패널·목록·수기 선택을 보완한다. 수정 뒤 새 head의 CI·Copilot을 다시 확인한다.
+13. 사용자 UI 표시 요청에 A/C 설계 미리보기를 메시지에 직접 표시했다. 실제 alpha after 증거로 취급하지 않는다. 다른 dev 변경 `7570bd809`의 계정 약관 배포로 space 326이 필수 약관 화면으로 이동하고 관리자 조회 403이 확인되어 계정 소유자에게 직접 동의 후 재개를 요청했다. 약관을 대신 수락하지 않는다.
+14. 마지막 Copilot 선택 오류를 공유 side-options helper로 패널·수기 연결·목록 모두 수정하고 중복 저장도 막았다. 서버의 `BRACKET_SOURCE_INVALID` 계약과 Sol 독립 정적 검토 PASS. 선택된 소비 테스트 2개 PASS; helper/panel 3개 PASS(잘못 구성한 테스트 입력 1개를 실제 계약에 맞게 정정한 뒤 좁게 재검증). root 최종 lint PASS. 소유 테스트 PID `20434`, `22329` 종료 확인; 로컬 전체 suite를 반복하지 않는다.
 
 ### Alpha 실행 계획 (아직 결과 아님)
 

@@ -18,7 +18,7 @@ import { V1ApiError, v1Post, v1Patch } from '@/lib/api-client';
 // 조별리그 라운드로빈은 서버(POST /admin/tournaments/:id/league/fixtures/generate)로 이관했다.
 // 여기 남는 knockoutSeedPairs 는 녹아웃 시드 페어링 전용이다.
 import { knockoutSeedPairs, round12Pairs } from '@/lib/tournament-bracket-gen';
-import { bracketSourceCandidates } from '@/lib/bracket-fixture-tools';
+import { bracketSourceCandidates, bracketSourceSideOptions } from '@/lib/bracket-fixture-tools';
 import { BRACKET_SOURCE_PHASES } from '@/lib/tournament-bracket-rounds';
 import { competitionMatchLabel, tournamentRoundLabel } from '@/lib/tournament-round-label';
 import { AdminDataTable, AdminEmpty } from '@/components/admin';
@@ -942,15 +942,20 @@ export function BracketTab({
             const candidates = sourceFixture && bracket
               ? bracketSourceCandidates({ target: sourceFixture, groups, fixtures: bracket.fixtures })
               : [];
+            const currentSource = side === 'HOME' ? homeSource : awaySource;
+            const oppositeSource = side === 'HOME' ? awaySource : homeSource;
+            const options = sourceFixture && bracket
+              ? bracketSourceSideOptions({ candidates, fixtures: bracket.fixtures, currentFixtureId: currentSource, oppositeFixtureId: oppositeSource })
+              : [];
             const targetPhase = groups.find((group) => group.id === sourceFixture?.groupId)?.phase ?? '';
             return <label key={side} className="block tm-text-label">{side === 'HOME' ? '홈 자리' : '어웨이 자리'}
-              <select className={inputCls} disabled={savingSources} value={side === 'HOME' ? homeSource : awaySource} onChange={(event) => side === 'HOME' ? setHomeSource(event.target.value) : setAwaySource(event.target.value)}>
+              <select className={inputCls} disabled={savingSources} value={options.some((fixture) => fixture.id === currentSource) ? currentSource : ''} onChange={(event) => side === 'HOME' ? setHomeSource(event.target.value) : setAwaySource(event.target.value)}>
                 <option value="">연결 없음 · 직접 배정</option>
-                {candidates.map((fixture) => <option key={fixture.id} value={fixture.id}>{bracketFixtureLabel(fixture, groups)} {targetPhase === 'third_place' ? '패자' : '승자'}</option>)}
+                {options.map((fixture) => <option key={fixture.id} value={fixture.id}>{bracketFixtureLabel(fixture, groups)} {targetPhase === 'third_place' ? '패자' : '승자'}</option>)}
               </select>
             </label>;
           })}
-          <button type="submit" className={submitBtnCls} disabled={savingSources}>{savingSources ? '저장 중…' : '연결 저장'}</button>
+          <button type="submit" className={submitBtnCls} disabled={savingSources || (homeSource !== '' && homeSource === awaySource)}>{savingSources ? '저장 중…' : '연결 저장'}</button>
         </form>
       </SimpleModal>
 

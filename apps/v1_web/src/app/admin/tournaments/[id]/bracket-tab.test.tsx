@@ -208,6 +208,26 @@ function renderTab(showToast = vi.fn(), registrations: V1AdminTournamentRegistra
   return showToast;
 }
 
+describe('BracketTab — 진출 연결 출처 선택', () => {
+  it('반대편에서 선택한 경기 출처를 목록에서 제외한다', async () => {
+    const quarter = { ...bracket.groups[0], id: 'quarter', name: '8강', phase: 'quarter', sortOrder: 0 } as unknown as typeof bracket.groups[number];
+    const semi = { ...bracket.groups[0], id: 'semi', name: '4강', phase: 'semi', sortOrder: 1 } as unknown as typeof bracket.groups[number];
+    const target = fixtureRow({ id: 'semi-fixture', groupId: semi.id, round: '4강', fixtureNumber: 3, game: makeGame() });
+    const q1 = fixtureRow({ id: 'q1', groupId: quarter.id, round: '8강', fixtureNumber: 1, game: makeGame() });
+    const q2 = fixtureRow({ id: 'q2', groupId: quarter.id, round: '8강', fixtureNumber: 2, game: makeGame() });
+    bracketGroups = [quarter, semi];
+    bracketFixtures = [target, q1, q2];
+    bracketSlots = [];
+    renderTab();
+
+    fireEvent.click(screen.getAllByRole('button', { name: '진출 연결' })[0]);
+    const dialog = await screen.findByRole('dialog', { name: '진출 경기 연결' });
+    fireEvent.change(within(dialog).getByLabelText('홈 자리'), { target: { value: 'q1' } });
+    const away = within(dialog).getByLabelText('어웨이 자리') as HTMLSelectElement;
+    expect(Array.from(away.options).map((option) => option.value)).toEqual(['', 'q2']);
+  });
+});
+
 function confirmedRegistration(overrides: Partial<V1AdminTournamentRegistration>): V1AdminTournamentRegistration {
   return {
     id: 'r1',

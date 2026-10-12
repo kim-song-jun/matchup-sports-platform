@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { makeFixture, makeGame, makeGroup } from '@/test/bracket-canvas-fixtures';
 import type { V1AdminBracketResult } from '@/types/api';
-import { bracketSourceCandidates, knockoutRoundLabel } from './bracket-fixture-tools';
+import { bracketSourceCandidates, bracketSourceSideOptions, knockoutRoundLabel } from './bracket-fixture-tools';
 
 describe('knockoutRoundLabel', () => {
   it.each([
@@ -85,5 +85,35 @@ describe('bracketSourceCandidates', () => {
     expect(bracketSourceCandidates({ target: finalTarget, groups: [...groups, third], fixtures })).toEqual([]);
     expect(bracketSourceCandidates({ target: finalWithWinner, groups: [...groups, third], fixtures })).toContain(semi);
     expect(bracketSourceCandidates({ target: thirdTarget, groups: [...groups, third], fixtures })).toContain(semi);
+  });
+});
+
+describe('bracketSourceSideOptions', () => {
+  const sourceGroup = makeGroup({ id: 'options-qf', name: '8강', phase: 'quarter' });
+  const targetGroup = makeGroup({ id: 'options-sf', name: '4강', phase: 'semi' });
+  const q1 = makeFixture({ id: 'options-q1', groupId: sourceGroup.id, fixtureNumber: 1, game: makeGame() });
+  const q2 = makeFixture({ id: 'options-q2', groupId: sourceGroup.id, fixtureNumber: 2, game: makeGame() });
+  const target = makeFixture({ id: 'options-s1', groupId: targetGroup.id, fixtureNumber: 3, game: makeGame() });
+
+  it('반대편이 선택한 경기만 제외하고 현재 연결 및 다른 후보는 유지한다', () => {
+    const fixtures = [q1, q2, target];
+    const options = bracketSourceSideOptions({
+      candidates: [q1, q2],
+      fixtures,
+      currentFixtureId: q2.id,
+      oppositeFixtureId: q1.id,
+    });
+    expect(options.map((fixture) => fixture.id)).toEqual([q2.id]);
+  });
+
+  it('후보에서 사라진 현재 연결은 반대편 선택과 중복되지 않으면 유지한다', () => {
+    const lockedSource = makeFixture({ id: 'locked-source', groupId: sourceGroup.id, fixtureNumber: 3, game: makeGame({ state: 'LIVE' }) });
+    const options = bracketSourceSideOptions({
+      candidates: [],
+      fixtures: [q1, q2, lockedSource, target],
+      currentFixtureId: 'locked-source',
+      oppositeFixtureId: q2.id,
+    });
+    expect(options.map((fixture) => fixture.id)).toEqual(['locked-source']);
   });
 });

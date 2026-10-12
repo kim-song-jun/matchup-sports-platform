@@ -37,3 +37,18 @@ export function bracketSourceCandidates(input: {
       ),
   );
 }
+
+/** Keep each source picker distinct while retaining an existing link that is no longer otherwise eligible. */
+export function bracketSourceSideOptions(input: {
+  candidates: readonly V1AdminBracketFixture[];
+  fixtures: readonly V1AdminBracketFixture[];
+  currentFixtureId: string;
+  oppositeFixtureId: string;
+}): V1AdminBracketFixture[] {
+  const options = input.candidates.filter((fixture) => fixture.id !== input.oppositeFixtureId);
+  if (input.currentFixtureId === '' || input.currentFixtureId === input.oppositeFixtureId || options.some((fixture) => fixture.id === input.currentFixtureId)) {
+    return options;
+  }
+  const current = input.fixtures.find((fixture) => fixture.id === input.currentFixtureId);
+  return current === undefined ? options : [current, ...options];
+}

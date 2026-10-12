@@ -11,7 +11,7 @@ import { Button } from '@/components/v1-ui/button';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
 import { useV1DeleteFixture, useV1UpdateFixture } from '@/hooks/use-v1-api';
 import { useV1AssignTournamentSlot, useV1QuickResult, useV1SetBracketSources } from '@/hooks/use-v1-bracket-canvas';
-import { bracketSourceCandidates, isFixtureLinkable } from '@/lib/bracket-fixture-tools';
+import { bracketSourceCandidates, bracketSourceSideOptions, isFixtureLinkable } from '@/lib/bracket-fixture-tools';
 import { TEAM_IN_OTHER_GROUP_HIDDEN_NOTE, applyGroupRule, registrationIdsBlockedForGroup, registrationIdsInOppositeFinalStage } from '@/lib/bracket-group-enrollment';
 import { describeBracketCanvasError } from '@/lib/bracket-canvas-errors';
 import { classifyFixtureSide, fixtureTeamChangeAccess, isFixtureLocked, isSlotAssignable, type SideKey } from '@/lib/bracket-canvas-layout';
@@ -85,11 +85,12 @@ export function BracketNodePanel({
   const placedIds = new Set(slots.filter((slot) => slot.kind !== 'GROUP_RANK' && slot.registrationId !== null).map((slot) => slot.registrationId));
   const game = fixture.game;
   const sourceCandidates = bracketSourceCandidates({ target: fixture, groups, fixtures });
-  const sourceOptions = (currentId: string) => {
-    if (currentId === '' || sourceCandidates.some((candidate) => candidate.id === currentId)) return sourceCandidates;
-    const current = fixtures.find((candidate) => candidate.id === currentId);
-    return current ? [current, ...sourceCandidates] : sourceCandidates;
+  const sourceOptions = (side: SideKey) => {
+    const currentFixtureId = side === 'HOME' ? homeSourceId : awaySourceId;
+    const oppositeFixtureId = side === 'HOME' ? awaySourceId : homeSourceId;
+    return bracketSourceSideOptions({ candidates: sourceCandidates, fixtures, currentFixtureId, oppositeFixtureId });
   };
+  const duplicateSourceSelected = homeSourceId !== '' && homeSourceId === awaySourceId;
 
   const handleSaveSources = () => {
     setBracketSources.mutate(
@@ -388,6 +389,7 @@ export function BracketNodePanel({
           <p className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>이전 경기의 승자나 패자를 이 칸으로 연결해요. 연결된 팀은 자리에서 직접 바꾸지 않고 여기서 출처를 수정해요.</p>
           {(['HOME', 'AWAY'] as const).map((side) => {
             const value = side === 'HOME' ? homeSourceId : awaySourceId;
+            const options = sourceOptions(side);
             return (
               <label key={side} className="flex flex-col gap-1 tm-text-caption" style={{ color: 'var(--text-muted)' }}>
                 {side === 'HOME' ? '홈 출처 경기' : '어웨이 출처 경기'}
@@ -395,19 +397,19 @@ export function BracketNodePanel({
                   aria-label={`${side === 'HOME' ? '홈' : '어웨이'} 출처 경기`}
                   className="tm-input"
                   style={{ minHeight: 44 }}
-                  value={value}
+                  value={options.some((candidate) => candidate.id === value) ? value : ''}
                   disabled={!canWrite || setBracketSources.isPending}
                   onChange={(event) => side === 'HOME' ? setHomeSourceId(event.target.value) : setAwaySourceId(event.target.value)}
                 >
                   <option value="">연결 없음 · 직접 배정</option>
-                  {sourceOptions(value).map((candidate) => (
+                  {options.map((candidate) => (
                     <option key={candidate.id} value={candidate.id}>{`${fixtureTitle(candidate, groups)} ${groups.find((group) => group.id === fixture.groupId)?.phase === 'third_place' ? '패자' : '승자'}`}</option>
                   ))}
                 </select>
               </label>
             );
           })}
-          {canWrite ? <Button type="button" variant="outline" size="md" loading={setBracketSources.isPending} onClick={handleSaveSources}>진출 연결 저장</Button> : null}
+          {canWrite ? <Button type="button" variant="outline" size="md" disabled={duplicateSourceSelected} loading={setBracketSources.isPending} onClick={handleSaveSources}>진출 연결 저장</Button> : null}
         </section>
       ) : null}
 

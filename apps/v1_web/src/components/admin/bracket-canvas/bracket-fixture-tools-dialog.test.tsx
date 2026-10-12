@@ -116,6 +116,19 @@ describe('BracketFixtureToolsDialog — 경기 연결', () => {
     expect(props.onClose).toHaveBeenCalledTimes(1);
   });
 
+  it('반대편에 이미 고른 경기는 후보에서 제외하고 서로 다른 출처를 저장한다', () => {
+    renderDialog('link');
+    fireEvent.change(screen.getByLabelText('연결할 경기'), { target: { value: 's1' } });
+    const away = screen.getByLabelText('어웨이 자리') as HTMLSelectElement;
+    expect(Array.from(away.options).map((option) => option.value)).toEqual(['', 'q2']);
+    fireEvent.change(away, { target: { value: 'q2' } });
+    fireEvent.click(screen.getByRole('button', { name: '연결 저장' }));
+    expect(mocks.setSources).toHaveBeenCalledWith(
+      { fixtureId: 's1', homeSourceFixtureId: 'q1', awaySourceFixtureId: 'q2' },
+      expect.any(Object),
+    );
+  });
+
   it('현재 연결된 원천이 더는 후보가 아니어도(진행 중) 선택값과 표시가 어긋나지 않는다', () => {
     render(
       <BracketFixtureToolsDialog

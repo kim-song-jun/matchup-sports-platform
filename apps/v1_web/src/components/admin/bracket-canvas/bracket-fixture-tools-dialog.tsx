@@ -6,7 +6,7 @@ import { Button } from '@/components/v1-ui/button';
 import { useModalA11y } from '@/components/v1-ui/use-modal-a11y';
 import { useV1AddBracketFixture, useV1SetBracketSources } from '@/hooks/use-v1-bracket-canvas';
 import { describeBracketCanvasError } from '@/lib/bracket-canvas-errors';
-import { bracketSourceCandidates, isFixtureLinkable, knockoutRoundLabel } from '@/lib/bracket-fixture-tools';
+import { bracketSourceCandidates, bracketSourceSideOptions, isFixtureLinkable, knockoutRoundLabel } from '@/lib/bracket-fixture-tools';
 import type { V1AdminBracketFixture, V1AdminTournamentBracket, V1TournamentFormat } from '@/types/api';
 import { BracketLeagueAddFixtureForm, type LeagueAddSubmit } from './bracket-league-add-fixture-form';
 
@@ -53,11 +53,13 @@ export function BracketFixtureToolsDialog({ open, mode, format, tournamentId, br
 
   const target = linkable.find((fixture) => fixture.id === targetId) ?? null;
   const candidates = target === null ? [] : bracketSourceCandidates({ target, groups: bracket.groups, fixtures: bracket.fixtures });
-  const sourceOptions = (current: string) => {
-    if (current === '' || candidates.some((fixture) => fixture.id === current)) return candidates;
-    const linked = bracket.fixtures.find((fixture) => fixture.id === current);
-    return linked === undefined ? candidates : [linked, ...candidates];
-  };
+  const sourceOptions = (side: 'HOME' | 'AWAY') => bracketSourceSideOptions({
+    candidates,
+    fixtures: bracket.fixtures,
+    currentFixtureId: side === 'HOME' ? homeSource : awaySource,
+    oppositeFixtureId: side === 'HOME' ? awaySource : homeSource,
+  });
+  const duplicateSourceSelected = homeSource !== '' && homeSource === awaySource;
   const targetPhase = target === null ? '' : (bracket.groups.find((group) => group.id === target.groupId)?.phase ?? '');
   const outcomeLabel = targetPhase === 'third_place' ? '패자' : '승자';
 
@@ -199,28 +201,32 @@ export function BracketFixtureToolsDialog({ open, mode, format, tournamentId, br
                     ))}
                   </select>
                 </div>
-                {(['HOME', 'AWAY'] as const).map((side) => (
-                  <div key={side} className="flex flex-col gap-1">
-                    <label htmlFor={`${idPrefix}-${side}`} className="tm-text-label font-semibold" style={{ color: 'var(--text-strong)' }}>
-                      {side === 'HOME' ? '홈 자리' : '어웨이 자리'}
-                    </label>
-                    <select
-                      id={`${idPrefix}-${side}`}
-                      className={SELECT_CLASS}
-                      style={{ minHeight: 44 }}
-                      value={side === 'HOME' ? homeSource : awaySource}
-                      onChange={(event) => (side === 'HOME' ? setHomeSource(event.target.value) : setAwaySource(event.target.value))}
-                    >
-                      <option value="">연결 없음 · 직접 배정</option>
-                      {sourceOptions(side === 'HOME' ? homeSource : awaySource).map((fixture) => (
-                        <option key={fixture.id} value={fixture.id}>{`${fixtureTitle(fixture)} ${outcomeLabel}`}</option>
-                      ))}
-                    </select>
-                  </div>
-                ))}
+                {(['HOME', 'AWAY'] as const).map((side) => {
+                  const current = side === 'HOME' ? homeSource : awaySource;
+                  const options = sourceOptions(side);
+                  return (
+                    <div key={side} className="flex flex-col gap-1">
+                      <label htmlFor={`${idPrefix}-${side}`} className="tm-text-label font-semibold" style={{ color: 'var(--text-strong)' }}>
+                        {side === 'HOME' ? '홈 자리' : '어웨이 자리'}
+                      </label>
+                      <select
+                        id={`${idPrefix}-${side}`}
+                        className={SELECT_CLASS}
+                        style={{ minHeight: 44 }}
+                        value={options.some((fixture) => fixture.id === current) ? current : ''}
+                        onChange={(event) => (side === 'HOME' ? setHomeSource(event.target.value) : setAwaySource(event.target.value))}
+                      >
+                        <option value="">연결 없음 · 직접 배정</option>
+                        {options.map((fixture) => (
+                          <option key={fixture.id} value={fixture.id}>{`${fixtureTitle(fixture)} ${outcomeLabel}`}</option>
+                        ))}
+                      </select>
+                    </div>
+                  );
+                })}
               </>
             )}
-            <Button variant="primary" size="md" disabled={linkDisabled} loading={setSources.isPending} onClick={handleLink}>
+            <Button variant="primary" size="md" disabled={linkDisabled || duplicateSourceSelected} loading={setSources.isPending} onClick={handleLink}>
               연결 저장
             </Button>
           </div>

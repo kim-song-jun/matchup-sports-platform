@@ -184,7 +184,12 @@ export function RosterModal({
                   >
                     {p.jerseyNumber === null ? '—' : p.jerseyNumber}
                   </span>
-                  <p className="min-w-0 flex-1 truncate text-sm font-medium text-[var(--text-strong)]">{p.realName}</p>
+                  <div className="min-w-0 flex-1">
+                    <p className="break-words text-[length:var(--font-size-body-sm)] font-medium text-[var(--text-strong)]">{p.realName}</p>
+                    <p className="mt-0.5 break-words text-[length:var(--font-size-caption)] text-[var(--text-muted)]">
+                      닉네임 {p.nickname?.trim() || '미등록'}
+                    </p>
+                  </div>
                   {p.isTeamCaptain ? (
                     <span className="shrink-0 rounded-md bg-[var(--blue50)] px-2 py-0.5 text-[length:var(--font-size-caption)] font-semibold text-[var(--blue700)]">팀장</span>
                   ) : null}

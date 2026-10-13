@@ -89,6 +89,7 @@ describe('admin tournament roster modal', () => {
             id: 'player-1',
             userId: 'user-1',
             realName: '홍길동',
+            nickname: '길동이',
             birthDateSnapshot: '1995-03-15',
             genderSnapshot: 'male',
             phone: '01012345678',

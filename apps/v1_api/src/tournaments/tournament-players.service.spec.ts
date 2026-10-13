@@ -1161,6 +1161,64 @@ describe('TournamentPlayersService', () => {
 
   // ─── 11. CSV export 어드민 게이트 ─────────────────────────────────────────
 
+  it.each([
+    { label: '서로 다른 실명과 닉네임', realName: '홍길동', profile: { nickname: '길동이' } },
+    { label: '실명과 동일한 닉네임', realName: '홍길동', profile: { nickname: '홍길동' } },
+    {
+      label: '긴 한글 실명과 닉네임',
+      realName: '홍길동실명스냅샷',
+      profile: { nickname: '주말마다축구하는홍길동' },
+    },
+    { label: '프로필이 없는 선수', realName: '홍길동', profile: null },
+  ])('listPlayersForAdmin: $label 행은 등록 실명과 현재 닉네임을 별도 필드로 반환한다', async ({ realName, profile }) => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(opsAdminRecord);
+    prisma.v1TournamentRegistration.findUnique.mockResolvedValue({
+      id: 'reg-1',
+      teamId: 'team-1',
+      rosterLockedAt: null,
+      team: { name: '번개팀', ownerUserId: 'owner-user-id' },
+      tournament: { minPlayers: 1 },
+    });
+    prisma.v1TournamentPlayer.findMany.mockResolvedValue([
+      playerRow({ realName, user: { phone: '01012345678', profile } }),
+    ]);
+
+    const result = await service.listPlayersForAdmin(adminUser, 'reg-1');
+
+    expect(result.players).toEqual([
+      expect.objectContaining({
+        realName,
+        nickname: profile?.nickname ?? null,
+        phone: '01012345678',
+        isTeamCaptain: false,
+      }),
+    ]);
+  });
+
+  it('listPlayersForAdmin: 닉네임을 변경한 후 다시 조회해도 등록 실명은 바뀌지 않는다', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(opsAdminRecord);
+    prisma.v1TournamentRegistration.findUnique.mockResolvedValue({
+      id: 'reg-1',
+      teamId: 'team-1',
+      rosterLockedAt: null,
+      team: { name: '번개팀', ownerUserId: 'owner-user-id' },
+      tournament: { minPlayers: 1 },
+    });
+    prisma.v1TournamentPlayer.findMany
+      .mockResolvedValueOnce([
+        playerRow({ user: { phone: null, profile: { nickname: '변경전닉네임' } } }),
+      ])
+      .mockResolvedValueOnce([
+        playerRow({ user: { phone: null, profile: { nickname: '변경후닉네임' } } }),
+      ]);
+
+    const before = await service.listPlayersForAdmin(adminUser, 'reg-1');
+    const after = await service.listPlayersForAdmin(adminUser, 'reg-1');
+
+    expect(before.players).toEqual([expect.objectContaining({ realName: '홍길동', nickname: '변경전닉네임' })]);
+    expect(after.players).toEqual([expect.objectContaining({ realName: '홍길동', nickname: '변경후닉네임' })]);
+  });
+
   it('listPlayersForAdmin: ops admin can read a roster without team membership', async () => {
     prisma.v1AdminUser.findUnique.mockResolvedValue(opsAdminRecord);
     prisma.v1TournamentRegistration.findUnique.mockResolvedValue({
@@ -1171,7 +1229,7 @@ describe('TournamentPlayersService', () => {
       tournament: { minPlayers: 2 },
     });
     prisma.v1TournamentPlayer.findMany.mockResolvedValue([
-      { ...playerRow(), user: { phone: '01012345678' } },
+      { ...playerRow(), user: { phone: '01012345678', profile: { nickname: '길동이' } } },
     ]);
 
     await expect(service.listPlayersForAdmin(adminUser, 'reg-1')).resolves.toEqual({
@@ -1182,6 +1240,7 @@ describe('TournamentPlayersService', () => {
       players: [
         expect.objectContaining({
           realName: '홍길동',
+          nickname: '길동이',
           genderSnapshot: 'male',
           phone: '01012345678',
         }),
@@ -1189,7 +1248,9 @@ describe('TournamentPlayersService', () => {
       belowMinimum: true,
     });
     expect(prisma.v1TournamentPlayer.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({ include: { user: { select: { phone: true } } } }),
+      expect.objectContaining({
+        include: { user: { select: { phone: true, profile: { select: { nickname: true } } } } },
+      }),
     );
     expect(prisma.v1TeamMembership.findFirst).not.toHaveBeenCalled();
   });
@@ -1204,9 +1265,9 @@ describe('TournamentPlayersService', () => {
       tournament: { minPlayers: 2 },
     });
     prisma.v1TournamentPlayer.findMany.mockResolvedValue([
-      { ...playerRow({ id: 'p-7', userId: 'u-7' }), user: { phone: null } },
-      { ...playerRow({ id: 'p-1', userId: 'u-1' }), user: { phone: null } },
-      { ...playerRow({ id: 'p-none', userId: 'u-none' }), user: { phone: null } },
+      { ...playerRow({ id: 'p-7', userId: 'u-7' }), user: { phone: null, profile: null } },
+      { ...playerRow({ id: 'p-1', userId: 'u-1' }), user: { phone: null, profile: null } },
+      { ...playerRow({ id: 'p-none', userId: 'u-none' }), user: { phone: null, profile: null } },
     ]);
     // 번호 없는 선수는 readJerseyNumbers 결과에 아예 들어오지 않는다.
     prisma.$queryRaw.mockResolvedValue([
@@ -1236,11 +1297,11 @@ describe('TournamentPlayersService', () => {
     prisma.v1TournamentPlayer.findMany.mockResolvedValue([
       {
         ...playerRow({ id: 'member-player', userId: 'member-user-id' }),
-        user: { phone: '01011112222' },
+        user: { phone: '01011112222', profile: { nickname: '팀원닉네임' } },
       },
       {
         ...playerRow({ id: 'owner-player', userId: 'owner-user-id' }),
-        user: { phone: '01033334444' },
+        user: { phone: '01033334444', profile: { nickname: '팀장닉네임' } },
       },
     ]);
 
@@ -1264,7 +1325,7 @@ describe('TournamentPlayersService', () => {
       tournament: { minPlayers: 1 },
     });
     prisma.v1TournamentPlayer.findMany.mockResolvedValue([
-      { ...playerRow(), user: { phone: null } },
+      { ...playerRow(), user: { phone: null, profile: null } },
     ]);
 
     await expect(

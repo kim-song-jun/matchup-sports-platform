@@ -35,8 +35,19 @@ export interface FixtureTimingOptions {
   gameDurationMinutes: number;
   /** 경기 간 휴식(분). */
   breakMinutes: number;
-  /** 팀당 매치데이(하루) 경기 수 = 하루에 소화하는 라운드 수. */
-  gamesPerTeamPerDay: number;
+  /** 하루 경기 수(전 팀 합계). 없으면 하루에 한 라운드. */
+  gamesPerDay?: number;
+}
+
+/** i번째 경기의 매치데이(1부터) — 하루 경기 수가 있으면 순서대로 그 수씩, 없으면 라운드마다 하루. */
+export function fixtureMatchday(round: number, index: number, gamesPerDay: number | undefined): number {
+  return gamesPerDay ? Math.floor(index / gamesPerDay) + 1 : round;
+}
+
+/** 대진 목록에 필요한 매치데이(경기 날짜) 수. 입력은 round 오름차순이다. */
+export function matchdayCountOf(fixtures: ReadonlyArray<{ round: number }>, gamesPerDay: number | undefined): number {
+  const last = fixtures.length - 1;
+  return last < 0 ? 0 : fixtureMatchday(fixtures[last].round, last, gamesPerDay);
 }
 
 export interface FixtureTimeSlot {
@@ -49,17 +60,17 @@ export interface FixtureTimeSlot {
 }
 
 /**
- * "한 구장 순차 진행" 모델의 경기 시각 배정. `gamesPerTeamPerDay`개 라운드를 한 매치데이로
- * 묶고(라운드 r → 매치데이 ceil(r/G)), 매치데이 시작 시각은 **호출자가 넘긴 날짜 목록**에서
+ * "한 구장 순차 진행" 모델의 경기 시각 배정. 대진 순서대로 하루 `gamesPerDay`경기씩 한 매치데이로
+ * 묶고(없으면 라운드마다 하루), 매치데이 시작 시각은 **호출자가 넘긴 날짜 목록**에서
  * 온다(Task 164 BE-2 이전엔 요일 템플릿으로 주간 리듬을 계산했다). 매치데이 안에서는 경기들이
- * `경기 시간 + 휴식` 간격으로 연달아 배치된다 — 예: 4팀·팀당 3경기·15분+5분이면
- * 22:00/22:20/22:40/23:00/23:20/23:40 (하루 6경기).
+ * `경기 시간 + 휴식` 간격으로 연달아 배치된다 — 예: 4팀·하루 6경기·15분+5분이면
+ * 22:00/22:20/22:40/23:00/23:20/23:40.
  *
  * 입력 `fixtures`는 round 오름차순이어야 한다(라운드로빈 생성기의 계약). 반환 배열은
  * 입력과 같은 순서·같은 길이로, i번째 슬롯이 i번째 대진의 시각이다.
  */
 export function resolveFixtureTimeSlots(
-  fixtures: readonly RoundRobinFixture[],
+  fixtures: ReadonlyArray<{ round: number }>,
   /** 매치데이 1..N 의 시작 시각. `league-fixture-dates.ts` 가 날짜 목록에서 푼다. */
   matchdayStartAts: readonly Date[],
   timing: FixtureTimingOptions,
@@ -67,8 +78,8 @@ export function resolveFixtureTimeSlots(
   const intervalMs = (timing.gameDurationMinutes + timing.breakMinutes) * 60_000;
   const durationMs = timing.gameDurationMinutes * 60_000;
   const lastOrderByMatchday = new Map<number, number>();
-  return fixtures.map((fixture) => {
-    const matchday = Math.ceil(fixture.round / timing.gamesPerTeamPerDay);
+  return fixtures.map((fixture, index) => {
+    const matchday = fixtureMatchday(fixture.round, index, timing.gamesPerDay);
     const orderInDay = (lastOrderByMatchday.get(matchday) ?? 0) + 1;
     lastOrderByMatchday.set(matchday, orderInDay);
     const dayStart = matchdayStartAts[matchday - 1];

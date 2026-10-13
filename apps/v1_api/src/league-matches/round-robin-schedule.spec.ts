@@ -1,4 +1,4 @@
-import { generateRoundRobinFixtures, resolveFixtureStartAt, resolveFixtureTimeSlots, WEEK_MS } from './round-robin-schedule';
+import { generateRoundRobinFixtures, matchdayCountOf, resolveFixtureStartAt, resolveFixtureTimeSlots, WEEK_MS } from './round-robin-schedule';
 
 describe('generateRoundRobinFixtures', () => {
   it('4팀·3주에 모든 페어가 정확히 한 번씩 만나고, 라운드마다 팀이 중복 출전하지 않는다', () => {
@@ -104,10 +104,10 @@ describe('resolveFixtureTimeSlots', () => {
     new Date('2026-10-07T13:00:00.000Z'),
   ];
 
-  it('4팀·팀당 하루 3경기·15분 경기·5분 휴식이면 하루 6경기가 20분 간격으로 연달아 배치된다', () => {
+  it('4팀·하루 6경기·15분 경기·5분 휴식이면 하루 6경기가 20분 간격으로 연달아 배치된다', () => {
     // 한 구장 운영 시나리오: 22:00~00:00 사이 6경기(팀당 3경기).
     const fixtures = generateRoundRobinFixtures(['A', 'B', 'C', 'D'], 3); // 1매치데이 × 3라운드
-    const slots = resolveFixtureTimeSlots(fixtures, wednesdays22, { gameDurationMinutes: 15, breakMinutes: 5, gamesPerTeamPerDay: 3 });
+    const slots = resolveFixtureTimeSlots(fixtures, wednesdays22, { gameDurationMinutes: 15, breakMinutes: 5, gamesPerDay: 6 });
     expect(slots).toHaveLength(6);
     expect(slots.map((s) => s.startAt.toISOString())).toEqual([
       '2026-09-02T13:00:00.000Z', // 22:00 KST
@@ -124,13 +124,13 @@ describe('resolveFixtureTimeSlots', () => {
 
   it('endAt은 startAt + 경기 시간이다(휴식은 다음 경기 시작 간격에만 반영)', () => {
     const fixtures = generateRoundRobinFixtures(['A', 'B'], 1);
-    const slots = resolveFixtureTimeSlots(fixtures, wednesdays22, { gameDurationMinutes: 40, breakMinutes: 10, gamesPerTeamPerDay: 1 });
+    const slots = resolveFixtureTimeSlots(fixtures, wednesdays22, { gameDurationMinutes: 40, breakMinutes: 10 });
     expect(slots[0].endAt.getTime() - slots[0].startAt.getTime()).toBe(40 * 60_000);
   });
 
-  it('각 팀은 매치데이마다 정확히 팀당 하루 경기 수만큼 출전한다', () => {
+  it('하루 경기 수가 라운드 크기의 배수면 각 팀은 매치데이마다 같은 수만큼 출전한다', () => {
     const fixtures = generateRoundRobinFixtures(['A', 'B', 'C', 'D'], 6); // 2매치데이 × 3라운드
-    const slots = resolveFixtureTimeSlots(fixtures, wednesdays22, { gameDurationMinutes: 15, breakMinutes: 5, gamesPerTeamPerDay: 3 });
+    const slots = resolveFixtureTimeSlots(fixtures, wednesdays22, { gameDurationMinutes: 15, breakMinutes: 5, gamesPerDay: 6 });
     const perDay = new Map<string, number>();
     fixtures.forEach((fixture, i) => {
       for (const teamId of [fixture.homeTeamId, fixture.awayTeamId]) {
@@ -144,15 +144,15 @@ describe('resolveFixtureTimeSlots', () => {
 
   it('다음 매치데이는 정확히 7일 뒤 같은 시각부터 다시 시작한다', () => {
     const fixtures = generateRoundRobinFixtures(['A', 'B', 'C', 'D'], 6);
-    const slots = resolveFixtureTimeSlots(fixtures, wednesdays22, { gameDurationMinutes: 15, breakMinutes: 5, gamesPerTeamPerDay: 3 });
+    const slots = resolveFixtureTimeSlots(fixtures, wednesdays22, { gameDurationMinutes: 15, breakMinutes: 5, gamesPerDay: 6 });
     expect(slots[6].matchday).toBe(2);
     expect(slots[6].orderInDay).toBe(1);
     expect(slots[6].startAt.getTime()).toBe(slots[0].startAt.getTime() + WEEK_MS);
   });
 
-  it('팀당 하루 1경기여도 같은 매치데이 경기들은 순차 배치된다(동시 시작 없음)', () => {
+  it('하루 경기 수가 없으면 하루 한 라운드이고, 그 경기들도 순차 배치된다(동시 시작 없음)', () => {
     const fixtures = generateRoundRobinFixtures(['A', 'B', 'C', 'D', 'E', 'F'], 1); // 1라운드 3경기
-    const slots = resolveFixtureTimeSlots(fixtures, wednesdays22, { gameDurationMinutes: 15, breakMinutes: 5, gamesPerTeamPerDay: 1 });
+    const slots = resolveFixtureTimeSlots(fixtures, wednesdays22, { gameDurationMinutes: 15, breakMinutes: 5 });
     expect(slots.map((s) => s.startAt.toISOString())).toEqual([
       '2026-09-02T13:00:00.000Z',
       '2026-09-02T13:20:00.000Z',
@@ -160,9 +160,20 @@ describe('resolveFixtureTimeSlots', () => {
     ]);
   });
 
+  it('하루 경기 수가 라운드 크기와 안 맞으면 라운드를 넘어 대진 순서대로 N경기씩 끊는다 — 6팀 15경기 하루 4경기 = 4일', () => {
+    const fixtures = generateRoundRobinFixtures(['A', 'B', 'C', 'D', 'E', 'F'], 5); // 5라운드 × 3경기
+    const slots = resolveFixtureTimeSlots(fixtures, wednesdays22, { gameDurationMinutes: 15, breakMinutes: 5, gamesPerDay: 4 });
+    expect(slots.map((s) => s.matchday)).toEqual([1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 4, 4, 4]);
+    expect(slots.map((s) => s.orderInDay)).toEqual([1, 2, 3, 4, 1, 2, 3, 4, 1, 2, 3, 4, 1, 2, 3]);
+    expect(slots[4].startAt.getTime()).toBe(slots[0].startAt.getTime() + WEEK_MS);
+    expect(matchdayCountOf(fixtures, 4)).toBe(4);
+    expect(matchdayCountOf(fixtures, undefined)).toBe(5);
+    expect(matchdayCountOf([], 4)).toBe(0);
+  });
+
   it('휴식 0분이면 경기 시간 간격으로 바로 이어 붙인다', () => {
     const fixtures = generateRoundRobinFixtures(['A', 'B', 'C', 'D'], 1);
-    const slots = resolveFixtureTimeSlots(fixtures, wednesdays22, { gameDurationMinutes: 30, breakMinutes: 0, gamesPerTeamPerDay: 1 });
+    const slots = resolveFixtureTimeSlots(fixtures, wednesdays22, { gameDurationMinutes: 30, breakMinutes: 0 });
     expect(slots[1].startAt.getTime() - slots[0].startAt.getTime()).toBe(30 * 60_000);
   });
 
@@ -171,7 +182,7 @@ describe('resolveFixtureTimeSlots', () => {
     // 이제 그 결정은 호출자(날짜 목록)의 것이고, 이 함수는 받은 시각을 그대로 쓴다.
     const fixtures = generateRoundRobinFixtures(['A', 'B', 'C', 'D'], 2); // 2매치데이 × 1라운드
     const weekly = [leagueStartsOn, new Date(leagueStartsOn.getTime() + WEEK_MS)];
-    const slots = resolveFixtureTimeSlots(fixtures, weekly, { gameDurationMinutes: 15, breakMinutes: 5, gamesPerTeamPerDay: 1 });
+    const slots = resolveFixtureTimeSlots(fixtures, weekly, { gameDurationMinutes: 15, breakMinutes: 5 });
     expect(slots[0].startAt).toEqual(leagueStartsOn);
     expect(slots[1].startAt.getTime()).toBe(leagueStartsOn.getTime() + 20 * 60_000);
     expect(slots[2].startAt.getTime()).toBe(leagueStartsOn.getTime() + WEEK_MS);
@@ -180,7 +191,7 @@ describe('resolveFixtureTimeSlots', () => {
   it('매치데이 수보다 짧은 날짜 배열이 오면 조용히 넘어가지 않고 던진다', () => {
     const fixtures = generateRoundRobinFixtures(['A', 'B', 'C', 'D'], 2); // 2매치데이 필요
     expect(() =>
-      resolveFixtureTimeSlots(fixtures, [leagueStartsOn], { gameDurationMinutes: 15, breakMinutes: 5, gamesPerTeamPerDay: 1 }),
+      resolveFixtureTimeSlots(fixtures, [leagueStartsOn], { gameDurationMinutes: 15, breakMinutes: 5 }),
     ).toThrow(/matchday 2/);
   });
 });

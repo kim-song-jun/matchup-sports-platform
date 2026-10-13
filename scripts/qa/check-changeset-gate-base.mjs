@@ -31,12 +31,13 @@
  * 앞서 있다). 즉 ③이 틀리면 ②가 막은 20건의 **17배** 구멍이 열린다 — ①만 고치고 ③을 두면
  * 지금보다 **더 나빠진다.**
  */
-import { execFileSync } from 'node:child_process';
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync, existsSync } from 'node:fs';
+import { execFileSync, spawnSync } from 'node:child_process';
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync, existsSync, copyFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 
 const args = process.argv.slice(2);
+const repoRoot = resolve(import.meta.dirname, '../..');
 const workflowPath = args.find((a) => !a.startsWith('--')) ?? '.github/workflows/deploy.yml';
 const STEP_NAME = 'Verify release changeset';
 const OUT_FILE = '/tmp/teameet-changed-files.txt';
@@ -328,11 +329,93 @@ function makeDispatchFixture() {
   return { repo, head };
 }
 
+/** Main target PR contract: execute the extracted workflow with promotion metadata. */
+function makeMainPromotionFixture() {
+  const repo = mkdtempSync(join(tmpdir(), 'cs-gate-main-promotion-'));
+  const git = (...a) => execFileSync('git', ['-C', repo, ...a], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
+  const commit = (message) => {
+    git('add', '-A');
+    git('-c', 'user.email=g@local', '-c', 'user.name=guard', 'commit', '-qm', message);
+    return git('rev-parse', 'HEAD');
+  };
+  const write = (path, content) => {
+    mkdirSync(join(repo, path.split('/').slice(0, -1).join('/') || '.'), { recursive: true });
+    writeFileSync(join(repo, path), content);
+  };
+
+  git('init', '-q', '-b', 'main', '.');
+  write('apps/v1_api/package.json', '{"name":"v1_api","version":"0.1.0"}\n');
+  write('apps/v1_web/package.json', '{"name":"v1_web","version":"0.1.0"}\n');
+  write('.changeset/config.json', JSON.stringify({
+    fixed: [['v1_api', 'v1_web']],
+    privatePackages: { version: true, tag: true },
+  }) + '\n');
+  mkdirSync(join(repo, 'scripts/release'), { recursive: true });
+  copyFileSync(join(repoRoot, 'scripts/release/check-changeset-policy.mjs'), join(repo, 'scripts/release/check-changeset-policy.mjs'));
+  copyFileSync(join(repoRoot, 'scripts/release/changeset-contract.mjs'), join(repo, 'scripts/release/changeset-contract.mjs'));
+  const base = commit('main: release gate baseline');
+
+  git('checkout', '-q', '-b', 'hotfix/kakao-login');
+  write('.changeset/scoped-hotfix.md', '---\n"v1_api": patch\n---\n\nScoped hotfix.\n');
+  commit('changeset: scoped hotfix');
+  write('apps/v1_api/src/main.ts', 'export const hotfix = true;\n');
+  write('apps/v1_api/package.json', '{"name":"v1_api","version":"0.2.0"}\n');
+  write('apps/v1_web/package.json', '{"name":"v1_web","version":"0.2.0"}\n');
+  write('apps/v1_api/CHANGELOG.md', '# v1_api\n\n## 0.2.0\n- Scoped hotfix.\n');
+  write('apps/v1_web/CHANGELOG.md', '# v1_web\n\n## 0.2.0\n- Scoped hotfix.\n');
+  rmSync(join(repo, '.changeset/scoped-hotfix.md'));
+  const head = commit('release: consume scoped hotfix changeset');
+  return { repo, base, head };
+}
+
+function runMainPromotionStep(shell, fixture, headRef) {
+  if (existsSync(OUT_FILE)) rmSync(OUT_FILE);
+  const result = spawnSync('bash', ['-c', shell], {
+    cwd: fixture.repo,
+    env: {
+      ...process.env,
+      EVENT_NAME: 'pull_request',
+      BASE_SHA: fixture.base,
+      HEAD_SHA: fixture.head,
+      BASE_REF: 'main',
+      HEAD_REF: headRef,
+    },
+    encoding: 'utf8',
+  });
+  return result;
+}
+
+function checkMainPromotionWorkflow(shell) {
+  const fixture = makeMainPromotionFixture();
+  try {
+    const scoped = runMainPromotionStep(shell, fixture, 'hotfix/kakao-login');
+    if (scoped.status !== 0 || !/Verified main release promotion/i.test(scoped.stdout)) {
+      fail(
+        'main-target hotfix PR did not pass the extracted release gate with complete metadata.\n'
+        + `  exit: ${scoped.status}\n  stdout: ${scoped.stdout}\n  stderr: ${scoped.stderr}`,
+      );
+    }
+
+    const missingHead = runMainPromotionStep(shell, fixture, '');
+    if (missingHead.status === 0 || !/require base\/head refs and both base versions/i.test(missingHead.stderr)) {
+      fail(
+        'main-target PR with empty HEAD_REF did not fail closed in policy metadata validation.\n'
+        + `  exit: ${missingHead.status}\n  stdout: ${missingHead.stdout}\n  stderr: ${missingHead.stderr}`,
+      );
+    }
+    console.log('[changeset-gate-base] main promotion 통과 — extracted workflow accepts scoped hotfix and rejects empty source metadata');
+  } finally {
+    if (existsSync(OUT_FILE)) rmSync(OUT_FILE);
+    rmSync(fixture.repo, { recursive: true, force: true });
+  }
+}
+
 const fixture = makeFixture();
 try {
   if (args.includes('--self-test')) selfTest(fixture);
   checkDispatchConditions(workflowPath);
   const shell = extractStepShell(workflowPath);
+  if (args.includes('--self-test')) checkMainPromotionWorkflow(shell);
   const list = runStep(shell, fixture);
   const foreign = list.filter((f) => f.startsWith('.changeset/'));
   if (foreign.length > 0) {

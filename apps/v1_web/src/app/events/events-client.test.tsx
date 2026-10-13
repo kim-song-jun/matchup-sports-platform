@@ -101,6 +101,32 @@ describe('EventsPage', () => {
     expect(replaceMock).toHaveBeenCalledWith('/events?sport=basketball', { scroll: false });
   });
 
+  it('종목을 바꿔도 들어온 곳(from)을 지켜 뒤로가기가 바로 전 화면으로 돌아간다', () => {
+    sportsState.value = [
+      { id: 'sport-futsal', code: 'futsal', name: '풋살' },
+      { id: 'sport-basketball', code: 'basketball', name: '농구' },
+    ];
+    const from = '/tournaments?kind=league';
+    searchParamsState.value = new URLSearchParams({ sport: 'futsal', from });
+    useV1TournamentCampaignsInfiniteMock.mockReturnValue({
+      data: { pages: [{ items: [] }] }, isPending: false, isError: false, error: null,
+      fetchNextPage, hasNextPage: false, isFetchingNextPage: false, isFetchNextPageError: false, refetch,
+    } as never);
+    render(<EventsPage />);
+
+    fireEvent.click(screen.getByRole('button', { name: '농구' }));
+    const sportUrl = new URL(String(replaceMock.mock.calls.at(-1)?.[0]), 'https://teameet.test');
+    expect(sportUrl.pathname).toBe('/events');
+    expect(sportUrl.searchParams.get('sport')).toBe('basketball');
+    expect(sportUrl.searchParams.get('from')).toBe(from);
+
+    fireEvent.click(screen.getByRole('button', { name: '전체' }));
+    const allUrl = new URL(String(replaceMock.mock.calls.at(-1)?.[0]), 'https://teameet.test');
+    expect(allUrl.pathname).toBe('/events');
+    expect(allUrl.searchParams.has('sport')).toBe(false);
+    expect(allUrl.searchParams.get('from')).toBe(from);
+  });
+
   it('switches to an external URL sport after a pending local draft', () => {
     sportsState.value = [
       { id: 'sport-futsal', code: 'futsal', name: '풋살' },

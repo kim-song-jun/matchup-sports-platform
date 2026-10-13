@@ -285,14 +285,15 @@ export function splitByArrival<T extends { arrivedAt: string | null }>(
 }
 
 /** 어드민 대진 칸 상태 칩 — 데스크톱 캔버스·리그 보드·모바일이 같은 글자·아이콘·톤을 쓰는 단일 정의. */
-const BRACKET_NODE_CHIP: Record<FixtureNodeState, StatusChipModel> = {
+const BRACKET_NODE_CHIP: Record<FixtureNodeState | 'voided', StatusChipModel> = {
   scheduled: { label: '예정', tone: 'grey', icon: 'clock' },
   live: { label: '진행 중', tone: 'blue', icon: 'live' },
   submitted: { label: '확정 전', tone: 'orange', icon: 'hourglass' },
   official: { label: '확정', tone: 'green', icon: 'check' },
   cancelled: { label: '취소', tone: 'red', icon: 'cancel' },
+  voided: { label: '무효', tone: 'grey', icon: 'cancel' },
 };
 
-export function bracketNodeStateChip(state: FixtureNodeState): StatusChipModel {
+export function bracketNodeStateChip(state: FixtureNodeState | 'voided'): StatusChipModel {
   return BRACKET_NODE_CHIP[state];
 }

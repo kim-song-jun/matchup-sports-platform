@@ -226,6 +226,8 @@ export interface V1AdminLeagueDetail {
   activeRegistrationCount: number;
   /** 같은 모집단(팀이 직접 낸 신청) 중 확정 수 — 운영자 시드 팀은 넣지 않는다. */
   confirmedRegistrationCount: number;
+  yellowAccumulationLimit?: number | null;
+  redCardSuspensionMatches?: number | null;
   /**
    * 대진 자리(slot) 목록 — 어드민 상세 전용. optional 은 API 가 먼저 배포되지 않은 창의 구버전 응답용이다.
    * 자리를 쓰지 않는 기존 리그는 빈 배열로 온다.

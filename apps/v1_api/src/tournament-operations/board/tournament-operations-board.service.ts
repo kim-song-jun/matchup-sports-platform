@@ -168,6 +168,7 @@ function decodeOperationsBoardCursor(raw: string): OperationsBoardCursorPayload 
  * 필드가 늘어 리그 행의 `currentScore`·`version` 이 조용히 비는 날이 온다.
  */
 const BOARD_GAME_SELECT = {
+  sides: { select: { sideKey: true, displayNameSnapshot: true } },
   id: true,
   state: true,
   version: true,
@@ -652,6 +653,8 @@ export class TournamentOperationsBoardService {
           gameState: row.game?.state ?? null,
           fieldId: row.fieldId,
           fieldName: row.field?.name ?? null,
+          homeTeamName: row.game?.sides?.find((side) => side.sideKey === 'HOME')?.displayNameSnapshot ?? null,
+          awayTeamName: row.game?.sides?.find((side) => side.sideKey === 'AWAY')?.displayNameSnapshot ?? null,
           homeRegistrationId: row.homeRegistrationId,
           awayRegistrationId: row.awayRegistrationId,
           scheduledAt: row.scheduledAt,
@@ -1065,8 +1068,7 @@ export class TournamentOperationsBoardService {
    * 적으면 그 보장이 사라진다(이 저장소는 실제로 세 벌이 서로 다른 상태였다).
    *
    * ## 필터 두 개는 축이 다르다
-   * - `fieldId`: 팀매치에 **필드 개념이 없다.** 필드로 거른 요청은 리그에서 **빈 페이지**다
-   *   — 없는 축으로 거른 결과가 "전체" 로 나오면 운영자가 필터가 먹은 줄 안다.
+   * - `fieldId`: 대회와 동일하게 TeamMatch에 배정된 경기장으로 필터링한다.
    * - `status`: 게임 상태 필터라 두 축이 같다(`V1Game.state`). 그대로 건다.
    *
    * ## 등록 id 는 팀 id 로 되찾는다
@@ -1081,8 +1083,6 @@ export class TournamentOperationsBoardService {
     cursor: OperationsBoardCursorPayload | null | undefined,
     limit: number,
   ): Promise<BoardRow[]> {
-    // 필드는 리그에 없는 축이다 — 그걸로 거르면 맞는 행이 하나도 없다.
-    if (query.fieldId !== undefined) return [];
 
     const cursorPredicate: Prisma.V1TeamMatchWhereInput | undefined =
       cursor != null && cursor.kind === 'teamMatch'
@@ -1096,6 +1096,7 @@ export class TournamentOperationsBoardService {
 
     const base: Prisma.V1TeamMatchWhereInput = {
       ...leagueFixtureListWhere(leagueId),
+      ...(query.fieldId ? { fieldId: query.fieldId } : {}),
       ...(query.status ? { game: { is: { state: query.status } } } : {}),
     };
 
@@ -1107,6 +1108,8 @@ export class TournamentOperationsBoardService {
         id: true,
         startAt: true,
         updatedAt: true,
+        fieldId: true,
+        field: { select: { name: true, version: true } },
         hostTeamId: true,
         approvedApplicantTeamId: true,
         game: { select: BOARD_GAME_SELECT },
@@ -1148,8 +1151,8 @@ export class TournamentOperationsBoardService {
       fixtureNumber: null,
       legNumber: null,
       groupName: null,
-      fieldId: null,
-      field: null,
+      fieldId: row.fieldId,
+      field: row.field,
       // A legacy league row can have no host team while it is still recruiting. Keep that
       // unresolved side null; never pass null through registration lookup as if it were a team.
       homeRegistrationId:

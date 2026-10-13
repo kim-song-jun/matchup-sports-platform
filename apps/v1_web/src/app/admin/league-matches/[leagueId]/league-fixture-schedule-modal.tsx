@@ -7,7 +7,7 @@ import { extractErrorMessage } from '@/lib/error-message';
 import type { V1LeagueFixture, V1UpdateLeagueFixturePayload } from '@/types/league-match';
 import type { V1PlaceView } from '@/types/api';
 import { isoToKstDatetimeLocal, kstDatetimeLocalToIso } from '@/lib/kst-calendar';
-import { placeFromView, toLeaguePlacePayload, PLACE_NAME_MAX_LENGTH } from '@/lib/place';
+import { isUnsetPlace, placeFromView, toLeaguePlacePayload, PLACE_NAME_MAX_LENGTH } from '@/lib/place';
 import { isSamePlace } from '@/lib/same-place';
 import {
   isLeaguePlaceChoiceIncomplete,
@@ -73,9 +73,10 @@ export function LeagueFixtureScheduleModal({
   const awayId = useId();
   const initialStartsAt = isoToKstDatetimeLocal(fixture.startAt);
   const currentPlace = fixtureCurrentPlace(fixture);
-  // 리그 기본 장소와 다른 경기는 "다른 장소" 로 열어 지금 장소를 그대로 보여 준다.
+  // 리그 기본 장소와 다른 경기는 "다른 장소" 로 열어 지금 장소를 그대로 보여 준다. 기본 장소가 없을 때 서버가 넣은
+  // '장소 미정'은 기본 장소를 따른 결과라 "기본 장소 사용"으로 연다 — 아니면 저장할 때마다 '장소 미정'이 직접 고른 장소로 굳는다.
   const initialChoice: LeaguePlaceChoice =
-    defaultPlace !== null && isSamePlace(currentPlace, defaultPlace)
+    (defaultPlace !== null && isSamePlace(currentPlace, defaultPlace)) || (defaultPlace === null && isUnsetPlace(currentPlace))
       ? { mode: 'default', place: null }
       : { mode: 'custom', place: placeFromView(currentPlace) };
   const [startsAtLocal, setStartsAtLocal] = useState(initialStartsAt);

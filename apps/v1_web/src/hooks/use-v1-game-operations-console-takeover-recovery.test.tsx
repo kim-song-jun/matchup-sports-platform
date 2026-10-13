@@ -56,7 +56,7 @@ describe('useV1GameOperationsConsole — renew가 TAKEOVER_TOKEN_EXPIRED로 실�
     mockSocket.emit.mockImplementation(
       (event: string, _payload: unknown, cb?: (result: unknown) => void) => {
         if (event === 'game.subscribe' && cb) {
-          cb({ status: 'subscribed', snapshot: { version: 5, state: 'LIVE', lastSequence: 0, events: [] } });
+          cb({ status: 'subscribed', snapshot: { gameId: 'game-1', version: 5, state: 'LIVE', lastSequence: 0, events: [] } });
         } else if (event === 'game.takeover.request' && cb) {
           takeoverRequestCount += 1;
           cb({

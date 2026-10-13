@@ -81,10 +81,9 @@ describe('LeagueManualFixtureModal', () => {
   it('같은 팀끼리는 만들 수 없다 — 화면에서 보이는 실수라 여기서 잡는다', async () => {
     const { onSubmit } = setup();
     pick('홈 팀', 'A팀');
-    pick('어웨이 팀', 'A팀');
-    fireEvent.change(screen.getByLabelText('시작 일시'), { target: { value: '2026-09-30T19:00' } });
-    fireEvent.click(screen.getByRole('button', { name: '경기 만들기' }));
-    expect(await screen.findByRole('alert')).toHaveTextContent('같은 팀끼리는 경기를 만들 수 없어요.');
+    fireEvent.focus(screen.getByRole('combobox', { name: '어웨이 팀' }));
+    expect(screen.queryByRole('option', { name: 'A팀' })).not.toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'B팀' })).toBeInTheDocument();
     expect(onSubmit).not.toHaveBeenCalled();
   });
 

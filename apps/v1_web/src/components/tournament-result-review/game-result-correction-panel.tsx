@@ -86,12 +86,14 @@ export function GameResultCorrectionPanel({
   tournamentId,
   inline = false,
   autoOpen = false,
+  isRegularLeague = false,
   onSaved,
 }: {
   gameId: string;
   tournamentId?: string;
   inline?: boolean;
   autoOpen?: boolean;
+  isRegularLeague?: boolean;
   onSaved?: () => void;
 }) {
   const gameQuery = useTournamentGame(gameId);
@@ -430,7 +432,9 @@ export function GameResultCorrectionPanel({
             공식 결과 무효화
           </p>
           <p className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>
-            무효화하면 이 경기의 공식 점수·기록이 모두 취소되고, 다음 라운드 진행에도 영향을 줄 수 있어요.
+            {isRegularLeague
+              ? '무효화하면 이 경기의 공식 점수·기록이 취소되고 리그 순위·전적 집계에서 빠져요.'
+              : '무효화하면 이 경기의 공식 점수·기록이 모두 취소되고, 다음 라운드 진행에도 영향을 줄 수 있어요.'}
           </p>
           {showGatedCta ? (
             <Button

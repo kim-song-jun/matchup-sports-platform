@@ -36,7 +36,7 @@ function createMockSocket(subscribeAckQueue: Array<{ status: string; snapshot?: 
     emit: vi.fn((event: string, payload: unknown, cb?: (result: unknown) => void) => {
       if (event === 'game.subscribe' && cb) {
         subscribeCalls.push(payload);
-        const next = subscribeAckQueue.shift() ?? { status: 'subscribed', snapshot: { version: 1, state: 'LIVE', lastSequence: 0, events: [] } };
+        const next = subscribeAckQueue.shift() ?? { status: 'subscribed', snapshot: { gameId: 'game-1', version: 1, state: 'LIVE', lastSequence: 0, events: [] } };
         cb(next);
         return;
       }
@@ -74,8 +74,8 @@ describe('useV1GameOperationsConsole — game.permission.revoked는 즉시 영�
   it('재구독이 성공하면(다른 배정만 해제된 오탐) 조용히 복구된다 — revoked로 떨어지지 않고 배너도 없다', async () => {
     // 최초 구독 1회 + 재검증용 재구독 1회, 둘 다 성공.
     const { socket, fire, subscribeCalls } = createMockSocket([
-      { status: 'subscribed', snapshot: { version: 1, state: 'LIVE', lastSequence: 0, events: [] } },
-      { status: 'subscribed', snapshot: { version: 1, state: 'LIVE', lastSequence: 2, events: [] } },
+      { status: 'subscribed', snapshot: { gameId: 'game-1', version: 1, state: 'LIVE', lastSequence: 0, events: [] } },
+      { status: 'subscribed', snapshot: { gameId: 'game-1', version: 1, state: 'LIVE', lastSequence: 2, events: [] } },
     ]);
     vi.doMock('@/lib/v1-game-operations-socket', () => ({
       getV1GameOperationsSocket: () => socket,
@@ -111,7 +111,7 @@ describe('useV1GameOperationsConsole — game.permission.revoked는 즉시 영�
 
   it('재구독마저 거부되면(실제로 이 게임 접근이 없음) 그때 revoked로 전환되고, 문구는 "다른 운영자가 담당"을 단정하지 않는다', async () => {
     const { socket, fire, subscribeCalls } = createMockSocket([
-      { status: 'subscribed', snapshot: { version: 1, state: 'LIVE', lastSequence: 0, events: [] } },
+      { status: 'subscribed', snapshot: { gameId: 'game-1', version: 1, state: 'LIVE', lastSequence: 0, events: [] } },
       { status: 'denied' },
     ]);
     vi.doMock('@/lib/v1-game-operations-socket', () => ({

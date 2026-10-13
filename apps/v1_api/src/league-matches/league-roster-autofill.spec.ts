@@ -42,6 +42,7 @@ function fakeTx(options: { stillEmpty: boolean; activeAfterLock?: readonly strin
         const active = new Set(options.activeAfterLock ?? MEMBERSHIPS.map((row) => row.userId));
         return MEMBERSHIPS.filter((row) => where.id!.in.includes(row.id) && active.has(row.userId)).map((row, index) => ({
           userId: row.userId,
+          jerseyNumber: index + 10,
           user: eligibleUser(index + 1),
         }));
       }),
@@ -90,4 +91,14 @@ describe('fillLeagueTeamRoster — 신청 → 계정 → 멤버십 순으로 잠
     await notifyLeagueRosterFillOutcomes(tx, { id: 'league-1', title: '가을 리그' }, [outcome]);
     expect(raw.v1Notification.createMany).not.toHaveBeenCalled();
   });
+});
+
+
+it('자동 채움 명단에 팀 멤버십의 등번호를 보존한다', async () => {
+  const { tx } = fakeTx({ stillEmpty: true });
+  await fillLeagueTeamRoster(tx as unknown as Prisma.TransactionClient, 'league-1', { id: 'reg-1', teamId: 'team-1' });
+  expect(jest.mocked(tx.v1TournamentPlayer.createMany).mock.calls[0][0]?.data).toEqual(expect.arrayContaining([
+    expect.objectContaining({ userId: 'u2', jerseyNumber: 10 }),
+    expect.objectContaining({ userId: 'u1', jerseyNumber: 11 }),
+  ]));
 });

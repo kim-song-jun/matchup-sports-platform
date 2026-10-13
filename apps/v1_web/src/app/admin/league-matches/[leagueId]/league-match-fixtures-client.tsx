@@ -57,7 +57,7 @@ import {
   type LeaguePlaceChoice,
 } from './league-fixture-place-field';
 import { PLACE_NAME_MAX_LENGTH } from '@/lib/place';
-import { BracketCanvasMobile } from '@/components/admin/bracket-canvas/bracket-canvas-mobile';
+import { LeagueMobileScheduleBoard } from './league-mobile-schedule-board';
 import { BracketCanvasResponsive } from '@/components/admin/bracket-canvas/bracket-canvas-responsive';
 import type { RegistrationsLoadState } from '@/components/admin/bracket-canvas/bracket-team-tray';
 import { LeagueScheduleBoard } from '@/components/admin/bracket-canvas/league-schedule-board';
@@ -816,9 +816,18 @@ export default function LeagueMatchFixturesClient({
             />
           }
           narrow={
-            <BracketCanvasMobile
-              competitionId={leagueId}
-              scope="league"
+            <LeagueMobileScheduleBoard
+              leagueId={leagueId}
+              replaceExisting={series.fixtures.length > 0}
+              templateBlockedReason={leagueEnded
+                ? '끝난 리그에서는 템플릿으로 경기를 만들 수 없어요.'
+                : series.fixtures.some((fixture) => fixture.status !== 'cancelled' && fixtureHasStartedOrResult(fixture))
+                  ? '시작했거나 결과가 있는 경기가 있어 템플릿으로 다시 만들 수 없어요.'
+                  : null}
+              onOpenTemplate={() => setTemplateOpen(true)}
+              onEditFixture={(teamMatchId) =>
+                setScheduleFixture(series.fixtures.find((fixture) => fixture.teamMatchId === teamMatchId) ?? null)
+              }
               rounds={mobileRounds}
               focusFixtureId={focusFixtureId}
               slots={series.slots ?? []}
@@ -1475,13 +1484,13 @@ export default function LeagueMatchFixturesClient({
           defaultPlace={series.defaultPlace ?? null}
           recentVenues={series.recentVenues ?? []}
           defaultGameMinutes={periodDefaultMinutes}
-          replaceExisting={series.fixtures.some((fixture) => fixture.status !== 'cancelled')}
+          replaceExisting={series.fixtures.length > 0}
           isSubmitting={applyTemplate.isPending}
           onSubmit={async (payload) => {
             const result = await applyTemplate.mutateAsync(payload);
             showToast(`빈 경기 ${result.fixtures}개를 만들었어요. 자리에 팀을 넣어 보세요.`, 'success');
             const refreshed = await refetch();
-            const firstFixture = refreshed.data?.fixtures[0];
+            const firstFixture = refreshed.data?.fixtures.find((fixture) => fixture.status !== 'cancelled');
             if (firstFixture) {
               setFocusFixtureId(firstFixture.teamMatchId);
               setView('board');

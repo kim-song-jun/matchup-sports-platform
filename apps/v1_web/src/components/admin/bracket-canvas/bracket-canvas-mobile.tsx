@@ -18,6 +18,7 @@ import {
 } from '@/lib/bracket-canvas-mobile-model';
 import { bracketNodeStateChip } from '@/lib/competition-status';
 import { formatKstDateShort, formatKstTime } from '@/lib/date-utils';
+import { closeOverlayThenNavigate } from '@/lib/overlay-history';
 import type { V1AdminBracketFixture, V1AdminBracketGroup, V1AdminBracketSlot } from '@/types/api';
 import { MobileNodeSheetBody, type MobileSheetView } from './bracket-canvas-mobile-sheet';
 import type { RegistrationsLoadState } from './bracket-team-tray';
@@ -35,6 +36,7 @@ export interface BracketCanvasMobileProps {
   canWrite: boolean;
   registrationsState: RegistrationsLoadState;
   showToast: (message: string, variant?: AdminToastVariant) => void;
+  onEditFixture?: (fixtureId: string) => void;
 }
 
 // 390 폭에서 탭 한 칸이 44px 터치 타깃과 3~4글자 라벨을 담을 수 있는 한계. 넘으면 셀렉트로 바꾼다.
@@ -107,7 +109,7 @@ function MobileNodeCard({ node, expanded, onOpen }: { node: MobileNode; expanded
   );
 }
 
-export function BracketCanvasMobile({ competitionId, scope, rounds, focusFixtureId = null, slots, groups, fixtures, candidates, canWrite, registrationsState, showToast }: BracketCanvasMobileProps) {
+export function BracketCanvasMobile({ competitionId, scope, rounds, focusFixtureId = null, slots, groups, fixtures, candidates, canWrite, registrationsState, showToast, onEditFixture }: BracketCanvasMobileProps) {
   const roundSelectId = useId();
   const [pickedRoundKey, setPickedRoundKey] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -146,7 +148,7 @@ export function BracketCanvasMobile({ competitionId, scope, rounds, focusFixture
   return (
     <section aria-label="대진 보기" className="flex flex-col gap-3">
       {canWrite ? (
-        <AlertBanner tone="info" message="대진 구조는 큰 화면에서 편집해요. 여기서는 팀 넣기와 결과 입력을 할 수 있어요." />
+        <AlertBanner tone="info" message={onEditFixture ? '경기를 눌러 경기 정보와 결과를 관리해요.' : '대진 구조는 큰 화면에서 편집해요. 여기서는 팀 넣기와 결과 입력을 할 수 있어요.'} />
       ) : null}
 
       {rounds.length <= ROUND_TABS_MAX ? (
@@ -198,6 +200,16 @@ export function BracketCanvasMobile({ competitionId, scope, rounds, focusFixture
 
       {selected ? (
         <BottomSheet open onClose={closeSheet} title={selected.title}>
+          {canWrite && onEditFixture && view.kind === 'detail' ? (
+            <button
+              type="button"
+              className="tm-btn tm-btn-outline mb-3 w-full"
+              style={{ minHeight: 'var(--size-touch-min)' }}
+              onClick={() => void closeOverlayThenNavigate(closeSheet, () => onEditFixture(selected.fixtureId))}
+            >
+              경기 수정
+            </button>
+          ) : null}
           <MobileNodeSheetBody
             node={selected}
             competitionId={competitionId}

@@ -11,7 +11,7 @@ Status: In Progress
 ## Original Conditions
 - [x] 2026-10-13 직접 사용자 A 선택
 - [x] 관리형 전용 워크트리와 feature branch, 최신 origin/dev 기준 9e3d596629ca350e5a12ac38a06ab42fff14713f
-- [ ] 실제 첫 모바일 진입 결함을 좁은 실패 테스트로 확인
+- [x] 실제 첫 모바일 진입 결함을 좁은 실패 테스트로 확인
 - [ ] 수정·검증·독립 적대적 리뷰·dev PR·기존 리포트 댓글
 
 ## User Scenarios
@@ -47,4 +47,5 @@ Phase A 단일 frontend owner: bracket-canvas-mobile 및 실제 league fixtures 
 | 2026-10-13 | user | 모바일 편집 방식 | A: 기존 템플릿/상세 + 목록 구조 편집 |
 
 ## Progress Snapshot
+- 2026-10-13 09:55Z: 최초 모바일 실제 소비자9건에서6 FAIL/3 PASS RED를 확인했다. 실제 API의 취소 이력 유지·기존 경기 전부에 대한 replaceExisting 계약으로 fixture를 대조한 추가10건은2 FAIL/8 PASS RED였고, 최소 parent 수정 후10/10 GREEN (`mdqa138-mobile-editor-final-green.log`). 390px 최초 진입,768/1440 전환, GET→템플릿POST→새 경기GET→상세PATCH, 완료/결과 보호, readonly, 취소 이력 보존과 새 경기 포커스를 검증한다. jsdom viewport 시나리오는 실제 alpha 스크린샷 PASS가 아니다. 최신 committed head 타입·독립 리뷰·dev PR·댓글·머지·alpha 검증은 남아 있다.
 - 2026-10-13 root: 관리형 생성/등록 완료, feature branch 준비. Phase A 회귀 준비 중; 새 테스트·PR·alpha는 NOT RUN.

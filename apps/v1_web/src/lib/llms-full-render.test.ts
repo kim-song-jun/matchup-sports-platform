@@ -22,6 +22,15 @@ const match = (over: Partial<V1Match>) => ({
 }) as unknown as V1Match;
 
 describe('renderLlmsFull', () => {
+  it('정원이 찬 개인 매치는 알려진 정원 마감 상태로 안내한다', () => {
+    expect(renderLlmsFull({ ...empty, matches: [match({ displayState: 'full' })] })).toContain('풋살 · 정원 마감');
+  });
+
+  it('조회 실패 출처를 명시해 부분 목록을 전체 자료 없음으로 오해하지 않게 한다', () => {
+    expect(renderLlmsFull({ ...empty, unavailableSources: ['/tournaments/bad'] }))
+      .toContain('누락된 출처: /tournaments/bad');
+  });
+
   it('조회에 실패한 섹션(null)은 빼고, 비어 있는 섹션은 "없어요"로 적는다', () => {
     const text = renderLlmsFull({ ...empty, matches: null });
     expect(text).not.toContain('## 모집 중인 개인 매치');
@@ -29,13 +38,15 @@ describe('renderLlmsFull', () => {
     expect(text).toContain('지금 상대 팀을 찾는 팀 매치가 없어요.');
   });
 
-  it('마감이 지나 화면에서 모집 마감으로 보이는 매치는 status 가 남아 있어도 싣지 않는다', () => {
+  it('마감된 공개 매치는 모집 중 목록과 분리하고 모집 마감으로 안내한다', () => {
     const text = renderLlmsFull({
       ...empty,
       matches: [match({}), match({ matchId: 'm2', title: '마감된 매치', displayState: 'closed' })],
     });
     expect(text).toContain('https://teameet.co.kr/matches/m1');
-    expect(text).not.toContain('마감된 매치');
+    const recruiting = text.split('## 모집 중인 개인 매치')[1]?.split('##')[0];
+    expect(recruiting).not.toContain('마감된 매치');
+    expect(text).toContain('[마감된 매치](https://teameet.co.kr/matches/m2): 풋살 · 모집 마감');
   });
 
   it('제목의 줄바꿈·대괄호로 링크 문법을 깨거나 가짜 링크를 끼워 넣지 못한다', () => {
@@ -101,10 +112,35 @@ describe('renderLlmsFull', () => {
     expect(line('full')).toContain('정원 마감');
   });
 
-  it('구장별 묶음은 목록 상한(60건) 안에 실린 항목만 가리킨다', () => {
+  it('61번째 항목도 원래 목록과 구장별 안내에서 조회할 수 있다', () => {
     const many = Array.from({ length: 61 }, (_, i) => match({ matchId: `m${i}`, title: `매치 ${i}`, place: { name: `구장 ${i}`, address: null, latitude: null, longitude: null, provider: null, providerPlaceId: null } }));
     const text = renderLlmsFull({ ...empty, matches: many });
     expect(text).toContain('/matches/m59)');
-    expect(text).not.toContain('/matches/m60)');
+    expect(text).toContain('/matches/m60)');
+    expect(text).toContain('- **구장 60**: [매치 60]');
+  });
+
+  it('상대가 확정된 리그 경기도 최종 상세 주소와 실제 상태로 안내한다', () => {
+    const fixture = {
+      teamMatchId: 'fixture-1', title: '여성부 리그 1경기', sportName: '풋살',
+      startsAt: '2026-10-14T11:00:00.000Z', displayState: 'matched',
+      hostTeam: { name: '홈 팀' }, approvedOpponentTeam: { name: '원정 팀' },
+      league: { leagueId: 'league-1', title: '여성부 리그' },
+    } as unknown as V1TeamMatch;
+    const text = renderLlmsFull({ ...empty, teamMatches: [fixture] });
+    expect(text).toContain('## 리그 경기 일정·결과');
+    expect(text).toContain('https://teameet.co.kr/league-matches/league-1/fixtures/fixture-1');
+    expect(text).toContain('경기 확정');
+    expect(text).toContain('홈 팀 vs 원정 팀');
+    expect(text).not.toContain('https://teameet.co.kr/team-matches/fixture-1');
+  });
+
+  it('공개 대회 경기는 실제 진행 상태와 기존 상세 주소로 안내한다', () => {
+    const text = renderLlmsFull({ ...empty, tournamentFixtures: [{
+      tournamentId: 'cup-1', tournamentTitle: '풋살컵', sportName: '풋살',
+      fixture: { id: 'game-1', homeTeamName: 'A팀', awayTeamName: 'B팀', liveStatus: 'ended', scheduledAt: '2026-10-01T01:00:00Z', venue: '송파 풋살파크' } as never,
+    }] });
+    expect(text).toContain('https://teameet.co.kr/tournaments/cup-1/matches/game-1');
+    expect(text).toContain('풋살 · 종료 · 2026년 10월 1일');
   });
 });

@@ -2,7 +2,7 @@
  * 구조화 데이터의 계약은 두 가지다: **틀린 사실을 내보내지 않는 것**과
  * **script 태그를 깨뜨리지 않는 것**. 아래는 그 둘만 지킨다.
  */
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { expectNoNonFootballCompetitionClaim } from '@/test/public-claims';
 import {
   buildBreadcrumbLd,
@@ -31,6 +31,8 @@ function tournament(overrides: Partial<V1TournamentDetail> = {}): V1TournamentDe
     longitude: 127.03,
     coverImageUrl: 'https://teameet.co.kr/uploads/cover.png',
     teamCount: 8,
+    confirmedCount: 0,
+    pendingPaymentCount: 0,
     entryFee: 120000,
     promoListSubtitle: '5대5 풋살 남자부',
     prizeSummary: '우승 100만원',
@@ -50,6 +52,25 @@ describe('serializeJsonLd', () => {
 });
 
 describe('buildSportsEventLd', () => {
+  beforeEach(() => { vi.useFakeTimers(); vi.setSystemTime(new Date('2026-09-10T00:00:00.000Z')); });
+  afterEach(() => vi.useRealTimers());
+
+  it('모집 중 상태라도 마감 또는 결제 대기를 포함한 정원 마감이면 신청 가능으로 광고하지 않는다', () => {
+    for (const item of [
+      tournament({ registrationDeadlineAt: '2026-09-09T14:59:59.000Z' }),
+      tournament({ confirmedCount: 6, pendingPaymentCount: 2 }),
+    ]) expect(buildSportsEventLd(item)?.offers).toMatchObject({ availability: 'https://schema.org/SoldOut' });
+  });
+
+  it('리그는 진행 중이어도 실제 신청 마감 전이면 신청 가능으로 안내한다', () => {
+    expect(buildSportsEventLd(tournament({ kind: 'regular_league', status: 'in_progress', entryFeeConfigured: true }))?.offers)
+      .toMatchObject({ availability: 'https://schema.org/InStock' });
+  });
+
+  it('구장 이름을 우편 주소로 지어내지 않는다', () => {
+    expect(buildSportsEventLd(tournament())?.location).not.toHaveProperty('address');
+  });
+
   it('일정이 확정된 대회는 화면에 보이는 값 그대로 SportsEvent 를 만든다', () => {
     const ld = buildSportsEventLd(tournament());
 

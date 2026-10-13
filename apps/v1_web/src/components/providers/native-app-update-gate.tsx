@@ -98,9 +98,14 @@ function RequiredUpdateDialog({ result, checking, failed, onCheck }: {
   });
   useLayoutEffect(() => {
     const dialog = dialogRef.current;
+    const onCancel = (event: Event) => event.preventDefault();
+    dialog?.addEventListener('cancel', onCancel);
     // Native dialog top-layer keeps all other modals and background controls inert.
     dialog?.showModal();
-    return () => dialog?.close();
+    return () => {
+      dialog?.removeEventListener('cancel', onCancel);
+      dialog?.close();
+    };
   }, [dialogRef]);
   const store = result.platform === 'android' ? 'Google Play' : 'App Store';
   return createPortal(
@@ -110,7 +115,6 @@ function RequiredUpdateDialog({ result, checking, failed, onCheck }: {
       aria-labelledby={titleId}
       aria-describedby={descriptionId}
       tabIndex={-1}
-      onCancel={(event) => event.preventDefault()}
       className="tm-native-update-dialog"
     >
       <div className="tm-native-update-content">

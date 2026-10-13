@@ -103,6 +103,7 @@ function periodSettingsOf(minutes: number[]) {
 }
 
 vi.mock('@/hooks/use-v1-api', () => ({
+  useV1UpdateLeagueDiscipline: vi.fn(() => ({ mutateAsync: vi.fn(), isPending: false })),
   useV1ActivePopup: vi.fn(),
   // 그룹 B 감사 결함 1: 참가팀 추가·제거. 대부분의 테스트는 로스터 조작을 다루지 않으므로
   // 무해한 기본값이면 충분하다.
@@ -1992,7 +1993,7 @@ describe('LeagueMatchFixturesClient — 대진 timing 설정', () => {
 
     const section = screen.getByRole('region', { name: '피리어드 설정' });
     fireEvent.click(within(section).getByRole('button', { name: '수정' }));
-    fireEvent.change(within(section).getByLabelText('피리어드 1'), { target: { value: '30' } });
+    fireEvent.change(within(section).getByLabelText('전반'), { target: { value: '30' } });
     fireEvent.click(within(section).getByRole('button', { name: '저장' }));
 
     expect(updatePeriodsMutateMock).toHaveBeenCalledWith(
@@ -2293,11 +2294,12 @@ describe('수동 대진 추가 입구 — 대진 유무와 무관하게 보인�
       expect(screen.getByText(/끝난 리그라 대진을 다시 만들 수 없어요. 먼저 위 ‘상태 변경’에서 진행 중으로 바꿔 주세요/)).toBeInTheDocument();
     });
 
-    it('진행 중인 리그는 둘 다 열려 있다 (회귀 방지 — 상태 조건이 항상 참이면 아무것도 못 한다)', async () => {
+    it('확정 결과가 있는 진행 중 리그도 경기 추가는 가능하지만 재생성은 막는다', async () => {
       renderWithFixtures([OFFICIAL_FIXTURE], 'active');
       openFixtureManage();
       expect(await screen.findByRole('button', { name: '경기 하나 추가' })).not.toBeDisabled();
-      expect(screen.getByRole('button', { name: '대진 재생성' })).not.toBeDisabled();
+      expect(screen.getByRole('button', { name: '대진 재생성' })).toBeDisabled();
+      expect(screen.getByText('확정된 결과가 있어 대진을 다시 만들 수 없어요.')).toBeInTheDocument();
       expect(screen.getByRole('button', { name: '미리보기' })).not.toBeDisabled();
       expect(screen.queryByText(/끝난 리그/)).toBeNull();
     });

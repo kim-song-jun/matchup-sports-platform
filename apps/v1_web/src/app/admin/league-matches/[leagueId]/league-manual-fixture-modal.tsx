@@ -163,7 +163,7 @@ export function LeagueManualFixtureModal({
             id="manual-fixture-home"
             value={home}
             onChange={setHome}
-            items={teams}
+            items={teams.filter((team) => team.id !== away?.id)}
             placeholder="참가팀에서 고르기"
             emptyText="참가팀이 없어요"
           />
@@ -177,7 +177,7 @@ export function LeagueManualFixtureModal({
             id="manual-fixture-away"
             value={away}
             onChange={setAway}
-            items={teams}
+            items={teams.filter((team) => team.id !== home?.id)}
             placeholder="참가팀에서 고르기"
             emptyText="참가팀이 없어요"
           />

@@ -495,3 +495,10 @@ The form hydrates that exact league, preserves failed drafts, and confirms expli
 Dates use KST; untouched ISO instants retain seconds/milliseconds. A successful save invalidates
 admin/public league and tournament queries and returns to the admin detail. Public league detail
 now includes nullable `rulesText`, rendered as operating guidance only when populated.
+
+## 2026-10-13 리그 QA 후속
+
+- 대진 재생성은 교체한 모든 옛 대진(기존 취소 대진 포함)의 `deletedAt`을 설정한다. Game·결과·감사 기록은 보존하고 현재 목록·주차·경기 수에서 제외한다. 확정 결과가 있으면 기존 409 계약대로 재생성을 거부한다.
+- `PATCH /admin/league-matches/:leagueId`의 `yellowAccumulationLimit`, `redCardSuspensionMatches`는 리그 상세에서 설정한다. 1~20 정수, `null`은 미적용이며 LIVE·PAUSED·ENDED 경기가 있으면 `LEAGUE_DISCIPLINE_LOCKED`다.
+- 빈 확정 명단의 자동 채움은 활성 팀 멤버십 등번호를 참가 명단에 함께 저장한다. 번호를 임의로 생성하거나 기존 참가 명단을 백필하지 않는다.
+- 결과 미입력 리마인더에 두 팀 이름을 표시하고 해당 경기 결과 검토로 연결한다. 단일 경기 취소 알림도 두 팀 이름을 표시한다.

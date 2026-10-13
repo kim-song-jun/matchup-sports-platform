@@ -1051,6 +1051,9 @@ describe('POST /admin/league-matches + fixtures', () => {
 
       const original = await prisma.v1TeamMatch.findUniqueOrThrow({ where: { id: originalFixtureId } });
       expect(original.status).toBe('cancelled');
+      expect(original.deletedAt).not.toBeNull();
+      const currentFixtures = await prisma.v1TeamMatch.findMany({ where: { leagueId, deletedAt: null }, select: { id: true } });
+      expect(currentFixtures.map((fixture) => fixture.id)).toEqual([newFixtureId]);
       const created = await prisma.v1TeamMatch.findUniqueOrThrow({ where: { id: newFixtureId } });
       expect(created.status).toBe('matched');
       expect(created.leagueId).toBe(leagueId);

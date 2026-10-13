@@ -30,6 +30,7 @@ import { leagueFixtureMatchupLabel } from '@/lib/league-fixture-meta';
 import { LeagueManualFixtureModal } from './league-manual-fixture-modal';
 import { LeagueFixtureScheduleModal, type LeagueFixtureSchedulePatch } from './league-fixture-schedule-modal';
 import { TournamentPeriodSettingsEditor } from '@/components/admin/tournament-period-settings-editor';
+import { LeagueDisciplineSettings } from './league-discipline-settings';
 import { useAdminCanWrite } from '@/hooks/use-admin-can-write';
 import { useTournamentPeriodSettings } from '@/hooks/use-tournament-period-settings';
 import { LeagueNextActionCard } from './league-next-action-card';
@@ -802,6 +803,7 @@ export default function LeagueMatchFixturesClient({
       {series.state === 'on_hold' ? null : <LeagueVisibilityControl leagueId={leagueId} isPublic={series.isPublic} />}
       <LeagueCloseRegistrationControl leagueId={leagueId} state={series.state} registrationOpen={series.registrationOpen} registrationDeadlineAt={series.registrationDeadlineAt} activeRegistrationCount={series.activeRegistrationCount} confirmedCount={series.confirmedRegistrationCount} showToast={showToast} />
       <TournamentPeriodSettingsEditor tournamentId={leagueId} canWrite={canWrite} showToast={showToast} />
+      <LeagueDisciplineSettings league={series} canWrite={canWrite} showToast={showToast} />
       <LeagueCoverImageControl leagueId={leagueId} sportCode={series.sportCode} coverImageUrl={series.coverImageUrl} />
       <LeagueVenueControl leagueId={leagueId} defaultPlace={series.defaultPlace ?? null} recentVenues={series.recentVenues} />
       <div className="mb-4 md:max-w-xs">
@@ -1371,7 +1373,7 @@ export default function LeagueMatchFixturesClient({
                     <button
                       type="button"
                       onClick={() => setRegenerateModalOpen(true)}
-                      disabled={!hasLeagueStartsOn || inProgressFixtures.length > 0 || hasSlotFixtures || leagueEnded}
+                      disabled={!hasLeagueStartsOn || inProgressFixtures.length > 0 || hasSlotFixtures || leagueEnded || leagueHasOfficialResult}
                       className="min-h-[44px] flex-[1.6] rounded-xl bg-[var(--button-fill-warning)] px-4 text-sm font-semibold text-white hover:bg-[var(--button-fill-warning-hover)] transition-colors disabled:opacity-50 md:flex-none"
                     >
                       대진 재생성
@@ -1384,6 +1386,11 @@ export default function LeagueMatchFixturesClient({
                     {leagueHasOfficialResult
                       ? '끝난 리그라 대진을 다시 만들 수 없어요. 확정된 결과가 있어 진행 중으로 되돌려도 다시 만들 수는 없어요.'
                       : '끝난 리그라 대진을 다시 만들 수 없어요. 먼저 위 ‘상태 변경’에서 진행 중으로 바꿔 주세요.'}
+                  </p>
+                ) : null}
+                {leagueHasOfficialResult && !leagueEnded ? (
+                  <p className="mt-2 text-[length:var(--font-size-body-sm)] text-[var(--orange700)]">
+                    확정된 결과가 있어 대진을 다시 만들 수 없어요.
                   </p>
                 ) : null}
                 {inProgressFixtures.length > 0 ? (
@@ -1544,8 +1551,8 @@ export default function LeagueMatchFixturesClient({
         open={regenerateModalOpen}
         pending={regenerateFixtures.isPending}
         title="대진을 다시 만들까요?"
-        description={`대진 ${series.fixtures.length}경기를 전부 취소하고 새로 만들어요.${
-          teamsData ? ` 참가팀: ${teamsData.teams.map((t) => t.name).join(', ')}` : ''
+        description={`대진 ${series.fixtures.length}경기를 교체하고 새로 만들어요. 옛 경기는 목록에서 숨겨요.${
+          teamsData ? ` 참가팀: ${teamsData.teams.map((t) => t.name).join(', ')}.` : ''
         } 공식 결과가 확정된 대진이 있으면 실패해요.`}
         confirmLabel="대진 재생성"
         tone="amber"

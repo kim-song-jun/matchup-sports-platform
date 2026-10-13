@@ -190,6 +190,7 @@ export function CorrectionsPageClient({ tournamentId }: { tournamentId: string }
                   key={selectedItem.gameId}
                   gameId={selectedItem.gameId}
                   tournamentId={tournamentId}
+                  isRegularLeague={tournament.data?.kind === 'regular_league'}
                   inline
                 />
               </div>

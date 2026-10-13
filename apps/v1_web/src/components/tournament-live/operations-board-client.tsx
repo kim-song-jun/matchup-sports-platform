@@ -46,10 +46,12 @@ import { DESKTOP_LIST_MEDIA_QUERY, useMediaQuery } from '@/hooks/use-media-query
 function ExpandedResultPanel({
   gameId,
   tournamentId,
+  isRegularLeague,
   onSaved,
 }: {
   gameId: string;
   tournamentId: string;
+  isRegularLeague: boolean;
   onSaved: () => void;
 }) {
   const revisions = useGameResultRevisions(gameId);
@@ -75,7 +77,7 @@ function ExpandedResultPanel({
   return mode === 'review' ? (
     <GameResultReviewPanel gameId={gameId} tournamentId={tournamentId} inline onSaved={handleSaved} />
   ) : (
-    <GameResultCorrectionPanel gameId={gameId} tournamentId={tournamentId} inline autoOpen onSaved={handleSaved} />
+    <GameResultCorrectionPanel gameId={gameId} tournamentId={tournamentId} isRegularLeague={isRegularLeague} inline autoOpen onSaved={handleSaved} />
   );
 }
 
@@ -374,6 +376,7 @@ export function OperationsBoardClient({ tournamentId }: Props) {
   function rowLabel(item: V1TournamentOperationsBoardItem): string {
     const names = teamNamesByFixtureId.get(item.fixtureId);
     if (names) return `${names.home} vs ${names.away}`;
+    if (item.homeTeamName && item.awayTeamName) return `${item.homeTeamName} vs ${item.awayTeamName}`;
     // 리그 행은 팀명 맵이 비고(`fixtures` 가 아니라 `leagueFixtures` 로 온다) 번호도 없다.
     return rowLabelFor(item, leagueTitlesByFixtureId.get(item.fixtureId));
   }
@@ -442,6 +445,7 @@ export function OperationsBoardClient({ tournamentId }: Props) {
         key={item.gameId}
         gameId={item.gameId}
         tournamentId={tournamentId}
+        isRegularLeague={tournament.data?.kind === 'regular_league'}
         onSaved={() => void board.refetch()}
       />
     );

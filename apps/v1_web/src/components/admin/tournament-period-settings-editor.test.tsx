@@ -44,7 +44,7 @@ describe('TournamentPeriodSettingsEditor', () => {
     // A background query refresh must not silently change the CAS token for this draft.
     state.settings = { ...state.settings, expectedVersion: 'version-2' };
     view.rerender(<TournamentPeriodSettingsEditor tournamentId="tournament-1" canWrite showToast={showToast} />);
-    fireEvent.change(screen.getByLabelText('피리어드 1'), { target: { value: '40' } });
+    fireEvent.change(screen.getByLabelText('전반'), { target: { value: '40' } });
     fireEvent.click(screen.getByRole('button', { name: '저장' }));
 
     expect(state.mutate).toHaveBeenCalledWith(
@@ -69,7 +69,7 @@ describe('TournamentPeriodSettingsEditor', () => {
     render(<TournamentPeriodSettingsEditor tournamentId="tournament-1" canWrite showToast={showToast} />);
 
     fireEvent.click(screen.getByRole('button', { name: '수정' }));
-    fireEvent.change(screen.getByLabelText('피리어드 1'), { target: { value: '40' } });
+    fireEvent.change(screen.getByLabelText('전반'), { target: { value: '40' } });
     fireEvent.click(screen.getByRole('button', { name: '저장' }));
 
     const [, callbacks] = state.mutate.mock.calls[0] as [
@@ -106,7 +106,7 @@ describe('TournamentPeriodSettingsEditor', () => {
     render(<TournamentPeriodSettingsEditor tournamentId="tournament-1" canWrite showToast={showToast} />);
 
     fireEvent.click(screen.getByRole('button', { name: '수정' }));
-    fireEvent.change(screen.getByLabelText('피리어드 2'), { target: { value: '40' } });
+    fireEvent.change(screen.getByLabelText('후반'), { target: { value: '40' } });
     fireEvent.click(screen.getByRole('button', { name: '저장' }));
     const [, callbacks] = state.mutate.mock.calls[0] as [unknown, { onError: (error: unknown) => Promise<void> }];
     await act(() => callbacks.onError({ response: { data: { code: 'TOURNAMENT_VERSION_CONFLICT' } } }));
@@ -127,7 +127,7 @@ describe('TournamentPeriodSettingsEditor', () => {
     render(<TournamentPeriodSettingsEditor tournamentId="tournament-1" canWrite showToast={showToast} />);
 
     fireEvent.click(screen.getByRole('button', { name: '수정' }));
-    fireEvent.change(screen.getByLabelText('피리어드 1'), { target: { value: '40' } });
+    fireEvent.change(screen.getByLabelText('전반'), { target: { value: '40' } });
     fireEvent.click(screen.getByRole('button', { name: '저장' }));
     const [, callbacks] = state.mutate.mock.calls[0] as [unknown, { onError: (error: unknown) => Promise<void> }];
     await act(() => callbacks.onError({ response: { data: { code: 'TOURNAMENT_VERSION_CONFLICT' } } }));

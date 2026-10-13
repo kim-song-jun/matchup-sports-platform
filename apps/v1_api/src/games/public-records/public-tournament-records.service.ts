@@ -33,6 +33,7 @@ import { decodeRecordCursor, encodeRecordCursor } from './public-cursor';
 import { isParticipantPubliclyEligible, isRankedRecordHiddenByEligibility, loadParticipantConsentEligibility, type ParticipantConsentEligibility } from './public-consent';
 import { resolveLiveClock, resolvePeriodBreak, type PublicGameClock, type PublicPeriodBreak } from './public-clock';
 import { tallyLiveScore } from './public-live-score';
+import { selectLineupParticipantsWithDraftFallback } from '../core/latest-lineup-participants';
 import {
   resolvePublicScorePresentation,
   type PublicScoreValue,
@@ -1942,6 +1943,7 @@ export class PublicTournamentRecordsService {
       consentMap,
       nameProfileByUserId,
       false,
+      true,
     );
     // finding #60: getMatch 와 동일한 창(종료~공식 확정 전)에 대한 트윈 게이트.
     const hidePendingOfficialEvents = status === 'ended' && !showOfficialResult;
@@ -2510,6 +2512,7 @@ function buildLineup(
   consentMap: Map<string, ParticipantConsentEligibility>,
   nameProfileByUserId: ReadonlyMap<string, ParticipantNameProfileRow>,
   isStaffBypass: boolean,
+  allowAutomaticRoster = false,
 ) {
   if (fixture.game === null) return null;
   if (mode === 'status_only') return null;
@@ -2548,9 +2551,17 @@ function buildLineup(
     }
   }
 
+  const automaticRoster = allowAutomaticRoster
+    ? new Set(selectLineupParticipantsWithDraftFallback(
+        fixture.game.participants,
+        fixture.game.lineups.filter((lineup) => lineup.invalidatedAt === null),
+      ).map((participant) => participant.id))
+    : null;
   const bySide = new Map<string, ParticipantRow[]>();
   for (const participant of fixture.game.participants) {
-    if (latestLineupBySide.get(participant.sideId)?.id !== participant.lineupId) continue;
+    if (automaticRoster !== null
+      ? !automaticRoster.has(participant.id)
+      : latestLineupBySide.get(participant.sideId)?.id !== participant.lineupId) continue;
     const list = bySide.get(participant.sideId) ?? [];
     list.push(participant);
     bySide.set(participant.sideId, list);

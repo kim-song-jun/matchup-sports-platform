@@ -1,6 +1,8 @@
 import { PrismaService } from '../../src/prisma/prisma.service';
 import { PublicTournamentRecordsService } from '../../src/games/public-records/public-tournament-records.service';
 import { TournamentOperationsBoardService } from '../../src/tournament-operations/board/tournament-operations-board.service';
+import { TournamentOperationsStaffService } from '../../src/tournament-operations/staff/tournament-operations-staff.service';
+import { TournamentStaffService } from '../../src/tournaments/staff/tournament-staff.service';
 import { TournamentStaffAccessService } from '../../src/tournaments/staff/tournament-staff-access.service';
 import type { ListTournamentOperationsQueryDto } from '../../src/tournament-operations/board/dto/list-operations-query.dto';
 
@@ -258,7 +260,31 @@ describe('운영 콘솔 목록 — 정규 리그', () => {
     expect(result.nextCursor).toBeNull();
   });
 
-  it('필드 필터는 리그에서 빈 페이지다 — 없는 축으로 거른 결과가 "전체" 로 보이면 안 된다', async () => {
+  it('리그 경기장 배정이 운영 보드 필터와 필드 담당자 목록에 함께 반영된다', async () => {
+    const field = await prisma.v1TournamentField.create({ data: { tournamentId: ids.league, scopeKey: 'qa-1013-field', name: '리그 1구장' } });
+    const game = await prisma.v1Game.findUniqueOrThrow({ where: { teamMatchId: matchId(1) } });
+    await prisma.v1GameSide.createMany({ data: [
+      { gameId: game.id, sideKey: 'HOME', teamId: teamId(1), displayNameSnapshot: '리그 홈팀' },
+      { gameId: game.id, sideKey: 'AWAY', teamId: teamId(2), displayNameSnapshot: '리그 원정팀' },
+    ] });
+    await prisma.v1TeamMatch.update({ where: { id: matchId(1) }, data: { tournamentId: ids.league, fieldId: field.id } });
+    const assignment = await prisma.v1TournamentStaffAssignment.create({ data: { tournamentId: ids.league, userId: ownerId(1), grantedByUserId: ids.adminUser, role: 'FIELD_OPERATOR', fieldId: field.id } });
+    try {
+      const result = await board.list(ids.league, query({ fieldId: field.id, limit: 50 }));
+      expect(result.items.map((item) => item.fixtureId)).toEqual([matchId(1)]);
+      expect(result.items[0]).toMatchObject({ fieldName: '리그 1구장', homeTeamName: '리그 홈팀', awayTeamName: '리그 원정팀' });
+      const staff = new TournamentOperationsStaffService(prisma, new TournamentStaffAccessService(prisma), {} as TournamentStaffService);
+      const mine = await staff.myAssignments(ownerId(1));
+      expect(mine.items[0].fixtures.map((item) => item.fixtureId)).toEqual([matchId(1)]);
+      expect(mine.items[0].fixtures[0]).toMatchObject({ fieldName: '리그 1구장', round: null, fixtureNumber: null });
+    } finally {
+      await prisma.v1TournamentStaffAssignment.delete({ where: { id: assignment.id } });
+      await prisma.v1TeamMatch.update({ where: { id: matchId(1) }, data: { fieldId: null } });
+      await prisma.v1TournamentField.delete({ where: { id: field.id } });
+    }
+  });
+
+  it('배정된 경기가 없는 필드 필터는 리그에서도 빈 페이지다', async () => {
     const result = await board.list(
       ids.league,
       query({ limit: 50, fieldId: 'b7000000-0000-4000-8000-000000000099' }),

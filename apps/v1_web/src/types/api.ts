@@ -5080,6 +5080,8 @@ export const V1_STABLE_WARNING_CODES: readonly V1TournamentStableWarningCode[] =
 /** GET /tournament-ops/tournaments/:tournamentId/operations 응답의 items[] 항목. */
 export type V1TournamentOperationsBoardItem = {
   fixtureId: string;
+  homeTeamName?: string | null;
+  awayTeamName?: string | null;
   tournamentId: string;
   /**
    * **리그 행에서는 `null` 이다.** 주차·번호는 대회 축(`V1TournamentFixture`)의 컬럼이고
@@ -5185,9 +5187,9 @@ export type V1MyTournamentStaffFixture = {
   scheduledAt: string | null;
   status: string;
   gameState: V1GameState | null;
-  round: string;
-  fixtureNumber: number;
-  legNumber: number;
+  round: string | null;
+  fixtureNumber: number | null;
+  legNumber: number | null;
   /** 조에 속하지 않은 경기(결선)는 `null`. */
   groupName: string | null;
   fieldId: string | null;

@@ -21,6 +21,10 @@ function draftFromSettings(settings: TournamentPeriodSettingsResponse | undefine
   return [];
 }
 
+function periodFieldLabel(index: number, count: number): string {
+  return count === 1 ? '단판' : count === 2 ? (index === 0 ? '전반' : '후반') : `피리어드 ${index + 1}`;
+}
+
 function hasValidDurations(durations: string[]) {
   return durations.every((duration) => /^\d+$/.test(duration.trim()) && Number(duration) >= 1);
 }
@@ -164,7 +168,7 @@ function PeriodSettingsEditor({
           <div className="mt-3 flex flex-col gap-2">
             {draft.map((duration, index) => (
               <div key={`period-${index}`} className="flex items-center gap-2">
-                <label htmlFor={`period-duration-${index}`} className="w-24 shrink-0 text-[length:var(--font-size-body-sm)] text-[var(--text-strong)]">피리어드 {index + 1}</label>
+                <label htmlFor={`period-duration-${index}`} className="w-24 shrink-0 text-[length:var(--font-size-body-sm)] text-[var(--text-strong)]">{periodFieldLabel(index, draft.length)}</label>
                 <div className="relative flex-1">
                   <input id={`period-duration-${index}`} inputMode="numeric" type="number" min={1} step={1} value={duration} onChange={(event) => setDraft((current) => current.map((value, valueIndex) => valueIndex === index ? event.target.value : value))} disabled={updateSettings.isPending || !canWrite} className="h-[44px] w-full rounded-xl border border-[var(--border)] bg-[var(--card-surface)] px-3 pr-10 text-[length:var(--font-size-body-sm)] text-[var(--text-strong)] focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:opacity-50" />
                   <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[length:var(--font-size-caption)] text-[var(--text-muted)]">분</span>

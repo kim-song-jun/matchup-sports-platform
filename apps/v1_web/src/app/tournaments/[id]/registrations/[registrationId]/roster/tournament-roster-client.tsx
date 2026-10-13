@@ -51,6 +51,7 @@ import {
 } from '@/lib/roster-editability';
 import { PLAYER_ELIGIBILITY_LABEL, teamRoleLabel } from '@/lib/v1-status-labels';
 import { AvatarFallback } from '@/components/v1-ui/avatar-fallback';
+import { rosterLimitText } from '@/lib/roster-limit';
 
 // 이 파일에서 가져다 쓰던 소비처(테스트 포함)가 그대로 돌아가게 이름만 다시 내보낸다.
 export { getRosterDeadlineState, isTournamentRosterMutable, tournamentRosterClosedMessage, type RosterDeadlineState };
@@ -1628,7 +1629,7 @@ export function TournamentRosterPageClient({
               </span>
             </div>
             <div className="tm-text-caption" style={{ marginTop: 4, color: 'var(--text-muted)' }}>
-              {`최소 ${minPlayers}명 · 최대 ${maxPlayers}명`}
+              {rosterLimitText(minPlayers, tournament?.maxPlayers ?? null, (min, max) => `최소 ${min}명 · 최대 ${max}명`)}
             </div>
           </div>
           {canAddDraftForm ? (

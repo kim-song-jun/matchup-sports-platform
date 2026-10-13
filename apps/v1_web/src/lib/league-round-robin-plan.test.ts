@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { plannedGameCount, plannedRounds, resolveWeeksCount, suggestedWeeks } from './league-round-robin-plan';
+import { plannedGameCount, plannedRounds, resolveWeeksCount, roundsForFixtureCount, suggestedWeeks } from './league-round-robin-plan';
 
 describe('팀 수로 주차 수 제안(F40) — 서버 라운드로빈과 같은 셈', () => {
   it('2팀이면 단일 1주·홈앤어웨이 2주 — 옛 기본값 7(같은 대진 7번)이 아니다', () => {
@@ -47,5 +47,14 @@ describe('팀 수로 주차 수 제안(F40) — 서버 라운드로빈과 같은
   it('팀이 2개 미만이면 만들 대진이 없지만 입력 칸은 1 이상으로 둔다', () => {
     expect(suggestedWeeks(1, 1)).toBe(1);
     expect(plannedGameCount(1, 1)).toBe(0);
+  });
+
+  it('총 경기 수 방식은 그 수를 채우는 라운드만 요청한다 — 4팀(라운드당 2경기) 총 5경기면 3라운드', () => {
+    expect(roundsForFixtureCount(4, 5)).toBe(3);
+    expect(plannedRounds({ kind: 'fixtures', count: 5 }, 4, 3)).toBe(3);
+    expect(resolveWeeksCount({ kind: 'fixtures', count: 5 }, 4)).toBe(3);
+    // 팀당 하루 2경기면 주차는 올림.
+    expect(resolveWeeksCount({ kind: 'fixtures', count: 5 }, 4, 2)).toBe(2);
+    expect(roundsForFixtureCount(1, 5)).toBe(0);
   });
 });

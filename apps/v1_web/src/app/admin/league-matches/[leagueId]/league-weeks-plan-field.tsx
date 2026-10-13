@@ -19,6 +19,7 @@ export function LeagueWeeksPlanField({
   gamesPerTeamPerDay,
   plan,
   weeksCount,
+  plannedFixtureCount,
   onPlanChange,
 }: {
   inputId: string;
@@ -27,17 +28,21 @@ export function LeagueWeeksPlanField({
   gamesPerTeamPerDay: number;
   plan: WeeksPlan;
   weeksCount: number;
+  /** 리그를 만들 때 정한 총 경기 수. 있으면 '총 N경기' 칩이 생긴다. */
+  plannedFixtureCount?: number | null;
   onPlanChange: (plan: WeeksPlan) => void;
 }) {
   const singleWeeks = suggestedWeeks(teamCount, 1, gamesPerTeamPerDay);
   const doubleWeeks = suggestedWeeks(teamCount, 2, gamesPerTeamPerDay);
   const rounds = plannedRounds(plan, teamCount, weeksCount, gamesPerTeamPerDay);
-  const games = plannedGameCount(teamCount, rounds);
+  // 총 경기 수 방식은 마지막 라운드를 서버가 그 수에서 자른다.
+  const games = plan.kind === 'fixtures' ? Math.min(plan.count, plannedGameCount(teamCount, rounds)) : plannedGameCount(teamCount, rounds);
   const lastDayRounds =
     plan.kind === 'custom' || weeksCount <= 1 ? 0 : rounds % Math.max(1, gamesPerTeamPerDay);
-  const chips = [
-    { kind: 'single' as const, label: `단일 ${singleWeeks}주` },
-    { kind: 'double' as const, label: `홈앤어웨이 ${doubleWeeks}주` },
+  const chips: Array<{ plan: WeeksPlan; label: string }> = [
+    ...(plannedFixtureCount ? [{ plan: { kind: 'fixtures', count: plannedFixtureCount } as const, label: `총 ${plannedFixtureCount}경기` }] : []),
+    { plan: { kind: 'single' }, label: `단일 ${singleWeeks}주` },
+    { plan: { kind: 'double' }, label: `홈앤어웨이 ${doubleWeeks}주` },
   ];
 
   return (
@@ -48,7 +53,7 @@ export function LeagueWeeksPlanField({
             {teamCount}팀 · {weeksPlanLabel(plan)}
           </span>{' '}
           → {weeksCount}주차 · {games}경기가 만들어져요
-          {plan.kind === 'custom' ? null : (
+          {plan.kind === 'custom' || plan.kind === 'fixtures' ? null : (
             <span className="tm-badge tm-badge-sm tm-badge-blue ml-2">
               팀 수로 자동 계산
             </span>
@@ -63,11 +68,11 @@ export function LeagueWeeksPlanField({
         <div role="group" aria-label="대진 방식" className="mt-2 flex flex-wrap gap-2">
           {chips.map((chip) => (
             <button
-              key={chip.kind}
+              key={chip.plan.kind}
               type="button"
-              className={`tm-chip ${plan.kind === chip.kind ? 'tm-chip-active' : ''}`}
-              aria-pressed={plan.kind === chip.kind}
-              onClick={() => onPlanChange({ kind: chip.kind })}
+              className={`tm-chip ${plan.kind === chip.plan.kind ? 'tm-chip-active' : ''}`}
+              aria-pressed={plan.kind === chip.plan.kind}
+              onClick={() => onPlanChange(chip.plan)}
             >
               {chip.label}
             </button>

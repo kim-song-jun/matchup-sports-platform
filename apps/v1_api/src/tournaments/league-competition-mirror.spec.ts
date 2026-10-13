@@ -100,6 +100,9 @@ describe('리그 QA 시드의 복제값 고정', () => {
       'competitionConfigVersionId',
       // 원본 리그의 생성 시각 — 안 옮기면 시드 실행 시각이 박혀 통합 목록 정렬을 지배한다.
       'createdAt',
+      // 리그 기본값 — 팀 명단 인원 제한 없음.
+      'minPlayers',
+      'maxPlayers',
     ];
     for (const key of seedKeys) {
       expect(Object.keys(fromHelper)).toContain(key);
@@ -132,26 +135,29 @@ describe('leagueMirrorCreateData — 시즌 승계(inherited)', () => {
     bankName: '국민은행',
     bankAccount: '123-456-789012',
     bankHolder: '팀밋',
+    minPlayers: 1,
+    maxPlayers: null,
   };
 
-  it('inherited 가 있으면 이미지·참가비·계좌만 싣고 설정 시각은 싣지 않는다', () => {
+  it('inherited 가 있으면 이미지·참가비·계좌·팀 명단 인원만 싣고 설정 시각은 싣지 않는다', () => {
     const data = leagueMirrorCreateData({ ...base, inherited });
     expect(data).toMatchObject(inherited);
     expect(data).not.toHaveProperty('entryFeeConfiguredAt');
   });
 
-  it('inherited 가 없으면 승계 컬럼 키가 아예 없다(DB 기본값: 0원·null)', () => {
+  it('inherited 가 없으면 승계 컬럼 키가 아예 없고(DB 기본값: 0원·null) 팀 명단 인원은 제한 없음이다', () => {
     const data = leagueMirrorCreateData(base);
     for (const key of ['coverImageUrl', 'entryFee', 'bankName', 'bankAccount', 'bankHolder', 'entryFeeConfiguredAt']) {
       expect(data).not.toHaveProperty(key);
     }
+    expect(data).toMatchObject({ minPlayers: 1, maxPlayers: null });
   });
 
   it('직전 시즌이 0원·이미지 없음이었다면 그 값(0, null)을 그대로 싣는다', () => {
     const data = leagueMirrorCreateData({
       ...base,
-      inherited: { coverImageUrl: null, entryFee: 0, bankName: null, bankAccount: null, bankHolder: null },
+      inherited: { coverImageUrl: null, entryFee: 0, bankName: null, bankAccount: null, bankHolder: null, minPlayers: 6, maxPlayers: 10 },
     });
-    expect(data).toMatchObject({ entryFee: 0, coverImageUrl: null, bankName: null });
+    expect(data).toMatchObject({ entryFee: 0, coverImageUrl: null, bankName: null, minPlayers: 6, maxPlayers: 10 });
   });
 });

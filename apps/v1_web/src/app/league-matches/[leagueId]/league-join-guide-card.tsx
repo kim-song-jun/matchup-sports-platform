@@ -97,7 +97,7 @@ export function LeagueJoinGuideCard({
 
   if (hasClosed || nextRound !== null) {
     if (lookupPending) return null;
-    const closedNote = hasClosed ? `${formatTournamentDateTimeLong(registrationDeadlineAt)}에 마감됐어요. ` : '';
+    const closedNote = hasClosed ? `${formatTournamentDateTimeLong(registrationDeadlineAt)}에 마감됐어요.` : null;
     const nextRows: { label: string; value: string }[] = nextRound === null ? [] : [
       { label: '다음 회차', value: `${nextRound.seasonNo}시즌 · ${nextRound.title}` },
       { label: '리그 기간', value: formatTournamentDateRangeShort(nextRound.startsOn, nextRound.endsOn) ?? '' },
@@ -112,7 +112,15 @@ export function LeagueJoinGuideCard({
             <span className="tm-badge tm-badge-grey">모집 마감</span>
             <h3 id={headingId} className="tm-text-card-title text-[var(--text-strong)]">신청이 마감됐어요</h3>
           </div>
-          <p className="tm-text-label text-[var(--text-muted)]">{closedNote}다음 회차에 신청해 주세요.</p>
+          <p className="tm-text-label text-[var(--text-muted)]">
+            {closedNote === null ? null : (
+              <>
+                {closedNote}
+                <br />
+              </>
+            )}
+            다음 회차에 신청해 주세요.
+          </p>
           {nextRows.length > 0 ? (
             <div>
               {nextRows.map((row, index) => (

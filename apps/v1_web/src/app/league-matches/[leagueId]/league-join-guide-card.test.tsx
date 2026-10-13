@@ -87,7 +87,9 @@ describe('닫힘 카드 — 마감이 지났다', () => {
 
     expect(screen.getByText('모집 마감')).toBeInTheDocument();
     expect(screen.getByRole('heading', { level: 3, name: '신청이 마감됐어요' })).toBeInTheDocument();
-    expect(screen.getByText(/10월 7일.*에 마감됐어요\. 다음 회차에 신청해 주세요\./)).toBeInTheDocument();
+    // 마감 시각 문장과 "다음 회차에 신청해 주세요."는 줄을 바꿔 적는다(좁은 화면에서 문장 중간에 끊기지 않게).
+    const note = screen.getByText(/10월 7일.*에 마감됐어요\.다음 회차에 신청해 주세요\./);
+    expect(note.querySelector('br')).toBeInTheDocument();
     expect(screen.getByText('다음 회차 일정이 정해지면 여기서 알려 드릴게요.')).toBeInTheDocument();
     const link = container.querySelector(OTHER_LEAGUES);
     expect(link).toHaveTextContent('다른 리그 둘러보기');
@@ -141,6 +143,13 @@ describe('닫힘 카드 — 마감이 지났다', () => {
     const { container } = renderCard({ state: 'completed', registrationOpen: false, registrationDeadlineAt: PAST, nextRound: { ...nextRound, registrationOpen: true, registrationDeadlineAt: DEADLINE } });
 
     expect(container.querySelector(NEXT_APPLY)).toBeInTheDocument();
+  });
+
+  it('마감 시각이 없는 끝난 리그는 줄을 바꾸지 않고 "다음 회차에 신청해 주세요."만 적는다', () => {
+    renderCard({ state: 'completed', registrationOpen: false, registrationDeadlineAt: null, nextRound });
+
+    const note = screen.getByText('다음 회차에 신청해 주세요.');
+    expect(note.querySelector('br')).not.toBeInTheDocument();
   });
 
   it('보류(on_hold) 리그도 마감이 지났으면 닫힘 카드를 그린다', () => {

@@ -35,7 +35,7 @@
   "src/app/admin/tournaments/[id]/bracket-tab.tsx": 9,
   "src/app/admin/tournaments/[id]/info-section.tsx": 17,
   "src/app/admin/tournaments/[id]/overview-section.tsx": 2,
-  "src/app/admin/tournaments/[id]/registrations-tab.tsx": 15,
+  "src/app/admin/tournaments/[id]/registrations-tab.tsx": 14,
   "src/app/admin/tournaments/[id]/reviews-tab.tsx": 1,
   "src/app/admin/tournaments/[id]/tournament-admin-shell.tsx": 2,
   "src/app/admin/tournaments/[id]/tournament-campaign-editor-collections.tsx": 8,

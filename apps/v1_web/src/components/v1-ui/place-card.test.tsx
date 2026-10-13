@@ -102,6 +102,14 @@ describe('PlaceCard', () => {
     }
   });
 
+  it("'장소 미정'이면 지도 검색 버튼 없이 아직 정해지지 않았다고만 알린다", () => {
+    renderCard(<PlaceCard place={{ ...nameOnly, name: '장소 미정' }} platform="ios" />);
+
+    expect(screen.getByText('아직 장소가 정해지지 않았어요.')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '지도 앱에서 찾기' })).not.toBeInTheDocument();
+    expect(screen.queryByText(/정확한 위치가 등록되지 않았어요/)).not.toBeInTheDocument();
+  });
+
   it('좌표가 없으면 지도 없이 안내 문구와 "지도 앱에서 찾기" 버튼을 보여 준다', async () => {
     mockKakaoKey('test-js-key');
     renderCard(<PlaceCard place={nameOnly} platform="ios" />);

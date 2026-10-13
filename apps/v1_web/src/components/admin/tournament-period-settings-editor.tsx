@@ -39,6 +39,8 @@ function PeriodSettingsEditor({
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<string[]>([]);
   const [editingExpectedVersion, setEditingExpectedVersion] = useState<string | null>(null);
+  // 편집을 시작할 때 본 피리어드. 버전 충돌이 나도 서버 피리어드가 이것과 같으면 다른 설정(기본 장소·대표 이미지 등)이 행을 바꾼 것뿐이다.
+  const [editingBasePeriods, setEditingBasePeriods] = useState<string | null>(null);
   const hydratedSettingsKey = useRef<string | null>(null);
   const settingsDataKey = useMemo(() => JSON.stringify(settingsQuery.data ?? null), [settingsQuery.data]);
 
@@ -58,6 +60,7 @@ function PeriodSettingsEditor({
   const startEditing = () => {
     setDraft(draftFromSettings(settingsQuery.data));
     setEditingExpectedVersion(settingsQuery.data?.expectedVersion ?? null);
+    setEditingBasePeriods(JSON.stringify(settingsQuery.data?.periods ?? null));
     setEditing(true);
   };
 
@@ -87,25 +90,34 @@ function PeriodSettingsEditor({
       return;
     }
 
-    updateSettings.mutate(
-      {
-        expectedVersion: editingExpectedVersion,
-        periods: draft.map((duration) => ({ durationMinutes: Number(duration) })),
-      },
-      {
-        onSuccess: () => {
-          setEditing(false);
-          showToast('피리어드 설정을 저장했어요. 새로 만드는 경기부터 적용돼요.', 'success');
+    const periods = draft.map((duration) => ({ durationMinutes: Number(duration) }));
+    const submit = (expectedVersion: string, retryOnUnrelatedChange: boolean) =>
+      updateSettings.mutate(
+        { expectedVersion, periods },
+        {
+          onSuccess: () => {
+            setEditing(false);
+            showToast('피리어드 설정을 저장했어요. 새로 만드는 경기부터 적용돼요.', 'success');
+          },
+          onError: async (error) => {
+            if (extractErrorCode(error) === 'TOURNAMENT_VERSION_CONFLICT') {
+              // 버전은 대회(리그) 행의 수정 시각이라 기본 장소·대표 이미지·공개 설정만 바꿔도 낡는다. 피리어드가 그대로면 새 버전으로 한 번 더 보낸다.
+              if (retryOnUnrelatedChange) {
+                const fresh = await settingsQuery.refetch();
+                if (fresh.data?.expectedVersion && JSON.stringify(fresh.data.periods ?? null) === editingBasePeriods) {
+                  setEditingExpectedVersion(fresh.data.expectedVersion);
+                  submit(fresh.data.expectedVersion, false);
+                  return;
+                }
+              }
+              showToast('다른 곳에서 피리어드 설정이 먼저 바뀌었어요. 입력 중인 값은 유지했어요. 최신 설정을 불러오려면 다시 불러오기를 눌러 주세요.', 'error');
+              return;
+            }
+            showToast(extractErrorMessage(error, '피리어드 설정 저장에 실패했어요.'), 'error');
+          },
         },
-        onError: (error) => {
-          if (extractErrorCode(error) === 'TOURNAMENT_VERSION_CONFLICT') {
-            showToast('다른 변경이 먼저 저장됐어요. 입력 중인 값은 유지했어요. 최신 설정을 불러오려면 다시 불러오기를 눌러 주세요.', 'error');
-            return;
-          }
-          showToast(extractErrorMessage(error, '피리어드 설정 저장에 실패했어요.'), 'error');
-        },
-      },
-    );
+      );
+    submit(editingExpectedVersion, true);
   };
 
   if (settingsQuery.isPending) {

@@ -6,7 +6,6 @@ import {
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
-import { excludeUnfilledSlotFixturesWhere } from '../common/competition/unfilled-slot-gate';
 import { isParticipantPubliclyEligible, isRankedRecordHiddenByEligibility, loadParticipantConsentEligibility } from '../games/public-records/public-consent';
 import { isPublicLiveEnabled } from '../games/public-records/public-live-flag';
 import { LEAGUE_STATE_PRIORITY_ORDER, paginateByStatePriority, sortMyLeaguesByState } from './league-lifecycle-rules';
@@ -548,7 +547,7 @@ export class LeagueMatchPublicService {
     const league = await this.loadLeague(leagueId);
     const teamIds = league.teams.map((entry) => entry.teamId);
     const teamMatches = await this.prisma.v1TeamMatch.findMany({
-      where: { leagueId, ...excludeUnfilledSlotFixturesWhere() },
+      where: publicLeagueFixtureListWhere(leagueId),
       select: {
         id: true,
         hostTeamId: true,

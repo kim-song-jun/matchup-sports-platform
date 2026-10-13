@@ -8,6 +8,7 @@ import { KakaoMapPreview } from '@/components/v1-ui/kakao-map-preview';
 import {
   detectPlaceNavPlatform,
   hasCoordinates,
+  isUnsetPlace,
   placeNavigationLinks,
   type PlaceNavPlatform,
 } from '@/lib/place';
@@ -45,6 +46,22 @@ export function PlaceCard({
     },
     [],
   );
+
+  // '장소 미정'은 실제 장소가 아니다 — 지도 앱에서 그 이름을 검색하게 하지 않는다.
+  if (isUnsetPlace(place)) {
+    return (
+      <div style={{ textAlign: 'left' }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+          <MapPin size={18} strokeWidth={2} aria-hidden="true" style={{ color: 'var(--text-muted)', marginTop: 2, flex: 'none' }} />
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div className="tm-text-label" style={{ color: 'var(--text-strong)' }}>{place.name}</div>
+            <div className="tm-text-caption" style={{ color: 'var(--text-muted)', marginTop: 2 }}>아직 장소가 정해지지 않았어요.</div>
+            {badge ? <div style={{ marginTop: 8 }}>{badge}</div> : null}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const coords = hasCoordinates(place) ? place : null;
   const navTitle = coords ? '길찾기' : '지도 앱에서 찾기';

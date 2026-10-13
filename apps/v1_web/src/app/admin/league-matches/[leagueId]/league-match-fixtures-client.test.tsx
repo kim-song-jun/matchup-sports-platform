@@ -256,6 +256,7 @@ describe('LeagueMatchFixturesClient', () => {
       </Providers>,
     );
 
+    expect(screen.getByRole('link', { name: '리그 수정' })).toHaveAttribute('href', '/admin/league-matches/league-1/edit');
     expect(screen.getByRole('link', { name: '후기 관리' })).toHaveAttribute('href', '/admin/league-matches/league-1/reviews');
     expect(screen.getByRole('columnheader', { name: '결과' })).toBeInTheDocument();
     // 표는 일정 위주로 줄었다 — 경기 · 결과 · 일시 · 운영. 구장·주소는 '경기' 열의 보조 줄로,

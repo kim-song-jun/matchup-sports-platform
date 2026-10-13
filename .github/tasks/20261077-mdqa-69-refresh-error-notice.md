@@ -64,6 +64,11 @@ Status: In Progress
 | 2026-10-13 | independent review | 캐시 보존 시 재조회 실패 안내 누락 | 기존 오류 컴포넌트로 최소 수정, 원 완료 상태/첨부 삭제를 다시 조작하지 않음 |
 
 ## Progress Snapshot
+- Latest root checkpoint 2026-10-13: same OPEN dev PR1886 review findings at head6526521b53b54ed3f988f531049afc636ceef47a are being repaired. Latest upstream29fd7fef7ca0f233838be08668f9e4ecbcada071 safely merged, preserving unrelated native startup changes and all owned UI WIP. Historical snapshots below remain evidence.
+- Actual Codex P2 r4254499224: retry unmount loses keyboard focus/progress. The opt-in shared ErrorState keeps the same button, uses aria-disabled plus guarded click while pending, and shows 조회 중.... Existing default error/back/retry behavior is preserved.
+- Actual Codex P2 r4254499230: full empty-state padding outside constrained layout. Only cached errors use compact token-based cards inside active desktop main/mobile article or dissolved-team wrapper. First-load and access failures keep the full error contract.
+- RED: actual pending keyboard retry and active layout/primitive cases4FAIL/1PASS, separate dissolved cached503 case1FAIL. GREEN: existing teams-client98 + actual focus/error consumer13 + shared primitive5 =116/116 PASS. Evidence mdqa69-review-red.log, mdqa69-dissolved-review-red.log, mdqa69-review-green.log in root ignored run directory.
+- Web CI failure at6526521 was one outdated test expecting the list error title; the expectation now asserts the actual team-detail title. No production fallback or validation gate changed. Latest scope lint and committed-head independent review are root next gates; alpha failure/recovery/auth/persona/viewport remains NOTRUN while login is pending.
 - Base: `552f5b6fb98d8546daf5e26f7de7a8ac413251f2` (`origin/dev` 직전 fetch).
 - Worktree: `C:/Users/kinso/.codex/worktrees/mdqa-69-team-detail-refresh/matchup-sports-platform` (기존 적합한 checkout 재사용).
 - Branch: `fix/mdqa-69-refresh-error-notice`.

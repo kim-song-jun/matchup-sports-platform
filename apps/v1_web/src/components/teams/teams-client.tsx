@@ -224,10 +224,11 @@ export function TeamDetailPageClient({ teamId, seed }: { teamId: string; seed?: 
   // 해체된 팀은 읽기 전용 — 가입 자격·채팅 자동 연결 같은 활동 팀 조회를 아예 부르지 않는다.
   if (query.data?.dissolution) {
     return (
-      <>
-        {query.isError ? <TeamDetailLoadError error={query.error} isFetching={query.isFetching} cached onRetry={() => void query.refetch({ cancelRefetch: false })} /> : null}
-        <DissolvedTeamView team={query.data} selfHref={withFromPath(`/teams/${teamId}`, fromPath)} />
-      </>
+      <DissolvedTeamView
+        team={query.data}
+        selfHref={withFromPath(`/teams/${teamId}`, fromPath)}
+        refreshError={query.isError ? <TeamDetailLoadError error={query.error} isFetching={query.isFetching} cached onRetry={() => void query.refetch({ cancelRefetch: false })} /> : undefined}
+      />
     );
   }
   return <ActiveTeamDetailPageClient teamId={teamId} seed={seed} />;
@@ -249,8 +250,10 @@ function TeamDetailLoadError({ error, isFetching, onRetry, cached = false }: {
       <ErrorState
         title={cached ? '최신 팀 정보를 불러오지 못했어요' : '팀 정보를 불러오지 못했어요'}
         message={extractErrorMessage(error, '팀 정보를 확인하지 못했어요. 잠시 후 다시 시도해 주세요.')}
-        onRetry={!accessDenied && !isFetching ? onRetry : undefined}
+        onRetry={!accessDenied ? onRetry : undefined}
         retryLabel="다시 불러오기"
+        retryPending={isFetching}
+        compact={cached}
         back={accessDenied ? { href: '/teams', label: '팀 목록으로 돌아가기' } : undefined}
       />
     </div>
@@ -510,10 +513,10 @@ function ActiveTeamDetailPageClient({ teamId, seed }: { teamId: string; seed?: V
   };
 
   return (
-    <>
-      {query.isError ? <TeamDetailLoadError error={query.error} isFetching={query.isFetching} cached onRetry={() => void query.refetch({ cancelRefetch: false })} /> : null}
-      <TeamDetailPageView model={model} />
-    </>
+    <TeamDetailPageView
+      model={model}
+      refreshError={query.isError ? <TeamDetailLoadError error={query.error} isFetching={query.isFetching} cached onRetry={() => void query.refetch({ cancelRefetch: false })} /> : undefined}
+    />
   );
 }
 

@@ -215,7 +215,7 @@ export function TeamListPageClient({ seed }: { readonly seed?: CursorListSeed<V1
  * 의존하는 것(가입 CTA·컨택 CTA)만 잠그고, 팀 이름·로고·소개·지역·멤버는 바로 보여준다.
  */
 export function TeamDetailPageClient({ teamId, seed }: { teamId: string; seed?: V1TeamDetail | null }) {
-  const query = useV1TeamDetail(teamId, { seed });
+  const query = useV1TeamDetail(teamId, { seed, refetchOnWindowFocus: 'always' });
   const fromPath = sanitizeRedirectPath(useSearchParams().get('from'));
   // 실패된 캐시는 현재 접근 권한이 아니다 — 활동 팀 하위 컴포넌트와 운영 요청도 함께 멈춘다.
   if (query.isError && isTeamReadAccessError(query.error)) {
@@ -287,7 +287,7 @@ function ActiveTeamDetailPageClient({ teamId, seed }: { teamId: string; seed?: V
   const authPending = Boolean(authMe.isPending || (authMe.isFetching && !authMe.data?.user?.id));
   const authVerified = Boolean(authMe.data?.user?.id) && !authPending && !authMe.isError && !authUnauthorized;
   const authError = Boolean(authMe.isError && !authUnauthorized);
-  const query = useV1TeamDetail(teamId, { seed, refetchOnWindowFocus: 'always' });
+  const query = useV1TeamDetail(teamId, { seed });
   const [firstLoadRetryFailure, setFirstLoadRetryFailure] = useState<{ teamId: string; error: unknown } | null>(null);
   useEffect(() => {
     setFirstLoadRetryFailure((previous) => query.data || previous?.teamId !== teamId ? null : previous);

@@ -88,9 +88,11 @@ describe.each([{ cache: 'fresh', staleTime: Infinity }, { cache: 'stale', staleT
       mountTab(staleTime);
       await screen.findAllByText('처음 팀 소개예요');
       introduction = '다른 탭에서 고친 팀 소개예요';
+      teamReads = 0;
       await leaveAndReturn(event);
       await screen.findAllByText('다른 탭에서 고친 팀 소개예요');
       expect(screen.queryAllByText('처음 팀 소개예요')).toHaveLength(0);
+      expect(teamReads).toBe(1);
     });
   },
 );
@@ -281,30 +283,33 @@ describe('team detail background refetch failure', () => {
     expect(teamReads).toBe(2);
   });
 
-  it('hides a cached dissolved team and its restore entry when a real refetch denies access', async () => {
+  it.each([401, 403, 404] as const)('hides a cached dissolved team and its restore entry after actual focus return receives %s', async (status) => {
     dissolved = true;
     const client = mountTab(0);
     await screen.findByRole('link', { name: '해체한 팀에서 복구하기' });
-    teamFailure = 403;
-    await act(async () => {
-      await client.refetchQueries({ queryKey: [...v1Keys.team(teamId), 'detail'] });
-    });
+    teamFailure = status;
+    teamReads = 0;
+    await leaveAndReturn('focus');
+    await waitFor(() => expect(teamReads).toBe(1));
     await waitFor(() => {
       expect(client.getQueryState([...v1Keys.team(teamId), 'detail'])).toMatchObject({ status: 'error', fetchStatus: 'idle' });
     });
     expect(await screen.findByText('팀 정보를 확인하지 못했어요. 잠시 후 다시 시도해 주세요.')).toBeVisible();
     expect(screen.queryByText('해체된 팀')).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: '해체한 팀에서 복구하기' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '다시 불러오기' })).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: '팀 목록으로 돌아가기' })).toBeVisible();
+    expect(teamReads).toBe(1);
   });
 
-  it('keeps a cached dissolved refresh error compact inside its actual content wrapper', async () => {
+  it('keeps a cached dissolved refresh error compact after actual focus return and recovers through retry', async () => {
     dissolved = true;
     const client = mountTab(0);
     await screen.findByRole('link', { name: '해체한 팀에서 복구하기' });
     teamFailure = 503;
-    await act(async () => {
-      await client.refetchQueries({ queryKey: [...v1Keys.team(teamId), 'detail'] });
-    });
+    teamReads = 0;
+    await leaveAndReturn('focus');
+    await waitFor(() => expect(teamReads).toBe(1));
     await waitFor(() => {
       expect(client.getQueryState([...v1Keys.team(teamId), 'detail'])).toMatchObject({ status: 'error', fetchStatus: 'idle' });
     });
@@ -314,7 +319,16 @@ describe('team detail background refetch failure', () => {
     expect(alert).toHaveTextContent('팀 정보를 확인하지 못했어요. 잠시 후 다시 시도해 주세요.');
     expect(alert).not.toHaveClass('tm-empty-state');
     expect(alert).toHaveStyle({ padding: 'var(--spacing-4)' });
-    expect(within(alert).getByRole('button', { name: '다시 불러오기' })).toBeEnabled();
+    const retry = within(alert).getByRole('button', { name: '다시 불러오기' });
+    expect(retry).toBeEnabled();
     expect(within(layout).getByRole('link', { name: '해체한 팀에서 복구하기' })).toBeVisible();
+    teamFailure = null;
+    await act(async () => { fireEvent.click(retry); fireEvent.click(retry); });
+    await waitFor(() => {
+      expect(client.getQueryState([...v1Keys.team(teamId), 'detail'])).toMatchObject({ status: 'success', fetchStatus: 'idle' });
+    });
+    expect(within(layout).queryByRole('alert')).not.toBeInTheDocument();
+    expect(within(layout).getByRole('link', { name: '해체한 팀에서 복구하기' })).toBeVisible();
+    expect(teamReads).toBe(2);
   });
 });

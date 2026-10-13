@@ -23,7 +23,7 @@ const failure = (code: string, message: string, status: number) =>
 const auth = (): V1AuthMe => ({
   user: { id: '99999999-9999-4999-8999-999999999999', email: null, phone: null,
     accountStatus: 'active', onboardingStatus: signupStatus, authProvider: provider },
-  profile: { displayName: null, nickname: '가입중회원' },
+  profile: { displayName: '가입중회원', nickname: '가입중회원' },
   verification: { emailVerified: false, phoneVerified: false }, socialSignupPrefill: null,
 });
 const server = setupServer(

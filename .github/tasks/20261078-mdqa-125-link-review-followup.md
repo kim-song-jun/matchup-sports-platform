@@ -90,3 +90,5 @@ PR1888 기존 head2bb4 및 원 PR1835·1837 이력은 아래 Progress Snapshot�
 - Actual alpha session is expired, existing QA login question pending. No new PR/commit/dev merge/alpha PASS yet.
 
 - 2026-10-13 11:28Z root: 최신 dev06a를 정상 merge한023266의 F6 독립 리뷰에서 URL에만 있는 복귀 주소가 약관 복구 refetch 전에 사라지는 실제 결함을 확인했다. 앞선2회 handler순서/CTA 테스트 준비 실패는 제품RED에서 제외하고 보존했다. 실제 TermsClient·프로필·sport/level/region/confirm을 모두 거친 회귀에서 최종/chat 기대→/home 실제1FAIL/8skip의 유효RED를 확인했다 (mdqa125-f6-full-consumer-destination-red1.log). 기존 bounded helper를 refetch 전에 사용하는 최소수정 뒤 기존8+신규1=9/9GREEN이었다 (mdqa125-f6-full-consumer-terms-recovery-green9.log). backend 미사용maskEmail import1행도 제거했다. 타입·새committedhead 독립 리뷰·PR1888 push·외부리뷰/CI·alpha·tracker 완료는 남아 있다.
+
+- 2026-10-13 11:33Z root: committed93df272의 Web lint는 account-proof fixture의 displayName:null과 실제 AuthService/V1AuthMe의 필수 string 계약 불일치(TS2322)로 FAIL이었다. 닉네임과 같은 displayName 문자열로 fixture1행만 맞췄고 실제 계정증명 소비자16/16 GREEN (mdqa125-account-proof-api-profile-contract-green16.log). API/types를 넓히지 않았다. 이 실제 타입 실패와 새커밋/재검증을 별도로 추적한다.

@@ -303,6 +303,16 @@ export function useV1GameOperationsConsole(
   const [takeover, dispatchTakeover] = useReducer(takeoverReducer, INITIAL_TAKEOVER_STATE);
   const [queue, dispatchQueue] = useReducer(gameOperationsQueueReducer, EMPTY_QUEUE_STATE);
   const [gameSnapshot, setGameSnapshot] = useState<{ version: number; state: GameState } | null>(null);
+  // Replayed commits/ACKs contain their original version. Keep acceptance synchronous
+  // so a stale snapshot in the same React batch cannot overwrite a newer command.
+  const acceptedVersionRef = useRef(0);
+  const confirmedSequenceRef = useRef(0);
+  const activeGameIdRef = useRef(gameId);
+  activeGameIdRef.current = gameId;
+  const advanceGameVersion = useCallback((version: number) => {
+    acceptedVersionRef.current = Math.max(acceptedVersionRef.current, version);
+    setGameSnapshot((current) => current && version > current.version ? { ...current, version } : current);
+  }, []);
   const [liveEvents, setLiveEvents] = useState<readonly GameEventRecord[]>([]);
   const [clockSamples, setClockSamples] = useState<readonly ClockPingPong[]>([]);
   const [bannerMessage, setBannerMessage] = useState<string | null>(null);
@@ -373,7 +383,7 @@ export function useV1GameOperationsConsole(
     // REST가 알려준 시퀀스는 **이미 받은 이벤트보다 앞설 때만** 반영한다. 뒤처진
     // REST 읽기가 소켓이 이미 확인한 시퀀스를 되돌리면, 그 뒤 도착하는 정상
     // 브로드캐스트가 비연속으로 보여 불필요한 전체 리싱크를 유발한다.
-    if (initialLastSequence <= receivedSequenceRef.current) return;
+    if (initialLastSequence <= Math.max(receivedSequenceRef.current, confirmedSequenceRef.current)) return;
     dispatchSync({ type: 'SNAPSHOT', lastSequence: initialLastSequence });
   }, [initialLastSequence]);
 
@@ -404,7 +414,13 @@ export function useV1GameOperationsConsole(
     // 새 경기의 구독을 시작하는 지점이다 — 이전 경기에서 올려 둔 시퀀스를 그대로
     // 들고 가면, 이벤트가 적은 경기로 옮겼을 때 그 경기의 초기 시퀀스가
     // "이미 아는 값"으로 보여 아래 중복 판정이 정상 브로드캐스트를 버린다.
+    // Versions belong to one game. Until its first authoritative snapshot arrives,
+    // do not show or compare against the previous game's snapshot/timeline.
+    setGameSnapshot(null);
+    setLiveEvents([]);
     receivedSequenceRef.current = 0;
+    confirmedSequenceRef.current = 0;
+    acceptedVersionRef.current = 0;
 
     type SubscribeAck = {
       status: string;
@@ -425,12 +441,14 @@ export function useV1GameOperationsConsole(
       // 있을 수 있다. 순서 보장이 없으므로 단조성을 여기서 직접 지킨다 — 이게 없으면
       // liveEvents가 과거로 되감기고(그 골이 화면에서 사라진다) `gameSnapshot.version`도
       // 함께 내려가 다음 append가 VERSION_CONFLICT로 튄다.
-      if (snapshot.lastSequence < receivedSequenceRef.current) return;
+      if (snapshot.lastSequence < receivedSequenceRef.current || snapshot.version < acceptedVersionRef.current) return;
+      acceptedVersionRef.current = snapshot.version;
       setGameSnapshot({ version: snapshot.version, state: snapshot.state });
       setLiveEvents(snapshot.events);
       // 스냅숏은 언제나 전체 이력이므로(아래 `resyncFromServer` 참고) 여기서
       // 받은 `lastSequence`까지는 이벤트 본문을 실제로 손에 넣은 것이다.
       receivedSequenceRef.current = snapshot.lastSequence;
+      confirmedSequenceRef.current = Math.max(confirmedSequenceRef.current, snapshot.lastSequence);
       // 동기 상태는 **이 스냅숏 자체**로 판정한다. 서버도 같은 구독 응답에서
       // `game.gap`을 따로 쏘지만(`realtime.gateway.ts`), 그건 같은 스냅숏을 실어 오는
       // ack과 순서 경쟁을 한다 — 나중에 도착한 쪽이 상태를 결정하면 갭이 조용히
@@ -442,7 +460,7 @@ export function useV1GameOperationsConsole(
         dispatchSync({ type: 'GAP', expectedSequence: hole.expectedSequence, availableFrom: hole.availableFrom });
         return;
       }
-      dispatchSync({ type: 'BACKFILLED', lastSequence: snapshot.lastSequence });
+      dispatchSync({ type: 'BACKFILLED', lastSequence: confirmedSequenceRef.current });
     };
 
     /**
@@ -581,7 +599,7 @@ export function useV1GameOperationsConsole(
     };
     const onCommitted = (committed: { gameId: string; sequence: number; version: number; event: GameEventRecord }) => {
       if (cancelled || committed.gameId !== gameId) return;
-      setGameSnapshot((current) => (current ? { ...current, version: committed.version } : current));
+      advanceGameVersion(committed.version);
       if (committed.sequence === receivedSequenceRef.current + 1) {
         // Contiguous. The gateway emits `game.event.committed` to the
         // sender's OWN socket too (not only the room broadcast, which
@@ -596,7 +614,8 @@ export function useV1GameOperationsConsole(
         // (스냅숏 자체에 구멍이 있으면 `applySnapshot`이 GAP을 걸어 두는데,
         // 거기서 `receivedSequenceRef`는 이미 `snapshot.lastSequence`까지 올라가
         // 있으므로 그 다음 이벤트는 여기서 "연속"으로 판정된다.)
-        dispatchSync({ type: 'EVENT_ARRIVED', lastSequence: committed.sequence });
+        confirmedSequenceRef.current = Math.max(confirmedSequenceRef.current, committed.sequence);
+        dispatchSync({ type: 'EVENT_ARRIVED', lastSequence: confirmedSequenceRef.current });
         setLiveEvents((current) => [...current, committed.event]);
       } else if (committed.sequence > receivedSequenceRef.current + 1) {
         // Non-contiguous broadcast: something between the last event we
@@ -915,6 +934,7 @@ export function useV1GameOperationsConsole(
         reason?: string;
       }) => {
         clearTimeout(ackTimeoutId);
+        if (!isMountedRef.current || activeGameIdRef.current !== gameId) return;
         if (result.status === 'ack' && result.sequence !== undefined && result.version !== undefined) {
           dispatchQueue({
             type: 'ACK',
@@ -930,8 +950,11 @@ export function useV1GameOperationsConsole(
           // "이미 아는 중복"으로 버려져 자기가 기록한 이벤트가 화면에서 사라진다.
           // `BACKFILLED`가 아니라 `EVENT_ARRIVED`인 이유는 그 액션의 주석 참고 —
           // ack은 빠진 구간의 이벤트 본문을 하나도 실어 오지 않으므로 갭 프리즈를 풀 수 없다.
-          dispatchSync({ type: 'EVENT_ARRIVED', lastSequence: result.sequence });
-          setGameSnapshot((current) => (current ? { ...current, version: result.version! } : current));
+          // A late success still acknowledges its own item, but cannot rewind
+          // newer ACK/commit knowledge or discard an unseen event body.
+          confirmedSequenceRef.current = Math.max(confirmedSequenceRef.current, result.sequence);
+          dispatchSync({ type: 'EVENT_ARRIVED', lastSequence: confirmedSequenceRef.current });
+          advanceGameVersion(result.version);
           void queryClient.invalidateQueries({ queryKey: v1Keys.game(gameId) });
         } else {
           if (result.code === ACTIVITY_PROFILE_REQUIRED_CODE) notifyActivityProfileRequired();
@@ -978,7 +1001,7 @@ export function useV1GameOperationsConsole(
         );
       }
     },
-    [gameId, takeover, sync, queryClient, gameSnapshot, clockOffsetMs],
+    [gameId, takeover, sync, queryClient, gameSnapshot, clockOffsetMs, advanceGameVersion],
   );
 
   useEffect(() => {
@@ -1107,7 +1130,8 @@ export function useV1GameOperationsConsole(
         },
         { headers: { 'Idempotency-Key': clientEventId } },
       );
-      setGameSnapshot((current) => (current ? { ...current, version: result.version } : current));
+      if (!isMountedRef.current || activeGameIdRef.current !== gameId) return;
+      advanceGameVersion(result.version);
       void queryClient.invalidateQueries({ queryKey: v1Keys.game(gameId) });
       // Root-cause fix (2026-08, requirement 3): a reversal has no realtime
       // broadcast counterpart (`GamesService.reverseEvent` is REST-only and
@@ -1119,7 +1143,7 @@ export function useV1GameOperationsConsole(
       // immediately.
       resyncEventsRef.current?.();
     },
-    [gameId, gameSnapshot, takeover, queryClient],
+    [gameId, gameSnapshot, takeover, queryClient, advanceGameVersion],
   );
 
   // 이슈 #376 — 큐를 거치지 않는 온라인 전용 REST 호출(reverseEvent와 동일한 이유,
@@ -1143,14 +1167,15 @@ export function useV1GameOperationsConsole(
         },
         { headers: { 'Idempotency-Key': clientEventId } },
       );
-      setGameSnapshot((current) => (current ? { ...current, version: result.version } : current));
+      if (!isMountedRef.current || activeGameIdRef.current !== gameId) return;
+      advanceGameVersion(result.version);
       void queryClient.invalidateQueries({ queryKey: v1Keys.game(gameId) });
       // reverseEvent와 동일한 이유(위 그 함수의 주석 참고) — 이 REST-only 커맨드도
       // 실시간 브로드캐스트 짝이 없다. liveEvents를 서버 스냅숏으로 강제 재동기화해
       // in-place로 갱신된 assistParticipantId가 새로고침 없이 즉시 반영되게 한다.
       resyncEventsRef.current?.();
     },
-    [gameId, gameSnapshot, takeover, queryClient],
+    [gameId, gameSnapshot, takeover, queryClient, advanceGameVersion],
   );
 
   // UX 감사 — REST 커맨드(start/pause/resume/end/end-period/start-period/
@@ -1158,10 +1183,12 @@ export function useV1GameOperationsConsole(
   // 그 자리에서 gameSnapshot에 반영한다. 자세한 이유는
   // `UseV1GameOperationsConsoleResult.applyCommandResult` 문서 참고.
   const applyCommandResult = useCallback((result: { state: GameState; version: number }) => {
+    if (activeGameIdRef.current !== gameId || result.version < acceptedVersionRef.current) return;
+    acceptedVersionRef.current = result.version;
     setGameSnapshot((current) =>
       current ? { ...current, state: result.state, version: result.version } : current,
     );
-  }, []);
+  }, [gameId]);
 
   return {
     connectionStatus,

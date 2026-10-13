@@ -312,6 +312,23 @@ LEAGUE_REGION_INVALID` for an unknown or unsuitable region.
   (forfeit/abandon end) first. Scheduled and ended games stay cancellable
   (ended ones for result corrections). The admin fixture table disables the
   cancel action on the same condition.
+- `PATCH /api/v1/admin/league-matches/:leagueId/fixtures/:teamMatchId` also accepts `title` (1–100) and
+  `homeTeamId` / `awayTeamId` (confirmed league teams). Team changes go through the same side-assignment
+  routine as slot boards (game side, team schedules, approved application, roster resync) and are allowed
+  only before the game starts with no official/void result (`409 FIXTURE_HAS_RESULT`). Swapping home and
+  away is supported. The same team on both sides returns `400 FIXTURE_SAME_TEAM`, a team without a
+  confirmed registration `400 LEAGUE_TEAM_INVALID`, and a slot-linked side `409 SLOT_LINKED` (change it on
+  the slot board). A title change also updates the team schedules. The response adds `title`,
+  `homeTeamId` and `awayTeamId`.
+- `POST /api/v1/admin/league-matches/:leagueId/fixtures/:teamMatchId/delete` (`{ reason }`, 1–500) deletes a
+  fixture: it is cancelled (same side effects and notification as cancel, then completion is re-checked)
+  and hidden with `deletedAt`, so it disappears from admin/public fixture lists while game, result and
+  audit rows are kept. Standings, auto completion and player records already exclude cancelled fixtures.
+  A fixture that is not cancelled must be scheduled with no official/void result, otherwise
+  `409 LEAGUE_FIXTURE_NOT_DELETABLE` (cancel it first). Already-cancelled fixtures can be deleted directly.
+  A deleted fixture returns `404` on update/cancel/forfeit/delete and no longer counts as an existing
+  fixture for generation. Returns `{ teamMatchId, deleted: true, leagueCompleted }` and records
+  `league_match.delete_fixture`.
 - The two other paths that cancel fixtures apply the same rule to every
   not-yet-cancelled fixture they would cancel, with the same
   `409 LEAGUE_FIXTURE_GAME_IN_PROGRESS` and nothing changed:

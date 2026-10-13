@@ -17,6 +17,7 @@ import {
   useV1CompleteLeague,
   useV1Teams,
   useV1UpdateLeagueFixture,
+  useV1DeleteLeagueFixture,
 } from '@/hooks/use-v1-api';
 import { installViewport, resizeViewport } from '@/test/viewport';
 import LeagueMatchFixturesClient from './league-match-fixtures-client';
@@ -136,6 +137,7 @@ vi.mock('@/hooks/use-v1-api', () => ({
   useV1PublicKakaoMapsKey: vi.fn(() => ({ data: { kakaoMapsJsKey: null }, isLoading: false })),
   useV1PlaceSearch: vi.fn(() => ({ data: undefined, isFetching: false, isError: false, error: null })),
   useV1UploadImages: vi.fn(() => ({ mutateAsync: vi.fn(), isPending: false })),
+  useV1DeleteLeagueFixture: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
   // 팀 추가 EntityPicker의 검색 후보 — 빈 목록이면 아무것도 렌더하지 않아 무해하다.
   useV1Teams: vi.fn(() => ({ data: undefined, isFetching: false })),
   useV1UpdateLeagueFixture: vi.fn(),
@@ -169,6 +171,7 @@ const useV1UpdateLeagueFixtureMock = vi.mocked(useV1UpdateLeagueFixture, { parti
 const useV1RevertLeagueCompletionMock = vi.mocked(useV1RevertLeagueCompletion, { partial: true });
 const useV1CompleteLeagueMock = vi.mocked(useV1CompleteLeague, { partial: true });
 const useV1TeamsMock = vi.mocked(useV1Teams, { partial: true });
+const useV1DeleteLeagueFixtureMock = vi.mocked(useV1DeleteLeagueFixture, { partial: true });
 
 /** 만든 대진은 지울 수 없어 생성은 확인 창을 거친다(F42) — 누르고 확인까지 한 번에. */
 /** 표에서 그 제목(주차 라벨)의 행을 찾아 ⋯ 시트를 열고 dialog 를 돌려준다. ⋯ 의 이름은 매치업·일시다. */
@@ -444,8 +447,8 @@ describe('LeagueMatchFixturesClient', () => {
       </Providers>,
     );
 
-    fireEvent.click(within(openRowMenu()).getByRole('button', { name: /^일정 수정/ }));
-    const startInput = within(screen.getByRole('dialog', { name: '일정 수정' })).getByLabelText('일시') as HTMLInputElement;
+    fireEvent.click(within(openRowMenu()).getByRole('button', { name: /^경기 수정/ }));
+    const startInput = within(screen.getByRole('dialog', { name: '경기 수정' })).getByLabelText('일시') as HTMLInputElement;
     // 표시값을 다시 Date로 파싱했을 때(브라우저가 datetime-local을 해석하는 방식과 동일)
     // 원본 UTC instant와 정확히 같은 시각이어야 한다. slice(0,16)로 만든 값은
     // KST(+9)에서 이 값과 9시간 어긋난다.
@@ -481,8 +484,8 @@ describe('LeagueMatchFixturesClient', () => {
     // AdminDataTable renders both a desktop <table> and a stacked mobile <ul>
     // for the same rows (CSS-only breakpoint hiding — both exist in jsdom at
     // once), so the ⋯ button exists twice. They wrap the same fixture.
-    fireEvent.click(within(openRowMenu()).getByRole('button', { name: /^일정 수정/ }));
-    const modal = screen.getByRole('dialog', { name: '일정 수정' });
+    fireEvent.click(within(openRowMenu()).getByRole('button', { name: /^경기 수정/ }));
+    const modal = screen.getByRole('dialog', { name: '경기 수정' });
     fireEvent.change(within(modal).getByLabelText('일시'), { target: { value: '2026-09-01T21:00' } });
     fireEvent.click(within(modal).getByRole('button', { name: '저장' }));
 
@@ -947,8 +950,8 @@ describe('LeagueMatchFixturesClient', () => {
       </Providers>,
     );
 
-    fireEvent.click(within(openRowMenu()).getByRole('button', { name: /^일정 수정/ }));
-    const modal = screen.getByRole('dialog', { name: '일정 수정' });
+    fireEvent.click(within(openRowMenu()).getByRole('button', { name: /^경기 수정/ }));
+    const modal = screen.getByRole('dialog', { name: '경기 수정' });
     const save = within(modal).getByRole('button', { name: '저장' });
     expect(save).toBeDisabled();
     fireEvent.click(save);
@@ -977,9 +980,65 @@ describe('LeagueMatchFixturesClient', () => {
           <LeagueMatchFixturesClient leagueId="league-1" initialView="list" />
         </Providers>,
       );
-      fireEvent.click(within(openRowMenu()).getByRole('button', { name: /^일정 수정/ }));
-      return screen.getByRole('dialog', { name: '일정 수정' });
+      fireEvent.click(within(openRowMenu()).getByRole('button', { name: /^경기 수정/ }));
+      return screen.getByRole('dialog', { name: '경기 수정' });
     }
+
+    it('홈·원정을 맞바꾸고 경기 이름을 고치면 바뀐 필드만 보낸다', async () => {
+      useV1AdminLeagueTeamsMock.mockReturnValue({
+        data: { teams: [
+          { teamId: 't1', name: '마포', status: 'active', memberCount: 8, logoUrl: null },
+          { teamId: 't2', name: '한강', status: 'active', memberCount: 8, logoUrl: null },
+        ] },
+      } as never);
+      const mutate = vi.fn();
+      const modal = renderOneFixture(mutate);
+
+      fireEvent.change(within(modal).getByLabelText('홈 팀'), { target: { value: 't2' } });
+      fireEvent.change(within(modal).getByLabelText('원정 팀'), { target: { value: 't1' } });
+      fireEvent.change(within(modal).getByLabelText('경기 이름'), { target: { value: '개막전' } });
+      fireEvent.click(within(modal).getByRole('button', { name: '저장' }));
+
+      await waitFor(() =>
+        expect(mutate).toHaveBeenCalledWith(
+          { teamMatchId: 'tm-1', body: { title: '개막전', homeTeamId: 't2', awayTeamId: 't1' } },
+          expect.anything(),
+        ),
+      );
+    });
+
+    it('같은 팀끼리 고르면 보내지 않고, 끝난 경기는 팀 칸을 잠그고 이유를 적는다', () => {
+      useV1AdminLeagueTeamsMock.mockReturnValue({
+        data: { teams: [
+          { teamId: 't1', name: '마포', status: 'active', memberCount: 8, logoUrl: null },
+          { teamId: 't2', name: '한강', status: 'active', memberCount: 8, logoUrl: null },
+        ] },
+      } as never);
+      const mutate = vi.fn();
+      const modal = renderOneFixture(mutate);
+      fireEvent.change(within(modal).getByLabelText('원정 팀'), { target: { value: 't1' } });
+      fireEvent.click(within(modal).getByRole('button', { name: '저장' }));
+      expect(within(modal).getByRole('alert')).toHaveTextContent('같은 팀끼리 경기를 만들 수 없어요.');
+      expect(mutate).not.toHaveBeenCalled();
+      cleanup();
+
+      useV1AdminLeagueMatchMock.mockReturnValue({
+        data: {
+          leagueId: 'league-1', isPublic: true, title: '가을 풋살 리그', state: 'active', teamIds: ['t1', 't2'], startsOn: '2026-09-01T00:00:00.000Z',
+          fixtures: [{ teamMatchId: 'tm-1', title: '가을 풋살 리그 1주차', homeTeamId: 't1', awayTeamId: 't2', startAt: '2026-09-01T20:00:00.000Z', placeName: '탄천', status: 'matched', gameState: 'ENDED', resultStage: 'official' }],
+        },
+        isPending: false,
+      } as never);
+      render(
+        <Providers>
+          <LeagueMatchFixturesClient leagueId="league-1" initialView="list" />
+        </Providers>,
+      );
+      fireEvent.click(within(openRowMenu()).getByRole('button', { name: /^경기 수정/ }));
+      const ended = screen.getByRole('dialog', { name: '경기 수정' });
+      expect(within(ended).getByLabelText('홈 팀')).toBeDisabled();
+      expect(within(ended).getByText('시작했거나 결과가 있는 경기는 팀을 바꿀 수 없어요.')).toBeInTheDocument();
+    });
 
     it('기본 장소가 없는 리그의 경기는 현재 장소로 열리고, 이름만 바꾸면 장소 필드만 보낸다', async () => {
       const mutate = vi.fn();
@@ -1030,8 +1089,8 @@ describe('LeagueMatchFixturesClient', () => {
       fireEvent.change(within(modal).getByLabelText('다른 장소'), { target: { value: '잠실 보조구장' } });
       fireEvent.click(within(modal).getByRole('button', { name: '저장' }));
 
-      expect(await screen.findByText('일정을 저장했어요.')).toBeInTheDocument();
-      await waitFor(() => expect(screen.queryByRole('dialog', { name: '일정 수정' })).toBeNull());
+      expect(await screen.findByText('경기를 저장했어요.')).toBeInTheDocument();
+      await waitFor(() => expect(screen.queryByRole('dialog', { name: '경기 수정' })).toBeNull());
     });
 
     it('저장에 실패하면 모달이 열린 채 서버 메시지를 보여주고 입력을 잃지 않는다', async () => {
@@ -1042,7 +1101,7 @@ describe('LeagueMatchFixturesClient', () => {
       fireEvent.click(within(modal).getByRole('button', { name: '저장' }));
 
       expect(await within(modal).findByRole('alert')).toBeInTheDocument();
-      expect(screen.getByRole('dialog', { name: '일정 수정' })).toBeInTheDocument();
+      expect(screen.getByRole('dialog', { name: '경기 수정' })).toBeInTheDocument();
       expect(within(modal).getByLabelText('다른 장소')).toHaveValue('잠실 보조구장');
     });
   });
@@ -2399,21 +2458,39 @@ describe('LeagueMatchFixturesClient — 지금 할 일 카드와 콘솔 열기',
     }
   });
 
-  it('⋯ 시트에는 일정 수정·몰수패·대진 취소가 있고, 부전승 행에는 몰수패가 없다', () => {
+  it('⋯ 시트에는 경기 수정·몰수패·대진 취소·경기 삭제가 있고, 부전승 행에는 몰수패가 없다', () => {
     renderLeague([
       { ...base, teamMatchId: 'tm-1', title: '1주차', startAt: W1 },
       { ...base, teamMatchId: 'tm-bye', title: '3주차', startAt: W2, awayTeamId: null },
     ]);
 
     const sheet = openRowMenu('1주차');
-    for (const name of [/^일정 수정/, /^몰수패 처리/, /^대진 취소/]) {
+    for (const name of [/^경기 수정/, /^몰수패 처리/, /^대진 취소/, /^경기 삭제/]) {
       expect(within(sheet).getByRole('button', { name })).toBeInTheDocument();
     }
     fireEvent.click(within(sheet).getByRole('button', { name: '닫기' }));
 
     const byeSheet = openRowMenu('3주차');
-    expect(within(byeSheet).getByRole('button', { name: /^일정 수정/ })).toBeInTheDocument();
+    expect(within(byeSheet).getByRole('button', { name: /^경기 수정/ })).toBeInTheDocument();
     expect(within(byeSheet).queryByRole('button', { name: /^몰수패 처리/ })).toBeNull();
+  });
+
+  it('시작 전 경기는 사유를 받아 삭제하고, 끝난 경기는 먼저 취소하라고 막는다', async () => {
+    const deleteMutate = vi.fn();
+    useV1DeleteLeagueFixtureMock.mockReturnValue({ mutate: deleteMutate, isPending: false } as never);
+    renderLeague([
+      { ...base, teamMatchId: 'tm-1', title: '1주차', startAt: W1 },
+      { ...base, teamMatchId: 'tm-ended', title: '2주차', startAt: W2, gameState: 'ENDED', resultStage: 'official' },
+    ]);
+
+    fireEvent.click(within(openRowMenu('1주차')).getByRole('button', { name: /^경기 삭제/ }));
+    fireEvent.change(await screen.findByLabelText(/^사유/), { target: { value: '잘못 만든 경기' } });
+    fireEvent.click(screen.getByRole('button', { name: '삭제' }));
+    await waitFor(() => expect(deleteMutate).toHaveBeenCalledWith({ teamMatchId: 'tm-1', body: { reason: '잘못 만든 경기' } }, expect.anything()));
+
+    const endedSheet = openRowMenu('2주차');
+    expect(within(endedSheet).getByRole('button', { name: /^경기 삭제/ })).toBeDisabled();
+    expect(within(endedSheet).getByText('시작했거나 결과가 있는 경기는 먼저 대진 취소를 해 주세요')).toBeInTheDocument();
   });
 
   // 자리만 있고 팀이 비어 있는 경기 — 팀을 못 정했으니 콘솔·결과·몰수 대상이 아니다.
@@ -2434,7 +2511,7 @@ describe('LeagueMatchFixturesClient — 지금 할 일 카드와 콘솔 열기',
     }
 
     const emptySheet = openRowMenu('2주차');
-    expect(within(emptySheet).getByRole('button', { name: /^일정 수정/ })).toBeInTheDocument();
+    expect(within(emptySheet).getByRole('button', { name: /^경기 수정/ })).toBeInTheDocument();
     expect(within(emptySheet).getByRole('button', { name: /^대진 취소/ })).toBeInTheDocument();
     expect(within(emptySheet).queryByRole('button', { name: /^몰수패 처리/ })).toBeNull();
     fireEvent.click(within(emptySheet).getByRole('button', { name: '닫기' }));
@@ -2654,7 +2731,7 @@ describe('LeagueMatchFixturesClient — 일정 보드와 보기 전환', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /경기 상세 열기/ }));
     fireEvent.click(screen.getByRole('button', { name: '일정 수정' }));
-    expect(screen.getByRole('heading', { name: '일정 수정' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: '경기 수정' })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '취소' }));
 
     fireEvent.click(screen.getByRole('button', { name: /경기 상세 열기/ }));

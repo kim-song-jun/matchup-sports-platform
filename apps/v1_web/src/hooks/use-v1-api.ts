@@ -5790,6 +5790,8 @@ import type {
   V1AdminLeagueTeamsResponse,
   V1CancelLeagueFixturePayload,
   V1CancelLeagueFixtureResult,
+  V1DeleteLeagueFixturePayload,
+  V1DeleteLeagueFixtureResult,
   V1CreateLeaguePayload,
   V1CreateLeagueResult,
   V1GenerateLeagueFixturesPayload,
@@ -6057,6 +6059,22 @@ export function useV1UpdateLeagueFixture(leagueId: string) {
       v1Patch<V1UpdateLeagueFixtureResult>(`/admin/league-matches/${leagueId}/fixtures/${teamMatchId}`, body),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: v1Keys.adminLeagueMatch(leagueId) });
+    },
+  });
+}
+
+// 경기 삭제 — 취소와 같은 후처리(리그 자동 종료 가능)라 목록 캐시까지 무효화한다.
+export function useV1DeleteLeagueFixture(leagueId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ teamMatchId, body }: { teamMatchId: string; body: V1DeleteLeagueFixturePayload }) =>
+      v1Post<V1DeleteLeagueFixtureResult>(
+        `/admin/league-matches/${encodeURIComponent(leagueId)}/fixtures/${encodeURIComponent(teamMatchId)}/delete`,
+        body,
+      ),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminLeagueMatch(leagueId) });
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminLeagueMatchList() });
     },
   });
 }

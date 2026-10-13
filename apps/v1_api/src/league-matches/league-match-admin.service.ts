@@ -57,6 +57,7 @@ import {
   CancelLeagueFixtureDto,
   CreateLeagueMatchDto,
   CreateManualLeagueFixtureDto,
+  DeleteLeagueFixtureDto,
   GenerateLeagueFixturesDto,
   RegenerateLeagueFixturesDto,
   OpenLeagueRegistrationDto,
@@ -81,6 +82,7 @@ import {
 import { LEAGUE_STATE_BY_STATUS, isCompleteLeagueMirror } from '../tournaments/league-competition-mirror';
 import { randomUUID } from 'node:crypto';
 import { BRACKET_TEMPLATE_MAX_FIXTURES } from '../tournaments/templates/bracket-template-plan';
+import { assignLeagueFixtureSideInTx } from './league-fixture-side-assignment';
 import { lockCompetitionForBracketMutationInTx } from '../tournaments/slots/competition-bracket-lock';
 import { planLeagueTemplate } from './league-template-plan';
 import { LeagueStateValue } from './league-state';
@@ -310,7 +312,7 @@ export class LeagueMatchAdminService {
     // BE-5 ④ drop 의 몫이다. id 는 두 축이 같으므로 leagueId 로 그대로 묶인다.
     const fixtureCounts = await this.prisma.v1TeamMatch.groupBy({
       by: ['leagueId'],
-      where: { leagueId: { in: rows.map((row) => row.id) } },
+      where: { leagueId: { in: rows.map((row) => row.id) }, deletedAt: null },
       _count: { _all: true },
     });
     const fixtureCountByLeagueId = new Map(
@@ -350,7 +352,7 @@ export class LeagueMatchAdminService {
     const league = await this.loadLeague(leagueId);
     const teamIds = league.teams.map((entry) => entry.teamId);
     const fixtures = await this.prisma.v1TeamMatch.findMany({
-      where: { leagueId },
+      where: { leagueId, deletedAt: null },
       orderBy: { startAt: 'asc' },
       select: {
         id: true,
@@ -626,7 +628,7 @@ export class LeagueMatchAdminService {
       // 로 깨진다. BE-5 drop 이 정확히 ②를 일으켰다 — 통합 스펙이 500 으로 잡았다.
       await tx.$queryRaw`SELECT id FROM "v1_tournaments" WHERE id = ${leagueId} FOR UPDATE`;
       await assertLeagueFixtureGenerationAllowedInTx(tx, leagueId);
-      const existingCount = await tx.v1TeamMatch.count({ where: { leagueId } });
+      const existingCount = await tx.v1TeamMatch.count({ where: { leagueId, deletedAt: null } });
       if (existingCount > 0) {
         throw new ConflictException({ code: 'LEAGUE_FIXTURES_EXIST', message: '이미 대진이 생성된 리그예요.' });
       }
@@ -747,7 +749,7 @@ export class LeagueMatchAdminService {
       });
     }
 
-    const existingFixtureCount = await this.prisma.v1TeamMatch.count({ where: { leagueId } });
+    const existingFixtureCount = await this.prisma.v1TeamMatch.count({ where: { leagueId, deletedAt: null } });
     await this.prisma.$transaction(async (tx) => {
       // BE-5 drop: 로스터 = confirmed 등록 하나다. 예전엔 레거시 로스터 행을 만들고 짝이
       // 되는 등록을 함께 만들었는데, 그 테이블이 사라져 이 한 줄이 참가 그 자체가 됐다.
@@ -969,7 +971,7 @@ export class LeagueMatchAdminService {
     // "성공적으로" 보여준 뒤 실제 재생성 시점에야 409로 거부됐다 — 그 불변식이 이 경로에서
     // 깨져 있었다. 최초 생성(대진 0건)에서는 이 조건이 항상 거짓이라 기존 동작에 영향이 없다.
     const existingFixturesWithResult = await this.prisma.v1TeamMatch.findMany({
-      where: { leagueId },
+      where: { leagueId, deletedAt: null },
       select: { game: { select: { currentOfficialRevisionId: true } } },
     });
     if (existingFixturesWithResult.some((fixture) => fixture.game?.currentOfficialRevisionId != null)) {
@@ -1033,7 +1035,7 @@ export class LeagueMatchAdminService {
   // 예외는 경기가 진행 중일 때 하나다(assertFixtureGamesNotInProgress).
   async cancelFixture(user: V1AuthUser, leagueId: string, teamMatchId: string, dto: CancelLeagueFixtureDto) {
     const admin = await this.adminContext.getMutationAdmin(user.id);
-    const teamMatch = await this.prisma.v1TeamMatch.findFirst({ where: { id: teamMatchId, leagueId } });
+    const teamMatch = await this.prisma.v1TeamMatch.findFirst({ where: { id: teamMatchId, leagueId, deletedAt: null } });
     if (teamMatch === null) {
       throw new NotFoundException({ code: 'LEAGUE_NOT_FOUND', message: '이 리그의 대진이 아니에요.' });
     }
@@ -1142,7 +1144,7 @@ export class LeagueMatchAdminService {
         });
       }
       const existingFixtures = await tx.v1TeamMatch.findMany({
-        where: { leagueId },
+        where: { leagueId, deletedAt: null },
         select: {
           id: true,
           status: true,
@@ -1285,7 +1287,7 @@ export class LeagueMatchAdminService {
       // `tournament-raw-sql-baseline.json` 의 이 파일 허용치가 이미 꽉 차 있다.
       await lockCompetitionForBracketMutationInTx(tx, { id: leagueId, kind: 'regular_league' });
       const existing = await tx.v1TeamMatch.findMany({
-        where: { leagueId },
+        where: { leagueId, deletedAt: null },
         select: {
           id: true,
           status: true,
@@ -1494,7 +1496,7 @@ export class LeagueMatchAdminService {
   async updateFixture(user: V1AuthUser, leagueId: string, teamMatchId: string, dto: UpdateLeagueFixtureDto) {
     const admin = await this.adminContext.getMutationAdmin(user.id);
     rejectPartialPlaceUpdate(dto.placeName, [dto.placeAddress, dto.placeLatitude, dto.placeLongitude, dto.placeProvider, dto.placeProviderId]);
-    const teamMatch = await this.prisma.v1TeamMatch.findFirst({ where: { id: teamMatchId, leagueId } });
+    const teamMatch = await this.prisma.v1TeamMatch.findFirst({ where: { id: teamMatchId, leagueId, deletedAt: null } });
     if (teamMatch === null) {
       throw new NotFoundException({ code: 'LEAGUE_NOT_FOUND', message: '이 리그의 대진이 아니에요.' });
     }
@@ -1510,6 +1512,8 @@ export class LeagueMatchAdminService {
     const updated = await this.prisma.$transaction(async (tx) => {
       // 끝남·취소만 막고 보류 중 수정은 허용한다. 여기 읽기는 빠른 거절용이고, 최종 판정은 쓰기 뒤 공유 잠금 아래에서 한다.
       await assertLeagueNotEndedInTx(tx, leagueId);
+      // 팀을 먼저 바꾼다 — 사이드 배정이 Game → TeamMatch 순서로 행을 잠그므로 아래 TeamMatch 쓰기보다 앞서야 한다.
+      const teamsChanged = await this.changeFixtureTeamsInTx(tx, admin, teamMatch, dto);
       const nextEndAt = nextStartAt === undefined
         ? undefined
         : durationMs !== null
@@ -1523,6 +1527,7 @@ export class LeagueMatchAdminService {
           ...(nextStartAt === undefined ? {} : { startAt: nextStartAt }),
           ...(nextEndAt === undefined ? {} : { endAt: nextEndAt }),
           ...(nextPlace === undefined ? {} : toPlaceColumns(nextPlace)),
+          ...(dto.title === undefined ? {} : { title: dto.title.trim() }),
         },
       });
       // 리그 행은 쓰기 뒤에 기다리지 않고 잡는다(FOR SHARE NOWAIT) — 순서·이유는 그 가드의 docblock.
@@ -1531,13 +1536,17 @@ export class LeagueMatchAdminService {
       // 사용자 확정: 시작 시각이 바뀌면 결과 미입력 리마인더도 새 시각을 따라간다 —
       // 새 세대(startAt)로 다시 스케줄할 뿐 옛 행은 건드리지 않는다(발화 시점에
       // expectedStartAt 불일치로 스스로 no-op — league-result-entry-reminder.service.ts 참고).
+      if (dto.title !== undefined && dto.startsAt === undefined) {
+        // 팀 일정에 경기 이름이 그대로 실려 있다 — 이름만 바꿔도 캘린더가 따라가게 한다.
+        await syncTeamMatchScheduleInTx(tx, teamMatchId, result.title, persistedStartAt, result.endAt);
+      }
       if (dto.startsAt !== undefined) {
         await scheduleLeagueResultEntryReminder(tx, { teamMatchId, startAt: persistedStartAt });
         // 그룹 B 감사 결함 5 후속: createFixturesInTx가 이제 양 팀 스케줄을 만들어 두므로,
         // 여기서 시작 시각만 바꾸고 스케줄을 그대로 두면 캘린더 시각이 대진 시각과 어긋난다
         // (team-matches.service.ts:593의 동일 패턴). syncTeamMatchScheduleInTx는 teamMatchId
         // 기준으로 SCHEDULED 상태인 스케줄을 전부(호스트+원정 최대 2건) 갱신한다.
-        await syncTeamMatchScheduleInTx(tx, teamMatchId, teamMatch.title, persistedStartAt, result.endAt);
+        await syncTeamMatchScheduleInTx(tx, teamMatchId, result.title, persistedStartAt, result.endAt);
         // 시각이 바뀌면 결장 기간·팀 경기 순서가 달라진다 — 양 팀 명단 재계산 이벤트를 남긴다.
         await enqueueRosterResync(
           tx,
@@ -1554,6 +1563,8 @@ export class LeagueMatchAdminService {
             startAt: persistedStartAt.toISOString(),
             endAt: result.endAt !== null ? result.endAt.toISOString() : null,
             placeName: result.placeName,
+            title: result.title,
+            ...(teamsChanged ? { homeTeamId: result.hostTeamId, awayTeamId: result.approvedApplicantTeamId } : {}),
           },
         },
         tx,
@@ -1565,12 +1576,121 @@ export class LeagueMatchAdminService {
     });
     return {
       teamMatchId: updated.id,
+      title: updated.title,
+      homeTeamId: updated.hostTeamId,
+      awayTeamId: updated.approvedApplicantTeamId,
       startAt: updated.startAt,
       endAt: updated.endAt,
       placeName: updated.placeName,
       placeAddress: updated.placeAddress,
       place: toPlaceView(updated),
     };
+  }
+
+  /**
+   * 경기 팀 바꾸기. 자리(템플릿) 방식이 아닌 경기도 운영자가 홈·원정을 고칠 수 있다 — 실제 변경은 자리 배정과 같은
+   * `assignLeagueFixtureSideInTx`(사이드·팀 일정·신청서·명단 정리, 시작 전·결과 없는 경기만)가 한다.
+   * 홈·원정을 맞바꾸면 원정을 먼저 비워야 "같은 팀끼리" 검사에 걸리지 않는다. 바뀐 게 있으면 true.
+   */
+  private async changeFixtureTeamsInTx(
+    tx: Prisma.TransactionClient,
+    admin: V1ActiveAdmin,
+    teamMatch: { id: string; hostTeamId: string | null; approvedApplicantTeamId: string | null; homeSlotId: string | null; awaySlotId: string | null; leagueId: string | null },
+    dto: Pick<UpdateLeagueFixtureDto, 'homeTeamId' | 'awayTeamId'>,
+  ): Promise<boolean> {
+    const nextHome = dto.homeTeamId ?? teamMatch.hostTeamId;
+    const nextAway = dto.awayTeamId ?? teamMatch.approvedApplicantTeamId;
+    if (nextHome === teamMatch.hostTeamId && nextAway === teamMatch.approvedApplicantTeamId) return false;
+    if (nextHome !== null && nextHome === nextAway) {
+      throw new BadRequestException({ code: 'FIXTURE_SAME_TEAM', message: '같은 팀끼리 경기를 만들 수 없어요.' });
+    }
+    if ((teamMatch.homeSlotId !== null && nextHome !== teamMatch.hostTeamId) || (teamMatch.awaySlotId !== null && nextAway !== teamMatch.approvedApplicantTeamId)) {
+      throw new ConflictException({ code: 'SLOT_LINKED', message: '자리 방식으로 만든 경기는 일정 보드의 자리에서 팀을 바꿔 주세요.' });
+    }
+    const teamIds = [nextHome, nextAway].filter((id): id is string => id !== null);
+    const registrations = await tx.v1TournamentRegistration.findMany({
+      where: { tournamentId: teamMatch.leagueId!, status: 'confirmed', teamId: { in: teamIds } },
+      select: { id: true, teamId: true },
+    });
+    const registrationOf = (teamId: string) => {
+      const registration = registrations.find((row) => row.teamId === teamId);
+      if (registration === undefined) {
+        throw new BadRequestException({ code: 'LEAGUE_TEAM_INVALID', message: '이 리그에 참가 확정된 팀만 고를 수 있어요.' });
+      }
+      return registration.id;
+    };
+    const deps = { games: this.games };
+    const assign = (side: 'HOME' | 'AWAY', registrationId: string | null) =>
+      assignLeagueFixtureSideInTx(tx, deps, admin, { teamMatchId: teamMatch.id, side, registrationId });
+    if (nextHome !== teamMatch.hostTeamId && nextHome === teamMatch.approvedApplicantTeamId) await assign('AWAY', null);
+    if (nextHome !== null && nextHome !== teamMatch.hostTeamId) await assign('HOME', registrationOf(nextHome));
+    // 바뀌지 않았으면 배정 함수가 그대로 돌아온다(맞바꾸기로 비운 원정은 여기서 다시 채운다).
+    if (nextAway !== null) await assign('AWAY', registrationOf(nextAway));
+    return true;
+  }
+
+  /**
+   * 경기 삭제 — 취소하고 대진표에서 숨긴다(`deletedAt`). Game·결과·감사 이력은 지우지 않는다(FK·기록 보존).
+   * 순위·자동 종료·개인 기록은 이미 취소 경기를 빼고 세므로 "취소 + 숨김"이면 집계가 그대로 맞는다.
+   * 시작했거나 결과가 있는 경기는 먼저 취소해야 한다 — 기록이 있는 경기를 한 번에 지우지 않게 하는 두 단계다.
+   */
+  async deleteFixture(user: V1AuthUser, leagueId: string, teamMatchId: string, dto: DeleteLeagueFixtureDto) {
+    const admin = await this.adminContext.getMutationAdmin(user.id);
+    const teamMatch = await this.prisma.v1TeamMatch.findFirst({
+      where: { id: teamMatchId, leagueId, deletedAt: null },
+      include: { game: { select: { state: true, currentOfficialRevisionId: true } } },
+    });
+    if (teamMatch === null) {
+      throw new NotFoundException({ code: 'LEAGUE_NOT_FOUND', message: '이 리그의 대진이 아니에요.' });
+    }
+    const wasCancelled = teamMatch.status === 'cancelled';
+    if (!wasCancelled && ((teamMatch.game?.state ?? 'SCHEDULED') !== 'SCHEDULED' || teamMatch.game?.currentOfficialRevisionId)) {
+      throw new ConflictException({
+        code: 'LEAGUE_FIXTURE_NOT_DELETABLE',
+        message: '시작했거나 결과가 있는 경기는 바로 삭제할 수 없어요. 먼저 경기를 취소한 뒤 삭제해 주세요.',
+      });
+    }
+    const leagueCompleted = await this.prisma.$transaction(async (tx) => {
+      if (!wasCancelled) {
+        await this.assertFixtureGamesNotInProgress(tx, [teamMatchId], '경기가 진행 중이에요. 운영 콘솔에서 먼저 끝낸 뒤 삭제해 주세요.');
+        await this.cancelLeagueFixtureRowInTx(tx, teamMatchId, dto.reason);
+      }
+      const hidden = await tx.v1TeamMatch.updateMany({ where: { id: teamMatchId, deletedAt: null }, data: { deletedAt: new Date() } });
+      if (hidden.count !== 1) {
+        throw new ConflictException({ code: 'LEAGUE_FIXTURE_CHANGED', message: '경기가 방금 바뀌었어요. 새로고침한 뒤 다시 시도해 주세요.' });
+      }
+      await this.adminContext.logAdminAction(
+        admin,
+        {
+          action: 'league_match.delete_fixture',
+          targetType: 'team_match',
+          targetId: teamMatchId,
+          reason: dto.reason,
+          fromStatus: teamMatch.status,
+          toStatus: 'cancelled',
+          beforeJson: {
+            title: teamMatch.title,
+            startAt: teamMatch.startAt?.toISOString() ?? null,
+            homeTeamId: teamMatch.hostTeamId,
+            awayTeamId: teamMatch.approvedApplicantTeamId,
+          },
+          afterJson: { deleted: true },
+        },
+        tx,
+      );
+      if (wasCancelled) return false;
+      // 취소와 같은 후처리 — 남은 빈 경기·미확정 경기가 사라져 자리가 다 차거나 리그가 끝날 수 있다.
+      await promoteLeagueWhenSlotsFilledInTx(tx, leagueId);
+      return this.leagueCompletion.settle(tx, leagueId, 'remaining_fixture_cancelled');
+    });
+    if (!wasCancelled && !isUnfilledSlotFixture(teamMatch)) {
+      this.notifyFixturesCancelled(
+        leagueId,
+        [{ id: teamMatch.id, title: teamMatch.title, hostTeamId: teamMatch.hostTeamId, approvedApplicantTeamId: teamMatch.approvedApplicantTeamId }],
+        dto.reason,
+      );
+    }
+    return { teamMatchId, deleted: true as const, leagueCompleted };
   }
 
   // R6/D-3: 전 대진이 확정되면 리그는 자동으로 completed 전이한다(LeagueCompletionProjectionService).

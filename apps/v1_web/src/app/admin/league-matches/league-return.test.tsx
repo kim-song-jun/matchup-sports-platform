@@ -92,6 +92,7 @@ vi.mock('@/hooks/use-v1-api', () => ({
   useV1GenerateLeagueFixtures: () => ({ isPending: false }),
   useV1UpdateLeagueFixture: () => ({ isPending: false }),
   useV1CancelLeagueFixture: () => ({ isPending: false }),
+  useV1DeleteLeagueFixture: () => ({ isPending: false }),
   useV1RegenerateLeagueFixtures: () => ({ isPending: false }),
   useV1CreateManualLeagueFixture: () => ({ isPending: false }),
   useV1RecordLeagueForfeit: () => ({ isPending: false }),

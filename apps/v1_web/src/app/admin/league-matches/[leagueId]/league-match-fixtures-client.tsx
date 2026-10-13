@@ -25,6 +25,7 @@ import {
   useV1RemoveLeagueTeam,
   useV1Teams,
   useV1UpdateLeagueFixture,
+  useV1DeleteLeagueFixture,
 } from '@/hooks/use-v1-api';
 import { describeLeagueRegistrationWindow } from '@/lib/league-registration-copy';
 import { leagueFixtureMatchupLabel } from '@/lib/league-fixture-meta';
@@ -94,6 +95,19 @@ function hasBothTeams(fixture: V1LeagueFixture): boolean {
  */
 function isFixtureGameInProgress(fixture: V1LeagueFixture): boolean {
   return fixture.status !== 'cancelled' && (fixture.gameState === 'LIVE' || fixture.gameState === 'PAUSED');
+}
+
+/**
+ * 서버가 경기 삭제(LEAGUE_FIXTURE_NOT_DELETABLE)·팀 바꾸기(FIXTURE_HAS_RESULT)를 막는 조건 — 경기가 시작됐거나
+ * 확정(또는 무효) 결과가 있다.
+ */
+function fixtureHasStartedOrResult(fixture: V1LeagueFixture): boolean {
+  // 무효 처리된 결과도 서버에서는 확정 리비전 포인터가 남아 있어 같은 취급이다.
+  return (
+    (fixture.gameState !== null && fixture.gameState !== undefined && fixture.gameState !== 'SCHEDULED') ||
+    fixture.resultStage === 'official' ||
+    fixture.resultStage === 'voided'
+  );
 }
 
 function manualFixtureHint(canAdd: boolean, leagueEnded: boolean): string {
@@ -225,6 +239,9 @@ export default function LeagueMatchFixturesClient({
   const [gamesPerTeamPerDay, setGamesPerTeamPerDay] = useState('');
   // R12: 취소 확인 대상 대진. null이면 모달을 닫는다.
   const [cancelTarget, setCancelTarget] = useState<V1LeagueFixture | null>(null);
+  // 삭제 확인 대상 대진. 취소와 같은 사유 모달을 쓴다.
+  const [deleteTarget, setDeleteTarget] = useState<V1LeagueFixture | null>(null);
+  const deleteFixture = useV1DeleteLeagueFixture(leagueId);
   // 그룹 B 감사 결함 3: 참가팀 제외 확인 대상. null이면 모달을 닫는다.
   const [removeTarget, setRemoveTarget] = useState<{ teamId: string; teamName: string } | null>(null);
   // R13: 대진 재생성 확인 모달 열림 상태.
@@ -353,8 +370,8 @@ export default function LeagueMatchFixturesClient({
     const actions: ActionSheetAction[] = [
       {
         key: 'schedule',
-        label: '일정 수정',
-        description: '일시·구장·주소를 바꿔요',
+        label: '경기 수정',
+        description: '팀·경기 이름·일시·구장을 바꿔요',
         onSelect: () => {
           setMenuFixture(null);
           setScheduleFixture(row);
@@ -397,6 +414,20 @@ export default function LeagueMatchFixturesClient({
       onSelect: () => {
         setMenuFixture(null);
         setCancelTarget(row);
+      },
+    });
+    // 삭제 = 취소 + 대진표에서 숨김. 시작했거나 결과가 있는 경기는 먼저 취소해야 한다(서버와 같은 규칙).
+    const deleteBlocked = row.status !== 'cancelled' && fixtureHasStartedOrResult(row);
+    actions.push({
+      key: 'delete',
+      label: '경기 삭제',
+      description: '대진표에서 이 경기를 지워요. 순위 집계에서도 빠져요',
+      destructive: true,
+      disabled: deleteBlocked,
+      disabledReason: deleteBlocked ? '시작했거나 결과가 있는 경기는 먼저 대진 취소를 해 주세요' : null,
+      onSelect: () => {
+        setMenuFixture(null);
+        setDeleteTarget(row);
       },
     });
     return actions;
@@ -580,14 +611,28 @@ export default function LeagueMatchFixturesClient({
     });
   };
 
-  // 일정 수정 모달의 저장. 실패는 모달 안에 남고(입력을 잃지 않는다) 성공하면 토스트로 알린다.
+  const onConfirmDelete = (reason: string) => {
+    if (!deleteTarget) return;
+    deleteFixture.mutate(
+      { teamMatchId: deleteTarget.teamMatchId, body: { reason } },
+      {
+        onSuccess: (result) => {
+          setDeleteTarget(null);
+          showToast(result.leagueCompleted ? '경기를 삭제했어요. 남은 경기가 없어 리그가 종료 처리됐어요.' : '경기를 삭제했어요.', 'success');
+        },
+        onError: (error) => showToast(extractErrorMessage(error, '경기를 삭제하지 못했어요.'), 'error'),
+      },
+    );
+  };
+
+  // 경기 수정 모달의 저장. 실패는 모달 안에 남고(입력을 잃지 않는다) 성공하면 토스트로 알린다.
   const onScheduleSubmit = (fixture: V1LeagueFixture) => (patch: LeagueFixtureSchedulePatch) =>
     new Promise<void>((resolve, reject) => {
       updateFixture.mutate(
         { teamMatchId: fixture.teamMatchId, body: patch },
         {
           onSuccess: () => {
-            showToast('일정을 저장했어요.', 'success');
+            showToast('경기를 저장했어요.', 'success');
             resolve();
           },
           onError: (error) => reject(error),
@@ -1457,6 +1502,14 @@ export default function LeagueMatchFixturesClient({
           defaultPlace={series.defaultPlace ?? null}
           recentVenues={series.recentVenues}
           matchupLabel={matchupLabelOf(scheduleFixture)}
+          teams={teamsData?.teams ?? []}
+          teamLockedReason={
+            scheduleFixture.homeSlotId || scheduleFixture.awaySlotId
+              ? '자리 방식으로 만든 경기는 일정 보드의 자리에서 팀을 바꿔요.'
+              : fixtureHasStartedOrResult(scheduleFixture)
+                ? '시작했거나 결과가 있는 경기는 팀을 바꿀 수 없어요.'
+                : null
+          }
           isSubmitting={updateFixture.isPending}
           onSubmit={onScheduleSubmit(scheduleFixture)}
           onClose={() => setScheduleFixture(null)}
@@ -1535,6 +1588,21 @@ export default function LeagueMatchFixturesClient({
         }
         onConfirm={onConfirmRemoveTeam}
         onClose={() => setRemoveTarget(null)}
+      />
+
+      <GateConfirmModal
+        open={deleteTarget !== null}
+        pending={deleteFixture.isPending}
+        title="경기를 삭제할까요?"
+        description={
+          deleteTarget
+            ? `"${deleteTarget.title}" 경기를 대진표에서 지워요. 순위 집계에서 빠지고 되돌릴 수 없어요.${deleteTarget.status === 'cancelled' ? '' : ' 두 팀에는 취소 알림이 가요.'}`
+            : ''
+        }
+        confirmLabel="삭제"
+        tone="amber"
+        onConfirm={onConfirmDelete}
+        onClose={() => setDeleteTarget(null)}
       />
 
       <GateConfirmModal

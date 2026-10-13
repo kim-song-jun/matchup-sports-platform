@@ -1776,6 +1776,7 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
           gameId={gameId}
           sides={sides}
           lineups={lineups}
+          onRosterError={(message) => showToast(message)}
           disabled={!canOperate || commandBlocked}
           pendingParticipantId={setArrival.isPending ? setArrival.variables?.participantId ?? null : null}
           pendingSideId={confirmSideArrival.isPending ? confirmSideArrival.variables ?? null : null}

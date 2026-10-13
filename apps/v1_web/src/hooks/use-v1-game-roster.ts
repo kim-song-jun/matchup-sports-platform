@@ -277,6 +277,30 @@ export function useV1GameRosterAdjustments(
   });
 }
 
+/**
+ * 경기 한 사이드에서 선수 빼기(`participating: false`)·되돌리기(`true`). 팀 owner·manager·경기 운영자(현장 스태프 포함)가
+ * 쓴다 — 팀 단위 일괄 저장(`useV1ApplyGameRosterBatch`)은 스태프가 못 쓴다. 경기 시작 전만 된다(서버 409).
+ */
+export function useV1SetGameRosterParticipation(gameId: string | null, sideId: string | null, teamId: string | null) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ userId, participating }: { userId: string; participating: boolean }) => {
+      if (!gameId || !sideId) throw new Error('경기·팀 정보 없이 명단을 바꿀 수 없어요.');
+      const base = `/games/${encodeURIComponent(gameId)}/sides/${encodeURIComponent(sideId)}/roster-adjustments`;
+      return participating ? v1Delete<unknown>(`${base}/${encodeURIComponent(userId)}`) : v1Post<unknown>(base, { userId });
+    },
+    onSuccess: () => {
+      if (!gameId || !sideId) return;
+      void queryClient.invalidateQueries({ queryKey: v1Keys.gameSideRosterAll(gameId, sideId) });
+      if (teamId) {
+        void queryClient.invalidateQueries({ queryKey: v1Keys.teamGameRoster(teamId, gameId) });
+        invalidateTeamRosterViews(queryClient, teamId);
+      }
+      invalidateLineupReaders(queryClient, [gameId]);
+    },
+  });
+}
+
 // ── 팀 B: 선수 × 경기 표와 일괄 저장 ─────────────────────────────────────────
 
 /** 팀 owner·manager·플랫폼 운영자 전용 — 팀원이면 서버가 403 이다. */

@@ -1,8 +1,9 @@
 'use client';
 
-import type { ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { GameLineup, GameLineupParticipant, GameSide } from '@/types/game-operations';
 import { jerseyText } from './player-label';
+import { participantIdentityCopyText, participantIdentityName, participantIdentityPhone } from './participant-identity';
 import { latestLineupForDisplay } from './lineup-grid';
 
 /**
@@ -159,19 +160,23 @@ function ArrivalRow({
 }) {
   const checked = participant.arrivedAt !== null;
   const jersey = jerseyText(participant.jerseyNumber);
+  // 운영진에게만 `identity` 가 내려온다 — 없으면 아래 값이 전부 닉네임·빈 값으로 접힌다.
+  const name = participantIdentityName(participant);
+  const phone = participantIdentityPhone(participant);
+  const copyText = participantIdentityCopyText(participant);
   return (
-    <li>
+    <li className="flex items-stretch gap-2">
       <button
         type="button"
         role="switch"
         aria-checked={checked}
         // 컬러만으로 상태를 전달하지 않는다(프로젝트 접근성 규칙) — aria-label 에 상태를
         // 말로 담고, 화면에도 체크 표시와 "도착"/"미확인" 텍스트를 함께 둔다.
-        aria-label={`${participant.displayNameSnapshot} — ${checked ? '도착 확인됨, 누르면 취소' : '아직 미확인, 누르면 도착 확인'}`}
+        aria-label={`${name} — ${checked ? '도착 확인됨, 누르면 취소' : '아직 미확인, 누르면 도착 확인'}`}
         disabled={disabled}
         onClick={onToggle}
         className={[
-          'flex min-h-[44px] w-full items-center gap-3 rounded-lg border px-3 py-2 text-left transition-colors',
+          'flex min-h-[44px] min-w-0 flex-1 items-center gap-3 rounded-lg border px-3 py-2 text-left transition-colors',
           checked
             ? 'border-[var(--blue500)] bg-[var(--blue50)]'
             : 'border-[var(--border)] bg-[var(--surface)]',
@@ -192,13 +197,57 @@ function ArrivalRow({
         <span className="min-w-0 flex-1">
           <span className="block truncate text-sm font-medium">
             {jersey ? `${jersey} ` : ''}
-            {participant.displayNameSnapshot}
+            {name}
           </span>
           <span className="block text-xs text-[var(--text-muted)]">
+            {phone ? `${phone} · ` : ''}
             {checked ? '도착' : '미확인'}
           </span>
         </span>
       </button>
+      {copyText ? <CopyIdentityButton name={name} text={copyText} /> : null}
     </li>
+  );
+}
+
+const COPY_FEEDBACK_MS = 1500;
+
+/**
+ * 한 선수의 `실명 ⇥ 닉네임 ⇥ 전화번호`를 클립보드에 복사한다.
+ * 도착 토글 버튼 **안에 두지 않고 옆에 둔다** — 버튼 안의 버튼은 유효한 마크업이 아니고, 복사를 눌렀는데
+ * 도착 확인이 같이 바뀌면 검인 기록이 오염된다.
+ */
+function CopyIdentityButton({ name, text }: { name: string; text: string }) {
+  const [state, setState] = useState<'idle' | 'copied' | 'failed'>('idle');
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(
+    () => () => {
+      if (timer.current) clearTimeout(timer.current);
+    },
+    [],
+  );
+
+  const onCopy = async () => {
+    let next: 'copied' | 'failed' = 'copied';
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch {
+      // 권한·보안 컨텍스트 문제로 막히면 실패를 그대로 알린다 — 복사된 척하면 잘못된 번호를 붙여 넣게 된다.
+      next = 'failed';
+    }
+    setState(next);
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = setTimeout(() => setState('idle'), COPY_FEEDBACK_MS);
+  };
+
+  return (
+    <button
+      type="button"
+      aria-label={`${name} 실명·닉네임·전화번호 복사`}
+      onClick={() => void onCopy()}
+      className="min-h-[44px] min-w-[56px] shrink-0 rounded-lg border border-[var(--border)] px-3 text-[length:var(--font-size-caption)] font-semibold text-[var(--text-strong)] transition-colors hover:bg-[var(--surface-soft)] focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+    >
+      <span aria-live="polite">{state === 'copied' ? '복사됨' : state === 'failed' ? '실패' : '복사'}</span>
+    </button>
   );
 }

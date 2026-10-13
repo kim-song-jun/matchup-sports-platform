@@ -34,8 +34,8 @@ https://teameet.jmandu.kr/issues/140/ 원문·재현·최근 댓글 확인, 김�
 - Phase B A안 단일 UI 소유자: 기존 `registrations-tab.tsx`의 이름 영역과 새 `tournament-roster-identity.test.tsx`만 변경한다. 공유 타입은 Phase A 소유자가 선행 완료했고 root가 Git·직렬 검증을 담당한다.
 
 ## Acceptance Criteria
-- [ ] Original conditions와 실제 회귀 RED→GREEN
-- [ ] 개인정보·권한 경계 유지 및 문서·fixture sync
+- [x] Original conditions와 실제 회귀 RED→GREEN
+- [x] 개인정보·권한 경계 유지 및 문서·fixture sync
 - [ ] 최신 committed head 독립 Critical0/Warning0
 - [ ] 필요한 alpha persona/viewport 검증은 코드 테스트와 구분
 
@@ -60,3 +60,4 @@ shared api.ts는 이 작업자 한 명만 해당 타입을 수정한다. UI 변�
 - 2026-10-13 Phase A: 실제 관리자 service의 신규 5건 RED → 기존 포함112/112 GREEN. 현재 프로필 닉네임은 nullable 별도 필드이며 등록 당시 실명·CSV·권한·정렬을 보존한다.
 - 2026-10-13 Phase B: 선택된 A안 실제 RosterModal + QueryClient + MSW GET/PATCH/DELETE 소비자6건에서5 FAIL/1 PASS RED를 확인한 뒤 기존 이름 영역만 수정했다. 기존 roster16 + awards11 + 신규6 =33/33 GREEN (`mdqa140-ui-a-affected-green.log`). 403 시 명단·개인정보를 숨기는 기존 계약과 read-only 수정 차단도 통과했다. 403의 logger HTTP boundary는 204 핸들러를 추가했고 신규6/6 재검증 PASS, unhandled request 없음 (`mdqa140-ui-a-logger-boundary-green.log`).
 - 공개 상세 실제 service의 exact nickname-only 응답 검증1 PASS /37 skipped (`mdqa140-public-privacy-green.log`); 전체 공개 suite 통과로 표시하지 않는다. 최신 origin/dev 통합, committed-tree 타입 검사·독립 개인정보/프론트 리뷰·dev PR·실제 alpha390/768/1440 검증은 아직 남아 있다.
+- 2026-10-13 07:15Z: 최신 dev `403e33980cbe6d207177c6c83f80ec24c30aa56b` 안전 통합 후 source checkpoint `69f09b27e0c688bf7e7e54a00b5acaf366b926e7`의 API tsc/surface675 PASS, Web tsc/pattern PASS를 확인했다. 최초 committed Web 패턴 실패는 기존 화면 폰트 리터럴이 15→14로 줄어든 기준 불일치였으며 해당 baseline 한 항목만 낮춰 재발 허용량을 축소했다. 개인정보 독립 리뷰와 프론트 적대적 리뷰 모두 이 정확한 checkpoint에서 Critical0/Warning0/OK다. PR 게시·외부 최신 head 리뷰/CI와 배포 후 실제 admin/public390/768/1440 QA는 남아 있다. 이후 기록 전용 커밋은 소스 검증의 새 실행으로 간주하지 않는다.

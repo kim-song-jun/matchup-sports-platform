@@ -61,8 +61,8 @@ import {
   type TournamentRegistrationBlockReason,
   pendingCapacityLabel,
 } from '@/lib/tournament-registration-availability';
-import { toKstDateString } from '@/lib/kst-calendar';
-import type { V1LeagueFixture } from '@/types/league-match';
+import { isLeagueMatchDay, leagueEntryCtaLabel } from '@/lib/league-match-day';
+import { BracketEntryLink } from '@/components/tournaments/bracket-entry-link';
 import type {
   V1PlaceView,
   V1TournamentDetail,
@@ -135,7 +135,7 @@ export function getBracketEntryCtaLabel(
   switch (status) {
     case 'in_progress':
       if (!isRegularLeague) return '진행 중인 대회 보기';
-      return isLeagueMatchDayToday ? '진행 중인 리그 보기' : '리그 일정 보기';
+      return leagueEntryCtaLabel(isLeagueMatchDayToday);
     case 'completed':
       return isRegularLeague ? '최종 순위 보기' : '경기 결과 · 대진표 보기';
     case 'open':
@@ -167,26 +167,8 @@ export function isDetailRegistrationPhase(
   return tournament.leagueFirstMatchStarted !== true;
 }
 
-/**
- * 정규 리그의 **경기가 있는 날**인가 — 리그 진입 CTA 를 LIVE 로 그리는 기준(2026-10-13 사용자 확정).
- *
- * 대회는 하루 안에 끝나 `in_progress` 만으로 LIVE 가 맞지만, 리그는 몇 주에 걸쳐 열려 경기가 없는
- * 날이 대부분이다. 그래서
- * · 진행 중·일시정지인 경기가 있으면 날짜와 상관없이 경기일이다(자정을 넘긴 경기).
- * · 아니면 오늘(KST) 시작하는 경기가 하나라도 있으면 경기일이다. 취소된 경기는 세지 않는다.
- */
-export function isLeagueMatchDay(
-  fixtures: readonly Pick<V1LeagueFixture, 'startAt' | 'status' | 'gameState'>[],
-  now: Date = new Date(),
-): boolean {
-  const today = toKstDateString(now);
-  return fixtures.some((fixture) => {
-    if (fixture.gameState === 'LIVE' || fixture.gameState === 'PAUSED') return true;
-    if (fixture.status === 'cancelled' || fixture.gameState === 'CANCELLED') return false;
-    const startsAt = new Date(fixture.startAt);
-    return Number.isFinite(startsAt.getTime()) && toKstDateString(startsAt) === today;
-  });
-}
+/** 경기일 판정은 리그 순위·일정 화면과 같이 쓴다(`lib/league-match-day.ts`). */
+export { isLeagueMatchDay };
 
 /** 리그면 오늘이 경기일인지, 대회면 항상 true — 진입 CTA 의 문구·LIVE 강조가 함께 쓴다. */
 function isMatchDayForEntryCta(tournament: V1TournamentDetail, now: Date = new Date()): boolean {
@@ -488,63 +470,7 @@ function BracketEntryCtaButton({ tournament }: { tournament: V1TournamentDetail 
   // 리그는 경기가 있는 날만 LIVE 로 강조한다 — 경기 없는 날은 중립 톤의 "리그 일정 보기".
   const isLive = tournament.status === 'in_progress' && isMatchDay;
 
-  return (
-    <Link
-      href={childHref(`/tournaments/${tournament.id}/bracket`)}
-      className="tm-pressable"
-      aria-label={label}
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: 12,
-        width: '100%',
-        padding: '16px 16px',
-        borderRadius: 'var(--radius-field)',
-        textDecoration: 'none',
-        background: isLive ? 'var(--blue500)' : 'var(--surface)',
-        border: isLive ? 'none' : '1px solid var(--border)',
-        boxShadow: isLive ? '0 2px 14px rgba(49,130,246,0.3)' : 'none',
-      }}
-    >
-      {isLive ? (
-        <span
-          style={{
-            display: 'flex', alignItems: 'center', gap: 4,
-            background: 'rgba(255,255,255,0.18)', borderRadius: 20,
-            padding: '3px 8px', flexShrink: 0,
-          }}
-        >
-          <span
-            style={{
-              width: 6, height: 6, borderRadius: 'var(--radius-circle)',
-              background: '#4ADE80', flexShrink: 0,
-              boxShadow: '0 0 0 2px rgba(74,222,128,0.35)',
-            }}
-            aria-hidden="true"
-          />
-          <span style={{ fontSize: 'var(--font-size-caption)', fontWeight: 800, color: '#fff', letterSpacing: '0.02em' }}>LIVE</span>
-        </span>
-      ) : (
-        <span
-          aria-hidden="true"
-          // 2026-08-11: 순수 내비게이션 CTA라 경고색 의미가 없는데 파란 틴트가 튀어
-          // 보인다는 지적 — 무채색으로 통일 (마이허브 메뉴 아이콘과 동일 근거)
-          style={{ width: 32, height: 32, borderRadius: 10, flexShrink: 0, display: 'grid', placeItems: 'center', background: 'var(--grey100)' }}
-        >
-          <Goal size={16} color="var(--text-strong)" strokeWidth={2.2} />
-        </span>
-      )}
-      <span style={{ flex: 1, fontSize: 'var(--font-size-body-lg)', fontWeight: 800, letterSpacing: '-0.01em', color: isLive ? '#fff' : 'var(--text-strong)' }}>
-        {label}
-      </span>
-      <ChevronRight
-        size={18}
-        strokeWidth={2.5}
-        style={{ color: isLive ? 'rgba(255,255,255,0.65)' : 'var(--text-caption)', flexShrink: 0 }}
-        aria-hidden="true"
-      />
-    </Link>
-  );
+  return <BracketEntryLink href={childHref(`/tournaments/${tournament.id}/bracket`)} label={label} live={isLive} />;
 }
 
 /* ── Entry point ── */

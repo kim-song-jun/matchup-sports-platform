@@ -34,7 +34,7 @@ import {
 import { LEAGUE_TIE_BREAK_ORDER } from './league-tie-break';
 import type { LeagueState } from './league-state';
 import { findPublicTournamentOnSurface } from '../tournaments/tournament-surface-lookup';
-import { hasLeagueFirstMatchStarted, isLeagueRegistrationOpen } from './league-registration-open';
+import { hasLeagueFirstMatchStarted, isLeagueRegistrationOpen, leaguesWithFirstMatchStarted } from './league-registration-open';
 import { TOURNAMENT_VENUE_SELECT, tournamentVenueSnapshot } from '../places/tournament-venue';
 
 const PLAYER_RECORDS_LIMIT = 30;
@@ -466,6 +466,9 @@ export class LeagueMatchPublicService {
     const factByGameId = new Map(facts.map((fact) => [fact.gameId, fact]));
     // 요청당 한 번만 읽는다 — 대진마다 읽으면 목록 길이만큼 쿼리가 늘어난다.
     const publicLiveEnabled = await isPublicLiveEnabled(this.prisma);
+    // 첫 경기가 실제로 킥오프했는가 — 신청 마감과 화면의 실시간 진입 버튼이 함께 쓴다(2026-10-13).
+    // 대진 목록의 `gameState` 는 공개 정책이 hidden 이면 비어 화면이 대신 판정할 수 없다.
+    const firstMatchStarted = await hasLeagueFirstMatchStarted(this.prisma, leagueId);
 
     // 이슈 1(감사 보통) — seriesId 는 응답에 이미 있었지만 "같은 시리즈의 다른 시즌·
     // 티어로 이동"할 링크가 어디에도 없었다. 새 엔드포인트 대신 이 상세 응답을
@@ -497,13 +500,15 @@ export class LeagueMatchPublicService {
               scheduledEndAt: true,
             },
           })
-          .then((rows) =>
-            rows.map(({ status, ...rest }) => ({
+          .then(async (rows) => {
+            // 형제 리그도 첫 경기 킥오프 뒤에는 신청을 받지 않는다 — 리그마다 묻지 않고 한 번에 읽는다.
+            const started = await leaguesWithFirstMatchStarted(this.prisma, rows.map((row) => row.id));
+            return rows.map(({ status, ...rest }) => ({
               ...rest,
               state: LEAGUE_STATE_BY_STATUS[status],
-              registrationOpen: isLeagueRegistrationOpen(status, rest.registrationDeadlineAt),
-            })),
-          );
+              registrationOpen: isLeagueRegistrationOpen(status, rest.registrationDeadlineAt, started.has(rest.id)),
+            }));
+          });
     // 신청이 마감된 리그가 "다음 회차로 신청하기"를 걸 대상 — 같은 티어의 바로 다음 시즌.
     // ponytail: 같은 티어만 본다. 신규 팀의 입문 티어를 따로 정하면 그 규칙으로 바꾼다.
     const nextRound = siblings
@@ -530,11 +535,8 @@ export class LeagueMatchPublicService {
       // 신청을 열 수 있고 등록 서비스도 리그를 받는데(`ALL_COMPETITION_KINDS`), 그 사실이
       // 공개 응답에 실리지 않아 화면이 알 방법이 없었다.
       registrationDeadlineAt: league.registrationDeadlineAt?.toISOString() ?? null,
-      registrationOpen: isLeagueRegistrationOpen(
-        league.mirrorStatus,
-        league.registrationDeadlineAt,
-        await hasLeagueFirstMatchStarted(this.prisma, leagueId),
-      ),
+      registrationOpen: isLeagueRegistrationOpen(league.mirrorStatus, league.registrationDeadlineAt, firstMatchStarted),
+      firstMatchStarted,
       // 시리즈에 속하지 않은 단발 리그는 셋 다 null 이다 — 화면은 null 이면 티어 뱃지를 띄우지 않는다.
       seriesId: league.seriesId,
       seriesTitle: league.series?.title ?? null,

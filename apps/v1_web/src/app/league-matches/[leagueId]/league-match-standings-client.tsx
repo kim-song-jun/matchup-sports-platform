@@ -36,6 +36,8 @@ import {
 import { StatusChip } from '@/components/v1-ui/status-chip';
 import { CompetitionThumbnail } from '@/components/v1-ui/competition-card';
 import { LeagueJoinGuideCard } from './league-join-guide-card';
+import { BracketEntryLink } from '@/components/tournaments/bracket-entry-link';
+import { isLeagueMatchDay, leagueEntryCtaLabel } from '@/lib/league-match-day';
 import { CompetitionEntrySection } from '@/components/tournaments/competition-entry-card';
 import type {
   V1LeagueChampionTeam,
@@ -651,6 +653,7 @@ export default function LeagueMatchStandingsClient({
   }
 
   const seasonStage = leagueSeasonStage(series.state, phaseCounts);
+  const leagueMatchDay = isLeagueMatchDay(series.fixtures);
   const stageLine = leagueSeasonStageLine(seasonStage, {
     counts: phaseCounts,
     nextStartLabel: nextUpcomingFixture === null ? null : formatTournamentDateTimeShort(nextUpcomingFixture.startAt) ?? null,
@@ -691,6 +694,18 @@ export default function LeagueMatchStandingsClient({
           <StatusChip chip={leagueStateChip(series.state)} size="md" />
         </div>
       </div>
+      {/* 실시간 중계 진입 — 대회 상세(`/tournaments/:id`)와 같은 버튼·같은 규칙(2026-10-13 사용자 확정, A안:
+          제목 바로 아래). 첫 경기가 실제로 킥오프한 진행 중 리그에만 뜨고, 경기가 있는 날만 LIVE 로
+          강조한다. 목적지도 같은 허브(`/tournaments/:id/bracket`)다. */}
+      {series.state === 'active' && series.firstMatchStarted === true ? (
+        <div className="mt-4">
+          <BracketEntryLink
+            href={withFromPath(`/tournaments/${leagueId}/bracket`, currentHref)}
+            label={leagueEntryCtaLabel(leagueMatchDay)}
+            live={leagueMatchDay}
+          />
+        </div>
+      ) : null}
       {series.rulesText && <section className="mt-4 space-y-2" aria-label="리그 운영 안내">
         <h3 className="tm-text-body font-semibold text-[var(--text-strong)]">리그 운영 안내</h3>
         <p className="whitespace-pre-wrap break-words tm-text-label text-[var(--text-muted)]">{series.rulesText}</p>

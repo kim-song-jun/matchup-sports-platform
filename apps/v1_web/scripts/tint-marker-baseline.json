@@ -11,7 +11,7 @@
   "src/app/tournaments/[id]/registrations/[registrationId]/roster/tournament-roster-client.tsx": 2,
   "src/app/tournaments/[id]/results/results-page-client.tsx": 6,
   "src/app/tournaments/[id]/reviews/reviews-page-client.tsx": 1,
-  "src/app/tournaments/[id]/tournament-detail-client.tsx": 11,
+  "src/app/tournaments/[id]/tournament-detail-client.tsx": 10,
   "src/app/tournaments/tournaments-list-client.tsx": 4,
   "src/app/tournaments/tournament-card.tsx": 2,
   "src/components/auth/otp/otp-verification-card.tsx": 1,

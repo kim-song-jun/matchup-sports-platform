@@ -1914,3 +1914,75 @@ describe('순위 규칙 줄', () => {
     expect(screen.queryByText(/순위 규칙/)).not.toBeInTheDocument();
   });
 });
+
+/**
+ * 리그 순위·일정 화면의 실시간 중계 진입 버튼(2026-10-13 사용자 확정, A안: 제목 바로 아래).
+ * 대회 상세(`/tournaments/:id`)와 같은 버튼·같은 규칙이다 — 첫 경기가 킥오프한 진행 중 리그에만 뜨고,
+ * 경기가 있는 날만 LIVE "진행 중인 리그 보기", 아니면 중립 "리그 일정 보기". 목적지는 같은 허브다.
+ */
+describe('실시간 중계 진입 버튼', () => {
+  const NOW = new Date('2026-10-13T03:00:00.000Z'); // 2026-10-13 12:00 KST
+
+  function mockLeague(overrides: Record<string, unknown>) {
+    useV1LeagueMatchMock.mockReturnValue({
+      data: {
+        leagueId: 'league-1', title: '가을 리그', state: 'active', registrationOpen: false, registrationDeadlineAt: null,
+        sportCode: 'futsal', coverImageUrl: null, entryFee: 0, entryFeeConfigured: false,
+        startsOn: '2026-09-01T00:00:00.000Z', endsOn: '2026-10-30T00:00:00.000Z', teamIds: ['t1', 't2'],
+        firstMatchStarted: true, fixtures: [], ...overrides,
+      },
+    } as never);
+    useV1LeagueMatchStandingsMock.mockReturnValue({
+      data: { leagueId: 'league-1', tieBreakOrder: ['points'], standings: [], pendingFixtures: [] },
+    } as never);
+    useV1LeagueMatchPlayerRecordsMock.mockReturnValue({ data: { leagueId: 'league-1', goals: [], assists: [] } } as never);
+    useV1AuthMeMock.mockReturnValue({ data: undefined } as never);
+    useV1LeagueClaimableFixturesMock.mockReturnValue({ data: undefined } as never);
+    useV1MyTeamsMock.mockReturnValue({ data: undefined } as never);
+    useV1RecordConsentMock.mockReturnValue({ data: undefined } as never);
+    useV1MyRegistrationsMock.mockReturnValue({ data: [] } as never);
+  }
+
+  function fixture(startAt: string, gameState: string = 'SCHEDULED') {
+    return { teamMatchId: `tm-${startAt}`, title: '주차', homeTeamId: 't1', awayTeamId: 't2', startAt, placeName: '성수 풋살장', status: 'matched', gameState };
+  }
+
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(NOW);
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('경기가 있는 날이면 LIVE "진행 중인 리그 보기" 가 대회와 같은 허브로 연결된다', async () => {
+    mockLeague({ fixtures: [fixture('2026-10-13T20:00:00.000+09:00')] });
+    render(<LeagueMatchStandingsClient leagueId="league-1" />);
+
+    const link = await screen.findByRole('link', { name: '진행 중인 리그 보기' });
+    expect(link).toHaveTextContent('LIVE');
+    expect(link.getAttribute('href')).toMatch(/^\/tournaments\/league-1\/bracket/);
+  });
+
+  it('경기가 없는 날이면 LIVE 없이 "리그 일정 보기" 다', async () => {
+    mockLeague({ fixtures: [fixture('2026-10-20T20:00:00.000+09:00', 'ENDED')] });
+    render(<LeagueMatchStandingsClient leagueId="league-1" />);
+
+    const link = await screen.findByRole('link', { name: '리그 일정 보기' });
+    expect(link).not.toHaveTextContent('LIVE');
+    expect(screen.queryByRole('link', { name: '진행 중인 리그 보기' })).toBeNull();
+  });
+
+  it.each([
+    ['첫 경기 전', { firstMatchStarted: false }],
+    ['구버전 응답(값 없음)', { firstMatchStarted: undefined }],
+    ['끝난 리그', { state: 'completed' }],
+  ])('%s 이면 버튼을 띄우지 않는다', async (_label, overrides) => {
+    mockLeague({ fixtures: [fixture('2026-10-13T20:00:00.000+09:00')], ...overrides });
+    render(<LeagueMatchStandingsClient leagueId="league-1" />);
+
+    await screen.findByRole('heading', { name: '가을 리그' });
+    expect(screen.queryByRole('link', { name: '진행 중인 리그 보기' })).toBeNull();
+    expect(screen.queryByRole('link', { name: '리그 일정 보기' })).toBeNull();
+  });
+});

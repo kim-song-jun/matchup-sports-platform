@@ -59,6 +59,27 @@ export async function hasLeagueFirstMatchStarted(
   return started !== null;
 }
 
+/**
+ * 여러 리그 중 첫 경기가 킥오프한 리그 id 집합 — 목록에서 리그마다 묻지 않도록 한 번에 읽는다.
+ * 조건은 `hasLeagueFirstMatchStarted` 와 같다(삭제되지 않은 대진, 킥오프한 경기 상태).
+ */
+export async function leaguesWithFirstMatchStarted(
+  db: Prisma.TransactionClient | PrismaService,
+  leagueIds: readonly string[],
+): Promise<Set<string>> {
+  if (leagueIds.length === 0) return new Set();
+  const rows = await db.v1TeamMatch.findMany({
+    where: {
+      leagueId: { in: [...leagueIds] },
+      deletedAt: null,
+      game: { is: { state: { in: [...LEAGUE_STARTED_GAME_STATES] } } },
+    },
+    select: { leagueId: true },
+    distinct: ['leagueId'],
+  });
+  return new Set(rows.map((row) => row.leagueId).filter((id): id is string => id !== null));
+}
+
 /** 첫 경기가 시작된 리그에 신청을 열거나 받으려 할 때의 공통 거절. */
 export function leagueAlreadyStartedException(): ConflictException {
   return new ConflictException({

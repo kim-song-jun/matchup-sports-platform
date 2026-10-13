@@ -614,6 +614,32 @@ describe('POST /admin/league-matches + fixtures', () => {
       expect(res.status).toBe(409);
       expect(res.body.code).toBe('LEAGUE_FIXTURE_NOT_DELETABLE');
     });
+
+    it('삭제 판정은 게임 행을 잠근 트랜잭션 안에서 한다 — 먼저 시작한 경기가 커밋되면 숨기지 않는다', async () => {
+      const { leagueId, teamMatchIds } = await createLeagueWithFixtures(1);
+      const game = await prisma.v1Game.findUniqueOrThrow({ where: { teamMatchId: teamMatchIds[0] } });
+      let release!: () => void;
+      const held = new Promise<void>((resolve) => (release = resolve));
+      // 콘솔의 경기 시작처럼 게임 행을 먼저 잠근 채, 삭제 요청이 들어온 뒤에 ENDED 로 커밋한다.
+      const starter = prisma.$transaction(async (tx) => {
+        await tx.$queryRaw`SELECT id FROM v1_games WHERE id = ${game.id} FOR UPDATE`;
+        await held;
+        await tx.v1Game.update({ where: { id: game.id }, data: { state: 'ENDED' } });
+      });
+      const deletion = request(app.getHttpServer())
+        .post(`/api/v1/admin/league-matches/${leagueId}/fixtures/${teamMatchIds[0]}/delete`)
+        .set('x-v1-user-id', ownerUserId)
+        .send({ reason: '동시 삭제' })
+        .then((res) => res);
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      release();
+      await starter;
+
+      const res = await deletion;
+      expect(res.status).toBe(409);
+      expect(res.body.code).toBe('LEAGUE_FIXTURE_NOT_DELETABLE');
+      expect((await prisma.v1TeamMatch.findUniqueOrThrow({ where: { id: teamMatchIds[0] } })).deletedAt).toBeNull();
+    });
   });
 
   describe('POST /admin/league-matches/:leagueId/revert-completion', () => {

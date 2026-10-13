@@ -1636,23 +1636,27 @@ export class LeagueMatchAdminService {
    */
   async deleteFixture(user: V1AuthUser, leagueId: string, teamMatchId: string, dto: DeleteLeagueFixtureDto) {
     const admin = await this.adminContext.getMutationAdmin(user.id);
-    const teamMatch = await this.prisma.v1TeamMatch.findFirst({
-      where: { id: teamMatchId, leagueId, deletedAt: null },
-      include: { game: { select: { state: true, currentOfficialRevisionId: true } } },
-    });
+    const teamMatch = await this.prisma.v1TeamMatch.findFirst({ where: { id: teamMatchId, leagueId, deletedAt: null } });
     if (teamMatch === null) {
       throw new NotFoundException({ code: 'LEAGUE_NOT_FOUND', message: '이 리그의 대진이 아니에요.' });
     }
     const wasCancelled = teamMatch.status === 'cancelled';
-    if (!wasCancelled && ((teamMatch.game?.state ?? 'SCHEDULED') !== 'SCHEDULED' || teamMatch.game?.currentOfficialRevisionId)) {
-      throw new ConflictException({
-        code: 'LEAGUE_FIXTURE_NOT_DELETABLE',
-        message: '시작했거나 결과가 있는 경기는 바로 삭제할 수 없어요. 먼저 경기를 취소한 뒤 삭제해 주세요.',
-      });
-    }
     const leagueCompleted = await this.prisma.$transaction(async (tx) => {
       if (!wasCancelled) {
-        await this.assertFixtureGamesNotInProgress(tx, [teamMatchId], '경기가 진행 중이에요. 운영 콘솔에서 먼저 끝낸 뒤 삭제해 주세요.');
+        // 콘솔 명령과 같은 게임 행 락을 잡은 뒤 판정한다 — 밖에서 읽고 지나가면 그 사이 시작·결과 확정된 경기를 숨긴다.
+        const games = await tx.$queryRaw<Array<{ state: string; currentOfficialRevisionId: string | null; revisionCount: number }>>`
+          SELECT game.state::text AS state,
+                 game.current_official_revision_id AS "currentOfficialRevisionId",
+                 (SELECT COUNT(*)::int FROM v1_game_result_revisions revision WHERE revision.game_id = game.id) AS "revisionCount"
+          FROM v1_games game
+          WHERE game.team_match_id = ${teamMatchId}
+          FOR UPDATE OF game`;
+        if (games.some((game) => game.state !== 'SCHEDULED' || game.currentOfficialRevisionId !== null || game.revisionCount > 0)) {
+          throw new ConflictException({
+            code: 'LEAGUE_FIXTURE_NOT_DELETABLE',
+            message: '시작했거나 결과가 있는 경기는 바로 삭제할 수 없어요. 먼저 경기를 취소한 뒤 삭제해 주세요.',
+          });
+        }
         await this.cancelLeagueFixtureRowInTx(tx, teamMatchId, dto.reason);
       }
       const hidden = await tx.v1TeamMatch.updateMany({ where: { id: teamMatchId, deletedAt: null }, data: { deletedAt: new Date() } });

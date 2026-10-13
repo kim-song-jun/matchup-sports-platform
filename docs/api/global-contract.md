@@ -164,3 +164,7 @@ above. UI must not simulate successful transactions or support outcomes for thes
 ## Team-match visibility update (2026-10-13)
 
 Team matches do not expose `on_hold`: unmatched recruitment with an elapsed deadline or kickoff is `closed`. Cancelled/archived team matches are excluded from public and personal team-match lists and counts; user detail and eligibility return 404. Linked team/my schedules are hidden, while admin records remain. Admin reopening of a future unmatched match clears an elapsed deadline in the same audited transaction. Personal-match hold behavior remains domain-specific; see `domains/team-matches.md` and `domains/admin-and-ops.md` for status gates.
+
+### League basic settings exception
+
+`GET/PATCH /api/v1/admin/league-matches/:leagueId/settings` uses a full editable snapshot and `expectedUpdatedAt` concurrency, without a mandatory Idempotency-Key. PATCH permits owner/ops only; stale snapshots return `409 LEAGUE_SETTINGS_STALE`, DTO failures `400 VALIDATION_ERROR`, semantic dates/region/deadline failures `422`. Detailed fields and transactional audit are in [league-matches](domains/league-matches.md#basic-information-editing-리그-기본-정보-수정).

@@ -522,8 +522,7 @@ describe('TeamMatchLineupService.saveLineup — 신원 연결', () => {
  * 정정 요청(requestChange)이 만드는 **복사 리비전**의 신원 연결.
  *
  * 이 복사본은 그 사이드의 최신 리비전이 되고, 결과 입력은 최신 리비전의 참가자만
- * 모집단으로 삼는다(latest-lineup-participants.ts + league-result-participants.ts 의
- * teamAuthored). 연결을 옮기지 않으면 그 팀 전원의 개인 기록이 그 경기에서 공개 불가가
+ * 모집단으로 삼는다(latest-lineup-participants.ts). 연결을 옮기지 않으면 그 팀 전원의 개인 기록이 그 경기에서 공개 불가가
  * 되는데, 기록이 생기거나 양 팀 최신 명단이 모두 제출되면 이후 수정은 서버 상태 게이트로 막히므로
  * "다시 저장하면 붙는다"는 자가 치유가 성립하지 않는다 — 킥오프 직전 정정에서 영구화된다.
  */

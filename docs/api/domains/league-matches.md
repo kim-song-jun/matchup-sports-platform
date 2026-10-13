@@ -44,6 +44,27 @@ draft or on-hold league returns `409 LEAGUE_NOT_ACTIVE`; an already completed le
 `alreadyProcessed: true`. Records `league_match.complete` in the admin audit and returns
 `{ leagueId, state: "completed", alreadyProcessed }`.
 
+## State change (상태 변경)
+
+`POST /api/v1/admin/league-matches/:leagueId/state` takes `{ "state": "draft" | "active" | "on_hold" | "completed", "reason"?: string }`
+(reason max 500) and is the single endpoint behind the admin "상태 변경" button. It reuses the rules of the
+endpoints below instead of adding new ones:
+
+- `on_hold` → hold (reason required, otherwise `422 LEAGUE_REASON_REQUIRED`).
+- From `on_hold`, only the remembered pre-hold state is accepted (resume); any other target returns
+  `409 LEAGUE_ON_HOLD`.
+- `completed` → manual completion (same `409 LEAGUE_FIXTURES_PENDING` / `LEAGUE_NOT_ACTIVE`).
+- `active` from `completed` → revert completion. `active` from `draft` (stored `draft`/`open`/`closed`)
+  starts the league (stored `in_progress`, audit `league_match.start`). Before this, only fixture
+  generation moved a league to active.
+- `draft` from `active` moves back to stored `draft` (audit `league_match.revert_to_draft`) only while no
+  game has started (`LIVE`/`PAUSED`/`ENDED`); otherwise `409 LEAGUE_HAS_STARTED_GAMES`. `draft` from
+  `completed` returns `409 LEAGUE_NOT_ACTIVE` (revert to active first).
+- Asking for the current state returns `alreadyProcessed: true`.
+
+Returns `{ leagueId, state, alreadyProcessed }`. The individual `hold`/`resume`/`complete`/`revert-completion`
+endpoints stay for compatibility.
+
 ## Hold and resume (보류)
 
 A regular league is put on hold instead of being cancelled (2026-10-07).
@@ -217,13 +238,17 @@ lock); it is intentionally not opened for leagues.
   "confirmed" exceed "active"; screen hints — the final
   reason-required decision is the save transaction's own count). Bank fields are
   admin-only.
+- Admin detail also returns `heldFromState` (the state resume returns to; only while on hold, otherwise
+  `null`), `minPlayers`, `maxPlayers` (team roster cap, `null` = unlimited) and `plannedFixtureCount`
+  (total games chosen at creation, `null` = not set).
 - Public detail (`GET /api/v1/league-matches/:leagueId`) adds `sportCode`,
   `coverImageUrl`, `entryFee` and `entryFeeConfigured` (`entryFeeConfiguredAt != null`).
   The raw timestamp, the bank fields and registration counts are never in any public
   league response or in `/tournaments` responses. Clients must not render the fee
   when `entryFeeConfigured` is `false` — an unset fee is not "free".
 - Season carry-over: `commitPromotions` (promotion/relegation commit) copies
-  `coverImageUrl`, `entryFee` and the three bank fields from the previous season's
+  `coverImageUrl`, `entryFee`, the three bank fields and the team roster size (`minPlayers`,
+  `maxPlayers` — `null` stays unlimited) from the previous season's
   league of the **same tier** into the new season. `entryFeeConfiguredAt` is left
   `null`, so the new season shows as "inherited — please confirm". Values are copied,
   not linked: later edits to either season do not affect the other. First-season
@@ -242,6 +267,17 @@ mutation-admin authorization remains unchanged; support administrators cannot cr
 `startsOn` and `endsOn`, and UUID `teamIds`. `regionId` is a non-empty master
 region identifier. Master data may use stable slugs such as
 `region-busan-jung`; it is not required to be a UUID.
+
+Optional roster and plan fields:
+
+- `minPlayers` / `maxPlayers` (1–50): team roster size. `maxPlayers: null` means **unlimited** — every
+  eligible team member goes onto the roster (auto-fill and roster add skip the `ROSTER_FULL` check).
+  Omitting them means unlimited (`minPlayers: 1, maxPlayers: null`) — the league default for every creation
+  path, including league-series seeding; season carry-over copies the previous season's values instead.
+  The 6/10 column default applies to tournaments only. `minPlayers > maxPlayers` returns
+  `422 LEAGUE_ROSTER_RANGE_INVALID`. Responses that carry `maxPlayers` (tournament list/detail for a league) may now return `null`.
+- `plannedFixtureCount` (1–500): total games planned for the league. It is only the default for the
+  fixture generation form (see `fixtureCount` below); it never limits manual fixtures.
 
 The service then verifies that the region exists, is active, and has level 2.
 An unknown, inactive, or non-district identifier returns `422
@@ -296,14 +332,16 @@ LEAGUE_REGION_INVALID` for an unknown or unsuitable region.
   config without period lengths fails with
   `422 LEAGUE_FIXTURE_DURATION_REQUIRED`. Without any `timing`, fixtures of a
   matchday share one kickoff and `endAt` is kickoff + regulation time.
-- The same three endpoints accept optional `roundsCount` (integer 1–104). The
-  total number of rounds is `weeksCount × timing.gamesPerTeamPerDay` (default 1
-  per day), cut down to `roundsCount` when given; omitting it keeps that product.
-  Send it when `weeksCount` is rounded up for `gamesPerTeamPerDay` (for example
-  4 teams, 2 games per day: 2 weeks × 2 = 4 rounds, but a single round robin has
-  3) so the spare slot does not replay round 1 as a rematch. A total above 104
-  rounds still returns `422 LEAGUE_FIXTURE_LIMIT_EXCEEDED`; `roundsCount` itself
-  is capped at 104.
+- `weeksCount` (1–104) is the number of round-robin rounds to generate; the optional `roundsCount`
+  (1–104) still cuts it down for older clients. `timing.gamesPerDay` (1–50) is the number of games per
+  day across all teams: fixtures are split in round-robin order into days of that many games, so the
+  number of dates needed is `ceil(fixtures / gamesPerDay)` and a day can end mid-round (a team may then
+  play twice that day). Without it each round is one day. Example: 6 teams, one round robin (5 rounds,
+  15 games) with `gamesPerDay: 4` needs 4 dates (4 + 4 + 4 + 3). The old `timing.gamesPerTeamPerDay`
+  is no longer accepted (`400`).
+- They also accept optional `fixtureCount` (1–500): fixtures are generated in round-robin order and cut
+  at that count, so a league created with `plannedFixtureCount` gets exactly that many games. The client
+  sends enough rounds (`ceil(fixtureCount / floor(teams / 2))`) for the count.
 - `POST /api/v1/admin/league-matches/:leagueId/fixtures/:teamMatchId/cancel`
   (`{ reason }`) cancels one fixture; an already-cancelled fixture returns
   `alreadyProcessed: true`. A fixture whose game is in progress (`LIVE` or
@@ -312,6 +350,23 @@ LEAGUE_REGION_INVALID` for an unknown or unsuitable region.
   (forfeit/abandon end) first. Scheduled and ended games stay cancellable
   (ended ones for result corrections). The admin fixture table disables the
   cancel action on the same condition.
+- `PATCH /api/v1/admin/league-matches/:leagueId/fixtures/:teamMatchId` also accepts `title` (1–100) and
+  `homeTeamId` / `awayTeamId` (confirmed league teams). Team changes go through the same side-assignment
+  routine as slot boards (game side, team schedules, approved application, roster resync) and are allowed
+  only before the game starts with no official/void result (`409 FIXTURE_HAS_RESULT`). Swapping home and
+  away is supported. The same team on both sides returns `400 FIXTURE_SAME_TEAM`, a team without a
+  confirmed registration `400 LEAGUE_TEAM_INVALID`, and a slot-linked side `409 SLOT_LINKED` (change it on
+  the slot board). A title change also updates the team schedules. The response adds `title`,
+  `homeTeamId` and `awayTeamId`.
+- `POST /api/v1/admin/league-matches/:leagueId/fixtures/:teamMatchId/delete` (`{ reason }`, 1–500) deletes a
+  fixture: it is cancelled (same side effects and notification as cancel, then completion is re-checked)
+  and hidden with `deletedAt`, so it disappears from admin/public fixture lists while game, result and
+  audit rows are kept. Standings, auto completion and player records already exclude cancelled fixtures.
+  A fixture that is not cancelled must be scheduled with no official/void result, otherwise
+  `409 LEAGUE_FIXTURE_NOT_DELETABLE` (cancel it first). Already-cancelled fixtures can be deleted directly.
+  A deleted fixture returns `404` on update/cancel/forfeit/delete and no longer counts as an existing
+  fixture for generation. Returns `{ teamMatchId, deleted: true, leagueCompleted }` and records
+  `league_match.delete_fixture`.
 - The two other paths that cancel fixtures apply the same rule to every
   not-yet-cancelled fixture they would cancel, with the same
   `409 LEAGUE_FIXTURE_GAME_IN_PROGRESS` and nothing changed:
@@ -329,10 +384,16 @@ A league can be drawn first and filled with teams later. A **slot** (`V1Tourname
 `awaySlotId`.
 
 - `POST /api/v1/admin/league-matches/:leagueId/fixtures/template`
-  (`{ teamCount: 3..20, legs: 1|2, schedule: { dates: string[], time: string }, placeName?, replaceExisting? }`)
+  (`{ teamCount: 3..20, legs: 1|2, schedule: { dates: string[], time: string }, gamesPerDay?: 1..50, gameDurationMinutes?: 5..240, breakMinutes?: 0..120, placeName?, replaceExisting? }`)
   creates `teamCount` slots and the round-robin fixtures between them in one transaction (response
   `{ slots, fixtures }`). `schedule` is required: one date per round (`LEAGUE_SCHEDULE_SLOTS_INSUFFICIENT`
-  / `LEAGUE_SCHEDULE_DATE_PAST` / `LEAGUE_SCHEDULE_DATE_INVALID` as in bulk generation). `placeName`
+  / `LEAGUE_SCHEDULE_DATE_PAST` / `LEAGUE_SCHEDULE_DATE_INVALID` as in bulk generation). Without
+  `gamesPerDay` every game of a round starts at `time` and has no end time. With `gamesPerDay` the fixtures
+  are split in round-robin order into days of that many games (one date per day, `ceil(fixtures / gamesPerDay)`
+  dates), and each day's games run back to back on one pitch from `time`, `gameDurationMinutes + breakMinutes`
+  apart, with `endAt = startAt + gameDurationMinutes`. `gameDurationMinutes` defaults to the league config's
+  regulation time (`422 LEAGUE_FIXTURE_DURATION_REQUIRED` when unknown); `breakMinutes` defaults to 0. The
+  title's `N주차` is the day number. `placeName`
   defaults to `장소 미정`. More than 240 fixtures returns `422 BRACKET_TEMPLATE_TOO_LARGE`. The league
   `status` is **not** changed.
   - Locks the league row (`FOR UPDATE`) and applies the same guard as bulk generation: `409 LEAGUE_ON_HOLD`
@@ -389,3 +450,36 @@ The result-entry reminder skips such fixtures as well.
 - Generate / regenerate / manual / template / update-fixture DTOs accept `placeName`, `placeAddress`, `placeLatitude`, `placeLongitude`, `placeProvider`, `placeProviderId`.
 - A blank `placeName` inherits the league's default place (the mirror tournament's `venue` snapshot); with no default it falls back to `장소 미정` with no coordinates. On update, a present `placeName` replaces the whole snapshot.
 - Fixture rows (admin detail, `updateFixture`, public list/detail) keep `placeName` and add `place: V1PlaceView | null`; admin `recentVenues` is now `V1PlaceView[]` (most recent snapshot per name, default excluded).
+
+## Basic information editing (리그 기본 정보 수정)
+
+`GET /api/v1/admin/league-matches/:leagueId/settings` requires an active administrator.
+`PATCH` at the same path requires owner/ops (`support` is read-only). Both are guarded by
+`V1AuthGuard`, UUID route validation, `kind=regular_league` and `deletedAt=null`.
+
+GET and successful PATCH return `{ leagueId, title, rulesText, regionId, startsOn, endsOn,
+registrationDeadlineAt, updatedAt, status, sportName }` inside the standard success envelope.
+Missing description is normalized to `rulesText: ""`; incomplete legacy dates/region remain null.
+PATCH requires the full editable snapshot: `{ expectedUpdatedAt, title, rulesText, regionId,
+startsOn, endsOn, registrationDeadlineAt }`. Title is trimmed, nonempty, max 100; rulesText max
+10,000; region must be an active level-2 district when changed; dates are ISO date-times.
+Empty rulesText is stored as null. Unknown UI fields and missing/invalid fields return
+`400 VALIDATION_ERROR`. No idempotency header is required by this route; optimistic concurrency
+uses exact `updatedAt` (`expectedUpdatedAt`) rather than `expectedVersion`.
+
+A tournament row lock, version check, write and `league_match.update_settings` before/after audit
+share one transaction. Stale snapshots return `409 LEAGUE_SETTINGS_STALE`; completed/cancelled
+leagues return `409 LEAGUE_ENDED`. End before start returns `422 LEAGUE_PERIOD_INVALID`.
+Changed periods cannot exclude the start/end of a non-cancelled, non-deleted existing fixture
+(`409 LEAGUE_FIXTURES_OUTSIDE_PERIOD`). No fixtures are moved automatically.
+Changed inactive/non-district regions return `422 LEAGUE_REGION_INVALID`.
+A changed, non-null deadline must be future (`422 LEAGUE_REGISTRATION_DEADLINE_PAST`);
+null closes new applications. Unchanged historical deadlines are preserved. Lifecycle,
+publication, existing applications, fees, sports, teams and fixtures stay unchanged.
+Regular leagues continue to have **no application capacity limit**; `teamCount` is not editable here.
+
+The admin detail links to `/admin/league-matches/:leagueId/edit` for writers on unfinished leagues.
+The form hydrates that exact league, preserves failed drafts, and confirms explicit discard/reload.
+Dates use KST; untouched ISO instants retain seconds/milliseconds. A successful save invalidates
+admin/public league and tournament queries and returns to the admin detail. Public league detail
+now includes nullable `rulesText`, rendered as operating guidance only when populated.

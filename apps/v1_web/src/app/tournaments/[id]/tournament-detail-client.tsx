@@ -72,6 +72,7 @@ import type {
   V1TournamentRegistration,
   V1TournamentStatus,
 } from '@/types/api';
+import { rosterLimitText } from '@/lib/roster-limit';
 
 export { getParticipantTeamBuckets } from '@/components/tournaments/tournament-event-hub-sections';
 
@@ -901,7 +902,7 @@ export function TournamentDetailView({
           ) : null}
           <InfoRow
             label="선수단 규모"
-            value={`팀당 ${tournament.minPlayers}~${tournament.maxPlayers}명`}
+            value={rosterLimitText(tournament.minPlayers, tournament.maxPlayers, (min, max) => `팀당 ${min}~${max}명`)}
             isLast={!genderQuotaLabel}
           />
           {genderQuotaLabel ? (
@@ -1021,7 +1022,7 @@ export function TournamentDetailView({
           ) : null}
           <InfoRow
             label="선수단 규모"
-            value={`팀당 ${tournament.minPlayers}~${tournament.maxPlayers}명`}
+            value={rosterLimitText(tournament.minPlayers, tournament.maxPlayers, (min, max) => `팀당 ${min}~${max}명`)}
             isLast={!genderQuotaLabel}
           />
           {genderQuotaLabel ? (

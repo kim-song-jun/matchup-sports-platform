@@ -78,7 +78,7 @@ function isSubmittedLineupState(state: V1GameLineupState | undefined): boolean {
  *
  * **종목과 무관하게 항상 이 리터럴**이다 — 대회 경기 라인업은 종목 사전의 코드를 그대로
  * 저장하는데(풋살은 `'GOLEIRO'`) 팀 매치는 `goalkeeper: true` 를 받아 여기서 눌러 담는다.
- * 그래서 읽는 쪽(`TeamLineupHistoryService`, `league-result-participants.ts`)은 팀 매치
+ * 그래서 읽는 쪽(`TeamLineupHistoryService`)은 팀 매치
  * 소스에 대해 사전 코드가 아니라 이 센티널과 비교해야 한다 — export 하는 이유다.
  *
  * ⚠️ 선발/후보를 나타내던 짝 센티널 `BENCH_MARKER('BENCH')` 는 **없앴다**(Task 163 BE-3).
@@ -531,8 +531,7 @@ export class TeamMatchLineupService {
           //
           // **연결까지 복사해야 하는 이유**: 이 복사본이 그 사이드의 최신 리비전이 되고,
           // 결과 입력은 최신 리비전의 참가자만 모집단으로 삼는다
-          // (games/core/latest-lineup-participants.ts + league-result-participants.ts 의
-          // teamAuthored 판정 — revision>1 이라 "팀이 작성한 라인업"으로 잡힌다).
+          // (games/core/latest-lineup-participants.ts — 콘솔 종료·빠른 결과가 그 참가자 전원을 출전으로 싣는다).
           // 연결 없이 두면 그 팀 **전원**의 개인 기록이 이 경기에서 공개 불가가 된다.
           // "그 팀이 다시 저장하면 붙는다"는 자가 치유는 성립하지 않는다 — 경기 시작
           // 기록이 생기거나 양 팀 최신 명단이 모두 제출되면 이후 수정은 서버 상태 게이트로 막힌다.
@@ -1145,7 +1144,7 @@ export class TeamMatchLineupService {
     // **빈 명단은 막는다.** 인원 min~max 게이트를 없앤 것과 다른 문제다 — 이건 선발
     // 규칙이 아니라 **데이터 손실 가드**다. 이 경로는 저장할 때마다 새 리비전을 만들므로
     // 옛 행이 지워지지는 않지만, 읽는 쪽은 전부 **최신 리비전**을 본다
-    // (serializeLineup · league-result-participants). 빈 리비전이 최신이 되면 그 팀의
+    // (serializeLineup · 결과 리비전 조립). 빈 리비전이 최신이 되면 그 팀의
     // 명단이 화면에서 사라지고 출전 기록도 만들어지지 않는다.
     if (rosterOf(dto).length === 0) {
       throw new BadRequestException({

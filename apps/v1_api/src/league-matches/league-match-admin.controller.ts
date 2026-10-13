@@ -1,3 +1,4 @@
+import { UpdateLeagueSettingsDto } from './dto/league-settings.dto';
 import { BadRequestException, Body, Controller, Delete, Get, HttpCode, Param, ParseUUIDPipe, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { IsIn, IsOptional, Matches } from 'class-validator';
 import { CurrentUser } from '../auth/current-user.decorator';
@@ -7,8 +8,10 @@ import {
   AddLeagueTeamDto,
   ApplyLeagueTemplateDto,
   CancelLeagueFixtureDto,
+  ChangeLeagueStateDto,
   CreateLeagueMatchDto,
   CreateManualLeagueFixtureDto,
+  DeleteLeagueFixtureDto,
   GenerateLeagueFixturesDto,
   OpenLeagueRegistrationDto,
   RegenerateLeagueFixturesDto,
@@ -59,6 +62,16 @@ export class LeagueMatchAdminController {
   @Get()
   list(@CurrentUser() user: V1AuthUser, @Query() query: AdminLeagueListQueryDto) {
     return this.service.list(user, query.seriesId, query.visibility);
+  }
+
+  @Get(':leagueId/settings')
+  settings(@CurrentUser() user: V1AuthUser, @Param('leagueId', leagueIdPipe) id: string) {
+    return this.service.settings(user, id);
+  }
+
+  @Patch(':leagueId/settings')
+  updateSettings(@CurrentUser() user: V1AuthUser, @Param('leagueId', leagueIdPipe) id: string, @Body() dto: UpdateLeagueSettingsDto) {
+    return this.service.updateSettings(user, id, dto);
   }
 
   @Get(':leagueId')
@@ -195,6 +208,18 @@ export class LeagueMatchAdminController {
     return this.service.cancelFixture(user, leagueId, teamMatchId, dto);
   }
 
+  /** 경기 삭제 — 취소하고 대진표에서 숨긴다. 시작했거나 결과가 있는 경기는 먼저 취소해야 한다. */
+  @Post(':leagueId/fixtures/:teamMatchId/delete')
+  @HttpCode(200)
+  deleteFixture(
+    @CurrentUser() user: V1AuthUser,
+    @Param('leagueId', leagueIdPipe) leagueId: string,
+    @Param('teamMatchId', teamMatchIdPipe) teamMatchId: string,
+    @Body() dto: DeleteLeagueFixtureDto,
+  ) {
+    return this.service.deleteFixture(user, leagueId, teamMatchId, dto);
+  }
+
   /**
    * 출전정지 규정 수정. 리그 첫 경기가 시작되면 잠긴다 — 규정이 이미 치른 경기의 카드까지
    * 소급해서 세기 때문이다(서비스 쪽 주석 참고).
@@ -206,6 +231,17 @@ export class LeagueMatchAdminController {
     @Body() dto: UpdateLeagueDisciplineDto,
   ) {
     return this.service.updateDiscipline(user, leagueId, dto);
+  }
+
+  /** 리그 상태 변경 — 준비 중·진행 중·보류·종료 중 목표 상태 하나를 받는다. */
+  @Post(':leagueId/state')
+  @HttpCode(200)
+  changeState(
+    @CurrentUser() user: V1AuthUser,
+    @Param('leagueId', leagueIdPipe) leagueId: string,
+    @Body() dto: ChangeLeagueStateDto,
+  ) {
+    return this.service.changeState(user, leagueId, dto);
   }
 
   @Post(':leagueId/open-registration')

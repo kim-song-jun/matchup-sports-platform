@@ -539,7 +539,7 @@ export function TeamDetailPageSkeleton() {
   );
 }
 
-export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
+export function TeamDetailPageView({ model, refreshError }: { model: TeamDetailViewModel; refreshError?: ReactNode }) {
   const { team, mode } = model;
   const locked = mode === 'pending' || mode === 'closed';
   const cta = model.ctaLabel ?? (mode === 'mine' ? '팀 관리' : mode === 'pending' ? '신청 상태 보기' : mode === 'closed' ? '모집 알림 받기' : '가입 신청');
@@ -658,6 +658,7 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
       <div className="tm-team-detail-desktop-layout tm-show-desktop">
         {/* LEFT: hero + info */}
         <div className="tm-team-detail-desktop-main">
+          {refreshError ? <div style={{ marginBottom: 'var(--spacing-4)' }}>{refreshError}</div> : null}
           {model.justCreated && model.manageShortcuts ? <TeamCreatedNotice inviteHref={model.manageShortcuts.inviteHref} /> : null}
           <Card pad={20} className="tm-team-detail-hero-card" style={teamHeroStyle(team)}>
             <button
@@ -804,6 +805,7 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
 
       {/* Mobile layout (unchanged) */}
       <article ref={mobileBodyRef} className="tm-team-detail-body tm-hide-desktop tm-content-enter">
+        {refreshError ? <div style={{ marginBottom: 'var(--spacing-4)' }}>{refreshError}</div> : null}
         {model.justCreated && model.manageShortcuts ? <TeamCreatedNotice inviteHref={model.manageShortcuts.inviteHref} /> : null}
         <Card pad={20} className="tm-team-detail-hero-card" style={teamHeroStyle(team)}>
           <button

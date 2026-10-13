@@ -12,9 +12,9 @@
  * 이 모듈이 그 계약을 복구한다.
  *
  * ## 몇 개를 만드는가
- * 서버가 요구하는 날짜 수는 **매치데이 수**이고, 그 값은 `weeksCount` 와 같다 —
- * `totalRounds = weeksCount × gamesPerTeamPerDay` 를 다시 `gamesPerTeamPerDay` 로 나누기
- * 때문이다(`league-match-admin.service.ts`). 그래서 여기서도 `weeksCount` 개를 만든다.
+ * 서버가 요구하는 날짜 수는 **매치데이 수**다 — 하루 경기 수가 있으면 ceil(경기 수 / 하루 경기 수),
+ * 없으면 라운드 수(`matchdayCountOf`, `round-robin-schedule.ts`). 화면은 `resolveFixturePlan().days` 를
+ * 이 함수의 `weeksCount` 로 넘긴다.
  * 모자라면 서버가 422 `LEAGUE_SCHEDULE_SLOTS_INSUFFICIENT` 로 거부한다.
  *
  * ## 날짜는 KST 달력 날짜다

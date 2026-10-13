@@ -12,8 +12,6 @@ import { useModalA11y } from '@/components/v1-ui/use-modal-a11y';
 import {
   useV1AddLeagueTeam,
   useV1AdminLeagueMatch,
-  useV1RevertLeagueCompletion,
-  useV1CompleteLeague,
   useV1AdminLeagueTeams,
   useV1CreateManualLeagueFixture,
   useV1AdminTeam,
@@ -25,6 +23,7 @@ import {
   useV1RemoveLeagueTeam,
   useV1Teams,
   useV1UpdateLeagueFixture,
+  useV1DeleteLeagueFixture,
 } from '@/hooks/use-v1-api';
 import { describeLeagueRegistrationWindow } from '@/lib/league-registration-copy';
 import { leagueFixtureMatchupLabel } from '@/lib/league-fixture-meta';
@@ -43,10 +42,10 @@ import { expandWeeklyFixtureDates, WEEKDAY_OPTIONS } from '@/lib/league-fixture-
 import { toKstDateString } from '@/lib/kst-calendar';
 import { LeagueFixtureDatePicker } from './league-fixture-date-picker';
 import { LeagueWeeksPlanField } from './league-weeks-plan-field';
-import { plannedRounds, resolveWeeksCount, type WeeksPlan } from '@/lib/league-round-robin-plan';
+import { resolveFixturePlan, type WeeksPlan } from '@/lib/league-round-robin-plan';
 import { formatKstDateShort, formatKstTime } from '@/lib/date-utils';
 import { LeagueVisibilityControl } from './league-visibility-control';
-import { LeagueHoldControl } from './league-hold-control';
+import { LeagueStateModal } from './league-state-modal';
 import { LeagueCloseRegistrationControl } from './league-close-registration-control';
 import { LeagueCoverImageControl } from './league-cover-image-control';
 import { LeagueVenueControl } from './league-venue-control';
@@ -70,7 +69,8 @@ import {
   computeDailyPlan,
   dayOffsetLabel,
   groupPreviewByMatchday,
-  suggestGamesPerTeamPerDay,
+  MAX_GAMES_PER_DAY,
+  suggestGamesPerDay,
   type DailyPlan,
 } from './league-fixture-timing.view-model';
 import type {
@@ -94,6 +94,19 @@ function hasBothTeams(fixture: V1LeagueFixture): boolean {
  */
 function isFixtureGameInProgress(fixture: V1LeagueFixture): boolean {
   return fixture.status !== 'cancelled' && (fixture.gameState === 'LIVE' || fixture.gameState === 'PAUSED');
+}
+
+/**
+ * 서버가 경기 삭제(LEAGUE_FIXTURE_NOT_DELETABLE)·팀 바꾸기(FIXTURE_HAS_RESULT)를 막는 조건 — 경기가 시작됐거나
+ * 확정(또는 무효) 결과가 있다.
+ */
+function fixtureHasStartedOrResult(fixture: V1LeagueFixture): boolean {
+  // 무효 처리된 결과도 서버에서는 확정 리비전 포인터가 남아 있어 같은 취급이다.
+  return (
+    (fixture.gameState !== null && fixture.gameState !== undefined && fixture.gameState !== 'SCHEDULED') ||
+    fixture.resultStage === 'official' ||
+    fixture.resultStage === 'voided'
+  );
 }
 
 function manualFixtureHint(canAdd: boolean, leagueEnded: boolean): string {
@@ -121,10 +134,8 @@ export default function LeagueMatchFixturesClient({
   initialView?: LeagueFixturesView;
 }) {
   const { data: series, isPending, isError, error, refetch } = useV1AdminLeagueMatch(leagueId);
-  const revertCompletion = useV1RevertLeagueCompletion(leagueId);
-  const [revertModalOpen, setRevertModalOpen] = useState(false);
-  const completeLeague = useV1CompleteLeague(leagueId);
-  const [completeModalOpen, setCompleteModalOpen] = useState(false);
+  // 상태 변경 모달 — 상태 버튼이 상황마다 흩어져 있던 것(보류 카드·되돌리기·종료)을 하나로 모았다.
+  const [stateModalOpen, setStateModalOpen] = useState(false);
   const generateFixtures = useV1GenerateLeagueFixtures(leagueId);
   const updateFixture = useV1UpdateLeagueFixture(leagueId);
   const cancelFixture = useV1CancelLeagueFixture(leagueId);
@@ -194,8 +205,12 @@ export default function LeagueMatchFixturesClient({
   const [forfeitFixture, setForfeitFixture] = useState<V1LeagueFixture | null>(null);
   const forfeitHostTeam = useV1AdminTeam(forfeitFixture?.homeTeamId ?? '');
   const forfeitAwayTeam = useV1AdminTeam(forfeitFixture?.awayTeamId ?? '');
-  // 기본은 팀 수로 계산한 단일 라운드로빈(F40) — 옛 고정값 7은 2팀 리그에 같은 대진 7번을 만들었다.
-  const [weeksPlan, setWeeksPlan] = useState<WeeksPlan>({ kind: 'single' });
+  // 기본은 리그를 만들 때 정한 총 경기 수, 없으면 팀 수로 계산한 단일 라운드로빈(F40) — 옛 고정값 7은
+  // 2팀 리그에 같은 대진 7번을 만들었다.
+  // 상세가 오기 전에도 훅 순서가 같아야 해서 고른 값만 상태로 들고, 기본값은 상세에서 파생한다.
+  const [weeksPlanChoice, setWeeksPlan] = useState<WeeksPlan | null>(null);
+  const weeksPlan: WeeksPlan =
+    weeksPlanChoice ?? (series?.plannedFixtureCount ? { kind: 'fixtures', count: series.plannedFixtureCount } : { kind: 'single' });
   const timeHintId = useId();
   const [dayOfWeek, setDayOfWeek] = useState<number | ''>('');
   // **날짜 목록이 정본이다.** 요일은 그것을 채우는 편의일 뿐 — 서버는 요일을 모른다.
@@ -205,7 +220,7 @@ export default function LeagueMatchFixturesClient({
   // 대진 timing(2026-08-25 사용자 확정: C안 시간창 역산 + B안 계산기·타임라인). 기존 필드처럼
   // 생성·재생성 두 폼이 같은 상태를 공유한다. ''=미입력 — 셋 다 비어 있으면 timing을 아예 안 보내
   // 같은 주차 동시 시각으로 만든다. 경기 시간만 비우면 서버가 경기 설정의 정규 시간(전·후반 합계,
-  // 단판이면 그 길이)으로 채운다. 종료 시각은 서버로 가지 않고 팀당 하루 경기 수 역산 제안에만 쓴다.
+  // 단판이면 그 길이)으로 채운다. 종료 시각은 서버로 가지 않고 하루 경기 수 역산 제안에만 쓴다.
   const [endTime, setEndTime] = useState('');
   const [gameDurationMinutes, setGameDurationMinutes] = useState('');
   // The league's own period settings prefill the duration field. An untouched prefill is not sent:
@@ -222,9 +237,12 @@ export default function LeagueMatchFixturesClient({
     setGameDurationMinutes(value);
   };
   const [breakMinutes, setBreakMinutes] = useState('');
-  const [gamesPerTeamPerDay, setGamesPerTeamPerDay] = useState('');
+  const [gamesPerDay, setGamesPerDay] = useState('');
   // R12: 취소 확인 대상 대진. null이면 모달을 닫는다.
   const [cancelTarget, setCancelTarget] = useState<V1LeagueFixture | null>(null);
+  // 삭제 확인 대상 대진. 취소와 같은 사유 모달을 쓴다.
+  const [deleteTarget, setDeleteTarget] = useState<V1LeagueFixture | null>(null);
+  const deleteFixture = useV1DeleteLeagueFixture(leagueId);
   // 그룹 B 감사 결함 3: 참가팀 제외 확인 대상. null이면 모달을 닫는다.
   const [removeTarget, setRemoveTarget] = useState<{ teamId: string; teamName: string } | null>(null);
   // R13: 대진 재생성 확인 모달 열림 상태.
@@ -282,28 +300,25 @@ export default function LeagueMatchFixturesClient({
     return /^\d+$/.test(trimmed) ? Number(trimmed) : null;
   };
   const isInvalidIntInput = (value: string) => value.trim() !== '' && !/^\d+$/.test(value.trim());
-  const hasInvalidTimingInput = [gameDurationMinutes, breakMinutes, gamesPerTeamPerDay].some(isInvalidIntInput);
+  const hasInvalidTimingInput = [gameDurationMinutes, breakMinutes, gamesPerDay].some(isInvalidIntInput);
   const durationValue = parseOptionalInt(gameDurationMinutes);
   const breakValue = parseOptionalInt(breakMinutes);
-  const gamesPerDayValue = parseOptionalInt(gamesPerTeamPerDay);
+  const gamesPerDayValue = parseOptionalInt(gamesPerDay);
   const teamCount = series.teamIds.length;
-  const weeksCount = resolveWeeksCount(weeksPlan, teamCount, gamesPerDayValue ?? 1);
-  // 하루 경기 수 때문에 주차가 올림되면 `주차 × 하루 경기` 칸이 라운드로빈 한 바퀴보다 커진다 —
-  // 그때만 서버에 총 라운드를 알려 남는 칸에 앞 라운드를 다시 만들지 않게 한다.
-  const targetRounds = plannedRounds(weeksPlan, teamCount, weeksCount, gamesPerDayValue ?? 1);
-  const roundsCap = targetRounds >= 1 && targetRounds < weeksCount * (gamesPerDayValue ?? 1) ? targetRounds : null;
+  const gamesPerRound = Math.floor(teamCount / 2);
+  // 라운드 수는 서버에 `weeksCount` 로, 필요한 경기 날짜 수(days)는 날짜 고르기·요일 채우기에 쓴다.
+  const fixturePlan = resolveFixturePlan(weeksPlan, teamCount, gamesPerDayValue);
 
-  // C안: 시간창(시작~종료)과 경기 시간이 다 있으면 팀당 하루 경기 수를 역산해 제안한다.
-  // 정수가 아닌 입력이 하나라도 있으면 제안·계산 카드를 아예 숨긴다 — ?? 폴백(휴식 0·팀당 1)으로
+  // C안: 시간창(시작~종료)과 경기 시간이 다 있으면 하루 경기 수를 역산해 제안한다.
+  // 정수가 아닌 입력이 하나라도 있으면 제안·계산 카드를 아예 숨긴다 — ?? 폴백(휴식 0·한 라운드)으로
   // 계산하면 사용자가 입력한 값과 다른 결과를 "정상 계산"처럼 보여주게 된다.
   const timingSuggestion =
     !hasInvalidTimingInput && dayOfWeek !== '' && time.trim() !== '' && endTime.trim() !== '' && durationValue !== null
-      ? suggestGamesPerTeamPerDay({
+      ? suggestGamesPerDay({
           startTime: time,
           endTime,
           gameDurationMinutes: durationValue,
           breakMinutes: breakValue ?? 0,
-          teamCount,
         })
       : null;
   // teamCount < 2면 제안이 null인 원인이 시간창이 아니라 참가팀 부족이다 — 그때 이 경고를
@@ -312,14 +327,13 @@ export default function LeagueMatchFixturesClient({
   const showTimingNoFit =
     !hasInvalidTimingInput && teamCount >= 2 &&
     dayOfWeek !== '' && time.trim() !== '' && endTime.trim() !== '' && durationValue !== null && timingSuggestion === null;
-  // B안: 현재 폼 값 그대로의 "하루 운영 계산" — 팀당 경기 수를 안 채웠으면 서버 기본값 1로 보여준다.
+  // B안: 현재 폼 값 그대로의 "하루 운영 계산" — 하루 경기 수를 안 채웠으면 서버 기본값(한 라운드)으로 보여준다.
   const dailyPlan =
     !hasInvalidTimingInput && durationValue !== null
       ? computeDailyPlan({
           gameDurationMinutes: durationValue,
           breakMinutes: breakValue ?? 0,
-          gamesPerTeamPerDay: gamesPerDayValue ?? 1,
-          teamCount,
+          gamesPerDay: gamesPerDayValue ?? gamesPerRound,
           startTime: dayOfWeek !== '' && time.trim() !== '' ? time : undefined,
         })
       : null;
@@ -353,8 +367,8 @@ export default function LeagueMatchFixturesClient({
     const actions: ActionSheetAction[] = [
       {
         key: 'schedule',
-        label: '일정 수정',
-        description: '일시·구장·주소를 바꿔요',
+        label: '경기 수정',
+        description: '팀·경기 이름·일시·구장을 바꿔요',
         onSelect: () => {
           setMenuFixture(null);
           setScheduleFixture(row);
@@ -399,6 +413,20 @@ export default function LeagueMatchFixturesClient({
         setCancelTarget(row);
       },
     });
+    // 삭제 = 취소 + 대진표에서 숨김. 시작했거나 결과가 있는 경기는 먼저 취소해야 한다(서버와 같은 규칙).
+    const deleteBlocked = row.status !== 'cancelled' && fixtureHasStartedOrResult(row);
+    actions.push({
+      key: 'delete',
+      label: '경기 삭제',
+      description: '대진표에서 이 경기를 지워요. 순위 집계에서도 빠져요',
+      destructive: true,
+      disabled: deleteBlocked,
+      disabledReason: deleteBlocked ? '시작했거나 결과가 있는 경기는 먼저 대진 취소를 해 주세요' : null,
+      onSelect: () => {
+        setMenuFixture(null);
+        setDeleteTarget(row);
+      },
+    });
     return actions;
   };
 
@@ -422,12 +450,13 @@ export default function LeagueMatchFixturesClient({
               startsOn: series.startsOn,
               dayOfWeek,
               time,
-              weeksCount,
+              weeksCount: fixturePlan.days,
               now: new Date(),
             });
     return {
-      weeksCount,
-      ...(roundsCap === null ? {} : { roundsCount: roundsCap }),
+      weeksCount: fixturePlan.rounds,
+      // 마지막 라운드를 다 쓰지 않을 때만 서버가 그 수에서 자른다.
+      ...(fixturePlan.games < fixturePlan.rounds * gamesPerRound ? { fixtureCount: fixturePlan.games } : {}),
       // **시각이 비면 `schedule` 을 싣지 않는다.** 요일 경로는 위에서 `time` 이 비면
       // `dates` 를 빈 배열로 만들어 자연히 빠졌는데, 달력 경로는 `dates` 가 채워져 있어
       // **빈 `time` 이 그대로 나갔다** — 서버가 `time은 HH:mm 형식이어야 해요` 로 거부한다.
@@ -440,28 +469,28 @@ export default function LeagueMatchFixturesClient({
             timing: {
               ...(!durationTouched || durationValue === null ? {} : { gameDurationMinutes: durationValue }),
               ...(breakValue === null ? {} : { breakMinutes: breakValue }),
-              ...(gamesPerDayValue === null ? {} : { gamesPerTeamPerDay: gamesPerDayValue }),
+              ...(gamesPerDayValue === null ? {} : { gamesPerDay: gamesPerDayValue }),
             },
           }),
     };
   };
 
   // 정수가 아닌 입력은 제출 전에 차단한다(parseOptionalInt가 null로 만들면 timing이 조용히
-  // 누락돼 더 나쁘다). 경기 시간을 비운 채 휴식·팀당 경기 수만 채우는 건 정상 — 서버가 기본값을 쓴다.
+  // 누락돼 더 나쁘다). 경기 시간을 비운 채 휴식·하루 경기 수만 채우는 건 정상 — 서버가 기본값을 쓴다.
   const validateTimingInputs = (): boolean => {
     if (isLeaguePlaceChoiceIncomplete(placeChoice)) {
       showToast('다른 장소를 골라 주세요. 기본 장소를 쓰려면 \'기본 장소 사용\'을 선택해 주세요.', 'error');
       return false;
     }
     if (hasInvalidTimingInput) {
-      showToast('경기 시간·휴식·팀당 하루 경기 수는 정수로만 입력할 수 있어요.', 'error');
+      showToast('경기 시간·휴식·하루 경기 수는 정수로만 입력할 수 있어요.', 'error');
       return false;
     }
     // 서버 DTO 범위(@Min/@Max)와 동일한 상한을 제출 전에 안내한다 — number input의
     // min/max 속성은 직접 타이핑을 막지 못한다.
     const inRange = (value: number | null, min: number, max: number) => value === null || (value >= min && value <= max);
-    if (!inRange(durationValue, 5, 240) || !inRange(breakValue, 0, 120) || !inRange(gamesPerDayValue, 1, 10)) {
-      showToast('경기 시간은 5~240분, 휴식은 0~120분, 팀당 하루 경기는 1~10 사이로 입력해주세요.', 'error');
+    if (!inRange(durationValue, 5, 240) || !inRange(breakValue, 0, 120) || !inRange(gamesPerDayValue, 1, MAX_GAMES_PER_DAY)) {
+      showToast(`경기 시간은 5~240분, 휴식은 0~120분, 하루 경기 수는 1~${MAX_GAMES_PER_DAY} 사이로 입력해주세요.`, 'error');
       return false;
     }
     return true;
@@ -580,14 +609,28 @@ export default function LeagueMatchFixturesClient({
     });
   };
 
-  // 일정 수정 모달의 저장. 실패는 모달 안에 남고(입력을 잃지 않는다) 성공하면 토스트로 알린다.
+  const onConfirmDelete = (reason: string) => {
+    if (!deleteTarget) return;
+    deleteFixture.mutate(
+      { teamMatchId: deleteTarget.teamMatchId, body: { reason } },
+      {
+        onSuccess: (result) => {
+          setDeleteTarget(null);
+          showToast(result.leagueCompleted ? '경기를 삭제했어요. 남은 경기가 없어 리그가 종료 처리됐어요.' : '경기를 삭제했어요.', 'success');
+        },
+        onError: (error) => showToast(extractErrorMessage(error, '경기를 삭제하지 못했어요.'), 'error'),
+      },
+    );
+  };
+
+  // 경기 수정 모달의 저장. 실패는 모달 안에 남고(입력을 잃지 않는다) 성공하면 토스트로 알린다.
   const onScheduleSubmit = (fixture: V1LeagueFixture) => (patch: LeagueFixtureSchedulePatch) =>
     new Promise<void>((resolve, reject) => {
       updateFixture.mutate(
         { teamMatchId: fixture.teamMatchId, body: patch },
         {
           onSuccess: () => {
-            showToast('일정을 저장했어요.', 'success');
+            showToast('경기를 저장했어요.', 'success');
             resolve();
           },
           onError: (error) => reject(error),
@@ -622,48 +665,6 @@ export default function LeagueMatchFixturesClient({
     );
   };
 
-
-  // R6/D-3: 전 대진 확정 시 리그는 자동으로 completed 로 전이한다. 결과를 정정해야 하면
-  // 운영자가 진행 중으로 되돌려야 하는데, 그동안 이 엔드포인트에 화면이 없어서 API 를 직접
-  // 호출하지 않는 한 되돌릴 방법이 없었다(2026-08-21 재감사). 사유는 감사 로그에 남는다.
-  const onConfirmRevert = (reason: string) => {
-    revertCompletion.mutate(
-      { reason: reason.trim() ? reason.trim() : undefined },
-      {
-        onSuccess: (result) => {
-          setRevertModalOpen(false);
-          showToast(
-            result.alreadyProcessed ? '이미 진행 중인 리그예요.' : '리그를 진행 중으로 되돌렸어요.',
-            'success',
-          );
-        },
-        onError: (error) => showToast(extractErrorMessage(error, '리그를 되돌리지 못했어요.'), 'error'),
-      },
-    );
-  };
-
-  // 자동 종료는 결과 확정·대진 취소 때만 판정된다 — '진행 중으로 되돌리기' 뒤 대진을 바꾸지 않으면
-  // 남은 경기가 없어도 진행 중으로 남는다(MD-QA #93). 서버 판정(`shouldCompleteLeague`)과 같은 조건일
-  // 때만 버튼을 낸다: 취소·무효를 뺀 대진이 하나 이상이고 전부 공식 결과다.
-  const liveFixtures = series.fixtures.filter(
-    (fixture) => fixture.status !== 'cancelled' && fixture.resultStage !== 'voided',
-  );
-  const canCompleteLeague =
-    series.state === 'active' &&
-    liveFixtures.length > 0 &&
-    liveFixtures.every((fixture) => fixture.resultStage === 'official');
-  const onConfirmComplete = (reason: string) => {
-    completeLeague.mutate(
-      { reason: reason.trim() ? reason.trim() : undefined },
-      {
-        onSuccess: (result) => {
-          setCompleteModalOpen(false);
-          showToast(result.alreadyProcessed ? '이미 종료된 리그예요.' : '리그를 종료했어요.', 'success');
-        },
-        onError: (error) => showToast(extractErrorMessage(error, '리그를 종료하지 못했어요.'), 'error'),
-      },
-    );
-  };
 
   // R12: 취소는 되돌릴 수 없는 조작이라 GateConfirmModal로 사유를 받은 뒤에만 실행한다.
   const onConfirmCancel = (reason: string) => {
@@ -741,6 +742,10 @@ export default function LeagueMatchFixturesClient({
         action={
           <div className="flex flex-wrap items-center gap-2">
             <AdminLeagueStatePill state={series.state} />
+            {canWrite && series.state !== 'completed' && (
+              <Link href={`/admin/league-matches/${encodeURIComponent(leagueId)}/edit`}
+                className="tm-btn tm-btn-md tm-btn-neutral min-h-[44px]">리그 수정</Link>
+            )}
             {/* 경기 영상 관리 — 대회 운영 콘솔의 영상 화면과 같은 역할의 리그 판.
                 대진이 없으면 그 화면이 빈 상태 안내를 대신한다. */}
             <Link
@@ -755,33 +760,22 @@ export default function LeagueMatchFixturesClient({
             >
               후기 관리
             </Link>
-            {/* 되돌리기는 completed 일 때만 의미가 있다 — draft/active 에서는 서버가
-                409 LEAGUE_NOT_COMPLETED 로 막으므로 버튼 자체를 내지 않는다. */}
-            {series.state === 'completed' && (
+            {canWrite && (
               <button
                 type="button"
-                onClick={() => setRevertModalOpen(true)}
-                disabled={revertCompletion.isPending}
-                className="inline-flex min-h-[44px] items-center rounded-xl border border-[var(--border-strong)] px-4 text-sm font-semibold text-[var(--text-strong)] disabled:opacity-50"
+                onClick={() => setStateModalOpen(true)}
+                className="inline-flex min-h-[var(--size-touch-min)] items-center rounded-xl border border-[var(--border-strong)] px-4 text-[length:var(--font-size-label)] font-semibold text-[var(--text-strong)] focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
               >
-                진행 중으로 되돌리기
-              </button>
-            )}
-            {canCompleteLeague && (
-              <button
-                type="button"
-                onClick={() => setCompleteModalOpen(true)}
-                disabled={completeLeague.isPending}
-                className="inline-flex min-h-[var(--size-touch-min)] items-center rounded-xl border border-[var(--border-strong)] px-4 text-[length:var(--font-size-label)] font-semibold text-[var(--text-strong)] disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
-              >
-                리그 종료하기
+                상태 변경
               </button>
             )}
           </div>
         }
       />
 
-      <LeagueHoldControl leagueId={leagueId} state={series.state} showToast={showToast} />
+      {stateModalOpen && (
+        <LeagueStateModal leagueId={leagueId} series={series} onClose={() => setStateModalOpen(false)} showToast={showToast} />
+      )}
       {/* 보류 중에는 공개 설정을 따로 바꾸지 않는다 — 보류 해제가 공개 여부까지 되돌린다(서버도 409). */}
       {series.state === 'on_hold' ? null : <LeagueVisibilityControl leagueId={leagueId} isPublic={series.isPublic} />}
       <LeagueCloseRegistrationControl leagueId={leagueId} state={series.state} registrationOpen={series.registrationOpen} registrationDeadlineAt={series.registrationDeadlineAt} activeRegistrationCount={series.activeRegistrationCount} confirmedCount={series.confirmedRegistrationCount} showToast={showToast} />
@@ -930,6 +924,7 @@ export default function LeagueMatchFixturesClient({
           teams={(teamsData?.teams ?? []).map((team) => ({ id: team.teamId, label: team.name }))}
           defaultPlace={series.defaultPlace ?? null}
           recentVenues={series.recentVenues}
+          defaultDuration={periodDefaultMinutes === null ? null : { minutes: periodDefaultMinutes, label: periodDefaultHint ?? `${periodDefaultMinutes}분` }}
           isSubmitting={createManualFixture.isPending}
           onSubmit={async (payload) => {
             try {
@@ -953,9 +948,9 @@ export default function LeagueMatchFixturesClient({
               inputId="weeks-count"
               inputClassName={inputClass}
               teamCount={teamCount}
-              gamesPerTeamPerDay={gamesPerDayValue ?? 1}
+              gamesPerDay={gamesPerDayValue}
               plan={weeksPlan}
-              weeksCount={weeksCount}
+              plannedFixtureCount={series.plannedFixtureCount}
               onPlanChange={setWeeksPlan}
             />
             <div>
@@ -1003,8 +998,9 @@ export default function LeagueMatchFixturesClient({
               prefilledHint={durationTouched ? null : periodDefaultHint}
               breakMinutes={breakMinutes}
               onBreakMinutesChange={setBreakMinutes}
-              gamesPerTeamPerDay={gamesPerTeamPerDay}
-              onGamesPerTeamPerDayChange={setGamesPerTeamPerDay}
+              gamesPerDay={gamesPerDay}
+              gamesPerRound={gamesPerRound}
+              onGamesPerDayChange={setGamesPerDay}
             />
             <div className="col-span-full">
               <p className="mb-1 block text-sm font-medium text-[var(--text-strong)]">경기 날짜</p>
@@ -1014,7 +1010,7 @@ export default function LeagueMatchFixturesClient({
               <LeagueFixtureDatePicker
                 selectedDates={selectedDates}
                 onChange={setSelectedDates}
-                requiredCount={weeksCount}
+                requiredCount={fixturePlan.days}
                 // KST 변환은 `toKstDateString` 한 곳에만 둔다 — 여기서 `+9시간` 을 다시
                 // 적으면 이 PR 이 단일화한 규칙이 그 자리에서 갈린다(Copilot 지적).
                 today={toKstDateString(new Date())}
@@ -1026,7 +1022,7 @@ export default function LeagueMatchFixturesClient({
                             startsOn: series.startsOn,
                             dayOfWeek,
                             time,
-                            weeksCount,
+                            weeksCount: fixturePlan.days,
                             now: new Date(),
                           }),
                         )
@@ -1074,14 +1070,14 @@ export default function LeagueMatchFixturesClient({
           <TimingSuggestionRow
             suggestion={timingSuggestion}
             showNoFit={showTimingNoFit}
-            onApply={(games) => setGamesPerTeamPerDay(String(games))}
+            onApply={(games) => setGamesPerDay(String(games))}
           />
           {dailyPlan !== null && <DailyPlanCard plan={dailyPlan} />}
           <FixturePreviewPanel result={previewResult} teamNameById={teamNameById} />
           <p className="text-xs text-[var(--text-muted)]">
             요일·시각을 정하면 매주 그 요일 그 시각으로 채워요. 비워두면 시작일 그대로 매주 반복돼요.
             경기 시간(분)을 넣으면 그날 경기들이 휴식 간격으로 연달아 배치되고, 종료 시각까지 넣으면
-            팀당 하루 경기 수를 계산해 제안해요. 생성 후 특정 주만 다르면 아래 표에서 개별 수정하면 돼요.
+            하루 경기 수를 계산해 제안해요. 생성 후 특정 주만 다르면 아래 표에서 개별 수정하면 돼요.
           </p>
         </div>
       ) : (
@@ -1311,9 +1307,9 @@ export default function LeagueMatchFixturesClient({
                     inputId="regen-weeks-count"
                     inputClassName={inputClass}
                     teamCount={teamCount}
-                    gamesPerTeamPerDay={gamesPerDayValue ?? 1}
+                    gamesPerDay={gamesPerDayValue}
                     plan={weeksPlan}
-                    weeksCount={weeksCount}
+                    plannedFixtureCount={series.plannedFixtureCount}
                     onPlanChange={setWeeksPlan}
                   />
                   <div>
@@ -1357,8 +1353,9 @@ export default function LeagueMatchFixturesClient({
                     prefilledHint={durationTouched ? null : periodDefaultHint}
                     breakMinutes={breakMinutes}
                     onBreakMinutesChange={setBreakMinutes}
-                    gamesPerTeamPerDay={gamesPerTeamPerDay}
-                    onGamesPerTeamPerDayChange={setGamesPerTeamPerDay}
+                    gamesPerDay={gamesPerDay}
+              gamesPerRound={gamesPerRound}
+                    onGamesPerDayChange={setGamesPerDay}
                   />
                   <LeagueFixturePlaceField
                     maxLength={PLACE_NAME_MAX_LENGTH.leagueFixture}
@@ -1413,7 +1410,7 @@ export default function LeagueMatchFixturesClient({
                   <TimingSuggestionRow
                     suggestion={timingSuggestion}
                     showNoFit={showTimingNoFit}
-                    onApply={(games) => setGamesPerTeamPerDay(String(games))}
+                    onApply={(games) => setGamesPerDay(String(games))}
                   />
                   {dailyPlan !== null && <DailyPlanCard plan={dailyPlan} />}
                 </div>
@@ -1457,6 +1454,14 @@ export default function LeagueMatchFixturesClient({
           defaultPlace={series.defaultPlace ?? null}
           recentVenues={series.recentVenues}
           matchupLabel={matchupLabelOf(scheduleFixture)}
+          teams={teamsData?.teams ?? []}
+          teamLockedReason={
+            scheduleFixture.homeSlotId || scheduleFixture.awaySlotId
+              ? '자리 방식으로 만든 경기는 일정 보드의 자리에서 팀을 바꿔요.'
+              : fixtureHasStartedOrResult(scheduleFixture)
+                ? '시작했거나 결과가 있는 경기는 팀을 바꿀 수 없어요.'
+                : null
+          }
           isSubmitting={updateFixture.isPending}
           onSubmit={onScheduleSubmit(scheduleFixture)}
           onClose={() => setScheduleFixture(null)}
@@ -1469,6 +1474,7 @@ export default function LeagueMatchFixturesClient({
           initialTeamCount={Math.min(20, Math.max(3, teamCount))}
           defaultPlace={series.defaultPlace ?? null}
           recentVenues={series.recentVenues ?? []}
+          defaultGameMinutes={periodDefaultMinutes}
           replaceExisting={series.fixtures.some((fixture) => fixture.status !== 'cancelled')}
           isSubmitting={applyTemplate.isPending}
           onSubmit={async (payload) => {
@@ -1489,33 +1495,6 @@ export default function LeagueMatchFixturesClient({
       {confirmModal}
 
       {/* R12: 대진 취소 확인 — 되돌릴 수 없으므로 사유를 필수로 받는다. */}
-      {/* R6/D-3: 종료 역전이 확인. 취소·재생성과 달리 되돌릴 수 있는 조작이라
-          typedChallenge 없이 사유만 받는다. */}
-      <GateConfirmModal
-        open={revertModalOpen}
-        pending={revertCompletion.isPending}
-        title="리그를 진행 중으로 되돌릴까요?"
-        description="종료된 리그를 다시 진행 중으로 바꿔요. 결과를 정정한 뒤 전 대진이 다시 확정되면 자동으로 종료돼요."
-        // 헤더 트리거("진행 중으로 되돌리기")와 접근 이름이 겹치지 않게 짧게 쓴다 —
-        // 겹치면 스크린리더 사용자도 두 버튼을 구분하지 못한다(취소·재생성 모달도 같은 관례).
-        confirmLabel="되돌리기"
-        tone="amber"
-        onConfirm={onConfirmRevert}
-        onClose={() => setRevertModalOpen(false)}
-      />
-
-      <GateConfirmModal
-        open={completeModalOpen}
-        pending={completeLeague.isPending}
-        title="리그를 종료할까요?"
-        description="남은 경기가 모두 확정되거나 취소됐어요. 종료하면 지금 순위표가 최종 순위가 되고, 필요하면 다시 진행 중으로 되돌릴 수 있어요."
-        // 헤더 트리거("리그 종료하기")와 접근 이름이 겹치지 않게 짧게 쓴다(되돌리기 모달과 같은 관례).
-        confirmLabel="종료"
-        tone="blue"
-        onConfirm={onConfirmComplete}
-        onClose={() => setCompleteModalOpen(false)}
-      />
-
       {/* 그룹 B 감사 결함 3: 참가팀 제외 확인 — 이전에는 칩의 X 버튼이 확인 없이 곧바로
           제외 + 관련 대진 취소를 실행했다. 되돌릴 경로(재추가 + 재생성)가 있어
           GateConfirmModal의 typedChallenge까지는 과하지만, 최소한의 확인은 필요하다.
@@ -1535,6 +1514,21 @@ export default function LeagueMatchFixturesClient({
         }
         onConfirm={onConfirmRemoveTeam}
         onClose={() => setRemoveTarget(null)}
+      />
+
+      <GateConfirmModal
+        open={deleteTarget !== null}
+        pending={deleteFixture.isPending}
+        title="경기를 삭제할까요?"
+        description={
+          deleteTarget
+            ? `"${deleteTarget.title}" 경기를 대진표에서 지워요. 순위 집계에서 빠지고 되돌릴 수 없어요.${deleteTarget.status === 'cancelled' ? '' : ' 두 팀에는 취소 알림이 가요.'}`
+            : ''
+        }
+        confirmLabel="삭제"
+        tone="amber"
+        onConfirm={onConfirmDelete}
+        onClose={() => setDeleteTarget(null)}
       />
 
       <GateConfirmModal
@@ -1763,7 +1757,7 @@ function FixturePreviewPanel({
   );
 }
 
-// 대진 timing 입력 4종(종료 시각 + 경기 시간·휴식·팀당 하루 경기). 생성·재생성 두 폼이 같은
+// 대진 timing 입력 4종(종료 시각 + 경기 시간·휴식·하루 경기 수). 생성·재생성 두 폼이 같은
 // 마크업을 공유한다 — 부모 grid 안에서 fragment 자식들이 그대로 grid 아이템이 된다.
 function FixtureTimingFields({
   idPrefix,
@@ -1775,8 +1769,9 @@ function FixtureTimingFields({
   prefilledHint,
   breakMinutes,
   onBreakMinutesChange,
-  gamesPerTeamPerDay,
-  onGamesPerTeamPerDayChange,
+  gamesPerDay,
+  gamesPerRound,
+  onGamesPerDayChange,
 }: {
   idPrefix: string;
   dayOfWeekUnset: boolean;
@@ -1788,8 +1783,10 @@ function FixtureTimingFields({
   prefilledHint: string | null;
   breakMinutes: string;
   onBreakMinutesChange: (value: string) => void;
-  gamesPerTeamPerDay: string;
-  onGamesPerTeamPerDayChange: (value: string) => void;
+  gamesPerDay: string;
+  /** 칸을 비웠을 때의 하루 경기 수(한 라운드). */
+  gamesPerRound: number;
+  onGamesPerDayChange: (value: string) => void;
 }) {
   return (
     <>
@@ -1843,17 +1840,21 @@ function FixtureTimingFields({
         />
       </div>
       <div>
-        <label htmlFor={`${idPrefix}-games-per-day`} className="mb-1 block text-sm font-medium text-[var(--text-strong)]">팀당 하루 경기</label>
+        <label htmlFor={`${idPrefix}-games-per-day`} className="mb-1 block text-sm font-medium text-[var(--text-strong)]">하루 경기 수</label>
         <input
           id={`${idPrefix}-games-per-day`}
           type="number"
           min={1}
-          max={10}
-          placeholder="1"
-          value={gamesPerTeamPerDay}
-          onChange={(e) => onGamesPerTeamPerDayChange(e.target.value)}
+          max={MAX_GAMES_PER_DAY}
+          placeholder={gamesPerRound > 0 ? String(gamesPerRound) : undefined}
+          value={gamesPerDay}
+          onChange={(e) => onGamesPerDayChange(e.target.value)}
+          aria-describedby={`${idPrefix}-games-per-day-hint`}
           className={`${inputClass} w-full`}
         />
+        <p id={`${idPrefix}-games-per-day-hint`} className="mt-1 text-[length:var(--font-size-caption)] text-[var(--text-muted)]">
+          모든 팀을 합친 하루 경기 수예요. 비우면 하루에 한 라운드({gamesPerRound}경기)를 치러요.
+        </p>
       </div>
     </>
   );
@@ -1866,7 +1867,7 @@ function TimingSuggestionRow({
   showNoFit,
   onApply,
 }: {
-  suggestion: { gamesPerTeamPerDay: number; plan: DailyPlan } | null;
+  suggestion: { gamesPerDay: number; plan: DailyPlan } | null;
   showNoFit: boolean;
   onApply: (games: number) => void;
 }) {
@@ -1875,21 +1876,21 @@ function TimingSuggestionRow({
     return (
       <div className="flex items-start gap-2 rounded-lg bg-[var(--tint-orange)] px-3 py-2 text-xs text-[var(--orange700)]">
         <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
-        <span>이 시간창엔 한 라운드도 못 치러요. 종료 시각을 늦추거나 경기 시간·휴식을 줄여주세요.</span>
+        <span>이 시간창엔 한 경기도 못 치러요. 종료 시각을 늦추거나 경기 시간·휴식을 줄여주세요.</span>
       </div>
     );
   }
   return (
     <div className="flex flex-wrap items-center gap-2 rounded-xl border border-dashed border-[var(--tint-blue-border)] px-3 py-2 text-xs text-[var(--text-strong)]">
       <span>
-        이 시간창이면 <b>팀당 {suggestion.gamesPerTeamPerDay}경기 · 하루 {suggestion.plan.totalGamesPerDay}경기</b> 가능해요
+        이 시간창이면 <b>하루 {suggestion.gamesPerDay}경기</b> 가능해요
         {suggestion.plan.lastGameEndTime !== null && (
           <> — {dayOffsetLabel(suggestion.plan.daysLater)}{suggestion.plan.lastGameEndTime} 종료</>
         )}
       </span>
       <button
         type="button"
-        onClick={() => onApply(suggestion.gamesPerTeamPerDay)}
+        onClick={() => onApply(suggestion.gamesPerDay)}
         className="min-h-[36px] rounded-lg border border-[var(--border-strong)] px-3 text-xs font-semibold text-[var(--text-strong)] hover:border-blue-500 hover:text-[var(--blue700)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
       >
         이대로 적용
@@ -1926,10 +1927,6 @@ function DailyPlanCard({ plan }: { plan: DailyPlan }) {
         <div>
           <dt className="text-xs text-[var(--text-muted)]">총 소요</dt>
           <dd className="m-0 text-lg font-bold tabular-nums text-[var(--blue700)]">{formatMinutesLabel(plan.totalMinutes)}</dd>
-        </div>
-        <div>
-          <dt className="text-xs text-[var(--text-muted)]">팀당</dt>
-          <dd className="m-0 text-lg font-bold tabular-nums text-[var(--blue700)]">{plan.gamesPerTeamPerDay}경기</dd>
         </div>
       </dl>
     </div>

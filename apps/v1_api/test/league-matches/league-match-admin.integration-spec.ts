@@ -314,6 +314,87 @@ describe('POST /admin/league-matches + fixtures', () => {
     expect(new Date(detailRes.body.data.startsOn).getTime()).toBe(startsOn.getTime());
   });
 
+  it('리그를 만들 때 팀 명단 인원 제한 없음과 총 경기 수를 정하고, 대진 생성은 그 수에서 자른다', async () => {
+    const createRes = await request(app.getHttpServer())
+      .post('/api/v1/admin/league-matches')
+      .set('x-v1-user-id', ownerUserId)
+      .send({
+        title: '총 경기 수 리그',
+        sportId,
+        regionId,
+        startsOn: new Date().toISOString(),
+        endsOn: new Date(Date.now() + 30 * 86_400_000).toISOString(),
+        teamIds: [teamAId, teamBId],
+        minPlayers: 1,
+        maxPlayers: null,
+        plannedFixtureCount: 2,
+      });
+    expect(createRes.status).toBe(201);
+    const leagueId = createRes.body.data.leagueId;
+
+    const detailRes = await request(app.getHttpServer())
+      .get(`/api/v1/admin/league-matches/${leagueId}`)
+      .set('x-v1-user-id', ownerUserId);
+    expect(detailRes.body.data).toMatchObject({ minPlayers: 1, maxPlayers: null, plannedFixtureCount: 2 });
+
+    // 2팀 = 라운드당 1경기. 3라운드를 만들 수 있어도 총 경기 수 2에서 자른다.
+    const fixturesRes = await request(app.getHttpServer())
+      .post(`/api/v1/admin/league-matches/${leagueId}/fixtures`)
+      .set('x-v1-user-id', ownerUserId)
+      .send({ weeksCount: 3, fixtureCount: 2 });
+    expect(fixturesRes.status).toBe(201);
+    expect(fixturesRes.body.data.teamMatchIds).toHaveLength(2);
+  });
+
+  it('총 경기 수에 null 을 보내면 0경기로 만들지 않고 거부한다', async () => {
+    const createRes = await request(app.getHttpServer())
+      .post('/api/v1/admin/league-matches')
+      .set('x-v1-user-id', ownerUserId)
+      .send({
+        title: '총 경기 수 null 리그',
+        sportId,
+        regionId,
+        startsOn: new Date().toISOString(),
+        endsOn: new Date(Date.now() + 30 * 86_400_000).toISOString(),
+        teamIds: [teamAId, teamBId],
+      });
+    const leagueId = createRes.body.data.leagueId;
+
+    const fixturesRes = await request(app.getHttpServer())
+      .post(`/api/v1/admin/league-matches/${leagueId}/fixtures`)
+      .set('x-v1-user-id', ownerUserId)
+      .send({ weeksCount: 1, fixtureCount: null });
+    expect(fixturesRes.status).toBe(400);
+    expect(fixturesRes.body.code).toBe('VALIDATION_ERROR');
+    expect(await prisma.v1TeamMatch.count({ where: { leagueId } })).toBe(0);
+  });
+
+  it('상태 변경 하나로 시작·보류·해제·준비 중 되돌리기를 처리한다', async () => {
+    const createRes = await request(app.getHttpServer())
+      .post('/api/v1/admin/league-matches')
+      .set('x-v1-user-id', ownerUserId)
+      .send({
+        title: '상태 변경 리그',
+        sportId,
+        regionId,
+        startsOn: new Date().toISOString(),
+        endsOn: new Date(Date.now() + 30 * 86_400_000).toISOString(),
+        teamIds: [teamAId, teamBId],
+      });
+    const leagueId = createRes.body.data.leagueId;
+    const change = (body: Record<string, unknown>) =>
+      request(app.getHttpServer()).post(`/api/v1/admin/league-matches/${leagueId}/state`).set('x-v1-user-id', ownerUserId).send(body);
+
+    expect((await change({ state: 'active' })).body.data).toMatchObject({ state: 'active', alreadyProcessed: false });
+    expect((await change({ state: 'on_hold' })).body.code).toBe('LEAGUE_REASON_REQUIRED');
+    expect((await change({ state: 'on_hold', reason: '구장 공사' })).body.data).toMatchObject({ state: 'on_hold' });
+    expect((await change({ state: 'draft' })).body.code).toBe('LEAGUE_ON_HOLD');
+    expect((await change({ state: 'active' })).body.data).toMatchObject({ state: 'active' });
+    expect((await change({ state: 'draft' })).body.data).toMatchObject({ state: 'draft' });
+    const league = await prisma.v1Tournament.findUniqueOrThrow({ where: { id: leagueId }, select: { status: true } });
+    expect(league.status).toBe('draft');
+  });
+
   it('요일·시각·장소 템플릿을 지정하지 않으면 기존 동작(시작일 그대로, 장소 미정)을 유지한다', async () => {
     const createRes = await request(app.getHttpServer())
       .post('/api/v1/admin/league-matches')
@@ -544,6 +625,104 @@ describe('POST /admin/league-matches + fixtures', () => {
   // R6: 결과 정정을 위한 completed -> active 운영자 역전이. 자동 전이(R6 handler) 경로는
   // league-completion-projection.integration-spec.ts가 전담하므로, 여기서는 이 리그를
   // 곧바로 completed 상태로 합성해 되돌리기 엔드포인트 자체의 계약만 검증한다.
+  describe('경기 수정(팀·이름)과 삭제', () => {
+    const createLeagueWithFixtures = async (weeksCount: number) => {
+      const createRes = await request(app.getHttpServer())
+        .post('/api/v1/admin/league-matches')
+        .set('x-v1-user-id', ownerUserId)
+        .send({
+          title: `수정 삭제 리그 ${weeksCount}`,
+          sportId,
+          regionId,
+          startsOn: new Date().toISOString(),
+          endsOn: new Date(Date.now() + 60 * 86_400_000).toISOString(),
+          teamIds: [teamAId, teamBId],
+        });
+      const leagueId = createRes.body.data.leagueId as string;
+      const fixturesRes = await request(app.getHttpServer())
+        .post(`/api/v1/admin/league-matches/${leagueId}/fixtures`)
+        .set('x-v1-user-id', ownerUserId)
+        .send({ weeksCount });
+      return { leagueId, teamMatchIds: fixturesRes.body.data.teamMatchIds as string[] };
+    };
+
+    it('홈·원정을 맞바꾸고 경기 이름을 고치면 대진과 게임 사이드가 함께 바뀐다', async () => {
+      const { leagueId, teamMatchIds } = await createLeagueWithFixtures(1);
+      const before = await prisma.v1TeamMatch.findUniqueOrThrow({ where: { id: teamMatchIds[0] } });
+
+      const res = await request(app.getHttpServer())
+        .patch(`/api/v1/admin/league-matches/${leagueId}/fixtures/${teamMatchIds[0]}`)
+        .set('x-v1-user-id', ownerUserId)
+        .send({ homeTeamId: before.approvedApplicantTeamId, awayTeamId: before.hostTeamId, title: '개막전' });
+      expect(res.status).toBe(200);
+      expect(res.body.data).toMatchObject({ title: '개막전', homeTeamId: before.approvedApplicantTeamId, awayTeamId: before.hostTeamId });
+
+      const sides = await prisma.v1GameSide.findMany({ where: { game: { teamMatchId: teamMatchIds[0] } }, select: { sideKey: true, teamId: true } });
+      expect(sides).toEqual(expect.arrayContaining([
+        { sideKey: 'HOME', teamId: before.approvedApplicantTeamId },
+        { sideKey: 'AWAY', teamId: before.hostTeamId },
+      ]));
+    });
+
+    it('시작 전 경기를 삭제하면 취소되고 대진표에서 사라지며, 다시 지우면 404', async () => {
+      const { leagueId, teamMatchIds } = await createLeagueWithFixtures(2);
+      const del = () =>
+        request(app.getHttpServer())
+          .post(`/api/v1/admin/league-matches/${leagueId}/fixtures/${teamMatchIds[0]}/delete`)
+          .set('x-v1-user-id', ownerUserId)
+          .send({ reason: '잘못 만든 경기' });
+
+      const res = await del();
+      expect(res.status).toBe(200);
+      expect(res.body.data).toMatchObject({ teamMatchId: teamMatchIds[0], deleted: true });
+      const row = await prisma.v1TeamMatch.findUniqueOrThrow({ where: { id: teamMatchIds[0] } });
+      expect(row.status).toBe('cancelled');
+      expect(row.deletedAt).not.toBeNull();
+
+      const detail = await request(app.getHttpServer()).get(`/api/v1/admin/league-matches/${leagueId}`).set('x-v1-user-id', ownerUserId);
+      expect(detail.body.data.fixtures.map((fixture: { teamMatchId: string }) => fixture.teamMatchId)).toEqual([teamMatchIds[1]]);
+      expect((await del()).status).toBe(404);
+    });
+
+    it('끝난 경기는 바로 삭제하지 못하고 먼저 취소해야 한다', async () => {
+      const { leagueId, teamMatchIds } = await createLeagueWithFixtures(1);
+      await prisma.v1Game.update({ where: { teamMatchId: teamMatchIds[0] }, data: { state: 'ENDED' } });
+
+      const res = await request(app.getHttpServer())
+        .post(`/api/v1/admin/league-matches/${leagueId}/fixtures/${teamMatchIds[0]}/delete`)
+        .set('x-v1-user-id', ownerUserId)
+        .send({ reason: '삭제 시도' });
+      expect(res.status).toBe(409);
+      expect(res.body.code).toBe('LEAGUE_FIXTURE_NOT_DELETABLE');
+    });
+
+    it('삭제 판정은 게임 행을 잠근 트랜잭션 안에서 한다 — 먼저 시작한 경기가 커밋되면 숨기지 않는다', async () => {
+      const { leagueId, teamMatchIds } = await createLeagueWithFixtures(1);
+      const game = await prisma.v1Game.findUniqueOrThrow({ where: { teamMatchId: teamMatchIds[0] } });
+      let release!: () => void;
+      const held = new Promise<void>((resolve) => (release = resolve));
+      // 콘솔의 경기 시작처럼 게임 행을 먼저 잠근 채, 삭제 요청이 들어온 뒤에 ENDED 로 커밋한다.
+      const starter = prisma.$transaction(async (tx) => {
+        await tx.$queryRaw`SELECT id FROM v1_games WHERE id = ${game.id} FOR UPDATE`;
+        await held;
+        await tx.v1Game.update({ where: { id: game.id }, data: { state: 'ENDED' } });
+      });
+      const deletion = request(app.getHttpServer())
+        .post(`/api/v1/admin/league-matches/${leagueId}/fixtures/${teamMatchIds[0]}/delete`)
+        .set('x-v1-user-id', ownerUserId)
+        .send({ reason: '동시 삭제' })
+        .then((res) => res);
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      release();
+      await starter;
+
+      const res = await deletion;
+      expect(res.status).toBe(409);
+      expect(res.body.code).toBe('LEAGUE_FIXTURE_NOT_DELETABLE');
+      expect((await prisma.v1TeamMatch.findUniqueOrThrow({ where: { id: teamMatchIds[0] } })).deletedAt).toBeNull();
+    });
+  });
+
   describe('POST /admin/league-matches/:leagueId/revert-completion', () => {
     async function createLeagueWithState(title: string, state: 'draft' | 'active' | 'completed') {
       const admin = await prisma.v1AdminUser.findUniqueOrThrow({ where: { userId: ownerUserId } });

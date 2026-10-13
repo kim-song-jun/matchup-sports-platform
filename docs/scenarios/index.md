@@ -16,6 +16,10 @@
 
 # Teameet QA Scenario Index
 
+## 2026-10-13 — Play Android first-launch crash on Windows
+
+[Task 156](../../.github/tasks/156-android-app-fcm-foundation.md#play-release-first-launch-crash--2026-10-13) · [Windows release startup evidence](./android-release-startup-20261013.md): production AAB `0.1.1`/code 2 reproduces a Kakao/Retrofit R8 generic-return crash on Android 14/API 34. Regression RED → optimized `0.1.2`/code 3 GREEN; units 42/42, release build, first launch/home, cold relaunch and background/resume PASS. Emulator cache warnings and physical/Play signing limits are recorded. Dev/main/Play rollout pending.
+
 ## 2026-10-03 — 종료 팀매치 카드 전체 dim / DEV 요청
 
 이미지와 카드 전체에 동일한 dim 적용; 완료·취소·만료된 리그 포함. 진행 중/종료 확인 중/예정 리그는 유지.
@@ -519,3 +523,4 @@ Implementation and isolated API/browser evidence tracked in Task 156; production
 [Task 181](../../.github/tasks/181-match-on-hold-lifecycle.md#2026-10-13-team-match-policy-override-active-follow-up) / [팀매치 시나리오](./05-team-match-flows.md#task-181--미매칭-마감취소-비노출어드민-상태-변경-2026-10-13-개정): 보류를 마감으로 통일, 취소는 사용자 목록·내 매치·상세·연결 일정에서 숨기고 어드민 이력 유지, 어드민 모집 재개 시 지난 마감일 해제 및 캐시 갱신. 구현은 별도 최신 dev 기반 작업트리에 있으며 운영 데이터 변경 없음. 관련 API 단위 168/168, Web 135/135 통과. 최종 타입/범위 점검 진행 중. 신규 HTTP/DB 회귀는 PostgreSQL 미가동으로 미실행; Alpha after QA 및 배포 미완료. 브라우저 커넥터는 kernel reset 오류로 시작 실패. 테스트 통과를 배포·실사용 QA 완료로 계산하지 않는다.
 
 - 최종 로컬 검증: 관련 API 297/297, Web 225/225; 양 앱 lint(타입+표면/패턴) 통과, diff --check 통과. 참석명단·기록 직접 URL의 사용자 비노출과 활성 관리자 기록 유지도 반영. 실제 DB/Alpha 배포/실화면 390·768·1440 검증은 여전히 미완료이며 운영 데이터는 변경하지 않았다.
+- [어드민 리그 기본 정보 수정](admin-league-basic-edit.md): Task 20261075, 로컬 190개 테스트·타입·표면/패턴 PASS. Alpha 390/768/1440 및 실제 로그인 흐름 대기.

@@ -878,7 +878,7 @@ describe('TeamDetailPageClient — 주요 멤버 미리보기', () => {
     render(<><ShellProbe /><TeamDetailPageClient teamId="team-1" /></>);
 
     // backHref는 더 이상 게시하지 않는다 — AppBackLink가 `?from=`을 직접 읽는다.
-    expect(published).toEqual({ title: '팀 목록을 불러오지 못했어요' });
+    expect(published).toEqual({ title: '팀 정보를 불러오지 못했어요' });
   });
 
   it('멤버 목록이 비공개인 팀에서는 미리보기도 더보기 CTA도 노출되지 않는다', () => {

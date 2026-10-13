@@ -240,6 +240,14 @@ export function hasCoordinates(
   return typeof place.latitude === 'number' && typeof place.longitude === 'number';
 }
 
+/** 장소를 안 정한 경기에 서버가 넣는 자리표시 이름(API `DEFAULT_FIXTURE_PLACE_NAME`). 실제 장소가 아니다. */
+export const UNSET_PLACE_NAME = '장소 미정';
+
+/** 자리표시 장소인가 — 지도 검색이나 "이 경기만 다른 장소"로 다루면 안 된다. */
+export function isUnsetPlace(place: Pick<V1PlaceView, 'name' | 'address' | 'latitude' | 'longitude'>): boolean {
+  return place.name.trim() === UNSET_PLACE_NAME && !place.address && !hasCoordinates(place);
+}
+
 // ── 길찾기 링크 ──────────────────────────────────────────────────────────────
 
 /**

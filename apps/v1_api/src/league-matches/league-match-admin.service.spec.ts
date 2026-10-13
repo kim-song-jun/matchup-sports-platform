@@ -1351,6 +1351,7 @@ describe('LeagueMatchAdminService.cancelFixture — 진행 중 경기의 대진 
       v1Tournament: { findFirst: jest.fn().mockResolvedValue({ id: LEAGUE_ID, status: 'draft' }) },
       v1TeamMatchApplication: { updateMany: jest.fn().mockResolvedValue({ count: 0 }) },
       v1TeamSchedule: { findMany: jest.fn().mockResolvedValue([]) },
+      v1Team: { findMany: jest.fn().mockResolvedValue([{ id: 'team-a', name: 'A팀' }, { id: 'team-b', name: 'B팀' }]) },
       v1TeamMembership: { findMany: jest.fn().mockResolvedValue([]) },
       // 대진의 게임 행만 상태로 답하고, 나머지 락 조회는 리그 행으로 답한다.
       $queryRaw: jest.fn().mockImplementation(async (strings: TemplateStringsArray) =>
@@ -1416,6 +1417,7 @@ describe('LeagueMatchAdminService.cancelFixture - 반쪽 경기의 홈 팀 비�
       v1Tournament: { findFirst: jest.fn().mockResolvedValue({ id: LEAGUE_ID, status: 'draft' }) },
       v1TeamMatchApplication: { updateMany: jest.fn().mockResolvedValue({ count: 0 }) },
       v1TeamSchedule: { findMany: jest.fn().mockResolvedValue([]) },
+      v1Team: { findMany: jest.fn().mockResolvedValue([{ id: 'team-a', name: 'A팀' }, { id: 'team-b', name: 'B팀' }]) },
       v1TeamMembership: { findMany: jest.fn().mockResolvedValue([]) },
       $queryRaw: jest.fn().mockImplementation(async (strings: TemplateStringsArray) =>
         strings.join('?').includes('v1_games') ? [{ state: 'SCHEDULED' }] : [{ id: LEAGUE_ID }],

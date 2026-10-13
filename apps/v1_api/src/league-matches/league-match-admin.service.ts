@@ -1192,6 +1192,12 @@ export class LeagueMatchAdminService {
         cancelledCount += 1;
       }
 
+      // 재생성으로 교체한 기록은 보존하고 현재 목록에서 숨긴다.
+      await tx.v1TeamMatch.updateMany({
+        where: { id: { in: existingFixtures.map((fixture) => fixture.id) }, deletedAt: null },
+        data: { deletedAt: new Date() },
+      });
+
       const teamsById = await loadLeagueTeamRosters(tx,league.id, teamIds);
       const { ids, place } = await this.createFixturesInTx(tx, {
         leagueId: league.id,
@@ -2632,23 +2638,34 @@ export class LeagueMatchAdminService {
       }
     }
     if (fixtureCountByTeamId.size === 0) return;
-    const body =
-      fixtures.length === 1
-        ? `"${fixtures[0].title}" 대진이 취소됐어요. 사유: ${reason}`
-        : `리그 대진 ${fixtures.length}경기가 취소됐어요. 사유: ${reason}`;
-    for (const [teamId] of fixtureCountByTeamId) {
-      this.notifications.emitToManyDeferred(
-        async () =>
-          (
+    const emit = (body: string) => {
+      for (const [teamId] of fixtureCountByTeamId) {
+        this.notifications.emitToManyDeferred(
+          async () => (
             await this.prisma.v1TeamMembership.findMany({
               where: { teamId, status: 'active', role: { in: ['owner', 'manager'] } },
               select: { userId: true },
             })
-          ).map((m) => m.userId),
-        'league_fixture_cancelled',
-        leagueId,
-        body,
-      );
+          ).map((member) => member.userId),
+          'league_fixture_cancelled', leagueId, body,
+        );
+      }
+    };
+    if (fixtures.length > 1) {
+      emit(`리그 대진 ${fixtures.length}경기가 취소됐어요. 사유: ${reason}`);
+      return;
     }
+    const fixture = fixtures[0];
+    void this.prisma.v1Team.findMany({
+      where: { id: { in: [...fixtureCountByTeamId.keys()] } },
+      select: { id: true, name: true },
+    }).then((teams) => {
+      const names = new Map(teams.map((team) => [team.id, team.name]));
+      const home = fixture.hostTeamId === null ? '홈팀 미정' : names.get(fixture.hostTeamId) ?? '홈팀';
+      const away = fixture.approvedApplicantTeamId === null ? '원정팀 미정' : names.get(fixture.approvedApplicantTeamId) ?? '원정팀';
+      emit(`"${fixture.title} · ${home} vs ${away}" 대진이 취소됐어요. 사유: ${reason}`);
+    }).catch((error: unknown) => {
+      this.logger.warn(`리그 취소 알림 준비 실패 (league=${leagueId}): ${String(error)}`);
+    });
   }
 }

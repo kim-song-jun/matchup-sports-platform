@@ -152,7 +152,7 @@ export function LeagueManualFixtureModal({
 
       <div className="flex-1 overflow-y-auto px-5 py-4">
         <p className="mb-4 text-xs text-[var(--text-muted)]">
-          라운드로빈 일괄 생성과 별개로 한 경기만 만들어요. 우천 순연 재편성이나 대체 경기에 써요.
+          두 팀을 골라 한 경기를 만들어요. 한 경기씩 운영하는 리그나 우천 순연·대체 경기에 써요.
         </p>
 
         <div className="mb-4">
@@ -163,7 +163,7 @@ export function LeagueManualFixtureModal({
             id="manual-fixture-home"
             value={home}
             onChange={setHome}
-            items={teams}
+            items={teams.filter((team) => team.id !== away?.id)}
             placeholder="참가팀에서 고르기"
             emptyText="참가팀이 없어요"
           />
@@ -177,7 +177,7 @@ export function LeagueManualFixtureModal({
             id="manual-fixture-away"
             value={away}
             onChange={setAway}
-            items={teams}
+            items={teams.filter((team) => team.id !== home?.id)}
             placeholder="참가팀에서 고르기"
             emptyText="참가팀이 없어요"
           />

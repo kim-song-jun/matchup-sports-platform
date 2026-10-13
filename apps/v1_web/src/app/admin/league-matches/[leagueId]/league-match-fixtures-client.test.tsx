@@ -103,6 +103,7 @@ function periodSettingsOf(minutes: number[]) {
 }
 
 vi.mock('@/hooks/use-v1-api', () => ({
+  useV1UpdateLeagueDiscipline: vi.fn(() => ({ mutateAsync: vi.fn(), isPending: false })),
   useV1ActivePopup: vi.fn(),
   // 그룹 B 감사 결함 1: 참가팀 추가·제거. 대부분의 테스트는 로스터 조작을 다루지 않으므로
   // 무해한 기본값이면 충분하다.
@@ -982,7 +983,7 @@ describe('LeagueMatchFixturesClient', () => {
   });
 
   describe('일정 수정 모달', () => {
-    function renderOneFixture(mutate: ReturnType<typeof vi.fn>, extra: Record<string, unknown> = {}) {
+    function renderOneFixture(mutate: ReturnType<typeof vi.fn>, extra: Record<string, unknown> = {}, fixtureExtra: Record<string, unknown> = {}) {
       useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false } as never);
       useV1AdminLeagueMatchMock.mockReturnValue({
         data: {
@@ -990,7 +991,7 @@ describe('LeagueMatchFixturesClient', () => {
           startsOn: '2026-09-01T00:00:00.000Z',
           ...extra,
           fixtures: [
-            { teamMatchId: 'tm-1', title: '가을 풋살 리그 1주차', homeTeamId: 't1', awayTeamId: 't2', startAt: '2026-09-01T20:00:00.000Z', placeName: '탄천 보조구장', placeAddress: '성남시 탄천로 1', status: 'matched' },
+            { teamMatchId: 'tm-1', title: '가을 풋살 리그 1주차', homeTeamId: 't1', awayTeamId: 't2', startAt: '2026-09-01T20:00:00.000Z', placeName: '탄천 보조구장', placeAddress: '성남시 탄천로 1', status: 'matched', ...fixtureExtra },
           ],
         },
         isPending: false,
@@ -1077,6 +1078,13 @@ describe('LeagueMatchFixturesClient', () => {
           expect.anything(),
         ),
       );
+    });
+
+    it("기본 장소가 없는 리그에서 '장소 미정'인 경기는 기본 장소 사용으로 열린다", () => {
+      const modal = renderOneFixture(vi.fn(), {}, { placeName: '장소 미정', placeAddress: null });
+
+      expect(within(modal).getByRole('radio', { name: '기본 장소 사용 (장소 미정)' })).toBeChecked();
+      expect(within(modal).getByRole('button', { name: '저장' })).toBeDisabled();
     });
 
     it('시각만 바꾸면 장소 필드를 하나도 보내지 않는다', async () => {
@@ -1368,17 +1376,16 @@ describe('LeagueMatchFixturesClient', () => {
 
       const trigger = screen.getByRole('button', { name: /^참가 신청 · 참가팀 · 대진 관리/ });
       expect(trigger).toHaveAttribute('aria-expanded', 'false');
-      // 접혀 있는 동안은 재생성뿐 아니라 참가팀 관리·경기 하나 추가도 화면에 없다.
+      // 접혀 있는 동안은 재생성·참가팀 관리가 화면에 없다. 경기 하나 추가는 접이식 밖이라 늘 보인다.
       expect(screen.queryByRole('button', { name: '대진 재생성' })).toBeNull();
       expect(screen.queryByLabelText('주차 수')).toBeNull();
       expect(screen.queryByText('참가팀 관리')).toBeNull();
-      expect(screen.queryByRole('button', { name: '경기 하나 추가' })).toBeNull();
+      expect(screen.getByRole('button', { name: '경기 하나 추가' })).toBeInTheDocument();
 
       fireEvent.click(trigger);
       expect(trigger).toHaveAttribute('aria-expanded', 'true');
       expect(screen.getByRole('button', { name: '대진 재생성' })).toBeInTheDocument();
       expect(screen.getByText('참가팀 관리')).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: '경기 하나 추가' })).toBeInTheDocument();
 
       fireEvent.click(trigger);
       expect(screen.queryByRole('button', { name: '대진 재생성' })).toBeNull();
@@ -1456,7 +1463,7 @@ describe('LeagueMatchFixturesClient', () => {
     fireEvent.click(within(openRowMenu()).getByRole('button', { name: /^몰수패 처리/ }));
 
     expect(await screen.findByText('원정팀FC 불참')).toBeInTheDocument();
-    fireEvent.change(screen.getByLabelText('변경할 상태'), { target: { value: 't2' } });
+    fireEvent.change(screen.getByLabelText('불참한 팀'), { target: { value: 't2' } });
     fireEvent.change(screen.getByLabelText(/^사유/), { target: { value: '원정팀이 경기 시작 30분 후에도 도착하지 않았어요.' } });
     fireEvent.click(screen.getByRole('button', { name: '확인' }));
 
@@ -1517,7 +1524,7 @@ describe('LeagueMatchFixturesClient', () => {
 
     fireEvent.click(within(openRowMenu()).getByRole('button', { name: /^몰수패 처리/ }));
     expect(await screen.findByText('원정팀FC 불참')).toBeInTheDocument();
-    fireEvent.change(screen.getByLabelText('변경할 상태'), { target: { value: 't2' } });
+    fireEvent.change(screen.getByLabelText('불참한 팀'), { target: { value: 't2' } });
     fireEvent.change(screen.getByLabelText(/^사유/), { target: { value: '반대 팀으로 정정 시도' } });
     fireEvent.click(screen.getByRole('button', { name: '확인' }));
 
@@ -1986,7 +1993,7 @@ describe('LeagueMatchFixturesClient — 대진 timing 설정', () => {
 
     const section = screen.getByRole('region', { name: '피리어드 설정' });
     fireEvent.click(within(section).getByRole('button', { name: '수정' }));
-    fireEvent.change(within(section).getByLabelText('피리어드 1'), { target: { value: '30' } });
+    fireEvent.change(within(section).getByLabelText('전반'), { target: { value: '30' } });
     fireEvent.click(within(section).getByRole('button', { name: '저장' }));
 
     expect(updatePeriodsMutateMock).toHaveBeenCalledWith(
@@ -2214,7 +2221,7 @@ describe('수동 대진 추가 입구 — 대진 유무와 무관하게 보인�
     );
   }
 
-  it('대진이 이미 있어도 접이식을 열면 보인다 — 우천 순연·대체 경기가 바로 이 경우다', async () => {
+  it('대진이 이미 있어도 접이식을 열지 않고 보인다 — 한 경기씩 운영하는 리그와 우천 순연·대체 경기가 바로 이 경우다', async () => {
     renderWithFixtures([
       {
         teamMatchId: 'tm-1', title: '1주차', homeTeamId: 't1', awayTeamId: 't2',
@@ -2222,8 +2229,7 @@ describe('수동 대진 추가 입구 — 대진 유무와 무관하게 보인�
         resultStage: 'official', homeScore: 3, awayScore: 1,
       },
     ]);
-    // 대진이 있는 리그에서는 "참가 신청 · 참가팀 · 대진 관리" 접이식 안에 있다(F51).
-    openFixtureManage();
+    // 예전엔 "참가 신청 · 참가팀 · 대진 관리" 접이식 안에 있어(F51) 모바일에서 경기마다 다시 펼쳐야 했다(2026-10-13 QA).
     expect(await screen.findByRole('button', { name: '경기 하나 추가' })).toBeInTheDocument();
   });
 
@@ -2288,11 +2294,12 @@ describe('수동 대진 추가 입구 — 대진 유무와 무관하게 보인�
       expect(screen.getByText(/끝난 리그라 대진을 다시 만들 수 없어요. 먼저 위 ‘상태 변경’에서 진행 중으로 바꿔 주세요/)).toBeInTheDocument();
     });
 
-    it('진행 중인 리그는 둘 다 열려 있다 (회귀 방지 — 상태 조건이 항상 참이면 아무것도 못 한다)', async () => {
+    it('확정 결과가 있는 진행 중 리그도 경기 추가는 가능하지만 재생성은 막는다', async () => {
       renderWithFixtures([OFFICIAL_FIXTURE], 'active');
       openFixtureManage();
       expect(await screen.findByRole('button', { name: '경기 하나 추가' })).not.toBeDisabled();
-      expect(screen.getByRole('button', { name: '대진 재생성' })).not.toBeDisabled();
+      expect(screen.getByRole('button', { name: '대진 재생성' })).toBeDisabled();
+      expect(screen.getByText('확정된 결과가 있어 대진을 다시 만들 수 없어요.')).toBeInTheDocument();
       expect(screen.getByRole('button', { name: '미리보기' })).not.toBeDisabled();
       expect(screen.queryByText(/끝난 리그/)).toBeNull();
     });

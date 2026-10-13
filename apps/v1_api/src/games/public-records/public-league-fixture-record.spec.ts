@@ -339,3 +339,31 @@ describe('PublicTournamentRecordsService.getLeagueFixtureRecord', () => {
     expect(result.lineup).toBeNull();
   });
 });
+
+
+describe('리그 자동 명단의 사이드별 공개', () => {
+  it('홈만 조정해 제출해도 원정 자동 명단을 유지하고 홈의 미제출 초안·무효화본은 제외한다', async () => {
+    const lineups = [
+      { id: 'h1', sideId: 'side-home', revision: 1, state: 'DRAFT', invalidatedAt: null },
+      { id: 'h2', sideId: 'side-home', revision: 2, state: 'SUBMITTED', invalidatedAt: null },
+      { id: 'h3', sideId: 'side-home', revision: 3, state: 'DRAFT', invalidatedAt: null },
+      { id: 'a1', sideId: 'side-away', revision: 1, state: 'DRAFT', invalidatedAt: null },
+      { id: 'a4', sideId: 'side-away', revision: 4, state: 'SUBMITTED', invalidatedAt: new Date() },
+    ];
+    const participants = lineups.map((lineup) => ({
+      id: `player-${lineup.id}`, lineupId: lineup.id, sideId: lineup.sideId, userId: null,
+      displayNameSnapshot: lineup.id, jerseyNumber: lineup.revision,
+    }));
+    const service = buildService({ fixture: makeFixtureRow({ game: makeGame({ lineups, participants }) }) });
+    const result = await service.getLeagueFixtureRecord(LEAGUE_ID, TEAM_MATCH_ID);
+    expect(result.lineup?.home.map((player) => player.participantId)).toEqual(['player-h2']);
+    expect(result.lineup?.away.map((player) => player.participantId)).toEqual(['player-a1']);
+  });
+  it('LIVE 리그 경기의 점수는 공식 결과 확정 전에도 공개된다', async () => {
+    const service = buildService({ fixture: makeFixtureRow({ game: makeGame({ state: 'LIVE', currentOfficialRevision: null }) }) });
+    const result = await service.getLeagueFixtureRecord(LEAGUE_ID, TEAM_MATCH_ID);
+    expect(result.status).toBe('live');
+    expect(result.scoreStatus).toBe('live');
+    expect(result.score).toEqual({ home: 0, away: 0, penalties: null });
+  });
+});

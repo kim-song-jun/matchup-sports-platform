@@ -91,9 +91,9 @@ export type MyTournamentStaffFixtureItem = {
   readonly scheduledAt: Date | null;
   readonly status: string;
   readonly gameState: string | null;
-  readonly round: string;
-  readonly fixtureNumber: number;
-  readonly legNumber: number;
+  readonly round: string | null;
+  readonly fixtureNumber: number | null;
+  readonly legNumber: number | null;
   /** 조에 속하지 않은 경기(결선 등)는 `null`. */
   readonly groupName: string | null;
   readonly fieldId: string | null;
@@ -249,7 +249,10 @@ export class TournamentOperationsStaffService {
           where: {
             tournamentId: group.tournamentId,
             deletedAt: null,
-            tournamentDetails: { isNot: null },
+            AND: [{ OR: [
+              { leagueId: null, tournamentDetails: { is: { tournamentId: group.tournamentId } } },
+              { leagueId: group.tournamentId, tournament: { is: { kind: 'regular_league' } } },
+            ] }],
             game: { is: { sourceType: 'TEAM_MATCH' } },
             OR: [
               ...(scopedFixtureIds.size > 0 ? [{ id: { in: [...scopedFixtureIds] } }] : []),
@@ -259,6 +262,7 @@ export class TournamentOperationsStaffService {
           select: {
             id: true,
             tournamentId: true,
+            leagueId: true,
             title: true,
             startAt: true,
             status: true,
@@ -279,10 +283,10 @@ export class TournamentOperationsStaffService {
             if (
               game === null ||
               game.sourceType !== 'TEAM_MATCH' ||
-              details === null ||
               fixtureTournamentId === null ||
               fixtureTournamentId !== group.tournamentId ||
-              details.tournamentId !== group.tournamentId
+              (fixture.leagueId === null && details?.tournamentId !== group.tournamentId) ||
+              (fixture.leagueId !== null && fixture.leagueId !== group.tournamentId)
             ) return [];
             const covered = fieldAssignments.some((assignment) => {
               const fixtureMatches =
@@ -302,10 +306,10 @@ export class TournamentOperationsStaffService {
               scheduledAt: fixture.startAt,
               status: fixture.status,
               gameState: game.state,
-              round: details.round,
-              fixtureNumber: details.fixtureNumber,
-              legNumber: details.legNumber,
-              groupName: details.group?.name ?? null,
+              round: details?.round ?? null,
+              fixtureNumber: details?.fixtureNumber ?? null,
+              legNumber: details?.legNumber ?? null,
+              groupName: details?.group?.name ?? null,
               fieldId: fixture.fieldId,
               fieldName: fixture.field?.name ?? null,
             }];

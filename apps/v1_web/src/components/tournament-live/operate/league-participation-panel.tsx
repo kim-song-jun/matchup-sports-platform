@@ -37,7 +37,7 @@ export function LeagueParticipationPanel({ gameId, sides, disabled = false, onEr
       <div>
         <h3 className="text-[length:var(--font-size-body-sm)] font-semibold">킥오프 준비 · 출전 선수</h3>
         <p className="mt-1 text-[length:var(--font-size-caption)] text-[var(--text-muted)]">
-          팀원 전원이 출전으로 체크돼 있어요. 오지 않은 선수만 눌러서 빼 주세요. 뺀 선수는 이 경기 출전 기록에 남지 않아요.
+          이 리그 참가 명단의 출전 가능한 선수가 체크돼 있어요. 오지 않은 선수만 눌러서 빼 주세요. 뺀 선수는 이 경기 출전 기록에 남지 않아요.
         </p>
       </div>
       {sides.map((side) => (

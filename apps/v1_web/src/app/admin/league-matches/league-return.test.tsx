@@ -86,6 +86,7 @@ vi.mock('@/hooks/use-v1-api', () => ({
   useV1CloseLeagueRegistration: () => ({ mutate: vi.fn(), isPending: false }),
   useV1UpdateLeagueCoverImage: () => ({ mutate: vi.fn(), isPending: false }),
   useV1UpdateLeagueVenue: () => ({ mutate: vi.fn(), isPending: false }),
+  useV1UpdateLeagueDiscipline: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useV1PlaceSearch: () => ({ data: undefined, isFetching: false, isError: false, error: null }),
   useV1PublicKakaoMapsKey: () => ({ data: { kakaoMapsJsKey: null }, isLoading: false }),
   useV1UploadImages: () => ({ mutateAsync: vi.fn(), isPending: false }),

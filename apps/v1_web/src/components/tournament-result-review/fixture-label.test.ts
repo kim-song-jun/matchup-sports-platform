@@ -72,3 +72,9 @@ describe('resolveFixtureLabel — 경기 이름', () => {
     });
   });
 });
+
+
+it('같은 주차의 리그 경기들도 운영 API의 팀 이름으로 구분한다', () => {
+  const item = { fixtureId: 'tm-1', round: null, fixtureNumber: null, legNumber: null, groupName: null, homeTeamName: '성수 FC', awayTeamName: '왕십리 FC' };
+  expect(resolveFixtureLabel(item, undefined, new Map([['tm-1', '가을 리그 1주차']]))).toEqual({ title: '성수 FC vs 왕십리 FC', subtitle: '가을 리그 1주차' });
+});

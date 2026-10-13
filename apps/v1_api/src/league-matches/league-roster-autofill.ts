@@ -110,6 +110,7 @@ export async function fillLeagueTeamRoster(
     orderBy: [{ joinedAt: 'asc' }, { id: 'asc' }],
     select: {
       userId: true,
+      jerseyNumber: true,
       user: {
         select: {
           phone: true,
@@ -162,6 +163,7 @@ export async function fillLeagueTeamRoster(
   const skipped: Array<{ userId: string; reason: string }> = [];
   const candidates: Array<{
     userId: string;
+    jerseyNumber: number | null;
     realName: string;
     birthDateSnapshot: string;
     genderSnapshot: string | null;
@@ -190,6 +192,7 @@ export async function fillLeagueTeamRoster(
     }
     candidates.push({
       userId: member.userId,
+      jerseyNumber: member.jerseyNumber,
       realName: member.user.profile!.realName!.trim(),
       birthDateSnapshot: member.user.profile!.birthDate!.trim(),
       genderSnapshot: normalizeGender(member.user.profile?.gender),
@@ -207,6 +210,7 @@ export async function fillLeagueTeamRoster(
       data: candidates.map((candidate) => ({
         registrationId: registration.id,
         userId: candidate.userId,
+        jerseyNumber: candidate.jerseyNumber,
         realName: candidate.realName,
         birthDateSnapshot: candidate.birthDateSnapshot,
         genderSnapshot: candidate.genderSnapshot,

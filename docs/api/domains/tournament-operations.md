@@ -368,3 +368,9 @@ projection source. The server returns 422 RESULT_GOAL_TIMELINE_INVALID if its
 score total, scorer side, own-goal opposing side, or participant goal totals
 do not agree. The correction UI also edits knockout penalty home/away scores
 and firstKickSideKey.
+
+## 2026-10-13 정규 리그 운영 조회
+
+- 운영 보드 항목의 `homeTeamName`, `awayTeamName`은 권한이 검증된 Game 사이드 표시 이름이다(`string | null`). 운영·결과 검토·정정에서 같은 주차의 경기를 구분한다.
+- 리그의 `fieldId`, `fieldName`은 TeamMatch의 실제 배정 값이며 경기장 필터도 적용한다. 없는 라운드·경기 번호·차수는 계속 `null`이다.
+- 내 스태프 배정의 `fixtures[]`에 MatchDetails가 없는 정규 리그 경기도 포함한다. 대회 소유권·리그 종류·담당 경기/경기장 범위를 검증하며 리그의 `round`, `fixtureNumber`, `legNumber`는 `null`이다. 만료·해제 배정, 다른 대회, 삭제 경기의 제외 규칙을 유지한다.

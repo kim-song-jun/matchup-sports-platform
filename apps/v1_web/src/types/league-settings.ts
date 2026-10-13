@@ -6,6 +6,7 @@ export interface LeagueSettings {
   startsOn: string | null;
   endsOn: string | null;
   registrationDeadlineAt: string | null;
+  plannedFixtureCount: number | null;
   updatedAt: string;
   status: string;
   sportName: string;
@@ -18,4 +19,5 @@ export interface UpdateLeagueSettings {
   startsOn: string;
   endsOn: string;
   registrationDeadlineAt: string | null;
+  plannedFixtureCount: number | null;
 }

@@ -8,7 +8,7 @@ import { UpdateLeagueSettingsDto } from './dto/league-settings.dto';
 
 const select = {
   id: true, title: true, rulesText: true, regionId: true, scheduledAt: true, scheduledEndAt: true,
-  registrationDeadlineAt: true, updatedAt: true, status: true,
+  registrationDeadlineAt: true, plannedFixtureCount: true, updatedAt: true, status: true,
   sport: { select: { name: true } },
 } satisfies Prisma.V1TournamentSelect;
 
@@ -21,6 +21,7 @@ function view(row: Awaited<ReturnType<typeof load>>) {
   return { leagueId: row.id, title: row.title, rulesText: row.rulesText ?? '', regionId: row.regionId,
     startsOn: row.scheduledAt?.toISOString() ?? null, endsOn: row.scheduledEndAt?.toISOString() ?? null,
     registrationDeadlineAt: row.registrationDeadlineAt?.toISOString() ?? null,
+    plannedFixtureCount: row.plannedFixtureCount,
     updatedAt: row.updatedAt.toISOString(), status: row.status, sportName: row.sport.name };
 }
 export async function getLeagueSettings(prisma: PrismaService, admins: AdminContextService, user: V1AuthUser, id: string) {
@@ -56,6 +57,7 @@ export async function updateLeagueSettings(prisma: PrismaService, admins: AdminC
     const updated = await tx.v1Tournament.update({ where: { id }, data: {
       title: dto.title.trim(), rulesText: dto.rulesText.trim() || null, regionId: dto.regionId,
       scheduledAt: startsOn, scheduledEndAt: endsOn, registrationDeadlineAt: deadline,
+      ...(dto.plannedFixtureCount !== undefined ? { plannedFixtureCount: dto.plannedFixtureCount } : {}),
     }, select });
     await admins.logAdminAction(admin, { action: 'league_match.update_settings', targetType: 'league_match', targetId: id,
       beforeJson: view(current), afterJson: view(updated) }, tx);

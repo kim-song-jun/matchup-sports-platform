@@ -3,7 +3,6 @@ import type { PlaceValue } from '@/lib/place';
 import type { V1PlaceView, V1RecentVenue, V1TeamMatchApiStatus } from '@/types/api';
 
 export type TeamMatchModel = {
-  lifecycleLabel?: '보류';
   id: string;
   title: string;
   /**

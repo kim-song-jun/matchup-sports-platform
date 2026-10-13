@@ -42,6 +42,7 @@ import {
   parseResultPolicy,
 } from '../tournaments/competition-config/competition-config.parse';
 import { FORFEIT_LOSER_SCORE, FORFEIT_WINNER_SCORE } from '../league-matches/league-forfeit-result';
+import { promoteLeagueOnGameActivityInTx } from '../league-matches/league-slot-status';
 import { assertPenaltyShootoutPersistable } from './core/penalty-shootout-outcome';
 import {
   areLatestTeamMatchLineupsSubmitted,
@@ -1010,6 +1011,7 @@ export class GamesService {
 
   /** 푸시 발송 실패 기록용. 이 클래스에는 주입 로거가 없어 지역 인스턴스를 쓴다. */
   private readonly pushLogger = new Logger(`${GamesService.name}:push`);
+  private readonly leagueLogger = new Logger(`${GamesService.name}:league`);
   async createFromSourceInTransaction(
     tx: Prisma.TransactionClient,
     input: GameSourceCreationInput,
@@ -1293,7 +1295,7 @@ export class GamesService {
     headerIdempotencyKey: string | undefined,
     dto: GameCommandDto,
   ): Promise<GameMutationResult | GameRevisionMutationResult> {
-    return this.withCommand<GameMutationResult | GameRevisionMutationResult>(
+    const result = await this.withCommand<GameMutationResult | GameRevisionMutationResult>(
       {
         gameId,
         action: gameCommandAuditAction(command),
@@ -1520,6 +1522,26 @@ export class GamesService {
         };
       },
     );
+    if (command === 'start') await this.promoteLeagueAfterStart(gameId);
+    return result;
+  }
+
+  /**
+   * 준비 중 리그의 경기가 시작되면 리그를 진행 중으로 올린다(2026-10-13 사용자 확정). 시작 트랜잭션이 커밋된 뒤 따로
+   * 한다 — 리그 행 잠금이 바쁠 때(재생성·템플릿 교체 중) 경기 시작까지 실패하지 않게. 놓쳐도 결과 확정 때 다시 올린다.
+   */
+  private async promoteLeagueAfterStart(gameId: string): Promise<void> {
+    try {
+      const game = await this.prisma.v1Game.findUnique({
+        where: { id: gameId },
+        select: { teamMatch: { select: { leagueId: true } } },
+      });
+      const leagueId = game?.teamMatch?.leagueId ?? null;
+      if (leagueId === null) return;
+      await this.prisma.$transaction((tx) => promoteLeagueOnGameActivityInTx(tx, leagueId, 'game_started'));
+    } catch (error) {
+      this.leagueLogger.warn(`league promotion after start skipped game=${gameId}: ${String(error)}`);
+    }
   }
 
   /**

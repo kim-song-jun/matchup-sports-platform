@@ -185,7 +185,7 @@ describe('friendly match shared score sheet (real DB)', () => {
   it('cancelled and existing result games cannot be edited through the shared endpoint', async () => {
     const f = await createSharedRecordFixture(prisma);
     await prisma.v1TeamMatch.update({ where: { id: f.match.id }, data: { status: 'cancelled' } });
-    await expect(records.mutate(user(f.userIds[1]), f.match.id, cmd('confirm', 0))).rejects.toMatchObject({ status: 409 });
+    await expect(records.mutate(user(f.userIds[1]), f.match.id, cmd('confirm', 0))).rejects.toMatchObject({ status: 404 });
     await prisma.v1TeamMatch.update({ where: { id: f.match.id }, data: { status: 'matched' } });
     await prisma.v1GameResultRevision.create({ data: { gameId: f.game.id, revision: 1, score: { home: 2, away: 1 }, eventsHash: 'legacy', createdByActorType: 'USER', createdByUserId: f.userIds[0] } });
     expect((await records.read(user(f.userIds[1]), f.match.id)).phase).toBe('legacy');

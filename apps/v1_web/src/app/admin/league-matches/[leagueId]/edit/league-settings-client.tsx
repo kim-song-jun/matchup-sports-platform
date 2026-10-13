@@ -16,7 +16,8 @@ function draftOf(data: LeagueSettings) {
   return { title: data.title, rulesText: data.rulesText, regionId: data.regionId ?? '',
     startsOn: data.startsOn ? toKstDateString(new Date(data.startsOn)) : '',
     endsOn: data.endsOn ? toKstDateString(new Date(data.endsOn)) : '',
-    deadline: isoToKstDatetimeLocal(data.registrationDeadlineAt) };
+    deadline: isoToKstDatetimeLocal(data.registrationDeadlineAt),
+    plannedFixtureCount: data.plannedFixtureCount?.toString() ?? '' };
 }
 const labelClass = 'grid gap-2 tm-text-label font-semibold text-[var(--text-strong)]';
 const buttonClass = 'tm-btn tm-btn-md tm-btn-neutral min-h-[44px]';
@@ -53,10 +54,15 @@ function SettingsForm({ leagueId, initial, reload }: { leagueId: string; initial
   const disabled = !canWrite || ended || busy;
   const detailHref = `/admin/league-matches/${encodeURIComponent(leagueId)}`;
   const change = (key: keyof typeof draft, value: string) => setDraft(current => ({ ...current, [key]: value }));
+  const plannedFixtureCountInvalid = draft.plannedFixtureCount.trim() !== ''
+    && !(/^\d+$/.test(draft.plannedFixtureCount.trim())
+      && Number(draft.plannedFixtureCount) >= 1
+      && Number(draft.plannedFixtureCount) <= 500);
   const hint = !draft.title.trim() ? '리그 이름을 입력해 주세요.'
     : !draft.regionId ? '지역을 선택해 주세요.'
     : !draft.startsOn || !draft.endsOn ? '시작일과 종료일을 입력해 주세요.'
     : draft.endsOn < draft.startsOn ? '종료일은 시작일보다 빠를 수 없어요.'
+    : plannedFixtureCountInvalid ? '총 경기 수는 1~500 사이로 입력해 주세요.'
     : null;
   const discard = async () => !dirty || await confirm({ title: '수정 내용을 버릴까요?', message: '저장하지 않은 입력이 사라져요.', confirmLabel: '수정 내용 버리기' });
   const submit = async (event: React.FormEvent) => {
@@ -70,6 +76,7 @@ function SettingsForm({ leagueId, initial, reload }: { leagueId: string; initial
         startsOn: draft.startsOn === original.startsOn && snapshot.startsOn ? snapshot.startsOn : new Date(`${draft.startsOn}T00:00:00.000+09:00`).toISOString(),
         endsOn: draft.endsOn === original.endsOn && snapshot.endsOn ? snapshot.endsOn : new Date(`${draft.endsOn}T23:59:59.999+09:00`).toISOString(),
         registrationDeadlineAt: draft.deadline === original.deadline ? snapshot.registrationDeadlineAt : kstDatetimeLocalToIso(draft.deadline),
+        plannedFixtureCount: draft.plannedFixtureCount.trim() === '' ? null : Number(draft.plannedFixtureCount),
       });
       router.push(detailHref);
     } catch (cause) { setError(extractErrorMessage(cause, '리그 정보를 저장하지 못했어요.')); }
@@ -109,6 +116,11 @@ function SettingsForm({ leagueId, initial, reload }: { leagueId: string; initial
         <label className={labelClass} htmlFor={`${id}-deadline`}>신청 마감 (한국 시간)
           <input id={`${id}-deadline`} className="tm-input min-h-[44px]" type="datetime-local" max="9999-12-31T23:59" value={draft.deadline} onChange={e => change('deadline', e.target.value)} />
         </label>
+        <label className={labelClass} htmlFor={`${id}-planned-fixtures`}>총 경기 수
+          <input id={`${id}-planned-fixtures`} className="tm-input min-h-[44px]" type="number" inputMode="numeric" min={1} max={500}
+            placeholder="미지정" value={draft.plannedFixtureCount} onChange={e => change('plannedFixtureCount', e.target.value)} />
+        </label>
+        <p className="tm-text-label text-[var(--text-muted)] sm:col-span-2">총 경기 수는 대진 생성의 기본값과 자동 종료 기준이에요. 비우면 기준을 두지 않아요. 바꿔도 이미 만든 경기는 추가·삭제되지 않아요.</p>
         <p className="tm-text-label text-[var(--text-muted)] sm:col-span-2">리그는 신청 정원 제한이 없어요. 신청 마감을 비우면 신규 신청이 닫혀요. 기간을 바꿔도 기존 경기 일정은 자동으로 이동하지 않아요.</p>
       </fieldset>
       {hint && <p role="status" className="tm-text-label text-[var(--text-muted)]">{hint}</p>}

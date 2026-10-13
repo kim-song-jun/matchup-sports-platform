@@ -194,7 +194,7 @@ function matchEventStatusOf(status: string): string | null {
  * 보이더라도 호스트가 적은 집·직장 위치일 수 있어 기계가 긁어 가는 필드로 내보내지 않는다.
  * 지역 표기는 상세 화면과 같은 우선순위(`region.name` → `regionName`)를 쓴다.
  */
-function matchPlaceNode(match: V1Match): JsonLdNode | null {
+function matchPlaceNode(match: V1Match | V1TeamMatch): JsonLdNode | null {
   const venue = (match.place?.name ?? match.placeName)?.trim();
   const region = (match.region?.name ?? match.regionName)?.trim();
   if (!venue && !region) return null;
@@ -210,7 +210,7 @@ function matchPlaceNode(match: V1Match): JsonLdNode | null {
  * 호스트·참가자 이름과 설명·규칙·비용 메모는 싣지 않는다. 전부 사용자가 직접 적는 자유
  * 입력이라 실명·연락처가 섞일 수 있고, 개인 호스트는 공개 프로필(`/users/*`)도 색인 밖이다.
  */
-function buildMatchEventBase(match: V1Match, path: string): JsonLdNode | null {
+function buildMatchEventBase(match: V1Match | V1TeamMatch, path: string): JsonLdNode | null {
   if (!match.startsAt) return null;
   const url = absoluteSiteUrl(path);
   const node: JsonLdNode = {

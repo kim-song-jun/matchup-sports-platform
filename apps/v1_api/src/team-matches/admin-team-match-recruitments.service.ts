@@ -16,7 +16,7 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { resolvePlaceSnapshot, toPlaceColumns } from '../places/place-snapshot';
 import { PrismaService } from '../prisma/prisma.service';
 import { resolveSportLevelRange } from '../sports/level-range';
-import { createTeamMatchScheduleInTx } from '../team-schedules/team-schedules.service';
+import { createTeamMatchScheduleInTx, syncTeamMatchScheduleInTx } from '../team-schedules/team-schedules.service';
 import {
   ApproveAdminTeamMatchApplicationDto,
   CreateAdminTeamMatchRecruitmentDto,
@@ -615,8 +615,8 @@ export class AdminTeamMatchRecruitmentsService {
       },
     });
     if (!existing) throw new NotFoundException({ code: 'NOT_FOUND', message: '팀매치 모집을 찾을 수 없어요.' });
-    if (!existing.platformManaged || existing.leagueId !== null || existing.tournamentId !== null || existing.status !== 'recruiting') {
-      throw new ConflictException({ code: 'TEAM_MATCH_NOT_PLATFORM_RECRUITING', message: '모집 중인 플랫폼 팀매치만 수정할 수 있어요.' });
+    if (!existing.platformManaged || existing.leagueId !== null || existing.tournamentId !== null || (existing.status !== 'recruiting' && existing.status !== 'closed')) {
+      throw new ConflictException({ code: 'TEAM_MATCH_NOT_PLATFORM_RECRUITING', message: '모집 중이거나 마감된 플랫폼 팀매치만 수정할 수 있어요.' });
     }
     if (existing.updatedAt.toISOString() !== dto.version) {
       throw new ConflictException({ code: 'VERSION_CONFLICT', message: '다른 관리자가 먼저 수정했어요. 최신 내용을 다시 불러와 주세요.' });
@@ -634,7 +634,7 @@ export class AdminTeamMatchRecruitmentsService {
     const matchStyle = (dto.matchStyle ?? []).map((item) => item.trim()).filter(Boolean);
     const updated = await this.prisma.$transaction(async (tx) => {
       const transition = await tx.v1TeamMatch.updateMany({
-        where: { id: teamMatchId, updatedAt: existing.updatedAt, status: 'recruiting', platformManaged: true },
+        where: { id: teamMatchId, updatedAt: existing.updatedAt, status: existing.status, platformManaged: true },
         data: {
           regionId: dto.regionId,
           title: dto.title.trim(),
@@ -658,6 +658,7 @@ export class AdminTeamMatchRecruitmentsService {
       if (transition.count !== 1) {
         throw new ConflictException({ code: 'VERSION_CONFLICT', message: '다른 관리자가 먼저 수정했어요. 최신 내용을 다시 불러와 주세요.' });
       }
+      await syncTeamMatchScheduleInTx(tx, teamMatchId, dto.title.trim(), dates.startsAt, dates.endsAt);
       const row = await tx.v1TeamMatch.findUniqueOrThrow({ where: { id: teamMatchId }, select: { updatedAt: true } });
       await this.adminContext.logAdminAction(
         admin,
@@ -675,7 +676,7 @@ export class AdminTeamMatchRecruitmentsService {
     });
     return {
       teamMatchId,
-      status: 'recruiting' as const,
+      status: existing.status,
       version: updated.updatedAt.toISOString(),
       detailRoute: `/admin/team-matches/${teamMatchId}`,
     };

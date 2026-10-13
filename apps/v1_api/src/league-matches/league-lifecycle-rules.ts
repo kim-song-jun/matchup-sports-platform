@@ -37,6 +37,11 @@ export interface LeagueFixtureCompletionRow {
 export function shouldCompleteLeague(input: {
   state: string;
   fixtures: readonly LeagueFixtureCompletionRow[];
+  /**
+   * 리그를 만들 때 정한 총 경기 수. 있으면 남은 경기가 다 확정돼도 확정된 경기가 이 수에 못 미치면 끝내지 않는다 —
+   * 경기를 하나씩 추가하는 리그가 경기마다 종료되지 않게(2026-10-13 사용자 확정). 없으면 지금처럼 남은 경기 기준이다.
+   */
+  plannedFixtureCount?: number | null;
 }): boolean {
   if (input.state !== 'active') return false;
   // 취소와 **무효(void)** 는 둘 다 "이 대진은 더 이상 결과를 기다리지 않는다"를 뜻한다.
@@ -48,6 +53,7 @@ export function shouldCompleteLeague(input: {
     (fixture) => fixture.status !== 'cancelled' && !fixture.isVoided,
   );
   if (live.length === 0) return false;
+  if (input.plannedFixtureCount != null && live.length < input.plannedFixtureCount) return false;
   return live.every((fixture) => fixture.hasOfficialResult);
 }
 

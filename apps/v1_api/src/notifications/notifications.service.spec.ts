@@ -11,7 +11,7 @@ import { Prisma } from '@prisma/client';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getLoggerToken } from 'nestjs-pino';
 import { PrismaService } from '../prisma/prisma.service';
-import { NotificationsService } from './notifications.service';
+import { NotificationsService, notificationCopyFor } from './notifications.service';
 import { REALTIME_NOTIFIER } from './realtime-notifier.port';
 import { WebPushService } from './web-push.service';
 
@@ -21,6 +21,10 @@ const user = {
   accountStatus: 'active' as const,
   onboardingStatus: 'completed' as const,
 };
+
+it('cancelled team-match notifications link to the list rather than the now-hidden detail', () => {
+  expect(notificationCopyFor('team_match_cancelled', 'team_match', 'cancelled-fixture').deepLink).toBe('/team-matches');
+});
 
 function makeNotification(overrides: Record<string, unknown> = {}) {
   return {

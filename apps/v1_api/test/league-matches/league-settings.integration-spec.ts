@@ -19,21 +19,22 @@ describe('리그 기본 정보 — 실제 HTTP/DB', () => {
   async function snapshot(id: string) {
     const res = await get(id);
     expect(res.status).toBe(200);
-    const { title, rulesText, regionId, startsOn, endsOn, registrationDeadlineAt, updatedAt } = res.body.data;
-    return { title, rulesText, regionId, startsOn, endsOn, registrationDeadlineAt, expectedUpdatedAt: updatedAt };
+    const { title, rulesText, regionId, startsOn, endsOn, registrationDeadlineAt, plannedFixtureCount, updatedAt } = res.body.data;
+    return { title, rulesText, regionId, startsOn, endsOn, registrationDeadlineAt, plannedFixtureCount, expectedUpdatedAt: updatedAt };
   }
   it('저장·재조회·공개 안내·audit를 같은 리그에 반영하고 이전 버전 저장을 막는다', async () => {
     const id = await h.makeLeague();
     const original = await snapshot(id);
     const body = { ...original, title: '수정된 가을 리그', rulesText: '첫 줄 운영 안내\n두 번째 줄',
-      startsOn: '2098-01-01T00:00:00+09:00', endsOn: '2098-12-31T23:59:59+09:00', registrationDeadlineAt: '2098-01-01T00:00:00+09:00' };
+      startsOn: '2098-01-01T00:00:00+09:00', endsOn: '2098-12-31T23:59:59+09:00',
+      registrationDeadlineAt: '2098-01-01T00:00:00+09:00', plannedFixtureCount: 24 };
     const saved = await patch(id, body);
     expect(saved.status).toBe(200);
-    expect((await get(id)).body.data).toMatchObject({ title: body.title, rulesText: body.rulesText, startsOn: '2097-12-31T15:00:00.000Z' });
-    expect(await h.prisma.v1Tournament.findUnique({ where: { id } })).toMatchObject({ title: body.title, rulesText: body.rulesText });
+    expect((await get(id)).body.data).toMatchObject({ title: body.title, rulesText: body.rulesText, startsOn: '2097-12-31T15:00:00.000Z', plannedFixtureCount: 24 });
+    expect(await h.prisma.v1Tournament.findUnique({ where: { id } })).toMatchObject({ title: body.title, rulesText: body.rulesText, plannedFixtureCount: 24 });
     const audit = await h.prisma.v1AdminActionLog.findFirstOrThrow({ where: { targetId: id, action: 'league_match.update_settings' } });
-    expect(audit.beforeJson).toMatchObject({ title: original.title });
-    expect(audit.afterJson).toMatchObject({ title: body.title });
+    expect(audit.beforeJson).toMatchObject({ title: original.title, plannedFixtureCount: original.plannedFixtureCount });
+    expect(audit.afterJson).toMatchObject({ title: body.title, plannedFixtureCount: 24 });
     const publicView = await request(app.getHttpServer()).get(`/api/v1/league-matches/${id}`);
     expect(publicView.status).toBe(200);
     expect(publicView.body.data.rulesText).toBe(body.rulesText);
@@ -42,8 +43,9 @@ describe('리그 기본 정보 — 실제 HTTP/DB', () => {
     expect(stale.status).toBe(409);
     expect(stale.body.code).toBe('LEAGUE_SETTINGS_STALE');
     expect(await h.prisma.v1AdminActionLog.count({ where: { targetId: id, action: 'league_match.update_settings' } })).toBe(1);
-    const close = await patch(id, { ...await snapshot(id), registrationDeadlineAt: null });
+    const close = await patch(id, { ...await snapshot(id), registrationDeadlineAt: null, plannedFixtureCount: null });
     expect(close.status).toBe(200);
+    expect((await get(id)).body.data.plannedFixtureCount).toBeNull();
     expect((await request(app.getHttpServer()).get(`/api/v1/league-matches/${id}`)).body.data.registrationOpen).toBe(false);
   });
   it('실제 권한, kind, 종료 상태와 DTO whitelist를 검사한다', async () => {

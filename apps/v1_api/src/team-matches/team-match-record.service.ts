@@ -50,7 +50,11 @@ export class TeamMatchRecordService {
   constructor(private readonly prisma: PrismaService) {}
 
   async read(user: V1AuthUser | null, teamMatchId: string) {
-    return this.prisma.$transaction(async (tx) => this.view(tx, await this.load(tx, teamMatchId), user), {
+    return this.prisma.$transaction(async (tx) => {
+      const game = await this.load(tx, teamMatchId);
+      await this.assertVisible(tx, game, user);
+      return this.view(tx, game, user);
+    }, {
       isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead,
     });
   }
@@ -59,6 +63,14 @@ export class TeamMatchRecordService {
     const game = await tx.v1Game.findUnique({ where: { teamMatchId }, include });
     if (!game?.teamMatch || game.teamMatch.deletedAt) throw new NotFoundException({ code: 'TEAM_MATCH_NOT_FOUND', message: '경기를 찾을 수 없어요.' });
     return game;
+  }
+
+  private async assertVisible(tx: Tx, game: Loaded, user: V1AuthUser | null) {
+    if (!['cancelled', 'archived'].includes(game.teamMatch!.status)) return;
+    const admin = user?.accountStatus === 'active'
+      ? await tx.v1AdminUser.findFirst({ where: { userId: user.id, status: 'active', user: { accountStatus: 'active' } }, select: { id: true } })
+      : null;
+    if (!admin) throw new NotFoundException({ code: 'TEAM_MATCH_NOT_FOUND', message: '경기를 찾을 수 없어요.' });
   }
 
   private roster(game: Loaded) {
@@ -319,6 +331,7 @@ export class TeamMatchRecordService {
       await tx.$queryRaw`SELECT id FROM v1_games WHERE team_match_id = ${teamMatchId} FOR UPDATE`;
       await tx.$queryRaw`SELECT id FROM v1_team_matches WHERE id = ${teamMatchId} FOR UPDATE`;
       const game = await this.load(tx, teamMatchId);
+      await this.assertVisible(tx, game, user);
       if (!this.lineupReadiness(game).lineupReady) {
         throw conflict('ROSTER_INCOMPLETE', '양 팀의 참석명단이 모두 제출되어야 경기 결과를 입력할 수 있어요.');
       }

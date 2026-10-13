@@ -14,6 +14,14 @@ const STATE_LABEL: Record<V1LeagueStateValue, string> = {
   completed: '종료',
 };
 
+// "지금은 ○○" 문장 — 라벨에 조사를 붙이면 '보류이에요'·'종료이에요'가 된다.
+const STATE_NOW: Record<V1LeagueStateValue, string> = {
+  draft: '준비 중이에요',
+  active: '진행 중이에요',
+  on_hold: '보류 중이에요',
+  completed: '종료됐어요',
+};
+
 type StateOption = { state: V1LeagueStateValue; description: string; disabledReason: string | null };
 
 /**
@@ -51,7 +59,7 @@ export function leagueStateOptions(series: Pick<V1AdminLeagueDetail, 'state' | '
         // 신청 여부는 상태가 아니라 신청 마감이 정한다(isLeagueRegistrationOpen) — 준비 중으로 돌린다고 신청이 열리지 않는다.
         return '공개 화면에서 준비 중으로 보여요. 참가 신청은 상태와 관계없이 신청 마감까지 받아요.';
       case 'active':
-        return state === 'completed' ? '종료를 풀고 다시 진행 중으로 돌려요. 남은 경기가 모두 확정되면 다시 자동으로 종료돼요.' : '리그를 시작해요.';
+        return state === 'completed' ? '종료를 풀고 다시 진행 중으로 돌려요. 남은 경기가 모두 확정되면(총 경기 수를 정했으면 그 수를 채우면) 다시 자동으로 종료돼요.' : '리그를 시작해요.';
       case 'on_hold':
         return '리그와 경기가 공개 화면에서 숨겨져요. 대진·결과·참가 팀은 그대로 남아요.';
       case 'completed':
@@ -111,7 +119,7 @@ export function LeagueStateModal({
       >
         <div>
           <h2 className="text-[length:var(--font-size-body-lg)] font-bold text-[var(--text-strong)]">상태 변경</h2>
-          <p className="mt-0.5 text-[length:var(--font-size-caption)] text-[var(--text-muted)]">지금은 {STATE_LABEL[series.state]}이에요.</p>
+          <p className="mt-0.5 text-[length:var(--font-size-caption)] text-[var(--text-muted)]">지금은 {STATE_NOW[series.state]}.</p>
         </div>
         <fieldset className="flex flex-col gap-2">
           <legend className="sr-only">바꿀 상태</legend>

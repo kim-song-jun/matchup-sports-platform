@@ -1,6 +1,7 @@
 import { normalizeGenderRule } from '../common/gender-rule';
 import { OPERATOR_ACTIONABLE_APPLICATION_WHERE } from './admin-team-match-pending';
 import { completePersonalMatch } from '../matches/complete-personal-match';
+import { cascadeCancelTeamMatchSchedulesInTx } from '../team-schedules/team-schedules.service';
 import {
   BadRequestException,
   ConflictException,
@@ -614,13 +615,15 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
         message: '팀 매칭 완료 처리는 관리자 화면이 아니라 경기 결과 확정 절차를 통해서만 가능해요.',
       });
     }
-    return this.prisma.$transaction(async (tx) => {
+    const result = await this.prisma.$transaction(async (tx) => {
+      // 경기 결과 처리와 같은 잠금 순서로 취소·재모집의 경합을 직렬화한다.
+      await tx.$queryRaw`SELECT id FROM v1_games WHERE team_match_id = ${teamMatchId} FOR UPDATE`;
       // 로그의 "이전 상태"는 바꾸기 직전 값이어야 한다. 트랜잭션 밖에서 읽으면 그 사이에
       // 다른 조작이 커밋됐을 때 실제와 다른 값이 감사 로그에 남는다 — changeUserStatus 는
       // 이미 트랜잭션 안에서 행을 잠그고 읽는다. 같은 방식으로 맞춘다.
       await tx.$queryRaw`SELECT id FROM "v1_team_matches" WHERE id = ${teamMatchId} FOR UPDATE`;
       const target = await tx.v1TeamMatch.findUnique({ where: { id: teamMatchId } });
-      if (!target) throw new NotFoundException({ code: 'NOT_FOUND', message: 'Team match was not found' });
+      if (!target || target.deletedAt) throw new NotFoundException({ code: 'NOT_FOUND', message: 'Team match was not found' });
       // Competition fixtures share TeamMatch storage, but their lifecycle belongs to
       // competition operations. A generic flip would leave Game/schedule state stale.
       if (target.leagueId || target.tournamentId) {
@@ -629,8 +632,42 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
           message: '대회·리그 경기의 상태는 해당 대회·리그 운영 화면에서 관리해 주세요.',
         });
       }
-      const updated = await tx.v1TeamMatch.update({ where: { id: teamMatchId }, data: { status: dto.status } });
-      return this.writeAdminStatusLogs(
+      const now = new Date();
+      const game = await tx.v1Game.findUnique({ where: { teamMatchId }, select: { state: true, currentOfficialRevisionId: true } });
+      if (dto.status !== target.status && (target.status === 'completed' || game?.currentOfficialRevisionId)) {
+        throw new ConflictException({ code: 'TEAM_MATCH_RESULT_OFFICIAL', message: '결과가 확정된 매치는 상태를 직접 변경할 수 없어요.' });
+      }
+      if (dto.status === 'recruiting' && (!target.startAt || target.startAt <= now || target.approvedApplicantTeamId || target.status === 'cancelled' || target.cancelledAt || (game && game.state !== 'SCHEDULED'))) {
+        throw new ConflictException({ code: 'TEAM_MATCH_REOPEN_FORBIDDEN', message: '경기 시작 전이고 상대팀이 미확정인 매치만 모집할 수 있어요. 취소된 매치는 다시 모집할 수 없어요.' });
+      }
+      if (dto.status === 'matched' && target.status !== 'matched') {
+        throw new ConflictException({ code: 'TEAM_MATCH_ASSIGNMENT_REQUIRED', message: '매칭 확정은 참가팀 승인 절차로 진행해 주세요.' });
+      }
+      if (dto.status === 'closed' && (target.approvedApplicantTeamId || target.status === 'cancelled' || target.cancelledAt || (game && game.state !== 'SCHEDULED'))) {
+        throw new ConflictException({ code: 'TEAM_MATCH_CLOSE_FORBIDDEN', message: '매칭되거나 취소된 매치는 모집 마감으로 변경할 수 없어요.' });
+      }
+      if ((dto.status === 'cancelled' || dto.status === 'archived') && ((game && !['SCHEDULED', 'CANCELLED'].includes(game.state)) || (target.status === 'matched' && target.approvedApplicantTeamId && target.startAt && target.startAt <= now))) {
+        throw new ConflictException({ code: 'TEAM_MATCH_ALREADY_STARTED', message: '이미 시작된 경기는 경기 운영 절차로 처리해 주세요.' });
+      }
+      if (dto.status === 'archived' && target.status === 'matched') {
+        throw new ConflictException({ code: 'TEAM_MATCH_CANCEL_FIRST', message: '매칭된 경기는 먼저 취소한 뒤 보관해 주세요.' });
+      }
+      // 모집 재개는 지난 마감 시각도 해제해야 사용자에게 실제로 신청 가능한 상태가 된다.
+      const clearDeadline = dto.status === 'recruiting' && !!target.deadlineAt && target.deadlineAt <= now;
+      const updated = await tx.v1TeamMatch.update({ where: { id: teamMatchId }, data: {
+        status: dto.status,
+        ...(clearDeadline ? { deadlineAt: null } : {}),
+        ...(dto.status === 'cancelled' ? { cancelledAt: now } : {}),
+      } });
+      if (dto.status === 'cancelled' && target.status !== 'cancelled') {
+        await tx.v1TeamMatchApplication.updateMany({
+          where: { teamMatchId, status: 'requested' },
+          data: { status: 'rejected', reviewedByUserId: user.id, reviewedAt: now },
+        });
+        await cascadeCancelTeamMatchSchedulesInTx(tx, teamMatchId, dto.reason);
+        await tx.v1Game.updateMany({ where: { teamMatchId, state: 'SCHEDULED' }, data: { state: 'CANCELLED', version: { increment: 1 } } });
+      }
+      const logs = await this.writeAdminStatusLogs(
         admin,
         {
           action: 'team_match.status.update',
@@ -639,13 +676,21 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
           previousStatus: target.status,
           status: updated.status,
           reason: dto.reason,
-          beforeState: { status: target.status },
-          afterState: { status: updated.status },
+          beforeState: { status: target.status, deadlineAt: target.deadlineAt?.toISOString() ?? null },
+          afterState: { status: updated.status, deadlineAt: updated.deadlineAt?.toISOString() ?? null },
           responseIdKey: 'teamMatchId',
         },
         tx,
       );
+      return { logs, target };
     });
+    if (dto.status === 'cancelled' && result.target.status !== 'cancelled') {
+      const teamIds = [result.target.hostTeamId, result.target.approvedApplicantTeamId].filter((id): id is string => !!id);
+      this.notifications?.emitToManyDeferred(async () => (await this.prisma.v1TeamMembership.findMany({
+        where: { teamId: { in: teamIds }, status: 'active', role: { in: ['owner', 'manager'] } }, select: { userId: true },
+      })).map((member) => member.userId), 'team_match_cancelled', teamMatchId, `"${result.target.title}" 팀매치가 취소됐어요. 사유: ${dto.reason}`);
+    }
+    return result.logs;
   }
 
   async actionLogs(user: V1AuthUser, query: AdminLogsQueryDto) {
@@ -3066,8 +3111,8 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
       previousStatus: string;
       status: string;
       reason: string;
-      beforeState: Record<string, string>;
-      afterState: Record<string, string>;
+      beforeState: Record<string, string | null>;
+      afterState: Record<string, string | null>;
       responseIdKey: string;
     },
     tx?: Prisma.TransactionClient,

@@ -38,6 +38,9 @@ describe('buildSportChips', () => {
  * 안 실어주는 응답이 섞여도 마감된 팀매치를 '모집 중'으로 그리면 안 된다.
  */
 describe('getStatus — 마감 판정', () => {
+  it('이전 배포 캐시에 남은 팀매치 보류도 마감으로 읽는다', () => {
+    expect(getStatus({ status: 'on_hold', displayState: 'on_hold' } as unknown as V1TeamMatch)).toBe('closed');
+  });
   const past = new Date(Date.now() - 60 * 60 * 1000).toISOString();
   const future = new Date(Date.now() + 60 * 60 * 1000).toISOString();
   // getStatus 는 status/displayState/deadlineAt 세 필드만 읽는다 — 전체 V1TeamMatch 를
@@ -244,14 +247,14 @@ describe('summarizeTeamMatches — 목록 상단 요약', () => {
     expect(summary.today).toBe(2);
   });
 
-  it('모집 중은 실제로 신청을 받는 건만 센다 (마감·확정·취소·보류 제외)', () => {
+  it('모집 중은 실제로 신청을 받는 건만 센다 (마감·확정·취소 제외)', () => {
     const summary = summarizeTeamMatches([
       item('2026-10-06T05:00:00.000Z', 'recruiting'),
       item('2026-10-07T05:00:00.000Z', 'recruiting'),
       item('2026-10-08T05:00:00.000Z', 'closed'),
       item('2026-10-09T05:00:00.000Z', 'matched'),
       item('2026-10-10T05:00:00.000Z', 'cancelled'),
-      item('2026-10-11T05:00:00.000Z', 'on_hold'),
+      item('2026-10-11T05:00:00.000Z', 'closed'),
     ]);
 
     expect(summary.urgent).toBe(2);

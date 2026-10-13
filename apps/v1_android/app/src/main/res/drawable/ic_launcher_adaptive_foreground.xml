@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<inset xmlns:android="http://schemas.android.com/apk/res/android"
+    android:inset="18%">
+    <!-- Keep the canonical mark's alpha; only the launcher supplies the background and mask. -->
+    <bitmap
+        android:src="@drawable/ic_launcher_symbol"
+        android:gravity="fill"
+        android:tint="#FFFFFFFF"
+        android:tintMode="src_in" />
+</inset>

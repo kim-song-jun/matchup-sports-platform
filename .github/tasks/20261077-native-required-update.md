@@ -75,8 +75,9 @@ Legacy binaries cannot retroactively gain this capability. A startup crash befor
 2026-10-13: Existing task-owned worktree fast-forwarded to dev 2c9cee4b; root shared checkout and its unrelated tournament WIP remain untouched. No new worktree/local branch created.
 
 - Android/iOS implementation completed by GPT-6 Luna. New versions are 0.1.3(4) and 0.1.6(10); current review submissions have not been changed.
-- Web bridge 11 focused tests passed; mandatory-gate suite 9 tests passed after fixes. Web `tsc --noEmit` passed.
+- Web bridge 12 focused tests and mandatory-gate suite 9 tests passed (21 total), including older WebViews without crypto.randomUUID and repeated unavailable results. Web `tsc --noEmit` and Web CI passed before this focused follow-up; latest-head CI remains required.
 - GPT-6 Sol independent review found Alpha version suffix and cancelled foreground request/loading ownership issues; all fixed with regression coverage. Final read-only review PASS for CI/PR.
-- iOS syntax parse and policy typecheck passed. Native full compile/tests await CI; no Android runtime/Play install or iOS store update is claimed.
+- Android Alpha CI 38349801342 passed on 84905b56f after adding the real org.json JVM test runtime (the initial JVM JSONObject stub failed). iOS Alpha CI 38349801339 passed on the same head, including Alpha/Production tests and Production Release build. No Android runtime/Play install or iOS store update is claimed.
+- GitHub Codex review found repeated unavailable warning requests and direct crypto.randomUUID usage; both were fixed and independently re-reviewed by GPT-6 Sol with no remaining P1/P2 finding. The hosted Advanced Security reviewer failed because its configured claude-opus-5 model is unavailable; that external failure is not a passing security scan.
 - Initial web test invocation used pnpm's wrong argument form; corrected to `pnpm --filter v1_web exec vitest run ... --maxWorkers=1`. jsdom lacks dialog.showModal; a narrow browser-API test substitute fixes the harness without changing product behavior.
 - Alpha browser baseline captured with ego task 391. Deployed changed UI verification pending. Store eligibility is tested separately from simulated bridge UI scenarios.

@@ -3,7 +3,7 @@ import { canCheckNativeAppUpdate, requestNativeAppUpdate } from './native-app-up
 
 const reply = (detail: unknown) => window.dispatchEvent(new CustomEvent('teameet:native-app-update-result', { detail }));
 const current = { platform: 'android', channel: 'production', version: '0.1.3', build: '4', status: 'up-to-date' };
-afterEach(() => { delete window.TeameetNative; vi.useRealTimers(); vi.restoreAllMocks(); });
+afterEach(() => { delete window.TeameetNative; vi.useRealTimers(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
 describe('native binary update bridge', () => {
   it('does not classify legacy shells or ordinary browsers as update-capable', async () => {
@@ -20,6 +20,16 @@ describe('native binary update bridge', () => {
       expect(request.type).toBe('check-app-update');
       reply({ ...current, requestId: 'another-request', status: 'update-required' });
       reply({ ...current, requestId: request.requestId });
+    } };
+    expect((await requestNativeAppUpdate(new AbortController().signal)).status).toBe('up-to-date');
+  });
+
+  it('checks older Android WebViews with getRandomValues but without randomUUID', async () => {
+    vi.stubGlobal('crypto', { getRandomValues: crypto.getRandomValues.bind(crypto) });
+    window.TeameetNative = { supports: ['check-app-update'], postMessage: (raw) => {
+      const requestId = JSON.parse(raw).requestId;
+      expect(requestId).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i);
+      reply({ ...current, requestId });
     } };
     expect((await requestNativeAppUpdate(new AbortController().signal)).status).toBe('up-to-date');
   });

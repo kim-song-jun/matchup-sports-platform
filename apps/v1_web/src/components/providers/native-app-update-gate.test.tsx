@@ -75,6 +75,9 @@ describe('mandatory store update gate', () => {
     fireEvent.click(screen.getByRole('button', { name: '업데이트 다시 확인' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('버전을 확인하지 못했어요');
     expect(screen.getByRole('dialog')).toHaveAttribute('open');
+    fireEvent.click(screen.getByRole('button', { name: '업데이트 다시 확인' }));
+    await waitFor(() => expect(posted).toHaveBeenCalledTimes(3));
+    expect(reportClientError).toHaveBeenCalledTimes(1);
     result.status = 'up-to-date';
     fireEvent.click(screen.getByRole('button', { name: '업데이트 다시 확인' }));
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());

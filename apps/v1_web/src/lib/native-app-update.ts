@@ -1,4 +1,5 @@
 import { detectNativeShell } from './native-bridge';
+import { randomUuid } from './uuid';
 
 export const NATIVE_UPDATE_READY_EVENT = 'teameet:native-capabilities-ready';
 const RESULT_EVENT = 'teameet:native-app-update-result';
@@ -49,7 +50,7 @@ export function requestNativeAppUpdate(signal: AbortSignal): Promise<NativeAppUp
   const bridge = typeof window === 'undefined' ? undefined : window.TeameetNative;
   if (!platform || !bridge || !canCheckNativeAppUpdate()) return Promise.reject(new Error('native-update-unsupported'));
   if (signal.aborted) return Promise.reject(new DOMException('Aborted', 'AbortError'));
-  const requestId = crypto.randomUUID();
+  const requestId = randomUuid();
   return new Promise((resolve, reject) => {
     let timeout: ReturnType<typeof setTimeout>;
     const cleanup = () => {

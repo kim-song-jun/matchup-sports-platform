@@ -22,6 +22,7 @@ export function NativeAppUpdateGate() {
     let disposed = false;
     let pending: AbortController | null = null;
     let lastCheck = -Infinity;
+    const reportedReasons = new Set<string>();
     const check = async (force = false) => {
       if (disposed || pending || document.visibilityState === 'hidden' || !canCheckNativeAppUpdate()) return;
       if (!force && Date.now() - lastCheck < FOCUS_THROTTLE_MS) return;
@@ -40,9 +41,15 @@ export function NativeAppUpdateGate() {
         if (disposed || controller.signal.aborted) return;
         // A failed lookup cannot revoke a previously confirmed mandatory update.
         setFailed(true);
-        reportClientError({ message: '앱 업데이트 확인 실패', level: 'warn', context: {
-          flow: 'native-app-update', reason: error instanceof Error ? error.message : 'unknown',
-        } });
+        const reason = error instanceof Error ? error.message : 'unknown';
+        // Unsupported stores/sideloads can remain unavailable indefinitely. Keep retrying,
+        // but report each reason once per page lifetime instead of logging every focus.
+        if (!reportedReasons.has(reason)) {
+          reportedReasons.add(reason);
+          reportClientError({ message: '앱 업데이트 확인 실패', level: 'warn', context: {
+            flow: 'native-app-update', reason,
+          } });
+        }
       } finally {
         if (pending === controller) {
           pending = null;

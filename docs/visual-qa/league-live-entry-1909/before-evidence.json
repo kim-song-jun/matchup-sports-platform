@@ -1,0 +1,35 @@
+{
+  "persona": "unauthenticated visitor",
+  "stage": "before",
+  "errors": [
+    "Failed to load resource: the server responded with a status of 401 ()"
+  ],
+  "apiFailures": [
+    {
+      "path": "/api/v1/auth/me",
+      "status": 401
+    }
+  ],
+  "viewports": [
+    {
+      "width": 390,
+      "liveEntryCount": 0,
+      "overflow": false
+    },
+    {
+      "width": 768,
+      "liveEntryCount": 0,
+      "overflow": false
+    },
+    {
+      "width": 1440,
+      "liveEntryCount": 0,
+      "overflow": false
+    }
+  ],
+  "existingDestination": {
+    "url": "https://alpha.teameet.co.kr/tournaments/aef0d98f-17eb-4590-b27d-a2d8bab765e6/bracket",
+    "scheduleTab": 1,
+    "standingsTab": 1
+  }
+}

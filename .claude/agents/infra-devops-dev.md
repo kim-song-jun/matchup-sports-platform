@@ -29,6 +29,8 @@ Your scope: Docker, Compose, deploy scripts, Makefile, CI/CD, reverse proxy, hea
 - Auth realm configuration (infra-security-dev)
 
 ## Key principles
+- 배포 취소 판단은 `CLAUDE.md`의 Actions 단계 표시 지연 주의사항을 따른다. `steps=[]` 또는 `Set up job`만으로 SSM 미시작을 단정하지 않는다.
+
 - Ports: v1_web 3013, v1_api 8121 (`API_PORT`), game-operations worker `WORKER_PORT` 8122; prod binds them to `127.0.0.1` behind nginx
 - Web → API: rewrites/server fetches use `INTERNAL_API_ORIGIN` (`http://v1_api:8121` in prod), never the dev `http://localhost:8121`
 - `dev` push = immediate alpha deploy (no approval). `main` push = prod deploy behind `environment: production`. Never trigger `dev → main` promotion.

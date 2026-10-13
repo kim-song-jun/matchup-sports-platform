@@ -322,6 +322,7 @@ Global rules inherited from `~/.codex/AGENTS.md`:
   dev 재실행·수동 dispatch는 run별로 격리해 과거 SHA가 최신 CI를 취소하지 못하게 한다.
   Alpha는 런타임 설정 변경 전과 SSM 시작 직전에 현재 dev SHA를 확인해 오래된 일반 배포를 건너뛴다.
   이미 시작한 SSM, 운영 배포, 명시적으로 고정한 Task168 Stage B 전환은 취소하지 않는다.
+  - GitHub Actions의 jobs/steps가 비어 있거나 `Set up job`만 보여도 실제 실행이 진행 중일 수 있다(2026-10-14 alpha 실측). 이 표시만으로 서버 배포·SSM 미시작을 단정하거나 취소하지 않는다. 취소 판단은 실제 실행 로그·활성 SSM 명령·배포 receipt를 교차 확인하고, 이미 시작한 SSM을 취소하지 않는 기존 규칙을 따른다.
 - **worktree는 항상 `git fetch origin dev` 직후 `origin/dev`에서 만든다.** 로컬 `dev` 브랜치를 체크아웃해
   base로 쓰지 않는다 — 여러 세션이 `.claude/worktrees/*`를 쓰는 공유 환경이라 로컬 `dev`가 이미 다른
   worktree에 물려 있다.

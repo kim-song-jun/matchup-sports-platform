@@ -1,0 +1,21 @@
+{
+  "commit": "792042b7d359c5552f9dba7f8cb45dab3e19699b",
+  "release": "1.9.0-alpha.20261014.g792042b7d359",
+  "health": {
+    "status": "success",
+    "db": true
+  },
+  "ci": {
+    "run": 38475457167,
+    "conclusion": "success"
+  },
+  "alphaWorkflow": {
+    "run": 38475457320,
+    "attempt1": "cancelled",
+    "attempt2": "failure",
+    "failedStage": "Create or reuse immutable release manifest",
+    "failedField": "unconfirmed"
+  },
+  "runtimeVerification": "PASS at 390/768/1440; see evidence.json",
+  "note": "Actions step metadata was incomplete; runtime identity and browser results do not imply workflow success."
+}

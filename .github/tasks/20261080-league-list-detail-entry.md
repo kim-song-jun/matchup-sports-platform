@@ -79,7 +79,7 @@ Status: Review
 - [x] 진행 중인 정규 리그의 상단 진입은 참가 상태와 무관하게 모든 폭에서 표시.
 - [x] 기존 `/tournaments/:id/bracket` 연결·from 복귀 체인·신청 CTA 유지.
 - [x] 실제 consumer 회귀 테스트·diff 검증.
-- [ ] alpha 배포 후 390/768/1440 실제 클릭·console/network 확인.
+- [x] alpha 반영 후 390/768/1440 실제 클릭·console/network 확인.
 
 Owned: 상세 client·기존 테스트·이 task·새 Changeset. Forbidden: 목록 카드의 완료 변경·API·다른 공유 WIP. 단일 에이전트 직렬 진행.
 Base: origin/dev=`439e4d2e0`; worktree `/tmp/teameet-league-live-entry-20261014`.
@@ -93,3 +93,16 @@ Alpha before: headed Chromium(owned node PID8521 → chrome PID8585) 비로그�
 PR 요청에 따라 최신 origin/dev=`e6cecf51f` 기반 `/tmp/teameet-league-live-pr`, branch `fix/league-live-public-entry`로 동일한 4개 파일을 옮겼다. 최신 dev에서 touched source/test/task 변경 없음 확인; 기존 공유 작업트리 WIP는 수정하지 않는다. alpha after 갤러리는 정본 CLAUDE.md 규칙대로 머지·배포 뒤 첨부하며 이번 요청은 dev 대상 PR 생성까지다.
 
 PR 전 검증: 최신 dev와 원래 검증한 상세 source/test 바이트 동일성 확인(81/81 결과 재사용), Web 전체 `tsc --noEmit` PASS(`/tmp/teameet-live-pr-typecheck.log`), 올바른 앱 cwd의 Web 패턴 검사 PASS(`/tmp/teameet-live-pr-pattern.log`). 최초 패턴 실행은 잘못된 cwd와 sandbox child-shell EPERM으로 실패했으며 앱 cwd의 읽기 전용 실행으로 해소했다. Changeset 포함 4개 파일만 커밋·push 대상이다.
+
+## 배포 진행 기록 — PR #1909
+- 사용자가 “예외로 하고 해줘”로 이번 PR의 Copilot 리뷰 조건 예외를 명시 승인했다. 요청·리뷰가 등록되지 않은 현상을 근거로 예외를 적용했으며 다른 PR의 규칙은 변경하지 않는다. PR 예외 기록: https://github.com/kim-song-jun/matchup-sports-platform/pull/1909#issuecomment-6156185915
+- Gates·API·Web 최신 PR CI SUCCESS, MERGEABLE/CLEAN 및 baseRefName=dev 확인 후 머지. merge SHA=`792042b7d359c5552f9dba7f8cb45dab3e19699b`.
+- 메인 작업트리 로컬 dev를 ff-only로 같은 SHA에 동기화했다. 겹친 로컬 파일은 이번 세션 소유와 원격 일치를 확인하고 `/tmp/teameet-1909-dev-sync-backup-20261014-070755`에 백업했다. index/HEAD/working 내용 동일성 확인 후 3개 파일 stat 메타데이터 갱신으로 ff-only 거부를 해소했으며 기타 WIP는 보존했다.
+- dev CI run `38475457167` SUCCESS. Alpha run `38475457320` attempt1 cancelled, attempt2 FAILURE. Workflow 성공을 주장하지 않으며 아래 실제 서빙/브라우저 결과와 구분한다.
+
+- Alpha 실제 반영: release=`1.9.0-alpha.20261014.g792042b7d359`, commit=`792042b7d359c5552f9dba7f8cb45dab3e19699b`, `/api/v1/health` status=success·DB=true. 공개 header의 SHA는 이번 머지 SHA와 동일하다.
+- Headed Chromium 비로그인 방문자: 390/768/1440 모두 PASS. 상단 버튼 높이57.5px, 화면 안 배치·가로 overflow없음. 실제 클릭→경기 일정·리그 순위 탭 전환→상세 뒤로가기 성공, `from=/tournaments?kind=league` 유지. 각 폭에서 경기 링크11개. pageerror0, 인증 없는 `/auth/me`401 외 API 실패0. Owned node18522→chrome18534, Browser.close 후 잔류없음.
+- 스크린샷 3폭을 육안 확인: 모바일·태블릿 헤더 바로 아래 기존 CTA, 데스크톱 상세 상단 full-width CTA. 기존 본문·신청 영역과 겹침 없음. 참가자 로그인 실측은 자격증명 미사용으로 포함하지 않고 confirmed/draft/cancelled 노출은 consumer 회귀 테스트로 확인했다.
+- 자동화 잔여 기록: Actions jobs/steps API와 run watch가 빈 단계/`Set up job`만 반환해 초기화 정지로 오판했다. 종료 후 실제 로그에는 이미지/manifest 생성 및 최신 dev 확인까지 진행한 것이 드러났다. 이 오판을 정정하고 `CLAUDE.md`·`AGENTS.md`·Codex/Claude infra entry에 주의사항을 같은 변경으로 기록한다.
+- attempt2는 `Create or reuse immutable release manifest`의 기존 manifest 검증에서 exit1. 재시도 환경의 PREVIOUS_SHA·MIGRATION_BASE_SHA는 이미 현재 RELEASE_SHA와 같다. 기존 manifest의 rollbackCompatibleWith와 현재 previous 계산 불일치가 가능한 계약임을 소스에서 확인했으나 manifest 원문·SSM receipt는 미수집이라 실제 불일치 필드를 확정하지 않는다. 런타임 반영은 확인됐지만 워크플로 green/서버 activation 출처를 수집한 로그만으로 주장하지 않는다. 배포 스크립트·workflow 제품 코드는 변경하지 않았다.
+- QA 기록/스크린샷: `docs/visual-qa/league-live-entry-1909/`; 재현 CLI: `QA_TOURNAMENT_ID=<alpha league id> QA_OUTPUT_DIR=<evidence dir> node scripts/qa/capture-league-live-entry-1909.cjs` (headed, alpha only).

@@ -57,6 +57,7 @@
   dev 재실행·수동 dispatch는 run별로 격리해 과거 SHA가 최신 CI를 취소하지 못하게 한다.
   Alpha는 런타임 설정 변경 전과 SSM 시작 직전에 현재 dev SHA를 확인해 오래된 일반 배포를 건너뛴다.
   이미 시작한 SSM, 운영 배포, 명시적으로 고정한 Task168 Stage B 전환은 취소하지 않는다.
+  - GitHub Actions의 jobs/steps가 비어 있거나 `Set up job`만 보여도 실제 실행이 진행 중일 수 있다(2026-10-14 alpha 실측). 이 표시만으로 서버 배포·SSM 미시작을 단정하거나 취소하지 않는다. 취소 판단은 실제 실행 로그·활성 SSM 명령·배포 receipt를 교차 확인하고, 이미 시작한 SSM을 취소하지 않는 기존 규칙을 따른다.
 - **`main`에 dev에 없는 커밋이 생겼다면 `origin/main → dev` 방향으로 흡수한다.** 반대 방향으로
   dev 내용을 main 기준에 맞춰 되돌리지 않는다.
 - **`main`에는 classic branch protection은 없지만 ruleset이 걸려 있다**(2026-08-09 실측 정정).

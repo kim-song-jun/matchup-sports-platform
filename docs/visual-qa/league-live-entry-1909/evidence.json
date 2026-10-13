@@ -1,0 +1,82 @@
+{
+  "stage": "after",
+  "persona": "unauthenticated visitor",
+  "route": "/tournaments/aef0d98f-17eb-4590-b27d-a2d8bab765e6?from=%2Ftournaments%3Fkind%3Dleague",
+  "errors": [],
+  "consoleErrors": [
+    "Failed to load resource: the server responded with a status of 401 ()",
+    "Failed to load resource: the server responded with a status of 401 ()",
+    "Failed to load resource: the server responded with a status of 401 ()",
+    "Failed to load resource: the server responded with a status of 401 ()",
+    "Failed to load resource: the server responded with a status of 401 ()"
+  ],
+  "apiFailures": [
+    {
+      "path": "/api/v1/auth/me",
+      "status": 401
+    },
+    {
+      "path": "/api/v1/auth/me",
+      "status": 401
+    },
+    {
+      "path": "/api/v1/auth/me",
+      "status": 401
+    },
+    {
+      "path": "/api/v1/auth/me",
+      "status": 401
+    },
+    {
+      "path": "/api/v1/auth/me",
+      "status": 401
+    }
+  ],
+  "viewports": [
+    {
+      "width": 390,
+      "verdict": "PASS",
+      "href": "/tournaments/aef0d98f-17eb-4590-b27d-a2d8bab765e6/bracket?from=%2Ftournaments%2Faef0d98f-17eb-4590-b27d-a2d8bab765e6%3Ffrom%3D%252Ftournaments%253Fkind%253Dleague",
+      "box": {
+        "x": 20,
+        "y": 64,
+        "width": 350,
+        "height": 57.5
+      },
+      "overflow": false,
+      "standingsSelected": "true",
+      "fixtureCount": 11,
+      "returnedTo": "/tournaments/aef0d98f-17eb-4590-b27d-a2d8bab765e6?from=%2Ftournaments%3Fkind%3Dleague"
+    },
+    {
+      "width": 768,
+      "verdict": "PASS",
+      "href": "/tournaments/aef0d98f-17eb-4590-b27d-a2d8bab765e6/bracket?from=%2Ftournaments%2Faef0d98f-17eb-4590-b27d-a2d8bab765e6%3Ffrom%3D%252Ftournaments%253Fkind%253Dleague",
+      "box": {
+        "x": 104,
+        "y": 64,
+        "width": 560,
+        "height": 57.5
+      },
+      "overflow": false,
+      "standingsSelected": "true",
+      "fixtureCount": 11,
+      "returnedTo": "/tournaments/aef0d98f-17eb-4590-b27d-a2d8bab765e6?from=%2Ftournaments%3Fkind%3Dleague"
+    },
+    {
+      "width": 1440,
+      "verdict": "PASS",
+      "href": "/tournaments/aef0d98f-17eb-4590-b27d-a2d8bab765e6/bracket?from=%2Ftournaments%2Faef0d98f-17eb-4590-b27d-a2d8bab765e6%3Ffrom%3D%252Ftournaments%253Fkind%253Dleague",
+      "box": {
+        "x": 220,
+        "y": 160,
+        "width": 1000,
+        "height": 57.5
+      },
+      "overflow": false,
+      "standingsSelected": "true",
+      "fixtureCount": 11,
+      "returnedTo": "/tournaments/aef0d98f-17eb-4590-b27d-a2d8bab765e6?from=%2Ftournaments%3Fkind%3Dleague"
+    }
+  ]
+}

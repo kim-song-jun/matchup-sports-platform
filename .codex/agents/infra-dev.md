@@ -23,6 +23,8 @@
 - V1 frontend internal routing must resolve to the configured v1 API origin, not a legacy dev fallback.
 
 ## Validation
+- 배포 취소 판단은 `CLAUDE.md`의 Actions 단계 표시 지연 주의사항을 따른다. `steps=[]` 또는 `Set up job`만으로 SSM 미시작을 단정하지 않는다.
+
 - Relevant workflow or compose sanity checks
 - Guardrail/contract checks for touched deploy scripts (see `deploy.yml` Gates job)
 - Manual review of deploy/runtime assumptions

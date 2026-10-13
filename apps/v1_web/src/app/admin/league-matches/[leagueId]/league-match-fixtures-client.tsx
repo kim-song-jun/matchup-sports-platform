@@ -934,6 +934,7 @@ export default function LeagueMatchFixturesClient({
           teams={(teamsData?.teams ?? []).map((team) => ({ id: team.teamId, label: team.name }))}
           defaultPlace={series.defaultPlace ?? null}
           recentVenues={series.recentVenues}
+          defaultDuration={periodDefaultMinutes === null ? null : { minutes: periodDefaultMinutes, label: periodDefaultHint ?? `${periodDefaultMinutes}분` }}
           isSubmitting={createManualFixture.isPending}
           onSubmit={async (payload) => {
             try {

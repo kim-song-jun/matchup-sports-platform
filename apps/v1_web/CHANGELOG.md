@@ -11,6 +11,7 @@
   팀 상세 화면을 떠날 때 알림 타이머를 정리하고, 늦게 도착한 작업 결과가 알림을 다시 만들지 않도록 수정해요.
 - 스토어에서 새 버전이 확인된 Android·iOS 앱에 필수 업데이트 안내를 표시합니다.
 - Prevent the first Escape key from dismissing the mandatory native app update dialog.
+- Validate scoped main release PRs with the same consumed Changesets, fixed app versions, and changelog checks as full dev promotions.
 
 ## 1.8.0
 

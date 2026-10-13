@@ -120,7 +120,7 @@ function compareVersions(left, right) {
   return 0;
 }
 
-function isDevToMainReleasePromotion({
+function isMainReleasePromotion({
   repo,
   changedFiles,
   baseRef,
@@ -128,14 +128,14 @@ function isDevToMainReleasePromotion({
   baseApiVersion,
   baseWebVersion,
 }) {
-  if (baseRef !== 'main' || headRef !== 'dev') return false;
+  if (baseRef !== 'main' || !headRef) return false;
 
   const contract = loadReleaseContract(repo);
   if (contract.changesets.length > 0) {
-    throw new Error('dev -> main promotion must not contain unreleased Changesets');
+    throw new Error('main release promotion must not contain unreleased Changesets');
   }
   if (!RELEASE_PROMOTION_REQUIRED_FILES.every((path) => changedFiles.includes(path))) {
-    throw new Error('dev -> main promotion must include both app versions and changelogs');
+    throw new Error('main release promotion must include both app versions and changelogs');
   }
 
   const consumedChangesets = changedFiles.filter(
@@ -145,13 +145,13 @@ function isDevToMainReleasePromotion({
       !existsSync(resolve(repo, path)),
   );
   if (consumedChangesets.length === 0) {
-    throw new Error('dev -> main promotion must include consumed Changesets');
+    throw new Error('main release promotion must include consumed Changesets');
   }
   if (baseApiVersion !== baseWebVersion) {
-    throw new Error('Base fixed package versions must match for promotion');
+    throw new Error('Base fixed package versions must match for main release promotion');
   }
   if (compareVersions(contract.baseVersion, baseApiVersion) <= 0) {
-    throw new Error('dev -> main promotion must advance the fixed package version');
+    throw new Error('main release promotion must advance the fixed package version');
   }
   return true;
 }
@@ -167,10 +167,10 @@ try {
   if (
     releaseFiles.length > 0 &&
     options.releasePromotion &&
-    isDevToMainReleasePromotion({ ...options, changedFiles })
+    isMainReleasePromotion({ ...options, changedFiles })
   ) {
     process.stdout.write(
-      'Verified dev -> main release promotion (version bump + changelogs + consumed Changesets)\n',
+      'Verified main release promotion (version bump + changelogs + consumed Changesets)\n',
     );
   } else if (releaseFiles.length > 0 && isChangesetsReleaseCommit(changedFiles, releaseFiles)) {
     process.stdout.write(

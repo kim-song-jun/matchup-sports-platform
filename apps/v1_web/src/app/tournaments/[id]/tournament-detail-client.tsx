@@ -425,8 +425,8 @@ export function ApplyCTA({
   );
 }
 
-/* ── Unified bracket-entry CTA (top-sticky + bottom, mobile/tablet only — desktop
-   uses the always-visible sticky rail below) ── */
+/* ── Unified bracket-entry CTA — 진행 중인 정규 리그는 모든 화면 폭에서 상단에 표시.
+   일반 대회는 mobile/tablet 상단 진입과 desktop sticky rail을 사용한다. ── */
 
 function BracketEntryCtaButton({ tournament }: { tournament: V1TournamentDetail }) {
   const childHref = useChildHref();
@@ -656,6 +656,7 @@ export function TournamentDetailView({
     myRegistration !== null && myRegistration.status !== 'cancelled';
   /** 하단 고정 신청 CTA 가 뜨는가 — 신청한 팀은 "우리 팀 참가" 카드가 그 자리를 맡아 뜨지 않는다(ApplyCTA 와 같은 조건). */
   const showsApplyCta = isOpen && !hasActiveRegistration;
+  const showsPublicLeagueLiveCta = isLeagueMirror && tournament.status === 'in_progress';
   // Mobile: extra bottom padding so fixed CTA doesn't occlude last content row.
   // Desktop: fixed CTA is hidden via .tm-hide-desktop; sticky right panel takes over.
   const detailArticleClassName = `tm-tournament-detail-article${showsApplyCta ? ' tm-tournament-detail-article--fixed-cta' : ''}`;
@@ -1394,10 +1395,12 @@ export function TournamentDetailView({
           있어 이 스티키 CTA를 숨길 스크롤 위치가 존재하지 않는다 — 데스크탑 rail도
           isOpen일 땐 ApplyCTAButtons만 두고 대진표 링크를 넣지 않으므로(railCTA 위,
           §isOpen 분기), 동일하게 여기서도 렌더 자체를 건너뛰어 "참가 신청하기" 하나만
-          1차 CTA로 남긴다(토스 루브릭: 카드당 주요 CTA 1개). */}
-      {bracketCtaLabel && !showsApplyCta ? (
+          1차 CTA로 남긴다(토스 루브릭: 카드당 주요 CTA 1개).
+          진행 중인 정규 리그는 신청 가능 여부와 별개로 경기 일정·라이브 진입을 모든
+          방문자에게 제공한다. 데스크톱도 리그 신청 rail을 쓰므로 이 상단 진입을 함께 표시한다. */}
+      {bracketCtaLabel && (!showsApplyCta || showsPublicLeagueLiveCta) ? (
         <div
-          className="tm-hide-desktop"
+          className={showsPublicLeagueLiveCta ? undefined : 'tm-hide-desktop'}
           style={{
             position: 'sticky',
             top: 0,

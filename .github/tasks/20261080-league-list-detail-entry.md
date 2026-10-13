@@ -1,6 +1,6 @@
 # Task 20261080: 리그 목록의 이전 상세페이지 연결 복구
 
-Status: In Progress
+Status: Review
 **Owner**: root
 **Created**: 2026-10-14
 
@@ -69,3 +69,27 @@ Status: In Progress
 - PR #1908, head `0278bb95b`, base dev. 직전 dev CI 38416474799의 Web 로그인 복귀 테스트 1건은 변경된 sessionStorage 복귀 계약과 불일치했다. 실제 consumer 로컬 RED 1 FAIL/6 PASS(`/tmp/teameet-deploy-email-login-red.log`); 필수 약관 경로, 저장된 원 목적지, 최종 이동·소비를 함께 검증하도록 동기화했다.
 - 같은 CI API 통합 실패는 단건 리그 취소가 팀 이름을 비동기로 조회한 뒤 알림을 발송하는데 테스트가 응답 직후 spy count를 검사한 race다. 기존 HTTP 200·spy 2회 검증을 유지하고 실제 `V1Notification` 2행의 양 팀 owner 수신자 및 팀 이름·취소 사유 저장을 기다려 검증한다. API 제품 코드·권한·DB schema 변경은 없다. 관련 테이블은 조회·검증하는 기존 `V1Notification`, `V1Team`이며 migration은 필요하지 않다. DB 실측은 PR CI가 수행한다.
 - 배포 blocker 테스트 수정 후 로그인·복귀 경로 31/31 PASS(`/tmp/teameet-deploy-email-login-green.log`), Web incremental 타입 검사 PASS(`/tmp/teameet-league-detail-typecheck-deploy.log`), API 표면 검사 PASS. 브라우저 공유 라이브러리는 시스템 설치 없이 `/tmp/teameet-browser-runtime-libs`에 추출해 headed 기동에 성공했고 현재 alpha 목록의 원래 `/league-matches/:id` 링크를 실제 브라우저로 재확인했다.
+
+
+## 후속 요청: 진행 중인 리그의 공개 상단 진입 (2026-10-14)
+사용자가 기존 두 화면을 지정했다: 상세 상단의 LIVE · 진행 중인 리그 보기 → 기존 순위·브래킷 화면의 경기 일정·리그 순위. 화면 신설 대신 기존 BracketEntryCtaButton을 재사용한다. 참가자뿐 아니라 미참가자·방문자에게도 웹·모바일에서 보여야 한다.
+
+- [x] 사용자 지정 기존 화면·컴포넌트 재사용 확인(새 시안 선택 불필요).
+- [x] 원인 확인: `tm-hide-desktop` 및 `showsApplyCta`가 상단 진입을 숨김. 리그는 신청 가능 상태를 `isOpen`으로 취급하여 데스크톱 진행 상태 rail에도 닿지 않음.
+- [x] 진행 중인 정규 리그의 상단 진입은 참가 상태와 무관하게 모든 폭에서 표시.
+- [x] 기존 `/tournaments/:id/bracket` 연결·from 복귀 체인·신청 CTA 유지.
+- [x] 실제 consumer 회귀 테스트·diff 검증.
+- [ ] alpha 배포 후 390/768/1440 실제 클릭·console/network 확인.
+
+Owned: 상세 client·기존 테스트·이 task·새 Changeset. Forbidden: 목록 카드의 완료 변경·API·다른 공유 WIP. 단일 에이전트 직렬 진행.
+Base: origin/dev=`439e4d2e0`; worktree `/tmp/teameet-league-live-entry-20261014`.
+공개 alpha API는 제보 리그의 kind=`regular_league`, status=`in_progress`, format=`group_knockout`임을 확인했다. 연결 화면은 이미 regular_league를 판별해 경기 일정·리그 순위를 렌더한다.
+RED: 실제 상세 consumer 81개 중 새 4개 실패/77개 통과(`/tmp/teameet-league-live-red.log`). 미참가·취소 사용자는 링크가 없고, 참가자는 desktop 숨김 조상 조건이 실패했다.
+
+GREEN: 상세 consumer 81/81 PASS(`/tmp/teameet-league-live-green.log`), diff check PASS, touched source/test debt marker 0. 추가 7개는 미신청/confirmed/draft/cancelled 상단 링크·desktop 숨김 부재·제목 이전 순서·실제 목적지 및 일반 대회/종료·취소 대조군을 검증한다.
+Alpha before: headed Chromium(owned node PID8521 → chrome PID8585) 비로그인 방문자 390/768/1440에서 liveEntryCount=0, overflow=false. 기존 `/bracket` 진입 시 경기 일정·리그 순위 탭이 각각 1개로 실제 구현됨을 확인했다. API 실패는 비로그인 `/auth/me` 401 한 건, pageerror 없음. evidence/screenshot: `/tmp/teameet-live-entry-before/`. Browser.close 완료·잔류 없음. 참가자 before 증거는 사용자가 제공한 이미지이며 자체 로그인 실측은 미실행이다.
+현재 변경은 격리 작업트리에서 검증 후 공유 작업트리에 반영하는 코드 변경이며 commit/push/merge/alpha 배포는 미실행이다. 새 UI의 alpha after 3폭/참가자·비참가자 실제 클릭은 배포 후 필요하다. 이를 완료한 QA로 보고하지 않는다.
+
+PR 요청에 따라 최신 origin/dev=`e6cecf51f` 기반 `/tmp/teameet-league-live-pr`, branch `fix/league-live-public-entry`로 동일한 4개 파일을 옮겼다. 최신 dev에서 touched source/test/task 변경 없음 확인; 기존 공유 작업트리 WIP는 수정하지 않는다. alpha after 갤러리는 정본 CLAUDE.md 규칙대로 머지·배포 뒤 첨부하며 이번 요청은 dev 대상 PR 생성까지다.
+
+PR 전 검증: 최신 dev와 원래 검증한 상세 source/test 바이트 동일성 확인(81/81 결과 재사용), Web 전체 `tsc --noEmit` PASS(`/tmp/teameet-live-pr-typecheck.log`), 올바른 앱 cwd의 Web 패턴 검사 PASS(`/tmp/teameet-live-pr-pattern.log`). 최초 패턴 실행은 잘못된 cwd와 sandbox child-shell EPERM으로 실패했으며 앱 cwd의 읽기 전용 실행으로 해소했다. Changeset 포함 4개 파일만 커밋·push 대상이다.

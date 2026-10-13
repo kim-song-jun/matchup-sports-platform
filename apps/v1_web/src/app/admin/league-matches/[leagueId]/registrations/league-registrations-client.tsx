@@ -130,6 +130,9 @@ export default function LeagueRegistrationsClient({ leagueId }: { leagueId: stri
     setPresetIso(next === 'custom' ? null : presetDeadlineIso(new Date(), next));
   };
 
+  const selectedDeadlineIso = preset === 'custom' ? kstDatetimeLocalToIso(deadline) : presetIso;
+  const deadlineAfterStart = Boolean(league && selectedDeadlineIso && Date.parse(selectedDeadlineIso) > Date.parse(league.startsOn));
+
   const steps = league
     ? deriveRegistrationSetupSteps({
         entryFeeConfigured: league.entryFeeConfiguredAt !== null,
@@ -228,6 +231,11 @@ export default function LeagueRegistrationsClient({ leagueId }: { leagueId: stri
                 </p>
               </div>
             ) : null}
+            {deadlineAfterStart ? (
+              <p role="status" className="mt-2 text-[length:var(--font-size-caption)] text-[var(--orange700)]">
+                신청 마감이 리그 시작일 이후예요. 리그가 시작된 뒤에도 신청을 받아요.
+              </p>
+            ) : null}
             {preset === 'custom' ? (
               <div className="flex flex-wrap items-end gap-2">
                 <label className="text-xs text-[var(--text-muted)]" htmlFor="league-registration-deadline">
@@ -274,7 +282,7 @@ export default function LeagueRegistrationsClient({ leagueId }: { leagueId: stri
           `LEAGUE_CANCEL_REASON_REQUIRED` 로 막는데 화면이 사유를 안 받아서, 그동안
           **어드민이 리그 신청을 거부할 방법이 아예 없었다.** 대회 화면은 이 값을 안 넘겨
           기존 계약(선택)이 그대로 유지된다. */}
-      <RegistrationsTab tournamentId={leagueId} showToast={showToast} canWrite requireCancelReason />
+      <RegistrationsTab tournamentId={leagueId} showToast={showToast} canWrite requireCancelReason isFreeEntry={league?.entryFee === 0} />
       <AdminToasts toasts={toasts} />
     </div>
   );

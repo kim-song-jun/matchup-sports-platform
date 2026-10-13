@@ -557,3 +557,7 @@ Self-view returns linked tournament awards regardless of public-record consent,
 matching the existing self-view game-record bypass. Other viewers receive the
 linked award list only while the target user's record consent is `GRANTED`;
 the response still omits `consentGranted` for non-owners.
+
+## 2026-10-13 정규 리그 자동 명단 공개
+
+리그 경기 공개 기록은 사이드별 최신 제출·잠금 명단을 우선 사용한다. 제출본이 없는 사이드는 유효한 최신 자동 초안을 표시하므로 홈만 출전을 조정해도 원정 명단이 사라지지 않는다. 무효화된 명단은 제외하며 제출본 위의 미제출 초안은 기존 제출본을 덮어쓰지 않는다. 이름 동의·명단 공개 시각·가시성 정책과 대회 명단 규칙은 유지한다.

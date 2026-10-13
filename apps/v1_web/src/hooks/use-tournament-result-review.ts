@@ -156,6 +156,8 @@ export type TournamentOperationsBoardWarning = 'NO_FIELD_ASSIGNED' | 'MISSING_SC
 
 export type TournamentOperationsBoardItem = {
   fixtureId: string;
+  homeTeamName?: string | null;
+  awayTeamName?: string | null;
   tournamentId: string;
   /**
    * **리그 행에서는 `null` 이다.** 주차·번호는 대회 축의 컬럼이고 `V1TeamMatch` 에는

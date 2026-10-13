@@ -48,7 +48,7 @@ function createMockSocket() {
         }
         cb({
           status: 'subscribed',
-          snapshot: { version: 3, state: 'LIVE' as GameState, lastSequence: 0, events: [] },
+          snapshot: { gameId: GAME_ID, version: 3, state: 'LIVE' as GameState, lastSequence: 0, events: [] },
         });
         return;
       }

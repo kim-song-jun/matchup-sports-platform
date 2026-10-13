@@ -1347,7 +1347,7 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
           hidden on desktop, so the console can return to the viewport top at lg. */}
       <header
         className={[
-          'sticky z-10 border-b border-[var(--border)] bg-white/95 px-4 py-3 sm:backdrop-blur-sm dark:bg-gray-900/95',
+          'sticky z-10 border-b border-[var(--border)] bg-[var(--card-surface)] px-4 py-3',
           tournamentOpsRole === 'FIELD_OPERATOR' ? 'top-[52px]' : 'top-[52px] lg:top-0',
         ].join(' ')}
       >

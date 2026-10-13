@@ -5861,6 +5861,18 @@ export function useV1AdminLeagueMatchList(seriesId?: string, visibility?: 'publi
   });
 }
 
+export function useV1UpdateLeagueDiscipline(leagueId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: { yellowAccumulationLimit: number | null; redCardSuspensionMatches: number | null }) =>
+      v1Patch<{ leagueId: string; yellowAccumulationLimit: number | null; redCardSuspensionMatches: number | null }>(`/admin/league-matches/${leagueId}`, payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminLeagueMatch(leagueId) });
+      queryClient.invalidateQueries({ queryKey: v1Keys.tournament(leagueId) });
+    },
+  });
+}
+
 export function useV1AdminLeagueMatch(leagueId: string) {
   return useQuery({
     queryKey: v1Keys.adminLeagueMatch(leagueId),

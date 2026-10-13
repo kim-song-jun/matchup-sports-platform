@@ -11,6 +11,9 @@ export const LEAGUE_RESULT_ENTRY_REMINDER_TYPE = 'LEAGUE_RESULT_ENTRY_REMINDER';
 const REMINDER_DELAY_MS = 24 * 60 * 60 * 1_000;
 
 type LockedFixture = {
+  title: string;
+  homeTeamName: string | null;
+  awayTeamName: string | null;
   teamMatchId: string;
   status: string;
   startAt: Date;
@@ -45,7 +48,7 @@ export async function scheduleLeagueResultEntryReminder(
 
 /**
  * 리그 대진의 경기 시작 24시간 후에도 결과가 미입력(not_entered)이면 운영자(active
- * admin 전원, support 제외)에게 1회 알림 — 딥링크는 해당 리그 어드민 대진 표.
+ * admin 전원, support 제외)에게 1회 알림 — 딥링크는 해당 경기 결과 검토.
  *
  * 이미 존재하는 대진(이 기능 이전에 생성된 것)은 스케줄이 없다 — 백필은 범위 밖.
  */
@@ -76,14 +79,15 @@ export class LeagueResultEntryReminderService {
 
     const admins = await this.activeOpsAdmins(tx);
     if (admins.length === 0) return;
-    const deepLink = `/admin/league-matches/${fixture.leagueId}`;
+    const deepLink = `/admin/live/${fixture.leagueId}/result-review?fixtureId=${teamMatchId}`;
+    const body = `${fixture.title} · ${fixture.homeTeamName ?? '홈팀 미정'} vs ${fixture.awayTeamName ?? '원정팀 미정'} — 경기 시작 24시간이 지났는데 결과가 입력되지 않았어요.`;
     for (const admin of admins) {
       const businessKey = `league-result-entry-reminder:${teamMatchId}:recipient:${admin.userId}`;
       await tx.$executeRaw`
         INSERT INTO v1_notifications (id, business_key, recipient_user_id, target_type, target_id, title, body, deep_link, created_at, updated_at)
         VALUES (
           ${randomUUID()}, ${businessKey}, ${admin.userId}, 'team_match'::"V1NotificationTargetType", ${teamMatchId},
-          '리그 경기 결과가 아직 입력되지 않았어요', '경기 시작 24시간이 지났는데 결과가 입력되지 않았어요.', ${deepLink},
+          '리그 경기 결과가 아직 입력되지 않았어요', ${body}, ${deepLink},
           CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
         )
         ON CONFLICT (business_key) DO NOTHING
@@ -111,12 +115,17 @@ export class LeagueResultEntryReminderService {
     const rows = await tx.$queryRaw<LockedFixture[]>`
       SELECT
         team_match.id AS "teamMatchId",
+        team_match.title AS title,
+        home_team.name AS "homeTeamName",
+        away_team.name AS "awayTeamName",
         team_match.status::text AS status,
         team_match.start_at AS "startAt",
         team_match.league_id AS "leagueId",
         game.current_official_revision_id AS "currentOfficialRevisionId",
         latest_revision.state::text AS "latestRevisionState"
       FROM v1_team_matches team_match
+      LEFT JOIN v1_teams home_team ON home_team.id = team_match.host_team_id
+      LEFT JOIN v1_teams away_team ON away_team.id = team_match.approved_applicant_team_id
       LEFT JOIN v1_games game ON game.team_match_id = team_match.id
       LEFT JOIN LATERAL (
         SELECT state FROM v1_game_result_revisions

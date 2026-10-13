@@ -165,12 +165,7 @@ describe('RealtimeGateway', () => {
         // 소켓 경로만 검증하므로 주입만 만족하면 된다(REST 경로 브로드캐스트는
         // games.controller.broadcast.spec.ts 가 따로 검증한다).
         { provide: GameBroadcastRegistry, useValue: { register: jest.fn(), emitToGame: jest.fn() } },
-        // 백로그 결함 수정(realtime-takeover-and-eviction-protocol): 게이트웨이가
-        // renew 실패의 superseded/naturally-expired 여부를 직접 이 서비스로
-        // 물어본다(games.gateway.task20-takeover.spec.ts가 그 분기를 검증한다).
-        // 이 파일의 스펙들은 그 분기와 무관하므로 기본값(false = 자연 만료
-        // 취급)만 만족하면 된다.
-        { provide: GameTakeoverService, useValue: { isSuperseded: jest.fn().mockReturnValue(false) } },
+        GameTakeoverService,
       ],
     }).compile();
     gateway = moduleRef.get(RealtimeGateway);

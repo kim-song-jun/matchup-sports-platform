@@ -120,6 +120,7 @@ function createMockSocket() {
         cb({
           status: 'subscribed',
           snapshot: {
+            gameId: input.gameId,
             version: 7,
             state: 'LIVE' as GameState,
             lastSequence: SERVER_LAST_SEQUENCE,

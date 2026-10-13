@@ -288,10 +288,16 @@ function ActiveTeamDetailPageClient({ teamId, seed }: { teamId: string; seed?: V
   const authVerified = Boolean(authMe.data?.user?.id) && !authPending && !authMe.isError && !authUnauthorized;
   const authError = Boolean(authMe.isError && !authUnauthorized);
   const query = useV1TeamDetail(teamId, { seed, refetchOnWindowFocus: 'always' });
+  const [firstLoadRetryFailure, setFirstLoadRetryFailure] = useState<{ teamId: string; error: unknown } | null>(null);
+  useEffect(() => {
+    setFirstLoadRetryFailure((previous) => query.data || previous?.teamId !== teamId ? null : previous);
+  }, [query.data, teamId]);
+  // 캐시 없는 재시도는 query.error를 지우므로 명시적 재시도의 실제 오류만 유지한다.
+  const retainedFirstLoadFailure = firstLoadRetryFailure?.teamId === teamId ? firstLoadRetryFailure : null;
   // override store는 한 칸이고 부모 effect가 자식(TeamStatePageView)보다 늦게 돈다 —
   // 에러 뷰의 제목까지 여기서 함께 게시하지 않으면 부모 값이 그 제목을 덮어쓴다.
   // 일시적 재조회 실패는 캐시와 실제 오류를 함께 표시한다. 접근 차단은 부모 경계가 처리한다.
-  const loadFailed = query.isError && !query.data;
+  const loadFailed = !query.data && (query.isError || retainedFirstLoadFailure !== null);
   const stateTitle = loadFailed ? '팀 정보를 불러오지 못했어요' : undefined;
   // 뒤로가기는 AppBackLink 가 `?from=` 을 직접 읽으므로 여기서 backHref 로 따로 넘기지 않는다.
   useShellOverride(stateTitle ? { title: stateTitle } : {});
@@ -346,7 +352,18 @@ function ActiveTeamDetailPageClient({ teamId, seed }: { teamId: string; seed?: V
     resolveChat.mutate({ targetType: 'team', targetId: teamId });
   }, [authVerified, query.data, resolveChat, teamId]);
 
-  if (loadFailed) return <TeamDetailLoadError error={query.error} isFetching={query.isFetching} onRetry={() => void query.refetch({ cancelRefetch: false })} />;
+  if (loadFailed) {
+    return (
+      <TeamDetailLoadError
+        error={query.isError ? query.error : retainedFirstLoadFailure?.error}
+        isFetching={query.isFetching}
+        onRetry={() => {
+          if (query.isError) setFirstLoadRetryFailure({ teamId, error: query.error });
+          void query.refetch({ cancelRefetch: false });
+        }}
+      />
+    );
+  }
 
   const regionParts = splitTeamRegion(query.data?.region);
   // 데이터가 오기 전에는 하드코딩 목업(`fallback`)을 화면 전체로 렌더하지 않는다 —

@@ -64,6 +64,8 @@ Status: In Progress
 | 2026-10-13 | independent review | 캐시 보존 시 재조회 실패 안내 누락 | 기존 오류 컴포넌트로 최소 수정, 원 완료 상태/첨부 삭제를 다시 조작하지 않음 |
 
 ## Progress Snapshot
+- Root latest checkpoint: independent e5050d467 Warning1 reproduced first-load503 retry removing the focused button while query reset to pending/error=null (RED1FAIL/13SKIP). The explicit retry now retains only the actual error and teamId until real data or route change, without populating cache/fake data or bypassing the parent access boundary. Existing14 focus/error cases GREEN; scoped latest lint PASS. Committed full117 cases and latest-head re-review follow.
+- Current origin/dev be354345a7c8344f6d498de190c411caa1fbbcd0 safely integrated; user alpha login completed and authenticated E2E관리자 UI confirmed. New UI source has not yet been deployed/visually verified, so alpha remains pending, not PASS.
 - Latest root checkpoint 2026-10-13: same OPEN dev PR1886 review findings at head6526521b53b54ed3f988f531049afc636ceef47a are being repaired. Latest upstream29fd7fef7ca0f233838be08668f9e4ecbcada071 safely merged, preserving unrelated native startup changes and all owned UI WIP. Historical snapshots below remain evidence.
 - Actual Codex P2 r4254499224: retry unmount loses keyboard focus/progress. The opt-in shared ErrorState keeps the same button, uses aria-disabled plus guarded click while pending, and shows 조회 중.... Existing default error/back/retry behavior is preserved.
 - Actual Codex P2 r4254499230: full empty-state padding outside constrained layout. Only cached errors use compact token-based cards inside active desktop main/mobile article or dissolved-team wrapper. First-load and access failures keep the full error contract.

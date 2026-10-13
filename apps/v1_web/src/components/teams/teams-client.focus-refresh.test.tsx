@@ -226,6 +226,61 @@ describe('team detail background refetch failure', () => {
     expect(screen.getByRole('button', { name: '다시 불러오기' })).toBeVisible();
   });
 
+  it('preserves the first-load error retry focus without cached data through repeated failure', async () => {
+    const user = userEvent.setup();
+    teamFailure = 503;
+    const client = mountTab(0);
+    await screen.findByText('팀 정보를 확인하지 못했어요. 잠시 후 다시 시도해 주세요.');
+    await waitFor(() => {
+      expect(client.getQueryState([...v1Keys.team(teamId), 'detail'])).toMatchObject({ data: undefined, status: 'error', fetchStatus: 'idle' });
+    });
+    const retry = screen.getByRole('button', { name: '다시 불러오기' });
+    retry.focus();
+    expect(retry).toHaveFocus();
+
+    let releaseResponse: (() => void) | undefined;
+    const responseReady = new Promise<void>((resolve) => { releaseResponse = resolve; });
+    server.use(http.get(`${api}/teams/${teamId}`, async () => {
+      teamReads += 1;
+      await responseReady;
+      return teamFailure
+        ? HttpResponse.json({ status: 'error', statusCode: teamFailure, code: 'TEAM_READ_FAILED', message: '팀 정보를 확인하지 못했어요. 잠시 후 다시 시도해 주세요.' }, { status: teamFailure })
+        : HttpResponse.json({ status: 'success', data: team() });
+    }));
+    teamReads = 0;
+    await user.keyboard('{Enter}');
+    try {
+      await waitFor(() => {
+        expect(client.getQueryState([...v1Keys.team(teamId), 'detail'])).toMatchObject({ data: undefined, status: 'pending', fetchStatus: 'fetching' });
+      });
+      expect(retry).toBeInTheDocument();
+      expect(retry).toHaveFocus();
+      expect(retry).toHaveAttribute('aria-disabled', 'true');
+      expect(retry).toHaveTextContent('조회 중...');
+      expect(screen.queryAllByText('처음 팀 소개예요')).toHaveLength(0);
+      await user.keyboard('{Enter}');
+      await user.keyboard(' ');
+      expect(teamReads).toBe(1);
+    } finally {
+      await act(async () => { releaseResponse?.(); });
+    }
+    await waitFor(() => {
+      expect(client.getQueryState([...v1Keys.team(teamId), 'detail'])).toMatchObject({ data: undefined, status: 'error', fetchStatus: 'idle' });
+    });
+    expect(retry).toBeInTheDocument();
+    expect(retry).toHaveFocus();
+    expect(retry).not.toHaveAttribute('aria-disabled');
+    expect(retry).toHaveTextContent('다시 불러오기');
+    expect(screen.getByText('팀 정보를 확인하지 못했어요. 잠시 후 다시 시도해 주세요.')).toBeVisible();
+
+    teamFailure = null;
+    introduction = '첫 로딩을 재시도해 복구한 팀 소개예요';
+    await user.keyboard('{Enter}');
+    await screen.findAllByText('첫 로딩을 재시도해 복구한 팀 소개예요');
+    expect(screen.queryAllByText('팀 정보를 확인하지 못했어요. 잠시 후 다시 시도해 주세요.')).toHaveLength(0);
+    expect(teamReads).toBe(2);
+  });
+
   it('hides a cached dissolved team and its restore entry when a real refetch denies access', async () => {
     dissolved = true;
     const client = mountTab(0);

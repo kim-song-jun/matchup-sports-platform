@@ -56,3 +56,9 @@ Surface gate: 단건 조회는 canonical findTournamentOnSurface(LEAGUE_KINDS) �
 - 생성과 같은 전체 너비의 저장 CTA를 사용하고 상세 복귀/재조회는 그 아래 보조 액션으로 유지한다.
 - 초기 검증은 기존 설치의 query persist 패키지 누락으로 수집 실패했다. 격리 작업트리 설치 후 수정 9개 PASS, 생성은 Node 18 설치에서 제외된 Tailwind native optional dependency로 수집 실패했다. Node 22로 의존성을 설치한 후 생성 14개 PASS. lockfile/package.json 변경 없음. Vitest는 모두 단일 워커, 실행 종료 확인. 테스트용 API는 MSW이며 alpha 실측 증거로 취급하지 않는다.
 - Alpha 실측 blocker: 변경은 로컬 격리 브랜치에서 검증했고 배포하지 않았다. 이 세션에는 실제 브라우저 QA 도구도 제공되지 않는다. UI 검증/배포 완료 또는 PR-ready로 판정하지 않는다.
+
+### 배포 요청 후 CI 보정
+- 사용자 요청: 추가 리뷰 없이 dev 머지 및 alpha 배포. main 승격은 하지 않는다.
+- PR #1907 첫 CI는 기본 필드 추출로 줄어든 raw font size baseline(13 → 6) 미반영으로 Web 실패. 기준을 실제 6곳으로 낮춘다.
+- API는 변경과 무관한 취소 알림 통합 테스트에서 HTTP 응답 직후 비동기 팀 이름 조회 완료를 가정해 0/2 알림으로 실패했다. 실제 대상 leagueId의 두 알림을 최대 5초간 기다린 뒤 동일한 개수 검증을 수행한다. production 서비스/API 계약은 변경하지 않는다. 알림 누락 시에는 그대로 실패한다. 관련 증거 업로드 실패는 선행 통합 단계 실패로 manual QA가 실행되지 않은 결과다.
+- API 통합 검증은 GitHub CI의 실제 PostgreSQL에서 수행한다. 로컬 Docker daemon은 제공되지 않는다.

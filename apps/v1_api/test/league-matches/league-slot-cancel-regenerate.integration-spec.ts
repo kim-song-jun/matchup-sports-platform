@@ -59,7 +59,13 @@ describe('리그 경기 취소 — 빈 경기·자리 연결', () => {
     const teamMatchId = await h.createFixture(leagueId, { homeTeamId: teamA.id, awayTeamId: teamB.id });
 
     expect((await cancel(leagueId, teamMatchId)).status).toBe(200);
-    expect(cancelNotices()).toHaveLength(2);
+    // 팀 이름 조회 뒤 비동기로 발행되므로 HTTP 응답만으로 알림 완료를 가정하지 않는다.
+    const notices = () => cancelNotices().filter((call) => call[2] === leagueId);
+    const deadline = Date.now() + 5_000;
+    while (notices().length < 2 && Date.now() < deadline) {
+      await new Promise((resolve) => setTimeout(resolve, 25));
+    }
+    expect(notices()).toHaveLength(2);
   });
 
   it('남은 빈 경기를 취소해 자리 경기가 모두 차면 리그가 진행 상태로 바뀐다', async () => {

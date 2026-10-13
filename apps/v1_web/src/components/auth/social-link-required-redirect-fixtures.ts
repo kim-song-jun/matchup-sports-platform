@@ -1,13 +1,19 @@
-import type { V1AuthMe, V1CurrentSignupTerms, V1OnboardingPreferencePayload } from '@/types/api';
+import { http, HttpResponse } from 'msw';
+import { setupServer } from 'msw/node';
+import { expect } from 'vitest';
+import type { V1AuthMe, V1CurrentSignupTerms, V1OnboardingDetail, V1OnboardingPreferencePayload } from '@/types/api';
 
 export const SPORT = '22222222-2222-4222-8222-222222222222';
 export const LEVEL = '33333333-3333-4333-8333-333333333333';
 export const REGION = '44444444-4444-4444-8444-444444444444';
 export const DISTRICT = '55555555-5555-4555-8555-555555555555';
 export const DOCUMENT = '66666666-6666-4666-8666-666666666666';
+export const ADDED_DOCUMENT = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 export const HOLDER = '88888888-8888-4888-8888-888888888888';
 export const PENDING = '99999999-9999-4999-8999-999999999999';
 type SignupStatus = 'social_profile_required' | 'social_profile_deferred';
+export const signupStatuses: SignupStatus[] = ['social_profile_required', 'social_profile_deferred'];
+type TermsSnapshot = V1CurrentSignupTerms & { compliance: NonNullable<V1CurrentSignupTerms['compliance']> };
 export type RequiredRoute = '/onboarding/sport' | '/terms?mode=renewal';
 type PreferenceStep = V1OnboardingPreferencePayload['currentStep'];
 export type FixtureStatus = SignupStatus | 'signup_done' | 'sport_done' | 'level_done' | 'region_done' | 'completed' | 'deferred';
@@ -19,7 +25,7 @@ export const signupJourneys: Array<[SignupStatus, RequiredRoute]> = [
 export const compliance = (accepted: boolean): NonNullable<V1CurrentSignupTerms['compliance']> => ({
   compliant: accepted, pendingRequiredDocumentIds: accepted ? [] : [DOCUMENT], nextRoute: accepted ? null : '/terms?mode=renewal',
 });
-export const terms = (accepted: boolean): V1CurrentSignupTerms => ({
+export const terms = (accepted: boolean): TermsSnapshot => ({
   context: 'signup', ready: true,
   items: [{
     policyId: '77777777-7777-4777-8777-777777777777', code: 'service_terms', documentId: DOCUMENT, title: '서비스 이용약관',
@@ -55,4 +61,106 @@ export function stepForRoute(pathname: string): PreferenceStep | null {
     case '/onboarding/confirm': return 'confirm';
     default: return null;
   }
+}
+
+type RedirectFixtureState = {
+  auth: V1AuthMe;
+  onboarding: V1OnboardingDetail;
+  requiredRoute: RequiredRoute;
+  renewalRequired: boolean;
+  acceptedTerms: boolean;
+  additionalTermsAccepted: boolean;
+  consentResult: 'accepted' | 'partial' | 'failure';
+  linkRequests: number;
+  completeRequests: number;
+  acceptRequests: number;
+  savedSteps: PreferenceStep[];
+};
+function initialState(): RedirectFixtureState {
+  return {
+    auth: makeAuth('social_profile_required'),
+    onboarding: { status: 'signup_done', currentStep: 'sport', canResume: true, missing: ['sports'], sports: [], regions: [], regionOptional: true },
+    requiredRoute: '/onboarding/sport', renewalRequired: false, acceptedTerms: false, additionalTermsAccepted: false, consentResult: 'accepted',
+    linkRequests: 0, completeRequests: 0, acceptRequests: 0, savedSteps: [],
+  };
+}
+function currentTerms(state: RedirectFixtureState): TermsSnapshot {
+  const current = terms(state.acceptedTerms);
+  if (state.consentResult !== 'partial' || !state.acceptedTerms) return current;
+  return { ...current, items: [...current.items, {
+    policyId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', code: 'privacy_policy', documentId: ADDED_DOCUMENT,
+    title: '추가 필수 약관', version: 'v2', subtitle: null, content: '새로 적용된 필수 문서', changeSummary: '동의 대상 추가',
+    requirement: 'required', displayOrder: 2, requiresReconsent: true, enforcementAt: null, effectiveAt: null,
+    accepted: state.additionalTermsAccepted, requiresAction: !state.additionalTermsAccepted,
+  }], compliance: state.additionalTermsAccepted ? compliance(true)
+    : { compliant: false, pendingRequiredDocumentIds: [ADDED_DOCUMENT], nextRoute: '/terms?mode=renewal' } };
+}
+const success = (data: unknown) => HttpResponse.json({ status: 'success', data });
+const failure = (message: string, status = 400) => HttpResponse.json({ status: 'error', statusCode: status, code: status === 503 ? 'SERVICE_UNAVAILABLE' : 'VALIDATION_FAILED', message }, { status });
+export function createRedirectFixture() {
+  const state = initialState();
+  const server = setupServer(
+    http.get('*/api/v1/auth/me', () => success(state.auth)),
+    http.post('*/api/v1/logs/client-error', () => success({})),
+    http.post('*/api/v1/verification/phone/request', () => HttpResponse.json({ status: 'error', statusCode: 409, code: 'PHONE_CONFLICT', message: '이미 사용 중인 번호예요.' }, { status: 409 })),
+    http.post('*/api/v1/auth/phone/issue', () => success({ expiresAt: new Date(Date.now() + 300_000).toISOString(), devCode: '123456' })),
+    http.post('*/api/v1/auth/phone/verify', () => success({ verified: true, proofToken: 'proof-1' })),
+    http.post('*/api/v1/auth/social-link/preview', () => success({ maskedEmail: 'ru***@gmail.com', providers: ['email'], hasPassword: true, linkingProvider: 'kakao' })),
+    http.post('*/api/v1/auth/social-link', () => {
+      state.linkRequests += 1;
+      state.auth = makeAuth(state.requiredRoute.startsWith('/onboarding') ? 'signup_done' : 'completed', HOLDER, true);
+      if (state.renewalRequired || state.requiredRoute.startsWith('/terms')) state.auth.termsCompliance = compliance(false);
+      if (state.requiredRoute.startsWith('/terms')) state.onboarding = { ...state.onboarding, status: 'completed', currentStep: 'done', canResume: false, missing: [],
+        sports: [{ sportId: SPORT, sportName: '풋살', levelId: LEVEL, levelName: '초급' }],
+      };
+      const response = success({ ...state.auth, session: { userId: HOLDER, userEmail: null }, next: { route: state.requiredRoute } });
+      if (state.acceptedTerms) state.auth = { ...state.auth, termsCompliance: compliance(true) };
+      return response;
+    }),
+    http.get('*/api/v1/master/sports', () => success([{ id: SPORT, code: 'futsal', name: '풋살', levels: [{ id: LEVEL, name: '초급' }] }])),
+    http.get('*/api/v1/master/regions', () => success([{ id: REGION, name: '서울', parentId: null, level: 1, children: [{ id: DISTRICT, name: '마포구', parentId: REGION, level: 2 }] }])),
+    http.get('*/api/v1/onboarding', () => success(state.onboarding)),
+    http.patch('*/api/v1/onboarding/preferences', async ({ request }) => {
+      const body: unknown = await request.json();
+      if (!isPreferencePayload(body)) return failure('온보딩 입력이 올바르지 않아요.');
+      state.savedSteps.push(body.currentStep);
+      const sports = body.sports ?? [];
+      const status: FixtureStatus = sports.length === 0 ? 'signup_done' : sports.some((sport) => !sport.levelId) ? 'sport_done'
+        : body.currentStep === 'region' || body.currentStep === 'confirm' ? 'region_done' : 'level_done';
+      state.onboarding = { ...state.onboarding, status, currentStep: body.currentStep,
+        sports: body.sports?.map((sport) => ({ sportId: sport.sportId, sportName: '풋살', levelId: sport.levelId ?? null, levelName: sport.levelId ? '초급' : null })) ?? state.onboarding.sports,
+        regions: body.regions?.map((region) => ({ ...region, name: '마포구' })) ?? state.onboarding.regions,
+      };
+      state.onboarding.missing = state.onboarding.sports.length === 0 ? ['sports'] : state.onboarding.sports.some((sport) => !sport.levelId) ? ['levels'] : [];
+      state.auth = { ...state.auth, user: { ...state.auth.user, onboardingStatus: status } };
+      return success({ status, currentStep: body.currentStep, missing: state.onboarding.missing, canContinue: state.onboarding.missing.length === 0,
+        sports: sports.map((sport) => ({ sportId: sport.sportId, levelId: sport.levelId ?? null })), regions: body.regions ?? [],
+      });
+    }),
+    http.post('*/api/v1/onboarding/complete', () => {
+      state.completeRequests += 1;
+      if (state.onboarding.missing.length > 0) return failure('Onboarding completion requirements are not met');
+      state.auth = { ...state.auth, user: { ...state.auth.user, onboardingStatus: 'completed' } };
+      state.onboarding = { ...state.onboarding, status: 'completed', currentStep: 'done', canResume: false, missing: [] };
+      return success({ status: 'completed', missing: [], limited: false, next: { route: '/home', reason: 'onboarding_completed' } });
+    }),
+    http.post('*/api/v1/onboarding/defer', () => {
+      state.auth = { ...state.auth, user: { ...state.auth.user, onboardingStatus: 'deferred' } };
+      state.onboarding = { ...state.onboarding, status: 'deferred', currentStep: 'confirm' };
+      return success({ status: 'deferred', missing: state.onboarding.missing, limited: true, next: { route: '/home', reason: 'onboarding_deferred' } });
+    }),
+    http.get('*/api/v1/terms/current', () => success(currentTerms(state))),
+    http.post('*/api/v1/terms/consents', async ({ request }) => {
+      const additional = state.consentResult === 'partial' && state.acceptedTerms;
+      expect(await request.json()).toEqual({ documentIds: [additional ? ADDED_DOCUMENT : DOCUMENT] });
+      state.acceptRequests += 1;
+      if (state.consentResult === 'failure') return failure('약관 저장 응답이 지연됐어요.', 503);
+      if (additional) state.additionalTermsAccepted = true;
+      state.acceptedTerms = true;
+      const result = currentTerms(state);
+      state.auth = { ...state.auth, termsCompliance: result.compliance };
+      return success(result);
+    }),
+  );
+  return { state, server, reset: () => Object.assign(state, initialState()) };
 }

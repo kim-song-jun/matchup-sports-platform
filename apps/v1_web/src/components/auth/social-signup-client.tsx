@@ -15,7 +15,7 @@ import { useSocialSignupExit } from './use-social-signup-exit';
 import { V1ApiError } from '@/lib/api-client';
 import { trackEvent } from '@/lib/analytics';
 import { clearV1IdentityCache } from '@/lib/query-keys';
-import { clearSavedRedirectPath, getSavedRedirectPath, sanitizeRedirectPath, saveRedirectPath, saveStoredV1Session } from '@/lib/session-storage';
+import { resolveAuthContinuationPath, saveStoredV1Session } from '@/lib/session-storage';
 import { AUTH_WELCOME_STAGE, AuthFrame } from './auth-page';
 import {
   formatBirthDate,
@@ -162,14 +162,9 @@ export function SocialSignupClient() {
     });
   };
 
-  // 주소의 redirect 가 먼저, 소셜 로그인을 거쳐 주소에서 사라졌다면 로그인 때 저장해 둔 값.
-  const readRedirect = () => sanitizeRedirectPath(new URLSearchParams(window.location.search).get('redirect'))
-    ?? getSavedRedirectPath();
-  const consumeRedirect = () => {
-    const redirect = readRedirect();
-    clearSavedRedirectPath();
-    return redirect;
-  };
+  const continuationPath = (nextRoute?: string | null) => resolveAuthContinuationPath(
+    nextRoute, new URLSearchParams(window.location.search).get('redirect'),
+  );
 
   const recoverRequiredTerms = async () => {
     // 서버가 가입 상태를 되돌린 오류라 fresh 캐시도 재조회해야 약관 게이트에 갇히지 않는다.
@@ -197,7 +192,7 @@ export function SocialSignupClient() {
           method: authMe.data?.user?.authProvider ?? 'social',
           profile: 'deferred',
         });
-        router.replace(consumeRedirect() ?? '/home');
+        router.replace(continuationPath());
       },
       onError: async (nextError) => {
         if (nextError instanceof V1ApiError && nextError.code === 'TERMS_REQUIRED') {
@@ -258,11 +253,11 @@ export function SocialSignupClient() {
           const nextRoute = result.next?.route;
           if (activityMode || !nextRoute) {
             trackEvent('activity_profile_complete', { method });
-            router.replace(consumeRedirect() ?? '/home');
+            router.replace(continuationPath());
             return;
           }
           trackEvent('sign_up_complete', { method });
-          router.replace(nextRoute);
+          router.replace(continuationPath(nextRoute));
         },
         onError: async (nextError) => {
           if (nextError instanceof V1ApiError && nextError.code === 'NICKNAME_CONFLICT') {
@@ -454,15 +449,7 @@ export function SocialSignupClient() {
               onLogin={() => void exitFlow.leaveTo('/login')}
               onFindAccount={() => void exitFlow.leaveTo('/auth/find-account')}
               exitPending={exitFlow.pending}
-              onLinked={(result) => {
-                if (result.next?.route) {
-                  // 대상 계정의 필수 단계를 먼저 끝내되 주소에만 있던 복귀 경로도 잃지 않는다.
-                  saveRedirectPath(readRedirect());
-                  router.replace(result.next.route);
-                  return;
-                }
-                router.replace(consumeRedirect() ?? '/home');
-              }}
+              onLinked={(result) => router.replace(continuationPath(result.next?.route))}
             />
           ) : null}
 

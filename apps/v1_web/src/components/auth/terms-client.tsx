@@ -14,7 +14,7 @@ import {
 } from '@/hooks/use-v1-api';
 import { V1ApiError } from '@/lib/api-client';
 import { trackEvent } from '@/lib/analytics';
-import { clearSavedRedirectPath, getSavedRedirectPath, sanitizeRedirectPath, saveRedirectPath } from '@/lib/session-storage';
+import { resolveAuthContinuationPath, sanitizeRedirectPath } from '@/lib/session-storage';
 import { saveSignupTermsDocumentIds } from '@/lib/signup-terms-storage';
 import { AUTH_WELCOME_STAGE, AuthFrame } from './auth-page';
 import { getTermsViewModel } from './auth.view-model';
@@ -115,14 +115,7 @@ export function TermsClient() {
   }, [document, isRenewalMode]);
 
   const continueAfterRenewal = (nextRoute?: string | null) => {
-    const redirect = sanitizeRedirectPath(searchParams.get('redirect')) ?? getSavedRedirectPath();
-    if (nextRoute && nextRoute !== '/home') {
-      if (redirect) saveRedirectPath(redirect);
-      router.replace(nextRoute);
-      return;
-    }
-    clearSavedRedirectPath();
-    router.replace(redirect ?? '/home');
+    router.replace(resolveAuthContinuationPath(nextRoute, searchParams.get('redirect')));
   };
 
   const continueToSignup = () => {

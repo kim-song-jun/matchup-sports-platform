@@ -65,6 +65,13 @@ vi.mock('@/hooks/use-v1-api', () => ({
   useV1MyRegistrations: () => ({ data: [] }),
 }));
 
+// 대회 일정과 같은 공개 일정 응답(실시간 중계) — 이 파일의 관심사가 아니라 기본값은 "아직 응답 없음"이다.
+vi.mock('@/components/public-game-records/use-public-game-records', () => ({
+  usePublicTournamentSchedule: () => ({
+    data: undefined, hasNextPage: false, isFetchingNextPage: false, isError: false, fetchNextPage: vi.fn(), refetch: vi.fn(),
+  }),
+}));
+
 const detail = () => render(<LeagueMatchStandingsClient leagueId="synthetic-league" />);
 const awards = () => render(<LeagueAwardsPageClient leagueId="synthetic-league" />);
 const filters = () => within(screen.getByRole('group', { name: '경기 일정 필터' }));

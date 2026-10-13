@@ -201,7 +201,8 @@ function toScheduleEventItems(entry: PublicScheduleEntry): ScheduleEventItem[] {
   return [...goals, ...cards];
 }
 
-function MatchEventSummary({ entry }: { entry: PublicScheduleEntry }) {
+/** 리그 상세의 일정 행이 대회와 같은 득점·카드 요약을 쓰도록 내보낸다. */
+export function MatchEventSummary({ entry }: { entry: PublicScheduleEntry }) {
   const items = toScheduleEventItems(entry);
   if (items.length === 0) return null;
 
@@ -318,7 +319,8 @@ function VideoBadge({ hasVideo }: { hasVideo: boolean }) {
   );
 }
 
-function ScheduleRow({
+/** 리그 상세의 "진행 중인 경기"가 대회 일정 카드를 그대로 쓰도록 내보낸다. */
+export function ScheduleRow({
   tournamentId,
   entry,
   isMine,

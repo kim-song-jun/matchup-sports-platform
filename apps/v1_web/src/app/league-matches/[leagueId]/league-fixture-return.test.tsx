@@ -87,6 +87,8 @@ beforeEach(() => {
       { teamId: 'qa59-away', teamName: '합성 원정팀', teamLogoUrl: null, position: 2, played: 7, wins: 0, draws: 0, losses: 7, goalsFor: 0, goalsAgainst: 7, points: 0 },
     ], pendingFixtures: [], champions: [], promotionDecided: false, promotionForecast: null, tieBreakOrder: ['points'] })),
     http.get(`*/api/v1${leaguePath}/player-records`, () => ok({ leagueId, goals: [], assists: [], hiddenByEligibility: false })),
+    // 대회 일정과 같은 공개 일정(실시간 중계) — 진행 중인 경기가 없는 일정이라 이 파일의 복귀 계약에는 영향이 없다.
+    http.get(`*/api/v1/tournaments/${leagueId}/schedule`, () => ok({ tournamentId: leagueId, tournamentTitle: 'QA59', bracketPublished: true, items: [], unscheduled: [], standings: [], nextCursor: null })),
     http.get('*/api/v1/team-matches/:fixtureId', ({ params }) => ok({ teamMatchId: params.fixtureId, gameId: null, viewer: { state: 'none', manageableHostTeam: false, manageableOpponentTeam: false, participantMember: false } })),
     // 게임 비공개 404는 실제 공개기록 contract의 요약 화면을 사용한다.
     http.get(`*/api/v1${leaguePath}/fixtures/:fixtureId/record`, () => HttpResponse.json({ status: 'error', statusCode: 404, code: 'LEAGUE_FIXTURE_NOT_FOUND', message: '게임 비공개예요.' }, { status: 404 })),

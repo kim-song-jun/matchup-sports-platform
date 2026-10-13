@@ -2,7 +2,7 @@
 
 import { useInfiniteQuery, useQuery, type Query, type UseQueryResult } from '@tanstack/react-query';
 import { V1ApiError, v1Get } from '@/lib/api-client';
-import { PUBLIC_LIVE_POLL_INTERVAL_MS, publicLivePollDelay } from '@/lib/public-live-polling';
+import { PUBLIC_LIVE_POLL_INTERVAL_MS, earliestPublicLivePollDelay, publicLivePollDelay } from '@/lib/public-live-polling';
 import type {
   PublicMatchDetail,
   PublicTeamRecordsResponse,
@@ -72,7 +72,15 @@ const LIVE_POLL_INTERVAL_MS = PUBLIC_LIVE_POLL_INTERVAL_MS;
 export function usePublicTournamentSchedule(
   tournamentId: string,
   filters: ScheduleFilters = {},
-  options: { enabled?: boolean } = {},
+  options: {
+    enabled?: boolean;
+    /**
+     * true 면 **지금 진행 중이거나 곧 시작하는 경기가 있을 때만** 폴링한다(`earliestPublicLivePollDelay`).
+     * 기본은 예정·진행 경기가 하나라도 있으면 계속 폴링한다 — 대진표 허브처럼 한 화면의 주인이 이 일정일 때의
+     * 값이다. 리그 상세처럼 일정이 화면의 일부이고 몇 주 뒤 경기까지 들어 있는 곳은 이 값을 켠다.
+     */
+    imminentOnlyPolling?: boolean;
+  } = {},
 ) {
   return useInfiniteQuery({
     queryKey: publicGameRecordsKeys.schedule(tournamentId, filters),
@@ -86,6 +94,10 @@ export function usePublicTournamentSchedule(
     enabled: Boolean(tournamentId) && (options.enabled ?? true),
     retry: false,
     refetchInterval: (query) => {
+      if (options.imminentOnlyPolling) {
+        const games = (query.state.data?.pages ?? []).flatMap((page) => [...page.items, ...page.unscheduled]);
+        return earliestPublicLivePollDelay(games);
+      }
       const hasPendingGames = query.state.data?.pages.some((page) => [...page.items, ...page.unscheduled]
         .some((item) => item.status === 'live' || item.status === 'scheduled'));
       return hasPendingGames === true ? LIVE_POLL_INTERVAL_MS : false;

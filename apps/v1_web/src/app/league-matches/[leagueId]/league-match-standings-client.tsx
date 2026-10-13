@@ -36,6 +36,8 @@ import {
 import { StatusChip } from '@/components/v1-ui/status-chip';
 import { CompetitionThumbnail } from '@/components/v1-ui/competition-card';
 import { LeagueJoinGuideCard } from './league-join-guide-card';
+import { LeagueLiveBanner, LeagueLiveSection, useLeagueLiveSchedule } from './league-live-schedule';
+import { MatchEventSummary } from '@/components/public-game-records/schedule-content';
 import { CompetitionEntrySection } from '@/components/tournaments/competition-entry-card';
 import type {
   V1LeagueChampionTeam,
@@ -537,6 +539,8 @@ export default function LeagueMatchStandingsClient({
   const seriesQuery = useV1LeagueMatch(leagueId, { seed: seed?.league });
   const standingsQuery = useV1LeagueMatchStandings(leagueId, { seed: seed?.standings });
   const recordsQuery = useV1LeagueMatchPlayerRecords(leagueId);
+  // 대회 일정과 같은 공개 일정 응답 — 진행 중인 경기·경기별 진행 상태·득점 요약의 근거다.
+  const liveSchedule = useLeagueLiveSchedule(leagueId);
   const series = seriesQuery.data;
   const standings = standingsQuery.data;
   const records = recordsQuery.data;
@@ -623,6 +627,9 @@ export default function LeagueMatchStandingsClient({
   }
   const fixtures = series?.fixtures ?? [];
   const visibleFixtures = showUpcomingOnly ? fixtures.filter(isUpcomingFixture) : fixtures;
+  // 진행 중인 경기는 위 "진행 중인 경기" 섹션이 그린다 — 대회 일정처럼 아래 목록에서는 뺀다.
+  const liveFixtureIds = new Set(liveSchedule.live.map((entry) => entry.fixtureId));
+  const listedFixtures = visibleFixtures.filter((fixture) => !liveFixtureIds.has(fixture.teamMatchId));
   // 오름차순 정렬 전제이므로 필터링된 배열의 첫 항목이 곧 가장 가까운 다음 경기다.
   const nextUpcomingFixture = fixtures.find(isUpcomingFixture) ?? null;
   const nextUpcomingFixtureId = nextUpcomingFixture?.teamMatchId ?? null;
@@ -691,6 +698,7 @@ export default function LeagueMatchStandingsClient({
           <StatusChip chip={leagueStateChip(series.state)} size="md" />
         </div>
       </div>
+      <LeagueLiveBanner leagueId={leagueId} live={liveSchedule.live} fromHref={fixtureSourceHref} />
       {series.rulesText && <section className="mt-4 space-y-2" aria-label="리그 운영 안내">
         <h3 className="tm-text-body font-semibold text-[var(--text-strong)]">리그 운영 안내</h3>
         <p className="whitespace-pre-wrap break-words tm-text-label text-[var(--text-muted)]">{series.rulesText}</p>
@@ -961,31 +969,43 @@ export default function LeagueMatchStandingsClient({
             </div>
           )}
         </div>
+        <LeagueLiveSection leagueId={leagueId} live={liveSchedule.live} fromHref={fixtureSourceHref} />
+        {liveSchedule.isError ? (
+          <p role="status" className="mb-2 flex flex-wrap items-center gap-2 text-[length:var(--font-size-caption)] text-[var(--text-muted)]">
+            실시간 경기 정보를 불러오지 못했어요.
+            <button type="button" onClick={liveSchedule.retry} className="font-semibold text-[var(--blue700)]">다시 시도</button>
+          </p>
+        ) : null}
         {fixtures.length === 0 ? (
           <EmptyState
             title="아직 등록된 경기가 없어요"
             sub="대진이 확정되면 경기 일정이 여기에 나타나요."
             illustration={{ name: 'matches-empty' }}
           />
-        ) : visibleFixtures.length === 0 ? (
-          <EmptyState
-            title="예정된 경기가 없어요"
-            sub="'전체'를 눌러 지난 경기를 다시 볼 수 있어요."
-            illustration={{ name: 'matches-empty' }}
-            cta="전체 보기"
-            onCta={() => setShowUpcomingOnly(false)}
-          />
+        ) : listedFixtures.length === 0 ? (
+          // 진행 중인 경기만 남았다면 위 섹션이 이미 보여 주므로 빈 상태 문구를 겹쳐 그리지 않는다.
+          liveSchedule.live.length > 0 ? null : (
+            <EmptyState
+              title="예정된 경기가 없어요"
+              sub="'전체'를 눌러 지난 경기를 다시 볼 수 있어요."
+              illustration={{ name: 'matches-empty' }}
+              cta="전체 보기"
+              onCta={() => setShowUpcomingOnly(false)}
+            />
+          )
         ) : (
           <ul className="space-y-2">
-            {visibleFixtures.map((fixture) => {
+            {listedFixtures.map((fixture) => {
               const phaseChip = matchPhaseChip(leagueFixturePhase(fixture));
               const result = fixtureResultLabel(fixture);
               const isNextUpcoming = fixture.teamMatchId === nextUpcomingFixtureId;
+              // 같은 경기의 공개 일정 행 — 끝난 경기의 득점·카드 기록을 대회 일정과 같은 요약으로 보여 준다.
+              const publicEntry = liveSchedule.entryByFixtureId.get(fixture.teamMatchId);
               return (
                 <li key={fixture.teamMatchId}>
                   <Link
                     href={withFromPath(`/league-matches/${leagueId}/fixtures/${fixture.teamMatchId}`, fixtureSourceHref)}
-                    className={`tm-pressable tm-list-row-interactive flex min-h-[44px] flex-col gap-2 rounded-xl border bg-[var(--card-surface)] p-3 text-sm sm:flex-row sm:items-center sm:justify-between ${isNextUpcoming ? 'border-[var(--blue500)]' : 'border-[var(--border)]'}`}
+                    className={`tm-pressable tm-list-row-interactive flex min-h-[44px] flex-col gap-2 rounded-xl border bg-[var(--card-surface)] p-3 text-sm sm:flex-row sm:flex-wrap sm:items-center sm:justify-between ${isNextUpcoming ? 'border-[var(--blue500)]' : 'border-[var(--border)]'}`}
                   >
                     <span className="inline-flex flex-wrap items-center gap-2">
                       {/* 다음 경기는 컬러(파란 테두리)만으로 구분하지 않는다 — 뱃지 텍스트를 함께 싣는다. */}
@@ -1017,6 +1037,11 @@ export default function LeagueMatchStandingsClient({
                         </>
                       ) : null}
                     </span>
+                    {publicEntry !== undefined ? (
+                      <div className="w-full">
+                        <MatchEventSummary entry={publicEntry} />
+                      </div>
+                    ) : null}
                   </Link>
                 </li>
               );

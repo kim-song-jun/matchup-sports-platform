@@ -61,6 +61,22 @@ vi.mock('@/hooks/use-v1-api', () => ({
   useV1UpdateSettings: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
 }));
 
+// 대회 일정과 같은 공개 일정 응답(실시간 중계). 기본값은 "아직 응답 없음" — 테스트가 `scheduleState` 로 채운다.
+const scheduleState = vi.hoisted(() => ({ pages: undefined as unknown[] | undefined, isError: false, refetch: undefined as unknown }));
+vi.mock('@/components/public-game-records/use-public-game-records', () => ({
+  usePublicTournamentSchedule: () => ({
+    data: scheduleState.pages === undefined ? undefined : { pages: scheduleState.pages },
+    hasNextPage: false, isFetchingNextPage: false, isError: scheduleState.isError,
+    fetchNextPage: vi.fn(), refetch: scheduleState.refetch ?? vi.fn(),
+  }),
+}));
+
+afterEach(() => {
+  scheduleState.pages = undefined;
+  scheduleState.isError = false;
+  scheduleState.refetch = undefined;
+});
+
 const useV1ActivePopupMock = vi.mocked(useV1ActivePopup, { partial: true });
 const useV1MyRegistrationsMock = vi.mocked(useV1MyRegistrations);
 const useV1TournamentMock = vi.mocked(useV1Tournament, { partial: true });
@@ -1912,5 +1928,165 @@ describe('순위 규칙 줄', () => {
 
     await screen.findByRole('link', { name: /성수 FC/ });
     expect(screen.queryByText(/순위 규칙/)).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * 리그 상세의 **실시간 중계** — 대회 일정과 같은 공개 일정 응답(`GET /tournaments/:id/schedule`)을 리그 id 로 받아
+ * ① 진행 중인 경기 섹션·LIVE 배너 ② 끝난 경기의 득점 요약 ③ 아래 목록에서 진행 중 경기 제외를 얹는다.
+ * 기존 리그 일정 목록(다음 경기·예정만·결과 단계)은 그대로다.
+ */
+describe('리그 상세 실시간 중계', () => {
+  const FAR_FUTURE = '2099-01-01T10:00:00.000Z';
+  const PAST = '2020-01-01T10:00:00.000Z';
+
+  function mockLeague(fixtures: Array<Record<string, unknown>>) {
+    useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false } as never);
+    useV1LeagueMatchMock.mockReturnValue({
+      data: {
+        leagueId: 'league-1', title: '가을 리그', state: 'active', registrationOpen: false, registrationDeadlineAt: null,
+        sportCode: 'futsal', coverImageUrl: null, entryFee: 0, entryFeeConfigured: false, startsOn: PAST, endsOn: FAR_FUTURE,
+        teamIds: ['t1', 't2'], seriesId: null, tier: null, tierLabel: null, seasonNo: null, seriesSiblings: [], fixtures,
+      },
+    } as never);
+    useV1LeagueMatchStandingsMock.mockReturnValue({
+      data: {
+        leagueId: 'league-1', tieBreakOrder: ['points'], pendingFixtures: [], champions: [], promotionDecided: false, promotionForecast: null,
+        standings: [
+          { teamId: 't1', teamName: '성수 FC', teamLogoUrl: null, position: 1, played: 1, wins: 1, draws: 0, losses: 0, goalsFor: 4, goalsAgainst: 2, points: 3 },
+          { teamId: 't2', teamName: '망원 FC', teamLogoUrl: null, position: 2, played: 1, wins: 0, draws: 0, losses: 1, goalsFor: 2, goalsAgainst: 4, points: 0 },
+        ],
+      },
+    } as never);
+    useV1LeagueMatchPlayerRecordsMock.mockReturnValue({ data: { leagueId: 'league-1', goals: [], assists: [] } } as never);
+  }
+
+  function entry(fixtureId: string, overrides: Record<string, unknown> = {}) {
+    return {
+      fixtureId, round: '1주차', fixtureNumber: 1, legNumber: 1, groupId: 'league-1', groupName: null,
+      scheduledAt: FAR_FUTURE, venue: '성수 풋살장', place: null, fieldId: null, fieldName: null,
+      home: { registrationId: 'r1', teamId: 't1', teamName: '성수 FC' },
+      away: { registrationId: 'r2', teamId: 't2', teamName: '망원 FC' },
+      homeSlotLabel: null, awaySlotLabel: null, visibilityMode: 'live', status: 'scheduled', resultState: 'pending',
+      scoreStatus: 'unavailable', score: null, clock: null, periodBreak: null, periodCount: 2, scorers: [], cards: [],
+      outcome: null, hasVideo: false, ...overrides,
+    };
+  }
+
+  function setSchedule(items: Array<Record<string, unknown>>) {
+    scheduleState.pages = [
+      { tournamentId: 'league-1', tournamentTitle: '가을 리그', bracketPublished: true, items, unscheduled: [], standings: [], nextCursor: null },
+    ];
+  }
+
+  const ENDED = (overrides: Record<string, unknown> = {}) => entry('tm-1', {
+    status: 'ended', scoreStatus: 'official', resultState: 'official', score: { home: 4, away: 2, penalties: null }, ...overrides,
+  });
+  const LIVE_ENTRY = (overrides: Record<string, unknown> = {}) => entry('tm-2', {
+    status: 'live', scoreStatus: 'live', score: { home: 2, away: 1, penalties: null },
+    clock: { periodNumber: 2, elapsedMs: 62 * 60_000, isPaused: false },
+    scorers: [{ side: 'home', participantName: '김철수', jerseyNumber: null, period: 1, clockMs: 12 * 60_000 }],
+    ...overrides,
+  });
+  const FIXTURES = () => [
+    { teamMatchId: 'tm-1', title: '1주차', homeTeamId: 't1', awayTeamId: 't2', startAt: PAST, placeName: '성수 풋살장', status: 'completed', homeScore: 4, awayScore: 2 },
+    { teamMatchId: 'tm-2', title: '2주차', homeTeamId: 't1', awayTeamId: 't2', startAt: FAR_FUTURE, placeName: '성수 풋살장', status: 'matched' },
+  ];
+
+  it('진행 중인 경기가 있으면 LIVE 배너와 "진행 중인 경기" 섹션이 뜨고, 아래 일정 목록에서는 그 경기가 빠진다', () => {
+    mockLeague(FIXTURES());
+    setSchedule([LIVE_ENTRY(), ENDED()]);
+
+    const { container } = render(<LeagueMatchStandingsClient leagueId="league-1" />);
+
+    const banner = screen.getByRole('link', { name: /지금 한 경기가 진행 중이에요/ });
+    expect(banner.getAttribute('href')).toContain('/league-matches/league-1/fixtures/tm-2');
+    expect(banner).toHaveTextContent('LIVE');
+    const section = screen.getByRole('region', { name: '진행 중인 경기' });
+    // 대회 일정과 같은 카드 — 라이브 점수와 득점 기록이 그대로 실린다.
+    expect(within(section).getByText('2 : 1')).toBeInTheDocument();
+    expect(within(section).getByText(/김철수/)).toBeInTheDocument();
+    // 진행 중 경기는 위 섹션이 그리므로 아래 목록(ul)에는 없다.
+    const listLinks = [...container.querySelectorAll('#league-schedule ul a')].map((a) => a.getAttribute('href'));
+    expect(listLinks.some((href) => href?.includes('/fixtures/tm-2'))).toBe(false);
+    expect(listLinks.some((href) => href?.includes('/fixtures/tm-1'))).toBe(true);
+  });
+
+  it('끝난 경기 행에는 득점 기록이 대회 일정과 같은 요약(경기 기록 목록)으로 붙는다', () => {
+    mockLeague(FIXTURES());
+    setSchedule([
+      ENDED({
+        scorers: [
+          { side: 'home', participantName: '박선수', jerseyNumber: null, period: 1, clockMs: 3 * 60_000 },
+          { side: 'away', participantName: '이영희', jerseyNumber: null, period: 2, clockMs: 41 * 60_000 },
+        ],
+      }),
+    ]);
+
+    const { container } = render(<LeagueMatchStandingsClient leagueId="league-1" />);
+
+    const row = container.querySelector('#league-schedule ul a[href*="/fixtures/tm-1"]') as HTMLElement;
+    expect(within(row).getByRole('list', { name: '경기 기록' })).toBeInTheDocument();
+    expect(within(row).getByText(/박선수/)).toBeInTheDocument();
+    expect(within(row).getByText(/이영희/)).toBeInTheDocument();
+  });
+
+  it('진행 중인 경기가 없으면 배너도 섹션도 없고 기존 일정 목록 그대로다', () => {
+    mockLeague(FIXTURES());
+    setSchedule([ENDED(), entry('tm-2')]);
+
+    const { container } = render(<LeagueMatchStandingsClient leagueId="league-1" />);
+
+    expect(screen.queryByRole('region', { name: '진행 중인 경기' })).toBeNull();
+    expect(screen.queryByText(/진행 중이에요/)).toBeNull();
+    expect(container.querySelectorAll('#league-schedule ul a')).toHaveLength(2);
+  });
+
+  it('공개 일정 응답이 아직 없어도(로딩) 리그 대진 목록은 그대로 그려진다', () => {
+    mockLeague(FIXTURES());
+
+    const { container } = render(<LeagueMatchStandingsClient leagueId="league-1" />);
+
+    expect(container.querySelectorAll('#league-schedule ul a')).toHaveLength(2);
+    expect(screen.queryByRole('region', { name: '진행 중인 경기' })).toBeNull();
+  });
+
+  it('일정 조회가 실패하면 실시간 정보가 빠졌다고 알리고 다시 시도할 수 있다 — 대진 목록은 그대로', () => {
+    const refetch = vi.fn();
+    scheduleState.isError = true;
+    scheduleState.refetch = refetch;
+    mockLeague(FIXTURES());
+
+    const { container } = render(<LeagueMatchStandingsClient leagueId="league-1" />);
+
+    expect(screen.getByRole('status')).toHaveTextContent('실시간 경기 정보를 불러오지 못했어요.');
+    fireEvent.click(screen.getByRole('button', { name: '다시 시도' }));
+    expect(refetch).toHaveBeenCalledTimes(1);
+    expect(container.querySelectorAll('#league-schedule ul a')).toHaveLength(2);
+  });
+
+  it('"예정만" 필터에서 진행 중 경기만 남아도 "예정된 경기가 없어요" 빈 상태를 겹쳐 그리지 않는다', () => {
+    useSearchParamsMock.mockReturnValue(new URLSearchParams('schedule=upcoming') as never);
+    onTestFinished(() => {
+      useSearchParamsMock.mockReturnValue(new URLSearchParams() as never);
+    });
+    mockLeague([FIXTURES()[1]]);
+    setSchedule([LIVE_ENTRY()]);
+
+    render(<LeagueMatchStandingsClient leagueId="league-1" />);
+
+    expect(screen.getByRole('region', { name: '진행 중인 경기' })).toBeInTheDocument();
+    expect(screen.queryByText('예정된 경기가 없어요')).toBeNull();
+  });
+
+  it('진행 중인 경기가 둘이면 배너가 개수를 말하고 시작 시각이 이른 첫 경기로 연결한다', () => {
+    mockLeague(FIXTURES());
+    setSchedule([LIVE_ENTRY(), ENDED({ status: 'live', scoreStatus: 'live', score: { home: 0, away: 0, penalties: null }, scheduledAt: PAST })]);
+
+    render(<LeagueMatchStandingsClient leagueId="league-1" />);
+
+    const banner = screen.getByRole('link', { name: /지금 2경기가 진행 중이에요/ });
+    expect(banner.getAttribute('href')).toContain('/fixtures/tm-1');
+    expect(banner).toHaveTextContent('첫 경기 보기');
   });
 });

@@ -777,3 +777,33 @@ Reviewed 8/8 areas: signup age; chat access/blocking; report processing; final a
 - Phone left on Alpha home with the authorized player session and push ON. QA-labelled messages and two private server files remain as evidence; no seed/reset or production writes.
 - Remaining external coverage: real Kakao callback, multi-device/account-switch/production isolation, map apps and geocoded venue fixtures, natural token refresh/OEM/foldable/multiwindow, signed upgrades and Play release gates. In-place Alpha upgrade failed signature compatibility and used an explicitly approved reinstall; this is not upgrade PASS.
 - No new project workflow/policy introduced; existing rules remain unchanged.
+
+## Play release first-launch crash — 2026-10-13
+
+### Scope / Progress Snapshot
+
+- Initial base: freshly fetched `origin/dev` `9e9a019253`; isolated Windows worktree `.claude/worktrees/android-play-launch-20261013`, branch `fix/android-play-launch-20261013`.
+- Owned: Android R8 rules, dedicated-emulator startup smoke test, Android release runbook and scenario evidence. Forbidden: API/Web behavior, unrelated WIP, publishing/promoting main or Play.
+- [x] Latest dev/main Android trees match; `versionCode=2`, `versionName=0.1.1`.
+- [x] Successful production AAB from Actions `38271649807` (`c22fd5da975101fb41fef2794dbbde3a235261ac`) downloaded; SHA-256 `f054d3640468d075f56fc11aa1b412237af50eff9762ebe4d2ea786569d31d0b` matches its CI checksum.
+- [x] Original optimized AAB converted by bundletool 1.18.2, debug-signed only for emulator installation. Android 14/API 34 x86_64 reproduces first-launch termination twice.
+- [x] Fatal exception: Kakao `UserApi.checkAccessToken`, `Call return type must be parameterized as Call<Foo> or Call<? extends Foo>` in `AppLifecycleObserver.onStateChanged`.
+- [x] Startup smoke RED against original artifact; throws `Release startup crashed` with the real fatal log.
+- [x] R8 generic-signature fix; production unit tests 42/42 and optimized release rebuild PASS (74 tasks, 5m23s, one worker). Kakao's resolved Retrofit 2.9.0 consumer rules omit the required Call/response endpoint keeps.
+- [x] Startup smoke GREEN after clearing only this task's emulator app data, plus visually inspected home/announcement, COLD relaunch and settled HOME → HOT resume. Actual release has all production public identifiers, DEBUG=false, version 0.1.2/code3, and workstation debug signing solely for QA.
+- [x] Play source-policy, PowerShell syntax, diff and new-debt checks PASS.
+- [x] Owned emulator launcher PID36464/child35900 stopped; no devices remained, so task-started ADB daemon stopped. Single-use Gradle processes exited; no unrelated process stopped. Final details in `docs/scenarios/android-release-startup-20261013.md`.
+
+### Acceptance Criteria / Test Scenarios
+
+1. Dedicated-emulator smoke fails for the original non-debuggable release with the actual fatal log.
+2. Optimized release preserves Kakao/Retrofit reflection contracts with Kakao enabled and remains on MainActivity after first launch.
+3. Relaunch and background/resume do not reproduce the exception; no initialization catch/fake success is added.
+4. Evidence distinguishes debug-signing for emulator from Play app signing and does not claim physical OEM, Play upgrade, FCM or authenticated Kakao login coverage.
+
+### Ambiguity / Risks / Security
+
+- User confirmed Play Store install and immediate closure, but the phone's exact model/API level and Play distribution record are unavailable. Local evidence is the matching successful production AAB, not a pulled Play APK.
+- Production public identifiers may be supplied to local builds without printing values; no signing credentials, `.env` files, token values or personal accounts are read.
+- Windows host has Java 17 at `C:\dev\jdk\jdk-17.0.13+11`; PATH's Oracle Java launcher is broken. Gradle 9.1.0 and API 36 build inputs are prepared separately; host launcher failure is unrelated to the reproduced app crash.
+- Three emulator Chromium WASM code-cache errors remain recorded; the actual home renders, but this is not console-clean/full-network QA. No physical phone, authenticated Kakao, FCM or Play-signing/upgrade verdict is claimed. Source fix is prepared on the feature branch for a dev PR; dev/main/Play rollout remains pending.

@@ -16,6 +16,10 @@
 
 # Teameet QA Scenario Index
 
+## 2026-10-13 — Play Android first-launch crash on Windows
+
+[Task 156](../../.github/tasks/156-android-app-fcm-foundation.md#play-release-first-launch-crash--2026-10-13) · [Windows release startup evidence](./android-release-startup-20261013.md): production AAB `0.1.1`/code 2 reproduces a Kakao/Retrofit R8 generic-return crash on Android 14/API 34. Regression RED → optimized `0.1.2`/code 3 GREEN; units 42/42, release build, first launch/home, cold relaunch and background/resume PASS. Emulator cache warnings and physical/Play signing limits are recorded. Dev/main/Play rollout pending.
+
 ## 2026-10-03 — 종료 팀매치 카드 전체 dim / DEV 요청
 
 이미지와 카드 전체에 동일한 dim 적용; 완료·취소·만료된 리그 포함. 진행 중/종료 확인 중/예정 리그는 유지.

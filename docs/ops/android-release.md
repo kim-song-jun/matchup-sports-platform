@@ -72,6 +72,35 @@ The runner materializes the keystore only under `RUNNER_TEMP`, assigns restricti
 removes it in an `always()` cleanup step. Gradle also refuses `bundleProductionRelease` and
 `assembleProductionRelease` when any signing input or production Firebase identifier is absent.
 
+### Windows optimized-release startup reproduction
+
+The `0.1.1` production AAB crashed on first launch in Kakao's lifecycle observer:
+`UserApi.checkAccessToken` reported `Call return type must be parameterized as Call<Foo> or Call<? extends Foo>`.
+Debug unit tests and a successful AAB build did not expose this R8 generic-signature loss. The
+`0.1.2` source change preserves the Retrofit reflection contract; shrinking remains enabled.
+
+Use a dedicated booted emulator and the optimized release APK, with the same public Firebase/Kakao
+identifiers as the release. In PowerShell:
+
+```powershell
+./scripts/qa/test-android-release-startup.ps1 `
+  -ApkPath '<optimized-production-release.apk>' `
+  -EvidenceDirectory 'output/android-release-startup' `
+  -DeviceSerial 'emulator-5554'
+```
+
+The smoke installs with `-r` (never uninstalls), rejects debuggable APKs, starts MainActivity, then
+checks the crash buffer, live process and resumed activity after 15 seconds. It saves package/launch/
+activity/crash evidence and a success screenshot. It deliberately accepts only emulator serials because
+it clears that device's logcat buffers. Repeat the user launch, relaunch and background/resume flow;
+a passing debug build does not cover the optimized release.
+
+When reproducing from an AAB, bundletool can generate a universal APK signed with the workstation's
+debug certificate. This preserves the optimized application code but does not test Play's signing,
+store upgrade, physical OEM behavior, FCM receipt or authenticated Kakao callbacks. Such an APK is
+local QA evidence and cannot replace the signed Play-distribution gates below. The emulator source fix
+and evidence are tracked in Task 156 and `docs/scenarios/android-release-startup-20261013.md`.
+
 ## App Links and store assets
 
 Before the first Play test release:

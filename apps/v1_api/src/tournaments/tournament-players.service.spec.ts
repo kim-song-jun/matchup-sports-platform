@@ -1673,6 +1673,16 @@ describe('TournamentPlayersService', () => {
     expect(genderOnly?.message).toContain('프로필에 성별이 없어');
   });
 
+  it('evaluateRosterCandidate: 정원이 null(제한 없음)이면 인원으로 막지 않는다', () => {
+    const input = {
+      alreadyOnRoster: false, alreadyOnOtherTeamInTournament: false, tournamentMutable: true, registrationMutable: true,
+      rosterCount: 40, genderCategory: null, phoneEnforced: false,
+      member: { realName: '홍길동', birthDate: new Date('1995-03-15'), phone: '01012345678', gender: 'male', phoneVerifiedAt: null },
+    };
+    expect(evaluateRosterCandidate({ ...input, maxPlayers: null } as never)).toBeNull();
+    expect(evaluateRosterCandidate({ ...input, maxPlayers: 40 } as never)).toMatchObject({ code: 'ROSTER_FULL' });
+  });
+
   it('listEligiblePlayersForAdmin: 어드민이 아니면 거부한다', async () => {
     prisma.v1AdminUser.findUnique.mockResolvedValue(null);
 

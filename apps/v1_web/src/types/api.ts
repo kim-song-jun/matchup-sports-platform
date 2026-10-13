@@ -3686,7 +3686,8 @@ export type V1Tournament = {
   coverImageUrl: string | null;
   teamCount: number;
   minPlayers: number;
-  maxPlayers: number;
+  /** null = 정원 제한 없음(리그). 대회는 항상 값이 있다. */
+  maxPlayers: number | null;
   /**
    * 위 minPlayers/maxPlayers("등록" 로스터 크기, 성별 쿼터가 묶이는 값)와는 완전히 다른
    * 값 — "출전 인원"(경기장에 서는 라인업 상한, GK 포함). `GET /admin/tournaments/:id`
@@ -3987,7 +3988,8 @@ export type V1TournamentDetail = {
   coverImageUrl: string | null;
   teamCount: number;
   minPlayers: number;
-  maxPlayers: number;
+  /** null = 정원 제한 없음(리그). 대회는 항상 값이 있다. */
+  maxPlayers: number | null;
   genderCategory: V1TournamentGenderCategory | null;
   genderMinMale: number | null;
   genderMaxMale: number | null;

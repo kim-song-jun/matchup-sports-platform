@@ -1025,6 +1025,9 @@ export async function ensureLeague(
       scheduledAt: startsOn,
       scheduledEndAt: endsOn,
       competitionConfigVersionId: ALPHA_SEED_LEAGUE_CONFIG_ID,
+      // 리그 기본값 — 팀 명단 인원 제한 없음(leagueMirrorCreateData 와 같은 모양).
+      minPlayers: 1,
+      maxPlayers: null,
       // **리그 시작일에 고정한다.** 생략하면 `@default(now())` 가 시드 실행 시각을 박고,
       // 그 값이 통합 목록 정렬(`createdAt desc`)을 지배해 시드 리그가 통째로 최신이 된다 —
       // 실제 대회보다 앞에 서서 첫 페이지를 차지한다. 고정 id 시드라 create 는 최초 1회뿐이니
@@ -1123,6 +1126,8 @@ export async function ensureTierSeries(
         tier,
         seasonNo: 1,
         competitionConfigVersionId: ALPHA_SEED_LEAGUE_CONFIG_ID,
+        minPlayers: 1,
+        maxPlayers: null,
         // 고정 id 시드라 create 는 최초 1회뿐이다 — 시드 실행 시각이 통합 목록 정렬을
         // 지배하지 않도록 리그 시작일을 쓴다(단발 리그 시드와 같은 규칙).
         createdAt: startsOn,

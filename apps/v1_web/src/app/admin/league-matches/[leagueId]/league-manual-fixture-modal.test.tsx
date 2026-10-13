@@ -21,13 +21,18 @@ const TEAMS = [
   { id: 'team-b', label: 'B팀' },
 ];
 
-function setup(onSubmit = vi.fn().mockResolvedValue({}), defaultPlace: typeof SANGAM | null = null) {
+function setup(
+  onSubmit = vi.fn().mockResolvedValue({}),
+  defaultPlace: typeof SANGAM | null = null,
+  defaultDuration: { minutes: number; label: string } | null = null,
+) {
   const onClose = vi.fn();
   render(
     <LeagueManualFixtureModal
       teams={TEAMS}
       defaultPlace={defaultPlace}
       recentVenues={[SANGAM]}
+      defaultDuration={defaultDuration}
       isSubmitting={false}
       onSubmit={onSubmit}
       onClose={onClose}
@@ -110,6 +115,30 @@ describe('LeagueManualFixtureModal', () => {
     fireEvent.change(screen.getByLabelText('시작 일시'), { target: { value: '2026-09-30T19:00' } });
     fireEvent.click(screen.getByRole('button', { name: '경기 만들기' }));
     await waitFor(() => expect(onSubmit).toHaveBeenCalled());
+    expect(onSubmit.mock.calls[0][0]).not.toHaveProperty('durationMinutes');
+  });
+
+  it('리그 피리어드 설정의 경기 시간을 미리 채워 보내고, 지우면 종료 시각 없이 만든다', async () => {
+    const { onSubmit } = setup(undefined, null, { minutes: 50, label: '전·후반 25분' });
+    pick('홈 팀', 'A팀');
+    pick('어웨이 팀', 'B팀');
+    fireEvent.change(screen.getByLabelText('시작 일시'), { target: { value: '2026-09-30T19:00' } });
+    expect(screen.getByLabelText('경기 시간(분)')).toHaveValue('50');
+    expect(screen.getByText(/전·후반 25분/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '경기 만들기' }));
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
+    expect(onSubmit.mock.calls[0][0]).toMatchObject({ durationMinutes: 50 });
+  });
+
+  it('미리 채운 경기 시간을 지우면 안내가 사라지고 그 필드를 안 보낸다', async () => {
+    const { onSubmit } = setup(undefined, null, { minutes: 40, label: '단판 40분' });
+    pick('홈 팀', 'A팀');
+    pick('어웨이 팀', 'B팀');
+    fireEvent.change(screen.getByLabelText('시작 일시'), { target: { value: '2026-09-30T19:00' } });
+    fireEvent.change(screen.getByLabelText('경기 시간(분)'), { target: { value: '' } });
+    expect(screen.queryByText(/단판 40분/)).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: '경기 만들기' }));
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
     expect(onSubmit.mock.calls[0][0]).not.toHaveProperty('durationMinutes');
   });
 

@@ -269,4 +269,3 @@ export function renderLlmsFull(s: LlmsFullSnapshot, now = new Date()): string {
 function inlineSource(path: string): string {
   return inline(path, 160);
 }
-

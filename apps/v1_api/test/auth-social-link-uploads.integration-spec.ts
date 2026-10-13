@@ -9,6 +9,9 @@ const PREFIX = 'integration-social-link-uploads';
 const CALLER = `${PREFIX}-caller`;
 const HOLDER = `${PREFIX}-holder`;
 const OTHER = `${PREFIX}-other`;
+const ACTIVITY_TEAM = `${PREFIX}-team`;
+const ACTIVITY_SPORT = `${PREFIX}-sport`;
+const ACTIVITY_REGION = `${PREFIX}-region`;
 const PHONE = '01055550125';
 const USER_IDS = [CALLER, HOLDER, OTHER];
 const HOLDER_IMAGE = '/uploads/integration-social-link-uploads-holder.png';
@@ -56,6 +59,9 @@ describe('V1 social link upload ownership integration', () => {
   async function cleanupFixtures() {
     if (!prisma) return;
     await prisma.v1ChatRoom.deleteMany({ where: { id: `${PREFIX}-room` } });
+    await prisma.v1Team.deleteMany({ where: { id: ACTIVITY_TEAM } });
+    await prisma.v1Sport.deleteMany({ where: { id: ACTIVITY_SPORT } });
+    await prisma.v1Region.deleteMany({ where: { id: ACTIVITY_REGION } });
     await prisma.v1UploadAsset.deleteMany({ where: { ownerUserId: { in: USER_IDS } } });
     await prisma.v1Notification.deleteMany({ where: { recipientUserId: { in: USER_IDS } } });
     await prisma.v1StatusChangeLog.deleteMany({ where: { targetId: `${PREFIX}-identity` } });
@@ -164,7 +170,16 @@ describe('V1 social link upload ownership integration', () => {
 
   it('rolls back upload ownership and proof consumption when disallowed activity prevents caller deletion', async () => {
     // Given: a retained activity FK deliberately makes this caller non-empty.
-    await prisma.v1ChatRoom.create({ data: { id: `${PREFIX}-room` } });
+    await prisma.v1Sport.create({
+      data: { id: ACTIVITY_SPORT, code: ACTIVITY_SPORT, name: '계정 연결 활동 테스트 종목' },
+    });
+    await prisma.v1Region.create({
+      data: { id: ACTIVITY_REGION, code: ACTIVITY_REGION, name: '계정 연결 활동 테스트 지역', level: 1 },
+    });
+    await prisma.v1Team.create({
+      data: { id: ACTIVITY_TEAM, ownerUserId: OTHER, sportId: ACTIVITY_SPORT, regionId: ACTIVITY_REGION, name: '계정 연결 활동 테스트 팀' },
+    });
+    await prisma.v1ChatRoom.create({ data: { id: `${PREFIX}-room`, teamId: ACTIVITY_TEAM } });
     await prisma.v1ChatMessage.create({ data: { chatRoomId: `${PREFIX}-room`, senderUserId: CALLER, body: '이전 활동' } });
     const callerAssets = await prisma.v1UploadAsset.findMany({ where: { ownerUserId: CALLER }, orderBy: { id: 'asc' } });
     const proof = await provePhone();

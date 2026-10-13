@@ -20,6 +20,7 @@ import {
 import type { V1OnboardingPreferencePayload, V1OnboardingStep, V1Region } from '@/types/api';
 import { AUTH_WELCOME_STAGE, AuthFrame, AuthIllustration, JOURNEY_DONE_STAGE } from './auth-page';
 import { extractErrorMessage } from '@/lib/error-message';
+import { clearSavedRedirectPath, getSavedRedirectPath, sanitizeRedirectPath, saveRedirectPath } from '@/lib/session-storage';
 
 type OnboardingRouteStep = 'resume' | Extract<V1OnboardingStep, 'sport' | 'level' | 'region' | 'confirm'>;
 
@@ -160,6 +161,20 @@ export function OnboardingClient({ step }: { step: OnboardingRouteStep }) {
   );
   const pending = savePreferences.isPending || completeOnboarding.isPending || deferOnboarding.isPending;
 
+  const readReturnPath = () => sanitizeRedirectPath(new URLSearchParams(window.location.search).get('redirect'))
+    ?? getSavedRedirectPath();
+  const continueAfterOnboarding = (nextRoute = '/home') => {
+    const redirect = readReturnPath();
+    if (nextRoute !== '/home') {
+      // 추가 필수 단계에서는 복귀 목적지를 소비하지 않는다.
+      if (redirect) saveRedirectPath(redirect);
+      router.replace(nextRoute);
+      return;
+    }
+    clearSavedRedirectPath();
+    router.replace(redirect ?? nextRoute);
+  };
+
   const saveAndGo = (currentStep: V1OnboardingPreferencePayload['currentStep'], href: string) => {
     // 로딩 중 재클릭 시 중복 제출 방지 — isPending 은 disabled 속성과 동일하게 리렌더
     // 이후에나 반영되는 값이라 동시 클릭까지 막지는 못하지만, 스피너가 보이는 동안의
@@ -199,6 +214,8 @@ export function OnboardingClient({ step }: { step: OnboardingRouteStep }) {
                 .join(',')
             : '';
           trackEvent('onboarding_step_complete', sportType ? { step: currentStep, sportType } : { step: currentStep });
+          const redirect = readReturnPath();
+          if (redirect) saveRedirectPath(redirect);
           router.push(href);
         },
         onError: (nextError) => setError(getErrorMessage(nextError)),
@@ -212,7 +229,7 @@ export function OnboardingClient({ step }: { step: OnboardingRouteStep }) {
     deferOnboarding.mutate(
       { reason: 'later' },
       {
-        onSuccess: (result) => router.replace(result.next?.route ?? '/home'),
+        onSuccess: (result) => continueAfterOnboarding(result.next?.route),
         onError: (nextError) => setError(getErrorMessage(nextError)),
       },
     );
@@ -225,7 +242,7 @@ export function OnboardingClient({ step }: { step: OnboardingRouteStep }) {
       onSuccess: (result) => {
         trackEvent('onboarding_complete', {});
         if (viewerId) clearDraft(viewerId);
-        router.replace(result.next?.route ?? '/home');
+        continueAfterOnboarding(result.next?.route);
       },
       onError: (nextError) => setError(getErrorMessage(nextError)),
     });

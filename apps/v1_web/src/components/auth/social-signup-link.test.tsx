@@ -158,7 +158,7 @@ describe('소셜 가입 번호 충돌 → 기존 계정 연결', () => {
     expect(getSavedRedirectPath()).toBeNull();
   });
 
-  it.each(['/onboarding/sports', '/terms?mode=social'])('기존 계정의 필수 경로 %s는 redirect보다 먼저 완료하고 목적지를 보존한다', async (route) => {
+  it.each(['/onboarding/sport', '/terms?mode=renewal'])('기존 계정의 필수 경로 %s는 redirect보다 먼저 완료하고 목적지를 보존한다', async (route) => {
     // Given: 연결 대상에게 아직 완료해야 할 필수 단계가 있다.
     saveRedirectPath('/teams/new');
     server.use(http.post('*/api/v1/auth/social-link', () => success({
@@ -356,7 +356,7 @@ describe('소셜 가입 번호 충돌 → 기존 계정 연결', () => {
       useDeferredAccount();
       setSearch('?redirect=%2Fteams%2Fnew');
       server.use(http.post('*/api/v1/auth/social-link', () => success({
-        session: { userId: 'holder-1', userEmail: null }, user: { id: 'holder-1' }, next: { route: '/onboarding/sports' },
+        session: { userId: 'holder-1', userEmail: null }, user: { id: 'holder-1' }, next: { route: '/onboarding/sport' },
       })));
       await openConflict();
       const user = await verifyOwnership();
@@ -365,7 +365,7 @@ describe('소셜 가입 번호 충돌 → 기존 계정 연결', () => {
       await user.click(within(await screen.findByRole('dialog')).getByRole('button', { name: '연결하고 로그인' }));
 
       // Then: 주소가 바뀌어도 필수 단계 완료 후 돌아갈 경로가 남는다.
-      await waitFor(() => expect(replace).toHaveBeenCalledWith('/onboarding/sports'));
+      await waitFor(() => expect(replace).toHaveBeenCalledWith('/onboarding/sport'));
       expect(getSavedRedirectPath()).toBe('/teams/new');
     });
   });

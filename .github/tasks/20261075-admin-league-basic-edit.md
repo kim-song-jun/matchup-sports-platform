@@ -62,3 +62,5 @@ Surface gate: 단건 조회는 canonical findTournamentOnSurface(LEAGUE_KINDS) �
 - PR #1907 첫 CI는 기본 필드 추출로 줄어든 raw font size baseline(13 → 6) 미반영으로 Web 실패. 기준을 실제 6곳으로 낮춘다.
 - API는 변경과 무관한 취소 알림 통합 테스트에서 HTTP 응답 직후 비동기 팀 이름 조회 완료를 가정해 0/2 알림으로 실패했다. 실제 대상 leagueId의 두 알림을 최대 5초간 기다린 뒤 동일한 개수 검증을 수행한다. production 서비스/API 계약은 변경하지 않는다. 알림 누락 시에는 그대로 실패한다. 관련 증거 업로드 실패는 선행 통합 단계 실패로 manual QA가 실행되지 않은 결과다.
 - API 통합 검증은 GitHub CI의 실제 PostgreSQL에서 수행한다. 로컬 Docker daemon은 제공되지 않는다.
+- 두 번째 CI의 Web은 759개 파일/8,988개 테스트 PASS, 기존 email-login-client 약관 갱신 목적지 테스트 1개 FAIL. 공통 resolveAuthContinuationPath 계약은 필수 인증 URL을 유지하고 `/my`는 세션에 보존하지만 해당 테스트만 URL query에 직접 붙기를 기대했다. 테스트를 실제 `/terms?mode=renewal` 이동 + 저장 목적지 `/my` + 최종 인증 성공 후 `/my` 소비/정리까지 검증하도록 동기화한다. 인증 production 코드는 변경하지 않는다.
+- 로그인 소비자 7개 + 공통 인증 목적지 24개 = 로컬 31/31 PASS. 두 번째 CI의 API와 Gates 전체 PASS. 최종 커밋 CI 재검증 후 dev 머지한다.

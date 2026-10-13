@@ -161,6 +161,6 @@ export default function AdminTeamMatchEditPage() {
   const { data, isPending, isError, error, refetch } = useV1AdminTeamMatch(params.id);
   if (isPending) return <AdminTableSkeleton rows={6} />;
   if (isError || !data) return <AdminEmpty title="팀매치 정보를 불러오지 못했어요" description={extractErrorMessage(error, '잠시 후 다시 시도해 주세요.')} action={<button type="button" onClick={() => void refetch()} className="min-h-[44px] rounded-xl bg-blue-500 px-4 text-[length:var(--font-size-body-sm)] font-semibold text-white">다시 시도</button>} />;
-  if (!data.platformManaged || data.status !== 'recruiting' || data.league || data.tournament) return <AdminEmpty title="수정할 수 없는 팀매치예요" description="플랫폼이 모집 중인 단발 팀매치만 여기에서 수정할 수 있어요." action={<Link href={`/admin/team-matches/${encodeURIComponent(data.teamMatchId)}`} className="inline-flex min-h-[44px] items-center rounded-xl border border-[var(--border)] px-4 text-[length:var(--font-size-body-sm)] font-semibold">상세로</Link>} />;
+  if (!data.platformManaged || !['recruiting', 'closed'].includes(data.status) || data.league || data.tournament) return <AdminEmpty title="수정할 수 없는 팀매치예요" description="플랫폼이 모집 중이거나 마감된 단발 팀매치만 여기에서 수정할 수 있어요." action={<Link href={`/admin/team-matches/${encodeURIComponent(data.teamMatchId)}`} className="inline-flex min-h-[44px] items-center rounded-xl border border-[var(--border)] px-4 text-[length:var(--font-size-body-sm)] font-semibold">상세로</Link>} />;
   return <EditForm key={data.version} teamMatch={data} />;
 }

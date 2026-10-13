@@ -5,6 +5,7 @@ import { STATUS_BY_LEAGUE_STATE } from '../tournaments/league-competition-mirror
 import { LEAGUE_STATE_BY_STATUS } from '../tournaments/league-competition-mirror';
 import { findTournamentOnSurface } from '../tournaments/tournament-surface-lookup';
 import { lockLeagueRowForCompletionInTx } from './league-fixture-generation-guard';
+import { promoteLeagueOnGameActivityInTx } from './league-slot-status';
 
 /**
  * `GameResultOfficialProjectionService.handler`가 여는 같은 트랜잭션(tx) 위에서
@@ -33,6 +34,8 @@ export class LeagueCompletionProjectionService {
     const leagueId = game.teamMatch?.leagueId ?? null;
     if (leagueId === null) return;
 
+    // 빠른 결과·몰수처럼 시작 없이 확정된 경기도 준비 중 리그를 진행 중으로 올린다. 그 뒤 완료 판정을 한다.
+    await promoteLeagueOnGameActivityInTx(tx, leagueId, 'result_confirmed');
     await this.settle(tx, leagueId, 'all_fixtures_confirmed');
   }
 
@@ -58,7 +61,7 @@ export class LeagueCompletionProjectionService {
     // BE-5: 조기 반환 판정을 통합 축에서 읽는다(쓰기는 아래 dual-write 그대로).
     const league = await findTournamentOnSurface(tx, ['regular_league'], {
       where: { id: leagueId, deletedAt: null },
-      select: { status: true },
+      select: { status: true, plannedFixtureCount: true },
     });
     // active 가 아니면 여기서 끝낸다. shouldCompleteLeague 도 같은 판정을 하지만, 그건
     // 아래 findMany 를 이미 돌린 뒤다 -- 이 조기 반환이 없으면 completed/draft 리그마다
@@ -92,6 +95,8 @@ export class LeagueCompletionProjectionService {
       });
       return shouldCompleteLeague({
         state: LEAGUE_STATE_BY_STATUS[league.status],
+        // 총 경기 수는 자동 종료의 기준이다 — 운영자가 '상태 변경'으로 직접 끝낼 때는 덜 치렀어도 끝낼 수 있어야 한다.
+        plannedFixtureCount: reason === 'admin_completed' ? null : league.plannedFixtureCount,
         fixtures: fixtures.map((fixture) => ({
           status: fixture.status,
           hasOfficialResult: fixture.game?.currentOfficialRevision?.state === 'OFFICIAL',

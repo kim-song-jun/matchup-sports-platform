@@ -351,6 +351,13 @@ function createFake(options: {
 
 const audit = { create: async () => undefined } as unknown as OperationAuditWriterService;
 
+it.each(['cancelled', 'archived'])('%s team-match lineup routes hide the entity even from its manager', async (status) => {
+  const { prisma } = createFake({ status });
+  const service = new TeamMatchLineupService(prisma, audit);
+  await expect(service.getLineup(manager, 'team-match-1')).rejects.toMatchObject({ status: 404, response: { code: 'TEAM_MATCH_NOT_FOUND' } });
+  await expect(service.getOpponentLineup(manager, 'team-match-1')).rejects.toMatchObject({ status: 404, response: { code: 'TEAM_MATCH_NOT_FOUND' } });
+});
+
 /**
  * 같은 가짜 상태를 **공개 자격 판정이 실제로 읽는 모양**으로 다시 노출한다.
  *

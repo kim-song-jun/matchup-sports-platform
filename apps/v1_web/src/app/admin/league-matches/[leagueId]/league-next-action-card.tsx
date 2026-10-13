@@ -42,7 +42,7 @@ export function LeagueNextActionCard({
       ? '확정하면 순위표와 전적에 반영돼요.'
       : action.kind === 'live'
         ? '콘솔에서 골·카드를 기록하고 경기를 마칠 수 있어요.'
-        : `${fixture.title} · ${when} — 킥오프 전에 콘솔에서 도착 확인을 해 주세요.`;
+        : `${fixture.title} · ${when} — 킥오프 전에 콘솔에서 출전 선수를 확인해 주세요.`;
 
   return (
     <section

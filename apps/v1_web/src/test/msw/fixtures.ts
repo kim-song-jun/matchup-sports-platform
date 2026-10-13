@@ -431,7 +431,7 @@ export const v1TeamMatchesFixture: V1TeamMatch[] = [
     placeName: '마포 월드컵 보조구장',
     startsAt: '2026-05-22T21:00:00.000Z',
     capacityText: '상대 0/1팀',
-    status: 'open',
+    status: 'recruiting',
     hostTeamId: 'team-1',
     hostTeamName: '마포 FC',
     applicantTeamState: 'eligible',

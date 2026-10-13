@@ -40,6 +40,15 @@ describe('내 개인·팀 매치 이력', () => {
     mock.teamQuery.mockReturnValue(emptyQuery());
   });
 
+  it('취소된 팀매치는 이전 캐시에 있어도 내 목록에 노출하지 않는다', () => {
+    mock.teamQuery.mockReturnValue({ ...emptyQuery(), data: { pages: [{ items: [{
+      teamMatchId: 'cancelled-tm', title: '취소된 팀매치', sportName: '풋살', startsAt: '2026-10-18T01:00:00Z',
+      status: 'cancelled', displayState: 'cancelled', relation: 'created_by_me', detailRoute: '/team-matches/cancelled-tm',
+    }] }] } });
+    render(<MyMatchesPageClient mode="created" />);
+    expect(screen.queryByText('취소된 팀매치')).not.toBeInTheDocument();
+  });
+
   it('더 보기로 다음 페이지를 요청하고 추가 기록을 상세 링크로 보여준다', () => {
     const item = { id: 'm1', title: '첫 매치', startsAt: '2026-09-18T01:00:00Z', status: 'completed', viewerState: 'participant' };
     mock.personalQuery.mockReturnValue({ ...emptyQuery(), data: { pages: [{ items: [item] }] }, hasNextPage: true, fetchNextPage: mock.personalFetchNextPage });

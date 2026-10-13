@@ -42,6 +42,7 @@ import {
   parseResultPolicy,
 } from '../tournaments/competition-config/competition-config.parse';
 import { FORFEIT_LOSER_SCORE, FORFEIT_WINNER_SCORE } from '../league-matches/league-forfeit-result';
+import { promoteLeagueOnGameActivityInTx } from '../league-matches/league-slot-status';
 import { assertPenaltyShootoutPersistable } from './core/penalty-shootout-outcome';
 import {
   areLatestTeamMatchLineupsSubmitted,
@@ -343,6 +344,22 @@ export function gameAuthorizationAction(action: string): GameAuthorizationAction
  */
 export function isTeamScopedActorRole(role: string): boolean {
   return role === 'team_manager' || role === 'team_owner' || role === 'team_member';
+}
+
+/**
+ * 명단 검인(현장 본인 확인)에 쓰는 선수의 실명·전화번호를 볼 수 있는 역할 — 대회를 운영하는 쪽뿐이다.
+ * `operations-lineup` 은 팀 매니저·오너에게도 열려 있어(경기 시작 뒤에는 양쪽 사이드), 이 집합에 팀 역할을
+ * 넣으면 **상대 팀 선수의 전화번호가 팀 매니저에게 새어 나간다.** 새 역할은 여기에 넣지 않는 쪽이 기본값이다.
+ * `support_readonly`(고객 지원, 읽기 전용)는 현장 검인을 하지 않으므로 뺐다.
+ */
+export function canViewParticipantIdentity(role: string): boolean {
+  return role === 'platform_ops' || role === 'tournament_director' || role === 'field_operator';
+}
+
+/** 운영 콘솔 명단 검인 줄에 붙는, 운영진 전용 본인 확인 정보. 계정이 없는 참가자·탈퇴 회원은 null 이다. */
+export interface GameParticipantIdentity {
+  realName: string | null;
+  phone: string | null;
 }
 
 export function gameOperationAuditActor(actor: GameActorScope): OperationAuditActor {
@@ -994,6 +1011,7 @@ export class GamesService {
 
   /** 푸시 발송 실패 기록용. 이 클래스에는 주입 로거가 없어 지역 인스턴스를 쓴다. */
   private readonly pushLogger = new Logger(`${GamesService.name}:push`);
+  private readonly leagueLogger = new Logger(`${GamesService.name}:league`);
   async createFromSourceInTransaction(
     tx: Prisma.TransactionClient,
     input: GameSourceCreationInput,
@@ -1277,7 +1295,7 @@ export class GamesService {
     headerIdempotencyKey: string | undefined,
     dto: GameCommandDto,
   ): Promise<GameMutationResult | GameRevisionMutationResult> {
-    return this.withCommand<GameMutationResult | GameRevisionMutationResult>(
+    const result = await this.withCommand<GameMutationResult | GameRevisionMutationResult>(
       {
         gameId,
         action: gameCommandAuditAction(command),
@@ -1504,6 +1522,26 @@ export class GamesService {
         };
       },
     );
+    if (command === 'start') await this.promoteLeagueAfterStart(gameId);
+    return result;
+  }
+
+  /**
+   * 준비 중 리그의 경기가 시작되면 리그를 진행 중으로 올린다(2026-10-13 사용자 확정). 시작 트랜잭션이 커밋된 뒤 따로
+   * 한다 — 리그 행 잠금이 바쁠 때(재생성·템플릿 교체 중) 경기 시작까지 실패하지 않게. 놓쳐도 결과 확정 때 다시 올린다.
+   */
+  private async promoteLeagueAfterStart(gameId: string): Promise<void> {
+    try {
+      const game = await this.prisma.v1Game.findUnique({
+        where: { id: gameId },
+        select: { teamMatch: { select: { leagueId: true } } },
+      });
+      const leagueId = game?.teamMatch?.leagueId ?? null;
+      if (leagueId === null) return;
+      await this.prisma.$transaction((tx) => promoteLeagueOnGameActivityInTx(tx, leagueId, 'game_started'));
+    } catch (error) {
+      this.leagueLogger.warn(`league promotion after start skipped game=${gameId}: ${String(error)}`);
+    }
   }
 
   /**
@@ -2588,10 +2626,42 @@ export class GamesService {
       orderBy: [{ jerseyNumber: 'asc' }, { createdAt: 'asc' }],
     });
     const participantsByLineupId = groupParticipantsByLineupId(participants);
+    // 운영진에게만 실명·전화번호를 실어 보낸다. 다른 역할 응답에는 `identity` 키 자체가 없다 — null 이
+    // 아니라 "없음"이어야 팀 매니저 화면이 빈 값을 만들어 내지도, 어떤 값이 있는지 짐작하지도 못한다.
+    const identityByUserId = canViewParticipantIdentity(actor.role)
+      ? await this.loadParticipantIdentities(participants)
+      : null;
     return lineups.map((lineup) => ({
       ...lineup,
-      participants: participantsByLineupId.get(lineup.id) ?? [],
+      participants: (participantsByLineupId.get(lineup.id) ?? []).map((participant) =>
+        identityByUserId === null
+          ? participant
+          : {
+              ...participant,
+              identity: participant.userId === null ? null : (identityByUserId.get(participant.userId) ?? null),
+            },
+      ),
     }));
+  }
+
+  /** 참가자들의 계정(`userId`)을 한 번에 조회해 실명·전화번호를 모은다(N+1 금지). 탈퇴 회원은 싣지 않는다. */
+  private async loadParticipantIdentities(
+    participants: readonly V1GameParticipant[],
+  ): Promise<ReadonlyMap<string, GameParticipantIdentity>> {
+    const userIds = Array.from(
+      new Set(participants.map((participant) => participant.userId).filter((id): id is string => id !== null)),
+    );
+    if (userIds.length === 0) return new Map();
+    const users = await this.prisma.v1User.findMany({
+      where: { id: { in: userIds }, deletedAt: null },
+      select: { id: true, phone: true, profile: { select: { realName: true } } },
+    });
+    return new Map(
+      users.map((user) => [
+        user.id,
+        { realName: user.profile?.realName?.trim() || null, phone: user.phone },
+      ]),
+    );
   }
 
   /**

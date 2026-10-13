@@ -149,6 +149,11 @@ function requireLeagueStartAt(startAt: Date | null, message: string): Date {
   return startAt;
 }
 
+/** fixtureCount를 생략하면 전체 대진을 유지한다. Array#slice(0, undefined)는 빈 배열이다. */
+function limitLeagueFixtures(fixtures: RoundRobinFixture[], fixtureCount: number | undefined): RoundRobinFixture[] {
+  return fixtureCount === undefined ? fixtures : fixtures.slice(0, fixtureCount);
+}
+
 // 총 라운드 상한. timing 없던 시절의 사실상 상한(weeksCount
 // Max 52)의 2배 — 대형 리그의 트랜잭션(팀 수 × 라운드 수만큼 팀매치·게임·참가자 행 생성,
 // timeout 120초)이 감당 가능한 범위로 묶는다. 52주 × 2경기까지는 허용, 그 이상은 422.
@@ -616,7 +621,7 @@ export class LeagueMatchAdminService {
     const teamIds = league.teams.map((entry) => entry.teamId);
     const regulation = await regulationMinutesForConfigVersion(this.prisma, config.id);
     const { totalRounds, timing } = this.resolveFixturePlan(dto, regulation);
-    const schedule = generateRoundRobinFixtures(teamIds, totalRounds).slice(0, dto.fixtureCount);
+    const schedule = limitLeagueFixtures(generateRoundRobinFixtures(teamIds, totalRounds), dto.fixtureCount);
     // 날짜 검증은 **트랜잭션 밖**에서 한다 — 도메인 거부가 락을 잡을 이유가 없다.
     const matchdayStartAts = this.resolveScheduleStartAts(dto, matchdayCountOf(schedule, timing?.gamesPerDay));
 
@@ -982,7 +987,7 @@ export class LeagueMatchAdminService {
     }
     const regulation = await regulationMinutesForConfigVersion(this.prisma, config.id);
     const { totalRounds, timing } = this.resolveFixturePlan(dto, regulation);
-    const schedule = generateRoundRobinFixtures(teamIds, totalRounds).slice(0, dto.fixtureCount);
+    const schedule = limitLeagueFixtures(generateRoundRobinFixtures(teamIds, totalRounds), dto.fixtureCount);
     const matchdayCount = matchdayCountOf(schedule, timing?.gamesPerDay);
     const matchdayStartAts = this.resolveScheduleStartAts(dto, matchdayCount);
     const slots = timing
@@ -1125,7 +1130,7 @@ export class LeagueMatchAdminService {
     const teamIds = league.teams.map((entry) => entry.teamId);
     const regulation = await regulationMinutesForConfigVersion(this.prisma, config.id);
     const { totalRounds, timing } = this.resolveFixturePlan(dto, regulation);
-    const schedule = generateRoundRobinFixtures(teamIds, totalRounds).slice(0, dto.fixtureCount);
+    const schedule = limitLeagueFixtures(generateRoundRobinFixtures(teamIds, totalRounds), dto.fixtureCount);
     const matchdayStartAts = this.resolveScheduleStartAts(dto, matchdayCountOf(schedule, timing?.gamesPerDay));
 
     const result = await this.prisma.$transaction(async (tx) => {

@@ -122,8 +122,8 @@ jobs:
           # 20 changed Changesets" 로 통과했고 3-dot 에선 "changeset not required" 였다.
           # 그 PR 이 실제로 건드린 건 scripts/ 6파일뿐이다).
           git diff --name-only "${BASE_SHA}...${HEAD_SHA}" > /tmp/teameet-changed-files.txt
-          if [[ ${BASE_REF} == main && ${HEAD_REF} == dev ]]; then
-            # A Changeset can be added and consumed entirely between main and dev,
+          if [[ ${BASE_REF} == main ]]; then
+            # A Changeset can be added and consumed entirely between main and the PR head,
             # so it is absent from the final tree diff. Preserve deleted Changeset
             # paths from commit history as the auditable release receipt.
             git log --format= --name-only --diff-filter=D \

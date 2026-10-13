@@ -32,8 +32,16 @@ afterEach(() => {
 
 describe('mandatory store update gate', () => {
   it('blocks an old Android shell, has no dismiss action, and uses the fixed Play URL', async () => {
+    let initialCancelPrevented = false;
+    vi.spyOn(HTMLDialogElement.prototype, 'showModal').mockImplementation(function (this: HTMLDialogElement) {
+      this.open = true;
+      const cancel = new Event('cancel', { cancelable: true });
+      this.dispatchEvent(cancel);
+      initialCancelPrevented = cancel.defaultPrevented;
+    });
     render(<NativeAppUpdateGate />);
     const dialog = await screen.findByRole('dialog');
+    expect(initialCancelPrevented).toBe(true);
     expect(dialog).toHaveAttribute('open');
     expect(screen.getByRole('link', { name: 'Google Play에서 업데이트' })).toHaveAttribute('href', ANDROID_PLAY_STORE_URL);
     expect(screen.queryByRole('button', { name: /나중|닫기|취소/ })).not.toBeInTheDocument();

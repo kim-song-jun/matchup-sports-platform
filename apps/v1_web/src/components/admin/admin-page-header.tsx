@@ -27,7 +27,9 @@ export function AdminPageHeader({ eyebrow, title, description, action }: AdminPa
           <p className="text-[length:var(--font-size-label)] md:text-[length:var(--font-size-body-sm)] text-[var(--text-muted)] mt-1">{description}</p>
         )}
       </div>
-      {action && <div className="flex-shrink-0">{action}</div>}
+      {/* max-w-full: 버튼이 여러 개인 action 이 한 줄 폭(max-content)으로 굳어 390px 를 넘으면 페이지 전체가
+          옆으로 넓어지고 모달까지 잘린다(2026-10-13 리그 상세 alpha 실측). 줄 폭으로 막아야 안쪽 flex-wrap 이 줄을 바꾼다. */}
+      {action && <div className="max-w-full flex-shrink-0">{action}</div>}
     </div>
   );
 }

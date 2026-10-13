@@ -657,7 +657,7 @@ describe('TeamMatchesService', () => {
     });
   });
 
-  it('cancel: 상대팀 없는 과거 매치는 보류 상태에서 취소할 수 있다', async () => {
+  it('cancel: 상대팀 없는 과거 매치는 마감 상태에서 취소할 수 있다', async () => {
     prisma.v1TeamMatch.findFirst.mockResolvedValue(teamMatchRow({ status: 'recruiting', startAt: PAST }));
     prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'mem-1' });
     prisma.v1TeamMatchApplication.updateMany.mockResolvedValue({ count: 0 });
@@ -719,7 +719,7 @@ describe('TeamMatchesService', () => {
             leagueId: null,
             tournamentId: null,
             approvedApplicantTeamId: null,
-            deadlineAt: { lte: expect.any(Date) },
+            OR: [{ deadlineAt: { lte: expect.any(Date) } }, { startAt: { lte: expect.any(Date) } }],
           }),
         ]),
       }),
@@ -966,6 +966,7 @@ describe('TeamMatchesService', () => {
           { hostTeamId: null, leagueId: null, tournamentId: null },
         ],
       },
+      { status: { notIn: ['cancelled', 'archived'] } },
     ]);
   });
 
@@ -1238,7 +1239,7 @@ describe('TeamMatchesService', () => {
     }
   });
 
-  it('remove: 신청 이력 없는 보류 팀매치는 삭제할 수 있다', async () => {
+  it('remove: 신청 이력 없는 마감 팀매치는 삭제할 수 있다', async () => {
     const row = teamMatchRow({ startAt: PAST });
     prisma.v1TeamMatch.findFirst.mockResolvedValue(row);
     prisma.v1TeamMatch.update.mockImplementation(async ({ data }) => Object.assign(row, data));
@@ -1261,7 +1262,7 @@ describe('TeamMatchesService', () => {
     await expect(service.remove(manager, 'tm-1')).rejects.toMatchObject({ status: 409 });
   });
 
-  it('edit: 상대팀 없는 과거 매치는 보류 상태로 수정할 수 있다', async () => {
+  it('edit: 상대팀 없는 과거 매치는 마감 상태로 수정할 수 있다', async () => {
     prisma.v1TeamMatch.findFirst.mockResolvedValue(
       teamMatchRow({ status: 'recruiting', startAt: PAST }),
     );
@@ -1271,7 +1272,7 @@ describe('TeamMatchesService', () => {
 
     expect(result.editable).toBe(true);
     expect(result.lockedReason).toBeNull();
-    expect(result.status).toBe('on_hold');
+    expect(result.status).toBe('closed');
   });
 
   // ─── withdrawApplication: 상태 머신 ───────────────────────────────────────
@@ -1516,14 +1517,16 @@ describe('TeamMatchesService', () => {
     expect(result.genderRule).toBe(expected);
   });
 
-  it('detail: 상대팀 없이 startAt이 과거면 on_hold를 반환 (NOT_FOUND_OR_ARCHIVED 전이 없음)', async () => {
-    // The recruiting + past startAt match should be visible as "expired", not 404.
+  it('detail: 상대팀 없이 startAt이 과거면 closed를 반환 (NOT_FOUND_OR_ARCHIVED 전이 없음)', async () => {
+    // Unmatched past recruitment is closed; cancellation is the separate visibility gate.
     const teamMatch = publicTeamMatchDetailRow({ status: 'recruiting', startAt: PAST });
     prisma.v1TeamMatch.findFirst.mockResolvedValue(teamMatch);
     prisma.v1Team.findMany.mockResolvedValue([]);
 
     const result = await service.detail(null, 'tm-1');
-    expect(result.status).toBe('on_hold');
+    expect(result.status).toBe('closed');
+    expect(result.displayState).toBe('closed');
+    expect(result.lifecycle.onHoldReason).toBeNull();
   });
 
   it('detail: 미매칭 모집 팀매치는 신청 마감 시각부터 closed로 노출한다', async () => {
@@ -1549,12 +1552,11 @@ describe('TeamMatchesService', () => {
     ['마감 시각 없음', { status: 'recruiting', deadlineAt: null }, 'recruiting', 'recruiting'],
     ['이미 마감된 글', { status: 'closed', deadlineAt: PAST }, 'closed', 'closed'],
     ['마감 뒤 경기 시작', { status: 'recruiting', startAt: PAST, deadlineAt: PAST }, 'closed', 'closed'],
-    ['시작 뒤 수동 마감', { status: 'closed', startAt: PAST, deadlineAt: null }, 'on_hold', 'on_hold'],
+    ['시작 뒤 수동 마감', { status: 'closed', startAt: PAST, deadlineAt: null }, 'closed', 'closed'],
     ['리그 모집의 기존 표시', { status: 'recruiting', leagueId: 'league-1', deadlineAt: PAST }, 'recruiting', 'closed'],
     ['대회 모집의 기존 표시', { status: 'recruiting', tournamentId: 'tournament-1', deadlineAt: PAST }, 'recruiting', 'closed'],
     ['상대팀 확정 모집의 기존 표시', { status: 'recruiting', approvedApplicantTeamId: 'team-away', deadlineAt: PAST }, 'recruiting', 'closed'],
     ['상대팀이 이미 매칭된 글', { status: 'matched', approvedApplicantTeamId: 'team-away', deadlineAt: PAST }, 'matched', 'matched'],
-    ['취소된 글', { status: 'cancelled', deadlineAt: PAST }, 'cancelled', 'cancelled'],
     ['종료된 글', { status: 'completed', deadlineAt: PAST }, 'completed', 'completed'],
   ])('detail: 신청 마감 전후에도 %s 상태는 기존 범위를 유지한다', async (_label, overrides, expectedStatus, expectedDisplayState) => {
     prisma.v1TeamMatch.findFirst.mockResolvedValue(publicTeamMatchDetailRow(overrides));
@@ -1564,6 +1566,13 @@ describe('TeamMatchesService', () => {
 
     expect(result.status).toBe(expectedStatus);
     expect(result.displayState).toBe(expectedDisplayState);
+  });
+
+  it.each(['cancelled', 'archived'])('detail: %s is absent for guests and the original host', async (status) => {
+    prisma.v1TeamMatch.findFirst.mockResolvedValue(publicTeamMatchDetailRow({ status }));
+    for (const viewer of [null, manager]) {
+      await expect(service.detail(viewer, 'tm-1')).rejects.toMatchObject({ status: 404, response: { code: 'NOT_FOUND_OR_ARCHIVED' } });
+    }
   });
 
   it('detail: 마감 시각과 같은 순간에도 새 신청을 닫고 이미 접수된 신청은 승인할 수 있다', async () => {

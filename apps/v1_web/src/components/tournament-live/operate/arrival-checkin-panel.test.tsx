@@ -1,5 +1,5 @@
-import { fireEvent, render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ArrivalCheckinPanel } from './arrival-checkin-panel';
 import type { GameLineup, GameLineupParticipant, GameSide } from '@/types/game-operations';
 
@@ -328,5 +328,78 @@ describe('ArrivalCheckinPanel — 명단 검인', () => {
 
       expect(screen.queryByRole('button', { name: /전원 도착/ })).toBeNull();
     });
+  });
+});
+
+describe('ArrivalCheckinPanel — 운영진 전용 본인 확인 정보(실명·닉네임·전화번호) 와 복사', () => {
+  const writeText = vi.fn();
+  beforeEach(() => {
+    writeText.mockReset().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
+  });
+
+  const staffLineup = () =>
+    lineup([
+      participant({
+        id: 'p-1',
+        displayNameSnapshot: 'E2E선수01',
+        jerseyNumber: 7,
+        userId: 'user-a',
+        identity: { realName: '김철수', phone: '01030101000' },
+      }),
+      participant({ id: 'p-2', displayNameSnapshot: '게스트', identity: null }),
+    ]);
+
+  it('운영진에게는 \x27실명 (닉네임)\x27 과 하이픈 전화번호를 도착 상태와 함께 보여준다', () => {
+    render(<ArrivalCheckinPanel sides={SIDES} lineups={[staffLineup()]} onToggleArrival={vi.fn()} />);
+
+    expect(screen.getByText('7 김철수 (E2E선수01)')).toBeInTheDocument();
+    expect(screen.getByText('010-3010-1000 · 미확인')).toBeInTheDocument();
+    // 계정이 없는 참가자는 값을 지어내지 않고 닉네임만, 도착 상태만 보여준다.
+    expect(screen.getByText('게스트')).toBeInTheDocument();
+  });
+
+  it('identity 가 내려오지 않은 화면(팀 매니저 등)에는 닉네임만 보이고 전화번호·복사 버튼이 없다', () => {
+    render(
+      <ArrivalCheckinPanel
+        sides={SIDES}
+        lineups={[lineup([participant({ id: 'p-1', displayNameSnapshot: 'E2E선수01', userId: 'user-a' })])]}
+        onToggleArrival={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText('E2E선수01')).toBeInTheDocument();
+    expect(screen.queryByText(/010-/)).toBeNull();
+    expect(screen.queryByRole('button', { name: /복사/ })).toBeNull();
+  });
+
+  it('복사 버튼은 계정이 있는 선수 줄에만 있고, 누르면 탭으로 구분한 실명·닉네임·전화번호를 복사한다', async () => {
+    render(<ArrivalCheckinPanel sides={SIDES} lineups={[staffLineup()]} onToggleArrival={vi.fn()} />);
+
+    expect(screen.getAllByRole('button', { name: /복사/ })).toHaveLength(1);
+    fireEvent.click(screen.getByRole('button', { name: '김철수 (E2E선수01) 실명·닉네임·전화번호 복사' }));
+
+    await waitFor(() => expect(writeText).toHaveBeenCalledWith('김철수	E2E선수01	010-3010-1000'));
+    expect(await screen.findByText('복사됨')).toBeInTheDocument();
+  });
+
+  it('복사를 눌러도 도착 확인은 바뀌지 않는다 — 검인 기록이 오염되면 안 된다', async () => {
+    const onToggleArrival = vi.fn();
+    render(<ArrivalCheckinPanel sides={SIDES} lineups={[staffLineup()]} onToggleArrival={onToggleArrival} />);
+
+    fireEvent.click(screen.getByRole('button', { name: /복사/ }));
+    await waitFor(() => expect(writeText).toHaveBeenCalled());
+
+    expect(onToggleArrival).not.toHaveBeenCalled();
+  });
+
+  it('클립보드가 막히면 복사된 척하지 않고 실패를 알린다', async () => {
+    writeText.mockRejectedValue(new Error('denied'));
+    render(<ArrivalCheckinPanel sides={SIDES} lineups={[staffLineup()]} onToggleArrival={vi.fn()} />);
+
+    fireEvent.click(screen.getByRole('button', { name: /복사/ }));
+
+    expect(await screen.findByText('실패')).toBeInTheDocument();
+    expect(screen.queryByText('복사됨')).toBeNull();
   });
 });

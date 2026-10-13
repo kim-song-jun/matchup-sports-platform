@@ -81,7 +81,6 @@ export function toTeamMatch(match: V1TeamMatch, fallback: TeamMatchModel): TeamM
     wins: match.hostTeam?.wins ?? null,
     status,
     apiStatus,
-    lifecycleLabel: apiStatus === 'on_hold' ? '보류' : undefined,
     closed: isClosedApiStatus(apiStatus),
   };
 }
@@ -168,8 +167,10 @@ export function buildTeamMatchHref(params: URLSearchParams, overrides: Record<st
   return queryString ? `/team-matches?${queryString}` : '/team-matches';
 }
 
-export function getStatus(match: V1TeamMatch): V1TeamMatchApiStatus {
+export function getStatus(match: Pick<V1TeamMatch, 'status' | 'displayState' | 'deadlineAt'>): V1TeamMatchApiStatus {
   const base = (match.displayState as V1TeamMatchApiStatus | undefined) ?? (match.status as V1TeamMatchApiStatus);
+  // 이전 배포의 persisted query cache에 남은 표시 상태도 새 마감 정책으로 읽는다.
+  if ((base as string) === 'on_hold') return 'closed';
   // 개인 매치 카드모델(matches.card-model.ts getStatus)과 같은 마감 폴백.
   // 서버가 이미 displayState 로 같은 판정을 내려주지만, 그 필드를 싣지 않는 응답이
   // 섞여도(실제로 GET /me/team-matches 가 그랬다) 카드가 마감된 팀매치를 '모집 중'으로
@@ -199,7 +200,7 @@ export function getViewerState(match: V1TeamMatch): V1TeamMatchViewerState {
  * 그 때문에 호스트는 자기 매치가 마감돼도 목록에서 마감 표시를 못 봤다(2026-09-07).
  */
 export function isClosedApiStatus(status: V1TeamMatchApiStatus): boolean {
-  return status === 'on_hold' || status === 'matched' || status === 'closed' || status === 'cancelled' || status === 'completed' || status === 'expired';
+  return status === 'matched' || status === 'closed' || status === 'cancelled' || status === 'completed' || status === 'expired';
 }
 
 export function statusToCardStatus(status: V1TeamMatchApiStatus, viewerState: V1TeamMatchViewerState = 'none'): TeamMatchModel['status'] {

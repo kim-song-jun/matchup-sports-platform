@@ -9,8 +9,8 @@ $ErrorActionPreference = 'Stop'
 if ($DeviceSerial -notmatch '^emulator-[0-9]+$') {
     throw 'Use a dedicated emulator: this smoke test clears its logcat buffers.'
 }
-if ($PackageName -notin @('kr.co.teameet', 'kr.co.teameet.alpha')) {
-    throw 'PackageName must be a Teameet Android application ID.'
+if ($PackageName -ne 'kr.co.teameet') {
+    throw 'PackageName must be the production Android application ID (kr.co.teameet).'
 }
 $apk = (Resolve-Path -LiteralPath $ApkPath).Path
 $evidence = New-Item -ItemType Directory -Path $EvidenceDirectory -Force

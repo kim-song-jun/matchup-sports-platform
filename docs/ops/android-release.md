@@ -91,8 +91,10 @@ identifiers as the release. In PowerShell:
 
 The smoke installs with `-r` (never uninstalls), rejects debuggable APKs, starts MainActivity, then
 checks the crash buffer, live process and resumed activity after 15 seconds. It saves package/launch/
-activity/crash evidence and a success screenshot. It deliberately accepts only emulator serials because
-it clears that device's logcat buffers. Repeat the user launch, relaunch and background/resume flow;
+activity/crash evidence and a success screenshot. It accepts only the production application ID
+`kr.co.teameet` and emulator serials because it clears that device's logcat buffers. Alpha is rejected
+before APK/device handling; its application ID suffix uses a different Activity component. Repeat
+the user launch, relaunch and background/resume flow;
 a passing debug build does not cover the optimized release.
 
 When reproducing from an AAB, bundletool can generate a universal APK signed with the workstation's

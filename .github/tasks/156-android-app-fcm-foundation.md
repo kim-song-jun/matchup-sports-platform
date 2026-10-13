@@ -792,6 +792,7 @@ Reviewed 8/8 areas: signup age; chat access/blocking; report processing; final a
 - [x] R8 generic-signature fix; production unit tests 42/42 and optimized release rebuild PASS (74 tasks, 5m23s, one worker). Kakao's resolved Retrofit 2.9.0 consumer rules omit the required Call/response endpoint keeps.
 - [x] Startup smoke GREEN after clearing only this task's emulator app data, plus visually inspected home/announcement, COLD relaunch and settled HOME → HOT resume. Actual release has all production public identifiers, DEBUG=false, version 0.1.2/code3, and workstation debug signing solely for QA.
 - [x] Play source-policy, PowerShell syntax, diff and new-debt checks PASS.
+- [x] PR #1881 review: production-only smoke guard rejects Alpha before APK/device handling (actual invocation RED → GREEN). Alpha's application ID suffix cannot be used to derive its Activity class; no Alpha runtime coverage is claimed.
 - [x] Owned emulator launcher PID36464/child35900 stopped; no devices remained, so task-started ADB daemon stopped. Single-use Gradle processes exited; no unrelated process stopped. Final details in `docs/scenarios/android-release-startup-20261013.md`.
 
 ### Acceptance Criteria / Test Scenarios

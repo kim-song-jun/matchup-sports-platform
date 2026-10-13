@@ -42,6 +42,7 @@ visible crash dialog as success. Local evidence: `output/android-play-launch-202
 - [x] Smoke GREEN after clearing only the task-created emulator app's data: `PASS: kr.co.teameet release MainActivity stayed resumed without a crash for 15 seconds.` The actual production home, announcement and content render; the announcement closes normally.
 - [x] Relaunch COLD PASS (2033 ms). Completed HOME transition followed by HOT resume PASS, resumed MainActivity and no app fatal log after 15 seconds. Initial back-to-back HOME/start needed a settled transition before checking foreground state; the final verdict uses the settled sequence.
 - [x] Play source-policy PASS (three application permissions, targetSdk 36); PowerShell syntax PASS; diff check PASS; no new debt markers (existing unrelated documentation references remain).
+- [x] PR review found that Alpha's application ID suffix does not change the Activity namespace. This production-release script now rejects `kr.co.teameet.alpha` before APK/device access. Actual script invocation verifies the guard RED → GREEN; no Alpha runtime coverage is claimed.
 - [x] Owned emulator launcher PID36464/child35900 stopped. No devices remained; task-started ADB daemon stopped. Single-use Gradle processes exited. Session-only size/density/animation overrides are discarded by read-only/no-snapshot shutdown; no unrelated process was stopped.
 
 ## Screenshots, logs and residual warnings

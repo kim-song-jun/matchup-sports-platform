@@ -43,3 +43,16 @@ Base 9e9a01925, fix/admin-league-basic-edit, _worktrees/fix-admin-league-basic-e
 2026-10-13 추가 작업: 후속 브랜치 `fix/league-mobile-copy-autostart`에서 설정 GET/PATCH·감사 로그·수정 화면에 `plannedFixtureCount`를 포함했다. 값 변경은 대진 생성 기본값과 자동 종료 기준만 바꾸며 기존 대진은 건드리지 않는다. 대진 생성·미리보기·재생성에서 `fixtureCount` 생략 시 0경기가 되던 `slice(0, undefined)` 경로도 공통 보정했다. API 전체 단위 6,086건, 관련 웹 128건, API/web 타입·표면·패턴 검사를 통과했다. 로컬 격리 PostgreSQL이 없어 설정 및 quick-result 통합 스펙은 CI에서 확인한다.
 
 Surface gate: 단건 조회는 canonical findTournamentOnSurface(LEAGUE_KINDS) 사용. Prisma 미지원 행 잠금 SQL 1곳은 kind/deletedAt 조건·직후 재조회 근거와 함께 raw-SQL baseline에 등록. 신규 폼/운영 안내 글자 크기는 tm-text 토큰 사용.
+
+
+## 2026-10-14 — 생성/수정 포맷 통일
+- 사용자 요청으로 생성 화면을 시각 기준으로 고정했다. 동일한 기존 포맷을 재사용한다.
+- Owned: league-basic-fields.tsx, league-matches/new/page.tsx, league-settings-client.tsx 및 회귀 테스트. API/DB 및 기존 미커밋 WIP는 변경하지 않는다.
+- 기본 입력을 공유해 이름 → 종목/지역 → 기간 순서, 라벨, 입력창, 날짜 범위 검증을 통일한다. 수정 너비도 생성과 같은 max-w-2xl이며 총 경기 수는 기존 공유 필드를 재사용한다.
+- 설명·신청 마감·오류/초안 보존·동시 수정·읽기 권한 보호는 유지한다. 종목 변경과 팀 구성/명단/경기 시간 설정 계약 확장은 이번 시각 통일의 범위 밖이다.
+- [x] 생성/수정 회귀 테스트 및 diff 검증: 생성 14/14, 수정 9/9 PASS; 웹 tsc --noEmit --incremental false PASS; git diff --check PASS; touched-path TODO/FIXME/HACK/XXX 신규/잔여 없음.
+- [ ] alpha 배포 후 390/768/1440 화면·console/network 검증 (현재 변경 미배포).
+- Resume: fix/league-edit-create-format, tmp/worktrees/league-edit-format, base d10ce4df4.
+- 생성과 같은 전체 너비의 저장 CTA를 사용하고 상세 복귀/재조회는 그 아래 보조 액션으로 유지한다.
+- 초기 검증은 기존 설치의 query persist 패키지 누락으로 수집 실패했다. 격리 작업트리 설치 후 수정 9개 PASS, 생성은 Node 18 설치에서 제외된 Tailwind native optional dependency로 수집 실패했다. Node 22로 의존성을 설치한 후 생성 14개 PASS. lockfile/package.json 변경 없음. Vitest는 모두 단일 워커, 실행 종료 확인. 테스트용 API는 MSW이며 alpha 실측 증거로 취급하지 않는다.
+- Alpha 실측 blocker: 변경은 로컬 격리 브랜치에서 검증했고 배포하지 않았다. 이 세션에는 실제 브라우저 QA 도구도 제공되지 않는다. UI 검증/배포 완료 또는 PR-ready로 판정하지 않는다.

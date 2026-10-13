@@ -1,5 +1,6 @@
 import UIKit
 import WebKit
+import os
 
 /// Hosts the `WKWebView` that is the entire Teameet experience on iOS.
 ///
@@ -27,6 +28,9 @@ final class WebShellViewController: UIViewController {
     private var webViewBottom: NSLayoutConstraint!
     /// How much of the web view the keyboard currently covers, in points.
     private var keyboardOverlap: CGFloat = 0
+    private var appUpdateTasks: [String: Task<Void, Never>] = [:]
+    private var documentGeneration = 0
+    private let appUpdateLogger = Logger(subsystem: "kr.co.teameet", category: "NativeAppUpdate")
     /// Supplied by the app delegate, which owns the APNs callbacks. Absent only in a build
     /// with no push at all, where the bridge honestly reports "not subscribed".
     private let push: PushCoordinator?
@@ -46,6 +50,10 @@ final class WebShellViewController: UIViewController {
 
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError("WebShellViewController is created in code") }
+
+    deinit {
+        appUpdateTasks.values.forEach { $0.cancel() }
+    }
 
     // MARK: - Lifecycle
 
@@ -167,6 +175,7 @@ final class WebShellViewController: UIViewController {
 
     @objc private func appWillResignActive() {
         persistSession()
+        cancelAppUpdateChecks()
     }
 
     /// The reader may have switched notifications off in Settings while the app was away.
@@ -401,6 +410,11 @@ extension WebShellViewController: WKNavigationDelegate {
         }
     }
 
+    func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
+        documentGeneration += 1
+        cancelAppUpdateChecks()
+    }
+
     /// Offers the shell's own notification explainer, once the reader is in a position for it
     /// to mean something.
     ///
@@ -555,6 +569,10 @@ extension WebShellViewController: WKScriptMessageHandler {
     }
 
     private func handle(_ request: NativeBridge.Message) async {
+        if request.action == .checkAppUpdate {
+            checkAppUpdate(request)
+            return
+        }
         // Independent of push: Kakao sign-in must answer even in a build with no push lifecycle.
         if request.action == .signInWithKakao {
             await presentKakaoSignIn(request)
@@ -589,6 +607,8 @@ extension WebShellViewController: WKScriptMessageHandler {
             // Handled above, before this switch. Listed so a new action added to `Action`
             // cannot be forgotten here — the compiler refuses an inexhaustive switch.
             return
+        case .checkAppUpdate:
+            return
         }
 
         // Every action answers with freshly read state rather than what it just did. The
@@ -598,6 +618,45 @@ extension WebShellViewController: WKScriptMessageHandler {
             to: request,
             permission: await push.currentPermission(),
             subscribed: await push.isSubscribed())
+    }
+
+    private func checkAppUpdate(_ request: NativeBridge.Message) {
+        appUpdateTasks.removeValue(forKey: request.requestId)?.cancel()
+        let generation = documentGeneration
+        let checker = AppUpdateChecker()
+        let config = self.config
+        let task = Task { [weak self, checker, config] in
+            let decision: AppUpdatePolicy.Decision
+            if config.channel == "alpha" {
+                decision = AppUpdatePolicy.Decision(
+                    status: .unavailable, availableVersion: nil, error: "alpha builds are not store-gated")
+            } else {
+                decision = await checker.check(installedVersion: config.appVersion)
+            }
+            guard !Task.isCancelled, let self else { return }
+            self.appUpdateTasks.removeValue(forKey: request.requestId)
+            guard self.documentGeneration == generation,
+                  AllowedNavigation.isInternal(self.webView.url, origin: self.config.webOrigin) else { return }
+            let script = NativeBridge.appUpdateResultScript(
+                requestId: request.requestId,
+                channel: self.config.channel,
+                version: self.config.appVersion,
+                build: self.config.buildNumber,
+                decision: decision)
+            guard !script.isEmpty else { return }
+            do {
+                _ = try await self.webView.evaluateJavaScript(script)
+            } catch {
+                self.appUpdateLogger.error(
+                    "Failed to deliver app update result: \(error.localizedDescription, privacy: .private)")
+            }
+        }
+        appUpdateTasks[request.requestId] = task
+    }
+
+    private func cancelAppUpdateChecks() {
+        appUpdateTasks.values.forEach { $0.cancel() }
+        appUpdateTasks.removeAll()
     }
 
     /// Opens this app's page in Settings. Counterpart of Android's

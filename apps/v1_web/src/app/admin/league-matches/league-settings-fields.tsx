@@ -91,12 +91,12 @@ export function LeaguePlannedFixtureField({
       <label htmlFor={id} className="mb-1 block text-[length:var(--font-size-body-sm)] font-medium text-[var(--text-strong)]">총 경기 수 (선택)</label>
       <div className="flex items-center gap-2">
         <input id={id} type="number" inputMode="numeric" min={1} max={500} value={value} placeholder="예: 10" disabled={disabled} onChange={(e) => onChange(e.target.value)} className={`${fieldClass} w-32`} />
-        <span className="text-[length:var(--font-size-body-sm)] text-[var(--text-muted)]">경기</span>
+        <span className="shrink-0 whitespace-nowrap text-[length:var(--font-size-body-sm)] text-[var(--text-muted)]">경기</span>
       </div>
       <p className="mt-1 text-[length:var(--font-size-caption)] text-[var(--text-muted)]">
         {teamCount >= 2
-          ? `${teamCount}팀이 한 번씩 만나면 ${counts.single}경기, 두 번씩이면 ${counts.double}경기예요. 대진을 만들 때 이 수만큼 만들고, 나중에 경기를 더 추가할 수 있어요.`
-          : '대진을 만들 때 이 수만큼 만들고, 나중에 경기를 더 추가할 수 있어요.'}
+          ? `${teamCount}팀이 한 번씩 만나면 ${counts.single}경기, 두 번씩이면 ${counts.double}경기예요. 대진을 만들 때 이 수만큼 만들고, 나중에 경기를 더 추가할 수 있어요. 이 수만큼 결과가 확정되면 리그가 자동으로 끝나요.`
+          : '대진을 만들 때 이 수만큼 만들고, 나중에 경기를 더 추가할 수 있어요. 이 수만큼 결과가 확정되면 리그가 자동으로 끝나요.'}
       </p>
     </div>
   );

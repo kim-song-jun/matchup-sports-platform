@@ -17,6 +17,7 @@ import { mergeCorrectionScore, toCorrectionParticipants } from '@/lib/bracket-qu
 import { formatGameResultScoreWithPenalties } from '@/lib/game-result-score';
 import type { V1AdminBracketFixtureGame, V1QuickResultScore } from '@/types/api';
 import { BracketQuickResultForm } from './bracket-quick-result-form';
+import { josa } from '@/lib/korean';
 
 export type BracketResultActionsProps = {
   tournamentId: string;
@@ -208,7 +209,7 @@ export function BracketResultActions({
       <ReasonModal
         open={step === 'reason'}
         title="점수를 고칠까요?"
-        message={`${draftScore === null ? '' : formatGameResultScoreWithPenalties(draftScore)}로 고쳐요. 사유를 남겨 주세요.`}
+        message={`${draftScore === null ? '' : josa(formatGameResultScoreWithPenalties(draftScore), ['으로', '로'])} 고쳐요. 사유를 남겨 주세요.`}
         reasonLabel="정정 사유"
         confirmLabel="정정 확정"
         submitting={busy}

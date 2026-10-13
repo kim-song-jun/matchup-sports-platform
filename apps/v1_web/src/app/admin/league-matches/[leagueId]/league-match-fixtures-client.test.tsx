@@ -1312,7 +1312,7 @@ describe('LeagueMatchFixturesClient', () => {
       fireEvent.click(screen.getByRole('button', { name: '라운드로빈 대진 생성' }));
 
       const dialog = await screen.findByRole('dialog', { name: '라운드로빈 대진을 만들까요?' });
-      expect(dialog).toHaveTextContent('지울 수 없고 취소만 할 수 있어요');
+      expect(dialog).toHaveTextContent('만든 경기는 나중에 하나씩 고치거나 지울 수 있어요');
       expect(mutateAsync).not.toHaveBeenCalled();
     });
 
@@ -2285,7 +2285,7 @@ describe('수동 대진 추가 입구 — 대진 유무와 무관하게 보인�
       renderWithFixtures([{ ...OFFICIAL_FIXTURE, resultStage: null, homeScore: null, awayScore: null }], 'completed');
       openFixtureManage();
       expect(await screen.findByRole('button', { name: '대진 재생성' })).toBeDisabled();
-      expect(screen.getByText(/끝난 리그라 대진을 다시 만들 수 없어요. 먼저 ‘진행 중으로 되돌리기’를 해 주세요/)).toBeInTheDocument();
+      expect(screen.getByText(/끝난 리그라 대진을 다시 만들 수 없어요. 먼저 위 ‘상태 변경’에서 진행 중으로 바꿔 주세요/)).toBeInTheDocument();
     });
 
     it('진행 중인 리그는 둘 다 열려 있다 (회귀 방지 — 상태 조건이 항상 참이면 아무것도 못 한다)', async () => {

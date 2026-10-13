@@ -856,7 +856,8 @@ export default function LeagueMatchFixturesClient({
               focusFixtureId={mobileFocusFixtureId}
               slots={series.slots ?? []}
               candidates={mobileCandidates}
-              canWrite={canWrite && !leagueEnded}
+              canWrite={canWrite}
+              canEditFixture={canWrite && !leagueEnded}
               registrationsState={registrationsState}
               showToast={showToast}
             />

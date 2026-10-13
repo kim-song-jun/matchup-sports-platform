@@ -7,6 +7,8 @@ interface LeagueMobileScheduleBoardProps extends Omit<BracketCanvasMobileProps, 
   leagueId: string;
   replaceExisting: boolean;
   templateBlockedReason: string | null;
+  /** 종료된 리그의 경기 편집 제한은 기존 결과 정정 권한과 분리해요. */
+  canEditFixture: boolean;
   onOpenTemplate: () => void;
   onEditFixture: (fixtureId: string) => void;
 }
@@ -15,6 +17,7 @@ export function LeagueMobileScheduleBoard({
   leagueId,
   replaceExisting,
   templateBlockedReason,
+  canEditFixture,
   onOpenTemplate,
   onEditFixture,
   ...canvasProps
@@ -52,7 +55,7 @@ export function LeagueMobileScheduleBoard({
         {...canvasProps}
         competitionId={leagueId}
         scope="league"
-        onEditFixture={canvasProps.canWrite ? onEditFixture : undefined}
+        onEditFixture={canEditFixture ? onEditFixture : undefined}
       />
     </section>
   );

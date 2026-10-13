@@ -51,3 +51,9 @@ Phase A 단일 frontend owner: bracket-canvas-mobile 및 실제 league fixtures 
 - 2026-10-13 root: 관리형 생성/등록 완료, feature branch 준비. Phase A 회귀 준비 중; 새 테스트·PR·alpha는 NOT RUN.
 
 - 2026-10-13 11:11Z root: 기존 완료 경기 상세 편집 C1의 실제 소비자 회귀는 1 FAIL/10 PASS RED 후 canWrite && !leagueEnded 최소수정으로 11/11 GREEN (mdqa138-completed-existing-fixture-green11.log). 현재 기준 ee7은 최신 peer1901 dev06a7과 부모 파일이 겹치므로 이 결과를 최신 dev 검증으로 재사용하지 않는다. 원 모바일 편집 진입 결함은 실제06a 코드에 남음을 독립 확인했고, peer mobileFocusFixtureId/수동추가/징계/공식결과 보호를 보존해 정상 merge 통합 후 영향 검증을 갱신한다. PR/alpha는 NOT RUN.
+
+- 2026-10-13 11:25Z root: origin/dev06a7를 정상 merge한 committed864882에서 실제 모바일 소비자11/11 GREEN (mdqa138-dev06-integrated-mobile-editor-green11.log). peer1901의 mobileFocusFixtureId와 템플릿 양쪽 포커스 연결은 이미 보존되어 중복 수정하지 않았다. 타입·최신head 독립 리뷰·PR·alpha·tracker 완료는 남아 있다.
+
+- 2026-10-13 F3: 최신 dev79d1744를 통합한 ef91e093에서 완료 리그의 실제 공식 경기(ENDED, non-null game, hasLiveRecords=true, console OFFICIAL revision)까지 결과 정정 출구가 숨겨지는 C1을 확인했다. root가 실제 parent→HTTP 조회→모바일 시트 회귀를 1 FAIL/10 SKIP RED로 실행했다 (`tmp/qa/mdqa-assigned-monitor/2026-10-13-heartbeat-0244/mdqa138-completed-official-correction-red1.log`). 기존 완료 경기/readonly 사례를 강화해 전체 11건을 유지했다. root 승인 후 parent의 canWrite 결과 권한을 복원하고, league-mobile-schedule-board 전용 canEditFixture로 새 경기 편집 콜백만 종료 제한과 분리했다. shared BracketCanvasMobile/sheet, peer1901 포커스·수동추가·기존 결과 보호 소스는 변경하지 않았다. GREEN·타입·committed-head 독립 재리뷰·PR·alpha 검증은 PENDING이며 subagent는 테스트/Git을 실행하지 않았다.
+
+- 2026-10-13T12:52:50.394Z root F3: 완료 리그 non-null ENDED+hasLiveRecords+공식 console 결과의 실제 parent HTTP 회귀는 정정 링크 누락1FAIL/10skip였다. 결과 canWrite 유지와 wrapper 전용 canEditFixture 분리 후 동일파일11/11 실제GREEN (mdqa138-completed-official-correction-green11.log). 공식/voided/읽기전용/템플릿/저장실패/390→768→1440 사례를 보존했다. 마지막 committed ef91 tsc는 PASS였지만 Windows find 패턴 wrapperFAIL을 기록한다. 새 source commit 타입·독립재리뷰·PR·alpha는 아직pending이며11tests를 실제alphaPASS로확대하지 않는다.

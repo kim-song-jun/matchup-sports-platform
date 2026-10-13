@@ -95,7 +95,7 @@ describe('LeagueMatchStandingsClient', () => {
   // 앱의 다른 화면과 같은 곳으로 가야 같은 단어가 화면마다 다른 데로 가지 않는다.
   it('순위표의 팀 이름은 팀 상세로 가는 링크다', async () => {
     useV1LeagueMatchMock.mockReturnValue({
-      data: { leagueId: 'league-1', title: '가을 리그', state: 'active', registrationOpen: false, registrationDeadlineAt: null, sportCode: 'futsal', coverImageUrl: null, entryFee: 0, entryFeeConfigured: false, startsOn: '2026-09-01T00:00:00.000Z', endsOn: '2026-10-20T00:00:00.000Z', teamIds: ['t1'], fixtures: [] },
+      data: { leagueId: 'league-1', title: '가을 리그', rulesText: '첫 줄 운영 안내\n둘째 줄', state: 'active', registrationOpen: false, registrationDeadlineAt: null, sportCode: 'futsal', coverImageUrl: null, entryFee: 0, entryFeeConfigured: false, startsOn: '2026-09-01T00:00:00.000Z', endsOn: '2026-10-20T00:00:00.000Z', teamIds: ['t1'], fixtures: [] },
     } as never);
     useV1LeagueMatchStandingsMock.mockReturnValue({
       data: {
@@ -109,6 +109,7 @@ describe('LeagueMatchStandingsClient', () => {
 
     render(<LeagueMatchStandingsClient leagueId="league-1" />);
 
+    expect(screen.getByRole('region', { name: '리그 운영 안내' })).toHaveTextContent('첫 줄 운영 안내 둘째 줄');
     const link = await screen.findByRole('link', { name: /성수 FC/ });
     // 팀 상세에서 뒤로가기를 누르면 이 리그 화면으로 돌아오도록 ?from=이 함께 실린다.
     expect(link).toHaveAttribute('href', `/teams/t1?from=${encodeURIComponent('/league-matches/league-1')}`);

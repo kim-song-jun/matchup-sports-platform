@@ -258,6 +258,7 @@ type V1AdminOnlyLeagueFields =
   | 'slots';
 
 export interface V1PublicLeagueDetail extends Omit<V1AdminLeagueDetail, V1AdminOnlyLeagueFields> {
+  rulesText?: string | null;
   /** 참가비를 운영자가 확정했는가. `false` 면 참가비를 '무료'로 말하지 않는다. */
   entryFeeConfigured: boolean;
   // startsOn 은 V1AdminLeagueDetail 로 올라갔다(대진 폼이 기준일로 쓴다) — 여기서 다시

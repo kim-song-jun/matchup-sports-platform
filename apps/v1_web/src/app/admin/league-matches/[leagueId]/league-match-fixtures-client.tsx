@@ -741,6 +741,10 @@ export default function LeagueMatchFixturesClient({
         action={
           <div className="flex flex-wrap items-center gap-2">
             <AdminLeagueStatePill state={series.state} />
+            {canWrite && series.state !== 'completed' && (
+              <Link href={`/admin/league-matches/${encodeURIComponent(leagueId)}/edit`}
+                className="tm-btn tm-btn-md tm-btn-neutral min-h-[44px]">리그 수정</Link>
+            )}
             {/* 경기 영상 관리 — 대회 운영 콘솔의 영상 화면과 같은 역할의 리그 판.
                 대진이 없으면 그 화면이 빈 상태 안내를 대신한다. */}
             <Link

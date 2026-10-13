@@ -1,3 +1,5 @@
+import { getLeagueSettings, updateLeagueSettings } from './league-settings';
+import { UpdateLeagueSettingsDto } from './dto/league-settings.dto';
 import {
   BadRequestException,
   ConflictException,
@@ -343,6 +345,13 @@ export class LeagueMatchAdminService {
         seasonNo: row.seasonNo,
       })),
     };
+  }
+
+  settings(user: V1AuthUser, id: string) {
+    return getLeagueSettings(this.prisma, this.adminContext, user, id);
+  }
+  updateSettings(user: V1AuthUser, id: string, dto: UpdateLeagueSettingsDto) {
+    return updateLeagueSettings(this.prisma, this.adminContext, user, id, dto);
   }
 
   async detail(user: V1AuthUser, leagueId: string) {

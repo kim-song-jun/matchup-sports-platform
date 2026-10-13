@@ -97,8 +97,9 @@ describe('KickoffChecklist — 킥오프 준비', () => {
   });
 
   it('요약을 못 읽은 팀은 못 읽었다고 말한다 — 0 으로 그리지 않고, 다른 팀 요약은 그대로 보인다', () => {
+    // 리그 여부는 첫 팀(레드) 명단으로 판정하므로, 요약 실패는 두 번째 팀으로 본다.
     mocks.useV1TeamGameRoster.mockImplementation((teamId: string) =>
-      teamId === 'team-red'
+      teamId === 'team-blue'
         ? { data: undefined, isPending: false, isError: true }
         : rosterData({ excluded: 0, unavailable: 0, suspended: 2 }),
     );
@@ -106,7 +107,26 @@ describe('KickoffChecklist — 킥오프 준비', () => {
 
     expect(screen.getByText('명단 요약을 불러오지 못했어요.')).toBeInTheDocument();
     expect(screen.getByText('빠짐 0 · 정지 2')).toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: '레드팀 경기 명단 보기' })).toBeNull();
+    expect(screen.queryByRole('link', { name: '블루팀 경기 명단 보기' })).toBeNull();
+  });
+
+  it('리그인지 확인하는 동안에는 대회용 도착 확인을 먼저 그리지 않는다', () => {
+    mocks.useV1TeamGameRoster.mockReturnValue({ data: undefined, isPending: true, isError: false });
+    renderChecklist({ lineups: lineups(NOT_YET, NOT_YET) });
+
+    expect(screen.getByRole('status')).toHaveTextContent('킥오프 준비를 불러오는 중이에요…');
+    expect(screen.queryByRole('button', { name: /전원 도착 확인/ })).toBeNull();
+  });
+
+  it('리그인지 확인하지 못하면 도착 확인 대신 오류와 다시 불러오기를 보여 준다', () => {
+    const refetch = vi.fn();
+    mocks.useV1TeamGameRoster.mockReturnValue({ data: undefined, isPending: false, isError: true, refetch });
+    renderChecklist({ lineups: lineups(NOT_YET, NOT_YET) });
+
+    expect(screen.getByRole('alert')).toHaveTextContent('킥오프 준비를 불러오지 못했어요.');
+    expect(screen.queryByRole('button', { name: /전원 도착 확인/ })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: '다시 불러오기' }));
+    expect(refetch).toHaveBeenCalledTimes(1);
   });
 
   it('팀이 정해지지 않은 사이드에는 요약도 링크도 없다', () => {

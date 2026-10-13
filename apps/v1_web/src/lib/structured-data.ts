@@ -1,4 +1,5 @@
 import { absoluteSiteUrl, DEFAULT_SOCIAL_IMAGE, getSiteOrigin } from '@/lib/seo';
+import { canStartTournamentRegistration } from '@/lib/tournament-registration-availability';
 import type {
   V1Match,
   V1Notice,
@@ -104,7 +105,6 @@ function placeNode(tournament: V1TournamentDetail): JsonLdNode | null {
   const place: JsonLdNode = {
     '@type': 'Place',
     name: tournament.venue,
-    address: { '@type': 'PostalAddress', addressCountry: 'KR', name: tournament.venue },
   };
   // 좌표는 지오코딩에 성공한 대회만 갖는다(카카오 로컬 API 미설정/검색 실패 시 null).
   if (typeof tournament.latitude === 'number' && typeof tournament.longitude === 'number') {
@@ -163,7 +163,7 @@ export function buildSportsEventLd(
       priceCurrency: 'KRW',
       url,
       availability:
-        tournament.status === 'open'
+        canStartTournamentRegistration(tournament)
           ? 'https://schema.org/InStock'
           : 'https://schema.org/SoldOut',
       ...(tournament.registrationDeadlineAt ? { validThrough: tournament.registrationDeadlineAt } : {}),

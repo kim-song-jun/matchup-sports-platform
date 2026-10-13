@@ -1,10 +1,11 @@
 import { focusManager, QueryClientProvider } from '@tanstack/react-query';
-import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import type { ReactNode } from 'react';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createV1QueryClient } from '@/lib/query-client';
+import { v1Keys } from '@/lib/query-keys';
 import type { V1AuthMe, V1TeamDetail } from '@/types/api';
 import { TeamDetailPageClient } from './teams-client';
 
@@ -17,8 +18,9 @@ const api = 'http://localhost/api/v1';
 const teamId = 'team-1';
 const me: V1AuthMe = { user: { id: 'user-1', email: null, onboardingStatus: 'completed' }, profile: { displayName: '팀장' } };
 let introduction = '처음 팀 소개예요';
-let teamFailure: 503 | null = null;
+let teamFailure: 401 | 403 | 404 | 503 | null = null;
 let teamReads = 0;
+let dissolved = false;
 let visibility: DocumentVisibilityState = 'visible';
 
 function team(): V1TeamDetail {
@@ -32,6 +34,7 @@ function team(): V1TeamDetail {
     owner: { userId: 'user-1', displayName: '팀장', profileImageUrl: null }, membersPreview: [], memberCount: 1,
     managerCount: 0, trust: { trustState: 'sample', score: null },
     viewer: { role: 'owner', membershipId: 'membership-1', joinState: 'active', canRequestJoin: false, disabledReason: null, manageRoute: null },
+    dissolution: dissolved ? { dissolvedAt: '2026-10-12T00:00:00Z', archivedBy: 'owner', restoreDeadlineAt: '2026-11-11T00:00:00Z', canRestore: true } : null,
   };
 }
 
@@ -39,7 +42,7 @@ const server = setupServer(
   http.get(`${api}/teams/${teamId}`, () => {
     teamReads += 1;
     return teamFailure
-      ? HttpResponse.json({ status: 'error', statusCode: 503, code: 'SERVICE_UNAVAILABLE', message: '잠시 후 다시 시도해 주세요.' }, { status: 503 })
+      ? HttpResponse.json({ status: 'error', statusCode: teamFailure, code: 'TEAM_READ_FAILED', message: '팀 정보를 확인하지 못했어요. 잠시 후 다시 시도해 주세요.' }, { status: teamFailure })
       : HttpResponse.json({ status: 'success', data: team() });
   }),
   http.get(`${api}/auth/me`, () => HttpResponse.json({ status: 'success', data: me })),
@@ -68,7 +71,7 @@ async function leaveAndReturn(event: 'visibilitychange' | 'focus') {
 
 beforeAll(() => server.listen({ onUnhandledRequest: 'bypass' }));
 beforeEach(() => {
-  introduction = '처음 팀 소개예요'; teamFailure = null; teamReads = 0; visibility = 'visible';
+  introduction = '처음 팀 소개예요'; teamFailure = null; teamReads = 0; dissolved = false; visibility = 'visible';
   vi.stubEnv('NEXT_PUBLIC_API_URL', api);
   vi.spyOn(document, 'visibilityState', 'get').mockImplementation(() => visibility);
   focusManager.setFocused(undefined);
@@ -92,15 +95,72 @@ describe.each([{ cache: 'fresh', staleTime: Infinity }, { cache: 'stale', staleT
 );
 
 describe('team detail background refetch failure', () => {
-  it('keeps the loaded team on screen and recovers on the next return', async () => {
-    mountTab(0);
+  it('shows the completed refetch error with cached content and recovers through one explicit retry GET', async () => {
+    const client = mountTab(0);
     await screen.findAllByText('처음 팀 소개예요');
     teamFailure = 503; teamReads = 0;
     await leaveAndReturn('focus');
-    await waitFor(() => expect(teamReads).toBeGreaterThan(0));
+    // The request count alone does not prove the response finished or the error reached the consumer.
+    await waitFor(() => {
+      expect(client.getQueryState([...v1Keys.team(teamId), 'detail'])).toMatchObject({ status: 'error', fetchStatus: 'idle' });
+    });
     expect(screen.getAllByText('처음 팀 소개예요').length).toBeGreaterThan(0);
+    expect(await screen.findByText('팀 정보를 확인하지 못했어요. 잠시 후 다시 시도해 주세요.')).toBeVisible();
+    const retry = screen.getByRole('button', { name: '다시 불러오기' });
     teamFailure = null; introduction = '복구된 팀 소개예요';
-    await leaveAndReturn('focus');
+    let releaseResponse: (() => void) | undefined;
+    const responseReady = new Promise<void>((resolve) => { releaseResponse = resolve; });
+    server.use(http.get(`${api}/teams/${teamId}`, async () => {
+      teamReads += 1;
+      await responseReady;
+      return HttpResponse.json({ status: 'success', data: team() });
+    }));
+    teamReads = 0;
+    await act(async () => { fireEvent.click(retry); fireEvent.click(retry); });
+    await waitFor(() => expect(teamReads).toBe(1));
+    expect(screen.getAllByText('처음 팀 소개예요').length).toBeGreaterThan(0);
+    await act(async () => { releaseResponse?.(); });
     await screen.findAllByText('복구된 팀 소개예요');
+    expect(screen.queryAllByText('처음 팀 소개예요')).toHaveLength(0);
+    expect(screen.queryByText('팀 정보를 확인하지 못했어요. 잠시 후 다시 시도해 주세요.')).not.toBeInTheDocument();
+    expect(teamReads).toBe(1);
+  });
+
+  it.each([401, 403, 404] as const)('hides cached team content and owner actions after a completed %s refetch', async (status) => {
+    const client = mountTab(0);
+    await screen.findAllByText('처음 팀 소개예요');
+    await screen.findAllByRole('link', { name: /^팀 정보 수정/ });
+    teamFailure = status;
+    await leaveAndReturn('focus');
+    await waitFor(() => {
+      expect(client.getQueryState([...v1Keys.team(teamId), 'detail'])).toMatchObject({ status: 'error', fetchStatus: 'idle' });
+    });
+    expect(await screen.findByText('팀 정보를 확인하지 못했어요. 잠시 후 다시 시도해 주세요.')).toBeVisible();
+    expect(screen.queryAllByText('처음 팀 소개예요')).toHaveLength(0);
+    expect(screen.queryAllByRole('link', { name: /^팀 정보 수정/ })).toHaveLength(0);
+  });
+
+  it('shows the actual first-load failure without rendering a cached or sample team', async () => {
+    teamFailure = 503;
+    mountTab(0);
+    expect(await screen.findByText('팀 정보를 확인하지 못했어요. 잠시 후 다시 시도해 주세요.')).toBeVisible();
+    expect(screen.queryAllByText('처음 팀 소개예요')).toHaveLength(0);
+    expect(screen.getByRole('button', { name: '다시 불러오기' })).toBeVisible();
+  });
+
+  it('hides a cached dissolved team and its restore entry when a real refetch denies access', async () => {
+    dissolved = true;
+    const client = mountTab(0);
+    await screen.findByRole('link', { name: '해체한 팀에서 복구하기' });
+    teamFailure = 403;
+    await act(async () => {
+      await client.refetchQueries({ queryKey: [...v1Keys.team(teamId), 'detail'] });
+    });
+    await waitFor(() => {
+      expect(client.getQueryState([...v1Keys.team(teamId), 'detail'])).toMatchObject({ status: 'error', fetchStatus: 'idle' });
+    });
+    expect(await screen.findByText('팀 정보를 확인하지 못했어요. 잠시 후 다시 시도해 주세요.')).toBeVisible();
+    expect(screen.queryByText('해체된 팀')).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: '해체한 팀에서 복구하기' })).not.toBeInTheDocument();
   });
 });

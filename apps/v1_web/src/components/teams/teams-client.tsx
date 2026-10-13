@@ -41,6 +41,7 @@ import { teamErrorMessage } from '@/lib/team-error-messages';
 import { isTeamOperatorRole, normalizeMyTeamsResponse, TEAM_MANAGER_LIMIT } from '@/lib/team-role';
 import { getLoginPathForRedirect, withFromPath, sanitizeRedirectPath } from '@/lib/session-storage';
 import { useShellOverride } from '@/components/v1-ui/shell-override';
+import { ErrorState } from '@/components/v1-ui/primitives';
 import { useCurrentHref } from '@/components/v1-ui/use-current-href';
 import { teamSharePath } from '@/lib/team-share-route';
 import { V1_LEVELS, levelRangeMatches, toLevelCodes, toggleLevelCode } from '@/lib/v1-levels';
@@ -216,11 +217,44 @@ export function TeamListPageClient({ seed }: { readonly seed?: CursorListSeed<V1
 export function TeamDetailPageClient({ teamId, seed }: { teamId: string; seed?: V1TeamDetail | null }) {
   const query = useV1TeamDetail(teamId, { seed });
   const fromPath = sanitizeRedirectPath(useSearchParams().get('from'));
+  // 실패된 캐시는 현재 접근 권한이 아니다 — 활동 팀 하위 컴포넌트와 운영 요청도 함께 멈춘다.
+  if (query.isError && isTeamReadAccessError(query.error)) {
+    return <TeamDetailLoadError error={query.error} isFetching={query.isFetching} onRetry={() => void query.refetch({ cancelRefetch: false })} />;
+  }
   // 해체된 팀은 읽기 전용 — 가입 자격·채팅 자동 연결 같은 활동 팀 조회를 아예 부르지 않는다.
   if (query.data?.dissolution) {
-    return <DissolvedTeamView team={query.data} selfHref={withFromPath(`/teams/${teamId}`, fromPath)} />;
+    return (
+      <>
+        {query.isError ? <TeamDetailLoadError error={query.error} isFetching={query.isFetching} cached onRetry={() => void query.refetch({ cancelRefetch: false })} /> : null}
+        <DissolvedTeamView team={query.data} selfHref={withFromPath(`/teams/${teamId}`, fromPath)} />
+      </>
+    );
   }
   return <ActiveTeamDetailPageClient teamId={teamId} seed={seed} />;
+}
+
+function isTeamReadAccessError(error: unknown): boolean {
+  return isUnauthenticatedError(error) || (error instanceof V1ApiError && (error.statusCode === 403 || error.statusCode === 404));
+}
+
+function TeamDetailLoadError({ error, isFetching, onRetry, cached = false }: {
+  readonly error: unknown;
+  readonly isFetching: boolean;
+  readonly onRetry: () => void;
+  readonly cached?: boolean;
+}) {
+  const accessDenied = isTeamReadAccessError(error);
+  return (
+    <div aria-busy={isFetching}>
+      <ErrorState
+        title={cached ? '최신 팀 정보를 불러오지 못했어요' : '팀 정보를 불러오지 못했어요'}
+        message={extractErrorMessage(error, '팀 정보를 확인하지 못했어요. 잠시 후 다시 시도해 주세요.')}
+        onRetry={!accessDenied && !isFetching ? onRetry : undefined}
+        retryLabel="다시 불러오기"
+        back={accessDenied ? { href: '/teams', label: '팀 목록으로 돌아가기' } : undefined}
+      />
+    </div>
+  );
 }
 
 function ActiveTeamDetailPageClient({ teamId, seed }: { teamId: string; seed?: V1TeamDetail | null }) {
@@ -253,9 +287,9 @@ function ActiveTeamDetailPageClient({ teamId, seed }: { teamId: string; seed?: V
   const query = useV1TeamDetail(teamId, { seed, refetchOnWindowFocus: 'always' });
   // override store는 한 칸이고 부모 effect가 자식(TeamStatePageView)보다 늦게 돈다 —
   // 에러 뷰의 제목까지 여기서 함께 게시하지 않으면 부모 값이 그 제목을 덮어쓴다.
-  // 이미 받은 팀이 있으면 백그라운드 재조회 실패로 화면을 에러 뷰로 바꾸지 않는다 — 다음 복귀 때 다시 시도한다.
+  // 일시적 재조회 실패는 캐시와 실제 오류를 함께 표시한다. 접근 차단은 부모 경계가 처리한다.
   const loadFailed = query.isError && !query.data;
-  const stateTitle = loadFailed ? getTeamStateViewModel('error').title : undefined;
+  const stateTitle = loadFailed ? '팀 정보를 불러오지 못했어요' : undefined;
   // 뒤로가기는 AppBackLink 가 `?from=` 을 직접 읽으므로 여기서 backHref 로 따로 넘기지 않는다.
   useShellOverride(stateTitle ? { title: stateTitle } : {});
   const eligibility = useV1TeamJoinEligibility(teamId, { enabled: Boolean(query.data) && authVerified });
@@ -309,7 +343,7 @@ function ActiveTeamDetailPageClient({ teamId, seed }: { teamId: string; seed?: V
     resolveChat.mutate({ targetType: 'team', targetId: teamId });
   }, [authVerified, query.data, resolveChat, teamId]);
 
-  if (loadFailed) return <TeamStatePageView model={getTeamStateViewModel('error')} />;
+  if (loadFailed) return <TeamDetailLoadError error={query.error} isFetching={query.isFetching} onRetry={() => void query.refetch({ cancelRefetch: false })} />;
 
   const regionParts = splitTeamRegion(query.data?.region);
   // 데이터가 오기 전에는 하드코딩 목업(`fallback`)을 화면 전체로 렌더하지 않는다 —
@@ -475,7 +509,12 @@ function ActiveTeamDetailPageClient({ teamId, seed }: { teamId: string; seed?: V
       : undefined,
   };
 
-  return <TeamDetailPageView model={model} />;
+  return (
+    <>
+      {query.isError ? <TeamDetailLoadError error={query.error} isFetching={query.isFetching} cached onRetry={() => void query.refetch({ cancelRefetch: false })} /> : null}
+      <TeamDetailPageView model={model} />
+    </>
+  );
 }
 
 /** 알림이 가입 신청·초대 탭을 직접 가리킨다(?tab=requests|invitations). 관리 권한이 없으면 화면은 멤버 목록만 그린다. */

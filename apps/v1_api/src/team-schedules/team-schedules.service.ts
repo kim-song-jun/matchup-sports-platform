@@ -23,6 +23,19 @@ const IDEMPOTENCY_RETENTION_MS = 30 * 24 * 60 * 60 * 1_000;
 
 type Tx = Prisma.TransactionClient;
 
+// 취소된 팀매치의 일정은 운영 이력으로만 남긴다. 일반 팀 일정의 취소 표시는 유지한다.
+async function visibleTeamMatchScheduleWhere(prisma: PrismaService, teamIds: string[]): Promise<Prisma.V1TeamScheduleWhereInput> {
+  // teamMatchId에는 Prisma relation이 없어 현재 팀의 비공개 매치 ID를 배치 조회해서 제외한다.
+  const hidden = await prisma.v1TeamMatch.findMany({
+    where: { AND: [
+      { OR: [{ status: { in: ['cancelled', 'archived'] } }, { deletedAt: { not: null } }] },
+      { OR: [{ hostTeamId: { in: teamIds } }, { approvedApplicantTeamId: { in: teamIds } }] },
+    ] },
+    select: { id: true },
+  });
+  return hidden.length ? { OR: [{ teamMatchId: null }, { teamMatchId: { notIn: hidden.map((match) => match.id) } }] } : {};
+}
+
 /** 일정 생성·취소 알림(H1-schedule-*) outbox 종류 — 워커의 ScheduleReminderService 가 받아 팀원에게 쓴다. */
 export const SCHEDULE_CREATED_NOTIFICATION_TYPE = 'SCHEDULE_CREATED_NOTIFICATION';
 export const SCHEDULE_CANCELLED_NOTIFICATION_TYPE = 'SCHEDULE_CANCELLED_NOTIFICATION';
@@ -176,6 +189,7 @@ export class TeamSchedulesService {
     const limit = Math.min(Math.max(query.limit ?? 20, 1), 100);
 
     const where: Prisma.V1TeamScheduleWhereInput = {
+      AND: [await visibleTeamMatchScheduleWhere(this.prisma, [teamId])],
       teamId,
       visibility: isMember ? undefined : V1ScheduleVisibility.PUBLIC,
       ...(query.type ? { type: query.type } : {}),
@@ -223,7 +237,7 @@ export class TeamSchedulesService {
     }
 
     const schedule = await this.prisma.v1TeamSchedule.findFirst({
-      where: { id: scheduleId, teamId },
+      where: { id: scheduleId, teamId, AND: [await visibleTeamMatchScheduleWhere(this.prisma, [teamId])] },
       include: {
         attendance: true,
         guestRecruitment: { include: { applications: { select: { state: true } } } },
@@ -334,6 +348,7 @@ export class TeamSchedulesService {
     const infoByTeam = new Map(memberships.map((m) => [m.teamId, { role: m.role, teamName: m.team.name }]));
 
     const where: Prisma.V1TeamScheduleWhereInput = {
+      AND: [await visibleTeamMatchScheduleWhere(this.prisma, [...infoByTeam.keys()])],
       teamId: { in: [...infoByTeam.keys()] },
       ...(state ? { state } : {}),
       ...(query.from || query.to

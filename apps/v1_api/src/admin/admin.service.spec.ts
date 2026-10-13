@@ -533,14 +533,17 @@ describe('AdminService.changeMatchStatus — 이전 상태를 트랜잭션 안�
 
 
 describe('AdminService.changeTeamMatchStatus — competition ownership', () => {
-  function setup(ownership: { leagueId: string | null; tournamentId: string | null }) {
-    const target = { id: 'fixture-1', status: 'matched', ...ownership };
+  function setup(ownership: { leagueId: string | null; tournamentId: string | null }, overrides: Record<string, unknown> = {}) {
+    const target = { id: 'fixture-1', status: 'matched', ...ownership, ...overrides };
     const prisma = {
       v1AdminUser: { findUnique: jest.fn().mockResolvedValue(actorAdminRecord) },
       v1TeamMatch: {
         findUnique: jest.fn().mockResolvedValue(target),
         update: jest.fn().mockImplementation(({ data }) => ({ ...target, ...data })),
       },
+      v1TeamMatchApplication: { updateMany: jest.fn().mockResolvedValue({ count: 0 }) },
+      v1TeamSchedule: { findMany: jest.fn().mockResolvedValue([]) },
+      v1Game: { findUnique: jest.fn().mockResolvedValue(null), updateMany: jest.fn().mockResolvedValue({ count: 0 }) },
       v1AdminActionLog: { create: jest.fn().mockResolvedValue({ id: 'action-1' }) },
       v1StatusChangeLog: { create: jest.fn().mockResolvedValue({ id: 'status-1' }) },
       $queryRaw: jest.fn().mockResolvedValue([]),
@@ -574,5 +577,46 @@ describe('AdminService.changeTeamMatchStatus — competition ownership', () => {
       teamMatchId: 'fixture-1', previousStatus: 'matched', status: 'cancelled', actionLogId: 'action-1', statusChangeLogId: 'status-1',
     });
     expect(prisma.v1StatusChangeLog.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ fromStatus: 'matched', toStatus: 'cancelled' }) }));
+  });
+
+  it('recruiting clears an elapsed deadline so a future unmatched recruitment actually reopens', async () => {
+    const deadlineAt = new Date(Date.now() - 60_000);
+    const { service, prisma } = setup({ leagueId: null, tournamentId: null }, {
+      status: 'closed', startAt: new Date(Date.now() + 86_400_000), deadlineAt, approvedApplicantTeamId: null,
+    });
+    const result = await service.changeTeamMatchStatus(actorAuthUser, 'fixture-1', { status: 'recruiting', reason: '모집 재개' });
+    expect(result).toMatchObject({ status: 'recruiting', previousStatus: 'closed' });
+    expect(prisma.v1TeamMatch.update).toHaveBeenCalledWith({ where: { id: 'fixture-1' }, data: { status: 'recruiting', deadlineAt: null } });
+    expect(prisma.v1AdminActionLog.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({
+      beforeJson: { status: 'closed', deadlineAt: deadlineAt.toISOString() }, afterJson: { status: 'recruiting', deadlineAt: null },
+    }) }));
+  });
+
+  it.each([
+    { startAt: new Date(Date.now() - 60_000) },
+    { status: 'cancelled' },
+    { approvedApplicantTeamId: 'away-team' },
+  ])('invalid recruiting transition fails without writes: %j', async (overrides) => {
+    const { service, prisma } = setup({ leagueId: null, tournamentId: null }, {
+      status: 'closed', startAt: new Date(Date.now() + 86_400_000), ...overrides,
+    });
+    await expect(service.changeTeamMatchStatus(actorAuthUser, 'fixture-1', { status: 'recruiting', reason: '모집 재개' })).rejects.toMatchObject({ response: { code: 'TEAM_MATCH_REOPEN_FORBIDDEN' } });
+    expect(prisma.v1TeamMatch.update).not.toHaveBeenCalled();
+  });
+
+  it('a generic matched flip cannot fabricate a team assignment', async () => {
+    const { service, prisma } = setup({ leagueId: null, tournamentId: null }, { status: 'recruiting' });
+    await expect(service.changeTeamMatchStatus(actorAuthUser, 'fixture-1', { status: 'matched', reason: '확정' })).rejects.toMatchObject({ response: { code: 'TEAM_MATCH_ASSIGNMENT_REQUIRED' } });
+    expect(prisma.v1TeamMatch.update).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    [{ state: 'LIVE', currentOfficialRevisionId: null }, 'TEAM_MATCH_ALREADY_STARTED'],
+    [{ state: 'ENDED', currentOfficialRevisionId: 'revision-1' }, 'TEAM_MATCH_RESULT_OFFICIAL'],
+  ])('game state/result cannot be bypassed by changing only the match status', async (game, code) => {
+    const { service, prisma } = setup({ leagueId: null, tournamentId: null }, { status: 'recruiting', startAt: new Date(Date.now() + 86_400_000) });
+    prisma.v1Game.findUnique.mockResolvedValue(game);
+    await expect(service.changeTeamMatchStatus(actorAuthUser, 'fixture-1', { status: 'cancelled', reason: '운영 확인' })).rejects.toMatchObject({ response: { code } });
+    expect(prisma.v1TeamMatch.update).not.toHaveBeenCalled();
   });
 });

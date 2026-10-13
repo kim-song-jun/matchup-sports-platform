@@ -135,6 +135,15 @@ function createFake(options: {
   return { service: new TeamMatchRecordService(prisma), changes, game, writes };
 }
 
+it.each(['cancelled', 'archived'])('%s record is absent for guests/team managers, while active admins retain the record', async (status) => {
+  const { service, game } = createFake({ memberships: [{ userId: 'coach', teamId: 'team-home', role: 'owner' }], admins: ['ops-admin'] });
+  game.teamMatch.status = status;
+  for (const viewer of [null, user('coach')]) {
+    await expect(service.read(viewer, 'tm-1')).rejects.toMatchObject({ status: 404, response: { code: 'TEAM_MATCH_NOT_FOUND' } });
+  }
+  await expect(service.read(user('ops-admin'), 'tm-1')).resolves.toMatchObject({ teamMatchId: 'tm-1' });
+});
+
 const addGoal = (sideId: string) => ({ action: 'add' as const, expectedVersion: 0, commandId: randomUUID(), sideId });
 const confirm = () => ({ action: 'confirm' as const, expectedVersion: 0, commandId: randomUUID() });
 

@@ -144,7 +144,7 @@ describe('AdminTeamMatchRecruitmentsService', () => {
         ]),
       },
       v1ParticipantIdentityLinkCurrent: { createMany: jest.fn().mockResolvedValue({ count: 1 }) },
-      v1TeamSchedule: { create: jest.fn().mockResolvedValue({}) },
+      v1TeamSchedule: { create: jest.fn().mockResolvedValue({}), updateMany: jest.fn().mockResolvedValue({ count: 0 }) },
       v1StatusChangeLog: { createMany: jest.fn().mockResolvedValue({ count: 2 }) },
       v1TeamMembership: { findMany: jest.fn().mockResolvedValue([]) },
       v1AdminUser: { findFirst: jest.fn().mockResolvedValue({ userId: adminUser.id }) },
@@ -434,6 +434,24 @@ describe('AdminTeamMatchRecruitmentsService', () => {
       expect.objectContaining({ action: 'team_match.recruitment.update' }),
       prisma,
     );
+  });
+
+  it('allows editing a closed platform recruitment without silently reopening it', async () => {
+    prisma.v1TeamMatch.findFirst.mockResolvedValue({
+      id: 'team-match-1', title: createDto.title, sportId, status: 'closed', platformManaged: true,
+      leagueId: null, tournamentId: null, deadlineAt: DEADLINE, updatedAt: new Date('2026-08-01T00:00:00.000Z'),
+    });
+    const result = await service.update(adminUser, 'team-match-1', {
+      ...createDto, clientCommandId: '00000000-0000-4000-8000-000000000004', version: '2026-08-01T00:00:00.000Z',
+    });
+    expect(result.status).toBe('closed');
+    expect(prisma.v1TeamMatch.updateMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({ status: 'closed' }),
+    }));
+    expect(prisma.v1TeamMatch.updateMany.mock.calls[0][0].data.status).toBeUndefined();
+    expect(prisma.v1TeamSchedule.updateMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: { teamMatchId: 'team-match-1', state: 'SCHEDULED' }, data: expect.objectContaining({ title: createDto.title }),
+    }));
   });
 
   it('rejects an update made from a stale detail version', async () => {

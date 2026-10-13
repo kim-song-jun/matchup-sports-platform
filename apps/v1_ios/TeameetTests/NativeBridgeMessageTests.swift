@@ -31,9 +31,7 @@ final class NativeBridgeMessageTests: XCTestCase {
         XCTAssertEqual(NativeBridge.resultEventName, "teameet:native-push-result")
     }
 
-    /// Every string the web can send. Four come from `NativePushAction`; the others are Apple
-    /// sign-in (Apple blocks its web flow inside an embedded browser) and Kakao sign-in (the
-    /// SDK hands off to the KakaoTalk app).
+    /// Every action the native shell advertises to the web.
     func testSupportsExactlyTheDeclaredActions() {
         XCTAssertEqual(
             Set(NativeBridge.Action.allCases.map(\.rawValue)),
@@ -42,7 +40,8 @@ final class NativeBridgeMessageTests: XCTestCase {
              "open-notification-settings",
              "revoke-push-device",
              "sign-in-with-apple",
-             "sign-in-with-kakao"])
+             "sign-in-with-kakao",
+             "check-app-update"])
     }
 
     func testUsesTheEventNameTheKakaoSignInWebCodeListensFor() {
@@ -148,6 +147,20 @@ final class NativeBridgeMessageTests: XCTestCase {
 
         XCTAssertFalse(script.contains("alert(1);({'"))
         XCTAssertTrue(script.contains("\"requestId\":\"a'});alert(1);({\""))
+    }
+
+    func testAppUpdateReplyCarriesValidatedMetadataAndEscapesRequestId() {
+        let script = NativeBridge.appUpdateResultScript(
+            requestId: "x'});alert(1);({", channel: "production", version: "0.1.5", build: "9",
+            decision: AppUpdatePolicy.Decision(status: .updateRequired, availableVersion: "0.1.6", error: nil))
+        XCTAssertTrue(script.contains("teameet:native-app-update-result"))
+        XCTAssertTrue(script.contains("\"platform\":\"ios\""))
+        XCTAssertTrue(script.contains("\"channel\":\"production\""))
+        XCTAssertTrue(script.contains("\"version\":\"0.1.5\""))
+        XCTAssertTrue(script.contains("\"build\":\"9\""))
+        XCTAssertTrue(script.contains("\"status\":\"update-required\""))
+        XCTAssertTrue(script.contains("\"availableVersion\":\"0.1.6\""))
+        XCTAssertFalse(script.contains("alert(1);({'"))
     }
 
     // MARK: - Parsing

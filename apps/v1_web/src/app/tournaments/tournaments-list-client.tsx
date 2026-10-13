@@ -26,17 +26,19 @@ import { useInfiniteScroll } from '@/hooks/use-infinite-scroll';
 import { useCursorPagination, useCursorPaginationSnapshot } from '@/hooks/use-cursor-pagination';
 import { PaginationBar } from '@/components/v1-ui/pagination-bar';
 import { extractErrorMessage } from '@/lib/error-message';
+import { withFromPath } from '@/lib/session-storage';
 import { TOURNAMENT_LIST_PAGE_SIZE, type TournamentListSeed } from '@/lib/public-list-seed';
 import { v1Keys } from '@/lib/query-keys';
 import { TournamentCard } from './tournament-card';
 import type { V1TournamentListItem } from '@/types/api';
 
 /** 이벤트 허브 진입 카드. */
-function TournamentEventHubEntry() {
+function TournamentEventHubEntry({ fromPath }: { fromPath: string }) {
   return (
     <div className="tm-tournament-event-hub-entry">
       <Link
-        href="/events"
+        // 지금 보는 목록 주소를 출처로 넘겨, 이벤트 화면의 뒤로가기가 바로 전 화면(필터·페이지 포함)으로 돌아오게 한다.
+        href={withFromPath('/events', fromPath)}
         // 지면에 색을 까므로 그 위 보조 텍스트를 함께 올린다(globals.css .tm-on-tint).
         className="tm-on-tint"
         style={{
@@ -313,7 +315,7 @@ export function TournamentsListPageClient({ seed }: { readonly seed?: Tournament
       />
 
       {/* ── 이벤트 허브 배너 — 캠페인 발견 진입점 ── */}
-      <TournamentEventHubEntry />
+      <TournamentEventHubEntry fromPath={listPath} />
 
       {/* ── Tournament list (리스트 우선 — 대회 탭의 핵심) ── */}
       <section id="tournament-list" aria-labelledby="tournament-list-heading" className="tm-tournament-list-section">
@@ -342,7 +344,7 @@ export function TournamentsListPageClient({ seed }: { readonly seed?: Tournament
             title="조건에 맞는 대회가 없어요"
             sub="필터 조건을 바꾸거나 팀밋 대회를 확인해 보세요."
             cta="팀밋 대회 보기"
-            ctaHref="/events"
+            ctaHref={withFromPath('/events', listPath)}
           />
         ) : (
           <>

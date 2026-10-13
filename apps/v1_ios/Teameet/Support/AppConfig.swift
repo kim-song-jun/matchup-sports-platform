@@ -16,6 +16,7 @@ struct AppConfig: Equatable {
         static let kakaoNativeAppKey = "TeameetKakaoNativeAppKey"
         static let appVersion = "CFBundleShortVersionString"
         static let buildNumber = "CFBundleVersion"
+        static let channel = "TeameetChannel"
     }
 
     /// The one origin this build is allowed to load. Everything else is external.
@@ -35,6 +36,7 @@ struct AppConfig: Equatable {
 
     /// Used to decide whether a persisted browsing session was written by this build.
     let buildNumber: String
+    let channel: String
 
 
     static let main = AppConfig(bundle: .main)
@@ -57,6 +59,7 @@ struct AppConfig: Equatable {
         kakaoNativeAppKey = kakaoKey.allSatisfy { $0.isASCII && ($0.isLetter || $0.isNumber) } ? kakaoKey : ""
         appVersion = string(Key.appVersion)
         buildNumber = string(Key.buildNumber)
+        channel = string(Key.channel) == "alpha" ? "alpha" : "production"
     }
 
     var isKakaoSignInConfigured: Bool { !kakaoNativeAppKey.isEmpty }

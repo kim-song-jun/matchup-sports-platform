@@ -19,9 +19,11 @@ final class AppConfigTests: XCTestCase {
 
         if bundleId.contains("alpha") {
             XCTAssertEqual(config.webOrigin, "https://alpha.teameet.co.kr")
+            XCTAssertEqual(config.channel, "alpha")
             XCTAssertTrue(config.webViewInspectable, "Alpha exposes the page to Web Inspector")
         } else {
             XCTAssertEqual(config.webOrigin, "https://teameet.co.kr")
+            XCTAssertEqual(config.channel, "production")
             XCTAssertFalse(
                 config.webViewInspectable,
                 "production must never be inspectable, whatever the build type")
@@ -53,9 +55,11 @@ final class AppConfigTests: XCTestCase {
         let config = AppConfig(infoDictionary: [
             AppConfig.Key.webOrigin: "https://alpha.teameet.co.kr",
             AppConfig.Key.webViewInspectable: "YES",
+            AppConfig.Key.channel: "alpha",
         ])
         XCTAssertEqual(config.webOrigin, "https://alpha.teameet.co.kr")
         XCTAssertTrue(config.webViewInspectable)
+        XCTAssertEqual(config.channel, "alpha")
     }
 
     func testTreatsAnyValueOtherThanYesAsNotInspectable() {

@@ -1,4 +1,4 @@
-import type { Prisma, V1GameState, V1VisibilityMode } from '@prisma/client';
+import type { Prisma, V1GameResultRevisionState, V1GameState, V1VisibilityMode } from '@prisma/client';
 import { excludeUnfilledSlotFixturesWhere } from '../common/competition/unfilled-slot-gate';
 import { effectivePublicVisibilityMode } from '../games/public-records/public-visibility';
 import { resolveIsForfeit } from './league-forfeit-result';
@@ -45,6 +45,8 @@ export type LeagueFixtureListRow = {
     id: string;
     state: V1GameState;
     currentOfficialRevisionId: string | null;
+    /** 무효화는 확정 포인터를 VOID 리비전으로 옮긴다 — 그 state 로 무효 여부를 안다. */
+    currentOfficialRevision: { state: V1GameResultRevisionState } | null;
     visibilityPolicy: { mode: V1VisibilityMode } | null;
   } | null;
 };
@@ -83,6 +85,11 @@ export type LeagueFixtureListItem = {
    * 구분되지 않아 화면이 '결과 대기' 라고 거짓말한다 — 결과는 확정돼 있고 공개만 안 될 뿐이다.
    */
   scoreHidden: boolean;
+  /**
+   * 확정 결과가 무효화됐는지. 무효 경기는 점수가 null 이라 이 값이 없으면 화면이 리그가 끝난 뒤에도
+   * '결과 대기'로 적는다. `hidden` 정책에서는 진행 여부처럼 싣지 않는다(false).
+   */
+  resultVoided: boolean;
   /**
    * 경기(Game)의 진행 상태. 예정 시각보다 일찍 시작한 경기를 화면이 '예정'으로 읽지 않게 한다
    * (W4-V13). 경기 상세가 404 인 `hidden` 정책에서는 진행 여부도 싣지 않는다(null).
@@ -131,6 +138,7 @@ export function toLeagueFixtureList(
       // 가린 적이 없는 것과 같다.
       isForfeit: scoreHidden || fact === undefined ? false : resolveIsForfeit(fact.resultRevision),
       scoreHidden,
+      resultVoided: game !== null && mode !== 'hidden' && game.currentOfficialRevision?.state === 'VOID',
       gameState: game === null || mode === 'hidden' ? null : game.state,
     };
   });
@@ -207,7 +215,15 @@ export const LEAGUE_FIXTURE_LIST_SELECT = {
   ...PLACE_SELECT,
   status: true,
   // `visibilityPolicy` 를 빼면 매퍼가 모드를 **볼 수 없어** 가려야 할 점수를 그대로 싣는다.
-  game: { select: { id: true, state: true, currentOfficialRevisionId: true, visibilityPolicy: { select: { mode: true } } } },
+  game: {
+    select: {
+      id: true,
+      state: true,
+      currentOfficialRevisionId: true,
+      currentOfficialRevision: { select: { state: true } },
+      visibilityPolicy: { select: { mode: true } },
+    },
+  },
 } as const;
 
 /**

@@ -157,6 +157,11 @@ export interface V1LeagueFixture {
    */
   scoreHidden?: boolean;
   /**
+   * 확정 결과가 무효화됐는지 — 공개 상세·일정 목록에서 채워진다. 무효 경기는 점수가 null 이라
+   * 이 값이 없으면 끝난 경기가 '결과 대기'로 읽힌다. 어드민은 `resultStage === 'voided'` 로 안다.
+   */
+  resultVoided?: boolean;
+  /**
    * 이 경기 사이드가 연결된 자리(slot). 어드민 상세에서만 채워지고, 자리 없이 만든 기존 경기는 null/없음이다.
    * 자리가 있는데 팀 id 가 null 이면 "자리만 있고 팀은 아직 안 정해진" 경기다.
    */

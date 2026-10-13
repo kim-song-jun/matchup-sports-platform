@@ -34,6 +34,9 @@ export function fixtureResultLabel(fixture: V1LeagueFixture): { text: string; ha
   if (fixture.status === 'cancelled') {
     return { text: '집계 제외', hasScore: false, isForfeit: false };
   }
+  if (fixture.resultVoided === true) {
+    return { text: '무효 · 집계 제외', hasScore: false, isForfeit: false };
+  }
   // 가려진 점수는 '결과 대기' 로 떨어뜨리지 않는다 — 결과는 확정돼 있고 공개만 안 되는
   // 상태라 그 문구는 거짓이다. 경기 상세가 쓰는 "점수는 공개되지 않아요" 와 같은 말을 한다.
   if (fixture.scoreHidden === true) {

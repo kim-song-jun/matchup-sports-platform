@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { V1LeagueFixture } from '@/types/league-match';
+import { leagueFixturePhase } from './competition-status';
 import { fixtureResultLabel, isUpcomingFixture, leagueFixtureMatchupLabel, leagueSideLabel } from './league-fixture-meta';
 
 function fixture(overrides: Partial<V1LeagueFixture>): V1LeagueFixture {
@@ -83,6 +84,12 @@ describe('fixtureResultLabel / isUpcomingFixture', () => {
     const f = fixture({ startAt: '2026-08-01T20:00:00.000Z', status: 'cancelled' });
     expect(fixtureResultLabel(f).text).toBe('집계 제외');
     expect(isUpcomingFixture(f)).toBe(false);
+  });
+
+  it('무효화된 대진은 "결과 대기"가 아니라 끝난 경기의 "무효 · 집계 제외"다', () => {
+    const f = fixture({ startAt: '2026-08-01T20:00:00.000Z', status: 'completed', gameState: 'ENDED', homeScore: null, awayScore: null, resultVoided: true });
+    expect(fixtureResultLabel(f)).toEqual({ text: '무효 · 집계 제외', hasScore: false, isForfeit: false });
+    expect(leagueFixturePhase(f)).toBe('ended');
   });
 });
 

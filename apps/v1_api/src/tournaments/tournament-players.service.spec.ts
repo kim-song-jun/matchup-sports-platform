@@ -1249,7 +1249,15 @@ describe('TournamentPlayersService', () => {
     });
     expect(prisma.v1TournamentPlayer.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        include: { user: { select: { phone: true, profile: { select: { nickname: true } } } } },
+        include: {
+          user: {
+            select: {
+              phone: true,
+              deletedAt: true,
+              profile: { select: { nickname: true, deletedAt: true } },
+            },
+          },
+        },
       }),
     );
     expect(prisma.v1TeamMembership.findFirst).not.toHaveBeenCalled();

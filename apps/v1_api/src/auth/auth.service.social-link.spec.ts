@@ -26,6 +26,7 @@ describe('AuthService.linkSocialToPhoneOwner', () => {
       v1User: { findUnique: jest.fn(), findFirst: jest.fn(), updateMany: jest.fn(), update: jest.fn(), delete: jest.fn() },
       v1AuthIdentity: { findFirst: jest.fn(), findMany: jest.fn(), update: jest.fn() },
       v1Inquiry: { updateMany: jest.fn().mockResolvedValue({ count: 0 }) },
+      v1UploadAsset: { updateMany: jest.fn().mockResolvedValue({ count: 0 }) },
       v1AdminUser: { findUnique: jest.fn() },
       v1PhoneVerificationChallenge: { deleteMany: jest.fn(), count: jest.fn() },
       v1StatusChangeLog: { create: jest.fn() },

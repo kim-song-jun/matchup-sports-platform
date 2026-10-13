@@ -5,6 +5,7 @@ import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { SocialSignupClient } from './social-signup-client';
+import { getSavedRedirectPath, saveRedirectPath } from '@/lib/session-storage';
 
 const replace = vi.fn();
 const trackEvent = vi.fn();
@@ -46,6 +47,7 @@ const server = setupServer(
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
 afterAll(() => server.close());
 beforeEach(() => {
+  window.sessionStorage.clear();
   authProvider = 'kakao';
   calls.verify = [];
   calls.preview = [];
@@ -140,6 +142,38 @@ describe('소셜 가입 번호 충돌 → 기존 계정 연결', () => {
     await user.click(within(await screen.findByRole('dialog')).getByRole('button', { name: '연결하고 로그인' }));
 
     await waitFor(() => expect(replace).toHaveBeenCalledWith('/onboarding'));
+  });
+
+  it('가입 모드에서 기존 계정에 연결하면 저장한 목적지로 돌아가고 redirect를 소비한다', async () => {
+    // Given: OAuth 왕복 후 주소에서 사라진 보호 경로를 로그인 전에 저장했다.
+    saveRedirectPath('/teams/new');
+    await openConflict();
+    const user = await verifyOwnership();
+
+    // When: 실제 번호 증명과 미리보기를 거쳐 기존 계정에 연결한다.
+    await user.click(within(await screen.findByRole('dialog')).getByRole('button', { name: '연결하고 로그인' }));
+
+    // Then: 홈으로 잃어버리지 않고 목적지를 소비한다.
+    await waitFor(() => expect(replace).toHaveBeenCalledWith('/teams/new'));
+    expect(getSavedRedirectPath()).toBeNull();
+  });
+
+  it.each(['/onboarding/sports', '/terms?mode=social'])('기존 계정의 필수 경로 %s는 redirect보다 먼저 완료하고 목적지를 보존한다', async (route) => {
+    // Given: 연결 대상에게 아직 완료해야 할 필수 단계가 있다.
+    saveRedirectPath('/teams/new');
+    server.use(http.post('*/api/v1/auth/social-link', () => success({
+      session: { userId: 'holder-1', userEmail: null }, user: { id: 'holder-1' }, next: { route },
+    })));
+    await openConflict();
+    const user = await verifyOwnership();
+
+    // When
+    await user.click(within(await screen.findByRole('dialog')).getByRole('button', { name: '연결하고 로그인' }));
+
+    // Then: 필수 단계를 우회하거나 이후 목적지를 미리 지우지 않는다.
+    await waitFor(() => expect(replace).toHaveBeenCalledWith(route));
+    expect(replace).not.toHaveBeenCalledWith('/teams/new');
+    expect(getSavedRedirectPath()).toBe('/teams/new');
   });
 
   it('이메일 없는 카카오 가입 계정은 가입 방법 라벨과 함께 표시된다', async () => {
@@ -302,7 +336,7 @@ describe('소셜 가입 번호 충돌 → 기존 계정 연결', () => {
       expect(calls.link).toEqual([{ phone: '01012345678', proofToken: 'proof-1' }]);
     });
 
-    it('redirect 가 없으면 홈으로, 서버 next 는 따르지 않는다', async () => {
+    it('활동 모드에서 연결해도 대상 계정의 필수 next는 먼저 완료한다', async () => {
       useDeferredAccount();
       server.use(
         http.post('*/api/v1/auth/social-link', () =>
@@ -313,8 +347,26 @@ describe('소셜 가입 번호 충돌 → 기존 계정 연결', () => {
       const user = await verifyOwnership();
       await user.click(within(await screen.findByRole('dialog')).getByRole('button', { name: '연결하고 로그인' }));
 
-      await waitFor(() => expect(replace).toHaveBeenCalledWith('/home'));
-      expect(replace).not.toHaveBeenCalledWith('/onboarding');
+      await waitFor(() => expect(replace).toHaveBeenCalledWith('/onboarding'));
+      expect(replace).not.toHaveBeenCalledWith('/home');
+    });
+
+    it('활동 화면 주소에만 있던 redirect도 기존 계정의 필수 단계로 이동하기 전에 저장한다', async () => {
+      // Given: 활동 진입 경로가 주소에만 있고 연결 대상에게 필수 단계가 남아 있다.
+      useDeferredAccount();
+      setSearch('?redirect=%2Fteams%2Fnew');
+      server.use(http.post('*/api/v1/auth/social-link', () => success({
+        session: { userId: 'holder-1', userEmail: null }, user: { id: 'holder-1' }, next: { route: '/onboarding/sports' },
+      })));
+      await openConflict();
+      const user = await verifyOwnership();
+
+      // When
+      await user.click(within(await screen.findByRole('dialog')).getByRole('button', { name: '연결하고 로그인' }));
+
+      // Then: 주소가 바뀌어도 필수 단계 완료 후 돌아갈 경로가 남는다.
+      await waitFor(() => expect(replace).toHaveBeenCalledWith('/onboarding/sports'));
+      expect(getSavedRedirectPath()).toBe('/teams/new');
     });
   });
 });

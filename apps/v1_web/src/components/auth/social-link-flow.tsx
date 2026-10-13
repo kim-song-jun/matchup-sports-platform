@@ -12,7 +12,7 @@ import { trackEvent } from '@/lib/analytics';
 import { extractErrorCode, extractErrorMessage } from '@/lib/error-message';
 import { clearV1IdentityCache } from '@/lib/query-keys';
 import { saveStoredV1Session } from '@/lib/session-storage';
-import type { V1SocialLinkPreview } from '@/types/api';
+import type { V1AuthSessionResponse, V1SocialLinkPreview } from '@/types/api';
 
 const PROVIDER_EXISTS = 'SOCIAL_LINK_PROVIDER_EXISTS';
 const NOT_VERIFIED = 'PHONE_NOT_VERIFIED';
@@ -54,8 +54,8 @@ type Props = {
   onLogin: () => void;
   onFindAccount: () => void;
   exitPending: boolean;
-  /** Where to go after linking when the server's `next` route is not the right target (activity mode returns to the saved page). */
-  onLinked?: () => void;
+  /** The caller preserves its return target without skipping the linked account's required steps. */
+  onLinked?: (result: V1AuthSessionResponse) => void;
 };
 
 type LinkError = { code: string | null; message: string };
@@ -151,7 +151,7 @@ export function SocialLinkVerify({ phone, providerLabel, onChooseOtherNumber, on
           saveStoredV1Session(result.session);
           clearV1IdentityCache(queryClient);
           trackEvent('social_account_linked', { provider: preview.linkingProvider });
-          if (onLinked) onLinked();
+          if (onLinked) onLinked(result);
           else router.replace(result.next?.route ?? '/home');
         },
         onError: fail,

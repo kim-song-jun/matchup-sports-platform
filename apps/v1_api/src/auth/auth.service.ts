@@ -1379,6 +1379,8 @@ export class AuthService {
         });
         // A deferred account may already have filed support inquiries (cascade on user delete); they are the same person's.
         await tx.v1Inquiry.updateMany({ where: { userId: callerId }, data: { userId: holder.id } });
+        // Keep permitted uploads and their storage paths while clearing the restrictive owner FK before deletion.
+        await tx.v1UploadAsset.updateMany({ where: { ownerUserId: callerId }, data: { ownerUserId: holder.id } });
         await tx.v1User.delete({ where: { id: callerId } });
         await tx.v1StatusChangeLog.create({
           data: {

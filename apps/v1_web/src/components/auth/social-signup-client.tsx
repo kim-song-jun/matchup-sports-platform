@@ -15,7 +15,7 @@ import { useSocialSignupExit } from './use-social-signup-exit';
 import { V1ApiError } from '@/lib/api-client';
 import { trackEvent } from '@/lib/analytics';
 import { clearV1IdentityCache } from '@/lib/query-keys';
-import { clearSavedRedirectPath, getSavedRedirectPath, sanitizeRedirectPath, saveStoredV1Session } from '@/lib/session-storage';
+import { clearSavedRedirectPath, getSavedRedirectPath, sanitizeRedirectPath, saveRedirectPath, saveStoredV1Session } from '@/lib/session-storage';
 import { AUTH_WELCOME_STAGE, AuthFrame } from './auth-page';
 import {
   formatBirthDate,
@@ -160,12 +160,23 @@ export function SocialSignupClient() {
     });
   };
 
-  // 주소의 redirect 가 먼저, 소셜 로그인을 거쳐 주소에서 사라졌다면 로그인 때 저장해 둔 값. 쓰는 즉시 비운다.
+  // 주소의 redirect 가 먼저, 소셜 로그인을 거쳐 주소에서 사라졌다면 로그인 때 저장해 둔 값.
+  const readRedirect = () => sanitizeRedirectPath(new URLSearchParams(window.location.search).get('redirect'))
+    ?? getSavedRedirectPath();
   const consumeRedirect = () => {
-    const redirect = sanitizeRedirectPath(new URLSearchParams(window.location.search).get('redirect'))
-      ?? getSavedRedirectPath();
+    const redirect = readRedirect();
     clearSavedRedirectPath();
     return redirect;
+  };
+
+  const recoverRequiredTerms = async () => {
+    // 서버가 가입 상태를 되돌린 오류라 fresh 캐시도 재조회해야 약관 게이트에 갇히지 않는다.
+    const currentAuth = await authMe.refetch();
+    if (currentAuth.isError) {
+      setError(extractErrorMessage(currentAuth.error, '가입을 완료하지 못했어요.'));
+      return;
+    }
+    router.replace('/terms?mode=social');
   };
 
   const deferSignup = () => {
@@ -181,9 +192,9 @@ export function SocialSignupClient() {
         });
         router.replace(consumeRedirect() ?? '/home');
       },
-      onError: (nextError) => {
+      onError: async (nextError) => {
         if (nextError instanceof V1ApiError && nextError.code === 'TERMS_REQUIRED') {
-          router.replace('/terms?mode=social');
+          await recoverRequiredTerms();
           return;
         }
         if (nextError instanceof V1ApiError && nextError.code === 'SOCIAL_SIGNUP_EXPIRED') {
@@ -248,7 +259,7 @@ export function SocialSignupClient() {
           trackEvent('sign_up_complete', { method });
           router.replace(nextRoute);
         },
-        onError: (nextError) => {
+        onError: async (nextError) => {
           if (nextError instanceof V1ApiError && nextError.code === 'NICKNAME_CONFLICT') {
             setFieldErrors({ nickname: '이미 사용 중인 닉네임이에요.' });
             setError('다른 닉네임으로 다시 시도해 주세요.');
@@ -266,7 +277,7 @@ export function SocialSignupClient() {
           }
 
           if (nextError instanceof V1ApiError && nextError.code === 'TERMS_REQUIRED') {
-            router.replace('/terms?mode=social');
+            await recoverRequiredTerms();
             return;
           }
 
@@ -438,7 +449,15 @@ export function SocialSignupClient() {
               onLogin={() => void exitFlow.leaveTo('/login')}
               onFindAccount={() => void exitFlow.leaveTo('/auth/find-account')}
               exitPending={exitFlow.pending}
-              onLinked={activityMode ? () => router.replace(consumeRedirect() ?? '/home') : undefined}
+              onLinked={(result) => {
+                if (result.next?.route) {
+                  // 대상 계정의 필수 단계를 먼저 끝내되 주소에만 있던 복귀 경로도 잃지 않는다.
+                  saveRedirectPath(readRedirect());
+                  router.replace(result.next.route);
+                  return;
+                }
+                router.replace(consumeRedirect() ?? '/home');
+              }}
             />
           ) : null}
 

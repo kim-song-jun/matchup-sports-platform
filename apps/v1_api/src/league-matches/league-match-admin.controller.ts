@@ -11,6 +11,7 @@ import {
   ChangeLeagueStateDto,
   CreateLeagueMatchDto,
   CreateManualLeagueFixtureDto,
+  DeleteLeagueFixtureDto,
   GenerateLeagueFixturesDto,
   OpenLeagueRegistrationDto,
   RegenerateLeagueFixturesDto,
@@ -205,6 +206,18 @@ export class LeagueMatchAdminController {
     @Body() dto: CancelLeagueFixtureDto,
   ) {
     return this.service.cancelFixture(user, leagueId, teamMatchId, dto);
+  }
+
+  /** 경기 삭제 — 취소하고 대진표에서 숨긴다. 시작했거나 결과가 있는 경기는 먼저 취소해야 한다. */
+  @Post(':leagueId/fixtures/:teamMatchId/delete')
+  @HttpCode(200)
+  deleteFixture(
+    @CurrentUser() user: V1AuthUser,
+    @Param('leagueId', leagueIdPipe) leagueId: string,
+    @Param('teamMatchId', teamMatchIdPipe) teamMatchId: string,
+    @Body() dto: DeleteLeagueFixtureDto,
+  ) {
+    return this.service.deleteFixture(user, leagueId, teamMatchId, dto);
   }
 
   /**

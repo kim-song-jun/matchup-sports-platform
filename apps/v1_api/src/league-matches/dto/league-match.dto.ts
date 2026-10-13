@@ -206,6 +206,30 @@ export class UpdateLeagueFixtureDto extends LeaguePlaceSnapshotDto {
   @IsString()
   @MaxLength(120)
   placeName?: string;
+
+  /** 경기 이름. 비우면 그대로다. */
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(100)
+  title?: string;
+
+  /** 홈·원정 팀(리그 확정 참가팀). 시작 전·결과 없는 경기만 바꿀 수 있다. 자리 방식 경기는 자리에서 바꾼다. */
+  @IsOptional()
+  @IsUUID()
+  homeTeamId?: string;
+
+  @IsOptional()
+  @IsUUID()
+  awayTeamId?: string;
+}
+
+/** 경기 삭제 — 취소하고 대진표에서 숨긴다(기록은 지우지 않는다). 사유는 감사 로그에 남는다. */
+export class DeleteLeagueFixtureDto {
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(500)
+  reason!: string;
 }
 
 // R6: 결과 정정 등으로 completed -> active 역전이할 때, 왜 되돌렸는지 감사 로그에

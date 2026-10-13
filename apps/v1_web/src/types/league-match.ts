@@ -530,10 +530,29 @@ export interface V1UpdateLeagueFixturePayload extends V1PlaceSnapshotPayload {
   startsAt?: string;
   placeName?: string;
   placeAddress?: string;
+  title?: string;
+  /** 리그 참가 확정 팀. 시작 전·결과 없는 경기만, 자리 방식 경기는 자리에서 바꾼다. */
+  homeTeamId?: string;
+  awayTeamId?: string;
+}
+
+/** POST /admin/league-matches/:leagueId/fixtures/:teamMatchId/delete — 취소하고 대진표에서 숨긴다. */
+export interface V1DeleteLeagueFixturePayload {
+  reason: string;
+}
+
+export interface V1DeleteLeagueFixtureResult {
+  teamMatchId: string;
+  deleted: true;
+  /** 이 삭제로 남은 경기가 모두 확정돼 리그가 끝났는가. */
+  leagueCompleted: boolean;
 }
 
 export interface V1UpdateLeagueFixtureResult {
   teamMatchId: string;
+  title?: string;
+  homeTeamId?: string | null;
+  awayTeamId?: string | null;
   startAt: string;
   placeName: string;
   placeAddress: string | null;

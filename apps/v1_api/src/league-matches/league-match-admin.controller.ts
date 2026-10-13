@@ -1,3 +1,4 @@
+import { UpdateLeagueSettingsDto } from './dto/league-settings.dto';
 import { BadRequestException, Body, Controller, Delete, Get, HttpCode, Param, ParseUUIDPipe, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { IsIn, IsOptional, Matches } from 'class-validator';
 import { CurrentUser } from '../auth/current-user.decorator';
@@ -59,6 +60,16 @@ export class LeagueMatchAdminController {
   @Get()
   list(@CurrentUser() user: V1AuthUser, @Query() query: AdminLeagueListQueryDto) {
     return this.service.list(user, query.seriesId, query.visibility);
+  }
+
+  @Get(':leagueId/settings')
+  settings(@CurrentUser() user: V1AuthUser, @Param('leagueId', leagueIdPipe) id: string) {
+    return this.service.settings(user, id);
+  }
+
+  @Patch(':leagueId/settings')
+  updateSettings(@CurrentUser() user: V1AuthUser, @Param('leagueId', leagueIdPipe) id: string, @Body() dto: UpdateLeagueSettingsDto) {
+    return this.service.updateSettings(user, id, dto);
   }
 
   @Get(':leagueId')

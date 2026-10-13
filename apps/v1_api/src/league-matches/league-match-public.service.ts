@@ -496,6 +496,7 @@ export class LeagueMatchPublicService {
     return {
       leagueId: league.id,
       title: league.title,
+      rulesText: league.rulesText,
       state: league.state,
       startsOn: league.startsOn,
       endsOn: league.endsOn,
@@ -771,6 +772,7 @@ export class LeagueMatchPublicService {
       select: {
         id: true,
         title: true,
+        rulesText: true,
         status: true,
         registrationDeadlineAt: true,
         scheduledAt: true,
@@ -818,9 +820,9 @@ export class LeagueMatchPublicService {
       teams: registrations,
       registrationDeadlineAt,
       // **신청 가능 여부는 서버가 판정해서 결과만 내려준다.** 등록 서비스가 실제로 던지는
-      // 조건(`status === 'open'` + 마감 미도과)과 **같은 규칙**이다 — 화면이 이 판정을
+      // 조건(신청 마감 미도과·미종료)과 **같은 규칙**이다 — 화면이 이 판정을
       // 복제하면 두 곳이 갈려 "버튼은 보이는데 누르면 409 `TOURNAMENT_NOT_OPEN`" 이 난다.
-      // 마감이 `null` 이면 기한 없이 열려 있는 것이다(등록 서비스도 그렇게 읽는다).
+      // 마감이 `null` 이면 신청을 받지 않는다(league-registration-open.ts와 같은 규칙).
       registrationOpen: isLeagueRegistrationOpen(status, registrationDeadlineAt),
     };
   }

@@ -517,3 +517,5 @@ Implementation and isolated API/browser evidence tracked in Task 156; production
 ### 2026-10-01 — Task 181 매치 보류 후속 조치
 
 개인·팀매치 보류와 주최자 후속 조치. [Task 181](../../.github/tasks/181-match-on-hold-lifecycle.md)에서 배포 및 검증 진행 상태를 관리한다.
+
+- [어드민 리그 기본 정보 수정](admin-league-basic-edit.md): Task 20261075, 로컬 190개 테스트·타입·표면/패턴 PASS. Alpha 390/768/1440 및 실제 로그인 흐름 대기.

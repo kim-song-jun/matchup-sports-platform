@@ -691,6 +691,10 @@ export default function LeagueMatchStandingsClient({
           <StatusChip chip={leagueStateChip(series.state)} size="md" />
         </div>
       </div>
+      {series.rulesText && <section className="mt-4 space-y-2" aria-label="리그 운영 안내">
+        <h3 className="tm-text-body font-semibold text-[var(--text-strong)]">리그 운영 안내</h3>
+        <p className="whitespace-pre-wrap break-words tm-text-label text-[var(--text-muted)]">{series.rulesText}</p>
+      </section>}
       <LeagueJoinGuideCard
         leagueId={leagueId}
         state={series.state}

@@ -67,5 +67,9 @@
   "src/league-matches/league-fixture-generation-guard.ts": {
     "allowed": 2,
     "why": "리그 행을 기다리지 않고 잠그는 NOWAIT 두 갈래(경기 수정의 끝남 검사용 FOR SHARE NOWAIT, 완료 처리용 FOR UPDATE NOWAIT) — 데이터를 돌려주지 않고, 상태 판정은 그 뒤 kind 를 거는 findTournamentOnSurface 가 한다. 리그 → 경기·경기 → 리그 두 잠금 순서가 공존해 리그 행을 기다리면 교착하므로, Prisma 로 표현할 수 없는 NOWAIT 잠금이 필요하다."
+  },
+  "src/league-matches/league-settings.ts": {
+    "allowed": 1,
+    "why": "리그 기본 정보 저장의 FOR UPDATE 잠금 하나. SQL에서 kind='regular_league'·deleted_at IS NULL을 제한하고, 즉시 findTournamentOnSurface(LEAGUE_KINDS)로 재조회한다. Prisma가 지원하지 않는 행 잠금만 사용하며 SQL 결과를 응답으로 노출하지 않는다. 기간 검사·updatedAt 충돌 검증·저장·audit를 같은 트랜잭션에 직렬화한다."
   }
 }

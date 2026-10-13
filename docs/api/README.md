@@ -75,3 +75,5 @@ Current Kakao signup and existing-account linking use the [provider contact conf
 라운드별 부전승 직접 입력과 대진표 표시 위치 계약은 [Tournaments](./domains/tournaments.md#라운드별-부전승-직접-등록-2026-10-05)에 정리한다.
 
 - 2026-10-05: tournament bye slots allow null registration + byeId reassignment; pre-start fixture deletion archives canonical history. See [tournament contract](domains/tournaments.md).
+
+리그 기본 정보 수정: [league-matches](domains/league-matches.md#basic-information-editing-리그-기본-정보-수정) — 실제 리그 GET/PATCH, updatedAt 충돌 검증, 기간·권한 보호 및 공개 운영 안내.

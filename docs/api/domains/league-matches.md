@@ -389,3 +389,36 @@ The result-entry reminder skips such fixtures as well.
 - Generate / regenerate / manual / template / update-fixture DTOs accept `placeName`, `placeAddress`, `placeLatitude`, `placeLongitude`, `placeProvider`, `placeProviderId`.
 - A blank `placeName` inherits the league's default place (the mirror tournament's `venue` snapshot); with no default it falls back to `장소 미정` with no coordinates. On update, a present `placeName` replaces the whole snapshot.
 - Fixture rows (admin detail, `updateFixture`, public list/detail) keep `placeName` and add `place: V1PlaceView | null`; admin `recentVenues` is now `V1PlaceView[]` (most recent snapshot per name, default excluded).
+
+## Basic information editing (리그 기본 정보 수정)
+
+`GET /api/v1/admin/league-matches/:leagueId/settings` requires an active administrator.
+`PATCH` at the same path requires owner/ops (`support` is read-only). Both are guarded by
+`V1AuthGuard`, UUID route validation, `kind=regular_league` and `deletedAt=null`.
+
+GET and successful PATCH return `{ leagueId, title, rulesText, regionId, startsOn, endsOn,
+registrationDeadlineAt, updatedAt, status, sportName }` inside the standard success envelope.
+Missing description is normalized to `rulesText: ""`; incomplete legacy dates/region remain null.
+PATCH requires the full editable snapshot: `{ expectedUpdatedAt, title, rulesText, regionId,
+startsOn, endsOn, registrationDeadlineAt }`. Title is trimmed, nonempty, max 100; rulesText max
+10,000; region must be an active level-2 district when changed; dates are ISO date-times.
+Empty rulesText is stored as null. Unknown UI fields and missing/invalid fields return
+`400 VALIDATION_ERROR`. No idempotency header is required by this route; optimistic concurrency
+uses exact `updatedAt` (`expectedUpdatedAt`) rather than `expectedVersion`.
+
+A tournament row lock, version check, write and `league_match.update_settings` before/after audit
+share one transaction. Stale snapshots return `409 LEAGUE_SETTINGS_STALE`; completed/cancelled
+leagues return `409 LEAGUE_ENDED`. End before start returns `422 LEAGUE_PERIOD_INVALID`.
+Changed periods cannot exclude the start/end of a non-cancelled, non-deleted existing fixture
+(`409 LEAGUE_FIXTURES_OUTSIDE_PERIOD`). No fixtures are moved automatically.
+Changed inactive/non-district regions return `422 LEAGUE_REGION_INVALID`.
+A changed, non-null deadline must be future (`422 LEAGUE_REGISTRATION_DEADLINE_PAST`);
+null closes new applications. Unchanged historical deadlines are preserved. Lifecycle,
+publication, existing applications, fees, sports, teams and fixtures stay unchanged.
+Regular leagues continue to have **no application capacity limit**; `teamCount` is not editable here.
+
+The admin detail links to `/admin/league-matches/:leagueId/edit` for writers on unfinished leagues.
+The form hydrates that exact league, preserves failed drafts, and confirms explicit discard/reload.
+Dates use KST; untouched ISO instants retain seconds/milliseconds. A successful save invalidates
+admin/public league and tournament queries and returns to the admin detail. Public league detail
+now includes nullable `rulesText`, rendered as operating guidance only when populated.

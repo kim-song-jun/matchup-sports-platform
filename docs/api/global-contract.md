@@ -161,3 +161,7 @@ above. UI must not simulate successful transactions or support outcomes for thes
 `POST /admin/tournaments/:tournamentId/byes` follows the standard auth guard, mutation-admin permission, DTO whitelist and success/error envelopes. A bye is a saved group-team entry, without a TeamMatch or Game result. See [the tournament domain](./domains/tournaments.md#라운드별-부전승-직접-등록-2026-10-05) for phase, capacity, conflict and display-position contracts.
 
 - 2026-10-05: tournament bye slots allow null registration + byeId reassignment; pre-start fixture deletion archives canonical history. See [tournament contract](domains/tournaments.md).
+
+### League basic settings exception
+
+`GET/PATCH /api/v1/admin/league-matches/:leagueId/settings` uses a full editable snapshot and `expectedUpdatedAt` concurrency, without a mandatory Idempotency-Key. PATCH permits owner/ops only; stale snapshots return `409 LEAGUE_SETTINGS_STALE`, DTO failures `400 VALIDATION_ERROR`, semantic dates/region/deadline failures `422`. Detailed fields and transactional audit are in [league-matches](domains/league-matches.md#basic-information-editing-리그-기본-정보-수정).

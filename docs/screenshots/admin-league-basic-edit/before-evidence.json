@@ -1,0 +1,29 @@
+{
+  "stage": "before",
+  "origin": "https://alpha.teameet.co.kr",
+  "errors": [],
+  "consoleErrors": [],
+  "failures": [],
+  "viewports": [
+    {
+      "width": 390,
+      "route": "https://alpha.teameet.co.kr/admin/league-matches/c041c8b2-b624-493c-8eba-b9d0995588d9",
+      "editEntry": 0,
+      "overflow": false
+    },
+    {
+      "width": 768,
+      "route": "https://alpha.teameet.co.kr/admin/league-matches/c041c8b2-b624-493c-8eba-b9d0995588d9",
+      "editEntry": 0,
+      "overflow": false
+    },
+    {
+      "width": 1440,
+      "route": "https://alpha.teameet.co.kr/admin/league-matches/c041c8b2-b624-493c-8eba-b9d0995588d9",
+      "editEntry": 0,
+      "overflow": false
+    }
+  ],
+  "leagueId": "c041c8b2-b624-493c-8eba-b9d0995588d9",
+  "title": "(테스트) MD-QA 98·99 검증 리그"
+}

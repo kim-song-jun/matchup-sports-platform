@@ -1,5 +1,5 @@
 import { Transform, Type } from 'class-transformer';
-import { ArrayNotEmpty, IsArray, IsBoolean, IsDateString, IsDefined, IsIn, IsInt, IsNotEmpty, IsOptional, IsString, IsUUID, Matches, Max, MaxLength, Min, ValidateNested } from 'class-validator';
+import { ArrayNotEmpty, IsArray, IsBoolean, IsDateString, IsDefined, IsIn, IsInt, IsNotEmpty, IsOptional, IsString, IsUUID, Matches, Max, MaxLength, Min, ValidateIf, ValidateNested } from 'class-validator';
 import { IsPlaceLatitude, IsPlaceLongitude, IsPlaceProvider, IsPlaceProviderId } from '../../places/place-snapshot';
 
 /** 경기 장소 스냅샷 입력(이름은 각 DTO 의 `placeName`). 규칙은 `places/place-snapshot.ts` 가 소유한다. */
@@ -59,6 +59,38 @@ export class CreateLeagueMatchDto {
   @IsArray()
   @IsUUID('4', { each: true })
   teamIds!: string[];
+
+  /** 팀 명단 최소 인원. 생략하면 1(제한 없음과 함께). */
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(50)
+  minPlayers?: number;
+
+  /** 팀 명단 최대 인원. `null`·생략 = 제한 없음(리그 기본값). */
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(50)
+  maxPlayers?: number | null;
+
+  /** 리그 총 경기 수(계획). 대진 생성 폼의 기본값이다. */
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(500)
+  plannedFixtureCount?: number;
+}
+
+/** 리그 상태 변경 — 상태 변경 버튼 하나가 보류·해제·종료·되돌리기·시작을 모두 이 요청으로 보낸다. */
+export class ChangeLeagueStateDto {
+  @IsIn(['draft', 'active', 'on_hold', 'completed'])
+  state!: 'draft' | 'active' | 'on_hold' | 'completed';
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  reason?: string;
 }
 
 // 그룹 B 감사 결함 1: 개설 후 참가팀을 추가·제거할 방법이 아예 없었다(V1LeagueTeam write는
@@ -135,6 +167,14 @@ export class GenerateLeagueFixturesDto extends LeaguePlaceSnapshotDto {
   @Min(1)
   @Max(104)
   roundsCount?: number;
+
+  // 리그를 만들 때 정한 총 경기 수 — 라운드로빈 순서대로 만든 뒤 이 수에서 자른다. 생략하면 라운드 전부.
+  // null 은 거부한다 — `@IsOptional` 은 null 도 통과시키는데 `slice(0, null)` 은 0경기를 만든다.
+  @ValidateIf((_object, value) => value !== undefined)
+  @IsInt()
+  @Min(1)
+  @Max(500)
+  fixtureCount?: number;
 
   // 지정하지 않으면 기존 동작(시작일 그대로 매주 반복)을 유지한다 — 하위 호환.
   @IsOptional()

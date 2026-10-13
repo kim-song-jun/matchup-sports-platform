@@ -12,8 +12,6 @@ import { useModalA11y } from '@/components/v1-ui/use-modal-a11y';
 import {
   useV1AddLeagueTeam,
   useV1AdminLeagueMatch,
-  useV1RevertLeagueCompletion,
-  useV1CompleteLeague,
   useV1AdminLeagueTeams,
   useV1CreateManualLeagueFixture,
   useV1AdminTeam,
@@ -46,7 +44,7 @@ import { LeagueWeeksPlanField } from './league-weeks-plan-field';
 import { plannedRounds, resolveWeeksCount, type WeeksPlan } from '@/lib/league-round-robin-plan';
 import { formatKstDateShort, formatKstTime } from '@/lib/date-utils';
 import { LeagueVisibilityControl } from './league-visibility-control';
-import { LeagueHoldControl } from './league-hold-control';
+import { LeagueStateModal } from './league-state-modal';
 import { LeagueCloseRegistrationControl } from './league-close-registration-control';
 import { LeagueCoverImageControl } from './league-cover-image-control';
 import { LeagueVenueControl } from './league-venue-control';
@@ -121,10 +119,8 @@ export default function LeagueMatchFixturesClient({
   initialView?: LeagueFixturesView;
 }) {
   const { data: series, isPending, isError, error, refetch } = useV1AdminLeagueMatch(leagueId);
-  const revertCompletion = useV1RevertLeagueCompletion(leagueId);
-  const [revertModalOpen, setRevertModalOpen] = useState(false);
-  const completeLeague = useV1CompleteLeague(leagueId);
-  const [completeModalOpen, setCompleteModalOpen] = useState(false);
+  // 상태 변경 모달 — 상태 버튼이 상황마다 흩어져 있던 것(보류 카드·되돌리기·종료)을 하나로 모았다.
+  const [stateModalOpen, setStateModalOpen] = useState(false);
   const generateFixtures = useV1GenerateLeagueFixtures(leagueId);
   const updateFixture = useV1UpdateLeagueFixture(leagueId);
   const cancelFixture = useV1CancelLeagueFixture(leagueId);
@@ -194,8 +190,12 @@ export default function LeagueMatchFixturesClient({
   const [forfeitFixture, setForfeitFixture] = useState<V1LeagueFixture | null>(null);
   const forfeitHostTeam = useV1AdminTeam(forfeitFixture?.homeTeamId ?? '');
   const forfeitAwayTeam = useV1AdminTeam(forfeitFixture?.awayTeamId ?? '');
-  // 기본은 팀 수로 계산한 단일 라운드로빈(F40) — 옛 고정값 7은 2팀 리그에 같은 대진 7번을 만들었다.
-  const [weeksPlan, setWeeksPlan] = useState<WeeksPlan>({ kind: 'single' });
+  // 기본은 리그를 만들 때 정한 총 경기 수, 없으면 팀 수로 계산한 단일 라운드로빈(F40) — 옛 고정값 7은
+  // 2팀 리그에 같은 대진 7번을 만들었다.
+  // 상세가 오기 전에도 훅 순서가 같아야 해서 고른 값만 상태로 들고, 기본값은 상세에서 파생한다.
+  const [weeksPlanChoice, setWeeksPlan] = useState<WeeksPlan | null>(null);
+  const weeksPlan: WeeksPlan =
+    weeksPlanChoice ?? (series?.plannedFixtureCount ? { kind: 'fixtures', count: series.plannedFixtureCount } : { kind: 'single' });
   const timeHintId = useId();
   const [dayOfWeek, setDayOfWeek] = useState<number | ''>('');
   // **날짜 목록이 정본이다.** 요일은 그것을 채우는 편의일 뿐 — 서버는 요일을 모른다.
@@ -428,6 +428,7 @@ export default function LeagueMatchFixturesClient({
     return {
       weeksCount,
       ...(roundsCap === null ? {} : { roundsCount: roundsCap }),
+      ...(weeksPlan.kind === 'fixtures' ? { fixtureCount: weeksPlan.count } : {}),
       // **시각이 비면 `schedule` 을 싣지 않는다.** 요일 경로는 위에서 `time` 이 비면
       // `dates` 를 빈 배열로 만들어 자연히 빠졌는데, 달력 경로는 `dates` 가 채워져 있어
       // **빈 `time` 이 그대로 나갔다** — 서버가 `time은 HH:mm 형식이어야 해요` 로 거부한다.
@@ -623,48 +624,6 @@ export default function LeagueMatchFixturesClient({
   };
 
 
-  // R6/D-3: 전 대진 확정 시 리그는 자동으로 completed 로 전이한다. 결과를 정정해야 하면
-  // 운영자가 진행 중으로 되돌려야 하는데, 그동안 이 엔드포인트에 화면이 없어서 API 를 직접
-  // 호출하지 않는 한 되돌릴 방법이 없었다(2026-08-21 재감사). 사유는 감사 로그에 남는다.
-  const onConfirmRevert = (reason: string) => {
-    revertCompletion.mutate(
-      { reason: reason.trim() ? reason.trim() : undefined },
-      {
-        onSuccess: (result) => {
-          setRevertModalOpen(false);
-          showToast(
-            result.alreadyProcessed ? '이미 진행 중인 리그예요.' : '리그를 진행 중으로 되돌렸어요.',
-            'success',
-          );
-        },
-        onError: (error) => showToast(extractErrorMessage(error, '리그를 되돌리지 못했어요.'), 'error'),
-      },
-    );
-  };
-
-  // 자동 종료는 결과 확정·대진 취소 때만 판정된다 — '진행 중으로 되돌리기' 뒤 대진을 바꾸지 않으면
-  // 남은 경기가 없어도 진행 중으로 남는다(MD-QA #93). 서버 판정(`shouldCompleteLeague`)과 같은 조건일
-  // 때만 버튼을 낸다: 취소·무효를 뺀 대진이 하나 이상이고 전부 공식 결과다.
-  const liveFixtures = series.fixtures.filter(
-    (fixture) => fixture.status !== 'cancelled' && fixture.resultStage !== 'voided',
-  );
-  const canCompleteLeague =
-    series.state === 'active' &&
-    liveFixtures.length > 0 &&
-    liveFixtures.every((fixture) => fixture.resultStage === 'official');
-  const onConfirmComplete = (reason: string) => {
-    completeLeague.mutate(
-      { reason: reason.trim() ? reason.trim() : undefined },
-      {
-        onSuccess: (result) => {
-          setCompleteModalOpen(false);
-          showToast(result.alreadyProcessed ? '이미 종료된 리그예요.' : '리그를 종료했어요.', 'success');
-        },
-        onError: (error) => showToast(extractErrorMessage(error, '리그를 종료하지 못했어요.'), 'error'),
-      },
-    );
-  };
-
   // R12: 취소는 되돌릴 수 없는 조작이라 GateConfirmModal로 사유를 받은 뒤에만 실행한다.
   const onConfirmCancel = (reason: string) => {
     if (!cancelTarget) return;
@@ -759,33 +718,22 @@ export default function LeagueMatchFixturesClient({
             >
               후기 관리
             </Link>
-            {/* 되돌리기는 completed 일 때만 의미가 있다 — draft/active 에서는 서버가
-                409 LEAGUE_NOT_COMPLETED 로 막으므로 버튼 자체를 내지 않는다. */}
-            {series.state === 'completed' && (
+            {canWrite && (
               <button
                 type="button"
-                onClick={() => setRevertModalOpen(true)}
-                disabled={revertCompletion.isPending}
-                className="inline-flex min-h-[44px] items-center rounded-xl border border-[var(--border-strong)] px-4 text-sm font-semibold text-[var(--text-strong)] disabled:opacity-50"
+                onClick={() => setStateModalOpen(true)}
+                className="inline-flex min-h-[var(--size-touch-min)] items-center rounded-xl border border-[var(--border-strong)] px-4 text-[length:var(--font-size-label)] font-semibold text-[var(--text-strong)] focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
               >
-                진행 중으로 되돌리기
-              </button>
-            )}
-            {canCompleteLeague && (
-              <button
-                type="button"
-                onClick={() => setCompleteModalOpen(true)}
-                disabled={completeLeague.isPending}
-                className="inline-flex min-h-[var(--size-touch-min)] items-center rounded-xl border border-[var(--border-strong)] px-4 text-[length:var(--font-size-label)] font-semibold text-[var(--text-strong)] disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
-              >
-                리그 종료하기
+                상태 변경
               </button>
             )}
           </div>
         }
       />
 
-      <LeagueHoldControl leagueId={leagueId} state={series.state} showToast={showToast} />
+      {stateModalOpen && (
+        <LeagueStateModal leagueId={leagueId} series={series} onClose={() => setStateModalOpen(false)} showToast={showToast} />
+      )}
       {/* 보류 중에는 공개 설정을 따로 바꾸지 않는다 — 보류 해제가 공개 여부까지 되돌린다(서버도 409). */}
       {series.state === 'on_hold' ? null : <LeagueVisibilityControl leagueId={leagueId} isPublic={series.isPublic} />}
       <LeagueCloseRegistrationControl leagueId={leagueId} state={series.state} registrationOpen={series.registrationOpen} registrationDeadlineAt={series.registrationDeadlineAt} activeRegistrationCount={series.activeRegistrationCount} confirmedCount={series.confirmedRegistrationCount} showToast={showToast} />
@@ -959,6 +907,7 @@ export default function LeagueMatchFixturesClient({
               teamCount={teamCount}
               gamesPerTeamPerDay={gamesPerDayValue ?? 1}
               plan={weeksPlan}
+              plannedFixtureCount={series.plannedFixtureCount}
               weeksCount={weeksCount}
               onPlanChange={setWeeksPlan}
             />
@@ -1317,6 +1266,7 @@ export default function LeagueMatchFixturesClient({
                     teamCount={teamCount}
                     gamesPerTeamPerDay={gamesPerDayValue ?? 1}
                     plan={weeksPlan}
+                    plannedFixtureCount={series.plannedFixtureCount}
                     weeksCount={weeksCount}
                     onPlanChange={setWeeksPlan}
                   />
@@ -1493,33 +1443,6 @@ export default function LeagueMatchFixturesClient({
       {confirmModal}
 
       {/* R12: 대진 취소 확인 — 되돌릴 수 없으므로 사유를 필수로 받는다. */}
-      {/* R6/D-3: 종료 역전이 확인. 취소·재생성과 달리 되돌릴 수 있는 조작이라
-          typedChallenge 없이 사유만 받는다. */}
-      <GateConfirmModal
-        open={revertModalOpen}
-        pending={revertCompletion.isPending}
-        title="리그를 진행 중으로 되돌릴까요?"
-        description="종료된 리그를 다시 진행 중으로 바꿔요. 결과를 정정한 뒤 전 대진이 다시 확정되면 자동으로 종료돼요."
-        // 헤더 트리거("진행 중으로 되돌리기")와 접근 이름이 겹치지 않게 짧게 쓴다 —
-        // 겹치면 스크린리더 사용자도 두 버튼을 구분하지 못한다(취소·재생성 모달도 같은 관례).
-        confirmLabel="되돌리기"
-        tone="amber"
-        onConfirm={onConfirmRevert}
-        onClose={() => setRevertModalOpen(false)}
-      />
-
-      <GateConfirmModal
-        open={completeModalOpen}
-        pending={completeLeague.isPending}
-        title="리그를 종료할까요?"
-        description="남은 경기가 모두 확정되거나 취소됐어요. 종료하면 지금 순위표가 최종 순위가 되고, 필요하면 다시 진행 중으로 되돌릴 수 있어요."
-        // 헤더 트리거("리그 종료하기")와 접근 이름이 겹치지 않게 짧게 쓴다(되돌리기 모달과 같은 관례).
-        confirmLabel="종료"
-        tone="blue"
-        onConfirm={onConfirmComplete}
-        onClose={() => setCompleteModalOpen(false)}
-      />
-
       {/* 그룹 B 감사 결함 3: 참가팀 제외 확인 — 이전에는 칩의 X 버튼이 확인 없이 곧바로
           제외 + 관련 대진 취소를 실행했다. 되돌릴 경로(재추가 + 재생성)가 있어
           GateConfirmModal의 typedChallenge까지는 과하지만, 최소한의 확인은 필요하다.

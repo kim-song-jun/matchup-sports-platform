@@ -192,6 +192,13 @@ export interface V1AdminLeagueDetail {
    * 공개 상세가 이미 같은 값을 갖고 있었고, 이제 어드민 상세도 내려준다.
    */
   startsOn: string;
+  /** 보류 해제가 돌아갈 상태 — 보류 중일 때만 값이 있다. */
+  heldFromState?: 'draft' | 'active' | 'completed' | null;
+  /** 팀 명단 인원. maxPlayers 가 null 이면 제한 없음. */
+  minPlayers?: number;
+  maxPlayers?: number | null;
+  /** 리그를 만들 때 정한 총 경기 수(계획). 대진 생성 폼의 기본값. */
+  plannedFixtureCount?: number | null;
   /**
    * 참가 신청 마감. **`null` 은 "안 받음" 이다** — 정본 §6 이 "마감을 안 정하면 그 리그는
    * 신청을 받지 않는다" 로 확정했다(2026-09-04). 받는지 여부는 `registrationOpen` 이 답한다.
@@ -339,6 +346,24 @@ export interface V1CreateLeaguePayload {
   startsOn: string;
   endsOn: string;
   teamIds: string[];
+  minPlayers?: number;
+  /** null = 팀 명단 인원 제한 없음. */
+  maxPlayers?: number | null;
+  plannedFixtureCount?: number;
+}
+
+export type V1LeagueStateValue = 'draft' | 'active' | 'completed' | 'on_hold';
+
+/** POST /admin/league-matches/:leagueId/state — 목표 상태 하나. 보류는 사유가 필요하다. */
+export interface V1ChangeLeagueStatePayload {
+  state: V1LeagueStateValue;
+  reason?: string;
+}
+
+export interface V1ChangeLeagueStateResult {
+  leagueId: string;
+  state: V1LeagueStateValue;
+  alreadyProcessed: boolean;
 }
 
 export interface V1CreateLeagueResult {
@@ -376,6 +401,8 @@ export interface V1GenerateLeagueFixturesPayload extends V1PlaceSnapshotPayload 
   weeksCount: number;
   /** 총 라운드 수, 1~104. 주면 서버가 `weeksCount × 팀당 하루 경기 수` 대신 이 수까지만 만든다(라운드로빈 재대결 방지). */
   roundsCount?: number;
+  /** 총 경기 수. 주면 서버가 라운드로빈 순서대로 만든 뒤 이 수에서 자른다. */
+  fixtureCount?: number;
   /** 지정하지 않으면 시작일 그대로(자정) 매주 반복하는 기존 동작을 유지한다. */
   schedule?: V1LeagueFixtureScheduleTemplate;
   /** 지정하지 않으면 서버 기본값('장소 미정')을 사용한다. */
@@ -483,33 +510,6 @@ export interface V1CancelLeagueFixtureResult {
    * 줄이는 조작이라 마지막 미확정 대진을 취소하면 리그가 그 자리에서 끝난다.
    */
   leagueCompleted: boolean;
-  alreadyProcessed: boolean;
-}
-
-// R6: 리그 종료 역전이 — POST /admin/league-matches/:leagueId/revert-completion.
-// 사유는 선택(감사 로그용). 이미 active 면 alreadyProcessed: true 로 멱등 응답한다.
-export interface V1RevertLeagueCompletionPayload {
-  reason?: string;
-}
-
-/** 리그 보류·보류 해제 응답 — state 는 바뀐 뒤 상태, alreadyProcessed 는 이미 그 상태였는지. */
-export interface V1LeagueHoldResult {
-  leagueId: string;
-  state: 'draft' | 'active' | 'completed' | 'on_hold';
-  isPublic: boolean;
-  alreadyProcessed: boolean;
-}
-
-export interface V1RevertLeagueCompletionResult {
-  leagueId: string;
-  state: 'active';
-  alreadyProcessed: boolean;
-}
-
-/** 리그 종료(수동) 응답 — POST /admin/league-matches/:leagueId/complete. */
-export interface V1CompleteLeagueResult {
-  leagueId: string;
-  state: 'completed';
   alreadyProcessed: boolean;
 }
 

@@ -26,6 +26,8 @@ enum NativeBridge {
     /// The event `requestNativeKakaoSignIn` listens for.
     static let kakaoResultEventName = "teameet:native-kakao-result"
 
+    static let appUpdateResultEventName = "teameet:native-app-update-result"
+
     /// The actions the web can ask for. Anything else is ignored rather than answered,
     /// because answering an action we do not implement would resolve the page's promise with
     /// a state we did not actually check.
@@ -40,6 +42,7 @@ enum NativeBridge {
         /// Kakao Talk login through the native SDK. Advertised only by a build that carries
         /// Kakao's native app key — see `supportedActionsJSON(kakaoConfigured:)`.
         case signInWithKakao = "sign-in-with-kakao"
+        case checkAppUpdate = "check-app-update"
     }
 
     struct Message: Equatable {
@@ -144,6 +147,30 @@ enum NativeBridge {
             return ""
         }
         return "window.dispatchEvent(new CustomEvent('\(kakaoResultEventName)',{detail:\(json)}))"
+    }
+
+    static func appUpdateResultScript(
+        requestId: String,
+        channel: String,
+        version: String,
+        build: String,
+        decision: AppUpdatePolicy.Decision
+    ) -> String {
+        var detail: [String: Any] = [
+            "requestId": requestId,
+            "platform": "ios",
+            "channel": channel,
+            "version": version,
+            "build": build,
+            "status": decision.status.rawValue,
+        ]
+        if let availableVersion = decision.availableVersion {
+            detail["availableVersion"] = availableVersion
+        }
+        if let error = decision.error { detail["error"] = error }
+        guard let data = try? JSONSerialization.data(withJSONObject: detail),
+              let json = String(data: data, encoding: .utf8) else { return "" }
+        return "window.dispatchEvent(new CustomEvent('\(appUpdateResultEventName)',{detail:\(json)}))"
     }
 
     /// Whether a frame that sent a message is allowed to drive the bridge.

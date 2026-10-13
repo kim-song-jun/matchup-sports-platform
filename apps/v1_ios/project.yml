@@ -125,6 +125,7 @@ targets:
         # The environment contract the app reads at runtime through AppConfig.
         TeameetWebOrigin: $(TEAMEET_WEB_ORIGIN)
         TeameetWebViewInspectable: $(TEAMEET_WEBVIEW_INSPECTABLE)
+        TeameetChannel: $(TEAMEET_CHANNEL)
         # Kakao's native app key comes from the gitignored Config/Secrets.generated.xcconfig
         # (scripts/release/generate-ios-secrets-xcconfig.sh). Empty means Kakao sign-in is off:
         # AppConfig reads it as "not configured" and the shell neither advertises nor
@@ -166,6 +167,8 @@ targets:
       - path: Teameet/WebShell/ShellMotionPolicy.swift
       - path: Teameet/WebShell/ViewportLock.swift
       - path: Teameet/WebShell/NativeBridgeMessage.swift
+      - path: Teameet/WebShell/AppUpdatePolicy.swift
+      - path: Teameet/WebShell/AppUpdateChecker.swift
       - path: Teameet/WebShell/ChromeColour.swift
       - path: Teameet/WebShell/DownloadPolicy.swift
       - path: Teameet/Push/PushPermission.swift
@@ -192,6 +195,7 @@ targets:
         CFBundleDisplayName: $(TEAMEET_DISPLAY_NAME)
         TeameetWebOrigin: $(TEAMEET_WEB_ORIGIN)
         TeameetWebViewInspectable: $(TEAMEET_WEBVIEW_INSPECTABLE)
+        TeameetChannel: $(TEAMEET_CHANNEL)
 
   TeameetUITests:
     type: bundle.ui-testing

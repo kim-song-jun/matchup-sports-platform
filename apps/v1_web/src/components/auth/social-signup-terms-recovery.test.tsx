@@ -171,7 +171,7 @@ describe('필수 약관이 변경된 소셜 가입의 실제 인증 캐시 복�
     ['defer', '503'], ['complete', '503'],
   ] as const)('%s의 약관 복구 중 가입 액션을 잠그고 %s 응답 후 회복한다', async (action, result) => {
     // Given: 실제 가입 오류는 끝났지만 서버의 인증 응답은 아직 도착하지 않았다.
-    let releaseAuth!: () => void;
+    let releaseAuth = () => { throw new Error('인증 응답 게이트가 준비되지 않았어요.'); };
     const authResponse = new Promise<void>((resolve) => { releaseAuth = resolve; });
     server.use(
       http.post('*/api/v1/auth/social-profile/defer', requireCurrentTerms),
@@ -188,7 +188,8 @@ describe('필수 약관이 변경된 소셜 가입의 실제 인증 캐시 복�
     const completeButton = await prepareProfile();
     const deferButton = screen.getByRole('button', { name: '나중에 입력할게요' });
     const trigger = action === 'defer' ? deferButton : completeButton;
-    const signupForm = screen.getByLabelText(/^닉네임/).closest('form')!;
+    const signupForm = screen.getByLabelText(/^닉네임/).closest('form');
+    if (!signupForm) throw new Error('실제 가입 폼을 찾지 못했어요.');
 
     try {
       fireEvent.click(trigger);

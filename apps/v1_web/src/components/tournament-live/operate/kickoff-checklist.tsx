@@ -8,9 +8,12 @@ import { OPERATIONS_BOARD_POLL_INTERVAL_MS } from '@/lib/operations-board-pollin
 import { withFromPath } from '@/lib/session-storage';
 import type { GameSide } from '@/types/game-operations';
 import { ArrivalCheckinPanel, arrivalProgress, type ArrivalCheckinPanelProps } from './arrival-checkin-panel';
+import { LeagueParticipationPanel } from './league-participation-panel';
 
 export interface KickoffChecklistProps extends Omit<ArrivalCheckinPanelProps, 'title' | 'sideAccessory'> {
   readonly gameId: string;
+  /** 리그 출전 선수 변경이 실패했을 때 알림. */
+  readonly onRosterError: (message: string) => void;
 }
 
 /**
@@ -21,8 +24,15 @@ export interface KickoffChecklistProps extends Omit<ArrivalCheckinPanelProps, 't
  * 도착 확인은 경기 시작의 조건이 아니다(서버도 막지 않는다) — 미확인이 남아도 시작할 수 있다는 것을
  * 안내 문구가 말한다. 그래서 여기에는 별도의 시작 버튼을 두지 않고, 조작 줄의 "경기 시작"이 그 자리다.
  */
-export function KickoffChecklist({ gameId, sides, lineups, ...panelProps }: KickoffChecklistProps) {
+export function KickoffChecklist({ gameId, sides, lineups, onRosterError, ...panelProps }: KickoffChecklistProps) {
+  // 리그인지는 명단 응답이 말한다 — 요약 줄과 같은 캐시라 요청이 늘지 않는다.
+  const probeTeamId = sides.find((side) => side.teamId !== null)?.teamId ?? null;
+  const probe = useV1TeamGameRoster(probeTeamId, gameId, { refetchInterval: OPERATIONS_BOARD_POLL_INTERVAL_MS });
   const { total, arrived } = arrivalProgress(sides, lineups);
+  // 리그는 팀 전원이 처음부터 출전이고 안 온 사람만 뺀다(체크 = 출전). 대회는 팀이 낸 명단에 도착 확인을 한다.
+  if (probe.data?.competitionKind === 'LEAGUE') {
+    return <LeagueParticipationPanel gameId={gameId} sides={sides} disabled={panelProps.disabled} onError={onRosterError} />;
+  }
   const remaining = total - arrived;
 
   return (

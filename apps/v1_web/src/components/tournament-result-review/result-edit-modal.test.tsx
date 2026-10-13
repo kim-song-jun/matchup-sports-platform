@@ -190,6 +190,60 @@ function expectLabelledByHtmlFor(input: HTMLElement, labelText: string) {
   expect(label).toHaveTextContent(labelText);
 }
 
+describe('ResultEditModal — 출전자 빼기·추가(어드민이 누가 뛰었는지 고친다)', () => {
+  const THIRD_ID = '33333333-3333-4c3a-9c1e-3333aa11bb';
+  const lineups: GameLineup[] = [
+    lineup(HOME_SIDE_ID, [
+      { id: HOME_PARTICIPANT_ID, name: '김골키', jersey: 1 },
+      { id: THIRD_ID, name: '박지각', jersey: 9 },
+    ]),
+    lineup(AWAY_SIDE_ID, [{ id: AWAY_PARTICIPANT_ID, name: '강아라', jersey: 7 }]),
+  ];
+
+  function renderModal(onConfirm = vi.fn(), participants = [
+    resultParticipant(HOME_PARTICIPANT_ID, HOME_SIDE_ID),
+    resultParticipant(AWAY_PARTICIPANT_ID, AWAY_SIDE_ID),
+  ]) {
+    const props = baseProps();
+    render(
+      <ResultEditModal
+        {...props}
+        base={{ ...props.base, score: { home: 0, away: 0 }, goalEvents: [], participants }}
+        lineups={lineups}
+        onConfirm={onConfirm}
+      />,
+    );
+    return onConfirm;
+  }
+
+  it('명단에 있던 선수를 추가하고 안 뛴 선수를 빼면 그대로 제출한다', () => {
+    const onConfirm = renderModal();
+
+    fireEvent.change(screen.getByLabelText('출전 선수 추가'), { target: { value: THIRD_ID } });
+    fireEvent.click(screen.getByRole('button', { name: '추가' }));
+    fireEvent.click(screen.getByRole('button', { name: '원정 · #7 강아라 출전 기록에서 빼기' }));
+    expect(screen.getByText('출전 추가: 1명 · 출전 제외: 1명')).toBeInTheDocument();
+    // 추가한 사람은 후보에서 빠지고, 뺀 사람은 다시 추가할 수 있게 후보로 돌아온다.
+    const options = within(screen.getByLabelText('출전 선수 추가')).getAllByRole('option').map((option) => option.textContent);
+    expect(options).toEqual(['선수 선택', '원정 · #7 강아라']);
+
+    fireEvent.change(screen.getByLabelText('사유'), { target: { value: '출전 명단 정정' } });
+    fireEvent.click(screen.getByRole('button', { name: '정정 제출' }));
+    const submitted = onConfirm.mock.calls[0][0].actualParticipants as Array<{ participantId: string; goals: number; started: boolean }>;
+    expect(submitted.map((participant) => participant.participantId)).toEqual([HOME_PARTICIPANT_ID, THIRD_ID]);
+    expect(submitted[1]).toMatchObject({ goals: 0, started: true, cards: { yellow: 0, red: 0 } });
+  });
+
+  it('기록이 있는 선수는 뺄 수 없고 이유를 적는다', () => {
+    renderModal(vi.fn(), [
+      resultParticipant(HOME_PARTICIPANT_ID, HOME_SIDE_ID, { assists: 1 }),
+      resultParticipant(AWAY_PARTICIPANT_ID, AWAY_SIDE_ID),
+    ]);
+    expect(screen.getByRole('button', { name: '홈 · #1 김골키 출전 기록에서 빼기' })).toBeDisabled();
+    expect(screen.getByText('기록이 있는 선수는 기록을 먼저 지운 뒤 뺄 수 있어요.')).toBeInTheDocument();
+  });
+});
+
 describe('ResultEditModal participant naming', () => {
   it('renders each participant row with their real lineup name and jersey number, not a truncated id', () => {
     const lineups: GameLineup[] = [

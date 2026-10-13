@@ -1165,7 +1165,17 @@ export function useV1GameOperationsConsole(
   // 때만 호출 가능"을 문서화한다.
   const reverseEvent = useCallback(
     async (input: { eventId: string; reason: string }) => {
-      if (!takeoverEnabledRef.current || !gameId || !gameSnapshot || !isTakeoverHeld(takeover)) {
+      if (
+        !isMountedRef.current ||
+        !takeoverEnabledRef.current ||
+        !gameId ||
+        activeGameIdRef.current !== gameId ||
+        heldTakeoverGameIdRef.current !== gameId ||
+        !gameSnapshot ||
+        !isTakeoverHeld(takeover) ||
+        takeoverStatusRef.current !== 'held' ||
+        takeoverTokenRef.current !== takeover.token
+      ) {
         throw new Error('경기 운영 권한이 없어 되돌릴 수 없어요.');
       }
       const clientEventId = randomUuid();
@@ -1195,7 +1205,17 @@ export function useV1GameOperationsConsole(
   // 송신 시점에 확정된 최신 버전을 보내고, 경합은 서버 버전 검증이 판정한다.
   const assignAssist = useCallback(
     async (input: { eventId: string; assistParticipantId: string | null }) => {
-      if (!takeoverEnabledRef.current || !gameId || !gameSnapshot || !isTakeoverHeld(takeover)) {
+      if (
+        !isMountedRef.current ||
+        !takeoverEnabledRef.current ||
+        !gameId ||
+        activeGameIdRef.current !== gameId ||
+        heldTakeoverGameIdRef.current !== gameId ||
+        !gameSnapshot ||
+        !isTakeoverHeld(takeover) ||
+        takeoverStatusRef.current !== 'held' ||
+        takeoverTokenRef.current !== takeover.token
+      ) {
         throw new Error('경기 운영 권한이 없어 어시스트를 기록할 수 없어요.');
       }
       const clientEventId = randomUuid();

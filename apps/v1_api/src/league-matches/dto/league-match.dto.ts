@@ -60,14 +60,14 @@ export class CreateLeagueMatchDto {
   @IsUUID('4', { each: true })
   teamIds!: string[];
 
-  /** 팀 명단 최소 인원. 생략하면 DB 기본값. */
+  /** 팀 명단 최소 인원. 생략하면 1(제한 없음과 함께). */
   @IsOptional()
   @IsInt()
   @Min(1)
   @Max(50)
   minPlayers?: number;
 
-  /** 팀 명단 최대 인원. `null` = 제한 없음, 생략하면 DB 기본값(10). */
+  /** 팀 명단 최대 인원. `null`·생략 = 제한 없음(리그 기본값). */
   @IsOptional()
   @IsInt()
   @Min(1)

@@ -272,9 +272,10 @@ Optional roster and plan fields:
 
 - `minPlayers` / `maxPlayers` (1–50): team roster size. `maxPlayers: null` means **unlimited** — every
   eligible team member goes onto the roster (auto-fill and roster add skip the `ROSTER_FULL` check).
-  Omitting either keeps the column default (6 / 10). `minPlayers > maxPlayers` returns
-  `422 LEAGUE_ROSTER_RANGE_INVALID`. The admin create screen sends `minPlayers: 1, maxPlayers: null` by
-  default. Responses that carry `maxPlayers` (tournament list/detail for a league) may now return `null`.
+  Omitting them means unlimited (`minPlayers: 1, maxPlayers: null`) — the league default for every creation
+  path, including league-series seeding; season carry-over copies the previous season's values instead.
+  The 6/10 column default applies to tournaments only. `minPlayers > maxPlayers` returns
+  `422 LEAGUE_ROSTER_RANGE_INVALID`. Responses that carry `maxPlayers` (tournament list/detail for a league) may now return `null`.
 - `plannedFixtureCount` (1–500): total games planned for the league. It is only the default for the
   fixture generation form (see `fixtureCount` below); it never limits manual fixtures.
 

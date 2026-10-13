@@ -113,6 +113,10 @@ export function leagueMirrorCreateData(
     // 원본 시각을 그대로 쓴다 — 생략하면 `@default(now())` 가 백필/생성 시각을 박고,
     // 그 값이 목록 정렬(`createdAt desc`)을 지배한다. 위 필드 주석 참조.
     createdAt: league.createdAt,
+    // 팀 명단 인원 — 리그는 팀 전원이 명단(=경기 출전자)에 오르는 것이 기본이라 '제한 없음'이다(2026-10-13 사용자 확정).
+    // 컬럼 기본값(6~10명)은 대회용이다. 직전 시즌을 이어받으면 아래 승계 값이 이긴다.
+    minPlayers: 1,
+    maxPlayers: null,
     // `entryFeeConfiguredAt` 은 어떤 경우에도 싣지 않는다 — null 이어야 이어받은 금액이 '확인 전'으로 보인다.
     ...(league.inherited === undefined
       ? {}

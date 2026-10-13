@@ -255,7 +255,7 @@ export class LeagueMatchAdminService {
         {
           ...leagueMirrorCreateData(created),
           createdByAdminUserId: admin.id,
-          // 생략한 값은 DB 기본값에 맡긴다(maxPlayers 의 null 은 "제한 없음"이라 그대로 싣는다).
+          // 생략한 값은 leagueMirrorCreateData 의 리그 기본값(제한 없음)을 따른다.
           ...(dto.minPlayers !== undefined ? { minPlayers: dto.minPlayers } : {}),
           ...(dto.maxPlayers !== undefined ? { maxPlayers: dto.maxPlayers } : {}),
           ...(dto.plannedFixtureCount !== undefined ? { plannedFixtureCount: dto.plannedFixtureCount } : {}),

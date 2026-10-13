@@ -7,12 +7,14 @@ on:
     paths:
       - apps/v1_android/**
       - scripts/qa/android-native-insets.test.mjs
+      - scripts/qa/android-adaptive-icon.test.mjs
       - .github/workflows/android-alpha.yml
   push:
     branches: [dev]
     paths:
       - apps/v1_android/**
       - scripts/qa/android-native-insets.test.mjs
+      - scripts/qa/android-adaptive-icon.test.mjs
       - .github/workflows/android-alpha.yml
 
 permissions:
@@ -62,6 +64,9 @@ jobs:
 
       - name: Verify native inset script lifecycle
         run: node --test scripts/qa/android-native-insets.test.mjs
+
+      - name: Verify adaptive launcher artwork and safe zone
+        run: node --test scripts/qa/android-adaptive-icon.test.mjs
 
       - name: Gate Alpha Firebase configuration
         id: firebase

@@ -31,7 +31,7 @@ afterEach(() => {
 });
 
 describe('mandatory store update gate', () => {
-  it('blocks an old Android shell, has no dismiss action, and uses the fixed Play URL', async () => {
+  it('disables browser close requests, guards legacy Escape handling, and uses the fixed Play URL', async () => {
     let initialCancelPrevented = false;
     vi.spyOn(HTMLDialogElement.prototype, 'showModal').mockImplementation(function (this: HTMLDialogElement) {
       this.open = true;
@@ -43,8 +43,16 @@ describe('mandatory store update gate', () => {
     const dialog = await screen.findByRole('dialog');
     expect(initialCancelPrevented).toBe(true);
     expect(dialog).toHaveAttribute('open');
+    expect(dialog).toHaveAttribute('closedby', 'none');
     expect(screen.getByRole('link', { name: 'Google Play에서 업데이트' })).toHaveAttribute('href', ANDROID_PLAY_STORE_URL);
     expect(screen.queryByRole('button', { name: /나중|닫기|취소/ })).not.toBeInTheDocument();
+
+    const escape = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true });
+    act(() => dialog.dispatchEvent(escape));
+    expect(escape.defaultPrevented).toBe(true);
+    expect(dialog).toHaveAttribute('open');
+
+    // Older WebViews may still emit a cancel event for Escape; retain that guard too.
     const cancel = new Event('cancel', { bubbles: false, cancelable: true });
     act(() => dialog.dispatchEvent(cancel));
     expect(cancel.defaultPrevented).toBe(true);

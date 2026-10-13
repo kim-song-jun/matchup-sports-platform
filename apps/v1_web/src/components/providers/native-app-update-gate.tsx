@@ -99,6 +99,9 @@ function RequiredUpdateDialog({ result, checking, failed, onCheck }: {
   useLayoutEffect(() => {
     const dialog = dialogRef.current;
     const onCancel = (event: Event) => event.preventDefault();
+    // `closedby` blocks non-cancelable CloseWatcher requests in supporting browsers;
+    // the key guard preserves the same behavior in older Android/iOS WebViews.
+    dialog?.setAttribute('closedby', 'none');
     dialog?.addEventListener('cancel', onCancel);
     // Native dialog top-layer keeps all other modals and background controls inert.
     dialog?.showModal();
@@ -115,6 +118,9 @@ function RequiredUpdateDialog({ result, checking, failed, onCheck }: {
       aria-labelledby={titleId}
       aria-describedby={descriptionId}
       tabIndex={-1}
+      onKeyDownCapture={(event) => {
+        if (event.key === 'Escape') event.preventDefault();
+      }}
       className="tm-native-update-dialog"
     >
       <div className="tm-native-update-content">

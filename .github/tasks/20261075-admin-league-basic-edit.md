@@ -64,3 +64,4 @@ Surface gate: 단건 조회는 canonical findTournamentOnSurface(LEAGUE_KINDS) �
 - API 통합 검증은 GitHub CI의 실제 PostgreSQL에서 수행한다. 로컬 Docker daemon은 제공되지 않는다.
 - 두 번째 CI의 Web은 759개 파일/8,988개 테스트 PASS, 기존 email-login-client 약관 갱신 목적지 테스트 1개 FAIL. 공통 resolveAuthContinuationPath 계약은 필수 인증 URL을 유지하고 `/my`는 세션에 보존하지만 해당 테스트만 URL query에 직접 붙기를 기대했다. 테스트를 실제 `/terms?mode=renewal` 이동 + 저장 목적지 `/my` + 최종 인증 성공 후 `/my` 소비/정리까지 검증하도록 동기화한다. 인증 production 코드는 변경하지 않는다.
 - 로그인 소비자 7개 + 공통 인증 목적지 24개 = 로컬 31/31 PASS. 두 번째 CI의 API와 Gates 전체 PASS. 최종 커밋 CI 재검증 후 dev 머지한다.
+- bcf1f7594의 최종 PR CI 38429068771은 API/Gates/Web 모두 PASS. 머지 직전 dev에 #1908(439e4d2e0)이 반영되어 두 테스트가 충돌했다. 최신 dev의 실제 DB 알림 수신자/본문 검증과 목적지 테스트를 그대로 보존해 통합했다. 리그 폼 변경과 별개인 카드/목록 수정도 dev 이력 그대로 유지한다. 통합 head CI 재확인 뒤 dev 머지·alpha 배포를 이어간다.

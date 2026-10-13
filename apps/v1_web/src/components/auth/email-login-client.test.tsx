@@ -61,6 +61,7 @@ describe('EmailLoginClient GA events', () => {
     vi.clearAllMocks();
     nativeApple.available = false;
     window.sessionStorage.clear();
+    window.history.replaceState({}, '', '/login/email');
   });
 
   it('tracks a login event with method=email on successful sign-in', async () => {
@@ -92,8 +93,10 @@ describe('EmailLoginClient GA events', () => {
 
     await submitLogin('me@example.com', 'password123');
 
-    await waitFor(() => expect(router.replace).toHaveBeenCalledWith('/terms?mode=renewal'));
-    // 필수 인증 단계는 서버 경로를 유지하고 원 목적지는 세션에 보존한다.
+    await waitFor(() =>
+      expect(router.replace).toHaveBeenCalledWith('/terms?mode=renewal'),
+    );
+    // 필수 단계에서 원 목적지는 sessionStorage에 보존하고 마지막 성공에서 소비한다.
     expect(getSavedRedirectPath()).toBe('/my');
     expect(resolveAuthContinuationPath('/home')).toBe('/my');
     expect(getSavedRedirectPath()).toBeNull();

@@ -385,10 +385,16 @@ A league can be drawn first and filled with teams later. A **slot** (`V1Tourname
 `awaySlotId`.
 
 - `POST /api/v1/admin/league-matches/:leagueId/fixtures/template`
-  (`{ teamCount: 3..20, legs: 1|2, schedule: { dates: string[], time: string }, placeName?, replaceExisting? }`)
+  (`{ teamCount: 3..20, legs: 1|2, schedule: { dates: string[], time: string }, gamesPerDay?: 1..50, gameDurationMinutes?: 5..240, breakMinutes?: 0..120, placeName?, replaceExisting? }`)
   creates `teamCount` slots and the round-robin fixtures between them in one transaction (response
   `{ slots, fixtures }`). `schedule` is required: one date per round (`LEAGUE_SCHEDULE_SLOTS_INSUFFICIENT`
-  / `LEAGUE_SCHEDULE_DATE_PAST` / `LEAGUE_SCHEDULE_DATE_INVALID` as in bulk generation). `placeName`
+  / `LEAGUE_SCHEDULE_DATE_PAST` / `LEAGUE_SCHEDULE_DATE_INVALID` as in bulk generation). Without
+  `gamesPerDay` every game of a round starts at `time` and has no end time. With `gamesPerDay` the fixtures
+  are split in round-robin order into days of that many games (one date per day, `ceil(fixtures / gamesPerDay)`
+  dates), and each day's games run back to back on one pitch from `time`, `gameDurationMinutes + breakMinutes`
+  apart, with `endAt = startAt + gameDurationMinutes`. `gameDurationMinutes` defaults to the league config's
+  regulation time (`422 LEAGUE_FIXTURE_DURATION_REQUIRED` when unknown); `breakMinutes` defaults to 0. The
+  title's `N주차` is the day number. `placeName`
   defaults to `장소 미정`. More than 240 fixtures returns `422 BRACKET_TEMPLATE_TOO_LARGE`. The league
   `status` is **not** changed.
   - Locks the league row (`FOR UPDATE`) and applies the same guard as bulk generation: `409 LEAGUE_ON_HOLD`

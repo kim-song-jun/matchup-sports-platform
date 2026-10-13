@@ -1477,6 +1477,7 @@ export default function LeagueMatchFixturesClient({
           initialTeamCount={Math.min(20, Math.max(3, teamCount))}
           defaultPlace={series.defaultPlace ?? null}
           recentVenues={series.recentVenues ?? []}
+          defaultGameMinutes={periodDefaultMinutes}
           replaceExisting={series.fixtures.some((fixture) => fixture.status !== 'cancelled')}
           isSubmitting={applyTemplate.isPending}
           onSubmit={async (payload) => {

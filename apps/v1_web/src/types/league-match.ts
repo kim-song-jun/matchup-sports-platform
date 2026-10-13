@@ -745,6 +745,11 @@ export interface V1ApplyLeagueTemplatePayload extends V1PlaceSnapshotPayload {
   legs: 1 | 2;
   /** 기존 일괄 생성과 같은 모양 — 날짜 목록이 정본이다. */
   schedule: V1LeagueFixtureScheduleTemplate;
+  /** 하루 경기 수(전 팀 합계, 1~50). 비우면 하루 한 라운드를 같은 시각에 시작한다. */
+  gamesPerDay?: number;
+  /** gamesPerDay 와 함께만. 비우면 서버가 경기 설정의 정규 시간을 쓴다. */
+  gameDurationMinutes?: number;
+  breakMinutes?: number;
   /** 모든 경기의 기본 장소. 비우면(키 없음) 서버가 '장소 미정' 을 쓴다. */
   placeName?: string;
   placeAddress?: string;

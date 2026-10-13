@@ -1312,7 +1312,8 @@ export class LeagueMatchAdminService {
       });
     }
     // 날짜 검증은 트랜잭션 밖 — 도메인 거부가 락을 잡을 이유가 없다.
-    const startAts = this.resolveScheduleStartAts({ schedule: dto.schedule }, plan.totalRounds, undefined);
+    const timings = await this.resolveTemplateTimings(dto, plan, config.id);
+    const startAts = timings.map((timing) => timing.startAt);
 
     const result = await this.prisma.$transaction(async (tx) => {
       // 리그 레인 = 행 FOR UPDATE + 보류 가드(PR-1b). raw SQL 을 이 파일에 새로 넣지 않는다 —
@@ -1348,17 +1349,17 @@ export class LeagueMatchAdminService {
           position,
         })),
       });
-      for (const fixture of plan.fixtures) {
+      for (const [index, fixture] of plan.fixtures.entries()) {
         await createLeagueFixture(tx, this.games, {
           leagueId: league.id,
           adminUserId: admin.userId,
           sportId: league.sportId,
           regionId: league.regionId,
           competitionConfigId: config.id,
-          title: leagueFixtureTitle({ leagueTitle: league.title, round: fixture.round }),
+          title: leagueFixtureTitle({ leagueTitle: league.title, round: timings[index].matchday }),
           place,
-          startAt: startAts[fixture.round - 1],
-          endAt: null,
+          startAt: timings[index].startAt,
+          endAt: timings[index].endAt,
           home: null,
           away: null,
           homeSlotId: slotIds[fixture.homePosition - 1],
@@ -1376,6 +1377,7 @@ export class LeagueMatchAdminService {
             legs: dto.legs,
             slotCount: slotIds.length,
             fixtureCount: plan.fixtures.length,
+            gamesPerDay: dto.gamesPerDay ?? null,
             schedule: toKstScheduleLog(startAts),
             placeName: place.name,
             replacedCount: replaced.length,
@@ -1391,6 +1393,39 @@ export class LeagueMatchAdminService {
     });
     if (result.replaced.length > 0) this.notifyFixturesCancelled(leagueId, result.replaced, TEMPLATE_REPLACE_CANCEL_REASON);
     return { slots: result.slots, fixtures: result.fixtures };
+  }
+
+  /**
+   * 템플릿 경기마다 몇 번째 날(제목의 N주차)·시작·종료 시각을 푼다. 하루 경기 수가 없으면 옛 동작 그대로 —
+   * 하루 한 라운드, 그 라운드 경기는 같은 시각, 종료 시각 없음. 있으면 하루를 한 라운드로 보고 일괄 생성의
+   * "한 구장 순차 진행" 배치(`resolveFixtureTimeSlots`)를 그대로 쓴다 — 하루 N경기가 `경기 시간 + 휴식` 간격으로 이어진다.
+   */
+  private async resolveTemplateTimings(
+    dto: ApplyLeagueTemplateDto,
+    plan: ReturnType<typeof planLeagueTemplate>,
+    configId: string,
+  ): Promise<Array<{ matchday: number; startAt: Date; endAt: Date | null }>> {
+    const gamesPerDay = dto.gamesPerDay;
+    if (gamesPerDay == null) {
+      const startAts = this.resolveScheduleStartAts({ schedule: dto.schedule }, plan.totalRounds, undefined);
+      return plan.fixtures.map((fixture) => ({ matchday: fixture.round, startAt: startAts[fixture.round - 1], endAt: null }));
+    }
+    const gameDurationMinutes = dto.gameDurationMinutes ?? (await regulationMinutesForConfigVersion(this.prisma, configId));
+    if (gameDurationMinutes == null) {
+      throw new UnprocessableEntityException({
+        code: 'LEAGUE_FIXTURE_DURATION_REQUIRED',
+        message: '이 리그의 기본 경기 시간을 알 수 없어요. 경기 시간(분)을 입력해 주세요.',
+      });
+    }
+    const days = plan.fixtures.map((fixture, index) => ({
+      round: Math.floor(index / gamesPerDay) + 1,
+      homeTeamId: String(fixture.homePosition),
+      awayTeamId: String(fixture.awayPosition),
+    }));
+    const timing = { gameDurationMinutes, breakMinutes: dto.breakMinutes ?? 0, gamesPerTeamPerDay: 1 };
+    // 필요한 날짜 수 = 날 수. 하루를 한 라운드로 넘기므로 기존 날짜 검증이 그대로 맞는다.
+    const dayStartAts = this.resolveScheduleStartAts({ schedule: dto.schedule }, days[days.length - 1]?.round ?? 0, undefined);
+    return resolveFixtureTimeSlots(days, dayStartAts, timing);
   }
 
   /**

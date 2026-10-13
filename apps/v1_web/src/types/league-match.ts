@@ -393,13 +393,14 @@ export interface V1LeagueFixtureTimingPayload {
   gameDurationMinutes?: number;
   /** 경기 간 휴식(분), 0~120. 생략 시 서버 기본 0. */
   breakMinutes?: number;
-  /** 팀당 매치데이(하루) 경기 수, 1~10. 생략 시 서버 기본 1. */
-  gamesPerTeamPerDay?: number;
+  /** 하루 경기 수(전 팀 합계), 1~50. 생략하면 하루에 한 라운드. */
+  gamesPerDay?: number;
 }
 
 export interface V1GenerateLeagueFixturesPayload extends V1PlaceSnapshotPayload {
+  /** 만들 라운드 수, 1~104(이름은 하루 한 라운드 시절의 '주차 수'). 경기 날짜 수는 `timing.gamesPerDay` 가 정한다. */
   weeksCount: number;
-  /** 총 라운드 수, 1~104. 주면 서버가 `weeksCount × 팀당 하루 경기 수` 대신 이 수까지만 만든다(라운드로빈 재대결 방지). */
+  /** 옛 화면 호환 — 주면 서버가 라운드를 이 수까지 자른다. 지금 화면은 보내지 않는다. */
   roundsCount?: number;
   /** 총 경기 수. 주면 서버가 라운드로빈 순서대로 만든 뒤 이 수에서 자른다. */
   fixtureCount?: number;

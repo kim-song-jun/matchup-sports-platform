@@ -111,7 +111,7 @@ export class AddLeagueTeamDto {
  *
  * 규칙(`league-fixture-dates.ts`): 중복 제거 · 오름차순 배정 · 과거 날짜 거부 ·
  * 날짜가 **매치데이 수**보다 적으면 422 `LEAGUE_SCHEDULE_SLOTS_INSUFFICIENT`.
- * (라운드 수가 아니다 — `timing.gamesPerTeamPerDay` 가 2 면 라운드 6 이 매치데이 3 이다.)
+ * (라운드 수가 아니다 — 4팀 6경기를 `timing.gamesPerDay` 3 으로 치르면 라운드 3 이 매치데이 2 다.)
  */
 export class LeagueFixtureScheduleDto {
   /** `'YYYY-MM-DD'` (KST 달력 날짜). 순서·중복 무관 — 서버가 정리한다. */
@@ -129,8 +129,10 @@ export class LeagueFixtureScheduleDto {
 }
 
 // 운영자 요구(2026-08-25): "한 구장 순차 진행" — 22시 리그에 한 경기장을 쓰면 4팀이
-// 15분 경기·5분 휴식으로 22:00~00:00 사이 하루 6경기(팀당 3경기)를 치르는 식으로,
-// 경기 시간·휴식·팀당 하루 경기 수를 설정하면 매치데이 안에서 경기별 시각이 계산된다.
+// 15분 경기·5분 휴식으로 22:00~00:00 사이 하루 6경기를 치르는 식으로,
+// 경기 시간·휴식·하루 경기 수를 설정하면 매치데이 안에서 경기별 시각이 계산된다.
+// 하루 경기 수는 2026-10-13 사용자 확정으로 '팀당'에서 '하루 전체'로 바꿨다 — 팀당이면 하루 경기가
+// 라운드 크기의 배수로만 정해져 6팀 하루 4경기 같은 운영을 못 했다.
 export class LeagueFixtureTimingDto {
   /** 경기당 소요 시간(분). 생략하면 경기 설정의 정규 시간(연장 제외 피리어드 합계). */
   @IsOptional()
@@ -146,22 +148,23 @@ export class LeagueFixtureTimingDto {
   @Max(120)
   breakMinutes?: number;
 
-  /** 팀당 매치데이(하루) 경기 수 = 하루에 소화하는 라운드 수. 생략 시 1. */
+  /** 하루 경기 수(전 팀 합계). 대진 순서대로 하루 N경기씩 묶는다. 생략하면 하루에 한 라운드. */
   @IsOptional()
   @IsInt()
   @Min(1)
-  @Max(10)
-  gamesPerTeamPerDay?: number;
+  @Max(50)
+  gamesPerDay?: number;
 }
 
 export class GenerateLeagueFixturesDto extends LeaguePlaceSnapshotDto {
   @IsInt()
   @Min(1)
-  @Max(52)
+  @Max(104)
+  // 만들 라운드 수(이름은 하루 한 라운드 시절의 '주차 수'를 그대로 둔다). 필요한 경기 날짜 수는
+  // 하루 경기 수(`timing.gamesPerDay`)가 정한다 — 없으면 이 수와 같다.
   weeksCount!: number;
 
-  // 지정하면 총 라운드를 `weeksCount × 팀당 하루 경기 수` 대신 이 수로 자른다 — 단일/홈앤어웨이가
-  // 라운드로빈 한 바퀴를 넘겨 앞 라운드를 다시 만들지 않게. 생략하면 기존 동작.
+  // 지정하면 총 라운드를 이 수로 자른다(옛 화면 호환 — 지금 화면은 weeksCount 에 라운드 수를 바로 싣는다).
   @IsOptional()
   @IsInt()
   @Min(1)

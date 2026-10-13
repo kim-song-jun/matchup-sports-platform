@@ -332,14 +332,13 @@ LEAGUE_REGION_INVALID` for an unknown or unsuitable region.
   config without period lengths fails with
   `422 LEAGUE_FIXTURE_DURATION_REQUIRED`. Without any `timing`, fixtures of a
   matchday share one kickoff and `endAt` is kickoff + regulation time.
-- The same three endpoints accept optional `roundsCount` (integer 1–104). The
-  total number of rounds is `weeksCount × timing.gamesPerTeamPerDay` (default 1
-  per day), cut down to `roundsCount` when given; omitting it keeps that product.
-  Send it when `weeksCount` is rounded up for `gamesPerTeamPerDay` (for example
-  4 teams, 2 games per day: 2 weeks × 2 = 4 rounds, but a single round robin has
-  3) so the spare slot does not replay round 1 as a rematch. A total above 104
-  rounds still returns `422 LEAGUE_FIXTURE_LIMIT_EXCEEDED`; `roundsCount` itself
-  is capped at 104.
+- `weeksCount` (1–104) is the number of round-robin rounds to generate; the optional `roundsCount`
+  (1–104) still cuts it down for older clients. `timing.gamesPerDay` (1–50) is the number of games per
+  day across all teams: fixtures are split in round-robin order into days of that many games, so the
+  number of dates needed is `ceil(fixtures / gamesPerDay)` and a day can end mid-round (a team may then
+  play twice that day). Without it each round is one day. Example: 6 teams, one round robin (5 rounds,
+  15 games) with `gamesPerDay: 4` needs 4 dates (4 + 4 + 4 + 3). The old `timing.gamesPerTeamPerDay`
+  is no longer accepted (`400`).
 - They also accept optional `fixtureCount` (1–500): fixtures are generated in round-robin order and cut
   at that count, so a league created with `plannedFixtureCount` gets exactly that many games. The client
   sends enough rounds (`ceil(fixtureCount / floor(teams / 2))`) for the count.
